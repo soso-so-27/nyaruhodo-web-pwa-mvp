@@ -195,6 +195,7 @@ export function HomeInput({
     setNewCatNameInput("");
     setCatNameMessage("");
     setIsAddingCat(true);
+    setIsSwitchingCat(true);
     setIsEditingCatName(false);
   }
 
@@ -479,6 +480,29 @@ function Header({
           {"\u540d\u524d\u3092\u5909\u66f4"}
         </button>
       </div>
+      <div style={styles.catChips}>
+        {catProfiles.map((profile) => (
+          <button
+            key={profile.id}
+            type="button"
+            onClick={() => onCatSelect(profile.id)}
+            style={
+              profile.id === activeCatId
+                ? styles.activeCatChipButton
+                : styles.catChipButton
+            }
+          >
+            {profile.name}
+          </button>
+        ))}
+        <button
+          type="button"
+          onClick={onStartAddingCat}
+          style={styles.addCatChipButton}
+        >
+          {"\uff0b\u8ffd\u52a0"}
+        </button>
+      </div>
       {isSwitchingCat ? (
         <div style={styles.catSwitcher}>
           <div style={styles.catSwitchList}>
@@ -716,7 +740,7 @@ const styles = {
   container: {
     width: "min(100%, 430px)",
     margin: "0 auto",
-    padding: "20px 16px 32px",
+    padding: "16px 14px calc(56px + env(safe-area-inset-bottom))",
   },
   title: {
     margin: 0,
@@ -725,30 +749,75 @@ const styles = {
     letterSpacing: 0,
   },
   header: {
-    marginBottom: "14px",
+    marginBottom: "10px",
     border: "1px solid #e4e4e7",
-    borderRadius: "20px",
+    borderRadius: "18px",
     background: "#ffffff",
-    padding: "22px 20px",
+    padding: "18px 16px",
   },
   catNameControls: {
     display: "flex",
-    gap: "14px",
+    flexWrap: "wrap",
+    gap: "8px",
     marginTop: "8px",
   },
   catNameEditButton: {
     margin: 0,
-    padding: 0,
-    border: "none",
-    background: "transparent",
+    minHeight: "30px",
+    padding: "0 12px",
+    border: "1px solid #d4d4d8",
+    borderRadius: "999px",
+    background: "#fafafa",
     color: "#71717a",
+    fontSize: "12px",
+    fontWeight: 500,
+    letterSpacing: 0,
+    cursor: "pointer",
+  },
+  catChips: {
+    display: "flex",
+    flexWrap: "wrap",
+    gap: "8px",
+    marginTop: "12px",
+  },
+  catChipButton: {
+    minHeight: "34px",
+    padding: "0 13px",
+    border: "1px solid #d4d4d8",
+    borderRadius: "999px",
+    background: "#ffffff",
+    color: "#27272a",
+    fontSize: "13px",
+    fontWeight: 500,
+    letterSpacing: 0,
+    cursor: "pointer",
+  },
+  activeCatChipButton: {
+    minHeight: "34px",
+    padding: "0 13px",
+    border: "1px solid #a1a1aa",
+    borderRadius: "999px",
+    background: "#3f3f46",
+    color: "#ffffff",
+    fontSize: "13px",
+    fontWeight: 600,
+    letterSpacing: 0,
+    cursor: "pointer",
+  },
+  addCatChipButton: {
+    minHeight: "34px",
+    padding: "0 13px",
+    border: "1px solid #d4d4d8",
+    borderRadius: "999px",
+    background: "#fafafa",
+    color: "#52525b",
     fontSize: "13px",
     fontWeight: 500,
     letterSpacing: 0,
     cursor: "pointer",
   },
   catSwitcher: {
-    marginTop: "12px",
+    marginTop: "10px",
   },
   catSwitchList: {
     display: "flex",
@@ -780,8 +849,8 @@ const styles = {
     cursor: "pointer",
   },
   addCatButton: {
-    marginTop: "10px",
-    minHeight: "38px",
+    marginTop: "8px",
+    minHeight: "36px",
     padding: "0 14px",
     border: "1px solid #d4d4d8",
     borderRadius: "12px",
@@ -793,7 +862,7 @@ const styles = {
     cursor: "pointer",
   },
   catNameEditor: {
-    marginTop: "12px",
+    marginTop: "10px",
   },
   catNameLabel: {
     display: "block",
@@ -918,11 +987,11 @@ const styles = {
     whiteSpace: "pre-line",
   },
   insightCard: {
-    marginBottom: "14px",
+    marginBottom: "10px",
     border: "1px solid #e4e4e7",
-    borderRadius: "20px",
+    borderRadius: "18px",
     background: "#ffffff",
-    padding: "20px",
+    padding: "16px",
   },
   guidance: {
     margin: 0,
@@ -966,11 +1035,11 @@ const styles = {
     cursor: "pointer",
   },
   section: {
-    marginBottom: "14px",
+    marginBottom: "10px",
     border: "1px solid #e4e4e7",
-    borderRadius: "20px",
+    borderRadius: "18px",
     background: "#ffffff",
-    padding: "20px",
+    padding: "16px",
   },
   sectionTitle: {
     margin: "0 0 14px",
@@ -1004,7 +1073,7 @@ const styles = {
     gap: "12px",
   },
   button: {
-    minHeight: "60px",
+    minHeight: "54px",
     border: "1px solid #d4d4d8",
     borderRadius: "14px",
     background: "#ffffff",
