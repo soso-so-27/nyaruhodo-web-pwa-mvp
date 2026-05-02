@@ -3,6 +3,7 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
+    "typecheck": "tsc --noEmit",
     "test:core": "tsc -p tsconfig.test.json && node .test-build/core/logic/__tests__/scenarios.test.js"
   },
   "dependencies": {
