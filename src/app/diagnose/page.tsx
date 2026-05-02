@@ -1,0 +1,174 @@
+import { DiagnosisResult } from "../../components/diagnose/DiagnosisResult";
+import { decideCategories } from "../../core/logic/decision";
+import { calculateScores } from "../../core/logic/scoring";
+import type { BehaviorInput, CauseCategory, DiagnosisContext } from "../../core/types";
+import {
+  getRecentEvents,
+  insertDiagnosis,
+  type RecentEvent,
+} from "../../lib/supabase/queries";
+
+type DiagnosePageProps = {
+  searchParams: Promise<{
+    input?: string;
+    event_id?: string;
+  }>;
+};
+
+const fixedContext: DiagnosisContext = {
+  time: "night",
+  history: [],
+  environment: [],
+};
+
+const validInputs: BehaviorInput[] = [
+  "meowing",
+  "following",
+  "restless",
+  "low_energy",
+  "fighting",
+];
+
+const categoryLabels: Record<CauseCategory, string> = {
+  food: "\u3054\u98ef",
+  play: "\u904a\u3073",
+  social: "\u304b\u307e\u3063\u3066\u307b\u3057\u3044",
+  stress: "\u30b9\u30c8\u30ec\u30b9",
+  health: "\u4f53\u8abf",
+};
+
+export default async function DiagnosePage({ searchParams }: DiagnosePageProps) {
+  const params = await searchParams;
+  const input = parseInput(params.input);
+
+  if (!input) {
+    return (
+      <DiagnosisResult
+        resultText={"\u307e\u3060\u5224\u65ad\u3067\u304d\u307e\u305b\u3093"}
+        reasons={[
+          "\u6c17\u306b\u306a\u308b\u3053\u3068\u3092\u3082\u3046\u4e00\u5ea6\u9078\u3093\u3067\u304f\u3060\u3055\u3044",
+        ]}
+        categories={[]}
+        diagnosisId={null}
+      />
+    );
+  }
+
+  const recentEvents = await getRecentEvents();
+  const diagnosisContext = buildDiagnosisContext(recentEvents);
+  const scores = calculateScores(input, diagnosisContext);
+  const categories = decideCategories(scores);
+
+  const diagnosis = params.event_id
+    ? await insertDiagnosis({
+        event_id: params.event_id,
+        input_signal: input,
+        scores,
+        selected_categories: categories,
+        primary_category: categories[0],
+        secondary_category: categories[1] ?? null,
+        context: diagnosisContext,
+        // TODO: Stabilize persistence with an API Route, Server Action,
+        // or deduplication key to avoid duplicate rows during render/reload.
+      })
+    : null;
+
+  if (!params.event_id) {
+    console.warn("diagnosis not saved: missing event_id");
+  }
+
+  return (
+    <DiagnosisResult
+      resultText={formatResultText(categories)}
+      reasons={formatReasons(input)}
+      categories={categories}
+      diagnosisId={diagnosis?.id ?? null}
+    />
+  );
+}
+
+function parseInput(input: string | undefined): BehaviorInput | undefined {
+  return validInputs.includes(input as BehaviorInput)
+    ? (input as BehaviorInput)
+    : undefined;
+}
+
+function buildDiagnosisContext(recentEvents: RecentEvent[]): DiagnosisContext {
+  const lastFoodMinutes = getLastElapsedMinutes(recentEvents, isFoodEvent);
+  const lastPlayMinutes = getLastElapsedMinutes(recentEvents, isPlayEvent);
+
+  if (lastFoodMinutes === undefined && lastPlayMinutes === undefined) {
+    return fixedContext;
+  }
+
+  return {
+    ...fixedContext,
+    lastFoodMinutes,
+    lastPlayMinutes,
+  };
+}
+
+function getLastElapsedMinutes(
+  recentEvents: RecentEvent[],
+  predicate: (event: RecentEvent) => boolean,
+) {
+  const event = recentEvents.find(predicate);
+
+  if (!event) {
+    return undefined;
+  }
+
+  const occurredAt = new Date(event.occurred_at).getTime();
+
+  if (Number.isNaN(occurredAt)) {
+    return undefined;
+  }
+
+  return Math.max(0, Math.floor((Date.now() - occurredAt) / 60000));
+}
+
+function isFoodEvent(event: RecentEvent) {
+  return (
+    event.signal === "after_food" ||
+    event.label === "\u3054\u98ef\u305f\u3079\u305f"
+  );
+}
+
+function isPlayEvent(event: RecentEvent) {
+  return event.signal === "playing" || event.label === "\u904a\u3093\u3067\u308b";
+}
+
+function formatResultText(categories: CauseCategory[]) {
+  const labels = categories.map((category) => categoryLabels[category]);
+
+  if (labels.length === 1) {
+    return `${labels[0]}\u306e\u53ef\u80fd\u6027\u304c\u9ad8\u3044\u3067\u3059`;
+  }
+
+  return `${labels.join("\u30fb")}\u306e\u53ef\u80fd\u6027\u304c\u3042\u308a\u307e\u3059`;
+}
+
+function formatReasons(input: BehaviorInput) {
+  const reasons: Record<BehaviorInput, string[]> = {
+    meowing: [
+      "\u591c\u306f\u904a\u3073\u305f\u3044\u6c17\u6301\u3061\u304c\u51fa\u3084\u3059\u3044\u6642\u9593\u3067\u3059",
+      "\u9cf4\u304f\u884c\u52d5\u306f\u3054\u98ef\u3084\u304b\u307e\u3063\u3066\u307b\u3057\u3044\u6642\u306b\u3082\u898b\u3089\u308c\u307e\u3059",
+    ],
+    following: [
+      "\u3064\u3044\u3066\u304f\u308b\u884c\u52d5\u306f\u304b\u307e\u3063\u3066\u307b\u3057\u3044\u6642\u306b\u898b\u3089\u308c\u307e\u3059",
+      "\u671d\u306f\u4eba\u3068\u306e\u95a2\u308f\u308a\u304c\u5897\u3048\u3084\u3059\u3044\u6642\u9593\u3067\u3059",
+    ],
+    restless: [
+      "\u843d\u3061\u7740\u304b\u306a\u3044\u69d8\u5b50\u306f\u904a\u3073\u305f\u3044\u6642\u306b\u3082\u898b\u3089\u308c\u307e\u3059",
+      "\u5468\u56f2\u306e\u523a\u6fc0\u3067\u7dca\u5f35\u3057\u3066\u3044\u308b\u53ef\u80fd\u6027\u3082\u3042\u308a\u307e\u3059",
+    ],
+    low_energy: [
+      "\u5143\u6c17\u304c\u306a\u3044\u6642\u306f\u4f53\u8abf\u306e\u5909\u5316\u3092\u512a\u5148\u3057\u3066\u898b\u307e\u3059",
+    ],
+    fighting: [
+      "\u30b1\u30f3\u30ab\u306f\u7dca\u5f35\u3084\u30b9\u30c8\u30ec\u30b9\u304c\u9ad8\u3044\u6642\u306b\u8d77\u304d\u3084\u3059\u3044\u884c\u52d5\u3067\u3059",
+    ],
+  };
+
+  return reasons[input].slice(0, 2);
+}
