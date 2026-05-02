@@ -408,3 +408,37 @@ latest_hypothesis 削除
 PWAとして最低限の「ホーム画面に追加」は確認済み。
 
 現時点では、オフライン対応やプッシュ通知は未実装。
+
+## local_cat_id による猫ごとの履歴分離
+
+### 実装日
+
+2026-05-02
+
+### 実装内容
+
+- `events.local_cat_id` に localStorage の `active_cat_id` を保存する
+- `diagnoses.local_cat_id` に診断対象の `active_cat_id` を保存する
+- `feedbacks.local_cat_id` に診断または直近仮説の `active_cat_id` を保存する
+- 診断URLには `local_cat_id` を query parameter として引き継ぐ
+- `latest_hypothesis` には `localCatId` を保存する
+
+### ホーム表示
+
+- 理解度は、現在選択中の猫の `events.local_cat_id` に一致する events のみで計算する
+- 推測候補は、現在選択中の猫の `events.local_cat_id` に一致する events のみで生成する
+- 既存の `local_cat_id null` データは、現在選択中の猫の理解度・推測候補には含めない
+
+### latest_hypothesis
+
+- `latest_hypothesis.localCatId` が現在の `active_cat_id` と異なる場合、ホームでは表示しない
+- 猫を切り替えた場合、別猫の仮説が混ざらないように `latest_hypothesis` を削除する
+
+### まだ未対応
+
+- `cats` テーブル
+- 認証
+- RLSのユーザー単位制御
+- 複数端末同期
+- 家族共有
+- 既存 `local_cat_id null` データの移行

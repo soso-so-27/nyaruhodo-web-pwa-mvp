@@ -3,6 +3,10 @@
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import type { CSSProperties } from "react";
+import {
+  calculateUnderstandingPercent,
+  getUnderstandingMessage,
+} from "../../core/understanding/understanding";
 import type { RecentEvent } from "../../lib/supabase/queries";
 import { insertEvent, insertFeedback } from "../../lib/supabase/queries";
 import {
@@ -29,8 +33,6 @@ import type { CatProfile, LatestHypothesisView } from "./homeInputHelpers";
 
 type HomeInputProps = {
   recentEvents: RecentEvent[];
-  understandingPercent: number;
-  understandingMessage: string;
 };
 
 const eventSaveErrorMessage =
@@ -44,8 +46,6 @@ const currentStateSaveSuccessMessage =
 
 export function HomeInput({
   recentEvents,
-  understandingPercent,
-  understandingMessage,
 }: HomeInputProps) {
   const router = useRouter();
   const [visibleLatestHypothesis, setVisibleLatestHypothesis] =
@@ -67,6 +67,13 @@ export function HomeInput({
       ? getActiveCatProfile(catProfiles, activeCatId)
       : null;
   const catName = getCatName(activeCatProfile);
+  const activeCatEvents = activeCatId
+    ? recentEvents.filter((event) => event.local_cat_id === activeCatId)
+    : [];
+  const understandingPercent = calculateUnderstandingPercent(
+    activeCatEvents.length,
+  );
+  const understandingMessage = getUnderstandingMessage(understandingPercent);
   const guidance = getGuidanceByUnderstanding(understandingPercent);
   const hypothesisCta = visibleLatestHypothesis
     ? HYPOTHESIS_CTA_LABELS[visibleLatestHypothesis.category] ??
@@ -75,7 +82,7 @@ export function HomeInput({
   const hasKnownHypothesisCategory = visibleLatestHypothesis
     ? Boolean(HYPOTHESIS_CTA_LABELS[visibleLatestHypothesis.category])
     : false;
-  const predictedConcernOptions = buildPredictedConcernOptions(recentEvents);
+  const predictedConcernOptions = buildPredictedConcernOptions(activeCatEvents);
   const shouldShowPredictedConcerns =
     !visibleLatestHypothesis && understandingPercent >= 71;
 
@@ -95,15 +102,23 @@ export function HomeInput({
     const latestHypothesis = readLatestHypothesis();
 
     if (latestHypothesis) {
-      setVisibleLatestHypothesis({
-        input: "",
-        context: {},
-        category: latestHypothesis.category ?? "",
-        text: latestHypothesis.text,
-        source: latestHypothesis.source,
-        diagnosisId: latestHypothesis.diagnosisId ?? null,
-      });
-      return;
+      if (
+        latestHypothesis.localCatId &&
+        latestHypothesis.localCatId !== activeProfile.id
+      ) {
+        clearLatestHypothesis();
+      } else {
+        setVisibleLatestHypothesis({
+          input: "",
+          context: {},
+          category: latestHypothesis.category ?? "",
+          text: latestHypothesis.text,
+          source: latestHypothesis.source,
+          diagnosisId: latestHypothesis.diagnosisId ?? null,
+          localCatId: latestHypothesis.localCatId ?? activeProfile.id,
+        });
+        return;
+      }
     }
 
     const input = window.localStorage.getItem("last_input_signal");
@@ -163,6 +178,11 @@ export function HomeInput({
     saveActiveCatId(catId);
     setActiveCatId(catId);
     setCatNameInput(getCatName(getActiveCatProfile(catProfiles, catId)));
+    clearLatestHypothesis();
+    setVisibleLatestHypothesis(null);
+    setHypothesisMessage("");
+    setCurrentStateMessage("");
+    setSaveErrorMessage("");
     setIsSwitchingCat(false);
     setIsAddingCat(false);
     setCatNameMessage("");
@@ -209,6 +229,7 @@ export function HomeInput({
       signal,
       label,
       source: "home",
+      localCatId: activeCatId,
     });
 
     if (!event) {
@@ -228,6 +249,7 @@ export function HomeInput({
       signal: input,
       label,
       source: "home",
+      localCatId: activeCatId,
     });
 
     if (!event) {
@@ -235,13 +257,31 @@ export function HomeInput({
       return;
     }
 
-    const eventQuery = event?.id ? `&event_id=${event.id}` : "";
+    const params = new URLSearchParams({
+      input,
+    });
 
-    router.push(`/diagnose?input=${input}${eventQuery}`);
+    if (event?.id) {
+      params.set("event_id", event.id);
+    }
+
+    if (activeCatId) {
+      params.set("local_cat_id", activeCatId);
+    }
+
+    router.push(`/diagnose?${params.toString()}`);
   }
 
   function handlePredictedConcernSelect(input: string) {
-    router.push(`/diagnose?input=${input}`);
+    const params = new URLSearchParams({
+      input,
+    });
+
+    if (activeCatId) {
+      params.set("local_cat_id", activeCatId);
+    }
+
+    router.push(`/diagnose?${params.toString()}`);
   }
 
   async function handleHypothesisAction(feedback: "resolved" | "unresolved") {
@@ -259,6 +299,7 @@ export function HomeInput({
       diagnosis_id: visibleLatestHypothesis.diagnosisId,
       feedback,
       category: visibleLatestHypothesis.category,
+      localCatId: visibleLatestHypothesis.localCatId ?? activeCatId,
     });
 
     if (!savedFeedback) {

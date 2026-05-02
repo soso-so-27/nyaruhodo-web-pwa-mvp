@@ -6,6 +6,7 @@ type InsertEventInput = {
   label?: string;
   source?: "home";
   context?: Record<string, unknown>;
+  localCatId?: string | null;
 };
 
 type InsertDiagnosisInput = {
@@ -16,12 +17,14 @@ type InsertDiagnosisInput = {
   primary_category: string;
   secondary_category?: string | null;
   context?: Record<string, unknown>;
+  localCatId?: string | null;
 };
 
 type InsertFeedbackInput = {
   diagnosis_id?: string | null;
   feedback: "resolved" | "unresolved";
   category?: string | null;
+  localCatId?: string | null;
 };
 
 export type RecentEvent = {
@@ -31,22 +34,33 @@ export type RecentEvent = {
   label: string | null;
   source: string;
   context: Record<string, unknown>;
+  local_cat_id: string | null;
   occurred_at: string;
   created_at: string;
 };
 
-export async function getRecentEvents(): Promise<RecentEvent[]> {
+export async function getRecentEvents(
+  localCatId?: string | null,
+): Promise<RecentEvent[]> {
   try {
     if (!supabase) {
       throw new Error("Supabase client is not configured");
     }
 
-    const { data, error } = await supabase
+    let query = supabase
       .from("events")
-      .select("id,event_type,signal,label,source,context,occurred_at,created_at")
+      .select(
+        "id,event_type,signal,label,source,context,local_cat_id,occurred_at,created_at",
+      )
       .eq("source", "home")
       .order("occurred_at", { ascending: false })
-      .limit(20);
+      .limit(localCatId ? 20 : 100);
+
+    if (localCatId) {
+      query = query.eq("local_cat_id", localCatId);
+    }
+
+    const { data, error } = await query;
 
     if (error) {
       throw error;
@@ -75,6 +89,7 @@ export async function insertEvent(input: InsertEventInput) {
         label: input.label ?? null,
         source: input.source ?? "home",
         context: input.context ?? {},
+        local_cat_id: input.localCatId ?? null,
       });
 
     if (error) {
@@ -107,6 +122,7 @@ export async function insertDiagnosis(input: InsertDiagnosisInput) {
         primary_category: input.primary_category,
         secondary_category: input.secondary_category ?? null,
         context: input.context ?? {},
+        local_cat_id: input.localCatId ?? null,
       });
 
     if (error) {
@@ -139,6 +155,7 @@ export async function insertFeedback(input: InsertFeedbackInput) {
         diagnosis_id: input.diagnosis_id,
         feedback: input.feedback,
         category: input.category ?? null,
+        local_cat_id: input.localCatId ?? null,
       });
 
     if (error) {

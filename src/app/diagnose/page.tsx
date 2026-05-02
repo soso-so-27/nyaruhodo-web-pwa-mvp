@@ -12,6 +12,7 @@ type DiagnosePageProps = {
   searchParams: Promise<{
     input?: string;
     event_id?: string;
+    local_cat_id?: string;
   }>;
 };
 
@@ -43,6 +44,7 @@ const diagnosisSaveErrorMessage =
 export default async function DiagnosePage({ searchParams }: DiagnosePageProps) {
   const params = await searchParams;
   const input = parseInput(params.input);
+  const localCatId = params.local_cat_id ?? null;
 
   if (!input) {
     return (
@@ -53,11 +55,12 @@ export default async function DiagnosePage({ searchParams }: DiagnosePageProps) 
         ]}
         categories={[]}
         diagnosisId={null}
+        localCatId={localCatId}
       />
     );
   }
 
-  const recentEvents = await getRecentEvents();
+  const recentEvents = await getRecentEvents(localCatId);
   const diagnosisContext = buildDiagnosisContext(recentEvents);
   const scores = calculateScores(input, diagnosisContext);
   const categories = decideCategories(scores);
@@ -71,6 +74,7 @@ export default async function DiagnosePage({ searchParams }: DiagnosePageProps) 
         primary_category: categories[0],
         secondary_category: categories[1] ?? null,
         context: diagnosisContext,
+        localCatId,
         // TODO: Stabilize persistence with an API Route, Server Action,
         // or deduplication key to avoid duplicate rows during render/reload.
       })
@@ -90,6 +94,7 @@ export default async function DiagnosePage({ searchParams }: DiagnosePageProps) 
       reasons={formatReasons(input)}
       categories={categories}
       diagnosisId={diagnosis?.id ?? null}
+      localCatId={localCatId}
       persistenceMessage={
         params.event_id && !diagnosis ? diagnosisSaveErrorMessage : undefined
       }

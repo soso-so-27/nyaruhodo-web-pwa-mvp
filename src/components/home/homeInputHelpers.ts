@@ -7,6 +7,7 @@ export type LatestHypothesisView = {
   text?: string;
   source?: string;
   diagnosisId?: string | null;
+  localCatId?: string | null;
 };
 
 export type CatProfile = {
@@ -384,6 +385,7 @@ export function readLatestHypothesis() {
       text?: string;
       category?: string;
       diagnosisId?: string | null;
+      localCatId?: string | null;
       createdAt?: string;
       expiresAt?: string;
     };

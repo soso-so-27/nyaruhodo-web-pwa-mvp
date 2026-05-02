@@ -12,6 +12,7 @@ type DiagnosisResultProps = {
   reasons: string[];
   categories: CauseCategory[];
   diagnosisId: string | null;
+  localCatId?: string | null;
   persistenceMessage?: string;
 };
 
@@ -73,6 +74,7 @@ export function DiagnosisResult({
   reasons,
   categories,
   diagnosisId,
+  localCatId,
   persistenceMessage,
 }: DiagnosisResultProps) {
   const router = useRouter();
@@ -99,11 +101,12 @@ export function DiagnosisResult({
         text: hypothesisMessages[currentCategory],
         category: currentCategory,
         diagnosisId,
+        localCatId: localCatId ?? null,
         createdAt: createdAt.toISOString(),
         expiresAt: expiresAt.toISOString(),
       }),
     );
-  }, [currentCategory, diagnosisId]);
+  }, [currentCategory, diagnosisId, localCatId]);
 
   async function handleAction(feedback: "resolved" | "unresolved") {
     if (!currentCategory) {
@@ -116,6 +119,7 @@ export function DiagnosisResult({
       diagnosis_id: diagnosisId,
       feedback,
       category: currentCategory,
+      localCatId,
     });
 
     if (!savedFeedback) {
