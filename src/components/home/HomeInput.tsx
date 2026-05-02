@@ -61,6 +61,9 @@ export function HomeInput({
   const [hypothesisMessage, setHypothesisMessage] = useState("");
   const [currentStateMessage, setCurrentStateMessage] = useState("");
   const [saveErrorMessage, setSaveErrorMessage] = useState("");
+  const [saveErrorSection, setSaveErrorSection] = useState<
+    "current" | "concern" | ""
+  >("");
 
   const activeCatProfile =
     catProfiles.length > 0
@@ -233,10 +236,12 @@ export function HomeInput({
     });
 
     if (!event) {
+      setSaveErrorSection("current");
       setSaveErrorMessage(eventSaveErrorMessage);
       return;
     }
 
+    setSaveErrorSection("");
     setSaveErrorMessage("");
     setCurrentStateMessage(currentStateSaveSuccessMessage);
   }
@@ -253,6 +258,7 @@ export function HomeInput({
     });
 
     if (!event) {
+      setSaveErrorSection("concern");
       setSaveErrorMessage(eventSaveErrorMessage);
       return;
     }
@@ -319,6 +325,7 @@ export function HomeInput({
     setVisibleLatestHypothesis(null);
     setHypothesisMessage("");
     setCurrentStateMessage("");
+    setSaveErrorSection("");
     setSaveErrorMessage("");
   }
 
@@ -349,46 +356,44 @@ export function HomeInput({
           onCancelAddingCat={cancelAddingCat}
         />
 
-        {visibleLatestHypothesis ? (
-          <LatestHypothesisCard
-            hypothesis={visibleLatestHypothesis}
-            cta={hypothesisCta}
-            onMainAction={() => {
-              void handleHypothesisAction("resolved");
-            }}
-            onSubAction={() => {
-              if (hasKnownHypothesisCategory) {
-                void handleHypothesisAction("unresolved");
-                return;
-              }
+        <section style={styles.insightCard}>
+          {visibleLatestHypothesis ? (
+            <LatestHypothesisCard
+              hypothesis={visibleLatestHypothesis}
+              cta={hypothesisCta}
+              onMainAction={() => {
+                void handleHypothesisAction("resolved");
+              }}
+              onSubAction={() => {
+                if (hasKnownHypothesisCategory) {
+                  void handleHypothesisAction("unresolved");
+                  return;
+                }
 
-              dismissLatestHypothesis();
-            }}
-          />
-        ) : (
-          <GuidanceBlock
-            guidance={guidance}
-            showPredictedConcerns={shouldShowPredictedConcerns}
-            predictedConcernOptions={predictedConcernOptions}
-            onPredictedConcernSelect={handlePredictedConcernSelect}
-          />
-        )}
+                dismissLatestHypothesis();
+              }}
+            />
+          ) : (
+            <GuidanceBlock
+              guidance={guidance}
+              showPredictedConcerns={shouldShowPredictedConcerns}
+              predictedConcernOptions={predictedConcernOptions}
+              onPredictedConcernSelect={handlePredictedConcernSelect}
+            />
+          )}
 
-        {hypothesisMessage ? (
-          <p style={styles.hypothesisMessage}>{hypothesisMessage}</p>
-        ) : null}
-
-        {currentStateMessage ? (
-          <p style={styles.currentStateMessage}>{currentStateMessage}</p>
-        ) : null}
-
-        {saveErrorMessage ? (
-          <p style={styles.saveErrorMessage}>{saveErrorMessage}</p>
-        ) : null}
+          {hypothesisMessage ? (
+            <p style={styles.hypothesisMessage}>{hypothesisMessage}</p>
+          ) : null}
+        </section>
 
         <OptionSection
           title={"\u3044\u307e\u306e\u69d8\u5b50"}
           options={CURRENT_OPTIONS}
+          message={currentStateMessage}
+          errorMessage={
+            saveErrorSection === "current" ? saveErrorMessage : ""
+          }
           onSelect={(option) => {
             void handleCurrentSelect(option.label, option.signal);
           }}
@@ -397,6 +402,10 @@ export function HomeInput({
         <OptionSection
           title={"\u6c17\u306b\u306a\u308b\u3053\u3068"}
           options={CONCERN_OPTIONS}
+          description={"\u3044\u3064\u3082\u3068\u9055\u3046\u69d8\u5b50\u304c\u3042\u308b\u3068\u304d\u306f\u3053\u3061\u3089"}
+          errorMessage={
+            saveErrorSection === "concern" ? saveErrorMessage : ""
+          }
           onSelect={(option) => {
             void handleConcernSelect(option.label, option.input);
           }}
@@ -658,15 +667,28 @@ function GuidanceBlock({
 function OptionSection<Option extends { label: string }>({
   title,
   options,
+  description,
+  message,
+  errorMessage,
   onSelect,
 }: {
   title: string;
   options: Option[];
+  description?: string;
+  message?: string;
+  errorMessage?: string;
   onSelect: (option: Option) => void;
 }) {
   return (
     <section style={styles.section}>
       <h2 style={styles.sectionTitle}>{title}</h2>
+      {description ? (
+        <p style={styles.sectionDescription}>{description}</p>
+      ) : null}
+      {message ? <p style={styles.sectionMessage}>{message}</p> : null}
+      {errorMessage ? (
+        <p style={styles.sectionErrorMessage}>{errorMessage}</p>
+      ) : null}
       <div style={styles.grid}>
         {options.map((option) => (
           <button
@@ -686,7 +708,7 @@ function OptionSection<Option extends { label: string }>({
 const styles = {
   page: {
     minHeight: "100vh",
-    background: "#f4f4f5",
+    background: "#f7f3ee",
     color: "#27272a",
     fontFamily:
       '-apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
@@ -694,7 +716,7 @@ const styles = {
   container: {
     width: "min(100%, 430px)",
     margin: "0 auto",
-    padding: "32px 20px",
+    padding: "20px 16px 32px",
   },
   title: {
     margin: 0,
@@ -703,7 +725,11 @@ const styles = {
     letterSpacing: 0,
   },
   header: {
-    marginBottom: "40px",
+    marginBottom: "14px",
+    border: "1px solid #e4e4e7",
+    borderRadius: "20px",
+    background: "#ffffff",
+    padding: "22px 20px",
   },
   catNameControls: {
     display: "flex",
@@ -840,7 +866,7 @@ const styles = {
     letterSpacing: 0,
   },
   lastResult: {
-    margin: "-18px 0 42px",
+    margin: 0,
     padding: 0,
   },
   lastResultLead: {
@@ -885,28 +911,21 @@ const styles = {
     cursor: "pointer",
   },
   hypothesisMessage: {
-    margin: "-22px 0 38px",
+    margin: "14px 0 0",
     color: "#52525b",
     fontSize: "13px",
     lineHeight: 1.7,
     whiteSpace: "pre-line",
   },
-  currentStateMessage: {
-    margin: "-22px 0 38px",
-    color: "#52525b",
-    fontSize: "13px",
-    lineHeight: 1.7,
-    whiteSpace: "pre-line",
-  },
-  saveErrorMessage: {
-    margin: "-22px 0 38px",
-    color: "#52525b",
-    fontSize: "13px",
-    lineHeight: 1.7,
-    whiteSpace: "pre-line",
+  insightCard: {
+    marginBottom: "14px",
+    border: "1px solid #e4e4e7",
+    borderRadius: "20px",
+    background: "#ffffff",
+    padding: "20px",
   },
   guidance: {
-    margin: "-18px 0 42px",
+    margin: 0,
   },
   predictionReason: {
     margin: "0 0 6px",
@@ -947,13 +966,37 @@ const styles = {
     cursor: "pointer",
   },
   section: {
-    marginBottom: "48px",
+    marginBottom: "14px",
+    border: "1px solid #e4e4e7",
+    borderRadius: "20px",
+    background: "#ffffff",
+    padding: "20px",
   },
   sectionTitle: {
-    margin: "0 0 18px",
+    margin: "0 0 14px",
     fontSize: "18px",
     fontWeight: 600,
     letterSpacing: 0,
+  },
+  sectionDescription: {
+    margin: "-6px 0 14px",
+    color: "#71717a",
+    fontSize: "13px",
+    lineHeight: 1.6,
+  },
+  sectionMessage: {
+    margin: "-4px 0 14px",
+    color: "#52525b",
+    fontSize: "13px",
+    lineHeight: 1.7,
+    whiteSpace: "pre-line",
+  },
+  sectionErrorMessage: {
+    margin: "-4px 0 14px",
+    color: "#52525b",
+    fontSize: "13px",
+    lineHeight: 1.7,
+    whiteSpace: "pre-line",
   },
   grid: {
     display: "grid",
