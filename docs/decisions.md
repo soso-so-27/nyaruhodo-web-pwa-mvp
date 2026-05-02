@@ -71,3 +71,60 @@ Reason: Scenario tests need to distinguish recent food/play from long elapsed ti
 Decision: Diagnosis pages may try to read recent `events` to derive `lastFoodMinutes` and `lastPlayMinutes`, but must fall back to fixed context if reads fail or no matching events exist.
 
 Reason: MVP RLS currently allows anon insert only, so select is expected to fail until a later authenticated read policy is designed.
+
+## 2026-05-02
+
+# 設計判断：MVPでは local_cat_id で猫ごとの履歴を暫定分離する
+
+## 背景
+
+MVPでは localStorage ベースで複数猫プロフィールを管理している。
+
+- `cat_profiles`
+- `active_cat_id`
+
+ただし、Supabase上の `events` / `diagnoses` / `feedbacks` はまだ猫ごとに分離されていない。
+
+そのため、麦・雨・テスト猫で実利用すると履歴が混ざる。
+
+## 判断
+
+正式な `cats` テーブルはまだ作らない。
+
+MVPでは、localStorage の `active_cat_id` を保存するために、各テーブルに `local_cat_id text` を追加する。
+
+追加対象：
+
+- `events.local_cat_id`
+- `diagnoses.local_cat_id`
+- `feedbacks.local_cat_id`
+
+## 理由
+
+既存DBには `cat_id uuid null` が存在するが、現在の `active_cat_id` は `local-cat-...` 形式の文字列であり、uuid型の `cat_id` にはそのまま保存できない。
+
+そのため、正式な `cats` テーブル導入までは `local_cat_id text` を使う。
+
+## やること
+
+- `local_cat_id text null` を `events` / `diagnoses` / `feedbacks` に追加する
+- 保存時に `active_cat_id` を `local_cat_id` として保存する
+- `getRecentEvents` で `local_cat_id` を使って絞り込む
+- 理解度と推測候補を猫ごとに分ける
+
+## まだやらないこと
+
+- `cats` テーブル追加
+- `profiles` テーブル追加
+- 認証追加
+- 家族共有
+- 複数端末同期
+- RLSのユーザー単位制御
+- 既存データ移行
+- 既存 `cat_id uuid` の変更
+
+## 既存データの扱い
+
+既存の `local_cat_id null` のデータは移行せず、そのまま残す。
+
+必要になれば後から「未分類データ」として扱う。
