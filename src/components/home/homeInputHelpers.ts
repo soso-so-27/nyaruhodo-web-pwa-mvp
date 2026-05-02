@@ -9,6 +9,12 @@ export type LatestHypothesisView = {
   diagnosisId?: string | null;
 };
 
+export type CatProfile = {
+  name: string;
+  createdAt: string;
+  updatedAt: string;
+};
+
 type ConcernSignal =
   | "meowing"
   | "following"
@@ -141,6 +147,7 @@ const PREDICTED_CONCERN_LABELS: Record<ConcernSignal, string> = {
 };
 
 const FALLBACK_PREDICTED_SIGNALS: ConcernSignal[] = ["meowing", "following"];
+const DEFAULT_CAT_NAME = "\u30df\u30b1";
 
 export function getGuidanceByUnderstanding(percent: number) {
   return (
@@ -185,6 +192,54 @@ export function buildPredictedConcernOptions(recentEvents: RecentEvent[]) {
     input,
     label: PREDICTED_CONCERN_LABELS[input],
   }));
+}
+
+export function readCatProfile() {
+  const value = window.localStorage.getItem("cat_profile");
+
+  if (!value) {
+    return null;
+  }
+
+  try {
+    const parsed = JSON.parse(value) as Partial<CatProfile>;
+
+    if (!parsed.name) {
+      return null;
+    }
+
+    return {
+      name: parsed.name,
+      createdAt: parsed.createdAt ?? new Date().toISOString(),
+      updatedAt: parsed.updatedAt ?? parsed.createdAt ?? new Date().toISOString(),
+    };
+  } catch {
+    return null;
+  }
+}
+
+export function saveCatProfile(name: string) {
+  const trimmedName = name.trim();
+
+  if (!trimmedName) {
+    return null;
+  }
+
+  const current = readCatProfile();
+  const now = new Date().toISOString();
+  const profile: CatProfile = {
+    name: trimmedName,
+    createdAt: current?.createdAt ?? now,
+    updatedAt: now,
+  };
+
+  window.localStorage.setItem("cat_profile", JSON.stringify(profile));
+
+  return profile;
+}
+
+export function getCatName(profile: CatProfile | null) {
+  return profile?.name || DEFAULT_CAT_NAME;
 }
 
 export function readLatestHypothesis() {
