@@ -12,6 +12,7 @@ type DiagnosisResultProps = {
   reasons: string[];
   categories: CauseCategory[];
   diagnosisId: string | null;
+  persistenceMessage?: string;
 };
 
 const categoryLabels: Record<CauseCategory, string> = {
@@ -64,11 +65,15 @@ const fallbackCtaLabels = {
   sub: "\u30db\u30fc\u30e0\u306b\u623b\u308b",
 };
 
+const feedbackSaveErrorMessage =
+  "\u884c\u52d5\u306e\u8a18\u9332\u306b\u5931\u6557\u3057\u307e\u3057\u305f\u3002\n\u5c11\u3057\u6642\u9593\u3092\u304a\u3044\u3066\u3001\u3082\u3046\u4e00\u5ea6\u304a\u8a66\u3057\u304f\u3060\u3055\u3044\u3002";
+
 export function DiagnosisResult({
   resultText,
   reasons,
   categories,
   diagnosisId,
+  persistenceMessage,
 }: DiagnosisResultProps) {
   const router = useRouter();
   const [feedbackMessage, setFeedbackMessage] = useState("");
@@ -102,7 +107,7 @@ export function DiagnosisResult({
 
   async function handleAction(feedback: "resolved" | "unresolved") {
     if (!currentCategory) {
-      setFeedbackMessage("\u8a18\u9332\u306f\u4fdd\u5b58\u3067\u304d\u307e\u305b\u3093\u3067\u3057\u305f");
+      setFeedbackMessage(feedbackSaveErrorMessage);
       return;
     }
 
@@ -114,7 +119,7 @@ export function DiagnosisResult({
     });
 
     if (!savedFeedback) {
-      setFeedbackMessage("\u8a18\u9332\u306f\u4fdd\u5b58\u3067\u304d\u307e\u305b\u3093\u3067\u3057\u305f");
+      setFeedbackMessage(feedbackSaveErrorMessage);
       return;
     }
 
@@ -171,6 +176,10 @@ export function DiagnosisResult({
 
         {feedbackMessage ? (
           <p style={styles.feedbackMessage}>{feedbackMessage}</p>
+        ) : null}
+
+        {persistenceMessage ? (
+          <p style={styles.persistenceMessage}>{persistenceMessage}</p>
         ) : null}
 
         {nextCandidateText ? (
@@ -271,6 +280,13 @@ const styles = {
     cursor: "pointer",
   },
   feedbackMessage: {
+    margin: "18px 0 0",
+    color: "#52525b",
+    fontSize: "14px",
+    lineHeight: 1.6,
+    whiteSpace: "pre-line",
+  },
+  persistenceMessage: {
     margin: "18px 0 0",
     color: "#52525b",
     fontSize: "14px",

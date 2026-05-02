@@ -26,6 +26,12 @@ type HomeInputProps = {
   understandingMessage: string;
 };
 
+const eventSaveErrorMessage =
+  "\u8a18\u9332\u3067\u304d\u307e\u305b\u3093\u3067\u3057\u305f\u3002\n\u901a\u4fe1\u72b6\u614b\u3092\u78ba\u8a8d\u3057\u3066\u3001\u3082\u3046\u4e00\u5ea6\u304a\u8a66\u3057\u304f\u3060\u3055\u3044\u3002";
+
+const feedbackSaveErrorMessage =
+  "\u884c\u52d5\u306e\u8a18\u9332\u306b\u5931\u6557\u3057\u307e\u3057\u305f\u3002\n\u5c11\u3057\u6642\u9593\u3092\u304a\u3044\u3066\u3001\u3082\u3046\u4e00\u5ea6\u304a\u8a66\u3057\u304f\u3060\u3055\u3044\u3002";
+
 export function HomeInput({
   recentEvents,
   understandingPercent,
@@ -35,6 +41,7 @@ export function HomeInput({
   const [visibleLatestHypothesis, setVisibleLatestHypothesis] =
     useState<LatestHypothesisView | null>(null);
   const [hypothesisMessage, setHypothesisMessage] = useState("");
+  const [saveErrorMessage, setSaveErrorMessage] = useState("");
 
   const guidance = getGuidanceByUnderstanding(understandingPercent);
   const hypothesisCta = visibleLatestHypothesis
@@ -78,12 +85,16 @@ export function HomeInput({
 
   async function handleCurrentSelect(label: string, signal: string) {
     dismissLatestHypothesis();
-    await insertEvent({
+    const event = await insertEvent({
       event_type: "current_state",
       signal,
       label,
       source: "home",
     });
+
+    if (!event) {
+      setSaveErrorMessage(eventSaveErrorMessage);
+    }
   }
 
   async function handleConcernSelect(label: string, input: string) {
@@ -94,6 +105,11 @@ export function HomeInput({
       label,
       source: "home",
     });
+
+    if (!event) {
+      setSaveErrorMessage(eventSaveErrorMessage);
+      return;
+    }
 
     const eventQuery = event?.id ? `&event_id=${event.id}` : "";
 
@@ -122,7 +138,7 @@ export function HomeInput({
     });
 
     if (!savedFeedback) {
-      setHypothesisMessage("\u8a18\u9332\u306f\u4fdd\u5b58\u3067\u304d\u307e\u305b\u3093\u3067\u3057\u305f");
+      setHypothesisMessage(feedbackSaveErrorMessage);
       return;
     }
 
@@ -137,6 +153,7 @@ export function HomeInput({
     clearLatestHypothesis();
     setVisibleLatestHypothesis(null);
     setHypothesisMessage("");
+    setSaveErrorMessage("");
   }
 
   return (
@@ -174,6 +191,10 @@ export function HomeInput({
 
         {hypothesisMessage ? (
           <p style={styles.hypothesisMessage}>{hypothesisMessage}</p>
+        ) : null}
+
+        {saveErrorMessage ? (
+          <p style={styles.saveErrorMessage}>{saveErrorMessage}</p>
         ) : null}
 
         <OptionSection
@@ -405,6 +426,13 @@ const styles = {
     cursor: "pointer",
   },
   hypothesisMessage: {
+    margin: "-22px 0 38px",
+    color: "#52525b",
+    fontSize: "13px",
+    lineHeight: 1.7,
+    whiteSpace: "pre-line",
+  },
+  saveErrorMessage: {
     margin: "-22px 0 38px",
     color: "#52525b",
     fontSize: "13px",

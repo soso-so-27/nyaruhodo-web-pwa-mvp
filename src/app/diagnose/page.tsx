@@ -37,6 +37,9 @@ const categoryLabels: Record<CauseCategory, string> = {
   health: "\u4f53\u8abf",
 };
 
+const diagnosisSaveErrorMessage =
+  "\u8a3a\u65ad\u7d50\u679c\u306e\u4fdd\u5b58\u306b\u5931\u6557\u3057\u307e\u3057\u305f\u3002\n\u753b\u9762\u306e\u8868\u793a\u306f\u7d9a\u3051\u3089\u308c\u307e\u3059\u304c\u3001\u8a18\u9332\u306b\u306f\u6b8b\u3063\u3066\u3044\u306a\u3044\u53ef\u80fd\u6027\u304c\u3042\u308a\u307e\u3059\u3002";
+
 export default async function DiagnosePage({ searchParams }: DiagnosePageProps) {
   const params = await searchParams;
   const input = parseInput(params.input);
@@ -77,12 +80,19 @@ export default async function DiagnosePage({ searchParams }: DiagnosePageProps) 
     console.warn("diagnosis not saved: missing event_id");
   }
 
+  if (params.event_id && !diagnosis) {
+    console.error("diagnosis save failed");
+  }
+
   return (
     <DiagnosisResult
       resultText={formatResultText(categories)}
       reasons={formatReasons(input)}
       categories={categories}
       diagnosisId={diagnosis?.id ?? null}
+      persistenceMessage={
+        params.event_id && !diagnosis ? diagnosisSaveErrorMessage : undefined
+      }
     />
   );
 }
