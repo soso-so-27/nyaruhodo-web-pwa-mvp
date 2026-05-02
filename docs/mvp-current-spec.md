@@ -352,3 +352,59 @@ latest_hypothesis 削除
 - 理解度71%以上での推測候補カード確認
 - PWA設定確認
 - Vercel Preview環境での動作確認
+
+## PWA最低限対応・本番確認結果
+
+### 確認日
+
+2026-05-02
+
+### 実装済み
+
+- `src/app/manifest.ts` を追加
+- `public/icons/icon-192.png` を追加
+- `public/icons/icon-512.png` を追加
+- `public/icons/icon-maskable-512.png` を追加
+- `public/apple-touch-icon.png` を追加
+- `src/app/layout.tsx` に metadata / viewport を追加
+
+### manifest仕様
+
+- `name`: にゃるほど
+- `short_name`: にゃるほど
+- `description`: 猫の様子から、飼い主の迷いを減らすアプリ
+- `start_url`: /home
+- `scope`: /
+- `display`: standalone
+- `background_color`: #fffaf3
+- `theme_color`: #f4a261
+- `lang`: ja
+
+### icons
+
+- `/icons/icon-192.png`
+- `/icons/icon-512.png`
+- `/icons/icon-maskable-512.png`
+- `/apple-touch-icon.png`
+
+### 本番確認結果
+
+- `/manifest.webmanifest` が表示される
+- アイコンURLが表示される
+- モバイルでホーム画面に追加できる
+- ホーム画面から起動できる
+
+### まだ未対応
+
+- Service Worker
+- offline対応
+- キャッシュ戦略
+- push通知
+- install prompt UI
+- next-pwa / Workbox 導入
+
+### 判定
+
+PWAとして最低限の「ホーム画面に追加」は確認済み。
+
+現時点では、オフライン対応やプッシュ通知は未実装。
