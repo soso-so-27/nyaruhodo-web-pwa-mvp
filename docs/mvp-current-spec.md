@@ -281,3 +281,74 @@ RLS は以下の前提です。
 - PWA 設定
 - Vercel 環境変数整理
 - Expo React Native 移行を見据えた UI / core 分離の継続整理
+
+## 本番Vercel確認結果
+
+### 確認日
+
+2026-05-02
+
+### 本番URL
+
+https://nyaruhodo-web-pwa-mvp.vercel.app
+
+### 確認できたこと
+
+- `/` が表示される
+- `/home` が表示される
+- `/diagnose?input=meowing` が表示される
+- `/onboarding` が表示される
+- `/home` から「鳴いてる」を押すと診断画面へ遷移する
+- `events` に保存される
+- `diagnoses` に保存される
+- 診断結果表示後に `latest_hypothesis` が localStorage に保存される
+- `/home` に戻ると直近仮説カードが表示される
+- ホーム直近仮説CTAを押すと `feedbacks` に保存される
+- 保存後に `latest_hypothesis` が localStorage から削除される
+
+### 確認できた latest_hypothesis の形式
+
+```json
+{
+  "source": "diagnosis",
+  "text": "遊びたい可能性があります",
+  "category": "play",
+  "diagnosisId": "診断ID",
+  "createdAt": "ISO文字列",
+  "expiresAt": "ISO文字列"
+}
+```
+
+### 判定
+
+本番環境で、MVPの主要導線は正常に動作している。
+
+確認済みの主要導線:
+
+```text
+/home から入力
+↓
+events 保存
+↓
+診断画面へ遷移
+↓
+diagnoses 保存
+↓
+latest_hypothesis 保存
+↓
+/home に直近仮説表示
+↓
+ホームCTA押下
+↓
+feedbacks 保存
+↓
+latest_hypothesis 削除
+```
+
+### 未確認・今後確認すること
+
+- `expiresAt` を過去にした場合の本番での自動削除
+- 複数カテゴリでのCTA文言確認
+- 理解度71%以上での推測候補カード確認
+- PWA設定確認
+- Vercel Preview環境での動作確認
