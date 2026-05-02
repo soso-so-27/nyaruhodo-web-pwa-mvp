@@ -39,6 +39,9 @@ const eventSaveErrorMessage =
 const feedbackSaveErrorMessage =
   "\u884c\u52d5\u306e\u8a18\u9332\u306b\u5931\u6557\u3057\u307e\u3057\u305f\u3002\n\u5c11\u3057\u6642\u9593\u3092\u304a\u3044\u3066\u3001\u3082\u3046\u4e00\u5ea6\u304a\u8a66\u3057\u304f\u3060\u3055\u3044\u3002";
 
+const currentStateSaveSuccessMessage =
+  "\u4eca\u65e5\u306e\u69d8\u5b50\u3092\u8a18\u9332\u3057\u307e\u3057\u305f\u3002";
+
 export function HomeInput({
   recentEvents,
   understandingPercent,
@@ -56,6 +59,7 @@ export function HomeInput({
   const [newCatNameInput, setNewCatNameInput] = useState("");
   const [catNameMessage, setCatNameMessage] = useState("");
   const [hypothesisMessage, setHypothesisMessage] = useState("");
+  const [currentStateMessage, setCurrentStateMessage] = useState("");
   const [saveErrorMessage, setSaveErrorMessage] = useState("");
 
   const activeCatProfile =
@@ -199,6 +203,7 @@ export function HomeInput({
 
   async function handleCurrentSelect(label: string, signal: string) {
     dismissLatestHypothesis();
+    setCurrentStateMessage("");
     const event = await insertEvent({
       event_type: "current_state",
       signal,
@@ -208,11 +213,16 @@ export function HomeInput({
 
     if (!event) {
       setSaveErrorMessage(eventSaveErrorMessage);
+      return;
     }
+
+    setSaveErrorMessage("");
+    setCurrentStateMessage(currentStateSaveSuccessMessage);
   }
 
   async function handleConcernSelect(label: string, input: string) {
     dismissLatestHypothesis();
+    setCurrentStateMessage("");
     const event = await insertEvent({
       event_type: "concern",
       signal: input,
@@ -267,6 +277,7 @@ export function HomeInput({
     clearLatestHypothesis();
     setVisibleLatestHypothesis(null);
     setHypothesisMessage("");
+    setCurrentStateMessage("");
     setSaveErrorMessage("");
   }
 
@@ -324,6 +335,10 @@ export function HomeInput({
 
         {hypothesisMessage ? (
           <p style={styles.hypothesisMessage}>{hypothesisMessage}</p>
+        ) : null}
+
+        {currentStateMessage ? (
+          <p style={styles.currentStateMessage}>{currentStateMessage}</p>
         ) : null}
 
         {saveErrorMessage ? (
@@ -829,6 +844,13 @@ const styles = {
     cursor: "pointer",
   },
   hypothesisMessage: {
+    margin: "-22px 0 38px",
+    color: "#52525b",
+    fontSize: "13px",
+    lineHeight: 1.7,
+    whiteSpace: "pre-line",
+  },
+  currentStateMessage: {
     margin: "-22px 0 38px",
     color: "#52525b",
     fontSize: "13px",
