@@ -11,15 +11,19 @@ import {
   CURRENT_OPTIONS,
   FALLBACK_HYPOTHESIS_CTA_LABELS,
   HYPOTHESIS_CTA_LABELS,
+  addCatProfile,
   buildPredictedConcernOptions,
   clearLatestHypothesis,
+  getActiveCatProfile,
   getCatName,
   getGuidanceByUnderstanding,
   getHypothesisCompletionMessage,
   parseStoredContext,
-  readCatProfile,
+  readActiveCatId,
+  readCatProfiles,
   readLatestHypothesis,
-  saveCatProfile,
+  saveActiveCatId,
+  updateCatProfileName,
 } from "./homeInputHelpers";
 import type { CatProfile, LatestHypothesisView } from "./homeInputHelpers";
 
@@ -43,14 +47,22 @@ export function HomeInput({
   const router = useRouter();
   const [visibleLatestHypothesis, setVisibleLatestHypothesis] =
     useState<LatestHypothesisView | null>(null);
-  const [catProfile, setCatProfile] = useState<CatProfile | null>(null);
+  const [catProfiles, setCatProfiles] = useState<CatProfile[]>([]);
+  const [activeCatId, setActiveCatId] = useState<string | null>(null);
+  const [isSwitchingCat, setIsSwitchingCat] = useState(false);
   const [isEditingCatName, setIsEditingCatName] = useState(false);
+  const [isAddingCat, setIsAddingCat] = useState(false);
   const [catNameInput, setCatNameInput] = useState("");
+  const [newCatNameInput, setNewCatNameInput] = useState("");
   const [catNameMessage, setCatNameMessage] = useState("");
   const [hypothesisMessage, setHypothesisMessage] = useState("");
   const [saveErrorMessage, setSaveErrorMessage] = useState("");
 
-  const catName = getCatName(catProfile);
+  const activeCatProfile =
+    catProfiles.length > 0
+      ? getActiveCatProfile(catProfiles, activeCatId)
+      : null;
+  const catName = getCatName(activeCatProfile);
   const guidance = getGuidanceByUnderstanding(understandingPercent);
   const hypothesisCta = visibleLatestHypothesis
     ? HYPOTHESIS_CTA_LABELS[visibleLatestHypothesis.category] ??
@@ -64,10 +76,17 @@ export function HomeInput({
     !visibleLatestHypothesis && understandingPercent >= 71;
 
   useEffect(() => {
-    const savedCatProfile = readCatProfile();
+    const savedCatProfiles = readCatProfiles();
+    const savedActiveCatId = readActiveCatId();
+    const activeProfile = getActiveCatProfile(
+      savedCatProfiles,
+      savedActiveCatId,
+    );
 
-    setCatProfile(savedCatProfile);
-    setCatNameInput(getCatName(savedCatProfile));
+    setCatProfiles(savedCatProfiles);
+    setActiveCatId(activeProfile.id);
+    setCatNameInput(getCatName(activeProfile));
+    saveActiveCatId(activeProfile.id);
 
     const latestHypothesis = readLatestHypothesis();
 
@@ -99,6 +118,8 @@ export function HomeInput({
   function startEditingCatName() {
     setCatNameInput(catName);
     setCatNameMessage("");
+    setIsAddingCat(false);
+    setIsSwitchingCat(false);
     setIsEditingCatName(true);
   }
 
@@ -109,15 +130,70 @@ export function HomeInput({
   }
 
   function handleCatNameSave() {
-    const savedProfile = saveCatProfile(catNameInput);
+    const result = updateCatProfileName(catProfiles, activeCatId, catNameInput);
 
-    if (!savedProfile) {
+    if (!result) {
       return;
     }
 
-    setCatProfile(savedProfile);
-    setCatNameInput(savedProfile.name);
+    const activeProfile = getActiveCatProfile(
+      result.profiles,
+      result.activeCatId,
+    );
+
+    setCatProfiles(result.profiles);
+    setActiveCatId(result.activeCatId);
+    setCatNameInput(activeProfile.name);
     setIsEditingCatName(false);
+    setCatNameMessage("\u4fdd\u5b58\u3057\u307e\u3057\u305f\u3002");
+  }
+
+  function toggleCatSwitcher() {
+    setIsSwitchingCat((current) => !current);
+    setIsAddingCat(false);
+    setIsEditingCatName(false);
+    setCatNameMessage("");
+  }
+
+  function handleCatSelect(catId: string) {
+    saveActiveCatId(catId);
+    setActiveCatId(catId);
+    setCatNameInput(getCatName(getActiveCatProfile(catProfiles, catId)));
+    setIsSwitchingCat(false);
+    setIsAddingCat(false);
+    setCatNameMessage("");
+  }
+
+  function startAddingCat() {
+    setNewCatNameInput("");
+    setCatNameMessage("");
+    setIsAddingCat(true);
+    setIsEditingCatName(false);
+  }
+
+  function cancelAddingCat() {
+    setNewCatNameInput("");
+    setIsAddingCat(false);
+  }
+
+  function handleAddCatSave() {
+    const result = addCatProfile(catProfiles, newCatNameInput);
+
+    if (!result) {
+      return;
+    }
+
+    const activeProfile = getActiveCatProfile(
+      result.profiles,
+      result.activeCatId,
+    );
+
+    setCatProfiles(result.profiles);
+    setActiveCatId(result.activeCatId);
+    setCatNameInput(activeProfile.name);
+    setNewCatNameInput("");
+    setIsAddingCat(false);
+    setIsSwitchingCat(false);
     setCatNameMessage("\u4fdd\u5b58\u3057\u307e\u3057\u305f\u3002");
   }
 
@@ -198,16 +274,27 @@ export function HomeInput({
     <main style={styles.page}>
       <div style={styles.container}>
         <Header
+          activeCatId={activeCatId}
           catName={catName}
           catNameInput={catNameInput}
           catNameMessage={catNameMessage}
+          catProfiles={catProfiles}
           isEditingCatName={isEditingCatName}
+          isAddingCat={isAddingCat}
+          isSwitchingCat={isSwitchingCat}
+          newCatNameInput={newCatNameInput}
           understandingPercent={understandingPercent}
           understandingMessage={understandingMessage}
           onCatNameInputChange={setCatNameInput}
+          onNewCatNameInputChange={setNewCatNameInput}
           onCatNameSave={handleCatNameSave}
+          onAddCatSave={handleAddCatSave}
+          onCatSelect={handleCatSelect}
           onEditCatName={startEditingCatName}
+          onToggleCatSwitcher={toggleCatSwitcher}
           onCancelCatNameEdit={cancelEditingCatName}
+          onStartAddingCat={startAddingCat}
+          onCancelAddingCat={cancelAddingCat}
         />
 
         {visibleLatestHypothesis ? (
@@ -264,31 +351,130 @@ export function HomeInput({
 }
 
 function Header({
+  activeCatId,
   catName,
   catNameInput,
   catNameMessage,
+  catProfiles,
   isEditingCatName,
+  isAddingCat,
+  isSwitchingCat,
+  newCatNameInput,
   understandingPercent,
   understandingMessage,
   onCatNameInputChange,
+  onNewCatNameInputChange,
   onCatNameSave,
+  onAddCatSave,
+  onCatSelect,
   onEditCatName,
+  onToggleCatSwitcher,
   onCancelCatNameEdit,
+  onStartAddingCat,
+  onCancelAddingCat,
 }: {
+  activeCatId: string | null;
   catName: string;
   catNameInput: string;
   catNameMessage: string;
+  catProfiles: CatProfile[];
   isEditingCatName: boolean;
+  isAddingCat: boolean;
+  isSwitchingCat: boolean;
+  newCatNameInput: string;
   understandingPercent: number;
   understandingMessage: string;
   onCatNameInputChange: (value: string) => void;
+  onNewCatNameInputChange: (value: string) => void;
   onCatNameSave: () => void;
+  onAddCatSave: () => void;
+  onCatSelect: (catId: string) => void;
   onEditCatName: () => void;
+  onToggleCatSwitcher: () => void;
   onCancelCatNameEdit: () => void;
+  onStartAddingCat: () => void;
+  onCancelAddingCat: () => void;
 }) {
   return (
     <div style={styles.header}>
       <h1 style={styles.title}>{catName}</h1>
+      <div style={styles.catNameControls}>
+        <button
+          type="button"
+          onClick={onToggleCatSwitcher}
+          style={styles.catNameEditButton}
+        >
+          {"\u732b\u3092\u5207\u308a\u66ff\u3048"}
+        </button>
+        <button
+          type="button"
+          onClick={onEditCatName}
+          style={styles.catNameEditButton}
+        >
+          {"\u540d\u524d\u3092\u5909\u66f4"}
+        </button>
+      </div>
+      {isSwitchingCat ? (
+        <div style={styles.catSwitcher}>
+          <div style={styles.catSwitchList}>
+            {catProfiles.map((profile) => (
+              <button
+                key={profile.id}
+                type="button"
+                onClick={() => onCatSelect(profile.id)}
+                style={
+                  profile.id === activeCatId
+                    ? styles.activeCatSwitchButton
+                    : styles.catSwitchButton
+                }
+              >
+                {profile.name}
+              </button>
+            ))}
+          </div>
+          {isAddingCat ? (
+            <div style={styles.catNameEditor}>
+              <label style={styles.catNameLabel} htmlFor="new-cat-name">
+                {"\u3053\u306e\u5b50\u306e\u540d\u524d"}
+              </label>
+              <input
+                id="new-cat-name"
+                type="text"
+                value={newCatNameInput}
+                onChange={(event) =>
+                  onNewCatNameInputChange(event.target.value)
+                }
+                placeholder={"\u4f8b\uff1a\u9ea6"}
+                style={styles.catNameInput}
+              />
+              <div style={styles.catNameActions}>
+                <button
+                  type="button"
+                  onClick={onAddCatSave}
+                  style={styles.catNameSaveButton}
+                >
+                  {"\u4fdd\u5b58"}
+                </button>
+                <button
+                  type="button"
+                  onClick={onCancelAddingCat}
+                  style={styles.catNameCancelButton}
+                >
+                  {"\u30ad\u30e3\u30f3\u30bb\u30eb"}
+                </button>
+              </div>
+            </div>
+          ) : (
+            <button
+              type="button"
+              onClick={onStartAddingCat}
+              style={styles.addCatButton}
+            >
+              {"\u732b\u3092\u8ffd\u52a0"}
+            </button>
+          )}
+        </div>
+      ) : null}
       {isEditingCatName ? (
         <div style={styles.catNameEditor}>
           <label style={styles.catNameLabel} htmlFor="cat-name">
@@ -319,15 +505,7 @@ function Header({
             </button>
           </div>
         </div>
-      ) : (
-        <button
-          type="button"
-          onClick={onEditCatName}
-          style={styles.catNameEditButton}
-        >
-          {"\u540d\u524d\u3092\u5909\u66f4"}
-        </button>
-      )}
+      ) : null}
       {catNameMessage ? (
         <p style={styles.catNameMessage}>{catNameMessage}</p>
       ) : null}
@@ -471,13 +649,63 @@ const styles = {
   header: {
     marginBottom: "40px",
   },
+  catNameControls: {
+    display: "flex",
+    gap: "14px",
+    marginTop: "8px",
+  },
   catNameEditButton: {
-    margin: "8px 0 0",
+    margin: 0,
     padding: 0,
     border: "none",
     background: "transparent",
     color: "#71717a",
     fontSize: "13px",
+    fontWeight: 500,
+    letterSpacing: 0,
+    cursor: "pointer",
+  },
+  catSwitcher: {
+    marginTop: "12px",
+  },
+  catSwitchList: {
+    display: "flex",
+    flexWrap: "wrap",
+    gap: "8px",
+  },
+  catSwitchButton: {
+    minHeight: "38px",
+    padding: "0 14px",
+    border: "1px solid #d4d4d8",
+    borderRadius: "12px",
+    background: "#ffffff",
+    color: "#27272a",
+    fontSize: "14px",
+    fontWeight: 500,
+    letterSpacing: 0,
+    cursor: "pointer",
+  },
+  activeCatSwitchButton: {
+    minHeight: "38px",
+    padding: "0 14px",
+    border: "1px solid #a1a1aa",
+    borderRadius: "12px",
+    background: "#3f3f46",
+    color: "#ffffff",
+    fontSize: "14px",
+    fontWeight: 600,
+    letterSpacing: 0,
+    cursor: "pointer",
+  },
+  addCatButton: {
+    marginTop: "10px",
+    minHeight: "38px",
+    padding: "0 14px",
+    border: "1px solid #d4d4d8",
+    borderRadius: "12px",
+    background: "#ffffff",
+    color: "#27272a",
+    fontSize: "14px",
     fontWeight: 500,
     letterSpacing: 0,
     cursor: "pointer",

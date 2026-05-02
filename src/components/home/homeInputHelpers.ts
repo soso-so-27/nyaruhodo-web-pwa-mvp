@@ -10,6 +10,7 @@ export type LatestHypothesisView = {
 };
 
 export type CatProfile = {
+  id: string;
   name: string;
   createdAt: string;
   updatedAt: string;
@@ -148,6 +149,12 @@ const PREDICTED_CONCERN_LABELS: Record<ConcernSignal, string> = {
 
 const FALLBACK_PREDICTED_SIGNALS: ConcernSignal[] = ["meowing", "following"];
 const DEFAULT_CAT_NAME = "\u30df\u30b1";
+const CAT_PROFILES_KEY = "cat_profiles";
+const ACTIVE_CAT_ID_KEY = "active_cat_id";
+const LEGACY_CAT_PROFILE_KEY = "cat_profile";
+
+// MVP only: this switches the local UI profile. Supabase events, diagnoses,
+// and feedbacks are not separated per cat until cats/cat_id are introduced.
 
 export function getGuidanceByUnderstanding(percent: number) {
   return (
@@ -194,52 +201,174 @@ export function buildPredictedConcernOptions(recentEvents: RecentEvent[]) {
   }));
 }
 
-export function readCatProfile() {
-  const value = window.localStorage.getItem("cat_profile");
+export function createLocalCatProfile(
+  name = DEFAULT_CAT_NAME,
+  timestamps?: { createdAt?: string; updatedAt?: string },
+): CatProfile {
+  const now = new Date().toISOString();
 
-  if (!value) {
-    return null;
-  }
-
-  try {
-    const parsed = JSON.parse(value) as Partial<CatProfile>;
-
-    if (!parsed.name) {
-      return null;
-    }
-
-    return {
-      name: parsed.name,
-      createdAt: parsed.createdAt ?? new Date().toISOString(),
-      updatedAt: parsed.updatedAt ?? parsed.createdAt ?? new Date().toISOString(),
-    };
-  } catch {
-    return null;
-  }
+  return {
+    id: `local-cat-${Date.now().toString(36)}-${Math.random()
+      .toString(36)
+      .slice(2, 8)}`,
+    name,
+    createdAt: timestamps?.createdAt ?? now,
+    updatedAt: timestamps?.updatedAt ?? timestamps?.createdAt ?? now,
+  };
 }
 
-export function saveCatProfile(name: string) {
+export function readCatProfiles() {
+  const savedProfiles = readStoredCatProfiles();
+
+  if (savedProfiles.length > 0) {
+    return savedProfiles;
+  }
+
+  const migratedProfiles = migrateLegacyCatProfile();
+
+  if (migratedProfiles.length > 0) {
+    return migratedProfiles;
+  }
+
+  const defaultProfile = createLocalCatProfile();
+  saveCatProfiles([defaultProfile]);
+  saveActiveCatId(defaultProfile.id);
+
+  return [defaultProfile];
+}
+
+export function saveCatProfiles(profiles: CatProfile[]) {
+  window.localStorage.setItem(CAT_PROFILES_KEY, JSON.stringify(profiles));
+}
+
+export function readActiveCatId() {
+  return window.localStorage.getItem(ACTIVE_CAT_ID_KEY);
+}
+
+export function saveActiveCatId(catId: string) {
+  window.localStorage.setItem(ACTIVE_CAT_ID_KEY, catId);
+}
+
+export function getActiveCatProfile(
+  profiles: CatProfile[],
+  activeCatId: string | null,
+) {
+  return (
+    profiles.find((profile) => profile.id === activeCatId) ??
+    profiles[0] ??
+    createLocalCatProfile()
+  );
+}
+
+export function addCatProfile(profiles: CatProfile[], name: string) {
   const trimmedName = name.trim();
 
   if (!trimmedName) {
     return null;
   }
 
-  const current = readCatProfile();
-  const now = new Date().toISOString();
-  const profile: CatProfile = {
-    name: trimmedName,
-    createdAt: current?.createdAt ?? now,
-    updatedAt: now,
+  const profile = createLocalCatProfile(trimmedName);
+  const nextProfiles = [...profiles, profile];
+
+  saveCatProfiles(nextProfiles);
+  saveActiveCatId(profile.id);
+
+  return {
+    activeCatId: profile.id,
+    profiles: nextProfiles,
   };
+}
 
-  window.localStorage.setItem("cat_profile", JSON.stringify(profile));
+export function updateCatProfileName(
+  profiles: CatProfile[],
+  activeCatId: string | null,
+  name: string,
+) {
+  const trimmedName = name.trim();
 
-  return profile;
+  if (!trimmedName) {
+    return null;
+  }
+
+  const activeProfile = getActiveCatProfile(profiles, activeCatId);
+  const now = new Date().toISOString();
+  const nextProfiles = profiles.map((profile) =>
+    profile.id === activeProfile.id
+      ? {
+          ...profile,
+          name: trimmedName,
+          updatedAt: now,
+        }
+      : profile,
+  );
+
+  saveCatProfiles(nextProfiles);
+  saveActiveCatId(activeProfile.id);
+
+  return {
+    activeCatId: activeProfile.id,
+    profiles: nextProfiles,
+  };
 }
 
 export function getCatName(profile: CatProfile | null) {
   return profile?.name || DEFAULT_CAT_NAME;
+}
+
+function readStoredCatProfiles() {
+  const value = window.localStorage.getItem(CAT_PROFILES_KEY);
+
+  if (!value) {
+    return [];
+  }
+
+  try {
+    const parsed = JSON.parse(value) as Partial<CatProfile>[];
+
+    if (!Array.isArray(parsed)) {
+      return [];
+    }
+
+    return parsed
+      .filter((profile) => profile.id && profile.name)
+      .map((profile) => ({
+        id: profile.id as string,
+        name: profile.name as string,
+        createdAt: profile.createdAt ?? new Date().toISOString(),
+        updatedAt:
+          profile.updatedAt ?? profile.createdAt ?? new Date().toISOString(),
+      }));
+  } catch {
+    return [];
+  }
+}
+
+function migrateLegacyCatProfile() {
+  const value = window.localStorage.getItem(LEGACY_CAT_PROFILE_KEY);
+
+  if (!value) {
+    return [];
+  }
+
+  try {
+    const parsed = JSON.parse(value) as Partial<Omit<CatProfile, "id">>;
+
+    if (!parsed.name) {
+      return [];
+    }
+
+    const profile = createLocalCatProfile(parsed.name, {
+      createdAt: parsed.createdAt,
+      updatedAt: parsed.updatedAt,
+    });
+
+    saveCatProfiles([profile]);
+    saveActiveCatId(profile.id);
+
+    return [profile];
+  } catch {
+    return [];
+  }
 }
 
 export function readLatestHypothesis() {
