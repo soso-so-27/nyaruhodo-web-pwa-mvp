@@ -522,21 +522,24 @@ function Header({
           {"%"}
         </span>
       </p>
-      <div style={styles.catChips}>
-        {catProfiles.map((profile) => (
-          <button
-            key={profile.id}
-            type="button"
-            onClick={() => onCatSelect(profile.id)}
-            style={
-              profile.id === activeCatId
-                ? styles.activeCatChipButton
-                : styles.catChipButton
-            }
-          >
-            {profile.name}
-          </button>
-        ))}
+      <div style={styles.homeCatSwitcher}>
+        <p style={styles.catChipLabel}>{"見る猫"}</p>
+        <div style={styles.catChips}>
+          {catProfiles.map((profile) => (
+            <button
+              key={profile.id}
+              type="button"
+              onClick={() => onCatSelect(profile.id)}
+              style={
+                profile.id === activeCatId
+                  ? styles.activeCatChipButton
+                  : styles.catChipButton
+              }
+            >
+              {profile.name}
+            </button>
+          ))}
+        </div>
       </div>
     </header>
   );
@@ -952,11 +955,23 @@ const styles = {
     display: "flex",
     flexWrap: "wrap",
     gap: "8px",
+    marginTop: "8px",
+  },
+  homeCatSwitcher: {
     marginTop: "14px",
+    borderTop: "1px solid rgba(234, 219, 202, 0.8)",
+    paddingTop: "12px",
+  },
+  catChipLabel: {
+    margin: 0,
+    color: "#8a8178",
+    fontSize: "11px",
+    fontWeight: 700,
+    letterSpacing: 0,
   },
   catChipButton: {
-    minHeight: "34px",
-    padding: "0 13px",
+    minHeight: "36px",
+    padding: "0 14px",
     border: "1px solid #d4d4d8",
     borderRadius: "999px",
     background: "#ffffff",
@@ -967,8 +982,8 @@ const styles = {
     cursor: "pointer",
   },
   activeCatChipButton: {
-    minHeight: "34px",
-    padding: "0 13px",
+    minHeight: "36px",
+    padding: "0 14px",
     border: "1px solid #a1a1aa",
     borderRadius: "999px",
     background: "#3f3f46",
