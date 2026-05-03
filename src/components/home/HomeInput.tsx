@@ -206,13 +206,6 @@ export function HomeInput({
     setCatNameMessage("\u4fdd\u5b58\u3057\u307e\u3057\u305f\u3002");
   }
 
-  function toggleCatSwitcher() {
-    setIsSwitchingCat((current) => !current);
-    setIsAddingCat(false);
-    setIsEditingCatName(false);
-    setCatNameMessage("");
-  }
-
   function handleCatSelect(catId: string) {
     saveActiveCatId(catId);
     setActiveCatId(catId);
@@ -433,7 +426,6 @@ export function HomeInput({
           onAddCatSave={handleAddCatSave}
           onCatSelect={handleCatSelect}
           onEditCatName={startEditingCatName}
-          onToggleCatSwitcher={toggleCatSwitcher}
           onCancelCatNameEdit={cancelEditingCatName}
           onStartAddingCat={startAddingCat}
           onCancelAddingCat={cancelAddingCat}
@@ -522,7 +514,6 @@ function Header({
   onAddCatSave,
   onCatSelect,
   onEditCatName,
-  onToggleCatSwitcher,
   onCancelCatNameEdit,
   onStartAddingCat,
   onCancelAddingCat,
@@ -544,7 +535,6 @@ function Header({
   onAddCatSave: () => void;
   onCatSelect: (catId: string) => void;
   onEditCatName: () => void;
-  onToggleCatSwitcher: () => void;
   onCancelCatNameEdit: () => void;
   onStartAddingCat: () => void;
   onCancelAddingCat: () => void;
@@ -553,13 +543,6 @@ function Header({
     <div style={styles.header}>
       <h1 style={styles.title}>{catName}</h1>
       <div style={styles.catNameControls}>
-        <button
-          type="button"
-          onClick={onToggleCatSwitcher}
-          style={styles.catNameEditButton}
-        >
-          {"\u732b\u3092\u5207\u308a\u66ff\u3048"}
-        </button>
         <button
           type="button"
           onClick={onEditCatName}
