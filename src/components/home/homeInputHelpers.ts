@@ -25,13 +25,18 @@ type ConcernSignal =
   | "fighting"
   | "unknown";
 
-type DailyHintCategory =
+export type DailyHintCategory =
   | "food"
   | "play"
   | "social"
   | "stress"
   | "health"
   | "unknown";
+
+export type CurrentCatHintFeedback =
+  | "accepted"
+  | "rejected"
+  | "dismissed";
 
 type DailyHintPattern =
   | DailyHintCategory
@@ -50,6 +55,14 @@ export type DailyHintHypothesis = {
     sub: string;
     tertiary: string;
   };
+};
+
+export type CurrentCatHintSuppression = {
+  localCatId: string;
+  category: DailyHintCategory;
+  feedback: CurrentCatHintFeedback;
+  createdAt: string;
+  suppressUntil: string;
 };
 
 export const CATEGORY_MESSAGES: Record<string, string> = {
@@ -295,6 +308,8 @@ const DEFAULT_CAT_NAME = "\u30df\u30b1";
 const CAT_PROFILES_KEY = "cat_profiles";
 const ACTIVE_CAT_ID_KEY = "active_cat_id";
 const LEGACY_CAT_PROFILE_KEY = "cat_profile";
+const CURRENT_CAT_HINT_SUPPRESSION_KEY = "current_cat_hint_suppression";
+const HINT_SUPPRESSION_HOURS = 3;
 
 // MVP only: this switches the local UI profile. Supabase tracking rows use
 // local_cat_id for provisional separation until cats/cat_id are introduced.
@@ -498,6 +513,101 @@ export function getCatName(profile: CatProfile | null) {
   return profile?.name || DEFAULT_CAT_NAME;
 }
 
+export function readCurrentCatHintSuppressions() {
+  return clearExpiredCurrentCatHintSuppressions();
+}
+
+export function saveCurrentCatHintSuppression({
+  localCatId,
+  category,
+  feedback,
+}: {
+  localCatId: string | null;
+  category: DailyHintCategory;
+  feedback: CurrentCatHintFeedback;
+}) {
+  const activeSuppressions = clearExpiredCurrentCatHintSuppressions();
+
+  if (!localCatId) {
+    return activeSuppressions;
+  }
+
+  const now = new Date();
+  const suppressUntil =
+    feedback === "rejected"
+      ? getEndOfDay(now)
+      : new Date(now.getTime() + HINT_SUPPRESSION_HOURS * 60 * 60 * 1000);
+  const nextSuppressions = [
+    ...activeSuppressions.filter(
+      (suppression) =>
+        suppression.localCatId !== localCatId ||
+        suppression.category !== category,
+    ),
+    {
+      localCatId,
+      category,
+      feedback,
+      createdAt: now.toISOString(),
+      suppressUntil: suppressUntil.toISOString(),
+    },
+  ];
+
+  saveCurrentCatHintSuppressions(nextSuppressions);
+
+  return nextSuppressions;
+}
+
+export function clearExpiredCurrentCatHintSuppressions(now = new Date()) {
+  const suppressions = readStoredCurrentCatHintSuppressions();
+  const nowTime = now.getTime();
+  const activeSuppressions = suppressions.filter((suppression) => {
+    const suppressUntilTime = new Date(suppression.suppressUntil).getTime();
+
+    return (
+      !Number.isNaN(suppressUntilTime) && suppressUntilTime > nowTime
+    );
+  });
+
+  if (activeSuppressions.length !== suppressions.length) {
+    saveCurrentCatHintSuppressions(activeSuppressions);
+  }
+
+  return activeSuppressions;
+}
+
+export function isCurrentCatHintSuppressed({
+  suppressions,
+  localCatId,
+  category,
+  now = new Date(),
+}: {
+  suppressions: CurrentCatHintSuppression[];
+  localCatId: string | null;
+  category: DailyHintCategory;
+  now?: Date;
+}) {
+  if (!localCatId) {
+    return false;
+  }
+
+  const nowTime = now.getTime();
+
+  return suppressions.some((suppression) => {
+    if (
+      suppression.localCatId !== localCatId ||
+      suppression.category !== category
+    ) {
+      return false;
+    }
+
+    const suppressUntilTime = new Date(suppression.suppressUntil).getTime();
+
+    return (
+      !Number.isNaN(suppressUntilTime) && suppressUntilTime > nowTime
+    );
+  });
+}
+
 function readStoredCatProfiles() {
   const value = window.localStorage.getItem(CAT_PROFILES_KEY);
 
@@ -524,6 +634,54 @@ function readStoredCatProfiles() {
   } catch {
     return [];
   }
+}
+
+function readStoredCurrentCatHintSuppressions() {
+  const value = window.localStorage.getItem(CURRENT_CAT_HINT_SUPPRESSION_KEY);
+
+  if (!value) {
+    return [];
+  }
+
+  try {
+    const parsed = JSON.parse(value) as Partial<CurrentCatHintSuppression>[];
+
+    if (!Array.isArray(parsed)) {
+      return [];
+    }
+
+    return parsed.filter(isValidCurrentCatHintSuppression);
+  } catch {
+    return [];
+  }
+}
+
+function saveCurrentCatHintSuppressions(
+  suppressions: CurrentCatHintSuppression[],
+) {
+  window.localStorage.setItem(
+    CURRENT_CAT_HINT_SUPPRESSION_KEY,
+    JSON.stringify(suppressions),
+  );
+}
+
+function isValidCurrentCatHintSuppression(
+  suppression: Partial<CurrentCatHintSuppression>,
+): suppression is CurrentCatHintSuppression {
+  return Boolean(
+    suppression.localCatId &&
+      suppression.category &&
+      suppression.feedback &&
+      suppression.createdAt &&
+      suppression.suppressUntil,
+  );
+}
+
+function getEndOfDay(date: Date) {
+  const endOfDay = new Date(date);
+  endOfDay.setHours(23, 59, 59, 999);
+
+  return endOfDay;
 }
 
 function migrateLegacyCatProfile() {

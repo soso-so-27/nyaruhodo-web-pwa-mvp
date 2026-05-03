@@ -27,15 +27,20 @@ import {
   getCatName,
   getGuidanceByUnderstanding,
   getHypothesisCompletionMessage,
+  isCurrentCatHintSuppressed,
   parseStoredContext,
   readActiveCatId,
   readCatProfiles,
+  readCurrentCatHintSuppressions,
   readLatestHypothesis,
   saveActiveCatId,
+  saveCurrentCatHintSuppression,
   updateCatProfileName,
 } from "./homeInputHelpers";
 import type {
   CatProfile,
+  CurrentCatHintFeedback,
+  CurrentCatHintSuppression,
   DailyHintHypothesis,
   LatestHypothesisView,
 } from "./homeInputHelpers";
@@ -74,6 +79,9 @@ export function HomeInput({
     "current" | "concern" | ""
   >("");
   const [isDailyHintDismissed, setIsDailyHintDismissed] = useState(false);
+  const [hintSuppressions, setHintSuppressions] = useState<
+    CurrentCatHintSuppression[]
+  >([]);
 
   const activeCatProfile =
     catProfiles.length > 0
@@ -96,9 +104,15 @@ export function HomeInput({
     ? Boolean(HYPOTHESIS_CTA_LABELS[visibleLatestHypothesis.category])
     : false;
   const dailyHintHypothesis = buildDailyHintHypothesis(activeCatEvents);
+  const isDailyHintSuppressed = isCurrentCatHintSuppressed({
+    suppressions: hintSuppressions,
+    localCatId: activeCatId,
+    category: dailyHintHypothesis.category,
+  });
   const shouldShowDailyHint =
     !visibleLatestHypothesis &&
     !isDailyHintDismissed &&
+    !isDailyHintSuppressed &&
     activeCatEvents.length >= 3;
 
   useEffect(() => {
@@ -112,6 +126,7 @@ export function HomeInput({
     setCatProfiles(savedCatProfiles);
     setActiveCatId(activeProfile.id);
     setCatNameInput(getCatName(activeProfile));
+    setHintSuppressions(readCurrentCatHintSuppressions());
     saveActiveCatId(activeProfile.id);
 
     const latestHypothesis = readLatestHypothesis();
@@ -199,6 +214,7 @@ export function HomeInput({
     setCurrentStateMessage("");
     setSaveErrorMessage("");
     setIsDailyHintDismissed(false);
+    setHintSuppressions(readCurrentCatHintSuppressions());
     setIsSwitchingCat(false);
     setIsAddingCat(false);
     setCatNameMessage("");
@@ -297,7 +313,7 @@ export function HomeInput({
   }
 
   async function saveDailyHintFeedback(
-    feedback: "accepted" | "rejected" | "dismissed",
+    feedback: CurrentCatHintFeedback,
     action: "primary_cta" | "rejected" | "dismissed",
   ) {
     const savedFeedback = await insertHintFeedback({
@@ -325,6 +341,13 @@ export function HomeInput({
       return;
     }
 
+    const nextSuppressions = saveCurrentCatHintSuppression({
+      localCatId: activeCatId,
+      category: dailyHintHypothesis.category,
+      feedback,
+    });
+
+    setHintSuppressions(nextSuppressions);
     setIsDailyHintDismissed(true);
     setHypothesisMessage(
       feedback === "dismissed"
