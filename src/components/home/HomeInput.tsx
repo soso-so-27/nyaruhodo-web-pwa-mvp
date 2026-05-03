@@ -873,8 +873,15 @@ function OptionSection<Option extends { label: string }>({
             onClick={() => onSelect(option)}
             style={buttonStyle}
           >
-            <span style={styles.optionMark} aria-hidden="true">
-              {getOptionMark(option.label)}
+            <span style={styles.optionIconFrame}>
+              <img
+                src={getOptionIconSrc(option.label)}
+                alt={option.label}
+                style={styles.optionIcon}
+                onError={(event) => {
+                  event.currentTarget.style.visibility = "hidden";
+                }}
+              />
             </span>
             <span>{option.label}</span>
           </button>
@@ -884,23 +891,23 @@ function OptionSection<Option extends { label: string }>({
   );
 }
 
-function getOptionMark(label: string) {
-  const marks: Record<string, string> = {
-    "\u306d\u3066\u308b": "Zz",
-    "\u30b0\u30eb\u30fc\u30df\u30f3\u30b0": "\u6574",
-    "\u904a\u3093\u3067\u308b": "\u904a",
-    "\u3054\u306f\u3093": "\u98df",
-    "\u30c8\u30a4\u30ec": "\u6e08",
-    "\u30b4\u30ed\u30b4\u30ed\u3057\u3066\u308b": "\u5b89",
-    "\u9cf4\u3044\u3066\u308b": "\u9cf4",
-    "\u3064\u3044\u3066\u304f\u308b": "\u8ffd",
-    "\u843d\u3061\u7740\u304b\u306a\u3044": "\u63fa",
-    "\u5143\u6c17\u306a\u3044": "\u4f11",
-    "\u30b1\u30f3\u30ab\u3057\u3066\u308b": "\u6c17",
-    "\u3088\u304f\u308f\u304b\u3089\u306a\u3044": "\uff1f",
+function getOptionIconSrc(label: string) {
+  const icons: Record<string, string> = {
+    "\u306d\u3066\u308b": "sleeping",
+    "\u30b0\u30eb\u30fc\u30df\u30f3\u30b0": "grooming",
+    "\u904a\u3093\u3067\u308b": "playing",
+    "\u3054\u306f\u3093": "food",
+    "\u30c8\u30a4\u30ec": "toilet",
+    "\u30b4\u30ed\u30b4\u30ed\u3057\u3066\u308b": "purring",
+    "\u9cf4\u3044\u3066\u308b": "meowing",
+    "\u3064\u3044\u3066\u304f\u308b": "following",
+    "\u843d\u3061\u7740\u304b\u306a\u3044": "restless",
+    "\u5143\u6c17\u306a\u3044": "low_energy",
+    "\u30b1\u30f3\u30ab\u3057\u3066\u308b": "fighting",
+    "\u3088\u304f\u308f\u304b\u3089\u306a\u3044": "unknown",
   };
 
-  return marks[label] ?? "\u30fb";
+  return `/icons/cat-actions/${icons[label] ?? "unknown"}.png`;
 }
 
 const styles = {
@@ -1434,19 +1441,22 @@ const styles = {
     fontWeight: 600,
     minHeight: "72px",
   },
-  optionMark: {
+  optionIconFrame: {
     display: "inline-flex",
     alignItems: "center",
     justifyContent: "center",
     flex: "0 0 auto",
-    width: "36px",
-    height: "36px",
+    width: "44px",
+    height: "44px",
     borderRadius: "999px",
     background: "#f7f3ee",
-    color: "#6b5f54",
-    fontSize: "12px",
-    fontWeight: 700,
-    lineHeight: 1,
+    overflow: "hidden",
+  },
+  optionIcon: {
+    display: "block",
+    width: "34px",
+    height: "34px",
+    objectFit: "contain",
   },
   bottomNav: {
     position: "fixed",
