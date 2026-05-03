@@ -4,6 +4,76 @@ This file records product, logic, UI, schema, and architecture decisions.
 
 Any change to the agreed specification must be recorded here.
 
+# 設計判断：MVPでは calendar_context jsonb で生活文脈を保存する
+
+## 背景
+
+猫の行動は、人間の生活リズムにも影響される。
+
+平日/休日、曜日、時間帯、祝日などによって、飼い主の在宅状況や行動が変わり、猫の行動も変わる可能性がある。
+
+## 判断
+
+MVPでは、events と diagnoses に calendar_context jsonb を追加する。
+
+追加対象：
+
+- events.calendar_context
+- diagnoses.calendar_context
+
+## 理由
+
+events に保存することで、日常ログにも生活文脈を残せる。
+
+diagnoses に保存することで、診断時の生活文脈を診断データ側にも残せる。
+
+jsonb にすることで、今後祝日・連休・時間帯などの項目を柔軟に増やせる。
+
+## 想定する形式
+
+```json
+{
+  "dayOfWeek": 0,
+  "dayName": "Sunday",
+  "dayType": "weekend",
+  "isWeekend": true,
+  "isHoliday": false,
+  "holidayName": null,
+  "timeBand": "morning"
+}
+```
+
+## timeBand
+
+- early_morning
+- morning
+- daytime
+- evening
+- night
+- late_night
+
+## dayType
+
+- weekday
+- weekend
+- holiday
+
+## 今回はまだやらないこと
+
+- 診断スコア補正
+- 祝日API連携
+- Google Calendar連携
+- ユーザー予定連携
+- 外部ライブラリ追加
+- 既存データ移行
+- RLS変更
+
+## 既存データの扱い
+
+既存データは calendar_context null のまま残す。
+
+新規データから保存する。
+
 ## 2026-05-01
 
 ### Start With Web/PWA
