@@ -58,6 +58,15 @@ const feedbackSaveErrorMessage =
 const currentStateSaveSuccessMessage =
   "\u4eca\u65e5\u306e\u69d8\u5b50\u3092\u8a18\u9332\u3057\u307e\u3057\u305f\u3002";
 
+const dailyHintFeedbackMessages: Record<CurrentCatHintFeedback, string> = {
+  accepted:
+    "\u8a18\u9332\u3057\u307e\u3057\u305f\u3002\n\u6b21\u304b\u3089\u306e\u30d2\u30f3\u30c8\u306b\u4f7f\u3044\u307e\u3059\u3002",
+  rejected:
+    "\u3042\u308a\u304c\u3068\u3046\u3002\n\u6b21\u304b\u3089\u5c11\u3057\u63a7\u3048\u3081\u306b\u3057\u307e\u3059\u3002",
+  dismissed:
+    "\u3042\u3068\u3067\u898b\u3089\u308c\u308b\u3088\u3046\u306b\u3057\u3066\u304a\u304d\u307e\u3059\u3002",
+};
+
 export function HomeInput({
   recentEvents,
 }: HomeInputProps) {
@@ -349,11 +358,7 @@ export function HomeInput({
 
     setHintSuppressions(nextSuppressions);
     setIsDailyHintDismissed(true);
-    setHypothesisMessage(
-      feedback === "dismissed"
-        ? "\u3042\u3068\u3067\u898b\u308b\u3088\u3046\u306b\u3057\u307e\u3057\u305f\u3002"
-        : "\u8a18\u9332\u3057\u307e\u3057\u305f\u3002",
-    );
+    setHypothesisMessage(dailyHintFeedbackMessages[feedback]);
   }
 
   function handleDailyHintMainAction() {
