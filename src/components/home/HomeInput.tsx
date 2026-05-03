@@ -668,7 +668,7 @@ function GuidanceBlock({
     <div style={styles.guidance}>
       {showPredictedConcerns ? (
         <p style={styles.predictionReason}>
-          {"\u3053\u306e\u5b50\u306e\u6700\u8fd1\u306e\u8a18\u9332\u304b\u3089"}
+          {"\u4eca\u65e5\u306e\u30d2\u30f3\u30c8"}
         </p>
       ) : null}
       <p style={styles.guidanceTitle}>{guidance.title}</p>
