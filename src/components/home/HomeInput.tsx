@@ -1,8 +1,8 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useEffect, useRef, useState } from "react";
-import type { CSSProperties, RefObject } from "react";
+import { useEffect, useState } from "react";
+import type { CSSProperties } from "react";
 import {
   calculateUnderstandingPercent,
   getUnderstandingMessage,
@@ -90,9 +90,6 @@ export function HomeInput({
   const [hintSuppressions, setHintSuppressions] = useState<
     CurrentCatHintSuppression[]
   >([]);
-  const topRef = useRef<HTMLDivElement | null>(null);
-  const recordRef = useRef<HTMLDivElement | null>(null);
-  const catSettingsRef = useRef<HTMLElement | null>(null);
 
   const activeCatProfile =
     catProfiles.length > 0
@@ -254,10 +251,6 @@ export function HomeInput({
     setCatNameMessage("\u4fdd\u5b58\u3057\u307e\u3057\u305f\u3002");
   }
 
-  function scrollTo(ref: RefObject<HTMLElement | HTMLDivElement | null>) {
-    ref.current?.scrollIntoView({ behavior: "smooth", block: "start" });
-  }
-
   async function handleCurrentSelect(label: string, signal: string) {
     dismissLatestHypothesis();
     setCurrentStateMessage("");
@@ -410,7 +403,7 @@ export function HomeInput({
   return (
     <main style={styles.page}>
       <div style={styles.container}>
-        <div ref={topRef}>
+        <div id="today">
         <Header
           activeCatId={activeCatId}
           catName={catName}
@@ -455,7 +448,7 @@ export function HomeInput({
           ) : null}
         </section>
 
-        <div ref={recordRef} style={styles.actionArea}>
+        <div id="record" style={styles.actionArea}>
           <OptionSection
             title={`${catName}\u306f\u3044\u307e\u3069\u3046\u3057\u3066\u308b\uff1f`}
             options={CURRENT_OPTIONS}
@@ -485,7 +478,6 @@ export function HomeInput({
         </div>
 
         <CatSettings
-          settingsRef={catSettingsRef}
           activeCatId={activeCatId}
           catNameInput={catNameInput}
           catNameMessage={catNameMessage}
@@ -504,11 +496,7 @@ export function HomeInput({
           onCancelAddingCat={cancelAddingCat}
         />
       </div>
-      <BottomNavigation
-        onTodayClick={() => scrollTo(topRef)}
-        onRecordClick={() => scrollTo(recordRef)}
-        onCatClick={() => scrollTo(catSettingsRef)}
-      />
+      <BottomNavigation />
     </main>
   );
 }
@@ -528,14 +516,14 @@ function Header({
   understandingMessage: string;
   onCatSelect: (catId: string) => void;
 }) {
+  const understandingTone = getUnderstandingTone(understandingPercent);
+
   return (
     <header style={styles.header}>
       <div style={styles.headerTopRow}>
         <p style={styles.headerEyebrow}>{"\u4eca\u65e5\u306e\u732b"}</p>
         <p style={styles.understanding}>
-          {"\u7406\u89e3\u5ea6 "}
-          {understandingPercent}
-          {"%"}
+          {understandingTone}
         </p>
       </div>
       <h1 style={styles.title}>
@@ -544,8 +532,12 @@ function Header({
       </h1>
       <p style={styles.understandingMessage}>
         {catName}
-        {"\u306e\u3053\u3068\u3001"}
-        {understandingMessage}
+        {"\u306e\u3053\u3068\u3001\u8a18\u9332\u3059\u308b\u307b\u3069\u898b\u3048\u3066\u304d\u307e\u3059"}
+        <span style={styles.understandingMeta}>
+          {"\u7406\u89e3\u5ea6 "}
+          {understandingPercent}
+          {"%"}
+        </span>
       </p>
       <div style={styles.catChips}>
         {catProfiles.map((profile) => (
@@ -567,8 +559,23 @@ function Header({
   );
 }
 
+function getUnderstandingTone(percent: number) {
+  if (percent >= 90) {
+    return "\u304b\u306a\u308a\u898b\u3048\u3066\u304d\u307e\u3057\u305f";
+  }
+
+  if (percent >= 60) {
+    return "\u3060\u3093\u3060\u3093\u5206\u304b\u3063\u3066\u304d\u307e\u3057\u305f";
+  }
+
+  if (percent >= 30) {
+    return "\u5c11\u3057\u305a\u3064\u5206\u304b\u3063\u3066\u304d\u307e\u3057\u305f";
+  }
+
+  return "\u3053\u308c\u304b\u3089\u77e5\u3063\u3066\u3044\u304d\u307e\u3059";
+}
+
 function CatSettings({
-  settingsRef,
   activeCatId,
   catNameInput,
   catNameMessage,
@@ -586,7 +593,6 @@ function CatSettings({
   onStartAddingCat,
   onCancelAddingCat,
 }: {
-  settingsRef: RefObject<HTMLElement | null>;
   activeCatId: string | null;
   catNameInput: string;
   catNameMessage: string;
@@ -605,7 +611,7 @@ function CatSettings({
   onCancelAddingCat: () => void;
 }) {
   return (
-    <section ref={settingsRef} style={styles.catSettings}>
+    <section id="cats" style={styles.catSettings}>
       <p style={styles.settingsEyebrow}>{"\u306d\u3053"}</p>
       <h2 style={styles.sectionTitle}>{"\u306d\u3053\u306e\u8a2d\u5b9a"}</h2>
       <p style={styles.sectionDescription}>
@@ -712,26 +718,18 @@ function CatSettings({
   );
 }
 
-function BottomNavigation({
-  onTodayClick,
-  onRecordClick,
-  onCatClick,
-}: {
-  onTodayClick: () => void;
-  onRecordClick: () => void;
-  onCatClick: () => void;
-}) {
+function BottomNavigation() {
   return (
     <nav style={styles.bottomNav} aria-label={"\u30db\u30fc\u30e0\u5185\u30ca\u30d3"}>
-      <button type="button" onClick={onTodayClick} style={styles.activeNavButton}>
+      <a href="#today" style={styles.activeNavButton}>
         {"\u4eca\u65e5"}
-      </button>
-      <button type="button" onClick={onRecordClick} style={styles.navButton}>
+      </a>
+      <a href="#record" style={styles.navButton}>
         {"\u304d\u308d\u304f"}
-      </button>
-      <button type="button" onClick={onCatClick} style={styles.navButton}>
+      </a>
+      <a href="#cats" style={styles.navButton}>
         {"\u306d\u3053"}
-      </button>
+      </a>
     </nav>
   );
 }
@@ -890,12 +888,34 @@ function OptionSection<Option extends { label: string }>({
             onClick={() => onSelect(option)}
             style={buttonStyle}
           >
-            {option.label}
+            <span style={styles.optionMark} aria-hidden="true">
+              {getOptionMark(option.label)}
+            </span>
+            <span>{option.label}</span>
           </button>
         ))}
       </div>
     </section>
   );
+}
+
+function getOptionMark(label: string) {
+  const marks: Record<string, string> = {
+    "\u306d\u3066\u308b": "Zz",
+    "\u30b0\u30eb\u30fc\u30df\u30f3\u30b0": "\u6574",
+    "\u904a\u3093\u3067\u308b": "\u904a",
+    "\u3054\u306f\u3093": "\u98df",
+    "\u30c8\u30a4\u30ec": "\u6e08",
+    "\u30b4\u30ed\u30b4\u30ed\u3057\u3066\u308b": "\u5b89",
+    "\u9cf4\u3044\u3066\u308b": "\u9cf4",
+    "\u3064\u3044\u3066\u304f\u308b": "\u8ffd",
+    "\u843d\u3061\u7740\u304b\u306a\u3044": "\u63fa",
+    "\u5143\u6c17\u306a\u3044": "\u4f11",
+    "\u30b1\u30f3\u30ab\u3057\u3066\u308b": "\u6c17",
+    "\u3088\u304f\u308f\u304b\u3089\u306a\u3044": "\uff1f",
+  };
+
+  return marks[label] ?? "\u30fb";
 }
 
 const styles = {
@@ -909,10 +929,10 @@ const styles = {
   container: {
     width: "min(100%, 430px)",
     margin: "0 auto",
-    padding: "14px 14px calc(176px + env(safe-area-inset-bottom))",
+    padding: "14px 14px calc(248px + env(safe-area-inset-bottom))",
   },
   actionArea: {
-    scrollMarginTop: "16px",
+    scrollMarginTop: "18px",
   },
   headerEyebrow: {
     margin: "0 0 4px",
@@ -1112,12 +1132,13 @@ const styles = {
     margin: 0,
     border: "1px solid #eadbca",
     borderRadius: "999px",
-    background: "#fffaf3",
+    background: "#ffffff",
     color: "#6b5f54",
-    fontSize: "12px",
+    fontSize: "11px",
     fontWeight: 600,
     letterSpacing: 0,
-    padding: "2px 9px",
+    padding: "3px 9px",
+    whiteSpace: "nowrap",
   },
   understandingMessage: {
     margin: "8px 0 0",
@@ -1125,6 +1146,15 @@ const styles = {
     fontSize: "13px",
     fontWeight: 400,
     letterSpacing: 0,
+    lineHeight: 1.7,
+  },
+  understandingMeta: {
+    display: "block",
+    marginTop: "2px",
+    color: "#a1a1aa",
+    fontSize: "11px",
+    fontWeight: 500,
+    lineHeight: 1.5,
   },
   catSettings: {
     marginTop: "12px",
@@ -1331,14 +1361,19 @@ const styles = {
     gap: "12px",
   },
   button: {
-    minHeight: "58px",
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "flex-start",
+    gap: "10px",
+    minHeight: "56px",
     border: "1px solid #d4d4d8",
-    borderRadius: "18px",
+    borderRadius: "20px",
     background: "#ffffff",
     color: "#27272a",
-    fontSize: "15px",
-    fontWeight: 500,
+    fontSize: "14px",
+    fontWeight: 600,
     letterSpacing: 0,
+    padding: "0 12px",
     cursor: "pointer",
   },
   currentButton: {
@@ -1350,10 +1385,24 @@ const styles = {
     borderColor: "#eadbca",
     fontWeight: 600,
   },
+  optionMark: {
+    display: "inline-flex",
+    alignItems: "center",
+    justifyContent: "center",
+    flex: "0 0 auto",
+    width: "28px",
+    height: "28px",
+    borderRadius: "999px",
+    background: "#f4f4f5",
+    color: "#71717a",
+    fontSize: "11px",
+    fontWeight: 700,
+    lineHeight: 1,
+  },
   bottomNav: {
     position: "fixed",
     left: "50%",
-    bottom: "calc(10px + env(safe-area-inset-bottom))",
+    bottom: "calc(18px + env(safe-area-inset-bottom))",
     zIndex: 20,
     display: "grid",
     gridTemplateColumns: "repeat(3, 1fr)",
@@ -1368,22 +1417,30 @@ const styles = {
     backdropFilter: "blur(14px)",
   },
   navButton: {
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
     minHeight: "42px",
     border: "none",
     borderRadius: "999px",
     background: "transparent",
     color: "#71717a",
+    textDecoration: "none",
     fontSize: "13px",
     fontWeight: 700,
     letterSpacing: 0,
     cursor: "pointer",
   },
   activeNavButton: {
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
     minHeight: "42px",
     border: "none",
     borderRadius: "999px",
     background: "#3f3f46",
     color: "#ffffff",
+    textDecoration: "none",
     fontSize: "13px",
     fontWeight: 700,
     letterSpacing: 0,
