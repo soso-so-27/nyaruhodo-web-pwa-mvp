@@ -389,8 +389,10 @@ export function HomeInput({
         </section>
 
         <OptionSection
-          title={"\u3044\u307e\u306e\u69d8\u5b50"}
+          label={"\u3044\u307e\u306e\u69d8\u5b50"}
+          title={`${catName}\u306f\u4eca\u4f55\u3057\u3066\u308b\uff1f`}
           options={CURRENT_OPTIONS}
+          variant="current"
           message={currentStateMessage}
           errorMessage={
             saveErrorSection === "current" ? saveErrorMessage : ""
@@ -403,6 +405,7 @@ export function HomeInput({
         <OptionSection
           title={"\u6c17\u306b\u306a\u308b\u3053\u3068"}
           options={CONCERN_OPTIONS}
+          variant="concern"
           description={"\u3044\u3064\u3082\u3068\u9055\u3046\u69d8\u5b50\u304c\u3042\u308b\u3068\u304d\u306f\u3053\u3061\u3089"}
           errorMessage={
             saveErrorSection === "concern" ? saveErrorMessage : ""
@@ -689,22 +692,36 @@ function GuidanceBlock({
 }
 
 function OptionSection<Option extends { label: string }>({
+  label,
   title,
   options,
   description,
+  variant = "current",
   message,
   errorMessage,
   onSelect,
 }: {
+  label?: string;
   title: string;
   options: Option[];
   description?: string;
+  variant?: "current" | "concern";
   message?: string;
   errorMessage?: string;
   onSelect: (option: Option) => void;
 }) {
+  const sectionStyle =
+    variant === "concern"
+      ? { ...styles.section, ...styles.concernSection }
+      : { ...styles.section, ...styles.currentSection };
+  const buttonStyle =
+    variant === "concern"
+      ? { ...styles.button, ...styles.concernButton }
+      : { ...styles.button, ...styles.currentButton };
+
   return (
-    <section style={styles.section}>
+    <section style={sectionStyle}>
+      {label ? <p style={styles.sectionLabel}>{label}</p> : null}
       <h2 style={styles.sectionTitle}>{title}</h2>
       {description ? (
         <p style={styles.sectionDescription}>{description}</p>
@@ -719,7 +736,7 @@ function OptionSection<Option extends { label: string }>({
             key={option.label}
             type="button"
             onClick={() => onSelect(option)}
-            style={styles.button}
+            style={buttonStyle}
           >
             {option.label}
           </button>
@@ -750,9 +767,9 @@ const styles = {
   },
   header: {
     marginBottom: "10px",
-    border: "1px solid #e4e4e7",
+    border: "1px solid #ebe2d6",
     borderRadius: "18px",
-    background: "#ffffff",
+    background: "#fffdf9",
     padding: "18px 16px",
   },
   catNameControls: {
@@ -940,12 +957,19 @@ const styles = {
   },
   lastResultLead: {
     margin: "0 0 4px",
-    color: "#52525b",
-    fontSize: "13px",
+    display: "inline-flex",
+    width: "fit-content",
+    border: "1px solid #eadbca",
+    borderRadius: "999px",
+    background: "#fffaf3",
+    color: "#6b5f54",
+    fontSize: "12px",
+    fontWeight: 500,
     lineHeight: 1.6,
+    padding: "2px 9px",
   },
   lastResultText: {
-    margin: 0,
+    margin: "8px 0 0",
     color: "#27272a",
     fontSize: "16px",
     fontWeight: 600,
@@ -988,9 +1012,9 @@ const styles = {
   },
   insightCard: {
     marginBottom: "10px",
-    border: "1px solid #e4e4e7",
+    border: "1px solid #eadbca",
     borderRadius: "18px",
-    background: "#ffffff",
+    background: "#fffaf3",
     padding: "16px",
   },
   guidance: {
@@ -998,10 +1022,16 @@ const styles = {
   },
   predictionReason: {
     margin: "0 0 6px",
-    color: "#71717a",
+    display: "inline-flex",
+    width: "fit-content",
+    border: "1px solid #eadbca",
+    borderRadius: "999px",
+    background: "#ffffff",
+    color: "#6b5f54",
     fontSize: "12px",
     fontWeight: 500,
     lineHeight: 1.5,
+    padding: "2px 9px",
   },
   guidanceTitle: {
     margin: "0 0 4px",
@@ -1041,9 +1071,24 @@ const styles = {
     background: "#ffffff",
     padding: "16px",
   },
+  currentSection: {
+    borderColor: "#e4e4e7",
+    background: "#ffffff",
+  },
+  concernSection: {
+    borderColor: "#eadbca",
+    background: "#fffdf9",
+  },
+  sectionLabel: {
+    margin: "0 0 5px",
+    color: "#71717a",
+    fontSize: "12px",
+    fontWeight: 500,
+    lineHeight: 1.5,
+  },
   sectionTitle: {
-    margin: "0 0 14px",
-    fontSize: "18px",
+    margin: "0 0 12px",
+    fontSize: "17px",
     fontWeight: 600,
     letterSpacing: 0,
   },
@@ -1082,5 +1127,14 @@ const styles = {
     fontWeight: 500,
     letterSpacing: 0,
     cursor: "pointer",
+  },
+  currentButton: {
+    background: "#ffffff",
+    borderColor: "#d4d4d8",
+  },
+  concernButton: {
+    background: "#fffaf3",
+    borderColor: "#eadbca",
+    fontWeight: 600,
   },
 } satisfies Record<string, CSSProperties>;
