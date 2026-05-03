@@ -4,3 +4,5 @@ node_modules
 .test-build
 tsconfig.tsbuildinfo
 supabase/.temp/
+playwright-report/
+test-results/

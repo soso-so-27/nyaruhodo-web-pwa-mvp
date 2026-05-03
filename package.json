@@ -4,6 +4,8 @@
     "build": "next build",
     "start": "next start",
     "typecheck": "tsc --noEmit",
+    "e2e": "playwright test",
+    "e2e:headed": "playwright test --headed",
     "test:core": "tsc -p tsconfig.test.json && node .test-build/core/logic/__tests__/scenarios.test.js"
   },
   "dependencies": {
@@ -13,6 +15,7 @@
     "react-dom": "latest"
   },
   "devDependencies": {
+    "@playwright/test": "^1.59.1",
     "@types/node": "latest",
     "@types/react": "latest",
     "@types/react-dom": "latest",
