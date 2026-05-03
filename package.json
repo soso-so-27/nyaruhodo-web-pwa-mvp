@@ -6,11 +6,13 @@
     "typecheck": "tsc --noEmit",
     "e2e": "playwright test",
     "e2e:headed": "playwright test --headed",
+    "generate:icons": "node scripts/generate-cat-action-icons.mjs",
     "test:core": "tsc -p tsconfig.test.json && node .test-build/core/logic/__tests__/scenarios.test.js"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.105.1",
     "next": "latest",
+    "openai": "^6.35.0",
     "react": "latest",
     "react-dom": "latest"
   },
