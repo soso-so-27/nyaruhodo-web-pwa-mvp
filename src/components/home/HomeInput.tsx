@@ -45,6 +45,12 @@ const feedbackSaveErrorMessage =
 const currentStateSaveSuccessMessage =
   "\u4eca\u65e5\u306e\u69d8\u5b50\u3092\u8a18\u9332\u3057\u307e\u3057\u305f\u3002";
 
+const dailyHintGuidance = {
+  title:
+    "\u6700\u8fd1\u306e\u8a18\u9332\u304b\u3089\u3001\u6c17\u306b\u306a\u308b\u69d8\u5b50\u3092\u5148\u306b\u898b\u3089\u308c\u307e\u3059",
+  text: "\u9055\u3063\u3066\u3044\u305f\u3089\u3001\u3044\u3064\u3082\u306e\u3088\u3046\u306b\u9078\u3073\u76f4\u3057\u3066\u304f\u3060\u3055\u3044",
+};
+
 export function HomeInput({
   recentEvents,
 }: HomeInputProps) {
@@ -88,7 +94,7 @@ export function HomeInput({
     : false;
   const predictedConcernOptions = buildPredictedConcernOptions(activeCatEvents);
   const shouldShowPredictedConcerns =
-    !visibleLatestHypothesis && understandingPercent >= 71;
+    !visibleLatestHypothesis && activeCatEvents.length >= 3;
 
   useEffect(() => {
     const savedCatProfiles = readCatProfiles();
@@ -379,7 +385,9 @@ export function HomeInput({
             />
           ) : (
             <GuidanceBlock
-              guidance={guidance}
+              guidance={
+                shouldShowPredictedConcerns ? dailyHintGuidance : guidance
+              }
               showPredictedConcerns={shouldShowPredictedConcerns}
               predictedConcernOptions={predictedConcernOptions}
               onPredictedConcernSelect={handlePredictedConcernSelect}
