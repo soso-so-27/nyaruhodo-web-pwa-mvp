@@ -17,7 +17,7 @@ import {
   FALLBACK_HYPOTHESIS_CTA_LABELS,
   HYPOTHESIS_CTA_LABELS,
   addCatProfile,
-  buildPredictedConcernOptions,
+  buildDailyHintHypothesis,
   clearLatestHypothesis,
   getActiveCatProfile,
   getCatName,
@@ -30,7 +30,11 @@ import {
   saveActiveCatId,
   updateCatProfileName,
 } from "./homeInputHelpers";
-import type { CatProfile, LatestHypothesisView } from "./homeInputHelpers";
+import type {
+  CatProfile,
+  DailyHintHypothesis,
+  LatestHypothesisView,
+} from "./homeInputHelpers";
 
 type HomeInputProps = {
   recentEvents: RecentEvent[];
@@ -44,12 +48,6 @@ const feedbackSaveErrorMessage =
 
 const currentStateSaveSuccessMessage =
   "\u4eca\u65e5\u306e\u69d8\u5b50\u3092\u8a18\u9332\u3057\u307e\u3057\u305f\u3002";
-
-const dailyHintGuidance = {
-  title:
-    "\u6c17\u306b\u306a\u308b\u3068\u304d\u306f\u3001\u307e\u305a\u3053\u306e\u3042\u305f\u308a\u304b\u3089\u898b\u3089\u308c\u307e\u3059",
-  text: "\u6700\u8fd1\u306e\u8a18\u9332\u304b\u3089\u3001\u5148\u306b\u78ba\u8a8d\u3057\u3084\u3059\u3044\u5019\u88dc\u3092\u51fa\u3057\u3066\u3044\u307e\u3059\n\u9055\u3063\u3066\u3044\u305f\u3089\u3001\u4e0b\u306e\u4e00\u89a7\u304b\u3089\u9078\u3073\u76f4\u305b\u307e\u3059",
-};
 
 export function HomeInput({
   recentEvents,
@@ -71,6 +69,7 @@ export function HomeInput({
   const [saveErrorSection, setSaveErrorSection] = useState<
     "current" | "concern" | ""
   >("");
+  const [isDailyHintDismissed, setIsDailyHintDismissed] = useState(false);
 
   const activeCatProfile =
     catProfiles.length > 0
@@ -92,9 +91,11 @@ export function HomeInput({
   const hasKnownHypothesisCategory = visibleLatestHypothesis
     ? Boolean(HYPOTHESIS_CTA_LABELS[visibleLatestHypothesis.category])
     : false;
-  const predictedConcernOptions = buildPredictedConcernOptions(activeCatEvents);
-  const shouldShowPredictedConcerns =
-    !visibleLatestHypothesis && activeCatEvents.length >= 3;
+  const dailyHintHypothesis = buildDailyHintHypothesis(activeCatEvents);
+  const shouldShowDailyHint =
+    !visibleLatestHypothesis &&
+    !isDailyHintDismissed &&
+    activeCatEvents.length >= 3;
 
   useEffect(() => {
     const savedCatProfiles = readCatProfiles();
@@ -193,6 +194,7 @@ export function HomeInput({
     setHypothesisMessage("");
     setCurrentStateMessage("");
     setSaveErrorMessage("");
+    setIsDailyHintDismissed(false);
     setIsSwitchingCat(false);
     setIsAddingCat(false);
     setCatNameMessage("");
@@ -253,6 +255,7 @@ export function HomeInput({
     setSaveErrorSection("");
     setSaveErrorMessage("");
     setCurrentStateMessage(currentStateSaveSuccessMessage);
+    setIsDailyHintDismissed(false);
     router.refresh();
   }
 
@@ -289,16 +292,13 @@ export function HomeInput({
     router.push(`/diagnose?${params.toString()}`);
   }
 
-  function handlePredictedConcernSelect(input: string) {
-    const params = new URLSearchParams({
-      input,
-    });
+  function handleDailyHintMainAction() {
+    setHypothesisMessage("\u8a18\u9332\u3057\u307e\u3057\u305f\u3002");
+  }
 
-    if (activeCatId) {
-      params.set("local_cat_id", activeCatId);
-    }
-
-    router.push(`/diagnose?${params.toString()}`);
+  function handleDailyHintSubAction() {
+    setIsDailyHintDismissed(true);
+    setHypothesisMessage("");
   }
 
   async function handleHypothesisAction(feedback: "resolved" | "unresolved") {
@@ -386,12 +386,12 @@ export function HomeInput({
             />
           ) : (
             <GuidanceBlock
-              guidance={
-                shouldShowPredictedConcerns ? dailyHintGuidance : guidance
-              }
-              showPredictedConcerns={shouldShowPredictedConcerns}
-              predictedConcernOptions={predictedConcernOptions}
-              onPredictedConcernSelect={handlePredictedConcernSelect}
+              guidance={guidance}
+              showDailyHint={shouldShowDailyHint}
+              dailyHintHypothesis={dailyHintHypothesis}
+              understandingPercent={understandingPercent}
+              onDailyHintMainAction={handleDailyHintMainAction}
+              onDailyHintSubAction={handleDailyHintSubAction}
             />
           )}
 
@@ -667,40 +667,67 @@ function LatestHypothesisCard({
 
 function GuidanceBlock({
   guidance,
-  showPredictedConcerns,
-  predictedConcernOptions,
-  onPredictedConcernSelect,
+  showDailyHint,
+  dailyHintHypothesis,
+  understandingPercent,
+  onDailyHintMainAction,
+  onDailyHintSubAction,
 }: {
   guidance: { title: string; text: string };
-  showPredictedConcerns: boolean;
-  predictedConcernOptions: { label: string; input: string }[];
-  onPredictedConcernSelect: (input: string) => void;
+  showDailyHint: boolean;
+  dailyHintHypothesis: DailyHintHypothesis;
+  understandingPercent: number;
+  onDailyHintMainAction: () => void;
+  onDailyHintSubAction: () => void;
 }) {
-  return (
-    <div style={styles.guidance}>
-      {showPredictedConcerns ? (
+  if (showDailyHint) {
+    return (
+      <div style={styles.guidance}>
         <p style={styles.predictionReason}>
           {"\u4eca\u65e5\u306e\u30d2\u30f3\u30c8"}
         </p>
-      ) : null}
+        <p style={styles.guidanceTitle}>{dailyHintHypothesis.text}</p>
+        <p style={styles.guidanceText}>
+          {getDailyHintSupplement(understandingPercent)}
+        </p>
+        <div style={styles.predictionActions}>
+          <button
+            type="button"
+            onClick={onDailyHintMainAction}
+            style={styles.hypothesisMainButton}
+          >
+            {dailyHintHypothesis.cta.main}
+          </button>
+          <button
+            type="button"
+            onClick={onDailyHintSubAction}
+            style={styles.hypothesisSubButton}
+          >
+            {dailyHintHypothesis.cta.sub}
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div style={styles.guidance}>
       <p style={styles.guidanceTitle}>{guidance.title}</p>
       <p style={styles.guidanceText}>{guidance.text}</p>
-      {showPredictedConcerns ? (
-        <div style={styles.predictionActions}>
-          {predictedConcernOptions.map(({ label, input }) => (
-            <button
-              key={input}
-              type="button"
-              onClick={() => onPredictedConcernSelect(input)}
-              style={styles.predictionButton}
-            >
-              {label}
-            </button>
-          ))}
-        </div>
-      ) : null}
     </div>
   );
+}
+
+function getDailyHintSupplement(percent: number) {
+  if (percent <= 30) {
+    return "\u307e\u3060\u8a18\u9332\u304c\u5c11\u306a\u3044\u306e\u3067\u3001\u307e\u305a\u306f\u69d8\u5b50\u3092\u6559\u3048\u3066\u304f\u3060\u3055\u3044";
+  }
+
+  if (percent <= 70) {
+    return "\u307e\u3060\u5c11\u3057\u305a\u3064\u898b\u3048\u3066\u304d\u305f\u6bb5\u968e\u3067\u3059\u3002\u9055\u3063\u3066\u3044\u305f\u3089\u3001\u4e0b\u304b\u3089\u9078\u3073\u76f4\u305b\u307e\u3059\u3002";
+  }
+
+  return "\u6700\u8fd1\u306e\u8a18\u9332\u304b\u3089\u3001\u50be\u5411\u304c\u898b\u3048\u3066\u304d\u3066\u3044\u307e\u3059\u3002\u9055\u3063\u3066\u3044\u305f\u3089\u3001\u9078\u3073\u76f4\u305b\u307e\u3059\u3002";
 }
 
 function OptionSection<Option extends { label: string }>({

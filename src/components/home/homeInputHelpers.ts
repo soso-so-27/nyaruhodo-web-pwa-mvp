@@ -25,6 +25,17 @@ type ConcernSignal =
   | "fighting"
   | "unknown";
 
+type DailyHintCategory = "food" | "play" | "social" | "stress" | "health";
+
+export type DailyHintHypothesis = {
+  category: DailyHintCategory;
+  text: string;
+  cta: {
+    main: string;
+    sub: string;
+  };
+};
+
 export const CATEGORY_MESSAGES: Record<string, string> = {
   food: "\u3054\u98ef\u304b\u3082\u3057\u308c\u307e\u305b\u3093",
   play: "\u904a\u3073\u305f\u3044\u53ef\u80fd\u6027\u304c\u3042\u308a\u307e\u3059",
@@ -149,6 +160,38 @@ const PREDICTED_CONCERN_LABELS: Record<ConcernSignal, string> = {
 };
 
 const FALLBACK_PREDICTED_SIGNALS: ConcernSignal[] = ["meowing", "following"];
+const DAILY_HINT_MESSAGES: Record<DailyHintCategory, string> = {
+  food: "\u304a\u8179\u304c\u7a7a\u3044\u3066\u3044\u308b\u53ef\u80fd\u6027\u304c\u3042\u308a\u307e\u3059",
+  play: "\u904a\u3073\u305f\u3044\u53ef\u80fd\u6027\u304c\u3042\u308a\u307e\u3059",
+  social: "\u304b\u307e\u3063\u3066\u307b\u3057\u3044\u53ef\u80fd\u6027\u304c\u3042\u308a\u307e\u3059",
+  stress: "\u5c11\u3057\u843d\u3061\u7740\u304b\u306a\u3044\u53ef\u80fd\u6027\u304c\u3042\u308a\u307e\u3059",
+  health: "\u4f53\u8abf\u306b\u6ce8\u610f\u3057\u305f\u65b9\u304c\u3088\u3044\u53ef\u80fd\u6027\u304c\u3042\u308a\u307e\u3059",
+};
+const DAILY_HINT_CTA_LABELS: Record<
+  DailyHintCategory,
+  { main: string; sub: string }
+> = {
+  food: {
+    main: "\u3054\u306f\u3093\u3092\u78ba\u8a8d\u3057\u305f",
+    sub: "\u9055\u3046\u304b\u3082",
+  },
+  play: {
+    main: "\u904a\u3093\u3067\u307f\u305f",
+    sub: "\u9055\u3046\u304b\u3082",
+  },
+  social: {
+    main: "\u304b\u307e\u3063\u3066\u307f\u305f",
+    sub: "\u9055\u3046\u304b\u3082",
+  },
+  stress: {
+    main: "\u843d\u3061\u7740\u3051\u308b\u3088\u3046\u306b\u3057\u305f",
+    sub: "\u9055\u3046\u304b\u3082",
+  },
+  health: {
+    main: "\u4f53\u8abf\u3092\u78ba\u8a8d\u3057\u305f",
+    sub: "\u9055\u3046\u304b\u3082",
+  },
+};
 const DEFAULT_CAT_NAME = "\u30df\u30b1";
 const CAT_PROFILES_KEY = "cat_profiles";
 const ACTIVE_CAT_ID_KEY = "active_cat_id";
@@ -200,6 +243,45 @@ export function buildPredictedConcernOptions(recentEvents: RecentEvent[]) {
     input,
     label: PREDICTED_CONCERN_LABELS[input],
   }));
+}
+
+export function buildDailyHintHypothesis(
+  recentEvents: RecentEvent[],
+): DailyHintHypothesis {
+  const stats = new Map<
+    DailyHintCategory,
+    { score: number; latestIndex: number }
+  >();
+
+  recentEvents.forEach((event, index) => {
+    const category = getDailyHintCategory(event.signal);
+
+    if (!category) {
+      return;
+    }
+
+    const current = stats.get(category);
+
+    stats.set(category, {
+      score: (current?.score ?? 0) + getDailyHintSignalWeight(event.signal),
+      latestIndex: current ? Math.min(current.latestIndex, index) : index,
+    });
+  });
+
+  const category =
+    [...stats.entries()].sort(([, a], [, b]) => {
+      if (b.score !== a.score) {
+        return b.score - a.score;
+      }
+
+      return a.latestIndex - b.latestIndex;
+    })[0]?.[0] ?? "play";
+
+  return {
+    category,
+    text: DAILY_HINT_MESSAGES[category],
+    cta: DAILY_HINT_CTA_LABELS[category],
+  };
 }
 
 export function createLocalCatProfile(
@@ -430,6 +512,50 @@ export function getHypothesisCompletionMessage(category: string) {
 
 function isConcernSignal(signal: string): signal is ConcernSignal {
   return signal in PREDICTED_CONCERN_LABELS;
+}
+
+function getDailyHintCategory(signal: string): DailyHintCategory | null {
+  if (signal === "low_energy") {
+    return "health";
+  }
+
+  if (signal === "restless" || signal === "fighting") {
+    return "stress";
+  }
+
+  if (signal === "following" || signal === "purring") {
+    return "social";
+  }
+
+  if (signal === "after_food" || signal === "eating") {
+    return "food";
+  }
+
+  if (signal === "playing" || signal === "meowing") {
+    return "play";
+  }
+
+  return null;
+}
+
+function getDailyHintSignalWeight(signal: string) {
+  if (signal === "low_energy") {
+    return 3;
+  }
+
+  if (
+    signal === "playing" ||
+    signal === "following" ||
+    signal === "purring" ||
+    signal === "after_food" ||
+    signal === "eating" ||
+    signal === "restless" ||
+    signal === "fighting"
+  ) {
+    return 2;
+  }
+
+  return 1;
 }
 
 function isExpiredLatestHypothesis(hypothesis: {
