@@ -124,7 +124,7 @@ export function DiagnosisResult({
       return;
     }
 
-    setFeedbackMessage(getCompletionMessage(currentCategory));
+    setFeedbackMessage(getCompletionMessage(currentCategory, feedback));
   }
 
   return (
@@ -216,12 +216,19 @@ export function DiagnosisResult({
   );
 }
 
-function getCompletionMessage(category: CauseCategory) {
+function getCompletionMessage(
+  category: CauseCategory,
+  feedback: "resolved" | "unresolved",
+) {
+  if (feedback === "unresolved") {
+    return "ありがとう。\n違ったことも記録しました。";
+  }
+
   if (category === "health") {
     return "記録しました。\n気になる様子が続くときは、早めに相談してください。";
   }
 
-  return "記録しました。\nまた少し、この子の傾向が見えてきました。";
+  return "記録しました。\nこの子の傾向づくりに使います。";
 }
 
 const styles = {
