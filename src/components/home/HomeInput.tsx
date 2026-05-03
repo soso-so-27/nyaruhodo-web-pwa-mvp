@@ -253,6 +253,7 @@ export function HomeInput({
     setSaveErrorSection("");
     setSaveErrorMessage("");
     setCurrentStateMessage(currentStateSaveSuccessMessage);
+    router.refresh();
   }
 
   async function handleConcernSelect(label: string, input: string) {
