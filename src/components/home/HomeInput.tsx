@@ -14,6 +14,7 @@ import {
   insertFeedback,
   insertHintFeedback,
 } from "../../lib/supabase/queries";
+import { BottomNavigation } from "../navigation/BottomNavigation";
 import {
   CATEGORY_MESSAGES,
   CONCERN_OPTIONS,
@@ -477,26 +478,8 @@ export function HomeInput({
           />
         </div>
 
-        <CatSettings
-          activeCatId={activeCatId}
-          catNameInput={catNameInput}
-          catNameMessage={catNameMessage}
-          catProfiles={catProfiles}
-          isEditingCatName={isEditingCatName}
-          isAddingCat={isAddingCat}
-          newCatNameInput={newCatNameInput}
-          onCatNameInputChange={setCatNameInput}
-          onNewCatNameInputChange={setNewCatNameInput}
-          onCatNameSave={handleCatNameSave}
-          onAddCatSave={handleAddCatSave}
-          onCatSelect={handleCatSelect}
-          onEditCatName={startEditingCatName}
-          onCancelCatNameEdit={cancelEditingCatName}
-          onStartAddingCat={startAddingCat}
-          onCancelAddingCat={cancelAddingCat}
-        />
       </div>
-      <BottomNavigation />
+      <BottomNavigation active="today" />
     </main>
   );
 }
@@ -715,22 +698,6 @@ function CatSettings({
         <p style={styles.catNameMessage}>{catNameMessage}</p>
       ) : null}
     </section>
-  );
-}
-
-function BottomNavigation() {
-  return (
-    <nav style={styles.bottomNav} aria-label={"\u30db\u30fc\u30e0\u5185\u30ca\u30d3"}>
-      <a href="#today" style={styles.activeNavButton}>
-        {"\u4eca\u65e5"}
-      </a>
-      <a href="#record" style={styles.navButton}>
-        {"\u304d\u308d\u304f"}
-      </a>
-      <a href="#cats" style={styles.navButton}>
-        {"\u306d\u3053"}
-      </a>
-    </nav>
   );
 }
 
