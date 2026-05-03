@@ -867,7 +867,7 @@ const styles = {
   container: {
     width: "min(100%, 430px)",
     margin: "0 auto",
-    padding: "16px 14px calc(56px + env(safe-area-inset-bottom))",
+    padding: "16px 14px calc(136px + env(safe-area-inset-bottom))",
   },
   title: {
     margin: 0,

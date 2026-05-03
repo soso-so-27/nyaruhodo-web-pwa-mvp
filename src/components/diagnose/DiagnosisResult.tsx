@@ -80,7 +80,7 @@ export function DiagnosisResult({
     ? hypothesisMessages[currentCategory]
     : resultText;
   const secondaryHypothesisText = nextCategory
-    ? hypothesisMessages[nextCategory]
+    ? getSecondaryHypothesisMessage(nextCategory)
     : "";
 
   useEffect(() => {
@@ -151,7 +151,7 @@ export function DiagnosisResult({
 
         {secondaryHypothesisText ? (
           <section style={styles.secondaryCard}>
-            <p style={styles.secondaryLabel}>{"ほかにもありそう"}</p>
+            <p style={styles.secondaryLabel}>{"ほかにも"}</p>
             <p style={styles.secondaryText}>{secondaryHypothesisText}</p>
           </section>
         ) : null}
@@ -231,6 +231,13 @@ function getCompletionMessage(
   return "記録しました。\nこの子の傾向づくりに使います。";
 }
 
+function getSecondaryHypothesisMessage(category: CauseCategory) {
+  return hypothesisMessages[category].replace(
+    "可能性があります",
+    "可能性もあります",
+  );
+}
+
 const styles = {
   page: {
     minHeight: "100vh",
@@ -308,7 +315,7 @@ const styles = {
     marginBottom: "10px",
     border: "1px solid #e4e4e7",
     borderRadius: "16px",
-    background: "#ffffff",
+    background: "#fffdf9",
     padding: "14px 16px",
   },
   secondaryLabel: {
@@ -320,9 +327,9 @@ const styles = {
   },
   secondaryText: {
     margin: 0,
-    color: "#3f3f46",
+    color: "#52525b",
     fontSize: "14px",
-    fontWeight: 600,
+    fontWeight: 500,
     lineHeight: 1.6,
   },
   reasonCard: {
