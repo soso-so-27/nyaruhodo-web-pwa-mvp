@@ -22,10 +22,12 @@ test("diagnosis page uses user-facing labels and avoids stale night copy", async
 }) => {
   await page.goto("/diagnose?input=meowing");
 
-  await expect(page.getByRole("heading", { name: "診断結果" })).toBeVisible();
+  await expect(
+    page.getByRole("heading", { name: "さっきの様子から" }),
+  ).toBeVisible();
   await expect(page.getByText("今の仮説")).toHaveCount(0);
   await expect(page.getByText("夜なので")).toHaveCount(0);
-  await expect(page.getByText("さっきの様子から", { exact: true })).toBeVisible();
+  await expect(page.getByText("いま見えること")).toBeVisible();
   await expect(page.getByText("そう考えた理由")).toBeVisible();
 });
 
@@ -57,7 +59,9 @@ async function openSavedMeowingDiagnosis(page: import("@playwright/test").Page) 
   await page.goto("/home");
   await page.getByRole("button", { name: "鳴いてる" }).click();
   await page.waitForURL(/\/diagnose\?/);
-  await expect(page.getByRole("heading", { name: "診断結果" })).toBeVisible();
+  await expect(
+    page.getByRole("heading", { name: "さっきの様子から" }),
+  ).toBeVisible();
 }
 
 async function clickVisibleMainCta(page: import("@playwright/test").Page) {

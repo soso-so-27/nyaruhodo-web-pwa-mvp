@@ -480,7 +480,7 @@ export function HomeInput({
         />
 
         <OptionSection
-          title={"\u6c17\u306b\u306a\u308b\u3053\u3068"}
+          title={"\u3061\u3087\u3063\u3068\u6c17\u306b\u306a\u308b\uff1f"}
           options={CONCERN_OPTIONS}
           variant="concern"
           description={"\u3044\u3064\u3082\u3068\u9055\u3046\u69d8\u5b50\u304c\u3042\u308b\u3068\u304d\u306f\u3053\u3061\u3089"}
@@ -541,7 +541,11 @@ function Header({
 }) {
   return (
     <div style={styles.header}>
-      <h1 style={styles.title}>{catName}</h1>
+      <p style={styles.headerEyebrow}>{"\u4eca\u65e5\u306e\u732b"}</p>
+      <h1 style={styles.title}>
+        {"\u4eca\u65e5\u306e"}
+        {catName}
+      </h1>
       <div style={styles.catNameControls}>
         <button
           type="button"
@@ -670,12 +674,15 @@ function Header({
         <p style={styles.catNameMessage}>{catNameMessage}</p>
       ) : null}
       <p style={styles.understanding}>
-        {catName}
-        {"\u306e\u7406\u89e3\u5ea6 "}
+        {"\u7406\u89e3\u5ea6 "}
         {understandingPercent}
         {"%"}
       </p>
-      <p style={styles.understandingMessage}>{understandingMessage}</p>
+      <p style={styles.understandingMessage}>
+        {catName}
+        {"\u306e\u3053\u3068\u3001"}
+        {understandingMessage}
+      </p>
     </div>
   );
 }
@@ -700,6 +707,9 @@ function LatestHypothesisCard({
         {hypothesis.text ??
           CATEGORY_MESSAGES[hypothesis.category] ??
           "\u4f55\u304b\u4f1d\u3048\u305f\u3044\u53ef\u80fd\u6027\u304c\u3042\u308a\u307e\u3059"}
+      </p>
+      <p style={styles.lastResultHint}>
+        {"\u5c11\u3057\u898b\u3066\u3042\u3052\u308b\u3068\u3001\u6b21\u306b\u4f55\u3092\u3059\u308b\u304b\u6c7a\u3081\u3084\u3059\u304f\u306a\u308a\u307e\u3059\u3002"}
       </p>
       <div style={styles.hypothesisActions}>
         <button
@@ -850,12 +860,19 @@ const styles = {
   container: {
     width: "min(100%, 430px)",
     margin: "0 auto",
-    padding: "16px 14px calc(136px + env(safe-area-inset-bottom))",
+    padding: "14px 14px calc(144px + env(safe-area-inset-bottom))",
+  },
+  headerEyebrow: {
+    margin: "0 0 4px",
+    color: "#71717a",
+    fontSize: "12px",
+    fontWeight: 600,
+    letterSpacing: 0,
   },
   title: {
     margin: 0,
-    fontSize: "32px",
-    fontWeight: 600,
+    fontSize: "30px",
+    fontWeight: 700,
     letterSpacing: 0,
   },
   header: {
@@ -869,7 +886,7 @@ const styles = {
     display: "flex",
     flexWrap: "wrap",
     gap: "8px",
-    marginTop: "8px",
+    marginTop: "10px",
   },
   catNameEditButton: {
     margin: 0,
@@ -1031,14 +1048,20 @@ const styles = {
     lineHeight: 1.5,
   },
   understanding: {
-    margin: "10px 0 0",
-    color: "#71717a",
-    fontSize: "13px",
-    fontWeight: 500,
+    display: "inline-flex",
+    width: "fit-content",
+    margin: "12px 0 0",
+    border: "1px solid #eadbca",
+    borderRadius: "999px",
+    background: "#fffaf3",
+    color: "#6b5f54",
+    fontSize: "12px",
+    fontWeight: 600,
     letterSpacing: 0,
+    padding: "2px 9px",
   },
   understandingMessage: {
-    margin: "5px 0 0",
+    margin: "7px 0 0",
     color: "#71717a",
     fontSize: "13px",
     fontWeight: 400,
@@ -1066,6 +1089,13 @@ const styles = {
     color: "#27272a",
     fontSize: "16px",
     fontWeight: 600,
+    lineHeight: 1.6,
+  },
+  lastResultHint: {
+    margin: "6px 0 0",
+    color: "#71717a",
+    fontSize: "13px",
+    fontWeight: 400,
     lineHeight: 1.6,
   },
   hypothesisActions: {

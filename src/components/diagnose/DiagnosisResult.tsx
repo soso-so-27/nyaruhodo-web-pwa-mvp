@@ -17,7 +17,7 @@ type DiagnosisResultProps = {
 };
 
 const hypothesisMessages: Record<CauseCategory, string> = {
-  food: "お腹が空いているかもしれません",
+  food: "ごはんが気になるかもしれません",
   play: "遊びたい気持ちかもしれません",
   social: "かまってほしい気持ちかもしれません",
   stress: "少し落ち着かない気持ちかもしれません",
@@ -25,7 +25,7 @@ const hypothesisMessages: Record<CauseCategory, string> = {
 };
 
 const secondaryHypothesisMessages: Record<CauseCategory, string> = {
-  food: "お腹が空いている気持ちもありそうです",
+  food: "ごはんが気になる気持ちもありそうです",
   play: "遊びたい気持ちもありそうです",
   social: "かまってほしい気持ちもありそうです",
   stress: "少し落ち着かない気持ちもありそうです",
@@ -82,6 +82,7 @@ export function DiagnosisResult({
   const [feedbackOutcome, setFeedbackOutcome] = useState<
     "resolved" | "unresolved" | null
   >(null);
+  const [catName, setCatName] = useState("");
   const currentCategory = categories[0];
   const nextCategory = categories[1];
   const labels = currentCategory
@@ -90,9 +91,16 @@ export function DiagnosisResult({
   const mainHypothesisText = currentCategory
     ? hypothesisMessages[currentCategory]
     : resultText;
+  const displayHypothesisText = catName
+    ? `${catName}\u3001${mainHypothesisText}`
+    : mainHypothesisText;
   const secondaryHypothesisText = nextCategory
     ? getSecondaryHypothesisMessage(nextCategory)
     : "";
+
+  useEffect(() => {
+    setCatName(readCatName(localCatId));
+  }, [localCatId]);
 
   useEffect(() => {
     if (!currentCategory) {
@@ -145,8 +153,9 @@ export function DiagnosisResult({
       <div style={styles.container}>
         <header style={styles.header}>
           <div>
-            <h1 style={styles.title}>{"診断結果"}</h1>
-            <p style={styles.lead}>{"さっきの様子から見ています"}</p>
+            <p style={styles.headerEyebrow}>{"\u8a3a\u65ad\u7d50\u679c"}</p>
+            <h1 style={styles.title}>{"\u3055\u3063\u304d\u306e\u69d8\u5b50\u304b\u3089"}</h1>
+            <p style={styles.lead}>{"\u6b21\u306b\u3067\u304d\u305d\u3046\u306a\u3053\u3068\u3092\u4e00\u7dd2\u306b\u898b\u307e\u3059"}</p>
           </div>
           <button
             type="button"
@@ -158,8 +167,8 @@ export function DiagnosisResult({
         </header>
 
         <section style={styles.hypothesisCard}>
-          <p style={styles.cardLabel}>{"さっきの様子から"}</p>
-          <p style={styles.hypothesisText}>{mainHypothesisText}</p>
+          <p style={styles.cardLabel}>{"\u3044\u307e\u898b\u3048\u308b\u3053\u3068"}</p>
+          <p style={styles.hypothesisText}>{displayHypothesisText}</p>
         </section>
 
         {secondaryHypothesisText ? (
@@ -181,7 +190,7 @@ export function DiagnosisResult({
         </section>
 
         <section style={styles.actionCard}>
-          <p style={styles.cardTitle}>{"まず試すなら"}</p>
+          <p style={styles.cardTitle}>{"\u307e\u305a\u3067\u304d\u308b\u3053\u3068"}</p>
           <div style={styles.feedbackGroup}>
             <button
               type="button"
@@ -250,6 +259,30 @@ function getCompletionMessage(
   }
 
   return "記録しました。\nこの子の傾向づくりに使います。";
+}
+
+function readCatName(localCatId?: string | null) {
+  if (!localCatId) {
+    return "";
+  }
+
+  try {
+    const value = window.localStorage.getItem("cat_profiles");
+
+    if (!value) {
+      return "";
+    }
+
+    const profiles = JSON.parse(value) as Array<{
+      id?: string;
+      name?: string;
+    }>;
+    const profile = profiles.find((item) => item.id === localCatId);
+
+    return profile?.name ?? "";
+  } catch {
+    return "";
+  }
 }
 
 function getSecondaryHypothesisMessage(category: CauseCategory) {
@@ -339,9 +372,9 @@ const styles = {
       '-apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
   },
   container: {
-    width: "min(100%, 560px)",
+    width: "min(100%, 430px)",
     margin: "0 auto",
-    padding: "28px 20px calc(40px + env(safe-area-inset-bottom))",
+    padding: "22px 14px calc(96px + env(safe-area-inset-bottom))",
   },
   header: {
     display: "flex",
@@ -350,10 +383,17 @@ const styles = {
     gap: "16px",
     marginBottom: "14px",
   },
+  headerEyebrow: {
+    margin: "0 0 4px",
+    color: "#71717a",
+    fontSize: "12px",
+    fontWeight: 600,
+    letterSpacing: 0,
+  },
   title: {
     margin: 0,
     color: "#18181b",
-    fontSize: "28px",
+    fontSize: "27px",
     fontWeight: 700,
     letterSpacing: 0,
   },
@@ -398,7 +438,7 @@ const styles = {
   hypothesisText: {
     margin: 0,
     color: "#18181b",
-    fontSize: "22px",
+    fontSize: "20px",
     fontWeight: 700,
     lineHeight: 1.55,
     letterSpacing: 0,
