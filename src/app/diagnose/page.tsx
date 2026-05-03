@@ -2,6 +2,7 @@ import { DiagnosisResult } from "../../components/diagnose/DiagnosisResult";
 import { decideCategories } from "../../core/logic/decision";
 import { calculateScores } from "../../core/logic/scoring";
 import type { BehaviorInput, CauseCategory, DiagnosisContext } from "../../core/types";
+import { buildCalendarContext } from "../../lib/calendarContext";
 import {
   getRecentEvents,
   insertDiagnosis,
@@ -62,6 +63,7 @@ export default async function DiagnosePage({ searchParams }: DiagnosePageProps) 
 
   const recentEvents = await getRecentEvents(localCatId);
   const diagnosisContext = buildDiagnosisContext(recentEvents);
+  const calendarContext = buildCalendarContext();
   const scores = calculateScores(input, diagnosisContext);
   const categories = decideCategories(scores);
 
@@ -74,6 +76,7 @@ export default async function DiagnosePage({ searchParams }: DiagnosePageProps) 
         primary_category: categories[0],
         secondary_category: categories[1] ?? null,
         context: diagnosisContext,
+        calendarContext,
         localCatId,
         // TODO: Stabilize persistence with an API Route, Server Action,
         // or deduplication key to avoid duplicate rows during render/reload.

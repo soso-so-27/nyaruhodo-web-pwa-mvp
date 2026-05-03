@@ -7,6 +7,7 @@ import {
   calculateUnderstandingPercent,
   getUnderstandingMessage,
 } from "../../core/understanding/understanding";
+import { buildCalendarContext } from "../../lib/calendarContext";
 import type { RecentEvent } from "../../lib/supabase/queries";
 import { insertEvent, insertFeedback } from "../../lib/supabase/queries";
 import {
@@ -233,6 +234,7 @@ export function HomeInput({
       signal,
       label,
       source: "home",
+      calendarContext: buildCalendarContext(),
       localCatId: activeCatId,
     });
 
@@ -255,6 +257,7 @@ export function HomeInput({
       signal: input,
       label,
       source: "home",
+      calendarContext: buildCalendarContext(),
       localCatId: activeCatId,
     });
 

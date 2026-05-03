@@ -1,4 +1,5 @@
 import { supabase } from "./client";
+import type { CalendarContext } from "../calendarContext";
 
 type InsertEventInput = {
   event_type: "current_state" | "concern";
@@ -6,6 +7,7 @@ type InsertEventInput = {
   label?: string;
   source?: "home";
   context?: Record<string, unknown>;
+  calendarContext?: CalendarContext | null;
   localCatId?: string | null;
 };
 
@@ -17,6 +19,7 @@ type InsertDiagnosisInput = {
   primary_category: string;
   secondary_category?: string | null;
   context?: Record<string, unknown>;
+  calendarContext?: CalendarContext | null;
   localCatId?: string | null;
 };
 
@@ -34,6 +37,7 @@ export type RecentEvent = {
   label: string | null;
   source: string;
   context: Record<string, unknown>;
+  calendar_context: CalendarContext | null;
   local_cat_id: string | null;
   occurred_at: string;
   created_at: string;
@@ -50,7 +54,7 @@ export async function getRecentEvents(
     let query = supabase
       .from("events")
       .select(
-        "id,event_type,signal,label,source,context,local_cat_id,occurred_at,created_at",
+        "id,event_type,signal,label,source,context,calendar_context,local_cat_id,occurred_at,created_at",
       )
       .eq("source", "home")
       .order("occurred_at", { ascending: false })
@@ -89,6 +93,7 @@ export async function insertEvent(input: InsertEventInput) {
         label: input.label ?? null,
         source: input.source ?? "home",
         context: input.context ?? {},
+        calendar_context: input.calendarContext ?? null,
         local_cat_id: input.localCatId ?? null,
       });
 
@@ -122,6 +127,7 @@ export async function insertDiagnosis(input: InsertDiagnosisInput) {
         primary_category: input.primary_category,
         secondary_category: input.secondary_category ?? null,
         context: input.context ?? {},
+        calendar_context: input.calendarContext ?? null,
         local_cat_id: input.localCatId ?? null,
       });
 
