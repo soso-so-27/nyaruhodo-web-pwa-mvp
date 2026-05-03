@@ -139,11 +139,11 @@ export const CURRENT_OPTIONS = [
     signal: "playing",
   },
   {
-    label: "\u3054\u98ef\u305f\u3079\u305f",
+    label: "\u3054\u306f\u3093",
     signal: "after_food",
   },
   {
-    label: "\u30c8\u30a4\u30ec\u3057\u305f",
+    label: "\u30c8\u30a4\u30ec",
     signal: "toilet",
   },
   {

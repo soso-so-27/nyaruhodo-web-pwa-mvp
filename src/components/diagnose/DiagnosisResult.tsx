@@ -155,7 +155,7 @@ export function DiagnosisResult({
           <div>
             <p style={styles.headerEyebrow}>{"\u8a3a\u65ad\u7d50\u679c"}</p>
             <h1 style={styles.title}>{"\u3055\u3063\u304d\u306e\u69d8\u5b50\u304b\u3089"}</h1>
-            <p style={styles.lead}>{"\u6b21\u306b\u3067\u304d\u305d\u3046\u306a\u3053\u3068\u3092\u4e00\u7dd2\u306b\u898b\u307e\u3059"}</p>
+            <p style={styles.lead}>{"\u6c7a\u3081\u3064\u3051\u305a\u306b\u3001\u307e\u305a\u3067\u304d\u308b\u3053\u3068\u3092\u898b\u3066\u307f\u307e\u3057\u3087\u3046"}</p>
           </div>
           <button
             type="button"
@@ -167,7 +167,7 @@ export function DiagnosisResult({
         </header>
 
         <section style={styles.hypothesisCard}>
-          <p style={styles.cardLabel}>{"\u3044\u307e\u898b\u3048\u308b\u3053\u3068"}</p>
+          <p style={styles.cardLabel}>{"\u307e\u305a\u306f\u3053\u3053\u304b\u3089"}</p>
           <p style={styles.hypothesisText}>{displayHypothesisText}</p>
         </section>
 
@@ -179,7 +179,7 @@ export function DiagnosisResult({
         ) : null}
 
         <section style={styles.reasonCard}>
-          <p style={styles.cardTitle}>{"そう考えた理由"}</p>
+          <p style={styles.cardTitle}>{"\u624b\u304c\u304b\u308a"}</p>
           <ul style={styles.reasonList}>
             {reasons.map((reason) => (
               <li key={reason} style={styles.reasonItem}>
@@ -190,7 +190,10 @@ export function DiagnosisResult({
         </section>
 
         <section style={styles.actionCard}>
-          <p style={styles.cardTitle}>{"\u307e\u305a\u3067\u304d\u308b\u3053\u3068"}</p>
+          <p style={styles.cardTitle}>{"\u307e\u305a\u306f\u5c11\u3057\u3060\u3051"}</p>
+          <p style={styles.actionIntro}>
+            {getActionIntro(currentCategory)}
+          </p>
           <div style={styles.feedbackGroup}>
             <button
               type="button"
@@ -259,6 +262,20 @@ function getCompletionMessage(
   }
 
   return "記録しました。\nこの子の傾向づくりに使います。";
+}
+
+function getActionIntro(category: CauseCategory | undefined) {
+  const actionIntros: Record<CauseCategory, string> = {
+    food: "ごはんやお水を見たあと、少し様子を見てみましょう。",
+    play: "3分だけ遊んだあと、落ち着くか少し見てみましょう。",
+    social: "声をかけたり近くにいてあげて、反応を見てみましょう。",
+    stress: "静かな場所をつくって、しばらく様子を見てみましょう。",
+    health: "気になる様子が続くときは、早めに相談してください。",
+  };
+
+  return category
+    ? actionIntros[category]
+    : "少し様子を見て、気になることが続くときはもう一度記録してみましょう。";
 }
 
 function readCatName(localCatId?: string | null) {
@@ -366,7 +383,7 @@ function getNextActionContent(
 const styles = {
   page: {
     minHeight: "100vh",
-    background: "#fffaf3",
+    background: "#f7f3ee",
     color: "#27272a",
     fontFamily:
       '-apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
@@ -374,7 +391,7 @@ const styles = {
   container: {
     width: "min(100%, 430px)",
     margin: "0 auto",
-    padding: "22px 14px calc(96px + env(safe-area-inset-bottom))",
+    padding: "22px 14px calc(120px + env(safe-area-inset-bottom))",
   },
   header: {
     display: "flex",
@@ -418,9 +435,9 @@ const styles = {
   hypothesisCard: {
     marginBottom: "10px",
     border: "1px solid #eadbca",
-    borderRadius: "18px",
-    background: "#ffffff",
-    padding: "18px",
+    borderRadius: "24px",
+    background: "#fffaf3",
+    padding: "20px 18px",
   },
   cardLabel: {
     display: "inline-flex",
@@ -467,14 +484,14 @@ const styles = {
   reasonCard: {
     marginBottom: "10px",
     border: "1px solid #e4e4e7",
-    borderRadius: "18px",
+    borderRadius: "20px",
     background: "#ffffff",
     padding: "16px",
   },
   actionCard: {
     marginBottom: "10px",
     border: "1px solid #eadbca",
-    borderRadius: "18px",
+    borderRadius: "22px",
     background: "#fffdf9",
     padding: "16px",
   },
@@ -506,6 +523,12 @@ const styles = {
     gridTemplateColumns: "1fr",
     gap: "10px",
     marginTop: "0",
+  },
+  actionIntro: {
+    margin: "-2px 0 14px",
+    color: "#71717a",
+    fontSize: "14px",
+    lineHeight: 1.7,
   },
   ctaButton: {
     width: "100%",

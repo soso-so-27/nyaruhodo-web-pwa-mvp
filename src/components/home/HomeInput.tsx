@@ -1,8 +1,8 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
-import type { CSSProperties } from "react";
+import { useEffect, useRef, useState } from "react";
+import type { CSSProperties, RefObject } from "react";
 import {
   calculateUnderstandingPercent,
   getUnderstandingMessage,
@@ -75,7 +75,6 @@ export function HomeInput({
     useState<LatestHypothesisView | null>(null);
   const [catProfiles, setCatProfiles] = useState<CatProfile[]>([]);
   const [activeCatId, setActiveCatId] = useState<string | null>(null);
-  const [isSwitchingCat, setIsSwitchingCat] = useState(false);
   const [isEditingCatName, setIsEditingCatName] = useState(false);
   const [isAddingCat, setIsAddingCat] = useState(false);
   const [catNameInput, setCatNameInput] = useState("");
@@ -91,6 +90,9 @@ export function HomeInput({
   const [hintSuppressions, setHintSuppressions] = useState<
     CurrentCatHintSuppression[]
   >([]);
+  const topRef = useRef<HTMLDivElement | null>(null);
+  const recordRef = useRef<HTMLDivElement | null>(null);
+  const catSettingsRef = useRef<HTMLElement | null>(null);
 
   const activeCatProfile =
     catProfiles.length > 0
@@ -177,7 +179,6 @@ export function HomeInput({
     setCatNameInput(catName);
     setCatNameMessage("");
     setIsAddingCat(false);
-    setIsSwitchingCat(false);
     setIsEditingCatName(true);
   }
 
@@ -217,7 +218,6 @@ export function HomeInput({
     setSaveErrorMessage("");
     setIsDailyHintDismissed(false);
     setHintSuppressions(readCurrentCatHintSuppressions());
-    setIsSwitchingCat(false);
     setIsAddingCat(false);
     setCatNameMessage("");
   }
@@ -226,7 +226,6 @@ export function HomeInput({
     setNewCatNameInput("");
     setCatNameMessage("");
     setIsAddingCat(true);
-    setIsSwitchingCat(true);
     setIsEditingCatName(false);
   }
 
@@ -252,8 +251,11 @@ export function HomeInput({
     setCatNameInput(activeProfile.name);
     setNewCatNameInput("");
     setIsAddingCat(false);
-    setIsSwitchingCat(false);
     setCatNameMessage("\u4fdd\u5b58\u3057\u307e\u3057\u305f\u3002");
+  }
+
+  function scrollTo(ref: RefObject<HTMLElement | HTMLDivElement | null>) {
+    ref.current?.scrollIntoView({ behavior: "smooth", block: "start" });
   }
 
   async function handleCurrentSelect(label: string, signal: string) {
@@ -408,28 +410,16 @@ export function HomeInput({
   return (
     <main style={styles.page}>
       <div style={styles.container}>
+        <div ref={topRef}>
         <Header
           activeCatId={activeCatId}
           catName={catName}
-          catNameInput={catNameInput}
-          catNameMessage={catNameMessage}
           catProfiles={catProfiles}
-          isEditingCatName={isEditingCatName}
-          isAddingCat={isAddingCat}
-          isSwitchingCat={isSwitchingCat}
-          newCatNameInput={newCatNameInput}
           understandingPercent={understandingPercent}
           understandingMessage={understandingMessage}
-          onCatNameInputChange={setCatNameInput}
-          onNewCatNameInputChange={setNewCatNameInput}
-          onCatNameSave={handleCatNameSave}
-          onAddCatSave={handleAddCatSave}
           onCatSelect={handleCatSelect}
-          onEditCatName={startEditingCatName}
-          onCancelCatNameEdit={cancelEditingCatName}
-          onStartAddingCat={startAddingCat}
-          onCancelAddingCat={cancelAddingCat}
         />
+        </div>
 
         <section style={styles.insightCard}>
           {visibleLatestHypothesis ? (
@@ -465,33 +455,60 @@ export function HomeInput({
           ) : null}
         </section>
 
-        <OptionSection
-          label={"\u3044\u307e\u306e\u69d8\u5b50"}
-          title={`${catName}\u306f\u4eca\u4f55\u3057\u3066\u308b\uff1f`}
-          options={CURRENT_OPTIONS}
-          variant="current"
-          message={currentStateMessage}
-          errorMessage={
-            saveErrorSection === "current" ? saveErrorMessage : ""
-          }
-          onSelect={(option) => {
-            void handleCurrentSelect(option.label, option.signal);
-          }}
-        />
+        <div ref={recordRef} style={styles.actionArea}>
+          <OptionSection
+            title={`${catName}\u306f\u3044\u307e\u3069\u3046\u3057\u3066\u308b\uff1f`}
+            options={CURRENT_OPTIONS}
+            variant="current"
+            description={"\u898b\u305f\u307e\u307e\u3092\u3072\u3068\u3064\u6b8b\u305b\u3070OK\u3067\u3059"}
+            message={currentStateMessage}
+            errorMessage={
+              saveErrorSection === "current" ? saveErrorMessage : ""
+            }
+            onSelect={(option) => {
+              void handleCurrentSelect(option.label, option.signal);
+            }}
+          />
 
-        <OptionSection
-          title={"\u3061\u3087\u3063\u3068\u6c17\u306b\u306a\u308b\uff1f"}
-          options={CONCERN_OPTIONS}
-          variant="concern"
-          description={"\u3044\u3064\u3082\u3068\u9055\u3046\u69d8\u5b50\u304c\u3042\u308b\u3068\u304d\u306f\u3053\u3061\u3089"}
-          errorMessage={
-            saveErrorSection === "concern" ? saveErrorMessage : ""
-          }
-          onSelect={(option) => {
-            void handleConcernSelect(option.label, option.input);
-          }}
+          <OptionSection
+            title={"\u3061\u3087\u3063\u3068\u6c17\u306b\u306a\u308b\uff1f"}
+            options={CONCERN_OPTIONS}
+            variant="concern"
+            description={"\u8ff7\u3063\u305f\u3089\u3001\u8fd1\u3044\u3082\u306e\u3092\u9078\u3093\u3067\u304f\u3060\u3055\u3044"}
+            errorMessage={
+              saveErrorSection === "concern" ? saveErrorMessage : ""
+            }
+            onSelect={(option) => {
+              void handleConcernSelect(option.label, option.input);
+            }}
+          />
+        </div>
+
+        <CatSettings
+          settingsRef={catSettingsRef}
+          activeCatId={activeCatId}
+          catNameInput={catNameInput}
+          catNameMessage={catNameMessage}
+          catProfiles={catProfiles}
+          isEditingCatName={isEditingCatName}
+          isAddingCat={isAddingCat}
+          newCatNameInput={newCatNameInput}
+          onCatNameInputChange={setCatNameInput}
+          onNewCatNameInputChange={setNewCatNameInput}
+          onCatNameSave={handleCatNameSave}
+          onAddCatSave={handleAddCatSave}
+          onCatSelect={handleCatSelect}
+          onEditCatName={startEditingCatName}
+          onCancelCatNameEdit={cancelEditingCatName}
+          onStartAddingCat={startAddingCat}
+          onCancelAddingCat={cancelAddingCat}
         />
       </div>
+      <BottomNavigation
+        onTodayClick={() => scrollTo(topRef)}
+        onRecordClick={() => scrollTo(recordRef)}
+        onCatClick={() => scrollTo(catSettingsRef)}
+      />
     </main>
   );
 }
@@ -499,62 +516,37 @@ export function HomeInput({
 function Header({
   activeCatId,
   catName,
-  catNameInput,
-  catNameMessage,
   catProfiles,
-  isEditingCatName,
-  isAddingCat,
-  isSwitchingCat,
-  newCatNameInput,
   understandingPercent,
   understandingMessage,
-  onCatNameInputChange,
-  onNewCatNameInputChange,
-  onCatNameSave,
-  onAddCatSave,
   onCatSelect,
-  onEditCatName,
-  onCancelCatNameEdit,
-  onStartAddingCat,
-  onCancelAddingCat,
 }: {
   activeCatId: string | null;
   catName: string;
-  catNameInput: string;
-  catNameMessage: string;
   catProfiles: CatProfile[];
-  isEditingCatName: boolean;
-  isAddingCat: boolean;
-  isSwitchingCat: boolean;
-  newCatNameInput: string;
   understandingPercent: number;
   understandingMessage: string;
-  onCatNameInputChange: (value: string) => void;
-  onNewCatNameInputChange: (value: string) => void;
-  onCatNameSave: () => void;
-  onAddCatSave: () => void;
   onCatSelect: (catId: string) => void;
-  onEditCatName: () => void;
-  onCancelCatNameEdit: () => void;
-  onStartAddingCat: () => void;
-  onCancelAddingCat: () => void;
 }) {
   return (
-    <div style={styles.header}>
-      <p style={styles.headerEyebrow}>{"\u4eca\u65e5\u306e\u732b"}</p>
+    <header style={styles.header}>
+      <div style={styles.headerTopRow}>
+        <p style={styles.headerEyebrow}>{"\u4eca\u65e5\u306e\u732b"}</p>
+        <p style={styles.understanding}>
+          {"\u7406\u89e3\u5ea6 "}
+          {understandingPercent}
+          {"%"}
+        </p>
+      </div>
       <h1 style={styles.title}>
         {"\u4eca\u65e5\u306e"}
         {catName}
       </h1>
-      <div style={styles.catNameControls}>
-        <button
-          type="button"
-          onClick={onEditCatName}
-          style={styles.catNameEditButton}
-        >
-          {"\u540d\u524d\u3092\u5909\u66f4"}
-        </button>
-      </div>
+      <p style={styles.understandingMessage}>
+        {catName}
+        {"\u306e\u3053\u3068\u3001"}
+        {understandingMessage}
+      </p>
       <div style={styles.catChips}>
         {catProfiles.map((profile) => (
           <button
@@ -570,73 +562,116 @@ function Header({
             {profile.name}
           </button>
         ))}
+      </div>
+    </header>
+  );
+}
+
+function CatSettings({
+  settingsRef,
+  activeCatId,
+  catNameInput,
+  catNameMessage,
+  catProfiles,
+  isEditingCatName,
+  isAddingCat,
+  newCatNameInput,
+  onCatNameInputChange,
+  onNewCatNameInputChange,
+  onCatNameSave,
+  onAddCatSave,
+  onCatSelect,
+  onEditCatName,
+  onCancelCatNameEdit,
+  onStartAddingCat,
+  onCancelAddingCat,
+}: {
+  settingsRef: RefObject<HTMLElement | null>;
+  activeCatId: string | null;
+  catNameInput: string;
+  catNameMessage: string;
+  catProfiles: CatProfile[];
+  isEditingCatName: boolean;
+  isAddingCat: boolean;
+  newCatNameInput: string;
+  onCatNameInputChange: (value: string) => void;
+  onNewCatNameInputChange: (value: string) => void;
+  onCatNameSave: () => void;
+  onAddCatSave: () => void;
+  onCatSelect: (catId: string) => void;
+  onEditCatName: () => void;
+  onCancelCatNameEdit: () => void;
+  onStartAddingCat: () => void;
+  onCancelAddingCat: () => void;
+}) {
+  return (
+    <section ref={settingsRef} style={styles.catSettings}>
+      <p style={styles.settingsEyebrow}>{"\u306d\u3053"}</p>
+      <h2 style={styles.sectionTitle}>{"\u306d\u3053\u306e\u8a2d\u5b9a"}</h2>
+      <p style={styles.sectionDescription}>
+        {"\u732b\u306e\u8ffd\u52a0\u3084\u540d\u524d\u306e\u5909\u66f4\u306f\u3053\u3053\u304b\u3089\u3067\u304d\u307e\u3059\u3002"}
+      </p>
+      <div style={styles.settingsCatList}>
+        {catProfiles.map((profile) => (
+          <button
+            key={profile.id}
+            type="button"
+            onClick={() => onCatSelect(profile.id)}
+            style={
+              profile.id === activeCatId
+                ? styles.activeCatSwitchButton
+                : styles.catSwitchButton
+            }
+          >
+            {profile.name}
+          </button>
+        ))}
+      </div>
+      <div style={styles.settingsActions}>
         <button
           type="button"
           onClick={onStartAddingCat}
-          style={styles.addCatChipButton}
+          style={styles.addCatButton}
         >
-          {"\uff0b\u8ffd\u52a0"}
+          {"\u732b\u3092\u8ffd\u52a0"}
+        </button>
+        <button
+          type="button"
+          onClick={onEditCatName}
+          style={styles.addCatButton}
+        >
+          {"\u540d\u524d\u3092\u5909\u66f4"}
         </button>
       </div>
-      {isSwitchingCat ? (
-        <div style={styles.catSwitcher}>
-          <div style={styles.catSwitchList}>
-            {catProfiles.map((profile) => (
-              <button
-                key={profile.id}
-                type="button"
-                onClick={() => onCatSelect(profile.id)}
-                style={
-                  profile.id === activeCatId
-                    ? styles.activeCatSwitchButton
-                    : styles.catSwitchButton
-                }
-              >
-                {profile.name}
-              </button>
-            ))}
-          </div>
-          {isAddingCat ? (
-            <div style={styles.catNameEditor}>
-              <label style={styles.catNameLabel} htmlFor="new-cat-name">
-                {"\u3053\u306e\u5b50\u306e\u540d\u524d"}
-              </label>
-              <input
-                id="new-cat-name"
-                type="text"
-                value={newCatNameInput}
-                onChange={(event) =>
-                  onNewCatNameInputChange(event.target.value)
-                }
-                placeholder={"\u4f8b\uff1a\u9ea6"}
-                style={styles.catNameInput}
-              />
-              <div style={styles.catNameActions}>
-                <button
-                  type="button"
-                  onClick={onAddCatSave}
-                  style={styles.catNameSaveButton}
-                >
-                  {"\u4fdd\u5b58"}
-                </button>
-                <button
-                  type="button"
-                  onClick={onCancelAddingCat}
-                  style={styles.catNameCancelButton}
-                >
-                  {"\u30ad\u30e3\u30f3\u30bb\u30eb"}
-                </button>
-              </div>
-            </div>
-          ) : (
+      {isAddingCat ? (
+        <div style={styles.catNameEditor}>
+          <label style={styles.catNameLabel} htmlFor="new-cat-name">
+            {"\u3053\u306e\u5b50\u306e\u540d\u524d"}
+          </label>
+          <input
+            id="new-cat-name"
+            type="text"
+            value={newCatNameInput}
+            onChange={(event) => onNewCatNameInputChange(event.target.value)}
+            placeholder={"\u4f8b\uff1a\u9ea6"}
+            style={styles.catNameInput}
+          />
+          <div style={styles.catNameActions}>
             <button
               type="button"
-              onClick={onStartAddingCat}
-              style={styles.addCatButton}
+              onClick={onAddCatSave}
+              style={styles.catNameSaveButton}
             >
-              {"\u732b\u3092\u8ffd\u52a0"}
+              {"\u4fdd\u5b58"}
             </button>
-          )}
+            <button
+              type="button"
+              onClick={onCancelAddingCat}
+              style={styles.catNameCancelButton}
+            >
+              {"\u30ad\u30e3\u30f3\u30bb\u30eb"}
+            </button>
+          </div>
         </div>
       ) : null}
       {isEditingCatName ? (
@@ -673,17 +708,31 @@ function Header({
       {catNameMessage ? (
         <p style={styles.catNameMessage}>{catNameMessage}</p>
       ) : null}
-      <p style={styles.understanding}>
-        {"\u7406\u89e3\u5ea6 "}
-        {understandingPercent}
-        {"%"}
-      </p>
-      <p style={styles.understandingMessage}>
-        {catName}
-        {"\u306e\u3053\u3068\u3001"}
-        {understandingMessage}
-      </p>
-    </div>
+    </section>
+  );
+}
+
+function BottomNavigation({
+  onTodayClick,
+  onRecordClick,
+  onCatClick,
+}: {
+  onTodayClick: () => void;
+  onRecordClick: () => void;
+  onCatClick: () => void;
+}) {
+  return (
+    <nav style={styles.bottomNav} aria-label={"\u30db\u30fc\u30e0\u5185\u30ca\u30d3"}>
+      <button type="button" onClick={onTodayClick} style={styles.activeNavButton}>
+        {"\u4eca\u65e5"}
+      </button>
+      <button type="button" onClick={onRecordClick} style={styles.navButton}>
+        {"\u304d\u308d\u304f"}
+      </button>
+      <button type="button" onClick={onCatClick} style={styles.navButton}>
+        {"\u306d\u3053"}
+      </button>
+    </nav>
   );
 }
 
@@ -709,7 +758,7 @@ function LatestHypothesisCard({
           "\u4f55\u304b\u4f1d\u3048\u305f\u3044\u53ef\u80fd\u6027\u304c\u3042\u308a\u307e\u3059"}
       </p>
       <p style={styles.lastResultHint}>
-        {"\u5c11\u3057\u898b\u3066\u3042\u3052\u308b\u3068\u3001\u6b21\u306b\u4f55\u3092\u3059\u308b\u304b\u6c7a\u3081\u3084\u3059\u304f\u306a\u308a\u307e\u3059\u3002"}
+        {"\u307e\u305a\u306f\u3067\u304d\u305d\u3046\u306a\u3053\u3068\u3060\u3051\u3067\u5927\u4e08\u592b\u3067\u3059\u3002\u9055\u3063\u305f\u3089\u3001\u9055\u3046\u304b\u3082\u3067\u6559\u3048\u3066\u304f\u3060\u3055\u3044\u3002"}
       </p>
       <div style={styles.hypothesisActions}>
         <button
@@ -860,7 +909,10 @@ const styles = {
   container: {
     width: "min(100%, 430px)",
     margin: "0 auto",
-    padding: "14px 14px calc(144px + env(safe-area-inset-bottom))",
+    padding: "14px 14px calc(176px + env(safe-area-inset-bottom))",
+  },
+  actionArea: {
+    scrollMarginTop: "16px",
   },
   headerEyebrow: {
     margin: "0 0 4px",
@@ -870,17 +922,25 @@ const styles = {
     letterSpacing: 0,
   },
   title: {
-    margin: 0,
-    fontSize: "30px",
-    fontWeight: 700,
+    margin: "4px 0 0",
+    fontSize: "32px",
+    fontWeight: 750,
     letterSpacing: 0,
+    lineHeight: 1.2,
   },
   header: {
     marginBottom: "10px",
     border: "1px solid #ebe2d6",
-    borderRadius: "18px",
-    background: "#fffdf9",
-    padding: "18px 16px",
+    borderRadius: "24px",
+    background: "linear-gradient(180deg, #fffdf9 0%, #fff7ec 100%)",
+    padding: "18px 16px 16px",
+    scrollMarginTop: "16px",
+  },
+  headerTopRow: {
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: "12px",
   },
   catNameControls: {
     display: "flex",
@@ -905,7 +965,7 @@ const styles = {
     display: "flex",
     flexWrap: "wrap",
     gap: "8px",
-    marginTop: "12px",
+    marginTop: "14px",
   },
   catChipButton: {
     minHeight: "34px",
@@ -976,7 +1036,6 @@ const styles = {
     cursor: "pointer",
   },
   addCatButton: {
-    marginTop: "8px",
     minHeight: "36px",
     padding: "0 14px",
     border: "1px solid #d4d4d8",
@@ -1050,7 +1109,7 @@ const styles = {
   understanding: {
     display: "inline-flex",
     width: "fit-content",
-    margin: "12px 0 0",
+    margin: 0,
     border: "1px solid #eadbca",
     borderRadius: "999px",
     background: "#fffaf3",
@@ -1061,11 +1120,39 @@ const styles = {
     padding: "2px 9px",
   },
   understandingMessage: {
-    margin: "7px 0 0",
+    margin: "8px 0 0",
     color: "#71717a",
     fontSize: "13px",
     fontWeight: 400,
     letterSpacing: 0,
+  },
+  catSettings: {
+    marginTop: "12px",
+    marginBottom: "10px",
+    border: "1px solid #e4e4e7",
+    borderRadius: "22px",
+    background: "#ffffff",
+    padding: "16px",
+    scrollMarginTop: "18px",
+  },
+  settingsEyebrow: {
+    margin: "0 0 4px",
+    color: "#71717a",
+    fontSize: "12px",
+    fontWeight: 600,
+    letterSpacing: 0,
+  },
+  settingsCatList: {
+    display: "flex",
+    flexWrap: "wrap",
+    gap: "8px",
+    marginTop: "12px",
+  },
+  settingsActions: {
+    display: "flex",
+    flexWrap: "wrap",
+    gap: "10px",
+    marginTop: "12px",
   },
   lastResult: {
     margin: 0,
@@ -1136,9 +1223,9 @@ const styles = {
   insightCard: {
     marginBottom: "10px",
     border: "1px solid #eadbca",
-    borderRadius: "18px",
+    borderRadius: "24px",
     background: "#fffaf3",
-    padding: "16px",
+    padding: "18px",
   },
   guidance: {
     margin: 0,
@@ -1193,9 +1280,9 @@ const styles = {
   section: {
     marginBottom: "10px",
     border: "1px solid #e4e4e7",
-    borderRadius: "18px",
+    borderRadius: "22px",
     background: "#ffffff",
-    padding: "16px",
+    padding: "17px 16px",
   },
   currentSection: {
     borderColor: "#e4e4e7",
@@ -1213,9 +1300,9 @@ const styles = {
     lineHeight: 1.5,
   },
   sectionTitle: {
-    margin: "0 0 12px",
-    fontSize: "17px",
-    fontWeight: 600,
+    margin: "0 0 10px",
+    fontSize: "19px",
+    fontWeight: 700,
     letterSpacing: 0,
   },
   sectionDescription: {
@@ -1244,9 +1331,9 @@ const styles = {
     gap: "12px",
   },
   button: {
-    minHeight: "54px",
+    minHeight: "58px",
     border: "1px solid #d4d4d8",
-    borderRadius: "14px",
+    borderRadius: "18px",
     background: "#ffffff",
     color: "#27272a",
     fontSize: "15px",
@@ -1262,5 +1349,44 @@ const styles = {
     background: "#fffaf3",
     borderColor: "#eadbca",
     fontWeight: 600,
+  },
+  bottomNav: {
+    position: "fixed",
+    left: "50%",
+    bottom: "calc(10px + env(safe-area-inset-bottom))",
+    zIndex: 20,
+    display: "grid",
+    gridTemplateColumns: "repeat(3, 1fr)",
+    gap: "6px",
+    width: "min(calc(100% - 28px), 402px)",
+    transform: "translateX(-50%)",
+    border: "1px solid rgba(212, 212, 216, 0.9)",
+    borderRadius: "999px",
+    background: "rgba(255, 255, 255, 0.94)",
+    boxShadow: "0 12px 30px rgba(39, 39, 42, 0.08)",
+    padding: "6px",
+    backdropFilter: "blur(14px)",
+  },
+  navButton: {
+    minHeight: "42px",
+    border: "none",
+    borderRadius: "999px",
+    background: "transparent",
+    color: "#71717a",
+    fontSize: "13px",
+    fontWeight: 700,
+    letterSpacing: 0,
+    cursor: "pointer",
+  },
+  activeNavButton: {
+    minHeight: "42px",
+    border: "none",
+    borderRadius: "999px",
+    background: "#3f3f46",
+    color: "#ffffff",
+    fontSize: "13px",
+    fontWeight: 700,
+    letterSpacing: 0,
+    cursor: "pointer",
   },
 } satisfies Record<string, CSSProperties>;

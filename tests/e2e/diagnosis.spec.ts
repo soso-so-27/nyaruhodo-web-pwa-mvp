@@ -27,8 +27,27 @@ test("diagnosis page uses user-facing labels and avoids stale night copy", async
   ).toBeVisible();
   await expect(page.getByText("今の仮説")).toHaveCount(0);
   await expect(page.getByText("夜なので")).toHaveCount(0);
-  await expect(page.getByText("いま見えること")).toBeVisible();
-  await expect(page.getByText("そう考えた理由")).toBeVisible();
+  await expect(page.getByText("まずはここから")).toBeVisible();
+  await expect(page.getByText("手がかり")).toBeVisible();
+});
+
+test("home app shell keeps cat management out of the top and scrolls by bottom nav", async ({
+  page,
+}) => {
+  await page.goto("/home");
+
+  await expect(page.getByRole("heading", { name: /今日の/ })).toBeVisible();
+  const header = page.locator("header").first();
+  await expect(header.getByRole("button", { name: "猫を追加" })).toHaveCount(0);
+  await expect(header.getByRole("button", { name: "名前を変更" })).toHaveCount(0);
+
+  await page.getByRole("button", { name: "きろく" }).click();
+  await expect(page.getByRole("heading", { name: /いまどうしてる/ })).toBeInViewport();
+
+  await page.getByRole("button", { name: "ねこ" }).click();
+  await expect(page.getByRole("heading", { name: "ねこの設定" })).toBeInViewport();
+  await expect(page.getByRole("button", { name: "猫を追加" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "名前を変更" })).toBeVisible();
 });
 
 test("main diagnosis CTA shows the next action card", async ({ page }) => {
