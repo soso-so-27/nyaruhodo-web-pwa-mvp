@@ -1,7 +1,12 @@
 import { DiagnosisResult } from "../../components/diagnose/DiagnosisResult";
 import { decideCategories } from "../../core/logic/decision";
 import { calculateScores } from "../../core/logic/scoring";
-import type { BehaviorInput, CauseCategory, DiagnosisContext } from "../../core/types";
+import type {
+  BehaviorInput,
+  CauseCategory,
+  DiagnosisContext,
+} from "../../core/types";
+import type { CalendarContext } from "../../lib/calendarContext";
 import { buildCalendarContext } from "../../lib/calendarContext";
 import {
   getRecentEvents,
@@ -18,7 +23,6 @@ type DiagnosePageProps = {
 };
 
 const fixedContext: DiagnosisContext = {
-  time: "night",
   history: [],
   environment: [],
 };
@@ -62,8 +66,11 @@ export default async function DiagnosePage({ searchParams }: DiagnosePageProps) 
   }
 
   const recentEvents = await getRecentEvents(localCatId);
-  const diagnosisContext = buildDiagnosisContext(recentEvents);
   const calendarContext = buildCalendarContext();
+  const diagnosisContext = buildDiagnosisContext(
+    recentEvents,
+    calendarContext.timeBand,
+  );
   const scores = calculateScores(input, diagnosisContext);
   const categories = decideCategories(scores);
 
@@ -94,7 +101,7 @@ export default async function DiagnosePage({ searchParams }: DiagnosePageProps) 
   return (
     <DiagnosisResult
       resultText={formatResultText(categories)}
-      reasons={formatReasons(input)}
+      reasons={formatReasons(input, calendarContext.timeBand)}
       categories={categories}
       diagnosisId={diagnosis?.id ?? null}
       localCatId={localCatId}
@@ -111,19 +118,45 @@ function parseInput(input: string | undefined): BehaviorInput | undefined {
     : undefined;
 }
 
-function buildDiagnosisContext(recentEvents: RecentEvent[]): DiagnosisContext {
+function buildDiagnosisContext(
+  recentEvents: RecentEvent[],
+  timeBand: CalendarContext["timeBand"],
+): DiagnosisContext {
   const lastFoodMinutes = getLastElapsedMinutes(recentEvents, isFoodEvent);
   const lastPlayMinutes = getLastElapsedMinutes(recentEvents, isPlayEvent);
+  const time = mapTimeBandToDiagnosisTime(timeBand);
 
   if (lastFoodMinutes === undefined && lastPlayMinutes === undefined) {
-    return fixedContext;
+    return {
+      ...fixedContext,
+      time,
+    };
   }
 
   return {
     ...fixedContext,
+    time,
     lastFoodMinutes,
     lastPlayMinutes,
   };
+}
+
+function mapTimeBandToDiagnosisTime(
+  timeBand: CalendarContext["timeBand"],
+): DiagnosisContext["time"] {
+  if (timeBand === "night") {
+    return "night";
+  }
+
+  if (timeBand === "late_night") {
+    return "late_night";
+  }
+
+  if (timeBand === "early_morning" || timeBand === "morning") {
+    return "morning";
+  }
+
+  return undefined;
 }
 
 function getLastElapsedMinutes(
@@ -166,10 +199,13 @@ function formatResultText(categories: CauseCategory[]) {
   return `${labels.join("\u30fb")}\u306e\u53ef\u80fd\u6027\u304c\u3042\u308a\u307e\u3059`;
 }
 
-function formatReasons(input: BehaviorInput) {
+function formatReasons(
+  input: BehaviorInput,
+  timeBand: CalendarContext["timeBand"],
+) {
   const reasons: Record<BehaviorInput, string[]> = {
     meowing: [
-      "夜は、遊びたい気持ちが出やすいことがあります",
+      getMeowingTimeReason(timeBand),
       "鳴いているときは、ご飯やかまってほしい気持ちも重なることがあります",
     ],
     following: [
@@ -189,4 +225,24 @@ function formatReasons(input: BehaviorInput) {
   };
 
   return reasons[input].slice(0, 2);
+}
+
+function getMeowingTimeReason(timeBand: CalendarContext["timeBand"]) {
+  if (timeBand === "night") {
+    return "夜は、遊びたい気持ちが出やすいことがあります";
+  }
+
+  if (timeBand === "late_night") {
+    return "夜遅い時間は、安心したくて鳴くことがあります";
+  }
+
+  if (timeBand === "early_morning" || timeBand === "morning") {
+    return "朝は、ごはんやかまってほしい気持ちが出やすいことがあります";
+  }
+
+  if (timeBand === "evening") {
+    return "夕方は、遊びやごはんを期待して鳴くことがあります";
+  }
+
+  return "日中は、かまってほしい気持ちで鳴くことがあります";
 }

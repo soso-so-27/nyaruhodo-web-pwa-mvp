@@ -24,8 +24,11 @@ const dayNames = [
   "Saturday",
 ] as const;
 
+const tokyoTimeZone = "Asia/Tokyo";
+
 export function buildCalendarContext(date = new Date()): CalendarContext {
-  const dayOfWeek = date.getDay();
+  const tokyoDate = getTokyoDateParts(date);
+  const dayOfWeek = tokyoDate.dayOfWeek;
   const isWeekend = dayOfWeek === 0 || dayOfWeek === 6;
 
   return {
@@ -35,13 +38,32 @@ export function buildCalendarContext(date = new Date()): CalendarContext {
     isWeekend,
     isHoliday: false,
     holidayName: null,
-    timeBand: getTimeBand(date),
+    timeBand: getTimeBand(tokyoDate.hour),
   };
 }
 
-function getTimeBand(date: Date): CalendarContext["timeBand"] {
-  const hour = date.getHours();
+function getTokyoDateParts(date: Date) {
+  const parts = new Intl.DateTimeFormat("en-US", {
+    timeZone: tokyoTimeZone,
+    weekday: "long",
+    hour: "2-digit",
+    hourCycle: "h23",
+  }).formatToParts(date);
 
+  const weekday =
+    parts.find((part) => part.type === "weekday")?.value ?? "Sunday";
+  const hour = Number(parts.find((part) => part.type === "hour")?.value ?? 0);
+  const dayOfWeek = dayNames.indexOf(
+    weekday as (typeof dayNames)[number],
+  );
+
+  return {
+    dayOfWeek: dayOfWeek >= 0 ? dayOfWeek : 0,
+    hour,
+  };
+}
+
+function getTimeBand(hour: number): CalendarContext["timeBand"] {
   if (hour >= 4 && hour <= 6) {
     return "early_morning";
   }
@@ -54,11 +76,11 @@ function getTimeBand(date: Date): CalendarContext["timeBand"] {
     return "daytime";
   }
 
-  if (hour >= 17 && hour <= 20) {
+  if (hour >= 17 && hour <= 19) {
     return "evening";
   }
 
-  if (hour >= 21 && hour <= 23) {
+  if (hour >= 20 && hour <= 23) {
     return "night";
   }
 
