@@ -9,7 +9,11 @@ import {
 } from "../../core/understanding/understanding";
 import { buildCalendarContext } from "../../lib/calendarContext";
 import type { RecentEvent } from "../../lib/supabase/queries";
-import { insertEvent, insertFeedback } from "../../lib/supabase/queries";
+import {
+  insertEvent,
+  insertFeedback,
+  insertHintFeedback,
+} from "../../lib/supabase/queries";
 import {
   CATEGORY_MESSAGES,
   CONCERN_OPTIONS,
@@ -296,9 +300,30 @@ export function HomeInput({
     setHypothesisMessage("\u8a18\u9332\u3057\u307e\u3057\u305f\u3002");
   }
 
-  function handleDailyHintSubAction() {
+  async function handleDailyHintSubAction() {
+    const savedFeedback = await insertHintFeedback({
+      localCatId: activeCatId,
+      hintType: "current_cat",
+      shownCategory: dailyHintHypothesis.category,
+      shownSignal: dailyHintHypothesis.shownSignal,
+      feedback: "rejected",
+      understandingPercent,
+      sourceEventIds: activeCatEvents.map((event) => event.id),
+      calendarContext: buildCalendarContext(),
+      metadata: {
+        source: "current_cat_card",
+        catName,
+        headline: dailyHintHypothesis.text,
+      },
+    });
+
+    if (!savedFeedback) {
+      setHypothesisMessage(eventSaveErrorMessage);
+      return;
+    }
+
     setIsDailyHintDismissed(true);
-    setHypothesisMessage("");
+    setHypothesisMessage("\u8a18\u9332\u3057\u307e\u3057\u305f\u3002");
   }
 
   async function handleHypothesisAction(feedback: "resolved" | "unresolved") {
@@ -391,7 +416,9 @@ export function HomeInput({
               catName={catName}
               dailyHintHypothesis={dailyHintHypothesis}
               onDailyHintMainAction={handleDailyHintMainAction}
-              onDailyHintSubAction={handleDailyHintSubAction}
+              onDailyHintSubAction={() => {
+                void handleDailyHintSubAction();
+              }}
             />
           )}
 

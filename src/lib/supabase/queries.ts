@@ -30,6 +30,18 @@ type InsertFeedbackInput = {
   localCatId?: string | null;
 };
 
+type InsertHintFeedbackInput = {
+  localCatId?: string | null;
+  hintType?: string;
+  shownCategory?: string | null;
+  shownSignal?: string | null;
+  feedback: "accepted" | "rejected" | "dismissed" | string;
+  understandingPercent?: number | null;
+  sourceEventIds?: string[] | null;
+  calendarContext?: CalendarContext | Record<string, unknown> | null;
+  metadata?: Record<string, unknown>;
+};
+
 export type RecentEvent = {
   id: string;
   event_type: string;
@@ -169,6 +181,40 @@ export async function insertFeedback(input: InsertFeedbackInput) {
     }
 
     console.log("feedback saved");
+    return { id };
+  } catch (error) {
+    console.error(error);
+    return null;
+  }
+}
+
+export async function insertHintFeedback(input: InsertHintFeedbackInput) {
+  try {
+    if (!supabase) {
+      throw new Error("Supabase client is not configured");
+    }
+
+    const id = crypto.randomUUID();
+    const { error } = await supabase
+      .from("hint_feedbacks")
+      .insert({
+        id,
+        local_cat_id: input.localCatId ?? null,
+        hint_type: input.hintType ?? "current_cat",
+        shown_category: input.shownCategory ?? null,
+        shown_signal: input.shownSignal ?? null,
+        feedback: input.feedback,
+        understanding_percent: input.understandingPercent ?? null,
+        source_event_ids: input.sourceEventIds ?? null,
+        calendar_context: input.calendarContext ?? null,
+        metadata: input.metadata ?? {},
+      });
+
+    if (error) {
+      throw error;
+    }
+
+    console.log("hint feedback saved");
     return { id };
   } catch (error) {
     console.error(error);

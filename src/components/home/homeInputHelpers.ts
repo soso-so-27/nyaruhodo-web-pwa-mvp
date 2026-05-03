@@ -42,6 +42,7 @@ type DailyHintPattern =
 
 export type DailyHintHypothesis = {
   category: DailyHintCategory;
+  shownSignal: string | null;
   text: string;
   body: string;
   cta: {
@@ -180,6 +181,7 @@ const DAILY_HINT_PATTERNS: Record<
 > = {
   food: {
     category: "food",
+    shownSignal: "food",
     text: "\u304a\u8179\u304c\u7a7a\u3044\u3066\u3044\u308b\u53ef\u80fd\u6027\u304c\u3042\u308a\u307e\u3059",
     body: "\u3054\u306f\u3093\u306b\u95a2\u4fc2\u3059\u308b\u8a18\u9332\u304c\u3042\u308a\u307e\u3059\u3002\u9055\u3063\u3066\u3044\u305f\u3089\u3001\u4e0b\u304b\u3089\u9078\u3073\u76f4\u305b\u307e\u3059\u3002",
     cta: {
@@ -189,6 +191,7 @@ const DAILY_HINT_PATTERNS: Record<
   },
   play: {
     category: "play",
+    shownSignal: "play",
     text: "\u904a\u3073\u305f\u3044\u53ef\u80fd\u6027\u304c\u3042\u308a\u307e\u3059",
     body: "\u6700\u8fd1\u306e\u8a18\u9332\u304b\u3089\u3001\u307e\u305a\u8a66\u3057\u3084\u3059\u3044\u5019\u88dc\u3067\u3059\u3002\u9055\u3063\u3066\u3044\u305f\u3089\u3001\u4e0b\u304b\u3089\u9078\u3073\u76f4\u305b\u307e\u3059\u3002",
     cta: {
@@ -198,6 +201,7 @@ const DAILY_HINT_PATTERNS: Record<
   },
   social: {
     category: "social",
+    shownSignal: "social",
     text: "\u304b\u307e\u3063\u3066\u307b\u3057\u3044\u53ef\u80fd\u6027\u304c\u3042\u308a\u307e\u3059",
     body: "\u305d\u3070\u306b\u3044\u305f\u3044\u3001\u5b89\u5fc3\u3057\u305f\u3044\u30b5\u30a4\u30f3\u304b\u3082\u3057\u308c\u307e\u305b\u3093\u3002\u9055\u3063\u3066\u3044\u305f\u3089\u3001\u4e0b\u304b\u3089\u9078\u3073\u76f4\u305b\u307e\u3059\u3002",
     cta: {
@@ -207,6 +211,7 @@ const DAILY_HINT_PATTERNS: Record<
   },
   stress: {
     category: "stress",
+    shownSignal: "stress",
     text: "\u5c11\u3057\u843d\u3061\u7740\u304b\u306a\u3044\u53ef\u80fd\u6027\u304c\u3042\u308a\u307e\u3059",
     body: "\u843d\u3061\u7740\u304b\u306a\u3044\u69d8\u5b50\u304c\u3042\u308b\u305f\u3081\u3001\u74b0\u5883\u3084\u523a\u6fc0\u3092\u898b\u76f4\u3057\u3066\u3082\u3088\u3055\u305d\u3046\u3067\u3059\u3002",
     cta: {
@@ -216,6 +221,7 @@ const DAILY_HINT_PATTERNS: Record<
   },
   health: {
     category: "health",
+    shownSignal: "health",
     text: "\u4f53\u8abf\u306b\u6ce8\u610f\u3057\u305f\u65b9\u304c\u3088\u3044\u53ef\u80fd\u6027\u304c\u3042\u308a\u307e\u3059",
     body: "\u5143\u6c17\u304c\u306a\u3044\u69d8\u5b50\u306f\u3001\u65e9\u3081\u306b\u898b\u3066\u304a\u304d\u305f\u3044\u30b5\u30a4\u30f3\u3067\u3059\u3002\u7d9a\u304f\u5834\u5408\u306f\u76f8\u8ac7\u3082\u8003\u3048\u3066\u304f\u3060\u3055\u3044\u3002",
     cta: {
@@ -225,6 +231,7 @@ const DAILY_HINT_PATTERNS: Record<
   },
   unknown: {
     category: "unknown",
+    shownSignal: "unknown",
     text: "\u307e\u3060\u306f\u3063\u304d\u308a\u3057\u307e\u305b\u3093",
     body: "\u6700\u8fd1\u306e\u8a18\u9332\u3060\u3051\u3067\u306f\u5224\u65ad\u3057\u304d\u308c\u307e\u305b\u3093\u3002\u8fd1\u3044\u69d8\u5b50\u3092\u9078\u3073\u76f4\u3057\u3066\u307f\u3066\u304f\u3060\u3055\u3044\u3002",
     cta: {
@@ -234,6 +241,7 @@ const DAILY_HINT_PATTERNS: Record<
   },
   sleeping: {
     category: "stress",
+    shownSignal: "sleeping",
     text: "\u4f11\u307f\u305f\u3044\u6642\u9593\u304b\u3082\u3057\u308c\u307e\u305b\u3093",
     body: "\u7720\u3063\u3066\u3044\u308b\u8a18\u9332\u304c\u3042\u308a\u307e\u3059\u3002\u7121\u7406\u306b\u69cb\u308f\u305a\u3001\u305d\u3063\u3068\u898b\u5b88\u3063\u3066\u3082\u3088\u3055\u305d\u3046\u3067\u3059\u3002",
     cta: {
@@ -243,6 +251,7 @@ const DAILY_HINT_PATTERNS: Record<
   },
   grooming: {
     category: "stress",
+    shownSignal: "grooming",
     text: "\u843d\u3061\u7740\u3053\u3046\u3068\u3057\u3066\u3044\u308b\u304b\u3082\u3057\u308c\u307e\u305b\u3093",
     body: "\u30b0\u30eb\u30fc\u30df\u30f3\u30b0\u306f\u6c17\u6301\u3061\u3092\u6574\u3048\u308b\u6642\u306b\u3082\u898b\u3089\u308c\u307e\u3059\u3002\u7d9a\u304f\u69d8\u5b50\u3092\u898b\u3066\u307f\u307e\u3057\u3087\u3046\u3002",
     cta: {
@@ -252,6 +261,7 @@ const DAILY_HINT_PATTERNS: Record<
   },
   after_food: {
     category: "food",
+    shownSignal: "after_food",
     text: "\u3054\u306f\u3093\u306e\u3042\u3068\u306f\u843d\u3061\u7740\u304d\u3084\u3059\u3044\u6642\u9593\u304b\u3082\u3057\u308c\u307e\u305b\u3093",
     body: "\u3054\u98ef\u306e\u8a18\u9332\u304c\u3042\u308a\u307e\u3059\u3002\u3053\u306e\u3042\u3068\u306e\u69d8\u5b50\u3082\u5c11\u3057\u898b\u3066\u304a\u304f\u3068\u5b89\u5fc3\u3067\u3059\u3002",
     cta: {
@@ -261,6 +271,7 @@ const DAILY_HINT_PATTERNS: Record<
   },
   toilet: {
     category: "health",
+    shownSignal: "toilet",
     text: "\u30c8\u30a4\u30ec\u5f8c\u306e\u69d8\u5b50\u3082\u898b\u3066\u304a\u304f\u3068\u3088\u3055\u305d\u3046\u3067\u3059",
     body: "\u30c8\u30a4\u30ec\u306e\u8a18\u9332\u304c\u3042\u308a\u307e\u3059\u3002\u3044\u3064\u3082\u3068\u9055\u3046\u69d8\u5b50\u304c\u3042\u308c\u3070\u3001\u6c17\u306b\u306a\u308b\u3053\u3068\u304b\u3089\u8a18\u9332\u3067\u304d\u307e\u3059\u3002",
     cta: {
@@ -327,7 +338,7 @@ export function buildDailyHintHypothesis(
 ): DailyHintHypothesis {
   const stats = new Map<
     DailyHintPattern,
-    { score: number; latestIndex: number }
+    { score: number; latestIndex: number; signal: string | null }
   >();
 
   recentEvents.forEach((event, index) => {
@@ -342,19 +353,24 @@ export function buildDailyHintHypothesis(
     stats.set(pattern, {
       score: (current?.score ?? 0) + getDailyHintSignalWeight(event.signal),
       latestIndex: current ? Math.min(current.latestIndex, index) : index,
+      signal:
+        !current || index < current.latestIndex ? event.signal : current.signal,
     });
   });
 
-  const pattern =
+  const [pattern, selectedStats] =
     [...stats.entries()].sort(([, a], [, b]) => {
       if (b.score !== a.score) {
         return b.score - a.score;
       }
 
       return a.latestIndex - b.latestIndex;
-    })[0]?.[0] ?? "play";
+    })[0] ?? ["play", { score: 0, latestIndex: 0, signal: null }];
 
-  return DAILY_HINT_PATTERNS[pattern];
+  return {
+    ...DAILY_HINT_PATTERNS[pattern],
+    shownSignal: selectedStats.signal ?? DAILY_HINT_PATTERNS[pattern].shownSignal,
+  };
 }
 
 export function createLocalCatProfile(
