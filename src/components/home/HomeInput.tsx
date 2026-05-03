@@ -388,8 +388,8 @@ export function HomeInput({
             <GuidanceBlock
               guidance={guidance}
               showDailyHint={shouldShowDailyHint}
+              catName={catName}
               dailyHintHypothesis={dailyHintHypothesis}
-              understandingPercent={understandingPercent}
               onDailyHintMainAction={handleDailyHintMainAction}
               onDailyHintSubAction={handleDailyHintSubAction}
             />
@@ -668,15 +668,15 @@ function LatestHypothesisCard({
 function GuidanceBlock({
   guidance,
   showDailyHint,
+  catName,
   dailyHintHypothesis,
-  understandingPercent,
   onDailyHintMainAction,
   onDailyHintSubAction,
 }: {
   guidance: { title: string; text: string };
   showDailyHint: boolean;
+  catName: string;
   dailyHintHypothesis: DailyHintHypothesis;
-  understandingPercent: number;
   onDailyHintMainAction: () => void;
   onDailyHintSubAction: () => void;
 }) {
@@ -684,12 +684,10 @@ function GuidanceBlock({
     return (
       <div style={styles.guidance}>
         <p style={styles.predictionReason}>
-          {"\u4eca\u65e5\u306e\u30d2\u30f3\u30c8"}
+          {`\u3044\u307e\u306e${catName}`}
         </p>
         <p style={styles.guidanceTitle}>{dailyHintHypothesis.text}</p>
-        <p style={styles.guidanceText}>
-          {getDailyHintSupplement(understandingPercent)}
-        </p>
+        <p style={styles.guidanceText}>{dailyHintHypothesis.body}</p>
         <div style={styles.predictionActions}>
           <button
             type="button"
@@ -716,18 +714,6 @@ function GuidanceBlock({
       <p style={styles.guidanceText}>{guidance.text}</p>
     </div>
   );
-}
-
-function getDailyHintSupplement(percent: number) {
-  if (percent <= 30) {
-    return "\u307e\u3060\u8a18\u9332\u304c\u5c11\u306a\u3044\u306e\u3067\u3001\u307e\u305a\u306f\u69d8\u5b50\u3092\u6559\u3048\u3066\u304f\u3060\u3055\u3044";
-  }
-
-  if (percent <= 70) {
-    return "\u307e\u3060\u5c11\u3057\u305a\u3064\u898b\u3048\u3066\u304d\u305f\u6bb5\u968e\u3067\u3059\u3002\u9055\u3063\u3066\u3044\u305f\u3089\u3001\u4e0b\u304b\u3089\u9078\u3073\u76f4\u305b\u307e\u3059\u3002";
-  }
-
-  return "\u6700\u8fd1\u306e\u8a18\u9332\u304b\u3089\u3001\u50be\u5411\u304c\u898b\u3048\u3066\u304d\u3066\u3044\u307e\u3059\u3002\u9055\u3063\u3066\u3044\u305f\u3089\u3001\u9078\u3073\u76f4\u305b\u307e\u3059\u3002";
 }
 
 function OptionSection<Option extends { label: string }>({

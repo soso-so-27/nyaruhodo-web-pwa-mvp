@@ -25,11 +25,25 @@ type ConcernSignal =
   | "fighting"
   | "unknown";
 
-type DailyHintCategory = "food" | "play" | "social" | "stress" | "health";
+type DailyHintCategory =
+  | "food"
+  | "play"
+  | "social"
+  | "stress"
+  | "health"
+  | "unknown";
+
+type DailyHintPattern =
+  | DailyHintCategory
+  | "sleeping"
+  | "grooming"
+  | "after_food"
+  | "toilet";
 
 export type DailyHintHypothesis = {
   category: DailyHintCategory;
   text: string;
+  body: string;
   cta: {
     main: string;
     sub: string;
@@ -160,36 +174,99 @@ const PREDICTED_CONCERN_LABELS: Record<ConcernSignal, string> = {
 };
 
 const FALLBACK_PREDICTED_SIGNALS: ConcernSignal[] = ["meowing", "following"];
-const DAILY_HINT_MESSAGES: Record<DailyHintCategory, string> = {
-  food: "\u304a\u8179\u304c\u7a7a\u3044\u3066\u3044\u308b\u53ef\u80fd\u6027\u304c\u3042\u308a\u307e\u3059",
-  play: "\u904a\u3073\u305f\u3044\u53ef\u80fd\u6027\u304c\u3042\u308a\u307e\u3059",
-  social: "\u304b\u307e\u3063\u3066\u307b\u3057\u3044\u53ef\u80fd\u6027\u304c\u3042\u308a\u307e\u3059",
-  stress: "\u5c11\u3057\u843d\u3061\u7740\u304b\u306a\u3044\u53ef\u80fd\u6027\u304c\u3042\u308a\u307e\u3059",
-  health: "\u4f53\u8abf\u306b\u6ce8\u610f\u3057\u305f\u65b9\u304c\u3088\u3044\u53ef\u80fd\u6027\u304c\u3042\u308a\u307e\u3059",
-};
-const DAILY_HINT_CTA_LABELS: Record<
-  DailyHintCategory,
-  { main: string; sub: string }
+const DAILY_HINT_PATTERNS: Record<
+  DailyHintPattern,
+  DailyHintHypothesis
 > = {
   food: {
-    main: "\u3054\u306f\u3093\u3092\u78ba\u8a8d\u3057\u305f",
-    sub: "\u9055\u3046\u304b\u3082",
+    category: "food",
+    text: "\u304a\u8179\u304c\u7a7a\u3044\u3066\u3044\u308b\u53ef\u80fd\u6027\u304c\u3042\u308a\u307e\u3059",
+    body: "\u3054\u306f\u3093\u306b\u95a2\u4fc2\u3059\u308b\u8a18\u9332\u304c\u3042\u308a\u307e\u3059\u3002\u9055\u3063\u3066\u3044\u305f\u3089\u3001\u4e0b\u304b\u3089\u9078\u3073\u76f4\u305b\u307e\u3059\u3002",
+    cta: {
+      main: "\u3054\u306f\u3093\u3092\u78ba\u8a8d\u3057\u305f",
+      sub: "\u9055\u3046\u304b\u3082",
+    },
   },
   play: {
-    main: "\u904a\u3093\u3067\u307f\u305f",
-    sub: "\u9055\u3046\u304b\u3082",
+    category: "play",
+    text: "\u904a\u3073\u305f\u3044\u53ef\u80fd\u6027\u304c\u3042\u308a\u307e\u3059",
+    body: "\u6700\u8fd1\u306e\u8a18\u9332\u304b\u3089\u3001\u307e\u305a\u8a66\u3057\u3084\u3059\u3044\u5019\u88dc\u3067\u3059\u3002\u9055\u3063\u3066\u3044\u305f\u3089\u3001\u4e0b\u304b\u3089\u9078\u3073\u76f4\u305b\u307e\u3059\u3002",
+    cta: {
+      main: "\u904a\u3093\u3067\u307f\u305f",
+      sub: "\u9055\u3046\u304b\u3082",
+    },
   },
   social: {
-    main: "\u304b\u307e\u3063\u3066\u307f\u305f",
-    sub: "\u9055\u3046\u304b\u3082",
+    category: "social",
+    text: "\u304b\u307e\u3063\u3066\u307b\u3057\u3044\u53ef\u80fd\u6027\u304c\u3042\u308a\u307e\u3059",
+    body: "\u305d\u3070\u306b\u3044\u305f\u3044\u3001\u5b89\u5fc3\u3057\u305f\u3044\u30b5\u30a4\u30f3\u304b\u3082\u3057\u308c\u307e\u305b\u3093\u3002\u9055\u3063\u3066\u3044\u305f\u3089\u3001\u4e0b\u304b\u3089\u9078\u3073\u76f4\u305b\u307e\u3059\u3002",
+    cta: {
+      main: "\u304b\u307e\u3063\u3066\u307f\u305f",
+      sub: "\u9055\u3046\u304b\u3082",
+    },
   },
   stress: {
-    main: "\u843d\u3061\u7740\u3051\u308b\u3088\u3046\u306b\u3057\u305f",
-    sub: "\u9055\u3046\u304b\u3082",
+    category: "stress",
+    text: "\u5c11\u3057\u843d\u3061\u7740\u304b\u306a\u3044\u53ef\u80fd\u6027\u304c\u3042\u308a\u307e\u3059",
+    body: "\u843d\u3061\u7740\u304b\u306a\u3044\u69d8\u5b50\u304c\u3042\u308b\u305f\u3081\u3001\u74b0\u5883\u3084\u523a\u6fc0\u3092\u898b\u76f4\u3057\u3066\u3082\u3088\u3055\u305d\u3046\u3067\u3059\u3002",
+    cta: {
+      main: "\u843d\u3061\u7740\u3051\u308b\u3088\u3046\u306b\u3057\u305f",
+      sub: "\u9055\u3046\u304b\u3082",
+    },
   },
   health: {
-    main: "\u4f53\u8abf\u3092\u78ba\u8a8d\u3057\u305f",
-    sub: "\u9055\u3046\u304b\u3082",
+    category: "health",
+    text: "\u4f53\u8abf\u306b\u6ce8\u610f\u3057\u305f\u65b9\u304c\u3088\u3044\u53ef\u80fd\u6027\u304c\u3042\u308a\u307e\u3059",
+    body: "\u5143\u6c17\u304c\u306a\u3044\u69d8\u5b50\u306f\u3001\u65e9\u3081\u306b\u898b\u3066\u304a\u304d\u305f\u3044\u30b5\u30a4\u30f3\u3067\u3059\u3002\u7d9a\u304f\u5834\u5408\u306f\u76f8\u8ac7\u3082\u8003\u3048\u3066\u304f\u3060\u3055\u3044\u3002",
+    cta: {
+      main: "\u4f53\u8abf\u3092\u78ba\u8a8d\u3057\u305f",
+      sub: "\u9055\u3046\u304b\u3082",
+    },
+  },
+  unknown: {
+    category: "unknown",
+    text: "\u307e\u3060\u306f\u3063\u304d\u308a\u3057\u307e\u305b\u3093",
+    body: "\u6700\u8fd1\u306e\u8a18\u9332\u3060\u3051\u3067\u306f\u5224\u65ad\u3057\u304d\u308c\u307e\u305b\u3093\u3002\u8fd1\u3044\u69d8\u5b50\u3092\u9078\u3073\u76f4\u3057\u3066\u307f\u3066\u304f\u3060\u3055\u3044\u3002",
+    cta: {
+      main: "\u69d8\u5b50\u3092\u898b\u308b",
+      sub: "\u9055\u3046\u304b\u3082",
+    },
+  },
+  sleeping: {
+    category: "stress",
+    text: "\u4f11\u307f\u305f\u3044\u6642\u9593\u304b\u3082\u3057\u308c\u307e\u305b\u3093",
+    body: "\u7720\u3063\u3066\u3044\u308b\u8a18\u9332\u304c\u3042\u308a\u307e\u3059\u3002\u7121\u7406\u306b\u69cb\u308f\u305a\u3001\u305d\u3063\u3068\u898b\u5b88\u3063\u3066\u3082\u3088\u3055\u305d\u3046\u3067\u3059\u3002",
+    cta: {
+      main: "\u305d\u3063\u3068\u3057\u3066\u304a\u304f",
+      sub: "\u9055\u3046\u304b\u3082",
+    },
+  },
+  grooming: {
+    category: "stress",
+    text: "\u843d\u3061\u7740\u3053\u3046\u3068\u3057\u3066\u3044\u308b\u304b\u3082\u3057\u308c\u307e\u305b\u3093",
+    body: "\u30b0\u30eb\u30fc\u30df\u30f3\u30b0\u306f\u6c17\u6301\u3061\u3092\u6574\u3048\u308b\u6642\u306b\u3082\u898b\u3089\u308c\u307e\u3059\u3002\u7d9a\u304f\u69d8\u5b50\u3092\u898b\u3066\u307f\u307e\u3057\u3087\u3046\u3002",
+    cta: {
+      main: "\u69d8\u5b50\u3092\u898b\u308b",
+      sub: "\u9055\u3046\u304b\u3082",
+    },
+  },
+  after_food: {
+    category: "food",
+    text: "\u3054\u306f\u3093\u306e\u3042\u3068\u306f\u843d\u3061\u7740\u304d\u3084\u3059\u3044\u6642\u9593\u304b\u3082\u3057\u308c\u307e\u305b\u3093",
+    body: "\u3054\u98ef\u306e\u8a18\u9332\u304c\u3042\u308a\u307e\u3059\u3002\u3053\u306e\u3042\u3068\u306e\u69d8\u5b50\u3082\u5c11\u3057\u898b\u3066\u304a\u304f\u3068\u5b89\u5fc3\u3067\u3059\u3002",
+    cta: {
+      main: "\u69d8\u5b50\u3092\u898b\u308b",
+      sub: "\u9055\u3046\u304b\u3082",
+    },
+  },
+  toilet: {
+    category: "health",
+    text: "\u30c8\u30a4\u30ec\u5f8c\u306e\u69d8\u5b50\u3082\u898b\u3066\u304a\u304f\u3068\u3088\u3055\u305d\u3046\u3067\u3059",
+    body: "\u30c8\u30a4\u30ec\u306e\u8a18\u9332\u304c\u3042\u308a\u307e\u3059\u3002\u3044\u3064\u3082\u3068\u9055\u3046\u69d8\u5b50\u304c\u3042\u308c\u3070\u3001\u6c17\u306b\u306a\u308b\u3053\u3068\u304b\u3089\u8a18\u9332\u3067\u304d\u307e\u3059\u3002",
+    cta: {
+      main: "\u69d8\u5b50\u3092\u898b\u308b",
+      sub: "\u9055\u3046\u304b\u3082",
+    },
   },
 };
 const DEFAULT_CAT_NAME = "\u30df\u30b1";
@@ -197,8 +274,8 @@ const CAT_PROFILES_KEY = "cat_profiles";
 const ACTIVE_CAT_ID_KEY = "active_cat_id";
 const LEGACY_CAT_PROFILE_KEY = "cat_profile";
 
-// MVP only: this switches the local UI profile. Supabase events, diagnoses,
-// and feedbacks are not separated per cat until cats/cat_id are introduced.
+// MVP only: this switches the local UI profile. Supabase tracking rows use
+// local_cat_id for provisional separation until cats/cat_id are introduced.
 
 export function getGuidanceByUnderstanding(percent: number) {
   return (
@@ -249,26 +326,26 @@ export function buildDailyHintHypothesis(
   recentEvents: RecentEvent[],
 ): DailyHintHypothesis {
   const stats = new Map<
-    DailyHintCategory,
+    DailyHintPattern,
     { score: number; latestIndex: number }
   >();
 
   recentEvents.forEach((event, index) => {
-    const category = getDailyHintCategory(event.signal);
+    const pattern = getDailyHintPattern(event.signal);
 
-    if (!category) {
+    if (!pattern) {
       return;
     }
 
-    const current = stats.get(category);
+    const current = stats.get(pattern);
 
-    stats.set(category, {
+    stats.set(pattern, {
       score: (current?.score ?? 0) + getDailyHintSignalWeight(event.signal),
       latestIndex: current ? Math.min(current.latestIndex, index) : index,
     });
   });
 
-  const category =
+  const pattern =
     [...stats.entries()].sort(([, a], [, b]) => {
       if (b.score !== a.score) {
         return b.score - a.score;
@@ -277,11 +354,7 @@ export function buildDailyHintHypothesis(
       return a.latestIndex - b.latestIndex;
     })[0]?.[0] ?? "play";
 
-  return {
-    category,
-    text: DAILY_HINT_MESSAGES[category],
-    cta: DAILY_HINT_CTA_LABELS[category],
-  };
+  return DAILY_HINT_PATTERNS[pattern];
 }
 
 export function createLocalCatProfile(
@@ -514,7 +587,23 @@ function isConcernSignal(signal: string): signal is ConcernSignal {
   return signal in PREDICTED_CONCERN_LABELS;
 }
 
-function getDailyHintCategory(signal: string): DailyHintCategory | null {
+function getDailyHintPattern(signal: string): DailyHintPattern | null {
+  if (signal === "sleeping") {
+    return "sleeping";
+  }
+
+  if (signal === "grooming") {
+    return "grooming";
+  }
+
+  if (signal === "toilet") {
+    return "toilet";
+  }
+
+  if (signal === "after_food" || signal === "eating") {
+    return "after_food";
+  }
+
   if (signal === "low_energy") {
     return "health";
   }
@@ -527,12 +616,12 @@ function getDailyHintCategory(signal: string): DailyHintCategory | null {
     return "social";
   }
 
-  if (signal === "after_food" || signal === "eating") {
-    return "food";
-  }
-
   if (signal === "playing" || signal === "meowing") {
     return "play";
+  }
+
+  if (signal === "unknown") {
+    return "unknown";
   }
 
   return null;
@@ -547,8 +636,11 @@ function getDailyHintSignalWeight(signal: string) {
     signal === "playing" ||
     signal === "following" ||
     signal === "purring" ||
+    signal === "sleeping" ||
+    signal === "grooming" ||
     signal === "after_food" ||
     signal === "eating" ||
+    signal === "toilet" ||
     signal === "restless" ||
     signal === "fighting"
   ) {
