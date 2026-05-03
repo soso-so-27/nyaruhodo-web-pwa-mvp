@@ -500,28 +500,43 @@ function Header({
   onCatSelect: (catId: string) => void;
 }) {
   const understandingTone = getUnderstandingTone(understandingPercent);
+  const ringDegree = Math.max(0, Math.min(100, understandingPercent)) * 3.6;
 
   return (
     <header style={styles.header}>
       <div style={styles.headerTopRow}>
         <p style={styles.headerEyebrow}>{"\u4eca\u65e5\u306e\u732b"}</p>
-        <p style={styles.understanding}>
-          {understandingTone}
-        </p>
       </div>
-      <h1 style={styles.title}>
-        {"\u4eca\u65e5\u306e"}
-        {catName}
-      </h1>
-      <p style={styles.understandingMessage}>
-        {catName}
-        {"\u306e\u3053\u3068\u3001\u8a18\u9332\u3059\u308b\u307b\u3069\u898b\u3048\u3066\u304d\u307e\u3059"}
-        <span style={styles.understandingMeta}>
-          {"\u7406\u89e3\u5ea6 "}
-          {understandingPercent}
-          {"%"}
-        </span>
-      </p>
+      <div style={styles.profileHero}>
+        <div style={styles.catAvatar} aria-hidden="true">
+          {catName.slice(0, 1)}
+        </div>
+        <div style={styles.profileText}>
+          <h1 style={styles.title}>
+            {"\u4eca\u65e5\u306e"}
+            {catName}
+          </h1>
+          <p style={styles.understandingMessage}>
+            {catName}
+            {"\u306e\u3053\u3068\u3001\u5c11\u3057\u305a\u3064\u898b\u3048\u3066\u304d\u307e\u3057\u305f"}
+          </p>
+        </div>
+        <div style={styles.understandingPanel}>
+          <div
+            style={{
+              ...styles.understandingRing,
+              background: `conic-gradient(#3f3f46 ${ringDegree}deg, #eee7dd 0deg)`,
+            }}
+            aria-label={`理解度 ${understandingPercent}%`}
+          >
+            <span style={styles.understandingRingInner}>
+              {understandingPercent}
+              {"%"}
+            </span>
+          </div>
+          <p style={styles.understanding}>{understandingTone}</p>
+        </div>
+      </div>
       <div style={styles.homeCatSwitcher}>
         <p style={styles.catChipLabel}>{"見る猫"}</p>
         <div style={styles.catChips}>
@@ -899,7 +914,7 @@ const styles = {
   container: {
     width: "min(100%, 430px)",
     margin: "0 auto",
-    padding: "14px 14px calc(248px + env(safe-area-inset-bottom))",
+    padding: "16px 14px calc(260px + env(safe-area-inset-bottom))",
   },
   actionArea: {
     scrollMarginTop: "18px",
@@ -912,18 +927,18 @@ const styles = {
     letterSpacing: 0,
   },
   title: {
-    margin: "4px 0 0",
-    fontSize: "32px",
+    margin: "2px 0 0",
+    fontSize: "26px",
     fontWeight: 750,
     letterSpacing: 0,
     lineHeight: 1.2,
   },
   header: {
-    marginBottom: "10px",
+    marginBottom: "12px",
     border: "1px solid #ebe2d6",
-    borderRadius: "24px",
+    borderRadius: "28px",
     background: "linear-gradient(180deg, #fffdf9 0%, #fff7ec 100%)",
-    padding: "18px 16px 16px",
+    padding: "18px 16px 17px",
     scrollMarginTop: "16px",
   },
   headerTopRow: {
@@ -931,6 +946,58 @@ const styles = {
     alignItems: "center",
     justifyContent: "space-between",
     gap: "12px",
+  },
+  profileHero: {
+    display: "grid",
+    gridTemplateColumns: "56px minmax(0, 1fr) auto",
+    alignItems: "center",
+    gap: "12px",
+    marginTop: "8px",
+  },
+  catAvatar: {
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    width: "56px",
+    height: "56px",
+    border: "1px solid #eadbca",
+    borderRadius: "20px",
+    background: "#ffffff",
+    color: "#3f3f46",
+    fontSize: "24px",
+    fontWeight: 800,
+    lineHeight: 1,
+  },
+  profileText: {
+    minWidth: 0,
+  },
+  understandingPanel: {
+    display: "flex",
+    flexDirection: "column",
+    alignItems: "center",
+    gap: "5px",
+    minWidth: "72px",
+  },
+  understandingRing: {
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    width: "54px",
+    height: "54px",
+    borderRadius: "999px",
+  },
+  understandingRingInner: {
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    width: "42px",
+    height: "42px",
+    borderRadius: "999px",
+    background: "#fffdf9",
+    color: "#3f3f46",
+    fontSize: "11px",
+    fontWeight: 800,
+    lineHeight: 1,
   },
   catNameControls: {
     display: "flex",
@@ -1109,18 +1176,15 @@ const styles = {
     lineHeight: 1.5,
   },
   understanding: {
-    display: "inline-flex",
-    width: "fit-content",
+    display: "block",
+    width: "72px",
     margin: 0,
-    border: "1px solid #eadbca",
-    borderRadius: "999px",
-    background: "#ffffff",
     color: "#6b5f54",
-    fontSize: "11px",
+    fontSize: "10px",
     fontWeight: 600,
     letterSpacing: 0,
-    padding: "3px 9px",
-    whiteSpace: "nowrap",
+    lineHeight: 1.35,
+    textAlign: "center",
   },
   understandingMessage: {
     margin: "8px 0 0",
@@ -1233,11 +1297,11 @@ const styles = {
     whiteSpace: "pre-line",
   },
   insightCard: {
-    marginBottom: "10px",
+    marginBottom: "12px",
     border: "1px solid #eadbca",
-    borderRadius: "24px",
-    background: "#fffaf3",
-    padding: "18px",
+    borderRadius: "28px",
+    background: "linear-gradient(180deg, #fffaf3 0%, #fffdf9 100%)",
+    padding: "18px 18px 19px",
   },
   guidance: {
     margin: 0,
@@ -1290,11 +1354,11 @@ const styles = {
     cursor: "pointer",
   },
   section: {
-    marginBottom: "10px",
+    marginBottom: "12px",
     border: "1px solid #e4e4e7",
-    borderRadius: "22px",
+    borderRadius: "26px",
     background: "#ffffff",
-    padding: "17px 16px",
+    padding: "18px 16px",
   },
   currentSection: {
     borderColor: "#e4e4e7",
@@ -1340,22 +1404,24 @@ const styles = {
   grid: {
     display: "grid",
     gridTemplateColumns: "repeat(2, minmax(0, 1fr))",
-    gap: "12px",
+    gap: "10px",
   },
   button: {
     display: "flex",
+    flexDirection: "column",
     alignItems: "center",
-    justifyContent: "flex-start",
-    gap: "10px",
-    minHeight: "56px",
+    justifyContent: "center",
+    gap: "8px",
+    minHeight: "82px",
     border: "1px solid #d4d4d8",
-    borderRadius: "20px",
+    borderRadius: "22px",
     background: "#ffffff",
     color: "#27272a",
     fontSize: "14px",
     fontWeight: 600,
     letterSpacing: 0,
-    padding: "0 12px",
+    textAlign: "center",
+    padding: "10px 8px",
     cursor: "pointer",
   },
   currentButton: {
@@ -1366,18 +1432,19 @@ const styles = {
     background: "#fffaf3",
     borderColor: "#eadbca",
     fontWeight: 600,
+    minHeight: "72px",
   },
   optionMark: {
     display: "inline-flex",
     alignItems: "center",
     justifyContent: "center",
     flex: "0 0 auto",
-    width: "28px",
-    height: "28px",
+    width: "36px",
+    height: "36px",
     borderRadius: "999px",
-    background: "#f4f4f5",
-    color: "#71717a",
-    fontSize: "11px",
+    background: "#f7f3ee",
+    color: "#6b5f54",
+    fontSize: "12px",
     fontWeight: 700,
     lineHeight: 1,
   },
