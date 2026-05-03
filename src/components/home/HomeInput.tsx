@@ -296,24 +296,27 @@ export function HomeInput({
     router.push(`/diagnose?${params.toString()}`);
   }
 
-  function handleDailyHintMainAction() {
-    setHypothesisMessage("\u8a18\u9332\u3057\u307e\u3057\u305f\u3002");
-  }
-
-  async function handleDailyHintSubAction() {
+  async function saveDailyHintFeedback(
+    feedback: "accepted" | "rejected" | "dismissed",
+    action: "primary_cta" | "rejected" | "dismissed",
+  ) {
     const savedFeedback = await insertHintFeedback({
       localCatId: activeCatId,
       hintType: "current_cat",
       shownCategory: dailyHintHypothesis.category,
       shownSignal: dailyHintHypothesis.shownSignal,
-      feedback: "rejected",
+      feedback,
       understandingPercent,
       sourceEventIds: activeCatEvents.map((event) => event.id),
       calendarContext: buildCalendarContext(),
       metadata: {
         source: "current_cat_card",
+        action,
         catName,
         headline: dailyHintHypothesis.text,
+        ...(action === "primary_cta"
+          ? { primaryCta: dailyHintHypothesis.cta.main }
+          : {}),
       },
     });
 
@@ -323,7 +326,23 @@ export function HomeInput({
     }
 
     setIsDailyHintDismissed(true);
-    setHypothesisMessage("\u8a18\u9332\u3057\u307e\u3057\u305f\u3002");
+    setHypothesisMessage(
+      feedback === "dismissed"
+        ? "\u3042\u3068\u3067\u898b\u308b\u3088\u3046\u306b\u3057\u307e\u3057\u305f\u3002"
+        : "\u8a18\u9332\u3057\u307e\u3057\u305f\u3002",
+    );
+  }
+
+  function handleDailyHintMainAction() {
+    void saveDailyHintFeedback("accepted", "primary_cta");
+  }
+
+  function handleDailyHintSubAction() {
+    void saveDailyHintFeedback("rejected", "rejected");
+  }
+
+  function handleDailyHintTertiaryAction() {
+    void saveDailyHintFeedback("dismissed", "dismissed");
   }
 
   async function handleHypothesisAction(feedback: "resolved" | "unresolved") {
@@ -416,9 +435,8 @@ export function HomeInput({
               catName={catName}
               dailyHintHypothesis={dailyHintHypothesis}
               onDailyHintMainAction={handleDailyHintMainAction}
-              onDailyHintSubAction={() => {
-                void handleDailyHintSubAction();
-              }}
+              onDailyHintSubAction={handleDailyHintSubAction}
+              onDailyHintTertiaryAction={handleDailyHintTertiaryAction}
             />
           )}
 
@@ -699,6 +717,7 @@ function GuidanceBlock({
   dailyHintHypothesis,
   onDailyHintMainAction,
   onDailyHintSubAction,
+  onDailyHintTertiaryAction,
 }: {
   guidance: { title: string; text: string };
   showDailyHint: boolean;
@@ -706,6 +725,7 @@ function GuidanceBlock({
   dailyHintHypothesis: DailyHintHypothesis;
   onDailyHintMainAction: () => void;
   onDailyHintSubAction: () => void;
+  onDailyHintTertiaryAction: () => void;
 }) {
   if (showDailyHint) {
     return (
@@ -719,7 +739,10 @@ function GuidanceBlock({
           <button
             type="button"
             onClick={onDailyHintMainAction}
-            style={styles.hypothesisMainButton}
+            style={{
+              ...styles.hypothesisMainButton,
+              ...styles.dailyHintPrimaryButton,
+            }}
           >
             {dailyHintHypothesis.cta.main}
           </button>
@@ -729,6 +752,13 @@ function GuidanceBlock({
             style={styles.hypothesisSubButton}
           >
             {dailyHintHypothesis.cta.sub}
+          </button>
+          <button
+            type="button"
+            onClick={onDailyHintTertiaryAction}
+            style={styles.hypothesisSubButton}
+          >
+            {dailyHintHypothesis.cta.tertiary}
           </button>
         </div>
       </div>
@@ -1104,6 +1134,9 @@ const styles = {
     gridTemplateColumns: "repeat(2, minmax(0, 1fr))",
     gap: "10px",
     marginTop: "14px",
+  },
+  dailyHintPrimaryButton: {
+    gridColumn: "1 / -1",
   },
   predictionButton: {
     minHeight: "48px",
