@@ -140,12 +140,12 @@ export const CONCERN_OPTIONS = [
 ];
 
 const PREDICTED_CONCERN_LABELS: Record<ConcernSignal, string> = {
-  meowing: "\u9cf4\u3044\u3066\u308b\u304b\u3082",
-  following: "\u3064\u3044\u3066\u304d\u3066\u308b\u304b\u3082",
-  restless: "\u843d\u3061\u7740\u304b\u306a\u3044\u304b\u3082",
-  low_energy: "\u5143\u6c17\u306a\u3044\u304b\u3082",
-  fighting: "\u30b1\u30f3\u30ab\u3057\u3066\u308b\u304b\u3082",
-  unknown: "\u3088\u304f\u308f\u304b\u3089\u306a\u3044\u304b\u3082",
+  meowing: "\u9cf4\u3044\u3066\u308b\u3092\u307f\u308b",
+  following: "\u3064\u3044\u3066\u304d\u3066\u308b\u3092\u307f\u308b",
+  restless: "\u843d\u3061\u7740\u304b\u306a\u3044\u3092\u307f\u308b",
+  low_energy: "\u5143\u6c17\u306a\u3044\u3092\u307f\u308b",
+  fighting: "\u30b1\u30f3\u30ab\u3057\u3066\u308b\u3092\u307f\u308b",
+  unknown: "\u3088\u304f\u308f\u304b\u3089\u306a\u3044\u3092\u307f\u308b",
 };
 
 const FALLBACK_PREDICTED_SIGNALS: ConcernSignal[] = ["meowing", "following"];
