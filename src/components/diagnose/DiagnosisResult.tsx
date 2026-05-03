@@ -16,20 +16,12 @@ type DiagnosisResultProps = {
   persistenceMessage?: string;
 };
 
-const categoryLabels: Record<CauseCategory, string> = {
-  food: "\u3054\u98ef",
-  play: "\u904a\u3073",
-  social: "\u304b\u307e\u3063\u3066\u307b\u3057\u3044",
-  stress: "\u30b9\u30c8\u30ec\u30b9",
-  health: "\u4f53\u8abf",
-};
-
 const hypothesisMessages: Record<CauseCategory, string> = {
-  food: "\u3054\u98ef\u304b\u3082\u3057\u308c\u307e\u305b\u3093",
-  play: "\u904a\u3073\u305f\u3044\u53ef\u80fd\u6027\u304c\u3042\u308a\u307e\u3059",
-  social: "\u304b\u307e\u3063\u3066\u307b\u3057\u3044\u53ef\u80fd\u6027\u304c\u3042\u308a\u307e\u3059",
-  stress: "\u5c11\u3057\u843d\u3061\u7740\u304d\u305f\u3044\u53ef\u80fd\u6027\u304c\u3042\u308a\u307e\u3059",
-  health: "\u4f53\u8abf\u3092\u898b\u3066\u3042\u3052\u305f\u65b9\u304c\u3088\u3055\u305d\u3046\u3067\u3059",
+  food: "お腹が空いている可能性があります",
+  play: "遊びたい可能性があります",
+  social: "かまってほしい可能性があります",
+  stress: "少し落ち着かない可能性があります",
+  health: "体調に注意した方がよい可能性があります",
 };
 
 const ctaLabels: Record<
@@ -40,34 +32,34 @@ const ctaLabels: Record<
   }
 > = {
   food: {
-    main: "\u3054\u306f\u3093\u3092\u78ba\u8a8d\u3057\u305f",
-    sub: "\u307e\u3060\u69d8\u5b50\u3092\u898b\u308b",
+    main: "ごはんを確認する",
+    sub: "違うかも",
   },
   play: {
-    main: "\u904a\u3093\u3067\u307f\u305f",
-    sub: "\u307e\u3060\u69d8\u5b50\u3092\u898b\u308b",
+    main: "3分だけ遊ぶ",
+    sub: "違うかも",
   },
   social: {
-    main: "\u304b\u307e\u3063\u3066\u307f\u305f",
-    sub: "\u307e\u3060\u69d8\u5b50\u3092\u898b\u308b",
+    main: "声をかける",
+    sub: "違うかも",
   },
   stress: {
-    main: "\u843d\u3061\u7740\u3051\u308b\u3088\u3046\u306b\u3057\u305f",
-    sub: "\u307e\u3060\u69d8\u5b50\u3092\u898b\u308b",
+    main: "静かな場所にする",
+    sub: "違うかも",
   },
   health: {
-    main: "\u4f53\u8abf\u3092\u78ba\u8a8d\u3057\u305f",
-    sub: "\u8a18\u9332\u3060\u3051\u3059\u308b",
+    main: "体調を確認する",
+    sub: "違うかも",
   },
 };
 
 const fallbackCtaLabels = {
-  main: "\u69d8\u5b50\u3092\u8a18\u9332\u3059\u308b",
-  sub: "\u30db\u30fc\u30e0\u306b\u623b\u308b",
+  main: "様子を見る",
+  sub: "違うかも",
 };
 
 const feedbackSaveErrorMessage =
-  "\u884c\u52d5\u306e\u8a18\u9332\u306b\u5931\u6557\u3057\u307e\u3057\u305f\u3002\n\u5c11\u3057\u6642\u9593\u3092\u304a\u3044\u3066\u3001\u3082\u3046\u4e00\u5ea6\u304a\u8a66\u3057\u304f\u3060\u3055\u3044\u3002";
+  "行動の記録に失敗しました。\n少し時間をおいて、もう一度お試しください。";
 
 export function DiagnosisResult({
   resultText,
@@ -79,12 +71,17 @@ export function DiagnosisResult({
 }: DiagnosisResultProps) {
   const router = useRouter();
   const [feedbackMessage, setFeedbackMessage] = useState("");
-  const [nextCandidateText, setNextCandidateText] = useState("");
   const currentCategory = categories[0];
   const nextCategory = categories[1];
   const labels = currentCategory
     ? ctaLabels[currentCategory]
     : fallbackCtaLabels;
+  const mainHypothesisText = currentCategory
+    ? hypothesisMessages[currentCategory]
+    : resultText;
+  const secondaryHypothesisText = nextCategory
+    ? hypothesisMessages[nextCategory]
+    : "";
 
   useEffect(() => {
     if (!currentCategory) {
@@ -128,21 +125,39 @@ export function DiagnosisResult({
     }
 
     setFeedbackMessage(getCompletionMessage(currentCategory));
-    setNextCandidateText(
-      feedback === "unresolved" && nextCategory
-        ? `${categoryLabels[nextCategory]}\u306e\u53ef\u80fd\u6027\u3082\u3042\u308a\u307e\u3059`
-        : "",
-    );
   }
 
   return (
     <main style={styles.page}>
       <div style={styles.container}>
-        <h1 style={styles.title}>{"\u8a3a\u65ad\u7d50\u679c"}</h1>
+        <header style={styles.header}>
+          <div>
+            <h1 style={styles.title}>{"診断結果"}</h1>
+            <p style={styles.lead}>{"さっきの様子から見ています"}</p>
+          </div>
+          <button
+            type="button"
+            onClick={() => router.push("/home")}
+            style={styles.headerHomeButton}
+          >
+            {"ホームに戻る"}
+          </button>
+        </header>
 
-        <section style={styles.resultSection}>
-          <p style={styles.resultText}>{resultText}</p>
+        <section style={styles.hypothesisCard}>
+          <p style={styles.cardLabel}>{"今の仮説"}</p>
+          <p style={styles.hypothesisText}>{mainHypothesisText}</p>
+        </section>
 
+        {secondaryHypothesisText ? (
+          <section style={styles.secondaryCard}>
+            <p style={styles.secondaryLabel}>{"ほかにもありそう"}</p>
+            <p style={styles.secondaryText}>{secondaryHypothesisText}</p>
+          </section>
+        ) : null}
+
+        <section style={styles.reasonCard}>
+          <p style={styles.cardTitle}>{"そう考えた理由"}</p>
           <ul style={styles.reasonList}>
             {reasons.map((reason) => (
               <li key={reason} style={styles.reasonItem}>
@@ -152,31 +167,34 @@ export function DiagnosisResult({
           </ul>
         </section>
 
-        <div style={styles.feedbackGroup}>
-          <button
-            type="button"
-            onClick={() => {
-              void handleAction("resolved");
-            }}
-            style={styles.ctaButton}
-          >
-            {labels.main}
-          </button>
-          <button
-            type="button"
-            onClick={() => {
-              if (!currentCategory) {
-                router.push("/home");
-                return;
-              }
+        <section style={styles.actionCard}>
+          <p style={styles.cardTitle}>{"まず試すなら"}</p>
+          <div style={styles.feedbackGroup}>
+            <button
+              type="button"
+              onClick={() => {
+                void handleAction("resolved");
+              }}
+              style={styles.ctaButton}
+            >
+              {labels.main}
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                if (!currentCategory) {
+                  router.push("/home");
+                  return;
+                }
 
-              void handleAction("unresolved");
-            }}
-            style={styles.feedbackButton}
-          >
-            {labels.sub}
-          </button>
-        </div>
+                void handleAction("unresolved");
+              }}
+              style={styles.feedbackButton}
+            >
+              {labels.sub}
+            </button>
+          </div>
+        </section>
 
         {feedbackMessage ? (
           <p style={styles.feedbackMessage}>{feedbackMessage}</p>
@@ -186,16 +204,12 @@ export function DiagnosisResult({
           <p style={styles.persistenceMessage}>{persistenceMessage}</p>
         ) : null}
 
-        {nextCandidateText ? (
-          <p style={styles.nextCandidate}>{nextCandidateText}</p>
-        ) : null}
-
         <button
           type="button"
           onClick={() => router.push("/home")}
           style={styles.homeButton}
         >
-          {"\u30db\u30fc\u30e0\u306b\u623b\u308b"}
+          {"ホームに戻る"}
         </button>
       </div>
     </main>
@@ -204,16 +218,16 @@ export function DiagnosisResult({
 
 function getCompletionMessage(category: CauseCategory) {
   if (category === "health") {
-    return "\u8a18\u9332\u3057\u307e\u3057\u305f\u3002\n\u6c17\u306b\u306a\u308b\u69d8\u5b50\u304c\u7d9a\u304f\u3068\u304d\u306f\u3001\u65e9\u3081\u306b\u76f8\u8ac7\u3057\u3066\u304f\u3060\u3055\u3044\u3002";
+    return "記録しました。\n気になる様子が続くときは、早めに相談してください。";
   }
 
-  return "\u8a18\u9332\u3057\u307e\u3057\u305f\u3002\n\u307e\u305f\u5c11\u3057\u3001\u3053\u306e\u5b50\u306e\u50be\u5411\u304c\u898b\u3048\u3066\u304d\u307e\u3057\u305f\u3002";
+  return "記録しました。\nまた少し、この子の傾向が見えてきました。";
 }
 
 const styles = {
   page: {
     minHeight: "100vh",
-    background: "#f4f4f5",
+    background: "#fffaf3",
     color: "#27272a",
     fontFamily:
       '-apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
@@ -221,100 +235,177 @@ const styles = {
   container: {
     width: "min(100%, 560px)",
     margin: "0 auto",
-    padding: "48px 24px",
+    padding: "28px 20px calc(40px + env(safe-area-inset-bottom))",
+  },
+  header: {
+    display: "flex",
+    alignItems: "flex-start",
+    justifyContent: "space-between",
+    gap: "16px",
+    marginBottom: "14px",
   },
   title: {
-    margin: "0 0 44px",
-    fontSize: "30px",
-    fontWeight: 600,
+    margin: 0,
+    color: "#18181b",
+    fontSize: "28px",
+    fontWeight: 700,
     letterSpacing: 0,
   },
-  resultSection: {
-    marginBottom: "32px",
+  lead: {
+    margin: "6px 0 0",
+    color: "#71717a",
+    fontSize: "13px",
+    lineHeight: 1.6,
   },
-  resultText: {
-    margin: "0 0 24px",
+  headerHomeButton: {
+    minHeight: "34px",
+    border: "1px solid #eadbca",
+    borderRadius: "999px",
+    background: "#ffffff",
+    color: "#52525b",
+    fontSize: "12px",
+    fontWeight: 600,
+    whiteSpace: "nowrap",
+    padding: "0 12px",
+    cursor: "pointer",
+  },
+  hypothesisCard: {
+    marginBottom: "10px",
+    border: "1px solid #eadbca",
+    borderRadius: "18px",
+    background: "#ffffff",
+    padding: "18px",
+  },
+  cardLabel: {
+    display: "inline-flex",
+    width: "fit-content",
+    margin: "0 0 10px",
+    border: "1px solid #eadbca",
+    borderRadius: "999px",
+    background: "#fffaf3",
+    color: "#6b5f54",
+    fontSize: "12px",
+    fontWeight: 600,
+    lineHeight: 1.5,
+    padding: "2px 9px",
+  },
+  hypothesisText: {
+    margin: 0,
+    color: "#18181b",
     fontSize: "22px",
+    fontWeight: 700,
+    lineHeight: 1.55,
+    letterSpacing: 0,
+  },
+  secondaryCard: {
+    marginBottom: "10px",
+    border: "1px solid #e4e4e7",
+    borderRadius: "16px",
+    background: "#ffffff",
+    padding: "14px 16px",
+  },
+  secondaryLabel: {
+    margin: "0 0 4px",
+    color: "#71717a",
+    fontSize: "12px",
+    fontWeight: 600,
+    lineHeight: 1.5,
+  },
+  secondaryText: {
+    margin: 0,
+    color: "#3f3f46",
+    fontSize: "14px",
     fontWeight: 600,
     lineHeight: 1.6,
-    letterSpacing: 0,
+  },
+  reasonCard: {
+    marginBottom: "10px",
+    border: "1px solid #e4e4e7",
+    borderRadius: "18px",
+    background: "#ffffff",
+    padding: "16px",
+  },
+  actionCard: {
+    marginBottom: "10px",
+    border: "1px solid #eadbca",
+    borderRadius: "18px",
+    background: "#fffdf9",
+    padding: "16px",
+  },
+  cardTitle: {
+    margin: "0 0 10px",
+    color: "#27272a",
+    fontSize: "15px",
+    fontWeight: 700,
+    lineHeight: 1.5,
   },
   reasonList: {
     display: "grid",
-    gap: "12px",
+    gap: "8px",
     margin: 0,
     padding: 0,
     listStyle: "none",
   },
   reasonItem: {
-    border: "1px solid #d4d4d8",
-    borderRadius: "14px",
-    background: "#ffffff",
-    padding: "16px",
-    fontSize: "15px",
+    border: "1px solid #f0e6dc",
+    borderRadius: "12px",
+    background: "#fffaf3",
+    padding: "12px",
+    color: "#52525b",
+    fontSize: "14px",
     lineHeight: 1.7,
+  },
+  feedbackGroup: {
+    display: "grid",
+    gridTemplateColumns: "1fr",
+    gap: "10px",
+    marginTop: "0",
   },
   ctaButton: {
     width: "100%",
-    minHeight: "58px",
+    minHeight: "56px",
     border: "1px solid #a1a1aa",
     borderRadius: "14px",
     background: "#3f3f46",
     color: "#ffffff",
     fontSize: "16px",
-    fontWeight: 600,
+    fontWeight: 700,
     letterSpacing: 0,
     cursor: "pointer",
   },
-  feedbackGroup: {
-    display: "grid",
-    gridTemplateColumns: "repeat(2, minmax(0, 1fr))",
-    gap: "12px",
-    marginTop: "0",
-  },
   feedbackButton: {
-    minHeight: "54px",
+    minHeight: "50px",
     border: "1px solid #d4d4d8",
     borderRadius: "14px",
     background: "#ffffff",
     color: "#27272a",
     fontSize: "15px",
-    fontWeight: 500,
+    fontWeight: 600,
     letterSpacing: 0,
     cursor: "pointer",
   },
   feedbackMessage: {
-    margin: "18px 0 0",
+    margin: "14px 0 0",
     color: "#52525b",
     fontSize: "14px",
     lineHeight: 1.6,
     whiteSpace: "pre-line",
   },
   persistenceMessage: {
-    margin: "18px 0 0",
+    margin: "14px 0 0",
     color: "#52525b",
     fontSize: "14px",
     lineHeight: 1.6,
     whiteSpace: "pre-line",
   },
-  nextCandidate: {
-    margin: "10px 0 0",
-    border: "1px solid #d4d4d8",
-    borderRadius: "14px",
-    background: "#ffffff",
-    padding: "14px 16px",
-    color: "#27272a",
-    fontSize: "15px",
-    lineHeight: 1.7,
-  },
   homeButton: {
     minHeight: "44px",
-    marginTop: "24px",
+    marginTop: "18px",
     border: "none",
     background: "transparent",
     color: "#52525b",
     fontSize: "14px",
-    fontWeight: 500,
+    fontWeight: 600,
     letterSpacing: 0,
     cursor: "pointer",
   },
