@@ -123,9 +123,9 @@ export function CatsPage() {
       <div style={styles.container}>
         <header style={styles.header}>
           <p style={styles.eyebrow}>{"ねこ"}</p>
-          <h1 style={styles.title}>{"ねこの設定"}</h1>
+          <h1 style={styles.title}>{"ねこ"}</h1>
           <p style={styles.lead}>
-            {"猫の追加や名前の変更はここからできます。"}
+            {"一緒に暮らしている子をここで見られます。"}
           </p>
         </header>
 

@@ -509,7 +509,14 @@ function Header({
       </div>
       <div style={styles.profileHero}>
         <div style={styles.catAvatar} aria-hidden="true">
-          {catName.slice(0, 1)}
+          <img
+            src="/icons/cat-actions/purring.png"
+            alt=""
+            style={styles.catAvatarIcon}
+            onError={(event) => {
+              event.currentTarget.style.visibility = "hidden";
+            }}
+          />
         </div>
         <div style={styles.profileText}>
           <h1 style={styles.title}>
@@ -853,6 +860,22 @@ function OptionSection<Option extends { label: string }>({
     variant === "concern"
       ? { ...styles.button, ...styles.concernButton }
       : { ...styles.button, ...styles.currentButton };
+  const gridStyle =
+    variant === "concern"
+      ? { ...styles.grid, ...styles.concernGrid }
+      : { ...styles.grid, ...styles.currentGrid };
+  const iconFrameStyle =
+    variant === "concern"
+      ? { ...styles.optionIconFrame, ...styles.concernOptionIconFrame }
+      : { ...styles.optionIconFrame, ...styles.currentOptionIconFrame };
+  const iconStyle =
+    variant === "concern"
+      ? { ...styles.optionIcon, ...styles.concernOptionIcon }
+      : { ...styles.optionIcon, ...styles.currentOptionIcon };
+  const labelStyle =
+    variant === "concern"
+      ? { ...styles.optionLabel, ...styles.concernOptionLabel }
+      : { ...styles.optionLabel, ...styles.currentOptionLabel };
 
   return (
     <section style={sectionStyle}>
@@ -865,7 +888,7 @@ function OptionSection<Option extends { label: string }>({
       {errorMessage ? (
         <p style={styles.sectionErrorMessage}>{errorMessage}</p>
       ) : null}
-      <div style={styles.grid}>
+      <div style={gridStyle}>
         {options.map((option) => (
           <button
             key={option.label}
@@ -873,17 +896,17 @@ function OptionSection<Option extends { label: string }>({
             onClick={() => onSelect(option)}
             style={buttonStyle}
           >
-            <span style={styles.optionIconFrame}>
+            <span style={iconFrameStyle}>
               <img
                 src={getOptionIconSrc(option.label)}
-                alt={option.label}
-                style={styles.optionIcon}
+                alt={getOptionDisplayLabel(option.label)}
+                style={iconStyle}
                 onError={(event) => {
                   event.currentTarget.style.visibility = "hidden";
                 }}
               />
             </span>
-            <span>{option.label}</span>
+            <span style={labelStyle}>{getOptionDisplayLabel(option.label)}</span>
           </button>
         ))}
       </div>
@@ -908,6 +931,15 @@ function getOptionIconSrc(label: string) {
   };
 
   return `/icons/cat-actions/${icons[label] ?? "unknown"}.png`;
+}
+
+function getOptionDisplayLabel(label: string) {
+  const labels: Record<string, string> = {
+    "\u30b0\u30eb\u30fc\u30df\u30f3\u30b0": "\u6bdb\u3065\u304f\u308d\u3044",
+    "\u30b4\u30ed\u30b4\u30ed\u3057\u3066\u308b": "\u30b4\u30ed\u30b4\u30ed",
+  };
+
+  return labels[label] ?? label;
 }
 
 const styles = {
@@ -970,10 +1002,14 @@ const styles = {
     border: "1px solid #eadbca",
     borderRadius: "20px",
     background: "#ffffff",
-    color: "#3f3f46",
-    fontSize: "24px",
-    fontWeight: 800,
-    lineHeight: 1,
+    overflow: "hidden",
+  },
+  catAvatarIcon: {
+    display: "block",
+    width: "46px",
+    height: "46px",
+    objectFit: "contain",
+    pointerEvents: "none",
   },
   profileText: {
     minWidth: 0,
@@ -1410,6 +1446,13 @@ const styles = {
   },
   grid: {
     display: "grid",
+    gap: "10px",
+  },
+  currentGrid: {
+    gridTemplateColumns: "repeat(3, minmax(0, 1fr))",
+    gap: "8px",
+  },
+  concernGrid: {
     gridTemplateColumns: "repeat(2, minmax(0, 1fr))",
     gap: "10px",
   },
@@ -1418,17 +1461,16 @@ const styles = {
     flexDirection: "column",
     alignItems: "center",
     justifyContent: "center",
-    gap: "11px",
-    minHeight: "96px",
+    gap: "7px",
+    minHeight: "98px",
     border: "1px solid #d4d4d8",
     borderRadius: "22px",
     background: "#ffffff",
     color: "#27272a",
-    fontSize: "14px",
     fontWeight: 600,
     letterSpacing: 0,
     textAlign: "center",
-    padding: "12px 8px 13px",
+    padding: "10px 7px 11px",
     cursor: "pointer",
   },
   currentButton: {
@@ -1439,23 +1481,50 @@ const styles = {
     background: "#fffaf3",
     borderColor: "#eadbca",
     fontWeight: 600,
-    minHeight: "92px",
+    minHeight: "116px",
+    gap: "9px",
+    padding: "13px 10px 14px",
   },
   optionIconFrame: {
     display: "inline-flex",
     alignItems: "center",
     justifyContent: "center",
     flex: "0 0 auto",
-    width: "50px",
-    height: "50px",
     background: "transparent",
+  },
+  currentOptionIconFrame: {
+    width: "48px",
+    height: "48px",
+  },
+  concernOptionIconFrame: {
+    width: "46px",
+    height: "46px",
   },
   optionIcon: {
     display: "block",
-    width: "46px",
-    height: "46px",
     objectFit: "contain",
     pointerEvents: "none",
+  },
+  currentOptionIcon: {
+    width: "46px",
+    height: "46px",
+  },
+  concernOptionIcon: {
+    width: "42px",
+    height: "42px",
+  },
+  optionLabel: {
+    display: "block",
+    lineHeight: 1.3,
+    letterSpacing: 0,
+  },
+  currentOptionLabel: {
+    fontSize: "13px",
+    fontWeight: 600,
+  },
+  concernOptionLabel: {
+    fontSize: "15px",
+    fontWeight: 650,
   },
   bottomNav: {
     position: "fixed",
