@@ -1466,8 +1466,8 @@ const styles = {
     gap: "8px",
   },
   concernGrid: {
-    gridTemplateColumns: "repeat(2, minmax(0, 1fr))",
-    gap: "10px",
+    gridTemplateColumns: "repeat(3, minmax(0, 1fr))",
+    gap: "8px",
   },
   button: {
     display: "flex",
@@ -1494,9 +1494,9 @@ const styles = {
     background: "#fffaf3",
     borderColor: "#eadbca",
     fontWeight: 600,
-    minHeight: "116px",
-    gap: "9px",
-    padding: "13px 10px 14px",
+    minHeight: "104px",
+    gap: "7px",
+    padding: "10px 6px 11px",
   },
   optionIconFrame: {
     display: "inline-flex",
@@ -1510,8 +1510,8 @@ const styles = {
     height: "48px",
   },
   concernOptionIconFrame: {
-    width: "46px",
-    height: "46px",
+    width: "42px",
+    height: "42px",
   },
   optionIcon: {
     display: "block",
@@ -1523,8 +1523,8 @@ const styles = {
     height: "46px",
   },
   concernOptionIcon: {
-    width: "42px",
-    height: "42px",
+    width: "39px",
+    height: "39px",
   },
   optionLabel: {
     display: "block",
@@ -1536,7 +1536,7 @@ const styles = {
     fontWeight: 600,
   },
   concernOptionLabel: {
-    fontSize: "15px",
+    fontSize: "13px",
     fontWeight: 650,
   },
   bottomNav: {
