@@ -4,7 +4,7 @@ import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import type { CSSProperties } from "react";
 import { applyDiagnosisFeedback } from "../../core/understanding/feedback";
-import type { CauseCategory } from "../../core/types";
+import type { BehaviorInput, CauseCategory } from "../../core/types";
 import { insertFeedback } from "../../lib/supabase/queries";
 
 type DiagnosisResultProps = {
@@ -12,6 +12,7 @@ type DiagnosisResultProps = {
   reasons: string[];
   categories: CauseCategory[];
   diagnosisId: string | null;
+  input?: BehaviorInput;
   localCatId?: string | null;
   persistenceMessage?: string;
 };
@@ -32,38 +33,38 @@ const secondaryHypothesisMessages: Record<CauseCategory, string> = {
   health: "体調も少し見てあげるとよさそうです",
 };
 
-const ctaLabels: Record<
+const outcomeLabels: Record<
   CauseCategory,
   {
-    main: string;
-    sub: string;
+    resolved: string;
+    unresolved: string;
   }
 > = {
   food: {
-    main: "ごはんを確認してみる",
-    sub: "違うかも",
+    resolved: "落ち着いた",
+    unresolved: "まだ気になる",
   },
   play: {
-    main: "3分だけ遊んでみる",
-    sub: "違うかも",
+    resolved: "落ち着いた",
+    unresolved: "まだ気になる",
   },
   social: {
-    main: "声をかけてみる",
-    sub: "違うかも",
+    resolved: "落ち着いた",
+    unresolved: "まだ気になる",
   },
   stress: {
-    main: "静かな場所をつくる",
-    sub: "違うかも",
+    resolved: "落ち着いた",
+    unresolved: "まだ気になる",
   },
   health: {
-    main: "体調を見てあげる",
-    sub: "違うかも",
+    resolved: "少し落ち着いた",
+    unresolved: "まだ気になる",
   },
 };
 
-const fallbackCtaLabels = {
-  main: "少し様子を見る",
-  sub: "違うかも",
+const fallbackOutcomeLabels = {
+  resolved: "落ち着いた",
+  unresolved: "まだ気になる",
 };
 
 const feedbackSaveErrorMessage =
@@ -74,20 +75,16 @@ export function DiagnosisResult({
   reasons,
   categories,
   diagnosisId,
+  input,
   localCatId,
   persistenceMessage,
 }: DiagnosisResultProps) {
   const router = useRouter();
   const [feedbackMessage, setFeedbackMessage] = useState("");
-  const [feedbackOutcome, setFeedbackOutcome] = useState<
-    "resolved" | "unresolved" | null
-  >(null);
   const [catName, setCatName] = useState("");
   const currentCategory = categories[0];
   const nextCategory = categories[1];
-  const labels = currentCategory
-    ? ctaLabels[currentCategory]
-    : fallbackCtaLabels;
+  const labels = getOutcomeLabels(input, currentCategory);
   const mainHypothesisText = currentCategory
     ? hypothesisMessages[currentCategory]
     : resultText;
@@ -140,19 +137,12 @@ export function DiagnosisResult({
 
     if (!savedFeedback) {
       setFeedbackMessage(feedbackSaveErrorMessage);
-      setFeedbackOutcome(null);
       return;
     }
 
-    if (feedback === "resolved") {
-      setFeedbackMessage("");
-      setFeedbackOutcome(null);
-      router.push("/home");
-      return;
-    }
-
-    setFeedbackMessage(getCompletionMessage(currentCategory, feedback));
-    setFeedbackOutcome(feedback);
+    clearLatestHypothesis();
+    setFeedbackMessage("");
+    router.push("/home");
   }
 
   return (
@@ -173,34 +163,12 @@ export function DiagnosisResult({
           </button>
         </header>
 
-        <section style={styles.hypothesisCard}>
-          <p style={styles.cardLabel}>{"\u3044\u307e\u898b\u3048\u308b\u3053\u3068"}</p>
-          <p style={styles.hypothesisText}>{displayHypothesisText}</p>
-        </section>
-
-        {secondaryHypothesisText ? (
-          <section style={styles.secondaryCard}>
-            <p style={styles.secondaryLabel}>{"ほかにも"}</p>
-            <p style={styles.secondaryText}>{secondaryHypothesisText}</p>
-          </section>
-        ) : null}
-
-        <section style={styles.reasonCard}>
-          <p style={styles.cardTitle}>{"\u305d\u3046\u898b\u305f\u7406\u7531"}</p>
-          <ul style={styles.reasonList}>
-            {reasons.map((reason) => (
-              <li key={reason} style={styles.reasonItem}>
-                {reason}
-              </li>
-            ))}
-          </ul>
-        </section>
-
         <section style={styles.actionCard}>
           <p style={styles.cardTitle}>{"\u3067\u304d\u305d\u3046\u306a\u3053\u3068"}</p>
           <p style={styles.actionIntro}>
             {getActionIntro(currentCategory)}
           </p>
+          <p style={styles.resultPrompt}>試したあと、教えてください。</p>
           <div style={styles.feedbackGroup}>
             <button
               type="button"
@@ -209,7 +177,7 @@ export function DiagnosisResult({
               }}
               style={styles.ctaButton}
             >
-              {labels.main}
+              {labels.resolved}
             </button>
             <button
               type="button"
@@ -223,21 +191,36 @@ export function DiagnosisResult({
               }}
               style={styles.feedbackButton}
             >
-              {labels.sub}
+              {labels.unresolved}
             </button>
           </div>
         </section>
 
-        {feedbackMessage ? (
-          <p style={styles.feedbackMessage}>{feedbackMessage}</p>
+        <section style={styles.hypothesisCard}>
+          <p style={styles.cardLabel}>{"\u3044\u307e\u898b\u3048\u308b\u3053\u3068"}</p>
+          <p style={styles.hypothesisText}>{displayHypothesisText}</p>
+        </section>
+
+        <section style={styles.reasonCard}>
+          <p style={styles.cardTitle}>{"\u305d\u3046\u898b\u305f\u7406\u7531"}</p>
+          <ul style={styles.reasonList}>
+            {reasons.map((reason) => (
+              <li key={reason} style={styles.reasonItem}>
+                {reason}
+              </li>
+            ))}
+          </ul>
+        </section>
+
+        {secondaryHypothesisText ? (
+          <section style={styles.secondaryCard}>
+            <p style={styles.secondaryLabel}>{"ほかにも"}</p>
+            <p style={styles.secondaryText}>{secondaryHypothesisText}</p>
+          </section>
         ) : null}
 
-        {feedbackOutcome === "unresolved" ? (
-          <NextActionCard
-            category={currentCategory}
-            feedback={feedbackOutcome}
-            onHomeClick={() => router.push("/home")}
-          />
+        {feedbackMessage ? (
+          <p style={styles.feedbackMessage}>{feedbackMessage}</p>
         ) : null}
 
         {persistenceMessage ? (
@@ -256,33 +239,41 @@ export function DiagnosisResult({
   );
 }
 
-function getCompletionMessage(
-  category: CauseCategory,
-  feedback: "resolved" | "unresolved",
-) {
-  if (feedback === "unresolved") {
-    return "";
-  }
-
-  if (category === "health") {
-    return "記録しました。\n気になる様子が続くときは、早めに相談してください。";
-  }
-
-  return "記録しました。\nこの子の傾向づくりに使います。";
-}
-
 function getActionIntro(category: CauseCategory | undefined) {
   const actionIntros: Record<CauseCategory, string> = {
-    food: "ごはんやお水を見たあと、少し様子を見てみましょう。",
-    play: "3分だけ遊んだあと、落ち着くか少し見てみましょう。",
-    social: "声をかけたり近くにいてあげて、反応を見てみましょう。",
-    stress: "静かな場所をつくって、しばらく様子を見てみましょう。",
-    health: "気になる様子が続くときは、早めに相談してください。",
+    food:
+      "ごはんやお水を確認してみませんか？\n確認したあと、少し様子を見てみましょう。",
+    play:
+      "3分だけ遊んでみませんか？\n少し遊んだあと、様子を見てみましょう。",
+    social:
+      "声をかけたり、近くにいてあげませんか？\n少し関わったあと、様子を見てみましょう。",
+    stress:
+      "静かな場所をつくってみませんか？\n少し落ち着ける時間をつくって、様子を見てみましょう。",
+    health:
+      "いつもの様子と比べて、少し見てあげませんか？\n気になる様子が続くときは、早めに相談してください。",
   };
 
   return category
     ? actionIntros[category]
-    : "少し様子を見て、気になることが続くときはもう一度記録してみましょう。";
+    : "少し様子を見てみませんか？\n気になることが続くときは、もう一度近い様子を選んでみてください。";
+}
+
+function getOutcomeLabels(
+  input: BehaviorInput | undefined,
+  category: CauseCategory | undefined,
+) {
+  if (input === "meowing") {
+    return {
+      resolved: "鳴きやんだ",
+      unresolved: "まだ鳴いてる",
+    };
+  }
+
+  return category ? outcomeLabels[category] : fallbackOutcomeLabels;
+}
+
+function clearLatestHypothesis() {
+  window.localStorage.removeItem("latest_hypothesis");
 }
 
 function readCatName(localCatId?: string | null) {
@@ -311,80 +302,6 @@ function readCatName(localCatId?: string | null) {
 
 function getSecondaryHypothesisMessage(category: CauseCategory) {
   return secondaryHypothesisMessages[category];
-}
-
-function NextActionCard({
-  category,
-  feedback,
-  onHomeClick,
-}: {
-  category: CauseCategory | undefined;
-  feedback: "resolved" | "unresolved";
-  onHomeClick: () => void;
-}) {
-  const content = getNextActionContent(category, feedback);
-
-  return (
-    <section style={styles.nextActionCard}>
-      <p style={styles.cardTitle}>{content.title}</p>
-      <p style={styles.nextActionText}>{content.body}</p>
-      <button type="button" onClick={onHomeClick} style={styles.nextActionButton}>
-        {content.button}
-      </button>
-    </section>
-  );
-}
-
-function getNextActionContent(
-  category: CauseCategory | undefined,
-  feedback: "resolved" | "unresolved",
-) {
-  if (feedback === "unresolved") {
-    return {
-      title: "違ったことも記録しました",
-      body: "次から少し見立てを調整します。\nまだ気になるときは、もう一度いまの様子を選んでください。",
-      button: "ホームに戻る",
-    };
-  }
-
-  const resolvedContent: Record<
-    CauseCategory,
-    { title: string; body: string; button: string }
-  > = {
-    food: {
-      title: "まずは試してみてください",
-      body: "ごはんやお水を確認したあと、少し様子を見てみましょう。\n落ち着いたら今日はこれでOKです。",
-      button: "ホームで様子を見る",
-    },
-    play: {
-      title: "まずは試してみてください",
-      body: "3分だけ遊んだあと、少し様子を見てみましょう。\n落ち着いたら今日はこれでOKです。",
-      button: "ホームで様子を見る",
-    },
-    social: {
-      title: "まずは試してみてください",
-      body: "声をかけたり近くにいてあげたあと、少し様子を見てみましょう。\n落ち着いたら今日はこれでOKです。",
-      button: "ホームで様子を見る",
-    },
-    stress: {
-      title: "まずは試してみてください",
-      body: "静かな場所をつくったあと、少し様子を見てみましょう。\n落ち着いたら今日はこれでOKです。",
-      button: "ホームで様子を見る",
-    },
-    health: {
-      title: "まずは様子を見てください",
-      body: "体調の気になる様子が続くときは、早めに相談してください。\nまずは無理に判断せず、様子を見てあげましょう。",
-      button: "ホームで様子を見る",
-    },
-  };
-
-  return (
-    category ? resolvedContent[category] : undefined
-  ) ?? {
-    title: "まずは様子を見てください",
-    body: "少し様子を見て、気になることが続くときはもう一度記録してみましょう。",
-    button: "ホームで様子を見る",
-  };
 }
 
 const styles = {
@@ -536,6 +453,14 @@ const styles = {
     color: "#71717a",
     fontSize: "14px",
     lineHeight: 1.7,
+    whiteSpace: "pre-line",
+  },
+  resultPrompt: {
+    margin: "0 0 12px",
+    color: "#52525b",
+    fontSize: "14px",
+    fontWeight: 700,
+    lineHeight: 1.6,
   },
   ctaButton: {
     width: "100%",

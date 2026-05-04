@@ -67,6 +67,7 @@ export default async function DiagnosePage({ searchParams }: DiagnosePageProps) 
         ]}
         categories={[]}
         diagnosisId={null}
+        input={undefined}
         localCatId={localCatId}
       />
     );
@@ -121,6 +122,7 @@ export default async function DiagnosePage({ searchParams }: DiagnosePageProps) 
       )}
       categories={categories}
       diagnosisId={diagnosis?.id ?? null}
+      input={input}
       localCatId={localCatId}
       persistenceMessage={
         params.event_id && !diagnosis ? diagnosisSaveErrorMessage : undefined
