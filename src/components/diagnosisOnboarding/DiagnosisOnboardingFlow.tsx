@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import type { CSSProperties } from "react";
 import { DIAGNOSIS_ONBOARDING_QUESTIONS } from "../../lib/diagnosisOnboarding/questions";
 import { buildOnboardingResult } from "../../lib/diagnosisOnboarding/scoring";
@@ -45,7 +45,9 @@ const typeOutlooks: Record<TypeKey, string> = {
 
 export function DiagnosisOnboardingFlow() {
   const router = useRouter();
+  const catNameDraftRef = useRef("");
   const [catName, setCatName] = useState("");
+  const [confirmedCatName, setConfirmedCatName] = useState("");
   const [step, setStep] = useState<"name" | "question" | "result">("name");
   const [questionIndex, setQuestionIndex] = useState(0);
   const [furthestQuestionCount, setFurthestQuestionCount] = useState(0);
@@ -53,7 +55,7 @@ export function DiagnosisOnboardingFlow() {
   const [message, setMessage] = useState("");
 
   const trimmedCatName = catName.trim();
-  const displayCatName = trimmedCatName || "この子";
+  const displayCatName = confirmedCatName || trimmedCatName || "この子";
   const currentQuestion = ONBOARDING_QUESTIONS[questionIndex];
   const result = useMemo(() => buildOnboardingResult(answers), [answers]);
   const visibleQuestionCount =
@@ -68,8 +70,18 @@ export function DiagnosisOnboardingFlow() {
   const hasHealthSignal = result.scores.health >= 2;
   const canAnswerMore = visibleQuestionCount < ONBOARDING_QUESTION_LIMIT;
 
+  function resolveCatName() {
+    const draftName = catNameDraftRef.current.trim() || catName.trim();
+
+    return draftName || "ミケ";
+  }
+
   function startQuestions() {
-    setCatName(trimmedCatName || "ミケ");
+    const nextCatName = resolveCatName();
+
+    catNameDraftRef.current = nextCatName;
+    setCatName(nextCatName);
+    setConfirmedCatName(nextCatName);
     setFurthestQuestionCount(1);
     setMessage("");
     setStep("question");
@@ -124,8 +136,9 @@ export function DiagnosisOnboardingFlow() {
 
   function saveAndGoHome() {
     const now = new Date().toISOString();
+    const profileName = confirmedCatName || resolveCatName();
     const profile: CatProfile = {
-      ...createLocalCatProfile(displayCatName, {
+      ...createLocalCatProfile(profileName, {
         createdAt: now,
         updatedAt: now,
       }),
@@ -182,7 +195,10 @@ export function DiagnosisOnboardingFlow() {
                 id="diagnosis-onboarding-cat-name"
                 type="text"
                 value={catName}
-                onChange={(event) => setCatName(event.target.value)}
+                onChange={(event) => {
+                  catNameDraftRef.current = event.target.value;
+                  setCatName(event.target.value);
+                }}
                 placeholder="例：ミケ"
                 style={styles.input}
               />

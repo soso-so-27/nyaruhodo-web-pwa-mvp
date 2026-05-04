@@ -70,17 +70,58 @@ const dailyHintFeedbackMessages: Record<CurrentCatHintFeedback, string> = {
     "\u3042\u3068\u3067\u898b\u3089\u308c\u308b\u3088\u3046\u306b\u3057\u3066\u304a\u304d\u307e\u3059\u3002",
 };
 
+type InitialHomeState = {
+  activeCatId: string | null;
+  activeProfile: CatProfile | null;
+  catProfiles: CatProfile[];
+};
+
+function readInitialHomeState(): InitialHomeState {
+  if (typeof window === "undefined") {
+    return {
+      activeCatId: null,
+      activeProfile: null,
+      catProfiles: [],
+    };
+  }
+
+  try {
+    const catProfiles = readCatProfiles();
+    const savedActiveCatId = readActiveCatId();
+    const activeProfile = getActiveCatProfile(catProfiles, savedActiveCatId);
+
+    return {
+      activeCatId: activeProfile.id,
+      activeProfile,
+      catProfiles,
+    };
+  } catch {
+    return {
+      activeCatId: null,
+      activeProfile: null,
+      catProfiles: [],
+    };
+  }
+}
+
 export function HomeInput({
   recentEvents,
 }: HomeInputProps) {
   const router = useRouter();
+  const [initialHomeState] = useState(readInitialHomeState);
   const [visibleLatestHypothesis, setVisibleLatestHypothesis] =
     useState<LatestHypothesisView | null>(null);
-  const [catProfiles, setCatProfiles] = useState<CatProfile[]>([]);
-  const [activeCatId, setActiveCatId] = useState<string | null>(null);
+  const [catProfiles, setCatProfiles] = useState<CatProfile[]>(
+    initialHomeState.catProfiles,
+  );
+  const [activeCatId, setActiveCatId] = useState<string | null>(
+    initialHomeState.activeCatId,
+  );
   const [isEditingCatName, setIsEditingCatName] = useState(false);
   const [isAddingCat, setIsAddingCat] = useState(false);
-  const [catNameInput, setCatNameInput] = useState("");
+  const [catNameInput, setCatNameInput] = useState(() =>
+    getCatName(initialHomeState.activeProfile),
+  );
   const [newCatNameInput, setNewCatNameInput] = useState("");
   const [catNameMessage, setCatNameMessage] = useState("");
   const [hypothesisMessage, setHypothesisMessage] = useState("");
