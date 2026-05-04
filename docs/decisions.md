@@ -844,3 +844,30 @@ MVP v1 では `/diagnosis-onboarding` を追加し、名前入力と Q1〜Q3 の
 - feedbacks / hint_feedbacks の保存仕様変更
 - DB変更
 - RLS変更
+
+## 2026-05-04
+
+# 設計判断：オンボーディング傾向は診断で弱い補正に留める
+
+## 判断
+
+診断オンボーディングで保存した `typeKey` は、日々の診断で強い決定要因にせず、入力と矛盾しない場合だけ弱い補正として使う。
+
+補正量は最大 `+0.5` 程度とし、今の行動、直近イベント、時間帯文脈を主軸にする。
+
+## 現時点の扱い
+
+- `play`: `meowing` / `restless` のとき `play` を少しだけ補正する
+- `food`: `meowing` のとき `food` を少しだけ補正する
+- `social`: `following` / `meowing` のとき `social` を少しだけ補正する
+- `stress`: `restless` / `fighting` のとき `stress` を少しだけ補正する
+- `balanced`: 補正しない
+
+`modifiers` は現時点では強いスコア補正に使わず、health 系の注意補足に使える場合だけ控えめに扱う。
+
+## まだやらないこと
+
+- オンボーディングだけで診断結果を決めること
+- health を `typeKey` として扱うこと
+- DB変更
+- RLS変更

@@ -328,6 +328,17 @@ export function HomeInput({
       params.set("local_cat_id", activeCatId);
     }
 
+    if (
+      activeCatProfile?.typeKey &&
+      activeCatProfile.typeKey !== "balanced"
+    ) {
+      params.set("onboarding_type_key", activeCatProfile.typeKey);
+    }
+
+    if (activeCatProfile?.modifiers?.length) {
+      params.set("onboarding_modifiers", activeCatProfile.modifiers.join(","));
+    }
+
     router.push(`/diagnose?${params.toString()}`);
   }
 

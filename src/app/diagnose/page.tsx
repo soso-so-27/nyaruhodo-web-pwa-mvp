@@ -8,6 +8,7 @@ import type {
 } from "../../core/types";
 import type { CalendarContext } from "../../lib/calendarContext";
 import { buildCalendarContext } from "../../lib/calendarContext";
+import type { TypeKey } from "../../lib/diagnosisOnboarding/types";
 import {
   getRecentEvents,
   insertDiagnosis,
@@ -19,6 +20,8 @@ type DiagnosePageProps = {
     input?: string;
     event_id?: string;
     local_cat_id?: string;
+    onboarding_type_key?: string;
+    onboarding_modifiers?: string;
   }>;
 };
 
@@ -50,6 +53,10 @@ export default async function DiagnosePage({ searchParams }: DiagnosePageProps) 
   const params = await searchParams;
   const input = parseInput(params.input);
   const localCatId = params.local_cat_id ?? null;
+  const onboardingTypeKey = parseOnboardingTypeKey(params.onboarding_type_key);
+  const onboardingModifiers = parseOnboardingModifiers(
+    params.onboarding_modifiers,
+  );
 
   if (!input) {
     return (
@@ -72,6 +79,11 @@ export default async function DiagnosePage({ searchParams }: DiagnosePageProps) 
     calendarContext.timeBand,
   );
   const scores = calculateScores(input, diagnosisContext);
+  const onboardingAdjustment = applyOnboardingTypeAdjustment(
+    scores,
+    input,
+    onboardingTypeKey,
+  );
   const categories = decideCategories(scores);
 
   const diagnosis = params.event_id
@@ -101,7 +113,12 @@ export default async function DiagnosePage({ searchParams }: DiagnosePageProps) 
   return (
     <DiagnosisResult
       resultText={formatResultText(categories)}
-      reasons={formatReasons(input, calendarContext.timeBand)}
+      reasons={formatReasons(
+        input,
+        calendarContext.timeBand,
+        onboardingAdjustment?.reason,
+        onboardingModifiers,
+      )}
       categories={categories}
       diagnosisId={diagnosis?.id ?? null}
       localCatId={localCatId}
@@ -116,6 +133,32 @@ function parseInput(input: string | undefined): BehaviorInput | undefined {
   return validInputs.includes(input as BehaviorInput)
     ? (input as BehaviorInput)
     : undefined;
+}
+
+function parseOnboardingTypeKey(typeKey: string | undefined): TypeKey | undefined {
+  const validTypeKeys: TypeKey[] = [
+    "play",
+    "food",
+    "social",
+    "stress",
+    "balanced",
+  ];
+
+  return validTypeKeys.includes(typeKey as TypeKey)
+    ? (typeKey as TypeKey)
+    : undefined;
+}
+
+function parseOnboardingModifiers(value: string | undefined) {
+  if (!value) {
+    return [];
+  }
+
+  return value
+    .split(",")
+    .map((modifier) => modifier.trim())
+    .filter(Boolean)
+    .slice(0, 2);
 }
 
 function buildDiagnosisContext(
@@ -202,6 +245,8 @@ function formatResultText(categories: CauseCategory[]) {
 function formatReasons(
   input: BehaviorInput,
   timeBand: CalendarContext["timeBand"],
+  onboardingReason?: string,
+  onboardingModifiers: string[] = [],
 ) {
   const reasons: Record<BehaviorInput, string[]> = {
     meowing: [
@@ -224,7 +269,94 @@ function formatReasons(
     ],
   };
 
-  return reasons[input].slice(0, 2);
+  const nextReasons = [...reasons[input]];
+
+  if (onboardingReason) {
+    nextReasons.push(onboardingReason);
+  }
+
+  const healthModifierReason = getHealthModifierReason(onboardingModifiers);
+
+  if (healthModifierReason && input === "low_energy") {
+    nextReasons.push(healthModifierReason);
+  }
+
+  return nextReasons.slice(0, 3);
+}
+
+function applyOnboardingTypeAdjustment(
+  scores: Record<CauseCategory, number>,
+  input: BehaviorInput,
+  typeKey: TypeKey | undefined,
+) {
+  if (!typeKey || typeKey === "balanced") {
+    return null;
+  }
+
+  const adjustment = getOnboardingTypeAdjustment(input, typeKey);
+
+  if (!adjustment) {
+    return null;
+  }
+
+  scores[adjustment.category] += 0.5;
+
+  return adjustment;
+}
+
+function getOnboardingTypeAdjustment(
+  input: BehaviorInput,
+  typeKey: Exclude<TypeKey, "balanced">,
+): { category: CauseCategory; reason: string } | null {
+  if (typeKey === "play" && (input === "meowing" || input === "restless")) {
+    return {
+      category: "play",
+      reason:
+        "これまでの回答では、遊びへの反応が少し出やすいようです。",
+    };
+  }
+
+  if (typeKey === "food" && input === "meowing") {
+    return {
+      category: "food",
+      reason:
+        "これまでの回答では、ごはんまわりに反応しやすい傾向がありそうです。",
+    };
+  }
+
+  if (
+    typeKey === "social" &&
+    (input === "following" || input === "meowing")
+  ) {
+    return {
+      category: "social",
+      reason:
+        "これまでの回答では、人との距離に反応しやすい傾向がありそうです。",
+    };
+  }
+
+  if (
+    typeKey === "stress" &&
+    (input === "restless" || input === "fighting")
+  ) {
+    return {
+      category: "stress",
+      reason:
+        "これまでの回答では、環境の変化に反応しやすい傾向がありそうです。",
+    };
+  }
+
+  return null;
+}
+
+function getHealthModifierReason(modifiers: string[]) {
+  const healthModifiers = ["食欲ムラ", "トイレ変化注意", "体調変化出やすい"];
+
+  if (!modifiers.some((modifier) => healthModifiers.includes(modifier))) {
+    return null;
+  }
+
+  return "これまでの回答では、体調やトイレまわりも少し丁寧に見てあげるとよさそうです。";
 }
 
 function getMeowingTimeReason(timeBand: CalendarContext["timeBand"]) {
