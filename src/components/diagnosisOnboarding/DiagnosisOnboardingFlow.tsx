@@ -1,11 +1,10 @@
 "use client";
 
-import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
+import { useMemo, useState } from "react";
 import type { CSSProperties } from "react";
 import {
   DIAGNOSIS_ONBOARDING_QUESTIONS,
-  TOTAL_ONBOARDING_QUESTIONS,
 } from "../../lib/diagnosisOnboarding/questions";
 import { buildOnboardingResult } from "../../lib/diagnosisOnboarding/scoring";
 import type {
@@ -24,19 +23,19 @@ import type { CatProfile } from "../home/homeInputHelpers";
 const ONBOARDING_VERSION = "diagnosis-v1" as const;
 const INITIAL_QUESTIONS = DIAGNOSIS_ONBOARDING_QUESTIONS.slice(0, 3);
 
-const typeDescriptions: Record<TypeKey, string> = {
-  play: "遊びへの反応が出やすく、動きのある関わりが好きそうです。",
-  food: "ごはんや時間の変化に気づきやすい子かもしれません。",
-  social: "人のそばにいることや、声をかけられることが安心につながりそうです。",
-  stress: "音や環境の変化に気づきやすく、落ち着ける場所があるとよさそうです。",
-  balanced: "まだひとつに決めすぎず、少しずつ様子を見ていけそうです。",
+const tendencyTexts: Record<TypeKey, string> = {
+  play: "遊びへの反応が少し出やすい",
+  food: "ごはんまわりの変化に反応しやすい",
+  social: "人との距離や、かまってほしい気持ちが出やすい",
+  stress: "環境や音の変化に反応しやすい",
+  balanced: "いまは大きな偏りはまだ見えていない",
 };
 
 const typeOutlooks: Record<TypeKey, string> = {
-  play: "まずは遊びたい気持ちが出る場面を少し見ていきましょう。",
+  play: "遊びたい気持ちが出る場面を、少しずつ見ていけそうです。",
   food: "ごはん前後の様子を残すと、見立てがしやすくなりそうです。",
   social: "鳴く・ついてくるなど、人との距離感を見ていくとよさそうです。",
-  stress: "落ち着かない時の時間帯や環境を少しずつ見ていきましょう。",
+  stress: "落ち着かない時の時間帯や環境を、少しずつ見ていきましょう。",
   balanced: "日常の記録を少し残すだけでも、この子らしさが見えてきます。",
 };
 
@@ -56,6 +55,7 @@ export function DiagnosisOnboardingFlow() {
     (question) => answers[question.questionId],
   ).length;
   const skippedInitialCount = INITIAL_QUESTIONS.length - answeredInitialCount;
+  const hasHealthSignal = result.scores.health >= 2;
 
   function startQuestions() {
     setCatName(trimmedCatName || "ミケ");
@@ -63,7 +63,10 @@ export function DiagnosisOnboardingFlow() {
     setStep("question");
   }
 
-  function answerQuestion(question: OnboardingQuestionDefinition, optionId: string | null) {
+  function answerQuestion(
+    question: OnboardingQuestionDefinition,
+    optionId: string | null,
+  ) {
     setAnswers((current) => ({
       ...current,
       [question.questionId]: optionId,
@@ -152,15 +155,28 @@ export function DiagnosisOnboardingFlow() {
 
         {step === "result" ? (
           <section style={styles.resultCard}>
-            <p style={styles.eyebrow}>3問だけ見ました</p>
+            <p style={styles.eyebrow}>最初の手がかり</p>
             <h1 style={styles.title}>{displayCatName}のこと、少し見えてきました</h1>
 
             <div style={styles.resultSummary}>
               <p style={styles.resultLead}>
-                {displayCatName}は、{result.type.typeLabel}っぽい子です
+                今の回答だけで見ると、
+                <br />
+                {tendencyTexts[result.type.typeKey]}かもしれません。
               </p>
-              <p style={styles.resultText}>{typeDescriptions[result.type.typeKey]}</p>
+              <p style={styles.resultText}>
+                まだ最初の手がかりなので、これからの記録や回答で少しずつ変わります。
+              </p>
+              <p style={styles.typeHint}>
+                今のところ、{result.type.typeLabel}寄りかもしれません。
+              </p>
             </div>
+
+            {hasHealthSignal ? (
+              <div style={styles.noticeCard}>
+                体調やトイレまわりは、少し丁寧に見てあげてもよさそうです。
+              </div>
+            ) : null}
 
             {result.modifiers.length > 0 ? (
               <div style={styles.modifierGroup}>
@@ -176,8 +192,11 @@ export function DiagnosisOnboardingFlow() {
             ) : null}
 
             <div style={styles.outlookCard}>
-              <p style={styles.smallLabel}>今の見立て</p>
+              <p style={styles.smallLabel}>これから見ていくこと</p>
               <p style={styles.outlookText}>{typeOutlooks[result.type.typeKey]}</p>
+              <p style={styles.outlookText}>
+                もっと答えると、{displayCatName}の傾向がもう少し見えてきます。
+              </p>
             </div>
 
             <div style={styles.actions}>
@@ -393,15 +412,32 @@ const styles = {
   resultLead: {
     margin: 0,
     color: "#27272a",
-    fontSize: "18px",
+    fontSize: "17px",
     fontWeight: 800,
-    lineHeight: 1.55,
+    lineHeight: 1.65,
   },
   resultText: {
-    margin: "8px 0 0",
+    margin: "10px 0 0",
     color: "#52525b",
     fontSize: "14px",
     lineHeight: 1.75,
+  },
+  typeHint: {
+    margin: "10px 0 0",
+    color: "#71717a",
+    fontSize: "13px",
+    fontWeight: 700,
+    lineHeight: 1.6,
+  },
+  noticeCard: {
+    marginTop: "14px",
+    border: "1px solid #ebe2d6",
+    borderRadius: "18px",
+    background: "#fff8ed",
+    color: "#52525b",
+    padding: "13px 14px",
+    fontSize: "14px",
+    lineHeight: 1.7,
   },
   modifierGroup: {
     marginTop: "14px",
@@ -435,7 +471,7 @@ const styles = {
     padding: "14px",
   },
   outlookText: {
-    margin: 0,
+    margin: "0 0 8px",
     color: "#52525b",
     fontSize: "14px",
     lineHeight: 1.7,
