@@ -28,6 +28,7 @@ export function CatsPage() {
       ? getActiveCatProfile(catProfiles, activeCatId)
       : null;
   const catName = getCatName(activeCatProfile);
+  const understandingPercent = activeCatProfile?.understanding?.percent;
 
   useEffect(() => {
     const savedCatProfiles = readCatProfiles();
@@ -125,7 +126,7 @@ export function CatsPage() {
           <p style={styles.eyebrow}>{"ねこ"}</p>
           <h1 style={styles.title}>{"ねこ"}</h1>
           <p style={styles.lead}>
-            {"一緒に暮らしている子のことをまとめます。"}
+            {"一緒に暮らしている子のことをここにまとめます。"}
           </p>
         </header>
 
@@ -135,10 +136,17 @@ export function CatsPage() {
           <p style={styles.description}>
             {"今日の記録や見立ては、この子にたまります。"}
           </p>
+          {typeof understandingPercent === "number" ? (
+            <p style={styles.understandingPill}>
+              {"理解度 "}
+              {understandingPercent}
+              {"%"}
+            </p>
+          ) : null}
         </section>
 
         <section style={styles.card}>
-          <h2 style={styles.sectionTitle}>{"猫一覧"}</h2>
+          <h2 style={styles.sectionTitle}>{"一緒に暮らしている子"}</h2>
           <div style={styles.catList}>
             {catProfiles.map((profile) => (
               <button
@@ -204,9 +212,9 @@ export function CatsPage() {
         </section>
 
         <section style={styles.card}>
-          <h2 style={styles.sectionTitle}>{"名前を変更"}</h2>
+          <h2 style={styles.sectionTitle}>{"名前を変える"}</h2>
           <p style={styles.description}>
-            {"現在選択中の猫の名前を変更できます。"}
+            {"いま見ている子の呼び名を変えられます。"}
           </p>
           {!isEditingCatName ? (
             <button
@@ -214,7 +222,7 @@ export function CatsPage() {
               onClick={startEditingCatName}
               style={styles.secondaryButton}
             >
-              {"名前を変更"}
+              {"名前を変える"}
             </button>
           ) : (
             <div style={styles.editor}>
@@ -326,6 +334,19 @@ const styles = {
     color: "#71717a",
     fontSize: "13px",
     lineHeight: 1.6,
+  },
+  understandingPill: {
+    display: "inline-flex",
+    width: "fit-content",
+    margin: "2px 0 0",
+    border: "1px solid #eadbca",
+    borderRadius: "999px",
+    background: "#fffaf3",
+    color: "#6b5f54",
+    fontSize: "12px",
+    fontWeight: 700,
+    lineHeight: 1.5,
+    padding: "3px 10px",
   },
   catList: {
     display: "flex",
