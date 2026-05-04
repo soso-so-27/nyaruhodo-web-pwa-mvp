@@ -61,6 +61,16 @@ const currentStateSaveSuccessMessage =
 const ONBOARDING_HOME_HINT_KEY = "diagnosis_onboarding_home_hint";
 const ONBOARDING_HOME_HINT_MAX_AGE_MS = 10 * 60 * 1000;
 const POST_DIAGNOSIS_FEEDBACK_KEY = "post_diagnosis_feedback";
+const RECENT_STATE_RECORDS_KEY = "recent_state_records";
+const RECENT_STATE_RECORD_TTL_MS = 30 * 60 * 1000;
+
+type RecentStateRecord = {
+  localCatId: string | null;
+  signal: string;
+  label: string;
+  createdAt: string;
+  expiresAt: string;
+};
 
 const dailyHintFeedbackMessages: Record<CurrentCatHintFeedback, string> = {
   accepted:
@@ -138,6 +148,9 @@ export function HomeInput({
   const [hintSuppressions, setHintSuppressions] = useState<
     CurrentCatHintSuppression[]
   >([]);
+  const [recentStateRecords, setRecentStateRecords] = useState<
+    RecentStateRecord[]
+  >([]);
 
   const activeCatProfile =
     catProfiles.length > 0
@@ -196,6 +209,7 @@ export function HomeInput({
     setActiveCatId(activeProfile.id);
     setCatNameInput(getCatName(activeProfile));
     setHintSuppressions(readCurrentCatHintSuppressions());
+    setRecentStateRecords(readRecentStateRecords());
     saveActiveCatId(activeProfile.id);
     setOnboardingHomeMessage(readOnboardingHomeMessage(activeProfile.id));
     setPostDiagnosisFeedbackMessage(
@@ -235,6 +249,14 @@ export function HomeInput({
         category,
       });
     }
+  }, []);
+
+  useEffect(() => {
+    const intervalId = window.setInterval(() => {
+      setRecentStateRecords(readRecentStateRecords());
+    }, 60 * 1000);
+
+    return () => window.clearInterval(intervalId);
   }, []);
 
   function startEditingCatName() {
@@ -286,6 +308,7 @@ export function HomeInput({
     setSaveErrorMessage("");
     setIsDailyHintDismissed(false);
     setHintSuppressions(readCurrentCatHintSuppressions());
+    setRecentStateRecords(readRecentStateRecords());
     setIsAddingCat(false);
     setCatNameMessage("");
   }
@@ -346,6 +369,13 @@ export function HomeInput({
     setSaveErrorMessage("");
     setCurrentStateMessage(
       currentStateSaveSuccessMessage.replace("{catName}", catName),
+    );
+    setRecentStateRecords(
+      saveRecentStateRecord({
+        localCatId: activeCatId,
+        signal,
+        label,
+      }),
     );
     setIsDailyHintDismissed(false);
     router.refresh();
@@ -551,6 +581,8 @@ export function HomeInput({
             errorMessage={
               saveErrorSection === "current" ? saveErrorMessage : ""
             }
+            activeCatId={activeCatId}
+            recentStateRecords={recentStateRecords}
             onSelect={(option) => {
               void handleCurrentSelect(option.label, option.signal);
             }}
@@ -653,6 +685,107 @@ function readPostDiagnosisFeedbackMessage(activeCatId: string, catName: string) 
     window.localStorage.removeItem(POST_DIAGNOSIS_FEEDBACK_KEY);
     return "";
   }
+}
+
+function readRecentStateRecords() {
+  const value = window.localStorage.getItem(RECENT_STATE_RECORDS_KEY);
+
+  if (!value) {
+    return [];
+  }
+
+  try {
+    const now = Date.now();
+    const records = JSON.parse(value) as RecentStateRecord[];
+    const activeRecords = records.filter((record) => {
+      const expiresAt = new Date(record.expiresAt).getTime();
+
+      return (
+        record &&
+        typeof record.signal === "string" &&
+        !Number.isNaN(expiresAt) &&
+        expiresAt > now
+      );
+    });
+
+    if (activeRecords.length !== records.length) {
+      writeRecentStateRecords(activeRecords);
+    }
+
+    return activeRecords;
+  } catch {
+    window.localStorage.removeItem(RECENT_STATE_RECORDS_KEY);
+    return [];
+  }
+}
+
+function writeRecentStateRecords(records: RecentStateRecord[]) {
+  if (records.length === 0) {
+    window.localStorage.removeItem(RECENT_STATE_RECORDS_KEY);
+    return;
+  }
+
+  window.localStorage.setItem(
+    RECENT_STATE_RECORDS_KEY,
+    JSON.stringify(records),
+  );
+}
+
+function saveRecentStateRecord({
+  localCatId,
+  signal,
+  label,
+}: {
+  localCatId?: string | null;
+  signal: string;
+  label: string;
+}) {
+  const now = new Date();
+  const normalizedCatId = localCatId ?? null;
+  const records = readRecentStateRecords().filter(
+    (record) =>
+      record.localCatId !== normalizedCatId || record.signal !== signal,
+  );
+  const nextRecords = [
+    ...records,
+    {
+      localCatId: normalizedCatId,
+      signal,
+      label,
+      createdAt: now.toISOString(),
+      expiresAt: new Date(
+        now.getTime() + RECENT_STATE_RECORD_TTL_MS,
+      ).toISOString(),
+    },
+  ];
+
+  writeRecentStateRecords(nextRecords);
+
+  return nextRecords;
+}
+
+function isRecentStateRecorded({
+  records,
+  localCatId,
+  signal,
+}: {
+  records: RecentStateRecord[];
+  localCatId?: string | null;
+  signal: string;
+}) {
+  const normalizedCatId = localCatId ?? null;
+  const now = Date.now();
+
+  return records.some((record) => {
+    const expiresAt = new Date(record.expiresAt).getTime();
+
+    return (
+      record.localCatId === normalizedCatId &&
+      record.signal === signal &&
+      !Number.isNaN(expiresAt) &&
+      expiresAt > now
+    );
+  });
 }
 
 function Header({
@@ -1099,6 +1232,8 @@ function OptionSection<Option extends { label: string }>({
   variant = "current",
   message,
   errorMessage,
+  activeCatId,
+  recentStateRecords = [],
   onSelect,
 }: {
   label?: string;
@@ -1108,6 +1243,8 @@ function OptionSection<Option extends { label: string }>({
   variant?: "current" | "concern";
   message?: string;
   errorMessage?: string;
+  activeCatId?: string | null;
+  recentStateRecords?: RecentStateRecord[];
   onSelect: (option: Option) => void;
 }) {
   const sectionStyle =
@@ -1147,26 +1284,65 @@ function OptionSection<Option extends { label: string }>({
         <p style={styles.sectionErrorMessage}>{errorMessage}</p>
       ) : null}
       <div style={gridStyle}>
-        {options.map((option) => (
-          <button
-            key={option.label}
-            type="button"
-            onClick={() => onSelect(option)}
-            style={buttonStyle}
-          >
-            <span style={iconFrameStyle}>
-              <img
-                src={getOptionIconSrc(option.label)}
-                alt={getOptionDisplayLabel(option.label)}
-                style={iconStyle}
-                onError={(event) => {
-                  event.currentTarget.style.visibility = "hidden";
-                }}
-              />
-            </span>
-            <span style={labelStyle}>{getOptionDisplayLabel(option.label)}</span>
-          </button>
-        ))}
+        {options.map((option) => {
+          const signal =
+            "signal" in option && typeof option.signal === "string"
+              ? option.signal
+              : "";
+          const isCompleted =
+            variant === "current" && signal
+              ? isRecentStateRecorded({
+                  records: recentStateRecords,
+                  localCatId: activeCatId,
+                  signal,
+                })
+              : false;
+
+          return (
+            <button
+              key={option.label}
+              type="button"
+              onClick={() => onSelect(option)}
+              style={
+                isCompleted
+                  ? {
+                      ...buttonStyle,
+                      ...styles.completedStateButton,
+                    }
+                  : buttonStyle
+              }
+            >
+              <span style={iconFrameStyle}>
+                <img
+                  src={getOptionIconSrc(option.label)}
+                  alt={getOptionDisplayLabel(option.label)}
+                  style={
+                    isCompleted
+                      ? { ...iconStyle, ...styles.completedOptionIcon }
+                      : iconStyle
+                  }
+                  onError={(event) => {
+                    event.currentTarget.style.visibility = "hidden";
+                  }}
+                />
+                {isCompleted ? (
+                  <span style={styles.completedCheck} aria-hidden="true">
+                    {"✓"}
+                  </span>
+                ) : null}
+              </span>
+              <span
+                style={
+                  isCompleted
+                    ? { ...labelStyle, ...styles.completedOptionLabel }
+                    : labelStyle
+                }
+              >
+                {isCompleted ? "✓ 残しました" : getOptionDisplayLabel(option.label)}
+              </span>
+            </button>
+          );
+        })}
       </div>
     </section>
   );
@@ -1808,6 +1984,7 @@ const styles = {
     justifyContent: "center",
     flex: "0 0 auto",
     background: "transparent",
+    position: "relative",
   },
   currentOptionIconFrame: {
     width: "48px",
@@ -1842,6 +2019,39 @@ const styles = {
   concernOptionLabel: {
     fontSize: "13px",
     fontWeight: 650,
+  },
+  completedStateButton: {
+    background: "#f8f4ee",
+    borderColor: "#d7c8b8",
+    opacity: 0.78,
+    transform: "scale(0.98)",
+    transition:
+      "background 180ms ease, border-color 180ms ease, opacity 180ms ease, transform 160ms ease",
+  },
+  completedOptionIcon: {
+    opacity: 0.78,
+    transform: "scale(0.96)",
+  },
+  completedCheck: {
+    position: "absolute",
+    right: "-3px",
+    top: "-4px",
+    display: "inline-flex",
+    alignItems: "center",
+    justifyContent: "center",
+    width: "18px",
+    height: "18px",
+    borderRadius: "999px",
+    background: "#3f3f46",
+    color: "#ffffff",
+    fontSize: "12px",
+    fontWeight: 800,
+    lineHeight: 1,
+  },
+  completedOptionLabel: {
+    color: "#6b5f54",
+    fontSize: "12px",
+    fontWeight: 700,
   },
   bottomNav: {
     position: "fixed",
