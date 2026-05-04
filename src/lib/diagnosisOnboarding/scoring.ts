@@ -13,7 +13,11 @@ import {
 
 const TYPE_CATEGORIES = ["play", "food", "social", "stress"] as const;
 
-const HEALTH_MODIFIERS = new Set(["食欲ムラ", "トイレ変化注意", "体調変化出やすい"]);
+const HEALTH_MODIFIERS = new Set([
+  "食欲ムラ",
+  "トイレ変化注意",
+  "体調変化出やすい",
+]);
 
 function createEmptyScores(): CategoryScores {
   return CATEGORIES.reduce((scores, category) => {
@@ -37,7 +41,9 @@ function getSelectedOptions(answers: OnboardingAnswers): OnboardingOptionDefinit
       return [];
     }
 
-    const selectedOption = question.options.find((option) => option.optionId === selectedOptionId);
+    const selectedOption = question.options.find(
+      (option) => option.optionId === selectedOptionId,
+    );
     return selectedOption ? [selectedOption] : [];
   });
 }
@@ -61,7 +67,10 @@ export function determineType(scores: CategoryScores): DeterminedType {
   })).sort((a, b) => b.score - a.score);
 
   const [top, second] = typeScores;
-  const typeTotal = TYPE_CATEGORIES.reduce((total, category) => total + scores[category], 0);
+  const typeTotal = TYPE_CATEGORIES.reduce(
+    (total, category) => total + scores[category],
+    0,
+  );
 
   if (!top || typeTotal < 3) {
     return {
@@ -89,7 +98,10 @@ export function determineType(scores: CategoryScores): DeterminedType {
   };
 }
 
-export function extractModifiers(answers: OnboardingAnswers, scores: CategoryScores): string[] {
+export function extractModifiers(
+  answers: OnboardingAnswers,
+  scores: CategoryScores,
+): string[] {
   const modifierCounts = new Map<string, number>();
 
   for (const option of getSelectedOptions(answers)) {
@@ -102,17 +114,21 @@ export function extractModifiers(answers: OnboardingAnswers, scores: CategorySco
   const healthIsNoticeable = scores.health >= 2;
 
   const primaryCandidates = entries.filter(
-    ([modifier, count]) => count >= 2 || (healthIsNoticeable && HEALTH_MODIFIERS.has(modifier)),
+    ([modifier, count]) =>
+      count >= 2 || (healthIsNoticeable && HEALTH_MODIFIERS.has(modifier)),
   );
 
   const fallbackCandidates = entries.filter(
-    ([modifier]) => !primaryCandidates.some(([candidate]) => candidate === modifier),
+    ([modifier]) =>
+      !primaryCandidates.some(([candidate]) => candidate === modifier),
   );
 
   return [...primaryCandidates, ...fallbackCandidates]
     .sort(([modifierA, countA], [modifierB, countB]) => {
-      const healthPriorityA = healthIsNoticeable && HEALTH_MODIFIERS.has(modifierA) ? 1 : 0;
-      const healthPriorityB = healthIsNoticeable && HEALTH_MODIFIERS.has(modifierB) ? 1 : 0;
+      const healthPriorityA =
+        healthIsNoticeable && HEALTH_MODIFIERS.has(modifierA) ? 1 : 0;
+      const healthPriorityB =
+        healthIsNoticeable && HEALTH_MODIFIERS.has(modifierB) ? 1 : 0;
 
       if (healthPriorityA !== healthPriorityB) {
         return healthPriorityB - healthPriorityA;
@@ -128,13 +144,16 @@ export function extractModifiers(answers: OnboardingAnswers, scores: CategorySco
     .map(([modifier]) => modifier);
 }
 
-export function calculateUnderstandingPercent(params: UnderstandingInput = {}): UnderstandingResult {
+export function calculateUnderstandingPercent(
+  params: UnderstandingInput = {},
+): UnderstandingResult {
   const totalQuestions = params.totalQuestions ?? TOTAL_ONBOARDING_QUESTIONS;
   const answeredCount = params.answeredCount ?? 0;
 
   const onboarding = totalQuestions > 0 ? (answeredCount / totalQuestions) * 40 : 0;
   const events = params.eventsPercent ?? Math.min((params.eventsCount ?? 0) * 3, 30);
-  const feedbacks = params.feedbacksPercent ?? Math.min((params.feedbacksCount ?? 0) * 4, 20);
+  const feedbacks =
+    params.feedbacksPercent ?? Math.min((params.feedbacksCount ?? 0) * 4, 20);
   const hintFeedbacks =
     params.hintFeedbacksPercent ?? Math.min((params.hintFeedbacksCount ?? 0) * 2, 10);
 

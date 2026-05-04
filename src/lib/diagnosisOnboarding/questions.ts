@@ -104,7 +104,9 @@ export const DIAGNOSIS_ONBOARDING_QUESTIONS = [
   question("q10_alone_time", "type_accuracy", "ひとりで過ごす時間は平気そうですか？", [
     option("fine", "平気そう", { stress: 1 }, ["ひとり時間平気"]),
     option("somewhat_bad", "少し苦手そう", { social: 2 }, ["ひとり時間苦手"]),
-    option("bad", "かなり苦手そう", { social: 3, stress: 1 }, ["ひとり時間苦手"]),
+    option("bad", "かなり苦手そう", { social: 3, stress: 1 }, [
+      "ひとり時間苦手",
+    ]),
     option("unknown", "わからない"),
   ]),
   question("q11_settling", "type_accuracy", "落ち着くまでに時間がかかることはありますか？", [
@@ -118,132 +120,120 @@ export const DIAGNOSIS_ONBOARDING_QUESTIONS = [
     option("increased", "増えた気がする", { stress: 2, health: 1 }, [
       "体調変化出やすい",
     ]),
-    option("normal", "あまり気にならない"),
+    option("less", "少ない気がする", { health: 1 }, ["体調変化出やすい"]),
     option("unknown", "わからない"),
   ]),
-  question("q13_toilet_change", "type_accuracy", "トイレの様子に変化を感じることはありますか？", [
-    option("yes", "ある", { health: 3 }, ["トイレ変化注意"]),
-    option("sometimes", "ときどきある", { health: 2 }, ["トイレ変化注意"]),
+  question("q13_toilet_change", "type_accuracy", "トイレの変化が気になることはありますか？", [
+    option("often", "よく気になる", { health: 3 }, ["トイレ変化注意"]),
+    option("sometimes", "ときどき気になる", { health: 2 }, ["トイレ変化注意"]),
     option("rarely", "あまりない"),
     option("unknown", "わからない"),
   ]),
   question("q14_energy_level", "type_accuracy", "ふだんの元気さはどうですか？", [
-    option("high", "元気いっぱい", { play: 2 }, ["遊び不足で爆発"]),
-    option("normal", "ふつう"),
-    option("varies", "元気に波がある", { health: 1, stress: 1 }, [
+    option("active", "よく動く", { play: 2 }),
+    option("calm", "落ち着いている", { social: 1 }),
+    option("low", "少し元気がない日がある", { health: 2 }, [
       "体調変化出やすい",
     ]),
     option("unknown", "わからない"),
   ]),
-  question("q15_sleep_amount", "type_accuracy", "睡眠時間は多い方だと感じますか？", [
-    option("much", "多い方", { health: 1 }, ["体調変化出やすい"]),
-    option("normal", "ふつう"),
-    option("little", "少ない方", { play: 1, stress: 1 }, ["夜に元気"]),
+  question("q15_sleep_time", "type_accuracy", "寝ている時間は長い方ですか？", [
+    option("long", "長い方だと思う", { health: 1 }),
+    option("normal", "いつも通りだと思う", { social: 1 }),
+    option("short", "短い気がする", { play: 1, stress: 1 }, ["夜に元気"]),
     option("unknown", "わからない"),
   ]),
-  question("q16_active_time_band", "understanding", "元気になりやすい時間帯はありますか？", [
-    option("morning", "朝", { social: 1, food: 1 }, ["朝に甘えやすい"]),
-    option("daytime", "昼", { play: 1 }),
-    option("night", "夜", { play: 2 }, ["夜に元気"]),
+  question("q16_active_time", "understanding", "元気になりやすい時間帯はありますか？", [
+    option("morning", "朝が多い", { social: 1 }, ["朝に甘えやすい"]),
+    option("evening", "夕方から夜が多い", { play: 2 }, ["夜に元気"]),
+    option("varies", "日によって違う", { stress: 1 }, ["甘えに波"]),
     option("unknown", "わからない"),
   ]),
-  question(
-    "q17_meal_interval_reaction",
-    "understanding",
-    "ごはんから時間が空くと、様子が変わりやすいですか？",
-    [
-      option("yes", "変わりやすい", { food: 3 }, ["ごはん時間に敏感"]),
-      option("somewhat", "少し変わる", { food: 2 }, ["ごはん時間に敏感"]),
-      option("rarely", "あまり変わらない"),
-      option("unknown", "わからない"),
-    ],
-  ),
-  question("q18_play_shortage", "understanding", "遊びの時間が少ない日は、様子が変わりますか？", [
-    option("much", "かなり変わる", { play: 3 }, ["遊び不足で爆発"]),
-    option("somewhat", "少し変わる", { play: 2 }, ["遊び不足で爆発"]),
-    option("rarely", "あまり変わらない"),
-    option("unknown", "わからない"),
-  ]),
-  question("q19_affection_style", "understanding", "甘え方に波はありますか？", [
-    option("much", "かなりある", { social: 2, stress: 1 }, ["甘えに波"]),
-    option("somewhat", "少しある", { social: 1 }, ["甘えに波"]),
-    option("rarely", "あまりない", { social: 1 }),
-    option("unknown", "わからない"),
-  ]),
-  question("q20_sound_sensitivity", "understanding", "大きな音や急な音にびっくりしやすいですか？", [
-    option("yes", "しやすい", { stress: 3 }, ["音に敏感"]),
-    option("somewhat", "少ししやすい", { stress: 2 }, ["音に敏感"]),
-    option("rarely", "あまりしない"),
-    option("unknown", "わからない"),
-  ]),
-  question("q21_litter_detail", "understanding", "トイレの回数や様子を気にして見ていますか？", [
-    option("often", "よく見ている", { health: 1 }, ["トイレ変化注意"]),
-    option("sometimes", "ときどき見ている", { health: 1 }),
-    option("rarely", "あまり見ていない"),
-    option("unknown", "わからない"),
-  ]),
-  question("q22_health_signals", "understanding", "体調の変化が行動に出やすいと感じますか？", [
-    option("yes", "出やすい", { health: 3 }, ["体調変化出やすい"]),
-    option("somewhat", "少し出る", { health: 2 }, ["体調変化出やすい"]),
-    option("rarely", "あまり感じない"),
-    option("unknown", "わからない"),
-  ]),
-  question("q23_family_reaction", "understanding", "家族の中で、反応が違う相手はいますか？", [
-    option("yes", "いる", { social: 2 }, ["家族で反応が違う"]),
-    option("somewhat", "少しいる", { social: 1 }, ["家族で反応が違う"]),
+  question("q17_meal_interval", "understanding", "食事の間隔が空くと変化がありますか？", [
+    option("very", "かなりある", { food: 3 }, ["ごはん時間に敏感"]),
+    option("somewhat", "少しある", { food: 2 }),
     option("rarely", "あまりない"),
     option("unknown", "わからない"),
   ]),
-  question("q24_after_absence", "understanding", "留守番のあと、甘えたり鳴いたりしますか？", [
-    option("often", "よくある", { social: 3 }, ["留守番後に甘えやすい"]),
-    option("sometimes", "ときどきある", { social: 2 }, ["留守番後に甘えやすい"]),
-    option("rarely", "あまりない", {}, ["ひとり時間平気"]),
+  question("q18_play_shortage", "understanding", "遊び足りないと変化が出ますか？", [
+    option("yes", "出やすい", { play: 3 }, ["遊び不足で爆発"]),
+    option("sometimes", "ときどき出る", { play: 2 }),
+    option("no", "あまり出ない"),
     option("unknown", "わからない"),
   ]),
-  question("q25_photo_or_notes", "understanding", "写真やメモで残しておきたい行動はありますか？", [
-    option("often", "よくある", { health: 1, stress: 1 }, ["体調変化出やすい"]),
+  question("q19_affection_style", "understanding", "甘え方に波はありますか？", [
+    option("strong", "かなりある", { social: 2, stress: 1 }, ["甘えに波"]),
+    option("some", "少しある", { social: 1 }, ["甘えに波"]),
+    option("stable", "わりと安定している", { social: 1 }),
+    option("unknown", "わからない"),
+  ]),
+  question("q20_noise_sensitivity", "understanding", "大きな音に驚きやすいですか？", [
+    option("very", "とても驚きやすい", { stress: 3 }, ["音に敏感"]),
+    option("somewhat", "少し驚きやすい", { stress: 2 }),
+    option("rarely", "あまり気にしない"),
+    option("unknown", "わからない"),
+  ]),
+  question("q21_toilet_detail", "understanding", "トイレ後の様子で気になることはありますか？", [
+    option("yes", "ある", { health: 3 }, ["トイレ変化注意"]),
+    option("sometimes", "ときどきある", { health: 2 }),
+    option("no", "あまりない"),
+    option("unknown", "わからない"),
+  ]),
+  question("q22_health_signal", "understanding", "体調の変化が行動に出やすい方ですか？", [
+    option("yes", "出やすい", { health: 3 }, ["体調変化出やすい"]),
+    option("some", "少し出る", { health: 2 }),
+    option("no", "あまり出ない"),
+    option("unknown", "わからない"),
+  ]),
+  question("q23_family_relation", "understanding", "家族によって反応が変わりますか？", [
+    option("yes", "よく変わる", { social: 2, stress: 1 }),
+    option("some", "少し変わる", { social: 1 }),
+    option("no", "あまり変わらない"),
+    option("unknown", "わからない"),
+  ]),
+  question("q24_staying_home", "understanding", "留守番のあとに変化がありますか？", [
+    option("yes", "出やすい", { social: 2, stress: 1 }, ["ひとり時間苦手"]),
+    option("some", "少しある", { social: 1 }),
+    option("no", "あまりない", {}, ["ひとり時間平気"]),
+    option("unknown", "わからない"),
+  ]),
+  question("q25_photo_memory", "understanding", "写真やメモで残したい様子はありますか？", [
+    option("often", "よくある", { social: 1, play: 1 }),
     option("sometimes", "ときどきある", { social: 1 }),
     option("rarely", "あまりない"),
     option("unknown", "わからない"),
   ]),
-  question("q26_daily_rhythm", "understanding", "生活リズムが変わると、猫の様子も変わりますか？", [
-    option("yes", "変わりやすい", { stress: 2, social: 1 }, ["環境変化に敏感"]),
-    option("somewhat", "少し変わる", { stress: 1 }, ["環境変化に敏感"]),
-    option("rarely", "あまり変わらない"),
+  question("q26_rhythm", "understanding", "生活リズムに合わせて行動が変わりますか？", [
+    option("yes", "変わりやすい", { food: 1, social: 1 }, ["ごはん時間に敏感"]),
+    option("some", "少し変わる", { social: 1 }),
+    option("no", "あまり変わらない"),
     option("unknown", "わからない"),
   ]),
-  question("q27_stress_signs", "understanding", "ストレスっぽいサインを感じることはありますか？", [
-    option("often", "よくある", { stress: 3 }, ["環境変化に敏感", "音に敏感"]),
-    option("sometimes", "ときどきある", { stress: 2 }),
+  question("q27_stress_sign", "understanding", "ストレスっぽいサインは見えますか？", [
+    option("often", "よく見える", { stress: 3 }, ["環境変化に敏感"]),
+    option("sometimes", "ときどき見える", { stress: 2 }),
     option("rarely", "あまりない"),
     option("unknown", "わからない"),
   ]),
-  question("q28_recovery_speed", "understanding", "びっくりしたあと、戻るまでの時間はどうですか？", [
-    option("quick", "すぐ戻る"),
-    option("some_time", "少し時間がかかる", { stress: 1 }, ["回復に時間がかかる"]),
-    option("long_time", "かなり時間がかかる", { stress: 2 }, ["回復に時間がかかる"]),
+  question("q28_recovery", "understanding", "一度落ち着かないとき、戻りやすいですか？", [
+    option("quick", "戻りやすい", { social: 1 }),
+    option("slow", "少し時間がかかる", { stress: 2 }, ["回復に時間がかかる"]),
+    option("varies", "日による", { stress: 1 }, ["甘えに波"]),
     option("unknown", "わからない"),
   ]),
-  question("q29_attention_signs", "understanding", "かまってほしい時のサインは分かりやすいですか？", [
-    option("clear", "分かりやすい", { social: 3 }),
-    option("somewhat", "少し分かる", { social: 2 }),
-    option("unclear", "分かりにくい", { stress: 1 }, ["甘えに波"]),
+  question("q29_attention_sign", "understanding", "かまってほしい時のサインは分かりますか？", [
+    option("clear", "わかりやすい", { social: 3 }),
+    option("some", "少しわかる", { social: 2 }),
+    option("hard", "まだわかりにくい", { stress: 1 }),
     option("unknown", "わからない"),
   ]),
-  question("q30_common_concern", "understanding", "よくある困りごとはどれに近いですか？", [
-    option("meowing", "鳴くこと", { social: 2, food: 1 }),
-    option("restless", "落ち着かないこと", { stress: 2, play: 1 }, [
-      "音に敏感",
-      "環境変化に敏感",
-    ]),
-    option("food_or_toilet", "ごはんやトイレ", { food: 1, health: 2 }, [
-      "食欲ムラ",
-      "トイレ変化注意",
-    ]),
-    option("none", "特にない"),
+  question("q30_common_trouble", "understanding", "よく困ることはありますか？", [
+    option("meowing", "鳴き声で迷う", { social: 1, food: 1, play: 1 }),
+    option("restless", "落ち着かなさで迷う", { stress: 2 }),
+    option("health", "体調サインで迷う", { health: 2 }, ["体調変化出やすい"]),
+    option("unknown", "まだわからない"),
   ]),
-] satisfies OnboardingQuestionDefinition[];
+] as const satisfies OnboardingQuestionDefinition[];
 
 export const ONBOARDING_QUESTIONS = DIAGNOSIS_ONBOARDING_QUESTIONS;
-
 export const TOTAL_ONBOARDING_QUESTIONS = DIAGNOSIS_ONBOARDING_QUESTIONS.length;

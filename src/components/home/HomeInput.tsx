@@ -100,8 +100,13 @@ export function HomeInput({
   const activeCatEvents = activeCatId
     ? recentEvents.filter((event) => event.local_cat_id === activeCatId)
     : [];
-  const understandingPercent = calculateUnderstandingPercent(
+  const eventUnderstandingPercent = calculateUnderstandingPercent(
     activeCatEvents.length,
+  );
+  const profileUnderstandingPercent = activeCatProfile?.understanding?.percent ?? 0;
+  const understandingPercent = Math.max(
+    eventUnderstandingPercent,
+    profileUnderstandingPercent,
   );
   const understandingMessage = getUnderstandingMessage(understandingPercent);
   const guidance = getGuidanceByUnderstanding(understandingPercent);

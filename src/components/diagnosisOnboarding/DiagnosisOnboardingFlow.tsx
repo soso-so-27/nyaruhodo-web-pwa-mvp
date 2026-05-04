@@ -3,9 +3,7 @@
 import { useRouter } from "next/navigation";
 import { useMemo, useState } from "react";
 import type { CSSProperties } from "react";
-import {
-  DIAGNOSIS_ONBOARDING_QUESTIONS,
-} from "../../lib/diagnosisOnboarding/questions";
+import { DIAGNOSIS_ONBOARDING_QUESTIONS } from "../../lib/diagnosisOnboarding/questions";
 import { buildOnboardingResult } from "../../lib/diagnosisOnboarding/scoring";
 import type {
   OnboardingAnswers,
@@ -21,7 +19,12 @@ import {
 import type { CatProfile } from "../home/homeInputHelpers";
 
 const ONBOARDING_VERSION = "diagnosis-v1" as const;
-const INITIAL_QUESTIONS = DIAGNOSIS_ONBOARDING_QUESTIONS.slice(0, 3);
+const PREVIEW_QUESTION_COUNT = 3;
+const ONBOARDING_QUESTION_LIMIT = 15;
+const ONBOARDING_QUESTIONS = DIAGNOSIS_ONBOARDING_QUESTIONS.slice(
+  0,
+  ONBOARDING_QUESTION_LIMIT,
+);
 
 const tendencyTexts: Record<TypeKey, string> = {
   play: "遊びへの反応が少し出やすい",
@@ -34,7 +37,7 @@ const tendencyTexts: Record<TypeKey, string> = {
 const typeOutlooks: Record<TypeKey, string> = {
   play: "遊びたい気持ちが出る場面を、少しずつ見ていけそうです。",
   food: "ごはん前後の様子を残すと、見立てがしやすくなりそうです。",
-  social: "鳴く・ついてくるなど、人との距離感を見ていくとよさそうです。",
+  social: "近くにいる、ついてくるなど、人との距離感を見ていくとよさそうです。",
   stress: "落ち着かない時の時間帯や環境を、少しずつ見ていきましょう。",
   balanced: "日常の記録を少し残すだけでも、この子らしさが見えてきます。",
 };
@@ -44,21 +47,29 @@ export function DiagnosisOnboardingFlow() {
   const [catName, setCatName] = useState("");
   const [step, setStep] = useState<"name" | "question" | "result">("name");
   const [questionIndex, setQuestionIndex] = useState(0);
+  const [furthestQuestionCount, setFurthestQuestionCount] = useState(0);
   const [answers, setAnswers] = useState<OnboardingAnswers>({});
   const [message, setMessage] = useState("");
 
   const trimmedCatName = catName.trim();
   const displayCatName = trimmedCatName || "この子";
-  const currentQuestion = INITIAL_QUESTIONS[questionIndex];
+  const currentQuestion = ONBOARDING_QUESTIONS[questionIndex];
   const result = useMemo(() => buildOnboardingResult(answers), [answers]);
-  const answeredInitialCount = INITIAL_QUESTIONS.filter(
+  const visibleQuestionCount =
+    step === "result"
+      ? Math.max(furthestQuestionCount, PREVIEW_QUESTION_COUNT)
+      : Math.max(furthestQuestionCount, questionIndex + 1);
+  const visibleQuestions = ONBOARDING_QUESTIONS.slice(0, visibleQuestionCount);
+  const answeredVisibleCount = visibleQuestions.filter(
     (question) => answers[question.questionId],
   ).length;
-  const skippedInitialCount = INITIAL_QUESTIONS.length - answeredInitialCount;
+  const skippedVisibleCount = visibleQuestions.length - answeredVisibleCount;
   const hasHealthSignal = result.scores.health >= 2;
+  const canAnswerMore = visibleQuestionCount < ONBOARDING_QUESTION_LIMIT;
 
   function startQuestions() {
     setCatName(trimmedCatName || "ミケ");
+    setFurthestQuestionCount(1);
     setMessage("");
     setStep("question");
   }
@@ -67,17 +78,47 @@ export function DiagnosisOnboardingFlow() {
     question: OnboardingQuestionDefinition,
     optionId: string | null,
   ) {
+    const nextIndex = questionIndex + 1;
+
     setAnswers((current) => ({
       ...current,
       [question.questionId]: optionId,
     }));
+    setFurthestQuestionCount((current) =>
+      Math.max(current, questionIndex + 1),
+    );
+    setMessage("");
 
-    if (questionIndex >= INITIAL_QUESTIONS.length - 1) {
+    if (
+      nextIndex === PREVIEW_QUESTION_COUNT ||
+      nextIndex >= ONBOARDING_QUESTIONS.length
+    ) {
       setStep("result");
       return;
     }
 
-    setQuestionIndex((current) => current + 1);
+    setQuestionIndex(nextIndex);
+    setFurthestQuestionCount((current) => Math.max(current, nextIndex + 1));
+  }
+
+  function continueQuestions() {
+    const nextIndex = Math.max(PREVIEW_QUESTION_COUNT, furthestQuestionCount);
+    const safeNextIndex = Math.min(nextIndex, ONBOARDING_QUESTIONS.length - 1);
+
+    setQuestionIndex(safeNextIndex);
+    setFurthestQuestionCount((current) =>
+      Math.max(current, safeNextIndex + 1),
+    );
+    setMessage("");
+    setStep("question");
+  }
+
+  function showResult() {
+    setFurthestQuestionCount((current) =>
+      Math.max(current, questionIndex + 1),
+    );
+    setMessage("");
+    setStep("result");
   }
 
   function saveAndGoHome() {
@@ -93,8 +134,8 @@ export function DiagnosisOnboardingFlow() {
       modifiers: result.modifiers,
       onboarding: {
         version: ONBOARDING_VERSION,
-        answeredCount: answeredInitialCount,
-        skippedCount: skippedInitialCount,
+        answeredCount: answeredVisibleCount,
+        skippedCount: skippedVisibleCount,
         answers,
         completedAt: now,
         updatedAt: now,
@@ -120,7 +161,8 @@ export function DiagnosisOnboardingFlow() {
             <p style={styles.eyebrow}>はじめに</p>
             <h1 style={styles.title}>うちの猫、どんなタイプ？</h1>
             <p style={styles.lead}>
-              鳴く・ついてくる・落ち着かない。行動から“いまの気持ち”が見えてきます。
+              鳴く・ついてくる・落ち着かない。
+              行動から&quot;いまの気持ち&quot;が見えてきます。
             </p>
 
             <div style={styles.formBlock}>
@@ -149,14 +191,22 @@ export function DiagnosisOnboardingFlow() {
             catName={displayCatName}
             question={currentQuestion}
             questionNumber={questionIndex + 1}
+            totalQuestions={ONBOARDING_QUESTION_LIMIT}
+            showProgressActions={questionIndex + 1 > PREVIEW_QUESTION_COUNT}
             onAnswer={(optionId) => answerQuestion(currentQuestion, optionId)}
+            onShowResult={showResult}
+            onGoHome={saveAndGoHome}
           />
         ) : null}
 
         {step === "result" ? (
           <section style={styles.resultCard}>
-            <p style={styles.eyebrow}>最初の手がかり</p>
-            <h1 style={styles.title}>{displayCatName}のこと、少し見えてきました</h1>
+            <p style={styles.eyebrow}>
+              {getResultStageLabel(visibleQuestionCount)}
+            </p>
+            <h1 style={styles.title}>
+              {displayCatName}のこと、少し見えてきました
+            </h1>
 
             <div style={styles.resultSummary}>
               <p style={styles.resultLead}>
@@ -165,10 +215,12 @@ export function DiagnosisOnboardingFlow() {
                 {tendencyTexts[result.type.typeKey]}かもしれません。
               </p>
               <p style={styles.resultText}>
-                まだ最初の手がかりなので、これからの記録や回答で少しずつ変わります。
+                {visibleQuestionCount <= PREVIEW_QUESTION_COUNT
+                  ? "まだ最初の手がかりなので、これからの記録や回答で少しずつ変わります。"
+                  : "答えてくれた分だけ、この子の傾向が少しずつ見えやすくなっています。"}
               </p>
               <p style={styles.typeHint}>
-                今のところ、{result.type.typeLabel}寄りかもしれません。
+                今のところ、{result.type.typeLabel}寄りかもしれません
               </p>
             </div>
 
@@ -199,19 +251,52 @@ export function DiagnosisOnboardingFlow() {
               </p>
             </div>
 
+            {visibleQuestionCount <= PREVIEW_QUESTION_COUNT ? (
+              <p style={styles.progressHint}>
+                今は3問だけ。あとからでも続けられます。
+              </p>
+            ) : null}
+
             <div style={styles.actions}>
-              <button type="button" onClick={saveAndGoHome} style={styles.primaryButton}>
-                ホームで見る
-              </button>
-              <button
-                type="button"
-                onClick={() =>
-                  setMessage("追加の質問は次のステップで使えるようにします。")
-                }
-                style={styles.secondaryButton}
-              >
-                もう少し詳しく見る
-              </button>
+              {canAnswerMore ? (
+                <>
+                  <button
+                    type="button"
+                    onClick={continueQuestions}
+                    style={styles.primaryButton}
+                  >
+                    もう少し答えてみる
+                  </button>
+                  <button
+                    type="button"
+                    onClick={saveAndGoHome}
+                    style={styles.secondaryButton}
+                  >
+                    ホームで見る
+                  </button>
+                </>
+              ) : (
+                <>
+                  <button
+                    type="button"
+                    onClick={saveAndGoHome}
+                    style={styles.primaryButton}
+                  >
+                    ホームで見る
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setMessage(
+                        "追加の質問は次のステップで使えるようにします。",
+                      )
+                    }
+                    style={styles.secondaryButton}
+                  >
+                    もう少し詳しく見る
+                  </button>
+                </>
+              )}
             </div>
             {message ? <p style={styles.message}>{message}</p> : null}
           </section>
@@ -225,18 +310,30 @@ function QuestionStep({
   catName,
   question,
   questionNumber,
+  totalQuestions,
+  showProgressActions,
   onAnswer,
+  onShowResult,
+  onGoHome,
 }: {
   catName: string;
   question: OnboardingQuestionDefinition;
   questionNumber: number;
+  totalQuestions: number;
+  showProgressActions: boolean;
   onAnswer: (optionId: string | null) => void;
+  onShowResult: () => void;
+  onGoHome: () => void;
 }) {
   return (
     <section style={styles.questionCard}>
-      <p style={styles.eyebrow}>質問 {questionNumber} / 3</p>
+      <p style={styles.eyebrow}>
+        質問 {questionNumber} / {totalQuestions}
+      </p>
       <h1 style={styles.questionTitle}>{question.question}</h1>
-      <p style={styles.lead}>{catName}のことを、少しだけ教えてください。</p>
+      <p style={styles.lead}>
+        {catName}のことを、少しだけ教えてください。
+      </p>
 
       <div style={styles.optionList}>
         {question.options.map((option) => (
@@ -256,8 +353,31 @@ function QuestionStep({
           スキップする
         </button>
       ) : null}
+
+      {showProgressActions ? (
+        <div style={styles.progressActions}>
+          <button type="button" onClick={onShowResult} style={styles.tertiaryButton}>
+            結果を見る
+          </button>
+          <button type="button" onClick={onGoHome} style={styles.ghostButton}>
+            あとでホームへ
+          </button>
+        </div>
+      ) : null}
     </section>
   );
+}
+
+function getResultStageLabel(questionCount: number) {
+  if (questionCount <= PREVIEW_QUESTION_COUNT) {
+    return "最初の手がかり";
+  }
+
+  if (questionCount < ONBOARDING_QUESTION_LIMIT) {
+    return "少し傾向が見えてきました";
+  }
+
+  return "だんだん傾向が見えてきました";
 }
 
 const styles = {
@@ -402,6 +522,30 @@ const styles = {
     letterSpacing: 0,
     cursor: "pointer",
   },
+  tertiaryButton: {
+    width: "100%",
+    minHeight: "46px",
+    border: "1px solid #d4d4d8",
+    borderRadius: "14px",
+    background: "#ffffff",
+    color: "#3f3f46",
+    fontSize: "14px",
+    fontWeight: 800,
+    letterSpacing: 0,
+    cursor: "pointer",
+  },
+  ghostButton: {
+    width: "100%",
+    minHeight: "46px",
+    border: "1px solid transparent",
+    borderRadius: "14px",
+    background: "transparent",
+    color: "#71717a",
+    fontSize: "14px",
+    fontWeight: 800,
+    letterSpacing: 0,
+    cursor: "pointer",
+  },
   resultSummary: {
     marginTop: "18px",
     border: "1px solid #ebe2d6",
@@ -476,9 +620,21 @@ const styles = {
     fontSize: "14px",
     lineHeight: 1.7,
   },
+  progressHint: {
+    margin: "14px 0 0",
+    color: "#71717a",
+    fontSize: "13px",
+    lineHeight: 1.6,
+  },
   actions: {
     display: "grid",
     gap: "10px",
+  },
+  progressActions: {
+    display: "grid",
+    gridTemplateColumns: "1fr 1fr",
+    gap: "8px",
+    marginTop: "10px",
   },
   message: {
     margin: "12px 0 0",
