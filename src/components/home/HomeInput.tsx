@@ -130,6 +130,7 @@ export function HomeInput({
     !isDailyHintDismissed &&
     !isDailyHintSuppressed &&
     activeCatEvents.length >= 3;
+  const returnMotivation = buildHomeReturnMotivation(activeCatEvents, catName);
 
   useEffect(() => {
     const completed =
@@ -443,6 +444,7 @@ export function HomeInput({
           catName={catName}
           catProfiles={catProfiles}
           onboardingHomeMessage={onboardingHomeMessage}
+          returnMotivation={returnMotivation}
           understandingPercent={understandingPercent}
           understandingMessage={understandingMessage}
           onCatSelect={handleCatSelect}
@@ -558,6 +560,7 @@ function Header({
   catName,
   catProfiles,
   onboardingHomeMessage,
+  returnMotivation,
   understandingPercent,
   understandingMessage,
   onCatSelect,
@@ -566,6 +569,7 @@ function Header({
   catName: string;
   catProfiles: CatProfile[];
   onboardingHomeMessage: string;
+  returnMotivation: { title: string; text: string };
   understandingPercent: number;
   understandingMessage: string;
   onCatSelect: (catId: string) => void;
@@ -648,10 +652,10 @@ function Header({
           <p style={styles.onboardingHomeMessage}>{onboardingHomeMessage}</p>
         ) : null}
         <p style={styles.headerGuideTitle}>
-          {"今日は、見たままをひとつ残せばOKです。"}
+          {returnMotivation.title}
         </p>
         <p style={styles.headerGuideText}>
-          {"気になるときだけ、下から選んでください。"}
+          {returnMotivation.text}
         </p>
       </div>
       {isCatSwitcherOpen ? (
@@ -693,6 +697,54 @@ function getUnderstandingTone(percent: number) {
   }
 
   return "\u3053\u308c\u304b\u3089\u77e5\u3063\u3066\u3044\u304d\u307e\u3059";
+}
+
+function buildHomeReturnMotivation(
+  events: RecentEvent[],
+  catName: string,
+): { title: string; text: string } {
+  const todayEventCount = events.filter((event) => isTodayEvent(event)).length;
+
+  if (todayEventCount > 0) {
+    return {
+      title: "今日の様子が少し残っています。",
+      text: "また気づいたら、ひとつ足してみてください。",
+    };
+  }
+
+  const lastEvent = events[0];
+  const lastLabel = lastEvent?.label ? getOptionDisplayLabel(lastEvent.label) : "";
+
+  if (lastLabel) {
+    return {
+      title: `前回は「${lastLabel}」を残しました。`,
+      text: `少しずつ、${catName}の過ごし方が見えてきます。`,
+    };
+  }
+
+  return {
+    title: "今日はまだ記録がありません。",
+    text: "見たままをひとつ残せばOKです。",
+  };
+}
+
+function isTodayEvent(event: RecentEvent) {
+  const eventDate = new Date(event.occurred_at || event.created_at);
+
+  if (Number.isNaN(eventDate.getTime())) {
+    return false;
+  }
+
+  return formatTokyoDateKey(eventDate) === formatTokyoDateKey(new Date());
+}
+
+function formatTokyoDateKey(date: Date) {
+  return new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Asia/Tokyo",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).format(date);
 }
 
 function CatSettings({

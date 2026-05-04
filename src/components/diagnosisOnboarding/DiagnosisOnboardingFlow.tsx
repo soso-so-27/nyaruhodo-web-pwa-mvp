@@ -364,10 +364,10 @@ function QuestionStep({
       {showProgressActions ? (
         <div style={styles.progressActions}>
           <button type="button" onClick={onShowResult} style={styles.tertiaryButton}>
-            結果を見る
+            いま見えていることを見る
           </button>
           <button type="button" onClick={onGoHome} style={styles.ghostButton}>
-            あとでホームへ
+            今日はここまで
           </button>
         </div>
       ) : null}
