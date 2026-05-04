@@ -125,15 +125,15 @@ export function CatsPage() {
           <p style={styles.eyebrow}>{"ねこ"}</p>
           <h1 style={styles.title}>{"ねこ"}</h1>
           <p style={styles.lead}>
-            {"一緒に暮らしている子をここで見られます。"}
+            {"一緒に暮らしている子のことをまとめます。"}
           </p>
         </header>
 
         <section style={styles.card}>
-          <p style={styles.sectionLabel}>{"いま見ている猫"}</p>
+          <p style={styles.sectionLabel}>{"いま見ている子"}</p>
           <h2 style={styles.activeCatName}>{catName}</h2>
           <p style={styles.description}>
-            {"ホームでは、この子の記録や診断を見ます。"}
+            {"今日の記録や見立ては、この子にたまります。"}
           </p>
         </section>
 

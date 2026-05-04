@@ -167,7 +167,7 @@ export function DiagnosisResult({
         </header>
 
         <section style={styles.hypothesisCard}>
-          <p style={styles.cardLabel}>{"\u307e\u305a\u306f\u3053\u3053\u304b\u3089"}</p>
+          <p style={styles.cardLabel}>{"\u3044\u307e\u898b\u3048\u308b\u3053\u3068"}</p>
           <p style={styles.hypothesisText}>{displayHypothesisText}</p>
         </section>
 
@@ -179,7 +179,7 @@ export function DiagnosisResult({
         ) : null}
 
         <section style={styles.reasonCard}>
-          <p style={styles.cardTitle}>{"\u624b\u304c\u304b\u308a"}</p>
+          <p style={styles.cardTitle}>{"\u305d\u3046\u898b\u305f\u7406\u7531"}</p>
           <ul style={styles.reasonList}>
             {reasons.map((reason) => (
               <li key={reason} style={styles.reasonItem}>
@@ -190,7 +190,7 @@ export function DiagnosisResult({
         </section>
 
         <section style={styles.actionCard}>
-          <p style={styles.cardTitle}>{"\u307e\u305a\u306f\u5c11\u3057\u3060\u3051"}</p>
+          <p style={styles.cardTitle}>{"\u3067\u304d\u305d\u3046\u306a\u3053\u3068"}</p>
           <p style={styles.actionIntro}>
             {getActionIntro(currentCategory)}
           </p>
@@ -254,7 +254,7 @@ function getCompletionMessage(
   feedback: "resolved" | "unresolved",
 ) {
   if (feedback === "unresolved") {
-    return "ありがとう。\n違ったことも記録しました。";
+    return "";
   }
 
   if (category === "health") {

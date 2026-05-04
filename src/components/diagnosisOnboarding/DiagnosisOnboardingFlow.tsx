@@ -224,7 +224,7 @@ export function DiagnosisOnboardingFlow() {
                 {tendencyTexts[result.type.typeKey]}かもしれません。
               </p>
               <p style={styles.resultText}>
-                {getResultBodyText(visibleQuestionCount)}
+                {getResultBodyText(displayCatName, visibleQuestionCount)}
               </p>
               <p style={styles.typeHint}>
                 今のところ、{result.type.typeLabel}寄りかもしれません
@@ -395,13 +395,13 @@ function getResultTitle(catName: string, questionCount: number) {
   return `${catName}のこと、少し見えてきました`;
 }
 
-function getResultBodyText(questionCount: number) {
+function getResultBodyText(catName: string, questionCount: number) {
   if (questionCount <= PREVIEW_QUESTION_COUNT) {
     return "まだ最初の手がかりなので、これからの記録や回答で少しずつ変わります。";
   }
 
   if (questionCount >= ONBOARDING_QUESTION_LIMIT) {
-    return "ここまで答えると、見え方が少し深まりました。これからの記録でも、少しずつ変わっていきます。";
+    return `ここまで答えると、${catName}の見え方が少し深まりました。これからの記録でも、少しずつ変わっていきます。`;
   }
 
   return "答えてくれた分だけ、この子の傾向が少しずつ見えやすくなっています。";
