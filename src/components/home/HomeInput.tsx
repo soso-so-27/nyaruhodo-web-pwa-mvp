@@ -510,14 +510,18 @@ function Header({
   understandingMessage: string;
   onCatSelect: (catId: string) => void;
 }) {
+  const [isCatSwitcherOpen, setIsCatSwitcherOpen] = useState(false);
   const understandingTone = getUnderstandingTone(understandingPercent);
   const ringDegree = Math.max(0, Math.min(100, understandingPercent)) * 3.6;
+  const canSwitchCats = catProfiles.length > 1;
+
+  function handleCatChipSelect(catId: string) {
+    onCatSelect(catId);
+    setIsCatSwitcherOpen(false);
+  }
 
   return (
     <header style={styles.header}>
-      <div style={styles.headerTopRow}>
-        <p style={styles.headerEyebrow}>{"\u4eca\u65e5\u306e\u732b"}</p>
-      </div>
       <div style={styles.profileHero}>
         <div style={styles.catAvatar} aria-hidden="true">
           <img
@@ -531,8 +535,27 @@ function Header({
         </div>
         <div style={styles.profileText}>
           <h1 style={styles.title}>
-            {"\u4eca\u65e5\u306e"}
-            {catName}
+            {canSwitchCats ? (
+              <button
+                type="button"
+                onClick={() => setIsCatSwitcherOpen((current) => !current)}
+                style={styles.titleSwitchButton}
+                aria-expanded={isCatSwitcherOpen}
+              >
+                <span>
+                  {"\u4eca\u65e5\u306e"}
+                  {catName}
+                </span>
+                <span style={styles.titleChevron} aria-hidden="true">
+                  {isCatSwitcherOpen ? "▲" : "▼"}
+                </span>
+              </button>
+            ) : (
+              <>
+                {"\u4eca\u65e5\u306e"}
+                {catName}
+              </>
+            )}
           </h1>
           <p style={styles.understandingMessage}>
             {catName}
@@ -555,33 +578,35 @@ function Header({
           <p style={styles.understanding}>{understandingTone}</p>
         </div>
       </div>
-      <div style={styles.homeCatSwitcher}>
-        <div style={styles.headerGuide}>
-          <p style={styles.headerGuideTitle}>
-            {"今日は、見たままをひとつ残せばOKです。"}
-          </p>
-          <p style={styles.headerGuideText}>
-            {"気になるときだけ、下から選んでください。"}
-          </p>
-        </div>
-        <p style={styles.catChipLabel}>{"他の子を見る"}</p>
-        <div style={styles.catChips}>
-          {catProfiles.map((profile) => (
-            <button
-              key={profile.id}
-              type="button"
-              onClick={() => onCatSelect(profile.id)}
-              style={
-                profile.id === activeCatId
-                  ? styles.activeCatChipButton
-                  : styles.catChipButton
-              }
-            >
-              {profile.name}
-            </button>
-          ))}
-        </div>
+      <div style={styles.headerGuide}>
+        <p style={styles.headerGuideTitle}>
+          {"今日は、見たままをひとつ残せばOKです。"}
+        </p>
+        <p style={styles.headerGuideText}>
+          {"気になるときだけ、下から選んでください。"}
+        </p>
       </div>
+      {isCatSwitcherOpen ? (
+        <div style={styles.homeCatSwitcher}>
+          <p style={styles.catChipLabel}>{"他の子を見る"}</p>
+          <div style={styles.catChips}>
+            {catProfiles.map((profile) => (
+              <button
+                key={profile.id}
+                type="button"
+                onClick={() => handleCatChipSelect(profile.id)}
+                style={
+                  profile.id === activeCatId
+                    ? styles.activeCatChipButton
+                    : styles.catChipButton
+                }
+              >
+                {profile.name}
+              </button>
+            ))}
+          </div>
+        </div>
+      ) : null}
     </header>
   );
 }
@@ -978,6 +1003,29 @@ const styles = {
     letterSpacing: 0,
     lineHeight: 1.2,
   },
+  titleSwitchButton: {
+    display: "inline-flex",
+    alignItems: "center",
+    gap: "6px",
+    margin: 0,
+    padding: 0,
+    border: 0,
+    background: "transparent",
+    color: "inherit",
+    font: "inherit",
+    fontWeight: "inherit",
+    letterSpacing: 0,
+    lineHeight: "inherit",
+    textAlign: "left",
+    cursor: "pointer",
+  },
+  titleChevron: {
+    color: "#71717a",
+    fontSize: "12px",
+    fontWeight: 800,
+    lineHeight: 1,
+    transform: "translateY(1px)",
+  },
   header: {
     marginBottom: "12px",
     border: "1px solid #ebe2d6",
@@ -997,7 +1045,7 @@ const styles = {
     gridTemplateColumns: "56px minmax(0, 1fr) auto",
     alignItems: "center",
     gap: "12px",
-    marginTop: "8px",
+    marginTop: 0,
   },
   catAvatar: {
     display: "flex",
@@ -1074,12 +1122,12 @@ const styles = {
     marginTop: "8px",
   },
   homeCatSwitcher: {
-    marginTop: "12px",
-    borderTop: "1px solid rgba(234, 219, 202, 0.8)",
-    paddingTop: "12px",
+    marginTop: "10px",
+    borderTop: "1px solid rgba(234, 219, 202, 0.58)",
+    paddingTop: "10px",
   },
   headerGuide: {
-    marginBottom: "12px",
+    marginTop: "12px",
     border: "1px solid rgba(234, 219, 202, 0.65)",
     borderRadius: "18px",
     background: "rgba(255, 255, 255, 0.52)",
