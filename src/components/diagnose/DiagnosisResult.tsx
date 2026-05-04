@@ -6,6 +6,7 @@ import type { CSSProperties } from "react";
 import { applyDiagnosisFeedback } from "../../core/understanding/feedback";
 import type { BehaviorInput, CauseCategory } from "../../core/types";
 import { insertFeedback } from "../../lib/supabase/queries";
+import { saveCurrentCatHintSuppression } from "../home/homeInputHelpers";
 
 type DiagnosisResultProps = {
   resultText: string;
@@ -156,6 +157,11 @@ export function DiagnosisResult({
       result: feedback,
       category: currentCategory,
       label,
+    });
+    saveCurrentCatHintSuppression({
+      localCatId: localCatId ?? null,
+      category: currentCategory,
+      feedback: feedback === "resolved" ? "accepted" : "rejected",
     });
     setFeedbackMessage("");
     router.push("/home");

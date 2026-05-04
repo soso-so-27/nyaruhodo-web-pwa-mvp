@@ -212,9 +212,17 @@ export function HomeInput({
     setRecentStateRecords(readRecentStateRecords());
     saveActiveCatId(activeProfile.id);
     setOnboardingHomeMessage(readOnboardingHomeMessage(activeProfile.id));
-    setPostDiagnosisFeedbackMessage(
-      readPostDiagnosisFeedbackMessage(activeProfile.id, getCatName(activeProfile)),
+    const postDiagnosisMessage = readPostDiagnosisFeedbackMessage(
+      activeProfile.id,
+      getCatName(activeProfile),
     );
+
+    setPostDiagnosisFeedbackMessage(postDiagnosisMessage);
+    if (postDiagnosisMessage) {
+      window.setTimeout(() => {
+        window.localStorage.removeItem(POST_DIAGNOSIS_FEEDBACK_KEY);
+      }, 0);
+    }
 
     const latestHypothesis = readLatestHypothesis();
 
@@ -662,8 +670,6 @@ function readPostDiagnosisFeedbackMessage(activeCatId: string, catName: string) 
       return "";
     }
 
-    window.localStorage.removeItem(POST_DIAGNOSIS_FEEDBACK_KEY);
-
     if (parsed.result === "resolved") {
       if (parsed.label === "鳴きやんだ") {
         return "鳴きやんだことを記録しました。\nまた気づいたら、見たままをひとつ残せばOKです。";
@@ -682,7 +688,6 @@ function readPostDiagnosisFeedbackMessage(activeCatId: string, catName: string) 
 
     return "まだ気になることを記録しました。\nもう一度、近い様子を選んでみても大丈夫です。";
   } catch {
-    window.localStorage.removeItem(POST_DIAGNOSIS_FEEDBACK_KEY);
     return "";
   }
 }
