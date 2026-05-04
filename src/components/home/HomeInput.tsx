@@ -125,6 +125,14 @@ export function HomeInput({
     activeCatEvents.length >= 3;
 
   useEffect(() => {
+    const completed =
+      window.localStorage.getItem("onboarding_completed") === "true";
+
+    if (!completed) {
+      router.replace("/diagnosis-onboarding");
+      return;
+    }
+
     const savedCatProfiles = readCatProfiles();
     const savedActiveCatId = readActiveCatId();
     const activeProfile = getActiveCatProfile(

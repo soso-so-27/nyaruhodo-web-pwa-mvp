@@ -98,11 +98,14 @@ export function DiagnosisOnboardingFlow() {
       },
       understanding: result.understanding,
     };
-    const profiles = readCatProfiles();
+    const profiles = window.localStorage.getItem("cat_profiles")
+      ? readCatProfiles()
+      : [];
     const nextProfiles = [...profiles, profile];
 
     saveCatProfiles(nextProfiles);
     saveActiveCatId(profile.id);
+    window.localStorage.setItem("onboarding_completed", "true");
     router.push("/home");
   }
 

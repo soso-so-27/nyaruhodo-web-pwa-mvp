@@ -10,7 +10,7 @@ export default function Page() {
     const completed =
       window.localStorage.getItem("onboarding_completed") === "true";
 
-    router.replace(completed ? "/home" : "/onboarding");
+    router.replace(completed ? "/home" : "/diagnosis-onboarding");
   }, [router]);
 
   return null;

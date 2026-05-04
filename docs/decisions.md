@@ -680,3 +680,25 @@ MVP v1 では `/diagnosis-onboarding` を追加し、名前入力と Q1〜Q3 の
 - 認証追加
 - 診断スコアへの反映
 - E2E追加
+## 2026-05-04
+
+# 設計判断：初回導線は診断オンボーディングを入口にする
+
+## 背景
+
+初回ユーザーには、使い方説明よりも「うちの猫、どんなタイプ？」という軽い体験から入ってもらう方が、にゃるほどの価値である「迷いを減らす」に近い。
+
+## 判断
+
+`onboarding_completed` が未設定または `true` 以外の場合、初回導線は `/diagnosis-onboarding` に誘導する。
+`/diagnosis-onboarding` の `ホームで見る` で `cat_profiles` と `active_cat_id` を保存し、同時に `onboarding_completed = true` を保存する。
+
+既存の `/onboarding` は削除せず、直接アクセスは残す。
+
+## まだやらないこと
+
+- 既存 `/onboarding` の削除
+- Q4〜Q30 の画面実装
+- DB保存
+- cats テーブル作成
+- 認証追加
