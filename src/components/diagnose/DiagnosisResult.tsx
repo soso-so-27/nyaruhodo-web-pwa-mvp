@@ -144,6 +144,13 @@ export function DiagnosisResult({
       return;
     }
 
+    if (feedback === "resolved") {
+      setFeedbackMessage("");
+      setFeedbackOutcome(null);
+      router.push("/home");
+      return;
+    }
+
     setFeedbackMessage(getCompletionMessage(currentCategory, feedback));
     setFeedbackOutcome(feedback);
   }
@@ -225,7 +232,7 @@ export function DiagnosisResult({
           <p style={styles.feedbackMessage}>{feedbackMessage}</p>
         ) : null}
 
-        {feedbackOutcome ? (
+        {feedbackOutcome === "unresolved" ? (
           <NextActionCard
             category={currentCategory}
             feedback={feedbackOutcome}

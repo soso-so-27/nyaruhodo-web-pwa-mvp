@@ -4,6 +4,32 @@ This file records product, logic, UI, schema, and architecture decisions.
 
 Any change to the agreed specification must be recorded here.
 
+## 2026-05-04
+
+# 設計判断：診断結果のメインCTA後はホームへ戻す
+
+## 判断
+
+診断結果画面のメインCTAは、`feedbacks` に `resolved` を保存できたら、確認カードを挟まず `/home` へ戻す。
+
+`違うかも` は現時点では従来通り、`unresolved` を保存したあとに「違ったことも記録しました」カードを表示する。
+
+## 理由
+
+診断結果画面は、気になる行動に対して次の一手を決めるための画面とする。
+
+メインCTAを押した後にさらに「ホームで様子を見る」を押す必要があると、行動完了までのステップが長く見えるため、保存成功後はすぐホームへ戻す。
+
+ホームに戻った後は、既存の `latest_hypothesis` 表示で、さっきの見立てを受けた文脈を維持する。
+
+## まだやらないこと
+
+- `feedbacks` 保存仕様変更
+- `latest_hypothesis` 保存形式変更
+- `違うかも` の即ホーム遷移
+- DB変更
+- RLS変更
+
 # 設計判断：MVPでは calendar_context jsonb で生活文脈を保存する
 
 ## 背景
