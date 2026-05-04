@@ -19,6 +19,7 @@ import {
 import type { CatProfile } from "../home/homeInputHelpers";
 
 const ONBOARDING_VERSION = "diagnosis-v1" as const;
+const ONBOARDING_HOME_HINT_KEY = "diagnosis_onboarding_home_hint";
 const PREVIEW_QUESTION_COUNT = 3;
 const ONBOARDING_QUESTION_LIMIT = 15;
 const ONBOARDING_QUESTIONS = DIAGNOSIS_ONBOARDING_QUESTIONS.slice(
@@ -150,6 +151,14 @@ export function DiagnosisOnboardingFlow() {
     saveCatProfiles(nextProfiles);
     saveActiveCatId(profile.id);
     window.localStorage.setItem("onboarding_completed", "true");
+    window.localStorage.setItem(
+      ONBOARDING_HOME_HINT_KEY,
+      JSON.stringify({
+        localCatId: profile.id,
+        catName: profile.name,
+        completedAt: now,
+      }),
+    );
     router.push("/home");
   }
 
@@ -205,7 +214,7 @@ export function DiagnosisOnboardingFlow() {
               {getResultStageLabel(visibleQuestionCount)}
             </p>
             <h1 style={styles.title}>
-              {displayCatName}のこと、少し見えてきました
+              {getResultTitle(displayCatName, visibleQuestionCount)}
             </h1>
 
             <div style={styles.resultSummary}>
@@ -215,9 +224,7 @@ export function DiagnosisOnboardingFlow() {
                 {tendencyTexts[result.type.typeKey]}かもしれません。
               </p>
               <p style={styles.resultText}>
-                {visibleQuestionCount <= PREVIEW_QUESTION_COUNT
-                  ? "まだ最初の手がかりなので、これからの記録や回答で少しずつ変わります。"
-                  : "答えてくれた分だけ、この子の傾向が少しずつ見えやすくなっています。"}
+                {getResultBodyText(visibleQuestionCount)}
               </p>
               <p style={styles.typeHint}>
                 今のところ、{result.type.typeLabel}寄りかもしれません
@@ -378,6 +385,26 @@ function getResultStageLabel(questionCount: number) {
   }
 
   return "だんだん傾向が見えてきました";
+}
+
+function getResultTitle(catName: string, questionCount: number) {
+  if (questionCount >= ONBOARDING_QUESTION_LIMIT) {
+    return `${catName}の傾向が、だんだん見えてきました`;
+  }
+
+  return `${catName}のこと、少し見えてきました`;
+}
+
+function getResultBodyText(questionCount: number) {
+  if (questionCount <= PREVIEW_QUESTION_COUNT) {
+    return "まだ最初の手がかりなので、これからの記録や回答で少しずつ変わります。";
+  }
+
+  if (questionCount >= ONBOARDING_QUESTION_LIMIT) {
+    return "ここまで答えると、見え方が少し深まりました。これからの記録でも、少しずつ変わっていきます。";
+  }
+
+  return "答えてくれた分だけ、この子の傾向が少しずつ見えやすくなっています。";
 }
 
 const styles = {

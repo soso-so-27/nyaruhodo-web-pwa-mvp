@@ -56,7 +56,10 @@ const feedbackSaveErrorMessage =
   "\u884c\u52d5\u306e\u8a18\u9332\u306b\u5931\u6557\u3057\u307e\u3057\u305f\u3002\n\u5c11\u3057\u6642\u9593\u3092\u304a\u3044\u3066\u3001\u3082\u3046\u4e00\u5ea6\u304a\u8a66\u3057\u304f\u3060\u3055\u3044\u3002";
 
 const currentStateSaveSuccessMessage =
-  "\u4eca\u65e5\u306e\u69d8\u5b50\u3092\u8a18\u9332\u3057\u307e\u3057\u305f\u3002";
+  "\u6b8b\u3057\u307e\u3057\u305f\u3002\n{catName}\u306e\u3053\u3068\u304c\u3001\u5c11\u3057\u305a\u3064\u898b\u3048\u3066\u304d\u307e\u3059\u3002";
+
+const ONBOARDING_HOME_HINT_KEY = "diagnosis_onboarding_home_hint";
+const ONBOARDING_HOME_HINT_MAX_AGE_MS = 10 * 60 * 1000;
 
 const dailyHintFeedbackMessages: Record<CurrentCatHintFeedback, string> = {
   accepted:
@@ -82,6 +85,7 @@ export function HomeInput({
   const [catNameMessage, setCatNameMessage] = useState("");
   const [hypothesisMessage, setHypothesisMessage] = useState("");
   const [currentStateMessage, setCurrentStateMessage] = useState("");
+  const [onboardingHomeMessage, setOnboardingHomeMessage] = useState("");
   const [saveErrorMessage, setSaveErrorMessage] = useState("");
   const [saveErrorSection, setSaveErrorSection] = useState<
     "current" | "concern" | ""
@@ -148,6 +152,7 @@ export function HomeInput({
     setCatNameInput(getCatName(activeProfile));
     setHintSuppressions(readCurrentCatHintSuppressions());
     saveActiveCatId(activeProfile.id);
+    setOnboardingHomeMessage(readOnboardingHomeMessage(activeProfile.id));
 
     const latestHypothesis = readLatestHypothesis();
 
@@ -224,6 +229,7 @@ export function HomeInput({
     setVisibleLatestHypothesis(null);
     setHypothesisMessage("");
     setCurrentStateMessage("");
+    setOnboardingHomeMessage("");
     setSaveErrorMessage("");
     setIsDailyHintDismissed(false);
     setHintSuppressions(readCurrentCatHintSuppressions());
@@ -266,6 +272,7 @@ export function HomeInput({
   async function handleCurrentSelect(label: string, signal: string) {
     dismissLatestHypothesis();
     setCurrentStateMessage("");
+    setOnboardingHomeMessage("");
     const event = await insertEvent({
       event_type: "current_state",
       signal,
@@ -283,7 +290,9 @@ export function HomeInput({
 
     setSaveErrorSection("");
     setSaveErrorMessage("");
-    setCurrentStateMessage(currentStateSaveSuccessMessage);
+    setCurrentStateMessage(
+      currentStateSaveSuccessMessage.replace("{catName}", catName),
+    );
     setIsDailyHintDismissed(false);
     router.refresh();
   }
@@ -291,6 +300,7 @@ export function HomeInput({
   async function handleConcernSelect(label: string, input: string) {
     dismissLatestHypothesis();
     setCurrentStateMessage("");
+    setOnboardingHomeMessage("");
     const event = await insertEvent({
       event_type: "concern",
       signal: input,
@@ -408,6 +418,7 @@ export function HomeInput({
     setVisibleLatestHypothesis(null);
     setHypothesisMessage("");
     setCurrentStateMessage("");
+    setOnboardingHomeMessage("");
     setSaveErrorSection("");
     setSaveErrorMessage("");
   }
@@ -420,6 +431,7 @@ export function HomeInput({
           activeCatId={activeCatId}
           catName={catName}
           catProfiles={catProfiles}
+          onboardingHomeMessage={onboardingHomeMessage}
           understandingPercent={understandingPercent}
           understandingMessage={understandingMessage}
           onCatSelect={handleCatSelect}
@@ -495,10 +507,46 @@ export function HomeInput({
   );
 }
 
+function readOnboardingHomeMessage(activeCatId: string) {
+  const value = window.localStorage.getItem(ONBOARDING_HOME_HINT_KEY);
+
+  if (!value) {
+    return "";
+  }
+
+  window.localStorage.removeItem(ONBOARDING_HOME_HINT_KEY);
+
+  try {
+    const parsed = JSON.parse(value) as {
+      localCatId?: string;
+      catName?: string;
+      completedAt?: string;
+    };
+    const completedAtTime = parsed.completedAt
+      ? new Date(parsed.completedAt).getTime()
+      : Number.NaN;
+
+    if (
+      parsed.localCatId !== activeCatId ||
+      Number.isNaN(completedAtTime) ||
+      Date.now() - completedAtTime > ONBOARDING_HOME_HINT_MAX_AGE_MS
+    ) {
+      return "";
+    }
+
+    const catName = parsed.catName || "\u3053\u306e\u5b50";
+
+    return `\u3055\u3063\u304d\u306e\u56de\u7b54\u304b\u3089\u3001${catName}\u306e\u3053\u3068\u304c\u5c11\u3057\u898b\u3048\u3066\u304d\u307e\u3057\u305f\u3002\n\u307e\u305a\u306f\u3001\u4eca\u65e5\u306e\u69d8\u5b50\u3092\u3072\u3068\u3064\u6b8b\u3057\u3066\u307f\u307e\u3057\u3087\u3046\u3002`;
+  } catch {
+    return "";
+  }
+}
+
 function Header({
   activeCatId,
   catName,
   catProfiles,
+  onboardingHomeMessage,
   understandingPercent,
   understandingMessage,
   onCatSelect,
@@ -506,6 +554,7 @@ function Header({
   activeCatId: string | null;
   catName: string;
   catProfiles: CatProfile[];
+  onboardingHomeMessage: string;
   understandingPercent: number;
   understandingMessage: string;
   onCatSelect: (catId: string) => void;
@@ -579,6 +628,14 @@ function Header({
         </div>
       </div>
       <div style={styles.headerGuide}>
+        {canSwitchCats ? (
+          <p style={styles.catSwitchHint}>
+            {"\u732b\u540d\u3092\u30bf\u30c3\u30d7\u3057\u3066\u5207\u308a\u66ff\u3048"}
+          </p>
+        ) : null}
+        {onboardingHomeMessage ? (
+          <p style={styles.onboardingHomeMessage}>{onboardingHomeMessage}</p>
+        ) : null}
         <p style={styles.headerGuideTitle}>
           {"今日は、見たままをひとつ残せばOKです。"}
         </p>
@@ -588,7 +645,7 @@ function Header({
       </div>
       {isCatSwitcherOpen ? (
         <div style={styles.homeCatSwitcher}>
-          <p style={styles.catChipLabel}>{"他の子を見る"}</p>
+          <p style={styles.catChipLabel}>{"\u898b\u308b\u732b\u3092\u9078\u3076"}</p>
           <div style={styles.catChips}>
             {catProfiles.map((profile) => (
               <button
@@ -1132,6 +1189,21 @@ const styles = {
     borderRadius: "18px",
     background: "rgba(255, 255, 255, 0.52)",
     padding: "10px 12px",
+  },
+  catSwitchHint: {
+    margin: "0 0 6px",
+    color: "#8a8178",
+    fontSize: "11px",
+    fontWeight: 600,
+    lineHeight: 1.45,
+  },
+  onboardingHomeMessage: {
+    margin: "0 0 8px",
+    color: "#52525b",
+    fontSize: "13px",
+    fontWeight: 600,
+    lineHeight: 1.65,
+    whiteSpace: "pre-line",
   },
   headerGuideTitle: {
     margin: "0 0 2px",
