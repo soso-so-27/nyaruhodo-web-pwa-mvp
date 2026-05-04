@@ -26,7 +26,6 @@ import {
   clearLatestHypothesis,
   getActiveCatProfile,
   getCatName,
-  getGuidanceByUnderstanding,
   getHypothesisCompletionMessage,
   isCurrentCatHintSuppressed,
   parseStoredContext,
@@ -109,7 +108,6 @@ export function HomeInput({
     profileUnderstandingPercent,
   );
   const understandingMessage = getUnderstandingMessage(understandingPercent);
-  const guidance = getGuidanceByUnderstanding(understandingPercent);
   const hypothesisCta = visibleLatestHypothesis
     ? HYPOTHESIS_CTA_LABELS[visibleLatestHypothesis.category] ??
       FALLBACK_HYPOTHESIS_CTA_LABELS
@@ -428,6 +426,7 @@ export function HomeInput({
         />
         </div>
 
+        {visibleLatestHypothesis || shouldShowDailyHint || hypothesisMessage ? (
         <section style={styles.insightCard}>
           {visibleLatestHypothesis ? (
             <LatestHypothesisCard
@@ -445,22 +444,21 @@ export function HomeInput({
                 dismissLatestHypothesis();
               }}
             />
-          ) : (
+          ) : shouldShowDailyHint ? (
             <GuidanceBlock
-              guidance={guidance}
-              showDailyHint={shouldShowDailyHint}
               catName={catName}
               dailyHintHypothesis={dailyHintHypothesis}
               onDailyHintMainAction={handleDailyHintMainAction}
               onDailyHintSubAction={handleDailyHintSubAction}
               onDailyHintTertiaryAction={handleDailyHintTertiaryAction}
             />
-          )}
+          ) : null}
 
           {hypothesisMessage ? (
             <p style={styles.hypothesisMessage}>{hypothesisMessage}</p>
           ) : null}
         </section>
+        ) : null}
 
         <div id="record" style={styles.actionArea}>
           <OptionSection
@@ -558,7 +556,15 @@ function Header({
         </div>
       </div>
       <div style={styles.homeCatSwitcher}>
-        <p style={styles.catChipLabel}>{"見る猫"}</p>
+        <div style={styles.headerGuide}>
+          <p style={styles.headerGuideTitle}>
+            {"今日は、見たままをひとつ残せばOKです。"}
+          </p>
+          <p style={styles.headerGuideText}>
+            {"気になるときだけ、下から選んでください。"}
+          </p>
+        </div>
+        <p style={styles.catChipLabel}>{"他の子を見る"}</p>
         <div style={styles.catChips}>
           {catProfiles.map((profile) => (
             <button
@@ -784,64 +790,51 @@ function LatestHypothesisCard({
 }
 
 function GuidanceBlock({
-  guidance,
-  showDailyHint,
   catName,
   dailyHintHypothesis,
   onDailyHintMainAction,
   onDailyHintSubAction,
   onDailyHintTertiaryAction,
 }: {
-  guidance: { title: string; text: string };
-  showDailyHint: boolean;
   catName: string;
   dailyHintHypothesis: DailyHintHypothesis;
   onDailyHintMainAction: () => void;
   onDailyHintSubAction: () => void;
   onDailyHintTertiaryAction: () => void;
 }) {
-  if (showDailyHint) {
-    return (
-      <div style={styles.guidance}>
-        <p style={styles.predictionReason}>
-          {`\u3044\u307e\u306e${catName}`}
-        </p>
-        <p style={styles.guidanceTitle}>{dailyHintHypothesis.text}</p>
-        <p style={styles.guidanceText}>{dailyHintHypothesis.body}</p>
-        <div style={styles.predictionActions}>
-          <button
-            type="button"
-            onClick={onDailyHintMainAction}
-            style={{
-              ...styles.hypothesisMainButton,
-              ...styles.dailyHintPrimaryButton,
-            }}
-          >
-            {dailyHintHypothesis.cta.main}
-          </button>
-          <button
-            type="button"
-            onClick={onDailyHintSubAction}
-            style={styles.hypothesisSubButton}
-          >
-            {dailyHintHypothesis.cta.sub}
-          </button>
-          <button
-            type="button"
-            onClick={onDailyHintTertiaryAction}
-            style={styles.hypothesisSubButton}
-          >
-            {dailyHintHypothesis.cta.tertiary}
-          </button>
-        </div>
-      </div>
-    );
-  }
-
   return (
     <div style={styles.guidance}>
-      <p style={styles.guidanceTitle}>{guidance.title}</p>
-      <p style={styles.guidanceText}>{guidance.text}</p>
+      <p style={styles.predictionReason}>
+        {`\u3044\u307e\u306e${catName}`}
+      </p>
+      <p style={styles.guidanceTitle}>{dailyHintHypothesis.text}</p>
+      <p style={styles.guidanceText}>{dailyHintHypothesis.body}</p>
+      <div style={styles.predictionActions}>
+        <button
+          type="button"
+          onClick={onDailyHintMainAction}
+          style={{
+            ...styles.hypothesisMainButton,
+            ...styles.dailyHintPrimaryButton,
+          }}
+        >
+          {dailyHintHypothesis.cta.main}
+        </button>
+        <button
+          type="button"
+          onClick={onDailyHintSubAction}
+          style={styles.hypothesisSubButton}
+        >
+          {dailyHintHypothesis.cta.sub}
+        </button>
+        <button
+          type="button"
+          onClick={onDailyHintTertiaryAction}
+          style={styles.hypothesisSubButton}
+        >
+          {dailyHintHypothesis.cta.tertiary}
+        </button>
+      </div>
     </div>
   );
 }
@@ -1081,15 +1074,36 @@ const styles = {
     marginTop: "8px",
   },
   homeCatSwitcher: {
-    marginTop: "14px",
+    marginTop: "12px",
     borderTop: "1px solid rgba(234, 219, 202, 0.8)",
     paddingTop: "12px",
+  },
+  headerGuide: {
+    marginBottom: "12px",
+    border: "1px solid rgba(234, 219, 202, 0.65)",
+    borderRadius: "18px",
+    background: "rgba(255, 255, 255, 0.52)",
+    padding: "10px 12px",
+  },
+  headerGuideTitle: {
+    margin: "0 0 2px",
+    color: "#3f3f46",
+    fontSize: "13px",
+    fontWeight: 700,
+    lineHeight: 1.45,
+  },
+  headerGuideText: {
+    margin: 0,
+    color: "#71717a",
+    fontSize: "12px",
+    fontWeight: 500,
+    lineHeight: 1.5,
   },
   catChipLabel: {
     margin: 0,
     color: "#8a8178",
     fontSize: "11px",
-    fontWeight: 700,
+    fontWeight: 600,
     letterSpacing: 0,
   },
   catChipButton: {

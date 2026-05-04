@@ -7,7 +7,7 @@ type BottomNavigationProps = {
 };
 
 type NavItem = {
-  key: "today" | "record" | "cats";
+  key: "today" | "cats";
   href: string;
   label: string;
   icon: ReactNode;
@@ -20,12 +20,6 @@ export function BottomNavigation({ active }: BottomNavigationProps) {
       href: "/home",
       label: "今日",
       icon: <HomeIcon />,
-    },
-    {
-      key: "record",
-      href: "/home#record",
-      label: "きろく",
-      icon: <RecordIcon />,
     },
     {
       key: "cats",
@@ -83,29 +77,6 @@ function HomeIcon() {
   );
 }
 
-function RecordIcon() {
-  return (
-    <svg viewBox="0 0 24 24" style={styles.svgIcon}>
-      <path
-        d="M8 5.8h8.2a2 2 0 0 1 2 2v10.4a2 2 0 0 1-2 2H7.8a2 2 0 0 1-2-2V7.8a2 2 0 0 1 2-2H8Z"
-        fill="none"
-        stroke="currentColor"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-        strokeWidth="1.9"
-      />
-      <path
-        d="M9 4.2h6M9 11h6M9 15h4"
-        fill="none"
-        stroke="currentColor"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-        strokeWidth="1.9"
-      />
-    </svg>
-  );
-}
-
 function CatIcon() {
   return (
     <svg viewBox="0 0 24 24" style={styles.svgIcon}>
@@ -136,9 +107,9 @@ const styles = {
     bottom: "calc(18px + env(safe-area-inset-bottom))",
     zIndex: 20,
     display: "grid",
-    gridTemplateColumns: "repeat(3, 1fr)",
-    gap: "7px",
-    width: "min(calc(100% - 28px), 402px)",
+    gridTemplateColumns: "repeat(2, 1fr)",
+    gap: "8px",
+    width: "min(calc(100% - 96px), 280px)",
     transform: "translateX(-50%)",
     border: "1px solid rgba(212, 212, 216, 0.9)",
     borderRadius: "26px",
