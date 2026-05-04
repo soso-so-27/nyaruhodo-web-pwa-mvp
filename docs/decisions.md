@@ -780,3 +780,17 @@ MVP v1 では `/diagnosis-onboarding` を追加し、名前入力と Q1〜Q3 の
 - 常時チップ一覧を出すと今日の猫カードの縦幅が増え、入力エリアまでの距離が伸びる
 - 猫追加・名前変更は管理操作なので `/cats` に置き、ホームには戻さない
 - ホームは `今日の{猫名}` から、提案と記録に自然につながる画面として扱う
+
+## 2026-05-04
+
+# 設計判断：iOS safe area もアプリ背景と一体化する
+
+## 判断
+
+`viewport-fit=cover` を設定し、`html` / `body` / PWA manifest のベース背景色をアプリ背景の `#f7f3ee` に統一する。`body` には `env(safe-area-inset-top)` の top padding を持たせ、iPhone の status bar 領域だけ白く残らないようにする。
+
+## 理由
+
+- iPhone 表示で status bar / safe area だけ白く見えると、Webページ感が強くなる
+- 画面本体と上端背景を一体化し、PWAらしい見え方に寄せる
+- カード配置や保存仕様には触れず、最上位背景だけを揃える
