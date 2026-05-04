@@ -131,22 +131,22 @@ export function CatsPage() {
         </header>
 
         <section style={styles.card}>
-          <p style={styles.sectionLabel}>{"いま見ている子"}</p>
-          <h2 style={styles.activeCatName}>{catName}</h2>
-          <p style={styles.description}>
-            {"今日の記録や見立ては、この子にたまります。"}
-          </p>
-          {typeof understandingPercent === "number" ? (
-            <p style={styles.understandingPill}>
-              {"理解度 "}
-              {understandingPercent}
-              {"%"}
-            </p>
-          ) : null}
-        </section>
-
-        <section style={styles.card}>
           <h2 style={styles.sectionTitle}>{"一緒に暮らしている子"}</h2>
+          <div style={styles.profileSummary}>
+            <p style={styles.sectionLabel}>{"いま見ている子"}</p>
+            <h3 style={styles.activeCatName}>{catName}</h3>
+            <p style={styles.description}>
+              {"今日の記録や見立ては、この子にたまります。"}
+            </p>
+            {typeof understandingPercent === "number" ? (
+              <p style={styles.understandingPill}>
+                {"理解度 "}
+                {understandingPercent}
+                {"%"}
+              </p>
+            ) : null}
+          </div>
+
           <div style={styles.catList}>
             {catProfiles.map((profile) => (
               <button
@@ -163,22 +163,25 @@ export function CatsPage() {
               </button>
             ))}
           </div>
-        </section>
 
-        <section style={styles.card}>
-          <h2 style={styles.sectionTitle}>{"猫を追加"}</h2>
-          <p style={styles.description}>
-            {"一緒に暮らしている猫を追加できます。"}
-          </p>
-          {!isAddingCat ? (
+          <div style={styles.managementActions}>
             <button
               type="button"
               onClick={startAddingCat}
-              style={styles.primaryButton}
+              style={styles.outlineActionButton}
             >
               {"猫を追加"}
             </button>
-          ) : (
+            <button
+              type="button"
+              onClick={startEditingCatName}
+              style={styles.outlineActionButton}
+            >
+              {"名前を変える"}
+            </button>
+          </div>
+
+          {isAddingCat ? (
             <div style={styles.editor}>
               <label style={styles.label} htmlFor="new-cat-name">
                 {"この子の名前"}
@@ -208,23 +211,9 @@ export function CatsPage() {
                 </button>
               </div>
             </div>
-          )}
-        </section>
+          ) : null}
 
-        <section style={styles.card}>
-          <h2 style={styles.sectionTitle}>{"名前を変える"}</h2>
-          <p style={styles.description}>
-            {"いま見ている子の呼び名を変えられます。"}
-          </p>
-          {!isEditingCatName ? (
-            <button
-              type="button"
-              onClick={startEditingCatName}
-              style={styles.secondaryButton}
-            >
-              {"名前を変える"}
-            </button>
-          ) : (
+          {isEditingCatName ? (
             <div style={styles.editor}>
               <label style={styles.label} htmlFor="cat-name">
                 {"この子の名前"}
@@ -254,7 +243,7 @@ export function CatsPage() {
                 </button>
               </div>
             </div>
-          )}
+          ) : null}
           {message ? <p style={styles.message}>{message}</p> : null}
         </section>
       </div>
@@ -281,7 +270,7 @@ const styles = {
     border: "1px solid #ebe2d6",
     borderRadius: "24px",
     background: "linear-gradient(180deg, #fffdf9 0%, #fff7ec 100%)",
-    padding: "18px 16px 16px",
+    padding: "16px",
   },
   eyebrow: {
     margin: "0 0 4px",
@@ -309,6 +298,11 @@ const styles = {
     borderRadius: "22px",
     background: "#ffffff",
     padding: "17px 16px",
+  },
+  profileSummary: {
+    marginBottom: "14px",
+    borderBottom: "1px solid #f0e6dc",
+    paddingBottom: "14px",
   },
   sectionLabel: {
     margin: "0 0 5px",
@@ -353,6 +347,12 @@ const styles = {
     flexWrap: "wrap",
     gap: "8px",
   },
+  managementActions: {
+    display: "grid",
+    gridTemplateColumns: "repeat(2, minmax(0, 1fr))",
+    gap: "10px",
+    marginTop: "14px",
+  },
   catButton: {
     minHeight: "38px",
     padding: "0 14px",
@@ -392,6 +392,17 @@ const styles = {
   secondaryButton: {
     minHeight: "44px",
     width: "100%",
+    border: "1px solid #d4d4d8",
+    borderRadius: "14px",
+    background: "#ffffff",
+    color: "#27272a",
+    fontSize: "14px",
+    fontWeight: 700,
+    letterSpacing: 0,
+    cursor: "pointer",
+  },
+  outlineActionButton: {
+    minHeight: "42px",
     border: "1px solid #d4d4d8",
     borderRadius: "14px",
     background: "#ffffff",
