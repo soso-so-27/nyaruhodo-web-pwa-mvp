@@ -1,4 +1,11 @@
 import type { RecentEvent } from "../../lib/supabase/queries";
+import type {
+  CategoryScores,
+  OnboardingAnswers,
+  TypeKey,
+  TypeLabel,
+  UnderstandingSourceBreakdown,
+} from "../../lib/diagnosisOnboarding/types";
 
 export type LatestHypothesisView = {
   input: string;
@@ -15,6 +22,22 @@ export type CatProfile = {
   name: string;
   createdAt: string;
   updatedAt: string;
+  typeKey?: TypeKey;
+  typeLabel?: TypeLabel;
+  typeScores?: CategoryScores;
+  modifiers?: string[];
+  onboarding?: {
+    version: "diagnosis-v1";
+    answeredCount: number;
+    skippedCount: number;
+    answers: OnboardingAnswers;
+    completedAt: string;
+    updatedAt: string;
+  };
+  understanding?: {
+    percent: number;
+    sourceBreakdown: UnderstandingSourceBreakdown;
+  };
 };
 
 type ConcernSignal =
@@ -630,6 +653,14 @@ function readStoredCatProfiles() {
         createdAt: profile.createdAt ?? new Date().toISOString(),
         updatedAt:
           profile.updatedAt ?? profile.createdAt ?? new Date().toISOString(),
+        typeKey: profile.typeKey,
+        typeLabel: profile.typeLabel,
+        typeScores: profile.typeScores,
+        modifiers: Array.isArray(profile.modifiers)
+          ? profile.modifiers
+          : undefined,
+        onboarding: profile.onboarding,
+        understanding: profile.understanding,
       }));
   } catch {
     return [];
