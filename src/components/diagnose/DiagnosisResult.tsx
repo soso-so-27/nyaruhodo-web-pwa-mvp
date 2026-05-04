@@ -121,7 +121,10 @@ export function DiagnosisResult({
     );
   }, [currentCategory, diagnosisId, localCatId]);
 
-  async function handleAction(feedback: "resolved" | "unresolved") {
+  async function handleAction(
+    feedback: "resolved" | "unresolved",
+    label: string,
+  ) {
     if (!currentCategory) {
       setFeedbackMessage(feedbackSaveErrorMessage);
       return;
@@ -141,6 +144,12 @@ export function DiagnosisResult({
     }
 
     clearLatestHypothesis();
+    savePostDiagnosisFeedback({
+      localCatId,
+      result: feedback,
+      category: currentCategory,
+      label,
+    });
     setFeedbackMessage("");
     router.push("/home");
   }
@@ -173,7 +182,7 @@ export function DiagnosisResult({
             <button
               type="button"
               onClick={() => {
-                void handleAction("resolved");
+                void handleAction("resolved", labels.resolved);
               }}
               style={styles.ctaButton}
             >
@@ -187,7 +196,7 @@ export function DiagnosisResult({
                   return;
                 }
 
-                void handleAction("unresolved");
+                void handleAction("unresolved", labels.unresolved);
               }}
               style={styles.feedbackButton}
             >
@@ -274,6 +283,29 @@ function getOutcomeLabels(
 
 function clearLatestHypothesis() {
   window.localStorage.removeItem("latest_hypothesis");
+}
+
+function savePostDiagnosisFeedback({
+  localCatId,
+  result,
+  category,
+  label,
+}: {
+  localCatId?: string | null;
+  result: "resolved" | "unresolved";
+  category: CauseCategory;
+  label: string;
+}) {
+  window.localStorage.setItem(
+    "post_diagnosis_feedback",
+    JSON.stringify({
+      localCatId: localCatId ?? null,
+      result,
+      category,
+      label,
+      createdAt: new Date().toISOString(),
+    }),
+  );
 }
 
 function readCatName(localCatId?: string | null) {

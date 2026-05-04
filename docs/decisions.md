@@ -6,6 +6,33 @@ Any change to the agreed specification must be recorded here.
 
 ## 2026-05-04
 
+# 設計判断：診断結果の反応後はホームで一度だけ受け止める
+
+## 判断
+
+診断結果の結果ボタンで `feedbacks` 保存に成功した場合、`post_diagnosis_feedback` を localStorage に一時保存してから `/home` へ戻す。
+
+ホームでは active cat と一致する場合だけ一度表示し、表示後に `post_diagnosis_feedback` を削除する。
+
+## 理由
+
+結果ボタン押下後に通常ホームだけへ戻ると、押した結果がどう扱われたか分かりにくい。
+
+ホームは日常に戻る場所なので、長い確認画面は挟まず、短いフォロー文で「記録されたこと」と「次にできること」を伝える。
+
+## 現時点の扱い
+
+- `resolved`: 落ち着いたことを記録した旨を表示する
+- `meowing` の `resolved`: 鳴きやんだことを記録した旨を表示する
+- `unresolved`: まだ気になることを記録した旨を表示する
+- `meowing` の `unresolved`: まだ鳴いていることを記録した旨を表示する
+- `health` の `unresolved`: 無理に判断せず相談も考える文言にする
+- 結果ボタン押下後は `latest_hypothesis` を削除する
+- DB変更なし
+- RLS変更なし
+
+## 2026-05-04
+
 # 設計判断：診断結果画面は試した結果を受け取る画面にする
 
 ## 判断

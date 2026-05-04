@@ -60,6 +60,7 @@ const currentStateSaveSuccessMessage =
 
 const ONBOARDING_HOME_HINT_KEY = "diagnosis_onboarding_home_hint";
 const ONBOARDING_HOME_HINT_MAX_AGE_MS = 10 * 60 * 1000;
+const POST_DIAGNOSIS_FEEDBACK_KEY = "post_diagnosis_feedback";
 
 const dailyHintFeedbackMessages: Record<CurrentCatHintFeedback, string> = {
   accepted:
@@ -127,6 +128,8 @@ export function HomeInput({
   const [hypothesisMessage, setHypothesisMessage] = useState("");
   const [currentStateMessage, setCurrentStateMessage] = useState("");
   const [onboardingHomeMessage, setOnboardingHomeMessage] = useState("");
+  const [postDiagnosisFeedbackMessage, setPostDiagnosisFeedbackMessage] =
+    useState("");
   const [saveErrorMessage, setSaveErrorMessage] = useState("");
   const [saveErrorSection, setSaveErrorSection] = useState<
     "current" | "concern" | ""
@@ -195,6 +198,9 @@ export function HomeInput({
     setHintSuppressions(readCurrentCatHintSuppressions());
     saveActiveCatId(activeProfile.id);
     setOnboardingHomeMessage(readOnboardingHomeMessage(activeProfile.id));
+    setPostDiagnosisFeedbackMessage(
+      readPostDiagnosisFeedbackMessage(activeProfile.id, getCatName(activeProfile)),
+    );
 
     const latestHypothesis = readLatestHypothesis();
 
@@ -264,14 +270,19 @@ export function HomeInput({
   }
 
   function handleCatSelect(catId: string) {
+    const selectedProfile = getActiveCatProfile(catProfiles, catId);
+
     saveActiveCatId(catId);
     setActiveCatId(catId);
-    setCatNameInput(getCatName(getActiveCatProfile(catProfiles, catId)));
+    setCatNameInput(getCatName(selectedProfile));
     clearLatestHypothesis();
     setVisibleLatestHypothesis(null);
     setHypothesisMessage("");
     setCurrentStateMessage("");
     setOnboardingHomeMessage("");
+    setPostDiagnosisFeedbackMessage(
+      readPostDiagnosisFeedbackMessage(catId, getCatName(selectedProfile)),
+    );
     setSaveErrorMessage("");
     setIsDailyHintDismissed(false);
     setHintSuppressions(readCurrentCatHintSuppressions());
@@ -315,6 +326,7 @@ export function HomeInput({
     dismissLatestHypothesis();
     setCurrentStateMessage("");
     setOnboardingHomeMessage("");
+    setPostDiagnosisFeedbackMessage("");
     const event = await insertEvent({
       event_type: "current_state",
       signal,
@@ -343,6 +355,7 @@ export function HomeInput({
     dismissLatestHypothesis();
     setCurrentStateMessage("");
     setOnboardingHomeMessage("");
+    setPostDiagnosisFeedbackMessage("");
     const event = await insertEvent({
       event_type: "concern",
       signal: input,
@@ -472,6 +485,7 @@ export function HomeInput({
     setHypothesisMessage("");
     setCurrentStateMessage("");
     setOnboardingHomeMessage("");
+    setPostDiagnosisFeedbackMessage("");
     setSaveErrorSection("");
     setSaveErrorMessage("");
   }
@@ -485,6 +499,7 @@ export function HomeInput({
           catName={catName}
           catProfiles={catProfiles}
           onboardingHomeMessage={onboardingHomeMessage}
+          postDiagnosisFeedbackMessage={postDiagnosisFeedbackMessage}
           returnMotivation={returnMotivation}
           understandingPercent={understandingPercent}
           understandingMessage={understandingMessage}
@@ -596,11 +611,56 @@ function readOnboardingHomeMessage(activeCatId: string) {
   }
 }
 
+function readPostDiagnosisFeedbackMessage(activeCatId: string, catName: string) {
+  const value = window.localStorage.getItem(POST_DIAGNOSIS_FEEDBACK_KEY);
+
+  if (!value) {
+    return "";
+  }
+
+  try {
+    const parsed = JSON.parse(value) as {
+      localCatId?: string | null;
+      result?: "resolved" | "unresolved";
+      category?: string;
+      label?: string;
+    };
+
+    if (parsed.localCatId !== activeCatId) {
+      return "";
+    }
+
+    window.localStorage.removeItem(POST_DIAGNOSIS_FEEDBACK_KEY);
+
+    if (parsed.result === "resolved") {
+      if (parsed.label === "鳴きやんだ") {
+        return "鳴きやんだことを記録しました。\nまた気づいたら、見たままをひとつ残せばOKです。";
+      }
+
+      return `${catName}の様子が${parsed.label ?? "落ち着いた"}ことを記録しました。\nまた気づいたら、見たままをひとつ残せばOKです。`;
+    }
+
+    if (parsed.label === "まだ鳴いてる") {
+      return "まだ鳴いていることを記録しました。\nもう一度、近い様子を選んでみても大丈夫です。";
+    }
+
+    if (parsed.category === "health") {
+      return "まだ気になることを記録しました。\n様子が続くときは、無理に判断せず相談も考えてください。";
+    }
+
+    return "まだ気になることを記録しました。\nもう一度、近い様子を選んでみても大丈夫です。";
+  } catch {
+    window.localStorage.removeItem(POST_DIAGNOSIS_FEEDBACK_KEY);
+    return "";
+  }
+}
+
 function Header({
   activeCatId,
   catName,
   catProfiles,
   onboardingHomeMessage,
+  postDiagnosisFeedbackMessage,
   returnMotivation,
   understandingPercent,
   understandingMessage,
@@ -610,6 +670,7 @@ function Header({
   catName: string;
   catProfiles: CatProfile[];
   onboardingHomeMessage: string;
+  postDiagnosisFeedbackMessage: string;
   returnMotivation: { title: string; text: string };
   understandingPercent: number;
   understandingMessage: string;
@@ -691,6 +752,11 @@ function Header({
         ) : null}
         {onboardingHomeMessage ? (
           <p style={styles.onboardingHomeMessage}>{onboardingHomeMessage}</p>
+        ) : null}
+        {postDiagnosisFeedbackMessage ? (
+          <p style={styles.onboardingHomeMessage}>
+            {postDiagnosisFeedbackMessage}
+          </p>
         ) : null}
         <p style={styles.headerGuideTitle}>
           {returnMotivation.title}
