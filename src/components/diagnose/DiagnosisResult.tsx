@@ -91,9 +91,14 @@ export function DiagnosisResult({
   const displayHypothesisText = catName
     ? `${catName}\u3001${mainHypothesisText}`
     : mainHypothesisText;
+  const proposalContent = getProposalContent(
+    currentCategory,
+    displayHypothesisText,
+  );
   const secondaryHypothesisText = nextCategory
     ? getSecondaryHypothesisMessage(nextCategory)
     : "";
+  const reasonText = formatReasonText(reasons);
 
   useEffect(() => {
     setCatName(readCatName(localCatId));
@@ -159,7 +164,6 @@ export function DiagnosisResult({
       <div style={styles.container}>
         <header style={styles.header}>
           <div>
-            <p style={styles.headerEyebrow}>{"\u8a3a\u65ad\u7d50\u679c"}</p>
             <h1 style={styles.title}>{"\u3055\u3063\u304d\u306e\u69d8\u5b50\u304b\u3089"}</h1>
             <p style={styles.lead}>{"\u6c7a\u3081\u3064\u3051\u305a\u306b\u3001\u307e\u305a\u3067\u304d\u308b\u3053\u3068\u3092\u898b\u3066\u307f\u307e\u3057\u3087\u3046"}</p>
           </div>
@@ -173,11 +177,10 @@ export function DiagnosisResult({
         </header>
 
         <section style={styles.actionCard}>
-          <p style={styles.cardTitle}>{"\u3067\u304d\u305d\u3046\u306a\u3053\u3068"}</p>
-          <p style={styles.actionIntro}>
-            {getActionIntro(currentCategory)}
-          </p>
-          <p style={styles.resultPrompt}>試したあと、教えてください。</p>
+          <p style={styles.proposalTitle}>{proposalContent.title}</p>
+          <p style={styles.proposalHypothesis}>{proposalContent.hypothesis}</p>
+          <p style={styles.actionIntro}>{proposalContent.body}</p>
+          <p style={styles.resultPrompt}>試したあと、近い方を選んでください。</p>
           <div style={styles.feedbackGroup}>
             <button
               type="button"
@@ -205,20 +208,9 @@ export function DiagnosisResult({
           </div>
         </section>
 
-        <section style={styles.hypothesisCard}>
-          <p style={styles.cardLabel}>{"\u3044\u307e\u898b\u3048\u308b\u3053\u3068"}</p>
-          <p style={styles.hypothesisText}>{displayHypothesisText}</p>
-        </section>
-
         <section style={styles.reasonCard}>
           <p style={styles.cardTitle}>{"\u305d\u3046\u898b\u305f\u7406\u7531"}</p>
-          <ul style={styles.reasonList}>
-            {reasons.map((reason) => (
-              <li key={reason} style={styles.reasonItem}>
-                {reason}
-              </li>
-            ))}
-          </ul>
+          <p style={styles.reasonText}>{reasonText}</p>
         </section>
 
         {secondaryHypothesisText ? (
@@ -249,22 +241,53 @@ export function DiagnosisResult({
 }
 
 function getActionIntro(category: CauseCategory | undefined) {
-  const actionIntros: Record<CauseCategory, string> = {
+  const actionIntros: Record<CauseCategory, { title: string; body: string }> = {
     food:
-      "ごはんやお水を確認してみませんか？\n確認したあと、少し様子を見てみましょう。",
+      {
+        title: "ごはんやお水を確認してみませんか？",
+        body: "確認したあと、少し様子を見てみましょう。",
+      },
     play:
-      "3分だけ遊んでみませんか？\n少し遊んだあと、様子を見てみましょう。",
+      {
+        title: "3分だけ遊んでみませんか？",
+        body: "少し遊んだあと、様子を見てみましょう。",
+      },
     social:
-      "声をかけたり、近くにいてあげませんか？\n少し関わったあと、様子を見てみましょう。",
+      {
+        title: "声をかけたり、近くにいてあげませんか？",
+        body: "少し関わったあと、様子を見てみましょう。",
+      },
     stress:
-      "静かな場所をつくってみませんか？\n少し落ち着ける時間をつくって、様子を見てみましょう。",
+      {
+        title: "静かな場所をつくってみませんか？",
+        body: "少し落ち着ける時間をつくって、様子を見てみましょう。",
+      },
     health:
-      "いつもの様子と比べて、少し見てあげませんか？\n気になる様子が続くときは、早めに相談してください。",
+      {
+        title: "いつもの様子と比べて、少し見てあげませんか？",
+        body: "気になる様子が続くときは、早めに相談してください。",
+      },
   };
 
-  return category
-    ? actionIntros[category]
-    : "少し様子を見てみませんか？\n気になることが続くときは、もう一度近い様子を選んでみてください。";
+  return (
+    category ? actionIntros[category] : undefined
+  ) ?? {
+    title: "少し様子を見てみませんか？",
+    body: "気になることが続くときは、もう一度近い様子を選んでみてください。",
+  };
+}
+
+function getProposalContent(
+  category: CauseCategory | undefined,
+  hypothesis: string,
+) {
+  const action = getActionIntro(category);
+
+  return {
+    title: action.title,
+    hypothesis,
+    body: action.body,
+  };
 }
 
 function getOutcomeLabels(
@@ -273,7 +296,7 @@ function getOutcomeLabels(
 ) {
   if (input === "meowing") {
     return {
-      resolved: "鳴きやんだ",
+      resolved: "落ち着いた",
       unresolved: "まだ鳴いてる",
     };
   }
@@ -283,6 +306,13 @@ function getOutcomeLabels(
 
 function clearLatestHypothesis() {
   window.localStorage.removeItem("latest_hypothesis");
+}
+
+function formatReasonText(reasons: string[]) {
+  return reasons
+    .map((reason) => reason.trim().replace(/[。.]$/, ""))
+    .filter(Boolean)
+    .join("。");
 }
 
 function savePostDiagnosisFeedback({
@@ -449,7 +479,7 @@ const styles = {
     border: "1px solid #eadbca",
     borderRadius: "22px",
     background: "#fffdf9",
-    padding: "16px",
+    padding: "18px 16px",
   },
   cardTitle: {
     margin: "0 0 10px",
@@ -474,6 +504,12 @@ const styles = {
     fontSize: "14px",
     lineHeight: 1.7,
   },
+  reasonText: {
+    margin: 0,
+    color: "#52525b",
+    fontSize: "14px",
+    lineHeight: 1.75,
+  },
   feedbackGroup: {
     display: "grid",
     gridTemplateColumns: "1fr",
@@ -481,11 +517,26 @@ const styles = {
     marginTop: "0",
   },
   actionIntro: {
-    margin: "-2px 0 14px",
+    margin: "0 0 14px",
     color: "#71717a",
     fontSize: "14px",
     lineHeight: 1.7,
     whiteSpace: "pre-line",
+  },
+  proposalTitle: {
+    margin: "0 0 12px",
+    color: "#18181b",
+    fontSize: "21px",
+    fontWeight: 750,
+    lineHeight: 1.45,
+    letterSpacing: 0,
+  },
+  proposalHypothesis: {
+    margin: "0 0 6px",
+    color: "#3f3f46",
+    fontSize: "15px",
+    fontWeight: 600,
+    lineHeight: 1.65,
   },
   resultPrompt: {
     margin: "0 0 12px",
