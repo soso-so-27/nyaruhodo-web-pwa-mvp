@@ -82,6 +82,8 @@ export function DiagnosisResult({
   const router = useRouter();
   const [feedbackMessage, setFeedbackMessage] = useState("");
   const [catName, setCatName] = useState("");
+  const [isReasonOpen, setIsReasonOpen] = useState(false);
+  const [isSecondaryOpen, setIsSecondaryOpen] = useState(false);
   const currentCategory = categories[0];
   const nextCategory = categories[1];
   const labels = getOutcomeLabels(input, currentCategory);
@@ -165,7 +167,6 @@ export function DiagnosisResult({
         <header style={styles.header}>
           <div>
             <h1 style={styles.title}>{"\u3055\u3063\u304d\u306e\u69d8\u5b50\u304b\u3089"}</h1>
-            <p style={styles.lead}>{"\u6c7a\u3081\u3064\u3051\u305a\u306b\u3001\u307e\u305a\u3067\u304d\u308b\u3053\u3068\u3092\u898b\u3066\u307f\u307e\u3057\u3087\u3046"}</p>
           </div>
           <button
             type="button"
@@ -179,7 +180,6 @@ export function DiagnosisResult({
         <section style={styles.actionCard}>
           <p style={styles.proposalTitle}>{proposalContent.title}</p>
           <p style={styles.proposalHypothesis}>{proposalContent.hypothesis}</p>
-          <p style={styles.actionIntro}>{proposalContent.body}</p>
           <p style={styles.resultPrompt}>試したあと、近い方を選んでください。</p>
           <div style={styles.feedbackGroup}>
             <button
@@ -209,14 +209,32 @@ export function DiagnosisResult({
         </section>
 
         <section style={styles.reasonCard}>
-          <p style={styles.cardTitle}>{"\u305d\u3046\u898b\u305f\u7406\u7531"}</p>
-          <p style={styles.reasonText}>{reasonText}</p>
+          <button
+            type="button"
+            onClick={() => setIsReasonOpen((current) => !current)}
+            style={styles.disclosureButton}
+            aria-expanded={isReasonOpen}
+          >
+            <span>{"\u7406\u7531\u3092\u898b\u308b"}</span>
+            <span aria-hidden="true">{isReasonOpen ? "^" : "v"}</span>
+          </button>
+          {isReasonOpen ? <p style={styles.reasonText}>{reasonText}</p> : null}
         </section>
 
         {secondaryHypothesisText ? (
           <section style={styles.secondaryCard}>
-            <p style={styles.secondaryLabel}>{"ほかにも"}</p>
-            <p style={styles.secondaryText}>{secondaryHypothesisText}</p>
+            <button
+              type="button"
+              onClick={() => setIsSecondaryOpen((current) => !current)}
+              style={styles.disclosureButton}
+              aria-expanded={isSecondaryOpen}
+            >
+              <span>{"\u307b\u304b\u306e\u898b\u65b9\u3082\u898b\u308b"}</span>
+              <span aria-hidden="true">{isSecondaryOpen ? "^" : "v"}</span>
+            </button>
+            {isSecondaryOpen ? (
+              <p style={styles.secondaryText}>{secondaryHypothesisText}</p>
+            ) : null}
           </section>
         ) : null}
 
@@ -228,44 +246,32 @@ export function DiagnosisResult({
           <p style={styles.persistenceMessage}>{persistenceMessage}</p>
         ) : null}
 
-        <button
-          type="button"
-          onClick={() => router.push("/home")}
-          style={styles.homeButton}
-        >
-          {"ホームに戻る"}
-        </button>
       </div>
     </main>
   );
 }
 
 function getActionIntro(category: CauseCategory | undefined) {
-  const actionIntros: Record<CauseCategory, { title: string; body: string }> = {
+  const actionIntros: Record<CauseCategory, { title: string }> = {
     food:
       {
         title: "ごはんやお水を確認してみませんか？",
-        body: "確認したあと、少し様子を見てみましょう。",
       },
     play:
       {
         title: "3分だけ遊んでみませんか？",
-        body: "少し遊んだあと、様子を見てみましょう。",
       },
     social:
       {
         title: "声をかけたり、近くにいてあげませんか？",
-        body: "少し関わったあと、様子を見てみましょう。",
       },
     stress:
       {
         title: "静かな場所をつくってみませんか？",
-        body: "少し落ち着ける時間をつくって、様子を見てみましょう。",
       },
     health:
       {
         title: "いつもの様子と比べて、少し見てあげませんか？",
-        body: "気になる様子が続くときは、早めに相談してください。",
       },
   };
 
@@ -273,7 +279,6 @@ function getActionIntro(category: CauseCategory | undefined) {
     category ? actionIntros[category] : undefined
   ) ?? {
     title: "少し様子を見てみませんか？",
-    body: "気になることが続くときは、もう一度近い様子を選んでみてください。",
   };
 }
 
@@ -286,7 +291,6 @@ function getProposalContent(
   return {
     title: action.title,
     hypothesis,
-    body: action.body,
   };
 }
 
@@ -309,10 +313,12 @@ function clearLatestHypothesis() {
 }
 
 function formatReasonText(reasons: string[]) {
-  return reasons
+  const text = reasons
     .map((reason) => reason.trim().replace(/[。.]$/, ""))
     .filter(Boolean)
     .join("。");
+
+  return text ? `${text}。` : "";
 }
 
 function savePostDiagnosisFeedback({
@@ -451,7 +457,7 @@ const styles = {
     border: "1px solid #e4e4e7",
     borderRadius: "16px",
     background: "#fffdf9",
-    padding: "14px 16px",
+    padding: "12px 14px",
   },
   secondaryLabel: {
     margin: "0 0 4px",
@@ -461,7 +467,7 @@ const styles = {
     lineHeight: 1.5,
   },
   secondaryText: {
-    margin: 0,
+    margin: "10px 0 0",
     color: "#52525b",
     fontSize: "14px",
     fontWeight: 500,
@@ -470,9 +476,9 @@ const styles = {
   reasonCard: {
     marginBottom: "10px",
     border: "1px solid #e4e4e7",
-    borderRadius: "20px",
+    borderRadius: "16px",
     background: "#ffffff",
-    padding: "16px",
+    padding: "12px 14px",
   },
   actionCard: {
     marginBottom: "10px",
@@ -505,10 +511,26 @@ const styles = {
     lineHeight: 1.7,
   },
   reasonText: {
-    margin: 0,
+    margin: "10px 0 0",
     color: "#52525b",
     fontSize: "14px",
     lineHeight: 1.75,
+  },
+  disclosureButton: {
+    display: "flex",
+    width: "100%",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: "10px",
+    border: "none",
+    background: "transparent",
+    color: "#52525b",
+    fontSize: "14px",
+    fontWeight: 700,
+    lineHeight: 1.5,
+    letterSpacing: 0,
+    padding: 0,
+    cursor: "pointer",
   },
   feedbackGroup: {
     display: "grid",
