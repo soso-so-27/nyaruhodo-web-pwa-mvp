@@ -63,6 +63,7 @@ const ONBOARDING_HOME_HINT_MAX_AGE_MS = 10 * 60 * 1000;
 const POST_DIAGNOSIS_FEEDBACK_KEY = "post_diagnosis_feedback";
 const RECENT_STATE_RECORDS_KEY = "recent_state_records";
 const RECENT_STATE_RECORD_TTL_MS = 30 * 60 * 1000;
+const RECENT_CAT_SUMMARY_WINDOW_MS = 7 * 24 * 60 * 60 * 1000;
 
 type RecentStateRecord = {
   localCatId: string | null;
@@ -188,6 +189,7 @@ export function HomeInput({
     !isDailyHintSuppressed &&
     activeCatEvents.length >= 3;
   const returnMotivation = buildHomeReturnMotivation(activeCatEvents, catName);
+  const recentCatSummary = buildRecentCatSummary(activeCatEvents, catName);
 
   useEffect(() => {
     const completed =
@@ -578,6 +580,11 @@ export function HomeInput({
           ) : null}
         </section>
         ) : null}
+
+        <RecentCatSummaryCard
+          catName={catName}
+          summary={recentCatSummary}
+        />
 
         <div id="record" style={styles.actionArea}>
           <OptionSection
@@ -992,6 +999,167 @@ function formatTokyoDateKey(date: Date) {
   }).format(date);
 }
 
+type RecentCatSummary = {
+  text: string;
+  meta: string;
+};
+
+type RecentCatSignalSummary = {
+  eventType: "current_state" | "concern";
+  signal: string;
+  count: number;
+};
+
+function buildRecentCatSummary(
+  events: RecentEvent[],
+  catName: string,
+): RecentCatSummary {
+  const recentEvents = getRecentSummaryEvents(events);
+  const count = recentEvents.length;
+  const meta = `\u76f4\u8fd17\u65e5 \u30fb ${count}\u4ef6`;
+
+  if (count === 0) {
+    return {
+      text: "\u307e\u3060\u5c11\u3057\u3060\u3051\u3067\u3059\u3002\n\u898b\u305f\u307e\u307e\u3092\u6b8b\u3059\u3068\u3001\u6700\u8fd1\u306e\u69d8\u5b50\u304c\u898b\u3048\u3066\u304d\u307e\u3059\u3002",
+      meta,
+    };
+  }
+
+  if (count <= 2) {
+    return {
+      text: "\u5c11\u3057\u305a\u3064\u6b8b\u3063\u3066\u3044\u307e\u3059\u3002\n\u3082\u3046\u5c11\u3057\u5897\u3048\u308b\u3068\u3001\u3053\u306e\u3054\u308d\u306e\u69d8\u5b50\u304c\u898b\u3048\u3066\u304d\u307e\u3059\u3002",
+      meta,
+    };
+  }
+
+  const topSignal = getTopRecentSignal(recentEvents);
+
+  if (!topSignal) {
+    return {
+      text: `\u6700\u8fd1\u306f\u3044\u304f\u3064\u304b\u306e\u69d8\u5b50\u304c\u6b8b\u3063\u3066\u3044\u307e\u3059\u3002\n${catName}\u306e\u904e\u3054\u3057\u65b9\u304c\u5c11\u3057\u305a\u3064\u898b\u3048\u3066\u304d\u307e\u3057\u305f\u3002`,
+      meta,
+    };
+  }
+
+  return {
+    text: getRecentSignalSummaryText(topSignal, catName),
+    meta,
+  };
+}
+
+function getRecentSummaryEvents(events: RecentEvent[]) {
+  const since = Date.now() - RECENT_CAT_SUMMARY_WINDOW_MS;
+
+  return events.filter((event) => {
+    if (
+      event.event_type !== "current_state" &&
+      event.event_type !== "concern"
+    ) {
+      return false;
+    }
+
+    const eventDate = new Date(event.occurred_at || event.created_at);
+
+    return !Number.isNaN(eventDate.getTime()) && eventDate.getTime() >= since;
+  });
+}
+
+function getTopRecentSignal(
+  events: RecentEvent[],
+): RecentCatSignalSummary | null {
+  const counts = new Map<string, RecentCatSignalSummary>();
+
+  events.forEach((event) => {
+    if (
+      event.event_type !== "current_state" &&
+      event.event_type !== "concern"
+    ) {
+      return;
+    }
+
+    const key = `${event.event_type}:${event.signal}`;
+    const current = counts.get(key);
+
+    if (current) {
+      counts.set(key, {
+        ...current,
+        count: current.count + 1,
+      });
+      return;
+    }
+
+    counts.set(key, {
+      eventType: event.event_type,
+      signal: event.signal,
+      count: 1,
+    });
+  });
+
+  const sorted = Array.from(counts.values()).sort((a, b) => b.count - a.count);
+  const top = sorted[0];
+
+  if (!top || top.count < 2) {
+    return null;
+  }
+
+  const tiedTopSignals = sorted.filter((entry) => entry.count === top.count);
+
+  if (tiedTopSignals.length > 1) {
+    return null;
+  }
+
+  return top;
+}
+
+function getRecentSignalSummaryText(
+  summary: RecentCatSignalSummary,
+  catName: string,
+) {
+  if (summary.eventType === "current_state") {
+    const currentMessages: Record<string, string> = {
+      sleeping:
+        "\u6700\u8fd1\u306f\u300c\u306d\u3066\u308b\u300d\u306e\u8a18\u9332\u304c\u591a\u3081\u3067\u3059\u3002\n\u843d\u3061\u7740\u3044\u3066\u904e\u3054\u3059\u6642\u9593\u304c\u5c11\u3057\u898b\u3048\u3066\u304d\u307e\u3057\u305f\u3002",
+      grooming:
+        "\u6700\u8fd1\u306f\u300c\u6bdb\u3065\u304f\u308d\u3044\u300d\u306e\u8a18\u9332\u304c\u6b8b\u3063\u3066\u3044\u307e\u3059\u3002\n\u3044\u3064\u3082\u306e\u6574\u3048\u308b\u6642\u9593\u304c\u5c11\u3057\u898b\u3048\u3066\u304d\u307e\u3057\u305f\u3002",
+      playing:
+        "\u6700\u8fd1\u306f\u300c\u904a\u3093\u3067\u308b\u300d\u306e\u8a18\u9332\u304c\u6b8b\u3063\u3066\u3044\u307e\u3059\u3002\n\u5143\u6c17\u306b\u52d5\u304f\u6642\u9593\u304c\u5c11\u3057\u898b\u3048\u3066\u304d\u307e\u3057\u305f\u3002",
+      after_food:
+        "\u6700\u8fd1\u306f\u300c\u3054\u306f\u3093\u300d\u306e\u8a18\u9332\u304c\u6b8b\u3063\u3066\u3044\u307e\u3059\u3002\n\u98df\u3079\u308b\u30ea\u30ba\u30e0\u304c\u5c11\u3057\u898b\u3048\u3066\u304d\u307e\u3057\u305f\u3002",
+      food:
+        "\u6700\u8fd1\u306f\u300c\u3054\u306f\u3093\u300d\u306e\u8a18\u9332\u304c\u6b8b\u3063\u3066\u3044\u307e\u3059\u3002\n\u98df\u3079\u308b\u30ea\u30ba\u30e0\u304c\u5c11\u3057\u898b\u3048\u3066\u304d\u307e\u3057\u305f\u3002",
+      toilet:
+        "\u6700\u8fd1\u306f\u300c\u30c8\u30a4\u30ec\u300d\u306e\u8a18\u9332\u304c\u6b8b\u3063\u3066\u3044\u307e\u3059\u3002\n\u3044\u3064\u3082\u306e\u30ea\u30ba\u30e0\u3092\u898b\u308b\u624b\u304c\u304b\u308a\u306b\u306a\u308a\u307e\u3059\u3002",
+      purring:
+        "\u6700\u8fd1\u306f\u300c\u30b4\u30ed\u30b4\u30ed\u300d\u306e\u8a18\u9332\u304c\u6b8b\u3063\u3066\u3044\u307e\u3059\u3002\n\u30ea\u30e9\u30c3\u30af\u30b9\u3057\u3066\u3044\u308b\u6642\u9593\u304c\u5c11\u3057\u898b\u3048\u3066\u304d\u307e\u3057\u305f\u3002",
+    };
+
+    return (
+      currentMessages[summary.signal] ??
+      `\u6700\u8fd1\u306f\u3044\u304f\u3064\u304b\u306e\u69d8\u5b50\u304c\u6b8b\u3063\u3066\u3044\u307e\u3059\u3002\n${catName}\u306e\u904e\u3054\u3057\u65b9\u304c\u5c11\u3057\u305a\u3064\u898b\u3048\u3066\u304d\u307e\u3057\u305f\u3002`
+    );
+  }
+
+  const concernMessages: Record<string, string> = {
+    meowing:
+      "\u6700\u8fd1\u300c\u9cf4\u3044\u3066\u308b\u300d\u304c\u4f55\u5ea6\u304b\u6b8b\u3063\u3066\u3044\u307e\u3059\u3002\n\u7d9a\u304f\u3088\u3046\u306a\u3089\u3001\u8fd1\u3044\u69d8\u5b50\u3092\u9078\u3093\u3067\u898b\u3066\u307f\u307e\u3057\u3087\u3046\u3002",
+    following:
+      "\u6700\u8fd1\u300c\u3064\u3044\u3066\u304f\u308b\u300d\u304c\u4f55\u5ea6\u304b\u6b8b\u3063\u3066\u3044\u307e\u3059\u3002\n\u304b\u307e\u3063\u3066\u307b\u3057\u3044\u6c17\u6301\u3061\u304c\u51fa\u3066\u3044\u308b\u65e5\u3082\u3042\u308b\u304b\u3082\u3057\u308c\u307e\u305b\u3093\u3002",
+    restless:
+      "\u6700\u8fd1\u300c\u843d\u3061\u7740\u304b\u306a\u3044\u300d\u304c\u4f55\u5ea6\u304b\u6b8b\u3063\u3066\u3044\u307e\u3059\u3002\n\u97f3\u3084\u74b0\u5883\u306e\u5909\u5316\u3082\u3001\u5c11\u3057\u898b\u3066\u3042\u3052\u308b\u3068\u3088\u3055\u305d\u3046\u3067\u3059\u3002",
+    low_energy:
+      "\u6700\u8fd1\u300c\u5143\u6c17\u306a\u3044\u300d\u304c\u4f55\u5ea6\u304b\u6b8b\u3063\u3066\u3044\u307e\u3059\u3002\n\u3044\u3064\u3082\u306e\u69d8\u5b50\u3068\u6bd4\u3079\u306a\u304c\u3089\u3001\u5c11\u3057\u4e01\u5be7\u306b\u898b\u3066\u3042\u3052\u307e\u3057\u3087\u3046\u3002",
+    fighting:
+      "\u6700\u8fd1\u300c\u30b1\u30f3\u30ab\u3057\u3066\u308b\u300d\u304c\u4f55\u5ea6\u304b\u6b8b\u3063\u3066\u3044\u307e\u3059\u3002\n\u843d\u3061\u7740\u3051\u308b\u5834\u6240\u3084\u8ddd\u96e2\u611f\u3092\u5c11\u3057\u898b\u3066\u3042\u3052\u308b\u3068\u3088\u3055\u305d\u3046\u3067\u3059\u3002",
+    unknown:
+      "\u6700\u8fd1\u300c\u3088\u304f\u308f\u304b\u3089\u306a\u3044\u300d\u304c\u4f55\u5ea6\u304b\u6b8b\u3063\u3066\u3044\u307e\u3059\u3002\n\u8fd1\u3044\u69d8\u5b50\u3092\u5c11\u3057\u305a\u3064\u9078\u3076\u3068\u3001\u898b\u3048\u65b9\u304c\u5897\u3048\u3066\u3044\u304d\u307e\u3059\u3002",
+  };
+
+  return (
+    concernMessages[summary.signal] ??
+    `\u6700\u8fd1\u306f\u3044\u304f\u3064\u304b\u306e\u69d8\u5b50\u304c\u6b8b\u3063\u3066\u3044\u307e\u3059\u3002\n${catName}\u306e\u904e\u3054\u3057\u65b9\u304c\u5c11\u3057\u305a\u3064\u898b\u3048\u3066\u304d\u307e\u3057\u305f\u3002`
+  );
+}
+
 function CatSettings({
   activeCatId,
   catNameInput,
@@ -1226,6 +1394,24 @@ function GuidanceBlock({
         </button>
       </div>
     </div>
+  );
+}
+
+function RecentCatSummaryCard({
+  catName,
+  summary,
+}: {
+  catName: string;
+  summary: RecentCatSummary;
+}) {
+  return (
+    <section style={styles.recentSummaryCard}>
+      <p style={styles.recentSummaryTitle}>
+        {`\u3053\u306e\u3054\u308d\u306e${catName}`}
+      </p>
+      <p style={styles.recentSummaryText}>{summary.text}</p>
+      <p style={styles.recentSummaryMeta}>{summary.meta}</p>
+    </section>
   );
 }
 
@@ -1843,6 +2029,35 @@ const styles = {
     borderRadius: "28px",
     background: "linear-gradient(180deg, #fffaf3 0%, #fffdf9 100%)",
     padding: "18px 18px 19px",
+  },
+  recentSummaryCard: {
+    marginBottom: "12px",
+    border: "1px solid rgba(234, 219, 202, 0.72)",
+    borderRadius: "22px",
+    background: "rgba(255, 253, 249, 0.86)",
+    padding: "14px 15px 13px",
+  },
+  recentSummaryTitle: {
+    margin: "0 0 6px",
+    color: "#3f3f46",
+    fontSize: "15px",
+    fontWeight: 750,
+    lineHeight: 1.45,
+  },
+  recentSummaryText: {
+    margin: 0,
+    color: "#5f5650",
+    fontSize: "13px",
+    fontWeight: 500,
+    lineHeight: 1.65,
+    whiteSpace: "pre-line",
+  },
+  recentSummaryMeta: {
+    margin: "8px 0 0",
+    color: "#9a8f84",
+    fontSize: "11px",
+    fontWeight: 650,
+    lineHeight: 1.4,
   },
   guidance: {
     margin: 0,
