@@ -57,6 +57,8 @@ const feedbackSaveErrorMessage =
 
 const currentStateSaveSuccessMessage =
   "\u6b8b\u3057\u307e\u3057\u305f\u3002\n{catName}\u306e\u3053\u3068\u304c\u3001\u5c11\u3057\u305a\u3064\u898b\u3048\u3066\u304d\u307e\u3059\u3002";
+const firstCurrentStateSaveSuccessMessage =
+  "{label}\u3001\u898b\u3064\u3051\u307e\u3057\u305f";
 
 const ONBOARDING_HOME_HINT_KEY = "diagnosis_onboarding_home_hint";
 const ONBOARDING_HOME_HINT_MAX_AGE_MS = 10 * 60 * 1000;
@@ -64,6 +66,7 @@ const POST_DIAGNOSIS_FEEDBACK_KEY = "post_diagnosis_feedback";
 const RECENT_STATE_RECORDS_KEY = "recent_state_records";
 const RECENT_STATE_RECORD_TTL_MS = 30 * 60 * 1000;
 const RECENT_CAT_SUMMARY_WINDOW_MS = 7 * 24 * 60 * 60 * 1000;
+const HOME_SIGNAL_TOTAL = 12;
 
 type RecentStateRecord = {
   localCatId: string | null;
@@ -360,6 +363,12 @@ export function HomeInput({
     setCurrentStateMessage("");
     setOnboardingHomeMessage("");
     setPostDiagnosisFeedbackMessage("");
+    const isFirstSignal = isFirstCurrentStateSignal({
+      events: activeCatEvents,
+      recentStateRecords,
+      localCatId: activeCatId,
+      signal,
+    });
     const event = await insertEvent({
       event_type: "current_state",
       signal,
@@ -378,7 +387,12 @@ export function HomeInput({
     setSaveErrorSection("");
     setSaveErrorMessage("");
     setCurrentStateMessage(
-      currentStateSaveSuccessMessage.replace("{catName}", catName),
+      isFirstSignal
+        ? firstCurrentStateSaveSuccessMessage.replace(
+            "{label}",
+            getOptionDisplayLabel(label),
+          )
+        : currentStateSaveSuccessMessage.replace("{catName}", catName),
     );
     setRecentStateRecords(
       saveRecentStateRecord({
@@ -540,6 +554,7 @@ export function HomeInput({
           catProfiles={catProfiles}
           onboardingHomeMessage={onboardingHomeMessage}
           postDiagnosisFeedbackMessage={postDiagnosisFeedbackMessage}
+          recentCatSummary={recentCatSummary}
           returnMotivation={returnMotivation}
           understandingPercent={understandingPercent}
           understandingMessage={understandingMessage}
@@ -580,11 +595,6 @@ export function HomeInput({
           ) : null}
         </section>
         ) : null}
-
-        <RecentCatSummaryCard
-          catName={catName}
-          summary={recentCatSummary}
-        />
 
         <div id="record" style={styles.actionArea}>
           <OptionSection
@@ -800,12 +810,40 @@ function isRecentStateRecorded({
   });
 }
 
+function isFirstCurrentStateSignal({
+  events,
+  recentStateRecords,
+  localCatId,
+  signal,
+}: {
+  events: RecentEvent[];
+  recentStateRecords: RecentStateRecord[];
+  localCatId?: string | null;
+  signal: string;
+}) {
+  const hasSavedSignal = events.some(
+    (event) =>
+      event.event_type === "current_state" && event.signal === signal,
+  );
+
+  if (hasSavedSignal) {
+    return false;
+  }
+
+  return !isRecentStateRecorded({
+    records: recentStateRecords,
+    localCatId,
+    signal,
+  });
+}
+
 function Header({
   activeCatId,
   catName,
   catProfiles,
   onboardingHomeMessage,
   postDiagnosisFeedbackMessage,
+  recentCatSummary,
   returnMotivation,
   understandingPercent,
   understandingMessage,
@@ -816,6 +854,7 @@ function Header({
   catProfiles: CatProfile[];
   onboardingHomeMessage: string;
   postDiagnosisFeedbackMessage: string;
+  recentCatSummary: RecentCatSummary;
   returnMotivation: { title: string; text: string };
   understandingPercent: number;
   understandingMessage: string;
@@ -854,7 +893,6 @@ function Header({
                 aria-expanded={isCatSwitcherOpen}
               >
                 <span>
-                  {"\u4eca\u65e5\u306e"}
                   {catName}
                 </span>
                 <span style={styles.titleChevron} aria-hidden="true">
@@ -862,10 +900,7 @@ function Header({
                 </span>
               </button>
             ) : (
-              <>
-                {"\u4eca\u65e5\u306e"}
-                {catName}
-              </>
+              <>{catName}</>
             )}
           </h1>
           <p style={styles.understandingMessage}>
@@ -907,7 +942,10 @@ function Header({
           {returnMotivation.title}
         </p>
         <p style={styles.headerGuideText}>
-          {returnMotivation.text}
+          {recentCatSummary.text}
+        </p>
+        <p style={styles.recentSignalTrail}>
+          {recentCatSummary.signalTrail}
         </p>
       </div>
       {isCatSwitcherOpen ? (
@@ -1001,7 +1039,7 @@ function formatTokyoDateKey(date: Date) {
 
 type RecentCatSummary = {
   text: string;
-  meta: string;
+  signalTrail: string;
 };
 
 type RecentCatSignalSummary = {
@@ -1016,19 +1054,19 @@ function buildRecentCatSummary(
 ): RecentCatSummary {
   const recentEvents = getRecentSummaryEvents(events);
   const count = recentEvents.length;
-  const meta = `\u76f4\u8fd17\u65e5 \u30fb ${count}\u4ef6`;
+  const signalTrail = buildRecentSignalTrail(recentEvents);
 
   if (count === 0) {
     return {
       text: "\u307e\u3060\u5c11\u3057\u3060\u3051\u3067\u3059\u3002\n\u898b\u305f\u307e\u307e\u3092\u6b8b\u3059\u3068\u3001\u6700\u8fd1\u306e\u69d8\u5b50\u304c\u898b\u3048\u3066\u304d\u307e\u3059\u3002",
-      meta,
+      signalTrail,
     };
   }
 
   if (count <= 2) {
     return {
       text: "\u5c11\u3057\u305a\u3064\u6b8b\u3063\u3066\u3044\u307e\u3059\u3002\n\u3082\u3046\u5c11\u3057\u5897\u3048\u308b\u3068\u3001\u3053\u306e\u3054\u308d\u306e\u69d8\u5b50\u304c\u898b\u3048\u3066\u304d\u307e\u3059\u3002",
-      meta,
+      signalTrail,
     };
   }
 
@@ -1037,13 +1075,13 @@ function buildRecentCatSummary(
   if (!topSignal) {
     return {
       text: `\u6700\u8fd1\u306f\u3044\u304f\u3064\u304b\u306e\u69d8\u5b50\u304c\u6b8b\u3063\u3066\u3044\u307e\u3059\u3002\n${catName}\u306e\u904e\u3054\u3057\u65b9\u304c\u5c11\u3057\u305a\u3064\u898b\u3048\u3066\u304d\u307e\u3057\u305f\u3002`,
-      meta,
+      signalTrail,
     };
   }
 
   return {
     text: getRecentSignalSummaryText(topSignal, catName),
-    meta,
+    signalTrail,
   };
 }
 
@@ -1109,6 +1147,26 @@ function getTopRecentSignal(
   }
 
   return top;
+}
+
+function buildRecentSignalTrail(events: RecentEvent[]) {
+  if (events.length === 0) {
+    return "\u307e\u3060\u3053\u308c\u304b\u3089";
+  }
+
+  const signals = new Map<string, string>();
+
+  events.forEach((event) => {
+    if (!signals.has(event.signal)) {
+      signals.set(event.signal, getSignalDisplayLabel(event.signal));
+    }
+  });
+
+  const labels = Array.from(signals.values());
+  const shownLabels = labels.slice(0, 3).join("\u30fb");
+  const suffix = labels.length > 3 ? "\u3000\u307b\u304b" : "";
+
+  return `${shownLabels}${suffix}\u3000${labels.length}/${HOME_SIGNAL_TOTAL}`;
 }
 
 function getRecentSignalSummaryText(
@@ -1397,24 +1455,6 @@ function GuidanceBlock({
   );
 }
 
-function RecentCatSummaryCard({
-  catName,
-  summary,
-}: {
-  catName: string;
-  summary: RecentCatSummary;
-}) {
-  return (
-    <section style={styles.recentSummaryCard}>
-      <p style={styles.recentSummaryTitle}>
-        {`\u3053\u306e\u3054\u308d\u306e${catName}`}
-      </p>
-      <p style={styles.recentSummaryText}>{summary.text}</p>
-      <p style={styles.recentSummaryMeta}>{summary.meta}</p>
-    </section>
-  );
-}
-
 function OptionSection<Option extends { label: string }>({
   label,
   title,
@@ -1565,6 +1605,26 @@ function getOptionDisplayLabel(label: string) {
   };
 
   return labels[label] ?? label;
+}
+
+function getSignalDisplayLabel(signal: string) {
+  const labels: Record<string, string> = {
+    sleeping: "\u306d\u3066\u308b",
+    grooming: "\u6bdb\u3065\u304f\u308d\u3044",
+    playing: "\u904a\u3093\u3067\u308b",
+    after_food: "\u3054\u306f\u3093",
+    food: "\u3054\u306f\u3093",
+    toilet: "\u30c8\u30a4\u30ec",
+    purring: "\u30b4\u30ed\u30b4\u30ed",
+    meowing: "\u9cf4\u3044\u3066\u308b",
+    following: "\u3064\u3044\u3066\u304f\u308b",
+    restless: "\u843d\u3061\u7740\u304b\u306a\u3044",
+    low_energy: "\u5143\u6c17\u306a\u3044",
+    fighting: "\u30b1\u30f3\u30ab\u3057\u3066\u308b",
+    unknown: "\u3088\u304f\u308f\u304b\u3089\u306a\u3044",
+  };
+
+  return labels[signal] ?? signal;
 }
 
 const styles = {
@@ -1755,6 +1815,20 @@ const styles = {
     fontSize: "12px",
     fontWeight: 500,
     lineHeight: 1.5,
+    whiteSpace: "pre-line",
+  },
+  recentSignalTrail: {
+    display: "inline-flex",
+    width: "fit-content",
+    margin: "8px 0 0",
+    border: "1px solid rgba(234, 219, 202, 0.72)",
+    borderRadius: "999px",
+    background: "rgba(255, 250, 243, 0.78)",
+    color: "#6b5f54",
+    fontSize: "11px",
+    fontWeight: 700,
+    lineHeight: 1.45,
+    padding: "3px 9px",
   },
   catChipLabel: {
     margin: 0,
@@ -2029,35 +2103,6 @@ const styles = {
     borderRadius: "28px",
     background: "linear-gradient(180deg, #fffaf3 0%, #fffdf9 100%)",
     padding: "18px 18px 19px",
-  },
-  recentSummaryCard: {
-    marginBottom: "12px",
-    border: "1px solid rgba(234, 219, 202, 0.72)",
-    borderRadius: "22px",
-    background: "rgba(255, 253, 249, 0.86)",
-    padding: "14px 15px 13px",
-  },
-  recentSummaryTitle: {
-    margin: "0 0 6px",
-    color: "#3f3f46",
-    fontSize: "15px",
-    fontWeight: 750,
-    lineHeight: 1.45,
-  },
-  recentSummaryText: {
-    margin: 0,
-    color: "#5f5650",
-    fontSize: "13px",
-    fontWeight: 500,
-    lineHeight: 1.65,
-    whiteSpace: "pre-line",
-  },
-  recentSummaryMeta: {
-    margin: "8px 0 0",
-    color: "#9a8f84",
-    fontSize: "11px",
-    fontWeight: 650,
-    lineHeight: 1.4,
   },
   guidance: {
     margin: 0,
