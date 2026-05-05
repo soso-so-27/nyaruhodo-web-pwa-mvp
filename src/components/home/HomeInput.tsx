@@ -3,10 +3,7 @@
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import type { CSSProperties } from "react";
-import {
-  calculateUnderstandingPercent,
-  getUnderstandingMessage,
-} from "../../core/understanding/understanding";
+import { calculateUnderstandingPercent } from "../../core/understanding/understanding";
 import { buildCalendarContext } from "../../lib/calendarContext";
 import type { RecentEvent } from "../../lib/supabase/queries";
 import {
@@ -172,7 +169,6 @@ export function HomeInput({
     eventUnderstandingPercent,
     profileUnderstandingPercent,
   );
-  const understandingMessage = getUnderstandingMessage(understandingPercent);
   const hypothesisCta = visibleLatestHypothesis
     ? HYPOTHESIS_CTA_LABELS[visibleLatestHypothesis.category] ??
       FALLBACK_HYPOTHESIS_CTA_LABELS
@@ -191,8 +187,7 @@ export function HomeInput({
     !isDailyHintDismissed &&
     !isDailyHintSuppressed &&
     activeCatEvents.length >= 3;
-  const returnMotivation = buildHomeReturnMotivation(activeCatEvents, catName);
-  const recentCatSummary = buildRecentCatSummary(activeCatEvents, catName);
+  const recentCatSummary = buildRecentCatSummary(activeCatEvents);
 
   useEffect(() => {
     const completed =
@@ -555,9 +550,7 @@ export function HomeInput({
           onboardingHomeMessage={onboardingHomeMessage}
           postDiagnosisFeedbackMessage={postDiagnosisFeedbackMessage}
           recentCatSummary={recentCatSummary}
-          returnMotivation={returnMotivation}
           understandingPercent={understandingPercent}
-          understandingMessage={understandingMessage}
           onCatSelect={handleCatSelect}
         />
         </div>
@@ -844,9 +837,7 @@ function Header({
   onboardingHomeMessage,
   postDiagnosisFeedbackMessage,
   recentCatSummary,
-  returnMotivation,
   understandingPercent,
-  understandingMessage,
   onCatSelect,
 }: {
   activeCatId: string | null;
@@ -855,9 +846,7 @@ function Header({
   onboardingHomeMessage: string;
   postDiagnosisFeedbackMessage: string;
   recentCatSummary: RecentCatSummary;
-  returnMotivation: { title: string; text: string };
   understandingPercent: number;
-  understandingMessage: string;
   onCatSelect: (catId: string) => void;
 }) {
   const [isCatSwitcherOpen, setIsCatSwitcherOpen] = useState(false);
@@ -903,10 +892,6 @@ function Header({
               <>{catName}</>
             )}
           </h1>
-          <p style={styles.understandingMessage}>
-            {catName}
-            {"\u306e\u3053\u3068\u3001\u5c11\u3057\u305a\u3064\u898b\u3048\u3066\u304d\u307e\u3057\u305f"}
-          </p>
         </div>
         <div style={styles.understandingPanel}>
           <div
@@ -938,15 +923,37 @@ function Header({
             {postDiagnosisFeedbackMessage}
           </p>
         ) : null}
-        <p style={styles.headerGuideTitle}>
-          {returnMotivation.title}
-        </p>
-        <p style={styles.headerGuideText}>
-          {recentCatSummary.text}
-        </p>
-        <p style={styles.recentSignalTrail}>
-          {recentCatSummary.signalTrail}
-        </p>
+        <div style={styles.statusRow}>
+          {recentCatSummary.statusLabel ? (
+            <span style={styles.statusLabel}>
+              {recentCatSummary.statusLabel}
+            </span>
+          ) : null}
+          <span style={styles.statusValue}>
+            {recentCatSummary.statusValue}
+          </span>
+        </div>
+        <div style={styles.signalChipRow}>
+          {recentCatSummary.signalLabels.length > 0 ? (
+            <>
+              {recentCatSummary.signalLabels.map((label) => (
+                <span key={label} style={styles.signalChip}>
+                  {label}
+                </span>
+              ))}
+              {recentCatSummary.hiddenSignalCount > 0 ? (
+                <span style={styles.signalChip}>
+                  {`+${recentCatSummary.hiddenSignalCount}`}
+                </span>
+              ) : null}
+              <span style={styles.signalCount}>
+                {`${recentCatSummary.totalSignalCount}/${HOME_SIGNAL_TOTAL}`}
+              </span>
+            </>
+          ) : (
+            <span style={styles.signalCount}>{"\u307e\u3060\u3053\u308c\u304b\u3089"}</span>
+          )}
+        </div>
       </div>
       {isCatSwitcherOpen ? (
         <div style={styles.homeCatSwitcher}>
@@ -1038,8 +1045,11 @@ function formatTokyoDateKey(date: Date) {
 }
 
 type RecentCatSummary = {
-  text: string;
-  signalTrail: string;
+  statusLabel: string;
+  statusValue: string;
+  signalLabels: string[];
+  hiddenSignalCount: number;
+  totalSignalCount: number;
 };
 
 type RecentCatSignalSummary = {
@@ -1048,40 +1058,48 @@ type RecentCatSignalSummary = {
   count: number;
 };
 
-function buildRecentCatSummary(
-  events: RecentEvent[],
-  catName: string,
-): RecentCatSummary {
+function buildRecentCatSummary(events: RecentEvent[]): RecentCatSummary {
   const recentEvents = getRecentSummaryEvents(events);
-  const count = recentEvents.length;
   const signalTrail = buildRecentSignalTrail(recentEvents);
+  const todayEventCount = events.filter((event) => isTodayEvent(event)).length;
 
-  if (count === 0) {
+  if (todayEventCount > 0) {
     return {
-      text: "\u307e\u3060\u5c11\u3057\u3060\u3051\u3067\u3059\u3002\n\u898b\u305f\u307e\u307e\u3092\u6b8b\u3059\u3068\u3001\u6700\u8fd1\u306e\u69d8\u5b50\u304c\u898b\u3048\u3066\u304d\u307e\u3059\u3002",
-      signalTrail,
-    };
-  }
-
-  if (count <= 2) {
-    return {
-      text: "\u5c11\u3057\u305a\u3064\u6b8b\u3063\u3066\u3044\u307e\u3059\u3002\n\u3082\u3046\u5c11\u3057\u5897\u3048\u308b\u3068\u3001\u3053\u306e\u3054\u308d\u306e\u69d8\u5b50\u304c\u898b\u3048\u3066\u304d\u307e\u3059\u3002",
-      signalTrail,
+      statusLabel: "\u4eca\u65e5",
+      statusValue: "\u5c11\u3057\u6b8b\u3063\u3066\u3044\u307e\u3059",
+      ...signalTrail,
     };
   }
 
   const topSignal = getTopRecentSignal(recentEvents);
 
-  if (!topSignal) {
+  if (topSignal) {
     return {
-      text: `\u6700\u8fd1\u306f\u3044\u304f\u3064\u304b\u306e\u69d8\u5b50\u304c\u6b8b\u3063\u3066\u3044\u307e\u3059\u3002\n${catName}\u306e\u904e\u3054\u3057\u65b9\u304c\u5c11\u3057\u305a\u3064\u898b\u3048\u3066\u304d\u307e\u3057\u305f\u3002`,
-      signalTrail,
+      statusLabel: "\u6700\u8fd1\u591a\u3044",
+      statusValue: getSignalDisplayLabel(topSignal.signal),
+      ...signalTrail,
+    };
+  }
+
+  const lastEvent = events[0];
+  const lastLabel = lastEvent?.label
+    ? getOptionDisplayLabel(lastEvent.label)
+    : lastEvent?.signal
+      ? getSignalDisplayLabel(lastEvent.signal)
+      : "";
+
+  if (lastLabel) {
+    return {
+      statusLabel: "\u524d\u56de",
+      statusValue: lastLabel,
+      ...signalTrail,
     };
   }
 
   return {
-    text: getRecentSignalSummaryText(topSignal, catName),
-    signalTrail,
+    statusLabel: "",
+    statusValue: "\u307e\u3060\u3053\u308c\u304b\u3089",
+    ...signalTrail,
   };
 }
 
@@ -1151,7 +1169,11 @@ function getTopRecentSignal(
 
 function buildRecentSignalTrail(events: RecentEvent[]) {
   if (events.length === 0) {
-    return "\u307e\u3060\u3053\u308c\u304b\u3089";
+    return {
+      signalLabels: [],
+      hiddenSignalCount: 0,
+      totalSignalCount: 0,
+    };
   }
 
   const signals = new Map<string, string>();
@@ -1163,10 +1185,12 @@ function buildRecentSignalTrail(events: RecentEvent[]) {
   });
 
   const labels = Array.from(signals.values());
-  const shownLabels = labels.slice(0, 3).join("\u30fb");
-  const suffix = labels.length > 3 ? "\u3000\u307b\u304b" : "";
 
-  return `${shownLabels}${suffix}\u3000${labels.length}/${HOME_SIGNAL_TOTAL}`;
+  return {
+    signalLabels: labels.slice(0, 3),
+    hiddenSignalCount: Math.max(0, labels.length - 3),
+    totalSignalCount: labels.length,
+  };
 }
 
 function getRecentSignalSummaryText(
@@ -1424,7 +1448,6 @@ function GuidanceBlock({
         {`\u3044\u307e\u306e${catName}`}
       </p>
       <p style={styles.guidanceTitle}>{dailyHintHypothesis.text}</p>
-      <p style={styles.guidanceText}>{dailyHintHypothesis.body}</p>
       <div style={styles.predictionActions}>
         <button
           type="button"
@@ -1801,6 +1824,55 @@ const styles = {
     fontWeight: 600,
     lineHeight: 1.65,
     whiteSpace: "pre-line",
+  },
+  statusRow: {
+    display: "flex",
+    alignItems: "center",
+    flexWrap: "wrap",
+    gap: "6px",
+  },
+  statusLabel: {
+    display: "inline-flex",
+    alignItems: "center",
+    border: "1px solid rgba(234, 219, 202, 0.78)",
+    borderRadius: "999px",
+    background: "#fffaf3",
+    color: "#6b5f54",
+    fontSize: "11px",
+    fontWeight: 700,
+    lineHeight: 1.4,
+    padding: "2px 8px",
+  },
+  statusValue: {
+    color: "#3f3f46",
+    fontSize: "13px",
+    fontWeight: 750,
+    lineHeight: 1.45,
+  },
+  signalChipRow: {
+    display: "flex",
+    alignItems: "center",
+    flexWrap: "wrap",
+    gap: "6px",
+    marginTop: "8px",
+  },
+  signalChip: {
+    display: "inline-flex",
+    alignItems: "center",
+    border: "1px solid rgba(234, 219, 202, 0.72)",
+    borderRadius: "999px",
+    background: "rgba(255, 250, 243, 0.78)",
+    color: "#6b5f54",
+    fontSize: "11px",
+    fontWeight: 700,
+    lineHeight: 1.4,
+    padding: "3px 8px",
+  },
+  signalCount: {
+    color: "#8a8178",
+    fontSize: "11px",
+    fontWeight: 700,
+    lineHeight: 1.4,
   },
   headerGuideTitle: {
     margin: "0 0 2px",
