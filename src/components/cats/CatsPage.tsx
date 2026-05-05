@@ -17,7 +17,7 @@ import {
 import type { CatCoat, CatProfile } from "../home/homeInputHelpers";
 
 const COAT_OPTIONS: { value: CatCoat; label: string; color: string }[] = [
-  { value: "cream", label: "クリーム", color: "#f6dfbf" },
+  { value: "saba", label: "サバ", color: "#d8d2c4" },
   { value: "gray", label: "グレー", color: "#d6d3d1" },
   { value: "orange_tabby", label: "茶トラ", color: "#efbd79" },
   { value: "black", label: "黒", color: "#57534e" },

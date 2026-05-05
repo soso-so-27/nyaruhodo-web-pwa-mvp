@@ -46,6 +46,7 @@ export type CatAppearance = {
 };
 
 export type CatCoat =
+  | "saba"
   | "cream"
   | "gray"
   | "orange_tabby"
@@ -55,7 +56,8 @@ export type CatCoat =
 
 export function getCatAvatarSrcForCoat(coat?: CatCoat) {
   const avatars: Record<CatCoat, string> = {
-    cream: "cream",
+    saba: "saba",
+    cream: "saba",
     gray: "gray",
     orange_tabby: "orange_tabby",
     black: "black",
@@ -712,7 +714,7 @@ function readStoredCatProfiles() {
         typeLabel: profile.typeLabel,
         typeScores: profile.typeScores,
         appearance: isValidCatAppearance(profile.appearance)
-          ? profile.appearance
+          ? normalizeCatAppearance(profile.appearance)
           : undefined,
         modifiers: Array.isArray(profile.modifiers)
           ? profile.modifiers
@@ -736,6 +738,7 @@ function isValidCatAppearance(
     !appearance.coat ||
     [
       "cream",
+      "saba",
       "gray",
       "orange_tabby",
       "black",
@@ -743,6 +746,13 @@ function isValidCatAppearance(
       "calico",
     ].includes(appearance.coat)
   );
+}
+
+function normalizeCatAppearance(appearance: CatAppearance): CatAppearance {
+  return {
+    ...appearance,
+    coat: appearance.coat === "cream" ? "saba" : appearance.coat,
+  };
 }
 
 function readStoredCurrentCatHintSuppressions() {

@@ -1762,9 +1762,13 @@ function getCatStateBadgeIconSrc(signal: string | null) {
 
 function getCatCoatAvatarStyle(coat?: CatCoat): CSSProperties {
   const stylesByCoat: Record<CatCoat, CSSProperties> = {
+    saba: {
+      borderColor: "#d8d2c4",
+      background: "linear-gradient(180deg, #fffaf2 0%, #e6ded1 100%)",
+    },
     cream: {
-      borderColor: "#ead7bd",
-      background: "linear-gradient(180deg, #fff7e8 0%, #f7e7ce 100%)",
+      borderColor: "#d8d2c4",
+      background: "linear-gradient(180deg, #fffaf2 0%, #e6ded1 100%)",
     },
     gray: {
       borderColor: "#d6d3d1",
