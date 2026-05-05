@@ -22,6 +22,7 @@ import {
   buildDailyHintHypothesis,
   clearLatestHypothesis,
   getActiveCatProfile,
+  getCatAvatarSrcForCoat,
   getCatName,
   getHypothesisCompletionMessage,
   isCurrentCatHintSuppressed,
@@ -64,7 +65,7 @@ const POST_DIAGNOSIS_FEEDBACK_KEY = "post_diagnosis_feedback";
 const RECENT_STATE_RECORDS_KEY = "recent_state_records";
 const RECENT_STATE_RECORD_TTL_MS = 30 * 60 * 1000;
 const RECENT_CAT_SUMMARY_WINDOW_MS = 7 * 24 * 60 * 60 * 1000;
-const DEFAULT_CAT_AVATAR_ICON_SRC = "/icons/cat-actions/neutral.png";
+const DEFAULT_CAT_AVATAR_ICON_SRC = "/icons/cat-avatars/neutral.png";
 
 type RecentStateRecord = {
   localCatId: string | null;
@@ -849,7 +850,8 @@ function Header({
   const understandingTone = getUnderstandingTone(understandingPercent);
   const ringDegree = Math.max(0, Math.min(100, understandingPercent)) * 3.6;
   const canSwitchCats = catProfiles.length > 1;
-  const catAvatarSrc = getCatAvatarIconSrc(recentCatSummary.avatarSignal);
+  const catAvatarSrc = getCatAvatarSrcForCoat(catCoat);
+  const stateBadgeSrc = getCatStateBadgeIconSrc(recentCatSummary.avatarSignal);
   const catAvatarStyle = getCatCoatAvatarStyle(catCoat);
 
   function handleCatChipSelect(catId: string) {
@@ -875,6 +877,19 @@ function Header({
               event.currentTarget.src = DEFAULT_CAT_AVATAR_ICON_SRC;
             }}
           />
+          {stateBadgeSrc ? (
+            <span style={styles.catAvatarBadge}>
+              <img
+                key={stateBadgeSrc}
+                src={stateBadgeSrc}
+                alt=""
+                style={styles.catAvatarBadgeIcon}
+                onError={(event) => {
+                  event.currentTarget.style.display = "none";
+                }}
+              />
+            </span>
+          ) : null}
         </div>
         <div style={styles.profileText}>
           <h1 style={styles.title}>
@@ -1721,7 +1736,7 @@ function getSignalIconSrc(signal: string) {
   return `/icons/cat-actions/${icons[signal] ?? "unknown"}.png`;
 }
 
-function getCatAvatarIconSrc(signal: string | null) {
+function getCatStateBadgeIconSrc(signal: string | null) {
   const icons: Record<string, string> = {
     sleeping: "sleeping",
     grooming: "grooming",
@@ -1739,7 +1754,7 @@ function getCatAvatarIconSrc(signal: string | null) {
   };
 
   if (!signal || !icons[signal]) {
-    return DEFAULT_CAT_AVATAR_ICON_SRC;
+    return null;
   }
 
   return `/icons/cat-actions/${icons[signal]}.png`;
@@ -1884,6 +1899,7 @@ const styles = {
     display: "flex",
     alignItems: "center",
     justifyContent: "center",
+    position: "relative",
     width: "52px",
     height: "52px",
     border: "1px solid #eadbca",
@@ -1899,6 +1915,27 @@ const styles = {
     objectFit: "contain",
     pointerEvents: "none",
     transition: "transform 160ms ease, opacity 160ms ease",
+  },
+  catAvatarBadge: {
+    position: "absolute",
+    right: "-3px",
+    bottom: "-3px",
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    width: "22px",
+    height: "22px",
+    border: "1px solid rgba(234, 219, 202, 0.92)",
+    borderRadius: "999px",
+    background: "rgba(255, 253, 249, 0.96)",
+    boxShadow: "0 1px 4px rgba(63, 63, 70, 0.08)",
+  },
+  catAvatarBadgeIcon: {
+    display: "block",
+    width: "16px",
+    height: "16px",
+    objectFit: "contain",
+    pointerEvents: "none",
   },
   profileText: {
     minWidth: 0,

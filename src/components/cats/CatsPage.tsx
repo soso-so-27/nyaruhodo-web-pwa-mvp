@@ -6,6 +6,7 @@ import { BottomNavigation } from "../navigation/BottomNavigation";
 import {
   addCatProfile,
   getActiveCatProfile,
+  getCatAvatarSrcForCoat,
   getCatName,
   readActiveCatId,
   readCatProfiles,
@@ -143,6 +144,7 @@ export function CatsPage() {
   }
 
   const selectedCoat = activeCatProfile?.appearance?.coat;
+  const activeCatAvatarSrc = getCatAvatarSrcForCoat(selectedCoat);
 
   return (
     <main style={styles.page}>
@@ -158,18 +160,25 @@ export function CatsPage() {
         <section style={styles.card}>
           <h2 style={styles.sectionTitle}>{"一緒に暮らしている子"}</h2>
           <div style={styles.profileSummary}>
-            <p style={styles.sectionLabel}>{"いま見ている子"}</p>
-            <h3 style={styles.activeCatName}>{catName}</h3>
-            <p style={styles.description}>
-              {"今日の記録や見立ては、この子にたまります。"}
-            </p>
-            {typeof understandingPercent === "number" ? (
-              <p style={styles.understandingPill}>
-                {"理解度 "}
-                {understandingPercent}
-                {"%"}
-              </p>
-            ) : null}
+            <div style={styles.profileSummaryHeader}>
+              <div style={styles.profileAvatar} aria-hidden="true">
+                <img src={activeCatAvatarSrc} alt="" style={styles.profileAvatarIcon} />
+              </div>
+              <div style={styles.profileSummaryText}>
+                <p style={styles.sectionLabel}>{"いま見ている子"}</p>
+                <h3 style={styles.activeCatName}>{catName}</h3>
+                <p style={styles.description}>
+                  {"今日の記録や見立ては、この子にたまります。"}
+                </p>
+                {typeof understandingPercent === "number" ? (
+                  <p style={styles.understandingPill}>
+                    {"理解度 "}
+                    {understandingPercent}
+                    {"%"}
+                  </p>
+                ) : null}
+              </div>
+            </div>
           </div>
 
           <div style={styles.coatSection}>
@@ -371,6 +380,32 @@ const styles = {
     marginBottom: "14px",
     borderBottom: "1px solid #f0e6dc",
     paddingBottom: "14px",
+  },
+  profileSummaryHeader: {
+    display: "flex",
+    alignItems: "center",
+    gap: "12px",
+  },
+  profileAvatar: {
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    width: "58px",
+    height: "58px",
+    border: "1px solid #eadbca",
+    borderRadius: "20px",
+    background: "#fffaf3",
+    flex: "0 0 auto",
+    overflow: "hidden",
+  },
+  profileAvatarIcon: {
+    display: "block",
+    width: "47px",
+    height: "47px",
+    objectFit: "contain",
+  },
+  profileSummaryText: {
+    minWidth: 0,
   },
   sectionLabel: {
     margin: "0 0 5px",

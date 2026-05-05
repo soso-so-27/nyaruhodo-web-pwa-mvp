@@ -53,6 +53,19 @@ export type CatCoat =
   | "white"
   | "calico";
 
+export function getCatAvatarSrcForCoat(coat?: CatCoat) {
+  const avatars: Record<CatCoat, string> = {
+    cream: "cream",
+    gray: "gray",
+    orange_tabby: "orange_tabby",
+    black: "black",
+    white: "white",
+    calico: "calico",
+  };
+
+  return `/icons/cat-avatars/${coat ? avatars[coat] : "neutral"}.png`;
+}
+
 type ConcernSignal =
   | "meowing"
   | "following"
