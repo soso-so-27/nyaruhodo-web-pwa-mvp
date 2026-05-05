@@ -22,6 +22,7 @@ export type CatProfile = {
   name: string;
   createdAt: string;
   updatedAt: string;
+  appearance?: CatAppearance;
   typeKey?: TypeKey;
   typeLabel?: TypeLabel;
   typeScores?: CategoryScores;
@@ -39,6 +40,18 @@ export type CatProfile = {
     sourceBreakdown: UnderstandingSourceBreakdown;
   };
 };
+
+export type CatAppearance = {
+  coat?: CatCoat;
+};
+
+export type CatCoat =
+  | "cream"
+  | "gray"
+  | "orange_tabby"
+  | "black"
+  | "white"
+  | "calico";
 
 type ConcernSignal =
   | "meowing"
@@ -532,6 +545,35 @@ export function updateCatProfileName(
   };
 }
 
+export function updateCatProfileCoat(
+  profiles: CatProfile[],
+  activeCatId: string | null,
+  coat: CatCoat,
+) {
+  const activeProfile = getActiveCatProfile(profiles, activeCatId);
+  const now = new Date().toISOString();
+  const nextProfiles = profiles.map((profile) =>
+    profile.id === activeProfile.id
+      ? {
+          ...profile,
+          appearance: {
+            ...profile.appearance,
+            coat,
+          },
+          updatedAt: now,
+        }
+      : profile,
+  );
+
+  saveCatProfiles(nextProfiles);
+  saveActiveCatId(activeProfile.id);
+
+  return {
+    activeCatId: activeProfile.id,
+    profiles: nextProfiles,
+  };
+}
+
 export function getCatName(profile: CatProfile | null) {
   return profile?.name || DEFAULT_CAT_NAME;
 }
@@ -656,6 +698,9 @@ function readStoredCatProfiles() {
         typeKey: profile.typeKey,
         typeLabel: profile.typeLabel,
         typeScores: profile.typeScores,
+        appearance: isValidCatAppearance(profile.appearance)
+          ? profile.appearance
+          : undefined,
         modifiers: Array.isArray(profile.modifiers)
           ? profile.modifiers
           : undefined,
@@ -665,6 +710,26 @@ function readStoredCatProfiles() {
   } catch {
     return [];
   }
+}
+
+function isValidCatAppearance(
+  appearance: Partial<CatAppearance> | undefined,
+): appearance is CatAppearance {
+  if (!appearance) {
+    return false;
+  }
+
+  return (
+    !appearance.coat ||
+    [
+      "cream",
+      "gray",
+      "orange_tabby",
+      "black",
+      "white",
+      "calico",
+    ].includes(appearance.coat)
+  );
 }
 
 function readStoredCurrentCatHintSuppressions() {

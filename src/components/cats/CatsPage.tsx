@@ -10,9 +10,19 @@ import {
   readActiveCatId,
   readCatProfiles,
   saveActiveCatId,
+  updateCatProfileCoat,
   updateCatProfileName,
 } from "../home/homeInputHelpers";
-import type { CatProfile } from "../home/homeInputHelpers";
+import type { CatCoat, CatProfile } from "../home/homeInputHelpers";
+
+const COAT_OPTIONS: { value: CatCoat; label: string; color: string }[] = [
+  { value: "cream", label: "クリーム", color: "#f6dfbf" },
+  { value: "gray", label: "グレー", color: "#d6d3d1" },
+  { value: "orange_tabby", label: "茶トラ", color: "#efbd79" },
+  { value: "black", label: "黒", color: "#57534e" },
+  { value: "white", label: "白", color: "#fafafa" },
+  { value: "calico", label: "三毛", color: "#f0c28b" },
+];
 
 export function CatsPage() {
   const [catProfiles, setCatProfiles] = useState<CatProfile[]>([]);
@@ -119,6 +129,21 @@ export function CatsPage() {
     setMessage("保存しました。");
   }
 
+  function handleCoatSelect(coat: CatCoat) {
+    const result = updateCatProfileCoat(catProfiles, activeCatId, coat);
+    const activeProfile = getActiveCatProfile(
+      result.profiles,
+      result.activeCatId,
+    );
+
+    setCatProfiles(result.profiles);
+    setActiveCatId(result.activeCatId);
+    setCatNameInput(activeProfile.name);
+    setMessage("保存しました。");
+  }
+
+  const selectedCoat = activeCatProfile?.appearance?.coat;
+
   return (
     <main style={styles.page}>
       <div style={styles.container}>
@@ -145,6 +170,49 @@ export function CatsPage() {
                 {"%"}
               </p>
             ) : null}
+          </div>
+
+          <div style={styles.coatSection}>
+            <div style={styles.coatHeader}>
+              <p style={styles.sectionLabel}>{"毛色"}</p>
+              <p style={styles.coatDescription}>
+                {"この子に近い色を選べます。"}
+              </p>
+            </div>
+            <div style={styles.coatOptions}>
+              {COAT_OPTIONS.map((option) => {
+                const isSelected = option.value === selectedCoat;
+
+                return (
+                  <button
+                    key={option.value}
+                    type="button"
+                    onClick={() => handleCoatSelect(option.value)}
+                    style={
+                      isSelected
+                        ? {
+                            ...styles.coatButton,
+                            ...styles.coatButtonActive,
+                          }
+                        : styles.coatButton
+                    }
+                    aria-pressed={isSelected}
+                  >
+                    <span
+                      style={{
+                        ...styles.coatSwatch,
+                        background:
+                          option.value === "calico"
+                            ? "linear-gradient(135deg, #fff7e8 0%, #fff7e8 36%, #efbd79 37%, #efbd79 66%, #d6d3d1 67%, #d6d3d1 100%)"
+                            : option.color,
+                      }}
+                      aria-hidden="true"
+                    />
+                    {option.label}
+                  </button>
+                );
+              })}
+            </div>
           </div>
 
           <div style={styles.catList}>
@@ -341,6 +409,53 @@ const styles = {
     fontWeight: 700,
     lineHeight: 1.5,
     padding: "3px 10px",
+  },
+  coatSection: {
+    marginBottom: "14px",
+    borderBottom: "1px solid #f0e6dc",
+    paddingBottom: "14px",
+  },
+  coatHeader: {
+    marginBottom: "8px",
+  },
+  coatDescription: {
+    margin: "2px 0 0",
+    color: "#71717a",
+    fontSize: "12px",
+    lineHeight: 1.5,
+  },
+  coatOptions: {
+    display: "flex",
+    flexWrap: "wrap",
+    gap: "8px",
+  },
+  coatButton: {
+    display: "inline-flex",
+    alignItems: "center",
+    gap: "7px",
+    minHeight: "34px",
+    border: "1px solid #d4d4d8",
+    borderRadius: "999px",
+    background: "#ffffff",
+    color: "#3f3f46",
+    fontSize: "13px",
+    fontWeight: 700,
+    letterSpacing: 0,
+    padding: "0 11px",
+    cursor: "pointer",
+  },
+  coatButtonActive: {
+    borderColor: "#a58b6f",
+    background: "#fff7ec",
+    color: "#27272a",
+  },
+  coatSwatch: {
+    display: "inline-block",
+    width: "14px",
+    height: "14px",
+    border: "1px solid rgba(63, 63, 70, 0.16)",
+    borderRadius: "999px",
+    flex: "0 0 auto",
   },
   catList: {
     display: "flex",

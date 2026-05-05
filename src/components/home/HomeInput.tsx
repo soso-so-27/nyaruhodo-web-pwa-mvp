@@ -35,6 +35,7 @@ import {
   updateCatProfileName,
 } from "./homeInputHelpers";
 import type {
+  CatCoat,
   CatProfile,
   CurrentCatHintFeedback,
   CurrentCatHintSuppression,
@@ -547,6 +548,7 @@ export function HomeInput({
           activeCatId={activeCatId}
           catName={catName}
           catProfiles={catProfiles}
+          catCoat={activeCatProfile?.appearance?.coat}
           onboardingHomeMessage={onboardingHomeMessage}
           postDiagnosisFeedbackMessage={postDiagnosisFeedbackMessage}
           recentCatSummary={recentCatSummary}
@@ -826,6 +828,7 @@ function Header({
   activeCatId,
   catName,
   catProfiles,
+  catCoat,
   onboardingHomeMessage,
   postDiagnosisFeedbackMessage,
   recentCatSummary,
@@ -835,6 +838,7 @@ function Header({
   activeCatId: string | null;
   catName: string;
   catProfiles: CatProfile[];
+  catCoat?: CatCoat;
   onboardingHomeMessage: string;
   postDiagnosisFeedbackMessage: string;
   recentCatSummary: RecentCatSummary;
@@ -846,6 +850,7 @@ function Header({
   const ringDegree = Math.max(0, Math.min(100, understandingPercent)) * 3.6;
   const canSwitchCats = catProfiles.length > 1;
   const catAvatarSrc = getCatAvatarIconSrc(recentCatSummary.avatarSignal);
+  const catAvatarStyle = getCatCoatAvatarStyle(catCoat);
 
   function handleCatChipSelect(catId: string) {
     onCatSelect(catId);
@@ -855,7 +860,7 @@ function Header({
   return (
     <header style={styles.header}>
       <div style={styles.profileHero}>
-        <div style={styles.catAvatar} aria-hidden="true">
+        <div style={{ ...styles.catAvatar, ...catAvatarStyle }} aria-hidden="true">
           <img
             key={catAvatarSrc}
             src={catAvatarSrc}
@@ -1738,6 +1743,38 @@ function getCatAvatarIconSrc(signal: string | null) {
   }
 
   return `/icons/cat-actions/${icons[signal]}.png`;
+}
+
+function getCatCoatAvatarStyle(coat?: CatCoat): CSSProperties {
+  const stylesByCoat: Record<CatCoat, CSSProperties> = {
+    cream: {
+      borderColor: "#ead7bd",
+      background: "linear-gradient(180deg, #fff7e8 0%, #f7e7ce 100%)",
+    },
+    gray: {
+      borderColor: "#d6d3d1",
+      background: "linear-gradient(180deg, #f6f5f3 0%, #e5e2de 100%)",
+    },
+    orange_tabby: {
+      borderColor: "#efc89a",
+      background: "linear-gradient(180deg, #fff1dc 0%, #f5c994 100%)",
+    },
+    black: {
+      borderColor: "#78716c",
+      background: "linear-gradient(180deg, #ede9e4 0%, #b8afa6 100%)",
+    },
+    white: {
+      borderColor: "#e4e4e7",
+      background: "linear-gradient(180deg, #ffffff 0%, #f4f4f5 100%)",
+    },
+    calico: {
+      borderColor: "#e8c8a8",
+      background:
+        "linear-gradient(135deg, #fff7e8 0%, #fff7e8 38%, #f4c48d 39%, #f4c48d 66%, #d8d3ca 67%, #d8d3ca 100%)",
+    },
+  };
+
+  return coat ? stylesByCoat[coat] : {};
 }
 
 function getOptionDisplayLabel(label: string) {
