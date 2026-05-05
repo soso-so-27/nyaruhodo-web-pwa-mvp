@@ -63,7 +63,6 @@ const POST_DIAGNOSIS_FEEDBACK_KEY = "post_diagnosis_feedback";
 const RECENT_STATE_RECORDS_KEY = "recent_state_records";
 const RECENT_STATE_RECORD_TTL_MS = 30 * 60 * 1000;
 const RECENT_CAT_SUMMARY_WINDOW_MS = 7 * 24 * 60 * 60 * 1000;
-const HOME_SIGNAL_TOTAL = 12;
 
 type RecentStateRecord = {
   localCatId: string | null;
@@ -910,11 +909,6 @@ function Header({
         </div>
       </div>
       <div style={styles.headerGuide}>
-        {canSwitchCats ? (
-          <p style={styles.catSwitchHint}>
-            {"\u732b\u540d\u3092\u30bf\u30c3\u30d7\u3057\u3066\u5207\u308a\u66ff\u3048"}
-          </p>
-        ) : null}
         {onboardingHomeMessage ? (
           <p style={styles.onboardingHomeMessage}>{onboardingHomeMessage}</p>
         ) : null}
@@ -923,36 +917,32 @@ function Header({
             {postDiagnosisFeedbackMessage}
           </p>
         ) : null}
-        <div style={styles.statusRow}>
-          {recentCatSummary.statusLabel ? (
-            <span style={styles.statusLabel}>
-              {recentCatSummary.statusLabel}
-            </span>
-          ) : null}
-          <span style={styles.statusValue}>
-            {recentCatSummary.statusValue}
-          </span>
-        </div>
-        <div style={styles.signalChipRow}>
-          {recentCatSummary.signalLabels.length > 0 ? (
-            <>
-              {recentCatSummary.signalLabels.map((label) => (
+        <div style={styles.dashboardRow}>
+          <span style={styles.statusLabel}>{"\u4eca\u65e5"}</span>
+          {recentCatSummary.todaySignals.length > 0 ? (
+            <div style={styles.signalChipRow}>
+              {recentCatSummary.todaySignals.map((label) => (
                 <span key={label} style={styles.signalChip}>
                   {label}
                 </span>
               ))}
-              {recentCatSummary.hiddenSignalCount > 0 ? (
-                <span style={styles.signalChip}>
-                  {`+${recentCatSummary.hiddenSignalCount}`}
-                </span>
-              ) : null}
-              <span style={styles.signalCount}>
-                {`${recentCatSummary.totalSignalCount}/${HOME_SIGNAL_TOTAL}`}
-              </span>
-            </>
+            </div>
           ) : (
-            <span style={styles.signalCount}>{"\u307e\u3060\u3053\u308c\u304b\u3089"}</span>
+            <span style={styles.statusValue}>
+              {"\u307e\u3060\u8a18\u9332\u306a\u3057"}
+            </span>
           )}
+        </div>
+        <div style={styles.dashboardRow}>
+          <span style={styles.statusLabel}>{recentCatSummary.recentLabel}</span>
+          <span style={styles.statusValue}>
+            {recentCatSummary.recentSignalLabel}
+          </span>
+          {recentCatSummary.varietyCount > 0 ? (
+            <span style={styles.signalCount}>
+              {`\u69d8\u5b50 ${recentCatSummary.varietyCount}\u7a2e\u985e`}
+            </span>
+          ) : null}
         </div>
       </div>
       {isCatSwitcherOpen ? (
@@ -1045,11 +1035,10 @@ function formatTokyoDateKey(date: Date) {
 }
 
 type RecentCatSummary = {
-  statusLabel: string;
-  statusValue: string;
-  signalLabels: string[];
-  hiddenSignalCount: number;
-  totalSignalCount: number;
+  todaySignals: string[];
+  recentLabel: string;
+  recentSignalLabel: string;
+  varietyCount: number;
 };
 
 type RecentCatSignalSummary = {
@@ -1060,46 +1049,40 @@ type RecentCatSignalSummary = {
 
 function buildRecentCatSummary(events: RecentEvent[]): RecentCatSummary {
   const recentEvents = getRecentSummaryEvents(events);
-  const signalTrail = buildRecentSignalTrail(recentEvents);
-  const todayEventCount = events.filter((event) => isTodayEvent(event)).length;
-
-  if (todayEventCount > 0) {
-    return {
-      statusLabel: "\u4eca\u65e5",
-      statusValue: "\u5c11\u3057\u6b8b\u3063\u3066\u3044\u307e\u3059",
-      ...signalTrail,
-    };
-  }
+  const todayEvents = events.filter(
+    (event) =>
+      (event.event_type === "current_state" ||
+        event.event_type === "concern") &&
+      isTodayEvent(event),
+  );
+  const todaySignals = buildUniqueSignalLabels(todayEvents).slice(0, 3);
+  const varietyCount = buildUniqueSignalLabels(recentEvents).length;
 
   const topSignal = getTopRecentSignal(recentEvents);
 
   if (topSignal) {
     return {
-      statusLabel: "\u6700\u8fd1\u591a\u3044",
-      statusValue: getSignalDisplayLabel(topSignal.signal),
-      ...signalTrail,
+      todaySignals,
+      recentLabel: "\u6700\u8fd1\u591a\u3044",
+      recentSignalLabel: getSignalDisplayLabel(topSignal.signal),
+      varietyCount,
     };
   }
 
-  const lastEvent = events[0];
-  const lastLabel = lastEvent?.label
-    ? getOptionDisplayLabel(lastEvent.label)
-    : lastEvent?.signal
-      ? getSignalDisplayLabel(lastEvent.signal)
-      : "";
-
-  if (lastLabel) {
+  if (recentEvents.length > 0) {
     return {
-      statusLabel: "\u524d\u56de",
-      statusValue: lastLabel,
-      ...signalTrail,
+      todaySignals,
+      recentLabel: "\u6700\u8fd1",
+      recentSignalLabel: "\u5c11\u3057\u305a\u3064",
+      varietyCount,
     };
   }
 
   return {
-    statusLabel: "",
-    statusValue: "\u307e\u3060\u3053\u308c\u304b\u3089",
-    ...signalTrail,
+    todaySignals,
+    recentLabel: "\u6700\u8fd1",
+    recentSignalLabel: "\u307e\u3060\u3053\u308c\u304b\u3089",
+    varietyCount,
   };
 }
 
@@ -1167,15 +1150,7 @@ function getTopRecentSignal(
   return top;
 }
 
-function buildRecentSignalTrail(events: RecentEvent[]) {
-  if (events.length === 0) {
-    return {
-      signalLabels: [],
-      hiddenSignalCount: 0,
-      totalSignalCount: 0,
-    };
-  }
-
+function buildUniqueSignalLabels(events: RecentEvent[]) {
   const signals = new Map<string, string>();
 
   events.forEach((event) => {
@@ -1184,13 +1159,7 @@ function buildRecentSignalTrail(events: RecentEvent[]) {
     }
   });
 
-  const labels = Array.from(signals.values());
-
-  return {
-    signalLabels: labels.slice(0, 3),
-    hiddenSignalCount: Math.max(0, labels.length - 3),
-    totalSignalCount: labels.length,
-  };
+  return Array.from(signals.values());
 }
 
 function getRecentSignalSummaryText(
@@ -1825,6 +1794,13 @@ const styles = {
     lineHeight: 1.65,
     whiteSpace: "pre-line",
   },
+  dashboardRow: {
+    display: "flex",
+    alignItems: "center",
+    flexWrap: "wrap",
+    gap: "6px",
+    marginTop: "8px",
+  },
   statusRow: {
     display: "flex",
     alignItems: "center",
@@ -1854,7 +1830,7 @@ const styles = {
     alignItems: "center",
     flexWrap: "wrap",
     gap: "6px",
-    marginTop: "8px",
+    marginTop: 0,
   },
   signalChip: {
     display: "inline-flex",
