@@ -64,7 +64,7 @@ const POST_DIAGNOSIS_FEEDBACK_KEY = "post_diagnosis_feedback";
 const RECENT_STATE_RECORDS_KEY = "recent_state_records";
 const RECENT_STATE_RECORD_TTL_MS = 30 * 60 * 1000;
 const RECENT_CAT_SUMMARY_WINDOW_MS = 7 * 24 * 60 * 60 * 1000;
-const DEFAULT_CAT_AVATAR_ICON_SRC = "/icons/cat-actions/purring.png";
+const DEFAULT_CAT_AVATAR_ICON_SRC = "/icons/cat-actions/neutral.png";
 
 type RecentStateRecord = {
   localCatId: string | null;
@@ -1760,17 +1760,17 @@ function getCatCoatAvatarStyle(coat?: CatCoat): CSSProperties {
       background: "linear-gradient(180deg, #fff1dc 0%, #f5c994 100%)",
     },
     black: {
-      borderColor: "#78716c",
-      background: "linear-gradient(180deg, #ede9e4 0%, #b8afa6 100%)",
+      borderColor: "#57534e",
+      background: "linear-gradient(180deg, #e7e2dc 0%, #9b928a 100%)",
     },
     white: {
-      borderColor: "#e4e4e7",
+      borderColor: "#d4d4d8",
       background: "linear-gradient(180deg, #ffffff 0%, #f4f4f5 100%)",
     },
     calico: {
-      borderColor: "#e8c8a8",
+      borderColor: "#ead7bd",
       background:
-        "linear-gradient(135deg, #fff7e8 0%, #fff7e8 38%, #f4c48d 39%, #f4c48d 66%, #d8d3ca 67%, #d8d3ca 100%)",
+        "linear-gradient(135deg, #fff9ef 0%, #fff9ef 42%, #f8d7ad 43%, #f8d7ad 66%, #e4ded5 67%, #e4ded5 100%)",
     },
   };
 
