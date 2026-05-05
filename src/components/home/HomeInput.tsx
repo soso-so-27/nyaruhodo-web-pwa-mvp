@@ -918,7 +918,7 @@ function Header({
               {recentCatSummary.recentSignalLabel}
             </span>
           </div>
-          <div style={styles.dashboardTile}>
+          <div style={{ ...styles.dashboardTile, ...styles.dashboardTileLast }}>
             <span style={styles.statusLabel}>
               {`\u3044\u307e\u306e${catName}`}
             </span>
@@ -1233,28 +1233,28 @@ function getDayPartFromTimeBand(
 
 function getCurrentTrendText(item?: DayMapItem) {
   if (!item || !item.signal) {
-    return "\u3053\u306e\u6642\u9593\u306f\u307e\u3060\u3053\u308c\u304b\u3089";
+    return "\u307e\u3060\u3053\u308c\u304b\u3089";
   }
 
   const trendTexts: Record<string, string> = {
-    sleeping: "\u3053\u306e\u6642\u9593\u306f\u306d\u3066\u308b\u3053\u3068\u304c\u591a\u3081",
-    grooming: "\u3053\u306e\u6642\u9593\u306f\u6bdb\u3065\u304f\u308d\u3044\u304c\u591a\u3081",
-    playing: `${item.period}\u306f\u904a\u3073\u305f\u304c\u308b\u3053\u3068\u304c\u591a\u3081`,
-    after_food: "\u3053\u306e\u6642\u9593\u306f\u3054\u306f\u3093\u304c\u6c17\u306b\u306a\u308b\u3053\u3068\u304c\u591a\u3081",
-    food: "\u3053\u306e\u6642\u9593\u306f\u3054\u306f\u3093\u304c\u6c17\u306b\u306a\u308b\u3053\u3068\u304c\u591a\u3081",
-    toilet: "\u3053\u306e\u6642\u9593\u306f\u30c8\u30a4\u30ec\u306e\u8a18\u9332\u304c\u591a\u3081",
-    purring: "\u3053\u306e\u6642\u9593\u306f\u30b4\u30ed\u30b4\u30ed\u304c\u591a\u3081",
-    meowing: "\u3053\u306e\u6642\u9593\u306f\u9cf4\u3044\u3066\u308b\u3053\u3068\u304c\u591a\u3081",
-    following: "\u3053\u306e\u6642\u9593\u306f\u3064\u3044\u3066\u304f\u308b\u3053\u3068\u304c\u591a\u3081",
-    restless: "\u3053\u306e\u6642\u9593\u306f\u843d\u3061\u7740\u304b\u306a\u3044\u3053\u3068\u304c\u591a\u3081",
-    low_energy: "\u3053\u306e\u6642\u9593\u306f\u5143\u6c17\u306a\u3044\u8a18\u9332\u304c\u591a\u3081",
-    fighting: "\u3053\u306e\u6642\u9593\u306f\u30b1\u30f3\u30ab\u306e\u8a18\u9332\u304c\u591a\u3081",
-    unknown: "\u3053\u306e\u6642\u9593\u306f\u307e\u3060\u3088\u304f\u308f\u304b\u3089\u306a\u3044\u3053\u3068\u304c\u591a\u3081",
+    sleeping: `${item.period}\u306f\u306d\u3066\u308b\u591a\u3081`,
+    grooming: `${item.period}\u306f\u6bdb\u3065\u304f\u308d\u3044\u591a\u3081`,
+    playing: `${item.period}\u306f\u904a\u3073\u591a\u3081`,
+    after_food: `${item.period}\u306f\u3054\u306f\u3093\u591a\u3081`,
+    food: `${item.period}\u306f\u3054\u306f\u3093\u591a\u3081`,
+    toilet: `${item.period}\u306f\u30c8\u30a4\u30ec\u591a\u3081`,
+    purring: `${item.period}\u306f\u30b4\u30ed\u30b4\u30ed\u591a\u3081`,
+    meowing: `${item.period}\u306f\u9cf4\u3044\u3066\u308b\u591a\u3081`,
+    following: `${item.period}\u306f\u3064\u3044\u3066\u304f\u308b\u591a\u3081`,
+    restless: `${item.period}\u306f\u843d\u3061\u7740\u304b\u306a\u3044\u591a\u3081`,
+    low_energy: `${item.period}\u306f\u5143\u6c17\u306a\u3044\u591a\u3081`,
+    fighting: `${item.period}\u306f\u30b1\u30f3\u30ab\u591a\u3081`,
+    unknown: `${item.period}\u306f\u3088\u304f\u308f\u304b\u3089\u306a\u3044\u591a\u3081`,
   };
 
   return (
     trendTexts[item.signal] ??
-    `\u3053\u306e\u6642\u9593\u306f${item.label}\u3053\u3068\u304c\u591a\u3081`
+    `${item.period}\u306f${item.label}\u591a\u3081`
   );
 }
 
@@ -1789,11 +1789,11 @@ const styles = {
     transform: "translateY(1px)",
   },
   header: {
-    marginBottom: "12px",
+    marginBottom: "10px",
     border: "1px solid #ebe2d6",
-    borderRadius: "28px",
+    borderRadius: "26px",
     background: "linear-gradient(180deg, #fffdf9 0%, #fff7ec 100%)",
-    padding: "18px 16px 17px",
+    padding: "15px 14px 14px",
     scrollMarginTop: "16px",
   },
   headerTopRow: {
@@ -1804,17 +1804,17 @@ const styles = {
   },
   profileHero: {
     display: "grid",
-    gridTemplateColumns: "56px minmax(0, 1fr) auto",
+    gridTemplateColumns: "52px minmax(0, 1fr) auto",
     alignItems: "center",
-    gap: "12px",
+    gap: "10px",
     marginTop: 0,
   },
   catAvatar: {
     display: "flex",
     alignItems: "center",
     justifyContent: "center",
-    width: "56px",
-    height: "56px",
+    width: "52px",
+    height: "52px",
     border: "1px solid #eadbca",
     borderRadius: "20px",
     background: "#ffffff",
@@ -1822,8 +1822,8 @@ const styles = {
   },
   catAvatarIcon: {
     display: "block",
-    width: "46px",
-    height: "46px",
+    width: "42px",
+    height: "42px",
     objectFit: "contain",
     pointerEvents: "none",
   },
@@ -1835,22 +1835,22 @@ const styles = {
     flexDirection: "column",
     alignItems: "center",
     gap: "5px",
-    minWidth: "72px",
+    minWidth: "66px",
   },
   understandingRing: {
     display: "flex",
     alignItems: "center",
     justifyContent: "center",
-    width: "54px",
-    height: "54px",
+    width: "50px",
+    height: "50px",
     borderRadius: "999px",
   },
   understandingRingInner: {
     display: "flex",
     alignItems: "center",
     justifyContent: "center",
-    width: "42px",
-    height: "42px",
+    width: "39px",
+    height: "39px",
     borderRadius: "999px",
     background: "#fffdf9",
     color: "#3f3f46",
@@ -1889,11 +1889,11 @@ const styles = {
     paddingTop: "10px",
   },
   headerGuide: {
-    marginTop: "12px",
+    marginTop: "10px",
     border: "1px solid rgba(234, 219, 202, 0.65)",
-    borderRadius: "18px",
+    borderRadius: "17px",
     background: "rgba(255, 255, 255, 0.52)",
-    padding: "10px 12px",
+    padding: "9px 10px 10px",
   },
   catSwitchHint: {
     margin: "0 0 6px",
@@ -1913,17 +1913,23 @@ const styles = {
   dashboardTiles: {
     display: "grid",
     gridTemplateColumns: "1fr 1fr",
-    gap: "8px",
+    gap: 0,
+    border: "1px solid rgba(234, 219, 202, 0.68)",
+    borderRadius: "15px",
+    background: "rgba(255, 250, 243, 0.66)",
+    overflow: "hidden",
   },
   dashboardTile: {
     display: "flex",
     minWidth: 0,
     flexDirection: "column",
-    gap: "4px",
-    border: "1px solid rgba(234, 219, 202, 0.72)",
-    borderRadius: "16px",
-    background: "rgba(255, 250, 243, 0.74)",
-    padding: "8px 9px",
+    gap: "3px",
+    borderRight: "1px solid rgba(234, 219, 202, 0.58)",
+    background: "transparent",
+    padding: "7px 9px",
+  },
+  dashboardTileLast: {
+    borderRight: 0,
   },
   dashboardRow: {
     display: "flex",
@@ -1939,22 +1945,25 @@ const styles = {
     gap: "6px",
   },
   statusLabel: {
-    display: "inline-flex",
-    alignItems: "center",
-    border: "1px solid rgba(234, 219, 202, 0.78)",
-    borderRadius: "999px",
-    background: "#fffaf3",
+    display: "block",
     color: "#6b5f54",
-    fontSize: "11px",
+    fontSize: "10px",
     fontWeight: 700,
-    lineHeight: 1.4,
-    padding: "2px 8px",
+    lineHeight: 1.25,
+    overflow: "hidden",
+    textOverflow: "ellipsis",
+    whiteSpace: "nowrap",
   },
   statusValue: {
+    display: "block",
+    minWidth: 0,
+    overflow: "hidden",
     color: "#3f3f46",
-    fontSize: "13px",
+    fontSize: "12px",
     fontWeight: 750,
-    lineHeight: 1.45,
+    lineHeight: 1.25,
+    textOverflow: "ellipsis",
+    whiteSpace: "nowrap",
   },
   signalChipRow: {
     display: "flex",
@@ -1982,33 +1991,33 @@ const styles = {
     lineHeight: 1.4,
   },
   dayMap: {
-    marginTop: "10px",
+    marginTop: "9px",
   },
   dayMapTitle: {
-    margin: "0 0 7px",
+    margin: "0 0 6px",
     color: "#6b5f54",
-    fontSize: "11px",
+    fontSize: "10px",
     fontWeight: 750,
     lineHeight: 1.4,
   },
   dayMapGrid: {
     display: "grid",
     gridTemplateColumns: "repeat(4, minmax(0, 1fr))",
-    gap: "6px",
+    gap: "5px",
   },
   dayMapItem: {
     display: "flex",
     minWidth: 0,
-    minHeight: "68px",
+    minHeight: "54px",
     flexDirection: "column",
     alignItems: "center",
     justifyContent: "center",
-    gap: "3px",
+    gap: "2px",
     border: "1px solid rgba(234, 219, 202, 0.72)",
-    borderRadius: "14px",
+    borderRadius: "12px",
     background: "rgba(255, 255, 255, 0.58)",
     color: "#3f3f46",
-    padding: "6px 4px",
+    padding: "5px 3px",
   },
   dayMapItemMuted: {
     background: "rgba(255, 255, 255, 0.36)",
@@ -2016,14 +2025,14 @@ const styles = {
   },
   dayMapPeriod: {
     color: "inherit",
-    fontSize: "10px",
+    fontSize: "9px",
     fontWeight: 750,
     lineHeight: 1.2,
   },
   dayMapIcon: {
     display: "block",
-    width: "25px",
-    height: "25px",
+    width: "19px",
+    height: "19px",
     objectFit: "contain",
     pointerEvents: "none",
   },
@@ -2039,7 +2048,7 @@ const styles = {
     maxWidth: "100%",
     overflow: "hidden",
     color: "inherit",
-    fontSize: "10px",
+    fontSize: "9px",
     fontWeight: 700,
     lineHeight: 1.25,
     textAlign: "center",
