@@ -3,22 +3,23 @@
 import type { CSSProperties, ReactNode } from "react";
 
 type BottomNavigationProps = {
-  active: "today" | "cats";
+  active: "home" | "today" | "cats" | "together";
 };
 
 type NavItem = {
-  key: "today" | "cats";
+  key: "home" | "cats" | "together";
   href: string;
   label: string;
   icon: ReactNode;
 };
 
 export function BottomNavigation({ active }: BottomNavigationProps) {
+  const activeKey = active === "today" ? "home" : active;
   const items: readonly NavItem[] = [
     {
-      key: "today",
+      key: "home",
       href: "/home",
-      label: "今日",
+      label: "ほーむ",
       icon: <HomeIcon />,
     },
     {
@@ -27,12 +28,18 @@ export function BottomNavigation({ active }: BottomNavigationProps) {
       label: "ねこ",
       icon: <CatIcon />,
     },
+    {
+      key: "together",
+      href: "/together",
+      label: "いっしょ",
+      icon: <TogetherIcon />,
+    },
   ];
 
   return (
-    <nav style={styles.bottomNav} aria-label="ホーム内ナビ">
+    <nav style={styles.bottomNav} aria-label="下部ナビ">
       {items.map((item) => {
-        const isActive = active === item.key;
+        const isActive = activeKey === item.key;
 
         return (
           <a
@@ -100,6 +107,29 @@ function CatIcon() {
   );
 }
 
+function TogetherIcon() {
+  return (
+    <svg viewBox="0 0 24 24" style={styles.svgIcon}>
+      <path
+        d="M12 19.2s-6.8-3.9-6.8-8.4c0-2 1.4-3.5 3.3-3.5 1.2 0 2.4.7 3.1 1.8.7-1.1 1.9-1.8 3.1-1.8 1.9 0 3.3 1.5 3.3 3.5 0 4.5-6 8.4-6 8.4Z"
+        fill="none"
+        stroke="currentColor"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        strokeWidth="1.9"
+      />
+      <path
+        d="M8.7 13.2c.5-.5 1-.7 1.6-.6.7.1 1.1.5 1.7.5s1-.4 1.7-.5c.6-.1 1.2.1 1.6.6"
+        fill="none"
+        stroke="currentColor"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        strokeWidth="1.7"
+      />
+    </svg>
+  );
+}
+
 const styles = {
   bottomNav: {
     position: "fixed",
@@ -107,12 +137,12 @@ const styles = {
     bottom: "calc(18px + env(safe-area-inset-bottom))",
     zIndex: 20,
     display: "grid",
-    gridTemplateColumns: "repeat(2, 1fr)",
-    gap: "8px",
-    width: "min(calc(100% - 96px), 280px)",
+    gridTemplateColumns: "repeat(3, 1fr)",
+    gap: "7px",
+    width: "min(calc(100% - 64px), 340px)",
     transform: "translateX(-50%)",
     border: "1px solid rgba(212, 212, 216, 0.9)",
-    borderRadius: "26px",
+    borderRadius: "28px",
     background: "rgba(255, 255, 255, 0.94)",
     boxShadow: "0 12px 30px rgba(39, 39, 42, 0.08)",
     padding: "7px",
@@ -142,7 +172,7 @@ const styles = {
     gap: "2px",
     minHeight: "50px",
     borderRadius: "20px",
-    background: "#3f3f46",
+    background: "#6b5746",
     color: "#ffffff",
     textDecoration: "none",
     fontSize: "11px",
