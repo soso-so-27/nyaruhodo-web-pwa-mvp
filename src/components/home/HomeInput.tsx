@@ -585,7 +585,7 @@ export function HomeInput({
             title={`${catName}\u306f\u3044\u307e\u3069\u3046\u3057\u3066\u308b\uff1f`}
             options={CURRENT_OPTIONS}
             variant="current"
-            description={"\u898b\u305f\u307e\u307e\u3092\u3072\u3068\u3064\u6b8b\u305b\u3070OK\u3067\u3059"}
+            description={"\u3044\u307e\u898b\u3048\u305f\u307e\u307e\u3001\u3072\u3068\u3064\u3067OK\u3067\u3059"}
             message={currentStateMessage}
             errorMessage={
               saveErrorSection === "current" ? saveErrorMessage : ""
@@ -601,7 +601,7 @@ export function HomeInput({
             title={"\u3061\u3087\u3063\u3068\u6c17\u306b\u306a\u308b\uff1f"}
             options={CONCERN_OPTIONS}
             variant="concern"
-            description={"\u8ff7\u3063\u305f\u3089\u3001\u8fd1\u3044\u3082\u306e\u3092\u9078\u3093\u3067\u304f\u3060\u3055\u3044"}
+            description={"\u8fd1\u3044\u3082\u306e\u3092\u3072\u3068\u3064\u3067OK"}
             errorMessage={
               saveErrorSection === "concern" ? saveErrorMessage : ""
             }
@@ -985,18 +985,18 @@ function Header({
 
 function getUnderstandingTone(percent: number) {
   if (percent >= 90) {
-    return "\u304b\u306a\u308a\u898b\u3048\u3066\u304d\u307e\u3057\u305f";
+    return "\u304b\u306a\u308a";
   }
 
   if (percent >= 60) {
-    return "\u3060\u3093\u3060\u3093\u5206\u304b\u3063\u3066\u304d\u307e\u3057\u305f";
+    return "\u3060\u3093\u3060\u3093";
   }
 
   if (percent >= 30) {
-    return "\u5c11\u3057\u305a\u3064\u5206\u304b\u3063\u3066\u304d\u307e\u3057\u305f";
+    return "\u5c11\u3057\u305a\u3064";
   }
 
-  return "\u3053\u308c\u304b\u3089\u77e5\u3063\u3066\u3044\u304d\u307e\u3059";
+  return "\u3053\u308c\u304b\u3089";
 }
 
 function buildHomeReturnMotivation(
@@ -1180,7 +1180,7 @@ function buildDayMap(events: RecentEvent[]): DayMapItem[] {
 function getRepresentativeSignal(events: RecentEvent[]) {
   if (events.length < 3) {
     return {
-      label: "\u307e\u3060",
+      label: "-",
       signal: null,
     };
   }
@@ -1233,7 +1233,7 @@ function getDayPartFromTimeBand(
 
 function getCurrentTrendText(item?: DayMapItem) {
   if (!item || !item.signal) {
-    return "\u307e\u3060\u3053\u308c\u304b\u3089";
+    return "\u3053\u308c\u304b\u3089";
   }
 
   const trendTexts: Record<string, string> = {
@@ -1834,27 +1834,27 @@ const styles = {
     display: "flex",
     flexDirection: "column",
     alignItems: "center",
-    gap: "5px",
-    minWidth: "66px",
+    gap: "4px",
+    minWidth: "58px",
   },
   understandingRing: {
     display: "flex",
     alignItems: "center",
     justifyContent: "center",
-    width: "50px",
-    height: "50px",
+    width: "46px",
+    height: "46px",
     borderRadius: "999px",
   },
   understandingRingInner: {
     display: "flex",
     alignItems: "center",
     justifyContent: "center",
-    width: "39px",
-    height: "39px",
+    width: "35px",
+    height: "35px",
     borderRadius: "999px",
     background: "#fffdf9",
     color: "#3f3f46",
-    fontSize: "11px",
+    fontSize: "10px",
     fontWeight: 800,
     lineHeight: 1,
   },
@@ -2231,7 +2231,7 @@ const styles = {
   },
   understanding: {
     display: "block",
-    width: "72px",
+    width: "62px",
     margin: 0,
     color: "#6b5f54",
     fontSize: "10px",

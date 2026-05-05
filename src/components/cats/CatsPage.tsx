@@ -126,7 +126,7 @@ export function CatsPage() {
           <p style={styles.eyebrow}>{"ねこ"}</p>
           <h1 style={styles.title}>{"ねこ"}</h1>
           <p style={styles.lead}>
-            {"一緒に暮らしている子のことをここにまとめます。"}
+            {"一緒に暮らしている子を見られます。"}
           </p>
         </header>
 
