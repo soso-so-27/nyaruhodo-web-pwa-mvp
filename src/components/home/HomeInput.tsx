@@ -554,7 +554,7 @@ export function HomeInput({
         />
         </div>
 
-        {visibleLatestHypothesis || shouldShowDailyHint || hypothesisMessage ? (
+        {visibleLatestHypothesis || hypothesisMessage ? (
         <section style={styles.insightCard}>
           {visibleLatestHypothesis ? (
             <LatestHypothesisCard
@@ -571,14 +571,6 @@ export function HomeInput({
 
                 dismissLatestHypothesis();
               }}
-            />
-          ) : shouldShowDailyHint ? (
-            <GuidanceBlock
-              catName={catName}
-              dailyHintHypothesis={dailyHintHypothesis}
-              onDailyHintMainAction={handleDailyHintMainAction}
-              onDailyHintSubAction={handleDailyHintSubAction}
-              onDailyHintTertiaryAction={handleDailyHintTertiaryAction}
             />
           ) : null}
 
@@ -917,32 +909,53 @@ function Header({
             {postDiagnosisFeedbackMessage}
           </p>
         ) : null}
-        <div style={styles.dashboardRow}>
-          <span style={styles.statusLabel}>{"\u4eca\u65e5"}</span>
-          {recentCatSummary.todaySignals.length > 0 ? (
-            <div style={styles.signalChipRow}>
-              {recentCatSummary.todaySignals.map((label) => (
-                <span key={label} style={styles.signalChip}>
-                  {label}
-                </span>
-              ))}
-            </div>
-          ) : (
+        <div style={styles.dashboardTiles}>
+          <div style={styles.dashboardTile}>
+            <span style={styles.statusLabel}>
+              {`\u3055\u3044\u304d\u3093\u306e${catName}`}
+            </span>
             <span style={styles.statusValue}>
-              {"\u307e\u3060\u8a18\u9332\u306a\u3057"}
+              {recentCatSummary.recentSignalLabel}
             </span>
-          )}
+          </div>
+          <div style={styles.dashboardTile}>
+            <span style={styles.statusLabel}>
+              {`\u3044\u307e\u306e${catName}`}
+            </span>
+            <span style={styles.statusValue}>
+              {recentCatSummary.currentTrendText}
+            </span>
+          </div>
         </div>
-        <div style={styles.dashboardRow}>
-          <span style={styles.statusLabel}>{recentCatSummary.recentLabel}</span>
-          <span style={styles.statusValue}>
-            {recentCatSummary.recentSignalLabel}
-          </span>
-          {recentCatSummary.varietyCount > 0 ? (
-            <span style={styles.signalCount}>
-              {`\u69d8\u5b50 ${recentCatSummary.varietyCount}\u7a2e\u985e`}
-            </span>
-          ) : null}
+        <div style={styles.dayMap}>
+          <p style={styles.dayMapTitle}>{`${catName}\u306e1\u65e5`}</p>
+          <div style={styles.dayMapGrid}>
+            {recentCatSummary.dayMap.map((item) => (
+              <div
+                key={item.period}
+                style={
+                  item.isMuted
+                    ? { ...styles.dayMapItem, ...styles.dayMapItemMuted }
+                    : styles.dayMapItem
+                }
+              >
+                <span style={styles.dayMapPeriod}>{item.period}</span>
+                {item.signal ? (
+                  <img
+                    src={getSignalIconSrc(item.signal)}
+                    alt=""
+                    style={styles.dayMapIcon}
+                    onError={(event) => {
+                      event.currentTarget.style.visibility = "hidden";
+                    }}
+                  />
+                ) : (
+                  <span style={styles.dayMapDot} aria-hidden="true" />
+                )}
+                <span style={styles.dayMapLabel}>{item.label}</span>
+              </div>
+            ))}
+          </div>
         </div>
       </div>
       {isCatSwitcherOpen ? (
@@ -1035,10 +1048,19 @@ function formatTokyoDateKey(date: Date) {
 }
 
 type RecentCatSummary = {
-  todaySignals: string[];
-  recentLabel: string;
   recentSignalLabel: string;
-  varietyCount: number;
+  currentTrendText: string;
+  dayMap: DayMapItem[];
+};
+
+type DayPart = "morning" | "daytime" | "evening" | "night";
+
+type DayMapItem = {
+  period: string;
+  dayPart: DayPart;
+  label: string;
+  signal: string | null;
+  isMuted: boolean;
 };
 
 type RecentCatSignalSummary = {
@@ -1049,40 +1071,19 @@ type RecentCatSignalSummary = {
 
 function buildRecentCatSummary(events: RecentEvent[]): RecentCatSummary {
   const recentEvents = getRecentSummaryEvents(events);
-  const todayEvents = events.filter(
-    (event) =>
-      (event.event_type === "current_state" ||
-        event.event_type === "concern") &&
-      isTodayEvent(event),
-  );
-  const todaySignals = buildUniqueSignalLabels(todayEvents).slice(0, 3);
-  const varietyCount = buildUniqueSignalLabels(recentEvents).length;
-
   const topSignal = getTopRecentSignal(recentEvents);
-
-  if (topSignal) {
-    return {
-      todaySignals,
-      recentLabel: "\u6700\u8fd1\u591a\u3044",
-      recentSignalLabel: getSignalDisplayLabel(topSignal.signal),
-      varietyCount,
-    };
-  }
-
-  if (recentEvents.length > 0) {
-    return {
-      todaySignals,
-      recentLabel: "\u6700\u8fd1",
-      recentSignalLabel: "\u5c11\u3057\u305a\u3064",
-      varietyCount,
-    };
-  }
+  const dayMap = buildDayMap(recentEvents);
+  const currentDayPart = getCurrentDayPart();
+  const currentMapItem = dayMap.find((item) => item.dayPart === currentDayPart);
 
   return {
-    todaySignals,
-    recentLabel: "\u6700\u8fd1",
-    recentSignalLabel: "\u307e\u3060\u3053\u308c\u304b\u3089",
-    varietyCount,
+    recentSignalLabel: topSignal
+      ? `${getSignalDisplayLabel(topSignal.signal)}\u591a\u3081`
+      : recentEvents.length > 0
+        ? "\u5c11\u3057\u305a\u3064"
+        : "\u307e\u3060\u3053\u308c\u304b\u3089",
+    currentTrendText: getCurrentTrendText(currentMapItem),
+    dayMap,
   };
 }
 
@@ -1150,16 +1151,111 @@ function getTopRecentSignal(
   return top;
 }
 
-function buildUniqueSignalLabels(events: RecentEvent[]) {
-  const signals = new Map<string, string>();
+function buildDayMap(events: RecentEvent[]): DayMapItem[] {
+  const dayParts: Array<{ dayPart: DayPart; period: string }> = [
+    { dayPart: "morning", period: "\u671d" },
+    { dayPart: "daytime", period: "\u663c" },
+    { dayPart: "evening", period: "\u5915" },
+    { dayPart: "night", period: "\u591c" },
+  ];
 
-  events.forEach((event) => {
-    if (!signals.has(event.signal)) {
-      signals.set(event.signal, getSignalDisplayLabel(event.signal));
-    }
+  return dayParts.map(({ dayPart, period }) => {
+    const eventsInPeriod = events.filter(
+      (event) => getEventDayPart(event) === dayPart,
+    );
+    const summary = getRepresentativeSignal(eventsInPeriod);
+
+    return {
+      period,
+      dayPart,
+      label: summary?.signal
+        ? getSignalDisplayLabel(summary.signal)
+        : summary?.label ?? "\u307e\u3060",
+      signal: summary?.signal ?? null,
+      isMuted: !summary?.signal,
+    };
   });
+}
 
-  return Array.from(signals.values());
+function getRepresentativeSignal(events: RecentEvent[]) {
+  if (events.length < 3) {
+    return {
+      label: "\u307e\u3060",
+      signal: null,
+    };
+  }
+
+  const topSignal = getTopRecentSignal(events);
+
+  if (!topSignal) {
+    return {
+      label: "\u5c11\u3057\u305a\u3064",
+      signal: null,
+    };
+  }
+
+  return {
+    label: getSignalDisplayLabel(topSignal.signal),
+    signal: topSignal.signal,
+  };
+}
+
+function getCurrentDayPart(): DayPart {
+  return getDayPartFromTimeBand(buildCalendarContext().timeBand);
+}
+
+function getEventDayPart(event: RecentEvent): DayPart {
+  const timeBand =
+    event.calendar_context?.timeBand ??
+    buildCalendarContext(new Date(event.occurred_at || event.created_at))
+      .timeBand;
+
+  return getDayPartFromTimeBand(timeBand);
+}
+
+function getDayPartFromTimeBand(
+  timeBand: ReturnType<typeof buildCalendarContext>["timeBand"],
+): DayPart {
+  if (timeBand === "early_morning" || timeBand === "morning") {
+    return "morning";
+  }
+
+  if (timeBand === "daytime") {
+    return "daytime";
+  }
+
+  if (timeBand === "evening") {
+    return "evening";
+  }
+
+  return "night";
+}
+
+function getCurrentTrendText(item?: DayMapItem) {
+  if (!item || !item.signal) {
+    return "\u3053\u306e\u6642\u9593\u306f\u307e\u3060\u3053\u308c\u304b\u3089";
+  }
+
+  const trendTexts: Record<string, string> = {
+    sleeping: "\u3053\u306e\u6642\u9593\u306f\u306d\u3066\u308b\u3053\u3068\u304c\u591a\u3081",
+    grooming: "\u3053\u306e\u6642\u9593\u306f\u6bdb\u3065\u304f\u308d\u3044\u304c\u591a\u3081",
+    playing: `${item.period}\u306f\u904a\u3073\u305f\u304c\u308b\u3053\u3068\u304c\u591a\u3081`,
+    after_food: "\u3053\u306e\u6642\u9593\u306f\u3054\u306f\u3093\u304c\u6c17\u306b\u306a\u308b\u3053\u3068\u304c\u591a\u3081",
+    food: "\u3053\u306e\u6642\u9593\u306f\u3054\u306f\u3093\u304c\u6c17\u306b\u306a\u308b\u3053\u3068\u304c\u591a\u3081",
+    toilet: "\u3053\u306e\u6642\u9593\u306f\u30c8\u30a4\u30ec\u306e\u8a18\u9332\u304c\u591a\u3081",
+    purring: "\u3053\u306e\u6642\u9593\u306f\u30b4\u30ed\u30b4\u30ed\u304c\u591a\u3081",
+    meowing: "\u3053\u306e\u6642\u9593\u306f\u9cf4\u3044\u3066\u308b\u3053\u3068\u304c\u591a\u3081",
+    following: "\u3053\u306e\u6642\u9593\u306f\u3064\u3044\u3066\u304f\u308b\u3053\u3068\u304c\u591a\u3081",
+    restless: "\u3053\u306e\u6642\u9593\u306f\u843d\u3061\u7740\u304b\u306a\u3044\u3053\u3068\u304c\u591a\u3081",
+    low_energy: "\u3053\u306e\u6642\u9593\u306f\u5143\u6c17\u306a\u3044\u8a18\u9332\u304c\u591a\u3081",
+    fighting: "\u3053\u306e\u6642\u9593\u306f\u30b1\u30f3\u30ab\u306e\u8a18\u9332\u304c\u591a\u3081",
+    unknown: "\u3053\u306e\u6642\u9593\u306f\u307e\u3060\u3088\u304f\u308f\u304b\u3089\u306a\u3044\u3053\u3068\u304c\u591a\u3081",
+  };
+
+  return (
+    trendTexts[item.signal] ??
+    `\u3053\u306e\u6642\u9593\u306f${item.label}\u3053\u3068\u304c\u591a\u3081`
+  );
 }
 
 function getRecentSignalSummaryText(
@@ -1590,6 +1686,26 @@ function getOptionIconSrc(label: string) {
   return `/icons/cat-actions/${icons[label] ?? "unknown"}.png`;
 }
 
+function getSignalIconSrc(signal: string) {
+  const icons: Record<string, string> = {
+    sleeping: "sleeping",
+    grooming: "grooming",
+    playing: "playing",
+    after_food: "food",
+    food: "food",
+    toilet: "toilet",
+    purring: "purring",
+    meowing: "meowing",
+    following: "following",
+    restless: "restless",
+    low_energy: "low_energy",
+    fighting: "fighting",
+    unknown: "unknown",
+  };
+
+  return `/icons/cat-actions/${icons[signal] ?? "unknown"}.png`;
+}
+
 function getOptionDisplayLabel(label: string) {
   const labels: Record<string, string> = {
     "\u30b0\u30eb\u30fc\u30df\u30f3\u30b0": "\u6bdb\u3065\u304f\u308d\u3044",
@@ -1794,6 +1910,21 @@ const styles = {
     lineHeight: 1.65,
     whiteSpace: "pre-line",
   },
+  dashboardTiles: {
+    display: "grid",
+    gridTemplateColumns: "1fr 1fr",
+    gap: "8px",
+  },
+  dashboardTile: {
+    display: "flex",
+    minWidth: 0,
+    flexDirection: "column",
+    gap: "4px",
+    border: "1px solid rgba(234, 219, 202, 0.72)",
+    borderRadius: "16px",
+    background: "rgba(255, 250, 243, 0.74)",
+    padding: "8px 9px",
+  },
   dashboardRow: {
     display: "flex",
     alignItems: "center",
@@ -1849,6 +1980,71 @@ const styles = {
     fontSize: "11px",
     fontWeight: 700,
     lineHeight: 1.4,
+  },
+  dayMap: {
+    marginTop: "10px",
+  },
+  dayMapTitle: {
+    margin: "0 0 7px",
+    color: "#6b5f54",
+    fontSize: "11px",
+    fontWeight: 750,
+    lineHeight: 1.4,
+  },
+  dayMapGrid: {
+    display: "grid",
+    gridTemplateColumns: "repeat(4, minmax(0, 1fr))",
+    gap: "6px",
+  },
+  dayMapItem: {
+    display: "flex",
+    minWidth: 0,
+    minHeight: "68px",
+    flexDirection: "column",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: "3px",
+    border: "1px solid rgba(234, 219, 202, 0.72)",
+    borderRadius: "14px",
+    background: "rgba(255, 255, 255, 0.58)",
+    color: "#3f3f46",
+    padding: "6px 4px",
+  },
+  dayMapItemMuted: {
+    background: "rgba(255, 255, 255, 0.36)",
+    color: "#9a9188",
+  },
+  dayMapPeriod: {
+    color: "inherit",
+    fontSize: "10px",
+    fontWeight: 750,
+    lineHeight: 1.2,
+  },
+  dayMapIcon: {
+    display: "block",
+    width: "25px",
+    height: "25px",
+    objectFit: "contain",
+    pointerEvents: "none",
+  },
+  dayMapDot: {
+    display: "block",
+    width: "6px",
+    height: "6px",
+    borderRadius: "999px",
+    background: "#d8cbbb",
+  },
+  dayMapLabel: {
+    display: "block",
+    maxWidth: "100%",
+    overflow: "hidden",
+    color: "inherit",
+    fontSize: "10px",
+    fontWeight: 700,
+    lineHeight: 1.25,
+    textAlign: "center",
+    textOverflow: "ellipsis",
+    whiteSpace: "nowrap",
   },
   headerGuideTitle: {
     margin: "0 0 2px",
