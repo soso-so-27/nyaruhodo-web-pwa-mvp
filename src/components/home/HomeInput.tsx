@@ -63,6 +63,7 @@ const POST_DIAGNOSIS_FEEDBACK_KEY = "post_diagnosis_feedback";
 const RECENT_STATE_RECORDS_KEY = "recent_state_records";
 const RECENT_STATE_RECORD_TTL_MS = 30 * 60 * 1000;
 const RECENT_CAT_SUMMARY_WINDOW_MS = 7 * 24 * 60 * 60 * 1000;
+const DEFAULT_CAT_AVATAR_ICON_SRC = "/icons/cat-actions/purring.png";
 
 type RecentStateRecord = {
   localCatId: string | null;
@@ -844,6 +845,7 @@ function Header({
   const understandingTone = getUnderstandingTone(understandingPercent);
   const ringDegree = Math.max(0, Math.min(100, understandingPercent)) * 3.6;
   const canSwitchCats = catProfiles.length > 1;
+  const catAvatarSrc = getCatAvatarIconSrc(recentCatSummary.avatarSignal);
 
   function handleCatChipSelect(catId: string) {
     onCatSelect(catId);
@@ -855,11 +857,17 @@ function Header({
       <div style={styles.profileHero}>
         <div style={styles.catAvatar} aria-hidden="true">
           <img
-            src="/icons/cat-actions/purring.png"
+            key={catAvatarSrc}
+            src={catAvatarSrc}
             alt=""
             style={styles.catAvatarIcon}
             onError={(event) => {
-              event.currentTarget.style.visibility = "hidden";
+              if (event.currentTarget.src.endsWith(DEFAULT_CAT_AVATAR_ICON_SRC)) {
+                event.currentTarget.style.visibility = "hidden";
+                return;
+              }
+
+              event.currentTarget.src = DEFAULT_CAT_AVATAR_ICON_SRC;
             }}
           />
         </div>
@@ -1048,6 +1056,7 @@ function formatTokyoDateKey(date: Date) {
 }
 
 type RecentCatSummary = {
+  avatarSignal: string | null;
   recentSignalLabel: string;
   currentTrendText: string;
   dayMap: DayMapItem[];
@@ -1077,6 +1086,7 @@ function buildRecentCatSummary(events: RecentEvent[]): RecentCatSummary {
   const currentMapItem = dayMap.find((item) => item.dayPart === currentDayPart);
 
   return {
+    avatarSignal: currentMapItem?.signal ?? topSignal?.signal ?? null,
     recentSignalLabel: topSignal
       ? `${getSignalDisplayLabel(topSignal.signal)}\u591a\u3081`
       : recentEvents.length > 0
@@ -1706,6 +1716,30 @@ function getSignalIconSrc(signal: string) {
   return `/icons/cat-actions/${icons[signal] ?? "unknown"}.png`;
 }
 
+function getCatAvatarIconSrc(signal: string | null) {
+  const icons: Record<string, string> = {
+    sleeping: "sleeping",
+    grooming: "grooming",
+    playing: "playing",
+    after_food: "food",
+    food: "food",
+    toilet: "toilet",
+    purring: "purring",
+    meowing: "meowing",
+    following: "following",
+    restless: "restless",
+    low_energy: "low_energy",
+    fighting: "fighting",
+    unknown: "unknown",
+  };
+
+  if (!signal || !icons[signal]) {
+    return DEFAULT_CAT_AVATAR_ICON_SRC;
+  }
+
+  return `/icons/cat-actions/${icons[signal]}.png`;
+}
+
 function getOptionDisplayLabel(label: string) {
   const labels: Record<string, string> = {
     "\u30b0\u30eb\u30fc\u30df\u30f3\u30b0": "\u6bdb\u3065\u304f\u308d\u3044",
@@ -1824,8 +1858,10 @@ const styles = {
     display: "block",
     width: "42px",
     height: "42px",
+    animation: "catAvatarSettle 220ms ease-out",
     objectFit: "contain",
     pointerEvents: "none",
+    transition: "transform 160ms ease, opacity 160ms ease",
   },
   profileText: {
     minWidth: 0,
