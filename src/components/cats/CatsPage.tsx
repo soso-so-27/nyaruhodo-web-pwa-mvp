@@ -145,6 +145,7 @@ export function CatsPage() {
 
   const selectedCoat = activeCatProfile?.appearance?.coat;
   const activeCatAvatarSrc = getCatAvatarSrcForCoat(selectedCoat);
+  const activeCatAvatarStyle = getCatCoatAvatarStyle(selectedCoat);
 
   return (
     <main style={styles.page}>
@@ -161,7 +162,10 @@ export function CatsPage() {
           <h2 style={styles.sectionTitle}>{"一緒に暮らしている子"}</h2>
           <div style={styles.profileSummary}>
             <div style={styles.profileSummaryHeader}>
-              <div style={styles.profileAvatar} aria-hidden="true">
+              <div
+                style={{ ...styles.profileAvatar, ...activeCatAvatarStyle }}
+                aria-hidden="true"
+              >
                 <img src={activeCatAvatarSrc} alt="" style={styles.profileAvatarIcon} />
               </div>
               <div style={styles.profileSummaryText}>
@@ -622,3 +626,39 @@ const styles = {
     lineHeight: 1.6,
   },
 } satisfies Record<string, CSSProperties>;
+
+function getCatCoatAvatarStyle(coat?: CatCoat): CSSProperties {
+  const stylesByCoat: Record<CatCoat, CSSProperties> = {
+    saba: {
+      borderColor: "#d8d2c4",
+      background: "linear-gradient(180deg, #fffaf2 0%, #e6ded1 100%)",
+    },
+    cream: {
+      borderColor: "#d8d2c4",
+      background: "linear-gradient(180deg, #fffaf2 0%, #e6ded1 100%)",
+    },
+    gray: {
+      borderColor: "#d6d3d1",
+      background: "linear-gradient(180deg, #f6f5f3 0%, #e5e2de 100%)",
+    },
+    orange_tabby: {
+      borderColor: "#efc89a",
+      background: "linear-gradient(180deg, #fff1dc 0%, #f5c994 100%)",
+    },
+    black: {
+      borderColor: "#57534e",
+      background: "linear-gradient(180deg, #e7e2dc 0%, #9b928a 100%)",
+    },
+    white: {
+      borderColor: "#d4d4d8",
+      background: "linear-gradient(180deg, #ffffff 0%, #f4f4f5 100%)",
+    },
+    calico: {
+      borderColor: "#ead7bd",
+      background:
+        "linear-gradient(135deg, #fff9ef 0%, #fff9ef 42%, #f8d7ad 43%, #f8d7ad 66%, #e4ded5 67%, #e4ded5 100%)",
+    },
+  };
+
+  return coat ? stylesByCoat[coat] : {};
+}
