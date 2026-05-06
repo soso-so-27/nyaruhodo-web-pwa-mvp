@@ -18,36 +18,51 @@ type TogetherPageProps = {
   recentEvents: RecentEvent[];
 };
 
-type SummaryStats = {
-  activeEvents: RecentEvent[];
-  recentEvents: RecentEvent[];
-  previousEvents: RecentEvent[];
-  recentDayCount: number;
-  previousDayCount: number;
-  recentEventCount: number;
-  previousEventCount: number;
-  increasedSignal: SignalTrend | null;
-  summaryText: string;
-  changeText: string;
-  changeSubText: string;
-  score: number;
-  badges: BadgeItem[];
+type PoseCategory = {
+  label: string;
+  slug: string;
+  group: string;
+  found: boolean;
 };
 
-type SignalTrend = {
-  signal: string;
+type RecentDiscovery = {
   label: string;
-  count: number;
-  diff: number;
+  date: string;
 };
 
-type BadgeItem = {
-  label: string;
+type TimelineItem = {
+  date: string;
   text: string;
-  unlocked: boolean;
 };
 
-const ONE_DAY_MS = 24 * 60 * 60 * 1000;
+const RECENT_DISCOVERIES: RecentDiscovery[] = [
+  { label: "へそ天", date: "5/10" },
+  { label: "箱入り", date: "5/22" },
+  { label: "のびー", date: "6/03" },
+];
+
+const POSE_CATEGORIES: PoseCategory[] = [
+  { label: "へそ天", slug: "belly_up", group: "くつろぎ", found: true },
+  { label: "ごめん寝", slug: "face_down_sleep", group: "ねむい", found: false },
+  { label: "香箱座り", slug: "loaf", group: "くつろぎ", found: false },
+  { label: "箱入り", slug: "in_box", group: "場所", found: true },
+  { label: "液体化", slug: "liquid_cat", group: "場所", found: false },
+  { label: "のびー", slug: "stretch", group: "あそび", found: true },
+  { label: "窓辺監視", slug: "window_watch", group: "場所", found: false },
+  { label: "ふみふみ", slug: "kneading", group: "あそび", found: false },
+  { label: "おててないない", slug: "hidden_paws", group: "くつろぎ", found: false },
+  { label: "顔だけ出す", slug: "peek_face", group: "ねむい", found: false },
+  { label: "まるまり", slug: "curled_up", group: "くつろぎ", found: false },
+  { label: "すりすり", slug: "rubbing", group: "あそび", found: false },
+];
+
+const TIMELINE_ITEMS: TimelineItem[] = [
+  { date: "5/10", text: "初めてのへそ天" },
+  { date: "5/22", text: "箱入りをみつけました" },
+  { date: "6/03", text: "のびーが増えてきました" },
+];
+
+const FOUND_POSE_COUNT = POSE_CATEGORIES.filter((pose) => pose.found).length;
 
 export function TogetherPage({ recentEvents }: TogetherPageProps) {
   const [catProfiles, setCatProfiles] = useState<CatProfile[]>([]);
@@ -73,22 +88,23 @@ export function TogetherPage({ recentEvents }: TogetherPageProps) {
   const catCoat = activeCatProfile?.appearance?.coat;
   const catAvatarSrc = getCatAvatarSrcForCoat(catCoat);
   const catAvatarStyle = getCatCoatAvatarStyle(catCoat);
-
-  const stats = useMemo(
-    () => buildTogetherStats(recentEvents, activeCatId, catName),
-    [recentEvents, activeCatId, catName],
-  );
-  const weekRange = getWeekRangeText();
   const hasActiveCat = Boolean(activeCatProfile);
+  const activeCatEvents = useMemo(
+    () =>
+      activeCatId
+        ? recentEvents.filter((event) => event.local_cat_id === activeCatId)
+        : [],
+    [recentEvents, activeCatId],
+  );
 
   if (!hasLoaded) {
     return (
       <main style={styles.page}>
         <div style={styles.container}>
           <section style={styles.emptyCard}>
-            <h1 style={styles.emptyTitle}>いっしょ時間を準備しています</h1>
+            <h1 style={styles.emptyTitle}>いっしょを準備しています</h1>
             <p style={styles.emptyText}>
-              この子との最近の記録を、少しだけ見ています。
+              この子との発見を、少しだけ整えています。
             </p>
           </section>
         </div>
@@ -104,7 +120,7 @@ export function TogetherPage({ recentEvents }: TogetherPageProps) {
           <section style={styles.emptyCard}>
             <h1 style={styles.emptyTitle}>一緒に暮らしている子を登録しましょう</h1>
             <p style={styles.emptyText}>
-              ねこページで登録すると、いっしょの時間も少しずつ見えてきます。
+              ねこページで登録すると、みつけたことや思い出も少しずつ増えていきます。
             </p>
             <a href="/cats" style={styles.primaryLink}>
               ねこを登録する
@@ -120,132 +136,101 @@ export function TogetherPage({ recentEvents }: TogetherPageProps) {
     <main style={styles.page}>
       <div style={styles.container}>
         <header style={styles.hero}>
-          <div style={styles.heroCopy}>
-            <p style={styles.eyebrow}>いっしょ</p>
-            <h1 style={styles.title}>あなたと{catName}のいっしょ時間</h1>
-            <p style={styles.lead}>ふたりの関係を一緒に見ていこう</p>
-          </div>
-          <div style={styles.heroIllustration} aria-hidden="true">
-            <span style={styles.personShape}>あなた</span>
-            <div style={{ ...styles.heroAvatar, ...catAvatarStyle }}>
+          <div style={styles.heroTop}>
+            <div style={{ ...styles.avatarFrame, ...catAvatarStyle }}>
               <img
                 src={catAvatarSrc}
-                alt=""
-                style={styles.heroAvatarImage}
+                alt={`${catName}のアイコン`}
+                style={styles.avatarImage}
                 onError={(event) => {
                   event.currentTarget.src = "/icons/cat-avatars/neutral.png";
                 }}
               />
             </div>
+            <div style={styles.heroCopy}>
+              <p style={styles.eyebrow}>いっしょ</p>
+              <h1 style={styles.title}>いっしょ</h1>
+              <p style={styles.lead}>
+                みつけたことや思い出が、ここにたまります。
+              </p>
+            </div>
           </div>
+          <p style={styles.heroNote}>
+            {activeCatEvents.length > 0
+              ? `${catName}との最近の記録も、あとで思い出にできます。`
+              : `${catName}との発見は、これから少しずつ増えていきます。`}
+          </p>
         </header>
 
-        <nav style={styles.segmentNav} aria-label="いっしょページ内ナビ">
-          <span style={styles.segmentActive}>まとめ</span>
-          <a href="#changes" style={styles.segmentButton}>
-            変化
-          </a>
-          <a href="#message" style={styles.segmentButton}>
-            思い出
-          </a>
-          <a href="#badges" style={styles.segmentButton}>
-            バッジ
-          </a>
-        </nav>
-
-        <section style={styles.summaryCard}>
-          <div style={styles.cardHeader}>
-            <h2 style={styles.cardTitle}>今週の関係のまとめ</h2>
-            <span style={styles.dateRange}>{weekRange}</span>
-          </div>
-          <p style={styles.summaryText}>{stats.summaryText}</p>
-        </section>
-
-        <section style={styles.statsGrid} aria-label="今週の小さなまとめ">
-          <MiniStatCard
-            label="いっしょに見た日数"
-            value={`${stats.recentDayCount}日`}
-            subText={formatDelta(stats.recentDayCount, stats.previousDayCount, "日")}
-          />
-          <MiniStatCard
-            label="あなたが見た回数"
-            value={`${stats.recentEventCount}回`}
-            subText={formatDelta(stats.recentEventCount, stats.previousEventCount, "回")}
-          />
-          <MiniStatCard
-            label={`${catName}の増えた様子`}
-            value={stats.increasedSignal ? `${stats.increasedSignal.label}多め` : "少しずつ"}
-            subText={
-              stats.increasedSignal
-                ? formatSignalDelta(stats.increasedSignal)
-                : "今週の記録から"
-            }
-          />
-        </section>
-
-        <section id="changes" style={styles.card}>
-          <h2 style={styles.cardTitle}>最近の変化</h2>
-          <p style={styles.bodyText}>{stats.changeText}</p>
-          <p style={styles.subtleText}>{stats.changeSubText}</p>
-        </section>
-
-        <section style={styles.relationshipCard}>
-          <div style={styles.scoreRing} aria-label={`関係スコア ${stats.score}`}>
-            <span style={styles.scoreValue}>{stats.score}</span>
-          </div>
-          <div style={styles.scoreTextBlock}>
-            <p style={styles.scoreLabel}>あなたと{catName}の関係スコア</p>
-            <h2 style={styles.scoreTitle}>ふたりの信頼が育ってきています</h2>
-            <p style={styles.subtleText}>
-              記録から見た、アプリ内の小さな目安です。
-            </p>
-          </div>
-        </section>
-
-        <section id="message" style={styles.messageCard}>
-          <div>
-            <h2 style={styles.cardTitle}>あなたへのメッセージ</h2>
-            <p style={styles.messageText}>
-              {stats.recentEventCount > 0
-                ? `${catName}のこと、ちゃんと見てるね。これからも少しずつ、いい時間をつくっていこうね。`
-                : `${catName}のこと、これから少しずつ見えてきます。見えたままをひとつ残すだけでOKです。`}
-            </p>
-          </div>
-          <div style={{ ...styles.messageAvatar, ...catAvatarStyle }} aria-hidden="true">
-            <img src={catAvatarSrc} alt="" style={styles.messageAvatarImage} />
-          </div>
-        </section>
-
-        {stats.recentEventCount < 2 ? (
-          <section style={styles.emptyHintCard}>
-            <h2 style={styles.cardTitle}>
-              {catName}との時間は、これから少しずつ見えてきます
+        <section style={styles.discoverySection} aria-labelledby="recent-found">
+          <div style={styles.sectionHeader}>
+            <h2 id="recent-found" style={styles.sectionTitle}>
+              最近みつけた
             </h2>
-            <p style={styles.bodyText}>
-              いま見えたままをひとつ残すだけでOKです。
-            </p>
-            <a href="/home" style={styles.secondaryLink}>
-              ほーむで記録する
-            </a>
-          </section>
-        ) : null}
-
-        <section id="badges" style={styles.card}>
-          <div style={styles.cardHeader}>
-            <h2 style={styles.cardTitle}>バッジコレクション</h2>
           </div>
-          <div style={styles.badgeGrid}>
-            {stats.badges.map((badge) => (
-              <div
-                key={badge.label}
-                style={badge.unlocked ? styles.badge : styles.badgeLocked}
+          <div style={styles.discoveryRow}>
+            {RECENT_DISCOVERIES.map((item) => (
+              <article key={item.label} style={styles.discoveryCard}>
+                <div style={styles.discoveryThumb} aria-hidden="true">
+                  {getPoseMark(item.label)}
+                </div>
+                <p style={styles.discoveryLabel}>{item.label}</p>
+                <p style={styles.discoveryDate}>{item.date}</p>
+              </article>
+            ))}
+          </div>
+        </section>
+
+        <section style={styles.card} aria-labelledby="pose-zukan">
+          <div style={styles.sectionHeader}>
+            <div>
+              <h2 id="pose-zukan" style={styles.sectionTitle}>
+                ポーズ図鑑
+              </h2>
+              <p style={styles.sectionSubText}>{FOUND_POSE_COUNT}つみつけた</p>
+            </div>
+          </div>
+          <div style={styles.poseGrid}>
+            {POSE_CATEGORIES.map((pose) => (
+              <article
+                key={pose.slug}
+                style={pose.found ? styles.poseCardFound : styles.poseCard}
               >
-                <span style={styles.badgeIcon} aria-hidden="true">
-                  {badge.unlocked ? "○" : "・"}
-                </span>
-                <span style={styles.badgeLabel}>{badge.label}</span>
-                <span style={styles.badgeText}>{badge.text}</span>
-              </div>
+                <div style={pose.found ? styles.poseIconFound : styles.poseIcon}>
+                  {getPoseMark(pose.label)}
+                </div>
+                <p style={styles.poseLabel}>{pose.label}</p>
+                <p style={styles.poseGroup}>{pose.group}</p>
+              </article>
+            ))}
+          </div>
+        </section>
+
+        <section style={styles.card} aria-labelledby="cat-likeness">
+          <h2 id="cat-likeness" style={styles.sectionTitle}>
+            この子らしさ
+          </h2>
+          <div style={styles.likenessList}>
+            <p style={styles.likenessText}>
+              {catName}は、箱に入るのが少し好きそうです。
+            </p>
+            <p style={styles.likenessText}>
+              夜は、のびーが見つかることもあります。
+            </p>
+          </div>
+        </section>
+
+        <section style={styles.card} aria-labelledby="memory-timeline">
+          <h2 id="memory-timeline" style={styles.sectionTitle}>
+            思い出タイムライン
+          </h2>
+          <div style={styles.timeline}>
+            {TIMELINE_ITEMS.map((item) => (
+              <article key={`${item.date}-${item.text}`} style={styles.timelineItem}>
+                <span style={styles.timelineDate}>{item.date}</span>
+                <span style={styles.timelineDot} aria-hidden="true" />
+                <p style={styles.timelineText}>{item.text}</p>
+              </article>
             ))}
           </div>
         </section>
@@ -255,301 +240,23 @@ export function TogetherPage({ recentEvents }: TogetherPageProps) {
   );
 }
 
-function MiniStatCard({
-  label,
-  value,
-  subText,
-}: {
-  label: string;
-  value: string;
-  subText: string;
-}) {
-  return (
-    <article style={styles.statCard}>
-      <p style={styles.statLabel}>{label}</p>
-      <p style={styles.statValue}>{value}</p>
-      <p style={styles.statSubText}>{subText}</p>
-    </article>
-  );
-}
-
-function buildTogetherStats(
-  events: RecentEvent[],
-  activeCatId: string | null,
-  catName: string,
-): SummaryStats {
-  const activeEvents = activeCatId
-    ? events.filter((event) => event.local_cat_id === activeCatId)
-    : [];
-  const now = Date.now();
-  const recentStart = now - 7 * ONE_DAY_MS;
-  const previousStart = now - 14 * ONE_DAY_MS;
-  const recentEvents = activeEvents.filter((event) => {
-    const time = getEventTime(event);
-    return time >= recentStart && time <= now;
-  });
-  const previousEvents = activeEvents.filter((event) => {
-    const time = getEventTime(event);
-    return time >= previousStart && time < recentStart;
-  });
-  const recentDayCount = countDistinctDays(recentEvents);
-  const previousDayCount = countDistinctDays(previousEvents);
-  const increasedSignal = getIncreasedSignal(recentEvents, previousEvents);
-  const score = calculateRelationshipScore(
-    recentEvents.length,
-    recentDayCount,
-  );
-
-  return {
-    activeEvents,
-    recentEvents,
-    previousEvents,
-    recentDayCount,
-    previousDayCount,
-    recentEventCount: recentEvents.length,
-    previousEventCount: previousEvents.length,
-    increasedSignal,
-    summaryText: buildSummaryText(catName, recentEvents, increasedSignal),
-    changeText: buildChangeText(recentEvents, increasedSignal),
-    changeSubText: buildChangeSubText(increasedSignal),
-    score,
-    badges: buildBadges(activeEvents),
-  };
-}
-
-function getEventTime(event: RecentEvent) {
-  const date = new Date(event.occurred_at || event.created_at);
-  const time = date.getTime();
-
-  return Number.isNaN(time) ? 0 : time;
-}
-
-function countDistinctDays(events: RecentEvent[]) {
-  return new Set(events.map((event) => formatTokyoDateKey(new Date(getEventTime(event))))).size;
-}
-
-function formatTokyoDateKey(date: Date) {
-  return new Intl.DateTimeFormat("en-CA", {
-    timeZone: "Asia/Tokyo",
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-  }).format(date);
-}
-
-function getIncreasedSignal(
-  recentEvents: RecentEvent[],
-  previousEvents: RecentEvent[],
-) {
-  const recentCounts = countSignals(recentEvents);
-  const previousCounts = countSignals(previousEvents);
-  const candidates = [...recentCounts.entries()]
-    .map(([signal, count]) => ({
-      signal,
-      label: getSignalDisplayLabel(signal),
-      count,
-      diff: count - (previousCounts.get(signal) ?? 0),
-    }))
-    .filter((item) => item.count >= 2)
-    .sort((a, b) => {
-      if (b.diff !== a.diff) {
-        return b.diff - a.diff;
-      }
-
-      return b.count - a.count;
-    });
-
-  const top = candidates[0];
-
-  if (!top || top.diff <= 0) {
-    return null;
-  }
-
-  return top;
-}
-
-function countSignals(events: RecentEvent[]) {
-  const counts = new Map<string, number>();
-
-  events.forEach((event) => {
-    if (!event.signal) {
-      return;
-    }
-
-    counts.set(event.signal, (counts.get(event.signal) ?? 0) + 1);
-  });
-
-  return counts;
-}
-
-function buildSummaryText(
-  catName: string,
-  recentEvents: RecentEvent[],
-  increasedSignal: SignalTrend | null,
-) {
-  if (recentEvents.length === 0) {
-    return `${catName}のこと、少しずつ分かってきています`;
-  }
-
-  if (recentEvents.length < 3) {
-    return `${catName}のリズムが少しずつ見えてきています`;
-  }
-
-  if (increasedSignal?.signal === "following") {
-    return `${catName}は、あなたの近くで過ごす日が少し増えているみたい`;
-  }
-
-  if (increasedSignal?.signal === "meowing") {
-    return `${catName}は、声で伝えることが少し多めみたい`;
-  }
-
-  if (increasedSignal?.signal === "playing") {
-    return `${catName}は、動きたい時間が少し見えてきています`;
-  }
-
-  return `${catName}のこと、少しずつ分かってきています`;
-}
-
-function buildChangeText(
-  recentEvents: RecentEvent[],
-  increasedSignal: SignalTrend | null,
-) {
-  if (recentEvents.length === 0) {
-    return "まだこれから。少しずつ見えてきます";
-  }
-
-  if (increasedSignal?.signal === "following") {
-    return "そばに来る記録が少し増えています";
-  }
-
-  if (increasedSignal?.signal === "meowing") {
-    return "鳴いて伝えることが少し増えています";
-  }
-
-  if (increasedSignal?.signal === "playing") {
-    return "遊んでいる記録が少し増えています";
-  }
-
-  const nightEvents = recentEvents.filter((event) => {
-    const timeBand = event.calendar_context?.timeBand;
-    return timeBand === "night" || timeBand === "late_night";
-  });
-
-  if (nightEvents.length >= 2) {
-    return "夜の記録が少し増えています";
-  }
-
-  const daytimeSleeping = recentEvents.filter(
-    (event) =>
-      event.signal === "sleeping" &&
-      event.calendar_context?.timeBand === "daytime",
-  );
-
-  if (daytimeSleeping.length >= 2) {
-    return "昼によく寝ているみたいです";
-  }
-
-  return "いくつかの様子が少しずつ残っています";
-}
-
-function buildChangeSubText(increasedSignal: SignalTrend | null) {
-  if (!increasedSignal) {
-    return "先週と比べながら、少しずつ見ていけます";
-  }
-
-  return `先週より +${increasedSignal.diff}回`;
-}
-
-function calculateRelationshipScore(eventCount: number, dayCount: number) {
-  if (eventCount === 0) {
-    return 12;
-  }
-
-  return Math.min(95, 40 + eventCount * 5 + dayCount * 5);
-}
-
-function buildBadges(events: RecentEvent[]): BadgeItem[] {
-  const dayCount = countDistinctDays(events);
-
-  return [
-    {
-      label: "はじめの一歩",
-      text: "1回記録",
-      unlocked: events.length >= 1,
-    },
-    {
-      label: "見守り上手",
-      text: "記録10回",
-      unlocked: events.length >= 10,
-    },
-    {
-      label: "なかよし",
-      text: "7日分",
-      unlocked: dayCount >= 7,
-    },
-    {
-      label: "これからも",
-      text: "おたのしみに",
-      unlocked: false,
-    },
-  ];
-}
-
-function formatDelta(current: number, previous: number, unit: string) {
-  const diff = current - previous;
-
-  if (diff > 0) {
-    return `先週より +${diff}${unit}`;
-  }
-
-  if (diff < 0) {
-    return "先週より少なめ";
-  }
-
-  return current > 0 ? "先週と同じくらい" : "これから";
-}
-
-function formatSignalDelta(signal: SignalTrend) {
-  if (signal.diff > 0) {
-    return `先週より +${signal.diff}回`;
-  }
-
-  return "今週の多め";
-}
-
-function getWeekRangeText() {
-  const end = new Date();
-  const start = new Date(end.getTime() - 6 * ONE_DAY_MS);
-
-  return `${formatMonthDay(start)} - ${formatMonthDay(end)}`;
-}
-
-function formatMonthDay(date: Date) {
-  return new Intl.DateTimeFormat("ja-JP", {
-    timeZone: "Asia/Tokyo",
-    month: "numeric",
-    day: "numeric",
-  }).format(date);
-}
-
-function getSignalDisplayLabel(signal: string) {
-  const labels: Record<string, string> = {
-    sleeping: "ねてる",
-    grooming: "毛づくろい",
-    playing: "遊んでる",
-    after_food: "ごはん",
-    food: "ごはん",
-    toilet: "トイレ",
-    purring: "ゴロゴロ",
-    meowing: "鳴いてる",
-    following: "ついてくる",
-    restless: "そわそわ",
-    low_energy: "元気ない",
-    fighting: "ケンカ",
-    unknown: "よくわからない",
+function getPoseMark(label: string) {
+  const marks: Record<string, string> = {
+    "へそ天": "へ",
+    "ごめん寝": "寝",
+    "香箱座り": "香",
+    "箱入り": "箱",
+    "液体化": "液",
+    "のびー": "伸",
+    "窓辺監視": "窓",
+    "ふみふみ": "ふ",
+    "おててないない": "手",
+    "顔だけ出す": "顔",
+    "まるまり": "丸",
+    "すりすり": "す",
   };
 
-  return labels[signal] ?? "様子";
+  return marks[label] ?? "猫";
 }
 
 function getCatCoatAvatarStyle(coat?: CatCoat): CSSProperties {
@@ -591,390 +298,288 @@ function getCatCoatAvatarStyle(coat?: CatCoat): CSSProperties {
 const styles = {
   page: {
     minHeight: "100svh",
-    background:
-      "linear-gradient(180deg, #faf6ef 0%, #f5efe7 48%, #f0ebe4 100%)",
+    background: "#f3eee7",
     color: "#27272a",
-    padding: "14px 14px calc(250px + env(safe-area-inset-bottom))",
   },
   container: {
-    width: "min(100%, 460px)",
+    width: "min(100%, 480px)",
     margin: "0 auto",
+    padding: "16px 14px calc(154px + env(safe-area-inset-bottom))",
   },
   hero: {
-    display: "grid",
-    gridTemplateColumns: "1fr auto",
-    gap: "14px",
-    alignItems: "center",
-    padding: "20px 18px",
-    border: "1px solid #eadfd2",
+    border: "1px solid #eadfce",
     borderRadius: "28px",
     background:
-      "radial-gradient(circle at 90% 10%, rgba(239, 196, 144, 0.26), transparent 34%), #fffaf3",
-    marginBottom: "12px",
+      "linear-gradient(145deg, rgba(255, 252, 247, 0.98), rgba(255, 245, 231, 0.92))",
+    padding: "18px",
+    marginBottom: "14px",
   },
-  heroCopy: {
-    minWidth: 0,
+  heroTop: {
+    display: "flex",
+    alignItems: "center",
+    gap: "14px",
   },
-  eyebrow: {
-    margin: "0 0 5px",
-    color: "#8a7562",
-    fontSize: "12px",
-    fontWeight: 800,
-  },
-  title: {
-    margin: 0,
-    color: "#27272a",
-    fontSize: "26px",
-    lineHeight: 1.18,
-    letterSpacing: 0,
-  },
-  lead: {
-    margin: "8px 0 0",
-    color: "#6f6257",
-    fontSize: "13px",
-    lineHeight: 1.6,
-  },
-  heroIllustration: {
-    position: "relative",
-    width: "118px",
-    height: "118px",
-  },
-  personShape: {
-    position: "absolute",
-    top: "7px",
-    right: "4px",
+  avatarFrame: {
+    flex: "0 0 auto",
     display: "flex",
     alignItems: "center",
     justifyContent: "center",
     width: "74px",
     height: "74px",
-    borderRadius: "999px",
-    background: "#e9d3bd",
-    color: "#755d4b",
-    fontSize: "11px",
-    fontWeight: 800,
-  },
-  heroAvatar: {
-    position: "absolute",
-    left: 0,
-    bottom: 0,
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "center",
-    width: "70px",
-    height: "70px",
-    border: "1px solid #eadfd2",
+    border: "1.5px solid #eadfce",
     borderRadius: "24px",
-    background: "#fff8ee",
+    background: "#fffaf4",
+    overflow: "hidden",
   },
-  heroAvatarImage: {
-    width: "56px",
-    height: "56px",
+  avatarImage: {
+    display: "block",
+    width: "62px",
+    height: "62px",
     objectFit: "contain",
   },
-  segmentNav: {
-    display: "flex",
-    gap: "8px",
-    overflowX: "auto",
-    marginBottom: "12px",
+  heroCopy: {
+    minWidth: 0,
   },
-  segmentActive: {
-    display: "inline-flex",
-    alignItems: "center",
-    justifyContent: "center",
-    minHeight: "34px",
-    padding: "0 14px",
-    borderRadius: "999px",
-    background: "#6b5746",
-    color: "#ffffff",
+  eyebrow: {
+    margin: "0 0 4px",
+    color: "#8a7b6b",
     fontSize: "13px",
     fontWeight: 800,
-    whiteSpace: "nowrap",
+    letterSpacing: 0,
   },
-  segmentButton: {
-    display: "inline-flex",
-    alignItems: "center",
-    justifyContent: "center",
-    minHeight: "34px",
-    padding: "0 14px",
-    border: "1px solid #eadfd2",
-    borderRadius: "999px",
+  title: {
+    margin: "0 0 6px",
+    color: "#27272a",
+    fontSize: "34px",
+    lineHeight: 1.05,
+    fontWeight: 900,
+    letterSpacing: 0,
+  },
+  lead: {
+    margin: 0,
+    color: "#6f665c",
+    fontSize: "14px",
+    lineHeight: 1.65,
+    fontWeight: 700,
+  },
+  heroNote: {
+    margin: "14px 0 0",
+    borderRadius: "18px",
     background: "rgba(255, 255, 255, 0.72)",
-    color: "#6f6257",
+    padding: "10px 12px",
+    color: "#6f665c",
     fontSize: "13px",
-    fontWeight: 800,
-    textDecoration: "none",
-    whiteSpace: "nowrap",
+    lineHeight: 1.55,
+    fontWeight: 700,
   },
-  summaryCard: {
-    padding: "17px 16px",
-    border: "1px solid #eadfd2",
-    borderRadius: "22px",
-    background: "#fffdfa",
-    marginBottom: "10px",
+  discoverySection: {
+    border: "1px solid #eadfce",
+    borderRadius: "26px",
+    background: "#fffaf4",
+    padding: "16px",
+    marginBottom: "14px",
   },
   card: {
+    border: "1px solid #e7ded4",
+    borderRadius: "26px",
+    background: "#ffffff",
     padding: "16px",
-    border: "1px solid #eadfd2",
-    borderRadius: "22px",
-    background: "#fffdfa",
-    marginBottom: "10px",
+    marginBottom: "14px",
   },
-  cardHeader: {
+  sectionHeader: {
     display: "flex",
-    alignItems: "baseline",
+    alignItems: "flex-start",
     justifyContent: "space-between",
     gap: "12px",
-    marginBottom: "8px",
+    marginBottom: "12px",
   },
-  cardTitle: {
+  sectionTitle: {
     margin: 0,
-    color: "#27272a",
-    fontSize: "16px",
+    color: "#2f2b28",
+    fontSize: "20px",
+    lineHeight: 1.25,
     fontWeight: 900,
     letterSpacing: 0,
   },
-  dateRange: {
-    color: "#a08a75",
-    fontSize: "12px",
+  sectionSubText: {
+    margin: "4px 0 0",
+    color: "#8a7b6b",
+    fontSize: "13px",
     fontWeight: 800,
-    whiteSpace: "nowrap",
   },
-  summaryText: {
-    margin: 0,
-    color: "#3f3f46",
-    fontSize: "19px",
-    fontWeight: 900,
-    lineHeight: 1.55,
-    letterSpacing: 0,
-  },
-  statsGrid: {
+  discoveryRow: {
     display: "grid",
     gridTemplateColumns: "repeat(3, minmax(0, 1fr))",
-    gap: "8px",
-    marginBottom: "10px",
+    gap: "10px",
   },
-  statCard: {
+  discoveryCard: {
     minWidth: 0,
-    padding: "12px 10px",
-    border: "1px solid #eadfd2",
+    border: "1px solid #efdcca",
+    borderRadius: "20px",
+    background: "#fff7ed",
+    padding: "10px 8px",
+    textAlign: "center",
+  },
+  discoveryThumb: {
+    display: "grid",
+    placeItems: "center",
+    width: "48px",
+    height: "48px",
+    margin: "0 auto 8px",
     borderRadius: "18px",
-    background: "rgba(255, 253, 249, 0.92)",
-  },
-  statLabel: {
-    margin: 0,
-    color: "#7a6a5d",
-    fontSize: "11px",
-    fontWeight: 800,
-    lineHeight: 1.35,
-  },
-  statValue: {
-    margin: "8px 0 2px",
-    color: "#7b5fbd",
-    fontSize: "22px",
+    background: "#fffdf8",
+    color: "#9a6a3f",
+    fontSize: "18px",
     fontWeight: 900,
-    lineHeight: 1,
   },
-  statSubText: {
+  discoveryLabel: {
     margin: 0,
-    color: "#8d8177",
-    fontSize: "11px",
-    fontWeight: 700,
-    lineHeight: 1.35,
-  },
-  bodyText: {
-    margin: "8px 0 0",
-    color: "#3f3f46",
-    fontSize: "15px",
-    fontWeight: 800,
-    lineHeight: 1.6,
-  },
-  subtleText: {
-    margin: "6px 0 0",
-    color: "#8d8177",
-    fontSize: "12px",
-    fontWeight: 700,
-    lineHeight: 1.55,
-  },
-  relationshipCard: {
-    display: "grid",
-    gridTemplateColumns: "92px 1fr",
-    gap: "14px",
-    alignItems: "center",
-    padding: "16px",
-    border: "1px solid #eadfd2",
-    borderRadius: "22px",
-    background: "#fffdfa",
-    marginBottom: "10px",
-  },
-  scoreRing: {
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "center",
-    width: "86px",
-    height: "78px",
-    borderRadius: "46% 46% 50% 50%",
-    background:
-      "radial-gradient(circle at 50% 48%, #fffdfa 47%, transparent 48%), conic-gradient(#f29a83 0deg 285deg, #f1e4d8 285deg 360deg)",
-  },
-  scoreValue: {
-    color: "#6b5746",
-    fontSize: "25px",
-    fontWeight: 950,
-  },
-  scoreTextBlock: {
-    minWidth: 0,
-  },
-  scoreLabel: {
-    margin: "0 0 5px",
-    color: "#7a6a5d",
-    fontSize: "12px",
-    fontWeight: 800,
-  },
-  scoreTitle: {
-    margin: 0,
-    color: "#3f3f46",
-    fontSize: "17px",
-    fontWeight: 900,
-    lineHeight: 1.45,
-  },
-  messageCard: {
-    display: "grid",
-    gridTemplateColumns: "1fr auto",
-    gap: "12px",
-    alignItems: "center",
-    padding: "16px",
-    border: "1px solid #eadfd2",
-    borderRadius: "22px",
-    background: "#fff8ef",
-    marginBottom: "10px",
-  },
-  messageText: {
-    margin: "8px 0 0",
-    color: "#4b4038",
-    fontSize: "14px",
-    fontWeight: 800,
-    lineHeight: 1.65,
-  },
-  messageAvatar: {
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "center",
-    width: "68px",
-    height: "68px",
-    border: "1px solid #eadfd2",
-    borderRadius: "22px",
-    background: "#fffdfa",
-  },
-  messageAvatarImage: {
-    width: "54px",
-    height: "54px",
-    objectFit: "contain",
-  },
-  emptyHintCard: {
-    padding: "16px",
-    border: "1px solid #eadfd2",
-    borderRadius: "22px",
-    background: "#fffdfa",
-    marginBottom: "10px",
-  },
-  secondaryLink: {
-    display: "inline-flex",
-    alignItems: "center",
-    justifyContent: "center",
-    minHeight: "40px",
-    marginTop: "12px",
-    padding: "0 14px",
-    border: "1px solid #dbcbbd",
-    borderRadius: "999px",
-    color: "#5f4d3f",
-    textDecoration: "none",
+    color: "#2f2b28",
     fontSize: "13px",
-    fontWeight: 850,
+    fontWeight: 900,
+    lineHeight: 1.35,
   },
-  badgeGrid: {
+  discoveryDate: {
+    margin: "3px 0 0",
+    color: "#a09082",
+    fontSize: "11px",
+    fontWeight: 800,
+  },
+  poseGrid: {
     display: "grid",
-    gridTemplateColumns: "repeat(4, minmax(0, 1fr))",
+    gridTemplateColumns: "repeat(3, minmax(0, 1fr))",
+    gap: "9px",
+  },
+  poseCard: {
+    minHeight: "92px",
+    border: "1px solid #eee4da",
+    borderRadius: "18px",
+    background: "#fbfaf8",
+    padding: "10px 6px",
+    textAlign: "center",
+    opacity: 0.58,
+  },
+  poseCardFound: {
+    minHeight: "92px",
+    border: "1px solid #efd7be",
+    borderRadius: "18px",
+    background: "#fff7ed",
+    padding: "10px 6px",
+    textAlign: "center",
+  },
+  poseIcon: {
+    display: "grid",
+    placeItems: "center",
+    width: "36px",
+    height: "36px",
+    margin: "0 auto 7px",
+    borderRadius: "14px",
+    background: "#f4eee8",
+    color: "#a69a8e",
+    fontSize: "14px",
+    fontWeight: 900,
+  },
+  poseIconFound: {
+    display: "grid",
+    placeItems: "center",
+    width: "36px",
+    height: "36px",
+    margin: "0 auto 7px",
+    borderRadius: "14px",
+    background: "#fffdf8",
+    color: "#9a6a3f",
+    fontSize: "14px",
+    fontWeight: 900,
+  },
+  poseLabel: {
+    margin: 0,
+    color: "#2f2b28",
+    fontSize: "12px",
+    fontWeight: 900,
+    lineHeight: 1.35,
+  },
+  poseGroup: {
+    margin: "3px 0 0",
+    color: "#9a8e82",
+    fontSize: "10px",
+    fontWeight: 800,
+    lineHeight: 1.25,
+  },
+  likenessList: {
+    display: "grid",
     gap: "8px",
   },
-  badge: {
-    display: "flex",
-    flexDirection: "column",
-    alignItems: "center",
-    gap: "4px",
-    minHeight: "82px",
-    padding: "10px 6px",
-    border: "1px solid #efd7a6",
+  likenessText: {
+    margin: 0,
     borderRadius: "18px",
-    background: "#fff8e7",
-    color: "#5f4d3f",
+    background: "#fbf7f1",
+    padding: "11px 12px",
+    color: "#4f463f",
+    fontSize: "14px",
+    lineHeight: 1.6,
+    fontWeight: 800,
   },
-  badgeLocked: {
-    display: "flex",
-    flexDirection: "column",
-    alignItems: "center",
-    gap: "4px",
-    minHeight: "82px",
-    padding: "10px 6px",
-    border: "1px solid #eee7df",
-    borderRadius: "18px",
-    background: "#faf7f2",
-    color: "#b4aaa1",
+  timeline: {
+    display: "grid",
+    gap: "10px",
   },
-  badgeIcon: {
-    display: "flex",
+  timelineItem: {
+    display: "grid",
+    gridTemplateColumns: "48px 12px 1fr",
     alignItems: "center",
-    justifyContent: "center",
-    width: "28px",
-    height: "28px",
+    gap: "8px",
+  },
+  timelineDate: {
+    color: "#8a7b6b",
+    fontSize: "12px",
+    fontWeight: 900,
+  },
+  timelineDot: {
+    width: "9px",
+    height: "9px",
     borderRadius: "999px",
-    background: "rgba(255, 255, 255, 0.78)",
-    fontSize: "17px",
-    fontWeight: 900,
+    background: "#d99b65",
   },
-  badgeLabel: {
-    color: "inherit",
-    fontSize: "11px",
-    fontWeight: 900,
-    textAlign: "center",
-    lineHeight: 1.2,
-  },
-  badgeText: {
-    color: "inherit",
-    fontSize: "10px",
-    fontWeight: 700,
-    textAlign: "center",
-    lineHeight: 1.2,
+  timelineText: {
+    margin: 0,
+    borderRadius: "16px",
+    background: "#fbf7f1",
+    padding: "10px 12px",
+    color: "#4f463f",
+    fontSize: "13px",
+    lineHeight: 1.5,
+    fontWeight: 800,
   },
   emptyCard: {
-    padding: "24px 18px",
-    border: "1px solid #eadfd2",
-    borderRadius: "26px",
-    background: "#fffdfa",
+    border: "1px solid #eadfce",
+    borderRadius: "28px",
+    background: "#fffaf4",
+    padding: "22px",
+    marginTop: "24px",
   },
   emptyTitle: {
-    margin: 0,
+    margin: "0 0 8px",
     color: "#27272a",
-    fontSize: "22px",
+    fontSize: "24px",
+    lineHeight: 1.3,
     fontWeight: 900,
-    lineHeight: 1.35,
   },
   emptyText: {
-    margin: "10px 0 0",
-    color: "#6f6257",
+    margin: "0 0 16px",
+    color: "#6f665c",
     fontSize: "14px",
     lineHeight: 1.7,
+    fontWeight: 700,
   },
   primaryLink: {
     display: "inline-flex",
     alignItems: "center",
     justifyContent: "center",
     minHeight: "44px",
-    marginTop: "16px",
-    padding: "0 18px",
     borderRadius: "999px",
-    background: "#6b5746",
+    background: "#3f3d46",
     color: "#ffffff",
+    padding: "0 18px",
     textDecoration: "none",
     fontSize: "14px",
     fontWeight: 900,
