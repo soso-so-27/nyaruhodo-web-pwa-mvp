@@ -58,6 +58,8 @@ const currentStateSaveSuccessMessage =
   "\u6b8b\u3057\u307e\u3057\u305f\u3002\n{catName}\u306e\u3053\u3068\u304c\u3001\u5c11\u3057\u305a\u3064\u898b\u3048\u3066\u304d\u307e\u3059\u3002";
 const firstCurrentStateSaveSuccessMessage =
   "{label}\u3001\u898b\u3064\u3051\u307e\u3057\u305f";
+const concernSaveSuccessMessage =
+  "\u6b8b\u3057\u307e\u3057\u305f\u3002\n{catName}\u306e\u69d8\u5b50\u304c\u3001\u5c11\u3057\u305a\u3064\u305f\u307e\u3063\u3066\u3044\u304d\u307e\u3059\u3002";
 
 const ONBOARDING_HOME_HINT_KEY = "diagnosis_onboarding_home_hint";
 const ONBOARDING_HOME_HINT_MAX_AGE_MS = 10 * 60 * 1000;
@@ -422,30 +424,20 @@ export function HomeInput({
       return;
     }
 
-    const params = new URLSearchParams({
-      input,
-    });
-
-    if (event?.id) {
-      params.set("event_id", event.id);
-    }
-
-    if (activeCatId) {
-      params.set("local_cat_id", activeCatId);
-    }
-
-    if (
-      activeCatProfile?.typeKey &&
-      activeCatProfile.typeKey !== "balanced"
-    ) {
-      params.set("onboarding_type_key", activeCatProfile.typeKey);
-    }
-
-    if (activeCatProfile?.modifiers?.length) {
-      params.set("onboarding_modifiers", activeCatProfile.modifiers.join(","));
-    }
-
-    router.push(`/diagnose?${params.toString()}`);
+    setSaveErrorSection("");
+    setSaveErrorMessage("");
+    setCurrentStateMessage(
+      concernSaveSuccessMessage.replace("{catName}", catName),
+    );
+    setRecentStateRecords(
+      saveRecentStateRecord({
+        localCatId: activeCatId,
+        signal: input,
+        label,
+      }),
+    );
+    setIsDailyHintDismissed(false);
+    router.refresh();
   }
 
   async function saveDailyHintFeedback(
@@ -585,34 +577,49 @@ export function HomeInput({
         ) : null}
 
         <div id="record" style={styles.actionArea}>
-          <OptionSection
-            title={`${catName}\u306f\u3044\u307e\u3069\u3046\u3057\u3066\u308b\uff1f`}
-            options={CURRENT_OPTIONS}
-            variant="current"
-            description={"\u3044\u307e\u898b\u3048\u305f\u307e\u307e\u3001\u3072\u3068\u3064\u3067OK\u3067\u3059"}
-            message={currentStateMessage}
-            errorMessage={
-              saveErrorSection === "current" ? saveErrorMessage : ""
-            }
-            activeCatId={activeCatId}
-            recentStateRecords={recentStateRecords}
-            onSelect={(option) => {
-              void handleCurrentSelect(option.label, option.signal);
-            }}
-          />
+          <section style={styles.observationCard}>
+            <h2 style={styles.sectionTitle}>
+              {`${catName}\u306f\u3044\u307e\u3069\u3046\u3057\u3066\u308b\uff1f`}
+            </h2>
+            <p style={styles.sectionDescription}>
+              {"\u3044\u307e\u898b\u3048\u305f\u307e\u307e\u3001\u3072\u3068\u3064\u3067OK\u3067\u3059"}
+            </p>
+            {currentStateMessage ? (
+              <p style={styles.sectionMessage}>{currentStateMessage}</p>
+            ) : null}
 
-          <OptionSection
-            title={"\u3061\u3087\u3063\u3068\u6c17\u306b\u306a\u308b\uff1f"}
-            options={CONCERN_OPTIONS}
-            variant="concern"
-            description={"\u8fd1\u3044\u3082\u306e\u3092\u3072\u3068\u3064\u3067OK"}
-            errorMessage={
-              saveErrorSection === "concern" ? saveErrorMessage : ""
-            }
-            onSelect={(option) => {
-              void handleConcernSelect(option.label, option.input);
-            }}
-          />
+            <OptionSection
+              label={"\u3044\u3064\u3082\u306e\u69d8\u5b50"}
+              title=""
+              options={CURRENT_OPTIONS}
+              variant="current"
+              embedded
+              errorMessage={
+                saveErrorSection === "current" ? saveErrorMessage : ""
+              }
+              activeCatId={activeCatId}
+              recentStateRecords={recentStateRecords}
+              onSelect={(option) => {
+                void handleCurrentSelect(option.label, option.signal);
+              }}
+            />
+
+            <OptionSection
+              label={"\u3061\u3087\u3063\u3068\u6c17\u306b\u306a\u308b"}
+              title=""
+              options={CONCERN_OPTIONS}
+              variant="concern"
+              embedded
+              errorMessage={
+                saveErrorSection === "concern" ? saveErrorMessage : ""
+              }
+              activeCatId={activeCatId}
+              recentStateRecords={recentStateRecords}
+              onSelect={(option) => {
+                void handleConcernSelect(option.label, option.input);
+              }}
+            />
+          </section>
         </div>
 
       </div>
@@ -1565,6 +1572,7 @@ function OptionSection<Option extends { label: string }>({
   options,
   description,
   variant = "current",
+  embedded = false,
   message,
   errorMessage,
   activeCatId,
@@ -1576,14 +1584,18 @@ function OptionSection<Option extends { label: string }>({
   options: Option[];
   description?: string;
   variant?: "current" | "concern";
+  embedded?: boolean;
   message?: string;
   errorMessage?: string;
   activeCatId?: string | null;
   recentStateRecords?: RecentStateRecord[];
   onSelect: (option: Option) => void;
 }) {
-  const sectionStyle =
-    variant === "concern"
+  const sectionStyle = embedded
+    ? variant === "concern"
+      ? { ...styles.embeddedSection, ...styles.embeddedConcernSection }
+      : styles.embeddedSection
+    : variant === "concern"
       ? { ...styles.section, ...styles.concernSection }
       : { ...styles.section, ...styles.currentSection };
   const buttonStyle =
@@ -1610,7 +1622,7 @@ function OptionSection<Option extends { label: string }>({
   return (
     <section style={sectionStyle}>
       {label ? <p style={styles.sectionLabel}>{label}</p> : null}
-      <h2 style={styles.sectionTitle}>{title}</h2>
+      {title ? <h2 style={styles.sectionTitle}>{title}</h2> : null}
       {description ? (
         <p style={styles.sectionDescription}>{description}</p>
       ) : null}
@@ -1623,9 +1635,11 @@ function OptionSection<Option extends { label: string }>({
           const signal =
             "signal" in option && typeof option.signal === "string"
               ? option.signal
+              : "input" in option && typeof option.input === "string"
+                ? option.input
               : "";
           const isCompleted =
-            variant === "current" && signal
+            signal
               ? isRecentStateRecorded({
                   records: recentStateRecords,
                   localCatId: activeCatId,
@@ -2468,6 +2482,21 @@ const styles = {
     borderRadius: "26px",
     background: "#ffffff",
     padding: "18px 16px",
+  },
+  observationCard: {
+    marginBottom: "12px",
+    border: "1px solid #e4e4e7",
+    borderRadius: "26px",
+    background: "#ffffff",
+    padding: "18px 16px",
+  },
+  embeddedSection: {
+    paddingTop: "14px",
+    marginTop: "14px",
+    borderTop: "1px solid #eee7dd",
+  },
+  embeddedConcernSection: {
+    borderTopColor: "#f0ddc5",
   },
   currentSection: {
     borderColor: "#e4e4e7",
