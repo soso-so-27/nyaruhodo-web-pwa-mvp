@@ -49,7 +49,7 @@ type HomeInputProps = {
 };
 
 const eventSaveErrorMessage =
-  "\u8a18\u9332\u3067\u304d\u307e\u305b\u3093\u3067\u3057\u305f\u3002\n\u901a\u4fe1\u72b6\u614b\u3092\u78ba\u8a8d\u3057\u3066\u3001\u3082\u3046\u4e00\u5ea6\u304a\u8a66\u3057\u304f\u3060\u3055\u3044\u3002";
+  "\u4fdd\u5b58\u3067\u304d\u307e\u305b\u3093\u3067\u3057\u305f\u3002\n\u901a\u4fe1\u72b6\u614b\u3092\u78ba\u8a8d\u3057\u3066\u3001\u3082\u3046\u4e00\u5ea6\u304a\u8a66\u3057\u304f\u3060\u3055\u3044\u3002";
 
 const feedbackSaveErrorMessage =
   "\u884c\u52d5\u306e\u8a18\u9332\u306b\u5931\u6557\u3057\u307e\u3057\u305f\u3002\n\u5c11\u3057\u6642\u9593\u3092\u304a\u3044\u3066\u3001\u3082\u3046\u4e00\u5ea6\u304a\u8a66\u3057\u304f\u3060\u3055\u3044\u3002";
@@ -587,6 +587,19 @@ export function HomeInput({
             {currentStateMessage ? (
               <p style={styles.sectionMessage}>{currentStateMessage}</p>
             ) : null}
+            {saveErrorMessage ? (
+              <p
+                style={styles.saveErrorAlert}
+                role="alert"
+                aria-label={
+                  saveErrorSection === "concern"
+                    ? "\u3061\u3087\u3063\u3068\u6c17\u306b\u306a\u308b\u306e\u4fdd\u5b58\u30a8\u30e9\u30fc"
+                    : "\u3044\u3064\u3082\u306e\u69d8\u5b50\u306e\u4fdd\u5b58\u30a8\u30e9\u30fc"
+                }
+              >
+                {saveErrorMessage}
+              </p>
+            ) : null}
 
             <OptionSection
               label={"\u3044\u3064\u3082\u306e\u69d8\u5b50"}
@@ -594,9 +607,6 @@ export function HomeInput({
               options={CURRENT_OPTIONS}
               variant="current"
               embedded
-              errorMessage={
-                saveErrorSection === "current" ? saveErrorMessage : ""
-              }
               activeCatId={activeCatId}
               recentStateRecords={recentStateRecords}
               onSelect={(option) => {
@@ -610,9 +620,6 @@ export function HomeInput({
               options={CONCERN_OPTIONS}
               variant="concern"
               embedded
-              errorMessage={
-                saveErrorSection === "concern" ? saveErrorMessage : ""
-              }
               activeCatId={activeCatId}
               recentStateRecords={recentStateRecords}
               onSelect={(option) => {
@@ -2530,6 +2537,18 @@ const styles = {
     color: "#52525b",
     fontSize: "13px",
     lineHeight: 1.7,
+    whiteSpace: "pre-line",
+  },
+  saveErrorAlert: {
+    margin: "-2px 0 14px",
+    border: "1px solid #ead7bd",
+    borderRadius: "16px",
+    background: "#fff7ed",
+    color: "#6b3f2a",
+    fontSize: "13px",
+    fontWeight: 700,
+    lineHeight: 1.7,
+    padding: "10px 12px",
     whiteSpace: "pre-line",
   },
   sectionErrorMessage: {
