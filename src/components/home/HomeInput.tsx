@@ -870,7 +870,7 @@ function buildSaveSuccessMessage(message: string, discoveredPoseLabel?: string) 
     return message;
   }
 
-  return `${message}\nコレクションに「${discoveredPoseLabel}」の記録が入りました`;
+  return `${message}\n「${discoveredPoseLabel}」の記録が入りました`;
 }
 
 function Header({

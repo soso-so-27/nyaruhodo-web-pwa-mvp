@@ -3,8 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import type { CSSProperties } from "react";
 import {
-  POSE_CATEGORIES,
-  buildDiscoveredPoseSlugs,
+  PHOTO_COLLECTION_POSES,
   getPoseCategoryForEvent,
   isConcernPose,
   isSocialPose,
@@ -59,14 +58,8 @@ export function CollectionPage({ recentEvents }: CollectionPageProps) {
     () => filterRecentEvents(activeCatEvents, RECENT_DAYS),
     [activeCatEvents],
   );
-  const recentFoundItems = buildRecentFoundItems(recentActiveCatEvents);
+  const recentRecordItems = buildRecentRecordItems(recentActiveCatEvents);
   const recentSummary = buildRecentSummary(recentActiveCatEvents, catName);
-  const discoveredPoseSlugs = useMemo(
-    () => buildDiscoveredPoseSlugs(activeCatEvents),
-    [activeCatEvents],
-  );
-  const discoveredPoseCount = discoveredPoseSlugs.size;
-
   if (!hasLoaded) {
     return (
       <main style={styles.page}>
@@ -113,18 +106,18 @@ export function CollectionPage({ recentEvents }: CollectionPageProps) {
           </p>
         </header>
 
-        <section style={styles.card} aria-labelledby="recent-found">
+        <section style={styles.card} aria-labelledby="recent-records">
           <div style={styles.sectionHeader}>
             <div>
-              <h2 id="recent-found" style={styles.sectionTitle}>
+              <h2 id="recent-records" style={styles.sectionTitle}>
                 最近見た
               </h2>
               <p style={styles.sectionSubText}>最近の記録から</p>
             </div>
           </div>
-          {recentFoundItems.length > 0 ? (
+          {recentRecordItems.length > 0 ? (
             <div style={styles.recentGrid}>
-              {recentFoundItems.map((item) => (
+              {recentRecordItems.map((item) => (
                 <article key={`${item.label}-${item.date}`} style={styles.recentItem}>
                   <span style={styles.recentMark} aria-hidden="true">
                     {item.label.slice(0, 1)}
@@ -150,39 +143,19 @@ export function CollectionPage({ recentEvents }: CollectionPageProps) {
               <h2 id="pose-collection" style={styles.sectionTitle}>
                 ポーズコレクション
               </h2>
-              <p style={styles.sectionSubText}>
-                {discoveredPoseCount > 0
-                  ? `${discoveredPoseCount}つ記録あり`
-                  : "写真はまだこれから"}
-              </p>
+              <p style={styles.sectionSubText}>写真はまだこれから</p>
             </div>
           </div>
           <div style={styles.poseGrid}>
-            {POSE_CATEGORIES.map((pose) => {
-              const isDiscovered = discoveredPoseSlugs.has(pose.slug);
-
-              return (
-                <article
-                  key={pose.slug}
-                  style={isDiscovered ? styles.poseCardFound : styles.poseCard}
-                >
-                  <span
-                    style={isDiscovered ? styles.poseMarkFound : styles.poseMark}
-                    aria-hidden="true"
-                  >
-                    {pose.label.slice(0, 1)}
-                  </span>
-                  <p style={styles.poseLabel}>{pose.label}</p>
-                  <span
-                    style={
-                      isDiscovered ? styles.poseFoundBadge : styles.posePendingText
-                    }
-                  >
-                    {isDiscovered ? "記録あり" : "まだこれから"}
-                  </span>
-                </article>
-              );
-            })}
+            {PHOTO_COLLECTION_POSES.map((pose) => (
+              <article key={pose.slug} style={styles.poseCard}>
+                <span style={styles.poseMark} aria-hidden="true">
+                  {pose.label.slice(0, 1)}
+                </span>
+                <p style={styles.poseLabel}>{pose.label}</p>
+                <span style={styles.posePendingText}>まだこれから</span>
+              </article>
+            ))}
           </div>
         </section>
 
@@ -211,7 +184,7 @@ function filterRecentEvents(events: RecentEvent[], days: number) {
   });
 }
 
-function buildRecentFoundItems(events: RecentEvent[]) {
+function buildRecentRecordItems(events: RecentEvent[]) {
   const items: Array<{ label: string; date: string; slug: string }> = [];
   const seen = new Set<string>();
 
@@ -488,14 +461,6 @@ const styles = {
     padding: "8px 4px",
     textAlign: "center",
   },
-  poseCardFound: {
-    minHeight: "76px",
-    border: "1px solid #ead2bd",
-    borderRadius: "16px",
-    background: "#fff7ec",
-    padding: "8px 4px",
-    textAlign: "center",
-  },
   poseMark: {
     display: "grid",
     placeItems: "center",
@@ -508,37 +473,12 @@ const styles = {
     fontSize: "12px",
     fontWeight: 900,
   },
-  poseMarkFound: {
-    display: "grid",
-    placeItems: "center",
-    width: "28px",
-    height: "28px",
-    margin: "0 auto 6px",
-    borderRadius: "11px",
-    background: "#fffdf8",
-    color: "#8b5a35",
-    fontSize: "12px",
-    fontWeight: 900,
-  },
   poseLabel: {
     margin: 0,
     color: "#2f2b28",
     fontSize: "11px",
     fontWeight: 900,
     lineHeight: 1.35,
-  },
-  poseFoundBadge: {
-    display: "inline-flex",
-    alignItems: "center",
-    justifyContent: "center",
-    marginTop: "6px",
-    borderRadius: "999px",
-    background: "#efe0cf",
-    color: "#6b5746",
-    padding: "2px 6px",
-    fontSize: "9px",
-    fontWeight: 900,
-    lineHeight: 1,
   },
   posePendingText: {
     display: "inline-flex",

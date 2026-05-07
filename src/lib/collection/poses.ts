@@ -1,10 +1,16 @@
-export type PoseCategory = {
+export type RecordPoseCategory = {
   label: string;
   slug: string;
   discoverySignals: string[];
   tone: PoseTone;
 };
 
+export type PhotoCollectionPose = {
+  label: string;
+  slug: string;
+};
+
+export type PoseCategory = RecordPoseCategory;
 export type PoseTone = "normal" | "social" | "concern";
 
 type PoseEventLike = {
@@ -12,7 +18,7 @@ type PoseEventLike = {
   label?: string | null;
 };
 
-export const POSE_CATEGORIES: PoseCategory[] = [
+export const RECORD_POSE_CATEGORIES: RecordPoseCategory[] = [
   {
     label: "ねむる",
     slug: "sleeping",
@@ -87,8 +93,59 @@ export const POSE_CATEGORIES: PoseCategory[] = [
   },
 ];
 
+export const PHOTO_COLLECTION_POSES: PhotoCollectionPose[] = [
+  {
+    label: "へそ天",
+    slug: "belly_up",
+  },
+  {
+    label: "箱入り",
+    slug: "in_box",
+  },
+  {
+    label: "のびー",
+    slug: "stretch",
+  },
+  {
+    label: "ごめん寝",
+    slug: "face_down_sleep",
+  },
+  {
+    label: "香箱",
+    slug: "loaf",
+  },
+  {
+    label: "窓辺監視",
+    slug: "window_watch",
+  },
+  {
+    label: "液体化",
+    slug: "liquid_cat",
+  },
+  {
+    label: "まるまり",
+    slug: "curled_up",
+  },
+  {
+    label: "しっぽピーン",
+    slug: "tail_up",
+  },
+  {
+    label: "おすわり",
+    slug: "sitting",
+  },
+  {
+    label: "変な寝相",
+    slug: "funny_sleep",
+  },
+  {
+    label: "ふみふみ",
+    slug: "kneading",
+  },
+];
+
 const POSE_CATEGORY_BY_SIGNAL = new Map(
-  POSE_CATEGORIES.flatMap((pose) =>
+  RECORD_POSE_CATEGORIES.flatMap((pose) =>
     pose.discoverySignals.map((signal) => [signal, pose] as const),
   ),
 );
@@ -133,7 +190,7 @@ export function getPoseCategoryForSignal(
     return null;
   }
 
-  return POSE_CATEGORIES.find((pose) => pose.slug === slugFromLabel) ?? null;
+  return RECORD_POSE_CATEGORIES.find((pose) => pose.slug === slugFromLabel) ?? null;
 }
 
 export function getPoseCategoryForEvent(event: PoseEventLike) {
@@ -141,7 +198,7 @@ export function getPoseCategoryForEvent(event: PoseEventLike) {
 }
 
 export function getPoseTone(slug: string): PoseTone {
-  return POSE_CATEGORIES.find((pose) => pose.slug === slug)?.tone ?? "normal";
+  return RECORD_POSE_CATEGORIES.find((pose) => pose.slug === slug)?.tone ?? "normal";
 }
 
 export function isConcernPose(slug: string) {
@@ -152,7 +209,7 @@ export function isSocialPose(slug: string) {
   return getPoseTone(slug) === "social";
 }
 
-export function buildDiscoveredPoseSlugs(events: PoseEventLike[]) {
+export function buildRecordedPoseSlugs(events: PoseEventLike[]) {
   const slugs = new Set<string>();
 
   events.forEach((event) => {
