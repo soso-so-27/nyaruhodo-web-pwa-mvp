@@ -6,7 +6,10 @@ import {
   POSE_CATEGORIES,
   buildDiscoveredPoseSlugs,
   getPoseCategoryForEvent,
+  isConcernPose,
+  isSocialPose,
 } from "../../lib/collection/poses";
+import type { PoseTone } from "../../lib/collection/poses";
 import type { RecentEvent } from "../../lib/supabase/queries";
 import {
   getActiveCatProfile,
@@ -23,14 +26,6 @@ type CollectionPageProps = {
 };
 
 const RECENT_DAYS = 7;
-const CONCERN_POSE_SLUGS = new Set([
-  "meowing",
-  "following",
-  "restless",
-  "low_energy",
-  "fighting",
-  "unknown",
-]);
 
 export function CollectionPage({ recentEvents }: CollectionPageProps) {
   const [catProfiles, setCatProfiles] = useState<CatProfile[]>([]);
@@ -247,7 +242,7 @@ function buildRecentSummary(events: RecentEvent[], catName: string) {
 
   const poseCounts = new Map<
     string,
-    { label: string; slug: string; count: number }
+    { label: string; slug: string; tone: PoseTone; count: number }
   >();
 
   events.forEach((event) => {
@@ -262,6 +257,7 @@ function buildRecentSummary(events: RecentEvent[], catName: string) {
     poseCounts.set(pose.slug, {
       label: pose.label,
       slug: pose.slug,
+      tone: pose.tone,
       count: (current?.count ?? 0) + 1,
     });
   });
@@ -283,10 +279,17 @@ function buildRecentSummary(events: RecentEvent[], catName: string) {
   }
 
   if (sorted.length > 1 && sorted[0].count === sorted[1].count) {
-    if (isConcernPose(sorted[0]) || isConcernPose(sorted[1])) {
+    if (isConcernPose(sorted[0].slug) || isConcernPose(sorted[1].slug)) {
       return {
         text: `「${sorted[0].label}」と「${sorted[1].label}」が残っています`,
         note: "気になる様子も、見たまま少しずつ残せています",
+      };
+    }
+
+    if (isSocialPose(sorted[0].slug) || isSocialPose(sorted[1].slug)) {
+      return {
+        text: `「${sorted[0].label}」と「${sorted[1].label}」が見えてきました`,
+        note: `${catName}との関わりも、少しずつ残っています`,
       };
     }
 
@@ -296,13 +299,20 @@ function buildRecentSummary(events: RecentEvent[], catName: string) {
     };
   }
 
-  if (isConcernPose(sorted[0])) {
+  if (isConcernPose(sorted[0].slug)) {
     return {
       text: `「${sorted[0].label}」も残っています`,
       note:
         sorted[0].slug === "low_energy"
           ? "いつもの様子と一緒に、やさしく見ていけます"
           : "気になる様子も、見たまま少しずつ残せています",
+    };
+  }
+
+  if (isSocialPose(sorted[0].slug)) {
+    return {
+      text: `「${sorted[0].label}」も見えてきました`,
+      note: `${catName}との関わりも、少しずつ残っています`,
     };
   }
 
@@ -317,10 +327,6 @@ function buildRecentSummary(events: RecentEvent[], catName: string) {
     text: "少しずつ、残っています",
     note: `${catName}らしい様子が、ゆっくりたまってきました`,
   };
-}
-
-function isConcernPose(pose: { slug: string }) {
-  return CONCERN_POSE_SLUGS.has(pose.slug);
 }
 
 function formatShortDate(value: string) {
