@@ -108,14 +108,19 @@ export function CollectionPage({ recentEvents }: CollectionPageProps) {
         <header style={styles.hero}>
           <p style={styles.eyebrow}>コレクション</p>
           <h1 style={styles.title}>コレクション</h1>
-          <p style={styles.lead}>{catName}との“みつけた”を集める</p>
+          <p style={styles.lead}>
+            今日見えたことが、少しずつここに残ります。
+          </p>
         </header>
 
         <section style={styles.card} aria-labelledby="recent-found">
           <div style={styles.sectionHeader}>
-            <h2 id="recent-found" style={styles.sectionTitle}>
-              最近みつけた
-            </h2>
+            <div>
+              <h2 id="recent-found" style={styles.sectionTitle}>
+                最近みつけた
+              </h2>
+              <p style={styles.sectionSubText}>直近で増えたもの</p>
+            </div>
           </div>
           {recentFoundItems.length > 0 ? (
             <div style={styles.recentGrid}>
@@ -133,7 +138,7 @@ export function CollectionPage({ recentEvents }: CollectionPageProps) {
             <div style={styles.softEmpty}>
               <p style={styles.softEmptyTitle}>まだこれから</p>
               <p style={styles.softEmptyText}>
-                今日みつけた様子が、ここにたまります。
+                今日見えたことを残すと、ここに出てきます。
               </p>
             </div>
           )}
@@ -148,7 +153,7 @@ export function CollectionPage({ recentEvents }: CollectionPageProps) {
               <p style={styles.sectionSubText}>
                 {discoveredPoseCount > 0
                   ? `${discoveredPoseCount}つみつけた`
-                  : "これからみつけるポーズ"}
+                  : "これからみつけるもの"}
               </p>
             </div>
           </div>
@@ -181,7 +186,7 @@ export function CollectionPage({ recentEvents }: CollectionPageProps) {
           </div>
         </section>
 
-        <section style={styles.card} aria-labelledby="recent-summary">
+        <section style={styles.memoCard} aria-labelledby="recent-summary">
           <h2 id="recent-summary" style={styles.sectionTitle}>
             このごろの{catName}
           </h2>
@@ -355,8 +360,8 @@ const styles = {
     borderRadius: "28px",
     background:
       "linear-gradient(145deg, rgba(255, 252, 247, 0.98), rgba(255, 245, 231, 0.92))",
-    padding: "20px 18px",
-    marginBottom: "14px",
+    padding: "18px",
+    marginBottom: "12px",
   },
   eyebrow: {
     margin: "0 0 5px",
@@ -387,6 +392,13 @@ const styles = {
     padding: "16px",
     marginBottom: "14px",
   },
+  memoCard: {
+    border: "1px solid #eadfce",
+    borderRadius: "24px",
+    background: "#fffaf2",
+    padding: "15px 16px",
+    marginBottom: "14px",
+  },
   sectionHeader: {
     display: "flex",
     alignItems: "flex-start",
@@ -411,16 +423,16 @@ const styles = {
   recentGrid: {
     display: "grid",
     gridTemplateColumns: "repeat(3, minmax(0, 1fr))",
-    gap: "10px",
+    gap: "8px",
   },
   recentItem: {
     display: "grid",
     justifyItems: "center",
-    gap: "4px",
+    gap: "3px",
     border: "1px solid #efdcca",
     borderRadius: "20px",
-    background: "#fff7ed",
-    padding: "10px 7px",
+    background: "#fff8ef",
+    padding: "9px 7px",
     textAlign: "center",
   },
   recentMark: {
@@ -469,19 +481,19 @@ const styles = {
     gap: "9px",
   },
   poseCard: {
-    minHeight: "88px",
+    minHeight: "84px",
     border: "1px solid #eee4da",
     borderRadius: "18px",
-    background: "#fbfaf8",
-    padding: "10px 6px",
+    background: "#fffdf9",
+    padding: "9px 6px",
     textAlign: "center",
   },
   poseCardFound: {
-    minHeight: "88px",
+    minHeight: "84px",
     border: "1px solid #ead2bd",
     borderRadius: "18px",
-    background: "#fff7ed",
-    padding: "10px 6px",
+    background: "#fff7ec",
+    padding: "9px 6px",
     textAlign: "center",
   },
   poseMark: {
@@ -491,7 +503,7 @@ const styles = {
     height: "34px",
     margin: "0 auto 7px",
     borderRadius: "13px",
-    background: "#f4eee8",
+    background: "#f7f1eb",
     color: "#9a8e82",
     fontSize: "14px",
     fontWeight: 900,
@@ -521,8 +533,8 @@ const styles = {
     justifyContent: "center",
     marginTop: "6px",
     borderRadius: "999px",
-    background: "#6b5746",
-    color: "#ffffff",
+    background: "#efe0cf",
+    color: "#6b5746",
     padding: "3px 8px",
     fontSize: "10px",
     fontWeight: 900,
@@ -537,7 +549,7 @@ const styles = {
     lineHeight: 1,
   },
   summaryText: {
-    margin: "12px 0 8px",
+    margin: "10px 0 7px",
     color: "#4f463f",
     fontSize: "15px",
     lineHeight: 1.65,
