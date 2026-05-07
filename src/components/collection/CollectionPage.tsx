@@ -20,22 +20,57 @@ type CollectionPageProps = {
 type PoseCategory = {
   label: string;
   slug: string;
+  discoverySignals: string[];
 };
 
 const POSE_CATEGORIES: PoseCategory[] = [
-  { label: "へそ天", slug: "belly_up" },
-  { label: "ごめん寝", slug: "face_down_sleep" },
-  { label: "箱入り", slug: "in_box" },
-  { label: "窓辺監視", slug: "window_watch" },
-  { label: "液体化", slug: "liquid_cat" },
-  { label: "のびー", slug: "stretch" },
-  { label: "香箱座り", slug: "loaf" },
-  { label: "ふみふみ", slug: "kneading" },
-  { label: "おててないない", slug: "hidden_paws" },
-  { label: "顔だけ出す", slug: "peek_face" },
-  { label: "まるまり", slug: "curled_up" },
-  { label: "すりすり", slug: "rubbing" },
+  { label: "ねむる", slug: "sleeping", discoverySignals: ["sleeping"] },
+  { label: "毛づくろい", slug: "grooming", discoverySignals: ["grooming"] },
+  { label: "あそぶ", slug: "playing", discoverySignals: ["playing"] },
+  {
+    label: "ごはん",
+    slug: "food",
+    discoverySignals: ["food", "after_food", "eating"],
+  },
+  { label: "トイレ", slug: "toilet", discoverySignals: ["toilet"] },
+  { label: "ごきげん", slug: "purring", discoverySignals: ["purring"] },
+  { label: "おしゃべり", slug: "meowing", discoverySignals: ["meowing"] },
+  { label: "ついてくる", slug: "following", discoverySignals: ["following"] },
+  { label: "そわそわ", slug: "restless", discoverySignals: ["restless"] },
+  { label: "休む", slug: "low_energy", discoverySignals: ["low_energy"] },
+  { label: "ケンカ", slug: "fighting", discoverySignals: ["fighting"] },
+  { label: "よくわからない", slug: "unknown", discoverySignals: ["unknown"] },
 ];
+
+const POSE_CATEGORY_BY_SIGNAL = new Map(
+  POSE_CATEGORIES.flatMap((pose) =>
+    pose.discoverySignals.map((signal) => [signal, pose] as const),
+  ),
+);
+
+const POSE_CATEGORY_BY_LABEL: Record<string, string> = {
+  ねてる: "sleeping",
+  眠る: "sleeping",
+  グルーミング: "grooming",
+  毛づくろい: "grooming",
+  遊んでる: "playing",
+  あそぶ: "playing",
+  ご飯たべた: "food",
+  ごはん: "food",
+  ご飯: "food",
+  トイレした: "toilet",
+  トイレ: "toilet",
+  ゴロゴロしてる: "purring",
+  ゴロゴロ: "purring",
+  鳴いてる: "meowing",
+  ついてくる: "following",
+  落ち着かない: "restless",
+  そわそわ: "restless",
+  元気ない: "low_energy",
+  ケンカしてる: "fighting",
+  ケンカ: "fighting",
+  よくわからない: "unknown",
+};
 
 const SIGNAL_LABELS: Record<string, string> = {
   sleeping: "ねてる",
@@ -89,6 +124,11 @@ export function CollectionPage({ recentEvents }: CollectionPageProps) {
   );
   const recentFoundItems = buildRecentFoundItems(recentActiveCatEvents);
   const recentSummary = buildRecentSummary(recentActiveCatEvents);
+  const discoveredPoseSlugs = useMemo(
+    () => buildDiscoveredPoseSlugs(activeCatEvents),
+    [activeCatEvents],
+  );
+  const discoveredPoseCount = discoveredPoseSlugs.size;
 
   if (!hasLoaded) {
     return (
@@ -168,18 +208,39 @@ export function CollectionPage({ recentEvents }: CollectionPageProps) {
               <h2 id="pose-collection" style={styles.sectionTitle}>
                 ポーズコレクション
               </h2>
-              <p style={styles.sectionSubText}>これからみつけるポーズ</p>
+              <p style={styles.sectionSubText}>
+                {discoveredPoseCount > 0
+                  ? `${discoveredPoseCount}つみつけた`
+                  : "これからみつけるポーズ"}
+              </p>
             </div>
           </div>
           <div style={styles.poseGrid}>
-            {POSE_CATEGORIES.map((pose) => (
-              <article key={pose.slug} style={styles.poseCard}>
-                <span style={styles.poseMark} aria-hidden="true">
-                  {pose.label.slice(0, 1)}
-                </span>
-                <p style={styles.poseLabel}>{pose.label}</p>
-              </article>
-            ))}
+            {POSE_CATEGORIES.map((pose) => {
+              const isDiscovered = discoveredPoseSlugs.has(pose.slug);
+
+              return (
+                <article
+                  key={pose.slug}
+                  style={isDiscovered ? styles.poseCardFound : styles.poseCard}
+                >
+                  <span
+                    style={isDiscovered ? styles.poseMarkFound : styles.poseMark}
+                    aria-hidden="true"
+                  >
+                    {pose.label.slice(0, 1)}
+                  </span>
+                  <p style={styles.poseLabel}>{pose.label}</p>
+                  <span
+                    style={
+                      isDiscovered ? styles.poseFoundBadge : styles.posePendingText
+                    }
+                  >
+                    {isDiscovered ? "みつけた" : "まだこれから"}
+                  </span>
+                </article>
+              );
+            })}
           </div>
         </section>
 
@@ -209,10 +270,29 @@ function filterRecentEvents(events: RecentEvent[], days: number) {
 }
 
 function buildRecentFoundItems(events: RecentEvent[]) {
-  return events.slice(0, 3).map((event) => ({
-    label: getEventLabel(event),
-    date: formatShortDate(event.occurred_at || event.created_at),
-  }));
+  const items: Array<{ label: string; date: string; slug: string }> = [];
+  const seen = new Set<string>();
+
+  for (const event of events) {
+    const pose = getPoseCategoryForEvent(event);
+
+    if (!pose || seen.has(pose.slug)) {
+      continue;
+    }
+
+    seen.add(pose.slug);
+    items.push({
+      label: pose.label,
+      slug: pose.slug,
+      date: formatShortDate(event.occurred_at || event.created_at),
+    });
+
+    if (items.length >= 3) {
+      break;
+    }
+  }
+
+  return items;
 }
 
 function buildRecentSummary(events: RecentEvent[]) {
@@ -253,6 +333,38 @@ function getTopSignal(events: RecentEvent[]) {
 
 function getEventLabel(event: RecentEvent) {
   return event.label || SIGNAL_LABELS[event.signal] || "様子";
+}
+
+function buildDiscoveredPoseSlugs(events: RecentEvent[]) {
+  const slugs = new Set<string>();
+
+  events.forEach((event) => {
+    const pose = getPoseCategoryForEvent(event);
+
+    if (pose) {
+      slugs.add(pose.slug);
+    }
+  });
+
+  return slugs;
+}
+
+function getPoseCategoryForEvent(event: RecentEvent) {
+  const signal = event.signal.trim();
+  const poseFromSignal = POSE_CATEGORY_BY_SIGNAL.get(signal);
+
+  if (poseFromSignal) {
+    return poseFromSignal;
+  }
+
+  const label = (event.label || "").trim();
+  const slugFromLabel = POSE_CATEGORY_BY_LABEL[label];
+
+  if (slugFromLabel) {
+    return POSE_CATEGORIES.find((pose) => pose.slug === slugFromLabel) ?? null;
+  }
+
+  return null;
 }
 
 function formatShortDate(value: string) {
@@ -402,6 +514,14 @@ const styles = {
     padding: "10px 6px",
     textAlign: "center",
   },
+  poseCardFound: {
+    minHeight: "88px",
+    border: "1px solid #ead2bd",
+    borderRadius: "18px",
+    background: "#fff7ed",
+    padding: "10px 6px",
+    textAlign: "center",
+  },
   poseMark: {
     display: "grid",
     placeItems: "center",
@@ -414,12 +534,45 @@ const styles = {
     fontSize: "14px",
     fontWeight: 900,
   },
+  poseMarkFound: {
+    display: "grid",
+    placeItems: "center",
+    width: "34px",
+    height: "34px",
+    margin: "0 auto 7px",
+    borderRadius: "13px",
+    background: "#fffdf8",
+    color: "#8b5a35",
+    fontSize: "14px",
+    fontWeight: 900,
+  },
   poseLabel: {
     margin: 0,
     color: "#2f2b28",
     fontSize: "12px",
     fontWeight: 900,
     lineHeight: 1.35,
+  },
+  poseFoundBadge: {
+    display: "inline-flex",
+    alignItems: "center",
+    justifyContent: "center",
+    marginTop: "6px",
+    borderRadius: "999px",
+    background: "#6b5746",
+    color: "#ffffff",
+    padding: "3px 8px",
+    fontSize: "10px",
+    fontWeight: 900,
+    lineHeight: 1,
+  },
+  posePendingText: {
+    display: "inline-flex",
+    marginTop: "6px",
+    color: "#a09082",
+    fontSize: "10px",
+    fontWeight: 800,
+    lineHeight: 1,
   },
   summaryText: {
     margin: "12px 0 8px",
