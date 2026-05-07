@@ -138,7 +138,7 @@ export function CollectionPage({ recentEvents }: CollectionPageProps) {
             <div style={styles.softEmpty}>
               <p style={styles.softEmptyTitle}>まだこれから</p>
               <p style={styles.softEmptyText}>
-                今日見えたことを残すと、ここに出てきます。
+                みつけたものが、ここに並びます。
               </p>
             </div>
           )}
@@ -241,7 +241,7 @@ function buildRecentSummary(events: RecentEvent[], catName: string) {
   if (events.length === 0) {
     return {
       text: "まだこれから",
-      note: "今日見えたことを残すと、ここに少しずつ出てきます",
+      note: "記録が増えると、ひとことメモになります",
     };
   }
 
@@ -477,53 +477,53 @@ const styles = {
   },
   poseGrid: {
     display: "grid",
-    gridTemplateColumns: "repeat(3, minmax(0, 1fr))",
-    gap: "9px",
+    gridTemplateColumns: "repeat(4, minmax(0, 1fr))",
+    gap: "8px",
   },
   poseCard: {
-    minHeight: "84px",
+    minHeight: "76px",
     border: "1px solid #eee4da",
-    borderRadius: "18px",
+    borderRadius: "16px",
     background: "#fffdf9",
-    padding: "9px 6px",
+    padding: "8px 4px",
     textAlign: "center",
   },
   poseCardFound: {
-    minHeight: "84px",
+    minHeight: "76px",
     border: "1px solid #ead2bd",
-    borderRadius: "18px",
+    borderRadius: "16px",
     background: "#fff7ec",
-    padding: "9px 6px",
+    padding: "8px 4px",
     textAlign: "center",
   },
   poseMark: {
     display: "grid",
     placeItems: "center",
-    width: "34px",
-    height: "34px",
-    margin: "0 auto 7px",
-    borderRadius: "13px",
+    width: "28px",
+    height: "28px",
+    margin: "0 auto 6px",
+    borderRadius: "11px",
     background: "#f7f1eb",
     color: "#9a8e82",
-    fontSize: "14px",
+    fontSize: "12px",
     fontWeight: 900,
   },
   poseMarkFound: {
     display: "grid",
     placeItems: "center",
-    width: "34px",
-    height: "34px",
-    margin: "0 auto 7px",
-    borderRadius: "13px",
+    width: "28px",
+    height: "28px",
+    margin: "0 auto 6px",
+    borderRadius: "11px",
     background: "#fffdf8",
     color: "#8b5a35",
-    fontSize: "14px",
+    fontSize: "12px",
     fontWeight: 900,
   },
   poseLabel: {
     margin: 0,
     color: "#2f2b28",
-    fontSize: "12px",
+    fontSize: "11px",
     fontWeight: 900,
     lineHeight: 1.35,
   },
@@ -535,16 +535,16 @@ const styles = {
     borderRadius: "999px",
     background: "#efe0cf",
     color: "#6b5746",
-    padding: "3px 8px",
-    fontSize: "10px",
+    padding: "2px 6px",
+    fontSize: "9px",
     fontWeight: 900,
     lineHeight: 1,
   },
   posePendingText: {
     display: "inline-flex",
-    marginTop: "6px",
+    marginTop: "5px",
     color: "#a09082",
-    fontSize: "10px",
+    fontSize: "9px",
     fontWeight: 800,
     lineHeight: 1,
   },
