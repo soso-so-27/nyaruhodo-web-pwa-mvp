@@ -23,6 +23,14 @@ type CollectionPageProps = {
 };
 
 const RECENT_DAYS = 7;
+const CONCERN_POSE_SLUGS = new Set([
+  "meowing",
+  "following",
+  "restless",
+  "low_energy",
+  "fighting",
+  "unknown",
+]);
 
 export function CollectionPage({ recentEvents }: CollectionPageProps) {
   const [catProfiles, setCatProfiles] = useState<CatProfile[]>([]);
@@ -275,16 +283,26 @@ function buildRecentSummary(events: RecentEvent[], catName: string) {
   }
 
   if (sorted.length > 1 && sorted[0].count === sorted[1].count) {
+    if (isConcernPose(sorted[0]) || isConcernPose(sorted[1])) {
+      return {
+        text: `「${sorted[0].label}」と「${sorted[1].label}」が残っています`,
+        note: "気になる様子も、見たまま少しずつ残せています",
+      };
+    }
+
     return {
       text: `「${sorted[0].label}」「${sorted[1].label}」が少し多めです`,
       note: "いろいろな様子が、少しずつたまっています",
     };
   }
 
-  if (sorted[0].slug === "low_energy") {
+  if (isConcernPose(sorted[0])) {
     return {
-      text: "「休む」も残っています",
-      note: "いつもの様子と一緒に、やさしく見ていけます",
+      text: `「${sorted[0].label}」も残っています`,
+      note:
+        sorted[0].slug === "low_energy"
+          ? "いつもの様子と一緒に、やさしく見ていけます"
+          : "気になる様子も、見たまま少しずつ残せています",
     };
   }
 
@@ -299,6 +317,10 @@ function buildRecentSummary(events: RecentEvent[], catName: string) {
     text: "少しずつ、残っています",
     note: `${catName}らしい様子が、ゆっくりたまってきました`,
   };
+}
+
+function isConcernPose(pose: { slug: string }) {
+  return CONCERN_POSE_SLUGS.has(pose.slug);
 }
 
 function formatShortDate(value: string) {
