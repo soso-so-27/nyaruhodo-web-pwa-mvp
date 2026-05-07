@@ -2,6 +2,11 @@
 
 import { useEffect, useMemo, useState } from "react";
 import type { CSSProperties } from "react";
+import {
+  POSE_CATEGORIES,
+  buildDiscoveredPoseSlugs,
+  getPoseCategoryForEvent,
+} from "../../lib/collection/poses";
 import type { RecentEvent } from "../../lib/supabase/queries";
 import {
   getActiveCatProfile,
@@ -15,61 +20,6 @@ import { BottomNavigation } from "../navigation/BottomNavigation";
 
 type CollectionPageProps = {
   recentEvents: RecentEvent[];
-};
-
-type PoseCategory = {
-  label: string;
-  slug: string;
-  discoverySignals: string[];
-};
-
-const POSE_CATEGORIES: PoseCategory[] = [
-  { label: "ねむる", slug: "sleeping", discoverySignals: ["sleeping"] },
-  { label: "毛づくろい", slug: "grooming", discoverySignals: ["grooming"] },
-  { label: "あそぶ", slug: "playing", discoverySignals: ["playing"] },
-  {
-    label: "ごはん",
-    slug: "food",
-    discoverySignals: ["food", "after_food", "eating"],
-  },
-  { label: "トイレ", slug: "toilet", discoverySignals: ["toilet"] },
-  { label: "ごきげん", slug: "purring", discoverySignals: ["purring"] },
-  { label: "おしゃべり", slug: "meowing", discoverySignals: ["meowing"] },
-  { label: "ついてくる", slug: "following", discoverySignals: ["following"] },
-  { label: "そわそわ", slug: "restless", discoverySignals: ["restless"] },
-  { label: "休む", slug: "low_energy", discoverySignals: ["low_energy"] },
-  { label: "ケンカ", slug: "fighting", discoverySignals: ["fighting"] },
-  { label: "よくわからない", slug: "unknown", discoverySignals: ["unknown"] },
-];
-
-const POSE_CATEGORY_BY_SIGNAL = new Map(
-  POSE_CATEGORIES.flatMap((pose) =>
-    pose.discoverySignals.map((signal) => [signal, pose] as const),
-  ),
-);
-
-const POSE_CATEGORY_BY_LABEL: Record<string, string> = {
-  ねてる: "sleeping",
-  眠る: "sleeping",
-  グルーミング: "grooming",
-  毛づくろい: "grooming",
-  遊んでる: "playing",
-  あそぶ: "playing",
-  ご飯たべた: "food",
-  ごはん: "food",
-  ご飯: "food",
-  トイレした: "toilet",
-  トイレ: "toilet",
-  ゴロゴロしてる: "purring",
-  ゴロゴロ: "purring",
-  鳴いてる: "meowing",
-  ついてくる: "following",
-  落ち着かない: "restless",
-  そわそわ: "restless",
-  元気ない: "low_energy",
-  ケンカしてる: "fighting",
-  ケンカ: "fighting",
-  よくわからない: "unknown",
 };
 
 const SIGNAL_LABELS: Record<string, string> = {
@@ -333,38 +283,6 @@ function getTopSignal(events: RecentEvent[]) {
 
 function getEventLabel(event: RecentEvent) {
   return event.label || SIGNAL_LABELS[event.signal] || "様子";
-}
-
-function buildDiscoveredPoseSlugs(events: RecentEvent[]) {
-  const slugs = new Set<string>();
-
-  events.forEach((event) => {
-    const pose = getPoseCategoryForEvent(event);
-
-    if (pose) {
-      slugs.add(pose.slug);
-    }
-  });
-
-  return slugs;
-}
-
-function getPoseCategoryForEvent(event: RecentEvent) {
-  const signal = event.signal.trim();
-  const poseFromSignal = POSE_CATEGORY_BY_SIGNAL.get(signal);
-
-  if (poseFromSignal) {
-    return poseFromSignal;
-  }
-
-  const label = (event.label || "").trim();
-  const slugFromLabel = POSE_CATEGORY_BY_LABEL[label];
-
-  if (slugFromLabel) {
-    return POSE_CATEGORIES.find((pose) => pose.slug === slugFromLabel) ?? null;
-  }
-
-  return null;
 }
 
 function formatShortDate(value: string) {

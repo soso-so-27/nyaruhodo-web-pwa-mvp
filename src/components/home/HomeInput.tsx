@@ -5,6 +5,7 @@ import { useEffect, useState } from "react";
 import type { CSSProperties } from "react";
 import { calculateUnderstandingPercent } from "../../core/understanding/understanding";
 import { buildCalendarContext } from "../../lib/calendarContext";
+import { getPoseCategoryForSignal } from "../../lib/collection/poses";
 import type { RecentEvent } from "../../lib/supabase/queries";
 import {
   insertEvent,
@@ -368,6 +369,13 @@ export function HomeInput({
       localCatId: activeCatId,
       signal,
     });
+    const firstPoseDiscovery = getFirstPoseDiscovery({
+      events: activeCatEvents,
+      recentStateRecords,
+      localCatId: activeCatId,
+      signal,
+      label,
+    });
     const event = await insertEvent({
       event_type: "current_state",
       signal,
@@ -385,13 +393,14 @@ export function HomeInput({
 
     setSaveErrorSection("");
     setSaveErrorMessage("");
-    setCurrentStateMessage(
-      isFirstSignal
+    const successMessage = isFirstSignal
         ? firstCurrentStateSaveSuccessMessage.replace(
             "{label}",
             getOptionDisplayLabel(label),
           )
-        : currentStateSaveSuccessMessage.replace("{catName}", catName),
+        : currentStateSaveSuccessMessage.replace("{catName}", catName);
+    setCurrentStateMessage(
+      buildSaveSuccessMessage(successMessage, firstPoseDiscovery?.label),
     );
     setRecentStateRecords(
       saveRecentStateRecord({
@@ -409,6 +418,13 @@ export function HomeInput({
     setCurrentStateMessage("");
     setOnboardingHomeMessage("");
     setPostDiagnosisFeedbackMessage("");
+    const firstPoseDiscovery = getFirstPoseDiscovery({
+      events: activeCatEvents,
+      recentStateRecords,
+      localCatId: activeCatId,
+      signal: input,
+      label,
+    });
     const event = await insertEvent({
       event_type: "concern",
       signal: input,
@@ -427,7 +443,10 @@ export function HomeInput({
     setSaveErrorSection("");
     setSaveErrorMessage("");
     setCurrentStateMessage(
-      concernSaveSuccessMessage.replace("{catName}", catName),
+      buildSaveSuccessMessage(
+        concernSaveSuccessMessage.replace("{catName}", catName),
+        firstPoseDiscovery?.label,
+      ),
     );
     setRecentStateRecords(
       saveRecentStateRecord({
@@ -837,6 +856,60 @@ function isFirstCurrentStateSignal({
     localCatId,
     signal,
   });
+}
+
+function getFirstPoseDiscovery({
+  events,
+  recentStateRecords,
+  localCatId,
+  signal,
+  label,
+}: {
+  events: RecentEvent[];
+  recentStateRecords: RecentStateRecord[];
+  localCatId?: string | null;
+  signal: string;
+  label: string;
+}) {
+  const pose = getPoseCategoryForSignal(signal, label);
+
+  if (!pose) {
+    return null;
+  }
+
+  const hasSavedPose = events.some((event) => {
+    const savedPose = getPoseCategoryForSignal(event.signal, event.label);
+
+    return savedPose?.slug === pose.slug;
+  });
+
+  if (hasSavedPose) {
+    return null;
+  }
+
+  const normalizedCatId = localCatId ?? null;
+  const now = Date.now();
+  const hasRecentPose = recentStateRecords.some((record) => {
+    const expiresAt = new Date(record.expiresAt).getTime();
+    const savedPose = getPoseCategoryForSignal(record.signal, record.label);
+
+    return (
+      record.localCatId === normalizedCatId &&
+      savedPose?.slug === pose.slug &&
+      !Number.isNaN(expiresAt) &&
+      expiresAt > now
+    );
+  });
+
+  return hasRecentPose ? null : pose;
+}
+
+function buildSaveSuccessMessage(message: string, discoveredPoseLabel?: string) {
+  if (!discoveredPoseLabel) {
+    return message;
+  }
+
+  return `${message}\nコレクションで「${discoveredPoseLabel}」をみつけました`;
 }
 
 function Header({
