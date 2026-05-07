@@ -3,36 +3,37 @@
 import type { CSSProperties, ReactNode } from "react";
 
 type BottomNavigationProps = {
-  active: "home" | "today" | "cats" | "together";
+  active: "home" | "today" | "collection" | "cats" | "together";
 };
 
 type NavItem = {
-  key: "home" | "cats" | "together";
+  key: "home" | "collection" | "cats";
   href: string;
   label: string;
   icon: ReactNode;
 };
 
 export function BottomNavigation({ active }: BottomNavigationProps) {
-  const activeKey = active === "today" ? "home" : active;
+  const activeKey =
+    active === "today" ? "home" : active === "together" ? "collection" : active;
   const items: readonly NavItem[] = [
     {
       key: "home",
       href: "/home",
-      label: "ほーむ",
+      label: "今日",
       icon: <HomeIcon />,
+    },
+    {
+      key: "collection",
+      href: "/collection",
+      label: "コレクション",
+      icon: <CollectionIcon />,
     },
     {
       key: "cats",
       href: "/cats",
       label: "ねこ",
       icon: <CatIcon />,
-    },
-    {
-      key: "together",
-      href: "/together",
-      label: "いっしょ",
-      icon: <TogetherIcon />,
     },
   ];
 
@@ -107,11 +108,11 @@ function CatIcon() {
   );
 }
 
-function TogetherIcon() {
+function CollectionIcon() {
   return (
     <svg viewBox="0 0 24 24" style={styles.svgIcon}>
       <path
-        d="M12 19.2s-6.8-3.9-6.8-8.4c0-2 1.4-3.5 3.3-3.5 1.2 0 2.4.7 3.1 1.8.7-1.1 1.9-1.8 3.1-1.8 1.9 0 3.3 1.5 3.3 3.5 0 4.5-6 8.4-6 8.4Z"
+        d="M6.2 8.2h11.6v10H6.2z"
         fill="none"
         stroke="currentColor"
         strokeLinecap="round"
@@ -119,7 +120,7 @@ function TogetherIcon() {
         strokeWidth="1.9"
       />
       <path
-        d="M8.7 13.2c.5-.5 1-.7 1.6-.6.7.1 1.1.5 1.7.5s1-.4 1.7-.5c.6-.1 1.2.1 1.6.6"
+        d="M8.6 8.2 10 5.8h4l1.4 2.4M9.2 12.1h5.6M9.2 15h3.7"
         fill="none"
         stroke="currentColor"
         strokeLinecap="round"
