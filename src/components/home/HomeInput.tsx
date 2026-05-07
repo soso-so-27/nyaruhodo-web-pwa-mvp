@@ -87,58 +87,18 @@ const dailyHintFeedbackMessages: Record<CurrentCatHintFeedback, string> = {
     "\u3042\u3068\u3067\u898b\u3089\u308c\u308b\u3088\u3046\u306b\u3057\u3066\u304a\u304d\u307e\u3059\u3002",
 };
 
-type InitialHomeState = {
-  activeCatId: string | null;
-  activeProfile: CatProfile | null;
-  catProfiles: CatProfile[];
-};
-
-function readInitialHomeState(): InitialHomeState {
-  if (typeof window === "undefined") {
-    return {
-      activeCatId: null,
-      activeProfile: null,
-      catProfiles: [],
-    };
-  }
-
-  try {
-    const catProfiles = readCatProfiles();
-    const savedActiveCatId = readActiveCatId();
-    const activeProfile = getActiveCatProfile(catProfiles, savedActiveCatId);
-
-    return {
-      activeCatId: activeProfile.id,
-      activeProfile,
-      catProfiles,
-    };
-  } catch {
-    return {
-      activeCatId: null,
-      activeProfile: null,
-      catProfiles: [],
-    };
-  }
-}
-
 export function HomeInput({
   recentEvents,
 }: HomeInputProps) {
   const router = useRouter();
-  const [initialHomeState] = useState(readInitialHomeState);
+  const [isHydrated, setIsHydrated] = useState(false);
   const [visibleLatestHypothesis, setVisibleLatestHypothesis] =
     useState<LatestHypothesisView | null>(null);
-  const [catProfiles, setCatProfiles] = useState<CatProfile[]>(
-    initialHomeState.catProfiles,
-  );
-  const [activeCatId, setActiveCatId] = useState<string | null>(
-    initialHomeState.activeCatId,
-  );
+  const [catProfiles, setCatProfiles] = useState<CatProfile[]>([]);
+  const [activeCatId, setActiveCatId] = useState<string | null>(null);
   const [isEditingCatName, setIsEditingCatName] = useState(false);
   const [isAddingCat, setIsAddingCat] = useState(false);
-  const [catNameInput, setCatNameInput] = useState(() =>
-    getCatName(initialHomeState.activeProfile),
-  );
+  const [catNameInput, setCatNameInput] = useState(() => getCatName(null));
   const [newCatNameInput, setNewCatNameInput] = useState("");
   const [catNameMessage, setCatNameMessage] = useState("");
   const [hypothesisMessage, setHypothesisMessage] = useState("");
@@ -163,7 +123,7 @@ export function HomeInput({
       ? getActiveCatProfile(catProfiles, activeCatId)
       : null;
   const catName = getCatName(activeCatProfile);
-  const activeCatEvents = activeCatId
+  const activeCatEvents = isHydrated && activeCatId
     ? recentEvents.filter((event) => event.local_cat_id === activeCatId)
     : [];
   const eventUnderstandingPercent = calculateUnderstandingPercent(
@@ -228,6 +188,7 @@ export function HomeInput({
         window.localStorage.removeItem(POST_DIAGNOSIS_FEEDBACK_KEY);
       }, 0);
     }
+    setIsHydrated(true);
 
     const latestHypothesis = readLatestHypothesis();
 
