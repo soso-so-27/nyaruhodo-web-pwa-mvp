@@ -22,22 +22,6 @@ type CollectionPageProps = {
   recentEvents: RecentEvent[];
 };
 
-const SIGNAL_LABELS: Record<string, string> = {
-  sleeping: "ねてる",
-  grooming: "毛づくろい",
-  playing: "遊んでる",
-  food: "ごはん",
-  after_food: "ごはん",
-  toilet: "トイレ",
-  purring: "ゴロゴロ",
-  meowing: "鳴いてる",
-  following: "ついてくる",
-  restless: "そわそわ",
-  low_energy: "元気ない",
-  fighting: "ケンカ",
-  unknown: "よくわからない",
-};
-
 const RECENT_DAYS = 7;
 
 export function CollectionPage({ recentEvents }: CollectionPageProps) {
@@ -73,7 +57,7 @@ export function CollectionPage({ recentEvents }: CollectionPageProps) {
     [activeCatEvents],
   );
   const recentFoundItems = buildRecentFoundItems(recentActiveCatEvents);
-  const recentSummary = buildRecentSummary(recentActiveCatEvents);
+  const recentSummary = buildRecentSummary(recentActiveCatEvents, catName);
   const discoveredPoseSlugs = useMemo(
     () => buildDiscoveredPoseSlugs(activeCatEvents),
     [activeCatEvents],
@@ -196,11 +180,11 @@ export function CollectionPage({ recentEvents }: CollectionPageProps) {
 
         <section style={styles.card} aria-labelledby="recent-summary">
           <h2 id="recent-summary" style={styles.sectionTitle}>
-            このごろ
+            このごろの{catName}
           </h2>
-          <p style={styles.summaryText}>{recentSummary}</p>
+          <p style={styles.summaryText}>{recentSummary.text}</p>
           <p style={styles.summaryMeta}>
-            直近{RECENT_DAYS}日 ・ {recentActiveCatEvents.length}件
+            {recentSummary.note}
           </p>
         </section>
       </div>
@@ -245,44 +229,76 @@ function buildRecentFoundItems(events: RecentEvent[]) {
   return items;
 }
 
-function buildRecentSummary(events: RecentEvent[]) {
+function buildRecentSummary(events: RecentEvent[], catName: string) {
   if (events.length === 0) {
-    return "まだこれから。見えたままを残すと、少しずつ増えていきます。";
+    return {
+      text: "まだこれから",
+      note: "今日見えたことを残すと、ここに少しずつ出てきます",
+    };
   }
 
-  const topSignal = getTopSignal(events);
-
-  if (!topSignal) {
-    return "いろいろ残っています。少しずつ、この子の暮らしが見えてきます。";
-  }
-
-  const label = SIGNAL_LABELS[topSignal] ?? "様子";
-
-  return `最近は${label}多めです。`;
-}
-
-function getTopSignal(events: RecentEvent[]) {
-  const counts = new Map<string, number>();
+  const poseCounts = new Map<
+    string,
+    { label: string; slug: string; count: number }
+  >();
 
   events.forEach((event) => {
-    counts.set(event.signal, (counts.get(event.signal) ?? 0) + 1);
+    const pose = getPoseCategoryForEvent(event);
+
+    if (!pose) {
+      return;
+    }
+
+    const current = poseCounts.get(pose.slug);
+
+    poseCounts.set(pose.slug, {
+      label: pose.label,
+      slug: pose.slug,
+      count: (current?.count ?? 0) + 1,
+    });
   });
 
-  const sorted = [...counts.entries()].sort(([, a], [, b]) => b - a);
+  const sorted = [...poseCounts.values()].sort((a, b) => b.count - a.count);
 
   if (sorted.length === 0) {
-    return "";
+    return {
+      text: "少しずつ、残っています",
+      note: `${catName}らしい様子が、ゆっくりたまってきました`,
+    };
   }
 
-  if (sorted.length > 1 && sorted[0][1] === sorted[1][1]) {
-    return "";
+  if (events.length <= 2) {
+    return {
+      text: `「${sorted[0].label}」が残っています`,
+      note: "もう少し増えると、このごろの様子が見えてきます",
+    };
   }
 
-  return sorted[0][0];
-}
+  if (sorted.length > 1 && sorted[0].count === sorted[1].count) {
+    return {
+      text: `「${sorted[0].label}」「${sorted[1].label}」が少し多めです`,
+      note: "いろいろな様子が、少しずつたまっています",
+    };
+  }
 
-function getEventLabel(event: RecentEvent) {
-  return event.label || SIGNAL_LABELS[event.signal] || "様子";
+  if (sorted[0].slug === "low_energy") {
+    return {
+      text: "「休む」も残っています",
+      note: "いつもの様子と一緒に、やさしく見ていけます",
+    };
+  }
+
+  if (sorted[0].count >= 2) {
+    return {
+      text: `「${sorted[0].label}」をよく見かけます`,
+      note: `${catName}のこのごろが、少しずつ見えてきました`,
+    };
+  }
+
+  return {
+    text: "少しずつ、残っています",
+    note: `${catName}らしい様子が、ゆっくりたまってきました`,
+  };
 }
 
 function formatShortDate(value: string) {
