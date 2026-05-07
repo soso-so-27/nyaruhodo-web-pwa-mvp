@@ -74,7 +74,7 @@ export function CollectionPage({ recentEvents }: CollectionPageProps) {
           <section style={styles.emptyCard}>
             <h1 style={styles.emptyTitle}>コレクションを準備しています</h1>
             <p style={styles.emptyText}>
-              みつけたことを、少しだけ整えています。
+              写真や記録を、少しだけ整えています。
             </p>
           </section>
         </div>
@@ -90,7 +90,7 @@ export function CollectionPage({ recentEvents }: CollectionPageProps) {
           <section style={styles.emptyCard}>
             <h1 style={styles.emptyTitle}>一緒に暮らしている子を登録しましょう</h1>
             <p style={styles.emptyText}>
-              ねこページで登録すると、みつけたことも少しずつ増えていきます。
+              ねこページで登録すると、記録も少しずつ増えていきます。
             </p>
             <a href="/cats" style={styles.primaryLink}>
               ねこを登録する
@@ -109,7 +109,7 @@ export function CollectionPage({ recentEvents }: CollectionPageProps) {
           <p style={styles.eyebrow}>コレクション</p>
           <h1 style={styles.title}>コレクション</h1>
           <p style={styles.lead}>
-            今日見えたことが、少しずつここに残ります。
+            写真や記録が、少しずつここに残ります。
           </p>
         </header>
 
@@ -117,9 +117,9 @@ export function CollectionPage({ recentEvents }: CollectionPageProps) {
           <div style={styles.sectionHeader}>
             <div>
               <h2 id="recent-found" style={styles.sectionTitle}>
-                最近みつけた
+                最近見た
               </h2>
-              <p style={styles.sectionSubText}>直近で増えたもの</p>
+              <p style={styles.sectionSubText}>最近の記録から</p>
             </div>
           </div>
           {recentFoundItems.length > 0 ? (
@@ -138,7 +138,7 @@ export function CollectionPage({ recentEvents }: CollectionPageProps) {
             <div style={styles.softEmpty}>
               <p style={styles.softEmptyTitle}>まだこれから</p>
               <p style={styles.softEmptyText}>
-                みつけたものが、ここに並びます。
+                写真を残すと、ここに並びます。
               </p>
             </div>
           )}
@@ -152,8 +152,8 @@ export function CollectionPage({ recentEvents }: CollectionPageProps) {
               </h2>
               <p style={styles.sectionSubText}>
                 {discoveredPoseCount > 0
-                  ? `${discoveredPoseCount}つみつけた`
-                  : "これからみつけるもの"}
+                  ? `${discoveredPoseCount}つ記録あり`
+                  : "写真はまだこれから"}
               </p>
             </div>
           </div>
@@ -178,7 +178,7 @@ export function CollectionPage({ recentEvents }: CollectionPageProps) {
                       isDiscovered ? styles.poseFoundBadge : styles.posePendingText
                     }
                   >
-                    {isDiscovered ? "みつけた" : "まだこれから"}
+                    {isDiscovered ? "記録あり" : "まだこれから"}
                   </span>
                 </article>
               );
