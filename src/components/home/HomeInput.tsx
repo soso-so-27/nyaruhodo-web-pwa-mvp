@@ -1689,18 +1689,15 @@ function OptionSection<Option extends { label: string }>({
                   : buttonStyle
               }
             >
-              <span style={iconFrameStyle}>
-                <img
-                  src={getOptionIconSrc(option.label)}
-                  alt={getOptionDisplayLabel(option.label)}
+              <span style={iconFrameStyle} aria-hidden="true">
+                <LineOptionIcon
+                  signal={signal}
+                  label={option.label}
                   style={
                     isCompleted
                       ? { ...iconStyle, ...styles.completedOptionIcon }
                       : iconStyle
                   }
-                  onError={(event) => {
-                    event.currentTarget.style.visibility = "hidden";
-                  }}
                 />
                 {isCompleted ? (
                   <span style={styles.completedCheck} aria-hidden="true">
@@ -1725,8 +1722,66 @@ function OptionSection<Option extends { label: string }>({
   );
 }
 
-function getOptionIconSrc(label: string) {
-  const icons: Record<string, string> = {
+type OptionIconKind =
+  | "sleeping"
+  | "grooming"
+  | "playing"
+  | "food"
+  | "toilet"
+  | "purring"
+  | "meowing"
+  | "following"
+  | "restless"
+  | "low_energy"
+  | "fighting"
+  | "unknown";
+
+function LineOptionIcon({
+  signal,
+  label,
+  style,
+}: {
+  signal: string;
+  label: string;
+  style: CSSProperties;
+}) {
+  const kind = getOptionIconKind(signal, label);
+
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      style={style}
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.55"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      focusable="false"
+    >
+      {renderOptionIconPath(kind)}
+    </svg>
+  );
+}
+
+function getOptionIconKind(signal: string, label: string): OptionIconKind {
+  const bySignal: Record<string, OptionIconKind> = {
+    sleeping: "sleeping",
+    grooming: "grooming",
+    playing: "playing",
+    after_food: "food",
+    food: "food",
+    eating: "food",
+    toilet: "toilet",
+    purring: "purring",
+    meowing: "meowing",
+    following: "following",
+    restless: "restless",
+    low_energy: "low_energy",
+    fighting: "fighting",
+    unknown: "unknown",
+  };
+
+  const byLabel: Record<string, OptionIconKind> = {
     "\u306d\u3066\u308b": "sleeping",
     "\u30b0\u30eb\u30fc\u30df\u30f3\u30b0": "grooming",
     "\u904a\u3093\u3067\u308b": "playing",
@@ -1741,7 +1796,103 @@ function getOptionIconSrc(label: string) {
     "\u3088\u304f\u308f\u304b\u3089\u306a\u3044": "unknown",
   };
 
-  return `/icons/cat-actions/${icons[label] ?? "unknown"}.png`;
+  return bySignal[signal] ?? byLabel[label] ?? "unknown";
+}
+
+function renderOptionIconPath(kind: OptionIconKind) {
+  switch (kind) {
+    case "sleeping":
+      return <path d="M16.5 4.5a7.2 7.2 0 1 0 3 11.8 8.4 8.4 0 1 1-3-11.8Z" />;
+    case "grooming":
+      return (
+        <>
+          <path d="M6.5 17.5c3.8-1.2 8.1-5.5 9.7-10.7" />
+          <path d="M16.2 6.8c1.4 3.7.3 7.8-3 10.1" />
+          <path d="M8.2 15.8 5.5 18.5" />
+          <path d="m17.7 4.5 1.1-1.1" />
+        </>
+      );
+    case "playing":
+      return (
+        <>
+          <circle cx="8" cy="15.5" r="2.3" />
+          <path d="M10.2 14.7c3.9-1 6.1-3.1 7.3-6.4" />
+          <path d="m17.5 8.3 1.1-3.1-3.1 1.1" />
+        </>
+      );
+    case "food":
+      return (
+        <>
+          <path d="M5.5 10.8h13l-1.2 5.7H6.7L5.5 10.8Z" />
+          <path d="M8 10.8c.3-1.7 1.8-3 4-3s3.7 1.3 4 3" />
+          <path d="M8.2 18.8h7.6" />
+        </>
+      );
+    case "toilet":
+      return (
+        <>
+          <rect x="6" y="7" width="12" height="11" rx="2.2" />
+          <path d="M8.8 10.2h6.4" />
+          <path d="M9.2 14.5h5.6" />
+          <path d="M9 5h6" />
+        </>
+      );
+    case "purring":
+      return (
+        <>
+          <path d="M4.5 9.5c1.6-1.8 3.2-1.8 4.8 0s3.2 1.8 4.8 0 3.2-1.8 5 0" />
+          <path d="M4.5 14.5c1.6-1.8 3.2-1.8 4.8 0s3.2 1.8 4.8 0 3.2-1.8 5 0" />
+        </>
+      );
+    case "meowing":
+      return (
+        <>
+          <path d="M5 9.8h3.2l3.1-2.6v9.6l-3.1-2.6H5V9.8Z" />
+          <path d="M15.3 9.4c.8.8 1.2 1.7 1.2 2.6s-.4 1.8-1.2 2.6" />
+          <path d="M18 7.2c1.3 1.3 2 2.9 2 4.8s-.7 3.5-2 4.8" />
+        </>
+      );
+    case "following":
+      return (
+        <>
+          <path d="M6.5 8.4c.8-.8 2.2-.8 3 0s.8 2.2 0 3-2.2.8-3 0-.8-2.2 0-3Z" />
+          <path d="M13.8 13.5c.8-.8 2.2-.8 3 0s.8 2.2 0 3-2.2.8-3 0-.8-2.2 0-3Z" />
+          <path d="M10.8 11.8 13 13.2" />
+        </>
+      );
+    case "restless":
+      return (
+        <>
+          <path d="M4.5 13c1.8-3 3.8-3 5.6 0s3.8 3 5.6 0 3.3-3 4.8-.8" />
+          <path d="M7 17.5h10" />
+        </>
+      );
+    case "low_energy":
+      return (
+        <>
+          <path d="M7.5 15.5h9" />
+          <path d="M8.5 10.8c.9-1.8 2.2-2.8 3.9-2.8 2.7 0 4.6 2.1 4.6 4.7v.4" />
+          <path d="M5.5 13.8c.9-.4 1.8-.4 2.7 0" />
+        </>
+      );
+    case "fighting":
+      return (
+        <>
+          <circle cx="8.3" cy="9" r="2.4" />
+          <circle cx="15.7" cy="9" r="2.4" />
+          <path d="M4.8 17.5c.9-2.3 2.1-3.4 3.6-3.4s2.7 1.1 3.6 3.4" />
+          <path d="M12 17.5c.9-2.3 2.1-3.4 3.6-3.4s2.7 1.1 3.6 3.4" />
+        </>
+      );
+    case "unknown":
+      return (
+        <>
+          <circle cx="12" cy="12" r="7.2" />
+          <path d="M9.8 9.8c.4-1.1 1.2-1.7 2.4-1.7 1.4 0 2.3.8 2.3 2 0 1.8-2.4 1.9-2.4 3.7" />
+          <path d="M12 16.6h.01" />
+        </>
+      );
+  }
 }
 
 function getSignalIconSrc(signal: string) {
@@ -2665,29 +2816,29 @@ const styles = {
     flexDirection: "column",
     alignItems: "center",
     justifyContent: "center",
-    gap: "4px",
-    minHeight: "78px",
-    border: "1px solid rgba(225, 222, 216, 0.76)",
+    gap: "5px",
+    minHeight: "76px",
+    border: "1px solid rgba(225, 222, 216, 0.68)",
     borderRadius: "19px",
     background: "rgba(255, 255, 255, 0.72)",
-    color: "#383936",
+    color: "#41433f",
     fontWeight: 480,
     letterSpacing: 0,
     textAlign: "center",
-    padding: "7px 7px 8px",
+    padding: "8px 7px",
     cursor: "pointer",
   },
   currentButton: {
     background: "rgba(255, 255, 255, 0.74)",
-    borderColor: "rgba(225, 222, 216, 0.76)",
+    borderColor: "rgba(225, 222, 216, 0.68)",
   },
   concernButton: {
-    background: "rgba(249, 248, 245, 0.62)",
-    borderColor: "rgba(228, 225, 219, 0.72)",
+    background: "rgba(249, 248, 245, 0.52)",
+    borderColor: "rgba(228, 225, 219, 0.62)",
     fontWeight: 480,
-    minHeight: "82px",
-    gap: "4px",
-    padding: "7px 6px 8px",
+    minHeight: "78px",
+    gap: "5px",
+    padding: "8px 6px",
   },
   optionIconFrame: {
     display: "inline-flex",
@@ -2696,27 +2847,28 @@ const styles = {
     flex: "0 0 auto",
     background: "transparent",
     position: "relative",
+    color: "#7a7b74",
   },
   currentOptionIconFrame: {
-    width: "39px",
-    height: "39px",
+    width: "31px",
+    height: "31px",
   },
   concernOptionIconFrame: {
-    width: "35px",
-    height: "35px",
+    width: "30px",
+    height: "30px",
   },
   optionIcon: {
     display: "block",
-    objectFit: "contain",
     pointerEvents: "none",
+    color: "currentColor",
   },
   currentOptionIcon: {
-    width: "36px",
-    height: "36px",
+    width: "25px",
+    height: "25px",
   },
   concernOptionIcon: {
-    width: "32px",
-    height: "32px",
+    width: "24px",
+    height: "24px",
   },
   optionLabel: {
     display: "block",
@@ -2725,11 +2877,11 @@ const styles = {
   },
   currentOptionLabel: {
     fontSize: "12px",
-    fontWeight: 520,
+    fontWeight: 500,
   },
   concernOptionLabel: {
     fontSize: "12px",
-    fontWeight: 530,
+    fontWeight: 500,
   },
   completedStateButton: {
     background: "#f2f3ef",
@@ -2753,7 +2905,7 @@ const styles = {
     width: "18px",
     height: "18px",
     borderRadius: "999px",
-    background: "#8a9384",
+    background: "#8b9288",
     color: "#ffffff",
     fontSize: "12px",
     fontWeight: 750,
