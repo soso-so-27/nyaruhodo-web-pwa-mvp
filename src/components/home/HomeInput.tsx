@@ -67,7 +67,7 @@ const POST_DIAGNOSIS_FEEDBACK_KEY = "post_diagnosis_feedback";
 const RECENT_STATE_RECORDS_KEY = "recent_state_records";
 const RECENT_STATE_RECORD_TTL_MS = 30 * 60 * 1000;
 const RECENT_CAT_SUMMARY_WINDOW_MS = 7 * 24 * 60 * 60 * 1000;
-const SAMPLE_HOME_CAT_PHOTO_SRC = "/sample-cats/mugi-hero.png";
+const SAMPLE_HOME_CAT_PHOTO_SRC = "/sample-cats/pose-stretch.png";
 
 type RecentStateRecord = {
   localCatId: string | null;
@@ -913,7 +913,7 @@ function Header({
       <div style={{ ...styles.photoHero, borderColor: photoBorderColor }}>
         <img src={SAMPLE_HOME_CAT_PHOTO_SRC} alt="" style={styles.photoHeroImage} />
         <div style={styles.photoHeroFade} aria-hidden="true" />
-        <div style={styles.photoHeroName}>
+        <div style={styles.photoHeroContent}>
           <h1 style={styles.title}>
             {canSwitchCats ? (
               <button
@@ -931,6 +931,62 @@ function Header({
               <>{catName}</>
             )}
           </h1>
+          {onboardingHomeMessage ? (
+            <p style={styles.onboardingHomeMessage}>{onboardingHomeMessage}</p>
+          ) : null}
+          {postDiagnosisFeedbackMessage ? (
+            <p style={styles.onboardingHomeMessage}>
+              {postDiagnosisFeedbackMessage}
+            </p>
+          ) : null}
+          <div style={styles.dashboardTiles}>
+            <div style={styles.dashboardTile}>
+              <span style={styles.statusLabel}>
+                {`\u3055\u3044\u304d\u3093\u306e${catName}`}
+              </span>
+              <span style={styles.statusValue}>
+                {recentCatSummary.recentSignalLabel}
+              </span>
+            </div>
+            <div style={{ ...styles.dashboardTile, ...styles.dashboardTileLast }}>
+              <span style={styles.statusLabel}>
+                {`\u3044\u307e\u306e${catName}`}
+              </span>
+              <span style={styles.statusValue}>
+                {recentCatSummary.currentTrendText}
+              </span>
+            </div>
+          </div>
+          <div style={styles.dayMap}>
+            <p style={styles.dayMapTitle}>{`${catName}\u306e1\u65e5`}</p>
+            <div style={styles.dayMapGrid}>
+              {recentCatSummary.dayMap.map((item) => (
+                <div
+                  key={item.period}
+                  style={
+                    item.isMuted
+                      ? { ...styles.dayMapItem, ...styles.dayMapItemMuted }
+                      : styles.dayMapItem
+                  }
+                >
+                  <span style={styles.dayMapPeriod}>{item.period}</span>
+                  {item.signal ? (
+                    <img
+                      src={getSignalIconSrc(item.signal)}
+                      alt=""
+                      style={styles.dayMapIcon}
+                      onError={(event) => {
+                        event.currentTarget.style.visibility = "hidden";
+                      }}
+                    />
+                  ) : (
+                    <span style={styles.dayMapDot} aria-hidden="true" />
+                  )}
+                  <span style={styles.dayMapLabel}>{item.label}</span>
+                </div>
+              ))}
+            </div>
+          </div>
         </div>
         <div style={styles.understandingPanel}>
           <div
@@ -941,69 +997,14 @@ function Header({
             aria-label={`理解度 ${understandingPercent}%`}
           >
             <span style={styles.understandingRingInner}>
-              {understandingPercent}
-              {"%"}
+              <span style={styles.understandingRingLabel}>理解度</span>
+              <span style={styles.understandingRingPercent}>
+                {understandingPercent}
+                {"%"}
+              </span>
             </span>
           </div>
           <p style={styles.understanding}>{understandingTone}</p>
-        </div>
-      </div>
-      <div style={styles.headerGuide}>
-        {onboardingHomeMessage ? (
-          <p style={styles.onboardingHomeMessage}>{onboardingHomeMessage}</p>
-        ) : null}
-        {postDiagnosisFeedbackMessage ? (
-          <p style={styles.onboardingHomeMessage}>
-            {postDiagnosisFeedbackMessage}
-          </p>
-        ) : null}
-        <div style={styles.dashboardTiles}>
-          <div style={styles.dashboardTile}>
-            <span style={styles.statusLabel}>
-              {`\u3055\u3044\u304d\u3093\u306e${catName}`}
-            </span>
-            <span style={styles.statusValue}>
-              {recentCatSummary.recentSignalLabel}
-            </span>
-          </div>
-          <div style={{ ...styles.dashboardTile, ...styles.dashboardTileLast }}>
-            <span style={styles.statusLabel}>
-              {`\u3044\u307e\u306e${catName}`}
-            </span>
-            <span style={styles.statusValue}>
-              {recentCatSummary.currentTrendText}
-            </span>
-          </div>
-        </div>
-        <div style={styles.dayMap}>
-          <p style={styles.dayMapTitle}>{`${catName}\u306e1\u65e5`}</p>
-          <div style={styles.dayMapGrid}>
-            {recentCatSummary.dayMap.map((item) => (
-              <div
-                key={item.period}
-                style={
-                  item.isMuted
-                    ? { ...styles.dayMapItem, ...styles.dayMapItemMuted }
-                    : styles.dayMapItem
-                }
-              >
-                <span style={styles.dayMapPeriod}>{item.period}</span>
-                {item.signal ? (
-                  <img
-                    src={getSignalIconSrc(item.signal)}
-                    alt=""
-                    style={styles.dayMapIcon}
-                    onError={(event) => {
-                      event.currentTarget.style.visibility = "hidden";
-                    }}
-                  />
-                ) : (
-                  <span style={styles.dayMapDot} aria-hidden="true" />
-                )}
-                <span style={styles.dayMapLabel}>{item.label}</span>
-              </div>
-            ))}
-          </div>
         </div>
       </div>
       {isCatSwitcherOpen ? (
@@ -1891,7 +1892,7 @@ const styles = {
   },
   photoHero: {
     position: "relative",
-    minHeight: "286px",
+    height: "438px",
     border: "1px solid #e4e1da",
     borderRadius: "30px",
     background: "#ffffff",
@@ -1904,25 +1905,31 @@ const styles = {
     display: "block",
     width: "100%",
     height: "100%",
-    objectFit: "cover",
-    objectPosition: "43% 50%",
+    objectFit: "contain",
+    objectPosition: "center 12px",
     filter: "saturate(0.94) contrast(0.97)",
   },
   photoHeroFade: {
     position: "absolute",
     inset: 0,
     background:
-      "linear-gradient(180deg, rgba(255,255,255,0.1) 0%, rgba(255,255,255,0.04) 42%, rgba(255,255,255,0.88) 100%)",
+      "linear-gradient(180deg, rgba(255,255,255,0.12) 0%, rgba(255,255,255,0.02) 34%, rgba(255,255,255,0.2) 56%, rgba(250,249,245,0.92) 100%), linear-gradient(90deg, rgba(255,255,255,0.24) 0%, rgba(255,255,255,0) 44%)",
   },
-  photoHeroName: {
+  photoHeroContent: {
     position: "absolute",
-    left: "18px",
-    bottom: "18px",
-    zIndex: 1,
-    display: "inline-flex",
-    maxWidth: "58%",
+    left: "12px",
+    right: "12px",
+    bottom: "12px",
+    zIndex: 2,
+    display: "flex",
     flexDirection: "column",
-    gap: "3px",
+    gap: "8px",
+    border: "1px solid rgba(232, 228, 219, 0.92)",
+    borderRadius: "22px",
+    background: "rgba(255, 255, 255, 0.76)",
+    boxShadow: "0 12px 26px rgba(43, 40, 34, 0.055)",
+    padding: "12px",
+    backdropFilter: "blur(10px)",
   },
   headerTopRow: {
     display: "flex",
@@ -1965,38 +1972,51 @@ const styles = {
     display: "flex",
     flexDirection: "column",
     alignItems: "center",
-    gap: "4px",
-    minWidth: "58px",
+    gap: "3px",
+    minWidth: "82px",
     position: "absolute",
-    right: "16px",
-    top: "16px",
-    zIndex: 1,
-    border: "1px solid rgba(227, 224, 218, 0.92)",
+    right: "18px",
+    top: "24px",
+    zIndex: 2,
+    border: "1px solid rgba(232, 229, 220, 0.94)",
     borderRadius: "999px",
-    background: "rgba(255, 255, 255, 0.74)",
-    boxShadow: "0 10px 24px rgba(43, 40, 34, 0.06)",
-    padding: "7px 8px 8px",
-    backdropFilter: "blur(8px)",
+    background: "rgba(255, 255, 255, 0.72)",
+    boxShadow: "0 14px 30px rgba(43, 40, 34, 0.075)",
+    padding: "9px 8px 10px",
+    backdropFilter: "blur(10px)",
   },
   understandingRing: {
     display: "flex",
     alignItems: "center",
     justifyContent: "center",
-    width: "46px",
-    height: "46px",
+    width: "64px",
+    height: "64px",
     borderRadius: "999px",
   },
   understandingRingInner: {
     display: "flex",
     alignItems: "center",
     justifyContent: "center",
-    width: "35px",
-    height: "35px",
+    flexDirection: "column",
+    gap: "2px",
+    width: "50px",
+    height: "50px",
     borderRadius: "999px",
     background: "rgba(255, 255, 255, 0.92)",
     color: "#3f433d",
-    fontSize: "10px",
-    fontWeight: 720,
+    fontWeight: 680,
+    lineHeight: 1,
+  },
+  understandingRingLabel: {
+    color: "#6c6a61",
+    fontSize: "8px",
+    fontWeight: 650,
+    lineHeight: 1,
+  },
+  understandingRingPercent: {
+    color: "#343632",
+    fontSize: "15px",
+    fontWeight: 690,
     lineHeight: 1,
   },
   catNameControls: {
