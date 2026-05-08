@@ -19,8 +19,8 @@ import type { CatCoat, CatProfile } from "../home/homeInputHelpers";
 const COAT_OPTIONS: { value: CatCoat; label: string; color: string }[] = [
   { value: "saba", label: "サバ", color: "#d8d2c4" },
   { value: "gray", label: "グレー", color: "#d6d3d1" },
-  { value: "orange_tabby", label: "茶トラ", color: "#efbd79" },
-  { value: "black", label: "黒", color: "#57534e" },
+  { value: "orange_tabby", label: "茶トラ", color: "#d8bd9a" },
+  { value: "black", label: "黒", color: "#625f59" },
   { value: "white", label: "白", color: "#fafafa" },
   { value: "calico", label: "三毛", color: "#f0c28b" },
 ];
@@ -216,7 +216,7 @@ export function CatsPage() {
                         ...styles.coatSwatch,
                         background:
                           option.value === "calico"
-                            ? "linear-gradient(135deg, #fff7e8 0%, #fff7e8 36%, #efbd79 37%, #efbd79 66%, #d6d3d1 67%, #d6d3d1 100%)"
+                            ? "linear-gradient(135deg, #faf6ee 0%, #faf6ee 38%, #e4cfb2 39%, #e4cfb2 64%, #d9d6cf 65%, #d9d6cf 100%)"
                             : option.color,
                       }}
                       aria-hidden="true"
@@ -336,7 +336,7 @@ export function CatsPage() {
 const styles = {
   page: {
     minHeight: "100vh",
-    background: "#f7f3ee",
+    background: "#f6f5f1",
     color: "#27272a",
     fontFamily:
       '-apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
@@ -348,9 +348,9 @@ const styles = {
   },
   header: {
     marginBottom: "10px",
-    border: "1px solid #ebe2d6",
+    border: "1px solid #e2ded6",
     borderRadius: "24px",
-    background: "linear-gradient(180deg, #fffdf9 0%, #fff7ec 100%)",
+    background: "linear-gradient(180deg, #fffefb 0%, #f7f5ef 100%)",
     padding: "16px",
   },
   eyebrow: {
@@ -382,7 +382,7 @@ const styles = {
   },
   profileSummary: {
     marginBottom: "14px",
-    borderBottom: "1px solid #f0e6dc",
+    borderBottom: "1px solid #e4e1da",
     paddingBottom: "14px",
   },
   profileSummaryHeader: {
@@ -396,9 +396,9 @@ const styles = {
     justifyContent: "center",
     width: "58px",
     height: "58px",
-    border: "1px solid #eadbca",
+    border: "1px solid #ddd8cf",
     borderRadius: "20px",
-    background: "#fffaf3",
+    background: "#f8f7f3",
     flex: "0 0 auto",
     overflow: "hidden",
   },
@@ -440,10 +440,10 @@ const styles = {
     display: "inline-flex",
     width: "fit-content",
     margin: "2px 0 0",
-    border: "1px solid #eadbca",
+    border: "1px solid #ddd8cf",
     borderRadius: "999px",
-    background: "#fffaf3",
-    color: "#6b5f54",
+    background: "#f8f7f3",
+    color: "#6f6a61",
     fontSize: "12px",
     fontWeight: 700,
     lineHeight: 1.5,
@@ -451,7 +451,7 @@ const styles = {
   },
   coatSection: {
     marginBottom: "14px",
-    borderBottom: "1px solid #f0e6dc",
+    borderBottom: "1px solid #e4e1da",
     paddingBottom: "14px",
   },
   coatHeader: {
@@ -484,8 +484,8 @@ const styles = {
     cursor: "pointer",
   },
   coatButtonActive: {
-    borderColor: "#a58b6f",
-    background: "#fff7ec",
+    borderColor: "#9ca394",
+    background: "#f2f3ef",
     color: "#27272a",
   },
   coatSwatch: {
@@ -524,7 +524,7 @@ const styles = {
     padding: "0 14px",
     border: "1px solid #a1a1aa",
     borderRadius: "999px",
-    background: "#3f3f46",
+    background: "#6f7668",
     color: "#ffffff",
     fontSize: "14px",
     fontWeight: 700,
@@ -534,9 +534,9 @@ const styles = {
   primaryButton: {
     minHeight: "44px",
     width: "100%",
-    border: "1px solid #3f3f46",
+    border: "1px solid #6f7668",
     borderRadius: "14px",
-    background: "#3f3f46",
+    background: "#6f7668",
     color: "#ffffff",
     fontSize: "14px",
     fontWeight: 700,
@@ -600,7 +600,7 @@ const styles = {
     padding: "0 18px",
     border: "1px solid #a1a1aa",
     borderRadius: "12px",
-    background: "#3f3f46",
+    background: "#6f7668",
     color: "#ffffff",
     fontSize: "14px",
     fontWeight: 700,
@@ -642,21 +642,21 @@ function getCatCoatAvatarStyle(coat?: CatCoat): CSSProperties {
       background: "linear-gradient(180deg, #f6f5f3 0%, #e5e2de 100%)",
     },
     orange_tabby: {
-      borderColor: "#efc89a",
-      background: "linear-gradient(180deg, #fff1dc 0%, #f5c994 100%)",
+      borderColor: "#dfc7a8",
+      background: "linear-gradient(180deg, #fbf3e7 0%, #e6d0b3 100%)",
     },
     black: {
-      borderColor: "#57534e",
-      background: "linear-gradient(180deg, #e7e2dc 0%, #9b928a 100%)",
+      borderColor: "#625f59",
+      background: "linear-gradient(180deg, #e6e3de 0%, #8d8881 100%)",
     },
     white: {
       borderColor: "#d4d4d8",
       background: "linear-gradient(180deg, #ffffff 0%, #f4f4f5 100%)",
     },
     calico: {
-      borderColor: "#ead7bd",
+      borderColor: "#ded6ca",
       background:
-        "linear-gradient(135deg, #fff9ef 0%, #fff9ef 42%, #f8d7ad 43%, #f8d7ad 66%, #e4ded5 67%, #e4ded5 100%)",
+        "linear-gradient(135deg, #faf6ee 0%, #faf6ee 44%, #ead8be 45%, #ead8be 64%, #e1ded8 65%, #e1ded8 100%)",
     },
   };
 
