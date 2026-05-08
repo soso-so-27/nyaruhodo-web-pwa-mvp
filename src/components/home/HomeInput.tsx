@@ -67,7 +67,7 @@ const POST_DIAGNOSIS_FEEDBACK_KEY = "post_diagnosis_feedback";
 const RECENT_STATE_RECORDS_KEY = "recent_state_records";
 const RECENT_STATE_RECORD_TTL_MS = 30 * 60 * 1000;
 const RECENT_CAT_SUMMARY_WINDOW_MS = 7 * 24 * 60 * 60 * 1000;
-const SAMPLE_HOME_CAT_PHOTO_SRC = "/sample-cats/pose-stretch.png";
+const SAMPLE_HOME_CAT_PHOTO_SRC = "/sample-cats/home-hero-generated.png";
 
 type RecentStateRecord = {
   localCatId: string | null;
