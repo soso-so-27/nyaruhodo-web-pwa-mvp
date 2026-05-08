@@ -1901,19 +1901,21 @@ const styles = {
   },
   photoHeroImage: {
     position: "absolute",
-    inset: 0,
+    top: 0,
+    left: 0,
+    right: 0,
     display: "block",
     width: "100%",
-    height: "100%",
-    objectFit: "contain",
-    objectPosition: "center 8px",
+    height: "312px",
+    objectFit: "cover",
+    objectPosition: "42% top",
     filter: "saturate(0.94) contrast(0.97)",
   },
   photoHeroFade: {
     position: "absolute",
     inset: 0,
     background:
-      "linear-gradient(180deg, rgba(255,255,255,0.08) 0%, rgba(255,255,255,0.02) 34%, rgba(251,250,247,0.24) 50%, rgba(251,250,247,0.78) 66%, rgba(251,250,247,0.98) 100%), linear-gradient(90deg, rgba(255,255,255,0.24) 0%, rgba(255,255,255,0) 46%)",
+      "linear-gradient(180deg, rgba(255,255,255,0.08) 0%, rgba(255,255,255,0.01) 34%, rgba(251,250,247,0.12) 48%, rgba(251,250,247,0.58) 62%, rgba(251,250,247,0.92) 75%, #fbfaf7 88%, #fbfaf7 100%), linear-gradient(90deg, rgba(255,255,255,0.22) 0%, rgba(255,255,255,0) 46%)",
   },
   photoHeroContent: {
     position: "absolute",
