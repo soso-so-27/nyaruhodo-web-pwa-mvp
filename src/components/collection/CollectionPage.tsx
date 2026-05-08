@@ -25,6 +25,13 @@ type CollectionPageProps = {
 };
 
 const RECENT_DAYS = 7;
+const SAMPLE_COLLECTION_HERO_PHOTO_SRC = "/sample-cats/pose-stretch.png";
+const PHOTO_POSE_IMAGE_BY_SLUG: Record<string, string> = {
+  belly_up: "/sample-cats/pose-belly.png",
+  in_box: "/sample-cats/pose-box.png",
+  stretch: "/sample-cats/pose-stretch.png",
+  loaf: "/sample-cats/pose-loaf.png",
+};
 
 export function CollectionPage({ recentEvents }: CollectionPageProps) {
   const [catProfiles, setCatProfiles] = useState<CatProfile[]>([]);
@@ -104,6 +111,16 @@ export function CollectionPage({ recentEvents }: CollectionPageProps) {
           <p style={styles.lead}>
             写真や記録が、少しずつここに残ります。
           </p>
+          <div style={styles.heroPhotoFrame} aria-hidden="true">
+            <img
+              src={SAMPLE_COLLECTION_HERO_PHOTO_SRC}
+              alt=""
+              style={styles.heroPhoto}
+            />
+            <div style={styles.heroPhotoOverlay}>
+              <span style={styles.heroPhotoLabel}>写真が入る棚</span>
+            </div>
+          </div>
         </header>
 
         <section style={styles.card} aria-labelledby="recent-records">
@@ -147,15 +164,43 @@ export function CollectionPage({ recentEvents }: CollectionPageProps) {
             </div>
           </div>
           <div style={styles.poseGrid}>
-            {PHOTO_COLLECTION_POSES.map((pose) => (
-              <article key={pose.slug} style={styles.poseCard}>
-                <span style={styles.poseMark} aria-hidden="true">
-                  {pose.label.slice(0, 1)}
-                </span>
-                <p style={styles.poseLabel}>{pose.label}</p>
-                <span style={styles.posePendingText}>まだこれから</span>
-              </article>
-            ))}
+            {PHOTO_COLLECTION_POSES.map((pose) => {
+              const photoSrc = PHOTO_POSE_IMAGE_BY_SLUG[pose.slug];
+
+              return (
+                <article
+                  key={pose.slug}
+                  style={
+                    photoSrc
+                      ? { ...styles.poseCard, ...styles.posePhotoCard }
+                      : styles.poseCard
+                  }
+                >
+                  {photoSrc ? (
+                    <>
+                      <img src={photoSrc} alt="" style={styles.posePhoto} />
+                      <span style={styles.posePhotoFade} aria-hidden="true" />
+                    </>
+                  ) : (
+                    <span style={styles.poseMark} aria-hidden="true">
+                      {pose.label.slice(0, 1)}
+                    </span>
+                  )}
+                  <p style={photoSrc ? styles.posePhotoLabel : styles.poseLabel}>
+                    {pose.label}
+                  </p>
+                  <span
+                    style={
+                      photoSrc
+                        ? styles.posePhotoPendingText
+                        : styles.posePendingText
+                    }
+                  >
+                    まだこれから
+                  </span>
+                </article>
+              );
+            })}
           </div>
         </section>
 
@@ -320,7 +365,7 @@ function formatShortDate(value: string) {
 const styles = {
   page: {
     minHeight: "100svh",
-    background: "#f7f6f2",
+    background: "#fbfaf7",
     color: "#27272a",
   },
   container: {
@@ -329,11 +374,11 @@ const styles = {
     padding: "16px 14px calc(154px + env(safe-area-inset-bottom))",
   },
   hero: {
-    border: "1px solid #e5e2dc",
-    borderRadius: "28px",
+    border: "1px solid #e8e5de",
+    borderRadius: "30px",
     background:
-      "linear-gradient(145deg, rgba(255, 255, 255, 0.98), rgba(248, 247, 243, 0.94))",
-    padding: "18px",
+      "linear-gradient(145deg, rgba(255, 255, 255, 0.98), rgba(250, 249, 246, 0.94))",
+    padding: "18px 18px 16px",
     marginBottom: "12px",
   },
   eyebrow: {
@@ -358,16 +403,50 @@ const styles = {
     lineHeight: 1.65,
     fontWeight: 500,
   },
+  heroPhotoFrame: {
+    position: "relative",
+    height: "184px",
+    marginTop: "14px",
+    border: "1px solid #e7e4dd",
+    borderRadius: "22px",
+    background: "#f4f2ed",
+    overflow: "hidden",
+  },
+  heroPhoto: {
+    display: "block",
+    width: "100%",
+    height: "100%",
+    objectFit: "cover",
+    objectPosition: "48% 48%",
+    filter: "saturate(0.9) contrast(0.97)",
+  },
+  heroPhotoOverlay: {
+    position: "absolute",
+    right: "12px",
+    bottom: "12px",
+    display: "inline-flex",
+    border: "1px solid rgba(255,255,255,0.72)",
+    borderRadius: "999px",
+    background: "rgba(255,255,255,0.82)",
+    padding: "5px 10px",
+    backdropFilter: "blur(8px)",
+  },
+  heroPhotoLabel: {
+    color: "#60635c",
+    fontSize: "12px",
+    fontWeight: 600,
+    lineHeight: 1,
+  },
   card: {
-    border: "1px solid #e3e0da",
-    borderRadius: "26px",
+    border: "1px solid #e8e5de",
+    borderRadius: "28px",
     background: "#ffffff",
-    padding: "16px",
+    padding: "17px",
     marginBottom: "14px",
   },
   memoCard: {
-    border: "1px solid #e5e2dc",
-    borderRadius: "24px",
+    border: "1px solid #e8e5de",
+    borderRadius: "26px",
     background: "#ffffff",
     padding: "15px 16px",
     marginBottom: "14px",
@@ -402,8 +481,8 @@ const styles = {
     display: "grid",
     justifyItems: "center",
     gap: "3px",
-    border: "1px solid #e3e0da",
-    borderRadius: "20px",
+    border: "1px solid #e7e4dd",
+    borderRadius: "22px",
     background: "#ffffff",
     padding: "9px 7px",
     textAlign: "center",
@@ -414,8 +493,8 @@ const styles = {
     width: "36px",
     height: "36px",
     borderRadius: "14px",
-    background: "#ffffff",
-    color: "#697164",
+    background: "#f2f1ec",
+    color: "#6d7469",
     fontSize: "15px",
     fontWeight: 650,
   },
@@ -432,7 +511,7 @@ const styles = {
   },
   softEmpty: {
     borderRadius: "20px",
-    background: "#f8f7f3",
+    background: "#faf9f6",
     border: "1px solid #ebe8e1",
     padding: "14px",
   },
@@ -451,16 +530,42 @@ const styles = {
   },
   poseGrid: {
     display: "grid",
-    gridTemplateColumns: "repeat(4, minmax(0, 1fr))",
-    gap: "8px",
+    gridTemplateColumns: "repeat(2, minmax(0, 1fr))",
+    gap: "10px",
   },
   poseCard: {
-    minHeight: "76px",
-    border: "1px solid #e4e1da",
-    borderRadius: "16px",
-    background: "#ffffff",
-    padding: "8px 4px",
+    position: "relative",
+    minHeight: "112px",
+    border: "1px solid #e7e4dd",
+    borderRadius: "20px",
+    background: "#fbfaf7",
+    padding: "12px 8px",
     textAlign: "center",
+    overflow: "hidden",
+  },
+  posePhotoCard: {
+    minHeight: "144px",
+    display: "flex",
+    flexDirection: "column",
+    justifyContent: "flex-end",
+    alignItems: "flex-start",
+    padding: "10px",
+    textAlign: "left",
+  },
+  posePhoto: {
+    position: "absolute",
+    inset: 0,
+    display: "block",
+    width: "100%",
+    height: "100%",
+    objectFit: "cover",
+    filter: "saturate(0.92) contrast(0.97)",
+  },
+  posePhotoFade: {
+    position: "absolute",
+    inset: 0,
+    background:
+      "linear-gradient(180deg, rgba(255,255,255,0.04) 0%, rgba(35,34,31,0.04) 45%, rgba(35,34,31,0.42) 100%)",
   },
   poseMark: {
     display: "grid",
@@ -469,7 +574,7 @@ const styles = {
     height: "28px",
     margin: "0 auto 6px",
     borderRadius: "11px",
-    background: "#f4f3ee",
+    background: "#f2f1ec",
     color: "#7a7f75",
     fontSize: "12px",
     fontWeight: 650,
@@ -481,6 +586,16 @@ const styles = {
     fontWeight: 600,
     lineHeight: 1.35,
   },
+  posePhotoLabel: {
+    position: "relative",
+    zIndex: 1,
+    margin: 0,
+    color: "#ffffff",
+    fontSize: "14px",
+    fontWeight: 650,
+    lineHeight: 1.25,
+    textShadow: "0 1px 8px rgba(0,0,0,0.24)",
+  },
   posePendingText: {
     display: "inline-flex",
     marginTop: "5px",
@@ -488,6 +603,21 @@ const styles = {
     fontSize: "9px",
     fontWeight: 500,
     lineHeight: 1,
+  },
+  posePhotoPendingText: {
+    position: "relative",
+    zIndex: 1,
+    display: "inline-flex",
+    marginTop: "5px",
+    border: "1px solid rgba(255,255,255,0.58)",
+    borderRadius: "999px",
+    background: "rgba(255,255,255,0.7)",
+    color: "#5d625a",
+    fontSize: "10px",
+    fontWeight: 600,
+    lineHeight: 1,
+    padding: "4px 7px",
+    backdropFilter: "blur(7px)",
   },
   summaryText: {
     margin: "10px 0 7px",

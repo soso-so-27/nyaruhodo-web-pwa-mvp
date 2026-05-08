@@ -23,7 +23,6 @@ import {
   buildDailyHintHypothesis,
   clearLatestHypothesis,
   getActiveCatProfile,
-  getCatAvatarSrcForCoat,
   getCatName,
   getHypothesisCompletionMessage,
   isCurrentCatHintSuppressed,
@@ -68,7 +67,7 @@ const POST_DIAGNOSIS_FEEDBACK_KEY = "post_diagnosis_feedback";
 const RECENT_STATE_RECORDS_KEY = "recent_state_records";
 const RECENT_STATE_RECORD_TTL_MS = 30 * 60 * 1000;
 const RECENT_CAT_SUMMARY_WINDOW_MS = 7 * 24 * 60 * 60 * 1000;
-const DEFAULT_CAT_AVATAR_ICON_SRC = "/icons/cat-avatars/neutral.png";
+const SAMPLE_HOME_CAT_PHOTO_SRC = "/sample-cats/mugi-hero.png";
 
 type RecentStateRecord = {
   localCatId: string | null;
@@ -898,8 +897,11 @@ function Header({
   const understandingTone = getUnderstandingTone(understandingPercent);
   const ringDegree = Math.max(0, Math.min(100, understandingPercent)) * 3.6;
   const canSwitchCats = catProfiles.length > 1;
-  const catAvatarSrc = getCatAvatarSrcForCoat(catCoat);
   const catAvatarStyle = getCatCoatAvatarStyle(catCoat);
+  const photoBorderColor =
+    typeof catAvatarStyle.borderColor === "string"
+      ? catAvatarStyle.borderColor
+      : "#e4e1da";
 
   function handleCatChipSelect(catId: string) {
     onCatSelect(catId);
@@ -908,24 +910,10 @@ function Header({
 
   return (
     <header style={styles.header}>
-      <div style={styles.profileHero}>
-        <div style={{ ...styles.catAvatar, ...catAvatarStyle }} aria-hidden="true">
-          <img
-            key={catAvatarSrc}
-            src={catAvatarSrc}
-            alt=""
-            style={styles.catAvatarIcon}
-            onError={(event) => {
-              if (event.currentTarget.src.endsWith(DEFAULT_CAT_AVATAR_ICON_SRC)) {
-                event.currentTarget.style.visibility = "hidden";
-                return;
-              }
-
-              event.currentTarget.src = DEFAULT_CAT_AVATAR_ICON_SRC;
-            }}
-          />
-        </div>
-        <div style={styles.profileText}>
+      <div style={{ ...styles.photoHero, borderColor: photoBorderColor }}>
+        <img src={SAMPLE_HOME_CAT_PHOTO_SRC} alt="" style={styles.photoHeroImage} />
+        <div style={styles.photoHeroFade} aria-hidden="true" />
+        <div style={styles.photoHeroName}>
           <h1 style={styles.title}>
             {canSwitchCats ? (
               <button
@@ -934,9 +922,7 @@ function Header({
                 style={styles.titleSwitchButton}
                 aria-expanded={isCatSwitcherOpen}
               >
-                <span>
-                  {catName}
-                </span>
+                <span>{catName}</span>
                 <span style={styles.titleChevron} aria-hidden="true">
                   {isCatSwitcherOpen ? "▲" : "▼"}
                 </span>
@@ -950,7 +936,7 @@ function Header({
           <div
             style={{
               ...styles.understandingRing,
-              background: `conic-gradient(#8a9284 ${ringDegree}deg, #e8e6df 0deg)`,
+              background: `conic-gradient(#858b7c ${ringDegree}deg, rgba(255, 255, 255, 0.76) 0deg)`,
             }}
             aria-label={`理解度 ${understandingPercent}%`}
           >
@@ -1845,7 +1831,7 @@ function getSignalDisplayLabel(signal: string) {
 const styles = {
   page: {
     minHeight: "100vh",
-    background: "#f7f6f2",
+    background: "#fbfaf7",
     color: "#27272a",
     fontFamily:
       '-apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
@@ -1896,12 +1882,47 @@ const styles = {
     transform: "translateY(1px)",
   },
   header: {
-    marginBottom: "10px",
-    border: "1px solid #e5e2dc",
-    borderRadius: "26px",
-    background: "linear-gradient(180deg, #ffffff 0%, #f8f7f3 100%)",
-    padding: "15px 14px 14px",
+    marginBottom: "12px",
+    border: "0",
+    borderRadius: "0",
+    background: "transparent",
+    padding: 0,
     scrollMarginTop: "16px",
+  },
+  photoHero: {
+    position: "relative",
+    minHeight: "286px",
+    border: "1px solid #e4e1da",
+    borderRadius: "30px",
+    background: "#ffffff",
+    overflow: "hidden",
+    boxShadow: "0 16px 34px rgba(43, 40, 34, 0.055)",
+  },
+  photoHeroImage: {
+    position: "absolute",
+    inset: 0,
+    display: "block",
+    width: "100%",
+    height: "100%",
+    objectFit: "cover",
+    objectPosition: "43% 50%",
+    filter: "saturate(0.94) contrast(0.97)",
+  },
+  photoHeroFade: {
+    position: "absolute",
+    inset: 0,
+    background:
+      "linear-gradient(180deg, rgba(255,255,255,0.1) 0%, rgba(255,255,255,0.04) 42%, rgba(255,255,255,0.88) 100%)",
+  },
+  photoHeroName: {
+    position: "absolute",
+    left: "18px",
+    bottom: "18px",
+    zIndex: 1,
+    display: "inline-flex",
+    maxWidth: "58%",
+    flexDirection: "column",
+    gap: "3px",
   },
   headerTopRow: {
     display: "flex",
@@ -1946,6 +1967,16 @@ const styles = {
     alignItems: "center",
     gap: "4px",
     minWidth: "58px",
+    position: "absolute",
+    right: "16px",
+    top: "16px",
+    zIndex: 1,
+    border: "1px solid rgba(227, 224, 218, 0.92)",
+    borderRadius: "999px",
+    background: "rgba(255, 255, 255, 0.74)",
+    boxShadow: "0 10px 24px rgba(43, 40, 34, 0.06)",
+    padding: "7px 8px 8px",
+    backdropFilter: "blur(8px)",
   },
   understandingRing: {
     display: "flex",
@@ -1962,7 +1993,7 @@ const styles = {
     width: "35px",
     height: "35px",
     borderRadius: "999px",
-    background: "#fffdf9",
+    background: "rgba(255, 255, 255, 0.92)",
     color: "#3f433d",
     fontSize: "10px",
     fontWeight: 720,
@@ -2000,10 +2031,10 @@ const styles = {
   },
   headerGuide: {
     marginTop: "10px",
-    border: "1px solid rgba(218, 216, 210, 0.78)",
-    borderRadius: "17px",
-    background: "rgba(255, 255, 255, 0.52)",
-    padding: "9px 10px 10px",
+    border: "1px solid rgba(226, 223, 216, 0.86)",
+    borderRadius: "22px",
+    background: "rgba(255, 255, 255, 0.74)",
+    padding: "10px",
   },
   catSwitchHint: {
     margin: "0 0 6px",
@@ -2024,9 +2055,9 @@ const styles = {
     display: "grid",
     gridTemplateColumns: "1fr 1fr",
     gap: 0,
-    border: "1px solid rgba(218, 216, 210, 0.82)",
-    borderRadius: "15px",
-    background: "rgba(255, 255, 255, 0.72)",
+    border: "1px solid rgba(226, 223, 216, 0.88)",
+    borderRadius: "18px",
+    background: "rgba(255, 255, 255, 0.82)",
     overflow: "hidden",
   },
   dashboardTile: {
@@ -2034,7 +2065,7 @@ const styles = {
     minWidth: 0,
     flexDirection: "column",
     gap: "3px",
-    borderRight: "1px solid rgba(218, 216, 210, 0.72)",
+    borderRight: "1px solid rgba(226, 223, 216, 0.82)",
     background: "transparent",
     padding: "7px 9px",
   },
@@ -2123,9 +2154,9 @@ const styles = {
     alignItems: "center",
     justifyContent: "center",
     gap: "2px",
-    border: "1px solid rgba(218, 216, 210, 0.84)",
+    border: "1px solid rgba(226, 223, 216, 0.88)",
     borderRadius: "12px",
-    background: "rgba(255, 255, 255, 0.58)",
+    background: "rgba(255, 255, 255, 0.76)",
     color: "#42433f",
     padding: "5px 3px",
   },
@@ -2526,10 +2557,10 @@ const styles = {
   },
   observationCard: {
     marginBottom: "12px",
-    border: "1px solid #e5e2dc",
-    borderRadius: "26px",
+    border: "1px solid #e6e3dc",
+    borderRadius: "28px",
     background: "#ffffff",
-    padding: "18px 16px",
+    padding: "20px 17px",
   },
   embeddedSection: {
     paddingTop: "14px",
@@ -2544,8 +2575,8 @@ const styles = {
     background: "#ffffff",
   },
   concernSection: {
-    borderColor: "#e5e2dc",
-    background: "#faf9f6",
+    borderColor: "#e6e3dc",
+    background: "#ffffff",
   },
   sectionLabel: {
     margin: "0 0 5px",
@@ -2610,12 +2641,12 @@ const styles = {
     alignItems: "center",
     justifyContent: "center",
     gap: "7px",
-    minHeight: "98px",
-    border: "1px solid #dedbd3",
-    borderRadius: "22px",
+    minHeight: "96px",
+    border: "1px solid #e0ddd6",
+    borderRadius: "23px",
     background: "#ffffff",
-    color: "#27272a",
-    fontWeight: 560,
+    color: "#30312e",
+    fontWeight: 540,
     letterSpacing: 0,
     textAlign: "center",
     padding: "10px 7px 11px",
@@ -2623,12 +2654,12 @@ const styles = {
   },
   currentButton: {
     background: "#ffffff",
-    borderColor: "#dedbd3",
+    borderColor: "#e0ddd6",
   },
   concernButton: {
-    background: "#faf9f6",
-    borderColor: "#e1ded6",
-    fontWeight: 560,
+    background: "#fbfaf7",
+    borderColor: "#e5e2dc",
+    fontWeight: 540,
     minHeight: "104px",
     gap: "7px",
     padding: "10px 6px 11px",
@@ -2676,9 +2707,9 @@ const styles = {
     fontWeight: 600,
   },
   completedStateButton: {
-    background: "#f1f0eb",
-    borderColor: "#cfcbc2",
-    opacity: 0.78,
+    background: "#f0f1ed",
+    borderColor: "#d3d8cf",
+    opacity: 0.82,
     transform: "scale(0.98)",
     transition:
       "background 180ms ease, border-color 180ms ease, opacity 180ms ease, transform 160ms ease",
@@ -2697,7 +2728,7 @@ const styles = {
     width: "18px",
     height: "18px",
     borderRadius: "999px",
-    background: "#7b8476",
+    background: "#7f8a7b",
     color: "#ffffff",
     fontSize: "12px",
     fontWeight: 750,

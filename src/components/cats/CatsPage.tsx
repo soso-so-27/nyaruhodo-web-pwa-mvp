@@ -24,6 +24,7 @@ const COAT_OPTIONS: { value: CatCoat; label: string; color: string }[] = [
   { value: "white", label: "白", color: "#fafafa" },
   { value: "calico", label: "三毛", color: "#f0c28b" },
 ];
+const SAMPLE_PROFILE_PHOTO_SRC = "/sample-cats/mugi-portrait.png";
 
 export function CatsPage() {
   const [catProfiles, setCatProfiles] = useState<CatProfile[]>([]);
@@ -163,10 +164,18 @@ export function CatsPage() {
           <div style={styles.profileSummary}>
             <div style={styles.profileSummaryHeader}>
               <div
-                style={{ ...styles.profileAvatar, ...activeCatAvatarStyle }}
+                style={{ ...styles.profilePhotoFrame, ...activeCatAvatarStyle }}
                 aria-hidden="true"
               >
-                <img src={activeCatAvatarSrc} alt="" style={styles.profileAvatarIcon} />
+                <img
+                  src={SAMPLE_PROFILE_PHOTO_SRC}
+                  alt=""
+                  style={styles.profilePhoto}
+                  onError={(event) => {
+                    event.currentTarget.src = activeCatAvatarSrc;
+                    event.currentTarget.style.objectFit = "contain";
+                  }}
+                />
               </div>
               <div style={styles.profileSummaryText}>
                 <p style={styles.sectionLabel}>{"いま見ている子"}</p>
@@ -336,7 +345,7 @@ export function CatsPage() {
 const styles = {
   page: {
     minHeight: "100vh",
-    background: "#f7f6f2",
+    background: "#fbfaf7",
     color: "#27272a",
     fontFamily:
       '-apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
@@ -348,9 +357,9 @@ const styles = {
   },
   header: {
     marginBottom: "10px",
-    border: "1px solid #e5e2dc",
-    borderRadius: "24px",
-    background: "linear-gradient(180deg, #ffffff 0%, #f8f7f3 100%)",
+    border: "1px solid #e8e5de",
+    borderRadius: "28px",
+    background: "linear-gradient(180deg, #ffffff 0%, #fbfaf7 100%)",
     padding: "16px",
   },
   eyebrow: {
@@ -375,10 +384,10 @@ const styles = {
   },
   card: {
     marginBottom: "10px",
-    border: "1px solid #e5e2dc",
-    borderRadius: "22px",
+    border: "1px solid #e8e5de",
+    borderRadius: "28px",
     background: "#ffffff",
-    padding: "17px 16px",
+    padding: "18px 17px",
   },
   profileSummary: {
     marginBottom: "14px",
@@ -388,7 +397,27 @@ const styles = {
   profileSummaryHeader: {
     display: "flex",
     alignItems: "center",
-    gap: "12px",
+    gap: "14px",
+  },
+  profilePhotoFrame: {
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    width: "86px",
+    height: "86px",
+    border: "1px solid #e2ded7",
+    borderRadius: "999px",
+    background: "#f6f4ef",
+    flex: "0 0 auto",
+    overflow: "hidden",
+    boxShadow: "0 12px 28px rgba(43, 40, 34, 0.055)",
+  },
+  profilePhoto: {
+    display: "block",
+    width: "100%",
+    height: "100%",
+    objectFit: "cover",
+    filter: "saturate(0.92) contrast(0.98)",
   },
   profileAvatar: {
     display: "flex",
@@ -473,10 +502,10 @@ const styles = {
     alignItems: "center",
     gap: "7px",
     minHeight: "34px",
-    border: "1px solid #dedbd3",
+    border: "1px solid #e0ddd6",
     borderRadius: "999px",
     background: "#ffffff",
-    color: "#3f433d",
+    color: "#4e514b",
     fontSize: "13px",
     fontWeight: 600,
     letterSpacing: 0,
@@ -484,9 +513,9 @@ const styles = {
     cursor: "pointer",
   },
   coatButtonActive: {
-    borderColor: "#b8beb0",
-    background: "#eef0eb",
-    color: "#343632",
+    borderColor: "#c9cec4",
+    background: "#f1f2ee",
+    color: "#3f433d",
   },
   coatSwatch: {
     display: "inline-block",
@@ -522,9 +551,9 @@ const styles = {
   activeCatButton: {
     minHeight: "38px",
     padding: "0 14px",
-    border: "1px solid #d4d6ce",
+    border: "1px solid #cfd4ca",
     borderRadius: "999px",
-    background: "#e8e9e4",
+    background: "#f0f1ed",
     color: "#3f433d",
     fontSize: "14px",
     fontWeight: 650,
@@ -534,9 +563,9 @@ const styles = {
   primaryButton: {
     minHeight: "44px",
     width: "100%",
-    border: "1px solid #aeb5a8",
+    border: "1px solid #bfc6bb",
     borderRadius: "14px",
-    background: "#7b8476",
+    background: "#7f8a7b",
     color: "#ffffff",
     fontSize: "14px",
     fontWeight: 650,
@@ -557,12 +586,12 @@ const styles = {
   },
   outlineActionButton: {
     minHeight: "42px",
-    border: "1px solid #dedbd3",
+    border: "1px solid #e0ddd6",
     borderRadius: "14px",
     background: "#ffffff",
-    color: "#27272a",
+    color: "#4b4d49",
     fontSize: "14px",
-    fontWeight: 600,
+    fontWeight: 560,
     letterSpacing: 0,
     cursor: "pointer",
   },
