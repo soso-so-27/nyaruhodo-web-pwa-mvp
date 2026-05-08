@@ -106,11 +106,6 @@ export function CollectionPage({ recentEvents }: CollectionPageProps) {
     <main style={styles.page}>
       <div style={styles.container}>
         <header style={styles.hero}>
-          <p style={styles.eyebrow}>コレクション</p>
-          <h1 style={styles.title}>コレクション</h1>
-          <p style={styles.lead}>
-            写真や記録が、少しずつここに残ります。
-          </p>
           <div style={styles.heroPhotoFrame} aria-hidden="true">
             <img
               src={SAMPLE_COLLECTION_HERO_PHOTO_SRC}
@@ -378,7 +373,7 @@ const styles = {
     borderRadius: "28px",
     background:
       "linear-gradient(145deg, rgba(255, 255, 255, 0.96), rgba(250, 249, 246, 0.74))",
-    padding: "16px 16px 15px",
+    padding: "10px",
     marginBottom: "10px",
     boxShadow: "0 8px 20px rgba(44, 42, 38, 0.018)",
   },
@@ -407,7 +402,6 @@ const styles = {
   heroPhotoFrame: {
     position: "relative",
     height: "206px",
-    marginTop: "14px",
     border: "1px solid rgba(230, 227, 220, 0.58)",
     borderRadius: "22px",
     background: "#f3f1eb",

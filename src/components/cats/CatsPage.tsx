@@ -151,14 +151,6 @@ export function CatsPage() {
   return (
     <main style={styles.page}>
       <div style={styles.container}>
-        <header style={styles.header}>
-          <p style={styles.eyebrow}>{"ねこ"}</p>
-          <h1 style={styles.title}>{"ねこ"}</h1>
-          <p style={styles.lead}>
-            {"一緒に暮らしている子を見られます。"}
-          </p>
-        </header>
-
         <section style={styles.card}>
           <h2 style={styles.sectionTitle}>{"一緒に暮らしている子"}</h2>
           <div style={styles.profileSummary}>
