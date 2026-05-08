@@ -894,7 +894,6 @@ function Header({
   onCatSelect: (catId: string) => void;
 }) {
   const [isCatSwitcherOpen, setIsCatSwitcherOpen] = useState(false);
-  const understandingTone = getUnderstandingTone(understandingPercent);
   const ringDegree = Math.max(0, Math.min(100, understandingPercent)) * 3.6;
   const canSwitchCats = catProfiles.length > 1;
   const catAvatarStyle = getCatCoatAvatarStyle(catCoat);
@@ -1004,7 +1003,6 @@ function Header({
               </span>
             </span>
           </div>
-          <p style={styles.understanding}>{understandingTone}</p>
         </div>
       </div>
       {isCatSwitcherOpen ? (
@@ -1030,22 +1028,6 @@ function Header({
       ) : null}
     </header>
   );
-}
-
-function getUnderstandingTone(percent: number) {
-  if (percent >= 90) {
-    return "\u304b\u306a\u308a";
-  }
-
-  if (percent >= 60) {
-    return "\u3060\u3093\u3060\u3093";
-  }
-
-  if (percent >= 30) {
-    return "\u5c11\u3057\u305a\u3064";
-  }
-
-  return "\u3053\u308c\u304b\u3089";
 }
 
 function buildHomeReturnMotivation(
@@ -1130,9 +1112,7 @@ function buildRecentCatSummary(events: RecentEvent[]): RecentCatSummary {
     avatarSignal: currentMapItem?.signal ?? topSignal?.signal ?? null,
     recentSignalLabel: topSignal
       ? `${getSignalDisplayLabel(topSignal.signal)}\u591a\u3081`
-      : recentEvents.length > 0
-        ? "\u5c11\u3057\u305a\u3064"
-        : "\u307e\u3060\u3053\u308c\u304b\u3089",
+      : "\u8a18\u9332\u5c11\u306a\u3081",
     currentTrendText: getCurrentTrendText(currentMapItem),
     dayMap,
   };
@@ -1284,7 +1264,7 @@ function getDayPartFromTimeBand(
 
 function getCurrentTrendText(item?: DayMapItem) {
   if (!item || !item.signal) {
-    return "\u3053\u308c\u304b\u3089";
+    return "\u8a18\u9332\u5c11\u306a\u3081";
   }
 
   const trendTexts: Record<string, string> = {
