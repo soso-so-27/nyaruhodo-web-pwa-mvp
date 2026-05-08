@@ -3,13 +3,11 @@
 import { useEffect, useMemo, useState } from "react";
 import type { CSSProperties } from "react";
 import {
-  PHOTO_COLLECTION_POSES,
-  getPoseCategoryForEvent,
-  isConcernPose,
-  isSocialPose,
+  COLLECTION_GROUPS,
+  type CollectionGroup,
+  type CollectionGroupId,
+  type CollectionSlot,
 } from "../../lib/collection/poses";
-import type { PoseTone } from "../../lib/collection/poses";
-import type { RecentEvent } from "../../lib/supabase/queries";
 import {
   getActiveCatProfile,
   getCatName,
@@ -20,20 +18,37 @@ import {
 import type { CatProfile } from "../home/homeInputHelpers";
 import { BottomNavigation } from "../navigation/BottomNavigation";
 
-type CollectionPageProps = {
-  recentEvents: RecentEvent[];
+type CollectionPhoto = {
+  id: string;
+  slotId: string;
+  src: string;
+  createdAt?: string;
 };
 
-const RECENT_DAYS = 7;
-const SAMPLE_COLLECTION_HERO_PHOTO_SRC = "/sample-cats/pose-stretch.png";
-const PHOTO_POSE_IMAGE_BY_SLUG: Record<string, string> = {
-  belly_up: "/sample-cats/pose-belly.png",
-  in_box: "/sample-cats/pose-box.png",
-  stretch: "/sample-cats/pose-stretch.png",
-  loaf: "/sample-cats/pose-loaf.png",
-};
+const SAMPLE_COLLECTION_PHOTOS: CollectionPhoto[] = [
+  {
+    id: "sample-belly-up",
+    slotId: "belly-up",
+    src: "/sample-cats/pose-belly.png",
+  },
+  {
+    id: "sample-loaf",
+    slotId: "loaf",
+    src: "/sample-cats/pose-loaf.png",
+  },
+  {
+    id: "sample-stretch",
+    slotId: "stretch",
+    src: "/sample-cats/pose-stretch.png",
+  },
+  {
+    id: "sample-in-box",
+    slotId: "in-box",
+    src: "/sample-cats/pose-box.png",
+  },
+];
 
-export function CollectionPage({ recentEvents }: CollectionPageProps) {
+export function CollectionPage() {
   const [catProfiles, setCatProfiles] = useState<CatProfile[]>([]);
   const [activeCatId, setActiveCatId] = useState<string | null>(null);
   const [hasLoaded, setHasLoaded] = useState(false);
@@ -54,19 +69,13 @@ export function CollectionPage({ recentEvents }: CollectionPageProps) {
       ? getActiveCatProfile(catProfiles, activeCatId)
       : null;
   const catName = getCatName(activeCatProfile);
-  const activeCatEvents = useMemo(
-    () =>
-      activeCatId
-        ? recentEvents.filter((event) => event.local_cat_id === activeCatId)
-        : [],
-    [recentEvents, activeCatId],
+
+  const photosBySlot = useMemo(() => groupPhotosBySlot(SAMPLE_COLLECTION_PHOTOS), []);
+  const progress = useMemo(
+    () => buildCollectionProgress(COLLECTION_GROUPS, photosBySlot),
+    [photosBySlot],
   );
-  const recentActiveCatEvents = useMemo(
-    () => filterRecentEvents(activeCatEvents, RECENT_DAYS),
-    [activeCatEvents],
-  );
-  const recentRecordItems = buildRecentRecordItems(recentActiveCatEvents);
-  const recentSummary = buildRecentSummary(recentActiveCatEvents, catName);
+
   if (!hasLoaded) {
     return (
       <main style={styles.page}>
@@ -74,7 +83,7 @@ export function CollectionPage({ recentEvents }: CollectionPageProps) {
           <section style={styles.emptyCard}>
             <h1 style={styles.emptyTitle}>コレクションを準備しています</h1>
             <p style={styles.emptyText}>
-              写真や記録を、少しだけ整えています。
+              写真を置く棚を、少しだけ整えています。
             </p>
           </section>
         </div>
@@ -90,7 +99,7 @@ export function CollectionPage({ recentEvents }: CollectionPageProps) {
           <section style={styles.emptyCard}>
             <h1 style={styles.emptyTitle}>一緒に暮らしている子を登録しましょう</h1>
             <p style={styles.emptyText}>
-              ねこページで登録すると、記録も少しずつ増えていきます。
+              ねこページで登録すると、コレクションも猫ごとに分けて見られます。
             </p>
             <a href="/cats" style={styles.primaryLink}>
               ねこを登録する
@@ -105,256 +114,360 @@ export function CollectionPage({ recentEvents }: CollectionPageProps) {
   return (
     <main style={styles.page}>
       <div style={styles.container}>
-        <header style={styles.hero}>
-          <div style={styles.heroPhotoFrame} aria-hidden="true">
-            <img
-              src={SAMPLE_COLLECTION_HERO_PHOTO_SRC}
-              alt=""
-              style={styles.heroPhoto}
-            />
-            <div style={styles.heroPhotoOverlay}>
-              <span style={styles.heroPhotoLabel}>写真が入る棚</span>
-            </div>
-          </div>
+        <header style={styles.header}>
+          <p style={styles.eyebrow}>コレクション</p>
+          <h1 style={styles.title}>{catName}のかわいい瞬間をあつめます</h1>
+          <CollectionProgress progress={progress} />
         </header>
 
-        <section style={styles.card} aria-labelledby="recent-records">
-          <div style={styles.sectionHeader}>
-            <div>
-              <h2 id="recent-records" style={styles.sectionTitle}>
-                最近見た
-              </h2>
-              <p style={styles.sectionSubText}>最近の記録から</p>
-            </div>
-          </div>
-          {recentRecordItems.length > 0 ? (
-            <div style={styles.recentGrid}>
-              {recentRecordItems.map((item) => (
-                <article key={`${item.label}-${item.date}`} style={styles.recentItem}>
-                  <span style={styles.recentMark} aria-hidden="true">
-                    {item.label.slice(0, 1)}
-                  </span>
-                  <span style={styles.recentLabel}>{item.label}</span>
-                  <span style={styles.recentDate}>{item.date}</span>
-                </article>
-              ))}
-            </div>
-          ) : (
-            <div style={styles.softEmpty}>
-              <p style={styles.softEmptyTitle}>まだこれから</p>
-              <p style={styles.softEmptyText}>
-                写真を残すと、ここに並びます。
-              </p>
-            </div>
-          )}
-        </section>
-
-        <section style={styles.card} aria-labelledby="pose-collection">
-          <div style={styles.sectionHeader}>
-            <div>
-              <h2 id="pose-collection" style={styles.sectionTitle}>
-                ポーズコレクション
-              </h2>
-              <p style={styles.sectionSubText}>写真はまだこれから</p>
-            </div>
-          </div>
-          <div style={styles.poseGrid}>
-            {PHOTO_COLLECTION_POSES.map((pose) => {
-              const photoSrc = PHOTO_POSE_IMAGE_BY_SLUG[pose.slug];
-
-              return (
-                <article
-                  key={pose.slug}
-                  style={
-                    photoSrc
-                      ? { ...styles.poseCard, ...styles.posePhotoCard }
-                      : styles.poseCard
-                  }
-                >
-                  {photoSrc ? (
-                    <>
-                      <img src={photoSrc} alt="" style={styles.posePhoto} />
-                      <span style={styles.posePhotoFade} aria-hidden="true" />
-                    </>
-                  ) : (
-                    <span style={styles.poseMark} aria-hidden="true">
-                      {pose.label.slice(0, 1)}
-                    </span>
-                  )}
-                  <p style={photoSrc ? styles.posePhotoLabel : styles.poseLabel}>
-                    {pose.label}
-                  </p>
-                  <span
-                    style={
-                      photoSrc
-                        ? styles.posePhotoPendingText
-                        : styles.posePendingText
-                    }
-                  >
-                    まだこれから
-                  </span>
-                </article>
-              );
-            })}
-          </div>
-        </section>
-
-        <section style={styles.memoCard} aria-labelledby="recent-summary">
-          <h2 id="recent-summary" style={styles.sectionTitle}>
-            このごろの{catName}
-          </h2>
-          <p style={styles.summaryText}>{recentSummary.text}</p>
-          <p style={styles.summaryMeta}>
-            {recentSummary.note}
-          </p>
-        </section>
+        {COLLECTION_GROUPS.map((group) => (
+          <CollectionSection
+            key={group.id}
+            group={group}
+            photosBySlot={photosBySlot}
+          />
+        ))}
       </div>
       <BottomNavigation active="collection" />
     </main>
   );
 }
 
-function filterRecentEvents(events: RecentEvent[], days: number) {
-  const since = Date.now() - days * 24 * 60 * 60 * 1000;
-
-  return events.filter((event) => {
-    const timestamp = new Date(event.occurred_at || event.created_at).getTime();
-
-    return Number.isFinite(timestamp) && timestamp >= since;
-  });
+function CollectionProgress({
+  progress,
+}: {
+  progress: ReturnType<typeof buildCollectionProgress>;
+}) {
+  return (
+    <section style={styles.progressCard} aria-label="コレクションの進み具合">
+      <p style={styles.progressMain}>
+        <span style={styles.progressNumber}>{progress.total.collected}</span>
+        <span style={styles.progressSlash}> / {progress.total.total}</span>
+        <span style={styles.progressLabel}> あつまりました</span>
+      </p>
+      <div style={styles.progressRows}>
+        <span style={styles.progressPill}>
+          ポーズ {progress.pose.collected} / {progress.pose.total}
+        </span>
+        <span style={styles.progressPill}>
+          シーン {progress.scene.collected} / {progress.scene.total}
+        </span>
+      </div>
+    </section>
+  );
 }
 
-function buildRecentRecordItems(events: RecentEvent[]) {
-  const items: Array<{ label: string; date: string; slug: string }> = [];
-  const seen = new Set<string>();
-
-  for (const event of events) {
-    const pose = getPoseCategoryForEvent(event);
-
-    if (!pose || seen.has(pose.slug)) {
-      continue;
-    }
-
-    seen.add(pose.slug);
-    items.push({
-      label: pose.label,
-      slug: pose.slug,
-      date: formatShortDate(event.occurred_at || event.created_at),
-    });
-
-    if (items.length >= 3) {
-      break;
-    }
-  }
-
-  return items;
+function CollectionSection({
+  group,
+  photosBySlot,
+}: {
+  group: CollectionGroup;
+  photosBySlot: Map<string, CollectionPhoto[]>;
+}) {
+  return (
+    <section style={styles.section} aria-labelledby={`${group.id}-collection`}>
+      <div style={styles.sectionHeader}>
+        <div>
+          <h2 id={`${group.id}-collection`} style={styles.sectionTitle}>
+            {group.label}
+          </h2>
+          <p style={styles.sectionSubText}>{group.description}</p>
+        </div>
+      </div>
+      <div style={styles.collectionGrid}>
+        {group.slots.map((slot) => (
+          <CollectionCard
+            key={slot.id}
+            slot={slot}
+            photos={photosBySlot.get(slot.id) ?? []}
+          />
+        ))}
+      </div>
+    </section>
+  );
 }
 
-function buildRecentSummary(events: RecentEvent[], catName: string) {
-  if (events.length === 0) {
-    return {
-      text: "まだこれから",
-      note: "記録が増えると、ひとことメモになります",
-    };
+function CollectionCard({
+  slot,
+  photos,
+}: {
+  slot: CollectionSlot;
+  photos: CollectionPhoto[];
+}) {
+  const firstPhoto = photos[0];
+  const isCollected = photos.length > 0;
+
+  if (isCollected && firstPhoto) {
+    return (
+      <article style={{ ...styles.collectionCard, ...styles.photoCard }}>
+        <img src={firstPhoto.src} alt="" style={styles.cardPhoto} />
+        <span style={styles.cardPhotoFade} aria-hidden="true" />
+        <div style={styles.photoCardText}>
+          <p style={styles.photoCardLabel}>{slot.label}</p>
+          <span style={styles.photoCount}>{photos.length}枚</span>
+        </div>
+      </article>
+    );
   }
 
-  const poseCounts = new Map<
-    string,
-    { label: string; slug: string; tone: PoseTone; count: number }
-  >();
+  return (
+    <article style={styles.collectionCard}>
+      <div style={styles.silhouetteWrap} aria-hidden="true">
+        <CollectionSilhouette slot={slot} />
+      </div>
+      <p style={styles.emptySlotLabel}>{slot.label}</p>
+      <span style={styles.emptySlotText}>まだこれから</span>
+    </article>
+  );
+}
 
-  events.forEach((event) => {
-    const pose = getPoseCategoryForEvent(event);
+function CollectionSilhouette({ slot }: { slot: CollectionSlot }) {
+  const shape = getSilhouetteShape(slot.silhouetteKey, slot.group);
 
-    if (!pose) {
-      return;
-    }
+  return (
+    <svg
+      viewBox="0 0 96 72"
+      style={styles.silhouette}
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="3.8"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      focusable="false"
+    >
+      {shape}
+    </svg>
+  );
+}
 
-    const current = poseCounts.get(pose.slug);
+function getSilhouetteShape(key: string, group: CollectionGroupId) {
+  switch (key) {
+    case "belly-up":
+      return (
+        <>
+          <path d="M23 43c8-16 38-18 50-3 7 9 0 19-18 19H37c-15 0-22-7-14-16Z" />
+          <path d="M34 38 27 28" />
+          <path d="M59 36 68 27" />
+          <path d="M42 50c3 2 9 2 12 0" />
+        </>
+      );
+    case "loaf":
+      return (
+        <>
+          <path d="M25 45c0-15 12-24 26-24s24 9 24 24c0 11-9 16-25 16s-25-5-25-16Z" />
+          <path d="M39 24 33 14" />
+          <path d="M60 24 66 14" />
+          <path d="M38 47h24" />
+        </>
+      );
+    case "stretch":
+      return (
+        <>
+          <path d="M16 47c13-10 38-15 63-6" />
+          <path d="M19 47c6 10 17 12 28 6" />
+          <path d="M62 41c2 9 10 13 19 13" />
+          <path d="M76 38 86 31" />
+        </>
+      );
+    case "face-down-sleep":
+      return (
+        <>
+          <path d="M25 51c0-16 13-26 28-26 14 0 24 9 24 21 0 10-8 15-25 15H36c-7 0-11-3-11-10Z" />
+          <path d="M37 48h24" />
+          <path d="M40 25 35 17" />
+          <path d="M58 25 64 17" />
+        </>
+      );
+    case "curled-up":
+      return (
+        <>
+          <path d="M25 39c4-17 23-25 39-15 15 9 14 29-2 36-15 7-35 0-37-21Z" />
+          <path d="M42 44c8 5 18 3 23-4" />
+          <path d="M57 25c8 3 13 8 15 15" />
+        </>
+      );
+    case "liquid":
+      return (
+        <>
+          <path d="M17 50c15-10 22 2 34-7 13-9 26-7 31 6 2 7-6 12-26 12H29c-12 0-17-5-12-11Z" />
+          <path d="M34 43c2-8 10-13 19-12" />
+          <path d="M53 31 49 22" />
+          <path d="M65 34 73 28" />
+        </>
+      );
+    case "sitting":
+      return (
+        <>
+          <path d="M34 58c-3-18 2-35 17-35s21 17 17 35" />
+          <path d="M39 25 33 14" />
+          <path d="M61 25 67 14" />
+          <path d="M35 58h34" />
+          <path d="M68 54c8-5 8-15 2-21" />
+        </>
+      );
+    case "tail-up":
+      return (
+        <>
+          <path d="M25 54c7-14 25-18 39-9" />
+          <path d="M31 54h28" />
+          <path d="M62 43c8-12 5-26-5-33" />
+          <path d="M30 43 24 34" />
+          <path d="M42 41 48 31" />
+        </>
+      );
+    case "weird-sleep":
+      return (
+        <>
+          <path d="M22 46c11-16 30-12 43-7 11 4 16 13 7 20-10 8-34 3-48-3" />
+          <path d="M30 41 20 33" />
+          <path d="M55 39 65 28" />
+          <path d="M45 55c6-4 8-10 6-17" />
+        </>
+      );
+    case "hidden-paws":
+      return (
+        <>
+          <path d="M27 47c0-16 11-27 24-27s23 11 23 27c0 11-9 16-24 16s-23-5-23-16Z" />
+          <path d="M39 22 34 14" />
+          <path d="M61 22 66 14" />
+          <path d="M39 51h22" />
+        </>
+      );
+    case "in-box":
+      return (
+        <>
+          <path d="M21 36h54l-6 25H27l-6-25Z" />
+          <path d="M31 36c3-12 12-18 23-14 9 3 14 8 14 14" />
+          <path d="M42 24 36 16" />
+          <path d="M58 25 65 18" />
+        </>
+      );
+    case "by-window":
+      return (
+        <>
+          <path d="M15 14h66v45H15z" />
+          <path d="M48 14v45" />
+          <path d="M15 37h66" />
+          <path d="M30 56c2-13 9-20 18-20s14 7 16 20" />
+        </>
+      );
+    case "sunbathing":
+      return (
+        <>
+          <circle cx="25" cy="19" r="7" />
+          <path d="M25 5v5M25 28v5M11 19h5M34 19h5" />
+          <path d="M37 52c8-15 29-16 41-3" />
+          <path d="M41 52h34" />
+        </>
+      );
+    case "in-futon":
+      return (
+        <>
+          <path d="M18 43c9-13 21-18 35-16 14 2 23 9 25 22" />
+          <path d="M16 48c17 10 44 13 66 0" />
+          <path d="M32 42c4-8 10-12 18-12" />
+          <path d="M43 30 38 22" />
+          <path d="M55 30 61 22" />
+        </>
+      );
+    case "cardboard":
+      return (
+        <>
+          <path d="M21 30h54v31H21z" />
+          <path d="M21 30 33 18h54L75 30" />
+          <path d="M75 30 87 18" />
+          <path d="M35 36c4-7 13-9 21-4 5 3 8 7 8 12" />
+        </>
+      );
+    case "waiting-food":
+      return (
+        <>
+          <path d="M15 54h28l-3 9H18l-3-9Z" />
+          <path d="M19 54c1-5 5-8 10-8s9 3 10 8" />
+          <path d="M54 59c-3-18 2-32 15-32 11 0 17 12 14 32" />
+          <path d="M60 29 55 20" />
+          <path d="M76 29 82 20" />
+        </>
+      );
+    case "welcome-home":
+      return (
+        <>
+          <path d="M18 12h29v50H18z" />
+          <path d="M47 18h18v44" />
+          <path d="M36 37h.01" />
+          <path d="M56 58c3-12 10-19 19-19 8 0 12 6 13 19" />
+          <path d="M75 39V26" />
+        </>
+      );
+    case "blanket-kneading":
+      return (
+        <>
+          <path d="M16 51c15-8 32 8 64-1" />
+          <path d="M17 58c15-8 32 8 64-1" />
+          <path d="M37 42c2-10 9-16 19-15 9 1 15 7 17 16" />
+          <path d="M46 43c0 6-4 8-8 8" />
+          <path d="M63 43c0 6 4 8 8 8" />
+        </>
+      );
+    default:
+      return group === "scene" ? (
+        <>
+          <path d="M17 20h62v39H17z" />
+          <path d="M31 54c2-12 9-18 18-18s15 6 17 18" />
+        </>
+      ) : (
+        <>
+          <path d="M25 49c3-17 15-27 29-25 13 2 21 13 18 28" />
+          <path d="M34 26 28 17" />
+          <path d="M59 26 66 18" />
+          <path d="M31 56h38" />
+        </>
+      );
+  }
+}
 
-    poseCounts.set(pose.slug, {
-      label: pose.label,
-      slug: pose.slug,
-      tone: pose.tone,
-      count: (current?.count ?? 0) + 1,
-    });
+function groupPhotosBySlot(photos: CollectionPhoto[]) {
+  const map = new Map<string, CollectionPhoto[]>();
+
+  photos.forEach((photo) => {
+    const current = map.get(photo.slotId) ?? [];
+    map.set(photo.slotId, [...current, photo]);
   });
 
-  const sorted = [...poseCounts.values()].sort((a, b) => b.count - a.count);
+  return map;
+}
 
-  if (sorted.length === 0) {
-    return {
-      text: "少しずつ、残っています",
-      note: `${catName}らしい様子が、ゆっくりたまってきました`,
-    };
-  }
+function buildCollectionProgress(
+  groups: CollectionGroup[],
+  photosBySlot: Map<string, CollectionPhoto[]>,
+) {
+  const byGroup = groups.reduce(
+    (acc, group) => {
+      const collected = group.slots.filter(
+        (slot) => (photosBySlot.get(slot.id)?.length ?? 0) > 0,
+      ).length;
 
-  if (events.length <= 2) {
-    return {
-      text: `「${sorted[0].label}」が残っています`,
-      note: "もう少し増えると、このごろの様子が見えてきます",
-    };
-  }
-
-  if (sorted.length > 1 && sorted[0].count === sorted[1].count) {
-    if (isConcernPose(sorted[0].slug) || isConcernPose(sorted[1].slug)) {
-      return {
-        text: `「${sorted[0].label}」と「${sorted[1].label}」が残っています`,
-        note: "気になる様子も、見たまま少しずつ残せています",
+      acc[group.id] = {
+        collected,
+        total: group.slots.length,
       };
-    }
 
-    if (isSocialPose(sorted[0].slug) || isSocialPose(sorted[1].slug)) {
-      return {
-        text: `「${sorted[0].label}」と「${sorted[1].label}」が見えてきました`,
-        note: `${catName}との関わりも、少しずつ残っています`,
-      };
-    }
-
-    return {
-      text: `「${sorted[0].label}」「${sorted[1].label}」が少し多めです`,
-      note: "いろいろな様子が、少しずつたまっています",
-    };
-  }
-
-  if (isConcernPose(sorted[0].slug)) {
-    return {
-      text: `「${sorted[0].label}」も残っています`,
-      note:
-        sorted[0].slug === "low_energy"
-          ? "いつもの様子と一緒に、やさしく見ていけます"
-          : "気になる様子も、見たまま少しずつ残せています",
-    };
-  }
-
-  if (isSocialPose(sorted[0].slug)) {
-    return {
-      text: `「${sorted[0].label}」も見えてきました`,
-      note: `${catName}との関わりも、少しずつ残っています`,
-    };
-  }
-
-  if (sorted[0].count >= 2) {
-    return {
-      text: `「${sorted[0].label}」をよく見かけます`,
-      note: `${catName}のこのごろが、少しずつ見えてきました`,
-    };
-  }
+      return acc;
+    },
+    {
+      pose: { collected: 0, total: 0 },
+      scene: { collected: 0, total: 0 },
+    } as Record<CollectionGroupId, { collected: number; total: number }>,
+  );
 
   return {
-    text: "少しずつ、残っています",
-    note: `${catName}らしい様子が、ゆっくりたまってきました`,
+    total: {
+      collected: byGroup.pose.collected + byGroup.scene.collected,
+      total: byGroup.pose.total + byGroup.scene.total,
+    },
+    pose: byGroup.pose,
+    scene: byGroup.scene,
   };
-}
-
-function formatShortDate(value: string) {
-  const date = new Date(value);
-
-  if (Number.isNaN(date.getTime())) {
-    return "";
-  }
-
-  return `${date.getMonth() + 1}/${date.getDate()}`;
 }
 
 const styles = {
@@ -366,73 +479,76 @@ const styles = {
   container: {
     width: "min(100%, 480px)",
     margin: "0 auto",
-    padding: "16px 14px calc(152px + env(safe-area-inset-bottom))",
+    padding: "18px 14px calc(132px + env(safe-area-inset-bottom))",
   },
-  hero: {
-    border: "1px solid rgba(226, 223, 216, 0.58)",
-    borderRadius: "28px",
-    background:
-      "linear-gradient(145deg, rgba(255, 255, 255, 0.96), rgba(250, 249, 246, 0.74))",
-    padding: "10px",
-    marginBottom: "10px",
-    boxShadow: "0 8px 20px rgba(44, 42, 38, 0.018)",
+  header: {
+    marginBottom: "12px",
+    padding: "2px 2px 0",
   },
   eyebrow: {
-    margin: "0 0 5px",
-    color: "#74756e",
+    margin: "0 0 8px",
+    color: "#777871",
     fontSize: "13px",
     fontWeight: 600,
     letterSpacing: 0,
   },
   title: {
-    margin: "0 0 8px",
+    margin: "0 0 14px",
     color: "#252622",
-    fontSize: "29px",
-    lineHeight: 1.05,
-    fontWeight: 660,
+    fontSize: "24px",
+    lineHeight: 1.25,
+    fontWeight: 650,
     letterSpacing: 0,
   },
-  lead: {
-    margin: 0,
-    color: "#6f706a",
-    fontSize: "14px",
-    lineHeight: 1.65,
-    fontWeight: 500,
+  progressCard: {
+    border: "1px solid rgba(226, 223, 216, 0.58)",
+    borderRadius: "24px",
+    background:
+      "linear-gradient(145deg, rgba(255, 255, 255, 0.96), rgba(250, 249, 246, 0.74))",
+    padding: "14px 15px",
+    boxShadow: "0 8px 20px rgba(44, 42, 38, 0.018)",
   },
-  heroPhotoFrame: {
-    position: "relative",
-    height: "206px",
-    border: "1px solid rgba(230, 227, 220, 0.58)",
-    borderRadius: "22px",
-    background: "#f3f1eb",
-    overflow: "hidden",
+  progressMain: {
+    display: "flex",
+    alignItems: "baseline",
+    gap: "2px",
+    margin: "0 0 9px",
+    color: "#2c2d29",
   },
-  heroPhoto: {
-    display: "block",
-    width: "100%",
-    height: "100%",
-    objectFit: "cover",
-    objectPosition: "48% 48%",
-    filter: "saturate(0.9) contrast(0.98) brightness(1.02)",
-  },
-  heroPhotoOverlay: {
-    position: "absolute",
-    right: "12px",
-    bottom: "12px",
-    display: "inline-flex",
-    border: "1px solid rgba(255,255,255,0.66)",
-    borderRadius: "999px",
-    background: "rgba(255,255,255,0.68)",
-    padding: "5px 10px",
-    backdropFilter: "blur(8px)",
-  },
-  heroPhotoLabel: {
-    color: "#60635c",
-    fontSize: "12px",
-    fontWeight: 600,
+  progressNumber: {
+    fontSize: "24px",
+    fontWeight: 690,
     lineHeight: 1,
   },
-  card: {
+  progressSlash: {
+    color: "#6f706a",
+    fontSize: "17px",
+    fontWeight: 580,
+  },
+  progressLabel: {
+    marginLeft: "4px",
+    color: "#555750",
+    fontSize: "13px",
+    fontWeight: 570,
+  },
+  progressRows: {
+    display: "flex",
+    flexWrap: "wrap",
+    gap: "8px",
+  },
+  progressPill: {
+    display: "inline-flex",
+    alignItems: "center",
+    border: "1px solid rgba(224, 221, 214, 0.72)",
+    borderRadius: "999px",
+    background: "rgba(255, 255, 255, 0.66)",
+    color: "#656860",
+    fontSize: "12px",
+    fontWeight: 570,
+    lineHeight: 1,
+    padding: "7px 10px",
+  },
+  section: {
     border: "1px solid rgba(228, 225, 218, 0.58)",
     borderRadius: "26px",
     background: "rgba(255, 255, 255, 0.86)",
@@ -440,19 +556,7 @@ const styles = {
     marginBottom: "12px",
     boxShadow: "0 7px 18px rgba(44, 42, 38, 0.016)",
   },
-  memoCard: {
-    border: "1px solid rgba(228, 225, 218, 0.58)",
-    borderRadius: "24px",
-    background: "rgba(255, 255, 255, 0.82)",
-    padding: "15px 16px",
-    marginBottom: "14px",
-    boxShadow: "0 7px 18px rgba(44, 42, 38, 0.014)",
-  },
   sectionHeader: {
-    display: "flex",
-    alignItems: "flex-start",
-    justifyContent: "space-between",
-    gap: "12px",
     marginBottom: "12px",
   },
   sectionTitle: {
@@ -460,7 +564,7 @@ const styles = {
     color: "#282925",
     fontSize: "18px",
     lineHeight: 1.25,
-    fontWeight: 590,
+    fontWeight: 610,
     letterSpacing: 0,
   },
   sectionSubText: {
@@ -469,87 +573,30 @@ const styles = {
     fontSize: "13px",
     fontWeight: 500,
   },
-  recentGrid: {
-    display: "grid",
-    gridTemplateColumns: "repeat(3, minmax(0, 1fr))",
-    gap: "8px",
-  },
-  recentItem: {
-    display: "grid",
-    justifyItems: "center",
-    gap: "3px",
-    border: "1px solid rgba(228, 225, 218, 0.56)",
-    borderRadius: "22px",
-    background: "rgba(255, 255, 255, 0.76)",
-    padding: "9px 7px",
-    textAlign: "center",
-  },
-  recentMark: {
-    display: "grid",
-    placeItems: "center",
-    width: "36px",
-    height: "36px",
-    borderRadius: "14px",
-    background: "#f3f2ee",
-    color: "#72766f",
-    fontSize: "15px",
-    fontWeight: 650,
-  },
-  recentLabel: {
-    color: "#2e2f2b",
-    fontSize: "13px",
-    fontWeight: 580,
-    lineHeight: 1.35,
-  },
-  recentDate: {
-    color: "#8c887f",
-    fontSize: "11px",
-    fontWeight: 500,
-  },
-  softEmpty: {
-    borderRadius: "20px",
-    background: "#faf9f5",
-    border: "1px solid rgba(232, 229, 222, 0.72)",
-    padding: "14px",
-  },
-  softEmptyTitle: {
-    margin: "0 0 4px",
-    color: "#2f2b28",
-    fontSize: "15px",
-    fontWeight: 650,
-  },
-  softEmptyText: {
-    margin: 0,
-    color: "#686760",
-    fontSize: "13px",
-    lineHeight: 1.6,
-    fontWeight: 500,
-  },
-  poseGrid: {
+  collectionGrid: {
     display: "grid",
     gridTemplateColumns: "repeat(2, minmax(0, 1fr))",
     gap: "10px",
   },
-  poseCard: {
+  collectionCard: {
     position: "relative",
-    minHeight: "104px",
-    border: "1px solid rgba(228, 225, 218, 0.52)",
-    borderRadius: "18px",
-    background: "linear-gradient(180deg, rgba(255,255,255,0.86) 0%, rgba(248,247,243,0.82) 100%)",
-    padding: "10px 8px",
-    textAlign: "center",
+    minHeight: "148px",
+    border: "1px solid rgba(228, 225, 218, 0.58)",
+    borderRadius: "22px",
+    background:
+      "linear-gradient(180deg, rgba(255,255,255,0.9) 0%, rgba(247,246,242,0.84) 100%)",
     overflow: "hidden",
+    padding: "14px 10px 12px",
+    textAlign: "center",
   },
-  posePhotoCard: {
-    minHeight: "158px",
+  photoCard: {
     display: "flex",
-    flexDirection: "column",
-    justifyContent: "flex-end",
-    alignItems: "flex-start",
-    padding: "11px",
+    alignItems: "flex-end",
+    minHeight: "166px",
+    padding: "12px",
     textAlign: "left",
   },
-  posePhoto: {
+  cardPhoto: {
     position: "absolute",
     inset: 0,
     display: "block",
@@ -558,76 +605,61 @@ const styles = {
     objectFit: "cover",
     filter: "saturate(0.9) contrast(0.98) brightness(1.02)",
   },
-  posePhotoFade: {
+  cardPhotoFade: {
     position: "absolute",
     inset: 0,
     background:
-      "linear-gradient(180deg, rgba(255,255,255,0.02) 0%, rgba(35,34,31,0.01) 48%, rgba(35,34,31,0.3) 100%)",
+      "linear-gradient(180deg, rgba(255,255,255,0.02) 0%, rgba(35,34,31,0.02) 48%, rgba(35,34,31,0.42) 100%)",
   },
-  poseMark: {
-    display: "grid",
-    placeItems: "center",
-    width: "28px",
-    height: "28px",
-    margin: "0 auto 6px",
-    borderRadius: "11px",
-    background: "#f4f3ef",
-    color: "#777a72",
-    fontSize: "12px",
-    fontWeight: 650,
-  },
-  poseLabel: {
-    margin: 0,
-    color: "#30312d",
-    fontSize: "11px",
-    fontWeight: 560,
-    lineHeight: 1.35,
-  },
-  posePhotoLabel: {
+  photoCardText: {
     position: "relative",
     zIndex: 1,
+    display: "grid",
+    gap: "6px",
+  },
+  photoCardLabel: {
     margin: 0,
     color: "#ffffff",
-    fontSize: "14px",
-    fontWeight: 650,
-    lineHeight: 1.25,
+    fontSize: "15px",
+    fontWeight: 680,
+    lineHeight: 1.2,
     textShadow: "0 1px 8px rgba(0,0,0,0.24)",
   },
-  posePendingText: {
+  photoCount: {
     display: "inline-flex",
-    marginTop: "5px",
-    color: "#8c887f",
-    fontSize: "9px",
-    fontWeight: 500,
-    lineHeight: 1,
-  },
-  posePhotoPendingText: {
-    position: "relative",
-    zIndex: 1,
-    display: "inline-flex",
-    marginTop: "5px",
+    width: "fit-content",
     border: "1px solid rgba(255,255,255,0.58)",
     borderRadius: "999px",
-    background: "rgba(255,255,255,0.66)",
-    color: "#5d625a",
-    fontSize: "10px",
-    fontWeight: 600,
+    background: "rgba(255,255,255,0.7)",
+    color: "#5c6259",
+    fontSize: "11px",
+    fontWeight: 620,
     lineHeight: 1,
-    padding: "4px 7px",
+    padding: "5px 8px",
     backdropFilter: "blur(7px)",
   },
-  summaryText: {
-    margin: "10px 0 7px",
-    color: "#4f4d49",
-    fontSize: "15px",
-    lineHeight: 1.65,
-    fontWeight: 550,
+  silhouetteWrap: {
+    display: "grid",
+    placeItems: "center",
+    height: "82px",
+    marginBottom: "8px",
+    color: "#aaa69b",
   },
-  summaryMeta: {
-    margin: 0,
-    color: "#8c887f",
-    fontSize: "12px",
-    fontWeight: 500,
+  silhouette: {
+    width: "92px",
+    height: "70px",
+  },
+  emptySlotLabel: {
+    margin: "0 0 5px",
+    color: "#343532",
+    fontSize: "14px",
+    fontWeight: 610,
+    lineHeight: 1.3,
+  },
+  emptySlotText: {
+    color: "#908c83",
+    fontSize: "11px",
+    fontWeight: 520,
   },
   emptyCard: {
     border: "1px solid #e3e0da",

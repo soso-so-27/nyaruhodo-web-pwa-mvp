@@ -6,8 +6,26 @@ export type RecordPoseCategory = {
 };
 
 export type PhotoCollectionPose = {
+  id?: string;
   label: string;
   slug: string;
+  silhouetteKey?: string;
+};
+
+export type CollectionGroupId = "pose" | "scene";
+
+export type CollectionSlot = {
+  id: string;
+  label: string;
+  group: CollectionGroupId;
+  silhouetteKey: string;
+};
+
+export type CollectionGroup = {
+  id: CollectionGroupId;
+  label: string;
+  description: string;
+  slots: CollectionSlot[];
 };
 
 export type PoseCategory = RecordPoseCategory;
@@ -141,6 +159,131 @@ export const PHOTO_COLLECTION_POSES: PhotoCollectionPose[] = [
   {
     label: "ふみふみ",
     slug: "kneading",
+  },
+];
+
+export const COLLECTION_GROUPS: CollectionGroup[] = [
+  {
+    id: "pose",
+    label: "ポーズコレクション",
+    description: "猫のすがたが主役の写真",
+    slots: [
+      {
+        id: "belly-up",
+        label: "へそ天",
+        group: "pose",
+        silhouetteKey: "belly-up",
+      },
+      {
+        id: "loaf",
+        label: "香箱",
+        group: "pose",
+        silhouetteKey: "loaf",
+      },
+      {
+        id: "stretch",
+        label: "のびー",
+        group: "pose",
+        silhouetteKey: "stretch",
+      },
+      {
+        id: "face-down-sleep",
+        label: "ごめん寝",
+        group: "pose",
+        silhouetteKey: "face-down-sleep",
+      },
+      {
+        id: "curled-up",
+        label: "まるまり",
+        group: "pose",
+        silhouetteKey: "curled-up",
+      },
+      {
+        id: "liquid",
+        label: "液体化",
+        group: "pose",
+        silhouetteKey: "liquid",
+      },
+      {
+        id: "sitting",
+        label: "おすわり",
+        group: "pose",
+        silhouetteKey: "sitting",
+      },
+      {
+        id: "tail-up",
+        label: "しっぽピーン",
+        group: "pose",
+        silhouetteKey: "tail-up",
+      },
+      {
+        id: "weird-sleep",
+        label: "変な寝相",
+        group: "pose",
+        silhouetteKey: "weird-sleep",
+      },
+      {
+        id: "hidden-paws",
+        label: "おててないない",
+        group: "pose",
+        silhouetteKey: "hidden-paws",
+      },
+    ],
+  },
+  {
+    id: "scene",
+    label: "シーンコレクション",
+    description: "場所や状況も一緒に残したい写真",
+    slots: [
+      {
+        id: "in-box",
+        label: "箱入り",
+        group: "scene",
+        silhouetteKey: "in-box",
+      },
+      {
+        id: "by-window",
+        label: "窓辺",
+        group: "scene",
+        silhouetteKey: "by-window",
+      },
+      {
+        id: "sunbathing",
+        label: "ひなたぼっこ",
+        group: "scene",
+        silhouetteKey: "sunbathing",
+      },
+      {
+        id: "in-futon",
+        label: "布団入り",
+        group: "scene",
+        silhouetteKey: "in-futon",
+      },
+      {
+        id: "cardboard",
+        label: "段ボール",
+        group: "scene",
+        silhouetteKey: "cardboard",
+      },
+      {
+        id: "waiting-food",
+        label: "ごはん待ち",
+        group: "scene",
+        silhouetteKey: "waiting-food",
+      },
+      {
+        id: "welcome-home",
+        label: "お出迎え",
+        group: "scene",
+        silhouetteKey: "welcome-home",
+      },
+      {
+        id: "blanket-kneading",
+        label: "毛布ふみふみ",
+        group: "scene",
+        silhouetteKey: "blanket-kneading",
+      },
+    ],
   },
 ];
 
