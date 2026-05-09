@@ -603,27 +603,18 @@ export function HomeInput({
             ) : null}
 
             <OptionSection
-              label={"\u3044\u3064\u3082\u306e\u69d8\u5b50"}
               title=""
-              options={CURRENT_OPTIONS}
+              options={[...CURRENT_OPTIONS, ...CONCERN_OPTIONS]}
               variant="current"
               embedded
               activeCatId={activeCatId}
               recentStateRecords={recentStateRecords}
               onSelect={(option) => {
-                void handleCurrentSelect(option.label, option.signal);
-              }}
-            />
+                if ("signal" in option) {
+                  void handleCurrentSelect(option.label, option.signal);
+                  return;
+                }
 
-            <OptionSection
-              label={"\u3061\u3087\u3063\u3068\u6c17\u306b\u306a\u308b"}
-              title=""
-              options={CONCERN_OPTIONS}
-              variant="concern"
-              embedded
-              activeCatId={activeCatId}
-              recentStateRecords={recentStateRecords}
-              onSelect={(option) => {
                 void handleConcernSelect(option.label, option.input);
               }}
             />
@@ -2769,12 +2760,13 @@ const styles = {
   currentButton: {
     background: "rgba(255, 255, 255, 0.74)",
     borderColor: "rgba(225, 222, 216, 0.68)",
+    minHeight: "84px",
   },
   concernButton: {
     background: "rgba(249, 248, 245, 0.52)",
     borderColor: "rgba(228, 225, 219, 0.62)",
     fontWeight: 480,
-    minHeight: "78px",
+    minHeight: "84px",
     gap: "5px",
     padding: "8px 6px",
   },
