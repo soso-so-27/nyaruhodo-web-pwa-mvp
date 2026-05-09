@@ -22,6 +22,7 @@ import {
   addCatProfile,
   buildDailyHintHypothesis,
   clearLatestHypothesis,
+  ensureActiveCatTraitMemo,
   getActiveCatProfile,
   getCatName,
   getHypothesisCompletionMessage,
@@ -175,21 +176,28 @@ export function HomeInput({
       savedCatProfiles,
       savedActiveCatId,
     );
+    const profileState = ensureActiveCatTraitMemo(
+      savedCatProfiles,
+      activeProfile.id,
+    );
 
-    setCatProfiles(savedCatProfiles);
-    setActiveCatId(activeProfile.id);
+    setCatProfiles(profileState.profiles);
+    setActiveCatId(profileState.activeProfile.id);
     setCatTraitMemo(
       readActiveCatTraitMemo(savedActiveCatId) ??
-        readActiveCatTraitMemo(activeProfile.id),
+        readActiveCatTraitMemo(profileState.activeProfile.id) ??
+        profileState.traitMemo,
     );
-    setCatNameInput(getCatName(activeProfile));
+    setCatNameInput(getCatName(profileState.activeProfile));
     setHintSuppressions(readCurrentCatHintSuppressions());
     setRecentStateRecords(readRecentStateRecords());
-    saveActiveCatId(activeProfile.id);
-    setOnboardingHomeMessage(readOnboardingHomeMessage(activeProfile.id));
+    saveActiveCatId(profileState.activeProfile.id);
+    setOnboardingHomeMessage(
+      readOnboardingHomeMessage(profileState.activeProfile.id),
+    );
     const postDiagnosisMessage = readPostDiagnosisFeedbackMessage(
-      activeProfile.id,
-      getCatName(activeProfile),
+      profileState.activeProfile.id,
+      getCatName(profileState.activeProfile),
     );
 
     setPostDiagnosisFeedbackMessage(postDiagnosisMessage);

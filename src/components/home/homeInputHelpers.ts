@@ -6,6 +6,7 @@ import type {
   TypeLabel,
   UnderstandingSourceBreakdown,
 } from "../../lib/diagnosisOnboarding/types";
+import { TYPE_LABELS } from "../../lib/diagnosisOnboarding/types";
 
 export type LatestHypothesisView = {
   input: string;
@@ -535,6 +536,56 @@ export function readActiveCatTraitMemo(activeCatId: string | null) {
   } catch {
     return null;
   }
+}
+
+export function ensureActiveCatTraitMemo(
+  profiles: CatProfile[],
+  activeCatId: string | null,
+) {
+  const activeProfile = getActiveCatProfile(profiles, activeCatId);
+
+  if (activeProfile.typeLabel) {
+    return {
+      profiles,
+      activeProfile,
+      traitMemo: {
+        typeLabel: activeProfile.typeLabel,
+        modifiers: activeProfile.modifiers ?? [],
+      } satisfies CatTraitMemo,
+    };
+  }
+
+  const nextProfiles = profiles.map((profile) =>
+    profile.id === activeProfile.id
+      ? {
+          ...profile,
+          typeKey: profile.typeKey ?? "balanced",
+          typeLabel:
+            profile.typeLabel ??
+            TYPE_LABELS[profile.typeKey ?? "balanced"],
+          modifiers: profile.modifiers ?? [],
+          updatedAt: new Date().toISOString(),
+        }
+      : profile,
+  );
+  const nextActiveProfile = getActiveCatProfile(
+    nextProfiles,
+    activeProfile.id,
+  );
+  const traitMemo = nextActiveProfile.typeLabel
+    ? {
+        typeLabel: nextActiveProfile.typeLabel,
+        modifiers: nextActiveProfile.modifiers ?? [],
+      }
+    : null;
+
+  saveCatProfiles(nextProfiles);
+
+  return {
+    profiles: nextProfiles,
+    activeProfile: nextActiveProfile,
+    traitMemo,
+  };
 }
 
 export function getActiveCatProfile(
