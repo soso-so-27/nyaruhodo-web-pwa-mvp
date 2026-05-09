@@ -24,7 +24,6 @@ import {
   clearLatestHypothesis,
   ensureActiveCatTraitMemo,
   getActiveCatProfile,
-  getCatAvatarSrcForCoat,
   getCatName,
   getHypothesisCompletionMessage,
   isCurrentCatHintSuppressed,
@@ -1447,8 +1446,18 @@ function formatGender(gender?: string): string {
   return "";
 }
 
-function getCatAvatarSrc(coat?: CatCoat) {
-  return getCatAvatarSrcForCoat(coat);
+function getCatAvatarSrc(coat?: string): string {
+  const coatMap: Record<string, string> = {
+    saba: "/sample-cats/saba.png",
+    gray: "/sample-cats/gray.png",
+    orange_tabby: "/sample-cats/orange_tabby.png",
+    black: "/sample-cats/black.png",
+    white: "/sample-cats/white.png",
+    calico: "/sample-cats/calico.png",
+    cream: "/sample-cats/saba.png",
+  };
+
+  return coatMap[coat ?? ""] ?? "/sample-cats/saba.png";
 }
 
 function CatSettings({
@@ -1523,7 +1532,7 @@ function CatSettings({
                     <div
                       style={{
                         ...styles.catListProgressFill,
-                        width: `${Math.min(100, understanding)}%`,
+                        width: `${Math.min(100, Math.max(0, understanding))}%`,
                       }}
                     />
                   </div>

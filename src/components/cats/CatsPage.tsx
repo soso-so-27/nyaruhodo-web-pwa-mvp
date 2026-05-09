@@ -246,7 +246,7 @@ export function CatsPage() {
                 >
                   <div style={styles.catListAvatar}>
                     <img
-                      src={getCatAvatarSrcForCoat(profile.appearance?.coat)}
+                      src={getCatAvatarSrc(profile.appearance?.coat)}
                       alt=""
                       style={styles.catListAvatarImg}
                     />
@@ -259,7 +259,7 @@ export function CatsPage() {
                         <div
                           style={{
                             ...styles.catListProgressFill,
-                            width: `${Math.min(100, understanding)}%`,
+                            width: `${Math.min(100, Math.max(0, understanding))}%`,
                           }}
                         />
                       </div>
@@ -399,6 +399,20 @@ function formatGender(gender?: string): string {
   }
 
   return "";
+}
+
+function getCatAvatarSrc(coat?: string): string {
+  const coatMap: Record<string, string> = {
+    saba: "/sample-cats/saba.png",
+    gray: "/sample-cats/gray.png",
+    orange_tabby: "/sample-cats/orange_tabby.png",
+    black: "/sample-cats/black.png",
+    white: "/sample-cats/white.png",
+    calico: "/sample-cats/calico.png",
+    cream: "/sample-cats/saba.png",
+  };
+
+  return coatMap[coat ?? ""] ?? "/sample-cats/saba.png";
 }
 
 const styles = {
