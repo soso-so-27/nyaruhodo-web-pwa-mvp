@@ -411,7 +411,10 @@ function CollectionCard({
       onClick={() => onOpenSlot(slot)}
       style={{ ...styles.collectionCard, ...styles.emptyCollectionCard }}
     >
-      <p style={styles.emptySlotLabel}>{getCollectionSlotLabel(slot)}</p>
+      <div style={styles.emptySlotContent}>
+        <img src={slot.iconPath} alt="" style={styles.emptyCardIcon} />
+        <span style={styles.emptySlotLabel}>{getCollectionSlotLabel(slot)}</span>
+      </div>
     </button>
   );
 }
@@ -1050,7 +1053,23 @@ const styles = {
     display: "flex",
     alignItems: "center",
     justifyContent: "center",
-    padding: "14px",
+    padding: 0,
+  },
+  emptySlotContent: {
+    display: "flex",
+    flexDirection: "column",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: "8px",
+    width: "100%",
+    height: "100%",
+    padding: "12px 8px",
+  },
+  emptyCardIcon: {
+    width: "56px",
+    height: "56px",
+    objectFit: "contain",
+    opacity: 0.7,
   },
   photoCard: {
     display: "flex",
@@ -1131,10 +1150,10 @@ const styles = {
   },
   emptySlotLabel: {
     margin: 0,
-    color: "#343532",
-    fontSize: "14px",
+    color: "#9a9890",
+    fontSize: "11px",
     fontWeight: 610,
-    lineHeight: 1.25,
+    lineHeight: 1.3,
     textAlign: "center",
   },
   plusBadge: {
@@ -1169,6 +1188,7 @@ const styles = {
     background: "#fbfaf7",
     borderRadius: "20px 20px 0 0",
     paddingBottom: "calc(16px + env(safe-area-inset-bottom))",
+    minHeight: "65vh",
     maxHeight: "85vh",
     overflowY: "auto",
   },
