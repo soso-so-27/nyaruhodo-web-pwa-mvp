@@ -521,6 +521,8 @@ export function HomeInput({
           catName={catName}
           catProfiles={catProfiles}
           catCoat={activeCatProfile?.appearance?.coat}
+          catTraitLabel={activeCatProfile?.typeLabel}
+          catModifiers={activeCatProfile?.modifiers ?? []}
           onboardingHomeMessage={onboardingHomeMessage}
           postDiagnosisFeedbackMessage={postDiagnosisFeedbackMessage}
           recentCatSummary={recentCatSummary}
@@ -877,6 +879,8 @@ function Header({
   catName,
   catProfiles,
   catCoat,
+  catTraitLabel,
+  catModifiers,
   onboardingHomeMessage,
   postDiagnosisFeedbackMessage,
   recentCatSummary,
@@ -887,6 +891,8 @@ function Header({
   catName: string;
   catProfiles: CatProfile[];
   catCoat?: CatCoat;
+  catTraitLabel?: string;
+  catModifiers: string[];
   onboardingHomeMessage: string;
   postDiagnosisFeedbackMessage: string;
   recentCatSummary: RecentCatSummary;
@@ -901,6 +907,8 @@ function Header({
     typeof catAvatarStyle.borderColor === "string"
       ? catAvatarStyle.borderColor
       : "#e4e1da";
+  const visibleCatModifiers = catModifiers.filter(Boolean).slice(0, 2);
+  const isDayMapEmpty = recentCatSummary.dayMap.every((item) => !item.signal);
 
   function handleCatChipSelect(catId: string) {
     onCatSelect(catId);
@@ -937,6 +945,19 @@ function Header({
             <p style={styles.onboardingHomeMessage}>
               {postDiagnosisFeedbackMessage}
             </p>
+          ) : null}
+          {catTraitLabel ? (
+            <section style={styles.catTraitSection} aria-label={`${catName}\u306e\u3053\u3068`}>
+              <p style={styles.catTraitTitle}>{"\u3053\u306e\u5b50\u306e\u3053\u3068"}</p>
+              <div style={styles.catTraitPills}>
+                <span style={styles.catTraitPill}>{catTraitLabel}</span>
+                {visibleCatModifiers.map((modifier) => (
+                  <span key={modifier} style={styles.catModifierTag}>
+                    {modifier}
+                  </span>
+                ))}
+              </div>
+            </section>
           ) : null}
           <div style={styles.dashboardTiles}>
             <div style={styles.dashboardTile}>
@@ -985,6 +1006,11 @@ function Header({
                 </div>
               ))}
             </div>
+            {isDayMapEmpty ? (
+              <p style={styles.dayMapEmptyHint}>
+                {"\u8a18\u9332\u304c\u6e9c\u307e\u308b\u3068\u3001\u3053\u306e\u5b50\u306e1\u65e5\u306e\u30ea\u30ba\u30e0\u304c\u898b\u3048\u3066\u304d\u307e\u3059"}
+              </p>
+            ) : null}
           </div>
         </div>
         <div style={styles.understandingPanel}>
@@ -1112,7 +1138,7 @@ function buildRecentCatSummary(events: RecentEvent[]): RecentCatSummary {
     avatarSignal: currentMapItem?.signal ?? topSignal?.signal ?? null,
     recentSignalLabel: topSignal
       ? `${getSignalDisplayLabel(topSignal.signal)}\u591a\u3081`
-      : "\u8a18\u9332\u5c11\u306a\u3081",
+      : "\u8a18\u9332\u304c\u5897\u3048\u308b\u3068\u898b\u3048\u3066\u304d\u307e\u3059",
     currentTrendText: getCurrentTrendText(currentMapItem),
     dayMap,
   };
@@ -2212,6 +2238,51 @@ const styles = {
     lineHeight: 1.65,
     whiteSpace: "pre-line",
   },
+  catTraitSection: {
+    margin: "0 0 8px",
+    border: "1px solid rgba(224, 222, 216, 0.72)",
+    borderRadius: "16px",
+    background: "rgba(255, 255, 255, 0.54)",
+    padding: "7px 9px",
+    backdropFilter: "blur(10px)",
+  },
+  catTraitTitle: {
+    margin: "0 0 5px",
+    color: "#6f6a61",
+    fontSize: "10px",
+    fontWeight: 650,
+    lineHeight: 1.3,
+  },
+  catTraitPills: {
+    display: "flex",
+    alignItems: "center",
+    flexWrap: "wrap",
+    gap: "5px",
+  },
+  catTraitPill: {
+    display: "inline-flex",
+    alignItems: "center",
+    border: "1px solid rgba(107, 158, 130, 0.24)",
+    borderRadius: "999px",
+    background: "rgba(107, 158, 130, 0.12)",
+    color: "#53685c",
+    fontSize: "11px",
+    fontWeight: 650,
+    lineHeight: 1.35,
+    padding: "3px 8px",
+  },
+  catModifierTag: {
+    display: "inline-flex",
+    alignItems: "center",
+    border: "1px solid rgba(218, 216, 210, 0.78)",
+    borderRadius: "999px",
+    background: "rgba(255, 255, 255, 0.64)",
+    color: "#6f6a61",
+    fontSize: "10px",
+    fontWeight: 600,
+    lineHeight: 1.35,
+    padding: "2px 7px",
+  },
   dashboardTiles: {
     display: "grid",
     gridTemplateColumns: "1fr 1fr",
@@ -2345,7 +2416,7 @@ const styles = {
     width: "6px",
     height: "6px",
     borderRadius: "999px",
-    background: "#d3d0c8",
+    background: "rgba(145, 141, 132, 0.3)",
   },
   dayMapLabel: {
     display: "block",
@@ -2358,6 +2429,13 @@ const styles = {
     textAlign: "center",
     textOverflow: "ellipsis",
     whiteSpace: "nowrap",
+  },
+  dayMapEmptyHint: {
+    margin: "6px 0 0",
+    color: "#8a8178",
+    fontSize: "12px",
+    fontWeight: 500,
+    lineHeight: 1.45,
   },
   headerGuideTitle: {
     margin: "0 0 2px",
