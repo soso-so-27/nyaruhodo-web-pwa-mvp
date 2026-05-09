@@ -515,12 +515,7 @@ export function CatsPage() {
         {message ? <p style={styles.message}>{message}</p> : null}
         {saveMessage ? <p style={styles.message}>{saveMessage}</p> : null}
       </div>
-      <BottomNavigation
-        active="cats"
-        catProfiles={catProfiles}
-        activeCatId={activeCatId}
-        onCatSelect={handleCatSelect}
-      />
+      <BottomNavigation active="cats" />
     </main>
   );
 }

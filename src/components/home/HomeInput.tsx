@@ -634,12 +634,7 @@ export function HomeInput({
         </div>
 
       </div>
-      <BottomNavigation
-        active="today"
-        catProfiles={catProfiles}
-        activeCatId={activeCatId}
-        onCatSelect={handleCatSelect}
-      />
+      <BottomNavigation active="today" />
     </main>
   );
 }
@@ -927,7 +922,7 @@ function Header({
   understandingPercent: number;
   onCatSelect: (catId: string) => void;
 }) {
-  const [isCatSwitcherOpen, setIsCatSwitcherOpen] = useState(false);
+  const [isCatSheetOpen, setIsCatSheetOpen] = useState(false);
   const ringDegree = Math.max(0, Math.min(100, understandingPercent)) * 3.6;
   const canSwitchCats = catProfiles.length > 1;
   const catAvatarStyle = getCatCoatAvatarStyle(catCoat);
@@ -937,11 +932,6 @@ function Header({
       : "#e4e1da";
   const visibleCatModifiers = catModifiers.filter(Boolean).slice(0, 2);
   const isDayMapEmpty = recentCatSummary.dayMap.every((item) => !item.signal);
-
-  function handleCatChipSelect(catId: string) {
-    onCatSelect(catId);
-    setIsCatSwitcherOpen(false);
-  }
 
   return (
     <header style={styles.header}>
@@ -954,13 +944,12 @@ function Header({
             {canSwitchCats ? (
               <button
                 type="button"
-                onClick={() => setIsCatSwitcherOpen((current) => !current)}
+                onClick={() => setIsCatSheetOpen(true)}
                 style={styles.titleSwitchButton}
-                aria-expanded={isCatSwitcherOpen}
               >
                 <span>{catName}</span>
                 <span style={styles.titleChevron} aria-hidden="true">
-                  {isCatSwitcherOpen ? "▲" : "▼"}
+                  {"▼"}
                 </span>
               </button>
             ) : (
@@ -1071,26 +1060,70 @@ function Header({
           </div>
         </div>
       </div>
-      {isCatSwitcherOpen ? (
-        <div style={styles.homeCatSwitcher}>
-          <p style={styles.catChipLabel}>{"\u898b\u308b\u732b\u3092\u9078\u3076"}</p>
-          <div style={styles.catChips}>
-            {catProfiles.map((profile) => (
-              <button
-                key={profile.id}
-                type="button"
-                onClick={() => handleCatChipSelect(profile.id)}
-                style={
-                  profile.id === activeCatId
-                    ? styles.activeCatChipButton
-                    : styles.catChipButton
-                }
-              >
-                {profile.name}
-              </button>
-            ))}
+      {isCatSheetOpen ? (
+        <>
+          <div
+            style={styles.catSheetOverlay}
+            onClick={() => setIsCatSheetOpen(false)}
+          />
+          <div style={styles.catSheet}>
+            <div style={styles.catSheetHandle} />
+            <p style={styles.catSheetTitle}>猫を選ぶ</p>
+            <div style={styles.catSheetGrid}>
+              {catProfiles.map((profile) => {
+                const isSelected = profile.id === activeCatId;
+                const age = formatCatAge(profile.basicInfo?.birthDate);
+                const gender = formatCatGender(profile.basicInfo?.gender);
+                const meta = [gender, age].filter(Boolean).join("・");
+
+                return (
+                  <button
+                    key={profile.id}
+                    type="button"
+                    onClick={() => {
+                      onCatSelect(profile.id);
+                      setIsCatSheetOpen(false);
+                    }}
+                    style={styles.catSheetItem}
+                  >
+                    <div
+                      style={
+                        isSelected
+                          ? { ...styles.catSheetAvatar, ...styles.catSheetAvatarActive }
+                          : styles.catSheetAvatar
+                      }
+                    >
+                      {profile.avatarDataUrl ? (
+                        <img
+                          src={profile.avatarDataUrl}
+                          alt={profile.name}
+                          style={styles.catSheetAvatarPhoto}
+                        />
+                      ) : (
+                        <img
+                          src={getCatAvatarSrc(profile.appearance?.coat)}
+                          alt={profile.name}
+                          style={styles.catSheetAvatarImg}
+                        />
+                      )}
+                    </div>
+                    <span style={styles.catSheetName}>{profile.name}</span>
+                    {meta ? (
+                      <span style={styles.catSheetMeta}>{meta}</span>
+                    ) : null}
+                  </button>
+                );
+              })}
+            </div>
+            <a
+              href="/cats"
+              style={styles.catSheetLink}
+              onClick={() => setIsCatSheetOpen(false)}
+            >
+              ねこタブで管理する ›
+            </a>
           </div>
-        </div>
+        </>
       ) : null}
     </header>
   );
@@ -1449,6 +1482,14 @@ function formatGender(gender?: string): string {
   }
 
   return "";
+}
+
+function formatCatAge(birthDate?: string): string {
+  return formatAge(birthDate);
+}
+
+function formatCatGender(gender?: string): string {
+  return formatGender(gender);
 }
 
 function getCatAvatarSrc(coat?: string): string {
@@ -2327,16 +2368,100 @@ const styles = {
     letterSpacing: 0,
     cursor: "pointer",
   },
-  catChips: {
-    display: "flex",
-    flexWrap: "wrap",
-    gap: "8px",
-    marginTop: "8px",
+  catSheetOverlay: {
+    position: "fixed",
+    inset: 0,
+    background: "rgba(0,0,0,0.3)",
+    zIndex: 50,
   },
-  homeCatSwitcher: {
-    marginTop: "10px",
-    borderTop: "1px solid rgba(218, 216, 210, 0.72)",
-    paddingTop: "10px",
+  catSheet: {
+    position: "fixed",
+    bottom: 0,
+    left: 0,
+    right: 0,
+    background: "#fbfaf7",
+    borderRadius: "20px 20px 0 0",
+    zIndex: 51,
+    padding: "0 20px calc(32px + env(safe-area-inset-bottom))",
+  },
+  catSheetHandle: {
+    width: "36px",
+    height: "4px",
+    background: "#d0cdc6",
+    borderRadius: "99px",
+    margin: "10px auto 16px",
+  },
+  catSheetTitle: {
+    fontSize: "13px",
+    fontWeight: 600,
+    color: "#8a8a80",
+    margin: "0 0 14px",
+    textAlign: "center",
+  },
+  catSheetGrid: {
+    display: "flex",
+    gap: "16px",
+    overflowX: "auto",
+    paddingBottom: "8px",
+    scrollbarWidth: "none",
+    marginBottom: "16px",
+  },
+  catSheetItem: {
+    display: "flex",
+    flexDirection: "column",
+    alignItems: "center",
+    gap: "5px",
+    flexShrink: 0,
+    background: "transparent",
+    border: "none",
+    cursor: "pointer",
+    padding: 0,
+    minWidth: "64px",
+  },
+  catSheetAvatar: {
+    width: "64px",
+    height: "64px",
+    borderRadius: "50%",
+    border: "3px solid transparent",
+    overflow: "hidden",
+    background: "#f5f3ef",
+    flexShrink: 0,
+  },
+  catSheetAvatarActive: {
+    border: "3px solid #6B9E82",
+  },
+  catSheetAvatarPhoto: {
+    width: "100%",
+    height: "100%",
+    objectFit: "cover",
+    borderRadius: "50%",
+  },
+  catSheetAvatarImg: {
+    width: "52px",
+    height: "52px",
+    objectFit: "contain",
+    display: "block",
+    margin: "6px auto",
+  },
+  catSheetName: {
+    fontSize: "12px",
+    fontWeight: 500,
+    color: "#2a2a28",
+    maxWidth: "72px",
+    textAlign: "center",
+    wordBreak: "break-all",
+  },
+  catSheetMeta: {
+    fontSize: "10px",
+    color: "#9a9890",
+  },
+  catSheetLink: {
+    display: "block",
+    textAlign: "center",
+    fontSize: "13px",
+    color: "#6B9E82",
+    textDecoration: "none",
+    padding: "10px 0",
   },
   headerGuide: {
     marginTop: "10px",
@@ -2596,37 +2721,6 @@ const styles = {
     fontWeight: 600,
     lineHeight: 1.45,
     padding: "3px 9px",
-  },
-  catChipLabel: {
-    margin: 0,
-    color: "#8a8178",
-    fontSize: "11px",
-    fontWeight: 600,
-    letterSpacing: 0,
-  },
-  catChipButton: {
-    minHeight: "36px",
-    padding: "0 14px",
-    border: "1px solid #dedbd3",
-    borderRadius: "999px",
-    background: "#ffffff",
-    color: "#27272a",
-    fontSize: "13px",
-    fontWeight: 500,
-    letterSpacing: 0,
-    cursor: "pointer",
-  },
-  activeCatChipButton: {
-    minHeight: "36px",
-    padding: "0 14px",
-    border: "1px solid #d4d6ce",
-    borderRadius: "999px",
-    background: "#e8e9e4",
-    color: "#3f433d",
-    fontSize: "13px",
-    fontWeight: 600,
-    letterSpacing: 0,
-    cursor: "pointer",
   },
   addCatChipButton: {
     minHeight: "34px",

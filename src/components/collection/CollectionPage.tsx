@@ -61,6 +61,7 @@ export function CollectionPage() {
   );
   const [selectedSlug, setSelectedSlug] = useState<string | null>(null);
   const [currentPhotoIndex, setCurrentPhotoIndex] = useState(0);
+  const [isCatSheetOpen, setIsCatSheetOpen] = useState(false);
 
   useEffect(() => {
     const profiles = readCatProfiles();
@@ -128,6 +129,7 @@ export function CollectionPage() {
     setActiveCatId(nextActiveProfile.id);
     setSelectedSlug(null);
     setCurrentPhotoIndex(0);
+    setIsCatSheetOpen(false);
   }
 
   async function handlePhotoAdd(slot: CollectionSlot) {
@@ -230,12 +232,7 @@ export function CollectionPage() {
             <p style={styles.emptyText}>準備しています</p>
           </section>
         </div>
-        <BottomNavigation
-          active="collection"
-          catProfiles={catProfiles}
-          activeCatId={activeCatId}
-          onCatSelect={handleCatSelect}
-        />
+        <BottomNavigation active="collection" />
       </main>
     );
   }
@@ -252,12 +249,7 @@ export function CollectionPage() {
             </a>
           </section>
         </div>
-        <BottomNavigation
-          active="collection"
-          catProfiles={catProfiles}
-          activeCatId={activeCatId}
-          onCatSelect={handleCatSelect}
-        />
+        <BottomNavigation active="collection" />
       </main>
     );
   }
@@ -266,8 +258,17 @@ export function CollectionPage() {
     <main style={styles.page}>
       <div style={styles.container}>
         <header style={styles.header}>
-          <h1 style={styles.title}>コレクション</h1>
-          <p style={styles.collectionCatName}>{catName}</p>
+          <div style={styles.pageHeader}>
+            <h1 style={styles.pageTitle}>コレクション</h1>
+            <button
+              type="button"
+              onClick={() => setIsCatSheetOpen(true)}
+              style={styles.catNameBtn}
+            >
+              {catName}
+              {"▼"}
+            </button>
+          </div>
           <CollectionProgress
             activeGroupId={activeGroupId}
             progress={progress}
@@ -294,12 +295,69 @@ export function CollectionPage() {
           onPhotoScroll={handlePhotoScroll}
         />
       ) : null}
-      <BottomNavigation
-        active="collection"
-        catProfiles={catProfiles}
-        activeCatId={activeCatId}
-        onCatSelect={handleCatSelect}
-      />
+      {isCatSheetOpen ? (
+        <>
+          <div
+            style={styles.catSheetOverlay}
+            onClick={() => setIsCatSheetOpen(false)}
+          />
+          <div style={styles.catSheet}>
+            <div style={styles.catSheetHandle} />
+            <p style={styles.catSheetTitle}>猫を選ぶ</p>
+            <div style={styles.catSheetGrid}>
+              {catProfiles.map((profile) => {
+                const isSelected = profile.id === activeCatId;
+                const age = formatCatAge(profile.basicInfo?.birthDate);
+                const gender = formatCatGender(profile.basicInfo?.gender);
+                const meta = [gender, age].filter(Boolean).join("・");
+
+                return (
+                  <button
+                    key={profile.id}
+                    type="button"
+                    onClick={() => handleCatSelect(profile.id)}
+                    style={styles.catSheetItem}
+                  >
+                    <div
+                      style={
+                        isSelected
+                          ? { ...styles.catSheetAvatar, ...styles.catSheetAvatarActive }
+                          : styles.catSheetAvatar
+                      }
+                    >
+                      {profile.avatarDataUrl ? (
+                        <img
+                          src={profile.avatarDataUrl}
+                          alt={profile.name}
+                          style={styles.catSheetAvatarPhoto}
+                        />
+                      ) : (
+                        <img
+                          src={getCatAvatarSrc(profile.appearance?.coat)}
+                          alt={profile.name}
+                          style={styles.catSheetAvatarImg}
+                        />
+                      )}
+                    </div>
+                    <span style={styles.catSheetName}>{profile.name}</span>
+                    {meta ? (
+                      <span style={styles.catSheetMeta}>{meta}</span>
+                    ) : null}
+                  </button>
+                );
+              })}
+            </div>
+            <a
+              href="/cats"
+              style={styles.catSheetLink}
+              onClick={() => setIsCatSheetOpen(false)}
+            >
+              ねこタブで管理する ›
+            </a>
+          </div>
+        </>
+      ) : null}
+      <BottomNavigation active="collection" />
     </main>
   );
 }
@@ -930,6 +988,50 @@ function getProgressPercent(collected: number, total: number) {
   return Math.min(100, Math.max(0, Math.round((collected / total) * 100)));
 }
 
+function getCatAvatarSrc(coat?: string): string {
+  const coatMap: Record<string, string> = {
+    saba: "/sample-cats/saba.png",
+    gray: "/sample-cats/gray.png",
+    orange_tabby: "/sample-cats/orange_tabby.png",
+    black: "/sample-cats/black.png",
+    white: "/sample-cats/white.png",
+    calico: "/sample-cats/calico.png",
+    cream: "/sample-cats/saba.png",
+  };
+
+  return coatMap[coat ?? ""] ?? "/sample-cats/saba.png";
+}
+
+function formatCatAge(birthDate?: string): string {
+  if (!birthDate) {
+    return "";
+  }
+
+  const birth = new Date(birthDate);
+  const now = new Date();
+  const totalMonths =
+    (now.getFullYear() - birth.getFullYear()) * 12 +
+    (now.getMonth() - birth.getMonth());
+
+  if (totalMonths < 12) {
+    return `${totalMonths}ヶ月`;
+  }
+
+  return `${Math.floor(totalMonths / 12)}歳`;
+}
+
+function formatCatGender(gender?: string): string {
+  if (gender === "male") {
+    return "男の子";
+  }
+
+  if (gender === "female") {
+    return "女の子";
+  }
+
+  return "";
+}
+
 const styles = {
   page: {
     position: "relative",
@@ -946,7 +1048,14 @@ const styles = {
     marginBottom: "14px",
     padding: "2px 0 0",
   },
-  title: {
+  pageHeader: {
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: "12px",
+    marginBottom: "14px",
+  },
+  pageTitle: {
     margin: 0,
     color: "#252622",
     fontSize: "24px",
@@ -954,10 +1063,118 @@ const styles = {
     fontWeight: 650,
     letterSpacing: 0,
   },
-  collectionCatName: {
-    fontSize: "12px",
+  catNameBtn: {
+    fontSize: "13px",
+    fontWeight: 500,
+    color: "#6a6a62",
+    background: "#f5f3ef",
+    border: "0.5px solid #e0ddd6",
+    borderRadius: "99px",
+    padding: "4px 12px",
+    cursor: "pointer",
+  },
+  catSheetOverlay: {
+    position: "fixed",
+    inset: 0,
+    background: "rgba(0,0,0,0.3)",
+    zIndex: 50,
+  },
+  catSheet: {
+    position: "fixed",
+    bottom: 0,
+    left: 0,
+    right: 0,
+    background: "#fbfaf7",
+    borderRadius: "20px 20px 0 0",
+    zIndex: 51,
+    padding: "0 20px calc(32px + env(safe-area-inset-bottom))",
+  },
+  catSheetHandle: {
+    width: "36px",
+    height: "4px",
+    background: "#d0cdc6",
+    borderRadius: "99px",
+    margin: "10px auto 16px",
+  },
+  catSheetTitle: {
+    fontSize: "13px",
+    fontWeight: 600,
     color: "#8a8a80",
-    margin: "-8px 0 12px",
+    margin: "0 0 14px",
+    textAlign: "center",
+  },
+  catSheetGrid: {
+    display: "flex",
+    gap: "16px",
+    overflowX: "auto",
+    paddingBottom: "8px",
+    scrollbarWidth: "none",
+    marginBottom: "16px",
+  },
+  catSheetItem: {
+    display: "flex",
+    flexDirection: "column",
+    alignItems: "center",
+    gap: "5px",
+    flexShrink: 0,
+    background: "transparent",
+    border: "none",
+    cursor: "pointer",
+    padding: 0,
+    minWidth: "64px",
+  },
+  catSheetAvatar: {
+    width: "64px",
+    height: "64px",
+    borderRadius: "50%",
+    border: "3px solid transparent",
+    overflow: "hidden",
+    background: "#f5f3ef",
+    flexShrink: 0,
+  },
+  catSheetAvatarActive: {
+    border: "3px solid #6B9E82",
+  },
+  catSheetAvatarPhoto: {
+    width: "100%",
+    height: "100%",
+    objectFit: "cover",
+    borderRadius: "50%",
+  },
+  catSheetAvatarImg: {
+    width: "52px",
+    height: "52px",
+    objectFit: "contain",
+    display: "block",
+    margin: "6px auto",
+  },
+  catSheetName: {
+    fontSize: "12px",
+    fontWeight: 500,
+    color: "#2a2a28",
+    maxWidth: "72px",
+    textAlign: "center",
+    wordBreak: "break-all",
+  },
+  catSheetMeta: {
+    fontSize: "10px",
+    color: "#9a9890",
+  },
+  catSheetLink: {
+    display: "block",
+    textAlign: "center",
+    fontSize: "13px",
+    color: "#6B9E82",
+    textDecoration: "none",
+    padding: "10px 0",
+  },
+  title: {
+    margin: 0,
+    color: "#252622",
+    fontSize: "24px",
+    lineHeight: 1.25,
+    fontWeight: 650,
+    letterSpacing: 0,
   },
   progressBlock: {
     display: "grid",
