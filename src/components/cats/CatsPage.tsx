@@ -37,6 +37,7 @@ export function CatsPage() {
   const [editBreed, setEditBreed] = useState("");
   const [editCoat, setEditCoat] = useState<EditableCoat>("");
   const [message, setMessage] = useState("");
+  const [saveMessage, setSaveMessage] = useState("");
 
   const activeCatProfile =
     catProfiles.length > 0
@@ -68,11 +69,13 @@ export function CatsPage() {
     setIsEditingCatName(false);
     setIsEditingProfile(false);
     setMessage("");
+    setSaveMessage("");
   }
 
   function startAddingCat() {
     setNewCatNameInput("");
     setMessage("");
+    setSaveMessage("");
     setIsAddingCat(true);
     setIsEditingCatName(false);
     setIsEditingProfile(false);
@@ -110,6 +113,7 @@ export function CatsPage() {
     setEditBreed(activeCatProfile?.basicInfo?.breed ?? "");
     setEditCoat(activeCatProfile?.appearance?.coat ?? "");
     setMessage("");
+    setSaveMessage("");
     setIsAddingCat(false);
     setIsEditingCatName(true);
     setIsEditingProfile(true);
@@ -118,6 +122,7 @@ export function CatsPage() {
   function cancelEditingCatName() {
     setCatNameInput(catName);
     setMessage("");
+    setSaveMessage("");
     setIsEditingCatName(false);
     setIsEditingProfile(false);
   }
@@ -161,7 +166,8 @@ export function CatsPage() {
       setCatNameInput(nextProfile.name);
       setIsEditingCatName(false);
       setIsEditingProfile(false);
-      setMessage("保存しました。");
+      setSaveMessage("保存しました。");
+      setTimeout(() => setSaveMessage(""), 2000);
     } catch {
       return;
     }
@@ -507,6 +513,7 @@ export function CatsPage() {
         </div>
 
         {message ? <p style={styles.message}>{message}</p> : null}
+        {saveMessage ? <p style={styles.message}>{saveMessage}</p> : null}
       </div>
       <BottomNavigation active="cats" />
     </main>
