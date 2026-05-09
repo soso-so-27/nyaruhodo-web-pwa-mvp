@@ -51,6 +51,7 @@ const SAMPLE_COLLECTION_PHOTOS: CollectionPhoto[] = [
 export function CollectionPage() {
   const [catProfiles, setCatProfiles] = useState<CatProfile[]>([]);
   const [activeCatId, setActiveCatId] = useState<string | null>(null);
+  const [activeGroupId, setActiveGroupId] = useState<CollectionGroupId>("pose");
   const [hasLoaded, setHasLoaded] = useState(false);
 
   useEffect(() => {
@@ -75,16 +76,17 @@ export function CollectionPage() {
     () => buildCollectionProgress(COLLECTION_GROUPS, photosBySlot),
     [photosBySlot],
   );
+  const activeGroup =
+    COLLECTION_GROUPS.find((group) => group.id === activeGroupId) ??
+    COLLECTION_GROUPS[0];
 
   if (!hasLoaded) {
     return (
       <main style={styles.page}>
         <div style={styles.container}>
           <section style={styles.emptyCard}>
-            <h1 style={styles.emptyTitle}>コレクションを準備しています</h1>
-            <p style={styles.emptyText}>
-              写真を置く棚を、少しだけ整えています。
-            </p>
+            <h1 style={styles.emptyTitle}>コレクション</h1>
+            <p style={styles.emptyText}>準備しています。</p>
           </section>
         </div>
         <BottomNavigation active="collection" />
@@ -97,10 +99,8 @@ export function CollectionPage() {
       <main style={styles.page}>
         <div style={styles.container}>
           <section style={styles.emptyCard}>
-            <h1 style={styles.emptyTitle}>一緒に暮らしている子を登録しましょう</h1>
-            <p style={styles.emptyText}>
-              ねこページで登録すると、コレクションも猫ごとに分けて見られます。
-            </p>
+            <h1 style={styles.emptyTitle}>コレクション</h1>
+            <p style={styles.emptyText}>一緒に暮らしている子を登録しましょう。</p>
             <a href="/cats" style={styles.primaryLink}>
               ねこを登録する
             </a>
@@ -115,18 +115,23 @@ export function CollectionPage() {
     <main style={styles.page}>
       <div style={styles.container}>
         <header style={styles.header}>
-          <p style={styles.eyebrow}>コレクション</p>
-          <h1 style={styles.title}>{catName}のかわいい瞬間をあつめます</h1>
-          <CollectionProgress progress={progress} />
+          <div style={styles.headerRow}>
+            <h1 style={styles.title}>コレクション</h1>
+            <span style={styles.catChip}>
+              {catName}
+              <span aria-hidden="true" style={styles.catChipArrow}>
+                ▼
+              </span>
+            </span>
+          </div>
+          <CollectionProgress
+            activeGroupId={activeGroupId}
+            progress={progress}
+            onSelectGroup={setActiveGroupId}
+          />
         </header>
 
-        {COLLECTION_GROUPS.map((group) => (
-          <CollectionSection
-            key={group.id}
-            group={group}
-            photosBySlot={photosBySlot}
-          />
-        ))}
+        <CollectionGrid group={activeGroup} photosBySlot={photosBySlot} />
       </div>
       <BottomNavigation active="collection" />
     </main>
@@ -134,30 +139,60 @@ export function CollectionPage() {
 }
 
 function CollectionProgress({
+  activeGroupId,
   progress,
+  onSelectGroup,
 }: {
+  activeGroupId: CollectionGroupId;
   progress: ReturnType<typeof buildCollectionProgress>;
+  onSelectGroup: (groupId: CollectionGroupId) => void;
 }) {
+  const progressPercent = getProgressPercent(
+    progress.total.collected,
+    progress.total.total,
+  );
+
   return (
-    <section style={styles.progressCard} aria-label="コレクションの進み具合">
+    <section style={styles.progressBlock} aria-label="コレクションの進み具合">
       <p style={styles.progressMain}>
         <span style={styles.progressNumber}>{progress.total.collected}</span>
-        <span style={styles.progressSlash}> / {progress.total.total}</span>
-        <span style={styles.progressLabel}> あつまりました</span>
+        <span style={styles.progressSlash}>/{progress.total.total}</span>
       </p>
-      <div style={styles.progressRows}>
-        <span style={styles.progressPill}>
-          ポーズ {progress.pose.collected} / {progress.pose.total}
-        </span>
-        <span style={styles.progressPill}>
-          シーン {progress.scene.collected} / {progress.scene.total}
-        </span>
+      <div style={styles.progressTrack} aria-hidden="true">
+        <span
+          style={{
+            ...styles.progressFill,
+            width: `${progressPercent}%`,
+          }}
+        />
+      </div>
+      <div role="tablist" aria-label="コレクションの種類" style={styles.tabs}>
+        {COLLECTION_GROUPS.map((group) => {
+          const groupProgress = progress[group.id];
+          const isActive = group.id === activeGroupId;
+
+          return (
+            <button
+              key={group.id}
+              type="button"
+              role="tab"
+              aria-selected={isActive}
+              onClick={() => onSelectGroup(group.id)}
+              style={{
+                ...styles.tab,
+                ...(isActive ? styles.activeTab : {}),
+              }}
+            >
+              {group.label} {groupProgress.collected}/{groupProgress.total}
+            </button>
+          );
+        })}
       </div>
     </section>
   );
 }
 
-function CollectionSection({
+function CollectionGrid({
   group,
   photosBySlot,
 }: {
@@ -165,15 +200,7 @@ function CollectionSection({
   photosBySlot: Map<string, CollectionPhoto[]>;
 }) {
   return (
-    <section style={styles.section} aria-labelledby={`${group.id}-collection`}>
-      <div style={styles.sectionHeader}>
-        <div>
-          <h2 id={`${group.id}-collection`} style={styles.sectionTitle}>
-            {group.label}
-          </h2>
-          <p style={styles.sectionSubText}>{group.description}</p>
-        </div>
-      </div>
+    <section aria-label={group.label}>
       <div style={styles.collectionGrid}>
         {group.slots.map((slot) => (
           <CollectionCard
@@ -204,19 +231,25 @@ function CollectionCard({
         <span style={styles.cardPhotoFade} aria-hidden="true" />
         <div style={styles.photoCardText}>
           <p style={styles.photoCardLabel}>{slot.label}</p>
-          <span style={styles.photoCount}>{photos.length}枚</span>
+          {photos.length > 1 ? (
+            <span style={styles.photoCount}>{photos.length}枚</span>
+          ) : null}
         </div>
       </article>
     );
   }
 
   return (
-    <article style={styles.collectionCard}>
+    <article style={{ ...styles.collectionCard, ...styles.emptyCollectionCard }}>
       <div style={styles.silhouetteWrap} aria-hidden="true">
         <CollectionSilhouette slot={slot} />
       </div>
-      <p style={styles.emptySlotLabel}>{slot.label}</p>
-      <span style={styles.emptySlotText}>まだこれから</span>
+      <div style={styles.emptyCardFooter}>
+        <p style={styles.emptySlotLabel}>{slot.label}</p>
+        <span style={styles.plusBadge} aria-hidden="true">
+          ＋
+        </span>
+      </div>
     </article>
   );
 }
@@ -230,7 +263,7 @@ function CollectionSilhouette({ slot }: { slot: CollectionSlot }) {
       style={styles.silhouette}
       fill="none"
       stroke="currentColor"
-      strokeWidth="3.8"
+      strokeWidth="3.6"
       strokeLinecap="round"
       strokeLinejoin="round"
       focusable="false"
@@ -348,7 +381,7 @@ function getSilhouetteShape(key: string, group: CollectionGroupId) {
           <path d="M15 14h66v45H15z" />
           <path d="M48 14v45" />
           <path d="M15 37h66" />
-          <path d="M30 56c2-13 9-20 18-20s14 7 16 20" />
+          <path d="M30 56c2-13 9-20 18-20s14 6 16 20" />
         </>
       );
     case "sunbathing":
@@ -370,13 +403,14 @@ function getSilhouetteShape(key: string, group: CollectionGroupId) {
           <path d="M55 30 61 22" />
         </>
       );
-    case "cardboard":
+    case "high-place":
       return (
         <>
-          <path d="M21 30h54v31H21z" />
-          <path d="M21 30 33 18h54L75 30" />
-          <path d="M75 30 87 18" />
-          <path d="M35 36c4-7 13-9 21-4 5 3 8 7 8 12" />
+          <path d="M18 55h60" />
+          <path d="M22 42h50v13H22z" />
+          <path d="M37 42c2-12 9-18 18-17 8 1 14 7 15 17" />
+          <path d="M45 27 39 19" />
+          <path d="M61 28 68 21" />
         </>
       );
     case "waiting-food":
@@ -470,6 +504,14 @@ function buildCollectionProgress(
   };
 }
 
+function getProgressPercent(collected: number, total: number) {
+  if (total <= 0) {
+    return 0;
+  }
+
+  return Math.min(100, Math.max(0, Math.round((collected / total) * 100)));
+}
+
 const styles = {
   page: {
     minHeight: "100svh",
@@ -479,120 +521,127 @@ const styles = {
   container: {
     width: "min(100%, 480px)",
     margin: "0 auto",
-    padding: "18px 14px calc(132px + env(safe-area-inset-bottom))",
+    padding: "18px 16px calc(144px + env(safe-area-inset-bottom))",
   },
   header: {
-    marginBottom: "12px",
-    padding: "2px 2px 0",
+    marginBottom: "14px",
+    padding: "2px 0 0",
   },
-  eyebrow: {
-    margin: "0 0 8px",
-    color: "#777871",
-    fontSize: "13px",
-    fontWeight: 600,
-    letterSpacing: 0,
+  headerRow: {
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: "12px",
+    marginBottom: "14px",
   },
   title: {
-    margin: "0 0 14px",
+    margin: 0,
     color: "#252622",
     fontSize: "24px",
     lineHeight: 1.25,
     fontWeight: 650,
     letterSpacing: 0,
   },
-  progressCard: {
-    border: "1px solid rgba(226, 223, 216, 0.58)",
-    borderRadius: "24px",
-    background:
-      "linear-gradient(145deg, rgba(255, 255, 255, 0.96), rgba(250, 249, 246, 0.74))",
-    padding: "14px 15px",
-    boxShadow: "0 8px 20px rgba(44, 42, 38, 0.018)",
+  catChip: {
+    display: "inline-flex",
+    alignItems: "center",
+    gap: "5px",
+    maxWidth: "42%",
+    border: "1px solid rgba(219, 216, 209, 0.86)",
+    borderRadius: "999px",
+    background: "rgba(255, 255, 255, 0.78)",
+    color: "#4f514b",
+    fontSize: "13px",
+    fontWeight: 620,
+    lineHeight: 1,
+    padding: "8px 11px",
+    overflow: "hidden",
+    whiteSpace: "nowrap",
+    textOverflow: "ellipsis",
+  },
+  catChipArrow: {
+    color: "#8b8d86",
+    fontSize: "10px",
+  },
+  progressBlock: {
+    display: "grid",
+    gap: "10px",
   },
   progressMain: {
     display: "flex",
     alignItems: "baseline",
-    gap: "2px",
-    margin: "0 0 9px",
+    gap: "1px",
+    margin: 0,
     color: "#2c2d29",
   },
   progressNumber: {
-    fontSize: "24px",
-    fontWeight: 690,
+    fontSize: "25px",
+    fontWeight: 700,
     lineHeight: 1,
   },
   progressSlash: {
-    color: "#6f706a",
+    color: "#676963",
     fontSize: "17px",
-    fontWeight: 580,
+    fontWeight: 590,
   },
-  progressLabel: {
-    marginLeft: "4px",
-    color: "#555750",
-    fontSize: "13px",
-    fontWeight: 570,
+  progressTrack: {
+    position: "relative",
+    width: "100%",
+    height: "7px",
+    borderRadius: "999px",
+    background: "rgba(222, 219, 211, 0.72)",
+    overflow: "hidden",
   },
-  progressRows: {
-    display: "flex",
-    flexWrap: "wrap",
+  progressFill: {
+    position: "absolute",
+    inset: "0 auto 0 0",
+    borderRadius: "999px",
+    background: "linear-gradient(90deg, #a8a697, #8f9688)",
+  },
+  tabs: {
+    display: "grid",
+    gridTemplateColumns: "repeat(2, minmax(0, 1fr))",
     gap: "8px",
   },
-  progressPill: {
-    display: "inline-flex",
-    alignItems: "center",
-    border: "1px solid rgba(224, 221, 214, 0.72)",
+  tab: {
+    minHeight: "38px",
+    border: "1px solid rgba(220, 217, 209, 0.82)",
     borderRadius: "999px",
-    background: "rgba(255, 255, 255, 0.66)",
-    color: "#656860",
-    fontSize: "12px",
-    fontWeight: 570,
-    lineHeight: 1,
-    padding: "7px 10px",
-  },
-  section: {
-    border: "1px solid rgba(228, 225, 218, 0.58)",
-    borderRadius: "26px",
-    background: "rgba(255, 255, 255, 0.86)",
-    padding: "15px",
-    marginBottom: "12px",
-    boxShadow: "0 7px 18px rgba(44, 42, 38, 0.016)",
-  },
-  sectionHeader: {
-    marginBottom: "12px",
-  },
-  sectionTitle: {
-    margin: 0,
-    color: "#282925",
-    fontSize: "18px",
-    lineHeight: 1.25,
-    fontWeight: 610,
-    letterSpacing: 0,
-  },
-  sectionSubText: {
-    margin: "4px 0 0",
-    color: "#777871",
+    background: "rgba(255, 255, 255, 0.78)",
+    color: "#696b64",
+    font: "inherit",
     fontSize: "13px",
-    fontWeight: 500,
+    fontWeight: 620,
+    lineHeight: 1,
+    cursor: "pointer",
+  },
+  activeTab: {
+    border: "1px solid rgba(173, 172, 158, 0.7)",
+    background: "rgba(226, 224, 214, 0.72)",
+    color: "#343630",
   },
   collectionGrid: {
     display: "grid",
     gridTemplateColumns: "repeat(2, minmax(0, 1fr))",
-    gap: "10px",
+    gap: "12px",
   },
   collectionCard: {
     position: "relative",
-    minHeight: "148px",
-    border: "1px solid rgba(228, 225, 218, 0.58)",
-    borderRadius: "22px",
+    aspectRatio: "1 / 1",
+    border: "1px solid rgba(225, 222, 215, 0.72)",
+    borderRadius: "18px",
     background:
-      "linear-gradient(180deg, rgba(255,255,255,0.9) 0%, rgba(247,246,242,0.84) 100%)",
+      "linear-gradient(180deg, rgba(255,255,255,0.92) 0%, rgba(247,246,242,0.9) 100%)",
     overflow: "hidden",
-    padding: "14px 10px 12px",
-    textAlign: "center",
+  },
+  emptyCollectionCard: {
+    display: "grid",
+    gridTemplateRows: "1fr auto",
+    padding: "14px",
   },
   photoCard: {
     display: "flex",
     alignItems: "flex-end",
-    minHeight: "166px",
     padding: "12px",
     textAlign: "left",
   },
@@ -609,7 +658,7 @@ const styles = {
     position: "absolute",
     inset: 0,
     background:
-      "linear-gradient(180deg, rgba(255,255,255,0.02) 0%, rgba(35,34,31,0.02) 48%, rgba(35,34,31,0.42) 100%)",
+      "linear-gradient(180deg, rgba(255,255,255,0.02) 0%, rgba(35,34,31,0.04) 48%, rgba(35,34,31,0.48) 100%)",
   },
   photoCardText: {
     position: "relative",
@@ -630,7 +679,7 @@ const styles = {
     width: "fit-content",
     border: "1px solid rgba(255,255,255,0.58)",
     borderRadius: "999px",
-    background: "rgba(255,255,255,0.7)",
+    background: "rgba(255,255,255,0.72)",
     color: "#5c6259",
     fontSize: "11px",
     fontWeight: 620,
@@ -641,25 +690,41 @@ const styles = {
   silhouetteWrap: {
     display: "grid",
     placeItems: "center",
-    height: "82px",
-    marginBottom: "8px",
+    minHeight: 0,
     color: "#aaa69b",
   },
   silhouette: {
-    width: "92px",
-    height: "70px",
+    width: "68px",
+    height: "56px",
+  },
+  emptyCardFooter: {
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: "8px",
   },
   emptySlotLabel: {
-    margin: "0 0 5px",
+    margin: 0,
     color: "#343532",
     fontSize: "14px",
     fontWeight: 610,
-    lineHeight: 1.3,
+    lineHeight: 1.25,
+    textAlign: "left",
   },
-  emptySlotText: {
-    color: "#908c83",
-    fontSize: "11px",
-    fontWeight: 520,
+  plusBadge: {
+    display: "inline-flex",
+    alignItems: "center",
+    justifyContent: "center",
+    width: "25px",
+    height: "25px",
+    flex: "0 0 auto",
+    border: "1px solid rgba(206, 203, 195, 0.84)",
+    borderRadius: "999px",
+    background: "rgba(255,255,255,0.76)",
+    color: "#7b7c74",
+    fontSize: "17px",
+    fontWeight: 460,
+    lineHeight: 1,
   },
   emptyCard: {
     border: "1px solid #e3e0da",

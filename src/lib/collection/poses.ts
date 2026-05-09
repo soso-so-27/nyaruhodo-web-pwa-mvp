@@ -24,7 +24,6 @@ export type CollectionSlot = {
 export type CollectionGroup = {
   id: CollectionGroupId;
   label: string;
-  description: string;
   slots: CollectionSlot[];
 };
 
@@ -133,7 +132,7 @@ export const PHOTO_COLLECTION_POSES: PhotoCollectionPose[] = [
     slug: "loaf",
   },
   {
-    label: "窓辺監視",
+    label: "窓辺",
     slug: "window_watch",
   },
   {
@@ -165,8 +164,7 @@ export const PHOTO_COLLECTION_POSES: PhotoCollectionPose[] = [
 export const COLLECTION_GROUPS: CollectionGroup[] = [
   {
     id: "pose",
-    label: "ポーズコレクション",
-    description: "猫のすがたが主役の写真",
+    label: "ポーズ",
     slots: [
       {
         id: "belly-up",
@@ -232,8 +230,7 @@ export const COLLECTION_GROUPS: CollectionGroup[] = [
   },
   {
     id: "scene",
-    label: "シーンコレクション",
-    description: "場所や状況も一緒に残したい写真",
+    label: "シーン",
     slots: [
       {
         id: "in-box",
@@ -260,10 +257,10 @@ export const COLLECTION_GROUPS: CollectionGroup[] = [
         silhouetteKey: "in-futon",
       },
       {
-        id: "cardboard",
-        label: "段ボール",
+        id: "high-place",
+        label: "高いところ",
         group: "scene",
-        silhouetteKey: "cardboard",
+        silhouetteKey: "high-place",
       },
       {
         id: "waiting-food",
