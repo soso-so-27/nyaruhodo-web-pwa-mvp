@@ -483,14 +483,22 @@ export function CatsPage() {
 
         <div style={styles.futureRow}>
           <div style={styles.futureCard}>
-            <div style={styles.futureIcon}>📋</div>
+            <i
+              className="ti ti-clipboard-heart"
+              style={{ fontSize: "20px", color: "#9a9890" }}
+              aria-hidden="true"
+            />
             <div>
               <p style={styles.futureTitle}>健康メモ</p>
               <p style={styles.futureSub}>準備中</p>
             </div>
           </div>
           <div style={styles.futureCard}>
-            <div style={styles.futureIcon}>📈</div>
+            <i
+              className="ti ti-chart-line"
+              style={{ fontSize: "20px", color: "#9a9890" }}
+              aria-hidden="true"
+            />
             <div>
               <p style={styles.futureTitle}>成長の記録</p>
               <p style={styles.futureSub}>準備中</p>
