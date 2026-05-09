@@ -966,78 +966,6 @@ function Header({
               {postDiagnosisFeedbackMessage}
             </p>
           ) : null}
-          {catTraitLabel ? (
-            <section style={styles.catTraitSection} aria-label={`${catName}\u306e\u3053\u3068`}>
-              <p style={styles.catTraitTitle}>{"\u3053\u306e\u5b50\u306e\u3053\u3068"}</p>
-              <div style={styles.catTraitPills}>
-                <span style={styles.catTraitPill}>{catTraitLabel}</span>
-              </div>
-              {visibleCatModifiers.length > 0 ? (
-                <div style={styles.catModifierTags}>
-                  {visibleCatModifiers.map((modifier) => (
-                    <span key={modifier} style={styles.catModifierTag}>
-                      {modifier}
-                    </span>
-                  ))}
-                </div>
-              ) : null}
-            </section>
-          ) : null}
-          <div style={styles.headerSummary}>
-            <div style={styles.dashboardTiles}>
-              <div style={styles.dashboardTile}>
-                <span style={styles.statusLabel}>
-                  {`\u3055\u3044\u304d\u3093\u306e${catName}`}
-                </span>
-                <span style={styles.statusValue}>
-                  {recentCatSummary.recentSignalLabel}
-                </span>
-              </div>
-              <div style={{ ...styles.dashboardTile, ...styles.dashboardTileLast }}>
-                <span style={styles.statusLabel}>
-                  {`\u3044\u307e\u306e${catName}`}
-                </span>
-                <span style={styles.statusValue}>
-                  {recentCatSummary.currentTrendText}
-                </span>
-              </div>
-            </div>
-            <div style={styles.dayMap}>
-              <p style={styles.dayMapTitle}>{`${catName}\u306e1\u65e5`}</p>
-              <div style={styles.dayMapGrid}>
-                {recentCatSummary.dayMap.map((item) => (
-                  <div
-                    key={item.period}
-                    style={
-                      item.isMuted
-                        ? { ...styles.dayMapItem, ...styles.dayMapItemMuted }
-                        : styles.dayMapItem
-                    }
-                  >
-                    <span style={styles.dayMapPeriod}>{item.period}</span>
-                    {item.signal ? (
-                      <img
-                        src={getSignalIconSrc(item.signal)}
-                        alt=""
-                        style={styles.dayMapIcon}
-                        onError={(event) => {
-                          event.currentTarget.style.visibility = "hidden";
-                        }}
-                      />
-                    ) : (
-                      <span style={styles.dayMapDot} aria-hidden="true" />
-                    )}
-                    <span style={styles.dayMapLabel}>{item.label}</span>
-                  </div>
-                ))}
-              </div>
-              {isDayMapEmpty ? (
-                <p style={styles.dayMapEmptyHint}>
-                  {"\u8a18\u9332\u304c\u6e9c\u307e\u308b\u3068\u3001\u3053\u306e\u5b50\u306e1\u65e5\u306e\u30ea\u30ba\u30e0\u304c\u898b\u3048\u3066\u304d\u307e\u3059"}
-                </p>
-              ) : null}
-            </div>
-          </div>
         </div>
         <div style={styles.understandingPanel}>
           <div
@@ -1055,6 +983,78 @@ function Header({
               </span>
             </span>
           </div>
+        </div>
+      </div>
+      {catTraitLabel ? (
+        <section style={styles.catTraitSection} aria-label={`${catName}\u306e\u3053\u3068`}>
+          <p style={styles.catTraitTitle}>{"\u3053\u306e\u5b50\u306e\u3053\u3068"}</p>
+          <div style={styles.catTraitPills}>
+            <span style={styles.catTraitPill}>{catTraitLabel}</span>
+          </div>
+          {visibleCatModifiers.length > 0 ? (
+            <div style={styles.catModifierTags}>
+              {visibleCatModifiers.map((modifier) => (
+                <span key={modifier} style={styles.catModifierTag}>
+                  {modifier}
+                </span>
+              ))}
+            </div>
+          ) : null}
+        </section>
+      ) : null}
+      <div style={styles.headerSummary}>
+        <div style={styles.dashboardTiles}>
+          <div style={styles.dashboardTile}>
+            <span style={styles.statusLabel}>
+              {`\u3055\u3044\u304d\u3093\u306e${catName}`}
+            </span>
+            <span style={styles.statusValue}>
+              {recentCatSummary.recentSignalLabel}
+            </span>
+          </div>
+          <div style={{ ...styles.dashboardTile, ...styles.dashboardTileLast }}>
+            <span style={styles.statusLabel}>
+              {`\u3044\u307e\u306e${catName}`}
+            </span>
+            <span style={styles.statusValue}>
+              {recentCatSummary.currentTrendText}
+            </span>
+          </div>
+        </div>
+        <div style={styles.dayMap}>
+          <p style={styles.dayMapTitle}>{`${catName}\u306e1\u65e5`}</p>
+          <div style={styles.dayMapGrid}>
+            {recentCatSummary.dayMap.map((item) => (
+              <div
+                key={item.period}
+                style={
+                  item.isMuted
+                    ? { ...styles.dayMapItem, ...styles.dayMapItemMuted }
+                    : styles.dayMapItem
+                }
+              >
+                <span style={styles.dayMapPeriod}>{item.period}</span>
+                {item.signal ? (
+                  <img
+                    src={getSignalIconSrc(item.signal)}
+                    alt=""
+                    style={styles.dayMapIcon}
+                    onError={(event) => {
+                      event.currentTarget.style.visibility = "hidden";
+                    }}
+                  />
+                ) : (
+                  <span style={styles.dayMapDot} aria-hidden="true" />
+                )}
+                <span style={styles.dayMapLabel}>{item.label}</span>
+              </div>
+            ))}
+          </div>
+          {isDayMapEmpty ? (
+            <p style={styles.dayMapEmptyHint}>
+              {"\u8a18\u9332\u304c\u6e9c\u307e\u308b\u3068\u3001\u3053\u306e\u5b50\u306e1\u65e5\u306e\u30ea\u30ba\u30e0\u304c\u898b\u3048\u3066\u304d\u307e\u3059"}
+            </p>
+          ) : null}
         </div>
       </div>
       {isCatSwitcherOpen ? (
@@ -2083,7 +2083,7 @@ const styles = {
   },
   photoHero: {
     position: "relative",
-    height: "430px",
+    height: "300px",
     border: "1px solid rgba(219, 216, 207, 0.72)",
     borderRadius: "32px",
     background: "#fbfaf7",
@@ -2114,7 +2114,7 @@ const styles = {
     zIndex: 2,
     display: "flex",
     flexDirection: "column",
-    gap: "8px",
+    gap: "6px",
     border: "0",
     borderRadius: "0",
     background: "transparent",
