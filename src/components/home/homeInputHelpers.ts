@@ -696,35 +696,41 @@ function readStoredCatProfiles() {
   }
 
   try {
-    const parsed = JSON.parse(value) as Partial<CatProfile>[];
+    const parsed = JSON.parse(value) as
+      | Partial<CatProfile>[]
+      | Record<string, Partial<CatProfile>>;
+    const profiles = Array.isArray(parsed)
+      ? parsed
+      : Object.entries(parsed).map(([id, profile]) => ({
+          ...profile,
+          id: profile.id ?? id,
+        }));
 
-    if (!Array.isArray(parsed)) {
-      return [];
-    }
-
-    return parsed
-      .filter((profile) => profile.id && profile.name)
-      .map((profile) => ({
-        id: profile.id as string,
-        name: profile.name as string,
-        createdAt: profile.createdAt ?? new Date().toISOString(),
-        updatedAt:
-          profile.updatedAt ?? profile.createdAt ?? new Date().toISOString(),
-        typeKey: profile.typeKey,
-        typeLabel: profile.typeLabel,
-        typeScores: profile.typeScores,
-        appearance: isValidCatAppearance(profile.appearance)
-          ? normalizeCatAppearance(profile.appearance)
-          : undefined,
-        modifiers: Array.isArray(profile.modifiers)
-          ? profile.modifiers
-          : undefined,
-        onboarding: profile.onboarding,
-        understanding: profile.understanding,
-      }));
+    return profiles
+      .filter((profile) => profile.id)
+      .map(normalizeStoredCatProfile);
   } catch {
     return [];
   }
+}
+
+function normalizeStoredCatProfile(profile: Partial<CatProfile>): CatProfile {
+  return {
+    id: profile.id as string,
+    name: profile.name ?? DEFAULT_CAT_NAME,
+    createdAt: profile.createdAt ?? new Date().toISOString(),
+    updatedAt:
+      profile.updatedAt ?? profile.createdAt ?? new Date().toISOString(),
+    typeKey: profile.typeKey,
+    typeLabel: profile.typeLabel,
+    typeScores: profile.typeScores,
+    appearance: isValidCatAppearance(profile.appearance)
+      ? normalizeCatAppearance(profile.appearance)
+      : undefined,
+    modifiers: Array.isArray(profile.modifiers) ? profile.modifiers : undefined,
+    onboarding: profile.onboarding,
+    understanding: profile.understanding,
+  };
 }
 
 function isValidCatAppearance(
