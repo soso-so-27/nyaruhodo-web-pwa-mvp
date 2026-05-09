@@ -6,7 +6,6 @@ import { BottomNavigation } from "../navigation/BottomNavigation";
 import {
   addCatProfile,
   getActiveCatProfile,
-  getCatAvatarSrcForCoat,
   getCatName,
   readActiveCatId,
   readCatProfiles,
@@ -24,7 +23,6 @@ const COAT_OPTIONS: { value: CatCoat; label: string; color: string }[] = [
   { value: "white", label: "白", color: "#fafafa" },
   { value: "calico", label: "三毛", color: "#f0c28b" },
 ];
-const SAMPLE_PROFILE_PHOTO_SRC = "/sample-cats/mugi-portrait.png";
 
 export function CatsPage() {
   const [catProfiles, setCatProfiles] = useState<CatProfile[]>([]);
@@ -32,6 +30,7 @@ export function CatsPage() {
   const [catNameInput, setCatNameInput] = useState("");
   const [newCatNameInput, setNewCatNameInput] = useState("");
   const [isEditingCatName, setIsEditingCatName] = useState(false);
+  const [isEditingProfile, setIsEditingProfile] = useState(false);
   const [isAddingCat, setIsAddingCat] = useState(false);
   const [message, setMessage] = useState("");
 
@@ -40,7 +39,6 @@ export function CatsPage() {
       ? getActiveCatProfile(catProfiles, activeCatId)
       : null;
   const catName = getCatName(activeCatProfile);
-  const understandingPercent = activeCatProfile?.understanding?.percent;
 
   useEffect(() => {
     const savedCatProfiles = readCatProfiles();
@@ -64,6 +62,7 @@ export function CatsPage() {
     setCatNameInput(getCatName(nextActiveProfile));
     setIsAddingCat(false);
     setIsEditingCatName(false);
+    setIsEditingProfile(false);
     setMessage("");
   }
 
@@ -72,6 +71,7 @@ export function CatsPage() {
     setMessage("");
     setIsAddingCat(true);
     setIsEditingCatName(false);
+    setIsEditingProfile(false);
   }
 
   function cancelAddingCat() {
@@ -104,12 +104,14 @@ export function CatsPage() {
     setMessage("");
     setIsAddingCat(false);
     setIsEditingCatName(true);
+    setIsEditingProfile(true);
   }
 
   function cancelEditingCatName() {
     setCatNameInput(catName);
     setMessage("");
     setIsEditingCatName(false);
+    setIsEditingProfile(false);
   }
 
   function handleCatNameSave() {
@@ -128,6 +130,7 @@ export function CatsPage() {
     setActiveCatId(result.activeCatId);
     setCatNameInput(activeProfile.name);
     setIsEditingCatName(false);
+    setIsEditingProfile(false);
     setMessage("保存しました。");
   }
 
@@ -145,213 +148,312 @@ export function CatsPage() {
   }
 
   const selectedCoat = activeCatProfile?.appearance?.coat;
-  const activeCatAvatarSrc = getCatAvatarSrcForCoat(selectedCoat);
-  const activeCatAvatarStyle = getCatCoatAvatarStyle(selectedCoat);
 
   return (
     <main style={styles.page}>
       <div style={styles.container}>
-        <section style={styles.card}>
-          <h2 style={styles.sectionTitle}>{"一緒に暮らしている子"}</h2>
-          <div style={styles.profileSummary}>
-            <div style={styles.profileSummaryHeader}>
-              <div
-                style={{ ...styles.profilePhotoFrame, ...activeCatAvatarStyle }}
-                aria-hidden="true"
+        <div style={styles.pageHeader}>
+          <h1 style={styles.pageTitle}>ねこ</h1>
+          <p style={styles.pageSub}>一緒に暮らしている子</p>
+        </div>
+
+        <div style={styles.catGrid}>
+          {catProfiles.map((profile) => {
+            const age = formatAge(profile.basicInfo?.birthDate);
+            const gender = formatGender(profile.basicInfo?.gender);
+            const meta = [gender, age].filter(Boolean).join("・");
+            const isActive = profile.id === activeCatId;
+
+            return (
+              <button
+                key={profile.id}
+                type="button"
+                style={styles.catGridItem}
+                onClick={() => handleCatSelect(profile.id)}
               >
-                <img
-                  src={SAMPLE_PROFILE_PHOTO_SRC}
-                  alt=""
-                  style={styles.profilePhoto}
-                  onError={(event) => {
-                    event.currentTarget.src = activeCatAvatarSrc;
-                    event.currentTarget.style.objectFit = "contain";
-                  }}
-                />
-              </div>
-              <div style={styles.profileSummaryText}>
-                <p style={styles.sectionLabel}>{"いま見ている子"}</p>
-                <h3 style={styles.activeCatName}>{catName}</h3>
-                <p style={styles.description}>
-                  {"今日の記録や見立ては、この子にたまります。"}
-                </p>
-                {typeof understandingPercent === "number" ? (
-                  <p style={styles.understandingPill}>
-                    {"理解度 "}
-                    {understandingPercent}
-                    {"%"}
-                  </p>
-                ) : null}
-              </div>
-            </div>
-          </div>
-
-          <div style={styles.coatSection}>
-            <div style={styles.coatHeader}>
-              <p style={styles.sectionLabel}>{"毛色"}</p>
-              <p style={styles.coatDescription}>
-                {"この子に近い色を選べます。"}
-              </p>
-            </div>
-            <div style={styles.coatOptions}>
-              {COAT_OPTIONS.map((option) => {
-                const isSelected = option.value === selectedCoat;
-
-                return (
-                  <button
-                    key={option.value}
-                    type="button"
-                    onClick={() => handleCoatSelect(option.value)}
-                    style={
-                      isSelected
-                        ? {
-                            ...styles.coatButton,
-                            ...styles.coatButtonActive,
-                          }
-                        : styles.coatButton
-                    }
-                    aria-pressed={isSelected}
-                  >
-                    <span
-                      style={{
-                        ...styles.coatSwatch,
-                        background:
-                          option.value === "calico"
-                            ? "linear-gradient(135deg, #faf6ee 0%, #faf6ee 38%, #e4cfb2 39%, #e4cfb2 64%, #d9d6cf 65%, #d9d6cf 100%)"
-                            : option.color,
-                      }}
-                      aria-hidden="true"
-                    />
-                    {option.label}
-                  </button>
-                );
-              })}
-            </div>
-          </div>
-
-          <div style={styles.catList}>
-            {catProfiles.map((profile) => {
-              const age = formatAge(profile.basicInfo?.birthDate);
-              const gender = formatGender(profile.basicInfo?.gender);
-              const meta = [gender, age].filter(Boolean).join("・");
-              const understanding = profile.understanding?.percent ?? 0;
-              const isActive = profile.id === activeCatId;
-
-              return (
-                <button
-                  key={profile.id}
-                  type="button"
-                  onClick={() => handleCatSelect(profile.id)}
-                  style={isActive ? styles.catListItemActive : styles.catListItem}
+                <div
+                  style={
+                    isActive
+                      ? { ...styles.catAvatar, ...styles.catAvatarActive }
+                      : styles.catAvatar
+                  }
                 >
-                  <div style={styles.catListAvatar}>
-                    <img
-                      src={getCatAvatarSrc(profile.appearance?.coat)}
-                      alt=""
-                      style={styles.catListAvatarImg}
-                    />
-                  </div>
-                  <div style={styles.catListInfo}>
-                    <span style={styles.catListName}>{profile.name}</span>
-                    {meta ? <span style={styles.catListMeta}>{meta}</span> : null}
-                    <div style={styles.catListProgress}>
-                      <div style={styles.catListProgressBar}>
-                        <div
-                          style={{
-                            ...styles.catListProgressFill,
-                            width: `${Math.min(100, Math.max(0, understanding))}%`,
-                          }}
-                        />
-                      </div>
-                      <span style={styles.catListProgressLabel}>
-                        {understanding}
-                        {"%"}
+                  <img
+                    src={getCatAvatarSrc(profile.appearance?.coat)}
+                    alt={profile.name}
+                    style={styles.catAvatarImg}
+                  />
+                </div>
+                <span style={styles.catGridName}>{profile.name}</span>
+                {meta ? <span style={styles.catGridMeta}>{meta}</span> : null}
+              </button>
+            );
+          })}
+
+          <button type="button" style={styles.catGridItem} onClick={startAddingCat}>
+            <div style={styles.catAvatarAdd}>
+              <span style={styles.catAvatarAddMark}>＋</span>
+            </div>
+            <span style={{ ...styles.catGridName, color: "#b0ada6" }}>追加</span>
+          </button>
+        </div>
+
+        {isAddingCat ? (
+          <div style={styles.editor}>
+            <label style={styles.label} htmlFor="new-cat-name">
+              {"この子の名前"}
+            </label>
+            <input
+              id="new-cat-name"
+              type="text"
+              value={newCatNameInput}
+              onChange={(event) => setNewCatNameInput(event.target.value)}
+              placeholder={"例：麦"}
+              style={styles.input}
+            />
+            <div style={styles.actions}>
+              <button
+                type="button"
+                onClick={handleAddCatSave}
+                style={styles.saveButton}
+              >
+                {"保存"}
+              </button>
+              <button
+                type="button"
+                onClick={cancelAddingCat}
+                style={styles.cancelButton}
+              >
+                {"キャンセル"}
+              </button>
+            </div>
+          </div>
+        ) : null}
+
+        {activeCatProfile ? (
+          <div style={styles.profileCard}>
+            <div style={styles.profileHeader}>
+              <div>
+                <div style={styles.profileName}>
+                  {activeCatProfile.name}
+                  {activeCatProfile.basicInfo?.gender ? (
+                    <span style={styles.genderBadge}>
+                      {formatGender(activeCatProfile.basicInfo.gender)}
+                    </span>
+                  ) : null}
+                </div>
+              </div>
+              <button
+                type="button"
+                style={styles.editBtn}
+                onClick={startEditingCatName}
+              >
+                編集
+              </button>
+            </div>
+
+            <hr style={styles.divider} />
+
+            {activeCatProfile.basicInfo?.birthDate ? (
+              <div style={styles.infoRow}>
+                <span style={styles.infoLabel}>誕生日</span>
+                <span style={styles.infoValue}>
+                  {formatBirthDate(activeCatProfile.basicInfo.birthDate)}
+                </span>
+              </div>
+            ) : null}
+            {activeCatProfile.basicInfo?.birthDate ? (
+              <div style={styles.infoRow}>
+                <span style={styles.infoLabel}>年齢</span>
+                <span style={styles.infoValue}>
+                  {formatAge(activeCatProfile.basicInfo.birthDate)}
+                </span>
+              </div>
+            ) : null}
+            {activeCatProfile.basicInfo?.breed ? (
+              <div style={styles.infoRow}>
+                <span style={styles.infoLabel}>猫種</span>
+                <span style={styles.infoValue}>
+                  {activeCatProfile.basicInfo.breed}
+                </span>
+              </div>
+            ) : null}
+            {activeCatProfile.appearance?.coat ? (
+              <div style={styles.infoRow}>
+                <span style={styles.infoLabel}>毛色</span>
+                <div style={styles.coatRow}>
+                  <div
+                    style={{
+                      ...styles.coatDot,
+                      background: getCoatColor(activeCatProfile.appearance.coat),
+                    }}
+                  />
+                  <span style={styles.infoValue}>
+                    {getCoatLabel(activeCatProfile.appearance.coat)}
+                  </span>
+                </div>
+              </div>
+            ) : null}
+
+            {activeCatProfile.typeLabel ||
+            (activeCatProfile.modifiers?.length ?? 0) > 0 ? (
+              <>
+                <hr style={styles.divider} />
+                <div style={styles.traitSection}>
+                  <p style={styles.traitLabel}>この子のこと</p>
+                  <div style={styles.traitPills}>
+                    {activeCatProfile.typeLabel ? (
+                      <span style={styles.traitPill}>
+                        {activeCatProfile.typeLabel}
                       </span>
+                    ) : null}
+                    {(activeCatProfile.modifiers ?? [])
+                      .slice(0, 2)
+                      .map((modifier) => (
+                        <span key={modifier} style={styles.traitModifier}>
+                          {modifier}
+                        </span>
+                      ))}
+                  </div>
+                </div>
+              </>
+            ) : null}
+
+            {isEditingProfile ? (
+              <>
+                <hr style={styles.divider} />
+                {isEditingCatName ? (
+                  <div style={styles.editor}>
+                    <label style={styles.label} htmlFor="cat-name">
+                      {"この子の名前"}
+                    </label>
+                    <input
+                      id="cat-name"
+                      type="text"
+                      value={catNameInput}
+                      onChange={(event) => setCatNameInput(event.target.value)}
+                      placeholder={"例：ミケ"}
+                      style={styles.input}
+                    />
+                    <div style={styles.actions}>
+                      <button
+                        type="button"
+                        onClick={handleCatNameSave}
+                        style={styles.saveButton}
+                      >
+                        {"保存"}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={cancelEditingCatName}
+                        style={styles.cancelButton}
+                      >
+                        {"キャンセル"}
+                      </button>
                     </div>
                   </div>
-                  <span style={styles.catListChevron}>›</span>
-                </button>
-              );
-            })}
+                ) : null}
+
+                <CoatSelector
+                  currentCoat={selectedCoat}
+                  onSelect={handleCoatSelect}
+                  onClose={() => {
+                    setIsEditingProfile(false);
+                    setIsEditingCatName(false);
+                  }}
+                />
+              </>
+            ) : null}
           </div>
+        ) : null}
 
-          <button
-            type="button"
-            onClick={startAddingCat}
-            style={styles.addCatListButton}
-          >
-            ＋ 猫を追加
-          </button>
-
-          {isAddingCat ? (
-            <div style={styles.editor}>
-              <label style={styles.label} htmlFor="new-cat-name">
-                {"この子の名前"}
-              </label>
-              <input
-                id="new-cat-name"
-                type="text"
-                value={newCatNameInput}
-                onChange={(event) => setNewCatNameInput(event.target.value)}
-                placeholder={"例：麦"}
-                style={styles.input}
-              />
-              <div style={styles.actions}>
-                <button
-                  type="button"
-                  onClick={handleAddCatSave}
-                  style={styles.saveButton}
-                >
-                  {"保存"}
-                </button>
-                <button
-                  type="button"
-                  onClick={cancelAddingCat}
-                  style={styles.cancelButton}
-                >
-                  {"キャンセル"}
-                </button>
-              </div>
+        <div style={styles.futureRow}>
+          <div style={styles.futureCard}>
+            <div style={styles.futureIcon}>📋</div>
+            <div>
+              <p style={styles.futureTitle}>健康メモ</p>
+              <p style={styles.futureSub}>準備中</p>
             </div>
-          ) : null}
-
-          {isEditingCatName ? (
-            <div style={styles.editor}>
-              <label style={styles.label} htmlFor="cat-name">
-                {"この子の名前"}
-              </label>
-              <input
-                id="cat-name"
-                type="text"
-                value={catNameInput}
-                onChange={(event) => setCatNameInput(event.target.value)}
-                placeholder={"例：ミケ"}
-                style={styles.input}
-              />
-              <div style={styles.actions}>
-                <button
-                  type="button"
-                  onClick={handleCatNameSave}
-                  style={styles.saveButton}
-                >
-                  {"保存"}
-                </button>
-                <button
-                  type="button"
-                  onClick={cancelEditingCatName}
-                  style={styles.cancelButton}
-                >
-                  {"キャンセル"}
-                </button>
-              </div>
+          </div>
+          <div style={styles.futureCard}>
+            <div style={styles.futureIcon}>📈</div>
+            <div>
+              <p style={styles.futureTitle}>成長の記録</p>
+              <p style={styles.futureSub}>準備中</p>
             </div>
-          ) : null}
-          {message ? <p style={styles.message}>{message}</p> : null}
-        </section>
+          </div>
+        </div>
+
+        {message ? <p style={styles.message}>{message}</p> : null}
       </div>
       <BottomNavigation active="cats" />
     </main>
   );
+}
+
+function CoatSelector({
+  currentCoat,
+  onSelect,
+  onClose,
+}: {
+  currentCoat?: CatCoat;
+  onSelect: (coat: CatCoat) => void;
+  onClose: () => void;
+}) {
+  return (
+    <div style={styles.coatSection}>
+      <div style={styles.coatHeader}>
+        <p style={styles.sectionLabel}>{"毛色"}</p>
+        <button type="button" onClick={onClose} style={styles.closeEditBtn}>
+          閉じる
+        </button>
+      </div>
+      <div style={styles.coatOptions}>
+        {COAT_OPTIONS.map((option) => {
+          const isSelected = option.value === currentCoat;
+
+          return (
+            <button
+              key={option.value}
+              type="button"
+              onClick={() => onSelect(option.value)}
+              style={
+                isSelected
+                  ? {
+                      ...styles.coatButton,
+                      ...styles.coatButtonActive,
+                    }
+                  : styles.coatButton
+              }
+              aria-pressed={isSelected}
+            >
+              <span
+                style={{
+                  ...styles.coatSwatch,
+                  background:
+                    option.value === "calico"
+                      ? "linear-gradient(135deg, #faf6ee 0%, #faf6ee 38%, #e4cfb2 39%, #e4cfb2 64%, #d9d6cf 65%, #d9d6cf 100%)"
+                      : option.color,
+                }}
+                aria-hidden="true"
+              />
+              {option.label}
+            </button>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+function formatBirthDate(birthDate: string): string {
+  const date = new Date(birthDate);
+
+  if (Number.isNaN(date.getTime())) {
+    return "";
+  }
+
+  return `${date.getFullYear()}年${date.getMonth() + 1}月${date.getDate()}日`;
 }
 
 function formatAge(birthDate?: string): string {
@@ -415,6 +517,34 @@ function getCatAvatarSrc(coat?: string): string {
   return coatMap[coat ?? ""] ?? "/sample-cats/saba.png";
 }
 
+function getCoatColor(coat: string): string {
+  const colors: Record<string, string> = {
+    saba: "#d8d2c4",
+    gray: "#c8c6c2",
+    orange_tabby: "#dfc7a8",
+    black: "#625f59",
+    white: "#f0eeea",
+    calico: "#ded6ca",
+    cream: "#d8d2c4",
+  };
+
+  return colors[coat] ?? "#d8d2c4";
+}
+
+function getCoatLabel(coat: string): string {
+  const labels: Record<string, string> = {
+    saba: "サバ",
+    gray: "グレー",
+    orange_tabby: "茶トラ",
+    black: "黒",
+    white: "白",
+    calico: "三毛",
+    cream: "サバ",
+  };
+
+  return labels[coat] ?? coat;
+}
+
 const styles = {
   page: {
     minHeight: "100vh",
@@ -427,6 +557,209 @@ const styles = {
     width: "min(100%, 430px)",
     margin: "0 auto",
     padding: "16px 14px calc(224px + env(safe-area-inset-bottom))",
+  },
+  pageHeader: {
+    marginBottom: "16px",
+  },
+  pageTitle: {
+    fontSize: "22px",
+    fontWeight: 500,
+    color: "#2a2a28",
+    margin: "0 0 4px",
+  },
+  pageSub: {
+    fontSize: "12px",
+    color: "#8a8a80",
+    margin: 0,
+  },
+  catGrid: {
+    display: "flex",
+    gap: "12px",
+    overflowX: "auto",
+    paddingBottom: "4px",
+    scrollbarWidth: "none",
+    marginBottom: "20px",
+  },
+  catGridItem: {
+    display: "flex",
+    flexDirection: "column",
+    alignItems: "center",
+    gap: "5px",
+    flexShrink: 0,
+    cursor: "pointer",
+    border: "none",
+    background: "transparent",
+    padding: 0,
+    font: "inherit",
+  },
+  catAvatar: {
+    width: "56px",
+    height: "56px",
+    borderRadius: "50%",
+    background: "#f5f3ef",
+    border: "2.5px solid transparent",
+    overflow: "hidden",
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  catAvatarActive: {
+    border: "2.5px solid #6B9E82",
+  },
+  catAvatarImg: {
+    width: "48px",
+    height: "48px",
+    objectFit: "contain",
+  },
+  catAvatarAdd: {
+    width: "56px",
+    height: "56px",
+    borderRadius: "50%",
+    border: "1.5px dashed #d0cdc6",
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  catAvatarAddMark: {
+    fontSize: "22px",
+    color: "#b0ada6",
+  },
+  catGridName: {
+    fontSize: "11px",
+    color: "#6a6a62",
+    fontWeight: 500,
+  },
+  catGridMeta: {
+    fontSize: "10px",
+    color: "#9a9890",
+  },
+  profileCard: {
+    background: "#ffffff",
+    border: "0.5px solid #e5e2dc",
+    borderRadius: "20px",
+    padding: "16px",
+    marginBottom: "10px",
+  },
+  profileHeader: {
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "space-between",
+    marginBottom: "14px",
+  },
+  profileName: {
+    fontSize: "18px",
+    fontWeight: 500,
+    color: "#2a2a28",
+    display: "flex",
+    alignItems: "center",
+    gap: "8px",
+  },
+  genderBadge: {
+    fontSize: "11px",
+    color: "#3d6650",
+    background: "rgba(107,158,130,0.1)",
+    border: "0.5px solid rgba(107,158,130,0.25)",
+    borderRadius: "99px",
+    padding: "2px 8px",
+  },
+  editBtn: {
+    fontSize: "12px",
+    color: "#6a6a62",
+    background: "#f5f3ef",
+    border: "0.5px solid #e0ddd6",
+    borderRadius: "99px",
+    padding: "4px 12px",
+    cursor: "pointer",
+  },
+  divider: {
+    border: "none",
+    borderTop: "0.5px solid #e8e5de",
+    margin: "12px 0",
+  },
+  infoRow: {
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "space-between",
+    padding: "5px 0",
+  },
+  infoLabel: {
+    fontSize: "12px",
+    color: "#8a8a80",
+  },
+  infoValue: {
+    fontSize: "12px",
+    color: "#2a2a28",
+    fontWeight: 500,
+  },
+  coatRow: {
+    display: "flex",
+    alignItems: "center",
+    gap: "6px",
+  },
+  coatDot: {
+    width: "14px",
+    height: "14px",
+    borderRadius: "50%",
+  },
+  traitSection: {
+    marginTop: "4px",
+  },
+  traitLabel: {
+    fontSize: "11px",
+    color: "#9a9890",
+    margin: "0 0 6px",
+  },
+  traitPills: {
+    display: "flex",
+    flexWrap: "wrap",
+    gap: "5px",
+  },
+  traitPill: {
+    fontSize: "11px",
+    background: "rgba(107,158,130,0.1)",
+    color: "#3d6650",
+    border: "0.5px solid rgba(107,158,130,0.25)",
+    borderRadius: "99px",
+    padding: "3px 9px",
+  },
+  traitModifier: {
+    fontSize: "10px",
+    background: "#f5f3ef",
+    color: "#6a6a62",
+    border: "0.5px solid #e0ddd6",
+    borderRadius: "99px",
+    padding: "2px 8px",
+  },
+  futureRow: {
+    display: "grid",
+    gridTemplateColumns: "1fr 1fr",
+    gap: "8px",
+    marginTop: "8px",
+  },
+  futureCard: {
+    background: "#f5f3ef",
+    border: "0.5px solid #e0ddd6",
+    borderRadius: "14px",
+    padding: "12px",
+    display: "flex",
+    alignItems: "center",
+    gap: "10px",
+    opacity: 0.5,
+  },
+  futureIcon: {
+    fontSize: "20px",
+    flexShrink: 0,
+  },
+  futureTitle: {
+    fontSize: "12px",
+    fontWeight: 500,
+    color: "#6a6a62",
+    margin: "0 0 2px",
+  },
+  futureSub: {
+    fontSize: "11px",
+    color: "#9a9890",
+    margin: 0,
   },
   header: {
     marginBottom: "12px",
@@ -455,65 +788,6 @@ const styles = {
     fontSize: "13px",
     lineHeight: 1.7,
   },
-  card: {
-    marginBottom: "10px",
-    border: "1px solid rgba(228, 225, 218, 0.72)",
-    borderRadius: "28px",
-    background: "rgba(255, 255, 255, 0.9)",
-    padding: "18px 17px",
-    boxShadow: "0 10px 24px rgba(44, 42, 38, 0.024)",
-  },
-  profileSummary: {
-    marginBottom: "14px",
-    borderBottom: "1px solid rgba(232, 229, 222, 0.72)",
-    paddingBottom: "14px",
-  },
-  profileSummaryHeader: {
-    display: "flex",
-    alignItems: "center",
-    gap: "15px",
-  },
-  profilePhotoFrame: {
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "center",
-    width: "94px",
-    height: "94px",
-    border: "1px solid rgba(224, 221, 214, 0.78)",
-    borderRadius: "999px",
-    background: "#f5f4ef",
-    flex: "0 0 auto",
-    overflow: "hidden",
-    boxShadow: "0 10px 24px rgba(43, 40, 34, 0.035)",
-  },
-  profilePhoto: {
-    display: "block",
-    width: "100%",
-    height: "100%",
-    objectFit: "cover",
-    filter: "saturate(0.92) contrast(0.98) brightness(1.02)",
-  },
-  profileAvatar: {
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "center",
-    width: "58px",
-    height: "58px",
-    border: "1px solid #ddd8cf",
-    borderRadius: "20px",
-    background: "#f8f7f3",
-    flex: "0 0 auto",
-    overflow: "hidden",
-  },
-  profileAvatarIcon: {
-    display: "block",
-    width: "47px",
-    height: "47px",
-    objectFit: "contain",
-  },
-  profileSummaryText: {
-    minWidth: 0,
-  },
   sectionLabel: {
     margin: "0 0 5px",
     color: "#74756f",
@@ -521,50 +795,24 @@ const styles = {
     fontWeight: 540,
     lineHeight: 1.5,
   },
-  activeCatName: {
-    margin: 0,
-    fontSize: "25px",
-    fontWeight: 680,
-    letterSpacing: 0,
-  },
-  sectionTitle: {
-    margin: "0 0 8px",
-    fontSize: "19px",
-    fontWeight: 620,
-    letterSpacing: 0,
-  },
-  description: {
-    margin: "0 0 14px",
-    color: "#74756f",
-    fontSize: "13px",
-    lineHeight: 1.6,
-  },
-  understandingPill: {
-    display: "inline-flex",
-    width: "fit-content",
-    margin: "2px 0 0",
-    border: "1px solid rgba(224, 221, 214, 0.78)",
-    borderRadius: "999px",
-    background: "#f5f4ef",
-    color: "#72746d",
-    fontSize: "12px",
-    fontWeight: 600,
-    lineHeight: 1.5,
-    padding: "3px 10px",
-  },
   coatSection: {
     marginBottom: "14px",
     borderBottom: "1px solid rgba(232, 229, 222, 0.72)",
     paddingBottom: "14px",
   },
   coatHeader: {
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: "10px",
     marginBottom: "8px",
   },
-  coatDescription: {
-    margin: "2px 0 0",
-    color: "#74756f",
+  closeEditBtn: {
+    border: "none",
+    background: "transparent",
+    color: "#8a8a80",
     fontSize: "12px",
-    lineHeight: 1.5,
+    cursor: "pointer",
   },
   coatOptions: {
     display: "flex",
@@ -598,135 +846,6 @@ const styles = {
     border: "1px solid rgba(63, 63, 70, 0.16)",
     borderRadius: "999px",
     flex: "0 0 auto",
-  },
-  catList: {
-    display: "flex",
-    flexDirection: "column",
-    gap: "6px",
-    marginTop: "12px",
-  },
-  catListItem: {
-    display: "flex",
-    alignItems: "center",
-    gap: "12px",
-    minHeight: "64px",
-    border: "1px solid #e5e2dc",
-    borderRadius: "16px",
-    background: "#ffffff",
-    padding: "10px 12px",
-    cursor: "pointer",
-    textAlign: "left",
-  },
-  catListItemActive: {
-    display: "flex",
-    alignItems: "center",
-    gap: "12px",
-    minHeight: "64px",
-    border: "1px solid #d4d6ce",
-    borderRadius: "16px",
-    background: "#f0f1ec",
-    padding: "10px 12px",
-    cursor: "pointer",
-    textAlign: "left",
-  },
-  catListAvatar: {
-    width: "44px",
-    height: "44px",
-    borderRadius: "12px",
-    overflow: "hidden",
-    flexShrink: 0,
-    background: "#f5f3ef",
-    border: "0.5px solid #e0ddd6",
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  catListAvatarImg: {
-    width: "36px",
-    height: "36px",
-    objectFit: "contain",
-  },
-  catListInfo: {
-    flex: 1,
-    minWidth: 0,
-    display: "flex",
-    flexDirection: "column",
-    gap: "3px",
-  },
-  catListName: {
-    fontSize: "14px",
-    fontWeight: 600,
-    color: "#27272a",
-    lineHeight: 1.3,
-  },
-  catListMeta: {
-    fontSize: "11px",
-    color: "#8a8a80",
-    lineHeight: 1.3,
-  },
-  catListProgress: {
-    display: "flex",
-    alignItems: "center",
-    gap: "6px",
-    marginTop: "2px",
-  },
-  catListProgressBar: {
-    flex: 1,
-    height: "3px",
-    background: "#e8e5de",
-    borderRadius: "99px",
-    overflow: "hidden",
-  },
-  catListProgressFill: {
-    height: "100%",
-    background: "#6B9E82",
-    borderRadius: "99px",
-  },
-  catListProgressLabel: {
-    fontSize: "10px",
-    color: "#8a8a80",
-    flexShrink: 0,
-  },
-  catListChevron: {
-    fontSize: "16px",
-    color: "#c8c5be",
-    flexShrink: 0,
-  },
-  addCatListButton: {
-    width: "100%",
-    minHeight: "48px",
-    border: "1px dashed #dedbd3",
-    borderRadius: "16px",
-    background: "transparent",
-    color: "#8a8a80",
-    fontSize: "13px",
-    fontWeight: 500,
-    cursor: "pointer",
-    marginTop: "6px",
-  },
-  primaryButton: {
-    minHeight: "44px",
-    width: "100%",
-    border: "1px solid #cdd3c9",
-    borderRadius: "14px",
-    background: "#f2f3ef",
-    color: "#3f433d",
-    fontSize: "14px",
-    fontWeight: 610,
-    letterSpacing: 0,
-    cursor: "pointer",
-  },
-  secondaryButton: {
-    minHeight: "44px",
-    width: "100%",
-    border: "1px solid rgba(222, 219, 211, 0.8)",
-    borderRadius: "14px",
-    background: "rgba(255, 255, 255, 0.82)",
-    color: "#383936",
-    fontSize: "14px",
-    fontWeight: 560,
-    letterSpacing: 0,
-    cursor: "pointer",
   },
   editor: {
     marginTop: "10px",
@@ -788,39 +907,3 @@ const styles = {
     lineHeight: 1.6,
   },
 } satisfies Record<string, CSSProperties>;
-
-function getCatCoatAvatarStyle(coat?: CatCoat): CSSProperties {
-  const stylesByCoat: Record<CatCoat, CSSProperties> = {
-    saba: {
-      borderColor: "#d8d2c4",
-      background: "linear-gradient(180deg, #fffaf2 0%, #e6ded1 100%)",
-    },
-    cream: {
-      borderColor: "#d8d2c4",
-      background: "linear-gradient(180deg, #fffaf2 0%, #e6ded1 100%)",
-    },
-    gray: {
-      borderColor: "#d6d3d1",
-      background: "linear-gradient(180deg, #f6f5f3 0%, #e5e2de 100%)",
-    },
-    orange_tabby: {
-      borderColor: "#dfc7a8",
-      background: "linear-gradient(180deg, #fbf3e7 0%, #e6d0b3 100%)",
-    },
-    black: {
-      borderColor: "#625f59",
-      background: "linear-gradient(180deg, #e6e3de 0%, #8d8881 100%)",
-    },
-    white: {
-      borderColor: "#dedbd3",
-      background: "linear-gradient(180deg, #ffffff 0%, #f4f4f5 100%)",
-    },
-    calico: {
-      borderColor: "#ded6ca",
-      background:
-        "linear-gradient(135deg, #faf6ee 0%, #faf6ee 44%, #ead8be 45%, #ead8be 64%, #e1ded8 65%, #e1ded8 100%)",
-    },
-  };
-
-  return coat ? stylesByCoat[coat] : {};
-}
