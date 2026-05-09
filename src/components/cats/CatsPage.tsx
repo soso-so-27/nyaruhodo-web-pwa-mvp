@@ -263,11 +263,6 @@ export function CatsPage() {
                       style={styles.catAvatarImg}
                     />
                   )}
-                  {isActive ? (
-                    <div style={styles.avatarOverlay}>
-                      <span style={styles.avatarOverlayIcon}>📷</span>
-                    </div>
-                  ) : null}
                 </div>
                 <span style={styles.catGridName}>{profile.name}</span>
               </button>
@@ -707,26 +702,27 @@ const styles = {
     padding: "16px 14px calc(224px + env(safe-area-inset-bottom))",
   },
   pageHeader: {
-    marginBottom: "16px",
+    marginBottom: "20px",
+    paddingTop: "8px",
   },
   pageTitle: {
-    fontSize: "22px",
-    fontWeight: 500,
+    fontSize: "26px",
+    fontWeight: 700,
     color: "#2a2a28",
     margin: "0 0 4px",
   },
   pageSub: {
-    fontSize: "12px",
+    fontSize: "13px",
     color: "#8a8a80",
     margin: 0,
   },
   catGrid: {
     display: "flex",
-    gap: "12px",
+    gap: "16px",
     overflowX: "auto",
-    paddingBottom: "4px",
+    paddingBottom: "8px",
     scrollbarWidth: "none",
-    marginBottom: "20px",
+    marginBottom: "24px",
   },
   catGridItem: {
     display: "flex",
@@ -743,22 +739,23 @@ const styles = {
   },
   catAvatar: {
     position: "relative",
-    width: "56px",
-    height: "56px",
+    width: "72px",
+    height: "72px",
     borderRadius: "50%",
     background: "#f5f3ef",
-    border: "2.5px solid transparent",
+    border: "3px solid transparent",
     overflow: "hidden",
     display: "flex",
     alignItems: "center",
     justifyContent: "center",
   },
   catAvatarActive: {
-    border: "2.5px solid #6B9E82",
+    border: "3px solid #6B9E82",
+    cursor: "pointer",
   },
   catAvatarImg: {
-    width: "48px",
-    height: "48px",
+    width: "60px",
+    height: "60px",
     objectFit: "contain",
   },
   catAvatarPhoto: {
@@ -767,21 +764,9 @@ const styles = {
     objectFit: "cover",
     borderRadius: "50%",
   },
-  avatarOverlay: {
-    position: "absolute",
-    inset: 0,
-    borderRadius: "50%",
-    background: "rgba(0,0,0,0.25)",
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  avatarOverlayIcon: {
-    fontSize: "16px",
-  },
   catAvatarAdd: {
-    width: "56px",
-    height: "56px",
+    width: "72px",
+    height: "72px",
     borderRadius: "50%",
     border: "1.5px dashed #d0cdc6",
     display: "flex",
@@ -794,20 +779,16 @@ const styles = {
     color: "#b0ada6",
   },
   catGridName: {
-    fontSize: "11px",
-    color: "#6a6a62",
+    fontSize: "12px",
+    color: "#4a4a42",
     fontWeight: 500,
-  },
-  catGridMeta: {
-    fontSize: "10px",
-    color: "#9a9890",
   },
   profileCard: {
     background: "#ffffff",
     border: "0.5px solid #e5e2dc",
-    borderRadius: "20px",
-    padding: "16px",
-    marginBottom: "10px",
+    borderRadius: "24px",
+    padding: "20px",
+    marginBottom: "12px",
   },
   profileHeader: {
     display: "flex",
@@ -816,8 +797,8 @@ const styles = {
     marginBottom: "14px",
   },
   profileName: {
-    fontSize: "18px",
-    fontWeight: 500,
+    fontSize: "22px",
+    fontWeight: 600,
     color: "#2a2a28",
     display: "flex",
     alignItems: "center",
@@ -843,20 +824,20 @@ const styles = {
   divider: {
     border: "none",
     borderTop: "0.5px solid #e8e5de",
-    margin: "12px 0",
+    margin: "14px 0",
   },
   infoRow: {
     display: "flex",
     alignItems: "center",
     justifyContent: "space-between",
-    padding: "5px 0",
+    padding: "8px 0",
   },
   infoLabel: {
-    fontSize: "12px",
+    fontSize: "13px",
     color: "#8a8a80",
   },
   infoValue: {
-    fontSize: "12px",
+    fontSize: "13px",
     color: "#2a2a28",
     fontWeight: 500,
   },
@@ -874,9 +855,9 @@ const styles = {
     marginTop: "4px",
   },
   traitLabel: {
-    fontSize: "11px",
+    fontSize: "12px",
     color: "#9a9890",
-    margin: "0 0 6px",
+    margin: "0 0 8px",
   },
   traitPills: {
     display: "flex",
@@ -884,20 +865,20 @@ const styles = {
     gap: "5px",
   },
   traitPill: {
-    fontSize: "11px",
+    fontSize: "12px",
     background: "rgba(107,158,130,0.1)",
     color: "#3d6650",
     border: "0.5px solid rgba(107,158,130,0.25)",
     borderRadius: "99px",
-    padding: "3px 9px",
+    padding: "4px 12px",
   },
   traitModifier: {
-    fontSize: "10px",
+    fontSize: "11px",
     background: "#f5f3ef",
     color: "#6a6a62",
     border: "0.5px solid #e0ddd6",
     borderRadius: "99px",
-    padding: "2px 8px",
+    padding: "3px 10px",
   },
   futureRow: {
     display: "grid",
@@ -906,27 +887,27 @@ const styles = {
     marginTop: "8px",
   },
   futureCard: {
-    background: "#f5f3ef",
-    border: "0.5px solid #e0ddd6",
-    borderRadius: "14px",
-    padding: "12px",
+    background: "#f8f7f3",
+    border: "0.5px solid #e8e5de",
+    borderRadius: "16px",
+    padding: "14px 16px",
     display: "flex",
     alignItems: "center",
-    gap: "10px",
-    opacity: 0.5,
+    gap: "12px",
+    opacity: 0.55,
   },
   futureIcon: {
     fontSize: "20px",
     flexShrink: 0,
   },
   futureTitle: {
-    fontSize: "12px",
+    fontSize: "13px",
     fontWeight: 500,
     color: "#6a6a62",
     margin: "0 0 2px",
   },
   futureSub: {
-    fontSize: "11px",
+    fontSize: "12px",
     color: "#9a9890",
     margin: 0,
   },
