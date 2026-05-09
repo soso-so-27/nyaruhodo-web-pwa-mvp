@@ -987,6 +987,7 @@ function Header({
         </div>
         </div>
         <div style={styles.cardBody}>
+          <div style={styles.catInfoCard}>
       {catTraitLabel ? (
         <section style={styles.catTraitSection} aria-label={`${catName}\u306e\u3053\u3068`}>
           <p style={styles.catTraitTitle}>{"\u3053\u306e\u5b50\u306e\u3053\u3068"}</p>
@@ -1059,6 +1060,7 @@ function Header({
           ) : null}
         </div>
       </div>
+          </div>
         </div>
       </div>
       {isCatSwitcherOpen ? (
@@ -2104,6 +2106,13 @@ const styles = {
     background: "#fbfaf7",
     borderRadius: "0 0 32px 32px",
   },
+  catInfoCard: {
+    border: "1px solid rgba(219, 216, 207, 0.72)",
+    borderRadius: "24px",
+    background: "#ffffff",
+    padding: "12px 14px",
+    marginTop: "8px",
+  },
   photoHeroImage: {
     position: "absolute",
     inset: "-1px",
@@ -2128,7 +2137,7 @@ const styles = {
     zIndex: 2,
     display: "flex",
     flexDirection: "column",
-    gap: "6px",
+    gap: "4px",
     border: "0",
     borderRadius: "0",
     background: "transparent",
@@ -2277,12 +2286,9 @@ const styles = {
     whiteSpace: "pre-line",
   },
   catTraitSection: {
-    margin: "10px 0 8px",
-    border: "1px solid rgba(224, 222, 216, 0.72)",
-    borderRadius: "18px",
-    background: "rgba(255, 255, 255, 0.68)",
-    padding: "9px 11px",
-    boxShadow: "0 10px 22px rgba(44, 42, 38, 0.026)",
+    margin: "0 0 10px",
+    borderBottom: "1px solid rgba(232, 229, 222, 0.66)",
+    padding: "0 0 10px",
   },
   catTraitTitle: {
     margin: "0 0 6px",
