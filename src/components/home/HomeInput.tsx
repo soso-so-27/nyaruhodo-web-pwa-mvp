@@ -2108,10 +2108,10 @@ const styles = {
   },
   catInfoCard: {
     border: "1px solid rgba(219, 216, 207, 0.72)",
-    borderRadius: "24px",
+    borderRadius: "0 0 24px 24px",
     background: "#ffffff",
     padding: "12px 14px",
-    marginTop: "8px",
+    marginTop: "0",
   },
   photoHeroImage: {
     position: "absolute",
