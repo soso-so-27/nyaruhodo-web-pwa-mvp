@@ -47,12 +47,16 @@ const SAMPLE_COLLECTION_PHOTOS: CollectionPhoto[] = [
     src: "/sample-cats/pose-box.png",
   },
 ];
+const COLLECTION_PHOTOS_STORAGE_KEY = "collection_photos";
 
 export function CollectionPage() {
   const [catProfiles, setCatProfiles] = useState<CatProfile[]>([]);
   const [activeCatId, setActiveCatId] = useState<string | null>(null);
   const [activeGroupId, setActiveGroupId] = useState<CollectionGroupId>("pose");
   const [hasLoaded, setHasLoaded] = useState(false);
+  const [collectionPhotos, setCollectionPhotos] = useState<Record<string, string>>(
+    {},
+  );
 
   useEffect(() => {
     const profiles = readCatProfiles();
@@ -65,13 +69,33 @@ export function CollectionPage() {
     setHasLoaded(true);
   }, []);
 
+  useEffect(() => {
+    if (!activeCatId) {
+      setCollectionPhotos({});
+      return;
+    }
+
+    setCollectionPhotos(readCollectionPhotos(activeCatId));
+  }, [activeCatId]);
+
   const activeCatProfile =
     catProfiles.length > 0
       ? getActiveCatProfile(catProfiles, activeCatId)
       : null;
   const catName = getCatName(activeCatProfile);
 
-  const photosBySlot = useMemo(() => groupPhotosBySlot(SAMPLE_COLLECTION_PHOTOS), []);
+  const storedCollectionPhotos = useMemo(
+    () => buildStoredCollectionPhotos(collectionPhotos),
+    [collectionPhotos],
+  );
+  const allCollectionPhotos = useMemo(
+    () => [...SAMPLE_COLLECTION_PHOTOS, ...storedCollectionPhotos],
+    [storedCollectionPhotos],
+  );
+  const photosBySlot = useMemo(
+    () => groupPhotosBySlot(allCollectionPhotos),
+    [allCollectionPhotos],
+  );
   const progress = useMemo(
     () => buildCollectionProgress(COLLECTION_GROUPS, photosBySlot),
     [photosBySlot],
@@ -79,6 +103,40 @@ export function CollectionPage() {
   const activeGroup =
     COLLECTION_GROUPS.find((group) => group.id === activeGroupId) ??
     COLLECTION_GROUPS[0];
+
+  async function handlePhotoAdd(slot: CollectionSlot) {
+    if (!activeCatId) {
+      return;
+    }
+
+    const input = document.createElement("input");
+    input.type = "file";
+    input.accept = "image/*";
+    input.setAttribute("capture", "environment");
+
+    input.onchange = async () => {
+      const file = input.files?.[0];
+
+      if (!file) {
+        return;
+      }
+
+      const dataUrl = await resizeAndEncode(file);
+      const slug = getCollectionPhotoSlug(slot);
+
+      if (!dataUrl) {
+        return;
+      }
+
+      saveCollectionPhoto(activeCatId, slug, dataUrl);
+      setCollectionPhotos((current) => ({
+        ...current,
+        [slug]: dataUrl,
+      }));
+    };
+
+    input.click();
+  }
 
   if (!hasLoaded) {
     return (
@@ -131,7 +189,11 @@ export function CollectionPage() {
           />
         </header>
 
-        <CollectionGrid group={activeGroup} photosBySlot={photosBySlot} />
+        <CollectionGrid
+          group={activeGroup}
+          photosBySlot={photosBySlot}
+          onPhotoAdd={handlePhotoAdd}
+        />
       </div>
       <BottomNavigation active="collection" />
     </main>
@@ -195,9 +257,11 @@ function CollectionProgress({
 function CollectionGrid({
   group,
   photosBySlot,
+  onPhotoAdd,
 }: {
   group: CollectionGroup;
   photosBySlot: Map<string, CollectionPhoto[]>;
+  onPhotoAdd: (slot: CollectionSlot) => void;
 }) {
   return (
     <section aria-label={group.label}>
@@ -207,6 +271,7 @@ function CollectionGrid({
             key={slot.id}
             slot={slot}
             photos={photosBySlot.get(slot.id) ?? []}
+            onPhotoAdd={onPhotoAdd}
           />
         ))}
       </div>
@@ -217,9 +282,11 @@ function CollectionGrid({
 function CollectionCard({
   slot,
   photos,
+  onPhotoAdd,
 }: {
   slot: CollectionSlot;
   photos: CollectionPhoto[];
+  onPhotoAdd: (slot: CollectionSlot) => void;
 }) {
   const firstPhoto = photos[0];
   const isCollected = photos.length > 0;
@@ -232,7 +299,7 @@ function CollectionCard({
         <div style={styles.photoCardText}>
           <p style={styles.photoCardLabel}>{slot.label}</p>
           {photos.length > 1 ? (
-            <span style={styles.photoCount}>{photos.length}枚</span>
+            <span style={styles.photoCount}>{photos.length}{"\u679a"}</span>
           ) : null}
         </div>
       </article>
@@ -246,9 +313,14 @@ function CollectionCard({
       </div>
       <div style={styles.emptyCardFooter}>
         <p style={styles.emptySlotLabel}>{slot.label}</p>
-        <span style={styles.plusBadge} aria-hidden="true">
-          ＋
-        </span>
+        <button
+          type="button"
+          onClick={() => onPhotoAdd(slot)}
+          style={styles.plusBadge}
+          aria-label={`Add photo for ${slot.label}`}
+        >
+          {"\uff0b"}
+        </button>
       </div>
     </article>
   );
@@ -469,6 +541,93 @@ function groupPhotosBySlot(photos: CollectionPhoto[]) {
   });
 
   return map;
+}
+
+function buildStoredCollectionPhotos(collectionPhotos: Record<string, string>) {
+  const photos: CollectionPhoto[] = [];
+
+  COLLECTION_GROUPS.forEach((group) => {
+    group.slots.forEach((slot) => {
+      const slug = getCollectionPhotoSlug(slot);
+      const src = collectionPhotos[slug];
+
+      if (src) {
+        photos.push({
+          id: `local-${slug}`,
+          slotId: slot.id,
+          src,
+        });
+      }
+    });
+  });
+
+  return photos;
+}
+
+function readCollectionPhotos(catId: string): Record<string, string> {
+  try {
+    const raw = window.localStorage.getItem(COLLECTION_PHOTOS_STORAGE_KEY);
+
+    if (!raw) {
+      return {};
+    }
+
+    const all = JSON.parse(raw) as Record<string, Record<string, string>>;
+    return all[catId] ?? {};
+  } catch {
+    return {};
+  }
+}
+
+function saveCollectionPhoto(catId: string, slug: string, dataUrl: string) {
+  try {
+    const raw = window.localStorage.getItem(COLLECTION_PHOTOS_STORAGE_KEY);
+    const all = raw
+      ? (JSON.parse(raw) as Record<string, Record<string, string>>)
+      : {};
+
+    if (!all[catId]) {
+      all[catId] = {};
+    }
+
+    all[catId][slug] = dataUrl;
+    window.localStorage.setItem(COLLECTION_PHOTOS_STORAGE_KEY, JSON.stringify(all));
+  } catch {
+    // Ignore localStorage quota or parse failures for this MVP fallback.
+  }
+}
+
+function resizeAndEncode(file: File, maxSize = 800): Promise<string> {
+  return new Promise((resolve) => {
+    const img = new Image();
+    const url = URL.createObjectURL(file);
+
+    img.onload = () => {
+      const scale = Math.min(1, maxSize / Math.max(img.width, img.height));
+      const canvas = document.createElement("canvas");
+
+      canvas.width = Math.round(img.width * scale);
+      canvas.height = Math.round(img.height * scale);
+
+      const ctx = canvas.getContext("2d");
+
+      if (!ctx) {
+        URL.revokeObjectURL(url);
+        resolve("");
+        return;
+      }
+
+      ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+      URL.revokeObjectURL(url);
+      resolve(canvas.toDataURL("image/jpeg", 0.85));
+    };
+
+    img.src = url;
+  });
+}
+
+function getCollectionPhotoSlug(slot: CollectionSlot) {
+  return `${slot.group}_${slot.id.replace(/-/g, "_")}`;
 }
 
 function buildCollectionProgress(
@@ -722,9 +881,12 @@ const styles = {
     borderRadius: "999px",
     background: "rgba(255,255,255,0.76)",
     color: "#7b7c74",
+    font: "inherit",
     fontSize: "17px",
     fontWeight: 460,
     lineHeight: 1,
+    padding: 0,
+    cursor: "pointer",
   },
   emptyCard: {
     border: "1px solid #e3e0da",
