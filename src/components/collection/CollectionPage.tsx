@@ -318,7 +318,11 @@ function CollectionProgress({
           }}
         />
       </div>
-      <style>{".collection-tabs::-webkit-scrollbar{display:none}"}</style>
+      <style>
+        {`.collection-tabs::-webkit-scrollbar{display:none}
+@keyframes fadeIn{from{opacity:0}to{opacity:1}}
+@keyframes slideUp{from{transform:translateY(100%)}to{transform:translateY(0)}}`}
+      </style>
       <div
         role="tablist"
         aria-label="コレクションの種類"
@@ -1069,7 +1073,8 @@ const styles = {
     width: "56px",
     height: "56px",
     objectFit: "contain",
-    opacity: 0.7,
+    opacity: 0.55,
+    mixBlendMode: "multiply",
   },
   photoCard: {
     display: "flex",
@@ -1175,22 +1180,23 @@ const styles = {
     cursor: "pointer",
   },
   sheetOverlay: {
-    position: "absolute",
+    position: "fixed",
     inset: 0,
-    minHeight: "100%",
     background: "rgba(0,0,0,0.3)",
     zIndex: 50,
     display: "flex",
     alignItems: "flex-end",
+    animation: "fadeIn 0.15s ease",
   },
   sheet: {
     width: "100%",
     background: "#fbfaf7",
     borderRadius: "20px 20px 0 0",
     paddingBottom: "calc(16px + env(safe-area-inset-bottom))",
-    minHeight: "65vh",
-    maxHeight: "85vh",
+    minHeight: "70vh",
+    maxHeight: "90vh",
     overflowY: "auto",
+    animation: "slideUp 0.25s ease",
   },
   sheetHandle: {
     width: "36px",
