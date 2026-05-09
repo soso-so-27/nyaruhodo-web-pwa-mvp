@@ -10,8 +10,6 @@ import {
   readActiveCatId,
   readCatProfiles,
   saveActiveCatId,
-  updateCatProfileCoat,
-  updateCatProfileName,
 } from "../home/homeInputHelpers";
 import type { CatCoat, CatProfile } from "../home/homeInputHelpers";
 
@@ -23,6 +21,8 @@ const COAT_OPTIONS: { value: CatCoat; label: string; color: string }[] = [
   { value: "white", label: "白", color: "#fafafa" },
   { value: "calico", label: "三毛", color: "#f0c28b" },
 ];
+type EditableGender = "male" | "female" | "unknown" | "";
+type EditableCoat = CatCoat | "";
 
 export function CatsPage() {
   const [catProfiles, setCatProfiles] = useState<CatProfile[]>([]);
@@ -32,6 +32,10 @@ export function CatsPage() {
   const [isEditingCatName, setIsEditingCatName] = useState(false);
   const [isEditingProfile, setIsEditingProfile] = useState(false);
   const [isAddingCat, setIsAddingCat] = useState(false);
+  const [editBirthDate, setEditBirthDate] = useState("");
+  const [editGender, setEditGender] = useState<EditableGender>("");
+  const [editBreed, setEditBreed] = useState("");
+  const [editCoat, setEditCoat] = useState<EditableCoat>("");
   const [message, setMessage] = useState("");
 
   const activeCatProfile =
@@ -99,8 +103,12 @@ export function CatsPage() {
     setMessage("保存しました。");
   }
 
-  function startEditingCatName() {
-    setCatNameInput(catName);
+  function handleStartEdit() {
+    setCatNameInput(activeCatProfile?.name ?? catName);
+    setEditBirthDate(activeCatProfile?.basicInfo?.birthDate ?? "");
+    setEditGender(activeCatProfile?.basicInfo?.gender ?? "");
+    setEditBreed(activeCatProfile?.basicInfo?.breed ?? "");
+    setEditCoat(activeCatProfile?.appearance?.coat ?? "");
     setMessage("");
     setIsAddingCat(false);
     setIsEditingCatName(true);
@@ -114,37 +122,96 @@ export function CatsPage() {
     setIsEditingProfile(false);
   }
 
-  function handleCatNameSave() {
-    const result = updateCatProfileName(catProfiles, activeCatId, catNameInput);
+  function handleSaveProfile() {
+    try {
+      const raw = window.localStorage.getItem("cat_profiles");
 
-    if (!result) {
+      if (!raw) {
+        return;
+      }
+
+      const profiles = JSON.parse(raw) as CatProfile[];
+      const index = profiles.findIndex((profile) => profile.id === activeCatId);
+
+      if (index === -1) {
+        return;
+      }
+
+      const nextProfile = {
+        ...profiles[index],
+        name: catNameInput.trim() || profiles[index].name,
+        basicInfo: {
+          birthDate: editBirthDate || undefined,
+          gender: editGender || undefined,
+          breed: editBreed.trim() || undefined,
+        },
+        appearance: {
+          ...(profiles[index].appearance ?? {}),
+          coat: editCoat || undefined,
+        },
+        updatedAt: new Date().toISOString(),
+      } satisfies CatProfile;
+      const nextProfiles = profiles.map((profile, profileIndex) =>
+        profileIndex === index ? nextProfile : profile,
+      );
+
+      window.localStorage.setItem("cat_profiles", JSON.stringify(nextProfiles));
+      setCatProfiles(nextProfiles);
+      setActiveCatId(nextProfile.id);
+      setCatNameInput(nextProfile.name);
+      setIsEditingCatName(false);
+      setIsEditingProfile(false);
+      setMessage("保存しました。");
+    } catch {
       return;
     }
-
-    const activeProfile = getActiveCatProfile(
-      result.profiles,
-      result.activeCatId,
-    );
-
-    setCatProfiles(result.profiles);
-    setActiveCatId(result.activeCatId);
-    setCatNameInput(activeProfile.name);
-    setIsEditingCatName(false);
-    setIsEditingProfile(false);
-    setMessage("保存しました。");
   }
 
-  function handleCoatSelect(coat: CatCoat) {
-    const result = updateCatProfileCoat(catProfiles, activeCatId, coat);
-    const activeProfile = getActiveCatProfile(
-      result.profiles,
-      result.activeCatId,
-    );
+  async function handleAvatarUpload() {
+    const input = document.createElement("input");
 
-    setCatProfiles(result.profiles);
-    setActiveCatId(result.activeCatId);
-    setCatNameInput(activeProfile.name);
-    setMessage("保存しました。");
+    input.type = "file";
+    input.accept = "image/*";
+    input.onchange = async () => {
+      const file = input.files?.[0];
+
+      if (!file) {
+        return;
+      }
+
+      try {
+        const dataUrl = await resizeAndEncode(file, 800);
+        const raw = window.localStorage.getItem("cat_profiles");
+
+        if (!raw) {
+          return;
+        }
+
+        const profiles = JSON.parse(raw) as CatProfile[];
+        const index = profiles.findIndex((profile) => profile.id === activeCatId);
+
+        if (index === -1) {
+          return;
+        }
+
+        const nextProfiles = profiles.map((profile, profileIndex) =>
+          profileIndex === index
+            ? {
+                ...profile,
+                avatarDataUrl: dataUrl,
+                updatedAt: new Date().toISOString(),
+              }
+            : profile,
+        );
+
+        window.localStorage.setItem("cat_profiles", JSON.stringify(nextProfiles));
+        setCatProfiles(nextProfiles);
+      } catch {
+        return;
+      }
+    };
+
+    input.click();
   }
 
   const selectedCoat = activeCatProfile?.appearance?.coat;
@@ -178,11 +245,30 @@ export function CatsPage() {
                       : styles.catAvatar
                   }
                 >
-                  <img
-                    src={getCatAvatarSrc(profile.appearance?.coat)}
-                    alt={profile.name}
-                    style={styles.catAvatarImg}
-                  />
+                  {profile.avatarDataUrl ? (
+                    <img
+                      src={profile.avatarDataUrl}
+                      alt={profile.name}
+                      style={styles.catAvatarPhoto}
+                    />
+                  ) : (
+                    <img
+                      src={getCatAvatarSrc(profile.appearance?.coat)}
+                      alt={profile.name}
+                      style={styles.catAvatarImg}
+                    />
+                  )}
+                  {isActive ? (
+                    <div
+                      style={styles.avatarCameraBtn}
+                      onClick={(event) => {
+                        event.stopPropagation();
+                        void handleAvatarUpload();
+                      }}
+                    >
+                      📷
+                    </div>
+                  ) : null}
                 </div>
                 <span style={styles.catGridName}>{profile.name}</span>
                 {meta ? <span style={styles.catGridMeta}>{meta}</span> : null}
@@ -246,7 +332,7 @@ export function CatsPage() {
               <button
                 type="button"
                 style={styles.editBtn}
-                onClick={startEditingCatName}
+                onClick={handleStartEdit}
               >
                 編集
               </button>
@@ -335,19 +421,53 @@ export function CatsPage() {
                       placeholder={"例：ミケ"}
                       style={styles.input}
                     />
+                    <p style={styles.editLabel}>生年月日</p>
+                    <input
+                      type="date"
+                      value={editBirthDate}
+                      onChange={(event) => setEditBirthDate(event.target.value)}
+                      max={new Date().toISOString().split("T")[0]}
+                      style={styles.editInput}
+                    />
+
+                    <p style={styles.editLabel}>性別</p>
+                    <div style={styles.genderButtons}>
+                      {[
+                        { value: "male", label: "男の子" },
+                        { value: "female", label: "女の子" },
+                        { value: "unknown", label: "わからない" },
+                      ].map((option) => (
+                        <button
+                          key={option.value}
+                          type="button"
+                          onClick={() =>
+                            setEditGender(option.value as EditableGender)
+                          }
+                          style={
+                            editGender === option.value
+                              ? { ...styles.genderBtn, ...styles.genderBtnActive }
+                              : styles.genderBtn
+                          }
+                        >
+                          {option.label}
+                        </button>
+                      ))}
+                    </div>
+
+                    <p style={styles.editLabel}>猫種</p>
+                    <input
+                      type="text"
+                      value={editBreed}
+                      onChange={(event) => setEditBreed(event.target.value)}
+                      placeholder="例：サバトラ、雑種・ミックス"
+                      style={styles.editInput}
+                    />
+
                     <div style={styles.actions}>
-                      <button
-                        type="button"
-                        onClick={handleCatNameSave}
-                        style={styles.saveButton}
-                      >
+                      <button type="button" onClick={handleSaveProfile} style={styles.saveButton}>
                         {"保存"}
                       </button>
-                      <button
-                        type="button"
-                        onClick={cancelEditingCatName}
-                        style={styles.cancelButton}
-                      >
+                      <button type="button" onClick={cancelEditingCatName} style={styles.cancelButton}>
                         {"キャンセル"}
                       </button>
                     </div>
@@ -355,8 +475,8 @@ export function CatsPage() {
                 ) : null}
 
                 <CoatSelector
-                  currentCoat={selectedCoat}
-                  onSelect={handleCoatSelect}
+                  currentCoat={editCoat || selectedCoat}
+                  onSelect={setEditCoat}
                   onClose={() => {
                     setIsEditingProfile(false);
                     setIsEditingCatName(false);
@@ -545,6 +665,35 @@ function getCoatLabel(coat: string): string {
   return labels[coat] ?? coat;
 }
 
+function resizeAndEncode(file: File, maxSize = 800): Promise<string> {
+  return new Promise((resolve) => {
+    const img = new Image();
+    const url = URL.createObjectURL(file);
+
+    img.onload = () => {
+      const scale = Math.min(1, maxSize / Math.max(img.width, img.height));
+      const canvas = document.createElement("canvas");
+
+      canvas.width = Math.round(img.width * scale);
+      canvas.height = Math.round(img.height * scale);
+
+      const context = canvas.getContext("2d");
+
+      if (!context) {
+        URL.revokeObjectURL(url);
+        resolve("");
+        return;
+      }
+
+      context.drawImage(img, 0, 0, canvas.width, canvas.height);
+      URL.revokeObjectURL(url);
+      resolve(canvas.toDataURL("image/jpeg", 0.85));
+    };
+
+    img.src = url;
+  });
+}
+
 const styles = {
   page: {
     minHeight: "100vh",
@@ -585,6 +734,7 @@ const styles = {
     flexDirection: "column",
     alignItems: "center",
     gap: "5px",
+    position: "relative",
     flexShrink: 0,
     cursor: "pointer",
     border: "none",
@@ -593,6 +743,7 @@ const styles = {
     font: "inherit",
   },
   catAvatar: {
+    position: "relative",
     width: "56px",
     height: "56px",
     borderRadius: "50%",
@@ -610,6 +761,27 @@ const styles = {
     width: "48px",
     height: "48px",
     objectFit: "contain",
+  },
+  catAvatarPhoto: {
+    width: "100%",
+    height: "100%",
+    objectFit: "cover",
+    borderRadius: "50%",
+  },
+  avatarCameraBtn: {
+    position: "absolute",
+    right: "0px",
+    bottom: "0px",
+    width: "20px",
+    height: "20px",
+    borderRadius: "50%",
+    background: "#ffffff",
+    border: "1px solid #e0ddd6",
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    fontSize: "11px",
+    cursor: "pointer",
   },
   catAvatarAdd: {
     width: "56px",
@@ -870,6 +1042,45 @@ const styles = {
     fontWeight: 500,
     letterSpacing: 0,
     padding: "0 14px",
+  },
+  editLabel: {
+    fontSize: "12px",
+    fontWeight: 500,
+    color: "#6a6a62",
+    margin: "0 0 6px",
+  },
+  editInput: {
+    width: "100%",
+    boxSizing: "border-box",
+    minHeight: "48px",
+    border: "1px solid #dedbd3",
+    borderRadius: "12px",
+    background: "#ffffff",
+    color: "#27272a",
+    fontSize: "15px",
+    padding: "0 14px",
+  },
+  genderButtons: {
+    display: "grid",
+    gridTemplateColumns: "repeat(3, 1fr)",
+    gap: "6px",
+    marginBottom: "12px",
+  },
+  genderBtn: {
+    minHeight: "40px",
+    border: "1px solid #dedbd3",
+    borderRadius: "10px",
+    background: "#ffffff",
+    color: "#27272a",
+    fontSize: "12px",
+    fontWeight: 500,
+    cursor: "pointer",
+  },
+  genderBtnActive: {
+    border: "1px solid #aeb5a8",
+    background: "#e8e9e4",
+    color: "#3f433d",
+    fontWeight: 600,
   },
   actions: {
     display: "flex",

@@ -1518,11 +1518,19 @@ function CatSettings({
               style={isActive ? styles.catListItemActive : styles.catListItem}
             >
               <div style={styles.catListAvatar}>
-                <img
-                  src={getCatAvatarSrc(profile.appearance?.coat)}
-                  alt=""
-                  style={styles.catListAvatarImg}
-                />
+                {profile.avatarDataUrl ? (
+                  <img
+                    src={profile.avatarDataUrl}
+                    alt=""
+                    style={styles.catListAvatarPhoto}
+                  />
+                ) : (
+                  <img
+                    src={getCatAvatarSrc(profile.appearance?.coat)}
+                    alt=""
+                    style={styles.catListAvatarImg}
+                  />
+                )}
               </div>
               <div style={styles.catListInfo}>
                 <span style={styles.catListName}>{profile.name}</span>
@@ -2676,6 +2684,11 @@ const styles = {
     width: "36px",
     height: "36px",
     objectFit: "contain",
+  },
+  catListAvatarPhoto: {
+    width: "100%",
+    height: "100%",
+    objectFit: "cover",
   },
   catListInfo: {
     flex: 1,

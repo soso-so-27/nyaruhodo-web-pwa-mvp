@@ -23,6 +23,7 @@ export type CatProfile = {
   name: string;
   createdAt: string;
   updatedAt: string;
+  avatarDataUrl?: string;
   basicInfo?: CatBasicInfo;
   appearance?: CatAppearance;
   typeKey?: TypeKey;
@@ -818,6 +819,7 @@ function normalizeStoredCatProfile(profile: Partial<CatProfile>): CatProfile {
     createdAt: profile.createdAt ?? new Date().toISOString(),
     updatedAt:
       profile.updatedAt ?? profile.createdAt ?? new Date().toISOString(),
+    avatarDataUrl: profile.avatarDataUrl,
     typeKey: profile.typeKey,
     typeLabel: profile.typeLabel,
     typeScores: profile.typeScores,
