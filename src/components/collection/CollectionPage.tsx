@@ -217,8 +217,8 @@ export function CollectionPage() {
       <main style={styles.page}>
         <div style={styles.container}>
           <section style={styles.emptyCard}>
-            <h1 style={styles.emptyTitle}>{"コレクション"}</h1>
-            <p style={styles.emptyText}>{"準備しています"}</p>
+            <h1 style={styles.emptyTitle}>コレクション</h1>
+            <p style={styles.emptyText}>準備しています</p>
           </section>
         </div>
         <BottomNavigation active="collection" />
@@ -231,10 +231,10 @@ export function CollectionPage() {
       <main style={styles.page}>
         <div style={styles.container}>
           <section style={styles.emptyCard}>
-            <h1 style={styles.emptyTitle}>{"コレクション"}</h1>
-            <p style={styles.emptyText}>{"一緒に暮らしている猫を登録しましょう"}</p>
+            <h1 style={styles.emptyTitle}>コレクション</h1>
+            <p style={styles.emptyText}>一緒に暮らしている猫を登録しましょう</p>
             <a href="/cats" style={styles.primaryLink}>
-              {"猫を登録する"}
+              猫を登録する
             </a>
           </section>
         </div>
@@ -248,11 +248,11 @@ export function CollectionPage() {
       <div style={styles.container}>
         <header style={styles.header}>
           <div style={styles.headerRow}>
-            <h1 style={styles.title}>郢ｧ・ｳ郢晢ｽｬ郢ｧ・ｯ郢ｧ・ｷ郢晢ｽｧ郢晢ｽｳ</h1>
+            <h1 style={styles.title}>コレクション</h1>
             <span style={styles.catChip}>
               {catName}
               <span aria-hidden="true" style={styles.catChipArrow}>
-                隨・ｽｼ
+                ▼
               </span>
             </span>
           </div>
@@ -302,13 +302,13 @@ function CollectionProgress({
   );
 
   return (
-    <section style={styles.progressBlock} aria-label="Collection progress">
+    <section style={styles.progressBlock} aria-label="コレクションの進み具合">
       <p style={styles.progressMain}>
         <span style={styles.progressNumber}>{progress.total.collected}</span>
-        <span style={styles.progressUnit}>{"\u7a2e\u985e"}</span>
+        <span style={styles.progressUnit}>種類</span>
       </p>
       <p style={styles.progressSub}>
-        {`${COLLECTION_GROUPS[0].label}${progress.pose.collected} \u30fb ${COLLECTION_GROUPS[1].label}${progress.scene.collected}`}
+        {`${getCollectionGroupLabel("pose")}${progress.pose.collected} ・ ${getCollectionGroupLabel("scene")}${progress.scene.collected}`}
       </p>
       <div style={styles.progressTrack} aria-hidden="true">
         <span
@@ -321,7 +321,7 @@ function CollectionProgress({
       <style>{".collection-tabs::-webkit-scrollbar{display:none}"}</style>
       <div
         role="tablist"
-        aria-label="Collection tabs"
+        aria-label="コレクションの種類"
         className="collection-tabs"
         style={styles.tabs}
       >
@@ -340,7 +340,7 @@ function CollectionProgress({
                 ...(isActive ? styles.activeTab : {}),
               }}
             >
-              {group.label}
+              {getCollectionGroupLabel(group.id)}
             </button>
           );
         })}
@@ -359,7 +359,7 @@ function CollectionGrid({
   onOpenSlot: (slot: CollectionSlot) => void;
 }) {
   return (
-    <section aria-label={group.label}>
+    <section aria-label={getCollectionGroupLabel(group.id)}>
       <div style={styles.collectionGrid}>
         {group.slots.map((slot) => (
           <CollectionCard
@@ -396,10 +396,10 @@ function CollectionCard({
         <img src={firstPhoto.src} alt="" style={styles.cardPhoto} />
         <span style={styles.cardPhotoFade} aria-hidden="true" />
         {photos.length > 1 ? (
-          <span style={styles.cardCountBadge}>{photos.length}{"\u679a"}</span>
+          <span style={styles.cardCountBadge}>{photos.length}枚</span>
         ) : null}
         <div style={styles.photoCardText}>
-          <p style={styles.photoCardLabel}>{slot.label}</p>
+          <p style={styles.photoCardLabel}>{getCollectionSlotLabel(slot)}</p>
         </div>
       </button>
     );
@@ -411,7 +411,7 @@ function CollectionCard({
       onClick={() => onOpenSlot(slot)}
       style={{ ...styles.collectionCard, ...styles.emptyCollectionCard }}
     >
-      <p style={styles.emptySlotLabel}>{slot.label}</p>
+      <p style={styles.emptySlotLabel}>{getCollectionSlotLabel(slot)}</p>
     </button>
   );
 }
@@ -440,8 +440,8 @@ function CollectionPhotoSheet({
       <div style={styles.sheet} onClick={(event) => event.stopPropagation()}>
         <div style={styles.sheetHandle} />
         <div style={styles.sheetHeader}>
-          <span style={styles.sheetTitle}>{slot.label}</span>
-          <span style={styles.sheetCount}>{photos.length}{"\u679a"}</span>
+          <span style={styles.sheetTitle}>{getCollectionSlotLabel(slot)}</span>
+          <span style={styles.sheetCount}>{photos.length}枚</span>
         </div>
 
         {photos.length > 0 ? (
@@ -456,7 +456,7 @@ function CollectionPhotoSheet({
                       style={styles.deleteBtn}
                       onClick={() => onDeletePhoto(slug, photo.localIndex ?? index)}
                     >
-                      {"\u524a\u9664"}
+                      削除
                     </button>
                   ) : null}
                 </div>
@@ -479,13 +479,13 @@ function CollectionPhotoSheet({
           </div>
         ) : (
           <div style={styles.photoEmpty}>
-            <span style={styles.photoEmptyText}>{"\u307e\u3060\u5199\u771f\u304c\u3042\u308a\u307e\u305b\u3093"}</span>
+            <span style={styles.photoEmptyText}>まだ写真がありません</span>
           </div>
         )}
 
         <div style={styles.sheetActions}>
           <button type="button" style={styles.btnPrimary} onClick={onAddPhoto}>
-            {"\uff0b \u5199\u771f\u3092\u64ae\u308b"}
+            ＋ 写真を撮る
           </button>
           <button
             type="button"
@@ -496,7 +496,7 @@ function CollectionPhotoSheet({
             }
             disabled={photos.length === 0}
           >
-            {"\u30b7\u30a7\u30a2"}
+            シェア
           </button>
         </div>
       </div>
@@ -822,6 +822,35 @@ function resizeAndEncode(file: File, maxSize = 800): Promise<string> {
 
     img.src = url;
   });
+}
+
+function getCollectionGroupLabel(groupId: CollectionGroupId) {
+  return groupId === "pose" ? "ポーズ" : "シーン";
+}
+
+const COLLECTION_SLOT_LABELS: Record<string, string> = {
+  "belly-up": "へそ天",
+  loaf: "香箱",
+  stretch: "のびー",
+  "face-down-sleep": "ごめん寝",
+  "curled-up": "まるまる",
+  liquid: "液体化",
+  sitting: "おすわり",
+  "tail-up": "しっぽピーン",
+  "weird-sleep": "変な寝相",
+  "hidden-paws": "おててないない",
+  "in-box": "箱入り",
+  "by-window": "窓辺",
+  sunbathing: "ひなたぼっこ",
+  "in-futon": "布団入り",
+  "high-place": "高いところ",
+  "waiting-food": "ごはん待ち",
+  "welcome-home": "お出迎え",
+  "blanket-kneading": "毛布ふみふみ",
+};
+
+function getCollectionSlotLabel(slot: CollectionSlot) {
+  return COLLECTION_SLOT_LABELS[slot.id] ?? slot.label;
 }
 
 function getCollectionPhotoSlug(slot: CollectionSlot) {
