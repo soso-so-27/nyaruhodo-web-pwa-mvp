@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import type { CSSProperties } from "react";
+import type { CSSProperties, UIEvent } from "react";
 import {
   COLLECTION_GROUPS,
   type CollectionGroup,
@@ -22,6 +22,8 @@ type CollectionPhoto = {
   id: string;
   slotId: string;
   src: string;
+  localIndex?: number;
+  storageSlug?: string;
   createdAt?: string;
 };
 
@@ -54,9 +56,11 @@ export function CollectionPage() {
   const [activeCatId, setActiveCatId] = useState<string | null>(null);
   const [activeGroupId, setActiveGroupId] = useState<CollectionGroupId>("pose");
   const [hasLoaded, setHasLoaded] = useState(false);
-  const [collectionPhotos, setCollectionPhotos] = useState<Record<string, string>>(
+  const [collectionPhotos, setCollectionPhotos] = useState<Record<string, string[]>>(
     {},
   );
+  const [selectedSlug, setSelectedSlug] = useState<string | null>(null);
+  const [currentPhotoIndex, setCurrentPhotoIndex] = useState(0);
 
   useEffect(() => {
     const profiles = readCatProfiles();
@@ -89,7 +93,7 @@ export function CollectionPage() {
     [collectionPhotos],
   );
   const allCollectionPhotos = useMemo(
-    () => [...SAMPLE_COLLECTION_PHOTOS, ...storedCollectionPhotos],
+    () => [...storedCollectionPhotos, ...SAMPLE_COLLECTION_PHOTOS],
     [storedCollectionPhotos],
   );
   const photosBySlot = useMemo(
@@ -103,6 +107,19 @@ export function CollectionPage() {
   const activeGroup =
     COLLECTION_GROUPS.find((group) => group.id === activeGroupId) ??
     COLLECTION_GROUPS[0];
+  const selectedSlot = selectedSlug ? getCollectionSlotBySlug(selectedSlug) : null;
+  const selectedPhotos = selectedSlot
+    ? photosBySlot.get(selectedSlot.id) ?? []
+    : [];
+
+  function openSheet(slot: CollectionSlot) {
+    setSelectedSlug(getCollectionPhotoSlug(slot));
+    setCurrentPhotoIndex(0);
+  }
+
+  function closeSheet() {
+    setSelectedSlug(null);
+  }
 
   async function handlePhotoAdd(slot: CollectionSlot) {
     if (!activeCatId) {
@@ -128,14 +145,71 @@ export function CollectionPage() {
         return;
       }
 
-      saveCollectionPhoto(activeCatId, slug, dataUrl);
+      addCollectionPhoto(activeCatId, slug, dataUrl);
       setCollectionPhotos((current) => ({
         ...current,
-        [slug]: dataUrl,
+        [slug]: [...(current[slug] ?? []), dataUrl],
       }));
     };
 
     input.click();
+  }
+
+  function handleDeletePhoto(slug: string, index: number) {
+    if (!activeCatId) {
+      return;
+    }
+
+    try {
+      const raw = window.localStorage.getItem(COLLECTION_PHOTOS_STORAGE_KEY);
+
+      if (!raw) {
+        return;
+      }
+
+      const all = JSON.parse(raw) as Record<
+        string,
+        Record<string, string[] | string>
+      >;
+      const catPhotos = normalizeStoredPhotoList(all[activeCatId]?.[slug]);
+
+      if (!catPhotos.length) {
+        return;
+      }
+
+      catPhotos.splice(index, 1);
+
+      if (catPhotos.length === 0) {
+        delete all[activeCatId]?.[slug];
+      } else if (all[activeCatId]) {
+        all[activeCatId][slug] = catPhotos;
+      }
+
+      window.localStorage.setItem(COLLECTION_PHOTOS_STORAGE_KEY, JSON.stringify(all));
+      setCollectionPhotos((current) => {
+        const next = { ...current };
+
+        if (catPhotos.length === 0) {
+          delete next[slug];
+        } else {
+          next[slug] = catPhotos;
+        }
+
+        return next;
+      });
+      setCurrentPhotoIndex((current) =>
+        Math.max(0, Math.min(current, catPhotos.length - 1)),
+      );
+    } catch {
+      // Ignore delete failures for this MVP fallback.
+    }
+  }
+
+  function handlePhotoScroll(event: UIEvent<HTMLDivElement>) {
+    const element = event.currentTarget;
+    const index = Math.round(element.scrollLeft / element.offsetWidth);
+
+    setCurrentPhotoIndex(index);
   }
 
   if (!hasLoaded) {
@@ -143,8 +217,8 @@ export function CollectionPage() {
       <main style={styles.page}>
         <div style={styles.container}>
           <section style={styles.emptyCard}>
-            <h1 style={styles.emptyTitle}>コレクション</h1>
-            <p style={styles.emptyText}>準備しています。</p>
+            <h1 style={styles.emptyTitle}>{"コレクション"}</h1>
+            <p style={styles.emptyText}>{"準備しています"}</p>
           </section>
         </div>
         <BottomNavigation active="collection" />
@@ -157,10 +231,10 @@ export function CollectionPage() {
       <main style={styles.page}>
         <div style={styles.container}>
           <section style={styles.emptyCard}>
-            <h1 style={styles.emptyTitle}>コレクション</h1>
-            <p style={styles.emptyText}>一緒に暮らしている子を登録しましょう。</p>
+            <h1 style={styles.emptyTitle}>{"コレクション"}</h1>
+            <p style={styles.emptyText}>{"一緒に暮らしている猫を登録しましょう"}</p>
             <a href="/cats" style={styles.primaryLink}>
-              ねこを登録する
+              {"猫を登録する"}
             </a>
           </section>
         </div>
@@ -174,11 +248,11 @@ export function CollectionPage() {
       <div style={styles.container}>
         <header style={styles.header}>
           <div style={styles.headerRow}>
-            <h1 style={styles.title}>コレクション</h1>
+            <h1 style={styles.title}>郢ｧ・ｳ郢晢ｽｬ郢ｧ・ｯ郢ｧ・ｷ郢晢ｽｧ郢晢ｽｳ</h1>
             <span style={styles.catChip}>
               {catName}
               <span aria-hidden="true" style={styles.catChipArrow}>
-                ▼
+                隨・ｽｼ
               </span>
             </span>
           </div>
@@ -192,9 +266,22 @@ export function CollectionPage() {
         <CollectionGrid
           group={activeGroup}
           photosBySlot={photosBySlot}
-          onPhotoAdd={handlePhotoAdd}
+          onOpenSlot={openSheet}
         />
       </div>
+      {selectedSlot ? (
+        <CollectionPhotoSheet
+          slot={selectedSlot}
+          photos={selectedPhotos}
+          currentPhotoIndex={currentPhotoIndex}
+          onClose={closeSheet}
+          onAddPhoto={() => {
+            void handlePhotoAdd(selectedSlot);
+          }}
+          onDeletePhoto={handleDeletePhoto}
+          onPhotoScroll={handlePhotoScroll}
+        />
+      ) : null}
       <BottomNavigation active="collection" />
     </main>
   );
@@ -215,10 +302,13 @@ function CollectionProgress({
   );
 
   return (
-    <section style={styles.progressBlock} aria-label="コレクションの進み具合">
+    <section style={styles.progressBlock} aria-label="Collection progress">
       <p style={styles.progressMain}>
         <span style={styles.progressNumber}>{progress.total.collected}</span>
-        <span style={styles.progressSlash}>/{progress.total.total}</span>
+        <span style={styles.progressUnit}>{"\u7a2e\u985e"}</span>
+      </p>
+      <p style={styles.progressSub}>
+        {`${COLLECTION_GROUPS[0].label}${progress.pose.collected} \u30fb ${COLLECTION_GROUPS[1].label}${progress.scene.collected}`}
       </p>
       <div style={styles.progressTrack} aria-hidden="true">
         <span
@@ -228,9 +318,14 @@ function CollectionProgress({
           }}
         />
       </div>
-      <div role="tablist" aria-label="コレクションの種類" style={styles.tabs}>
+      <style>{".collection-tabs::-webkit-scrollbar{display:none}"}</style>
+      <div
+        role="tablist"
+        aria-label="Collection tabs"
+        className="collection-tabs"
+        style={styles.tabs}
+      >
         {COLLECTION_GROUPS.map((group) => {
-          const groupProgress = progress[group.id];
           const isActive = group.id === activeGroupId;
 
           return (
@@ -245,7 +340,7 @@ function CollectionProgress({
                 ...(isActive ? styles.activeTab : {}),
               }}
             >
-              {group.label} {groupProgress.collected}/{groupProgress.total}
+              {group.label}
             </button>
           );
         })}
@@ -257,11 +352,11 @@ function CollectionProgress({
 function CollectionGrid({
   group,
   photosBySlot,
-  onPhotoAdd,
+  onOpenSlot,
 }: {
   group: CollectionGroup;
   photosBySlot: Map<string, CollectionPhoto[]>;
-  onPhotoAdd: (slot: CollectionSlot) => void;
+  onOpenSlot: (slot: CollectionSlot) => void;
 }) {
   return (
     <section aria-label={group.label}>
@@ -271,7 +366,7 @@ function CollectionGrid({
             key={slot.id}
             slot={slot}
             photos={photosBySlot.get(slot.id) ?? []}
-            onPhotoAdd={onPhotoAdd}
+            onOpenSlot={onOpenSlot}
           />
         ))}
       </div>
@@ -282,47 +377,130 @@ function CollectionGrid({
 function CollectionCard({
   slot,
   photos,
-  onPhotoAdd,
+  onOpenSlot,
 }: {
   slot: CollectionSlot;
   photos: CollectionPhoto[];
-  onPhotoAdd: (slot: CollectionSlot) => void;
+  onOpenSlot: (slot: CollectionSlot) => void;
 }) {
   const firstPhoto = photos[0];
   const isCollected = photos.length > 0;
 
   if (isCollected && firstPhoto) {
     return (
-      <article style={{ ...styles.collectionCard, ...styles.photoCard }}>
+      <button
+        type="button"
+        onClick={() => onOpenSlot(slot)}
+        style={{ ...styles.collectionCard, ...styles.photoCard }}
+      >
         <img src={firstPhoto.src} alt="" style={styles.cardPhoto} />
         <span style={styles.cardPhotoFade} aria-hidden="true" />
+        {photos.length > 1 ? (
+          <span style={styles.cardCountBadge}>{photos.length}{"\u679a"}</span>
+        ) : null}
         <div style={styles.photoCardText}>
           <p style={styles.photoCardLabel}>{slot.label}</p>
-          {photos.length > 1 ? (
-            <span style={styles.photoCount}>{photos.length}{"\u679a"}</span>
-          ) : null}
         </div>
-      </article>
+      </button>
     );
   }
 
   return (
-    <article style={{ ...styles.collectionCard, ...styles.emptyCollectionCard }}>
-      <div style={styles.silhouetteWrap} aria-hidden="true">
-        <CollectionSilhouette slot={slot} />
+    <button
+      type="button"
+      onClick={() => onOpenSlot(slot)}
+      style={{ ...styles.collectionCard, ...styles.emptyCollectionCard }}
+    >
+      <p style={styles.emptySlotLabel}>{slot.label}</p>
+    </button>
+  );
+}
+
+function CollectionPhotoSheet({
+  slot,
+  photos,
+  currentPhotoIndex,
+  onClose,
+  onAddPhoto,
+  onDeletePhoto,
+  onPhotoScroll,
+}: {
+  slot: CollectionSlot;
+  photos: CollectionPhoto[];
+  currentPhotoIndex: number;
+  onClose: () => void;
+  onAddPhoto: () => void;
+  onDeletePhoto: (slug: string, index: number) => void;
+  onPhotoScroll: (event: UIEvent<HTMLDivElement>) => void;
+}) {
+  const slug = getCollectionPhotoSlug(slot);
+
+  return (
+    <div style={styles.sheetOverlay} onClick={onClose}>
+      <div style={styles.sheet} onClick={(event) => event.stopPropagation()}>
+        <div style={styles.sheetHandle} />
+        <div style={styles.sheetHeader}>
+          <span style={styles.sheetTitle}>{slot.label}</span>
+          <span style={styles.sheetCount}>{photos.length}{"\u679a"}</span>
+        </div>
+
+        {photos.length > 0 ? (
+          <div style={styles.sheetPhotoArea}>
+            <div style={styles.photoScroll} onScroll={onPhotoScroll}>
+              {photos.map((photo, index) => (
+                <div key={photo.id} style={styles.photoSlide}>
+                  <img src={photo.src} alt="" style={styles.photoImg} />
+                  {photo.localIndex !== undefined ? (
+                    <button
+                      type="button"
+                      style={styles.deleteBtn}
+                      onClick={() => onDeletePhoto(slug, photo.localIndex ?? index)}
+                    >
+                      {"\u524a\u9664"}
+                    </button>
+                  ) : null}
+                </div>
+              ))}
+            </div>
+            {photos.length > 1 ? (
+              <div style={styles.photoDots}>
+                {photos.map((photo, index) => (
+                  <div
+                    key={`${photo.id}-dot`}
+                    style={
+                      index === currentPhotoIndex
+                        ? { ...styles.photoDot, ...styles.photoDotActive }
+                        : styles.photoDot
+                    }
+                  />
+                ))}
+              </div>
+            ) : null}
+          </div>
+        ) : (
+          <div style={styles.photoEmpty}>
+            <span style={styles.photoEmptyText}>{"\u307e\u3060\u5199\u771f\u304c\u3042\u308a\u307e\u305b\u3093"}</span>
+          </div>
+        )}
+
+        <div style={styles.sheetActions}>
+          <button type="button" style={styles.btnPrimary} onClick={onAddPhoto}>
+            {"\uff0b \u5199\u771f\u3092\u64ae\u308b"}
+          </button>
+          <button
+            type="button"
+            style={
+              photos.length > 0
+                ? styles.btnSecondary
+                : { ...styles.btnSecondary, ...styles.btnDisabled }
+            }
+            disabled={photos.length === 0}
+          >
+            {"\u30b7\u30a7\u30a2"}
+          </button>
+        </div>
       </div>
-      <div style={styles.emptyCardFooter}>
-        <p style={styles.emptySlotLabel}>{slot.label}</p>
-        <button
-          type="button"
-          onClick={() => onPhotoAdd(slot)}
-          style={styles.plusBadge}
-          aria-label={`Add photo for ${slot.label}`}
-        >
-          {"\uff0b"}
-        </button>
-      </div>
-    </article>
+    </div>
   );
 }
 
@@ -543,28 +721,30 @@ function groupPhotosBySlot(photos: CollectionPhoto[]) {
   return map;
 }
 
-function buildStoredCollectionPhotos(collectionPhotos: Record<string, string>) {
+function buildStoredCollectionPhotos(collectionPhotos: Record<string, string[]>) {
   const photos: CollectionPhoto[] = [];
 
   COLLECTION_GROUPS.forEach((group) => {
     group.slots.forEach((slot) => {
       const slug = getCollectionPhotoSlug(slot);
-      const src = collectionPhotos[slug];
+      const slotPhotos = collectionPhotos[slug] ?? [];
 
-      if (src) {
+      slotPhotos.forEach((src, index) => {
         photos.push({
-          id: `local-${slug}`,
+          id: `local-${slug}-${index}`,
           slotId: slot.id,
           src,
+          storageSlug: slug,
+          localIndex: index,
         });
-      }
+      });
     });
   });
 
-  return photos;
+  return photos.reverse();
 }
 
-function readCollectionPhotos(catId: string): Record<string, string> {
+function readCollectionPhotos(catId: string): Record<string, string[]> {
   try {
     const raw = window.localStorage.getItem(COLLECTION_PHOTOS_STORAGE_KEY);
 
@@ -572,29 +752,47 @@ function readCollectionPhotos(catId: string): Record<string, string> {
       return {};
     }
 
-    const all = JSON.parse(raw) as Record<string, Record<string, string>>;
-    return all[catId] ?? {};
+    const all = JSON.parse(raw) as Record<
+      string,
+      Record<string, string[] | string>
+    >;
+    const catPhotos = all[catId] ?? {};
+
+    return Object.fromEntries(
+      Object.entries(catPhotos).map(([slug, value]) => [
+        slug,
+        normalizeStoredPhotoList(value),
+      ]),
+    );
   } catch {
     return {};
   }
 }
 
-function saveCollectionPhoto(catId: string, slug: string, dataUrl: string) {
+function addCollectionPhoto(catId: string, slug: string, dataUrl: string) {
   try {
     const raw = window.localStorage.getItem(COLLECTION_PHOTOS_STORAGE_KEY);
     const all = raw
-      ? (JSON.parse(raw) as Record<string, Record<string, string>>)
+      ? (JSON.parse(raw) as Record<string, Record<string, string[] | string>>)
       : {};
 
     if (!all[catId]) {
       all[catId] = {};
     }
 
-    all[catId][slug] = dataUrl;
+    all[catId][slug] = [...normalizeStoredPhotoList(all[catId][slug]), dataUrl];
     window.localStorage.setItem(COLLECTION_PHOTOS_STORAGE_KEY, JSON.stringify(all));
   } catch {
     // Ignore localStorage quota or parse failures for this MVP fallback.
   }
+}
+
+function normalizeStoredPhotoList(value: string[] | string | undefined) {
+  if (typeof value === "string") {
+    return [value];
+  }
+
+  return value ?? [];
 }
 
 function resizeAndEncode(file: File, maxSize = 800): Promise<string> {
@@ -628,6 +826,14 @@ function resizeAndEncode(file: File, maxSize = 800): Promise<string> {
 
 function getCollectionPhotoSlug(slot: CollectionSlot) {
   return `${slot.group}_${slot.id.replace(/-/g, "_")}`;
+}
+
+function getCollectionSlotBySlug(slug: string) {
+  return (
+    COLLECTION_GROUPS.flatMap((group) => group.slots).find(
+      (slot) => getCollectionPhotoSlug(slot) === slug,
+    ) ?? null
+  );
 }
 
 function buildCollectionProgress(
@@ -673,6 +879,7 @@ function getProgressPercent(collected: number, total: number) {
 
 const styles = {
   page: {
+    position: "relative",
     minHeight: "100svh",
     background: "linear-gradient(180deg, #fdfcf9 0%, #f7f5ef 100%)",
     color: "#242522",
@@ -729,19 +936,26 @@ const styles = {
   progressMain: {
     display: "flex",
     alignItems: "baseline",
-    gap: "1px",
+    gap: "4px",
     margin: 0,
     color: "#2c2d29",
   },
   progressNumber: {
-    fontSize: "25px",
+    fontSize: "30px",
     fontWeight: 700,
     lineHeight: 1,
   },
-  progressSlash: {
+  progressUnit: {
     color: "#676963",
-    fontSize: "17px",
+    fontSize: "14px",
     fontWeight: 590,
+  },
+  progressSub: {
+    margin: "-4px 0 0",
+    color: "#73746d",
+    fontSize: "12px",
+    fontWeight: 590,
+    lineHeight: 1.4,
   },
   progressTrack: {
     position: "relative",
@@ -758,11 +972,16 @@ const styles = {
     background: "linear-gradient(90deg, #a8a697, #8f9688)",
   },
   tabs: {
-    display: "grid",
-    gridTemplateColumns: "repeat(2, minmax(0, 1fr))",
-    gap: "8px",
+    display: "flex",
+    gap: "6px",
+    overflowX: "auto",
+    scrollbarWidth: "none",
+    msOverflowStyle: "none",
+    paddingBottom: "2px",
   },
   tab: {
+    flex: "0 0 auto",
+    minWidth: "92px",
     minHeight: "38px",
     border: "1px solid rgba(220, 217, 209, 0.82)",
     borderRadius: "999px",
@@ -786,16 +1005,22 @@ const styles = {
   },
   collectionCard: {
     position: "relative",
+    display: "block",
     aspectRatio: "1 / 1",
     border: "1px solid rgba(225, 222, 215, 0.72)",
     borderRadius: "18px",
     background:
       "linear-gradient(180deg, rgba(255,255,255,0.92) 0%, rgba(247,246,242,0.9) 100%)",
     overflow: "hidden",
+    font: "inherit",
+    cursor: "pointer",
+    padding: 0,
+    textAlign: "inherit",
   },
   emptyCollectionCard: {
-    display: "grid",
-    gridTemplateRows: "1fr auto",
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
     padding: "14px",
   },
   photoCard: {
@@ -824,6 +1049,19 @@ const styles = {
     zIndex: 1,
     display: "grid",
     gap: "6px",
+  },
+  cardCountBadge: {
+    position: "absolute",
+    top: "10px",
+    right: "10px",
+    zIndex: 2,
+    borderRadius: "99px",
+    background: "rgba(0,0,0,0.45)",
+    color: "#fff",
+    fontSize: "10px",
+    fontWeight: 650,
+    lineHeight: 1,
+    padding: "2px 7px",
   },
   photoCardLabel: {
     margin: 0,
@@ -868,7 +1106,7 @@ const styles = {
     fontSize: "14px",
     fontWeight: 610,
     lineHeight: 1.25,
-    textAlign: "left",
+    textAlign: "center",
   },
   plusBadge: {
     display: "inline-flex",
@@ -887,6 +1125,142 @@ const styles = {
     lineHeight: 1,
     padding: 0,
     cursor: "pointer",
+  },
+  sheetOverlay: {
+    position: "absolute",
+    inset: 0,
+    minHeight: "100%",
+    background: "rgba(0,0,0,0.3)",
+    zIndex: 50,
+    display: "flex",
+    alignItems: "flex-end",
+  },
+  sheet: {
+    width: "100%",
+    background: "#fbfaf7",
+    borderRadius: "20px 20px 0 0",
+    paddingBottom: "calc(16px + env(safe-area-inset-bottom))",
+    maxHeight: "85vh",
+    overflowY: "auto",
+  },
+  sheetHandle: {
+    width: "36px",
+    height: "4px",
+    background: "#d0cdc6",
+    borderRadius: "99px",
+    margin: "10px auto 14px",
+  },
+  sheetHeader: {
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "space-between",
+    padding: "0 16px 12px",
+    borderBottom: "0.5px solid #e8e5de",
+  },
+  sheetTitle: {
+    color: "#2a2a28",
+    fontSize: "16px",
+    fontWeight: 700,
+  },
+  sheetCount: {
+    color: "#8a8a80",
+    fontSize: "12px",
+  },
+  sheetPhotoArea: {
+    margin: "12px 16px",
+  },
+  photoScroll: {
+    display: "flex",
+    overflowX: "auto",
+    scrollSnapType: "x mandatory",
+    scrollbarWidth: "none",
+    gap: "8px",
+  },
+  photoSlide: {
+    position: "relative",
+    flexShrink: 0,
+    width: "100%",
+    aspectRatio: "1",
+    borderRadius: "16px",
+    overflow: "hidden",
+    scrollSnapAlign: "start",
+  },
+  photoImg: {
+    width: "100%",
+    height: "100%",
+    objectFit: "cover",
+  },
+  deleteBtn: {
+    position: "absolute",
+    top: "10px",
+    right: "10px",
+    border: "none",
+    borderRadius: "99px",
+    background: "rgba(0,0,0,0.5)",
+    color: "#fff",
+    fontSize: "11px",
+    padding: "4px 10px",
+    cursor: "pointer",
+  },
+  photoDots: {
+    display: "flex",
+    justifyContent: "center",
+    gap: "5px",
+    margin: "8px 0 0",
+  },
+  photoDot: {
+    width: "5px",
+    height: "5px",
+    borderRadius: "99px",
+    background: "#d0cdc6",
+    transition: "width 0.2s",
+  },
+  photoDotActive: {
+    width: "14px",
+    background: "#6B9E82",
+  },
+  photoEmpty: {
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    aspectRatio: "1",
+    margin: "12px 16px",
+    borderRadius: "16px",
+    background: "#f0ede8",
+  },
+  photoEmptyText: {
+    color: "#b0ada6",
+    fontSize: "13px",
+  },
+  sheetActions: {
+    display: "grid",
+    gridTemplateColumns: "1fr 1fr",
+    gap: "8px",
+    padding: "12px 16px 0",
+  },
+  btnPrimary: {
+    border: "none",
+    borderRadius: "12px",
+    background: "#6B9E82",
+    color: "#fff",
+    fontSize: "13px",
+    fontWeight: 600,
+    padding: "12px",
+    cursor: "pointer",
+  },
+  btnSecondary: {
+    border: "0.5px solid #d8d5ce",
+    borderRadius: "12px",
+    background: "#fff",
+    color: "#2a2a28",
+    fontSize: "13px",
+    fontWeight: 500,
+    padding: "12px",
+    cursor: "pointer",
+  },
+  btnDisabled: {
+    opacity: 0.4,
+    cursor: "not-allowed",
   },
   emptyCard: {
     border: "1px solid #e3e0da",
