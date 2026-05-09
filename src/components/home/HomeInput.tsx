@@ -938,6 +938,7 @@ function Header({
   return (
     <header style={styles.header}>
       <div style={{ ...styles.photoHero, borderColor: photoBorderColor }}>
+        <div style={styles.photoArea}>
         <img src={SAMPLE_HOME_CAT_PHOTO_SRC} alt="" style={styles.photoHeroImage} />
         <div style={styles.photoHeroFade} aria-hidden="true" />
         <div style={styles.photoHeroContent}>
@@ -984,7 +985,8 @@ function Header({
             </span>
           </div>
         </div>
-      </div>
+        </div>
+        <div style={styles.cardBody}>
       {catTraitLabel ? (
         <section style={styles.catTraitSection} aria-label={`${catName}\u306e\u3053\u3068`}>
           <p style={styles.catTraitTitle}>{"\u3053\u306e\u5b50\u306e\u3053\u3068"}</p>
@@ -1055,6 +1057,8 @@ function Header({
               {"\u8a18\u9332\u304c\u6e9c\u307e\u308b\u3068\u3001\u3053\u306e\u5b50\u306e1\u65e5\u306e\u30ea\u30ba\u30e0\u304c\u898b\u3048\u3066\u304d\u307e\u3059"}
             </p>
           ) : null}
+        </div>
+      </div>
         </div>
       </div>
       {isCatSwitcherOpen ? (
@@ -2083,12 +2087,22 @@ const styles = {
   },
   photoHero: {
     position: "relative",
-    height: "300px",
     border: "1px solid rgba(219, 216, 207, 0.72)",
     borderRadius: "32px",
     background: "#fbfaf7",
     overflow: "hidden",
     boxShadow: "0 12px 28px rgba(44, 42, 38, 0.032)",
+  },
+  photoArea: {
+    position: "relative",
+    height: "300px",
+    overflow: "hidden",
+    borderRadius: "32px 32px 0 0",
+  },
+  cardBody: {
+    padding: "12px 14px 16px",
+    background: "#fbfaf7",
+    borderRadius: "0 0 32px 32px",
   },
   photoHeroImage: {
     position: "absolute",
