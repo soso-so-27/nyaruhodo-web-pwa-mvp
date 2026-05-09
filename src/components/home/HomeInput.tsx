@@ -28,6 +28,7 @@ import {
   isCurrentCatHintSuppressed,
   parseStoredContext,
   readActiveCatId,
+  readActiveCatTraitMemo,
   readCatProfiles,
   readCurrentCatHintSuppressions,
   readLatestHypothesis,
@@ -38,6 +39,7 @@ import {
 import type {
   CatCoat,
   CatProfile,
+  CatTraitMemo,
   CurrentCatHintFeedback,
   CurrentCatHintSuppression,
   DailyHintHypothesis,
@@ -95,6 +97,7 @@ export function HomeInput({
     useState<LatestHypothesisView | null>(null);
   const [catProfiles, setCatProfiles] = useState<CatProfile[]>([]);
   const [activeCatId, setActiveCatId] = useState<string | null>(null);
+  const [catTraitMemo, setCatTraitMemo] = useState<CatTraitMemo | null>(null);
   const [isEditingCatName, setIsEditingCatName] = useState(false);
   const [isAddingCat, setIsAddingCat] = useState(false);
   const [catNameInput, setCatNameInput] = useState(() => getCatName(null));
@@ -152,6 +155,10 @@ export function HomeInput({
     !isDailyHintSuppressed &&
     activeCatEvents.length >= 3;
   const recentCatSummary = buildRecentCatSummary(activeCatEvents);
+  const activeCatTraitLabel =
+    activeCatProfile?.typeLabel ?? catTraitMemo?.typeLabel;
+  const activeCatModifiers =
+    activeCatProfile?.modifiers ?? catTraitMemo?.modifiers ?? [];
 
   useEffect(() => {
     const completed =
@@ -171,6 +178,10 @@ export function HomeInput({
 
     setCatProfiles(savedCatProfiles);
     setActiveCatId(activeProfile.id);
+    setCatTraitMemo(
+      readActiveCatTraitMemo(savedActiveCatId) ??
+        readActiveCatTraitMemo(activeProfile.id),
+    );
     setCatNameInput(getCatName(activeProfile));
     setHintSuppressions(readCurrentCatHintSuppressions());
     setRecentStateRecords(readRecentStateRecords());
@@ -269,6 +280,7 @@ export function HomeInput({
 
     saveActiveCatId(catId);
     setActiveCatId(catId);
+    setCatTraitMemo(readActiveCatTraitMemo(catId));
     setCatNameInput(getCatName(selectedProfile));
     clearLatestHypothesis();
     setVisibleLatestHypothesis(null);
@@ -521,8 +533,8 @@ export function HomeInput({
           catName={catName}
           catProfiles={catProfiles}
           catCoat={activeCatProfile?.appearance?.coat}
-          catTraitLabel={activeCatProfile?.typeLabel}
-          catModifiers={activeCatProfile?.modifiers ?? []}
+          catTraitLabel={activeCatTraitLabel}
+          catModifiers={activeCatModifiers}
           onboardingHomeMessage={onboardingHomeMessage}
           postDiagnosisFeedbackMessage={postDiagnosisFeedbackMessage}
           recentCatSummary={recentCatSummary}

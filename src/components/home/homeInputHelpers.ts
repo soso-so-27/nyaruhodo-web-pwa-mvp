@@ -41,6 +41,11 @@ export type CatProfile = {
   };
 };
 
+export type CatTraitMemo = {
+  typeLabel?: TypeLabel;
+  modifiers: string[];
+};
+
 export type CatAppearance = {
   coat?: CatCoat;
 };
@@ -496,6 +501,40 @@ export function readActiveCatId() {
 
 export function saveActiveCatId(catId: string) {
   window.localStorage.setItem(ACTIVE_CAT_ID_KEY, catId);
+}
+
+export function readActiveCatTraitMemo(activeCatId: string | null) {
+  const value = window.localStorage.getItem(CAT_PROFILES_KEY);
+
+  if (!value) {
+    return null;
+  }
+
+  try {
+    const parsed = JSON.parse(value) as
+      | Partial<CatProfile>[]
+      | Record<string, Partial<CatProfile>>;
+    const candidates = Array.isArray(parsed)
+      ? parsed
+      : Object.entries(parsed).map(([id, profile]) => ({
+          ...profile,
+          id: profile.id ?? id,
+        }));
+    const profile =
+      candidates.find((candidate) => candidate.id === activeCatId) ??
+      candidates.find((candidate) => candidate.typeLabel);
+
+    if (!profile?.typeLabel) {
+      return null;
+    }
+
+    return {
+      typeLabel: profile.typeLabel,
+      modifiers: Array.isArray(profile.modifiers) ? profile.modifiers : [],
+    } satisfies CatTraitMemo;
+  } catch {
+    return null;
+  }
 }
 
 export function getActiveCatProfile(
