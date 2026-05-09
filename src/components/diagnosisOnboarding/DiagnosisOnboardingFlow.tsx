@@ -48,7 +48,18 @@ export function DiagnosisOnboardingFlow() {
   const catNameDraftRef = useRef("");
   const [catName, setCatName] = useState("");
   const [confirmedCatName, setConfirmedCatName] = useState("");
-  const [step, setStep] = useState<"name" | "question" | "result">("name");
+  const [step, setStep] = useState<
+    "name" | "basicInfo" | "questions" | "result"
+  >("name");
+  const [basicInfo, setBasicInfo] = useState<{
+    birthDate: string;
+    gender: "male" | "female" | "unknown" | "";
+    breed: string;
+  }>({
+    birthDate: "",
+    gender: "",
+    breed: "",
+  });
   const [questionIndex, setQuestionIndex] = useState(0);
   const [furthestQuestionCount, setFurthestQuestionCount] = useState(0);
   const [answers, setAnswers] = useState<OnboardingAnswers>({});
@@ -84,7 +95,14 @@ export function DiagnosisOnboardingFlow() {
     setConfirmedCatName(nextCatName);
     setFurthestQuestionCount(1);
     setMessage("");
-    setStep("question");
+    setStep("basicInfo");
+  }
+
+  function startQuestionStep() {
+    setMessage("");
+    setQuestionIndex(0);
+    setFurthestQuestionCount(1);
+    setStep("questions");
   }
 
   function answerQuestion(
@@ -123,7 +141,7 @@ export function DiagnosisOnboardingFlow() {
       Math.max(current, safeNextIndex + 1),
     );
     setMessage("");
-    setStep("question");
+    setStep("questions");
   }
 
   function showResult() {
@@ -137,11 +155,23 @@ export function DiagnosisOnboardingFlow() {
   function saveAndGoHome() {
     const now = new Date().toISOString();
     const profileName = confirmedCatName || resolveCatName();
+    const normalizedBasicInfo: CatProfile["basicInfo"] = {
+      birthDate: basicInfo.birthDate || undefined,
+      gender: basicInfo.gender || undefined,
+      breed: basicInfo.breed.trim() || undefined,
+    };
+    const basicInfoToSave =
+      normalizedBasicInfo.birthDate ||
+      normalizedBasicInfo.gender ||
+      normalizedBasicInfo.breed
+        ? normalizedBasicInfo
+        : undefined;
     const profile: CatProfile = {
       ...createLocalCatProfile(profileName, {
         createdAt: now,
         updatedAt: now,
       }),
+      basicInfo: basicInfoToSave,
       typeKey: result.type.typeKey,
       typeLabel: result.type.typeLabel,
       typeScores: result.scores,
@@ -211,7 +241,99 @@ export function DiagnosisOnboardingFlow() {
           </section>
         ) : null}
 
-        {step === "question" && currentQuestion ? (
+        {step === "basicInfo" ? (
+          <section style={styles.heroCard}>
+            <div style={styles.stepContainer}>
+              <p style={styles.stepEyebrow}>この子のことを少し教えてください</p>
+              <p style={styles.stepNote}>
+                あとで変更できます。スキップしてもOKです。
+              </p>
+
+              <div style={styles.fieldGroup}>
+                <label style={styles.fieldLabel}>生年月日</label>
+                <input
+                  type="date"
+                  value={basicInfo.birthDate}
+                  onChange={(event) =>
+                    setBasicInfo((current) => ({
+                      ...current,
+                      birthDate: event.target.value,
+                    }))
+                  }
+                  style={styles.dateInput}
+                  max={new Date().toISOString().split("T")[0]}
+                />
+              </div>
+
+              <div style={styles.fieldGroup}>
+                <label style={styles.fieldLabel}>性別</label>
+                <div style={styles.genderButtons}>
+                  {[
+                    { value: "male", label: "男の子" },
+                    { value: "female", label: "女の子" },
+                    { value: "unknown", label: "わからない" },
+                  ].map((option) => (
+                    <button
+                      key={option.value}
+                      type="button"
+                      onClick={() =>
+                        setBasicInfo((current) => ({
+                          ...current,
+                          gender: option.value as "male" | "female" | "unknown",
+                        }))
+                      }
+                      style={
+                        basicInfo.gender === option.value
+                          ? {
+                              ...styles.genderButton,
+                              ...styles.genderButtonActive,
+                            }
+                          : styles.genderButton
+                      }
+                    >
+                      {option.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div style={styles.fieldGroup}>
+                <label style={styles.fieldLabel}>猫種</label>
+                <input
+                  type="text"
+                  value={basicInfo.breed}
+                  onChange={(event) =>
+                    setBasicInfo((current) => ({
+                      ...current,
+                      breed: event.target.value,
+                    }))
+                  }
+                  placeholder="例：サバトラ、雑種・ミックス"
+                  style={styles.textInput}
+                />
+              </div>
+
+              <div style={styles.basicInfoActions}>
+                <button
+                  type="button"
+                  onClick={startQuestionStep}
+                  style={styles.primaryButton}
+                >
+                  次へ
+                </button>
+                <button
+                  type="button"
+                  onClick={startQuestionStep}
+                  style={styles.basicInfoSkipButton}
+                >
+                  スキップ
+                </button>
+              </div>
+            </div>
+          </section>
+        ) : null}
+
+        {step === "questions" && currentQuestion ? (
           <QuestionStep
             catName={displayCatName}
             question={currentQuestion}
@@ -440,6 +562,92 @@ const styles = {
     borderRadius: "28px",
     background: "linear-gradient(180deg, #fffdf9 0%, #fff7ec 100%)",
     padding: "24px 18px 18px",
+  },
+  stepContainer: {
+    display: "flex",
+    flexDirection: "column",
+    gap: "20px",
+    padding: "0 4px",
+  },
+  stepEyebrow: {
+    fontSize: "18px",
+    fontWeight: 650,
+    color: "#2a2a28",
+    margin: 0,
+    lineHeight: 1.4,
+  },
+  stepNote: {
+    fontSize: "13px",
+    color: "#8a8a80",
+    margin: "-12px 0 0",
+    lineHeight: 1.6,
+  },
+  fieldGroup: {
+    display: "flex",
+    flexDirection: "column",
+    gap: "8px",
+  },
+  fieldLabel: {
+    fontSize: "12px",
+    fontWeight: 600,
+    color: "#6a6a62",
+  },
+  dateInput: {
+    width: "100%",
+    minHeight: "48px",
+    border: "1px solid #dedbd3",
+    borderRadius: "12px",
+    background: "#ffffff",
+    color: "#27272a",
+    fontSize: "15px",
+    padding: "0 14px",
+    boxSizing: "border-box",
+  },
+  textInput: {
+    width: "100%",
+    minHeight: "48px",
+    border: "1px solid #dedbd3",
+    borderRadius: "12px",
+    background: "#ffffff",
+    color: "#27272a",
+    fontSize: "15px",
+    padding: "0 14px",
+    boxSizing: "border-box",
+  },
+  genderButtons: {
+    display: "grid",
+    gridTemplateColumns: "repeat(3, 1fr)",
+    gap: "8px",
+  },
+  genderButton: {
+    minHeight: "44px",
+    border: "1px solid #dedbd3",
+    borderRadius: "12px",
+    background: "#ffffff",
+    color: "#27272a",
+    fontSize: "13px",
+    fontWeight: 500,
+    cursor: "pointer",
+  },
+  genderButtonActive: {
+    border: "1px solid #aeb5a8",
+    background: "#e8e9e4",
+    color: "#3f433d",
+    fontWeight: 600,
+  },
+  basicInfoActions: {
+    display: "flex",
+    flexDirection: "column",
+    gap: "10px",
+    marginTop: "8px",
+  },
+  basicInfoSkipButton: {
+    minHeight: "44px",
+    border: "none",
+    background: "transparent",
+    color: "#8a8a80",
+    fontSize: "13px",
+    cursor: "pointer",
   },
   questionCard: {
     border: "1px solid #e4e4e7",

@@ -24,6 +24,7 @@ import {
   clearLatestHypothesis,
   ensureActiveCatTraitMemo,
   getActiveCatProfile,
+  getCatAvatarSrcForCoat,
   getCatName,
   getHypothesisCompletionMessage,
   isCurrentCatHintSuppressed,
@@ -1399,6 +1400,57 @@ function getRecentSignalSummaryText(
   );
 }
 
+function formatAge(birthDate?: string): string {
+  if (!birthDate) {
+    return "";
+  }
+
+  const birth = new Date(birthDate);
+
+  if (Number.isNaN(birth.getTime())) {
+    return "";
+  }
+
+  const now = new Date();
+  let totalMonths =
+    (now.getFullYear() - birth.getFullYear()) * 12 +
+    (now.getMonth() - birth.getMonth());
+
+  if (now.getDate() < birth.getDate()) {
+    totalMonths -= 1;
+  }
+
+  if (totalMonths < 0) {
+    return "";
+  }
+
+  if (totalMonths < 12) {
+    return `${totalMonths}ヶ月`;
+  }
+
+  if (totalMonths < 24) {
+    return "1歳";
+  }
+
+  return `${Math.floor(totalMonths / 12)}歳`;
+}
+
+function formatGender(gender?: string): string {
+  if (gender === "male") {
+    return "男の子";
+  }
+
+  if (gender === "female") {
+    return "女の子";
+  }
+
+  return "";
+}
+
+function getCatAvatarSrc(coat?: CatCoat) {
+  return getCatAvatarSrcForCoat(coat);
+}
+
 function CatSettings({
   activeCatId,
   catNameInput,
@@ -1441,30 +1493,59 @@ function CatSettings({
       <p style={styles.sectionDescription}>
         {"\u732b\u306e\u8ffd\u52a0\u3084\u540d\u524d\u306e\u5909\u66f4\u306f\u3053\u3053\u304b\u3089\u3067\u304d\u307e\u3059\u3002"}
       </p>
-      <div style={styles.settingsCatList}>
-        {catProfiles.map((profile) => (
-          <button
-            key={profile.id}
-            type="button"
-            onClick={() => onCatSelect(profile.id)}
-            style={
-              profile.id === activeCatId
-                ? styles.activeCatSwitchButton
-                : styles.catSwitchButton
-            }
-          >
-            {profile.name}
-          </button>
-        ))}
+      <div style={styles.catList}>
+        {catProfiles.map((profile) => {
+          const age = formatAge(profile.basicInfo?.birthDate);
+          const gender = formatGender(profile.basicInfo?.gender);
+          const meta = [gender, age].filter(Boolean).join("・");
+          const understanding = profile.understanding?.percent ?? 0;
+          const isActive = profile.id === activeCatId;
+
+          return (
+            <button
+              key={profile.id}
+              type="button"
+              onClick={() => onCatSelect(profile.id)}
+              style={isActive ? styles.catListItemActive : styles.catListItem}
+            >
+              <div style={styles.catListAvatar}>
+                <img
+                  src={getCatAvatarSrc(profile.appearance?.coat)}
+                  alt=""
+                  style={styles.catListAvatarImg}
+                />
+              </div>
+              <div style={styles.catListInfo}>
+                <span style={styles.catListName}>{profile.name}</span>
+                {meta ? <span style={styles.catListMeta}>{meta}</span> : null}
+                <div style={styles.catListProgress}>
+                  <div style={styles.catListProgressBar}>
+                    <div
+                      style={{
+                        ...styles.catListProgressFill,
+                        width: `${Math.min(100, understanding)}%`,
+                      }}
+                    />
+                  </div>
+                  <span style={styles.catListProgressLabel}>
+                    {understanding}
+                    {"%"}
+                  </span>
+                </div>
+              </div>
+              <span style={styles.catListChevron}>›</span>
+            </button>
+          );
+        })}
       </div>
+      <button
+        type="button"
+        onClick={onStartAddingCat}
+        style={styles.addCatListButton}
+      >
+        ＋ 猫を追加
+      </button>
       <div style={styles.settingsActions}>
-        <button
-          type="button"
-          onClick={onStartAddingCat}
-          style={styles.addCatButton}
-        >
-          {"\u732b\u3092\u8ffd\u52a0"}
-        </button>
         <button
           type="button"
           onClick={onEditCatName}
@@ -2539,6 +2620,111 @@ const styles = {
   },
   catSwitcher: {
     marginTop: "10px",
+  },
+  catList: {
+    display: "flex",
+    flexDirection: "column",
+    gap: "6px",
+    marginTop: "12px",
+  },
+  catListItem: {
+    display: "flex",
+    alignItems: "center",
+    gap: "12px",
+    minHeight: "64px",
+    border: "1px solid #e5e2dc",
+    borderRadius: "16px",
+    background: "#ffffff",
+    padding: "10px 12px",
+    cursor: "pointer",
+    textAlign: "left",
+  },
+  catListItemActive: {
+    display: "flex",
+    alignItems: "center",
+    gap: "12px",
+    minHeight: "64px",
+    border: "1px solid #d4d6ce",
+    borderRadius: "16px",
+    background: "#f0f1ec",
+    padding: "10px 12px",
+    cursor: "pointer",
+    textAlign: "left",
+  },
+  catListAvatar: {
+    width: "44px",
+    height: "44px",
+    borderRadius: "12px",
+    overflow: "hidden",
+    flexShrink: 0,
+    background: "#f5f3ef",
+    border: "0.5px solid #e0ddd6",
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  catListAvatarImg: {
+    width: "36px",
+    height: "36px",
+    objectFit: "contain",
+  },
+  catListInfo: {
+    flex: 1,
+    minWidth: 0,
+    display: "flex",
+    flexDirection: "column",
+    gap: "3px",
+  },
+  catListName: {
+    fontSize: "14px",
+    fontWeight: 600,
+    color: "#27272a",
+    lineHeight: 1.3,
+  },
+  catListMeta: {
+    fontSize: "11px",
+    color: "#8a8a80",
+    lineHeight: 1.3,
+  },
+  catListProgress: {
+    display: "flex",
+    alignItems: "center",
+    gap: "6px",
+    marginTop: "2px",
+  },
+  catListProgressBar: {
+    flex: 1,
+    height: "3px",
+    background: "#e8e5de",
+    borderRadius: "99px",
+    overflow: "hidden",
+  },
+  catListProgressFill: {
+    height: "100%",
+    background: "#6B9E82",
+    borderRadius: "99px",
+  },
+  catListProgressLabel: {
+    fontSize: "10px",
+    color: "#8a8a80",
+    flexShrink: 0,
+  },
+  catListChevron: {
+    fontSize: "16px",
+    color: "#c8c5be",
+    flexShrink: 0,
+  },
+  addCatListButton: {
+    width: "100%",
+    minHeight: "48px",
+    border: "1px dashed #dedbd3",
+    borderRadius: "16px",
+    background: "transparent",
+    color: "#8a8a80",
+    fontSize: "13px",
+    fontWeight: 500,
+    cursor: "pointer",
+    marginTop: "6px",
   },
   catSwitchList: {
     display: "flex",

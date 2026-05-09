@@ -23,6 +23,7 @@ export type CatProfile = {
   name: string;
   createdAt: string;
   updatedAt: string;
+  basicInfo?: CatBasicInfo;
   appearance?: CatAppearance;
   typeKey?: TypeKey;
   typeLabel?: TypeLabel;
@@ -40,6 +41,12 @@ export type CatProfile = {
     percent: number;
     sourceBreakdown: UnderstandingSourceBreakdown;
   };
+};
+
+export type CatBasicInfo = {
+  birthDate?: string;
+  gender?: "male" | "female" | "unknown";
+  breed?: string;
 };
 
 export type CatTraitMemo = {
@@ -814,6 +821,7 @@ function normalizeStoredCatProfile(profile: Partial<CatProfile>): CatProfile {
     typeKey: profile.typeKey,
     typeLabel: profile.typeLabel,
     typeScores: profile.typeScores,
+    basicInfo: normalizeCatBasicInfo(profile.basicInfo),
     appearance: isValidCatAppearance(profile.appearance)
       ? normalizeCatAppearance(profile.appearance)
       : undefined,
@@ -821,6 +829,27 @@ function normalizeStoredCatProfile(profile: Partial<CatProfile>): CatProfile {
     onboarding: profile.onboarding,
     understanding: profile.understanding,
   };
+}
+
+function normalizeCatBasicInfo(
+  basicInfo: Partial<CatBasicInfo> | undefined,
+): CatBasicInfo | undefined {
+  if (!basicInfo) {
+    return undefined;
+  }
+
+  const gender = ["male", "female", "unknown"].includes(basicInfo.gender ?? "")
+    ? basicInfo.gender
+    : undefined;
+  const nextBasicInfo: CatBasicInfo = {
+    birthDate: basicInfo.birthDate || undefined,
+    gender,
+    breed: basicInfo.breed || undefined,
+  };
+
+  return nextBasicInfo.birthDate || nextBasicInfo.gender || nextBasicInfo.breed
+    ? nextBasicInfo
+    : undefined;
 }
 
 function isValidCatAppearance(
