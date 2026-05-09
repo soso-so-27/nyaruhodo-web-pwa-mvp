@@ -2102,7 +2102,7 @@ const styles = {
     borderRadius: "32px 32px 0 0",
   },
   cardBody: {
-    padding: "12px 14px 16px",
+    padding: "0 14px 16px",
     background: "#fbfaf7",
     borderRadius: "0 0 32px 32px",
   },
