@@ -226,9 +226,6 @@ export function CatsPage() {
 
         <div style={styles.catGrid}>
           {catProfiles.map((profile) => {
-            const age = formatAge(profile.basicInfo?.birthDate);
-            const gender = formatGender(profile.basicInfo?.gender);
-            const meta = [gender, age].filter(Boolean).join("・");
             const isActive = profile.id === activeCatId;
 
             return (
@@ -243,6 +240,14 @@ export function CatsPage() {
                     isActive
                       ? { ...styles.catAvatar, ...styles.catAvatarActive }
                       : styles.catAvatar
+                  }
+                  onClick={
+                    isActive
+                      ? (event) => {
+                          event.stopPropagation();
+                          void handleAvatarUpload();
+                        }
+                      : undefined
                   }
                 >
                   {profile.avatarDataUrl ? (
@@ -259,19 +264,12 @@ export function CatsPage() {
                     />
                   )}
                   {isActive ? (
-                    <div
-                      style={styles.avatarCameraBtn}
-                      onClick={(event) => {
-                        event.stopPropagation();
-                        void handleAvatarUpload();
-                      }}
-                    >
-                      📷
+                    <div style={styles.avatarOverlay}>
+                      <span style={styles.avatarOverlayIcon}>📷</span>
                     </div>
                   ) : null}
                 </div>
                 <span style={styles.catGridName}>{profile.name}</span>
-                {meta ? <span style={styles.catGridMeta}>{meta}</span> : null}
               </button>
             );
           })}
@@ -381,8 +379,9 @@ export function CatsPage() {
               </div>
             ) : null}
 
-            {activeCatProfile.typeLabel ||
-            (activeCatProfile.modifiers?.length ?? 0) > 0 ? (
+            {!isEditingProfile &&
+            (activeCatProfile.typeLabel ||
+              (activeCatProfile.modifiers?.length ?? 0) > 0) ? (
               <>
                 <hr style={styles.divider} />
                 <div style={styles.traitSection}>
@@ -768,20 +767,17 @@ const styles = {
     objectFit: "cover",
     borderRadius: "50%",
   },
-  avatarCameraBtn: {
+  avatarOverlay: {
     position: "absolute",
-    right: "0px",
-    bottom: "0px",
-    width: "20px",
-    height: "20px",
+    inset: 0,
     borderRadius: "50%",
-    background: "#ffffff",
-    border: "1px solid #e0ddd6",
+    background: "rgba(0,0,0,0.25)",
     display: "flex",
     alignItems: "center",
     justifyContent: "center",
-    fontSize: "11px",
-    cursor: "pointer",
+  },
+  avatarOverlayIcon: {
+    fontSize: "16px",
   },
   catAvatarAdd: {
     width: "56px",
@@ -791,6 +787,7 @@ const styles = {
     display: "flex",
     alignItems: "center",
     justifyContent: "center",
+    cursor: "pointer",
   },
   catAvatarAddMark: {
     fontSize: "22px",
