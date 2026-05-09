@@ -57,10 +57,6 @@ const eventSaveErrorMessage =
 const feedbackSaveErrorMessage =
   "\u884c\u52d5\u306e\u8a18\u9332\u306b\u5931\u6557\u3057\u307e\u3057\u305f\u3002\n\u5c11\u3057\u6642\u9593\u3092\u304a\u3044\u3066\u3001\u3082\u3046\u4e00\u5ea6\u304a\u8a66\u3057\u304f\u3060\u3055\u3044\u3002";
 
-const currentStateSaveSuccessMessage =
-  "\u6b8b\u3057\u307e\u3057\u305f\u3002\n{catName}\u306e\u3053\u3068\u304c\u3001\u5c11\u3057\u305a\u3064\u898b\u3048\u3066\u304d\u307e\u3059\u3002";
-const firstCurrentStateSaveSuccessMessage =
-  "{label}\u3001\u898b\u3064\u3051\u307e\u3057\u305f";
 const concernSaveSuccessMessage =
   "\u6b8b\u3057\u307e\u3057\u305f\u3002\n{catName}\u306e\u69d8\u5b50\u304c\u3001\u5c11\u3057\u305a\u3064\u305f\u307e\u3063\u3066\u3044\u304d\u307e\u3059\u3002";
 
@@ -160,6 +156,17 @@ export function HomeInput({
     activeCatProfile?.typeLabel ?? catTraitMemo?.typeLabel;
   const activeCatModifiers =
     activeCatProfile?.modifiers ?? catTraitMemo?.modifiers ?? [];
+  const activeCatTypeKey =
+    activeCatProfile?.typeKey ??
+    (catTraitMemo as { typeKey?: string } | null)?.typeKey;
+  const currentTimeBand = buildCalendarContext().timeBand;
+  const suggestedSignals = isHydrated
+    ? getSuggestedSignals({
+        timeBand: currentTimeBand,
+        typeKey: activeCatTypeKey,
+        modifiers: activeCatModifiers,
+      })
+    : [];
 
   useEffect(() => {
     const completed =
@@ -356,12 +363,13 @@ export function HomeInput({
       signal,
       label,
     });
+    const calendarContext = buildCalendarContext();
     const event = await insertEvent({
       event_type: "current_state",
       signal,
       label,
       source: "home",
-      calendarContext: buildCalendarContext(),
+      calendarContext,
       localCatId: activeCatId,
     });
 
@@ -373,12 +381,15 @@ export function HomeInput({
 
     setSaveErrorSection("");
     setSaveErrorMessage("");
-    const successMessage = isFirstSignal
-        ? firstCurrentStateSaveSuccessMessage.replace(
-            "{label}",
-            getOptionDisplayLabel(label),
-          )
-        : currentStateSaveSuccessMessage.replace("{catName}", catName);
+    const successMessage = buildCurrentStateSuccessMessage({
+      catName,
+      label,
+      signal,
+      isFirst: isFirstSignal,
+      totalEventCount: activeCatEvents.length,
+      timeBand: calendarContext.timeBand,
+      typeKey: activeCatTypeKey,
+    });
     setCurrentStateMessage(
       buildSaveSuccessMessage(successMessage, firstPoseDiscovery?.label),
     );
@@ -582,8 +593,8 @@ export function HomeInput({
             <h2 style={styles.sectionTitle}>
               {`${catName}\u306f\u3044\u307e\u3069\u3046\u3057\u3066\u308b\uff1f`}
             </h2>
-            <p style={styles.sectionDescription}>
-              {"\u3044\u307e\u898b\u3048\u305f\u307e\u307e\u3001\u3072\u3068\u3064\u3067OK\u3067\u3059"}
+            <p style={styles.tapPrompt}>
+              {"\u3044\u3061\u3070\u3093\u8fd1\u3044\u306e\u3092\u3072\u3068\u3064\u3060\u3051"}
             </p>
             {currentStateMessage ? (
               <p style={styles.sectionMessage}>{currentStateMessage}</p>
@@ -607,6 +618,7 @@ export function HomeInput({
               options={[...CURRENT_OPTIONS, ...CONCERN_OPTIONS]}
               variant="current"
               embedded
+              suggestedSignals={suggestedSignals}
               activeCatId={activeCatId}
               recentStateRecords={recentStateRecords}
               onSelect={(option) => {
@@ -1634,6 +1646,7 @@ function OptionSection<Option extends { label: string }>({
   errorMessage,
   activeCatId,
   recentStateRecords = [],
+  suggestedSignals = [],
   onSelect,
 }: {
   label?: string;
@@ -1646,6 +1659,7 @@ function OptionSection<Option extends { label: string }>({
   errorMessage?: string;
   activeCatId?: string | null;
   recentStateRecords?: RecentStateRecord[];
+  suggestedSignals?: string[];
   onSelect: (option: Option) => void;
 }) {
   const sectionStyle = embedded
@@ -1703,6 +1717,9 @@ function OptionSection<Option extends { label: string }>({
                   signal,
                 })
               : false;
+          const isSuggested = signal
+            ? suggestedSignals.includes(getSuggestedSignalKey(signal))
+            : false;
 
           return (
             <button
@@ -1715,6 +1732,8 @@ function OptionSection<Option extends { label: string }>({
                       ...buttonStyle,
                       ...styles.completedStateButton,
                     }
+                  : isSuggested
+                    ? { ...buttonStyle, ...styles.suggestedStateButton }
                   : buttonStyle
               }
             >
@@ -1745,6 +1764,153 @@ function OptionSection<Option extends { label: string }>({
       </div>
     </section>
   );
+}
+
+function buildCurrentStateSuccessMessage({
+  catName,
+  label,
+  signal,
+  isFirst,
+  totalEventCount,
+  timeBand,
+  typeKey,
+}: {
+  catName: string;
+  label: string;
+  signal: string;
+  isFirst: boolean;
+  totalEventCount: number;
+  timeBand: string;
+  typeKey?: string;
+}): string {
+  const messageSignal = getSuggestedSignalKey(signal);
+
+  if (totalEventCount === 0) {
+    return `はじめての記録！\n${catName}のことが、少しずつ見えてきます。`;
+  }
+
+  if (isFirst) {
+    return `${getOptionDisplayLabel(label)}、見つけました。\nこの様子も${catName}の一部です。`;
+  }
+
+  if ((totalEventCount + 1) % 5 === 0) {
+    return `${totalEventCount + 1}回目の記録！\n${catName}のことが、だいぶ見えてきました。`;
+  }
+
+  const timeBandMessages: Record<string, Record<string, string>> = {
+    morning: {
+      grooming: "朝の毛づくろい、いつも通りですね。",
+      sleeping: `朝もまだねてる${catName}。`,
+      food: "朝ごはんの時間、ちゃんと食べてますね。",
+    },
+    daytime: {
+      sleeping: "昼間はねてることが多そうですね。",
+      playing: `昼間に遊んでる${catName}、元気そう。`,
+    },
+    evening: {
+      food: "夕ごはんの時間、敏感そうですね。",
+      following: `夕方はついてくる${catName}。`,
+    },
+    night: {
+      sleeping: `夜はやっぱりねてる${catName}。`,
+      playing: `夜に遊ぶ${catName}、夜型かも。`,
+      purring: "夜のゴロゴロ、リラックスしてますね。",
+    },
+    late_night: {
+      sleeping: `深夜もねてる${catName}。`,
+    },
+    early_morning: {
+      sleeping: "早朝もまだねてます。",
+      food: "早起きして待ってたのかも。",
+    },
+  };
+
+  const timeBandMsg = timeBandMessages[timeBand]?.[messageSignal];
+  if (timeBandMsg && Math.random() < 0.25) {
+    return `残しました。\n${timeBandMsg}`;
+  }
+
+  const typeKeyMessages: Record<string, Record<string, string>> = {
+    play: {
+      playing: "やっぱり遊ぶのが好きそう。",
+      sleeping: "遊び疲れてねてるのかも。",
+    },
+    food: {
+      food: "ごはんへの反応、敏感ですね。",
+      following: "ごはん待ちでついてきてるのかも。",
+    },
+    social: {
+      following: "かまってほしい気持ちが出てますね。",
+      purring: "一緒にいるのが好きそう。",
+    },
+    stress: {
+      restless: "少し落ち着かない様子ですね。",
+      unknown: "よくわからないときは、様子見でOK。",
+    },
+  };
+
+  const typeMsg = typeKey ? typeKeyMessages[typeKey]?.[messageSignal] : undefined;
+  if (typeMsg && Math.random() < 0.20) {
+    return `残しました。\n${typeMsg}`;
+  }
+
+  const defaults = [
+    `残しました。\n${catName}のことが、少しずつ見えてきます。`,
+    `残しました。\n小さな記録が、${catName}の理解につながります。`,
+    `残しました。\nこうして見ていくと、${catName}のことがわかってきます。`,
+  ];
+  return defaults[totalEventCount % defaults.length];
+}
+
+function getSuggestedSignals({
+  timeBand,
+  typeKey,
+  modifiers,
+}: {
+  timeBand: string;
+  typeKey?: string;
+  modifiers: string[];
+}): string[] {
+  const suggestions: string[] = [];
+
+  const timeBandSuggestions: Record<string, string[]> = {
+    early_morning: ["food", "grooming"],
+    morning: ["grooming", "food", "sleeping"],
+    daytime: ["sleeping", "purring"],
+    evening: ["food", "following"],
+    night: ["sleeping", "purring", "playing"],
+    late_night: ["sleeping"],
+  };
+  const timeSuggested = timeBandSuggestions[timeBand] ?? [];
+  suggestions.push(...timeSuggested.slice(0, 1));
+
+  const typeKeySuggestions: Record<string, string[]> = {
+    play: ["playing"],
+    food: ["food"],
+    social: ["following", "purring"],
+    stress: ["restless"],
+    balanced: [],
+  };
+  if (typeKey) {
+    const typeSuggested = typeKeySuggestions[typeKey] ?? [];
+    suggestions.push(...typeSuggested.slice(0, 1));
+  }
+
+  if (
+    modifiers.includes("夜に元気") &&
+    (timeBand === "night" || timeBand === "late_night")
+  ) {
+    suggestions.push("playing");
+  }
+  if (modifiers.includes("遊び不足で爆発")) {
+    suggestions.push("playing");
+  }
+
+  return [...new Set(suggestions)].slice(0, 2);
+}
+
+function getSuggestedSignalKey(signal: string) {
+  return signal === "after_food" ? "food" : signal;
 }
 
 function getSignalIconSrc(signal: string) {
@@ -2702,6 +2868,13 @@ const styles = {
     fontSize: "13px",
     lineHeight: 1.6,
   },
+  tapPrompt: {
+    margin: "-6px 0 14px",
+    color: "#6B9E82",
+    fontSize: "13px",
+    fontWeight: 600,
+    lineHeight: 1.5,
+  },
   sectionMessage: {
     margin: "-4px 0 14px",
     color: "#52525b",
@@ -2820,6 +2993,10 @@ const styles = {
     transform: "scale(0.98)",
     transition:
       "background 180ms ease, border-color 180ms ease, opacity 180ms ease, transform 160ms ease",
+  },
+  suggestedStateButton: {
+    borderColor: "rgba(107, 158, 130, 0.5)",
+    background: "rgba(107, 158, 130, 0.06)",
   },
   completedOptionIcon: {
     opacity: 0.78,
