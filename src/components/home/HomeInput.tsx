@@ -1731,7 +1731,7 @@ function OptionSection<Option extends { label: string }>({
                 <img
                   src={getSignalIconSrc(signal)}
                   alt=""
-                  style={{ width: "28px", height: "28px", objectFit: "contain" }}
+                  style={{ width: "40px", height: "40px", objectFit: "contain" }}
                 />
                 {isCompleted ? (
                   <span style={styles.completedCheck} aria-hidden="true">
@@ -2755,7 +2755,7 @@ const styles = {
     alignItems: "center",
     justifyContent: "center",
     gap: "5px",
-    minHeight: "76px",
+    minHeight: "84px",
     border: "1px solid rgba(225, 222, 216, 0.68)",
     borderRadius: "19px",
     background: "rgba(255, 255, 255, 0.72)",
