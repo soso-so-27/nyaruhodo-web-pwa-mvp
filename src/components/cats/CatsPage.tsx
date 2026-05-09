@@ -230,38 +230,58 @@ export function CatsPage() {
           </div>
 
           <div style={styles.catList}>
-            {catProfiles.map((profile) => (
-              <button
-                key={profile.id}
-                type="button"
-                onClick={() => handleCatSelect(profile.id)}
-                style={
-                  profile.id === activeCatId
-                    ? styles.activeCatButton
-                    : styles.catButton
-                }
-              >
-                {profile.name}
-              </button>
-            ))}
+            {catProfiles.map((profile) => {
+              const age = formatAge(profile.basicInfo?.birthDate);
+              const gender = formatGender(profile.basicInfo?.gender);
+              const meta = [gender, age].filter(Boolean).join("・");
+              const understanding = profile.understanding?.percent ?? 0;
+              const isActive = profile.id === activeCatId;
+
+              return (
+                <button
+                  key={profile.id}
+                  type="button"
+                  onClick={() => handleCatSelect(profile.id)}
+                  style={isActive ? styles.catListItemActive : styles.catListItem}
+                >
+                  <div style={styles.catListAvatar}>
+                    <img
+                      src={getCatAvatarSrcForCoat(profile.appearance?.coat)}
+                      alt=""
+                      style={styles.catListAvatarImg}
+                    />
+                  </div>
+                  <div style={styles.catListInfo}>
+                    <span style={styles.catListName}>{profile.name}</span>
+                    {meta ? <span style={styles.catListMeta}>{meta}</span> : null}
+                    <div style={styles.catListProgress}>
+                      <div style={styles.catListProgressBar}>
+                        <div
+                          style={{
+                            ...styles.catListProgressFill,
+                            width: `${Math.min(100, understanding)}%`,
+                          }}
+                        />
+                      </div>
+                      <span style={styles.catListProgressLabel}>
+                        {understanding}
+                        {"%"}
+                      </span>
+                    </div>
+                  </div>
+                  <span style={styles.catListChevron}>›</span>
+                </button>
+              );
+            })}
           </div>
 
-          <div style={styles.managementActions}>
-            <button
-              type="button"
-              onClick={startAddingCat}
-              style={styles.outlineActionButton}
-            >
-              {"猫を追加"}
-            </button>
-            <button
-              type="button"
-              onClick={startEditingCatName}
-              style={styles.outlineActionButton}
-            >
-              {"名前を変える"}
-            </button>
-          </div>
+          <button
+            type="button"
+            onClick={startAddingCat}
+            style={styles.addCatListButton}
+          >
+            ＋ 猫を追加
+          </button>
 
           {isAddingCat ? (
             <div style={styles.editor}>
@@ -332,6 +352,53 @@ export function CatsPage() {
       <BottomNavigation active="cats" />
     </main>
   );
+}
+
+function formatAge(birthDate?: string): string {
+  if (!birthDate) {
+    return "";
+  }
+
+  const birth = new Date(birthDate);
+
+  if (Number.isNaN(birth.getTime())) {
+    return "";
+  }
+
+  const now = new Date();
+  let totalMonths =
+    (now.getFullYear() - birth.getFullYear()) * 12 +
+    (now.getMonth() - birth.getMonth());
+
+  if (now.getDate() < birth.getDate()) {
+    totalMonths -= 1;
+  }
+
+  if (totalMonths < 0) {
+    return "";
+  }
+
+  if (totalMonths < 12) {
+    return `${totalMonths}ヶ月`;
+  }
+
+  if (totalMonths < 24) {
+    return "1歳";
+  }
+
+  return `${Math.floor(totalMonths / 12)}歳`;
+}
+
+function formatGender(gender?: string): string {
+  if (gender === "male") {
+    return "男の子";
+  }
+
+  if (gender === "female") {
+    return "女の子";
+  }
+
+  return "";
 }
 
 const styles = {
@@ -520,38 +587,108 @@ const styles = {
   },
   catList: {
     display: "flex",
-    flexWrap: "wrap",
-    gap: "8px",
+    flexDirection: "column",
+    gap: "6px",
+    marginTop: "12px",
   },
-  managementActions: {
-    display: "grid",
-    gridTemplateColumns: "repeat(2, minmax(0, 1fr))",
-    gap: "10px",
-    marginTop: "14px",
-  },
-  catButton: {
-    minHeight: "38px",
-    padding: "0 14px",
-    border: "1px solid rgba(222, 219, 211, 0.78)",
-    borderRadius: "999px",
-    background: "rgba(255, 255, 255, 0.78)",
-    color: "#383936",
-    fontSize: "14px",
-    fontWeight: 520,
-    letterSpacing: 0,
+  catListItem: {
+    display: "flex",
+    alignItems: "center",
+    gap: "12px",
+    minHeight: "64px",
+    border: "1px solid #e5e2dc",
+    borderRadius: "16px",
+    background: "#ffffff",
+    padding: "10px 12px",
     cursor: "pointer",
+    textAlign: "left",
   },
-  activeCatButton: {
-    minHeight: "38px",
-    padding: "0 14px",
-    border: "1px solid #cfd4ca",
-    borderRadius: "999px",
-    background: "#f2f3ef",
-    color: "#3f433d",
-    fontSize: "14px",
-    fontWeight: 610,
-    letterSpacing: 0,
+  catListItemActive: {
+    display: "flex",
+    alignItems: "center",
+    gap: "12px",
+    minHeight: "64px",
+    border: "1px solid #d4d6ce",
+    borderRadius: "16px",
+    background: "#f0f1ec",
+    padding: "10px 12px",
     cursor: "pointer",
+    textAlign: "left",
+  },
+  catListAvatar: {
+    width: "44px",
+    height: "44px",
+    borderRadius: "12px",
+    overflow: "hidden",
+    flexShrink: 0,
+    background: "#f5f3ef",
+    border: "0.5px solid #e0ddd6",
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  catListAvatarImg: {
+    width: "36px",
+    height: "36px",
+    objectFit: "contain",
+  },
+  catListInfo: {
+    flex: 1,
+    minWidth: 0,
+    display: "flex",
+    flexDirection: "column",
+    gap: "3px",
+  },
+  catListName: {
+    fontSize: "14px",
+    fontWeight: 600,
+    color: "#27272a",
+    lineHeight: 1.3,
+  },
+  catListMeta: {
+    fontSize: "11px",
+    color: "#8a8a80",
+    lineHeight: 1.3,
+  },
+  catListProgress: {
+    display: "flex",
+    alignItems: "center",
+    gap: "6px",
+    marginTop: "2px",
+  },
+  catListProgressBar: {
+    flex: 1,
+    height: "3px",
+    background: "#e8e5de",
+    borderRadius: "99px",
+    overflow: "hidden",
+  },
+  catListProgressFill: {
+    height: "100%",
+    background: "#6B9E82",
+    borderRadius: "99px",
+  },
+  catListProgressLabel: {
+    fontSize: "10px",
+    color: "#8a8a80",
+    flexShrink: 0,
+  },
+  catListChevron: {
+    fontSize: "16px",
+    color: "#c8c5be",
+    flexShrink: 0,
+  },
+  addCatListButton: {
+    width: "100%",
+    minHeight: "48px",
+    border: "1px dashed #dedbd3",
+    borderRadius: "16px",
+    background: "transparent",
+    color: "#8a8a80",
+    fontSize: "13px",
+    fontWeight: 500,
+    cursor: "pointer",
+    marginTop: "6px",
   },
   primaryButton: {
     minHeight: "44px",
@@ -574,17 +711,6 @@ const styles = {
     color: "#383936",
     fontSize: "14px",
     fontWeight: 560,
-    letterSpacing: 0,
-    cursor: "pointer",
-  },
-  outlineActionButton: {
-    minHeight: "42px",
-    border: "1px solid rgba(224, 221, 214, 0.8)",
-    borderRadius: "14px",
-    background: "rgba(255, 255, 255, 0.78)",
-    color: "#4b4d49",
-    fontSize: "14px",
-    fontWeight: 540,
     letterSpacing: 0,
     cursor: "pointer",
   },

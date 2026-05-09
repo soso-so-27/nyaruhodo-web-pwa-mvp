@@ -2869,12 +2869,6 @@ const styles = {
     fontWeight: 600,
     letterSpacing: 0,
   },
-  settingsCatList: {
-    display: "flex",
-    flexWrap: "wrap",
-    gap: "8px",
-    marginTop: "12px",
-  },
   settingsActions: {
     display: "flex",
     flexWrap: "wrap",
