@@ -121,6 +121,15 @@ export function CollectionPage() {
     setSelectedSlug(null);
   }
 
+  function handleCatSelect(catId: string) {
+    const nextActiveProfile = getActiveCatProfile(catProfiles, catId);
+
+    saveActiveCatId(nextActiveProfile.id);
+    setActiveCatId(nextActiveProfile.id);
+    setSelectedSlug(null);
+    setCurrentPhotoIndex(0);
+  }
+
   async function handlePhotoAdd(slot: CollectionSlot) {
     if (!activeCatId) {
       return;
@@ -221,7 +230,12 @@ export function CollectionPage() {
             <p style={styles.emptyText}>準備しています</p>
           </section>
         </div>
-        <BottomNavigation active="collection" />
+        <BottomNavigation
+          active="collection"
+          catProfiles={catProfiles}
+          activeCatId={activeCatId}
+          onCatSelect={handleCatSelect}
+        />
       </main>
     );
   }
@@ -238,7 +252,12 @@ export function CollectionPage() {
             </a>
           </section>
         </div>
-        <BottomNavigation active="collection" />
+        <BottomNavigation
+          active="collection"
+          catProfiles={catProfiles}
+          activeCatId={activeCatId}
+          onCatSelect={handleCatSelect}
+        />
       </main>
     );
   }
@@ -247,15 +266,8 @@ export function CollectionPage() {
     <main style={styles.page}>
       <div style={styles.container}>
         <header style={styles.header}>
-          <div style={styles.headerRow}>
-            <h1 style={styles.title}>コレクション</h1>
-            <span style={styles.catChip}>
-              {catName}
-              <span aria-hidden="true" style={styles.catChipArrow}>
-                ▼
-              </span>
-            </span>
-          </div>
+          <h1 style={styles.title}>コレクション</h1>
+          <p style={styles.collectionCatName}>{catName}</p>
           <CollectionProgress
             activeGroupId={activeGroupId}
             progress={progress}
@@ -282,7 +294,12 @@ export function CollectionPage() {
           onPhotoScroll={handlePhotoScroll}
         />
       ) : null}
-      <BottomNavigation active="collection" />
+      <BottomNavigation
+        active="collection"
+        catProfiles={catProfiles}
+        activeCatId={activeCatId}
+        onCatSelect={handleCatSelect}
+      />
     </main>
   );
 }
@@ -929,13 +946,6 @@ const styles = {
     marginBottom: "14px",
     padding: "2px 0 0",
   },
-  headerRow: {
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "space-between",
-    gap: "12px",
-    marginBottom: "14px",
-  },
   title: {
     margin: 0,
     color: "#252622",
@@ -944,26 +954,10 @@ const styles = {
     fontWeight: 650,
     letterSpacing: 0,
   },
-  catChip: {
-    display: "inline-flex",
-    alignItems: "center",
-    gap: "5px",
-    maxWidth: "42%",
-    border: "1px solid rgba(219, 216, 209, 0.86)",
-    borderRadius: "999px",
-    background: "rgba(255, 255, 255, 0.78)",
-    color: "#4f514b",
-    fontSize: "13px",
-    fontWeight: 620,
-    lineHeight: 1,
-    padding: "8px 11px",
-    overflow: "hidden",
-    whiteSpace: "nowrap",
-    textOverflow: "ellipsis",
-  },
-  catChipArrow: {
-    color: "#8b8d86",
-    fontSize: "10px",
+  collectionCatName: {
+    fontSize: "12px",
+    color: "#8a8a80",
+    margin: "-8px 0 12px",
   },
   progressBlock: {
     display: "grid",

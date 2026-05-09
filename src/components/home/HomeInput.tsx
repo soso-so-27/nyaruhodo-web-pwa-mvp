@@ -634,7 +634,12 @@ export function HomeInput({
         </div>
 
       </div>
-      <BottomNavigation active="today" />
+      <BottomNavigation
+        active="today"
+        catProfiles={catProfiles}
+        activeCatId={activeCatId}
+        onCatSelect={handleCatSelect}
+      />
     </main>
   );
 }

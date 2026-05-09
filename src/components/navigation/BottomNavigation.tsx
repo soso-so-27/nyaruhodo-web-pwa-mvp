@@ -1,9 +1,24 @@
 "use client";
 
+import { useState } from "react";
 import type { CSSProperties, ReactNode } from "react";
 
 type BottomNavigationProps = {
   active: "home" | "today" | "collection" | "cats" | "together";
+  catProfiles?: CatProfile[];
+  activeCatId?: string | null;
+  onCatSelect?: (catId: string) => void;
+};
+
+type CatProfile = {
+  id: string;
+  name: string;
+  appearance?: { coat?: string };
+  avatarDataUrl?: string;
+  basicInfo?: {
+    birthDate?: string;
+    gender?: "male" | "female" | "unknown";
+  };
 };
 
 type NavItem = {
@@ -13,9 +28,19 @@ type NavItem = {
   icon: ReactNode;
 };
 
-export function BottomNavigation({ active }: BottomNavigationProps) {
+export function BottomNavigation({
+  active,
+  catProfiles,
+  activeCatId,
+  onCatSelect,
+}: BottomNavigationProps) {
+  const [isSheetOpen, setIsSheetOpen] = useState(false);
   const activeKey =
     active === "today" ? "home" : active === "together" ? "collection" : active;
+  const activeCatProfile =
+    catProfiles?.find((profile) => profile.id === activeCatId) ?? null;
+  const activeCatName = activeCatProfile?.name ?? "ねこ";
+  const activeCatAvatarUrl = activeCatProfile?.avatarDataUrl ?? null;
   const items: readonly NavItem[] = [
     {
       key: "home",
@@ -38,28 +63,171 @@ export function BottomNavigation({ active }: BottomNavigationProps) {
   ];
 
   return (
-    <nav style={styles.bottomNav} aria-label="下部ナビ">
-      {items.map((item) => {
-        const isActive = activeKey === item.key;
+    <>
+      <nav style={styles.bottomNav} aria-label="下部ナビ">
+        {items.map((item) => {
+          const isActive = activeKey === item.key;
 
-        return (
-          <a
-            key={item.key}
-            href={item.href}
-            style={isActive ? styles.activeNavButton : styles.navButton}
-          >
-            <span
-              style={isActive ? styles.activeNavIcon : styles.navIcon}
-              aria-hidden="true"
+          if (item.key === "cats") {
+            return (
+              <button
+                key={item.key}
+                type="button"
+                onClick={() => setIsSheetOpen(true)}
+                style={isActive ? styles.activeNavButton : styles.navButton}
+              >
+                <span style={styles.catNavAvatar}>
+                  {activeCatAvatarUrl ? (
+                    <img
+                      src={activeCatAvatarUrl}
+                      alt=""
+                      style={styles.catNavAvatarImg}
+                    />
+                  ) : (
+                    <span style={isActive ? styles.activeNavIcon : styles.navIcon}>
+                      <CatIcon />
+                    </span>
+                  )}
+                </span>
+                <span style={styles.catNavLabel}>
+                  {truncateName(activeCatName)}
+                  {"▾"}
+                </span>
+              </button>
+            );
+          }
+
+          return (
+            <a
+              key={item.key}
+              href={item.href}
+              style={isActive ? styles.activeNavButton : styles.navButton}
             >
-              {item.icon}
-            </span>
-            <span>{item.label}</span>
-          </a>
-        );
-      })}
-    </nav>
+              <span
+                style={isActive ? styles.activeNavIcon : styles.navIcon}
+                aria-hidden="true"
+              >
+                {item.icon}
+              </span>
+              <span>{item.label}</span>
+            </a>
+          );
+        })}
+      </nav>
+
+      {isSheetOpen ? (
+        <>
+          <div
+            style={styles.sheetOverlay}
+            onClick={() => setIsSheetOpen(false)}
+          />
+          <div style={styles.sheet}>
+            <div style={styles.sheetHandle} />
+            <p style={styles.sheetTitle}>猫を選ぶ</p>
+            <div style={styles.sheetCatGrid}>
+              {(catProfiles ?? []).map((profile) => {
+                const isSelected = profile.id === activeCatId;
+                const age = formatAge(profile.basicInfo?.birthDate);
+                const gender = formatGender(profile.basicInfo?.gender);
+                const meta = [gender, age].filter(Boolean).join("・");
+
+                return (
+                  <button
+                    key={profile.id}
+                    type="button"
+                    onClick={() => {
+                      onCatSelect?.(profile.id);
+                      setIsSheetOpen(false);
+                    }}
+                    style={styles.sheetCatItem}
+                  >
+                    <div
+                      style={
+                        isSelected
+                          ? { ...styles.sheetCatAvatar, ...styles.sheetCatAvatarActive }
+                          : styles.sheetCatAvatar
+                      }
+                    >
+                      {profile.avatarDataUrl ? (
+                        <img
+                          src={profile.avatarDataUrl}
+                          alt={profile.name}
+                          style={styles.sheetCatAvatarPhoto}
+                        />
+                      ) : (
+                        <img
+                          src={getCatAvatarSrc(profile.appearance?.coat)}
+                          alt={profile.name}
+                          style={styles.sheetCatAvatarImg}
+                        />
+                      )}
+                    </div>
+                    <span style={styles.sheetCatName}>{profile.name}</span>
+                    {meta ? <span style={styles.sheetCatMeta}>{meta}</span> : null}
+                  </button>
+                );
+              })}
+            </div>
+            <a
+              href="/cats"
+              style={styles.sheetCatsLink}
+              onClick={() => setIsSheetOpen(false)}
+            >
+              ねこタブで管理する ›
+            </a>
+          </div>
+        </>
+      ) : null}
+    </>
   );
+}
+
+function truncateName(name: string): string {
+  return name.length > 5 ? `${name.slice(0, 4)}…` : name;
+}
+
+function getCatAvatarSrc(coat?: string): string {
+  const coatMap: Record<string, string> = {
+    saba: "/sample-cats/saba.png",
+    gray: "/sample-cats/gray.png",
+    orange_tabby: "/sample-cats/orange_tabby.png",
+    black: "/sample-cats/black.png",
+    white: "/sample-cats/white.png",
+    calico: "/sample-cats/calico.png",
+    cream: "/sample-cats/saba.png",
+  };
+
+  return coatMap[coat ?? ""] ?? "/sample-cats/saba.png";
+}
+
+function formatAge(birthDate?: string): string {
+  if (!birthDate) {
+    return "";
+  }
+
+  const birth = new Date(birthDate);
+  const now = new Date();
+  const totalMonths =
+    (now.getFullYear() - birth.getFullYear()) * 12 +
+    (now.getMonth() - birth.getMonth());
+
+  if (totalMonths < 12) {
+    return `${totalMonths}ヶ月`;
+  }
+
+  return `${Math.floor(totalMonths / 12)}歳`;
+}
+
+function formatGender(gender?: string): string {
+  if (gender === "male") {
+    return "男の子";
+  }
+
+  if (gender === "female") {
+    return "女の子";
+  }
+
+  return "";
 }
 
 function HomeIcon() {
@@ -157,12 +325,15 @@ const styles = {
     gap: "1px",
     minHeight: "42px",
     borderRadius: "18px",
+    border: "none",
     background: "transparent",
     color: "#777872",
     textDecoration: "none",
     fontSize: "10px",
     fontWeight: 600,
+    fontFamily: "inherit",
     letterSpacing: 0,
+    padding: 0,
     cursor: "pointer",
   },
   activeNavButton: {
@@ -173,12 +344,15 @@ const styles = {
     gap: "1px",
     minHeight: "42px",
     borderRadius: "18px",
+    border: "none",
     background: "#ecece7",
     color: "#3f433d",
     textDecoration: "none",
     fontSize: "10px",
     fontWeight: 650,
+    fontFamily: "inherit",
     letterSpacing: 0,
+    padding: 0,
     cursor: "pointer",
   },
   navIcon: {
@@ -203,5 +377,122 @@ const styles = {
     width: "18px",
     height: "18px",
     display: "block",
+  },
+  catNavAvatar: {
+    width: "22px",
+    height: "22px",
+    borderRadius: "50%",
+    overflow: "hidden",
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  catNavAvatarImg: {
+    width: "22px",
+    height: "22px",
+    objectFit: "cover",
+    borderRadius: "50%",
+  },
+  catNavLabel: {
+    fontSize: "10px",
+    fontWeight: 600,
+    letterSpacing: 0,
+    display: "flex",
+    alignItems: "center",
+    gap: "1px",
+  },
+  sheetOverlay: {
+    position: "fixed",
+    inset: 0,
+    background: "rgba(0,0,0,0.25)",
+    zIndex: 30,
+  },
+  sheet: {
+    position: "fixed",
+    bottom: 0,
+    left: 0,
+    right: 0,
+    background: "#fbfaf7",
+    borderRadius: "20px 20px 0 0",
+    zIndex: 40,
+    padding: "0 20px calc(32px + env(safe-area-inset-bottom))",
+  },
+  sheetHandle: {
+    width: "36px",
+    height: "4px",
+    background: "#d0cdc6",
+    borderRadius: "99px",
+    margin: "10px auto 16px",
+  },
+  sheetTitle: {
+    fontSize: "13px",
+    fontWeight: 600,
+    color: "#8a8a80",
+    margin: "0 0 14px",
+    textAlign: "center",
+  },
+  sheetCatGrid: {
+    display: "flex",
+    gap: "16px",
+    overflowX: "auto",
+    paddingBottom: "4px",
+    scrollbarWidth: "none",
+    marginBottom: "16px",
+  },
+  sheetCatItem: {
+    display: "flex",
+    flexDirection: "column",
+    alignItems: "center",
+    gap: "5px",
+    flexShrink: 0,
+    background: "transparent",
+    border: "none",
+    cursor: "pointer",
+    padding: 0,
+    fontFamily: "inherit",
+  },
+  sheetCatAvatar: {
+    width: "64px",
+    height: "64px",
+    borderRadius: "50%",
+    border: "3px solid transparent",
+    overflow: "hidden",
+    background: "#f5f3ef",
+  },
+  sheetCatAvatarActive: {
+    border: "3px solid #6B9E82",
+  },
+  sheetCatAvatarPhoto: {
+    width: "100%",
+    height: "100%",
+    objectFit: "cover",
+    borderRadius: "50%",
+  },
+  sheetCatAvatarImg: {
+    width: "52px",
+    height: "52px",
+    objectFit: "contain",
+    margin: "6px auto",
+    display: "block",
+  },
+  sheetCatName: {
+    fontSize: "12px",
+    fontWeight: 500,
+    color: "#2a2a28",
+    maxWidth: "72px",
+    textAlign: "center",
+    wordBreak: "break-all",
+  },
+  sheetCatMeta: {
+    fontSize: "10px",
+    color: "#9a9890",
+  },
+  sheetCatsLink: {
+    display: "block",
+    textAlign: "center",
+    fontSize: "13px",
+    color: "#6B9E82",
+    textDecoration: "none",
+    padding: "10px 0",
   },
 } satisfies Record<string, CSSProperties>;
