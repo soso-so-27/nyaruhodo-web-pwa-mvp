@@ -226,8 +226,13 @@ export function CatsPage() {
     <main style={styles.page}>
       <div style={styles.container}>
         <div style={styles.pageHeader}>
-          <h1 style={styles.pageTitle}>ねこ</h1>
-          <p style={styles.pageSub}>一緒に暮らしている子</p>
+          <div>
+            <h1 style={styles.pageTitle}>ねこ</h1>
+            <p style={styles.pageSub}>一緒に暮らしている子</p>
+          </div>
+          <a href="/settings" style={styles.settingsButton} aria-label="設定">
+            <SettingsGearIcon />
+          </a>
         </div>
 
         <div style={styles.catGrid}>
@@ -632,6 +637,25 @@ function formatGender(gender?: string): string {
   return "";
 }
 
+function SettingsGearIcon() {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      width="20"
+      height="20"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.8"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+    >
+      <circle cx="12" cy="12" r="3" />
+      <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z" />
+    </svg>
+  );
+}
+
 function getCatAvatarSrc(coat?: string): string {
   const coatMap: Record<string, string> = {
     saba: "/sample-cats/saba.png",
@@ -717,6 +741,10 @@ const styles = {
     padding: "16px 14px calc(224px + env(safe-area-inset-bottom))",
   },
   pageHeader: {
+    display: "flex",
+    alignItems: "flex-start",
+    justifyContent: "space-between",
+    gap: "12px",
     marginBottom: "20px",
     paddingTop: "8px",
   },
@@ -730,6 +758,19 @@ const styles = {
     fontSize: "13px",
     color: "#8a8a80",
     margin: 0,
+  },
+  settingsButton: {
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    width: "36px",
+    height: "36px",
+    borderRadius: "50%",
+    background: "rgba(255,255,255,0.8)",
+    border: "0.5px solid #e0ddd6",
+    color: "#6a6a62",
+    textDecoration: "none",
+    flexShrink: 0,
   },
   catGrid: {
     display: "flex",

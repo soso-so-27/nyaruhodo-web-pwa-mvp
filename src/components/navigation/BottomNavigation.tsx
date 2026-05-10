@@ -21,7 +21,7 @@ export function BottomNavigation({ active }: BottomNavigationProps) {
     {
       key: "home",
       href: "/home",
-      label: "今日",
+      label: "ホーム",
       icon: <HomeIcon />,
     },
     {
