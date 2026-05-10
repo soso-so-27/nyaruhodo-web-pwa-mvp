@@ -1919,7 +1919,7 @@ const styles = {
   },
   photoHeroMedia: {
     position: "relative",
-    height: "280px",
+    height: "240px",
     overflow: "hidden",
   },
   photoHeroInfo: {
@@ -2024,7 +2024,7 @@ const styles = {
     position: "absolute",
     left: "12px",
     right: "12px",
-    bottom: "4px",
+    bottom: "20px",
     zIndex: 2,
     display: "flex",
     flexDirection: "column",
