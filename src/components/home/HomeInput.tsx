@@ -64,6 +64,8 @@ const ONBOARDING_HOME_HINT_KEY = "diagnosis_onboarding_home_hint";
 const ONBOARDING_HOME_HINT_MAX_AGE_MS = 10 * 60 * 1000;
 const POST_DIAGNOSIS_FEEDBACK_KEY = "post_diagnosis_feedback";
 const RECENT_STATE_RECORDS_KEY = "recent_state_records";
+const ACCOUNT_CREATE_PROMPT_DISMISSED_KEY = "account_create_prompt_dismissed";
+const ACCOUNT_CREATE_PROMPT_DISMISSED_MS = 7 * 24 * 60 * 60 * 1000;
 const RECENT_STATE_RECORD_TTL_MS = 30 * 60 * 1000;
 const RECENT_CAT_SUMMARY_WINDOW_MS = 7 * 24 * 60 * 60 * 1000;
 const SAMPLE_HOME_CAT_PHOTO_SRC = "/sample-cats/home-hero-generated.png";
@@ -116,6 +118,10 @@ export function HomeInput({
   const [recentStateRecords, setRecentStateRecords] = useState<
     RecentStateRecord[]
   >([]);
+  const [
+    isAccountCreatePromptVisible,
+    setIsAccountCreatePromptVisible,
+  ] = useState(false);
 
   const activeCatProfile =
     catProfiles.length > 0
@@ -167,6 +173,11 @@ export function HomeInput({
         modifiers: activeCatModifiers,
       })
     : [];
+  const shouldRenderAccountCreatePrompt =
+    isHydrated &&
+    isAccountCreatePromptVisible &&
+    catProfiles.length > 0 &&
+    Boolean(activeCatId);
 
   useEffect(() => {
     const completed =
@@ -213,6 +224,7 @@ export function HomeInput({
         window.localStorage.removeItem(POST_DIAGNOSIS_FEEDBACK_KEY);
       }, 0);
     }
+    setIsAccountCreatePromptVisible(shouldShowAccountCreatePrompt());
     setIsHydrated(true);
 
     const latestHypothesis = readLatestHypothesis();
@@ -543,6 +555,11 @@ export function HomeInput({
     setSaveErrorMessage("");
   }
 
+  function handleAccountCreatePromptDismiss() {
+    dismissAccountCreatePrompt();
+    setIsAccountCreatePromptVisible(false);
+  }
+
   return (
     <main style={styles.page}>
       <div style={styles.container}>
@@ -561,6 +578,13 @@ export function HomeInput({
           onCatSelect={handleCatSelect}
         />
         </div>
+
+        {shouldRenderAccountCreatePrompt ? (
+          <AccountCreatePrompt
+            onCreate={() => router.push("/account/create")}
+            onDismiss={handleAccountCreatePromptDismiss}
+          />
+        ) : null}
 
         {visibleLatestHypothesis || hypothesisMessage ? (
         <section style={styles.insightCard}>
@@ -713,6 +737,43 @@ function readPostDiagnosisFeedbackMessage(activeCatId: string, catName: string) 
   } catch {
     return "";
   }
+}
+
+function shouldShowAccountCreatePrompt() {
+  const value = window.localStorage.getItem(ACCOUNT_CREATE_PROMPT_DISMISSED_KEY);
+
+  if (!value) {
+    return true;
+  }
+
+  try {
+    const parsed = JSON.parse(value) as { dismissedUntil?: string };
+    const dismissedUntil = parsed.dismissedUntil
+      ? new Date(parsed.dismissedUntil).getTime()
+      : Number.NaN;
+
+    if (Number.isNaN(dismissedUntil) || dismissedUntil <= Date.now()) {
+      window.localStorage.removeItem(ACCOUNT_CREATE_PROMPT_DISMISSED_KEY);
+      return true;
+    }
+
+    return false;
+  } catch {
+    window.localStorage.removeItem(ACCOUNT_CREATE_PROMPT_DISMISSED_KEY);
+    return true;
+  }
+}
+
+function dismissAccountCreatePrompt() {
+  window.localStorage.setItem(
+    ACCOUNT_CREATE_PROMPT_DISMISSED_KEY,
+    JSON.stringify({
+      dismissedAt: new Date().toISOString(),
+      dismissedUntil: new Date(
+        Date.now() + ACCOUNT_CREATE_PROMPT_DISMISSED_MS,
+      ).toISOString(),
+    }),
+  );
 }
 
 function readRecentStateRecords() {
@@ -1129,6 +1190,41 @@ function Header({
         </>
       ) : null}
     </header>
+  );
+}
+
+function AccountCreatePrompt({
+  onCreate,
+  onDismiss,
+}: {
+  onCreate: () => void;
+  onDismiss: () => void;
+}) {
+  return (
+    <section style={styles.accountPromptCard} aria-label="アカウント作成">
+      <div style={styles.accountPromptText}>
+        <h2 style={styles.accountPromptTitle}>この子の記録を残しておく</h2>
+        <p style={styles.accountPromptBody}>
+          タイプ診断や最近の様子を、あとから見返せるようにします。
+        </p>
+      </div>
+      <div style={styles.accountPromptActions}>
+        <button
+          type="button"
+          onClick={onCreate}
+          style={styles.accountPromptPrimaryButton}
+        >
+          無料で保存する
+        </button>
+        <button
+          type="button"
+          onClick={onDismiss}
+          style={styles.accountPromptSecondaryButton}
+        >
+          あとで
+        </button>
+      </div>
+    </section>
   );
 }
 
@@ -2222,6 +2318,62 @@ const styles = {
   },
   photoHeroInfo: {
     padding: "12px 14px 16px",
+  },
+  accountPromptCard: {
+    display: "grid",
+    gap: "12px",
+    margin: "0 0 12px",
+    border: "1px solid rgba(219, 216, 207, 0.72)",
+    borderRadius: "22px",
+    background: "rgba(255, 255, 255, 0.72)",
+    boxShadow: "0 10px 22px rgba(44, 42, 38, 0.028)",
+    padding: "14px",
+  },
+  accountPromptText: {
+    display: "grid",
+    gap: "4px",
+  },
+  accountPromptTitle: {
+    margin: 0,
+    color: "#343632",
+    fontSize: "15px",
+    fontWeight: 700,
+    lineHeight: 1.45,
+    letterSpacing: 0,
+  },
+  accountPromptBody: {
+    margin: 0,
+    color: "#6f6a61",
+    fontSize: "12px",
+    fontWeight: 500,
+    lineHeight: 1.65,
+  },
+  accountPromptActions: {
+    display: "grid",
+    gridTemplateColumns: "minmax(0, 1fr) auto",
+    alignItems: "center",
+    gap: "8px",
+  },
+  accountPromptPrimaryButton: {
+    minHeight: "40px",
+    border: "none",
+    borderRadius: "14px",
+    background: "#6B9E82",
+    color: "#ffffff",
+    fontSize: "13px",
+    fontWeight: 700,
+    cursor: "pointer",
+  },
+  accountPromptSecondaryButton: {
+    minHeight: "40px",
+    border: "none",
+    borderRadius: "14px",
+    background: "transparent",
+    color: "#8a8a80",
+    fontSize: "13px",
+    fontWeight: 650,
+    padding: "0 8px",
+    cursor: "pointer",
   },
   photoHeroImage: {
     position: "absolute",
