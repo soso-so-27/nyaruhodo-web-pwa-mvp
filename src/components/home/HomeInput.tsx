@@ -936,128 +936,130 @@ function Header({
   return (
     <header style={styles.header}>
       <div style={{ ...styles.photoHero, borderColor: photoBorderColor }}>
-        <img src={SAMPLE_HOME_CAT_PHOTO_SRC} alt="" style={styles.photoHeroImage} />
-        <div style={styles.photoHeroFade} aria-hidden="true" />
-        <div style={styles.photoHeroContent}>
-          <h1 style={styles.title}>
-            {canSwitchCats ? (
-              <button
-                type="button"
-                onClick={() => setIsCatSheetOpen(true)}
-                style={styles.titleSwitchButton}
-              >
-                <span>{catName}</span>
-                <span style={styles.titleChevron} aria-hidden="true">
-                  {"▼"}
-                </span>
-              </button>
-            ) : (
-              <>{catName}</>
-            )}
-          </h1>
-          {onboardingHomeMessage ? (
-            <p style={styles.onboardingHomeMessage}>{onboardingHomeMessage}</p>
-          ) : null}
-          {postDiagnosisFeedbackMessage ? (
-            <p style={styles.onboardingHomeMessage}>
-              {postDiagnosisFeedbackMessage}
-            </p>
-          ) : null}
-        </div>
-        <div style={styles.understandingPanel}>
-          <div
-            style={{
-              ...styles.understandingRing,
-              background: `conic-gradient(#858b7c ${ringDegree}deg, rgba(255, 255, 255, 0.76) 0deg)`,
-            }}
-            aria-label={`理解度 ${understandingPercent}%`}
-          >
-            <span style={styles.understandingRingInner}>
-              <span style={styles.understandingRingLabel}>理解度</span>
-              <span style={styles.understandingRingPercent}>
-                {understandingPercent}
-                {"%"}
-              </span>
-            </span>
-          </div>
-        </div>
-      </div>
-      <div style={styles.catInfoCard}>
-        {catTraitLabel ? (
-          <section
-            style={styles.catTraitSection}
-            aria-label={`${catName}\u306e\u3053\u3068`}
-          >
-            <p style={styles.catTraitTitle}>
-              {"\u3053\u306e\u5b50\u306e\u3053\u3068"}
-            </p>
-            <div style={styles.catTraitPills}>
-              <span style={styles.catTraitPill}>{catTraitLabel}</span>
-            </div>
-            {visibleCatModifiers.length > 0 ? (
-              <div style={styles.catModifierTags}>
-                {visibleCatModifiers.map((modifier) => (
-                  <span key={modifier} style={styles.catModifierTag}>
-                    {modifier}
-                  </span>
-                ))}
-              </div>
-            ) : null}
-          </section>
-        ) : null}
-        <div style={styles.headerSummary}>
-          <div style={styles.dashboardTiles}>
-            <div style={styles.dashboardTile}>
-              <span style={styles.statusLabel}>
-                {`\u3055\u3044\u304d\u3093\u306e${catName}`}
-              </span>
-              <span style={styles.statusValue}>
-                {recentCatSummary.recentSignalLabel}
-              </span>
-            </div>
-            <div style={{ ...styles.dashboardTile, ...styles.dashboardTileLast }}>
-              <span style={styles.statusLabel}>
-                {`\u3044\u307e\u306e${catName}`}
-              </span>
-              <span style={styles.statusValue}>
-                {recentCatSummary.currentTrendText}
-              </span>
-            </div>
-          </div>
-          <div style={styles.dayMap}>
-            <p style={styles.dayMapTitle}>{`${catName}\u306e1\u65e5`}</p>
-            <div style={styles.dayMapGrid}>
-              {recentCatSummary.dayMap.map((item) => (
-                <div
-                  key={item.period}
-                  style={
-                    item.isMuted
-                      ? { ...styles.dayMapItem, ...styles.dayMapItemMuted }
-                      : styles.dayMapItem
-                  }
+        <div style={styles.photoHeroMedia}>
+          <img src={SAMPLE_HOME_CAT_PHOTO_SRC} alt="" style={styles.photoHeroImage} />
+          <div style={styles.photoHeroFade} aria-hidden="true" />
+          <div style={styles.photoHeroContent}>
+            <h1 style={styles.title}>
+              {canSwitchCats ? (
+                <button
+                  type="button"
+                  onClick={() => setIsCatSheetOpen(true)}
+                  style={styles.titleSwitchButton}
                 >
-                  <span style={styles.dayMapPeriod}>{item.period}</span>
-                  {item.signal ? (
-                    <img
-                      src={getSignalIconSrc(item.signal)}
-                      alt=""
-                      style={styles.dayMapIcon}
-                      onError={(event) => {
-                        event.currentTarget.style.visibility = "hidden";
-                      }}
-                    />
-                  ) : (
-                    <span style={styles.dayMapDot} aria-hidden="true" />
-                  )}
-                  <span style={styles.dayMapLabel}>{item.label}</span>
-                </div>
-              ))}
-            </div>
-            {isDayMapEmpty ? (
-              <p style={styles.dayMapEmptyHint}>
-                {"\u8a18\u9332\u304c\u6e9c\u307e\u308b\u3068\u3001\u3053\u306e\u5b50\u306e1\u65e5\u306e\u30ea\u30ba\u30e0\u304c\u898b\u3048\u3066\u304d\u307e\u3059"}
+                  <span>{catName}</span>
+                  <span style={styles.titleChevron} aria-hidden="true">
+                    {"▼"}
+                  </span>
+                </button>
+              ) : (
+                <>{catName}</>
+              )}
+            </h1>
+            {onboardingHomeMessage ? (
+              <p style={styles.onboardingHomeMessage}>{onboardingHomeMessage}</p>
+            ) : null}
+            {postDiagnosisFeedbackMessage ? (
+              <p style={styles.onboardingHomeMessage}>
+                {postDiagnosisFeedbackMessage}
               </p>
             ) : null}
+          </div>
+          <div style={styles.understandingPanel}>
+            <div
+              style={{
+                ...styles.understandingRing,
+                background: `conic-gradient(#858b7c ${ringDegree}deg, rgba(255, 255, 255, 0.76) 0deg)`,
+              }}
+              aria-label={`理解度 ${understandingPercent}%`}
+            >
+              <span style={styles.understandingRingInner}>
+                <span style={styles.understandingRingLabel}>理解度</span>
+                <span style={styles.understandingRingPercent}>
+                  {understandingPercent}
+                  {"%"}
+                </span>
+              </span>
+            </div>
+          </div>
+        </div>
+        <div style={styles.photoHeroInfo}>
+          {catTraitLabel ? (
+            <section
+              style={styles.catTraitSection}
+              aria-label={`${catName}\u306e\u3053\u3068`}
+            >
+              <p style={styles.catTraitTitle}>
+                {"\u3053\u306e\u5b50\u306e\u3053\u3068"}
+              </p>
+              <div style={styles.catTraitPills}>
+                <span style={styles.catTraitPill}>{catTraitLabel}</span>
+              </div>
+              {visibleCatModifiers.length > 0 ? (
+                <div style={styles.catModifierTags}>
+                  {visibleCatModifiers.map((modifier) => (
+                    <span key={modifier} style={styles.catModifierTag}>
+                      {modifier}
+                    </span>
+                  ))}
+                </div>
+              ) : null}
+            </section>
+          ) : null}
+          <div style={styles.headerSummary}>
+            <div style={styles.dashboardTiles}>
+              <div style={styles.dashboardTile}>
+                <span style={styles.statusLabel}>
+                  {`\u3055\u3044\u304d\u3093\u306e${catName}`}
+                </span>
+                <span style={styles.statusValue}>
+                  {recentCatSummary.recentSignalLabel}
+                </span>
+              </div>
+              <div style={{ ...styles.dashboardTile, ...styles.dashboardTileLast }}>
+                <span style={styles.statusLabel}>
+                  {`\u3044\u307e\u306e${catName}`}
+                </span>
+                <span style={styles.statusValue}>
+                  {recentCatSummary.currentTrendText}
+                </span>
+              </div>
+            </div>
+            <div style={styles.dayMap}>
+              <p style={styles.dayMapTitle}>{`${catName}\u306e1\u65e5`}</p>
+              <div style={styles.dayMapGrid}>
+                {recentCatSummary.dayMap.map((item) => (
+                  <div
+                    key={item.period}
+                    style={
+                      item.isMuted
+                        ? { ...styles.dayMapItem, ...styles.dayMapItemMuted }
+                        : styles.dayMapItem
+                    }
+                  >
+                    <span style={styles.dayMapPeriod}>{item.period}</span>
+                    {item.signal ? (
+                      <img
+                        src={getSignalIconSrc(item.signal)}
+                        alt=""
+                        style={styles.dayMapIcon}
+                        onError={(event) => {
+                          event.currentTarget.style.visibility = "hidden";
+                        }}
+                      />
+                    ) : (
+                      <span style={styles.dayMapDot} aria-hidden="true" />
+                    )}
+                    <span style={styles.dayMapLabel}>{item.label}</span>
+                  </div>
+                ))}
+              </div>
+              {isDayMapEmpty ? (
+                <p style={styles.dayMapEmptyHint}>
+                  {"\u8a18\u9332\u304c\u6e9c\u307e\u308b\u3068\u3001\u3053\u306e\u5b50\u306e1\u65e5\u306e\u30ea\u30ba\u30e0\u304c\u898b\u3048\u3066\u304d\u307e\u3059"}
+                </p>
+              ) : null}
+            </div>
           </div>
         </div>
       </div>
@@ -2206,24 +2208,20 @@ const styles = {
   },
   photoHero: {
     position: "relative",
-    height: "300px",
     border: "1px solid rgba(219, 216, 207, 0.72)",
     borderRadius: "32px",
     background: "#fbfaf7",
     overflow: "hidden",
     boxShadow: "0 12px 28px rgba(44, 42, 38, 0.032)",
+    marginBottom: "12px",
   },
-  cardBody: {
-    padding: "0 14px 16px",
-    background: "#fbfaf7",
-    borderRadius: "0 0 32px 32px",
+  photoHeroMedia: {
+    position: "relative",
+    height: "280px",
+    overflow: "hidden",
   },
-  catInfoCard: {
-    border: "1px solid rgba(219, 216, 207, 0.72)",
-    borderRadius: "0 0 24px 24px",
-    background: "#ffffff",
-    padding: "12px 14px",
-    marginTop: "0",
+  photoHeroInfo: {
+    padding: "12px 14px 16px",
   },
   photoHeroImage: {
     position: "absolute",
