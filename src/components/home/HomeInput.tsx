@@ -1868,7 +1868,7 @@ const styles = {
     overflow: "hidden",
   },
   photoHeroInfo: {
-    padding: "2px 16px 16px",
+    padding: "0 16px 16px",
   },
   accountPromptCard: {
     display: "grid",
@@ -1969,7 +1969,7 @@ const styles = {
     position: "absolute",
     left: "12px",
     right: "12px",
-    bottom: "8px",
+    bottom: "4px",
     zIndex: 2,
     display: "flex",
     flexDirection: "column",
