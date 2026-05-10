@@ -67,9 +67,18 @@ const POST_DIAGNOSIS_FEEDBACK_KEY = "post_diagnosis_feedback";
 const RECENT_STATE_RECORDS_KEY = "recent_state_records";
 const ACCOUNT_CREATE_PROMPT_DISMISSED_KEY = "account_create_prompt_dismissed";
 const ACCOUNT_CREATE_PROMPT_DISMISSED_MS = 7 * 24 * 60 * 60 * 1000;
+const HOME_VISIT_COUNT_KEY = "home_visit_count";
 const RECENT_STATE_RECORD_TTL_MS = 30 * 60 * 1000;
 const RECENT_CAT_SUMMARY_WINDOW_MS = 7 * 24 * 60 * 60 * 1000;
 const SAMPLE_HOME_CAT_PHOTO_SRC = "/sample-cats/home-hero-generated.png";
+
+const peakTimeMap: Record<string, string[]> = {
+  morning: ["朝"],
+  afternoon: ["昼"],
+  evening: ["夕", "夜"],
+  night: ["夜"],
+  random: [],
+};
 
 type RecentStateRecord = {
   localCatId: string | null;
@@ -126,6 +135,7 @@ export function HomeInput({
   const [isAccountConnected, setIsAccountConnected] = useState(false);
   const [hasCheckedAccountConnection, setHasCheckedAccountConnection] =
     useState(false);
+  const [homeVisitCount, setHomeVisitCount] = useState(0);
 
   const activeCatProfile =
     catProfiles.length > 0
@@ -164,6 +174,8 @@ export function HomeInput({
   const recentCatSummary = buildRecentCatSummary(activeCatEvents);
   const activeCatTraitLabel =
     activeCatProfile?.typeLabel ?? catTraitMemo?.typeLabel;
+  const activeCatTraitTagline =
+    activeCatProfile?.typeTagline ?? catTraitMemo?.typeTagline;
   const activeCatModifiers =
     activeCatProfile?.modifiers ?? catTraitMemo?.modifiers ?? [];
   const activeCatTypeKey =
@@ -190,6 +202,16 @@ export function HomeInput({
     isAccountConnected &&
     catProfiles.length > 0 &&
     Boolean(activeCatId);
+  const showSaveButton = homeVisitCount >= 3;
+  const showOnboardingFeedback =
+    isHydrated && homeVisitCount <= 1 && Boolean(activeCatTraitLabel);
+  const onboardingFeedbackText = activeCatTraitLabel
+    ? buildPostOnboardingMessage(
+        catName,
+        activeCatTraitLabel,
+        activeCatProfile?.activityPattern,
+      )
+    : "";
 
   useEffect(() => {
     const completed =
@@ -236,6 +258,18 @@ export function HomeInput({
         window.localStorage.removeItem(POST_DIAGNOSIS_FEEDBACK_KEY);
       }, 0);
     }
+    const currentHomeVisitCount = Number.parseInt(
+      window.localStorage.getItem(HOME_VISIT_COUNT_KEY) ?? "0",
+      10,
+    );
+    const safeHomeVisitCount = Number.isNaN(currentHomeVisitCount)
+      ? 0
+      : currentHomeVisitCount;
+    setHomeVisitCount(safeHomeVisitCount);
+    window.localStorage.setItem(
+      HOME_VISIT_COUNT_KEY,
+      String(safeHomeVisitCount + 1),
+    );
     setIsAccountCreatePromptVisible(shouldShowAccountCreatePrompt());
     void hasSupabaseAuthUser().then((hasUser) => {
       setIsAccountConnected(hasUser);
@@ -589,7 +623,9 @@ export function HomeInput({
           catProfiles={catProfiles}
           catCoat={activeCatProfile?.appearance?.coat}
           catTraitLabel={activeCatTraitLabel}
+          catTraitTagline={activeCatTraitTagline}
           catModifiers={activeCatModifiers}
+          activityPattern={activeCatProfile?.activityPattern}
           onboardingHomeMessage={onboardingHomeMessage}
           postDiagnosisFeedbackMessage={postDiagnosisFeedbackMessage}
           recentCatSummary={recentCatSummary}
@@ -602,6 +638,7 @@ export function HomeInput({
           <AccountCreatePrompt
             onCreate={() => router.push("/account/create")}
             onDismiss={handleAccountCreatePromptDismiss}
+            showSaveButton={showSaveButton}
           />
         ) : null}
 
@@ -609,26 +646,12 @@ export function HomeInput({
           <AccountConnectedStatus />
         ) : null}
 
-        {visibleLatestHypothesis || hypothesisMessage ? (
+        {showOnboardingFeedback ? (
+          <OnboardingFeedbackCard text={onboardingFeedbackText} />
+        ) : null}
+
+        {hypothesisMessage ? (
         <section style={styles.insightCard}>
-          {visibleLatestHypothesis ? (
-            <LatestHypothesisCard
-              hypothesis={visibleLatestHypothesis}
-              cta={hypothesisCta}
-              onMainAction={() => {
-                void handleHypothesisAction("resolved");
-              }}
-              onSubAction={() => {
-                if (hasKnownHypothesisCategory) {
-                  void handleHypothesisAction("unresolved");
-                  return;
-                }
-
-                dismissLatestHypothesis();
-              }}
-            />
-          ) : null}
-
           {hypothesisMessage ? (
             <p style={styles.hypothesisMessage}>{hypothesisMessage}</p>
           ) : null}
@@ -1003,7 +1026,9 @@ function Header({
   catProfiles,
   catCoat,
   catTraitLabel,
+  catTraitTagline,
   catModifiers,
+  activityPattern,
   onboardingHomeMessage,
   postDiagnosisFeedbackMessage,
   recentCatSummary,
@@ -1015,7 +1040,9 @@ function Header({
   catProfiles: CatProfile[];
   catCoat?: CatCoat;
   catTraitLabel?: string;
+  catTraitTagline?: string;
   catModifiers: string[];
+  activityPattern?: CatProfile["activityPattern"];
   onboardingHomeMessage: string;
   postDiagnosisFeedbackMessage: string;
   recentCatSummary: RecentCatSummary;
@@ -1032,6 +1059,9 @@ function Header({
       : "#e4e1da";
   const visibleCatModifiers = catModifiers.filter(Boolean).slice(0, 2);
   const isDayMapEmpty = recentCatSummary.dayMap.every((item) => !item.signal);
+  const peakSlots = activityPattern?.peakTime
+    ? peakTimeMap[activityPattern.peakTime] ?? []
+    : [];
 
   return (
     <header style={styles.header}>
@@ -1095,6 +1125,9 @@ function Header({
               <div style={styles.catTraitPills}>
                 <span style={styles.catTraitPill}>{catTraitLabel}</span>
               </div>
+              {catTraitTagline ? (
+                <p style={styles.catTraitTagline}>{catTraitTagline}</p>
+              ) : null}
               {visibleCatModifiers.length > 0 ? (
                 <div style={styles.catModifierTags}>
                   {visibleCatModifiers.map((modifier) => (
@@ -1128,31 +1161,43 @@ function Header({
             <div style={styles.dayMap}>
               <p style={styles.dayMapTitle}>{`${catName}\u306e1\u65e5`}</p>
               <div style={styles.dayMapGrid}>
-                {recentCatSummary.dayMap.map((item) => (
-                  <div
-                    key={item.period}
-                    style={
-                      item.isMuted
-                        ? { ...styles.dayMapItem, ...styles.dayMapItemMuted }
-                        : styles.dayMapItem
-                    }
-                  >
-                    <span style={styles.dayMapPeriod}>{item.period}</span>
-                    {item.signal ? (
-                      <img
-                        src={getSignalIconSrc(item.signal)}
-                        alt=""
-                        style={styles.dayMapIcon}
-                        onError={(event) => {
-                          event.currentTarget.style.visibility = "hidden";
-                        }}
-                      />
-                    ) : (
-                      <span style={styles.dayMapDot} aria-hidden="true" />
-                    )}
-                    <span style={styles.dayMapLabel}>{item.label}</span>
-                  </div>
-                ))}
+                {recentCatSummary.dayMap.map((item) => {
+                  const isPeakSlot = !item.signal && peakSlots.includes(item.period);
+
+                  return (
+                    <div
+                      key={item.period}
+                      style={
+                        item.isMuted && !isPeakSlot
+                          ? { ...styles.dayMapItem, ...styles.dayMapItemMuted }
+                          : styles.dayMapItem
+                      }
+                    >
+                      <span style={styles.dayMapPeriod}>{item.period}</span>
+                      {item.signal ? (
+                        <img
+                          src={getSignalIconSrc(item.signal)}
+                          alt=""
+                          style={styles.dayMapIcon}
+                          onError={(event) => {
+                            event.currentTarget.style.visibility = "hidden";
+                          }}
+                        />
+                      ) : (
+                        <span
+                          style={{
+                            ...styles.dayMapDot,
+                            background: isPeakSlot ? "#6B9E82" : "#d0cdc6",
+                          }}
+                          aria-hidden="true"
+                        />
+                      )}
+                      <span style={styles.dayMapLabel}>
+                        {isPeakSlot ? "元気" : item.label}
+                      </span>
+                    </div>
+                  );
+                })}
               </div>
               {isDayMapEmpty ? (
                 <p style={styles.dayMapEmptyHint}>
@@ -1235,9 +1280,11 @@ function Header({
 function AccountCreatePrompt({
   onCreate,
   onDismiss,
+  showSaveButton,
 }: {
   onCreate: () => void;
   onDismiss: () => void;
+  showSaveButton: boolean;
 }) {
   return (
     <section style={styles.accountPromptCard} aria-label="アカウント作成">
@@ -1248,13 +1295,17 @@ function AccountCreatePrompt({
         </p>
       </div>
       <div style={styles.accountPromptActions}>
-        <button
-          type="button"
-          onClick={onCreate}
-          style={styles.accountPromptPrimaryButton}
-        >
-          無料で保存する
-        </button>
+        {showSaveButton ? (
+          <div style={styles.saveButtonArea}>
+            <button
+              type="button"
+              onClick={onCreate}
+              style={styles.accountPromptPrimaryButton}
+            >
+              無料で保存する
+            </button>
+          </div>
+        ) : null}
         <button
           type="button"
           onClick={onDismiss}
@@ -1277,6 +1328,53 @@ function AccountConnectedStatus() {
       <span style={styles.accountConnectedText}>アカウント接続済み</span>
     </section>
   );
+}
+
+function OnboardingFeedbackCard({ text }: { text: string }) {
+  return (
+    <section style={styles.onboardingFeedbackCard}>
+      <p style={styles.onboardingFeedbackEyebrow}>さっきの回答から</p>
+      <p style={styles.onboardingFeedbackText}>{text}</p>
+    </section>
+  );
+}
+
+function buildPostOnboardingMessage(
+  catName: string,
+  typeLabel: string,
+  activityPattern?: {
+    peakTime: string;
+    foodSensitivity: string;
+    stressSensitivity: string;
+  },
+): string {
+  const timeMap: Record<string, string> = {
+    morning: "朝に元気になりやすい",
+    afternoon: "昼間はまったりしていることが多い",
+    evening: "夕方から夜にかけて元気になりやすい",
+    night: "夜に活発になりやすい",
+    random: "気まぐれに元気になる",
+  };
+
+  const foodMap: Record<string, string> = {
+    high: "ごはんへの関心がとても強い",
+    medium: "ごはんの時間を気にしている",
+    low: "ごはんをあまり気にしない",
+  };
+
+  const timePart = activityPattern?.peakTime
+    ? timeMap[activityPattern.peakTime] ?? ""
+    : "";
+  const foodPart = activityPattern?.foodSensitivity
+    ? foodMap[activityPattern.foodSensitivity] ?? ""
+    : "";
+  const parts = [timePart, foodPart].filter(Boolean);
+
+  if (parts.length === 0) {
+    return `${catName}のことが少しずつ見えてきました。`;
+  }
+
+  return `${catName}は${parts.join("、")}子のようです。`;
 }
 
 function buildHomeReturnMotivation(
@@ -2405,7 +2503,11 @@ const styles = {
     alignItems: "center",
     gap: "8px",
   },
+  saveButtonArea: {
+    minWidth: 0,
+  },
   accountPromptPrimaryButton: {
+    width: "100%",
     minHeight: "40px",
     border: "none",
     borderRadius: "14px",
@@ -2449,6 +2551,25 @@ const styles = {
   },
   accountConnectedText: {
     letterSpacing: 0,
+  },
+  onboardingFeedbackCard: {
+    marginBottom: "10px",
+    border: "0.5px solid rgba(107,158,130,0.2)",
+    borderRadius: "16px",
+    background: "rgba(107,158,130,0.08)",
+    padding: "14px 16px",
+  },
+  onboardingFeedbackEyebrow: {
+    margin: "0 0 6px",
+    color: "#6B9E82",
+    fontSize: "11px",
+    fontWeight: 600,
+  },
+  onboardingFeedbackText: {
+    margin: 0,
+    color: "#4a4a42",
+    fontSize: "13px",
+    lineHeight: 1.7,
   },
   photoHeroImage: {
     position: "absolute",
@@ -2742,6 +2863,13 @@ const styles = {
     fontWeight: 650,
     lineHeight: 1.35,
     padding: "3px 8px",
+  },
+  catTraitTagline: {
+    margin: "2px 0 8px",
+    color: "#8a8a80",
+    fontSize: "12px",
+    fontStyle: "italic",
+    lineHeight: 1.6,
   },
   catModifierTag: {
     display: "inline-flex",

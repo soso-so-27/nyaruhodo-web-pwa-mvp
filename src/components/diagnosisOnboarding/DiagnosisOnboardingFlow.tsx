@@ -1,6 +1,5 @@
 "use client";
 
-import { useRouter } from "next/navigation";
 import { useState } from "react";
 import type { CSSProperties } from "react";
 import { getCatTypeInfo } from "../../lib/diagnosisOnboarding/catTypes";
@@ -67,7 +66,6 @@ const COLLECTION_PREVIEW_ICONS = [
 ];
 
 export function DiagnosisOnboardingFlow() {
-  const router = useRouter();
   const [step, setStep] = useState<Step>("name");
   const [catName, setCatName] = useState("");
   const [coat, setCoat] = useState<CatCoat | "">("");
@@ -213,6 +211,7 @@ export function DiagnosisOnboardingFlow() {
       saveCatProfiles(nextProfiles);
       saveActiveCatId(newCatId);
       window.localStorage.setItem("onboarding_completed", "true");
+      window.localStorage.setItem("home_visit_count", "0");
       window.localStorage.setItem(
         ONBOARDING_HOME_HINT_KEY,
         JSON.stringify({
@@ -226,7 +225,7 @@ export function DiagnosisOnboardingFlow() {
     }
 
     setStep("done");
-    router.push("/home");
+    window.location.href = "/home";
   }
 
   return (

@@ -63,6 +63,7 @@ export type CatBasicInfo = {
 
 export type CatTraitMemo = {
   typeLabel?: CatTypeLabel;
+  typeTagline?: string;
   modifiers: string[];
 };
 
@@ -557,6 +558,8 @@ export function readActiveCatTraitMemo(activeCatId: string | null) {
 
     return {
       typeLabel,
+      typeTagline:
+        getCatTypeInfo(migratedTypeKey ?? "")?.tagline ?? profile?.typeTagline,
       modifiers: Array.isArray(profile?.modifiers) ? profile.modifiers : [],
     } satisfies CatTraitMemo;
   } catch {
@@ -576,6 +579,7 @@ export function ensureActiveCatTraitMemo(
       activeProfile,
       traitMemo: {
         typeLabel: activeProfile.typeLabel,
+        typeTagline: activeProfile.typeTagline,
         modifiers: activeProfile.modifiers ?? [],
       } satisfies CatTraitMemo,
     };
@@ -598,8 +602,9 @@ export function ensureActiveCatTraitMemo(
     activeProfile.id,
   );
   const traitMemo = nextActiveProfile.typeLabel
-    ? {
+      ? {
         typeLabel: nextActiveProfile.typeLabel,
+        typeTagline: nextActiveProfile.typeTagline,
         modifiers: nextActiveProfile.modifiers ?? [],
       }
     : null;
