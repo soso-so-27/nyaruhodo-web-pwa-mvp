@@ -27,28 +27,6 @@ type CollectionPhoto = {
   createdAt?: string;
 };
 
-const SAMPLE_COLLECTION_PHOTOS: CollectionPhoto[] = [
-  {
-    id: "sample-belly-up",
-    slotId: "belly-up",
-    src: "/sample-cats/pose-belly.png",
-  },
-  {
-    id: "sample-loaf",
-    slotId: "loaf",
-    src: "/sample-cats/pose-loaf.png",
-  },
-  {
-    id: "sample-stretch",
-    slotId: "stretch",
-    src: "/sample-cats/pose-stretch.png",
-  },
-  {
-    id: "sample-in-box",
-    slotId: "in-box",
-    src: "/sample-cats/pose-box.png",
-  },
-];
 const COLLECTION_PHOTOS_STORAGE_KEY = "collection_photos";
 
 export function CollectionPage() {
@@ -93,13 +71,9 @@ export function CollectionPage() {
     () => buildStoredCollectionPhotos(collectionPhotos),
     [collectionPhotos],
   );
-  const allCollectionPhotos = useMemo(
-    () => [...storedCollectionPhotos, ...SAMPLE_COLLECTION_PHOTOS],
-    [storedCollectionPhotos],
-  );
   const photosBySlot = useMemo(
-    () => groupPhotosBySlot(allCollectionPhotos),
-    [allCollectionPhotos],
+    () => groupPhotosBySlot(storedCollectionPhotos),
+    [storedCollectionPhotos],
   );
   const progress = useMemo(
     () => buildCollectionProgress(COLLECTION_GROUPS, photosBySlot),
