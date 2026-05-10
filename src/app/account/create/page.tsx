@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import type { CSSProperties } from "react";
 import { createBrowserSupabaseClient } from "../../../lib/supabase/browser";
 import { getSiteUrl } from "../../../lib/supabase/config";
@@ -13,6 +13,43 @@ export default function AccountCreatePage() {
   const router = useRouter();
   const [message, setMessage] = useState("");
   const [isStartingAuth, setIsStartingAuth] = useState(false);
+  const [isCheckingAccount, setIsCheckingAccount] = useState(true);
+  const [isAccountConnected, setIsAccountConnected] = useState(false);
+  const [connectedEmail, setConnectedEmail] = useState("");
+
+  useEffect(() => {
+    let isMounted = true;
+
+    async function checkAccountConnection() {
+      const supabase = createBrowserSupabaseClient();
+
+      if (!supabase) {
+        if (isMounted) {
+          setIsCheckingAccount(false);
+        }
+        return;
+      }
+
+      const { data, error } = await supabase.auth.getUser();
+
+      if (!isMounted) {
+        return;
+      }
+
+      if (!error && data.user) {
+        setIsAccountConnected(true);
+        setConnectedEmail(data.user.email ?? "");
+      }
+
+      setIsCheckingAccount(false);
+    }
+
+    void checkAccountConnection();
+
+    return () => {
+      isMounted = false;
+    };
+  }, []);
 
   async function handleGoogleSignIn() {
     const supabase = createBrowserSupabaseClient();
@@ -57,51 +94,79 @@ export default function AccountCreatePage() {
     <main style={styles.page}>
       <div style={styles.container}>
         <section style={styles.card}>
-          <p style={styles.eyebrow}>にゃるほどの保存</p>
-          <h1 style={styles.title}>
-            この子のことを、あとから見返せるように
-          </h1>
-          <p style={styles.body}>
-            にゃるほどにアカウントを作ると、診断結果やプロフィールを残しておけます。
-            今はこの端末に保存されていますが、アカウント作成後は引き継げるようにしていきます。
-          </p>
+          {isAccountConnected ? (
+            <>
+              <p style={styles.eyebrow}>アカウント</p>
+              <h1 style={styles.title}>アカウントに接続済みです</h1>
+              <p style={styles.body}>
+                この端末の猫情報はそのまま使えます。
+                次のステップで、この子の記録を引き継げるようにします。
+              </p>
+              {connectedEmail ? (
+                <p style={styles.connectedEmail}>{connectedEmail}</p>
+              ) : null}
+              <div style={styles.actions}>
+                <button
+                  type="button"
+                  onClick={() => router.push("/home")}
+                  style={styles.primaryButton}
+                >
+                  ホームへ戻る
+                </button>
+              </div>
+            </>
+          ) : (
+            <>
+              <p style={styles.eyebrow}>にゃるほどの保存</p>
+              <h1 style={styles.title}>
+                この子のことを、あとから見返せるように
+              </h1>
+              <p style={styles.body}>
+                にゃるほどにアカウントを作ると、診断結果やプロフィールを残しておけます。
+                今はこの端末に保存されていますが、アカウント作成後は引き継げるようにしていきます。
+              </p>
 
-          <div style={styles.valueList} aria-label="保存できるもの">
-            {["タイプ診断の結果", "猫のプロフィール", "最近の様子", "コレクション"].map(
-              (item) => (
-                <div key={item} style={styles.valueItem}>
-                  <span style={styles.valueDot} aria-hidden="true" />
-                  <span>{item}</span>
-                </div>
-              ),
-            )}
-          </div>
+              <div style={styles.valueList} aria-label="保存できるもの">
+                {[
+                  "タイプ診断の結果",
+                  "猫のプロフィール",
+                  "最近の様子",
+                  "コレクション",
+                ].map((item) => (
+                  <div key={item} style={styles.valueItem}>
+                    <span style={styles.valueDot} aria-hidden="true" />
+                    <span>{item}</span>
+                  </div>
+                ))}
+              </div>
 
-          {message ? (
-            <p style={styles.message} role="status">
-              {message}
-            </p>
-          ) : null}
+              {message ? (
+                <p style={styles.message} role="status">
+                  {message}
+                </p>
+              ) : null}
 
-          <div style={styles.actions}>
-            <button
-              type="button"
-              onClick={() => {
-                void handleGoogleSignIn();
-              }}
-              style={styles.primaryButton}
-              disabled={isStartingAuth}
-            >
-              無料で保存する
-            </button>
-            <button
-              type="button"
-              onClick={handleLater}
-              style={styles.secondaryButton}
-            >
-              あとで
-            </button>
-          </div>
+              <div style={styles.actions}>
+                <button
+                  type="button"
+                  onClick={() => {
+                    void handleGoogleSignIn();
+                  }}
+                  style={styles.primaryButton}
+                  disabled={isStartingAuth || isCheckingAccount}
+                >
+                  無料で保存する
+                </button>
+                <button
+                  type="button"
+                  onClick={handleLater}
+                  style={styles.secondaryButton}
+                >
+                  あとで
+                </button>
+              </div>
+            </>
+          )}
         </section>
       </div>
     </main>
@@ -186,6 +251,14 @@ const styles = {
     fontWeight: 600,
     lineHeight: 1.6,
     padding: "10px 12px",
+  },
+  connectedEmail: {
+    margin: "0 0 18px",
+    color: "#8a8a80",
+    fontSize: "12px",
+    fontWeight: 600,
+    lineHeight: 1.5,
+    wordBreak: "break-all",
   },
   actions: {
     display: "grid",
