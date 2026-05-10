@@ -352,6 +352,7 @@ export function HomeInput({
         <div id="today">
         <Header
           activeCatId={activeCatId}
+          activeCatProfile={activeCatProfile}
           catName={catName}
           catProfiles={catProfiles}
           catCoat={activeCatProfile?.appearance?.coat}
@@ -744,6 +745,7 @@ function buildSaveSuccessMessage(message: string, discoveredPoseLabel?: string) 
 
 function Header({
   activeCatId,
+  activeCatProfile,
   catName,
   catProfiles,
   catCoat,
@@ -755,6 +757,7 @@ function Header({
   onCatSelect,
 }: {
   activeCatId: string | null;
+  activeCatProfile: CatProfile | null;
   catName: string;
   catProfiles: CatProfile[];
   catCoat?: CatCoat;
@@ -777,12 +780,23 @@ function Header({
   const peakSlots = activityPattern?.peakTime
     ? peakTimeMap[activityPattern.peakTime] ?? []
     : [];
+  const heroPhotoSrc =
+    activeCatProfile?.avatarDataUrl ?? SAMPLE_HOME_CAT_PHOTO_SRC;
 
   return (
     <header style={styles.header}>
       <div style={{ ...styles.photoHero, borderColor: photoBorderColor }}>
         <div style={styles.photoHeroMedia}>
-          <img src={SAMPLE_HOME_CAT_PHOTO_SRC} alt="" style={styles.photoHeroImage} />
+          <img
+            src={heroPhotoSrc}
+            alt=""
+            style={{
+              ...styles.photoHeroImage,
+              objectPosition: activeCatProfile?.avatarDataUrl
+                ? "center center"
+                : "43% top",
+            }}
+          />
           <div style={styles.photoHeroFade} aria-hidden="true" />
           <div style={styles.photoHeroContent}>
             <h1 style={styles.title}>
