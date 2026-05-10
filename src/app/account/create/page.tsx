@@ -4,9 +4,25 @@ import { useRouter } from "next/navigation";
 import { useState } from "react";
 import type { CSSProperties } from "react";
 
+const ACCOUNT_CREATE_PROMPT_DISMISSED_KEY = "account_create_prompt_dismissed";
+const ACCOUNT_CREATE_PROMPT_DISMISSED_MS = 7 * 24 * 60 * 60 * 1000;
+
 export default function AccountCreatePage() {
   const router = useRouter();
   const [message, setMessage] = useState("");
+
+  function handleLater() {
+    window.localStorage.setItem(
+      ACCOUNT_CREATE_PROMPT_DISMISSED_KEY,
+      JSON.stringify({
+        dismissedAt: new Date().toISOString(),
+        dismissedUntil: new Date(
+          Date.now() + ACCOUNT_CREATE_PROMPT_DISMISSED_MS,
+        ).toISOString(),
+      }),
+    );
+    router.push("/home");
+  }
 
   return (
     <main style={styles.page}>
@@ -50,7 +66,7 @@ export default function AccountCreatePage() {
             </button>
             <button
               type="button"
-              onClick={() => router.push("/home")}
+              onClick={handleLater}
               style={styles.secondaryButton}
             >
               あとで
