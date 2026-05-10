@@ -8,44 +8,23 @@ import { buildCalendarContext } from "../../lib/calendarContext";
 import { getPoseCategoryForSignal } from "../../lib/collection/poses";
 import { createBrowserSupabaseClient } from "../../lib/supabase/browser";
 import type { RecentEvent } from "../../lib/supabase/queries";
-import {
-  insertEvent,
-  insertFeedback,
-  insertHintFeedback,
-} from "../../lib/supabase/queries";
+import { insertEvent } from "../../lib/supabase/queries";
 import { BottomNavigation } from "../navigation/BottomNavigation";
 import {
-  CATEGORY_MESSAGES,
   CONCERN_OPTIONS,
   CURRENT_OPTIONS,
-  FALLBACK_HYPOTHESIS_CTA_LABELS,
-  HYPOTHESIS_CTA_LABELS,
-  addCatProfile,
-  buildDailyHintHypothesis,
-  clearLatestHypothesis,
   ensureActiveCatTraitMemo,
   getActiveCatProfile,
   getCatName,
-  getHypothesisCompletionMessage,
-  isCurrentCatHintSuppressed,
-  parseStoredContext,
   readActiveCatId,
   readActiveCatTraitMemo,
   readCatProfiles,
-  readCurrentCatHintSuppressions,
-  readLatestHypothesis,
   saveActiveCatId,
-  saveCurrentCatHintSuppression,
-  updateCatProfileName,
 } from "./homeInputHelpers";
 import type {
   CatCoat,
   CatProfile,
   CatTraitMemo,
-  CurrentCatHintFeedback,
-  CurrentCatHintSuppression,
-  DailyHintHypothesis,
-  LatestHypothesisView,
 } from "./homeInputHelpers";
 
 type HomeInputProps = {
@@ -54,9 +33,6 @@ type HomeInputProps = {
 
 const eventSaveErrorMessage =
   "\u4fdd\u5b58\u3067\u304d\u307e\u305b\u3093\u3067\u3057\u305f\u3002\n\u901a\u4fe1\u72b6\u614b\u3092\u78ba\u8a8d\u3057\u3066\u3001\u3082\u3046\u4e00\u5ea6\u304a\u8a66\u3057\u304f\u3060\u3055\u3044\u3002";
-
-const feedbackSaveErrorMessage =
-  "\u884c\u52d5\u306e\u8a18\u9332\u306b\u5931\u6557\u3057\u307e\u3057\u305f\u3002\n\u5c11\u3057\u6642\u9593\u3092\u304a\u3044\u3066\u3001\u3082\u3046\u4e00\u5ea6\u304a\u8a66\u3057\u304f\u3060\u3055\u3044\u3002";
 
 const concernSaveSuccessMessage =
   "\u6b8b\u3057\u307e\u3057\u305f\u3002\n{catName}\u306e\u69d8\u5b50\u304c\u3001\u5c11\u3057\u305a\u3064\u305f\u307e\u3063\u3066\u3044\u304d\u307e\u3059\u3002";
@@ -88,31 +64,14 @@ type RecentStateRecord = {
   expiresAt: string;
 };
 
-const dailyHintFeedbackMessages: Record<CurrentCatHintFeedback, string> = {
-  accepted:
-    "\u8a18\u9332\u3057\u307e\u3057\u305f\u3002\n\u6b21\u304b\u3089\u306e\u30d2\u30f3\u30c8\u306b\u4f7f\u3044\u307e\u3059\u3002",
-  rejected:
-    "\u3042\u308a\u304c\u3068\u3046\u3002\n\u6b21\u304b\u3089\u5c11\u3057\u63a7\u3048\u3081\u306b\u3057\u307e\u3059\u3002",
-  dismissed:
-    "\u3042\u3068\u3067\u898b\u3089\u308c\u308b\u3088\u3046\u306b\u3057\u3066\u304a\u304d\u307e\u3059\u3002",
-};
-
 export function HomeInput({
   recentEvents,
 }: HomeInputProps) {
   const router = useRouter();
   const [isHydrated, setIsHydrated] = useState(false);
-  const [visibleLatestHypothesis, setVisibleLatestHypothesis] =
-    useState<LatestHypothesisView | null>(null);
   const [catProfiles, setCatProfiles] = useState<CatProfile[]>([]);
   const [activeCatId, setActiveCatId] = useState<string | null>(null);
   const [catTraitMemo, setCatTraitMemo] = useState<CatTraitMemo | null>(null);
-  const [isEditingCatName, setIsEditingCatName] = useState(false);
-  const [isAddingCat, setIsAddingCat] = useState(false);
-  const [catNameInput, setCatNameInput] = useState(() => getCatName(null));
-  const [newCatNameInput, setNewCatNameInput] = useState("");
-  const [catNameMessage, setCatNameMessage] = useState("");
-  const [hypothesisMessage, setHypothesisMessage] = useState("");
   const [currentStateMessage, setCurrentStateMessage] = useState("");
   const [onboardingHomeMessage, setOnboardingHomeMessage] = useState("");
   const [postDiagnosisFeedbackMessage, setPostDiagnosisFeedbackMessage] =
@@ -121,10 +80,6 @@ export function HomeInput({
   const [saveErrorSection, setSaveErrorSection] = useState<
     "current" | "concern" | ""
   >("");
-  const [isDailyHintDismissed, setIsDailyHintDismissed] = useState(false);
-  const [hintSuppressions, setHintSuppressions] = useState<
-    CurrentCatHintSuppression[]
-  >([]);
   const [recentStateRecords, setRecentStateRecords] = useState<
     RecentStateRecord[]
   >([]);
@@ -153,24 +108,6 @@ export function HomeInput({
     eventUnderstandingPercent,
     profileUnderstandingPercent,
   );
-  const hypothesisCta = visibleLatestHypothesis
-    ? HYPOTHESIS_CTA_LABELS[visibleLatestHypothesis.category] ??
-      FALLBACK_HYPOTHESIS_CTA_LABELS
-    : FALLBACK_HYPOTHESIS_CTA_LABELS;
-  const hasKnownHypothesisCategory = visibleLatestHypothesis
-    ? Boolean(HYPOTHESIS_CTA_LABELS[visibleLatestHypothesis.category])
-    : false;
-  const dailyHintHypothesis = buildDailyHintHypothesis(activeCatEvents);
-  const isDailyHintSuppressed = isCurrentCatHintSuppressed({
-    suppressions: hintSuppressions,
-    localCatId: activeCatId,
-    category: dailyHintHypothesis.category,
-  });
-  const shouldShowDailyHint =
-    !visibleLatestHypothesis &&
-    !isDailyHintDismissed &&
-    !isDailyHintSuppressed &&
-    activeCatEvents.length >= 3;
   const recentCatSummary = buildRecentCatSummary(activeCatEvents);
   const activeCatTraitLabel =
     activeCatProfile?.typeLabel ?? catTraitMemo?.typeLabel;
@@ -187,6 +124,7 @@ export function HomeInput({
         timeBand: currentTimeBand,
         typeKey: activeCatTypeKey,
         modifiers: activeCatModifiers,
+        axisScores: activeCatProfile?.axisScores,
       })
     : [];
   const shouldRenderAccountConnectedStatus =
@@ -241,8 +179,6 @@ export function HomeInput({
         readActiveCatTraitMemo(profileState.activeProfile.id) ??
         profileState.traitMemo,
     );
-    setCatNameInput(getCatName(profileState.activeProfile));
-    setHintSuppressions(readCurrentCatHintSuppressions());
     setRecentStateRecords(readRecentStateRecords());
     saveActiveCatId(profileState.activeProfile.id);
     setOnboardingHomeMessage(
@@ -280,40 +216,6 @@ export function HomeInput({
       }
     });
     setIsHydrated(true);
-
-    const latestHypothesis = readLatestHypothesis();
-
-    if (latestHypothesis) {
-      if (
-        latestHypothesis.localCatId &&
-        latestHypothesis.localCatId !== activeProfile.id
-      ) {
-        clearLatestHypothesis();
-      } else {
-        setVisibleLatestHypothesis({
-          input: "",
-          context: {},
-          category: latestHypothesis.category ?? "",
-          text: latestHypothesis.text,
-          source: latestHypothesis.source,
-          diagnosisId: latestHypothesis.diagnosisId ?? null,
-          localCatId: latestHypothesis.localCatId ?? activeProfile.id,
-        });
-        return;
-      }
-    }
-
-    const input = window.localStorage.getItem("last_input_signal");
-    const context = window.localStorage.getItem("last_context");
-    const category = window.localStorage.getItem("last_primary_category");
-
-    if (input && context && category) {
-      setVisibleLatestHypothesis({
-        input,
-        context: parseStoredContext(context),
-        category,
-      });
-    }
   }, []);
 
   useEffect(() => {
@@ -324,98 +226,28 @@ export function HomeInput({
     return () => window.clearInterval(intervalId);
   }, []);
 
-  function startEditingCatName() {
-    setCatNameInput(catName);
-    setCatNameMessage("");
-    setIsAddingCat(false);
-    setIsEditingCatName(true);
-  }
-
-  function cancelEditingCatName() {
-    setCatNameInput(catName);
-    setCatNameMessage("");
-    setIsEditingCatName(false);
-  }
-
-  function handleCatNameSave() {
-    const result = updateCatProfileName(catProfiles, activeCatId, catNameInput);
-
-    if (!result) {
-      return;
-    }
-
-    const activeProfile = getActiveCatProfile(
-      result.profiles,
-      result.activeCatId,
-    );
-
-    setCatProfiles(result.profiles);
-    setActiveCatId(result.activeCatId);
-    setCatNameInput(activeProfile.name);
-    setIsEditingCatName(false);
-    setCatNameMessage("\u4fdd\u5b58\u3057\u307e\u3057\u305f\u3002");
-  }
-
   function handleCatSelect(catId: string) {
     const selectedProfile = getActiveCatProfile(catProfiles, catId);
 
     saveActiveCatId(catId);
     setActiveCatId(catId);
     setCatTraitMemo(readActiveCatTraitMemo(catId));
-    setCatNameInput(getCatName(selectedProfile));
-    clearLatestHypothesis();
-    setVisibleLatestHypothesis(null);
-    setHypothesisMessage("");
     setCurrentStateMessage("");
     setOnboardingHomeMessage("");
     setPostDiagnosisFeedbackMessage(
       readPostDiagnosisFeedbackMessage(catId, getCatName(selectedProfile)),
     );
     setSaveErrorMessage("");
-    setIsDailyHintDismissed(false);
-    setHintSuppressions(readCurrentCatHintSuppressions());
+    setSaveErrorSection("");
     setRecentStateRecords(readRecentStateRecords());
-    setIsAddingCat(false);
-    setCatNameMessage("");
-  }
-
-  function startAddingCat() {
-    setNewCatNameInput("");
-    setCatNameMessage("");
-    setIsAddingCat(true);
-    setIsEditingCatName(false);
-  }
-
-  function cancelAddingCat() {
-    setNewCatNameInput("");
-    setIsAddingCat(false);
-  }
-
-  function handleAddCatSave() {
-    const result = addCatProfile(catProfiles, newCatNameInput);
-
-    if (!result) {
-      return;
-    }
-
-    const activeProfile = getActiveCatProfile(
-      result.profiles,
-      result.activeCatId,
-    );
-
-    setCatProfiles(result.profiles);
-    setActiveCatId(result.activeCatId);
-    setCatNameInput(activeProfile.name);
-    setNewCatNameInput("");
-    setIsAddingCat(false);
-    setCatNameMessage("\u4fdd\u5b58\u3057\u307e\u3057\u305f\u3002");
   }
 
   async function handleCurrentSelect(label: string, signal: string) {
-    dismissLatestHypothesis();
     setCurrentStateMessage("");
     setOnboardingHomeMessage("");
     setPostDiagnosisFeedbackMessage("");
+    setSaveErrorSection("");
+    setSaveErrorMessage("");
     const isFirstSignal = isFirstCurrentStateSignal({
       events: activeCatEvents,
       recentStateRecords,
@@ -466,15 +298,15 @@ export function HomeInput({
         label,
       }),
     );
-    setIsDailyHintDismissed(false);
     router.refresh();
   }
 
   async function handleConcernSelect(label: string, input: string) {
-    dismissLatestHypothesis();
     setCurrentStateMessage("");
     setOnboardingHomeMessage("");
     setPostDiagnosisFeedbackMessage("");
+    setSaveErrorSection("");
+    setSaveErrorMessage("");
     const firstPoseDiscovery = getFirstPoseDiscovery({
       events: activeCatEvents,
       recentStateRecords,
@@ -512,101 +344,7 @@ export function HomeInput({
         label,
       }),
     );
-    setIsDailyHintDismissed(false);
     router.refresh();
-  }
-
-  async function saveDailyHintFeedback(
-    feedback: CurrentCatHintFeedback,
-    action: "primary_cta" | "rejected" | "dismissed",
-  ) {
-    const savedFeedback = await insertHintFeedback({
-      localCatId: activeCatId,
-      hintType: "current_cat",
-      shownCategory: dailyHintHypothesis.category,
-      shownSignal: dailyHintHypothesis.shownSignal,
-      feedback,
-      understandingPercent,
-      sourceEventIds: activeCatEvents.map((event) => event.id),
-      calendarContext: buildCalendarContext(),
-      metadata: {
-        source: "current_cat_card",
-        action,
-        catName,
-        headline: dailyHintHypothesis.text,
-        ...(action === "primary_cta"
-          ? { primaryCta: dailyHintHypothesis.cta.main }
-          : {}),
-      },
-    });
-
-    if (!savedFeedback) {
-      setHypothesisMessage(eventSaveErrorMessage);
-      return;
-    }
-
-    const nextSuppressions = saveCurrentCatHintSuppression({
-      localCatId: activeCatId,
-      category: dailyHintHypothesis.category,
-      feedback,
-    });
-
-    setHintSuppressions(nextSuppressions);
-    setIsDailyHintDismissed(true);
-    setHypothesisMessage(dailyHintFeedbackMessages[feedback]);
-  }
-
-  function handleDailyHintMainAction() {
-    void saveDailyHintFeedback("accepted", "primary_cta");
-  }
-
-  function handleDailyHintSubAction() {
-    void saveDailyHintFeedback("rejected", "rejected");
-  }
-
-  function handleDailyHintTertiaryAction() {
-    void saveDailyHintFeedback("dismissed", "dismissed");
-  }
-
-  async function handleHypothesisAction(feedback: "resolved" | "unresolved") {
-    if (!visibleLatestHypothesis) {
-      return;
-    }
-
-    if (!visibleLatestHypothesis.diagnosisId) {
-      dismissLatestHypothesis();
-      setHypothesisMessage("\u9589\u3058\u307e\u3057\u305f");
-      return;
-    }
-
-    const savedFeedback = await insertFeedback({
-      diagnosis_id: visibleLatestHypothesis.diagnosisId,
-      feedback,
-      category: visibleLatestHypothesis.category,
-      localCatId: visibleLatestHypothesis.localCatId ?? activeCatId,
-    });
-
-    if (!savedFeedback) {
-      setHypothesisMessage(feedbackSaveErrorMessage);
-      return;
-    }
-
-    clearLatestHypothesis();
-    setVisibleLatestHypothesis(null);
-    setHypothesisMessage(
-      getHypothesisCompletionMessage(visibleLatestHypothesis.category),
-    );
-  }
-
-  function dismissLatestHypothesis() {
-    clearLatestHypothesis();
-    setVisibleLatestHypothesis(null);
-    setHypothesisMessage("");
-    setCurrentStateMessage("");
-    setOnboardingHomeMessage("");
-    setPostDiagnosisFeedbackMessage("");
-    setSaveErrorSection("");
-    setSaveErrorMessage("");
   }
 
   function handleAccountCreatePromptDismiss() {
@@ -648,14 +386,6 @@ export function HomeInput({
 
         {showOnboardingFeedback ? (
           <OnboardingFeedbackCard text={onboardingFeedbackText} />
-        ) : null}
-
-        {hypothesisMessage ? (
-        <section style={styles.insightCard}>
-          {hypothesisMessage ? (
-            <p style={styles.hypothesisMessage}>{hypothesisMessage}</p>
-          ) : null}
-        </section>
         ) : null}
 
         <div id="record" style={styles.actionArea}>
@@ -1373,54 +1103,6 @@ function buildPostOnboardingMessage(
   return `${catName}は${parts.join("、")}子のようです。`;
 }
 
-function buildHomeReturnMotivation(
-  events: RecentEvent[],
-  catName: string,
-): { title: string; text: string } {
-  const todayEventCount = events.filter((event) => isTodayEvent(event)).length;
-
-  if (todayEventCount > 0) {
-    return {
-      title: "今日の様子が少し残っています。",
-      text: "また気づいたら、ひとつ足してみてください。",
-    };
-  }
-
-  const lastEvent = events[0];
-  const lastLabel = lastEvent?.label ? getOptionDisplayLabel(lastEvent.label) : "";
-
-  if (lastLabel) {
-    return {
-      title: `前回は「${lastLabel}」を残しました。`,
-      text: `少しずつ、${catName}の過ごし方が見えてきます。`,
-    };
-  }
-
-  return {
-    title: "今日はまだ記録がありません。",
-    text: "見たままをひとつ残せばOKです。",
-  };
-}
-
-function isTodayEvent(event: RecentEvent) {
-  const eventDate = new Date(event.occurred_at || event.created_at);
-
-  if (Number.isNaN(eventDate.getTime())) {
-    return false;
-  }
-
-  return formatTokyoDateKey(eventDate) === formatTokyoDateKey(new Date());
-}
-
-function formatTokyoDateKey(date: Date) {
-  return new Intl.DateTimeFormat("en-CA", {
-    timeZone: "Asia/Tokyo",
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-  }).format(date);
-}
-
 type RecentCatSummary = {
   avatarSignal: string | null;
   recentSignalLabel: string;
@@ -1632,55 +1314,6 @@ function getCurrentTrendText(item?: DayMapItem) {
   );
 }
 
-function getRecentSignalSummaryText(
-  summary: RecentCatSignalSummary,
-  catName: string,
-) {
-  if (summary.eventType === "current_state") {
-    const currentMessages: Record<string, string> = {
-      sleeping:
-        "\u6700\u8fd1\u306f\u300c\u306d\u3066\u308b\u300d\u306e\u8a18\u9332\u304c\u591a\u3081\u3067\u3059\u3002\n\u843d\u3061\u7740\u3044\u3066\u904e\u3054\u3059\u6642\u9593\u304c\u5c11\u3057\u898b\u3048\u3066\u304d\u307e\u3057\u305f\u3002",
-      grooming:
-        "\u6700\u8fd1\u306f\u300c\u6bdb\u3065\u304f\u308d\u3044\u300d\u306e\u8a18\u9332\u304c\u6b8b\u3063\u3066\u3044\u307e\u3059\u3002\n\u3044\u3064\u3082\u306e\u6574\u3048\u308b\u6642\u9593\u304c\u5c11\u3057\u898b\u3048\u3066\u304d\u307e\u3057\u305f\u3002",
-      playing:
-        "\u6700\u8fd1\u306f\u300c\u904a\u3093\u3067\u308b\u300d\u306e\u8a18\u9332\u304c\u6b8b\u3063\u3066\u3044\u307e\u3059\u3002\n\u5143\u6c17\u306b\u52d5\u304f\u6642\u9593\u304c\u5c11\u3057\u898b\u3048\u3066\u304d\u307e\u3057\u305f\u3002",
-      after_food:
-        "\u6700\u8fd1\u306f\u300c\u3054\u306f\u3093\u300d\u306e\u8a18\u9332\u304c\u6b8b\u3063\u3066\u3044\u307e\u3059\u3002\n\u98df\u3079\u308b\u30ea\u30ba\u30e0\u304c\u5c11\u3057\u898b\u3048\u3066\u304d\u307e\u3057\u305f\u3002",
-      food:
-        "\u6700\u8fd1\u306f\u300c\u3054\u306f\u3093\u300d\u306e\u8a18\u9332\u304c\u6b8b\u3063\u3066\u3044\u307e\u3059\u3002\n\u98df\u3079\u308b\u30ea\u30ba\u30e0\u304c\u5c11\u3057\u898b\u3048\u3066\u304d\u307e\u3057\u305f\u3002",
-      toilet:
-        "\u6700\u8fd1\u306f\u300c\u30c8\u30a4\u30ec\u300d\u306e\u8a18\u9332\u304c\u6b8b\u3063\u3066\u3044\u307e\u3059\u3002\n\u3044\u3064\u3082\u306e\u30ea\u30ba\u30e0\u3092\u898b\u308b\u624b\u304c\u304b\u308a\u306b\u306a\u308a\u307e\u3059\u3002",
-      purring:
-        "\u6700\u8fd1\u306f\u300c\u30b4\u30ed\u30b4\u30ed\u300d\u306e\u8a18\u9332\u304c\u6b8b\u3063\u3066\u3044\u307e\u3059\u3002\n\u30ea\u30e9\u30c3\u30af\u30b9\u3057\u3066\u3044\u308b\u6642\u9593\u304c\u5c11\u3057\u898b\u3048\u3066\u304d\u307e\u3057\u305f\u3002",
-    };
-
-    return (
-      currentMessages[summary.signal] ??
-      `\u6700\u8fd1\u306f\u3044\u304f\u3064\u304b\u306e\u69d8\u5b50\u304c\u6b8b\u3063\u3066\u3044\u307e\u3059\u3002\n${catName}\u306e\u904e\u3054\u3057\u65b9\u304c\u5c11\u3057\u305a\u3064\u898b\u3048\u3066\u304d\u307e\u3057\u305f\u3002`
-    );
-  }
-
-  const concernMessages: Record<string, string> = {
-    meowing:
-      "\u6700\u8fd1\u300c\u9cf4\u3044\u3066\u308b\u300d\u304c\u4f55\u5ea6\u304b\u6b8b\u3063\u3066\u3044\u307e\u3059\u3002\n\u7d9a\u304f\u3088\u3046\u306a\u3089\u3001\u8fd1\u3044\u69d8\u5b50\u3092\u9078\u3093\u3067\u898b\u3066\u307f\u307e\u3057\u3087\u3046\u3002",
-    following:
-      "\u6700\u8fd1\u300c\u3064\u3044\u3066\u304f\u308b\u300d\u304c\u4f55\u5ea6\u304b\u6b8b\u3063\u3066\u3044\u307e\u3059\u3002\n\u304b\u307e\u3063\u3066\u307b\u3057\u3044\u6c17\u6301\u3061\u304c\u51fa\u3066\u3044\u308b\u65e5\u3082\u3042\u308b\u304b\u3082\u3057\u308c\u307e\u305b\u3093\u3002",
-    restless:
-      "\u6700\u8fd1\u300c\u843d\u3061\u7740\u304b\u306a\u3044\u300d\u304c\u4f55\u5ea6\u304b\u6b8b\u3063\u3066\u3044\u307e\u3059\u3002\n\u97f3\u3084\u74b0\u5883\u306e\u5909\u5316\u3082\u3001\u5c11\u3057\u898b\u3066\u3042\u3052\u308b\u3068\u3088\u3055\u305d\u3046\u3067\u3059\u3002",
-    low_energy:
-      "\u6700\u8fd1\u300c\u5143\u6c17\u306a\u3044\u300d\u304c\u4f55\u5ea6\u304b\u6b8b\u3063\u3066\u3044\u307e\u3059\u3002\n\u3044\u3064\u3082\u306e\u69d8\u5b50\u3068\u6bd4\u3079\u306a\u304c\u3089\u3001\u5c11\u3057\u4e01\u5be7\u306b\u898b\u3066\u3042\u3052\u307e\u3057\u3087\u3046\u3002",
-    fighting:
-      "\u6700\u8fd1\u300c\u30b1\u30f3\u30ab\u3057\u3066\u308b\u300d\u304c\u4f55\u5ea6\u304b\u6b8b\u3063\u3066\u3044\u307e\u3059\u3002\n\u843d\u3061\u7740\u3051\u308b\u5834\u6240\u3084\u8ddd\u96e2\u611f\u3092\u5c11\u3057\u898b\u3066\u3042\u3052\u308b\u3068\u3088\u3055\u305d\u3046\u3067\u3059\u3002",
-    unknown:
-      "\u6700\u8fd1\u300c\u3088\u304f\u308f\u304b\u3089\u306a\u3044\u300d\u304c\u4f55\u5ea6\u304b\u6b8b\u3063\u3066\u3044\u307e\u3059\u3002\n\u8fd1\u3044\u69d8\u5b50\u3092\u5c11\u3057\u305a\u3064\u9078\u3076\u3068\u3001\u898b\u3048\u65b9\u304c\u5897\u3048\u3066\u3044\u304d\u307e\u3059\u3002",
-  };
-
-  return (
-    concernMessages[summary.signal] ??
-    `\u6700\u8fd1\u306f\u3044\u304f\u3064\u304b\u306e\u69d8\u5b50\u304c\u6b8b\u3063\u3066\u3044\u307e\u3059\u3002\n${catName}\u306e\u904e\u3054\u3057\u65b9\u304c\u5c11\u3057\u305a\u3064\u898b\u3048\u3066\u304d\u307e\u3057\u305f\u3002`
-  );
-}
-
 function formatAge(birthDate?: string): string {
   if (!birthDate) {
     return "";
@@ -1748,279 +1381,6 @@ function getCatAvatarSrc(coat?: string): string {
   };
 
   return coatMap[coat ?? ""] ?? "/sample-cats/saba.png";
-}
-
-function CatSettings({
-  activeCatId,
-  catNameInput,
-  catNameMessage,
-  catProfiles,
-  isEditingCatName,
-  isAddingCat,
-  newCatNameInput,
-  onCatNameInputChange,
-  onNewCatNameInputChange,
-  onCatNameSave,
-  onAddCatSave,
-  onCatSelect,
-  onEditCatName,
-  onCancelCatNameEdit,
-  onStartAddingCat,
-  onCancelAddingCat,
-}: {
-  activeCatId: string | null;
-  catNameInput: string;
-  catNameMessage: string;
-  catProfiles: CatProfile[];
-  isEditingCatName: boolean;
-  isAddingCat: boolean;
-  newCatNameInput: string;
-  onCatNameInputChange: (value: string) => void;
-  onNewCatNameInputChange: (value: string) => void;
-  onCatNameSave: () => void;
-  onAddCatSave: () => void;
-  onCatSelect: (catId: string) => void;
-  onEditCatName: () => void;
-  onCancelCatNameEdit: () => void;
-  onStartAddingCat: () => void;
-  onCancelAddingCat: () => void;
-}) {
-  return (
-    <section id="cats" style={styles.catSettings}>
-      <p style={styles.settingsEyebrow}>{"\u306d\u3053"}</p>
-      <h2 style={styles.sectionTitle}>{"\u306d\u3053\u306e\u8a2d\u5b9a"}</h2>
-      <p style={styles.sectionDescription}>
-        {"\u732b\u306e\u8ffd\u52a0\u3084\u540d\u524d\u306e\u5909\u66f4\u306f\u3053\u3053\u304b\u3089\u3067\u304d\u307e\u3059\u3002"}
-      </p>
-      <div style={styles.catList}>
-        {catProfiles.map((profile) => {
-          const age = formatAge(profile.basicInfo?.birthDate);
-          const gender = formatGender(profile.basicInfo?.gender);
-          const meta = [gender, age].filter(Boolean).join("・");
-          const understanding = profile.understanding?.percent ?? 0;
-          const isActive = profile.id === activeCatId;
-
-          return (
-            <button
-              key={profile.id}
-              type="button"
-              onClick={() => onCatSelect(profile.id)}
-              style={isActive ? styles.catListItemActive : styles.catListItem}
-            >
-              <div style={styles.catListAvatar}>
-                {profile.avatarDataUrl ? (
-                  <img
-                    src={profile.avatarDataUrl}
-                    alt=""
-                    style={styles.catListAvatarPhoto}
-                  />
-                ) : (
-                  <img
-                    src={getCatAvatarSrc(profile.appearance?.coat)}
-                    alt=""
-                    style={styles.catListAvatarImg}
-                  />
-                )}
-              </div>
-              <div style={styles.catListInfo}>
-                <span style={styles.catListName}>{profile.name}</span>
-                {meta ? <span style={styles.catListMeta}>{meta}</span> : null}
-                <div style={styles.catListProgress}>
-                  <div style={styles.catListProgressBar}>
-                    <div
-                      style={{
-                        ...styles.catListProgressFill,
-                        width: `${Math.min(100, Math.max(0, understanding))}%`,
-                      }}
-                    />
-                  </div>
-                  <span style={styles.catListProgressLabel}>
-                    {understanding}
-                    {"%"}
-                  </span>
-                </div>
-              </div>
-              <span style={styles.catListChevron}>›</span>
-            </button>
-          );
-        })}
-      </div>
-      <button
-        type="button"
-        onClick={onStartAddingCat}
-        style={styles.addCatListButton}
-      >
-        ＋ 猫を追加
-      </button>
-      <div style={styles.settingsActions}>
-        <button
-          type="button"
-          onClick={onEditCatName}
-          style={styles.addCatButton}
-        >
-          {"\u540d\u524d\u3092\u5909\u66f4"}
-        </button>
-      </div>
-      {isAddingCat ? (
-        <div style={styles.catNameEditor}>
-          <label style={styles.catNameLabel} htmlFor="new-cat-name">
-            {"\u3053\u306e\u5b50\u306e\u540d\u524d"}
-          </label>
-          <input
-            id="new-cat-name"
-            type="text"
-            value={newCatNameInput}
-            onChange={(event) => onNewCatNameInputChange(event.target.value)}
-            placeholder={"\u4f8b\uff1a\u9ea6"}
-            style={styles.catNameInput}
-          />
-          <div style={styles.catNameActions}>
-            <button
-              type="button"
-              onClick={onAddCatSave}
-              style={styles.catNameSaveButton}
-            >
-              {"\u4fdd\u5b58"}
-            </button>
-            <button
-              type="button"
-              onClick={onCancelAddingCat}
-              style={styles.catNameCancelButton}
-            >
-              {"\u30ad\u30e3\u30f3\u30bb\u30eb"}
-            </button>
-          </div>
-        </div>
-      ) : null}
-      {isEditingCatName ? (
-        <div style={styles.catNameEditor}>
-          <label style={styles.catNameLabel} htmlFor="cat-name">
-            {"\u3053\u306e\u5b50\u306e\u540d\u524d"}
-          </label>
-          <input
-            id="cat-name"
-            type="text"
-            value={catNameInput}
-            onChange={(event) => onCatNameInputChange(event.target.value)}
-            placeholder={"\u4f8b\uff1a\u30df\u30b1"}
-            style={styles.catNameInput}
-          />
-          <div style={styles.catNameActions}>
-            <button
-              type="button"
-              onClick={onCatNameSave}
-              style={styles.catNameSaveButton}
-            >
-              {"\u4fdd\u5b58"}
-            </button>
-            <button
-              type="button"
-              onClick={onCancelCatNameEdit}
-              style={styles.catNameCancelButton}
-            >
-              {"\u30ad\u30e3\u30f3\u30bb\u30eb"}
-            </button>
-          </div>
-        </div>
-      ) : null}
-      {catNameMessage ? (
-        <p style={styles.catNameMessage}>{catNameMessage}</p>
-      ) : null}
-    </section>
-  );
-}
-
-function LatestHypothesisCard({
-  hypothesis,
-  cta,
-  onMainAction,
-  onSubAction,
-}: {
-  hypothesis: LatestHypothesisView;
-  cta: { main: string; sub: string };
-  onMainAction: () => void;
-  onSubAction: () => void;
-}) {
-  return (
-    <div style={styles.lastResult}>
-      <p style={styles.lastResultLead}>
-        {"\u3055\u3063\u304d\u306e\u69d8\u5b50\u304b\u3089"}
-      </p>
-      <p style={styles.lastResultText}>
-        {hypothesis.text ??
-          CATEGORY_MESSAGES[hypothesis.category] ??
-          "\u4f55\u304b\u4f1d\u3048\u305f\u3044\u53ef\u80fd\u6027\u304c\u3042\u308a\u307e\u3059"}
-      </p>
-      <p style={styles.lastResultHint}>
-        {"\u307e\u305a\u306f\u3067\u304d\u305d\u3046\u306a\u3053\u3068\u3060\u3051\u3067\u5927\u4e08\u592b\u3067\u3059\u3002\u9055\u3063\u305f\u3089\u3001\u9055\u3046\u304b\u3082\u3067\u6559\u3048\u3066\u304f\u3060\u3055\u3044\u3002"}
-      </p>
-      <div style={styles.hypothesisActions}>
-        <button
-          type="button"
-          onClick={onMainAction}
-          style={styles.hypothesisMainButton}
-        >
-          {cta.main}
-        </button>
-        <button
-          type="button"
-          onClick={onSubAction}
-          style={styles.hypothesisSubButton}
-        >
-          {cta.sub}
-        </button>
-      </div>
-    </div>
-  );
-}
-
-function GuidanceBlock({
-  catName,
-  dailyHintHypothesis,
-  onDailyHintMainAction,
-  onDailyHintSubAction,
-  onDailyHintTertiaryAction,
-}: {
-  catName: string;
-  dailyHintHypothesis: DailyHintHypothesis;
-  onDailyHintMainAction: () => void;
-  onDailyHintSubAction: () => void;
-  onDailyHintTertiaryAction: () => void;
-}) {
-  return (
-    <div style={styles.guidance}>
-      <p style={styles.predictionReason}>
-        {`\u3044\u307e\u306e${catName}`}
-      </p>
-      <p style={styles.guidanceTitle}>{dailyHintHypothesis.text}</p>
-      <div style={styles.predictionActions}>
-        <button
-          type="button"
-          onClick={onDailyHintMainAction}
-          style={{
-            ...styles.hypothesisMainButton,
-            ...styles.dailyHintPrimaryButton,
-          }}
-        >
-          {dailyHintHypothesis.cta.main}
-        </button>
-        <button
-          type="button"
-          onClick={onDailyHintSubAction}
-          style={styles.hypothesisSubButton}
-        >
-          {dailyHintHypothesis.cta.sub}
-        </button>
-        <button
-          type="button"
-          onClick={onDailyHintTertiaryAction}
-          style={styles.hypothesisSubButton}
-        >
-          {dailyHintHypothesis.cta.tertiary}
-        </button>
-      </div>
-    </div>
-  );
 }
 
 function OptionSection<Option extends { label: string }>({
@@ -2219,6 +1579,46 @@ function buildCurrentStateSuccessMessage({
   }
 
   const typeKeyMessages: Record<string, Record<string, string>> = {
+    luce: {
+      playing: "やっぱり遊ぶのが好きそう。",
+      following: "かまってほしい気持ちが出てますね。",
+      sleeping: "遊び疲れてねてるのかも。",
+    },
+    fiore: {
+      following: "そばにいたい気持ちが出てますね。",
+      purring: "機嫌がいいときのゴロゴロですね。",
+      sleeping: "繊細な子なので、休息も大事です。",
+    },
+    leone: {
+      playing: "自分のペースで遊んでますね。",
+      grooming: "きちんとお手入れする子ですね。",
+      sleeping: "我が道を行く、堂々としたねかたですね。",
+    },
+    nimbus: {
+      playing: "気まぐれに全力で遊ぶのがこの子らしい。",
+      restless: "落ち着かない様子、何か気になることがあるのかも。",
+      unknown: "よくわからないのも、この子らしさかもしれません。",
+    },
+    sole: {
+      sleeping: "穏やかにねてる、安心してる様子ですね。",
+      purring: "そばにいるだけでゴロゴロしてくれる子ですね。",
+      following: "ついてくるのも愛情表現のひとつですね。",
+    },
+    luna: {
+      sleeping: "静かにねてる、いつものルナですね。",
+      following: "気分がいいときについてきてますね。",
+      purring: "そっとそばでゴロゴロ、幸せそうです。",
+    },
+    stella: {
+      sleeping: "じっとねてる、この子の定位置ですね。",
+      grooming: "丁寧に毛づくろいする子ですね。",
+      unknown: "静かに何かを考えてる様子かも。",
+    },
+    aura: {
+      sleeping: "どこかでひっそりねてるのがこの子らしい。",
+      unknown: "よくわからないのも、オーラらしさです。",
+      restless: "繊細なので、環境の変化に敏感なのかも。",
+    },
     play: {
       playing: "やっぱり遊ぶのが好きそう。",
       sleeping: "遊び疲れてねてるのかも。",
@@ -2254,10 +1654,19 @@ function getSuggestedSignals({
   timeBand,
   typeKey,
   modifiers,
+  axisScores,
 }: {
   timeBand: string;
   typeKey?: string;
   modifiers: string[];
+  axisScores?: {
+    P: number;
+    C: number;
+    S: number;
+    I: number;
+    B: number;
+    N: number;
+  };
 }): string[] {
   const suggestions: string[] = [];
 
@@ -2273,6 +1682,14 @@ function getSuggestedSignals({
   suggestions.push(...timeSuggested.slice(0, 1));
 
   const typeKeySuggestions: Record<string, string[]> = {
+    luce: ["playing", "following"],
+    fiore: ["following", "purring"],
+    leone: ["playing", "grooming"],
+    nimbus: ["playing", "restless"],
+    sole: ["sleeping", "purring"],
+    luna: ["sleeping", "following"],
+    stella: ["sleeping", "grooming"],
+    aura: ["sleeping", "unknown"],
     play: ["playing"],
     food: ["food"],
     social: ["following", "purring"],
@@ -2282,6 +1699,21 @@ function getSuggestedSignals({
   if (typeKey) {
     const typeSuggested = typeKeySuggestions[typeKey] ?? [];
     suggestions.push(...typeSuggested.slice(0, 1));
+  }
+
+  if (axisScores) {
+    if (axisScores.P > axisScores.C && axisScores.P >= 3) {
+      suggestions.push("playing");
+    }
+    if (axisScores.S > axisScores.I && axisScores.S >= 3) {
+      suggestions.push("following");
+    }
+    if (
+      axisScores.N > axisScores.B &&
+      (timeBand === "night" || timeBand === "late_night")
+    ) {
+      suggestions.push("restless");
+    }
   }
 
   if (
