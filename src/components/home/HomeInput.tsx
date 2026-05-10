@@ -127,12 +127,6 @@ export function HomeInput({
           activeCatProfile?.activityPattern?.stressSensitivity,
       })
     : [];
-  const shouldRenderAccountConnectedStatus =
-    isHydrated &&
-    hasCheckedAccountConnection &&
-    isAccountConnected &&
-    catProfiles.length > 0 &&
-    Boolean(activeCatId);
   const showSaveButton = homeVisitCount >= 3;
   const shouldRenderAccountCreatePrompt =
     isHydrated &&
@@ -375,10 +369,6 @@ export function HomeInput({
             onCreate={() => router.push("/account/create")}
             onDismiss={handleAccountCreatePromptDismiss}
           />
-        ) : null}
-
-        {shouldRenderAccountConnectedStatus ? (
-          <AccountConnectedStatus />
         ) : null}
 
         {showOnboardingFeedback ? (
@@ -1026,18 +1016,6 @@ function AccountCreatePrompt({
           あとで
         </button>
       </div>
-    </section>
-  );
-}
-
-function AccountConnectedStatus() {
-  return (
-    <section
-      style={styles.accountConnectedCard}
-      aria-label="アカウント接続状態"
-    >
-      <span style={styles.accountConnectedDot} aria-hidden="true" />
-      <span style={styles.accountConnectedText}>アカウント接続済み</span>
     </section>
   );
 }
@@ -1890,7 +1868,7 @@ const styles = {
     overflow: "hidden",
   },
   photoHeroInfo: {
-    padding: "14px 16px 18px",
+    padding: "10px 16px 16px",
   },
   accountPromptCard: {
     display: "grid",
@@ -1951,30 +1929,6 @@ const styles = {
     fontWeight: 650,
     padding: "0 8px",
     cursor: "pointer",
-  },
-  accountConnectedCard: {
-    display: "inline-flex",
-    alignItems: "center",
-    gap: "7px",
-    margin: "0 0 12px",
-    border: "1px solid rgba(107, 158, 130, 0.18)",
-    borderRadius: "999px",
-    background: "rgba(255, 255, 255, 0.62)",
-    color: "#5f7f6d",
-    fontSize: "12px",
-    fontWeight: 650,
-    lineHeight: 1,
-    padding: "8px 11px",
-  },
-  accountConnectedDot: {
-    width: "7px",
-    height: "7px",
-    borderRadius: "50%",
-    background: "#6B9E82",
-    flexShrink: 0,
-  },
-  accountConnectedText: {
-    letterSpacing: 0,
   },
   onboardingFeedbackCard: {
     marginBottom: "10px",
