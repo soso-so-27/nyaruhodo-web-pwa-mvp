@@ -8,7 +8,7 @@ import type {
 } from "../../core/types";
 import type { CalendarContext } from "../../lib/calendarContext";
 import { buildCalendarContext } from "../../lib/calendarContext";
-import type { TypeKey } from "../../lib/diagnosisOnboarding/types";
+import type { CatTypeKey } from "../../lib/diagnosisOnboarding/types";
 import {
   getRecentEvents,
   insertDiagnosis,
@@ -137,17 +137,30 @@ function parseInput(input: string | undefined): BehaviorInput | undefined {
     : undefined;
 }
 
-function parseOnboardingTypeKey(typeKey: string | undefined): TypeKey | undefined {
-  const validTypeKeys: TypeKey[] = [
-    "play",
-    "food",
-    "social",
-    "stress",
-    "balanced",
+function parseOnboardingTypeKey(
+  typeKey: string | undefined,
+): CatTypeKey | undefined {
+  const legacyTypeMap: Record<string, CatTypeKey> = {
+    play: "leone",
+    food: "sole",
+    social: "luna",
+    stress: "aura",
+    balanced: "stella",
+  };
+  const validTypeKeys: CatTypeKey[] = [
+    "luce",
+    "fiore",
+    "leone",
+    "nimbus",
+    "sole",
+    "luna",
+    "stella",
+    "aura",
   ];
+  const migratedTypeKey = typeKey ? legacyTypeMap[typeKey] ?? typeKey : undefined;
 
-  return validTypeKeys.includes(typeKey as TypeKey)
-    ? (typeKey as TypeKey)
+  return validTypeKeys.includes(migratedTypeKey as CatTypeKey)
+    ? (migratedTypeKey as CatTypeKey)
     : undefined;
 }
 
@@ -289,9 +302,9 @@ function formatReasons(
 function applyOnboardingTypeAdjustment(
   scores: Record<CauseCategory, number>,
   input: BehaviorInput,
-  typeKey: TypeKey | undefined,
+  typeKey: CatTypeKey | undefined,
 ) {
-  if (!typeKey || typeKey === "balanced") {
+  if (!typeKey || typeKey === "stella") {
     return null;
   }
 
@@ -308,9 +321,12 @@ function applyOnboardingTypeAdjustment(
 
 function getOnboardingTypeAdjustment(
   input: BehaviorInput,
-  typeKey: Exclude<TypeKey, "balanced">,
+  typeKey: Exclude<CatTypeKey, "stella">,
 ): { category: CauseCategory; reason: string } | null {
-  if (typeKey === "play" && (input === "meowing" || input === "restless")) {
+  if (
+    ["luce", "fiore", "leone", "nimbus"].includes(typeKey) &&
+    (input === "meowing" || input === "restless")
+  ) {
     return {
       category: "play",
       reason:
@@ -318,7 +334,7 @@ function getOnboardingTypeAdjustment(
     };
   }
 
-  if (typeKey === "food" && input === "meowing") {
+  if (typeKey === "sole" && input === "meowing") {
     return {
       category: "food",
       reason:
@@ -327,7 +343,7 @@ function getOnboardingTypeAdjustment(
   }
 
   if (
-    typeKey === "social" &&
+    ["luce", "fiore", "sole", "luna"].includes(typeKey) &&
     (input === "following" || input === "meowing")
   ) {
     return {
@@ -338,7 +354,7 @@ function getOnboardingTypeAdjustment(
   }
 
   if (
-    typeKey === "stress" &&
+    ["fiore", "nimbus", "luna", "aura"].includes(typeKey) &&
     (input === "restless" || input === "fighting")
   ) {
     return {

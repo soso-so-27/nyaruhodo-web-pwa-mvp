@@ -1,86 +1,60 @@
-export const CATEGORIES = ["play", "food", "social", "stress", "health"] as const;
-
-export type Category = (typeof CATEGORIES)[number];
-
-export type TypeKey = "play" | "food" | "social" | "stress" | "balanced";
-
-export type TypeLabel =
-  | "あそびハンター"
-  | "ごはんセンサー"
-  | "かまってレーダー"
-  | "びっくりセンサー"
-  | "マイペース観察";
-
-export const TYPE_LABELS: Record<TypeKey, TypeLabel> = {
-  play: "あそびハンター",
-  food: "ごはんセンサー",
-  social: "かまってレーダー",
-  stress: "びっくりセンサー",
-  balanced: "マイペース観察",
+// 3軸のスコア
+export type AxisScores = {
+  P: number; // 活動性（Play）
+  C: number; // まったり（Calm）
+  S: number; // 社交性（Social）
+  I: number; // 独立（Independent）
+  B: number; // どっしり（Bold）
+  N: number; // 繊細（Nervous）
 };
 
-export type OnboardingZone = "immediate" | "type_accuracy" | "understanding";
+// 8タイプ
+export type CatTypeKey =
+  | "luce" // PSB
+  | "fiore" // PSN
+  | "leone" // PIB
+  | "nimbus" // PIN
+  | "sole" // CSB
+  | "luna" // CSN
+  | "stella" // CIB
+  | "aura"; // CIN
 
-export type CategoryScores = Record<Category, number>;
+export type CatTypeLabel =
+  | "ルーチェ"
+  | "フィオーレ"
+  | "レオーネ"
+  | "ニンバス"
+  | "ソーレ"
+  | "ルナ"
+  | "ステラ"
+  | "オーラ";
 
-export type ScoreInput = Partial<CategoryScores>;
-
-export type ModifierCandidate = string;
-
-export type OnboardingOptionDefinition = {
-  optionId: string;
-  label: string;
-  score: ScoreInput;
-  modifierCandidates: ModifierCandidate[];
+export type CatTypeInfo = {
+  key: CatTypeKey;
+  label: CatTypeLabel;
+  axes: "PSB" | "PSN" | "PIB" | "PIN" | "CSB" | "CSN" | "CIB" | "CIN";
+  tagline: string;
+  description: string;
+  trivia: string[];
+  hint: string;
+  rarity: number; // 0〜100のパーセンテージ
 };
 
-export type OnboardingQuestionDefinition = {
-  questionId: string;
-  zone: OnboardingZone;
-  question: string;
-  options: OnboardingOptionDefinition[];
-  skippable: boolean;
+// 行動・時間パターン
+export type ActivityPattern = {
+  peakTime: "morning" | "afternoon" | "evening" | "night" | "random";
+  foodSensitivity: "high" | "medium" | "low";
+  stressSensitivity: "high" | "medium" | "low";
 };
 
-export type OnboardingAnswers = Record<string, string | null | undefined>;
-
-export type TypeDeterminationReason = "top_score" | "low_score" | "close_score";
-
-export type DeterminedType = {
-  typeKey: TypeKey;
-  typeLabel: TypeLabel;
-  topCategory: Exclude<Category, "health"> | null;
-  reason: TypeDeterminationReason;
-};
-
-export type UnderstandingSourceBreakdown = {
-  onboarding: number;
-  events: number;
-  feedbacks: number;
-  hintFeedbacks: number;
-};
-
-export type UnderstandingResult = {
-  percent: number;
-  sourceBreakdown: UnderstandingSourceBreakdown;
-};
-
-export type UnderstandingInput = {
-  answeredCount?: number;
-  totalQuestions?: number;
-  eventsCount?: number;
-  feedbacksCount?: number;
-  hintFeedbacksCount?: number;
-  eventsPercent?: number;
-  feedbacksPercent?: number;
-  hintFeedbacksPercent?: number;
-};
-
+// オンボーディング結果
 export type OnboardingResult = {
-  scores: CategoryScores;
-  type: DeterminedType;
-  modifiers: ModifierCandidate[];
-  understanding: UnderstandingResult;
+  typeKey: CatTypeKey;
+  typeLabel: CatTypeLabel;
+  typeInfo: CatTypeInfo;
+  axisScores: AxisScores;
+  activityPattern: ActivityPattern;
+  provisionalTypeKey: CatTypeKey; // 途中結果
   answeredCount: number;
-  skippedCount: number;
+  completedAt: string;
 };

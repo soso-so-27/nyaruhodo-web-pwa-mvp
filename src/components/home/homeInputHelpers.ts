@@ -1,12 +1,20 @@
 import type { RecentEvent } from "../../lib/supabase/queries";
+import { getCatTypeInfo } from "../../lib/diagnosisOnboarding/catTypes";
 import type {
-  CategoryScores,
-  OnboardingAnswers,
-  TypeKey,
-  TypeLabel,
-  UnderstandingSourceBreakdown,
+  ActivityPattern,
+  AxisScores,
+  CatTypeKey,
+  CatTypeLabel,
 } from "../../lib/diagnosisOnboarding/types";
-import { TYPE_LABELS } from "../../lib/diagnosisOnboarding/types";
+
+type OnboardingAnswers = Record<string, unknown> | string[];
+
+type UnderstandingSourceBreakdown = {
+  onboarding: number;
+  events: number;
+  feedbacks: number;
+  hintFeedbacks: number;
+};
 
 export type LatestHypothesisView = {
   input: string;
@@ -26,12 +34,15 @@ export type CatProfile = {
   avatarDataUrl?: string;
   basicInfo?: CatBasicInfo;
   appearance?: CatAppearance;
-  typeKey?: TypeKey;
-  typeLabel?: TypeLabel;
-  typeScores?: CategoryScores;
+  typeKey?: CatTypeKey;
+  typeLabel?: CatTypeLabel;
+  typeTagline?: string;
+  typeScores?: Record<string, number>;
+  axisScores?: AxisScores;
+  activityPattern?: ActivityPattern;
   modifiers?: string[];
   onboarding?: {
-    version: "diagnosis-v1";
+    version: string;
     answeredCount: number;
     skippedCount: number;
     answers: OnboardingAnswers;
@@ -51,7 +62,7 @@ export type CatBasicInfo = {
 };
 
 export type CatTraitMemo = {
-  typeLabel?: TypeLabel;
+  typeLabel?: CatTypeLabel;
   modifiers: string[];
 };
 
@@ -533,13 +544,20 @@ export function readActiveCatTraitMemo(activeCatId: string | null) {
       candidates.find((candidate) => candidate.id === activeCatId) ??
       candidates.find((candidate) => candidate.typeLabel);
 
-    if (!profile?.typeLabel) {
+    const migratedTypeKey = profile?.typeKey
+      ? migrateTypeKey(String(profile.typeKey))
+      : undefined;
+    const typeLabel =
+      getCatTypeInfo(migratedTypeKey ?? "")?.label ??
+      normalizeCatTypeLabel(profile?.typeLabel);
+
+    if (!typeLabel) {
       return null;
     }
 
     return {
-      typeLabel: profile.typeLabel,
-      modifiers: Array.isArray(profile.modifiers) ? profile.modifiers : [],
+      typeLabel,
+      modifiers: Array.isArray(profile?.modifiers) ? profile.modifiers : [],
     } satisfies CatTraitMemo;
   } catch {
     return null;
@@ -567,10 +585,9 @@ export function ensureActiveCatTraitMemo(
     profile.id === activeProfile.id
       ? {
           ...profile,
-          typeKey: profile.typeKey ?? "balanced",
+          typeKey: profile.typeKey ?? "stella",
           typeLabel:
-            profile.typeLabel ??
-            TYPE_LABELS[profile.typeKey ?? "balanced"],
+            profile.typeLabel ?? getCatTypeInfo(profile.typeKey ?? "stella")?.label,
           modifiers: profile.modifiers ?? [],
           updatedAt: new Date().toISOString(),
         }
@@ -813,6 +830,11 @@ function readStoredCatProfiles() {
 }
 
 function normalizeStoredCatProfile(profile: Partial<CatProfile>): CatProfile {
+  const typeKey = profile.typeKey
+    ? migrateTypeKey(String(profile.typeKey))
+    : undefined;
+  const typeInfo = typeKey ? getCatTypeInfo(typeKey) : undefined;
+
   return {
     id: profile.id as string,
     name: profile.name ?? DEFAULT_CAT_NAME,
@@ -820,9 +842,12 @@ function normalizeStoredCatProfile(profile: Partial<CatProfile>): CatProfile {
     updatedAt:
       profile.updatedAt ?? profile.createdAt ?? new Date().toISOString(),
     avatarDataUrl: profile.avatarDataUrl,
-    typeKey: profile.typeKey,
-    typeLabel: profile.typeLabel,
+    typeKey,
+    typeLabel: typeInfo?.label ?? normalizeCatTypeLabel(profile.typeLabel),
+    typeTagline: profile.typeTagline ?? typeInfo?.tagline,
     typeScores: profile.typeScores,
+    axisScores: normalizeAxisScores(profile.axisScores),
+    activityPattern: normalizeActivityPattern(profile.activityPattern),
     basicInfo: normalizeCatBasicInfo(profile.basicInfo),
     appearance: isValidCatAppearance(profile.appearance)
       ? normalizeCatAppearance(profile.appearance)
@@ -830,6 +855,84 @@ function normalizeStoredCatProfile(profile: Partial<CatProfile>): CatProfile {
     modifiers: Array.isArray(profile.modifiers) ? profile.modifiers : undefined,
     onboarding: profile.onboarding,
     understanding: profile.understanding,
+  };
+}
+
+function migrateTypeKey(oldKey: string): CatTypeKey {
+  const map: Record<string, CatTypeKey> = {
+    play: "leone",
+    food: "sole",
+    social: "luna",
+    stress: "aura",
+    balanced: "stella",
+  };
+  const migrated = map[oldKey] ?? oldKey;
+  return getCatTypeInfo(migrated)?.key ?? "stella";
+}
+
+function normalizeCatTypeLabel(label: unknown): CatTypeLabel | undefined {
+  if (typeof label !== "string") {
+    return undefined;
+  }
+
+  return getCatTypeInfo(label)?.label ??
+    (["ルーチェ", "フィオーレ", "レオーネ", "ニンバス", "ソーレ", "ルナ", "ステラ", "オーラ"].includes(label)
+      ? (label as CatTypeLabel)
+      : undefined);
+}
+
+function normalizeAxisScores(scores: unknown): AxisScores | undefined {
+  if (!scores || typeof scores !== "object") {
+    return undefined;
+  }
+
+  const candidate = scores as Partial<Record<keyof AxisScores, unknown>>;
+  const keys: (keyof AxisScores)[] = ["P", "C", "S", "I", "B", "N"];
+  if (!keys.every((key) => typeof candidate[key] === "number")) {
+    return undefined;
+  }
+
+  return {
+    P: candidate.P as number,
+    C: candidate.C as number,
+    S: candidate.S as number,
+    I: candidate.I as number,
+    B: candidate.B as number,
+    N: candidate.N as number,
+  };
+}
+
+function normalizeActivityPattern(pattern: unknown): ActivityPattern | undefined {
+  if (!pattern || typeof pattern !== "object") {
+    return undefined;
+  }
+
+  const candidate = pattern as Partial<ActivityPattern>;
+  const peakTimes: ActivityPattern["peakTime"][] = [
+    "morning",
+    "afternoon",
+    "evening",
+    "night",
+    "random",
+  ];
+  const sensitivities: ActivityPattern["foodSensitivity"][] = [
+    "high",
+    "medium",
+    "low",
+  ];
+
+  if (
+    !peakTimes.includes(candidate.peakTime ?? "random") ||
+    !sensitivities.includes(candidate.foodSensitivity ?? "medium") ||
+    !sensitivities.includes(candidate.stressSensitivity ?? "medium")
+  ) {
+    return undefined;
+  }
+
+  return {
+    peakTime: candidate.peakTime ?? "random",
+    foodSensitivity: candidate.foodSensitivity ?? "medium",
+    stressSensitivity: candidate.stressSensitivity ?? "medium",
   };
 }
 
