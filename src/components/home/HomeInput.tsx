@@ -833,7 +833,7 @@ function Header({
             <div style={styles.summaryList}>
               <div style={styles.dayMapRow}>
                 <span style={styles.dayMapRowPeriod}>
-                  {"さいきん"}
+                  {"さいきんの様子"}
                 </span>
                 <span
                   style={
@@ -849,7 +849,7 @@ function Header({
               </div>
               <div style={{ ...styles.dayMapRow, borderBottom: "none" }}>
                 <span style={styles.dayMapRowPeriod}>
-                  {"いま"}
+                  {"いまの様子"}
                 </span>
                 <span
                   style={
@@ -1816,7 +1816,7 @@ const styles = {
     letterSpacing: 0,
   },
   title: {
-    margin: "0",
+    margin: "0 0 0 0",
     fontSize: "26px",
     fontWeight: 720,
     letterSpacing: 0,
@@ -1868,7 +1868,7 @@ const styles = {
     overflow: "hidden",
   },
   photoHeroInfo: {
-    padding: "4px 16px 16px",
+    padding: "2px 16px 16px",
   },
   accountPromptCard: {
     display: "grid",
