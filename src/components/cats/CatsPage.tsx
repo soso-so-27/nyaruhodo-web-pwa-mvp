@@ -517,6 +517,16 @@ export function CatsPage() {
           </div>
         </div>
 
+        <div style={styles.settingsSection}>
+          <p style={styles.settingsSectionLabel}>設定</p>
+          <div style={styles.settingsCard}>
+            <a href="/settings" style={styles.settingsRow}>
+              <span style={styles.settingsRowLabel}>アカウントと設定</span>
+              <span style={styles.settingsRowChevron}>›</span>
+            </a>
+          </div>
+        </div>
+
         {message ? <p style={styles.message}>{message}</p> : null}
         {saveMessage ? <p style={styles.message}>{saveMessage}</p> : null}
       </div>
@@ -966,6 +976,39 @@ const styles = {
     fontSize: "12px",
     color: "#9a9890",
     margin: 0,
+  },
+  settingsSection: {
+    marginTop: "16px",
+  },
+  settingsSectionLabel: {
+    fontSize: "12px",
+    fontWeight: 600,
+    color: "#9a9890",
+    margin: "0 0 8px 4px",
+    letterSpacing: "0.04em",
+  },
+  settingsCard: {
+    background: "#ffffff",
+    border: "0.5px solid #e5e2dc",
+    borderRadius: "16px",
+    overflow: "hidden",
+  },
+  settingsRow: {
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "space-between",
+    padding: "14px 16px",
+    textDecoration: "none",
+    color: "#2a2a28",
+  },
+  settingsRowLabel: {
+    fontSize: "14px",
+    fontWeight: 500,
+    color: "#2a2a28",
+  },
+  settingsRowChevron: {
+    fontSize: "18px",
+    color: "#c8c5be",
   },
   header: {
     marginBottom: "12px",
