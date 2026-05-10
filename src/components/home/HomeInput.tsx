@@ -111,8 +111,6 @@ export function HomeInput({
   const recentCatSummary = buildRecentCatSummary(activeCatEvents);
   const activeCatTraitLabel =
     activeCatProfile?.typeLabel ?? catTraitMemo?.typeLabel;
-  const activeCatTraitTagline =
-    activeCatProfile?.typeTagline ?? catTraitMemo?.typeTagline;
   const activeCatModifiers =
     activeCatProfile?.modifiers ?? catTraitMemo?.modifiers ?? [];
   const activeCatTypeKey =
@@ -125,6 +123,8 @@ export function HomeInput({
         typeKey: activeCatTypeKey,
         modifiers: activeCatModifiers,
         axisScores: activeCatProfile?.axisScores,
+        stressSensitivity:
+          activeCatProfile?.activityPattern?.stressSensitivity,
       })
     : [];
   const shouldRenderAccountConnectedStatus =
@@ -361,9 +361,6 @@ export function HomeInput({
           catName={catName}
           catProfiles={catProfiles}
           catCoat={activeCatProfile?.appearance?.coat}
-          catTraitLabel={activeCatTraitLabel}
-          catTraitTagline={activeCatTraitTagline}
-          catModifiers={activeCatModifiers}
           activityPattern={activeCatProfile?.activityPattern}
           onboardingHomeMessage={onboardingHomeMessage}
           postDiagnosisFeedbackMessage={postDiagnosisFeedbackMessage}
@@ -389,6 +386,11 @@ export function HomeInput({
         ) : null}
 
         <div id="record" style={styles.actionArea}>
+          <div style={styles.zoneDivider}>
+            <div style={styles.zoneDividerLine} />
+            <span style={styles.zoneDividerText}>今日を残す</span>
+            <div style={styles.zoneDividerLine} />
+          </div>
           <section style={styles.observationCard}>
             <h2 style={styles.sectionTitle}>
               {`${catName}\u306f\u3044\u307e\u3069\u3046\u3057\u3066\u308b\uff1f`}
@@ -755,9 +757,6 @@ function Header({
   catName,
   catProfiles,
   catCoat,
-  catTraitLabel,
-  catTraitTagline,
-  catModifiers,
   activityPattern,
   onboardingHomeMessage,
   postDiagnosisFeedbackMessage,
@@ -769,9 +768,6 @@ function Header({
   catName: string;
   catProfiles: CatProfile[];
   catCoat?: CatCoat;
-  catTraitLabel?: string;
-  catTraitTagline?: string;
-  catModifiers: string[];
   activityPattern?: CatProfile["activityPattern"];
   onboardingHomeMessage: string;
   postDiagnosisFeedbackMessage: string;
@@ -787,7 +783,6 @@ function Header({
     typeof catAvatarStyle.borderColor === "string"
       ? catAvatarStyle.borderColor
       : "#e4e1da";
-  const visibleCatModifiers = catModifiers.filter(Boolean).slice(0, 2);
   const isDayMapEmpty = recentCatSummary.dayMap.every((item) => !item.signal);
   const peakSlots = activityPattern?.peakTime
     ? peakTimeMap[activityPattern.peakTime] ?? []
@@ -844,86 +839,77 @@ function Header({
           </div>
         </div>
         <div style={styles.photoHeroInfo}>
-          {catTraitLabel ? (
-            <section
-              style={styles.catTraitSection}
-              aria-label={`${catName}\u306e\u3053\u3068`}
-            >
-              <p style={styles.catTraitTitle}>
-                {"\u3053\u306e\u5b50\u306e\u3053\u3068"}
-              </p>
-              <div style={styles.catTraitPills}>
-                <span style={styles.catTraitPill}>{catTraitLabel}</span>
-              </div>
-              {catTraitTagline ? (
-                <p style={styles.catTraitTagline}>{catTraitTagline}</p>
-              ) : null}
-              {visibleCatModifiers.length > 0 ? (
-                <div style={styles.catModifierTags}>
-                  {visibleCatModifiers.map((modifier) => (
-                    <span key={modifier} style={styles.catModifierTag}>
-                      {modifier}
-                    </span>
-                  ))}
-                </div>
-              ) : null}
-            </section>
-          ) : null}
           <div style={styles.headerSummary}>
-            <div style={styles.dashboardTiles}>
-              <div style={styles.dashboardTile}>
-                <span style={styles.statusLabel}>
+            <div style={styles.summaryList}>
+              <div style={styles.dayMapRow}>
+                <span style={styles.dayMapRowPeriod}>
                   {`\u3055\u3044\u304d\u3093\u306e${catName}`}
                 </span>
-                <span style={styles.statusValue}>
+                <span
+                  style={
+                    recentCatSummary.recentSignalLabel &&
+                    recentCatSummary.recentSignalLabel !==
+                      "記録が増えると見えてきます"
+                      ? styles.dayMapRowValue
+                      : styles.dayMapRowValueEmpty
+                  }
+                >
                   {recentCatSummary.recentSignalLabel}
                 </span>
               </div>
-              <div style={{ ...styles.dashboardTile, ...styles.dashboardTileLast }}>
-                <span style={styles.statusLabel}>
+              <div style={{ ...styles.dayMapRow, borderBottom: "none" }}>
+                <span style={styles.dayMapRowPeriod}>
                   {`\u3044\u307e\u306e${catName}`}
                 </span>
-                <span style={styles.statusValue}>
+                <span
+                  style={
+                    recentCatSummary.currentTrendText &&
+                    recentCatSummary.currentTrendText !== "まだ記録がありません"
+                      ? styles.dayMapRowValue
+                      : styles.dayMapRowValueEmpty
+                  }
+                >
                   {recentCatSummary.currentTrendText}
                 </span>
               </div>
             </div>
             <div style={styles.dayMap}>
               <p style={styles.dayMapTitle}>{`${catName}\u306e1\u65e5`}</p>
-              <div style={styles.dayMapGrid}>
-                {recentCatSummary.dayMap.map((item) => {
+              <div style={styles.dayMapList}>
+                {recentCatSummary.dayMap.map((item, index) => {
                   const isPeakSlot = !item.signal && peakSlots.includes(item.period);
 
                   return (
                     <div
                       key={item.period}
                       style={
-                        item.isMuted && !isPeakSlot
-                          ? { ...styles.dayMapItem, ...styles.dayMapItemMuted }
-                          : styles.dayMapItem
+                        index === recentCatSummary.dayMap.length - 1
+                          ? { ...styles.dayMapRow, borderBottom: "none" }
+                          : styles.dayMapRow
                       }
                     >
-                      <span style={styles.dayMapPeriod}>{item.period}</span>
-                      {item.signal ? (
-                        <img
-                          src={getSignalIconSrc(item.signal)}
-                          alt=""
-                          style={styles.dayMapIcon}
-                          onError={(event) => {
-                            event.currentTarget.style.visibility = "hidden";
-                          }}
-                        />
-                      ) : (
+                      <div style={styles.dayMapRowLeft}>
                         <span
                           style={{
-                            ...styles.dayMapDot,
-                            background: isPeakSlot ? "#6B9E82" : "#d0cdc6",
+                            ...styles.dayMapRowDot,
+                            background: item.signal
+                              ? "#6B9E82"
+                              : isPeakSlot
+                                ? "rgba(107,158,130,0.35)"
+                                : "#e0ddd6",
                           }}
                           aria-hidden="true"
                         />
-                      )}
-                      <span style={styles.dayMapLabel}>
-                        {isPeakSlot ? "元気" : item.label}
+                        <span style={styles.dayMapRowPeriod}>{item.period}</span>
+                      </div>
+                      <span
+                        style={
+                          item.signal
+                            ? styles.dayMapRowValue
+                            : styles.dayMapRowValueEmpty
+                        }
+                      >
+                        {item.signal ? getSignalDisplayLabel(item.signal) : "-"}
                       </span>
                     </div>
                   );
@@ -1655,6 +1641,7 @@ function getSuggestedSignals({
   typeKey,
   modifiers,
   axisScores,
+  stressSensitivity,
 }: {
   timeBand: string;
   typeKey?: string;
@@ -1667,6 +1654,7 @@ function getSuggestedSignals({
     B: number;
     N: number;
   };
+  stressSensitivity?: "high" | "medium" | "low";
 }): string[] {
   const suggestions: string[] = [];
 
@@ -1714,6 +1702,14 @@ function getSuggestedSignals({
     ) {
       suggestions.push("restless");
     }
+  }
+
+  if (stressSensitivity === "high") {
+    suggestions.push("restless");
+    suggestions.push("unknown");
+  } else if (stressSensitivity === "low") {
+    suggestions.push("sleeping");
+    suggestions.push("purring");
   }
 
   if (
@@ -1894,7 +1890,7 @@ const styles = {
     overflow: "hidden",
   },
   photoHeroInfo: {
-    padding: "12px 14px 16px",
+    padding: "14px 16px 18px",
   },
   accountPromptCard: {
     display: "grid",
@@ -2263,7 +2259,7 @@ const styles = {
   catTraitTitle: {
     margin: "0 0 6px",
     color: "#6f6a61",
-    fontSize: "11px",
+    fontSize: "12px",
     fontWeight: 650,
     lineHeight: 1.3,
   },
@@ -2287,7 +2283,7 @@ const styles = {
     borderRadius: "999px",
     background: "rgba(107, 158, 130, 0.12)",
     color: "#53685c",
-    fontSize: "11px",
+    fontSize: "12px",
     fontWeight: 650,
     lineHeight: 1.35,
     padding: "3px 8px",
@@ -2295,7 +2291,7 @@ const styles = {
   catTraitTagline: {
     margin: "2px 0 8px",
     color: "#8a8a80",
-    fontSize: "12px",
+    fontSize: "13px",
     fontStyle: "italic",
     lineHeight: 1.6,
   },
@@ -2306,7 +2302,7 @@ const styles = {
     borderRadius: "999px",
     background: "rgba(255, 255, 255, 0.64)",
     color: "#6f6a61",
-    fontSize: "10px",
+    fontSize: "11px",
     fontWeight: 600,
     lineHeight: 1.35,
     padding: "2px 7px",
@@ -2314,8 +2310,13 @@ const styles = {
   headerSummary: {
     display: "flex",
     flexDirection: "column",
-    gap: "8px",
-    marginTop: "8px",
+    gap: "12px",
+    marginTop: "0px",
+  },
+  summaryList: {
+    display: "flex",
+    flexDirection: "column",
+    marginBottom: "8px",
   },
   dashboardTiles: {
     display: "grid",
@@ -2355,7 +2356,7 @@ const styles = {
   statusLabel: {
     display: "block",
     color: "#6f6a61",
-    fontSize: "10px",
+    fontSize: "12px",
     fontWeight: 650,
     lineHeight: 1.25,
     overflow: "hidden",
@@ -2367,7 +2368,7 @@ const styles = {
     minWidth: 0,
     overflow: "hidden",
     color: "#343632",
-    fontSize: "12px",
+    fontSize: "13px",
     fontWeight: 650,
     lineHeight: 1.25,
     textOverflow: "ellipsis",
@@ -2404,9 +2405,51 @@ const styles = {
   dayMapTitle: {
     margin: "0 0 6px",
     color: "#6f6a61",
-    fontSize: "10px",
+    fontSize: "12px",
     fontWeight: 650,
     lineHeight: 1.4,
+  },
+  dayMapList: {
+    display: "flex",
+    flexDirection: "column",
+    gap: "0px",
+  },
+  dayMapRow: {
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: "12px",
+    borderBottom: "0.5px solid #f0ede8",
+    padding: "7px 0",
+  },
+  dayMapRowLeft: {
+    display: "flex",
+    alignItems: "center",
+    gap: "10px",
+  },
+  dayMapRowDot: {
+    width: "7px",
+    height: "7px",
+    borderRadius: "50%",
+    flexShrink: 0,
+    transition: "background 0.2s",
+  },
+  dayMapRowPeriod: {
+    color: "#6a6a62",
+    fontSize: "13px",
+    fontWeight: 500,
+  },
+  dayMapRowValue: {
+    color: "#2a2a28",
+    fontSize: "13px",
+    fontWeight: 600,
+    textAlign: "right",
+  },
+  dayMapRowValueEmpty: {
+    color: "#d0cdc6",
+    fontSize: "13px",
+    fontWeight: 400,
+    textAlign: "right",
   },
   dayMapGrid: {
     display: "grid",
@@ -2467,7 +2510,7 @@ const styles = {
   dayMapEmptyHint: {
     margin: "6px 0 0",
     color: "#8a8178",
-    fontSize: "12px",
+    fontSize: "13px",
     fontWeight: 500,
     lineHeight: 1.45,
   },
@@ -2895,6 +2938,24 @@ const styles = {
     fontWeight: 500,
     letterSpacing: 0,
     cursor: "pointer",
+  },
+  zoneDivider: {
+    display: "flex",
+    alignItems: "center",
+    gap: "10px",
+    margin: "4px 0 8px",
+  },
+  zoneDividerLine: {
+    flex: 1,
+    height: "0.5px",
+    background: "#e8e5de",
+  },
+  zoneDividerText: {
+    color: "#b0ada6",
+    fontSize: "11px",
+    fontWeight: 600,
+    letterSpacing: "0.06em",
+    flexShrink: 0,
   },
   section: {
     marginBottom: "12px",
