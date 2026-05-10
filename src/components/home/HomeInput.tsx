@@ -833,7 +833,7 @@ function Header({
             <div style={styles.summaryList}>
               <div style={styles.dayMapRow}>
                 <span style={styles.dayMapRowPeriod}>
-                  {`\u3055\u3044\u304d\u3093\u306e${catName}`}
+                  {"さいきん"}
                 </span>
                 <span
                   style={
@@ -849,7 +849,7 @@ function Header({
               </div>
               <div style={{ ...styles.dayMapRow, borderBottom: "none" }}>
                 <span style={styles.dayMapRowPeriod}>
-                  {`\u3044\u307e\u306e${catName}`}
+                  {"いま"}
                 </span>
                 <span
                   style={
@@ -864,7 +864,7 @@ function Header({
               </div>
             </div>
             <div style={styles.dayMap}>
-              <p style={styles.dayMapTitle}>{`${catName}\u306e1\u65e5`}</p>
+              <p style={styles.dayMapTitle}>{"1日のリズム"}</p>
               <div style={styles.dayMapList}>
                 {recentCatSummary.dayMap.map((item, index) => {
                   const isPeakSlot = !item.signal && peakSlots.includes(item.period);
@@ -907,7 +907,7 @@ function Header({
               </div>
               {isDayMapEmpty ? (
                 <p style={styles.dayMapEmptyHint}>
-                  {"\u8a18\u9332\u304c\u6e9c\u307e\u308b\u3068\u3001\u3053\u306e\u5b50\u306e1\u65e5\u306e\u30ea\u30ba\u30e0\u304c\u898b\u3048\u3066\u304d\u307e\u3059"}
+                  {"記録が溜まると、1日のリズムが見えてきます"}
                 </p>
               ) : null}
             </div>
@@ -1816,7 +1816,7 @@ const styles = {
     letterSpacing: 0,
   },
   title: {
-    margin: "2px 0 0",
+    margin: "0",
     fontSize: "26px",
     fontWeight: 720,
     letterSpacing: 0,
@@ -1868,7 +1868,7 @@ const styles = {
     overflow: "hidden",
   },
   photoHeroInfo: {
-    padding: "10px 16px 16px",
+    padding: "4px 16px 16px",
   },
   accountPromptCard: {
     display: "grid",
@@ -1969,7 +1969,7 @@ const styles = {
     position: "absolute",
     left: "12px",
     right: "12px",
-    bottom: "16px",
+    bottom: "8px",
     zIndex: 2,
     display: "flex",
     flexDirection: "column",
