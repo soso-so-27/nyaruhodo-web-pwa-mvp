@@ -6,6 +6,7 @@ import type { CSSProperties } from "react";
 import { calculateUnderstandingPercent } from "../../core/understanding/understanding";
 import { buildCalendarContext } from "../../lib/calendarContext";
 import { getPoseCategoryForSignal } from "../../lib/collection/poses";
+import { createBrowserSupabaseClient } from "../../lib/supabase/browser";
 import type { RecentEvent } from "../../lib/supabase/queries";
 import {
   insertEvent,
@@ -122,6 +123,9 @@ export function HomeInput({
     isAccountCreatePromptVisible,
     setIsAccountCreatePromptVisible,
   ] = useState(false);
+  const [isAccountConnected, setIsAccountConnected] = useState(false);
+  const [hasCheckedAccountConnection, setHasCheckedAccountConnection] =
+    useState(false);
 
   const activeCatProfile =
     catProfiles.length > 0
@@ -175,7 +179,9 @@ export function HomeInput({
     : [];
   const shouldRenderAccountCreatePrompt =
     isHydrated &&
+    hasCheckedAccountConnection &&
     isAccountCreatePromptVisible &&
+    !isAccountConnected &&
     catProfiles.length > 0 &&
     Boolean(activeCatId);
 
@@ -225,6 +231,13 @@ export function HomeInput({
       }, 0);
     }
     setIsAccountCreatePromptVisible(shouldShowAccountCreatePrompt());
+    void hasSupabaseAuthUser().then((hasUser) => {
+      setIsAccountConnected(hasUser);
+      setHasCheckedAccountConnection(true);
+      if (hasUser) {
+        setIsAccountCreatePromptVisible(false);
+      }
+    });
     setIsHydrated(true);
 
     const latestHypothesis = readLatestHypothesis();
@@ -774,6 +787,22 @@ function dismissAccountCreatePrompt() {
       ).toISOString(),
     }),
   );
+}
+
+async function hasSupabaseAuthUser() {
+  const supabase = createBrowserSupabaseClient();
+
+  if (!supabase) {
+    return false;
+  }
+
+  const { data, error } = await supabase.auth.getUser();
+
+  if (error) {
+    return false;
+  }
+
+  return Boolean(data.user);
 }
 
 function readRecentStateRecords() {

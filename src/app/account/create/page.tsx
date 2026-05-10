@@ -3,6 +3,8 @@
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import type { CSSProperties } from "react";
+import { createBrowserSupabaseClient } from "../../../lib/supabase/browser";
+import { getSiteUrl } from "../../../lib/supabase/config";
 
 const ACCOUNT_CREATE_PROMPT_DISMISSED_KEY = "account_create_prompt_dismissed";
 const ACCOUNT_CREATE_PROMPT_DISMISSED_MS = 7 * 24 * 60 * 60 * 1000;
@@ -10,6 +12,33 @@ const ACCOUNT_CREATE_PROMPT_DISMISSED_MS = 7 * 24 * 60 * 60 * 1000;
 export default function AccountCreatePage() {
   const router = useRouter();
   const [message, setMessage] = useState("");
+  const [isStartingAuth, setIsStartingAuth] = useState(false);
+
+  async function handleGoogleSignIn() {
+    const supabase = createBrowserSupabaseClient();
+
+    if (!supabase) {
+      setMessage("アカウント接続の準備がまだできていません。");
+      return;
+    }
+
+    setIsStartingAuth(true);
+    setMessage("");
+
+    const { error } = await supabase.auth.signInWithOAuth({
+      provider: "google",
+      options: {
+        redirectTo: `${getSiteUrl()}/auth/callback?next=/home`,
+      },
+    });
+
+    if (error) {
+      setIsStartingAuth(false);
+      setMessage(
+        "Googleログインを開始できませんでした。少し時間をおいてもう一度お試しください。",
+      );
+    }
+  }
 
   function handleLater() {
     window.localStorage.setItem(
@@ -58,9 +87,10 @@ export default function AccountCreatePage() {
             <button
               type="button"
               onClick={() => {
-                setMessage("アカウント作成は次のステップで対応します。");
+                void handleGoogleSignIn();
               }}
               style={styles.primaryButton}
+              disabled={isStartingAuth}
             >
               無料で保存する
             </button>
