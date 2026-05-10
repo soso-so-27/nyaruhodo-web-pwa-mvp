@@ -982,9 +982,10 @@ function Header({
             </span>
           </div>
         </div>
-        </div>
-        <div style={styles.cardBody}>
-          <div style={styles.catInfoCard}>
+      </div>
+      </div>
+      <div style={styles.cardBody}>
+        <div style={styles.catInfoCard}>
       {catTraitLabel ? (
         <section style={styles.catTraitSection} aria-label={`${catName}\u306e\u3053\u3068`}>
           <p style={styles.catTraitTitle}>{"\u3053\u306e\u5b50\u306e\u3053\u3068"}</p>
@@ -1058,7 +1059,6 @@ function Header({
         </div>
       </div>
           </div>
-        </div>
       </div>
       {isCatSheetOpen ? (
         <>

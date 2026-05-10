@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import type { CSSProperties, ReactNode } from "react";
 
 type BottomNavigationProps = {
@@ -43,9 +44,10 @@ export function BottomNavigation({ active }: BottomNavigationProps) {
         const isActive = activeKey === item.key;
 
         return (
-          <a
+          <Link
             key={item.key}
             href={item.href}
+            prefetch={true}
             style={isActive ? styles.activeNavButton : styles.navButton}
           >
             <span
@@ -55,7 +57,7 @@ export function BottomNavigation({ active }: BottomNavigationProps) {
               {item.icon}
             </span>
             <span>{item.label}</span>
-          </a>
+          </Link>
         );
       })}
     </nav>
@@ -142,12 +144,13 @@ const styles = {
     gap: "4px",
     width: "min(calc(100% - 72px), 326px)",
     transform: "translateX(-50%)",
-    border: "1px solid rgba(224, 222, 216, 0.96)",
+    border: "1px solid rgba(200, 197, 190, 0.9)",
     borderRadius: "24px",
-    background: "rgba(255, 255, 255, 0.9)",
-    boxShadow: "0 8px 20px rgba(52, 50, 46, 0.035)",
+    background: "rgba(255, 255, 255, 0.96)",
+    boxShadow:
+      "0 -2px 0 rgba(200,197,190,0.3), 0 8px 24px rgba(52, 50, 46, 0.12)",
     padding: "5px",
-    backdropFilter: "blur(14px)",
+    backdropFilter: "blur(20px)",
   },
   navButton: {
     display: "flex",
