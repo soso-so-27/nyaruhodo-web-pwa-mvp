@@ -189,13 +189,6 @@ export function HomeInput({
         modifiers: activeCatModifiers,
       })
     : [];
-  const shouldRenderAccountCreatePrompt =
-    isHydrated &&
-    hasCheckedAccountConnection &&
-    isAccountCreatePromptVisible &&
-    !isAccountConnected &&
-    catProfiles.length > 0 &&
-    Boolean(activeCatId);
   const shouldRenderAccountConnectedStatus =
     isHydrated &&
     hasCheckedAccountConnection &&
@@ -203,6 +196,14 @@ export function HomeInput({
     catProfiles.length > 0 &&
     Boolean(activeCatId);
   const showSaveButton = homeVisitCount >= 3;
+  const shouldRenderAccountCreatePrompt =
+    isHydrated &&
+    hasCheckedAccountConnection &&
+    showSaveButton &&
+    isAccountCreatePromptVisible &&
+    !isAccountConnected &&
+    catProfiles.length > 0 &&
+    Boolean(activeCatId);
   const showOnboardingFeedback =
     isHydrated && homeVisitCount <= 1 && Boolean(activeCatTraitLabel);
   const onboardingFeedbackText = activeCatTraitLabel
@@ -638,7 +639,6 @@ export function HomeInput({
           <AccountCreatePrompt
             onCreate={() => router.push("/account/create")}
             onDismiss={handleAccountCreatePromptDismiss}
-            showSaveButton={showSaveButton}
           />
         ) : null}
 
@@ -1280,11 +1280,9 @@ function Header({
 function AccountCreatePrompt({
   onCreate,
   onDismiss,
-  showSaveButton,
 }: {
   onCreate: () => void;
   onDismiss: () => void;
-  showSaveButton: boolean;
 }) {
   return (
     <section style={styles.accountPromptCard} aria-label="アカウント作成">
@@ -1295,17 +1293,15 @@ function AccountCreatePrompt({
         </p>
       </div>
       <div style={styles.accountPromptActions}>
-        {showSaveButton ? (
-          <div style={styles.saveButtonArea}>
-            <button
-              type="button"
-              onClick={onCreate}
-              style={styles.accountPromptPrimaryButton}
-            >
-              無料で保存する
-            </button>
-          </div>
-        ) : null}
+        <div style={styles.saveButtonArea}>
+          <button
+            type="button"
+            onClick={onCreate}
+            style={styles.accountPromptPrimaryButton}
+          >
+            無料で保存する
+          </button>
+        </div>
         <button
           type="button"
           onClick={onDismiss}
