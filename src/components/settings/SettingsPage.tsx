@@ -119,6 +119,15 @@ export function SettingsPage() {
               <span style={styles.rowLabel}>にゃるほど</span>
               <span style={styles.rowValue}>猫と話せない人のためのアプリ</span>
             </div>
+            <div style={styles.divider} />
+            <div style={styles.betaNote}>
+              <p style={styles.betaNoteTitle}>現在ベータ版として無料公開中</p>
+              <p style={styles.betaNoteText}>
+                むぎの記録を長く残すためのデータ保管プランを準備しています。
+                正式版リリース時に、記録の長期保存に関する有料プランを導入予定です。
+                現在ご利用の記録データは引き続き大切にお預かりします。
+              </p>
+            </div>
           </div>
         </section>
       </div>
@@ -250,5 +259,23 @@ const styles = {
     border: "none",
     textAlign: "center" as const,
     cursor: "pointer",
+  },
+  betaNote: {
+    padding: "14px 0",
+    display: "flex",
+    flexDirection: "column" as const,
+    gap: "6px",
+  },
+  betaNoteTitle: {
+    fontSize: "13px",
+    fontWeight: 600,
+    color: "#6B9E82",
+    margin: 0,
+  },
+  betaNoteText: {
+    fontSize: "12px",
+    color: "#8a8a80",
+    lineHeight: 1.7,
+    margin: 0,
   },
 } satisfies Record<string, CSSProperties>;
