@@ -4,11 +4,11 @@ import Link from "next/link";
 import type { CSSProperties, ReactNode } from "react";
 
 type BottomNavigationProps = {
-  active: "home" | "today" | "collection" | "cats" | "together";
+  active: "home" | "today" | "torisetu" | "collection" | "cats" | "together";
 };
 
 type NavItem = {
-  key: "home" | "collection" | "cats";
+  key: "home" | "torisetu" | "collection" | "cats";
   href: string;
   label: string;
   icon: ReactNode;
@@ -23,6 +23,12 @@ export function BottomNavigation({ active }: BottomNavigationProps) {
       href: "/home",
       label: "ホーム",
       icon: <HomeIcon />,
+    },
+    {
+      key: "torisetu",
+      href: "/torisetu",
+      label: "トリセツ",
+      icon: <BookIcon />,
     },
     {
       key: "collection",
@@ -87,6 +93,36 @@ function HomeIcon() {
   );
 }
 
+function BookIcon() {
+  return (
+    <svg viewBox="0 0 24 24" style={styles.svgIcon}>
+      <path
+        d="M6.2 5.8h6.1c1 0 1.7.7 1.7 1.7v10.7c0-.8-.7-1.5-1.7-1.5H6.2z"
+        fill="none"
+        stroke="currentColor"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        strokeWidth="1.8"
+      />
+      <path
+        d="M17.8 5.8h-3.8v12.4c0-.8.7-1.5 1.7-1.5h2.1z"
+        fill="none"
+        stroke="currentColor"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        strokeWidth="1.8"
+      />
+      <path
+        d="M8.4 9.2h3.2M8.4 12h3.2"
+        fill="none"
+        stroke="currentColor"
+        strokeLinecap="round"
+        strokeWidth="1.6"
+      />
+    </svg>
+  );
+}
+
 function CatIcon() {
   return (
     <svg viewBox="0 0 24 24" style={styles.svgIcon}>
@@ -140,9 +176,9 @@ const styles = {
     bottom: "calc(14px + env(safe-area-inset-bottom))",
     zIndex: 20,
     display: "grid",
-    gridTemplateColumns: "repeat(3, 1fr)",
+    gridTemplateColumns: "repeat(4, 1fr)",
     gap: "4px",
-    width: "min(calc(100% - 72px), 326px)",
+    width: "min(calc(100% - 48px), 380px)",
     transform: "translateX(-50%)",
     border: "1px solid rgba(200, 197, 190, 0.9)",
     borderRadius: "24px",

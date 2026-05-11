@@ -360,6 +360,7 @@ export function HomeInput({
           onboardingHomeMessage={onboardingHomeMessage}
           postDiagnosisFeedbackMessage={postDiagnosisFeedbackMessage}
           recentCatSummary={recentCatSummary}
+          recentStateRecords={recentStateRecords}
           understandingPercent={understandingPercent}
           onCatSelect={handleCatSelect}
         />
@@ -753,6 +754,7 @@ function Header({
   onboardingHomeMessage,
   postDiagnosisFeedbackMessage,
   recentCatSummary,
+  recentStateRecords,
   understandingPercent,
   onCatSelect,
 }: {
@@ -765,6 +767,7 @@ function Header({
   onboardingHomeMessage: string;
   postDiagnosisFeedbackMessage: string;
   recentCatSummary: RecentCatSummary;
+  recentStateRecords: RecentStateRecord[];
   understandingPercent: number;
   onCatSelect: (catId: string) => void;
 }) {
@@ -782,6 +785,42 @@ function Header({
     : [];
   const heroPhotoSrc =
     activeCatProfile?.avatarDataUrl ?? SAMPLE_HOME_CAT_PHOTO_SRC;
+  const normalizedActiveCatId = activeCatId ?? null;
+  const activeRecentStateRecords = recentStateRecords
+    .filter((record) => record.localCatId === normalizedActiveCatId)
+    .sort(
+      (a, b) =>
+        new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
+    );
+  const recordCount = activeRecentStateRecords.length;
+  const latestRecordCreatedAt = activeRecentStateRecords[0]?.createdAt;
+  const latestRecordTime = latestRecordCreatedAt
+    ? new Date(latestRecordCreatedAt).getTime()
+    : Number.NaN;
+  const daysSinceLastRecord = Number.isNaN(latestRecordTime)
+    ? 999
+    : Math.floor((Date.now() - latestRecordTime) / (1000 * 60 * 60 * 24));
+  const fogLevel = (() => {
+    if (daysSinceLastRecord >= 7) return 3;
+    if (daysSinceLastRecord >= 3) return 2;
+    if (recordCount < 3) return 1;
+    return 0;
+  })();
+  const fogStyle: CSSProperties = {
+    position: "absolute",
+    inset: 0,
+    background: [
+      "transparent",
+      "rgba(247,245,239,0.25)",
+      "rgba(247,245,239,0.5)",
+      "rgba(247,245,239,0.72)",
+    ][fogLevel],
+    backdropFilter: ["none", "blur(1px)", "blur(3px)", "blur(6px)"][
+      fogLevel
+    ],
+    transition: "all 0.5s ease",
+    pointerEvents: "none",
+  };
 
   return (
     <header style={styles.header}>
@@ -797,6 +836,7 @@ function Header({
                 : "43% top",
             }}
           />
+          <div style={fogStyle} aria-hidden="true" />
           <div style={styles.photoHeroFade} aria-hidden="true" />
           <div style={styles.photoHeroContent}>
             <h1 style={styles.title}>
@@ -843,6 +883,15 @@ function Header({
           </div>
         </div>
         <div style={styles.photoHeroInfo}>
+          {daysSinceLastRecord >= 3 ? (
+            <div style={styles.fogMessage}>
+              <p style={styles.fogMessageText}>
+                {daysSinceLastRecord >= 7
+                  ? `${catName}のことが少し遠くなってきました`
+                  : `${catName}のことが少し見えにくくなってきました`}
+              </p>
+            </div>
+          ) : null}
           <div style={styles.headerSummary}>
             <div style={styles.summaryList}>
               <div style={styles.dayMapRow}>
@@ -1883,6 +1932,19 @@ const styles = {
   },
   photoHeroInfo: {
     padding: "0 16px 16px",
+  },
+  fogMessage: {
+    background: "rgba(180,160,120,0.07)",
+    border: "0.5px solid rgba(180,160,120,0.2)",
+    borderRadius: "10px",
+    padding: "8px 12px",
+    margin: "0 0 8px",
+  },
+  fogMessageText: {
+    fontSize: "12px",
+    color: "#8a7050",
+    lineHeight: 1.6,
+    margin: 0,
   },
   accountPromptCard: {
     display: "grid",
