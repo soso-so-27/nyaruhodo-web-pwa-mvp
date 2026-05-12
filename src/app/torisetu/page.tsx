@@ -1,5 +1,10 @@
 import { TorisetuPage } from "../../components/torisetu/TorisetuPage";
+import { getRecentEvents } from "../../lib/supabase/queries";
 
-export default function Torisetu() {
-  return <TorisetuPage />;
+export const dynamic = "force-dynamic";
+
+export default async function Torisetu() {
+  const recentEvents = await getRecentEvents();
+
+  return <TorisetuPage recentEvents={recentEvents} />;
 }

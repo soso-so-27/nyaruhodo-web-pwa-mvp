@@ -3,10 +3,33 @@
 import { useEffect, useState } from "react";
 import type { CSSProperties } from "react";
 import { loadCatProfiles, getActiveCatProfile } from "../../lib/catProfiles";
+import type { RecentEvent } from "../../lib/supabase/queries";
 import type { CatProfile } from "../../components/home/homeInputHelpers";
 import { BottomNavigation } from "../navigation/BottomNavigation";
 
-export function TorisetuPage() {
+type TorisetuPageProps = {
+  recentEvents: RecentEvent[];
+};
+
+type DayPart = "morning" | "daytime" | "evening" | "night";
+
+type DayMapItem = {
+  period: string;
+  dayPart: DayPart;
+  signal: string | null;
+};
+
+const RECENT_CAT_SUMMARY_WINDOW_MS = 7 * 24 * 60 * 60 * 1000;
+
+const peakTimeMap: Record<string, string[]> = {
+  morning: ["朝"],
+  afternoon: ["昼"],
+  evening: ["夕", "夜"],
+  night: ["夜"],
+  random: [],
+};
+
+export function TorisetuPage({ recentEvents }: TorisetuPageProps) {
   const [catProfile, setCatProfile] = useState<CatProfile | null>(null);
 
   useEffect(() => {
@@ -16,6 +39,14 @@ export function TorisetuPage() {
   }, []);
 
   const catName = catProfile?.name ?? "むぎ";
+  const rhythmEvents = catProfile
+    ? recentEvents.filter((event) => event.local_cat_id === catProfile.id)
+    : [];
+  const dayMap = buildDayMap(rhythmEvents);
+  const isDayMapEmpty = dayMap.every((item) => !item.signal);
+  const peakSlots = catProfile?.activityPattern?.peakTime
+    ? peakTimeMap[catProfile.activityPattern.peakTime] ?? []
+    : [];
 
   const unlockedCards = [
     {
@@ -91,6 +122,58 @@ export function TorisetuPage() {
           </p>
         </div>
 
+        <div style={styles.card}>
+          <div style={styles.cardHeader}>
+            <span style={styles.cardTitle}>1日のリズム</span>
+            <span style={styles.badgeUnlocked}>記録から</span>
+          </div>
+          <div style={styles.dayMapList}>
+            {dayMap.map((item, index) => {
+              const isPeakSlot = !item.signal && peakSlots.includes(item.period);
+
+              return (
+                <div
+                  key={item.period}
+                  style={
+                    index === dayMap.length - 1
+                      ? { ...styles.dayMapRow, borderBottom: "none" }
+                      : styles.dayMapRow
+                  }
+                >
+                  <div style={styles.dayMapRowLeft}>
+                    <span
+                      style={{
+                        ...styles.dayMapRowDot,
+                        background: item.signal
+                          ? "#6B9E82"
+                          : isPeakSlot
+                            ? "rgba(107,158,130,0.35)"
+                            : "#e0ddd6",
+                      }}
+                      aria-hidden="true"
+                    />
+                    <span style={styles.dayMapRowPeriod}>{item.period}</span>
+                  </div>
+                  <span
+                    style={
+                      item.signal
+                        ? styles.dayMapRowValue
+                        : styles.dayMapRowValueEmpty
+                    }
+                  >
+                    {item.signal ? getSignalDisplayLabel(item.signal) : "-"}
+                  </span>
+                </div>
+              );
+            })}
+          </div>
+          {isDayMapEmpty ? (
+            <p style={styles.dayMapEmptyHint}>
+              記録が溜まると、1日のリズムが見えてきます
+            </p>
+          ) : null}
+        </div>
+
         {unlockedCards.map((card) => (
           <div key={card.id} style={styles.card}>
             <div style={styles.cardHeader}>
@@ -120,7 +203,10 @@ export function TorisetuPage() {
             }}
           >
             <div style={styles.cardHeader}>
-              <span style={styles.cardTitleLocked}>🔒 {card.title}</span>
+              <span style={styles.cardTitleLocked}>
+                <LockIcon />
+                {card.title}
+              </span>
               <span style={styles.badgeLocked}>あと{card.remaining}回</span>
             </div>
             <p style={styles.cardPreview}>{card.preview}</p>
@@ -139,6 +225,144 @@ export function TorisetuPage() {
       </div>
       <BottomNavigation active="torisetu" />
     </main>
+  );
+}
+
+function buildDayMap(events: RecentEvent[]): DayMapItem[] {
+  const since = Date.now() - RECENT_CAT_SUMMARY_WINDOW_MS;
+  const recentEvents = events.filter((event) => {
+    const eventDate = new Date(event.occurred_at || event.created_at);
+
+    return !Number.isNaN(eventDate.getTime()) && eventDate.getTime() >= since;
+  });
+  const dayParts: Array<{ dayPart: DayPart; period: string }> = [
+    { dayPart: "morning", period: "朝" },
+    { dayPart: "daytime", period: "昼" },
+    { dayPart: "evening", period: "夕" },
+    { dayPart: "night", period: "夜" },
+  ];
+
+  return dayParts.map(({ dayPart, period }) => {
+    const eventsInPeriod = recentEvents.filter(
+      (event) => getEventDayPart(event) === dayPart,
+    );
+    const signal = getRepresentativeSignal(eventsInPeriod);
+
+    return {
+      period,
+      dayPart,
+      signal,
+    };
+  });
+}
+
+function getRepresentativeSignal(events: RecentEvent[]) {
+  if (events.length < 3) {
+    return null;
+  }
+
+  const counts = new Map<string, number>();
+
+  events.forEach((event) => {
+    if (
+      event.event_type !== "current_state" &&
+      event.event_type !== "concern"
+    ) {
+      return;
+    }
+
+    counts.set(event.signal, (counts.get(event.signal) ?? 0) + 1);
+  });
+
+  const sorted = Array.from(counts.entries()).sort((a, b) => b[1] - a[1]);
+  const top = sorted[0];
+
+  if (!top || top[1] < 2) {
+    return null;
+  }
+
+  const tiedTopSignals = sorted.filter(([, count]) => count === top[1]);
+
+  if (tiedTopSignals.length > 1) {
+    return null;
+  }
+
+  return top[0];
+}
+
+function getEventDayPart(event: RecentEvent): DayPart {
+  const timeBand = event.calendar_context?.timeBand;
+
+  if (timeBand === "early_morning" || timeBand === "morning") {
+    return "morning";
+  }
+
+  if (timeBand === "daytime") {
+    return "daytime";
+  }
+
+  if (timeBand === "evening") {
+    return "evening";
+  }
+
+  if (timeBand === "night" || timeBand === "late_night") {
+    return "night";
+  }
+
+  const eventDate = new Date(event.occurred_at || event.created_at);
+  const hour = eventDate.getHours();
+
+  if (hour >= 5 && hour < 11) {
+    return "morning";
+  }
+
+  if (hour >= 11 && hour < 17) {
+    return "daytime";
+  }
+
+  if (hour >= 17 && hour < 21) {
+    return "evening";
+  }
+
+  return "night";
+}
+
+function getSignalDisplayLabel(signal: string) {
+  const labels: Record<string, string> = {
+    sleeping: "ねてる",
+    grooming: "毛づくろい",
+    playing: "遊んでる",
+    after_food: "ごはん",
+    food: "ごはん",
+    toilet: "トイレ",
+    purring: "ゴロゴロ",
+    meowing: "鳴いてる",
+    following: "ついてくる",
+    restless: "落ち着かない",
+    low_energy: "元気ない",
+    fighting: "ケンカしてる",
+    unknown: "よくわからない",
+  };
+
+  return labels[signal] ?? signal;
+}
+
+function LockIcon() {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      width="14"
+      height="14"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+    >
+      <rect x="5.5" y="10" width="13" height="9" rx="2" />
+      <path d="M8.5 10V7.4a3.5 3.5 0 0 1 7 0V10" />
+    </svg>
   );
 }
 
@@ -230,6 +454,9 @@ const styles = {
     color: "#2a2a28",
   },
   cardTitleLocked: {
+    display: "inline-flex",
+    alignItems: "center",
+    gap: "5px",
     fontSize: "13px",
     fontWeight: 500,
     color: "#b0ada6",
@@ -246,6 +473,55 @@ const styles = {
     fontStyle: "italic",
     lineHeight: "1.5",
     margin: "0 0 6px",
+  },
+  dayMapList: {
+    display: "flex",
+    flexDirection: "column",
+    gap: "0px",
+  },
+  dayMapRow: {
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: "12px",
+    borderBottom: "0.5px solid #f0ede8",
+    padding: "7px 0",
+  },
+  dayMapRowLeft: {
+    display: "flex",
+    alignItems: "center",
+    gap: "10px",
+  },
+  dayMapRowDot: {
+    width: "7px",
+    height: "7px",
+    borderRadius: "50%",
+    flexShrink: 0,
+    transition: "background 0.2s",
+  },
+  dayMapRowPeriod: {
+    color: "#6a6a62",
+    fontSize: "13px",
+    fontWeight: 500,
+  },
+  dayMapRowValue: {
+    color: "#2a2a28",
+    fontSize: "13px",
+    fontWeight: 600,
+    textAlign: "right",
+  },
+  dayMapRowValueEmpty: {
+    color: "#d0cdc6",
+    fontSize: "13px",
+    fontWeight: 400,
+    textAlign: "right",
+  },
+  dayMapEmptyHint: {
+    margin: "6px 0 0",
+    color: "#8a8178",
+    fontSize: "13px",
+    fontWeight: 500,
+    lineHeight: 1.45,
   },
   tagRow: {
     display: "flex",

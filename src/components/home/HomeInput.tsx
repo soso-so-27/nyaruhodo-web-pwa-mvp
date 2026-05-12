@@ -48,14 +48,6 @@ const RECENT_STATE_RECORD_TTL_MS = 30 * 60 * 1000;
 const RECENT_CAT_SUMMARY_WINDOW_MS = 7 * 24 * 60 * 60 * 1000;
 const SAMPLE_HOME_CAT_PHOTO_SRC = "/sample-cats/home-hero-generated.png";
 
-const peakTimeMap: Record<string, string[]> = {
-  morning: ["朝"],
-  afternoon: ["昼"],
-  evening: ["夕", "夜"],
-  night: ["夜"],
-  random: [],
-};
-
 type RecentStateRecord = {
   localCatId: string | null;
   signal: string;
@@ -356,7 +348,6 @@ export function HomeInput({
           catName={catName}
           catProfiles={catProfiles}
           catCoat={activeCatProfile?.appearance?.coat}
-          activityPattern={activeCatProfile?.activityPattern}
           onboardingHomeMessage={onboardingHomeMessage}
           postDiagnosisFeedbackMessage={postDiagnosisFeedbackMessage}
           recentCatSummary={recentCatSummary}
@@ -750,7 +741,6 @@ function Header({
   catName,
   catProfiles,
   catCoat,
-  activityPattern,
   onboardingHomeMessage,
   postDiagnosisFeedbackMessage,
   recentCatSummary,
@@ -763,7 +753,6 @@ function Header({
   catName: string;
   catProfiles: CatProfile[];
   catCoat?: CatCoat;
-  activityPattern?: CatProfile["activityPattern"];
   onboardingHomeMessage: string;
   postDiagnosisFeedbackMessage: string;
   recentCatSummary: RecentCatSummary;
@@ -779,10 +768,6 @@ function Header({
     typeof catAvatarStyle.borderColor === "string"
       ? catAvatarStyle.borderColor
       : "#e4e1da";
-  const isDayMapEmpty = recentCatSummary.dayMap.every((item) => !item.signal);
-  const peakSlots = activityPattern?.peakTime
-    ? peakTimeMap[activityPattern.peakTime] ?? []
-    : [];
   const heroPhotoSrc =
     activeCatProfile?.avatarDataUrl ?? SAMPLE_HOME_CAT_PHOTO_SRC;
   const normalizedActiveCatId = activeCatId ?? null;
@@ -925,54 +910,6 @@ function Header({
                   {recentCatSummary.currentTrendText}
                 </span>
               </div>
-            </div>
-            <div style={styles.dayMap}>
-              <p style={styles.dayMapTitle}>{"1日のリズム"}</p>
-              <div style={styles.dayMapList}>
-                {recentCatSummary.dayMap.map((item, index) => {
-                  const isPeakSlot = !item.signal && peakSlots.includes(item.period);
-
-                  return (
-                    <div
-                      key={item.period}
-                      style={
-                        index === recentCatSummary.dayMap.length - 1
-                          ? { ...styles.dayMapRow, borderBottom: "none" }
-                          : styles.dayMapRow
-                      }
-                    >
-                      <div style={styles.dayMapRowLeft}>
-                        <span
-                          style={{
-                            ...styles.dayMapRowDot,
-                            background: item.signal
-                              ? "#6B9E82"
-                              : isPeakSlot
-                                ? "rgba(107,158,130,0.35)"
-                                : "#e0ddd6",
-                          }}
-                          aria-hidden="true"
-                        />
-                        <span style={styles.dayMapRowPeriod}>{item.period}</span>
-                      </div>
-                      <span
-                        style={
-                          item.signal
-                            ? styles.dayMapRowValue
-                            : styles.dayMapRowValueEmpty
-                        }
-                      >
-                        {item.signal ? getSignalDisplayLabel(item.signal) : "-"}
-                      </span>
-                    </div>
-                  );
-                })}
-              </div>
-              {isDayMapEmpty ? (
-                <p style={styles.dayMapEmptyHint}>
-                  {"記録が溜まると、1日のリズムが見えてきます"}
-                </p>
-              ) : null}
             </div>
           </div>
         </div>
