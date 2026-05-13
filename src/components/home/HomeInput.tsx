@@ -203,19 +203,15 @@ export function HomeInput({ recentEvents: _recentEvents }: HomeInputProps) {
 
   return (
     <main style={styles.page}>
-      <section
-        style={{
-          ...styles.photoArea,
-          ...(photoSrc
-            ? {
-                backgroundImage: `url(${photoSrc})`,
-                backgroundSize: "cover",
-                backgroundPosition: "center top",
-              }
-            : { background: "linear-gradient(160deg, #C8C4BC, #A8A49C)" }),
-        }}
-      >
-        <div style={styles.photoOverlay} aria-hidden="true" />
+      {photoSrc ? (
+        <img src={photoSrc} alt="" style={styles.backgroundPhoto} />
+      ) : (
+        <div style={styles.backgroundFallback} aria-hidden="true" />
+      )}
+      <div style={styles.screenOverlay} aria-hidden="true" />
+
+      <div style={styles.contentLayer}>
+        <section style={styles.heroContent}>
         <button
           type="button"
           onClick={() => setIsCatSheetOpen(true)}
@@ -335,6 +331,7 @@ export function HomeInput({ recentEvents: _recentEvents }: HomeInputProps) {
           )}
         </button>
       </section>
+      </div>
 
       {isMugiSheetOpen ? (
         <ActionSheet
@@ -892,25 +889,52 @@ function ChevronIcon() {
 
 const styles = {
   page: {
-    minHeight: "100svh",
-    height: "100svh",
+    minHeight: "100dvh",
+    height: "100dvh",
+    position: "relative",
     overflow: "hidden",
-    background: "#FAF9F7",
+    background: "linear-gradient(160deg, #C8C4BC, #A8A49C)",
     color: "#2A2A28",
     fontFamily:
       'Outfit, "Zen Kaku Gothic New", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
   },
-  photoArea: {
-    position: "relative",
-    height: "40svh",
-    minHeight: "280px",
-    overflow: "hidden",
-  },
-  photoOverlay: {
-    position: "absolute",
+  backgroundPhoto: {
+    position: "fixed",
     inset: 0,
+    zIndex: 0,
+    width: "100%",
+    height: "100%",
+    objectFit: "cover",
+    objectPosition: "center top",
+  },
+  backgroundFallback: {
+    position: "fixed",
+    inset: 0,
+    zIndex: 0,
+    background: "linear-gradient(160deg, #C8C4BC, #A8A49C)",
+  },
+  screenOverlay: {
+    position: "fixed",
+    inset: 0,
+    zIndex: 1,
     background: "rgba(240, 237, 232, 0.25)",
     pointerEvents: "none",
+  },
+  contentLayer: {
+    position: "relative",
+    zIndex: 2,
+    height: "100dvh",
+    display: "flex",
+    flexDirection: "column",
+    overflow: "hidden",
+    paddingBottom: "calc(86px + env(safe-area-inset-bottom))",
+    boxSizing: "border-box",
+  },
+  heroContent: {
+    position: "relative",
+    height: "40dvh",
+    minHeight: "280px",
+    flexShrink: 0,
   },
   catSwitchButton: {
     position: "absolute",
@@ -967,13 +991,14 @@ const styles = {
     textShadow: "0 1px 3px rgba(0,0,0,0.3)",
   },
   controlArea: {
-    height: "60svh",
     minHeight: 0,
+    flex: 1,
     display: "flex",
     flexDirection: "column",
     gap: "12px",
-    background: "#FAF9F7",
-    padding: "16px 16px calc(86px + env(safe-area-inset-bottom))",
+    background: "transparent",
+    padding: "16px",
+    boxSizing: "border-box",
   },
   primaryCards: {
     display: "grid",
