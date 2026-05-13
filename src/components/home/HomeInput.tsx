@@ -212,6 +212,7 @@ export function HomeInput({ recentEvents: _recentEvents }: HomeInputProps) {
 
       <div style={styles.contentLayer}>
         <section style={styles.heroContent}>
+          <div style={styles.heroTopBar}>
         <button
           type="button"
           onClick={() => setIsCatSheetOpen(true)}
@@ -232,6 +233,7 @@ export function HomeInput({ recentEvents: _recentEvents }: HomeInputProps) {
             />
           </div>
         </div>
+          </div>
         <p style={styles.lightText}>{lightText}</p>
       </section>
 
@@ -905,7 +907,7 @@ const styles = {
     width: "100%",
     height: "100%",
     objectFit: "cover",
-    objectPosition: "center top",
+    objectPosition: "center 30%",
   },
   backgroundFallback: {
     position: "fixed",
@@ -926,20 +928,28 @@ const styles = {
     height: "100dvh",
     display: "flex",
     flexDirection: "column",
+    justifyContent: "space-between",
     overflow: "hidden",
-    paddingBottom: "calc(86px + env(safe-area-inset-bottom))",
+    paddingBottom: "calc(80px + env(safe-area-inset-bottom))",
     boxSizing: "border-box",
   },
   heroContent: {
     position: "relative",
-    height: "40dvh",
-    minHeight: "280px",
-    flexShrink: 0,
+    flex: "1 1 auto",
+    minHeight: 0,
+    display: "flex",
+    flexDirection: "column",
+    justifyContent: "space-between",
+    padding: "calc(12px + env(safe-area-inset-top)) 16px 12px",
+    boxSizing: "border-box",
+  },
+  heroTopBar: {
+    display: "flex",
+    alignItems: "flex-start",
+    justifyContent: "space-between",
+    gap: "12px",
   },
   catSwitchButton: {
-    position: "absolute",
-    top: "calc(12px + env(safe-area-inset-top))",
-    left: "16px",
     display: "inline-flex",
     alignItems: "center",
     gap: "4px",
@@ -954,9 +964,6 @@ const styles = {
     backdropFilter: "blur(12px)",
   },
   lightPill: {
-    position: "absolute",
-    top: "calc(12px + env(safe-area-inset-top))",
-    right: "16px",
     display: "flex",
     alignItems: "center",
     gap: "6px",
@@ -979,10 +986,6 @@ const styles = {
     transition: "width 0.5s ease-in-out, background-color 0.5s ease-in-out",
   },
   lightText: {
-    position: "absolute",
-    right: "16px",
-    bottom: "12px",
-    left: "16px",
     margin: 0,
     color: "rgba(255,255,255,0.95)",
     fontSize: "13px",
@@ -991,13 +994,12 @@ const styles = {
     textShadow: "0 1px 3px rgba(0,0,0,0.3)",
   },
   controlArea: {
-    minHeight: 0,
-    flex: 1,
+    flex: "0 0 auto",
     display: "flex",
     flexDirection: "column",
     gap: "12px",
     background: "transparent",
-    padding: "16px",
+    padding: "0 16px 16px",
     boxSizing: "border-box",
   },
   primaryCards: {
