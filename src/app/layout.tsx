@@ -9,7 +9,7 @@ export const metadata: Metadata = {
   appleWebApp: {
     capable: true,
     title: "にゃるほど",
-    statusBarStyle: "default",
+    statusBarStyle: "black-translucent",
   },
   icons: {
     icon: [
@@ -35,6 +35,10 @@ export default function RootLayout({
   return (
     <html lang="ja">
       <head>
+        <meta
+          name="apple-mobile-web-app-status-bar-style"
+          content="black-translucent"
+        />
         <link
           rel="stylesheet"
           href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@latest/tabler-icons.min.css"
