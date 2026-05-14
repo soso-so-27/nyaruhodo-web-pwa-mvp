@@ -208,7 +208,22 @@ export function HomeInput({ recentEvents: _recentEvents }: HomeInputProps) {
       ) : (
         <div style={styles.backgroundFallback} aria-hidden="true" />
       )}
-      <div style={styles.screenOverlay} aria-hidden="true" />
+      <div
+        style={{
+          ...styles.darkOverlay,
+          background: `rgba(20, 18, 15, ${getDarkOverlayOpacity(lightScore)})`,
+        }}
+        aria-hidden="true"
+      />
+      <div
+        style={{
+          ...styles.glowOverlay,
+          background: `radial-gradient(ellipse at bottom, rgba(245, 200, 66, ${getGlowOpacity(
+            lightScore,
+          )}) 0%, transparent 70%)`,
+        }}
+        aria-hidden="true"
+      />
 
       <div style={styles.contentLayer}>
         <section style={styles.heroContent}>
@@ -678,6 +693,14 @@ function getLightColor(level: number) {
   return "#F5C842";
 }
 
+function getDarkOverlayOpacity(score: number) {
+  return 0.55 - (score / 100) * 0.5;
+}
+
+function getGlowOpacity(score: number) {
+  return (score / 100) * 0.3;
+}
+
 function getLightText(level: number, name: string) {
   if (level === 1) return `${name}のことが、少し遠くなってきたかも`;
   if (level === 2) return `${name}のこと、もう少し見てあげたいな`;
@@ -941,16 +964,23 @@ const styles = {
     zIndex: 0,
     background: "linear-gradient(160deg, #C8C4BC, #A8A49C)",
   },
-  screenOverlay: {
+  darkOverlay: {
     position: "fixed",
     inset: 0,
     zIndex: 1,
-    background: "rgba(20, 18, 15, 0.25)",
     pointerEvents: "none",
+    transition: "background 1s ease-in-out",
+  },
+  glowOverlay: {
+    position: "fixed",
+    inset: 0,
+    zIndex: 2,
+    pointerEvents: "none",
+    transition: "background 1s ease-in-out",
   },
   contentLayer: {
     position: "relative",
-    zIndex: 2,
+    zIndex: 3,
     height: "100dvh",
     display: "flex",
     flexDirection: "column",
