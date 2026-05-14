@@ -375,7 +375,7 @@ const styles = {
   container: {
     width: "min(100%, 430px)",
     margin: "0 auto",
-    padding: "0 16px",
+    padding: "env(safe-area-inset-top) 16px 0",
   },
   header: {
     padding: "20px 0 12px",

@@ -1018,7 +1018,8 @@ const styles = {
   container: {
     width: "min(100%, 480px)",
     margin: "0 auto",
-    padding: "18px 16px calc(144px + env(safe-area-inset-bottom))",
+    padding:
+      "calc(18px + env(safe-area-inset-top)) 16px calc(144px + env(safe-area-inset-bottom))",
   },
   header: {
     marginBottom: "14px",

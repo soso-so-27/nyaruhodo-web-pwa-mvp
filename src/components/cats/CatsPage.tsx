@@ -726,7 +726,8 @@ const styles = {
   container: {
     width: "min(100%, 430px)",
     margin: "0 auto",
-    padding: "16px 14px calc(224px + env(safe-area-inset-bottom))",
+    padding:
+      "calc(16px + env(safe-area-inset-top)) 14px calc(224px + env(safe-area-inset-bottom))",
   },
   pageHeader: {
     display: "flex",
