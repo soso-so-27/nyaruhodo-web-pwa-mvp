@@ -698,7 +698,7 @@ function getOverlayStyle(score: number): string {
 
 function getPhotoStyle(score: number): CSSProperties {
   const lv = getLightLevel(score);
-  const blurMap: Record<number, number> = { 1: 8, 2: 4, 3: 0, 4: 0, 5: 0 };
+  const blurMap: Record<number, number> = { 1: 2.5, 2: 1, 3: 0, 4: 0, 5: 0 };
   const blur = blurMap[lv];
 
   return {
