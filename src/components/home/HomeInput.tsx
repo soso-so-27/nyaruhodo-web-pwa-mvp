@@ -237,43 +237,7 @@ export function HomeInput({ recentEvents: _recentEvents }: HomeInputProps) {
         <p style={styles.lightText}>{lightText}</p>
       </section>
 
-      <section style={styles.controlArea}>
-        {isYousuOpen ? (
-          <div style={styles.yousuPanel}>
-            <div style={styles.yousuHeader}>
-              <span style={styles.yousuTitle}>{catName}のようす</span>
-              <button
-                type="button"
-                onClick={() => setIsYousuOpen(false)}
-                style={styles.closeButton}
-                aria-label="閉じる"
-              >
-                <CloseIcon />
-              </button>
-            </div>
-            <div style={styles.yousuGrid}>
-              {YOUSU_OPTIONS.map((option) => {
-                const isSelected = selectedYousu === option;
-
-                return (
-                  <button
-                    key={option}
-                    type="button"
-                    onClick={() => recordYousu(option)}
-                    disabled={isYousuLocked}
-                    style={{
-                      ...styles.yousuOption,
-                      ...(isSelected ? styles.yousuOptionSelected : {}),
-                      ...(isYousuLocked ? styles.lockedState : {}),
-                    }}
-                  >
-                    {option}
-                  </button>
-                );
-              })}
-            </div>
-          </div>
-        ) : (
+        <section style={styles.controlArea}>
           <div style={styles.primaryCards}>
             <button
               type="button"
@@ -306,7 +270,6 @@ export function HomeInput({ recentEvents: _recentEvents }: HomeInputProps) {
               <span style={styles.primaryCardText}>{catName}へ</span>
             </button>
           </div>
-        )}
 
         <button
           type="button"
@@ -334,6 +297,17 @@ export function HomeInput({ recentEvents: _recentEvents }: HomeInputProps) {
         </button>
       </section>
       </div>
+
+      {isYousuOpen ? (
+        <YousuSheet
+          title={`${catName}のようす`}
+          options={YOUSU_OPTIONS}
+          selected={selectedYousu}
+          isLocked={isYousuLocked}
+          onClose={() => setIsYousuOpen(false)}
+          onSelect={recordYousu}
+        />
+      ) : null}
 
       {isMugiSheetOpen ? (
         <ActionSheet
@@ -384,6 +358,58 @@ export function HomeInput({ recentEvents: _recentEvents }: HomeInputProps) {
         }
       `}</style>
     </main>
+  );
+}
+
+function YousuSheet({
+  title,
+  options,
+  selected,
+  isLocked,
+  onClose,
+  onSelect,
+}: {
+  title: string;
+  options: string[];
+  selected: string | null;
+  isLocked: boolean;
+  onClose: () => void;
+  onSelect: (value: string) => void;
+}) {
+  return (
+    <>
+      <div style={styles.sheetBackdrop} onClick={onClose} />
+      <div style={styles.sheet}>
+        <div style={styles.sheetHeader}>
+          <p style={styles.sheetTitle}>{title}</p>
+          <button
+            type="button"
+            onClick={onClose}
+            style={styles.sheetCloseButton}
+            aria-label="閉じる"
+          >
+            <CloseIcon />
+          </button>
+        </div>
+        <div style={styles.yousuSheetGrid}>
+          {options.map((option) => (
+            <button
+              key={option}
+              type="button"
+              onClick={() => onSelect(option)}
+              disabled={isLocked}
+              style={{
+                ...styles.yousuOption,
+                ...(selected === option ? styles.yousuOptionSelected : {}),
+                ...(isLocked ? styles.lockedState : {}),
+              }}
+            >
+              {option}
+            </button>
+          ))}
+        </div>
+      </div>
+    </>
   );
 }
 
@@ -919,7 +945,7 @@ const styles = {
     position: "fixed",
     inset: 0,
     zIndex: 1,
-    background: "rgba(240, 237, 232, 0.25)",
+    background: "rgba(20, 18, 15, 0.25)",
     pointerEvents: "none",
   },
   contentLayer: {
@@ -1190,6 +1216,12 @@ const styles = {
     display: "grid",
     gridTemplateColumns: "1fr 1fr",
     gap: "12px",
+    marginTop: "16px",
+  },
+  yousuSheetGrid: {
+    display: "grid",
+    gridTemplateColumns: "repeat(4, 1fr)",
+    gap: "8px",
     marginTop: "16px",
   },
   sheetOption: {
