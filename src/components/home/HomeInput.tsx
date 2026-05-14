@@ -107,7 +107,8 @@ export function HomeInput({ recentEvents: _recentEvents }: HomeInputProps) {
   const photoSrc = activeCat?.avatarDataUrl ?? null;
   const lightScore = lightData ? getCurrentScore(lightData, tick) : 0;
   const lightLevel = getLightLevel(lightScore);
-  const lightColor = getLightColor(lightLevel);
+  const bulbColor = getBulbColor(lightScore);
+  const bulbGlowFilter = getBulbGlowFilter(lightScore);
   const lightText = getLightText(lightLevel, catName);
   const yousuRemaining = getRemainingTime(lockData, "yousu", tick);
   const mugiRemaining = getRemainingTime(lockData, "mugi", tick);
@@ -215,16 +216,6 @@ export function HomeInput({ recentEvents: _recentEvents }: HomeInputProps) {
         }}
         aria-hidden="true"
       />
-      <div
-        style={{
-          ...styles.glowOverlay,
-          background: `radial-gradient(ellipse at bottom, rgba(245, 200, 66, ${getGlowOpacity(
-            lightScore,
-          )}) 0%, transparent 70%)`,
-        }}
-        aria-hidden="true"
-      />
-
       <div style={styles.contentLayer}>
         <section style={styles.heroContent}>
           <div style={styles.heroTopBar}>
@@ -237,13 +228,13 @@ export function HomeInput({ recentEvents: _recentEvents }: HomeInputProps) {
           <span aria-hidden="true">▾</span>
         </button>
         <div style={styles.lightPill}>
-          <BulbIcon color={lightColor} glow={lightLevel === 5} />
+          <BulbIcon color={bulbColor} glowFilter={bulbGlowFilter} />
           <div style={styles.lightTrack}>
             <div
               style={{
                 ...styles.lightFill,
                 width: `${lightScore}%`,
-                backgroundColor: lightColor,
+                backgroundColor: bulbColor,
               }}
             />
           </div>
@@ -686,19 +677,34 @@ function getLightLevel(score: number) {
   return 5;
 }
 
-function getLightColor(level: number) {
-  if (level === 1) return "#C8C4BC";
-  if (level === 2) return "#DDD5A8";
-  if (level === 3) return "#EEE080";
-  return "#F5C842";
-}
-
 function getDarkOverlayOpacity(score: number) {
   return 0.55 - (score / 100) * 0.5;
 }
 
-function getGlowOpacity(score: number) {
-  return (score / 100) * 0.3;
+function getBulbColor(score: number) {
+  const clampedScore = Math.max(0, Math.min(100, score));
+  const ratio = clampedScore / 100;
+  const r = Math.round(200 + (245 - 200) * ratio);
+  const g = Math.round(196 + (200 - 196) * ratio);
+  const b = Math.round(188 + (66 - 188) * ratio);
+  return `rgb(${r}, ${g}, ${b})`;
+}
+
+function getBulbGlowFilter(score: number) {
+  const glowIntensity = Math.max(0, Math.min(100, score)) / 100;
+  if (glowIntensity <= 0) return "none";
+
+  return [
+    `drop-shadow(0 0 ${glowIntensity * 8}px rgba(245, 200, 66, ${
+      glowIntensity * 0.9
+    }))`,
+    `drop-shadow(0 0 ${glowIntensity * 20}px rgba(245, 200, 66, ${
+      glowIntensity * 0.5
+    }))`,
+    `drop-shadow(0 0 ${glowIntensity * 40}px rgba(245, 200, 66, ${
+      glowIntensity * 0.2
+    }))`,
+  ].join(" ");
 }
 
 function getLightText(level: number, name: string) {
@@ -833,7 +839,7 @@ function markDiscoverySeen(catId: string) {
   }
 }
 
-function BulbIcon({ color, glow }: { color: string; glow: boolean }) {
+function BulbIcon({ color, glowFilter }: { color: string; glowFilter: string }) {
   return (
     <svg
       viewBox="0 0 16 20"
@@ -841,13 +847,17 @@ function BulbIcon({ color, glow }: { color: string; glow: boolean }) {
       height="20"
       fill="none"
       aria-hidden="true"
-      style={glow ? { filter: `drop-shadow(0 0 6px ${color})` } : undefined}
+      style={{
+        color,
+        filter: glowFilter,
+        transition: "color 1s ease-in-out, filter 1s ease-in-out",
+      }}
     >
       <path
         d="M8 1.6a5.7 5.7 0 0 0-3.4 10.3c.7.5 1 1.2 1 2.1h4.8c0-.9.4-1.6 1-2.1A5.7 5.7 0 0 0 8 1.6Z"
-        fill={color}
+        fill="currentColor"
       />
-      <path d="M5.7 15.1h4.6v1.4H5.7zM6.2 17.2h3.6v1.2H6.2z" fill={color} />
+      <path d="M5.7 15.1h4.6v1.4H5.7zM6.2 17.2h3.6v1.2H6.2z" fill="currentColor" />
     </svg>
   );
 }
@@ -971,16 +981,9 @@ const styles = {
     pointerEvents: "none",
     transition: "background 1s ease-in-out",
   },
-  glowOverlay: {
-    position: "fixed",
-    inset: 0,
-    zIndex: 2,
-    pointerEvents: "none",
-    transition: "background 1s ease-in-out",
-  },
   contentLayer: {
     position: "relative",
-    zIndex: 3,
+    zIndex: 2,
     height: "100dvh",
     display: "flex",
     flexDirection: "column",
