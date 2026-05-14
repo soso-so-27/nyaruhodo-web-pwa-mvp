@@ -107,8 +107,8 @@ export function HomeInput({ recentEvents: _recentEvents }: HomeInputProps) {
   const photoSrc = activeCat?.avatarDataUrl ?? null;
   const lightScore = lightData ? getCurrentScore(lightData, tick) : 0;
   const lightLevel = getLightLevel(lightScore);
-  const bulbColor = getBulbColor(lightScore);
-  const bulbGlowFilter = getBulbGlowFilter(lightScore);
+  const bulbStyle = getBulbStyle(lightScore);
+  const barStyle = getBarStyle(lightScore);
   const lightText = getLightText(lightLevel, catName);
   const yousuRemaining = getRemainingTime(lockData, "yousu", tick);
   const mugiRemaining = getRemainingTime(lockData, "mugi", tick);
@@ -205,14 +205,21 @@ export function HomeInput({ recentEvents: _recentEvents }: HomeInputProps) {
   return (
     <main style={styles.page}>
       {photoSrc ? (
-        <img src={photoSrc} alt="" style={styles.backgroundPhoto} />
+        <img
+          src={photoSrc}
+          alt=""
+          style={{
+            ...styles.backgroundPhoto,
+            ...getPhotoStyle(lightScore),
+          }}
+        />
       ) : (
         <div style={styles.backgroundFallback} aria-hidden="true" />
       )}
       <div
         style={{
           ...styles.darkOverlay,
-          background: `rgba(20, 18, 15, ${getDarkOverlayOpacity(lightScore)})`,
+          background: getOverlayStyle(lightScore),
         }}
         aria-hidden="true"
       />
@@ -228,13 +235,13 @@ export function HomeInput({ recentEvents: _recentEvents }: HomeInputProps) {
           <span aria-hidden="true">▾</span>
         </button>
         <div style={styles.lightPill}>
-          <BulbIcon color={bulbColor} glowFilter={bulbGlowFilter} />
+          <BulbIcon color={bulbStyle.color} glow={bulbStyle.glow} />
           <div style={styles.lightTrack}>
             <div
               style={{
                 ...styles.lightFill,
-                width: `${lightScore}%`,
-                backgroundColor: bulbColor,
+                width: barStyle.width,
+                backgroundColor: barStyle.background,
               }}
             />
           </div>
@@ -669,7 +676,7 @@ function getCurrentScore(lightData: LightData, now = Date.now()) {
   return Math.max(0, Math.min(100, decayed));
 }
 
-function getLightLevel(score: number) {
+function getLightLevel(score: number): 1 | 2 | 3 | 4 | 5 {
   if (score <= 20) return 1;
   if (score <= 40) return 2;
   if (score <= 60) return 3;
@@ -677,34 +684,56 @@ function getLightLevel(score: number) {
   return 5;
 }
 
-function getDarkOverlayOpacity(score: number) {
-  return 0.55 - (score / 100) * 0.5;
+function getOverlayStyle(score: number): string {
+  const lv = getLightLevel(score);
+  const gradients: Record<number, string> = {
+    1: "radial-gradient(ellipse at 75% 15%, rgba(30,20,10,0.15) 0%, rgba(0,0,0,0.88) 100%)",
+    2: "radial-gradient(ellipse at 75% 15%, rgba(180,100,20,0.30) 0%, rgba(0,0,0,0.70) 100%)",
+    3: "radial-gradient(ellipse at 75% 15%, rgba(210,130,30,0.40) 0%, rgba(0,0,0,0.20) 100%)",
+    4: "radial-gradient(ellipse at 75% 15%, rgba(230,150,40,0.55) 0%, rgba(180,100,20,0.20) 100%)",
+    5: "radial-gradient(ellipse at 75% 15%, rgba(245,180,60,0.65) 0%, rgba(200,120,30,0.35) 100%)",
+  };
+  return gradients[lv];
 }
 
-function getBulbColor(score: number) {
-  const clampedScore = Math.max(0, Math.min(100, score));
-  const ratio = clampedScore / 100;
-  const r = Math.round(200 + (245 - 200) * ratio);
-  const g = Math.round(196 + (200 - 196) * ratio);
-  const b = Math.round(188 + (66 - 188) * ratio);
-  return `rgb(${r}, ${g}, ${b})`;
+function getPhotoStyle(score: number): CSSProperties {
+  const lv = getLightLevel(score);
+  const blurMap: Record<number, number> = { 1: 8, 2: 4, 3: 0, 4: 0, 5: 0 };
+  const blur = blurMap[lv];
+
+  return {
+    filter: blur > 0 ? `blur(${blur}px)` : "none",
+    transform: blur > 0 ? `scale(${1 + blur * 0.015})` : "scale(1)",
+    transition: "filter 1s ease-in-out, transform 1s ease-in-out",
+  };
 }
 
-function getBulbGlowFilter(score: number) {
-  const glowIntensity = Math.max(0, Math.min(100, score)) / 100;
-  if (glowIntensity <= 0) return "none";
+function getBulbStyle(score: number) {
+  const lv = getLightLevel(score);
+  const styles: Record<number, { color: string; glow: string }> = {
+    1: { color: "#444444", glow: "none" },
+    2: { color: "#C8A050", glow: "none" },
+    3: { color: "#E0B840", glow: "0 0 6px 3px rgba(245,200,66,0.35)" },
+    4: { color: "#F5C842", glow: "0 0 8px 4px rgba(245,200,66,0.55)" },
+    5: {
+      color: "#F5C842",
+      glow: "0 0 12px 6px rgba(245,200,66,0.7), 0 0 24px 12px rgba(245,200,66,0.3)",
+    },
+  };
+  return styles[lv];
+}
 
-  return [
-    `drop-shadow(0 0 ${glowIntensity * 8}px rgba(245, 200, 66, ${
-      glowIntensity * 0.9
-    }))`,
-    `drop-shadow(0 0 ${glowIntensity * 20}px rgba(245, 200, 66, ${
-      glowIntensity * 0.5
-    }))`,
-    `drop-shadow(0 0 ${glowIntensity * 40}px rgba(245, 200, 66, ${
-      glowIntensity * 0.2
-    }))`,
-  ].join(" ");
+function getBarStyle(score: number) {
+  const lv = getLightLevel(score);
+  const widthMap: Record<number, number> = { 1: 0, 2: 25, 3: 50, 4: 75, 5: 100 };
+  const colorMap: Record<number, string> = {
+    1: "#666666",
+    2: "#C8A050",
+    3: "#E0B840",
+    4: "#F5C842",
+    5: "#F5C842",
+  };
+  return { width: `${widthMap[lv]}%`, background: colorMap[lv] };
 }
 
 function getLightText(level: number, name: string) {
@@ -839,26 +868,30 @@ function markDiscoverySeen(catId: string) {
   }
 }
 
-function BulbIcon({ color, glowFilter }: { color: string; glowFilter: string }) {
+function BulbIcon({ color, glow }: { color: string; glow: string }) {
   return (
-    <svg
-      viewBox="0 0 16 20"
-      width="16"
-      height="20"
-      fill="none"
-      aria-hidden="true"
+    <span
       style={{
+        width: "16px",
+        height: "20px",
+        borderRadius: "50%",
+        boxShadow: glow,
         color,
-        filter: glowFilter,
-        transition: "color 1s ease-in-out, filter 1s ease-in-out",
+        display: "inline-flex",
+        alignItems: "center",
+        justifyContent: "center",
+        transition: "all 1s ease-in-out",
       }}
+      aria-hidden="true"
     >
-      <path
-        d="M8 1.6a5.7 5.7 0 0 0-3.4 10.3c.7.5 1 1.2 1 2.1h4.8c0-.9.4-1.6 1-2.1A5.7 5.7 0 0 0 8 1.6Z"
-        fill="currentColor"
-      />
-      <path d="M5.7 15.1h4.6v1.4H5.7zM6.2 17.2h3.6v1.2H6.2z" fill="currentColor" />
-    </svg>
+      <svg viewBox="0 0 16 20" width="16" height="20" fill="none">
+        <path
+          d="M8 1.6a5.7 5.7 0 0 0-3.4 10.3c.7.5 1 1.2 1 2.1h4.8c0-.9.4-1.6 1-2.1A5.7 5.7 0 0 0 8 1.6Z"
+          fill="currentColor"
+        />
+        <path d="M5.7 15.1h4.6v1.4H5.7zM6.2 17.2h3.6v1.2H6.2z" fill="currentColor" />
+      </svg>
+    </span>
   );
 }
 
