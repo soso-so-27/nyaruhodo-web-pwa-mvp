@@ -34,6 +34,8 @@ type LockType = "yousu" | "mugi";
 
 type LightLevelKey = 1 | 2 | 3 | 4 | 5;
 
+const HOME_FALLBACK_PHOTO_SRC = "/sample-cats/mugi-hero.png";
+
 const LIGHT_LEVELS = {
   1: {
     brightness: 0.5,
@@ -214,7 +216,7 @@ export function HomeInput({ recentEvents: _recentEvents }: HomeInputProps) {
   }, []);
 
   const catName = activeCat ? getCatName(activeCat) : "ねこ";
-  const photoSrc = activeCat?.avatarDataUrl ?? null;
+  const photoSrc = activeCat?.avatarDataUrl ?? HOME_FALLBACK_PHOTO_SRC;
   const lightScore = lightData ? getCurrentScore(lightData, tick) : 0;
   const lightLevel = getLightLevel(lightScore);
   const lightConfig = LIGHT_LEVELS[lightLevel];

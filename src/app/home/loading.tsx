@@ -4,7 +4,8 @@ export default function HomeLoading() {
       style={{
         minHeight: "100dvh",
         height: "100dvh",
-        background: "linear-gradient(180deg, #1a1a18 0%, #24231f 100%)",
+        background:
+          'linear-gradient(to top right, rgba(8,12,28,0.68), rgba(0,0,0,0.10)), url("/sample-cats/mugi-hero.png") center 30% / cover no-repeat',
         padding: "14px 14px 200px",
         display: "flex",
         flexDirection: "column",
