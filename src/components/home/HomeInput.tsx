@@ -255,16 +255,16 @@ export function HomeInput({ recentEvents: _recentEvents }: HomeInputProps) {
   const lightLevel = getLightLevel(lightScore);
   const lightConfig = LIGHT_LEVELS[lightLevel];
   const dynamicCardStyle: CSSProperties = {
-    background: lightConfig.cardBg,
+    background: `linear-gradient(180deg, rgba(255,255,255,0.42) 0%, rgba(255,255,255,0.12) 100%), ${lightConfig.cardBg}`,
     backdropFilter: "blur(24px)",
     WebkitBackdropFilter: "blur(24px)",
-    border: `0.5px solid ${lightConfig.glassBorder}`,
-    boxShadow: lightConfig.glassShadow,
+    border: `1px solid ${lightConfig.glassBorder}`,
+    boxShadow: `${lightConfig.glassShadow}, 0 10px 28px rgba(18,16,12,0.16)`,
     position: "relative",
     transition: "all 1s ease-in-out",
   };
   const dynamicPillStyle: CSSProperties = {
-    background: lightConfig.cardBg,
+    background: `linear-gradient(180deg, rgba(255,255,255,0.46) 0%, rgba(255,255,255,0.16) 100%), ${lightConfig.cardBg}`,
     backdropFilter: "blur(18px)",
     WebkitBackdropFilter: "blur(18px)",
     border: `0.5px solid ${lightConfig.glassBorder}`,
@@ -522,11 +522,14 @@ export function HomeInput({ recentEvents: _recentEvents }: HomeInputProps) {
                 ...(isYousuLocked ? styles.lockedState : {}),
               }}
             >
-              <PawIcon />
+              <span style={styles.primaryIconBadge} aria-hidden="true">
+                <PawIcon />
+              </span>
               {yousuRemaining ? (
                 <span style={styles.remainingTime}>{yousuRemaining}</span>
               ) : null}
               <span style={styles.primaryCardText}>{catName}のようす</span>
+              <span style={styles.primaryCardHint}>ねてる・遊んでる</span>
             </button>
             <button
               type="button"
@@ -538,11 +541,14 @@ export function HomeInput({ recentEvents: _recentEvents }: HomeInputProps) {
                 ...(isMugiLocked ? styles.lockedState : {}),
               }}
             >
-              <HandIcon />
+              <span style={styles.primaryIconBadge} aria-hidden="true">
+                <HandIcon />
+              </span>
               {mugiRemaining ? (
                 <span style={styles.remainingTime}>{mugiRemaining}</span>
               ) : null}
               <span style={styles.primaryCardText}>{catName}へ</span>
+              <span style={styles.primaryCardHint}>遊んだ・なでた</span>
             </button>
           </div>
 
@@ -566,8 +572,11 @@ export function HomeInput({ recentEvents: _recentEvents }: HomeInputProps) {
               <ChevronIcon />
             </>
           ) : (
-            <span style={styles.discoveryEmptyText}>
-              {catName}のことを記録すると、発見が届くよ
+            <span style={styles.discoveryEmptyGroup}>
+              <span style={styles.discoveryEmptyLabel}>発見</span>
+              <span style={styles.discoveryEmptyText}>
+                {catName}のことを記録すると、発見が届くよ
+              </span>
             </span>
           )}
         </button>
@@ -1440,20 +1449,39 @@ const styles = {
     borderRadius: "16px",
     background: "rgba(247, 245, 239, 0.85)",
     color: "#6B9E82",
-    padding: "18px 12px",
+    padding: "14px 12px 13px",
     display: "flex",
     flexDirection: "column",
     alignItems: "center",
     justifyContent: "center",
-    gap: "8px",
+    gap: "6px",
     cursor: "pointer",
     transition: "transform 0.1s",
   },
+  primaryIconBadge: {
+    width: "44px",
+    height: "44px",
+    borderRadius: "14px",
+    display: "inline-flex",
+    alignItems: "center",
+    justifyContent: "center",
+    color: "#6B9E82",
+    background: "rgba(107,158,130,0.12)",
+    border: "0.5px solid rgba(107,158,130,0.22)",
+    boxShadow: "inset 0 0.5px 0 rgba(255,255,255,0.35)",
+  },
   primaryCardText: {
     color: "#2A2A28",
-    fontSize: "14px",
-    fontWeight: 600,
+    fontSize: "15px",
+    fontWeight: 700,
     textShadow: "0 1px 0 rgba(255,255,255,0.28)",
+  },
+  primaryCardHint: {
+    color: "#74716a",
+    fontSize: "11px",
+    fontWeight: 600,
+    lineHeight: 1.2,
+    textShadow: "0 1px 0 rgba(255,255,255,0.22)",
   },
   remainingTime: {
     color: "#6a6862",
@@ -1533,7 +1561,7 @@ const styles = {
     border: "0.5px solid #E0DDD6",
     borderRadius: "14px",
     background: "rgba(247, 245, 239, 0.85)",
-    padding: "14px",
+    padding: "12px 14px",
     textAlign: "center",
   },
   discoveryIcon: {
@@ -1566,10 +1594,23 @@ const styles = {
     lineHeight: 1.45,
     textShadow: "0 1px 0 rgba(255,255,255,0.22)",
   },
+  discoveryEmptyGroup: {
+    display: "flex",
+    flexDirection: "column",
+    alignItems: "center",
+    gap: "3px",
+  },
+  discoveryEmptyLabel: {
+    color: "#6B9E82",
+    fontSize: "11px",
+    fontWeight: 700,
+    letterSpacing: "0.04em",
+    textShadow: "0 1px 0 rgba(255,255,255,0.22)",
+  },
   discoveryEmptyText: {
-    color: "#6f6c66",
+    color: "#56534d",
     fontSize: "13px",
-    fontWeight: 600,
+    fontWeight: 700,
     lineHeight: 1.5,
     textShadow: "0 1px 0 rgba(255,255,255,0.22)",
   },
