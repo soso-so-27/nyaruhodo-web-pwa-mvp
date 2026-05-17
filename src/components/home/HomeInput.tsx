@@ -39,22 +39,22 @@ const ENABLE_LIGHT_DEBUG = process.env.NODE_ENV !== "production";
 
 const LIGHT_LEVELS = {
   1: {
-    brightness: 0.44,
-    saturate: 0.58,
-    contrast: 0.9,
+    brightness: 0.58,
+    saturate: 0.78,
+    contrast: 0.94,
     mainOverlay:
-      "linear-gradient(to top right, rgba(4,8,24,0.86) 0%, rgba(8,12,30,0.78) 28%, rgba(12,16,34,0.58) 52%, rgba(18,18,30,0.30) 76%, rgba(25,20,25,0.08) 92%, rgba(0,0,0,0.0) 100%)",
+      "linear-gradient(to top right, rgba(4,8,24,0.62) 0%, rgba(8,12,30,0.50) 32%, rgba(12,16,34,0.28) 60%, rgba(18,18,30,0.10) 82%, rgba(0,0,0,0.0) 100%)",
     cornerGlow:
-      "radial-gradient(circle at 86% 12%, rgba(255,190,110,0.22) 0%, rgba(255,190,110,0.08) 16%, rgba(255,190,110,0) 34%)",
-    faceReveal:
-      "radial-gradient(ellipse at 50% 58%, rgba(255,224,188,0.13) 0%, rgba(255,224,188,0.05) 22%, rgba(255,224,188,0) 38%), radial-gradient(circle at 49% 68%, rgba(255,210,170,0.07) 0%, rgba(255,210,170,0.03) 18%, rgba(255,210,170,0) 32%)",
+      "radial-gradient(circle at 86% 12%, rgba(255,190,110,0.16) 0%, rgba(255,190,110,0.06) 14%, rgba(255,190,110,0) 30%)",
+    ambientGlow:
+      "radial-gradient(ellipse at 50% 64%, rgba(255,226,190,0.07) 0%, rgba(255,226,190,0.03) 22%, rgba(255,226,190,0) 42%)",
     coldOverlay:
       "radial-gradient(circle at 0% 0%, rgba(60,80,120,0.35) 0%, rgba(40,60,100,0.15) 30%, rgba(0,0,0,0) 55%)",
     bottomWarmth:
       "radial-gradient(circle at 50% 92%, rgba(255,170,90,0.03) 0%, rgba(255,170,90,0) 48%)",
-    fogOverlay: "rgba(18,24,42,0.20)",
+    fogOverlay: "rgba(18,24,42,0.08)",
     goldenBloom: "transparent",
-    cardBg: "rgba(226,226,220,0.66)",
+    cardBg: "rgba(232,232,226,0.80)",
     glassBorder: "rgba(255,255,255,0.10)",
     glassShadow:
       "0 2px 8px rgba(0,0,0,0.20), inset 0 0.5px 0 rgba(255,255,255,0.10)",
@@ -64,22 +64,22 @@ const LIGHT_LEVELS = {
     barColor: "#444",
   },
   2: {
-    brightness: 0.62,
-    saturate: 0.74,
-    contrast: 0.92,
+    brightness: 0.72,
+    saturate: 0.86,
+    contrast: 0.95,
     mainOverlay:
-      "linear-gradient(to top right, rgba(10,14,24,0.68) 0%, rgba(12,16,26,0.55) 25%, rgba(18,18,28,0.35) 55%, rgba(20,18,22,0.14) 78%, rgba(0,0,0,0.02) 92%, rgba(0,0,0,0.0) 100%)",
+      "linear-gradient(to top right, rgba(10,14,24,0.42) 0%, rgba(12,16,26,0.32) 30%, rgba(18,18,28,0.16) 60%, rgba(0,0,0,0.0) 100%)",
     cornerGlow:
       "radial-gradient(circle at 86% 12%, rgba(255,190,110,0.34) 0%, rgba(255,190,110,0.13) 18%, rgba(255,190,110,0) 36%)",
-    faceReveal:
-      "radial-gradient(ellipse at 50% 58%, rgba(255,224,188,0.18) 0%, rgba(255,224,188,0.07) 24%, rgba(255,224,188,0) 40%), radial-gradient(circle at 49% 68%, rgba(255,210,170,0.10) 0%, rgba(255,210,170,0.04) 18%, rgba(255,210,170,0) 32%)",
+    ambientGlow:
+      "radial-gradient(ellipse at 50% 64%, rgba(255,226,190,0.10) 0%, rgba(255,226,190,0.04) 24%, rgba(255,226,190,0) 44%)",
     coldOverlay:
       "radial-gradient(circle at 0% 0%, rgba(60,80,120,0.18) 0%, rgba(40,60,100,0.06) 30%, rgba(0,0,0,0) 48%)",
     bottomWarmth:
       "radial-gradient(circle at 50% 92%, rgba(255,170,90,0.06) 0%, rgba(255,170,90,0) 50%)",
-    fogOverlay: "rgba(36,38,46,0.10)",
+    fogOverlay: "rgba(36,38,46,0.04)",
     goldenBloom: "transparent",
-    cardBg: "rgba(238,235,226,0.70)",
+    cardBg: "rgba(242,238,230,0.82)",
     glassBorder: "rgba(255,255,255,0.12)",
     glassShadow:
       "0 2px 8px rgba(0,0,0,0.18), inset 0 0.5px 0 rgba(255,255,255,0.14)",
@@ -89,21 +89,21 @@ const LIGHT_LEVELS = {
     barColor: "#C8A050",
   },
   3: {
-    brightness: 0.82,
-    saturate: 0.94,
-    contrast: 0.95,
+    brightness: 0.88,
+    saturate: 0.98,
+    contrast: 0.98,
     mainOverlay:
-      "linear-gradient(to top right, rgba(0,0,0,0.45) 0%, rgba(0,0,0,0.35) 30%, rgba(0,0,0,0.20) 55%, rgba(0,0,0,0.08) 75%, rgba(0,0,0,0.01) 90%, rgba(0,0,0,0.0) 100%)",
+      "linear-gradient(to top right, rgba(0,0,0,0.24) 0%, rgba(0,0,0,0.16) 34%, rgba(0,0,0,0.06) 70%, rgba(0,0,0,0.0) 100%)",
     cornerGlow:
       "radial-gradient(circle at 86% 12%, rgba(255,190,110,0.46) 0%, rgba(255,190,110,0.20) 20%, rgba(255,190,110,0) 40%)",
-    faceReveal:
-      "radial-gradient(ellipse at 50% 58%, rgba(255,224,188,0.22) 0%, rgba(255,224,188,0.09) 24%, rgba(255,224,188,0) 40%), radial-gradient(circle at 49% 68%, rgba(255,210,170,0.13) 0%, rgba(255,210,170,0.05) 20%, rgba(255,210,170,0) 34%)",
+    ambientGlow:
+      "radial-gradient(ellipse at 50% 64%, rgba(255,226,190,0.12) 0%, rgba(255,226,190,0.05) 26%, rgba(255,226,190,0) 46%)",
     coldOverlay: "transparent",
     bottomWarmth:
       "radial-gradient(circle at 50% 92%, rgba(255,170,90,0.10) 0%, rgba(255,170,90,0) 52%)",
-    fogOverlay: "rgba(240,235,220,0.07)",
+    fogOverlay: "transparent",
     goldenBloom: "transparent",
-    cardBg: "rgba(255,250,238,0.76)",
+    cardBg: "rgba(255,250,238,0.84)",
     glassBorder: "rgba(255,255,255,0.15)",
     glassShadow:
       "0 2px 10px rgba(0,0,0,0.15), inset 0 0.5px 0 rgba(255,255,255,0.18)",
@@ -113,22 +113,22 @@ const LIGHT_LEVELS = {
     barColor: "#E0B840",
   },
   4: {
-    brightness: 0.9,
+    brightness: 0.94,
     saturate: 1.02,
     contrast: 1,
     mainOverlay:
-      "linear-gradient(to top right, rgba(0,0,0,0.22) 0%, rgba(0,0,0,0.15) 30%, rgba(0,0,0,0.08) 55%, rgba(0,0,0,0.02) 75%, rgba(0,0,0,0.0) 100%)",
+      "linear-gradient(to top right, rgba(0,0,0,0.12) 0%, rgba(0,0,0,0.08) 34%, rgba(0,0,0,0.02) 72%, rgba(0,0,0,0.0) 100%)",
     cornerGlow:
       "radial-gradient(circle at 86% 12%, rgba(255,192,112,0.72) 0%, rgba(255,192,112,0.36) 20%, rgba(255,192,112,0.08) 34%, rgba(255,192,112,0) 44%)",
-    faceReveal:
-      "radial-gradient(ellipse at 50% 58%, rgba(255,226,190,0.28) 0%, rgba(255,226,190,0.12) 24%, rgba(255,226,190,0) 42%), radial-gradient(circle at 49% 68%, rgba(255,214,174,0.17) 0%, rgba(255,214,174,0.07) 20%, rgba(255,214,174,0) 34%)",
+    ambientGlow:
+      "radial-gradient(ellipse at 50% 64%, rgba(255,226,190,0.12) 0%, rgba(255,226,190,0.05) 26%, rgba(255,226,190,0) 46%)",
     coldOverlay: "transparent",
     bottomWarmth:
       "radial-gradient(circle at 50% 92%, rgba(255,170,90,0.16) 0%, rgba(255,170,90,0) 55%)",
     fogOverlay: "transparent",
     goldenBloom:
       "radial-gradient(ellipse at 84% 12%, rgba(255,202,82,0.32) 0%, rgba(255,182,62,0.16) 24%, rgba(255,160,40,0.05) 44%, rgba(255,160,40,0) 56%)",
-    cardBg: "rgba(255,250,238,0.80)",
+    cardBg: "rgba(255,250,238,0.86)",
     glassBorder: "rgba(255,220,140,0.32)",
     glassShadow:
       "0 2px 16px rgba(255,180,60,0.16), inset 0 0.5px 0 rgba(255,220,140,0.30)",
@@ -142,18 +142,18 @@ const LIGHT_LEVELS = {
     saturate: 1.04,
     contrast: 1,
     mainOverlay:
-      "linear-gradient(to top right, rgba(0,0,0,0.08) 0%, rgba(0,0,0,0.04) 40%, rgba(0,0,0,0.01) 70%, rgba(0,0,0,0.0) 100%)",
+      "linear-gradient(to top right, rgba(0,0,0,0.06) 0%, rgba(0,0,0,0.03) 44%, rgba(0,0,0,0.0) 100%)",
     cornerGlow:
       "radial-gradient(circle at 86% 12%, rgba(255,198,114,0.78) 0%, rgba(255,198,114,0.38) 22%, rgba(255,198,114,0.10) 36%, rgba(255,198,114,0) 48%)",
-    faceReveal:
-      "radial-gradient(ellipse at 50% 58%, rgba(255,232,196,0.34) 0%, rgba(255,232,196,0.14) 24%, rgba(255,232,196,0) 42%), radial-gradient(circle at 49% 68%, rgba(255,218,178,0.20) 0%, rgba(255,218,178,0.08) 20%, rgba(255,218,178,0) 34%)",
+    ambientGlow:
+      "radial-gradient(ellipse at 50% 64%, rgba(255,232,196,0.14) 0%, rgba(255,232,196,0.05) 26%, rgba(255,232,196,0) 46%)",
     coldOverlay: "transparent",
     bottomWarmth:
       "radial-gradient(circle at 50% 92%, rgba(255,170,90,0.20) 0%, rgba(255,170,90,0) 58%)",
     fogOverlay: "transparent",
     goldenBloom:
       "radial-gradient(ellipse at 84% 12%, rgba(255,212,102,0.40) 0%, rgba(255,192,72,0.22) 22%, rgba(255,170,50,0.08) 40%, rgba(255,170,50,0) 52%)",
-    cardBg: "rgba(255,252,242,0.84)",
+    cardBg: "rgba(255,252,242,0.88)",
     glassBorder: "rgba(255,230,160,0.42)",
     glassShadow:
       "0 2px 20px rgba(255,190,70,0.24), inset 0 0.5px 0 rgba(255,230,160,0.42)",
@@ -431,7 +431,7 @@ export function HomeInput({ recentEvents: _recentEvents }: HomeInputProps) {
       <div
         style={{
           ...styles.overlayLayer,
-          background: lightConfig.faceReveal,
+          background: lightConfig.ambientGlow,
           zIndex: 3,
         }}
         aria-hidden="true"
