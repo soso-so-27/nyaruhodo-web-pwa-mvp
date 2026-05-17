@@ -4,7 +4,7 @@ body {
   width: 100%;
   min-height: 100%;
   background-color: #1a1a18;
-  background-image: url("/sample-cats/mugi-hero.png");
+  background-image: var(--home-bg-image, url("/sample-cats/mugi-hero.png"));
   background-position: center 30%;
   background-size: cover;
   background-repeat: no-repeat;

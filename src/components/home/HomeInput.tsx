@@ -251,6 +251,28 @@ export function HomeInput({ recentEvents: _recentEvents }: HomeInputProps) {
     return getDiscoveryState(activeCatId);
   }, [activeCatId, discoveryDismissedToday, tick]);
 
+  useEffect(() => {
+    const cssPhotoUrl = toCssUrl(photoSrc);
+    const root = document.documentElement;
+    const body = document.body;
+
+    root.style.setProperty("--home-bg-image", cssPhotoUrl);
+    body.style.setProperty("--home-bg-image", cssPhotoUrl);
+    body.style.backgroundImage = cssPhotoUrl;
+    body.style.backgroundPosition = "center 30%";
+    body.style.backgroundSize = "cover";
+    body.style.backgroundRepeat = "no-repeat";
+
+    return () => {
+      root.style.removeProperty("--home-bg-image");
+      body.style.removeProperty("--home-bg-image");
+      body.style.removeProperty("background-image");
+      body.style.removeProperty("background-position");
+      body.style.removeProperty("background-size");
+      body.style.removeProperty("background-repeat");
+    };
+  }, [photoSrc]);
+
   function hydrateCatState(catId: string) {
     setLightData(resetIfNewDay(readLightData(catId)));
     setLockData(readLockData(catId));
@@ -863,6 +885,10 @@ function getPhotoStyle(level: (typeof LIGHT_LEVELS)[LightLevelKey]): CSSProperti
     filter: `brightness(${level.brightness}) saturate(${level.saturate}) contrast(${level.contrast})`,
     transition: "filter 1s ease-in-out",
   };
+}
+
+function toCssUrl(src: string) {
+  return `url("${src.replace(/\\/g, "\\\\").replace(/"/g, '\\"')}")`;
 }
 
 function getLightText(level: number, name: string) {
