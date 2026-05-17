@@ -40,13 +40,17 @@ const LIGHT_LEVELS = {
     saturate: 0.55,
     contrast: 0.85,
     mainOverlay:
-      "linear-gradient(to top right, rgba(0,0,0,0.82) 0%, rgba(0,0,0,0.75) 30%, rgba(0,0,0,0.55) 55%, rgba(0,0,0,0.30) 75%, rgba(0,0,0,0.10) 90%, rgba(0,0,0,0.0) 100%)",
+      "linear-gradient(to top right, rgba(8,12,28,0.88) 0%, rgba(10,15,32,0.78) 25%, rgba(15,18,35,0.58) 50%, rgba(20,20,30,0.30) 75%, rgba(25,20,25,0.08) 90%, rgba(0,0,0,0.0) 100%)",
     cornerGlow:
       "radial-gradient(circle at 110% -10%, rgba(255,185,100,0.15) 0%, rgba(255,185,100,0.04) 15%, rgba(255,185,100,0) 25%)",
     coldOverlay:
-      "radial-gradient(circle at 0% 0%, rgba(100,115,140,0.20) 0%, rgba(100,115,140,0) 38%)",
+      "radial-gradient(circle at 0% 0%, rgba(60,80,120,0.35) 0%, rgba(40,60,100,0.15) 30%, rgba(0,0,0,0) 55%)",
     fogOverlay: "rgba(240,235,220,0.28)",
+    goldenBloom: "transparent",
     cardBg: "rgba(215,210,200,0.70)",
+    glassBorder: "rgba(255,255,255,0.10)",
+    glassShadow:
+      "0 2px 8px rgba(0,0,0,0.20), inset 0 0.5px 0 rgba(255,255,255,0.10)",
     bulbColor: "#3a3a3a",
     bulbGlow: "none",
     barWidth: 0,
@@ -57,13 +61,17 @@ const LIGHT_LEVELS = {
     saturate: 0.7,
     contrast: 0.9,
     mainOverlay:
-      "linear-gradient(to top right, rgba(0,0,0,0.65) 0%, rgba(0,0,0,0.55) 30%, rgba(0,0,0,0.38) 55%, rgba(0,0,0,0.18) 75%, rgba(0,0,0,0.05) 90%, rgba(0,0,0,0.0) 100%)",
+      "linear-gradient(to top right, rgba(10,14,24,0.68) 0%, rgba(12,16,26,0.55) 25%, rgba(18,18,28,0.35) 55%, rgba(20,18,22,0.14) 78%, rgba(0,0,0,0.02) 92%, rgba(0,0,0,0.0) 100%)",
     cornerGlow:
       "radial-gradient(circle at 110% -10%, rgba(255,185,100,0.30) 0%, rgba(255,185,100,0.10) 15%, rgba(255,185,100,0.02) 25%, rgba(255,185,100,0) 32%)",
     coldOverlay:
-      "radial-gradient(circle at 0% 0%, rgba(100,115,140,0.10) 0%, rgba(100,115,140,0) 35%)",
+      "radial-gradient(circle at 0% 0%, rgba(60,80,120,0.18) 0%, rgba(40,60,100,0.06) 30%, rgba(0,0,0,0) 48%)",
     fogOverlay: "rgba(240,235,220,0.16)",
+    goldenBloom: "transparent",
     cardBg: "rgba(228,223,210,0.75)",
+    glassBorder: "rgba(255,255,255,0.12)",
+    glassShadow:
+      "0 2px 8px rgba(0,0,0,0.18), inset 0 0.5px 0 rgba(255,255,255,0.14)",
     bulbColor: "#C8A050",
     bulbGlow: "none",
     barWidth: 25,
@@ -79,7 +87,11 @@ const LIGHT_LEVELS = {
       "radial-gradient(circle at 110% -10%, rgba(255,190,105,0.50) 0%, rgba(255,190,105,0.20) 16%, rgba(255,190,105,0.05) 28%, rgba(255,190,105,0) 36%)",
     coldOverlay: "transparent",
     fogOverlay: "rgba(240,235,220,0.07)",
+    goldenBloom: "transparent",
     cardBg: "rgba(240,236,224,0.80)",
+    glassBorder: "rgba(255,255,255,0.15)",
+    glassShadow:
+      "0 2px 10px rgba(0,0,0,0.15), inset 0 0.5px 0 rgba(255,255,255,0.18)",
     bulbColor: "#E0B840",
     bulbGlow: "0 0 5px 2px rgba(245,200,66,0.35)",
     barWidth: 50,
@@ -95,7 +107,12 @@ const LIGHT_LEVELS = {
       "radial-gradient(circle at 110% -10%, rgba(255,190,105,0.70) 0%, rgba(255,190,105,0.32) 18%, rgba(255,190,105,0.08) 30%, rgba(255,190,105,0) 40%)",
     coldOverlay: "transparent",
     fogOverlay: "transparent",
+    goldenBloom:
+      "radial-gradient(ellipse at 75% 15%, rgba(255,200,80,0.22) 0%, rgba(255,180,60,0.12) 30%, rgba(255,160,40,0.04) 55%, rgba(255,160,40,0) 70%)",
     cardBg: "rgba(248,244,232,0.85)",
+    glassBorder: "rgba(255,220,140,0.25)",
+    glassShadow:
+      "0 2px 14px rgba(255,180,60,0.12), inset 0 0.5px 0 rgba(255,220,140,0.25)",
     bulbColor: "#F5C842",
     bulbGlow: "0 0 7px 3px rgba(245,200,66,0.55)",
     barWidth: 75,
@@ -111,7 +128,12 @@ const LIGHT_LEVELS = {
       "radial-gradient(circle at 110% -10%, rgba(255,195,110,0.85) 0%, rgba(255,195,110,0.42) 20%, rgba(255,195,110,0.12) 34%, rgba(255,195,110,0) 44%)",
     coldOverlay: "transparent",
     fogOverlay: "transparent",
+    goldenBloom:
+      "radial-gradient(ellipse at 75% 15%, rgba(255,210,100,0.40) 0%, rgba(255,190,70,0.22) 28%, rgba(255,170,50,0.08) 50%, rgba(255,170,50,0) 65%)",
     cardBg: "rgba(252,248,238,0.88)",
+    glassBorder: "rgba(255,230,160,0.35)",
+    glassShadow:
+      "0 2px 18px rgba(255,190,70,0.20), inset 0 0.5px 0 rgba(255,230,160,0.35)",
     bulbColor: "#F5C842",
     bulbGlow:
       "0 0 10px 5px rgba(245,200,66,0.7), 0 0 22px 11px rgba(245,200,66,0.3)",
@@ -196,9 +218,23 @@ export function HomeInput({ recentEvents: _recentEvents }: HomeInputProps) {
   const lightScore = lightData ? getCurrentScore(lightData, tick) : 0;
   const lightLevel = getLightLevel(lightScore);
   const lightConfig = LIGHT_LEVELS[lightLevel];
-  const dynamicCardStyle = {
+  const dynamicCardStyle: CSSProperties = {
     background: lightConfig.cardBg,
-    transition: "background 1s ease-in-out",
+    backdropFilter: "blur(12px)",
+    WebkitBackdropFilter: "blur(12px)",
+    border: `0.5px solid ${lightConfig.glassBorder}`,
+    boxShadow: lightConfig.glassShadow,
+    position: "relative",
+    transition: "all 1s ease-in-out",
+  };
+  const dynamicPillStyle: CSSProperties = {
+    background: lightConfig.cardBg,
+    backdropFilter: "blur(10px)",
+    WebkitBackdropFilter: "blur(10px)",
+    border: `0.5px solid ${lightConfig.glassBorder}`,
+    boxShadow: lightConfig.glassShadow,
+    position: "relative",
+    transition: "all 1s ease-in-out",
   };
   const lightText = getLightText(lightLevel, catName);
   const yousuRemaining = getRemainingTime(lockData, "yousu", tick);
@@ -345,18 +381,34 @@ export function HomeInput({ recentEvents: _recentEvents }: HomeInputProps) {
         }}
         aria-hidden="true"
       />
+      <div
+        style={{
+          ...styles.overlayLayer,
+          background: lightConfig.goldenBloom,
+          zIndex: 5,
+        }}
+        aria-hidden="true"
+      />
       <div style={styles.contentLayer}>
         <section style={styles.heroContent}>
           <div style={styles.heroTopBar}>
         <button
           type="button"
           onClick={() => setIsCatSheetOpen(true)}
-          style={styles.catSwitchButton}
+          style={{
+            ...styles.catSwitchButton,
+            ...dynamicPillStyle,
+          }}
         >
           <span>{catName}</span>
           <span aria-hidden="true">▾</span>
         </button>
-        <div style={styles.lightPill}>
+        <div
+          style={{
+            ...styles.lightPill,
+            ...dynamicPillStyle,
+          }}
+        >
           <BulbIcon color={lightConfig.bulbColor} glow={lightConfig.bulbGlow} />
           <div style={styles.lightTrack}>
             <div
@@ -1096,7 +1148,7 @@ const styles = {
   },
   contentLayer: {
     position: "relative",
-    zIndex: 5,
+    zIndex: 6,
     height: "100dvh",
     display: "flex",
     flexDirection: "column",
