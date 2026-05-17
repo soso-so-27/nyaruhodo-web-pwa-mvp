@@ -178,6 +178,8 @@ export function DiagnosisOnboardingFlow() {
       activityPattern,
       appearance: { coat: coat || undefined },
       avatarDataUrl: avatarDataUrl || undefined,
+      homePhotoDataUrl: avatarDataUrl || undefined,
+      homePhotoPosition: "center 38%",
       basicInfo: {
         birthDate: basicInfo.birthDate || undefined,
         gender: basicInfo.gender || undefined,
@@ -267,7 +269,7 @@ export function DiagnosisOnboardingFlow() {
             <div style={styles.stepContainer}>
               <p style={styles.eyebrow}>{displayName}の写真を1枚</p>
               <p style={styles.note}>
-                写真があると、ホームでもこの子らしく表示できます。あとで変更できます。
+                ホームの背景にも使います。あとで、ねこタブから変更できます。
               </p>
               <button
                 type="button"
