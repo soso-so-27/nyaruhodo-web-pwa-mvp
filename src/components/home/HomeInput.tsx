@@ -240,6 +240,7 @@ export function HomeInput({ recentEvents: _recentEvents }: HomeInputProps) {
     activeCat?.homePhotoDataUrl ??
     activeCat?.avatarDataUrl ??
     HOME_FALLBACK_PHOTO_SRC;
+  const homePhotoPosition = activeCat?.homePhotoPosition ?? "center 38%";
   const lightScore = lightData ? getCurrentScore(lightData, tick) : 0;
   const lightLevel = getLightLevel(lightScore);
   const lightConfig = LIGHT_LEVELS[lightLevel];
@@ -282,7 +283,7 @@ export function HomeInput({ recentEvents: _recentEvents }: HomeInputProps) {
     root.style.setProperty("--home-bg-image", cssPhotoUrl);
     body.style.setProperty("--home-bg-image", cssPhotoUrl);
     body.style.backgroundImage = cssPhotoUrl;
-    body.style.backgroundPosition = "center 30%";
+    body.style.backgroundPosition = homePhotoPosition;
     body.style.backgroundSize = "cover";
     body.style.backgroundRepeat = "no-repeat";
 
@@ -294,7 +295,7 @@ export function HomeInput({ recentEvents: _recentEvents }: HomeInputProps) {
       body.style.removeProperty("background-size");
       body.style.removeProperty("background-repeat");
     };
-  }, [photoSrc]);
+  }, [homePhotoPosition, photoSrc]);
 
   function hydrateCatState(catId: string) {
     setLightData(resetIfNewDay(readLightData(catId)));
@@ -381,12 +382,14 @@ export function HomeInput({ recentEvents: _recentEvents }: HomeInputProps) {
       style={{
         ...styles.page,
         backgroundImage: `url("${photoSrc}")`,
+        backgroundPosition: homePhotoPosition,
       }}
     >
       <div
         style={{
           ...styles.backgroundPhoto,
           backgroundImage: `url("${photoSrc}")`,
+          backgroundPosition: homePhotoPosition,
           ...getPhotoStyle(lightConfig),
         }}
         aria-hidden="true"
@@ -1199,22 +1202,26 @@ const styles = {
     position: "fixed",
     top: 0,
     right: 0,
-    bottom: "auto",
+    bottom: 0,
     left: 0,
-    height: "calc(100vh + 180px)",
+    width: "100%",
+    height: "100dvh",
+    minHeight: "100vh",
     zIndex: 0,
     backgroundColor: "#1a1a18",
     backgroundSize: "cover",
-    backgroundPosition: "center 30%",
+    backgroundPosition: "center 38%",
     backgroundRepeat: "no-repeat",
   },
   overlayLayer: {
     position: "fixed",
     top: 0,
     right: 0,
-    bottom: "auto",
+    bottom: 0,
     left: 0,
-    height: "calc(100vh + 180px)",
+    width: "100%",
+    height: "100dvh",
+    minHeight: "100vh",
     pointerEvents: "none",
     transition: "background 1s ease-in-out",
   },

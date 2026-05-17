@@ -21,6 +21,11 @@ const COAT_OPTIONS: { value: CatCoat; label: string; color: string }[] = [
   { value: "white", label: "白", color: "#fafafa" },
   { value: "calico", label: "三毛", color: "#f0c28b" },
 ];
+const HOME_PHOTO_POSITIONS = [
+  { value: "center 30%", label: "上" },
+  { value: "center 38%", label: "中央" },
+  { value: "center 46%", label: "下" },
+] as const;
 type EditableGender = "male" | "female" | "unknown" | "";
 type EditableCoat = CatCoat | "";
 
@@ -220,6 +225,88 @@ export function CatsPage() {
     input.click();
   }
 
+  async function handleHomePhotoUpload() {
+    const input = document.createElement("input");
+
+    input.type = "file";
+    input.accept = "image/*";
+    input.onchange = async () => {
+      const file = input.files?.[0];
+
+      if (!file) {
+        return;
+      }
+
+      try {
+        const dataUrl = await resizeAndEncode(file, 1600);
+        const raw = window.localStorage.getItem("cat_profiles");
+
+        if (!raw) {
+          return;
+        }
+
+        const profiles = JSON.parse(raw) as CatProfile[];
+        const index = profiles.findIndex((profile) => profile.id === activeCatId);
+
+        if (index === -1) {
+          return;
+        }
+
+        const nextProfiles = profiles.map((profile, profileIndex) =>
+          profileIndex === index
+            ? {
+                ...profile,
+                homePhotoDataUrl: dataUrl,
+                homePhotoPosition: profile.homePhotoPosition ?? "center 38%",
+                updatedAt: new Date().toISOString(),
+              }
+            : profile,
+        );
+
+        window.localStorage.setItem("cat_profiles", JSON.stringify(nextProfiles));
+        setCatProfiles(nextProfiles);
+        setSaveMessage("ホーム写真を保存しました。");
+        setTimeout(() => setSaveMessage(""), 2000);
+      } catch {
+        return;
+      }
+    };
+
+    input.click();
+  }
+
+  function handleHomePhotoPositionSelect(position: string) {
+    try {
+      const raw = window.localStorage.getItem("cat_profiles");
+
+      if (!raw) {
+        return;
+      }
+
+      const profiles = JSON.parse(raw) as CatProfile[];
+      const index = profiles.findIndex((profile) => profile.id === activeCatId);
+
+      if (index === -1) {
+        return;
+      }
+
+      const nextProfiles = profiles.map((profile, profileIndex) =>
+        profileIndex === index
+          ? {
+              ...profile,
+              homePhotoPosition: position,
+              updatedAt: new Date().toISOString(),
+            }
+          : profile,
+      );
+
+      window.localStorage.setItem("cat_profiles", JSON.stringify(nextProfiles));
+      setCatProfiles(nextProfiles);
+    } catch {
+      return;
+    }
+  }
+
   const selectedCoat = activeCatProfile?.appearance?.coat;
 
   return (
@@ -337,6 +424,64 @@ export function CatsPage() {
               >
                 編集
               </button>
+            </div>
+
+            <hr style={styles.divider} />
+
+            <div style={styles.homePhotoSection}>
+              <div style={styles.homePhotoPreview}>
+                {activeCatProfile.homePhotoDataUrl ? (
+                  <img
+                    src={activeCatProfile.homePhotoDataUrl}
+                    alt=""
+                    style={styles.homePhotoPreviewImg}
+                  />
+                ) : (
+                  <span style={styles.homePhotoPreviewText}>ホーム写真</span>
+                )}
+              </div>
+              <div style={styles.homePhotoInfo}>
+                <p style={styles.homePhotoTitle}>ホーム背景の写真</p>
+                <p style={styles.homePhotoSub}>
+                  ホームで大きく表示する専用写真です。
+                </p>
+                <div style={styles.homePhotoActions}>
+                  <button
+                    type="button"
+                    onClick={() => void handleHomePhotoUpload()}
+                    style={styles.homePhotoButton}
+                  >
+                    写真を選ぶ
+                  </button>
+                  <div style={styles.homePhotoPositionRow}>
+                    {HOME_PHOTO_POSITIONS.map((option) => {
+                      const isSelected =
+                        (activeCatProfile.homePhotoPosition ?? "center 38%") ===
+                        option.value;
+
+                      return (
+                        <button
+                          key={option.value}
+                          type="button"
+                          onClick={() =>
+                            handleHomePhotoPositionSelect(option.value)
+                          }
+                          style={
+                            isSelected
+                              ? {
+                                  ...styles.homePhotoPositionButton,
+                                  ...styles.homePhotoPositionButtonActive,
+                                }
+                              : styles.homePhotoPositionButton
+                          }
+                        >
+                          {option.label}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              </div>
             </div>
 
             <hr style={styles.divider} />
@@ -852,6 +997,85 @@ const styles = {
     borderRadius: "99px",
     padding: "4px 12px",
     cursor: "pointer",
+  },
+  homePhotoSection: {
+    display: "flex",
+    gap: "12px",
+    alignItems: "center",
+    padding: "2px 0",
+  },
+  homePhotoPreview: {
+    width: "86px",
+    height: "112px",
+    borderRadius: "16px",
+    overflow: "hidden",
+    background: "#f5f3ef",
+    border: "0.5px solid #e0ddd6",
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    flexShrink: 0,
+  },
+  homePhotoPreviewImg: {
+    width: "100%",
+    height: "100%",
+    objectFit: "cover",
+  },
+  homePhotoPreviewText: {
+    fontSize: "11px",
+    color: "#b0ada6",
+  },
+  homePhotoInfo: {
+    flex: 1,
+    minWidth: 0,
+  },
+  homePhotoTitle: {
+    fontSize: "14px",
+    fontWeight: 600,
+    color: "#2a2a28",
+    margin: "0 0 4px",
+  },
+  homePhotoSub: {
+    fontSize: "11px",
+    color: "#8a8a80",
+    lineHeight: 1.5,
+    margin: "0 0 10px",
+  },
+  homePhotoActions: {
+    display: "flex",
+    flexDirection: "column",
+    gap: "8px",
+  },
+  homePhotoButton: {
+    width: "fit-content",
+    border: "0.5px solid rgba(107,158,130,0.35)",
+    borderRadius: "99px",
+    background: "rgba(107,158,130,0.1)",
+    color: "#3d6650",
+    fontSize: "12px",
+    fontWeight: 600,
+    padding: "6px 12px",
+    cursor: "pointer",
+  },
+  homePhotoPositionRow: {
+    display: "flex",
+    gap: "6px",
+  },
+  homePhotoPositionButton: {
+    border: "0.5px solid #e0ddd6",
+    borderRadius: "99px",
+    background: "#fff",
+    color: "#8a8a80",
+    fontSize: "11px",
+    fontWeight: 500,
+    padding: "4px 10px",
+    cursor: "pointer",
+  },
+  homePhotoPositionButtonActive: {
+    border: "0.5px solid rgba(107,158,130,0.35)",
+    background: "rgba(107,158,130,0.12)",
+    color: "#3d6650",
+    fontWeight: 600,
   },
   divider: {
     border: "none",
