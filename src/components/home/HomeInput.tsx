@@ -332,7 +332,12 @@ export function HomeInput({ recentEvents: _recentEvents }: HomeInputProps) {
   }
 
   return (
-    <main style={styles.page}>
+    <main
+      style={{
+        ...styles.page,
+        backgroundImage: `url("${photoSrc}")`,
+      }}
+    >
       <div
         style={{
           ...styles.backgroundPhoto,
@@ -1111,10 +1116,11 @@ const styles = {
     position: "fixed",
     inset: 0,
     width: "100%",
-    minHeight: "100dvh",
-    height: "100dvh",
     overflow: "hidden",
-    background: "linear-gradient(160deg, #C8C4BC, #A8A49C)",
+    backgroundColor: "#1a1a18",
+    backgroundSize: "cover",
+    backgroundPosition: "center 30%",
+    backgroundRepeat: "no-repeat",
     color: "#2A2A28",
     fontFamily:
       'Outfit, "Zen Kaku Gothic New", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
@@ -1145,7 +1151,6 @@ const styles = {
     zIndex: 6,
     width: "100%",
     height: "100%",
-    minHeight: "100dvh",
     display: "flex",
     flexDirection: "column",
     justifyContent: "space-between",
