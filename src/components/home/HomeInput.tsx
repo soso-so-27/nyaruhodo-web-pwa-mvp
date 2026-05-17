@@ -35,6 +35,7 @@ type LockType = "yousu" | "mugi";
 type LightLevelKey = 1 | 2 | 3 | 4 | 5;
 
 const HOME_FALLBACK_PHOTO_SRC = "/sample-cats/mugi-hero.png";
+const ENABLE_LIGHT_DEBUG = process.env.NODE_ENV !== "production";
 
 const LIGHT_LEVELS = {
   1: {
@@ -137,13 +138,13 @@ const LIGHT_LEVELS = {
     barColor: "#F5C842",
   },
   5: {
-    brightness: 1.02,
-    saturate: 1.1,
-    contrast: 1.02,
+    brightness: 0.96,
+    saturate: 1.04,
+    contrast: 1,
     mainOverlay:
       "linear-gradient(to top right, rgba(0,0,0,0.08) 0%, rgba(0,0,0,0.04) 40%, rgba(0,0,0,0.01) 70%, rgba(0,0,0,0.0) 100%)",
     cornerGlow:
-      "radial-gradient(circle at 86% 12%, rgba(255,198,114,0.92) 0%, rgba(255,198,114,0.48) 22%, rgba(255,198,114,0.12) 36%, rgba(255,198,114,0) 48%)",
+      "radial-gradient(circle at 86% 12%, rgba(255,198,114,0.78) 0%, rgba(255,198,114,0.38) 22%, rgba(255,198,114,0.10) 36%, rgba(255,198,114,0) 48%)",
     faceReveal:
       "radial-gradient(ellipse at 50% 58%, rgba(255,232,196,0.34) 0%, rgba(255,232,196,0.14) 24%, rgba(255,232,196,0) 42%), radial-gradient(circle at 49% 68%, rgba(255,218,178,0.20) 0%, rgba(255,218,178,0.08) 20%, rgba(255,218,178,0) 34%)",
     coldOverlay: "transparent",
@@ -151,7 +152,7 @@ const LIGHT_LEVELS = {
       "radial-gradient(circle at 50% 92%, rgba(255,170,90,0.20) 0%, rgba(255,170,90,0) 58%)",
     fogOverlay: "transparent",
     goldenBloom:
-      "radial-gradient(ellipse at 84% 12%, rgba(255,212,102,0.52) 0%, rgba(255,192,72,0.30) 22%, rgba(255,170,50,0.10) 40%, rgba(255,170,50,0) 52%)",
+      "radial-gradient(ellipse at 84% 12%, rgba(255,212,102,0.40) 0%, rgba(255,192,72,0.22) 22%, rgba(255,170,50,0.08) 40%, rgba(255,170,50,0) 52%)",
     cardBg: "rgba(255,252,242,0.84)",
     glassBorder: "rgba(255,230,160,0.42)",
     glassShadow:
@@ -214,6 +215,8 @@ export function HomeInput({ recentEvents: _recentEvents }: HomeInputProps) {
   const [selectedReaction, setSelectedReaction] = useState<string | null>(null);
   const [toastText, setToastText] = useState("");
   const [recordGlowActive, setRecordGlowActive] = useState(false);
+  const [isLightDebugEnabled, setIsLightDebugEnabled] = useState(false);
+  const [debugLightLevel, setDebugLightLevel] = useState<LightLevelKey | null>(null);
   const [discoveryDismissedToday, setDiscoveryDismissedToday] = useState(false);
 
   useEffect(() => {
@@ -226,6 +229,11 @@ export function HomeInput({ recentEvents: _recentEvents }: HomeInputProps) {
     setActiveCat(active);
     saveActiveCatId(active.id);
     hydrateCatState(active.id);
+
+    if (ENABLE_LIGHT_DEBUG) {
+      const params = new URLSearchParams(window.location.search);
+      setIsLightDebugEnabled(params.get("lightDebug") === "1");
+    }
   }, []);
 
   useEffect(() => {
@@ -242,7 +250,8 @@ export function HomeInput({ recentEvents: _recentEvents }: HomeInputProps) {
     activeCat?.avatarDataUrl ??
     HOME_FALLBACK_PHOTO_SRC;
   const homePhotoPosition = activeCat?.homePhotoPosition ?? "center 38%";
-  const lightScore = lightData ? getCurrentScore(lightData, tick) : 0;
+  const liveLightScore = lightData ? getCurrentScore(lightData, tick) : 0;
+  const lightScore = debugLightLevel ? getDebugLightScore(debugLightLevel) : liveLightScore;
   const lightLevel = getLightLevel(lightScore);
   const lightConfig = LIGHT_LEVELS[lightLevel];
   const dynamicCardStyle: CSSProperties = {
@@ -564,6 +573,39 @@ export function HomeInput({ recentEvents: _recentEvents }: HomeInputProps) {
         </button>
       </section>
       </div>
+
+      {ENABLE_LIGHT_DEBUG && isLightDebugEnabled ? (
+        <div style={styles.lightDebugPanel}>
+          <span style={styles.lightDebugLabel}>
+            Lv{lightLevel} / {Math.round(lightScore)}
+          </span>
+          {([1, 3, 5] as const).map((level) => (
+            <button
+              key={level}
+              type="button"
+              onClick={() => setDebugLightLevel(level)}
+              style={
+                debugLightLevel === level
+                  ? { ...styles.lightDebugButton, ...styles.lightDebugButtonActive }
+                  : styles.lightDebugButton
+              }
+            >
+              Lv{level}
+            </button>
+          ))}
+          <button
+            type="button"
+            onClick={() => setDebugLightLevel(null)}
+            style={
+              debugLightLevel === null
+                ? { ...styles.lightDebugButton, ...styles.lightDebugButtonActive }
+                : styles.lightDebugButton
+            }
+          >
+            Live
+          </button>
+        </div>
+      ) : null}
 
       {isYousuOpen ? (
         <YousuSheet
@@ -949,6 +991,17 @@ function toCssUrl(src: string) {
   return `url("${src.replace(/\\/g, "\\\\").replace(/"/g, '\\"')}")`;
 }
 
+function getDebugLightScore(level: LightLevelKey): number {
+  const scoreByLevel: Record<LightLevelKey, number> = {
+    1: 10,
+    2: 30,
+    3: 50,
+    4: 70,
+    5: 100,
+  };
+  return scoreByLevel[level];
+}
+
 function getLightText(level: number, name: string) {
   if (level === 1) return `${name}のことが、少し遠くなってきたかも`;
   if (level === 2) return `${name}のこと、もう少し見てあげたいな`;
@@ -1255,6 +1308,45 @@ const styles = {
     background:
       "radial-gradient(circle at 84% 12%, rgba(255,220,128,0.34) 0%, rgba(255,194,90,0.16) 24%, rgba(255,194,90,0) 48%), radial-gradient(ellipse at 50% 72%, rgba(255,232,190,0.12) 0%, rgba(255,232,190,0) 36%)",
     transition: "opacity 1s ease-out",
+  },
+  lightDebugPanel: {
+    position: "fixed",
+    right: "12px",
+    bottom: "calc(92px + env(safe-area-inset-bottom))",
+    zIndex: 140,
+    display: "flex",
+    alignItems: "center",
+    gap: "5px",
+    border: "0.5px solid rgba(255,255,255,0.22)",
+    borderRadius: "99px",
+    background: "rgba(24,24,22,0.58)",
+    backdropFilter: "blur(16px)",
+    WebkitBackdropFilter: "blur(16px)",
+    boxShadow: "0 8px 24px rgba(0,0,0,0.18)",
+    padding: "6px",
+  },
+  lightDebugLabel: {
+    color: "rgba(255,255,255,0.82)",
+    fontSize: "10px",
+    fontWeight: 700,
+    padding: "0 5px",
+    whiteSpace: "nowrap",
+  },
+  lightDebugButton: {
+    minWidth: "34px",
+    height: "26px",
+    border: "0.5px solid rgba(255,255,255,0.20)",
+    borderRadius: "99px",
+    background: "rgba(255,255,255,0.12)",
+    color: "rgba(255,255,255,0.82)",
+    fontSize: "10px",
+    fontWeight: 700,
+    cursor: "pointer",
+  },
+  lightDebugButtonActive: {
+    border: "0.5px solid rgba(245,200,66,0.65)",
+    background: "rgba(245,200,66,0.28)",
+    color: "#fff",
   },
   contentLayer: {
     position: "relative",
