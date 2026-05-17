@@ -48,6 +48,20 @@ export default function RootLayout({
         <link
           rel="apple-touch-startup-image"
           href="/splash/apple-splash-1170-2532.png"
+        />
+        <link
+          rel="apple-touch-startup-image"
+          href="/splash/apple-splash-1206-2622.png"
+          media="(device-width: 402px) and (device-height: 874px) and (-webkit-device-pixel-ratio: 3)"
+        />
+        <link
+          rel="apple-touch-startup-image"
+          href="/splash/apple-splash-1320-2868.png"
+          media="(device-width: 440px) and (device-height: 956px) and (-webkit-device-pixel-ratio: 3)"
+        />
+        <link
+          rel="apple-touch-startup-image"
+          href="/splash/apple-splash-1170-2532.png"
           media="(device-width: 390px) and (device-height: 844px) and (-webkit-device-pixel-ratio: 3)"
         />
         <link
