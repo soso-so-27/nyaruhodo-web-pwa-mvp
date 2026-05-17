@@ -32,6 +32,94 @@ type LockData = {
 
 type LockType = "yousu" | "mugi";
 
+type LightLevelKey = 1 | 2 | 3 | 4 | 5;
+
+const LIGHT_LEVELS = {
+  1: {
+    brightness: 0.5,
+    saturate: 0.55,
+    contrast: 0.85,
+    mainOverlay:
+      "linear-gradient(to top right, rgba(0,0,0,0.82) 0%, rgba(0,0,0,0.75) 30%, rgba(0,0,0,0.55) 55%, rgba(0,0,0,0.30) 75%, rgba(0,0,0,0.10) 90%, rgba(0,0,0,0.0) 100%)",
+    cornerGlow:
+      "radial-gradient(circle at 110% -10%, rgba(255,185,100,0.15) 0%, rgba(255,185,100,0.04) 15%, rgba(255,185,100,0) 25%)",
+    coldOverlay:
+      "radial-gradient(circle at 0% 0%, rgba(100,115,140,0.20) 0%, rgba(100,115,140,0) 38%)",
+    fogOverlay: "rgba(240,235,220,0.28)",
+    cardBg: "rgba(215,210,200,0.70)",
+    bulbColor: "#3a3a3a",
+    bulbGlow: "none",
+    barWidth: 0,
+    barColor: "#444",
+  },
+  2: {
+    brightness: 0.62,
+    saturate: 0.7,
+    contrast: 0.9,
+    mainOverlay:
+      "linear-gradient(to top right, rgba(0,0,0,0.65) 0%, rgba(0,0,0,0.55) 30%, rgba(0,0,0,0.38) 55%, rgba(0,0,0,0.18) 75%, rgba(0,0,0,0.05) 90%, rgba(0,0,0,0.0) 100%)",
+    cornerGlow:
+      "radial-gradient(circle at 110% -10%, rgba(255,185,100,0.30) 0%, rgba(255,185,100,0.10) 15%, rgba(255,185,100,0.02) 25%, rgba(255,185,100,0) 32%)",
+    coldOverlay:
+      "radial-gradient(circle at 0% 0%, rgba(100,115,140,0.10) 0%, rgba(100,115,140,0) 35%)",
+    fogOverlay: "rgba(240,235,220,0.16)",
+    cardBg: "rgba(228,223,210,0.75)",
+    bulbColor: "#C8A050",
+    bulbGlow: "none",
+    barWidth: 25,
+    barColor: "#C8A050",
+  },
+  3: {
+    brightness: 0.75,
+    saturate: 0.88,
+    contrast: 0.95,
+    mainOverlay:
+      "linear-gradient(to top right, rgba(0,0,0,0.45) 0%, rgba(0,0,0,0.35) 30%, rgba(0,0,0,0.20) 55%, rgba(0,0,0,0.08) 75%, rgba(0,0,0,0.01) 90%, rgba(0,0,0,0.0) 100%)",
+    cornerGlow:
+      "radial-gradient(circle at 110% -10%, rgba(255,190,105,0.50) 0%, rgba(255,190,105,0.20) 16%, rgba(255,190,105,0.05) 28%, rgba(255,190,105,0) 36%)",
+    coldOverlay: "transparent",
+    fogOverlay: "rgba(240,235,220,0.07)",
+    cardBg: "rgba(240,236,224,0.80)",
+    bulbColor: "#E0B840",
+    bulbGlow: "0 0 5px 2px rgba(245,200,66,0.35)",
+    barWidth: 50,
+    barColor: "#E0B840",
+  },
+  4: {
+    brightness: 0.9,
+    saturate: 1.02,
+    contrast: 1,
+    mainOverlay:
+      "linear-gradient(to top right, rgba(0,0,0,0.22) 0%, rgba(0,0,0,0.15) 30%, rgba(0,0,0,0.08) 55%, rgba(0,0,0,0.02) 75%, rgba(0,0,0,0.0) 100%)",
+    cornerGlow:
+      "radial-gradient(circle at 110% -10%, rgba(255,190,105,0.70) 0%, rgba(255,190,105,0.32) 18%, rgba(255,190,105,0.08) 30%, rgba(255,190,105,0) 40%)",
+    coldOverlay: "transparent",
+    fogOverlay: "transparent",
+    cardBg: "rgba(248,244,232,0.85)",
+    bulbColor: "#F5C842",
+    bulbGlow: "0 0 7px 3px rgba(245,200,66,0.55)",
+    barWidth: 75,
+    barColor: "#F5C842",
+  },
+  5: {
+    brightness: 1.02,
+    saturate: 1.1,
+    contrast: 1.02,
+    mainOverlay:
+      "linear-gradient(to top right, rgba(0,0,0,0.08) 0%, rgba(0,0,0,0.04) 40%, rgba(0,0,0,0.01) 70%, rgba(0,0,0,0.0) 100%)",
+    cornerGlow:
+      "radial-gradient(circle at 110% -10%, rgba(255,195,110,0.85) 0%, rgba(255,195,110,0.42) 20%, rgba(255,195,110,0.12) 34%, rgba(255,195,110,0) 44%)",
+    coldOverlay: "transparent",
+    fogOverlay: "transparent",
+    cardBg: "rgba(252,248,238,0.88)",
+    bulbColor: "#F5C842",
+    bulbGlow:
+      "0 0 10px 5px rgba(245,200,66,0.7), 0 0 22px 11px rgba(245,200,66,0.3)",
+    barWidth: 100,
+    barColor: "#F5C842",
+  },
+} as const;
+
 type RecordLogItem = {
   id: string;
   type: "yousu" | "mugi" | "reaction";
@@ -107,8 +195,11 @@ export function HomeInput({ recentEvents: _recentEvents }: HomeInputProps) {
   const photoSrc = activeCat?.avatarDataUrl ?? null;
   const lightScore = lightData ? getCurrentScore(lightData, tick) : 0;
   const lightLevel = getLightLevel(lightScore);
-  const bulbStyle = getBulbStyle(lightScore);
-  const barStyle = getBarStyle(lightScore);
+  const lightConfig = LIGHT_LEVELS[lightLevel];
+  const dynamicCardStyle = {
+    background: lightConfig.cardBg,
+    transition: "background 1s ease-in-out",
+  };
   const lightText = getLightText(lightLevel, catName);
   const yousuRemaining = getRemainingTime(lockData, "yousu", tick);
   const mugiRemaining = getRemainingTime(lockData, "mugi", tick);
@@ -210,16 +301,47 @@ export function HomeInput({ recentEvents: _recentEvents }: HomeInputProps) {
           alt=""
           style={{
             ...styles.backgroundPhoto,
-            ...getPhotoStyle(lightScore),
+            ...getPhotoStyle(lightConfig),
           }}
         />
       ) : (
-        <div style={styles.backgroundFallback} aria-hidden="true" />
+        <div
+          style={{
+            ...styles.backgroundFallback,
+            ...getPhotoStyle(lightConfig),
+          }}
+          aria-hidden="true"
+        />
       )}
       <div
         style={{
-          ...styles.darkOverlay,
-          background: getOverlayStyle(lightScore),
+          ...styles.overlayLayer,
+          background: lightConfig.mainOverlay,
+          zIndex: 1,
+        }}
+        aria-hidden="true"
+      />
+      <div
+        style={{
+          ...styles.overlayLayer,
+          background: lightConfig.cornerGlow,
+          zIndex: 2,
+        }}
+        aria-hidden="true"
+      />
+      <div
+        style={{
+          ...styles.overlayLayer,
+          background: lightConfig.coldOverlay,
+          zIndex: 3,
+        }}
+        aria-hidden="true"
+      />
+      <div
+        style={{
+          ...styles.overlayLayer,
+          background: lightConfig.fogOverlay,
+          zIndex: 4,
         }}
         aria-hidden="true"
       />
@@ -235,13 +357,13 @@ export function HomeInput({ recentEvents: _recentEvents }: HomeInputProps) {
           <span aria-hidden="true">▾</span>
         </button>
         <div style={styles.lightPill}>
-          <BulbIcon color={bulbStyle.color} glow={bulbStyle.glow} />
+          <BulbIcon color={lightConfig.bulbColor} glow={lightConfig.bulbGlow} />
           <div style={styles.lightTrack}>
             <div
               style={{
                 ...styles.lightFill,
-                width: barStyle.width,
-                backgroundColor: barStyle.background,
+                width: `${lightConfig.barWidth}%`,
+                backgroundColor: lightConfig.barColor,
               }}
             />
           </div>
@@ -258,6 +380,7 @@ export function HomeInput({ recentEvents: _recentEvents }: HomeInputProps) {
               disabled={isYousuLocked}
               style={{
                 ...styles.primaryCard,
+                ...dynamicCardStyle,
                 ...(isYousuLocked ? styles.lockedState : {}),
               }}
             >
@@ -273,6 +396,7 @@ export function HomeInput({ recentEvents: _recentEvents }: HomeInputProps) {
               disabled={isMugiLocked}
               style={{
                 ...styles.primaryCard,
+                ...dynamicCardStyle,
                 ...(isMugiLocked ? styles.lockedState : {}),
               }}
             >
@@ -287,9 +411,10 @@ export function HomeInput({ recentEvents: _recentEvents }: HomeInputProps) {
         <button
           type="button"
           onClick={handleDiscoveryClick}
-          style={
-            discovery.available ? styles.discoveryCard : styles.discoveryEmptyCard
-          }
+          style={{
+            ...(discovery.available ? styles.discoveryCard : styles.discoveryEmptyCard),
+            ...dynamicCardStyle,
+          }}
         >
           {discovery.available ? (
             <>
@@ -676,7 +801,7 @@ function getCurrentScore(lightData: LightData, now = Date.now()) {
   return Math.max(0, Math.min(100, decayed));
 }
 
-function getLightLevel(score: number): 1 | 2 | 3 | 4 | 5 {
+function getLightLevel(score: number): LightLevelKey {
   if (score <= 20) return 1;
   if (score <= 40) return 2;
   if (score <= 60) return 3;
@@ -684,56 +809,11 @@ function getLightLevel(score: number): 1 | 2 | 3 | 4 | 5 {
   return 5;
 }
 
-function getOverlayStyle(score: number): string {
-  const lv = getLightLevel(score);
-  const gradients: Record<number, string> = {
-    1: "radial-gradient(ellipse at 75% 15%, rgba(30,20,10,0.15) 0%, rgba(0,0,0,0.88) 100%)",
-    2: "radial-gradient(ellipse at 75% 15%, rgba(180,100,20,0.30) 0%, rgba(0,0,0,0.70) 100%)",
-    3: "radial-gradient(ellipse at 75% 15%, rgba(210,130,30,0.40) 0%, rgba(0,0,0,0.20) 100%)",
-    4: "radial-gradient(ellipse at 75% 15%, rgba(230,150,40,0.55) 0%, rgba(180,100,20,0.20) 100%)",
-    5: "radial-gradient(ellipse at 75% 15%, rgba(245,180,60,0.65) 0%, rgba(200,120,30,0.35) 100%)",
-  };
-  return gradients[lv];
-}
-
-function getPhotoStyle(score: number): CSSProperties {
-  const lv = getLightLevel(score);
-  const blurMap: Record<number, number> = { 1: 2.5, 2: 1, 3: 0, 4: 0, 5: 0 };
-  const blur = blurMap[lv];
-
+function getPhotoStyle(level: (typeof LIGHT_LEVELS)[LightLevelKey]): CSSProperties {
   return {
-    filter: blur > 0 ? `blur(${blur}px)` : "none",
-    transform: blur > 0 ? `scale(${1 + blur * 0.015})` : "scale(1)",
-    transition: "filter 1s ease-in-out, transform 1s ease-in-out",
+    filter: `brightness(${level.brightness}) saturate(${level.saturate}) contrast(${level.contrast})`,
+    transition: "filter 1s ease-in-out",
   };
-}
-
-function getBulbStyle(score: number) {
-  const lv = getLightLevel(score);
-  const styles: Record<number, { color: string; glow: string }> = {
-    1: { color: "#444444", glow: "none" },
-    2: { color: "#C8A050", glow: "none" },
-    3: { color: "#E0B840", glow: "0 0 6px 3px rgba(245,200,66,0.35)" },
-    4: { color: "#F5C842", glow: "0 0 8px 4px rgba(245,200,66,0.55)" },
-    5: {
-      color: "#F5C842",
-      glow: "0 0 12px 6px rgba(245,200,66,0.7), 0 0 24px 12px rgba(245,200,66,0.3)",
-    },
-  };
-  return styles[lv];
-}
-
-function getBarStyle(score: number) {
-  const lv = getLightLevel(score);
-  const widthMap: Record<number, number> = { 1: 0, 2: 25, 3: 50, 4: 75, 5: 100 };
-  const colorMap: Record<number, string> = {
-    1: "#666666",
-    2: "#C8A050",
-    3: "#E0B840",
-    4: "#F5C842",
-    5: "#F5C842",
-  };
-  return { width: `${widthMap[lv]}%`, background: colorMap[lv] };
 }
 
 function getLightText(level: number, name: string) {
@@ -877,6 +957,7 @@ function BulbIcon({ color, glow }: { color: string; glow: string }) {
         borderRadius: "50%",
         boxShadow: glow,
         color,
+        filter: glow === "none" ? "none" : `drop-shadow(0 0 4px ${color})`,
         display: "inline-flex",
         alignItems: "center",
         justifyContent: "center",
@@ -1007,16 +1088,15 @@ const styles = {
     zIndex: 0,
     background: "linear-gradient(160deg, #C8C4BC, #A8A49C)",
   },
-  darkOverlay: {
+  overlayLayer: {
     position: "fixed",
     inset: 0,
-    zIndex: 1,
     pointerEvents: "none",
     transition: "background 1s ease-in-out",
   },
   contentLayer: {
     position: "relative",
-    zIndex: 2,
+    zIndex: 5,
     height: "100dvh",
     display: "flex",
     flexDirection: "column",
