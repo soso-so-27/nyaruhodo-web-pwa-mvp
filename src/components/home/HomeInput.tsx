@@ -38,18 +38,22 @@ const HOME_FALLBACK_PHOTO_SRC = "/sample-cats/mugi-hero.png";
 
 const LIGHT_LEVELS = {
   1: {
-    brightness: 0.5,
-    saturate: 0.55,
-    contrast: 0.85,
+    brightness: 0.38,
+    saturate: 0.5,
+    contrast: 0.9,
     mainOverlay:
-      "linear-gradient(to top right, rgba(8,12,28,0.88) 0%, rgba(10,15,32,0.78) 25%, rgba(15,18,35,0.58) 50%, rgba(20,20,30,0.30) 75%, rgba(25,20,25,0.08) 90%, rgba(0,0,0,0.0) 100%)",
+      "linear-gradient(to top right, rgba(4,8,24,0.92) 0%, rgba(8,12,30,0.84) 28%, rgba(12,16,34,0.64) 52%, rgba(18,18,30,0.34) 76%, rgba(25,20,25,0.10) 92%, rgba(0,0,0,0.0) 100%)",
     cornerGlow:
-      "radial-gradient(circle at 110% -10%, rgba(255,185,100,0.15) 0%, rgba(255,185,100,0.04) 15%, rgba(255,185,100,0) 25%)",
+      "radial-gradient(circle at 86% 12%, rgba(255,190,110,0.18) 0%, rgba(255,190,110,0.06) 16%, rgba(255,190,110,0) 34%)",
+    faceReveal:
+      "radial-gradient(ellipse at 52% 47%, rgba(255,224,188,0.08) 0%, rgba(255,224,188,0.03) 16%, rgba(255,224,188,0) 30%), radial-gradient(circle at 49% 58%, rgba(255,210,170,0.05) 0%, rgba(255,210,170,0.02) 14%, rgba(255,210,170,0) 26%)",
     coldOverlay:
       "radial-gradient(circle at 0% 0%, rgba(60,80,120,0.35) 0%, rgba(40,60,100,0.15) 30%, rgba(0,0,0,0) 55%)",
-    fogOverlay: "rgba(240,235,220,0.28)",
+    bottomWarmth:
+      "radial-gradient(circle at 50% 92%, rgba(255,170,90,0.03) 0%, rgba(255,170,90,0) 48%)",
+    fogOverlay: "rgba(18,24,42,0.20)",
     goldenBloom: "transparent",
-    cardBg: "rgba(215,210,200,0.70)",
+    cardBg: "rgba(220,224,224,0.48)",
     glassBorder: "rgba(255,255,255,0.10)",
     glassShadow:
       "0 2px 8px rgba(0,0,0,0.20), inset 0 0.5px 0 rgba(255,255,255,0.10)",
@@ -59,18 +63,22 @@ const LIGHT_LEVELS = {
     barColor: "#444",
   },
   2: {
-    brightness: 0.62,
-    saturate: 0.7,
-    contrast: 0.9,
+    brightness: 0.54,
+    saturate: 0.66,
+    contrast: 0.92,
     mainOverlay:
       "linear-gradient(to top right, rgba(10,14,24,0.68) 0%, rgba(12,16,26,0.55) 25%, rgba(18,18,28,0.35) 55%, rgba(20,18,22,0.14) 78%, rgba(0,0,0,0.02) 92%, rgba(0,0,0,0.0) 100%)",
     cornerGlow:
-      "radial-gradient(circle at 110% -10%, rgba(255,185,100,0.30) 0%, rgba(255,185,100,0.10) 15%, rgba(255,185,100,0.02) 25%, rgba(255,185,100,0) 32%)",
+      "radial-gradient(circle at 86% 12%, rgba(255,190,110,0.34) 0%, rgba(255,190,110,0.13) 18%, rgba(255,190,110,0) 36%)",
+    faceReveal:
+      "radial-gradient(ellipse at 52% 47%, rgba(255,224,188,0.13) 0%, rgba(255,224,188,0.05) 18%, rgba(255,224,188,0) 32%), radial-gradient(circle at 49% 58%, rgba(255,210,170,0.08) 0%, rgba(255,210,170,0.03) 16%, rgba(255,210,170,0) 28%)",
     coldOverlay:
       "radial-gradient(circle at 0% 0%, rgba(60,80,120,0.18) 0%, rgba(40,60,100,0.06) 30%, rgba(0,0,0,0) 48%)",
-    fogOverlay: "rgba(240,235,220,0.16)",
+    bottomWarmth:
+      "radial-gradient(circle at 50% 92%, rgba(255,170,90,0.06) 0%, rgba(255,170,90,0) 50%)",
+    fogOverlay: "rgba(36,38,46,0.10)",
     goldenBloom: "transparent",
-    cardBg: "rgba(228,223,210,0.75)",
+    cardBg: "rgba(236,234,224,0.56)",
     glassBorder: "rgba(255,255,255,0.12)",
     glassShadow:
       "0 2px 8px rgba(0,0,0,0.18), inset 0 0.5px 0 rgba(255,255,255,0.14)",
@@ -86,11 +94,15 @@ const LIGHT_LEVELS = {
     mainOverlay:
       "linear-gradient(to top right, rgba(0,0,0,0.45) 0%, rgba(0,0,0,0.35) 30%, rgba(0,0,0,0.20) 55%, rgba(0,0,0,0.08) 75%, rgba(0,0,0,0.01) 90%, rgba(0,0,0,0.0) 100%)",
     cornerGlow:
-      "radial-gradient(circle at 110% -10%, rgba(255,190,105,0.50) 0%, rgba(255,190,105,0.20) 16%, rgba(255,190,105,0.05) 28%, rgba(255,190,105,0) 36%)",
+      "radial-gradient(circle at 86% 12%, rgba(255,190,110,0.46) 0%, rgba(255,190,110,0.20) 20%, rgba(255,190,110,0) 40%)",
+    faceReveal:
+      "radial-gradient(ellipse at 52% 47%, rgba(255,224,188,0.20) 0%, rgba(255,224,188,0.08) 20%, rgba(255,224,188,0) 34%), radial-gradient(circle at 49% 58%, rgba(255,210,170,0.12) 0%, rgba(255,210,170,0.04) 18%, rgba(255,210,170,0) 30%)",
     coldOverlay: "transparent",
+    bottomWarmth:
+      "radial-gradient(circle at 50% 92%, rgba(255,170,90,0.10) 0%, rgba(255,170,90,0) 52%)",
     fogOverlay: "rgba(240,235,220,0.07)",
     goldenBloom: "transparent",
-    cardBg: "rgba(240,236,224,0.80)",
+    cardBg: "rgba(255,250,238,0.66)",
     glassBorder: "rgba(255,255,255,0.15)",
     glassShadow:
       "0 2px 10px rgba(0,0,0,0.15), inset 0 0.5px 0 rgba(255,255,255,0.18)",
@@ -106,15 +118,19 @@ const LIGHT_LEVELS = {
     mainOverlay:
       "linear-gradient(to top right, rgba(0,0,0,0.22) 0%, rgba(0,0,0,0.15) 30%, rgba(0,0,0,0.08) 55%, rgba(0,0,0,0.02) 75%, rgba(0,0,0,0.0) 100%)",
     cornerGlow:
-      "radial-gradient(circle at 110% -10%, rgba(255,190,105,0.70) 0%, rgba(255,190,105,0.32) 18%, rgba(255,190,105,0.08) 30%, rgba(255,190,105,0) 40%)",
+      "radial-gradient(circle at 86% 12%, rgba(255,192,112,0.72) 0%, rgba(255,192,112,0.36) 20%, rgba(255,192,112,0.08) 34%, rgba(255,192,112,0) 44%)",
+    faceReveal:
+      "radial-gradient(ellipse at 52% 47%, rgba(255,226,190,0.27) 0%, rgba(255,226,190,0.11) 22%, rgba(255,226,190,0) 36%), radial-gradient(circle at 49% 58%, rgba(255,214,174,0.16) 0%, rgba(255,214,174,0.06) 20%, rgba(255,214,174,0) 32%)",
     coldOverlay: "transparent",
+    bottomWarmth:
+      "radial-gradient(circle at 50% 92%, rgba(255,170,90,0.16) 0%, rgba(255,170,90,0) 55%)",
     fogOverlay: "transparent",
     goldenBloom:
-      "radial-gradient(ellipse at 75% 15%, rgba(255,200,80,0.22) 0%, rgba(255,180,60,0.12) 30%, rgba(255,160,40,0.04) 55%, rgba(255,160,40,0) 70%)",
-    cardBg: "rgba(248,244,232,0.85)",
-    glassBorder: "rgba(255,220,140,0.25)",
+      "radial-gradient(ellipse at 84% 12%, rgba(255,202,82,0.32) 0%, rgba(255,182,62,0.16) 24%, rgba(255,160,40,0.05) 44%, rgba(255,160,40,0) 56%)",
+    cardBg: "rgba(255,250,238,0.66)",
+    glassBorder: "rgba(255,220,140,0.32)",
     glassShadow:
-      "0 2px 14px rgba(255,180,60,0.12), inset 0 0.5px 0 rgba(255,220,140,0.25)",
+      "0 2px 16px rgba(255,180,60,0.16), inset 0 0.5px 0 rgba(255,220,140,0.30)",
     bulbColor: "#F5C842",
     bulbGlow: "0 0 7px 3px rgba(245,200,66,0.55)",
     barWidth: 75,
@@ -127,15 +143,19 @@ const LIGHT_LEVELS = {
     mainOverlay:
       "linear-gradient(to top right, rgba(0,0,0,0.08) 0%, rgba(0,0,0,0.04) 40%, rgba(0,0,0,0.01) 70%, rgba(0,0,0,0.0) 100%)",
     cornerGlow:
-      "radial-gradient(circle at 110% -10%, rgba(255,195,110,0.85) 0%, rgba(255,195,110,0.42) 20%, rgba(255,195,110,0.12) 34%, rgba(255,195,110,0) 44%)",
+      "radial-gradient(circle at 86% 12%, rgba(255,198,114,0.92) 0%, rgba(255,198,114,0.48) 22%, rgba(255,198,114,0.12) 36%, rgba(255,198,114,0) 48%)",
+    faceReveal:
+      "radial-gradient(ellipse at 52% 47%, rgba(255,232,196,0.34) 0%, rgba(255,232,196,0.14) 24%, rgba(255,232,196,0) 38%), radial-gradient(circle at 49% 58%, rgba(255,218,178,0.20) 0%, rgba(255,218,178,0.08) 20%, rgba(255,218,178,0) 34%)",
     coldOverlay: "transparent",
+    bottomWarmth:
+      "radial-gradient(circle at 50% 92%, rgba(255,170,90,0.20) 0%, rgba(255,170,90,0) 58%)",
     fogOverlay: "transparent",
     goldenBloom:
-      "radial-gradient(ellipse at 75% 15%, rgba(255,210,100,0.40) 0%, rgba(255,190,70,0.22) 28%, rgba(255,170,50,0.08) 50%, rgba(255,170,50,0) 65%)",
-    cardBg: "rgba(252,248,238,0.88)",
-    glassBorder: "rgba(255,230,160,0.35)",
+      "radial-gradient(ellipse at 84% 12%, rgba(255,212,102,0.52) 0%, rgba(255,192,72,0.30) 22%, rgba(255,170,50,0.10) 40%, rgba(255,170,50,0) 52%)",
+    cardBg: "rgba(255,252,242,0.70)",
+    glassBorder: "rgba(255,230,160,0.42)",
     glassShadow:
-      "0 2px 18px rgba(255,190,70,0.20), inset 0 0.5px 0 rgba(255,230,160,0.35)",
+      "0 2px 20px rgba(255,190,70,0.24), inset 0 0.5px 0 rgba(255,230,160,0.42)",
     bulbColor: "#F5C842",
     bulbGlow:
       "0 0 10px 5px rgba(245,200,66,0.7), 0 0 22px 11px rgba(245,200,66,0.3)",
@@ -216,14 +236,17 @@ export function HomeInput({ recentEvents: _recentEvents }: HomeInputProps) {
   }, []);
 
   const catName = activeCat ? getCatName(activeCat) : "ねこ";
-  const photoSrc = activeCat?.avatarDataUrl ?? HOME_FALLBACK_PHOTO_SRC;
+  const photoSrc =
+    activeCat?.homePhotoDataUrl ??
+    activeCat?.avatarDataUrl ??
+    HOME_FALLBACK_PHOTO_SRC;
   const lightScore = lightData ? getCurrentScore(lightData, tick) : 0;
   const lightLevel = getLightLevel(lightScore);
   const lightConfig = LIGHT_LEVELS[lightLevel];
   const dynamicCardStyle: CSSProperties = {
     background: lightConfig.cardBg,
-    backdropFilter: "blur(12px)",
-    WebkitBackdropFilter: "blur(12px)",
+    backdropFilter: "blur(24px)",
+    WebkitBackdropFilter: "blur(24px)",
     border: `0.5px solid ${lightConfig.glassBorder}`,
     boxShadow: lightConfig.glassShadow,
     position: "relative",
@@ -231,8 +254,8 @@ export function HomeInput({ recentEvents: _recentEvents }: HomeInputProps) {
   };
   const dynamicPillStyle: CSSProperties = {
     background: lightConfig.cardBg,
-    backdropFilter: "blur(10px)",
-    WebkitBackdropFilter: "blur(10px)",
+    backdropFilter: "blur(18px)",
+    WebkitBackdropFilter: "blur(18px)",
     border: `0.5px solid ${lightConfig.glassBorder}`,
     boxShadow: lightConfig.glassShadow,
     position: "relative",
@@ -387,7 +410,7 @@ export function HomeInput({ recentEvents: _recentEvents }: HomeInputProps) {
       <div
         style={{
           ...styles.overlayLayer,
-          background: lightConfig.coldOverlay,
+          background: lightConfig.faceReveal,
           zIndex: 3,
         }}
         aria-hidden="true"
@@ -395,7 +418,7 @@ export function HomeInput({ recentEvents: _recentEvents }: HomeInputProps) {
       <div
         style={{
           ...styles.overlayLayer,
-          background: lightConfig.fogOverlay,
+          background: lightConfig.coldOverlay,
           zIndex: 4,
         }}
         aria-hidden="true"
@@ -403,8 +426,24 @@ export function HomeInput({ recentEvents: _recentEvents }: HomeInputProps) {
       <div
         style={{
           ...styles.overlayLayer,
-          background: lightConfig.goldenBloom,
+          background: lightConfig.fogOverlay,
           zIndex: 5,
+        }}
+        aria-hidden="true"
+      />
+      <div
+        style={{
+          ...styles.overlayLayer,
+          background: lightConfig.goldenBloom,
+          zIndex: 6,
+        }}
+        aria-hidden="true"
+      />
+      <div
+        style={{
+          ...styles.overlayLayer,
+          background: lightConfig.bottomWarmth,
+          zIndex: 7,
         }}
         aria-hidden="true"
       />
@@ -1181,7 +1220,7 @@ const styles = {
   },
   contentLayer: {
     position: "relative",
-    zIndex: 6,
+    zIndex: 10,
     width: "100%",
     height: "100vh",
     display: "flex",
