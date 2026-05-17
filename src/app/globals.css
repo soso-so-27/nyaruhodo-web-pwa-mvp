@@ -34,6 +34,13 @@ body {
   font-synthesis-weight: none;
 }
 
+@media all and (display-mode: standalone) {
+  html,
+  body {
+    min-height: 100vh;
+  }
+}
+
 * {
   box-sizing: border-box;
   overscroll-behavior-x: none;
