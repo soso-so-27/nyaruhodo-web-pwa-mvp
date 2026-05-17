@@ -333,24 +333,14 @@ export function HomeInput({ recentEvents: _recentEvents }: HomeInputProps) {
 
   return (
     <main style={styles.page}>
-      {photoSrc ? (
-        <img
-          src={photoSrc}
-          alt=""
-          style={{
-            ...styles.backgroundPhoto,
-            ...getPhotoStyle(lightConfig),
-          }}
-        />
-      ) : (
-        <div
-          style={{
-            ...styles.backgroundFallback,
-            ...getPhotoStyle(lightConfig),
-          }}
-          aria-hidden="true"
-        />
-      )}
+      <div
+        style={{
+          ...styles.backgroundPhoto,
+          backgroundImage: `url("${photoSrc}")`,
+          ...getPhotoStyle(lightConfig),
+        }}
+        aria-hidden="true"
+      />
       <div
         style={{
           ...styles.overlayLayer,
@@ -1133,28 +1123,20 @@ const styles = {
     position: "fixed",
     top: 0,
     right: 0,
+    bottom: "-180px",
     left: 0,
     zIndex: 0,
-    width: "100%",
-    height: "calc(100dvh + 120px)",
-    objectFit: "cover",
-    objectPosition: "center 30%",
-  },
-  backgroundFallback: {
-    position: "fixed",
-    top: 0,
-    right: 0,
-    left: 0,
-    height: "calc(100dvh + 120px)",
-    zIndex: 0,
-    background: "linear-gradient(160deg, #C8C4BC, #A8A49C)",
+    backgroundColor: "#1a1a18",
+    backgroundSize: "cover",
+    backgroundPosition: "center 30%",
+    backgroundRepeat: "no-repeat",
   },
   overlayLayer: {
     position: "fixed",
     top: 0,
     right: 0,
+    bottom: "-180px",
     left: 0,
-    height: "calc(100dvh + 120px)",
     pointerEvents: "none",
     transition: "background 1s ease-in-out",
   },
