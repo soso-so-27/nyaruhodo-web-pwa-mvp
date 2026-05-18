@@ -77,6 +77,7 @@ const REACTION_OPTIONS = [
 
 const DISCOVERY_TEXT =
   "昨日の小さな記録から、少しだけリズムが見えてきました。";
+const HOME_ACCENT_COLOR = "#6F927B";
 
 export function HomeInput({ recentEvents: _recentEvents }: HomeInputProps) {
   const [catProfiles, setCatProfiles] = useState<CatProfile[]>([]);
@@ -1002,7 +1003,16 @@ function BulbIcon({ color, glow }: { color: string; glow: string }) {
 
 function PawIcon() {
   return (
-    <svg viewBox="0 0 32 32" width="32" height="32" fill="currentColor">
+    <svg
+      viewBox="0 0 32 32"
+      width="32"
+      height="32"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.9"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
       <ellipse cx="16" cy="21.2" rx="7.2" ry="5.8" />
       <circle cx="7.5" cy="13" r="3.2" />
       <circle cx="13.1" cy="8.5" r="3.1" />
@@ -1277,7 +1287,7 @@ const styles = {
     border: "0.5px solid #E0DDD6",
     borderRadius: "16px",
     background: "rgba(247, 245, 239, 0.85)",
-    color: "#6B9E82",
+    color: HOME_ACCENT_COLOR,
     padding: "14px 12px 13px",
     display: "flex",
     flexDirection: "column",
@@ -1294,9 +1304,9 @@ const styles = {
     display: "inline-flex",
     alignItems: "center",
     justifyContent: "center",
-    color: "#6B9E82",
-    background: "rgba(107,158,130,0.12)",
-    border: "0.5px solid rgba(107,158,130,0.22)",
+    color: HOME_ACCENT_COLOR,
+    background: "rgba(111,146,123,0.12)",
+    border: "0.5px solid rgba(111,146,123,0.22)",
     boxShadow: "inset 0 0.5px 0 rgba(255,255,255,0.35)",
   },
   primaryCardText: {
@@ -1369,8 +1379,8 @@ const styles = {
     cursor: "pointer",
   },
   yousuOptionSelected: {
-    borderColor: "#6B9E82",
-    background: "#6B9E82",
+    borderColor: HOME_ACCENT_COLOR,
+    background: HOME_ACCENT_COLOR,
     color: "#FFFFFF",
   },
   discoveryCard: {
@@ -1401,8 +1411,9 @@ const styles = {
     height: "40px",
     flexShrink: 0,
     borderRadius: "50%",
-    background: "#6B9E82",
-    color: "#FFFFFF",
+    border: "0.5px solid rgba(111,146,123,0.30)",
+    background: "rgba(111,146,123,0.18)",
+    color: HOME_ACCENT_COLOR,
   },
   discoveryTextGroup: {
     display: "flex",
@@ -1430,7 +1441,7 @@ const styles = {
     gap: "3px",
   },
   discoveryEmptyLabel: {
-    color: "#6B9E82",
+    color: HOME_ACCENT_COLOR,
     fontSize: "11px",
     fontWeight: 700,
     letterSpacing: "0.04em",
@@ -1511,8 +1522,8 @@ const styles = {
     cursor: "pointer",
   },
   sheetOptionSelected: {
-    borderColor: "#6B9E82",
-    background: "#6B9E82",
+    borderColor: HOME_ACCENT_COLOR,
+    background: HOME_ACCENT_COLOR,
     color: "#FFFFFF",
   },
   catList: {
@@ -1532,15 +1543,15 @@ const styles = {
     cursor: "pointer",
   },
   catListItemActive: {
-    borderColor: "#6B9E82",
-    background: "rgba(107,158,130,0.08)",
+    borderColor: HOME_ACCENT_COLOR,
+    background: "rgba(111,146,123,0.08)",
   },
   catListName: {
     fontSize: "14px",
     fontWeight: 700,
   },
   catListMark: {
-    color: "#6B9E82",
+    color: HOME_ACCENT_COLOR,
     fontSize: "12px",
     fontWeight: 600,
   },

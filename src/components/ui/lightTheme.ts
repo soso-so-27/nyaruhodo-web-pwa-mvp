@@ -20,13 +20,13 @@ export const LIGHT_LEVELS = {
     fogOverlay: "rgba(18,24,42,0.08)",
     goldenBloom: "transparent",
     cardBg: "rgba(232,232,226,0.80)",
-    glassBorder: "rgba(255,255,255,0.10)",
+    glassBorder: "rgba(255,255,255,0.26)",
     glassShadow:
       "0 2px 8px rgba(0,0,0,0.20), inset 0 0.5px 0 rgba(255,255,255,0.10)",
-    bulbColor: "#3a3a3a",
+    bulbColor: "#6F6655",
     bulbGlow: "none",
     barWidth: 0,
-    barColor: "#444",
+    barColor: "#6F6655",
   },
   2: {
     brightness: 0.72,
@@ -45,13 +45,13 @@ export const LIGHT_LEVELS = {
     fogOverlay: "rgba(36,38,46,0.04)",
     goldenBloom: "transparent",
     cardBg: "rgba(242,238,230,0.82)",
-    glassBorder: "rgba(255,255,255,0.12)",
+    glassBorder: "rgba(255,255,255,0.30)",
     glassShadow:
       "0 2px 8px rgba(0,0,0,0.18), inset 0 0.5px 0 rgba(255,255,255,0.14)",
-    bulbColor: "#C8A050",
+    bulbColor: "#A98B4A",
     bulbGlow: "none",
     barWidth: 25,
-    barColor: "#C8A050",
+    barColor: "#A98B4A",
   },
   3: {
     brightness: 0.88,
@@ -69,13 +69,13 @@ export const LIGHT_LEVELS = {
     fogOverlay: "transparent",
     goldenBloom: "transparent",
     cardBg: "rgba(255,250,238,0.84)",
-    glassBorder: "rgba(255,255,255,0.15)",
+    glassBorder: "rgba(255,255,255,0.34)",
     glassShadow:
       "0 2px 10px rgba(0,0,0,0.15), inset 0 0.5px 0 rgba(255,255,255,0.18)",
-    bulbColor: "#E0B840",
+    bulbColor: "#D6A84C",
     bulbGlow: "0 0 5px 2px rgba(245,200,66,0.35)",
     barWidth: 50,
-    barColor: "#E0B840",
+    barColor: "#D6A84C",
   },
   4: {
     brightness: 0.94,
@@ -94,13 +94,13 @@ export const LIGHT_LEVELS = {
     goldenBloom:
       "radial-gradient(ellipse at 84% 12%, rgba(255,202,82,0.32) 0%, rgba(255,182,62,0.16) 24%, rgba(255,160,40,0.05) 44%, rgba(255,160,40,0) 56%)",
     cardBg: "rgba(255,250,238,0.86)",
-    glassBorder: "rgba(255,220,140,0.32)",
+    glassBorder: "rgba(255,220,140,0.38)",
     glassShadow:
       "0 2px 16px rgba(255,180,60,0.16), inset 0 0.5px 0 rgba(255,220,140,0.30)",
-    bulbColor: "#F5C842",
+    bulbColor: "#F4C55A",
     bulbGlow: "0 0 7px 3px rgba(245,200,66,0.55)",
     barWidth: 75,
-    barColor: "#F5C842",
+    barColor: "#F4C55A",
   },
   5: {
     brightness: 0.96,
@@ -119,14 +119,14 @@ export const LIGHT_LEVELS = {
     goldenBloom:
       "radial-gradient(ellipse at 84% 12%, rgba(255,212,102,0.40) 0%, rgba(255,192,72,0.22) 22%, rgba(255,170,50,0.08) 40%, rgba(255,170,50,0) 52%)",
     cardBg: "rgba(255,252,242,0.88)",
-    glassBorder: "rgba(255,230,160,0.42)",
+    glassBorder: "rgba(255,230,160,0.46)",
     glassShadow:
       "0 2px 20px rgba(255,190,70,0.24), inset 0 0.5px 0 rgba(255,230,160,0.42)",
-    bulbColor: "#F5C842",
+    bulbColor: "#F4C55A",
     bulbGlow:
       "0 0 10px 5px rgba(245,200,66,0.7), 0 0 22px 11px rgba(245,200,66,0.3)",
     barWidth: 100,
-    barColor: "#F5C842",
+    barColor: "#F4C55A",
   },
 } as const;
 
