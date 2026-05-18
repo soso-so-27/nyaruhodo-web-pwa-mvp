@@ -3,7 +3,7 @@ export default function CollectionLoading() {
     <div
       style={{
         minHeight: "100vh",
-        background: "#f7f5ef",
+        background: "linear-gradient(180deg, #fdfcf9 0%, #f7f5ef 100%)",
         padding: "20px 16px 200px",
         display: "flex",
         flexDirection: "column",

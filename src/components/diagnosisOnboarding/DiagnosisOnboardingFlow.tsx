@@ -21,6 +21,14 @@ import {
   type CatCoat,
   type CatProfile,
 } from "../home/homeInputHelpers";
+import {
+  APP_ACCENT,
+  APP_ACCENT_SOFT_BG,
+  APP_ACCENT_SOFT_BORDER,
+  APP_PAGE_BACKGROUND,
+  APP_SUBTLE_SURFACE,
+  APP_SURFACE,
+} from "../ui/appTheme";
 
 type Step =
   | "name"
@@ -615,7 +623,7 @@ function resizeAndEncode(file: File, maxSize = 800): Promise<string> {
 const styles = {
   page: {
     minHeight: "100vh",
-    background: "linear-gradient(180deg, #fdfcf9 0%, #f7f5ef 100%)",
+    background: APP_PAGE_BACKGROUND,
     color: "#2a2a28",
     fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
   },
@@ -626,10 +634,8 @@ const styles = {
     boxSizing: "border-box",
   },
   card: {
-    border: "1px solid rgba(219, 216, 207, 0.72)",
+    ...APP_SURFACE,
     borderRadius: "28px",
-    background: "#ffffff",
-    boxShadow: "0 12px 28px rgba(44, 42, 38, 0.04)",
     padding: "24px 18px 20px",
   },
   stepContainer: {
@@ -639,7 +645,7 @@ const styles = {
   },
   eyebrow: {
     margin: 0,
-    color: "#6B9E82",
+    color: APP_ACCENT,
     fontSize: "14px",
     fontWeight: 700,
     lineHeight: 1.45,
@@ -676,7 +682,7 @@ const styles = {
     minHeight: "54px",
     border: "none",
     borderRadius: "16px",
-    background: "#6B9E82",
+    background: APP_ACCENT,
     color: "#ffffff",
     fontSize: "15px",
     fontWeight: 750,
@@ -687,11 +693,10 @@ const styles = {
     cursor: "not-allowed",
   },
   photoButton: {
+    ...APP_SUBTLE_SURFACE,
     width: "100%",
     minHeight: "56px",
-    border: "1px solid rgba(219, 216, 207, 0.9)",
     borderRadius: "16px",
-    background: "#fbfaf7",
     color: "#2a2a28",
     fontSize: "15px",
     fontWeight: 700,
@@ -714,9 +719,9 @@ const styles = {
   },
   coatButton: {
     minHeight: "48px",
-    border: "1px solid #dedbd3",
+    border: "1px solid rgba(210, 207, 200, 0.86)",
     borderRadius: "14px",
-    background: "#ffffff",
+    background: "rgba(255,255,255,0.86)",
     color: "#27272a",
     fontSize: "14px",
     fontWeight: 650,
@@ -727,9 +732,9 @@ const styles = {
     gap: "8px",
   },
   coatButtonActive: {
-    borderColor: "rgba(107, 158, 130, 0.45)",
-    background: "rgba(107, 158, 130, 0.08)",
-    color: "#3d6650",
+    borderColor: APP_ACCENT_SOFT_BORDER,
+    background: APP_ACCENT_SOFT_BG,
+    color: APP_ACCENT,
   },
   coatDot: {
     width: "16px",
@@ -786,9 +791,9 @@ const styles = {
     cursor: "pointer",
   },
   genderButtonActive: {
-    borderColor: "rgba(107, 158, 130, 0.45)",
-    background: "rgba(107, 158, 130, 0.08)",
-    color: "#3d6650",
+    borderColor: APP_ACCENT_SOFT_BORDER,
+    background: APP_ACCENT_SOFT_BG,
+    color: APP_ACCENT,
     fontWeight: 700,
   },
   progressBar: {
@@ -800,7 +805,7 @@ const styles = {
   progressFill: {
     height: "100%",
     borderRadius: "999px",
-    background: "#6B9E82",
+    background: APP_ACCENT,
     transition: "width 0.22s ease",
   },
   avatarArea: {
@@ -843,10 +848,9 @@ const styles = {
     gap: "10px",
   },
   optionButton: {
+    ...APP_SUBTLE_SURFACE,
     minHeight: "54px",
-    border: "1px solid rgba(219, 216, 207, 0.9)",
     borderRadius: "16px",
-    background: "#ffffff",
     color: "#2a2a28",
     fontSize: "15px",
     fontWeight: 700,
@@ -856,9 +860,9 @@ const styles = {
     padding: "0 16px",
   },
   typeReveal: {
-    border: "1px solid rgba(107, 158, 130, 0.22)",
+    border: `1px solid ${APP_ACCENT_SOFT_BORDER}`,
     borderRadius: "24px",
-    background: "rgba(107, 158, 130, 0.07)",
+    background: APP_ACCENT_SOFT_BG,
     padding: "22px 18px",
     textAlign: "center",
     animation: "fadeIn 0.35s ease",
@@ -872,7 +876,7 @@ const styles = {
   },
   typeTagline: {
     margin: "10px 0 0",
-    color: "#3d6650",
+    color: APP_ACCENT,
     fontSize: "15px",
     fontWeight: 700,
     lineHeight: 1.6,
@@ -885,9 +889,8 @@ const styles = {
     textAlign: "center",
   },
   typeCard: {
-    border: "1px solid rgba(219, 216, 207, 0.72)",
+    ...APP_SUBTLE_SURFACE,
     borderRadius: "24px",
-    background: "#fbfaf7",
     padding: "20px 16px",
   },
   typeDescription: {
@@ -910,9 +913,8 @@ const styles = {
     lineHeight: 1.6,
   },
   rarityArea: {
-    border: "1px solid rgba(232, 229, 222, 0.9)",
+    ...APP_SUBTLE_SURFACE,
     borderRadius: "18px",
-    background: "#ffffff",
     padding: "13px 14px",
   },
   rarityText: {
@@ -930,14 +932,14 @@ const styles = {
   rarityFill: {
     height: "100%",
     borderRadius: "999px",
-    background: "#6B9E82",
+    background: APP_ACCENT,
   },
   hintText: {
     margin: 0,
-    color: "#3d6650",
-    border: "1px solid rgba(107, 158, 130, 0.18)",
+    color: APP_ACCENT,
+    border: `1px solid ${APP_ACCENT_SOFT_BORDER}`,
     borderRadius: "18px",
-    background: "rgba(107, 158, 130, 0.06)",
+    background: APP_ACCENT_SOFT_BG,
     fontSize: "14px",
     fontWeight: 650,
     lineHeight: 1.7,
@@ -950,9 +952,8 @@ const styles = {
   },
   collectionPreviewCard: {
     aspectRatio: "1",
-    border: "1px solid #e8e5de",
+    ...APP_SUBTLE_SURFACE,
     borderRadius: "18px",
-    background: "#f5f3ef",
     display: "flex",
     alignItems: "center",
     justifyContent: "center",

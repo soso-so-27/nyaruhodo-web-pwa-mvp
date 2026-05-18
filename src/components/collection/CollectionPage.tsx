@@ -17,6 +17,17 @@ import {
 } from "../home/homeInputHelpers";
 import type { CatProfile } from "../home/homeInputHelpers";
 import { BottomNavigation } from "../navigation/BottomNavigation";
+import {
+  APP_ACCENT,
+  APP_ACCENT_SOFT_BG,
+  APP_ACCENT_SOFT_BORDER,
+  APP_PAGE_BACKGROUND,
+  APP_PILL,
+  APP_SHEET,
+  APP_SHEET_OVERLAY,
+  APP_SUBTLE_SURFACE,
+  APP_SURFACE,
+} from "../ui/appTheme";
 
 type CollectionPhoto = {
   id: string;
@@ -1012,7 +1023,7 @@ const styles = {
   page: {
     position: "relative",
     minHeight: "100svh",
-    background: "linear-gradient(180deg, #fdfcf9 0%, #f7f5ef 100%)",
+    background: APP_PAGE_BACKGROUND,
     color: "#242522",
   },
   container: {
@@ -1047,11 +1058,10 @@ const styles = {
     letterSpacing: 0,
   },
   catNameBtn: {
+    ...APP_PILL,
     fontSize: "13px",
     fontWeight: 500,
     color: "#6a6a62",
-    background: "#f5f3ef",
-    border: "0.5px solid #e0ddd6",
     borderRadius: "99px",
     padding: "4px 12px",
     cursor: "pointer",
@@ -1059,7 +1069,7 @@ const styles = {
   catSheetOverlay: {
     position: "fixed",
     inset: 0,
-    background: "rgba(0,0,0,0.3)",
+    ...APP_SHEET_OVERLAY,
     zIndex: 50,
   },
   catSheet: {
@@ -1067,7 +1077,7 @@ const styles = {
     bottom: 0,
     left: 0,
     right: 0,
-    background: "#fbfaf7",
+    ...APP_SHEET,
     borderRadius: "20px 20px 0 0",
     zIndex: 51,
     padding: "0 20px calc(32px + env(safe-area-inset-bottom))",
@@ -1116,7 +1126,7 @@ const styles = {
     flexShrink: 0,
   },
   catSheetAvatarActive: {
-    border: "3px solid #6B9E82",
+    border: `3px solid ${APP_ACCENT}`,
   },
   catSheetAvatarPhoto: {
     width: "100%",
@@ -1147,7 +1157,7 @@ const styles = {
     display: "block",
     textAlign: "center",
     fontSize: "13px",
-    color: "#6B9E82",
+    color: APP_ACCENT,
     textDecoration: "none",
     padding: "10px 0",
   },
@@ -1199,7 +1209,7 @@ const styles = {
     position: "absolute",
     inset: "0 auto 0 0",
     borderRadius: "999px",
-    background: "linear-gradient(90deg, #a8a697, #8f9688)",
+    background: `linear-gradient(90deg, ${APP_ACCENT_SOFT_BORDER}, ${APP_ACCENT})`,
   },
   tabs: {
     display: "flex",
@@ -1224,8 +1234,8 @@ const styles = {
     cursor: "pointer",
   },
   activeTab: {
-    border: "1px solid rgba(173, 172, 158, 0.7)",
-    background: "rgba(226, 224, 214, 0.72)",
+    border: `1px solid ${APP_ACCENT_SOFT_BORDER}`,
+    background: APP_ACCENT_SOFT_BG,
     color: "#343630",
   },
   collectionGrid: {
@@ -1237,10 +1247,8 @@ const styles = {
     position: "relative",
     display: "block",
     aspectRatio: "1 / 1",
-    border: "1px solid rgba(225, 222, 215, 0.72)",
+    ...APP_SURFACE,
     borderRadius: "18px",
-    background:
-      "linear-gradient(180deg, rgba(255,255,255,0.92) 0%, rgba(247,246,242,0.9) 100%)",
     overflow: "hidden",
     font: "inherit",
     cursor: "pointer",
@@ -1376,7 +1384,7 @@ const styles = {
   sheetOverlay: {
     position: "fixed",
     inset: 0,
-    background: "rgba(0,0,0,0.3)",
+    ...APP_SHEET_OVERLAY,
     zIndex: 50,
     display: "flex",
     alignItems: "flex-end",
@@ -1384,7 +1392,7 @@ const styles = {
   },
   sheet: {
     width: "100%",
-    background: "#fbfaf7",
+    ...APP_SHEET,
     borderRadius: "20px 20px 0 0",
     paddingBottom: "calc(16px + env(safe-area-inset-bottom))",
     minHeight: "70vh",
@@ -1466,7 +1474,7 @@ const styles = {
   },
   photoDotActive: {
     width: "14px",
-    background: "#6B9E82",
+    background: APP_ACCENT,
   },
   photoEmpty: {
     display: "flex",
@@ -1475,7 +1483,7 @@ const styles = {
     aspectRatio: "1",
     margin: "12px 16px",
     borderRadius: "16px",
-    background: "#f0ede8",
+    ...APP_SUBTLE_SURFACE,
   },
   photoEmptyText: {
     color: "#b0ada6",
@@ -1490,7 +1498,7 @@ const styles = {
   btnPrimary: {
     border: "none",
     borderRadius: "12px",
-    background: "#6B9E82",
+    background: APP_ACCENT,
     color: "#fff",
     fontSize: "13px",
     fontWeight: 600,
@@ -1498,9 +1506,9 @@ const styles = {
     cursor: "pointer",
   },
   btnSecondary: {
-    border: "0.5px solid #d8d5ce",
+    border: "0.5px solid rgba(210, 207, 200, 0.86)",
     borderRadius: "12px",
-    background: "#fff",
+    background: "rgba(255,255,255,0.86)",
     color: "#2a2a28",
     fontSize: "13px",
     fontWeight: 500,
@@ -1512,9 +1520,8 @@ const styles = {
     cursor: "not-allowed",
   },
   emptyCard: {
-    border: "1px solid #e3e0da",
+    ...APP_SURFACE,
     borderRadius: "26px",
-    background: "#ffffff",
     padding: "20px",
   },
   emptyTitle: {
@@ -1537,9 +1544,9 @@ const styles = {
     justifyContent: "center",
     minHeight: "44px",
     borderRadius: "999px",
-    border: "1px solid #d4d6ce",
-    background: "#e8e9e4",
-    color: "#3f433d",
+    border: `1px solid ${APP_ACCENT_SOFT_BORDER}`,
+    background: APP_ACCENT_SOFT_BG,
+    color: APP_ACCENT,
     padding: "0 18px",
     textDecoration: "none",
     fontSize: "14px",

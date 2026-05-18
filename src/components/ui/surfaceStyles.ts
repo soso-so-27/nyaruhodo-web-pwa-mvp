@@ -1,4 +1,5 @@
 import type { CSSProperties } from "react";
+import { APP_PILL, APP_SURFACE } from "./appTheme";
 import type { LightTheme } from "./lightTheme";
 
 export function getGlassCardStyle(light: LightTheme): CSSProperties {
@@ -7,15 +8,7 @@ export function getGlassCardStyle(light: LightTheme): CSSProperties {
 
 export function getLiquidGlassCardStyle(_light: LightTheme): CSSProperties {
   return {
-    background: "rgba(255, 255, 255, 0.93)",
-    backdropFilter: "blur(20px)",
-    WebkitBackdropFilter: "blur(20px)",
-    border: "1px solid rgba(210, 207, 200, 0.86)",
-    boxShadow: [
-      "0 4px 14px rgba(52, 50, 46, 0.08)",
-      "inset 0 1px 0 rgba(255,255,255,0.46)",
-    ].join(", "),
-    position: "relative",
+    ...APP_SURFACE,
     transition: "all 1s ease-in-out",
   };
 }
@@ -38,15 +31,7 @@ export function getReadableFrostedPaperCardStyle(light: LightTheme): CSSProperti
 
 export function getGlassPillStyle(_light: LightTheme): CSSProperties {
   return {
-    background: "rgba(255, 255, 255, 0.90)",
-    backdropFilter: "blur(20px)",
-    WebkitBackdropFilter: "blur(20px)",
-    border: "1px solid rgba(210, 207, 200, 0.86)",
-    boxShadow: [
-      "0 4px 14px rgba(52, 50, 46, 0.08)",
-      "inset 0 1px 0 rgba(255,255,255,0.46)",
-    ].join(", "),
-    position: "relative",
+    ...APP_PILL,
     transition: "all 1s ease-in-out",
   };
 }

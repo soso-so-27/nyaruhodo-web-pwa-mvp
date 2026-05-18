@@ -12,6 +12,14 @@ import {
   getPhotoStyle,
   type LightLevelKey,
 } from "../ui/lightTheme";
+import {
+  APP_ACCENT,
+  APP_ACCENT_SOFT_BG,
+  APP_ACCENT_SOFT_BORDER,
+  APP_SHEET,
+  APP_SHEET_OVERLAY,
+  APP_SUBTLE_SURFACE,
+} from "../ui/appTheme";
 import { getFrostedPaperCardStyle, getGlassPillStyle } from "../ui/surfaceStyles";
 import {
   getActiveCatProfile,
@@ -77,9 +85,9 @@ const REACTION_OPTIONS = [
 
 const DISCOVERY_TEXT =
   "昨日の小さな記録から、少しだけリズムが見えてきました。";
-const HOME_ACCENT_COLOR = "#566052";
-const HOME_ACCENT_SOFT_BG = "rgba(236,236,231,0.82)";
-const HOME_ACCENT_SOFT_BORDER = "rgba(200,197,190,0.9)";
+const HOME_ACCENT_COLOR = APP_ACCENT;
+const HOME_ACCENT_SOFT_BG = APP_ACCENT_SOFT_BG;
+const HOME_ACCENT_SOFT_BORDER = APP_ACCENT_SOFT_BORDER;
 
 export function HomeInput({ recentEvents: _recentEvents }: HomeInputProps) {
   const [catProfiles, setCatProfiles] = useState<CatProfile[]>([]);
@@ -1480,7 +1488,7 @@ const styles = {
     position: "fixed",
     inset: 0,
     zIndex: 99,
-    background: "rgba(42,42,40,0.18)",
+    ...APP_SHEET_OVERLAY,
   },
   sheet: {
     position: "fixed",
@@ -1489,8 +1497,7 @@ const styles = {
     left: 0,
     zIndex: 100,
     borderRadius: "24px 24px 0 0",
-    background: "#FAF9F7",
-    boxShadow: "0 -4px 24px rgba(0,0,0,0.1)",
+    ...APP_SHEET,
     padding: "24px 16px calc(40px + env(safe-area-inset-bottom))",
     animation: "slideUp 0.25s ease-out",
   },
@@ -1533,9 +1540,8 @@ const styles = {
     marginTop: "16px",
   },
   sheetOption: {
-    border: "0.5px solid #E0DDD6",
+    ...APP_SUBTLE_SURFACE,
     borderRadius: "14px",
-    background: "#F7F5EF",
     color: "#2A2A28",
     padding: "20px 12px",
     fontSize: "14px",
@@ -1554,12 +1560,11 @@ const styles = {
     marginTop: "16px",
   },
   catListItem: {
+    ...APP_SUBTLE_SURFACE,
     display: "flex",
     alignItems: "center",
     justifyContent: "space-between",
-    border: "0.5px solid #E0DDD6",
     borderRadius: "14px",
-    background: "#F7F5EF",
     padding: "14px 16px",
     color: "#2A2A28",
     cursor: "pointer",

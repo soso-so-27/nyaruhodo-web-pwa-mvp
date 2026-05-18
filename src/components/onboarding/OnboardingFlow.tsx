@@ -3,6 +3,11 @@
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import type { CSSProperties } from "react";
+import {
+  APP_ACCENT,
+  APP_PAGE_BACKGROUND,
+  APP_SUBTLE_SURFACE,
+} from "../ui/appTheme";
 
 const concernOptions = [
   "\u9cf4\u3044\u3066\u308b",
@@ -158,7 +163,7 @@ function StepWithOptions({
 const styles = {
   page: {
     minHeight: "100vh",
-    background: "#f4f4f5",
+    background: APP_PAGE_BACKGROUND,
     color: "#27272a",
     fontFamily:
       '-apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
@@ -181,10 +186,9 @@ const styles = {
     gap: "12px",
   },
   button: {
+    ...APP_SUBTLE_SURFACE,
     minHeight: "60px",
-    border: "1px solid #d4d4d8",
     borderRadius: "14px",
-    background: "#ffffff",
     color: "#27272a",
     fontSize: "15px",
     fontWeight: 500,
@@ -195,9 +199,9 @@ const styles = {
     width: "100%",
     minHeight: "60px",
     marginTop: "28px",
-    border: "1px solid #a1a1aa",
+    border: "none",
     borderRadius: "14px",
-    background: "#3f3f46",
+    background: APP_ACCENT,
     color: "#ffffff",
     fontSize: "16px",
     fontWeight: 600,
@@ -212,9 +216,8 @@ const styles = {
     listStyle: "none",
   },
   reasonItem: {
-    border: "1px solid #d4d4d8",
+    ...APP_SUBTLE_SURFACE,
     borderRadius: "14px",
-    background: "#ffffff",
     padding: "16px",
     fontSize: "15px",
     lineHeight: 1.7,

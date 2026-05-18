@@ -5,6 +5,13 @@ import { useEffect, useState } from "react";
 import type { CSSProperties } from "react";
 import { createBrowserSupabaseClient } from "../../../lib/supabase/browser";
 import { getSiteUrl } from "../../../lib/supabase/config";
+import {
+  APP_ACCENT,
+  APP_ACCENT_SOFT_BG,
+  APP_PAGE_BACKGROUND,
+  APP_SUBTLE_SURFACE,
+  APP_SURFACE,
+} from "../../../components/ui/appTheme";
 
 const ACCOUNT_CREATE_PROMPT_DISMISSED_KEY = "account_create_prompt_dismissed";
 const ACCOUNT_CREATE_PROMPT_DISMISSED_MS = 7 * 24 * 60 * 60 * 1000;
@@ -176,7 +183,7 @@ export default function AccountCreatePage() {
 const styles = {
   page: {
     minHeight: "100vh",
-    background: "linear-gradient(180deg, #fdfcf9 0%, #f7f5ef 100%)",
+    background: APP_PAGE_BACKGROUND,
     color: "#2a2a28",
     fontFamily:
       '-apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
@@ -188,15 +195,13 @@ const styles = {
     boxSizing: "border-box",
   },
   card: {
-    background: "#ffffff",
-    border: "1px solid rgba(219, 216, 207, 0.72)",
+    ...APP_SURFACE,
     borderRadius: "28px",
     padding: "24px 20px 20px",
-    boxShadow: "0 12px 28px rgba(44, 42, 38, 0.04)",
   },
   eyebrow: {
     margin: "0 0 10px",
-    color: "#6B9E82",
+    color: APP_ACCENT,
     fontSize: "12px",
     fontWeight: 700,
     lineHeight: 1.4,
@@ -222,13 +227,12 @@ const styles = {
     margin: "0 0 18px",
   },
   valueItem: {
+    ...APP_SUBTLE_SURFACE,
     display: "flex",
     alignItems: "center",
     gap: "9px",
     minHeight: "38px",
-    border: "1px solid rgba(232, 229, 222, 0.86)",
     borderRadius: "14px",
-    background: "#fbfaf7",
     color: "#3f433d",
     fontSize: "13px",
     fontWeight: 600,
@@ -238,15 +242,15 @@ const styles = {
     width: "7px",
     height: "7px",
     borderRadius: "50%",
-    background: "#6B9E82",
+    background: APP_ACCENT,
     flexShrink: 0,
   },
   message: {
     margin: "0 0 14px",
-    border: "1px solid rgba(107, 158, 130, 0.24)",
+    border: "1px solid rgba(200,197,190,0.9)",
     borderRadius: "14px",
-    background: "rgba(107, 158, 130, 0.08)",
-    color: "#3d6650",
+    background: APP_ACCENT_SOFT_BG,
+    color: APP_ACCENT,
     fontSize: "13px",
     fontWeight: 600,
     lineHeight: 1.6,
@@ -269,7 +273,7 @@ const styles = {
     minHeight: "52px",
     border: "none",
     borderRadius: "16px",
-    background: "#6B9E82",
+    background: APP_ACCENT,
     color: "#ffffff",
     fontSize: "15px",
     fontWeight: 700,

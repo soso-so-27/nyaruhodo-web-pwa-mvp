@@ -13,6 +13,14 @@ import {
   saveActiveCatId,
 } from "../home/homeInputHelpers";
 import type { CatCoat, CatProfile } from "../home/homeInputHelpers";
+import {
+  APP_ACCENT,
+  APP_ACCENT_SOFT_BG,
+  APP_ACCENT_SOFT_BORDER,
+  APP_PAGE_BACKGROUND,
+  APP_SUBTLE_SURFACE,
+  APP_SURFACE,
+} from "../ui/appTheme";
 
 type TogetherPageProps = {
   recentEvents: RecentEvent[];
@@ -298,7 +306,7 @@ function getCatCoatAvatarStyle(coat?: CatCoat): CSSProperties {
 const styles = {
   page: {
     minHeight: "100svh",
-    background: "#f3eee7",
+    background: APP_PAGE_BACKGROUND,
     color: "#27272a",
   },
   container: {
@@ -307,10 +315,8 @@ const styles = {
     padding: "16px 14px calc(154px + env(safe-area-inset-bottom))",
   },
   hero: {
-    border: "1px solid #eadfce",
+    ...APP_SURFACE,
     borderRadius: "28px",
-    background:
-      "linear-gradient(145deg, rgba(255, 252, 247, 0.98), rgba(255, 245, 231, 0.92))",
     padding: "18px",
     marginBottom: "14px",
   },
@@ -365,7 +371,7 @@ const styles = {
   heroNote: {
     margin: "14px 0 0",
     borderRadius: "18px",
-    background: "rgba(255, 255, 255, 0.72)",
+    background: "rgba(255, 255, 255, 0.76)",
     padding: "10px 12px",
     color: "#6f665c",
     fontSize: "13px",
@@ -373,16 +379,14 @@ const styles = {
     fontWeight: 700,
   },
   discoverySection: {
-    border: "1px solid #eadfce",
+    ...APP_SURFACE,
     borderRadius: "26px",
-    background: "#fffaf4",
     padding: "16px",
     marginBottom: "14px",
   },
   card: {
-    border: "1px solid #e7ded4",
+    ...APP_SURFACE,
     borderRadius: "26px",
-    background: "#ffffff",
     padding: "16px",
     marginBottom: "14px",
   },
@@ -414,9 +418,8 @@ const styles = {
   },
   discoveryCard: {
     minWidth: 0,
-    border: "1px solid #efdcca",
+    ...APP_SUBTLE_SURFACE,
     borderRadius: "20px",
-    background: "#fff7ed",
     padding: "10px 8px",
     textAlign: "center",
   },
@@ -427,8 +430,8 @@ const styles = {
     height: "48px",
     margin: "0 auto 8px",
     borderRadius: "18px",
-    background: "#fffdf8",
-    color: "#9a6a3f",
+    background: APP_ACCENT_SOFT_BG,
+    color: APP_ACCENT,
     fontSize: "18px",
     fontWeight: 900,
   },
@@ -452,18 +455,18 @@ const styles = {
   },
   poseCard: {
     minHeight: "92px",
-    border: "1px solid #eee4da",
+    border: "1px solid rgba(210, 207, 200, 0.62)",
     borderRadius: "18px",
-    background: "#fbfaf8",
+    background: "rgba(255,255,255,0.64)",
     padding: "10px 6px",
     textAlign: "center",
     opacity: 0.58,
   },
   poseCardFound: {
     minHeight: "92px",
-    border: "1px solid #efd7be",
+    border: `1px solid ${APP_ACCENT_SOFT_BORDER}`,
     borderRadius: "18px",
-    background: "#fff7ed",
+    background: APP_ACCENT_SOFT_BG,
     padding: "10px 6px",
     textAlign: "center",
   },
@@ -486,8 +489,8 @@ const styles = {
     height: "36px",
     margin: "0 auto 7px",
     borderRadius: "14px",
-    background: "#fffdf8",
-    color: "#9a6a3f",
+    background: "rgba(255,255,255,0.78)",
+    color: APP_ACCENT,
     fontSize: "14px",
     fontWeight: 900,
   },
@@ -538,7 +541,7 @@ const styles = {
     width: "9px",
     height: "9px",
     borderRadius: "999px",
-    background: "#d99b65",
+    background: APP_ACCENT,
   },
   timelineText: {
     margin: 0,
@@ -551,9 +554,8 @@ const styles = {
     fontWeight: 800,
   },
   emptyCard: {
-    border: "1px solid #eadfce",
+    ...APP_SURFACE,
     borderRadius: "28px",
-    background: "#fffaf4",
     padding: "22px",
     marginTop: "24px",
   },
@@ -577,7 +579,7 @@ const styles = {
     justifyContent: "center",
     minHeight: "44px",
     borderRadius: "999px",
-    background: "#3f3d46",
+    background: APP_ACCENT,
     color: "#ffffff",
     padding: "0 18px",
     textDecoration: "none",

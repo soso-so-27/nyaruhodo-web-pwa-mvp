@@ -6,6 +6,15 @@ import { loadCatProfiles, getActiveCatProfile } from "../../lib/catProfiles";
 import type { RecentEvent } from "../../lib/supabase/queries";
 import type { CatProfile } from "../../components/home/homeInputHelpers";
 import { BottomNavigation } from "../navigation/BottomNavigation";
+import {
+  APP_ACCENT,
+  APP_ACCENT_MUTED,
+  APP_ACCENT_SOFT_BG,
+  APP_ACCENT_SOFT_BORDER,
+  APP_PAGE_BACKGROUND,
+  APP_SUBTLE_SURFACE,
+  APP_SURFACE,
+} from "../ui/appTheme";
 
 type TorisetuPageProps = {
   recentEvents: RecentEvent[];
@@ -145,9 +154,9 @@ export function TorisetuPage({ recentEvents }: TorisetuPageProps) {
                       style={{
                         ...styles.dayMapRowDot,
                         background: item.signal
-                          ? "#6B9E82"
+                          ? APP_ACCENT
                           : isPeakSlot
-                            ? "rgba(107,158,130,0.35)"
+                            ? APP_ACCENT_SOFT_BG
                             : "#e0ddd6",
                       }}
                       aria-hidden="true"
@@ -369,7 +378,7 @@ function LockIcon() {
 const styles = {
   page: {
     minHeight: "100vh",
-    background: "linear-gradient(180deg, #fdfcf9 0%, #f7f5ef 100%)",
+    background: APP_PAGE_BACKGROUND,
     color: "#242522",
   },
   container: {
@@ -392,8 +401,7 @@ const styles = {
     margin: 0,
   },
   progressCard: {
-    background: "#fff",
-    border: "0.5px solid #e5e2dc",
+    ...APP_SURFACE,
     borderRadius: "16px",
     padding: "14px 16px",
     marginBottom: "12px",
@@ -423,24 +431,23 @@ const styles = {
   },
   progressFill: {
     height: "100%",
-    background: "#6B9E82",
+    background: APP_ACCENT,
     borderRadius: "99px",
     transition: "width 0.3s ease",
   },
   progressHint: {
     fontSize: "11px",
-    color: "#6B9E82",
+    color: APP_ACCENT,
     margin: 0,
   },
   card: {
-    background: "#fff",
-    border: "0.5px solid #e5e2dc",
+    ...APP_SURFACE,
     borderRadius: "16px",
     padding: "14px 16px",
     marginBottom: "8px",
   },
   cardLocked: {
-    background: "#f9f8f5",
+    ...APP_SUBTLE_SURFACE,
   },
   cardHeader: {
     display: "flex",
@@ -530,27 +537,27 @@ const styles = {
     marginTop: "8px",
   },
   tag: {
-    background: "rgba(107,158,130,0.1)",
-    border: "0.5px solid rgba(107,158,130,0.3)",
+    background: APP_ACCENT_SOFT_BG,
+    border: `0.5px solid ${APP_ACCENT_SOFT_BORDER}`,
     borderRadius: "99px",
-    color: "#3d6650",
+    color: APP_ACCENT,
     fontSize: "11px",
     padding: "3px 9px",
   },
   badgeUnlocked: {
-    background: "#e8f4ee",
-    border: "0.5px solid #a8d4bc",
+    background: APP_ACCENT_SOFT_BG,
+    border: `0.5px solid ${APP_ACCENT_SOFT_BORDER}`,
     borderRadius: "99px",
-    color: "#3d6650",
+    color: APP_ACCENT,
     fontSize: "10px",
     padding: "2px 8px",
     flexShrink: 0,
   },
   badgeLocked: {
-    background: "#f5f3ef",
-    border: "0.5px solid #e0ddd6",
+    background: "rgba(255,255,255,0.76)",
+    border: "0.5px solid rgba(210, 207, 200, 0.86)",
     borderRadius: "99px",
-    color: "#9a9890",
+    color: APP_ACCENT_MUTED,
     fontSize: "10px",
     padding: "2px 8px",
     flexShrink: 0,

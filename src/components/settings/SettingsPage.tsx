@@ -3,6 +3,12 @@
 import { useEffect, useState } from "react";
 import type { CSSProperties } from "react";
 import { createBrowserSupabaseClient } from "../../lib/supabase/browser";
+import {
+  APP_ACCENT,
+  APP_PAGE_BACKGROUND,
+  APP_PILL,
+  APP_SURFACE,
+} from "../ui/appTheme";
 
 export function SettingsPage() {
   const [isLoggedIn, setIsLoggedIn] = useState(false);
@@ -138,7 +144,7 @@ export function SettingsPage() {
 const styles = {
   page: {
     minHeight: "100vh",
-    background: "linear-gradient(180deg, #fdfcf9 0%, #f7f5ef 100%)",
+    background: APP_PAGE_BACKGROUND,
     color: "#242522",
   },
   container: {
@@ -153,14 +159,13 @@ const styles = {
     padding: "16px 0 20px",
   },
   backButton: {
+    ...APP_PILL,
     display: "flex",
     alignItems: "center",
     justifyContent: "center",
     width: "36px",
     height: "36px",
     borderRadius: "50%",
-    background: "rgba(255,255,255,0.8)",
-    border: "0.5px solid #e0ddd6",
     textDecoration: "none",
     color: "#2a2a28",
     flexShrink: 0,
@@ -187,8 +192,7 @@ const styles = {
     letterSpacing: "0.04em",
   },
   card: {
-    background: "#ffffff",
-    border: "0.5px solid #e5e2dc",
+    ...APP_SURFACE,
     borderRadius: "20px",
     padding: "4px 16px",
   },
@@ -221,7 +225,7 @@ const styles = {
     width: "8px",
     height: "8px",
     borderRadius: "50%",
-    background: "#6B9E82",
+    background: APP_ACCENT,
     flexShrink: 0,
   },
   statusDotOff: {
@@ -244,7 +248,7 @@ const styles = {
     padding: "14px 0",
     fontSize: "14px",
     fontWeight: 600,
-    color: "#6B9E82",
+    color: APP_ACCENT,
     textDecoration: "none",
     cursor: "pointer",
   },
@@ -269,7 +273,7 @@ const styles = {
   betaNoteTitle: {
     fontSize: "13px",
     fontWeight: 600,
-    color: "#6B9E82",
+    color: APP_ACCENT,
     margin: 0,
   },
   betaNoteText: {

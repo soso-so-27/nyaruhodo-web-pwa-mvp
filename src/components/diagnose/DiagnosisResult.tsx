@@ -7,6 +7,13 @@ import { applyDiagnosisFeedback } from "../../core/understanding/feedback";
 import type { BehaviorInput, CauseCategory } from "../../core/types";
 import { insertFeedback } from "../../lib/supabase/queries";
 import { saveCurrentCatHintSuppression } from "../home/homeInputHelpers";
+import {
+  APP_ACCENT,
+  APP_PAGE_BACKGROUND,
+  APP_PILL,
+  APP_SUBTLE_SURFACE,
+  APP_SURFACE,
+} from "../ui/appTheme";
 
 type DiagnosisResultProps = {
   resultText: string;
@@ -381,7 +388,7 @@ function getSecondaryHypothesisMessage(category: CauseCategory) {
 const styles = {
   page: {
     minHeight: "100vh",
-    background: "#f7f3ee",
+    background: APP_PAGE_BACKGROUND,
     color: "#27272a",
     fontFamily:
       '-apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
@@ -419,10 +426,9 @@ const styles = {
     lineHeight: 1.6,
   },
   headerHomeButton: {
+    ...APP_PILL,
     minHeight: "34px",
-    border: "1px solid #eadbca",
     borderRadius: "999px",
-    background: "#ffffff",
     color: "#52525b",
     fontSize: "12px",
     fontWeight: 600,
@@ -459,10 +465,9 @@ const styles = {
     letterSpacing: 0,
   },
   secondaryCard: {
+    ...APP_SURFACE,
     marginBottom: "10px",
-    border: "1px solid #e4e4e7",
     borderRadius: "16px",
-    background: "#fffdf9",
     padding: "12px 14px",
   },
   secondaryLabel: {
@@ -480,17 +485,15 @@ const styles = {
     lineHeight: 1.6,
   },
   reasonCard: {
+    ...APP_SURFACE,
     marginBottom: "10px",
-    border: "1px solid #e4e4e7",
     borderRadius: "16px",
-    background: "#ffffff",
     padding: "12px 14px",
   },
   actionCard: {
+    ...APP_SURFACE,
     marginBottom: "10px",
-    border: "1px solid #eadbca",
     borderRadius: "22px",
-    background: "#fffdf9",
     padding: "18px 16px",
   },
   cardTitle: {
@@ -576,9 +579,9 @@ const styles = {
   ctaButton: {
     width: "100%",
     minHeight: "56px",
-    border: "1px solid #a1a1aa",
+    border: "none",
     borderRadius: "14px",
-    background: "#3f3f46",
+    background: APP_ACCENT,
     color: "#ffffff",
     fontSize: "16px",
     fontWeight: 700,
@@ -586,10 +589,9 @@ const styles = {
     cursor: "pointer",
   },
   feedbackButton: {
+    ...APP_SUBTLE_SURFACE,
     minHeight: "50px",
-    border: "1px solid #d4d4d8",
     borderRadius: "14px",
-    background: "#ffffff",
     color: "#27272a",
     fontSize: "15px",
     fontWeight: 600,

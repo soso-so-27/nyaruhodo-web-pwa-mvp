@@ -4,6 +4,15 @@ import { useEffect, useState } from "react";
 import type { CSSProperties } from "react";
 import { BottomNavigation } from "../navigation/BottomNavigation";
 import {
+  APP_ACCENT,
+  APP_ACCENT_SOFT_BG,
+  APP_ACCENT_SOFT_BORDER,
+  APP_PAGE_BACKGROUND,
+  APP_PILL,
+  APP_SUBTLE_SURFACE,
+  APP_SURFACE,
+} from "../ui/appTheme";
+import {
   addCatProfile,
   getActiveCatProfile,
   getCatName,
@@ -863,7 +872,7 @@ function resizeAndEncode(file: File, maxSize = 800): Promise<string> {
 const styles = {
   page: {
     minHeight: "100vh",
-    background: "linear-gradient(180deg, #fdfcf9 0%, #f7f5ef 100%)",
+    background: APP_PAGE_BACKGROUND,
     color: "#242522",
     fontFamily:
       '-apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
@@ -961,8 +970,7 @@ const styles = {
     fontWeight: 500,
   },
   profileCard: {
-    background: "#ffffff",
-    border: "0.5px solid #e5e2dc",
+    ...APP_SURFACE,
     borderRadius: "24px",
     padding: "20px",
     marginBottom: "12px",
@@ -983,17 +991,16 @@ const styles = {
   },
   genderBadge: {
     fontSize: "11px",
-    color: "#3d6650",
-    background: "rgba(107,158,130,0.1)",
-    border: "0.5px solid rgba(107,158,130,0.25)",
+    color: APP_ACCENT,
+    background: APP_ACCENT_SOFT_BG,
+    border: `0.5px solid ${APP_ACCENT_SOFT_BORDER}`,
     borderRadius: "99px",
     padding: "2px 8px",
   },
   editBtn: {
     fontSize: "12px",
     color: "#6a6a62",
-    background: "#f5f3ef",
-    border: "0.5px solid #e0ddd6",
+    ...APP_PILL,
     borderRadius: "99px",
     padding: "4px 12px",
     cursor: "pointer",
@@ -1009,8 +1016,7 @@ const styles = {
     height: "112px",
     borderRadius: "16px",
     overflow: "hidden",
-    background: "#f5f3ef",
-    border: "0.5px solid #e0ddd6",
+    ...APP_SUBTLE_SURFACE,
     display: "flex",
     alignItems: "center",
     justifyContent: "center",
@@ -1048,10 +1054,10 @@ const styles = {
   },
   homePhotoButton: {
     width: "fit-content",
-    border: "0.5px solid rgba(107,158,130,0.35)",
+    border: `0.5px solid ${APP_ACCENT_SOFT_BORDER}`,
     borderRadius: "99px",
-    background: "rgba(107,158,130,0.1)",
-    color: "#3d6650",
+    background: APP_ACCENT_SOFT_BG,
+    color: APP_ACCENT,
     fontSize: "12px",
     fontWeight: 600,
     padding: "6px 12px",
@@ -1062,9 +1068,9 @@ const styles = {
     gap: "6px",
   },
   homePhotoPositionButton: {
-    border: "0.5px solid #e0ddd6",
+    border: "0.5px solid rgba(210, 207, 200, 0.86)",
     borderRadius: "99px",
-    background: "#fff",
+    background: "rgba(255, 255, 255, 0.86)",
     color: "#8a8a80",
     fontSize: "11px",
     fontWeight: 500,
@@ -1072,9 +1078,9 @@ const styles = {
     cursor: "pointer",
   },
   homePhotoPositionButtonActive: {
-    border: "0.5px solid rgba(107,158,130,0.35)",
-    background: "rgba(107,158,130,0.12)",
-    color: "#3d6650",
+    border: `0.5px solid ${APP_ACCENT_SOFT_BORDER}`,
+    background: APP_ACCENT_SOFT_BG,
+    color: APP_ACCENT,
     fontWeight: 600,
   },
   divider: {
@@ -1122,15 +1128,15 @@ const styles = {
   },
   traitPill: {
     fontSize: "12px",
-    background: "rgba(107,158,130,0.1)",
-    color: "#3d6650",
-    border: "0.5px solid rgba(107,158,130,0.25)",
+    background: APP_ACCENT_SOFT_BG,
+    color: APP_ACCENT,
+    border: `0.5px solid ${APP_ACCENT_SOFT_BORDER}`,
     borderRadius: "99px",
     padding: "4px 12px",
   },
   traitModifier: {
     fontSize: "11px",
-    background: "#f5f3ef",
+    background: "rgba(255, 255, 255, 0.78)",
     color: "#6a6a62",
     border: "0.5px solid #e0ddd6",
     borderRadius: "99px",
@@ -1143,8 +1149,7 @@ const styles = {
     marginTop: "8px",
   },
   futureCard: {
-    background: "#f8f7f3",
-    border: "0.5px solid #e8e5de",
+    ...APP_SUBTLE_SURFACE,
     borderRadius: "16px",
     padding: "14px 16px",
     display: "flex",
@@ -1178,8 +1183,7 @@ const styles = {
     letterSpacing: "0.04em",
   },
   settingsCard: {
-    background: "#ffffff",
-    border: "0.5px solid #e5e2dc",
+    ...APP_SURFACE,
     borderRadius: "16px",
     overflow: "hidden",
   },
@@ -1274,8 +1278,8 @@ const styles = {
     cursor: "pointer",
   },
   coatButtonActive: {
-    borderColor: "#c9cec4",
-    background: "#f2f3ef",
+    borderColor: APP_ACCENT_SOFT_BORDER,
+    background: APP_ACCENT_SOFT_BG,
     color: "#3f433d",
   },
   coatSwatch: {
@@ -1357,10 +1361,10 @@ const styles = {
   saveButton: {
     minHeight: "40px",
     padding: "0 18px",
-    border: "1px solid #cdd3c9",
+    border: `1px solid ${APP_ACCENT_SOFT_BORDER}`,
     borderRadius: "12px",
-    background: "#f2f3ef",
-    color: "#3f433d",
+    background: APP_ACCENT_SOFT_BG,
+    color: APP_ACCENT,
     fontSize: "14px",
     fontWeight: 610,
     letterSpacing: 0,
