@@ -127,20 +127,34 @@ function CatIcon() {
   return (
     <svg viewBox="0 0 24 24" style={styles.svgIcon}>
       <path
-        d="M7.2 9.2 6.5 5.5l3.2 2a7.6 7.6 0 0 1 4.6 0l3.2-2-.7 3.7a6.5 6.5 0 0 1 1.4 4.1c0 3.6-2.8 6-6.2 6s-6.2-2.4-6.2-6c0-1.6.5-3 1.4-4.1Z"
+        d="M7.4 9.4 7.1 6.1l2.8 1.7a7.2 7.2 0 0 1 4.2 0l2.8-1.7-.3 3.3a6.2 6.2 0 0 1 1.5 4c0 3.2-2.5 5.6-6.1 5.6s-6.1-2.4-6.1-5.6c0-1.5.5-2.9 1.5-4Z"
         fill="none"
         stroke="currentColor"
         strokeLinecap="round"
         strokeLinejoin="round"
-        strokeWidth="1.9"
+        strokeWidth="1.75"
       />
       <path
-        d="M9.2 13.5h.1M14.7 13.5h.1M11 16.2c.7.5 1.3.5 2 0"
+        d="M9.3 13.1h.1M14.6 13.1h.1"
         fill="none"
         stroke="currentColor"
         strokeLinecap="round"
         strokeLinejoin="round"
-        strokeWidth="2"
+        strokeWidth="2.2"
+      />
+      <path
+        d="M10.3 15.5c.45.45 1 .68 1.7.68s1.25-.23 1.7-.68"
+        fill="none"
+        stroke="currentColor"
+        strokeLinecap="round"
+        strokeWidth="1.55"
+      />
+      <path
+        d="M4.5 12.8H7M17 12.8h2.5"
+        fill="none"
+        stroke="currentColor"
+        strokeLinecap="round"
+        strokeWidth="1.35"
       />
     </svg>
   );

@@ -139,6 +139,7 @@ export function HomeInput({ recentEvents: _recentEvents }: HomeInputProps) {
   const dynamicCardStyle = getFrostedPaperCardStyle(lightConfig);
   const dynamicPillStyle = getGlassPillStyle(lightConfig);
   const lightText = getLightText(lightLevel, catName);
+  const shouldShowLightText = lightLevel <= 2;
   const yousuRemaining = getRemainingTime(lockData, "yousu", tick);
   const mugiRemaining = getRemainingTime(lockData, "mugi", tick);
   const isYousuLocked = Boolean(yousuRemaining);
@@ -373,7 +374,7 @@ export function HomeInput({ recentEvents: _recentEvents }: HomeInputProps) {
           </div>
         </div>
           </div>
-        <p style={styles.lightText}>{lightText}</p>
+        {shouldShowLightText ? <p style={styles.lightText}>{lightText}</p> : null}
       </section>
 
         <section style={styles.controlArea}>
@@ -388,14 +389,34 @@ export function HomeInput({ recentEvents: _recentEvents }: HomeInputProps) {
                 ...(isYousuLocked ? styles.lockedState : {}),
               }}
             >
-              <span style={styles.primaryIconBadge} aria-hidden="true">
+              <span
+                style={{
+                  ...styles.primaryIconBadge,
+                  ...(isYousuLocked ? styles.lockedIcon : {}),
+                }}
+                aria-hidden="true"
+              >
                 <PawIcon />
               </span>
               {yousuRemaining ? (
                 <span style={styles.remainingTime}>{yousuRemaining}</span>
               ) : null}
-              <span style={styles.primaryCardText}>{catName}のようす</span>
-              <span style={styles.primaryCardHint}>ねてる・遊んでる</span>
+              <span
+                style={{
+                  ...styles.primaryCardText,
+                  ...(isYousuLocked ? styles.lockedText : {}),
+                }}
+              >
+                {catName}のようす
+              </span>
+              <span
+                style={{
+                  ...styles.primaryCardHint,
+                  ...(isYousuLocked ? styles.lockedHint : {}),
+                }}
+              >
+                ねてる・遊んでる
+              </span>
             </button>
             <button
               type="button"
@@ -407,14 +428,34 @@ export function HomeInput({ recentEvents: _recentEvents }: HomeInputProps) {
                 ...(isMugiLocked ? styles.lockedState : {}),
               }}
             >
-              <span style={styles.primaryIconBadge} aria-hidden="true">
+              <span
+                style={{
+                  ...styles.primaryIconBadge,
+                  ...(isMugiLocked ? styles.lockedIcon : {}),
+                }}
+                aria-hidden="true"
+              >
                 <HandIcon />
               </span>
               {mugiRemaining ? (
                 <span style={styles.remainingTime}>{mugiRemaining}</span>
               ) : null}
-              <span style={styles.primaryCardText}>{catName}へ</span>
-              <span style={styles.primaryCardHint}>遊んだ・なでた</span>
+              <span
+                style={{
+                  ...styles.primaryCardText,
+                  ...(isMugiLocked ? styles.lockedText : {}),
+                }}
+              >
+                {catName}へ
+              </span>
+              <span
+                style={{
+                  ...styles.primaryCardHint,
+                  ...(isMugiLocked ? styles.lockedHint : {}),
+                }}
+              >
+                遊んだ・なでた
+              </span>
             </button>
           </div>
 
@@ -433,14 +474,12 @@ export function HomeInput({ recentEvents: _recentEvents }: HomeInputProps) {
                 <HeartIcon />
               </span>
               <span style={styles.discoveryTextGroup}>
-                <span style={styles.discoveryLabel}>きょうの小さな発見</span>
                 <span style={styles.discoveryText}>{DISCOVERY_TEXT}</span>
               </span>
               <ChevronIcon />
             </>
           ) : (
             <span style={styles.discoveryEmptyGroup}>
-              <span style={styles.discoveryEmptyLabel}>発見</span>
               <span style={styles.discoveryEmptyText}>
                 {catName}のことを記録すると、発見が届くよ
               </span>
@@ -1275,7 +1314,7 @@ const styles = {
     flex: "0 0 auto",
     display: "flex",
     flexDirection: "column",
-    gap: "12px",
+    gap: "10px",
     background: "transparent",
     padding: "0 16px 16px",
     boxSizing: "border-box",
@@ -1286,23 +1325,23 @@ const styles = {
     gap: "12px",
   },
   primaryCard: {
-    minHeight: "116px",
+    minHeight: "102px",
     border: "0.5px solid #E0DDD6",
     borderRadius: "16px",
     background: "rgba(247, 245, 239, 0.85)",
     color: HOME_ACCENT_COLOR,
-    padding: "14px 12px 13px",
+    padding: "12px 12px 11px",
     display: "flex",
     flexDirection: "column",
     alignItems: "center",
     justifyContent: "center",
-    gap: "6px",
+    gap: "5px",
     cursor: "pointer",
     transition: "transform 0.1s",
   },
   primaryIconBadge: {
     width: "40px",
-    height: "36px",
+    height: "30px",
     borderRadius: "12px",
     display: "inline-flex",
     alignItems: "center",
@@ -1326,14 +1365,23 @@ const styles = {
     textShadow: "0 1px 0 rgba(255,255,255,0.22)",
   },
   remainingTime: {
-    color: "#6a6862",
-    fontSize: "11px",
-    fontWeight: 600,
+    color: "#2A2A28",
+    fontSize: "12px",
+    fontWeight: 750,
     textShadow: "0 1px 0 rgba(255,255,255,0.22)",
   },
   lockedState: {
-    opacity: 0.4,
     pointerEvents: "none",
+    background: "rgba(255,255,255,0.78)",
+  },
+  lockedIcon: {
+    color: "#a8a69f",
+  },
+  lockedText: {
+    color: "#77746d",
+  },
+  lockedHint: {
+    color: "#aaa7a0",
   },
   yousuPanel: {
     border: "0.5px solid #E0DDD6",
@@ -1409,7 +1457,7 @@ const styles = {
   discoverySurface: {
     background: "rgba(255,255,255,0.88)",
     boxShadow: "0 3px 10px rgba(52, 50, 46, 0.06)",
-    padding: "11px 14px",
+    padding: "10px 14px",
   },
   discoveryIcon: {
     display: "inline-flex",
@@ -1430,11 +1478,6 @@ const styles = {
     flexDirection: "column",
     gap: "3px",
   },
-  discoveryLabel: {
-    color: "#6f6c66",
-    fontSize: "11px",
-    fontWeight: 600,
-  },
   discoveryText: {
     color: "#2A2A28",
     fontSize: "13px",
@@ -1447,13 +1490,6 @@ const styles = {
     flexDirection: "column",
     alignItems: "center",
     gap: "3px",
-  },
-  discoveryEmptyLabel: {
-    color: HOME_ACCENT_COLOR,
-    fontSize: "11px",
-    fontWeight: 700,
-    letterSpacing: "0.04em",
-    textShadow: "0 1px 0 rgba(255,255,255,0.22)",
   },
   discoveryEmptyText: {
     color: "#56534d",
