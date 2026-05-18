@@ -23,10 +23,10 @@ export const LIGHT_LEVELS = {
     glassBorder: "rgba(255,255,255,0.26)",
     glassShadow:
       "0 2px 8px rgba(0,0,0,0.20), inset 0 0.5px 0 rgba(255,255,255,0.10)",
-    bulbColor: "#6F6655",
+    bulbColor: "#8A806C",
     bulbGlow: "none",
     barWidth: 0,
-    barColor: "#6F6655",
+    barColor: "#8A806C",
   },
   2: {
     brightness: 0.72,
@@ -48,10 +48,10 @@ export const LIGHT_LEVELS = {
     glassBorder: "rgba(255,255,255,0.30)",
     glassShadow:
       "0 2px 8px rgba(0,0,0,0.18), inset 0 0.5px 0 rgba(255,255,255,0.14)",
-    bulbColor: "#A98B4A",
+    bulbColor: "#B79A56",
     bulbGlow: "none",
     barWidth: 25,
-    barColor: "#A98B4A",
+    barColor: "#B79A56",
   },
   3: {
     brightness: 0.88,
@@ -72,10 +72,10 @@ export const LIGHT_LEVELS = {
     glassBorder: "rgba(255,255,255,0.34)",
     glassShadow:
       "0 2px 10px rgba(0,0,0,0.15), inset 0 0.5px 0 rgba(255,255,255,0.18)",
-    bulbColor: "#D6A84C",
+    bulbColor: "#D7AD54",
     bulbGlow: "0 0 5px 2px rgba(245,200,66,0.35)",
     barWidth: 50,
-    barColor: "#D6A84C",
+    barColor: "#D7AD54",
   },
   4: {
     brightness: 0.94,
@@ -97,10 +97,10 @@ export const LIGHT_LEVELS = {
     glassBorder: "rgba(255,220,140,0.38)",
     glassShadow:
       "0 2px 16px rgba(255,180,60,0.16), inset 0 0.5px 0 rgba(255,220,140,0.30)",
-    bulbColor: "#F4C55A",
+    bulbColor: "#E6B956",
     bulbGlow: "0 0 7px 3px rgba(245,200,66,0.55)",
     barWidth: 75,
-    barColor: "#F4C55A",
+    barColor: "#E6B956",
   },
   5: {
     brightness: 0.96,
@@ -122,11 +122,11 @@ export const LIGHT_LEVELS = {
     glassBorder: "rgba(255,230,160,0.46)",
     glassShadow:
       "0 2px 20px rgba(255,190,70,0.24), inset 0 0.5px 0 rgba(255,230,160,0.42)",
-    bulbColor: "#F4C55A",
+    bulbColor: "#F0C461",
     bulbGlow:
       "0 0 10px 5px rgba(245,200,66,0.7), 0 0 22px 11px rgba(245,200,66,0.3)",
     barWidth: 100,
-    barColor: "#F4C55A",
+    barColor: "#F0C461",
   },
 } as const;
 

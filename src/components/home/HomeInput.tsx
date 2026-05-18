@@ -424,6 +424,7 @@ export function HomeInput({ recentEvents: _recentEvents }: HomeInputProps) {
           style={{
             ...(discovery.available ? styles.discoveryCard : styles.discoveryEmptyCard),
             ...dynamicCardStyle,
+            ...styles.discoverySurface,
           }}
         >
           {discovery.available ? (
@@ -1300,16 +1301,16 @@ const styles = {
     transition: "transform 0.1s",
   },
   primaryIconBadge: {
-    width: "44px",
-    height: "44px",
-    borderRadius: "14px",
+    width: "40px",
+    height: "36px",
+    borderRadius: "12px",
     display: "inline-flex",
     alignItems: "center",
     justifyContent: "center",
     color: HOME_ACCENT_COLOR,
-    background: HOME_ACCENT_SOFT_BG,
-    border: `0.5px solid ${HOME_ACCENT_SOFT_BORDER}`,
-    boxShadow: "inset 0 0.5px 0 rgba(255,255,255,0.35)",
+    background: "transparent",
+    border: "none",
+    boxShadow: "none",
   },
   primaryCardText: {
     color: "#2A2A28",
@@ -1405,16 +1406,21 @@ const styles = {
     padding: "12px 14px",
     textAlign: "center",
   },
+  discoverySurface: {
+    background: "rgba(255,255,255,0.88)",
+    boxShadow: "0 3px 10px rgba(52, 50, 46, 0.06)",
+    padding: "11px 14px",
+  },
   discoveryIcon: {
     display: "inline-flex",
     alignItems: "center",
     justifyContent: "center",
-    width: "40px",
-    height: "40px",
+    width: "34px",
+    height: "34px",
     flexShrink: 0,
     borderRadius: "50%",
-    border: `0.5px solid ${HOME_ACCENT_SOFT_BORDER}`,
-    background: HOME_ACCENT_SOFT_BG,
+    border: "none",
+    background: "transparent",
     color: HOME_ACCENT_COLOR,
   },
   discoveryTextGroup: {
