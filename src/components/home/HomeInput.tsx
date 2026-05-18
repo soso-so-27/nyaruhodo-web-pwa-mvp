@@ -389,34 +389,22 @@ export function HomeInput({ recentEvents: _recentEvents }: HomeInputProps) {
                 ...(isYousuLocked ? styles.lockedState : {}),
               }}
             >
-              <span
-                style={{
-                  ...styles.primaryIconBadge,
-                  ...(isYousuLocked ? styles.lockedIcon : {}),
-                }}
-                aria-hidden="true"
-              >
-                <PawIcon />
-              </span>
-              {yousuRemaining ? (
-                <span style={styles.remainingTime}>{yousuRemaining}</span>
-              ) : null}
-              <span
-                style={{
-                  ...styles.primaryCardText,
-                  ...(isYousuLocked ? styles.lockedText : {}),
-                }}
-              >
-                {catName}のようす
-              </span>
-              <span
-                style={{
-                  ...styles.primaryCardHint,
-                  ...(isYousuLocked ? styles.lockedHint : {}),
-                }}
-              >
-                ねてる・遊んでる
-              </span>
+              {isYousuLocked ? (
+                <span style={styles.lockedCardContent}>
+                  <span style={{ ...styles.primaryIconBadge, ...styles.lockedIcon }} aria-hidden="true">
+                    <PawIcon />
+                  </span>
+                  <span style={styles.remainingTime}>{yousuRemaining}</span>
+                </span>
+              ) : (
+                <>
+                  <span style={styles.primaryIconBadge} aria-hidden="true">
+                    <PawIcon />
+                  </span>
+                  <span style={styles.primaryCardText}>{catName}のようす</span>
+                  <span style={styles.primaryCardHint}>ねてる・遊んでる</span>
+                </>
+              )}
             </button>
             <button
               type="button"
@@ -428,34 +416,22 @@ export function HomeInput({ recentEvents: _recentEvents }: HomeInputProps) {
                 ...(isMugiLocked ? styles.lockedState : {}),
               }}
             >
-              <span
-                style={{
-                  ...styles.primaryIconBadge,
-                  ...(isMugiLocked ? styles.lockedIcon : {}),
-                }}
-                aria-hidden="true"
-              >
-                <HandIcon />
-              </span>
-              {mugiRemaining ? (
-                <span style={styles.remainingTime}>{mugiRemaining}</span>
-              ) : null}
-              <span
-                style={{
-                  ...styles.primaryCardText,
-                  ...(isMugiLocked ? styles.lockedText : {}),
-                }}
-              >
-                {catName}へ
-              </span>
-              <span
-                style={{
-                  ...styles.primaryCardHint,
-                  ...(isMugiLocked ? styles.lockedHint : {}),
-                }}
-              >
-                遊んだ・なでた
-              </span>
+              {isMugiLocked ? (
+                <span style={styles.lockedCardContent}>
+                  <span style={{ ...styles.primaryIconBadge, ...styles.lockedIcon }} aria-hidden="true">
+                    <HandIcon />
+                  </span>
+                  <span style={styles.remainingTime}>{mugiRemaining}</span>
+                </span>
+              ) : (
+                <>
+                  <span style={styles.primaryIconBadge} aria-hidden="true">
+                    <HandIcon />
+                  </span>
+                  <span style={styles.primaryCardText}>{catName}へ</span>
+                  <span style={styles.primaryCardHint}>遊んだ・なでた</span>
+                </>
+              )}
             </button>
           </div>
 
@@ -1366,7 +1342,7 @@ const styles = {
   },
   remainingTime: {
     color: "#2A2A28",
-    fontSize: "12px",
+    fontSize: "13px",
     fontWeight: 750,
     textShadow: "0 1px 0 rgba(255,255,255,0.22)",
   },
@@ -1374,14 +1350,16 @@ const styles = {
     pointerEvents: "none",
     background: "rgba(255,255,255,0.78)",
   },
+  lockedCardContent: {
+    display: "flex",
+    flexDirection: "column",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: "8px",
+    minHeight: "64px",
+  },
   lockedIcon: {
     color: "#a8a69f",
-  },
-  lockedText: {
-    color: "#77746d",
-  },
-  lockedHint: {
-    color: "#aaa7a0",
   },
   yousuPanel: {
     border: "0.5px solid #E0DDD6",
