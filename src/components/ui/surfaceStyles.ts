@@ -1,32 +1,20 @@
 import type { CSSProperties } from "react";
 import type { LightTheme } from "./lightTheme";
 
-function withAlpha(rgba: string, alpha: number): string {
-  return rgba.replace(
-    /rgba\((\d+),(\d+),(\d+),[0-9.]+\)/,
-    `rgba($1,$2,$3,${alpha})`,
-  );
-}
-
 export function getGlassCardStyle(light: LightTheme): CSSProperties {
   return getLiquidGlassCardStyle(light);
 }
 
-export function getLiquidGlassCardStyle(light: LightTheme): CSSProperties {
+export function getLiquidGlassCardStyle(_light: LightTheme): CSSProperties {
   return {
-    background: [
-      "linear-gradient(160deg, rgba(255,255,255,0.22) 0%, rgba(255,255,255,0.07) 42%, rgba(255,255,255,0.02) 100%)",
-      "radial-gradient(circle at 18% 0%, rgba(255,255,255,0.34) 0%, rgba(255,255,255,0.08) 30%, rgba(255,255,255,0) 54%)",
-      withAlpha(light.cardBg, 0.18),
-    ].join(", "),
-    backdropFilter: "blur(18px) saturate(1.25) brightness(1.04)",
-    WebkitBackdropFilter: "blur(18px) saturate(1.25) brightness(1.04)",
-    border: `0.75px solid ${light.glassBorder}`,
+    background: "rgba(255, 255, 255, 0.92)",
+    backdropFilter: "blur(20px)",
+    WebkitBackdropFilter: "blur(20px)",
+    border: "1px solid rgba(200, 197, 190, 0.9)",
     boxShadow: [
-      "inset 0 1px 0 rgba(255,255,255,0.46)",
-      "inset 0 -1px 0 rgba(255,255,255,0.08)",
-      "0 10px 28px rgba(0,0,0,0.16)",
-      light.glassShadow,
+      "0 -1px 0 rgba(200,197,190,0.18)",
+      "0 8px 24px rgba(52, 50, 46, 0.12)",
+      "inset 0 1px 0 rgba(255,255,255,0.42)",
     ].join(", "),
     position: "relative",
     transition: "all 1s ease-in-out",
@@ -49,21 +37,16 @@ export function getReadableFrostedPaperCardStyle(light: LightTheme): CSSProperti
   };
 }
 
-export function getGlassPillStyle(light: LightTheme): CSSProperties {
+export function getGlassPillStyle(_light: LightTheme): CSSProperties {
   return {
-    background: [
-      "linear-gradient(160deg, rgba(255,255,255,0.28) 0%, rgba(255,255,255,0.08) 44%, rgba(255,255,255,0.02) 100%)",
-      "radial-gradient(circle at 18% 0%, rgba(255,255,255,0.42) 0%, rgba(255,255,255,0.10) 34%, rgba(255,255,255,0) 58%)",
-      withAlpha(light.cardBg, 0.16),
-    ].join(", "),
-    backdropFilter: "blur(16px) saturate(1.28) brightness(1.06)",
-    WebkitBackdropFilter: "blur(16px) saturate(1.28) brightness(1.06)",
-    border: `0.75px solid ${light.glassBorder}`,
+    background: "rgba(255, 255, 255, 0.90)",
+    backdropFilter: "blur(20px)",
+    WebkitBackdropFilter: "blur(20px)",
+    border: "1px solid rgba(200, 197, 190, 0.9)",
     boxShadow: [
-      "inset 0 1px 0 rgba(255,255,255,0.50)",
-      "inset 0 -1px 0 rgba(255,255,255,0.08)",
-      "0 8px 20px rgba(0,0,0,0.16)",
-      light.glassShadow,
+      "0 -1px 0 rgba(200,197,190,0.18)",
+      "0 8px 24px rgba(52, 50, 46, 0.12)",
+      "inset 0 1px 0 rgba(255,255,255,0.42)",
     ].join(", "),
     position: "relative",
     transition: "all 1s ease-in-out",

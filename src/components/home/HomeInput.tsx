@@ -77,7 +77,9 @@ const REACTION_OPTIONS = [
 
 const DISCOVERY_TEXT =
   "昨日の小さな記録から、少しだけリズムが見えてきました。";
-const HOME_ACCENT_COLOR = "#6F927B";
+const HOME_ACCENT_COLOR = "#566052";
+const HOME_ACCENT_SOFT_BG = "rgba(236,236,231,0.82)";
+const HOME_ACCENT_SOFT_BORDER = "rgba(200,197,190,0.9)";
 
 export function HomeInput({ recentEvents: _recentEvents }: HomeInputProps) {
   const [catProfiles, setCatProfiles] = useState<CatProfile[]>([]);
@@ -1305,8 +1307,8 @@ const styles = {
     alignItems: "center",
     justifyContent: "center",
     color: HOME_ACCENT_COLOR,
-    background: "rgba(111,146,123,0.12)",
-    border: "0.5px solid rgba(111,146,123,0.22)",
+    background: HOME_ACCENT_SOFT_BG,
+    border: `0.5px solid ${HOME_ACCENT_SOFT_BORDER}`,
     boxShadow: "inset 0 0.5px 0 rgba(255,255,255,0.35)",
   },
   primaryCardText: {
@@ -1411,8 +1413,8 @@ const styles = {
     height: "40px",
     flexShrink: 0,
     borderRadius: "50%",
-    border: "0.5px solid rgba(111,146,123,0.30)",
-    background: "rgba(111,146,123,0.18)",
+    border: `0.5px solid ${HOME_ACCENT_SOFT_BORDER}`,
+    background: HOME_ACCENT_SOFT_BG,
     color: HOME_ACCENT_COLOR,
   },
   discoveryTextGroup: {
@@ -1544,7 +1546,7 @@ const styles = {
   },
   catListItemActive: {
     borderColor: HOME_ACCENT_COLOR,
-    background: "rgba(111,146,123,0.08)",
+    background: HOME_ACCENT_SOFT_BG,
   },
   catListName: {
     fontSize: "14px",
