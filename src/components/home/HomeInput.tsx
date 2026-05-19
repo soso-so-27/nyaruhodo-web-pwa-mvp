@@ -27,6 +27,7 @@ import {
   readActiveCatId,
   readCatProfiles,
   saveActiveCatId,
+  saveCatProfiles,
 } from "./homeInputHelpers";
 import type { CatProfile } from "./homeInputHelpers";
 
@@ -97,6 +98,7 @@ export function HomeInput({ recentEvents: _recentEvents }: HomeInputProps) {
   const [lockData, setLockData] = useState<LockData>({});
   const [tick, setTick] = useState(Date.now());
   const [isYousuOpen, setIsYousuOpen] = useState(false);
+  const [isMikkeSheetOpen, setIsMikkeSheetOpen] = useState(false);
   const [isMugiSheetOpen, setIsMugiSheetOpen] = useState(false);
   const [isReactionSheetOpen, setIsReactionSheetOpen] = useState(false);
   const [isCatSheetOpen, setIsCatSheetOpen] = useState(false);
@@ -262,6 +264,45 @@ export function HomeInput({ recentEvents: _recentEvents }: HomeInputProps) {
     window.setTimeout(() => setIsReactionSheetOpen(false), 500);
   }
 
+  async function handleHomePhotoSelect() {
+    if (!activeCatId) return;
+
+    const input = document.createElement("input");
+    input.type = "file";
+    input.accept = "image/*";
+
+    input.onchange = async () => {
+      const file = input.files?.[0];
+      if (!file) return;
+
+      try {
+        const dataUrl = await resizeAndEncode(file, 1600);
+        const profiles = readCatProfiles();
+        const nextProfiles = profiles.map((profile) =>
+          profile.id === activeCatId
+            ? {
+                ...profile,
+                homePhotoDataUrl: dataUrl,
+                homePhotoPosition: profile.homePhotoPosition ?? "center 38%",
+                updatedAt: new Date().toISOString(),
+              }
+            : profile,
+        );
+        const nextActive = getActiveCatProfile(nextProfiles, activeCatId);
+
+        saveCatProfiles(nextProfiles);
+        setCatProfiles(nextProfiles);
+        setActiveCat(nextActive);
+        triggerRecordGlow();
+        showToast("写真を残したよ");
+      } catch {
+        showToast("写真を保存できませんでした");
+      }
+    };
+
+    input.click();
+  }
+
   function handleDiscoveryClick() {
     if (!activeCatId || !discovery.available) return;
 
@@ -386,6 +427,28 @@ export function HomeInput({ recentEvents: _recentEvents }: HomeInputProps) {
       </section>
 
         <section style={styles.controlArea}>
+          <button
+            type="button"
+            onClick={() => setIsMikkeSheetOpen(true)}
+            style={{
+              ...styles.mikkeButton,
+              ...dynamicCardStyle,
+            }}
+          >
+            <span style={styles.mikkeIconRow} aria-hidden="true">
+              <span style={styles.primaryIconBadge}>
+                <PawIcon />
+              </span>
+              <span style={styles.primaryIconBadge}>
+                <HandIcon />
+              </span>
+              <span style={styles.primaryIconBadge}>
+                <CameraIcon />
+              </span>
+            </span>
+            <span style={styles.mikkeButtonText}>{catName}みっけ</span>
+            <span style={styles.mikkeButtonHint}>見かけたら、ひとつだけ残す</span>
+          </button>
           <div style={styles.primaryCards}>
             <button
               type="button"
@@ -506,6 +569,29 @@ export function HomeInput({ recentEvents: _recentEvents }: HomeInputProps) {
         </div>
       ) : null}
 
+      {isMikkeSheetOpen ? (
+        <MikkeSheet
+          catName={catName}
+          yousuRemaining={yousuRemaining}
+          mugiRemaining={mugiRemaining}
+          onClose={() => setIsMikkeSheetOpen(false)}
+          onOpenYousu={() => {
+            if (isYousuLocked) return;
+            setIsMikkeSheetOpen(false);
+            setIsYousuOpen(true);
+          }}
+          onOpenMugi={() => {
+            if (isMugiLocked) return;
+            setIsMikkeSheetOpen(false);
+            setIsMugiSheetOpen(true);
+          }}
+          onOpenPhoto={() => {
+            setIsMikkeSheetOpen(false);
+            void handleHomePhotoSelect();
+          }}
+        />
+      ) : null}
+
       {isYousuOpen ? (
         <YousuSheet
           title={`${catName}のようす`}
@@ -566,6 +652,86 @@ export function HomeInput({ recentEvents: _recentEvents }: HomeInputProps) {
         }
       `}</style>
     </main>
+  );
+}
+
+function MikkeSheet({
+  catName,
+  yousuRemaining,
+  mugiRemaining,
+  onClose,
+  onOpenYousu,
+  onOpenMugi,
+  onOpenPhoto,
+}: {
+  catName: string;
+  yousuRemaining: string | null;
+  mugiRemaining: string | null;
+  onClose: () => void;
+  onOpenYousu: () => void;
+  onOpenMugi: () => void;
+  onOpenPhoto: () => void;
+}) {
+  const choices = [
+    {
+      key: "yousu",
+      label: "ようす",
+      sub: yousuRemaining ? yousuRemaining : "なにしてる？",
+      icon: <PawIcon />,
+      disabled: Boolean(yousuRemaining),
+      onClick: onOpenYousu,
+    },
+    {
+      key: "mugi",
+      label: "してあげた",
+      sub: mugiRemaining ? mugiRemaining : "なにした？",
+      icon: <HandIcon />,
+      disabled: Boolean(mugiRemaining),
+      onClick: onOpenMugi,
+    },
+    {
+      key: "photo",
+      label: "写真",
+      sub: "いまを残す",
+      icon: <CameraIcon />,
+      disabled: false,
+      onClick: onOpenPhoto,
+    },
+  ];
+
+  return (
+    <>
+      <div style={styles.sheetBackdrop} onClick={onClose} />
+      <div style={styles.sheet}>
+        <div style={styles.sheetHeader}>
+          <p style={styles.sheetTitle}>{catName}みっけ</p>
+          <button type="button" onClick={onClose} style={styles.sheetCloseButton}>
+            <CloseIcon />
+          </button>
+        </div>
+        <p style={styles.mikkeSheetLead}>見かけた今、ひとつだけ残します。</p>
+        <div style={styles.mikkeChoiceGrid}>
+          {choices.map((choice) => (
+            <button
+              key={choice.key}
+              type="button"
+              disabled={choice.disabled}
+              onClick={choice.onClick}
+              style={{
+                ...styles.mikkeChoice,
+                ...(choice.disabled ? styles.mikkeChoiceDisabled : {}),
+              }}
+            >
+              <span style={styles.mikkeChoiceIcon} aria-hidden="true">
+                {choice.icon}
+              </span>
+              <span style={styles.mikkeChoiceLabel}>{choice.label}</span>
+              <span style={styles.mikkeChoiceSub}>{choice.sub}</span>
+            </button>
+          ))}
+        </div>
+      </div>
+    </>
   );
 }
 
@@ -875,6 +1041,38 @@ function toCssUrl(src: string) {
   return `url("${src.replace(/\\/g, "\\\\").replace(/"/g, '\\"')}")`;
 }
 
+function resizeAndEncode(file: File, maxSize = 1200): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    const url = URL.createObjectURL(file);
+
+    img.onload = () => {
+      const scale = Math.min(1, maxSize / Math.max(img.width, img.height));
+      const canvas = document.createElement("canvas");
+      canvas.width = Math.round(img.width * scale);
+      canvas.height = Math.round(img.height * scale);
+      const ctx = canvas.getContext("2d");
+
+      if (!ctx) {
+        URL.revokeObjectURL(url);
+        reject(new Error("Canvas is not available"));
+        return;
+      }
+
+      ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+      URL.revokeObjectURL(url);
+      resolve(canvas.toDataURL("image/jpeg", 0.86));
+    };
+
+    img.onerror = () => {
+      URL.revokeObjectURL(url);
+      reject(new Error("Image load failed"));
+    };
+
+    img.src = url;
+  });
+}
+
 function setLock(catId: string, type: LockType): LockData {
   const lockData = readLockData(catId);
   const field = type === "yousu" ? "yousuLockedUntil" : "mugiLockedUntil";
@@ -1082,6 +1280,24 @@ function HeartIcon() {
       aria-hidden="true"
     >
       <path d="M12 20s-7-4.2-7-9.6A3.9 3.9 0 0 1 12 8a3.9 3.9 0 0 1 7 2.4C19 15.8 12 20 12 20Z" />
+    </svg>
+  );
+}
+
+function CameraIcon() {
+  return (
+    <svg
+      viewBox="0 0 32 32"
+      width="32"
+      height="32"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
+      <path d="M10.2 10.5 12 7.8h8l1.8 2.7h3.1a3.1 3.1 0 0 1 3.1 3.1v9.2a3.1 3.1 0 0 1-3.1 3.1H7.1A3.1 3.1 0 0 1 4 22.8v-9.2a3.1 3.1 0 0 1 3.1-3.1h3.1Z" />
+      <circle cx="16" cy="18" r="5" />
     </svg>
   );
 }
@@ -1304,9 +1520,44 @@ const styles = {
     boxSizing: "border-box",
   },
   primaryCards: {
-    display: "grid",
+    display: "none",
     gridTemplateColumns: "1fr 1fr",
     gap: "12px",
+  },
+  mikkeButton: {
+    minHeight: "124px",
+    border: "0.5px solid #E0DDD6",
+    borderRadius: "20px",
+    background: "rgba(247, 245, 239, 0.85)",
+    color: HOME_ACCENT_COLOR,
+    padding: "16px 14px 15px",
+    display: "flex",
+    flexDirection: "column",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: "7px",
+    cursor: "pointer",
+    transition: "transform 0.1s",
+  },
+  mikkeIconRow: {
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: "4px",
+  },
+  mikkeButtonText: {
+    color: "#2A2A28",
+    fontSize: "20px",
+    fontWeight: 760,
+    lineHeight: 1.25,
+    textShadow: "0 1px 0 rgba(255,255,255,0.28)",
+  },
+  mikkeButtonHint: {
+    color: "#74716a",
+    fontSize: "13px",
+    fontWeight: 650,
+    lineHeight: 1.35,
+    textShadow: "0 1px 0 rgba(255,255,255,0.22)",
   },
   primaryCard: {
     minHeight: "102px",
@@ -1538,6 +1789,57 @@ const styles = {
     gridTemplateColumns: "repeat(4, 1fr)",
     gap: "8px",
     marginTop: "16px",
+  },
+  mikkeSheetLead: {
+    margin: "8px 0 0",
+    color: "#74716a",
+    fontSize: "13px",
+    fontWeight: 600,
+    lineHeight: 1.55,
+  },
+  mikkeChoiceGrid: {
+    display: "grid",
+    gridTemplateColumns: "repeat(3, 1fr)",
+    gap: "10px",
+    marginTop: "16px",
+  },
+  mikkeChoice: {
+    ...APP_SUBTLE_SURFACE,
+    minHeight: "118px",
+    borderRadius: "16px",
+    color: "#2A2A28",
+    padding: "14px 8px",
+    display: "flex",
+    flexDirection: "column",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: "7px",
+    textAlign: "center",
+    cursor: "pointer",
+  },
+  mikkeChoiceDisabled: {
+    opacity: 0.48,
+    cursor: "not-allowed",
+  },
+  mikkeChoiceIcon: {
+    width: "34px",
+    height: "34px",
+    color: HOME_ACCENT_COLOR,
+    display: "inline-flex",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  mikkeChoiceLabel: {
+    color: "#2A2A28",
+    fontSize: "14px",
+    fontWeight: 720,
+    lineHeight: 1.25,
+  },
+  mikkeChoiceSub: {
+    color: "#74716a",
+    fontSize: "11px",
+    fontWeight: 650,
+    lineHeight: 1.25,
   },
   sheetOption: {
     ...APP_SUBTLE_SURFACE,
