@@ -431,80 +431,17 @@ export function HomeInput({ recentEvents: _recentEvents }: HomeInputProps) {
             type="button"
             onClick={() => setIsMikkeSheetOpen(true)}
             style={{
-              ...styles.mikkeButton,
               ...dynamicCardStyle,
+              ...styles.mikkeButton,
             }}
           >
             <span style={styles.mikkeIconRow} aria-hidden="true">
               <span style={styles.primaryIconBadge}>
                 <PawIcon />
               </span>
-              <span style={styles.primaryIconBadge}>
-                <HandIcon />
-              </span>
-              <span style={styles.primaryIconBadge}>
-                <CameraIcon />
-              </span>
             </span>
-            <span style={styles.mikkeButtonText}>{catName}みっけ</span>
-            <span style={styles.mikkeButtonHint}>見かけたら、ひとつだけ残す</span>
+            <span style={styles.mikkeButtonText}>みっけ</span>
           </button>
-          <div style={styles.primaryCards}>
-            <button
-              type="button"
-              onClick={() => setIsYousuOpen(true)}
-              disabled={isYousuLocked}
-              style={{
-                ...styles.primaryCard,
-                ...dynamicCardStyle,
-                ...(isYousuLocked ? styles.lockedState : {}),
-              }}
-            >
-              {isYousuLocked ? (
-                <span style={styles.lockedCardContent}>
-                  <span style={{ ...styles.primaryIconBadge, ...styles.lockedIcon }} aria-hidden="true">
-                    <PawIcon />
-                  </span>
-                  <span style={styles.remainingTime}>{yousuRemaining}</span>
-                </span>
-              ) : (
-                <>
-                  <span style={styles.primaryIconBadge} aria-hidden="true">
-                    <PawIcon />
-                  </span>
-                  <span style={styles.primaryCardText}>{catName}のようす</span>
-                  <span style={styles.primaryCardHint}>ねてる・遊んでる</span>
-                </>
-              )}
-            </button>
-            <button
-              type="button"
-              onClick={() => setIsMugiSheetOpen(true)}
-              disabled={isMugiLocked}
-              style={{
-                ...styles.primaryCard,
-                ...dynamicCardStyle,
-                ...(isMugiLocked ? styles.lockedState : {}),
-              }}
-            >
-              {isMugiLocked ? (
-                <span style={styles.lockedCardContent}>
-                  <span style={{ ...styles.primaryIconBadge, ...styles.lockedIcon }} aria-hidden="true">
-                    <HandIcon />
-                  </span>
-                  <span style={styles.remainingTime}>{mugiRemaining}</span>
-                </span>
-              ) : (
-                <>
-                  <span style={styles.primaryIconBadge} aria-hidden="true">
-                    <HandIcon />
-                  </span>
-                  <span style={styles.primaryCardText}>{catName}へ</span>
-                  <span style={styles.primaryCardHint}>遊んだ・なでた</span>
-                </>
-              )}
-            </button>
-          </div>
 
         <button
           type="button"
@@ -709,7 +646,6 @@ function MikkeSheet({
             <CloseIcon />
           </button>
         </div>
-        <p style={styles.mikkeSheetLead}>見かけた今、ひとつだけ残します。</p>
         <div style={styles.mikkeChoiceGrid}>
           {choices.map((choice) => (
             <button
@@ -1514,65 +1450,52 @@ const styles = {
     flex: "0 0 auto",
     display: "flex",
     flexDirection: "column",
-    gap: "10px",
+    gap: "12px",
     background: "transparent",
     padding: "0 16px 16px",
     boxSizing: "border-box",
   },
-  primaryCards: {
-    display: "none",
-    gridTemplateColumns: "1fr 1fr",
-    gap: "12px",
-  },
   mikkeButton: {
-    minHeight: "124px",
-    border: "0.5px solid #E0DDD6",
-    borderRadius: "20px",
-    background: "rgba(247, 245, 239, 0.85)",
+    width: "min(100%, 280px)",
+    minHeight: "76px",
+    alignSelf: "center",
+    border: "1px solid rgba(255,255,255,0.78)",
+    borderRadius: "999px",
+    background:
+      "linear-gradient(180deg, rgba(255,255,255,0.98) 0%, rgba(238,237,231,0.92) 100%)",
     color: HOME_ACCENT_COLOR,
-    padding: "16px 14px 15px",
+    padding: "10px 20px",
     display: "flex",
-    flexDirection: "column",
+    flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
-    gap: "7px",
+    gap: "12px",
     cursor: "pointer",
-    transition: "transform 0.1s",
+    boxShadow:
+      "0 12px 28px rgba(20,18,15,0.18), inset 0 1px 0 rgba(255,255,255,0.92), inset 0 -1px 0 rgba(180,176,166,0.18)",
+    transform: "translateY(0)",
+    transition: "transform 0.12s ease, box-shadow 0.12s ease, background 0.2s ease",
   },
   mikkeIconRow: {
     display: "flex",
     alignItems: "center",
     justifyContent: "center",
-    gap: "4px",
+    gap: "0",
+    width: "42px",
+    height: "42px",
+    borderRadius: "50%",
+    background: "rgba(86,96,82,0.09)",
+    border: "0.5px solid rgba(86,96,82,0.12)",
+    color: HOME_ACCENT_COLOR,
+    flexShrink: 0,
   },
   mikkeButtonText: {
     color: "#2A2A28",
-    fontSize: "20px",
-    fontWeight: 760,
+    fontSize: "25px",
+    fontWeight: 800,
     lineHeight: 1.25,
-    textShadow: "0 1px 0 rgba(255,255,255,0.28)",
-  },
-  mikkeButtonHint: {
-    color: "#74716a",
-    fontSize: "13px",
-    fontWeight: 650,
-    lineHeight: 1.35,
-    textShadow: "0 1px 0 rgba(255,255,255,0.22)",
-  },
-  primaryCard: {
-    minHeight: "102px",
-    border: "0.5px solid #E0DDD6",
-    borderRadius: "16px",
-    background: "rgba(247, 245, 239, 0.85)",
-    color: HOME_ACCENT_COLOR,
-    padding: "12px 12px 11px",
-    display: "flex",
-    flexDirection: "column",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: "5px",
-    cursor: "pointer",
-    transition: "transform 0.1s",
+    letterSpacing: 0,
+    textShadow: "0 1px 0 rgba(255,255,255,0.55)",
   },
   primaryIconBadge: {
     width: "40px",
@@ -1586,39 +1509,9 @@ const styles = {
     border: "none",
     boxShadow: "none",
   },
-  primaryCardText: {
-    color: "#2A2A28",
-    fontSize: "16px",
-    fontWeight: 700,
-    textShadow: "0 1px 0 rgba(255,255,255,0.28)",
-  },
-  primaryCardHint: {
-    color: "#74716a",
-    fontSize: "12px",
-    fontWeight: 600,
-    lineHeight: 1.35,
-    textShadow: "0 1px 0 rgba(255,255,255,0.22)",
-  },
-  remainingTime: {
-    color: "#2A2A28",
-    fontSize: "14px",
-    fontWeight: 750,
-    textShadow: "0 1px 0 rgba(255,255,255,0.22)",
-  },
   lockedState: {
     pointerEvents: "none",
     background: "rgba(255,255,255,0.78)",
-  },
-  lockedCardContent: {
-    display: "flex",
-    flexDirection: "column",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: "8px",
-    minHeight: "64px",
-  },
-  lockedIcon: {
-    color: "#a8a69f",
   },
   yousuPanel: {
     border: "0.5px solid #E0DDD6",
@@ -1789,13 +1682,6 @@ const styles = {
     gridTemplateColumns: "repeat(4, 1fr)",
     gap: "8px",
     marginTop: "16px",
-  },
-  mikkeSheetLead: {
-    margin: "8px 0 0",
-    color: "#74716a",
-    fontSize: "13px",
-    fontWeight: 600,
-    lineHeight: 1.55,
   },
   mikkeChoiceGrid: {
     display: "grid",
