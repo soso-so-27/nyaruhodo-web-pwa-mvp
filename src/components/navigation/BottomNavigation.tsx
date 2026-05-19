@@ -83,8 +83,10 @@ export function BottomNavigation({ active, onMikkeClick }: BottomNavigationProps
                 style={styles.mikkeAction}
                 aria-label="みっけ"
               >
-                <span style={styles.mikkeActionIcon} aria-hidden="true">
-                  <MikkeIcon />
+                <span style={styles.mikkeActionCircle} aria-hidden="true">
+                  <span style={styles.mikkeActionIcon}>
+                    <MikkeIcon />
+                  </span>
                 </span>
                 <span style={styles.mikkeActionLabel}>みっけ</span>
               </button>
@@ -96,8 +98,10 @@ export function BottomNavigation({ active, onMikkeClick }: BottomNavigationProps
                 style={styles.mikkeAction}
                 aria-label="みっけ"
               >
-                <span style={styles.mikkeActionIcon} aria-hidden="true">
-                  <MikkeIcon />
+                <span style={styles.mikkeActionCircle} aria-hidden="true">
+                  <span style={styles.mikkeActionIcon}>
+                    <MikkeIcon />
+                  </span>
                 </span>
                 <span style={styles.mikkeActionLabel}>みっけ</span>
               </Link>
@@ -233,13 +237,6 @@ function MikkeIcon() {
         d="M7.3 11.2c.82 0 1.42-.78 1.42-1.74S8.12 7.72 7.3 7.72 5.88 8.5 5.88 9.46s.6 1.74 1.42 1.74ZM10.2 9.85c.86 0 1.48-.86 1.48-1.92S11.06 6 10.2 6 8.72 6.86 8.72 7.93s.62 1.92 1.48 1.92ZM14 9.85c.86 0 1.48-.86 1.48-1.92S14.86 6 14 6s-1.48.86-1.48 1.93.62 1.92 1.48 1.92ZM16.9 11.2c.82 0 1.42-.78 1.42-1.74s-.6-1.74-1.42-1.74-1.42.78-1.42 1.74.6 1.74 1.42 1.74Z"
         fill="currentColor"
       />
-      <path
-        d="M18.7 4.2v2.1M17.65 5.25h2.1"
-        fill="none"
-        stroke="currentColor"
-        strokeLinecap="round"
-        strokeWidth="1.65"
-      />
     </svg>
   );
 }
@@ -265,39 +262,50 @@ const styles = {
   },
   mikkeAction: {
     position: "relative",
-    top: "-22px",
+    top: "-18px",
     display: "flex",
     flexDirection: "column",
     alignItems: "center",
     justifyContent: "center",
-    gap: "2px",
-    minHeight: "64px",
-    borderRadius: "22px",
-    border: "1px solid rgba(200, 197, 190, 0.96)",
-    background:
-      "linear-gradient(180deg, rgba(255,255,255,0.98) 0%, rgba(238,237,231,0.96) 100%)",
+    gap: "3px",
+    minHeight: "74px",
+    border: "none",
+    background: "transparent",
     color: "#2A2A28",
     textDecoration: "none",
     fontSize: "11px",
     fontWeight: 800,
     letterSpacing: 0,
     cursor: "pointer",
+    padding: 0,
+  },
+  mikkeActionCircle: {
+    display: "inline-flex",
+    alignItems: "center",
+    justifyContent: "center",
+    width: "58px",
+    height: "58px",
+    borderRadius: "50%",
+    border: "1px solid rgba(200, 197, 190, 0.96)",
+    background:
+      "linear-gradient(180deg, rgba(255,255,255,0.99) 0%, rgba(238,237,231,0.96) 100%)",
     boxShadow:
-      "0 10px 26px rgba(52,50,46,0.18), inset 0 1px 0 rgba(255,255,255,0.88)",
+      "0 10px 24px rgba(52,50,46,0.18), inset 0 1px 0 rgba(255,255,255,0.9)",
   },
   mikkeActionIcon: {
     display: "inline-flex",
     alignItems: "center",
     justifyContent: "center",
-    width: "28px",
-    height: "26px",
+    width: "32px",
+    height: "32px",
     color: "#566052",
   },
   mikkeActionLabel: {
     color: "#2A2A28",
     fontSize: "11px",
     fontWeight: 800,
-    lineHeight: 1.1,
+    lineHeight: 1,
+    textShadow: "0 1px 0 rgba(255,255,255,0.78)",
   },
   navButton: {
     display: "flex",
@@ -357,8 +365,8 @@ const styles = {
     display: "block",
   },
   mikkeSvgIcon: {
-    width: "25px",
-    height: "25px",
+    width: "28px",
+    height: "28px",
     display: "block",
   },
 } satisfies Record<string, CSSProperties>;
