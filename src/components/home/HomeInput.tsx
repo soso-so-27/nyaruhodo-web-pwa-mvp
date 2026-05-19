@@ -1259,8 +1259,8 @@ const styles = {
     background: "rgba(255,255,255,0.85)",
     color: "#2A2A28",
     padding: "7px 12px",
-    fontSize: "13px",
-    fontWeight: 600,
+    fontSize: "14px",
+    fontWeight: 700,
     cursor: "pointer",
     backdropFilter: "blur(12px)",
   },
@@ -1289,10 +1289,10 @@ const styles = {
   lightText: {
     margin: 0,
     color: "rgba(255,255,255,0.95)",
-    fontSize: "13px",
-    fontWeight: 600,
+    fontSize: "14px",
+    fontWeight: 700,
     lineHeight: 1.6,
-    textShadow: "0 1px 3px rgba(0,0,0,0.3)",
+    textShadow: "0 1px 4px rgba(0,0,0,0.36)",
   },
   controlArea: {
     flex: "0 0 auto",
@@ -1337,20 +1337,20 @@ const styles = {
   },
   primaryCardText: {
     color: "#2A2A28",
-    fontSize: "15px",
+    fontSize: "16px",
     fontWeight: 700,
     textShadow: "0 1px 0 rgba(255,255,255,0.28)",
   },
   primaryCardHint: {
     color: "#74716a",
-    fontSize: "11px",
+    fontSize: "12px",
     fontWeight: 600,
-    lineHeight: 1.2,
+    lineHeight: 1.35,
     textShadow: "0 1px 0 rgba(255,255,255,0.22)",
   },
   remainingTime: {
     color: "#2A2A28",
-    fontSize: "13px",
+    fontSize: "14px",
     fontWeight: 750,
     textShadow: "0 1px 0 rgba(255,255,255,0.22)",
   },
@@ -1466,7 +1466,7 @@ const styles = {
   },
   discoveryText: {
     color: "#2A2A28",
-    fontSize: "13px",
+    fontSize: "14px",
     fontWeight: 600,
     lineHeight: 1.45,
     textShadow: "0 1px 0 rgba(255,255,255,0.22)",
@@ -1479,7 +1479,7 @@ const styles = {
   },
   discoveryEmptyText: {
     color: "#56534d",
-    fontSize: "13px",
+    fontSize: "14px",
     fontWeight: 700,
     lineHeight: 1.5,
     textShadow: "0 1px 0 rgba(255,255,255,0.22)",
@@ -1510,8 +1510,8 @@ const styles = {
   sheetTitle: {
     margin: 0,
     color: "#2A2A28",
-    fontSize: "16px",
-    fontWeight: 600,
+    fontSize: "17px",
+    fontWeight: 700,
     lineHeight: 1.5,
   },
   sheetCloseButton: {
@@ -1544,7 +1544,7 @@ const styles = {
     borderRadius: "14px",
     color: "#2A2A28",
     padding: "20px 12px",
-    fontSize: "14px",
+    fontSize: "15px",
     fontWeight: 600,
     textAlign: "center",
     cursor: "pointer",
@@ -1574,7 +1574,7 @@ const styles = {
     background: HOME_ACCENT_SOFT_BG,
   },
   catListName: {
-    fontSize: "14px",
+    fontSize: "15px",
     fontWeight: 700,
   },
   catListMark: {

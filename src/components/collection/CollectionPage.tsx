@@ -244,7 +244,7 @@ export function CollectionPage() {
       <div style={styles.container}>
         <header style={styles.header}>
           <div style={styles.pageHeader}>
-            <h1 style={styles.pageTitle}>コレクション</h1>
+            <h1 style={styles.pageTitle}>見つけたしぐさ</h1>
             <div style={styles.pageHeaderActions}>
               <button
                 type="button"
@@ -1033,7 +1033,7 @@ const styles = {
       "calc(18px + env(safe-area-inset-top)) 16px calc(144px + env(safe-area-inset-bottom))",
   },
   header: {
-    marginBottom: "14px",
+    marginBottom: "12px",
     padding: "2px 0 0",
   },
   pageHeader: {
@@ -1041,7 +1041,7 @@ const styles = {
     alignItems: "center",
     justifyContent: "space-between",
     gap: "12px",
-    marginBottom: "14px",
+    marginBottom: "10px",
   },
   pageHeaderActions: {
     display: "flex",
@@ -1051,16 +1051,16 @@ const styles = {
   },
   pageTitle: {
     margin: 0,
-    color: "#252622",
-    fontSize: "24px",
-    lineHeight: 1.25,
+    color: "#62645d",
+    fontSize: "16px",
+    lineHeight: 1.45,
     fontWeight: 650,
     letterSpacing: 0,
   },
   catNameBtn: {
     ...APP_PILL,
-    fontSize: "13px",
-    fontWeight: 500,
+    fontSize: "12px",
+    fontWeight: 650,
     color: "#6a6a62",
     borderRadius: "99px",
     padding: "4px 12px",
@@ -1181,20 +1181,20 @@ const styles = {
     color: "#2c2d29",
   },
   progressNumber: {
-    fontSize: "30px",
+    fontSize: "32px",
     fontWeight: 700,
     lineHeight: 1,
   },
   progressUnit: {
     color: "#676963",
-    fontSize: "14px",
+    fontSize: "15px",
     fontWeight: 590,
   },
   progressSub: {
     margin: "-4px 0 0",
     color: "#73746d",
-    fontSize: "12px",
-    fontWeight: 590,
+    fontSize: "13px",
+    fontWeight: 600,
     lineHeight: 1.4,
   },
   progressTrack: {
@@ -1222,14 +1222,14 @@ const styles = {
   tab: {
     flex: "0 0 auto",
     minWidth: "92px",
-    minHeight: "38px",
+    minHeight: "40px",
     border: "1px solid rgba(220, 217, 209, 0.82)",
     borderRadius: "999px",
     background: "rgba(255, 255, 255, 0.78)",
     color: "#696b64",
     font: "inherit",
-    fontSize: "13px",
-    fontWeight: 620,
+    fontSize: "14px",
+    fontWeight: 650,
     lineHeight: 1,
     cursor: "pointer",
   },
@@ -1313,7 +1313,7 @@ const styles = {
     borderRadius: "99px",
     background: "rgba(0,0,0,0.45)",
     color: "#fff",
-    fontSize: "10px",
+    fontSize: "11px",
     fontWeight: 650,
     lineHeight: 1,
     padding: "2px 7px",
@@ -1358,8 +1358,8 @@ const styles = {
   emptySlotLabel: {
     margin: 0,
     color: "#9a9890",
-    fontSize: "11px",
-    fontWeight: 610,
+    fontSize: "12px",
+    fontWeight: 650,
     lineHeight: 1.3,
     textAlign: "center",
   },
@@ -1416,12 +1416,12 @@ const styles = {
   },
   sheetTitle: {
     color: "#2a2a28",
-    fontSize: "16px",
+    fontSize: "17px",
     fontWeight: 700,
   },
   sheetCount: {
     color: "#8a8a80",
-    fontSize: "12px",
+    fontSize: "13px",
   },
   sheetPhotoArea: {
     margin: "12px 16px",
@@ -1487,7 +1487,7 @@ const styles = {
   },
   photoEmptyText: {
     color: "#b0ada6",
-    fontSize: "13px",
+    fontSize: "14px",
   },
   sheetActions: {
     display: "grid",

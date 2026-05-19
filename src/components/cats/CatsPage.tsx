@@ -323,8 +323,7 @@ export function CatsPage() {
       <div style={styles.container}>
         <div style={styles.pageHeader}>
           <div>
-            <h1 style={styles.pageTitle}>ねこ</h1>
-            <p style={styles.pageSub}>一緒に暮らしている子</p>
+            <h1 style={styles.pageTitle}>一緒に暮らしている子</h1>
           </div>
         </div>
 
@@ -888,17 +887,18 @@ const styles = {
     alignItems: "flex-start",
     justifyContent: "space-between",
     gap: "12px",
-    marginBottom: "20px",
-    paddingTop: "8px",
+    marginBottom: "14px",
+    paddingTop: "2px",
   },
   pageTitle: {
-    fontSize: "26px",
-    fontWeight: 700,
-    color: "#2a2a28",
-    margin: "0 0 4px",
+    fontSize: "16px",
+    fontWeight: 650,
+    color: "#62645d",
+    lineHeight: 1.45,
+    margin: 0,
   },
   pageSub: {
-    fontSize: "13px",
+    fontSize: "12px",
     color: "#8a8a80",
     margin: 0,
   },
@@ -965,9 +965,9 @@ const styles = {
     color: "#b0ada6",
   },
   catGridName: {
-    fontSize: "12px",
+    fontSize: "13px",
     color: "#4a4a42",
-    fontWeight: 500,
+    fontWeight: 600,
   },
   profileCard: {
     ...APP_SURFACE,
@@ -982,7 +982,7 @@ const styles = {
     marginBottom: "14px",
   },
   profileName: {
-    fontSize: "22px",
+    fontSize: "21px",
     fontWeight: 600,
     color: "#2a2a28",
     display: "flex",
@@ -1099,7 +1099,7 @@ const styles = {
     color: "#8a8a80",
   },
   infoValue: {
-    fontSize: "13px",
+    fontSize: "14px",
     color: "#2a2a28",
     fontWeight: 500,
   },
