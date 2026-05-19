@@ -136,6 +136,17 @@ export function HomeInput({ recentEvents: _recentEvents }: HomeInputProps) {
     return () => window.clearInterval(intervalId);
   }, []);
 
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    if (params.get("mikke") !== "1") return;
+
+    setIsMikkeSheetOpen(true);
+    params.delete("mikke");
+    const nextSearch = params.toString();
+    const nextUrl = `${window.location.pathname}${nextSearch ? `?${nextSearch}` : ""}`;
+    window.history.replaceState(null, "", nextUrl);
+  }, []);
+
   const catName = activeCat ? getCatName(activeCat) : "ねこ";
   const photoSrc =
     activeCat?.homePhotoDataUrl ??
@@ -427,22 +438,6 @@ export function HomeInput({ recentEvents: _recentEvents }: HomeInputProps) {
       </section>
 
         <section style={styles.controlArea}>
-          <button
-            type="button"
-            onClick={() => setIsMikkeSheetOpen(true)}
-            style={{
-              ...dynamicCardStyle,
-              ...styles.mikkeButton,
-            }}
-          >
-            <span style={styles.mikkeIconRow} aria-hidden="true">
-              <span style={styles.primaryIconBadge}>
-                <PawIcon />
-              </span>
-            </span>
-            <span style={styles.mikkeButtonText}>みっけ</span>
-          </button>
-
         <button
           type="button"
           onClick={handleDiscoveryClick}
@@ -571,7 +566,7 @@ export function HomeInput({ recentEvents: _recentEvents }: HomeInputProps) {
 
       {toastText ? <div style={styles.toast}>{toastText}</div> : null}
 
-      <BottomNavigation active="today" />
+      <BottomNavigation active="today" onMikkeClick={() => setIsMikkeSheetOpen(true)} />
       <style>{`
         @keyframes slideUp {
           from { transform: translateY(100%); }
@@ -1457,60 +1452,6 @@ const styles = {
     background: "transparent",
     padding: "0 18px 18px",
     boxSizing: "border-box",
-  },
-  mikkeButton: {
-    width: "100%",
-    minHeight: "88px",
-    alignSelf: "center",
-    border: "1px solid rgba(255,255,255,0.78)",
-    borderRadius: "30px",
-    background:
-      "linear-gradient(180deg, rgba(255,255,255,0.98) 0%, rgba(238,237,231,0.92) 100%)",
-    color: HOME_ACCENT_COLOR,
-    padding: "14px 22px",
-    display: "flex",
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: "14px",
-    cursor: "pointer",
-    boxShadow:
-      "0 12px 28px rgba(20,18,15,0.18), inset 0 1px 0 rgba(255,255,255,0.92), inset 0 -1px 0 rgba(180,176,166,0.18)",
-    transform: "translateY(0)",
-    transition: "transform 0.12s ease, box-shadow 0.12s ease, background 0.2s ease",
-  },
-  mikkeIconRow: {
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: "0",
-    width: "42px",
-    height: "42px",
-    borderRadius: "16px",
-    background: "rgba(86,96,82,0.09)",
-    border: "0.5px solid rgba(86,96,82,0.12)",
-    color: HOME_ACCENT_COLOR,
-    flexShrink: 0,
-  },
-  mikkeButtonText: {
-    color: "#2A2A28",
-    fontSize: "27px",
-    fontWeight: 800,
-    lineHeight: 1.25,
-    letterSpacing: 0,
-    textShadow: "0 1px 0 rgba(255,255,255,0.55)",
-  },
-  primaryIconBadge: {
-    width: "40px",
-    height: "30px",
-    borderRadius: "12px",
-    display: "inline-flex",
-    alignItems: "center",
-    justifyContent: "center",
-    color: HOME_ACCENT_COLOR,
-    background: "transparent",
-    border: "none",
-    boxShadow: "none",
   },
   lockedState: {
     pointerEvents: "none",
