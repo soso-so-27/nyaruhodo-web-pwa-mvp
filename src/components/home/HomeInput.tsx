@@ -705,18 +705,22 @@ function HomeBulletinBoard({
 }) {
   const [isOpen, setIsOpen] = useState(false);
   const [touchStartY, setTouchStartY] = useState<number | null>(null);
-  const primaryItem =
-    items[0] ??
-    ({
-      id: "fallback",
-      kind: "mission",
-      priority: 999,
-      title: "今日のみっけ",
-      body: `見かけたら、${catName}のことをひとつだけ残しましょう。`,
-      icon: "paw",
-      actionLabel: "みっけ",
-      actionType: "open_mikke",
-    } satisfies HomeBoardItem);
+  const displayItems =
+    items.length > 0
+      ? items
+      : [
+          {
+            id: "fallback",
+            kind: "mission",
+            priority: 999,
+            title: "今日のみっけ",
+            body: `見かけたら、${catName}のことをひとつだけ残しましょう。`,
+            icon: "paw",
+            actionLabel: "みっけ",
+            actionType: "open_mikke",
+          } satisfies HomeBoardItem,
+        ];
+  const unreadCount = displayItems.filter((item) => item.isUnread).length;
   const recentRecords = records.slice(0, 3);
 
   function handleTouchStart(event: TouchEvent<HTMLDivElement>) {
@@ -742,45 +746,68 @@ function HomeBulletinBoard({
       style={isOpen ? styles.boardExpanded : styles.boardPeek}
       onTouchStart={handleTouchStart}
       onTouchEnd={handleTouchEnd}
-      aria-label={`${catName}から届いています`}
+      aria-label="あなたへのおすすめ"
     >
       <button
         type="button"
         style={styles.boardHandleButton}
         onClick={() => setIsOpen((value) => !value)}
+        aria-label={isOpen ? "おすすめを閉じる" : "おすすめを開く"}
       >
         <span style={styles.boardHandle} aria-hidden="true" />
-        <span style={styles.boardTitle}>{catName}から届いています</span>
-        <span style={styles.boardChevron}>{isOpen ? "⌄" : "⌃"}</span>
       </button>
+
+      <div style={styles.boardHeader}>
+        <span style={styles.boardHeaderIcon} aria-hidden="true">
+          <SparkIcon />
+        </span>
+        <span style={styles.boardHeaderText}>
+          <span style={styles.boardTitle}>あなたへのおすすめ</span>
+          <span style={styles.boardSubtitle}>{catName}の変化や、今日できること</span>
+        </span>
+        <span style={styles.boardHeaderMeta}>{unreadCount > 0 ? "新着" : `${displayItems.length}件`}</span>
+      </div>
+
+      <div style={styles.boardRail} aria-label="おすすめカード">
+        {displayItems.map((item, index) => (
+          <button
+            key={item.id}
+            type="button"
+            style={{
+              ...styles.boardCard,
+              ...(index === 0 ? styles.boardCardPrimary : {}),
+            }}
+            onClick={() => onAction(item.actionType)}
+          >
+            <span style={styles.boardCardTop}>
+              <span style={styles.boardCardIcon} aria-hidden="true">
+                <BoardIcon icon={item.icon} />
+              </span>
+              {item.isUnread ? <span style={styles.boardUnreadDot} /> : null}
+            </span>
+            <span style={styles.boardCardKind}>{formatBoardKind(item.kind)}</span>
+            <span style={styles.boardCardTitle}>{item.title}</span>
+            <span style={styles.boardCardText}>{item.body}</span>
+          </button>
+        ))}
+      </div>
 
       {isOpen ? (
         <div style={styles.boardOpenContent}>
           <div style={styles.boardSectionHeader}>
-            <span style={styles.boardSectionTitle}>いま見ておきたいこと</span>
-            <span style={styles.boardUnreadBadge}>
-              {items.filter((item) => item.isUnread).length || items.length}
-            </span>
+            <span style={styles.boardSectionTitle}>すぐできること</span>
           </div>
-          <div style={styles.boardCardList}>
-            {items.map((item) => (
+          <div style={styles.boardActionList}>
+            {displayItems.map((item) => (
               <button
-                key={item.id}
+                key={`${item.id}-action`}
                 type="button"
-                style={styles.boardCard}
+                style={styles.boardActionRow}
                 onClick={() => onAction(item.actionType)}
               >
-                <span style={styles.boardCardIcon} aria-hidden="true">
-                  <BoardIcon icon={item.icon} />
-                </span>
-                <span style={styles.boardCardBody}>
-                  <span style={styles.boardCardTitleRow}>
-                    <span style={styles.boardCardTitle}>{item.title}</span>
-                    {item.isUnread ? <span style={styles.boardUnreadDot} /> : null}
-                  </span>
-                  <span style={styles.boardCardText}>{item.body}</span>
-                  <span style={styles.boardCardAction}>{item.actionLabel}</span>
-                </span>
+                <span style={styles.boardActionLabel}>{item.actionLabel}</span>
+                <span style={styles.boardActionTitle}>{item.title}</span>
+                <ChevronIcon />
               </button>
             ))}
           </div>
@@ -806,18 +833,7 @@ function HomeBulletinBoard({
             </p>
           )}
         </div>
-      ) : (
-        <button type="button" style={styles.boardPreviewCard} onClick={() => setIsOpen(true)}>
-          <span style={styles.boardPreviewIcon} aria-hidden="true">
-            <BoardIcon icon={primaryItem.icon} />
-          </span>
-          <span style={styles.boardPreviewBody}>
-            <span style={styles.boardPreviewLabel}>{primaryItem.title}</span>
-            <span style={styles.boardPreviewText}>{primaryItem.body}</span>
-          </span>
-          <ChevronIcon />
-        </button>
-      )}
+      ) : null}
     </section>
   );
 }
@@ -912,6 +928,15 @@ function buildHomeBoardItems({
   });
 
   return items.sort((a, b) => a.priority - b.priority);
+}
+
+function formatBoardKind(kind: HomeBoardItem["kind"]) {
+  if (kind === "mission") return "ミッション";
+  if (kind === "insight") return "変化";
+  if (kind === "notice") return "お知らせ";
+  if (kind === "tip") return "ヒント";
+  if (kind === "collection") return "コレクション";
+  return "アカウント";
 }
 
 function getLockDataKey(catId: string) {
@@ -1260,6 +1285,25 @@ function BellIcon() {
   );
 }
 
+function SparkIcon() {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      width="18"
+      height="18"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+    >
+      <path d="M12 3.5 13.7 9l5.8 1.7-5.8 1.7L12 18l-1.7-5.6-5.8-1.7L10.3 9 12 3.5Z" />
+      <path d="M19 16.5 19.8 19l2.7.8-2.7.8L19 23l-.8-2.4-2.7-.8 2.7-.8.8-2.5Z" />
+    </svg>
+  );
+}
+
 function CloseIcon() {
   return (
     <svg
@@ -1375,106 +1419,177 @@ const styles = {
   boardPeek: {
     position: "fixed",
     left: "50%",
-    bottom: "calc(92px + env(safe-area-inset-bottom))",
+    bottom: "calc(86px + env(safe-area-inset-bottom))",
     zIndex: 24,
-    width: "min(calc(100% - 28px), 402px)",
-    maxHeight: "122px",
+    width: "min(calc(100% - 24px), 406px)",
+    height: "162px",
     transform: "translateX(-50%)",
-    border: "0.5px solid rgba(224,221,214,0.86)",
-    borderRadius: "24px",
-    background: "rgba(255,255,255,0.9)",
-    boxShadow: "0 10px 30px rgba(24,23,20,0.16)",
-    backdropFilter: "blur(18px)",
-    WebkitBackdropFilter: "blur(18px)",
+    border: "0.5px solid rgba(255,255,255,0.42)",
+    borderRadius: "28px 28px 0 0",
+    background: "rgba(41,36,34,0.55)",
+    boxShadow: "0 -10px 34px rgba(0,0,0,0.22), inset 0 1px 0 rgba(255,255,255,0.14)",
+    backdropFilter: "blur(24px)",
+    WebkitBackdropFilter: "blur(24px)",
     overflow: "hidden",
-    transition: "height 0.24s ease, max-height 0.24s ease, transform 0.24s ease",
+    transition: "height 0.24s ease, transform 0.24s ease, background 0.24s ease",
   },
   boardExpanded: {
     position: "fixed",
     left: "50%",
-    bottom: "calc(84px + env(safe-area-inset-bottom))",
+    bottom: "calc(78px + env(safe-area-inset-bottom))",
     zIndex: 24,
-    width: "min(calc(100% - 24px), 406px)",
-    height: "min(64dvh, 540px)",
+    width: "min(calc(100% - 18px), 412px)",
+    height: "min(72dvh, 620px)",
     transform: "translateX(-50%)",
-    border: "0.5px solid rgba(224,221,214,0.9)",
-    borderRadius: "26px",
-    background: "rgba(255,255,255,0.94)",
-    boxShadow: "0 12px 34px rgba(24,23,20,0.2)",
-    backdropFilter: "blur(22px)",
-    WebkitBackdropFilter: "blur(22px)",
+    border: "0.5px solid rgba(255,255,255,0.45)",
+    borderRadius: "30px 30px 0 0",
+    background: "rgba(40,35,34,0.66)",
+    boxShadow: "0 -14px 42px rgba(0,0,0,0.28), inset 0 1px 0 rgba(255,255,255,0.16)",
+    backdropFilter: "blur(28px)",
+    WebkitBackdropFilter: "blur(28px)",
     overflow: "hidden",
-    transition: "height 0.24s ease, max-height 0.24s ease, transform 0.24s ease",
+    transition: "height 0.24s ease, transform 0.24s ease, background 0.24s ease",
   },
   boardHandleButton: {
     width: "100%",
     border: "none",
     background: "transparent",
-    color: "#2A2A28",
-    display: "grid",
-    gridTemplateColumns: "1fr auto 1fr",
+    display: "flex",
     alignItems: "center",
-    gap: "8px",
-    padding: "8px 14px 5px",
+    justifyContent: "center",
+    padding: "9px 0 5px",
     cursor: "pointer",
   },
   boardHandle: {
-    justifySelf: "end",
-    width: "34px",
+    width: "42px",
     height: "4px",
     borderRadius: "99px",
-    background: "#d8d4cc",
+    background: "rgba(255,255,255,0.28)",
   },
-  boardTitle: {
-    fontSize: "12px",
-    fontWeight: 750,
-    color: "#6f6b64",
-    whiteSpace: "nowrap",
-  },
-  boardChevron: {
-    justifySelf: "start",
-    fontSize: "15px",
-    lineHeight: 1,
-    color: "#9a958d",
-  },
-  boardPreviewCard: {
-    width: "100%",
-    border: "none",
-    background: "transparent",
+  boardHeader: {
     display: "flex",
     alignItems: "center",
-    gap: "11px",
-    padding: "8px 14px 14px",
-    textAlign: "left",
-    cursor: "pointer",
+    gap: "9px",
+    padding: "2px 16px 10px",
   },
-  boardPreviewIcon: {
-    width: "38px",
-    height: "38px",
-    flexShrink: 0,
-    borderRadius: "14px",
-    background: HOME_ACCENT_SOFT_BG,
-    color: HOME_ACCENT_COLOR,
+  boardHeaderIcon: {
+    width: "24px",
+    height: "24px",
+    borderRadius: "50%",
+    color: "rgba(255,255,255,0.92)",
     display: "inline-flex",
     alignItems: "center",
     justifyContent: "center",
   },
-  boardPreviewBody: {
+  boardHeaderText: {
     minWidth: 0,
     flex: 1,
     display: "flex",
     flexDirection: "column",
-    gap: "3px",
+    gap: "2px",
   },
-  boardPreviewLabel: {
-    color: "#77736d",
+  boardTitle: {
+    fontSize: "15px",
+    fontWeight: 760,
+    color: "rgba(255,255,255,0.94)",
+    whiteSpace: "nowrap",
+  },
+  boardSubtitle: {
+    color: "rgba(255,255,255,0.58)",
     fontSize: "11px",
-    fontWeight: 750,
+    fontWeight: 650,
+    whiteSpace: "nowrap",
+    overflow: "hidden",
+    textOverflow: "ellipsis",
   },
-  boardPreviewText: {
-    color: "#2A2A28",
-    fontSize: "13px",
-    fontWeight: 750,
+  boardHeaderMeta: {
+    flexShrink: 0,
+    border: "0.5px solid rgba(255,255,255,0.22)",
+    borderRadius: "99px",
+    color: "rgba(255,255,255,0.72)",
+    fontSize: "10px",
+    fontWeight: 760,
+    padding: "3px 8px",
+  },
+  boardRail: {
+    display: "flex",
+    gap: "12px",
+    overflowX: "auto",
+    scrollbarWidth: "none",
+    padding: "0 16px 18px",
+    scrollSnapType: "x proximity",
+  },
+  boardOpenContent: {
+    height: "calc(100% - 198px)",
+    overflowY: "auto",
+    padding: "0 16px 18px",
+    boxSizing: "border-box",
+  },
+  boardSectionHeader: {
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "space-between",
+    margin: "6px 2px 8px",
+  },
+  boardSectionTitle: {
+    color: "rgba(255,255,255,0.62)",
+    fontSize: "12px",
+    fontWeight: 800,
+    letterSpacing: "0.03em",
+  },
+  boardCard: {
+    width: "142px",
+    minWidth: "142px",
+    minHeight: "112px",
+    border: "0.5px solid rgba(255,255,255,0.24)",
+    borderRadius: "22px",
+    background: "rgba(255,255,255,0.14)",
+    color: "rgba(255,255,255,0.94)",
+    display: "flex",
+    flexDirection: "column",
+    gap: "6px",
+    padding: "14px",
+    textAlign: "left",
+    cursor: "pointer",
+    scrollSnapAlign: "start",
+    backdropFilter: "blur(18px)",
+    WebkitBackdropFilter: "blur(18px)",
+    boxShadow: "inset 0 0.5px 0 rgba(255,255,255,0.16)",
+  },
+  boardCardPrimary: {
+    width: "166px",
+    minWidth: "166px",
+    background: "rgba(255,255,255,0.20)",
+  },
+  boardCardTop: {
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "space-between",
+  },
+  boardCardIcon: {
+    width: "30px",
+    height: "30px",
+    borderRadius: "50%",
+    color: "rgba(255,255,255,0.92)",
+    display: "inline-flex",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  boardCardKind: {
+    color: "rgba(255,255,255,0.56)",
+    fontSize: "10px",
+    fontWeight: 760,
+  },
+  boardCardTitle: {
+    color: "rgba(255,255,255,0.96)",
+    fontSize: "14px",
+    fontWeight: 780,
+    lineHeight: 1.25,
+  },
+  boardCardText: {
+    color: "rgba(255,255,255,0.68)",
+    fontSize: "11px",
+    fontWeight: 620,
     lineHeight: 1.35,
     overflow: "hidden",
     textOverflow: "ellipsis",
@@ -1482,96 +1597,44 @@ const styles = {
     WebkitLineClamp: 2,
     WebkitBoxOrient: "vertical",
   },
-  boardOpenContent: {
-    height: "calc(100% - 41px)",
-    overflowY: "auto",
-    padding: "4px 14px 18px",
-    boxSizing: "border-box",
-  },
-  boardSectionHeader: {
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "space-between",
-    margin: "10px 2px 8px",
-  },
-  boardSectionTitle: {
-    color: "#8a867f",
-    fontSize: "11px",
-    fontWeight: 800,
-    letterSpacing: "0.03em",
-  },
-  boardUnreadBadge: {
-    minWidth: "20px",
-    height: "20px",
-    borderRadius: "99px",
-    background: HOME_ACCENT_SOFT_BG,
-    color: HOME_ACCENT_COLOR,
-    fontSize: "11px",
-    fontWeight: 800,
-    display: "inline-flex",
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  boardCardList: {
-    display: "grid",
-    gap: "8px",
-  },
-  boardCard: {
-    width: "100%",
-    border: "0.5px solid rgba(224,221,214,0.9)",
-    borderRadius: "17px",
-    background: "rgba(250,249,247,0.82)",
-    color: "#2A2A28",
-    display: "flex",
-    gap: "11px",
-    alignItems: "flex-start",
-    padding: "12px",
-    textAlign: "left",
-    cursor: "pointer",
-  },
-  boardCardIcon: {
-    width: "36px",
-    height: "36px",
-    borderRadius: "13px",
-    flexShrink: 0,
-    background: HOME_ACCENT_SOFT_BG,
-    color: HOME_ACCENT_COLOR,
-    display: "inline-flex",
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  boardCardBody: {
-    minWidth: 0,
-    display: "flex",
-    flexDirection: "column",
-    gap: "4px",
-  },
-  boardCardTitleRow: {
-    display: "flex",
-    alignItems: "center",
-    gap: "6px",
-  },
-  boardCardTitle: {
-    fontSize: "13px",
-    fontWeight: 800,
-    color: "#2A2A28",
-  },
   boardUnreadDot: {
     width: "7px",
     height: "7px",
     borderRadius: "50%",
-    background: HOME_ACCENT_COLOR,
+    background: "rgba(255,255,255,0.92)",
+    boxShadow: "0 0 0 3px rgba(255,255,255,0.12)",
   },
-  boardCardText: {
-    color: "#605d56",
-    fontSize: "12px",
-    fontWeight: 650,
-    lineHeight: 1.45,
+  boardActionList: {
+    display: "grid",
+    gap: "7px",
+    marginBottom: "14px",
   },
-  boardCardAction: {
-    color: HOME_ACCENT_COLOR,
+  boardActionRow: {
+    width: "100%",
+    border: "0.5px solid rgba(255,255,255,0.16)",
+    borderRadius: "16px",
+    background: "rgba(255,255,255,0.10)",
+    color: "rgba(255,255,255,0.92)",
+    display: "grid",
+    gridTemplateColumns: "64px 1fr auto",
+    alignItems: "center",
+    gap: "8px",
+    padding: "10px 12px",
+    textAlign: "left",
+    cursor: "pointer",
+  },
+  boardActionLabel: {
+    color: "rgba(255,255,255,0.52)",
     fontSize: "11px",
-    fontWeight: 800,
+    fontWeight: 760,
+  },
+  boardActionTitle: {
+    color: "rgba(255,255,255,0.9)",
+    fontSize: "13px",
+    fontWeight: 760,
+    overflow: "hidden",
+    textOverflow: "ellipsis",
+    whiteSpace: "nowrap",
   },
   boardMemoList: {
     display: "grid",
@@ -1583,16 +1646,16 @@ const styles = {
     gap: "8px",
     alignItems: "center",
     borderRadius: "13px",
-    background: "rgba(247,245,239,0.72)",
+    background: "rgba(255,255,255,0.10)",
     padding: "8px 10px",
   },
   boardMemoTime: {
-    color: "#96918a",
+    color: "rgba(255,255,255,0.48)",
     fontSize: "11px",
     fontWeight: 750,
   },
   boardMemoKind: {
-    color: "#6f6b64",
+    color: "rgba(255,255,255,0.62)",
     fontSize: "11px",
     fontWeight: 800,
   },
@@ -1601,13 +1664,13 @@ const styles = {
     overflow: "hidden",
     textOverflow: "ellipsis",
     whiteSpace: "nowrap",
-    color: "#2A2A28",
+    color: "rgba(255,255,255,0.86)",
     fontSize: "12px",
     fontWeight: 750,
   },
   boardEmptyText: {
     margin: "0 2px",
-    color: "#8a867f",
+    color: "rgba(255,255,255,0.58)",
     fontSize: "12px",
     lineHeight: 1.6,
     fontWeight: 650,
