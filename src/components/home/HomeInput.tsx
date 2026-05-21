@@ -841,6 +841,7 @@ function HomeBulletinBoard({
       </div>
 
       <div style={styles.boardRail} aria-label="おすすめカード">
+        <div style={styles.boardRailSpacer} aria-hidden="true" />
         {displayItems.map((item, index) => (
           <button
             key={item.id}
@@ -861,6 +862,7 @@ function HomeBulletinBoard({
             <span style={styles.boardCardTitle}>{item.title}</span>
           </button>
         ))}
+        <div style={styles.boardRailSpacer} aria-hidden="true" />
       </div>
 
       {isOpen ? (
@@ -1660,8 +1662,13 @@ const styles = {
     gap: "10px",
     overflowX: "auto",
     scrollbarWidth: "none",
-    padding: `0 ${HOME_NAV_CONTENT_INSET} 18px`,
+    padding: "0 0 18px",
     scrollSnapType: "x proximity",
+  },
+  boardRailSpacer: {
+    width: HOME_NAV_CONTENT_INSET,
+    minWidth: HOME_NAV_CONTENT_INSET,
+    flexShrink: 0,
   },
   boardOpenContent: {
     height: "calc(100% - 198px)",
