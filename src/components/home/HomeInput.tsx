@@ -763,9 +763,8 @@ function HomeBulletinBoard({
         </span>
         <span style={styles.boardHeaderText}>
           <span style={styles.boardTitle}>あなたへのおすすめ</span>
-          <span style={styles.boardSubtitle}>{catName}の変化や、今日できること</span>
         </span>
-        <span style={styles.boardHeaderMeta}>{unreadCount > 0 ? "新着" : `${displayItems.length}件`}</span>
+        {unreadCount > 0 ? <span style={styles.boardHeaderMeta}>新着</span> : null}
       </div>
 
       <div style={styles.boardRail} aria-label="おすすめカード">
@@ -787,7 +786,6 @@ function HomeBulletinBoard({
             </span>
             <span style={styles.boardCardKind}>{formatBoardKind(item.kind)}</span>
             <span style={styles.boardCardTitle}>{item.title}</span>
-            <span style={styles.boardCardText}>{item.body}</span>
           </button>
         ))}
       </div>
@@ -1490,21 +1488,12 @@ const styles = {
     flex: 1,
     display: "flex",
     flexDirection: "column",
-    gap: "2px",
   },
   boardTitle: {
     fontSize: "15px",
     fontWeight: 760,
     color: "rgba(255,255,255,0.94)",
     whiteSpace: "nowrap",
-  },
-  boardSubtitle: {
-    color: "rgba(255,255,255,0.58)",
-    fontSize: "11px",
-    fontWeight: 650,
-    whiteSpace: "nowrap",
-    overflow: "hidden",
-    textOverflow: "ellipsis",
   },
   boardHeaderMeta: {
     flexShrink: 0,
@@ -1517,7 +1506,7 @@ const styles = {
   },
   boardRail: {
     display: "flex",
-    gap: "12px",
+    gap: "10px",
     overflowX: "auto",
     scrollbarWidth: "none",
     padding: "0 16px 18px",
@@ -1542,17 +1531,17 @@ const styles = {
     letterSpacing: "0.03em",
   },
   boardCard: {
-    width: "142px",
-    minWidth: "142px",
-    minHeight: "112px",
+    width: "132px",
+    minWidth: "132px",
+    minHeight: "92px",
     border: "0.5px solid rgba(255,255,255,0.24)",
-    borderRadius: "22px",
+    borderRadius: "20px",
     background: "rgba(255,255,255,0.14)",
     color: "rgba(255,255,255,0.94)",
     display: "flex",
     flexDirection: "column",
-    gap: "6px",
-    padding: "14px",
+    gap: "5px",
+    padding: "12px",
     textAlign: "left",
     cursor: "pointer",
     scrollSnapAlign: "start",
@@ -1561,8 +1550,6 @@ const styles = {
     boxShadow: "inset 0 0.5px 0 rgba(255,255,255,0.16)",
   },
   boardCardPrimary: {
-    width: "166px",
-    minWidth: "166px",
     background: "rgba(255,255,255,0.20)",
   },
   boardCardTop: {
@@ -1571,8 +1558,8 @@ const styles = {
     justifyContent: "space-between",
   },
   boardCardIcon: {
-    width: "30px",
-    height: "30px",
+    width: "28px",
+    height: "28px",
     borderRadius: "50%",
     color: "rgba(255,255,255,0.92)",
     display: "inline-flex",
@@ -1581,20 +1568,14 @@ const styles = {
   },
   boardCardKind: {
     color: "rgba(255,255,255,0.56)",
-    fontSize: "10px",
+    fontSize: "9px",
     fontWeight: 760,
   },
   boardCardTitle: {
     color: "rgba(255,255,255,0.96)",
-    fontSize: "14px",
+    fontSize: "13px",
     fontWeight: 780,
-    lineHeight: 1.25,
-  },
-  boardCardText: {
-    color: "rgba(255,255,255,0.68)",
-    fontSize: "11px",
-    fontWeight: 620,
-    lineHeight: 1.35,
+    lineHeight: 1.3,
     overflow: "hidden",
     textOverflow: "ellipsis",
     display: "-webkit-box",
