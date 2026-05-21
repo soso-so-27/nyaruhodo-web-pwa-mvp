@@ -1695,8 +1695,8 @@ const styles = {
     letterSpacing: "0.03em",
   },
   boardCard: {
-    width: "132px",
-    minWidth: "132px",
+    width: "calc((100% - 20px) / 3)",
+    minWidth: "calc((100% - 20px) / 3)",
     minHeight: "92px",
     border: "0.5px solid rgba(255,255,255,0.24)",
     borderRadius: "20px",
