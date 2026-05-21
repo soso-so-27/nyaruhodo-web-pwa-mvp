@@ -87,6 +87,7 @@ const REACTION_OPTIONS = [
 
 const DISCOVERY_TEXT =
   "昨日の小さな記録から、少しだけリズムが見えてきました。";
+const HOME_NAV_EDGE_INSET = "max(14px, calc((100vw - 410px) / 2))";
 const HOME_ACCENT_COLOR = APP_ACCENT;
 const HOME_ACCENT_SOFT_BG = APP_ACCENT_SOFT_BG;
 const HOME_ACCENT_SOFT_BORDER = APP_ACCENT_SOFT_BORDER;
@@ -106,6 +107,9 @@ export function HomeInput({ recentEvents: _recentEvents }: HomeInputProps) {
   const [selectedMugi, setSelectedMugi] = useState<string | null>(null);
   const [selectedReaction, setSelectedReaction] = useState<string | null>(null);
   const [recordLog, setRecordLog] = useState<RecordLogItem[]>([]);
+  const [homeSwipeStart, setHomeSwipeStart] = useState<{ x: number; y: number } | null>(
+    null,
+  );
   const [toastText, setToastText] = useState("");
   const [discoveryDismissedToday, setDiscoveryDismissedToday] = useState(false);
 
@@ -221,6 +225,43 @@ export function HomeInput({ recentEvents: _recentEvents }: HomeInputProps) {
     setActiveCat(profile);
     setIsCatSheetOpen(false);
     hydrateCatState(profile.id);
+  }
+
+  function switchActiveCat(direction: -1 | 1) {
+    if (catProfiles.length < 2 || !activeCatId) return;
+
+    const currentIndex = catProfiles.findIndex((profile) => profile.id === activeCatId);
+    if (currentIndex === -1) return;
+
+    const nextIndex =
+      (currentIndex + direction + catProfiles.length) % catProfiles.length;
+    handleCatSelect(catProfiles[nextIndex].id);
+  }
+
+  function handleHomeSwipeStart(event: TouchEvent<HTMLDivElement>) {
+    const touch = event.touches[0];
+    if (!touch) return;
+    setHomeSwipeStart({ x: touch.clientX, y: touch.clientY });
+  }
+
+  function handleHomeSwipeEnd(event: TouchEvent<HTMLDivElement>) {
+    if (!homeSwipeStart) return;
+
+    const touch = event.changedTouches[0];
+    if (!touch) {
+      setHomeSwipeStart(null);
+      return;
+    }
+
+    const deltaX = touch.clientX - homeSwipeStart.x;
+    const deltaY = touch.clientY - homeSwipeStart.y;
+    const isHorizontalSwipe = Math.abs(deltaX) > 56 && Math.abs(deltaX) > Math.abs(deltaY) * 1.3;
+
+    if (isHorizontalSwipe) {
+      switchActiveCat(deltaX < 0 ? 1 : -1);
+    }
+
+    setHomeSwipeStart(null);
   }
 
   function showToast(message: string) {
@@ -354,17 +395,49 @@ export function HomeInput({ recentEvents: _recentEvents }: HomeInputProps) {
         }}
         aria-hidden="true"
       />
-      <div style={styles.contentLayer}>
+      <div
+        style={styles.contentLayer}
+        onTouchStart={handleHomeSwipeStart}
+        onTouchEnd={handleHomeSwipeEnd}
+      >
         <section style={styles.heroContent}>
           <div style={styles.heroTopBar}>
-            <button
-              type="button"
-              onClick={() => setIsCatSheetOpen(true)}
-              style={styles.catSwitchButton}
-            >
-              <span>{catName}</span>
-              <span aria-hidden="true">▾</span>
-            </button>
+            <div style={styles.catSwitchRail} aria-label="ねこを切り替える">
+              {(catProfiles.length > 0 ? catProfiles : activeCat ? [activeCat] : []).map(
+                (profile) => {
+                  const isActive = profile.id === activeCatId;
+                  const profileName = getCatName(profile);
+
+                  return (
+                    <button
+                      key={profile.id}
+                      type="button"
+                      onClick={() =>
+                        isActive ? setIsCatSheetOpen(true) : handleCatSelect(profile.id)
+                      }
+                      style={isActive ? styles.catSwitchChipActive : styles.catSwitchChip}
+                      aria-label={`${profileName}に切り替える`}
+                    >
+                      <span style={styles.catSwitchAvatar} aria-hidden="true">
+                        <img
+                          src={getHomeCatThumbSrc(profile)}
+                          alt=""
+                          style={styles.catSwitchAvatarImg}
+                        />
+                      </span>
+                      {isActive ? (
+                        <>
+                          <span style={styles.catSwitchName}>{profileName}</span>
+                          <span style={styles.catSwitchChevron} aria-hidden="true">
+                            ▾
+                          </span>
+                        </>
+                      ) : null}
+                    </button>
+                  );
+                },
+              )}
+            </div>
           </div>
         </section>
       </div>
@@ -937,6 +1010,27 @@ function formatBoardKind(kind: HomeBoardItem["kind"]) {
   return "アカウント";
 }
 
+function getHomeCatThumbSrc(profile: CatProfile) {
+  return (
+    profile.avatarDataUrl ??
+    profile.homePhotoDataUrl ??
+    getCoatAvatarSrc(profile.appearance?.coat)
+  );
+}
+
+function getCoatAvatarSrc(coat?: string) {
+  const coatMap: Record<string, string> = {
+    saba: "/sample-cats/saba.png",
+    gray: "/sample-cats/gray.png",
+    orange_tabby: "/sample-cats/orange_tabby.png",
+    black: "/sample-cats/black.png",
+    white: "/sample-cats/white.png",
+    calico: "/sample-cats/calico.png",
+    cream: "/sample-cats/saba.png",
+  };
+  return coatMap[coat ?? ""] ?? "/sample-cats/saba.png";
+}
+
 function getLockDataKey(catId: string) {
   return `lock_data_${catId}`;
 }
@@ -1400,19 +1494,76 @@ const styles = {
     justifyContent: "space-between",
     gap: "12px",
   },
-  catSwitchButton: {
+  catSwitchRail: {
+    display: "flex",
+    alignItems: "center",
+    gap: "6px",
+    maxWidth: "min(68vw, 286px)",
+    overflowX: "auto",
+    scrollbarWidth: "none",
+  },
+  catSwitchChip: {
     display: "inline-flex",
     alignItems: "center",
-    gap: "4px",
-    border: "0.5px solid rgba(224,221,214,0.7)",
+    justifyContent: "center",
+    width: "38px",
+    height: "38px",
+    border: "0.5px solid rgba(224,221,214,0.62)",
     borderRadius: "99px",
-    background: "rgba(255,255,255,0.85)",
+    background: "rgba(255,255,255,0.70)",
     color: "#2A2A28",
-    padding: "7px 12px",
+    padding: "3px",
+    cursor: "pointer",
+    backdropFilter: "blur(12px)",
+    WebkitBackdropFilter: "blur(12px)",
+    boxShadow: "0 4px 14px rgba(0,0,0,0.10), inset 0 0.5px 0 rgba(255,255,255,0.55)",
+  },
+  catSwitchChipActive: {
+    display: "inline-flex",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: "6px",
+    minWidth: "auto",
+    height: "38px",
+    border: "0.5px solid rgba(224,221,214,0.72)",
+    borderRadius: "99px",
+    background: "rgba(255,255,255,0.86)",
+    color: "#2A2A28",
+    padding: "3px 10px 3px 4px",
     fontSize: "14px",
     fontWeight: 700,
     cursor: "pointer",
     backdropFilter: "blur(12px)",
+    WebkitBackdropFilter: "blur(12px)",
+    boxShadow: "0 4px 14px rgba(0,0,0,0.12), inset 0 0.5px 0 rgba(255,255,255,0.62)",
+  },
+  catSwitchAvatar: {
+    width: "30px",
+    height: "30px",
+    borderRadius: "50%",
+    overflow: "hidden",
+    flexShrink: 0,
+    background: "rgba(245,243,239,0.82)",
+    display: "inline-flex",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  catSwitchAvatarImg: {
+    width: "100%",
+    height: "100%",
+    objectFit: "cover",
+    display: "block",
+  },
+  catSwitchName: {
+    maxWidth: "72px",
+    overflow: "hidden",
+    textOverflow: "ellipsis",
+    whiteSpace: "nowrap",
+  },
+  catSwitchChevron: {
+    fontSize: "10px",
+    lineHeight: 1,
+    opacity: 0.74,
   },
   boardPeek: {
     position: "fixed",
@@ -1472,7 +1623,7 @@ const styles = {
     display: "flex",
     alignItems: "center",
     gap: "9px",
-    padding: "2px 16px 10px",
+    padding: `2px ${HOME_NAV_EDGE_INSET} 10px`,
   },
   boardHeaderIcon: {
     width: "24px",
@@ -1509,13 +1660,13 @@ const styles = {
     gap: "10px",
     overflowX: "auto",
     scrollbarWidth: "none",
-    padding: "0 16px 18px",
+    padding: `0 ${HOME_NAV_EDGE_INSET} 18px`,
     scrollSnapType: "x proximity",
   },
   boardOpenContent: {
     height: "calc(100% - 198px)",
     overflowY: "auto",
-    padding: "0 16px calc(112px + env(safe-area-inset-bottom))",
+    padding: `0 ${HOME_NAV_EDGE_INSET} calc(112px + env(safe-area-inset-bottom))`,
     boxSizing: "border-box",
   },
   boardSectionHeader: {
