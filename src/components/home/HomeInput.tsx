@@ -87,7 +87,7 @@ const REACTION_OPTIONS = [
 
 const DISCOVERY_TEXT =
   "昨日の小さな記録から、少しだけリズムが見えてきました。";
-const HOME_NAV_EDGE_INSET = "max(14px, calc((100vw - 410px) / 2))";
+const HOME_NAV_CONTENT_INSET = "max(18px, calc((100vw - 410px) / 2 + 4px))";
 const HOME_ACCENT_COLOR = APP_ACCENT;
 const HOME_ACCENT_SOFT_BG = APP_ACCENT_SOFT_BG;
 const HOME_ACCENT_SOFT_BORDER = APP_ACCENT_SOFT_BORDER;
@@ -1623,7 +1623,7 @@ const styles = {
     display: "flex",
     alignItems: "center",
     gap: "9px",
-    padding: `2px ${HOME_NAV_EDGE_INSET} 10px`,
+    padding: `2px ${HOME_NAV_CONTENT_INSET} 10px`,
   },
   boardHeaderIcon: {
     width: "24px",
@@ -1660,13 +1660,13 @@ const styles = {
     gap: "10px",
     overflowX: "auto",
     scrollbarWidth: "none",
-    padding: `0 ${HOME_NAV_EDGE_INSET} 18px`,
+    padding: `0 ${HOME_NAV_CONTENT_INSET} 18px`,
     scrollSnapType: "x proximity",
   },
   boardOpenContent: {
     height: "calc(100% - 198px)",
     overflowY: "auto",
-    padding: `0 ${HOME_NAV_EDGE_INSET} calc(112px + env(safe-area-inset-bottom))`,
+    padding: `0 ${HOME_NAV_CONTENT_INSET} calc(112px + env(safe-area-inset-bottom))`,
     boxSizing: "border-box",
   },
   boardSectionHeader: {
