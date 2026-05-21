@@ -1,17 +1,9 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import type { CSSProperties } from "react";
+import type { CSSProperties, TouchEvent } from "react";
 import type { RecentEvent } from "../../lib/supabase/queries";
 import { BottomNavigation } from "../navigation/BottomNavigation";
-import {
-  LIGHT_LEVELS,
-  getDebugLightScore,
-  getLightLevel,
-  getLightText,
-  getPhotoStyle,
-  type LightLevelKey,
-} from "../ui/lightTheme";
 import {
   APP_ACCENT,
   APP_ACCENT_SOFT_BG,
@@ -20,7 +12,6 @@ import {
   APP_SHEET_OVERLAY,
   APP_SUBTLE_SURFACE,
 } from "../ui/appTheme";
-import { getFrostedPaperCardStyle, getGlassPillStyle } from "../ui/surfaceStyles";
 import {
   getActiveCatProfile,
   getCatName,
@@ -35,14 +26,6 @@ type HomeInputProps = {
   recentEvents: RecentEvent[];
 };
 
-type LightData = {
-  score: number;
-  lastUpdated: number;
-  todayYousuCount: number;
-  todayMugiCount: number;
-  todayDate: string;
-};
-
 type LockData = {
   yousuLockedUntil?: number;
   mugiLockedUntil?: number;
@@ -51,13 +34,31 @@ type LockData = {
 type LockType = "yousu" | "mugi";
 
 const HOME_FALLBACK_PHOTO_SRC = "/sample-cats/mugi-hero.png";
-const ENABLE_LIGHT_DEBUG = process.env.NODE_ENV !== "production";
 
 type RecordLogItem = {
   id: string;
   type: "yousu" | "mugi" | "reaction";
   value: string;
   timestamp: number;
+};
+
+type HomeBoardAction =
+  | "open_mikke"
+  | "open_photo"
+  | "open_discovery"
+  | "go_torisetu"
+  | "go_collection";
+
+type HomeBoardItem = {
+  id: string;
+  kind: "mission" | "notice" | "insight" | "tip" | "collection" | "account";
+  priority: number;
+  title: string;
+  body: string;
+  icon: "paw" | "heart" | "bell" | "camera" | "book";
+  actionLabel: string;
+  actionType: HomeBoardAction;
+  isUnread?: boolean;
 };
 
 const YOUSU_OPTIONS = [
@@ -94,7 +95,6 @@ export function HomeInput({ recentEvents: _recentEvents }: HomeInputProps) {
   const [catProfiles, setCatProfiles] = useState<CatProfile[]>([]);
   const [activeCatId, setActiveCatId] = useState<string | null>(null);
   const [activeCat, setActiveCat] = useState<CatProfile | null>(null);
-  const [lightData, setLightData] = useState<LightData | null>(null);
   const [lockData, setLockData] = useState<LockData>({});
   const [tick, setTick] = useState(Date.now());
   const [isYousuOpen, setIsYousuOpen] = useState(false);
@@ -105,10 +105,8 @@ export function HomeInput({ recentEvents: _recentEvents }: HomeInputProps) {
   const [selectedYousu, setSelectedYousu] = useState<string | null>(null);
   const [selectedMugi, setSelectedMugi] = useState<string | null>(null);
   const [selectedReaction, setSelectedReaction] = useState<string | null>(null);
+  const [recordLog, setRecordLog] = useState<RecordLogItem[]>([]);
   const [toastText, setToastText] = useState("");
-  const [recordGlowActive, setRecordGlowActive] = useState(false);
-  const [isLightDebugEnabled, setIsLightDebugEnabled] = useState(false);
-  const [debugLightLevel, setDebugLightLevel] = useState<LightLevelKey | null>(null);
   const [discoveryDismissedToday, setDiscoveryDismissedToday] = useState(false);
 
   useEffect(() => {
@@ -121,11 +119,6 @@ export function HomeInput({ recentEvents: _recentEvents }: HomeInputProps) {
     setActiveCat(active);
     saveActiveCatId(active.id);
     hydrateCatState(active.id);
-
-    if (ENABLE_LIGHT_DEBUG) {
-      const params = new URLSearchParams(window.location.search);
-      setIsLightDebugEnabled(params.get("lightDebug") === "1");
-    }
   }, []);
 
   useEffect(() => {
@@ -153,14 +146,6 @@ export function HomeInput({ recentEvents: _recentEvents }: HomeInputProps) {
     activeCat?.avatarDataUrl ??
     HOME_FALLBACK_PHOTO_SRC;
   const homePhotoPosition = activeCat?.homePhotoPosition ?? "center 38%";
-  const liveLightScore = lightData ? getCurrentScore(lightData, tick) : 0;
-  const lightScore = debugLightLevel ? getDebugLightScore(debugLightLevel) : liveLightScore;
-  const lightLevel = getLightLevel(lightScore);
-  const lightConfig = LIGHT_LEVELS[lightLevel];
-  const dynamicCardStyle = getFrostedPaperCardStyle(lightConfig);
-  const dynamicPillStyle = getGlassPillStyle(lightConfig);
-  const lightText = getLightText(lightLevel, catName);
-  const shouldShowLightText = lightLevel <= 2;
   const yousuRemaining = getRemainingTime(lockData, "yousu", tick);
   const mugiRemaining = getRemainingTime(lockData, "mugi", tick);
   const isYousuLocked = Boolean(yousuRemaining);
@@ -172,6 +157,25 @@ export function HomeInput({ recentEvents: _recentEvents }: HomeInputProps) {
 
     return getDiscoveryState(activeCatId);
   }, [activeCatId, discoveryDismissedToday, tick]);
+  const boardItems = useMemo(
+    () =>
+      buildHomeBoardItems({
+        catName,
+        discoveryAvailable: discovery.available,
+        hasHomePhoto: Boolean(activeCat?.homePhotoDataUrl),
+        recordLog,
+        yousuRemaining,
+        mugiRemaining,
+      }),
+    [
+      activeCat?.homePhotoDataUrl,
+      catName,
+      discovery.available,
+      mugiRemaining,
+      recordLog,
+      yousuRemaining,
+    ],
+  );
 
   useEffect(() => {
     const cssPhotoUrl = toCssUrl(photoSrc);
@@ -196,7 +200,6 @@ export function HomeInput({ recentEvents: _recentEvents }: HomeInputProps) {
   }, [homePhotoPosition, photoSrc]);
 
   function hydrateCatState(catId: string) {
-    setLightData(resetIfNewDay(readLightData(catId)));
     setLockData(readLockData(catId));
     setDiscoveryDismissedToday(hasSeenDiscoveryToday(catId));
 
@@ -204,6 +207,7 @@ export function HomeInput({ recentEvents: _recentEvents }: HomeInputProps) {
     const latestYousu = records.find((record) => record.type === "yousu");
     const latestMugi = records.find((record) => record.type === "mugi");
 
+    setRecordLog(records);
     setSelectedYousu(latestYousu?.value ?? null);
     setSelectedMugi(latestMugi?.value ?? null);
     setSelectedReaction(null);
@@ -224,22 +228,15 @@ export function HomeInput({ recentEvents: _recentEvents }: HomeInputProps) {
     window.setTimeout(() => setToastText(""), 1500);
   }
 
-  function triggerRecordGlow() {
-    setRecordGlowActive(true);
-    window.setTimeout(() => setRecordGlowActive(false), 1100);
-  }
-
   function recordYousu(value: string) {
     if (!activeCatId || isLocked(lockData, "yousu", Date.now())) return;
 
-    const nextLightData = updateLightForRecord(activeCatId, "yousu");
     const nextLockData = setLock(activeCatId, "yousu");
 
     saveRecord(activeCatId, { type: "yousu", value });
     setSelectedYousu(value);
-    setLightData(nextLightData);
+    setRecordLog(readRecordLog(activeCatId));
     setLockData(nextLockData);
-    triggerRecordGlow();
     showToast("記録したよ");
     window.setTimeout(() => setIsYousuOpen(false), 1000);
   }
@@ -247,14 +244,12 @@ export function HomeInput({ recentEvents: _recentEvents }: HomeInputProps) {
   function recordMugi(value: string) {
     if (!activeCatId || isLocked(lockData, "mugi", Date.now())) return;
 
-    const nextLightData = updateLightForRecord(activeCatId, "mugi");
     const nextLockData = setLock(activeCatId, "mugi");
 
     saveRecord(activeCatId, { type: "mugi", value });
     setSelectedMugi(value);
-    setLightData(nextLightData);
+    setRecordLog(readRecordLog(activeCatId));
     setLockData(nextLockData);
-    triggerRecordGlow();
     showToast("記録したよ");
 
     window.setTimeout(() => {
@@ -270,7 +265,7 @@ export function HomeInput({ recentEvents: _recentEvents }: HomeInputProps) {
 
     saveRecord(activeCatId, { type: "reaction", value });
     setSelectedReaction(value);
-    triggerRecordGlow();
+    setRecordLog(readRecordLog(activeCatId));
     showToast("記録したよ");
     window.setTimeout(() => setIsReactionSheetOpen(false), 500);
   }
@@ -304,7 +299,6 @@ export function HomeInput({ recentEvents: _recentEvents }: HomeInputProps) {
         saveCatProfiles(nextProfiles);
         setCatProfiles(nextProfiles);
         setActiveCat(nextActive);
-        triggerRecordGlow();
         showToast("写真を残したよ");
       } catch {
         showToast("写真を保存できませんでした");
@@ -322,6 +316,28 @@ export function HomeInput({ recentEvents: _recentEvents }: HomeInputProps) {
     showToast("発見を残したよ");
   }
 
+  function handleBoardAction(actionType: HomeBoardAction) {
+    if (actionType === "open_mikke") {
+      setIsMikkeSheetOpen(true);
+      return;
+    }
+    if (actionType === "open_photo") {
+      void handleHomePhotoSelect();
+      return;
+    }
+    if (actionType === "open_discovery") {
+      handleDiscoveryClick();
+      return;
+    }
+    if (actionType === "go_torisetu") {
+      window.location.href = "/torisetu";
+      return;
+    }
+    if (actionType === "go_collection") {
+      window.location.href = "/collection";
+    }
+  }
+
   return (
     <main
       style={{
@@ -335,171 +351,30 @@ export function HomeInput({ recentEvents: _recentEvents }: HomeInputProps) {
           ...styles.backgroundPhoto,
           backgroundImage: `url("${photoSrc}")`,
           backgroundPosition: homePhotoPosition,
-          ...getPhotoStyle(lightConfig),
-        }}
-        aria-hidden="true"
-      />
-      <div
-        style={{
-          ...styles.overlayLayer,
-          background: lightConfig.mainOverlay,
-          zIndex: 1,
-        }}
-        aria-hidden="true"
-      />
-      <div
-        style={{
-          ...styles.overlayLayer,
-          background: lightConfig.cornerGlow,
-          zIndex: 2,
-        }}
-        aria-hidden="true"
-      />
-      <div
-        style={{
-          ...styles.overlayLayer,
-          background: lightConfig.ambientGlow,
-          zIndex: 3,
-        }}
-        aria-hidden="true"
-      />
-      <div
-        style={{
-          ...styles.overlayLayer,
-          background: lightConfig.coldOverlay,
-          zIndex: 4,
-        }}
-        aria-hidden="true"
-      />
-      <div
-        style={{
-          ...styles.overlayLayer,
-          background: lightConfig.fogOverlay,
-          zIndex: 5,
-        }}
-        aria-hidden="true"
-      />
-      <div
-        style={{
-          ...styles.overlayLayer,
-          background: lightConfig.goldenBloom,
-          zIndex: 6,
-        }}
-        aria-hidden="true"
-      />
-      <div
-        style={{
-          ...styles.overlayLayer,
-          background: lightConfig.bottomWarmth,
-          zIndex: 7,
-        }}
-        aria-hidden="true"
-      />
-      <div
-        style={{
-          ...styles.recordGlowLayer,
-          opacity: recordGlowActive ? 1 : 0,
         }}
         aria-hidden="true"
       />
       <div style={styles.contentLayer}>
         <section style={styles.heroContent}>
           <div style={styles.heroTopBar}>
-        <button
-          type="button"
-          onClick={() => setIsCatSheetOpen(true)}
-          style={{
-            ...styles.catSwitchButton,
-            ...dynamicPillStyle,
-          }}
-        >
-          <span>{catName}</span>
-          <span aria-hidden="true">▾</span>
-        </button>
-        <div
-          style={{
-            ...styles.lightPill,
-            ...dynamicPillStyle,
-          }}
-        >
-          <BulbIcon color={lightConfig.bulbColor} glow={lightConfig.bulbGlow} />
-          <div style={styles.lightTrack}>
-            <div
-              style={{
-                ...styles.lightFill,
-                width: `${lightConfig.barWidth}%`,
-                backgroundColor: lightConfig.barColor,
-              }}
-            />
+            <button
+              type="button"
+              onClick={() => setIsCatSheetOpen(true)}
+              style={styles.catSwitchButton}
+            >
+              <span>{catName}</span>
+              <span aria-hidden="true">▾</span>
+            </button>
           </div>
-        </div>
-          </div>
-        {shouldShowLightText ? <p style={styles.lightText}>{lightText}</p> : null}
-      </section>
-
-        <section style={styles.controlArea}>
-        <button
-          type="button"
-          onClick={handleDiscoveryClick}
-          style={{
-            ...(discovery.available ? styles.discoveryCard : styles.discoveryEmptyCard),
-            ...dynamicCardStyle,
-            ...styles.discoverySurface,
-          }}
-        >
-          {discovery.available ? (
-            <>
-              <span style={styles.discoveryIcon}>
-                <HeartIcon />
-              </span>
-              <span style={styles.discoveryTextGroup}>
-                <span style={styles.discoveryText}>{DISCOVERY_TEXT}</span>
-              </span>
-              <ChevronIcon />
-            </>
-          ) : (
-            <span style={styles.discoveryEmptyGroup}>
-              <span style={styles.discoveryEmptyText}>
-                {catName}のことを記録すると、発見が届くよ
-              </span>
-            </span>
-          )}
-        </button>
-      </section>
+        </section>
       </div>
 
-      {ENABLE_LIGHT_DEBUG && isLightDebugEnabled ? (
-        <div style={styles.lightDebugPanel}>
-          <span style={styles.lightDebugLabel}>
-            Lv{lightLevel} / {Math.round(lightScore)}
-          </span>
-          {([1, 3, 5] as const).map((level) => (
-            <button
-              key={level}
-              type="button"
-              onClick={() => setDebugLightLevel(level)}
-              style={
-                debugLightLevel === level
-                  ? { ...styles.lightDebugButton, ...styles.lightDebugButtonActive }
-                  : styles.lightDebugButton
-              }
-            >
-              Lv{level}
-            </button>
-          ))}
-          <button
-            type="button"
-            onClick={() => setDebugLightLevel(null)}
-            style={
-              debugLightLevel === null
-                ? { ...styles.lightDebugButton, ...styles.lightDebugButtonActive }
-                : styles.lightDebugButton
-            }
-          >
-            Live
-          </button>
-        </div>
-      ) : null}
+      <HomeBulletinBoard
+        catName={catName}
+        items={boardItems}
+        records={recordLog}
+        onAction={handleBoardAction}
+      />
 
       {isMikkeSheetOpen ? (
         <MikkeSheet
@@ -817,8 +692,226 @@ function CatSheet({
   );
 }
 
-function getLightDataKey(catId: string) {
-  return `light_data_${catId}`;
+function HomeBulletinBoard({
+  catName,
+  items,
+  records,
+  onAction,
+}: {
+  catName: string;
+  items: HomeBoardItem[];
+  records: RecordLogItem[];
+  onAction: (actionType: HomeBoardAction) => void;
+}) {
+  const [isOpen, setIsOpen] = useState(false);
+  const [touchStartY, setTouchStartY] = useState<number | null>(null);
+  const primaryItem =
+    items[0] ??
+    ({
+      id: "fallback",
+      kind: "mission",
+      priority: 999,
+      title: "今日のみっけ",
+      body: `見かけたら、${catName}のことをひとつだけ残しましょう。`,
+      icon: "paw",
+      actionLabel: "みっけ",
+      actionType: "open_mikke",
+    } satisfies HomeBoardItem);
+  const recentRecords = records.slice(0, 3);
+
+  function handleTouchStart(event: TouchEvent<HTMLDivElement>) {
+    setTouchStartY(event.touches[0]?.clientY ?? null);
+  }
+
+  function handleTouchEnd(event: TouchEvent<HTMLDivElement>) {
+    if (touchStartY === null) return;
+
+    const endY = event.changedTouches[0]?.clientY ?? touchStartY;
+    const deltaY = endY - touchStartY;
+
+    if (deltaY < -36) {
+      setIsOpen(true);
+    } else if (deltaY > 36) {
+      setIsOpen(false);
+    }
+    setTouchStartY(null);
+  }
+
+  return (
+    <section
+      style={isOpen ? styles.boardExpanded : styles.boardPeek}
+      onTouchStart={handleTouchStart}
+      onTouchEnd={handleTouchEnd}
+      aria-label={`${catName}から届いています`}
+    >
+      <button
+        type="button"
+        style={styles.boardHandleButton}
+        onClick={() => setIsOpen((value) => !value)}
+      >
+        <span style={styles.boardHandle} aria-hidden="true" />
+        <span style={styles.boardTitle}>{catName}から届いています</span>
+        <span style={styles.boardChevron}>{isOpen ? "⌄" : "⌃"}</span>
+      </button>
+
+      {isOpen ? (
+        <div style={styles.boardOpenContent}>
+          <div style={styles.boardSectionHeader}>
+            <span style={styles.boardSectionTitle}>いま見ておきたいこと</span>
+            <span style={styles.boardUnreadBadge}>
+              {items.filter((item) => item.isUnread).length || items.length}
+            </span>
+          </div>
+          <div style={styles.boardCardList}>
+            {items.map((item) => (
+              <button
+                key={item.id}
+                type="button"
+                style={styles.boardCard}
+                onClick={() => onAction(item.actionType)}
+              >
+                <span style={styles.boardCardIcon} aria-hidden="true">
+                  <BoardIcon icon={item.icon} />
+                </span>
+                <span style={styles.boardCardBody}>
+                  <span style={styles.boardCardTitleRow}>
+                    <span style={styles.boardCardTitle}>{item.title}</span>
+                    {item.isUnread ? <span style={styles.boardUnreadDot} /> : null}
+                  </span>
+                  <span style={styles.boardCardText}>{item.body}</span>
+                  <span style={styles.boardCardAction}>{item.actionLabel}</span>
+                </span>
+              </button>
+            ))}
+          </div>
+
+          <div style={styles.boardSectionHeader}>
+            <span style={styles.boardSectionTitle}>最近のメモ</span>
+          </div>
+          {recentRecords.length > 0 ? (
+            <div style={styles.boardMemoList}>
+              {recentRecords.map((record) => (
+                <div key={record.id} style={styles.boardMemoRow}>
+                  <span style={styles.boardMemoTime}>
+                    {formatRecordTime(record.timestamp)}
+                  </span>
+                  <span style={styles.boardMemoKind}>{formatRecordKind(record.type)}</span>
+                  <span style={styles.boardMemoValue}>{record.value}</span>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <p style={styles.boardEmptyText}>
+              みっけを残すと、ここに小さな変化が並びます。
+            </p>
+          )}
+        </div>
+      ) : (
+        <button type="button" style={styles.boardPreviewCard} onClick={() => setIsOpen(true)}>
+          <span style={styles.boardPreviewIcon} aria-hidden="true">
+            <BoardIcon icon={primaryItem.icon} />
+          </span>
+          <span style={styles.boardPreviewBody}>
+            <span style={styles.boardPreviewLabel}>{primaryItem.title}</span>
+            <span style={styles.boardPreviewText}>{primaryItem.body}</span>
+          </span>
+          <ChevronIcon />
+        </button>
+      )}
+    </section>
+  );
+}
+
+function BoardIcon({ icon }: { icon: HomeBoardItem["icon"] }) {
+  if (icon === "paw") return <PawIcon />;
+  if (icon === "heart") return <HeartIcon />;
+  if (icon === "camera") return <CameraIcon />;
+  if (icon === "book") return <BookIcon />;
+  return <BellIcon />;
+}
+
+function buildHomeBoardItems({
+  catName,
+  discoveryAvailable,
+  hasHomePhoto,
+  recordLog,
+  yousuRemaining,
+  mugiRemaining,
+}: {
+  catName: string;
+  discoveryAvailable: boolean;
+  hasHomePhoto: boolean;
+  recordLog: RecordLogItem[];
+  yousuRemaining: string | null;
+  mugiRemaining: string | null;
+}): HomeBoardItem[] {
+  const items: HomeBoardItem[] = [];
+  const latestRecord = recordLog[0];
+
+  if (discoveryAvailable) {
+    items.push({
+      id: "daily-discovery",
+      kind: "insight",
+      priority: 10,
+      title: "今日の小さな発見",
+      body: DISCOVERY_TEXT,
+      icon: "heart",
+      actionLabel: "見る",
+      actionType: "open_discovery",
+      isUnread: true,
+    });
+  } else if (latestRecord) {
+    items.push({
+      id: "recent-change",
+      kind: "insight",
+      priority: 20,
+      title: "最近の変化",
+      body: `${formatRecordKind(latestRecord.type)}に「${latestRecord.value}」が残っています。少しずつ${catName}のリズムが見えてきます。`,
+      icon: "heart",
+      actionLabel: "トリセツへ",
+      actionType: "go_torisetu",
+    });
+  }
+
+  items.push({
+    id: "today-mikke",
+    kind: "mission",
+    priority: 30,
+    title: "今日のみっけ",
+    body:
+      yousuRemaining && mugiRemaining
+        ? `次のみっけまで、あと${yousuRemaining}くらいです。`
+        : `見かけたら、${catName}のことをひとつだけ残しましょう。`,
+    icon: "paw",
+    actionLabel: "みっけ",
+    actionType: "open_mikke",
+  });
+
+  if (!hasHomePhoto) {
+    items.push({
+      id: "home-photo",
+      kind: "mission",
+      priority: 40,
+      title: "写真を置く",
+      body: `ホームに${catName}の写真を置くと、開いた瞬間に思い出せます。`,
+      icon: "camera",
+      actionLabel: "写真を選ぶ",
+      actionType: "open_photo",
+    });
+  }
+
+  items.push({
+    id: "torisetu-progress",
+    kind: "notice",
+    priority: 50,
+    title: "トリセツが育ちます",
+    body: "みっけが増えると、機嫌の見分け方や距離の縮め方が少しずつ見えてきます。",
+    icon: "book",
+    actionLabel: "見る",
+    actionType: "go_torisetu",
+  });
+
+  return items.sort((a, b) => a.priority - b.priority);
 }
 
 function getLockDataKey(catId: string) {
@@ -831,42 +924,6 @@ function getRecordLogKey(catId: string) {
 
 function getDiscoveryLogKey(catId: string) {
   return `discovery_log_${catId}`;
-}
-
-function createDefaultLightData(): LightData {
-  return {
-    score: 0,
-    lastUpdated: Date.now(),
-    todayYousuCount: 0,
-    todayMugiCount: 0,
-    todayDate: getTodayJST(),
-  };
-}
-
-function readLightData(catId: string): LightData {
-  try {
-    const raw = window.localStorage.getItem(getLightDataKey(catId));
-    if (!raw) return createDefaultLightData();
-    const parsed = JSON.parse(raw) as Partial<LightData>;
-
-    return {
-      score: typeof parsed.score === "number" ? parsed.score : 0,
-      lastUpdated:
-        typeof parsed.lastUpdated === "number" ? parsed.lastUpdated : Date.now(),
-      todayYousuCount:
-        typeof parsed.todayYousuCount === "number" ? parsed.todayYousuCount : 0,
-      todayMugiCount:
-        typeof parsed.todayMugiCount === "number" ? parsed.todayMugiCount : 0,
-      todayDate: parsed.todayDate ?? getTodayJST(),
-    };
-  } catch {
-    return createDefaultLightData();
-  }
-}
-
-function saveLightData(catId: string, data: LightData) {
-  // TODO: Supabase移行時はここを書き換え
-  window.localStorage.setItem(getLightDataKey(catId), JSON.stringify(data));
 }
 
 function readLockData(catId: string): LockData {
@@ -912,60 +969,6 @@ function saveRecord(
     getRecordLogKey(catId),
     JSON.stringify([nextRecord, ...records].slice(0, 200)),
   );
-}
-
-function resetIfNewDay(lightData: LightData): LightData {
-  const today = getTodayJST();
-
-  if (lightData.todayDate !== today) {
-    return {
-      ...lightData,
-      todayYousuCount: 0,
-      todayMugiCount: 0,
-      todayDate: today,
-    };
-  }
-
-  return lightData;
-}
-
-function updateLightForRecord(catId: string, type: LockType): LightData {
-  const lightData = resetIfNewDay(readLightData(catId));
-  const currentScore = getCurrentScore(lightData, Date.now());
-  const gain = getScoreGain(lightData);
-  const nextData: LightData = {
-    ...lightData,
-    score: Math.min(100, currentScore + gain),
-    lastUpdated: Date.now(),
-    todayYousuCount:
-      type === "yousu"
-        ? lightData.todayYousuCount + 1
-        : lightData.todayYousuCount,
-    todayMugiCount:
-      type === "mugi"
-        ? lightData.todayMugiCount + 1
-        : lightData.todayMugiCount,
-  };
-
-  saveLightData(catId, nextData);
-  return nextData;
-}
-
-function getScoreGain(lightData: LightData) {
-  const totalCount =
-    (lightData.todayYousuCount || 0) + (lightData.todayMugiCount || 0);
-  if (totalCount === 0) return 10;
-  if (totalCount === 1) return 7;
-  if (totalCount === 2) return 3;
-  return 0;
-}
-
-function getCurrentScore(lightData: LightData, now = Date.now()) {
-  const hoursSinceLast = (now - lightData.lastUpdated) / (1000 * 60 * 60);
-  const decayPerHour = 100 / 480;
-  const decayed = lightData.score - decayPerHour * hoursSinceLast;
-
-  return Math.max(0, Math.min(100, decayed));
 }
 
 function toCssUrl(src: string) {
@@ -1056,6 +1059,20 @@ function getJSTDate(timestamp: number) {
     .replace(/\//g, "-");
 }
 
+function formatRecordTime(timestamp: number) {
+  return new Intl.DateTimeFormat("ja-JP", {
+    timeZone: "Asia/Tokyo",
+    hour: "2-digit",
+    minute: "2-digit",
+  }).format(new Date(timestamp));
+}
+
+function formatRecordKind(type: RecordLogItem["type"]) {
+  if (type === "yousu") return "ようす";
+  if (type === "mugi") return "してあげた";
+  return "反応";
+}
+
 function getJSTHour(timestamp: number) {
   const hourText = new Intl.DateTimeFormat("ja-JP", {
     timeZone: "Asia/Tokyo",
@@ -1126,34 +1143,6 @@ function markDiscoverySeen(catId: string) {
   } catch {
     window.localStorage.setItem(getDiscoveryLogKey(catId), JSON.stringify([]));
   }
-}
-
-function BulbIcon({ color, glow }: { color: string; glow: string }) {
-  return (
-    <span
-      style={{
-        width: "16px",
-        height: "20px",
-        borderRadius: "50%",
-        boxShadow: glow,
-        color,
-        filter: glow === "none" ? "none" : `drop-shadow(0 0 4px ${color})`,
-        display: "inline-flex",
-        alignItems: "center",
-        justifyContent: "center",
-        transition: "all 1s ease-in-out",
-      }}
-      aria-hidden="true"
-    >
-      <svg viewBox="0 0 16 20" width="16" height="20" fill="none">
-        <path
-          d="M8 1.6a5.7 5.7 0 0 0-3.4 10.3c.7.5 1 1.2 1 2.1h4.8c0-.9.4-1.6 1-2.1A5.7 5.7 0 0 0 8 1.6Z"
-          fill="currentColor"
-        />
-        <path d="M5.7 15.1h4.6v1.4H5.7zM6.2 17.2h3.6v1.2H6.2z" fill="currentColor" />
-      </svg>
-    </span>
-  );
 }
 
 function PawIcon() {
@@ -1233,6 +1222,44 @@ function CameraIcon() {
   );
 }
 
+function BookIcon() {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      width="22"
+      height="22"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+    >
+      <path d="M4 5.5A2.5 2.5 0 0 1 6.5 3H20v17H6.5A2.5 2.5 0 0 0 4 22V5.5Z" />
+      <path d="M8 7h8M8 11h6" />
+    </svg>
+  );
+}
+
+function BellIcon() {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      width="22"
+      height="22"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+    >
+      <path d="M18 8a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9" />
+      <path d="M10 21h4" />
+    </svg>
+  );
+}
+
 function CloseIcon() {
   return (
     <svg
@@ -1303,72 +1330,6 @@ const styles = {
     backgroundPosition: "center 38%",
     backgroundRepeat: "no-repeat",
   },
-  overlayLayer: {
-    position: "fixed",
-    top: 0,
-    right: 0,
-    bottom: 0,
-    left: 0,
-    width: "100%",
-    height: "100dvh",
-    minHeight: "100vh",
-    pointerEvents: "none",
-    transition: "background 1s ease-in-out",
-  },
-  recordGlowLayer: {
-    position: "fixed",
-    top: 0,
-    right: 0,
-    bottom: 0,
-    left: 0,
-    width: "100%",
-    height: "100dvh",
-    minHeight: "100vh",
-    zIndex: 8,
-    pointerEvents: "none",
-    background:
-      "radial-gradient(circle at 84% 12%, rgba(255,220,128,0.34) 0%, rgba(255,194,90,0.16) 24%, rgba(255,194,90,0) 48%), radial-gradient(ellipse at 50% 72%, rgba(255,232,190,0.12) 0%, rgba(255,232,190,0) 36%)",
-    transition: "opacity 1s ease-out",
-  },
-  lightDebugPanel: {
-    position: "fixed",
-    right: "12px",
-    bottom: "calc(92px + env(safe-area-inset-bottom))",
-    zIndex: 140,
-    display: "flex",
-    alignItems: "center",
-    gap: "5px",
-    border: "0.5px solid rgba(255,255,255,0.22)",
-    borderRadius: "99px",
-    background: "rgba(24,24,22,0.58)",
-    backdropFilter: "blur(16px)",
-    WebkitBackdropFilter: "blur(16px)",
-    boxShadow: "0 8px 24px rgba(0,0,0,0.18)",
-    padding: "6px",
-  },
-  lightDebugLabel: {
-    color: "rgba(255,255,255,0.82)",
-    fontSize: "10px",
-    fontWeight: 700,
-    padding: "0 5px",
-    whiteSpace: "nowrap",
-  },
-  lightDebugButton: {
-    minWidth: "34px",
-    height: "26px",
-    border: "0.5px solid rgba(255,255,255,0.20)",
-    borderRadius: "99px",
-    background: "rgba(255,255,255,0.12)",
-    color: "rgba(255,255,255,0.82)",
-    fontSize: "10px",
-    fontWeight: 700,
-    cursor: "pointer",
-  },
-  lightDebugButtonActive: {
-    border: "0.5px solid rgba(245,200,66,0.65)",
-    background: "rgba(245,200,66,0.28)",
-    color: "#fff",
-  },
   contentLayer: {
     position: "relative",
     zIndex: 10,
@@ -1411,47 +1372,245 @@ const styles = {
     cursor: "pointer",
     backdropFilter: "blur(12px)",
   },
-  lightPill: {
+  boardPeek: {
+    position: "fixed",
+    left: "50%",
+    bottom: "calc(92px + env(safe-area-inset-bottom))",
+    zIndex: 24,
+    width: "min(calc(100% - 28px), 402px)",
+    maxHeight: "122px",
+    transform: "translateX(-50%)",
+    border: "0.5px solid rgba(224,221,214,0.86)",
+    borderRadius: "24px",
+    background: "rgba(255,255,255,0.9)",
+    boxShadow: "0 10px 30px rgba(24,23,20,0.16)",
+    backdropFilter: "blur(18px)",
+    WebkitBackdropFilter: "blur(18px)",
+    overflow: "hidden",
+    transition: "height 0.24s ease, max-height 0.24s ease, transform 0.24s ease",
+  },
+  boardExpanded: {
+    position: "fixed",
+    left: "50%",
+    bottom: "calc(84px + env(safe-area-inset-bottom))",
+    zIndex: 24,
+    width: "min(calc(100% - 24px), 406px)",
+    height: "min(64dvh, 540px)",
+    transform: "translateX(-50%)",
+    border: "0.5px solid rgba(224,221,214,0.9)",
+    borderRadius: "26px",
+    background: "rgba(255,255,255,0.94)",
+    boxShadow: "0 12px 34px rgba(24,23,20,0.2)",
+    backdropFilter: "blur(22px)",
+    WebkitBackdropFilter: "blur(22px)",
+    overflow: "hidden",
+    transition: "height 0.24s ease, max-height 0.24s ease, transform 0.24s ease",
+  },
+  boardHandleButton: {
+    width: "100%",
+    border: "none",
+    background: "transparent",
+    color: "#2A2A28",
+    display: "grid",
+    gridTemplateColumns: "1fr auto 1fr",
+    alignItems: "center",
+    gap: "8px",
+    padding: "8px 14px 5px",
+    cursor: "pointer",
+  },
+  boardHandle: {
+    justifySelf: "end",
+    width: "34px",
+    height: "4px",
+    borderRadius: "99px",
+    background: "#d8d4cc",
+  },
+  boardTitle: {
+    fontSize: "12px",
+    fontWeight: 750,
+    color: "#6f6b64",
+    whiteSpace: "nowrap",
+  },
+  boardChevron: {
+    justifySelf: "start",
+    fontSize: "15px",
+    lineHeight: 1,
+    color: "#9a958d",
+  },
+  boardPreviewCard: {
+    width: "100%",
+    border: "none",
+    background: "transparent",
+    display: "flex",
+    alignItems: "center",
+    gap: "11px",
+    padding: "8px 14px 14px",
+    textAlign: "left",
+    cursor: "pointer",
+  },
+  boardPreviewIcon: {
+    width: "38px",
+    height: "38px",
+    flexShrink: 0,
+    borderRadius: "14px",
+    background: HOME_ACCENT_SOFT_BG,
+    color: HOME_ACCENT_COLOR,
+    display: "inline-flex",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  boardPreviewBody: {
+    minWidth: 0,
+    flex: 1,
+    display: "flex",
+    flexDirection: "column",
+    gap: "3px",
+  },
+  boardPreviewLabel: {
+    color: "#77736d",
+    fontSize: "11px",
+    fontWeight: 750,
+  },
+  boardPreviewText: {
+    color: "#2A2A28",
+    fontSize: "13px",
+    fontWeight: 750,
+    lineHeight: 1.35,
+    overflow: "hidden",
+    textOverflow: "ellipsis",
+    display: "-webkit-box",
+    WebkitLineClamp: 2,
+    WebkitBoxOrient: "vertical",
+  },
+  boardOpenContent: {
+    height: "calc(100% - 41px)",
+    overflowY: "auto",
+    padding: "4px 14px 18px",
+    boxSizing: "border-box",
+  },
+  boardSectionHeader: {
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "space-between",
+    margin: "10px 2px 8px",
+  },
+  boardSectionTitle: {
+    color: "#8a867f",
+    fontSize: "11px",
+    fontWeight: 800,
+    letterSpacing: "0.03em",
+  },
+  boardUnreadBadge: {
+    minWidth: "20px",
+    height: "20px",
+    borderRadius: "99px",
+    background: HOME_ACCENT_SOFT_BG,
+    color: HOME_ACCENT_COLOR,
+    fontSize: "11px",
+    fontWeight: 800,
+    display: "inline-flex",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  boardCardList: {
+    display: "grid",
+    gap: "8px",
+  },
+  boardCard: {
+    width: "100%",
+    border: "0.5px solid rgba(224,221,214,0.9)",
+    borderRadius: "17px",
+    background: "rgba(250,249,247,0.82)",
+    color: "#2A2A28",
+    display: "flex",
+    gap: "11px",
+    alignItems: "flex-start",
+    padding: "12px",
+    textAlign: "left",
+    cursor: "pointer",
+  },
+  boardCardIcon: {
+    width: "36px",
+    height: "36px",
+    borderRadius: "13px",
+    flexShrink: 0,
+    background: HOME_ACCENT_SOFT_BG,
+    color: HOME_ACCENT_COLOR,
+    display: "inline-flex",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  boardCardBody: {
+    minWidth: 0,
+    display: "flex",
+    flexDirection: "column",
+    gap: "4px",
+  },
+  boardCardTitleRow: {
     display: "flex",
     alignItems: "center",
     gap: "6px",
-    border: "0.5px solid rgba(224,221,214,0.7)",
-    borderRadius: "99px",
-    background: "rgba(255,255,255,0.85)",
-    padding: "5px 10px",
-    backdropFilter: "blur(12px)",
   },
-  lightTrack: {
-    width: "60px",
-    height: "6px",
-    borderRadius: "99px",
-    background: "#E0DDD6",
+  boardCardTitle: {
+    fontSize: "13px",
+    fontWeight: 800,
+    color: "#2A2A28",
+  },
+  boardUnreadDot: {
+    width: "7px",
+    height: "7px",
+    borderRadius: "50%",
+    background: HOME_ACCENT_COLOR,
+  },
+  boardCardText: {
+    color: "#605d56",
+    fontSize: "12px",
+    fontWeight: 650,
+    lineHeight: 1.45,
+  },
+  boardCardAction: {
+    color: HOME_ACCENT_COLOR,
+    fontSize: "11px",
+    fontWeight: 800,
+  },
+  boardMemoList: {
+    display: "grid",
+    gap: "6px",
+  },
+  boardMemoRow: {
+    display: "grid",
+    gridTemplateColumns: "42px 70px 1fr",
+    gap: "8px",
+    alignItems: "center",
+    borderRadius: "13px",
+    background: "rgba(247,245,239,0.72)",
+    padding: "8px 10px",
+  },
+  boardMemoTime: {
+    color: "#96918a",
+    fontSize: "11px",
+    fontWeight: 750,
+  },
+  boardMemoKind: {
+    color: "#6f6b64",
+    fontSize: "11px",
+    fontWeight: 800,
+  },
+  boardMemoValue: {
+    minWidth: 0,
     overflow: "hidden",
+    textOverflow: "ellipsis",
+    whiteSpace: "nowrap",
+    color: "#2A2A28",
+    fontSize: "12px",
+    fontWeight: 750,
   },
-  lightFill: {
-    height: "100%",
-    borderRadius: "99px",
-    transition: "width 0.5s ease-in-out, background-color 0.5s ease-in-out",
-  },
-  lightText: {
-    alignSelf: "flex-start",
-    maxWidth: "min(100%, 330px)",
-    margin: "auto 0 0",
-    padding: "0 2px",
-    color: "rgba(255,255,255,0.95)",
-    fontSize: "14px",
-    fontWeight: 700,
+  boardEmptyText: {
+    margin: "0 2px",
+    color: "#8a867f",
+    fontSize: "12px",
     lineHeight: 1.6,
-    textShadow: "0 1px 4px rgba(0,0,0,0.36)",
-  },
-  controlArea: {
-    flex: "0 0 auto",
-    display: "flex",
-    flexDirection: "column",
-    gap: "10px",
-    background: "transparent",
-    padding: "0 18px 18px",
-    boxSizing: "border-box",
+    fontWeight: 650,
   },
   lockedState: {
     pointerEvents: "none",
@@ -1507,72 +1666,6 @@ const styles = {
     borderColor: HOME_ACCENT_COLOR,
     background: HOME_ACCENT_COLOR,
     color: "#FFFFFF",
-  },
-  discoveryCard: {
-    display: "flex",
-    alignItems: "center",
-    gap: "12px",
-    width: "100%",
-    border: "0.5px solid #E0DDD6",
-    minHeight: "58px",
-    borderRadius: "18px",
-    background: "rgba(247, 245, 239, 0.85)",
-    padding: "12px 14px",
-    textAlign: "left",
-    cursor: "pointer",
-  },
-  discoveryEmptyCard: {
-    width: "100%",
-    border: "0.5px solid #E0DDD6",
-    minHeight: "54px",
-    borderRadius: "18px",
-    background: "rgba(247, 245, 239, 0.85)",
-    padding: "12px 14px",
-    textAlign: "center",
-  },
-  discoverySurface: {
-    background: "rgba(255,255,255,0.88)",
-    boxShadow: "0 3px 10px rgba(52, 50, 46, 0.06)",
-    padding: "9px 14px",
-  },
-  discoveryIcon: {
-    display: "inline-flex",
-    alignItems: "center",
-    justifyContent: "center",
-    width: "30px",
-    height: "30px",
-    flexShrink: 0,
-    borderRadius: "50%",
-    border: "none",
-    background: "transparent",
-    color: HOME_ACCENT_COLOR,
-  },
-  discoveryTextGroup: {
-    display: "flex",
-    minWidth: 0,
-    flex: 1,
-    flexDirection: "column",
-    gap: "3px",
-  },
-  discoveryText: {
-    color: "#2A2A28",
-    fontSize: "13px",
-    fontWeight: 600,
-    lineHeight: 1.4,
-    textShadow: "0 1px 0 rgba(255,255,255,0.22)",
-  },
-  discoveryEmptyGroup: {
-    display: "flex",
-    flexDirection: "column",
-    alignItems: "center",
-    gap: "3px",
-  },
-  discoveryEmptyText: {
-    color: "#56534d",
-    fontSize: "13px",
-    fontWeight: 700,
-    lineHeight: 1.4,
-    textShadow: "0 1px 0 rgba(255,255,255,0.22)",
   },
   sheetBackdrop: {
     position: "fixed",
