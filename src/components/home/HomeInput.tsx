@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import type { CSSProperties, TouchEvent } from "react";
 import type { RecentEvent } from "../../lib/supabase/queries";
 import { BottomNavigation } from "../navigation/BottomNavigation";
@@ -87,7 +87,8 @@ const REACTION_OPTIONS = [
 
 const DISCOVERY_TEXT =
   "昨日の小さな記録から、少しだけリズムが見えてきました。";
-const HOME_NAV_CONTENT_INSET = "max(18px, calc((100vw - 410px) / 2 + 4px))";
+const HOME_NAV_FRAME_WIDTH = "min(calc(100% - 28px), 410px)";
+const HOME_NAV_EDGE_INSET = "max(14px, calc((100vw - 410px) / 2))";
 const HOME_ACCENT_COLOR = APP_ACCENT;
 const HOME_ACCENT_SOFT_BG = APP_ACCENT_SOFT_BG;
 const HOME_ACCENT_SOFT_BORDER = APP_ACCENT_SOFT_BORDER;
@@ -778,6 +779,7 @@ function HomeBulletinBoard({
 }) {
   const [isOpen, setIsOpen] = useState(false);
   const [touchStartY, setTouchStartY] = useState<number | null>(null);
+  const boardRailRef = useRef<HTMLDivElement | null>(null);
   const displayItems =
     items.length > 0
       ? items
@@ -795,6 +797,10 @@ function HomeBulletinBoard({
         ];
   const unreadCount = displayItems.filter((item) => item.isUnread).length;
   const recentRecords = records.slice(0, 3);
+
+  useEffect(() => {
+    boardRailRef.current?.scrollTo({ left: 0, behavior: "auto" });
+  }, [catName, displayItems.length, isOpen]);
 
   function handleTouchStart(event: TouchEvent<HTMLDivElement>) {
     setTouchStartY(event.touches[0]?.clientY ?? null);
@@ -840,8 +846,7 @@ function HomeBulletinBoard({
         {unreadCount > 0 ? <span style={styles.boardHeaderMeta}>新着</span> : null}
       </div>
 
-      <div style={styles.boardRail} aria-label="おすすめカード">
-        <div style={styles.boardRailSpacer} aria-hidden="true" />
+      <div ref={boardRailRef} style={styles.boardRail} aria-label="おすすめカード">
         {displayItems.map((item, index) => (
           <button
             key={item.id}
@@ -862,7 +867,6 @@ function HomeBulletinBoard({
             <span style={styles.boardCardTitle}>{item.title}</span>
           </button>
         ))}
-        <div style={styles.boardRailSpacer} aria-hidden="true" />
       </div>
 
       {isOpen ? (
@@ -993,7 +997,7 @@ function buildHomeBoardItems({
     id: "torisetu-progress",
     kind: "notice",
     priority: 50,
-    title: "トリセツが育ちます",
+    title: "トリセツが追加",
     body: "みっけが増えると、機嫌の見分け方や距離の縮め方が少しずつ見えてきます。",
     icon: "book",
     actionLabel: "見る",
@@ -1622,10 +1626,13 @@ const styles = {
     background: "rgba(255,255,255,0.34)",
   },
   boardHeader: {
+    width: HOME_NAV_FRAME_WIDTH,
+    margin: "0 auto",
+    boxSizing: "border-box",
     display: "flex",
     alignItems: "center",
     gap: "9px",
-    padding: `2px ${HOME_NAV_CONTENT_INSET} 10px`,
+    padding: "2px 0 10px",
   },
   boardHeaderIcon: {
     width: "24px",
@@ -1658,22 +1665,21 @@ const styles = {
     padding: "3px 8px",
   },
   boardRail: {
+    width: HOME_NAV_FRAME_WIDTH,
+    margin: "0 auto",
+    boxSizing: "border-box",
     display: "flex",
     gap: "10px",
     overflowX: "auto",
     scrollbarWidth: "none",
     padding: "0 0 18px",
     scrollSnapType: "x proximity",
-  },
-  boardRailSpacer: {
-    width: HOME_NAV_CONTENT_INSET,
-    minWidth: HOME_NAV_CONTENT_INSET,
-    flexShrink: 0,
+    overscrollBehaviorX: "contain",
   },
   boardOpenContent: {
     height: "calc(100% - 198px)",
     overflowY: "auto",
-    padding: `0 ${HOME_NAV_CONTENT_INSET} calc(112px + env(safe-area-inset-bottom))`,
+    padding: `0 ${HOME_NAV_EDGE_INSET} calc(112px + env(safe-area-inset-bottom))`,
     boxSizing: "border-box",
   },
   boardSectionHeader: {
