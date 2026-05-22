@@ -62,21 +62,21 @@ type DayMapItem = {
   signal: string | null;
 };
 
-type KnowledgeChapter = {
+type KnownFact = {
   id: string;
-  title: string;
-  label: string;
-  body: string;
-  status: "open" | "ready" | "locked";
-  meta: string;
-  rows: KnowledgeRow[];
-  actionLabel?: string;
-  actionCard?: DeepDiveCard;
-};
-
-type KnowledgeRow = {
   label: string;
   value: string;
+  source: string;
+};
+
+type DiagnosisItem = {
+  card: DeepDiveCard;
+  status: "completed" | "ready" | "locked";
+  meta: string;
+  body: string;
+  remaining: number;
+  progress: number;
+  answer?: DeepDiveAnswer;
 };
 
 type DeepDiveOption = {
@@ -88,6 +88,7 @@ type DeepDiveCard = {
   id: string;
   title: string;
   threshold: number;
+  questionCount: number;
   preview: string;
   question: string;
   options: DeepDiveOption[];
@@ -115,7 +116,8 @@ const DEEP_DIVE_CARDS: DeepDiveCard[] = [
     id: "mood",
     title: "機嫌の見分け方",
     threshold: 8,
-    preview: "いつもの表情や距離感を、もう少し詳しく残せます。",
+    questionCount: 30,
+    preview: "表情・距離感・しっぽなどから、機嫌のサインを整理する診断です。",
     question: "機嫌がよさそうなとき、いちばん多いサインは？",
     options: [
       { label: "目がやわらかい", result: "機嫌がいいときは、目つきや表情に出やすいかもしれません。" },
@@ -128,7 +130,8 @@ const DEEP_DIVE_CARDS: DeepDiveCard[] = [
     id: "play",
     title: "遊び方のコツ",
     threshold: 15,
-    preview: "喜びやすい誘い方や、乗りやすいタイミングを探せます。",
+    questionCount: 30,
+    preview: "好きな誘い方、乗りやすい時間、飽きやすさを探る診断です。",
     question: "遊びに誘うなら、どれが一番反応しやすい？",
     options: [
       { label: "動くおもちゃ", result: "動きのある遊びに反応しやすい子かもしれません。" },
@@ -141,7 +144,8 @@ const DEEP_DIVE_CARDS: DeepDiveCard[] = [
     id: "food",
     title: "ごはんのこと",
     threshold: 20,
-    preview: "ごはん前後の変化や、気にしやすさを整理できます。",
+    questionCount: 30,
+    preview: "ごはん前後の変化や、食への関心の強さを整理する診断です。",
     question: "ごはんの時間が近いとき、どんな様子が多い？",
     options: [
       { label: "先に待っている", result: "ごはんの時間をかなり覚えている子かもしれません。" },
@@ -154,7 +158,8 @@ const DEEP_DIVE_CARDS: DeepDiveCard[] = [
     id: "stress",
     title: "ストレスのサイン",
     threshold: 25,
-    preview: "不安なときに出やすい変化を、やさしく見分けます。",
+    questionCount: 30,
+    preview: "不安なときに出やすい行動や、環境変化への反応を見る診断です。",
     question: "落ち着かなさそうなとき、先に出やすい変化は？",
     options: [
       { label: "隠れる", result: "不安なときは、まず距離を取るサインが出やすそうです。" },
@@ -167,7 +172,8 @@ const DEEP_DIVE_CARDS: DeepDiveCard[] = [
     id: "bond",
     title: "距離の縮め方",
     threshold: 30,
-    preview: "近づきたいとき、待つときの境目を探せます。",
+    questionCount: 30,
+    preview: "触る・待つ・声をかけるなど、距離の取り方を探る診断です。",
     question: "こちらから近づくなら、どれが一番うまくいきやすい？",
     options: [
       { label: "声をかける", result: "先に声をかけると、安心して受け入れやすいかもしれません。" },
@@ -219,110 +225,72 @@ export function TorisetuPage({ recentEvents }: TorisetuPageProps) {
   const answeredDeepDives = DEEP_DIVE_CARDS.map((card) => answers[card.id]).filter(
     Boolean,
   );
-  const readyDeepDive =
-    DEEP_DIVE_CARDS.find((card) => recordCount >= card.threshold && !answers[card.id]) ??
-    null;
-  const nextDeepDive =
-    readyDeepDive ?? DEEP_DIVE_CARDS.find((card) => !answers[card.id]) ?? null;
-  const nextDeepDiveRemaining = nextDeepDive
-    ? Math.max(0, nextDeepDive.threshold - recordCount)
-    : 0;
   const hasRhythmSignal = dayMap.some((item) => item.signal);
   const peakTime = catProfile?.activityPattern?.peakTime;
   const peakSlots = peakTime ? peakTimeMap[peakTime] ?? [] : [];
-  const chapters: KnowledgeChapter[] = [
+  const knownFacts: KnownFact[] = [
     {
-      id: "personality",
-      title: "この子の基本",
-      label: "診断から",
-      body: catProfile?.typeTagline ?? catProfile?.typeLabel ?? "みっけが増えると、この子らしさが少しずつ言葉になります。",
-      status: "open",
-      meta: "追加済み",
-      rows: [
-        { label: "タイプ", value: typeLabel },
-        { label: "もと", value: "オンボーディング診断" },
-      ],
+      id: "type",
+      label: "タイプ",
+      value: typeLabel,
+      source: catProfile?.typeTagline ?? "オンボーディング診断から",
     },
     {
       id: "recent",
-      title: "最近のようす",
-      label: "日々のみっけ",
-      body: recentSummary,
-      status: records.length > 0 ? "open" : "locked",
-      meta: records.length > 0 ? `${recordCount}件から` : "みっけ待ち",
-      rows: [
-        { label: "記録数", value: `${recordCount}件` },
-        {
-          label: "よく見る",
-          value:
-            records.length > 0
-              ? recentSummary
-              : "みっけを残すと見えてきます",
-        },
-      ],
+      label: "最近",
+      value: recentSummary,
+      source: records.length > 0 ? `${recordCount}件のみっけから` : "みっけ待ち",
     },
     {
       id: "rhythm",
-      title: "1日のリズム",
-      label: "時間帯",
-      body: rhythmSummary,
-      status: hasRhythmSignal || peakSlots.length > 0 ? "open" : "locked",
-      meta: hasRhythmSignal ? "見えてきた" : peakSlots.length > 0 ? "診断から" : "記録待ち",
-      rows: dayMap.map((item) => ({
-        label: item.period,
-        value: item.signal
-          ? getSignalDisplayLabel(item.signal)
-          : peakSlots.includes(item.period)
-            ? "動きやすい"
-            : "-",
-      })),
+      label: "リズム",
+      value: rhythmSummary,
+      source: hasRhythmSignal
+        ? "時間帯のみっけから"
+        : peakSlots.length > 0
+          ? "診断から"
+          : "記録待ち",
     },
-    {
-      id: "lifeTips",
-      title: "暮らしのコツ",
-      label: "深掘り質問",
-      body:
-        answeredDeepDives.length > 0
-          ? `${answeredDeepDives.length}件のコツが追加されています。`
-          : readyDeepDive
-            ? `${readyDeepDive.title}を1問で追加できます。`
-            : nextDeepDive
-              ? `${nextDeepDive.title}は、みっけが増えると開きます。`
-              : "この子との暮らし方を見返せます。",
-      status: answeredDeepDives.length > 0 ? "open" : readyDeepDive ? "ready" : "locked",
-      meta:
-        answeredDeepDives.length > 0
-          ? `${answeredDeepDives.length}件追加`
-          : readyDeepDive
-            ? "1問で追加"
-            : nextDeepDive
-              ? `あと${nextDeepDiveRemaining}回`
-              : "追加済み",
-      rows:
-        answeredDeepDives.length > 0
-          ? answeredDeepDives.slice(0, 3).map((answer) => ({
-              label: answer.label,
-              value: compactText(answer.result, 28),
-            }))
-          : [
-              {
-                label: readyDeepDive ? "次に追加" : "次に開く",
-                value: nextDeepDive
-                  ? readyDeepDive
-                    ? readyDeepDive.title
-                    : `${nextDeepDive.title} あと${nextDeepDiveRemaining}回`
-                  : "すべて追加済み",
-              },
-            ],
-      actionLabel: readyDeepDive ? "答える" : undefined,
-      actionCard: readyDeepDive ?? undefined,
-    },
+    ...answeredDeepDives.map((answer) => ({
+      id: `diagnosis-${answer.cardId}`,
+      label: answer.label,
+      value: compactText(answer.result, 42),
+      source: "深掘り診断から",
+    })),
   ];
-  const openChapterCount = chapters.filter((chapter) => chapter.status === "open").length;
-  const nextChapter =
-    chapters.find((chapter) => chapter.status === "ready") ??
-    chapters.find((chapter) => chapter.status === "locked") ??
-    null;
+  const diagnosisItems: DiagnosisItem[] = DEEP_DIVE_CARDS.map((card) => {
+    const answer = answers[card.id];
+    const remaining = Math.max(0, card.threshold - recordCount);
+    const status = answer ? "completed" : remaining === 0 ? "ready" : "locked";
+
+    return {
+      card,
+      status,
+      answer,
+      remaining,
+      progress: Math.min(100, Math.round((recordCount / card.threshold) * 100)),
+      meta: answer ? "結果あり" : status === "ready" ? "開放中" : `あと${remaining}回`,
+      body: answer?.result ?? card.preview,
+    };
+  });
+  const unlockedDiagnoses = diagnosisItems.filter(
+    (item) => item.status === "completed" || item.status === "ready",
+  );
+  const upcomingDiagnoses = diagnosisItems.filter((item) => item.status === "locked");
+  const readyDiagnosis = diagnosisItems.find((item) => item.status === "ready") ?? null;
+  const nextDiagnosis = readyDiagnosis ?? upcomingDiagnoses[0] ?? null;
+  const knowledgeCount = knownFacts.length;
+  const openDiagnosisCount = diagnosisItems.filter(
+    (item) => item.status === "completed",
+  ).length;
+  const primaryDiagnosisItems =
+    unlockedDiagnoses.length > 0
+      ? unlockedDiagnoses
+      : nextDiagnosis
+        ? [nextDiagnosis]
+        : [];
+  const secondaryDiagnosisItems =
+    unlockedDiagnoses.length > 0 ? upcomingDiagnoses : upcomingDiagnoses.slice(1);
 
   function handleAnswer(option: DeepDiveOption) {
     if (!catProfile || !activeDive) return;
@@ -355,7 +323,7 @@ export function TorisetuPage({ recentEvents }: TorisetuPageProps) {
           <div style={styles.headerText}>
             <p style={styles.eyebrow}>CAT GUIDE</p>
             <h1 style={styles.title}>{catName}のトリセツ</h1>
-            <p style={styles.headerLead}>みっけから、この子専用の知識が育ちます。</p>
+            <p style={styles.headerLead}>ホームのみっけから、この子専用の知識が育ちます。</p>
           </div>
         </header>
 
@@ -366,92 +334,95 @@ export function TorisetuPage({ recentEvents }: TorisetuPageProps) {
           </div>
           <div style={styles.libraryStats}>
             <div>
-              <p style={styles.libraryStatNumber}>{openChapterCount}</p>
-              <p style={styles.libraryStatLabel}>開いた章</p>
+              <p style={styles.libraryStatNumber}>{knowledgeCount}</p>
+              <p style={styles.libraryStatLabel}>見えてきたこと</p>
             </div>
             <div>
               <p style={styles.libraryStatNumber}>{recordCount}</p>
               <p style={styles.libraryStatLabel}>みっけ</p>
             </div>
             <div>
-              <p style={styles.libraryStatNumber}>{answeredCount}</p>
-              <p style={styles.libraryStatLabel}>深掘り</p>
+              <p style={styles.libraryStatNumber}>{openDiagnosisCount}</p>
+              <p style={styles.libraryStatLabel}>診断結果</p>
             </div>
           </div>
           <div style={styles.progressTrack}>
             <div style={{ ...styles.progressFill, width: `${understanding}%` }} />
           </div>
           <p style={styles.libraryHeroNote}>
-            {nextChapter?.status === "ready"
-              ? `${nextChapter.title}に1問で追加できます。`
-              : nextChapter
-                ? `${nextChapter.title}は${nextChapter.meta}で育ちます。`
-                : "4つの章を見返せます。"}
+            {readyDiagnosis
+              ? `${readyDiagnosis.card.title}が開放されています。`
+              : nextDiagnosis
+                ? `${nextDiagnosis.card.title}はあと${nextDiagnosis.remaining}回のみっけで開きます。`
+                : "いま分かっていることを見返せます。"}
           </p>
+          {!readyDiagnosis && nextDiagnosis ? (
+            <a href="/home" style={styles.heroActionLink}>
+              今日のみっけを残す
+            </a>
+          ) : null}
         </section>
 
         <section style={styles.section}>
           <div style={styles.sectionHeader}>
-            <p style={styles.sectionKicker}>GUIDE BOOK</p>
-            <h2 style={styles.sectionTitle}>4つの章</h2>
+            <p style={styles.sectionKicker}>KNOWLEDGE</p>
+            <h2 style={styles.sectionTitle}>いま分かっていること</h2>
             <p style={styles.sectionLead}>
-              この子を知る手がかりを、まとまりごとに見返せます。
+              みっけと診断から、迷ったときに見返せる手がかりだけを残します。
             </p>
           </div>
 
-          <div style={styles.chapterList}>
-            {chapters.map((chapter) => (
-              <article
-                key={chapter.id}
-                style={
-                  chapter.status === "locked"
-                    ? { ...styles.chapterCard, ...styles.chapterCardLocked }
-                    : chapter.status === "ready"
-                      ? { ...styles.chapterCard, ...styles.chapterCardReady }
-                      : styles.chapterCard
-                }
-              >
-                <div style={styles.chapterCardTop}>
-                  <span style={styles.chapterLabel}>{chapter.label}</span>
-                  <span
-                    style={
-                      chapter.status === "open"
-                        ? styles.chapterStatusOpen
-                        : chapter.status === "ready"
-                          ? styles.chapterStatusReady
-                          : styles.chapterStatusLocked
-                    }
-                  >
-                    {chapter.meta}
-                  </span>
+          <div style={styles.factCard}>
+            {knownFacts.map((fact) => (
+              <div key={fact.id} style={styles.factRow}>
+                <span style={styles.factLabel}>{fact.label}</span>
+                <div style={styles.factText}>
+                  <strong style={styles.factValue}>{fact.value}</strong>
+                  <span style={styles.factSource}>{fact.source}</span>
                 </div>
-                <div style={styles.chapterBodyRow}>
-                  <div style={styles.chapterText}>
-                    <h3 style={styles.chapterTitle}>{chapter.title}</h3>
-                    <p style={styles.chapterBody}>{chapter.body}</p>
-                  </div>
-                  {chapter.status === "ready" && chapter.actionCard ? (
-                    <button
-                      type="button"
-                      style={styles.chapterAction}
-                      onClick={() => setActiveDive(chapter.actionCard ?? null)}
-                    >
-                      {chapter.actionLabel}
-                    </button>
-                  ) : null}
-                </div>
-                <div style={styles.chapterRows}>
-                  {chapter.rows.map((row) => (
-                    <div key={`${chapter.id}-${row.label}`} style={styles.chapterRow}>
-                      <span style={styles.chapterRowLabel}>{row.label}</span>
-                      <span style={styles.chapterRowValue}>{row.value}</span>
-                    </div>
-                  ))}
-                </div>
-              </article>
+              </div>
             ))}
           </div>
         </section>
+
+        <section style={styles.section}>
+          <div style={styles.sectionHeader}>
+            <p style={styles.sectionKicker}>DIAGNOSIS</p>
+            <h2 style={styles.sectionTitle}>深掘り診断</h2>
+            <p style={styles.sectionLead}>
+              みっけが増えると、30問前後の診断モジュールが開きます。
+            </p>
+          </div>
+
+          <div style={styles.diagnosisList}>
+            {primaryDiagnosisItems.map((item) => (
+              <DiagnosisCard
+                key={item.card.id}
+                item={item}
+                onStart={() => setActiveDive(item.card)}
+              />
+            ))}
+          </div>
+        </section>
+
+        {secondaryDiagnosisItems.length > 0 ? (
+          <section style={styles.section}>
+            <div style={styles.sectionHeaderCompact}>
+              <h2 style={styles.sectionTitleSmall}>ロック中の診断</h2>
+            </div>
+            <div style={styles.upcomingList}>
+              {secondaryDiagnosisItems.map((item) => (
+                <div key={item.card.id} style={styles.upcomingRow}>
+                  <div style={styles.upcomingText}>
+                    <span style={styles.upcomingTitle}>{item.card.title}</span>
+                    <span style={styles.upcomingSub}>{item.card.questionCount}問診断</span>
+                  </div>
+                  <span style={styles.upcomingMeta}>あと{item.remaining}回</span>
+                </div>
+              ))}
+            </div>
+          </section>
+        ) : null}
 
         <div style={{ height: "108px" }} />
       </div>
@@ -468,7 +439,7 @@ export function TorisetuPage({ recentEvents }: TorisetuPageProps) {
             <div style={styles.sheetHandle} />
             <div style={styles.sheetHeader}>
               <div>
-                <p style={styles.sheetKicker}>深掘り質問</p>
+                <p style={styles.sheetKicker}>深掘り診断</p>
                 <h2 style={styles.sheetTitle}>{activeDive.title}</h2>
               </div>
               <button
@@ -499,6 +470,72 @@ export function TorisetuPage({ recentEvents }: TorisetuPageProps) {
 
       <BottomNavigation active="torisetu" />
     </main>
+  );
+}
+
+function DiagnosisCard({
+  item,
+  onStart,
+}: {
+  item: DiagnosisItem;
+  onStart: () => void;
+}) {
+  const isReady = item.status === "ready";
+  const isCompleted = item.status === "completed";
+
+  return (
+    <article
+      style={
+        item.status === "locked"
+          ? { ...styles.diagnosisCard, ...styles.diagnosisCardLocked }
+          : isReady
+            ? { ...styles.diagnosisCard, ...styles.diagnosisCardReady }
+            : styles.diagnosisCard
+      }
+    >
+      <div style={styles.diagnosisTop}>
+        <span style={styles.diagnosisMeta}>
+          {isCompleted ? "診断結果" : `${item.card.questionCount}問診断`}
+        </span>
+        <span
+          style={
+            isCompleted
+              ? styles.diagnosisBadgeDone
+              : isReady
+                ? styles.diagnosisBadgeReady
+                : styles.diagnosisBadgeLocked
+          }
+        >
+          {item.meta}
+        </span>
+      </div>
+      <div style={styles.diagnosisBodyRow}>
+        <div style={styles.diagnosisText}>
+          <h3 style={styles.diagnosisTitle}>{item.card.title}</h3>
+          <p style={styles.diagnosisBody}>{item.body}</p>
+        </div>
+        {isReady ? (
+          <button type="button" style={styles.diagnosisAction} onClick={onStart}>
+            はじめる
+          </button>
+        ) : null}
+      </div>
+      {!isCompleted ? (
+        <div style={styles.diagnosisProgressArea}>
+          <div style={styles.diagnosisProgressTrack}>
+            <div
+              style={{
+                ...styles.diagnosisProgressFill,
+                width: `${item.progress}%`,
+              }}
+            />
+          </div>
+          <span style={styles.diagnosisProgressText}>
+            {isReady ? "診断できます" : `あと${item.remaining}回のみっけ`}
+          </span>
+        </div>
+      ) : null}
+    </article>
   );
 }
 
@@ -956,6 +993,21 @@ const styles = {
     fontWeight: 520,
     lineHeight: 1.55,
   },
+  heroActionLink: {
+    display: "inline-flex",
+    alignItems: "center",
+    justifyContent: "center",
+    minHeight: "34px",
+    marginTop: "12px",
+    borderRadius: "99px",
+    background: "rgba(255,255,255,0.88)",
+    color: "#2a2a28",
+    fontSize: "12px",
+    fontWeight: 620,
+    textDecoration: "none",
+    padding: "0 14px",
+    boxShadow: "0 8px 18px rgba(0,0,0,0.12)",
+  },
   progressHeader: {
     display: "flex",
     justifyContent: "space-between",
@@ -1084,6 +1136,208 @@ const styles = {
     fontSize: "12px",
     fontWeight: 500,
     lineHeight: 1.55,
+  },
+  sectionHeaderCompact: {
+    margin: "0 4px 8px",
+  },
+  sectionTitleSmall: {
+    margin: 0,
+    color: TORISETU_MUTED,
+    fontSize: "14px",
+    fontWeight: 620,
+    lineHeight: 1.35,
+  },
+  factCard: {
+    ...TORISETU_SURFACE_SOFT,
+    borderRadius: "20px",
+    padding: "4px 14px",
+  },
+  factRow: {
+    display: "grid",
+    gridTemplateColumns: "62px 1fr",
+    gap: "12px",
+    padding: "12px 0",
+    borderBottom: "0.5px solid rgba(255,255,255,0.08)",
+  },
+  factLabel: {
+    color: TORISETU_FAINT,
+    fontSize: "12px",
+    fontWeight: 560,
+    lineHeight: 1.45,
+    paddingTop: "1px",
+  },
+  factText: {
+    minWidth: 0,
+    display: "flex",
+    flexDirection: "column" as const,
+    gap: "3px",
+  },
+  factValue: {
+    color: TORISETU_TEXT_STRONG,
+    fontSize: "14px",
+    fontWeight: 620,
+    lineHeight: 1.45,
+  },
+  factSource: {
+    color: TORISETU_MUTED,
+    fontSize: "11px",
+    fontWeight: 500,
+    lineHeight: 1.45,
+  },
+  diagnosisList: {
+    display: "flex",
+    flexDirection: "column" as const,
+    gap: "10px",
+  },
+  diagnosisCard: {
+    ...TORISETU_SURFACE_SOFT,
+    borderRadius: "20px",
+    padding: "14px",
+  },
+  diagnosisCardReady: {
+    background: "rgba(255,255,255,0.14)",
+    border: "0.5px solid rgba(255,220,160,0.28)",
+  },
+  diagnosisCardLocked: {
+    opacity: 0.72,
+    background: "rgba(255,255,255,0.07)",
+  },
+  diagnosisTop: {
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: "10px",
+    marginBottom: "9px",
+  },
+  diagnosisMeta: {
+    color: TORISETU_MUTED,
+    fontSize: "11px",
+    fontWeight: 560,
+    lineHeight: 1.3,
+  },
+  diagnosisBadgeDone: {
+    color: "rgba(255,255,255,0.72)",
+    border: "0.5px solid rgba(255,255,255,0.16)",
+    borderRadius: "99px",
+    padding: "2px 8px",
+    fontSize: "11px",
+    fontWeight: 520,
+  },
+  diagnosisBadgeReady: {
+    color: "rgba(255,232,190,0.95)",
+    border: "0.5px solid rgba(255,220,160,0.28)",
+    borderRadius: "99px",
+    padding: "2px 8px",
+    fontSize: "11px",
+    fontWeight: 560,
+  },
+  diagnosisBadgeLocked: {
+    color: TORISETU_FAINT,
+    border: "0.5px solid rgba(255,255,255,0.10)",
+    borderRadius: "99px",
+    padding: "2px 8px",
+    fontSize: "11px",
+    fontWeight: 520,
+  },
+  diagnosisBodyRow: {
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: "14px",
+  },
+  diagnosisText: {
+    minWidth: 0,
+    flex: 1,
+  },
+  diagnosisTitle: {
+    margin: "0 0 5px",
+    color: TORISETU_TEXT_STRONG,
+    fontSize: "16px",
+    fontWeight: 650,
+    lineHeight: 1.38,
+  },
+  diagnosisBody: {
+    margin: 0,
+    color: TORISETU_MUTED,
+    fontSize: "13px",
+    fontWeight: 500,
+    lineHeight: 1.58,
+  },
+  diagnosisAction: {
+    flexShrink: 0,
+    minHeight: "36px",
+    border: "none",
+    borderRadius: "99px",
+    background: "rgba(255,255,255,0.92)",
+    color: "#2a2a28",
+    fontSize: "12px",
+    fontWeight: 620,
+    padding: "0 14px",
+    cursor: "pointer",
+  },
+  diagnosisProgressArea: {
+    display: "grid",
+    gridTemplateColumns: "1fr auto",
+    alignItems: "center",
+    gap: "10px",
+    marginTop: "12px",
+  },
+  diagnosisProgressTrack: {
+    height: "3px",
+    borderRadius: "99px",
+    background: "rgba(255,255,255,0.13)",
+    overflow: "hidden",
+  },
+  diagnosisProgressFill: {
+    height: "100%",
+    borderRadius: "99px",
+    background: "rgba(255,232,190,0.82)",
+    transition: "width 0.3s ease",
+  },
+  diagnosisProgressText: {
+    color: TORISETU_MUTED,
+    fontSize: "11px",
+    fontWeight: 520,
+    lineHeight: 1.3,
+  },
+  upcomingList: {
+    ...TORISETU_SURFACE_SOFT,
+    borderRadius: "18px",
+    padding: "2px 14px",
+  },
+  upcomingRow: {
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: "12px",
+    padding: "11px 0",
+    borderBottom: "0.5px solid rgba(255,255,255,0.08)",
+  },
+  upcomingText: {
+    minWidth: 0,
+    display: "flex",
+    flexDirection: "column" as const,
+    gap: "2px",
+  },
+  upcomingTitle: {
+    minWidth: 0,
+    color: TORISETU_TEXT,
+    fontSize: "13px",
+    fontWeight: 560,
+    lineHeight: 1.45,
+  },
+  upcomingSub: {
+    color: TORISETU_FAINT,
+    fontSize: "11px",
+    fontWeight: 500,
+    lineHeight: 1.35,
+  },
+  upcomingMeta: {
+    flexShrink: 0,
+    color: TORISETU_FAINT,
+    fontSize: "12px",
+    fontWeight: 520,
+    lineHeight: 1.45,
   },
   chapterList: {
     display: "flex",
