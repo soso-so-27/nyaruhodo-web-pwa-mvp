@@ -38,6 +38,7 @@ type HomeBoardAction =
   | "open_mikke"
   | "open_photo"
   | "open_discovery"
+  | "open_recent_change"
   | "go_torisetu"
   | "go_collection";
 
@@ -78,7 +79,7 @@ const REACTION_OPTIONS = [
 ];
 
 const DISCOVERY_TEXT =
-  "昨日の小さな記録から、少しだけリズムが見えてきました。";
+  "昨日の小さな記録から、少しだけ変化が見えてきました。";
 const HOME_NAV_FRAME_WIDTH = "min(calc(100% - 28px), 410px)";
 const HOME_NAV_EDGE_INSET = "max(14px, calc((100vw - 410px) / 2))";
 
@@ -93,6 +94,8 @@ export function HomeInput({ recentEvents: _recentEvents }: HomeInputProps) {
   const [isMugiSheetOpen, setIsMugiSheetOpen] = useState(false);
   const [isReactionSheetOpen, setIsReactionSheetOpen] = useState(false);
   const [isCatSheetOpen, setIsCatSheetOpen] = useState(false);
+  const [isDiscoverySheetOpen, setIsDiscoverySheetOpen] = useState(false);
+  const [isRecentChangeSheetOpen, setIsRecentChangeSheetOpen] = useState(false);
   const [selectedYousu, setSelectedYousu] = useState<string | null>(null);
   const [selectedMugi, setSelectedMugi] = useState<string | null>(null);
   const [selectedReaction, setSelectedReaction] = useState<string | null>(null);
@@ -144,6 +147,7 @@ export function HomeInput({ recentEvents: _recentEvents }: HomeInputProps) {
   const mugiRemaining = getRemainingTime(lockData, "mugi", tick);
   const isYousuLocked = Boolean(yousuRemaining);
   const isMugiLocked = Boolean(mugiRemaining);
+  const latestRecord = recordLog[0] ?? null;
   const discovery = useMemo(() => {
     if (!activeCatId || discoveryDismissedToday) {
       return { available: false };
@@ -344,7 +348,7 @@ export function HomeInput({ recentEvents: _recentEvents }: HomeInputProps) {
 
     markDiscoverySeen(activeCatId);
     setDiscoveryDismissedToday(true);
-    showToast("発見を残したよ");
+    setIsDiscoverySheetOpen(true);
   }
 
   function handleBoardAction(actionType: HomeBoardAction) {
@@ -358,6 +362,10 @@ export function HomeInput({ recentEvents: _recentEvents }: HomeInputProps) {
     }
     if (actionType === "open_discovery") {
       handleDiscoveryClick();
+      return;
+    }
+    if (actionType === "open_recent_change") {
+      setIsRecentChangeSheetOpen(true);
       return;
     }
     if (actionType === "go_torisetu") {
@@ -490,6 +498,32 @@ export function HomeInput({ recentEvents: _recentEvents }: HomeInputProps) {
           selected={selectedReaction}
           onClose={() => setIsReactionSheetOpen(false)}
           onSelect={recordReaction}
+        />
+      ) : null}
+
+      {isDiscoverySheetOpen ? (
+        <InfoSheet
+          title="小さな発見"
+          lead="発見がありました"
+          body={DISCOVERY_TEXT}
+          onClose={() => setIsDiscoverySheetOpen(false)}
+        />
+      ) : null}
+
+      {isRecentChangeSheetOpen ? (
+        <InfoSheet
+          title="最近の変化"
+          lead={
+            latestRecord
+              ? `${formatRecordKind(latestRecord.type)}に「${latestRecord.value}」が残っています`
+              : "まだ最近の記録がありません"
+          }
+          body={
+            latestRecord
+              ? `小さな記録が増えると、${catName}がよくしていることや、落ち着きやすい場面が少しずつ見えてきます。`
+              : "みっけを残すと、ここに小さな変化が並びます。"
+          }
+          onClose={() => setIsRecentChangeSheetOpen(false)}
         />
       ) : null}
 
@@ -701,6 +735,42 @@ function ActionSheet({
               {option}
             </button>
           ))}
+        </div>
+      </div>
+    </>
+  );
+}
+
+function InfoSheet({
+  title,
+  lead,
+  body,
+  onClose,
+}: {
+  title: string;
+  lead: string;
+  body: string;
+  onClose: () => void;
+}) {
+  return (
+    <>
+      <div style={styles.sheetBackdrop} onClick={onClose} />
+      <div style={styles.sheet}>
+        <div style={styles.sheetHandle} aria-hidden="true" />
+        <div style={styles.sheetHeader}>
+          <p style={styles.sheetTitle}>{title}</p>
+          <button
+            type="button"
+            onClick={onClose}
+            style={styles.sheetCloseButton}
+            aria-label="閉じる"
+          >
+            <CloseIcon />
+          </button>
+        </div>
+        <div style={styles.infoSheetBody}>
+          <p style={styles.infoSheetLead}>{lead}</p>
+          <p style={styles.infoSheetText}>{body}</p>
         </div>
       </div>
     </>
@@ -993,7 +1063,7 @@ function buildHomeBoardItems({
       id: "daily-discovery",
       kind: "insight",
       priority: 10,
-      title: "今日の小さな発見",
+      title: "発見があります",
       body: DISCOVERY_TEXT,
       icon: "heart",
       actionLabel: "見る",
@@ -1005,11 +1075,11 @@ function buildHomeBoardItems({
       id: "recent-change",
       kind: "insight",
       priority: 20,
-      title: "リズムが見えてきた",
-      body: `${formatRecordKind(latestRecord.type)}に「${latestRecord.value}」が残っています。少しずつ${catName}のリズムが見えてきます。`,
+      title: "最近の変化",
+      body: `${formatRecordKind(latestRecord.type)}に「${latestRecord.value}」が残っています。少しずつ${catName}の変化が見えてきます。`,
       icon: "heart",
-      actionLabel: "トリセツへ",
-      actionType: "go_torisetu",
+      actionLabel: "見る",
+      actionType: "open_recent_change",
     });
   }
 
@@ -2075,6 +2145,30 @@ const styles = {
     borderColor: "rgba(255,255,255,0.72)",
     background: "rgba(255,255,255,0.92)",
     color: "#2A2A28",
+  },
+  infoSheetBody: {
+    marginTop: "18px",
+    border: "0.5px solid rgba(255,255,255,0.16)",
+    borderRadius: "18px",
+    background: "rgba(255,255,255,0.10)",
+    padding: "16px",
+    backdropFilter: "blur(18px)",
+    WebkitBackdropFilter: "blur(18px)",
+    boxShadow: "inset 0 1px 0 rgba(255,255,255,0.12)",
+  },
+  infoSheetLead: {
+    margin: "0 0 8px",
+    color: "rgba(255,255,255,0.96)",
+    fontSize: "15px",
+    fontWeight: 780,
+    lineHeight: 1.5,
+  },
+  infoSheetText: {
+    margin: 0,
+    color: "rgba(255,255,255,0.72)",
+    fontSize: "13px",
+    fontWeight: 650,
+    lineHeight: 1.75,
   },
   catList: {
     display: "grid",
