@@ -17,17 +17,29 @@ import {
 } from "../home/homeInputHelpers";
 import type { CatProfile } from "../home/homeInputHelpers";
 import { BottomNavigation } from "../navigation/BottomNavigation";
-import {
-  APP_ACCENT,
-  APP_ACCENT_SOFT_BG,
-  APP_ACCENT_SOFT_BORDER,
-  APP_PAGE_BACKGROUND,
-  APP_PILL,
-  APP_SHEET,
-  APP_SHEET_OVERLAY,
-  APP_SUBTLE_SURFACE,
-  APP_SURFACE,
-} from "../ui/appTheme";
+
+const COLLECTION_TEXT = "rgba(255,255,255,0.94)";
+const COLLECTION_TEXT_STRONG = "rgba(255,255,255,0.98)";
+const COLLECTION_MUTED = "rgba(255,255,255,0.62)";
+const COLLECTION_SURFACE: CSSProperties = {
+  position: "relative",
+  background: "rgba(34,29,28,0.58)",
+  backdropFilter: "blur(28px)",
+  WebkitBackdropFilter: "blur(28px)",
+  border: "0.5px solid rgba(255,255,255,0.18)",
+  boxShadow: [
+    "0 14px 34px rgba(0,0,0,0.22)",
+    "inset 0 1px 0 rgba(255,255,255,0.16)",
+  ].join(", "),
+};
+const COLLECTION_SURFACE_SOFT: CSSProperties = {
+  ...COLLECTION_SURFACE,
+  background: "rgba(255,255,255,0.10)",
+  boxShadow: [
+    "0 10px 24px rgba(0,0,0,0.18)",
+    "inset 0 1px 0 rgba(255,255,255,0.12)",
+  ].join(", "),
+};
 
 type CollectionPhoto = {
   id: string;
@@ -211,6 +223,7 @@ export function CollectionPage() {
   if (!hasLoaded) {
     return (
       <main style={styles.page}>
+        <PageBackdrop />
         <div style={styles.container}>
           <section style={styles.emptyCard}>
             <h1 style={styles.emptyTitle}>コレクション</h1>
@@ -225,6 +238,7 @@ export function CollectionPage() {
   if (!activeCatProfile) {
     return (
       <main style={styles.page}>
+        <PageBackdrop />
         <div style={styles.container}>
           <section style={styles.emptyCard}>
             <h1 style={styles.emptyTitle}>コレクション</h1>
@@ -241,6 +255,7 @@ export function CollectionPage() {
 
   return (
     <main style={styles.page}>
+      <PageBackdrop />
       <div style={styles.container}>
         <header style={styles.header}>
           <div style={styles.pageHeader}>
@@ -346,6 +361,16 @@ export function CollectionPage() {
       ) : null}
       <BottomNavigation active="collection" />
     </main>
+  );
+}
+
+function PageBackdrop() {
+  return (
+    <>
+      <div style={styles.ambientBackground} aria-hidden="true" />
+      <div style={styles.ambientHighlight} aria-hidden="true" />
+      <div style={styles.backgroundVeil} aria-hidden="true" />
+    </>
   );
 }
 
@@ -1023,10 +1048,42 @@ const styles = {
   page: {
     position: "relative",
     minHeight: "100svh",
-    background: APP_PAGE_BACKGROUND,
-    color: "#242522",
+    background: "#1a1a18",
+    color: COLLECTION_TEXT,
+    overflowX: "hidden",
+  },
+  ambientBackground: {
+    position: "fixed" as const,
+    inset: 0,
+    zIndex: 0,
+    background: [
+      "radial-gradient(circle at 16% 10%, rgba(148,136,118,0.28) 0%, rgba(148,136,118,0.07) 24%, rgba(148,136,118,0) 48%)",
+      "radial-gradient(circle at 88% 18%, rgba(192,132,80,0.22) 0%, rgba(192,132,80,0.08) 20%, rgba(192,132,80,0) 42%)",
+      "radial-gradient(ellipse at 52% 82%, rgba(74,65,58,0.64) 0%, rgba(39,34,32,0.8) 50%, rgba(20,18,17,0.96) 100%)",
+      "linear-gradient(145deg, #2f3438 0%, #5e514a 38%, #342c29 70%, #171615 100%)",
+    ].join(", "),
+  },
+  ambientHighlight: {
+    position: "fixed" as const,
+    inset: 0,
+    zIndex: 0,
+    pointerEvents: "none" as const,
+    background:
+      "linear-gradient(115deg, rgba(255,255,255,0.05) 0%, rgba(255,255,255,0) 30%, rgba(255,210,150,0.07) 64%, rgba(255,255,255,0) 100%)",
+  },
+  backgroundVeil: {
+    position: "fixed" as const,
+    inset: 0,
+    zIndex: 1,
+    pointerEvents: "none" as const,
+    background: [
+      "linear-gradient(to bottom, rgba(12,10,9,0.18) 0%, rgba(12,10,9,0.04) 34%, rgba(12,10,9,0.4) 100%)",
+      "radial-gradient(circle at 72% 8%, rgba(255,200,130,0.16) 0%, rgba(255,200,130,0.05) 24%, rgba(255,200,130,0) 52%)",
+    ].join(", "),
   },
   container: {
+    position: "relative",
+    zIndex: 2,
     width: "min(100%, 480px)",
     margin: "0 auto",
     padding:
@@ -1051,17 +1108,17 @@ const styles = {
   },
   pageTitle: {
     margin: 0,
-    color: "#62645d",
+    color: COLLECTION_TEXT_STRONG,
     fontSize: "16px",
     lineHeight: 1.45,
-    fontWeight: 650,
+    fontWeight: 760,
     letterSpacing: 0,
   },
   catNameBtn: {
-    ...APP_PILL,
+    ...COLLECTION_SURFACE_SOFT,
     fontSize: "12px",
     fontWeight: 650,
-    color: "#6a6a62",
+    color: COLLECTION_TEXT,
     borderRadius: "99px",
     padding: "4px 12px",
     cursor: "pointer",
@@ -1069,7 +1126,9 @@ const styles = {
   catSheetOverlay: {
     position: "fixed",
     inset: 0,
-    ...APP_SHEET_OVERLAY,
+    background: "rgba(12,10,9,0.42)",
+    backdropFilter: "blur(4px)",
+    WebkitBackdropFilter: "blur(4px)",
     zIndex: 50,
   },
   catSheet: {
@@ -1077,7 +1136,7 @@ const styles = {
     bottom: 0,
     left: 0,
     right: 0,
-    ...APP_SHEET,
+    ...COLLECTION_SURFACE,
     borderRadius: "20px 20px 0 0",
     zIndex: 51,
     padding: "0 20px calc(32px + env(safe-area-inset-bottom))",
@@ -1085,14 +1144,14 @@ const styles = {
   catSheetHandle: {
     width: "36px",
     height: "4px",
-    background: "#d0cdc6",
+    background: "rgba(255,255,255,0.34)",
     borderRadius: "99px",
     margin: "10px auto 16px",
   },
   catSheetTitle: {
     fontSize: "13px",
     fontWeight: 600,
-    color: "#8a8a80",
+    color: COLLECTION_MUTED,
     margin: "0 0 14px",
     textAlign: "center",
   },
@@ -1122,11 +1181,11 @@ const styles = {
     borderRadius: "50%",
     border: "3px solid transparent",
     overflow: "hidden",
-    background: "#f5f3ef",
+    background: "rgba(255,255,255,0.12)",
     flexShrink: 0,
   },
   catSheetAvatarActive: {
-    border: `3px solid ${APP_ACCENT}`,
+    border: "3px solid rgba(255,255,255,0.78)",
   },
   catSheetAvatarPhoto: {
     width: "100%",
@@ -1144,41 +1203,44 @@ const styles = {
   catSheetName: {
     fontSize: "12px",
     fontWeight: 500,
-    color: "#2a2a28",
+    color: COLLECTION_TEXT,
     maxWidth: "72px",
     textAlign: "center",
     wordBreak: "break-all",
   },
   catSheetMeta: {
     fontSize: "10px",
-    color: "#9a9890",
+    color: COLLECTION_MUTED,
   },
   catSheetLink: {
     display: "block",
     textAlign: "center",
     fontSize: "13px",
-    color: APP_ACCENT,
+    color: COLLECTION_TEXT,
     textDecoration: "none",
     padding: "10px 0",
   },
   title: {
     margin: 0,
-    color: "#252622",
+    color: COLLECTION_TEXT_STRONG,
     fontSize: "24px",
     lineHeight: 1.25,
     fontWeight: 650,
     letterSpacing: 0,
   },
   progressBlock: {
+    ...COLLECTION_SURFACE,
     display: "grid",
     gap: "10px",
+    borderRadius: "20px",
+    padding: "14px",
   },
   progressMain: {
     display: "flex",
     alignItems: "baseline",
     gap: "4px",
     margin: 0,
-    color: "#2c2d29",
+    color: COLLECTION_TEXT_STRONG,
   },
   progressNumber: {
     fontSize: "32px",
@@ -1186,13 +1248,13 @@ const styles = {
     lineHeight: 1,
   },
   progressUnit: {
-    color: "#676963",
+    color: COLLECTION_MUTED,
     fontSize: "15px",
     fontWeight: 590,
   },
   progressSub: {
     margin: "-4px 0 0",
-    color: "#73746d",
+    color: COLLECTION_MUTED,
     fontSize: "13px",
     fontWeight: 600,
     lineHeight: 1.4,
@@ -1202,14 +1264,14 @@ const styles = {
     width: "100%",
     height: "7px",
     borderRadius: "999px",
-    background: "rgba(222, 219, 211, 0.72)",
+    background: "rgba(255,255,255,0.16)",
     overflow: "hidden",
   },
   progressFill: {
     position: "absolute",
     inset: "0 auto 0 0",
     borderRadius: "999px",
-    background: `linear-gradient(90deg, ${APP_ACCENT_SOFT_BORDER}, ${APP_ACCENT})`,
+    background: "rgba(255,255,255,0.86)",
   },
   tabs: {
     display: "flex",
@@ -1223,10 +1285,10 @@ const styles = {
     flex: "0 0 auto",
     minWidth: "92px",
     minHeight: "40px",
-    border: "1px solid rgba(220, 217, 209, 0.82)",
+    border: "0.5px solid rgba(255,255,255,0.16)",
     borderRadius: "999px",
-    background: "rgba(255, 255, 255, 0.78)",
-    color: "#696b64",
+    background: "rgba(255,255,255,0.10)",
+    color: COLLECTION_TEXT,
     font: "inherit",
     fontSize: "14px",
     fontWeight: 650,
@@ -1234,9 +1296,9 @@ const styles = {
     cursor: "pointer",
   },
   activeTab: {
-    border: `1px solid ${APP_ACCENT_SOFT_BORDER}`,
-    background: APP_ACCENT_SOFT_BG,
-    color: "#343630",
+    border: "0.5px solid rgba(255,255,255,0.42)",
+    background: "rgba(255,255,255,0.92)",
+    color: "#2a2a28",
   },
   collectionGrid: {
     display: "grid",
@@ -1247,7 +1309,7 @@ const styles = {
     position: "relative",
     display: "block",
     aspectRatio: "1 / 1",
-    ...APP_SURFACE,
+    ...COLLECTION_SURFACE_SOFT,
     borderRadius: "18px",
     overflow: "hidden",
     font: "inherit",
@@ -1275,8 +1337,9 @@ const styles = {
     width: "80px",
     height: "80px",
     objectFit: "contain",
-    opacity: 0.55,
-    mixBlendMode: "multiply",
+    opacity: 0.78,
+    mixBlendMode: "normal",
+    filter: "saturate(0.78) contrast(0.94)",
   },
   photoCard: {
     display: "flex",
@@ -1357,7 +1420,7 @@ const styles = {
   },
   emptySlotLabel: {
     margin: 0,
-    color: "#9a9890",
+    color: COLLECTION_MUTED,
     fontSize: "12px",
     fontWeight: 650,
     lineHeight: 1.3,
@@ -1384,7 +1447,9 @@ const styles = {
   sheetOverlay: {
     position: "fixed",
     inset: 0,
-    ...APP_SHEET_OVERLAY,
+    background: "rgba(12,10,9,0.42)",
+    backdropFilter: "blur(4px)",
+    WebkitBackdropFilter: "blur(4px)",
     zIndex: 50,
     display: "flex",
     alignItems: "flex-end",
@@ -1392,7 +1457,7 @@ const styles = {
   },
   sheet: {
     width: "100%",
-    ...APP_SHEET,
+    ...COLLECTION_SURFACE,
     borderRadius: "20px 20px 0 0",
     paddingBottom: "calc(16px + env(safe-area-inset-bottom))",
     minHeight: "70vh",
@@ -1403,7 +1468,7 @@ const styles = {
   sheetHandle: {
     width: "36px",
     height: "4px",
-    background: "#d0cdc6",
+    background: "rgba(255,255,255,0.34)",
     borderRadius: "99px",
     margin: "10px auto 14px",
   },
@@ -1412,15 +1477,15 @@ const styles = {
     alignItems: "center",
     justifyContent: "space-between",
     padding: "0 16px 12px",
-    borderBottom: "0.5px solid #e8e5de",
+    borderBottom: "0.5px solid rgba(255,255,255,0.14)",
   },
   sheetTitle: {
-    color: "#2a2a28",
+    color: COLLECTION_TEXT_STRONG,
     fontSize: "17px",
     fontWeight: 700,
   },
   sheetCount: {
-    color: "#8a8a80",
+    color: COLLECTION_MUTED,
     fontSize: "13px",
   },
   sheetPhotoArea: {
@@ -1469,12 +1534,12 @@ const styles = {
     width: "5px",
     height: "5px",
     borderRadius: "99px",
-    background: "#d0cdc6",
+    background: "rgba(255,255,255,0.22)",
     transition: "width 0.2s",
   },
   photoDotActive: {
     width: "14px",
-    background: APP_ACCENT,
+    background: "rgba(255,255,255,0.86)",
   },
   photoEmpty: {
     display: "flex",
@@ -1483,10 +1548,10 @@ const styles = {
     aspectRatio: "1",
     margin: "12px 16px",
     borderRadius: "16px",
-    ...APP_SUBTLE_SURFACE,
+    ...COLLECTION_SURFACE_SOFT,
   },
   photoEmptyText: {
-    color: "#b0ada6",
+    color: COLLECTION_MUTED,
     fontSize: "14px",
   },
   sheetActions: {
@@ -1498,18 +1563,18 @@ const styles = {
   btnPrimary: {
     border: "none",
     borderRadius: "12px",
-    background: APP_ACCENT,
-    color: "#fff",
+    background: "rgba(255,255,255,0.92)",
+    color: "#2a2a28",
     fontSize: "13px",
     fontWeight: 600,
     padding: "12px",
     cursor: "pointer",
   },
   btnSecondary: {
-    border: "0.5px solid rgba(210, 207, 200, 0.86)",
+    border: "0.5px solid rgba(255,255,255,0.16)",
     borderRadius: "12px",
-    background: "rgba(255,255,255,0.86)",
-    color: "#2a2a28",
+    background: "rgba(255,255,255,0.10)",
+    color: COLLECTION_TEXT,
     fontSize: "13px",
     fontWeight: 500,
     padding: "12px",
@@ -1520,20 +1585,20 @@ const styles = {
     cursor: "not-allowed",
   },
   emptyCard: {
-    ...APP_SURFACE,
+    ...COLLECTION_SURFACE,
     borderRadius: "26px",
     padding: "20px",
   },
   emptyTitle: {
     margin: "0 0 10px",
-    color: "#27272a",
+    color: COLLECTION_TEXT_STRONG,
     fontSize: "24px",
     lineHeight: 1.25,
     fontWeight: 700,
   },
   emptyText: {
     margin: "0 0 16px",
-    color: "#686760",
+    color: COLLECTION_MUTED,
     fontSize: "14px",
     lineHeight: 1.65,
     fontWeight: 500,
@@ -1544,9 +1609,9 @@ const styles = {
     justifyContent: "center",
     minHeight: "44px",
     borderRadius: "999px",
-    border: `1px solid ${APP_ACCENT_SOFT_BORDER}`,
-    background: APP_ACCENT_SOFT_BG,
-    color: APP_ACCENT,
+    border: "1px solid rgba(255,255,255,0.42)",
+    background: "rgba(255,255,255,0.92)",
+    color: "#2a2a28",
     padding: "0 18px",
     textDecoration: "none",
     fontSize: "14px",

@@ -4,15 +4,6 @@ import { useEffect, useState } from "react";
 import type { CSSProperties } from "react";
 import { BottomNavigation } from "../navigation/BottomNavigation";
 import {
-  APP_ACCENT,
-  APP_ACCENT_SOFT_BG,
-  APP_ACCENT_SOFT_BORDER,
-  APP_PAGE_BACKGROUND,
-  APP_PILL,
-  APP_SUBTLE_SURFACE,
-  APP_SURFACE,
-} from "../ui/appTheme";
-import {
   addCatProfile,
   getActiveCatProfile,
   getCatName,
@@ -37,6 +28,29 @@ const HOME_PHOTO_POSITIONS = [
 ] as const;
 type EditableGender = "male" | "female" | "unknown" | "";
 type EditableCoat = CatCoat | "";
+
+const CATS_TEXT = "rgba(255,255,255,0.94)";
+const CATS_TEXT_STRONG = "rgba(255,255,255,0.98)";
+const CATS_MUTED = "rgba(255,255,255,0.62)";
+const CATS_SURFACE: CSSProperties = {
+  position: "relative",
+  background: "rgba(34,29,28,0.58)",
+  backdropFilter: "blur(28px)",
+  WebkitBackdropFilter: "blur(28px)",
+  border: "0.5px solid rgba(255,255,255,0.18)",
+  boxShadow: [
+    "0 14px 34px rgba(0,0,0,0.22)",
+    "inset 0 1px 0 rgba(255,255,255,0.16)",
+  ].join(", "),
+};
+const CATS_SURFACE_SOFT: CSSProperties = {
+  ...CATS_SURFACE,
+  background: "rgba(255,255,255,0.10)",
+  boxShadow: [
+    "0 10px 24px rgba(0,0,0,0.18)",
+    "inset 0 1px 0 rgba(255,255,255,0.12)",
+  ].join(", "),
+};
 
 export function CatsPage() {
   const [catProfiles, setCatProfiles] = useState<CatProfile[]>([]);
@@ -320,6 +334,7 @@ export function CatsPage() {
 
   return (
     <main style={styles.page}>
+      <PageBackdrop />
       <div style={styles.container}>
         <div style={styles.pageHeader}>
           <div>
@@ -376,7 +391,7 @@ export function CatsPage() {
             <div style={styles.catAvatarAdd}>
               <span style={styles.catAvatarAddMark}>＋</span>
             </div>
-            <span style={{ ...styles.catGridName, color: "#b0ada6" }}>追加</span>
+            <span style={{ ...styles.catGridName, color: CATS_MUTED }}>追加</span>
           </button>
         </div>
 
@@ -646,7 +661,7 @@ export function CatsPage() {
           <div style={styles.futureCard}>
             <i
               className="ti ti-clipboard-heart"
-              style={{ fontSize: "20px", color: "#9a9890" }}
+              style={{ fontSize: "20px", color: CATS_MUTED }}
               aria-hidden="true"
             />
             <div>
@@ -657,7 +672,7 @@ export function CatsPage() {
           <div style={styles.futureCard}>
             <i
               className="ti ti-chart-line"
-              style={{ fontSize: "20px", color: "#9a9890" }}
+              style={{ fontSize: "20px", color: CATS_MUTED }}
               aria-hidden="true"
             />
             <div>
@@ -682,6 +697,16 @@ export function CatsPage() {
       </div>
       <BottomNavigation active="cats" />
     </main>
+  );
+}
+
+function PageBackdrop() {
+  return (
+    <>
+      <div style={styles.ambientBackground} aria-hidden="true" />
+      <div style={styles.ambientHighlight} aria-hidden="true" />
+      <div style={styles.backgroundVeil} aria-hidden="true" />
+    </>
   );
 }
 
@@ -870,13 +895,46 @@ function resizeAndEncode(file: File, maxSize = 800): Promise<string> {
 
 const styles = {
   page: {
+    position: "relative",
     minHeight: "100vh",
-    background: APP_PAGE_BACKGROUND,
-    color: "#242522",
+    background: "#1a1a18",
+    color: CATS_TEXT,
+    overflowX: "hidden",
     fontFamily:
       '-apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
   },
+  ambientBackground: {
+    position: "fixed" as const,
+    inset: 0,
+    zIndex: 0,
+    background: [
+      "radial-gradient(circle at 20% 10%, rgba(148,136,118,0.30) 0%, rgba(148,136,118,0.08) 22%, rgba(148,136,118,0) 45%)",
+      "radial-gradient(circle at 84% 18%, rgba(192,132,80,0.22) 0%, rgba(192,132,80,0.08) 20%, rgba(192,132,80,0) 42%)",
+      "radial-gradient(ellipse at 50% 82%, rgba(74,65,58,0.62) 0%, rgba(39,34,32,0.78) 48%, rgba(20,18,17,0.96) 100%)",
+      "linear-gradient(145deg, #2f3438 0%, #5e514a 38%, #342c29 70%, #171615 100%)",
+    ].join(", "),
+  },
+  ambientHighlight: {
+    position: "fixed" as const,
+    inset: 0,
+    zIndex: 0,
+    pointerEvents: "none" as const,
+    background:
+      "linear-gradient(115deg, rgba(255,255,255,0.05) 0%, rgba(255,255,255,0) 30%, rgba(255,210,150,0.07) 64%, rgba(255,255,255,0) 100%)",
+  },
+  backgroundVeil: {
+    position: "fixed" as const,
+    inset: 0,
+    zIndex: 1,
+    pointerEvents: "none" as const,
+    background: [
+      "linear-gradient(to bottom, rgba(12,10,9,0.20) 0%, rgba(12,10,9,0.04) 34%, rgba(12,10,9,0.40) 100%)",
+      "radial-gradient(circle at 72% 8%, rgba(255,200,130,0.16) 0%, rgba(255,200,130,0.05) 24%, rgba(255,200,130,0) 52%)",
+    ].join(", "),
+  },
   container: {
+    position: "relative",
+    zIndex: 2,
     width: "min(100%, 430px)",
     margin: "0 auto",
     padding:
@@ -892,14 +950,14 @@ const styles = {
   },
   pageTitle: {
     fontSize: "16px",
-    fontWeight: 650,
-    color: "#62645d",
+    fontWeight: 760,
+    color: CATS_TEXT_STRONG,
     lineHeight: 1.45,
     margin: 0,
   },
   pageSub: {
     fontSize: "12px",
-    color: "#8a8a80",
+    color: CATS_MUTED,
     margin: 0,
   },
   catGrid: {
@@ -928,15 +986,15 @@ const styles = {
     width: "72px",
     height: "72px",
     borderRadius: "50%",
-    background: "#f5f3ef",
-    border: "3px solid transparent",
+    background: "rgba(255,255,255,0.12)",
+    border: "3px solid rgba(255,255,255,0.14)",
     overflow: "hidden",
     display: "flex",
     alignItems: "center",
     justifyContent: "center",
   },
   catAvatarActive: {
-    border: "3px solid #6B9E82",
+    border: "3px solid rgba(255,255,255,0.78)",
     cursor: "pointer",
   },
   catAvatarImg: {
@@ -954,7 +1012,7 @@ const styles = {
     width: "72px",
     height: "72px",
     borderRadius: "50%",
-    border: "1.5px dashed #d0cdc6",
+    border: "1.5px dashed rgba(255,255,255,0.28)",
     display: "flex",
     alignItems: "center",
     justifyContent: "center",
@@ -962,15 +1020,15 @@ const styles = {
   },
   catAvatarAddMark: {
     fontSize: "22px",
-    color: "#b0ada6",
+    color: CATS_MUTED,
   },
   catGridName: {
     fontSize: "13px",
-    color: "#4a4a42",
+    color: CATS_TEXT,
     fontWeight: 600,
   },
   profileCard: {
-    ...APP_SURFACE,
+    ...CATS_SURFACE,
     borderRadius: "24px",
     padding: "20px",
     marginBottom: "12px",
@@ -984,23 +1042,23 @@ const styles = {
   profileName: {
     fontSize: "21px",
     fontWeight: 600,
-    color: "#2a2a28",
+    color: CATS_TEXT_STRONG,
     display: "flex",
     alignItems: "center",
     gap: "8px",
   },
   genderBadge: {
     fontSize: "11px",
-    color: APP_ACCENT,
-    background: APP_ACCENT_SOFT_BG,
-    border: `0.5px solid ${APP_ACCENT_SOFT_BORDER}`,
+    color: CATS_TEXT,
+    background: "rgba(255,255,255,0.10)",
+    border: "0.5px solid rgba(255,255,255,0.16)",
     borderRadius: "99px",
     padding: "2px 8px",
   },
   editBtn: {
     fontSize: "12px",
-    color: "#6a6a62",
-    ...APP_PILL,
+    color: CATS_TEXT,
+    ...CATS_SURFACE_SOFT,
     borderRadius: "99px",
     padding: "4px 12px",
     cursor: "pointer",
@@ -1016,7 +1074,7 @@ const styles = {
     height: "112px",
     borderRadius: "16px",
     overflow: "hidden",
-    ...APP_SUBTLE_SURFACE,
+    ...CATS_SURFACE_SOFT,
     display: "flex",
     alignItems: "center",
     justifyContent: "center",
@@ -1029,7 +1087,7 @@ const styles = {
   },
   homePhotoPreviewText: {
     fontSize: "11px",
-    color: "#b0ada6",
+    color: CATS_MUTED,
   },
   homePhotoInfo: {
     flex: 1,
@@ -1038,12 +1096,12 @@ const styles = {
   homePhotoTitle: {
     fontSize: "14px",
     fontWeight: 600,
-    color: "#2a2a28",
+    color: CATS_TEXT_STRONG,
     margin: "0 0 4px",
   },
   homePhotoSub: {
     fontSize: "11px",
-    color: "#8a8a80",
+    color: CATS_MUTED,
     lineHeight: 1.5,
     margin: "0 0 10px",
   },
@@ -1054,10 +1112,10 @@ const styles = {
   },
   homePhotoButton: {
     width: "fit-content",
-    border: `0.5px solid ${APP_ACCENT_SOFT_BORDER}`,
+    border: "0.5px solid rgba(255,255,255,0.16)",
     borderRadius: "99px",
-    background: APP_ACCENT_SOFT_BG,
-    color: APP_ACCENT,
+    background: "rgba(255,255,255,0.10)",
+    color: CATS_TEXT,
     fontSize: "12px",
     fontWeight: 600,
     padding: "6px 12px",
@@ -1068,24 +1126,24 @@ const styles = {
     gap: "6px",
   },
   homePhotoPositionButton: {
-    border: "0.5px solid rgba(210, 207, 200, 0.86)",
+    border: "0.5px solid rgba(255,255,255,0.14)",
     borderRadius: "99px",
-    background: "rgba(255, 255, 255, 0.86)",
-    color: "#8a8a80",
+    background: "rgba(255,255,255,0.08)",
+    color: CATS_MUTED,
     fontSize: "11px",
     fontWeight: 500,
     padding: "4px 10px",
     cursor: "pointer",
   },
   homePhotoPositionButtonActive: {
-    border: `0.5px solid ${APP_ACCENT_SOFT_BORDER}`,
-    background: APP_ACCENT_SOFT_BG,
-    color: APP_ACCENT,
+    border: "0.5px solid rgba(255,255,255,0.42)",
+    background: "rgba(255,255,255,0.92)",
+    color: "#2a2a28",
     fontWeight: 600,
   },
   divider: {
     border: "none",
-    borderTop: "0.5px solid #e8e5de",
+    borderTop: "0.5px solid rgba(255,255,255,0.14)",
     margin: "14px 0",
   },
   infoRow: {
@@ -1096,11 +1154,11 @@ const styles = {
   },
   infoLabel: {
     fontSize: "13px",
-    color: "#8a8a80",
+    color: CATS_MUTED,
   },
   infoValue: {
     fontSize: "14px",
-    color: "#2a2a28",
+    color: CATS_TEXT,
     fontWeight: 500,
   },
   coatRow: {
@@ -1118,7 +1176,7 @@ const styles = {
   },
   traitLabel: {
     fontSize: "12px",
-    color: "#9a9890",
+    color: CATS_MUTED,
     margin: "0 0 8px",
   },
   traitPills: {
@@ -1128,17 +1186,17 @@ const styles = {
   },
   traitPill: {
     fontSize: "12px",
-    background: APP_ACCENT_SOFT_BG,
-    color: APP_ACCENT,
-    border: `0.5px solid ${APP_ACCENT_SOFT_BORDER}`,
+    background: "rgba(255,255,255,0.10)",
+    color: CATS_TEXT,
+    border: "0.5px solid rgba(255,255,255,0.16)",
     borderRadius: "99px",
     padding: "4px 12px",
   },
   traitModifier: {
     fontSize: "11px",
-    background: "rgba(255, 255, 255, 0.78)",
-    color: "#6a6a62",
-    border: "0.5px solid #e0ddd6",
+    background: "rgba(255,255,255,0.08)",
+    color: CATS_MUTED,
+    border: "0.5px solid rgba(255,255,255,0.12)",
     borderRadius: "99px",
     padding: "3px 10px",
   },
@@ -1149,13 +1207,13 @@ const styles = {
     marginTop: "8px",
   },
   futureCard: {
-    ...APP_SUBTLE_SURFACE,
+    ...CATS_SURFACE_SOFT,
     borderRadius: "16px",
     padding: "14px 16px",
     display: "flex",
     alignItems: "center",
     gap: "12px",
-    opacity: 0.55,
+    opacity: 0.78,
   },
   futureIcon: {
     fontSize: "20px",
@@ -1164,12 +1222,12 @@ const styles = {
   futureTitle: {
     fontSize: "13px",
     fontWeight: 500,
-    color: "#6a6a62",
+    color: CATS_TEXT,
     margin: "0 0 2px",
   },
   futureSub: {
     fontSize: "12px",
-    color: "#9a9890",
+    color: CATS_MUTED,
     margin: 0,
   },
   settingsSection: {
@@ -1178,12 +1236,12 @@ const styles = {
   settingsSectionLabel: {
     fontSize: "12px",
     fontWeight: 600,
-    color: "#9a9890",
+    color: CATS_MUTED,
     margin: "0 0 8px 4px",
     letterSpacing: "0.04em",
   },
   settingsCard: {
-    ...APP_SURFACE,
+    ...CATS_SURFACE,
     borderRadius: "16px",
     overflow: "hidden",
   },
@@ -1193,16 +1251,16 @@ const styles = {
     justifyContent: "space-between",
     padding: "14px 16px",
     textDecoration: "none",
-    color: "#2a2a28",
+    color: CATS_TEXT,
   },
   settingsRowLabel: {
     fontSize: "14px",
     fontWeight: 500,
-    color: "#2a2a28",
+    color: CATS_TEXT,
   },
   settingsRowChevron: {
     fontSize: "18px",
-    color: "#c8c5be",
+    color: CATS_MUTED,
   },
   header: {
     marginBottom: "12px",
@@ -1213,7 +1271,7 @@ const styles = {
   },
   eyebrow: {
     margin: "0 0 4px",
-    color: "#71717a",
+    color: CATS_MUTED,
     fontSize: "12px",
     fontWeight: 600,
     letterSpacing: 0,
@@ -1227,20 +1285,20 @@ const styles = {
   },
   lead: {
     margin: "8px 0 0",
-    color: "#71717a",
+    color: CATS_MUTED,
     fontSize: "13px",
     lineHeight: 1.7,
   },
   sectionLabel: {
     margin: "0 0 5px",
-    color: "#74756f",
+    color: CATS_MUTED,
     fontSize: "12px",
     fontWeight: 540,
     lineHeight: 1.5,
   },
   coatSection: {
     marginBottom: "14px",
-    borderBottom: "1px solid rgba(232, 229, 222, 0.72)",
+    borderBottom: "1px solid rgba(255,255,255,0.12)",
     paddingBottom: "14px",
   },
   coatHeader: {
@@ -1253,7 +1311,7 @@ const styles = {
   closeEditBtn: {
     border: "none",
     background: "transparent",
-    color: "#8a8a80",
+    color: CATS_MUTED,
     fontSize: "12px",
     cursor: "pointer",
   },
@@ -1267,10 +1325,10 @@ const styles = {
     alignItems: "center",
     gap: "7px",
     minHeight: "34px",
-    border: "1px solid rgba(224, 221, 214, 0.76)",
+    border: "1px solid rgba(255,255,255,0.14)",
     borderRadius: "999px",
-    background: "rgba(255, 255, 255, 0.78)",
-    color: "#4e514b",
+    background: "rgba(255,255,255,0.08)",
+    color: CATS_TEXT,
     fontSize: "13px",
     fontWeight: 540,
     letterSpacing: 0,
@@ -1278,15 +1336,15 @@ const styles = {
     cursor: "pointer",
   },
   coatButtonActive: {
-    borderColor: APP_ACCENT_SOFT_BORDER,
-    background: APP_ACCENT_SOFT_BG,
-    color: "#3f433d",
+    borderColor: "rgba(255,255,255,0.42)",
+    background: "rgba(255,255,255,0.92)",
+    color: "#2a2a28",
   },
   coatSwatch: {
     display: "inline-block",
     width: "14px",
     height: "14px",
-    border: "1px solid rgba(63, 63, 70, 0.16)",
+    border: "1px solid rgba(255,255,255,0.24)",
     borderRadius: "999px",
     flex: "0 0 auto",
   },
@@ -1296,7 +1354,7 @@ const styles = {
   label: {
     display: "block",
     marginBottom: "8px",
-    color: "#74756f",
+    color: CATS_MUTED,
     fontSize: "13px",
     fontWeight: 560,
     letterSpacing: 0,
@@ -1305,10 +1363,10 @@ const styles = {
     width: "100%",
     boxSizing: "border-box",
     minHeight: "48px",
-    border: "1px solid rgba(222, 219, 211, 0.86)",
+    border: "1px solid rgba(255,255,255,0.16)",
     borderRadius: "12px",
-    background: "rgba(255, 255, 255, 0.86)",
-    color: "#242522",
+    background: "rgba(255,255,255,0.10)",
+    color: CATS_TEXT,
     fontSize: "15px",
     fontWeight: 500,
     letterSpacing: 0,
@@ -1317,17 +1375,17 @@ const styles = {
   editLabel: {
     fontSize: "12px",
     fontWeight: 500,
-    color: "#6a6a62",
+    color: CATS_MUTED,
     margin: "0 0 6px",
   },
   editInput: {
     width: "100%",
     boxSizing: "border-box",
     minHeight: "48px",
-    border: "1px solid #dedbd3",
+    border: "1px solid rgba(255,255,255,0.16)",
     borderRadius: "12px",
-    background: "#ffffff",
-    color: "#27272a",
+    background: "rgba(255,255,255,0.10)",
+    color: CATS_TEXT,
     fontSize: "15px",
     padding: "0 14px",
   },
@@ -1339,18 +1397,18 @@ const styles = {
   },
   genderBtn: {
     minHeight: "40px",
-    border: "1px solid #dedbd3",
+    border: "1px solid rgba(255,255,255,0.16)",
     borderRadius: "10px",
-    background: "#ffffff",
-    color: "#27272a",
+    background: "rgba(255,255,255,0.10)",
+    color: CATS_TEXT,
     fontSize: "12px",
     fontWeight: 500,
     cursor: "pointer",
   },
   genderBtnActive: {
-    border: "1px solid #aeb5a8",
-    background: "#e8e9e4",
-    color: "#3f433d",
+    border: "1px solid rgba(255,255,255,0.42)",
+    background: "rgba(255,255,255,0.92)",
+    color: "#2a2a28",
     fontWeight: 600,
   },
   actions: {
@@ -1361,10 +1419,10 @@ const styles = {
   saveButton: {
     minHeight: "40px",
     padding: "0 18px",
-    border: `1px solid ${APP_ACCENT_SOFT_BORDER}`,
+    border: "1px solid rgba(255,255,255,0.42)",
     borderRadius: "12px",
-    background: APP_ACCENT_SOFT_BG,
-    color: APP_ACCENT,
+    background: "rgba(255,255,255,0.92)",
+    color: "#2a2a28",
     fontSize: "14px",
     fontWeight: 610,
     letterSpacing: 0,
@@ -1373,10 +1431,10 @@ const styles = {
   cancelButton: {
     minHeight: "40px",
     padding: "0 18px",
-    border: "1px solid rgba(222, 219, 211, 0.8)",
+    border: "1px solid rgba(255,255,255,0.16)",
     borderRadius: "12px",
-    background: "rgba(255, 255, 255, 0.82)",
-    color: "#383936",
+    background: "rgba(255,255,255,0.10)",
+    color: CATS_TEXT,
     fontSize: "14px",
     fontWeight: 560,
     letterSpacing: 0,
@@ -1384,7 +1442,7 @@ const styles = {
   },
   message: {
     margin: "10px 0 0",
-    color: "#74756f",
+    color: CATS_MUTED,
     fontSize: "13px",
     lineHeight: 1.6,
   },
