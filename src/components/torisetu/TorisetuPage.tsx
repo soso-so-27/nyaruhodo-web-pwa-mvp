@@ -41,6 +41,35 @@ type DayMapItem = {
   signal: string | null;
 };
 
+type InsightCard = {
+  id: string;
+  source: "みっけ" | "診断" | "深掘り";
+  title: string;
+  body: string;
+  tags?: string[];
+};
+
+type DeepDiveOption = {
+  label: string;
+  result: string;
+};
+
+type DeepDiveCard = {
+  id: string;
+  title: string;
+  threshold: number;
+  preview: string;
+  question: string;
+  options: DeepDiveOption[];
+};
+
+type DeepDiveAnswer = {
+  cardId: string;
+  label: string;
+  result: string;
+  answeredAt: string;
+};
+
 const RECENT_CAT_SUMMARY_WINDOW_MS = 7 * 24 * 60 * 60 * 1000;
 
 const peakTimeMap: Record<string, string[]> = {
@@ -51,48 +80,86 @@ const peakTimeMap: Record<string, string[]> = {
   random: [],
 };
 
-const UNLOCKS = [
+const DEEP_DIVE_CARDS: DeepDiveCard[] = [
   {
     id: "mood",
     title: "機嫌の見分け方",
     threshold: 8,
-    preview: "よく出るサインが見えてきます",
+    preview: "いつもの表情や距離感を、もう少し詳しく残せます。",
+    question: "機嫌がよさそうなとき、いちばん多いサインは？",
+    options: [
+      { label: "目がやわらかい", result: "機嫌がいいときは、目つきや表情に出やすいかもしれません。" },
+      { label: "近くに来る", result: "機嫌がいいときは、距離が少し近くなるタイプかもしれません。" },
+      { label: "しっぽがゆっくり動く", result: "しっぽの動きが、気分を見る手がかりになりそうです。" },
+      { label: "まだわからない", result: "まだ決めなくて大丈夫。みっけを重ねると見えてきます。" },
+    ],
   },
   {
     id: "play",
     title: "遊び方のコツ",
     threshold: 15,
-    preview: "喜びやすい関わり方が見えてきます",
+    preview: "喜びやすい誘い方や、乗りやすいタイミングを探せます。",
+    question: "遊びに誘うなら、どれが一番反応しやすい？",
+    options: [
+      { label: "動くおもちゃ", result: "動きのある遊びに反応しやすい子かもしれません。" },
+      { label: "隠れる遊び", result: "待ち伏せや物陰を使った遊びが合いやすそうです。" },
+      { label: "短く何回か", result: "長時間より、短い遊びを何度か挟む方が合いそうです。" },
+      { label: "気分次第", result: "遊びは気分の波を見ながら誘うのがよさそうです。" },
+    ],
   },
   {
     id: "food",
     title: "ごはんのこと",
     threshold: 20,
-    preview: "ごはんへの関心が見えてきます",
+    preview: "ごはん前後の変化や、気にしやすさを整理できます。",
+    question: "ごはんの時間が近いとき、どんな様子が多い？",
+    options: [
+      { label: "先に待っている", result: "ごはんの時間をかなり覚えている子かもしれません。" },
+      { label: "鳴いて知らせる", result: "声で伝えることが、ごはん前のサインになりそうです。" },
+      { label: "近くを歩く", result: "そばに来ることが、ごはん待ちのサインかもしれません。" },
+      { label: "あまり変わらない", result: "ごはんより、その時の気分や環境の影響が大きそうです。" },
+    ],
   },
   {
     id: "stress",
     title: "ストレスのサイン",
     threshold: 25,
-    preview: "不安なときの変化が見えてきます",
+    preview: "不安なときに出やすい変化を、やさしく見分けます。",
+    question: "落ち着かなさそうなとき、先に出やすい変化は？",
+    options: [
+      { label: "隠れる", result: "不安なときは、まず距離を取るサインが出やすそうです。" },
+      { label: "鳴く", result: "声が、不安や戸惑いのサインになることがありそうです。" },
+      { label: "うろうろする", result: "落ち着かない動きが、環境変化への反応かもしれません。" },
+      { label: "まだわからない", result: "焦らず、いつもと違う小さな変化だけ見ていきましょう。" },
+    ],
   },
   {
     id: "bond",
     title: "距離の縮め方",
     threshold: 30,
-    preview: "もっと仲良くなるヒントが見えてきます",
+    preview: "近づきたいとき、待つときの境目を探せます。",
+    question: "こちらから近づくなら、どれが一番うまくいきやすい？",
+    options: [
+      { label: "声をかける", result: "先に声をかけると、安心して受け入れやすいかもしれません。" },
+      { label: "手を出して待つ", result: "この子から近づく余白を残すと、距離が縮まりやすそうです。" },
+      { label: "そばに座る", result: "触るより先に、同じ場所にいる時間が効きそうです。" },
+      { label: "放っておく", result: "構わない時間も、信頼を育てる大事な関わりになりそうです。" },
+    ],
   },
 ];
 
 export function TorisetuPage({ recentEvents }: TorisetuPageProps) {
   const [catProfile, setCatProfile] = useState<CatProfile | null>(null);
   const [localRecords, setLocalRecords] = useState<RecordLike[]>([]);
+  const [answers, setAnswers] = useState<Record<string, DeepDiveAnswer>>({});
+  const [activeDive, setActiveDive] = useState<DeepDiveCard | null>(null);
 
   useEffect(() => {
     const profiles = loadCatProfiles();
     const active = getActiveCatProfile(profiles);
     setCatProfile(active ?? null);
     setLocalRecords(active ? readLocalRecordLog(active.id) : []);
+    setAnswers(active ? readDeepDiveAnswers(active.id) : {});
   }, []);
 
   const catName = catProfile ? getCatName(catProfile) : "ねこ";
@@ -109,23 +176,67 @@ export function TorisetuPage({ recentEvents }: TorisetuPageProps) {
     100,
     Math.max(catProfile?.understanding?.percent ?? 0, Math.round(recordCount * 3)),
   );
-  const nextUnlock = UNLOCKS.find((item) => recordCount < item.threshold);
+  const nextUnlock = DEEP_DIVE_CARDS.find((item) => !answers[item.id]);
   const nextRemaining = nextUnlock
     ? Math.max(0, nextUnlock.threshold - recordCount)
     : 0;
   const dayMap = buildDayMap(records);
-  const isDayMapEmpty = dayMap.every((item) => !item.signal);
-  const peakSlots = catProfile?.activityPattern?.peakTime
-    ? peakTimeMap[catProfile.activityPattern.peakTime] ?? []
-    : [];
+  const rhythmSummary = buildRhythmSummary(dayMap, catProfile);
+  const recentSummary = buildRecentSummary(records);
   const avatarSrc =
     catProfile?.avatarDataUrl ??
     catProfile?.homePhotoDataUrl ??
     getCatAvatarSrcForCoat(catProfile?.appearance?.coat);
-  const typeLabel = catProfile?.typeLabel ?? "まだ観察中";
+  const typeLabel = catProfile?.typeLabel ?? "観察中";
   const typeTagline =
     catProfile?.typeTagline ??
     "みっけを重ねると、この子らしさが少しずつ見えてきます。";
+
+  const insightCards: InsightCard[] = [
+    {
+      id: "personality",
+      source: "診断",
+      title: "基本の性格",
+      body: typeTagline,
+      tags: [catProfile?.typeLabel ?? ""].filter(Boolean),
+    },
+    {
+      id: "recent",
+      source: "みっけ",
+      title: "最近の様子",
+      body: recentSummary,
+    },
+    {
+      id: "rhythm",
+      source: "みっけ",
+      title: "1日のリズム",
+      body: rhythmSummary,
+    },
+    ...Object.values(answers).map((answer) => ({
+      id: `answer-${answer.cardId}`,
+      source: "深掘り" as const,
+      title: answer.label,
+      body: answer.result,
+    })),
+  ];
+
+  function handleAnswer(option: DeepDiveOption) {
+    if (!catProfile || !activeDive) return;
+
+    const nextAnswers = {
+      ...answers,
+      [activeDive.id]: {
+        cardId: activeDive.id,
+        label: activeDive.title,
+        result: option.result,
+        answeredAt: new Date().toISOString(),
+      },
+    };
+
+    setAnswers(nextAnswers);
+    saveDeepDiveAnswers(catProfile.id, nextAnswers);
+    setActiveDive(null);
+  }
 
   return (
     <main style={styles.page}>
@@ -133,7 +244,7 @@ export function TorisetuPage({ recentEvents }: TorisetuPageProps) {
         <header style={styles.header}>
           <p style={styles.eyebrow}>トリセツ</p>
           <h1 style={styles.title}>{catName}のこと</h1>
-          <p style={styles.subtitle}>記録から少しずつ見えてきたこと</p>
+          <p style={styles.subtitle}>みっけが増えるほど、読めるページが増えていきます。</p>
         </header>
 
         <section style={styles.heroCard}>
@@ -151,7 +262,7 @@ export function TorisetuPage({ recentEvents }: TorisetuPageProps) {
 
         <section style={styles.progressCard}>
           <div style={styles.progressHeader}>
-            <span style={styles.progressLabel}>見えてきたこと</span>
+            <span style={styles.progressLabel}>トリセツの育ち具合</span>
             <span style={styles.progressValue}>{understanding}%</span>
           </div>
           <div style={styles.progressTrack}>
@@ -159,121 +270,134 @@ export function TorisetuPage({ recentEvents }: TorisetuPageProps) {
           </div>
           <p style={styles.progressHint}>
             {nextUnlock
-              ? `あと${nextRemaining}回のみっけで「${nextUnlock.title}」が開きます`
-              : "いま用意しているトリセツはすべて開いています"}
+              ? recordCount >= nextUnlock.threshold
+                ? `「${nextUnlock.title}」の質問が開きました`
+                : `あと${nextRemaining}回のみっけで「${nextUnlock.title}」の質問が開きます`
+              : "いま用意している深掘りはすべて開いています"}
           </p>
         </section>
 
         <section style={styles.section}>
           <div style={styles.sectionHeader}>
-            <h2 style={styles.sectionTitle}>今わかっていること</h2>
+            <div>
+              <p style={styles.sectionKicker}>日々のみっけから</p>
+              <h2 style={styles.sectionTitle}>見えてきたこと</h2>
+            </div>
           </div>
 
-          <article style={styles.card}>
-            <div style={styles.cardHeader}>
-              <span style={styles.cardTitle}>基本の性格</span>
-              <span style={styles.badgeUnlocked}>解放済み</span>
-            </div>
-            <p style={styles.cardBody}>{typeTagline}</p>
-            {catProfile?.typeLabel ? (
-              <div style={styles.tagRow}>
-                <span style={styles.tag}>{catProfile.typeLabel}</span>
-              </div>
-            ) : null}
-          </article>
-
-          <article style={styles.card}>
-            <div style={styles.cardHeader}>
-              <span style={styles.cardTitle}>1日のリズム</span>
-              <span style={styles.badgeUnlocked}>記録から</span>
-            </div>
-            <div style={styles.dayMapList}>
-              {dayMap.map((item, index) => {
-                const isPeakSlot = !item.signal && peakSlots.includes(item.period);
-
-                return (
-                  <div
-                    key={item.period}
-                    style={
-                      index === dayMap.length - 1
-                        ? { ...styles.dayMapRow, borderBottom: "none" }
-                        : styles.dayMapRow
-                    }
-                  >
-                    <div style={styles.dayMapRowLeft}>
-                      <span
-                        style={{
-                          ...styles.dayMapRowDot,
-                          background: item.signal
-                            ? APP_ACCENT
-                            : isPeakSlot
-                              ? "rgba(86,96,82,0.35)"
-                              : "#d8d5cd",
-                        }}
-                        aria-hidden="true"
-                      />
-                      <span style={styles.dayMapRowPeriod}>{item.period}</span>
-                    </div>
-                    <span
-                      style={
-                        item.signal
-                          ? styles.dayMapRowValue
-                          : styles.dayMapRowValueEmpty
-                      }
-                    >
-                      {item.signal ? getSignalDisplayLabel(item.signal) : "-"}
-                    </span>
+          <div style={styles.insightShelf}>
+            {insightCards.map((card) => (
+              <article key={card.id} style={styles.insightCard}>
+                <span style={styles.insightSource}>{card.source}</span>
+                <h3 style={styles.insightTitle}>{card.title}</h3>
+                <p style={styles.insightBody}>{card.body}</p>
+                {card.tags?.length ? (
+                  <div style={styles.tagRow}>
+                    {card.tags.map((tag) => (
+                      <span key={tag} style={styles.tag}>
+                        {tag}
+                      </span>
+                    ))}
                   </div>
-                );
-              })}
-            </div>
-            {isDayMapEmpty ? (
-              <p style={styles.dayMapEmptyHint}>
-                記録が増えると、時間帯ごとの傾向がここに並びます。
-              </p>
-            ) : null}
-          </article>
+                ) : null}
+              </article>
+            ))}
+          </div>
         </section>
 
         <section style={styles.section}>
           <div style={styles.sectionHeader}>
-            <h2 style={styles.sectionTitle}>これから見えてくること</h2>
+            <div>
+              <p style={styles.sectionKicker}>もっと知る</p>
+              <h2 style={styles.sectionTitle}>質問で深掘り</h2>
+            </div>
           </div>
 
-          {UNLOCKS.map((card) => {
-            const progress = Math.min(100, Math.round((recordCount / card.threshold) * 100));
-            const remaining = Math.max(0, card.threshold - recordCount);
-            const isUnlocked = remaining === 0;
+          <div style={styles.diveList}>
+            {DEEP_DIVE_CARDS.map((card) => {
+              const progress = Math.min(100, Math.round((recordCount / card.threshold) * 100));
+              const remaining = Math.max(0, card.threshold - recordCount);
+              const answer = answers[card.id];
+              const isUnlocked = remaining === 0;
 
-            return (
-              <article
-                key={card.id}
-                style={isUnlocked ? styles.card : { ...styles.card, ...styles.cardLocked }}
-              >
-                <div style={styles.cardHeader}>
-                  <span style={isUnlocked ? styles.cardTitle : styles.cardTitleLocked}>
-                    {isUnlocked ? null : <LockIcon />}
-                    {card.title}
-                  </span>
-                  <span style={isUnlocked ? styles.badgeUnlocked : styles.badgeLocked}>
-                    {isUnlocked ? "解放済み" : `あと${remaining}回`}
-                  </span>
-                </div>
-                <p style={isUnlocked ? styles.cardBody : styles.cardPreview}>
-                  {isUnlocked
-                    ? `${catName}の記録から、少しずつ読めるようになりました。`
-                    : card.preview}
-                </p>
-                <div style={styles.progressTrackCompact}>
-                  <div style={{ ...styles.progressFill, width: `${progress}%` }} />
-                </div>
-              </article>
-            );
-          })}
+              return (
+                <article key={card.id} style={styles.diveCard}>
+                  <div style={styles.diveHeader}>
+                    <div style={styles.diveTitleArea}>
+                      <span style={answer ? styles.diveStatusDone : styles.diveStatus}>
+                        {answer ? "回答済み" : isUnlocked ? "質問が開きました" : `あと${remaining}回`}
+                      </span>
+                      <h3 style={styles.diveTitle}>{card.title}</h3>
+                    </div>
+                    <button
+                      type="button"
+                      disabled={!isUnlocked || Boolean(answer)}
+                      onClick={() => setActiveDive(card)}
+                      style={
+                        answer
+                          ? styles.diveButtonDone
+                          : isUnlocked
+                            ? styles.diveButton
+                            : styles.diveButtonLocked
+                      }
+                    >
+                      {answer ? "追加済み" : isUnlocked ? "答える" : "準備中"}
+                    </button>
+                  </div>
+                  <p style={styles.divePreview}>{answer?.result ?? card.preview}</p>
+                  <div style={styles.progressTrackCompact}>
+                    <div style={{ ...styles.progressFill, width: `${progress}%` }} />
+                  </div>
+                </article>
+              );
+            })}
+          </div>
         </section>
 
         <div style={{ height: "108px" }} />
       </div>
+
+      {activeDive ? (
+        <div style={styles.sheetLayer}>
+          <button
+            type="button"
+            aria-label="閉じる"
+            style={styles.sheetOverlay}
+            onClick={() => setActiveDive(null)}
+          />
+          <section style={styles.sheet}>
+            <div style={styles.sheetHandle} />
+            <div style={styles.sheetHeader}>
+              <div>
+                <p style={styles.sheetKicker}>深掘り質問</p>
+                <h2 style={styles.sheetTitle}>{activeDive.title}</h2>
+              </div>
+              <button
+                type="button"
+                aria-label="閉じる"
+                style={styles.sheetClose}
+                onClick={() => setActiveDive(null)}
+              >
+                ×
+              </button>
+            </div>
+            <p style={styles.sheetQuestion}>{activeDive.question}</p>
+            <div style={styles.sheetOptions}>
+              {activeDive.options.map((option) => (
+                <button
+                  key={option.label}
+                  type="button"
+                  style={styles.sheetOption}
+                  onClick={() => handleAnswer(option)}
+                >
+                  {option.label}
+                </button>
+              ))}
+            </div>
+          </section>
+        </div>
+      ) : null}
+
       <BottomNavigation active="torisetu" />
     </main>
   );
@@ -322,6 +446,29 @@ function readLocalRecordLog(catId: string): RecordLike[] {
   }
 }
 
+function readDeepDiveAnswers(catId: string): Record<string, DeepDiveAnswer> {
+  try {
+    const raw = window.localStorage.getItem(`torisetu_check_answers_${catId}`);
+    return raw ? (JSON.parse(raw) as Record<string, DeepDiveAnswer>) : {};
+  } catch {
+    return {};
+  }
+}
+
+function saveDeepDiveAnswers(
+  catId: string,
+  answers: Record<string, DeepDiveAnswer>,
+) {
+  try {
+    window.localStorage.setItem(
+      `torisetu_check_answers_${catId}`,
+      JSON.stringify(answers),
+    );
+  } catch {
+    // localStorage保存失敗時はUIだけ更新する
+  }
+}
+
 function buildDayMap(records: RecordLike[]): DayMapItem[] {
   const since = Date.now() - RECENT_CAT_SUMMARY_WINDOW_MS;
   const recentRecords = records.filter((record) => record.timestamp >= since);
@@ -344,6 +491,43 @@ function buildDayMap(records: RecordLike[]): DayMapItem[] {
       signal,
     };
   });
+}
+
+function buildRhythmSummary(dayMap: DayMapItem[], catProfile: CatProfile | null) {
+  const activeItems = dayMap.filter((item) => item.signal);
+
+  if (activeItems.length > 0) {
+    return activeItems
+      .map((item) => `${item.period}は${getSignalDisplayLabel(item.signal ?? "")}`)
+      .join("、");
+  }
+
+  const peakTime = catProfile?.activityPattern?.peakTime;
+  const peakSlots = peakTime ? peakTimeMap[peakTime] ?? [] : [];
+
+  if (peakSlots.length > 0) {
+    return `${peakSlots.join("と")}に動きが出やすいかもしれません。`;
+  }
+
+  return "みっけが増えると、時間帯ごとのリズムがここに出ます。";
+}
+
+function buildRecentSummary(records: RecordLike[]) {
+  if (records.length === 0) {
+    return "まだ最近の変化はありません。みっけを残すと少しずつ見えてきます。";
+  }
+
+  const representativeSignal = getRepresentativeSignal(records.slice(0, 12));
+
+  if (representativeSignal) {
+    return `最近は「${getSignalDisplayLabel(representativeSignal)}」が少し目立っています。`;
+  }
+
+  if (records.length < 3) {
+    return "まだ判断は急がなくて大丈夫。小さなみっけを増やしていきましょう。";
+  }
+
+  return "いろいろな様子が混ざっています。もう少し記録すると傾向が見えてきます。";
 }
 
 function getRepresentativeSignal(records: RecordLike[]) {
@@ -442,25 +626,6 @@ function getSignalDisplayLabel(signal: string) {
   return labels[signal] ?? signal;
 }
 
-function LockIcon() {
-  return (
-    <svg
-      viewBox="0 0 24 24"
-      width="14"
-      height="14"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="2"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      aria-hidden="true"
-    >
-      <rect x="5.5" y="10" width="13" height="9" rx="2" />
-      <path d="M8.5 10V7.4a3.5 3.5 0 0 1 7 0V10" />
-    </svg>
-  );
-}
-
 const styles = {
   page: {
     minHeight: "100vh",
@@ -486,21 +651,21 @@ const styles = {
     fontSize: "24px",
     fontWeight: 760,
     color: "#2a2a28",
-    margin: "0 0 3px",
+    margin: "0 0 4px",
     lineHeight: 1.28,
   },
   subtitle: {
     fontSize: "13px",
     color: "#8f8b83",
     margin: 0,
-    lineHeight: 1.5,
+    lineHeight: 1.55,
   },
   heroCard: {
     ...APP_SURFACE,
     display: "flex",
     alignItems: "center",
     gap: "14px",
-    borderRadius: "20px",
+    borderRadius: "22px",
     padding: "14px",
     marginBottom: "10px",
   },
@@ -533,7 +698,7 @@ const styles = {
     minWidth: 0,
     overflow: "hidden",
     textOverflow: "ellipsis",
-    whiteSpace: "nowrap",
+    whiteSpace: "nowrap" as const,
     color: "#2a2a28",
     fontSize: "18px",
     fontWeight: 760,
@@ -557,9 +722,9 @@ const styles = {
   },
   progressCard: {
     ...APP_SURFACE,
-    borderRadius: "18px",
+    borderRadius: "20px",
     padding: "14px 16px",
-    marginBottom: "16px",
+    marginBottom: "18px",
   },
   progressHeader: {
     display: "flex",
@@ -605,118 +770,72 @@ const styles = {
     fontWeight: 650,
   },
   section: {
-    marginBottom: "16px",
+    marginBottom: "20px",
   },
   sectionHeader: {
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "space-between",
-    margin: "0 4px 8px",
+    margin: "0 4px 10px",
+  },
+  sectionKicker: {
+    color: APP_ACCENT_MUTED,
+    fontSize: "11px",
+    fontWeight: 740,
+    letterSpacing: "0.04em",
+    margin: "0 0 3px",
   },
   sectionTitle: {
     margin: 0,
-    color: "#6f6a62",
-    fontSize: "13px",
+    color: "#2a2a28",
+    fontSize: "19px",
     fontWeight: 760,
-    letterSpacing: "0.02em",
+    lineHeight: 1.35,
   },
-  card: {
-    ...APP_SURFACE,
-    borderRadius: "18px",
-    padding: "14px 16px",
-    marginBottom: "8px",
-  },
-  cardLocked: {
-    ...APP_SUBTLE_SURFACE,
-  },
-  cardHeader: {
+  insightShelf: {
     display: "flex",
-    justifyContent: "space-between",
-    alignItems: "flex-start",
-    gap: "12px",
-    marginBottom: "7px",
-  },
-  cardTitle: {
-    fontSize: "15px",
-    fontWeight: 720,
-    color: "#2a2a28",
-    lineHeight: 1.45,
-  },
-  cardTitleLocked: {
-    display: "inline-flex",
-    alignItems: "center",
-    gap: "5px",
-    fontSize: "14px",
-    fontWeight: 650,
-    color: "#8f8b83",
-    lineHeight: 1.45,
-  },
-  cardBody: {
-    fontSize: "14px",
-    color: "#4a4a42",
-    lineHeight: "1.75",
-    margin: 0,
-  },
-  cardPreview: {
-    fontSize: "13px",
-    color: "#8f8b83",
-    lineHeight: "1.6",
-    margin: 0,
-  },
-  dayMapList: {
-    display: "flex",
-    flexDirection: "column",
-    gap: "0px",
-  },
-  dayMapRow: {
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "space-between",
-    gap: "12px",
-    borderBottom: "0.5px solid #f0ede8",
-    padding: "8px 0",
-  },
-  dayMapRowLeft: {
-    display: "flex",
-    alignItems: "center",
     gap: "10px",
+    margin: "0 -16px",
+    padding: "0 16px 4px",
+    overflowX: "auto" as const,
+    scrollbarWidth: "none" as const,
+    scrollSnapType: "x proximity",
   },
-  dayMapRowDot: {
-    width: "7px",
-    height: "7px",
-    borderRadius: "50%",
-    flexShrink: 0,
-    transition: "background 0.2s",
+  insightCard: {
+    ...APP_SURFACE,
+    width: "min(72vw, 286px)",
+    minHeight: "178px",
+    flex: "0 0 auto",
+    scrollSnapAlign: "start",
+    borderRadius: "22px",
+    padding: "16px",
+    display: "flex",
+    flexDirection: "column" as const,
   },
-  dayMapRowPeriod: {
-    color: "#6a6a62",
-    fontSize: "14px",
-    fontWeight: 600,
+  insightSource: {
+    color: APP_ACCENT,
+    fontSize: "11px",
+    fontWeight: 760,
+    letterSpacing: "0.04em",
+    marginBottom: "10px",
   },
-  dayMapRowValue: {
+  insightTitle: {
     color: "#2a2a28",
-    fontSize: "14px",
-    fontWeight: 680,
-    textAlign: "right",
+    fontSize: "18px",
+    fontWeight: 780,
+    lineHeight: 1.35,
+    margin: "0 0 8px",
   },
-  dayMapRowValueEmpty: {
-    color: "#d0cdc6",
-    fontSize: "14px",
-    fontWeight: 500,
-    textAlign: "right",
-  },
-  dayMapEmptyHint: {
-    margin: "8px 0 0",
-    color: "#8f8b83",
+  insightBody: {
+    color: "#5c584f",
     fontSize: "13px",
     fontWeight: 560,
-    lineHeight: 1.6,
+    lineHeight: 1.65,
+    margin: 0,
   },
   tagRow: {
     display: "flex",
     flexWrap: "wrap" as const,
     gap: "6px",
-    marginTop: "10px",
+    marginTop: "auto",
+    paddingTop: "12px",
   },
   tag: {
     background: APP_ACCENT_SOFT_BG,
@@ -727,24 +846,179 @@ const styles = {
     fontWeight: 680,
     padding: "3px 9px",
   },
-  badgeUnlocked: {
+  diveList: {
+    display: "flex",
+    flexDirection: "column" as const,
+    gap: "8px",
+  },
+  diveCard: {
+    ...APP_SURFACE,
+    borderRadius: "20px",
+    padding: "14px 16px",
+  },
+  diveHeader: {
+    display: "flex",
+    justifyContent: "space-between",
+    alignItems: "flex-start",
+    gap: "12px",
+    marginBottom: "8px",
+  },
+  diveTitleArea: {
+    minWidth: 0,
+  },
+  diveStatus: {
+    display: "inline-flex",
+    color: APP_ACCENT,
     background: APP_ACCENT_SOFT_BG,
     border: `0.5px solid ${APP_ACCENT_SOFT_BORDER}`,
     borderRadius: "99px",
+    padding: "2px 8px",
+    fontSize: "11px",
+    fontWeight: 720,
+    marginBottom: "7px",
+  },
+  diveStatusDone: {
+    display: "inline-flex",
+    color: "#7b756b",
+    background: "rgba(245,242,235,0.9)",
+    border: "0.5px solid rgba(210,207,200,0.9)",
+    borderRadius: "99px",
+    padding: "2px 8px",
+    fontSize: "11px",
+    fontWeight: 720,
+    marginBottom: "7px",
+  },
+  diveTitle: {
+    margin: 0,
+    color: "#2a2a28",
+    fontSize: "16px",
+    fontWeight: 740,
+    lineHeight: 1.38,
+  },
+  divePreview: {
+    color: "#6a665e",
+    fontSize: "13px",
+    fontWeight: 560,
+    lineHeight: 1.6,
+    margin: 0,
+  },
+  diveButton: {
+    flexShrink: 0,
+    minHeight: "34px",
+    border: "none",
+    borderRadius: "99px",
+    background: APP_ACCENT,
+    color: "#fff",
+    fontSize: "12px",
+    fontWeight: 760,
+    padding: "0 14px",
+    cursor: "pointer",
+  },
+  diveButtonDone: {
+    flexShrink: 0,
+    minHeight: "34px",
+    border: "0.5px solid rgba(210,207,200,0.9)",
+    borderRadius: "99px",
+    background: "rgba(245,242,235,0.9)",
+    color: "#8f8b83",
+    fontSize: "12px",
+    fontWeight: 720,
+    padding: "0 14px",
+  },
+  diveButtonLocked: {
+    flexShrink: 0,
+    minHeight: "34px",
+    border: "0.5px solid rgba(210,207,200,0.9)",
+    borderRadius: "99px",
+    background: "rgba(255,255,255,0.72)",
+    color: "#aaa59b",
+    fontSize: "12px",
+    fontWeight: 720,
+    padding: "0 14px",
+  },
+  sheetLayer: {
+    position: "fixed" as const,
+    inset: 0,
+    zIndex: 80,
+  },
+  sheetOverlay: {
+    position: "absolute" as const,
+    inset: 0,
+    border: "none",
+    padding: 0,
+    background: "rgba(42,42,40,0.32)",
+    backdropFilter: "blur(2px)",
+    WebkitBackdropFilter: "blur(2px)",
+  },
+  sheet: {
+    ...APP_SURFACE,
+    position: "absolute" as const,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    borderRadius: "24px 24px 0 0",
+    padding: "0 18px calc(24px + env(safe-area-inset-bottom))",
+    borderBottom: "none",
+    boxShadow: "0 -10px 32px rgba(52,50,46,0.18)",
+  },
+  sheetHandle: {
+    width: "38px",
+    height: "4px",
+    borderRadius: "99px",
+    background: "#d0cdc6",
+    margin: "10px auto 16px",
+  },
+  sheetHeader: {
+    display: "flex",
+    justifyContent: "space-between",
+    alignItems: "flex-start",
+    gap: "12px",
+    marginBottom: "14px",
+  },
+  sheetKicker: {
+    margin: "0 0 4px",
     color: APP_ACCENT,
     fontSize: "11px",
-    fontWeight: 700,
-    padding: "2px 8px",
-    flexShrink: 0,
+    fontWeight: 760,
+    letterSpacing: "0.04em",
   },
-  badgeLocked: {
-    background: "rgba(255,255,255,0.76)",
-    border: "0.5px solid rgba(210, 207, 200, 0.86)",
-    borderRadius: "99px",
-    color: APP_ACCENT_MUTED,
-    fontSize: "11px",
+  sheetTitle: {
+    margin: 0,
+    color: "#2a2a28",
+    fontSize: "20px",
+    fontWeight: 760,
+  },
+  sheetClose: {
+    width: "34px",
+    height: "34px",
+    borderRadius: "50%",
+    border: "0.5px solid rgba(210,207,200,0.9)",
+    background: "rgba(255,255,255,0.72)",
+    color: "#6f6a62",
+    fontSize: "20px",
+    cursor: "pointer",
+  },
+  sheetQuestion: {
+    margin: "0 0 14px",
+    color: "#4a4a42",
+    fontSize: "15px",
+    fontWeight: 680,
+    lineHeight: 1.55,
+  },
+  sheetOptions: {
+    display: "grid",
+    gridTemplateColumns: "1fr 1fr",
+    gap: "10px",
+  },
+  sheetOption: {
+    minHeight: "54px",
+    border: "0.5px solid rgba(210,207,200,0.9)",
+    borderRadius: "16px",
+    background: "rgba(255,255,255,0.74)",
+    color: "#2a2a28",
+    fontSize: "14px",
     fontWeight: 700,
-    padding: "2px 8px",
-    flexShrink: 0,
+    cursor: "pointer",
+    padding: "10px",
   },
 } satisfies Record<string, CSSProperties>;
