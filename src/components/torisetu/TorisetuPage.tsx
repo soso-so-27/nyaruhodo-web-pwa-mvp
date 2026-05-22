@@ -203,8 +203,6 @@ export function TorisetuPage({ recentEvents }: TorisetuPageProps) {
     catProfile?.avatarDataUrl ??
     catProfile?.homePhotoDataUrl ??
     getCatAvatarSrcForCoat(catProfile?.appearance?.coat);
-  const backgroundSrc = catProfile?.homePhotoDataUrl ?? catProfile?.avatarDataUrl ?? null;
-  const backgroundPosition = catProfile?.homePhotoPosition ?? "center 38%";
   const typeLabel = catProfile?.typeLabel ?? "観察中";
 
   const insightCards: InsightCard[] = [
@@ -262,16 +260,8 @@ export function TorisetuPage({ recentEvents }: TorisetuPageProps) {
 
   return (
     <main style={styles.page}>
-      {backgroundSrc ? (
-        <img
-          src={backgroundSrc}
-          alt=""
-          aria-hidden="true"
-          style={{ ...styles.backgroundImage, objectPosition: backgroundPosition }}
-        />
-      ) : (
-        <div style={styles.backgroundFallback} aria-hidden="true" />
-      )}
+      <div style={styles.ambientBackground} aria-hidden="true" />
+      <div style={styles.ambientBackgroundAfter} aria-hidden="true" />
       <div style={styles.backgroundVeil} aria-hidden="true" />
       <div style={styles.container}>
         <header style={styles.header}>
@@ -675,23 +665,24 @@ const styles = {
     color: TORISETU_TEXT,
     overflowX: "hidden",
   },
-  backgroundImage: {
+  ambientBackground: {
     position: "fixed" as const,
     inset: 0,
-    width: "100%",
-    height: "100dvh",
-    minHeight: "100vh",
-    objectFit: "cover",
-    objectPosition: "center 38%",
     zIndex: 0,
-    filter: "brightness(0.72) saturate(0.96) contrast(0.98)",
+    background: [
+      "radial-gradient(circle at 18% 12%, rgba(148,136,118,0.30) 0%, rgba(148,136,118,0.08) 22%, rgba(148,136,118,0) 45%)",
+      "radial-gradient(circle at 82% 18%, rgba(192,132,80,0.24) 0%, rgba(192,132,80,0.08) 20%, rgba(192,132,80,0) 42%)",
+      "radial-gradient(ellipse at 50% 82%, rgba(74,65,58,0.62) 0%, rgba(39,34,32,0.78) 48%, rgba(20,18,17,0.96) 100%)",
+      "linear-gradient(145deg, #2f3438 0%, #5e514a 38%, #342c29 70%, #171615 100%)",
+    ].join(", "),
   },
-  backgroundFallback: {
+  ambientBackgroundAfter: {
     position: "fixed" as const,
     inset: 0,
     zIndex: 0,
+    pointerEvents: "none" as const,
     background:
-      "linear-gradient(160deg, #2a2724 0%, #5f5148 48%, #1a1a18 100%)",
+      "linear-gradient(115deg, rgba(255,255,255,0.06) 0%, rgba(255,255,255,0) 28%, rgba(255,210,150,0.07) 62%, rgba(255,255,255,0) 100%)",
   },
   backgroundVeil: {
     position: "fixed" as const,
@@ -699,8 +690,9 @@ const styles = {
     zIndex: 1,
     pointerEvents: "none" as const,
     background: [
-      "linear-gradient(to bottom, rgba(12,10,9,0.36) 0%, rgba(12,10,9,0.16) 34%, rgba(12,10,9,0.52) 100%)",
-      "radial-gradient(circle at 82% 12%, rgba(255,190,110,0.18) 0%, rgba(255,190,110,0.06) 24%, rgba(255,190,110,0) 48%)",
+      "linear-gradient(to bottom, rgba(12,10,9,0.20) 0%, rgba(12,10,9,0.04) 34%, rgba(12,10,9,0.38) 100%)",
+      "radial-gradient(circle at 72% 8%, rgba(255,200,130,0.18) 0%, rgba(255,200,130,0.05) 24%, rgba(255,200,130,0) 52%)",
+      "radial-gradient(circle at 20% 86%, rgba(110,130,130,0.16) 0%, rgba(110,130,130,0) 42%)",
     ].join(", "),
   },
   container: {
