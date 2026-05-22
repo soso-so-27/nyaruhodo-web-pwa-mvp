@@ -62,22 +62,21 @@ type DayMapItem = {
   signal: string | null;
 };
 
-type InsightCard = {
-  id: string;
-  title: string;
-  body: string;
-  tags?: string[];
-};
-
-type KnowledgeItem = {
+type KnowledgeChapter = {
   id: string;
   title: string;
   label: string;
   body: string;
   status: "open" | "ready" | "locked";
   meta: string;
+  rows: KnowledgeRow[];
   actionLabel?: string;
-  card?: DeepDiveCard;
+  actionCard?: DeepDiveCard;
+};
+
+type KnowledgeRow = {
+  label: string;
+  value: string;
 };
 
 type DeepDiveOption = {
@@ -216,75 +215,113 @@ export function TorisetuPage({ recentEvents }: TorisetuPageProps) {
     getCatAvatarSrcForCoat(catProfile?.appearance?.coat);
   const typeLabel = catProfile?.typeLabel ?? "観察中";
 
-  const insightCards: InsightCard[] = [
-    {
-      id: "personality",
-      title: "基本の性格",
-      body: catProfile?.typeLabel ?? "観察中",
-    },
-    {
-      id: "recent",
-      title: "最近",
-      body: recentSummary,
-    },
-    {
-      id: "rhythm",
-      title: "リズム",
-      body: rhythmSummary,
-    },
-    ...Object.values(answers).map((answer) => ({
-      id: `answer-${answer.cardId}`,
-      title: answer.label,
-      body: compactText(answer.result, 24),
-    })),
-  ];
   const answeredCount = Object.keys(answers).length;
-  const knowledgeItems: KnowledgeItem[] = [
+  const answeredDeepDives = DEEP_DIVE_CARDS.map((card) => answers[card.id]).filter(
+    Boolean,
+  );
+  const readyDeepDive =
+    DEEP_DIVE_CARDS.find((card) => recordCount >= card.threshold && !answers[card.id]) ??
+    null;
+  const nextDeepDive =
+    readyDeepDive ?? DEEP_DIVE_CARDS.find((card) => !answers[card.id]) ?? null;
+  const nextDeepDiveRemaining = nextDeepDive
+    ? Math.max(0, nextDeepDive.threshold - recordCount)
+    : 0;
+  const hasRhythmSignal = dayMap.some((item) => item.signal);
+  const peakTime = catProfile?.activityPattern?.peakTime;
+  const peakSlots = peakTime ? peakTimeMap[peakTime] ?? [] : [];
+  const chapters: KnowledgeChapter[] = [
     {
       id: "personality",
-      title: "基本の性格",
+      title: "この子の基本",
       label: "診断から",
       body: catProfile?.typeTagline ?? catProfile?.typeLabel ?? "みっけが増えると、この子らしさが少しずつ言葉になります。",
       status: "open",
       meta: "追加済み",
+      rows: [
+        { label: "タイプ", value: typeLabel },
+        { label: "もと", value: "オンボーディング診断" },
+      ],
     },
     {
       id: "recent",
-      title: "最近の変化",
+      title: "最近のようす",
       label: "日々のみっけ",
       body: recentSummary,
       status: records.length > 0 ? "open" : "locked",
       meta: records.length > 0 ? `${recordCount}件から` : "みっけ待ち",
+      rows: [
+        { label: "記録数", value: `${recordCount}件` },
+        {
+          label: "よく見る",
+          value:
+            records.length > 0
+              ? recentSummary
+              : "みっけを残すと見えてきます",
+        },
+      ],
     },
     {
       id: "rhythm",
       title: "1日のリズム",
       label: "時間帯",
       body: rhythmSummary,
-      status: dayMap.some((item) => item.signal) ? "open" : "locked",
-      meta: dayMap.some((item) => item.signal) ? "見えてきた" : "記録待ち",
+      status: hasRhythmSignal || peakSlots.length > 0 ? "open" : "locked",
+      meta: hasRhythmSignal ? "見えてきた" : peakSlots.length > 0 ? "診断から" : "記録待ち",
+      rows: dayMap.map((item) => ({
+        label: item.period,
+        value: item.signal
+          ? getSignalDisplayLabel(item.signal)
+          : peakSlots.includes(item.period)
+            ? "動きやすい"
+            : "-",
+      })),
     },
-    ...DEEP_DIVE_CARDS.map((card) => {
-      const answer = answers[card.id];
-      const remaining = Math.max(0, card.threshold - recordCount);
-      const isReady = remaining === 0 && !answer;
-
-      return {
-        id: card.id,
-        title: card.title,
-        label: "深掘り",
-        body: answer?.result ?? card.preview,
-        status: answer ? "open" : isReady ? "ready" : "locked",
-        meta: answer ? "追加済み" : isReady ? "1問で追加" : `あと${remaining}回`,
-        actionLabel: isReady ? "答える" : undefined,
-        card,
-      } satisfies KnowledgeItem;
-    }),
+    {
+      id: "lifeTips",
+      title: "暮らしのコツ",
+      label: "深掘り質問",
+      body:
+        answeredDeepDives.length > 0
+          ? `${answeredDeepDives.length}件のコツが追加されています。`
+          : readyDeepDive
+            ? `${readyDeepDive.title}を1問で追加できます。`
+            : nextDeepDive
+              ? `${nextDeepDive.title}は、みっけが増えると開きます。`
+              : "この子との暮らし方を見返せます。",
+      status: answeredDeepDives.length > 0 ? "open" : readyDeepDive ? "ready" : "locked",
+      meta:
+        answeredDeepDives.length > 0
+          ? `${answeredDeepDives.length}件追加`
+          : readyDeepDive
+            ? "1問で追加"
+            : nextDeepDive
+              ? `あと${nextDeepDiveRemaining}回`
+              : "追加済み",
+      rows:
+        answeredDeepDives.length > 0
+          ? answeredDeepDives.slice(0, 3).map((answer) => ({
+              label: answer.label,
+              value: compactText(answer.result, 28),
+            }))
+          : [
+              {
+                label: readyDeepDive ? "次に追加" : "次に開く",
+                value: nextDeepDive
+                  ? readyDeepDive
+                    ? readyDeepDive.title
+                    : `${nextDeepDive.title} あと${nextDeepDiveRemaining}回`
+                  : "すべて追加済み",
+              },
+            ],
+      actionLabel: readyDeepDive ? "答える" : undefined,
+      actionCard: readyDeepDive ?? undefined,
+    },
   ];
-  const openKnowledgeCount = knowledgeItems.filter((item) => item.status === "open").length;
-  const nextKnowledgeItem =
-    knowledgeItems.find((item) => item.status === "ready") ??
-    knowledgeItems.find((item) => item.status === "locked") ??
+  const openChapterCount = chapters.filter((chapter) => chapter.status === "open").length;
+  const nextChapter =
+    chapters.find((chapter) => chapter.status === "ready") ??
+    chapters.find((chapter) => chapter.status === "locked") ??
     null;
 
   function handleAnswer(option: DeepDiveOption) {
@@ -329,8 +366,8 @@ export function TorisetuPage({ recentEvents }: TorisetuPageProps) {
           </div>
           <div style={styles.libraryStats}>
             <div>
-              <p style={styles.libraryStatNumber}>{openKnowledgeCount}</p>
-              <p style={styles.libraryStatLabel}>追加済み</p>
+              <p style={styles.libraryStatNumber}>{openChapterCount}</p>
+              <p style={styles.libraryStatLabel}>開いた章</p>
             </div>
             <div>
               <p style={styles.libraryStatNumber}>{recordCount}</p>
@@ -345,77 +382,72 @@ export function TorisetuPage({ recentEvents }: TorisetuPageProps) {
             <div style={{ ...styles.progressFill, width: `${understanding}%` }} />
           </div>
           <p style={styles.libraryHeroNote}>
-            {nextKnowledgeItem?.status === "ready"
-              ? `${nextKnowledgeItem.title}を1問で追加できます。`
-              : nextKnowledgeItem
-                ? `${nextKnowledgeItem.title}は${nextKnowledgeItem.meta}で追加されます。`
-                : "いま開いている知識を見返せます。"}
+            {nextChapter?.status === "ready"
+              ? `${nextChapter.title}に1問で追加できます。`
+              : nextChapter
+                ? `${nextChapter.title}は${nextChapter.meta}で育ちます。`
+                : "4つの章を見返せます。"}
           </p>
         </section>
 
         <section style={styles.section}>
           <div style={styles.sectionHeader}>
-            <p style={styles.sectionKicker}>LIBRARY</p>
-            <h2 style={styles.sectionTitle}>たまっていく知識</h2>
+            <p style={styles.sectionKicker}>GUIDE BOOK</p>
+            <h2 style={styles.sectionTitle}>4つの章</h2>
+            <p style={styles.sectionLead}>
+              この子を知る手がかりを、まとまりごとに見返せます。
+            </p>
           </div>
 
-          <div style={styles.knowledgeList}>
-            {knowledgeItems.map((item) => (
+          <div style={styles.chapterList}>
+            {chapters.map((chapter) => (
               <article
-                key={item.id}
+                key={chapter.id}
                 style={
-                  item.status === "locked"
-                    ? { ...styles.knowledgeCard, ...styles.knowledgeCardLocked }
-                    : item.status === "ready"
-                      ? { ...styles.knowledgeCard, ...styles.knowledgeCardReady }
-                      : styles.knowledgeCard
+                  chapter.status === "locked"
+                    ? { ...styles.chapterCard, ...styles.chapterCardLocked }
+                    : chapter.status === "ready"
+                      ? { ...styles.chapterCard, ...styles.chapterCardReady }
+                      : styles.chapterCard
                 }
               >
-                <div style={styles.knowledgeCardTop}>
-                  <span style={styles.knowledgeLabel}>{item.label}</span>
+                <div style={styles.chapterCardTop}>
+                  <span style={styles.chapterLabel}>{chapter.label}</span>
                   <span
                     style={
-                      item.status === "open"
-                        ? styles.knowledgeStatusOpen
-                        : item.status === "ready"
-                          ? styles.knowledgeStatusReady
-                          : styles.knowledgeStatusLocked
+                      chapter.status === "open"
+                        ? styles.chapterStatusOpen
+                        : chapter.status === "ready"
+                          ? styles.chapterStatusReady
+                          : styles.chapterStatusLocked
                     }
                   >
-                    {item.meta}
+                    {chapter.meta}
                   </span>
                 </div>
-                <div style={styles.knowledgeBodyRow}>
-                  <div style={styles.knowledgeText}>
-                    <h3 style={styles.knowledgeTitle}>{item.title}</h3>
-                    <p style={styles.knowledgeBody}>{item.body}</p>
+                <div style={styles.chapterBodyRow}>
+                  <div style={styles.chapterText}>
+                    <h3 style={styles.chapterTitle}>{chapter.title}</h3>
+                    <p style={styles.chapterBody}>{chapter.body}</p>
                   </div>
-                  {item.status === "ready" && item.card ? (
+                  {chapter.status === "ready" && chapter.actionCard ? (
                     <button
                       type="button"
-                      style={styles.knowledgeAction}
-                      onClick={() => setActiveDive(item.card ?? null)}
+                      style={styles.chapterAction}
+                      onClick={() => setActiveDive(chapter.actionCard ?? null)}
                     >
-                      {item.actionLabel}
+                      {chapter.actionLabel}
                     </button>
                   ) : null}
                 </div>
-              </article>
-            ))}
-          </div>
-        </section>
-
-        <section style={styles.section}>
-          <div style={styles.sectionHeader}>
-            <p style={styles.sectionKicker}>NOTES</p>
-            <h2 style={styles.sectionTitle}>最近のメモ</h2>
-          </div>
-
-          <div style={styles.noteShelf}>
-            {insightCards.map((card) => (
-              <article key={card.id} style={styles.noteCard}>
-                <h3 style={styles.noteTitle}>{card.title}</h3>
-                <p style={styles.noteBody}>{card.body}</p>
+                <div style={styles.chapterRows}>
+                  {chapter.rows.map((row) => (
+                    <div key={`${chapter.id}-${row.label}`} style={styles.chapterRow}>
+                      <span style={styles.chapterRowLabel}>{row.label}</span>
+                      <span style={styles.chapterRowValue}>{row.value}</span>
+                    </div>
+                  ))}
+                </div>
               </article>
             ))}
           </div>
@@ -1045,6 +1077,132 @@ const styles = {
     fontSize: "17px",
     fontWeight: 680,
     lineHeight: 1.35,
+  },
+  sectionLead: {
+    margin: "5px 0 0",
+    color: TORISETU_MUTED,
+    fontSize: "12px",
+    fontWeight: 500,
+    lineHeight: 1.55,
+  },
+  chapterList: {
+    display: "flex",
+    flexDirection: "column" as const,
+    gap: "10px",
+  },
+  chapterCard: {
+    ...TORISETU_SURFACE_SOFT,
+    borderRadius: "20px",
+    padding: "14px",
+  },
+  chapterCardReady: {
+    background: "rgba(255,255,255,0.14)",
+    border: "0.5px solid rgba(255,220,160,0.28)",
+  },
+  chapterCardLocked: {
+    opacity: 0.74,
+    background: "rgba(255,255,255,0.07)",
+  },
+  chapterCardTop: {
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: "10px",
+    marginBottom: "9px",
+  },
+  chapterLabel: {
+    color: TORISETU_MUTED,
+    fontSize: "11px",
+    fontWeight: 560,
+    lineHeight: 1.3,
+  },
+  chapterStatusOpen: {
+    color: "rgba(255,255,255,0.72)",
+    border: "0.5px solid rgba(255,255,255,0.16)",
+    borderRadius: "99px",
+    padding: "2px 8px",
+    fontSize: "11px",
+    fontWeight: 520,
+  },
+  chapterStatusReady: {
+    color: "rgba(255,232,190,0.95)",
+    border: "0.5px solid rgba(255,220,160,0.28)",
+    borderRadius: "99px",
+    padding: "2px 8px",
+    fontSize: "11px",
+    fontWeight: 560,
+  },
+  chapterStatusLocked: {
+    color: TORISETU_FAINT,
+    border: "0.5px solid rgba(255,255,255,0.10)",
+    borderRadius: "99px",
+    padding: "2px 8px",
+    fontSize: "11px",
+    fontWeight: 520,
+  },
+  chapterBodyRow: {
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: "14px",
+  },
+  chapterText: {
+    minWidth: 0,
+    flex: 1,
+  },
+  chapterTitle: {
+    margin: "0 0 5px",
+    color: TORISETU_TEXT_STRONG,
+    fontSize: "17px",
+    fontWeight: 650,
+    lineHeight: 1.38,
+  },
+  chapterBody: {
+    margin: 0,
+    color: TORISETU_MUTED,
+    fontSize: "13px",
+    fontWeight: 500,
+    lineHeight: 1.58,
+  },
+  chapterAction: {
+    flexShrink: 0,
+    minHeight: "36px",
+    border: "none",
+    borderRadius: "99px",
+    background: "rgba(255,255,255,0.92)",
+    color: "#2a2a28",
+    fontSize: "12px",
+    fontWeight: 620,
+    padding: "0 14px",
+    cursor: "pointer",
+  },
+  chapterRows: {
+    display: "flex",
+    flexDirection: "column" as const,
+    gap: "0px",
+    marginTop: "12px",
+    borderTop: "0.5px solid rgba(255,255,255,0.10)",
+  },
+  chapterRow: {
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: "12px",
+    padding: "8px 0",
+    borderBottom: "0.5px solid rgba(255,255,255,0.08)",
+  },
+  chapterRowLabel: {
+    color: TORISETU_FAINT,
+    fontSize: "12px",
+    fontWeight: 520,
+    flexShrink: 0,
+  },
+  chapterRowValue: {
+    color: TORISETU_TEXT,
+    fontSize: "12px",
+    fontWeight: 560,
+    lineHeight: 1.45,
+    textAlign: "right" as const,
   },
   knowledgeList: {
     display: "flex",
