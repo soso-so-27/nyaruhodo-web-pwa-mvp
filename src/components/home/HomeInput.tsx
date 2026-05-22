@@ -5,14 +5,6 @@ import type { CSSProperties, TouchEvent } from "react";
 import type { RecentEvent } from "../../lib/supabase/queries";
 import { BottomNavigation } from "../navigation/BottomNavigation";
 import {
-  APP_ACCENT,
-  APP_ACCENT_SOFT_BG,
-  APP_ACCENT_SOFT_BORDER,
-  APP_SHEET,
-  APP_SHEET_OVERLAY,
-  APP_SUBTLE_SURFACE,
-} from "../ui/appTheme";
-import {
   getActiveCatProfile,
   getCatName,
   readActiveCatId,
@@ -89,9 +81,6 @@ const DISCOVERY_TEXT =
   "昨日の小さな記録から、少しだけリズムが見えてきました。";
 const HOME_NAV_FRAME_WIDTH = "min(calc(100% - 28px), 410px)";
 const HOME_NAV_EDGE_INSET = "max(14px, calc((100vw - 410px) / 2))";
-const HOME_ACCENT_COLOR = APP_ACCENT;
-const HOME_ACCENT_SOFT_BG = APP_ACCENT_SOFT_BG;
-const HOME_ACCENT_SOFT_BORDER = APP_ACCENT_SOFT_BORDER;
 
 export function HomeInput({ recentEvents: _recentEvents }: HomeInputProps) {
   const [catProfiles, setCatProfiles] = useState<CatProfile[]>([]);
@@ -557,7 +546,7 @@ function MikkeSheet({
     {
       key: "yousu",
       label: "ようす",
-      sub: yousuRemaining ? yousuRemaining : "なにしてる？",
+      sub: yousuRemaining ? `あと ${yousuRemaining}` : "ねてる・遊んでる",
       icon: <PawIcon />,
       disabled: Boolean(yousuRemaining),
       onClick: onOpenYousu,
@@ -565,7 +554,7 @@ function MikkeSheet({
     {
       key: "mugi",
       label: "してあげた",
-      sub: mugiRemaining ? mugiRemaining : "なにした？",
+      sub: mugiRemaining ? `あと ${mugiRemaining}` : "遊んだ・なでた",
       icon: <HandIcon />,
       disabled: Boolean(mugiRemaining),
       onClick: onOpenMugi,
@@ -584,8 +573,9 @@ function MikkeSheet({
     <>
       <div style={styles.sheetBackdrop} onClick={onClose} />
       <div style={styles.sheet}>
+        <div style={styles.sheetHandle} aria-hidden="true" />
         <div style={styles.sheetHeader}>
-          <p style={styles.sheetTitle}>{catName}みっけ</p>
+          <p style={styles.sheetTitle}>みっけ</p>
           <button type="button" onClick={onClose} style={styles.sheetCloseButton}>
             <CloseIcon />
           </button>
@@ -634,6 +624,7 @@ function YousuSheet({
     <>
       <div style={styles.sheetBackdrop} onClick={onClose} />
       <div style={styles.sheet}>
+        <div style={styles.sheetHandle} aria-hidden="true" />
         <div style={styles.sheetHeader}>
           <p style={styles.sheetTitle}>{title}</p>
           <button
@@ -684,6 +675,7 @@ function ActionSheet({
     <>
       <div style={styles.sheetBackdrop} onClick={onClose} />
       <div style={styles.sheet}>
+        <div style={styles.sheetHandle} aria-hidden="true" />
         <div style={styles.sheetHeader}>
           <p style={styles.sheetTitle}>{title}</p>
           <button
@@ -730,6 +722,7 @@ function CatSheet({
     <>
       <div style={styles.sheetBackdrop} onClick={onClose} />
       <div style={styles.sheet}>
+        <div style={styles.sheetHandle} aria-hidden="true" />
         <div style={styles.sheetHeader}>
           <p style={styles.sheetTitle}>ねこを選ぶ</p>
           <button
@@ -1883,7 +1876,9 @@ const styles = {
   },
   lockedState: {
     pointerEvents: "none",
-    background: "rgba(255,255,255,0.78)",
+    borderColor: "rgba(255,255,255,0.10)",
+    background: "rgba(255,255,255,0.06)",
+    color: "rgba(255,255,255,0.58)",
   },
   yousuPanel: {
     border: "0.5px solid #E0DDD6",
@@ -1921,26 +1916,30 @@ const styles = {
   },
   yousuOption: {
     minHeight: "48px",
-    border: "0.5px solid #E0DDD6",
+    border: "0.5px solid rgba(255,255,255,0.16)",
     borderRadius: "10px",
-    background: "rgba(247, 245, 239, 0.85)",
-    color: "#2A2A28",
+    background: "rgba(255,255,255,0.10)",
+    color: "rgba(255,255,255,0.94)",
     padding: "10px 4px",
     fontSize: "12px",
-    fontWeight: 600,
+    fontWeight: 720,
     textAlign: "center",
     cursor: "pointer",
+    backdropFilter: "blur(18px)",
+    WebkitBackdropFilter: "blur(18px)",
   },
   yousuOptionSelected: {
-    borderColor: HOME_ACCENT_COLOR,
-    background: HOME_ACCENT_COLOR,
-    color: "#FFFFFF",
+    borderColor: "rgba(255,255,255,0.72)",
+    background: "rgba(255,255,255,0.92)",
+    color: "#2A2A28",
   },
   sheetBackdrop: {
     position: "fixed",
     inset: 0,
     zIndex: 99,
-    ...APP_SHEET_OVERLAY,
+    background: "rgba(12,10,9,0.42)",
+    backdropFilter: "blur(4px)",
+    WebkitBackdropFilter: "blur(4px)",
   },
   sheet: {
     position: "fixed",
@@ -1949,9 +1948,26 @@ const styles = {
     left: 0,
     zIndex: 100,
     borderRadius: "24px 24px 0 0",
-    ...APP_SHEET,
-    padding: "24px 16px calc(40px + env(safe-area-inset-bottom))",
+    background: "rgba(34,29,28,0.76)",
+    color: "rgba(255,255,255,0.94)",
+    border: "0.5px solid rgba(255,255,255,0.22)",
+    borderBottom: "none",
+    boxShadow:
+      "0 -18px 48px rgba(0,0,0,0.32), inset 0 1px 0 rgba(255,255,255,0.16)",
+    backdropFilter: "blur(34px)",
+    WebkitBackdropFilter: "blur(34px)",
+    maxHeight: "min(78dvh, 620px)",
+    overflowY: "auto",
+    padding: "10px 16px calc(40px + env(safe-area-inset-bottom))",
     animation: "slideUp 0.25s ease-out",
+    boxSizing: "border-box",
+  },
+  sheetHandle: {
+    width: "42px",
+    height: "4px",
+    borderRadius: "99px",
+    background: "rgba(255,255,255,0.34)",
+    margin: "2px auto 16px",
   },
   sheetHeader: {
     display: "flex",
@@ -1961,9 +1977,9 @@ const styles = {
   },
   sheetTitle: {
     margin: 0,
-    color: "#2A2A28",
-    fontSize: "17px",
-    fontWeight: 700,
+    color: "rgba(255,255,255,0.96)",
+    fontSize: "18px",
+    fontWeight: 780,
     lineHeight: 1.5,
   },
   sheetCloseButton: {
@@ -1973,11 +1989,13 @@ const styles = {
     width: "32px",
     height: "32px",
     flexShrink: 0,
-    border: "none",
+    border: "0.5px solid rgba(255,255,255,0.14)",
     borderRadius: "50%",
-    background: "transparent",
-    color: "#888580",
+    background: "rgba(255,255,255,0.08)",
+    color: "rgba(255,255,255,0.72)",
     cursor: "pointer",
+    backdropFilter: "blur(12px)",
+    WebkitBackdropFilter: "blur(12px)",
   },
   sheetGrid: {
     display: "grid",
@@ -1998,10 +2016,11 @@ const styles = {
     marginTop: "16px",
   },
   mikkeChoice: {
-    ...APP_SUBTLE_SURFACE,
     minHeight: "118px",
+    border: "0.5px solid rgba(255,255,255,0.18)",
     borderRadius: "16px",
-    color: "#2A2A28",
+    background: "rgba(255,255,255,0.10)",
+    color: "rgba(255,255,255,0.94)",
     padding: "14px 8px",
     display: "flex",
     flexDirection: "column",
@@ -2010,45 +2029,52 @@ const styles = {
     gap: "7px",
     textAlign: "center",
     cursor: "pointer",
+    backdropFilter: "blur(18px)",
+    WebkitBackdropFilter: "blur(18px)",
+    boxShadow: "inset 0 1px 0 rgba(255,255,255,0.12)",
   },
   mikkeChoiceDisabled: {
-    opacity: 0.48,
+    borderColor: "rgba(255,255,255,0.10)",
+    background: "rgba(255,255,255,0.06)",
     cursor: "not-allowed",
   },
   mikkeChoiceIcon: {
     width: "34px",
     height: "34px",
-    color: HOME_ACCENT_COLOR,
+    color: "rgba(255,255,255,0.88)",
     display: "inline-flex",
     alignItems: "center",
     justifyContent: "center",
   },
   mikkeChoiceLabel: {
-    color: "#2A2A28",
+    color: "rgba(255,255,255,0.96)",
     fontSize: "14px",
-    fontWeight: 720,
+    fontWeight: 760,
     lineHeight: 1.25,
   },
   mikkeChoiceSub: {
-    color: "#74716a",
+    color: "rgba(255,255,255,0.62)",
     fontSize: "11px",
-    fontWeight: 650,
+    fontWeight: 720,
     lineHeight: 1.25,
   },
   sheetOption: {
-    ...APP_SUBTLE_SURFACE,
+    border: "0.5px solid rgba(255,255,255,0.16)",
     borderRadius: "14px",
-    color: "#2A2A28",
+    background: "rgba(255,255,255,0.10)",
+    color: "rgba(255,255,255,0.94)",
     padding: "20px 12px",
     fontSize: "15px",
-    fontWeight: 600,
+    fontWeight: 720,
     textAlign: "center",
     cursor: "pointer",
+    backdropFilter: "blur(18px)",
+    WebkitBackdropFilter: "blur(18px)",
   },
   sheetOptionSelected: {
-    borderColor: HOME_ACCENT_COLOR,
-    background: HOME_ACCENT_COLOR,
-    color: "#FFFFFF",
+    borderColor: "rgba(255,255,255,0.72)",
+    background: "rgba(255,255,255,0.92)",
+    color: "#2A2A28",
   },
   catList: {
     display: "grid",
@@ -2056,25 +2082,28 @@ const styles = {
     marginTop: "16px",
   },
   catListItem: {
-    ...APP_SUBTLE_SURFACE,
     display: "flex",
     alignItems: "center",
     justifyContent: "space-between",
+    border: "0.5px solid rgba(255,255,255,0.16)",
     borderRadius: "14px",
+    background: "rgba(255,255,255,0.10)",
     padding: "14px 16px",
-    color: "#2A2A28",
+    color: "rgba(255,255,255,0.94)",
     cursor: "pointer",
+    backdropFilter: "blur(18px)",
+    WebkitBackdropFilter: "blur(18px)",
   },
   catListItemActive: {
-    borderColor: HOME_ACCENT_COLOR,
-    background: HOME_ACCENT_SOFT_BG,
+    borderColor: "rgba(255,255,255,0.62)",
+    background: "rgba(255,255,255,0.18)",
   },
   catListName: {
     fontSize: "15px",
     fontWeight: 700,
   },
   catListMark: {
-    color: HOME_ACCENT_COLOR,
+    color: "rgba(255,255,255,0.62)",
     fontSize: "12px",
     fontWeight: 600,
   },
