@@ -69,6 +69,17 @@ type InsightCard = {
   tags?: string[];
 };
 
+type KnowledgeItem = {
+  id: string;
+  title: string;
+  label: string;
+  body: string;
+  status: "open" | "ready" | "locked";
+  meta: string;
+  actionLabel?: string;
+  card?: DeepDiveCard;
+};
+
 type DeepDiveOption = {
   label: string;
   result: string;
@@ -228,17 +239,53 @@ export function TorisetuPage({ recentEvents }: TorisetuPageProps) {
     })),
   ];
   const answeredCount = Object.keys(answers).length;
-  const actionableDive =
-    DEEP_DIVE_CARDS.find(
-      (card) => recordCount >= card.threshold && !answers[card.id],
-    ) ?? null;
-  const nextLockedDive =
-    DEEP_DIVE_CARDS.find(
-      (card) => recordCount < card.threshold && !answers[card.id],
-    ) ?? null;
-  const nextRemaining = nextLockedDive
-    ? Math.max(0, nextLockedDive.threshold - recordCount)
-    : 0;
+  const knowledgeItems: KnowledgeItem[] = [
+    {
+      id: "personality",
+      title: "基本の性格",
+      label: "診断から",
+      body: catProfile?.typeTagline ?? catProfile?.typeLabel ?? "みっけが増えると、この子らしさが少しずつ言葉になります。",
+      status: "open",
+      meta: "追加済み",
+    },
+    {
+      id: "recent",
+      title: "最近の変化",
+      label: "日々のみっけ",
+      body: recentSummary,
+      status: records.length > 0 ? "open" : "locked",
+      meta: records.length > 0 ? `${recordCount}件から` : "みっけ待ち",
+    },
+    {
+      id: "rhythm",
+      title: "1日のリズム",
+      label: "時間帯",
+      body: rhythmSummary,
+      status: dayMap.some((item) => item.signal) ? "open" : "locked",
+      meta: dayMap.some((item) => item.signal) ? "見えてきた" : "記録待ち",
+    },
+    ...DEEP_DIVE_CARDS.map((card) => {
+      const answer = answers[card.id];
+      const remaining = Math.max(0, card.threshold - recordCount);
+      const isReady = remaining === 0 && !answer;
+
+      return {
+        id: card.id,
+        title: card.title,
+        label: "深掘り",
+        body: answer?.result ?? card.preview,
+        status: answer ? "open" : isReady ? "ready" : "locked",
+        meta: answer ? "追加済み" : isReady ? "1問で追加" : `あと${remaining}回`,
+        actionLabel: isReady ? "答える" : undefined,
+        card,
+      } satisfies KnowledgeItem;
+    }),
+  ];
+  const openKnowledgeCount = knowledgeItems.filter((item) => item.status === "open").length;
+  const nextKnowledgeItem =
+    knowledgeItems.find((item) => item.status === "ready") ??
+    knowledgeItems.find((item) => item.status === "locked") ??
+    null;
 
   function handleAnswer(option: DeepDiveOption) {
     if (!catProfile || !activeDive) return;
@@ -264,79 +311,95 @@ export function TorisetuPage({ recentEvents }: TorisetuPageProps) {
       <div style={styles.ambientBackgroundAfter} aria-hidden="true" />
       <div style={styles.backgroundVeil} aria-hidden="true" />
       <div style={styles.container}>
-        <header style={styles.header}>
+        <header style={styles.libraryHeader}>
           <div style={styles.headerAvatar}>
             <img src={avatarSrc} alt="" style={styles.headerAvatarImg} />
           </div>
           <div style={styles.headerText}>
-            <p style={styles.eyebrow}>トリセツ</p>
-            <h1 style={styles.title}>{catName}</h1>
+            <p style={styles.eyebrow}>CAT GUIDE</p>
+            <h1 style={styles.title}>{catName}のトリセツ</h1>
+            <p style={styles.headerLead}>みっけから、この子専用の知識が育ちます。</p>
           </div>
-          <span style={styles.headerBadge}>{typeLabel}</span>
         </header>
 
-        <section style={styles.progressCard}>
-          <div style={styles.progressHeader}>
-            <span style={styles.progressLabel}>トリセツ</span>
-            <span style={styles.progressValue}>{understanding}%</span>
+        <section style={styles.libraryHero}>
+          <div style={styles.libraryHeroTop}>
+            <span style={styles.libraryHeroLabel}>ナレッジ棚</span>
+            <span style={styles.headerBadge}>{typeLabel}</span>
+          </div>
+          <div style={styles.libraryStats}>
+            <div>
+              <p style={styles.libraryStatNumber}>{openKnowledgeCount}</p>
+              <p style={styles.libraryStatLabel}>追加済み</p>
+            </div>
+            <div>
+              <p style={styles.libraryStatNumber}>{recordCount}</p>
+              <p style={styles.libraryStatLabel}>みっけ</p>
+            </div>
+            <div>
+              <p style={styles.libraryStatNumber}>{answeredCount}</p>
+              <p style={styles.libraryStatLabel}>深掘り</p>
+            </div>
           </div>
           <div style={styles.progressTrack}>
             <div style={{ ...styles.progressFill, width: `${understanding}%` }} />
           </div>
-          <div style={styles.progressMeta}>
-            <span>見えてきたこと {insightCards.length}</span>
-            <span>質問 {answeredCount}/{DEEP_DIVE_CARDS.length}</span>
-          </div>
-        </section>
-
-        <section style={styles.nextCard}>
-          <p style={styles.nextLabel}>次にできること</p>
-          {actionableDive ? (
-            <div style={styles.nextActionRow}>
-              <div style={styles.nextActionText}>
-                <h2 style={styles.nextTitle}>{actionableDive.title}</h2>
-                <p style={styles.nextSub}>質問に答えると、トリセツに追加されます。</p>
-              </div>
-              <button
-                type="button"
-                style={styles.nextButton}
-                onClick={() => setActiveDive(actionableDive)}
-              >
-                答える
-              </button>
-            </div>
-          ) : nextLockedDive ? (
-            <div style={styles.nextActionText}>
-              <h2 style={styles.nextTitle}>{nextLockedDive.title}</h2>
-              <p style={styles.nextSub}>あと{nextRemaining}回のみっけで開きます。</p>
-            </div>
-          ) : (
-            <div style={styles.nextActionText}>
-              <h2 style={styles.nextTitle}>いまは全部開いています</h2>
-              <p style={styles.nextSub}>またみっけが増えたら、新しい見え方を足していきます。</p>
-            </div>
-          )}
+          <p style={styles.libraryHeroNote}>
+            {nextKnowledgeItem?.status === "ready"
+              ? `${nextKnowledgeItem.title}を1問で追加できます。`
+              : nextKnowledgeItem
+                ? `${nextKnowledgeItem.title}は${nextKnowledgeItem.meta}で追加されます。`
+                : "いま開いている知識を見返せます。"}
+          </p>
         </section>
 
         <section style={styles.section}>
           <div style={styles.sectionHeader}>
-            <h2 style={styles.sectionTitle}>見えてきたこと</h2>
+            <p style={styles.sectionKicker}>LIBRARY</p>
+            <h2 style={styles.sectionTitle}>たまっていく知識</h2>
           </div>
 
-          <div style={styles.insightShelf}>
-            {insightCards.map((card) => (
-              <article key={card.id} style={styles.insightCard}>
-                <h3 style={styles.insightTitle}>{card.title}</h3>
-                <p style={styles.insightBody}>{card.body}</p>
-                {card.tags?.length ? (
-                  <div style={styles.tagRow}>
-                    {card.tags.map((tag) => (
-                      <span key={tag} style={styles.tag}>
-                        {tag}
-                      </span>
-                    ))}
+          <div style={styles.knowledgeList}>
+            {knowledgeItems.map((item) => (
+              <article
+                key={item.id}
+                style={
+                  item.status === "locked"
+                    ? { ...styles.knowledgeCard, ...styles.knowledgeCardLocked }
+                    : item.status === "ready"
+                      ? { ...styles.knowledgeCard, ...styles.knowledgeCardReady }
+                      : styles.knowledgeCard
+                }
+              >
+                <div style={styles.knowledgeCardTop}>
+                  <span style={styles.knowledgeLabel}>{item.label}</span>
+                  <span
+                    style={
+                      item.status === "open"
+                        ? styles.knowledgeStatusOpen
+                        : item.status === "ready"
+                          ? styles.knowledgeStatusReady
+                          : styles.knowledgeStatusLocked
+                    }
+                  >
+                    {item.meta}
+                  </span>
+                </div>
+                <div style={styles.knowledgeBodyRow}>
+                  <div style={styles.knowledgeText}>
+                    <h3 style={styles.knowledgeTitle}>{item.title}</h3>
+                    <p style={styles.knowledgeBody}>{item.body}</p>
                   </div>
-                ) : null}
+                  {item.status === "ready" && item.card ? (
+                    <button
+                      type="button"
+                      style={styles.knowledgeAction}
+                      onClick={() => setActiveDive(item.card ?? null)}
+                    >
+                      {item.actionLabel}
+                    </button>
+                  ) : null}
+                </div>
               </article>
             ))}
           </div>
@@ -344,41 +407,17 @@ export function TorisetuPage({ recentEvents }: TorisetuPageProps) {
 
         <section style={styles.section}>
           <div style={styles.sectionHeader}>
-            <h2 style={styles.sectionTitle}>質問</h2>
+            <p style={styles.sectionKicker}>NOTES</p>
+            <h2 style={styles.sectionTitle}>最近のメモ</h2>
           </div>
 
-          <div style={styles.diveList}>
-            {DEEP_DIVE_CARDS.map((card) => {
-              const remaining = Math.max(0, card.threshold - recordCount);
-              const answer = answers[card.id];
-              const isUnlocked = remaining === 0;
-
-              return (
-                <article key={card.id} style={styles.questionRow}>
-                  <div style={styles.questionMain}>
-                    <span style={answer ? styles.diveStatusDone : styles.diveStatus}>
-                      {answer ? "回答済み" : isUnlocked ? "開いた" : `あと${remaining}`}
-                    </span>
-                    <h3 style={styles.diveTitle}>{card.title}</h3>
-                  </div>
-                  <button
-                    type="button"
-                    disabled={!isUnlocked || Boolean(answer)}
-                    onClick={() => setActiveDive(card)}
-                    style={
-                      answer
-                        ? styles.questionButtonDone
-                        : isUnlocked
-                          ? styles.questionButton
-                          : styles.questionButtonLocked
-                    }
-                    aria-label={`${card.title}に答える`}
-                  >
-                    {answer ? "✓" : isUnlocked ? "答える" : "－"}
-                  </button>
-                </article>
-              );
-            })}
+          <div style={styles.noteShelf}>
+            {insightCards.map((card) => (
+              <article key={card.id} style={styles.noteCard}>
+                <h3 style={styles.noteTitle}>{card.title}</h3>
+                <p style={styles.noteBody}>{card.body}</p>
+              </article>
+            ))}
           </div>
         </section>
 
@@ -708,6 +747,12 @@ const styles = {
     gap: "10px",
     padding: "4px 0 14px",
   },
+  libraryHeader: {
+    display: "flex",
+    alignItems: "center",
+    gap: "11px",
+    padding: "6px 0 16px",
+  },
   headerAvatar: {
     width: "44px",
     height: "44px",
@@ -753,6 +798,13 @@ const styles = {
     color: TORISETU_TEXT_STRONG,
     margin: 0,
     lineHeight: 1.28,
+  },
+  headerLead: {
+    margin: "4px 0 0",
+    color: TORISETU_MUTED,
+    fontSize: "12px",
+    fontWeight: 520,
+    lineHeight: 1.5,
   },
   subtitle: {
     fontSize: "13px",
@@ -825,6 +877,52 @@ const styles = {
     borderRadius: "20px",
     padding: "12px 14px",
     marginBottom: "16px",
+  },
+  libraryHero: {
+    ...TORISETU_SURFACE,
+    borderRadius: "24px",
+    padding: "16px",
+    marginBottom: "18px",
+  },
+  libraryHeroTop: {
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: "12px",
+    marginBottom: "16px",
+  },
+  libraryHeroLabel: {
+    color: TORISETU_TEXT_STRONG,
+    fontSize: "16px",
+    fontWeight: 660,
+    lineHeight: 1.4,
+  },
+  libraryStats: {
+    display: "grid",
+    gridTemplateColumns: "repeat(3, 1fr)",
+    gap: "10px",
+    marginBottom: "12px",
+  },
+  libraryStatNumber: {
+    margin: 0,
+    color: TORISETU_TEXT_STRONG,
+    fontSize: "22px",
+    fontWeight: 680,
+    lineHeight: 1,
+  },
+  libraryStatLabel: {
+    margin: "5px 0 0",
+    color: TORISETU_MUTED,
+    fontSize: "11px",
+    fontWeight: 520,
+    lineHeight: 1.3,
+  },
+  libraryHeroNote: {
+    margin: "10px 0 0",
+    color: TORISETU_MUTED,
+    fontSize: "12px",
+    fontWeight: 520,
+    lineHeight: 1.55,
   },
   progressHeader: {
     display: "flex",
@@ -947,6 +1045,132 @@ const styles = {
     fontSize: "17px",
     fontWeight: 680,
     lineHeight: 1.35,
+  },
+  knowledgeList: {
+    display: "flex",
+    flexDirection: "column" as const,
+    gap: "9px",
+  },
+  knowledgeCard: {
+    ...TORISETU_SURFACE_SOFT,
+    borderRadius: "18px",
+    padding: "14px",
+  },
+  knowledgeCardReady: {
+    background: "rgba(255,255,255,0.14)",
+    border: "0.5px solid rgba(255,220,160,0.28)",
+  },
+  knowledgeCardLocked: {
+    opacity: 0.72,
+    background: "rgba(255,255,255,0.07)",
+  },
+  knowledgeCardTop: {
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: "10px",
+    marginBottom: "9px",
+  },
+  knowledgeLabel: {
+    color: TORISETU_MUTED,
+    fontSize: "11px",
+    fontWeight: 560,
+    lineHeight: 1.3,
+  },
+  knowledgeStatusOpen: {
+    color: "rgba(255,255,255,0.72)",
+    border: "0.5px solid rgba(255,255,255,0.16)",
+    borderRadius: "99px",
+    padding: "2px 8px",
+    fontSize: "11px",
+    fontWeight: 520,
+  },
+  knowledgeStatusReady: {
+    color: "rgba(255,232,190,0.95)",
+    border: "0.5px solid rgba(255,220,160,0.28)",
+    borderRadius: "99px",
+    padding: "2px 8px",
+    fontSize: "11px",
+    fontWeight: 560,
+  },
+  knowledgeStatusLocked: {
+    color: TORISETU_FAINT,
+    border: "0.5px solid rgba(255,255,255,0.10)",
+    borderRadius: "99px",
+    padding: "2px 8px",
+    fontSize: "11px",
+    fontWeight: 520,
+  },
+  knowledgeBodyRow: {
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: "14px",
+  },
+  knowledgeText: {
+    minWidth: 0,
+    flex: 1,
+  },
+  knowledgeTitle: {
+    margin: "0 0 5px",
+    color: TORISETU_TEXT_STRONG,
+    fontSize: "16px",
+    fontWeight: 650,
+    lineHeight: 1.38,
+  },
+  knowledgeBody: {
+    margin: 0,
+    color: TORISETU_MUTED,
+    fontSize: "13px",
+    fontWeight: 500,
+    lineHeight: 1.58,
+  },
+  knowledgeAction: {
+    flexShrink: 0,
+    minHeight: "36px",
+    border: "none",
+    borderRadius: "99px",
+    background: "rgba(255,255,255,0.92)",
+    color: "#2a2a28",
+    fontSize: "12px",
+    fontWeight: 620,
+    padding: "0 14px",
+    cursor: "pointer",
+  },
+  noteShelf: {
+    display: "flex",
+    gap: "10px",
+    margin: "0 -16px",
+    padding: "0 16px 4px",
+    overflowX: "auto" as const,
+    scrollbarWidth: "none" as const,
+    scrollSnapType: "x proximity",
+  },
+  noteCard: {
+    ...TORISETU_SURFACE_SOFT,
+    width: "min(50vw, 188px)",
+    minHeight: "104px",
+    flex: "0 0 auto",
+    scrollSnapAlign: "start",
+    borderRadius: "18px",
+    padding: "14px",
+    display: "flex",
+    flexDirection: "column" as const,
+    justifyContent: "space-between",
+  },
+  noteTitle: {
+    margin: "0 0 10px",
+    color: TORISETU_MUTED,
+    fontSize: "12px",
+    fontWeight: 560,
+    lineHeight: 1.35,
+  },
+  noteBody: {
+    margin: 0,
+    color: TORISETU_TEXT_STRONG,
+    fontSize: "17px",
+    fontWeight: 660,
+    lineHeight: 1.38,
   },
   insightShelf: {
     display: "flex",
