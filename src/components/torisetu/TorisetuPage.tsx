@@ -16,7 +16,6 @@ import {
   APP_ACCENT_SOFT_BG,
   APP_ACCENT_SOFT_BORDER,
   APP_PAGE_BACKGROUND,
-  APP_SUBTLE_SURFACE,
   APP_SURFACE,
 } from "../ui/appTheme";
 
@@ -43,7 +42,6 @@ type DayMapItem = {
 
 type InsightCard = {
   id: string;
-  source: "みっけ" | "診断" | "深掘り";
   title: string;
   body: string;
   tags?: string[];
@@ -188,35 +186,27 @@ export function TorisetuPage({ recentEvents }: TorisetuPageProps) {
     catProfile?.homePhotoDataUrl ??
     getCatAvatarSrcForCoat(catProfile?.appearance?.coat);
   const typeLabel = catProfile?.typeLabel ?? "観察中";
-  const typeTagline =
-    catProfile?.typeTagline ??
-    "みっけを重ねると、この子らしさが少しずつ見えてきます。";
 
   const insightCards: InsightCard[] = [
     {
       id: "personality",
-      source: "診断",
       title: "基本の性格",
-      body: typeTagline,
-      tags: [catProfile?.typeLabel ?? ""].filter(Boolean),
+      body: catProfile?.typeLabel ?? "観察中",
     },
     {
       id: "recent",
-      source: "みっけ",
-      title: "最近の様子",
+      title: "最近",
       body: recentSummary,
     },
     {
       id: "rhythm",
-      source: "みっけ",
-      title: "1日のリズム",
+      title: "リズム",
       body: rhythmSummary,
     },
     ...Object.values(answers).map((answer) => ({
       id: `answer-${answer.cardId}`,
-      source: "深掘り" as const,
       title: answer.label,
-      body: answer.result,
+      body: compactText(answer.result, 24),
     })),
   ];
 
@@ -242,27 +232,19 @@ export function TorisetuPage({ recentEvents }: TorisetuPageProps) {
     <main style={styles.page}>
       <div style={styles.container}>
         <header style={styles.header}>
-          <p style={styles.eyebrow}>トリセツ</p>
-          <h1 style={styles.title}>{catName}のこと</h1>
-          <p style={styles.subtitle}>みっけが増えるほど、読めるページが増えていきます。</p>
+          <div style={styles.headerAvatar}>
+            <img src={avatarSrc} alt="" style={styles.headerAvatarImg} />
+          </div>
+          <div style={styles.headerText}>
+            <p style={styles.eyebrow}>トリセツ</p>
+            <h1 style={styles.title}>{catName}</h1>
+          </div>
+          <span style={styles.headerBadge}>{typeLabel}</span>
         </header>
-
-        <section style={styles.heroCard}>
-          <div style={styles.heroAvatar}>
-            <img src={avatarSrc} alt="" style={styles.heroAvatarImg} />
-          </div>
-          <div style={styles.heroInfo}>
-            <div style={styles.heroTitleRow}>
-              <span style={styles.heroName}>{catName}</span>
-              <span style={styles.heroBadge}>{typeLabel}</span>
-            </div>
-            <p style={styles.heroText}>{typeTagline}</p>
-          </div>
-        </section>
 
         <section style={styles.progressCard}>
           <div style={styles.progressHeader}>
-            <span style={styles.progressLabel}>トリセツの育ち具合</span>
+            <span style={styles.progressLabel}>育ち具合</span>
             <span style={styles.progressValue}>{understanding}%</span>
           </div>
           <div style={styles.progressTrack}>
@@ -271,24 +253,20 @@ export function TorisetuPage({ recentEvents }: TorisetuPageProps) {
           <p style={styles.progressHint}>
             {nextUnlock
               ? recordCount >= nextUnlock.threshold
-                ? `「${nextUnlock.title}」の質問が開きました`
-                : `あと${nextRemaining}回のみっけで「${nextUnlock.title}」の質問が開きます`
-              : "いま用意している深掘りはすべて開いています"}
+                ? `${nextUnlock.title} が開きました`
+                : `次: ${nextUnlock.title} / あと${nextRemaining}回`
+              : "深掘りはすべて開いています"}
           </p>
         </section>
 
         <section style={styles.section}>
           <div style={styles.sectionHeader}>
-            <div>
-              <p style={styles.sectionKicker}>日々のみっけから</p>
-              <h2 style={styles.sectionTitle}>見えてきたこと</h2>
-            </div>
+            <h2 style={styles.sectionTitle}>見えてきたこと</h2>
           </div>
 
           <div style={styles.insightShelf}>
             {insightCards.map((card) => (
               <article key={card.id} style={styles.insightCard}>
-                <span style={styles.insightSource}>{card.source}</span>
                 <h3 style={styles.insightTitle}>{card.title}</h3>
                 <p style={styles.insightBody}>{card.body}</p>
                 {card.tags?.length ? (
@@ -307,10 +285,7 @@ export function TorisetuPage({ recentEvents }: TorisetuPageProps) {
 
         <section style={styles.section}>
           <div style={styles.sectionHeader}>
-            <div>
-              <p style={styles.sectionKicker}>もっと知る</p>
-              <h2 style={styles.sectionTitle}>質問で深掘り</h2>
-            </div>
+            <h2 style={styles.sectionTitle}>質問</h2>
           </div>
 
           <div style={styles.diveList}>
@@ -344,7 +319,6 @@ export function TorisetuPage({ recentEvents }: TorisetuPageProps) {
                       {answer ? "追加済み" : isUnlocked ? "答える" : "準備中"}
                     </button>
                   </div>
-                  <p style={styles.divePreview}>{answer?.result ?? card.preview}</p>
                   <div style={styles.progressTrackCompact}>
                     <div style={{ ...styles.progressFill, width: `${progress}%` }} />
                   </div>
@@ -497,37 +471,40 @@ function buildRhythmSummary(dayMap: DayMapItem[], catProfile: CatProfile | null)
   const activeItems = dayMap.filter((item) => item.signal);
 
   if (activeItems.length > 0) {
-    return activeItems
-      .map((item) => `${item.period}は${getSignalDisplayLabel(item.signal ?? "")}`)
-      .join("、");
+    const first = activeItems[0];
+    return `${first.period}に${getSignalDisplayLabel(first.signal ?? "")}`;
   }
 
   const peakTime = catProfile?.activityPattern?.peakTime;
   const peakSlots = peakTime ? peakTimeMap[peakTime] ?? [] : [];
 
   if (peakSlots.length > 0) {
-    return `${peakSlots.join("と")}に動きが出やすいかもしれません。`;
+    return `${peakSlots.join("・")}に動きやすい`;
   }
 
-  return "みっけが増えると、時間帯ごとのリズムがここに出ます。";
+  return "まだ観察中";
 }
 
 function buildRecentSummary(records: RecordLike[]) {
   if (records.length === 0) {
-    return "まだ最近の変化はありません。みっけを残すと少しずつ見えてきます。";
+    return "まだ観察中";
   }
 
   const representativeSignal = getRepresentativeSignal(records.slice(0, 12));
 
   if (representativeSignal) {
-    return `最近は「${getSignalDisplayLabel(representativeSignal)}」が少し目立っています。`;
+    return `${getSignalDisplayLabel(representativeSignal)}多め`;
   }
 
   if (records.length < 3) {
-    return "まだ判断は急がなくて大丈夫。小さなみっけを増やしていきましょう。";
+    return "少しずつ記録中";
   }
 
-  return "いろいろな様子が混ざっています。もう少し記録すると傾向が見えてきます。";
+  return "いろいろ混ざる";
+}
+
+function compactText(text: string, maxLength: number) {
+  return text.length > maxLength ? `${text.slice(0, maxLength)}…` : text;
 }
 
 function getRepresentativeSignal(records: RecordLike[]) {
@@ -638,20 +615,52 @@ const styles = {
     padding: "calc(env(safe-area-inset-top) + 14px) 16px 0",
   },
   header: {
+    display: "flex",
+    alignItems: "center",
+    gap: "10px",
     padding: "4px 0 14px",
+  },
+  headerAvatar: {
+    width: "44px",
+    height: "44px",
+    borderRadius: "14px",
+    overflow: "hidden",
+    flexShrink: 0,
+    border: "0.5px solid rgba(210, 207, 200, 0.86)",
+    background: "#f5f3ef",
+  },
+  headerAvatarImg: {
+    width: "100%",
+    height: "100%",
+    objectFit: "cover",
+    display: "block",
+  },
+  headerText: {
+    minWidth: 0,
+    flex: 1,
+  },
+  headerBadge: {
+    flexShrink: 0,
+    borderRadius: "99px",
+    border: `0.5px solid ${APP_ACCENT_SOFT_BORDER}`,
+    background: APP_ACCENT_SOFT_BG,
+    color: APP_ACCENT,
+    fontSize: "11px",
+    fontWeight: 740,
+    padding: "3px 9px",
   },
   eyebrow: {
     margin: "0 0 4px",
     color: APP_ACCENT_MUTED,
-    fontSize: "12px",
+    fontSize: "11px",
     fontWeight: 760,
     letterSpacing: "0.04em",
   },
   title: {
-    fontSize: "24px",
+    fontSize: "22px",
     fontWeight: 760,
     color: "#2a2a28",
-    margin: "0 0 4px",
+    margin: 0,
     lineHeight: 1.28,
   },
   subtitle: {
@@ -723,8 +732,8 @@ const styles = {
   progressCard: {
     ...APP_SURFACE,
     borderRadius: "20px",
-    padding: "14px 16px",
-    marginBottom: "18px",
+    padding: "12px 14px",
+    marginBottom: "16px",
   },
   progressHeader: {
     display: "flex",
@@ -770,10 +779,10 @@ const styles = {
     fontWeight: 650,
   },
   section: {
-    marginBottom: "20px",
+    marginBottom: "18px",
   },
   sectionHeader: {
-    margin: "0 4px 10px",
+    margin: "0 4px 8px",
   },
   sectionKicker: {
     color: APP_ACCENT_MUTED,
@@ -785,7 +794,7 @@ const styles = {
   sectionTitle: {
     margin: 0,
     color: "#2a2a28",
-    fontSize: "19px",
+    fontSize: "17px",
     fontWeight: 760,
     lineHeight: 1.35,
   },
@@ -800,12 +809,12 @@ const styles = {
   },
   insightCard: {
     ...APP_SURFACE,
-    width: "min(72vw, 286px)",
-    minHeight: "178px",
+    width: "min(44vw, 178px)",
+    minHeight: "118px",
     flex: "0 0 auto",
     scrollSnapAlign: "start",
-    borderRadius: "22px",
-    padding: "16px",
+    borderRadius: "18px",
+    padding: "14px",
     display: "flex",
     flexDirection: "column" as const,
   },
@@ -817,17 +826,17 @@ const styles = {
     marginBottom: "10px",
   },
   insightTitle: {
-    color: "#2a2a28",
-    fontSize: "18px",
-    fontWeight: 780,
+    color: "#6f6a62",
+    fontSize: "12px",
+    fontWeight: 720,
     lineHeight: 1.35,
     margin: "0 0 8px",
   },
   insightBody: {
-    color: "#5c584f",
-    fontSize: "13px",
-    fontWeight: 560,
-    lineHeight: 1.65,
+    color: "#2a2a28",
+    fontSize: "18px",
+    fontWeight: 780,
+    lineHeight: 1.35,
     margin: 0,
   },
   tagRow: {
@@ -853,15 +862,15 @@ const styles = {
   },
   diveCard: {
     ...APP_SURFACE,
-    borderRadius: "20px",
-    padding: "14px 16px",
+    borderRadius: "18px",
+    padding: "13px 14px",
   },
   diveHeader: {
     display: "flex",
     justifyContent: "space-between",
     alignItems: "flex-start",
     gap: "12px",
-    marginBottom: "8px",
+    marginBottom: "4px",
   },
   diveTitleArea: {
     minWidth: 0,
@@ -875,7 +884,7 @@ const styles = {
     padding: "2px 8px",
     fontSize: "11px",
     fontWeight: 720,
-    marginBottom: "7px",
+    marginBottom: "6px",
   },
   diveStatusDone: {
     display: "inline-flex",
@@ -886,12 +895,12 @@ const styles = {
     padding: "2px 8px",
     fontSize: "11px",
     fontWeight: 720,
-    marginBottom: "7px",
+    marginBottom: "6px",
   },
   diveTitle: {
     margin: 0,
     color: "#2a2a28",
-    fontSize: "16px",
+    fontSize: "15px",
     fontWeight: 740,
     lineHeight: 1.38,
   },
