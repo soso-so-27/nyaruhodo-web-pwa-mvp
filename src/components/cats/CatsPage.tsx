@@ -72,6 +72,12 @@ export function CatsPage() {
       ? getActiveCatProfile(catProfiles, activeCatId)
       : null;
   const catName = getCatName(activeCatProfile);
+  const activeGender = formatGender(activeCatProfile?.basicInfo?.gender);
+  const activeAge = formatAge(activeCatProfile?.basicInfo?.birthDate);
+  const activeMeta = [activeGender, activeAge].filter(Boolean).join("・");
+  const activeAvatarSrc =
+    activeCatProfile?.avatarDataUrl ??
+    getCatAvatarSrc(activeCatProfile?.appearance?.coat);
 
   useEffect(() => {
     const savedCatProfiles = readCatProfiles();
@@ -338,7 +344,11 @@ export function CatsPage() {
       <div style={styles.container}>
         <div style={styles.pageHeader}>
           <div>
-            <h1 style={styles.pageTitle}>一緒に暮らしている子</h1>
+            <p style={styles.pageKicker}>CATS</p>
+            <h1 style={styles.pageTitle}>ねこ</h1>
+            <p style={styles.pageSub}>
+              プロフィールとホーム写真を整える場所
+            </p>
           </div>
         </div>
 
@@ -429,16 +439,31 @@ export function CatsPage() {
 
         {activeCatProfile ? (
           <div style={styles.profileCard}>
-            <div style={styles.profileHeader}>
-              <div>
-                <div style={styles.profileName}>
-                  {activeCatProfile.name}
-                  {activeCatProfile.basicInfo?.gender ? (
-                    <span style={styles.genderBadge}>
-                      {formatGender(activeCatProfile.basicInfo.gender)}
-                    </span>
-                  ) : null}
-                </div>
+            <div style={styles.profileHero}>
+              <button
+                type="button"
+                style={styles.profileHeroAvatar}
+                onClick={() => void handleAvatarUpload()}
+                aria-label={`${activeCatProfile.name}のアイコン写真を変更`}
+              >
+                <img
+                  src={activeAvatarSrc}
+                  alt=""
+                  style={
+                    activeCatProfile.avatarDataUrl
+                      ? styles.profileHeroAvatarPhoto
+                      : styles.profileHeroAvatarImg
+                  }
+                />
+              </button>
+              <div style={styles.profileHeroInfo}>
+                <p style={styles.profileKicker}>いま見ている子</p>
+                <div style={styles.profileName}>{activeCatProfile.name}</div>
+                {activeMeta ? (
+                  <p style={styles.profileMeta}>{activeMeta}</p>
+                ) : (
+                  <p style={styles.profileMeta}>基本情報はあとで追加できます</p>
+                )}
               </div>
               <button
                 type="button"
@@ -451,6 +476,7 @@ export function CatsPage() {
 
             <hr style={styles.divider} />
 
+            <p style={styles.sectionTitle}>ホーム写真</p>
             <div style={styles.homePhotoSection}>
               <div style={styles.homePhotoPreview}>
                 {activeCatProfile.homePhotoDataUrl ? (
@@ -464,9 +490,9 @@ export function CatsPage() {
                 )}
               </div>
               <div style={styles.homePhotoInfo}>
-                <p style={styles.homePhotoTitle}>ホーム背景の写真</p>
+                <p style={styles.homePhotoTitle}>ホームに出る写真</p>
                 <p style={styles.homePhotoSub}>
-                  ホームで大きく表示する専用写真です。
+                  顔が自然に見える位置を選べます。
                 </p>
                 <div style={styles.homePhotoActions}>
                   <button
@@ -509,6 +535,7 @@ export function CatsPage() {
 
             <hr style={styles.divider} />
 
+            <p style={styles.sectionTitle}>基本情報</p>
             {activeCatProfile.basicInfo?.birthDate ? (
               <div style={styles.infoRow}>
                 <span style={styles.infoLabel}>誕生日</span>
@@ -549,30 +576,12 @@ export function CatsPage() {
                 </div>
               </div>
             ) : null}
-
-            {!isEditingProfile &&
-            (activeCatProfile.typeLabel ||
-              (activeCatProfile.modifiers?.length ?? 0) > 0) ? (
-              <>
-                <hr style={styles.divider} />
-                <div style={styles.traitSection}>
-                  <p style={styles.traitLabel}>この子のこと</p>
-                  <div style={styles.traitPills}>
-                    {activeCatProfile.typeLabel ? (
-                      <span style={styles.traitPill}>
-                        {activeCatProfile.typeLabel}
-                      </span>
-                    ) : null}
-                    {(activeCatProfile.modifiers ?? [])
-                      .slice(0, 2)
-                      .map((modifier) => (
-                        <span key={modifier} style={styles.traitModifier}>
-                          {modifier}
-                        </span>
-                      ))}
-                  </div>
-                </div>
-              </>
+            {!activeCatProfile.basicInfo?.birthDate &&
+            !activeCatProfile.basicInfo?.breed &&
+            !activeCatProfile.appearance?.coat ? (
+              <p style={styles.emptyInfoText}>
+                編集から誕生日・猫種・毛色を追加できます。
+              </p>
             ) : null}
 
             {isEditingProfile ? (
@@ -656,31 +665,6 @@ export function CatsPage() {
             ) : null}
           </div>
         ) : null}
-
-        <div style={styles.futureRow}>
-          <div style={styles.futureCard}>
-            <i
-              className="ti ti-clipboard-heart"
-              style={{ fontSize: "20px", color: CATS_MUTED }}
-              aria-hidden="true"
-            />
-            <div>
-              <p style={styles.futureTitle}>健康メモ</p>
-              <p style={styles.futureSub}>準備中</p>
-            </div>
-          </div>
-          <div style={styles.futureCard}>
-            <i
-              className="ti ti-chart-line"
-              style={{ fontSize: "20px", color: CATS_MUTED }}
-              aria-hidden="true"
-            />
-            <div>
-              <p style={styles.futureTitle}>成長の記録</p>
-              <p style={styles.futureSub}>準備中</p>
-            </div>
-          </div>
-        </div>
 
         <div style={styles.settingsSection}>
           <p style={styles.settingsSectionLabel}>設定</p>
@@ -945,20 +929,28 @@ const styles = {
     alignItems: "flex-start",
     justifyContent: "space-between",
     gap: "12px",
-    marginBottom: "14px",
+    marginBottom: "18px",
     paddingTop: "2px",
   },
+  pageKicker: {
+    margin: "0 0 5px",
+    color: CATS_MUTED,
+    fontSize: "11px",
+    fontWeight: 620,
+    letterSpacing: "0.12em",
+  },
   pageTitle: {
-    fontSize: "16px",
-    fontWeight: 680,
+    fontSize: "30px",
+    fontWeight: 640,
     color: CATS_TEXT_STRONG,
-    lineHeight: 1.45,
-    margin: 0,
+    lineHeight: 1.15,
+    margin: "0 0 6px",
   },
   pageSub: {
-    fontSize: "12px",
+    fontSize: "13px",
     color: CATS_MUTED,
     margin: 0,
+    lineHeight: 1.6,
   },
   catGrid: {
     display: "flex",
@@ -1033,11 +1025,44 @@ const styles = {
     padding: "20px",
     marginBottom: "12px",
   },
-  profileHeader: {
+  profileHero: {
+    display: "grid",
+    gridTemplateColumns: "64px 1fr auto",
+    alignItems: "center",
+    gap: "13px",
+  },
+  profileHeroAvatar: {
+    width: "64px",
+    height: "64px",
+    borderRadius: "50%",
+    border: "1px solid rgba(255,255,255,0.28)",
+    background: "rgba(255,255,255,0.12)",
+    overflow: "hidden",
     display: "flex",
     alignItems: "center",
-    justifyContent: "space-between",
-    marginBottom: "14px",
+    justifyContent: "center",
+    padding: 0,
+    cursor: "pointer",
+    boxShadow: "inset 0 1px 0 rgba(255,255,255,0.16)",
+  },
+  profileHeroAvatarPhoto: {
+    width: "100%",
+    height: "100%",
+    objectFit: "cover",
+  },
+  profileHeroAvatarImg: {
+    width: "52px",
+    height: "52px",
+    objectFit: "contain",
+  },
+  profileHeroInfo: {
+    minWidth: 0,
+  },
+  profileKicker: {
+    margin: "0 0 4px",
+    color: CATS_MUTED,
+    fontSize: "11px",
+    fontWeight: 560,
   },
   profileName: {
     fontSize: "21px",
@@ -1047,13 +1072,11 @@ const styles = {
     alignItems: "center",
     gap: "8px",
   },
-  genderBadge: {
-    fontSize: "11px",
-    color: CATS_TEXT,
-    background: "rgba(255,255,255,0.10)",
-    border: "0.5px solid rgba(255,255,255,0.16)",
-    borderRadius: "99px",
-    padding: "2px 8px",
+  profileMeta: {
+    margin: "4px 0 0",
+    color: CATS_MUTED,
+    fontSize: "12px",
+    lineHeight: 1.45,
   },
   editBtn: {
     fontSize: "12px",
@@ -1068,6 +1091,13 @@ const styles = {
     gap: "12px",
     alignItems: "center",
     padding: "2px 0",
+  },
+  sectionTitle: {
+    margin: "0 0 10px",
+    color: CATS_MUTED,
+    fontSize: "12px",
+    fontWeight: 620,
+    letterSpacing: "0.06em",
   },
   homePhotoPreview: {
     width: "86px",
@@ -1161,6 +1191,12 @@ const styles = {
     color: CATS_TEXT,
     fontWeight: 500,
   },
+  emptyInfoText: {
+    margin: "2px 0 0",
+    color: CATS_MUTED,
+    fontSize: "12px",
+    lineHeight: 1.6,
+  },
   coatRow: {
     display: "flex",
     alignItems: "center",
@@ -1170,65 +1206,6 @@ const styles = {
     width: "14px",
     height: "14px",
     borderRadius: "50%",
-  },
-  traitSection: {
-    marginTop: "4px",
-  },
-  traitLabel: {
-    fontSize: "12px",
-    color: CATS_MUTED,
-    margin: "0 0 8px",
-  },
-  traitPills: {
-    display: "flex",
-    flexWrap: "wrap",
-    gap: "5px",
-  },
-  traitPill: {
-    fontSize: "12px",
-    background: "rgba(255,255,255,0.10)",
-    color: CATS_TEXT,
-    border: "0.5px solid rgba(255,255,255,0.16)",
-    borderRadius: "99px",
-    padding: "4px 12px",
-  },
-  traitModifier: {
-    fontSize: "11px",
-    background: "rgba(255,255,255,0.08)",
-    color: CATS_MUTED,
-    border: "0.5px solid rgba(255,255,255,0.12)",
-    borderRadius: "99px",
-    padding: "3px 10px",
-  },
-  futureRow: {
-    display: "grid",
-    gridTemplateColumns: "1fr 1fr",
-    gap: "8px",
-    marginTop: "8px",
-  },
-  futureCard: {
-    ...CATS_SURFACE_SOFT,
-    borderRadius: "16px",
-    padding: "14px 16px",
-    display: "flex",
-    alignItems: "center",
-    gap: "12px",
-    opacity: 0.78,
-  },
-  futureIcon: {
-    fontSize: "20px",
-    flexShrink: 0,
-  },
-  futureTitle: {
-    fontSize: "13px",
-    fontWeight: 500,
-    color: CATS_TEXT,
-    margin: "0 0 2px",
-  },
-  futureSub: {
-    fontSize: "12px",
-    color: CATS_MUTED,
-    margin: 0,
   },
   settingsSection: {
     marginTop: "16px",
@@ -1261,33 +1238,6 @@ const styles = {
   settingsRowChevron: {
     fontSize: "18px",
     color: CATS_MUTED,
-  },
-  header: {
-    marginBottom: "12px",
-    border: "0",
-    borderRadius: "0",
-    background: "transparent",
-    padding: "4px 2px 0",
-  },
-  eyebrow: {
-    margin: "0 0 4px",
-    color: CATS_MUTED,
-    fontSize: "12px",
-    fontWeight: 540,
-    letterSpacing: 0,
-  },
-  title: {
-    margin: 0,
-    fontSize: "30px",
-    fontWeight: 640,
-    letterSpacing: 0,
-    lineHeight: 1.2,
-  },
-  lead: {
-    margin: "8px 0 0",
-    color: CATS_MUTED,
-    fontSize: "13px",
-    lineHeight: 1.7,
   },
   sectionLabel: {
     margin: "0 0 5px",
