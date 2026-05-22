@@ -915,11 +915,50 @@ function HomeBulletinBoard({
 }
 
 function BoardIcon({ icon }: { icon: HomeBoardItem["icon"] }) {
-  if (icon === "paw") return <PawIcon />;
-  if (icon === "heart") return <HeartIcon />;
-  if (icon === "camera") return <CameraIcon />;
-  if (icon === "book") return <BookIcon />;
-  return <BellIcon />;
+  if (icon === "paw") {
+    return (
+      <svg viewBox="0 0 32 32" style={styles.boardIconSvg}>
+        <ellipse cx="16" cy="21.2" rx="7.2" ry="5.7" />
+        <circle cx="7.5" cy="13" r="3.1" />
+        <circle cx="13.1" cy="8.5" r="3" />
+        <circle cx="18.9" cy="8.5" r="3" />
+        <circle cx="24.5" cy="13" r="3.1" />
+      </svg>
+    );
+  }
+
+  if (icon === "heart") {
+    return (
+      <svg viewBox="0 0 32 32" style={styles.boardIconSvg}>
+        <path d="M16 26.5S6.2 20.6 6.2 13.2A5.4 5.4 0 0 1 16 10a5.4 5.4 0 0 1 9.8 3.2C25.8 20.6 16 26.5 16 26.5Z" />
+      </svg>
+    );
+  }
+
+  if (icon === "camera") {
+    return (
+      <svg viewBox="0 0 32 32" style={styles.boardIconSvg}>
+        <path d="M10.2 10.5 12 7.8h8l1.8 2.7h3.1a3.1 3.1 0 0 1 3.1 3.1v9.2a3.1 3.1 0 0 1-3.1 3.1H7.1A3.1 3.1 0 0 1 4 22.8v-9.2a3.1 3.1 0 0 1 3.1-3.1h3.1Z" />
+        <circle cx="16" cy="18" r="5" />
+      </svg>
+    );
+  }
+
+  if (icon === "book") {
+    return (
+      <svg viewBox="0 0 32 32" style={styles.boardIconSvg}>
+        <path d="M7.5 7.5A3.5 3.5 0 0 1 11 4h14v22H11a3.5 3.5 0 0 0-3.5 3.5v-22Z" />
+        <path d="M12.5 10h8.5M12.5 14h6.5" />
+      </svg>
+    );
+  }
+
+  return (
+    <svg viewBox="0 0 32 32" style={styles.boardIconSvg}>
+      <path d="M23.5 13.2a7.5 7.5 0 0 0-15 0c0 7.9-3.4 8.2-3.4 10.8h21.8c0-2.6-3.4-2.9-3.4-10.8Z" />
+      <path d="M13.2 27h5.6" />
+    </svg>
+  );
 }
 
 function buildHomeBoardItems({
@@ -1695,11 +1734,11 @@ const styles = {
     color: "rgba(255,255,255,0.94)",
     display: "flex",
     flexDirection: "column",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: "8px",
-    padding: "10px 6px",
-    textAlign: "center",
+    alignItems: "flex-start",
+    justifyContent: "space-between",
+    gap: "10px",
+    padding: "13px 12px",
+    textAlign: "left",
     cursor: "pointer",
     scrollSnapAlign: "start",
     backdropFilter: "blur(18px)",
@@ -1710,26 +1749,34 @@ const styles = {
     background: "rgba(255,255,255,0.20)",
   },
   boardCardTop: {
+    width: "100%",
     display: "flex",
     alignItems: "center",
-    justifyContent: "center",
+    justifyContent: "space-between",
   },
   boardCardIcon: {
-    width: "38px",
-    height: "38px",
-    borderRadius: "14px",
-    border: "0.5px solid rgba(255,255,255,0.18)",
-    background: "rgba(255,255,255,0.10)",
+    width: "32px",
+    height: "32px",
     color: "rgba(255,255,255,0.92)",
     display: "inline-flex",
     alignItems: "center",
     justifyContent: "center",
   },
+  boardIconSvg: {
+    width: "30px",
+    height: "30px",
+    display: "block",
+    fill: "none",
+    stroke: "currentColor",
+    strokeWidth: 2.1,
+    strokeLinecap: "round",
+    strokeLinejoin: "round",
+  },
   boardCardTitle: {
     color: "rgba(255,255,255,0.96)",
-    fontSize: "12px",
-    fontWeight: 820,
-    lineHeight: 1.25,
+    fontSize: "13px",
+    fontWeight: 800,
+    lineHeight: 1.24,
     overflow: "hidden",
     textOverflow: "ellipsis",
     display: "-webkit-box",
