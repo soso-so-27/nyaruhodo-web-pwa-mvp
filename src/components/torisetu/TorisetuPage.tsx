@@ -12,12 +12,34 @@ import {
 import { BottomNavigation } from "../navigation/BottomNavigation";
 import {
   APP_ACCENT,
-  APP_ACCENT_MUTED,
   APP_ACCENT_SOFT_BG,
   APP_ACCENT_SOFT_BORDER,
-  APP_PAGE_BACKGROUND,
   APP_SURFACE,
 } from "../ui/appTheme";
+
+const TORISETU_TEXT = "rgba(255,255,255,0.94)";
+const TORISETU_TEXT_STRONG = "rgba(255,255,255,0.98)";
+const TORISETU_MUTED = "rgba(255,255,255,0.62)";
+const TORISETU_FAINT = "rgba(255,255,255,0.42)";
+const TORISETU_SURFACE: CSSProperties = {
+  position: "relative",
+  background: "rgba(34,29,28,0.58)",
+  backdropFilter: "blur(28px)",
+  WebkitBackdropFilter: "blur(28px)",
+  border: "0.5px solid rgba(255,255,255,0.18)",
+  boxShadow: [
+    "0 14px 34px rgba(0,0,0,0.22)",
+    "inset 0 1px 0 rgba(255,255,255,0.16)",
+  ].join(", "),
+};
+const TORISETU_SURFACE_SOFT: CSSProperties = {
+  ...TORISETU_SURFACE,
+  background: "rgba(255,255,255,0.10)",
+  boxShadow: [
+    "0 10px 24px rgba(0,0,0,0.18)",
+    "inset 0 1px 0 rgba(255,255,255,0.12)",
+  ].join(", "),
+};
 
 type TorisetuPageProps = {
   recentEvents: RecentEvent[];
@@ -174,10 +196,6 @@ export function TorisetuPage({ recentEvents }: TorisetuPageProps) {
     100,
     Math.max(catProfile?.understanding?.percent ?? 0, Math.round(recordCount * 3)),
   );
-  const nextUnlock = DEEP_DIVE_CARDS.find((item) => !answers[item.id]);
-  const nextRemaining = nextUnlock
-    ? Math.max(0, nextUnlock.threshold - recordCount)
-    : 0;
   const dayMap = buildDayMap(records);
   const rhythmSummary = buildRhythmSummary(dayMap, catProfile);
   const recentSummary = buildRecentSummary(records);
@@ -185,6 +203,8 @@ export function TorisetuPage({ recentEvents }: TorisetuPageProps) {
     catProfile?.avatarDataUrl ??
     catProfile?.homePhotoDataUrl ??
     getCatAvatarSrcForCoat(catProfile?.appearance?.coat);
+  const backgroundSrc = catProfile?.homePhotoDataUrl ?? catProfile?.avatarDataUrl ?? null;
+  const backgroundPosition = catProfile?.homePhotoPosition ?? "center 38%";
   const typeLabel = catProfile?.typeLabel ?? "観察中";
 
   const insightCards: InsightCard[] = [
@@ -209,6 +229,18 @@ export function TorisetuPage({ recentEvents }: TorisetuPageProps) {
       body: compactText(answer.result, 24),
     })),
   ];
+  const answeredCount = Object.keys(answers).length;
+  const actionableDive =
+    DEEP_DIVE_CARDS.find(
+      (card) => recordCount >= card.threshold && !answers[card.id],
+    ) ?? null;
+  const nextLockedDive =
+    DEEP_DIVE_CARDS.find(
+      (card) => recordCount < card.threshold && !answers[card.id],
+    ) ?? null;
+  const nextRemaining = nextLockedDive
+    ? Math.max(0, nextLockedDive.threshold - recordCount)
+    : 0;
 
   function handleAnswer(option: DeepDiveOption) {
     if (!catProfile || !activeDive) return;
@@ -230,6 +262,17 @@ export function TorisetuPage({ recentEvents }: TorisetuPageProps) {
 
   return (
     <main style={styles.page}>
+      {backgroundSrc ? (
+        <img
+          src={backgroundSrc}
+          alt=""
+          aria-hidden="true"
+          style={{ ...styles.backgroundImage, objectPosition: backgroundPosition }}
+        />
+      ) : (
+        <div style={styles.backgroundFallback} aria-hidden="true" />
+      )}
+      <div style={styles.backgroundVeil} aria-hidden="true" />
       <div style={styles.container}>
         <header style={styles.header}>
           <div style={styles.headerAvatar}>
@@ -244,19 +287,45 @@ export function TorisetuPage({ recentEvents }: TorisetuPageProps) {
 
         <section style={styles.progressCard}>
           <div style={styles.progressHeader}>
-            <span style={styles.progressLabel}>育ち具合</span>
+            <span style={styles.progressLabel}>トリセツ</span>
             <span style={styles.progressValue}>{understanding}%</span>
           </div>
           <div style={styles.progressTrack}>
             <div style={{ ...styles.progressFill, width: `${understanding}%` }} />
           </div>
-          <p style={styles.progressHint}>
-            {nextUnlock
-              ? recordCount >= nextUnlock.threshold
-                ? `${nextUnlock.title} が開きました`
-                : `次: ${nextUnlock.title} / あと${nextRemaining}回`
-              : "深掘りはすべて開いています"}
-          </p>
+          <div style={styles.progressMeta}>
+            <span>見えてきたこと {insightCards.length}</span>
+            <span>質問 {answeredCount}/{DEEP_DIVE_CARDS.length}</span>
+          </div>
+        </section>
+
+        <section style={styles.nextCard}>
+          <p style={styles.nextLabel}>次にできること</p>
+          {actionableDive ? (
+            <div style={styles.nextActionRow}>
+              <div style={styles.nextActionText}>
+                <h2 style={styles.nextTitle}>{actionableDive.title}</h2>
+                <p style={styles.nextSub}>質問に答えると、トリセツに追加されます。</p>
+              </div>
+              <button
+                type="button"
+                style={styles.nextButton}
+                onClick={() => setActiveDive(actionableDive)}
+              >
+                答える
+              </button>
+            </div>
+          ) : nextLockedDive ? (
+            <div style={styles.nextActionText}>
+              <h2 style={styles.nextTitle}>{nextLockedDive.title}</h2>
+              <p style={styles.nextSub}>あと{nextRemaining}回のみっけで開きます。</p>
+            </div>
+          ) : (
+            <div style={styles.nextActionText}>
+              <h2 style={styles.nextTitle}>いまは全部開いています</h2>
+              <p style={styles.nextSub}>またみっけが増えたら、新しい見え方を足していきます。</p>
+            </div>
+          )}
         </section>
 
         <section style={styles.section}>
@@ -290,38 +359,33 @@ export function TorisetuPage({ recentEvents }: TorisetuPageProps) {
 
           <div style={styles.diveList}>
             {DEEP_DIVE_CARDS.map((card) => {
-              const progress = Math.min(100, Math.round((recordCount / card.threshold) * 100));
               const remaining = Math.max(0, card.threshold - recordCount);
               const answer = answers[card.id];
               const isUnlocked = remaining === 0;
 
               return (
-                <article key={card.id} style={styles.diveCard}>
-                  <div style={styles.diveHeader}>
-                    <div style={styles.diveTitleArea}>
-                      <span style={answer ? styles.diveStatusDone : styles.diveStatus}>
-                        {answer ? "回答済み" : isUnlocked ? "質問が開きました" : `あと${remaining}回`}
-                      </span>
-                      <h3 style={styles.diveTitle}>{card.title}</h3>
-                    </div>
-                    <button
-                      type="button"
-                      disabled={!isUnlocked || Boolean(answer)}
-                      onClick={() => setActiveDive(card)}
-                      style={
-                        answer
-                          ? styles.diveButtonDone
-                          : isUnlocked
-                            ? styles.diveButton
-                            : styles.diveButtonLocked
-                      }
-                    >
-                      {answer ? "追加済み" : isUnlocked ? "答える" : "準備中"}
-                    </button>
+                <article key={card.id} style={styles.questionRow}>
+                  <div style={styles.questionMain}>
+                    <span style={answer ? styles.diveStatusDone : styles.diveStatus}>
+                      {answer ? "回答済み" : isUnlocked ? "開いた" : `あと${remaining}`}
+                    </span>
+                    <h3 style={styles.diveTitle}>{card.title}</h3>
                   </div>
-                  <div style={styles.progressTrackCompact}>
-                    <div style={{ ...styles.progressFill, width: `${progress}%` }} />
-                  </div>
+                  <button
+                    type="button"
+                    disabled={!isUnlocked || Boolean(answer)}
+                    onClick={() => setActiveDive(card)}
+                    style={
+                      answer
+                        ? styles.questionButtonDone
+                        : isUnlocked
+                          ? styles.questionButton
+                          : styles.questionButtonLocked
+                    }
+                    aria-label={`${card.title}に答える`}
+                  >
+                    {answer ? "✓" : isUnlocked ? "答える" : "－"}
+                  </button>
                 </article>
               );
             })}
@@ -605,11 +669,43 @@ function getSignalDisplayLabel(signal: string) {
 
 const styles = {
   page: {
+    position: "relative",
     minHeight: "100vh",
-    background: APP_PAGE_BACKGROUND,
-    color: "#242522",
+    background: "#1a1a18",
+    color: TORISETU_TEXT,
+    overflowX: "hidden",
+  },
+  backgroundImage: {
+    position: "fixed" as const,
+    inset: 0,
+    width: "100%",
+    height: "100dvh",
+    minHeight: "100vh",
+    objectFit: "cover",
+    objectPosition: "center 38%",
+    zIndex: 0,
+    filter: "brightness(0.72) saturate(0.96) contrast(0.98)",
+  },
+  backgroundFallback: {
+    position: "fixed" as const,
+    inset: 0,
+    zIndex: 0,
+    background:
+      "linear-gradient(160deg, #2a2724 0%, #5f5148 48%, #1a1a18 100%)",
+  },
+  backgroundVeil: {
+    position: "fixed" as const,
+    inset: 0,
+    zIndex: 1,
+    pointerEvents: "none" as const,
+    background: [
+      "linear-gradient(to bottom, rgba(12,10,9,0.36) 0%, rgba(12,10,9,0.16) 34%, rgba(12,10,9,0.52) 100%)",
+      "radial-gradient(circle at 82% 12%, rgba(255,190,110,0.18) 0%, rgba(255,190,110,0.06) 24%, rgba(255,190,110,0) 48%)",
+    ].join(", "),
   },
   container: {
+    position: "relative",
+    zIndex: 2,
     width: "min(100%, 430px)",
     margin: "0 auto",
     padding: "calc(env(safe-area-inset-top) + 14px) 16px 0",
@@ -623,11 +719,12 @@ const styles = {
   headerAvatar: {
     width: "44px",
     height: "44px",
-    borderRadius: "14px",
+    borderRadius: "50%",
     overflow: "hidden",
     flexShrink: 0,
-    border: "0.5px solid rgba(210, 207, 200, 0.86)",
-    background: "#f5f3ef",
+    border: "2px solid rgba(255,255,255,0.5)",
+    background: "rgba(255,255,255,0.12)",
+    boxShadow: "0 10px 24px rgba(0,0,0,0.22)",
   },
   headerAvatarImg: {
     width: "100%",
@@ -642,16 +739,18 @@ const styles = {
   headerBadge: {
     flexShrink: 0,
     borderRadius: "99px",
-    border: `0.5px solid ${APP_ACCENT_SOFT_BORDER}`,
-    background: APP_ACCENT_SOFT_BG,
-    color: APP_ACCENT,
+    border: "0.5px solid rgba(255,255,255,0.2)",
+    background: "rgba(255,255,255,0.10)",
+    color: TORISETU_TEXT,
     fontSize: "11px",
     fontWeight: 740,
     padding: "3px 9px",
+    backdropFilter: "blur(18px)",
+    WebkitBackdropFilter: "blur(18px)",
   },
   eyebrow: {
     margin: "0 0 4px",
-    color: APP_ACCENT_MUTED,
+    color: TORISETU_MUTED,
     fontSize: "11px",
     fontWeight: 760,
     letterSpacing: "0.04em",
@@ -659,7 +758,7 @@ const styles = {
   title: {
     fontSize: "22px",
     fontWeight: 760,
-    color: "#2a2a28",
+    color: TORISETU_TEXT_STRONG,
     margin: 0,
     lineHeight: 1.28,
   },
@@ -730,7 +829,7 @@ const styles = {
     lineHeight: 1.6,
   },
   progressCard: {
-    ...APP_SURFACE,
+    ...TORISETU_SURFACE,
     borderRadius: "20px",
     padding: "12px 14px",
     marginBottom: "16px",
@@ -743,17 +842,17 @@ const styles = {
   },
   progressLabel: {
     fontSize: "13px",
-    color: "#8f8b83",
+    color: TORISETU_MUTED,
     fontWeight: 680,
   },
   progressValue: {
     fontSize: "16px",
-    color: "#2a2a28",
+    color: TORISETU_TEXT_STRONG,
     fontWeight: 780,
   },
   progressTrack: {
     height: "4px",
-    background: "#eeeae2",
+    background: "rgba(255,255,255,0.16)",
     borderRadius: "99px",
     overflow: "hidden",
     marginBottom: "8px",
@@ -767,7 +866,7 @@ const styles = {
   },
   progressFill: {
     height: "100%",
-    background: APP_ACCENT,
+    background: "rgba(255,255,255,0.86)",
     borderRadius: "99px",
     transition: "width 0.3s ease",
   },
@@ -778,6 +877,65 @@ const styles = {
     lineHeight: 1.5,
     fontWeight: 650,
   },
+  progressMeta: {
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: "10px",
+    color: TORISETU_MUTED,
+    fontSize: "11px",
+    fontWeight: 650,
+    lineHeight: 1.4,
+  },
+  nextCard: {
+    ...TORISETU_SURFACE,
+    borderRadius: "20px",
+    padding: "14px",
+    marginBottom: "18px",
+  },
+  nextLabel: {
+    color: TORISETU_MUTED,
+    fontSize: "11px",
+    fontWeight: 760,
+    letterSpacing: "0.04em",
+    margin: "0 0 8px",
+  },
+  nextActionRow: {
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: "12px",
+  },
+  nextActionText: {
+    minWidth: 0,
+    flex: 1,
+  },
+  nextTitle: {
+    margin: "0 0 4px",
+    color: TORISETU_TEXT_STRONG,
+    fontSize: "17px",
+    fontWeight: 760,
+    lineHeight: 1.35,
+  },
+  nextSub: {
+    margin: 0,
+    color: TORISETU_MUTED,
+    fontSize: "13px",
+    fontWeight: 560,
+    lineHeight: 1.55,
+  },
+  nextButton: {
+    flexShrink: 0,
+    minHeight: "38px",
+    border: "none",
+    borderRadius: "99px",
+    background: "rgba(255,255,255,0.92)",
+    color: "#2a2a28",
+    fontSize: "13px",
+    fontWeight: 760,
+    padding: "0 16px",
+    cursor: "pointer",
+  },
   section: {
     marginBottom: "18px",
   },
@@ -785,7 +943,7 @@ const styles = {
     margin: "0 4px 8px",
   },
   sectionKicker: {
-    color: APP_ACCENT_MUTED,
+    color: TORISETU_MUTED,
     fontSize: "11px",
     fontWeight: 740,
     letterSpacing: "0.04em",
@@ -793,7 +951,7 @@ const styles = {
   },
   sectionTitle: {
     margin: 0,
-    color: "#2a2a28",
+    color: TORISETU_TEXT_STRONG,
     fontSize: "17px",
     fontWeight: 760,
     lineHeight: 1.35,
@@ -808,7 +966,7 @@ const styles = {
     scrollSnapType: "x proximity",
   },
   insightCard: {
-    ...APP_SURFACE,
+    ...TORISETU_SURFACE_SOFT,
     width: "min(44vw, 178px)",
     minHeight: "118px",
     flex: "0 0 auto",
@@ -819,21 +977,21 @@ const styles = {
     flexDirection: "column" as const,
   },
   insightSource: {
-    color: APP_ACCENT,
+    color: TORISETU_MUTED,
     fontSize: "11px",
     fontWeight: 760,
     letterSpacing: "0.04em",
     marginBottom: "10px",
   },
   insightTitle: {
-    color: "#6f6a62",
+    color: TORISETU_MUTED,
     fontSize: "12px",
     fontWeight: 720,
     lineHeight: 1.35,
     margin: "0 0 8px",
   },
   insightBody: {
-    color: "#2a2a28",
+    color: TORISETU_TEXT_STRONG,
     fontSize: "18px",
     fontWeight: 780,
     lineHeight: 1.35,
@@ -847,10 +1005,10 @@ const styles = {
     paddingTop: "12px",
   },
   tag: {
-    background: APP_ACCENT_SOFT_BG,
-    border: `0.5px solid ${APP_ACCENT_SOFT_BORDER}`,
+    background: "rgba(255,255,255,0.10)",
+    border: "0.5px solid rgba(255,255,255,0.18)",
     borderRadius: "99px",
-    color: APP_ACCENT,
+    color: TORISETU_TEXT,
     fontSize: "11px",
     fontWeight: 680,
     padding: "3px 9px",
@@ -859,6 +1017,54 @@ const styles = {
     display: "flex",
     flexDirection: "column" as const,
     gap: "8px",
+  },
+  questionRow: {
+    ...TORISETU_SURFACE_SOFT,
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: "12px",
+    borderRadius: "16px",
+    padding: "12px 12px 12px 14px",
+  },
+  questionMain: {
+    minWidth: 0,
+    flex: 1,
+  },
+  questionButton: {
+    flexShrink: 0,
+    minWidth: "58px",
+    minHeight: "34px",
+    border: "none",
+    borderRadius: "99px",
+    background: "rgba(255,255,255,0.92)",
+    color: "#2a2a28",
+    fontSize: "12px",
+    fontWeight: 760,
+    padding: "0 12px",
+    cursor: "pointer",
+  },
+  questionButtonDone: {
+    flexShrink: 0,
+    width: "34px",
+    height: "34px",
+    border: "0.5px solid rgba(255,255,255,0.14)",
+    borderRadius: "50%",
+    background: "rgba(255,255,255,0.10)",
+    color: TORISETU_MUTED,
+    fontSize: "14px",
+    fontWeight: 780,
+  },
+  questionButtonLocked: {
+    flexShrink: 0,
+    width: "34px",
+    height: "34px",
+    border: "0.5px solid rgba(255,255,255,0.10)",
+    borderRadius: "50%",
+    background: "rgba(255,255,255,0.06)",
+    color: TORISETU_FAINT,
+    fontSize: "14px",
+    fontWeight: 760,
   },
   diveCard: {
     ...APP_SURFACE,
@@ -877,9 +1083,9 @@ const styles = {
   },
   diveStatus: {
     display: "inline-flex",
-    color: APP_ACCENT,
-    background: APP_ACCENT_SOFT_BG,
-    border: `0.5px solid ${APP_ACCENT_SOFT_BORDER}`,
+    color: TORISETU_TEXT,
+    background: "rgba(255,255,255,0.10)",
+    border: "0.5px solid rgba(255,255,255,0.16)",
     borderRadius: "99px",
     padding: "2px 8px",
     fontSize: "11px",
@@ -888,9 +1094,9 @@ const styles = {
   },
   diveStatusDone: {
     display: "inline-flex",
-    color: "#7b756b",
-    background: "rgba(245,242,235,0.9)",
-    border: "0.5px solid rgba(210,207,200,0.9)",
+    color: TORISETU_MUTED,
+    background: "rgba(255,255,255,0.08)",
+    border: "0.5px solid rgba(255,255,255,0.12)",
     borderRadius: "99px",
     padding: "2px 8px",
     fontSize: "11px",
@@ -899,7 +1105,7 @@ const styles = {
   },
   diveTitle: {
     margin: 0,
-    color: "#2a2a28",
+    color: TORISETU_TEXT_STRONG,
     fontSize: "15px",
     fontWeight: 740,
     lineHeight: 1.38,
@@ -955,12 +1161,12 @@ const styles = {
     inset: 0,
     border: "none",
     padding: 0,
-    background: "rgba(42,42,40,0.32)",
-    backdropFilter: "blur(2px)",
-    WebkitBackdropFilter: "blur(2px)",
+    background: "rgba(12,10,9,0.42)",
+    backdropFilter: "blur(4px)",
+    WebkitBackdropFilter: "blur(4px)",
   },
   sheet: {
-    ...APP_SURFACE,
+    ...TORISETU_SURFACE,
     position: "absolute" as const,
     left: 0,
     right: 0,
@@ -968,13 +1174,15 @@ const styles = {
     borderRadius: "24px 24px 0 0",
     padding: "0 18px calc(24px + env(safe-area-inset-bottom))",
     borderBottom: "none",
-    boxShadow: "0 -10px 32px rgba(52,50,46,0.18)",
+    color: TORISETU_TEXT,
+    boxShadow:
+      "0 -18px 48px rgba(0,0,0,0.32), inset 0 1px 0 rgba(255,255,255,0.16)",
   },
   sheetHandle: {
     width: "38px",
     height: "4px",
     borderRadius: "99px",
-    background: "#d0cdc6",
+    background: "rgba(255,255,255,0.34)",
     margin: "10px auto 16px",
   },
   sheetHeader: {
@@ -986,14 +1194,14 @@ const styles = {
   },
   sheetKicker: {
     margin: "0 0 4px",
-    color: APP_ACCENT,
+    color: TORISETU_MUTED,
     fontSize: "11px",
     fontWeight: 760,
     letterSpacing: "0.04em",
   },
   sheetTitle: {
     margin: 0,
-    color: "#2a2a28",
+    color: TORISETU_TEXT_STRONG,
     fontSize: "20px",
     fontWeight: 760,
   },
@@ -1001,15 +1209,15 @@ const styles = {
     width: "34px",
     height: "34px",
     borderRadius: "50%",
-    border: "0.5px solid rgba(210,207,200,0.9)",
-    background: "rgba(255,255,255,0.72)",
-    color: "#6f6a62",
+    border: "0.5px solid rgba(255,255,255,0.14)",
+    background: "rgba(255,255,255,0.08)",
+    color: TORISETU_MUTED,
     fontSize: "20px",
     cursor: "pointer",
   },
   sheetQuestion: {
     margin: "0 0 14px",
-    color: "#4a4a42",
+    color: TORISETU_TEXT,
     fontSize: "15px",
     fontWeight: 680,
     lineHeight: 1.55,
@@ -1021,13 +1229,15 @@ const styles = {
   },
   sheetOption: {
     minHeight: "54px",
-    border: "0.5px solid rgba(210,207,200,0.9)",
+    border: "0.5px solid rgba(255,255,255,0.16)",
     borderRadius: "16px",
-    background: "rgba(255,255,255,0.74)",
-    color: "#2a2a28",
+    background: "rgba(255,255,255,0.10)",
+    color: TORISETU_TEXT_STRONG,
     fontSize: "14px",
     fontWeight: 700,
     cursor: "pointer",
     padding: "10px",
+    backdropFilter: "blur(18px)",
+    WebkitBackdropFilter: "blur(18px)",
   },
 } satisfies Record<string, CSSProperties>;
