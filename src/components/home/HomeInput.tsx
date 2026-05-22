@@ -863,7 +863,6 @@ function HomeBulletinBoard({
               </span>
               {item.isUnread ? <span style={styles.boardUnreadDot} /> : null}
             </span>
-            <span style={styles.boardCardKind}>{formatBoardKind(item.kind)}</span>
             <span style={styles.boardCardTitle}>{item.title}</span>
           </button>
         ))}
@@ -972,7 +971,7 @@ function buildHomeBoardItems({
       id: "recent-change",
       kind: "insight",
       priority: 20,
-      title: "最近の変化",
+      title: "リズムが見えてきた",
       body: `${formatRecordKind(latestRecord.type)}に「${latestRecord.value}」が残っています。少しずつ${catName}のリズムが見えてきます。`,
       icon: "heart",
       actionLabel: "トリセツへ",
@@ -1005,15 +1004,6 @@ function buildHomeBoardItems({
   });
 
   return items.sort((a, b) => a.priority - b.priority);
-}
-
-function formatBoardKind(kind: HomeBoardItem["kind"]) {
-  if (kind === "mission") return "ミッション";
-  if (kind === "insight") return "変化";
-  if (kind === "notice") return "お知らせ";
-  if (kind === "tip") return "ヒント";
-  if (kind === "collection") return "コレクション";
-  return "アカウント";
 }
 
 function getHomeCatThumbSrc(profile: CatProfile) {
@@ -1695,8 +1685,8 @@ const styles = {
     letterSpacing: "0.03em",
   },
   boardCard: {
-    width: "156px",
-    minWidth: "156px",
+    width: "calc((100% - 54px) / 2)",
+    minWidth: "calc((100% - 54px) / 2)",
     minHeight: "104px",
     border: "0.5px solid rgba(255,255,255,0.24)",
     borderRadius: "20px",
@@ -1729,11 +1719,6 @@ const styles = {
     display: "inline-flex",
     alignItems: "center",
     justifyContent: "center",
-  },
-  boardCardKind: {
-    color: "rgba(255,255,255,0.56)",
-    fontSize: "9px",
-    fontWeight: 760,
   },
   boardCardTitle: {
     color: "rgba(255,255,255,0.96)",
