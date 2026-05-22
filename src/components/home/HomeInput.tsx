@@ -1633,7 +1633,7 @@ const styles = {
     color: "rgba(255,255,255,0.96)",
     padding: "4px 13px 4px 4px",
     fontSize: "15px",
-    fontWeight: 760,
+    fontWeight: 680,
     cursor: "pointer",
     backdropFilter: "blur(26px)",
     WebkitBackdropFilter: "blur(26px)",
@@ -1753,7 +1753,7 @@ const styles = {
   },
   boardTitle: {
     fontSize: "15px",
-    fontWeight: 760,
+    fontWeight: 680,
     color: "rgba(255,255,255,0.94)",
     whiteSpace: "nowrap",
   },
@@ -1763,7 +1763,7 @@ const styles = {
     borderRadius: "99px",
     color: "rgba(255,255,255,0.72)",
     fontSize: "10px",
-    fontWeight: 760,
+    fontWeight: 620,
     padding: "3px 8px",
   },
   boardRailFrame: {
@@ -1798,8 +1798,8 @@ const styles = {
   boardSectionTitle: {
     color: "rgba(255,255,255,0.62)",
     fontSize: "12px",
-    fontWeight: 800,
-    letterSpacing: "0.03em",
+    fontWeight: 620,
+    letterSpacing: "0.02em",
   },
   boardCard: {
     position: "relative",
@@ -1854,7 +1854,7 @@ const styles = {
   boardCardTitle: {
     color: "rgba(255,255,255,0.96)",
     fontSize: "13px",
-    fontWeight: 800,
+    fontWeight: 680,
     lineHeight: 1.24,
     overflow: "hidden",
     textOverflow: "ellipsis",
@@ -1895,12 +1895,12 @@ const styles = {
   boardActionLabel: {
     color: "rgba(255,255,255,0.52)",
     fontSize: "11px",
-    fontWeight: 760,
+    fontWeight: 620,
   },
   boardActionTitle: {
     color: "rgba(255,255,255,0.9)",
     fontSize: "13px",
-    fontWeight: 760,
+    fontWeight: 650,
     overflow: "hidden",
     textOverflow: "ellipsis",
     whiteSpace: "nowrap",
@@ -1921,12 +1921,12 @@ const styles = {
   boardMemoTime: {
     color: "rgba(255,255,255,0.48)",
     fontSize: "11px",
-    fontWeight: 750,
+    fontWeight: 600,
   },
   boardMemoKind: {
     color: "rgba(255,255,255,0.62)",
     fontSize: "11px",
-    fontWeight: 800,
+    fontWeight: 650,
   },
   boardMemoValue: {
     minWidth: 0,
@@ -1935,14 +1935,14 @@ const styles = {
     whiteSpace: "nowrap",
     color: "rgba(255,255,255,0.86)",
     fontSize: "12px",
-    fontWeight: 750,
+    fontWeight: 650,
   },
   boardEmptyText: {
     margin: "0 2px",
     color: "rgba(255,255,255,0.58)",
     fontSize: "12px",
     lineHeight: 1.6,
-    fontWeight: 650,
+    fontWeight: 500,
   },
   lockedState: {
     pointerEvents: "none",
@@ -1965,7 +1965,7 @@ const styles = {
   yousuTitle: {
     color: "#2A2A28",
     fontSize: "14px",
-    fontWeight: 700,
+    fontWeight: 640,
   },
   closeButton: {
     display: "inline-flex",
@@ -1992,7 +1992,7 @@ const styles = {
     color: "rgba(255,255,255,0.94)",
     padding: "10px 4px",
     fontSize: "12px",
-    fontWeight: 720,
+    fontWeight: 600,
     textAlign: "center",
     cursor: "pointer",
     backdropFilter: "blur(18px)",
@@ -2049,7 +2049,7 @@ const styles = {
     margin: 0,
     color: "rgba(255,255,255,0.96)",
     fontSize: "18px",
-    fontWeight: 780,
+    fontWeight: 680,
     lineHeight: 1.5,
   },
   sheetCloseButton: {
@@ -2119,13 +2119,13 @@ const styles = {
   mikkeChoiceLabel: {
     color: "rgba(255,255,255,0.96)",
     fontSize: "14px",
-    fontWeight: 760,
+    fontWeight: 680,
     lineHeight: 1.25,
   },
   mikkeChoiceSub: {
     color: "rgba(255,255,255,0.62)",
     fontSize: "11px",
-    fontWeight: 720,
+    fontWeight: 560,
     lineHeight: 1.25,
   },
   sheetOption: {
@@ -2135,7 +2135,7 @@ const styles = {
     color: "rgba(255,255,255,0.94)",
     padding: "20px 12px",
     fontSize: "15px",
-    fontWeight: 720,
+    fontWeight: 650,
     textAlign: "center",
     cursor: "pointer",
     backdropFilter: "blur(18px)",
@@ -2160,14 +2160,14 @@ const styles = {
     margin: "0 0 8px",
     color: "rgba(255,255,255,0.96)",
     fontSize: "15px",
-    fontWeight: 780,
+    fontWeight: 680,
     lineHeight: 1.5,
   },
   infoSheetText: {
     margin: 0,
     color: "rgba(255,255,255,0.72)",
     fontSize: "13px",
-    fontWeight: 650,
+    fontWeight: 500,
     lineHeight: 1.75,
   },
   catList: {
@@ -2194,12 +2194,12 @@ const styles = {
   },
   catListName: {
     fontSize: "15px",
-    fontWeight: 700,
+    fontWeight: 620,
   },
   catListMark: {
     color: "rgba(255,255,255,0.62)",
     fontSize: "12px",
-    fontWeight: 600,
+    fontWeight: 520,
   },
   toast: {
     position: "fixed",
@@ -2211,7 +2211,7 @@ const styles = {
     color: "#FFFFFF",
     padding: "8px 20px",
     fontSize: "13px",
-    fontWeight: 600,
+    fontWeight: 560,
     animation: "toastIn 0.2s ease-out",
   },
 } satisfies Record<string, CSSProperties>;
