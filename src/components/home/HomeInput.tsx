@@ -846,26 +846,28 @@ function HomeBulletinBoard({
         {unreadCount > 0 ? <span style={styles.boardHeaderMeta}>新着</span> : null}
       </div>
 
-      <div ref={boardRailRef} style={styles.boardRail} aria-label="おすすめカード">
-        {displayItems.map((item, index) => (
-          <button
-            key={item.id}
-            type="button"
-            style={{
-              ...styles.boardCard,
-              ...(index === 0 ? styles.boardCardPrimary : {}),
-            }}
-            onClick={() => onAction(item.actionType)}
-          >
-            <span style={styles.boardCardTop}>
-              <span style={styles.boardCardIcon} aria-hidden="true">
-                <BoardIcon icon={item.icon} />
+      <div style={styles.boardRailFrame}>
+        <div ref={boardRailRef} style={styles.boardRail} aria-label="おすすめカード">
+          {displayItems.map((item, index) => (
+            <button
+              key={item.id}
+              type="button"
+              style={{
+                ...styles.boardCard,
+                ...(index === 0 ? styles.boardCardPrimary : {}),
+              }}
+              onClick={() => onAction(item.actionType)}
+            >
+              <span style={styles.boardCardTop}>
+                <span style={styles.boardCardIcon} aria-hidden="true">
+                  <BoardIcon icon={item.icon} />
+                </span>
+                {item.isUnread ? <span style={styles.boardUnreadDot} /> : null}
               </span>
-              {item.isUnread ? <span style={styles.boardUnreadDot} /> : null}
-            </span>
-            <span style={styles.boardCardTitle}>{item.title}</span>
-          </button>
-        ))}
+              <span style={styles.boardCardTitle}>{item.title}</span>
+            </button>
+          ))}
+        </div>
       </div>
 
       {isOpen ? (
@@ -1693,15 +1695,20 @@ const styles = {
     fontWeight: 760,
     padding: "3px 8px",
   },
+  boardRailFrame: {
+    width: HOME_NAV_FRAME_WIDTH,
+    margin: "0 auto",
+    overflow: "visible",
+  },
   boardRail: {
-    width: "100vw",
+    width: `calc(100vw - ${HOME_NAV_EDGE_INSET})`,
     margin: 0,
     boxSizing: "border-box",
     display: "flex",
     gap: "8px",
     overflowX: "auto",
     scrollbarWidth: "none",
-    padding: `0 0 10px ${HOME_NAV_EDGE_INSET}`,
+    padding: "0 0 10px",
     scrollSnapType: "x mandatory",
     overscrollBehaviorX: "contain",
   },
