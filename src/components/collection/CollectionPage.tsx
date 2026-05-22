@@ -1337,9 +1337,9 @@ const styles = {
     width: "80px",
     height: "80px",
     objectFit: "contain",
-    opacity: 0.64,
-    mixBlendMode: "multiply",
-    filter: "saturate(0.72) contrast(0.92)",
+    opacity: 0.7,
+    mixBlendMode: "normal",
+    filter: "saturate(0.74) contrast(0.94)",
   },
   photoCard: {
     display: "flex",
