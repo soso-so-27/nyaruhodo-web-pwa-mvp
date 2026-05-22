@@ -515,7 +515,7 @@ export function HomeInput({ recentEvents: _recentEvents }: HomeInputProps) {
 
       {toastText ? <div style={styles.toast}>{toastText}</div> : null}
 
-      <BottomNavigation active="today" onMikkeClick={() => setIsMikkeSheetOpen(true)} />
+      <BottomNavigation active="today" />
       <style>{`
         @keyframes slideUp {
           from { transform: translateY(100%); }
@@ -788,10 +788,10 @@ function HomeBulletinBoard({
             id: "fallback",
             kind: "mission",
             priority: 999,
-            title: "今日のみっけ",
-            body: `見かけたら、${catName}のことをひとつだけ残しましょう。`,
+            title: "みっけ",
+            body: "ようす・してあげた・写真",
             icon: "paw",
-            actionLabel: "みっけ",
+            actionLabel: "開く",
             actionType: "open_mikke",
           } satisfies HomeBoardItem,
         ];
@@ -941,6 +941,20 @@ function buildHomeBoardItems({
   const items: HomeBoardItem[] = [];
   const latestRecord = recordLog[0];
 
+  items.push({
+    id: "today-mikke",
+    kind: "mission",
+    priority: 5,
+    title: "みっけ",
+    body:
+      yousuRemaining && mugiRemaining
+        ? `次のみっけまで、あと${yousuRemaining}くらいです。`
+        : "ようす・してあげた・写真",
+    icon: "paw",
+    actionLabel: "開く",
+    actionType: "open_mikke",
+  });
+
   if (discoveryAvailable) {
     items.push({
       id: "daily-discovery",
@@ -965,20 +979,6 @@ function buildHomeBoardItems({
       actionType: "go_torisetu",
     });
   }
-
-  items.push({
-    id: "today-mikke",
-    kind: "mission",
-    priority: 30,
-    title: "今日のみっけ",
-    body:
-      yousuRemaining && mugiRemaining
-        ? `次のみっけまで、あと${yousuRemaining}くらいです。`
-        : `見かけたら、${catName}のことをひとつだけ残しましょう。`,
-    icon: "paw",
-    actionLabel: "みっけ",
-    actionType: "open_mikke",
-  });
 
   if (!hasHomePhoto) {
     items.push({
@@ -1578,8 +1578,8 @@ const styles = {
     bottom: 0,
     zIndex: 18,
     width: "100%",
-    height: "292px",
-    paddingBottom: "calc(96px + env(safe-area-inset-bottom))",
+    height: "320px",
+    paddingBottom: "calc(116px + env(safe-area-inset-bottom))",
     boxSizing: "border-box",
     border: "none",
     borderRadius: 0,
@@ -1672,8 +1672,8 @@ const styles = {
     gap: "10px",
     overflowX: "auto",
     scrollbarWidth: "none",
-    padding: "0 0 18px",
-    scrollSnapType: "x proximity",
+    padding: "0 0 20px",
+    scrollSnapType: "x mandatory",
     overscrollBehaviorX: "contain",
   },
   boardOpenContent: {
@@ -1695,9 +1695,9 @@ const styles = {
     letterSpacing: "0.03em",
   },
   boardCard: {
-    width: "calc((100% - 20px) / 3)",
-    minWidth: "calc((100% - 20px) / 3)",
-    minHeight: "92px",
+    width: "min(232px, calc(100% - 86px))",
+    minWidth: "min(232px, calc(100% - 86px))",
+    minHeight: "112px",
     border: "0.5px solid rgba(255,255,255,0.24)",
     borderRadius: "20px",
     background: "rgba(255,255,255,0.14)",
@@ -1705,7 +1705,7 @@ const styles = {
     display: "flex",
     flexDirection: "column",
     gap: "5px",
-    padding: "12px",
+    padding: "14px",
     textAlign: "left",
     cursor: "pointer",
     scrollSnapAlign: "start",

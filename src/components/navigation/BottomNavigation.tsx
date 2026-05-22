@@ -1,12 +1,10 @@
 "use client";
 
 import Link from "next/link";
-import { Fragment } from "react";
 import type { CSSProperties, ReactNode } from "react";
 
 type BottomNavigationProps = {
   active: "home" | "today" | "torisetu" | "collection" | "cats" | "together";
-  onMikkeClick?: () => void;
 };
 
 type NavItem = {
@@ -16,7 +14,7 @@ type NavItem = {
   icon: ReactNode;
 };
 
-export function BottomNavigation({ active, onMikkeClick }: BottomNavigationProps) {
+export function BottomNavigation({ active }: BottomNavigationProps) {
   const activeKey =
     active === "today" ? "home" : active === "together" ? "collection" : active;
   const items: readonly NavItem[] = [
@@ -48,10 +46,9 @@ export function BottomNavigation({ active, onMikkeClick }: BottomNavigationProps
 
   return (
     <nav style={styles.bottomNav} aria-label="下部ナビ">
-      {items.map((item, index) => {
+      {items.map((item) => {
         const isActive = activeKey === item.key;
-
-        const navLink = (
+        return (
           <Link
             key={item.key}
             href={item.href}
@@ -66,47 +63,6 @@ export function BottomNavigation({ active, onMikkeClick }: BottomNavigationProps
             </span>
             <span>{item.label}</span>
           </Link>
-        );
-
-        if (index !== 1) {
-          return navLink;
-        }
-
-        return (
-          <Fragment key="torisetu-with-mikke">
-            {navLink}
-            {onMikkeClick ? (
-              <button
-                key="mikke-action"
-                type="button"
-                onClick={onMikkeClick}
-                style={styles.mikkeAction}
-                aria-label="みっけ"
-              >
-                <span style={styles.mikkeActionCircle} aria-hidden="true">
-                  <span style={styles.mikkeActionIcon}>
-                    <MikkeIcon />
-                  </span>
-                </span>
-                <span style={styles.mikkeActionLabel}>みっけ</span>
-              </button>
-            ) : (
-              <Link
-                key="mikke-action"
-                href="/home?mikke=1"
-                prefetch={true}
-                style={styles.mikkeAction}
-                aria-label="みっけ"
-              >
-                <span style={styles.mikkeActionCircle} aria-hidden="true">
-                  <span style={styles.mikkeActionIcon}>
-                    <MikkeIcon />
-                  </span>
-                </span>
-                <span style={styles.mikkeActionLabel}>みっけ</span>
-              </Link>
-            )}
-          </Fragment>
         );
       })}
     </nav>
@@ -226,21 +182,6 @@ function CollectionIcon() {
   );
 }
 
-function MikkeIcon() {
-  return (
-    <svg viewBox="0 0 24 24" style={styles.mikkeSvgIcon}>
-      <path
-        d="M12.1 12.7c2.3 0 4.1 1.65 4.1 3.65 0 1.5-1.05 2.55-2.35 2.55-.7 0-1.05-.22-1.75-.22s-1.08.22-1.78.22c-1.3 0-2.35-1.05-2.35-2.55 0-2 1.82-3.65 4.13-3.65Z"
-        fill="currentColor"
-      />
-      <path
-        d="M7.3 11.2c.82 0 1.42-.78 1.42-1.74S8.12 7.72 7.3 7.72 5.88 8.5 5.88 9.46s.6 1.74 1.42 1.74ZM10.2 9.85c.86 0 1.48-.86 1.48-1.92S11.06 6 10.2 6 8.72 6.86 8.72 7.93s.62 1.92 1.48 1.92ZM14 9.85c.86 0 1.48-.86 1.48-1.92S14.86 6 14 6s-1.48.86-1.48 1.93.62 1.92 1.48 1.92ZM16.9 11.2c.82 0 1.42-.78 1.42-1.74s-.6-1.74-1.42-1.74-1.42.78-1.42 1.74.6 1.74 1.42 1.74Z"
-        fill="currentColor"
-      />
-    </svg>
-  );
-}
-
 const styles = {
   bottomNav: {
     position: "fixed",
@@ -248,7 +189,7 @@ const styles = {
     bottom: "calc(12px + env(safe-area-inset-bottom))",
     zIndex: 20,
     display: "grid",
-    gridTemplateColumns: "1fr 1fr 62px 1fr 1fr",
+    gridTemplateColumns: "repeat(4, 1fr)",
     gap: "4px",
     width: "min(calc(100% - 28px), 410px)",
     transform: "translateX(-50%)",
@@ -259,53 +200,6 @@ const styles = {
       "0 -2px 0 rgba(200,197,190,0.3), 0 8px 24px rgba(52, 50, 46, 0.12)",
     padding: "4px",
     backdropFilter: "blur(20px)",
-  },
-  mikkeAction: {
-    position: "relative",
-    top: "-12px",
-    display: "flex",
-    flexDirection: "column",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: "2px",
-    minHeight: "62px",
-    border: "none",
-    background: "transparent",
-    color: "#2A2A28",
-    textDecoration: "none",
-    fontSize: "10px",
-    fontWeight: 800,
-    letterSpacing: 0,
-    cursor: "pointer",
-    padding: 0,
-  },
-  mikkeActionCircle: {
-    display: "inline-flex",
-    alignItems: "center",
-    justifyContent: "center",
-    width: "50px",
-    height: "50px",
-    borderRadius: "50%",
-    border: "1px solid rgba(200, 197, 190, 0.96)",
-    background:
-      "linear-gradient(180deg, rgba(255,255,255,0.99) 0%, rgba(238,237,231,0.96) 100%)",
-    boxShadow:
-      "0 8px 20px rgba(52,50,46,0.16), inset 0 1px 0 rgba(255,255,255,0.9)",
-  },
-  mikkeActionIcon: {
-    display: "inline-flex",
-    alignItems: "center",
-    justifyContent: "center",
-    width: "28px",
-    height: "28px",
-    color: "#566052",
-  },
-  mikkeActionLabel: {
-    color: "#2A2A28",
-    fontSize: "10px",
-    fontWeight: 800,
-    lineHeight: 1,
-    textShadow: "0 1px 0 rgba(255,255,255,0.78)",
   },
   navButton: {
     display: "flex",
@@ -362,11 +256,6 @@ const styles = {
   svgIcon: {
     width: "19px",
     height: "19px",
-    display: "block",
-  },
-  mikkeSvgIcon: {
-    width: "28px",
-    height: "28px",
     display: "block",
   },
 } satisfies Record<string, CSSProperties>;
