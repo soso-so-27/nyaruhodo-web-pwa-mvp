@@ -221,7 +221,6 @@ export function TorisetuPage({ recentEvents }: TorisetuPageProps) {
     getCatAvatarSrcForCoat(catProfile?.appearance?.coat);
   const typeLabel = catProfile?.typeLabel ?? "観察中";
 
-  const answeredCount = Object.keys(answers).length;
   const answeredDeepDives = DEEP_DIVE_CARDS.map((card) => answers[card.id]).filter(
     Boolean,
   );
@@ -273,9 +272,6 @@ export function TorisetuPage({ recentEvents }: TorisetuPageProps) {
       body: answer?.result ?? card.preview,
     };
   });
-  const unlockedDiagnoses = diagnosisItems.filter(
-    (item) => item.status === "completed" || item.status === "ready",
-  );
   const upcomingDiagnoses = diagnosisItems.filter((item) => item.status === "locked");
   const readyDiagnosis = diagnosisItems.find((item) => item.status === "ready") ?? null;
   const nextDiagnosis = readyDiagnosis ?? upcomingDiagnoses[0] ?? null;
@@ -283,14 +279,12 @@ export function TorisetuPage({ recentEvents }: TorisetuPageProps) {
   const openDiagnosisCount = diagnosisItems.filter(
     (item) => item.status === "completed",
   ).length;
-  const primaryDiagnosisItems =
-    unlockedDiagnoses.length > 0
-      ? unlockedDiagnoses
-      : nextDiagnosis
-        ? [nextDiagnosis]
-        : [];
-  const secondaryDiagnosisItems =
-    unlockedDiagnoses.length > 0 ? upcomingDiagnoses : upcomingDiagnoses.slice(1);
+  const completedDiagnoses = diagnosisItems.filter((item) => item.status === "completed");
+  const primaryDiagnosisItem = readyDiagnosis ?? completedDiagnoses[0] ?? nextDiagnosis;
+  const diagnosisShelfItems = diagnosisItems.filter(
+    (item) => item.card.id !== primaryDiagnosisItem?.card.id,
+  );
+  const visibleKnownFacts = knownFacts.slice(0, 3);
 
   function handleAnswer(option: DeepDiveOption) {
     if (!catProfile || !activeDive) return;
@@ -323,7 +317,7 @@ export function TorisetuPage({ recentEvents }: TorisetuPageProps) {
           <div style={styles.headerText}>
             <p style={styles.eyebrow}>CAT GUIDE</p>
             <h1 style={styles.title}>{catName}のトリセツ</h1>
-            <p style={styles.headerLead}>ホームのみっけから、この子専用の知識が育ちます。</p>
+            <p style={styles.headerLead}>みっけから育つ知識棚。</p>
           </div>
         </header>
 
@@ -351,10 +345,10 @@ export function TorisetuPage({ recentEvents }: TorisetuPageProps) {
           </div>
           <p style={styles.libraryHeroNote}>
             {readyDiagnosis
-              ? `${readyDiagnosis.card.title}が開放されています。`
+              ? `${readyDiagnosis.card.title}が開きました。`
               : nextDiagnosis
-                ? `${nextDiagnosis.card.title}はあと${nextDiagnosis.remaining}回のみっけで開きます。`
-                : "いま分かっていることを見返せます。"}
+                ? `次はあと${nextDiagnosis.remaining}回で開きます。`
+                : "見返せる手がかりがここにたまります。"}
           </p>
           {!readyDiagnosis && nextDiagnosis ? (
             <a href="/home" style={styles.heroActionLink}>
@@ -364,21 +358,17 @@ export function TorisetuPage({ recentEvents }: TorisetuPageProps) {
         </section>
 
         <section style={styles.section}>
-          <div style={styles.sectionHeader}>
-            <p style={styles.sectionKicker}>KNOWLEDGE</p>
-            <h2 style={styles.sectionTitle}>いま分かっていること</h2>
-            <p style={styles.sectionLead}>
-              みっけと診断から、迷ったときに見返せる手がかりだけを残します。
-            </p>
+          <div style={styles.sectionHeaderInline}>
+            <h2 style={styles.sectionTitle}>見えてきたこと</h2>
+            <span style={styles.sectionMeta}>{knowledgeCount}件</span>
           </div>
 
           <div style={styles.factCard}>
-            {knownFacts.map((fact) => (
+            {visibleKnownFacts.map((fact) => (
               <div key={fact.id} style={styles.factRow}>
                 <span style={styles.factLabel}>{fact.label}</span>
                 <div style={styles.factText}>
                   <strong style={styles.factValue}>{fact.value}</strong>
-                  <span style={styles.factSource}>{fact.source}</span>
                 </div>
               </div>
             ))}
@@ -386,39 +376,47 @@ export function TorisetuPage({ recentEvents }: TorisetuPageProps) {
         </section>
 
         <section style={styles.section}>
-          <div style={styles.sectionHeader}>
-            <p style={styles.sectionKicker}>DIAGNOSIS</p>
+          <div style={styles.sectionHeaderInline}>
             <h2 style={styles.sectionTitle}>深掘り診断</h2>
-            <p style={styles.sectionLead}>
-              みっけが増えると、30問前後の診断モジュールが開きます。
-            </p>
+            <span style={styles.sectionMeta}>30問</span>
           </div>
 
-          <div style={styles.diagnosisList}>
-            {primaryDiagnosisItems.map((item) => (
+          {primaryDiagnosisItem ? (
+            <div style={styles.diagnosisList}>
               <DiagnosisCard
-                key={item.card.id}
-                item={item}
-                onStart={() => setActiveDive(item.card)}
+                item={primaryDiagnosisItem}
+                onStart={() => setActiveDive(primaryDiagnosisItem.card)}
               />
-            ))}
-          </div>
+            </div>
+          ) : null}
         </section>
 
-        {secondaryDiagnosisItems.length > 0 ? (
+        {diagnosisShelfItems.length > 0 ? (
           <section style={styles.section}>
-            <div style={styles.sectionHeaderCompact}>
-              <h2 style={styles.sectionTitleSmall}>ロック中の診断</h2>
+            <div style={styles.sectionHeaderInline}>
+              <h2 style={styles.sectionTitleSmall}>診断棚</h2>
+              <span style={styles.sectionMeta}>{diagnosisItems.length}個</span>
             </div>
-            <div style={styles.upcomingList}>
-              {secondaryDiagnosisItems.map((item) => (
-                <div key={item.card.id} style={styles.upcomingRow}>
-                  <div style={styles.upcomingText}>
-                    <span style={styles.upcomingTitle}>{item.card.title}</span>
-                    <span style={styles.upcomingSub}>{item.card.questionCount}問診断</span>
-                  </div>
-                  <span style={styles.upcomingMeta}>あと{item.remaining}回</span>
-                </div>
+            <div style={styles.diagnosisShelf}>
+              {diagnosisShelfItems.map((item) => (
+                <button
+                  key={item.card.id}
+                  type="button"
+                  style={styles.diagnosisShelfCard}
+                  disabled={item.status === "locked"}
+                  onClick={() => {
+                    if (item.status === "ready") setActiveDive(item.card);
+                  }}
+                >
+                  <span style={styles.diagnosisShelfTitle}>{item.card.title}</span>
+                  <span style={styles.diagnosisShelfMeta}>
+                    {item.status === "completed"
+                      ? "結果あり"
+                      : item.status === "ready"
+                        ? "開放中"
+                        : `あと${item.remaining}回`}
+                  </span>
+                </button>
               ))}
             </div>
           </section>
@@ -512,7 +510,11 @@ function DiagnosisCard({
       <div style={styles.diagnosisBodyRow}>
         <div style={styles.diagnosisText}>
           <h3 style={styles.diagnosisTitle}>{item.card.title}</h3>
-          <p style={styles.diagnosisBody}>{item.body}</p>
+          {isCompleted || isReady ? (
+            <p style={styles.diagnosisBody}>
+              {isCompleted ? item.body : "いくつか質問に答えると、手がかりが増えます。"}
+            </p>
+          ) : null}
         </div>
         {isReady ? (
           <button type="button" style={styles.diagnosisAction} onClick={onStart}>
@@ -950,19 +952,19 @@ const styles = {
   libraryHero: {
     ...TORISETU_SURFACE,
     borderRadius: "24px",
-    padding: "16px",
-    marginBottom: "18px",
+    padding: "14px",
+    marginBottom: "16px",
   },
   libraryHeroTop: {
     display: "flex",
     alignItems: "center",
     justifyContent: "space-between",
     gap: "12px",
-    marginBottom: "16px",
+    marginBottom: "12px",
   },
   libraryHeroLabel: {
     color: TORISETU_TEXT_STRONG,
-    fontSize: "16px",
+    fontSize: "15px",
     fontWeight: 660,
     lineHeight: 1.4,
   },
@@ -987,7 +989,7 @@ const styles = {
     lineHeight: 1.3,
   },
   libraryHeroNote: {
-    margin: "10px 0 0",
+    margin: "8px 0 0",
     color: TORISETU_MUTED,
     fontSize: "12px",
     fontWeight: 520,
@@ -1111,9 +1113,16 @@ const styles = {
     cursor: "pointer",
   },
   section: {
-    marginBottom: "18px",
+    marginBottom: "15px",
   },
   sectionHeader: {
+    margin: "0 4px 8px",
+  },
+  sectionHeaderInline: {
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: "12px",
     margin: "0 4px 8px",
   },
   sectionKicker: {
@@ -1126,8 +1135,15 @@ const styles = {
   sectionTitle: {
     margin: 0,
     color: TORISETU_TEXT_STRONG,
-    fontSize: "17px",
-    fontWeight: 680,
+    fontSize: "16px",
+    fontWeight: 660,
+    lineHeight: 1.35,
+  },
+  sectionMeta: {
+    flexShrink: 0,
+    color: TORISETU_FAINT,
+    fontSize: "11px",
+    fontWeight: 560,
     lineHeight: 1.35,
   },
   sectionLead: {
@@ -1143,20 +1159,20 @@ const styles = {
   sectionTitleSmall: {
     margin: 0,
     color: TORISETU_MUTED,
-    fontSize: "14px",
+    fontSize: "13px",
     fontWeight: 620,
     lineHeight: 1.35,
   },
   factCard: {
     ...TORISETU_SURFACE_SOFT,
     borderRadius: "20px",
-    padding: "4px 14px",
+    padding: "2px 13px",
   },
   factRow: {
     display: "grid",
-    gridTemplateColumns: "62px 1fr",
-    gap: "12px",
-    padding: "12px 0",
+    gridTemplateColumns: "52px 1fr",
+    gap: "10px",
+    padding: "10px 0",
     borderBottom: "0.5px solid rgba(255,255,255,0.08)",
   },
   factLabel: {
@@ -1192,7 +1208,7 @@ const styles = {
   diagnosisCard: {
     ...TORISETU_SURFACE_SOFT,
     borderRadius: "20px",
-    padding: "14px",
+    padding: "13px",
   },
   diagnosisCardReady: {
     background: "rgba(255,255,255,0.14)",
@@ -1207,7 +1223,7 @@ const styles = {
     alignItems: "center",
     justifyContent: "space-between",
     gap: "10px",
-    marginBottom: "9px",
+    marginBottom: "7px",
   },
   diagnosisMeta: {
     color: TORISETU_MUTED,
@@ -1250,16 +1266,16 @@ const styles = {
     flex: 1,
   },
   diagnosisTitle: {
-    margin: "0 0 5px",
+    margin: "0 0 4px",
     color: TORISETU_TEXT_STRONG,
-    fontSize: "16px",
+    fontSize: "15px",
     fontWeight: 650,
     lineHeight: 1.38,
   },
   diagnosisBody: {
     margin: 0,
     color: TORISETU_MUTED,
-    fontSize: "13px",
+    fontSize: "12px",
     fontWeight: 500,
     lineHeight: 1.58,
   },
@@ -1280,7 +1296,43 @@ const styles = {
     gridTemplateColumns: "1fr auto",
     alignItems: "center",
     gap: "10px",
-    marginTop: "12px",
+    marginTop: "10px",
+  },
+  diagnosisShelf: {
+    display: "flex",
+    gap: "10px",
+    margin: "0 -16px",
+    padding: "0 16px 4px",
+    overflowX: "auto" as const,
+    scrollbarWidth: "none" as const,
+    scrollSnapType: "x proximity",
+  },
+  diagnosisShelfCard: {
+    ...TORISETU_SURFACE_SOFT,
+    width: "min(45vw, 176px)",
+    minHeight: "92px",
+    flex: "0 0 auto",
+    scrollSnapAlign: "start",
+    borderRadius: "18px",
+    padding: "13px",
+    border: "0.5px solid rgba(255,255,255,0.13)",
+    display: "flex",
+    flexDirection: "column" as const,
+    justifyContent: "space-between",
+    textAlign: "left" as const,
+    cursor: "pointer",
+  },
+  diagnosisShelfTitle: {
+    color: TORISETU_TEXT,
+    fontSize: "13px",
+    fontWeight: 600,
+    lineHeight: 1.45,
+  },
+  diagnosisShelfMeta: {
+    color: TORISETU_FAINT,
+    fontSize: "11px",
+    fontWeight: 540,
+    lineHeight: 1.35,
   },
   diagnosisProgressTrack: {
     height: "3px",
