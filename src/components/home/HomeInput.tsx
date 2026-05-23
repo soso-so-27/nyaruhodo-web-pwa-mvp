@@ -36,6 +36,7 @@ type RecordLogItem = {
 
 type HomeBoardAction =
   | "open_mikke"
+  | "open_care"
   | "open_photo"
   | "open_discovery"
   | "open_recent_change"
@@ -48,10 +49,12 @@ type HomeBoardItem = {
   priority: number;
   title: string;
   body: string;
-  icon: "paw" | "heart" | "bell" | "camera" | "book";
+  icon: "paw" | "hand" | "heart" | "bell" | "camera" | "book";
   actionLabel: string;
   actionType: HomeBoardAction;
   isUnread?: boolean;
+  isDisabled?: boolean;
+  surfaceText?: string;
 };
 
 const YOUSU_OPTIONS = [
@@ -90,7 +93,6 @@ export function HomeInput({ recentEvents: _recentEvents }: HomeInputProps) {
   const [lockData, setLockData] = useState<LockData>({});
   const [tick, setTick] = useState(Date.now());
   const [isYousuOpen, setIsYousuOpen] = useState(false);
-  const [isMikkeSheetOpen, setIsMikkeSheetOpen] = useState(false);
   const [isMugiSheetOpen, setIsMugiSheetOpen] = useState(false);
   const [isReactionSheetOpen, setIsReactionSheetOpen] = useState(false);
   const [isCatSheetOpen, setIsCatSheetOpen] = useState(false);
@@ -130,7 +132,7 @@ export function HomeInput({ recentEvents: _recentEvents }: HomeInputProps) {
     const params = new URLSearchParams(window.location.search);
     if (params.get("mikke") !== "1") return;
 
-    setIsMikkeSheetOpen(true);
+    setIsYousuOpen(true);
     params.delete("mikke");
     const nextSearch = params.toString();
     const nextUrl = `${window.location.pathname}${nextSearch ? `?${nextSearch}` : ""}`;
@@ -353,7 +355,15 @@ export function HomeInput({ recentEvents: _recentEvents }: HomeInputProps) {
 
   function handleBoardAction(actionType: HomeBoardAction) {
     if (actionType === "open_mikke") {
-      setIsMikkeSheetOpen(true);
+      if (!isYousuLocked) {
+        setIsYousuOpen(true);
+      }
+      return;
+    }
+    if (actionType === "open_care") {
+      if (!isMugiLocked) {
+        setIsMugiSheetOpen(true);
+      }
       return;
     }
     if (actionType === "open_photo") {
@@ -447,29 +457,6 @@ export function HomeInput({ recentEvents: _recentEvents }: HomeInputProps) {
         onAction={handleBoardAction}
       />
 
-      {isMikkeSheetOpen ? (
-        <MikkeSheet
-          catName={catName}
-          yousuRemaining={yousuRemaining}
-          mugiRemaining={mugiRemaining}
-          onClose={() => setIsMikkeSheetOpen(false)}
-          onOpenYousu={() => {
-            if (isYousuLocked) return;
-            setIsMikkeSheetOpen(false);
-            setIsYousuOpen(true);
-          }}
-          onOpenMugi={() => {
-            if (isMugiLocked) return;
-            setIsMikkeSheetOpen(false);
-            setIsMugiSheetOpen(true);
-          }}
-          onOpenPhoto={() => {
-            setIsMikkeSheetOpen(false);
-            void handleHomePhotoSelect();
-          }}
-        />
-      ) : null}
-
       {isYousuOpen ? (
         <YousuSheet
           title={`${catName}のようす`}
@@ -483,7 +470,7 @@ export function HomeInput({ recentEvents: _recentEvents }: HomeInputProps) {
 
       {isMugiSheetOpen ? (
         <ActionSheet
-          title={`${catName}のために、なにかした？`}
+          title={`${catName}にしたこと`}
           options={MUGI_OPTIONS}
           selected={selectedMugi}
           onClose={() => setIsMugiSheetOpen(false)}
@@ -556,86 +543,6 @@ export function HomeInput({ recentEvents: _recentEvents }: HomeInputProps) {
         }
       `}</style>
     </main>
-  );
-}
-
-function MikkeSheet({
-  catName,
-  yousuRemaining,
-  mugiRemaining,
-  onClose,
-  onOpenYousu,
-  onOpenMugi,
-  onOpenPhoto,
-}: {
-  catName: string;
-  yousuRemaining: string | null;
-  mugiRemaining: string | null;
-  onClose: () => void;
-  onOpenYousu: () => void;
-  onOpenMugi: () => void;
-  onOpenPhoto: () => void;
-}) {
-  const choices = [
-    {
-      key: "yousu",
-      label: "ようす",
-      sub: yousuRemaining ? `あと ${yousuRemaining}` : "ねてる・遊んでる",
-      icon: <PawIcon />,
-      disabled: Boolean(yousuRemaining),
-      onClick: onOpenYousu,
-    },
-    {
-      key: "mugi",
-      label: "してあげた",
-      sub: mugiRemaining ? `あと ${mugiRemaining}` : "遊んだ・なでた",
-      icon: <HandIcon />,
-      disabled: Boolean(mugiRemaining),
-      onClick: onOpenMugi,
-    },
-    {
-      key: "photo",
-      label: "写真",
-      sub: "いまを残す",
-      icon: <CameraIcon />,
-      disabled: false,
-      onClick: onOpenPhoto,
-    },
-  ];
-
-  return (
-    <>
-      <div style={styles.sheetBackdrop} onClick={onClose} />
-      <div style={styles.sheet}>
-        <div style={styles.sheetHandle} aria-hidden="true" />
-        <div style={styles.sheetHeader}>
-          <p style={styles.sheetTitle}>みっけ</p>
-          <button type="button" onClick={onClose} style={styles.sheetCloseButton}>
-            <CloseIcon />
-          </button>
-        </div>
-        <div style={styles.mikkeChoiceGrid}>
-          {choices.map((choice) => (
-            <button
-              key={choice.key}
-              type="button"
-              disabled={choice.disabled}
-              onClick={choice.onClick}
-              style={{
-                ...styles.mikkeChoice,
-                ...(choice.disabled ? styles.mikkeChoiceDisabled : {}),
-              }}
-            >
-              <span style={styles.mikkeChoiceIcon} aria-hidden="true">
-                {choice.icon}
-              </span>
-              <span style={styles.mikkeChoiceLabel}>{choice.label}</span>
-              <span style={styles.mikkeChoiceSub}>{choice.sub}</span>
-            </button>
-          ))}
-        </div>
-      </div>
-    </>
   );
 }
 
@@ -852,10 +759,11 @@ function HomeBulletinBoard({
             kind: "mission",
             priority: 999,
             title: "みっけ",
-            body: "ようす・してあげた・写真",
+            body: "ようす",
             icon: "paw",
-            actionLabel: "開く",
+            actionLabel: "ようす",
             actionType: "open_mikke",
+            surfaceText: "ようす",
           } satisfies HomeBoardItem,
         ];
   const unreadCount = displayItems.filter((item) => item.isUnread).length;
@@ -915,9 +823,11 @@ function HomeBulletinBoard({
             <button
               key={item.id}
               type="button"
+              disabled={item.isDisabled}
               style={{
                 ...styles.boardCard,
                 ...(index === 0 ? styles.boardCardPrimary : {}),
+                ...(item.isDisabled ? styles.boardCardDisabled : {}),
               }}
               onClick={() => onAction(item.actionType)}
             >
@@ -928,6 +838,9 @@ function HomeBulletinBoard({
                 {item.isUnread ? <span style={styles.boardUnreadDot} /> : null}
               </span>
               <span style={styles.boardCardTitle}>{item.title}</span>
+              {item.surfaceText ? (
+                <span style={styles.boardCardSub}>{item.surfaceText}</span>
+              ) : null}
             </button>
           ))}
         </div>
@@ -943,7 +856,11 @@ function HomeBulletinBoard({
               <button
                 key={`${item.id}-action`}
                 type="button"
-                style={styles.boardActionRow}
+                disabled={item.isDisabled}
+                style={{
+                  ...styles.boardActionRow,
+                  ...(item.isDisabled ? styles.boardActionRowDisabled : {}),
+                }}
                 onClick={() => onAction(item.actionType)}
               >
                 <span style={styles.boardActionLabel}>{item.actionLabel}</span>
@@ -988,6 +905,17 @@ function BoardIcon({ icon }: { icon: HomeBoardItem["icon"] }) {
         <circle cx="13.1" cy="8.5" r="3" />
         <circle cx="18.9" cy="8.5" r="3" />
         <circle cx="24.5" cy="13" r="3.1" />
+      </svg>
+    );
+  }
+
+  if (icon === "hand") {
+    return (
+      <svg viewBox="0 0 32 32" style={styles.boardIconSvg}>
+        <path d="M10.5 17V9.2a2 2 0 0 1 4 0V16" />
+        <path d="M14.5 15V7.4a2 2 0 0 1 4 0V16" />
+        <path d="M18.5 16V9.2a2 2 0 0 1 4 0v8.7" />
+        <path d="M10.5 17.2 8.8 15a2 2 0 0 0-3.1 2.4l5.1 7.2c1.5 2.1 3.9 3.2 6.5 3.2h1.2c4.1 0 7.5-3.4 7.5-7.5v-6.8a2 2 0 0 0-4 0" />
       </svg>
     );
   }
@@ -1049,13 +977,25 @@ function buildHomeBoardItems({
     kind: "mission",
     priority: 5,
     title: "みっけ",
-    body:
-      yousuRemaining && mugiRemaining
-        ? `次のみっけまで、あと${yousuRemaining}くらいです。`
-        : "ようす・してあげた・写真",
+    body: yousuRemaining ? `あと ${yousuRemaining}` : "ようす",
     icon: "paw",
-    actionLabel: "開く",
+    actionLabel: yousuRemaining ? "待ち時間" : "ようす",
     actionType: "open_mikke",
+    isDisabled: Boolean(yousuRemaining),
+    surfaceText: yousuRemaining ? yousuRemaining : "ようす",
+  });
+
+  items.push({
+    id: "today-care",
+    kind: "mission",
+    priority: 6,
+    title: "おせわ",
+    body: mugiRemaining ? `あと ${mugiRemaining}` : "したこと",
+    icon: "hand",
+    actionLabel: mugiRemaining ? "待ち時間" : "したこと",
+    actionType: "open_care",
+    isDisabled: Boolean(mugiRemaining),
+    surfaceText: mugiRemaining ? mugiRemaining : "したこと",
   });
 
   if (discoveryAvailable) {
@@ -1827,6 +1767,10 @@ const styles = {
   boardCardPrimary: {
     background: "rgba(54,47,43,0.5)",
   },
+  boardCardDisabled: {
+    cursor: "default",
+    opacity: 0.72,
+  },
   boardCardTop: {
     width: "100%",
     display: "flex",
@@ -1863,6 +1807,14 @@ const styles = {
     WebkitBoxOrient: "vertical",
     overflowWrap: "anywhere",
   },
+  boardCardSub: {
+    marginTop: "-5px",
+    color: "rgba(255,255,255,0.58)",
+    fontSize: "11px",
+    fontWeight: 650,
+    lineHeight: 1.15,
+    fontVariantNumeric: "tabular-nums",
+  },
   boardUnreadDot: {
     position: "absolute",
     top: "11px",
@@ -1891,6 +1843,10 @@ const styles = {
     padding: "10px 12px",
     textAlign: "left",
     cursor: "pointer",
+  },
+  boardActionRowDisabled: {
+    cursor: "default",
+    opacity: 0.58,
   },
   boardActionLabel: {
     color: "rgba(255,255,255,0.52)",
@@ -2078,55 +2034,6 @@ const styles = {
     gridTemplateColumns: "repeat(4, 1fr)",
     gap: "8px",
     marginTop: "16px",
-  },
-  mikkeChoiceGrid: {
-    display: "grid",
-    gridTemplateColumns: "repeat(3, 1fr)",
-    gap: "10px",
-    marginTop: "16px",
-  },
-  mikkeChoice: {
-    minHeight: "118px",
-    border: "0.5px solid rgba(255,255,255,0.18)",
-    borderRadius: "16px",
-    background: "rgba(255,255,255,0.10)",
-    color: "rgba(255,255,255,0.94)",
-    padding: "14px 8px",
-    display: "flex",
-    flexDirection: "column",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: "7px",
-    textAlign: "center",
-    cursor: "pointer",
-    backdropFilter: "blur(18px)",
-    WebkitBackdropFilter: "blur(18px)",
-    boxShadow: "inset 0 1px 0 rgba(255,255,255,0.12)",
-  },
-  mikkeChoiceDisabled: {
-    borderColor: "rgba(255,255,255,0.10)",
-    background: "rgba(255,255,255,0.06)",
-    cursor: "not-allowed",
-  },
-  mikkeChoiceIcon: {
-    width: "34px",
-    height: "34px",
-    color: "rgba(255,255,255,0.88)",
-    display: "inline-flex",
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  mikkeChoiceLabel: {
-    color: "rgba(255,255,255,0.96)",
-    fontSize: "14px",
-    fontWeight: 680,
-    lineHeight: 1.25,
-  },
-  mikkeChoiceSub: {
-    color: "rgba(255,255,255,0.62)",
-    fontSize: "11px",
-    fontWeight: 560,
-    lineHeight: 1.25,
   },
   sheetOption: {
     border: "0.5px solid rgba(255,255,255,0.16)",
