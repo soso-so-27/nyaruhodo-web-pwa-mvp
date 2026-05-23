@@ -259,7 +259,7 @@ export function CollectionPage() {
       <div style={styles.container}>
         <header style={styles.header}>
           <div style={styles.pageHeader}>
-            <h1 style={styles.pageTitle}>見つけたしぐさ</h1>
+            <h1 style={styles.pageTitle}>しぐさアルバム</h1>
             <div style={styles.pageHeaderActions}>
               <button
                 type="button"
@@ -391,8 +391,12 @@ function CollectionProgress({
   return (
     <section style={styles.progressBlock} aria-label="コレクションの進み具合">
       <p style={styles.progressMain}>
-        <span style={styles.progressNumber}>{progress.total.collected}</span>
-        <span style={styles.progressUnit}>種類</span>
+        <span style={styles.progressNumber}>
+          {progress.total.collected}
+          <span style={styles.progressSlash}>/</span>
+          {progress.total.total}
+        </span>
+        <span style={styles.progressUnit}>見つけた姿</span>
       </p>
       <p style={styles.progressSub}>
         {`${getCollectionGroupLabel("pose")}${progress.pose.collected} ・ ${getCollectionGroupLabel("scene")}${progress.scene.collected}`}
@@ -919,7 +923,7 @@ function resizeAndEncode(file: File, maxSize = 800): Promise<string> {
 }
 
 function getCollectionGroupLabel(groupId: CollectionGroupId) {
-  return groupId === "pose" ? "ポーズ" : "シーン";
+  return groupId === "pose" ? "しぐさ" : "いる場所";
 }
 
 const COLLECTION_SLOT_LABELS: Record<string, string> = {
@@ -1109,9 +1113,9 @@ const styles = {
   pageTitle: {
     margin: 0,
     color: COLLECTION_TEXT_STRONG,
-    fontSize: "16px",
-    lineHeight: 1.45,
-    fontWeight: 680,
+    fontSize: "22px",
+    lineHeight: 1.24,
+    fontWeight: 620,
     letterSpacing: 0,
   },
   catNameBtn: {
@@ -1229,40 +1233,46 @@ const styles = {
     letterSpacing: 0,
   },
   progressBlock: {
-    ...COLLECTION_SURFACE,
+    ...COLLECTION_SURFACE_SOFT,
     display: "grid",
-    gap: "10px",
-    borderRadius: "20px",
-    padding: "14px",
+    gap: "8px",
+    borderRadius: "18px",
+    padding: "11px 12px 12px",
   },
   progressMain: {
     display: "flex",
     alignItems: "baseline",
-    gap: "4px",
+    gap: "7px",
     margin: 0,
     color: COLLECTION_TEXT_STRONG,
   },
   progressNumber: {
-    fontSize: "32px",
-    fontWeight: 660,
+    fontSize: "20px",
+    fontWeight: 610,
     lineHeight: 1,
+  },
+  progressSlash: {
+    color: COLLECTION_MUTED,
+    fontSize: "15px",
+    fontWeight: 540,
+    margin: "0 2px",
   },
   progressUnit: {
     color: COLLECTION_MUTED,
-    fontSize: "15px",
-    fontWeight: 590,
+    fontSize: "12px",
+    fontWeight: 540,
   },
   progressSub: {
-    margin: "-4px 0 0",
+    margin: "-3px 0 0",
     color: COLLECTION_MUTED,
-    fontSize: "13px",
-    fontWeight: 540,
+    fontSize: "11px",
+    fontWeight: 500,
     lineHeight: 1.4,
   },
   progressTrack: {
     position: "relative",
     width: "100%",
-    height: "7px",
+    height: "4px",
     borderRadius: "999px",
     background: "rgba(255,255,255,0.16)",
     overflow: "hidden",
@@ -1279,19 +1289,20 @@ const styles = {
     overflowX: "auto",
     scrollbarWidth: "none",
     msOverflowStyle: "none",
-    paddingBottom: "2px",
+    paddingTop: "2px",
+    paddingBottom: "1px",
   },
   tab: {
     flex: "0 0 auto",
-    minWidth: "92px",
-    minHeight: "40px",
+    minWidth: "82px",
+    minHeight: "34px",
     border: "0.5px solid rgba(255,255,255,0.16)",
     borderRadius: "999px",
     background: "rgba(255,255,255,0.10)",
     color: COLLECTION_TEXT,
     font: "inherit",
-    fontSize: "14px",
-    fontWeight: 560,
+    fontSize: "13px",
+    fontWeight: 540,
     lineHeight: 1,
     cursor: "pointer",
   },
@@ -1322,6 +1333,9 @@ const styles = {
     alignItems: "center",
     justifyContent: "center",
     padding: 0,
+    background: "rgba(255,255,255,0.055)",
+    border: "0.5px solid rgba(255,255,255,0.10)",
+    boxShadow: "inset 0 1px 0 rgba(255,255,255,0.08)",
   },
   emptySlotContent: {
     display: "flex",
@@ -1334,12 +1348,12 @@ const styles = {
     padding: "12px 8px",
   },
   emptyCardIcon: {
-    width: "80px",
-    height: "80px",
+    width: "74px",
+    height: "74px",
     objectFit: "contain",
-    opacity: 0.7,
-    mixBlendMode: "normal",
-    filter: "saturate(0.74) contrast(0.94)",
+    opacity: 0.44,
+    mixBlendMode: "multiply",
+    filter: "saturate(0.7) contrast(0.9)",
   },
   photoCard: {
     display: "flex",
@@ -1421,8 +1435,8 @@ const styles = {
   emptySlotLabel: {
     margin: 0,
     color: COLLECTION_MUTED,
-    fontSize: "12px",
-    fontWeight: 560,
+    fontSize: "11px",
+    fontWeight: 520,
     lineHeight: 1.3,
     textAlign: "center",
   },
