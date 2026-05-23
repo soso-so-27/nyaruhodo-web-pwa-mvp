@@ -232,10 +232,16 @@ export function TorisetuPage({ recentEvents }: TorisetuPageProps) {
   const knownFacts: KnownFact[] = [
     {
       id: "type",
-      label: "タイプ",
+      label: "タイプ診断",
       value: typeLabel,
-      source: catProfile?.typeTagline ?? "オンボーディング診断から",
+      source: catProfile?.typeTagline ?? "オンボーディング結果",
     },
+    ...answeredDeepDives.map((answer) => ({
+      id: `diagnosis-${answer.cardId}`,
+      label: answer.label,
+      value: compactText(answer.result, 42),
+      source: "診断結果",
+    })),
     {
       id: "recent",
       label: "最近",
@@ -252,12 +258,6 @@ export function TorisetuPage({ recentEvents }: TorisetuPageProps) {
           ? "診断から"
           : "記録待ち",
     },
-    ...answeredDeepDives.map((answer) => ({
-      id: `diagnosis-${answer.cardId}`,
-      label: answer.label,
-      value: compactText(answer.result, 42),
-      source: "診断から",
-    })),
   ];
   const diagnosisItems: DiagnosisItem[] = DEEP_DIVE_CARDS.map((card) => {
     const answer = answers[card.id];
@@ -274,19 +274,15 @@ export function TorisetuPage({ recentEvents }: TorisetuPageProps) {
       body: answer?.result ?? card.preview,
     };
   });
-  const upcomingDiagnoses = diagnosisItems.filter((item) => item.status === "locked");
-  const readyDiagnosis = diagnosisItems.find((item) => item.status === "ready") ?? null;
-  const nextDiagnosis = readyDiagnosis ?? upcomingDiagnoses[0] ?? null;
+  const readyDiagnoses = diagnosisItems.filter((item) => item.status === "ready");
+  const lockedDiagnoses = diagnosisItems.filter((item) => item.status === "locked");
+  const readyDiagnosis = readyDiagnoses[0] ?? null;
+  const nextDiagnosis = readyDiagnosis ?? lockedDiagnoses[0] ?? null;
   const knowledgeCount = knownFacts.length;
   const openDiagnosisCount = diagnosisItems.filter(
     (item) => item.status === "completed",
   ).length;
-  const completedDiagnoses = diagnosisItems.filter((item) => item.status === "completed");
-  const primaryDiagnosisItem = readyDiagnosis ?? completedDiagnoses[0] ?? nextDiagnosis;
-  const diagnosisShelfItems = diagnosisItems.filter(
-    (item) => item.card.id !== primaryDiagnosisItem?.card.id,
-  );
-  const visibleKnownFacts = knownFacts.slice(0, 3);
+  const visibleKnownFacts = knownFacts;
 
   function handleAnswer(option: DeepDiveOption) {
     if (!catProfile || !activeDive) return;
@@ -371,6 +367,7 @@ export function TorisetuPage({ recentEvents }: TorisetuPageProps) {
                 <span style={styles.factLabel}>{fact.label}</span>
                 <div style={styles.factText}>
                   <strong style={styles.factValue}>{fact.value}</strong>
+                  <span style={styles.factSource}>{fact.source}</span>
                 </div>
               </div>
             ))}
@@ -383,40 +380,42 @@ export function TorisetuPage({ recentEvents }: TorisetuPageProps) {
             <span style={styles.sectionMeta}>30問</span>
           </div>
 
-          {primaryDiagnosisItem ? (
+          {readyDiagnoses.length > 0 ? (
             <div style={styles.diagnosisList}>
-              <DiagnosisCard
-                item={primaryDiagnosisItem}
-                onStart={() => setActiveDive(primaryDiagnosisItem.card)}
-              />
+              {readyDiagnoses.map((item) => (
+                <DiagnosisCard
+                  key={item.card.id}
+                  item={item}
+                  onStart={() => setActiveDive(item.card)}
+                />
+              ))}
             </div>
-          ) : null}
+          ) : (
+            <div style={styles.emptyStateCard}>
+              <span style={styles.emptyStateText}>
+                みっけが増えると、ここに診断が出てきます。
+              </span>
+            </div>
+          )}
         </section>
 
-        {diagnosisShelfItems.length > 0 ? (
+        {lockedDiagnoses.length > 0 ? (
           <section style={styles.section}>
             <div style={styles.sectionHeaderInline}>
               <CategoryLabel icon="lock" label="開く" />
-              <span style={styles.sectionMeta}>{diagnosisItems.length}個</span>
+              <span style={styles.sectionMeta}>{lockedDiagnoses.length}個</span>
             </div>
             <div style={styles.diagnosisShelf}>
-              {diagnosisShelfItems.map((item) => (
+              {lockedDiagnoses.map((item) => (
                 <button
                   key={item.card.id}
                   type="button"
                   style={styles.diagnosisShelfCard}
-                  disabled={item.status === "locked"}
-                  onClick={() => {
-                    if (item.status === "ready") setActiveDive(item.card);
-                  }}
+                  disabled
                 >
                   <span style={styles.diagnosisShelfTitle}>{item.card.title}</span>
                   <span style={styles.diagnosisShelfMeta}>
-                    {item.status === "completed"
-                      ? "結果"
-                      : item.status === "ready"
-                        ? "できます"
-                        : `あと${item.remaining}回`}
+                    あと{item.remaining}回
                   </span>
                 </button>
               ))}
@@ -1311,6 +1310,17 @@ const styles = {
     flexDirection: "column" as const,
     gap: "10px",
   },
+  emptyStateCard: {
+    ...TORISETU_SURFACE_SOFT,
+    borderRadius: "18px",
+    padding: "13px 14px",
+  },
+  emptyStateText: {
+    color: TORISETU_MUTED,
+    fontSize: "13px",
+    fontWeight: 540,
+    lineHeight: 1.55,
+  },
   diagnosisCard: {
     ...TORISETU_SURFACE_SOFT,
     borderRadius: "20px",
@@ -1426,7 +1436,7 @@ const styles = {
     flexDirection: "column" as const,
     justifyContent: "space-between",
     textAlign: "left" as const,
-    cursor: "pointer",
+    cursor: "default",
   },
   diagnosisShelfTitle: {
     color: TORISETU_TEXT,
