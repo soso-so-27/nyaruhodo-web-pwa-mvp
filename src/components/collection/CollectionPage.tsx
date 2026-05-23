@@ -1,7 +1,11 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import type { CSSProperties, UIEvent } from "react";
+import {
+  getCollectionSlotPhotoSlug,
+  getDailyCollectionTarget,
+} from "../../lib/collection/dailyTarget";
 import {
   COLLECTION_GROUPS,
   type CollectionGroup,
@@ -63,6 +67,8 @@ export function CollectionPage() {
   const [selectedSlug, setSelectedSlug] = useState<string | null>(null);
   const [currentPhotoIndex, setCurrentPhotoIndex] = useState(0);
   const [isCatSheetOpen, setIsCatSheetOpen] = useState(false);
+  const [toastText, setToastText] = useState("");
+  const toastTimerRef = useRef<number | null>(null);
 
   useEffect(() => {
     const profiles = readCatProfiles();
@@ -84,6 +90,14 @@ export function CollectionPage() {
     setCollectionPhotos(readCollectionPhotos(activeCatId));
   }, [activeCatId]);
 
+  useEffect(() => {
+    return () => {
+      if (toastTimerRef.current) {
+        window.clearTimeout(toastTimerRef.current);
+      }
+    };
+  }, []);
+
   const activeCatProfile =
     catProfiles.length > 0
       ? getActiveCatProfile(catProfiles, activeCatId)
@@ -101,6 +115,13 @@ export function CollectionPage() {
   const progress = useMemo(
     () => buildCollectionProgress(COLLECTION_GROUPS, photosBySlot),
     [photosBySlot],
+  );
+  const dailyTargetSlot = useMemo(
+    () =>
+      activeCatId
+        ? getDailyCollectionTarget(activeCatId, collectionPhotos)
+        : null,
+    [activeCatId, collectionPhotos],
   );
   const activeGroup =
     COLLECTION_GROUPS.find((group) => group.id === activeGroupId) ??
@@ -158,9 +179,51 @@ export function CollectionPage() {
         ...current,
         [slug]: [...(current[slug] ?? []), dataUrl],
       }));
+      showToast(`${getCollectionSlotLabel(slot)}を見つけた`);
     };
 
     input.click();
+  }
+
+  function showToast(message: string) {
+    setToastText(message);
+
+    if (toastTimerRef.current) {
+      window.clearTimeout(toastTimerRef.current);
+    }
+
+    toastTimerRef.current = window.setTimeout(() => {
+      setToastText("");
+    }, 1600);
+  }
+
+  async function handleShareSlot(slot: CollectionSlot, photos: CollectionPhoto[]) {
+    if (photos.length === 0) {
+      return;
+    }
+
+    const label = getCollectionSlotLabel(slot);
+    const shareText = `${catName}の${label}を見つけたよ`;
+
+    try {
+      if (navigator.share) {
+        await navigator.share({
+          title: "にゃるほど",
+          text: shareText,
+        });
+        return;
+      }
+
+      if (navigator.clipboard?.writeText) {
+        await navigator.clipboard.writeText(shareText);
+        showToast("共有文をコピーしたよ");
+        return;
+      }
+
+      showToast(shareText);
+    } catch {
+      // Share cancel/failure should not interrupt the collection flow.
+    }
   }
 
   function handleDeletePhoto(slug: string, index: number) {
@@ -276,11 +339,18 @@ export function CollectionPage() {
             progress={progress}
             onSelectGroup={setActiveGroupId}
           />
+          {dailyTargetSlot ? (
+            <DailyCollectionTarget
+              slot={dailyTargetSlot}
+              onOpenSlot={openSheet}
+            />
+          ) : null}
         </header>
 
         <CollectionGrid
           group={activeGroup}
           photosBySlot={photosBySlot}
+          dailyTargetSlotId={dailyTargetSlot?.id ?? null}
           onOpenSlot={openSheet}
         />
       </div>
@@ -292,6 +362,9 @@ export function CollectionPage() {
           onClose={closeSheet}
           onAddPhoto={() => {
             void handlePhotoAdd(selectedSlot);
+          }}
+          onShare={() => {
+            void handleShareSlot(selectedSlot, selectedPhotos);
           }}
           onDeletePhoto={handleDeletePhoto}
           onPhotoScroll={handlePhotoScroll}
@@ -359,6 +432,7 @@ export function CollectionPage() {
           </div>
         </>
       ) : null}
+      {toastText ? <div style={styles.toast}>{toastText}</div> : null}
       <BottomNavigation active="collection" />
     </main>
   );
@@ -444,13 +518,35 @@ function CollectionProgress({
   );
 }
 
+function DailyCollectionTarget({
+  slot,
+  onOpenSlot,
+}: {
+  slot: CollectionSlot;
+  onOpenSlot: (slot: CollectionSlot) => void;
+}) {
+  return (
+    <button
+      type="button"
+      style={styles.dailyTargetCard}
+      onClick={() => onOpenSlot(slot)}
+    >
+      <span style={styles.dailyTargetLabel}>今日の見つけたい姿</span>
+      <strong style={styles.dailyTargetName}>{getCollectionSlotLabel(slot)}</strong>
+      <span style={styles.dailyTargetHint}>見つけたら写真で残す</span>
+    </button>
+  );
+}
+
 function CollectionGrid({
   group,
   photosBySlot,
+  dailyTargetSlotId,
   onOpenSlot,
 }: {
   group: CollectionGroup;
   photosBySlot: Map<string, CollectionPhoto[]>;
+  dailyTargetSlotId: string | null;
   onOpenSlot: (slot: CollectionSlot) => void;
 }) {
   return (
@@ -461,6 +557,7 @@ function CollectionGrid({
             key={slot.id}
             slot={slot}
             photos={photosBySlot.get(slot.id) ?? []}
+            isDailyTarget={slot.id === dailyTargetSlotId}
             onOpenSlot={onOpenSlot}
           />
         ))}
@@ -472,10 +569,12 @@ function CollectionGrid({
 function CollectionCard({
   slot,
   photos,
+  isDailyTarget,
   onOpenSlot,
 }: {
   slot: CollectionSlot;
   photos: CollectionPhoto[];
+  isDailyTarget: boolean;
   onOpenSlot: (slot: CollectionSlot) => void;
 }) {
   const firstPhoto = photos[0];
@@ -493,6 +592,7 @@ function CollectionCard({
         {photos.length > 1 ? (
           <span style={styles.cardCountBadge}>{photos.length}枚</span>
         ) : null}
+        {isDailyTarget ? <span style={styles.todayBadge}>今日</span> : null}
         <div style={styles.photoCardText}>
           <p style={styles.photoCardLabel}>{getCollectionSlotLabel(slot)}</p>
         </div>
@@ -506,6 +606,7 @@ function CollectionCard({
       onClick={() => onOpenSlot(slot)}
       style={{ ...styles.collectionCard, ...styles.emptyCollectionCard }}
     >
+      {isDailyTarget ? <span style={styles.todayBadge}>今日</span> : null}
       <div style={styles.emptySlotContent}>
         <img src={slot.iconPath} alt="" style={styles.emptyCardIcon} />
         <span style={styles.emptySlotLabel}>{getCollectionSlotLabel(slot)}</span>
@@ -520,6 +621,7 @@ function CollectionPhotoSheet({
   currentPhotoIndex,
   onClose,
   onAddPhoto,
+  onShare,
   onDeletePhoto,
   onPhotoScroll,
 }: {
@@ -528,6 +630,7 @@ function CollectionPhotoSheet({
   currentPhotoIndex: number;
   onClose: () => void;
   onAddPhoto: () => void;
+  onShare: () => void;
   onDeletePhoto: (slug: string, index: number) => void;
   onPhotoScroll: (event: UIEvent<HTMLDivElement>) => void;
 }) {
@@ -587,6 +690,7 @@ function CollectionPhotoSheet({
           </button>
           <button
             type="button"
+            onClick={onShare}
             style={
               photos.length > 0
                 ? styles.btnSecondary
@@ -952,7 +1056,7 @@ function getCollectionSlotLabel(slot: CollectionSlot) {
 }
 
 function getCollectionPhotoSlug(slot: CollectionSlot) {
-  return `${slot.group}_${slot.id.replace(/-/g, "_")}`;
+  return getCollectionSlotPhotoSlug(slot);
 }
 
 function getCollectionSlotBySlug(slug: string) {
@@ -1311,6 +1415,42 @@ const styles = {
     background: "rgba(255,255,255,0.92)",
     color: "#2a2a28",
   },
+  dailyTargetCard: {
+    width: "100%",
+    ...COLLECTION_SURFACE_SOFT,
+    display: "grid",
+    gridTemplateColumns: "auto 1fr auto",
+    alignItems: "center",
+    gap: "8px",
+    borderRadius: "16px",
+    padding: "11px 12px",
+    color: COLLECTION_TEXT,
+    font: "inherit",
+    textAlign: "left",
+    cursor: "pointer",
+  },
+  dailyTargetLabel: {
+    color: COLLECTION_MUTED,
+    fontSize: "11px",
+    fontWeight: 520,
+    whiteSpace: "nowrap",
+  },
+  dailyTargetName: {
+    minWidth: 0,
+    color: COLLECTION_TEXT_STRONG,
+    fontSize: "14px",
+    fontWeight: 620,
+    lineHeight: 1.2,
+    overflow: "hidden",
+    textOverflow: "ellipsis",
+    whiteSpace: "nowrap",
+  },
+  dailyTargetHint: {
+    color: COLLECTION_MUTED,
+    fontSize: "11px",
+    fontWeight: 500,
+    whiteSpace: "nowrap",
+  },
   collectionGrid: {
     display: "grid",
     gridTemplateColumns: "repeat(2, minmax(0, 1fr))",
@@ -1394,6 +1534,20 @@ const styles = {
     fontWeight: 560,
     lineHeight: 1,
     padding: "2px 7px",
+  },
+  todayBadge: {
+    position: "absolute",
+    top: "10px",
+    left: "10px",
+    zIndex: 3,
+    borderRadius: "99px",
+    background: "rgba(255,255,255,0.9)",
+    color: "#2f332f",
+    fontSize: "11px",
+    fontWeight: 620,
+    lineHeight: 1,
+    padding: "4px 8px",
+    boxShadow: "0 3px 10px rgba(0,0,0,0.12)",
   },
   photoCardLabel: {
     margin: 0,
@@ -1597,6 +1751,23 @@ const styles = {
   btnDisabled: {
     opacity: 0.4,
     cursor: "not-allowed",
+  },
+  toast: {
+    position: "fixed",
+    left: "50%",
+    top: "calc(18px + env(safe-area-inset-top))",
+    zIndex: 80,
+    transform: "translateX(-50%)",
+    borderRadius: "999px",
+    background: "rgba(255,255,255,0.92)",
+    color: "#2a2a28",
+    fontSize: "13px",
+    fontWeight: 620,
+    lineHeight: 1,
+    padding: "10px 16px",
+    boxShadow: "0 10px 30px rgba(0,0,0,0.2)",
+    backdropFilter: "blur(18px)",
+    WebkitBackdropFilter: "blur(18px)",
   },
   emptyCard: {
     ...COLLECTION_SURFACE,

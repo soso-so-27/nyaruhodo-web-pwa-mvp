@@ -2,6 +2,10 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { CSSProperties, TouchEvent } from "react";
+import {
+  getDailyCollectionTarget,
+  readStoredCollectionPhotos,
+} from "../../lib/collection/dailyTarget";
 import type { RecentEvent } from "../../lib/supabase/queries";
 import { BottomNavigation } from "../navigation/BottomNavigation";
 import {
@@ -150,6 +154,16 @@ export function HomeInput({ recentEvents: _recentEvents }: HomeInputProps) {
   const isYousuLocked = Boolean(yousuRemaining);
   const isMugiLocked = Boolean(mugiRemaining);
   const latestRecord = recordLog[0] ?? null;
+  const dailyCollectionTarget = useMemo(() => {
+    if (!activeCatId) {
+      return null;
+    }
+
+    return getDailyCollectionTarget(
+      activeCatId,
+      readStoredCollectionPhotos(activeCatId),
+    );
+  }, [activeCatId]);
   const discovery = useMemo(() => {
     if (!activeCatId || discoveryDismissedToday) {
       return { available: false };
@@ -164,6 +178,7 @@ export function HomeInput({ recentEvents: _recentEvents }: HomeInputProps) {
         discoveryAvailable: discovery.available,
         hasHomePhoto: Boolean(activeCat?.homePhotoDataUrl),
         recordLog,
+        collectionTargetLabel: dailyCollectionTarget?.label ?? null,
         yousuRemaining,
         mugiRemaining,
       }),
@@ -171,6 +186,7 @@ export function HomeInput({ recentEvents: _recentEvents }: HomeInputProps) {
       activeCat?.homePhotoDataUrl,
       catName,
       discovery.available,
+      dailyCollectionTarget?.label,
       mugiRemaining,
       recordLog,
       yousuRemaining,
@@ -959,6 +975,7 @@ function buildHomeBoardItems({
   discoveryAvailable,
   hasHomePhoto,
   recordLog,
+  collectionTargetLabel,
   yousuRemaining,
   mugiRemaining,
 }: {
@@ -966,6 +983,7 @@ function buildHomeBoardItems({
   discoveryAvailable: boolean;
   hasHomePhoto: boolean;
   recordLog: RecordLogItem[];
+  collectionTargetLabel: string | null;
   yousuRemaining: string | null;
   mugiRemaining: string | null;
 }): HomeBoardItem[] {
@@ -1033,6 +1051,20 @@ function buildHomeBoardItems({
       icon: "camera",
       actionLabel: "写真を選ぶ",
       actionType: "open_photo",
+    });
+  }
+
+  if (collectionTargetLabel) {
+    items.push({
+      id: "daily-collection-target",
+      kind: "collection",
+      priority: 45,
+      title: "今日の見つけたい姿",
+      body: `${catName}の${collectionTargetLabel}を見つけたら写真で残そう。`,
+      icon: "camera",
+      actionLabel: "探す",
+      actionType: "go_collection",
+      surfaceText: collectionTargetLabel,
     });
   }
 
