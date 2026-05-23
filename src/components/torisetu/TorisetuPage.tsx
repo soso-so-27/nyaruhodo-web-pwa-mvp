@@ -383,9 +383,9 @@ export function TorisetuPage({ recentEvents }: TorisetuPageProps) {
 
           <div style={styles.factGroups}>
             <FactGroup icon="paw" label="みっけ" facts={mikkeFacts} />
-            <FactGroup
+            <FactCardShelf
               icon="clipboard"
-              label="結果"
+              label="トリセツ"
               facts={diagnosisFacts}
               onOpenFact={setActiveFact}
             />
@@ -598,6 +598,51 @@ function FactGroup({
             </button>
           );
         })}
+      </div>
+    </div>
+  );
+}
+
+function FactCardShelf({
+  icon,
+  label,
+  facts,
+  onOpenFact,
+}: {
+  icon: CategoryIconName;
+  label: string;
+  facts: KnownFact[];
+  onOpenFact: (fact: KnownFact) => void;
+}) {
+  return (
+    <div style={styles.factGroup}>
+      <div style={styles.factGroupHeader}>
+        <div style={styles.factGroupHeading}>
+          <span style={styles.factGroupIcon} aria-hidden="true">
+            <CategoryIcon name={icon} />
+          </span>
+          <span style={styles.factGroupLabel}>{label}</span>
+        </div>
+        <span style={styles.factGroupMeta}>{facts.length}件</span>
+      </div>
+      <div style={styles.torisetuCardRail}>
+        {facts.map((fact, index) => (
+          <button
+            key={fact.id}
+            type="button"
+            style={{
+              ...styles.torisetuFactCard,
+              ...(index === 0 ? styles.torisetuFactCardPrimary : {}),
+            }}
+            onClick={() => onOpenFact(fact)}
+          >
+            <span style={styles.torisetuFactIcon} aria-hidden="true">
+              <CategoryIcon name={icon} />
+            </span>
+            <span style={styles.torisetuFactLabel}>{fact.label}</span>
+            <strong style={styles.torisetuFactValue}>{fact.value}</strong>
+          </button>
+        ))}
       </div>
     </div>
   );
@@ -1444,6 +1489,63 @@ const styles = {
     fontWeight: 500,
     lineHeight: 1,
     flexShrink: 0,
+  },
+  torisetuCardRail: {
+    display: "flex",
+    gap: "10px",
+    margin: "0 -16px",
+    padding: "0 16px 4px",
+    overflowX: "auto" as const,
+    scrollbarWidth: "none" as const,
+    scrollSnapType: "x mandatory",
+  },
+  torisetuFactCard: {
+    ...TORISETU_SURFACE_SOFT,
+    width: "min(46vw, 176px)",
+    minWidth: "min(46vw, 176px)",
+    minHeight: "112px",
+    flex: "0 0 auto",
+    scrollSnapAlign: "start",
+    borderRadius: "18px",
+    padding: "13px",
+    color: TORISETU_TEXT_STRONG,
+    display: "flex",
+    flexDirection: "column" as const,
+    alignItems: "flex-start",
+    justifyContent: "space-between",
+    gap: "8px",
+    textAlign: "left" as const,
+    cursor: "pointer",
+  },
+  torisetuFactCardPrimary: {
+    background: "rgba(255,255,255,0.14)",
+    border: "0.5px solid rgba(255,220,160,0.24)",
+  },
+  torisetuFactIcon: {
+    width: "28px",
+    height: "28px",
+    color: "rgba(255,255,255,0.88)",
+    display: "inline-flex",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  torisetuFactLabel: {
+    color: TORISETU_MUTED,
+    fontSize: "11px",
+    fontWeight: 620,
+    lineHeight: 1.3,
+  },
+  torisetuFactValue: {
+    color: TORISETU_TEXT_STRONG,
+    fontSize: "16px",
+    fontWeight: 680,
+    lineHeight: 1.32,
+    overflow: "hidden",
+    textOverflow: "ellipsis",
+    display: "-webkit-box",
+    WebkitLineClamp: 2,
+    WebkitBoxOrient: "vertical",
+    overflowWrap: "anywhere",
   },
   diagnosisList: {
     display: "flex",
