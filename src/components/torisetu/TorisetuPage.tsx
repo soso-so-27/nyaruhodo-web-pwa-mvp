@@ -67,6 +67,7 @@ type KnownFact = {
   label: string;
   value: string;
   source: string;
+  detail?: string;
 };
 
 type DiagnosisItem = {
@@ -191,6 +192,7 @@ export function TorisetuPage({ recentEvents }: TorisetuPageProps) {
   const [localRecords, setLocalRecords] = useState<RecordLike[]>([]);
   const [answers, setAnswers] = useState<Record<string, DeepDiveAnswer>>({});
   const [activeDive, setActiveDive] = useState<DeepDiveCard | null>(null);
+  const [activeFact, setActiveFact] = useState<KnownFact | null>(null);
 
   useEffect(() => {
     const profiles = loadCatProfiles();
@@ -234,13 +236,17 @@ export function TorisetuPage({ recentEvents }: TorisetuPageProps) {
       id: "type",
       label: "タイプ診断",
       value: typeLabel,
-      source: catProfile?.typeTagline ?? "オンボーディング結果",
+      source: "オンボーディング結果",
+      detail:
+        catProfile?.typeTagline ??
+        "最初のタイプ診断で見えている、この子の入り口です。",
     },
     ...answeredDeepDives.map((answer) => ({
       id: `diagnosis-${answer.cardId}`,
       label: answer.label,
       value: compactText(answer.result, 42),
       source: "診断結果",
+      detail: answer.result,
     })),
     ...(!hasRhythmSignal && peakSlots.length > 0
       ? [
@@ -249,6 +255,8 @@ export function TorisetuPage({ recentEvents }: TorisetuPageProps) {
             label: "リズム",
             value: rhythmSummary,
             source: "オンボーディング結果",
+            detail:
+              "オンボーディングで答えた時間帯から見えた傾向です。みっけが増えると、実際の記録から見えるリズムに置き換わっていきます。",
           },
         ]
       : []),
@@ -375,7 +383,12 @@ export function TorisetuPage({ recentEvents }: TorisetuPageProps) {
 
           <div style={styles.factGroups}>
             <FactGroup icon="paw" label="みっけ" facts={mikkeFacts} />
-            <FactGroup icon="clipboard" label="診断" facts={diagnosisFacts} />
+            <FactGroup
+              icon="clipboard"
+              label="結果"
+              facts={diagnosisFacts}
+              onOpenFact={setActiveFact}
+            />
           </div>
         </section>
 
@@ -472,6 +485,38 @@ export function TorisetuPage({ recentEvents }: TorisetuPageProps) {
         </div>
       ) : null}
 
+      {activeFact ? (
+        <div style={styles.sheetLayer}>
+          <button
+            type="button"
+            aria-label="閉じる"
+            style={styles.sheetOverlay}
+            onClick={() => setActiveFact(null)}
+          />
+          <section style={styles.sheet}>
+            <div style={styles.sheetHandle} />
+            <div style={styles.sheetHeader}>
+              <div>
+                <p style={styles.sheetKicker}>{activeFact.source}</p>
+                <h2 style={styles.sheetTitle}>{activeFact.label}</h2>
+              </div>
+              <button
+                type="button"
+                aria-label="閉じる"
+                style={styles.sheetClose}
+                onClick={() => setActiveFact(null)}
+              >
+                ×
+              </button>
+            </div>
+            <p style={styles.resultValue}>{activeFact.value}</p>
+            {activeFact.detail ? (
+              <p style={styles.resultDetail}>{activeFact.detail}</p>
+            ) : null}
+          </section>
+        </div>
+      ) : null}
+
       <BottomNavigation active="torisetu" />
     </main>
   );
@@ -484,65 +529,17 @@ function DiagnosisCard({
   item: DiagnosisItem;
   onStart: () => void;
 }) {
-  const isReady = item.status === "ready";
-  const isCompleted = item.status === "completed";
-
   return (
-    <article
-      style={
-        item.status === "locked"
-          ? { ...styles.diagnosisCard, ...styles.diagnosisCardLocked }
-          : isReady
-            ? { ...styles.diagnosisCard, ...styles.diagnosisCardReady }
-            : styles.diagnosisCard
-      }
-    >
-      <div style={styles.diagnosisTop}>
-        <span style={styles.diagnosisMeta}>
-          {isCompleted ? "診断結果" : `${item.card.questionCount}問診断`}
-        </span>
-        <span
-          style={
-            isCompleted
-              ? styles.diagnosisBadgeDone
-              : isReady
-                ? styles.diagnosisBadgeReady
-                : styles.diagnosisBadgeLocked
-          }
-        >
-          {item.meta}
-        </span>
-      </div>
+    <article style={{ ...styles.diagnosisCard, ...styles.diagnosisCardReady }}>
       <div style={styles.diagnosisBodyRow}>
         <div style={styles.diagnosisText}>
+          <span style={styles.diagnosisMeta}>{item.card.questionCount}問</span>
           <h3 style={styles.diagnosisTitle}>{item.card.title}</h3>
-          {isCompleted || isReady ? (
-            <p style={styles.diagnosisBody}>
-              {isCompleted ? item.body : "いくつか質問に答えると、手がかりが増えます。"}
-            </p>
-          ) : null}
         </div>
-        {isReady ? (
-          <button type="button" style={styles.diagnosisAction} onClick={onStart}>
-            はじめる
-          </button>
-        ) : null}
+        <button type="button" style={styles.diagnosisAction} onClick={onStart}>
+          はじめる
+        </button>
       </div>
-      {!isCompleted ? (
-        <div style={styles.diagnosisProgressArea}>
-          <div style={styles.diagnosisProgressTrack}>
-            <div
-              style={{
-                ...styles.diagnosisProgressFill,
-                width: `${item.progress}%`,
-              }}
-            />
-          </div>
-          <span style={styles.diagnosisProgressText}>
-            {isReady ? "診断できます" : `あと${item.remaining}回のみっけ`}
-          </span>
-        </div>
-      ) : null}
     </article>
   );
 }
@@ -551,10 +548,12 @@ function FactGroup({
   icon,
   label,
   facts,
+  onOpenFact,
 }: {
   icon: CategoryIconName;
   label: string;
   facts: KnownFact[];
+  onOpenFact?: (fact: KnownFact) => void;
 }) {
   return (
     <div style={styles.factGroup}>
@@ -568,22 +567,37 @@ function FactGroup({
         <span style={styles.factGroupMeta}>{facts.length}件</span>
       </div>
       <div style={styles.factCard}>
-        {facts.map((fact, index) => (
-          <div
-            key={fact.id}
-            style={
-              index === facts.length - 1
-                ? { ...styles.factRow, borderBottom: "none" }
-                : styles.factRow
-            }
-          >
+        {facts.map((fact, index) => {
+          const isOpenable = Boolean(onOpenFact && fact.detail);
+          const rowStyle =
+            index === facts.length - 1
+              ? { ...styles.factRow, borderBottom: "none" }
+              : styles.factRow;
+
+          return (
+            <button
+              key={fact.id}
+              type="button"
+              style={
+                isOpenable
+                  ? { ...rowStyle, ...styles.factRowButton }
+                  : { ...rowStyle, cursor: "default" }
+              }
+              onClick={isOpenable ? () => onOpenFact?.(fact) : undefined}
+              disabled={!isOpenable}
+            >
             <span style={styles.factLabel}>{fact.label}</span>
             <div style={styles.factText}>
               <strong style={styles.factValue}>{fact.value}</strong>
-              <span style={styles.factSource}>{fact.source}</span>
+              {isOpenable ? (
+                <span style={styles.factChevron} aria-hidden="true">
+                  ›
+                </span>
+              ) : null}
             </div>
-          </div>
-        ))}
+            </button>
+          );
+        })}
       </div>
     </div>
   );
@@ -1381,39 +1395,55 @@ const styles = {
   factCard: {
     ...TORISETU_SURFACE_SOFT,
     borderRadius: "20px",
-    padding: "2px 13px",
+    padding: "1px 13px",
   },
   factRow: {
     display: "grid",
-    gridTemplateColumns: "52px 1fr",
-    gap: "10px",
-    padding: "10px 0",
+    gridTemplateColumns: "62px 1fr",
+    alignItems: "center",
+    gap: "12px",
+    width: "100%",
+    padding: "11px 0",
+    border: "none",
+    background: "transparent",
     borderBottom: "0.5px solid rgba(255,255,255,0.08)",
+    textAlign: "left" as const,
+  },
+  factRowButton: {
+    cursor: "pointer",
   },
   factLabel: {
     color: TORISETU_FAINT,
     fontSize: "12px",
     fontWeight: 560,
     lineHeight: 1.45,
-    paddingTop: "1px",
   },
   factText: {
     minWidth: 0,
     display: "flex",
-    flexDirection: "column" as const,
-    gap: "3px",
+    alignItems: "center",
+    justifyContent: "flex-end",
+    gap: "8px",
   },
   factValue: {
     color: TORISETU_TEXT_STRONG,
     fontSize: "14px",
-    fontWeight: 620,
+    fontWeight: 640,
     lineHeight: 1.45,
+    textAlign: "right" as const,
   },
   factSource: {
     color: TORISETU_MUTED,
     fontSize: "11px",
     fontWeight: 500,
     lineHeight: 1.45,
+  },
+  factChevron: {
+    color: TORISETU_FAINT,
+    fontSize: "18px",
+    fontWeight: 500,
+    lineHeight: 1,
+    flexShrink: 0,
   },
   diagnosisList: {
     display: "flex",
@@ -1434,7 +1464,7 @@ const styles = {
   diagnosisCard: {
     ...TORISETU_SURFACE_SOFT,
     borderRadius: "20px",
-    padding: "13px",
+    padding: "12px 13px",
   },
   diagnosisCardReady: {
     background: "rgba(255,255,255,0.14)",
@@ -1454,7 +1484,7 @@ const styles = {
   diagnosisMeta: {
     color: TORISETU_MUTED,
     fontSize: "11px",
-    fontWeight: 560,
+    fontWeight: 600,
     lineHeight: 1.3,
   },
   diagnosisBadgeDone: {
@@ -1492,10 +1522,10 @@ const styles = {
     flex: 1,
   },
   diagnosisTitle: {
-    margin: "0 0 4px",
+    margin: "3px 0 0",
     color: TORISETU_TEXT_STRONG,
-    fontSize: "15px",
-    fontWeight: 650,
+    fontSize: "16px",
+    fontWeight: 660,
     lineHeight: 1.38,
   },
   diagnosisBody: {
@@ -2127,6 +2157,20 @@ const styles = {
     fontSize: "15px",
     fontWeight: 600,
     lineHeight: 1.55,
+  },
+  resultValue: {
+    margin: "0 0 10px",
+    color: TORISETU_TEXT_STRONG,
+    fontSize: "18px",
+    fontWeight: 680,
+    lineHeight: 1.45,
+  },
+  resultDetail: {
+    margin: "0 0 8px",
+    color: TORISETU_TEXT,
+    fontSize: "14px",
+    fontWeight: 520,
+    lineHeight: 1.75,
   },
   sheetOptions: {
     display: "grid",
