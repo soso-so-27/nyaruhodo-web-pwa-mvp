@@ -101,6 +101,8 @@ type DeepDiveAnswer = {
   answeredAt: string;
 };
 
+type CategoryIconName = "sparkles" | "clipboard" | "lock";
+
 const RECENT_CAT_SUMMARY_WINDOW_MS = 7 * 24 * 60 * 60 * 1000;
 
 const peakTimeMap: Record<string, string[]> = {
@@ -114,7 +116,7 @@ const peakTimeMap: Record<string, string[]> = {
 const DEEP_DIVE_CARDS: DeepDiveCard[] = [
   {
     id: "mood",
-    title: "機嫌の見分け方",
+    title: "ごきげん",
     threshold: 8,
     questionCount: 30,
     preview: "表情・距離感・しっぽなどから、機嫌のサインを整理する診断です。",
@@ -128,7 +130,7 @@ const DEEP_DIVE_CARDS: DeepDiveCard[] = [
   },
   {
     id: "play",
-    title: "遊び方のコツ",
+    title: "遊び",
     threshold: 15,
     questionCount: 30,
     preview: "好きな誘い方、乗りやすい時間、飽きやすさを探る診断です。",
@@ -142,7 +144,7 @@ const DEEP_DIVE_CARDS: DeepDiveCard[] = [
   },
   {
     id: "food",
-    title: "ごはんのこと",
+    title: "ごはん",
     threshold: 20,
     questionCount: 30,
     preview: "ごはん前後の変化や、食への関心の強さを整理する診断です。",
@@ -156,7 +158,7 @@ const DEEP_DIVE_CARDS: DeepDiveCard[] = [
   },
   {
     id: "stress",
-    title: "ストレスのサイン",
+    title: "苦手",
     threshold: 25,
     questionCount: 30,
     preview: "不安なときに出やすい行動や、環境変化への反応を見る診断です。",
@@ -170,7 +172,7 @@ const DEEP_DIVE_CARDS: DeepDiveCard[] = [
   },
   {
     id: "bond",
-    title: "距離の縮め方",
+    title: "距離",
     threshold: 30,
     questionCount: 30,
     preview: "触る・待つ・声をかけるなど、距離の取り方を探る診断です。",
@@ -254,7 +256,7 @@ export function TorisetuPage({ recentEvents }: TorisetuPageProps) {
       id: `diagnosis-${answer.cardId}`,
       label: answer.label,
       value: compactText(answer.result, 42),
-      source: "深掘り診断から",
+      source: "診断から",
     })),
   ];
   const diagnosisItems: DiagnosisItem[] = DEEP_DIVE_CARDS.map((card) => {
@@ -268,7 +270,7 @@ export function TorisetuPage({ recentEvents }: TorisetuPageProps) {
       answer,
       remaining,
       progress: Math.min(100, Math.round((recordCount / card.threshold) * 100)),
-      meta: answer ? "結果あり" : status === "ready" ? "開放中" : `あと${remaining}回`,
+      meta: answer ? "結果" : status === "ready" ? "できます" : `あと${remaining}回`,
       body: answer?.result ?? card.preview,
     };
   });
@@ -317,19 +319,19 @@ export function TorisetuPage({ recentEvents }: TorisetuPageProps) {
           <div style={styles.headerText}>
             <p style={styles.eyebrow}>CAT GUIDE</p>
             <h1 style={styles.title}>{catName}のトリセツ</h1>
-            <p style={styles.headerLead}>みっけから育つ知識棚。</p>
+            <p style={styles.headerLead}>みっけで少しずつ増えます。</p>
           </div>
         </header>
 
         <section style={styles.libraryHero}>
           <div style={styles.libraryHeroTop}>
-            <span style={styles.libraryHeroLabel}>ナレッジ棚</span>
+            <span style={styles.libraryHeroLabel}>トリセツ一覧</span>
             <span style={styles.headerBadge}>{typeLabel}</span>
           </div>
           <div style={styles.libraryStats}>
             <div>
               <p style={styles.libraryStatNumber}>{knowledgeCount}</p>
-              <p style={styles.libraryStatLabel}>見えてきたこと</p>
+              <p style={styles.libraryStatLabel}>発見</p>
             </div>
             <div>
               <p style={styles.libraryStatNumber}>{recordCount}</p>
@@ -337,7 +339,7 @@ export function TorisetuPage({ recentEvents }: TorisetuPageProps) {
             </div>
             <div>
               <p style={styles.libraryStatNumber}>{openDiagnosisCount}</p>
-              <p style={styles.libraryStatLabel}>診断結果</p>
+              <p style={styles.libraryStatLabel}>診断</p>
             </div>
           </div>
           <div style={styles.progressTrack}>
@@ -359,7 +361,7 @@ export function TorisetuPage({ recentEvents }: TorisetuPageProps) {
 
         <section style={styles.section}>
           <div style={styles.sectionHeaderInline}>
-            <h2 style={styles.sectionTitle}>見えてきたこと</h2>
+            <CategoryLabel icon="sparkles" label="発見" />
             <span style={styles.sectionMeta}>{knowledgeCount}件</span>
           </div>
 
@@ -377,7 +379,7 @@ export function TorisetuPage({ recentEvents }: TorisetuPageProps) {
 
         <section style={styles.section}>
           <div style={styles.sectionHeaderInline}>
-            <h2 style={styles.sectionTitle}>深掘り診断</h2>
+            <CategoryLabel icon="clipboard" label="診断" />
             <span style={styles.sectionMeta}>30問</span>
           </div>
 
@@ -394,7 +396,7 @@ export function TorisetuPage({ recentEvents }: TorisetuPageProps) {
         {diagnosisShelfItems.length > 0 ? (
           <section style={styles.section}>
             <div style={styles.sectionHeaderInline}>
-              <h2 style={styles.sectionTitleSmall}>診断棚</h2>
+              <CategoryLabel icon="lock" label="開く" />
               <span style={styles.sectionMeta}>{diagnosisItems.length}個</span>
             </div>
             <div style={styles.diagnosisShelf}>
@@ -411,9 +413,9 @@ export function TorisetuPage({ recentEvents }: TorisetuPageProps) {
                   <span style={styles.diagnosisShelfTitle}>{item.card.title}</span>
                   <span style={styles.diagnosisShelfMeta}>
                     {item.status === "completed"
-                      ? "結果あり"
+                      ? "結果"
                       : item.status === "ready"
-                        ? "開放中"
+                        ? "できます"
                         : `あと${item.remaining}回`}
                   </span>
                 </button>
@@ -437,7 +439,7 @@ export function TorisetuPage({ recentEvents }: TorisetuPageProps) {
             <div style={styles.sheetHandle} />
             <div style={styles.sheetHeader}>
               <div>
-                <p style={styles.sheetKicker}>深掘り診断</p>
+                <p style={styles.sheetKicker}>診断</p>
                 <h2 style={styles.sheetTitle}>{activeDive.title}</h2>
               </div>
               <button
@@ -538,6 +540,89 @@ function DiagnosisCard({
         </div>
       ) : null}
     </article>
+  );
+}
+
+function CategoryLabel({
+  icon,
+  label,
+}: {
+  icon: CategoryIconName;
+  label: string;
+}) {
+  return (
+    <h2 style={styles.categoryLabel}>
+      <span style={styles.categoryIcon} aria-hidden="true">
+        <CategoryIcon name={icon} />
+      </span>
+      <span>{label}</span>
+    </h2>
+  );
+}
+
+function CategoryIcon({ name }: { name: CategoryIconName }) {
+  if (name === "clipboard") {
+    return (
+      <svg viewBox="0 0 24 24" width="18" height="18" fill="none">
+        <path
+          d="M9 5h6M9 11h6M9 15h4M8 3.5h8l1 2H7l1-2Z"
+          stroke="currentColor"
+          strokeWidth="1.8"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        />
+        <path
+          d="M7 5.5H5.8A1.8 1.8 0 0 0 4 7.3v11.4a1.8 1.8 0 0 0 1.8 1.8h12.4a1.8 1.8 0 0 0 1.8-1.8V7.3a1.8 1.8 0 0 0-1.8-1.8H17"
+          stroke="currentColor"
+          strokeWidth="1.8"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        />
+      </svg>
+    );
+  }
+
+  if (name === "lock") {
+    return (
+      <svg viewBox="0 0 24 24" width="18" height="18" fill="none">
+        <path
+          d="M7 10V8.3a5 5 0 0 1 9.4-2.4"
+          stroke="currentColor"
+          strokeWidth="1.8"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        />
+        <path
+          d="M6.5 10h11A2.5 2.5 0 0 1 20 12.5v5A2.5 2.5 0 0 1 17.5 20h-11A2.5 2.5 0 0 1 4 17.5v-5A2.5 2.5 0 0 1 6.5 10Z"
+          stroke="currentColor"
+          strokeWidth="1.8"
+          strokeLinejoin="round"
+        />
+        <path
+          d="M12 14v2"
+          stroke="currentColor"
+          strokeWidth="1.8"
+          strokeLinecap="round"
+        />
+      </svg>
+    );
+  }
+
+  return (
+    <svg viewBox="0 0 24 24" width="18" height="18" fill="none">
+      <path
+        d="M12 3.5 13.8 8l4.7 1.8-4.7 1.8L12 16l-1.8-4.4-4.7-1.8L10.2 8 12 3.5Z"
+        stroke="currentColor"
+        strokeWidth="1.8"
+        strokeLinejoin="round"
+      />
+      <path
+        d="m18 15 .8 2 .2.2 2 .8-2 .8-.2.2-.8 2-.8-2-.2-.2-2-.8 2-.8.2-.2.8-2ZM5 14l.5 1.2 1.2.5-1.2.5L5 17.5l-.5-1.3-1.2-.5 1.2-.5L5 14Z"
+        stroke="currentColor"
+        strokeWidth="1.5"
+        strokeLinejoin="round"
+      />
+    </svg>
   );
 }
 
@@ -1124,6 +1209,27 @@ const styles = {
     justifyContent: "space-between",
     gap: "12px",
     margin: "0 4px 8px",
+  },
+  categoryLabel: {
+    display: "inline-flex",
+    alignItems: "center",
+    gap: "7px",
+    margin: 0,
+    color: TORISETU_TEXT_STRONG,
+    fontSize: "15px",
+    fontWeight: 690,
+    lineHeight: 1.25,
+    letterSpacing: "0.01em",
+  },
+  categoryIcon: {
+    width: "22px",
+    height: "22px",
+    borderRadius: "999px",
+    color: "rgba(255,255,255,0.88)",
+    display: "inline-flex",
+    alignItems: "center",
+    justifyContent: "center",
+    flexShrink: 0,
   },
   sectionKicker: {
     color: TORISETU_MUTED,

@@ -21,11 +21,6 @@ const COAT_OPTIONS: { value: CatCoat; label: string; color: string }[] = [
   { value: "white", label: "白", color: "#fafafa" },
   { value: "calico", label: "三毛", color: "#f0c28b" },
 ];
-const HOME_PHOTO_POSITIONS = [
-  { value: "center 30%", label: "上" },
-  { value: "center 38%", label: "中央" },
-  { value: "center 46%", label: "下" },
-] as const;
 type EditableGender = "male" | "female" | "unknown" | "";
 type EditableCoat = CatCoat | "";
 
@@ -304,38 +299,6 @@ export function CatsPage() {
     input.click();
   }
 
-  function handleHomePhotoPositionSelect(position: string) {
-    try {
-      const raw = window.localStorage.getItem("cat_profiles");
-
-      if (!raw) {
-        return;
-      }
-
-      const profiles = JSON.parse(raw) as CatProfile[];
-      const index = profiles.findIndex((profile) => profile.id === activeCatId);
-
-      if (index === -1) {
-        return;
-      }
-
-      const nextProfiles = profiles.map((profile, profileIndex) =>
-        profileIndex === index
-          ? {
-              ...profile,
-              homePhotoPosition: position,
-              updatedAt: new Date().toISOString(),
-            }
-          : profile,
-      );
-
-      window.localStorage.setItem("cat_profiles", JSON.stringify(nextProfiles));
-      setCatProfiles(nextProfiles);
-    } catch {
-      return;
-    }
-  }
-
   const selectedCoat = activeCatProfile?.appearance?.coat;
 
   return (
@@ -492,7 +455,7 @@ export function CatsPage() {
               <div style={styles.homePhotoInfo}>
                 <p style={styles.homePhotoTitle}>ホームに出る写真</p>
                 <p style={styles.homePhotoSub}>
-                  顔が自然に見える位置を選べます。
+                  ホームを開いたときに大きく表示されます。
                 </p>
                 <div style={styles.homePhotoActions}>
                   <button
@@ -502,33 +465,6 @@ export function CatsPage() {
                   >
                     写真を選ぶ
                   </button>
-                  <div style={styles.homePhotoPositionRow}>
-                    {HOME_PHOTO_POSITIONS.map((option) => {
-                      const isSelected =
-                        (activeCatProfile.homePhotoPosition ?? "center 38%") ===
-                        option.value;
-
-                      return (
-                        <button
-                          key={option.value}
-                          type="button"
-                          onClick={() =>
-                            handleHomePhotoPositionSelect(option.value)
-                          }
-                          style={
-                            isSelected
-                              ? {
-                                  ...styles.homePhotoPositionButton,
-                                  ...styles.homePhotoPositionButtonActive,
-                                }
-                              : styles.homePhotoPositionButton
-                          }
-                        >
-                          {option.label}
-                        </button>
-                      );
-                    })}
-                  </div>
                 </div>
               </div>
             </div>
@@ -1137,8 +1073,7 @@ const styles = {
   },
   homePhotoActions: {
     display: "flex",
-    flexDirection: "column",
-    gap: "8px",
+    alignItems: "center",
   },
   homePhotoButton: {
     width: "fit-content",
@@ -1150,26 +1085,6 @@ const styles = {
     fontWeight: 560,
     padding: "6px 12px",
     cursor: "pointer",
-  },
-  homePhotoPositionRow: {
-    display: "flex",
-    gap: "6px",
-  },
-  homePhotoPositionButton: {
-    border: "0.5px solid rgba(255,255,255,0.14)",
-    borderRadius: "99px",
-    background: "rgba(255,255,255,0.08)",
-    color: CATS_MUTED,
-    fontSize: "11px",
-    fontWeight: 500,
-    padding: "4px 10px",
-    cursor: "pointer",
-  },
-  homePhotoPositionButtonActive: {
-    border: "0.5px solid rgba(255,255,255,0.42)",
-    background: "rgba(255,255,255,0.92)",
-    color: "#2a2a28",
-    fontWeight: 600,
   },
   divider: {
     border: "none",
