@@ -3,10 +3,21 @@
 import { useEffect, useMemo, useState } from "react";
 import type { CSSProperties } from "react";
 import { loadCatProfiles, getActiveCatProfile } from "../../lib/catProfiles";
+import { getCatTypeInfo } from "../../lib/diagnosisOnboarding/catTypes";
+import {
+  QUESTIONS,
+  type AnswerOption,
+} from "../../lib/diagnosisOnboarding/questions";
+import {
+  calcActivityPattern,
+  calcAxisScores,
+  determineType,
+} from "../../lib/diagnosisOnboarding/scoring";
 import type { RecentEvent } from "../../lib/supabase/queries";
 import {
   getCatAvatarSrcForCoat,
   getCatName,
+  saveCatProfiles,
   type CatProfile,
 } from "../../components/home/homeInputHelpers";
 import { BottomNavigation } from "../navigation/BottomNavigation";
@@ -71,35 +82,15 @@ type KnownFact = {
 };
 
 type DiagnosisItem = {
-  card: DeepDiveCard;
-  status: "completed" | "ready" | "locked";
-  meta: string;
-  body: string;
+  card: LockedDiagnosisCard;
   remaining: number;
   progress: number;
-  answer?: DeepDiveAnswer;
 };
 
-type DeepDiveOption = {
-  label: string;
-  result: string;
-};
-
-type DeepDiveCard = {
+type LockedDiagnosisCard = {
   id: string;
   title: string;
   threshold: number;
-  questionCount: number;
-  preview: string;
-  question: string;
-  options: DeepDiveOption[];
-};
-
-type DeepDiveAnswer = {
-  cardId: string;
-  label: string;
-  result: string;
-  answeredAt: string;
 };
 
 type CategoryIconName = "sparkles" | "clipboard" | "lock" | "paw";
@@ -114,92 +105,47 @@ const peakTimeMap: Record<string, string[]> = {
   random: [],
 };
 
-const DEEP_DIVE_CARDS: DeepDiveCard[] = [
+const LOCKED_DIAGNOSIS_SAMPLES: LockedDiagnosisCard[] = [
   {
     id: "mood",
     title: "ごきげん",
     threshold: 8,
-    questionCount: 30,
-    preview: "表情・距離感・しっぽなどから、機嫌のサインを整理する診断です。",
-    question: "機嫌がよさそうなとき、いちばん多いサインは？",
-    options: [
-      { label: "目がやわらかい", result: "機嫌がいいときは、目つきや表情に出やすいかもしれません。" },
-      { label: "近くに来る", result: "機嫌がいいときは、距離が少し近くなるタイプかもしれません。" },
-      { label: "しっぽがゆっくり動く", result: "しっぽの動きが、気分を見る手がかりになりそうです。" },
-      { label: "まだわからない", result: "まだ決めなくて大丈夫。みっけを重ねると見えてきます。" },
-    ],
   },
   {
     id: "play",
     title: "遊び",
     threshold: 15,
-    questionCount: 30,
-    preview: "好きな誘い方、乗りやすい時間、飽きやすさを探る診断です。",
-    question: "遊びに誘うなら、どれが一番反応しやすい？",
-    options: [
-      { label: "動くおもちゃ", result: "動きのある遊びに反応しやすい子かもしれません。" },
-      { label: "隠れる遊び", result: "待ち伏せや物陰を使った遊びが合いやすそうです。" },
-      { label: "短く何回か", result: "長時間より、短い遊びを何度か挟む方が合いそうです。" },
-      { label: "気分次第", result: "遊びは気分の波を見ながら誘うのがよさそうです。" },
-    ],
   },
   {
     id: "food",
-    title: "ごはん",
+    title: "食事",
     threshold: 20,
-    questionCount: 30,
-    preview: "ごはん前後の変化や、食への関心の強さを整理する診断です。",
-    question: "ごはんの時間が近いとき、どんな様子が多い？",
-    options: [
-      { label: "先に待っている", result: "ごはんの時間をかなり覚えている子かもしれません。" },
-      { label: "鳴いて知らせる", result: "声で伝えることが、ごはん前のサインになりそうです。" },
-      { label: "近くを歩く", result: "そばに来ることが、ごはん待ちのサインかもしれません。" },
-      { label: "あまり変わらない", result: "ごはんより、その時の気分や環境の影響が大きそうです。" },
-    ],
   },
   {
     id: "stress",
-    title: "苦手",
+    title: "不安サイン",
     threshold: 25,
-    questionCount: 30,
-    preview: "不安なときに出やすい行動や、環境変化への反応を見る診断です。",
-    question: "落ち着かなさそうなとき、先に出やすい変化は？",
-    options: [
-      { label: "隠れる", result: "不安なときは、まず距離を取るサインが出やすそうです。" },
-      { label: "鳴く", result: "声が、不安や戸惑いのサインになることがありそうです。" },
-      { label: "うろうろする", result: "落ち着かない動きが、環境変化への反応かもしれません。" },
-      { label: "まだわからない", result: "焦らず、いつもと違う小さな変化だけ見ていきましょう。" },
-    ],
   },
   {
     id: "bond",
     title: "距離",
     threshold: 30,
-    questionCount: 30,
-    preview: "触る・待つ・声をかけるなど、距離の取り方を探る診断です。",
-    question: "こちらから近づくなら、どれが一番うまくいきやすい？",
-    options: [
-      { label: "声をかける", result: "先に声をかけると、安心して受け入れやすいかもしれません。" },
-      { label: "手を出して待つ", result: "この子から近づく余白を残すと、距離が縮まりやすそうです。" },
-      { label: "そばに座る", result: "触るより先に、同じ場所にいる時間が効きそうです。" },
-      { label: "放っておく", result: "構わない時間も、信頼を育てる大事な関わりになりそうです。" },
-    ],
   },
 ];
 
 export function TorisetuPage({ recentEvents }: TorisetuPageProps) {
   const [catProfile, setCatProfile] = useState<CatProfile | null>(null);
   const [localRecords, setLocalRecords] = useState<RecordLike[]>([]);
-  const [answers, setAnswers] = useState<Record<string, DeepDiveAnswer>>({});
-  const [activeDive, setActiveDive] = useState<DeepDiveCard | null>(null);
   const [activeFact, setActiveFact] = useState<KnownFact | null>(null);
+  const [isTypeDiagnosisOpen, setIsTypeDiagnosisOpen] = useState(false);
+  const [typeAnswers, setTypeAnswers] = useState<AnswerOption[]>([]);
+  const [typeQuestionIndex, setTypeQuestionIndex] = useState(0);
 
   useEffect(() => {
     const profiles = loadCatProfiles();
     const active = getActiveCatProfile(profiles);
     setCatProfile(active ?? null);
     setLocalRecords(active ? readLocalRecordLog(active.id) : []);
-    setAnswers(active ? readDeepDiveAnswers(active.id) : {});
   }, []);
 
   const catName = catProfile ? getCatName(catProfile) : "ねこ";
@@ -219,32 +165,27 @@ export function TorisetuPage({ recentEvents }: TorisetuPageProps) {
     catProfile?.avatarDataUrl ??
     catProfile?.homePhotoDataUrl ??
     getCatAvatarSrcForCoat(catProfile?.appearance?.coat);
+  const hasTypeDiagnosis = Boolean(catProfile?.typeKey && catProfile?.typeLabel);
   const typeLabel = catProfile?.typeLabel ?? "タイプ未診断";
   const shouldShowTypeBadge = Boolean(catProfile?.typeLabel);
 
-  const answeredDeepDives = DEEP_DIVE_CARDS.map((card) => answers[card.id]).filter(
-    Boolean,
-  );
   const hasRhythmSignal = dayMap.some((item) => item.signal);
   const peakTime = catProfile?.activityPattern?.peakTime;
   const peakSlots = peakTime ? peakTimeMap[peakTime] ?? [] : [];
   const diagnosisFacts: KnownFact[] = [
-    {
-      id: "type",
-      label: "タイプ診断",
-      value: typeLabel,
-      source: "オンボーディング結果",
-      detail:
-        catProfile?.typeTagline ??
-        "最初のタイプ診断で見えている、この子の入り口です。",
-    },
-    ...answeredDeepDives.map((answer) => ({
-      id: `diagnosis-${answer.cardId}`,
-      label: answer.label,
-      value: compactText(answer.result, 42),
-      source: "診断結果",
-      detail: answer.result,
-    })),
+    ...(hasTypeDiagnosis
+      ? [
+          {
+            id: "type",
+            label: "タイプ診断",
+            value: typeLabel,
+            source: "診断結果",
+            detail:
+              catProfile?.typeTagline ??
+              "タイプ診断で見えている、この子の入り口です。",
+          },
+        ]
+      : []),
     ...(!hasRhythmSignal && peakSlots.length > 0
       ? [
           {
@@ -276,60 +217,89 @@ export function TorisetuPage({ recentEvents }: TorisetuPageProps) {
         ]
       : []),
   ];
-  const knownFacts = [...mikkeFacts, ...diagnosisFacts];
-  const diagnosisItems: DiagnosisItem[] = DEEP_DIVE_CARDS.map((card) => {
-    const answer = answers[card.id];
+  const diagnosisItems: DiagnosisItem[] = LOCKED_DIAGNOSIS_SAMPLES.map((card) => {
     const remaining = Math.max(0, card.threshold - recordCount);
-    const status = answer ? "completed" : remaining === 0 ? "ready" : "locked";
 
     return {
       card,
-      status,
-      answer,
       remaining,
       progress: Math.min(100, Math.round((recordCount / card.threshold) * 100)),
-      meta: answer ? "結果" : status === "ready" ? "できます" : `あと${remaining}回`,
-      body: answer?.result ?? card.preview,
     };
   });
-  const readyDiagnoses = diagnosisItems.filter((item) => item.status === "ready");
-  const lockedDiagnoses = diagnosisItems.filter((item) => item.status === "locked");
-  const readyDiagnosis = readyDiagnoses[0] ?? null;
-  const nextDiagnosis = readyDiagnosis ?? lockedDiagnoses[0] ?? null;
+  const lockedDiagnoses = diagnosisItems;
+  const currentTypeQuestion = QUESTIONS[typeQuestionIndex] ?? QUESTIONS[0];
   const dashboardItems = [
     {
       label: "みっけ",
       value: String(recordCount),
-      note: "手がかり",
     },
     {
       label: "トリセツ",
       value: String(diagnosisFacts.length),
-      note: "読める",
     },
     {
       label: "診断",
-      value: readyDiagnosis ? "開く" : nextDiagnosis ? `あと${nextDiagnosis.remaining}` : "完了",
-      note: readyDiagnosis?.card.title ?? nextDiagnosis?.card.title ?? "深掘り",
+      value: hasTypeDiagnosis ? "済" : "開く",
     },
   ];
 
-  function handleAnswer(option: DeepDiveOption) {
-    if (!catProfile || !activeDive) return;
+  function handleStartTypeDiagnosis() {
+    setTypeAnswers([]);
+    setTypeQuestionIndex(0);
+    setIsTypeDiagnosisOpen(true);
+  }
 
-    const nextAnswers = {
-      ...answers,
-      [activeDive.id]: {
-        cardId: activeDive.id,
-        label: activeDive.title,
-        result: option.result,
-        answeredAt: new Date().toISOString(),
-      },
-    };
+  function handleTypeAnswer(option: AnswerOption) {
+    if (!catProfile) return;
 
-    setAnswers(nextAnswers);
-    saveDeepDiveAnswers(catProfile.id, nextAnswers);
-    setActiveDive(null);
+    const nextAnswers = [...typeAnswers, option];
+
+    if (typeQuestionIndex < QUESTIONS.length - 1) {
+      setTypeAnswers(nextAnswers);
+      setTypeQuestionIndex((index) => index + 1);
+      return;
+    }
+
+    const axisScores = calcAxisScores(nextAnswers);
+    const typeKey = determineType(axisScores);
+    const typeInfo = getCatTypeInfo(typeKey);
+
+    if (!typeInfo) {
+      setIsTypeDiagnosisOpen(false);
+      return;
+    }
+
+    const now = new Date().toISOString();
+    const profiles = loadCatProfiles();
+    const nextProfiles = profiles.map((profile) =>
+      profile.id === catProfile.id
+        ? {
+            ...profile,
+            typeKey,
+            typeLabel: typeInfo.label,
+            typeTagline: typeInfo.tagline,
+            axisScores,
+            activityPattern: calcActivityPattern(nextAnswers),
+            onboarding: {
+              version: "torisetu-type-diagnosis-v1",
+              answeredCount: nextAnswers.length,
+              skippedCount: 0,
+              answers: nextAnswers.map((answer) => answer.label),
+              completedAt: profile.onboarding?.completedAt ?? now,
+              updatedAt: now,
+            },
+            updatedAt: now,
+          }
+        : profile,
+    );
+
+    saveCatProfiles(nextProfiles);
+    setCatProfile(
+      nextProfiles.find((profile) => profile.id === catProfile.id) ?? catProfile,
+    );
+    setTypeAnswers([]);
+    setTypeQuestionIndex(0);
+    setIsTypeDiagnosisOpen(false);
   }
 
   return (
@@ -357,26 +327,18 @@ export function TorisetuPage({ recentEvents }: TorisetuPageProps) {
             ) : null}
           </div>
           <p style={styles.libraryHeroMain}>
-            {readyDiagnosis
-              ? `${readyDiagnosis.card.title}を答えられます。`
-              : nextDiagnosis
-                ? `${nextDiagnosis.card.title}まであと${nextDiagnosis.remaining}回`
-                : "見返せる手がかりがここにたまります。"}
+            {hasTypeDiagnosis
+              ? "診断結果を見返せます。"
+              : "タイプ診断が開いています。"}
           </p>
           <div style={styles.libraryDashboard}>
             {dashboardItems.map((item) => (
               <div key={item.label} style={styles.libraryDashboardItem}>
                 <span style={styles.libraryDashboardLabel}>{item.label}</span>
                 <strong style={styles.libraryDashboardValue}>{item.value}</strong>
-                <span style={styles.libraryDashboardNote}>{item.note}</span>
               </div>
             ))}
           </div>
-          {!readyDiagnosis && nextDiagnosis ? (
-            <a href="/home" style={styles.heroActionLink}>
-              今日のみっけを残す
-            </a>
-          ) : null}
         </section>
 
         <section style={{ ...styles.sectionFrame, ...styles.sectionFrameKnowledge }}>
@@ -387,39 +349,29 @@ export function TorisetuPage({ recentEvents }: TorisetuPageProps) {
           />
           <div style={styles.factGroups}>
             <FactGroup icon="paw" label="みっけから" facts={mikkeFacts} />
-            <FactCardShelf
-              icon="clipboard"
-              label="トリセツ"
-              facts={diagnosisFacts}
-              onOpenFact={setActiveFact}
-            />
+            {diagnosisFacts.length > 0 ? (
+              <FactCardShelf
+                icon="clipboard"
+                label="トリセツ"
+                facts={diagnosisFacts}
+                onOpenFact={setActiveFact}
+              />
+            ) : null}
           </div>
         </section>
 
-        <section style={{ ...styles.sectionFrame, ...styles.sectionFrameAction }}>
-          <CategoryLabel
-            icon="clipboard"
-            label="答える"
-            description="開いた診断でさらに深掘り"
-          />
-          {readyDiagnoses.length > 0 ? (
+        {!hasTypeDiagnosis ? (
+          <section style={{ ...styles.sectionFrame, ...styles.sectionFrameAction }}>
+            <CategoryLabel
+              icon="clipboard"
+              label="答える"
+              description="いま使える診断"
+            />
             <div style={styles.diagnosisList}>
-              {readyDiagnoses.map((item) => (
-                <DiagnosisCard
-                  key={item.card.id}
-                  item={item}
-                  onStart={() => setActiveDive(item.card)}
-                />
-              ))}
+              <TypeDiagnosisCard onStart={handleStartTypeDiagnosis} />
             </div>
-          ) : (
-            <div style={styles.emptyStateCard}>
-              <span style={styles.emptyStateText}>
-                みっけが増えると開きます。
-              </span>
-            </div>
-          )}
-        </section>
+          </section>
+        ) : null}
 
         {lockedDiagnoses.length > 0 ? (
           <section style={{ ...styles.sectionFrame, ...styles.sectionFrameLocked }}>
@@ -449,38 +401,42 @@ export function TorisetuPage({ recentEvents }: TorisetuPageProps) {
         <div style={{ height: "108px" }} />
       </div>
 
-      {activeDive ? (
+      {isTypeDiagnosisOpen ? (
         <div style={styles.sheetLayer}>
           <button
             type="button"
             aria-label="閉じる"
             style={styles.sheetOverlay}
-            onClick={() => setActiveDive(null)}
+            onClick={() => setIsTypeDiagnosisOpen(false)}
           />
           <section style={styles.sheet}>
             <div style={styles.sheetHandle} />
             <div style={styles.sheetHeader}>
               <div>
-                <p style={styles.sheetKicker}>診断</p>
-                <h2 style={styles.sheetTitle}>{activeDive.title}</h2>
+                <p style={styles.sheetKicker}>
+                  タイプ診断 {typeQuestionIndex + 1}/{QUESTIONS.length}
+                </p>
+                <h2 style={styles.sheetTitle}>タイプ診断</h2>
               </div>
               <button
                 type="button"
                 aria-label="閉じる"
                 style={styles.sheetClose}
-                onClick={() => setActiveDive(null)}
+                onClick={() => setIsTypeDiagnosisOpen(false)}
               >
                 ×
               </button>
             </div>
-            <p style={styles.sheetQuestion}>{activeDive.question}</p>
+            <p style={styles.sheetQuestion}>
+              {currentTypeQuestion.text.replace("{name}", catName)}
+            </p>
             <div style={styles.sheetOptions}>
-              {activeDive.options.map((option) => (
+              {currentTypeQuestion.options.map((option) => (
                 <button
                   key={option.label}
                   type="button"
                   style={styles.sheetOption}
-                  onClick={() => handleAnswer(option)}
+                  onClick={() => handleTypeAnswer(option)}
                 >
                   {option.label}
                 </button>
@@ -527,18 +483,12 @@ export function TorisetuPage({ recentEvents }: TorisetuPageProps) {
   );
 }
 
-function DiagnosisCard({
-  item,
-  onStart,
-}: {
-  item: DiagnosisItem;
-  onStart: () => void;
-}) {
+function TypeDiagnosisCard({ onStart }: { onStart: () => void }) {
   return (
     <article style={{ ...styles.diagnosisCard, ...styles.diagnosisCardReady }}>
       <div style={styles.diagnosisBodyRow}>
         <div style={styles.diagnosisText}>
-          <h3 style={styles.diagnosisTitle}>{item.card.title}</h3>
+          <h3 style={styles.diagnosisTitle}>タイプ診断</h3>
         </div>
         <button type="button" style={styles.diagnosisAction} onClick={onStart}>
           はじめる
@@ -806,29 +756,6 @@ function readLocalRecordLog(catId: string): RecordLike[] {
   }
 }
 
-function readDeepDiveAnswers(catId: string): Record<string, DeepDiveAnswer> {
-  try {
-    const raw = window.localStorage.getItem(`torisetu_check_answers_${catId}`);
-    return raw ? (JSON.parse(raw) as Record<string, DeepDiveAnswer>) : {};
-  } catch {
-    return {};
-  }
-}
-
-function saveDeepDiveAnswers(
-  catId: string,
-  answers: Record<string, DeepDiveAnswer>,
-) {
-  try {
-    window.localStorage.setItem(
-      `torisetu_check_answers_${catId}`,
-      JSON.stringify(answers),
-    );
-  } catch {
-    // localStorage保存失敗時はUIだけ更新する
-  }
-}
-
 function buildDayMap(records: RecordLike[]): DayMapItem[] {
   const since = Date.now() - RECENT_CAT_SUMMARY_WINDOW_MS;
   const recentRecords = records.filter((record) => record.timestamp >= since);
@@ -887,10 +814,6 @@ function buildRecentSummary(records: RecordLike[]) {
   }
 
   return "いろいろ混ざる";
-}
-
-function compactText(text: string, maxLength: number) {
-  return text.length > maxLength ? `${text.slice(0, maxLength)}…` : text;
 }
 
 function getRepresentativeSignal(records: RecordLike[]) {
