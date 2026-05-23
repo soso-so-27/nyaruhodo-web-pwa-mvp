@@ -333,7 +333,7 @@ export function TorisetuPage({ recentEvents }: TorisetuPageProps) {
             label="発見"
           />
           <div style={styles.factGroups}>
-            <FactGroup icon="paw" label="みっけの記録" facts={mikkeFacts} />
+            <FactGroup icon="paw" label={`${catName}の特徴`} facts={mikkeFacts} />
             {diagnosisFacts.length > 0 ? (
               <FactCardShelf
                 icon="clipboard"
@@ -503,12 +503,8 @@ function FactGroup({
         </div>
       </div>
       <div style={styles.factCard}>
-        {facts.map((fact, index) => {
+        {facts.map((fact) => {
           const isOpenable = Boolean(onOpenFact && fact.detail);
-          const rowStyle =
-            index === facts.length - 1
-              ? { ...styles.factRow, borderBottom: "none" }
-              : styles.factRow;
 
           return (
             <button
@@ -516,21 +512,21 @@ function FactGroup({
               type="button"
               style={
                 isOpenable
-                  ? { ...rowStyle, ...styles.factRowButton }
-                  : { ...rowStyle, cursor: "default" }
+                  ? { ...styles.factRow, ...styles.factRowButton }
+                  : { ...styles.factRow, cursor: "default" }
               }
               onClick={isOpenable ? () => onOpenFact?.(fact) : undefined}
               disabled={!isOpenable}
             >
-            <span style={styles.factLabel}>{fact.label}</span>
-            <div style={styles.factText}>
-              <strong style={styles.factValue}>{fact.value}</strong>
-              {isOpenable ? (
-                <span style={styles.factChevron} aria-hidden="true">
-                  ›
-                </span>
-              ) : null}
-            </div>
+              <span style={styles.factLabel}>{fact.label}</span>
+              <div style={styles.factText}>
+                <strong style={styles.factValue}>{fact.value}</strong>
+                {isOpenable ? (
+                  <span style={styles.factChevron} aria-hidden="true">
+                    ›
+                  </span>
+                ) : null}
+              </div>
             </button>
           );
         })}
@@ -1332,20 +1328,23 @@ const styles = {
     lineHeight: 1.3,
   },
   factCard: {
-    ...TORISETU_SURFACE_SOFT,
-    borderRadius: "20px",
-    padding: "1px 13px",
+    display: "grid",
+    gridTemplateColumns: "1fr",
+    gap: "8px",
   },
   factRow: {
-    display: "grid",
-    gridTemplateColumns: "62px 1fr",
-    alignItems: "center",
-    gap: "12px",
+    ...TORISETU_SURFACE_SOFT,
+    display: "flex",
+    flexDirection: "column",
+    alignItems: "flex-start",
+    justifyContent: "center",
+    gap: "5px",
     width: "100%",
-    padding: "11px 0",
-    border: "none",
-    background: "transparent",
-    borderBottom: "0.5px solid rgba(255,255,255,0.08)",
+    minHeight: "72px",
+    borderRadius: "18px",
+    padding: "12px 13px",
+    border: "0.5px solid rgba(255,255,255,0.13)",
+    background: "rgba(255,255,255,0.095)",
     textAlign: "left" as const,
   },
   factRowButton: {
@@ -1353,23 +1352,24 @@ const styles = {
   },
   factLabel: {
     color: TORISETU_FAINT,
-    fontSize: "12px",
-    fontWeight: 470,
-    lineHeight: 1.45,
+    fontSize: "11px",
+    fontWeight: 520,
+    lineHeight: 1.3,
   },
   factText: {
+    width: "100%",
     minWidth: 0,
     display: "flex",
     alignItems: "center",
-    justifyContent: "flex-end",
+    justifyContent: "space-between",
     gap: "8px",
   },
   factValue: {
     color: TORISETU_TEXT_STRONG,
-    fontSize: "14px",
-    fontWeight: 560,
-    lineHeight: 1.45,
-    textAlign: "right" as const,
+    fontSize: "16px",
+    fontWeight: 590,
+    lineHeight: 1.35,
+    textAlign: "left" as const,
   },
   factSource: {
     color: TORISETU_MUTED,
