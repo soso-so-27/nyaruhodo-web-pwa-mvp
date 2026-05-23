@@ -233,7 +233,7 @@ export function TorisetuPage({ recentEvents }: TorisetuPageProps) {
       value: String(recordCount),
     },
     {
-      label: "見返す",
+      label: "発見",
       value: String(diagnosisFacts.length),
     },
     {
@@ -312,9 +312,7 @@ export function TorisetuPage({ recentEvents }: TorisetuPageProps) {
             <img src={avatarSrc} alt="" style={styles.headerAvatarImg} />
           </div>
           <div style={styles.headerText}>
-            <p style={styles.eyebrow}>CAT GUIDE</p>
             <h1 style={styles.title}>{catName}のトリセツ</h1>
-            <p style={styles.headerLead}>みっけで少しずつ増えます。</p>
           </div>
         </header>
 
@@ -332,10 +330,10 @@ export function TorisetuPage({ recentEvents }: TorisetuPageProps) {
         <section style={{ ...styles.sectionFrame, ...styles.sectionFrameKnowledge }}>
           <CategoryLabel
             icon="sparkles"
-            label="見返す"
+            label="発見"
           />
           <div style={styles.factGroups}>
-            <FactGroup icon="paw" label="みっけから" facts={mikkeFacts} />
+            <FactGroup icon="paw" label="みっけの記録" facts={mikkeFacts} />
             {diagnosisFacts.length > 0 ? (
               <FactCardShelf
                 icon="clipboard"
@@ -969,26 +967,12 @@ const styles = {
     minWidth: 0,
     flex: 1,
   },
-  eyebrow: {
-    margin: "0 0 4px",
-    color: TORISETU_MUTED,
-    fontSize: "11px",
-    fontWeight: 540,
-    letterSpacing: "0.04em",
-  },
   title: {
     fontSize: "22px",
     fontWeight: 620,
     color: TORISETU_TEXT_STRONG,
     margin: 0,
     lineHeight: 1.28,
-  },
-  headerLead: {
-    margin: "4px 0 0",
-    color: TORISETU_MUTED,
-    fontSize: "12px",
-    fontWeight: 520,
-    lineHeight: 1.5,
   },
   subtitle: {
     fontSize: "13px",
