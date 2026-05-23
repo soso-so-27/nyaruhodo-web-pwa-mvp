@@ -212,10 +212,6 @@ export function TorisetuPage({ recentEvents }: TorisetuPageProps) {
     [localRecords, remoteRecords],
   );
   const recordCount = records.length;
-  const understanding = Math.min(
-    100,
-    Math.max(catProfile?.understanding?.percent ?? 0, Math.round(recordCount * 3)),
-  );
   const dayMap = buildDayMap(records);
   const rhythmSummary = buildRhythmSummary(dayMap, catProfile);
   const recentSummary = buildRecentSummary(records);
@@ -299,10 +295,6 @@ export function TorisetuPage({ recentEvents }: TorisetuPageProps) {
   const lockedDiagnoses = diagnosisItems.filter((item) => item.status === "locked");
   const readyDiagnosis = readyDiagnoses[0] ?? null;
   const nextDiagnosis = readyDiagnosis ?? lockedDiagnoses[0] ?? null;
-  const knowledgeCount = knownFacts.length;
-  const openDiagnosisCount = diagnosisItems.filter(
-    (item) => item.status === "completed",
-  ).length;
 
   function handleAnswer(option: DeepDiveOption) {
     if (!catProfile || !activeDive) return;
@@ -341,31 +333,14 @@ export function TorisetuPage({ recentEvents }: TorisetuPageProps) {
 
         <section style={styles.libraryHero}>
           <div style={styles.libraryHeroTop}>
-            <span style={styles.libraryHeroLabel}>トリセツ一覧</span>
+            <span style={styles.libraryHeroLabel}>トリセツ</span>
             <span style={styles.headerBadge}>{typeLabel}</span>
           </div>
-          <div style={styles.libraryStats}>
-            <div>
-              <p style={styles.libraryStatNumber}>{knowledgeCount}</p>
-              <p style={styles.libraryStatLabel}>発見</p>
-            </div>
-            <div>
-              <p style={styles.libraryStatNumber}>{recordCount}</p>
-              <p style={styles.libraryStatLabel}>みっけ</p>
-            </div>
-            <div>
-              <p style={styles.libraryStatNumber}>{openDiagnosisCount}</p>
-              <p style={styles.libraryStatLabel}>診断</p>
-            </div>
-          </div>
-          <div style={styles.progressTrack}>
-            <div style={{ ...styles.progressFill, width: `${understanding}%` }} />
-          </div>
-          <p style={styles.libraryHeroNote}>
+          <p style={styles.libraryHeroMain}>
             {readyDiagnosis
-              ? `${readyDiagnosis.card.title}が開きました。`
+              ? `${readyDiagnosis.card.title}を答えられます。`
               : nextDiagnosis
-                ? `次はあと${nextDiagnosis.remaining}回で開きます。`
+                ? `${nextDiagnosis.card.title}まであと${nextDiagnosis.remaining}回`
                 : "見返せる手がかりがここにたまります。"}
           </p>
           {!readyDiagnosis && nextDiagnosis ? (
@@ -377,12 +352,11 @@ export function TorisetuPage({ recentEvents }: TorisetuPageProps) {
 
         <section style={styles.section}>
           <div style={styles.sectionHeaderInline}>
-            <CategoryLabel icon="sparkles" label="発見" />
-            <span style={styles.sectionMeta}>{knowledgeCount}件</span>
+            <CategoryLabel icon="sparkles" label="わかったこと" />
           </div>
 
           <div style={styles.factGroups}>
-            <FactGroup icon="paw" label="みっけ" facts={mikkeFacts} />
+            <FactGroup icon="paw" label="みっけから" facts={mikkeFacts} />
             <FactCardShelf
               icon="clipboard"
               label="トリセツ"
@@ -394,8 +368,7 @@ export function TorisetuPage({ recentEvents }: TorisetuPageProps) {
 
         <section style={styles.section}>
           <div style={styles.sectionHeaderInline}>
-            <CategoryLabel icon="clipboard" label="診断" />
-            <span style={styles.sectionMeta}>30問</span>
+            <CategoryLabel icon="clipboard" label="診断する" />
           </div>
 
           {readyDiagnoses.length > 0 ? (
@@ -411,7 +384,7 @@ export function TorisetuPage({ recentEvents }: TorisetuPageProps) {
           ) : (
             <div style={styles.emptyStateCard}>
               <span style={styles.emptyStateText}>
-                みっけが増えると、ここに診断が出てきます。
+                みっけが増えると開きます。
               </span>
             </div>
           )}
@@ -420,8 +393,7 @@ export function TorisetuPage({ recentEvents }: TorisetuPageProps) {
         {lockedDiagnoses.length > 0 ? (
           <section style={styles.section}>
             <div style={styles.sectionHeaderInline}>
-              <CategoryLabel icon="lock" label="開く" />
-              <span style={styles.sectionMeta}>{lockedDiagnoses.length}個</span>
+              <CategoryLabel icon="lock" label="これから開く" />
             </div>
             <div style={styles.diagnosisShelf}>
               {lockedDiagnoses.map((item) => (
@@ -533,7 +505,6 @@ function DiagnosisCard({
     <article style={{ ...styles.diagnosisCard, ...styles.diagnosisCardReady }}>
       <div style={styles.diagnosisBodyRow}>
         <div style={styles.diagnosisText}>
-          <span style={styles.diagnosisMeta}>{item.card.questionCount}問</span>
           <h3 style={styles.diagnosisTitle}>{item.card.title}</h3>
         </div>
         <button type="button" style={styles.diagnosisAction} onClick={onStart}>
@@ -564,7 +535,6 @@ function FactGroup({
           </span>
           <span style={styles.factGroupLabel}>{label}</span>
         </div>
-        <span style={styles.factGroupMeta}>{facts.length}件</span>
       </div>
       <div style={styles.factCard}>
         {facts.map((fact, index) => {
@@ -623,7 +593,6 @@ function FactCardShelf({
           </span>
           <span style={styles.factGroupLabel}>{label}</span>
         </div>
-        <span style={styles.factGroupMeta}>{facts.length}件</span>
       </div>
       <div style={styles.torisetuCardRail}>
         {facts.map((fact, index) => (
@@ -1181,32 +1150,12 @@ const styles = {
     fontWeight: 660,
     lineHeight: 1.4,
   },
-  libraryStats: {
-    display: "grid",
-    gridTemplateColumns: "repeat(3, 1fr)",
-    gap: "10px",
-    marginBottom: "12px",
-  },
-  libraryStatNumber: {
-    margin: 0,
+  libraryHeroMain: {
+    margin: "2px 0 0",
     color: TORISETU_TEXT_STRONG,
-    fontSize: "22px",
+    fontSize: "18px",
     fontWeight: 680,
-    lineHeight: 1,
-  },
-  libraryStatLabel: {
-    margin: "5px 0 0",
-    color: TORISETU_MUTED,
-    fontSize: "11px",
-    fontWeight: 520,
-    lineHeight: 1.3,
-  },
-  libraryHeroNote: {
-    margin: "8px 0 0",
-    color: TORISETU_MUTED,
-    fontSize: "12px",
-    fontWeight: 520,
-    lineHeight: 1.55,
+    lineHeight: 1.45,
   },
   heroActionLink: {
     display: "inline-flex",
@@ -1326,7 +1275,7 @@ const styles = {
     cursor: "pointer",
   },
   section: {
-    marginBottom: "15px",
+    marginBottom: "22px",
   },
   sectionHeader: {
     margin: "0 4px 8px",
@@ -1336,7 +1285,7 @@ const styles = {
     alignItems: "center",
     justifyContent: "space-between",
     gap: "12px",
-    margin: "0 4px 8px",
+    margin: "0 4px 11px",
   },
   categoryLabel: {
     display: "inline-flex",
@@ -1373,13 +1322,6 @@ const styles = {
     fontWeight: 660,
     lineHeight: 1.35,
   },
-  sectionMeta: {
-    flexShrink: 0,
-    color: TORISETU_FAINT,
-    fontSize: "11px",
-    fontWeight: 560,
-    lineHeight: 1.35,
-  },
   sectionLead: {
     margin: "5px 0 0",
     color: TORISETU_MUTED,
@@ -1400,12 +1342,12 @@ const styles = {
   factGroups: {
     display: "flex",
     flexDirection: "column" as const,
-    gap: "10px",
+    gap: "16px",
   },
   factGroup: {
     display: "flex",
     flexDirection: "column" as const,
-    gap: "7px",
+    gap: "9px",
   },
   factGroupHeader: {
     display: "flex",
@@ -1433,12 +1375,6 @@ const styles = {
     color: TORISETU_TEXT,
     fontSize: "13px",
     fontWeight: 670,
-    lineHeight: 1.3,
-  },
-  factGroupMeta: {
-    color: TORISETU_FAINT,
-    fontSize: "11px",
-    fontWeight: 540,
     lineHeight: 1.3,
   },
   factCard: {
@@ -1595,12 +1531,6 @@ const styles = {
     gap: "10px",
     marginBottom: "7px",
   },
-  diagnosisMeta: {
-    color: TORISETU_MUTED,
-    fontSize: "11px",
-    fontWeight: 600,
-    lineHeight: 1.3,
-  },
   diagnosisBadgeDone: {
     color: "rgba(255,255,255,0.72)",
     border: "0.5px solid rgba(255,255,255,0.16)",
@@ -1636,7 +1566,7 @@ const styles = {
     flex: 1,
   },
   diagnosisTitle: {
-    margin: "3px 0 0",
+    margin: 0,
     color: TORISETU_TEXT_STRONG,
     fontSize: "16px",
     fontWeight: 660,
