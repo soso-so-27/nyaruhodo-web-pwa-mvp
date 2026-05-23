@@ -636,11 +636,15 @@ function FactCardShelf({
             }}
             onClick={() => onOpenFact(fact)}
           >
-            <span style={styles.torisetuFactIcon} aria-hidden="true">
-              <CategoryIcon name={icon} />
+            <span style={styles.torisetuFactTop}>
+              <span style={styles.torisetuFactIcon} aria-hidden="true">
+                <CategoryIcon name={icon} />
+              </span>
+              <span style={styles.torisetuFactChevron} aria-hidden="true">
+                ›
+              </span>
             </span>
             <span style={styles.torisetuFactLabel}>{fact.label}</span>
-            <strong style={styles.torisetuFactValue}>{fact.value}</strong>
           </button>
         ))}
       </div>
@@ -1493,17 +1497,17 @@ const styles = {
   torisetuCardRail: {
     display: "flex",
     gap: "10px",
-    margin: "0 -16px",
-    padding: "0 16px 4px",
+    margin: 0,
+    padding: "0 16px 4px 0",
     overflowX: "auto" as const,
     scrollbarWidth: "none" as const,
     scrollSnapType: "x mandatory",
   },
   torisetuFactCard: {
     ...TORISETU_SURFACE_SOFT,
-    width: "min(46vw, 176px)",
-    minWidth: "min(46vw, 176px)",
-    minHeight: "112px",
+    width: "min(40vw, 156px)",
+    minWidth: "min(40vw, 156px)",
+    minHeight: "88px",
     flex: "0 0 auto",
     scrollSnapAlign: "start",
     borderRadius: "18px",
@@ -1521,6 +1525,13 @@ const styles = {
     background: "rgba(255,255,255,0.14)",
     border: "0.5px solid rgba(255,220,160,0.24)",
   },
+  torisetuFactTop: {
+    width: "100%",
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: "8px",
+  },
   torisetuFactIcon: {
     width: "28px",
     height: "28px",
@@ -1529,13 +1540,14 @@ const styles = {
     alignItems: "center",
     justifyContent: "center",
   },
-  torisetuFactLabel: {
-    color: TORISETU_MUTED,
-    fontSize: "11px",
-    fontWeight: 620,
-    lineHeight: 1.3,
+  torisetuFactChevron: {
+    color: TORISETU_FAINT,
+    fontSize: "18px",
+    fontWeight: 500,
+    lineHeight: 1,
+    flexShrink: 0,
   },
-  torisetuFactValue: {
+  torisetuFactLabel: {
     color: TORISETU_TEXT_STRONG,
     fontSize: "16px",
     fontWeight: 680,
