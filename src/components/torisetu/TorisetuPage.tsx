@@ -13,6 +13,10 @@ import {
   calcAxisScores,
   determineType,
 } from "../../lib/diagnosisOnboarding/scoring";
+import {
+  type TorisetuLockedDiagnosisCard,
+} from "../../lib/torisetu/diagnosisCatalog";
+import { getRecordLogKey } from "../../lib/storage";
 import type { RecentEvent } from "../../lib/supabase/queries";
 import {
   getCatAvatarSrcForCoat,
@@ -21,6 +25,7 @@ import {
   type CatProfile,
 } from "../../components/home/homeInputHelpers";
 import { BottomNavigation } from "../navigation/BottomNavigation";
+import { AppIcon, type AppIconName } from "../ui/AppIcons";
 import {
   APP_ACCENT,
   APP_ACCENT_SOFT_BG,
@@ -82,18 +87,17 @@ type KnownFact = {
 };
 
 type DiagnosisItem = {
-  card: LockedDiagnosisCard;
+  card: TorisetuLockedDiagnosisCard;
   remaining: number;
   progress: number;
 };
 
-type LockedDiagnosisCard = {
-  id: string;
-  title: string;
-  threshold: number;
-};
+type LockedDiagnosisCard = TorisetuLockedDiagnosisCard;
 
-type CategoryIconName = "sparkles" | "clipboard" | "lock" | "paw";
+type CategoryIconName = Extract<
+  AppIconName,
+  "sparkles" | "clipboard" | "lock" | "paw"
+>;
 
 const RECENT_CAT_SUMMARY_WINDOW_MS = 7 * 24 * 60 * 60 * 1000;
 
@@ -118,7 +122,7 @@ const LOCKED_DIAGNOSIS_SAMPLES: LockedDiagnosisCard[] = [
   },
   {
     id: "food",
-    title: "食事診断",
+    title: "ごはん診断",
     threshold: 20,
   },
   {
@@ -181,7 +185,7 @@ export function TorisetuPage({ recentEvents }: TorisetuPageProps) {
             source: "診断結果",
             detail:
               catProfile?.typeTagline ??
-              "タイプ診断で見えている、この子の入り口です。",
+              "タイプ診断で見えている、この子の入口です。",
           },
         ]
       : []),
@@ -193,7 +197,7 @@ export function TorisetuPage({ recentEvents }: TorisetuPageProps) {
             value: rhythmSummary,
             source: "オンボーディング結果",
             detail:
-              "オンボーディングで答えた時間帯から見えた傾向です。みっけが増えると、実際の記録から見えるリズムに置き換わっていきます。",
+              "オンボーディングで答えた時間帯から見えている傾向です。みっけが増えると、実際の記録から見えるリズムに置き換わっていきます。",
           },
         ]
       : []),
@@ -349,7 +353,7 @@ export function TorisetuPage({ recentEvents }: TorisetuPageProps) {
           <section style={{ ...styles.sectionFrame, ...styles.sectionFrameAction }}>
             <CategoryLabel
               icon="clipboard"
-              label="答える"
+              label="診断する"
             />
             <div style={styles.diagnosisList}>
               <TypeDiagnosisCard onStart={handleStartTypeDiagnosis} />
@@ -603,90 +607,9 @@ function CategoryLabel({
 }
 
 function CategoryIcon({ name }: { name: CategoryIconName }) {
-  if (name === "paw") {
-    return (
-      <svg viewBox="0 0 24 24" width="18" height="18" fill="none">
-        <path
-          d="M12 13.2c3 0 5.2 2.1 5.2 4.4 0 1.7-1.2 2.9-2.9 2.9-.8 0-1.5-.3-2.3-.3s-1.5.3-2.3.3c-1.7 0-2.9-1.2-2.9-2.9 0-2.3 2.2-4.4 5.2-4.4Z"
-          stroke="currentColor"
-          strokeWidth="1.8"
-          strokeLinejoin="round"
-        />
-        <path
-          d="M6.8 11.2c1 0 1.8-1 1.8-2.2S7.8 6.8 6.8 6.8 5 7.8 5 9s.8 2.2 1.8 2.2ZM10.3 8.8c1 0 1.8-1.1 1.8-2.4S11.3 4 10.3 4 8.5 5.1 8.5 6.4s.8 2.4 1.8 2.4ZM13.7 8.8c1 0 1.8-1.1 1.8-2.4S14.7 4 13.7 4s-1.8 1.1-1.8 2.4.8 2.4 1.8 2.4ZM17.2 11.2c1 0 1.8-1 1.8-2.2s-.8-2.2-1.8-2.2-1.8 1-1.8 2.2.8 2.2 1.8 2.2Z"
-          stroke="currentColor"
-          strokeWidth="1.8"
-          strokeLinejoin="round"
-        />
-      </svg>
-    );
-  }
-
-  if (name === "clipboard") {
-    return (
-      <svg viewBox="0 0 24 24" width="18" height="18" fill="none">
-        <path
-          d="M9 5h6M9 11h6M9 15h4M8 3.5h8l1 2H7l1-2Z"
-          stroke="currentColor"
-          strokeWidth="1.8"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-        />
-        <path
-          d="M7 5.5H5.8A1.8 1.8 0 0 0 4 7.3v11.4a1.8 1.8 0 0 0 1.8 1.8h12.4a1.8 1.8 0 0 0 1.8-1.8V7.3a1.8 1.8 0 0 0-1.8-1.8H17"
-          stroke="currentColor"
-          strokeWidth="1.8"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-        />
-      </svg>
-    );
-  }
-
-  if (name === "lock") {
-    return (
-      <svg viewBox="0 0 24 24" width="18" height="18" fill="none">
-        <path
-          d="M7 10V8.3a5 5 0 0 1 9.4-2.4"
-          stroke="currentColor"
-          strokeWidth="1.8"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-        />
-        <path
-          d="M6.5 10h11A2.5 2.5 0 0 1 20 12.5v5A2.5 2.5 0 0 1 17.5 20h-11A2.5 2.5 0 0 1 4 17.5v-5A2.5 2.5 0 0 1 6.5 10Z"
-          stroke="currentColor"
-          strokeWidth="1.8"
-          strokeLinejoin="round"
-        />
-        <path
-          d="M12 14v2"
-          stroke="currentColor"
-          strokeWidth="1.8"
-          strokeLinecap="round"
-        />
-      </svg>
-    );
-  }
-
-  return (
-    <svg viewBox="0 0 24 24" width="18" height="18" fill="none">
-      <path
-        d="M12 3.5 13.8 8l4.7 1.8-4.7 1.8L12 16l-1.8-4.4-4.7-1.8L10.2 8 12 3.5Z"
-        stroke="currentColor"
-        strokeWidth="1.8"
-        strokeLinejoin="round"
-      />
-      <path
-        d="m18 15 .8 2 .2.2 2 .8-2 .8-.2.2-.8 2-.8-2-.2-.2-2-.8 2-.8.2-.2.8-2ZM5 14l.5 1.2 1.2.5-1.2.5L5 17.5l-.5-1.3-1.2-.5 1.2-.5L5 14Z"
-        stroke="currentColor"
-        strokeWidth="1.5"
-        strokeLinejoin="round"
-      />
-    </svg>
-  );
+  const iconStyle: CSSProperties = { width: "18px", height: "18px" };
+  return <AppIcon name={name} size={18} style={iconStyle} />;
 }
-
 function buildRemoteRecords(
   events: RecentEvent[],
   catId: string | null,
@@ -706,7 +629,7 @@ function buildRemoteRecords(
 
 function readLocalRecordLog(catId: string): RecordLike[] {
   try {
-    const raw = window.localStorage.getItem(`record_log_${catId}`);
+    const raw = window.localStorage.getItem(getRecordLogKey(catId));
     const records = raw
       ? (JSON.parse(raw) as Array<{
           id?: string;

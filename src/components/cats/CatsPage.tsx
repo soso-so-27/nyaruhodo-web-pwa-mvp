@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import type { CSSProperties } from "react";
+import { STORAGE_KEYS } from "../../lib/storage";
 import { BottomNavigation } from "../navigation/BottomNavigation";
 import {
   addCatProfile,
@@ -158,7 +159,7 @@ export function CatsPage() {
 
   function handleSaveProfile() {
     try {
-      const raw = window.localStorage.getItem("cat_profiles");
+      const raw = window.localStorage.getItem(STORAGE_KEYS.catProfiles);
 
       if (!raw) {
         return;
@@ -189,7 +190,10 @@ export function CatsPage() {
         profileIndex === index ? nextProfile : profile,
       );
 
-      window.localStorage.setItem("cat_profiles", JSON.stringify(nextProfiles));
+      window.localStorage.setItem(
+        STORAGE_KEYS.catProfiles,
+        JSON.stringify(nextProfiles),
+      );
       setCatProfiles(nextProfiles);
       setActiveCatId(nextProfile.id);
       setCatNameInput(nextProfile.name);
@@ -216,7 +220,7 @@ export function CatsPage() {
 
       try {
         const dataUrl = await resizeAndEncode(file, 800);
-        const raw = window.localStorage.getItem("cat_profiles");
+        const raw = window.localStorage.getItem(STORAGE_KEYS.catProfiles);
 
         if (!raw) {
           return;
@@ -239,7 +243,10 @@ export function CatsPage() {
             : profile,
         );
 
-        window.localStorage.setItem("cat_profiles", JSON.stringify(nextProfiles));
+        window.localStorage.setItem(
+          STORAGE_KEYS.catProfiles,
+          JSON.stringify(nextProfiles),
+        );
         setCatProfiles(nextProfiles);
       } catch {
         return;
@@ -263,7 +270,7 @@ export function CatsPage() {
 
       try {
         const dataUrl = await resizeAndEncode(file, 1600);
-        const raw = window.localStorage.getItem("cat_profiles");
+        const raw = window.localStorage.getItem(STORAGE_KEYS.catProfiles);
 
         if (!raw) {
           return;
@@ -287,7 +294,10 @@ export function CatsPage() {
             : profile,
         );
 
-        window.localStorage.setItem("cat_profiles", JSON.stringify(nextProfiles));
+        window.localStorage.setItem(
+          STORAGE_KEYS.catProfiles,
+          JSON.stringify(nextProfiles),
+        );
         setCatProfiles(nextProfiles);
         setSaveMessage("ホーム写真を保存しました。");
         setTimeout(() => setSaveMessage(""), 2000);

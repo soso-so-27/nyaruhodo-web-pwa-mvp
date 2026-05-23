@@ -1,6 +1,5 @@
 import { COLLECTION_GROUPS, type CollectionSlot } from "./poses";
-
-const COLLECTION_PHOTOS_STORAGE_KEY = "collection_photos";
+import { STORAGE_KEYS } from "../storage";
 
 export function getCollectionSlotPhotoSlug(slot: CollectionSlot) {
   return `${slot.group}_${slot.id.replace(/-/g, "_")}`;
@@ -32,7 +31,7 @@ export function readStoredCollectionPhotos(catId: string) {
   }
 
   try {
-    const raw = window.localStorage.getItem(COLLECTION_PHOTOS_STORAGE_KEY);
+    const raw = window.localStorage.getItem(STORAGE_KEYS.collectionPhotos);
 
     if (!raw) {
       return {};

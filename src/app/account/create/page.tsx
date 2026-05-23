@@ -3,8 +3,6 @@
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import type { CSSProperties } from "react";
-import { createBrowserSupabaseClient } from "../../../lib/supabase/browser";
-import { getSiteUrl } from "../../../lib/supabase/config";
 import {
   APP_ACCENT,
   APP_ACCENT_SOFT_BG,
@@ -12,8 +10,12 @@ import {
   APP_SUBTLE_SURFACE,
   APP_SURFACE,
 } from "../../../components/ui/appTheme";
+import { STORAGE_KEYS } from "../../../lib/storage";
+import { createBrowserSupabaseClient } from "../../../lib/supabase/browser";
+import { getSiteUrl } from "../../../lib/supabase/config";
 
-const ACCOUNT_CREATE_PROMPT_DISMISSED_KEY = "account_create_prompt_dismissed";
+const ACCOUNT_CREATE_PROMPT_DISMISSED_KEY =
+  STORAGE_KEYS.accountCreatePromptDismissed;
 const ACCOUNT_CREATE_PROMPT_DISMISSED_MS = 7 * 24 * 60 * 60 * 1000;
 
 export default function AccountCreatePage() {

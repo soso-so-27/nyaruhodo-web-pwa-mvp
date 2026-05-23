@@ -6,6 +6,7 @@ import {
   getCollectionSlotPhotoSlug,
   getDailyCollectionTarget,
 } from "../../lib/collection/dailyTarget";
+import { STORAGE_KEYS } from "../../lib/storage";
 import {
   COLLECTION_GROUPS,
   type CollectionGroup,
@@ -21,6 +22,7 @@ import {
 } from "../home/homeInputHelpers";
 import type { CatProfile } from "../home/homeInputHelpers";
 import { BottomNavigation } from "../navigation/BottomNavigation";
+import { AppBottomSheet } from "../ui/AppBottomSheet";
 
 const COLLECTION_TEXT = "rgba(255,255,255,0.94)";
 const COLLECTION_TEXT_STRONG = "rgba(255,255,255,0.98)";
@@ -53,8 +55,6 @@ type CollectionPhoto = {
   storageSlug?: string;
   createdAt?: string;
 };
-
-const COLLECTION_PHOTOS_STORAGE_KEY = "collection_photos";
 
 export function CollectionPage() {
   const [catProfiles, setCatProfiles] = useState<CatProfile[]>([]);
@@ -216,7 +216,7 @@ export function CollectionPage() {
 
       if (navigator.clipboard?.writeText) {
         await navigator.clipboard.writeText(shareText);
-        showToast("共有文をコピーしたよ");
+        showToast("共有文をコピーしました");
         return;
       }
 
@@ -232,7 +232,7 @@ export function CollectionPage() {
     }
 
     try {
-      const raw = window.localStorage.getItem(COLLECTION_PHOTOS_STORAGE_KEY);
+      const raw = window.localStorage.getItem(STORAGE_KEYS.collectionPhotos);
 
       if (!raw) {
         return;
@@ -256,7 +256,7 @@ export function CollectionPage() {
         all[activeCatId][slug] = catPhotos;
       }
 
-      window.localStorage.setItem(COLLECTION_PHOTOS_STORAGE_KEY, JSON.stringify(all));
+      window.localStorage.setItem(STORAGE_KEYS.collectionPhotos, JSON.stringify(all));
       setCollectionPhotos((current) => {
         const next = { ...current };
 
@@ -371,66 +371,12 @@ export function CollectionPage() {
         />
       ) : null}
       {isCatSheetOpen ? (
-        <>
-          <div
-            style={styles.catSheetOverlay}
-            onClick={() => setIsCatSheetOpen(false)}
-          />
-          <div style={styles.catSheet}>
-            <div style={styles.catSheetHandle} />
-            <p style={styles.catSheetTitle}>猫を選ぶ</p>
-            <div style={styles.catSheetGrid}>
-              {catProfiles.map((profile) => {
-                const isSelected = profile.id === activeCatId;
-                const age = formatCatAge(profile.basicInfo?.birthDate);
-                const gender = formatCatGender(profile.basicInfo?.gender);
-                const meta = [gender, age].filter(Boolean).join("・");
-
-                return (
-                  <button
-                    key={profile.id}
-                    type="button"
-                    onClick={() => handleCatSelect(profile.id)}
-                    style={styles.catSheetItem}
-                  >
-                    <div
-                      style={
-                        isSelected
-                          ? { ...styles.catSheetAvatar, ...styles.catSheetAvatarActive }
-                          : styles.catSheetAvatar
-                      }
-                    >
-                      {profile.avatarDataUrl ? (
-                        <img
-                          src={profile.avatarDataUrl}
-                          alt={profile.name}
-                          style={styles.catSheetAvatarPhoto}
-                        />
-                      ) : (
-                        <img
-                          src={getCatAvatarSrc(profile.appearance?.coat)}
-                          alt={profile.name}
-                          style={styles.catSheetAvatarImg}
-                        />
-                      )}
-                    </div>
-                    <span style={styles.catSheetName}>{profile.name}</span>
-                    {meta ? (
-                      <span style={styles.catSheetMeta}>{meta}</span>
-                    ) : null}
-                  </button>
-                );
-              })}
-            </div>
-            <a
-              href="/cats"
-              style={styles.catSheetLink}
-              onClick={() => setIsCatSheetOpen(false)}
-            >
-              ねこタブで管理する ›
-            </a>
-          </div>
-        </>
+        <CollectionCatSheet
+          profiles={catProfiles}
+          activeCatId={activeCatId}
+          onClose={() => setIsCatSheetOpen(false)}
+          onSelect={handleCatSelect}
+        />
       ) : null}
       {toastText ? <div style={styles.toast}>{toastText}</div> : null}
       <BottomNavigation active="collection" />
@@ -637,72 +583,128 @@ function CollectionPhotoSheet({
   const slug = getCollectionPhotoSlug(slot);
 
   return (
-    <div style={styles.sheetOverlay} onClick={onClose}>
-      <div style={styles.sheet} onClick={(event) => event.stopPropagation()}>
-        <div style={styles.sheetHandle} />
-        <div style={styles.sheetHeader}>
-          <span style={styles.sheetTitle}>{getCollectionSlotLabel(slot)}</span>
-          <span style={styles.sheetCount}>{photos.length}枚</span>
-        </div>
-
-        {photos.length > 0 ? (
-          <div style={styles.sheetPhotoArea}>
-            <div style={styles.photoScroll} onScroll={onPhotoScroll}>
+    <AppBottomSheet
+      title={`${getCollectionSlotLabel(slot)} (${photos.length}枚)`}
+      onClose={onClose}
+    >
+      {photos.length > 0 ? (
+        <div style={styles.sheetPhotoArea}>
+          <div style={styles.photoScroll} onScroll={onPhotoScroll}>
+            {photos.map((photo, index) => (
+              <div key={photo.id} style={styles.photoSlide}>
+                <img src={photo.src} alt="" style={styles.photoImg} />
+                {photo.localIndex !== undefined ? (
+                  <button
+                    type="button"
+                    style={styles.deleteBtn}
+                    onClick={() => onDeletePhoto(slug, photo.localIndex ?? index)}
+                  >
+                    削除
+                  </button>
+                ) : null}
+              </div>
+            ))}
+          </div>
+          {photos.length > 1 ? (
+            <div style={styles.photoDots}>
               {photos.map((photo, index) => (
-                <div key={photo.id} style={styles.photoSlide}>
-                  <img src={photo.src} alt="" style={styles.photoImg} />
-                  {photo.localIndex !== undefined ? (
-                    <button
-                      type="button"
-                      style={styles.deleteBtn}
-                      onClick={() => onDeletePhoto(slug, photo.localIndex ?? index)}
-                    >
-                      削除
-                    </button>
-                  ) : null}
-                </div>
+                <div
+                  key={`${photo.id}-dot`}
+                  style={
+                    index === currentPhotoIndex
+                      ? { ...styles.photoDot, ...styles.photoDotActive }
+                      : styles.photoDot
+                  }
+                />
               ))}
             </div>
-            {photos.length > 1 ? (
-              <div style={styles.photoDots}>
-                {photos.map((photo, index) => (
-                  <div
-                    key={`${photo.id}-dot`}
-                    style={
-                      index === currentPhotoIndex
-                        ? { ...styles.photoDot, ...styles.photoDotActive }
-                        : styles.photoDot
-                    }
-                  />
-                ))}
-              </div>
-            ) : null}
-          </div>
-        ) : (
-          <div style={styles.photoEmpty}>
-            <span style={styles.photoEmptyText}>まだ写真がありません</span>
-          </div>
-        )}
-
-        <div style={styles.sheetActions}>
-          <button type="button" style={styles.btnPrimary} onClick={onAddPhoto}>
-            ＋ 写真を撮る
-          </button>
-          <button
-            type="button"
-            onClick={onShare}
-            style={
-              photos.length > 0
-                ? styles.btnSecondary
-                : { ...styles.btnSecondary, ...styles.btnDisabled }
-            }
-            disabled={photos.length === 0}
-          >
-            シェア
-          </button>
+          ) : null}
         </div>
+      ) : (
+        <div style={styles.photoEmpty}>
+          <span style={styles.photoEmptyText}>まだ写真がありません</span>
+        </div>
+      )}
+
+      <div style={styles.sheetActions}>
+        <button type="button" style={styles.btnPrimary} onClick={onAddPhoto}>
+          写真を追加
+        </button>
+        <button
+          type="button"
+          onClick={onShare}
+          style={
+            photos.length > 0
+              ? styles.btnSecondary
+              : { ...styles.btnSecondary, ...styles.btnDisabled }
+          }
+          disabled={photos.length === 0}
+        >
+          シェア
+        </button>
       </div>
-    </div>
+    </AppBottomSheet>
+  );
+}
+
+function CollectionCatSheet({
+  profiles,
+  activeCatId,
+  onClose,
+  onSelect,
+}: {
+  profiles: CatProfile[];
+  activeCatId: string | null;
+  onClose: () => void;
+  onSelect: (catId: string) => void;
+}) {
+  return (
+    <AppBottomSheet title="ねこを選ぶ" onClose={onClose}>
+      <div style={styles.catSheetGrid}>
+        {profiles.map((profile) => {
+          const isSelected = profile.id === activeCatId;
+          const age = formatCatAge(profile.basicInfo?.birthDate);
+          const gender = formatCatGender(profile.basicInfo?.gender);
+          const meta = [gender, age].filter(Boolean).join("・");
+
+          return (
+            <button
+              key={profile.id}
+              type="button"
+              onClick={() => onSelect(profile.id)}
+              style={styles.catSheetItem}
+            >
+              <div
+                style={
+                  isSelected
+                    ? { ...styles.catSheetAvatar, ...styles.catSheetAvatarActive }
+                    : styles.catSheetAvatar
+                }
+              >
+                {profile.avatarDataUrl ? (
+                  <img
+                    src={profile.avatarDataUrl}
+                    alt={profile.name}
+                    style={styles.catSheetAvatarPhoto}
+                  />
+                ) : (
+                  <img
+                    src={getCatAvatarSrc(profile.appearance?.coat)}
+                    alt={profile.name}
+                    style={styles.catSheetAvatarImg}
+                  />
+                )}
+              </div>
+              <span style={styles.catSheetName}>{profile.name}</span>
+              {meta ? <span style={styles.catSheetMeta}>{meta}</span> : null}
+            </button>
+          );
+        })}
+      </div>
+      <a href="/cats" style={styles.catSheetLink} onClick={onClose}>
+        ねこタブで管理する ›
+      </a>
+    </AppBottomSheet>
   );
 }
 
@@ -948,7 +950,7 @@ function buildStoredCollectionPhotos(collectionPhotos: Record<string, string[]>)
 
 function readCollectionPhotos(catId: string): Record<string, string[]> {
   try {
-    const raw = window.localStorage.getItem(COLLECTION_PHOTOS_STORAGE_KEY);
+    const raw = window.localStorage.getItem(STORAGE_KEYS.collectionPhotos);
 
     if (!raw) {
       return {};
@@ -973,7 +975,7 @@ function readCollectionPhotos(catId: string): Record<string, string[]> {
 
 function addCollectionPhoto(catId: string, slug: string, dataUrl: string) {
   try {
-    const raw = window.localStorage.getItem(COLLECTION_PHOTOS_STORAGE_KEY);
+    const raw = window.localStorage.getItem(STORAGE_KEYS.collectionPhotos);
     const all = raw
       ? (JSON.parse(raw) as Record<string, Record<string, string[] | string>>)
       : {};
@@ -983,7 +985,7 @@ function addCollectionPhoto(catId: string, slug: string, dataUrl: string) {
     }
 
     all[catId][slug] = [...normalizeStoredPhotoList(all[catId][slug]), dataUrl];
-    window.localStorage.setItem(COLLECTION_PHOTOS_STORAGE_KEY, JSON.stringify(all));
+    window.localStorage.setItem(STORAGE_KEYS.collectionPhotos, JSON.stringify(all));
   } catch {
     // Ignore localStorage quota or parse failures for this MVP fallback.
   }
@@ -1035,7 +1037,7 @@ const COLLECTION_SLOT_LABELS: Record<string, string> = {
   loaf: "香箱",
   stretch: "のびー",
   "face-down-sleep": "ごめん寝",
-  "curled-up": "まるまる",
+  "curled-up": "まるまり",
   liquid: "液体化",
   sitting: "おすわり",
   "tail-up": "しっぽピーン",
@@ -1230,38 +1232,6 @@ const styles = {
     borderRadius: "99px",
     padding: "4px 12px",
     cursor: "pointer",
-  },
-  catSheetOverlay: {
-    position: "fixed",
-    inset: 0,
-    background: "rgba(12,10,9,0.42)",
-    backdropFilter: "blur(4px)",
-    WebkitBackdropFilter: "blur(4px)",
-    zIndex: 50,
-  },
-  catSheet: {
-    position: "fixed",
-    bottom: 0,
-    left: 0,
-    right: 0,
-    ...COLLECTION_SURFACE,
-    borderRadius: "20px 20px 0 0",
-    zIndex: 51,
-    padding: "0 20px calc(32px + env(safe-area-inset-bottom))",
-  },
-  catSheetHandle: {
-    width: "36px",
-    height: "4px",
-    background: "rgba(255,255,255,0.34)",
-    borderRadius: "99px",
-    margin: "10px auto 16px",
-  },
-  catSheetTitle: {
-    fontSize: "13px",
-    fontWeight: 600,
-    color: COLLECTION_MUTED,
-    margin: "0 0 14px",
-    textAlign: "center",
   },
   catSheetGrid: {
     display: "flex",
@@ -1611,50 +1581,6 @@ const styles = {
     lineHeight: 1,
     padding: 0,
     cursor: "pointer",
-  },
-  sheetOverlay: {
-    position: "fixed",
-    inset: 0,
-    background: "rgba(12,10,9,0.42)",
-    backdropFilter: "blur(4px)",
-    WebkitBackdropFilter: "blur(4px)",
-    zIndex: 50,
-    display: "flex",
-    alignItems: "flex-end",
-    animation: "fadeIn 0.15s ease",
-  },
-  sheet: {
-    width: "100%",
-    ...COLLECTION_SURFACE,
-    borderRadius: "20px 20px 0 0",
-    paddingBottom: "calc(16px + env(safe-area-inset-bottom))",
-    minHeight: "70vh",
-    maxHeight: "90vh",
-    overflowY: "auto",
-    animation: "slideUp 0.25s ease",
-  },
-  sheetHandle: {
-    width: "36px",
-    height: "4px",
-    background: "rgba(255,255,255,0.34)",
-    borderRadius: "99px",
-    margin: "10px auto 14px",
-  },
-  sheetHeader: {
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "space-between",
-    padding: "0 16px 12px",
-    borderBottom: "0.5px solid rgba(255,255,255,0.14)",
-  },
-  sheetTitle: {
-    color: COLLECTION_TEXT_STRONG,
-    fontSize: "17px",
-    fontWeight: 640,
-  },
-  sheetCount: {
-    color: COLLECTION_MUTED,
-    fontSize: "13px",
   },
   sheetPhotoArea: {
     margin: "12px 16px",

@@ -8,6 +8,7 @@ import {
   APP_PAGE_BACKGROUND,
   APP_SUBTLE_SURFACE,
 } from "../ui/appTheme";
+import { STORAGE_KEYS } from "../../lib/storage";
 
 const concernOptions = [
   "\u9cf4\u3044\u3066\u308b",
@@ -38,12 +39,15 @@ export function OnboardingFlow() {
   }
 
   function completeOnboarding() {
-    window.localStorage.setItem("onboarding_completed", "true");
-    window.localStorage.setItem("last_input_signal", "meowing");
-    window.localStorage.setItem("last_context", JSON.stringify({ time: "night" }));
-    window.localStorage.setItem("last_primary_category", "play");
+    window.localStorage.setItem(STORAGE_KEYS.onboardingCompleted, "true");
+    window.localStorage.setItem(STORAGE_KEYS.lastInputSignal, "meowing");
     window.localStorage.setItem(
-      "latest_hypothesis",
+      STORAGE_KEYS.lastContext,
+      JSON.stringify({ time: "night" }),
+    );
+    window.localStorage.setItem(STORAGE_KEYS.lastPrimaryCategory, "play");
+    window.localStorage.setItem(
+      STORAGE_KEYS.latestHypothesis,
       JSON.stringify({
         source: "onboarding",
         text: "\u904a\u3073\u305f\u3044\u53ef\u80fd\u6027\u304c\u3042\u308a\u307e\u3059",

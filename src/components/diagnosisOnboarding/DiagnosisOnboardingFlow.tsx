@@ -14,6 +14,7 @@ import {
   determineType,
 } from "../../lib/diagnosisOnboarding/scoring";
 import type { AxisScores, CatTypeKey } from "../../lib/diagnosisOnboarding/types";
+import { STORAGE_KEYS } from "../../lib/storage";
 import {
   readCatProfiles,
   saveActiveCatId,
@@ -48,7 +49,6 @@ type BasicInfo = {
   breed: string;
 };
 
-const ONBOARDING_HOME_HINT_KEY = "diagnosis_onboarding_home_hint";
 const ONBOARDING_VERSION = "diagnosis-v2";
 const EMPTY_AXIS_SCORES: AxisScores = { P: 0, C: 0, S: 0, I: 0, B: 0, N: 0 };
 const allQuestions = [...PROVISIONAL_QUESTIONS, ...REFINEMENT_QUESTIONS];
@@ -113,7 +113,7 @@ export function DiagnosisOnboardingFlow() {
     input.type = "file";
     input.accept = "image/*";
     if (capture) {
-      input.capture = "environment";
+      input.setAttribute("capture", "environment");
     }
 
     input.onchange = async () => {
@@ -214,16 +214,16 @@ export function DiagnosisOnboardingFlow() {
     };
 
     try {
-      const existing = window.localStorage.getItem("cat_profiles")
+      const existing = window.localStorage.getItem(STORAGE_KEYS.catProfiles)
         ? readCatProfiles()
         : [];
       const nextProfiles = [...existing, profile];
       saveCatProfiles(nextProfiles);
       saveActiveCatId(newCatId);
-      window.localStorage.setItem("onboarding_completed", "true");
-      window.localStorage.setItem("home_visit_count", "0");
+      window.localStorage.setItem(STORAGE_KEYS.onboardingCompleted, "true");
+      window.localStorage.setItem(STORAGE_KEYS.homeVisitCount, "0");
       window.localStorage.setItem(
-        ONBOARDING_HOME_HINT_KEY,
+        STORAGE_KEYS.diagnosisOnboardingHomeHint,
         JSON.stringify({
           localCatId: newCatId,
           catName: displayName,
@@ -231,7 +231,7 @@ export function DiagnosisOnboardingFlow() {
         }),
       );
     } catch {
-      // localStorage MVPの暫定実装なので、保存失敗時も画面遷移は妨げない。
+      // localStorage MVPなので、保存失敗時も画面遷移は妨げない。
     }
 
     setStep("done");
@@ -286,7 +286,7 @@ export function DiagnosisOnboardingFlow() {
                 }}
                 style={styles.photoButton}
               >
-                📷 カメラで撮る
+                カメラで撮る
               </button>
               <button
                 type="button"
@@ -295,7 +295,7 @@ export function DiagnosisOnboardingFlow() {
                 }}
                 style={styles.photoButton}
               >
-                🖼 ライブラリから選ぶ
+                ライブラリから選ぶ
               </button>
               <button
                 type="button"
@@ -312,7 +312,9 @@ export function DiagnosisOnboardingFlow() {
           <section style={styles.card}>
             <div style={styles.stepContainer}>
               <p style={styles.eyebrow}>どんな毛色？</p>
-              <p style={styles.note}>近い色でOKです。あとでねこタブから変えられます。</p>
+              <p style={styles.note}>
+                近い色でOKです。あとでねこタブから変えられます。
+              </p>
               <div style={styles.coatGrid}>
                 {COAT_OPTIONS.map((option) => (
                   <button
@@ -483,7 +485,7 @@ export function DiagnosisOnboardingFlow() {
                 </p>
               </div>
               <p style={styles.continueText}>
-                もう少し教えてもらうと、もっとくわしくわかります。
+                もう少し教えてもらうと、もっとくわしくわかります
               </p>
               <button
                 type="button"
@@ -787,26 +789,26 @@ const styles = {
     background: "#ffffff",
     color: "#27272a",
     fontSize: "13px",
-    fontWeight: 550,
+    fontWeight: 600,
     cursor: "pointer",
   },
   genderButtonActive: {
-    borderColor: APP_ACCENT_SOFT_BORDER,
-    background: APP_ACCENT_SOFT_BG,
-    color: APP_ACCENT,
-    fontWeight: 700,
+    border: "1px solid #aeb5a8",
+    background: "#e8e9e4",
+    color: "#3f433d",
   },
   progressBar: {
-    height: "6px",
-    borderRadius: "999px",
-    background: "#ebe8e0",
+    width: "100%",
+    height: "5px",
+    borderRadius: "99px",
+    background: "#ede9df",
     overflow: "hidden",
   },
   progressFill: {
     height: "100%",
-    borderRadius: "999px",
     background: APP_ACCENT,
-    transition: "width 0.22s ease",
+    borderRadius: "99px",
+    transition: "width 0.2s ease",
   },
   avatarArea: {
     display: "flex",
@@ -815,12 +817,12 @@ const styles = {
     gap: "8px",
   },
   avatar: {
-    width: "76px",
-    height: "76px",
+    width: "82px",
+    height: "82px",
     borderRadius: "50%",
     objectFit: "cover",
     background: "#f5f3ef",
-    border: "1px solid #e8e5de",
+    border: "1px solid #e0ddd6",
   },
   avatarName: {
     margin: 0,
@@ -829,7 +831,7 @@ const styles = {
     fontWeight: 700,
   },
   questionCount: {
-    margin: "0 0 -10px",
+    margin: 0,
     color: "#9a9890",
     fontSize: "12px",
     fontWeight: 700,
@@ -838,9 +840,9 @@ const styles = {
   questionText: {
     margin: 0,
     color: "#2a2a28",
-    fontSize: "24px",
-    fontWeight: 750,
-    lineHeight: 1.38,
+    fontSize: "22px",
+    fontWeight: 760,
+    lineHeight: 1.45,
     textAlign: "center",
   },
   optionList: {
@@ -848,43 +850,42 @@ const styles = {
     gap: "10px",
   },
   optionButton: {
-    ...APP_SUBTLE_SURFACE,
-    minHeight: "54px",
+    minHeight: "56px",
+    border: "1px solid rgba(222,219,211,0.95)",
     borderRadius: "16px",
+    background: "#ffffff",
     color: "#2a2a28",
     fontSize: "15px",
     fontWeight: 700,
     lineHeight: 1.45,
+    padding: "10px 14px",
     cursor: "pointer",
-    textAlign: "left",
-    padding: "0 16px",
   },
   typeReveal: {
-    border: `1px solid ${APP_ACCENT_SOFT_BORDER}`,
+    ...APP_SUBTLE_SURFACE,
     borderRadius: "24px",
-    background: APP_ACCENT_SOFT_BG,
-    padding: "22px 18px",
+    padding: "22px 16px",
     textAlign: "center",
-    animation: "fadeIn 0.35s ease",
   },
   typeLabelLarge: {
-    margin: 0,
+    margin: "0 0 8px",
     color: "#2a2a28",
-    fontSize: "34px",
-    fontWeight: 800,
+    fontSize: "30px",
+    fontWeight: 760,
     lineHeight: 1.2,
   },
   typeTagline: {
-    margin: "10px 0 0",
-    color: APP_ACCENT,
-    fontSize: "15px",
-    fontWeight: 700,
-    lineHeight: 1.6,
+    margin: 0,
+    color: "#6a6a62",
+    fontSize: "14px",
+    fontWeight: 600,
+    lineHeight: 1.7,
   },
   continueText: {
     margin: 0,
-    color: "#6f6a61",
+    color: "#6a6a62",
     fontSize: "14px",
+    fontWeight: 600,
     lineHeight: 1.7,
     textAlign: "center",
   },
@@ -894,15 +895,15 @@ const styles = {
     padding: "20px 16px",
   },
   typeDescription: {
-    margin: "14px 0 0",
-    color: "#4f4b45",
+    margin: "12px 0 0",
+    color: "#4a4a42",
     fontSize: "14px",
-    fontWeight: 500,
-    lineHeight: 1.8,
+    fontWeight: 560,
+    lineHeight: 1.85,
   },
   triviaList: {
     display: "grid",
-    gap: "4px",
+    gap: "6px",
     marginTop: "14px",
   },
   triviaItem: {
@@ -913,37 +914,32 @@ const styles = {
     lineHeight: 1.6,
   },
   rarityArea: {
-    ...APP_SUBTLE_SURFACE,
-    borderRadius: "18px",
-    padding: "13px 14px",
+    display: "grid",
+    gap: "8px",
   },
   rarityText: {
-    margin: "0 0 9px",
+    margin: 0,
     color: "#6a6a62",
     fontSize: "13px",
     fontWeight: 700,
   },
   rarityBar: {
     height: "7px",
-    borderRadius: "999px",
-    background: "#ebe8e0",
+    borderRadius: "99px",
+    background: "#ede9df",
     overflow: "hidden",
   },
   rarityFill: {
     height: "100%",
-    borderRadius: "999px",
+    borderRadius: "99px",
     background: APP_ACCENT,
   },
   hintText: {
     margin: 0,
     color: APP_ACCENT,
-    border: `1px solid ${APP_ACCENT_SOFT_BORDER}`,
-    borderRadius: "18px",
-    background: APP_ACCENT_SOFT_BG,
     fontSize: "14px",
-    fontWeight: 650,
-    lineHeight: 1.7,
-    padding: "13px 14px",
+    fontWeight: 700,
+    lineHeight: 1.75,
   },
   collectionPreview: {
     display: "grid",
@@ -952,17 +948,18 @@ const styles = {
   },
   collectionPreviewCard: {
     aspectRatio: "1",
-    ...APP_SUBTLE_SURFACE,
-    borderRadius: "18px",
+    borderRadius: "16px",
+    background: "rgba(255,255,255,0.7)",
+    border: "1px solid rgba(222,219,211,0.86)",
     display: "flex",
     alignItems: "center",
     justifyContent: "center",
   },
   collectionPreviewIcon: {
-    width: "62px",
-    height: "62px",
+    width: "70%",
+    height: "70%",
     objectFit: "contain",
-    opacity: 0.48,
+    opacity: 0.7,
     mixBlendMode: "multiply",
   },
 } satisfies Record<string, CSSProperties>;

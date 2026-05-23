@@ -1,5 +1,6 @@
 import type { RecentEvent } from "../../lib/supabase/queries";
 import { getCatTypeInfo } from "../../lib/diagnosisOnboarding/catTypes";
+import { STORAGE_KEYS } from "../../lib/storage";
 import type {
   ActivityPattern,
   AxisScores,
@@ -384,10 +385,10 @@ const DAILY_HINT_PATTERNS: Record<
   },
 };
 const DEFAULT_CAT_NAME = "\u30df\u30b1";
-const CAT_PROFILES_KEY = "cat_profiles";
-const ACTIVE_CAT_ID_KEY = "active_cat_id";
-const LEGACY_CAT_PROFILE_KEY = "cat_profile";
-const CURRENT_CAT_HINT_SUPPRESSION_KEY = "current_cat_hint_suppression";
+const CAT_PROFILES_KEY = STORAGE_KEYS.catProfiles;
+const ACTIVE_CAT_ID_KEY = STORAGE_KEYS.activeCatId;
+const LEGACY_CAT_PROFILE_KEY = STORAGE_KEYS.legacyCatProfile;
+const CURRENT_CAT_HINT_SUPPRESSION_KEY = STORAGE_KEYS.currentCatHintSuppression;
 const HINT_SUPPRESSION_HOURS = 3;
 
 // MVP only: this switches the local UI profile. Supabase tracking rows use
@@ -1071,7 +1072,7 @@ function migrateLegacyCatProfile() {
 }
 
 export function readLatestHypothesis() {
-  const value = window.localStorage.getItem("latest_hypothesis");
+  const value = window.localStorage.getItem(STORAGE_KEYS.latestHypothesis);
 
   if (!value) {
     return null;
@@ -1093,7 +1094,7 @@ export function readLatestHypothesis() {
     }
 
     if (isExpiredLatestHypothesis(parsed)) {
-      window.localStorage.removeItem("latest_hypothesis");
+      window.localStorage.removeItem(STORAGE_KEYS.latestHypothesis);
       return null;
     }
 
@@ -1104,10 +1105,10 @@ export function readLatestHypothesis() {
 }
 
 export function clearLatestHypothesis() {
-  window.localStorage.removeItem("latest_hypothesis");
-  window.localStorage.removeItem("last_input_signal");
-  window.localStorage.removeItem("last_context");
-  window.localStorage.removeItem("last_primary_category");
+  window.localStorage.removeItem(STORAGE_KEYS.latestHypothesis);
+  window.localStorage.removeItem(STORAGE_KEYS.lastInputSignal);
+  window.localStorage.removeItem(STORAGE_KEYS.lastContext);
+  window.localStorage.removeItem(STORAGE_KEYS.lastPrimaryCategory);
 }
 
 export function parseStoredContext(value: string) {

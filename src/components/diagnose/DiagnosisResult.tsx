@@ -5,6 +5,7 @@ import { useEffect, useState } from "react";
 import type { CSSProperties } from "react";
 import { applyDiagnosisFeedback } from "../../core/understanding/feedback";
 import type { BehaviorInput, CauseCategory } from "../../core/types";
+import { STORAGE_KEYS } from "../../lib/storage";
 import { insertFeedback } from "../../lib/supabase/queries";
 import { saveCurrentCatHintSuppression } from "../home/homeInputHelpers";
 import {
@@ -123,7 +124,7 @@ export function DiagnosisResult({
     const expiresAt = new Date(createdAt.getTime() + 3 * 60 * 60 * 1000);
 
     window.localStorage.setItem(
-      "latest_hypothesis",
+      STORAGE_KEYS.latestHypothesis,
       JSON.stringify({
         source: "diagnosis",
         text: hypothesisMessages[currentCategory],
@@ -322,7 +323,7 @@ function getOutcomeLabels(
 }
 
 function clearLatestHypothesis() {
-  window.localStorage.removeItem("latest_hypothesis");
+  window.localStorage.removeItem(STORAGE_KEYS.latestHypothesis);
 }
 
 function formatReasonText(reasons: string[]) {
@@ -346,7 +347,7 @@ function savePostDiagnosisFeedback({
   label: string;
 }) {
   window.localStorage.setItem(
-    "post_diagnosis_feedback",
+    STORAGE_KEYS.postDiagnosisFeedback,
     JSON.stringify({
       localCatId: localCatId ?? null,
       result,
@@ -363,7 +364,7 @@ function readCatName(localCatId?: string | null) {
   }
 
   try {
-    const value = window.localStorage.getItem("cat_profiles");
+    const value = window.localStorage.getItem(STORAGE_KEYS.catProfiles);
 
     if (!value) {
       return "";

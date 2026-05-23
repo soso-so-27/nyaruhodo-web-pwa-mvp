@@ -6,6 +6,11 @@ import {
   getDailyCollectionTarget,
   readStoredCollectionPhotos,
 } from "../../lib/collection/dailyTarget";
+import {
+  getDiscoveryLogKey,
+  getLockDataKey,
+  getRecordLogKey,
+} from "../../lib/storage";
 import type { RecentEvent } from "../../lib/supabase/queries";
 import { BottomNavigation } from "../navigation/BottomNavigation";
 import {
@@ -17,6 +22,12 @@ import {
   saveCatProfiles,
 } from "./homeInputHelpers";
 import type { CatProfile } from "./homeInputHelpers";
+import { AppBottomSheet } from "../ui/AppBottomSheet";
+import {
+  AppIcon,
+  ChevronRightIcon as SharedChevronRightIcon,
+  SparklesIcon as SharedSparklesIcon,
+} from "../ui/AppIcons";
 
 type HomeInputProps = {
   recentEvents: RecentEvent[];
@@ -86,7 +97,7 @@ const REACTION_OPTIONS = [
 ];
 
 const DISCOVERY_TEXT =
-  "昨日の小さな記録から、少しだけ変化が見えてきました。";
+  "昨日の小さな記録から、少しだけリズムが見えてきました。";
 const HOME_NAV_FRAME_WIDTH = "min(calc(100% - 28px), 410px)";
 const HOME_NAV_EDGE_INSET = "max(14px, calc((100vw - 410px) / 2))";
 
@@ -496,7 +507,7 @@ export function HomeInput({ recentEvents: _recentEvents }: HomeInputProps) {
 
       {isReactionSheetOpen ? (
         <ActionSheet
-          title={`${catName}はどんな反応をしましたか？`}
+          title={`${catName}はどんな反応でしたか？`}
           options={REACTION_OPTIONS}
           selected={selectedReaction}
           onClose={() => setIsReactionSheetOpen(false)}
@@ -578,40 +589,25 @@ function YousuSheet({
   onSelect: (value: string) => void;
 }) {
   return (
-    <>
-      <div style={styles.sheetBackdrop} onClick={onClose} />
-      <div style={styles.sheet}>
-        <div style={styles.sheetHandle} aria-hidden="true" />
-        <div style={styles.sheetHeader}>
-          <p style={styles.sheetTitle}>{title}</p>
+    <AppBottomSheet title={title} onClose={onClose}>
+      <div style={styles.yousuSheetGrid}>
+        {options.map((option) => (
           <button
+            key={option}
             type="button"
-            onClick={onClose}
-            style={styles.sheetCloseButton}
-            aria-label="閉じる"
+            onClick={() => onSelect(option)}
+            disabled={isLocked}
+            style={{
+              ...styles.yousuOption,
+              ...(selected === option ? styles.yousuOptionSelected : {}),
+              ...(isLocked ? styles.lockedState : {}),
+            }}
           >
-            <CloseIcon />
+            {option}
           </button>
-        </div>
-        <div style={styles.yousuSheetGrid}>
-          {options.map((option) => (
-            <button
-              key={option}
-              type="button"
-              onClick={() => onSelect(option)}
-              disabled={isLocked}
-              style={{
-                ...styles.yousuOption,
-                ...(selected === option ? styles.yousuOptionSelected : {}),
-                ...(isLocked ? styles.lockedState : {}),
-              }}
-            >
-              {option}
-            </button>
-          ))}
-        </div>
+        ))}
       </div>
-    </>
+    </AppBottomSheet>
   );
 }
 
@@ -629,38 +625,23 @@ function ActionSheet({
   onSelect: (value: string) => void;
 }) {
   return (
-    <>
-      <div style={styles.sheetBackdrop} onClick={onClose} />
-      <div style={styles.sheet}>
-        <div style={styles.sheetHandle} aria-hidden="true" />
-        <div style={styles.sheetHeader}>
-          <p style={styles.sheetTitle}>{title}</p>
+    <AppBottomSheet title={title} onClose={onClose}>
+      <div style={styles.sheetGrid}>
+        {options.map((option) => (
           <button
+            key={option}
             type="button"
-            onClick={onClose}
-            style={styles.sheetCloseButton}
-            aria-label="閉じる"
+            onClick={() => onSelect(option)}
+            style={{
+              ...styles.sheetOption,
+              ...(selected === option ? styles.sheetOptionSelected : {}),
+            }}
           >
-            <CloseIcon />
+            {option}
           </button>
-        </div>
-        <div style={styles.sheetGrid}>
-          {options.map((option) => (
-            <button
-              key={option}
-              type="button"
-              onClick={() => onSelect(option)}
-              style={{
-                ...styles.sheetOption,
-                ...(selected === option ? styles.sheetOptionSelected : {}),
-              }}
-            >
-              {option}
-            </button>
-          ))}
-        </div>
+        ))}
       </div>
-    </>
+    </AppBottomSheet>
   );
 }
 
@@ -676,27 +657,12 @@ function InfoSheet({
   onClose: () => void;
 }) {
   return (
-    <>
-      <div style={styles.sheetBackdrop} onClick={onClose} />
-      <div style={styles.sheet}>
-        <div style={styles.sheetHandle} aria-hidden="true" />
-        <div style={styles.sheetHeader}>
-          <p style={styles.sheetTitle}>{title}</p>
-          <button
-            type="button"
-            onClick={onClose}
-            style={styles.sheetCloseButton}
-            aria-label="閉じる"
-          >
-            <CloseIcon />
-          </button>
-        </div>
-        <div style={styles.infoSheetBody}>
-          <p style={styles.infoSheetLead}>{lead}</p>
-          <p style={styles.infoSheetText}>{body}</p>
-        </div>
+    <AppBottomSheet title={title} onClose={onClose}>
+      <div style={styles.infoSheetBody}>
+        <p style={styles.infoSheetLead}>{lead}</p>
+        <p style={styles.infoSheetText}>{body}</p>
       </div>
-    </>
+    </AppBottomSheet>
   );
 }
 
@@ -712,46 +678,30 @@ function CatSheet({
   onSelect: (catId: string) => void;
 }) {
   return (
-    <>
-      <div style={styles.sheetBackdrop} onClick={onClose} />
-      <div style={styles.sheet}>
-        <div style={styles.sheetHandle} aria-hidden="true" />
-        <div style={styles.sheetHeader}>
-          <p style={styles.sheetTitle}>ねこを選ぶ</p>
-          <button
-            type="button"
-            onClick={onClose}
-            style={styles.sheetCloseButton}
-            aria-label="閉じる"
-          >
-            <CloseIcon />
-          </button>
-        </div>
-        <div style={styles.catList}>
-          {profiles.map((profile) => {
-            const isActive = profile.id === activeCatId;
+    <AppBottomSheet title="ねこを選ぶ" onClose={onClose}>
+      <div style={styles.catList}>
+        {profiles.map((profile) => {
+          const isActive = profile.id === activeCatId;
 
-            return (
-              <button
-                key={profile.id}
-                type="button"
-                onClick={() => onSelect(profile.id)}
-                style={{
-                  ...styles.catListItem,
-                  ...(isActive ? styles.catListItemActive : {}),
-                }}
-              >
-                <span style={styles.catListName}>{getCatName(profile)}</span>
-                <span style={styles.catListMark}>{isActive ? "選択中" : ""}</span>
-              </button>
-            );
-          })}
-        </div>
+          return (
+            <button
+              key={profile.id}
+              type="button"
+              onClick={() => onSelect(profile.id)}
+              style={{
+                ...styles.catListItem,
+                ...(isActive ? styles.catListItemActive : {}),
+              }}
+            >
+              <span style={styles.catListName}>{getCatName(profile)}</span>
+              <span style={styles.catListMark}>{isActive ? "選択中" : ""}</span>
+            </button>
+          );
+        })}
       </div>
-    </>
+    </AppBottomSheet>
   );
 }
-
 function HomeBulletinBoard({
   catName,
   items,
@@ -825,7 +775,7 @@ function HomeBulletinBoard({
 
       <div style={styles.boardHeader}>
         <span style={styles.boardHeaderIcon} aria-hidden="true">
-          <SparkIcon />
+          <SharedSparklesIcon size={18} />
         </span>
         <span style={styles.boardHeaderText}>
           <span style={styles.boardTitle}>あなたへのおすすめ</span>
@@ -881,7 +831,10 @@ function HomeBulletinBoard({
               >
                 <span style={styles.boardActionLabel}>{item.actionLabel}</span>
                 <span style={styles.boardActionTitle}>{item.title}</span>
-                <ChevronIcon />
+                <SharedChevronRightIcon
+                  size={18}
+                  style={{ color: "#888580", flexShrink: 0 }}
+                />
               </button>
             ))}
           </div>
@@ -913,61 +866,7 @@ function HomeBulletinBoard({
 }
 
 function BoardIcon({ icon }: { icon: HomeBoardItem["icon"] }) {
-  if (icon === "paw") {
-    return (
-      <svg viewBox="0 0 32 32" style={styles.boardIconSvg}>
-        <ellipse cx="16" cy="21.2" rx="7.2" ry="5.7" />
-        <circle cx="7.5" cy="13" r="3.1" />
-        <circle cx="13.1" cy="8.5" r="3" />
-        <circle cx="18.9" cy="8.5" r="3" />
-        <circle cx="24.5" cy="13" r="3.1" />
-      </svg>
-    );
-  }
-
-  if (icon === "hand") {
-    return (
-      <svg viewBox="0 0 32 32" style={styles.boardIconSvg}>
-        <path d="M10.5 17V9.2a2 2 0 0 1 4 0V16" />
-        <path d="M14.5 15V7.4a2 2 0 0 1 4 0V16" />
-        <path d="M18.5 16V9.2a2 2 0 0 1 4 0v8.7" />
-        <path d="M10.5 17.2 8.8 15a2 2 0 0 0-3.1 2.4l5.1 7.2c1.5 2.1 3.9 3.2 6.5 3.2h1.2c4.1 0 7.5-3.4 7.5-7.5v-6.8a2 2 0 0 0-4 0" />
-      </svg>
-    );
-  }
-
-  if (icon === "heart") {
-    return (
-      <svg viewBox="0 0 32 32" style={styles.boardIconSvg}>
-        <path d="M16 26.5S6.2 20.6 6.2 13.2A5.4 5.4 0 0 1 16 10a5.4 5.4 0 0 1 9.8 3.2C25.8 20.6 16 26.5 16 26.5Z" />
-      </svg>
-    );
-  }
-
-  if (icon === "camera") {
-    return (
-      <svg viewBox="0 0 32 32" style={styles.boardIconSvg}>
-        <path d="M10.2 10.5 12 7.8h8l1.8 2.7h3.1a3.1 3.1 0 0 1 3.1 3.1v9.2a3.1 3.1 0 0 1-3.1 3.1H7.1A3.1 3.1 0 0 1 4 22.8v-9.2a3.1 3.1 0 0 1 3.1-3.1h3.1Z" />
-        <circle cx="16" cy="18" r="5" />
-      </svg>
-    );
-  }
-
-  if (icon === "book") {
-    return (
-      <svg viewBox="0 0 32 32" style={styles.boardIconSvg}>
-        <path d="M7.5 7.5A3.5 3.5 0 0 1 11 4h14v22H11a3.5 3.5 0 0 0-3.5 3.5v-22Z" />
-        <path d="M12.5 10h8.5M12.5 14h6.5" />
-      </svg>
-    );
-  }
-
-  return (
-    <svg viewBox="0 0 32 32" style={styles.boardIconSvg}>
-      <path d="M23.5 13.2a7.5 7.5 0 0 0-15 0c0 7.9-3.4 8.2-3.4 10.8h21.8c0-2.6-3.4-2.9-3.4-10.8Z" />
-      <path d="M13.2 27h5.6" />
-    </svg>
-  );
+  return <AppIcon name={icon} size={30} style={styles.boardIconSvg} />;
 }
 
 function buildHomeBoardItems({
@@ -1021,7 +920,7 @@ function buildHomeBoardItems({
       id: "daily-discovery",
       kind: "insight",
       priority: 10,
-      title: "発見があります",
+      title: "発見がありました",
       body: DISCOVERY_TEXT,
       icon: "heart",
       actionLabel: "見る",
@@ -1101,18 +1000,6 @@ function getCoatAvatarSrc(coat?: string) {
     cream: "/sample-cats/saba.png",
   };
   return coatMap[coat ?? ""] ?? "/sample-cats/saba.png";
-}
-
-function getLockDataKey(catId: string) {
-  return `lock_data_${catId}`;
-}
-
-function getRecordLogKey(catId: string) {
-  return `record_log_${catId}`;
-}
-
-function getDiscoveryLogKey(catId: string) {
-  return `discovery_log_${catId}`;
 }
 
 function readLockData(catId: string): LockData {
@@ -1332,176 +1219,6 @@ function markDiscoverySeen(catId: string) {
   } catch {
     window.localStorage.setItem(getDiscoveryLogKey(catId), JSON.stringify([]));
   }
-}
-
-function PawIcon() {
-  return (
-    <svg
-      viewBox="0 0 32 32"
-      width="32"
-      height="32"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="1.9"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-    >
-      <ellipse cx="16" cy="21.2" rx="7.2" ry="5.8" />
-      <circle cx="7.5" cy="13" r="3.2" />
-      <circle cx="13.1" cy="8.5" r="3.1" />
-      <circle cx="18.9" cy="8.5" r="3.1" />
-      <circle cx="24.5" cy="13" r="3.2" />
-    </svg>
-  );
-}
-
-function HandIcon() {
-  return (
-    <svg
-      viewBox="0 0 32 32"
-      width="32"
-      height="32"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="2"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-    >
-      <path d="M10.5 17V9.2a2 2 0 0 1 4 0V16" />
-      <path d="M14.5 15V7.4a2 2 0 0 1 4 0V16" />
-      <path d="M18.5 16V9.2a2 2 0 0 1 4 0v8.7" />
-      <path d="M10.5 17.2 8.8 15a2 2 0 0 0-3.1 2.4l5.1 7.2c1.5 2.1 3.9 3.2 6.5 3.2h1.2c4.1 0 7.5-3.4 7.5-7.5v-6.8a2 2 0 0 0-4 0" />
-    </svg>
-  );
-}
-
-function HeartIcon() {
-  return (
-    <svg
-      viewBox="0 0 24 24"
-      width="20"
-      height="20"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="2"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      aria-hidden="true"
-    >
-      <path d="M12 20s-7-4.2-7-9.6A3.9 3.9 0 0 1 12 8a3.9 3.9 0 0 1 7 2.4C19 15.8 12 20 12 20Z" />
-    </svg>
-  );
-}
-
-function CameraIcon() {
-  return (
-    <svg
-      viewBox="0 0 32 32"
-      width="32"
-      height="32"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="2"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-    >
-      <path d="M10.2 10.5 12 7.8h8l1.8 2.7h3.1a3.1 3.1 0 0 1 3.1 3.1v9.2a3.1 3.1 0 0 1-3.1 3.1H7.1A3.1 3.1 0 0 1 4 22.8v-9.2a3.1 3.1 0 0 1 3.1-3.1h3.1Z" />
-      <circle cx="16" cy="18" r="5" />
-    </svg>
-  );
-}
-
-function BookIcon() {
-  return (
-    <svg
-      viewBox="0 0 24 24"
-      width="22"
-      height="22"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="2"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      aria-hidden="true"
-    >
-      <path d="M4 5.5A2.5 2.5 0 0 1 6.5 3H20v17H6.5A2.5 2.5 0 0 0 4 22V5.5Z" />
-      <path d="M8 7h8M8 11h6" />
-    </svg>
-  );
-}
-
-function BellIcon() {
-  return (
-    <svg
-      viewBox="0 0 24 24"
-      width="22"
-      height="22"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="2"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      aria-hidden="true"
-    >
-      <path d="M18 8a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9" />
-      <path d="M10 21h4" />
-    </svg>
-  );
-}
-
-function SparkIcon() {
-  return (
-    <svg
-      viewBox="0 0 24 24"
-      width="18"
-      height="18"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="2"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      aria-hidden="true"
-    >
-      <path d="M12 3.5 13.7 9l5.8 1.7-5.8 1.7L12 18l-1.7-5.6-5.8-1.7L10.3 9 12 3.5Z" />
-      <path d="M19 16.5 19.8 19l2.7.8-2.7.8L19 23l-.8-2.4-2.7-.8 2.7-.8.8-2.5Z" />
-    </svg>
-  );
-}
-
-function CloseIcon() {
-  return (
-    <svg
-      viewBox="0 0 24 24"
-      width="18"
-      height="18"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="2"
-      strokeLinecap="round"
-      aria-hidden="true"
-    >
-      <path d="M6 6l12 12M18 6 6 18" />
-    </svg>
-  );
-}
-
-function ChevronIcon() {
-  return (
-    <svg
-      viewBox="0 0 24 24"
-      width="18"
-      height="18"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="2"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      aria-hidden="true"
-      style={{ color: "#888580", flexShrink: 0 }}
-    >
-      <path d="m9 6 6 6-6 6" />
-    </svg>
-  );
 }
 
 const styles = {
@@ -1990,70 +1707,6 @@ const styles = {
     borderColor: "rgba(255,255,255,0.72)",
     background: "rgba(255,255,255,0.92)",
     color: "#2A2A28",
-  },
-  sheetBackdrop: {
-    position: "fixed",
-    inset: 0,
-    zIndex: 99,
-    background: "rgba(12,10,9,0.42)",
-    backdropFilter: "blur(4px)",
-    WebkitBackdropFilter: "blur(4px)",
-  },
-  sheet: {
-    position: "fixed",
-    right: 0,
-    bottom: 0,
-    left: 0,
-    zIndex: 100,
-    borderRadius: "24px 24px 0 0",
-    background: "rgba(34,29,28,0.76)",
-    color: "rgba(255,255,255,0.94)",
-    border: "0.5px solid rgba(255,255,255,0.22)",
-    borderBottom: "none",
-    boxShadow:
-      "0 -18px 48px rgba(0,0,0,0.32), inset 0 1px 0 rgba(255,255,255,0.16)",
-    backdropFilter: "blur(34px)",
-    WebkitBackdropFilter: "blur(34px)",
-    maxHeight: "min(78dvh, 620px)",
-    overflowY: "auto",
-    padding: "10px 16px calc(40px + env(safe-area-inset-bottom))",
-    animation: "slideUp 0.25s ease-out",
-    boxSizing: "border-box",
-  },
-  sheetHandle: {
-    width: "42px",
-    height: "4px",
-    borderRadius: "99px",
-    background: "rgba(255,255,255,0.34)",
-    margin: "2px auto 16px",
-  },
-  sheetHeader: {
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "space-between",
-    gap: "12px",
-  },
-  sheetTitle: {
-    margin: 0,
-    color: "rgba(255,255,255,0.96)",
-    fontSize: "18px",
-    fontWeight: 680,
-    lineHeight: 1.5,
-  },
-  sheetCloseButton: {
-    display: "inline-flex",
-    alignItems: "center",
-    justifyContent: "center",
-    width: "32px",
-    height: "32px",
-    flexShrink: 0,
-    border: "0.5px solid rgba(255,255,255,0.14)",
-    borderRadius: "50%",
-    background: "rgba(255,255,255,0.08)",
-    color: "rgba(255,255,255,0.72)",
-    cursor: "pointer",
-    backdropFilter: "blur(12px)",
-    WebkitBackdropFilter: "blur(12px)",
   },
   sheetGrid: {
     display: "grid",
