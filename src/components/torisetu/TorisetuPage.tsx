@@ -101,7 +101,7 @@ type DeepDiveAnswer = {
   answeredAt: string;
 };
 
-type CategoryIconName = "sparkles" | "clipboard" | "lock";
+type CategoryIconName = "sparkles" | "clipboard" | "lock" | "paw";
 
 const RECENT_CAT_SUMMARY_WINDOW_MS = 7 * 24 * 60 * 60 * 1000;
 
@@ -229,7 +229,7 @@ export function TorisetuPage({ recentEvents }: TorisetuPageProps) {
   const hasRhythmSignal = dayMap.some((item) => item.signal);
   const peakTime = catProfile?.activityPattern?.peakTime;
   const peakSlots = peakTime ? peakTimeMap[peakTime] ?? [] : [];
-  const knownFacts: KnownFact[] = [
+  const diagnosisFacts: KnownFact[] = [
     {
       id: "type",
       label: "タイプ診断",
@@ -242,23 +242,36 @@ export function TorisetuPage({ recentEvents }: TorisetuPageProps) {
       value: compactText(answer.result, 42),
       source: "診断結果",
     })),
+    ...(!hasRhythmSignal && peakSlots.length > 0
+      ? [
+          {
+            id: "diagnosis-rhythm",
+            label: "リズム",
+            value: rhythmSummary,
+            source: "オンボーディング結果",
+          },
+        ]
+      : []),
+  ];
+  const mikkeFacts: KnownFact[] = [
     {
       id: "recent",
       label: "最近",
       value: recentSummary,
       source: records.length > 0 ? `${recordCount}件のみっけから` : "みっけ待ち",
     },
-    {
-      id: "rhythm",
-      label: "リズム",
-      value: rhythmSummary,
-      source: hasRhythmSignal
-        ? "時間帯のみっけから"
-        : peakSlots.length > 0
-          ? "診断から"
-          : "記録待ち",
-    },
+    ...(hasRhythmSignal || peakSlots.length === 0
+      ? [
+          {
+            id: "rhythm",
+            label: "リズム",
+            value: rhythmSummary,
+            source: hasRhythmSignal ? "時間帯のみっけから" : "みっけ待ち",
+          },
+        ]
+      : []),
   ];
+  const knownFacts = [...mikkeFacts, ...diagnosisFacts];
   const diagnosisItems: DiagnosisItem[] = DEEP_DIVE_CARDS.map((card) => {
     const answer = answers[card.id];
     const remaining = Math.max(0, card.threshold - recordCount);
@@ -282,7 +295,6 @@ export function TorisetuPage({ recentEvents }: TorisetuPageProps) {
   const openDiagnosisCount = diagnosisItems.filter(
     (item) => item.status === "completed",
   ).length;
-  const visibleKnownFacts = knownFacts;
 
   function handleAnswer(option: DeepDiveOption) {
     if (!catProfile || !activeDive) return;
@@ -361,16 +373,9 @@ export function TorisetuPage({ recentEvents }: TorisetuPageProps) {
             <span style={styles.sectionMeta}>{knowledgeCount}件</span>
           </div>
 
-          <div style={styles.factCard}>
-            {visibleKnownFacts.map((fact) => (
-              <div key={fact.id} style={styles.factRow}>
-                <span style={styles.factLabel}>{fact.label}</span>
-                <div style={styles.factText}>
-                  <strong style={styles.factValue}>{fact.value}</strong>
-                  <span style={styles.factSource}>{fact.source}</span>
-                </div>
-              </div>
-            ))}
+          <div style={styles.factGroups}>
+            <FactGroup icon="paw" label="みっけ" facts={mikkeFacts} />
+            <FactGroup icon="clipboard" label="診断" facts={diagnosisFacts} />
           </div>
         </section>
 
@@ -542,6 +547,48 @@ function DiagnosisCard({
   );
 }
 
+function FactGroup({
+  icon,
+  label,
+  facts,
+}: {
+  icon: CategoryIconName;
+  label: string;
+  facts: KnownFact[];
+}) {
+  return (
+    <div style={styles.factGroup}>
+      <div style={styles.factGroupHeader}>
+        <div style={styles.factGroupHeading}>
+          <span style={styles.factGroupIcon} aria-hidden="true">
+            <CategoryIcon name={icon} />
+          </span>
+          <span style={styles.factGroupLabel}>{label}</span>
+        </div>
+        <span style={styles.factGroupMeta}>{facts.length}件</span>
+      </div>
+      <div style={styles.factCard}>
+        {facts.map((fact, index) => (
+          <div
+            key={fact.id}
+            style={
+              index === facts.length - 1
+                ? { ...styles.factRow, borderBottom: "none" }
+                : styles.factRow
+            }
+          >
+            <span style={styles.factLabel}>{fact.label}</span>
+            <div style={styles.factText}>
+              <strong style={styles.factValue}>{fact.value}</strong>
+              <span style={styles.factSource}>{fact.source}</span>
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 function CategoryLabel({
   icon,
   label,
@@ -560,6 +607,25 @@ function CategoryLabel({
 }
 
 function CategoryIcon({ name }: { name: CategoryIconName }) {
+  if (name === "paw") {
+    return (
+      <svg viewBox="0 0 24 24" width="18" height="18" fill="none">
+        <path
+          d="M12 13.2c3 0 5.2 2.1 5.2 4.4 0 1.7-1.2 2.9-2.9 2.9-.8 0-1.5-.3-2.3-.3s-1.5.3-2.3.3c-1.7 0-2.9-1.2-2.9-2.9 0-2.3 2.2-4.4 5.2-4.4Z"
+          stroke="currentColor"
+          strokeWidth="1.8"
+          strokeLinejoin="round"
+        />
+        <path
+          d="M6.8 11.2c1 0 1.8-1 1.8-2.2S7.8 6.8 6.8 6.8 5 7.8 5 9s.8 2.2 1.8 2.2ZM10.3 8.8c1 0 1.8-1.1 1.8-2.4S11.3 4 10.3 4 8.5 5.1 8.5 6.4s.8 2.4 1.8 2.4ZM13.7 8.8c1 0 1.8-1.1 1.8-2.4S14.7 4 13.7 4s-1.8 1.1-1.8 2.4.8 2.4 1.8 2.4ZM17.2 11.2c1 0 1.8-1 1.8-2.2s-.8-2.2-1.8-2.2-1.8 1-1.8 2.2.8 2.2 1.8 2.2Z"
+          stroke="currentColor"
+          strokeWidth="1.8"
+          strokeLinejoin="round"
+        />
+      </svg>
+    );
+  }
+
   if (name === "clipboard") {
     return (
       <svg viewBox="0 0 24 24" width="18" height="18" fill="none">
@@ -1267,6 +1333,50 @@ const styles = {
     fontSize: "13px",
     fontWeight: 620,
     lineHeight: 1.35,
+  },
+  factGroups: {
+    display: "flex",
+    flexDirection: "column" as const,
+    gap: "10px",
+  },
+  factGroup: {
+    display: "flex",
+    flexDirection: "column" as const,
+    gap: "7px",
+  },
+  factGroupHeader: {
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: "10px",
+    padding: "0 4px",
+  },
+  factGroupHeading: {
+    display: "inline-flex",
+    alignItems: "center",
+    gap: "7px",
+    color: TORISETU_TEXT,
+  },
+  factGroupIcon: {
+    width: "20px",
+    height: "20px",
+    color: "rgba(255,255,255,0.84)",
+    display: "inline-flex",
+    alignItems: "center",
+    justifyContent: "center",
+    flexShrink: 0,
+  },
+  factGroupLabel: {
+    color: TORISETU_TEXT,
+    fontSize: "13px",
+    fontWeight: 670,
+    lineHeight: 1.3,
+  },
+  factGroupMeta: {
+    color: TORISETU_FAINT,
+    fontSize: "11px",
+    fontWeight: 540,
+    lineHeight: 1.3,
   },
   factCard: {
     ...TORISETU_SURFACE_SOFT,
