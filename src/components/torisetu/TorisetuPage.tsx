@@ -219,7 +219,8 @@ export function TorisetuPage({ recentEvents }: TorisetuPageProps) {
     catProfile?.avatarDataUrl ??
     catProfile?.homePhotoDataUrl ??
     getCatAvatarSrcForCoat(catProfile?.appearance?.coat);
-  const typeLabel = catProfile?.typeLabel ?? "観察中";
+  const typeLabel = catProfile?.typeLabel ?? "タイプ未診断";
+  const shouldShowTypeBadge = Boolean(catProfile?.typeLabel);
 
   const answeredDeepDives = DEEP_DIVE_CARDS.map((card) => answers[card.id]).filter(
     Boolean,
@@ -295,6 +296,23 @@ export function TorisetuPage({ recentEvents }: TorisetuPageProps) {
   const lockedDiagnoses = diagnosisItems.filter((item) => item.status === "locked");
   const readyDiagnosis = readyDiagnoses[0] ?? null;
   const nextDiagnosis = readyDiagnosis ?? lockedDiagnoses[0] ?? null;
+  const dashboardItems = [
+    {
+      label: "みっけ",
+      value: String(recordCount),
+      note: "手がかり",
+    },
+    {
+      label: "トリセツ",
+      value: String(diagnosisFacts.length),
+      note: "読める",
+    },
+    {
+      label: "診断",
+      value: readyDiagnosis ? "開く" : nextDiagnosis ? `あと${nextDiagnosis.remaining}` : "完了",
+      note: readyDiagnosis?.card.title ?? nextDiagnosis?.card.title ?? "深掘り",
+    },
+  ];
 
   function handleAnswer(option: DeepDiveOption) {
     if (!catProfile || !activeDive) return;
@@ -334,7 +352,9 @@ export function TorisetuPage({ recentEvents }: TorisetuPageProps) {
         <section style={styles.libraryHero}>
           <div style={styles.libraryHeroTop}>
             <span style={styles.libraryHeroLabel}>トリセツ</span>
-            <span style={styles.headerBadge}>{typeLabel}</span>
+            {shouldShowTypeBadge ? (
+              <span style={styles.headerBadge}>{typeLabel}</span>
+            ) : null}
           </div>
           <p style={styles.libraryHeroMain}>
             {readyDiagnosis
@@ -343,6 +363,15 @@ export function TorisetuPage({ recentEvents }: TorisetuPageProps) {
                 ? `${nextDiagnosis.card.title}まであと${nextDiagnosis.remaining}回`
                 : "見返せる手がかりがここにたまります。"}
           </p>
+          <div style={styles.libraryDashboard}>
+            {dashboardItems.map((item) => (
+              <div key={item.label} style={styles.libraryDashboardItem}>
+                <span style={styles.libraryDashboardLabel}>{item.label}</span>
+                <strong style={styles.libraryDashboardValue}>{item.value}</strong>
+                <span style={styles.libraryDashboardNote}>{item.note}</span>
+              </div>
+            ))}
+          </div>
           {!readyDiagnosis && nextDiagnosis ? (
             <a href="/home" style={styles.heroActionLink}>
               今日のみっけを残す
@@ -350,11 +379,12 @@ export function TorisetuPage({ recentEvents }: TorisetuPageProps) {
           ) : null}
         </section>
 
-        <section style={styles.section}>
-          <div style={styles.sectionHeaderInline}>
-            <CategoryLabel icon="sparkles" label="わかったこと" />
-          </div>
-
+        <section style={{ ...styles.sectionFrame, ...styles.sectionFrameKnowledge }}>
+          <CategoryLabel
+            icon="sparkles"
+            label="見返す"
+            description="みっけと診断でわかったこと"
+          />
           <div style={styles.factGroups}>
             <FactGroup icon="paw" label="みっけから" facts={mikkeFacts} />
             <FactCardShelf
@@ -366,11 +396,12 @@ export function TorisetuPage({ recentEvents }: TorisetuPageProps) {
           </div>
         </section>
 
-        <section style={styles.section}>
-          <div style={styles.sectionHeaderInline}>
-            <CategoryLabel icon="clipboard" label="診断する" />
-          </div>
-
+        <section style={{ ...styles.sectionFrame, ...styles.sectionFrameAction }}>
+          <CategoryLabel
+            icon="clipboard"
+            label="答える"
+            description="開いた診断でさらに深掘り"
+          />
           {readyDiagnoses.length > 0 ? (
             <div style={styles.diagnosisList}>
               {readyDiagnoses.map((item) => (
@@ -391,10 +422,12 @@ export function TorisetuPage({ recentEvents }: TorisetuPageProps) {
         </section>
 
         {lockedDiagnoses.length > 0 ? (
-          <section style={styles.section}>
-            <div style={styles.sectionHeaderInline}>
-              <CategoryLabel icon="lock" label="これから開く" />
-            </div>
+          <section style={{ ...styles.sectionFrame, ...styles.sectionFrameLocked }}>
+            <CategoryLabel
+              icon="lock"
+              label="これから開く"
+              description="みっけが増えると順番に増えます"
+            />
             <div style={styles.diagnosisShelf}>
               {lockedDiagnoses.map((item) => (
                 <button
@@ -624,17 +657,24 @@ function FactCardShelf({
 function CategoryLabel({
   icon,
   label,
+  description,
 }: {
   icon: CategoryIconName;
   label: string;
+  description?: string;
 }) {
   return (
-    <h2 style={styles.categoryLabel}>
-      <span style={styles.categoryIcon} aria-hidden="true">
+    <div style={styles.categoryHeader}>
+      <span style={styles.categoryIconWrap} aria-hidden="true">
         <CategoryIcon name={icon} />
       </span>
-      <span>{label}</span>
-    </h2>
+      <div style={styles.categoryText}>
+        <h2 style={styles.categoryLabel}>{label}</h2>
+        {description ? (
+          <p style={styles.categoryDescription}>{description}</p>
+        ) : null}
+      </div>
+    </div>
   );
 }
 
@@ -1033,7 +1073,7 @@ const styles = {
     background: "rgba(255,255,255,0.10)",
     color: TORISETU_TEXT,
     fontSize: "11px",
-    fontWeight: 620,
+    fontWeight: 540,
     padding: "3px 9px",
     backdropFilter: "blur(18px)",
     WebkitBackdropFilter: "blur(18px)",
@@ -1042,12 +1082,12 @@ const styles = {
     margin: "0 0 4px",
     color: TORISETU_MUTED,
     fontSize: "11px",
-    fontWeight: 620,
+    fontWeight: 540,
     letterSpacing: "0.04em",
   },
   title: {
     fontSize: "22px",
-    fontWeight: 680,
+    fontWeight: 620,
     color: TORISETU_TEXT_STRONG,
     margin: 0,
     lineHeight: 1.28,
@@ -1147,15 +1187,55 @@ const styles = {
   libraryHeroLabel: {
     color: TORISETU_TEXT_STRONG,
     fontSize: "15px",
-    fontWeight: 660,
+    fontWeight: 560,
     lineHeight: 1.4,
   },
   libraryHeroMain: {
     margin: "2px 0 0",
     color: TORISETU_TEXT_STRONG,
-    fontSize: "18px",
-    fontWeight: 680,
+    fontSize: "17px",
+    fontWeight: 590,
     lineHeight: 1.45,
+  },
+  libraryDashboard: {
+    display: "grid",
+    gridTemplateColumns: "repeat(3, 1fr)",
+    gap: "7px",
+    marginTop: "14px",
+  },
+  libraryDashboardItem: {
+    borderRadius: "16px",
+    background: "rgba(255,255,255,0.09)",
+    border: "0.5px solid rgba(255,255,255,0.12)",
+    padding: "9px 8px",
+    display: "flex",
+    flexDirection: "column" as const,
+    gap: "2px",
+    minWidth: 0,
+  },
+  libraryDashboardLabel: {
+    color: TORISETU_MUTED,
+    fontSize: "10px",
+    fontWeight: 500,
+    lineHeight: 1.2,
+  },
+  libraryDashboardValue: {
+    color: TORISETU_TEXT_STRONG,
+    fontSize: "18px",
+    fontWeight: 610,
+    lineHeight: 1.15,
+    overflow: "hidden",
+    textOverflow: "ellipsis",
+    whiteSpace: "nowrap" as const,
+  },
+  libraryDashboardNote: {
+    color: TORISETU_FAINT,
+    fontSize: "10px",
+    fontWeight: 500,
+    lineHeight: 1.25,
+    overflow: "hidden",
+    textOverflow: "ellipsis",
+    whiteSpace: "nowrap" as const,
   },
   heroActionLink: {
     display: "inline-flex",
@@ -1167,7 +1247,7 @@ const styles = {
     background: "rgba(255,255,255,0.88)",
     color: "#2a2a28",
     fontSize: "12px",
-    fontWeight: 620,
+    fontWeight: 560,
     textDecoration: "none",
     padding: "0 14px",
     boxShadow: "0 8px 18px rgba(0,0,0,0.12)",
@@ -1277,6 +1357,34 @@ const styles = {
   section: {
     marginBottom: "22px",
   },
+  sectionFrame: {
+    position: "relative",
+    borderRadius: "24px",
+    padding: "14px",
+    marginBottom: "18px",
+    background: "rgba(255,255,255,0.075)",
+    border: "0.5px solid rgba(255,255,255,0.13)",
+    boxShadow: "inset 0 1px 0 rgba(255,255,255,0.08)",
+    overflow: "hidden",
+  },
+  sectionFrameKnowledge: {
+    background:
+      "linear-gradient(135deg, rgba(255,255,255,0.11), rgba(255,255,255,0.055))",
+    boxShadow:
+      "inset 3px 0 0 rgba(255,255,255,0.24), inset 0 1px 0 rgba(255,255,255,0.08)",
+  },
+  sectionFrameAction: {
+    background:
+      "linear-gradient(135deg, rgba(255,219,165,0.15), rgba(255,255,255,0.055))",
+    boxShadow:
+      "inset 3px 0 0 rgba(255,214,150,0.38), inset 0 1px 0 rgba(255,255,255,0.08)",
+  },
+  sectionFrameLocked: {
+    background:
+      "linear-gradient(135deg, rgba(180,190,205,0.13), rgba(255,255,255,0.045))",
+    boxShadow:
+      "inset 3px 0 0 rgba(190,200,220,0.22), inset 0 1px 0 rgba(255,255,255,0.08)",
+  },
   sectionHeader: {
     margin: "0 4px 8px",
   },
@@ -1287,6 +1395,16 @@ const styles = {
     gap: "12px",
     margin: "0 4px 11px",
   },
+  categoryHeader: {
+    display: "flex",
+    alignItems: "flex-start",
+    gap: "9px",
+    margin: "0 0 13px",
+  },
+  categoryText: {
+    minWidth: 0,
+    flex: 1,
+  },
   categoryLabel: {
     display: "inline-flex",
     alignItems: "center",
@@ -1294,9 +1412,28 @@ const styles = {
     margin: 0,
     color: TORISETU_TEXT_STRONG,
     fontSize: "15px",
-    fontWeight: 690,
+    fontWeight: 600,
     lineHeight: 1.25,
     letterSpacing: "0.01em",
+  },
+  categoryDescription: {
+    margin: "3px 0 0",
+    color: TORISETU_FAINT,
+    fontSize: "11px",
+    fontWeight: 460,
+    lineHeight: 1.45,
+  },
+  categoryIconWrap: {
+    width: "26px",
+    height: "26px",
+    borderRadius: "10px",
+    color: "rgba(255,255,255,0.9)",
+    background: "rgba(255,255,255,0.08)",
+    border: "0.5px solid rgba(255,255,255,0.10)",
+    display: "inline-flex",
+    alignItems: "center",
+    justifyContent: "center",
+    flexShrink: 0,
   },
   categoryIcon: {
     width: "22px",
@@ -1342,7 +1479,7 @@ const styles = {
   factGroups: {
     display: "flex",
     flexDirection: "column" as const,
-    gap: "16px",
+    gap: "14px",
   },
   factGroup: {
     display: "flex",
@@ -1374,7 +1511,7 @@ const styles = {
   factGroupLabel: {
     color: TORISETU_TEXT,
     fontSize: "13px",
-    fontWeight: 670,
+    fontWeight: 560,
     lineHeight: 1.3,
   },
   factCard: {
@@ -1400,7 +1537,7 @@ const styles = {
   factLabel: {
     color: TORISETU_FAINT,
     fontSize: "12px",
-    fontWeight: 560,
+    fontWeight: 470,
     lineHeight: 1.45,
   },
   factText: {
@@ -1413,7 +1550,7 @@ const styles = {
   factValue: {
     color: TORISETU_TEXT_STRONG,
     fontSize: "14px",
-    fontWeight: 640,
+    fontWeight: 560,
     lineHeight: 1.45,
     textAlign: "right" as const,
   },
@@ -1486,7 +1623,7 @@ const styles = {
   torisetuFactLabel: {
     color: TORISETU_TEXT_STRONG,
     fontSize: "16px",
-    fontWeight: 680,
+    fontWeight: 590,
     lineHeight: 1.32,
     overflow: "hidden",
     textOverflow: "ellipsis",
@@ -1508,7 +1645,7 @@ const styles = {
   emptyStateText: {
     color: TORISETU_MUTED,
     fontSize: "13px",
-    fontWeight: 540,
+    fontWeight: 460,
     lineHeight: 1.55,
   },
   diagnosisCard: {
@@ -1569,7 +1706,7 @@ const styles = {
     margin: 0,
     color: TORISETU_TEXT_STRONG,
     fontSize: "16px",
-    fontWeight: 660,
+    fontWeight: 590,
     lineHeight: 1.38,
   },
   diagnosisBody: {
@@ -1587,7 +1724,7 @@ const styles = {
     background: "rgba(255,255,255,0.92)",
     color: "#2a2a28",
     fontSize: "12px",
-    fontWeight: 620,
+    fontWeight: 560,
     padding: "0 14px",
     cursor: "pointer",
   },
@@ -1625,7 +1762,7 @@ const styles = {
   diagnosisShelfTitle: {
     color: TORISETU_TEXT,
     fontSize: "13px",
-    fontWeight: 600,
+    fontWeight: 540,
     lineHeight: 1.45,
   },
   diagnosisShelfMeta: {
@@ -2176,14 +2313,14 @@ const styles = {
     margin: "0 0 4px",
     color: TORISETU_MUTED,
     fontSize: "11px",
-    fontWeight: 620,
+    fontWeight: 520,
     letterSpacing: "0.04em",
   },
   sheetTitle: {
     margin: 0,
     color: TORISETU_TEXT_STRONG,
     fontSize: "20px",
-    fontWeight: 680,
+    fontWeight: 610,
   },
   sheetClose: {
     width: "34px",
@@ -2199,14 +2336,14 @@ const styles = {
     margin: "0 0 14px",
     color: TORISETU_TEXT,
     fontSize: "15px",
-    fontWeight: 600,
+    fontWeight: 540,
     lineHeight: 1.55,
   },
   resultValue: {
     margin: "0 0 10px",
     color: TORISETU_TEXT_STRONG,
     fontSize: "18px",
-    fontWeight: 680,
+    fontWeight: 590,
     lineHeight: 1.45,
   },
   resultDetail: {
@@ -2228,7 +2365,7 @@ const styles = {
     background: "rgba(255,255,255,0.10)",
     color: TORISETU_TEXT_STRONG,
     fontSize: "14px",
-    fontWeight: 620,
+    fontWeight: 540,
     cursor: "pointer",
     padding: "10px",
     backdropFilter: "blur(18px)",
