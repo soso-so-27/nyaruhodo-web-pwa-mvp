@@ -167,7 +167,6 @@ export function TorisetuPage({ recentEvents }: TorisetuPageProps) {
     getCatAvatarSrcForCoat(catProfile?.appearance?.coat);
   const hasTypeDiagnosis = Boolean(catProfile?.typeKey && catProfile?.typeLabel);
   const typeLabel = catProfile?.typeLabel ?? "タイプ未診断";
-  const shouldShowTypeBadge = Boolean(catProfile?.typeLabel);
 
   const hasRhythmSignal = dayMap.some((item) => item.signal);
   const peakTime = catProfile?.activityPattern?.peakTime;
@@ -234,12 +233,12 @@ export function TorisetuPage({ recentEvents }: TorisetuPageProps) {
       value: String(recordCount),
     },
     {
-      label: "トリセツ",
+      label: "見返す",
       value: String(diagnosisFacts.length),
     },
     {
-      label: "診断",
-      value: hasTypeDiagnosis ? "済" : "開く",
+      label: "未開封",
+      value: String(lockedDiagnoses.length),
     },
   ];
 
@@ -320,17 +319,6 @@ export function TorisetuPage({ recentEvents }: TorisetuPageProps) {
         </header>
 
         <section style={styles.libraryHero}>
-          <div style={styles.libraryHeroTop}>
-            <span style={styles.libraryHeroLabel}>トリセツ</span>
-            {shouldShowTypeBadge ? (
-              <span style={styles.headerBadge}>{typeLabel}</span>
-            ) : null}
-          </div>
-          <p style={styles.libraryHeroMain}>
-            {hasTypeDiagnosis
-              ? "診断結果を見返せます。"
-              : "タイプ診断が開いています。"}
-          </p>
           <div style={styles.libraryDashboard}>
             {dashboardItems.map((item) => (
               <div key={item.label} style={styles.libraryDashboardItem}>
@@ -981,18 +969,6 @@ const styles = {
     minWidth: 0,
     flex: 1,
   },
-  headerBadge: {
-    flexShrink: 0,
-    borderRadius: "99px",
-    border: "0.5px solid rgba(255,255,255,0.2)",
-    background: "rgba(255,255,255,0.10)",
-    color: TORISETU_TEXT,
-    fontSize: "11px",
-    fontWeight: 540,
-    padding: "3px 9px",
-    backdropFilter: "blur(18px)",
-    WebkitBackdropFilter: "blur(18px)",
-  },
   eyebrow: {
     margin: "0 0 4px",
     color: TORISETU_MUTED,
@@ -1087,85 +1063,34 @@ const styles = {
     marginBottom: "16px",
   },
   libraryHero: {
-    ...TORISETU_SURFACE,
-    borderRadius: "24px",
-    padding: "14px",
-    marginBottom: "16px",
-  },
-  libraryHeroTop: {
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "space-between",
-    gap: "12px",
-    marginBottom: "12px",
-  },
-  libraryHeroLabel: {
-    color: TORISETU_TEXT_STRONG,
-    fontSize: "15px",
-    fontWeight: 560,
-    lineHeight: 1.4,
-  },
-  libraryHeroMain: {
-    margin: "2px 0 0",
-    color: TORISETU_TEXT_STRONG,
-    fontSize: "17px",
-    fontWeight: 590,
-    lineHeight: 1.45,
+    margin: "-2px 4px 18px",
   },
   libraryDashboard: {
-    display: "grid",
-    gridTemplateColumns: "repeat(3, 1fr)",
-    gap: "7px",
-    marginTop: "14px",
+    display: "flex",
+    alignItems: "center",
+    gap: "18px",
+    minWidth: 0,
   },
   libraryDashboardItem: {
-    borderRadius: "16px",
-    background: "rgba(255,255,255,0.09)",
-    border: "0.5px solid rgba(255,255,255,0.12)",
-    padding: "9px 8px",
-    display: "flex",
-    flexDirection: "column" as const,
-    gap: "2px",
+    display: "inline-flex",
+    alignItems: "baseline",
+    gap: "5px",
     minWidth: 0,
   },
   libraryDashboardLabel: {
-    color: TORISETU_MUTED,
-    fontSize: "10px",
-    fontWeight: 500,
+    color: TORISETU_FAINT,
+    fontSize: "11px",
+    fontWeight: 520,
     lineHeight: 1.2,
   },
   libraryDashboardValue: {
-    color: TORISETU_TEXT_STRONG,
-    fontSize: "18px",
-    fontWeight: 610,
+    color: TORISETU_TEXT,
+    fontSize: "13px",
+    fontWeight: 570,
     lineHeight: 1.15,
     overflow: "hidden",
     textOverflow: "ellipsis",
     whiteSpace: "nowrap" as const,
-  },
-  libraryDashboardNote: {
-    color: TORISETU_FAINT,
-    fontSize: "10px",
-    fontWeight: 500,
-    lineHeight: 1.25,
-    overflow: "hidden",
-    textOverflow: "ellipsis",
-    whiteSpace: "nowrap" as const,
-  },
-  heroActionLink: {
-    display: "inline-flex",
-    alignItems: "center",
-    justifyContent: "center",
-    minHeight: "34px",
-    marginTop: "12px",
-    borderRadius: "99px",
-    background: "rgba(255,255,255,0.88)",
-    color: "#2a2a28",
-    fontSize: "12px",
-    fontWeight: 560,
-    textDecoration: "none",
-    padding: "0 14px",
-    boxShadow: "0 8px 18px rgba(0,0,0,0.12)",
   },
   progressHeader: {
     display: "flex",
