@@ -108,27 +108,27 @@ const peakTimeMap: Record<string, string[]> = {
 const LOCKED_DIAGNOSIS_SAMPLES: LockedDiagnosisCard[] = [
   {
     id: "mood",
-    title: "ごきげん",
+    title: "ごきげん診断",
     threshold: 8,
   },
   {
     id: "play",
-    title: "遊び",
+    title: "遊び診断",
     threshold: 15,
   },
   {
     id: "food",
-    title: "食事",
+    title: "食事診断",
     threshold: 20,
   },
   {
     id: "stress",
-    title: "不安サイン",
+    title: "不安サイン診断",
     threshold: 25,
   },
   {
     id: "bond",
-    title: "距離",
+    title: "距離感診断",
     threshold: 30,
   },
 ];
@@ -345,7 +345,6 @@ export function TorisetuPage({ recentEvents }: TorisetuPageProps) {
           <CategoryLabel
             icon="sparkles"
             label="見返す"
-            description="みっけと診断でわかったこと"
           />
           <div style={styles.factGroups}>
             <FactGroup icon="paw" label="みっけから" facts={mikkeFacts} />
@@ -365,7 +364,6 @@ export function TorisetuPage({ recentEvents }: TorisetuPageProps) {
             <CategoryLabel
               icon="clipboard"
               label="答える"
-              description="いま使える診断"
             />
             <div style={styles.diagnosisList}>
               <TypeDiagnosisCard onStart={handleStartTypeDiagnosis} />
@@ -377,8 +375,7 @@ export function TorisetuPage({ recentEvents }: TorisetuPageProps) {
           <section style={{ ...styles.sectionFrame, ...styles.sectionFrameLocked }}>
             <CategoryLabel
               icon="lock"
-              label="これから開く"
-              description="みっけが増えると順番に増えます"
+              label="未開封のトリセツ"
             />
             <div style={styles.diagnosisShelf}>
               {lockedDiagnoses.map((item) => (
@@ -607,11 +604,9 @@ function FactCardShelf({
 function CategoryLabel({
   icon,
   label,
-  description,
 }: {
   icon: CategoryIconName;
   label: string;
-  description?: string;
 }) {
   return (
     <div style={styles.categoryHeader}>
@@ -620,9 +615,6 @@ function CategoryLabel({
       </span>
       <div style={styles.categoryText}>
         <h2 style={styles.categoryLabel}>{label}</h2>
-        {description ? (
-          <p style={styles.categoryDescription}>{description}</p>
-        ) : null}
       </div>
     </div>
   );
@@ -1339,13 +1331,6 @@ const styles = {
     lineHeight: 1.25,
     letterSpacing: "0.01em",
   },
-  categoryDescription: {
-    margin: "3px 0 0",
-    color: TORISETU_FAINT,
-    fontSize: "11px",
-    fontWeight: 460,
-    lineHeight: 1.45,
-  },
   categoryIconWrap: {
     width: "26px",
     height: "26px",
@@ -1661,8 +1646,8 @@ const styles = {
   diagnosisShelf: {
     display: "flex",
     gap: "10px",
-    margin: "0 -16px",
-    padding: "0 16px 4px",
+    margin: 0,
+    padding: "0 2px 4px 0",
     overflowX: "auto" as const,
     scrollbarWidth: "none" as const,
     scrollSnapType: "x proximity",
