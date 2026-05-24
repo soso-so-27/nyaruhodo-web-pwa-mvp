@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { CSSProperties, TouchEvent } from "react";
+import { syncLocalDataWithAccount } from "../../lib/accountSync";
 import { trackProductEvent } from "../../lib/analytics/productAnalytics";
 import {
   getDailyCollectionTarget,
@@ -209,6 +210,40 @@ export function HomeInput({ recentEvents: _recentEvents }: HomeInputProps) {
         userId,
       },
     );
+
+    const syncResult = await syncLocalDataWithAccount({
+      restoreIfLocalEmpty: true,
+    });
+
+    trackProductEvent(
+      "account_data_sync_completed",
+      {
+        status: syncResult.status,
+        pushed_cats: syncResult.pushedCats,
+        pushed_records: syncResult.pushedRecords,
+        pushed_collection_photos: syncResult.pushedCollectionPhotos,
+        restored_cats: syncResult.restoredCats,
+        restored_records: syncResult.restoredRecords,
+        restored_collection_photos: syncResult.restoredCollectionPhotos,
+        error_count: syncResult.errors.length,
+      },
+      {
+        localCatId,
+        userId,
+      },
+    );
+
+    if (syncResult.status === "restored" && syncResult.restoredCats > 0) {
+      const profiles = readCatProfiles();
+      const activeId = readActiveCatId();
+      const active = getActiveCatProfile(profiles, activeId);
+
+      setCatProfiles(profiles);
+      setActiveCatId(active.id);
+      setActiveCat(active);
+      saveActiveCatId(active.id);
+      hydrateCatState(active.id);
+    }
   }
 
   const catName = activeCat ? getCatName(activeCat) : "ねこ";

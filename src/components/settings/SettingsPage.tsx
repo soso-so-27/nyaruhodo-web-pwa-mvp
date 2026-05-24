@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import type { CSSProperties } from "react";
+import { syncLocalDataWithAccount } from "../../lib/accountSync";
 import { createBrowserSupabaseClient } from "../../lib/supabase/browser";
 import {
   APP_ACCENT,
@@ -13,7 +14,9 @@ import {
 export function SettingsPage() {
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
+  const [isSyncing, setIsSyncing] = useState(false);
   const [email, setEmail] = useState<string | null>(null);
+  const [syncMessage, setSyncMessage] = useState("");
 
   useEffect(() => {
     void checkAuthState();
@@ -39,6 +42,26 @@ export function SettingsPage() {
     await supabase.auth.signOut();
     setIsLoggedIn(false);
     setEmail(null);
+    setSyncMessage("");
+  }
+
+  async function handleSyncNow() {
+    setIsSyncing(true);
+    setSyncMessage("");
+
+    const result = await syncLocalDataWithAccount({ restoreIfLocalEmpty: true });
+
+    if (result.status === "synced") {
+      setSyncMessage("この端末のデータをアカウントに保存しました。");
+    } else if (result.status === "restored") {
+      setSyncMessage("アカウントのデータをこの端末に復元しました。");
+    } else if (result.status === "error") {
+      setSyncMessage("同期できませんでした。少し時間をおいてもう一度お試しください。");
+    } else {
+      setSyncMessage("同期できるデータはまだありません。");
+    }
+
+    setIsSyncing(false);
   }
 
   return (
@@ -65,6 +88,22 @@ export function SettingsPage() {
                   </div>
                   <span style={styles.rowValue}>{email ?? ""}</span>
                 </div>
+                <div style={styles.divider} />
+                <button
+                  type="button"
+                  onClick={() => {
+                    void handleSyncNow();
+                  }}
+                  style={styles.primaryButton}
+                  disabled={isSyncing}
+                >
+                  {isSyncing ? "同期中..." : "この端末のデータを同期する"}
+                </button>
+                {syncMessage ? (
+                  <p style={styles.syncMessage} role="status">
+                    {syncMessage}
+                  </p>
+                ) : null}
                 <div style={styles.divider} />
                 <button
                   type="button"
@@ -242,13 +281,24 @@ const styles = {
     padding: "14px 0",
     margin: 0,
   },
+  syncMessage: {
+    fontSize: "12px",
+    color: "#8a8a80",
+    lineHeight: 1.6,
+    margin: "0",
+    padding: "0 0 12px",
+    textAlign: "center" as const,
+  },
   primaryButton: {
     display: "block",
+    width: "100%",
     textAlign: "center" as const,
     padding: "14px 0",
     fontSize: "15px",
     fontWeight: 600,
     color: APP_ACCENT,
+    background: "transparent",
+    border: "none",
     textDecoration: "none",
     cursor: "pointer",
   },
