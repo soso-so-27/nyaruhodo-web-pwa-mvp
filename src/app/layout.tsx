@@ -3,6 +3,9 @@ import type { Metadata, Viewport } from "next";
 import { AppAnalyticsTracker } from "../components/analytics/AppAnalyticsTracker";
 
 export const metadata: Metadata = {
+  metadataBase: new URL(
+    process.env.NEXT_PUBLIC_SITE_URL ?? "https://nyaruhodo-web-pwa-mvp.vercel.app",
+  ),
   title: "にゃるほど",
   description: "猫の様子から、飼い主の迷いを減らすアプリ",
   applicationName: "にゃるほど",
