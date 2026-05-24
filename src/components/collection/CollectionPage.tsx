@@ -6,6 +6,7 @@ import {
   getCollectionSlotPhotoSlug,
   getDailyCollectionTarget,
 } from "../../lib/collection/dailyTarget";
+import { trackProductEvent } from "../../lib/analytics/productAnalytics";
 import { STORAGE_KEYS } from "../../lib/storage";
 import {
   COLLECTION_GROUPS,
@@ -69,6 +70,8 @@ export function CollectionPage() {
   const [isCatSheetOpen, setIsCatSheetOpen] = useState(false);
   const [toastText, setToastText] = useState("");
   const toastTimerRef = useRef<number | null>(null);
+  const trackedViewCatIdRef = useRef<string | null>(null);
+  const trackedDailyTargetRef = useRef<string | null>(null);
 
   useEffect(() => {
     const profiles = readCatProfiles();
@@ -131,7 +134,69 @@ export function CollectionPage() {
     ? photosBySlot.get(selectedSlot.id) ?? []
     : [];
 
-  function openSheet(slot: CollectionSlot) {
+  useEffect(() => {
+    if (!hasLoaded || !activeCatId || trackedViewCatIdRef.current === activeCatId) {
+      return;
+    }
+
+    trackedViewCatIdRef.current = activeCatId;
+    trackProductEvent(
+      "collection_viewed",
+      {
+        photo_count: storedCollectionPhotos.length,
+        collected_slot_count: photosBySlot.size,
+        total_slot_count: COLLECTION_GROUPS.reduce(
+          (total, group) => total + group.slots.length,
+          0,
+        ),
+        active_group_id: activeGroupId,
+        daily_target_slot_id: dailyTargetSlot?.id ?? null,
+      },
+      { localCatId: activeCatId },
+    );
+  }, [
+    activeCatId,
+    activeGroupId,
+    dailyTargetSlot?.id,
+    hasLoaded,
+    photosBySlot.size,
+    storedCollectionPhotos.length,
+  ]);
+
+  useEffect(() => {
+    if (!activeCatId || !dailyTargetSlot) {
+      return;
+    }
+
+    const trackingKey = `${activeCatId}:${dailyTargetSlot.id}`;
+    if (trackedDailyTargetRef.current === trackingKey) {
+      return;
+    }
+
+    trackedDailyTargetRef.current = trackingKey;
+    trackProductEvent(
+      "collection_target_viewed",
+      {
+        slot_id: dailyTargetSlot.id,
+        slot_slug: getCollectionPhotoSlug(dailyTargetSlot),
+        group_id: getCollectionGroupIdForSlot(dailyTargetSlot),
+      },
+      { localCatId: activeCatId },
+    );
+  }, [activeCatId, dailyTargetSlot]);
+
+  function openSheet(slot: CollectionSlot, entry: "daily_target" | "grid" = "grid") {
+    trackProductEvent(
+      "collection_slot_opened",
+      {
+        slot_id: slot.id,
+        slot_slug: getCollectionPhotoSlug(slot),
+        group_id: getCollectionGroupIdForSlot(slot),
+        entry,
+        photo_count: photosBySlot.get(slot.id)?.length ?? 0,
+      },
+      { localCatId: activeCatId },
+    );
     setSelectedSlug(getCollectionPhotoSlug(slot));
     setCurrentPhotoIndex(0);
   }
@@ -150,10 +215,29 @@ export function CollectionPage() {
     setIsCatSheetOpen(false);
   }
 
+  function handleGroupSelect(groupId: CollectionGroupId) {
+    setActiveGroupId(groupId);
+    trackProductEvent(
+      "collection_group_selected",
+      { group_id: groupId },
+      { localCatId: activeCatId },
+    );
+  }
+
   async function handlePhotoAdd(slot: CollectionSlot) {
     if (!activeCatId) {
       return;
     }
+
+    trackProductEvent(
+      "collection_photo_add_started",
+      {
+        slot_id: slot.id,
+        slot_slug: getCollectionPhotoSlug(slot),
+        group_id: getCollectionGroupIdForSlot(slot),
+      },
+      { localCatId: activeCatId },
+    );
 
     const input = document.createElement("input");
     input.type = "file";
@@ -179,6 +263,26 @@ export function CollectionPage() {
         ...current,
         [slug]: [...(current[slug] ?? []), dataUrl],
       }));
+      trackProductEvent(
+        "collection_photo_added",
+        {
+          slot_id: slot.id,
+          slot_slug: slug,
+          group_id: getCollectionGroupIdForSlot(slot),
+          file_size_bucket: getFileSizeBucket(file.size),
+          photo_count_after: (collectionPhotos[slug]?.length ?? 0) + 1,
+        },
+        { localCatId: activeCatId },
+      );
+      trackProductEvent(
+        "collection_pose_found",
+        {
+          slot_id: slot.id,
+          slot_slug: slug,
+          group_id: getCollectionGroupIdForSlot(slot),
+        },
+        { localCatId: activeCatId },
+      );
       showToast(`${getCollectionSlotLabel(slot)}を見つけた`);
     };
 
@@ -201,6 +305,17 @@ export function CollectionPage() {
     if (photos.length === 0) {
       return;
     }
+
+    trackProductEvent(
+      "collection_share_tapped",
+      {
+        slot_id: slot.id,
+        slot_slug: getCollectionPhotoSlug(slot),
+        group_id: getCollectionGroupIdForSlot(slot),
+        photo_count: photos.length,
+      },
+      { localCatId: activeCatId },
+    );
 
     const label = getCollectionSlotLabel(slot);
     const shareText = `${catName}の${label}を見つけたよ`;
@@ -337,12 +452,12 @@ export function CollectionPage() {
           <CollectionProgress
             activeGroupId={activeGroupId}
             progress={progress}
-            onSelectGroup={setActiveGroupId}
+            onSelectGroup={handleGroupSelect}
           />
           {dailyTargetSlot ? (
             <DailyCollectionTarget
               slot={dailyTargetSlot}
-              onOpenSlot={openSheet}
+              onOpenSlot={(slot) => openSheet(slot, "daily_target")}
             />
           ) : null}
         </header>
@@ -351,7 +466,7 @@ export function CollectionPage() {
           group={activeGroup}
           photosBySlot={photosBySlot}
           dailyTargetSlotId={dailyTargetSlot?.id ?? null}
-          onOpenSlot={openSheet}
+          onOpenSlot={(slot) => openSheet(slot, "grid")}
         />
       </div>
       {selectedSlot ? (
@@ -1061,12 +1176,27 @@ function getCollectionPhotoSlug(slot: CollectionSlot) {
   return getCollectionSlotPhotoSlug(slot);
 }
 
+function getCollectionGroupIdForSlot(slot: CollectionSlot): CollectionGroupId | null {
+  return (
+    COLLECTION_GROUPS.find((group) =>
+      group.slots.some((groupSlot) => groupSlot.id === slot.id),
+    )?.id ?? null
+  );
+}
+
 function getCollectionSlotBySlug(slug: string) {
   return (
     COLLECTION_GROUPS.flatMap((group) => group.slots).find(
       (slot) => getCollectionPhotoSlug(slot) === slug,
     ) ?? null
   );
+}
+
+function getFileSizeBucket(size: number) {
+  if (size < 500_000) return "under_500kb";
+  if (size < 2_000_000) return "500kb_2mb";
+  if (size < 5_000_000) return "2mb_5mb";
+  return "over_5mb";
 }
 
 function buildCollectionProgress(

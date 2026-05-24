@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { CSSProperties, TouchEvent } from "react";
+import { trackProductEvent } from "../../lib/analytics/productAnalytics";
 import {
   getDailyCollectionTarget,
   readStoredCollectionPhotos,
@@ -122,6 +123,7 @@ export function HomeInput({ recentEvents: _recentEvents }: HomeInputProps) {
   );
   const [toastText, setToastText] = useState("");
   const [discoveryDismissedToday, setDiscoveryDismissedToday] = useState(false);
+  const hasTrackedHomeView = useRef(false);
 
   useEffect(() => {
     const profiles = readCatProfiles();
@@ -226,6 +228,23 @@ export function HomeInput({ recentEvents: _recentEvents }: HomeInputProps) {
     };
   }, [homePhotoPosition, photoSrc]);
 
+  useEffect(() => {
+    if (hasTrackedHomeView.current || !activeCatId || !activeCat) {
+      return;
+    }
+    hasTrackedHomeView.current = true;
+    trackProductEvent(
+      "home_viewed",
+      {
+        cat_count: catProfiles.length,
+        has_active_cat: true,
+        has_home_photo: Boolean(activeCat.homePhotoDataUrl),
+        record_count: recordLog.length,
+      },
+      { localCatId: activeCatId },
+    );
+  }, [activeCat, activeCatId, catProfiles.length, recordLog.length]);
+
   function hydrateCatState(catId: string) {
     setLockData(readLockData(catId));
     setDiscoveryDismissedToday(hasSeenDiscoveryToday(catId));
@@ -295,9 +314,18 @@ export function HomeInput({ recentEvents: _recentEvents }: HomeInputProps) {
   function recordYousu(value: string) {
     if (!activeCatId || isLocked(lockData, "yousu", Date.now())) return;
 
+    const lockRemainingBefore = yousuRemaining;
     const nextLockData = setLock(activeCatId, "yousu");
 
     saveRecord(activeCatId, { type: "yousu", value });
+    trackProductEvent(
+      "home_mikke_recorded",
+      {
+        value,
+        lock_remaining_before: lockRemainingBefore,
+      },
+      { localCatId: activeCatId },
+    );
     setSelectedYousu(value);
     setRecordLog(readRecordLog(activeCatId));
     setLockData(nextLockData);
@@ -308,9 +336,18 @@ export function HomeInput({ recentEvents: _recentEvents }: HomeInputProps) {
   function recordMugi(value: string) {
     if (!activeCatId || isLocked(lockData, "mugi", Date.now())) return;
 
+    const lockRemainingBefore = mugiRemaining;
     const nextLockData = setLock(activeCatId, "mugi");
 
     saveRecord(activeCatId, { type: "mugi", value });
+    trackProductEvent(
+      "home_care_recorded",
+      {
+        value,
+        lock_remaining_before: lockRemainingBefore,
+      },
+      { localCatId: activeCatId },
+    );
     setSelectedMugi(value);
     setRecordLog(readRecordLog(activeCatId));
     setLockData(nextLockData);
@@ -363,6 +400,14 @@ export function HomeInput({ recentEvents: _recentEvents }: HomeInputProps) {
         saveCatProfiles(nextProfiles);
         setCatProfiles(nextProfiles);
         setActiveCat(nextActive);
+        trackProductEvent(
+          "home_photo_added",
+          {
+            source: "gallery",
+            file_size_bucket: getFileSizeBucket(file.size),
+          },
+          { localCatId: activeCatId },
+        );
         showToast("写真を残したよ");
       } catch {
         showToast("写真を保存できませんでした");
@@ -1049,6 +1094,16 @@ function saveRecord(
 
 function toCssUrl(src: string) {
   return `url("${src.replace(/\\/g, "\\\\").replace(/"/g, '\\"')}")`;
+}
+
+function getFileSizeBucket(size: number) {
+  if (size < 1_000_000) {
+    return "small";
+  }
+  if (size < 5_000_000) {
+    return "medium";
+  }
+  return "large";
 }
 
 function resizeAndEncode(file: File, maxSize = 1200): Promise<string> {

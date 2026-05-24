@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import type { CSSProperties } from "react";
 import { loadCatProfiles, getActiveCatProfile } from "../../lib/catProfiles";
 import { getCatTypeInfo } from "../../lib/diagnosisOnboarding/catTypes";
@@ -16,6 +16,7 @@ import {
 import {
   type TorisetuLockedDiagnosisCard,
 } from "../../lib/torisetu/diagnosisCatalog";
+import { trackProductEvent } from "../../lib/analytics/productAnalytics";
 import { getRecordLogKey } from "../../lib/storage";
 import type { RecentEvent } from "../../lib/supabase/queries";
 import {
@@ -144,6 +145,7 @@ export function TorisetuPage({ recentEvents }: TorisetuPageProps) {
   const [isTypeDiagnosisOpen, setIsTypeDiagnosisOpen] = useState(false);
   const [typeAnswers, setTypeAnswers] = useState<AnswerOption[]>([]);
   const [typeQuestionIndex, setTypeQuestionIndex] = useState(0);
+  const trackedViewCatIdRef = useRef<string | null>(null);
 
   useEffect(() => {
     const profiles = loadCatProfiles();
@@ -245,10 +247,58 @@ export function TorisetuPage({ recentEvents }: TorisetuPageProps) {
     },
   ];
 
+  useEffect(() => {
+    if (!catProfile || trackedViewCatIdRef.current === catProfile.id) {
+      return;
+    }
+
+    trackedViewCatIdRef.current = catProfile.id;
+    trackProductEvent(
+      "torisetu_viewed",
+      {
+        record_count: recordCount,
+        mikke_fact_count: mikkeFacts.length,
+        diagnosis_fact_count: diagnosisFacts.length,
+        locked_diagnosis_count: lockedDiagnoses.length,
+        has_type_diagnosis: hasTypeDiagnosis,
+      },
+      { localCatId: catProfile.id },
+    );
+  }, [
+    catProfile,
+    diagnosisFacts.length,
+    hasTypeDiagnosis,
+    lockedDiagnoses.length,
+    mikkeFacts.length,
+    recordCount,
+  ]);
+
   function handleStartTypeDiagnosis() {
+    trackProductEvent(
+      "torisetu_diagnosis_card_started",
+      {
+        diagnosis_id: "type_diagnosis",
+        question_count: QUESTIONS.length,
+        has_existing_result: hasTypeDiagnosis,
+      },
+      { localCatId: catProfile?.id ?? null },
+    );
     setTypeAnswers([]);
     setTypeQuestionIndex(0);
     setIsTypeDiagnosisOpen(true);
+  }
+
+  function handleOpenFact(fact: KnownFact, section: "diagnosis_result" | "mikke_fact") {
+    trackProductEvent(
+      "torisetu_result_card_opened",
+      {
+        fact_id: fact.id,
+        section,
+        has_detail: Boolean(fact.detail),
+      },
+      { localCatId: catProfile?.id ?? null },
+    );
+    setActiveFact(fact);
   }
 
   function handleTypeAnswer(option: AnswerOption) {
@@ -296,6 +346,15 @@ export function TorisetuPage({ recentEvents }: TorisetuPageProps) {
     );
 
     saveCatProfiles(nextProfiles);
+    trackProductEvent(
+      "torisetu_diagnosis_completed",
+      {
+        diagnosis_id: "type_diagnosis",
+        answered_count: nextAnswers.length,
+        result_type_key: typeKey,
+      },
+      { localCatId: catProfile.id },
+    );
     setCatProfile(
       nextProfiles.find((profile) => profile.id === catProfile.id) ?? catProfile,
     );
@@ -342,7 +401,7 @@ export function TorisetuPage({ recentEvents }: TorisetuPageProps) {
                 icon="clipboard"
                 label="診断結果"
                 facts={diagnosisFacts}
-                onOpenFact={setActiveFact}
+                onOpenFact={(fact) => handleOpenFact(fact, "diagnosis_result")}
               />
             ) : null}
           </div>

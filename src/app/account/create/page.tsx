@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { CSSProperties } from "react";
 import {
   APP_ACCENT,
@@ -11,6 +11,7 @@ import {
   APP_SURFACE,
 } from "../../../components/ui/appTheme";
 import { STORAGE_KEYS } from "../../../lib/storage";
+import { trackProductEvent } from "../../../lib/analytics/productAnalytics";
 import { createBrowserSupabaseClient } from "../../../lib/supabase/browser";
 import { getSiteUrl } from "../../../lib/supabase/config";
 
@@ -25,6 +26,7 @@ export default function AccountCreatePage() {
   const [isCheckingAccount, setIsCheckingAccount] = useState(true);
   const [isAccountConnected, setIsAccountConnected] = useState(false);
   const [connectedEmail, setConnectedEmail] = useState("");
+  const hasTrackedCtaView = useRef(false);
 
   useEffect(() => {
     let isMounted = true;
@@ -60,7 +62,24 @@ export default function AccountCreatePage() {
     };
   }, []);
 
+  useEffect(() => {
+    if (hasTrackedCtaView.current || isCheckingAccount || isAccountConnected) {
+      return;
+    }
+
+    hasTrackedCtaView.current = true;
+    trackProductEvent("account_create_cta_viewed", {
+      route: "/account/create",
+      trigger: "account_create_page",
+    });
+  }, [isAccountConnected, isCheckingAccount]);
+
   async function handleGoogleSignIn() {
+    trackProductEvent("account_create_cta_clicked", {
+      route: "/account/create",
+      trigger: "account_create_page",
+    });
+
     const supabase = createBrowserSupabaseClient();
 
     if (!supabase) {
@@ -70,6 +89,9 @@ export default function AccountCreatePage() {
 
     setIsStartingAuth(true);
     setMessage("");
+    trackProductEvent("auth_google_started", {
+      route: "/account/create",
+    });
 
     const { error } = await supabase.auth.signInWithOAuth({
       provider: "google",
@@ -79,6 +101,9 @@ export default function AccountCreatePage() {
     });
 
     if (error) {
+      trackProductEvent("auth_google_failed", {
+        error_type: "oauth_start_failed",
+      });
       setIsStartingAuth(false);
       setMessage(
         "Googleログインを開始できませんでした。少し時間をおいてもう一度お試しください。",

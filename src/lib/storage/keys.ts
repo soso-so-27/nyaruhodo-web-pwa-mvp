@@ -1,6 +1,9 @@
 export const STORAGE_KEYS = {
   accountCreatePromptDismissed: "account_create_prompt_dismissed",
   activeCatId: "active_cat_id",
+  analyticsAnonymousId: "analytics_anonymous_id",
+  analyticsEventQueue: "analytics_event_queue",
+  analyticsSession: "analytics_session",
   catProfiles: "cat_profiles",
   collectionPhotos: "collection_photos",
   currentCatHintSuppression: "current_cat_hint_suppression",

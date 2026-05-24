@@ -1,7 +1,8 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { CSSProperties } from "react";
+import { trackProductEvent } from "../../lib/analytics/productAnalytics";
 import { getCatTypeInfo } from "../../lib/diagnosisOnboarding/catTypes";
 import {
   PROVISIONAL_QUESTIONS,
@@ -88,14 +89,29 @@ export function DiagnosisOnboardingFlow() {
   const [provisionalType, setProvisionalType] = useState<CatTypeKey | null>(null);
   const [finalType, setFinalType] = useState<CatTypeKey | null>(null);
   const [axisScores, setAxisScores] = useState<AxisScores>(EMPTY_AXIS_SCORES);
+  const hasTrackedStart = useRef(false);
 
   const displayName = catName.trim() || "この子";
   const currentQuestion = allQuestions[currentQuestionIndex];
+
+  useEffect(() => {
+    if (hasTrackedStart.current) {
+      return;
+    }
+    hasTrackedStart.current = true;
+    trackProductEvent("diagnosis_onboarding_started", {
+      has_existing_profile: getStoredCatProfileCount() > 0,
+      entry_source: "diagnosis_onboarding",
+    });
+  }, []);
 
   function handleNameNext() {
     if (!catName.trim()) {
       return;
     }
+    trackProductEvent("diagnosis_name_submitted", {
+      name_length_bucket: getNameLengthBucket(catName.trim()),
+    });
     setCatName(catName.trim());
     setStep("photo");
   }
@@ -124,15 +140,40 @@ export function DiagnosisOnboardingFlow() {
 
       const dataUrl = await resizeAndEncode(file, 800);
       setAvatarDataUrl(dataUrl);
+      trackProductEvent("diagnosis_photo_added", {
+        source: capture ? "camera" : "gallery",
+        file_size_bucket: getFileSizeBucket(file.size),
+      });
       setStep("basicInfo");
     };
 
     input.click();
   }
 
-  function handleAnswer(option: AnswerOption) {
+  function handleBasicInfoNext() {
+    trackProductEvent("diagnosis_basic_info_submitted", {
+      has_birth_date: Boolean(basicInfo.birthDate),
+      has_gender: Boolean(basicInfo.gender),
+      has_breed: Boolean(basicInfo.breed.trim()),
+    });
+    setStep("questions_provisional");
+  }
+
+  function handleBasicInfoSkip() {
+    trackProductEvent("diagnosis_basic_info_skipped");
+    setStep("questions_provisional");
+  }
+
+  function handleAnswer(option: AnswerOption, optionIndex: number) {
     const newAnswers = [...answers, option];
     setAnswers(newAnswers);
+    trackProductEvent("diagnosis_question_answered", {
+      phase:
+        step === "questions_provisional" ? "provisional" : "refinement",
+      question_id: currentQuestion?.id,
+      question_index: currentQuestionIndex,
+      option_index: optionIndex,
+    });
 
     if (step === "questions_provisional") {
       if (currentQuestionIndex < 2) {
@@ -142,7 +183,12 @@ export function DiagnosisOnboardingFlow() {
 
       const scores = calcAxisScores(newAnswers);
       setAxisScores(scores);
-      setProvisionalType(determineType(scores));
+      const provisional = determineType(scores);
+      setProvisionalType(provisional);
+      trackProductEvent("diagnosis_provisional_result_viewed", {
+        type_key: provisional,
+        answered_count: newAnswers.length,
+      });
       setCurrentQuestionIndex(3);
       setStep("provisional_result");
       return;
@@ -156,7 +202,14 @@ export function DiagnosisOnboardingFlow() {
 
       const scores = calcAxisScores(newAnswers);
       setAxisScores(scores);
-      setFinalType(determineType(scores));
+      const final = determineType(scores);
+      setFinalType(final);
+      trackProductEvent("diagnosis_final_result_viewed", {
+        type_key: final,
+        provisional_type_key: provisionalType,
+        changed_from_provisional: Boolean(provisionalType && final !== provisionalType),
+        answered_count: newAnswers.length,
+      });
       setStep("final_result");
     }
   }
@@ -220,6 +273,15 @@ export function DiagnosisOnboardingFlow() {
       const nextProfiles = [...existing, profile];
       saveCatProfiles(nextProfiles);
       saveActiveCatId(newCatId);
+      trackProductEvent(
+        "diagnosis_result_saved",
+        {
+          type_key: finalType,
+          has_photo: Boolean(avatarDataUrl),
+          has_basic_info: hasAnyBasicInfo(basicInfo),
+        },
+        { localCatId: newCatId },
+      );
       window.localStorage.setItem(STORAGE_KEYS.onboardingCompleted, "true");
       window.localStorage.setItem(STORAGE_KEYS.homeVisitCount, "0");
       window.localStorage.setItem(
@@ -235,6 +297,13 @@ export function DiagnosisOnboardingFlow() {
     }
 
     setStep("done");
+    trackProductEvent(
+      "diagnosis_home_started",
+      {
+        cta: "mikke_start",
+      },
+      { localCatId: newCatId },
+    );
     window.location.href = "/home";
   }
 
@@ -244,10 +313,10 @@ export function DiagnosisOnboardingFlow() {
         {step === "name" ? (
           <section style={styles.card}>
             <div style={styles.stepContainer}>
-              <p style={styles.eyebrow}>この子のことを教えてください</p>
-              <h1 style={styles.title}>まずは名前から</h1>
+              <p style={styles.eyebrow}>うちの子、何タイプ？</p>
+              <h1 style={styles.title}>この子のトリセツを作ります</h1>
               <p style={styles.note}>
-                診断は、猫の正解を決めるものではありません。迷ったときに見る手がかりを少しずつ作ります。
+                名前といくつかの質問から、迷ったときに見返せる最初の手がかりを作ります。
               </p>
               <input
                 type="text"
@@ -277,7 +346,7 @@ export function DiagnosisOnboardingFlow() {
             <div style={styles.stepContainer}>
               <p style={styles.eyebrow}>{displayName}の写真を1枚</p>
               <p style={styles.note}>
-                ホームの背景にも使います。あとで、ねこタブから変更できます。
+                ホームの背景やねこアイコンに使います。あとで、ねこタブから変更できます。
               </p>
               <button
                 type="button"
@@ -286,7 +355,7 @@ export function DiagnosisOnboardingFlow() {
                 }}
                 style={styles.photoButton}
               >
-                カメラで撮る
+                写真を撮る
               </button>
               <button
                 type="button"
@@ -295,14 +364,19 @@ export function DiagnosisOnboardingFlow() {
                 }}
                 style={styles.photoButton}
               >
-                ライブラリから選ぶ
+                写真を選ぶ
               </button>
               <button
                 type="button"
-                onClick={() => setStep("coat")}
+                onClick={() => {
+                  trackProductEvent("diagnosis_photo_skipped", {
+                    next_step: "coat",
+                  });
+                  setStep("coat");
+                }}
                 style={styles.skipLink}
               >
-                スキップして毛色を選ぶ →
+                あとで登録して、毛色を選ぶ →
               </button>
             </div>
           </section>
@@ -311,9 +385,9 @@ export function DiagnosisOnboardingFlow() {
         {step === "coat" ? (
           <section style={styles.card}>
             <div style={styles.stepContainer}>
-              <p style={styles.eyebrow}>どんな毛色？</p>
+              <p style={styles.eyebrow}>写真なしでも始められます</p>
               <p style={styles.note}>
-                近い色でOKです。あとでねこタブから変えられます。
+                近い毛色を選ぶと、仮のアイコンでトリセツを作れます。
               </p>
               <div style={styles.coatGrid}>
                 {COAT_OPTIONS.map((option) => (
@@ -322,6 +396,9 @@ export function DiagnosisOnboardingFlow() {
                     type="button"
                     onClick={() => {
                       setCoat(option.key);
+                      trackProductEvent("diagnosis_coat_selected", {
+                        coat: option.key,
+                      });
                       setStep("basicInfo");
                     }}
                     style={
@@ -342,8 +419,10 @@ export function DiagnosisOnboardingFlow() {
         {step === "basicInfo" ? (
           <section style={styles.card}>
             <div style={styles.stepContainer}>
-              <p style={styles.eyebrow}>もう少し教えてください</p>
-              <p style={styles.note}>あとで変更できます。スキップしてもOKです。</p>
+              <p style={styles.eyebrow}>診断の手がかりを増やします</p>
+              <p style={styles.note}>
+                わかるところだけでOKです。空欄でも、あとからねこタブで変更できます。
+              </p>
 
               <div style={styles.fieldGroup}>
                 <label style={styles.fieldLabel}>生年月日</label>
@@ -411,14 +490,14 @@ export function DiagnosisOnboardingFlow() {
 
               <button
                 type="button"
-                onClick={() => setStep("questions_provisional")}
+                onClick={handleBasicInfoNext}
                 style={styles.primaryButton}
               >
-                次へ
+                診断を始める
               </button>
               <button
                 type="button"
-                onClick={() => setStep("questions_provisional")}
+                onClick={handleBasicInfoSkip}
                 style={styles.skipLink}
               >
                 スキップ
@@ -450,7 +529,10 @@ export function DiagnosisOnboardingFlow() {
               </div>
 
               <p style={styles.questionCount}>
-                {currentQuestionIndex + 1} / {allQuestions.length}
+                {step === "questions_provisional"
+                  ? "まずは3問"
+                  : "あと5問でくわしく"}{" "}
+                ・ {currentQuestionIndex + 1} / {allQuestions.length}
               </p>
               <h1 style={styles.questionText}>
                 {currentQuestion.text.replace("{name}", displayName)}
@@ -462,7 +544,7 @@ export function DiagnosisOnboardingFlow() {
                     key={`${currentQuestion.id}-${index}`}
                     type="button"
                     style={styles.optionButton}
-                    onClick={() => handleAnswer(option)}
+                    onClick={() => handleAnswer(option, index)}
                   >
                     {option.label}
                   </button>
@@ -475,7 +557,7 @@ export function DiagnosisOnboardingFlow() {
         {step === "provisional_result" && provisionalType ? (
           <section style={styles.card}>
             <div style={styles.stepContainer}>
-              <p style={styles.eyebrow}>診断中...</p>
+              <p style={styles.eyebrow}>最初の手がかり</p>
               <div style={styles.typeReveal}>
                 <p style={styles.typeLabelLarge}>
                   {getCatTypeInfo(provisionalType)?.label}
@@ -485,14 +567,19 @@ export function DiagnosisOnboardingFlow() {
                 </p>
               </div>
               <p style={styles.continueText}>
-                もう少し教えてもらうと、もっとくわしくわかります
+                ここから5問だけ答えると、トリセツに残す内容がもう少しはっきりします。
               </p>
               <button
                 type="button"
                 style={styles.primaryButton}
-                onClick={() => setStep("questions_refinement")}
+                onClick={() => {
+                  trackProductEvent("diagnosis_refinement_started", {
+                    provisional_type_key: provisionalType,
+                  });
+                  setStep("questions_refinement");
+                }}
               >
-                続けて教える →
+                くわしく診断する →
               </button>
             </div>
           </section>
@@ -501,13 +588,14 @@ export function DiagnosisOnboardingFlow() {
         {step === "final_result" && finalType ? (
           <section style={styles.card}>
             <div style={styles.stepContainer}>
-              <p style={styles.eyebrow}>
-                {finalType === provisionalType
-                  ? `やっぱり${getCatTypeInfo(finalType)?.label}でした`
-                  : `実は${getCatTypeInfo(finalType)?.label}でした`}
-              </p>
+              <p style={styles.eyebrow}>トリセツの最初の1枚ができました</p>
 
               <div style={styles.typeCard}>
+                <p style={styles.resultStatus}>
+                  {finalType === provisionalType
+                    ? "最初の印象と同じタイプでした"
+                    : "追加の質問で見え方が変わりました"}
+                </p>
                 <p style={styles.typeLabelLarge}>
                   {getCatTypeInfo(finalType)?.label}
                 </p>
@@ -540,12 +628,15 @@ export function DiagnosisOnboardingFlow() {
               </div>
 
               <p style={styles.hintText}>{getCatTypeInfo(finalType)?.hint}</p>
+              <p style={styles.saveNote}>
+                この診断結果は、あとでトリセツから見返せます。
+              </p>
               <button
                 type="button"
                 style={styles.primaryButton}
                 onClick={() => setStep("collection_preview")}
               >
-                {displayName}の毎日を残していく →
+                トリセツに残して次へ →
               </button>
             </div>
           </section>
@@ -555,10 +646,10 @@ export function DiagnosisOnboardingFlow() {
           <section style={styles.card}>
             <div style={styles.stepContainer}>
               <p style={styles.eyebrow}>
-                {displayName}の暮らしを、少しずつ残していきませんか
+                ここからは、見つけた日常を残せます
               </p>
               <p style={styles.note}>
-                写真や日々の様子が増えるほど、この子らしさをあとから見返しやすくなります。
+                ホームで「みっけ」すると、トリセツやコレクションにこの子らしさが少しずつ残ります。
               </p>
               <div style={styles.collectionPreview}>
                 {COLLECTION_PREVIEW_ICONS.map((src) => (
@@ -572,7 +663,7 @@ export function DiagnosisOnboardingFlow() {
                 style={styles.primaryButton}
                 onClick={handleSaveAndGoHome}
               >
-                はじめる →
+                みっけを始める →
               </button>
             </div>
           </section>
@@ -593,6 +684,56 @@ function getCatAvatarSrc(coat?: string): string {
     cream: "/sample-cats/saba.png",
   };
   return coatMap[coat ?? ""] ?? "/sample-cats/saba.png";
+}
+
+function getNameLengthBucket(name: string) {
+  if (name.length <= 3) {
+    return "1-3";
+  }
+  if (name.length <= 8) {
+    return "4-8";
+  }
+  return "9+";
+}
+
+function getFileSizeBucket(size: number) {
+  if (size < 1_000_000) {
+    return "small";
+  }
+  if (size < 5_000_000) {
+    return "medium";
+  }
+  return "large";
+}
+
+function hasAnyBasicInfo(basicInfo: BasicInfo) {
+  return Boolean(
+    basicInfo.birthDate || basicInfo.gender || basicInfo.breed.trim(),
+  );
+}
+
+function getStoredCatProfileCount() {
+  if (typeof window === "undefined") {
+    return 0;
+  }
+
+  try {
+    const raw = window.localStorage.getItem(STORAGE_KEYS.catProfiles);
+    if (!raw) {
+      return 0;
+    }
+    const parsed = JSON.parse(raw);
+    if (Array.isArray(parsed)) {
+      return parsed.length;
+    }
+    if (parsed && typeof parsed === "object") {
+      return Object.keys(parsed).length;
+    }
+  } catch {
+    return 0;
+  }
+
+  return 0;
 }
 
 function resizeAndEncode(file: File, maxSize = 800): Promise<string> {
@@ -894,6 +1035,13 @@ const styles = {
     borderRadius: "24px",
     padding: "20px 16px",
   },
+  resultStatus: {
+    margin: "0 0 10px",
+    color: APP_ACCENT,
+    fontSize: "12px",
+    fontWeight: 700,
+    lineHeight: 1.5,
+  },
   typeDescription: {
     margin: "12px 0 0",
     color: "#4a4a42",
@@ -940,6 +1088,14 @@ const styles = {
     fontSize: "14px",
     fontWeight: 700,
     lineHeight: 1.75,
+  },
+  saveNote: {
+    margin: "-6px 0 0",
+    color: "#8a8a80",
+    fontSize: "12px",
+    fontWeight: 650,
+    lineHeight: 1.65,
+    textAlign: "center",
   },
   collectionPreview: {
     display: "grid",
