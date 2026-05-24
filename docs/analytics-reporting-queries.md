@@ -242,3 +242,28 @@ limit 50;
 Manual QA order and expected events are tracked in:
 
 - `docs/open-beta-qa-checklist.md`
+
+## 12. Open Beta Campaign Attribution
+
+SNS公開時は、入口URLに `utm_source` / `utm_campaign` を付ける。
+
+Example:
+
+- `/?utm_source=instagram&utm_campaign=open_beta_01`
+- `/?source=sns&utm_campaign=open_beta_01`
+
+The root route preserves these params when it redirects to `/diagnosis-onboarding` or `/home`, and analytics events copy them into `properties`.
+
+```sql
+select
+  properties->>'utm_source' as utm_source,
+  properties->>'utm_campaign' as utm_campaign,
+  count(distinct anonymous_id) filter (where name = 'diagnosis_onboarding_started') as diagnosis_started,
+  count(distinct anonymous_id) filter (where name = 'diagnosis_onboarding_completed') as diagnosis_completed,
+  count(distinct anonymous_id) filter (where name = 'home_mikke_recorded') as mikke_users,
+  count(distinct anonymous_id) filter (where name = 'auth_google_succeeded') as auth_users
+from public.product_analytics_events
+where created_at >= now() - interval '30 days'
+group by utm_source, utm_campaign
+order by diagnosis_started desc nulls last;
+```

@@ -4,6 +4,23 @@ import { createBrowserSupabaseClient } from "../supabase/browser";
 const SESSION_TIMEOUT_MS = 30 * 60 * 1000;
 const MAX_QUEUE_SIZE = 200;
 const FLUSH_BATCH_SIZE = 25;
+const SOCIAL_SOURCE_VALUES = new Set([
+  "sns",
+  "instagram",
+  "ig",
+  "threads",
+  "x",
+  "twitter",
+  "tiktok",
+  "line",
+]);
+const ATTRIBUTION_PROPERTY_KEYS = [
+  "utm_source",
+  "utm_medium",
+  "utm_campaign",
+  "utm_content",
+  "campaign",
+] as const;
 
 let isFlushingAnalytics = false;
 
@@ -50,7 +67,10 @@ export function trackProductEvent(
       route: window.location.pathname,
       referrer: document.referrer || null,
       source: getTrafficSource(),
-      properties,
+      properties: {
+        ...getAttributionProperties(),
+        ...properties,
+      },
     };
 
     const queue = readAnalyticsEventQueue();
@@ -176,7 +196,7 @@ function getTrafficSource(): ProductAnalyticsEvent["source"] {
   const params = new URLSearchParams(window.location.search);
   const source = params.get("source") || params.get("utm_source");
   if (source) {
-    return source === "sns" ? "sns" : "unknown";
+    return SOCIAL_SOURCE_VALUES.has(source.toLowerCase()) ? "sns" : "unknown";
   }
 
   if (window.matchMedia?.("(display-mode: standalone)").matches) {
@@ -184,6 +204,25 @@ function getTrafficSource(): ProductAnalyticsEvent["source"] {
   }
 
   return document.referrer ? "unknown" : "direct";
+}
+
+function getAttributionProperties() {
+  const params = new URLSearchParams(window.location.search);
+  const properties: Record<string, string> = {};
+
+  const sourceParam = params.get("source");
+  if (sourceParam) {
+    properties.source_param = sourceParam.slice(0, 160);
+  }
+
+  for (const key of ATTRIBUTION_PROPERTY_KEYS) {
+    const value = params.get(key);
+    if (value) {
+      properties[key] = value.slice(0, 160);
+    }
+  }
+
+  return properties;
 }
 
 function createId() {
