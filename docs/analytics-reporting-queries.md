@@ -237,3 +237,8 @@ order by created_at desc
 limit 50;
 ```
 
+## 11. Related QA Flow
+
+Manual QA order and expected events are tracked in:
+
+- `docs/open-beta-qa-checklist.md`
