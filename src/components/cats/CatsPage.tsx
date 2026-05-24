@@ -319,9 +319,7 @@ export function CatsPage() {
           <div>
             <p style={styles.pageKicker}>CATS</p>
             <h1 style={styles.pageTitle}>ねこ</h1>
-            <p style={styles.pageSub}>
-              プロフィールとホーム写真を整える場所
-            </p>
+            <p style={styles.pageSub}>プロフィール管理</p>
           </div>
         </div>
 

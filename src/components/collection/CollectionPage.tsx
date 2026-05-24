@@ -479,7 +479,7 @@ function DailyCollectionTarget({
     >
       <span style={styles.dailyTargetLabel}>今日の見つけたい姿</span>
       <strong style={styles.dailyTargetName}>{getCollectionSlotLabel(slot)}</strong>
-      <span style={styles.dailyTargetHint}>見つけたら写真で残す</span>
+      <span style={styles.dailyTargetHint}>写真で残す</span>
     </button>
   );
 }

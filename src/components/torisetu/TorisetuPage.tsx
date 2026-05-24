@@ -185,7 +185,7 @@ export function TorisetuPage({ recentEvents }: TorisetuPageProps) {
             source: "診断結果",
             detail:
               catProfile?.typeTagline ??
-              "タイプ診断で見えている、この子の入口です。",
+              "診断で見えたタイプです。",
           },
         ]
       : []),
@@ -196,8 +196,7 @@ export function TorisetuPage({ recentEvents }: TorisetuPageProps) {
             label: "リズム",
             value: rhythmSummary,
             source: "オンボーディング結果",
-            detail:
-              "オンボーディングで答えた時間帯から見えている傾向です。みっけが増えると、実際の記録から見えるリズムに置き換わっていきます。",
+            detail: "最初の回答から見えているリズムです。",
           },
         ]
       : []),
@@ -233,7 +232,7 @@ export function TorisetuPage({ recentEvents }: TorisetuPageProps) {
   const currentTypeQuestion = QUESTIONS[typeQuestionIndex] ?? QUESTIONS[0];
   const dashboardItems = [
     {
-      label: "みっけ",
+      label: "記録",
       value: String(recordCount),
     },
     {
@@ -341,7 +340,7 @@ export function TorisetuPage({ recentEvents }: TorisetuPageProps) {
             {diagnosisFacts.length > 0 ? (
               <FactCardShelf
                 icon="clipboard"
-                label="トリセツ"
+                label="診断結果"
                 facts={diagnosisFacts}
                 onOpenFact={setActiveFact}
               />
@@ -353,7 +352,7 @@ export function TorisetuPage({ recentEvents }: TorisetuPageProps) {
           <section style={{ ...styles.sectionFrame, ...styles.sectionFrameAction }}>
             <CategoryLabel
               icon="clipboard"
-              label="診断する"
+              label="診断"
             />
             <div style={styles.diagnosisList}>
               <TypeDiagnosisCard onStart={handleStartTypeDiagnosis} />
@@ -365,7 +364,7 @@ export function TorisetuPage({ recentEvents }: TorisetuPageProps) {
           <section style={{ ...styles.sectionFrame, ...styles.sectionFrameLocked }}>
             <CategoryLabel
               icon="lock"
-              label="未開封のトリセツ"
+              label="未開封"
             />
             <div style={styles.diagnosisShelf}>
               {lockedDiagnoses.map((item) => (

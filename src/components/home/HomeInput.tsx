@@ -517,9 +517,9 @@ export function HomeInput({ recentEvents: _recentEvents }: HomeInputProps) {
 
       {isDiscoverySheetOpen ? (
         <InfoSheet
-          title="小さな発見"
-          lead="発見がありました"
-          body={DISCOVERY_TEXT}
+          title="発見"
+          lead={DISCOVERY_TEXT}
+          body="トリセツで見返せます。"
           onClose={() => setIsDiscoverySheetOpen(false)}
         />
       ) : null}
@@ -534,8 +534,8 @@ export function HomeInput({ recentEvents: _recentEvents }: HomeInputProps) {
           }
           body={
             latestRecord
-              ? `小さな記録が増えると、${catName}がよくしていることや、落ち着きやすい場面が少しずつ見えてきます。`
-              : "みっけを残すと、ここに小さな変化が並びます。"
+              ? `${catName}の特徴として、トリセツに残していきます。`
+              : "みっけを残すと、変化がここに出ます。"
           }
           onClose={() => setIsRecentChangeSheetOpen(false)}
         />
@@ -815,7 +815,7 @@ function HomeBulletinBoard({
       {isOpen ? (
         <div style={styles.boardOpenContent}>
           <div style={styles.boardSectionHeader}>
-            <span style={styles.boardSectionTitle}>すぐできること</span>
+            <span style={styles.boardSectionTitle}>アクション</span>
           </div>
           <div style={styles.boardActionList}>
             {displayItems.map((item) => (
@@ -840,7 +840,7 @@ function HomeBulletinBoard({
           </div>
 
           <div style={styles.boardSectionHeader}>
-            <span style={styles.boardSectionTitle}>最近のメモ</span>
+            <span style={styles.boardSectionTitle}>メモ</span>
           </div>
           {recentRecords.length > 0 ? (
             <div style={styles.boardMemoList}>
@@ -856,7 +856,7 @@ function HomeBulletinBoard({
             </div>
           ) : (
             <p style={styles.boardEmptyText}>
-              みっけを残すと、ここに小さな変化が並びます。
+              まだメモはありません。
             </p>
           )}
         </div>
@@ -920,7 +920,7 @@ function buildHomeBoardItems({
       id: "daily-discovery",
       kind: "insight",
       priority: 10,
-      title: "発見がありました",
+      title: "発見",
       body: DISCOVERY_TEXT,
       icon: "heart",
       actionLabel: "見る",
@@ -932,8 +932,8 @@ function buildHomeBoardItems({
       id: "recent-change",
       kind: "insight",
       priority: 20,
-      title: "最近の変化",
-      body: `${formatRecordKind(latestRecord.type)}に「${latestRecord.value}」が残っています。少しずつ${catName}の変化が見えてきます。`,
+      title: "変化",
+      body: `${formatRecordKind(latestRecord.type)}「${latestRecord.value}」`,
       icon: "heart",
       actionLabel: "見る",
       actionType: "open_recent_change",
@@ -946,7 +946,7 @@ function buildHomeBoardItems({
       kind: "mission",
       priority: 40,
       title: "写真を置く",
-      body: `ホームに${catName}の写真を置くと、開いた瞬間に思い出せます。`,
+      body: "ホーム写真を設定",
       icon: "camera",
       actionLabel: "写真を選ぶ",
       actionType: "open_photo",
@@ -958,8 +958,8 @@ function buildHomeBoardItems({
       id: "daily-collection-target",
       kind: "collection",
       priority: 45,
-      title: "今日の見つけたい姿",
-      body: `${catName}の${collectionTargetLabel}を見つけたら写真で残そう。`,
+      title: "見つけたい姿",
+      body: `${catName}の${collectionTargetLabel}`,
       icon: "camera",
       actionLabel: "探す",
       actionType: "go_collection",
@@ -971,8 +971,8 @@ function buildHomeBoardItems({
     id: "torisetu-progress",
     kind: "notice",
     priority: 50,
-    title: "トリセツが追加",
-    body: "みっけが増えると、機嫌の見分け方や距離の縮め方が少しずつ見えてきます。",
+    title: "トリセツ",
+    body: "見返す",
     icon: "book",
     actionLabel: "見る",
     actionType: "go_torisetu",
