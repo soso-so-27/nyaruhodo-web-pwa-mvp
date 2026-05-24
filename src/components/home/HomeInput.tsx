@@ -8,6 +8,7 @@ import {
   readStoredCollectionPhotos,
 } from "../../lib/collection/dailyTarget";
 import {
+  STORAGE_KEYS,
   getDiscoveryLogKey,
   getLockDataKey,
   getRecordLogKey,
@@ -125,6 +126,7 @@ export function HomeInput({ recentEvents: _recentEvents }: HomeInputProps) {
   const [toastText, setToastText] = useState("");
   const [discoveryDismissedToday, setDiscoveryDismissedToday] = useState(false);
   const hasTrackedHomeView = useRef(false);
+  const hasTrackedGoogleAuthSuccess = useRef(false);
 
   useEffect(() => {
     const profiles = readCatProfiles();
@@ -150,9 +152,14 @@ export function HomeInput({ recentEvents: _recentEvents }: HomeInputProps) {
     const params = new URLSearchParams(window.location.search);
     const shouldOpenMikke = params.get("mikke") === "1";
     const authStatus = params.get("auth");
+    const hasPendingGoogleAuth = Boolean(
+      window.localStorage.getItem(STORAGE_KEYS.authGooglePending),
+    );
 
-    if (authStatus === "google_success") {
-      void trackGoogleAuthSuccess();
+    if (authStatus === "google_success" || hasPendingGoogleAuth) {
+      void trackGoogleAuthSuccess(
+        authStatus === "google_success" ? "callback_marker" : "pending_marker",
+      );
       params.delete("auth");
     }
 
@@ -170,20 +177,32 @@ export function HomeInput({ recentEvents: _recentEvents }: HomeInputProps) {
     window.history.replaceState(null, "", nextUrl);
   }, []);
 
-  async function trackGoogleAuthSuccess() {
-    const supabase = createBrowserSupabaseClient();
-    const localCatId = readActiveCatId();
-    let userId: string | null = null;
-
-    if (supabase) {
-      const { data } = await supabase.auth.getUser();
-      userId = data.user?.id ?? null;
+  async function trackGoogleAuthSuccess(trigger: "callback_marker" | "pending_marker") {
+    if (hasTrackedGoogleAuthSuccess.current) {
+      return;
     }
 
+    const supabase = createBrowserSupabaseClient();
+    const localCatId = readActiveCatId();
+
+    if (!supabase) {
+      return;
+    }
+
+    const { data } = await supabase.auth.getUser();
+    const userId = data.user?.id ?? null;
+
+    if (!userId) {
+      return;
+    }
+
+    hasTrackedGoogleAuthSuccess.current = true;
+    window.localStorage.removeItem(STORAGE_KEYS.authGooglePending);
     trackProductEvent(
       "auth_google_succeeded",
       {
         route_after: "/home",
+        trigger,
       },
       {
         localCatId,

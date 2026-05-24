@@ -112,6 +112,14 @@ export default function AccountCreatePage() {
     trackProductEvent("auth_google_started", {
       route: "/account/create",
     });
+    window.localStorage.setItem(
+      STORAGE_KEYS.authGooglePending,
+      JSON.stringify({
+        provider: "google",
+        route: "/account/create",
+        startedAt: new Date().toISOString(),
+      }),
+    );
 
     const { error } = await supabase.auth.signInWithOAuth({
       provider: "google",
@@ -121,6 +129,7 @@ export default function AccountCreatePage() {
     });
 
     if (error) {
+      window.localStorage.removeItem(STORAGE_KEYS.authGooglePending);
       trackProductEvent("auth_google_failed", {
         error_type: "oauth_start_failed",
       });

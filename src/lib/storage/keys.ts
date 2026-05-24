@@ -4,6 +4,7 @@ export const STORAGE_KEYS = {
   analyticsAnonymousId: "analytics_anonymous_id",
   analyticsEventQueue: "analytics_event_queue",
   analyticsSession: "analytics_session",
+  authGooglePending: "auth_google_pending",
   catProfiles: "cat_profiles",
   collectionPhotos: "collection_photos",
   currentCatHintSuppression: "current_cat_hint_suppression",
