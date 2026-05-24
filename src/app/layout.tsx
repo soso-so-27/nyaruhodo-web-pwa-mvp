@@ -1,5 +1,6 @@
 import "./globals.css";
 import type { Metadata, Viewport } from "next";
+import { AppAnalyticsTracker } from "../components/analytics/AppAnalyticsTracker";
 
 export const metadata: Metadata = {
   title: "にゃるほど",
@@ -112,7 +113,10 @@ export default function RootLayout({
         <link rel="icon" href="/favicon.ico" sizes="any" />
         <link rel="icon" href="/icon-192.png" type="image/png" />
       </head>
-      <body>{children}</body>
+      <body>
+        <AppAnalyticsTracker />
+        {children}
+      </body>
     </html>
   );
 }

@@ -364,6 +364,9 @@ Behavior:
 
 Instrumented events:
 
+- `app_opened`
+- `route_viewed`
+- `pwa_display_mode_detected`
 - `diagnosis_onboarding_started`
 - `diagnosis_name_submitted`
 - `diagnosis_photo_added`
