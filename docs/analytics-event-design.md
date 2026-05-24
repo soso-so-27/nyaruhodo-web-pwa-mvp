@@ -409,7 +409,7 @@ Instrumented events:
 
 ### Next implementation batch
 
-1. Apply `20260524152000_create_product_analytics_events.sql` to Supabase
+1. Use `docs/analytics-reporting-queries.md` for open beta reporting
 2. Add a small internal event QA/debug viewer if needed
 3. Add paid-intent CTA events after CTA copy is finalized
-4. Build the first dashboard queries for open beta
+4. Turn the reporting queries into a dashboard if manual SQL becomes slow
