@@ -282,6 +282,16 @@ export function DiagnosisOnboardingFlow() {
         },
         { localCatId: newCatId },
       );
+      trackProductEvent(
+        "diagnosis_onboarding_completed",
+        {
+          type_key: finalType,
+          answered_count: answers.length,
+          has_photo: Boolean(avatarDataUrl),
+          has_basic_info: hasAnyBasicInfo(basicInfo),
+        },
+        { localCatId: newCatId },
+      );
       window.localStorage.setItem(STORAGE_KEYS.onboardingCompleted, "true");
       window.localStorage.setItem(STORAGE_KEYS.homeVisitCount, "0");
       window.localStorage.setItem(
@@ -634,7 +644,13 @@ export function DiagnosisOnboardingFlow() {
               <button
                 type="button"
                 style={styles.primaryButton}
-                onClick={() => setStep("collection_preview")}
+                onClick={() => {
+                  trackProductEvent("diagnosis_collection_preview_viewed", {
+                    type_key: finalType,
+                    has_photo: Boolean(avatarDataUrl),
+                  });
+                  setStep("collection_preview");
+                }}
               >
                 トリセツに残して次へ →
               </button>

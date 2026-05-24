@@ -375,7 +375,9 @@ Instrumented events:
 - `diagnosis_provisional_result_viewed`
 - `diagnosis_refinement_started`
 - `diagnosis_final_result_viewed`
+- `diagnosis_collection_preview_viewed`
 - `diagnosis_result_saved`
+- `diagnosis_onboarding_completed`
 - `diagnosis_home_started`
 - `home_viewed`
 - `home_mikke_recorded`
@@ -401,9 +403,9 @@ Instrumented events:
 
 ### Not implemented yet
 
-- analytics dashboard
+- internal event QA/debug viewer
 - paid intent events
-- remote migration application in production/staging
+- analytics reporting dashboard
 
 ### Next implementation batch
 
