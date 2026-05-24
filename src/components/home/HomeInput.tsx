@@ -13,6 +13,7 @@ import {
   getRecordLogKey,
 } from "../../lib/storage";
 import type { RecentEvent } from "../../lib/supabase/queries";
+import { createBrowserSupabaseClient } from "../../lib/supabase/browser";
 import { BottomNavigation } from "../navigation/BottomNavigation";
 import {
   getActiveCatProfile,
@@ -147,14 +148,49 @@ export function HomeInput({ recentEvents: _recentEvents }: HomeInputProps) {
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
-    if (params.get("mikke") !== "1") return;
+    const shouldOpenMikke = params.get("mikke") === "1";
+    const authStatus = params.get("auth");
 
-    setIsYousuOpen(true);
-    params.delete("mikke");
+    if (authStatus === "google_success") {
+      void trackGoogleAuthSuccess();
+      params.delete("auth");
+    }
+
+    if (shouldOpenMikke) {
+      setIsYousuOpen(true);
+      params.delete("mikke");
+    }
+
+    if (!shouldOpenMikke && authStatus !== "google_success") {
+      return;
+    }
+
     const nextSearch = params.toString();
     const nextUrl = `${window.location.pathname}${nextSearch ? `?${nextSearch}` : ""}`;
     window.history.replaceState(null, "", nextUrl);
   }, []);
+
+  async function trackGoogleAuthSuccess() {
+    const supabase = createBrowserSupabaseClient();
+    const localCatId = readActiveCatId();
+    let userId: string | null = null;
+
+    if (supabase) {
+      const { data } = await supabase.auth.getUser();
+      userId = data.user?.id ?? null;
+    }
+
+    trackProductEvent(
+      "auth_google_succeeded",
+      {
+        route_after: "/home",
+      },
+      {
+        localCatId,
+        userId,
+      },
+    );
+  }
 
   const catName = activeCat ? getCatName(activeCat) : "ねこ";
   const photoSrc =

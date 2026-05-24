@@ -24,7 +24,10 @@ export async function GET(request: NextRequest) {
     return NextResponse.redirect(errorUrl);
   }
 
-  return NextResponse.redirect(new URL(next, requestUrl.origin));
+  const successUrl = new URL(next, requestUrl.origin);
+  successUrl.searchParams.set("auth", "google_success");
+
+  return NextResponse.redirect(successUrl);
 }
 
 function getSafeNextPath(next: string | null) {

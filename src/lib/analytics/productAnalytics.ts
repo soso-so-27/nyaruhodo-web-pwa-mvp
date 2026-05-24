@@ -1,7 +1,11 @@
 import { STORAGE_KEYS } from "../storage";
+import { createBrowserSupabaseClient } from "../supabase/browser";
 
 const SESSION_TIMEOUT_MS = 30 * 60 * 1000;
 const MAX_QUEUE_SIZE = 200;
+const FLUSH_BATCH_SIZE = 25;
+
+let isFlushingAnalytics = false;
 
 type AnalyticsSession = {
   id: string;
@@ -9,6 +13,7 @@ type AnalyticsSession = {
 };
 
 export type ProductAnalyticsEvent = {
+  id?: string;
   name: string;
   occurred_at: string;
   anonymous_id: string;
@@ -35,6 +40,7 @@ export function trackProductEvent(
 
   try {
     const event: ProductAnalyticsEvent = {
+      id: createId(),
       name,
       occurred_at: new Date().toISOString(),
       anonymous_id: getOrCreateAnonymousId(),
@@ -53,8 +59,52 @@ export function trackProductEvent(
       STORAGE_KEYS.analyticsEventQueue,
       JSON.stringify(nextQueue),
     );
+
+    void flushProductAnalyticsEvents();
   } catch {
     // Analytics must never block the MVP experience.
+  }
+}
+
+export async function flushProductAnalyticsEvents() {
+  if (typeof window === "undefined" || isFlushingAnalytics) {
+    return;
+  }
+
+  const supabase = createBrowserSupabaseClient();
+
+  if (!supabase) {
+    return;
+  }
+
+  const queue = readAnalyticsEventQueue();
+
+  if (queue.length === 0) {
+    return;
+  }
+
+  const batch = queue.slice(0, FLUSH_BATCH_SIZE);
+
+  try {
+    isFlushingAnalytics = true;
+
+    const { error } = await supabase
+      .from("product_analytics_events")
+      .insert(batch.map(toAnalyticsRow));
+
+    if (error) {
+      return;
+    }
+
+    const currentQueue = readAnalyticsEventQueue();
+    window.localStorage.setItem(
+      STORAGE_KEYS.analyticsEventQueue,
+      JSON.stringify(currentQueue.slice(batch.length)),
+    );
+  } catch {
+    // Keep the local queue and retry later.
+  } finally {
+    isFlushingAnalytics = false;
   }
 }
 
@@ -142,4 +192,35 @@ function createId() {
   }
 
   return `id-${Date.now()}-${Math.random().toString(16).slice(2)}`;
+}
+
+function toAnalyticsRow(event: ProductAnalyticsEvent) {
+  return {
+    id: event.id ?? createId(),
+    name: event.name,
+    occurred_at: event.occurred_at,
+    anonymous_id: event.anonymous_id,
+    session_id: event.session_id,
+    user_id: event.user_id ?? null,
+    local_cat_id: event.local_cat_id ?? null,
+    route: event.route ?? null,
+    referrer: event.referrer ?? null,
+    source: event.source ?? "unknown",
+    properties: sanitizeProperties(event.properties ?? {}),
+  };
+}
+
+function sanitizeProperties(properties: Record<string, unknown>) {
+  const sanitized: Record<string, unknown> = {};
+
+  for (const [key, value] of Object.entries(properties)) {
+    if (typeof value === "string" && value.length > 160) {
+      sanitized[key] = value.slice(0, 160);
+      continue;
+    }
+
+    sanitized[key] = value;
+  }
+
+  return sanitized;
 }

@@ -27,6 +27,7 @@ export default function AccountCreatePage() {
   const [isAccountConnected, setIsAccountConnected] = useState(false);
   const [connectedEmail, setConnectedEmail] = useState("");
   const hasTrackedCtaView = useRef(false);
+  const hasTrackedCallbackError = useRef(false);
 
   useEffect(() => {
     let isMounted = true;
@@ -73,6 +74,25 @@ export default function AccountCreatePage() {
       trigger: "account_create_page",
     });
   }, [isAccountConnected, isCheckingAccount]);
+
+  useEffect(() => {
+    if (hasTrackedCallbackError.current) {
+      return;
+    }
+
+    const params = new URLSearchParams(window.location.search);
+    if (params.get("error") !== "auth") {
+      return;
+    }
+
+    hasTrackedCallbackError.current = true;
+    trackProductEvent("auth_google_failed", {
+      error_type: "callback_failed",
+    });
+    setMessage(
+      "Googleログインを完了できませんでした。少し時間をおいてもう一度お試しください。",
+    );
+  }, []);
 
   async function handleGoogleSignIn() {
     trackProductEvent("account_create_cta_clicked", {

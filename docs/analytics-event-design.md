@@ -359,7 +359,7 @@ Behavior:
 - Generates anonymous id locally
 - Generates session id locally and refreshes after 30 minutes of inactivity
 - Stores events in a capped localStorage queue
-- Does not send events to Supabase or any third-party service yet
+- Flushes queued events to Supabase `product_analytics_events` when the migration is applied
 - Does not store cat names, emails, image data, or free text
 
 Instrumented events:
@@ -385,6 +385,7 @@ Instrumented events:
 - `account_create_cta_clicked`
 - `auth_google_started`
 - `auth_google_failed`
+- `auth_google_succeeded`
 - `torisetu_viewed`
 - `torisetu_result_card_opened`
 - `torisetu_diagnosis_card_started`
@@ -400,14 +401,13 @@ Instrumented events:
 
 ### Not implemented yet
 
-- DB0 / Supabase flush
 - analytics dashboard
-- `auth_google_succeeded`
 - paid intent events
+- remote migration application in production/staging
 
 ### Next implementation batch
 
-1. Add `auth_google_succeeded` in the auth callback without leaking secrets
-2. Decide DB0/Supabase flush design
+1. Apply `20260524152000_create_product_analytics_events.sql` to Supabase
+2. Add a small internal event QA/debug viewer if needed
 3. Add paid-intent CTA events after CTA copy is finalized
-4. Add event QA/debug viewer for local beta testing if needed
+4. Build the first dashboard queries for open beta
