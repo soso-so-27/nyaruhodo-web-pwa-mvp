@@ -202,16 +202,59 @@ export function CollectionPage() {
   }
 
   function closeSheet() {
+    if (selectedSlot) {
+      trackProductEvent(
+        "collection_photo_sheet_closed",
+        {
+          slot_id: selectedSlot.id,
+          slot_slug: getCollectionPhotoSlug(selectedSlot),
+          group_id: getCollectionGroupIdForSlot(selectedSlot),
+          photo_count: selectedPhotos.length,
+          current_photo_index: currentPhotoIndex,
+        },
+        { localCatId: activeCatId },
+      );
+    }
     setSelectedSlug(null);
   }
 
   function handleCatSelect(catId: string) {
     const nextActiveProfile = getActiveCatProfile(catProfiles, catId);
 
+    trackProductEvent(
+      "collection_cat_selected",
+      {
+        previous_cat_id: activeCatId,
+        next_cat_id: nextActiveProfile.id,
+      },
+      { localCatId: nextActiveProfile.id },
+    );
     saveActiveCatId(nextActiveProfile.id);
     setActiveCatId(nextActiveProfile.id);
     setSelectedSlug(null);
     setCurrentPhotoIndex(0);
+    setIsCatSheetOpen(false);
+  }
+
+  function openCatSheet() {
+    trackProductEvent(
+      "collection_cat_switcher_opened",
+      {
+        cat_count: catProfiles.length,
+      },
+      { localCatId: activeCatId },
+    );
+    setIsCatSheetOpen(true);
+  }
+
+  function closeCatSheet() {
+    trackProductEvent(
+      "collection_cat_switcher_closed",
+      {
+        cat_count: catProfiles.length,
+      },
+      { localCatId: activeCatId },
+    );
     setIsCatSheetOpen(false);
   }
 
@@ -363,6 +406,8 @@ export function CollectionPage() {
         return;
       }
 
+      const slot = getCollectionSlotBySlug(slug);
+      const photoCountBefore = catPhotos.length;
       catPhotos.splice(index, 1);
 
       if (catPhotos.length === 0) {
@@ -386,6 +431,17 @@ export function CollectionPage() {
       setCurrentPhotoIndex((current) =>
         Math.max(0, Math.min(current, catPhotos.length - 1)),
       );
+      trackProductEvent(
+        "collection_photo_deleted",
+        {
+          slot_id: slot?.id ?? null,
+          slot_slug: slug,
+          group_id: slot ? getCollectionGroupIdForSlot(slot) : null,
+          photo_count_before: photoCountBefore,
+          photo_count_after: catPhotos.length,
+        },
+        { localCatId: activeCatId },
+      );
     } catch {
       // Ignore delete failures for this MVP fallback.
     }
@@ -395,6 +451,19 @@ export function CollectionPage() {
     const element = event.currentTarget;
     const index = Math.round(element.scrollLeft / element.offsetWidth);
 
+    if (index !== currentPhotoIndex && selectedSlot) {
+      trackProductEvent(
+        "collection_photo_carousel_changed",
+        {
+          slot_id: selectedSlot.id,
+          slot_slug: getCollectionPhotoSlug(selectedSlot),
+          group_id: getCollectionGroupIdForSlot(selectedSlot),
+          photo_index: index,
+          photo_count: selectedPhotos.length,
+        },
+        { localCatId: activeCatId },
+      );
+    }
     setCurrentPhotoIndex(index);
   }
 
@@ -441,7 +510,7 @@ export function CollectionPage() {
             <div style={styles.pageHeaderActions}>
               <button
                 type="button"
-                onClick={() => setIsCatSheetOpen(true)}
+                onClick={openCatSheet}
                 style={styles.catNameBtn}
               >
                 {catName}
@@ -489,7 +558,7 @@ export function CollectionPage() {
         <CollectionCatSheet
           profiles={catProfiles}
           activeCatId={activeCatId}
-          onClose={() => setIsCatSheetOpen(false)}
+          onClose={closeCatSheet}
           onSelect={handleCatSelect}
         />
       ) : null}

@@ -261,6 +261,9 @@ export function TorisetuPage({ recentEvents }: TorisetuPageProps) {
         diagnosis_fact_count: diagnosisFacts.length,
         locked_diagnosis_count: lockedDiagnoses.length,
         has_type_diagnosis: hasTypeDiagnosis,
+        mikke_fact_ids: mikkeFacts.map((fact) => fact.id),
+        diagnosis_fact_ids: diagnosisFacts.map((fact) => fact.id),
+        locked_diagnosis_ids: lockedDiagnoses.map((item) => item.card.id),
       },
       { localCatId: catProfile.id },
     );
@@ -288,6 +291,20 @@ export function TorisetuPage({ recentEvents }: TorisetuPageProps) {
     setIsTypeDiagnosisOpen(true);
   }
 
+  function handleCloseTypeDiagnosis(reason: "overlay" | "close_button") {
+    trackProductEvent(
+      "torisetu_diagnosis_sheet_closed",
+      {
+        diagnosis_id: "type_diagnosis",
+        answered_count: typeAnswers.length,
+        question_index: typeQuestionIndex,
+        reason,
+      },
+      { localCatId: catProfile?.id ?? null },
+    );
+    setIsTypeDiagnosisOpen(false);
+  }
+
   function handleOpenFact(fact: KnownFact, section: "diagnosis_result" | "mikke_fact") {
     trackProductEvent(
       "torisetu_result_card_opened",
@@ -299,6 +316,33 @@ export function TorisetuPage({ recentEvents }: TorisetuPageProps) {
       { localCatId: catProfile?.id ?? null },
     );
     setActiveFact(fact);
+  }
+
+  function handleCloseFact(reason: "overlay" | "close_button") {
+    if (activeFact) {
+      trackProductEvent(
+        "torisetu_result_sheet_closed",
+        {
+          fact_id: activeFact.id,
+          reason,
+        },
+        { localCatId: catProfile?.id ?? null },
+      );
+    }
+    setActiveFact(null);
+  }
+
+  function handleLockedDiagnosisTap(item: DiagnosisItem) {
+    trackProductEvent(
+      "torisetu_locked_diagnosis_tapped",
+      {
+        diagnosis_id: item.card.id,
+        remaining: item.remaining,
+        progress: item.progress,
+        threshold: item.card.threshold,
+      },
+      { localCatId: catProfile?.id ?? null },
+    );
   }
 
   function handleTypeAnswer(option: AnswerOption) {
@@ -431,7 +475,8 @@ export function TorisetuPage({ recentEvents }: TorisetuPageProps) {
                   key={item.card.id}
                   type="button"
                   style={styles.diagnosisShelfCard}
-                  disabled
+                  aria-disabled="true"
+                  onClick={() => handleLockedDiagnosisTap(item)}
                 >
                   <span style={styles.diagnosisShelfTitle}>{item.card.title}</span>
                   <span style={styles.diagnosisShelfMeta}>
@@ -452,7 +497,7 @@ export function TorisetuPage({ recentEvents }: TorisetuPageProps) {
             type="button"
             aria-label="閉じる"
             style={styles.sheetOverlay}
-            onClick={() => setIsTypeDiagnosisOpen(false)}
+            onClick={() => handleCloseTypeDiagnosis("overlay")}
           />
           <section style={styles.sheet}>
             <div style={styles.sheetHandle} />
@@ -467,7 +512,7 @@ export function TorisetuPage({ recentEvents }: TorisetuPageProps) {
                 type="button"
                 aria-label="閉じる"
                 style={styles.sheetClose}
-                onClick={() => setIsTypeDiagnosisOpen(false)}
+                onClick={() => handleCloseTypeDiagnosis("close_button")}
               >
                 ×
               </button>
@@ -497,7 +542,7 @@ export function TorisetuPage({ recentEvents }: TorisetuPageProps) {
             type="button"
             aria-label="閉じる"
             style={styles.sheetOverlay}
-            onClick={() => setActiveFact(null)}
+            onClick={() => handleCloseFact("overlay")}
           />
           <section style={styles.sheet}>
             <div style={styles.sheetHandle} />
@@ -510,7 +555,7 @@ export function TorisetuPage({ recentEvents }: TorisetuPageProps) {
                 type="button"
                 aria-label="閉じる"
                 style={styles.sheetClose}
-                onClick={() => setActiveFact(null)}
+                onClick={() => handleCloseFact("close_button")}
               >
                 ×
               </button>
