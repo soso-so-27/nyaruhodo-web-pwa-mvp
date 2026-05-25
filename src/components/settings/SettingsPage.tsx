@@ -7,6 +7,7 @@ import {
   syncLocalDataWithAccount,
 } from "../../lib/accountSync";
 import type { AccountSyncOverview } from "../../lib/accountSync";
+import { trackProductEvent } from "../../lib/analytics/productAnalytics";
 import { createBrowserSupabaseClient } from "../../lib/supabase/browser";
 import {
   APP_ACCENT,
@@ -66,6 +67,11 @@ export function SettingsPage() {
   async function handleSyncNow() {
     setIsSyncing(true);
     setSyncMessage("");
+    trackProductEvent("settings_account_sync_clicked", {
+      remote_cats: syncOverview?.remoteCats ?? null,
+      remote_records: syncOverview?.remoteRecords ?? null,
+      remote_collection_photos: syncOverview?.remoteCollectionPhotos ?? null,
+    });
 
     const result = await syncLocalDataWithAccount({ restoreIfLocalEmpty: true });
 
@@ -84,15 +90,34 @@ export function SettingsPage() {
     }
 
     await refreshSyncOverview();
+    trackProductEvent("settings_account_sync_completed", {
+      status: result.status,
+      pushed_cats: result.pushedCats,
+      pushed_records: result.pushedRecords,
+      pushed_collection_photos: result.pushedCollectionPhotos,
+      restored_cats: result.restoredCats,
+      restored_records: result.restoredRecords,
+      restored_collection_photos: result.restoredCollectionPhotos,
+      error_count: result.errors.length,
+    });
     setIsSyncing(false);
   }
 
   async function handleRestoreFromAccount() {
+    trackProductEvent("settings_account_restore_clicked", {
+      remote_cats: syncOverview?.remoteCats ?? null,
+      remote_records: syncOverview?.remoteRecords ?? null,
+      remote_collection_photos: syncOverview?.remoteCollectionPhotos ?? null,
+    });
     if (
       !window.confirm(
         "この端末の猫データを、アカウントに保存されているデータで復元しますか？",
       )
     ) {
+      trackProductEvent("settings_account_restore_cancelled", {
+        remote_cats: syncOverview?.remoteCats ?? null,
+        remote_records: syncOverview?.remoteRecords ?? null,
+      });
       return;
     }
 
@@ -113,6 +138,13 @@ export function SettingsPage() {
     }
 
     await refreshSyncOverview();
+    trackProductEvent("settings_account_restore_completed", {
+      status: result.status,
+      restored_cats: result.restoredCats,
+      restored_records: result.restoredRecords,
+      restored_collection_photos: result.restoredCollectionPhotos,
+      error_count: result.errors.length,
+    });
     setIsSyncing(false);
   }
 

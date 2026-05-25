@@ -358,6 +358,16 @@ export function HomeInput({ recentEvents: _recentEvents }: HomeInputProps) {
         remoteCollectionPhotos: overview.remoteCollectionPhotos,
       });
       setIsAccountRestoreSheetOpen(true);
+      trackProductEvent(
+        "account_restore_prompt_viewed",
+        {
+          local_cats: overview.localCats,
+          remote_cats: overview.remoteCats,
+          remote_records: overview.remoteRecords,
+          remote_collection_photos: overview.remoteCollectionPhotos,
+        },
+        { localCatId: activeCatId },
+      );
     }
 
     void checkAccountRestoreSuggestion();
@@ -446,6 +456,16 @@ export function HomeInput({ recentEvents: _recentEvents }: HomeInputProps) {
   }
 
   function dismissAccountRestorePrompt() {
+    trackProductEvent(
+      "account_restore_prompt_dismissed",
+      {
+        remote_cats: accountRestoreSummary?.remoteCats ?? null,
+        remote_records: accountRestoreSummary?.remoteRecords ?? null,
+        remote_collection_photos:
+          accountRestoreSummary?.remoteCollectionPhotos ?? null,
+      },
+      { localCatId: activeCatId },
+    );
     window.localStorage.setItem(
       STORAGE_KEYS.accountRestorePromptDismissed,
       String(Date.now()),
@@ -454,6 +474,16 @@ export function HomeInput({ recentEvents: _recentEvents }: HomeInputProps) {
   }
 
   async function handleAccountRestoreFromSheet() {
+    trackProductEvent(
+      "account_restore_prompt_restore_clicked",
+      {
+        remote_cats: accountRestoreSummary?.remoteCats ?? null,
+        remote_records: accountRestoreSummary?.remoteRecords ?? null,
+        remote_collection_photos:
+          accountRestoreSummary?.remoteCollectionPhotos ?? null,
+      },
+      { localCatId: activeCatId },
+    );
     setIsAccountRestoring(true);
 
     const result = await syncLocalDataWithAccount({
@@ -462,6 +492,17 @@ export function HomeInput({ recentEvents: _recentEvents }: HomeInputProps) {
     });
 
     setIsAccountRestoring(false);
+    trackProductEvent(
+      "account_restore_prompt_restore_completed",
+      {
+        status: result.status,
+        restored_cats: result.restoredCats,
+        restored_records: result.restoredRecords,
+        restored_collection_photos: result.restoredCollectionPhotos,
+        error_count: result.errors.length,
+      },
+      { localCatId: activeCatId },
+    );
 
     if (result.status === "restored" && result.restoredCats > 0) {
       refreshHomeFromLocalStorage();
