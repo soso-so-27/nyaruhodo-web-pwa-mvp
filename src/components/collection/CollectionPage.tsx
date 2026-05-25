@@ -59,6 +59,17 @@ type CollectionPhoto = {
 
 type CollectionView = "collect" | "album" | "share";
 
+type CollectionShareFeedItem = {
+  id: string;
+  itemType: "photo";
+  ownerScope: "self";
+  slot: CollectionSlot | null;
+  src: string;
+  ownerName: string;
+  badge: string;
+  sourcePhotoId: string;
+};
+
 export function CollectionPage() {
   const [catProfiles, setCatProfiles] = useState<CatProfile[]>([]);
   const [activeCatId, setActiveCatId] = useState<string | null>(null);
@@ -142,9 +153,9 @@ export function CollectionPage() {
     () => buildNextCollectionTargets(photosBySlot, dailyTargetSlot?.id ?? null),
     [dailyTargetSlot?.id, photosBySlot],
   );
-  const recentSharePhotos = useMemo(
-    () => storedCollectionPhotos.slice(0, 8),
-    [storedCollectionPhotos],
+  const shareFeedItems = useMemo(
+    () => buildCollectionShareFeed(storedCollectionPhotos, catName),
+    [catName, storedCollectionPhotos],
   );
 
   useEffect(() => {
@@ -398,6 +409,26 @@ export function CollectionPage() {
     showToast("シェアに表示しました");
   }
 
+  function handleShareFeedItemOpen(item: CollectionShareFeedItem) {
+    trackProductEvent(
+      "collection_share_feed_card_opened",
+      {
+        item_id: item.id,
+        item_type: item.itemType,
+        owner_scope: item.ownerScope,
+        source_photo_id: item.sourcePhotoId,
+        slot_id: item.slot?.id ?? null,
+        slot_slug: item.slot ? getCollectionPhotoSlug(item.slot) : null,
+        group_id: item.slot ? getCollectionGroupIdForSlot(item.slot) : null,
+      },
+      { localCatId: activeCatId },
+    );
+
+    if (item.slot) {
+      openSheet(item.slot, "grid");
+    }
+  }
+
   function handleDeletePhoto(slug: string, index: number) {
     if (!activeCatId) {
       return;
@@ -560,8 +591,8 @@ export function CollectionPage() {
 
         {activeView === "share" ? (
           <CollectionShareView
-            photos={recentSharePhotos}
-            onOpenSlot={(slot) => openSheet(slot, "grid")}
+            feedItems={shareFeedItems}
+            onOpenItem={handleShareFeedItemOpen}
           />
         ) : null}
       </div>
@@ -736,13 +767,13 @@ function CollectionAlbumView({
 }
 
 function CollectionShareView({
-  photos,
-  onOpenSlot,
+  feedItems,
+  onOpenItem,
 }: {
-  photos: CollectionPhoto[];
-  onOpenSlot: (slot: CollectionSlot) => void;
+  feedItems: CollectionShareFeedItem[];
+  onOpenItem: (item: CollectionShareFeedItem) => void;
 }) {
-  if (photos.length === 0) {
+  if (feedItems.length === 0) {
     return (
       <section style={styles.shareEmptyCard}>
         <p style={styles.shareEmptyTitle}>まだありません</p>
@@ -753,29 +784,27 @@ function CollectionShareView({
 
   return (
     <section style={styles.shareView} aria-label="シェア">
+      <div style={styles.shareHeaderCard}>
+        <p style={styles.shareHeaderKicker}>シェア</p>
+        <p style={styles.shareHeaderTitle}>共有フィードの準備中</p>
+      </div>
       <div style={styles.shareFeed}>
-        {photos.map((photo) => {
-          const slot = getCollectionSlotById(photo.slotId);
-
-          return (
-            <button
-              key={photo.id}
-              type="button"
-              onClick={() => {
-                if (slot) {
-                  onOpenSlot(slot);
-                }
-              }}
-              style={styles.shareFeedCard}
-            >
-              <img src={photo.src} alt="" style={styles.shareFeedPhoto} />
-              <span style={styles.shareFeedFade} aria-hidden="true" />
-              <span style={styles.shareFeedLabel}>
-                {slot ? getCollectionSlotLabel(slot) : "写真"}
-              </span>
-            </button>
-          );
-        })}
+        {feedItems.map((item) => (
+          <button
+            key={item.id}
+            type="button"
+            onClick={() => onOpenItem(item)}
+            style={styles.shareFeedCard}
+          >
+            <img src={item.src} alt="" style={styles.shareFeedPhoto} />
+            <span style={styles.shareFeedFade} aria-hidden="true" />
+            <span style={styles.shareFeedBadge}>{item.badge}</span>
+            <span style={styles.shareFeedMeta}>{item.ownerName}</span>
+            <span style={styles.shareFeedLabel}>
+              {item.slot ? getCollectionSlotLabel(item.slot) : "写真"}
+            </span>
+          </button>
+        ))}
       </div>
     </section>
   );
@@ -1380,6 +1409,22 @@ function buildStoredCollectionPhotos(collectionPhotos: Record<string, string[]>)
   return photos.reverse();
 }
 
+function buildCollectionShareFeed(
+  photos: CollectionPhoto[],
+  catName: string,
+): CollectionShareFeedItem[] {
+  return photos.slice(0, 12).map((photo) => ({
+    id: `mine-${photo.id}`,
+    itemType: "photo",
+    ownerScope: "self",
+    slot: getCollectionSlotById(photo.slotId),
+    src: photo.src,
+    ownerName: catName,
+    badge: "自分の一枚",
+    sourcePhotoId: photo.id,
+  }));
+}
+
 function buildNextCollectionTargets(
   photosBySlot: Map<string, CollectionPhoto[]>,
   dailyTargetSlotId: string | null,
@@ -1981,14 +2026,32 @@ const styles = {
     display: "grid",
     gap: "12px",
   },
+  shareHeaderCard: {
+    ...COLLECTION_SURFACE_SOFT,
+    borderRadius: "18px",
+    padding: "13px 14px",
+  },
+  shareHeaderKicker: {
+    margin: "0 0 4px",
+    color: COLLECTION_MUTED,
+    fontSize: "11px",
+    fontWeight: 540,
+    lineHeight: 1.2,
+  },
+  shareHeaderTitle: {
+    margin: 0,
+    color: COLLECTION_TEXT_STRONG,
+    fontSize: "15px",
+    fontWeight: 600,
+    lineHeight: 1.35,
+  },
   shareFeed: {
     display: "grid",
-    gridTemplateColumns: "repeat(2, minmax(0, 1fr))",
-    gap: "12px",
+    gap: "10px",
   },
   shareFeedCard: {
     position: "relative",
-    aspectRatio: "1 / 1.2",
+    minHeight: "132px",
     overflow: "hidden",
     border: "0.5px solid rgba(255,255,255,0.16)",
     borderRadius: "18px",
@@ -1997,6 +2060,7 @@ const styles = {
     padding: 0,
     font: "inherit",
     cursor: "pointer",
+    textAlign: "left",
   },
   shareFeedPhoto: {
     position: "absolute",
@@ -2009,15 +2073,40 @@ const styles = {
     position: "absolute",
     inset: 0,
     background:
-      "linear-gradient(180deg, rgba(0,0,0,0.02) 0%, rgba(0,0,0,0.18) 52%, rgba(0,0,0,0.58) 100%)",
+      "linear-gradient(90deg, rgba(0,0,0,0.54) 0%, rgba(0,0,0,0.22) 54%, rgba(0,0,0,0.06) 100%)",
+  },
+  shareFeedBadge: {
+    position: "absolute",
+    top: "12px",
+    left: "12px",
+    zIndex: 1,
+    borderRadius: "99px",
+    background: "rgba(255,255,255,0.84)",
+    color: "#2a2a28",
+    fontSize: "10px",
+    fontWeight: 620,
+    lineHeight: 1,
+    padding: "4px 8px",
+  },
+  shareFeedMeta: {
+    position: "absolute",
+    left: "12px",
+    right: "12px",
+    bottom: "38px",
+    color: "rgba(255,255,255,0.70)",
+    fontSize: "11px",
+    fontWeight: 520,
+    lineHeight: 1.2,
+    zIndex: 1,
   },
   shareFeedLabel: {
     position: "absolute",
     left: "12px",
     right: "12px",
     bottom: "12px",
+    zIndex: 1,
     color: "#fff",
-    fontSize: "14px",
+    fontSize: "16px",
     fontWeight: 600,
     lineHeight: 1.25,
     textAlign: "left",

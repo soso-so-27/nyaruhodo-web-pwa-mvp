@@ -194,6 +194,7 @@ order by name;
 - `collection_photo_added`
 - `collection_pose_found`
 - `collection_share_tapped`
+- `collection_share_feed_card_opened`
 
 ### OK基準
 
@@ -274,4 +275,3 @@ order by name;
 - 直す優先度が高い: 診断完了できない、ホームで記録できない、ログインでデータが消える、イベントが入らない。
 - 次に高い: PWA表示崩れ、BottomNav被り、主要カードの誤タップ。
 - 低い: 文言の細かい好み、カード順、ロック中カードの仮データ。
-

@@ -101,6 +101,7 @@ Useful checks:
 - `torisetu_locked_diagnosis_tapped`: future diagnosis interest
 - `collection_photo_added`: collection behavior
 - `collection_share_tapped`: sharing intent
+- `collection_share_feed_card_opened`: share feed interest
 
 ## 5. Safe Recent Events
 

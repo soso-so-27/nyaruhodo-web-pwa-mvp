@@ -172,7 +172,8 @@ where created_at >= now() - interval '7 days'
     'torisetu_diagnosis_card_started',
     'collection_viewed',
     'collection_photo_added',
-    'collection_share_tapped'
+    'collection_share_tapped',
+    'collection_share_feed_card_opened'
   )
 group by name
 order by users desc, events desc;
