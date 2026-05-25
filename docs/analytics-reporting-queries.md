@@ -2,6 +2,8 @@
 
 Last updated: 2026-05-24
 
+For reusable Supabase views, see `docs/analytics-reporting-views.md`.
+
 Open betaでは、まず「SNSから来た人が診断を完了し、ホームでみっけし、保存意欲を持つか」を見る。
 このメモはSupabase SQL Editorでそのまま使うためのクエリ集。
 
