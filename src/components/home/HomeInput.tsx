@@ -2,7 +2,10 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { CSSProperties, TouchEvent } from "react";
-import { syncLocalDataWithAccount } from "../../lib/accountSync";
+import {
+  getAccountSyncOverview,
+  syncLocalDataWithAccount,
+} from "../../lib/accountSync";
 import { trackProductEvent } from "../../lib/analytics/productAnalytics";
 import {
   getDailyCollectionTarget,
@@ -115,6 +118,14 @@ export function HomeInput({ recentEvents: _recentEvents }: HomeInputProps) {
   const [isMugiSheetOpen, setIsMugiSheetOpen] = useState(false);
   const [isReactionSheetOpen, setIsReactionSheetOpen] = useState(false);
   const [isCatSheetOpen, setIsCatSheetOpen] = useState(false);
+  const [isAccountRestoreSheetOpen, setIsAccountRestoreSheetOpen] =
+    useState(false);
+  const [isAccountRestoring, setIsAccountRestoring] = useState(false);
+  const [accountRestoreSummary, setAccountRestoreSummary] = useState<{
+    remoteCats: number;
+    remoteRecords: number;
+    remoteCollectionPhotos: number;
+  } | null>(null);
   const [isDiscoverySheetOpen, setIsDiscoverySheetOpen] = useState(false);
   const [isRecentChangeSheetOpen, setIsRecentChangeSheetOpen] = useState(false);
   const [selectedYousu, setSelectedYousu] = useState<string | null>(null);
@@ -234,15 +245,7 @@ export function HomeInput({ recentEvents: _recentEvents }: HomeInputProps) {
     );
 
     if (syncResult.status === "restored" && syncResult.restoredCats > 0) {
-      const profiles = readCatProfiles();
-      const activeId = readActiveCatId();
-      const active = getActiveCatProfile(profiles, activeId);
-
-      setCatProfiles(profiles);
-      setActiveCatId(active.id);
-      setActiveCat(active);
-      saveActiveCatId(active.id);
-      hydrateCatState(active.id);
+      refreshHomeFromLocalStorage();
     }
   }
 
@@ -335,6 +338,35 @@ export function HomeInput({ recentEvents: _recentEvents }: HomeInputProps) {
     );
   }, [activeCat, activeCatId, catProfiles.length, recordLog.length]);
 
+  useEffect(() => {
+    if (!activeCatId || isAccountRestoreDismissed()) {
+      return;
+    }
+
+    let isCancelled = false;
+
+    async function checkAccountRestoreSuggestion() {
+      const overview = await getAccountSyncOverview();
+
+      if (isCancelled || !overview.shouldSuggestRestore) {
+        return;
+      }
+
+      setAccountRestoreSummary({
+        remoteCats: overview.remoteCats,
+        remoteRecords: overview.remoteRecords,
+        remoteCollectionPhotos: overview.remoteCollectionPhotos,
+      });
+      setIsAccountRestoreSheetOpen(true);
+    }
+
+    void checkAccountRestoreSuggestion();
+
+    return () => {
+      isCancelled = true;
+    };
+  }, [activeCatId]);
+
   function hydrateCatState(catId: string) {
     setLockData(readLockData(catId));
     setDiscoveryDismissedToday(hasSeenDiscoveryToday(catId));
@@ -347,6 +379,18 @@ export function HomeInput({ recentEvents: _recentEvents }: HomeInputProps) {
     setSelectedYousu(latestYousu?.value ?? null);
     setSelectedMugi(latestMugi?.value ?? null);
     setSelectedReaction(null);
+  }
+
+  function refreshHomeFromLocalStorage() {
+    const profiles = readCatProfiles();
+    const activeId = readActiveCatId();
+    const active = getActiveCatProfile(profiles, activeId);
+
+    setCatProfiles(profiles);
+    setActiveCatId(active.id);
+    setActiveCat(active);
+    saveActiveCatId(active.id);
+    hydrateCatState(active.id);
   }
 
   function handleCatSelect(catId: string) {
@@ -399,6 +443,44 @@ export function HomeInput({ recentEvents: _recentEvents }: HomeInputProps) {
   function showToast(message: string) {
     setToastText(message);
     window.setTimeout(() => setToastText(""), 1500);
+  }
+
+  function dismissAccountRestorePrompt() {
+    window.localStorage.setItem(
+      STORAGE_KEYS.accountRestorePromptDismissed,
+      String(Date.now()),
+    );
+    setIsAccountRestoreSheetOpen(false);
+  }
+
+  async function handleAccountRestoreFromSheet() {
+    setIsAccountRestoring(true);
+
+    const result = await syncLocalDataWithAccount({
+      forceRestore: true,
+      restoreIfLocalEmpty: true,
+    });
+
+    setIsAccountRestoring(false);
+
+    if (result.status === "restored" && result.restoredCats > 0) {
+      refreshHomeFromLocalStorage();
+      window.localStorage.setItem(
+        STORAGE_KEYS.accountRestorePromptDismissed,
+        String(Date.now()),
+      );
+      setIsAccountRestoreSheetOpen(false);
+      showToast("復元しました");
+      return;
+    }
+
+    if (result.status === "error") {
+      showToast("復元できませんでした");
+      return;
+    }
+
+    setIsAccountRestoreSheetOpen(false);
+    showToast("復元できるデータはありません");
   }
 
   function recordYousu(value: string) {
@@ -676,6 +758,17 @@ export function HomeInput({ recentEvents: _recentEvents }: HomeInputProps) {
         />
       ) : null}
 
+      {isAccountRestoreSheetOpen ? (
+        <AccountRestoreSheet
+          summary={accountRestoreSummary}
+          isRestoring={isAccountRestoring}
+          onRestore={() => {
+            void handleAccountRestoreFromSheet();
+          }}
+          onClose={dismissAccountRestorePrompt}
+        />
+      ) : null}
+
       {isCatSheetOpen ? (
         <CatSheet
           profiles={catProfiles}
@@ -796,6 +889,57 @@ function InfoSheet({
       <div style={styles.infoSheetBody}>
         <p style={styles.infoSheetLead}>{lead}</p>
         <p style={styles.infoSheetText}>{body}</p>
+      </div>
+    </AppBottomSheet>
+  );
+}
+
+function AccountRestoreSheet({
+  summary,
+  isRestoring,
+  onRestore,
+  onClose,
+}: {
+  summary: {
+    remoteCats: number;
+    remoteRecords: number;
+    remoteCollectionPhotos: number;
+  } | null;
+  isRestoring: boolean;
+  onRestore: () => void;
+  onClose: () => void;
+}) {
+  return (
+    <AppBottomSheet title="アカウントのデータがあります" onClose={onClose}>
+      <div style={styles.accountRestoreBody}>
+        <p style={styles.accountRestoreLead}>
+          別の端末で保存した猫データを、この端末に復元できます。
+        </p>
+        {summary ? (
+          <div style={styles.accountRestoreStats}>
+            <span>猫 {summary.remoteCats}</span>
+            <span>記録 {summary.remoteRecords}</span>
+            <span>写真 {summary.remoteCollectionPhotos}</span>
+          </div>
+        ) : null}
+        <div style={styles.accountRestoreActions}>
+          <button
+            type="button"
+            onClick={onRestore}
+            disabled={isRestoring}
+            style={styles.accountRestorePrimary}
+          >
+            {isRestoring ? "復元中..." : "復元する"}
+          </button>
+          <button
+            type="button"
+            onClick={onClose}
+            disabled={isRestoring}
+            style={styles.accountRestoreSecondary}
+          >
+            あとで
+          </button>
+        </div>
       </div>
     </AppBottomSheet>
   );
@@ -1366,6 +1510,24 @@ function markDiscoverySeen(catId: string) {
   }
 }
 
+function isAccountRestoreDismissed() {
+  try {
+    const raw = window.localStorage.getItem(
+      STORAGE_KEYS.accountRestorePromptDismissed,
+    );
+    const dismissedAt = raw ? Number(raw) : 0;
+
+    if (!Number.isFinite(dismissedAt) || dismissedAt <= 0) {
+      return false;
+    }
+
+    const sevenDays = 7 * 24 * 60 * 60 * 1000;
+    return Date.now() - dismissedAt < sevenDays;
+  } catch {
+    return false;
+  }
+}
+
 const styles = {
   page: {
     position: "fixed",
@@ -1906,6 +2068,51 @@ const styles = {
     fontSize: "13px",
     fontWeight: 500,
     lineHeight: 1.75,
+  },
+  accountRestoreBody: {
+    marginTop: "18px",
+    display: "grid",
+    gap: "14px",
+  },
+  accountRestoreLead: {
+    margin: 0,
+    color: "rgba(255,255,255,0.88)",
+    fontSize: "14px",
+    fontWeight: 560,
+    lineHeight: 1.7,
+  },
+  accountRestoreStats: {
+    display: "flex",
+    gap: "8px",
+    flexWrap: "wrap",
+    color: "rgba(255,255,255,0.74)",
+    fontSize: "12px",
+    fontWeight: 620,
+  },
+  accountRestoreActions: {
+    display: "grid",
+    gap: "8px",
+  },
+  accountRestorePrimary: {
+    width: "100%",
+    minHeight: "48px",
+    border: "none",
+    borderRadius: "16px",
+    background: "rgba(255,255,255,0.92)",
+    color: "#2A2A28",
+    fontSize: "15px",
+    fontWeight: 680,
+    cursor: "pointer",
+  },
+  accountRestoreSecondary: {
+    width: "100%",
+    minHeight: "40px",
+    border: "none",
+    background: "transparent",
+    color: "rgba(255,255,255,0.64)",
+    fontSize: "13px",
+    fontWeight: 600,
+    cursor: "pointer",
   },
   catList: {
     display: "grid",

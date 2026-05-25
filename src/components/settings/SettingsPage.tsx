@@ -2,7 +2,11 @@
 
 import { useEffect, useState } from "react";
 import type { CSSProperties } from "react";
-import { syncLocalDataWithAccount } from "../../lib/accountSync";
+import {
+  getAccountSyncOverview,
+  syncLocalDataWithAccount,
+} from "../../lib/accountSync";
+import type { AccountSyncOverview } from "../../lib/accountSync";
 import { createBrowserSupabaseClient } from "../../lib/supabase/browser";
 import {
   APP_ACCENT,
@@ -17,6 +21,7 @@ export function SettingsPage() {
   const [isSyncing, setIsSyncing] = useState(false);
   const [email, setEmail] = useState<string | null>(null);
   const [syncMessage, setSyncMessage] = useState("");
+  const [syncOverview, setSyncOverview] = useState<AccountSyncOverview | null>(null);
 
   useEffect(() => {
     void checkAuthState();
@@ -32,7 +37,19 @@ export function SettingsPage() {
     const { data } = await supabase.auth.getUser();
     setIsLoggedIn(Boolean(data.user));
     setEmail(data.user?.email ?? null);
+    if (data.user) {
+      await refreshSyncOverview();
+    }
     setIsLoading(false);
+  }
+
+  async function refreshSyncOverview() {
+    try {
+      const overview = await getAccountSyncOverview();
+      setSyncOverview(overview.isLoggedIn ? overview : null);
+    } catch {
+      setSyncOverview(null);
+    }
   }
 
   async function handleLogout() {
@@ -43,6 +60,7 @@ export function SettingsPage() {
     setIsLoggedIn(false);
     setEmail(null);
     setSyncMessage("");
+    setSyncOverview(null);
   }
 
   async function handleSyncNow() {
@@ -65,6 +83,7 @@ export function SettingsPage() {
       setSyncMessage("同期できるデータはまだありません。");
     }
 
+    await refreshSyncOverview();
     setIsSyncing(false);
   }
 
@@ -93,6 +112,7 @@ export function SettingsPage() {
       setSyncMessage("復元できるアカウントデータはまだありません。");
     }
 
+    await refreshSyncOverview();
     setIsSyncing(false);
   }
 
@@ -121,6 +141,26 @@ export function SettingsPage() {
                   <span style={styles.rowValue}>{email ?? ""}</span>
                 </div>
                 <div style={styles.divider} />
+                {syncOverview ? (
+                  <>
+                    <div style={styles.syncOverview}>
+                      <div>
+                        <p style={styles.syncOverviewLabel}>アカウント保存</p>
+                        <p style={styles.syncOverviewText}>
+                          猫 {syncOverview.remoteCats} ・ 記録{" "}
+                          {syncOverview.remoteRecords}
+                          {syncOverview.remoteCollectionPhotos > 0
+                            ? ` ・ 写真 ${syncOverview.remoteCollectionPhotos}`
+                            : ""}
+                        </p>
+                      </div>
+                      {syncOverview.shouldSuggestRestore ? (
+                        <span style={styles.syncOverviewBadge}>復元できます</span>
+                      ) : null}
+                    </div>
+                    <div style={styles.divider} />
+                  </>
+                ) : null}
                 <button
                   type="button"
                   onClick={() => {
@@ -330,6 +370,34 @@ const styles = {
     margin: "0",
     padding: "0 0 12px",
     textAlign: "center" as const,
+  },
+  syncOverview: {
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: "12px",
+    padding: "14px 0",
+  },
+  syncOverviewLabel: {
+    fontSize: "13px",
+    fontWeight: 600,
+    color: "#2a2a28",
+    margin: "0 0 4px",
+  },
+  syncOverviewText: {
+    fontSize: "12px",
+    fontWeight: 500,
+    color: "#8a8a80",
+    margin: 0,
+  },
+  syncOverviewBadge: {
+    flexShrink: 0,
+    border: `0.5px solid ${APP_ACCENT}`,
+    borderRadius: "99px",
+    color: APP_ACCENT,
+    fontSize: "11px",
+    fontWeight: 600,
+    padding: "4px 8px",
   },
   primaryButton: {
     display: "block",

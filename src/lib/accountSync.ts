@@ -97,8 +97,94 @@ export type AccountSyncResult = {
   errors: string[];
 };
 
+export type AccountSyncOverview = {
+  isLoggedIn: boolean;
+  hasLocalData: boolean;
+  localCats: number;
+  remoteCats: number;
+  remoteRecords: number;
+  remoteCollectionPhotos: number;
+  lastPushAt: string | null;
+  lastPullAt: string | null;
+  shouldSuggestRestore: boolean;
+};
+
 const CAT_PHOTOS_BUCKET = "cat-photos";
 const SYNC_METADATA = { source: "localStorage-v1" };
+
+export async function getAccountSyncOverview(): Promise<AccountSyncOverview> {
+  const emptyOverview: AccountSyncOverview = {
+    isLoggedIn: false,
+    hasLocalData: false,
+    localCats: 0,
+    remoteCats: 0,
+    remoteRecords: 0,
+    remoteCollectionPhotos: 0,
+    lastPushAt: null,
+    lastPullAt: null,
+    shouldSuggestRestore: false,
+  };
+
+  if (typeof window === "undefined") {
+    return emptyOverview;
+  }
+
+  const snapshot = readLocalSnapshot();
+  const localCats = snapshot.profiles.length;
+  const hasLocalData = hasMeaningfulLocalData(snapshot);
+  const supabase = createBrowserSupabaseClient();
+
+  if (!supabase) {
+    return { ...emptyOverview, hasLocalData, localCats };
+  }
+
+  const { data, error } = await supabase.auth.getUser();
+
+  if (error || !data.user) {
+    return { ...emptyOverview, hasLocalData, localCats };
+  }
+
+  const userId = data.user.id;
+  const [catsResult, recordsResult, collectionResult, syncStateResult] =
+    await Promise.all([
+      supabase
+        .from("cats")
+        .select("id", { count: "exact", head: true })
+        .eq("owner_user_id", userId),
+      supabase
+        .from("record_logs")
+        .select("id", { count: "exact", head: true })
+        .eq("user_id", userId),
+      supabase
+        .from("collection_photos")
+        .select("id", { count: "exact", head: true })
+        .eq("user_id", userId),
+      supabase
+        .from("account_sync_state")
+        .select("last_push_at,last_pull_at")
+        .eq("user_id", userId)
+        .maybeSingle(),
+    ]);
+
+  const remoteCats = catsResult.count ?? 0;
+  const remoteRecords = recordsResult.count ?? 0;
+  const remoteCollectionPhotos = collectionResult.count ?? 0;
+  const syncState = syncStateResult.data as
+    | { last_push_at?: string | null; last_pull_at?: string | null }
+    | null;
+
+  return {
+    isLoggedIn: true,
+    hasLocalData,
+    localCats,
+    remoteCats,
+    remoteRecords,
+    remoteCollectionPhotos,
+    lastPushAt: syncState?.last_push_at ?? null,
+    lastPullAt: syncState?.last_pull_at ?? null,
+    shouldSuggestRestore: remoteCats > 0 && (!hasLocalData || remoteCats > localCats),
+  };
+}
 
 export async function syncLocalDataWithAccount(options?: {
   restoreIfLocalEmpty?: boolean;
