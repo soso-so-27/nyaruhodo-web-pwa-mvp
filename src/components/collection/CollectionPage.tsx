@@ -950,8 +950,15 @@ function DailyCollectionTarget({
       style={styles.dailyTargetCard}
       onClick={() => onOpenSlot(slot)}
     >
-      <span style={styles.dailyTargetLabel}>今日の一枚</span>
-      <strong style={styles.dailyTargetName}>{getCollectionSlotLabel(slot)}</strong>
+      <span style={styles.dailyTargetThumb} aria-hidden="true">
+        <img src={slot.iconPath} alt="" style={styles.dailyTargetIcon} />
+      </span>
+      <span style={styles.dailyTargetText}>
+        <span style={styles.dailyTargetLabel}>今日の見つけたい姿</span>
+        <strong style={styles.dailyTargetName}>
+          {getCollectionSlotLabel(slot)}
+        </strong>
+      </span>
       <span style={styles.dailyTargetHint}>撮る</span>
     </button>
   );
@@ -1132,7 +1139,7 @@ function CollectionCompletionSheet({
   onOpenShare: () => void;
 }) {
   return (
-    <AppBottomSheet title="残しました" onClose={onClose}>
+    <AppBottomSheet title="見つけました" onClose={onClose}>
       <div style={styles.completionBody}>
         <div style={styles.completionIcon} aria-hidden="true">
           <svg
@@ -1150,7 +1157,7 @@ function CollectionCompletionSheet({
         </div>
         <p style={styles.completionTitle}>
           {getCollectionSlotLabel(slot)}
-          を残した
+          を見つけた
         </p>
         <div style={styles.completionActions}>
           <button type="button" style={styles.btnPrimary} onClick={onOpenAlbum}>
@@ -2002,15 +2009,38 @@ const styles = {
     width: "100%",
     ...COLLECTION_SURFACE_SOFT,
     display: "grid",
-    gridTemplateColumns: "auto 1fr auto",
+    gridTemplateColumns: "48px minmax(0, 1fr) auto",
     alignItems: "center",
-    gap: "8px",
-    borderRadius: "16px",
-    padding: "11px 12px",
+    gap: "11px",
+    borderRadius: "18px",
+    padding: "12px",
     color: COLLECTION_TEXT,
     font: "inherit",
     textAlign: "left",
     cursor: "pointer",
+  },
+  dailyTargetThumb: {
+    width: "48px",
+    height: "48px",
+    borderRadius: "15px",
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    background: "rgba(255,255,255,0.11)",
+    border: "0.5px solid rgba(255,255,255,0.12)",
+    overflow: "hidden",
+  },
+  dailyTargetIcon: {
+    width: "38px",
+    height: "38px",
+    objectFit: "contain",
+    opacity: 0.62,
+    filter: "grayscale(1) brightness(1.8) contrast(0.88)",
+  },
+  dailyTargetText: {
+    minWidth: 0,
+    display: "grid",
+    gap: "4px",
   },
   collectView: {
     display: "grid",
@@ -2069,14 +2099,14 @@ const styles = {
   },
   dailyTargetLabel: {
     color: COLLECTION_MUTED,
-    fontSize: "11px",
+    fontSize: "10px",
     fontWeight: 520,
     whiteSpace: "nowrap",
   },
   dailyTargetName: {
     minWidth: 0,
     color: COLLECTION_TEXT_STRONG,
-    fontSize: "14px",
+    fontSize: "16px",
     fontWeight: 620,
     lineHeight: 1.2,
     overflow: "hidden",
