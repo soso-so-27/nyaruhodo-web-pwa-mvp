@@ -69,6 +69,7 @@ export function CollectionPage() {
     {},
   );
   const [selectedSlug, setSelectedSlug] = useState<string | null>(null);
+  const [completedSlug, setCompletedSlug] = useState<string | null>(null);
   const [currentPhotoIndex, setCurrentPhotoIndex] = useState(0);
   const [isCatSheetOpen, setIsCatSheetOpen] = useState(false);
   const [toastText, setToastText] = useState("");
@@ -133,6 +134,7 @@ export function CollectionPage() {
     COLLECTION_GROUPS.find((group) => group.id === activeGroupId) ??
     COLLECTION_GROUPS[0];
   const selectedSlot = selectedSlug ? getCollectionSlotBySlug(selectedSlug) : null;
+  const completedSlot = completedSlug ? getCollectionSlotBySlug(completedSlug) : null;
   const selectedPhotos = selectedSlot
     ? photosBySlot.get(selectedSlot.id) ?? []
     : [];
@@ -243,6 +245,7 @@ export function CollectionPage() {
     saveActiveCatId(nextActiveProfile.id);
     setActiveCatId(nextActiveProfile.id);
     setSelectedSlug(null);
+    setCompletedSlug(null);
     setCurrentPhotoIndex(0);
     setIsCatSheetOpen(false);
   }
@@ -346,7 +349,17 @@ export function CollectionPage() {
         },
         { localCatId: activeCatId },
       );
-      showToast(`${getCollectionSlotLabel(slot)}を残した`);
+      trackProductEvent(
+        "collection_completion_shown",
+        {
+          slot_id: slot.id,
+          slot_slug: slug,
+          group_id: getCollectionGroupIdForSlot(slot),
+        },
+        { localCatId: activeCatId },
+      );
+      setSelectedSlug(null);
+      setCompletedSlug(slug);
     };
 
     input.click();
@@ -574,6 +587,23 @@ export function CollectionPage() {
           activeCatId={activeCatId}
           onClose={closeCatSheet}
           onSelect={handleCatSelect}
+        />
+      ) : null}
+      {completedSlot ? (
+        <CollectionCompletionSheet
+          slot={completedSlot}
+          onClose={() => setCompletedSlug(null)}
+          onOpenAlbum={() => {
+            setCompletedSlug(null);
+            setActiveView("album");
+            setActiveGroupId(completedSlot.group);
+            setSelectedSlug(getCollectionPhotoSlug(completedSlot));
+            setCurrentPhotoIndex(0);
+          }}
+          onOpenShare={() => {
+            setCompletedSlug(null);
+            setActiveView("share");
+          }}
         />
       ) : null}
       {toastText ? <div style={styles.toast}>{toastText}</div> : null}
@@ -999,6 +1029,51 @@ function CollectionPhotoSheet({
         >
           シェアへ
         </button>
+      </div>
+    </AppBottomSheet>
+  );
+}
+
+function CollectionCompletionSheet({
+  slot,
+  onClose,
+  onOpenAlbum,
+  onOpenShare,
+}: {
+  slot: CollectionSlot;
+  onClose: () => void;
+  onOpenAlbum: () => void;
+  onOpenShare: () => void;
+}) {
+  return (
+    <AppBottomSheet title="残しました" onClose={onClose}>
+      <div style={styles.completionBody}>
+        <div style={styles.completionIcon} aria-hidden="true">
+          <svg
+            viewBox="0 0 24 24"
+            width="22"
+            height="22"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2.2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          >
+            <path d="M20 6 9 17l-5-5" />
+          </svg>
+        </div>
+        <p style={styles.completionTitle}>
+          {getCollectionSlotLabel(slot)}
+          を残した
+        </p>
+        <div style={styles.completionActions}>
+          <button type="button" style={styles.btnPrimary} onClick={onOpenAlbum}>
+            アルバムを見る
+          </button>
+          <button type="button" style={styles.btnSecondary} onClick={onOpenShare}>
+            シェアへ
+          </button>
+        </div>
       </div>
     </AppBottomSheet>
   );
@@ -2194,6 +2269,37 @@ const styles = {
     gridTemplateColumns: "1fr 1fr",
     gap: "8px",
     padding: "12px 16px 0",
+  },
+  completionBody: {
+    display: "grid",
+    justifyItems: "center",
+    gap: "12px",
+    padding: "18px 16px 4px",
+  },
+  completionIcon: {
+    display: "grid",
+    placeItems: "center",
+    width: "44px",
+    height: "44px",
+    borderRadius: "50%",
+    background: "rgba(255,255,255,0.12)",
+    border: "0.5px solid rgba(255,255,255,0.18)",
+    color: COLLECTION_TEXT_STRONG,
+  },
+  completionTitle: {
+    margin: 0,
+    color: COLLECTION_TEXT_STRONG,
+    fontSize: "18px",
+    fontWeight: 620,
+    lineHeight: 1.35,
+    textAlign: "center",
+  },
+  completionActions: {
+    display: "grid",
+    gridTemplateColumns: "1fr 1fr",
+    gap: "8px",
+    width: "100%",
+    paddingTop: "4px",
   },
   btnPrimary: {
     border: "none",
