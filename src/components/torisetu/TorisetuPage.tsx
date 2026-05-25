@@ -14,6 +14,7 @@ import {
   determineType,
 } from "../../lib/diagnosisOnboarding/scoring";
 import {
+  TORISETU_LOCKED_DIAGNOSIS_SAMPLES,
   type TorisetuLockedDiagnosisCard,
 } from "../../lib/torisetu/diagnosisCatalog";
 import { trackProductEvent } from "../../lib/analytics/productAnalytics";
@@ -93,8 +94,6 @@ type DiagnosisItem = {
   progress: number;
 };
 
-type LockedDiagnosisCard = TorisetuLockedDiagnosisCard;
-
 type CategoryIconName = Extract<
   AppIconName,
   "sparkles" | "clipboard" | "lock" | "paw"
@@ -109,34 +108,6 @@ const peakTimeMap: Record<string, string[]> = {
   night: ["夜"],
   random: [],
 };
-
-const LOCKED_DIAGNOSIS_SAMPLES: LockedDiagnosisCard[] = [
-  {
-    id: "mood",
-    title: "ごきげん診断",
-    threshold: 8,
-  },
-  {
-    id: "play",
-    title: "遊び診断",
-    threshold: 15,
-  },
-  {
-    id: "food",
-    title: "ごはん診断",
-    threshold: 20,
-  },
-  {
-    id: "stress",
-    title: "不安サイン診断",
-    threshold: 25,
-  },
-  {
-    id: "bond",
-    title: "距離感診断",
-    threshold: 30,
-  },
-];
 
 export function TorisetuPage({ recentEvents }: TorisetuPageProps) {
   const [catProfile, setCatProfile] = useState<CatProfile | null>(null);
@@ -187,7 +158,7 @@ export function TorisetuPage({ recentEvents }: TorisetuPageProps) {
             source: "診断結果",
             detail:
               catProfile?.typeTagline ??
-              "診断で見えたタイプです。",
+              "診断で見えた、この子の基本タイプです。",
           },
         ]
       : []),
@@ -198,7 +169,7 @@ export function TorisetuPage({ recentEvents }: TorisetuPageProps) {
             label: "リズム",
             value: rhythmSummary,
             source: "オンボーディング結果",
-            detail: "最初の回答から見えているリズムです。",
+            detail: "最初の回答から見えている、今の仮説です。",
           },
         ]
       : []),
@@ -206,22 +177,27 @@ export function TorisetuPage({ recentEvents }: TorisetuPageProps) {
   const mikkeFacts: KnownFact[] = [
     {
       id: "recent",
-      label: "最近",
+      label: "いま見えていること",
       value: recentSummary,
-      source: records.length > 0 ? `${recordCount}件のみっけから` : "みっけ待ち",
+      source: "みっけ",
+      detail:
+        records.length > 0
+          ? "みっけの積み重ねで、この内容は少しずつ更新されます。"
+          : "みっけを残すと、この子らしさがここに出てきます。",
     },
     ...(hasRhythmSignal || peakSlots.length === 0
       ? [
           {
             id: "rhythm",
-            label: "リズム",
+            label: "よく出る時間",
             value: rhythmSummary,
-            source: hasRhythmSignal ? "時間帯のみっけから" : "みっけ待ち",
+            source: "みっけ",
+            detail: "時間帯ごとのみっけから、見え方が変わっていきます。",
           },
         ]
       : []),
   ];
-  const diagnosisItems: DiagnosisItem[] = LOCKED_DIAGNOSIS_SAMPLES.map((card) => {
+  const diagnosisItems: DiagnosisItem[] = TORISETU_LOCKED_DIAGNOSIS_SAMPLES.map((card) => {
     const remaining = Math.max(0, card.threshold - recordCount);
 
     return {
@@ -232,20 +208,6 @@ export function TorisetuPage({ recentEvents }: TorisetuPageProps) {
   });
   const lockedDiagnoses = diagnosisItems;
   const currentTypeQuestion = QUESTIONS[typeQuestionIndex] ?? QUESTIONS[0];
-  const dashboardItems = [
-    {
-      label: "記録",
-      value: String(recordCount),
-    },
-    {
-      label: "発見",
-      value: String(diagnosisFacts.length),
-    },
-    {
-      label: "未開封",
-      value: String(lockedDiagnoses.length),
-    },
-  ];
 
   useEffect(() => {
     if (!catProfile || trackedViewCatIdRef.current === catProfile.id) {
@@ -422,46 +384,39 @@ export function TorisetuPage({ recentEvents }: TorisetuPageProps) {
           </div>
         </header>
 
-        <section style={styles.libraryHero}>
-          <div style={styles.libraryDashboard}>
-            {dashboardItems.map((item) => (
-              <div key={item.label} style={styles.libraryDashboardItem}>
-                <span style={styles.libraryDashboardLabel}>{item.label}</span>
-                <strong style={styles.libraryDashboardValue}>{item.value}</strong>
-              </div>
-            ))}
-          </div>
-        </section>
-
         <section style={{ ...styles.sectionFrame, ...styles.sectionFrameKnowledge }}>
           <CategoryLabel
             icon="sparkles"
             label="発見"
           />
           <div style={styles.factGroups}>
-            <FactGroup icon="paw" label={`${catName}の特徴`} facts={mikkeFacts} />
-            {diagnosisFacts.length > 0 ? (
-              <FactCardShelf
-                icon="clipboard"
-                label="診断結果"
-                facts={diagnosisFacts}
-                onOpenFact={(fact) => handleOpenFact(fact, "diagnosis_result")}
-              />
-            ) : null}
+            <FactGroup
+              icon="paw"
+              label={`${catName}の特徴`}
+              facts={mikkeFacts}
+              onOpenFact={(fact) => handleOpenFact(fact, "mikke_fact")}
+            />
           </div>
         </section>
 
-        {!hasTypeDiagnosis ? (
-          <section style={{ ...styles.sectionFrame, ...styles.sectionFrameAction }}>
-            <CategoryLabel
-              icon="clipboard"
-              label="診断"
-            />
-            <div style={styles.diagnosisList}>
+        <section style={{ ...styles.sectionFrame, ...styles.sectionFrameAction }}>
+          <CategoryLabel
+            icon="clipboard"
+            label="診断結果"
+          />
+          <div style={styles.factGroups}>
+            {hasTypeDiagnosis && diagnosisFacts.length > 0 ? (
+              <FactCardShelf
+                icon="clipboard"
+                label="見返す"
+                facts={diagnosisFacts}
+                onOpenFact={(fact) => handleOpenFact(fact, "diagnosis_result")}
+              />
+            ) : (
               <TypeDiagnosisCard onStart={handleStartTypeDiagnosis} />
-            </div>
-          </section>
-        ) : null}
+            )}
+          </div>
+        </section>
 
         {lockedDiagnoses.length > 0 ? (
           <section style={{ ...styles.sectionFrame, ...styles.sectionFrameLocked }}>
@@ -581,7 +536,7 @@ function TypeDiagnosisCard({ onStart }: { onStart: () => void }) {
           <h3 style={styles.diagnosisTitle}>タイプ診断</h3>
         </div>
         <button type="button" style={styles.diagnosisAction} onClick={onStart}>
-          はじめる
+          こたえる
         </button>
       </div>
     </article>
@@ -682,7 +637,8 @@ function FactCardShelf({
                 ›
               </span>
             </span>
-            <span style={styles.torisetuFactLabel}>{fact.label}</span>
+            <span style={styles.torisetuFactKicker}>{fact.label}</span>
+            <span style={styles.torisetuFactLabel}>{fact.value}</span>
           </button>
         ))}
       </div>
@@ -1068,36 +1024,6 @@ const styles = {
     padding: "12px 14px",
     marginBottom: "16px",
   },
-  libraryHero: {
-    margin: "-2px 4px 18px",
-  },
-  libraryDashboard: {
-    display: "flex",
-    alignItems: "center",
-    gap: "18px",
-    minWidth: 0,
-  },
-  libraryDashboardItem: {
-    display: "inline-flex",
-    alignItems: "baseline",
-    gap: "5px",
-    minWidth: 0,
-  },
-  libraryDashboardLabel: {
-    color: TORISETU_FAINT,
-    fontSize: "11px",
-    fontWeight: 520,
-    lineHeight: 1.2,
-  },
-  libraryDashboardValue: {
-    color: TORISETU_TEXT,
-    fontSize: "13px",
-    fontWeight: 570,
-    lineHeight: 1.15,
-    overflow: "hidden",
-    textOverflow: "ellipsis",
-    whiteSpace: "nowrap" as const,
-  },
   progressHeader: {
     display: "flex",
     justifyContent: "space-between",
@@ -1462,6 +1388,12 @@ const styles = {
     fontWeight: 500,
     lineHeight: 1,
     flexShrink: 0,
+  },
+  torisetuFactKicker: {
+    color: TORISETU_MUTED,
+    fontSize: "11px",
+    fontWeight: 520,
+    lineHeight: 1.25,
   },
   torisetuFactLabel: {
     color: TORISETU_TEXT_STRONG,

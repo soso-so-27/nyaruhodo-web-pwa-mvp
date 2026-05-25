@@ -57,10 +57,13 @@ type CollectionPhoto = {
   createdAt?: string;
 };
 
+type CollectionView = "collect" | "album" | "share";
+
 export function CollectionPage() {
   const [catProfiles, setCatProfiles] = useState<CatProfile[]>([]);
   const [activeCatId, setActiveCatId] = useState<string | null>(null);
   const [activeGroupId, setActiveGroupId] = useState<CollectionGroupId>("pose");
+  const [activeView, setActiveView] = useState<CollectionView>("collect");
   const [hasLoaded, setHasLoaded] = useState(false);
   const [collectionPhotos, setCollectionPhotos] = useState<Record<string, string[]>>(
     {},
@@ -133,6 +136,14 @@ export function CollectionPage() {
   const selectedPhotos = selectedSlot
     ? photosBySlot.get(selectedSlot.id) ?? []
     : [];
+  const nextTargetSlots = useMemo(
+    () => buildNextCollectionTargets(photosBySlot, dailyTargetSlot?.id ?? null),
+    [dailyTargetSlot?.id, photosBySlot],
+  );
+  const recentSharePhotos = useMemo(
+    () => storedCollectionPhotos.slice(0, 8),
+    [storedCollectionPhotos],
+  );
 
   useEffect(() => {
     if (!hasLoaded || !activeCatId || trackedViewCatIdRef.current === activeCatId) {
@@ -267,6 +278,15 @@ export function CollectionPage() {
     );
   }
 
+  function handleViewSelect(view: CollectionView) {
+    setActiveView(view);
+    trackProductEvent(
+      "collection_view_tab_selected",
+      { view },
+      { localCatId: activeCatId },
+    );
+  }
+
   async function handlePhotoAdd(slot: CollectionSlot) {
     if (!activeCatId) {
       return;
@@ -326,7 +346,7 @@ export function CollectionPage() {
         },
         { localCatId: activeCatId },
       );
-      showToast(`${getCollectionSlotLabel(slot)}を見つけた`);
+      showToast(`${getCollectionSlotLabel(slot)}を残した`);
     };
 
     input.click();
@@ -360,28 +380,9 @@ export function CollectionPage() {
       { localCatId: activeCatId },
     );
 
-    const label = getCollectionSlotLabel(slot);
-    const shareText = `${catName}の${label}を見つけたよ`;
-
-    try {
-      if (navigator.share) {
-        await navigator.share({
-          title: "にゃるほど",
-          text: shareText,
-        });
-        return;
-      }
-
-      if (navigator.clipboard?.writeText) {
-        await navigator.clipboard.writeText(shareText);
-        showToast("共有文をコピーしました");
-        return;
-      }
-
-      showToast(shareText);
-    } catch {
-      // Share cancel/failure should not interrupt the collection flow.
-    }
+    setActiveView("share");
+    setSelectedSlug(null);
+    showToast("シェアに表示しました");
   }
 
   function handleDeletePhoto(slug: string, index: number) {
@@ -506,7 +507,7 @@ export function CollectionPage() {
       <div style={styles.container}>
         <header style={styles.header}>
           <div style={styles.pageHeader}>
-            <h1 style={styles.pageTitle}>しぐさアルバム</h1>
+            <h1 style={styles.pageTitle}>コレクション</h1>
             <div style={styles.pageHeaderActions}>
               <button
                 type="button"
@@ -518,25 +519,38 @@ export function CollectionPage() {
               </button>
             </div>
           </div>
-          <CollectionProgress
-            activeGroupId={activeGroupId}
-            progress={progress}
-            onSelectGroup={handleGroupSelect}
+          <CollectionViewTabs
+            activeView={activeView}
+            onSelectView={handleViewSelect}
           />
-          {dailyTargetSlot ? (
-            <DailyCollectionTarget
-              slot={dailyTargetSlot}
-              onOpenSlot={(slot) => openSheet(slot, "daily_target")}
-            />
-          ) : null}
         </header>
 
-        <CollectionGrid
-          group={activeGroup}
-          photosBySlot={photosBySlot}
-          dailyTargetSlotId={dailyTargetSlot?.id ?? null}
-          onOpenSlot={(slot) => openSheet(slot, "grid")}
-        />
+        {activeView === "collect" ? (
+          <CollectionCollectView
+            dailyTargetSlot={dailyTargetSlot}
+            nextTargetSlots={nextTargetSlots}
+            onOpenSlot={(slot) => openSheet(slot, "daily_target")}
+          />
+        ) : null}
+
+        {activeView === "album" ? (
+          <CollectionAlbumView
+            activeGroup={activeGroup}
+            activeGroupId={activeGroupId}
+            progress={progress}
+            photosBySlot={photosBySlot}
+            dailyTargetSlotId={dailyTargetSlot?.id ?? null}
+            onSelectGroup={handleGroupSelect}
+            onOpenSlot={(slot) => openSheet(slot, "grid")}
+          />
+        ) : null}
+
+        {activeView === "share" ? (
+          <CollectionShareView
+            photos={recentSharePhotos}
+            onOpenSlot={(slot) => openSheet(slot, "grid")}
+          />
+        ) : null}
       </div>
       {selectedSlot ? (
         <CollectionPhotoSheet
@@ -578,6 +592,165 @@ function PageBackdrop() {
   );
 }
 
+function CollectionViewTabs({
+  activeView,
+  onSelectView,
+}: {
+  activeView: CollectionView;
+  onSelectView: (view: CollectionView) => void;
+}) {
+  const tabs: Array<{ key: CollectionView; label: string }> = [
+    { key: "collect", label: "あつめる" },
+    { key: "album", label: "アルバム" },
+    { key: "share", label: "シェア" },
+  ];
+
+  return (
+    <div role="tablist" aria-label="コレクションの表示" style={styles.viewTabs}>
+      {tabs.map((tab) => {
+        const isActive = tab.key === activeView;
+
+        return (
+          <button
+            key={tab.key}
+            type="button"
+            role="tab"
+            aria-selected={isActive}
+            onClick={() => onSelectView(tab.key)}
+            style={{
+              ...styles.viewTab,
+              ...(isActive ? styles.viewTabActive : {}),
+            }}
+          >
+            {tab.label}
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
+function CollectionCollectView({
+  dailyTargetSlot,
+  nextTargetSlots,
+  onOpenSlot,
+}: {
+  dailyTargetSlot: CollectionSlot | null;
+  nextTargetSlots: CollectionSlot[];
+  onOpenSlot: (slot: CollectionSlot) => void;
+}) {
+  return (
+    <section style={styles.collectView} aria-label="今日あつめる">
+      {dailyTargetSlot ? (
+        <DailyCollectionTarget slot={dailyTargetSlot} onOpenSlot={onOpenSlot} />
+      ) : null}
+
+      {nextTargetSlots.length > 0 ? (
+        <div style={styles.nextTargetBlock}>
+          <div style={styles.sectionHeadingRow}>
+            <p style={styles.sectionHeading}>次に残したい姿</p>
+          </div>
+          <div style={styles.nextTargetRail}>
+            {nextTargetSlots.map((slot) => (
+              <button
+                key={slot.id}
+                type="button"
+                onClick={() => onOpenSlot(slot)}
+                style={styles.nextTargetCard}
+              >
+                <img src={slot.iconPath} alt="" style={styles.nextTargetIcon} />
+                <span style={styles.nextTargetName}>
+                  {getCollectionSlotLabel(slot)}
+                </span>
+              </button>
+            ))}
+          </div>
+        </div>
+      ) : null}
+    </section>
+  );
+}
+
+function CollectionAlbumView({
+  activeGroup,
+  activeGroupId,
+  progress,
+  photosBySlot,
+  dailyTargetSlotId,
+  onSelectGroup,
+  onOpenSlot,
+}: {
+  activeGroup: CollectionGroup;
+  activeGroupId: CollectionGroupId;
+  progress: ReturnType<typeof buildCollectionProgress>;
+  photosBySlot: Map<string, CollectionPhoto[]>;
+  dailyTargetSlotId: string | null;
+  onSelectGroup: (groupId: CollectionGroupId) => void;
+  onOpenSlot: (slot: CollectionSlot) => void;
+}) {
+  return (
+    <>
+      <CollectionProgress
+        activeGroupId={activeGroupId}
+        progress={progress}
+        onSelectGroup={onSelectGroup}
+      />
+      <CollectionGrid
+        group={activeGroup}
+        photosBySlot={photosBySlot}
+        dailyTargetSlotId={dailyTargetSlotId}
+        onOpenSlot={onOpenSlot}
+      />
+    </>
+  );
+}
+
+function CollectionShareView({
+  photos,
+  onOpenSlot,
+}: {
+  photos: CollectionPhoto[];
+  onOpenSlot: (slot: CollectionSlot) => void;
+}) {
+  if (photos.length === 0) {
+    return (
+      <section style={styles.shareEmptyCard}>
+        <p style={styles.shareEmptyTitle}>まだありません</p>
+        <p style={styles.shareEmptyText}>写真を残すと、ここに一枚ずつ並びます。</p>
+      </section>
+    );
+  }
+
+  return (
+    <section style={styles.shareView} aria-label="シェア">
+      <div style={styles.shareFeed}>
+        {photos.map((photo) => {
+          const slot = getCollectionSlotById(photo.slotId);
+
+          return (
+            <button
+              key={photo.id}
+              type="button"
+              onClick={() => {
+                if (slot) {
+                  onOpenSlot(slot);
+                }
+              }}
+              style={styles.shareFeedCard}
+            >
+              <img src={photo.src} alt="" style={styles.shareFeedPhoto} />
+              <span style={styles.shareFeedFade} aria-hidden="true" />
+              <span style={styles.shareFeedLabel}>
+                {slot ? getCollectionSlotLabel(slot) : "写真"}
+              </span>
+            </button>
+          );
+        })}
+      </div>
+    </section>
+  );
+}
+
 function CollectionProgress({
   activeGroupId,
   progress,
@@ -600,7 +773,7 @@ function CollectionProgress({
           <span style={styles.progressSlash}>/</span>
           {progress.total.total}
         </span>
-        <span style={styles.progressUnit}>見つけた姿</span>
+        <span style={styles.progressUnit}>残した姿</span>
       </p>
       <p style={styles.progressSub}>
         {`${getCollectionGroupLabel("pose")}${progress.pose.collected} ・ ${getCollectionGroupLabel("scene")}${progress.scene.collected}`}
@@ -661,9 +834,9 @@ function DailyCollectionTarget({
       style={styles.dailyTargetCard}
       onClick={() => onOpenSlot(slot)}
     >
-      <span style={styles.dailyTargetLabel}>今日の見つけたい姿</span>
+      <span style={styles.dailyTargetLabel}>今日の一枚</span>
       <strong style={styles.dailyTargetName}>{getCollectionSlotLabel(slot)}</strong>
-      <span style={styles.dailyTargetHint}>写真で残す</span>
+      <span style={styles.dailyTargetHint}>撮る</span>
     </button>
   );
 }
@@ -768,7 +941,7 @@ function CollectionPhotoSheet({
 
   return (
     <AppBottomSheet
-      title={`${getCollectionSlotLabel(slot)} (${photos.length}枚)`}
+      title={getCollectionSlotLabel(slot)}
       onClose={onClose}
     >
       {photos.length > 0 ? (
@@ -824,7 +997,7 @@ function CollectionPhotoSheet({
           }
           disabled={photos.length === 0}
         >
-          シェア
+          シェアへ
         </button>
       </div>
     </AppBottomSheet>
@@ -1132,6 +1305,21 @@ function buildStoredCollectionPhotos(collectionPhotos: Record<string, string[]>)
   return photos.reverse();
 }
 
+function buildNextCollectionTargets(
+  photosBySlot: Map<string, CollectionPhoto[]>,
+  dailyTargetSlotId: string | null,
+) {
+  const slots = COLLECTION_GROUPS.flatMap((group) => group.slots);
+  const uncollectedSlots = slots.filter(
+    (slot) =>
+      slot.id !== dailyTargetSlotId && (photosBySlot.get(slot.id)?.length ?? 0) === 0,
+  );
+
+  return (uncollectedSlots.length > 0 ? uncollectedSlots : slots)
+    .filter((slot) => slot.id !== dailyTargetSlotId)
+    .slice(0, 4);
+}
+
 function readCollectionPhotos(catId: string): Record<string, string[]> {
   try {
     const raw = window.localStorage.getItem(STORAGE_KEYS.collectionPhotos);
@@ -1257,6 +1445,14 @@ function getCollectionSlotBySlug(slug: string) {
   return (
     COLLECTION_GROUPS.flatMap((group) => group.slots).find(
       (slot) => getCollectionPhotoSlug(slot) === slug,
+    ) ?? null
+  );
+}
+
+function getCollectionSlotById(slotId: string) {
+  return (
+    COLLECTION_GROUPS.flatMap((group) => group.slots).find(
+      (slot) => slot.id === slotId,
     ) ?? null
   );
 }
@@ -1423,6 +1619,31 @@ const styles = {
     fontWeight: 620,
     letterSpacing: 0,
   },
+  viewTabs: {
+    display: "grid",
+    gridTemplateColumns: "repeat(3, 1fr)",
+    gap: "6px",
+    ...COLLECTION_SURFACE_SOFT,
+    borderRadius: "999px",
+    padding: "5px",
+  },
+  viewTab: {
+    minHeight: "34px",
+    border: "none",
+    borderRadius: "999px",
+    background: "transparent",
+    color: COLLECTION_MUTED,
+    font: "inherit",
+    fontSize: "13px",
+    fontWeight: 540,
+    lineHeight: 1,
+    cursor: "pointer",
+  },
+  viewTabActive: {
+    background: "rgba(255,255,255,0.92)",
+    color: "#2a2a28",
+    boxShadow: "0 7px 18px rgba(0,0,0,0.16)",
+  },
   catNameBtn: {
     ...COLLECTION_SURFACE_SOFT,
     fontSize: "12px",
@@ -1511,6 +1732,7 @@ const styles = {
     gap: "8px",
     borderRadius: "18px",
     padding: "11px 12px 12px",
+    marginBottom: "12px",
   },
   progressMain: {
     display: "flex",
@@ -1598,6 +1820,61 @@ const styles = {
     textAlign: "left",
     cursor: "pointer",
   },
+  collectView: {
+    display: "grid",
+    gap: "12px",
+  },
+  nextTargetBlock: {
+    ...COLLECTION_SURFACE_SOFT,
+    borderRadius: "18px",
+    padding: "12px",
+  },
+  sectionHeadingRow: {
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "space-between",
+    marginBottom: "10px",
+  },
+  sectionHeading: {
+    margin: 0,
+    color: COLLECTION_TEXT,
+    fontSize: "13px",
+    fontWeight: 560,
+    lineHeight: 1.3,
+  },
+  nextTargetRail: {
+    display: "grid",
+    gridTemplateColumns: "repeat(4, minmax(0, 1fr))",
+    gap: "8px",
+  },
+  nextTargetCard: {
+    display: "grid",
+    justifyItems: "center",
+    gap: "6px",
+    minHeight: "96px",
+    border: "0.5px solid rgba(255,255,255,0.12)",
+    borderRadius: "14px",
+    background: "rgba(255,255,255,0.07)",
+    color: COLLECTION_TEXT,
+    font: "inherit",
+    padding: "10px 6px",
+    cursor: "pointer",
+  },
+  nextTargetIcon: {
+    width: "42px",
+    height: "42px",
+    objectFit: "contain",
+    opacity: 0.54,
+    mixBlendMode: "multiply",
+    filter: "saturate(0.7) contrast(0.9)",
+  },
+  nextTargetName: {
+    color: COLLECTION_MUTED,
+    fontSize: "10px",
+    fontWeight: 520,
+    lineHeight: 1.25,
+    textAlign: "center",
+  },
   dailyTargetLabel: {
     color: COLLECTION_MUTED,
     fontSize: "11px",
@@ -1624,6 +1901,71 @@ const styles = {
     display: "grid",
     gridTemplateColumns: "repeat(2, minmax(0, 1fr))",
     gap: "12px",
+  },
+  shareView: {
+    display: "grid",
+    gap: "12px",
+  },
+  shareFeed: {
+    display: "grid",
+    gridTemplateColumns: "repeat(2, minmax(0, 1fr))",
+    gap: "12px",
+  },
+  shareFeedCard: {
+    position: "relative",
+    aspectRatio: "1 / 1.2",
+    overflow: "hidden",
+    border: "0.5px solid rgba(255,255,255,0.16)",
+    borderRadius: "18px",
+    background: "rgba(255,255,255,0.08)",
+    boxShadow: "0 10px 24px rgba(0,0,0,0.18)",
+    padding: 0,
+    font: "inherit",
+    cursor: "pointer",
+  },
+  shareFeedPhoto: {
+    position: "absolute",
+    inset: 0,
+    width: "100%",
+    height: "100%",
+    objectFit: "cover",
+  },
+  shareFeedFade: {
+    position: "absolute",
+    inset: 0,
+    background:
+      "linear-gradient(180deg, rgba(0,0,0,0.02) 0%, rgba(0,0,0,0.18) 52%, rgba(0,0,0,0.58) 100%)",
+  },
+  shareFeedLabel: {
+    position: "absolute",
+    left: "12px",
+    right: "12px",
+    bottom: "12px",
+    color: "#fff",
+    fontSize: "14px",
+    fontWeight: 600,
+    lineHeight: 1.25,
+    textAlign: "left",
+    textShadow: "0 1px 8px rgba(0,0,0,0.26)",
+  },
+  shareEmptyCard: {
+    ...COLLECTION_SURFACE_SOFT,
+    borderRadius: "18px",
+    padding: "18px",
+    textAlign: "center",
+  },
+  shareEmptyTitle: {
+    margin: "0 0 6px",
+    color: COLLECTION_TEXT_STRONG,
+    fontSize: "15px",
+    fontWeight: 600,
+  },
+  shareEmptyText: {
+    margin: 0,
+    color: COLLECTION_MUTED,
+    fontSize: "13px",
+    lineHeight: 1.55,
+    fontWeight: 500,
   },
   collectionCard: {
     position: "relative",
