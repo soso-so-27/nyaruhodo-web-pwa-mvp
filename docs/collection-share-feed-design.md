@@ -4,14 +4,14 @@
 
 `/collection` の `シェア` は、写真を外部SNSへ即共有する場所ではなく、将来のアプリ内共有フィードへ伸ばすための面として扱う。
 
-現在は「自分の一枚」を並べる。将来は同じ面に、共有された写真やおすすめ候補を混ぜられるようにする。
+現在は「自分の一枚」と「次に残したい候補」を並べる。将来は同じ面に、共有された写真やおすすめ候補を混ぜられるようにする。
 
 ## Current MVP Scope
 
 - Source: local `collection_photos`
-- Visible item type: 自分の一枚
+- Visible item type: 自分の一枚 / 候補
 - Action: カードを開くと該当コレクション詳細へ戻る
-- Empty state: コレクション写真追加へ戻す
+- Empty state: コレクション写真追加へ戻す。候補がある場合は候補カードを表示する
 - Do not imply public sharing is already live
 
 ## Future Feed Sources

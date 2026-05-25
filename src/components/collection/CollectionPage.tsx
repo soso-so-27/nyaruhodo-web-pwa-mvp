@@ -61,13 +61,15 @@ type CollectionView = "collect" | "album" | "share";
 
 type CollectionShareFeedItem = {
   id: string;
-  itemType: "photo";
-  ownerScope: "self";
+  itemType: "photo" | "suggestion";
+  ownerScope: "self" | "system";
   slot: CollectionSlot | null;
-  src: string;
-  ownerName: string;
+  src?: string;
+  iconPath?: string;
+  ownerName?: string;
   badge: string;
-  sourcePhotoId: string;
+  sourcePhotoId?: string;
+  description?: string;
 };
 
 export function CollectionPage() {
@@ -153,9 +155,15 @@ export function CollectionPage() {
     () => buildNextCollectionTargets(photosBySlot, dailyTargetSlot?.id ?? null),
     [dailyTargetSlot?.id, photosBySlot],
   );
+  const shareSuggestionSlot = dailyTargetSlot ?? nextTargetSlots[0] ?? null;
   const shareFeedItems = useMemo(
-    () => buildCollectionShareFeed(storedCollectionPhotos, catName),
-    [catName, storedCollectionPhotos],
+    () =>
+      buildCollectionShareFeed(
+        storedCollectionPhotos,
+        catName,
+        shareSuggestionSlot,
+      ),
+    [catName, shareSuggestionSlot, storedCollectionPhotos],
   );
 
   useEffect(() => {
@@ -416,7 +424,7 @@ export function CollectionPage() {
         item_id: item.id,
         item_type: item.itemType,
         owner_scope: item.ownerScope,
-        source_photo_id: item.sourcePhotoId,
+        source_photo_id: item.sourcePhotoId ?? null,
         slot_id: item.slot?.id ?? null,
         slot_slug: item.slot ? getCollectionPhotoSlug(item.slot) : null,
         group_id: item.slot ? getCollectionGroupIdForSlot(item.slot) : null,
@@ -788,15 +796,37 @@ function CollectionShareView({
     );
   }
 
+  const hasPhotoItems = feedItems.some((item) => item.itemType === "photo");
+  const hasSuggestionItems = feedItems.some(
+    (item) => item.itemType === "suggestion",
+  );
+  const headerTitle = hasPhotoItems ? "写真と候補" : "次の一枚";
+
   return (
     <section style={styles.shareView} aria-label="シェア">
       <div style={styles.shareHeaderCard}>
         <p style={styles.shareHeaderKicker}>シェア</p>
-        <p style={styles.shareHeaderTitle}>自分の一枚</p>
+        <p style={styles.shareHeaderTitle}>{headerTitle}</p>
         <div style={styles.shareSourceRow} aria-label="シェアに並ぶもの">
-          <span style={styles.shareSourceChipActive}>自分</span>
+          <span
+            style={
+              hasPhotoItems
+                ? styles.shareSourceChipActive
+                : styles.shareSourceChip
+            }
+          >
+            自分
+          </span>
           <span style={styles.shareSourceChip}>共有写真</span>
-          <span style={styles.shareSourceChip}>候補</span>
+          <span
+            style={
+              hasSuggestionItems
+                ? styles.shareSourceChipActive
+                : styles.shareSourceChip
+            }
+          >
+            候補
+          </span>
         </div>
       </div>
       <div style={styles.shareFeed}>
@@ -807,10 +837,24 @@ function CollectionShareView({
             onClick={() => onOpenItem(item)}
             style={styles.shareFeedCard}
           >
-            <img src={item.src} alt="" style={styles.shareFeedPhoto} />
+            {item.src ? (
+              <img src={item.src} alt="" style={styles.shareFeedPhoto} />
+            ) : (
+              <span style={styles.shareSuggestionVisual} aria-hidden="true">
+                {item.iconPath ? (
+                  <img
+                    src={item.iconPath}
+                    alt=""
+                    style={styles.shareSuggestionIcon}
+                  />
+                ) : null}
+              </span>
+            )}
             <span style={styles.shareFeedFade} aria-hidden="true" />
             <span style={styles.shareFeedBadge}>{item.badge}</span>
-            {item.ownerScope !== "self" ? (
+            {item.description ? (
+              <span style={styles.shareFeedMeta}>{item.description}</span>
+            ) : item.ownerScope !== "self" && item.ownerName ? (
               <span style={styles.shareFeedMeta}>{item.ownerName}</span>
             ) : null}
             <span style={styles.shareFeedLabel}>
@@ -1425,8 +1469,9 @@ function buildStoredCollectionPhotos(collectionPhotos: Record<string, string[]>)
 function buildCollectionShareFeed(
   photos: CollectionPhoto[],
   catName: string,
+  suggestionSlot: CollectionSlot | null,
 ): CollectionShareFeedItem[] {
-  return photos.slice(0, 12).map((photo) => ({
+  const items: CollectionShareFeedItem[] = photos.slice(0, 12).map((photo) => ({
     id: `mine-${photo.id}`,
     itemType: "photo",
     ownerScope: "self",
@@ -1436,6 +1481,20 @@ function buildCollectionShareFeed(
     badge: "自分",
     sourcePhotoId: photo.id,
   }));
+
+  if (suggestionSlot) {
+    items.push({
+      id: `suggestion-${getCollectionPhotoSlug(suggestionSlot)}`,
+      itemType: "suggestion",
+      ownerScope: "system",
+      slot: suggestionSlot,
+      iconPath: suggestionSlot.iconPath,
+      badge: "候補",
+      description: "次に残したい一枚",
+    });
+  }
+
+  return items;
 }
 
 function buildNextCollectionTargets(
@@ -2108,6 +2167,22 @@ const styles = {
     width: "100%",
     height: "100%",
     objectFit: "cover",
+  },
+  shareSuggestionVisual: {
+    position: "absolute",
+    inset: 0,
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    background:
+      "linear-gradient(135deg, rgba(255,255,255,0.16), rgba(255,255,255,0.05))",
+  },
+  shareSuggestionIcon: {
+    width: "68px",
+    height: "68px",
+    objectFit: "contain",
+    opacity: 0.58,
+    filter: "grayscale(1) brightness(1.9) contrast(0.9)",
   },
   shareFeedFade: {
     position: "absolute",
