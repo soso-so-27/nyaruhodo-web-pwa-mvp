@@ -121,6 +121,12 @@ Answers:
 - Was the user logged in (`has_user_id`)?
 - Was a local cat attached (`has_local_cat_id`)?
 
+## Access Note
+
+These reporting views are intentionally not readable from the public anon client. Confirm production analytics in Supabase SQL Editor or another private/admin context.
+
+If an anon client query returns `permission denied for view ...`, that is expected.
+
 ## 6. Recommended Open Beta Routine
 
 After a test deploy:

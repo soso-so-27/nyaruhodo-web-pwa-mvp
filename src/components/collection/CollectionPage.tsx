@@ -593,6 +593,7 @@ export function CollectionPage() {
           <CollectionShareView
             feedItems={shareFeedItems}
             onOpenItem={handleShareFeedItemOpen}
+            onGoCollect={() => setActiveView("collect")}
           />
         ) : null}
       </div>
@@ -769,15 +770,20 @@ function CollectionAlbumView({
 function CollectionShareView({
   feedItems,
   onOpenItem,
+  onGoCollect,
 }: {
   feedItems: CollectionShareFeedItem[];
   onOpenItem: (item: CollectionShareFeedItem) => void;
+  onGoCollect: () => void;
 }) {
   if (feedItems.length === 0) {
     return (
       <section style={styles.shareEmptyCard}>
-        <p style={styles.shareEmptyTitle}>まだありません</p>
-        <p style={styles.shareEmptyText}>写真を残すと、ここに一枚ずつ並びます。</p>
+        <p style={styles.shareEmptyTitle}>まだ写真がありません</p>
+        <p style={styles.shareEmptyText}>コレクションに写真を残すと、ここに並びます。</p>
+        <button type="button" style={styles.shareEmptyButton} onClick={onGoCollect}>
+          写真を残す
+        </button>
       </section>
     );
   }
@@ -786,7 +792,12 @@ function CollectionShareView({
     <section style={styles.shareView} aria-label="シェア">
       <div style={styles.shareHeaderCard}>
         <p style={styles.shareHeaderKicker}>シェア</p>
-        <p style={styles.shareHeaderTitle}>共有フィードの準備中</p>
+        <p style={styles.shareHeaderTitle}>自分の一枚</p>
+        <div style={styles.shareSourceRow} aria-label="シェアに並ぶもの">
+          <span style={styles.shareSourceChipActive}>自分</span>
+          <span style={styles.shareSourceChip}>共有写真</span>
+          <span style={styles.shareSourceChip}>候補</span>
+        </div>
       </div>
       <div style={styles.shareFeed}>
         {feedItems.map((item) => (
@@ -799,7 +810,9 @@ function CollectionShareView({
             <img src={item.src} alt="" style={styles.shareFeedPhoto} />
             <span style={styles.shareFeedFade} aria-hidden="true" />
             <span style={styles.shareFeedBadge}>{item.badge}</span>
-            <span style={styles.shareFeedMeta}>{item.ownerName}</span>
+            {item.ownerScope !== "self" ? (
+              <span style={styles.shareFeedMeta}>{item.ownerName}</span>
+            ) : null}
             <span style={styles.shareFeedLabel}>
               {item.slot ? getCollectionSlotLabel(item.slot) : "写真"}
             </span>
@@ -1420,7 +1433,7 @@ function buildCollectionShareFeed(
     slot: getCollectionSlotById(photo.slotId),
     src: photo.src,
     ownerName: catName,
-    badge: "自分の一枚",
+    badge: "自分",
     sourcePhotoId: photo.id,
   }));
 }
@@ -2039,11 +2052,38 @@ const styles = {
     lineHeight: 1.2,
   },
   shareHeaderTitle: {
-    margin: 0,
+    margin: "0 0 10px",
     color: COLLECTION_TEXT_STRONG,
     fontSize: "15px",
     fontWeight: 600,
     lineHeight: 1.35,
+  },
+  shareSourceRow: {
+    display: "flex",
+    gap: "6px",
+    overflowX: "auto",
+    scrollbarWidth: "none",
+  },
+  shareSourceChipActive: {
+    flex: "0 0 auto",
+    borderRadius: "999px",
+    background: "rgba(255,255,255,0.88)",
+    color: "#2a2a28",
+    fontSize: "11px",
+    fontWeight: 610,
+    lineHeight: 1,
+    padding: "6px 9px",
+  },
+  shareSourceChip: {
+    flex: "0 0 auto",
+    borderRadius: "999px",
+    border: "0.5px solid rgba(255,255,255,0.16)",
+    background: "rgba(255,255,255,0.08)",
+    color: COLLECTION_MUTED,
+    fontSize: "11px",
+    fontWeight: 560,
+    lineHeight: 1,
+    padding: "6px 9px",
   },
   shareFeed: {
     display: "grid",
@@ -2130,6 +2170,20 @@ const styles = {
     fontSize: "13px",
     lineHeight: 1.55,
     fontWeight: 500,
+  },
+  shareEmptyButton: {
+    marginTop: "14px",
+    minHeight: "38px",
+    border: "0.5px solid rgba(255,255,255,0.2)",
+    borderRadius: "999px",
+    background: "rgba(255,255,255,0.88)",
+    color: "#2a2a28",
+    font: "inherit",
+    fontSize: "13px",
+    fontWeight: 610,
+    lineHeight: 1,
+    padding: "0 16px",
+    cursor: "pointer",
   },
   collectionCard: {
     position: "relative",
