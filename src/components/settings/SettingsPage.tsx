@@ -245,6 +245,21 @@ export function SettingsPage() {
         </section>
 
         <section style={styles.section}>
+          <p style={styles.sectionLabel}>安心とルール</p>
+          <div style={styles.card}>
+            <a href="/privacy" style={styles.linkRow}>
+              <span style={styles.rowLabel}>プライバシーポリシー</span>
+              <span style={styles.rowChevron}>›</span>
+            </a>
+            <div style={styles.divider} />
+            <a href="/terms" style={styles.linkRow}>
+              <span style={styles.rowLabel}>利用規約</span>
+              <span style={styles.rowChevron}>›</span>
+            </a>
+          </div>
+        </section>
+
+        <section style={styles.section}>
           <p style={styles.sectionLabel}>データ</p>
           <div style={styles.card}>
             <button
@@ -355,6 +370,14 @@ const styles = {
     justifyContent: "space-between",
     padding: "14px 0",
   },
+  linkRow: {
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "space-between",
+    padding: "14px 0",
+    textDecoration: "none",
+    color: "#2a2a28",
+  },
   rowLeft: {
     display: "flex",
     alignItems: "center",
@@ -373,6 +396,11 @@ const styles = {
     overflow: "hidden",
     textOverflow: "ellipsis",
     whiteSpace: "nowrap" as const,
+  },
+  rowChevron: {
+    fontSize: "18px",
+    lineHeight: 1,
+    color: "#c8c5be",
   },
   statusDot: {
     width: "8px",
