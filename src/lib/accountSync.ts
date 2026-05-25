@@ -102,6 +102,7 @@ const SYNC_METADATA = { source: "localStorage-v1" };
 
 export async function syncLocalDataWithAccount(options?: {
   restoreIfLocalEmpty?: boolean;
+  forceRestore?: boolean;
 }): Promise<AccountSyncResult> {
   const result = createEmptyResult();
 
@@ -128,18 +129,42 @@ export async function syncLocalDataWithAccount(options?: {
   const snapshot = readLocalSnapshot();
   const shouldPush = hasMeaningfulLocalData(snapshot);
   const shouldRestore = options?.restoreIfLocalEmpty ?? true;
+  const shouldForceRestore = options?.forceRestore ?? false;
 
   try {
     await ensureRemoteProfile(supabase, data.user.id, data.user.user_metadata);
 
+    if (shouldForceRestore) {
+      await restoreRemoteSnapshot(supabase, data.user.id, result, {
+        mergeLocal: false,
+      });
+      if (result.restoredCats > 0) {
+        await saveSyncState(supabase, data.user.id, {
+          last_pull_at: new Date().toISOString(),
+        });
+        return { ...result, status: "restored" };
+      }
+      return { ...result, status: "skipped" };
+    }
+
     if (shouldPush) {
       await pushLocalSnapshot(supabase, data.user.id, snapshot, result);
-      await saveSyncState(supabase, data.user.id, { last_push_at: new Date().toISOString() });
+      await restoreRemoteSnapshot(supabase, data.user.id, result, {
+        mergeLocal: true,
+      });
+      await saveSyncState(supabase, data.user.id, {
+        last_push_at: new Date().toISOString(),
+        ...(result.restoredCats > 0
+          ? { last_pull_at: new Date().toISOString() }
+          : {}),
+      });
       return { ...result, status: "synced" };
     }
 
     if (shouldRestore) {
-      await restoreRemoteSnapshot(supabase, data.user.id, result);
+      await restoreRemoteSnapshot(supabase, data.user.id, result, {
+        mergeLocal: false,
+      });
       if (result.restoredCats > 0) {
         await saveSyncState(supabase, data.user.id, {
           last_pull_at: new Date().toISOString(),
@@ -507,6 +532,7 @@ async function restoreRemoteSnapshot(
   supabase: NonNullable<ReturnType<typeof createBrowserSupabaseClient>>,
   userId: string,
   result: AccountSyncResult,
+  options: { mergeLocal: boolean },
 ) {
   const { data: cats, error: catsError } = await supabase
     .from("cats")
@@ -525,13 +551,22 @@ async function restoreRemoteSnapshot(
   }
 
   const remoteIdToLocalId = new Map<string, string>();
-  const profiles: LocalCatProfile[] = [];
+  const localProfiles = options.mergeLocal
+    ? normalizeProfiles(
+        readJson<LocalCatProfile[] | Record<string, LocalCatProfile>>(
+          STORAGE_KEYS.catProfiles,
+        ),
+      )
+    : [];
+  const profiles: LocalCatProfile[] = [...localProfiles];
+  const remoteLocalCatIds: string[] = [];
 
   for (const cat of remoteCats) {
     const localCatId = cat.local_cat_id ?? `remote-cat-${cat.id}`;
     remoteIdToLocalId.set(cat.id, localCatId);
+    remoteLocalCatIds.push(localCatId);
 
-    profiles.push({
+    const restoredProfile = {
       id: localCatId,
       name: cat.name,
       createdAt: cat.local_created_at ?? cat.created_at,
@@ -554,16 +589,34 @@ async function restoreRemoteSnapshot(
       modifiers: cat.modifiers ?? undefined,
       onboarding: cat.onboarding ?? undefined,
       understanding: cat.understanding ?? undefined,
-    });
+    };
+    const existingIndex = profiles.findIndex((profile) => profile.id === localCatId);
+
+    if (existingIndex >= 0) {
+      profiles[existingIndex] = {
+        ...profiles[existingIndex],
+        ...restoredProfile,
+      };
+    } else {
+      profiles.push(restoredProfile);
+    }
   }
 
   window.localStorage.setItem(STORAGE_KEYS.catProfiles, JSON.stringify(profiles));
-  window.localStorage.setItem(STORAGE_KEYS.activeCatId, profiles[0].id);
+  const previousActiveCatId = window.localStorage.getItem(STORAGE_KEYS.activeCatId);
+  const nextActiveCatId =
+    options.mergeLocal &&
+    previousActiveCatId &&
+    remoteLocalCatIds.includes(previousActiveCatId)
+      ? previousActiveCatId
+      : remoteLocalCatIds[0] ?? profiles[0].id;
+
+  window.localStorage.setItem(STORAGE_KEYS.activeCatId, nextActiveCatId);
   window.localStorage.setItem(STORAGE_KEYS.onboardingCompleted, "true");
   result.restoredCats = profiles.length;
 
-  await restoreRecordLogs(supabase, userId, remoteIdToLocalId, result);
-  await restoreCollectionPhotos(supabase, userId, remoteIdToLocalId, result);
+  await restoreRecordLogs(supabase, userId, remoteIdToLocalId, result, options);
+  await restoreCollectionPhotos(supabase, userId, remoteIdToLocalId, result, options);
 }
 
 async function restoreRecordLogs(
@@ -571,6 +624,7 @@ async function restoreRecordLogs(
   userId: string,
   remoteIdToLocalId: Map<string, string>,
   result: AccountSyncResult,
+  options: { mergeLocal: boolean },
 ) {
   const { data, error } = await supabase
     .from("record_logs")
@@ -607,7 +661,17 @@ async function restoreRecordLogs(
   }
 
   for (const [localCatId, records] of recordsByCat.entries()) {
-    window.localStorage.setItem(getRecordLogKey(localCatId), JSON.stringify(records));
+    const mergedRecords = options.mergeLocal
+      ? mergeRecordLogs(
+          readJson<LocalRecordLogItem[]>(getRecordLogKey(localCatId)) ?? [],
+          records,
+        )
+      : records;
+
+    window.localStorage.setItem(
+      getRecordLogKey(localCatId),
+      JSON.stringify(mergedRecords),
+    );
     result.restoredRecords += records.length;
   }
 }
@@ -617,6 +681,7 @@ async function restoreCollectionPhotos(
   userId: string,
   remoteIdToLocalId: Map<string, string>,
   result: AccountSyncResult,
+  options: { mergeLocal: boolean },
 ) {
   const { data, error } = await supabase
     .from("collection_photos")
@@ -628,7 +693,9 @@ async function restoreCollectionPhotos(
     throw new Error(`Collection restore failed: ${error.message}`);
   }
 
-  const collectionStore: LocalCollectionStore = {};
+  const collectionStore: LocalCollectionStore = options.mergeLocal
+    ? readJson<LocalCollectionStore>(STORAGE_KEYS.collectionPhotos) ?? {}
+    : {};
 
   for (const photo of (data ?? []) as RemoteCollectionPhotoRow[]) {
     const localCatId =
@@ -758,6 +825,20 @@ function blobToDataUrl(blob: Blob) {
     reader.onerror = () => reject(reader.error);
     reader.readAsDataURL(blob);
   });
+}
+
+function mergeRecordLogs(
+  existingRecords: LocalRecordLogItem[],
+  restoredRecords: LocalRecordLogItem[],
+) {
+  const byId = new Map<string, LocalRecordLogItem>();
+
+  for (const record of [...existingRecords, ...restoredRecords]) {
+    const key = record.id ?? `${record.type}:${record.value}:${record.timestamp}`;
+    byId.set(key, record);
+  }
+
+  return [...byId.values()].sort((a, b) => (b.timestamp ?? 0) - (a.timestamp ?? 0));
 }
 
 function readJson<T>(key: string): T | null {

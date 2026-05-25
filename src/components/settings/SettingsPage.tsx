@@ -52,13 +52,45 @@ export function SettingsPage() {
     const result = await syncLocalDataWithAccount({ restoreIfLocalEmpty: true });
 
     if (result.status === "synced") {
-      setSyncMessage("この端末のデータをアカウントに保存しました。");
+      setSyncMessage(
+        result.restoredCats > 0
+          ? "アカウントとこの端末のデータを同期しました。"
+          : "この端末のデータをアカウントに保存しました。",
+      );
     } else if (result.status === "restored") {
       setSyncMessage("アカウントのデータをこの端末に復元しました。");
     } else if (result.status === "error") {
       setSyncMessage("同期できませんでした。少し時間をおいてもう一度お試しください。");
     } else {
       setSyncMessage("同期できるデータはまだありません。");
+    }
+
+    setIsSyncing(false);
+  }
+
+  async function handleRestoreFromAccount() {
+    if (
+      !window.confirm(
+        "この端末の猫データを、アカウントに保存されているデータで復元しますか？",
+      )
+    ) {
+      return;
+    }
+
+    setIsSyncing(true);
+    setSyncMessage("");
+
+    const result = await syncLocalDataWithAccount({
+      forceRestore: true,
+      restoreIfLocalEmpty: true,
+    });
+
+    if (result.status === "restored") {
+      setSyncMessage("アカウントのデータをこの端末に復元しました。");
+    } else if (result.status === "error") {
+      setSyncMessage("復元できませんでした。少し時間をおいてもう一度お試しください。");
+    } else {
+      setSyncMessage("復元できるアカウントデータはまだありません。");
     }
 
     setIsSyncing(false);
@@ -98,6 +130,16 @@ export function SettingsPage() {
                   disabled={isSyncing}
                 >
                   {isSyncing ? "同期中..." : "この端末のデータを同期する"}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    void handleRestoreFromAccount();
+                  }}
+                  style={styles.restoreButton}
+                  disabled={isSyncing}
+                >
+                  アカウントから復元する
                 </button>
                 {syncMessage ? (
                   <p style={styles.syncMessage} role="status">
@@ -297,6 +339,19 @@ const styles = {
     fontSize: "15px",
     fontWeight: 600,
     color: APP_ACCENT,
+    background: "transparent",
+    border: "none",
+    textDecoration: "none",
+    cursor: "pointer",
+  },
+  restoreButton: {
+    display: "block",
+    width: "100%",
+    textAlign: "center" as const,
+    padding: "0 0 14px",
+    fontSize: "13px",
+    fontWeight: 500,
+    color: "#8a8a80",
     background: "transparent",
     border: "none",
     textDecoration: "none",
