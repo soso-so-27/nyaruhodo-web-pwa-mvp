@@ -35,8 +35,8 @@ Do not implement everything at once.
 ## UI
 
 - Keep Home minimal.
-- Do not add Home categories outside `いまの様子` and `気になること`.
-- Do not put action recommendations on Home.
+- Home may show only the next useful quick actions: `みっけ`, `おせわ`, and one contextual card.
+- Keep learned results, diagnosis cards, and reading-heavy knowledge in Torisetu.
 - Follow the gray-based design direction with at most one accent color.
 - Keep buttons flat, rounded, and spacious.
 

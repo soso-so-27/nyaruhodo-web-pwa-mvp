@@ -414,7 +414,7 @@ export function CollectionPage() {
 
     setActiveView("share");
     setSelectedSlug(null);
-    showToast("シェアに表示しました");
+    showToast("シェアに並べました");
   }
 
   function handleShareFeedItemOpen(item: CollectionShareFeedItem) {
@@ -718,7 +718,7 @@ function CollectionCollectView({
       {nextTargetSlots.length > 0 ? (
         <div style={styles.nextTargetBlock}>
           <div style={styles.sectionHeadingRow}>
-            <p style={styles.sectionHeading}>次に残したい姿</p>
+            <p style={styles.sectionHeading}>次に見つけたい姿</p>
           </div>
           <div style={styles.nextTargetRail}>
             {nextTargetSlots.map((slot) => (
@@ -788,7 +788,7 @@ function CollectionShareView({
     return (
       <section style={styles.shareEmptyCard}>
         <p style={styles.shareEmptyTitle}>まだ写真がありません</p>
-        <p style={styles.shareEmptyText}>コレクションに写真を残すと、ここに並びます。</p>
+        <p style={styles.shareEmptyText}>写真を見つけると、ここに自分の一枚が並びます。</p>
         <button type="button" style={styles.shareEmptyButton} onClick={onGoCollect}>
           写真を残す
         </button>
@@ -800,12 +800,12 @@ function CollectionShareView({
   const hasSuggestionItems = feedItems.some(
     (item) => item.itemType === "suggestion",
   );
-  const headerTitle = hasPhotoItems ? "写真と候補" : "次の一枚";
+  const headerTitle = hasPhotoItems ? "自分の一枚と候補" : "次に撮る候補";
 
   return (
     <section style={styles.shareView} aria-label="シェア">
       <div style={styles.shareHeaderCard}>
-        <p style={styles.shareHeaderKicker}>シェア</p>
+        <p style={styles.shareHeaderKicker}>シェア準備</p>
         <p style={styles.shareHeaderTitle}>{headerTitle}</p>
         <div style={styles.shareSourceRow} aria-label="シェアに並ぶもの">
           <span
@@ -817,7 +817,7 @@ function CollectionShareView({
           >
             自分
           </span>
-          <span style={styles.shareSourceChip}>共有写真</span>
+          <span style={styles.shareSourceChip}>共有はこれから</span>
           <span
             style={
               hasSuggestionItems
@@ -825,7 +825,7 @@ function CollectionShareView({
                 : styles.shareSourceChip
             }
           >
-            候補
+            撮る候補
           </span>
         </div>
       </div>
@@ -959,7 +959,7 @@ function DailyCollectionTarget({
           {getCollectionSlotLabel(slot)}
         </strong>
       </span>
-      <span style={styles.dailyTargetHint}>撮る</span>
+      <span style={styles.dailyTargetHint}>見つける</span>
     </button>
   );
 }
@@ -1102,7 +1102,7 @@ function CollectionPhotoSheet({
         </div>
       ) : (
         <div style={styles.photoEmpty}>
-          <span style={styles.photoEmptyText}>まだ写真がありません</span>
+          <span style={styles.photoEmptyText}>見つけたら写真を残す</span>
         </div>
       )}
 
@@ -1120,7 +1120,7 @@ function CollectionPhotoSheet({
           }
           disabled={photos.length === 0}
         >
-          シェアへ
+          シェアに並べる
         </button>
       </div>
     </AppBottomSheet>
@@ -1164,7 +1164,7 @@ function CollectionCompletionSheet({
             アルバムを見る
           </button>
           <button type="button" style={styles.btnSecondary} onClick={onOpenShare}>
-            シェアへ
+            シェアに並べる
           </button>
         </div>
       </div>
@@ -1496,8 +1496,8 @@ function buildCollectionShareFeed(
       ownerScope: "system",
       slot: suggestionSlot,
       iconPath: suggestionSlot.iconPath,
-      badge: "候補",
-      description: "次に残したい一枚",
+      badge: "撮る候補",
+      description: "次に撮る候補",
     });
   }
 

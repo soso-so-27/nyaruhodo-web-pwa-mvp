@@ -319,7 +319,7 @@ export function CatsPage() {
           <div>
             <p style={styles.pageKicker}>CATS</p>
             <h1 style={styles.pageTitle}>ねこ</h1>
-            <p style={styles.pageSub}>プロフィール管理</p>
+            <p style={styles.pageSub}>プロフィールとホーム写真</p>
           </div>
         </div>
 
@@ -428,12 +428,12 @@ export function CatsPage() {
                 />
               </button>
               <div style={styles.profileHeroInfo}>
-                <p style={styles.profileKicker}>いま見ている子</p>
+                <p style={styles.profileKicker}>プロフィール</p>
                 <div style={styles.profileName}>{activeCatProfile.name}</div>
                 {activeMeta ? (
                   <p style={styles.profileMeta}>{activeMeta}</p>
                 ) : (
-                  <p style={styles.profileMeta}>基本情報はあとで追加できます</p>
+                  <p style={styles.profileMeta}>編集から基本情報を追加できます</p>
                 )}
               </div>
               <button
@@ -461,9 +461,9 @@ export function CatsPage() {
                 )}
               </div>
               <div style={styles.homePhotoInfo}>
-                <p style={styles.homePhotoTitle}>ホームに出る写真</p>
+                <p style={styles.homePhotoTitle}>ホームの背景写真</p>
                 <p style={styles.homePhotoSub}>
-                  ホームを開いたときに大きく表示されます。
+                  ホーム画面の空気をつくる写真です。
                 </p>
                 <div style={styles.homePhotoActions}>
                   <button
@@ -471,7 +471,7 @@ export function CatsPage() {
                     onClick={() => void handleHomePhotoUpload()}
                     style={styles.homePhotoButton}
                   >
-                    写真を選ぶ
+                    背景写真を選ぶ
                   </button>
                 </div>
               </div>
@@ -524,7 +524,7 @@ export function CatsPage() {
             !activeCatProfile.basicInfo?.breed &&
             !activeCatProfile.appearance?.coat ? (
               <p style={styles.emptyInfoText}>
-                編集から誕生日・猫種・毛色を追加できます。
+                編集から基本情報を追加できます。
               </p>
             ) : null}
 

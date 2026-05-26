@@ -107,6 +107,12 @@ const DISCOVERY_TEXT =
   "昨日の小さな記録から、少しだけリズムが見えてきました。";
 const HOME_NAV_FRAME_WIDTH = "min(calc(100% - 28px), 410px)";
 const HOME_NAV_EDGE_INSET = "max(14px, calc((100vw - 410px) / 2))";
+const QUICK_BOARD_ITEM_IDS = new Set(["today-mikke", "today-care"]);
+const ACTION_BOARD_ITEM_IDS = new Set([
+  "today-mikke",
+  "today-care",
+  "home-photo",
+]);
 
 export function HomeInput({ recentEvents: _recentEvents }: HomeInputProps) {
   const [catProfiles, setCatProfiles] = useState<CatProfile[]>([]);
@@ -1052,12 +1058,22 @@ function HomeBulletinBoard({
             surfaceText: "ようす",
           } satisfies HomeBoardItem,
         ];
+  const peekItems = getBoardPeekItems(displayItems);
+  const actionItems = displayItems.filter((item) =>
+    ACTION_BOARD_ITEM_IDS.has(item.id),
+  );
+  const insightItems = displayItems.filter((item) =>
+    ["daily-discovery", "recent-change"].includes(item.id),
+  );
+  const collectionItems = displayItems.filter(
+    (item) => item.id === "daily-collection-target",
+  );
   const unreadCount = displayItems.filter((item) => item.isUnread).length;
   const recentRecords = records.slice(0, 3);
 
   useEffect(() => {
     boardRailRef.current?.scrollTo({ left: 0, behavior: "auto" });
-  }, [catName, displayItems.length, isOpen]);
+  }, [catName, peekItems.length, isOpen]);
 
   function handleTouchStart(event: TouchEvent<HTMLDivElement>) {
     setTouchStartY(event.touches[0]?.clientY ?? null);
@@ -1105,7 +1121,7 @@ function HomeBulletinBoard({
 
       <div style={styles.boardRailFrame}>
         <div ref={boardRailRef} style={styles.boardRail} aria-label="おすすめカード">
-          {displayItems.map((item, index) => (
+          {peekItems.map((item, index) => (
             <button
               key={item.id}
               type="button"
@@ -1134,59 +1150,104 @@ function HomeBulletinBoard({
 
       {isOpen ? (
         <div style={styles.boardOpenContent}>
-          <div style={styles.boardSectionHeader}>
-            <span style={styles.boardSectionTitle}>アクション</span>
-          </div>
-          <div style={styles.boardActionList}>
-            {displayItems.map((item) => (
-              <button
-                key={`${item.id}-action`}
-                type="button"
-                disabled={item.isDisabled}
-                style={{
-                  ...styles.boardActionRow,
-                  ...(item.isDisabled ? styles.boardActionRowDisabled : {}),
-                }}
-                onClick={() => onAction(item.actionType)}
-              >
-                <span style={styles.boardActionLabel}>{item.actionLabel}</span>
-                <span style={styles.boardActionTitle}>{item.title}</span>
-                <SharedChevronRightIcon
-                  size={18}
-                  style={{ color: "#888580", flexShrink: 0 }}
-                />
-              </button>
-            ))}
-          </div>
+          {actionItems.length > 0 ? (
+            <BoardOpenSection
+              title="すぐ残す"
+              items={actionItems}
+              onAction={onAction}
+            />
+          ) : null}
 
-          <div style={styles.boardSectionHeader}>
-            <span style={styles.boardSectionTitle}>メモ</span>
-          </div>
+          {insightItems.length > 0 ? (
+            <BoardOpenSection
+              title="届いていること"
+              items={insightItems}
+              onAction={onAction}
+            />
+          ) : null}
+
+          {collectionItems.length > 0 ? (
+            <BoardOpenSection
+              title="次に見つけたい"
+              items={collectionItems}
+              onAction={onAction}
+            />
+          ) : null}
+
           {recentRecords.length > 0 ? (
-            <div style={styles.boardMemoList}>
-              {recentRecords.map((record) => (
-                <div key={record.id} style={styles.boardMemoRow}>
-                  <span style={styles.boardMemoTime}>
-                    {formatRecordTime(record.timestamp)}
-                  </span>
-                  <span style={styles.boardMemoKind}>{formatRecordKind(record.type)}</span>
-                  <span style={styles.boardMemoValue}>{record.value}</span>
-                </div>
-              ))}
-            </div>
-          ) : (
-            <p style={styles.boardEmptyText}>
-              まだメモはありません。
-            </p>
-          )}
+            <>
+              <div style={styles.boardSectionHeader}>
+                <span style={styles.boardSectionTitle}>最近のメモ</span>
+              </div>
+              <div style={styles.boardMemoList}>
+                {recentRecords.map((record) => (
+                  <div key={record.id} style={styles.boardMemoRow}>
+                    <span style={styles.boardMemoTime}>
+                      {formatRecordTime(record.timestamp)}
+                    </span>
+                    <span style={styles.boardMemoKind}>
+                      {formatRecordKind(record.type)}
+                    </span>
+                    <span style={styles.boardMemoValue}>{record.value}</span>
+                  </div>
+                ))}
+              </div>
+            </>
+          ) : null}
         </div>
       ) : null}
     </section>
   );
 }
 
+function BoardOpenSection({
+  title,
+  items,
+  onAction,
+}: {
+  title: string;
+  items: HomeBoardItem[];
+  onAction: (actionType: HomeBoardAction) => void;
+}) {
+  return (
+    <>
+      <div style={styles.boardSectionHeader}>
+        <span style={styles.boardSectionTitle}>{title}</span>
+      </div>
+      <div style={styles.boardActionList}>
+        {items.map((item) => (
+          <button
+            key={`${title}-${item.id}`}
+            type="button"
+            disabled={item.isDisabled}
+            style={{
+              ...styles.boardActionRow,
+              ...(item.isDisabled ? styles.boardActionRowDisabled : {}),
+            }}
+            onClick={() => onAction(item.actionType)}
+          >
+            <span style={styles.boardActionLabel}>{item.actionLabel}</span>
+            <span style={styles.boardActionTitle}>{item.title}</span>
+            <SharedChevronRightIcon
+              size={18}
+              style={{ color: "rgba(255,255,255,0.62)", flexShrink: 0 }}
+            />
+          </button>
+        ))}
+      </div>
+    </>
+  );
+}
+
 function BoardIcon({ icon }: { icon: HomeBoardItem["icon"] }) {
   return <AppIcon name={icon} size={30} style={styles.boardIconSvg} />;
+}
+
+function getBoardPeekItems(items: HomeBoardItem[]) {
+  const quickItems = items.filter((item) => QUICK_BOARD_ITEM_IDS.has(item.id));
+  const nextItem = items.find((item) => !QUICK_BOARD_ITEM_IDS.has(item.id));
+
+  return [...quickItems, ...(nextItem ? [nextItem] : [])].slice(0, 3);
 }
 
 function buildHomeBoardItems({
@@ -1246,6 +1307,7 @@ function buildHomeBoardItems({
       actionLabel: "見る",
       actionType: "open_discovery",
       isUnread: true,
+      surfaceText: "新着",
     });
   } else if (latestRecord) {
     items.push({
@@ -1257,6 +1319,7 @@ function buildHomeBoardItems({
       icon: "heart",
       actionLabel: "見る",
       actionType: "open_recent_change",
+      surfaceText: formatRecordKind(latestRecord.type),
     });
   }
 
@@ -1270,6 +1333,7 @@ function buildHomeBoardItems({
       icon: "camera",
       actionLabel: "写真を選ぶ",
       actionType: "open_photo",
+      surfaceText: "ホーム",
     });
   }
 
@@ -1286,17 +1350,6 @@ function buildHomeBoardItems({
       surfaceText: collectionTargetLabel,
     });
   }
-
-  items.push({
-    id: "torisetu-progress",
-    kind: "notice",
-    priority: 50,
-    title: "トリセツ",
-    body: "見返す",
-    icon: "book",
-    actionLabel: "見る",
-    actionType: "go_torisetu",
-  });
 
   return items.sort((a, b) => a.priority - b.priority);
 }

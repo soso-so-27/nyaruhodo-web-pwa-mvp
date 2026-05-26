@@ -20,7 +20,9 @@ Role: the first screen to open when the owner sees the cat.
 
 Owns:
 - Quick actions such as Mikke, care, and photo capture.
-- A short recommendation board for the next useful action.
+- A short recommendation board:
+  - Closed state: quick launch for `みっけ`, `おせわ`, and one contextual card.
+  - Expanded state: today's small board grouped into `すぐ残す`, `届いていること`, `次に見つけたい`, and recent memos.
 - Cat switching for the current moment.
 
 Should avoid:
@@ -170,6 +172,7 @@ Diagnosis definitions live in `src/lib/torisetu/diagnosisCatalog.ts`.
 - `source: "future"` means the card is a locked sample or future diagnostic entry point.
 - Unlock logic belongs in the catalog or a Torisetu helper, not in Home.
 - Home may recommend a next action, but learned results and diagnosis result cards belong in Torisetu.
+- Home should not keep a permanent Torisetu card in the recommendation rail. Surface Torisetu only when there is a concrete new result or unread knowledge.
 
 ### Checkpoint Before Push
 
