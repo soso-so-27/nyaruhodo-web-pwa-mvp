@@ -104,7 +104,7 @@ const REACTION_OPTIONS = [
 ];
 
 const DISCOVERY_TEXT =
-  "昨日の記録を、次に見る視点に変えていきます。";
+  "記録が増えるほど、少しずつこの子らしさが見えてきます。";
 const HOME_NAV_FRAME_WIDTH = "min(calc(100% - 28px), 410px)";
 const HOME_NAV_EDGE_INSET = "max(14px, calc((100vw - 410px) / 2))";
 const QUICK_BOARD_ITEM_IDS = new Set(["today-mikke", "today-care"]);
@@ -781,16 +781,16 @@ export function HomeInput({ recentEvents: _recentEvents }: HomeInputProps) {
 
       {isDiscoverySheetOpen ? (
         <InfoSheet
-          title="うちの子らしさ"
+          title="見えてきたこと"
           lead={DISCOVERY_TEXT}
-          body="今日のみっけで続きが見えてきます。"
+          body="みっけを重ねると、トリセツに残せる発見につながります。"
           onClose={() => setIsDiscoverySheetOpen(false)}
         />
       ) : null}
 
       {isRecentChangeSheetOpen ? (
         <InfoSheet
-          title="うちの子らしさ"
+          title="見えてきたこと"
           lead={buildPersonalityPrompt(recordLog, catName)}
           body={
             latestRecord
@@ -1058,6 +1058,12 @@ function HomeBulletinBoard({
   const actionItems = displayItems.filter((item) =>
     ACTION_BOARD_ITEM_IDS.has(item.id),
   );
+  const quickActionItems = actionItems.filter((item) =>
+    QUICK_BOARD_ITEM_IDS.has(item.id),
+  );
+  const supportActionItems = actionItems.filter(
+    (item) => !QUICK_BOARD_ITEM_IDS.has(item.id),
+  );
   const insightItems = displayItems.filter((item) =>
     ["daily-discovery", "personality-insight"].includes(item.id),
   );
@@ -1071,8 +1077,9 @@ function HomeBulletinBoard({
   const secondaryCollectionItems = heroItem
     ? collectionItems.filter((item) => item.id !== heroItem.id)
     : collectionItems;
+  const supportItems = [...supportActionItems, ...secondaryCollectionItems];
   const unreadCount = displayItems.filter((item) => item.isUnread).length;
-  const recentRecords = records.slice(0, 3);
+  const latestRecord = records[0] ?? null;
 
   useEffect(() => {
     boardRailRef.current?.scrollTo({ left: 0, behavior: "auto" });
@@ -1122,34 +1129,36 @@ function HomeBulletinBoard({
         {unreadCount > 0 ? <span style={styles.boardHeaderMeta}>新着</span> : null}
       </div>
 
-      <div style={styles.boardRailFrame}>
-        <div ref={boardRailRef} style={styles.boardRail} aria-label="おすすめカード">
-          {peekItems.map((item, index) => (
-            <button
-              key={item.id}
-              type="button"
-              disabled={item.isDisabled}
-              style={{
-                ...styles.boardCard,
-                ...(index === 0 ? styles.boardCardPrimary : {}),
-                ...(item.isDisabled ? styles.boardCardDisabled : {}),
-              }}
-              onClick={() => onAction(item.actionType)}
-            >
-              <span style={styles.boardCardTop}>
-                <span style={styles.boardCardIcon} aria-hidden="true">
-                  <BoardIcon icon={item.icon} />
+      {!isOpen ? (
+        <div style={styles.boardRailFrame}>
+          <div ref={boardRailRef} style={styles.boardRail} aria-label="おすすめカード">
+            {peekItems.map((item, index) => (
+              <button
+                key={item.id}
+                type="button"
+                disabled={item.isDisabled}
+                style={{
+                  ...styles.boardCard,
+                  ...(index === 0 ? styles.boardCardPrimary : {}),
+                  ...(item.isDisabled ? styles.boardCardDisabled : {}),
+                }}
+                onClick={() => onAction(item.actionType)}
+              >
+                <span style={styles.boardCardTop}>
+                  <span style={styles.boardCardIcon} aria-hidden="true">
+                    <BoardIcon icon={item.icon} />
+                  </span>
+                  {item.isUnread ? <span style={styles.boardUnreadDot} /> : null}
                 </span>
-                {item.isUnread ? <span style={styles.boardUnreadDot} /> : null}
-              </span>
-              <span style={styles.boardCardTitle}>{item.title}</span>
-              {item.surfaceText ? (
-                <span style={styles.boardCardSub}>{item.surfaceText}</span>
-              ) : null}
-            </button>
-          ))}
+                <span style={styles.boardCardTitle}>{item.title}</span>
+                {item.surfaceText ? (
+                  <span style={styles.boardCardSub}>{item.surfaceText}</span>
+                ) : null}
+              </button>
+            ))}
+          </div>
         </div>
-      </div>
+      ) : null}
 
       {isOpen ? (
         <div style={styles.boardOpenContent}>
@@ -1176,12 +1185,8 @@ function HomeBulletinBoard({
             </button>
           ) : null}
 
-          {actionItems.length > 0 ? (
-            <BoardOpenSection
-              title="すぐ残す"
-              items={actionItems}
-              onAction={onAction}
-            />
+          {quickActionItems.length > 0 ? (
+            <BoardQuickActions items={quickActionItems} onAction={onAction} />
           ) : null}
 
           {secondaryInsightItems.length > 0 ? (
@@ -1192,37 +1197,59 @@ function HomeBulletinBoard({
             />
           ) : null}
 
-          {secondaryCollectionItems.length > 0 ? (
+          {supportItems.length > 0 ? (
             <BoardOpenSection
               title="次に見つけたい"
-              items={secondaryCollectionItems}
+              items={supportItems}
               onAction={onAction}
             />
           ) : null}
 
-          {recentRecords.length > 0 ? (
-            <>
-              <div style={styles.boardSectionHeader}>
-                <span style={styles.boardSectionTitle}>最近のメモ</span>
-              </div>
-              <div style={styles.boardMemoList}>
-                {recentRecords.map((record) => (
-                  <div key={record.id} style={styles.boardMemoRow}>
-                    <span style={styles.boardMemoTime}>
-                      {formatRecordTime(record.timestamp)}
-                    </span>
-                    <span style={styles.boardMemoKind}>
-                      {formatRecordKind(record.type)}
-                    </span>
-                    <span style={styles.boardMemoValue}>{record.value}</span>
-                  </div>
-                ))}
-              </div>
-            </>
+          {latestRecord ? (
+            <div style={styles.boardLatestMemo}>
+              <span style={styles.boardLatestMemoLabel}>最後の記録</span>
+              <span style={styles.boardLatestMemoValue}>
+                {formatRecordTime(latestRecord.timestamp)} /{" "}
+                {formatRecordKind(latestRecord.type)} / {latestRecord.value}
+              </span>
+            </div>
           ) : null}
         </div>
       ) : null}
     </section>
+  );
+}
+
+function BoardQuickActions({
+  items,
+  onAction,
+}: {
+  items: HomeBoardItem[];
+  onAction: (actionType: HomeBoardAction) => void;
+}) {
+  return (
+    <div style={styles.boardQuickActions}>
+      {items.map((item) => (
+        <button
+          key={`quick-${item.id}`}
+          type="button"
+          disabled={item.isDisabled}
+          style={{
+            ...styles.boardQuickAction,
+            ...(item.isDisabled ? styles.boardActionRowDisabled : {}),
+          }}
+          onClick={() => onAction(item.actionType)}
+        >
+          <span style={styles.boardQuickIcon} aria-hidden="true">
+            <BoardIcon icon={item.icon} />
+          </span>
+          <span style={styles.boardQuickText}>
+            <span style={styles.boardQuickTitle}>{item.title}</span>
+            <span style={styles.boardQuickSub}>{item.surfaceText ?? item.body}</span>
+          </span>
+        </button>
+      ))}
+    </div>
   );
 }
 
@@ -1345,25 +1372,25 @@ function buildHomeBoardItems({
       id: "daily-discovery",
       kind: "insight",
       priority: 10,
-      title: "うちの子らしさ",
+      title: "見えてきたこと",
       body: DISCOVERY_TEXT,
       icon: "heart",
-      actionLabel: "見る視点",
+      actionLabel: "うちの子らしさ",
       actionType: "open_discovery",
       isUnread: true,
-      surfaceText: "新着",
+      surfaceText: "うちの子らしさ",
     });
   } else {
     items.push({
       id: "personality-insight",
       kind: "insight",
       priority: 10,
-      title: "うちの子らしさ",
+      title: "見えてきたこと",
       body: buildPersonalityPrompt(recordLog, catName),
       icon: "heart",
-      actionLabel: "見る視点",
+      actionLabel: "うちの子らしさ",
       actionType: "open_recent_change",
-      surfaceText: latestRecord ? "今日の視点" : "はじめる",
+      surfaceText: latestRecord ? "うちの子らしさ" : "はじめる",
     });
   }
 
@@ -1918,7 +1945,7 @@ const styles = {
     overscrollBehaviorX: "contain",
   },
   boardOpenContent: {
-    height: "calc(100% - 198px)",
+    height: "calc(100% - 70px)",
     overflowY: "auto",
     padding: `0 ${HOME_NAV_EDGE_INSET} calc(112px + env(safe-area-inset-bottom))`,
     boxSizing: "border-box",
@@ -1986,6 +2013,58 @@ const styles = {
     fontSize: "12px",
     fontWeight: 620,
     letterSpacing: "0.02em",
+  },
+  boardQuickActions: {
+    display: "grid",
+    gridTemplateColumns: "1fr 1fr",
+    gap: "9px",
+    margin: "0 0 16px",
+  },
+  boardQuickAction: {
+    minHeight: "58px",
+    border: "0.5px solid rgba(255,255,255,0.18)",
+    borderRadius: "18px",
+    background: "rgba(255,255,255,0.09)",
+    color: "rgba(255,255,255,0.94)",
+    display: "flex",
+    alignItems: "center",
+    gap: "10px",
+    padding: "10px 12px",
+    textAlign: "left",
+    cursor: "pointer",
+    backdropFilter: "blur(20px)",
+    WebkitBackdropFilter: "blur(20px)",
+    boxShadow: "inset 0 1px 0 rgba(255,255,255,0.12)",
+  },
+  boardQuickIcon: {
+    width: "28px",
+    height: "28px",
+    color: "rgba(255,255,255,0.9)",
+    display: "inline-flex",
+    alignItems: "center",
+    justifyContent: "center",
+    flexShrink: 0,
+  },
+  boardQuickText: {
+    minWidth: 0,
+    display: "flex",
+    flexDirection: "column",
+    gap: "2px",
+  },
+  boardQuickTitle: {
+    color: "rgba(255,255,255,0.94)",
+    fontSize: "13px",
+    fontWeight: 660,
+    lineHeight: 1.2,
+  },
+  boardQuickSub: {
+    color: "rgba(255,255,255,0.52)",
+    fontSize: "11px",
+    fontWeight: 620,
+    lineHeight: 1.15,
+    whiteSpace: "nowrap",
+    overflow: "hidden",
+    textOverflow: "ellipsis",
   },
   boardCard: {
     position: "relative",
@@ -2106,6 +2185,29 @@ const styles = {
     overflow: "hidden",
     textOverflow: "ellipsis",
     whiteSpace: "nowrap",
+  },
+  boardLatestMemo: {
+    display: "flex",
+    alignItems: "center",
+    gap: "10px",
+    borderTop: "0.5px solid rgba(255,255,255,0.12)",
+    margin: "8px 0 0",
+    padding: "12px 2px 0",
+  },
+  boardLatestMemoLabel: {
+    flexShrink: 0,
+    color: "rgba(255,255,255,0.42)",
+    fontSize: "11px",
+    fontWeight: 620,
+  },
+  boardLatestMemoValue: {
+    minWidth: 0,
+    overflow: "hidden",
+    textOverflow: "ellipsis",
+    whiteSpace: "nowrap",
+    color: "rgba(255,255,255,0.68)",
+    fontSize: "12px",
+    fontWeight: 590,
   },
   boardMemoList: {
     display: "grid",
