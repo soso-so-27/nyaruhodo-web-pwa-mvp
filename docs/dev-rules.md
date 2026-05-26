@@ -36,6 +36,7 @@ Do not implement everything at once.
 
 - Keep Home minimal.
 - Home may show only the next useful quick actions: `みっけ`, `おせわ`, and one contextual card.
+- The primary contextual card should use `うちの子らしさ`: it should offer a small observation point, not restate raw input counts.
 - Keep learned results, diagnosis cards, and reading-heavy knowledge in Torisetu.
 - Follow the gray-based design direction with at most one accent color.
 - Keep buttons flat, rounded, and spacious.

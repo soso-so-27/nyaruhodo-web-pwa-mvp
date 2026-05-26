@@ -104,7 +104,7 @@ const REACTION_OPTIONS = [
 ];
 
 const DISCOVERY_TEXT =
-  "昨日の小さな記録から、少しだけリズムが見えてきました。";
+  "昨日の記録を、次に見る視点に変えていきます。";
 const HOME_NAV_FRAME_WIDTH = "min(calc(100% - 28px), 410px)";
 const HOME_NAV_EDGE_INSET = "max(14px, calc((100vw - 410px) / 2))";
 const QUICK_BOARD_ITEM_IDS = new Set(["today-mikke", "today-care"]);
@@ -781,25 +781,21 @@ export function HomeInput({ recentEvents: _recentEvents }: HomeInputProps) {
 
       {isDiscoverySheetOpen ? (
         <InfoSheet
-          title="発見"
+          title="うちの子らしさ"
           lead={DISCOVERY_TEXT}
-          body="トリセツで見返せます。"
+          body="今日のみっけで続きが見えてきます。"
           onClose={() => setIsDiscoverySheetOpen(false)}
         />
       ) : null}
 
       {isRecentChangeSheetOpen ? (
         <InfoSheet
-          title="最近の変化"
-          lead={
-            latestRecord
-              ? `${formatRecordKind(latestRecord.type)}に「${latestRecord.value}」が残っています`
-              : "まだ最近の記録がありません"
-          }
+          title="うちの子らしさ"
+          lead={buildPersonalityPrompt(recordLog, catName)}
           body={
             latestRecord
-              ? `${catName}の特徴として、トリセツに残していきます。`
-              : "みっけを残すと、変化がここに出ます。"
+              ? "記録が増えると、この子の特徴としてトリセツに残ります。"
+              : "まずはひとつだけ見れば十分です。"
           }
           onClose={() => setIsRecentChangeSheetOpen(false)}
         />
@@ -1063,11 +1059,18 @@ function HomeBulletinBoard({
     ACTION_BOARD_ITEM_IDS.has(item.id),
   );
   const insightItems = displayItems.filter((item) =>
-    ["daily-discovery", "recent-change"].includes(item.id),
+    ["daily-discovery", "personality-insight"].includes(item.id),
   );
   const collectionItems = displayItems.filter(
     (item) => item.id === "daily-collection-target",
   );
+  const heroItem = insightItems[0] ?? collectionItems[0] ?? null;
+  const secondaryInsightItems = heroItem
+    ? insightItems.filter((item) => item.id !== heroItem.id)
+    : insightItems;
+  const secondaryCollectionItems = heroItem
+    ? collectionItems.filter((item) => item.id !== heroItem.id)
+    : collectionItems;
   const unreadCount = displayItems.filter((item) => item.isUnread).length;
   const recentRecords = records.slice(0, 3);
 
@@ -1150,6 +1153,29 @@ function HomeBulletinBoard({
 
       {isOpen ? (
         <div style={styles.boardOpenContent}>
+          {heroItem ? (
+            <button
+              type="button"
+              disabled={heroItem.isDisabled}
+              style={{
+                ...styles.boardHeroCard,
+                ...(heroItem.isDisabled ? styles.boardActionRowDisabled : {}),
+              }}
+              onClick={() => onAction(heroItem.actionType)}
+            >
+              <span style={styles.boardHeroTop}>
+                <span style={styles.boardHeroIcon} aria-hidden="true">
+                  <BoardIcon icon={heroItem.icon} />
+                </span>
+                {heroItem.isUnread ? (
+                  <span style={styles.boardHeroBadge}>新着</span>
+                ) : null}
+              </span>
+              <span style={styles.boardHeroTitle}>{heroItem.title}</span>
+              <span style={styles.boardHeroBody}>{heroItem.body}</span>
+            </button>
+          ) : null}
+
           {actionItems.length > 0 ? (
             <BoardOpenSection
               title="すぐ残す"
@@ -1158,18 +1184,18 @@ function HomeBulletinBoard({
             />
           ) : null}
 
-          {insightItems.length > 0 ? (
+          {secondaryInsightItems.length > 0 ? (
             <BoardOpenSection
               title="届いていること"
-              items={insightItems}
+              items={secondaryInsightItems}
               onAction={onAction}
             />
           ) : null}
 
-          {collectionItems.length > 0 ? (
+          {secondaryCollectionItems.length > 0 ? (
             <BoardOpenSection
               title="次に見つけたい"
-              items={collectionItems}
+              items={secondaryCollectionItems}
               onAction={onAction}
             />
           ) : null}
@@ -1250,6 +1276,24 @@ function getBoardPeekItems(items: HomeBoardItem[]) {
   return [...quickItems, ...(nextItem ? [nextItem] : [])].slice(0, 3);
 }
 
+function buildPersonalityPrompt(recordLog: RecordLogItem[], catName: string) {
+  const latestRecord = recordLog[0];
+
+  if (!latestRecord) {
+    return `今日は、${catName}に近づいた時の反応をひとつ見てみる`;
+  }
+
+  if (latestRecord.type === "mugi") {
+    return `「${latestRecord.value}」のあと、${catName}の反応をひとつ見てみる`;
+  }
+
+  if (latestRecord.type === "yousu") {
+    return `「${latestRecord.value}」の前後に、何があったか見てみる`;
+  }
+
+  return `今日は、${catName}のいつもと違うところをひとつ見てみる`;
+}
+
 function buildHomeBoardItems({
   catName,
   discoveryAvailable,
@@ -1301,25 +1345,25 @@ function buildHomeBoardItems({
       id: "daily-discovery",
       kind: "insight",
       priority: 10,
-      title: "発見",
+      title: "うちの子らしさ",
       body: DISCOVERY_TEXT,
       icon: "heart",
-      actionLabel: "見る",
+      actionLabel: "見る視点",
       actionType: "open_discovery",
       isUnread: true,
       surfaceText: "新着",
     });
-  } else if (latestRecord) {
+  } else {
     items.push({
-      id: "recent-change",
+      id: "personality-insight",
       kind: "insight",
-      priority: 20,
-      title: "変化",
-      body: `${formatRecordKind(latestRecord.type)}「${latestRecord.value}」`,
+      priority: 10,
+      title: "うちの子らしさ",
+      body: buildPersonalityPrompt(recordLog, catName),
       icon: "heart",
-      actionLabel: "見る",
+      actionLabel: "見る視点",
       actionType: "open_recent_change",
-      surfaceText: formatRecordKind(latestRecord.type),
+      surfaceText: latestRecord ? "今日の視点" : "はじめる",
     });
   }
 
@@ -1878,6 +1922,58 @@ const styles = {
     overflowY: "auto",
     padding: `0 ${HOME_NAV_EDGE_INSET} calc(112px + env(safe-area-inset-bottom))`,
     boxSizing: "border-box",
+  },
+  boardHeroCard: {
+    width: "100%",
+    border: "0.5px solid rgba(255,255,255,0.2)",
+    borderRadius: "22px",
+    background:
+      "linear-gradient(145deg, rgba(255,255,255,0.18), rgba(255,255,255,0.08))",
+    color: "rgba(255,255,255,0.94)",
+    display: "flex",
+    flexDirection: "column",
+    alignItems: "flex-start",
+    gap: "8px",
+    padding: "16px 16px 15px",
+    marginBottom: "14px",
+    textAlign: "left",
+    cursor: "pointer",
+    boxShadow:
+      "0 14px 36px rgba(0,0,0,0.22), inset 0 1px 0 rgba(255,255,255,0.18)",
+  },
+  boardHeroTop: {
+    width: "100%",
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "space-between",
+  },
+  boardHeroIcon: {
+    width: "32px",
+    height: "32px",
+    color: "rgba(255,255,255,0.92)",
+    display: "inline-flex",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  boardHeroBadge: {
+    border: "0.5px solid rgba(255,255,255,0.2)",
+    borderRadius: "99px",
+    color: "rgba(255,255,255,0.74)",
+    fontSize: "10px",
+    fontWeight: 620,
+    padding: "3px 8px",
+  },
+  boardHeroTitle: {
+    color: "rgba(255,255,255,0.96)",
+    fontSize: "18px",
+    fontWeight: 660,
+    lineHeight: 1.25,
+  },
+  boardHeroBody: {
+    color: "rgba(255,255,255,0.76)",
+    fontSize: "13px",
+    fontWeight: 540,
+    lineHeight: 1.55,
   },
   boardSectionHeader: {
     display: "flex",
