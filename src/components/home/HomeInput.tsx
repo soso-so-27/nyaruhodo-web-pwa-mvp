@@ -79,6 +79,12 @@ type HomeBoardItem = {
   surfaceText?: string;
 };
 
+type PersonalityInsight = {
+  body: string;
+  surfaceText: string;
+  sheetBody: string;
+};
+
 const YOUSU_OPTIONS = [
   "ねてる",
   "毛づくろい",
@@ -103,8 +109,6 @@ const REACTION_OPTIONS = [
   "わからなかった",
 ];
 
-const DISCOVERY_TEXT =
-  "記録が増えるほど、少しずつこの子らしさが見えてきます。";
 const HOME_NAV_FRAME_WIDTH = "min(calc(100% - 28px), 410px)";
 const HOME_NAV_EDGE_INSET = "max(14px, calc((100vw - 410px) / 2))";
 const QUICK_BOARD_ITEM_IDS = new Set(["today-mikke", "today-care"]);
@@ -266,6 +270,10 @@ export function HomeInput({ recentEvents: _recentEvents }: HomeInputProps) {
   const isYousuLocked = Boolean(yousuRemaining);
   const isMugiLocked = Boolean(mugiRemaining);
   const latestRecord = recordLog[0] ?? null;
+  const personalityInsight = useMemo(
+    () => buildPersonalityInsight(recordLog, catName),
+    [catName, recordLog],
+  );
   const dailyCollectionTarget = useMemo(() => {
     if (!activeCatId) {
       return null;
@@ -782,8 +790,8 @@ export function HomeInput({ recentEvents: _recentEvents }: HomeInputProps) {
       {isDiscoverySheetOpen ? (
         <InfoSheet
           title="見えてきたこと"
-          lead={DISCOVERY_TEXT}
-          body="みっけを重ねると、トリセツに残せる発見につながります。"
+          lead={personalityInsight.body}
+          body={personalityInsight.sheetBody}
           onClose={() => setIsDiscoverySheetOpen(false)}
         />
       ) : null}
@@ -791,12 +799,8 @@ export function HomeInput({ recentEvents: _recentEvents }: HomeInputProps) {
       {isRecentChangeSheetOpen ? (
         <InfoSheet
           title="見えてきたこと"
-          lead={buildPersonalityPrompt(recordLog, catName)}
-          body={
-            latestRecord
-              ? "記録が増えると、この子の特徴としてトリセツに残ります。"
-              : "まずはひとつだけ見れば十分です。"
-          }
+          lead={personalityInsight.body}
+          body={personalityInsight.sheetBody}
           onClose={() => setIsRecentChangeSheetOpen(false)}
         />
       ) : null}
@@ -1303,22 +1307,109 @@ function getBoardPeekItems(items: HomeBoardItem[]) {
   return [...quickItems, ...(nextItem ? [nextItem] : [])].slice(0, 3);
 }
 
-function buildPersonalityPrompt(recordLog: RecordLogItem[], catName: string) {
+function buildPersonalityInsight(
+  recordLog: RecordLogItem[],
+  catName: string,
+): PersonalityInsight {
   const latestRecord = recordLog[0];
+  const yousuRecords = recordLog.filter((record) => record.type === "yousu");
+  const careRecords = recordLog.filter((record) => record.type === "mugi");
+  const reactionRecords = recordLog.filter(
+    (record) => record.type === "reaction",
+  );
+  const topYousu = getTopRecordValue(yousuRecords);
 
   if (!latestRecord) {
-    return `今日は、${catName}に近づいた時の反応をひとつ見てみる`;
+    return {
+      body: `${catName}を見かけたら、まずはひとつだけ残してみる。`,
+      surfaceText: "はじめる",
+      sheetBody:
+        "最初は正確に分析しようとしなくて大丈夫です。見かけた瞬間をひとつ残すことが、この子らしさの入口になります。",
+    };
   }
 
   if (latestRecord.type === "mugi") {
-    return `「${latestRecord.value}」のあと、${catName}の反応をひとつ見てみる`;
+    return {
+      body: `「${latestRecord.value}」のあと、どんな反応だったか残すと距離感が見えやすくなります。`,
+      surfaceText: "反応を足す",
+      sheetBody:
+        "してあげたことだけでなく、その後の反応まで残すと、喜びやすい距離・苦手な距離が少しずつ分かれていきます。",
+    };
+  }
+
+  if (careRecords.length >= 2 && reactionRecords.length === 0) {
+    return {
+      body: `おせわの後の反応をひとつ足すと、${catName}の好きな距離が残りやすくなります。`,
+      surfaceText: "反応待ち",
+      sheetBody:
+        "おせわの記録に反応がつながると、ただの回数ではなく「この子には何が合いやすいか」を見返しやすくなります。",
+    };
+  }
+
+  if (
+    topYousu &&
+    yousuRecords.length >= 5 &&
+    topYousu.count >= 3 &&
+    topYousu.count / yousuRecords.length >= 0.45
+  ) {
+    if (topYousu.value === "ねてる") {
+      return {
+        body: "ねてる記録は多くなりやすいので、起きた直後のようすをひとつ足すと差が見えます。",
+        surfaceText: "違いを見る",
+        sheetBody:
+          "猫は寝ている時間が長いので、寝ている回数だけでは特徴になりにくいことがあります。起きた直後や移動した後を残すと、この子らしさが見えやすくなります。",
+      };
+    }
+
+    return {
+      body: `「${topYousu.value}」が何度か出ています。次はその前後を一緒に見ると特徴になります。`,
+      surfaceText: "くり返し",
+      sheetBody:
+        "同じようすが繰り返し出てきたら、次は時間・直前の出来事・その後の反応を足すと、単なる記録から特徴に変わっていきます。",
+    };
   }
 
   if (latestRecord.type === "yousu") {
-    return `「${latestRecord.value}」の前後に、何があったか見てみる`;
+    return {
+      body: `「${latestRecord.value}」の前後に、何があったか見てみる。`,
+      surfaceText: "前後を見る",
+      sheetBody:
+        "ようすだけを残すより、その前後に声をかけたか、なでたか、そっとしたかが残ると、この子の流れが見えやすくなります。",
+    };
   }
 
-  return `今日は、${catName}のいつもと違うところをひとつ見てみる`;
+  if (recordLog.length >= 7) {
+    return {
+      body: "記録が少しずつつながってきました。次はいつもと違う場面をひとつ足してみる。",
+      surfaceText: "幅を見る",
+      sheetBody:
+        "同じ場面だけでなく、少し違う時間や距離で残すと、この子らしさの幅がトリセツに残りやすくなります。",
+    };
+  }
+
+  return {
+    body: `${catName}のいつもと違うところをひとつ残すと、見返す手がかりになります。`,
+    surfaceText: "少しずつ",
+    sheetBody:
+      "大きな変化を探さなくても大丈夫です。少し違う表情や距離感を残すだけで、あとから見返せる手がかりになります。",
+  };
+}
+
+function getTopRecordValue(records: RecordLogItem[]) {
+  const counts = new Map<string, number>();
+
+  for (const record of records) {
+    counts.set(record.value, (counts.get(record.value) ?? 0) + 1);
+  }
+
+  let top: { value: string; count: number } | null = null;
+  for (const [value, count] of counts.entries()) {
+    if (!top || count > top.count) {
+      top = { value, count };
+    }
+  }
+
+  return top;
 }
 
 function buildHomeBoardItems({
@@ -1340,6 +1431,7 @@ function buildHomeBoardItems({
 }): HomeBoardItem[] {
   const items: HomeBoardItem[] = [];
   const latestRecord = recordLog[0];
+  const personalityInsight = buildPersonalityInsight(recordLog, catName);
 
   items.push({
     id: "today-mikke",
@@ -1373,12 +1465,12 @@ function buildHomeBoardItems({
       kind: "insight",
       priority: 10,
       title: "見えてきたこと",
-      body: DISCOVERY_TEXT,
+      body: personalityInsight.body,
       icon: "heart",
       actionLabel: "うちの子らしさ",
       actionType: "open_discovery",
       isUnread: true,
-      surfaceText: "うちの子らしさ",
+      surfaceText: personalityInsight.surfaceText,
     });
   } else {
     items.push({
@@ -1386,11 +1478,11 @@ function buildHomeBoardItems({
       kind: "insight",
       priority: 10,
       title: "見えてきたこと",
-      body: buildPersonalityPrompt(recordLog, catName),
+      body: personalityInsight.body,
       icon: "heart",
       actionLabel: "うちの子らしさ",
       actionType: "open_recent_change",
-      surfaceText: latestRecord ? "うちの子らしさ" : "はじめる",
+      surfaceText: latestRecord ? personalityInsight.surfaceText : "はじめる",
     });
   }
 

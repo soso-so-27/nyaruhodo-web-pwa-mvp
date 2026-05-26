@@ -88,6 +88,11 @@ type KnownFact = {
   detail?: string;
 };
 
+type TraitUpdateState = {
+  label: string;
+  body: string;
+};
+
 type DiagnosisItem = {
   card: TorisetuLockedDiagnosisCard;
   remaining: number;
@@ -137,7 +142,6 @@ export function TorisetuPage({ recentEvents }: TorisetuPageProps) {
   const recordCount = records.length;
   const dayMap = buildDayMap(records);
   const rhythmSummary = buildRhythmSummary(dayMap, catProfile);
-  const recentSummary = buildRecentSummary(records);
   const avatarSrc =
     catProfile?.avatarDataUrl ??
     catProfile?.homePhotoDataUrl ??
@@ -148,6 +152,7 @@ export function TorisetuPage({ recentEvents }: TorisetuPageProps) {
   const hasRhythmSignal = dayMap.some((item) => item.signal);
   const peakTime = catProfile?.activityPattern?.peakTime;
   const peakSlots = peakTime ? peakTimeMap[peakTime] ?? [] : [];
+  const traitUpdateState = buildTraitUpdateState(recordCount);
   const diagnosisFacts: KnownFact[] = [
     ...(hasTypeDiagnosis
       ? [
@@ -174,29 +179,12 @@ export function TorisetuPage({ recentEvents }: TorisetuPageProps) {
         ]
       : []),
   ];
-  const mikkeFacts: KnownFact[] = [
-    {
-      id: "recent",
-      label: "いま見えていること",
-      value: recentSummary,
-      source: "みっけ",
-      detail:
-        records.length > 0
-          ? "みっけの積み重ねで、この内容は少しずつ更新されます。"
-          : "みっけを残すと、この子らしさがここに出てきます。",
-    },
-    ...(hasRhythmSignal || peakSlots.length === 0
-      ? [
-          {
-            id: "rhythm",
-            label: "よく出る時間",
-            value: rhythmSummary,
-            source: "みっけ",
-            detail: "時間帯ごとのみっけから、見え方が変わっていきます。",
-          },
-        ]
-      : []),
-  ];
+  const mikkeFacts = buildMikkeFacts({
+    records,
+    rhythmSummary,
+    hasRhythmSignal,
+    peakSlots,
+  });
   const diagnosisItems: DiagnosisItem[] = TORISETU_LOCKED_DIAGNOSIS_SAMPLES.map((card) => {
     const remaining = Math.max(0, card.threshold - recordCount);
 
@@ -387,12 +375,16 @@ export function TorisetuPage({ recentEvents }: TorisetuPageProps) {
         <section style={{ ...styles.sectionFrame, ...styles.sectionFrameKnowledge }}>
           <CategoryLabel
             icon="sparkles"
-            label="発見"
+            label="うちの子らしさ"
           />
+          <div style={styles.traitStatusCard}>
+            <span style={styles.traitStatusLabel}>{traitUpdateState.label}</span>
+            <span style={styles.traitStatusText}>{traitUpdateState.body}</span>
+          </div>
           <div style={styles.factGroups}>
             <FactGroup
               icon="paw"
-              label={`${catName}の特徴`}
+              label="見えてきたこと"
               facts={mikkeFacts}
               onOpenFact={(fact) => handleOpenFact(fact, "mikke_fact")}
             />
@@ -734,6 +726,164 @@ function buildDayMap(records: RecordLike[]): DayMapItem[] {
       signal,
     };
   });
+}
+
+function buildTraitUpdateState(recordCount: number): TraitUpdateState {
+  if (recordCount === 0) {
+    return {
+      label: "みっけで増えていきます",
+      body: "見かけたことを残すと、ここに手がかりがたまります。",
+    };
+  }
+
+  if (recordCount < 3) {
+    return {
+      label: "手がかり集め中",
+      body: "もう少し残すと、変化や比べ方が出てきます。",
+    };
+  }
+
+  if (recordCount < 7) {
+    return {
+      label: "手がかりが増えました",
+      body: "みっけから、この子らしさが少し見え始めています。",
+    };
+  }
+
+  return {
+    label: "特徴が見え始めています",
+    body: "記録がつながり、見返せるトリセツになってきました。",
+  };
+}
+
+function buildMikkeFacts({
+  records,
+  rhythmSummary,
+  hasRhythmSignal,
+  peakSlots,
+}: {
+  records: RecordLike[];
+  rhythmSummary: string;
+  hasRhythmSignal: boolean;
+  peakSlots: string[];
+}): KnownFact[] {
+  const facts: KnownFact[] = [
+    {
+      id: "current-trait",
+      label: "いまの特徴",
+      value: buildRecentSummary(records),
+      source: "みっけ",
+      detail:
+        records.length > 0
+          ? "みっけを重ねるたびに、ここは更新されます。これは確定ではなく、今の見え方です。"
+          : "まだ手がかりが少ない状態です。みっけを残すと、この子らしさがここに出てきます。",
+    },
+  ];
+
+  const changeFact = buildChangeFact(records);
+  if (changeFact) {
+    facts.push(changeFact);
+  }
+
+  const comparisonFact = buildComparisonFact(records);
+  if (comparisonFact) {
+    facts.push(comparisonFact);
+  }
+
+  if (hasRhythmSignal || peakSlots.length === 0) {
+    facts.push({
+      id: "rhythm",
+      label: "よく出る時間",
+      value: rhythmSummary,
+      source: "みっけ",
+      detail: "時間帯ごとのみっけから、見え方が変わっていきます。",
+    });
+  }
+
+  return facts.slice(0, 4);
+}
+
+function buildChangeFact(records: RecordLike[]): KnownFact | null {
+  if (records.length < 4) {
+    return null;
+  }
+
+  const now = Date.now();
+  const recentRecords = records.filter(
+    (record) => now - record.timestamp <= RECENT_CAT_SUMMARY_WINDOW_MS,
+  );
+  const previousRecords = records.filter(
+    (record) =>
+      now - record.timestamp > RECENT_CAT_SUMMARY_WINDOW_MS &&
+      now - record.timestamp <= RECENT_CAT_SUMMARY_WINDOW_MS * 2,
+  );
+  const recentTop = getTopSignalEntry(recentRecords);
+
+  if (!recentTop) {
+    return null;
+  }
+
+  const previousTop = getTopSignalEntry(previousRecords);
+  const label = getSignalDisplayLabel(recentTop[0]);
+  const value =
+    previousTop && previousTop[0] !== recentTop[0]
+      ? `最近は${label}が目立つ`
+      : `${label}が続いている`;
+
+  return {
+    id: "change",
+    label: "変わってきたこと",
+    value,
+    source: "みっけ",
+    detail:
+      "直近のみっけで目立つものです。日によって揺れるので、記録が増えるとまた変わります。",
+  };
+}
+
+function buildComparisonFact(records: RecordLike[]): KnownFact | null {
+  if (records.length < 5) {
+    return null;
+  }
+
+  const top = getTopSignalEntry(records);
+  if (!top) {
+    return null;
+  }
+
+  const [signal, count] = top;
+  const label = getSignalDisplayLabel(signal);
+  const ratio = Math.round((count / records.length) * 100);
+  const isSleeping = signal === "sleeping" || signal === "ねてる";
+
+  return {
+    id: "within-cat-compare",
+    label: "くらべると",
+    value: isSleeping
+      ? "ねてる以外が次の手がかり"
+      : `${label}がこの子の中で多い`,
+    source: "みっけ",
+    detail: isSleeping
+      ? "猫はねてる記録に寄りやすいので、起きた直後や移動したあとを足すと、この子らしさが見えやすくなります。"
+      : `この子の記録内では、${label}が約${ratio}%です。全体平均ではなく、この子の中での比較です。`,
+  };
+}
+
+function getTopSignalEntry(records: RecordLike[]): [string, number] | null {
+  const counts = new Map<string, number>();
+
+  records.forEach((record) => {
+    if (!record.signal) return;
+    counts.set(record.signal, (counts.get(record.signal) ?? 0) + 1);
+  });
+
+  const sorted = Array.from(counts.entries()).sort((a, b) => b[1] - a[1]);
+  const top = sorted[0];
+
+  if (!top || top[1] < 2) {
+    return null;
+  }
+
+  return top;
 }
 
 function buildRhythmSummary(dayMap: DayMapItem[], catProfile: CatProfile | null) {
@@ -1209,6 +1359,29 @@ const styles = {
     alignItems: "center",
     justifyContent: "center",
     flexShrink: 0,
+  },
+  traitStatusCard: {
+    display: "flex",
+    flexDirection: "column" as const,
+    gap: "5px",
+    margin: "-2px 0 13px",
+    padding: "11px 12px",
+    borderRadius: "17px",
+    background: "rgba(255,255,255,0.08)",
+    border: "0.5px solid rgba(255,255,255,0.12)",
+    boxShadow: "inset 0 1px 0 rgba(255,255,255,0.08)",
+  },
+  traitStatusLabel: {
+    color: TORISETU_TEXT_STRONG,
+    fontSize: "13px",
+    fontWeight: 590,
+    lineHeight: 1.35,
+  },
+  traitStatusText: {
+    color: TORISETU_MUTED,
+    fontSize: "12px",
+    fontWeight: 450,
+    lineHeight: 1.55,
   },
   sectionKicker: {
     color: TORISETU_MUTED,
