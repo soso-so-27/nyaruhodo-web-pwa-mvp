@@ -1662,9 +1662,17 @@ function HomeBulletinBoard({
           <div style={styles.boardDock} aria-label="あなたへのおすすめ">
             {peekItems.map((item) => {
               const completed = completion?.itemId === item.id ? completion : null;
-              const displayTitle = completed?.title ?? item.title;
+              const defaultTitle =
+                item.id === "daily-collection-target"
+                  ? item.surfaceText ?? item.title
+                  : item.title;
+              const defaultSurfaceText =
+                item.id === "daily-collection-target"
+                  ? item.title
+                  : item.surfaceText;
+              const displayTitle = completed?.title ?? defaultTitle;
               const displaySurfaceText =
-                completed?.surfaceText ?? item.surfaceText;
+                completed?.surfaceText ?? defaultSurfaceText ?? "";
 
               return (
                 <button
@@ -1716,14 +1724,13 @@ function HomeBulletinBoard({
                     <span style={styles.boardDockSub}>{displaySurfaceText}</span>
                   </span>
                   {typeof item.cooldownProgress === "number" ? (
-                    <span style={styles.boardDockProgressTrack} aria-hidden="true">
-                      <span
-                        style={{
-                          ...styles.boardDockProgressFill,
-                          ...getBoardDockProgressStyle(item),
-                        }}
-                      />
-                    </span>
+                    <span
+                      style={{
+                        ...styles.boardDockEdgeProgress,
+                        ...getBoardDockEdgeStyle(item),
+                      }}
+                      aria-hidden="true"
+                    />
                   ) : null}
                 </button>
               );
@@ -1907,15 +1914,17 @@ function getBoardPeekItems(items: HomeBoardItem[]) {
   return [...orderedItems, ...fallbackItems].slice(0, 3);
 }
 
-function getBoardDockProgressStyle(item: HomeBoardItem): CSSProperties {
+function getBoardDockEdgeStyle(item: HomeBoardItem): CSSProperties {
   if (typeof item.cooldownProgress !== "number") {
     return {};
   }
 
   const progress = Math.max(0, Math.min(1, item.cooldownProgress));
+  const degrees = Math.round(progress * 360);
 
   return {
-    transform: `scaleX(${progress})`,
+    background:
+      `conic-gradient(from -90deg, rgba(255,255,255,0.58) 0deg ${degrees}deg, rgba(255,255,255,0.12) ${degrees}deg 360deg)`,
   };
 }
 
@@ -2592,7 +2601,7 @@ const styles = {
     bottom: 0,
     zIndex: 18,
     width: "100%",
-    height: "232px",
+    height: "258px",
     paddingBottom: "calc(84px + env(safe-area-inset-bottom))",
     boxSizing: "border-box",
     border: "none",
@@ -2710,16 +2719,16 @@ const styles = {
     color: "rgba(255,255,255,0.72)",
     display: "inline-flex",
     alignItems: "center",
-    gap: "7px",
-    padding: "0 0 9px",
+    gap: "6px",
+    padding: "0 0 8px",
     margin: 0,
     textAlign: "left",
     cursor: "pointer",
     textShadow: "0 1px 12px rgba(0,0,0,0.34)",
   },
   boardDockHeaderIcon: {
-    width: "18px",
-    height: "18px",
+    width: "17px",
+    height: "17px",
     display: "inline-flex",
     alignItems: "center",
     justifyContent: "center",
@@ -2727,8 +2736,8 @@ const styles = {
     flexShrink: 0,
   },
   boardDockHeaderText: {
-    fontSize: "13px",
-    fontWeight: 610,
+    fontSize: "12.5px",
+    fontWeight: 590,
     letterSpacing: 0,
     whiteSpace: "nowrap",
   },
@@ -2894,9 +2903,9 @@ const styles = {
   },
   boardDockCard: {
     position: "relative",
-    width: "min(148px, calc((100vw - 56px) / 2.14))",
-    minWidth: "min(148px, calc((100vw - 56px) / 2.14))",
-    minHeight: "88px",
+    width: "min(142px, calc((100vw - 58px) / 2.16))",
+    minWidth: "min(142px, calc((100vw - 58px) / 2.16))",
+    minHeight: "80px",
     border: "0.5px solid rgba(255,255,255,0.22)",
     borderRadius: "18px",
     background:
@@ -2906,8 +2915,8 @@ const styles = {
     flexDirection: "column",
     alignItems: "flex-start",
     justifyContent: "space-between",
-    gap: "10px",
-    padding: "12px 12px 11px",
+    gap: "7px",
+    padding: "10px 11px",
     boxSizing: "border-box",
     textAlign: "left",
     cursor: "pointer",
@@ -2936,11 +2945,11 @@ const styles = {
     display: "flex",
     alignItems: "center",
     justifyContent: "space-between",
-    minHeight: "28px",
+    minHeight: "26px",
   },
   boardDockIcon: {
-    width: "30px",
-    height: "30px",
+    width: "28px",
+    height: "28px",
     color: "rgba(255,255,255,0.9)",
     display: "inline-flex",
     alignItems: "center",
@@ -2959,8 +2968,8 @@ const styles = {
     boxShadow: "0 0 0 4px rgba(255,255,255,0.14)",
   },
   boardIconSvg: {
-    width: "30px",
-    height: "30px",
+    width: "28px",
+    height: "28px",
     display: "block",
     fill: "none",
     stroke: "currentColor",
@@ -2977,8 +2986,8 @@ const styles = {
   },
   boardDockLabel: {
     color: "rgba(255,255,255,0.96)",
-    fontSize: "14px",
-    fontWeight: 640,
+    fontSize: "13px",
+    fontWeight: 610,
     lineHeight: 1.22,
     overflow: "hidden",
     textOverflow: "ellipsis",
@@ -2989,8 +2998,8 @@ const styles = {
   },
   boardDockSub: {
     color: "rgba(255,255,255,0.62)",
-    fontSize: "12px",
-    fontWeight: 560,
+    fontSize: "11.5px",
+    fontWeight: 520,
     lineHeight: 1.18,
     fontVariantNumeric: "tabular-nums",
     overflow: "hidden",
@@ -3007,22 +3016,17 @@ const styles = {
     boxShadow: "0 0 0 3px rgba(255,255,255,0.12)",
     flexShrink: 0,
   },
-  boardDockProgressTrack: {
-    width: "100%",
-    height: "2px",
-    borderRadius: "999px",
-    background: "rgba(255,255,255,0.16)",
-    overflow: "hidden",
-    transform: "translateZ(0)",
-  },
-  boardDockProgressFill: {
-    display: "block",
-    width: "100%",
-    height: "100%",
-    borderRadius: "999px",
-    background: "rgba(255,255,255,0.68)",
-    transformOrigin: "left center",
-    transition: "transform 0.28s cubic-bezier(0.2, 0.8, 0.2, 1)",
+  boardDockEdgeProgress: {
+    position: "absolute",
+    inset: "-1px",
+    borderRadius: "inherit",
+    padding: "1px",
+    pointerEvents: "none",
+    opacity: 0.9,
+    WebkitMask:
+      "linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0)",
+    WebkitMaskComposite: "xor",
+    maskComposite: "exclude",
   },
   boardActionList: {
     display: "grid",
