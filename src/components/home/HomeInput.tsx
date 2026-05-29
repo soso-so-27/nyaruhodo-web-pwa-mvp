@@ -1224,17 +1224,6 @@ function HomeMorphSheet({
         aria-modal="true"
       >
         <span style={styles.morphBloom} aria-hidden="true" />
-        <button
-          type="button"
-          style={{
-            ...styles.morphHandleButton,
-            opacity: isReturning || !isContentReady ? 0 : 1,
-          }}
-          onClick={onClose}
-          aria-label="閉じる"
-        >
-          <span style={styles.morphHandle} aria-hidden="true" />
-        </button>
         {source ? (
           <div
             style={{
@@ -1625,17 +1614,6 @@ function HomeBulletinBoard({
       onTouchEnd={handleTouchEnd}
       aria-label={isOpen ? "あなたへのおすすめ" : "すぐ残す"}
     >
-      {isOpen ? (
-        <button
-          type="button"
-          style={styles.boardHandleButton}
-          onClick={() => setIsOpen(false)}
-          aria-label="おすすめを閉じる"
-        >
-          <span style={styles.boardHandle} aria-hidden="true" />
-        </button>
-      ) : null}
-
       {isOpen ? <div style={styles.boardHeader}>
         <span style={styles.boardHeaderIcon} aria-hidden="true">
           <SharedSparklesIcon size={18} />
@@ -1648,16 +1626,14 @@ function HomeBulletinBoard({
 
       {!isOpen ? (
         <div style={styles.boardDockFrame}>
+          <span style={styles.boardDockShelfGlow} aria-hidden="true" />
           <button
             type="button"
             style={styles.boardDockHeader}
             onClick={() => setIsOpen(true)}
             aria-label="おすすめを開く"
           >
-            <span style={styles.boardDockHeaderIcon} aria-hidden="true">
-              <SharedSparklesIcon size={15} />
-            </span>
-            <span style={styles.boardDockHeaderText}>あなたへのおすすめ</span>
+            <span style={styles.boardDockLiftHandle} aria-hidden="true" />
           </button>
           <div style={styles.boardDock} aria-label="あなたへのおすすめ">
             {peekItems.map((item) => {
@@ -1924,7 +1900,7 @@ function getBoardDockEdgeStyle(item: HomeBoardItem): CSSProperties {
 
   return {
     background:
-      `conic-gradient(from -90deg, rgba(255,255,255,0.58) 0deg ${degrees}deg, rgba(255,255,255,0.12) ${degrees}deg 360deg)`,
+      `conic-gradient(from -90deg, rgba(255,255,255,0.76) 0deg ${degrees}deg, rgba(255,255,255,0.08) ${degrees}deg 360deg)`,
   };
 }
 
@@ -2601,7 +2577,7 @@ const styles = {
     bottom: 0,
     zIndex: 18,
     width: "100%",
-    height: "258px",
+    height: "194px",
     paddingBottom: "calc(84px + env(safe-area-inset-bottom))",
     boxSizing: "border-box",
     border: "none",
@@ -2635,22 +2611,6 @@ const styles = {
     transition:
       "height 0.28s cubic-bezier(0.2, 0.8, 0.2, 1), transform 0.28s cubic-bezier(0.2, 0.8, 0.2, 1), background 0.28s cubic-bezier(0.2, 0.8, 0.2, 1)",
     willChange: "transform",
-  },
-  boardHandleButton: {
-    width: "100%",
-    border: "none",
-    background: "transparent",
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "center",
-    padding: "9px 0 5px",
-    cursor: "pointer",
-  },
-  boardHandle: {
-    width: "42px",
-    height: "4px",
-    borderRadius: "99px",
-    background: "rgba(255,255,255,0.34)",
   },
   boardHeader: {
     width: HOME_NAV_FRAME_WIDTH,
@@ -2712,34 +2672,42 @@ const styles = {
     width: HOME_NAV_FRAME_WIDTH,
     margin: "0 auto",
     overflow: "visible",
+    position: "relative",
+  },
+  boardDockShelfGlow: {
+    position: "absolute",
+    left: "-8px",
+    right: "-8px",
+    bottom: "-2px",
+    height: "112px",
+    borderRadius: "28px",
+    background:
+      "radial-gradient(ellipse at 50% 100%, rgba(0,0,0,0.34), rgba(0,0,0,0.12) 48%, rgba(0,0,0,0) 76%)",
+    filter: "blur(16px)",
+    opacity: 0.52,
+    pointerEvents: "none",
+    zIndex: 0,
   },
   boardDockHeader: {
     border: "none",
     background: "transparent",
-    color: "rgba(255,255,255,0.72)",
-    display: "inline-flex",
-    alignItems: "center",
-    gap: "6px",
-    padding: "0 0 8px",
-    margin: 0,
-    textAlign: "left",
-    cursor: "pointer",
-    textShadow: "0 1px 12px rgba(0,0,0,0.34)",
-  },
-  boardDockHeaderIcon: {
-    width: "17px",
-    height: "17px",
-    display: "inline-flex",
+    display: "flex",
     alignItems: "center",
     justifyContent: "center",
-    color: "rgba(255,255,255,0.78)",
-    flexShrink: 0,
+    width: "100%",
+    height: "18px",
+    padding: "0 0 7px",
+    margin: 0,
+    cursor: "pointer",
+    position: "relative",
+    zIndex: 2,
   },
-  boardDockHeaderText: {
-    fontSize: "12.5px",
-    fontWeight: 590,
-    letterSpacing: 0,
-    whiteSpace: "nowrap",
+  boardDockLiftHandle: {
+    width: "40px",
+    height: "3px",
+    borderRadius: "999px",
+    background: "rgba(255,255,255,0.46)",
+    boxShadow: "0 1px 10px rgba(0,0,0,0.16)",
   },
   boardDock: {
     width: `calc(100vw - ${HOME_NAV_EDGE_INSET})`,
@@ -2752,6 +2720,8 @@ const styles = {
     padding: "0 0 8px",
     scrollSnapType: "x mandatory",
     overscrollBehaviorX: "contain",
+    position: "relative",
+    zIndex: 1,
   },
   boardOpenContent: {
     height: "calc(100% - 70px)",
@@ -2923,12 +2893,15 @@ const styles = {
     scrollSnapAlign: "start",
     backdropFilter: "blur(24px)",
     WebkitBackdropFilter: "blur(24px)",
+    overflow: "visible",
+    isolation: "isolate",
     boxShadow:
-      "0 12px 30px rgba(0,0,0,0.18), inset 0 1px 0 rgba(255,255,255,0.15)",
+      "0 4px 16px rgba(0,0,0,0.08), inset 0 1px 0 rgba(255,255,255,0.15)",
     transition:
       "transform 0.2s cubic-bezier(0.2, 0.8, 0.2, 1), opacity 0.2s cubic-bezier(0.2, 0.8, 0.2, 1), border-color 0.2s cubic-bezier(0.2, 0.8, 0.2, 1)",
     animation: "boardCardSettle 0.28s cubic-bezier(0.2, 0.8, 0.2, 1) both",
     willChange: "transform, opacity",
+    zIndex: 1,
   },
   boardDockCardCompleted: {
     transform: "translateY(-2px) scale(1.015)",
@@ -2946,6 +2919,8 @@ const styles = {
     alignItems: "center",
     justifyContent: "space-between",
     minHeight: "26px",
+    position: "relative",
+    zIndex: 2,
   },
   boardDockIcon: {
     width: "28px",
@@ -2983,6 +2958,8 @@ const styles = {
     display: "flex",
     flexDirection: "column",
     gap: "3px",
+    position: "relative",
+    zIndex: 2,
   },
   boardDockLabel: {
     color: "rgba(255,255,255,0.96)",
@@ -3018,11 +2995,12 @@ const styles = {
   },
   boardDockEdgeProgress: {
     position: "absolute",
-    inset: "-1px",
+    inset: "-2px",
     borderRadius: "inherit",
-    padding: "1px",
+    padding: "2px",
     pointerEvents: "none",
-    opacity: 0.9,
+    opacity: 1,
+    zIndex: 3,
     WebkitMask:
       "linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0)",
     WebkitMaskComposite: "xor",
@@ -3160,7 +3138,7 @@ const styles = {
       "0 18px 54px rgba(0,0,0,0.32), inset 0 1px 0 rgba(255,255,255,0.16)",
     backdropFilter: "blur(28px)",
     WebkitBackdropFilter: "blur(28px)",
-    padding: "10px 16px 18px",
+    padding: "16px 16px 18px",
     overflow: "hidden",
     transformOrigin: "top left",
     willChange: "transform, opacity",
