@@ -34,8 +34,6 @@ import type { CatProfile } from "./homeInputHelpers";
 import { AppBottomSheet } from "../ui/AppBottomSheet";
 import {
   AppIcon,
-  ChevronRightIcon as SharedChevronRightIcon,
-  SparklesIcon as SharedSparklesIcon,
 } from "../ui/AppIcons";
 
 type HomeInputProps = {
@@ -139,12 +137,12 @@ const REACTION_OPTIONS = [
 
 const HOME_NAV_FRAME_WIDTH = "min(calc(100% - 28px), 410px)";
 const HOME_NAV_EDGE_INSET = "max(14px, calc((100vw - 410px) / 2))";
-const QUICK_BOARD_ITEM_IDS = new Set(["today-mikke", "today-care"]);
-const ACTION_BOARD_ITEM_IDS = new Set([
-  "today-mikke",
-  "today-care",
-  "home-photo",
-]);
+
+type BoardShelfStat = {
+  label: string;
+  value: string;
+  detail: string;
+};
 
 export function HomeInput({ recentEvents: _recentEvents }: HomeInputProps) {
   const [catProfiles, setCatProfiles] = useState<CatProfile[]>([]);
@@ -332,12 +330,24 @@ export function HomeInput({ recentEvents: _recentEvents }: HomeInputProps) {
   );
   const yousuCooldownProgress = getCooldownProgress(lockData, "yousu", tick);
   const mugiCooldownProgress = getCooldownProgress(lockData, "mugi", tick);
+  const activeCollectionPhotos = useMemo<Record<string, string[]>>(
+    () => (activeCatId ? readStoredCollectionPhotos(activeCatId) : {}),
+    [activeCatId, collectionRefreshTick],
+  );
+  const collectionPhotoCount = useMemo(
+    () =>
+      Object.values(activeCollectionPhotos).reduce(
+        (total, photos) => total + photos.length,
+        0,
+      ),
+    [activeCollectionPhotos],
+  );
   const dailyCollectionTarget = useMemo(() => {
     return getDailyCollectionTarget(
       activeCatId ?? "cat",
-      activeCatId ? readStoredCollectionPhotos(activeCatId) : {},
+      activeCollectionPhotos,
     );
-  }, [activeCatId, collectionRefreshTick]);
+  }, [activeCatId, activeCollectionPhotos]);
   const discovery = useMemo(() => {
     if (!activeCatId || discoveryDismissedToday) {
       return { available: false };
@@ -957,9 +967,9 @@ export function HomeInput({ recentEvents: _recentEvents }: HomeInputProps) {
       </div>
 
       <HomeBulletinBoard
-        catName={catName}
         items={boardItems}
         records={recordLog}
+        collectionPhotoCount={collectionPhotoCount}
         onAction={handleBoardAction}
         completion={boardCompletion}
       />
@@ -1536,15 +1546,15 @@ function CatSheet({
   );
 }
 function HomeBulletinBoard({
-  catName,
   items,
   records,
+  collectionPhotoCount,
   onAction,
   completion,
 }: {
-  catName: string;
   items: HomeBoardItem[];
   records: RecordLogItem[];
+  collectionPhotoCount: number;
   onAction: HomeBoardActionHandler;
   completion: HomeBoardCompletion | null;
 }) {
@@ -1567,15 +1577,6 @@ function HomeBulletinBoard({
           } satisfies HomeBoardItem,
         ];
   const peekItems = getBoardPeekItems(displayItems);
-  const actionItems = displayItems.filter((item) =>
-    ACTION_BOARD_ITEM_IDS.has(item.id),
-  );
-  const quickActionItems = actionItems.filter((item) =>
-    QUICK_BOARD_ITEM_IDS.has(item.id),
-  );
-  const supportActionItems = actionItems.filter(
-    (item) => !QUICK_BOARD_ITEM_IDS.has(item.id),
-  );
   const insightItems = displayItems.filter((item) =>
     ["daily-discovery", "personality-insight"].includes(item.id),
   );
@@ -1583,15 +1584,7 @@ function HomeBulletinBoard({
     (item) => item.id === "daily-collection-target",
   );
   const heroItem = insightItems[0] ?? collectionItems[0] ?? null;
-  const secondaryInsightItems = heroItem
-    ? insightItems.filter((item) => item.id !== heroItem.id)
-    : insightItems;
-  const secondaryCollectionItems = heroItem
-    ? collectionItems.filter((item) => item.id !== heroItem.id)
-    : collectionItems;
-  const supportItems = [...supportActionItems, ...secondaryCollectionItems];
-  const unreadCount = displayItems.filter((item) => item.isUnread).length;
-  const latestRecord = records[0] ?? null;
+  const nextCollectionItem = collectionItems[0] ?? null;
 
   useEffect(() => {
     if (completion) {
@@ -1622,17 +1615,18 @@ function HomeBulletinBoard({
       style={isOpen ? styles.boardExpanded : styles.boardPeek}
       onTouchStart={handleTouchStart}
       onTouchEnd={handleTouchEnd}
-      aria-label={isOpen ? "あなたへのおすすめ" : "すぐ残す"}
+      aria-label={isOpen ? "うちの子らしさ" : "すぐ残す"}
     >
-      {isOpen ? <div style={styles.boardHeader}>
-        <span style={styles.boardHeaderIcon} aria-hidden="true">
-          <SharedSparklesIcon size={18} />
-        </span>
-        <span style={styles.boardHeaderText}>
-          <span style={styles.boardTitle}>あなたへのおすすめ</span>
-        </span>
-        {unreadCount > 0 ? <span style={styles.boardHeaderMeta}>新着</span> : null}
-      </div> : null}
+      {isOpen ? (
+        <button
+          type="button"
+          style={styles.boardOpenHandleButton}
+          onClick={() => setIsOpen(false)}
+          aria-label="閉じる"
+        >
+          <span style={styles.boardDockLiftHandle} aria-hidden="true" />
+        </button>
+      ) : null}
 
       {!isOpen ? (
         <div style={styles.boardDockFrame}>
@@ -1747,39 +1741,18 @@ function HomeBulletinBoard({
                   <span style={styles.boardHeroBadge}>新着</span>
                 ) : null}
               </span>
-              <span style={styles.boardHeroTitle}>{heroItem.title}</span>
-              <span style={styles.boardHeroBody}>{heroItem.body}</span>
+              <span style={styles.boardHeroKicker}>{heroItem.title}</span>
+              <span style={styles.boardHeroStatement}>{heroItem.body}</span>
             </button>
           ) : null}
 
-          {quickActionItems.length > 0 ? (
-            <BoardQuickActions items={quickActionItems} onAction={onAction} />
-          ) : null}
+          <BoardShelfSummary
+            records={records}
+            collectionPhotoCount={collectionPhotoCount}
+          />
 
-          {secondaryInsightItems.length > 0 ? (
-            <BoardOpenSection
-              title="届いていること"
-              items={secondaryInsightItems}
-              onAction={onAction}
-            />
-          ) : null}
-
-          {supportItems.length > 0 ? (
-            <BoardOpenSection
-              title="次に見つけたい"
-              items={supportItems}
-              onAction={onAction}
-            />
-          ) : null}
-
-          {latestRecord ? (
-            <div style={styles.boardLatestMemo}>
-              <span style={styles.boardLatestMemoLabel}>最後の記録</span>
-              <span style={styles.boardLatestMemoValue}>
-                {formatRecordTime(latestRecord.timestamp)} /{" "}
-                {formatRecordKind(latestRecord.type)} / {latestRecord.value}
-              </span>
-            </div>
+          {nextCollectionItem ? (
+            <BoardNextPrompt item={nextCollectionItem} onAction={onAction} />
           ) : null}
         </div>
       ) : null}
@@ -1787,76 +1760,99 @@ function HomeBulletinBoard({
   );
 }
 
-function BoardQuickActions({
-  items,
-  onAction,
+function BoardShelfSummary({
+  records,
+  collectionPhotoCount,
 }: {
-  items: HomeBoardItem[];
-  onAction: HomeBoardActionHandler;
+  records: RecordLogItem[];
+  collectionPhotoCount: number;
 }) {
+  const stats = buildBoardShelfStats(records, collectionPhotoCount);
+
+  if (stats.length === 0) {
+    return null;
+  }
+
   return (
-    <div style={styles.boardQuickActions}>
-      {items.map((item) => (
-        <button
-          key={`quick-${item.id}`}
-          type="button"
-          disabled={item.isDisabled}
-          style={{
-            ...styles.boardQuickAction,
-            ...(item.isDisabled ? styles.boardActionRowDisabled : {}),
-          }}
-          onClick={() => onAction(item.actionType)}
-        >
-          <span style={styles.boardQuickIcon} aria-hidden="true">
-            <BoardIcon icon={item.icon} />
+    <div style={styles.boardShelf}>
+      <div style={styles.boardSectionHeader}>
+        <span style={styles.boardSectionTitle}>たまってきた</span>
+      </div>
+      <div style={styles.boardShelfGrid}>
+        {stats.map((stat) => (
+          <span key={stat.label} style={styles.boardShelfTile}>
+            <span style={styles.boardShelfLabel}>{stat.label}</span>
+            <span style={styles.boardShelfValue}>{stat.value}</span>
+            <span style={styles.boardShelfDetail}>{stat.detail}</span>
           </span>
-          <span style={styles.boardQuickText}>
-            <span style={styles.boardQuickTitle}>{item.title}</span>
-            <span style={styles.boardQuickSub}>{item.surfaceText ?? item.body}</span>
-          </span>
-        </button>
-      ))}
+        ))}
+      </div>
     </div>
   );
 }
 
-function BoardOpenSection({
-  title,
-  items,
+function BoardNextPrompt({
+  item,
   onAction,
 }: {
-  title: string;
-  items: HomeBoardItem[];
+  item: HomeBoardItem;
   onAction: HomeBoardActionHandler;
 }) {
   return (
-    <>
-      <div style={styles.boardSectionHeader}>
-        <span style={styles.boardSectionTitle}>{title}</span>
-      </div>
-      <div style={styles.boardActionList}>
-        {items.map((item) => (
-          <button
-            key={`${title}-${item.id}`}
-            type="button"
-            disabled={item.isDisabled}
-            style={{
-              ...styles.boardActionRow,
-              ...(item.isDisabled ? styles.boardActionRowDisabled : {}),
-            }}
-            onClick={() => onAction(item.actionType)}
-          >
-            <span style={styles.boardActionLabel}>{item.actionLabel}</span>
-            <span style={styles.boardActionTitle}>{item.title}</span>
-            <SharedChevronRightIcon
-              size={18}
-              style={{ color: "rgba(255,255,255,0.62)", flexShrink: 0 }}
-            />
-          </button>
-        ))}
-      </div>
-    </>
+    <button
+      type="button"
+      disabled={item.isDisabled}
+      style={{
+        ...styles.boardNextCard,
+        ...(item.isDisabled ? styles.boardActionRowDisabled : {}),
+      }}
+      onClick={() => onAction(item.actionType)}
+    >
+      <span style={styles.boardNextIcon} aria-hidden="true">
+        <BoardIcon icon={item.icon} />
+      </span>
+      <span style={styles.boardNextText}>
+        <span style={styles.boardNextKicker}>{item.title}</span>
+        <span style={styles.boardNextTitle}>{item.surfaceText ?? item.body}</span>
+        <span style={styles.boardNextBody}>{item.body}</span>
+      </span>
+    </button>
   );
+}
+
+function buildBoardShelfStats(
+  records: RecordLogItem[],
+  collectionPhotoCount: number,
+): BoardShelfStat[] {
+  const yousuCount = records.filter((record) => record.type === "yousu").length;
+  const careCount = records.filter((record) => record.type === "mugi").length;
+  const stats: BoardShelfStat[] = [];
+
+  if (yousuCount > 0) {
+    stats.push({
+      label: "ようす",
+      value: String(yousuCount),
+      detail: "見つけた",
+    });
+  }
+
+  if (careCount > 0) {
+    stats.push({
+      label: "おせわ",
+      value: String(careCount),
+      detail: "したこと",
+    });
+  }
+
+  if (collectionPhotoCount > 0) {
+    stats.push({
+      label: "写真",
+      value: String(collectionPhotoCount),
+      detail: "棚に",
+    });
+  }
+
+  return stats;
 }
 
 function getBoardTransitionSource(
@@ -1928,7 +1924,7 @@ function buildPersonalityInsight(
 
   if (!latestRecord) {
     return {
-      body: `${catName}を見かけたら、まずはひとつだけ残してみる。`,
+      body: `${catName}を見かけたら、まずはひとつ。`,
       surfaceText: "はじめる",
       sheetBody:
         "最初は正確に分析しようとしなくて大丈夫です。見かけた瞬間をひとつ残すことが、この子らしさの入口になります。",
@@ -1937,7 +1933,7 @@ function buildPersonalityInsight(
 
   if (latestRecord.type === "mugi") {
     return {
-      body: `「${latestRecord.value}」のあと、どんな反応だったか残すと距離感が見えやすくなります。`,
+      body: `「${latestRecord.value}」は残っています。次は反応もひとつ。`,
       surfaceText: "反応を足す",
       sheetBody:
         "してあげたことだけでなく、その後の反応まで残すと、喜びやすい距離・苦手な距離が少しずつ分かれていきます。",
@@ -1946,7 +1942,7 @@ function buildPersonalityInsight(
 
   if (careRecords.length >= 2 && reactionRecords.length === 0) {
     return {
-      body: `おせわの後の反応をひとつ足すと、${catName}の好きな距離が残りやすくなります。`,
+      body: "おせわは残っています。反応があると見返しやすくなります。",
       surfaceText: "反応待ち",
       sheetBody:
         "おせわの記録に反応がつながると、ただの回数ではなく「この子には何が合いやすいか」を見返しやすくなります。",
@@ -1961,7 +1957,7 @@ function buildPersonalityInsight(
   ) {
     if (topYousu.value === "ねてる") {
       return {
-        body: "ねてる記録は多くなりやすいので、起きた直後のようすをひとつ足すと差が見えます。",
+        body: "「ねてる」が少し多め。次は起きた直後もひとつ。",
         surfaceText: "違いを見る",
         sheetBody:
           "猫は寝ている時間が長いので、寝ている回数だけでは特徴になりにくいことがあります。起きた直後や移動した後を残すと、この子らしさが見えやすくなります。",
@@ -1969,7 +1965,7 @@ function buildPersonalityInsight(
     }
 
     return {
-      body: `「${topYousu.value}」が何度か出ています。次はその前後を一緒に見ると特徴になります。`,
+      body: `「${topYousu.value}」が何度か出ています。前後も残ると比べやすいです。`,
       surfaceText: "くり返し",
       sheetBody:
         "同じようすが繰り返し出てきたら、次は時間・直前の出来事・その後の反応を足すと、単なる記録から特徴に変わっていきます。",
@@ -1978,7 +1974,7 @@ function buildPersonalityInsight(
 
   if (latestRecord.type === "yousu") {
     return {
-      body: `「${latestRecord.value}」の前後に、何があったか見てみる。`,
+      body: `「${latestRecord.value}」が残っています。次は前後もひとつ。`,
       surfaceText: "前後を見る",
       sheetBody:
         "ようすだけを残すより、その前後に声をかけたか、なでたか、そっとしたかが残ると、この子の流れが見えやすくなります。",
@@ -1987,7 +1983,7 @@ function buildPersonalityInsight(
 
   if (recordLog.length >= 7) {
     return {
-      body: "記録が少しずつつながってきました。次はいつもと違う場面をひとつ足してみる。",
+      body: "手がかりが増えてきました。違う時間もひとつ。",
       surfaceText: "幅を見る",
       sheetBody:
         "同じ場面だけでなく、少し違う時間や距離で残すと、この子らしさの幅がトリセツに残りやすくなります。",
@@ -1995,7 +1991,7 @@ function buildPersonalityInsight(
   }
 
   return {
-    body: `${catName}のいつもと違うところをひとつ残すと、見返す手がかりになります。`,
+    body: `${catName}の違う場面もひとつ。`,
     surfaceText: "少しずつ",
     sheetBody:
       "大きな変化を探さなくても大丈夫です。少し違う表情や距離感を残すだけで、あとから見返せる手がかりになります。",
@@ -2077,10 +2073,10 @@ function buildHomeBoardItems({
       id: "daily-discovery",
       kind: "insight",
       priority: 10,
-      title: "見えてきたこと",
+      title: "手がかり",
       body: personalityInsight.body,
       icon: "heart",
-      actionLabel: "うちの子らしさ",
+      actionLabel: "見返す",
       actionType: "open_discovery",
       isUnread: true,
       surfaceText: personalityInsight.surfaceText,
@@ -2090,10 +2086,10 @@ function buildHomeBoardItems({
       id: "personality-insight",
       kind: "insight",
       priority: 10,
-      title: "見えてきたこと",
+      title: "手がかり",
       body: personalityInsight.body,
       icon: "heart",
-      actionLabel: "うちの子らしさ",
+      actionLabel: "見返す",
       actionType: "open_recent_change",
       surfaceText: latestRecord ? personalityInsight.surfaceText : "はじめる",
     });
@@ -2118,10 +2114,10 @@ function buildHomeBoardItems({
       id: "daily-collection-target",
       kind: "collection",
       priority: 45,
-      title: "今日の1枚",
-      body: `${catName}の${collectionTargetLabel}`,
+      title: "まだない姿",
+      body: "見つけたら、写真の棚に入ります。",
       icon: "camera",
-      actionLabel: "写真",
+      actionLabel: "写真で残す",
       actionType: "open_collection_photo",
       surfaceText: collectionTargetLabel,
     });
@@ -2622,44 +2618,18 @@ const styles = {
       "height 0.28s cubic-bezier(0.2, 0.8, 0.2, 1), transform 0.28s cubic-bezier(0.2, 0.8, 0.2, 1), background 0.28s cubic-bezier(0.2, 0.8, 0.2, 1)",
     willChange: "transform",
   },
-  boardHeader: {
+  boardOpenHandleButton: {
     width: HOME_NAV_FRAME_WIDTH,
-    margin: "0 auto",
+    height: "32px",
+    margin: "0 auto 4px",
+    padding: "9px 0 8px",
+    border: "none",
+    background: "transparent",
     boxSizing: "border-box",
     display: "flex",
     alignItems: "center",
-    gap: "9px",
-    padding: "2px 0 10px",
-  },
-  boardHeaderIcon: {
-    width: "24px",
-    height: "24px",
-    borderRadius: "50%",
-    color: "rgba(255,255,255,0.92)",
-    display: "inline-flex",
-    alignItems: "center",
     justifyContent: "center",
-  },
-  boardHeaderText: {
-    minWidth: 0,
-    flex: 1,
-    display: "flex",
-    flexDirection: "column",
-  },
-  boardTitle: {
-    fontSize: "15px",
-    fontWeight: 680,
-    color: "rgba(255,255,255,0.94)",
-    whiteSpace: "nowrap",
-  },
-  boardHeaderMeta: {
-    flexShrink: 0,
-    border: "0.5px solid rgba(255,255,255,0.22)",
-    borderRadius: "99px",
-    color: "rgba(255,255,255,0.72)",
-    fontSize: "10px",
-    fontWeight: 620,
-    padding: "3px 8px",
+    cursor: "pointer",
   },
   boardRailFrame: {
     width: HOME_NAV_FRAME_WIDTH,
@@ -2737,7 +2707,7 @@ const styles = {
     zIndex: 1,
   },
   boardOpenContent: {
-    height: "calc(100% - 70px)",
+    height: "calc(100% - 36px)",
     overflowY: "auto",
     padding: `0 ${HOME_NAV_EDGE_INSET} calc(112px + env(safe-area-inset-bottom))`,
     boxSizing: "border-box",
@@ -2794,17 +2764,127 @@ const styles = {
     fontWeight: 540,
     lineHeight: 1.55,
   },
+  boardHeroKicker: {
+    color: "rgba(255,255,255,0.58)",
+    fontSize: "11px",
+    fontWeight: 620,
+    lineHeight: 1.2,
+  },
+  boardHeroStatement: {
+    color: "rgba(255,255,255,0.94)",
+    fontSize: "16px",
+    fontWeight: 610,
+    lineHeight: 1.45,
+  },
   boardSectionHeader: {
     display: "flex",
     alignItems: "center",
     justifyContent: "space-between",
-    margin: "6px 2px 8px",
+    margin: "4px 2px 8px",
   },
   boardSectionTitle: {
-    color: "rgba(255,255,255,0.62)",
+    color: "rgba(255,255,255,0.58)",
     fontSize: "12px",
     fontWeight: 620,
-    letterSpacing: "0.02em",
+    letterSpacing: 0,
+  },
+  boardShelf: {
+    margin: "0 0 15px",
+  },
+  boardShelfGrid: {
+    display: "grid",
+    gridTemplateColumns: "repeat(3, 1fr)",
+    gap: "8px",
+  },
+  boardShelfTile: {
+    minHeight: "74px",
+    border: "0.5px solid rgba(255,255,255,0.15)",
+    borderRadius: "17px",
+    background: "rgba(255,255,255,0.08)",
+    color: "rgba(255,255,255,0.92)",
+    display: "flex",
+    flexDirection: "column",
+    alignItems: "flex-start",
+    justifyContent: "space-between",
+    padding: "10px 10px 9px",
+    boxSizing: "border-box",
+    backdropFilter: "blur(20px)",
+    WebkitBackdropFilter: "blur(20px)",
+    boxShadow: "inset 0 1px 0 rgba(255,255,255,0.1)",
+  },
+  boardShelfLabel: {
+    color: "rgba(255,255,255,0.56)",
+    fontSize: "11px",
+    fontWeight: 610,
+    lineHeight: 1.2,
+  },
+  boardShelfValue: {
+    color: "rgba(255,255,255,0.94)",
+    fontSize: "22px",
+    fontWeight: 600,
+    lineHeight: 1,
+    fontVariantNumeric: "tabular-nums",
+  },
+  boardShelfDetail: {
+    color: "rgba(255,255,255,0.5)",
+    fontSize: "10.5px",
+    fontWeight: 560,
+    lineHeight: 1.15,
+  },
+  boardNextCard: {
+    width: "100%",
+    minHeight: "88px",
+    border: "0.5px solid rgba(255,255,255,0.17)",
+    borderRadius: "20px",
+    background:
+      "linear-gradient(145deg, rgba(255,255,255,0.12), rgba(255,255,255,0.07))",
+    color: "rgba(255,255,255,0.94)",
+    display: "grid",
+    gridTemplateColumns: "38px 1fr",
+    alignItems: "center",
+    gap: "12px",
+    padding: "13px 14px",
+    boxSizing: "border-box",
+    textAlign: "left",
+    cursor: "pointer",
+    backdropFilter: "blur(22px)",
+    WebkitBackdropFilter: "blur(22px)",
+    boxShadow: "inset 0 1px 0 rgba(255,255,255,0.12)",
+  },
+  boardNextIcon: {
+    width: "34px",
+    height: "34px",
+    color: "rgba(255,255,255,0.88)",
+    display: "inline-flex",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  boardNextText: {
+    minWidth: 0,
+    display: "flex",
+    flexDirection: "column",
+    gap: "3px",
+  },
+  boardNextKicker: {
+    color: "rgba(255,255,255,0.52)",
+    fontSize: "11px",
+    fontWeight: 620,
+    lineHeight: 1.2,
+  },
+  boardNextTitle: {
+    color: "rgba(255,255,255,0.96)",
+    fontSize: "17px",
+    fontWeight: 640,
+    lineHeight: 1.22,
+    overflow: "hidden",
+    textOverflow: "ellipsis",
+    whiteSpace: "nowrap",
+  },
+  boardNextBody: {
+    color: "rgba(255,255,255,0.58)",
+    fontSize: "12px",
+    fontWeight: 520,
+    lineHeight: 1.35,
   },
   boardQuickActions: {
     display: "grid",
