@@ -1081,6 +1081,16 @@ export function HomeInput({ recentEvents: _recentEvents }: HomeInputProps) {
             transform: translate3d(0, 0, 0) scale(1);
           }
         }
+        @keyframes boardCountdownEdgeEnter {
+          from {
+            opacity: 0.35;
+            transform: scale(0.992);
+          }
+          to {
+            opacity: 1;
+            transform: scale(1);
+          }
+        }
         @keyframes morphBloom {
           0% {
             opacity: 0;
@@ -1700,13 +1710,19 @@ function HomeBulletinBoard({
                     <span style={styles.boardDockSub}>{displaySurfaceText}</span>
                   </span>
                   {typeof item.cooldownProgress === "number" ? (
-                    <span
-                      style={{
-                        ...styles.boardDockEdgeProgress,
-                        ...getBoardDockEdgeStyle(item),
-                      }}
-                      aria-hidden="true"
-                    />
+                    <>
+                      <span
+                        style={styles.boardDockEdgeTrack}
+                        aria-hidden="true"
+                      />
+                      <span
+                        style={{
+                          ...styles.boardDockEdgeProgress,
+                          ...getBoardDockEdgeStyle(item),
+                        }}
+                        aria-hidden="true"
+                      />
+                    </>
                   ) : null}
                 </button>
               );
@@ -1900,7 +1916,7 @@ function getBoardDockEdgeStyle(item: HomeBoardItem): CSSProperties {
 
   return {
     background:
-      `conic-gradient(from -90deg, rgba(255,255,255,0.76) 0deg ${degrees}deg, rgba(255,255,255,0.08) ${degrees}deg 360deg)`,
+      `conic-gradient(from -90deg, rgba(255,255,255,0.98) 0deg ${degrees}deg, rgba(255,255,255,0) ${degrees}deg 360deg)`,
   };
 }
 
@@ -2996,14 +3012,30 @@ const styles = {
     boxShadow: "0 0 0 3px rgba(255,255,255,0.12)",
     flexShrink: 0,
   },
+  boardDockEdgeTrack: {
+    position: "absolute",
+    inset: "-3px",
+    borderRadius: "inherit",
+    padding: "3px",
+    background: "rgba(255,255,255,0.22)",
+    pointerEvents: "none",
+    zIndex: 3,
+    WebkitMask:
+      "linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0)",
+    WebkitMaskComposite: "xor",
+    maskComposite: "exclude",
+  },
   boardDockEdgeProgress: {
     position: "absolute",
-    inset: "-2px",
+    inset: "-3px",
     borderRadius: "inherit",
-    padding: "2px",
+    padding: "3px",
     pointerEvents: "none",
     opacity: 1,
-    zIndex: 3,
+    zIndex: 4,
+    filter: "drop-shadow(0 0 5px rgba(255,255,255,0.42))",
+    animation:
+      "boardCountdownEdgeEnter 0.46s cubic-bezier(0.2, 0.8, 0.2, 1) both",
     WebkitMask:
       "linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0)",
     WebkitMaskComposite: "xor",
