@@ -1324,19 +1324,24 @@ function HomeBulletinBoard({
                   disabled={item.isDisabled}
                   style={{
                     ...styles.boardDockCard,
-                    ...getBoardDockCardStyle(item),
-                    ...(item.cooldownProgress ? styles.boardDockCardCooldown : {}),
                     ...(item.isDisabled ? styles.boardCardDisabled : {}),
                     ...(completed ? styles.boardDockCardCompleted : {}),
                   }}
                   onClick={() => onAction(item.actionType)}
                 >
-                  <span style={styles.boardCardTop}>
-                    <span style={styles.boardCardIcon} aria-hidden="true">
+                  <span
+                    style={{
+                      ...styles.boardDockCircle,
+                      ...getBoardDockCircleStyle(item),
+                      ...(completed ? styles.boardDockCircleCompleted : {}),
+                    }}
+                    aria-hidden="true"
+                  >
+                    <span style={styles.boardDockCircleInner}>
                       <BoardIcon icon={item.icon} />
                     </span>
                     {completed ? (
-                      <span style={styles.boardCompletionMark} aria-hidden="true">
+                      <span style={styles.boardCompletionMark}>
                         <svg
                           viewBox="0 0 24 24"
                           width="13"
@@ -1354,15 +1359,8 @@ function HomeBulletinBoard({
                       <span style={styles.boardUnreadDot} />
                     ) : null}
                   </span>
-                  <span style={styles.boardCardTitle}>{displayTitle}</span>
-                  {displaySurfaceText ? (
-                    <span style={styles.boardCardSub}>{displaySurfaceText}</span>
-                  ) : null}
-                  {item.cooldownProgress ? (
-                    <span style={styles.boardCooldownTrack} aria-hidden="true">
-                      <span style={getBoardCooldownFillStyle(item.cooldownProgress)} />
-                    </span>
-                  ) : null}
+                  <span style={styles.boardDockLabel}>{displayTitle}</span>
+                  <span style={styles.boardDockSub}>{displaySurfaceText}</span>
                 </button>
               );
             })}
@@ -1523,22 +1521,17 @@ function getBoardPeekItems(items: HomeBoardItem[]) {
   return [...orderedItems, ...fallbackItems].slice(0, 3);
 }
 
-function getBoardDockCardStyle(item: HomeBoardItem): CSSProperties {
+function getBoardDockCircleStyle(item: HomeBoardItem): CSSProperties {
   if (!item.cooldownProgress) {
     return {};
   }
 
-  return {
-    borderColor: "rgba(255,255,255,0.32)",
-    background:
-      "linear-gradient(145deg, rgba(72,63,58,0.58), rgba(36,32,30,0.50))",
-  };
-}
+  const progress = Math.max(0, Math.min(1, item.cooldownProgress));
+  const degrees = Math.round(progress * 360);
 
-function getBoardCooldownFillStyle(progress: number): CSSProperties {
   return {
-    ...styles.boardCooldownFill,
-    transform: `scaleX(${Math.max(0.02, Math.min(1, progress))})`,
+    borderColor: "transparent",
+    background: `conic-gradient(from -90deg, rgba(255,255,255,0.92) 0deg ${degrees}deg, rgba(255,255,255,0.18) ${degrees}deg 360deg)`,
   };
 }
 
@@ -2327,6 +2320,7 @@ const styles = {
     display: "grid",
     gridTemplateColumns: "repeat(3, minmax(0, 1fr))",
     gap: "8px",
+    alignItems: "start",
   },
   boardOpenContent: {
     height: "calc(100% - 70px)",
@@ -2479,58 +2473,69 @@ const styles = {
   boardDockCard: {
     position: "relative",
     minWidth: 0,
-    minHeight: "94px",
-    border: "0.5px solid rgba(255,255,255,0.22)",
-    borderRadius: "18px",
-    background: "rgba(42,36,34,0.44)",
+    minHeight: "98px",
+    border: "none",
+    borderRadius: "20px",
+    background: "transparent",
     color: "rgba(255,255,255,0.94)",
     display: "flex",
     flexDirection: "column",
-    alignItems: "flex-start",
-    justifyContent: "space-between",
-    gap: "8px",
-    padding: "12px 11px",
-    textAlign: "left",
+    alignItems: "center",
+    justifyContent: "flex-start",
+    gap: "5px",
+    padding: "0 2px",
+    textAlign: "center",
     cursor: "pointer",
-    backdropFilter: "blur(24px)",
-    WebkitBackdropFilter: "blur(24px)",
-    boxShadow:
-      "0 10px 28px rgba(0,0,0,0.18), inset 0 1px 0 rgba(255,255,255,0.14)",
     transition:
-      "background 0.18s ease, border-color 0.18s ease, transform 0.18s ease, opacity 0.18s ease",
-  },
-  boardDockCardCooldown: {
-    paddingBottom: "20px",
+      "transform 0.18s ease, opacity 0.18s ease",
   },
   boardDockCardCompleted: {
-    background: "rgba(255,255,255,0.24)",
-    borderColor: "rgba(255,255,255,0.68)",
     transform: "translateY(-2px)",
-    boxShadow:
-      "0 14px 34px rgba(0,0,0,0.22), 0 0 0 3px rgba(255,255,255,0.08), inset 0 1px 0 rgba(255,255,255,0.28)",
   },
   boardCardDisabled: {
     cursor: "default",
     opacity: 0.84,
   },
-  boardCardTop: {
-    width: "100%",
+  boardDockCircle: {
+    position: "relative",
+    width: "64px",
+    height: "64px",
+    borderRadius: "50%",
+    border: "0.5px solid rgba(255,255,255,0.24)",
+    background: "rgba(54,48,44,0.48)",
+    color: "rgba(255,255,255,0.94)",
     display: "flex",
     alignItems: "center",
-    justifyContent: "space-between",
+    justifyContent: "center",
+    padding: "2px",
+    boxSizing: "border-box",
+    boxShadow:
+      "0 12px 30px rgba(0,0,0,0.22), inset 0 1px 0 rgba(255,255,255,0.18)",
+    backdropFilter: "blur(24px)",
+    WebkitBackdropFilter: "blur(24px)",
+    transition:
+      "background 0.18s ease, border-color 0.18s ease, box-shadow 0.18s ease, transform 0.18s ease",
   },
-  boardCardIcon: {
-    width: "32px",
-    height: "32px",
-    color: "rgba(255,255,255,0.92)",
+  boardDockCircleInner: {
+    width: "100%",
+    height: "100%",
+    borderRadius: "50%",
+    background:
+      "linear-gradient(145deg, rgba(74,65,59,0.68), rgba(37,33,31,0.54))",
     display: "inline-flex",
     alignItems: "center",
     justifyContent: "center",
   },
+  boardDockCircleCompleted: {
+    background: "rgba(255,255,255,0.94)",
+    borderColor: "rgba(255,255,255,0.72)",
+    boxShadow:
+      "0 14px 34px rgba(0,0,0,0.24), 0 0 0 4px rgba(255,255,255,0.1), inset 0 1px 0 rgba(255,255,255,0.3)",
+  },
   boardCompletionMark: {
     position: "absolute",
-    top: "11px",
-    right: "11px",
+    top: "-2px",
+    right: "-2px",
     width: "20px",
     height: "20px",
     borderRadius: "50%",
@@ -2551,49 +2556,34 @@ const styles = {
     strokeLinecap: "round",
     strokeLinejoin: "round",
   },
-  boardCardTitle: {
+  boardDockLabel: {
     color: "rgba(255,255,255,0.96)",
-    fontSize: "13px",
-    fontWeight: 680,
-    lineHeight: 1.24,
+    fontSize: "12px",
+    fontWeight: 660,
+    lineHeight: 1.18,
     overflow: "hidden",
     textOverflow: "ellipsis",
-    display: "-webkit-box",
-    WebkitLineClamp: 2,
-    WebkitBoxOrient: "vertical",
+    whiteSpace: "nowrap",
+    maxWidth: "100%",
     overflowWrap: "anywhere",
+    textShadow: "0 1px 10px rgba(0,0,0,0.28)",
   },
-  boardCardSub: {
-    marginTop: "-5px",
-    color: "rgba(255,255,255,0.58)",
+  boardDockSub: {
+    color: "rgba(255,255,255,0.66)",
     fontSize: "11px",
-    fontWeight: 650,
+    fontWeight: 620,
     lineHeight: 1.15,
     fontVariantNumeric: "tabular-nums",
-  },
-  boardCooldownTrack: {
-    position: "absolute",
-    left: "11px",
-    right: "11px",
-    bottom: "9px",
-    height: "3px",
-    borderRadius: "99px",
-    background: "rgba(255,255,255,0.16)",
     overflow: "hidden",
-  },
-  boardCooldownFill: {
-    display: "block",
-    width: "100%",
-    height: "100%",
-    borderRadius: "99px",
-    background: "rgba(255,255,255,0.86)",
-    transformOrigin: "left center",
-    transition: "transform 0.4s ease",
+    textOverflow: "ellipsis",
+    whiteSpace: "nowrap",
+    maxWidth: "100%",
+    textShadow: "0 1px 10px rgba(0,0,0,0.28)",
   },
   boardUnreadDot: {
     position: "absolute",
-    top: "11px",
-    right: "11px",
+    top: "6px",
+    right: "6px",
     width: "7px",
     height: "7px",
     borderRadius: "50%",
