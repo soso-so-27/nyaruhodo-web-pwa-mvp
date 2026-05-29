@@ -8,9 +8,11 @@ import {
 } from "../../lib/accountSync";
 import { trackProductEvent } from "../../lib/analytics/productAnalytics";
 import {
+  getCollectionSlotPhotoSlug,
   getDailyCollectionTarget,
   readStoredCollectionPhotos,
 } from "../../lib/collection/dailyTarget";
+import type { CollectionSlot } from "../../lib/collection/poses";
 import {
   STORAGE_KEYS,
   getDiscoveryLogKey,
@@ -60,6 +62,7 @@ type HomeBoardAction =
   | "open_mikke"
   | "open_care"
   | "open_photo"
+  | "open_collection_photo"
   | "open_discovery"
   | "open_recent_change"
   | "go_torisetu"
@@ -77,6 +80,7 @@ type HomeBoardItem = {
   isUnread?: boolean;
   isDisabled?: boolean;
   surfaceText?: string;
+  cooldownProgress?: number;
 };
 
 type PersonalityInsight = {
@@ -128,6 +132,9 @@ export function HomeInput({ recentEvents: _recentEvents }: HomeInputProps) {
   const [isMugiSheetOpen, setIsMugiSheetOpen] = useState(false);
   const [isReactionSheetOpen, setIsReactionSheetOpen] = useState(false);
   const [isCatSheetOpen, setIsCatSheetOpen] = useState(false);
+  const [isCollectionPhotoSheetOpen, setIsCollectionPhotoSheetOpen] =
+    useState(false);
+  const [isCollectionPhotoAdding, setIsCollectionPhotoAdding] = useState(false);
   const [isAccountRestoreSheetOpen, setIsAccountRestoreSheetOpen] =
     useState(false);
   const [isAccountRestoring, setIsAccountRestoring] = useState(false);
@@ -146,9 +153,14 @@ export function HomeInput({ recentEvents: _recentEvents }: HomeInputProps) {
     null,
   );
   const [toastText, setToastText] = useState("");
+  const [completedBoardItemId, setCompletedBoardItemId] = useState<string | null>(
+    null,
+  );
+  const [collectionRefreshTick, setCollectionRefreshTick] = useState(0);
   const [discoveryDismissedToday, setDiscoveryDismissedToday] = useState(false);
   const hasTrackedHomeView = useRef(false);
   const hasTrackedGoogleAuthSuccess = useRef(false);
+  const completedBoardTimerRef = useRef<number | null>(null);
 
   useEffect(() => {
     const profiles = readCatProfiles();
@@ -168,6 +180,14 @@ export function HomeInput({ recentEvents: _recentEvents }: HomeInputProps) {
     }, 1000);
 
     return () => window.clearInterval(intervalId);
+  }, []);
+
+  useEffect(() => {
+    return () => {
+      if (completedBoardTimerRef.current) {
+        window.clearTimeout(completedBoardTimerRef.current);
+      }
+    };
   }, []);
 
   useEffect(() => {
@@ -274,16 +294,14 @@ export function HomeInput({ recentEvents: _recentEvents }: HomeInputProps) {
     () => buildPersonalityInsight(recordLog, catName),
     [catName, recordLog],
   );
+  const yousuCooldownProgress = getCooldownProgress(lockData, "yousu", tick);
+  const mugiCooldownProgress = getCooldownProgress(lockData, "mugi", tick);
   const dailyCollectionTarget = useMemo(() => {
-    if (!activeCatId) {
-      return null;
-    }
-
     return getDailyCollectionTarget(
-      activeCatId,
-      readStoredCollectionPhotos(activeCatId),
+      activeCatId ?? "cat",
+      activeCatId ? readStoredCollectionPhotos(activeCatId) : {},
     );
-  }, [activeCatId]);
+  }, [activeCatId, collectionRefreshTick]);
   const discovery = useMemo(() => {
     if (!activeCatId || discoveryDismissedToday) {
       return { available: false };
@@ -301,14 +319,18 @@ export function HomeInput({ recentEvents: _recentEvents }: HomeInputProps) {
         collectionTargetLabel: dailyCollectionTarget?.label ?? null,
         yousuRemaining,
         mugiRemaining,
+        yousuCooldownProgress,
+        mugiCooldownProgress,
       }),
     [
       activeCat?.homePhotoDataUrl,
       catName,
       discovery.available,
       dailyCollectionTarget?.label,
+      mugiCooldownProgress,
       mugiRemaining,
       recordLog,
+      yousuCooldownProgress,
       yousuRemaining,
     ],
   );
@@ -469,6 +491,19 @@ export function HomeInput({ recentEvents: _recentEvents }: HomeInputProps) {
     window.setTimeout(() => setToastText(""), 1500);
   }
 
+  function showBoardCompletion(itemId: string) {
+    setCompletedBoardItemId(itemId);
+
+    if (completedBoardTimerRef.current) {
+      window.clearTimeout(completedBoardTimerRef.current);
+    }
+
+    completedBoardTimerRef.current = window.setTimeout(() => {
+      setCompletedBoardItemId(null);
+      completedBoardTimerRef.current = null;
+    }, 1200);
+  }
+
   function dismissAccountRestorePrompt() {
     trackProductEvent(
       "account_restore_prompt_dismissed",
@@ -556,7 +591,8 @@ export function HomeInput({ recentEvents: _recentEvents }: HomeInputProps) {
     setSelectedYousu(value);
     setRecordLog(readRecordLog(activeCatId));
     setLockData(nextLockData);
-    showToast("記録したよ");
+    showBoardCompletion("today-mikke");
+    showToast("みっけに追加");
     window.setTimeout(() => setIsYousuOpen(false), 1000);
   }
 
@@ -578,7 +614,8 @@ export function HomeInput({ recentEvents: _recentEvents }: HomeInputProps) {
     setSelectedMugi(value);
     setRecordLog(readRecordLog(activeCatId));
     setLockData(nextLockData);
-    showToast("記録したよ");
+    showBoardCompletion("today-care");
+    showToast("おせわに追加");
 
     window.setTimeout(() => {
       setIsMugiSheetOpen(false);
@@ -594,7 +631,7 @@ export function HomeInput({ recentEvents: _recentEvents }: HomeInputProps) {
     saveRecord(activeCatId, { type: "reaction", value });
     setSelectedReaction(value);
     setRecordLog(readRecordLog(activeCatId));
-    showToast("記録したよ");
+    showToast("反応に追加");
     window.setTimeout(() => setIsReactionSheetOpen(false), 500);
   }
 
@@ -644,6 +681,61 @@ export function HomeInput({ recentEvents: _recentEvents }: HomeInputProps) {
     input.click();
   }
 
+  async function handleCollectionPhotoAdd(slot: CollectionSlot) {
+    if (!activeCatId || isCollectionPhotoAdding) return;
+
+    trackProductEvent(
+      "collection_photo_add_started",
+      {
+        slot_id: slot.id,
+        slot_slug: getCollectionSlotPhotoSlug(slot),
+        group_id: slot.group,
+        entry: "home_board",
+      },
+      { localCatId: activeCatId },
+    );
+
+    const input = document.createElement("input");
+    input.type = "file";
+    input.accept = "image/*";
+    input.setAttribute("capture", "environment");
+
+    input.onchange = async () => {
+      const file = input.files?.[0];
+      if (!file || !activeCatId) return;
+
+      setIsCollectionPhotoAdding(true);
+
+      try {
+        const slug = getCollectionSlotPhotoSlug(slot);
+        const dataUrl = await resizeAndEncode(file, 900);
+
+        saveCollectionPhoto(activeCatId, slug, dataUrl);
+        setCollectionRefreshTick((value) => value + 1);
+        setIsCollectionPhotoSheetOpen(false);
+        showBoardCompletion("daily-collection-target");
+        showToast("コレクションに追加");
+        trackProductEvent(
+          "collection_photo_added",
+          {
+            slot_id: slot.id,
+            slot_slug: slug,
+            group_id: slot.group,
+            entry: "home_board",
+            file_size_bucket: getFileSizeBucket(file.size),
+          },
+          { localCatId: activeCatId },
+        );
+      } catch {
+        showToast("写真を保存できませんでした");
+      } finally {
+        setIsCollectionPhotoAdding(false);
+      }
+    };
+
+    input.click();
+  }
+
   function handleDiscoveryClick() {
     if (!activeCatId || !discovery.available) return;
 
@@ -667,6 +759,10 @@ export function HomeInput({ recentEvents: _recentEvents }: HomeInputProps) {
     }
     if (actionType === "open_photo") {
       void handleHomePhotoSelect();
+      return;
+    }
+    if (actionType === "open_collection_photo") {
+      setIsCollectionPhotoSheetOpen(true);
       return;
     }
     if (actionType === "open_discovery") {
@@ -754,6 +850,7 @@ export function HomeInput({ recentEvents: _recentEvents }: HomeInputProps) {
         items={boardItems}
         records={recordLog}
         onAction={handleBoardAction}
+        completedItemId={completedBoardItemId}
       />
 
       {isYousuOpen ? (
@@ -802,6 +899,17 @@ export function HomeInput({ recentEvents: _recentEvents }: HomeInputProps) {
           lead={personalityInsight.body}
           body={personalityInsight.sheetBody}
           onClose={() => setIsRecentChangeSheetOpen(false)}
+        />
+      ) : null}
+
+      {isCollectionPhotoSheetOpen && dailyCollectionTarget ? (
+        <CollectionQuickPhotoSheet
+          slot={dailyCollectionTarget}
+          isAdding={isCollectionPhotoAdding}
+          onAdd={() => {
+            void handleCollectionPhotoAdd(dailyCollectionTarget);
+          }}
+          onClose={() => setIsCollectionPhotoSheetOpen(false)}
         />
       ) : null}
 
@@ -941,6 +1049,46 @@ function InfoSheet({
   );
 }
 
+function CollectionQuickPhotoSheet({
+  slot,
+  isAdding,
+  onAdd,
+  onClose,
+}: {
+  slot: CollectionSlot;
+  isAdding: boolean;
+  onAdd: () => void;
+  onClose: () => void;
+}) {
+  return (
+    <AppBottomSheet title="今日の1枚" onClose={onClose}>
+      <div style={styles.collectionQuickBody}>
+        <div style={styles.collectionQuickTarget}>
+          <span style={styles.collectionQuickThumb} aria-hidden="true">
+            <img
+              src={slot.iconPath}
+              alt=""
+              style={styles.collectionQuickIcon}
+            />
+          </span>
+          <span style={styles.collectionQuickText}>
+            <span style={styles.collectionQuickLabel}>見つけたい姿</span>
+            <span style={styles.collectionQuickName}>{slot.label}</span>
+          </span>
+        </div>
+        <button
+          type="button"
+          style={styles.collectionQuickButton}
+          onClick={onAdd}
+          disabled={isAdding}
+        >
+          {isAdding ? "追加中..." : "写真を追加"}
+        </button>
+      </div>
+    </AppBottomSheet>
+  );
+}
+
 function AccountRestoreSheet({
   summary,
   isRestoring,
@@ -1033,15 +1181,16 @@ function HomeBulletinBoard({
   items,
   records,
   onAction,
+  completedItemId,
 }: {
   catName: string;
   items: HomeBoardItem[];
   records: RecordLogItem[];
   onAction: (actionType: HomeBoardAction) => void;
+  completedItemId: string | null;
 }) {
   const [isOpen, setIsOpen] = useState(false);
   const [touchStartY, setTouchStartY] = useState<number | null>(null);
-  const boardRailRef = useRef<HTMLDivElement | null>(null);
   const displayItems =
     items.length > 0
       ? items
@@ -1085,10 +1234,6 @@ function HomeBulletinBoard({
   const unreadCount = displayItems.filter((item) => item.isUnread).length;
   const latestRecord = records[0] ?? null;
 
-  useEffect(() => {
-    boardRailRef.current?.scrollTo({ left: 0, behavior: "auto" });
-  }, [catName, peekItems.length, isOpen]);
-
   function handleTouchStart(event: TouchEvent<HTMLDivElement>) {
     setTouchStartY(event.touches[0]?.clientY ?? null);
   }
@@ -1112,7 +1257,7 @@ function HomeBulletinBoard({
       style={isOpen ? styles.boardExpanded : styles.boardPeek}
       onTouchStart={handleTouchStart}
       onTouchEnd={handleTouchEnd}
-      aria-label="あなたへのおすすめ"
+      aria-label={isOpen ? "あなたへのおすすめ" : "すぐ残す"}
     >
       <button
         type="button"
@@ -1123,7 +1268,7 @@ function HomeBulletinBoard({
         <span style={styles.boardHandle} aria-hidden="true" />
       </button>
 
-      <div style={styles.boardHeader}>
+      {isOpen ? <div style={styles.boardHeader}>
         <span style={styles.boardHeaderIcon} aria-hidden="true">
           <SharedSparklesIcon size={18} />
         </span>
@@ -1131,20 +1276,23 @@ function HomeBulletinBoard({
           <span style={styles.boardTitle}>あなたへのおすすめ</span>
         </span>
         {unreadCount > 0 ? <span style={styles.boardHeaderMeta}>新着</span> : null}
-      </div>
+      </div> : null}
 
       {!isOpen ? (
-        <div style={styles.boardRailFrame}>
-          <div ref={boardRailRef} style={styles.boardRail} aria-label="おすすめカード">
-            {peekItems.map((item, index) => (
+        <div style={styles.boardDockFrame}>
+          <div style={styles.boardDock} aria-label="すぐ残す">
+            {peekItems.map((item) => (
               <button
                 key={item.id}
                 type="button"
                 disabled={item.isDisabled}
                 style={{
-                  ...styles.boardCard,
-                  ...(index === 0 ? styles.boardCardPrimary : {}),
+                  ...styles.boardDockCard,
+                  ...getBoardDockCardStyle(item),
                   ...(item.isDisabled ? styles.boardCardDisabled : {}),
+                  ...(completedItemId === item.id
+                    ? styles.boardDockCardCompleted
+                    : {}),
                 }}
                 onClick={() => onAction(item.actionType)}
               >
@@ -1301,10 +1449,37 @@ function BoardIcon({ icon }: { icon: HomeBoardItem["icon"] }) {
 }
 
 function getBoardPeekItems(items: HomeBoardItem[]) {
-  const quickItems = items.filter((item) => QUICK_BOARD_ITEM_IDS.has(item.id));
-  const nextItem = items.find((item) => !QUICK_BOARD_ITEM_IDS.has(item.id));
+  const orderedIds = ["today-mikke", "daily-collection-target", "today-care"];
+  const orderedItems = orderedIds
+    .map((id) => items.find((item) => item.id === id))
+    .filter((item): item is HomeBoardItem => Boolean(item));
 
-  return [...quickItems, ...(nextItem ? [nextItem] : [])].slice(0, 3);
+  if (orderedItems.length >= 3) {
+    return orderedItems.slice(0, 3);
+  }
+
+  const fallbackItems = items.filter(
+    (item) => !orderedItems.some((orderedItem) => orderedItem.id === item.id),
+  );
+
+  return [...orderedItems, ...fallbackItems].slice(0, 3);
+}
+
+function getBoardDockCardStyle(item: HomeBoardItem): CSSProperties {
+  if (!item.cooldownProgress) {
+    return {};
+  }
+
+  const progress = Math.max(0, Math.min(1, item.cooldownProgress));
+  const degrees = Math.round(progress * 360);
+
+  return {
+    borderColor: "transparent",
+    background: [
+      "linear-gradient(rgba(42,36,34,0.48), rgba(42,36,34,0.48)) padding-box",
+      `conic-gradient(from -90deg, rgba(255,255,255,0.78) 0deg ${degrees}deg, rgba(255,255,255,0.16) ${degrees}deg 360deg) border-box`,
+    ].join(", "),
+  };
 }
 
 function buildPersonalityInsight(
@@ -1420,6 +1595,8 @@ function buildHomeBoardItems({
   collectionTargetLabel,
   yousuRemaining,
   mugiRemaining,
+  yousuCooldownProgress,
+  mugiCooldownProgress,
 }: {
   catName: string;
   discoveryAvailable: boolean;
@@ -1428,6 +1605,8 @@ function buildHomeBoardItems({
   collectionTargetLabel: string | null;
   yousuRemaining: string | null;
   mugiRemaining: string | null;
+  yousuCooldownProgress: number | null;
+  mugiCooldownProgress: number | null;
 }): HomeBoardItem[] {
   const items: HomeBoardItem[] = [];
   const latestRecord = recordLog[0];
@@ -1444,6 +1623,7 @@ function buildHomeBoardItems({
     actionType: "open_mikke",
     isDisabled: Boolean(yousuRemaining),
     surfaceText: yousuRemaining ? yousuRemaining : "ようす",
+    cooldownProgress: yousuCooldownProgress ?? undefined,
   });
 
   items.push({
@@ -1457,6 +1637,7 @@ function buildHomeBoardItems({
     actionType: "open_care",
     isDisabled: Boolean(mugiRemaining),
     surfaceText: mugiRemaining ? mugiRemaining : "したこと",
+    cooldownProgress: mugiCooldownProgress ?? undefined,
   });
 
   if (discoveryAvailable) {
@@ -1505,11 +1686,11 @@ function buildHomeBoardItems({
       id: "daily-collection-target",
       kind: "collection",
       priority: 45,
-      title: "見つけたい姿",
+      title: "写真",
       body: `${catName}の${collectionTargetLabel}`,
       icon: "camera",
-      actionLabel: "探す",
-      actionType: "go_collection",
+      actionLabel: "今日の1枚",
+      actionType: "open_collection_photo",
       surfaceText: collectionTargetLabel,
     });
   }
@@ -1581,6 +1762,32 @@ function saveRecord(
     getRecordLogKey(catId),
     JSON.stringify([nextRecord, ...records].slice(0, 200)),
   );
+}
+
+function saveCollectionPhoto(catId: string, slug: string, dataUrl: string) {
+  try {
+    const raw = window.localStorage.getItem(STORAGE_KEYS.collectionPhotos);
+    const all = raw
+      ? (JSON.parse(raw) as Record<string, Record<string, string[] | string>>)
+      : {};
+
+    all[catId] ??= {};
+    all[catId][slug] = [
+      ...normalizeStoredPhotoList(all[catId][slug]),
+      dataUrl,
+    ];
+    window.localStorage.setItem(STORAGE_KEYS.collectionPhotos, JSON.stringify(all));
+  } catch {
+    // Keep the home flow usable even if local photo storage fails.
+  }
+}
+
+function normalizeStoredPhotoList(value: string[] | string | undefined) {
+  if (typeof value === "string") {
+    return [value];
+  }
+
+  return value ?? [];
 }
 
 function toCssUrl(src: string) {
@@ -1657,6 +1864,21 @@ function getRemainingTime(lockData: LockData, type: LockType, now = Date.now()) 
     2,
     "0",
   )}`;
+}
+
+function getCooldownProgress(
+  lockData: LockData,
+  type: LockType,
+  now = Date.now(),
+) {
+  const field = type === "yousu" ? "yousuLockedUntil" : "mugiLockedUntil";
+  const remaining = (lockData[field] || 0) - now;
+
+  if (remaining <= 0) {
+    return null;
+  }
+
+  return Math.min(1, remaining / (60 * 60 * 1000));
 }
 
 function getTodayJST() {
@@ -1933,7 +2155,7 @@ const styles = {
     bottom: 0,
     zIndex: 18,
     width: "100%",
-    height: "264px",
+    height: "218px",
     paddingBottom: "calc(84px + env(safe-area-inset-bottom))",
     boxSizing: "border-box",
     border: "none",
@@ -2035,6 +2257,16 @@ const styles = {
     padding: "0 0 10px",
     scrollSnapType: "x mandatory",
     overscrollBehaviorX: "contain",
+  },
+  boardDockFrame: {
+    width: HOME_NAV_FRAME_WIDTH,
+    margin: "2px auto 0",
+    overflow: "visible",
+  },
+  boardDock: {
+    display: "grid",
+    gridTemplateColumns: "repeat(3, minmax(0, 1fr))",
+    gap: "8px",
   },
   boardOpenContent: {
     height: "calc(100% - 70px)",
@@ -2183,6 +2415,34 @@ const styles = {
   },
   boardCardPrimary: {
     background: "rgba(54,47,43,0.5)",
+  },
+  boardDockCard: {
+    position: "relative",
+    minWidth: 0,
+    minHeight: "94px",
+    border: "0.5px solid rgba(255,255,255,0.22)",
+    borderRadius: "18px",
+    background: "rgba(42,36,34,0.44)",
+    color: "rgba(255,255,255,0.94)",
+    display: "flex",
+    flexDirection: "column",
+    alignItems: "flex-start",
+    justifyContent: "space-between",
+    gap: "8px",
+    padding: "12px 11px",
+    textAlign: "left",
+    cursor: "pointer",
+    backdropFilter: "blur(24px)",
+    WebkitBackdropFilter: "blur(24px)",
+    boxShadow:
+      "0 10px 28px rgba(0,0,0,0.18), inset 0 1px 0 rgba(255,255,255,0.14)",
+    transition:
+      "background 0.18s ease, border-color 0.18s ease, transform 0.18s ease, opacity 0.18s ease",
+  },
+  boardDockCardCompleted: {
+    background: "rgba(255,255,255,0.18)",
+    borderColor: "rgba(255,255,255,0.48)",
+    transform: "translateY(-2px)",
   },
   boardCardDisabled: {
     cursor: "default",
@@ -2452,6 +2712,68 @@ const styles = {
     fontSize: "13px",
     fontWeight: 500,
     lineHeight: 1.75,
+  },
+  collectionQuickBody: {
+    marginTop: "18px",
+    display: "grid",
+    gap: "14px",
+  },
+  collectionQuickTarget: {
+    border: "0.5px solid rgba(255,255,255,0.16)",
+    borderRadius: "18px",
+    background: "rgba(255,255,255,0.10)",
+    padding: "14px",
+    display: "flex",
+    alignItems: "center",
+    gap: "12px",
+    backdropFilter: "blur(18px)",
+    WebkitBackdropFilter: "blur(18px)",
+    boxShadow: "inset 0 1px 0 rgba(255,255,255,0.12)",
+  },
+  collectionQuickThumb: {
+    width: "54px",
+    height: "54px",
+    borderRadius: "16px",
+    background: "rgba(255,255,255,0.10)",
+    display: "inline-flex",
+    alignItems: "center",
+    justifyContent: "center",
+    overflow: "hidden",
+    flexShrink: 0,
+  },
+  collectionQuickIcon: {
+    width: "46px",
+    height: "46px",
+    objectFit: "contain",
+    display: "block",
+  },
+  collectionQuickText: {
+    minWidth: 0,
+    display: "flex",
+    flexDirection: "column",
+    gap: "4px",
+  },
+  collectionQuickLabel: {
+    color: "rgba(255,255,255,0.56)",
+    fontSize: "12px",
+    fontWeight: 620,
+  },
+  collectionQuickName: {
+    color: "rgba(255,255,255,0.96)",
+    fontSize: "20px",
+    fontWeight: 680,
+    lineHeight: 1.2,
+  },
+  collectionQuickButton: {
+    width: "100%",
+    minHeight: "50px",
+    border: "0.5px solid rgba(255,255,255,0.2)",
+    borderRadius: "16px",
+    background: "rgba(255,255,255,0.94)",
+    color: "#2A2A28",
+    fontSize: "15px",
+    fontWeight: 680,
+    cursor: "pointer",
   },
   accountRestoreBody: {
     marginTop: "18px",
