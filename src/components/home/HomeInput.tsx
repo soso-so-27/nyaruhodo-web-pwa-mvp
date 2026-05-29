@@ -1081,14 +1081,14 @@ export function HomeInput({ recentEvents: _recentEvents }: HomeInputProps) {
             transform: translate3d(0, 0, 0) scale(1);
           }
         }
-        @keyframes boardCountdownEdgeEnter {
+        @keyframes boardCountdownRestEnter {
           from {
-            opacity: 0.35;
-            transform: scale(0.992);
+            opacity: 0;
+            transform: scaleX(0.96);
           }
           to {
             opacity: 1;
-            transform: scale(1);
+            transform: scaleX(1);
           }
         }
         @keyframes morphBloom {
@@ -1710,19 +1710,15 @@ function HomeBulletinBoard({
                     <span style={styles.boardDockSub}>{displaySurfaceText}</span>
                   </span>
                   {typeof item.cooldownProgress === "number" ? (
-                    <>
-                      <span
-                        style={styles.boardDockEdgeTrack}
-                        aria-hidden="true"
-                      />
+                    <span style={styles.boardDockCountdown} aria-hidden="true">
+                      <span style={styles.boardDockCountdownTrack} />
                       <span
                         style={{
-                          ...styles.boardDockEdgeProgress,
-                          ...getBoardDockEdgeStyle(item),
+                          ...styles.boardDockCountdownFill,
+                          ...getBoardDockCountdownStyle(item),
                         }}
-                        aria-hidden="true"
                       />
-                    </>
+                    </span>
                   ) : null}
                 </button>
               );
@@ -1906,17 +1902,15 @@ function getBoardPeekItems(items: HomeBoardItem[]) {
   return [...orderedItems, ...fallbackItems].slice(0, 3);
 }
 
-function getBoardDockEdgeStyle(item: HomeBoardItem): CSSProperties {
+function getBoardDockCountdownStyle(item: HomeBoardItem): CSSProperties {
   if (typeof item.cooldownProgress !== "number") {
     return {};
   }
 
   const progress = Math.max(0, Math.min(1, item.cooldownProgress));
-  const degrees = Math.round(progress * 360);
 
   return {
-    background:
-      `conic-gradient(from -90deg, rgba(255,255,255,0.98) 0deg ${degrees}deg, rgba(255,255,255,0) ${degrees}deg 360deg)`,
+    transform: `scaleX(${progress})`,
   };
 }
 
@@ -2905,7 +2899,7 @@ const styles = {
     alignItems: "flex-start",
     justifyContent: "space-between",
     gap: "7px",
-    padding: "10px 11px",
+    padding: "10px 11px 15px",
     boxSizing: "border-box",
     textAlign: "left",
     cursor: "pointer",
@@ -3012,34 +3006,32 @@ const styles = {
     boxShadow: "0 0 0 3px rgba(255,255,255,0.12)",
     flexShrink: 0,
   },
-  boardDockEdgeTrack: {
+  boardDockCountdown: {
     position: "absolute",
-    inset: "-3px",
-    borderRadius: "inherit",
-    padding: "3px",
-    background: "rgba(255,255,255,0.22)",
+    left: "12px",
+    right: "12px",
+    bottom: "9px",
+    height: "3px",
+    borderRadius: "999px",
+    overflow: "hidden",
     pointerEvents: "none",
-    zIndex: 3,
-    WebkitMask:
-      "linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0)",
-    WebkitMaskComposite: "xor",
-    maskComposite: "exclude",
+    zIndex: 2,
+    animation: "boardCountdownRestEnter 0.32s cubic-bezier(0.2, 0.8, 0.2, 1) both",
   },
-  boardDockEdgeProgress: {
+  boardDockCountdownTrack: {
     position: "absolute",
-    inset: "-3px",
+    inset: 0,
     borderRadius: "inherit",
-    padding: "3px",
-    pointerEvents: "none",
-    opacity: 1,
-    zIndex: 4,
-    filter: "drop-shadow(0 0 5px rgba(255,255,255,0.42))",
-    animation:
-      "boardCountdownEdgeEnter 0.46s cubic-bezier(0.2, 0.8, 0.2, 1) both",
-    WebkitMask:
-      "linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0)",
-    WebkitMaskComposite: "xor",
-    maskComposite: "exclude",
+    background: "rgba(255,255,255,0.13)",
+  },
+  boardDockCountdownFill: {
+    position: "absolute",
+    inset: 0,
+    borderRadius: "inherit",
+    background:
+      "linear-gradient(90deg, rgba(255,255,255,0.64), rgba(255,255,255,0.9))",
+    transformOrigin: "left center",
+    transition: "transform 0.42s cubic-bezier(0.2, 0.8, 0.2, 1)",
   },
   boardActionList: {
     display: "grid",
