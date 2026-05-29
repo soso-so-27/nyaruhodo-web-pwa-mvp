@@ -83,6 +83,12 @@ type HomeBoardItem = {
   cooldownProgress?: number;
 };
 
+type HomeBoardCompletion = {
+  itemId: string;
+  title: string;
+  surfaceText: string;
+};
+
 type PersonalityInsight = {
   body: string;
   surfaceText: string;
@@ -153,13 +159,13 @@ export function HomeInput({ recentEvents: _recentEvents }: HomeInputProps) {
     null,
   );
   const [toastText, setToastText] = useState("");
-  const [completedBoardItemId, setCompletedBoardItemId] = useState<string | null>(
-    null,
-  );
+  const [boardCompletion, setBoardCompletion] =
+    useState<HomeBoardCompletion | null>(null);
   const [collectionRefreshTick, setCollectionRefreshTick] = useState(0);
   const [discoveryDismissedToday, setDiscoveryDismissedToday] = useState(false);
   const hasTrackedHomeView = useRef(false);
   const hasTrackedGoogleAuthSuccess = useRef(false);
+  const toastTimerRef = useRef<number | null>(null);
   const completedBoardTimerRef = useRef<number | null>(null);
 
   useEffect(() => {
@@ -184,6 +190,9 @@ export function HomeInput({ recentEvents: _recentEvents }: HomeInputProps) {
 
   useEffect(() => {
     return () => {
+      if (toastTimerRef.current) {
+        window.clearTimeout(toastTimerRef.current);
+      }
       if (completedBoardTimerRef.current) {
         window.clearTimeout(completedBoardTimerRef.current);
       }
@@ -488,20 +497,32 @@ export function HomeInput({ recentEvents: _recentEvents }: HomeInputProps) {
 
   function showToast(message: string) {
     setToastText(message);
-    window.setTimeout(() => setToastText(""), 1500);
+
+    if (toastTimerRef.current) {
+      window.clearTimeout(toastTimerRef.current);
+    }
+
+    toastTimerRef.current = window.setTimeout(() => {
+      setToastText("");
+      toastTimerRef.current = null;
+    }, 1500);
   }
 
-  function showBoardCompletion(itemId: string) {
-    setCompletedBoardItemId(itemId);
+  function showBoardCompletion(
+    itemId: string,
+    title: string,
+    surfaceText: string,
+  ) {
+    setBoardCompletion({ itemId, title, surfaceText });
 
     if (completedBoardTimerRef.current) {
       window.clearTimeout(completedBoardTimerRef.current);
     }
 
     completedBoardTimerRef.current = window.setTimeout(() => {
-      setCompletedBoardItemId(null);
+      setBoardCompletion(null);
       completedBoardTimerRef.current = null;
-    }, 1200);
+    }, 1600);
   }
 
   function dismissAccountRestorePrompt() {
@@ -591,9 +612,8 @@ export function HomeInput({ recentEvents: _recentEvents }: HomeInputProps) {
     setSelectedYousu(value);
     setRecordLog(readRecordLog(activeCatId));
     setLockData(nextLockData);
-    showBoardCompletion("today-mikke");
-    showToast("みっけに追加");
-    window.setTimeout(() => setIsYousuOpen(false), 1000);
+    showBoardCompletion("today-mikke", value, "手がかりへ");
+    window.setTimeout(() => setIsYousuOpen(false), 260);
   }
 
   function recordMugi(value: string) {
@@ -614,15 +634,17 @@ export function HomeInput({ recentEvents: _recentEvents }: HomeInputProps) {
     setSelectedMugi(value);
     setRecordLog(readRecordLog(activeCatId));
     setLockData(nextLockData);
-    showBoardCompletion("today-care");
-    showToast("おせわに追加");
+    showBoardCompletion("today-care", value, "手がかりへ");
 
     window.setTimeout(() => {
       setIsMugiSheetOpen(false);
+    }, 260);
+
+    window.setTimeout(() => {
       if (Math.random() < 0.33) {
         setIsReactionSheetOpen(true);
       }
-    }, 500);
+    }, 1650);
   }
 
   function recordReaction(value: string) {
@@ -631,8 +653,7 @@ export function HomeInput({ recentEvents: _recentEvents }: HomeInputProps) {
     saveRecord(activeCatId, { type: "reaction", value });
     setSelectedReaction(value);
     setRecordLog(readRecordLog(activeCatId));
-    showToast("反応に追加");
-    window.setTimeout(() => setIsReactionSheetOpen(false), 500);
+    window.setTimeout(() => setIsReactionSheetOpen(false), 260);
   }
 
   async function handleHomePhotoSelect() {
@@ -713,8 +734,11 @@ export function HomeInput({ recentEvents: _recentEvents }: HomeInputProps) {
         saveCollectionPhoto(activeCatId, slug, dataUrl);
         setCollectionRefreshTick((value) => value + 1);
         setIsCollectionPhotoSheetOpen(false);
-        showBoardCompletion("daily-collection-target");
-        showToast("コレクションに追加");
+        showBoardCompletion(
+          "daily-collection-target",
+          slot.label,
+          "コレクションへ",
+        );
         trackProductEvent(
           "collection_photo_added",
           {
@@ -850,7 +874,7 @@ export function HomeInput({ recentEvents: _recentEvents }: HomeInputProps) {
         items={boardItems}
         records={recordLog}
         onAction={handleBoardAction}
-        completedItemId={completedBoardItemId}
+        completion={boardCompletion}
       />
 
       {isYousuOpen ? (
@@ -1181,13 +1205,13 @@ function HomeBulletinBoard({
   items,
   records,
   onAction,
-  completedItemId,
+  completion,
 }: {
   catName: string;
   items: HomeBoardItem[];
   records: RecordLogItem[];
   onAction: (actionType: HomeBoardAction) => void;
-  completedItemId: string | null;
+  completion: HomeBoardCompletion | null;
 }) {
   const [isOpen, setIsOpen] = useState(false);
   const [touchStartY, setTouchStartY] = useState<number | null>(null);
@@ -1233,6 +1257,12 @@ function HomeBulletinBoard({
   const supportItems = [...supportActionItems, ...secondaryCollectionItems];
   const unreadCount = displayItems.filter((item) => item.isUnread).length;
   const latestRecord = records[0] ?? null;
+
+  useEffect(() => {
+    if (completion) {
+      setIsOpen(false);
+    }
+  }, [completion]);
 
   function handleTouchStart(event: TouchEvent<HTMLDivElement>) {
     setTouchStartY(event.touches[0]?.clientY ?? null);
@@ -1281,33 +1311,61 @@ function HomeBulletinBoard({
       {!isOpen ? (
         <div style={styles.boardDockFrame}>
           <div style={styles.boardDock} aria-label="すぐ残す">
-            {peekItems.map((item) => (
-              <button
-                key={item.id}
-                type="button"
-                disabled={item.isDisabled}
-                style={{
-                  ...styles.boardDockCard,
-                  ...getBoardDockCardStyle(item),
-                  ...(item.isDisabled ? styles.boardCardDisabled : {}),
-                  ...(completedItemId === item.id
-                    ? styles.boardDockCardCompleted
-                    : {}),
-                }}
-                onClick={() => onAction(item.actionType)}
-              >
-                <span style={styles.boardCardTop}>
-                  <span style={styles.boardCardIcon} aria-hidden="true">
-                    <BoardIcon icon={item.icon} />
+            {peekItems.map((item) => {
+              const completed = completion?.itemId === item.id ? completion : null;
+              const displayTitle = completed?.title ?? item.title;
+              const displaySurfaceText =
+                completed?.surfaceText ?? item.surfaceText;
+
+              return (
+                <button
+                  key={item.id}
+                  type="button"
+                  disabled={item.isDisabled}
+                  style={{
+                    ...styles.boardDockCard,
+                    ...getBoardDockCardStyle(item),
+                    ...(item.cooldownProgress ? styles.boardDockCardCooldown : {}),
+                    ...(item.isDisabled ? styles.boardCardDisabled : {}),
+                    ...(completed ? styles.boardDockCardCompleted : {}),
+                  }}
+                  onClick={() => onAction(item.actionType)}
+                >
+                  <span style={styles.boardCardTop}>
+                    <span style={styles.boardCardIcon} aria-hidden="true">
+                      <BoardIcon icon={item.icon} />
+                    </span>
+                    {completed ? (
+                      <span style={styles.boardCompletionMark} aria-hidden="true">
+                        <svg
+                          viewBox="0 0 24 24"
+                          width="13"
+                          height="13"
+                          fill="none"
+                          stroke="currentColor"
+                          strokeWidth="2.6"
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                        >
+                          <path d="M20 6 9 17l-5-5" />
+                        </svg>
+                      </span>
+                    ) : item.isUnread ? (
+                      <span style={styles.boardUnreadDot} />
+                    ) : null}
                   </span>
-                  {item.isUnread ? <span style={styles.boardUnreadDot} /> : null}
-                </span>
-                <span style={styles.boardCardTitle}>{item.title}</span>
-                {item.surfaceText ? (
-                  <span style={styles.boardCardSub}>{item.surfaceText}</span>
-                ) : null}
-              </button>
-            ))}
+                  <span style={styles.boardCardTitle}>{displayTitle}</span>
+                  {displaySurfaceText ? (
+                    <span style={styles.boardCardSub}>{displaySurfaceText}</span>
+                  ) : null}
+                  {item.cooldownProgress ? (
+                    <span style={styles.boardCooldownTrack} aria-hidden="true">
+                      <span style={getBoardCooldownFillStyle(item.cooldownProgress)} />
+                    </span>
+                  ) : null}
+                </button>
+              );
+            })}
           </div>
         </div>
       ) : null}
@@ -1470,15 +1528,17 @@ function getBoardDockCardStyle(item: HomeBoardItem): CSSProperties {
     return {};
   }
 
-  const progress = Math.max(0, Math.min(1, item.cooldownProgress));
-  const degrees = Math.round(progress * 360);
-
   return {
-    borderColor: "transparent",
-    background: [
-      "linear-gradient(rgba(42,36,34,0.48), rgba(42,36,34,0.48)) padding-box",
-      `conic-gradient(from -90deg, rgba(255,255,255,0.78) 0deg ${degrees}deg, rgba(255,255,255,0.16) ${degrees}deg 360deg) border-box`,
-    ].join(", "),
+    borderColor: "rgba(255,255,255,0.32)",
+    background:
+      "linear-gradient(145deg, rgba(72,63,58,0.58), rgba(36,32,30,0.50))",
+  };
+}
+
+function getBoardCooldownFillStyle(progress: number): CSSProperties {
+  return {
+    ...styles.boardCooldownFill,
+    transform: `scaleX(${Math.max(0.02, Math.min(1, progress))})`,
   };
 }
 
@@ -1622,7 +1682,7 @@ function buildHomeBoardItems({
     actionLabel: yousuRemaining ? "待ち時間" : "ようす",
     actionType: "open_mikke",
     isDisabled: Boolean(yousuRemaining),
-    surfaceText: yousuRemaining ? yousuRemaining : "ようす",
+    surfaceText: yousuRemaining ? `あと ${yousuRemaining}` : "ようす",
     cooldownProgress: yousuCooldownProgress ?? undefined,
   });
 
@@ -1636,7 +1696,7 @@ function buildHomeBoardItems({
     actionLabel: mugiRemaining ? "待ち時間" : "したこと",
     actionType: "open_care",
     isDisabled: Boolean(mugiRemaining),
-    surfaceText: mugiRemaining ? mugiRemaining : "したこと",
+    surfaceText: mugiRemaining ? `あと ${mugiRemaining}` : "したこと",
     cooldownProgress: mugiCooldownProgress ?? undefined,
   });
 
@@ -2439,14 +2499,19 @@ const styles = {
     transition:
       "background 0.18s ease, border-color 0.18s ease, transform 0.18s ease, opacity 0.18s ease",
   },
+  boardDockCardCooldown: {
+    paddingBottom: "20px",
+  },
   boardDockCardCompleted: {
-    background: "rgba(255,255,255,0.18)",
-    borderColor: "rgba(255,255,255,0.48)",
+    background: "rgba(255,255,255,0.24)",
+    borderColor: "rgba(255,255,255,0.68)",
     transform: "translateY(-2px)",
+    boxShadow:
+      "0 14px 34px rgba(0,0,0,0.22), 0 0 0 3px rgba(255,255,255,0.08), inset 0 1px 0 rgba(255,255,255,0.28)",
   },
   boardCardDisabled: {
     cursor: "default",
-    opacity: 0.72,
+    opacity: 0.84,
   },
   boardCardTop: {
     width: "100%",
@@ -2461,6 +2526,20 @@ const styles = {
     display: "inline-flex",
     alignItems: "center",
     justifyContent: "center",
+  },
+  boardCompletionMark: {
+    position: "absolute",
+    top: "11px",
+    right: "11px",
+    width: "20px",
+    height: "20px",
+    borderRadius: "50%",
+    background: "rgba(255,255,255,0.92)",
+    color: "#2A2A28",
+    display: "inline-flex",
+    alignItems: "center",
+    justifyContent: "center",
+    boxShadow: "0 0 0 4px rgba(255,255,255,0.14)",
   },
   boardIconSvg: {
     width: "30px",
@@ -2491,6 +2570,25 @@ const styles = {
     fontWeight: 650,
     lineHeight: 1.15,
     fontVariantNumeric: "tabular-nums",
+  },
+  boardCooldownTrack: {
+    position: "absolute",
+    left: "11px",
+    right: "11px",
+    bottom: "9px",
+    height: "3px",
+    borderRadius: "99px",
+    background: "rgba(255,255,255,0.16)",
+    overflow: "hidden",
+  },
+  boardCooldownFill: {
+    display: "block",
+    width: "100%",
+    height: "100%",
+    borderRadius: "99px",
+    background: "rgba(255,255,255,0.86)",
+    transformOrigin: "left center",
+    transition: "transform 0.4s ease",
   },
   boardUnreadDot: {
     position: "absolute",
@@ -2653,11 +2751,14 @@ const styles = {
     cursor: "pointer",
     backdropFilter: "blur(18px)",
     WebkitBackdropFilter: "blur(18px)",
+    transition:
+      "background 0.16s ease, border-color 0.16s ease, color 0.16s ease, transform 0.16s ease",
   },
   yousuOptionSelected: {
     borderColor: "rgba(255,255,255,0.72)",
     background: "rgba(255,255,255,0.92)",
     color: "#2A2A28",
+    transform: "translateY(-1px)",
   },
   sheetGrid: {
     display: "grid",
@@ -2683,11 +2784,14 @@ const styles = {
     cursor: "pointer",
     backdropFilter: "blur(18px)",
     WebkitBackdropFilter: "blur(18px)",
+    transition:
+      "background 0.16s ease, border-color 0.16s ease, color 0.16s ease, transform 0.16s ease",
   },
   sheetOptionSelected: {
     borderColor: "rgba(255,255,255,0.72)",
     background: "rgba(255,255,255,0.92)",
     color: "#2A2A28",
+    transform: "translateY(-1px)",
   },
   infoSheetBody: {
     marginTop: "18px",
