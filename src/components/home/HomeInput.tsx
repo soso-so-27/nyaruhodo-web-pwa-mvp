@@ -1,7 +1,7 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
-import type { CSSProperties, TouchEvent } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import type { CSSProperties, MouseEvent, ReactNode, TouchEvent } from "react";
 import {
   getAccountSyncOverview,
   syncLocalDataWithAccount,
@@ -89,6 +89,24 @@ type HomeBoardCompletion = {
   surfaceText: string;
 };
 
+type HomeBoardTransitionSource = {
+  itemId: string;
+  rect: {
+    left: number;
+    top: number;
+    width: number;
+    height: number;
+  };
+  title: string;
+  surfaceText: string;
+  icon: HomeBoardItem["icon"];
+};
+
+type HomeBoardActionHandler = (
+  actionType: HomeBoardAction,
+  source?: HomeBoardTransitionSource,
+) => void;
+
 type PersonalityInsight = {
   body: string;
   surfaceText: string;
@@ -161,12 +179,18 @@ export function HomeInput({ recentEvents: _recentEvents }: HomeInputProps) {
   const [toastText, setToastText] = useState("");
   const [boardCompletion, setBoardCompletion] =
     useState<HomeBoardCompletion | null>(null);
+  const [boardSheetSource, setBoardSheetSource] =
+    useState<HomeBoardTransitionSource | null>(null);
+  const [boardSheetReturn, setBoardSheetReturn] =
+    useState<HomeBoardCompletion | null>(null);
+  const [isBoardSheetReturning, setIsBoardSheetReturning] = useState(false);
   const [collectionRefreshTick, setCollectionRefreshTick] = useState(0);
   const [discoveryDismissedToday, setDiscoveryDismissedToday] = useState(false);
   const hasTrackedHomeView = useRef(false);
   const hasTrackedGoogleAuthSuccess = useRef(false);
   const toastTimerRef = useRef<number | null>(null);
   const completedBoardTimerRef = useRef<number | null>(null);
+  const boardSheetReturnTimerRef = useRef<number | null>(null);
 
   useEffect(() => {
     const profiles = readCatProfiles();
@@ -195,6 +219,9 @@ export function HomeInput({ recentEvents: _recentEvents }: HomeInputProps) {
       }
       if (completedBoardTimerRef.current) {
         window.clearTimeout(completedBoardTimerRef.current);
+      }
+      if (boardSheetReturnTimerRef.current) {
+        window.clearTimeout(boardSheetReturnTimerRef.current);
       }
     };
   }, []);
@@ -525,6 +552,61 @@ export function HomeInput({ recentEvents: _recentEvents }: HomeInputProps) {
     }, 1600);
   }
 
+  function openBoardInput(
+    setOpen: (value: boolean) => void,
+    source?: HomeBoardTransitionSource,
+  ) {
+    if (boardSheetReturnTimerRef.current) {
+      window.clearTimeout(boardSheetReturnTimerRef.current);
+      boardSheetReturnTimerRef.current = null;
+    }
+
+    setBoardSheetSource(source ?? null);
+    setBoardSheetReturn(null);
+    setIsBoardSheetReturning(false);
+    setOpen(true);
+  }
+
+  function resetBoardInputMotion() {
+    setBoardSheetSource(null);
+    setBoardSheetReturn(null);
+    setIsBoardSheetReturning(false);
+  }
+
+  function closeBoardInput(
+    setOpen: (value: boolean) => void,
+    completion?: HomeBoardCompletion,
+  ) {
+    if (completion) {
+      showBoardCompletion(
+        completion.itemId,
+        completion.title,
+        completion.surfaceText,
+      );
+      setBoardSheetReturn(completion);
+    } else {
+      setBoardSheetReturn(null);
+    }
+
+    if (!boardSheetSource) {
+      setOpen(false);
+      resetBoardInputMotion();
+      return;
+    }
+
+    setIsBoardSheetReturning(true);
+
+    if (boardSheetReturnTimerRef.current) {
+      window.clearTimeout(boardSheetReturnTimerRef.current);
+    }
+
+    boardSheetReturnTimerRef.current = window.setTimeout(() => {
+      setOpen(false);
+      resetBoardInputMotion();
+      boardSheetReturnTimerRef.current = null;
+    }, 380);
+  }
+
   function dismissAccountRestorePrompt() {
     trackProductEvent(
       "account_restore_prompt_dismissed",
@@ -612,8 +694,11 @@ export function HomeInput({ recentEvents: _recentEvents }: HomeInputProps) {
     setSelectedYousu(value);
     setRecordLog(readRecordLog(activeCatId));
     setLockData(nextLockData);
-    showBoardCompletion("today-mikke", value, "手がかりへ");
-    window.setTimeout(() => setIsYousuOpen(false), 260);
+    closeBoardInput(setIsYousuOpen, {
+      itemId: "today-mikke",
+      title: value,
+      surfaceText: "手がかりへ",
+    });
   }
 
   function recordMugi(value: string) {
@@ -634,11 +719,11 @@ export function HomeInput({ recentEvents: _recentEvents }: HomeInputProps) {
     setSelectedMugi(value);
     setRecordLog(readRecordLog(activeCatId));
     setLockData(nextLockData);
-    showBoardCompletion("today-care", value, "手がかりへ");
-
-    window.setTimeout(() => {
-      setIsMugiSheetOpen(false);
-    }, 260);
+    closeBoardInput(setIsMugiSheetOpen, {
+      itemId: "today-care",
+      title: value,
+      surfaceText: "手がかりへ",
+    });
 
     window.setTimeout(() => {
       if (Math.random() < 0.33) {
@@ -733,12 +818,11 @@ export function HomeInput({ recentEvents: _recentEvents }: HomeInputProps) {
 
         saveCollectionPhoto(activeCatId, slug, dataUrl);
         setCollectionRefreshTick((value) => value + 1);
-        setIsCollectionPhotoSheetOpen(false);
-        showBoardCompletion(
-          "daily-collection-target",
-          slot.label,
-          "コレクションへ",
-        );
+        closeBoardInput(setIsCollectionPhotoSheetOpen, {
+          itemId: "daily-collection-target",
+          title: slot.label,
+          surfaceText: "コレクションへ",
+        });
         trackProductEvent(
           "collection_photo_added",
           {
@@ -768,16 +852,19 @@ export function HomeInput({ recentEvents: _recentEvents }: HomeInputProps) {
     setIsDiscoverySheetOpen(true);
   }
 
-  function handleBoardAction(actionType: HomeBoardAction) {
+  function handleBoardAction(
+    actionType: HomeBoardAction,
+    source?: HomeBoardTransitionSource,
+  ) {
     if (actionType === "open_mikke") {
       if (!isYousuLocked) {
-        setIsYousuOpen(true);
+        openBoardInput(setIsYousuOpen, source);
       }
       return;
     }
     if (actionType === "open_care") {
       if (!isMugiLocked) {
-        setIsMugiSheetOpen(true);
+        openBoardInput(setIsMugiSheetOpen, source);
       }
       return;
     }
@@ -786,7 +873,7 @@ export function HomeInput({ recentEvents: _recentEvents }: HomeInputProps) {
       return;
     }
     if (actionType === "open_collection_photo") {
-      setIsCollectionPhotoSheetOpen(true);
+      openBoardInput(setIsCollectionPhotoSheetOpen, source);
       return;
     }
     if (actionType === "open_discovery") {
@@ -880,10 +967,13 @@ export function HomeInput({ recentEvents: _recentEvents }: HomeInputProps) {
       {isYousuOpen ? (
         <YousuSheet
           title={`${catName}のようす`}
+          source={boardSheetSource}
+          returnCompletion={boardSheetReturn}
+          isReturning={isBoardSheetReturning}
           options={YOUSU_OPTIONS}
           selected={selectedYousu}
           isLocked={isYousuLocked}
-          onClose={() => setIsYousuOpen(false)}
+          onClose={() => closeBoardInput(setIsYousuOpen)}
           onSelect={recordYousu}
         />
       ) : null}
@@ -891,9 +981,12 @@ export function HomeInput({ recentEvents: _recentEvents }: HomeInputProps) {
       {isMugiSheetOpen ? (
         <ActionSheet
           title={`${catName}にしたこと`}
+          source={boardSheetSource}
+          returnCompletion={boardSheetReturn}
+          isReturning={isBoardSheetReturning}
           options={MUGI_OPTIONS}
           selected={selectedMugi}
-          onClose={() => setIsMugiSheetOpen(false)}
+          onClose={() => closeBoardInput(setIsMugiSheetOpen)}
           onSelect={recordMugi}
         />
       ) : null}
@@ -929,11 +1022,14 @@ export function HomeInput({ recentEvents: _recentEvents }: HomeInputProps) {
       {isCollectionPhotoSheetOpen && dailyCollectionTarget ? (
         <CollectionQuickPhotoSheet
           slot={dailyCollectionTarget}
+          source={boardSheetSource}
+          returnCompletion={boardSheetReturn}
+          isReturning={isBoardSheetReturning}
           isAdding={isCollectionPhotoAdding}
           onAdd={() => {
             void handleCollectionPhotoAdd(dailyCollectionTarget);
           }}
-          onClose={() => setIsCollectionPhotoSheetOpen(false)}
+          onClose={() => closeBoardInput(setIsCollectionPhotoSheetOpen)}
         />
       ) : null}
 
@@ -985,6 +1081,20 @@ export function HomeInput({ recentEvents: _recentEvents }: HomeInputProps) {
             transform: translate3d(0, 0, 0) scale(1);
           }
         }
+        @keyframes morphBloom {
+          0% {
+            opacity: 0;
+            transform: scale(0.92);
+          }
+          36% {
+            opacity: 0.72;
+            transform: scale(1.035);
+          }
+          100% {
+            opacity: 0;
+            transform: scale(1.12);
+          }
+        }
         @media (prefers-reduced-motion: reduce) {
           * {
             animation-duration: 0.01ms !important;
@@ -996,8 +1106,173 @@ export function HomeInput({ recentEvents: _recentEvents }: HomeInputProps) {
   );
 }
 
+function HomeMorphSheet({
+  title,
+  source,
+  returnCompletion,
+  isReturning,
+  onClose,
+  children,
+}: {
+  title: string;
+  source: HomeBoardTransitionSource | null;
+  returnCompletion: HomeBoardCompletion | null;
+  isReturning: boolean;
+  onClose: () => void;
+  children: ReactNode;
+}) {
+  const panelRef = useRef<HTMLElement | null>(null);
+  const openTimerRef = useRef<number | null>(null);
+  const [isContentReady, setIsContentReady] = useState(false);
+  const [motionStyle, setMotionStyle] = useState<CSSProperties>(() => ({
+    opacity: 0,
+    transform: "translate3d(0, 14px, 0) scale(0.985)",
+  }));
+  const compactTitle = returnCompletion?.title ?? source?.title ?? title;
+  const compactSub = returnCompletion?.surfaceText ?? source?.surfaceText ?? "";
+  const sourceKey = source
+    ? `${source.itemId}:${Math.round(source.rect.left)}:${Math.round(source.rect.top)}`
+    : "no-source";
+
+  function getSourceTransform() {
+    const panel = panelRef.current;
+    if (!panel || !source) {
+      return "translate3d(0, 14px, 0) scale(0.985)";
+    }
+
+    const target = panel.getBoundingClientRect();
+    const scaleX = source.rect.width / Math.max(target.width, 1);
+    const scaleY = source.rect.height / Math.max(target.height, 1);
+    const translateX = source.rect.left - target.left;
+    const translateY = source.rect.top - target.top;
+
+    return `translate3d(${translateX}px, ${translateY}px, 0) scale(${scaleX}, ${scaleY})`;
+  }
+
+  useLayoutEffect(() => {
+    const fromTransform = getSourceTransform();
+
+    setIsContentReady(false);
+    setMotionStyle({
+      opacity: source ? 0.86 : 0,
+      transform: fromTransform,
+      transition: "none",
+      borderRadius: source ? "18px" : "24px",
+    });
+
+    const enterFrame = window.requestAnimationFrame(() => {
+      setMotionStyle({
+        opacity: 1,
+        transform: "translate3d(0, 0, 0) scale(1)",
+        transition:
+          "transform 340ms cubic-bezier(0.2, 0.8, 0.2, 1), opacity 180ms ease-out, border-radius 340ms cubic-bezier(0.2, 0.8, 0.2, 1)",
+        borderRadius: "24px",
+      });
+    });
+
+    openTimerRef.current = window.setTimeout(() => {
+      setIsContentReady(true);
+      openTimerRef.current = null;
+    }, 145);
+
+    return () => {
+      window.cancelAnimationFrame(enterFrame);
+      if (openTimerRef.current) {
+        window.clearTimeout(openTimerRef.current);
+        openTimerRef.current = null;
+      }
+    };
+  }, [sourceKey]);
+
+  useEffect(() => {
+    if (!isReturning) return;
+
+    if (openTimerRef.current) {
+      window.clearTimeout(openTimerRef.current);
+      openTimerRef.current = null;
+    }
+
+    setIsContentReady(false);
+    setMotionStyle({
+      opacity: 0.92,
+      transform: getSourceTransform(),
+      transition:
+        "transform 340ms cubic-bezier(0.4, 0, 0.6, 1), opacity 260ms ease-in, border-radius 340ms cubic-bezier(0.4, 0, 0.6, 1)",
+      borderRadius: "18px",
+    });
+  }, [isReturning]);
+
+  const compactOpacity = isReturning || !isContentReady ? 1 : 0;
+  const contentOpacity = isReturning ? 0 : isContentReady ? 1 : 0;
+
+  return (
+    <>
+      <div
+        style={{
+          ...styles.morphBackdrop,
+          ...(isReturning ? styles.morphBackdropReturning : {}),
+        }}
+        onClick={onClose}
+      />
+      <section
+        ref={panelRef}
+        style={{
+          ...styles.morphPanel,
+          ...motionStyle,
+        }}
+        role="dialog"
+        aria-modal="true"
+      >
+        <span style={styles.morphBloom} aria-hidden="true" />
+        <button
+          type="button"
+          style={{
+            ...styles.morphHandleButton,
+            opacity: isReturning || !isContentReady ? 0 : 1,
+          }}
+          onClick={onClose}
+          aria-label="閉じる"
+        >
+          <span style={styles.morphHandle} aria-hidden="true" />
+        </button>
+        {source ? (
+          <div
+            style={{
+              ...styles.morphCompact,
+              opacity: compactOpacity,
+            }}
+            aria-hidden={!isReturning && isContentReady}
+          >
+            <span style={styles.morphCompactIcon}>
+              <BoardIcon icon={source.icon} />
+            </span>
+            <span style={styles.morphCompactText}>
+              <span style={styles.morphCompactTitle}>{compactTitle}</span>
+              {compactSub ? (
+                <span style={styles.morphCompactSub}>{compactSub}</span>
+              ) : null}
+            </span>
+          </div>
+        ) : null}
+        <div
+          style={{
+            ...styles.morphContent,
+            opacity: contentOpacity,
+          }}
+        >
+          <p style={styles.morphTitle}>{title}</p>
+          {children}
+        </div>
+      </section>
+    </>
+  );
+}
+
 function YousuSheet({
   title,
+  source,
+  returnCompletion,
+  isReturning,
   options,
   selected,
   isLocked,
@@ -1005,6 +1280,9 @@ function YousuSheet({
   onSelect,
 }: {
   title: string;
+  source: HomeBoardTransitionSource | null;
+  returnCompletion: HomeBoardCompletion | null;
+  isReturning: boolean;
   options: string[];
   selected: string | null;
   isLocked: boolean;
@@ -1012,7 +1290,13 @@ function YousuSheet({
   onSelect: (value: string) => void;
 }) {
   return (
-    <AppBottomSheet title={title} onClose={onClose}>
+    <HomeMorphSheet
+      title={title}
+      source={source}
+      returnCompletion={returnCompletion}
+      isReturning={isReturning}
+      onClose={onClose}
+    >
       <div style={styles.yousuSheetGrid}>
         {options.map((option) => (
           <button
@@ -1030,41 +1314,65 @@ function YousuSheet({
           </button>
         ))}
       </div>
-    </AppBottomSheet>
+    </HomeMorphSheet>
   );
 }
 
 function ActionSheet({
   title,
+  source,
+  returnCompletion,
+  isReturning,
   options,
   selected,
   onClose,
   onSelect,
 }: {
   title: string;
+  source?: HomeBoardTransitionSource | null;
+  returnCompletion?: HomeBoardCompletion | null;
+  isReturning?: boolean;
   options: string[];
   selected: string | null;
   onClose: () => void;
   onSelect: (value: string) => void;
 }) {
+  const content = (
+    <div style={styles.sheetGrid}>
+      {options.map((option) => (
+        <button
+          key={option}
+          type="button"
+          onClick={() => onSelect(option)}
+          style={{
+            ...styles.sheetOption,
+            ...(selected === option ? styles.sheetOptionSelected : {}),
+          }}
+        >
+          {option}
+        </button>
+      ))}
+    </div>
+  );
+
+  if (source === undefined) {
+    return (
+      <AppBottomSheet title={title} onClose={onClose}>
+        {content}
+      </AppBottomSheet>
+    );
+  }
+
   return (
-    <AppBottomSheet title={title} onClose={onClose}>
-      <div style={styles.sheetGrid}>
-        {options.map((option) => (
-          <button
-            key={option}
-            type="button"
-            onClick={() => onSelect(option)}
-            style={{
-              ...styles.sheetOption,
-              ...(selected === option ? styles.sheetOptionSelected : {}),
-            }}
-          >
-            {option}
-          </button>
-        ))}
-      </div>
-    </AppBottomSheet>
+    <HomeMorphSheet
+      title={title}
+      source={source}
+      returnCompletion={returnCompletion ?? null}
+      isReturning={Boolean(isReturning)}
+      onClose={onClose}
+    >
+      {content}
+    </HomeMorphSheet>
   );
 }
 
@@ -1091,17 +1399,29 @@ function InfoSheet({
 
 function CollectionQuickPhotoSheet({
   slot,
+  source,
+  returnCompletion,
+  isReturning,
   isAdding,
   onAdd,
   onClose,
 }: {
   slot: CollectionSlot;
+  source: HomeBoardTransitionSource | null;
+  returnCompletion: HomeBoardCompletion | null;
+  isReturning: boolean;
   isAdding: boolean;
   onAdd: () => void;
   onClose: () => void;
 }) {
   return (
-    <AppBottomSheet title="今日の1枚" onClose={onClose}>
+    <HomeMorphSheet
+      title="今日の1枚"
+      source={source}
+      returnCompletion={returnCompletion}
+      isReturning={isReturning}
+      onClose={onClose}
+    >
       <div style={styles.collectionQuickBody}>
         <div style={styles.collectionQuickTarget}>
           <span style={styles.collectionQuickThumb} aria-hidden="true">
@@ -1125,7 +1445,7 @@ function CollectionQuickPhotoSheet({
           {isAdding ? "追加中..." : "写真を追加"}
         </button>
       </div>
-    </AppBottomSheet>
+    </HomeMorphSheet>
   );
 }
 
@@ -1226,7 +1546,7 @@ function HomeBulletinBoard({
   catName: string;
   items: HomeBoardItem[];
   records: RecordLogItem[];
-  onAction: (actionType: HomeBoardAction) => void;
+  onAction: HomeBoardActionHandler;
   completion: HomeBoardCompletion | null;
 }) {
   const [isOpen, setIsOpen] = useState(false);
@@ -1356,7 +1676,17 @@ function HomeBulletinBoard({
                     ...(item.isDisabled ? styles.boardCardDisabled : {}),
                     ...(completed ? styles.boardDockCardCompleted : {}),
                   }}
-                  onClick={() => onAction(item.actionType)}
+                  onClick={(event) =>
+                    onAction(
+                      item.actionType,
+                      getBoardTransitionSource(
+                        event,
+                        item,
+                        displayTitle,
+                        displaySurfaceText,
+                      ),
+                    )
+                  }
                 >
                   <span style={styles.boardDockTop}>
                     <span style={styles.boardDockIcon} aria-hidden="true">
@@ -1467,7 +1797,7 @@ function BoardQuickActions({
   onAction,
 }: {
   items: HomeBoardItem[];
-  onAction: (actionType: HomeBoardAction) => void;
+  onAction: HomeBoardActionHandler;
 }) {
   return (
     <div style={styles.boardQuickActions}>
@@ -1502,7 +1832,7 @@ function BoardOpenSection({
 }: {
   title: string;
   items: HomeBoardItem[];
-  onAction: (actionType: HomeBoardAction) => void;
+  onAction: HomeBoardActionHandler;
 }) {
   return (
     <>
@@ -1532,6 +1862,28 @@ function BoardOpenSection({
       </div>
     </>
   );
+}
+
+function getBoardTransitionSource(
+  event: MouseEvent<HTMLElement>,
+  item: HomeBoardItem,
+  title = item.title,
+  surfaceText = item.surfaceText ?? item.body,
+): HomeBoardTransitionSource {
+  const rect = event.currentTarget.getBoundingClientRect();
+
+  return {
+    itemId: item.id,
+    rect: {
+      left: rect.left,
+      top: rect.top,
+      width: rect.width,
+      height: rect.height,
+    },
+    title,
+    surfaceText,
+    icon: item.icon,
+  };
 }
 
 function BoardIcon({ icon }: { icon: HomeBoardItem["icon"] }) {
@@ -2775,6 +3127,122 @@ const styles = {
     borderColor: "rgba(255,255,255,0.10)",
     background: "rgba(255,255,255,0.06)",
     color: "rgba(255,255,255,0.58)",
+  },
+  morphBackdrop: {
+    position: "fixed",
+    inset: 0,
+    zIndex: 60,
+    background: "rgba(13,11,10,0.34)",
+    backdropFilter: "blur(2px)",
+    WebkitBackdropFilter: "blur(2px)",
+    transition: "opacity 220ms ease",
+  },
+  morphBackdropReturning: {
+    opacity: 0,
+  },
+  morphPanel: {
+    position: "fixed",
+    left: HOME_NAV_EDGE_INSET,
+    right: HOME_NAV_EDGE_INSET,
+    bottom: "calc(86px + env(safe-area-inset-bottom))",
+    zIndex: 61,
+    maxWidth: "410px",
+    margin: "0 auto",
+    border: "0.5px solid rgba(255,255,255,0.2)",
+    background:
+      "linear-gradient(145deg, rgba(58,51,47,0.78), rgba(26,23,22,0.86))",
+    color: "rgba(255,255,255,0.94)",
+    boxShadow:
+      "0 18px 54px rgba(0,0,0,0.32), inset 0 1px 0 rgba(255,255,255,0.16)",
+    backdropFilter: "blur(28px)",
+    WebkitBackdropFilter: "blur(28px)",
+    padding: "10px 16px 18px",
+    overflow: "hidden",
+    transformOrigin: "top left",
+    willChange: "transform, opacity",
+  },
+  morphBloom: {
+    position: "absolute",
+    inset: "-1px",
+    pointerEvents: "none",
+    borderRadius: "inherit",
+    background:
+      "radial-gradient(circle at 24% 10%, rgba(255,255,255,0.34), rgba(255,255,255,0) 34%), linear-gradient(120deg, rgba(255,255,255,0.2), rgba(255,255,255,0) 58%)",
+    mixBlendMode: "screen",
+    animation: "morphBloom 420ms cubic-bezier(0.2, 0.8, 0.2, 1) both",
+  },
+  morphHandleButton: {
+    width: "100%",
+    border: "none",
+    background: "transparent",
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    padding: "0 0 12px",
+    cursor: "pointer",
+    position: "relative",
+    zIndex: 2,
+  },
+  morphHandle: {
+    width: "42px",
+    height: "4px",
+    borderRadius: "999px",
+    background: "rgba(255,255,255,0.36)",
+  },
+  morphCompact: {
+    position: "absolute",
+    inset: "12px",
+    display: "flex",
+    alignItems: "center",
+    gap: "10px",
+    transition: "opacity 140ms ease",
+    pointerEvents: "none",
+    zIndex: 2,
+  },
+  morphCompactIcon: {
+    width: "30px",
+    height: "30px",
+    display: "inline-flex",
+    alignItems: "center",
+    justifyContent: "center",
+    color: "rgba(255,255,255,0.9)",
+    flexShrink: 0,
+  },
+  morphCompactText: {
+    minWidth: 0,
+    display: "flex",
+    flexDirection: "column",
+    gap: "3px",
+  },
+  morphCompactTitle: {
+    color: "rgba(255,255,255,0.96)",
+    fontSize: "14px",
+    fontWeight: 650,
+    lineHeight: 1.2,
+    overflow: "hidden",
+    textOverflow: "ellipsis",
+    whiteSpace: "nowrap",
+  },
+  morphCompactSub: {
+    color: "rgba(255,255,255,0.62)",
+    fontSize: "12px",
+    fontWeight: 560,
+    lineHeight: 1.18,
+    overflow: "hidden",
+    textOverflow: "ellipsis",
+    whiteSpace: "nowrap",
+  },
+  morphContent: {
+    position: "relative",
+    zIndex: 2,
+    transition: "opacity 150ms ease",
+  },
+  morphTitle: {
+    margin: 0,
+    color: "rgba(255,255,255,0.96)",
+    fontSize: "17px",
+    fontWeight: 660,
+    lineHeight: 1.35,
   },
   yousuPanel: {
     border: "0.5px solid #E0DDD6",
