@@ -962,12 +962,28 @@ export function HomeInput({ recentEvents: _recentEvents }: HomeInputProps) {
       <BottomNavigation active="today" />
       <style>{`
         @keyframes slideUp {
-          from { transform: translateY(100%); }
-          to { transform: translateY(0); }
+          from {
+            opacity: 0;
+            transform: translate3d(0, 18px, 0) scale(0.985);
+          }
+          to {
+            opacity: 1;
+            transform: translate3d(0, 0, 0) scale(1);
+          }
         }
         @keyframes toastIn {
           from { opacity: 0; transform: translate(-50%, -8px); }
           to { opacity: 1; transform: translate(-50%, 0); }
+        }
+        @keyframes boardCardSettle {
+          from {
+            opacity: 0;
+            transform: translate3d(0, 8px, 0) scale(0.985);
+          }
+          to {
+            opacity: 1;
+            transform: translate3d(0, 0, 0) scale(1);
+          }
         }
         @media (prefers-reduced-motion: reduce) {
           * {
@@ -1289,14 +1305,16 @@ function HomeBulletinBoard({
       onTouchEnd={handleTouchEnd}
       aria-label={isOpen ? "あなたへのおすすめ" : "すぐ残す"}
     >
-      <button
-        type="button"
-        style={styles.boardHandleButton}
-        onClick={() => setIsOpen((value) => !value)}
-        aria-label={isOpen ? "おすすめを閉じる" : "おすすめを開く"}
-      >
-        <span style={styles.boardHandle} aria-hidden="true" />
-      </button>
+      {isOpen ? (
+        <button
+          type="button"
+          style={styles.boardHandleButton}
+          onClick={() => setIsOpen(false)}
+          aria-label="おすすめを閉じる"
+        >
+          <span style={styles.boardHandle} aria-hidden="true" />
+        </button>
+      ) : null}
 
       {isOpen ? <div style={styles.boardHeader}>
         <span style={styles.boardHeaderIcon} aria-hidden="true">
@@ -1310,7 +1328,18 @@ function HomeBulletinBoard({
 
       {!isOpen ? (
         <div style={styles.boardDockFrame}>
-          <div style={styles.boardDock} aria-label="すぐ残す">
+          <button
+            type="button"
+            style={styles.boardDockHeader}
+            onClick={() => setIsOpen(true)}
+            aria-label="おすすめを開く"
+          >
+            <span style={styles.boardDockHeaderIcon} aria-hidden="true">
+              <SharedSparklesIcon size={15} />
+            </span>
+            <span style={styles.boardDockHeaderText}>あなたへのおすすめ</span>
+          </button>
+          <div style={styles.boardDock} aria-label="あなたへのおすすめ">
             {peekItems.map((item) => {
               const completed = completion?.itemId === item.id ? completion : null;
               const displayTitle = completed?.title ?? item.title;
@@ -1329,15 +1358,8 @@ function HomeBulletinBoard({
                   }}
                   onClick={() => onAction(item.actionType)}
                 >
-                  <span
-                    style={{
-                      ...styles.boardDockCircle,
-                      ...getBoardDockCircleStyle(item),
-                      ...(completed ? styles.boardDockCircleCompleted : {}),
-                    }}
-                    aria-hidden="true"
-                  >
-                    <span style={styles.boardDockCircleInner}>
+                  <span style={styles.boardDockTop}>
+                    <span style={styles.boardDockIcon} aria-hidden="true">
                       <BoardIcon icon={item.icon} />
                     </span>
                     {completed ? (
@@ -1359,8 +1381,20 @@ function HomeBulletinBoard({
                       <span style={styles.boardUnreadDot} />
                     ) : null}
                   </span>
-                  <span style={styles.boardDockLabel}>{displayTitle}</span>
-                  <span style={styles.boardDockSub}>{displaySurfaceText}</span>
+                  <span style={styles.boardDockText}>
+                    <span style={styles.boardDockLabel}>{displayTitle}</span>
+                    <span style={styles.boardDockSub}>{displaySurfaceText}</span>
+                  </span>
+                  {typeof item.cooldownProgress === "number" ? (
+                    <span style={styles.boardDockProgressTrack} aria-hidden="true">
+                      <span
+                        style={{
+                          ...styles.boardDockProgressFill,
+                          ...getBoardDockProgressStyle(item),
+                        }}
+                      />
+                    </span>
+                  ) : null}
                 </button>
               );
             })}
@@ -1521,17 +1555,15 @@ function getBoardPeekItems(items: HomeBoardItem[]) {
   return [...orderedItems, ...fallbackItems].slice(0, 3);
 }
 
-function getBoardDockCircleStyle(item: HomeBoardItem): CSSProperties {
-  if (!item.cooldownProgress) {
+function getBoardDockProgressStyle(item: HomeBoardItem): CSSProperties {
+  if (typeof item.cooldownProgress !== "number") {
     return {};
   }
 
   const progress = Math.max(0, Math.min(1, item.cooldownProgress));
-  const degrees = Math.round(progress * 360);
 
   return {
-    borderColor: "transparent",
-    background: `conic-gradient(from -90deg, rgba(255,255,255,0.92) 0deg ${degrees}deg, rgba(255,255,255,0.18) ${degrees}deg 360deg)`,
+    transform: `scaleX(${progress})`,
   };
 }
 
@@ -1739,10 +1771,10 @@ function buildHomeBoardItems({
       id: "daily-collection-target",
       kind: "collection",
       priority: 45,
-      title: "写真",
+      title: "今日の1枚",
       body: `${catName}の${collectionTargetLabel}`,
       icon: "camera",
-      actionLabel: "今日の1枚",
+      actionLabel: "写真",
       actionType: "open_collection_photo",
       surfaceText: collectionTargetLabel,
     });
@@ -2208,18 +2240,20 @@ const styles = {
     bottom: 0,
     zIndex: 18,
     width: "100%",
-    height: "218px",
+    height: "232px",
     paddingBottom: "calc(84px + env(safe-area-inset-bottom))",
     boxSizing: "border-box",
     border: "none",
     borderRadius: 0,
     background:
-      "linear-gradient(to top, rgba(18,16,15,0.42) 0%, rgba(18,16,15,0.22) 48%, rgba(18,16,15,0) 100%)",
+      "linear-gradient(to top, rgba(18,16,15,0.58) 0%, rgba(18,16,15,0.34) 42%, rgba(18,16,15,0.02) 100%)",
     boxShadow: "none",
     backdropFilter: "none",
     WebkitBackdropFilter: "none",
     overflow: "hidden",
-    transition: "height 0.24s ease, transform 0.24s ease, background 0.24s ease",
+    transition:
+      "height 0.28s cubic-bezier(0.2, 0.8, 0.2, 1), transform 0.28s cubic-bezier(0.2, 0.8, 0.2, 1), background 0.28s cubic-bezier(0.2, 0.8, 0.2, 1)",
+    willChange: "transform",
   },
   boardExpanded: {
     position: "fixed",
@@ -2237,7 +2271,9 @@ const styles = {
     backdropFilter: "blur(30px)",
     WebkitBackdropFilter: "blur(30px)",
     overflow: "hidden",
-    transition: "height 0.24s ease, transform 0.24s ease, background 0.24s ease",
+    transition:
+      "height 0.28s cubic-bezier(0.2, 0.8, 0.2, 1), transform 0.28s cubic-bezier(0.2, 0.8, 0.2, 1), background 0.28s cubic-bezier(0.2, 0.8, 0.2, 1)",
+    willChange: "transform",
   },
   boardHandleButton: {
     width: "100%",
@@ -2313,14 +2349,48 @@ const styles = {
   },
   boardDockFrame: {
     width: HOME_NAV_FRAME_WIDTH,
-    margin: "2px auto 0",
+    margin: "0 auto",
     overflow: "visible",
   },
+  boardDockHeader: {
+    border: "none",
+    background: "transparent",
+    color: "rgba(255,255,255,0.72)",
+    display: "inline-flex",
+    alignItems: "center",
+    gap: "7px",
+    padding: "0 0 9px",
+    margin: 0,
+    textAlign: "left",
+    cursor: "pointer",
+    textShadow: "0 1px 12px rgba(0,0,0,0.34)",
+  },
+  boardDockHeaderIcon: {
+    width: "18px",
+    height: "18px",
+    display: "inline-flex",
+    alignItems: "center",
+    justifyContent: "center",
+    color: "rgba(255,255,255,0.78)",
+    flexShrink: 0,
+  },
+  boardDockHeaderText: {
+    fontSize: "13px",
+    fontWeight: 610,
+    letterSpacing: 0,
+    whiteSpace: "nowrap",
+  },
   boardDock: {
-    display: "grid",
-    gridTemplateColumns: "repeat(3, minmax(0, 1fr))",
-    gap: "8px",
-    alignItems: "start",
+    width: `calc(100vw - ${HOME_NAV_EDGE_INSET})`,
+    display: "flex",
+    gap: "10px",
+    alignItems: "stretch",
+    overflowX: "auto",
+    overflowY: "visible",
+    scrollbarWidth: "none",
+    padding: "0 0 8px",
+    scrollSnapType: "x mandatory",
+    overscrollBehaviorX: "contain",
   },
   boardOpenContent: {
     height: "calc(100% - 70px)",
@@ -2472,72 +2542,62 @@ const styles = {
   },
   boardDockCard: {
     position: "relative",
-    minWidth: 0,
-    minHeight: "98px",
-    border: "none",
-    borderRadius: "20px",
-    background: "transparent",
+    width: "min(148px, calc((100vw - 56px) / 2.14))",
+    minWidth: "min(148px, calc((100vw - 56px) / 2.14))",
+    minHeight: "88px",
+    border: "0.5px solid rgba(255,255,255,0.22)",
+    borderRadius: "18px",
+    background:
+      "linear-gradient(145deg, rgba(72,64,60,0.46), rgba(38,34,32,0.38))",
     color: "rgba(255,255,255,0.94)",
     display: "flex",
     flexDirection: "column",
-    alignItems: "center",
-    justifyContent: "flex-start",
-    gap: "5px",
-    padding: "0 2px",
-    textAlign: "center",
+    alignItems: "flex-start",
+    justifyContent: "space-between",
+    gap: "10px",
+    padding: "12px 12px 11px",
+    boxSizing: "border-box",
+    textAlign: "left",
     cursor: "pointer",
+    scrollSnapAlign: "start",
+    backdropFilter: "blur(24px)",
+    WebkitBackdropFilter: "blur(24px)",
+    boxShadow:
+      "0 12px 30px rgba(0,0,0,0.18), inset 0 1px 0 rgba(255,255,255,0.15)",
     transition:
-      "transform 0.18s ease, opacity 0.18s ease",
+      "transform 0.2s cubic-bezier(0.2, 0.8, 0.2, 1), opacity 0.2s cubic-bezier(0.2, 0.8, 0.2, 1), border-color 0.2s cubic-bezier(0.2, 0.8, 0.2, 1)",
+    animation: "boardCardSettle 0.28s cubic-bezier(0.2, 0.8, 0.2, 1) both",
+    willChange: "transform, opacity",
   },
   boardDockCardCompleted: {
-    transform: "translateY(-2px)",
+    transform: "translateY(-2px) scale(1.015)",
+    borderColor: "rgba(255,255,255,0.54)",
+    background:
+      "linear-gradient(145deg, rgba(255,255,255,0.28), rgba(58,52,48,0.48))",
   },
   boardCardDisabled: {
     cursor: "default",
     opacity: 0.84,
   },
-  boardDockCircle: {
-    position: "relative",
-    width: "64px",
-    height: "64px",
-    borderRadius: "50%",
-    border: "0.5px solid rgba(255,255,255,0.24)",
-    background: "rgba(54,48,44,0.48)",
-    color: "rgba(255,255,255,0.94)",
+  boardDockTop: {
+    width: "100%",
     display: "flex",
     alignItems: "center",
-    justifyContent: "center",
-    padding: "2px",
-    boxSizing: "border-box",
-    boxShadow:
-      "0 12px 30px rgba(0,0,0,0.22), inset 0 1px 0 rgba(255,255,255,0.18)",
-    backdropFilter: "blur(24px)",
-    WebkitBackdropFilter: "blur(24px)",
-    transition:
-      "background 0.18s ease, border-color 0.18s ease, box-shadow 0.18s ease, transform 0.18s ease",
+    justifyContent: "space-between",
+    minHeight: "28px",
   },
-  boardDockCircleInner: {
-    width: "100%",
-    height: "100%",
-    borderRadius: "50%",
-    background:
-      "linear-gradient(145deg, rgba(74,65,59,0.68), rgba(37,33,31,0.54))",
+  boardDockIcon: {
+    width: "30px",
+    height: "30px",
+    color: "rgba(255,255,255,0.9)",
     display: "inline-flex",
     alignItems: "center",
     justifyContent: "center",
-  },
-  boardDockCircleCompleted: {
-    background: "rgba(255,255,255,0.94)",
-    borderColor: "rgba(255,255,255,0.72)",
-    boxShadow:
-      "0 14px 34px rgba(0,0,0,0.24), 0 0 0 4px rgba(255,255,255,0.1), inset 0 1px 0 rgba(255,255,255,0.3)",
+    flexShrink: 0,
   },
   boardCompletionMark: {
-    position: "absolute",
-    top: "-2px",
-    right: "-2px",
-    width: "20px",
-    height: "20px",
+    width: "21px",
+    height: "21px",
     borderRadius: "50%",
     background: "rgba(255,255,255,0.92)",
     color: "#2A2A28",
@@ -2556,11 +2616,18 @@ const styles = {
     strokeLinecap: "round",
     strokeLinejoin: "round",
   },
+  boardDockText: {
+    minWidth: 0,
+    width: "100%",
+    display: "flex",
+    flexDirection: "column",
+    gap: "3px",
+  },
   boardDockLabel: {
     color: "rgba(255,255,255,0.96)",
-    fontSize: "12px",
-    fontWeight: 660,
-    lineHeight: 1.18,
+    fontSize: "14px",
+    fontWeight: 640,
+    lineHeight: 1.22,
     overflow: "hidden",
     textOverflow: "ellipsis",
     whiteSpace: "nowrap",
@@ -2569,10 +2636,10 @@ const styles = {
     textShadow: "0 1px 10px rgba(0,0,0,0.28)",
   },
   boardDockSub: {
-    color: "rgba(255,255,255,0.66)",
-    fontSize: "11px",
-    fontWeight: 620,
-    lineHeight: 1.15,
+    color: "rgba(255,255,255,0.62)",
+    fontSize: "12px",
+    fontWeight: 560,
+    lineHeight: 1.18,
     fontVariantNumeric: "tabular-nums",
     overflow: "hidden",
     textOverflow: "ellipsis",
@@ -2581,14 +2648,29 @@ const styles = {
     textShadow: "0 1px 10px rgba(0,0,0,0.28)",
   },
   boardUnreadDot: {
-    position: "absolute",
-    top: "6px",
-    right: "6px",
     width: "7px",
     height: "7px",
     borderRadius: "50%",
     background: "rgba(255,255,255,0.92)",
     boxShadow: "0 0 0 3px rgba(255,255,255,0.12)",
+    flexShrink: 0,
+  },
+  boardDockProgressTrack: {
+    width: "100%",
+    height: "2px",
+    borderRadius: "999px",
+    background: "rgba(255,255,255,0.16)",
+    overflow: "hidden",
+    transform: "translateZ(0)",
+  },
+  boardDockProgressFill: {
+    display: "block",
+    width: "100%",
+    height: "100%",
+    borderRadius: "999px",
+    background: "rgba(255,255,255,0.68)",
+    transformOrigin: "left center",
+    transition: "transform 0.28s cubic-bezier(0.2, 0.8, 0.2, 1)",
   },
   boardActionList: {
     display: "grid",
@@ -2742,7 +2824,8 @@ const styles = {
     backdropFilter: "blur(18px)",
     WebkitBackdropFilter: "blur(18px)",
     transition:
-      "background 0.16s ease, border-color 0.16s ease, color 0.16s ease, transform 0.16s ease",
+      "background 0.16s cubic-bezier(0.2, 0.8, 0.2, 1), border-color 0.16s cubic-bezier(0.2, 0.8, 0.2, 1), color 0.16s cubic-bezier(0.2, 0.8, 0.2, 1), transform 0.16s cubic-bezier(0.2, 0.8, 0.2, 1)",
+    willChange: "transform",
   },
   yousuOptionSelected: {
     borderColor: "rgba(255,255,255,0.72)",
@@ -2775,7 +2858,8 @@ const styles = {
     backdropFilter: "blur(18px)",
     WebkitBackdropFilter: "blur(18px)",
     transition:
-      "background 0.16s ease, border-color 0.16s ease, color 0.16s ease, transform 0.16s ease",
+      "background 0.16s cubic-bezier(0.2, 0.8, 0.2, 1), border-color 0.16s cubic-bezier(0.2, 0.8, 0.2, 1), color 0.16s cubic-bezier(0.2, 0.8, 0.2, 1), transform 0.16s cubic-bezier(0.2, 0.8, 0.2, 1)",
+    willChange: "transform",
   },
   sheetOptionSelected: {
     borderColor: "rgba(255,255,255,0.72)",

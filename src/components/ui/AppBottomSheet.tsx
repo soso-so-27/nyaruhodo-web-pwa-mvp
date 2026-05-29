@@ -46,6 +46,7 @@ const styles = {
     zIndex: 60,
     backdropFilter: "blur(2px)",
     WebkitBackdropFilter: "blur(2px)",
+    willChange: "opacity",
   },
   sheet: {
     position: "fixed",
@@ -62,7 +63,9 @@ const styles = {
     backdropFilter: "blur(28px)",
     WebkitBackdropFilter: "blur(28px)",
     padding: "10px 16px calc(40px + env(safe-area-inset-bottom))",
-    animation: "slideUp 0.22s ease-out",
+    transformOrigin: "50% 100%",
+    animation: "slideUp 0.28s cubic-bezier(0.2, 0.8, 0.2, 1)",
+    willChange: "transform, opacity",
   },
   handle: {
     width: "42px",
