@@ -106,6 +106,7 @@ type HomeBoardActionHandler = (
 ) => void;
 
 type PersonalityInsight = {
+  title: string;
   body: string;
   surfaceText: string;
   sheetBody: string;
@@ -707,7 +708,7 @@ export function HomeInput({ recentEvents: _recentEvents }: HomeInputProps) {
     closeBoardInput(setIsYousuOpen, {
       itemId: "today-mikke",
       title: value,
-      surfaceText: "手がかりへ",
+      surfaceText: "見返せます",
     });
   }
 
@@ -732,7 +733,7 @@ export function HomeInput({ recentEvents: _recentEvents }: HomeInputProps) {
     closeBoardInput(setIsMugiSheetOpen, {
       itemId: "today-care",
       title: value,
-      surfaceText: "手がかりへ",
+      surfaceText: "見返せます",
     });
 
     window.setTimeout(() => {
@@ -1013,7 +1014,7 @@ export function HomeInput({ recentEvents: _recentEvents }: HomeInputProps) {
 
       {isDiscoverySheetOpen ? (
         <InfoSheet
-          title="見えてきたこと"
+          title={personalityInsight.title}
           lead={personalityInsight.body}
           body={personalityInsight.sheetBody}
           onClose={() => setIsDiscoverySheetOpen(false)}
@@ -1022,7 +1023,7 @@ export function HomeInput({ recentEvents: _recentEvents }: HomeInputProps) {
 
       {isRecentChangeSheetOpen ? (
         <InfoSheet
-          title="見えてきたこと"
+          title={personalityInsight.title}
           lead={personalityInsight.body}
           body={personalityInsight.sheetBody}
           onClose={() => setIsRecentChangeSheetOpen(false)}
@@ -1733,15 +1734,12 @@ function HomeBulletinBoard({
               }}
               onClick={() => onAction(heroItem.actionType)}
             >
-              <span style={styles.boardHeroTop}>
-                <span style={styles.boardHeroIcon} aria-hidden="true">
-                  <BoardIcon icon={heroItem.icon} />
-                </span>
+              <span style={styles.boardHeroKickerRow}>
+                <span style={styles.boardHeroKicker}>{heroItem.title}</span>
                 {heroItem.isUnread ? (
                   <span style={styles.boardHeroBadge}>新着</span>
                 ) : null}
               </span>
-              <span style={styles.boardHeroKicker}>{heroItem.title}</span>
               <span style={styles.boardHeroStatement}>{heroItem.body}</span>
             </button>
           ) : null}
@@ -1775,9 +1773,6 @@ function BoardShelfSummary({
 
   return (
     <div style={styles.boardShelf}>
-      <div style={styles.boardSectionHeader}>
-        <span style={styles.boardSectionTitle}>たまってきた</span>
-      </div>
       <div style={styles.boardShelfGrid}>
         {stats.map((stat) => (
           <span key={stat.label} style={styles.boardShelfTile}>
@@ -1924,28 +1919,31 @@ function buildPersonalityInsight(
 
   if (!latestRecord) {
     return {
-      body: `${catName}を見かけたら、まずはひとつ。`,
-      surfaceText: "はじめる",
+      title: "にゃるほど",
+      body: `${catName}の姿が、ここに少しずつ集まります。`,
+      surfaceText: "これから",
       sheetBody:
-        "最初は正確に分析しようとしなくて大丈夫です。見かけた瞬間をひとつ残すことが、この子らしさの入口になります。",
+        "最初から何かを分かろうとしなくて大丈夫です。見かけた姿が少しずつ増えると、あとからこの子らしさとして見返しやすくなります。",
     };
   }
 
   if (latestRecord.type === "mugi") {
     return {
-      body: `「${latestRecord.value}」は残っています。次は反応もひとつ。`,
+      title: "にゃるほど",
+      body: `「${latestRecord.value}」のあとが残ると、見返しやすくなります。`,
       surfaceText: "反応を足す",
       sheetBody:
-        "してあげたことだけでなく、その後の反応まで残すと、喜びやすい距離・苦手な距離が少しずつ分かれていきます。",
+        "したことだけだと出来事で止まります。その後の反応が少し残ると、距離感や受け取り方をあとから比べやすくなります。",
     };
   }
 
   if (careRecords.length >= 2 && reactionRecords.length === 0) {
     return {
-      body: "おせわは残っています。反応があると見返しやすくなります。",
+      title: "にゃるほど",
+      body: "したことは残っています。反応があると、違いを見返しやすくなります。",
       surfaceText: "反応待ち",
       sheetBody:
-        "おせわの記録に反応がつながると、ただの回数ではなく「この子には何が合いやすいか」を見返しやすくなります。",
+        "同じおせわでも、その後の反応が違うことがあります。そこが残ると、回数ではなく関わり方の違いとして見返せます。",
     };
   }
 
@@ -1957,44 +1955,49 @@ function buildPersonalityInsight(
   ) {
     if (topYousu.value === "ねてる") {
       return {
-        body: "「ねてる」が少し多め。次は起きた直後もひとつ。",
+        title: "にゃるほど",
+        body: "「ねてる」が少し多め。起きた直後があると、違いも残ります。",
         surfaceText: "違いを見る",
         sheetBody:
-          "猫は寝ている時間が長いので、寝ている回数だけでは特徴になりにくいことがあります。起きた直後や移動した後を残すと、この子らしさが見えやすくなります。",
+          "猫は寝ている時間が長いので、寝ている姿だけでは特徴になりにくいことがあります。起きた直後や移動した後が少し残ると、違いとして見返しやすくなります。",
       };
     }
 
     return {
-      body: `「${topYousu.value}」が何度か出ています。前後も残ると比べやすいです。`,
+      title: "にゃるほど",
+      body: `「${topYousu.value}」が何度か出ています。前後があると、比べやすくなります。`,
       surfaceText: "くり返し",
       sheetBody:
-        "同じようすが繰り返し出てきたら、次は時間・直前の出来事・その後の反応を足すと、単なる記録から特徴に変わっていきます。",
+        "同じようすが何度か出てきたら、時間や直前の出来事が少しあるだけで、ただの回数より見返しやすくなります。",
     };
   }
 
   if (latestRecord.type === "yousu") {
     return {
-      body: `「${latestRecord.value}」が残っています。次は前後もひとつ。`,
+      title: "にゃるほど",
+      body: `「${latestRecord.value}」が残っています。前後があると、あとで見やすくなります。`,
       surfaceText: "前後を見る",
       sheetBody:
-        "ようすだけを残すより、その前後に声をかけたか、なでたか、そっとしたかが残ると、この子の流れが見えやすくなります。",
+        "ようすだけでも残りますが、前後に声をかけたか、なでたか、そっとしたかがあると、その日の流れとして見返しやすくなります。",
     };
   }
 
   if (recordLog.length >= 7) {
     return {
-      body: "手がかりが増えてきました。違う時間もひとつ。",
+      title: "にゃるほど",
+      body: "場面が増えてきました。違う時間もあると、幅が残ります。",
       surfaceText: "幅を見る",
       sheetBody:
-        "同じ場面だけでなく、少し違う時間や距離で残すと、この子らしさの幅がトリセツに残りやすくなります。",
+        "同じ場面だけでなく、少し違う時間や距離の姿もあると、あとから見たときに幅として残りやすくなります。",
     };
   }
 
   return {
-    body: `${catName}の違う場面もひとつ。`,
+    title: "にゃるほど",
+    body: `${catName}の違う場面も残ると、あとで見返しやすくなります。`,
     surfaceText: "少しずつ",
     sheetBody:
-      "大きな変化を探さなくても大丈夫です。少し違う表情や距離感を残すだけで、あとから見返せる手がかりになります。",
+      "大きな変化を探さなくても大丈夫です。少し違う表情や距離感が残るだけで、あとから見返せるものになります。",
   };
 }
 
@@ -2073,7 +2076,7 @@ function buildHomeBoardItems({
       id: "daily-discovery",
       kind: "insight",
       priority: 10,
-      title: "手がかり",
+      title: personalityInsight.title,
       body: personalityInsight.body,
       icon: "heart",
       actionLabel: "見返す",
@@ -2086,7 +2089,7 @@ function buildHomeBoardItems({
       id: "personality-insight",
       kind: "insight",
       priority: 10,
-      title: "手がかり",
+      title: personalityInsight.title,
       body: personalityInsight.body,
       icon: "heart",
       actionLabel: "見返す",
@@ -2114,7 +2117,7 @@ function buildHomeBoardItems({
       id: "daily-collection-target",
       kind: "collection",
       priority: 45,
-      title: "まだない姿",
+      title: "今日のコレクション",
       body: "見つけたら、写真の棚に入ります。",
       icon: "camera",
       actionLabel: "写真で残す",
@@ -2602,20 +2605,21 @@ const styles = {
     position: "fixed",
     left: 0,
     right: 0,
-    bottom: 0,
+    bottom: "calc(76px + env(safe-area-inset-bottom))",
     zIndex: 18,
     width: "100%",
-    height: "min(74dvh, 640px)",
-    border: "none",
-    borderTop: "0.5px solid rgba(255,255,255,0.34)",
-    borderRadius: "30px 30px 0 0",
+    height: "auto",
+    maxHeight: "min(calc(100dvh - 112px - env(safe-area-inset-bottom)), 560px)",
+    border: "0.5px solid rgba(255,255,255,0.24)",
+    borderRadius: "30px",
     background: "rgba(34,29,28,0.56)",
-    boxShadow: "0 -18px 48px rgba(0,0,0,0.26), inset 0 1px 0 rgba(255,255,255,0.16)",
+    boxShadow:
+      "0 -10px 36px rgba(0,0,0,0.2), 0 12px 34px rgba(0,0,0,0.14), inset 0 1px 0 rgba(255,255,255,0.16)",
     backdropFilter: "blur(30px)",
     WebkitBackdropFilter: "blur(30px)",
     overflow: "hidden",
     transition:
-      "height 0.28s cubic-bezier(0.2, 0.8, 0.2, 1), transform 0.28s cubic-bezier(0.2, 0.8, 0.2, 1), background 0.28s cubic-bezier(0.2, 0.8, 0.2, 1)",
+      "max-height 0.28s cubic-bezier(0.2, 0.8, 0.2, 1), transform 0.28s cubic-bezier(0.2, 0.8, 0.2, 1), background 0.28s cubic-bezier(0.2, 0.8, 0.2, 1)",
     willChange: "transform",
   },
   boardOpenHandleButton: {
@@ -2707,42 +2711,36 @@ const styles = {
     zIndex: 1,
   },
   boardOpenContent: {
-    height: "calc(100% - 36px)",
+    height: "auto",
+    maxHeight: "min(calc(100dvh - 156px - env(safe-area-inset-bottom)), 524px)",
     overflowY: "auto",
-    padding: `0 ${HOME_NAV_EDGE_INSET} calc(112px + env(safe-area-inset-bottom))`,
+    padding: `0 ${HOME_NAV_EDGE_INSET} 18px`,
     boxSizing: "border-box",
   },
   boardHeroCard: {
     width: "100%",
-    border: "0.5px solid rgba(255,255,255,0.2)",
-    borderRadius: "22px",
+    border: "0.5px solid rgba(255,255,255,0.18)",
+    borderRadius: "24px",
     background:
-      "linear-gradient(145deg, rgba(255,255,255,0.18), rgba(255,255,255,0.08))",
+      "linear-gradient(150deg, rgba(255,255,255,0.16), rgba(255,255,255,0.07))",
     color: "rgba(255,255,255,0.94)",
     display: "flex",
     flexDirection: "column",
     alignItems: "flex-start",
-    gap: "8px",
-    padding: "16px 16px 15px",
-    marginBottom: "14px",
+    gap: "10px",
+    padding: "17px 17px 18px",
+    marginBottom: "10px",
     textAlign: "left",
     cursor: "pointer",
     boxShadow:
-      "0 14px 36px rgba(0,0,0,0.22), inset 0 1px 0 rgba(255,255,255,0.18)",
+      "0 12px 32px rgba(0,0,0,0.16), inset 0 1px 0 rgba(255,255,255,0.16)",
   },
-  boardHeroTop: {
+  boardHeroKickerRow: {
     width: "100%",
     display: "flex",
     alignItems: "center",
     justifyContent: "space-between",
-  },
-  boardHeroIcon: {
-    width: "32px",
-    height: "32px",
-    color: "rgba(255,255,255,0.92)",
-    display: "inline-flex",
-    alignItems: "center",
-    justifyContent: "center",
+    gap: "10px",
   },
   boardHeroBadge: {
     border: "0.5px solid rgba(255,255,255,0.2)",
@@ -2752,29 +2750,17 @@ const styles = {
     fontWeight: 620,
     padding: "3px 8px",
   },
-  boardHeroTitle: {
-    color: "rgba(255,255,255,0.96)",
-    fontSize: "18px",
-    fontWeight: 660,
-    lineHeight: 1.25,
-  },
-  boardHeroBody: {
-    color: "rgba(255,255,255,0.76)",
-    fontSize: "13px",
-    fontWeight: 540,
-    lineHeight: 1.55,
-  },
   boardHeroKicker: {
-    color: "rgba(255,255,255,0.58)",
-    fontSize: "11px",
-    fontWeight: 620,
+    color: "rgba(255,255,255,0.68)",
+    fontSize: "12px",
+    fontWeight: 640,
     lineHeight: 1.2,
   },
   boardHeroStatement: {
-    color: "rgba(255,255,255,0.94)",
-    fontSize: "16px",
-    fontWeight: 610,
-    lineHeight: 1.45,
+    color: "rgba(255,255,255,0.92)",
+    fontSize: "14.5px",
+    fontWeight: 540,
+    lineHeight: 1.58,
   },
   boardSectionHeader: {
     display: "flex",
@@ -2789,75 +2775,83 @@ const styles = {
     letterSpacing: 0,
   },
   boardShelf: {
-    margin: "0 0 15px",
+    margin: "0 0 10px",
   },
   boardShelfGrid: {
-    display: "grid",
-    gridTemplateColumns: "repeat(3, 1fr)",
-    gap: "8px",
+    display: "flex",
+    gap: "7px",
+    alignItems: "center",
   },
   boardShelfTile: {
-    minHeight: "74px",
-    border: "0.5px solid rgba(255,255,255,0.15)",
-    borderRadius: "17px",
-    background: "rgba(255,255,255,0.08)",
+    minWidth: 0,
+    flex: "1 1 0",
+    minHeight: "34px",
+    border: "0.5px solid rgba(255,255,255,0.13)",
+    borderRadius: "999px",
+    background: "rgba(255,255,255,0.07)",
     color: "rgba(255,255,255,0.92)",
     display: "flex",
-    flexDirection: "column",
-    alignItems: "flex-start",
-    justifyContent: "space-between",
-    padding: "10px 10px 9px",
+    alignItems: "baseline",
+    justifyContent: "center",
+    gap: "4px",
+    padding: "7px 9px",
     boxSizing: "border-box",
     backdropFilter: "blur(20px)",
     WebkitBackdropFilter: "blur(20px)",
-    boxShadow: "inset 0 1px 0 rgba(255,255,255,0.1)",
+    boxShadow: "inset 0 1px 0 rgba(255,255,255,0.08)",
   },
   boardShelfLabel: {
-    color: "rgba(255,255,255,0.56)",
-    fontSize: "11px",
-    fontWeight: 610,
+    color: "rgba(255,255,255,0.58)",
+    fontSize: "10.5px",
+    fontWeight: 590,
     lineHeight: 1.2,
+    whiteSpace: "nowrap",
   },
   boardShelfValue: {
     color: "rgba(255,255,255,0.94)",
-    fontSize: "22px",
-    fontWeight: 600,
+    fontSize: "14px",
+    fontWeight: 640,
     lineHeight: 1,
     fontVariantNumeric: "tabular-nums",
   },
   boardShelfDetail: {
-    color: "rgba(255,255,255,0.5)",
-    fontSize: "10.5px",
-    fontWeight: 560,
+    color: "rgba(255,255,255,0.44)",
+    fontSize: "10px",
+    fontWeight: 520,
     lineHeight: 1.15,
+    whiteSpace: "nowrap",
   },
   boardNextCard: {
     width: "100%",
-    minHeight: "88px",
-    border: "0.5px solid rgba(255,255,255,0.17)",
-    borderRadius: "20px",
+    minHeight: "92px",
+    border: "0.5px solid rgba(255,255,255,0.18)",
+    borderRadius: "22px",
     background:
-      "linear-gradient(145deg, rgba(255,255,255,0.12), rgba(255,255,255,0.07))",
+      "linear-gradient(145deg, rgba(255,255,255,0.13), rgba(255,255,255,0.075))",
     color: "rgba(255,255,255,0.94)",
     display: "grid",
-    gridTemplateColumns: "38px 1fr",
+    gridTemplateColumns: "42px 1fr",
     alignItems: "center",
     gap: "12px",
-    padding: "13px 14px",
+    padding: "14px 15px",
     boxSizing: "border-box",
     textAlign: "left",
     cursor: "pointer",
     backdropFilter: "blur(22px)",
     WebkitBackdropFilter: "blur(22px)",
-    boxShadow: "inset 0 1px 0 rgba(255,255,255,0.12)",
+    boxShadow:
+      "0 10px 26px rgba(0,0,0,0.12), inset 0 1px 0 rgba(255,255,255,0.12)",
   },
   boardNextIcon: {
-    width: "34px",
-    height: "34px",
+    width: "38px",
+    height: "38px",
+    borderRadius: "14px",
+    background: "rgba(255,255,255,0.08)",
     color: "rgba(255,255,255,0.88)",
     display: "inline-flex",
     alignItems: "center",
     justifyContent: "center",
+    boxShadow: "inset 0 1px 0 rgba(255,255,255,0.1)",
   },
   boardNextText: {
     minWidth: 0,
@@ -2866,7 +2860,7 @@ const styles = {
     gap: "3px",
   },
   boardNextKicker: {
-    color: "rgba(255,255,255,0.52)",
+    color: "rgba(255,255,255,0.58)",
     fontSize: "11px",
     fontWeight: 620,
     lineHeight: 1.2,
@@ -2881,7 +2875,7 @@ const styles = {
     whiteSpace: "nowrap",
   },
   boardNextBody: {
-    color: "rgba(255,255,255,0.58)",
+    color: "rgba(255,255,255,0.56)",
     fontSize: "12px",
     fontWeight: 520,
     lineHeight: 1.35,
