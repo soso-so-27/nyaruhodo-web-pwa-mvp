@@ -27,6 +27,7 @@ type LocalRecordLogItem = {
   type?: string;
   value?: string;
   timestamp?: number;
+  metadata?: Record<string, unknown>;
 };
 
 type LocalCollectionStore = Record<string, Record<string, string[] | string>>;
@@ -70,6 +71,7 @@ type RemoteRecordLogRow = {
   local_record_id: string | null;
   record_type: "yousu" | "mugi" | "reaction" | "photo";
   value: string;
+  metadata: Record<string, unknown> | null;
   occurred_at: string;
 };
 
@@ -521,7 +523,7 @@ async function syncRecordLogs(
         local_record_id: record.id ?? null,
         record_type: record.type,
         value: record.value,
-        metadata: SYNC_METADATA,
+        metadata: { ...SYNC_METADATA, ...(record.metadata ?? {}) },
         occurred_at: new Date(record.timestamp ?? Date.now()).toISOString(),
       }));
   });
@@ -714,7 +716,9 @@ async function restoreRecordLogs(
 ) {
   const { data, error } = await supabase
     .from("record_logs")
-    .select("id, cat_id, local_cat_id, local_record_id, record_type, value, occurred_at")
+    .select(
+      "id, cat_id, local_cat_id, local_record_id, record_type, value, metadata, occurred_at",
+    )
     .eq("user_id", userId)
     .order("occurred_at", { ascending: false });
 
@@ -741,6 +745,7 @@ async function restoreRecordLogs(
       id: record.local_record_id ?? record.id,
       type: record.record_type,
       value: record.value,
+      metadata: record.metadata ?? undefined,
       timestamp: new Date(record.occurred_at).getTime(),
     });
     recordsByCat.set(localCatId, records);

@@ -12,7 +12,28 @@ import {
   getDailyCollectionTarget,
   readStoredCollectionPhotos,
 } from "../../lib/collection/dailyTarget";
-import type { CollectionSlot } from "../../lib/collection/poses";
+import {
+  COLLECTION_GROUPS,
+  type CollectionSlot,
+} from "../../lib/collection/poses";
+import {
+  buildMikkeWindowResult,
+  getCurrentMikkeWindow,
+  getMikkeWindowOption,
+  getMikkeWindowOptions,
+  MIKKE_WINDOW_QUESTIONS,
+  readStoredMikkeWindowAnswer,
+  saveStoredMikkeWindowAnswer,
+  type MikkeWindowCategory,
+  type MikkeWindow,
+  type MikkeWindowOption,
+  type MikkeWindowResult,
+  type StoredMikkeWindowAnswer,
+} from "../../lib/home/mikkeWindows";
+import {
+  fetchMikkeWindowCounts,
+  submitMikkeWindowAnswer,
+} from "../../lib/home/mikkeWindowResults";
 import {
   STORAGE_KEYS,
   getDiscoveryLogKey,
@@ -43,9 +64,13 @@ type HomeInputProps = {
 type LockData = {
   yousuLockedUntil?: number;
   mugiLockedUntil?: number;
+  mikkeCategoryLockedUntil?: Partial<Record<MikkeWindowCategory, number>>;
 };
 
 type LockType = "yousu" | "mugi";
+
+const MIKKE_CATEGORIES: MikkeWindowCategory[] = ["place", "pose", "sign"];
+const MIKKE_LOCK_MS = 60 * 60 * 1000;
 
 const HOME_FALLBACK_PHOTO_SRC = "/sample-cats/mugi-hero.png";
 
@@ -54,11 +79,16 @@ type RecordLogItem = {
   type: "yousu" | "mugi" | "reaction";
   value: string;
   timestamp: number;
+  metadata?: {
+    mikkeWindowId?: string;
+    mikkeQuestionId?: string;
+    mikkeCategory?: string;
+    mikkeAnswerId?: string;
+  };
 };
 
 type HomeBoardAction =
   | "open_mikke"
-  | "open_care"
   | "open_photo"
   | "open_collection_photo"
   | "open_discovery"
@@ -127,15 +157,6 @@ const YOUSU_OPTIONS = [
   "その他",
 ];
 
-const MUGI_OPTIONS = ["遊んだ", "なでた", "そっとした", "声かけた"];
-
-const REACTION_OPTIONS = [
-  "うれしそうだった",
-  "ふつうだった",
-  "いやそうだった",
-  "わからなかった",
-];
-
 const HOME_NAV_FRAME_WIDTH = "min(calc(100% - 28px), 410px)";
 const HOME_NAV_EDGE_INSET = "max(14px, calc((100vw - 410px) / 2))";
 
@@ -152,8 +173,6 @@ export function HomeInput({ recentEvents: _recentEvents }: HomeInputProps) {
   const [lockData, setLockData] = useState<LockData>({});
   const [tick, setTick] = useState(Date.now());
   const [isYousuOpen, setIsYousuOpen] = useState(false);
-  const [isMugiSheetOpen, setIsMugiSheetOpen] = useState(false);
-  const [isReactionSheetOpen, setIsReactionSheetOpen] = useState(false);
   const [isCatSheetOpen, setIsCatSheetOpen] = useState(false);
   const [isCollectionPhotoSheetOpen, setIsCollectionPhotoSheetOpen] =
     useState(false);
@@ -169,9 +188,10 @@ export function HomeInput({ recentEvents: _recentEvents }: HomeInputProps) {
   const [isDiscoverySheetOpen, setIsDiscoverySheetOpen] = useState(false);
   const [isRecentChangeSheetOpen, setIsRecentChangeSheetOpen] = useState(false);
   const [selectedYousu, setSelectedYousu] = useState<string | null>(null);
-  const [selectedMugi, setSelectedMugi] = useState<string | null>(null);
-  const [selectedReaction, setSelectedReaction] = useState<string | null>(null);
   const [recordLog, setRecordLog] = useState<RecordLogItem[]>([]);
+  const [mikkeRefreshTick, setMikkeRefreshTick] = useState(0);
+  const [mikkeResult, setMikkeResult] = useState<MikkeWindowResult | null>(null);
+  const [isMikkeResultLoading, setIsMikkeResultLoading] = useState(false);
   const [homeSwipeStart, setHomeSwipeStart] = useState<{ x: number; y: number } | null>(
     null,
   );
@@ -330,17 +350,35 @@ export function HomeInput({ recentEvents: _recentEvents }: HomeInputProps) {
     activeCat?.avatarDataUrl ??
     HOME_FALLBACK_PHOTO_SRC;
   const homePhotoPosition = activeCat?.homePhotoPosition ?? "center 38%";
-  const yousuRemaining = getRemainingTime(lockData, "yousu", tick);
-  const mugiRemaining = getRemainingTime(lockData, "mugi", tick);
-  const isYousuLocked = Boolean(yousuRemaining);
-  const isMugiLocked = Boolean(mugiRemaining);
+  const mikkeCategoryRemaining = getMikkeCategoryRemainingMap(lockData, tick);
+  const mikkeAllRemaining = getAllMikkeCategoriesLockedRemaining(lockData, tick);
+  const mikkeWindowKey = Math.floor(tick / (60 * 60 * 1000));
+  const mikkeWindow = useMemo(
+    () => getCurrentMikkeWindow(tick),
+    [mikkeWindowKey],
+  );
+  const mikkeAnswer = useMemo(
+    () =>
+      activeCatId
+        ? readStoredMikkeWindowAnswer(activeCatId, mikkeWindow.id)
+        : null,
+    [activeCatId, mikkeRefreshTick, mikkeWindow.id],
+  );
+  const mikkeSelectedOption = mikkeAnswer
+    ? getMikkeWindowOption(mikkeWindow.question, mikkeAnswer.answerId)
+    : null;
+  const mikkeWindowRemaining = mikkeAnswer
+    ? formatRemainingMs(mikkeWindow.endsAt - tick)
+    : null;
   const latestRecord = recordLog[0] ?? null;
   const personalityInsight = useMemo(
     () => buildPersonalityInsight(recordLog, catName),
     [catName, recordLog],
   );
-  const yousuCooldownProgress = getCooldownProgress(lockData, "yousu", tick);
-  const mugiCooldownProgress = getCooldownProgress(lockData, "mugi", tick);
+  const mikkeAllCooldownProgress = getAllMikkeCategoriesCooldownProgress(
+    lockData,
+    tick,
+  );
   const activeCollectionPhotos = useMemo<Record<string, string[]>>(
     () => (activeCatId ? readStoredCollectionPhotos(activeCatId) : {}),
     [activeCatId, collectionRefreshTick],
@@ -374,23 +412,53 @@ export function HomeInput({ recentEvents: _recentEvents }: HomeInputProps) {
         hasHomePhoto: Boolean(activeCat?.homePhotoDataUrl),
         recordLog,
         collectionTargetLabel: dailyCollectionTarget?.label ?? null,
-        yousuRemaining,
-        mugiRemaining,
-        yousuCooldownProgress,
-        mugiCooldownProgress,
+        mikkeWindow,
+        mikkeAnswer,
+        mikkeRemaining: mikkeAllRemaining,
+        mikkeCooldownProgress: mikkeAllCooldownProgress,
       }),
     [
       activeCat?.homePhotoDataUrl,
       catName,
       discovery.available,
       dailyCollectionTarget?.label,
-      mugiCooldownProgress,
-      mugiRemaining,
+      mikkeAnswer,
+      mikkeWindow,
       recordLog,
-      yousuCooldownProgress,
-      yousuRemaining,
+      mikkeAllCooldownProgress,
+      mikkeAllRemaining,
     ],
   );
+
+  useEffect(() => {
+    let isCancelled = false;
+
+    if (!mikkeAnswer) {
+      setMikkeResult(null);
+      setIsMikkeResultLoading(false);
+      return;
+    }
+
+    async function loadMikkeResult() {
+      setIsMikkeResultLoading(true);
+      const counts = await fetchMikkeWindowCounts(mikkeWindow);
+
+      if (isCancelled) {
+        return;
+      }
+
+      setMikkeResult(
+        buildMikkeWindowResult(mikkeWindow.question, counts, mikkeWindow.id),
+      );
+      setIsMikkeResultLoading(false);
+    }
+
+    void loadMikkeResult();
+
+    return () => {
+      isCancelled = true;
+    };
+  }, [mikkeAnswer, mikkeWindow]);
 
   useEffect(() => {
     const cssPhotoUrl = toCssUrl(photoSrc);
@@ -476,12 +544,9 @@ export function HomeInput({ recentEvents: _recentEvents }: HomeInputProps) {
 
     const records = readRecordLog(catId);
     const latestYousu = records.find((record) => record.type === "yousu");
-    const latestMugi = records.find((record) => record.type === "mugi");
 
     setRecordLog(records);
     setSelectedYousu(latestYousu?.value ?? null);
-    setSelectedMugi(latestMugi?.value ?? null);
-    setSelectedReaction(null);
   }
 
   function refreshHomeFromLocalStorage() {
@@ -718,69 +783,110 @@ export function HomeInput({ recentEvents: _recentEvents }: HomeInputProps) {
     showToast("復元できるデータはありません");
   }
 
-  function recordYousu(value: string) {
-    if (!activeCatId || isLocked(lockData, "yousu", Date.now())) return;
+  async function recordMikkeWindowAnswer(
+    option: MikkeWindowOption,
+  ) {
+    if (!activeCatId || mikkeAnswer) return;
 
-    const lockRemainingBefore = yousuRemaining;
-    const nextLockData = setLock(activeCatId, "yousu");
+    const answer: StoredMikkeWindowAnswer = {
+      windowId: mikkeWindow.id,
+      questionId: mikkeWindow.question.id,
+      category: mikkeWindow.question.category,
+      answerId: option.id,
+      answerLabel: option.label,
+      answeredAt: Date.now(),
+    };
 
-    saveRecord(activeCatId, { type: "yousu", value });
+    saveStoredMikkeWindowAnswer(activeCatId, answer);
+    saveRecord(activeCatId, {
+      type: "yousu",
+      value: option.label,
+      metadata: {
+        mikkeWindowId: mikkeWindow.id,
+        mikkeQuestionId: mikkeWindow.question.id,
+        mikkeCategory: mikkeWindow.question.category,
+        mikkeAnswerId: option.id,
+      },
+    });
     trackProductEvent(
       "home_mikke_recorded",
       {
-        value,
+        value: option.label,
+        answer_id: option.id,
+        question_id: mikkeWindow.question.id,
+        category: mikkeWindow.question.category,
+        window_id: mikkeWindow.id,
+        window_remaining_before: mikkeWindow.endsAt - Date.now(),
+      },
+      { localCatId: activeCatId },
+    );
+    setSelectedYousu(option.label);
+    setRecordLog(readRecordLog(activeCatId));
+    setMikkeRefreshTick((value) => value + 1);
+
+    try {
+      await submitMikkeWindowAnswer({
+        window: mikkeWindow,
+        option,
+        localCatId: activeCatId,
+      });
+    } catch {
+      // Local input should still feel instant if aggregation is temporarily unavailable.
+    }
+
+    const counts = await fetchMikkeWindowCounts(mikkeWindow);
+    setMikkeResult(
+      buildMikkeWindowResult(mikkeWindow.question, counts, mikkeWindow.id),
+    );
+  }
+
+  function recordMikkeFreeAnswer(
+    question: (typeof MIKKE_WINDOW_QUESTIONS)[number],
+    option: MikkeWindowOption,
+  ) {
+    if (
+      !activeCatId ||
+      isMikkeCategoryLocked(lockData, question.category, Date.now())
+    ) {
+      return;
+    }
+
+    const lockRemainingBefore = getMikkeCategoryRemainingTime(
+      lockData,
+      question.category,
+      Date.now(),
+    );
+    const nextLockData = setMikkeCategoryLock(activeCatId, question.category);
+
+    saveRecord(activeCatId, {
+      type: "yousu",
+      value: option.label,
+      metadata: {
+        mikkeQuestionId: question.id,
+        mikkeCategory: question.category,
+        mikkeAnswerId: option.id,
+      },
+    });
+    trackProductEvent(
+      "home_mikke_recorded",
+      {
+        value: option.label,
+        answer_id: option.id,
+        question_id: question.id,
+        category: question.category,
+        entry: "free_mikke",
         lock_remaining_before: lockRemainingBefore,
       },
       { localCatId: activeCatId },
     );
-    setSelectedYousu(value);
+    setSelectedYousu(option.label);
     setRecordLog(readRecordLog(activeCatId));
     setLockData(nextLockData);
     closeBoardInput(setIsYousuOpen, {
       itemId: "today-mikke",
-      title: value,
-      surfaceText: "見返せます",
+      title: option.label,
+      surfaceText: "みっけ",
     });
-  }
-
-  function recordMugi(value: string) {
-    if (!activeCatId || isLocked(lockData, "mugi", Date.now())) return;
-
-    const lockRemainingBefore = mugiRemaining;
-    const nextLockData = setLock(activeCatId, "mugi");
-
-    saveRecord(activeCatId, { type: "mugi", value });
-    trackProductEvent(
-      "home_care_recorded",
-      {
-        value,
-        lock_remaining_before: lockRemainingBefore,
-      },
-      { localCatId: activeCatId },
-    );
-    setSelectedMugi(value);
-    setRecordLog(readRecordLog(activeCatId));
-    setLockData(nextLockData);
-    closeBoardInput(setIsMugiSheetOpen, {
-      itemId: "today-care",
-      title: value,
-      surfaceText: "見返せます",
-    });
-
-    window.setTimeout(() => {
-      if (Math.random() < 0.33) {
-        setIsReactionSheetOpen(true);
-      }
-    }, 1650);
-  }
-
-  function recordReaction(value: string) {
-    if (!activeCatId) return;
-
-    saveRecord(activeCatId, { type: "reaction", value });
-    setSelectedReaction(value);
-    setRecordLog(readRecordLog(activeCatId));
-    window.setTimeout(() => setIsReactionSheetOpen(false), 260);
   }
 
   async function handleHomePhotoSelect() {
@@ -886,6 +992,59 @@ export function HomeInput({ recentEvents: _recentEvents }: HomeInputProps) {
     input.click();
   }
 
+  async function handleMikkePhotoAdd(slot: CollectionSlot) {
+    if (!activeCatId || isCollectionPhotoAdding) return;
+
+    trackProductEvent(
+      "collection_photo_add_started",
+      {
+        slot_id: slot.id,
+        slot_slug: getCollectionSlotPhotoSlug(slot),
+        group_id: slot.group,
+        entry: "mikke_window",
+      },
+      { localCatId: activeCatId },
+    );
+
+    const input = document.createElement("input");
+    input.type = "file";
+    input.accept = "image/*";
+    input.setAttribute("capture", "environment");
+
+    input.onchange = async () => {
+      const file = input.files?.[0];
+      if (!file || !activeCatId) return;
+
+      setIsCollectionPhotoAdding(true);
+
+      try {
+        const slug = getCollectionSlotPhotoSlug(slot);
+        const dataUrl = await resizeAndEncode(file, 900);
+
+        saveCollectionPhoto(activeCatId, slug, dataUrl);
+        setCollectionRefreshTick((value) => value + 1);
+        showToast(`${slot.label}を見つけた`);
+        trackProductEvent(
+          "collection_photo_added",
+          {
+            slot_id: slot.id,
+            slot_slug: slug,
+            group_id: slot.group,
+            entry: "mikke_window",
+            file_size_bucket: getFileSizeBucket(file.size),
+          },
+          { localCatId: activeCatId },
+        );
+      } catch {
+        showToast("写真を保存できませんでした");
+      } finally {
+        setIsCollectionPhotoAdding(false);
+      }
+    };
+
+    input.click();
+  }
+
   function handleDiscoveryClick() {
     if (!activeCatId || !discovery.available) return;
 
@@ -899,15 +1058,7 @@ export function HomeInput({ recentEvents: _recentEvents }: HomeInputProps) {
     source?: HomeBoardTransitionSource,
   ) {
     if (actionType === "open_mikke") {
-      if (!isYousuLocked) {
-        openBoardInput(setIsYousuOpen, source);
-      }
-      return;
-    }
-    if (actionType === "open_care") {
-      if (!isMugiLocked) {
-        openBoardInput(setIsMugiSheetOpen, source);
-      }
+      openBoardInput(setIsYousuOpen, source);
       return;
     }
     if (actionType === "open_photo") {
@@ -1016,44 +1167,36 @@ export function HomeInput({ recentEvents: _recentEvents }: HomeInputProps) {
         items={boardItems}
         records={recordLog}
         collectionPhotoCount={collectionPhotoCount}
+        mikkeWindow={mikkeWindow}
+        mikkeAnswer={mikkeAnswer}
+        mikkeResult={mikkeResult}
+        isMikkeResultLoading={isMikkeResultLoading}
+        mikkeRemaining={mikkeWindowRemaining}
         onAction={handleBoardAction}
+        onMikkeAnswer={(option) => {
+          void recordMikkeWindowAnswer(option);
+        }}
+        mikkePhotoSlot={getCollectionSlotById(mikkeSelectedOption?.collectionSlotId)}
+        isMikkePhotoAdding={isCollectionPhotoAdding}
+        onMikkePhotoAdd={(slot) => {
+          void handleMikkePhotoAdd(slot);
+        }}
         completion={boardCompletion}
       />
 
       {isYousuOpen ? (
-        <YousuSheet
-          title={`${catName}のようす`}
+        <MikkeAllSheet
+          title={`${catName}のみっけ`}
           source={boardSheetSource}
           returnCompletion={boardSheetReturn}
           isReturning={isBoardSheetReturning}
-          options={YOUSU_OPTIONS}
+          questions={MIKKE_WINDOW_QUESTIONS}
           selected={selectedYousu}
-          isLocked={isYousuLocked}
+          categoryRemaining={mikkeCategoryRemaining}
           onClose={() => closeBoardInput(setIsYousuOpen)}
-          onSelect={recordYousu}
-        />
-      ) : null}
-
-      {isMugiSheetOpen ? (
-        <ActionSheet
-          title={`${catName}にしたこと`}
-          source={boardSheetSource}
-          returnCompletion={boardSheetReturn}
-          isReturning={isBoardSheetReturning}
-          options={MUGI_OPTIONS}
-          selected={selectedMugi}
-          onClose={() => closeBoardInput(setIsMugiSheetOpen)}
-          onSelect={recordMugi}
-        />
-      ) : null}
-
-      {isReactionSheetOpen ? (
-        <ActionSheet
-          title={`${catName}はどんな反応でしたか？`}
-          options={REACTION_OPTIONS}
-          selected={selectedReaction}
-          onClose={() => setIsReactionSheetOpen(false)}
-          onSelect={recordReaction}
+          onSelect={(question, option) => {
+            recordMikkeFreeAnswer(question, option);
+          }}
         />
       ) : null}
 
@@ -1355,14 +1498,14 @@ function HomeMorphSheet({
   );
 }
 
-function YousuSheet({
+function MikkeAllSheet({
   title,
   source,
   returnCompletion,
   isReturning,
-  options,
+  questions,
   selected,
-  isLocked,
+  categoryRemaining,
   onClose,
   onSelect,
 }: {
@@ -1370,11 +1513,14 @@ function YousuSheet({
   source: HomeBoardTransitionSource | null;
   returnCompletion: HomeBoardCompletion | null;
   isReturning: boolean;
-  options: string[];
+  questions: typeof MIKKE_WINDOW_QUESTIONS;
   selected: string | null;
-  isLocked: boolean;
+  categoryRemaining: Record<MikkeWindowCategory, string | null>;
   onClose: () => void;
-  onSelect: (value: string) => void;
+  onSelect: (
+    question: (typeof MIKKE_WINDOW_QUESTIONS)[number],
+    option: MikkeWindowOption,
+  ) => void;
 }) {
   return (
     <HomeMorphSheet
@@ -1384,82 +1530,193 @@ function YousuSheet({
       isReturning={isReturning}
       onClose={onClose}
     >
-      <div style={styles.yousuSheetGrid}>
-        {options.map((option) => (
-          <button
-            key={option}
-            type="button"
-            onClick={() => onSelect(option)}
-            disabled={isLocked}
-            style={{
-              ...styles.yousuOption,
-              ...(selected === option ? styles.yousuOptionSelected : {}),
-              ...(isLocked ? styles.lockedState : {}),
-            }}
-          >
-            {option}
-          </button>
-        ))}
+      <div style={styles.mikkeAllBody}>
+        {questions.map((question) => {
+          const remaining = categoryRemaining[question.category];
+          const isLocked = Boolean(remaining);
+
+          return (
+            <section key={question.id} style={styles.mikkeAllSection}>
+              <div style={styles.mikkeAllSectionHeader}>
+                <span style={styles.mikkeQuestionCategory}>
+                  {question.categoryLabel}
+                </span>
+                <span style={styles.mikkeAllPromptRow}>
+                  <span style={styles.mikkeAllPrompt}>{question.prompt}</span>
+                  {remaining ? (
+                    <span style={styles.mikkeAllCategoryLock}>
+                      あと {remaining}
+                    </span>
+                  ) : null}
+                </span>
+              </div>
+              <div style={styles.mikkeOptionGrid}>
+                {question.options.map((option) => {
+                  const isSelected = selected === option.label;
+                  return (
+                    <button
+                      key={option.id}
+                      type="button"
+                      onClick={() => onSelect(question, option)}
+                      disabled={isLocked}
+                      style={{
+                        ...styles.mikkeOption,
+                        ...(isSelected ? styles.mikkeOptionSelected : {}),
+                        ...(isLocked && !isSelected ? styles.lockedState : {}),
+                      }}
+                    >
+                      {option.label}
+                    </button>
+                  );
+                })}
+              </div>
+            </section>
+          );
+        })}
       </div>
     </HomeMorphSheet>
   );
 }
 
-function ActionSheet({
-  title,
-  source,
-  returnCompletion,
-  isReturning,
-  options,
-  selected,
-  onClose,
+function MikkeWindowCard({
+  window,
+  answer,
+  result,
+  isResultLoading,
+  remaining,
   onSelect,
+  photoSlot,
+  isPhotoAdding,
+  onAddPhoto,
 }: {
-  title: string;
-  source?: HomeBoardTransitionSource | null;
-  returnCompletion?: HomeBoardCompletion | null;
-  isReturning?: boolean;
-  options: string[];
-  selected: string | null;
-  onClose: () => void;
-  onSelect: (value: string) => void;
+  window: MikkeWindow;
+  answer: StoredMikkeWindowAnswer | null;
+  result: MikkeWindowResult | null;
+  isResultLoading: boolean;
+  remaining: string | null;
+  onSelect: (option: MikkeWindowOption) => void;
+  photoSlot: CollectionSlot | null;
+  isPhotoAdding: boolean;
+  onAddPhoto: (slot: CollectionSlot) => void;
 }) {
-  const content = (
-    <div style={styles.sheetGrid}>
-      {options.map((option) => (
-        <button
-          key={option}
-          type="button"
-          onClick={() => onSelect(option)}
-          style={{
-            ...styles.sheetOption,
-            ...(selected === option ? styles.sheetOptionSelected : {}),
-          }}
-        >
-          {option}
-        </button>
-      ))}
+  return (
+    <div style={styles.mikkeWindowPanel}>
+      <div style={styles.mikkeWindowHeader}>
+        <span style={styles.mikkeWindowKicker}>みっけ</span>
+        <span style={styles.mikkeWindowBadge}>
+          {remaining ? `あと ${remaining}` : window.question.categoryLabel}
+        </span>
+      </div>
+      <MikkeWindowContent
+        window={window}
+        answer={answer}
+        result={result}
+        isResultLoading={isResultLoading}
+        onSelect={onSelect}
+        photoSlot={photoSlot}
+        isPhotoAdding={isPhotoAdding}
+        onAddPhoto={onAddPhoto}
+        variant="card"
+      />
     </div>
   );
+}
 
-  if (source === undefined) {
-    return (
-      <AppBottomSheet title={title} onClose={onClose}>
-        {content}
-      </AppBottomSheet>
-    );
-  }
+function MikkeWindowContent({
+  window,
+  answer,
+  result,
+  isResultLoading,
+  onSelect,
+  photoSlot,
+  isPhotoAdding,
+  onAddPhoto,
+  variant,
+}: {
+  window: MikkeWindow;
+  answer: StoredMikkeWindowAnswer | null;
+  result: MikkeWindowResult | null;
+  isResultLoading: boolean;
+  onSelect: (option: MikkeWindowOption) => void;
+  photoSlot: CollectionSlot | null;
+  isPhotoAdding: boolean;
+  onAddPhoto: (slot: CollectionSlot) => void;
+  variant: "card" | "sheet";
+}) {
+  const isAnswered = Boolean(answer);
+  const disabled = isAnswered;
 
   return (
-    <HomeMorphSheet
-      title={title}
-      source={source}
-      returnCompletion={returnCompletion ?? null}
-      isReturning={Boolean(isReturning)}
-      onClose={onClose}
-    >
-      {content}
-    </HomeMorphSheet>
+    <div style={variant === "card" ? styles.mikkeWindowBody : styles.mikkeSheetBody}>
+      <div style={styles.mikkeQuestionBlock}>
+        <span style={styles.mikkeQuestionCategory}>
+          {window.question.categoryLabel}
+        </span>
+        <p style={styles.mikkeQuestionText}>{window.question.prompt}</p>
+      </div>
+      <div style={styles.mikkeOptionGrid}>
+        {getMikkeWindowOptions(window.question).map((option) => {
+          const isSelected = answer?.answerId === option.id;
+          return (
+            <button
+              key={option.id}
+              type="button"
+              onClick={() => onSelect(option)}
+              disabled={disabled}
+              style={{
+                ...styles.mikkeOption,
+                ...(isSelected ? styles.mikkeOptionSelected : {}),
+                ...(disabled && !isSelected ? styles.lockedState : {}),
+              }}
+            >
+              {option.label}
+            </button>
+          );
+        })}
+      </div>
+      {isAnswered ? (
+        <div style={styles.mikkeResultBlock}>
+          <div style={styles.mikkeResultHeader}>
+            <span style={styles.mikkeResultMine}>
+              {answer?.answerLabel}、みっけ
+            </span>
+            <span style={styles.mikkeResultMeta}>
+              {result?.isMockAssisted ? "集まり中" : `${result?.realTotal ?? 0}匹`}
+            </span>
+          </div>
+          {isResultLoading && !result ? (
+            <p style={styles.mikkeResultEmpty}>ほかの子たちを見ています</p>
+          ) : result ? (
+            <div style={styles.mikkeResultRows}>
+              {result.counts.map((count) => (
+                <div key={count.answerId} style={styles.mikkeResultRow}>
+                  <span style={styles.mikkeResultLabel}>{count.answerLabel}</span>
+                  <span style={styles.mikkeResultTrack}>
+                    <span
+                      style={{
+                        ...styles.mikkeResultFill,
+                        width: `${Math.max(6, count.ratio)}%`,
+                      }}
+                    />
+                  </span>
+                  <span style={styles.mikkeResultRatio}>{count.ratio}%</span>
+                </div>
+              ))}
+            </div>
+          ) : null}
+          {photoSlot ? (
+            <button
+              type="button"
+              style={styles.mikkePhotoButton}
+              onClick={() => onAddPhoto(photoSlot)}
+              disabled={isPhotoAdding}
+            >
+              {isPhotoAdding ? "追加中..." : "写真も残す"}
+            </button>
+          ) : null}
+        </div>
+      ) : null}
+    </div>
   );
 }
 
@@ -1627,13 +1884,31 @@ function HomeBulletinBoard({
   items,
   records,
   collectionPhotoCount,
+  mikkeWindow,
+  mikkeAnswer,
+  mikkeResult,
+  isMikkeResultLoading,
+  mikkeRemaining,
   onAction,
+  onMikkeAnswer,
+  mikkePhotoSlot,
+  isMikkePhotoAdding,
+  onMikkePhotoAdd,
   completion,
 }: {
   items: HomeBoardItem[];
   records: RecordLogItem[];
   collectionPhotoCount: number;
+  mikkeWindow: MikkeWindow;
+  mikkeAnswer: StoredMikkeWindowAnswer | null;
+  mikkeResult: MikkeWindowResult | null;
+  isMikkeResultLoading: boolean;
+  mikkeRemaining: string | null;
   onAction: HomeBoardActionHandler;
+  onMikkeAnswer: (option: MikkeWindowOption) => void;
+  mikkePhotoSlot: CollectionSlot | null;
+  isMikkePhotoAdding: boolean;
+  onMikkePhotoAdd: (slot: CollectionSlot) => void;
   completion: HomeBoardCompletion | null;
 }) {
   const [isOpen, setIsOpen] = useState(false);
@@ -1655,14 +1930,6 @@ function HomeBulletinBoard({
           } satisfies HomeBoardItem,
         ];
   const peekItems = getBoardPeekItems(displayItems);
-  const insightItems = displayItems.filter((item) =>
-    ["daily-discovery", "personality-insight"].includes(item.id),
-  );
-  const collectionItems = displayItems.filter(
-    (item) => item.id === "daily-collection-target",
-  );
-  const heroItem = insightItems[0] ?? collectionItems[0] ?? null;
-  const nextCollectionItem = collectionItems[0] ?? null;
 
   useEffect(() => {
     if (completion) {
@@ -1803,34 +2070,18 @@ function HomeBulletinBoard({
           onClick={(event) => event.stopPropagation()}
         aria-hidden={!isOpen}
         >
-          {heroItem ? (
-            <button
-              type="button"
-              disabled={heroItem.isDisabled}
-              style={{
-                ...styles.boardHeroCard,
-                ...(heroItem.isDisabled ? styles.boardActionRowDisabled : {}),
-              }}
-              onClick={() => onAction(heroItem.actionType)}
-            >
-              <span style={styles.boardHeroKickerRow}>
-                <span style={styles.boardHeroKicker}>{heroItem.title}</span>
-                {heroItem.isUnread ? (
-                  <span style={styles.boardHeroBadge}>新着</span>
-                ) : null}
-              </span>
-              <span style={styles.boardHeroStatement}>{heroItem.body}</span>
-            </button>
-          ) : null}
-
-          <BoardShelfSummary
-            records={records}
-            collectionPhotoCount={collectionPhotoCount}
+          <MikkeWindowCard
+            window={mikkeWindow}
+            answer={mikkeAnswer}
+            result={mikkeResult}
+            isResultLoading={isMikkeResultLoading}
+            remaining={mikkeRemaining}
+            onSelect={onMikkeAnswer}
+            photoSlot={mikkePhotoSlot}
+            isPhotoAdding={isMikkePhotoAdding}
+            onAddPhoto={onMikkePhotoAdd}
           />
 
-          {nextCollectionItem ? (
-            <BoardNextPrompt item={nextCollectionItem} onAction={onAction} />
-          ) : null}
         </div>
     </section>
   );
@@ -1898,22 +2149,13 @@ function buildBoardShelfStats(
   collectionPhotoCount: number,
 ): BoardShelfStat[] {
   const yousuCount = records.filter((record) => record.type === "yousu").length;
-  const careCount = records.filter((record) => record.type === "mugi").length;
   const stats: BoardShelfStat[] = [];
 
   if (yousuCount > 0) {
     stats.push({
-      label: "ようす",
+      label: "みっけ",
       value: String(yousuCount),
-      detail: "見つけた",
-    });
-  }
-
-  if (careCount > 0) {
-    stats.push({
-      label: "おせわ",
-      value: String(careCount),
-      detail: "したこと",
+      detail: "残った",
     });
   }
 
@@ -1955,20 +2197,20 @@ function BoardIcon({ icon }: { icon: HomeBoardItem["icon"] }) {
 }
 
 function getBoardPeekItems(items: HomeBoardItem[]) {
-  const orderedIds = ["today-mikke", "daily-collection-target", "today-care"];
+  const orderedIds = ["today-mikke", "daily-collection-target"];
   const orderedItems = orderedIds
     .map((id) => items.find((item) => item.id === id))
     .filter((item): item is HomeBoardItem => Boolean(item));
 
-  if (orderedItems.length >= 3) {
-    return orderedItems.slice(0, 3);
+  if (orderedItems.length >= 2) {
+    return orderedItems.slice(0, 2);
   }
 
   const fallbackItems = items.filter(
     (item) => !orderedItems.some((orderedItem) => orderedItem.id === item.id),
   );
 
-  return [...orderedItems, ...fallbackItems].slice(0, 3);
+  return [...orderedItems, ...fallbackItems].slice(0, 2);
 }
 
 function getBoardDockCountdownStyle(item: HomeBoardItem): CSSProperties {
@@ -1989,10 +2231,6 @@ function buildPersonalityInsight(
 ): PersonalityInsight {
   const latestRecord = recordLog[0];
   const yousuRecords = recordLog.filter((record) => record.type === "yousu");
-  const careRecords = recordLog.filter((record) => record.type === "mugi");
-  const reactionRecords = recordLog.filter(
-    (record) => record.type === "reaction",
-  );
   const topYousu = getTopRecordValue(yousuRecords);
 
   if (!latestRecord) {
@@ -2008,20 +2246,10 @@ function buildPersonalityInsight(
   if (latestRecord.type === "mugi") {
     return {
       title: "にゃるほど",
-      body: `「${latestRecord.value}」のあとが残ると、見返しやすくなります。`,
-      surfaceText: "反応を足す",
+      body: `「${latestRecord.value}」のあとも、サインとして見返せます。`,
+      surfaceText: "サイン",
       sheetBody:
-        "したことだけだと出来事で止まります。その後の反応が少し残ると、距離感や受け取り方をあとから比べやすくなります。",
-    };
-  }
-
-  if (careRecords.length >= 2 && reactionRecords.length === 0) {
-    return {
-      title: "にゃるほど",
-      body: "したことは残っています。反応があると、違いを見返しやすくなります。",
-      surfaceText: "反応待ち",
-      sheetBody:
-        "同じおせわでも、その後の反応が違うことがあります。そこが残ると、回数ではなく関わり方の違いとして見返せます。",
+        "お世話そのものより、そのとき猫に見えたサインを残す方が、この子らしさとして見返しやすくなります。",
     };
   }
 
@@ -2102,20 +2330,20 @@ function buildHomeBoardItems({
   hasHomePhoto,
   recordLog,
   collectionTargetLabel,
-  yousuRemaining,
-  mugiRemaining,
-  yousuCooldownProgress,
-  mugiCooldownProgress,
+  mikkeWindow,
+  mikkeAnswer,
+  mikkeRemaining,
+  mikkeCooldownProgress,
 }: {
   catName: string;
   discoveryAvailable: boolean;
   hasHomePhoto: boolean;
   recordLog: RecordLogItem[];
   collectionTargetLabel: string | null;
-  yousuRemaining: string | null;
-  mugiRemaining: string | null;
-  yousuCooldownProgress: number | null;
-  mugiCooldownProgress: number | null;
+  mikkeWindow: MikkeWindow;
+  mikkeAnswer: StoredMikkeWindowAnswer | null;
+  mikkeRemaining: string | null;
+  mikkeCooldownProgress: number | null;
 }): HomeBoardItem[] {
   const items: HomeBoardItem[] = [];
   const latestRecord = recordLog[0];
@@ -2126,27 +2354,16 @@ function buildHomeBoardItems({
     kind: "mission",
     priority: 5,
     title: "みっけ",
-    body: yousuRemaining ? `あと ${yousuRemaining}` : "ようす",
+    body: mikkeRemaining
+      ? `あと ${mikkeRemaining}`
+      : mikkeWindow.question.prompt,
     icon: "paw",
-    actionLabel: yousuRemaining ? "待ち時間" : "ようす",
+    actionLabel: mikkeRemaining ? "待ち時間" : "3つから",
     actionType: "open_mikke",
-    isDisabled: Boolean(yousuRemaining),
-    surfaceText: yousuRemaining ? `あと ${yousuRemaining}` : "ようす",
-    cooldownProgress: yousuCooldownProgress ?? undefined,
-  });
-
-  items.push({
-    id: "today-care",
-    kind: "mission",
-    priority: 6,
-    title: "おせわ",
-    body: mugiRemaining ? `あと ${mugiRemaining}` : "したこと",
-    icon: "hand",
-    actionLabel: mugiRemaining ? "待ち時間" : "したこと",
-    actionType: "open_care",
-    isDisabled: Boolean(mugiRemaining),
-    surfaceText: mugiRemaining ? `あと ${mugiRemaining}` : "したこと",
-    cooldownProgress: mugiCooldownProgress ?? undefined,
+    surfaceText: mikkeRemaining
+      ? `あと ${mikkeRemaining}`
+      : mikkeAnswer?.answerLabel ?? mikkeWindow.question.surfaceText,
+    cooldownProgress: mikkeCooldownProgress ?? undefined,
   });
 
   if (discoveryAvailable) {
@@ -2195,8 +2412,8 @@ function buildHomeBoardItems({
       id: "daily-collection-target",
       kind: "collection",
       priority: 45,
-      title: "今日のコレクション",
-      body: "見つけたら、写真の棚に入ります。",
+      title: "今日の1枚",
+      body: "写真で残す",
       icon: "camera",
       actionLabel: "写真で残す",
       actionType: "open_collection_photo",
@@ -2213,6 +2430,19 @@ function getHomeCatThumbSrc(profile: CatProfile) {
     profile.homePhotoDataUrl ??
     getCoatAvatarSrc(profile.appearance?.coat)
   );
+}
+
+function getCollectionSlotById(slotId?: string) {
+  if (!slotId) return null;
+
+  for (const group of COLLECTION_GROUPS) {
+    const slot = group.slots.find((item) => item.id === slotId);
+    if (slot) {
+      return slot;
+    }
+  }
+
+  return null;
 }
 
 function getCoatAvatarSrc(coat?: string) {
@@ -2350,11 +2580,86 @@ function setLock(catId: string, type: LockType): LockData {
   const field = type === "yousu" ? "yousuLockedUntil" : "mugiLockedUntil";
   const nextData = {
     ...lockData,
-    [field]: Date.now() + 60 * 60 * 1000,
+    [field]: Date.now() + MIKKE_LOCK_MS,
   };
 
   saveLockData(catId, nextData);
   return nextData;
+}
+
+function setMikkeCategoryLock(
+  catId: string,
+  category: MikkeWindowCategory,
+): LockData {
+  const lockData = readLockData(catId);
+  const nextData: LockData = {
+    ...lockData,
+    mikkeCategoryLockedUntil: {
+      ...lockData.mikkeCategoryLockedUntil,
+      [category]: Date.now() + MIKKE_LOCK_MS,
+    },
+  };
+
+  saveLockData(catId, nextData);
+  return nextData;
+}
+
+function isMikkeCategoryLocked(
+  lockData: LockData,
+  category: MikkeWindowCategory,
+  now = Date.now(),
+) {
+  return now < (lockData.mikkeCategoryLockedUntil?.[category] || 0);
+}
+
+function getMikkeCategoryRemainingTime(
+  lockData: LockData,
+  category: MikkeWindowCategory,
+  now = Date.now(),
+) {
+  return formatRemainingMs(
+    (lockData.mikkeCategoryLockedUntil?.[category] || 0) - now,
+  );
+}
+
+function getMikkeCategoryRemainingMap(lockData: LockData, now = Date.now()) {
+  return MIKKE_CATEGORIES.reduce(
+    (remainingMap, category) => ({
+      ...remainingMap,
+      [category]: getMikkeCategoryRemainingTime(lockData, category, now),
+    }),
+    {} as Record<MikkeWindowCategory, string | null>,
+  );
+}
+
+function getAllMikkeCategoriesLockedRemaining(
+  lockData: LockData,
+  now = Date.now(),
+) {
+  const remainingMs = MIKKE_CATEGORIES.map(
+    (category) => (lockData.mikkeCategoryLockedUntil?.[category] || 0) - now,
+  );
+
+  if (remainingMs.some((remaining) => remaining <= 0)) {
+    return null;
+  }
+
+  return formatRemainingMs(Math.min(...remainingMs));
+}
+
+function getAllMikkeCategoriesCooldownProgress(
+  lockData: LockData,
+  now = Date.now(),
+) {
+  const remainingMs = MIKKE_CATEGORIES.map(
+    (category) => (lockData.mikkeCategoryLockedUntil?.[category] || 0) - now,
+  );
+
+  if (remainingMs.some((remaining) => remaining <= 0)) {
+    return null;
+  }
+
+  return Math.min(1, Math.min(...remainingMs) / MIKKE_LOCK_MS);
 }
 
 function isLocked(lockData: LockData, type: LockType, now = Date.now()) {
@@ -2364,7 +2669,10 @@ function isLocked(lockData: LockData, type: LockType, now = Date.now()) {
 
 function getRemainingTime(lockData: LockData, type: LockType, now = Date.now()) {
   const field = type === "yousu" ? "yousuLockedUntil" : "mugiLockedUntil";
-  const remaining = (lockData[field] || 0) - now;
+  return formatRemainingMs((lockData[field] || 0) - now);
+}
+
+function formatRemainingMs(remaining: number) {
   if (remaining <= 0) return null;
   const minutes = Math.floor(remaining / 60000);
   const seconds = Math.floor((remaining % 60000) / 1000);
@@ -2714,8 +3022,8 @@ const styles = {
     bottom: 0,
     zIndex: 18,
     width: "100%",
-    height: "58dvh",
-    maxHeight: "520px",
+    height: "64dvh",
+    maxHeight: "580px",
     padding: "0 0 calc(82px + env(safe-area-inset-bottom))",
     boxSizing: "border-box",
     border: "none",
@@ -2826,7 +3134,7 @@ const styles = {
   boardOpenContent: {
     width: HOME_NAV_FRAME_WIDTH,
     maxHeight: "100%",
-    overflowY: "auto",
+    overflowY: "hidden",
     padding: "0 0 2px",
     boxSizing: "border-box",
     cursor: "default",
@@ -3458,6 +3766,219 @@ const styles = {
     fontSize: "17px",
     fontWeight: 660,
     lineHeight: 1.35,
+  },
+  mikkeAllBody: {
+    display: "grid",
+    gap: "15px",
+    marginTop: "14px",
+  },
+  mikkeAllLockedText: {
+    margin: 0,
+    color: "rgba(255,255,255,0.62)",
+    fontSize: "12px",
+    fontWeight: 600,
+    lineHeight: 1.4,
+  },
+  mikkeAllSection: {
+    display: "grid",
+    gap: "9px",
+  },
+  mikkeAllSectionHeader: {
+    display: "grid",
+    gap: "3px",
+  },
+  mikkeAllPromptRow: {
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: "10px",
+    minWidth: 0,
+  },
+  mikkeAllPrompt: {
+    minWidth: 0,
+    color: "rgba(255,255,255,0.88)",
+    fontSize: "14px",
+    fontWeight: 640,
+    lineHeight: 1.3,
+  },
+  mikkeAllCategoryLock: {
+    flex: "0 0 auto",
+    color: "rgba(255,255,255,0.52)",
+    fontSize: "11px",
+    fontWeight: 650,
+    lineHeight: 1.2,
+    fontVariantNumeric: "tabular-nums",
+  },
+  mikkeWindowPanel: {
+    width: "100%",
+    border: "none",
+    borderRadius: 0,
+    background: "transparent",
+    boxShadow: "none",
+    backdropFilter: "none",
+    WebkitBackdropFilter: "none",
+    padding: "0 4px 2px",
+    boxSizing: "border-box",
+  },
+  mikkeWindowHeader: {
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: "10px",
+    marginBottom: "10px",
+  },
+  mikkeWindowKicker: {
+    color: "rgba(255,255,255,0.68)",
+    fontSize: "12px",
+    fontWeight: 640,
+    lineHeight: 1.2,
+  },
+  mikkeWindowBadge: {
+    border: "0.5px solid rgba(255,255,255,0.18)",
+    borderRadius: "999px",
+    background: "rgba(255,255,255,0.08)",
+    color: "rgba(255,255,255,0.74)",
+    padding: "4px 9px",
+    fontSize: "11px",
+    fontWeight: 620,
+    lineHeight: 1,
+    fontVariantNumeric: "tabular-nums",
+  },
+  mikkeWindowBody: {
+    display: "grid",
+    gap: "12px",
+  },
+  mikkeSheetBody: {
+    display: "grid",
+    gap: "12px",
+    marginTop: "14px",
+  },
+  mikkeQuestionBlock: {
+    display: "grid",
+    gap: "4px",
+  },
+  mikkeQuestionCategory: {
+    color: "rgba(255,255,255,0.52)",
+    fontSize: "11px",
+    fontWeight: 640,
+    lineHeight: 1.2,
+  },
+  mikkeQuestionText: {
+    margin: 0,
+    color: "rgba(255,255,255,0.96)",
+    fontSize: "20px",
+    fontWeight: 660,
+    lineHeight: 1.28,
+  },
+  mikkeOptionGrid: {
+    display: "grid",
+    gridTemplateColumns: "repeat(2, minmax(0, 1fr))",
+    gap: "8px",
+  },
+  mikkeOption: {
+    minHeight: "48px",
+    border: "0.5px solid rgba(255,255,255,0.17)",
+    borderRadius: "15px",
+    background: "rgba(255,255,255,0.10)",
+    color: "rgba(255,255,255,0.94)",
+    padding: "10px 8px",
+    fontSize: "14px",
+    fontWeight: 640,
+    textAlign: "center",
+    cursor: "pointer",
+    backdropFilter: "blur(18px)",
+    WebkitBackdropFilter: "blur(18px)",
+    transition:
+      "background 0.18s cubic-bezier(0.2, 0.8, 0.2, 1), border-color 0.18s cubic-bezier(0.2, 0.8, 0.2, 1), color 0.18s cubic-bezier(0.2, 0.8, 0.2, 1), transform 0.18s cubic-bezier(0.2, 0.8, 0.2, 1)",
+    willChange: "transform",
+  },
+  mikkeOptionSelected: {
+    borderColor: "rgba(255,255,255,0.72)",
+    background: "rgba(255,255,255,0.92)",
+    color: "#2A2A28",
+    transform: "translateY(-1px)",
+  },
+  mikkeResultBlock: {
+    display: "grid",
+    gap: "8px",
+    borderTop: "0.5px solid rgba(255,255,255,0.12)",
+    paddingTop: "10px",
+  },
+  mikkeResultHeader: {
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: "10px",
+  },
+  mikkeResultMine: {
+    color: "rgba(255,255,255,0.92)",
+    fontSize: "13px",
+    fontWeight: 650,
+    lineHeight: 1.25,
+  },
+  mikkeResultMeta: {
+    color: "rgba(255,255,255,0.5)",
+    fontSize: "11px",
+    fontWeight: 620,
+    lineHeight: 1.2,
+  },
+  mikkeResultEmpty: {
+    margin: 0,
+    color: "rgba(255,255,255,0.58)",
+    fontSize: "12px",
+    fontWeight: 520,
+    lineHeight: 1.4,
+  },
+  mikkeResultRows: {
+    display: "grid",
+    gap: "6px",
+  },
+  mikkeResultRow: {
+    display: "grid",
+    gridTemplateColumns: "70px 1fr 36px",
+    alignItems: "center",
+    gap: "8px",
+  },
+  mikkeResultLabel: {
+    minWidth: 0,
+    overflow: "hidden",
+    textOverflow: "ellipsis",
+    whiteSpace: "nowrap",
+    color: "rgba(255,255,255,0.72)",
+    fontSize: "12px",
+    fontWeight: 600,
+  },
+  mikkeResultTrack: {
+    height: "7px",
+    borderRadius: "999px",
+    background: "rgba(255,255,255,0.12)",
+    overflow: "hidden",
+  },
+  mikkeResultFill: {
+    display: "block",
+    height: "100%",
+    borderRadius: "inherit",
+    background:
+      "linear-gradient(90deg, rgba(255,255,255,0.56), rgba(255,255,255,0.92))",
+    transition: "width 0.42s cubic-bezier(0.22, 1, 0.36, 1)",
+  },
+  mikkeResultRatio: {
+    color: "rgba(255,255,255,0.6)",
+    fontSize: "11px",
+    fontWeight: 620,
+    textAlign: "right",
+    fontVariantNumeric: "tabular-nums",
+  },
+  mikkePhotoButton: {
+    width: "100%",
+    minHeight: "44px",
+    border: "0.5px solid rgba(255,255,255,0.2)",
+    borderRadius: "15px",
+    background: "rgba(255,255,255,0.92)",
+    color: "#2A2A28",
+    fontSize: "14px",
+    fontWeight: 680,
+    cursor: "pointer",
   },
   yousuPanel: {
     border: "0.5px solid #E0DDD6",
