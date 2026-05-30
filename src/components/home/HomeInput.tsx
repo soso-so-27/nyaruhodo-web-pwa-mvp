@@ -1102,16 +1102,6 @@ export function HomeInput({ recentEvents: _recentEvents }: HomeInputProps) {
             transform: scaleX(1);
           }
         }
-        @keyframes boardShelfRise {
-          from {
-            opacity: 0;
-            transform: translate3d(0, 28px, 0);
-          }
-          to {
-            opacity: 1;
-            transform: translate3d(0, 0, 0);
-          }
-        }
         @keyframes morphBloom {
           0% {
             opacity: 0;
@@ -1629,8 +1619,13 @@ function HomeBulletinBoard({
       onClick={isOpen ? () => setIsOpen(false) : undefined}
       aria-label={isOpen ? "うちの子らしさ" : "すぐ残す"}
     >
-      {!isOpen ? (
-        <div style={styles.boardDockFrame}>
+      <div
+        style={{
+          ...styles.boardDockFrame,
+          ...(isOpen ? styles.boardDockFrameHidden : styles.boardDockFrameVisible),
+        }}
+        aria-hidden={isOpen}
+      >
           <span style={styles.boardDockShelfGlow} aria-hidden="true" />
           <button
             type="button"
@@ -1720,12 +1715,16 @@ function HomeBulletinBoard({
             })}
           </div>
         </div>
-      ) : null}
 
-      {isOpen ? (
         <div
-          style={styles.boardOpenContent}
+        style={{
+          ...styles.boardOpenContent,
+          ...(isOpen
+            ? styles.boardOpenContentVisible
+            : styles.boardOpenContentHidden),
+        }}
           onClick={(event) => event.stopPropagation()}
+        aria-hidden={!isOpen}
         >
           {heroItem ? (
             <button
@@ -1756,7 +1755,6 @@ function HomeBulletinBoard({
             <BoardNextPrompt item={nextCollectionItem} onAction={onAction} />
           ) : null}
         </div>
-      ) : null}
     </section>
   );
 }
@@ -2590,7 +2588,7 @@ const styles = {
     zIndex: 18,
     width: "100%",
     height: "280px",
-    paddingBottom: 0,
+    padding: "0 0 calc(82px + env(safe-area-inset-bottom))",
     boxSizing: "border-box",
     border: "none",
     borderRadius: 0,
@@ -2600,9 +2598,12 @@ const styles = {
     backdropFilter: "none",
     WebkitBackdropFilter: "none",
     overflow: "hidden",
+    display: "flex",
+    alignItems: "flex-end",
+    justifyContent: "center",
     transition:
-      "height 0.28s cubic-bezier(0.2, 0.8, 0.2, 1), transform 0.28s cubic-bezier(0.2, 0.8, 0.2, 1), background 0.28s cubic-bezier(0.2, 0.8, 0.2, 1)",
-    willChange: "transform",
+      "height 0.52s cubic-bezier(0.22, 1, 0.36, 1), background 0.52s cubic-bezier(0.22, 1, 0.36, 1)",
+    willChange: "height, background",
   },
   boardExpanded: {
     position: "fixed",
@@ -2611,7 +2612,8 @@ const styles = {
     bottom: 0,
     zIndex: 18,
     width: "100%",
-    height: "clamp(360px, 58dvh, 520px)",
+    height: "58dvh",
+    maxHeight: "520px",
     padding: "0 0 calc(82px + env(safe-area-inset-bottom))",
     boxSizing: "border-box",
     border: "none",
@@ -2626,8 +2628,8 @@ const styles = {
     alignItems: "flex-end",
     justifyContent: "center",
     transition:
-      "height 0.34s cubic-bezier(0.22, 1, 0.36, 1), background 0.34s cubic-bezier(0.22, 1, 0.36, 1)",
-    willChange: "height",
+      "height 0.52s cubic-bezier(0.22, 1, 0.36, 1), background 0.52s cubic-bezier(0.22, 1, 0.36, 1)",
+    willChange: "height, background",
     cursor: "pointer",
   },
   boardRailFrame: {
@@ -2654,7 +2656,21 @@ const styles = {
     position: "absolute",
     left: "50%",
     bottom: "calc(76px + env(safe-area-inset-bottom))",
-    transform: "translateX(-50%)",
+    transition:
+      "opacity 0.24s ease-out, transform 0.44s cubic-bezier(0.22, 1, 0.36, 1)",
+    willChange: "opacity, transform",
+  },
+  boardDockFrameVisible: {
+    opacity: 1,
+    transform: "translateX(-50%) translate3d(0, 0, 0) scale(1)",
+    pointerEvents: "auto",
+    transitionDelay: "0.12s",
+  },
+  boardDockFrameHidden: {
+    opacity: 0,
+    transform: "translateX(-50%) translate3d(0, 34px, 0) scale(0.985)",
+    pointerEvents: "none",
+    transitionDelay: "0s",
   },
   boardDockShelfGlow: {
     position: "absolute",
@@ -2711,8 +2727,22 @@ const styles = {
     overflowY: "auto",
     padding: "0 0 2px",
     boxSizing: "border-box",
-    animation: "boardShelfRise 0.34s cubic-bezier(0.22, 1, 0.36, 1) both",
     cursor: "default",
+    transition:
+      "opacity 0.34s ease-out, transform 0.52s cubic-bezier(0.22, 1, 0.36, 1)",
+    willChange: "opacity, transform",
+  },
+  boardOpenContentVisible: {
+    opacity: 1,
+    transform: "translate3d(0, 0, 0) scale(1)",
+    pointerEvents: "auto",
+    transitionDelay: "0.08s",
+  },
+  boardOpenContentHidden: {
+    opacity: 0,
+    transform: "translate3d(0, 34px, 0) scale(0.985)",
+    pointerEvents: "none",
+    transitionDelay: "0s",
   },
   boardHeroCard: {
     width: "100%",
