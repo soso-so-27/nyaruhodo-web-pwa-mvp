@@ -1102,6 +1102,16 @@ export function HomeInput({ recentEvents: _recentEvents }: HomeInputProps) {
             transform: scaleX(1);
           }
         }
+        @keyframes boardShelfRise {
+          from {
+            opacity: 0;
+            transform: translate3d(0, 28px, 0);
+          }
+          to {
+            opacity: 1;
+            transform: translate3d(0, 0, 0);
+          }
+        }
         @keyframes morphBloom {
           0% {
             opacity: 0;
@@ -1616,19 +1626,9 @@ function HomeBulletinBoard({
       style={isOpen ? styles.boardExpanded : styles.boardPeek}
       onTouchStart={handleTouchStart}
       onTouchEnd={handleTouchEnd}
+      onClick={isOpen ? () => setIsOpen(false) : undefined}
       aria-label={isOpen ? "うちの子らしさ" : "すぐ残す"}
     >
-      {isOpen ? (
-        <button
-          type="button"
-          style={styles.boardOpenHandleButton}
-          onClick={() => setIsOpen(false)}
-          aria-label="閉じる"
-        >
-          <span style={styles.boardDockLiftHandle} aria-hidden="true" />
-        </button>
-      ) : null}
-
       {!isOpen ? (
         <div style={styles.boardDockFrame}>
           <span style={styles.boardDockShelfGlow} aria-hidden="true" />
@@ -1723,7 +1723,10 @@ function HomeBulletinBoard({
       ) : null}
 
       {isOpen ? (
-        <div style={styles.boardOpenContent}>
+        <div
+          style={styles.boardOpenContent}
+          onClick={(event) => event.stopPropagation()}
+        >
           {heroItem ? (
             <button
               type="button"
@@ -2603,37 +2606,28 @@ const styles = {
   },
   boardExpanded: {
     position: "fixed",
-    left: "50%",
-    right: "auto",
-    bottom: "calc(76px + env(safe-area-inset-bottom))",
+    left: 0,
+    right: 0,
+    bottom: 0,
     zIndex: 18,
-    width: HOME_NAV_FRAME_WIDTH,
-    height: "auto",
-    maxHeight: "min(calc(100dvh - 112px - env(safe-area-inset-bottom)), 560px)",
-    border: "0.5px solid rgba(255,255,255,0.22)",
-    borderRadius: "28px",
-    background: "rgba(38,32,30,0.58)",
-    boxShadow:
-      "0 -8px 30px rgba(0,0,0,0.18), 0 12px 30px rgba(0,0,0,0.14), inset 0 1px 0 rgba(255,255,255,0.14)",
-    backdropFilter: "blur(30px)",
-    WebkitBackdropFilter: "blur(30px)",
-    overflow: "hidden",
-    transform: "translateX(-50%)",
-    transition:
-      "max-height 0.28s cubic-bezier(0.2, 0.8, 0.2, 1), transform 0.28s cubic-bezier(0.2, 0.8, 0.2, 1), background 0.28s cubic-bezier(0.2, 0.8, 0.2, 1)",
-    willChange: "transform",
-  },
-  boardOpenHandleButton: {
     width: "100%",
-    height: "28px",
-    margin: 0,
-    padding: "9px 0 6px",
-    border: "none",
-    background: "transparent",
+    height: "clamp(360px, 58dvh, 520px)",
+    padding: "0 0 calc(82px + env(safe-area-inset-bottom))",
     boxSizing: "border-box",
+    border: "none",
+    borderRadius: 0,
+    background:
+      "linear-gradient(to top, rgba(18,16,15,0.76) 0%, rgba(18,16,15,0.54) 48%, rgba(18,16,15,0.05) 100%)",
+    boxShadow: "none",
+    backdropFilter: "none",
+    WebkitBackdropFilter: "none",
+    overflow: "hidden",
     display: "flex",
-    alignItems: "center",
+    alignItems: "flex-end",
     justifyContent: "center",
+    transition:
+      "height 0.34s cubic-bezier(0.22, 1, 0.36, 1), background 0.34s cubic-bezier(0.22, 1, 0.36, 1)",
+    willChange: "height",
     cursor: "pointer",
   },
   boardRailFrame: {
@@ -2712,11 +2706,13 @@ const styles = {
     zIndex: 1,
   },
   boardOpenContent: {
-    height: "auto",
-    maxHeight: "min(calc(100dvh - 156px - env(safe-area-inset-bottom)), 524px)",
+    width: HOME_NAV_FRAME_WIDTH,
+    maxHeight: "100%",
     overflowY: "auto",
-    padding: "0 14px 14px",
+    padding: "0 0 2px",
     boxSizing: "border-box",
+    animation: "boardShelfRise 0.34s cubic-bezier(0.22, 1, 0.36, 1) both",
+    cursor: "default",
   },
   boardHeroCard: {
     width: "100%",
