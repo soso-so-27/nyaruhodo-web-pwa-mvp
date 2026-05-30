@@ -185,11 +185,18 @@ export function HomeInput({ recentEvents: _recentEvents }: HomeInputProps) {
   const [isBoardSheetReturning, setIsBoardSheetReturning] = useState(false);
   const [collectionRefreshTick, setCollectionRefreshTick] = useState(0);
   const [discoveryDismissedToday, setDiscoveryDismissedToday] = useState(false);
+  const [catSwitchMotionKey, setCatSwitchMotionKey] = useState(0);
+  const [previousHomePhoto, setPreviousHomePhoto] = useState<{
+    src: string;
+    position: string;
+    key: number;
+  } | null>(null);
   const hasTrackedHomeView = useRef(false);
   const hasTrackedGoogleAuthSuccess = useRef(false);
   const toastTimerRef = useRef<number | null>(null);
   const completedBoardTimerRef = useRef<number | null>(null);
   const boardSheetReturnTimerRef = useRef<number | null>(null);
+  const previousHomePhotoTimerRef = useRef<number | null>(null);
 
   useEffect(() => {
     const profiles = readCatProfiles();
@@ -221,6 +228,9 @@ export function HomeInput({ recentEvents: _recentEvents }: HomeInputProps) {
       }
       if (boardSheetReturnTimerRef.current) {
         window.clearTimeout(boardSheetReturnTimerRef.current);
+      }
+      if (previousHomePhotoTimerRef.current) {
+        window.clearTimeout(previousHomePhotoTimerRef.current);
       }
     };
   }, []);
@@ -486,9 +496,30 @@ export function HomeInput({ recentEvents: _recentEvents }: HomeInputProps) {
     hydrateCatState(active.id);
   }
 
+  function startCatSwitchMotion(nextProfile: CatProfile) {
+    if (nextProfile.id === activeCatId) return;
+
+    setPreviousHomePhoto({
+      src: photoSrc,
+      position: homePhotoPosition,
+      key: Date.now(),
+    });
+    setCatSwitchMotionKey((current) => current + 1);
+
+    if (previousHomePhotoTimerRef.current) {
+      window.clearTimeout(previousHomePhotoTimerRef.current);
+    }
+
+    previousHomePhotoTimerRef.current = window.setTimeout(() => {
+      setPreviousHomePhoto(null);
+      previousHomePhotoTimerRef.current = null;
+    }, 540);
+  }
+
   function handleCatSelect(catId: string) {
     const profile = getActiveCatProfile(catProfiles, catId);
 
+    startCatSwitchMotion(profile);
     saveActiveCatId(profile.id);
     setActiveCatId(profile.id);
     setActiveCat(profile);
@@ -913,13 +944,27 @@ export function HomeInput({ recentEvents: _recentEvents }: HomeInputProps) {
       }}
     >
       <div
+        key={`home-photo-${activeCatId ?? "none"}-${catSwitchMotionKey}`}
         style={{
           ...styles.backgroundPhoto,
+          ...styles.backgroundPhotoCurrent,
           backgroundImage: `url("${photoSrc}")`,
           backgroundPosition: homePhotoPosition,
         }}
         aria-hidden="true"
       />
+      {previousHomePhoto ? (
+        <div
+          key={`previous-home-photo-${previousHomePhoto.key}`}
+          style={{
+            ...styles.backgroundPhoto,
+            ...styles.backgroundPhotoPrevious,
+            backgroundImage: `url("${previousHomePhoto.src}")`,
+            backgroundPosition: previousHomePhoto.position,
+          }}
+          aria-hidden="true"
+        />
+      ) : null}
       <div
         style={styles.contentLayer}
         onTouchStart={handleHomeSwipeStart}
@@ -1100,6 +1145,38 @@ export function HomeInput({ recentEvents: _recentEvents }: HomeInputProps) {
           to {
             opacity: 1;
             transform: scaleX(1);
+          }
+        }
+        @keyframes homePhotoSettle {
+          from {
+            opacity: 0.82;
+            transform: scale(1.018);
+            filter: blur(1.5px);
+          }
+          to {
+            opacity: 1;
+            transform: scale(1);
+            filter: blur(0);
+          }
+        }
+        @keyframes homePhotoFadeOut {
+          from {
+            opacity: 1;
+            transform: scale(1);
+          }
+          to {
+            opacity: 0;
+            transform: scale(1.012);
+          }
+        }
+        @keyframes homeCatChromeSettle {
+          from {
+            opacity: 0.86;
+            transform: translate3d(0, 8px, 0) scale(0.992);
+          }
+          to {
+            opacity: 1;
+            transform: translate3d(0, 0, 0) scale(1);
           }
         }
         @keyframes morphBloom {
@@ -2472,6 +2549,16 @@ const styles = {
     backgroundSize: "cover",
     backgroundPosition: "center 38%",
     backgroundRepeat: "no-repeat",
+    pointerEvents: "none",
+    willChange: "opacity, transform, filter",
+  },
+  backgroundPhotoCurrent: {
+    zIndex: 0,
+    animation: "homePhotoSettle 0.52s cubic-bezier(0.22, 1, 0.36, 1) both",
+  },
+  backgroundPhotoPrevious: {
+    zIndex: 1,
+    animation: "homePhotoFadeOut 0.54s cubic-bezier(0.22, 1, 0.36, 1) both",
   },
   contentLayer: {
     position: "relative",
@@ -2508,6 +2595,7 @@ const styles = {
     maxWidth: "min(78vw, 330px)",
     overflowX: "auto",
     scrollbarWidth: "none",
+    padding: "2px",
   },
   catSwitchChip: {
     display: "inline-flex",
@@ -2521,16 +2609,23 @@ const styles = {
     color: "rgba(255,255,255,0.9)",
     padding: "3px",
     cursor: "pointer",
+    flexShrink: 0,
+    overflow: "hidden",
+    isolation: "isolate",
     backdropFilter: "blur(22px)",
     WebkitBackdropFilter: "blur(22px)",
     boxShadow:
       "0 10px 28px rgba(0,0,0,0.2), inset 0 1px 0 rgba(255,255,255,0.16)",
+    transition:
+      "width 0.42s cubic-bezier(0.22, 1, 0.36, 1), min-width 0.42s cubic-bezier(0.22, 1, 0.36, 1), background 0.32s ease, border-color 0.32s ease, box-shadow 0.32s ease, transform 0.32s ease, opacity 0.32s ease",
+    willChange: "width, transform",
   },
   catSwitchChipActive: {
     display: "inline-flex",
     alignItems: "center",
     justifyContent: "center",
     gap: "9px",
+    width: "min(176px, max(116px, 34vw))",
     minWidth: "116px",
     maxWidth: "176px",
     height: "52px",
@@ -2542,10 +2637,16 @@ const styles = {
     fontSize: "15px",
     fontWeight: 680,
     cursor: "pointer",
+    flexShrink: 0,
+    overflow: "hidden",
+    isolation: "isolate",
     backdropFilter: "blur(26px)",
     WebkitBackdropFilter: "blur(26px)",
     boxShadow:
       "0 12px 32px rgba(0,0,0,0.24), inset 0 1px 0 rgba(255,255,255,0.2)",
+    transition:
+      "width 0.42s cubic-bezier(0.22, 1, 0.36, 1), min-width 0.42s cubic-bezier(0.22, 1, 0.36, 1), background 0.32s ease, border-color 0.32s ease, box-shadow 0.32s ease, transform 0.32s ease, opacity 0.32s ease",
+    willChange: "width, transform",
   },
   catSwitchAvatar: {
     width: "44px",
@@ -2573,6 +2674,7 @@ const styles = {
     textOverflow: "ellipsis",
     whiteSpace: "nowrap",
     textAlign: "center",
+    animation: "homeCatChromeSettle 0.36s cubic-bezier(0.22, 1, 0.36, 1) both",
   },
   catSwitchChevron: {
     fontSize: "11px",

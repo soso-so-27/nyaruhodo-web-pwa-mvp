@@ -1,7 +1,9 @@
 "use client";
 
 import Link from "next/link";
-import type { CSSProperties, ReactNode } from "react";
+import { usePathname, useRouter } from "next/navigation";
+import { useEffect, useState } from "react";
+import type { CSSProperties, MouseEvent, ReactNode } from "react";
 import {
   BookIcon,
   CatIcon,
@@ -20,7 +22,16 @@ type NavItem = {
   icon: ReactNode;
 };
 
+type ViewTransitionDocument = Document & {
+  startViewTransition?: (callback: () => void) => {
+    finished: Promise<void>;
+  };
+};
+
 export function BottomNavigation({ active }: BottomNavigationProps) {
+  const router = useRouter();
+  const pathname = usePathname();
+  const [pendingKey, setPendingKey] = useState<NavItem["key"] | null>(null);
   const activeKey =
     active === "today" ? "home" : active === "together" ? "collection" : active;
   const items: readonly NavItem[] = [
@@ -49,17 +60,64 @@ export function BottomNavigation({ active }: BottomNavigationProps) {
       icon: <CatIcon style={styles.svgIcon} />,
     },
   ];
+  const displayActiveKey = pendingKey ?? activeKey;
+  const activeIndex = Math.max(
+    0,
+    items.findIndex((item) => item.key === displayActiveKey),
+  );
+
+  useEffect(() => {
+    setPendingKey(null);
+  }, [activeKey, pathname]);
+
+  function handleNavClick(
+    event: MouseEvent<HTMLAnchorElement>,
+    item: NavItem,
+    isActive: boolean,
+  ) {
+    if (isActive) return;
+    if (event.defaultPrevented || event.button !== 0) return;
+    if (event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
+
+    setPendingKey(item.key);
+
+    const prefersReducedMotion = window.matchMedia(
+      "(prefers-reduced-motion: reduce)",
+    ).matches;
+    const viewTransitionDocument = document as ViewTransitionDocument;
+
+    if (
+      prefersReducedMotion ||
+      typeof viewTransitionDocument.startViewTransition !== "function"
+    ) {
+      return;
+    }
+
+    event.preventDefault();
+    viewTransitionDocument.startViewTransition(() => {
+      router.push(item.href);
+    });
+  }
 
   return (
     <nav style={styles.bottomNav} aria-label="下部ナビゲーション">
+      <span
+        style={{
+          ...styles.activeNavIndicator,
+          transform: `translateX(calc(${activeIndex} * (100% + 4px)))`,
+        }}
+        aria-hidden="true"
+      />
       {items.map((item) => {
-        const isActive = activeKey === item.key;
+        const isActive = displayActiveKey === item.key;
         return (
           <Link
             key={item.key}
             href={item.href}
             prefetch={true}
             style={isActive ? styles.activeNavButton : styles.navButton}
+            aria-current={activeKey === item.key ? "page" : undefined}
+            onClick={(event) => handleNavClick(event, item, isActive)}
           >
             <span
               style={isActive ? styles.activeNavIcon : styles.navIcon}
@@ -81,6 +139,7 @@ const styles = {
     left: "50%",
     bottom: "calc(12px + env(safe-area-inset-bottom))",
     zIndex: 20,
+    overflow: "hidden",
     display: "grid",
     gridTemplateColumns: "repeat(4, 1fr)",
     gap: "4px",
@@ -93,8 +152,24 @@ const styles = {
       "0 -2px 0 rgba(200,197,190,0.3), 0 8px 24px rgba(52, 50, 46, 0.12)",
     padding: "4px",
     backdropFilter: "blur(20px)",
+    viewTransitionName: "bottom-nav",
+  },
+  activeNavIndicator: {
+    position: "absolute",
+    top: "4px",
+    bottom: "4px",
+    left: "4px",
+    width: "calc((100% - 20px) / 4)",
+    borderRadius: "17px",
+    background: "#ecece7",
+    boxShadow: "inset 0 1px 0 rgba(255,255,255,0.72)",
+    pointerEvents: "none",
+    transition: "transform 0.42s cubic-bezier(0.22, 1, 0.36, 1)",
+    willChange: "transform",
   },
   navButton: {
+    position: "relative",
+    zIndex: 1,
     display: "flex",
     flexDirection: "column",
     alignItems: "center",
@@ -110,8 +185,12 @@ const styles = {
     letterSpacing: 0,
     whiteSpace: "nowrap",
     cursor: "pointer",
+    transition:
+      "color 0.24s ease, transform 0.32s cubic-bezier(0.22, 1, 0.36, 1)",
   },
   activeNavButton: {
+    position: "relative",
+    zIndex: 1,
     display: "flex",
     flexDirection: "column",
     alignItems: "center",
@@ -119,7 +198,7 @@ const styles = {
     gap: "2px",
     minHeight: "42px",
     borderRadius: "17px",
-    background: "#ecece7",
+    background: "transparent",
     color: "#3f433d",
     textDecoration: "none",
     fontSize: "10px",
@@ -127,6 +206,9 @@ const styles = {
     letterSpacing: 0,
     whiteSpace: "nowrap",
     cursor: "pointer",
+    transform: "translateY(-1px)",
+    transition:
+      "color 0.24s ease, transform 0.32s cubic-bezier(0.22, 1, 0.36, 1)",
   },
   navIcon: {
     display: "inline-flex",
@@ -136,6 +218,7 @@ const styles = {
     height: "20px",
     color: "#777872",
     lineHeight: 1,
+    transition: "color 0.24s ease, transform 0.32s cubic-bezier(0.22, 1, 0.36, 1)",
   },
   activeNavIcon: {
     display: "inline-flex",
@@ -145,6 +228,8 @@ const styles = {
     height: "20px",
     color: "#566052",
     lineHeight: 1,
+    transform: "scale(1.04)",
+    transition: "color 0.24s ease, transform 0.32s cubic-bezier(0.22, 1, 0.36, 1)",
   },
   svgIcon: {
     width: "19px",

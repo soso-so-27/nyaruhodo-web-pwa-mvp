@@ -1,4 +1,5 @@
 import type { CSSProperties } from "react";
+import { BottomNavigation } from "../navigation/BottomNavigation";
 
 type AppLoadingScreenProps = {
   variant: "home" | "collection" | "cats" | "torisetu";
@@ -9,6 +10,13 @@ export function AppLoadingScreen({ variant }: AppLoadingScreenProps) {
   const isCats = variant === "cats";
   const isCollection = variant === "collection";
   const isTorisetu = variant === "torisetu";
+  const activeNav = isHome
+    ? "today"
+    : isCollection
+      ? "collection"
+      : isCats
+        ? "cats"
+        : "torisetu";
 
   return (
     <main style={isHome ? styles.homePage : styles.page}>
@@ -40,6 +48,7 @@ export function AppLoadingScreen({ variant }: AppLoadingScreenProps) {
           100% { background-position: -180% 0; }
         }
       `}</style>
+      <BottomNavigation active={activeNav} />
     </main>
   );
 }
