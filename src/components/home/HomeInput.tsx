@@ -1336,6 +1336,12 @@ export function HomeInput({ recentEvents: _recentEvents }: HomeInputProps) {
             transform: scale(1.12);
           }
         }
+        .mikke-all-body {
+          scrollbar-width: none;
+        }
+        .mikke-all-body::-webkit-scrollbar {
+          display: none;
+        }
         @media (prefers-reduced-motion: reduce) {
           * {
             animation-duration: 0.01ms !important;
@@ -1530,7 +1536,7 @@ function MikkeAllSheet({
       isReturning={isReturning}
       onClose={onClose}
     >
-      <div style={styles.mikkeAllBody}>
+      <div className="mikke-all-body" style={styles.mikkeAllBody}>
         {questions.map((question) => {
           const remaining = categoryRemaining[question.category];
           const isLocked = Boolean(remaining);
@@ -1550,7 +1556,7 @@ function MikkeAllSheet({
                   ) : null}
                 </span>
               </div>
-              <div style={styles.mikkeOptionGrid}>
+              <div style={styles.mikkeAllOptionGrid}>
                 {question.options.map((option) => {
                   const isSelected = selected === option.label;
                   return (
@@ -1561,6 +1567,7 @@ function MikkeAllSheet({
                       disabled={isLocked}
                       style={{
                         ...styles.mikkeOption,
+                        ...styles.mikkeAllOption,
                         ...(isSelected ? styles.mikkeOptionSelected : {}),
                         ...(isLocked && !isSelected ? styles.lockedState : {}),
                       }}
@@ -3029,7 +3036,7 @@ const styles = {
     border: "none",
     borderRadius: 0,
     background:
-      "linear-gradient(to top, rgba(18,16,15,0.76) 0%, rgba(18,16,15,0.54) 48%, rgba(18,16,15,0.05) 100%)",
+      "linear-gradient(to top, rgba(14,12,11,0.86) 0%, rgba(14,12,11,0.7) 48%, rgba(14,12,11,0.22) 82%, rgba(14,12,11,0) 100%)",
     boxShadow: "none",
     backdropFilter: "none",
     WebkitBackdropFilter: "none",
@@ -3771,6 +3778,12 @@ const styles = {
     display: "grid",
     gap: "15px",
     marginTop: "14px",
+    maxHeight: "min(66dvh, 580px)",
+    overflowY: "auto",
+    overscrollBehavior: "contain",
+    paddingRight: "2px",
+    paddingBottom: "4px",
+    WebkitOverflowScrolling: "touch",
   },
   mikkeAllLockedText: {
     margin: 0,
@@ -3875,6 +3888,11 @@ const styles = {
     gridTemplateColumns: "repeat(2, minmax(0, 1fr))",
     gap: "8px",
   },
+  mikkeAllOptionGrid: {
+    display: "grid",
+    gridTemplateColumns: "repeat(3, minmax(0, 1fr))",
+    gap: "7px",
+  },
   mikkeOption: {
     minHeight: "48px",
     border: "0.5px solid rgba(255,255,255,0.17)",
@@ -3891,6 +3909,14 @@ const styles = {
     transition:
       "background 0.18s cubic-bezier(0.2, 0.8, 0.2, 1), border-color 0.18s cubic-bezier(0.2, 0.8, 0.2, 1), color 0.18s cubic-bezier(0.2, 0.8, 0.2, 1), transform 0.18s cubic-bezier(0.2, 0.8, 0.2, 1)",
     willChange: "transform",
+  },
+  mikkeAllOption: {
+    minHeight: "42px",
+    borderRadius: "14px",
+    padding: "8px 4px",
+    fontSize: "13px",
+    fontWeight: 620,
+    lineHeight: 1.16,
   },
   mikkeOptionSelected: {
     borderColor: "rgba(255,255,255,0.72)",
