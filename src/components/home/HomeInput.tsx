@@ -1342,6 +1342,12 @@ export function HomeInput({ recentEvents: _recentEvents }: HomeInputProps) {
         .mikke-all-body::-webkit-scrollbar {
           display: none;
         }
+        .board-open-content {
+          scrollbar-width: none;
+        }
+        .board-open-content::-webkit-scrollbar {
+          display: none;
+        }
         @media (prefers-reduced-motion: reduce) {
           * {
             animation-duration: 0.01ms !important;
@@ -1651,38 +1657,38 @@ function MikkeWindowContent({
   variant: "card" | "sheet";
 }) {
   const isAnswered = Boolean(answer);
-  const disabled = isAnswered;
 
   return (
     <div style={variant === "card" ? styles.mikkeWindowBody : styles.mikkeSheetBody}>
-      <div style={styles.mikkeQuestionBlock}>
-        <span style={styles.mikkeQuestionCategory}>
-          {window.question.categoryLabel}
-        </span>
-        <p style={styles.mikkeQuestionText}>{window.question.prompt}</p>
-      </div>
-      <div style={styles.mikkeOptionGrid}>
-        {getMikkeWindowOptions(window.question).map((option) => {
-          const isSelected = answer?.answerId === option.id;
-          return (
-            <button
-              key={option.id}
-              type="button"
-              onClick={() => onSelect(option)}
-              disabled={disabled}
-              style={{
-                ...styles.mikkeOption,
-                ...(isSelected ? styles.mikkeOptionSelected : {}),
-                ...(disabled && !isSelected ? styles.lockedState : {}),
-              }}
-            >
-              {option.label}
-            </button>
-          );
-        })}
-      </div>
+      {!isAnswered ? (
+        <>
+          <div style={styles.mikkeQuestionBlock}>
+            <span style={styles.mikkeQuestionCategory}>
+              {window.question.categoryLabel}
+            </span>
+            <p style={styles.mikkeQuestionText}>{window.question.prompt}</p>
+          </div>
+          <div style={styles.mikkeOptionGrid}>
+            {getMikkeWindowOptions(window.question).map((option) => (
+              <button
+                key={option.id}
+                type="button"
+                onClick={() => onSelect(option)}
+                style={styles.mikkeOption}
+              >
+                {option.label}
+              </button>
+            ))}
+          </div>
+        </>
+      ) : null}
       {isAnswered ? (
-        <div style={styles.mikkeResultBlock}>
+        <div
+          style={{
+            ...styles.mikkeResultBlock,
+            ...styles.mikkeResultBlockCollapsed,
+          }}
+        >
           <div style={styles.mikkeResultHeader}>
             <span style={styles.mikkeResultMine}>
               {answer?.answerLabel}、みっけ
@@ -2068,14 +2074,15 @@ function HomeBulletinBoard({
         </div>
 
         <div
-        style={{
-          ...styles.boardOpenContent,
-          ...(isOpen
-            ? styles.boardOpenContentVisible
-            : styles.boardOpenContentHidden),
-        }}
+          className="board-open-content"
+          style={{
+            ...styles.boardOpenContent,
+            ...(isOpen
+              ? styles.boardOpenContentVisible
+              : styles.boardOpenContentHidden),
+          }}
           onClick={(event) => event.stopPropagation()}
-        aria-hidden={!isOpen}
+          aria-hidden={!isOpen}
         >
           <MikkeWindowCard
             window={mikkeWindow}
@@ -2088,9 +2095,8 @@ function HomeBulletinBoard({
             isPhotoAdding={isMikkePhotoAdding}
             onAddPhoto={onMikkePhotoAdd}
           />
-
         </div>
-    </section>
+      </section>
   );
 }
 
@@ -3141,7 +3147,9 @@ const styles = {
   boardOpenContent: {
     width: HOME_NAV_FRAME_WIDTH,
     maxHeight: "100%",
-    overflowY: "hidden",
+    overflowY: "auto",
+    overscrollBehavior: "contain",
+    WebkitOverflowScrolling: "touch",
     padding: "0 0 2px",
     boxSizing: "border-box",
     cursor: "default",
@@ -3929,6 +3937,10 @@ const styles = {
     gap: "8px",
     borderTop: "0.5px solid rgba(255,255,255,0.12)",
     paddingTop: "10px",
+  },
+  mikkeResultBlockCollapsed: {
+    borderTop: "none",
+    paddingTop: 0,
   },
   mikkeResultHeader: {
     display: "flex",
