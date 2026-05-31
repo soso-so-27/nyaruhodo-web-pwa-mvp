@@ -371,6 +371,10 @@ export function HomeInput({ recentEvents: _recentEvents }: HomeInputProps) {
     ? formatRemainingMs(mikkeWindow.endsAt - tick)
     : null;
   const latestRecord = recordLog[0] ?? null;
+  const mikkeCategoryLastLabels = useMemo(
+    () => buildMikkeCategoryLastLabels(recordLog),
+    [recordLog],
+  );
   const personalityInsight = useMemo(
     () => buildPersonalityInsight(recordLog, catName),
     [catName, recordLog],
@@ -1191,8 +1195,10 @@ export function HomeInput({ recentEvents: _recentEvents }: HomeInputProps) {
           returnCompletion={boardSheetReturn}
           isReturning={isBoardSheetReturning}
           questions={MIKKE_WINDOW_QUESTIONS}
+          currentCategory={mikkeWindow.question.category}
           selected={selectedYousu}
           categoryRemaining={mikkeCategoryRemaining}
+          categoryLastLabels={mikkeCategoryLastLabels}
           onClose={() => closeBoardInput(setIsYousuOpen)}
           onSelect={(question, option) => {
             recordMikkeFreeAnswer(question, option);
@@ -1516,8 +1522,10 @@ function MikkeAllSheet({
   returnCompletion,
   isReturning,
   questions,
+  currentCategory,
   selected,
   categoryRemaining,
+  categoryLastLabels,
   onClose,
   onSelect,
 }: {
@@ -1526,14 +1534,43 @@ function MikkeAllSheet({
   returnCompletion: HomeBoardCompletion | null;
   isReturning: boolean;
   questions: typeof MIKKE_WINDOW_QUESTIONS;
+  currentCategory: MikkeWindowCategory;
   selected: string | null;
   categoryRemaining: Record<MikkeWindowCategory, string | null>;
+  categoryLastLabels: Record<MikkeWindowCategory, string | null>;
   onClose: () => void;
   onSelect: (
     question: (typeof MIKKE_WINDOW_QUESTIONS)[number],
     option: MikkeWindowOption,
   ) => void;
 }) {
+  const [expandedLockedCategories, setExpandedLockedCategories] = useState<
+    Partial<Record<MikkeWindowCategory, boolean>>
+  >({});
+  const sectionRefs = useRef<Record<MikkeWindowCategory, HTMLElement | null>>({
+    place: null,
+    pose: null,
+    sign: null,
+  });
+  const orderedQuestions = [
+    ...questions.filter((question) => question.category === currentCategory),
+    ...questions.filter((question) => question.category !== currentCategory),
+  ];
+
+  function jumpToCategory(category: MikkeWindowCategory) {
+    sectionRefs.current[category]?.scrollIntoView({
+      behavior: "smooth",
+      block: "start",
+    });
+  }
+
+  function toggleLockedCategory(category: MikkeWindowCategory) {
+    setExpandedLockedCategories((current) => ({
+      ...current,
+      [category]: !current[category],
+    }));
+  }
+
   return (
     <HomeMorphSheet
       title={title}
@@ -1542,13 +1579,47 @@ function MikkeAllSheet({
       isReturning={isReturning}
       onClose={onClose}
     >
-      <div className="mikke-all-body" style={styles.mikkeAllBody}>
-        {questions.map((question) => {
+      <div style={styles.mikkeCategoryNav} aria-label="みっけカテゴリ">
+        {orderedQuestions.map((question) => {
           const remaining = categoryRemaining[question.category];
-          const isLocked = Boolean(remaining);
+          const isCurrent = question.category === currentCategory;
 
           return (
-            <section key={question.id} style={styles.mikkeAllSection}>
+            <button
+              key={question.category}
+              type="button"
+              style={{
+                ...styles.mikkeCategoryNavItem,
+                ...(isCurrent ? styles.mikkeCategoryNavItemActive : {}),
+              }}
+              onClick={() => jumpToCategory(question.category)}
+            >
+              <span>{question.categoryLabel}</span>
+              {remaining ? (
+                <span style={styles.mikkeCategoryNavStatus}>あと</span>
+              ) : null}
+            </button>
+          );
+        })}
+      </div>
+      <div className="mikke-all-body" style={styles.mikkeAllBody}>
+        {orderedQuestions.map((question) => {
+          const remaining = categoryRemaining[question.category];
+          const isLocked = Boolean(remaining);
+          const isExpandedLocked = Boolean(
+            expandedLockedCategories[question.category],
+          );
+          const shouldCollapse = isLocked && !isExpandedLocked;
+          const lastLabel = categoryLastLabels[question.category];
+
+          return (
+            <section
+              key={question.id}
+              ref={(node) => {
+                sectionRefs.current[question.category] = node;
+              }}
+              style={styles.mikkeAllSection}
+            >
               <div style={styles.mikkeAllSectionHeader}>
                 <span style={styles.mikkeQuestionCategory}>
                   {question.categoryLabel}
@@ -1562,6 +1633,31 @@ function MikkeAllSheet({
                   ) : null}
                 </span>
               </div>
+              {shouldCollapse ? (
+                <button
+                  type="button"
+                  style={styles.mikkeLockedSummary}
+                  onClick={() => toggleLockedCategory(question.category)}
+                >
+                  <span style={styles.mikkeLockedSummaryText}>
+                    {lastLabel ? `${lastLabel}、みっけ` : "みっけ済み"}
+                  </span>
+                  <span style={styles.mikkeLockedSummarySub}>開く</span>
+                </button>
+              ) : null}
+              {isLocked && isExpandedLocked ? (
+                <button
+                  type="button"
+                  style={styles.mikkeLockedSummary}
+                  onClick={() => toggleLockedCategory(question.category)}
+                >
+                  <span style={styles.mikkeLockedSummaryText}>
+                    {lastLabel ? `${lastLabel}、みっけ` : "みっけ済み"}
+                  </span>
+                  <span style={styles.mikkeLockedSummarySub}>閉じる</span>
+                </button>
+              ) : null}
+              {!shouldCollapse ? (
               <div style={styles.mikkeAllOptionGrid}>
                 {question.options.map((option) => {
                   const isSelected = selected === option.label;
@@ -1583,6 +1679,7 @@ function MikkeAllSheet({
                   );
                 })}
               </div>
+              ) : null}
             </section>
           );
         })}
@@ -2643,6 +2740,30 @@ function getMikkeCategoryRemainingMap(lockData: LockData, now = Date.now()) {
     }),
     {} as Record<MikkeWindowCategory, string | null>,
   );
+}
+
+function buildMikkeCategoryLastLabels(records: RecordLogItem[]) {
+  const labels: Record<MikkeWindowCategory, string | null> = {
+    place: null,
+    pose: null,
+    sign: null,
+  };
+
+  for (const record of records) {
+    const category = record.metadata?.mikkeCategory;
+
+    if (!isMikkeCategory(category) || labels[category]) {
+      continue;
+    }
+
+    labels[category] = record.value;
+  }
+
+  return labels;
+}
+
+function isMikkeCategory(value?: string): value is MikkeWindowCategory {
+  return MIKKE_CATEGORIES.includes(value as MikkeWindowCategory);
 }
 
 function getAllMikkeCategoriesLockedRemaining(
@@ -3785,13 +3906,47 @@ const styles = {
   mikkeAllBody: {
     display: "grid",
     gap: "15px",
-    marginTop: "14px",
-    maxHeight: "min(66dvh, 580px)",
+    marginTop: "12px",
+    maxHeight: "min(58dvh, 520px)",
     overflowY: "auto",
     overscrollBehavior: "contain",
     paddingRight: "2px",
     paddingBottom: "4px",
     WebkitOverflowScrolling: "touch",
+  },
+  mikkeCategoryNav: {
+    display: "grid",
+    gridTemplateColumns: "repeat(3, minmax(0, 1fr))",
+    gap: "7px",
+    marginTop: "12px",
+  },
+  mikkeCategoryNavItem: {
+    minWidth: 0,
+    minHeight: "34px",
+    border: "0.5px solid rgba(255,255,255,0.13)",
+    borderRadius: "999px",
+    background: "rgba(255,255,255,0.07)",
+    color: "rgba(255,255,255,0.66)",
+    padding: "7px 8px",
+    display: "inline-flex",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: "5px",
+    fontSize: "12px",
+    fontWeight: 650,
+    lineHeight: 1.15,
+    cursor: "pointer",
+  },
+  mikkeCategoryNavItemActive: {
+    borderColor: "rgba(255,255,255,0.32)",
+    background: "rgba(255,255,255,0.14)",
+    color: "rgba(255,255,255,0.94)",
+  },
+  mikkeCategoryNavStatus: {
+    color: "rgba(255,255,255,0.46)",
+    fontSize: "10px",
+    fontWeight: 650,
+    lineHeight: 1,
   },
   mikkeAllLockedText: {
     margin: 0,
@@ -3829,6 +3984,37 @@ const styles = {
     fontWeight: 650,
     lineHeight: 1.2,
     fontVariantNumeric: "tabular-nums",
+  },
+  mikkeLockedSummary: {
+    width: "100%",
+    minHeight: "44px",
+    border: "0.5px solid rgba(255,255,255,0.14)",
+    borderRadius: "14px",
+    background: "rgba(255,255,255,0.07)",
+    color: "rgba(255,255,255,0.86)",
+    padding: "10px 12px",
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: "10px",
+    textAlign: "left",
+    cursor: "pointer",
+  },
+  mikkeLockedSummaryText: {
+    minWidth: 0,
+    overflow: "hidden",
+    textOverflow: "ellipsis",
+    whiteSpace: "nowrap",
+    fontSize: "13px",
+    fontWeight: 650,
+    lineHeight: 1.2,
+  },
+  mikkeLockedSummarySub: {
+    flex: "0 0 auto",
+    color: "rgba(255,255,255,0.5)",
+    fontSize: "11px",
+    fontWeight: 650,
+    lineHeight: 1.2,
   },
   mikkeWindowPanel: {
     width: "100%",
