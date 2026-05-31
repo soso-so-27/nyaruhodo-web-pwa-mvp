@@ -26,6 +26,7 @@ import {
   saveStoredMikkeWindowAnswer,
   type MikkeWindowCategory,
   type MikkeWindow,
+  type MikkeWindowCount,
   type MikkeWindowOption,
   type MikkeWindowResult,
   type StoredMikkeWindowAnswer,
@@ -64,6 +65,7 @@ type HomeInputProps = {
 type LockData = {
   yousuLockedUntil?: number;
   mugiLockedUntil?: number;
+  sleepingCounterLockedUntil?: number;
   mikkeCategoryLockedUntil?: Partial<Record<MikkeWindowCategory, number>>;
 };
 
@@ -71,6 +73,7 @@ type LockType = "yousu" | "mugi";
 
 const MIKKE_CATEGORIES: MikkeWindowCategory[] = ["place", "pose", "sign"];
 const MIKKE_LOCK_MS = 60 * 60 * 1000;
+const HOME_SLEEPING_COUNTER_BASE_COUNT = 75;
 
 const HOME_FALLBACK_PHOTO_SRC = "/sample-cats/mugi-hero.png";
 
@@ -84,6 +87,7 @@ type RecordLogItem = {
     mikkeQuestionId?: string;
     mikkeCategory?: string;
     mikkeAnswerId?: string;
+    homeCounterId?: string;
   };
 };
 
@@ -94,7 +98,8 @@ type HomeBoardAction =
   | "open_discovery"
   | "open_recent_change"
   | "go_torisetu"
-  | "go_collection";
+  | "go_collection"
+  | "add_sleeping";
 
 type HomeBoardItem = {
   id: string;
@@ -102,7 +107,7 @@ type HomeBoardItem = {
   priority: number;
   title: string;
   body: string;
-  icon: "paw" | "hand" | "heart" | "bell" | "camera" | "book";
+  icon: "paw" | "sleep" | "hand" | "heart" | "bell" | "camera" | "book";
   actionLabel: string;
   actionType: HomeBoardAction;
   isUnread?: boolean;
@@ -164,6 +169,12 @@ type BoardShelfStat = {
   label: string;
   value: string;
   detail: string;
+};
+
+type HomeCatCounter = {
+  id: "sleeping" | "window" | "loaf";
+  label: string;
+  count: number;
 };
 
 export function HomeInput({ recentEvents: _recentEvents }: HomeInputProps) {
@@ -370,6 +381,21 @@ export function HomeInput({ recentEvents: _recentEvents }: HomeInputProps) {
   const mikkeWindowRemaining = mikkeAnswer
     ? formatRemainingMs(mikkeWindow.endsAt - tick)
     : null;
+  const sleepingCounterRemaining = getSleepingCounterRemaining(lockData, tick);
+  const sleepingCounterCooldownProgress = getSleepingCounterCooldownProgress(
+    lockData,
+    tick,
+  );
+  const homeCatCounters = useMemo(
+    () =>
+      buildHomeCatCounters({
+        mikkeWindow,
+        mikkeAnswer,
+        mikkeResult,
+        recordLog,
+      }),
+    [mikkeAnswer, mikkeResult, mikkeWindow, recordLog],
+  );
   const latestRecord = recordLog[0] ?? null;
   const mikkeCategoryLastLabels = useMemo(
     () => buildMikkeCategoryLastLabels(recordLog),
@@ -418,19 +444,25 @@ export function HomeInput({ recentEvents: _recentEvents }: HomeInputProps) {
         collectionTargetLabel: dailyCollectionTarget?.label ?? null,
         mikkeWindow,
         mikkeAnswer,
+        homeCatCounters,
         mikkeRemaining: mikkeAllRemaining,
         mikkeCooldownProgress: mikkeAllCooldownProgress,
+        sleepingCounterRemaining,
+        sleepingCounterCooldownProgress,
       }),
     [
       activeCat?.homePhotoDataUrl,
       catName,
       discovery.available,
       dailyCollectionTarget?.label,
+      homeCatCounters,
       mikkeAnswer,
       mikkeWindow,
       recordLog,
       mikkeAllCooldownProgress,
       mikkeAllRemaining,
+      sleepingCounterCooldownProgress,
+      sleepingCounterRemaining,
     ],
   );
 
@@ -452,7 +484,11 @@ export function HomeInput({ recentEvents: _recentEvents }: HomeInputProps) {
       }
 
       setMikkeResult(
-        buildMikkeWindowResult(mikkeWindow.question, counts, mikkeWindow.id),
+        buildMikkeWindowResult(
+          mikkeWindow.question,
+          addLocalAnswerCount(counts, mikkeAnswer),
+          mikkeWindow.id,
+        ),
       );
       setIsMikkeResultLoading(false);
     }
@@ -840,7 +876,11 @@ export function HomeInput({ recentEvents: _recentEvents }: HomeInputProps) {
 
     const counts = await fetchMikkeWindowCounts(mikkeWindow);
     setMikkeResult(
-      buildMikkeWindowResult(mikkeWindow.question, counts, mikkeWindow.id),
+      buildMikkeWindowResult(
+        mikkeWindow.question,
+        addLocalAnswerCount(counts, answer),
+        mikkeWindow.id,
+      ),
     );
   }
 
@@ -1065,6 +1105,10 @@ export function HomeInput({ recentEvents: _recentEvents }: HomeInputProps) {
       openBoardInput(setIsYousuOpen, source);
       return;
     }
+    if (actionType === "add_sleeping") {
+      recordSleepingCounterAnswer();
+      return;
+    }
     if (actionType === "open_photo") {
       void handleHomePhotoSelect();
       return;
@@ -1088,6 +1132,41 @@ export function HomeInput({ recentEvents: _recentEvents }: HomeInputProps) {
     if (actionType === "go_collection") {
       window.location.href = "/collection";
     }
+  }
+
+  function recordSleepingCounterAnswer() {
+    if (!activeCatId || getSleepingCounterRemaining(lockData, Date.now())) {
+      return;
+    }
+
+    const nextLockData = setSleepingCounterLock(activeCatId);
+
+    saveRecord(activeCatId, {
+      type: "yousu",
+      value: "ねてる",
+      metadata: {
+        homeCounterId: "sleeping",
+      },
+    });
+    trackProductEvent(
+      "home_sleeping_counter_joined",
+      {
+        counter_id: "sleeping",
+        window_id: mikkeWindow.id,
+      },
+      { localCatId: activeCatId },
+    );
+    setSelectedYousu("ねてる");
+    setRecordLog(readRecordLog(activeCatId));
+    setLockData(nextLockData);
+    const sleepingCounter = homeCatCounters.find(
+      (counter) => counter.id === "sleeping",
+    );
+    showBoardCompletion(
+      "sleeping-counter",
+      formatSleepingCounterCount((sleepingCounter?.count ?? 0) + 1),
+      `${catName}も加わりました`,
+    );
   }
 
   return (
@@ -1174,11 +1253,16 @@ export function HomeInput({ recentEvents: _recentEvents }: HomeInputProps) {
         mikkeWindow={mikkeWindow}
         mikkeAnswer={mikkeAnswer}
         mikkeResult={mikkeResult}
+        catName={catName}
+        catCounters={homeCatCounters}
         isMikkeResultLoading={isMikkeResultLoading}
         mikkeRemaining={mikkeWindowRemaining}
         onAction={handleBoardAction}
         onMikkeAnswer={(option) => {
           void recordMikkeWindowAnswer(option);
+        }}
+        onOpenMikkeAll={() => {
+          openBoardInput(setIsYousuOpen);
         }}
         mikkePhotoSlot={getCollectionSlotById(mikkeSelectedOption?.collectionSlotId)}
         isMikkePhotoAdding={isCollectionPhotoAdding}
@@ -1692,9 +1776,12 @@ function MikkeWindowCard({
   window,
   answer,
   result,
+  catName,
+  catCounters,
   isResultLoading,
   remaining,
   onSelect,
+  onOpenAll,
   photoSlot,
   isPhotoAdding,
   onAddPhoto,
@@ -1702,9 +1789,12 @@ function MikkeWindowCard({
   window: MikkeWindow;
   answer: StoredMikkeWindowAnswer | null;
   result: MikkeWindowResult | null;
+  catName: string;
+  catCounters: HomeCatCounter[];
   isResultLoading: boolean;
   remaining: string | null;
   onSelect: (option: MikkeWindowOption) => void;
+  onOpenAll: () => void;
   photoSlot: CollectionSlot | null;
   isPhotoAdding: boolean;
   onAddPhoto: (slot: CollectionSlot) => void;
@@ -1712,17 +1802,27 @@ function MikkeWindowCard({
   return (
     <div style={styles.mikkeWindowPanel}>
       <div style={styles.mikkeWindowHeader}>
-        <span style={styles.mikkeWindowKicker}>みっけ</span>
+        <span style={styles.mikkeWindowKicker}>ほかの猫</span>
         <span style={styles.mikkeWindowBadge}>
           {remaining ? `あと ${remaining}` : window.question.categoryLabel}
         </span>
+      </div>
+      <div style={styles.catCounterGrid}>
+        {catCounters.map((counter) => (
+          <span key={counter.id} style={styles.catCounterTile}>
+            <span style={styles.catCounterValue}>{counter.count}匹</span>
+            <span style={styles.catCounterLabel}>{counter.label}</span>
+          </span>
+        ))}
       </div>
       <MikkeWindowContent
         window={window}
         answer={answer}
         result={result}
+        catName={catName}
         isResultLoading={isResultLoading}
         onSelect={onSelect}
+        onOpenAll={onOpenAll}
         photoSlot={photoSlot}
         isPhotoAdding={isPhotoAdding}
         onAddPhoto={onAddPhoto}
@@ -1736,8 +1836,10 @@ function MikkeWindowContent({
   window,
   answer,
   result,
+  catName,
   isResultLoading,
   onSelect,
+  onOpenAll,
   photoSlot,
   isPhotoAdding,
   onAddPhoto,
@@ -1746,14 +1848,23 @@ function MikkeWindowContent({
   window: MikkeWindow;
   answer: StoredMikkeWindowAnswer | null;
   result: MikkeWindowResult | null;
+  catName: string;
   isResultLoading: boolean;
   onSelect: (option: MikkeWindowOption) => void;
+  onOpenAll: () => void;
   photoSlot: CollectionSlot | null;
   isPhotoAdding: boolean;
   onAddPhoto: (slot: CollectionSlot) => void;
   variant: "card" | "sheet";
 }) {
   const isAnswered = Boolean(answer);
+  const selectedCount =
+    answer && result
+      ? result.counts.find((count) => count.answerId === answer.answerId)
+      : null;
+  const visibleResultCounts = result
+    ? getVisibleMikkeResultCounts(result.counts, answer?.answerId)
+    : [];
 
   return (
     <div style={variant === "card" ? styles.mikkeWindowBody : styles.mikkeSheetBody}>
@@ -1761,9 +1872,18 @@ function MikkeWindowContent({
         <>
           <div style={styles.mikkeQuestionBlock}>
             <span style={styles.mikkeQuestionCategory}>
-              {window.question.categoryLabel}
+              {catName}も加える
             </span>
-            <p style={styles.mikkeQuestionText}>{window.question.prompt}</p>
+            <span style={styles.mikkeQuestionRow}>
+              <p style={styles.mikkeQuestionText}>{window.question.prompt}</p>
+              <button
+                type="button"
+                style={styles.mikkeAllOpenButton}
+                onClick={onOpenAll}
+              >
+                ぜんぶ
+              </button>
+            </span>
           </div>
           <div style={styles.mikkeOptionGrid}>
             {getMikkeWindowOptions(window.question).map((option) => (
@@ -1786,10 +1906,19 @@ function MikkeWindowContent({
             ...styles.mikkeResultBlockCollapsed,
           }}
         >
-          <div style={styles.mikkeResultHeader}>
-            <span style={styles.mikkeResultMine}>
-              {answer?.answerLabel}、みっけ
+          <div style={styles.mikkeResultCounter}>
+            <span style={styles.mikkeResultCounterLabel}>
+              {answer?.answerLabel}の猫
             </span>
+            <span style={styles.mikkeResultCounterValue}>
+              {selectedCount?.count ?? 1}匹
+            </span>
+            <span style={styles.mikkeResultCounterSub}>
+              {catName}も加わりました
+            </span>
+          </div>
+          <div style={styles.mikkeResultHeader}>
+            <span style={styles.mikkeResultMine}>ほかの子</span>
             <span style={styles.mikkeResultMeta}>
               {result?.isMockAssisted ? "集まり中" : `${result?.realTotal ?? 0}匹`}
             </span>
@@ -1798,13 +1927,33 @@ function MikkeWindowContent({
             <p style={styles.mikkeResultEmpty}>ほかの子たちを見ています</p>
           ) : result ? (
             <div style={styles.mikkeResultRows}>
-              {result.counts.map((count) => (
-                <div key={count.answerId} style={styles.mikkeResultRow}>
-                  <span style={styles.mikkeResultLabel}>{count.answerLabel}</span>
+              {visibleResultCounts.map((count) => (
+                <div
+                  key={count.answerId}
+                  style={{
+                    ...styles.mikkeResultRow,
+                    ...(count.answerId === answer?.answerId
+                      ? styles.mikkeResultRowSelected
+                      : {}),
+                  }}
+                >
+                  <span
+                    style={{
+                      ...styles.mikkeResultLabel,
+                      ...(count.answerId === answer?.answerId
+                        ? styles.mikkeResultLabelSelected
+                        : {}),
+                    }}
+                  >
+                    {count.answerLabel}
+                  </span>
                   <span style={styles.mikkeResultTrack}>
                     <span
                       style={{
                         ...styles.mikkeResultFill,
+                        ...(count.answerId === answer?.answerId
+                          ? styles.mikkeResultFillSelected
+                          : {}),
                         width: `${Math.max(6, count.ratio)}%`,
                       }}
                     />
@@ -1997,10 +2146,13 @@ function HomeBulletinBoard({
   mikkeWindow,
   mikkeAnswer,
   mikkeResult,
+  catName,
+  catCounters,
   isMikkeResultLoading,
   mikkeRemaining,
   onAction,
   onMikkeAnswer,
+  onOpenMikkeAll,
   mikkePhotoSlot,
   isMikkePhotoAdding,
   onMikkePhotoAdd,
@@ -2012,10 +2164,13 @@ function HomeBulletinBoard({
   mikkeWindow: MikkeWindow;
   mikkeAnswer: StoredMikkeWindowAnswer | null;
   mikkeResult: MikkeWindowResult | null;
+  catName: string;
+  catCounters: HomeCatCounter[];
   isMikkeResultLoading: boolean;
   mikkeRemaining: string | null;
   onAction: HomeBoardActionHandler;
   onMikkeAnswer: (option: MikkeWindowOption) => void;
+  onOpenMikkeAll: () => void;
   mikkePhotoSlot: CollectionSlot | null;
   isMikkePhotoAdding: boolean;
   onMikkePhotoAdd: (slot: CollectionSlot) => void;
@@ -2040,6 +2195,20 @@ function HomeBulletinBoard({
           } satisfies HomeBoardItem,
         ];
   const peekItems = getBoardPeekItems(displayItems);
+  const sleepingCounterItem = displayItems.find(
+    (item) => item.id === "sleeping-counter",
+  );
+  const sleepingCounterCompletion =
+    sleepingCounterItem && completion?.itemId === sleepingCounterItem.id
+      ? completion
+      : null;
+  const sleepingCounterTitle = sleepingCounterItem?.title ?? "";
+  const sleepingCounterValue =
+    sleepingCounterCompletion?.title ??
+    getBoardCounterPrimaryText(sleepingCounterItem?.surfaceText);
+  const sleepingCounterSurfaceText =
+    sleepingCounterCompletion?.surfaceText ??
+    getBoardCounterSecondaryText(sleepingCounterItem?.surfaceText);
 
   useEffect(() => {
     if (completion) {
@@ -2089,17 +2258,67 @@ function HomeBulletinBoard({
           >
             <span style={styles.boardDockLiftHandle} aria-hidden="true" />
           </button>
+          {sleepingCounterItem ? (
+            <button
+              type="button"
+              disabled={sleepingCounterItem.isDisabled}
+              style={{
+                ...styles.boardSleepCounter,
+                ...(sleepingCounterItem.isDisabled
+                  ? styles.boardSleepCounterDisabled
+                  : {}),
+                ...(sleepingCounterCompletion
+                  ? styles.boardSleepCounterCompleted
+                  : {}),
+              }}
+              onClick={(event) => {
+                onAction(
+                  sleepingCounterItem.actionType,
+                  getBoardTransitionSource(
+                    event,
+                    sleepingCounterItem,
+                    sleepingCounterTitle,
+                    `${sleepingCounterValue}・${sleepingCounterSurfaceText}`,
+                  ),
+                );
+              }}
+            >
+              <span style={styles.boardSleepCounterIcon} aria-hidden="true">
+                <BoardIcon
+                  icon={sleepingCounterItem.icon}
+                  size={22}
+                  style={styles.boardSleepCounterIconSvg}
+                />
+              </span>
+              <span style={styles.boardSleepCounterText}>
+                <span style={styles.boardSleepCounterLabel}>
+                  {sleepingCounterTitle}
+                </span>
+                <span style={styles.boardSleepCounterSub}>
+                  {sleepingCounterSurfaceText}
+                </span>
+              </span>
+              <span style={styles.boardSleepCounterValue}>
+                {sleepingCounterValue}
+              </span>
+              {typeof sleepingCounterItem.cooldownProgress === "number" ? (
+                <span style={styles.boardSleepCounterCountdown} aria-hidden="true">
+                  <span style={styles.boardSleepCounterCountdownTrack} />
+                  <span
+                    style={{
+                      ...styles.boardSleepCounterCountdownFill,
+                      ...getBoardDockCountdownStyle(sleepingCounterItem),
+                    }}
+                  />
+                </span>
+              ) : null}
+            </button>
+          ) : null}
           <div style={styles.boardDock} aria-label="あなたへのおすすめ">
             {peekItems.map((item) => {
               const completed = completion?.itemId === item.id ? completion : null;
-              const defaultTitle =
-                item.id === "daily-collection-target"
-                  ? item.surfaceText ?? item.title
-                  : item.title;
-              const defaultSurfaceText =
-                item.id === "daily-collection-target"
-                  ? item.title
-                  : item.surfaceText;
+              const defaultTitle = item.title;
+              const defaultSurfaceText = item.surfaceText;
               const displayTitle = completed?.title ?? defaultTitle;
               const displaySurfaceText =
                 completed?.surfaceText ?? defaultSurfaceText ?? "";
@@ -2114,7 +2333,7 @@ function HomeBulletinBoard({
                     ...(item.isDisabled ? styles.boardCardDisabled : {}),
                     ...(completed ? styles.boardDockCardCompleted : {}),
                   }}
-                  onClick={(event) =>
+                  onClick={(event) => {
                     onAction(
                       item.actionType,
                       getBoardTransitionSource(
@@ -2123,36 +2342,40 @@ function HomeBulletinBoard({
                         displayTitle,
                         displaySurfaceText,
                       ),
-                    )
-                  }
+                    );
+                  }}
                 >
-                  <span style={styles.boardDockTop}>
-                    <span style={styles.boardDockIcon} aria-hidden="true">
-                      <BoardIcon icon={item.icon} />
-                    </span>
-                    {completed ? (
-                      <span style={styles.boardCompletionMark}>
-                        <svg
-                          viewBox="0 0 24 24"
-                          width="13"
-                          height="13"
-                          fill="none"
-                          stroke="currentColor"
-                          strokeWidth="2.6"
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                        >
-                          <path d="M20 6 9 17l-5-5" />
-                        </svg>
-                      </span>
-                    ) : item.isUnread ? (
-                      <span style={styles.boardUnreadDot} />
-                    ) : null}
-                  </span>
                   <span style={styles.boardDockText}>
-                    <span style={styles.boardDockLabel}>{displayTitle}</span>
+                    <span style={styles.boardDockTitleRow}>
+                      <span style={styles.boardDockIcon} aria-hidden="true">
+                        <BoardIcon
+                          icon={item.icon}
+                          size={22}
+                          style={styles.boardDockIconSvg}
+                        />
+                      </span>
+                      <span style={styles.boardDockLabel}>{displayTitle}</span>
+                    </span>
                     <span style={styles.boardDockSub}>{displaySurfaceText}</span>
                   </span>
+                  {completed ? (
+                    <span style={styles.boardCompletionMark}>
+                      <svg
+                        viewBox="0 0 24 24"
+                        width="13"
+                        height="13"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth="2.6"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                      >
+                        <path d="M20 6 9 17l-5-5" />
+                      </svg>
+                    </span>
+                  ) : item.isUnread ? (
+                    <span style={styles.boardUnreadDot} />
+                  ) : null}
                   {typeof item.cooldownProgress === "number" ? (
                     <span style={styles.boardDockCountdown} aria-hidden="true">
                       <span style={styles.boardDockCountdownTrack} />
@@ -2185,9 +2408,12 @@ function HomeBulletinBoard({
             window={mikkeWindow}
             answer={mikkeAnswer}
             result={mikkeResult}
+            catName={catName}
+            catCounters={catCounters}
             isResultLoading={isMikkeResultLoading}
             remaining={mikkeRemaining}
             onSelect={onMikkeAnswer}
+            onOpenAll={onOpenMikkeAll}
             photoSlot={mikkePhotoSlot}
             isPhotoAdding={isMikkePhotoAdding}
             onAddPhoto={onMikkePhotoAdd}
@@ -2302,8 +2528,22 @@ function getBoardTransitionSource(
   };
 }
 
-function BoardIcon({ icon }: { icon: HomeBoardItem["icon"] }) {
-  return <AppIcon name={icon} size={30} style={styles.boardIconSvg} />;
+function BoardIcon({
+  icon,
+  size = 30,
+  style,
+}: {
+  icon: HomeBoardItem["icon"];
+  size?: number;
+  style?: CSSProperties;
+}) {
+  return (
+    <AppIcon
+      name={icon}
+      size={size}
+      style={{ ...styles.boardIconSvg, ...style }}
+    />
+  );
 }
 
 function getBoardPeekItems(items: HomeBoardItem[]) {
@@ -2317,7 +2557,9 @@ function getBoardPeekItems(items: HomeBoardItem[]) {
   }
 
   const fallbackItems = items.filter(
-    (item) => !orderedItems.some((orderedItem) => orderedItem.id === item.id),
+    (item) =>
+      item.id !== "sleeping-counter" &&
+      !orderedItems.some((orderedItem) => orderedItem.id === item.id),
   );
 
   return [...orderedItems, ...fallbackItems].slice(0, 2);
@@ -2333,6 +2575,193 @@ function getBoardDockCountdownStyle(item: HomeBoardItem): CSSProperties {
   return {
     transform: `scaleX(${progress})`,
   };
+}
+
+function getBoardCounterPrimaryText(surfaceText?: string) {
+  return surfaceText?.split("・")[0] || "";
+}
+
+function getBoardCounterSecondaryText(surfaceText?: string) {
+  const parts = surfaceText?.split("・") ?? [];
+
+  if (parts.length <= 1) {
+    return surfaceText ?? "";
+  }
+
+  return parts.slice(1).join("・");
+}
+
+function formatSleepingCounterCount(count: number) {
+  return `${count}ひき`;
+}
+
+function buildHomeCatCounters({
+  mikkeWindow,
+  mikkeAnswer,
+  mikkeResult,
+  recordLog,
+}: {
+  mikkeWindow: MikkeWindow;
+  mikkeAnswer: StoredMikkeWindowAnswer | null;
+  mikkeResult: MikkeWindowResult | null;
+  recordLog: RecordLogItem[];
+}): HomeCatCounter[] {
+  const poseQuestion = MIKKE_WINDOW_QUESTIONS.find(
+    (question) => question.category === "pose",
+  );
+  const placeQuestion = MIKKE_WINDOW_QUESTIONS.find(
+    (question) => question.category === "place",
+  );
+
+  if (!poseQuestion || !placeQuestion) {
+    return [];
+  }
+
+  const poseResult = getDisplayMikkeResult(
+    poseQuestion,
+    mikkeWindow,
+    mikkeAnswer,
+    mikkeResult,
+  );
+  const placeResult = getDisplayMikkeResult(
+    placeQuestion,
+    mikkeWindow,
+    mikkeAnswer,
+    mikkeResult,
+  );
+  const sleepingIds = new Set([
+    "curled-up",
+    "belly-up",
+    "face-down-sleep",
+    "side-sleep",
+    "weird-sleep",
+  ]);
+  const localSleepingCount = recordLog.filter(
+    (record) =>
+      record.metadata?.homeCounterId === "sleeping" &&
+      record.timestamp >= mikkeWindow.startsAt &&
+      record.timestamp < mikkeWindow.endsAt,
+  ).length;
+
+  return [
+    {
+      id: "sleeping",
+      label: "いま寝てる猫",
+      count:
+        Math.max(
+          HOME_SLEEPING_COUNTER_BASE_COUNT,
+          sumCounts(poseResult, sleepingIds),
+        ) + localSleepingCount,
+    },
+    {
+      id: "window",
+      label: "窓辺の猫",
+      count: getCountByAnswerId(placeResult, "window"),
+    },
+    {
+      id: "loaf",
+      label: "香箱の猫",
+      count: getCountByAnswerId(poseResult, "loaf"),
+    },
+  ];
+}
+
+function getDisplayMikkeResult(
+  question: (typeof MIKKE_WINDOW_QUESTIONS)[number],
+  currentWindow: MikkeWindow,
+  answer: StoredMikkeWindowAnswer | null,
+  currentResult: MikkeWindowResult | null,
+) {
+  if (question.id === currentWindow.question.id) {
+    if (currentResult) {
+      return currentResult;
+    }
+
+    const localCounts =
+      answer?.questionId === question.id
+        ? [
+            {
+              answerId: answer.answerId,
+              answerLabel: answer.answerLabel,
+              count: 1,
+            },
+          ]
+        : [];
+
+    return buildMikkeWindowResult(question, localCounts, currentWindow.id);
+  }
+
+  return buildMikkeWindowResult(
+    question,
+    [],
+    `${question.id}-${new Date(currentWindow.startsAt).toISOString().slice(0, 13)}`,
+  );
+}
+
+function addLocalAnswerCount(
+  counts: MikkeWindowCount[],
+  answer: StoredMikkeWindowAnswer | null,
+) {
+  if (!answer) {
+    return counts;
+  }
+
+  let didIncrement = false;
+  const nextCounts = counts.map((count) => {
+    if (count.answerId !== answer.answerId) {
+      return count;
+    }
+
+    didIncrement = true;
+    return {
+      ...count,
+      count: count.count + 1,
+    };
+  });
+
+  if (didIncrement) {
+    return nextCounts;
+  }
+
+  return [
+    ...nextCounts,
+    {
+      answerId: answer.answerId,
+      answerLabel: answer.answerLabel,
+      count: 1,
+    },
+  ];
+}
+
+function getVisibleMikkeResultCounts(
+  counts: MikkeWindowResult["counts"],
+  selectedAnswerId?: string,
+) {
+  const selected = selectedAnswerId
+    ? counts.find((count) => count.answerId === selectedAnswerId)
+    : null;
+  const visible = counts.slice(0, 4);
+
+  if (!selected || visible.some((count) => count.answerId === selected.answerId)) {
+    return visible;
+  }
+
+  return [...visible.slice(0, 3), selected].sort((a, b) => b.count - a.count);
+}
+
+function sumCounts(
+  result: MikkeWindowResult,
+  answerIds: Set<string>,
+) {
+  return result.counts.reduce(
+    (total, count) =>
+      answerIds.has(count.answerId) ? total + count.count : total,
+    0,
+  );
+}
+
+function getCountByAnswerId(result: MikkeWindowResult, answerId: string) {
+  return result.counts.find((count) => count.answerId === answerId)?.count ?? 0;
 }
 
 function buildPersonalityInsight(
@@ -2442,8 +2871,11 @@ function buildHomeBoardItems({
   collectionTargetLabel,
   mikkeWindow,
   mikkeAnswer,
+  homeCatCounters,
   mikkeRemaining,
   mikkeCooldownProgress,
+  sleepingCounterRemaining,
+  sleepingCounterCooldownProgress,
 }: {
   catName: string;
   discoveryAvailable: boolean;
@@ -2452,29 +2884,49 @@ function buildHomeBoardItems({
   collectionTargetLabel: string | null;
   mikkeWindow: MikkeWindow;
   mikkeAnswer: StoredMikkeWindowAnswer | null;
+  homeCatCounters: HomeCatCounter[];
   mikkeRemaining: string | null;
   mikkeCooldownProgress: number | null;
+  sleepingCounterRemaining: string | null;
+  sleepingCounterCooldownProgress: number | null;
 }): HomeBoardItem[] {
   const items: HomeBoardItem[] = [];
   const latestRecord = recordLog[0];
   const personalityInsight = buildPersonalityInsight(recordLog, catName);
+  const sleepingCounter = homeCatCounters.find((counter) => counter.id === "sleeping");
 
   items.push({
     id: "today-mikke",
     kind: "mission",
     priority: 5,
-    title: "みっけ",
-    body: mikkeRemaining
-      ? `あと ${mikkeRemaining}`
-      : mikkeWindow.question.prompt,
+    title: `${catName}のようす`,
+    body: mikkeRemaining ? `あと ${mikkeRemaining}` : mikkeWindow.question.prompt,
     icon: "paw",
-    actionLabel: mikkeRemaining ? "待ち時間" : "3つから",
+    actionLabel: mikkeRemaining ? "待ち時間" : "ぜんぶ",
     actionType: "open_mikke",
-    surfaceText: mikkeRemaining
-      ? `あと ${mikkeRemaining}`
-      : mikkeAnswer?.answerLabel ?? mikkeWindow.question.surfaceText,
+    surfaceText: "選ぶ",
     cooldownProgress: mikkeCooldownProgress ?? undefined,
   });
+
+  if (sleepingCounter) {
+    items.push({
+      id: "sleeping-counter",
+      kind: "mission",
+      priority: 7,
+      title: "寝てる猫",
+      body: sleepingCounterRemaining
+        ? `あと ${sleepingCounterRemaining}`
+        : `${catName}も加わる`,
+      icon: "sleep",
+      actionLabel: sleepingCounterRemaining ? "待ち時間" : "加わる",
+      actionType: "add_sleeping",
+      surfaceText: sleepingCounterRemaining
+        ? `${formatSleepingCounterCount(sleepingCounter.count)}・${catName}も加わった`
+        : `${formatSleepingCounterCount(sleepingCounter.count)}・${catName}も加わる`,
+      isDisabled: Boolean(sleepingCounterRemaining),
+      cooldownProgress: sleepingCounterCooldownProgress ?? undefined,
+    });
+  }
 
   if (discoveryAvailable) {
     items.push({
@@ -2714,6 +3166,17 @@ function setMikkeCategoryLock(
   return nextData;
 }
 
+function setSleepingCounterLock(catId: string): LockData {
+  const lockData = readLockData(catId);
+  const nextData: LockData = {
+    ...lockData,
+    sleepingCounterLockedUntil: Date.now() + MIKKE_LOCK_MS,
+  };
+
+  saveLockData(catId, nextData);
+  return nextData;
+}
+
 function isMikkeCategoryLocked(
   lockData: LockData,
   category: MikkeWindowCategory,
@@ -2794,6 +3257,23 @@ function getAllMikkeCategoriesCooldownProgress(
   }
 
   return Math.min(1, Math.min(...remainingMs) / MIKKE_LOCK_MS);
+}
+
+function getSleepingCounterRemaining(lockData: LockData, now = Date.now()) {
+  return formatRemainingMs((lockData.sleepingCounterLockedUntil || 0) - now);
+}
+
+function getSleepingCounterCooldownProgress(
+  lockData: LockData,
+  now = Date.now(),
+) {
+  const remaining = (lockData.sleepingCounterLockedUntil || 0) - now;
+
+  if (remaining <= 0) {
+    return null;
+  }
+
+  return Math.min(1, remaining / MIKKE_LOCK_MS);
 }
 
 function isLocked(lockData: LockData, type: LockType, now = Date.now()) {
@@ -3221,7 +3701,7 @@ const styles = {
     left: "-8px",
     right: "-8px",
     bottom: "-2px",
-    height: "112px",
+    height: "178px",
     borderRadius: "28px",
     background:
       "radial-gradient(ellipse at 50% 100%, rgba(0,0,0,0.34), rgba(0,0,0,0.12) 48%, rgba(0,0,0,0) 76%)",
@@ -3251,16 +3731,140 @@ const styles = {
     background: "rgba(255,255,255,0.46)",
     boxShadow: "0 1px 10px rgba(0,0,0,0.16)",
   },
-  boardDock: {
-    width: `calc(100vw - ${HOME_NAV_EDGE_INSET})`,
+  boardSleepCounter: {
+    width: "100%",
+    minHeight: "70px",
+    border: "0.5px solid rgba(255,220,160,0.22)",
+    borderRadius: "22px",
+    background:
+      "linear-gradient(145deg, rgba(76,67,60,0.54), rgba(36,32,30,0.44))",
+    color: "rgba(255,255,255,0.96)",
+    display: "grid",
+    gridTemplateColumns: "24px minmax(0, 1fr) auto",
+    alignItems: "center",
+    gap: "9px",
+    padding: "11px 14px 14px",
+    boxSizing: "border-box",
+    textAlign: "left",
+    cursor: "pointer",
+    position: "relative",
+    zIndex: 2,
+    margin: "0 0 9px",
+    overflow: "hidden",
+    isolation: "isolate",
+    backdropFilter: "blur(26px)",
+    WebkitBackdropFilter: "blur(26px)",
+    boxShadow:
+      "0 8px 24px rgba(0,0,0,0.16), inset 0 1px 0 rgba(255,255,255,0.15)",
+    transition:
+      "transform 0.2s cubic-bezier(0.2, 0.8, 0.2, 1), opacity 0.2s cubic-bezier(0.2, 0.8, 0.2, 1), border-color 0.2s cubic-bezier(0.2, 0.8, 0.2, 1)",
+    animation: "boardCardSettle 0.28s cubic-bezier(0.2, 0.8, 0.2, 1) both",
+    willChange: "transform, opacity",
+  },
+  boardSleepCounterCompleted: {
+    transform: "translateY(-2px) scale(1.012)",
+    border: "0.5px solid rgba(255,232,190,0.48)",
+    background:
+      "linear-gradient(145deg, rgba(96,86,76,0.56), rgba(42,37,34,0.48))",
+  },
+  boardSleepCounterDisabled: {
+    cursor: "default",
+    opacity: 0.9,
+  },
+  boardSleepCounterIcon: {
+    width: "24px",
+    height: "24px",
+    borderRadius: 0,
+    background: "transparent",
+    color: "rgba(255,244,226,0.82)",
+    display: "inline-flex",
+    alignItems: "center",
+    justifyContent: "center",
+    boxShadow: "none",
+  },
+  boardSleepCounterIconSvg: {
+    width: "20px",
+    height: "20px",
+    strokeWidth: 1.9,
+  },
+  boardSleepCounterText: {
+    minWidth: 0,
     display: "flex",
+    flexDirection: "column",
+    gap: "4px",
+    position: "relative",
+    zIndex: 2,
+  },
+  boardSleepCounterLabel: {
+    color: "rgba(255,255,255,0.96)",
+    fontSize: "13px",
+    fontWeight: 560,
+    lineHeight: 1.18,
+    whiteSpace: "nowrap",
+    overflow: "hidden",
+    textOverflow: "ellipsis",
+    textShadow: "0 1px 10px rgba(0,0,0,0.28)",
+  },
+  boardSleepCounterSub: {
+    color: "rgba(255,255,255,0.62)",
+    fontSize: "11.2px",
+    fontWeight: 430,
+    lineHeight: 1.16,
+    whiteSpace: "nowrap",
+    overflow: "hidden",
+    textOverflow: "ellipsis",
+    textShadow: "0 1px 10px rgba(0,0,0,0.28)",
+  },
+  boardSleepCounterValue: {
+    color: "rgba(255,255,255,0.9)",
+    fontSize: "19px",
+    fontWeight: 460,
+    lineHeight: 1,
+    letterSpacing: 0,
+    fontVariantNumeric: "tabular-nums",
+    whiteSpace: "nowrap",
+    textShadow: "0 2px 14px rgba(0,0,0,0.24)",
+    position: "relative",
+    zIndex: 2,
+  },
+  boardSleepCounterCountdown: {
+    position: "absolute",
+    left: "14px",
+    right: "14px",
+    bottom: "8px",
+    height: "3px",
+    borderRadius: "999px",
+    overflow: "hidden",
+    pointerEvents: "none",
+    zIndex: 2,
+  },
+  boardSleepCounterCountdownTrack: {
+    position: "absolute",
+    inset: 0,
+    borderRadius: "inherit",
+    background: "rgba(255,255,255,0.13)",
+  },
+  boardSleepCounterCountdownFill: {
+    position: "absolute",
+    inset: 0,
+    borderRadius: "inherit",
+    background:
+      "linear-gradient(90deg, rgba(255,255,255,0.72), rgba(255,255,255,0.96))",
+    transformOrigin: "left center",
+    transition: "transform 0.42s cubic-bezier(0.2, 0.8, 0.2, 1)",
+  },
+  boardDock: {
+    width: "100%",
+    display: "grid",
+    gridTemplateColumns: "repeat(2, minmax(0, 1fr))",
     gap: "10px",
     alignItems: "stretch",
-    overflowX: "auto",
+    overflowX: "visible",
     overflowY: "visible",
     scrollbarWidth: "none",
     padding: "0 0 8px",
-    scrollSnapType: "x mandatory",
+    boxSizing: "border-box",
+    scrollSnapType: "none",
     overscrollBehaviorX: "contain",
     position: "relative",
     zIndex: 1,
@@ -3536,9 +4140,9 @@ const styles = {
   },
   boardDockCard: {
     position: "relative",
-    width: "min(142px, calc((100vw - 58px) / 2.16))",
-    minWidth: "min(142px, calc((100vw - 58px) / 2.16))",
-    minHeight: "80px",
+    width: "100%",
+    minWidth: 0,
+    minHeight: "68px",
     border: "0.5px solid rgba(255,255,255,0.22)",
     borderRadius: "18px",
     background:
@@ -3547,9 +4151,9 @@ const styles = {
     display: "flex",
     flexDirection: "column",
     alignItems: "flex-start",
-    justifyContent: "space-between",
-    gap: "7px",
-    padding: "10px 11px 15px",
+    justifyContent: "center",
+    gap: "0",
+    padding: "10px 11px 13px",
     boxSizing: "border-box",
     textAlign: "left",
     cursor: "pointer",
@@ -3568,7 +4172,7 @@ const styles = {
   },
   boardDockCardCompleted: {
     transform: "translateY(-2px) scale(1.015)",
-    borderColor: "rgba(255,255,255,0.54)",
+    border: "0.5px solid rgba(255,255,255,0.54)",
     background:
       "linear-gradient(145deg, rgba(255,255,255,0.28), rgba(58,52,48,0.48))",
   },
@@ -3586,15 +4190,18 @@ const styles = {
     zIndex: 2,
   },
   boardDockIcon: {
-    width: "28px",
-    height: "28px",
-    color: "rgba(255,255,255,0.9)",
+    width: "20px",
+    height: "20px",
+    color: "rgba(255,255,255,0.82)",
     display: "inline-flex",
     alignItems: "center",
     justifyContent: "center",
     flexShrink: 0,
   },
   boardCompletionMark: {
+    position: "absolute",
+    top: "10px",
+    right: "10px",
     width: "21px",
     height: "21px",
     borderRadius: "50%",
@@ -3615,19 +4222,30 @@ const styles = {
     strokeLinecap: "round",
     strokeLinejoin: "round",
   },
+  boardDockIconSvg: {
+    width: "20px",
+    height: "20px",
+    strokeWidth: 2.05,
+  },
   boardDockText: {
     minWidth: 0,
     width: "100%",
     display: "flex",
     flexDirection: "column",
-    gap: "3px",
+    gap: "5px",
     position: "relative",
     zIndex: 2,
   },
+  boardDockTitleRow: {
+    minWidth: 0,
+    display: "flex",
+    alignItems: "center",
+    gap: "6px",
+  },
   boardDockLabel: {
     color: "rgba(255,255,255,0.96)",
-    fontSize: "13px",
-    fontWeight: 610,
+    fontSize: "12.8px",
+    fontWeight: 540,
     lineHeight: 1.22,
     overflow: "hidden",
     textOverflow: "ellipsis",
@@ -3638,8 +4256,8 @@ const styles = {
   },
   boardDockSub: {
     color: "rgba(255,255,255,0.62)",
-    fontSize: "11.5px",
-    fontWeight: 520,
+    fontSize: "11.2px",
+    fontWeight: 430,
     lineHeight: 1.18,
     fontVariantNumeric: "tabular-nums",
     overflow: "hidden",
@@ -3649,6 +4267,9 @@ const styles = {
     textShadow: "0 1px 10px rgba(0,0,0,0.28)",
   },
   boardUnreadDot: {
+    position: "absolute",
+    top: "13px",
+    right: "13px",
     width: "7px",
     height: "7px",
     borderRadius: "50%",
@@ -3783,7 +4404,7 @@ const styles = {
   },
   lockedState: {
     pointerEvents: "none",
-    borderColor: "rgba(255,255,255,0.10)",
+    border: "0.5px solid rgba(255,255,255,0.10)",
     background: "rgba(255,255,255,0.06)",
     color: "rgba(255,255,255,0.58)",
   },
@@ -3938,7 +4559,7 @@ const styles = {
     cursor: "pointer",
   },
   mikkeCategoryNavItemActive: {
-    borderColor: "rgba(255,255,255,0.32)",
+    border: "0.5px solid rgba(255,255,255,0.32)",
     background: "rgba(255,255,255,0.14)",
     color: "rgba(255,255,255,0.94)",
   },
@@ -4051,6 +4672,46 @@ const styles = {
     lineHeight: 1,
     fontVariantNumeric: "tabular-nums",
   },
+  catCounterGrid: {
+    display: "grid",
+    gridTemplateColumns: "1.25fr 1fr 1fr",
+    gap: "8px",
+    marginBottom: "12px",
+  },
+  catCounterTile: {
+    minWidth: 0,
+    minHeight: "64px",
+    border: "0.5px solid rgba(255,255,255,0.16)",
+    borderRadius: "17px",
+    background:
+      "linear-gradient(145deg, rgba(255,255,255,0.13), rgba(255,255,255,0.07))",
+    display: "flex",
+    flexDirection: "column",
+    justifyContent: "center",
+    gap: "4px",
+    padding: "10px 10px",
+    boxSizing: "border-box",
+    boxShadow: "inset 0 1px 0 rgba(255,255,255,0.11)",
+    backdropFilter: "blur(20px)",
+    WebkitBackdropFilter: "blur(20px)",
+  },
+  catCounterValue: {
+    color: "rgba(255,255,255,0.96)",
+    fontSize: "20px",
+    fontWeight: 680,
+    lineHeight: 1.05,
+    letterSpacing: 0,
+    fontVariantNumeric: "tabular-nums",
+  },
+  catCounterLabel: {
+    color: "rgba(255,255,255,0.58)",
+    fontSize: "11px",
+    fontWeight: 610,
+    lineHeight: 1.16,
+    overflow: "hidden",
+    textOverflow: "ellipsis",
+    whiteSpace: "nowrap",
+  },
   mikkeWindowBody: {
     display: "grid",
     gap: "12px",
@@ -4064,6 +4725,12 @@ const styles = {
     display: "grid",
     gap: "4px",
   },
+  mikkeQuestionRow: {
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: "10px",
+  },
   mikkeQuestionCategory: {
     color: "rgba(255,255,255,0.52)",
     fontSize: "11px",
@@ -4076,6 +4743,21 @@ const styles = {
     fontSize: "20px",
     fontWeight: 660,
     lineHeight: 1.28,
+  },
+  mikkeAllOpenButton: {
+    flex: "0 0 auto",
+    minHeight: "30px",
+    border: "0.5px solid rgba(255,255,255,0.18)",
+    borderRadius: "999px",
+    background: "rgba(255,255,255,0.08)",
+    color: "rgba(255,255,255,0.76)",
+    padding: "6px 10px",
+    fontSize: "11px",
+    fontWeight: 650,
+    lineHeight: 1,
+    cursor: "pointer",
+    backdropFilter: "blur(18px)",
+    WebkitBackdropFilter: "blur(18px)",
   },
   mikkeOptionGrid: {
     display: "grid",
@@ -4113,7 +4795,7 @@ const styles = {
     lineHeight: 1.16,
   },
   mikkeOptionSelected: {
-    borderColor: "rgba(255,255,255,0.72)",
+    border: "0.5px solid rgba(255,255,255,0.72)",
     background: "rgba(255,255,255,0.92)",
     color: "#2A2A28",
     transform: "translateY(-1px)",
@@ -4127,6 +4809,47 @@ const styles = {
   mikkeResultBlockCollapsed: {
     borderTop: "none",
     paddingTop: 0,
+  },
+  mikkeResultCounter: {
+    border: "0.5px solid rgba(255,255,255,0.18)",
+    borderRadius: "18px",
+    background:
+      "linear-gradient(145deg, rgba(255,255,255,0.15), rgba(255,255,255,0.075))",
+    padding: "12px 13px",
+    display: "grid",
+    gridTemplateColumns: "1fr auto",
+    alignItems: "end",
+    gap: "2px 12px",
+    boxShadow: "inset 0 1px 0 rgba(255,255,255,0.12)",
+  },
+  mikkeResultCounterLabel: {
+    minWidth: 0,
+    color: "rgba(255,255,255,0.62)",
+    fontSize: "12px",
+    fontWeight: 640,
+    lineHeight: 1.2,
+    overflow: "hidden",
+    textOverflow: "ellipsis",
+    whiteSpace: "nowrap",
+  },
+  mikkeResultCounterValue: {
+    gridRow: "1 / span 2",
+    gridColumn: 2,
+    color: "rgba(255,255,255,0.97)",
+    fontSize: "28px",
+    fontWeight: 700,
+    lineHeight: 1,
+    fontVariantNumeric: "tabular-nums",
+  },
+  mikkeResultCounterSub: {
+    minWidth: 0,
+    color: "rgba(255,255,255,0.86)",
+    fontSize: "13px",
+    fontWeight: 640,
+    lineHeight: 1.22,
+    overflow: "hidden",
+    textOverflow: "ellipsis",
+    whiteSpace: "nowrap",
   },
   mikkeResultHeader: {
     display: "flex",
@@ -4163,6 +4886,9 @@ const styles = {
     alignItems: "center",
     gap: "8px",
   },
+  mikkeResultRowSelected: {
+    borderRadius: "11px",
+  },
   mikkeResultLabel: {
     minWidth: 0,
     overflow: "hidden",
@@ -4171,6 +4897,10 @@ const styles = {
     color: "rgba(255,255,255,0.72)",
     fontSize: "12px",
     fontWeight: 600,
+  },
+  mikkeResultLabelSelected: {
+    color: "rgba(255,255,255,0.96)",
+    fontWeight: 700,
   },
   mikkeResultTrack: {
     height: "7px",
@@ -4185,6 +4915,11 @@ const styles = {
     background:
       "linear-gradient(90deg, rgba(255,255,255,0.56), rgba(255,255,255,0.92))",
     transition: "width 0.42s cubic-bezier(0.22, 1, 0.36, 1)",
+  },
+  mikkeResultFillSelected: {
+    background:
+      "linear-gradient(90deg, rgba(255,255,255,0.92), rgba(255,255,255,1))",
+    boxShadow: "0 0 12px rgba(255,255,255,0.22)",
   },
   mikkeResultRatio: {
     color: "rgba(255,255,255,0.6)",
@@ -4256,7 +4991,7 @@ const styles = {
     willChange: "transform",
   },
   yousuOptionSelected: {
-    borderColor: "rgba(255,255,255,0.72)",
+    border: "0.5px solid rgba(255,255,255,0.72)",
     background: "rgba(255,255,255,0.92)",
     color: "#2A2A28",
     transform: "translateY(-1px)",
@@ -4290,7 +5025,7 @@ const styles = {
     willChange: "transform",
   },
   sheetOptionSelected: {
-    borderColor: "rgba(255,255,255,0.72)",
+    border: "0.5px solid rgba(255,255,255,0.72)",
     background: "rgba(255,255,255,0.92)",
     color: "#2A2A28",
     transform: "translateY(-1px)",
@@ -4445,7 +5180,7 @@ const styles = {
     WebkitBackdropFilter: "blur(18px)",
   },
   catListItemActive: {
-    borderColor: "rgba(255,255,255,0.62)",
+    border: "0.5px solid rgba(255,255,255,0.62)",
     background: "rgba(255,255,255,0.18)",
   },
   catListName: {

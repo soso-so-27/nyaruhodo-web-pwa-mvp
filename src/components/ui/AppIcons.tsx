@@ -11,6 +11,7 @@ export type AppIconName =
   | "collection"
   | "cat"
   | "paw"
+  | "sleep"
   | "hand"
   | "heart"
   | "camera"
@@ -46,6 +47,8 @@ export function AppIcon({
       return <CatIcon size={size} style={style} />;
     case "paw":
       return <PawIcon size={size} style={style} />;
+    case "sleep":
+      return <SleepIcon size={size} style={style} />;
     case "hand":
       return <HandIcon size={size} style={style} />;
     case "heart":
@@ -226,6 +229,34 @@ export function PawIcon({ size = 24, style }: IconProps) {
         d="M6.8 11.2c1 0 1.8-1 1.8-2.2S7.8 6.8 6.8 6.8 5 7.8 5 9s.8 2.2 1.8 2.2ZM10.3 8.8c1 0 1.8-1.1 1.8-2.4S11.3 4 10.3 4 8.5 5.1 8.5 6.4s.8 2.4 1.8 2.4ZM13.7 8.8c1 0 1.8-1.1 1.8-2.4S14.7 4 13.7 4s-1.8 1.1-1.8 2.4.8 2.4 1.8 2.4ZM17.2 11.2c1 0 1.8-1 1.8-2.2s-.8-2.2-1.8-2.2-1.8 1-1.8 2.2.8 2.2 1.8 2.2Z"
         stroke="currentColor"
         strokeWidth="1.8"
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
+}
+
+export function SleepIcon({ size = 24, style }: IconProps) {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      width={size}
+      height={size}
+      fill="none"
+      style={mergeStyle(style)}
+      aria-hidden="true"
+    >
+      <path
+        d="M16.7 17.9a7 7 0 0 1-6.6-10.8 7 7 0 1 0 8.9 8.9 6.9 6.9 0 0 1-2.3 1.9Z"
+        stroke="currentColor"
+        strokeWidth="1.8"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+      <path
+        d="M16.2 5.4h3.2l-3.2 3.3h3.2M13.3 3.5h2.1l-2.1 2.2h2.1"
+        stroke="currentColor"
+        strokeWidth="1.45"
+        strokeLinecap="round"
         strokeLinejoin="round"
       />
     </svg>
