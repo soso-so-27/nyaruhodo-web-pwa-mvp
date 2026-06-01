@@ -72,6 +72,14 @@ type CollectionShareFeedItem = {
   description?: string;
 };
 
+type BoxPreviewPhoto = {
+  id: string;
+  src: string;
+};
+
+const OWN_SLEEPING_BOX_STORAGE_KEY = "nyaruhodo_exchange_own_sleeping_photos";
+const KEPT_OTHER_BOX_STORAGE_KEY = "nyaruhodo_exchange_kept_photos";
+
 export function CollectionPage() {
   const [catProfiles, setCatProfiles] = useState<CatProfile[]>([]);
   const [activeCatId, setActiveCatId] = useState<string | null>(null);
@@ -164,6 +172,22 @@ export function CollectionPage() {
         shareSuggestionSlot,
       ),
     [catName, shareSuggestionSlot, storedCollectionPhotos],
+  );
+  const sleepingBoxPhotos = useMemo(
+    () => readBoxPreviewPhotos(OWN_SLEEPING_BOX_STORAGE_KEY),
+    [hasLoaded],
+  );
+  const otherBoxPhotos = useMemo(
+    () => readBoxPreviewPhotos(KEPT_OTHER_BOX_STORAGE_KEY),
+    [hasLoaded],
+  );
+  const awakeBoxPhotos = useMemo(
+    () =>
+      storedCollectionPhotos.map((photo) => ({
+        id: photo.id,
+        src: photo.src,
+      })),
+    [storedCollectionPhotos],
   );
 
   useEffect(() => {
@@ -526,7 +550,7 @@ export function CollectionPage() {
         <PageBackdrop />
         <div style={styles.container}>
           <section style={styles.emptyCard}>
-            <h1 style={styles.emptyTitle}>コレクション</h1>
+            <h1 style={styles.emptyTitle}>ボックス</h1>
             <p style={styles.emptyText}>準備しています</p>
           </section>
         </div>
@@ -541,7 +565,7 @@ export function CollectionPage() {
         <PageBackdrop />
         <div style={styles.container}>
           <section style={styles.emptyCard}>
-            <h1 style={styles.emptyTitle}>コレクション</h1>
+            <h1 style={styles.emptyTitle}>ボックス</h1>
             <p style={styles.emptyText}>一緒に暮らしている猫を登録しましょう</p>
             <a href="/cats" style={styles.primaryLink}>
               猫を登録する
@@ -559,7 +583,7 @@ export function CollectionPage() {
       <div style={styles.container}>
         <header style={styles.header}>
           <div style={styles.pageHeader}>
-            <h1 style={styles.pageTitle}>コレクション</h1>
+            <h1 style={styles.pageTitle}>ボックス</h1>
             <div style={styles.pageHeaderActions}>
               <button
                 type="button"
@@ -571,39 +595,13 @@ export function CollectionPage() {
               </button>
             </div>
           </div>
-          <CollectionViewTabs
-            activeView={activeView}
-            onSelectView={handleViewSelect}
-          />
         </header>
 
-        {activeView === "collect" ? (
-          <CollectionCollectView
-            dailyTargetSlot={dailyTargetSlot}
-            nextTargetSlots={nextTargetSlots}
-            onOpenSlot={(slot) => openSheet(slot, "daily_target")}
-          />
-        ) : null}
-
-        {activeView === "album" ? (
-          <CollectionAlbumView
-            activeGroup={activeGroup}
-            activeGroupId={activeGroupId}
-            progress={progress}
-            photosBySlot={photosBySlot}
-            dailyTargetSlotId={dailyTargetSlot?.id ?? null}
-            onSelectGroup={handleGroupSelect}
-            onOpenSlot={(slot) => openSheet(slot, "grid")}
-          />
-        ) : null}
-
-        {activeView === "share" ? (
-          <CollectionShareView
-            feedItems={shareFeedItems}
-            onOpenItem={handleShareFeedItemOpen}
-            onGoCollect={() => setActiveView("collect")}
-          />
-        ) : null}
+        <BoxOverview
+          sleepingPhotos={sleepingBoxPhotos}
+          awakePhotos={awakeBoxPhotos}
+          otherPhotos={otherBoxPhotos}
+        />
       </div>
       {selectedSlot ? (
         <CollectionPhotoSheet
@@ -662,6 +660,69 @@ function PageBackdrop() {
   );
 }
 
+function BoxOverview({
+  sleepingPhotos,
+  awakePhotos,
+  otherPhotos,
+}: {
+  sleepingPhotos: BoxPreviewPhoto[];
+  awakePhotos: BoxPreviewPhoto[];
+  otherPhotos: BoxPreviewPhoto[];
+}) {
+  return (
+    <section style={styles.boxOverview} aria-label="ボックス">
+      <BoxSummaryCard
+        title="ねてる箱"
+        photos={sleepingPhotos}
+      />
+      <BoxSummaryCard
+        title="おきてる箱"
+        photos={awakePhotos}
+        showAddSlot={true}
+      />
+      <BoxSummaryCard
+        title="ほかのねこ箱"
+        photos={otherPhotos}
+      />
+    </section>
+  );
+}
+
+function BoxSummaryCard({
+  title,
+  photos,
+  showAddSlot = false,
+}: {
+  title: string;
+  photos: BoxPreviewPhoto[];
+  showAddSlot?: boolean;
+}) {
+  const visiblePhotos = photos.slice(0, showAddSlot ? 5 : 6);
+
+  return (
+    <article style={styles.boxSummaryCard}>
+      <div style={styles.boxSummaryHeader}>
+        <div>
+          <h2 style={styles.boxSummaryTitle}>{title}</h2>
+        </div>
+        <span style={styles.boxSummaryCount}>{photos.length}</span>
+      </div>
+      <div style={styles.boxPhotoStrip}>
+        {visiblePhotos.map((photo) => (
+          <span key={photo.id} style={styles.boxPhotoThumb}>
+            <img src={photo.src} alt="" style={styles.boxPhotoImg} />
+          </span>
+        ))}
+        {showAddSlot ? (
+          <span style={styles.boxAddSlot} aria-label="おきてる箱に追加">
+            +
+          </span>
+        ) : null}
+      </div>
+    </article>
+  );
+}
+
 function CollectionViewTabs({
   activeView,
   onSelectView,
@@ -670,13 +731,13 @@ function CollectionViewTabs({
   onSelectView: (view: CollectionView) => void;
 }) {
   const tabs: Array<{ key: CollectionView; label: string }> = [
-    { key: "collect", label: "あつめる" },
-    { key: "album", label: "アルバム" },
-    { key: "share", label: "シェア" },
+    { key: "collect", label: "ねてる箱" },
+    { key: "album", label: "おきてる箱" },
+    { key: "share", label: "ほかのねこ箱" },
   ];
 
   return (
-    <div role="tablist" aria-label="コレクションの表示" style={styles.viewTabs}>
+    <div role="tablist" aria-label="ボックスの表示" style={styles.viewTabs}>
       {tabs.map((tab) => {
         const isActive = tab.key === activeView;
 
@@ -1473,6 +1534,29 @@ function buildStoredCollectionPhotos(collectionPhotos: Record<string, string[]>)
   return photos.reverse();
 }
 
+function readBoxPreviewPhotos(key: string): BoxPreviewPhoto[] {
+  if (typeof window === "undefined") {
+    return [];
+  }
+
+  try {
+    const raw = window.localStorage.getItem(key);
+    const parsed = raw ? (JSON.parse(raw) as Array<Partial<BoxPreviewPhoto>>) : [];
+
+    if (!Array.isArray(parsed)) {
+      return [];
+    }
+
+    return parsed
+      .filter((photo): photo is BoxPreviewPhoto =>
+        Boolean(photo.id && photo.src),
+      )
+      .slice(0, 24);
+  } catch {
+    return [];
+  }
+}
+
 function buildCollectionShareFeed(
   photos: CollectionPhoto[],
   catName: string,
@@ -1851,6 +1935,89 @@ const styles = {
     borderRadius: "99px",
     padding: "4px 12px",
     cursor: "pointer",
+  },
+  boxOverview: {
+    display: "grid",
+    gap: "12px",
+  },
+  boxSummaryCard: {
+    ...COLLECTION_SURFACE,
+    display: "grid",
+    gap: "14px",
+    borderRadius: "22px",
+    padding: "16px",
+  },
+  boxSummaryHeader: {
+    display: "flex",
+    alignItems: "flex-start",
+    justifyContent: "space-between",
+    gap: "14px",
+  },
+  boxSummaryTitle: {
+    margin: 0,
+    color: COLLECTION_TEXT_STRONG,
+    fontSize: "18px",
+    fontWeight: 660,
+    lineHeight: 1.22,
+  },
+  boxSummaryText: {
+    margin: "4px 0 0",
+    color: COLLECTION_MUTED,
+    fontSize: "12.5px",
+    fontWeight: 520,
+    lineHeight: 1.35,
+  },
+  boxSummaryCount: {
+    display: "inline-flex",
+    alignItems: "center",
+    justifyContent: "center",
+    minWidth: "34px",
+    height: "28px",
+    borderRadius: "999px",
+    background: "rgba(255,255,255,0.12)",
+    color: COLLECTION_TEXT,
+    fontSize: "13px",
+    fontWeight: 700,
+  },
+  boxPhotoStrip: {
+    display: "grid",
+    gridTemplateColumns: "repeat(6, minmax(0, 1fr))",
+    gap: "7px",
+    alignItems: "center",
+    minHeight: "54px",
+  },
+  boxPhotoThumb: {
+    aspectRatio: "1 / 1",
+    minWidth: 0,
+    borderRadius: "13px",
+    overflow: "hidden",
+    background: "rgba(255,255,255,0.1)",
+    border: "0.5px solid rgba(255,255,255,0.14)",
+  },
+  boxPhotoImg: {
+    width: "100%",
+    height: "100%",
+    objectFit: "cover",
+    display: "block",
+  },
+  boxAddSlot: {
+    aspectRatio: "1 / 1",
+    minWidth: 0,
+    display: "inline-flex",
+    alignItems: "center",
+    justifyContent: "center",
+    borderRadius: "13px",
+    background: "rgba(255,255,255,0.12)",
+    border: "0.5px solid rgba(255,255,255,0.18)",
+    color: "rgba(255,255,255,0.76)",
+    fontSize: "24px",
+    fontWeight: 360,
+  },
+  boxEmptyText: {
+    gridColumn: "1 / -1",
+    color: "rgba(255,255,255,0.52)",
+    fontSize: "12px",
+    fontWeight: 540,
   },
   catSheetGrid: {
     display: "flex",

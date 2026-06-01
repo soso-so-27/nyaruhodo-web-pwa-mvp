@@ -4,19 +4,14 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import type { CSSProperties, MouseEvent, ReactNode } from "react";
-import {
-  BookIcon,
-  CatIcon,
-  CollectionIcon,
-  HomeIcon,
-} from "../ui/AppIcons";
+import { BoxIcon, CameraIcon } from "../ui/AppIcons";
 
 type BottomNavigationProps = {
   active: "home" | "today" | "torisetu" | "collection" | "cats" | "together";
 };
 
 type NavItem = {
-  key: "home" | "torisetu" | "collection" | "cats";
+  key: "home" | "collection" | "cats";
   href: string;
   label: string;
   icon: ReactNode;
@@ -38,26 +33,20 @@ export function BottomNavigation({ active }: BottomNavigationProps) {
     {
       key: "home",
       href: "/home",
-      label: "ホーム",
-      icon: <HomeIcon style={styles.svgIcon} />,
-    },
-    {
-      key: "torisetu",
-      href: "/torisetu",
-      label: "トリセツ",
-      icon: <BookIcon style={styles.svgIcon} />,
+      label: "しゃしん",
+      icon: <CameraIcon style={{ ...styles.svgIcon, ...styles.cameraSvgIcon }} />,
     },
     {
       key: "collection",
       href: "/collection",
-      label: "コレクション",
-      icon: <CollectionIcon style={styles.svgIcon} />,
+      label: "ボックス",
+      icon: <BoxIcon style={{ ...styles.svgIcon, ...styles.boxSvgIcon }} />,
     },
     {
       key: "cats",
       href: "/cats",
       label: "ねこ",
-      icon: <CatIcon style={styles.svgIcon} />,
+      icon: <span style={styles.catImageIcon} />,
     },
   ];
   const displayActiveKey = pendingKey ?? activeKey;
@@ -116,6 +105,7 @@ export function BottomNavigation({ active }: BottomNavigationProps) {
             href={item.href}
             prefetch={true}
             style={isActive ? styles.activeNavButton : styles.navButton}
+            aria-label={item.label}
             aria-current={activeKey === item.key ? "page" : undefined}
             onClick={(event) => handleNavClick(event, item, isActive)}
           >
@@ -125,7 +115,6 @@ export function BottomNavigation({ active }: BottomNavigationProps) {
             >
               {item.icon}
             </span>
-            <span>{item.label}</span>
           </Link>
         );
       })}
@@ -141,9 +130,10 @@ const styles = {
     zIndex: 20,
     overflow: "hidden",
     display: "grid",
-    gridTemplateColumns: "repeat(4, 1fr)",
+    gridTemplateColumns: "repeat(3, 1fr)",
     gap: "4px",
-    width: "min(calc(100% - 28px), 410px)",
+    width: "min(calc(100% - 104px), 278px)",
+    minWidth: "236px",
     transform: "translateX(-50%)",
     border: "1px solid rgba(200, 197, 190, 0.9)",
     borderRadius: "22px",
@@ -159,7 +149,7 @@ const styles = {
     top: "4px",
     bottom: "4px",
     left: "4px",
-    width: "calc((100% - 20px) / 4)",
+    width: "calc((100% - 16px) / 3)",
     borderRadius: "17px",
     background: "#ecece7",
     boxShadow: "inset 0 1px 0 rgba(255,255,255,0.72)",
@@ -171,19 +161,13 @@ const styles = {
     position: "relative",
     zIndex: 1,
     display: "flex",
-    flexDirection: "column",
     alignItems: "center",
     justifyContent: "center",
-    gap: "2px",
-    minHeight: "42px",
+    minHeight: "44px",
     borderRadius: "17px",
     background: "transparent",
     color: "#777872",
     textDecoration: "none",
-    fontSize: "10px",
-    fontWeight: 560,
-    letterSpacing: 0,
-    whiteSpace: "nowrap",
     cursor: "pointer",
     transition:
       "color 0.24s ease, transform 0.32s cubic-bezier(0.22, 1, 0.36, 1)",
@@ -192,19 +176,13 @@ const styles = {
     position: "relative",
     zIndex: 1,
     display: "flex",
-    flexDirection: "column",
     alignItems: "center",
     justifyContent: "center",
-    gap: "2px",
-    minHeight: "42px",
+    minHeight: "44px",
     borderRadius: "17px",
     background: "transparent",
     color: "#3f433d",
     textDecoration: "none",
-    fontSize: "10px",
-    fontWeight: 600,
-    letterSpacing: 0,
-    whiteSpace: "nowrap",
     cursor: "pointer",
     transform: "translateY(-1px)",
     transition:
@@ -214,8 +192,8 @@ const styles = {
     display: "inline-flex",
     alignItems: "center",
     justifyContent: "center",
-    width: "20px",
-    height: "20px",
+    width: "24px",
+    height: "24px",
     color: "#777872",
     lineHeight: 1,
     transition: "color 0.24s ease, transform 0.32s cubic-bezier(0.22, 1, 0.36, 1)",
@@ -224,16 +202,39 @@ const styles = {
     display: "inline-flex",
     alignItems: "center",
     justifyContent: "center",
-    width: "20px",
-    height: "20px",
+    width: "24px",
+    height: "24px",
     color: "#566052",
     lineHeight: 1,
     transform: "scale(1.04)",
     transition: "color 0.24s ease, transform 0.32s cubic-bezier(0.22, 1, 0.36, 1)",
   },
   svgIcon: {
-    width: "19px",
-    height: "19px",
+    width: "22px",
+    height: "22px",
     display: "block",
+  },
+  cameraSvgIcon: {
+    width: "21px",
+    height: "21px",
+  },
+  boxSvgIcon: {
+    width: "23px",
+    height: "23px",
+  },
+  catImageIcon: {
+    width: "23px",
+    height: "23px",
+    display: "block",
+    backgroundColor: "currentColor",
+    maskImage: "url('/icons/cat-tab-mask.png')",
+    maskPosition: "center",
+    maskRepeat: "no-repeat",
+    maskSize: "contain",
+    WebkitMaskImage: "url('/icons/cat-tab-mask.png')",
+    WebkitMaskPosition: "center",
+    WebkitMaskRepeat: "no-repeat",
+    WebkitMaskSize: "contain",
+    transform: "translateY(0.5px)",
   },
 } satisfies Record<string, CSSProperties>;

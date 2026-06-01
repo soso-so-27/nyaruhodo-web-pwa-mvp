@@ -75,8 +75,6 @@ const MIKKE_CATEGORIES: MikkeWindowCategory[] = ["place", "pose", "sign"];
 const MIKKE_LOCK_MS = 60 * 60 * 1000;
 const HOME_SLEEPING_COUNTER_BASE_COUNT = 75;
 
-const HOME_FALLBACK_PHOTO_SRC = "/sample-cats/mugi-hero.png";
-
 type RecordLogItem = {
   id: string;
   type: "yousu" | "mugi" | "reaction";
@@ -177,6 +175,86 @@ type HomeCatCounter = {
   count: number;
 };
 
+type ExchangePhoto = {
+  id: string;
+  src: string;
+  title: string;
+  subtitle: string;
+  triggerLabel: string;
+  theme: string;
+  deliveredAt: number;
+};
+
+type ExchangePhotoPoolItem = {
+  id: string;
+  src: string;
+  title: string;
+  subtitle: string;
+  tags: readonly string[];
+};
+
+type PendingExchangeSharePhoto = {
+  src: string;
+  triggerLabel: string;
+  theme: string;
+  fileSizeBucket: string;
+};
+
+type OwnExchangePhoto = {
+  id: string;
+  catId: string;
+  src: string;
+  triggerLabel: string;
+  theme: string;
+  shared: boolean;
+  createdAt: number;
+};
+
+const EXCHANGE_PHOTO_STORAGE_KEY = "nyaruhodo_exchange_kept_photos";
+const EXCHANGE_SHARED_PHOTO_STORAGE_KEY = "nyaruhodo_exchange_shared_photos";
+const EXCHANGE_OWN_SLEEPING_PHOTO_STORAGE_KEY =
+  "nyaruhodo_exchange_own_sleeping_photos";
+const SLEEPING_SAFETY_ACCEPTED_STORAGE_KEY =
+  "nyaruhodo_sleeping_safety_accepted";
+
+const EXCHANGE_PHOTO_POOL: ExchangePhotoPoolItem[] = [
+  {
+    id: "sleeping-loaf",
+    src: "/sample-cats/pose-loaf.png",
+    title: "ほかの猫の寝顔",
+    subtitle: "",
+    tags: ["sleeping", "ねてる", "loaf", "香箱", "curled-up", "まるまり", "bed"],
+  },
+  {
+    id: "sleeping-belly",
+    src: "/sample-cats/pose-belly.png",
+    title: "ほかの猫の寝顔",
+    subtitle: "",
+    tags: ["sleeping", "ねてる", "belly-up", "へそ天", "weird-sleep"],
+  },
+  {
+    id: "stretch-cat",
+    src: "/sample-cats/pose-stretch.png",
+    title: "ほかの猫の寝顔",
+    subtitle: "",
+    tags: ["stretch", "のびー", "pose"],
+  },
+  {
+    id: "box-cat",
+    src: "/sample-cats/pose-box.png",
+    title: "ほかの猫の寝顔",
+    subtitle: "",
+    tags: ["box-bag", "箱・袋", "hideout", "隠れ場所"],
+  },
+  {
+    id: "window-cat",
+    src: "/sample-cats/mugi-portrait.png",
+    title: "ほかの猫の寝顔",
+    subtitle: "",
+    tags: ["window", "窓辺", "watching", "見ている", "high-place", "高いところ"],
+  },
+];
+
 export function HomeInput({ recentEvents: _recentEvents }: HomeInputProps) {
   const [catProfiles, setCatProfiles] = useState<CatProfile[]>([]);
   const [activeCatId, setActiveCatId] = useState<string | null>(null);
@@ -184,7 +262,6 @@ export function HomeInput({ recentEvents: _recentEvents }: HomeInputProps) {
   const [lockData, setLockData] = useState<LockData>({});
   const [tick, setTick] = useState(Date.now());
   const [isYousuOpen, setIsYousuOpen] = useState(false);
-  const [isCatSheetOpen, setIsCatSheetOpen] = useState(false);
   const [isCollectionPhotoSheetOpen, setIsCollectionPhotoSheetOpen] =
     useState(false);
   const [isCollectionPhotoAdding, setIsCollectionPhotoAdding] = useState(false);
@@ -203,9 +280,6 @@ export function HomeInput({ recentEvents: _recentEvents }: HomeInputProps) {
   const [mikkeRefreshTick, setMikkeRefreshTick] = useState(0);
   const [mikkeResult, setMikkeResult] = useState<MikkeWindowResult | null>(null);
   const [isMikkeResultLoading, setIsMikkeResultLoading] = useState(false);
-  const [homeSwipeStart, setHomeSwipeStart] = useState<{ x: number; y: number } | null>(
-    null,
-  );
   const [toastText, setToastText] = useState("");
   const [boardCompletion, setBoardCompletion] =
     useState<HomeBoardCompletion | null>(null);
@@ -214,20 +288,26 @@ export function HomeInput({ recentEvents: _recentEvents }: HomeInputProps) {
   const [boardSheetReturn, setBoardSheetReturn] =
     useState<HomeBoardCompletion | null>(null);
   const [isBoardSheetReturning, setIsBoardSheetReturning] = useState(false);
+  const [deliveredExchangePhoto, setDeliveredExchangePhoto] =
+    useState<ExchangePhoto | null>(null);
+  const [pendingExchangeSharePhoto, setPendingExchangeSharePhoto] =
+    useState<PendingExchangeSharePhoto | null>(null);
+  const [pendingExchangeCatId, setPendingExchangeCatId] = useState<string | null>(
+    null,
+  );
+  const [isExchangePhotoAdding, setIsExchangePhotoAdding] = useState(false);
+  const [hasAcceptedSleepingSafety, setHasAcceptedSleepingSafety] =
+    useState(false);
+  const [isSleepingSafetySheetOpen, setIsSleepingSafetySheetOpen] =
+    useState(false);
+  const [isSleepingSafetyChecked, setIsSleepingSafetyChecked] = useState(false);
   const [collectionRefreshTick, setCollectionRefreshTick] = useState(0);
   const [discoveryDismissedToday, setDiscoveryDismissedToday] = useState(false);
-  const [catSwitchMotionKey, setCatSwitchMotionKey] = useState(0);
-  const [previousHomePhoto, setPreviousHomePhoto] = useState<{
-    src: string;
-    position: string;
-    key: number;
-  } | null>(null);
   const hasTrackedHomeView = useRef(false);
   const hasTrackedGoogleAuthSuccess = useRef(false);
   const toastTimerRef = useRef<number | null>(null);
   const completedBoardTimerRef = useRef<number | null>(null);
   const boardSheetReturnTimerRef = useRef<number | null>(null);
-  const previousHomePhotoTimerRef = useRef<number | null>(null);
 
   useEffect(() => {
     const profiles = readCatProfiles();
@@ -239,6 +319,7 @@ export function HomeInput({ recentEvents: _recentEvents }: HomeInputProps) {
     setActiveCat(active);
     saveActiveCatId(active.id);
     hydrateCatState(active.id);
+    setHasAcceptedSleepingSafety(hasAcceptedSleepingSafetyNotice());
   }, []);
 
   useEffect(() => {
@@ -247,6 +328,23 @@ export function HomeInput({ recentEvents: _recentEvents }: HomeInputProps) {
     }, 1000);
 
     return () => window.clearInterval(intervalId);
+  }, []);
+
+  useEffect(() => {
+    const root = document.documentElement;
+    const body = document.body;
+
+    root.style.setProperty("--home-bg-image", "none");
+    body.style.setProperty("--home-bg-image", "none");
+    body.style.removeProperty("background-image");
+    body.style.removeProperty("background-position");
+    body.style.removeProperty("background-size");
+    body.style.removeProperty("background-repeat");
+
+    return () => {
+      root.style.removeProperty("--home-bg-image");
+      body.style.removeProperty("--home-bg-image");
+    };
   }, []);
 
   useEffect(() => {
@@ -259,9 +357,6 @@ export function HomeInput({ recentEvents: _recentEvents }: HomeInputProps) {
       }
       if (boardSheetReturnTimerRef.current) {
         window.clearTimeout(boardSheetReturnTimerRef.current);
-      }
-      if (previousHomePhotoTimerRef.current) {
-        window.clearTimeout(previousHomePhotoTimerRef.current);
       }
     };
   }, []);
@@ -356,11 +451,6 @@ export function HomeInput({ recentEvents: _recentEvents }: HomeInputProps) {
   }
 
   const catName = activeCat ? getCatName(activeCat) : "ねこ";
-  const photoSrc =
-    activeCat?.homePhotoDataUrl ??
-    activeCat?.avatarDataUrl ??
-    HOME_FALLBACK_PHOTO_SRC;
-  const homePhotoPosition = activeCat?.homePhotoPosition ?? "center 38%";
   const mikkeCategoryRemaining = getMikkeCategoryRemainingMap(lockData, tick);
   const mikkeAllRemaining = getAllMikkeCategoriesLockedRemaining(lockData, tick);
   const mikkeWindowKey = Math.floor(tick / (60 * 60 * 1000));
@@ -501,28 +591,6 @@ export function HomeInput({ recentEvents: _recentEvents }: HomeInputProps) {
   }, [mikkeAnswer, mikkeWindow]);
 
   useEffect(() => {
-    const cssPhotoUrl = toCssUrl(photoSrc);
-    const root = document.documentElement;
-    const body = document.body;
-
-    root.style.setProperty("--home-bg-image", cssPhotoUrl);
-    body.style.setProperty("--home-bg-image", cssPhotoUrl);
-    body.style.backgroundImage = cssPhotoUrl;
-    body.style.backgroundPosition = homePhotoPosition;
-    body.style.backgroundSize = "cover";
-    body.style.backgroundRepeat = "no-repeat";
-
-    return () => {
-      root.style.removeProperty("--home-bg-image");
-      body.style.removeProperty("--home-bg-image");
-      body.style.removeProperty("background-image");
-      body.style.removeProperty("background-position");
-      body.style.removeProperty("background-size");
-      body.style.removeProperty("background-repeat");
-    };
-  }, [homePhotoPosition, photoSrc]);
-
-  useEffect(() => {
     if (hasTrackedHomeView.current || !activeCatId || !activeCat) {
       return;
     }
@@ -599,74 +667,6 @@ export function HomeInput({ recentEvents: _recentEvents }: HomeInputProps) {
     setActiveCat(active);
     saveActiveCatId(active.id);
     hydrateCatState(active.id);
-  }
-
-  function startCatSwitchMotion(nextProfile: CatProfile) {
-    if (nextProfile.id === activeCatId) return;
-
-    setPreviousHomePhoto({
-      src: photoSrc,
-      position: homePhotoPosition,
-      key: Date.now(),
-    });
-    setCatSwitchMotionKey((current) => current + 1);
-
-    if (previousHomePhotoTimerRef.current) {
-      window.clearTimeout(previousHomePhotoTimerRef.current);
-    }
-
-    previousHomePhotoTimerRef.current = window.setTimeout(() => {
-      setPreviousHomePhoto(null);
-      previousHomePhotoTimerRef.current = null;
-    }, 540);
-  }
-
-  function handleCatSelect(catId: string) {
-    const profile = getActiveCatProfile(catProfiles, catId);
-
-    startCatSwitchMotion(profile);
-    saveActiveCatId(profile.id);
-    setActiveCatId(profile.id);
-    setActiveCat(profile);
-    setIsCatSheetOpen(false);
-    hydrateCatState(profile.id);
-  }
-
-  function switchActiveCat(direction: -1 | 1) {
-    if (catProfiles.length < 2 || !activeCatId) return;
-
-    const currentIndex = catProfiles.findIndex((profile) => profile.id === activeCatId);
-    if (currentIndex === -1) return;
-
-    const nextIndex =
-      (currentIndex + direction + catProfiles.length) % catProfiles.length;
-    handleCatSelect(catProfiles[nextIndex].id);
-  }
-
-  function handleHomeSwipeStart(event: TouchEvent<HTMLDivElement>) {
-    const touch = event.touches[0];
-    if (!touch) return;
-    setHomeSwipeStart({ x: touch.clientX, y: touch.clientY });
-  }
-
-  function handleHomeSwipeEnd(event: TouchEvent<HTMLDivElement>) {
-    if (!homeSwipeStart) return;
-
-    const touch = event.changedTouches[0];
-    if (!touch) {
-      setHomeSwipeStart(null);
-      return;
-    }
-
-    const deltaX = touch.clientX - homeSwipeStart.x;
-    const deltaY = touch.clientY - homeSwipeStart.y;
-    const isHorizontalSwipe = Math.abs(deltaX) > 56 && Math.abs(deltaX) > Math.abs(deltaY) * 1.3;
-
-    if (isHorizontalSwipe) {
-      switchActiveCat(deltaX < 0 ? 1 : -1);
-    }
-
-    setHomeSwipeStart(null);
   }
 
   function showToast(message: string) {
@@ -1106,7 +1106,7 @@ export function HomeInput({ recentEvents: _recentEvents }: HomeInputProps) {
       return;
     }
     if (actionType === "add_sleeping") {
-      recordSleepingCounterAnswer();
+      void handleSleepingExchangePhotoSelect();
       return;
     }
     if (actionType === "open_photo") {
@@ -1134,14 +1134,88 @@ export function HomeInput({ recentEvents: _recentEvents }: HomeInputProps) {
     }
   }
 
-  function recordSleepingCounterAnswer() {
-    if (!activeCatId || getSleepingCounterRemaining(lockData, Date.now())) {
+  async function handleSleepingExchangePhotoSelect() {
+    if (
+      !activeCatId ||
+      isExchangePhotoAdding ||
+      getSleepingCounterRemaining(lockData, Date.now())
+    ) {
       return;
     }
 
-    const nextLockData = setSleepingCounterLock(activeCatId);
+    const input = document.createElement("input");
+    input.type = "file";
+    input.accept = "image/*";
+    input.setAttribute("capture", "environment");
 
-    saveRecord(activeCatId, {
+    input.onchange = async () => {
+      const file = input.files?.[0];
+      if (!file) return;
+
+      setIsExchangePhotoAdding(true);
+
+      try {
+        const dataUrl = await resizeAndEncode(file, 900);
+        const fileSizeBucket = getFileSizeBucket(file.size);
+
+        setPendingExchangeSharePhoto({
+          src: dataUrl,
+          triggerLabel: "ねてる",
+          theme: "sleeping",
+          fileSizeBucket,
+        });
+        setPendingExchangeCatId(activeCatId);
+        trackProductEvent(
+          "home_exchange_sleeping_photo_selected",
+          {
+            theme: "sleeping",
+            file_size_bucket: fileSizeBucket,
+          },
+          { localCatId: activeCatId },
+        );
+      } catch {
+        showToast("写真を読み込めませんでした");
+      } finally {
+        setIsExchangePhotoAdding(false);
+      }
+    };
+
+    input.click();
+  }
+
+  function handleSleepingPhotoStart() {
+    if (!hasAcceptedSleepingSafety) {
+      setIsSleepingSafetyChecked(false);
+      setIsSleepingSafetySheetOpen(true);
+      return;
+    }
+
+    void handleSleepingExchangePhotoSelect();
+  }
+
+  function handleAcceptSleepingSafety() {
+    markSleepingSafetyNoticeAccepted();
+    setHasAcceptedSleepingSafety(true);
+    setIsSleepingSafetySheetOpen(false);
+    setIsSleepingSafetyChecked(false);
+    void handleSleepingExchangePhotoSelect();
+  }
+
+  function recordSleepingCounterAnswer(targetCatId = activeCatId) {
+    if (!targetCatId) {
+      return;
+    }
+
+    const targetLockData =
+      targetCatId === activeCatId ? lockData : readLockData(targetCatId);
+    if (getSleepingCounterRemaining(targetLockData, Date.now())) {
+      return;
+    }
+
+    const targetProfile = getActiveCatProfile(catProfiles, targetCatId);
+    const nextLockData = setSleepingCounterLock(targetProfile.id);
+
+    saveRecord(targetProfile.id, {
       type: "yousu",
       value: "ねてる",
       metadata: {
@@ -1154,10 +1228,13 @@ export function HomeInput({ recentEvents: _recentEvents }: HomeInputProps) {
         counter_id: "sleeping",
         window_id: mikkeWindow.id,
       },
-      { localCatId: activeCatId },
+      { localCatId: targetProfile.id },
     );
+    saveActiveCatId(targetProfile.id);
+    setActiveCatId(targetProfile.id);
+    setActiveCat(targetProfile);
     setSelectedYousu("ねてる");
-    setRecordLog(readRecordLog(activeCatId));
+    setRecordLog(readRecordLog(targetProfile.id));
     setLockData(nextLockData);
     const sleepingCounter = homeCatCounters.find(
       (counter) => counter.id === "sleeping",
@@ -1165,112 +1242,172 @@ export function HomeInput({ recentEvents: _recentEvents }: HomeInputProps) {
     showBoardCompletion(
       "sleeping-counter",
       formatSleepingCounterCount((sleepingCounter?.count ?? 0) + 1),
-      `${catName}も加わりました`,
+      `${getCatName(targetProfile)}も加わりました`,
     );
   }
 
+  function deliverExchangePhoto({
+    triggerLabel,
+    theme,
+    category,
+    localCatId,
+    excludePhotoId,
+  }: {
+    triggerLabel: string;
+    theme: string;
+    category: MikkeWindowCategory | "sleep";
+    localCatId?: string | null;
+    excludePhotoId?: string;
+  }) {
+    const photo = createExchangePhoto({
+      triggerLabel,
+      theme,
+      category,
+      seed: `${localCatId ?? activeCatId ?? "cat"}:${Date.now()}`,
+      excludePhotoId,
+    });
+
+    setDeliveredExchangePhoto(photo);
+    trackProductEvent(
+      "home_exchange_photo_delivered",
+      {
+        trigger_label: triggerLabel,
+        theme,
+        category,
+        photo_id: photo.id,
+      },
+      { localCatId: localCatId ?? activeCatId },
+    );
+  }
+
+  function handleKeepExchangePhoto(photo: ExchangePhoto) {
+    keepExchangePhoto(photo);
+    setDeliveredExchangePhoto(null);
+    showToast("とっておきました");
+    trackProductEvent(
+      "home_exchange_photo_kept",
+      {
+        photo_id: photo.id,
+        trigger_label: photo.triggerLabel,
+        theme: photo.theme,
+      },
+      { localCatId: activeCatId },
+    );
+  }
+
+  function handleCloseExchangePhoto(photo: ExchangePhoto) {
+    setDeliveredExchangePhoto(null);
+    trackProductEvent(
+      "home_exchange_photo_closed",
+      {
+        photo_id: photo.id,
+        trigger_label: photo.triggerLabel,
+        theme: photo.theme,
+      },
+      { localCatId: activeCatId },
+    );
+  }
+
+  function handleConfirmExchangeSharePhoto(photo: PendingExchangeSharePhoto) {
+    const targetCatId = pendingExchangeCatId ?? activeCatId;
+    if (!targetCatId) return;
+
+    saveOwnExchangePhoto(targetCatId, photo, true);
+    const sharedPhoto = saveSharedExchangePhoto(photo);
+    setPendingExchangeSharePhoto(null);
+    setPendingExchangeCatId(null);
+    recordSleepingCounterAnswer(targetCatId);
+    window.setTimeout(() => {
+      deliverExchangePhoto({
+        triggerLabel: photo.triggerLabel,
+        theme: photo.theme,
+        category: "pose",
+        localCatId: targetCatId,
+        excludePhotoId: sharedPhoto?.id,
+      });
+    }, 280);
+    trackProductEvent(
+      "home_exchange_share_photo_confirmed",
+      {
+        theme: photo.theme,
+        trigger_label: photo.triggerLabel,
+        file_size_bucket: photo.fileSizeBucket,
+      },
+      { localCatId: targetCatId },
+    );
+  }
+
+  function handleKeepExchangeSharePhotoPrivate(photo: PendingExchangeSharePhoto) {
+    const targetCatId = pendingExchangeCatId ?? activeCatId;
+    if (!targetCatId) return;
+
+    saveOwnExchangePhoto(targetCatId, photo, false);
+    setPendingExchangeSharePhoto(null);
+    setPendingExchangeCatId(null);
+    recordSleepingCounterAnswer(targetCatId);
+    showToast("うちのねこ箱に入りました");
+    trackProductEvent(
+      "home_exchange_share_photo_declined",
+      {
+        theme: photo.theme,
+        trigger_label: photo.triggerLabel,
+      },
+      { localCatId: targetCatId },
+    );
+  }
+
+  const sleepingCounterItem = homeCatCounters.find(
+    (counter) => counter.id === "sleeping",
+  );
+
   return (
-    <main
-      style={{
-        ...styles.page,
-        backgroundImage: `url("${photoSrc}")`,
-        backgroundPosition: homePhotoPosition,
-      }}
-    >
-      <div
-        key={`home-photo-${activeCatId ?? "none"}-${catSwitchMotionKey}`}
-        style={{
-          ...styles.backgroundPhoto,
-          ...styles.backgroundPhotoCurrent,
-          backgroundImage: `url("${photoSrc}")`,
-          backgroundPosition: homePhotoPosition,
-        }}
-        aria-hidden="true"
+    <main style={styles.page}>
+      <div style={styles.paperBackground} aria-hidden="true" />
+      <div style={styles.paperNoise} aria-hidden="true" />
+
+      <SleepingPhotoHome
+        countLabel={formatSleepingCounterCount(
+          sleepingCounterItem?.count ?? HOME_SLEEPING_COUNTER_BASE_COUNT,
+        )}
+        remaining={sleepingCounterRemaining}
+        cooldownProgress={sleepingCounterCooldownProgress}
+        onTakePhoto={handleSleepingPhotoStart}
       />
-      {previousHomePhoto ? (
-        <div
-          key={`previous-home-photo-${previousHomePhoto.key}`}
-          style={{
-            ...styles.backgroundPhoto,
-            ...styles.backgroundPhotoPrevious,
-            backgroundImage: `url("${previousHomePhoto.src}")`,
-            backgroundPosition: previousHomePhoto.position,
+
+      {isSleepingSafetySheetOpen ? (
+        <SleepingSafetySheet
+          isChecked={isSleepingSafetyChecked}
+          onCheckedChange={setIsSleepingSafetyChecked}
+          onConfirm={handleAcceptSleepingSafety}
+          onClose={() => {
+            setIsSleepingSafetySheetOpen(false);
+            setIsSleepingSafetyChecked(false);
           }}
-          aria-hidden="true"
         />
       ) : null}
-      <div
-        style={styles.contentLayer}
-        onTouchStart={handleHomeSwipeStart}
-        onTouchEnd={handleHomeSwipeEnd}
-      >
-        <section style={styles.heroContent}>
-          <div style={styles.heroTopBar}>
-            <div style={styles.catSwitchRail} aria-label="ねこを切り替える">
-              {(catProfiles.length > 0 ? catProfiles : activeCat ? [activeCat] : []).map(
-                (profile) => {
-                  const isActive = profile.id === activeCatId;
-                  const profileName = getCatName(profile);
 
-                  return (
-                    <button
-                      key={profile.id}
-                      type="button"
-                      onClick={() =>
-                        isActive ? setIsCatSheetOpen(true) : handleCatSelect(profile.id)
-                      }
-                      style={isActive ? styles.catSwitchChipActive : styles.catSwitchChip}
-                      aria-label={`${profileName}に切り替える`}
-                    >
-                      <span style={styles.catSwitchAvatar} aria-hidden="true">
-                        <img
-                          src={getHomeCatThumbSrc(profile)}
-                          alt=""
-                          style={styles.catSwitchAvatarImg}
-                        />
-                      </span>
-                      {isActive ? (
-                        <>
-                          <span style={styles.catSwitchName}>{profileName}</span>
-                          <span style={styles.catSwitchChevron} aria-hidden="true">
-                            ▾
-                          </span>
-                        </>
-                      ) : null}
-                    </button>
-                  );
-                },
-              )}
-            </div>
-          </div>
-        </section>
-      </div>
+      {deliveredExchangePhoto ? (
+        <ExchangePhotoSheet
+          photo={deliveredExchangePhoto}
+          onKeep={() => handleKeepExchangePhoto(deliveredExchangePhoto)}
+          onClose={() => handleCloseExchangePhoto(deliveredExchangePhoto)}
+        />
+      ) : null}
 
-      <HomeBulletinBoard
-        items={boardItems}
-        records={recordLog}
-        collectionPhotoCount={collectionPhotoCount}
-        mikkeWindow={mikkeWindow}
-        mikkeAnswer={mikkeAnswer}
-        mikkeResult={mikkeResult}
-        catName={catName}
-        catCounters={homeCatCounters}
-        isMikkeResultLoading={isMikkeResultLoading}
-        mikkeRemaining={mikkeWindowRemaining}
-        onAction={handleBoardAction}
-        onMikkeAnswer={(option) => {
-          void recordMikkeWindowAnswer(option);
-        }}
-        onOpenMikkeAll={() => {
-          openBoardInput(setIsYousuOpen);
-        }}
-        mikkePhotoSlot={getCollectionSlotById(mikkeSelectedOption?.collectionSlotId)}
-        isMikkePhotoAdding={isCollectionPhotoAdding}
-        onMikkePhotoAdd={(slot) => {
-          void handleMikkePhotoAdd(slot);
-        }}
-        completion={boardCompletion}
-      />
+      {pendingExchangeSharePhoto ? (
+        <ExchangeSharePermissionSheet
+          photo={pendingExchangeSharePhoto}
+          catProfiles={catProfiles}
+          selectedCatId={pendingExchangeCatId ?? activeCatId}
+          onCatSelect={setPendingExchangeCatId}
+          onConfirm={() =>
+            handleConfirmExchangeSharePhoto(pendingExchangeSharePhoto)
+          }
+          onPrivate={() =>
+            handleKeepExchangeSharePhotoPrivate(pendingExchangeSharePhoto)
+          }
+        />
+      ) : null}
 
       {isYousuOpen ? (
         <MikkeAllSheet
@@ -1333,15 +1470,6 @@ export function HomeInput({ recentEvents: _recentEvents }: HomeInputProps) {
         />
       ) : null}
 
-      {isCatSheetOpen ? (
-        <CatSheet
-          profiles={catProfiles}
-          activeCatId={activeCatId}
-          onClose={() => setIsCatSheetOpen(false)}
-          onSelect={handleCatSelect}
-        />
-      ) : null}
-
       {toastText ? <div style={styles.toast}>{toastText}</div> : null}
 
       <BottomNavigation active="today" />
@@ -1380,28 +1508,6 @@ export function HomeInput({ recentEvents: _recentEvents }: HomeInputProps) {
             transform: scaleX(1);
           }
         }
-        @keyframes homePhotoSettle {
-          from {
-            opacity: 0.82;
-            transform: scale(1.018);
-            filter: blur(1.5px);
-          }
-          to {
-            opacity: 1;
-            transform: scale(1);
-            filter: blur(0);
-          }
-        }
-        @keyframes homePhotoFadeOut {
-          from {
-            opacity: 1;
-            transform: scale(1);
-          }
-          to {
-            opacity: 0;
-            transform: scale(1.012);
-          }
-        }
         @keyframes homeCatChromeSettle {
           from {
             opacity: 0.86;
@@ -1424,6 +1530,18 @@ export function HomeInput({ recentEvents: _recentEvents }: HomeInputProps) {
           100% {
             opacity: 0;
             transform: scale(1.12);
+          }
+        }
+        @keyframes exchangePhotoIn {
+          from {
+            opacity: 0;
+            transform: translate3d(0, 18px, 0) scale(0.985);
+            filter: blur(1.2px);
+          }
+          to {
+            opacity: 1;
+            transform: translate3d(0, 0, 0) scale(1);
+            filter: blur(0);
           }
         }
         .mikke-all-body {
@@ -1997,6 +2115,253 @@ function InfoSheet({
         <p style={styles.infoSheetText}>{body}</p>
       </div>
     </AppBottomSheet>
+  );
+}
+
+function SleepingPhotoHome({
+  countLabel,
+  remaining,
+  cooldownProgress,
+  onTakePhoto,
+}: {
+  countLabel: string;
+  remaining: string | null;
+  cooldownProgress: number | null;
+  onTakePhoto: () => void;
+}) {
+  const [isDetailsOpen, setIsDetailsOpen] = useState(false);
+
+  return (
+    <section style={styles.sleepingHome} aria-label="しゃしん">
+      <div style={styles.sleepingHomeHeader}>
+        <p style={styles.sleepingHomeKicker}>ねてるねこ</p>
+        <h1 style={styles.sleepingHomeTitle}>
+          寝顔を撮る、
+          <br />
+          ほかのねこ箱が開く。
+        </h1>
+        <p style={styles.sleepingHomeLead}>
+          いいねもフォローもなく、
+          <br />
+          ただ撮って、ただ見るだけ。
+        </p>
+      </div>
+
+      <div style={styles.sleepingActionGroup}>
+        <button
+          type="button"
+          disabled={Boolean(remaining)}
+          style={{
+            ...styles.sleepingPhotoButton,
+            ...(remaining ? styles.sleepingPhotoButtonDisabled : {}),
+          }}
+          onClick={onTakePhoto}
+          aria-label={remaining ? `次の箱まで ${remaining}` : "寝顔を撮る"}
+        >
+          寝顔を撮る
+        </button>
+
+        {remaining ? (
+          <p style={styles.sleepingCooldownText}>次の箱まで {remaining}</p>
+        ) : null}
+
+        {typeof cooldownProgress === "number" ? (
+          <span style={styles.sleepingBoxCooldown} aria-hidden="true">
+            <span style={styles.sleepingBoxCooldownTrack} />
+            <span
+              style={{
+                ...styles.sleepingBoxCooldownFill,
+                transform: `scaleX(${Math.max(0, Math.min(1, 1 - cooldownProgress))})`,
+              }}
+            />
+          </span>
+        ) : null}
+      </div>
+
+      <button
+        type="button"
+        style={styles.sleepingMoreButton}
+        onClick={() => setIsDetailsOpen((value) => !value)}
+        aria-expanded={isDetailsOpen}
+      >
+        もっとくわしく
+      </button>
+
+      {isDetailsOpen ? (
+        <div style={styles.sleepingDetails}>
+          <p style={styles.sleepingDetailText}>
+            寝顔を入れると、ほかの猫の寝顔がひとつ開きます。
+          </p>
+          <p style={styles.sleepingDetailText}>
+            とっておくは自分だけ。相手に通知されません。
+          </p>
+          <p style={styles.sleepingDetailText}>
+            不安なときは、自分だけに入れられます。
+          </p>
+        </div>
+      ) : null}
+
+      <div style={styles.sleepingBoxPills} aria-label="ねこ箱">
+        <span style={styles.sleepingBoxPill}>
+          ねてるねこ
+          <strong style={styles.sleepingBoxPillValue}>{countLabel}</strong>
+        </span>
+        <span style={styles.sleepingBoxPill}>
+          ほかのねこ箱
+          <span style={styles.sleepingBoxPillIcon} aria-label="閉じています">
+            <AppIcon name="lock" size={12} />
+          </span>
+        </span>
+      </div>
+    </section>
+  );
+}
+
+function SleepingSafetySheet({
+  isChecked,
+  onCheckedChange,
+  onConfirm,
+  onClose,
+}: {
+  isChecked: boolean;
+  onCheckedChange: (checked: boolean) => void;
+  onConfirm: () => void;
+  onClose: () => void;
+}) {
+  return (
+    <AppBottomSheet title="ねてるねこが安心できる場所であるために" onClose={onClose}>
+      <div style={styles.sleepingSafetyBody}>
+        <p style={styles.sleepingSafetyText}>
+          ほかのねこ箱で開いた写真を、そのまま外に出すのは控えてください。
+        </p>
+        <p style={styles.sleepingSafetyText}>
+          不安なときは、写真を自分だけに入れられます。
+        </p>
+        <label style={styles.sleepingSafetyCheck}>
+          <input
+            type="checkbox"
+            checked={isChecked}
+            onChange={(event) => onCheckedChange(event.currentTarget.checked)}
+            style={styles.sleepingSafetyCheckbox}
+          />
+          読みました
+        </label>
+        <button
+          type="button"
+          disabled={!isChecked}
+          style={{
+            ...styles.sleepingSafetyButton,
+            ...(!isChecked ? styles.sleepingSafetyButtonDisabled : {}),
+          }}
+          onClick={onConfirm}
+        >
+          はじめる
+        </button>
+      </div>
+    </AppBottomSheet>
+  );
+}
+
+function ExchangePhotoSheet({
+  photo,
+  onKeep,
+  onClose,
+}: {
+  photo: ExchangePhoto;
+  onKeep: () => void;
+  onClose: () => void;
+}) {
+  return (
+    <div style={styles.exchangeBackdrop} onClick={onClose}>
+      <section
+        style={styles.exchangePanel}
+        aria-label="届いた猫写真"
+        onClick={(event) => event.stopPropagation()}
+      >
+        <div style={styles.exchangeHeader}>
+          <span style={styles.exchangeKicker}>ほかのねこ箱が開きました</span>
+        </div>
+        <div style={styles.exchangePhotoFrame}>
+          <img src={photo.src} alt="" style={styles.exchangePhoto} />
+        </div>
+        <div style={styles.exchangeActions}>
+          <button type="button" style={styles.exchangeKeepButton} onClick={onKeep}>
+            とっておく
+          </button>
+          <button type="button" style={styles.exchangePlainButton} onClick={onClose}>
+            閉じる
+          </button>
+        </div>
+      </section>
+    </div>
+  );
+}
+
+function ExchangeSharePermissionSheet({
+  photo,
+  catProfiles,
+  selectedCatId,
+  onCatSelect,
+  onConfirm,
+  onPrivate,
+}: {
+  photo: PendingExchangeSharePhoto;
+  catProfiles: CatProfile[];
+  selectedCatId: string | null;
+  onCatSelect: (catId: string) => void;
+  onConfirm: () => void;
+  onPrivate: () => void;
+}) {
+  const shouldShowCatPicker = catProfiles.length > 1;
+
+  return (
+    <div style={styles.exchangeBackdrop}>
+      <section style={styles.exchangePanel} aria-label="写真を届ける確認">
+        <div style={styles.exchangeHeader}>
+          <span style={styles.exchangeKicker}>うちのねこ箱に入れる？</span>
+        </div>
+        <div style={styles.exchangeSharePreview}>
+          <img src={photo.src} alt="" style={styles.exchangePhoto} />
+        </div>
+        {shouldShowCatPicker ? (
+          <div style={styles.exchangeCatPicker} aria-label="入れるねこ箱">
+            {catProfiles.map((profile) => {
+              const isSelected = profile.id === selectedCatId;
+
+              return (
+                <button
+                  key={profile.id}
+                  type="button"
+                  style={{
+                    ...styles.exchangeCatOption,
+                    ...(isSelected ? styles.exchangeCatOptionActive : {}),
+                  }}
+                  onClick={() => onCatSelect(profile.id)}
+                  aria-pressed={isSelected}
+                >
+                  <span style={styles.exchangeCatThumb} aria-hidden="true">
+                    <img
+                      src={getHomeCatThumbSrc(profile)}
+                      alt=""
+                      style={styles.exchangeCatThumbImage}
+                    />
+                  </span>
+                  <span style={styles.exchangeCatName}>{getCatName(profile)}</span>
+                </button>
+              );
+            })}
+          </div>
+        ) : null}
+        <div style={styles.exchangeActions}>
+          <button type="button" style={styles.exchangeKeepButton} onClick={onConfirm}>
+            入れて、ほかの箱を見る
+          </button>
+          <button type="button" style={styles.exchangePlainButton} onClick={onPrivate}>
+            自分だけに入れる
+          </button>
+        </div>
+      </section>
+    </div>
   );
 }
 
@@ -3083,16 +3448,168 @@ function saveCollectionPhoto(catId: string, slug: string, dataUrl: string) {
   }
 }
 
+function createExchangePhoto({
+  triggerLabel,
+  theme,
+  category,
+  seed,
+  excludePhotoId,
+}: {
+  triggerLabel: string;
+  theme: string;
+  category: MikkeWindowCategory | "sleep";
+  seed: string;
+  excludePhotoId?: string;
+}): ExchangePhoto {
+  const normalizedTheme = theme.toLowerCase();
+  const exchangePool = [...readSharedExchangePhotos(), ...EXCHANGE_PHOTO_POOL].filter(
+    (photo) => photo.id !== excludePhotoId,
+  );
+  const candidates = exchangePool.filter((photo) =>
+    photo.tags.some(
+      (tag) =>
+        tag.toLowerCase() === normalizedTheme ||
+        tag === triggerLabel ||
+        tag === category,
+    ),
+      );
+  const pool = candidates.length > 0 ? candidates : EXCHANGE_PHOTO_POOL;
+  const index = hashText(`${seed}:${triggerLabel}:${theme}`) % pool.length;
+  const selected = pool[index];
+
+  return {
+    id: `${selected.id}-${Date.now()}`,
+    src: selected.src,
+    title: selected.title,
+    subtitle: selected.subtitle,
+    triggerLabel,
+    theme,
+    deliveredAt: Date.now(),
+  };
+}
+
+function keepExchangePhoto(photo: ExchangePhoto) {
+  try {
+    const raw = window.localStorage.getItem(EXCHANGE_PHOTO_STORAGE_KEY);
+    const saved = raw ? (JSON.parse(raw) as ExchangePhoto[]) : [];
+
+    window.localStorage.setItem(
+      EXCHANGE_PHOTO_STORAGE_KEY,
+      JSON.stringify([photo, ...saved].slice(0, 50)),
+    );
+  } catch {
+    // The received photo is a soft reward, so storage failure should not block the flow.
+  }
+}
+
+function hasAcceptedSleepingSafetyNotice() {
+  if (typeof window === "undefined") {
+    return false;
+  }
+
+  try {
+    return window.localStorage.getItem(SLEEPING_SAFETY_ACCEPTED_STORAGE_KEY) === "1";
+  } catch {
+    return false;
+  }
+}
+
+function markSleepingSafetyNoticeAccepted() {
+  try {
+    window.localStorage.setItem(SLEEPING_SAFETY_ACCEPTED_STORAGE_KEY, "1");
+  } catch {
+    // The notice is a gentle first-run guard; storage failure should not block use.
+  }
+}
+
+function saveOwnExchangePhoto(
+  catId: string,
+  photo: PendingExchangeSharePhoto,
+  shared: boolean,
+) {
+  try {
+    const raw = window.localStorage.getItem(EXCHANGE_OWN_SLEEPING_PHOTO_STORAGE_KEY);
+    const saved = raw ? (JSON.parse(raw) as OwnExchangePhoto[]) : [];
+    const ownPhoto: OwnExchangePhoto = {
+      id: `own-sleeping-${Date.now()}`,
+      catId,
+      src: photo.src,
+      triggerLabel: photo.triggerLabel,
+      theme: photo.theme,
+      shared,
+      createdAt: Date.now(),
+    };
+
+    window.localStorage.setItem(
+      EXCHANGE_OWN_SLEEPING_PHOTO_STORAGE_KEY,
+      JSON.stringify([ownPhoto, ...saved].slice(0, 50)),
+    );
+  } catch {
+    // A sleeping photo should feel lightweight; storage failure should not trap the user.
+  }
+}
+
+function saveSharedExchangePhoto(
+  photo: PendingExchangeSharePhoto,
+): ExchangePhotoPoolItem | null {
+  try {
+    const current = readSharedExchangePhotos();
+    const sharedPhoto: ExchangePhotoPoolItem = {
+      id: `shared-sleeping-${Date.now()}`,
+      src: photo.src,
+      title: "ほかの猫の寝顔",
+      subtitle: "",
+      tags: ["sleeping", "ねてる"],
+    };
+
+    window.localStorage.setItem(
+      EXCHANGE_SHARED_PHOTO_STORAGE_KEY,
+      JSON.stringify([sharedPhoto, ...current].slice(0, 30)),
+    );
+    return sharedPhoto;
+  } catch {
+    // Sharing is optional, so keep the main recording flow alive if storage fails.
+    return null;
+  }
+}
+
+function readSharedExchangePhotos(): ExchangePhotoPoolItem[] {
+  if (typeof window === "undefined") {
+    return [];
+  }
+
+  try {
+    const raw = window.localStorage.getItem(EXCHANGE_SHARED_PHOTO_STORAGE_KEY);
+    const parsed = raw ? (JSON.parse(raw) as Partial<ExchangePhotoPoolItem>[]) : [];
+
+    if (!Array.isArray(parsed)) {
+      return [];
+    }
+
+    return parsed.filter(isValidExchangePhotoPoolItem);
+  } catch {
+    return [];
+  }
+}
+
+function isValidExchangePhotoPoolItem(
+  photo: Partial<ExchangePhotoPoolItem>,
+): photo is ExchangePhotoPoolItem {
+  return Boolean(
+    photo.id &&
+      photo.src &&
+      photo.title &&
+      photo.subtitle &&
+      Array.isArray(photo.tags),
+  );
+}
+
 function normalizeStoredPhotoList(value: string[] | string | undefined) {
   if (typeof value === "string") {
     return [value];
   }
 
   return value ?? [];
-}
-
-function toCssUrl(src: string) {
-  return `url("${src.replace(/\\/g, "\\\\").replace(/"/g, '\\"')}")`;
 }
 
 function getFileSizeBucket(size: number) {
@@ -3103,6 +3620,15 @@ function getFileSizeBucket(size: number) {
     return "medium";
   }
   return "large";
+}
+
+function hashText(value: string) {
+  let hash = 0;
+  for (let index = 0; index < value.length; index += 1) {
+    hash = (hash << 5) - hash + value.charCodeAt(index);
+    hash |= 0;
+  }
+  return Math.abs(hash);
 }
 
 function resizeAndEncode(file: File, maxSize = 1200): Promise<string> {
@@ -3449,160 +3975,31 @@ const styles = {
     height: "100vh",
     minHeight: "100vh",
     overflow: "hidden",
-    backgroundColor: "#1a1a18",
-    backgroundSize: "cover",
-    backgroundPosition: "center 30%",
-    backgroundRepeat: "no-repeat",
-    color: "#2A2A28",
+    backgroundColor: "#f7f3ea",
+    color: "#202020",
     fontFamily:
       'Outfit, "Zen Kaku Gothic New", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
   },
-  backgroundPhoto: {
+  paperBackground: {
     position: "fixed",
-    top: 0,
-    right: 0,
-    bottom: 0,
-    left: 0,
-    width: "100%",
-    height: "100dvh",
-    minHeight: "100vh",
+    inset: 0,
     zIndex: 0,
-    backgroundColor: "#1a1a18",
-    backgroundSize: "cover",
-    backgroundPosition: "center 38%",
-    backgroundRepeat: "no-repeat",
     pointerEvents: "none",
-    willChange: "opacity, transform, filter",
+    background: [
+      "radial-gradient(circle at 18% 14%, rgba(255,255,255,0.84) 0%, rgba(255,255,255,0.28) 28%, rgba(255,255,255,0) 54%)",
+      "radial-gradient(circle at 86% 82%, rgba(226,211,185,0.34) 0%, rgba(226,211,185,0.12) 30%, rgba(226,211,185,0) 58%)",
+      "linear-gradient(180deg, #fbf8f0 0%, #f4efe4 52%, #eee6d8 100%)",
+    ].join(", "),
   },
-  backgroundPhotoCurrent: {
-    zIndex: 0,
-    animation: "homePhotoSettle 0.52s cubic-bezier(0.22, 1, 0.36, 1) both",
-  },
-  backgroundPhotoPrevious: {
+  paperNoise: {
+    position: "fixed",
+    inset: 0,
     zIndex: 1,
-    animation: "homePhotoFadeOut 0.54s cubic-bezier(0.22, 1, 0.36, 1) both",
-  },
-  contentLayer: {
-    position: "relative",
-    zIndex: 10,
-    width: "100%",
-    height: "100vh",
-    display: "flex",
-    flexDirection: "column",
-    justifyContent: "space-between",
-    overflow: "hidden",
-    paddingBottom: "calc(92px + env(safe-area-inset-bottom))",
-    boxSizing: "border-box",
-  },
-  heroContent: {
-    position: "relative",
-    flex: "1 1 auto",
-    minHeight: 0,
-    display: "flex",
-    flexDirection: "column",
-    justifyContent: "space-between",
-    padding: "calc(12px + env(safe-area-inset-top)) 16px 10px",
-    boxSizing: "border-box",
-  },
-  heroTopBar: {
-    display: "flex",
-    alignItems: "flex-start",
-    justifyContent: "space-between",
-    gap: "12px",
-  },
-  catSwitchRail: {
-    display: "flex",
-    alignItems: "center",
-    gap: "8px",
-    maxWidth: "min(78vw, 330px)",
-    overflowX: "auto",
-    scrollbarWidth: "none",
-    padding: "2px",
-  },
-  catSwitchChip: {
-    display: "inline-flex",
-    alignItems: "center",
-    justifyContent: "center",
-    width: "50px",
-    height: "50px",
-    border: "0.5px solid rgba(255,255,255,0.22)",
-    borderRadius: "99px",
-    background: "rgba(38,34,32,0.32)",
-    color: "rgba(255,255,255,0.9)",
-    padding: "3px",
-    cursor: "pointer",
-    flexShrink: 0,
-    overflow: "hidden",
-    isolation: "isolate",
-    backdropFilter: "blur(22px)",
-    WebkitBackdropFilter: "blur(22px)",
-    boxShadow:
-      "0 10px 28px rgba(0,0,0,0.2), inset 0 1px 0 rgba(255,255,255,0.16)",
-    transition:
-      "width 0.42s cubic-bezier(0.22, 1, 0.36, 1), min-width 0.42s cubic-bezier(0.22, 1, 0.36, 1), background 0.32s ease, border-color 0.32s ease, box-shadow 0.32s ease, transform 0.32s ease, opacity 0.32s ease",
-    willChange: "width, transform",
-  },
-  catSwitchChipActive: {
-    display: "inline-flex",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: "9px",
-    width: "min(176px, max(116px, 34vw))",
-    minWidth: "116px",
-    maxWidth: "176px",
-    height: "52px",
-    border: "0.5px solid rgba(255,255,255,0.3)",
-    borderRadius: "99px",
-    background: "rgba(54,48,44,0.42)",
-    color: "rgba(255,255,255,0.96)",
-    padding: "4px 13px 4px 4px",
-    fontSize: "15px",
-    fontWeight: 680,
-    cursor: "pointer",
-    flexShrink: 0,
-    overflow: "hidden",
-    isolation: "isolate",
-    backdropFilter: "blur(26px)",
-    WebkitBackdropFilter: "blur(26px)",
-    boxShadow:
-      "0 12px 32px rgba(0,0,0,0.24), inset 0 1px 0 rgba(255,255,255,0.2)",
-    transition:
-      "width 0.42s cubic-bezier(0.22, 1, 0.36, 1), min-width 0.42s cubic-bezier(0.22, 1, 0.36, 1), background 0.32s ease, border-color 0.32s ease, box-shadow 0.32s ease, transform 0.32s ease, opacity 0.32s ease",
-    willChange: "width, transform",
-  },
-  catSwitchAvatar: {
-    width: "44px",
-    height: "44px",
-    borderRadius: "50%",
-    border: "2px solid rgba(255,255,255,0.58)",
-    overflow: "hidden",
-    flexShrink: 0,
-    background: "rgba(255,255,255,0.12)",
-    display: "inline-flex",
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  catSwitchAvatarImg: {
-    width: "100%",
-    height: "100%",
-    objectFit: "cover",
-    display: "block",
-  },
-  catSwitchName: {
-    flex: 1,
-    minWidth: 0,
-    maxWidth: "92px",
-    overflow: "hidden",
-    textOverflow: "ellipsis",
-    whiteSpace: "nowrap",
-    textAlign: "center",
-    animation: "homeCatChromeSettle 0.36s cubic-bezier(0.22, 1, 0.36, 1) both",
-  },
-  catSwitchChevron: {
-    fontSize: "11px",
-    lineHeight: 1,
-    opacity: 0.58,
-    flexShrink: 0,
+    pointerEvents: "none",
+    opacity: 0.18,
+    backgroundImage:
+      "linear-gradient(90deg, rgba(88,73,50,0.05) 1px, transparent 1px), linear-gradient(0deg, rgba(88,73,50,0.04) 1px, transparent 1px)",
+    backgroundSize: "26px 26px",
   },
   boardPeek: {
     position: "fixed",
@@ -4407,6 +4804,460 @@ const styles = {
     border: "0.5px solid rgba(255,255,255,0.10)",
     background: "rgba(255,255,255,0.06)",
     color: "rgba(255,255,255,0.58)",
+  },
+  sleepingHome: {
+    position: "fixed",
+    left: "50%",
+    bottom: "calc(clamp(174px, 20vh, 206px) + env(safe-area-inset-bottom))",
+    zIndex: 18,
+    width: HOME_NAV_FRAME_WIDTH,
+    transform: "translateX(-50%)",
+    display: "grid",
+    justifyItems: "center",
+    gap: "14px",
+    color: "#202020",
+    pointerEvents: "auto",
+    textAlign: "center",
+  },
+  sleepingHomeHeader: {
+    display: "grid",
+    gap: "16px",
+    padding: "0 16px",
+  },
+  sleepingHomeKicker: {
+    margin: 0,
+    color: "#6f665a",
+    fontSize: "12px",
+    fontWeight: 500,
+    lineHeight: 1.2,
+  },
+  sleepingHomeTitle: {
+    margin: 0,
+    color: "#202020",
+    fontFamily: "\"Shippori Mincho B1\", \"Hiragino Mincho ProN\", \"Yu Mincho\", serif",
+    fontSize: "20px",
+    fontWeight: 500,
+    lineHeight: 1.9,
+    letterSpacing: 0,
+  },
+  sleepingHomeLead: {
+    margin: 0,
+    color: "#4d4940",
+    fontFamily: "\"Shippori Mincho B1\", \"Hiragino Mincho ProN\", \"Yu Mincho\", serif",
+    fontSize: "13px",
+    fontWeight: 400,
+    lineHeight: 1.9,
+  },
+  sleepingActionGroup: {
+    display: "grid",
+    justifyItems: "center",
+    gap: "7px",
+  },
+  sleepingBoxStack: {
+    display: "grid",
+    gap: "10px",
+  },
+  sleepingBoxPrimary: {
+    position: "relative",
+    overflow: "hidden",
+    display: "grid",
+    gap: "6px",
+    minHeight: "176px",
+    border: "0.5px solid rgba(255,255,255,0.22)",
+    borderRadius: "24px",
+    background:
+      "linear-gradient(145deg, rgba(49,44,40,0.76), rgba(23,21,19,0.9))",
+    padding: "16px",
+    boxSizing: "border-box",
+    boxShadow:
+      "0 18px 48px rgba(0,0,0,0.34), inset 0 1px 0 rgba(255,255,255,0.16)",
+    backdropFilter: "blur(28px)",
+    WebkitBackdropFilter: "blur(28px)",
+  },
+  sleepingBoxSecondary: {
+    display: "grid",
+    gap: "4px",
+    minHeight: "122px",
+    border: "0.5px solid rgba(255,255,255,0.16)",
+    borderRadius: "22px",
+    background: "rgba(23,21,19,0.58)",
+    padding: "14px 16px",
+    boxSizing: "border-box",
+    boxShadow: "0 14px 32px rgba(0,0,0,0.24)",
+    backdropFilter: "blur(24px)",
+    WebkitBackdropFilter: "blur(24px)",
+  },
+  sleepingBoxTopRow: {
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: "12px",
+  },
+  sleepingBoxLabel: {
+    color: "rgba(255,255,255,0.68)",
+    fontSize: "12px",
+    fontWeight: 620,
+    lineHeight: 1.2,
+  },
+  sleepingBoxCount: {
+    color: "rgba(255,255,255,0.72)",
+    fontSize: "12px",
+    fontWeight: 620,
+    lineHeight: 1.2,
+  },
+  sleepingBoxClosed: {
+    display: "inline-flex",
+    alignItems: "center",
+    justifyContent: "center",
+    width: "22px",
+    height: "22px",
+    borderRadius: "999px",
+    background: "rgba(255,255,255,0.1)",
+    color: "rgba(255,255,255,0.58)",
+    fontSize: "11px",
+    fontWeight: 700,
+  },
+  sleepingBoxLead: {
+    margin: "10px 0 0",
+    color: "rgba(255,255,255,0.96)",
+    fontSize: "19px",
+    fontWeight: 660,
+    lineHeight: 1.25,
+  },
+  sleepingBoxSub: {
+    margin: 0,
+    color: "rgba(255,255,255,0.7)",
+    fontSize: "15px",
+    fontWeight: 560,
+    lineHeight: 1.32,
+  },
+  sleepingBoxNote: {
+    margin: "8px 0 0",
+    color: "rgba(255,255,255,0.48)",
+    fontSize: "12px",
+    fontWeight: 540,
+    lineHeight: 1.35,
+  },
+  sleepingPhotoButton: {
+    justifySelf: "center",
+    minHeight: "39px",
+    minWidth: "124px",
+    border: "none",
+    borderRadius: "9999px",
+    background: "rgba(255,255,255,0.96)",
+    color: "#202020",
+    fontFamily: "\"Shippori Mincho B1\", \"Hiragino Mincho ProN\", \"Yu Mincho\", serif",
+    fontSize: "13px",
+    fontWeight: 500,
+    lineHeight: 1,
+    cursor: "pointer",
+    padding: "10px 28px",
+    boxShadow: "0 12px 28px rgba(119,101,73,0.16)",
+  },
+  sleepingPhotoButtonDisabled: {
+    background: "rgba(255,255,255,0.62)",
+    color: "rgba(32,32,32,0.42)",
+    cursor: "default",
+  },
+  sleepingCooldownText: {
+    margin: 0,
+    color: "#777064",
+    fontFamily: "\"Shippori Mincho B1\", \"Hiragino Mincho ProN\", \"Yu Mincho\", serif",
+    fontSize: "11px",
+    fontWeight: 400,
+    lineHeight: 1.2,
+  },
+  sleepingBoxCooldown: {
+    position: "relative",
+    display: "block",
+    width: "160px",
+    height: "3px",
+    overflow: "hidden",
+    borderRadius: "999px",
+    pointerEvents: "none",
+  },
+  sleepingBoxCooldownTrack: {
+    position: "absolute",
+    inset: 0,
+    background: "rgba(83,72,55,0.12)",
+  },
+  sleepingBoxCooldownFill: {
+    position: "absolute",
+    inset: 0,
+    transformOrigin: "left center",
+    background: "rgba(83,72,55,0.34)",
+  },
+  sleepingMoreButton: {
+    border: "none",
+    background: "transparent",
+    color: "#777064",
+    fontFamily: "\"Shippori Mincho B1\", \"Hiragino Mincho ProN\", \"Yu Mincho\", serif",
+    fontSize: "11px",
+    fontWeight: 400,
+    lineHeight: 1,
+    cursor: "pointer",
+    padding: "3px 8px",
+  },
+  sleepingDetails: {
+    width: "min(100%, 330px)",
+    display: "grid",
+    gap: "7px",
+    padding: "4px 16px 0",
+    boxSizing: "border-box",
+    textAlign: "left",
+  },
+  sleepingDetailText: {
+    margin: 0,
+    color: "#5b554c",
+    fontFamily: "\"Shippori Mincho B1\", \"Hiragino Mincho ProN\", \"Yu Mincho\", serif",
+    fontSize: "12px",
+    fontWeight: 400,
+    lineHeight: 1.7,
+  },
+  sleepingBoxPills: {
+    display: "flex",
+    justifyContent: "center",
+    gap: "8px",
+    flexWrap: "wrap",
+  },
+  sleepingBoxPill: {
+    display: "inline-flex",
+    alignItems: "center",
+    gap: "8px",
+    minHeight: "30px",
+    border: "0.5px solid rgba(95,82,62,0.16)",
+    borderRadius: "999px",
+    background: "rgba(255,255,255,0.52)",
+    color: "#6c6559",
+    fontSize: "11px",
+    fontWeight: 560,
+    padding: "0 10px",
+    backdropFilter: "blur(20px)",
+    WebkitBackdropFilter: "blur(20px)",
+  },
+  sleepingBoxPillValue: {
+    color: "#2f2b25",
+    fontSize: "11px",
+    fontWeight: 680,
+  },
+  sleepingBoxPillIcon: {
+    display: "inline-flex",
+    alignItems: "center",
+    justifyContent: "center",
+    color: "#2f2b25",
+  },
+  sleepingSafetyBody: {
+    display: "grid",
+    gap: "12px",
+    padding: "4px 2px 0",
+  },
+  sleepingSafetyText: {
+    margin: 0,
+    color: "rgba(255,255,255,0.72)",
+    fontSize: "13px",
+    fontWeight: 460,
+    lineHeight: 1.7,
+  },
+  sleepingSafetyCheck: {
+    display: "inline-flex",
+    alignItems: "center",
+    gap: "9px",
+    color: "rgba(255,255,255,0.86)",
+    fontSize: "13px",
+    fontWeight: 560,
+    marginTop: "4px",
+  },
+  sleepingSafetyCheckbox: {
+    width: "18px",
+    height: "18px",
+    accentColor: "#f4f1ea",
+  },
+  sleepingSafetyButton: {
+    minHeight: "44px",
+    border: "none",
+    borderRadius: "999px",
+    background: "rgba(255,255,255,0.94)",
+    color: "#2A2A28",
+    fontSize: "14px",
+    fontWeight: 660,
+    cursor: "pointer",
+    marginTop: "4px",
+  },
+  sleepingSafetyButtonDisabled: {
+    background: "rgba(255,255,255,0.16)",
+    color: "rgba(255,255,255,0.44)",
+    cursor: "default",
+  },
+  exchangeBackdrop: {
+    position: "fixed",
+    inset: 0,
+    zIndex: 72,
+    display: "flex",
+    alignItems: "flex-end",
+    justifyContent: "center",
+    padding: "0 14px calc(92px + env(safe-area-inset-bottom))",
+    boxSizing: "border-box",
+    background: "rgba(10,9,8,0.28)",
+    backdropFilter: "blur(3px)",
+    WebkitBackdropFilter: "blur(3px)",
+  },
+  exchangePanel: {
+    width: HOME_NAV_FRAME_WIDTH,
+    maxWidth: "410px",
+    border: "0.5px solid rgba(255,255,255,0.22)",
+    borderRadius: "24px",
+    background:
+      "linear-gradient(145deg, rgba(54,48,44,0.78), rgba(24,22,20,0.9))",
+    color: "rgba(255,255,255,0.94)",
+    padding: "14px",
+    boxSizing: "border-box",
+    boxShadow:
+      "0 22px 60px rgba(0,0,0,0.36), inset 0 1px 0 rgba(255,255,255,0.16)",
+    backdropFilter: "blur(30px)",
+    WebkitBackdropFilter: "blur(30px)",
+    animation: "exchangePhotoIn 0.44s cubic-bezier(0.22, 1, 0.36, 1) both",
+  },
+  exchangeHeader: {
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "flex-start",
+    gap: "12px",
+    marginBottom: "10px",
+  },
+  exchangeKicker: {
+    color: "rgba(255,255,255,0.64)",
+    fontSize: "12px",
+    fontWeight: 560,
+    lineHeight: 1.2,
+  },
+  exchangePhotoFrame: {
+    width: "100%",
+    aspectRatio: "4 / 3",
+    borderRadius: "20px",
+    overflow: "hidden",
+    background: "rgba(255,255,255,0.08)",
+    border: "0.5px solid rgba(255,255,255,0.16)",
+  },
+  exchangePhoto: {
+    width: "100%",
+    height: "100%",
+    objectFit: "cover",
+    display: "block",
+  },
+  exchangeSharePreview: {
+    width: "100%",
+    aspectRatio: "4 / 3",
+    borderRadius: "20px",
+    overflow: "hidden",
+    background: "rgba(255,255,255,0.08)",
+    border: "0.5px solid rgba(255,255,255,0.16)",
+  },
+  exchangeCatPicker: {
+    display: "flex",
+    gap: "8px",
+    overflowX: "auto",
+    scrollbarWidth: "none",
+    padding: "10px 1px 2px",
+  },
+  exchangeCatOption: {
+    display: "inline-flex",
+    alignItems: "center",
+    gap: "8px",
+    minWidth: "94px",
+    minHeight: "42px",
+    border: "0.5px solid rgba(255,255,255,0.12)",
+    borderRadius: "999px",
+    background: "rgba(255,255,255,0.08)",
+    color: "rgba(255,255,255,0.68)",
+    padding: "4px 11px 4px 4px",
+    cursor: "pointer",
+    flexShrink: 0,
+  },
+  exchangeCatOptionActive: {
+    border: "0.5px solid rgba(255,255,255,0.3)",
+    background: "rgba(255,255,255,0.18)",
+    color: "rgba(255,255,255,0.96)",
+  },
+  exchangeCatThumb: {
+    width: "34px",
+    height: "34px",
+    borderRadius: "50%",
+    overflow: "hidden",
+    background: "rgba(255,255,255,0.16)",
+    flexShrink: 0,
+  },
+  exchangeCatThumbImage: {
+    width: "100%",
+    height: "100%",
+    objectFit: "cover",
+    display: "block",
+  },
+  exchangeCatName: {
+    minWidth: 0,
+    maxWidth: "88px",
+    overflow: "hidden",
+    textOverflow: "ellipsis",
+    whiteSpace: "nowrap",
+    fontSize: "13px",
+    fontWeight: 650,
+  },
+  exchangeText: {
+    display: "grid",
+    gap: "4px",
+    padding: "13px 2px 12px",
+  },
+  exchangeTitle: {
+    margin: 0,
+    color: "rgba(255,255,255,0.96)",
+    fontSize: "17px",
+    fontWeight: 600,
+    lineHeight: 1.28,
+  },
+  exchangeSubtitle: {
+    margin: 0,
+    color: "rgba(255,255,255,0.66)",
+    fontSize: "12.5px",
+    fontWeight: 480,
+    lineHeight: 1.45,
+  },
+  exchangeMeta: {
+    margin: "2px 0 0",
+    color: "rgba(255,255,255,0.58)",
+    fontSize: "12px",
+    fontWeight: 480,
+    lineHeight: 1.35,
+  },
+  exchangeActions: {
+    display: "grid",
+    gridTemplateColumns: "1fr auto",
+    alignItems: "center",
+    gap: "10px",
+  },
+  exchangeSecondaryActions: {
+    minWidth: "104px",
+    display: "grid",
+    justifyItems: "end",
+    gap: "4px",
+  },
+  exchangeKeepButton: {
+    minHeight: "48px",
+    border: "none",
+    borderRadius: "16px",
+    background: "rgba(255,255,255,0.94)",
+    color: "#2A2A28",
+    fontSize: "15px",
+    fontWeight: 620,
+    cursor: "pointer",
+  },
+  exchangePlainButton: {
+    minHeight: "28px",
+    border: "none",
+    background: "transparent",
+    color: "rgba(255,255,255,0.56)",
+    fontSize: "12px",
+    fontWeight: 560,
+    cursor: "pointer",
+    padding: "0 2px",
   },
   morphBackdrop: {
     position: "fixed",
