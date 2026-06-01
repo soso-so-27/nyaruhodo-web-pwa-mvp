@@ -1282,6 +1282,7 @@ export function HomeInput({ recentEvents: _recentEvents }: HomeInputProps) {
 
   function handleKeepExchangePhoto(photo: ExchangePhoto) {
     keepExchangePhoto(photo);
+    setCollectionRefreshTick((value) => value + 1);
     setDeliveredExchangePhoto(null);
     showToast("とっておきました");
     trackProductEvent(
@@ -1314,6 +1315,7 @@ export function HomeInput({ recentEvents: _recentEvents }: HomeInputProps) {
 
     saveOwnExchangePhoto(targetCatId, photo, true);
     const sharedPhoto = saveSharedExchangePhoto(photo);
+    setCollectionRefreshTick((value) => value + 1);
     setPendingExchangeSharePhoto(null);
     setPendingExchangeCatId(null);
     recordSleepingCounterAnswer(targetCatId);
@@ -1342,6 +1344,7 @@ export function HomeInput({ recentEvents: _recentEvents }: HomeInputProps) {
     if (!targetCatId) return;
 
     saveOwnExchangePhoto(targetCatId, photo, false);
+    setCollectionRefreshTick((value) => value + 1);
     setPendingExchangeSharePhoto(null);
     setPendingExchangeCatId(null);
     recordSleepingCounterAnswer(targetCatId);
@@ -1359,6 +1362,15 @@ export function HomeInput({ recentEvents: _recentEvents }: HomeInputProps) {
   const sleepingCounterItem = homeCatCounters.find(
     (counter) => counter.id === "sleeping",
   );
+  const homeSleepingBoxStats = useMemo(
+    () =>
+      buildHomeSleepingBoxStats({
+        activeCatId,
+        sleepingCounter:
+          sleepingCounterItem?.count ?? HOME_SLEEPING_COUNTER_BASE_COUNT,
+      }),
+    [activeCatId, collectionRefreshTick, sleepingCounterItem?.count],
+  );
 
   return (
     <main style={styles.page}>
@@ -1366,11 +1378,9 @@ export function HomeInput({ recentEvents: _recentEvents }: HomeInputProps) {
       <div style={styles.paperNoise} aria-hidden="true" />
 
       <SleepingPhotoHome
-        countLabel={formatSleepingCounterCount(
-          sleepingCounterItem?.count ?? HOME_SLEEPING_COUNTER_BASE_COUNT,
-        )}
         remaining={sleepingCounterRemaining}
         cooldownProgress={sleepingCounterCooldownProgress}
+        stats={homeSleepingBoxStats}
         onTakePhoto={handleSleepingPhotoStart}
       />
 
@@ -2119,14 +2129,14 @@ function InfoSheet({
 }
 
 function SleepingPhotoHome({
-  countLabel,
   remaining,
   cooldownProgress,
+  stats,
   onTakePhoto,
 }: {
-  countLabel: string;
   remaining: string | null;
   cooldownProgress: number | null;
+  stats: BoardShelfStat[];
   onTakePhoto: () => void;
 }) {
   const [isDetailsOpen, setIsDetailsOpen] = useState(false);
@@ -2136,14 +2146,12 @@ function SleepingPhotoHome({
       <div style={styles.sleepingHomeHeader}>
         <p style={styles.sleepingHomeKicker}>ねてるねこ</p>
         <h1 style={styles.sleepingHomeTitle}>
-          寝顔を撮る、
-          <br />
-          ほかのねこ箱が開く。
+          寝顔を撮る
         </h1>
         <p style={styles.sleepingHomeLead}>
-          いいねもフォローもなく、
+          ねてる猫を見つけたら、
           <br />
-          ただ撮って、ただ見るだけ。
+          ここから入れておく
         </p>
       </div>
 
@@ -2158,7 +2166,7 @@ function SleepingPhotoHome({
           onClick={onTakePhoto}
           aria-label={remaining ? `次の箱まで ${remaining}` : "寝顔を撮る"}
         >
-          寝顔を撮る
+          <AppIcon name="camera" size={34} />
         </button>
 
         {remaining ? (
@@ -2190,28 +2198,21 @@ function SleepingPhotoHome({
       {isDetailsOpen ? (
         <div style={styles.sleepingDetails}>
           <p style={styles.sleepingDetailText}>
-            寝顔を入れると、ほかの猫の寝顔がひとつ開きます。
-          </p>
-          <p style={styles.sleepingDetailText}>
-            とっておくは自分だけ。相手に通知されません。
-          </p>
-          <p style={styles.sleepingDetailText}>
-            不安なときは、自分だけに入れられます。
+            寝顔を入れると、ほかの猫の寝顔がひとつ開きます。とっておくは自分だけです。
           </p>
         </div>
       ) : null}
 
-      <div style={styles.sleepingBoxPills} aria-label="ねこ箱">
-        <span style={styles.sleepingBoxPill}>
-          ねてるねこ
-          <strong style={styles.sleepingBoxPillValue}>{countLabel}</strong>
-        </span>
-        <span style={styles.sleepingBoxPill}>
-          ほかのねこ箱
-          <span style={styles.sleepingBoxPillIcon} aria-label="閉じています">
-            <AppIcon name="lock" size={12} />
+      <div style={styles.sleepingStatCards} aria-label="ねこ箱">
+        {stats.map((stat) => (
+          <span key={stat.label} style={styles.sleepingStatCard}>
+            <span style={styles.sleepingStatLabel}>{stat.label}</span>
+            <span style={styles.sleepingStatValue}>{stat.value}</span>
+            {stat.detail ? (
+              <span style={styles.sleepingStatDetail}>{stat.detail}</span>
+            ) : null}
           </span>
-        </span>
+        ))}
       </div>
     </section>
   );
@@ -2869,6 +2870,71 @@ function buildBoardShelfStats(
   }
 
   return stats;
+}
+
+function buildHomeSleepingBoxStats({
+  activeCatId,
+  sleepingCounter,
+}: {
+  activeCatId: string | null;
+  sleepingCounter: number;
+}): BoardShelfStat[] {
+  const ownSleepingCount = readOwnSleepingPhotoCount(activeCatId);
+  const keptOtherCount = readKeptExchangePhotoCount();
+
+  return [
+    {
+      label: "うちの寝顔",
+      value: String(ownSleepingCount),
+      detail: "",
+    },
+    {
+      label: "ほかの寝顔",
+      value: `${Math.min(keptOtherCount, 10)}/10`,
+      detail: "",
+    },
+    {
+      label: "ねてるねこ",
+      value: formatSleepingCounterCount(sleepingCounter),
+      detail: "",
+    },
+  ];
+}
+
+function readOwnSleepingPhotoCount(activeCatId: string | null) {
+  if (typeof window === "undefined") {
+    return 0;
+  }
+
+  try {
+    const raw = window.localStorage.getItem(EXCHANGE_OWN_SLEEPING_PHOTO_STORAGE_KEY);
+    const parsed = raw ? (JSON.parse(raw) as Partial<OwnExchangePhoto>[]) : [];
+
+    if (!Array.isArray(parsed)) {
+      return 0;
+    }
+
+    return parsed.filter((photo) =>
+      activeCatId ? photo.catId === activeCatId : Boolean(photo.src),
+    ).length;
+  } catch {
+    return 0;
+  }
+}
+
+function readKeptExchangePhotoCount() {
+  if (typeof window === "undefined") {
+    return 0;
+  }
+
+  try {
+    const raw = window.localStorage.getItem(EXCHANGE_PHOTO_STORAGE_KEY);
+    const parsed = raw ? (JSON.parse(raw) as Partial<ExchangePhoto>[]) : [];
+
+    return Array.isArray(parsed) ? parsed.length : 0;
+  } catch {
+    return 0;
+  }
 }
 
 function getBoardTransitionSource(
@@ -4347,56 +4413,56 @@ const styles = {
     letterSpacing: 0,
   },
   boardShelf: {
-    margin: "0 0 11px",
+    margin: "0 auto 11px",
+    width: "min(100%, 372px)",
   },
   boardShelfGrid: {
-    display: "flex",
-    gap: "0",
+    display: "grid",
+    gridTemplateColumns: "repeat(3, minmax(0, 1fr))",
+    gap: "16px",
     alignItems: "center",
-    borderRadius: "15px",
-    background: "rgba(255,255,255,0.055)",
-    border: "0.5px solid rgba(255,255,255,0.11)",
-    boxShadow: "inset 0 1px 0 rgba(255,255,255,0.08)",
-    overflow: "hidden",
+    background: "transparent",
   },
   boardShelfTile: {
     minWidth: 0,
-    flex: "1 1 0",
-    minHeight: "33px",
-    border: "none",
-    borderRadius: 0,
-    background: "transparent",
-    color: "rgba(255,255,255,0.92)",
-    display: "flex",
-    alignItems: "baseline",
+    minHeight: "78px",
+    border: "0.5px solid rgba(86,78,64,0.18)",
+    borderRadius: "8px",
+    background: "rgba(255,255,255,0.54)",
+    color: "#2b2924",
+    display: "grid",
+    alignItems: "center",
     justifyContent: "center",
     gap: "4px",
-    padding: "7px 7px",
+    padding: "11px 8px",
     boxSizing: "border-box",
-    backdropFilter: "blur(20px)",
-    WebkitBackdropFilter: "blur(20px)",
-    boxShadow: "none",
+    backdropFilter: "blur(18px)",
+    WebkitBackdropFilter: "blur(18px)",
+    boxShadow: "0 8px 22px rgba(72,61,43,0.06)",
   },
   boardShelfLabel: {
-    color: "rgba(255,255,255,0.58)",
-    fontSize: "10.5px",
-    fontWeight: 590,
+    color: "#756f64",
+    fontSize: "11px",
+    fontWeight: 560,
     lineHeight: 1.2,
     whiteSpace: "nowrap",
+    textAlign: "center",
   },
   boardShelfValue: {
-    color: "rgba(255,255,255,0.94)",
-    fontSize: "14px",
-    fontWeight: 640,
+    color: "#23211d",
+    fontSize: "25px",
+    fontWeight: 500,
     lineHeight: 1,
     fontVariantNumeric: "tabular-nums",
+    textAlign: "center",
   },
   boardShelfDetail: {
-    color: "rgba(255,255,255,0.44)",
+    color: "#7f786d",
     fontSize: "10px",
     fontWeight: 520,
     lineHeight: 1.15,
     whiteSpace: "nowrap",
+    textAlign: "center",
   },
   boardNextCard: {
     width: "100%",
@@ -4808,26 +4874,26 @@ const styles = {
   sleepingHome: {
     position: "fixed",
     left: "50%",
-    bottom: "calc(clamp(174px, 20vh, 206px) + env(safe-area-inset-bottom))",
+    bottom: "calc(clamp(190px, 22vh, 232px) + env(safe-area-inset-bottom))",
     zIndex: 18,
     width: HOME_NAV_FRAME_WIDTH,
     transform: "translateX(-50%)",
     display: "grid",
     justifyItems: "center",
-    gap: "14px",
+    gap: "22px",
     color: "#202020",
     pointerEvents: "auto",
     textAlign: "center",
   },
   sleepingHomeHeader: {
     display: "grid",
-    gap: "16px",
+    gap: "12px",
     padding: "0 16px",
   },
   sleepingHomeKicker: {
     margin: 0,
     color: "#6f665a",
-    fontSize: "12px",
+    fontSize: "13px",
     fontWeight: 500,
     lineHeight: 1.2,
   },
@@ -4835,23 +4901,23 @@ const styles = {
     margin: 0,
     color: "#202020",
     fontFamily: "\"Shippori Mincho B1\", \"Hiragino Mincho ProN\", \"Yu Mincho\", serif",
-    fontSize: "20px",
+    fontSize: "28px",
     fontWeight: 500,
-    lineHeight: 1.9,
+    lineHeight: 1.25,
     letterSpacing: 0,
   },
   sleepingHomeLead: {
     margin: 0,
     color: "#4d4940",
     fontFamily: "\"Shippori Mincho B1\", \"Hiragino Mincho ProN\", \"Yu Mincho\", serif",
-    fontSize: "13px",
+    fontSize: "14px",
     fontWeight: 400,
     lineHeight: 1.9,
   },
   sleepingActionGroup: {
     display: "grid",
     justifyItems: "center",
-    gap: "7px",
+    gap: "9px",
   },
   sleepingBoxStack: {
     display: "grid",
@@ -4940,23 +5006,25 @@ const styles = {
   },
   sleepingPhotoButton: {
     justifySelf: "center",
-    minHeight: "39px",
-    minWidth: "124px",
-    border: "none",
-    borderRadius: "9999px",
-    background: "rgba(255,255,255,0.96)",
-    color: "#202020",
-    fontFamily: "\"Shippori Mincho B1\", \"Hiragino Mincho ProN\", \"Yu Mincho\", serif",
-    fontSize: "13px",
-    fontWeight: 500,
-    lineHeight: 1,
+    width: "116px",
+    height: "116px",
+    border: "1px solid rgba(96,86,69,0.15)",
+    borderRadius: "50%",
+    background:
+      "radial-gradient(circle at 50% 48%, rgba(150,142,126,0.96), rgba(130,121,105,0.95))",
+    color: "rgba(255,255,255,0.94)",
+    display: "inline-flex",
+    alignItems: "center",
+    justifyContent: "center",
     cursor: "pointer",
-    padding: "10px 28px",
-    boxShadow: "0 12px 28px rgba(119,101,73,0.16)",
+    padding: 0,
+    boxShadow:
+      "0 0 0 14px rgba(255,255,255,0.52), 0 18px 38px rgba(119,101,73,0.18)",
   },
   sleepingPhotoButtonDisabled: {
-    background: "rgba(255,255,255,0.62)",
-    color: "rgba(32,32,32,0.42)",
+    background:
+      "radial-gradient(circle at 50% 48%, rgba(176,170,158,0.7), rgba(142,132,115,0.7))",
+    color: "rgba(255,255,255,0.65)",
     cursor: "default",
   },
   sleepingCooldownText: {
@@ -5013,6 +5081,54 @@ const styles = {
     fontSize: "12px",
     fontWeight: 400,
     lineHeight: 1.7,
+  },
+  sleepingStatCards: {
+    display: "grid",
+    gridTemplateColumns: "repeat(3, minmax(0, 1fr))",
+    gap: "16px",
+    width: "min(100%, 372px)",
+    marginTop: "4px",
+  },
+  sleepingStatCard: {
+    minWidth: 0,
+    minHeight: "78px",
+    border: "0.5px solid rgba(86,78,64,0.18)",
+    borderRadius: "8px",
+    background: "rgba(255,255,255,0.54)",
+    color: "#2b2924",
+    display: "grid",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: "4px",
+    padding: "11px 8px",
+    boxSizing: "border-box",
+    backdropFilter: "blur(18px)",
+    WebkitBackdropFilter: "blur(18px)",
+    boxShadow: "0 8px 22px rgba(72,61,43,0.06)",
+  },
+  sleepingStatLabel: {
+    color: "#756f64",
+    fontSize: "11px",
+    fontWeight: 560,
+    lineHeight: 1.2,
+    whiteSpace: "nowrap",
+    textAlign: "center",
+  },
+  sleepingStatValue: {
+    color: "#23211d",
+    fontSize: "25px",
+    fontWeight: 500,
+    lineHeight: 1,
+    fontVariantNumeric: "tabular-nums",
+    textAlign: "center",
+  },
+  sleepingStatDetail: {
+    color: "#7f786d",
+    fontSize: "10px",
+    fontWeight: 520,
+    lineHeight: 1.15,
+    whiteSpace: "nowrap",
+    textAlign: "center",
   },
   sleepingBoxPills: {
     display: "flex",

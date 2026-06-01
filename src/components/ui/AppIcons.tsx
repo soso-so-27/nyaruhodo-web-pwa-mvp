@@ -19,6 +19,7 @@ export type AppIconName =
   | "camera"
   | "bell"
   | "clipboard"
+  | "settings"
   | "lock"
   | "sparkles"
   | "chevronRight"
@@ -65,6 +66,8 @@ export function AppIcon({
       return <BellIcon size={size} style={style} />;
     case "clipboard":
       return <ClipboardIcon size={size} style={style} />;
+    case "settings":
+      return <SettingsIcon size={size} style={style} />;
     case "lock":
       return <LockIcon size={size} style={style} />;
     case "sparkles":
@@ -431,6 +434,34 @@ export function ClipboardIcon({ size = 24, style }: IconProps) {
         strokeWidth="1.8"
         strokeLinecap="round"
         strokeLinejoin="round"
+      />
+    </svg>
+  );
+}
+
+export function SettingsIcon({ size = 24, style }: IconProps) {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      width={size}
+      height={size}
+      fill="none"
+      style={mergeStyle(style)}
+      aria-hidden="true"
+    >
+      <path
+        d="M9.7 4.2a2.35 2.35 0 0 1 4.6 0 2.2 2.2 0 0 0 3.1 1.8 2.35 2.35 0 0 1 2.3 4 2.2 2.2 0 0 0 0 3.6 2.35 2.35 0 0 1-2.3 4 2.2 2.2 0 0 0-3.1 1.8 2.35 2.35 0 0 1-4.6 0 2.2 2.2 0 0 0-3.1-1.8 2.35 2.35 0 0 1-2.3-4 2.2 2.2 0 0 0 0-3.6 2.35 2.35 0 0 1 2.3-4 2.2 2.2 0 0 0 3.1-1.8Z"
+        stroke="currentColor"
+        strokeWidth="1.8"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+      <circle
+        cx="12"
+        cy="12"
+        r="3"
+        stroke="currentColor"
+        strokeWidth="1.8"
       />
     </svg>
   );

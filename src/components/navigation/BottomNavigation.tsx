@@ -93,7 +93,7 @@ export function BottomNavigation({ active }: BottomNavigationProps) {
       <span
         style={{
           ...styles.activeNavIndicator,
-          transform: `translateX(calc(${activeIndex} * (100% + 4px)))`,
+          transform: `translateX(calc(${activeIndex} * (100% + 2px)))`,
         }}
         aria-hidden="true"
       />
@@ -115,6 +115,9 @@ export function BottomNavigation({ active }: BottomNavigationProps) {
             >
               {item.icon}
             </span>
+            <span style={isActive ? styles.activeNavLabel : styles.navLabel}>
+              {item.label}
+            </span>
           </Link>
         );
       })}
@@ -126,31 +129,30 @@ const styles = {
   bottomNav: {
     position: "fixed",
     left: "50%",
-    bottom: "calc(12px + env(safe-area-inset-bottom))",
+    bottom: "calc(10px + env(safe-area-inset-bottom))",
     zIndex: 20,
     overflow: "hidden",
     display: "grid",
     gridTemplateColumns: "repeat(3, 1fr)",
-    gap: "4px",
-    width: "min(calc(100% - 104px), 278px)",
-    minWidth: "236px",
+    gap: "2px",
+    width: "min(calc(100% - 28px), 390px)",
     transform: "translateX(-50%)",
     border: "1px solid rgba(200, 197, 190, 0.9)",
-    borderRadius: "22px",
+    borderRadius: "20px",
     background: "rgba(255, 255, 255, 0.96)",
     boxShadow:
       "0 -2px 0 rgba(200,197,190,0.3), 0 8px 24px rgba(52, 50, 46, 0.12)",
-    padding: "4px",
+    padding: "5px",
     backdropFilter: "blur(20px)",
     viewTransitionName: "bottom-nav",
   },
   activeNavIndicator: {
     position: "absolute",
-    top: "4px",
-    bottom: "4px",
-    left: "4px",
-    width: "calc((100% - 16px) / 3)",
-    borderRadius: "17px",
+    top: "5px",
+    bottom: "5px",
+    left: "5px",
+    width: "calc((100% - 14px) / 3)",
+    borderRadius: "15px",
     background: "#ecece7",
     boxShadow: "inset 0 1px 0 rgba(255,255,255,0.72)",
     pointerEvents: "none",
@@ -161,10 +163,12 @@ const styles = {
     position: "relative",
     zIndex: 1,
     display: "flex",
+    flexDirection: "column",
     alignItems: "center",
     justifyContent: "center",
-    minHeight: "44px",
-    borderRadius: "17px",
+    gap: "3px",
+    minHeight: "48px",
+    borderRadius: "15px",
     background: "transparent",
     color: "#777872",
     textDecoration: "none",
@@ -176,10 +180,12 @@ const styles = {
     position: "relative",
     zIndex: 1,
     display: "flex",
+    flexDirection: "column",
     alignItems: "center",
     justifyContent: "center",
-    minHeight: "44px",
-    borderRadius: "17px",
+    gap: "3px",
+    minHeight: "48px",
+    borderRadius: "15px",
     background: "transparent",
     color: "#3f433d",
     textDecoration: "none",
@@ -192,8 +198,8 @@ const styles = {
     display: "inline-flex",
     alignItems: "center",
     justifyContent: "center",
-    width: "24px",
-    height: "24px",
+    width: "22px",
+    height: "22px",
     color: "#777872",
     lineHeight: 1,
     transition: "color 0.24s ease, transform 0.32s cubic-bezier(0.22, 1, 0.36, 1)",
@@ -202,29 +208,29 @@ const styles = {
     display: "inline-flex",
     alignItems: "center",
     justifyContent: "center",
-    width: "24px",
-    height: "24px",
+    width: "22px",
+    height: "22px",
     color: "#566052",
     lineHeight: 1,
-    transform: "scale(1.04)",
+    transform: "scale(1.02)",
     transition: "color 0.24s ease, transform 0.32s cubic-bezier(0.22, 1, 0.36, 1)",
   },
   svgIcon: {
-    width: "22px",
-    height: "22px",
+    width: "21px",
+    height: "21px",
     display: "block",
   },
   cameraSvgIcon: {
+    width: "20px",
+    height: "20px",
+  },
+  boxSvgIcon: {
     width: "21px",
     height: "21px",
   },
-  boxSvgIcon: {
-    width: "23px",
-    height: "23px",
-  },
   catImageIcon: {
-    width: "23px",
-    height: "23px",
+    width: "21px",
+    height: "21px",
     display: "block",
     backgroundColor: "currentColor",
     maskImage: "url('/icons/cat-tab-mask.png')",
@@ -236,5 +242,19 @@ const styles = {
     WebkitMaskRepeat: "no-repeat",
     WebkitMaskSize: "contain",
     transform: "translateY(0.5px)",
+  },
+  navLabel: {
+    color: "currentColor",
+    fontSize: "10px",
+    fontWeight: 520,
+    lineHeight: 1,
+    letterSpacing: 0,
+  },
+  activeNavLabel: {
+    color: "currentColor",
+    fontSize: "10px",
+    fontWeight: 640,
+    lineHeight: 1,
+    letterSpacing: 0,
   },
 } satisfies Record<string, CSSProperties>;

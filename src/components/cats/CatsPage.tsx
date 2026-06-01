@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import type { CSSProperties } from "react";
 import { STORAGE_KEYS } from "../../lib/storage";
 import { BottomNavigation } from "../navigation/BottomNavigation";
+import { AppIcon } from "../ui/AppIcons";
 import {
   addCatProfile,
   getActiveCatProfile,
@@ -25,26 +26,26 @@ const COAT_OPTIONS: { value: CatCoat; label: string; color: string }[] = [
 type EditableGender = "male" | "female" | "unknown" | "";
 type EditableCoat = CatCoat | "";
 
-const CATS_TEXT = "rgba(255,255,255,0.94)";
-const CATS_TEXT_STRONG = "rgba(255,255,255,0.98)";
-const CATS_MUTED = "rgba(255,255,255,0.62)";
+const CATS_TEXT = "#2d2b27";
+const CATS_TEXT_STRONG = "#1f1d1a";
+const CATS_MUTED = "#777166";
 const CATS_SURFACE: CSSProperties = {
   position: "relative",
-  background: "rgba(34,29,28,0.58)",
-  backdropFilter: "blur(28px)",
-  WebkitBackdropFilter: "blur(28px)",
-  border: "0.5px solid rgba(255,255,255,0.18)",
+  background: "rgba(255,255,255,0.66)",
+  backdropFilter: "blur(24px)",
+  WebkitBackdropFilter: "blur(24px)",
+  border: "0.5px solid rgba(78,70,58,0.12)",
   boxShadow: [
-    "0 14px 34px rgba(0,0,0,0.22)",
-    "inset 0 1px 0 rgba(255,255,255,0.16)",
+    "0 10px 26px rgba(86,76,58,0.08)",
+    "inset 0 1px 0 rgba(255,255,255,0.72)",
   ].join(", "),
 };
 const CATS_SURFACE_SOFT: CSSProperties = {
   ...CATS_SURFACE,
-  background: "rgba(255,255,255,0.10)",
+  background: "rgba(255,255,255,0.46)",
   boxShadow: [
-    "0 10px 24px rgba(0,0,0,0.18)",
-    "inset 0 1px 0 rgba(255,255,255,0.12)",
+    "0 8px 20px rgba(86,76,58,0.06)",
+    "inset 0 1px 0 rgba(255,255,255,0.64)",
   ].join(", "),
 };
 
@@ -316,11 +317,10 @@ export function CatsPage() {
       <PageBackdrop />
       <div style={styles.container}>
         <div style={styles.pageHeader}>
-          <div>
-            <p style={styles.pageKicker}>CATS</p>
-            <h1 style={styles.pageTitle}>ねこ</h1>
-            <p style={styles.pageSub}>プロフィールとホーム写真</p>
-          </div>
+          <h1 style={styles.pageTitle}>ねてるねこ</h1>
+          <a href="/settings" style={styles.headerIconLink} aria-label="設定">
+            <AppIcon name="settings" size={24} />
+          </a>
         </div>
 
         <div style={styles.catGrid}>
@@ -447,7 +447,7 @@ export function CatsPage() {
 
             <hr style={styles.divider} />
 
-            <p style={styles.sectionTitle}>ホーム写真</p>
+            <p style={styles.sectionTitle}>うちの背景</p>
             <div style={styles.homePhotoSection}>
               <div style={styles.homePhotoPreview}>
                 {activeCatProfile.homePhotoDataUrl ? (
@@ -461,9 +461,9 @@ export function CatsPage() {
                 )}
               </div>
               <div style={styles.homePhotoInfo}>
-                <p style={styles.homePhotoTitle}>ホームの背景写真</p>
+                <p style={styles.homePhotoTitle}>うちの背景</p>
                 <p style={styles.homePhotoSub}>
-                  ホーム画面の空気をつくる写真です。
+                  この子の暮らしが見える写真です。
                 </p>
                 <div style={styles.homePhotoActions}>
                   <button
@@ -471,7 +471,7 @@ export function CatsPage() {
                     onClick={() => void handleHomePhotoUpload()}
                     style={styles.homePhotoButton}
                   >
-                    背景写真を選ぶ
+                    写真を選ぶ
                   </button>
                 </div>
               </div>
@@ -825,7 +825,7 @@ const styles = {
   page: {
     position: "relative",
     minHeight: "100vh",
-    background: "#1a1a18",
+    background: "#f7f5ef",
     color: CATS_TEXT,
     overflowX: "hidden",
     fontFamily:
@@ -835,12 +835,8 @@ const styles = {
     position: "fixed" as const,
     inset: 0,
     zIndex: 0,
-    background: [
-      "radial-gradient(circle at 20% 10%, rgba(148,136,118,0.30) 0%, rgba(148,136,118,0.08) 22%, rgba(148,136,118,0) 45%)",
-      "radial-gradient(circle at 84% 18%, rgba(192,132,80,0.22) 0%, rgba(192,132,80,0.08) 20%, rgba(192,132,80,0) 42%)",
-      "radial-gradient(ellipse at 50% 82%, rgba(74,65,58,0.62) 0%, rgba(39,34,32,0.78) 48%, rgba(20,18,17,0.96) 100%)",
-      "linear-gradient(145deg, #2f3438 0%, #5e514a 38%, #342c29 70%, #171615 100%)",
-    ].join(", "),
+    background:
+      "linear-gradient(180deg, #fbfaf6 0%, #f2eee5 58%, #eee7dc 100%)",
   },
   ambientHighlight: {
     position: "fixed" as const,
@@ -848,17 +844,15 @@ const styles = {
     zIndex: 0,
     pointerEvents: "none" as const,
     background:
-      "linear-gradient(115deg, rgba(255,255,255,0.05) 0%, rgba(255,255,255,0) 30%, rgba(255,210,150,0.07) 64%, rgba(255,255,255,0) 100%)",
+      "linear-gradient(115deg, rgba(255,255,255,0.54) 0%, rgba(255,255,255,0) 34%, rgba(205,184,150,0.14) 100%)",
   },
   backgroundVeil: {
     position: "fixed" as const,
     inset: 0,
     zIndex: 1,
     pointerEvents: "none" as const,
-    background: [
-      "linear-gradient(to bottom, rgba(12,10,9,0.20) 0%, rgba(12,10,9,0.04) 34%, rgba(12,10,9,0.40) 100%)",
-      "radial-gradient(circle at 72% 8%, rgba(255,200,130,0.16) 0%, rgba(255,200,130,0.05) 24%, rgba(255,200,130,0) 52%)",
-    ].join(", "),
+    background:
+      "linear-gradient(to bottom, rgba(255,255,255,0.22) 0%, rgba(255,255,255,0) 42%, rgba(203,188,164,0.14) 100%)",
   },
   container: {
     position: "relative",
@@ -866,15 +860,16 @@ const styles = {
     width: "min(100%, 430px)",
     margin: "0 auto",
     padding:
-      "calc(16px + env(safe-area-inset-top)) 14px calc(224px + env(safe-area-inset-bottom))",
+      "calc(18px + env(safe-area-inset-top)) 24px calc(118px + env(safe-area-inset-bottom))",
   },
   pageHeader: {
     display: "flex",
-    alignItems: "flex-start",
-    justifyContent: "space-between",
+    alignItems: "center",
+    justifyContent: "center",
     gap: "12px",
-    marginBottom: "18px",
+    marginBottom: "28px",
     paddingTop: "2px",
+    position: "relative",
   },
   pageKicker: {
     margin: "0 0 5px",
@@ -884,11 +879,27 @@ const styles = {
     letterSpacing: "0.12em",
   },
   pageTitle: {
-    fontSize: "30px",
-    fontWeight: 640,
+    fontFamily: "\"Shippori Mincho B1\", \"Hiragino Mincho ProN\", \"Yu Mincho\", serif",
+    fontSize: "20px",
+    fontWeight: 500,
     color: CATS_TEXT_STRONG,
-    lineHeight: 1.15,
-    margin: "0 0 6px",
+    lineHeight: 1.24,
+    letterSpacing: "0.18em",
+    margin: 0,
+  },
+  headerIconLink: {
+    position: "absolute",
+    right: 0,
+    top: "50%",
+    transform: "translateY(-50%)",
+    width: "34px",
+    height: "34px",
+    display: "inline-flex",
+    alignItems: "center",
+    justifyContent: "center",
+    color: "#4d4942",
+    textDecoration: "none",
+    borderRadius: "50%",
   },
   pageSub: {
     fontSize: "13px",
@@ -902,7 +913,7 @@ const styles = {
     overflowX: "auto",
     paddingBottom: "8px",
     scrollbarWidth: "none",
-    marginBottom: "24px",
+    marginBottom: "28px",
   },
   catGridItem: {
     display: "flex",
@@ -919,18 +930,19 @@ const styles = {
   },
   catAvatar: {
     position: "relative",
-    width: "72px",
-    height: "72px",
+    width: "68px",
+    height: "68px",
     borderRadius: "50%",
-    background: "rgba(255,255,255,0.12)",
-    border: "3px solid rgba(255,255,255,0.14)",
+    background: "rgba(255,255,255,0.52)",
+    border: "2px solid rgba(104,96,84,0.12)",
     overflow: "hidden",
     display: "flex",
     alignItems: "center",
     justifyContent: "center",
   },
   catAvatarActive: {
-    border: "3px solid rgba(255,255,255,0.78)",
+    border: "2px solid rgba(63,59,52,0.72)",
+    boxShadow: "0 0 0 4px rgba(255,255,255,0.62)",
     cursor: "pointer",
   },
   catAvatarImg: {
@@ -945,10 +957,10 @@ const styles = {
     borderRadius: "50%",
   },
   catAvatarAdd: {
-    width: "72px",
-    height: "72px",
+    width: "68px",
+    height: "68px",
     borderRadius: "50%",
-    border: "1.5px dashed rgba(255,255,255,0.28)",
+    border: "1.5px dashed rgba(104,96,84,0.28)",
     display: "flex",
     alignItems: "center",
     justifyContent: "center",
@@ -965,7 +977,7 @@ const styles = {
   },
   profileCard: {
     ...CATS_SURFACE,
-    borderRadius: "24px",
+    borderRadius: "8px",
     padding: "20px",
     marginBottom: "12px",
   },
@@ -979,8 +991,8 @@ const styles = {
     width: "64px",
     height: "64px",
     borderRadius: "50%",
-    border: "1px solid rgba(255,255,255,0.28)",
-    background: "rgba(255,255,255,0.12)",
+    border: "1px solid rgba(104,96,84,0.14)",
+    background: "rgba(255,255,255,0.5)",
     overflow: "hidden",
     display: "flex",
     alignItems: "center",
@@ -1026,8 +1038,8 @@ const styles = {
     fontSize: "12px",
     color: CATS_TEXT,
     ...CATS_SURFACE_SOFT,
-    borderRadius: "99px",
-    padding: "4px 12px",
+    borderRadius: "999px",
+    padding: "7px 13px",
     cursor: "pointer",
   },
   homePhotoSection: {
@@ -1046,7 +1058,7 @@ const styles = {
   homePhotoPreview: {
     width: "86px",
     height: "112px",
-    borderRadius: "16px",
+    borderRadius: "8px",
     overflow: "hidden",
     ...CATS_SURFACE_SOFT,
     display: "flex",
@@ -1096,8 +1108,8 @@ const styles = {
   },
   divider: {
     border: "none",
-    borderTop: "0.5px solid rgba(255,255,255,0.14)",
-    margin: "14px 0",
+    borderTop: "0.5px solid rgba(79,73,63,0.14)",
+    margin: "18px -20px",
   },
   infoRow: {
     display: "flex",

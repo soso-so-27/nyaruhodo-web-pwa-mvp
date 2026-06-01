@@ -24,27 +24,28 @@ import {
 import type { CatProfile } from "../home/homeInputHelpers";
 import { BottomNavigation } from "../navigation/BottomNavigation";
 import { AppBottomSheet } from "../ui/AppBottomSheet";
+import { AppIcon } from "../ui/AppIcons";
 
-const COLLECTION_TEXT = "rgba(255,255,255,0.94)";
-const COLLECTION_TEXT_STRONG = "rgba(255,255,255,0.98)";
-const COLLECTION_MUTED = "rgba(255,255,255,0.62)";
+const COLLECTION_TEXT = "#2d2b27";
+const COLLECTION_TEXT_STRONG = "#1f1d1a";
+const COLLECTION_MUTED = "#777166";
 const COLLECTION_SURFACE: CSSProperties = {
   position: "relative",
-  background: "rgba(34,29,28,0.58)",
-  backdropFilter: "blur(28px)",
-  WebkitBackdropFilter: "blur(28px)",
-  border: "0.5px solid rgba(255,255,255,0.18)",
+  background: "rgba(255,255,255,0.62)",
+  backdropFilter: "blur(24px)",
+  WebkitBackdropFilter: "blur(24px)",
+  border: "0.5px solid rgba(78,70,58,0.12)",
   boxShadow: [
-    "0 14px 34px rgba(0,0,0,0.22)",
-    "inset 0 1px 0 rgba(255,255,255,0.16)",
+    "0 10px 26px rgba(86,76,58,0.08)",
+    "inset 0 1px 0 rgba(255,255,255,0.72)",
   ].join(", "),
 };
 const COLLECTION_SURFACE_SOFT: CSSProperties = {
   ...COLLECTION_SURFACE,
-  background: "rgba(255,255,255,0.10)",
+  background: "rgba(255,255,255,0.46)",
   boxShadow: [
-    "0 10px 24px rgba(0,0,0,0.18)",
-    "inset 0 1px 0 rgba(255,255,255,0.12)",
+    "0 8px 20px rgba(86,76,58,0.06)",
+    "inset 0 1px 0 rgba(255,255,255,0.64)",
   ].join(", "),
 };
 
@@ -583,15 +584,15 @@ export function CollectionPage() {
       <div style={styles.container}>
         <header style={styles.header}>
           <div style={styles.pageHeader}>
-            <h1 style={styles.pageTitle}>ボックス</h1>
+            <h1 style={styles.pageTitle}>ねてるねこ</h1>
             <div style={styles.pageHeaderActions}>
               <button
                 type="button"
                 onClick={openCatSheet}
                 style={styles.catNameBtn}
+                aria-label="猫を切り替える"
               >
-                {catName}
-                {"▼"}
+                ☰
               </button>
             </div>
           </div>
@@ -697,7 +698,15 @@ function BoxSummaryCard({
   photos: BoxPreviewPhoto[];
   showAddSlot?: boolean;
 }) {
-  const visiblePhotos = photos.slice(0, showAddSlot ? 5 : 6);
+  const visiblePhotos = photos.slice(0, 4);
+  const emptySlotCount = Math.max(
+    0,
+    4 - visiblePhotos.length - (showAddSlot ? 1 : 0),
+  );
+  const isOtherBox = title === "ほかのねこ箱";
+  const countLabel = isOtherBox
+    ? `${Math.min(photos.length, 10)} / 10`
+    : `${photos.length}`;
 
   return (
     <article style={styles.boxSummaryCard}>
@@ -705,7 +714,10 @@ function BoxSummaryCard({
         <div>
           <h2 style={styles.boxSummaryTitle}>{title}</h2>
         </div>
-        <span style={styles.boxSummaryCount}>{photos.length}</span>
+        <span style={styles.boxSummaryMeta}>
+          <span style={styles.boxSummaryCount}>{countLabel}</span>
+          <span style={styles.boxSummaryArrow}>›</span>
+        </span>
       </div>
       <div style={styles.boxPhotoStrip}>
         {visiblePhotos.map((photo) => (
@@ -718,6 +730,15 @@ function BoxSummaryCard({
             +
           </span>
         ) : null}
+        {Array.from({ length: emptySlotCount }).map((_, index) => (
+          <span
+            key={`${title}-empty-${index}`}
+            style={isOtherBox ? styles.boxLockedSlot : styles.boxEmptySlot}
+            aria-hidden="true"
+          >
+            {isOtherBox ? <AppIcon name="lock" size={16} /> : null}
+          </span>
+        ))}
       </div>
     </article>
   );
@@ -1836,7 +1857,7 @@ const styles = {
   page: {
     position: "relative",
     minHeight: "100svh",
-    background: "#1a1a18",
+    background: "#f7f5ef",
     color: COLLECTION_TEXT,
     overflowX: "hidden",
   },
@@ -1844,12 +1865,8 @@ const styles = {
     position: "fixed" as const,
     inset: 0,
     zIndex: 0,
-    background: [
-      "radial-gradient(circle at 16% 10%, rgba(148,136,118,0.28) 0%, rgba(148,136,118,0.07) 24%, rgba(148,136,118,0) 48%)",
-      "radial-gradient(circle at 88% 18%, rgba(192,132,80,0.22) 0%, rgba(192,132,80,0.08) 20%, rgba(192,132,80,0) 42%)",
-      "radial-gradient(ellipse at 52% 82%, rgba(74,65,58,0.64) 0%, rgba(39,34,32,0.8) 50%, rgba(20,18,17,0.96) 100%)",
-      "linear-gradient(145deg, #2f3438 0%, #5e514a 38%, #342c29 70%, #171615 100%)",
-    ].join(", "),
+    background:
+      "linear-gradient(180deg, #fbfaf6 0%, #f2eee5 58%, #eee7dc 100%)",
   },
   ambientHighlight: {
     position: "fixed" as const,
@@ -1857,17 +1874,15 @@ const styles = {
     zIndex: 0,
     pointerEvents: "none" as const,
     background:
-      "linear-gradient(115deg, rgba(255,255,255,0.05) 0%, rgba(255,255,255,0) 30%, rgba(255,210,150,0.07) 64%, rgba(255,255,255,0) 100%)",
+      "linear-gradient(115deg, rgba(255,255,255,0.54) 0%, rgba(255,255,255,0) 34%, rgba(205,184,150,0.14) 100%)",
   },
   backgroundVeil: {
     position: "fixed" as const,
     inset: 0,
     zIndex: 1,
     pointerEvents: "none" as const,
-    background: [
-      "linear-gradient(to bottom, rgba(12,10,9,0.18) 0%, rgba(12,10,9,0.04) 34%, rgba(12,10,9,0.4) 100%)",
-      "radial-gradient(circle at 72% 8%, rgba(255,200,130,0.16) 0%, rgba(255,200,130,0.05) 24%, rgba(255,200,130,0) 52%)",
-    ].join(", "),
+    background:
+      "linear-gradient(to bottom, rgba(255,255,255,0.22) 0%, rgba(255,255,255,0) 42%, rgba(203,188,164,0.14) 100%)",
   },
   container: {
     position: "relative",
@@ -1875,20 +1890,25 @@ const styles = {
     width: "min(100%, 480px)",
     margin: "0 auto",
     padding:
-      "calc(18px + env(safe-area-inset-top)) 16px calc(144px + env(safe-area-inset-bottom))",
+      "calc(18px + env(safe-area-inset-top)) 24px calc(118px + env(safe-area-inset-bottom))",
   },
   header: {
-    marginBottom: "12px",
+    marginBottom: "28px",
     padding: "2px 0 0",
   },
   pageHeader: {
     display: "flex",
     alignItems: "center",
-    justifyContent: "space-between",
+    justifyContent: "center",
     gap: "12px",
-    marginBottom: "10px",
+    marginBottom: "0",
+    position: "relative",
   },
   pageHeaderActions: {
+    position: "absolute",
+    right: 0,
+    top: "50%",
+    transform: "translateY(-50%)",
     display: "flex",
     alignItems: "center",
     gap: "8px",
@@ -1897,10 +1917,11 @@ const styles = {
   pageTitle: {
     margin: 0,
     color: COLLECTION_TEXT_STRONG,
-    fontSize: "22px",
+    fontFamily: "\"Shippori Mincho B1\", \"Hiragino Mincho ProN\", \"Yu Mincho\", serif",
+    fontSize: "20px",
     lineHeight: 1.24,
-    fontWeight: 620,
-    letterSpacing: 0,
+    fontWeight: 500,
+    letterSpacing: "0.18em",
   },
   viewTabs: {
     display: "grid",
@@ -1928,37 +1949,47 @@ const styles = {
     boxShadow: "0 7px 18px rgba(0,0,0,0.16)",
   },
   catNameBtn: {
-    ...COLLECTION_SURFACE_SOFT,
-    fontSize: "12px",
-    fontWeight: 600,
-    color: COLLECTION_TEXT,
-    borderRadius: "99px",
-    padding: "4px 12px",
+    width: "34px",
+    height: "34px",
+    border: "none",
+    background: "transparent",
+    fontSize: "23px",
+    fontWeight: 300,
+    color: "#4d4942",
+    borderRadius: "50%",
+    padding: 0,
     cursor: "pointer",
   },
   boxOverview: {
     display: "grid",
-    gap: "12px",
+    gap: "0",
   },
   boxSummaryCard: {
-    ...COLLECTION_SURFACE,
+    position: "relative",
     display: "grid",
-    gap: "14px",
-    borderRadius: "22px",
-    padding: "16px",
+    gap: "22px",
+    padding: "28px 0 30px",
+    borderBottom: "0.5px solid rgba(79,73,63,0.16)",
   },
   boxSummaryHeader: {
     display: "flex",
-    alignItems: "flex-start",
+    alignItems: "center",
     justifyContent: "space-between",
     gap: "14px",
   },
   boxSummaryTitle: {
     margin: 0,
     color: COLLECTION_TEXT_STRONG,
-    fontSize: "18px",
-    fontWeight: 660,
+    fontFamily: "\"Shippori Mincho B1\", \"Hiragino Mincho ProN\", \"Yu Mincho\", serif",
+    fontSize: "19px",
+    fontWeight: 600,
     lineHeight: 1.22,
+  },
+  boxSummaryMeta: {
+    display: "inline-flex",
+    alignItems: "center",
+    gap: "12px",
+    color: "#777166",
   },
   boxSummaryText: {
     margin: "4px 0 0",
@@ -1970,29 +2001,34 @@ const styles = {
   boxSummaryCount: {
     display: "inline-flex",
     alignItems: "center",
-    justifyContent: "center",
-    minWidth: "34px",
-    height: "28px",
-    borderRadius: "999px",
-    background: "rgba(255,255,255,0.12)",
-    color: COLLECTION_TEXT,
-    fontSize: "13px",
-    fontWeight: 700,
+    justifyContent: "flex-end",
+    minWidth: "36px",
+    color: "#777166",
+    fontSize: "14px",
+    fontWeight: 500,
+    fontVariantNumeric: "tabular-nums",
+  },
+  boxSummaryArrow: {
+    color: "#4d4942",
+    fontSize: "25px",
+    fontWeight: 300,
+    lineHeight: 1,
   },
   boxPhotoStrip: {
     display: "grid",
-    gridTemplateColumns: "repeat(6, minmax(0, 1fr))",
-    gap: "7px",
+    gridTemplateColumns: "repeat(4, minmax(0, 1fr))",
+    gap: "14px",
     alignItems: "center",
-    minHeight: "54px",
+    minHeight: "90px",
   },
   boxPhotoThumb: {
     aspectRatio: "1 / 1",
     minWidth: 0,
-    borderRadius: "13px",
+    borderRadius: "8px",
     overflow: "hidden",
-    background: "rgba(255,255,255,0.1)",
-    border: "0.5px solid rgba(255,255,255,0.14)",
+    background: "rgba(255,255,255,0.52)",
+    border: "0.5px solid rgba(85,75,62,0.08)",
+    boxShadow: "0 8px 20px rgba(83,72,55,0.08)",
   },
   boxPhotoImg: {
     width: "100%",
@@ -2006,12 +2042,33 @@ const styles = {
     display: "inline-flex",
     alignItems: "center",
     justifyContent: "center",
-    borderRadius: "13px",
-    background: "rgba(255,255,255,0.12)",
-    border: "0.5px solid rgba(255,255,255,0.18)",
-    color: "rgba(255,255,255,0.76)",
-    fontSize: "24px",
-    fontWeight: 360,
+    borderRadius: "8px",
+    background: "rgba(255,255,255,0.42)",
+    border: "1.5px dashed rgba(104,96,84,0.26)",
+    color: "#777166",
+    fontSize: "26px",
+    fontWeight: 300,
+  },
+  boxEmptySlot: {
+    aspectRatio: "1 / 1",
+    minWidth: 0,
+    borderRadius: "8px",
+    background: "rgba(255,255,255,0.34)",
+    border: "0.5px solid rgba(104,96,84,0.08)",
+  },
+  boxLockedSlot: {
+    aspectRatio: "1 / 1",
+    minWidth: 0,
+    display: "inline-flex",
+    alignItems: "center",
+    justifyContent: "center",
+    borderRadius: "8px",
+    background: "rgba(231,226,216,0.7)",
+    border: "0.5px solid rgba(104,96,84,0.08)",
+    color: "#8a8378",
+  },
+  boxLockedIcon: {
+    color: "#8a8378",
   },
   boxEmptyText: {
     gridColumn: "1 / -1",
