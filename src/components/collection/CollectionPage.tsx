@@ -742,7 +742,6 @@ export function CollectionPage() {
           onToggleSleepingDelivery={handleToggleSleepingPhotoDelivery}
           onDeleteSleepingPhoto={handleDeleteSleepingPhoto}
           onHideOtherPhoto={(photo) => handleHideOtherPhoto(photo, "hide")}
-          onReportOtherPhoto={(photo) => handleHideOtherPhoto(photo, "report")}
         />
       ) : null}
       {selectedSlot ? (
@@ -906,7 +905,6 @@ function BoxPhotoDetailSheet({
   onToggleSleepingDelivery,
   onDeleteSleepingPhoto,
   onHideOtherPhoto,
-  onReportOtherPhoto,
 }: {
   kind: BoxDetailKind;
   photos: BoxPreviewPhoto[];
@@ -916,7 +914,6 @@ function BoxPhotoDetailSheet({
   onToggleSleepingDelivery: (photo: BoxPreviewPhoto) => void;
   onDeleteSleepingPhoto: (photo: BoxPreviewPhoto) => void;
   onHideOtherPhoto: (photo: BoxPreviewPhoto) => void;
-  onReportOtherPhoto: (photo: BoxPreviewPhoto) => void;
 }) {
   const title = kind === "sleeping" ? "とったねがお" : "とどいたねがお";
   const currentPhoto =
@@ -1002,24 +999,15 @@ function BoxPhotoDetailSheet({
             <div style={styles.boxIconActionBar} aria-label="写真の操作">
               <button
                 type="button"
-                aria-label="通報して非表示"
-                title="通報して非表示"
+                aria-label="アルバムから外す"
+                title="アルバムから外す"
                 style={{
                   ...styles.boxIconActionButton,
                   ...styles.boxIconActionButtonDanger,
                 }}
-                onClick={() => onReportOtherPhoto(currentPhoto)}
-              >
-                <AppIcon name="flag" size={20} />
-              </button>
-              <button
-                type="button"
-                aria-label="アルバムから外す"
-                title="アルバムから外す"
-                style={styles.boxIconActionButton}
                 onClick={() => onHideOtherPhoto(currentPhoto)}
               >
-                <AppIcon name="close" size={20} />
+                <AppIcon name="trash" size={20} />
               </button>
             </div>
           </div>
