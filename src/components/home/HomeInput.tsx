@@ -1410,8 +1410,14 @@ export function HomeInput({ recentEvents: _recentEvents }: HomeInputProps) {
         activeCatId,
         sleepingCounter:
           sleepingCounterItem?.count ?? HOME_SLEEPING_COUNTER_BASE_COUNT,
+        deliveryRemaining: sleepingCounterRemaining,
       }),
-    [activeCatId, collectionRefreshTick, sleepingCounterItem?.count],
+    [
+      activeCatId,
+      collectionRefreshTick,
+      sleepingCounterItem?.count,
+      sleepingCounterRemaining,
+    ],
   );
 
   return (
@@ -1420,8 +1426,6 @@ export function HomeInput({ recentEvents: _recentEvents }: HomeInputProps) {
       <div style={styles.paperNoise} aria-hidden="true" />
 
       <SleepingPhotoHome
-        remaining={sleepingCounterRemaining}
-        cooldownProgress={sleepingCounterCooldownProgress}
         stats={homeSleepingBoxStats}
         onTakePhoto={() => handleSleepingPhotoStart("camera")}
         onSelectPhoto={handleSleepingLibraryPhotoStart}
@@ -2174,20 +2178,14 @@ function InfoSheet({
 }
 
 function SleepingPhotoHome({
-  remaining,
-  cooldownProgress,
   stats,
   onTakePhoto,
   onSelectPhoto,
 }: {
-  remaining: string | null;
-  cooldownProgress: number | null;
   stats: BoardShelfStat[];
   onTakePhoto: () => void;
   onSelectPhoto: () => void;
 }) {
-  const [isDetailsOpen, setIsDetailsOpen] = useState(false);
-
   return (
     <section style={styles.sleepingHome} aria-label="しゃしん">
       <div style={styles.sleepingHomeHeader}>
@@ -2214,22 +2212,6 @@ function SleepingPhotoHome({
           <AppIcon name="camera" size={34} />
         </button>
 
-        {remaining ? (
-          <p style={styles.sleepingCooldownText}>次に届くまで {remaining}</p>
-        ) : null}
-
-        {typeof cooldownProgress === "number" ? (
-          <span style={styles.sleepingBoxCooldown} aria-hidden="true">
-            <span style={styles.sleepingBoxCooldownTrack} />
-            <span
-              style={{
-                ...styles.sleepingBoxCooldownFill,
-                transform: `scaleX(${Math.max(0, Math.min(1, 1 - cooldownProgress))})`,
-              }}
-            />
-          </span>
-        ) : null}
-
         <button
           type="button"
           style={{
@@ -2240,23 +2222,6 @@ function SleepingPhotoHome({
           写真から入れる
         </button>
       </div>
-
-      <button
-        type="button"
-        style={styles.sleepingMoreButton}
-        onClick={() => setIsDetailsOpen((value) => !value)}
-        aria-expanded={isDetailsOpen}
-      >
-        もっとくわしく
-      </button>
-
-      {isDetailsOpen ? (
-        <div style={styles.sleepingDetails}>
-          <p style={styles.sleepingDetailText}>
-            とった寝顔はいつでも入ります。とどいた寝顔は、一定時間ごとにひとつ届きます。
-          </p>
-        </div>
-      ) : null}
 
       <div style={styles.sleepingStatCards} aria-label="寝顔">
         {stats.map((stat) => (
@@ -2938,9 +2903,11 @@ function buildBoardShelfStats(
 function buildHomeSleepingBoxStats({
   activeCatId,
   sleepingCounter,
+  deliveryRemaining,
 }: {
   activeCatId: string | null;
   sleepingCounter: number;
+  deliveryRemaining: string | null;
 }): BoardShelfStat[] {
   const ownSleepingCount = readOwnSleepingPhotoCount(activeCatId);
   const keptOtherCount = readKeptExchangePhotoCount();
@@ -2954,7 +2921,7 @@ function buildHomeSleepingBoxStats({
     {
       label: "とどいた寝顔",
       value: formatPhotoCount(keptOtherCount),
-      detail: "",
+      detail: deliveryRemaining ? `次に届くまで ${deliveryRemaining}` : "",
     },
     {
       label: "ねてるねこ",
@@ -5095,20 +5062,6 @@ const styles = {
     boxShadow:
       "0 0 0 14px rgba(255,255,255,0.52), 0 18px 38px rgba(119,101,73,0.18)",
   },
-  sleepingPhotoButtonDisabled: {
-    background:
-      "radial-gradient(circle at 50% 48%, rgba(176,170,158,0.7), rgba(142,132,115,0.7))",
-    color: "rgba(255,255,255,0.65)",
-    cursor: "default",
-  },
-  sleepingCooldownText: {
-    margin: 0,
-    color: "#777064",
-    fontFamily: "\"Shippori Mincho B1\", \"Hiragino Mincho ProN\", \"Yu Mincho\", serif",
-    fontSize: "11px",
-    fontWeight: 400,
-    lineHeight: 1.2,
-  },
   sleepingLibraryButton: {
     border: "none",
     background: "transparent",
@@ -5120,57 +5073,6 @@ const styles = {
     cursor: "pointer",
     padding: "4px 10px",
   },
-  sleepingLibraryButtonDisabled: {
-    color: "#aaa398",
-    cursor: "default",
-  },
-  sleepingBoxCooldown: {
-    position: "relative",
-    display: "block",
-    width: "160px",
-    height: "3px",
-    overflow: "hidden",
-    borderRadius: "999px",
-    pointerEvents: "none",
-  },
-  sleepingBoxCooldownTrack: {
-    position: "absolute",
-    inset: 0,
-    background: "rgba(83,72,55,0.12)",
-  },
-  sleepingBoxCooldownFill: {
-    position: "absolute",
-    inset: 0,
-    transformOrigin: "left center",
-    background: "rgba(83,72,55,0.34)",
-  },
-  sleepingMoreButton: {
-    border: "none",
-    background: "transparent",
-    color: "#777064",
-    fontFamily: "\"Shippori Mincho B1\", \"Hiragino Mincho ProN\", \"Yu Mincho\", serif",
-    fontSize: "11px",
-    fontWeight: 400,
-    lineHeight: 1,
-    cursor: "pointer",
-    padding: "3px 8px",
-  },
-  sleepingDetails: {
-    width: "min(100%, 330px)",
-    display: "grid",
-    gap: "7px",
-    padding: "4px 16px 0",
-    boxSizing: "border-box",
-    textAlign: "left",
-  },
-  sleepingDetailText: {
-    margin: 0,
-    color: "#5b554c",
-    fontFamily: "\"Shippori Mincho B1\", \"Hiragino Mincho ProN\", \"Yu Mincho\", serif",
-    fontSize: "12px",
-    fontWeight: 400,
-    lineHeight: 1.7,
-  },
   sleepingStatCards: {
     display: "grid",
     gridTemplateColumns: "repeat(3, minmax(0, 1fr))",
@@ -5180,7 +5082,7 @@ const styles = {
   },
   sleepingStatCard: {
     minWidth: 0,
-    minHeight: "64px",
+    minHeight: "72px",
     border: "0.5px solid rgba(86,78,64,0.18)",
     borderRadius: "8px",
     background: "rgba(255,255,255,0.54)",
@@ -5213,10 +5115,9 @@ const styles = {
   },
   sleepingStatDetail: {
     color: "#7f786d",
-    fontSize: "10px",
+    fontSize: "9.5px",
     fontWeight: 520,
-    lineHeight: 1.15,
-    whiteSpace: "nowrap",
+    lineHeight: 1.25,
     textAlign: "center",
   },
   sleepingBoxPills: {
