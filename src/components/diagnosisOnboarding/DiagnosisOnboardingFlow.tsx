@@ -361,7 +361,7 @@ export function DiagnosisOnboardingFlow() {
             <div style={styles.stepContainer}>
               <p style={styles.eyebrow}>最初の寝顔を1枚</p>
               <p style={styles.note}>
-                前に撮った写真で大丈夫です。うちのねこ箱に入れて、ねてるねこを始めます。
+                前に撮った写真で大丈夫です。とった寝顔に入れて、ねてるねこを始めます。
               </p>
               <button
                 type="button"
@@ -667,10 +667,10 @@ export function DiagnosisOnboardingFlow() {
           <section style={styles.card}>
             <div style={styles.stepContainer}>
               <p style={styles.eyebrow}>
-                ここからは、ねこ箱に入れていきます
+                ここからは、寝顔を入れていきます
               </p>
               <p style={styles.note}>
-                寝顔を入れると、うちの寝顔がたまり、ほかのねこ箱がひとつ開きます。
+                とった寝顔はいつでも入ります。とどいた寝顔は、一定時間ごとにひとつ届きます。
               </p>
               <div style={styles.collectionPreview}>
                 {COLLECTION_PREVIEW_ICONS.map((src) => (

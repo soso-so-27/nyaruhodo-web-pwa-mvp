@@ -45,15 +45,15 @@ type TimelineItem = {
 
 const RECENT_DISCOVERIES: RecentDiscovery[] = [
   { label: "へそ天", date: "5/10" },
-  { label: "箱入り", date: "5/22" },
+  { label: "もぐりこみ", date: "5/22" },
   { label: "のびー", date: "6/03" },
 ];
 
 const POSE_CATEGORIES: PoseCategory[] = [
   { label: "へそ天", slug: "belly_up", group: "くつろぎ", found: true },
   { label: "ごめん寝", slug: "face_down_sleep", group: "ねむい", found: false },
-  { label: "香箱座り", slug: "loaf", group: "くつろぎ", found: false },
-  { label: "箱入り", slug: "in_box", group: "場所", found: true },
+  { label: "ちょこん寝", slug: "loaf", group: "くつろぎ", found: false },
+  { label: "もぐりこみ", slug: "in_box", group: "場所", found: true },
   { label: "液体化", slug: "liquid_cat", group: "場所", found: false },
   { label: "のびー", slug: "stretch", group: "あそび", found: true },
   { label: "窓辺監視", slug: "window_watch", group: "場所", found: false },
@@ -66,7 +66,7 @@ const POSE_CATEGORIES: PoseCategory[] = [
 
 const TIMELINE_ITEMS: TimelineItem[] = [
   { date: "5/10", text: "初めてのへそ天" },
-  { date: "5/22", text: "箱入りをみつけました" },
+  { date: "5/22", text: "もぐりこみをみつけました" },
   { date: "6/03", text: "のびーが増えてきました" },
 ];
 
@@ -220,7 +220,7 @@ export function TogetherPage({ recentEvents }: TogetherPageProps) {
           </h2>
           <div style={styles.likenessList}>
             <p style={styles.likenessText}>
-              {catName}は、箱に入るのが少し好きそうです。
+              {catName}は、もぐりこむのが少し好きそうです。
             </p>
             <p style={styles.likenessText}>
               夜は、のびーが見つかることもあります。
@@ -252,8 +252,8 @@ function getPoseMark(label: string) {
   const marks: Record<string, string> = {
     "へそ天": "へ",
     "ごめん寝": "寝",
-    "香箱座り": "香",
-    "箱入り": "箱",
+    ちょこん寝: "寝",
+    もぐりこみ: "潜",
     "液体化": "液",
     "のびー": "伸",
     "窓辺監視": "窓",

@@ -1142,8 +1142,7 @@ export function HomeInput({ recentEvents: _recentEvents }: HomeInputProps) {
   async function handleSleepingExchangePhotoSelect(source: SleepingPhotoSource) {
     if (
       !activeCatId ||
-      isExchangePhotoAdding ||
-      getSleepingCounterRemaining(lockData, Date.now())
+      isExchangePhotoAdding
     ) {
       return;
     }
@@ -1162,7 +1161,7 @@ export function HomeInput({ recentEvents: _recentEvents }: HomeInputProps) {
       setIsExchangePhotoAdding(true);
 
       try {
-        const dataUrl = await resizeAndEncode(file, 900);
+        const dataUrl = await resizeAndEncode(file, 820);
         const fileSizeBucket = getFileSizeBucket(file.size);
 
         setPendingExchangeSharePhoto({
@@ -1328,6 +1327,13 @@ export function HomeInput({ recentEvents: _recentEvents }: HomeInputProps) {
     const targetCatId = pendingExchangeCatId ?? activeCatId;
     if (!targetCatId) return;
 
+    const targetLockData =
+      targetCatId === activeCatId ? lockData : readLockData(targetCatId);
+    const deliveryRemaining = getSleepingCounterRemaining(
+      targetLockData,
+      Date.now(),
+    );
+
     if (!saveOwnExchangePhoto(targetCatId, photo, true)) {
       showToast("写真を保存できませんでした");
       return;
@@ -1336,6 +1342,21 @@ export function HomeInput({ recentEvents: _recentEvents }: HomeInputProps) {
     setCollectionRefreshTick((value) => value + 1);
     setPendingExchangeSharePhoto(null);
     setPendingExchangeCatId(null);
+    if (deliveryRemaining) {
+      showToast(`とった寝顔に入りました。次に届くのは ${deliveryRemaining}`);
+      trackProductEvent(
+        "home_exchange_share_photo_confirmed",
+        {
+          theme: photo.theme,
+          trigger_label: photo.triggerLabel,
+          file_size_bucket: photo.fileSizeBucket,
+          delivery_available: false,
+        },
+        { localCatId: targetCatId },
+      );
+      return;
+    }
+
     recordSleepingCounterAnswer(targetCatId);
     window.setTimeout(() => {
       deliverExchangePhoto({
@@ -1352,6 +1373,7 @@ export function HomeInput({ recentEvents: _recentEvents }: HomeInputProps) {
         theme: photo.theme,
         trigger_label: photo.triggerLabel,
         file_size_bucket: photo.fileSizeBucket,
+        delivery_available: true,
       },
       { localCatId: targetCatId },
     );
@@ -1368,8 +1390,7 @@ export function HomeInput({ recentEvents: _recentEvents }: HomeInputProps) {
     setCollectionRefreshTick((value) => value + 1);
     setPendingExchangeSharePhoto(null);
     setPendingExchangeCatId(null);
-    recordSleepingCounterAnswer(targetCatId);
-    showToast("うちのねこ箱に入りました");
+    showToast("とった寝顔に入りました");
     trackProductEvent(
       "home_exchange_share_photo_declined",
       {
@@ -1432,6 +1453,7 @@ export function HomeInput({ recentEvents: _recentEvents }: HomeInputProps) {
           photo={pendingExchangeSharePhoto}
           catProfiles={catProfiles}
           selectedCatId={pendingExchangeCatId ?? activeCatId}
+          deliveryRemaining={sleepingCounterRemaining}
           onCatSelect={setPendingExchangeCatId}
           onConfirm={() =>
             handleConfirmExchangeSharePhoto(pendingExchangeSharePhoto)
@@ -2183,19 +2205,17 @@ function SleepingPhotoHome({
       <div style={styles.sleepingActionGroup}>
         <button
           type="button"
-          disabled={Boolean(remaining)}
           style={{
             ...styles.sleepingPhotoButton,
-            ...(remaining ? styles.sleepingPhotoButtonDisabled : {}),
           }}
           onClick={onTakePhoto}
-          aria-label={remaining ? `次の箱まで ${remaining}` : "寝顔を撮る"}
+          aria-label="寝顔を撮る"
         >
           <AppIcon name="camera" size={34} />
         </button>
 
         {remaining ? (
-          <p style={styles.sleepingCooldownText}>次の箱まで {remaining}</p>
+          <p style={styles.sleepingCooldownText}>次に届くまで {remaining}</p>
         ) : null}
 
         {typeof cooldownProgress === "number" ? (
@@ -2212,10 +2232,8 @@ function SleepingPhotoHome({
 
         <button
           type="button"
-          disabled={Boolean(remaining)}
           style={{
             ...styles.sleepingLibraryButton,
-            ...(remaining ? styles.sleepingLibraryButtonDisabled : {}),
           }}
           onClick={onSelectPhoto}
         >
@@ -2235,12 +2253,12 @@ function SleepingPhotoHome({
       {isDetailsOpen ? (
         <div style={styles.sleepingDetails}>
           <p style={styles.sleepingDetailText}>
-            寝顔を入れると、ほかの猫の寝顔がひとつ開きます。とっておくは自分だけです。
+            とった寝顔はいつでも入ります。とどいた寝顔は、一定時間ごとにひとつ届きます。
           </p>
         </div>
       ) : null}
 
-      <div style={styles.sleepingStatCards} aria-label="ねこ箱">
+      <div style={styles.sleepingStatCards} aria-label="寝顔">
         {stats.map((stat) => (
           <span key={stat.label} style={styles.sleepingStatCard}>
             <span style={styles.sleepingStatLabel}>{stat.label}</span>
@@ -2270,10 +2288,10 @@ function SleepingSafetySheet({
     <AppBottomSheet title="ねてるねこが安心できる場所であるために" onClose={onClose}>
       <div style={styles.sleepingSafetyBody}>
         <p style={styles.sleepingSafetyText}>
-          ほかのねこ箱で開いた写真を、そのまま外に出すのは控えてください。
+          とどいた寝顔を、そのまま外に出すのは控えてください。
         </p>
         <p style={styles.sleepingSafetyText}>
-          不安なときは、写真を自分だけに入れられます。
+          不安なときは、自分だけに入れられます。
         </p>
         <label style={styles.sleepingSafetyCheck}>
           <input
@@ -2317,7 +2335,7 @@ function ExchangePhotoSheet({
         onClick={(event) => event.stopPropagation()}
       >
         <div style={styles.exchangeHeader}>
-          <span style={styles.exchangeKicker}>ほかのねこ箱が開きました</span>
+          <span style={styles.exchangeKicker}>寝顔が届きました</span>
         </div>
         <div style={styles.exchangePhotoFrame}>
           <img src={photo.src} alt="" style={styles.exchangePhoto} />
@@ -2339,6 +2357,7 @@ function ExchangeSharePermissionSheet({
   photo,
   catProfiles,
   selectedCatId,
+  deliveryRemaining,
   onCatSelect,
   onConfirm,
   onPrivate,
@@ -2346,11 +2365,13 @@ function ExchangeSharePermissionSheet({
   photo: PendingExchangeSharePhoto;
   catProfiles: CatProfile[];
   selectedCatId: string | null;
+  deliveryRemaining: string | null;
   onCatSelect: (catId: string) => void;
   onConfirm: () => void;
   onPrivate: () => void;
 }) {
   const shouldShowCatPicker = catProfiles.length > 1;
+  const canReceivePhoto = !deliveryRemaining;
 
   return (
     <div style={styles.exchangeBackdrop}>
@@ -2359,13 +2380,15 @@ function ExchangeSharePermissionSheet({
           <span style={styles.exchangeKicker}>この寝顔を入れます</span>
         </div>
         <p style={styles.exchangeLead}>
-          入れると、ほかのねこ箱がひとつ開きます。
+          {canReceivePhoto
+            ? "入れると、とどいた寝顔が1枚届きます。"
+            : `とった寝顔にはいつでも入ります。次に届くのは ${deliveryRemaining}。`}
         </p>
         <div style={styles.exchangeSharePreview}>
           <img src={photo.src} alt="" style={styles.exchangePhoto} />
         </div>
         {shouldShowCatPicker ? (
-          <div style={styles.exchangeCatPicker} aria-label="入れるねこ箱">
+          <div style={styles.exchangeCatPicker} aria-label="入れる猫">
             {catProfiles.map((profile) => {
               const isSelected = profile.id === selectedCatId;
 
@@ -2395,7 +2418,7 @@ function ExchangeSharePermissionSheet({
         ) : null}
         <div style={styles.exchangeActions}>
           <button type="button" style={styles.exchangeKeepButton} onClick={onConfirm}>
-            入れて、箱を開く
+            {canReceivePhoto ? "入れて、1枚受け取る" : "とった寝顔に入れる"}
           </button>
           <button type="button" style={styles.exchangePlainButton} onClick={onPrivate}>
             自分だけに入れる
@@ -3135,7 +3158,7 @@ function buildHomeCatCounters({
     },
     {
       id: "loaf",
-      label: "香箱の猫",
+      label: "ちょこん寝の猫",
       count: getCountByAnswerId(poseResult, "loaf"),
     },
   ];
@@ -3929,13 +3952,15 @@ function getRemainingTime(lockData: LockData, type: LockType, now = Date.now()) 
 
 function formatRemainingMs(remaining: number) {
   if (remaining <= 0) return null;
-  const minutes = Math.floor(remaining / 60000);
-  const seconds = Math.floor((remaining % 60000) / 1000);
+  const totalMinutes = Math.max(1, Math.ceil(remaining / 60000));
 
-  return `${String(minutes).padStart(2, "0")}:${String(seconds).padStart(
-    2,
-    "0",
-  )}`;
+  if (totalMinutes >= 60) {
+    const hours = Math.floor(totalMinutes / 60);
+    const minutes = totalMinutes % 60;
+    return minutes > 0 ? `${hours}時間${minutes}分` : `${hours}時間`;
+  }
+
+  return `${totalMinutes}分`;
 }
 
 function getCooldownProgress(

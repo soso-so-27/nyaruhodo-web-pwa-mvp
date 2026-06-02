@@ -117,7 +117,7 @@ export const PHOTO_COLLECTION_POSES: PhotoCollectionPose[] = [
     slug: "belly_up",
   },
   {
-    label: "箱入り",
+    label: "もぐりこみ",
     slug: "in_box",
   },
   {
@@ -129,7 +129,7 @@ export const PHOTO_COLLECTION_POSES: PhotoCollectionPose[] = [
     slug: "face_down_sleep",
   },
   {
-    label: "香箱",
+    label: "ちょこん寝",
     slug: "loaf",
   },
   {
@@ -176,7 +176,7 @@ export const COLLECTION_GROUPS: CollectionGroup[] = [
       },
       {
         id: "loaf",
-        label: "香箱",
+        label: "ちょこん寝",
         group: "pose",
         silhouetteKey: "loaf",
         iconPath: "/icons/collection/02_kobako_loaf_pose.png",
@@ -245,7 +245,7 @@ export const COLLECTION_GROUPS: CollectionGroup[] = [
     slots: [
       {
         id: "in-box",
-        label: "箱入り",
+        label: "もぐりこみ",
         group: "scene",
         silhouetteKey: "in-box",
         iconPath: "/icons/collection/11_hakoiri_in_box.png",

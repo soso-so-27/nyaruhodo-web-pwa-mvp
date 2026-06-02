@@ -65,7 +65,7 @@ export const MIKKE_WINDOW_QUESTIONS: MikkeWindowQuestion[] = [
       { id: "high-place", label: "高いところ", collectionSlotId: "high-place" },
       { id: "hideout", label: "隠れ場所" },
       { id: "nearby", label: "近く" },
-      { id: "box-bag", label: "箱・袋", collectionSlotId: "in-box" },
+      { id: "box-bag", label: "もぐりこみ", collectionSlotId: "in-box" },
       { id: "sunny", label: "ひなた", collectionSlotId: "sunbathing" },
       { id: "food-water", label: "ごはん場" },
       { id: "sofa-cushion", label: "ソファ" },
@@ -90,7 +90,7 @@ export const MIKKE_WINDOW_QUESTIONS: MikkeWindowQuestion[] = [
     surfaceText: "すがた",
     resultLead: "ほかの子たちは",
     options: [
-      { id: "loaf", label: "香箱", collectionSlotId: "loaf" },
+      { id: "loaf", label: "ちょこん寝", collectionSlotId: "loaf" },
       { id: "curled-up", label: "まるまり", collectionSlotId: "curled-up" },
       { id: "stretch", label: "のびー", collectionSlotId: "stretch" },
       { id: "belly-up", label: "へそ天", collectionSlotId: "belly-up" },

@@ -694,7 +694,7 @@ function BoxOverview({
         photos={sleepingPhotos}
       />
       <BoxSummaryCard
-        title="おきてる箱"
+        title="おきてる写真"
         photos={awakePhotos}
         showAddSlot={true}
       />
@@ -741,7 +741,7 @@ function BoxSummaryCard({
           </span>
         ))}
         {showAddSlot ? (
-          <span style={styles.boxAddSlot} aria-label="おきてる箱に追加">
+          <span style={styles.boxAddSlot} aria-label="おきてる写真を追加">
             +
           </span>
         ) : null}
@@ -768,7 +768,7 @@ function CollectionViewTabs({
 }) {
   const tabs: Array<{ key: CollectionView; label: string }> = [
     { key: "collect", label: "とった寝顔" },
-    { key: "album", label: "おきてる箱" },
+    { key: "album", label: "おきてる写真" },
     { key: "share", label: "とどいた寝顔" },
   ];
 
@@ -1731,7 +1731,7 @@ function getCollectionGroupLabel(groupId: CollectionGroupId) {
 
 const COLLECTION_SLOT_LABELS: Record<string, string> = {
   "belly-up": "へそ天",
-  loaf: "香箱",
+  loaf: "ちょこん寝",
   stretch: "のびー",
   "face-down-sleep": "ごめん寝",
   "curled-up": "まるまり",
@@ -1740,7 +1740,7 @@ const COLLECTION_SLOT_LABELS: Record<string, string> = {
   "tail-up": "しっぽピーン",
   "weird-sleep": "変な寝相",
   "hidden-paws": "おててないない",
-  "in-box": "箱入り",
+  "in-box": "もぐりこみ",
   "by-window": "窓辺",
   sunbathing: "ひなたぼっこ",
   "in-futon": "布団入り",
