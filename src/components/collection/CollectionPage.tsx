@@ -76,10 +76,12 @@ type CollectionShareFeedItem = {
 type BoxPreviewPhoto = {
   id: string;
   src: string;
+  catId?: string;
 };
 
 const OWN_SLEEPING_BOX_STORAGE_KEY = "nyaruhodo_exchange_own_sleeping_photos";
 const KEPT_OTHER_BOX_STORAGE_KEY = "nyaruhodo_exchange_kept_photos";
+const BOX_PHOTO_STORAGE_EVENT = "nyaruhodo_box_photos_updated";
 
 export function CollectionPage() {
   const [catProfiles, setCatProfiles] = useState<CatProfile[]>([]);
@@ -95,6 +97,7 @@ export function CollectionPage() {
   const [currentPhotoIndex, setCurrentPhotoIndex] = useState(0);
   const [isCatSheetOpen, setIsCatSheetOpen] = useState(false);
   const [toastText, setToastText] = useState("");
+  const [boxRefreshTick, setBoxRefreshTick] = useState(0);
   const toastTimerRef = useRef<number | null>(null);
   const trackedViewCatIdRef = useRef<string | null>(null);
   const trackedDailyTargetRef = useRef<string | null>(null);
@@ -124,6 +127,20 @@ export function CollectionPage() {
       if (toastTimerRef.current) {
         window.clearTimeout(toastTimerRef.current);
       }
+    };
+  }, []);
+
+  useEffect(() => {
+    function refreshBoxes() {
+      setBoxRefreshTick((value) => value + 1);
+    }
+
+    window.addEventListener(BOX_PHOTO_STORAGE_EVENT, refreshBoxes);
+    window.addEventListener("storage", refreshBoxes);
+
+    return () => {
+      window.removeEventListener(BOX_PHOTO_STORAGE_EVENT, refreshBoxes);
+      window.removeEventListener("storage", refreshBoxes);
     };
   }, []);
 
@@ -175,12 +192,12 @@ export function CollectionPage() {
     [catName, shareSuggestionSlot, storedCollectionPhotos],
   );
   const sleepingBoxPhotos = useMemo(
-    () => readBoxPreviewPhotos(OWN_SLEEPING_BOX_STORAGE_KEY),
-    [hasLoaded],
+    () => readBoxPreviewPhotos(OWN_SLEEPING_BOX_STORAGE_KEY, activeCatId),
+    [activeCatId, boxRefreshTick, hasLoaded],
   );
   const otherBoxPhotos = useMemo(
     () => readBoxPreviewPhotos(KEPT_OTHER_BOX_STORAGE_KEY),
-    [hasLoaded],
+    [boxRefreshTick, hasLoaded],
   );
   const awakeBoxPhotos = useMemo(
     () =>
@@ -673,7 +690,7 @@ function BoxOverview({
   return (
     <section style={styles.boxOverview} aria-label="ボックス">
       <BoxSummaryCard
-        title="ねてる箱"
+        title="とった寝顔"
         photos={sleepingPhotos}
       />
       <BoxSummaryCard
@@ -682,7 +699,7 @@ function BoxOverview({
         showAddSlot={true}
       />
       <BoxSummaryCard
-        title="ほかのねこ箱"
+        title="とどいた寝顔"
         photos={otherPhotos}
       />
     </section>
@@ -703,10 +720,8 @@ function BoxSummaryCard({
     0,
     4 - visiblePhotos.length - (showAddSlot ? 1 : 0),
   );
-  const isOtherBox = title === "ほかのねこ箱";
-  const countLabel = isOtherBox
-    ? `${Math.min(photos.length, 10)} / 10`
-    : `${photos.length}`;
+  const isOtherBox = title === "とどいた寝顔";
+  const countLabel = photos.length > 0 ? `${photos.length}枚` : "まだなし";
 
   return (
     <article style={styles.boxSummaryCard}>
@@ -752,9 +767,9 @@ function CollectionViewTabs({
   onSelectView: (view: CollectionView) => void;
 }) {
   const tabs: Array<{ key: CollectionView; label: string }> = [
-    { key: "collect", label: "ねてる箱" },
+    { key: "collect", label: "とった寝顔" },
     { key: "album", label: "おきてる箱" },
-    { key: "share", label: "ほかのねこ箱" },
+    { key: "share", label: "とどいた寝顔" },
   ];
 
   return (
@@ -1555,7 +1570,10 @@ function buildStoredCollectionPhotos(collectionPhotos: Record<string, string[]>)
   return photos.reverse();
 }
 
-function readBoxPreviewPhotos(key: string): BoxPreviewPhoto[] {
+function readBoxPreviewPhotos(
+  key: string,
+  activeCatId: string | null = null,
+): BoxPreviewPhoto[] {
   if (typeof window === "undefined") {
     return [];
   }
@@ -1571,6 +1589,9 @@ function readBoxPreviewPhotos(key: string): BoxPreviewPhoto[] {
     return parsed
       .filter((photo): photo is BoxPreviewPhoto =>
         Boolean(photo.id && photo.src),
+      )
+      .filter((photo) =>
+        activeCatId && photo.catId ? photo.catId === activeCatId : true,
       )
       .slice(0, 24);
   } catch {

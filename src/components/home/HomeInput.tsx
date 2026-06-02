@@ -218,6 +218,7 @@ const EXCHANGE_OWN_SLEEPING_PHOTO_STORAGE_KEY =
   "nyaruhodo_exchange_own_sleeping_photos";
 const SLEEPING_SAFETY_ACCEPTED_STORAGE_KEY =
   "nyaruhodo_sleeping_safety_accepted";
+const BOX_PHOTO_STORAGE_EVENT = "nyaruhodo_box_photos_updated";
 
 const EXCHANGE_PHOTO_POOL: ExchangePhotoPoolItem[] = [
   {
@@ -1010,7 +1011,7 @@ export function HomeInput({ recentEvents: _recentEvents }: HomeInputProps) {
 
       try {
         const slug = getCollectionSlotPhotoSlug(slot);
-        const dataUrl = await resizeAndEncode(file, 900);
+        const dataUrl = await resizeAndEncode(file, 820);
 
         saveCollectionPhoto(activeCatId, slug, dataUrl);
         setCollectionRefreshTick((value) => value + 1);
@@ -1327,7 +1328,10 @@ export function HomeInput({ recentEvents: _recentEvents }: HomeInputProps) {
     const targetCatId = pendingExchangeCatId ?? activeCatId;
     if (!targetCatId) return;
 
-    saveOwnExchangePhoto(targetCatId, photo, true);
+    if (!saveOwnExchangePhoto(targetCatId, photo, true)) {
+      showToast("写真を保存できませんでした");
+      return;
+    }
     const sharedPhoto = saveSharedExchangePhoto(photo);
     setCollectionRefreshTick((value) => value + 1);
     setPendingExchangeSharePhoto(null);
@@ -1357,7 +1361,10 @@ export function HomeInput({ recentEvents: _recentEvents }: HomeInputProps) {
     const targetCatId = pendingExchangeCatId ?? activeCatId;
     if (!targetCatId) return;
 
-    saveOwnExchangePhoto(targetCatId, photo, false);
+    if (!saveOwnExchangePhoto(targetCatId, photo, false)) {
+      showToast("写真を保存できませんでした");
+      return;
+    }
     setCollectionRefreshTick((value) => value + 1);
     setPendingExchangeSharePhoto(null);
     setPendingExchangeCatId(null);
@@ -2349,8 +2356,11 @@ function ExchangeSharePermissionSheet({
     <div style={styles.exchangeBackdrop}>
       <section style={styles.exchangePanel} aria-label="写真を届ける確認">
         <div style={styles.exchangeHeader}>
-          <span style={styles.exchangeKicker}>うちのねこ箱に入れる？</span>
+          <span style={styles.exchangeKicker}>この寝顔を入れます</span>
         </div>
+        <p style={styles.exchangeLead}>
+          入れると、ほかのねこ箱がひとつ開きます。
+        </p>
         <div style={styles.exchangeSharePreview}>
           <img src={photo.src} alt="" style={styles.exchangePhoto} />
         </div>
@@ -2385,7 +2395,7 @@ function ExchangeSharePermissionSheet({
         ) : null}
         <div style={styles.exchangeActions}>
           <button type="button" style={styles.exchangeKeepButton} onClick={onConfirm}>
-            入れて、ほかの箱を見る
+            入れて、箱を開く
           </button>
           <button type="button" style={styles.exchangePlainButton} onClick={onPrivate}>
             自分だけに入れる
@@ -2914,13 +2924,13 @@ function buildHomeSleepingBoxStats({
 
   return [
     {
-      label: "うちの寝顔",
-      value: String(ownSleepingCount),
+      label: "とった寝顔",
+      value: formatPhotoCount(ownSleepingCount),
       detail: "",
     },
     {
-      label: "ほかの寝顔",
-      value: `${Math.min(keptOtherCount, 10)}/10`,
+      label: "とどいた寝顔",
+      value: formatPhotoCount(keptOtherCount),
       detail: "",
     },
     {
@@ -2929,6 +2939,10 @@ function buildHomeSleepingBoxStats({
       detail: "",
     },
   ];
+}
+
+function formatPhotoCount(count: number) {
+  return count > 0 ? `${count}枚` : "まだなし";
 }
 
 function readOwnSleepingPhotoCount(activeCatId: string | null) {
@@ -3625,23 +3639,28 @@ function saveOwnExchangePhoto(
 ) {
   try {
     const raw = window.localStorage.getItem(EXCHANGE_OWN_SLEEPING_PHOTO_STORAGE_KEY);
-    const saved = raw ? (JSON.parse(raw) as OwnExchangePhoto[]) : [];
+    const parsed = raw ? (JSON.parse(raw) as unknown) : [];
+    const saved = Array.isArray(parsed) ? (parsed as OwnExchangePhoto[]) : [];
+    const createdAt = Date.now();
     const ownPhoto: OwnExchangePhoto = {
-      id: `own-sleeping-${Date.now()}`,
+      id: `own-sleeping-${createdAt}`,
       catId,
       src: photo.src,
       triggerLabel: photo.triggerLabel,
       theme: photo.theme,
       shared,
-      createdAt: Date.now(),
+      createdAt,
     };
 
     window.localStorage.setItem(
       EXCHANGE_OWN_SLEEPING_PHOTO_STORAGE_KEY,
       JSON.stringify([ownPhoto, ...saved].slice(0, 50)),
     );
+    window.dispatchEvent(new Event(BOX_PHOTO_STORAGE_EVENT));
+    return true;
   } catch {
     // A sleeping photo should feel lightweight; storage failure should not trap the user.
+    return false;
   }
 }
 
@@ -5136,7 +5155,7 @@ const styles = {
   },
   sleepingStatCard: {
     minWidth: 0,
-    minHeight: "78px",
+    minHeight: "64px",
     border: "0.5px solid rgba(86,78,64,0.18)",
     borderRadius: "8px",
     background: "rgba(255,255,255,0.54)",
@@ -5144,25 +5163,25 @@ const styles = {
     display: "grid",
     alignItems: "center",
     justifyContent: "center",
-    gap: "4px",
-    padding: "11px 8px",
+    gap: "7px",
+    padding: "10px 8px",
     boxSizing: "border-box",
     backdropFilter: "blur(18px)",
     WebkitBackdropFilter: "blur(18px)",
     boxShadow: "0 8px 22px rgba(72,61,43,0.06)",
   },
   sleepingStatLabel: {
-    color: "#756f64",
-    fontSize: "11px",
-    fontWeight: 560,
+    color: "#4a463e",
+    fontSize: "12px",
+    fontWeight: 540,
     lineHeight: 1.2,
     whiteSpace: "nowrap",
     textAlign: "center",
   },
   sleepingStatValue: {
-    color: "#23211d",
-    fontSize: "25px",
-    fontWeight: 500,
+    color: "#8a8174",
+    fontSize: "12px",
+    fontWeight: 480,
     lineHeight: 1,
     fontVariantNumeric: "tabular-nums",
     textAlign: "center",
@@ -5258,24 +5277,24 @@ const styles = {
     justifyContent: "center",
     padding: "0 14px calc(92px + env(safe-area-inset-bottom))",
     boxSizing: "border-box",
-    background: "rgba(10,9,8,0.28)",
-    backdropFilter: "blur(3px)",
-    WebkitBackdropFilter: "blur(3px)",
+    background: "rgba(32,28,22,0.18)",
+    backdropFilter: "blur(4px)",
+    WebkitBackdropFilter: "blur(4px)",
   },
   exchangePanel: {
     width: HOME_NAV_FRAME_WIDTH,
     maxWidth: "410px",
-    border: "0.5px solid rgba(255,255,255,0.22)",
+    border: "0.5px solid rgba(86,78,64,0.14)",
     borderRadius: "24px",
     background:
-      "linear-gradient(145deg, rgba(54,48,44,0.78), rgba(24,22,20,0.9))",
-    color: "rgba(255,255,255,0.94)",
+      "linear-gradient(145deg, rgba(255,253,248,0.96), rgba(244,239,229,0.96))",
+    color: "#292721",
     padding: "14px",
     boxSizing: "border-box",
     boxShadow:
-      "0 22px 60px rgba(0,0,0,0.36), inset 0 1px 0 rgba(255,255,255,0.16)",
-    backdropFilter: "blur(30px)",
-    WebkitBackdropFilter: "blur(30px)",
+      "0 22px 60px rgba(64,52,34,0.2), inset 0 1px 0 rgba(255,255,255,0.74)",
+    backdropFilter: "blur(26px)",
+    WebkitBackdropFilter: "blur(26px)",
     animation: "exchangePhotoIn 0.44s cubic-bezier(0.22, 1, 0.36, 1) both",
   },
   exchangeHeader: {
@@ -5283,35 +5302,48 @@ const styles = {
     alignItems: "center",
     justifyContent: "flex-start",
     gap: "12px",
-    marginBottom: "10px",
+    marginBottom: "5px",
   },
   exchangeKicker: {
-    color: "rgba(255,255,255,0.64)",
-    fontSize: "12px",
-    fontWeight: 560,
+    color: "#292721",
+    fontSize: "14px",
+    fontWeight: 620,
     lineHeight: 1.2,
+  },
+  exchangeLead: {
+    margin: "0 0 12px",
+    color: "#716b60",
+    fontSize: "12px",
+    fontWeight: 460,
+    lineHeight: 1.45,
   },
   exchangePhotoFrame: {
     width: "100%",
-    aspectRatio: "4 / 3",
     borderRadius: "20px",
     overflow: "hidden",
-    background: "rgba(255,255,255,0.08)",
-    border: "0.5px solid rgba(255,255,255,0.16)",
+    background: "rgba(47,42,35,0.06)",
+    border: "0.5px solid rgba(86,78,64,0.1)",
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
   },
   exchangePhoto: {
-    width: "100%",
-    height: "100%",
-    objectFit: "cover",
+    width: "auto",
+    height: "auto",
+    maxWidth: "100%",
+    maxHeight: "min(45vh, 360px)",
+    objectFit: "contain",
     display: "block",
   },
   exchangeSharePreview: {
     width: "100%",
-    aspectRatio: "4 / 3",
     borderRadius: "20px",
     overflow: "hidden",
-    background: "rgba(255,255,255,0.08)",
-    border: "0.5px solid rgba(255,255,255,0.16)",
+    background: "rgba(47,42,35,0.06)",
+    border: "0.5px solid rgba(86,78,64,0.1)",
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
   },
   exchangeCatPicker: {
     display: "flex",
@@ -5326,25 +5358,25 @@ const styles = {
     gap: "8px",
     minWidth: "94px",
     minHeight: "42px",
-    border: "0.5px solid rgba(255,255,255,0.12)",
+    border: "0.5px solid rgba(86,78,64,0.12)",
     borderRadius: "999px",
-    background: "rgba(255,255,255,0.08)",
-    color: "rgba(255,255,255,0.68)",
+    background: "rgba(255,255,255,0.56)",
+    color: "#716b60",
     padding: "4px 11px 4px 4px",
     cursor: "pointer",
     flexShrink: 0,
   },
   exchangeCatOptionActive: {
-    border: "0.5px solid rgba(255,255,255,0.3)",
-    background: "rgba(255,255,255,0.18)",
-    color: "rgba(255,255,255,0.96)",
+    border: "0.5px solid rgba(61,54,44,0.22)",
+    background: "rgba(255,255,255,0.88)",
+    color: "#292721",
   },
   exchangeCatThumb: {
     width: "34px",
     height: "34px",
     borderRadius: "50%",
     overflow: "hidden",
-    background: "rgba(255,255,255,0.16)",
+    background: "rgba(47,42,35,0.08)",
     flexShrink: 0,
   },
   exchangeCatThumbImage: {
@@ -5369,21 +5401,21 @@ const styles = {
   },
   exchangeTitle: {
     margin: 0,
-    color: "rgba(255,255,255,0.96)",
+    color: "#292721",
     fontSize: "17px",
     fontWeight: 600,
     lineHeight: 1.28,
   },
   exchangeSubtitle: {
     margin: 0,
-    color: "rgba(255,255,255,0.66)",
+    color: "#716b60",
     fontSize: "12.5px",
     fontWeight: 480,
     lineHeight: 1.45,
   },
   exchangeMeta: {
     margin: "2px 0 0",
-    color: "rgba(255,255,255,0.58)",
+    color: "#8a8174",
     fontSize: "12px",
     fontWeight: 480,
     lineHeight: 1.35,
@@ -5404,8 +5436,8 @@ const styles = {
     minHeight: "48px",
     border: "none",
     borderRadius: "16px",
-    background: "rgba(255,255,255,0.94)",
-    color: "#2A2A28",
+    background: "#292721",
+    color: "rgba(255,255,255,0.94)",
     fontSize: "15px",
     fontWeight: 620,
     cursor: "pointer",
@@ -5414,7 +5446,7 @@ const styles = {
     minHeight: "28px",
     border: "none",
     background: "transparent",
-    color: "rgba(255,255,255,0.56)",
+    color: "#7c7468",
     fontSize: "12px",
     fontWeight: 560,
     cursor: "pointer",
