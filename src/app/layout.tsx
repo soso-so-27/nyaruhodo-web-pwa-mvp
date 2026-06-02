@@ -6,14 +6,14 @@ export const metadata: Metadata = {
   metadataBase: new URL(
     process.env.NEXT_PUBLIC_SITE_URL ?? "https://nyaruhodo-web-pwa-mvp.vercel.app",
   ),
-  title: "にゃるほど",
-  description: "猫の様子から、飼い主の迷いを減らすアプリ",
-  applicationName: "にゃるほど",
+  title: "ねてるねこ",
+  description: "寝顔を撮ると、ほかのねがおが届く猫の写真記録アプリ",
+  applicationName: "ねてるねこ",
   manifest: "/manifest.webmanifest",
   appleWebApp: {
     capable: true,
-    title: "にゃるほど",
-    statusBarStyle: "black-translucent",
+    title: "ねてるねこ",
+    statusBarStyle: "default",
   },
   icons: {
     icon: [
@@ -28,7 +28,7 @@ export const viewport: Viewport = {
   width: "device-width",
   initialScale: 1,
   viewportFit: "cover",
-  themeColor: "#1a1a18",
+  themeColor: "#f7f3ea",
 };
 
 export default function RootLayout({
@@ -42,7 +42,7 @@ export default function RootLayout({
         <meta name="apple-mobile-web-app-capable" content="yes" />
         <meta
           name="apple-mobile-web-app-status-bar-style"
-          content="black-translucent"
+          content="default"
         />
         <link
           rel="stylesheet"

@@ -19,31 +19,20 @@ export function AppLoadingScreen({ variant }: AppLoadingScreenProps) {
         : "torisetu";
 
   return (
-    <main style={isHome ? styles.homePage : styles.page}>
-      <div style={styles.backdrop} aria-hidden="true" />
-      <div style={styles.veil} aria-hidden="true" />
+    <main style={styles.page}>
+      <div style={styles.paperBackground} aria-hidden="true" />
+      <div style={styles.paperNoise} aria-hidden="true" />
+      <div style={styles.topBar}>ねてるねこ</div>
+
       <div style={styles.container}>
-        <div style={styles.topRow}>
-          <div style={styles.titleLine} />
-          <div style={styles.pillLine} />
-        </div>
-
-        {isHome ? (
-          <div style={styles.homeSpacer} />
-        ) : (
-          <div style={styles.headerCard}>
-            <div style={styles.headerLineLarge} />
-            <div style={styles.headerLineSmall} />
-          </div>
-        )}
-
-        {isCats ? <AvatarRail /> : null}
-        {isCollection ? <CollectionGridSkeleton /> : null}
-        {isTorisetu ? <KnowledgeShelfSkeleton /> : null}
-        {isHome ? <HomeBoardSkeleton /> : null}
+        {isHome ? <HomeLoading /> : null}
+        {isCollection ? <CollectionLoading /> : null}
+        {isCats ? <CatsLoading /> : null}
+        {isTorisetu ? <TorisetuLoading /> : null}
       </div>
+
       <style>{`
-        @keyframes loadingShimmer {
+        @keyframes paperLoading {
           0% { background-position: 180% 0; }
           100% { background-position: -180% 0; }
         }
@@ -53,287 +42,329 @@ export function AppLoadingScreen({ variant }: AppLoadingScreenProps) {
   );
 }
 
-function AvatarRail() {
+function HomeLoading() {
   return (
-    <>
+    <section style={styles.homeStage} aria-label="しゃしんを読み込み中">
+      <div style={styles.homeCopy}>
+        <div style={styles.titleLineLarge} />
+        <div style={styles.copyLine} />
+        <div style={styles.copyLineShort} />
+      </div>
+      <div style={styles.cameraCircle}>
+        <div style={styles.cameraIconLine} />
+      </div>
+      <div style={styles.statGrid}>
+        <div style={styles.statCard} />
+        <div style={styles.statCard} />
+        <div style={styles.statCard} />
+      </div>
+    </section>
+  );
+}
+
+function CollectionLoading() {
+  return (
+    <section style={styles.pageStage} aria-label="アルバムを読み込み中">
+      <div style={styles.pageTitleLine} />
+      <div style={styles.albumSection}>
+        <div style={styles.sectionTitleLine} />
+        <div style={styles.thumbRow}>
+          <div style={styles.thumb} />
+          <div style={styles.thumb} />
+          <div style={styles.thumb} />
+        </div>
+      </div>
+      <div style={styles.albumSection}>
+        <div style={styles.sectionTitleLineShort} />
+        <div style={styles.thumbRow}>
+          <div style={styles.thumb} />
+          <div style={styles.thumb} />
+          <div style={styles.thumbMuted} />
+        </div>
+      </div>
+    </section>
+  );
+}
+
+function CatsLoading() {
+  return (
+    <section style={styles.pageStage} aria-label="ねこを読み込み中">
+      <div style={styles.pageTitleLine} />
       <div style={styles.avatarRail}>
-        {[...Array(4)].map((_, index) => (
-          <div key={index} style={styles.avatarItem}>
-            <div style={styles.avatarCircle} />
-            <div style={styles.avatarNameLine} />
-          </div>
-        ))}
+        <div style={styles.avatarItem} />
+        <div style={styles.avatarItem} />
+        <div style={styles.avatarItem} />
       </div>
-      <div style={styles.largeCard} />
-      <div style={styles.smallCardRow}>
-        <div style={styles.smallCard} />
-        <div style={styles.smallCard} />
+      <div style={styles.profileCard}>
+        <div style={styles.profilePhoto} />
+        <div style={styles.profileLines}>
+          <div style={styles.profileNameLine} />
+          <div style={styles.profileSmallLine} />
+        </div>
       </div>
-    </>
+      <div style={styles.infoList}>
+        <div style={styles.infoRow} />
+        <div style={styles.infoRow} />
+        <div style={styles.infoRow} />
+      </div>
+    </section>
   );
 }
 
-function CollectionGridSkeleton() {
+function TorisetuLoading() {
   return (
-    <>
-      <div style={styles.segmentRow}>
-        <div style={styles.segmentActive} />
-        <div style={styles.segment} />
+    <section style={styles.pageStage} aria-label="読み込み中">
+      <div style={styles.pageTitleLine} />
+      <div style={styles.albumSection}>
+        <div style={styles.sectionTitleLine} />
+        <div style={styles.copyBlock} />
       </div>
-      <div style={styles.grid}>
-        {[...Array(6)].map((_, index) => (
-          <div key={index} style={styles.gridCard} />
-        ))}
+      <div style={styles.infoList}>
+        <div style={styles.infoRow} />
+        <div style={styles.infoRow} />
       </div>
-    </>
+    </section>
   );
 }
 
-function KnowledgeShelfSkeleton() {
-  return (
-    <>
-      <div style={styles.largeCard} />
-      <div style={styles.shelfRail}>
-        {[...Array(3)].map((_, index) => (
-          <div key={index} style={styles.shelfCard} />
-        ))}
-      </div>
-      <div style={styles.stackedList}>
-        <div style={styles.listRow} />
-        <div style={styles.listRow} />
-        <div style={styles.listRow} />
-      </div>
-    </>
-  );
-}
-
-function HomeBoardSkeleton() {
-  return (
-    <div style={styles.homeBoard}>
-      <div style={styles.boardTitleLine} />
-      <div style={styles.boardRail}>
-        <div style={styles.boardCard} />
-        <div style={styles.boardCard} />
-        <div style={styles.boardCardPeek} />
-      </div>
-    </div>
-  );
-}
-
-const glassBase: CSSProperties = {
+const shimmerBase: CSSProperties = {
   background:
-    "linear-gradient(90deg, rgba(255,255,255,0.095) 25%, rgba(255,255,255,0.18) 50%, rgba(255,255,255,0.095) 75%)",
+    "linear-gradient(90deg, rgba(169,149,126,0.08) 25%, rgba(255,253,248,0.7) 50%, rgba(169,149,126,0.08) 75%)",
   backgroundSize: "200% 100%",
-  animation: "loadingShimmer 1.55s infinite",
-  border: "0.5px solid rgba(255,255,255,0.13)",
-  boxShadow: [
-    "0 14px 34px rgba(0,0,0,0.2)",
-    "inset 0 1px 0 rgba(255,255,255,0.13)",
-  ].join(", "),
+  animation: "paperLoading 1.55s infinite",
+  border: "1px solid rgba(144,126,102,0.1)",
+  boxShadow: "0 8px 18px rgba(90,76,60,0.045)",
+};
+
+const paperCard: CSSProperties = {
+  background: "rgba(255,253,248,0.64)",
+  border: "1px solid rgba(144,126,102,0.11)",
+  boxShadow: "0 8px 18px rgba(90,76,60,0.045)",
 };
 
 const styles = {
   page: {
     position: "relative",
-    minHeight: "100dvh",
-    overflow: "hidden",
-    background: "#171514",
-    color: "rgba(255,255,255,0.94)",
-  },
-  homePage: {
-    position: "relative",
     height: "100dvh",
     overflow: "hidden",
-    background:
-      'linear-gradient(to bottom, rgba(18,16,15,0.16), rgba(18,16,15,0.46)), url("/sample-cats/mugi-hero.png") center 38% / cover no-repeat',
-    color: "rgba(255,255,255,0.94)",
+    background: "#f7f3ea",
+    color: "#332c26",
+    fontFamily:
+      'Outfit, "Zen Kaku Gothic New", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
   },
-  backdrop: {
+  paperBackground: {
     position: "fixed",
     inset: 0,
     zIndex: 0,
+    pointerEvents: "none",
     background: [
-      "radial-gradient(circle at 84% 10%, rgba(220,150,92,0.22) 0%, rgba(220,150,92,0.06) 25%, rgba(220,150,92,0) 52%)",
-      "radial-gradient(ellipse at 45% 86%, rgba(78,66,58,0.66) 0%, rgba(25,22,20,0.92) 64%, rgba(15,14,13,1) 100%)",
-      "linear-gradient(145deg, #30363a 0%, #5b4f48 44%, #201d1b 100%)",
+      "radial-gradient(circle at 18% 14%, rgba(255,255,255,0.84) 0%, rgba(255,255,255,0.28) 28%, rgba(255,255,255,0) 54%)",
+      "radial-gradient(circle at 86% 82%, rgba(226,211,185,0.34) 0%, rgba(226,211,185,0.12) 30%, rgba(226,211,185,0) 58%)",
+      "linear-gradient(180deg, #fbf8f0 0%, #f4efe4 52%, #eee6d8 100%)",
     ].join(", "),
   },
-  veil: {
+  paperNoise: {
     position: "fixed",
     inset: 0,
     zIndex: 1,
     pointerEvents: "none",
-    background:
-      "linear-gradient(to bottom, rgba(8,7,7,0.14) 0%, rgba(8,7,7,0.02) 35%, rgba(8,7,7,0.42) 100%)",
+    opacity: 0.045,
+    backgroundImage:
+      "linear-gradient(90deg, rgba(88,73,50,0.035) 1px, transparent 1px), linear-gradient(0deg, rgba(88,73,50,0.03) 1px, transparent 1px)",
+    backgroundSize: "28px 28px",
+  },
+  topBar: {
+    position: "fixed",
+    top: "calc(58px + env(safe-area-inset-top))",
+    left: "50%",
+    transform: "translateX(-50%)",
+    zIndex: 3,
+    color: "#4a463e",
+    fontFamily: '"Shippori Mincho B1", "Hiragino Mincho ProN", "Yu Mincho", serif',
+    fontSize: "18px",
+    fontWeight: 400,
+    letterSpacing: "0.16em",
+    lineHeight: 1.4,
+    whiteSpace: "nowrap",
   },
   container: {
     position: "relative",
     zIndex: 2,
-    width: "min(100%, 480px)",
+    width: "min(calc(100% - 28px), 410px)",
     height: "100%",
     margin: "0 auto",
-    padding:
-      "calc(18px + env(safe-area-inset-top)) 16px calc(118px + env(safe-area-inset-bottom))",
-    boxSizing: "border-box",
-    display: "flex",
-    flexDirection: "column",
-    gap: "12px",
   },
-  topRow: {
-    display: "flex",
-    justifyContent: "space-between",
-    alignItems: "center",
-    gap: "12px",
-  },
-  titleLine: {
-    ...glassBase,
-    width: "128px",
-    height: "38px",
-    borderRadius: "999px",
-  },
-  pillLine: {
-    ...glassBase,
-    width: "92px",
-    height: "34px",
-    borderRadius: "999px",
-  },
-  headerCard: {
-    ...glassBase,
-    height: "86px",
-    borderRadius: "22px",
-    padding: "16px",
-    display: "grid",
-    alignContent: "center",
-    gap: "10px",
-  },
-  headerLineLarge: {
-    width: "52%",
-    height: "16px",
-    borderRadius: "999px",
-    background: "rgba(255,255,255,0.2)",
-  },
-  headerLineSmall: {
-    width: "34%",
-    height: "10px",
-    borderRadius: "999px",
-    background: "rgba(255,255,255,0.13)",
-  },
-  homeSpacer: {
-    flex: 1,
-  },
-  avatarRail: {
-    display: "flex",
-    gap: "14px",
-    padding: "2px 0",
-  },
-  avatarItem: {
+  homeStage: {
+    position: "absolute",
+    inset: 0,
     display: "grid",
     justifyItems: "center",
-    gap: "7px",
+    textAlign: "center",
   },
-  avatarCircle: {
-    ...glassBase,
-    width: "68px",
-    height: "68px",
+  homeCopy: {
+    position: "absolute",
+    top: "calc(clamp(120px, 18dvh, 168px) + env(safe-area-inset-top))",
+    display: "grid",
+    justifyItems: "center",
+    gap: "13px",
+    width: "100%",
+  },
+  titleLineLarge: {
+    ...shimmerBase,
+    width: "160px",
+    height: "34px",
+    borderRadius: "999px",
+  },
+  copyLine: {
+    ...shimmerBase,
+    width: "172px",
+    height: "12px",
+    borderRadius: "999px",
+  },
+  copyLineShort: {
+    ...shimmerBase,
+    width: "136px",
+    height: "12px",
+    borderRadius: "999px",
+  },
+  cameraCircle: {
+    ...shimmerBase,
+    position: "absolute",
+    top: "calc(clamp(284px, 38dvh, 348px) + env(safe-area-inset-top))",
+    left: "50%",
+    width: "154px",
+    height: "154px",
+    transform: "translateX(-50%)",
     borderRadius: "50%",
-  },
-  avatarNameLine: {
-    ...glassBase,
-    width: "38px",
-    height: "9px",
-    borderRadius: "999px",
-  },
-  largeCard: {
-    ...glassBase,
-    height: "168px",
-    borderRadius: "24px",
-  },
-  smallCardRow: {
     display: "grid",
-    gridTemplateColumns: "1fr 1fr",
-    gap: "10px",
+    placeItems: "center",
+    boxShadow:
+      "0 0 0 12px rgba(255,255,255,0.66), 0 18px 34px rgba(119,101,73,0.14)",
   },
-  smallCard: {
-    ...glassBase,
-    height: "72px",
-    borderRadius: "18px",
+  cameraIconLine: {
+    width: "42px",
+    height: "30px",
+    borderRadius: "10px",
+    background: "rgba(255,253,248,0.58)",
   },
-  segmentRow: {
-    display: "flex",
-    gap: "8px",
-  },
-  segmentActive: {
-    ...glassBase,
-    width: "84px",
-    height: "34px",
-    borderRadius: "999px",
-    background:
-      "linear-gradient(90deg, rgba(255,255,255,0.24) 25%, rgba(255,255,255,0.36) 50%, rgba(255,255,255,0.24) 75%)",
-  },
-  segment: {
-    ...glassBase,
-    width: "84px",
-    height: "34px",
-    borderRadius: "999px",
-  },
-  grid: {
+  statGrid: {
+    position: "absolute",
+    top: "calc(clamp(456px, 64dvh, 584px) + env(safe-area-inset-top))",
+    left: "50%",
+    width: "min(100%, 380px)",
+    transform: "translateX(-50%)",
     display: "grid",
-    gridTemplateColumns: "repeat(2, minmax(0, 1fr))",
+    gridTemplateColumns: "repeat(3, minmax(0, 1fr))",
     gap: "12px",
   },
-  gridCard: {
-    ...glassBase,
-    aspectRatio: "1 / 1",
-    borderRadius: "18px",
-  },
-  shelfRail: {
-    display: "flex",
-    gap: "10px",
-    overflow: "hidden",
-  },
-  shelfCard: {
-    ...glassBase,
-    width: "148px",
-    minWidth: "148px",
-    height: "108px",
+  statCard: {
+    ...paperCard,
+    minHeight: "100px",
     borderRadius: "20px",
   },
-  stackedList: {
+  pageStage: {
+    padding:
+      "calc(128px + env(safe-area-inset-top)) 0 calc(118px + env(safe-area-inset-bottom))",
     display: "grid",
-    gap: "8px",
+    gap: "18px",
   },
-  listRow: {
-    ...glassBase,
-    height: "64px",
-    borderRadius: "18px",
+  pageTitleLine: {
+    ...shimmerBase,
+    width: "132px",
+    height: "32px",
+    borderRadius: "999px",
+    margin: "0 auto 8px",
   },
-  homeBoard: {
+  albumSection: {
+    ...paperCard,
+    borderRadius: "24px",
+    padding: "18px",
     display: "grid",
-    gap: "12px",
+    gap: "14px",
   },
-  boardTitleLine: {
-    ...glassBase,
-    width: "168px",
+  sectionTitleLine: {
+    ...shimmerBase,
+    width: "108px",
     height: "20px",
     borderRadius: "999px",
   },
-  boardRail: {
+  sectionTitleLineShort: {
+    ...shimmerBase,
+    width: "86px",
+    height: "20px",
+    borderRadius: "999px",
+  },
+  thumbRow: {
+    display: "grid",
+    gridTemplateColumns: "repeat(3, 1fr)",
+    gap: "10px",
+  },
+  thumb: {
+    ...shimmerBase,
+    aspectRatio: "1 / 1",
+    borderRadius: "16px",
+  },
+  thumbMuted: {
+    ...shimmerBase,
+    aspectRatio: "1 / 1",
+    borderRadius: "16px",
+    opacity: 0.56,
+  },
+  avatarRail: {
+    display: "grid",
+    gridTemplateColumns: "repeat(3, 72px)",
+    gap: "16px",
+    justifyContent: "center",
+  },
+  avatarItem: {
+    ...shimmerBase,
+    width: "72px",
+    height: "72px",
+    borderRadius: "50%",
+  },
+  profileCard: {
+    ...paperCard,
+    borderRadius: "24px",
+    padding: "20px",
     display: "flex",
+    alignItems: "center",
+    gap: "16px",
+  },
+  profilePhoto: {
+    ...shimmerBase,
+    width: "84px",
+    height: "84px",
+    borderRadius: "50%",
+  },
+  profileLines: {
+    display: "grid",
     gap: "12px",
+    flex: 1,
+  },
+  profileNameLine: {
+    ...shimmerBase,
+    width: "104px",
+    height: "26px",
+    borderRadius: "999px",
+  },
+  profileSmallLine: {
+    ...shimmerBase,
+    width: "78px",
+    height: "14px",
+    borderRadius: "999px",
+  },
+  infoList: {
+    ...paperCard,
+    borderRadius: "24px",
     overflow: "hidden",
   },
-  boardCard: {
-    ...glassBase,
-    width: "168px",
-    minWidth: "168px",
-    height: "136px",
-    borderRadius: "24px",
+  infoRow: {
+    height: "58px",
+    borderBottom: "1px solid rgba(144,126,102,0.1)",
   },
-  boardCardPeek: {
-    ...glassBase,
-    width: "90px",
-    minWidth: "90px",
-    height: "136px",
-    borderRadius: "24px 0 0 24px",
+  copyBlock: {
+    ...shimmerBase,
+    height: "128px",
+    borderRadius: "18px",
   },
 } satisfies Record<string, CSSProperties>;

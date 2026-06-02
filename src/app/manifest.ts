@@ -2,14 +2,14 @@ import type { MetadataRoute } from "next";
 
 export default function manifest(): MetadataRoute.Manifest {
   return {
-    name: "にゃるほど",
-    short_name: "にゃるほど",
-    description: "猫の様子から、飼い主の迷いを減らすアプリ",
+    name: "ねてるねこ",
+    short_name: "ねてるねこ",
+    description: "寝顔を撮ると、ほかのねがおが届く猫の写真記録アプリ",
     start_url: "/home",
     scope: "/",
     display: "standalone",
-    background_color: "#1a1a18",
-    theme_color: "#1a1a18",
+    background_color: "#f7f3ea",
+    theme_color: "#f7f3ea",
     lang: "ja",
     icons: [
       {

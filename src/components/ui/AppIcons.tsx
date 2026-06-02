@@ -17,6 +17,8 @@ export type AppIconName =
   | "hand"
   | "heart"
   | "camera"
+  | "photo"
+  | "mail"
   | "bell"
   | "clipboard"
   | "settings"
@@ -66,6 +68,10 @@ export function AppIcon({
       return <HeartIcon size={size} style={style} />;
     case "camera":
       return <CameraIcon size={size} style={style} />;
+    case "photo":
+      return <PhotoIcon size={size} style={style} />;
+    case "mail":
+      return <MailIcon size={size} style={style} />;
     case "bell":
       return <BellIcon size={size} style={style} />;
     case "clipboard":
@@ -402,6 +408,67 @@ export function CameraIcon({ size = 24, style }: IconProps) {
         r="3.5"
         stroke="currentColor"
         strokeWidth="1.8"
+      />
+    </svg>
+  );
+}
+
+export function PhotoIcon({ size = 24, style }: IconProps) {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      width={size}
+      height={size}
+      fill="none"
+      style={mergeStyle(style)}
+      aria-hidden="true"
+    >
+      <rect
+        x="4"
+        y="5"
+        width="16"
+        height="14"
+        rx="2.4"
+        stroke="currentColor"
+        strokeWidth="1.8"
+      />
+      <path
+        d="m5.5 16 4.1-4.1a1.4 1.4 0 0 1 2 0l1.3 1.3 1.8-1.8a1.4 1.4 0 0 1 2 0l1.8 1.8"
+        stroke="currentColor"
+        strokeWidth="1.8"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+      <circle cx="15.8" cy="8.9" r="1.15" fill="currentColor" />
+    </svg>
+  );
+}
+
+export function MailIcon({ size = 24, style }: IconProps) {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      width={size}
+      height={size}
+      fill="none"
+      style={mergeStyle(style)}
+      aria-hidden="true"
+    >
+      <rect
+        x="3.8"
+        y="6"
+        width="16.4"
+        height="12"
+        rx="2.4"
+        stroke="currentColor"
+        strokeWidth="1.8"
+      />
+      <path
+        d="m5 8 6.2 4.7a1.4 1.4 0 0 0 1.6 0L19 8"
+        stroke="currentColor"
+        strokeWidth="1.8"
+        strokeLinecap="round"
+        strokeLinejoin="round"
       />
     </svg>
   );
