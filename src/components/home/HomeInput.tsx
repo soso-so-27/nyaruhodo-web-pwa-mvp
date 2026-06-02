@@ -1011,7 +1011,7 @@ export function HomeInput({ recentEvents: _recentEvents }: HomeInputProps) {
 
       try {
         const slug = getCollectionSlotPhotoSlug(slot);
-        const dataUrl = await resizeAndEncode(file, 820);
+        const dataUrl = await resizeAndEncode(file, 560, 0.76);
 
         saveCollectionPhoto(activeCatId, slug, dataUrl);
         setCollectionRefreshTick((value) => value + 1);
@@ -1178,7 +1178,7 @@ export function HomeInput({ recentEvents: _recentEvents }: HomeInputProps) {
       setIsExchangePhotoAdding(true);
 
       try {
-        const dataUrl = await resizeAndEncode(file, 820);
+        const dataUrl = await resizeAndEncode(file, 560, 0.76);
         const fileSizeBucket = getFileSizeBucket(file.size);
 
         setPendingExchangeSharePhoto({
@@ -2361,6 +2361,7 @@ function ExchangeSharePermissionSheet({
 }) {
   const shouldShowCatPicker = catProfiles.length > 1;
   const canReceivePhoto = !deliveryRemaining;
+  const [isPrivate, setIsPrivate] = useState(false);
 
   return (
     <div style={styles.exchangeBackdrop}>
@@ -2405,12 +2406,26 @@ function ExchangeSharePermissionSheet({
             })}
           </div>
         ) : null}
+        <label style={styles.exchangePrivateCheck}>
+          <input
+            type="checkbox"
+            checked={isPrivate}
+            onChange={(event) => setIsPrivate(event.currentTarget.checked)}
+            style={styles.exchangePrivateCheckbox}
+          />
+          <span>この写真は届かないようにする</span>
+        </label>
         <div style={styles.exchangeActions}>
-          <button type="button" style={styles.exchangeKeepButton} onClick={onConfirm}>
-            {canReceivePhoto ? "入れて、1枚受け取る" : "とった寝顔に入れる"}
-          </button>
-          <button type="button" style={styles.exchangePlainButton} onClick={onPrivate}>
-            自分だけに入れる
+          <button
+            type="button"
+            style={styles.exchangeKeepButton}
+            onClick={isPrivate ? onPrivate : onConfirm}
+          >
+            {isPrivate
+              ? "とった寝顔に入れる"
+              : canReceivePhoto
+                ? "入れて、1枚受け取る"
+                : "とった寝顔に入れる"}
           </button>
         </div>
       </section>
@@ -3666,12 +3681,23 @@ function saveOwnExchangePhoto(
       createdAt,
     };
 
-    window.localStorage.setItem(
-      EXCHANGE_OWN_SLEEPING_PHOTO_STORAGE_KEY,
-      JSON.stringify([ownPhoto, ...saved].slice(0, 50)),
-    );
-    window.dispatchEvent(new Event(BOX_PHOTO_STORAGE_EVENT));
-    return true;
+    const nextPhotos = [ownPhoto, ...saved];
+    const keepCounts = [24, 12, 6, 1];
+
+    for (const keepCount of keepCounts) {
+      try {
+        window.localStorage.setItem(
+          EXCHANGE_OWN_SLEEPING_PHOTO_STORAGE_KEY,
+          JSON.stringify(nextPhotos.slice(0, keepCount)),
+        );
+        window.dispatchEvent(new Event(BOX_PHOTO_STORAGE_EVENT));
+        return true;
+      } catch {
+        // Retry with fewer older photos if local storage is near its limit.
+      }
+    }
+
+    return false;
   } catch {
     // A sleeping photo should feel lightweight; storage failure should not trap the user.
     return false;
@@ -3760,7 +3786,11 @@ function hashText(value: string) {
   return Math.abs(hash);
 }
 
-function resizeAndEncode(file: File, maxSize = 1200): Promise<string> {
+function resizeAndEncode(
+  file: File,
+  maxSize = 1200,
+  quality = 0.86,
+): Promise<string> {
   return new Promise((resolve, reject) => {
     const img = new Image();
     const url = URL.createObjectURL(file);
@@ -3780,7 +3810,7 @@ function resizeAndEncode(file: File, maxSize = 1200): Promise<string> {
 
       ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
       URL.revokeObjectURL(url);
-      resolve(canvas.toDataURL("image/jpeg", 0.86));
+      resolve(canvas.toDataURL("image/jpeg", quality));
     };
 
     img.onerror = () => {
@@ -5370,17 +5400,28 @@ const styles = {
     fontWeight: 480,
     lineHeight: 1.35,
   },
+  exchangePrivateCheck: {
+    display: "inline-flex",
+    alignItems: "center",
+    gap: "8px",
+    margin: "10px 2px 12px",
+    color: "#5f584f",
+    fontSize: "12.5px",
+    fontWeight: 520,
+    lineHeight: 1.35,
+    cursor: "pointer",
+  },
+  exchangePrivateCheckbox: {
+    width: "16px",
+    height: "16px",
+    accentColor: "#292721",
+    flexShrink: 0,
+  },
   exchangeActions: {
     display: "grid",
-    gridTemplateColumns: "1fr auto",
+    gridTemplateColumns: "1fr",
     alignItems: "center",
     gap: "10px",
-  },
-  exchangeSecondaryActions: {
-    minWidth: "104px",
-    display: "grid",
-    justifyItems: "end",
-    gap: "4px",
   },
   exchangeKeepButton: {
     minHeight: "48px",
