@@ -200,6 +200,8 @@ type PendingExchangeSharePhoto = {
   fileSizeBucket: string;
 };
 
+type SleepingPhotoSource = "camera" | "library";
+
 type OwnExchangePhoto = {
   id: string;
   catId: string;
@@ -301,6 +303,8 @@ export function HomeInput({ recentEvents: _recentEvents }: HomeInputProps) {
   const [isSleepingSafetySheetOpen, setIsSleepingSafetySheetOpen] =
     useState(false);
   const [isSleepingSafetyChecked, setIsSleepingSafetyChecked] = useState(false);
+  const [pendingSleepingPhotoSource, setPendingSleepingPhotoSource] =
+    useState<SleepingPhotoSource>("camera");
   const [collectionRefreshTick, setCollectionRefreshTick] = useState(0);
   const [discoveryDismissedToday, setDiscoveryDismissedToday] = useState(false);
   const hasTrackedHomeView = useRef(false);
@@ -1106,7 +1110,7 @@ export function HomeInput({ recentEvents: _recentEvents }: HomeInputProps) {
       return;
     }
     if (actionType === "add_sleeping") {
-      void handleSleepingExchangePhotoSelect();
+      handleSleepingPhotoStart("camera");
       return;
     }
     if (actionType === "open_photo") {
@@ -1134,7 +1138,7 @@ export function HomeInput({ recentEvents: _recentEvents }: HomeInputProps) {
     }
   }
 
-  async function handleSleepingExchangePhotoSelect() {
+  async function handleSleepingExchangePhotoSelect(source: SleepingPhotoSource) {
     if (
       !activeCatId ||
       isExchangePhotoAdding ||
@@ -1146,7 +1150,9 @@ export function HomeInput({ recentEvents: _recentEvents }: HomeInputProps) {
     const input = document.createElement("input");
     input.type = "file";
     input.accept = "image/*";
-    input.setAttribute("capture", "environment");
+    if (source === "camera") {
+      input.setAttribute("capture", "environment");
+    }
 
     input.onchange = async () => {
       const file = input.files?.[0];
@@ -1169,6 +1175,7 @@ export function HomeInput({ recentEvents: _recentEvents }: HomeInputProps) {
           "home_exchange_sleeping_photo_selected",
           {
             theme: "sleeping",
+            source,
             file_size_bucket: fileSizeBucket,
           },
           { localCatId: activeCatId },
@@ -1183,22 +1190,29 @@ export function HomeInput({ recentEvents: _recentEvents }: HomeInputProps) {
     input.click();
   }
 
-  function handleSleepingPhotoStart() {
+  function handleSleepingPhotoStart(source: SleepingPhotoSource = "camera") {
     if (!hasAcceptedSleepingSafety) {
+      setPendingSleepingPhotoSource(source);
       setIsSleepingSafetyChecked(false);
       setIsSleepingSafetySheetOpen(true);
       return;
     }
 
-    void handleSleepingExchangePhotoSelect();
+    void handleSleepingExchangePhotoSelect(source);
+  }
+
+  function handleSleepingLibraryPhotoStart() {
+    handleSleepingPhotoStart("library");
   }
 
   function handleAcceptSleepingSafety() {
+    const source = pendingSleepingPhotoSource;
     markSleepingSafetyNoticeAccepted();
     setHasAcceptedSleepingSafety(true);
     setIsSleepingSafetySheetOpen(false);
     setIsSleepingSafetyChecked(false);
-    void handleSleepingExchangePhotoSelect();
+    setPendingSleepingPhotoSource("camera");
+    void handleSleepingExchangePhotoSelect(source);
   }
 
   function recordSleepingCounterAnswer(targetCatId = activeCatId) {
@@ -1381,7 +1395,8 @@ export function HomeInput({ recentEvents: _recentEvents }: HomeInputProps) {
         remaining={sleepingCounterRemaining}
         cooldownProgress={sleepingCounterCooldownProgress}
         stats={homeSleepingBoxStats}
-        onTakePhoto={handleSleepingPhotoStart}
+        onTakePhoto={() => handleSleepingPhotoStart("camera")}
+        onSelectPhoto={handleSleepingLibraryPhotoStart}
       />
 
       {isSleepingSafetySheetOpen ? (
@@ -1392,6 +1407,7 @@ export function HomeInput({ recentEvents: _recentEvents }: HomeInputProps) {
           onClose={() => {
             setIsSleepingSafetySheetOpen(false);
             setIsSleepingSafetyChecked(false);
+            setPendingSleepingPhotoSource("camera");
           }}
         />
       ) : null}
@@ -2133,11 +2149,13 @@ function SleepingPhotoHome({
   cooldownProgress,
   stats,
   onTakePhoto,
+  onSelectPhoto,
 }: {
   remaining: string | null;
   cooldownProgress: number | null;
   stats: BoardShelfStat[];
   onTakePhoto: () => void;
+  onSelectPhoto: () => void;
 }) {
   const [isDetailsOpen, setIsDetailsOpen] = useState(false);
 
@@ -2184,6 +2202,18 @@ function SleepingPhotoHome({
             />
           </span>
         ) : null}
+
+        <button
+          type="button"
+          disabled={Boolean(remaining)}
+          style={{
+            ...styles.sleepingLibraryButton,
+            ...(remaining ? styles.sleepingLibraryButtonDisabled : {}),
+          }}
+          onClick={onSelectPhoto}
+        >
+          写真から入れる
+        </button>
       </div>
 
       <button
@@ -3023,7 +3053,7 @@ function getBoardCounterSecondaryText(surfaceText?: string) {
 }
 
 function formatSleepingCounterCount(count: number) {
-  return `${count}ひき`;
+  return String(count);
 }
 
 function buildHomeCatCounters({
@@ -5034,6 +5064,21 @@ const styles = {
     fontSize: "11px",
     fontWeight: 400,
     lineHeight: 1.2,
+  },
+  sleepingLibraryButton: {
+    border: "none",
+    background: "transparent",
+    color: "#575147",
+    fontFamily: "\"Shippori Mincho B1\", \"Hiragino Mincho ProN\", \"Yu Mincho\", serif",
+    fontSize: "12px",
+    fontWeight: 500,
+    lineHeight: 1,
+    cursor: "pointer",
+    padding: "4px 10px",
+  },
+  sleepingLibraryButtonDisabled: {
+    color: "#aaa398",
+    cursor: "default",
   },
   sleepingBoxCooldown: {
     position: "relative",

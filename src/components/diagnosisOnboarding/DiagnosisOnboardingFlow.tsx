@@ -51,6 +51,8 @@ type BasicInfo = {
 };
 
 const ONBOARDING_VERSION = "diagnosis-v2";
+const ONBOARDING_OWN_SLEEPING_PHOTO_STORAGE_KEY =
+  "nyaruhodo_exchange_own_sleeping_photos";
 const EMPTY_AXIS_SCORES: AxisScores = { P: 0, C: 0, S: 0, I: 0, B: 0, N: 0 };
 const allQuestions = [...PROVISIONAL_QUESTIONS, ...REFINEMENT_QUESTIONS];
 
@@ -273,6 +275,9 @@ export function DiagnosisOnboardingFlow() {
       const nextProfiles = [...existing, profile];
       saveCatProfiles(nextProfiles);
       saveActiveCatId(newCatId);
+      if (avatarDataUrl) {
+        saveOnboardingSleepingPhoto(newCatId, avatarDataUrl);
+      }
       trackProductEvent(
         "diagnosis_result_saved",
         {
@@ -354,19 +359,10 @@ export function DiagnosisOnboardingFlow() {
         {step === "photo" ? (
           <section style={styles.card}>
             <div style={styles.stepContainer}>
-              <p style={styles.eyebrow}>{displayName}の写真を1枚</p>
+              <p style={styles.eyebrow}>最初の寝顔を1枚</p>
               <p style={styles.note}>
-                ホームの背景やねこアイコンに使います。あとで、ねこタブから変更できます。
+                前に撮った写真で大丈夫です。うちのねこ箱に入れて、ねてるねこを始めます。
               </p>
-              <button
-                type="button"
-                onClick={() => {
-                  void handleCameraCapture();
-                }}
-                style={styles.photoButton}
-              >
-                写真を撮る
-              </button>
               <button
                 type="button"
                 onClick={() => {
@@ -374,7 +370,16 @@ export function DiagnosisOnboardingFlow() {
                 }}
                 style={styles.photoButton}
               >
-                写真を選ぶ
+                寝顔を1枚選ぶ
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  void handleCameraCapture();
+                }}
+                style={styles.photoButton}
+              >
+                今撮る
               </button>
               <button
                 type="button"
@@ -386,7 +391,7 @@ export function DiagnosisOnboardingFlow() {
                 }}
                 style={styles.skipLink}
               >
-                あとで登録して、毛色を選ぶ →
+                あとで入れる →
               </button>
             </div>
           </section>
@@ -662,10 +667,10 @@ export function DiagnosisOnboardingFlow() {
           <section style={styles.card}>
             <div style={styles.stepContainer}>
               <p style={styles.eyebrow}>
-                ここからは、見つけた日常を残せます
+                ここからは、ねこ箱に入れていきます
               </p>
               <p style={styles.note}>
-                ホームで「みっけ」すると、トリセツやコレクションにこの子らしさが少しずつ残ります。
+                寝顔を入れると、うちの寝顔がたまり、ほかのねこ箱がひとつ開きます。
               </p>
               <div style={styles.collectionPreview}>
                 {COLLECTION_PREVIEW_ICONS.map((src) => (
@@ -679,7 +684,7 @@ export function DiagnosisOnboardingFlow() {
                 style={styles.primaryButton}
                 onClick={handleSaveAndGoHome}
               >
-                みっけを始める →
+                ねてるねこを始める →
               </button>
             </div>
           </section>
@@ -687,6 +692,33 @@ export function DiagnosisOnboardingFlow() {
       </div>
     </main>
   );
+}
+
+function saveOnboardingSleepingPhoto(catId: string, src: string) {
+  try {
+    const raw = window.localStorage.getItem(
+      ONBOARDING_OWN_SLEEPING_PHOTO_STORAGE_KEY,
+    );
+    const saved = raw ? (JSON.parse(raw) as unknown) : [];
+    const savedPhotos = Array.isArray(saved) ? saved : [];
+    const createdAt = Date.now();
+    const ownPhoto = {
+      id: `own-sleeping-${createdAt}`,
+      catId,
+      src,
+      triggerLabel: "ねてる",
+      theme: "sleeping",
+      shared: false,
+      createdAt,
+    };
+
+    window.localStorage.setItem(
+      ONBOARDING_OWN_SLEEPING_PHOTO_STORAGE_KEY,
+      JSON.stringify([ownPhoto, ...savedPhotos].slice(0, 50)),
+    );
+  } catch {
+    // The first sleeping photo is helpful, but onboarding should still finish.
+  }
 }
 
 function getCatAvatarSrc(coat?: string): string {
