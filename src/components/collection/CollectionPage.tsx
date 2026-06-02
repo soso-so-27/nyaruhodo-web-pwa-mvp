@@ -77,11 +77,16 @@ type BoxPreviewPhoto = {
   id: string;
   src: string;
   catId?: string;
+  shared?: boolean;
+  createdAt?: number;
 };
 
 const OWN_SLEEPING_BOX_STORAGE_KEY = "nyaruhodo_exchange_own_sleeping_photos";
 const KEPT_OTHER_BOX_STORAGE_KEY = "nyaruhodo_exchange_kept_photos";
+const SHARED_SLEEPING_BOX_STORAGE_KEY = "nyaruhodo_exchange_shared_photos";
+const REPORTED_OTHER_BOX_STORAGE_KEY = "nyaruhodo_exchange_reported_photos";
 const BOX_PHOTO_STORAGE_EVENT = "nyaruhodo_box_photos_updated";
+type BoxDetailKind = "sleeping" | "other";
 
 export function CollectionPage() {
   const [catProfiles, setCatProfiles] = useState<CatProfile[]>([]);
@@ -98,6 +103,10 @@ export function CollectionPage() {
   const [isCatSheetOpen, setIsCatSheetOpen] = useState(false);
   const [toastText, setToastText] = useState("");
   const [boxRefreshTick, setBoxRefreshTick] = useState(0);
+  const [selectedBoxKind, setSelectedBoxKind] = useState<BoxDetailKind | null>(
+    null,
+  );
+  const [currentBoxPhotoIndex, setCurrentBoxPhotoIndex] = useState(0);
   const toastTimerRef = useRef<number | null>(null);
   const trackedViewCatIdRef = useRef<string | null>(null);
   const trackedDailyTargetRef = useRef<string | null>(null);
@@ -199,6 +208,12 @@ export function CollectionPage() {
     () => readBoxPreviewPhotos(KEPT_OTHER_BOX_STORAGE_KEY),
     [boxRefreshTick, hasLoaded],
   );
+  const selectedBoxPhotos =
+    selectedBoxKind === "sleeping"
+      ? sleepingBoxPhotos
+      : selectedBoxKind === "other"
+        ? otherBoxPhotos
+        : [];
   const awakeBoxPhotos = useMemo(
     () =>
       storedCollectionPhotos.map((photo) => ({
@@ -292,6 +307,89 @@ export function CollectionPage() {
     setSelectedSlug(null);
   }
 
+  function openBoxDetail(kind: BoxDetailKind) {
+    setSelectedBoxKind(kind);
+    setCurrentBoxPhotoIndex(0);
+    trackProductEvent(
+      "collection_box_detail_opened",
+      { kind },
+      { localCatId: activeCatId },
+    );
+  }
+
+  function closeBoxDetail() {
+    if (selectedBoxKind) {
+      trackProductEvent(
+        "collection_box_detail_closed",
+        {
+          kind: selectedBoxKind,
+          current_photo_index: currentBoxPhotoIndex,
+          photo_count: selectedBoxPhotos.length,
+        },
+        { localCatId: activeCatId },
+      );
+    }
+
+    setSelectedBoxKind(null);
+    setCurrentBoxPhotoIndex(0);
+  }
+
+  function handleBoxPhotoScroll(event: UIEvent<HTMLDivElement>) {
+    const element = event.currentTarget;
+    const index = Math.round(element.scrollLeft / element.offsetWidth);
+
+    if (index !== currentBoxPhotoIndex) {
+      setCurrentBoxPhotoIndex(index);
+    }
+  }
+
+  function handleToggleSleepingPhotoDelivery(photo: BoxPreviewPhoto) {
+    const nextShared = !photo.shared;
+
+    updateOwnSleepingPhotoDelivery(photo.id, nextShared);
+    setBoxRefreshTick((value) => value + 1);
+    showToast(nextShared ? "とどくようにしました" : "自分だけにしました");
+    trackProductEvent(
+      "collection_sleeping_photo_delivery_toggled",
+      {
+        photo_id: photo.id,
+        shared: nextShared,
+      },
+      { localCatId: activeCatId },
+    );
+  }
+
+  function handleDeleteSleepingPhoto(photo: BoxPreviewPhoto) {
+    deleteOwnSleepingPhoto(photo.id);
+    setBoxRefreshTick((value) => value + 1);
+    setCurrentBoxPhotoIndex((current) =>
+      Math.max(0, Math.min(current, sleepingBoxPhotos.length - 2)),
+    );
+    showToast("とったねがおから外しました");
+    trackProductEvent(
+      "collection_sleeping_photo_deleted",
+      { photo_id: photo.id },
+      { localCatId: activeCatId },
+    );
+  }
+
+  function handleHideOtherPhoto(photo: BoxPreviewPhoto, reason: "hide" | "report") {
+    hideKeptOtherPhoto(photo.id, reason);
+    setBoxRefreshTick((value) => value + 1);
+    setCurrentBoxPhotoIndex((current) =>
+      Math.max(0, Math.min(current, otherBoxPhotos.length - 2)),
+    );
+    showToast(reason === "report" ? "通報して非表示にしました" : "アルバムから外しました");
+    trackProductEvent(
+      "collection_other_photo_hidden",
+      {
+        photo_id: photo.id,
+        reason,
+      },
+      { localCatId: activeCatId },
+    );
+  }
+
   function handleCatSelect(catId: string) {
     const nextActiveProfile = getActiveCatProfile(catProfiles, catId);
 
@@ -306,8 +404,10 @@ export function CollectionPage() {
     saveActiveCatId(nextActiveProfile.id);
     setActiveCatId(nextActiveProfile.id);
     setSelectedSlug(null);
+    setSelectedBoxKind(null);
     setCompletedSlug(null);
     setCurrentPhotoIndex(0);
+    setCurrentBoxPhotoIndex(0);
     setIsCatSheetOpen(false);
   }
 
@@ -619,8 +719,22 @@ export function CollectionPage() {
           sleepingPhotos={sleepingBoxPhotos}
           awakePhotos={awakeBoxPhotos}
           otherPhotos={otherBoxPhotos}
+          onOpenBox={openBoxDetail}
         />
       </div>
+      {selectedBoxKind ? (
+        <BoxPhotoDetailSheet
+          kind={selectedBoxKind}
+          photos={selectedBoxPhotos}
+          currentPhotoIndex={currentBoxPhotoIndex}
+          onClose={closeBoxDetail}
+          onPhotoScroll={handleBoxPhotoScroll}
+          onToggleSleepingDelivery={handleToggleSleepingPhotoDelivery}
+          onDeleteSleepingPhoto={handleDeleteSleepingPhoto}
+          onHideOtherPhoto={(photo) => handleHideOtherPhoto(photo, "hide")}
+          onReportOtherPhoto={(photo) => handleHideOtherPhoto(photo, "report")}
+        />
+      ) : null}
       {selectedSlot ? (
         <CollectionPhotoSheet
           slot={selectedSlot}
@@ -682,16 +796,19 @@ function BoxOverview({
   sleepingPhotos,
   awakePhotos,
   otherPhotos,
+  onOpenBox,
 }: {
   sleepingPhotos: BoxPreviewPhoto[];
   awakePhotos: BoxPreviewPhoto[];
   otherPhotos: BoxPreviewPhoto[];
+  onOpenBox: (kind: BoxDetailKind) => void;
 }) {
   return (
     <section style={styles.boxOverview} aria-label="アルバム">
       <BoxSummaryCard
         title="とったねがお"
         photos={sleepingPhotos}
+        onOpen={() => onOpenBox("sleeping")}
       />
       <BoxSummaryCard
         title="おきてる写真"
@@ -701,6 +818,7 @@ function BoxOverview({
       <BoxSummaryCard
         title="とどいたねがお"
         photos={otherPhotos}
+        onOpen={() => onOpenBox("other")}
       />
     </section>
   );
@@ -710,10 +828,12 @@ function BoxSummaryCard({
   title,
   photos,
   showAddSlot = false,
+  onOpen,
 }: {
   title: string;
   photos: BoxPreviewPhoto[];
   showAddSlot?: boolean;
+  onOpen?: () => void;
 }) {
   const visiblePhotos = photos.slice(0, 4);
   const emptySlotCount = Math.max(
@@ -724,7 +844,15 @@ function BoxSummaryCard({
   const countLabel = photos.length > 0 ? `${photos.length}枚` : "まだなし";
 
   return (
-    <article style={styles.boxSummaryCard}>
+    <button
+      type="button"
+      style={{
+        ...styles.boxSummaryCard,
+        ...(onOpen ? styles.boxSummaryButton : styles.boxSummaryStatic),
+      }}
+      onClick={onOpen}
+      disabled={!onOpen}
+    >
       <div style={styles.boxSummaryHeader}>
         <div>
           <h2 style={styles.boxSummaryTitle}>{title}</h2>
@@ -755,7 +883,121 @@ function BoxSummaryCard({
           </span>
         ))}
       </div>
-    </article>
+    </button>
+  );
+}
+
+function BoxPhotoDetailSheet({
+  kind,
+  photos,
+  currentPhotoIndex,
+  onClose,
+  onPhotoScroll,
+  onToggleSleepingDelivery,
+  onDeleteSleepingPhoto,
+  onHideOtherPhoto,
+  onReportOtherPhoto,
+}: {
+  kind: BoxDetailKind;
+  photos: BoxPreviewPhoto[];
+  currentPhotoIndex: number;
+  onClose: () => void;
+  onPhotoScroll: (event: UIEvent<HTMLDivElement>) => void;
+  onToggleSleepingDelivery: (photo: BoxPreviewPhoto) => void;
+  onDeleteSleepingPhoto: (photo: BoxPreviewPhoto) => void;
+  onHideOtherPhoto: (photo: BoxPreviewPhoto) => void;
+  onReportOtherPhoto: (photo: BoxPreviewPhoto) => void;
+}) {
+  const title = kind === "sleeping" ? "とったねがお" : "とどいたねがお";
+  const currentPhoto =
+    photos[Math.max(0, Math.min(currentPhotoIndex, photos.length - 1))] ?? null;
+
+  return (
+    <AppBottomSheet title={title} onClose={onClose}>
+      {photos.length > 0 ? (
+        <div style={styles.sheetPhotoArea}>
+          <div style={styles.photoScroll} onScroll={onPhotoScroll}>
+            {photos.map((photo) => (
+              <div key={photo.id} style={styles.photoSlide}>
+                <img src={photo.src} alt="" style={styles.photoImg} />
+                {kind === "sleeping" ? (
+                  <span style={styles.boxPhotoStateBadge}>
+                    {photo.shared ? "とどく" : "自分だけ"}
+                  </span>
+                ) : null}
+              </div>
+            ))}
+          </div>
+          {photos.length > 1 ? (
+            <div style={styles.photoDots}>
+              {photos.map((photo, index) => (
+                <div
+                  key={`${photo.id}-dot`}
+                  style={
+                    index === currentPhotoIndex
+                      ? { ...styles.photoDot, ...styles.photoDotActive }
+                      : styles.photoDot
+                  }
+                />
+              ))}
+            </div>
+          ) : null}
+        </div>
+      ) : (
+        <div style={styles.photoEmpty}>
+          <span style={styles.photoEmptyText}>
+            {kind === "sleeping" ? "ねがおを入れると、ここに並びます" : "とっておくと、ここに並びます"}
+          </span>
+        </div>
+      )}
+
+      {currentPhoto ? (
+        kind === "sleeping" ? (
+          <div style={styles.boxDetailActions}>
+            <div style={styles.boxPhotoStatusRow}>
+              <span style={styles.boxPhotoStatusLabel}>届く設定</span>
+              <span style={styles.boxPhotoStatusValue}>
+                {currentPhoto.shared ? "とどく" : "自分だけ"}
+              </span>
+            </div>
+            <button
+              type="button"
+              style={styles.btnPrimary}
+              onClick={() => onToggleSleepingDelivery(currentPhoto)}
+            >
+              {currentPhoto.shared ? "自分だけにする" : "とどくようにする"}
+            </button>
+            <button
+              type="button"
+              style={styles.btnSecondary}
+              onClick={() => onDeleteSleepingPhoto(currentPhoto)}
+            >
+              とったねがおから外す
+            </button>
+          </div>
+        ) : (
+          <div style={styles.boxDetailActions}>
+            <p style={styles.boxDetailNote}>
+              不安な写真は、反応せずに非表示にできます。
+            </p>
+            <button
+              type="button"
+              style={styles.btnPrimary}
+              onClick={() => onReportOtherPhoto(currentPhoto)}
+            >
+              通報して非表示
+            </button>
+            <button
+              type="button"
+              style={styles.btnSecondary}
+              onClick={() => onHideOtherPhoto(currentPhoto)}
+            >
+              アルバムから外す
+            </button>
+          </div>
+        )
+      ) : null}
+    </AppBottomSheet>
   );
 }
 
@@ -887,7 +1129,7 @@ function CollectionShareView({
         <p style={styles.shareEmptyTitle}>まだ写真がありません</p>
         <p style={styles.shareEmptyText}>写真を見つけると、ここに自分の一枚が並びます。</p>
         <button type="button" style={styles.shareEmptyButton} onClick={onGoCollect}>
-          写真を残す
+          写真を入れる
         </button>
       </section>
     );
@@ -1199,7 +1441,7 @@ function CollectionPhotoSheet({
         </div>
       ) : (
         <div style={styles.photoEmpty}>
-          <span style={styles.photoEmptyText}>見つけたら写真を残す</span>
+          <span style={styles.photoEmptyText}>見つけたら写真を入れる</span>
         </div>
       )}
 
@@ -1599,6 +1841,140 @@ function readBoxPreviewPhotos(
   }
 }
 
+function updateOwnSleepingPhotoDelivery(photoId: string, shared: boolean) {
+  if (typeof window === "undefined") {
+    return;
+  }
+
+  try {
+    const raw = window.localStorage.getItem(OWN_SLEEPING_BOX_STORAGE_KEY);
+    const parsed = raw ? (JSON.parse(raw) as BoxPreviewPhoto[]) : [];
+    const targetPhoto = parsed.find((photo) => photo.id === photoId);
+    const nextPhotos = parsed.map((photo) =>
+      photo.id === photoId ? { ...photo, shared } : photo,
+    );
+
+    window.localStorage.setItem(
+      OWN_SLEEPING_BOX_STORAGE_KEY,
+      JSON.stringify(nextPhotos),
+    );
+
+    if (targetPhoto?.src) {
+      if (shared) {
+        addSharedSleepingPhoto(targetPhoto);
+      } else {
+        removeSharedSleepingPhotoBySrc(targetPhoto.src);
+      }
+    }
+
+    window.dispatchEvent(new Event(BOX_PHOTO_STORAGE_EVENT));
+  } catch {
+    // Local MVP storage should not block album use.
+  }
+}
+
+function deleteOwnSleepingPhoto(photoId: string) {
+  if (typeof window === "undefined") {
+    return;
+  }
+
+  try {
+    const raw = window.localStorage.getItem(OWN_SLEEPING_BOX_STORAGE_KEY);
+    const parsed = raw ? (JSON.parse(raw) as BoxPreviewPhoto[]) : [];
+    const targetPhoto = parsed.find((photo) => photo.id === photoId);
+    const nextPhotos = parsed.filter((photo) => photo.id !== photoId);
+
+    window.localStorage.setItem(
+      OWN_SLEEPING_BOX_STORAGE_KEY,
+      JSON.stringify(nextPhotos),
+    );
+
+    if (targetPhoto?.src) {
+      removeSharedSleepingPhotoBySrc(targetPhoto.src);
+    }
+
+    window.dispatchEvent(new Event(BOX_PHOTO_STORAGE_EVENT));
+  } catch {
+    // Local MVP storage should not block album use.
+  }
+}
+
+function addSharedSleepingPhoto(photo: BoxPreviewPhoto) {
+  try {
+    const raw = window.localStorage.getItem(SHARED_SLEEPING_BOX_STORAGE_KEY);
+    const parsed = raw ? (JSON.parse(raw) as BoxPreviewPhoto[]) : [];
+
+    if (parsed.some((sharedPhoto) => sharedPhoto.src === photo.src)) {
+      return;
+    }
+
+    const sharedPhoto = {
+      id: `shared-sleeping-${Date.now()}`,
+      src: photo.src,
+      title: "とったねがお",
+      subtitle: "",
+      tags: ["sleeping", "ねてる"],
+    };
+
+    window.localStorage.setItem(
+      SHARED_SLEEPING_BOX_STORAGE_KEY,
+      JSON.stringify([sharedPhoto, ...parsed].slice(0, 30)),
+    );
+  } catch {
+    // Sharing can be retried later from the album.
+  }
+}
+
+function removeSharedSleepingPhotoBySrc(src: string) {
+  try {
+    const raw = window.localStorage.getItem(SHARED_SLEEPING_BOX_STORAGE_KEY);
+    const parsed = raw ? (JSON.parse(raw) as BoxPreviewPhoto[]) : [];
+    const nextPhotos = parsed.filter((photo) => photo.src !== src);
+
+    window.localStorage.setItem(
+      SHARED_SLEEPING_BOX_STORAGE_KEY,
+      JSON.stringify(nextPhotos),
+    );
+  } catch {
+    // Sharing can be retried later from the album.
+  }
+}
+
+function hideKeptOtherPhoto(photoId: string, reason: "hide" | "report") {
+  if (typeof window === "undefined") {
+    return;
+  }
+
+  try {
+    const raw = window.localStorage.getItem(KEPT_OTHER_BOX_STORAGE_KEY);
+    const parsed = raw ? (JSON.parse(raw) as BoxPreviewPhoto[]) : [];
+    const targetPhoto = parsed.find((photo) => photo.id === photoId);
+    const nextPhotos = parsed.filter((photo) => photo.id !== photoId);
+
+    window.localStorage.setItem(
+      KEPT_OTHER_BOX_STORAGE_KEY,
+      JSON.stringify(nextPhotos),
+    );
+
+    if (reason === "report" && targetPhoto) {
+      const reportRaw = window.localStorage.getItem(REPORTED_OTHER_BOX_STORAGE_KEY);
+      const reports = reportRaw ? (JSON.parse(reportRaw) as BoxPreviewPhoto[]) : [];
+
+      window.localStorage.setItem(
+        REPORTED_OTHER_BOX_STORAGE_KEY,
+        JSON.stringify([
+          { ...targetPhoto, reportedAt: Date.now() },
+          ...reports,
+        ].slice(0, 50)),
+      );
+    }
+
+    window.dispatchEvent(new Event(BOX_PHOTO_STORAGE_EVENT));
+  } catch {
+    // Local MVP storage should not block album use.
+  }
+}
+
 function buildCollectionShareFeed(
   photos: CollectionPhoto[],
   catName: string,
@@ -1989,8 +2365,25 @@ const styles = {
     position: "relative",
     display: "grid",
     gap: "22px",
+    width: "100%",
     padding: "28px 0 30px",
     borderBottom: "0.5px solid rgba(79,73,63,0.16)",
+    font: "inherit",
+    textAlign: "left",
+  },
+  boxSummaryButton: {
+    borderTop: "none",
+    borderRight: "none",
+    borderLeft: "none",
+    background: "transparent",
+    cursor: "pointer",
+  },
+  boxSummaryStatic: {
+    borderTop: "none",
+    borderRight: "none",
+    borderLeft: "none",
+    background: "transparent",
+    cursor: "default",
   },
   boxSummaryHeader: {
     display: "flex",
@@ -2715,6 +3108,19 @@ const styles = {
     height: "100%",
     objectFit: "cover",
   },
+  boxPhotoStateBadge: {
+    position: "absolute",
+    left: "12px",
+    top: "12px",
+    borderRadius: "999px",
+    background: "rgba(255,255,255,0.88)",
+    color: "#2a2a28",
+    fontSize: "12px",
+    fontWeight: 620,
+    lineHeight: 1,
+    padding: "6px 10px",
+    boxShadow: "0 6px 18px rgba(0,0,0,0.14)",
+  },
   deleteBtn: {
     position: "absolute",
     top: "10px",
@@ -2762,6 +3168,35 @@ const styles = {
     gridTemplateColumns: "1fr 1fr",
     gap: "8px",
     padding: "12px 16px 0",
+  },
+  boxDetailActions: {
+    display: "grid",
+    gap: "8px",
+    padding: "12px 16px 0",
+  },
+  boxPhotoStatusRow: {
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: "12px",
+    padding: "2px 2px 8px",
+  },
+  boxPhotoStatusLabel: {
+    color: COLLECTION_MUTED,
+    fontSize: "12px",
+    fontWeight: 560,
+  },
+  boxPhotoStatusValue: {
+    color: COLLECTION_TEXT_STRONG,
+    fontSize: "13px",
+    fontWeight: 650,
+  },
+  boxDetailNote: {
+    margin: "0 0 4px",
+    color: COLLECTION_MUTED,
+    fontSize: "12.5px",
+    fontWeight: 520,
+    lineHeight: 1.5,
   },
   completionBody: {
     display: "grid",

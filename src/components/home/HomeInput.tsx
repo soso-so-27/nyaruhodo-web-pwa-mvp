@@ -1323,7 +1323,7 @@ export function HomeInput({ recentEvents: _recentEvents }: HomeInputProps) {
     keepExchangePhoto(photo);
     setCollectionRefreshTick((value) => value + 1);
     setDeliveredExchangePhoto(null);
-    showToast("とっておきました");
+    showToast("アルバムに入りました");
     trackProductEvent(
       "home_exchange_photo_kept",
       {
@@ -2172,7 +2172,7 @@ function MikkeWindowContent({
               onClick={() => onAddPhoto(photoSlot)}
               disabled={isPhotoAdding}
             >
-              {isPhotoAdding ? "追加中..." : "写真も残す"}
+              {isPhotoAdding ? "追加中..." : "写真も入れる"}
             </button>
           ) : null}
         </div>
@@ -2672,7 +2672,7 @@ function HomeBulletinBoard({
       onTouchStart={handleTouchStart}
       onTouchEnd={handleTouchEnd}
       onClick={isOpen ? () => setIsOpen(false) : undefined}
-      aria-label={isOpen ? "うちの子らしさ" : "すぐ残す"}
+      aria-label={isOpen ? "うちの子らしさ" : "すぐ入れる"}
     >
       <div
         style={{
@@ -3478,9 +3478,9 @@ function buildHomeBoardItems({
       kind: "collection",
       priority: 45,
       title: "今日の1枚",
-      body: "写真で残す",
+      body: "写真を入れる",
       icon: "camera",
-      actionLabel: "写真で残す",
+      actionLabel: "写真を入れる",
       actionType: "open_collection_photo",
       surfaceText: collectionTargetLabel,
     });
