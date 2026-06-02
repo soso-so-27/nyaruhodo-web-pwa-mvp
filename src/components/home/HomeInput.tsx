@@ -1150,13 +1150,30 @@ export function HomeInput({ recentEvents: _recentEvents }: HomeInputProps) {
     const input = document.createElement("input");
     input.type = "file";
     input.accept = "image/*";
+    input.tabIndex = -1;
+    input.setAttribute("aria-hidden", "true");
+    input.style.position = "fixed";
+    input.style.left = "-9999px";
+    input.style.top = "0";
+    input.style.width = "1px";
+    input.style.height = "1px";
+    input.style.opacity = "0";
     if (source === "camera") {
       input.setAttribute("capture", "environment");
     }
 
+    const cleanupInput = () => {
+      window.setTimeout(() => {
+        input.remove();
+      }, 0);
+    };
+
     input.onchange = async () => {
       const file = input.files?.[0];
-      if (!file) return;
+      if (!file) {
+        cleanupInput();
+        return;
+      }
 
       setIsExchangePhotoAdding(true);
 
@@ -1184,10 +1201,17 @@ export function HomeInput({ recentEvents: _recentEvents }: HomeInputProps) {
         showToast("写真を読み込めませんでした");
       } finally {
         setIsExchangePhotoAdding(false);
+        cleanupInput();
       }
     };
 
+    document.body.appendChild(input);
     input.click();
+    window.setTimeout(() => {
+      if (!input.files?.length) {
+        input.remove();
+      }
+    }, 60000);
   }
 
   function handleSleepingPhotoStart(source: SleepingPhotoSource = "camera") {
