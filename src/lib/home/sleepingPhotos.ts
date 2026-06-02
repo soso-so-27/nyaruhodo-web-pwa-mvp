@@ -295,6 +295,38 @@ export function dismissExchangePhoto(photo: ExchangePhoto) {
   }
 }
 
+export function reportExchangePhoto(photo: ExchangePhoto) {
+  try {
+    const reported = readStorageArray<Partial<ExchangePhoto>>(
+      REPORTED_EXCHANGE_PHOTO_STORAGE_KEY,
+    );
+    const dismissed = readStorageArray<Partial<ExchangePhoto>>(
+      DISMISSED_EXCHANGE_PHOTO_STORAGE_KEY,
+    );
+    const reportedPhoto = {
+      ...photo,
+      reportedAt: Date.now(),
+    };
+    const dismissedPhoto = {
+      id: photo.id,
+      sourcePhotoId: photo.sourcePhotoId,
+      src: photo.src,
+      dismissedAt: Date.now(),
+    };
+
+    writeStorageArray(
+      REPORTED_EXCHANGE_PHOTO_STORAGE_KEY,
+      [reportedPhoto, ...reported].slice(0, 50),
+    );
+    writeStorageArray(
+      DISMISSED_EXCHANGE_PHOTO_STORAGE_KEY,
+      [dismissedPhoto, ...dismissed].slice(0, 80),
+    );
+  } catch {
+    // Reporting is a safety action, but it should still let the user close.
+  }
+}
+
 export function hideKeptExchangePhoto(
   photoId: string,
   reason: HiddenExchangePhotoReason,

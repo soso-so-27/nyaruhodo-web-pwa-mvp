@@ -41,6 +41,7 @@ import {
   keepExchangePhoto,
   readKeptExchangePhotoCount,
   readOwnSleepingPhotoCount,
+  reportExchangePhoto,
   saveOwnSleepingPhoto,
   saveSharedExchangePhoto,
   selectDeliverableSleepingPhoto,
@@ -1330,6 +1331,22 @@ export function HomeInput({ recentEvents: _recentEvents }: HomeInputProps) {
     );
   }
 
+  function handleReportExchangePhoto(photo: ExchangePhoto) {
+    reportExchangePhoto(photo);
+    setDeliveredExchangePhoto(null);
+    showToast("通報して閉じました");
+    trackProductEvent(
+      "home_exchange_photo_reported",
+      {
+        photo_id: photo.id,
+        source_photo_id: photo.sourcePhotoId,
+        trigger_label: photo.triggerLabel,
+        theme: photo.theme,
+      },
+      { localCatId: activeCatId },
+    );
+  }
+
   function handleConfirmExchangeSharePhoto(photo: PendingExchangeSharePhoto) {
     const targetCatId = pendingExchangeCatId ?? activeCatId;
     if (!targetCatId) return;
@@ -1474,6 +1491,7 @@ export function HomeInput({ recentEvents: _recentEvents }: HomeInputProps) {
           photo={deliveredExchangePhoto}
           onKeep={() => handleKeepExchangePhoto(deliveredExchangePhoto)}
           onClose={() => handleCloseExchangePhoto(deliveredExchangePhoto)}
+          onReport={() => handleReportExchangePhoto(deliveredExchangePhoto)}
         />
       ) : null}
 
@@ -2310,10 +2328,12 @@ function ExchangePhotoSheet({
   photo,
   onKeep,
   onClose,
+  onReport,
 }: {
   photo: ExchangePhoto;
   onKeep: () => void;
   onClose: () => void;
+  onReport: () => void;
 }) {
   return (
     <div style={styles.exchangeBackdrop} onClick={onClose}>
@@ -2324,6 +2344,15 @@ function ExchangePhotoSheet({
       >
         <div style={styles.exchangeHeader}>
           <span style={styles.exchangeKicker}>ねがおがとどきました</span>
+          <button
+            type="button"
+            aria-label="通報して閉じる"
+            title="通報して閉じる"
+            style={styles.exchangeReportButton}
+            onClick={onReport}
+          >
+            <AppIcon name="flag" size={18} />
+          </button>
         </div>
         <div style={styles.exchangePhotoFrame}>
           <img src={photo.src} alt="" style={styles.exchangePhoto} />
@@ -5125,7 +5154,7 @@ const styles = {
   exchangeHeader: {
     display: "flex",
     alignItems: "center",
-    justifyContent: "flex-start",
+    justifyContent: "space-between",
     gap: "12px",
     marginBottom: "5px",
   },
@@ -5134,6 +5163,18 @@ const styles = {
     fontSize: "14px",
     fontWeight: 620,
     lineHeight: 1.2,
+  },
+  exchangeReportButton: {
+    display: "grid",
+    placeItems: "center",
+    width: "34px",
+    height: "34px",
+    border: "0.5px solid rgba(86,78,64,0.14)",
+    borderRadius: "50%",
+    background: "rgba(255,255,255,0.54)",
+    color: "#716b60",
+    cursor: "pointer",
+    flexShrink: 0,
   },
   exchangeLead: {
     margin: "0 0 12px",
