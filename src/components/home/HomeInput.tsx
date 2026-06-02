@@ -36,6 +36,19 @@ import {
   submitMikkeWindowAnswer,
 } from "../../lib/home/mikkeWindowResults";
 import {
+  BOX_PHOTO_STORAGE_EVENT,
+  dismissExchangePhoto,
+  keepExchangePhoto,
+  readKeptExchangePhotoCount,
+  readOwnSleepingPhotoCount,
+  saveOwnSleepingPhoto,
+  saveSharedExchangePhoto,
+  selectDeliverableSleepingPhoto,
+  type ExchangePhoto,
+  type ExchangePhotoPoolItem,
+} from "../../lib/home/sleepingPhotos";
+import { backupOwnSleepingPhotoMoment } from "../../lib/home/sleepingPhotoBackup";
+import {
   STORAGE_KEYS,
   getDiscoveryLogKey,
   getLockDataKey,
@@ -176,24 +189,6 @@ type HomeCatCounter = {
   count: number;
 };
 
-type ExchangePhoto = {
-  id: string;
-  src: string;
-  title: string;
-  subtitle: string;
-  triggerLabel: string;
-  theme: string;
-  deliveredAt: number;
-};
-
-type ExchangePhotoPoolItem = {
-  id: string;
-  src: string;
-  title: string;
-  subtitle: string;
-  tags: readonly string[];
-};
-
 type PendingExchangeSharePhoto = {
   src: string;
   triggerLabel: string;
@@ -203,23 +198,8 @@ type PendingExchangeSharePhoto = {
 
 type SleepingPhotoSource = "camera" | "library";
 
-type OwnExchangePhoto = {
-  id: string;
-  catId: string;
-  src: string;
-  triggerLabel: string;
-  theme: string;
-  shared: boolean;
-  createdAt: number;
-};
-
-const EXCHANGE_PHOTO_STORAGE_KEY = "nyaruhodo_exchange_kept_photos";
-const EXCHANGE_SHARED_PHOTO_STORAGE_KEY = "nyaruhodo_exchange_shared_photos";
-const EXCHANGE_OWN_SLEEPING_PHOTO_STORAGE_KEY =
-  "nyaruhodo_exchange_own_sleeping_photos";
 const SLEEPING_SAFETY_ACCEPTED_STORAGE_KEY =
   "nyaruhodo_sleeping_safety_accepted";
-const BOX_PHOTO_STORAGE_EVENT = "nyaruhodo_box_photos_updated";
 
 const EXCHANGE_PHOTO_POOL: ExchangePhotoPoolItem[] = [
   {
@@ -1304,6 +1284,7 @@ export function HomeInput({ recentEvents: _recentEvents }: HomeInputProps) {
       category,
       seed: `${localCatId ?? activeCatId ?? "cat"}:${Date.now()}`,
       excludePhotoId,
+      recipientCatId: localCatId ?? activeCatId,
     });
 
     setDeliveredExchangePhoto(photo);
@@ -1336,6 +1317,7 @@ export function HomeInput({ recentEvents: _recentEvents }: HomeInputProps) {
   }
 
   function handleCloseExchangePhoto(photo: ExchangePhoto) {
+    dismissExchangePhoto(photo);
     setDeliveredExchangePhoto(null);
     trackProductEvent(
       "home_exchange_photo_closed",
@@ -1359,11 +1341,20 @@ export function HomeInput({ recentEvents: _recentEvents }: HomeInputProps) {
       Date.now(),
     );
 
-    if (!saveOwnExchangePhoto(targetCatId, photo, true)) {
+    const ownPhoto = saveOwnSleepingPhoto({
+      catId: targetCatId,
+      src: photo.src,
+      triggerLabel: photo.triggerLabel,
+      theme: photo.theme,
+      shared: true,
+    });
+
+    if (!ownPhoto) {
       showToast("写真を保存できませんでした");
       return;
     }
-    const sharedPhoto = saveSharedExchangePhoto(photo);
+    void backupOwnSleepingPhotoMoment(ownPhoto);
+    const sharedPhoto = saveSharedExchangePhoto({ ownPhoto });
     setCollectionRefreshTick((value) => value + 1);
     setPendingExchangeSharePhoto(null);
     setPendingExchangeCatId(null);
@@ -1408,10 +1399,19 @@ export function HomeInput({ recentEvents: _recentEvents }: HomeInputProps) {
     const targetCatId = pendingExchangeCatId ?? activeCatId;
     if (!targetCatId) return;
 
-    if (!saveOwnExchangePhoto(targetCatId, photo, false)) {
+    const ownPhoto = saveOwnSleepingPhoto({
+      catId: targetCatId,
+      src: photo.src,
+      triggerLabel: photo.triggerLabel,
+      theme: photo.theme,
+      shared: false,
+    });
+
+    if (!ownPhoto) {
       showToast("写真を保存できませんでした");
       return;
     }
+    void backupOwnSleepingPhotoMoment(ownPhoto);
     setCollectionRefreshTick((value) => value + 1);
     setPendingExchangeSharePhoto(null);
     setPendingExchangeCatId(null);
@@ -2973,42 +2973,6 @@ function formatPhotoCount(count: number) {
   return count > 0 ? `${count}枚` : "まだなし";
 }
 
-function readOwnSleepingPhotoCount(activeCatId: string | null) {
-  if (typeof window === "undefined") {
-    return 0;
-  }
-
-  try {
-    const raw = window.localStorage.getItem(EXCHANGE_OWN_SLEEPING_PHOTO_STORAGE_KEY);
-    const parsed = raw ? (JSON.parse(raw) as Partial<OwnExchangePhoto>[]) : [];
-
-    if (!Array.isArray(parsed)) {
-      return 0;
-    }
-
-    return parsed.filter((photo) =>
-      activeCatId ? photo.catId === activeCatId : Boolean(photo.src),
-    ).length;
-  } catch {
-    return 0;
-  }
-}
-
-function readKeptExchangePhotoCount() {
-  if (typeof window === "undefined") {
-    return 0;
-  }
-
-  try {
-    const raw = window.localStorage.getItem(EXCHANGE_PHOTO_STORAGE_KEY);
-    const parsed = raw ? (JSON.parse(raw) as Partial<ExchangePhoto>[]) : [];
-
-    return Array.isArray(parsed) ? parsed.length : 0;
-  } catch {
-    return 0;
-  }
-}
-
 function getBoardTransitionSource(
   event: MouseEvent<HTMLElement>,
   item: HomeBoardItem,
@@ -3592,47 +3556,29 @@ function createExchangePhoto({
   category,
   seed,
   excludePhotoId,
+  recipientCatId,
 }: {
   triggerLabel: string;
   theme: string;
   category: MikkeWindowCategory | "sleep";
   seed: string;
   excludePhotoId?: string;
+  recipientCatId?: string | null;
 }): ExchangePhoto {
-  const normalizedTheme = theme.toLowerCase();
-  const sharedPool = readSharedExchangePhotos().filter(
-    (photo) => photo.id !== excludePhotoId,
-  );
-  const samplePool = EXCHANGE_PHOTO_POOL.filter(
-    (photo) => photo.id !== excludePhotoId,
-  );
-  const sharedCandidates = sharedPool.filter((photo) =>
-    photo.tags.some(
-      (tag) =>
-        tag.toLowerCase() === normalizedTheme ||
-        tag === triggerLabel ||
-        tag === category,
-    ),
-  );
-  const sampleCandidates = samplePool.filter((photo) =>
-    photo.tags.some(
-      (tag) =>
-        tag.toLowerCase() === normalizedTheme ||
-        tag === triggerLabel ||
-        tag === category,
-    ),
-  );
-  const pool =
-    sharedCandidates.length > 0
-      ? sharedCandidates
-      : sampleCandidates.length > 0
-        ? sampleCandidates
-        : samplePool;
-  const index = hashText(`${seed}:${triggerLabel}:${theme}`) % pool.length;
-  const selected = pool[index];
+  const selected =
+    selectDeliverableSleepingPhoto({
+      triggerLabel,
+      theme,
+      category,
+      seed,
+      samplePool: EXCHANGE_PHOTO_POOL,
+      excludePhotoId,
+      recipientCatId,
+    }).photo ?? EXCHANGE_PHOTO_POOL[0];
 
   return {
     id: `${selected.id}-${Date.now()}`,
+    sourcePhotoId: selected.id,
     src: selected.src,
     title: selected.title,
     subtitle: selected.subtitle,
@@ -3640,20 +3586,6 @@ function createExchangePhoto({
     theme,
     deliveredAt: Date.now(),
   };
-}
-
-function keepExchangePhoto(photo: ExchangePhoto) {
-  try {
-    const raw = window.localStorage.getItem(EXCHANGE_PHOTO_STORAGE_KEY);
-    const saved = raw ? (JSON.parse(raw) as ExchangePhoto[]) : [];
-
-    window.localStorage.setItem(
-      EXCHANGE_PHOTO_STORAGE_KEY,
-      JSON.stringify([photo, ...saved].slice(0, 50)),
-    );
-  } catch {
-    // The received photo is a soft reward, so storage failure should not block the flow.
-  }
 }
 
 function hasAcceptedSleepingSafetyNotice() {
@@ -3676,104 +3608,6 @@ function markSleepingSafetyNoticeAccepted() {
   }
 }
 
-function saveOwnExchangePhoto(
-  catId: string,
-  photo: PendingExchangeSharePhoto,
-  shared: boolean,
-) {
-  try {
-    const raw = window.localStorage.getItem(EXCHANGE_OWN_SLEEPING_PHOTO_STORAGE_KEY);
-    const parsed = raw ? (JSON.parse(raw) as unknown) : [];
-    const saved = Array.isArray(parsed) ? (parsed as OwnExchangePhoto[]) : [];
-    const createdAt = Date.now();
-    const ownPhoto: OwnExchangePhoto = {
-      id: `own-sleeping-${createdAt}`,
-      catId,
-      src: photo.src,
-      triggerLabel: photo.triggerLabel,
-      theme: photo.theme,
-      shared,
-      createdAt,
-    };
-
-    const nextPhotos = [ownPhoto, ...saved];
-    const keepCounts = [24, 12, 6, 1];
-
-    for (const keepCount of keepCounts) {
-      try {
-        window.localStorage.setItem(
-          EXCHANGE_OWN_SLEEPING_PHOTO_STORAGE_KEY,
-          JSON.stringify(nextPhotos.slice(0, keepCount)),
-        );
-        window.dispatchEvent(new Event(BOX_PHOTO_STORAGE_EVENT));
-        return true;
-      } catch {
-        // Retry with fewer older photos if local storage is near its limit.
-      }
-    }
-
-    return false;
-  } catch {
-    // A sleeping photo should feel lightweight; storage failure should not trap the user.
-    return false;
-  }
-}
-
-function saveSharedExchangePhoto(
-  photo: PendingExchangeSharePhoto,
-): ExchangePhotoPoolItem | null {
-  try {
-    const current = readSharedExchangePhotos();
-    const sharedPhoto: ExchangePhotoPoolItem = {
-      id: `shared-sleeping-${Date.now()}`,
-      src: photo.src,
-      title: "とったねがお",
-      subtitle: "",
-      tags: ["sleeping", "ねてる"],
-    };
-
-    window.localStorage.setItem(
-      EXCHANGE_SHARED_PHOTO_STORAGE_KEY,
-      JSON.stringify([sharedPhoto, ...current].slice(0, 30)),
-    );
-    return sharedPhoto;
-  } catch {
-    // Sharing is optional, so keep the main recording flow alive if storage fails.
-    return null;
-  }
-}
-
-function readSharedExchangePhotos(): ExchangePhotoPoolItem[] {
-  if (typeof window === "undefined") {
-    return [];
-  }
-
-  try {
-    const raw = window.localStorage.getItem(EXCHANGE_SHARED_PHOTO_STORAGE_KEY);
-    const parsed = raw ? (JSON.parse(raw) as Partial<ExchangePhotoPoolItem>[]) : [];
-
-    if (!Array.isArray(parsed)) {
-      return [];
-    }
-
-    return parsed.filter(isValidExchangePhotoPoolItem);
-  } catch {
-    return [];
-  }
-}
-
-function isValidExchangePhotoPoolItem(
-  photo: Partial<ExchangePhotoPoolItem>,
-): photo is ExchangePhotoPoolItem {
-  return Boolean(
-    typeof photo.id === "string" &&
-      typeof photo.src === "string" &&
-      typeof photo.title === "string" &&
-      typeof photo.subtitle === "string" &&
-      Array.isArray(photo.tags),
-  );
-}
-
 function normalizeStoredPhotoList(value: string[] | string | undefined) {
   if (typeof value === "string") {
     return [value];
@@ -3790,15 +3624,6 @@ function getFileSizeBucket(size: number) {
     return "medium";
   }
   return "large";
-}
-
-function hashText(value: string) {
-  let hash = 0;
-  for (let index = 0; index < value.length; index += 1) {
-    hash = (hash << 5) - hash + value.charCodeAt(index);
-    hash |= 0;
-  }
-  return Math.abs(hash);
 }
 
 function resizeAndEncode(

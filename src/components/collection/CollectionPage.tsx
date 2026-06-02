@@ -7,6 +7,15 @@ import {
   getDailyCollectionTarget,
 } from "../../lib/collection/dailyTarget";
 import { trackProductEvent } from "../../lib/analytics/productAnalytics";
+import {
+  BOX_PHOTO_STORAGE_EVENT,
+  deleteOwnSleepingPhoto,
+  hideKeptExchangePhoto,
+  readKeptExchangePhotos,
+  readOwnSleepingPhotos,
+  updateOwnSleepingPhotoDelivery,
+} from "../../lib/home/sleepingPhotos";
+import { backupOwnSleepingPhotoMoment } from "../../lib/home/sleepingPhotoBackup";
 import { STORAGE_KEYS } from "../../lib/storage";
 import {
   COLLECTION_GROUPS,
@@ -79,13 +88,10 @@ type BoxPreviewPhoto = {
   catId?: string;
   shared?: boolean;
   createdAt?: number;
+  sourcePhotoId?: string;
+  deliveredAt?: number;
 };
 
-const OWN_SLEEPING_BOX_STORAGE_KEY = "nyaruhodo_exchange_own_sleeping_photos";
-const KEPT_OTHER_BOX_STORAGE_KEY = "nyaruhodo_exchange_kept_photos";
-const SHARED_SLEEPING_BOX_STORAGE_KEY = "nyaruhodo_exchange_shared_photos";
-const REPORTED_OTHER_BOX_STORAGE_KEY = "nyaruhodo_exchange_reported_photos";
-const BOX_PHOTO_STORAGE_EVENT = "nyaruhodo_box_photos_updated";
 type BoxDetailKind = "sleeping" | "other";
 
 export function CollectionPage() {
@@ -201,11 +207,11 @@ export function CollectionPage() {
     [catName, shareSuggestionSlot, storedCollectionPhotos],
   );
   const sleepingBoxPhotos = useMemo(
-    () => readBoxPreviewPhotos(OWN_SLEEPING_BOX_STORAGE_KEY, activeCatId),
+    () => readOwnSleepingPhotos(activeCatId),
     [activeCatId, boxRefreshTick, hasLoaded],
   );
   const otherBoxPhotos = useMemo(
-    () => readBoxPreviewPhotos(KEPT_OTHER_BOX_STORAGE_KEY),
+    () => readKeptExchangePhotos(),
     [boxRefreshTick, hasLoaded],
   );
   const selectedBoxPhotos =
@@ -346,7 +352,11 @@ export function CollectionPage() {
   function handleToggleSleepingPhotoDelivery(photo: BoxPreviewPhoto) {
     const nextShared = !photo.shared;
 
-    updateOwnSleepingPhotoDelivery(photo.id, nextShared);
+    const updatedPhoto = updateOwnSleepingPhotoDelivery(photo.id, nextShared);
+
+    if (updatedPhoto) {
+      void backupOwnSleepingPhotoMoment(updatedPhoto);
+    }
     setBoxRefreshTick((value) => value + 1);
     showToast(nextShared ? "とどくようにしました" : "自分だけにしました");
     trackProductEvent(
@@ -374,7 +384,7 @@ export function CollectionPage() {
   }
 
   function handleHideOtherPhoto(photo: BoxPreviewPhoto, reason: "hide" | "report") {
-    hideKeptOtherPhoto(photo.id, reason);
+    hideKeptExchangePhoto(photo.id, reason);
     setBoxRefreshTick((value) => value + 1);
     setCurrentBoxPhotoIndex((current) =>
       Math.max(0, Math.min(current, otherBoxPhotos.length - 2)),
@@ -1810,169 +1820,6 @@ function buildStoredCollectionPhotos(collectionPhotos: Record<string, string[]>)
   });
 
   return photos.reverse();
-}
-
-function readBoxPreviewPhotos(
-  key: string,
-  activeCatId: string | null = null,
-): BoxPreviewPhoto[] {
-  if (typeof window === "undefined") {
-    return [];
-  }
-
-  try {
-    const raw = window.localStorage.getItem(key);
-    const parsed = raw ? (JSON.parse(raw) as Array<Partial<BoxPreviewPhoto>>) : [];
-
-    if (!Array.isArray(parsed)) {
-      return [];
-    }
-
-    return parsed
-      .filter((photo): photo is BoxPreviewPhoto =>
-        Boolean(photo.id && photo.src),
-      )
-      .filter((photo) =>
-        activeCatId && photo.catId ? photo.catId === activeCatId : true,
-      )
-      .slice(0, 24);
-  } catch {
-    return [];
-  }
-}
-
-function updateOwnSleepingPhotoDelivery(photoId: string, shared: boolean) {
-  if (typeof window === "undefined") {
-    return;
-  }
-
-  try {
-    const raw = window.localStorage.getItem(OWN_SLEEPING_BOX_STORAGE_KEY);
-    const parsed = raw ? (JSON.parse(raw) as BoxPreviewPhoto[]) : [];
-    const targetPhoto = parsed.find((photo) => photo.id === photoId);
-    const nextPhotos = parsed.map((photo) =>
-      photo.id === photoId ? { ...photo, shared } : photo,
-    );
-
-    window.localStorage.setItem(
-      OWN_SLEEPING_BOX_STORAGE_KEY,
-      JSON.stringify(nextPhotos),
-    );
-
-    if (targetPhoto?.src) {
-      if (shared) {
-        addSharedSleepingPhoto(targetPhoto);
-      } else {
-        removeSharedSleepingPhotoBySrc(targetPhoto.src);
-      }
-    }
-
-    window.dispatchEvent(new Event(BOX_PHOTO_STORAGE_EVENT));
-  } catch {
-    // Local MVP storage should not block album use.
-  }
-}
-
-function deleteOwnSleepingPhoto(photoId: string) {
-  if (typeof window === "undefined") {
-    return;
-  }
-
-  try {
-    const raw = window.localStorage.getItem(OWN_SLEEPING_BOX_STORAGE_KEY);
-    const parsed = raw ? (JSON.parse(raw) as BoxPreviewPhoto[]) : [];
-    const targetPhoto = parsed.find((photo) => photo.id === photoId);
-    const nextPhotos = parsed.filter((photo) => photo.id !== photoId);
-
-    window.localStorage.setItem(
-      OWN_SLEEPING_BOX_STORAGE_KEY,
-      JSON.stringify(nextPhotos),
-    );
-
-    if (targetPhoto?.src) {
-      removeSharedSleepingPhotoBySrc(targetPhoto.src);
-    }
-
-    window.dispatchEvent(new Event(BOX_PHOTO_STORAGE_EVENT));
-  } catch {
-    // Local MVP storage should not block album use.
-  }
-}
-
-function addSharedSleepingPhoto(photo: BoxPreviewPhoto) {
-  try {
-    const raw = window.localStorage.getItem(SHARED_SLEEPING_BOX_STORAGE_KEY);
-    const parsed = raw ? (JSON.parse(raw) as BoxPreviewPhoto[]) : [];
-
-    if (parsed.some((sharedPhoto) => sharedPhoto.src === photo.src)) {
-      return;
-    }
-
-    const sharedPhoto = {
-      id: `shared-sleeping-${Date.now()}`,
-      src: photo.src,
-      title: "とったねがお",
-      subtitle: "",
-      tags: ["sleeping", "ねてる"],
-    };
-
-    window.localStorage.setItem(
-      SHARED_SLEEPING_BOX_STORAGE_KEY,
-      JSON.stringify([sharedPhoto, ...parsed].slice(0, 30)),
-    );
-  } catch {
-    // Sharing can be retried later from the album.
-  }
-}
-
-function removeSharedSleepingPhotoBySrc(src: string) {
-  try {
-    const raw = window.localStorage.getItem(SHARED_SLEEPING_BOX_STORAGE_KEY);
-    const parsed = raw ? (JSON.parse(raw) as BoxPreviewPhoto[]) : [];
-    const nextPhotos = parsed.filter((photo) => photo.src !== src);
-
-    window.localStorage.setItem(
-      SHARED_SLEEPING_BOX_STORAGE_KEY,
-      JSON.stringify(nextPhotos),
-    );
-  } catch {
-    // Sharing can be retried later from the album.
-  }
-}
-
-function hideKeptOtherPhoto(photoId: string, reason: "hide" | "report") {
-  if (typeof window === "undefined") {
-    return;
-  }
-
-  try {
-    const raw = window.localStorage.getItem(KEPT_OTHER_BOX_STORAGE_KEY);
-    const parsed = raw ? (JSON.parse(raw) as BoxPreviewPhoto[]) : [];
-    const targetPhoto = parsed.find((photo) => photo.id === photoId);
-    const nextPhotos = parsed.filter((photo) => photo.id !== photoId);
-
-    window.localStorage.setItem(
-      KEPT_OTHER_BOX_STORAGE_KEY,
-      JSON.stringify(nextPhotos),
-    );
-
-    if (reason === "report" && targetPhoto) {
-      const reportRaw = window.localStorage.getItem(REPORTED_OTHER_BOX_STORAGE_KEY);
-      const reports = reportRaw ? (JSON.parse(reportRaw) as BoxPreviewPhoto[]) : [];
-
-      window.localStorage.setItem(
-        REPORTED_OTHER_BOX_STORAGE_KEY,
-        JSON.stringify([
-          { ...targetPhoto, reportedAt: Date.now() },
-          ...reports,
-        ].slice(0, 50)),
-      );
-    }
-
-    window.dispatchEvent(new Event(BOX_PHOTO_STORAGE_EVENT));
-  } catch {
-    // Local MVP storage should not block album use.
-  }
 }
 
 function buildCollectionShareFeed(
