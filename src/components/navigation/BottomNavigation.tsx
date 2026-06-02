@@ -39,7 +39,7 @@ export function BottomNavigation({ active }: BottomNavigationProps) {
     {
       key: "collection",
       href: "/collection",
-      label: "ボックス",
+      label: "アルバム",
       icon: <BoxIcon style={{ ...styles.svgIcon, ...styles.boxSvgIcon }} />,
     },
     {

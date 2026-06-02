@@ -568,7 +568,7 @@ export function CollectionPage() {
         <PageBackdrop />
         <div style={styles.container}>
           <section style={styles.emptyCard}>
-            <h1 style={styles.emptyTitle}>ボックス</h1>
+            <h1 style={styles.emptyTitle}>アルバム</h1>
             <p style={styles.emptyText}>準備しています</p>
           </section>
         </div>
@@ -583,7 +583,7 @@ export function CollectionPage() {
         <PageBackdrop />
         <div style={styles.container}>
           <section style={styles.emptyCard}>
-            <h1 style={styles.emptyTitle}>ボックス</h1>
+            <h1 style={styles.emptyTitle}>アルバム</h1>
             <p style={styles.emptyText}>一緒に暮らしている猫を登録しましょう</p>
             <a href="/cats" style={styles.primaryLink}>
               猫を登録する
@@ -688,9 +688,9 @@ function BoxOverview({
   otherPhotos: BoxPreviewPhoto[];
 }) {
   return (
-    <section style={styles.boxOverview} aria-label="ボックス">
+    <section style={styles.boxOverview} aria-label="アルバム">
       <BoxSummaryCard
-        title="とった寝顔"
+        title="とったねがお"
         photos={sleepingPhotos}
       />
       <BoxSummaryCard
@@ -699,7 +699,7 @@ function BoxOverview({
         showAddSlot={true}
       />
       <BoxSummaryCard
-        title="とどいた寝顔"
+        title="とどいたねがお"
         photos={otherPhotos}
       />
     </section>
@@ -720,7 +720,7 @@ function BoxSummaryCard({
     0,
     4 - visiblePhotos.length - (showAddSlot ? 1 : 0),
   );
-  const isOtherBox = title === "とどいた寝顔";
+  const isOtherBox = title === "とどいたねがお";
   const countLabel = photos.length > 0 ? `${photos.length}枚` : "まだなし";
 
   return (
@@ -767,13 +767,13 @@ function CollectionViewTabs({
   onSelectView: (view: CollectionView) => void;
 }) {
   const tabs: Array<{ key: CollectionView; label: string }> = [
-    { key: "collect", label: "とった寝顔" },
+    { key: "collect", label: "とったねがお" },
     { key: "album", label: "おきてる写真" },
-    { key: "share", label: "とどいた寝顔" },
+    { key: "share", label: "とどいたねがお" },
   ];
 
   return (
-    <div role="tablist" aria-label="ボックスの表示" style={styles.viewTabs}>
+    <div role="tablist" aria-label="アルバムの表示" style={styles.viewTabs}>
       {tabs.map((tab) => {
         const isActive = tab.key === activeView;
 
@@ -897,7 +897,7 @@ function CollectionShareView({
   const hasSuggestionItems = feedItems.some(
     (item) => item.itemType === "suggestion",
   );
-  const headerTitle = hasPhotoItems ? "自分の一枚と候補" : "次に撮る候補";
+  const headerTitle = hasPhotoItems ? "自分の一枚と候補" : "次にとる候補";
 
   return (
     <section style={styles.shareView} aria-label="シェア">
@@ -922,7 +922,7 @@ function CollectionShareView({
                 : styles.shareSourceChip
             }
           >
-            撮る候補
+            とる候補
           </span>
         </div>
       </div>
@@ -1622,8 +1622,8 @@ function buildCollectionShareFeed(
       ownerScope: "system",
       slot: suggestionSlot,
       iconPath: suggestionSlot.iconPath,
-      badge: "撮る候補",
-      description: "次に撮る候補",
+      badge: "とる候補",
+      description: "次にとる候補",
     });
   }
 

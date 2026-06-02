@@ -359,9 +359,9 @@ export function DiagnosisOnboardingFlow() {
         {step === "photo" ? (
           <section style={styles.card}>
             <div style={styles.stepContainer}>
-              <p style={styles.eyebrow}>最初の寝顔を1枚</p>
+              <p style={styles.eyebrow}>最初のねがおを1枚</p>
               <p style={styles.note}>
-                前に撮った写真で大丈夫です。とった寝顔に入れて、ねてるねこを始めます。
+                前にとった写真で大丈夫です。とったねがおに入れて、ねてるねこを始めます。
               </p>
               <button
                 type="button"
@@ -370,7 +370,7 @@ export function DiagnosisOnboardingFlow() {
                 }}
                 style={styles.photoButton}
               >
-                寝顔を1枚選ぶ
+                ねがおを1枚選ぶ
               </button>
               <button
                 type="button"
@@ -379,7 +379,7 @@ export function DiagnosisOnboardingFlow() {
                 }}
                 style={styles.photoButton}
               >
-                今撮る
+                今とる
               </button>
               <button
                 type="button"
@@ -667,10 +667,10 @@ export function DiagnosisOnboardingFlow() {
           <section style={styles.card}>
             <div style={styles.stepContainer}>
               <p style={styles.eyebrow}>
-                ここからは、寝顔を入れていきます
+                ここからは、ねがおを入れていきます
               </p>
               <p style={styles.note}>
-                とった寝顔はいつでも入ります。とどいた寝顔は、一定時間ごとにひとつ届きます。
+                とったねがおはいつでも入ります。とどいたねがおは、6時間ごとにひとつとどきます。
               </p>
               <div style={styles.collectionPreview}>
                 {COLLECTION_PREVIEW_ICONS.map((src) => (

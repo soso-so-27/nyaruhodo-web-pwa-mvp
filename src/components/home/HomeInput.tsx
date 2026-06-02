@@ -73,6 +73,7 @@ type LockType = "yousu" | "mugi";
 
 const MIKKE_CATEGORIES: MikkeWindowCategory[] = ["place", "pose", "sign"];
 const MIKKE_LOCK_MS = 60 * 60 * 1000;
+const SLEEPING_DELIVERY_LOCK_MS = 6 * 60 * 60 * 1000;
 const HOME_SLEEPING_COUNTER_BASE_COUNT = 75;
 
 type RecordLogItem = {
@@ -224,35 +225,35 @@ const EXCHANGE_PHOTO_POOL: ExchangePhotoPoolItem[] = [
   {
     id: "sleeping-loaf",
     src: "/sample-cats/pose-loaf.png",
-    title: "ほかの猫の寝顔",
+    title: "ほかの猫のねがお",
     subtitle: "",
     tags: ["sleeping", "ねてる", "loaf", "香箱", "curled-up", "まるまり", "bed"],
   },
   {
     id: "sleeping-belly",
     src: "/sample-cats/pose-belly.png",
-    title: "ほかの猫の寝顔",
+    title: "ほかの猫のねがお",
     subtitle: "",
     tags: ["sleeping", "ねてる", "belly-up", "へそ天", "weird-sleep"],
   },
   {
     id: "stretch-cat",
     src: "/sample-cats/pose-stretch.png",
-    title: "ほかの猫の寝顔",
+    title: "ほかの猫のねがお",
     subtitle: "",
     tags: ["stretch", "のびー", "pose"],
   },
   {
     id: "box-cat",
     src: "/sample-cats/pose-box.png",
-    title: "ほかの猫の寝顔",
+    title: "ほかの猫のねがお",
     subtitle: "",
     tags: ["box-bag", "箱・袋", "hideout", "隠れ場所"],
   },
   {
     id: "window-cat",
     src: "/sample-cats/mugi-portrait.png",
-    title: "ほかの猫の寝顔",
+    title: "ほかの猫のねがお",
     subtitle: "",
     tags: ["window", "窓辺", "watching", "見ている", "high-place", "高いところ"],
   },
@@ -1367,7 +1368,7 @@ export function HomeInput({ recentEvents: _recentEvents }: HomeInputProps) {
     setPendingExchangeSharePhoto(null);
     setPendingExchangeCatId(null);
     if (deliveryRemaining) {
-      showToast(`とった寝顔に入りました。次に届くのは ${deliveryRemaining}`);
+      showToast(`とったねがおに入りました。つぎにとどくのは ${deliveryRemaining}`);
       trackProductEvent(
         "home_exchange_share_photo_confirmed",
         {
@@ -1414,7 +1415,7 @@ export function HomeInput({ recentEvents: _recentEvents }: HomeInputProps) {
     setCollectionRefreshTick((value) => value + 1);
     setPendingExchangeSharePhoto(null);
     setPendingExchangeCatId(null);
-    showToast("とった寝顔に入りました");
+    showToast("とったねがおに入りました");
     trackProductEvent(
       "home_exchange_share_photo_declined",
       {
@@ -2212,13 +2213,20 @@ function SleepingPhotoHome({
 }) {
   return (
     <section style={styles.sleepingHome} aria-label="しゃしん">
+      <button
+        type="button"
+        style={styles.sleepingLibraryButton}
+        onClick={onSelectPhoto}
+      >
+        管理用
+      </button>
       <div style={styles.sleepingHomeHeader}>
         <p style={styles.sleepingHomeKicker}>ねてるねこ</p>
         <h1 style={styles.sleepingHomeTitle}>
-          寝顔を撮る
+          ねがおをとる
         </h1>
         <p style={styles.sleepingHomeLead}>
-          ねてる猫を見つけたら、
+          ねてるねこを見つけたら、
           <br />
           ここから入れておく
         </p>
@@ -2231,23 +2239,14 @@ function SleepingPhotoHome({
             ...styles.sleepingPhotoButton,
           }}
           onClick={onTakePhoto}
-          aria-label="寝顔を撮る"
+          aria-label="ねがおをとる"
         >
           <AppIcon name="camera" size={34} />
         </button>
 
-        <button
-          type="button"
-          style={{
-            ...styles.sleepingLibraryButton,
-          }}
-          onClick={onSelectPhoto}
-        >
-          写真から入れる
-        </button>
       </div>
 
-      <div style={styles.sleepingStatCards} aria-label="寝顔">
+      <div style={styles.sleepingStatCards} aria-label="ねがお">
         {stats.map((stat) => (
           <span key={stat.label} style={styles.sleepingStatCard}>
             <span style={styles.sleepingStatLabel}>{stat.label}</span>
@@ -2277,7 +2276,7 @@ function SleepingSafetySheet({
     <AppBottomSheet title="ねてるねこが安心できる場所であるために" onClose={onClose}>
       <div style={styles.sleepingSafetyBody}>
         <p style={styles.sleepingSafetyText}>
-          とどいた寝顔を、そのまま外に出すのは控えてください。
+          とどいたねがおを、そのまま外に出すのは控えてください。
         </p>
         <p style={styles.sleepingSafetyText}>
           不安なときは、自分だけに入れられます。
@@ -2320,11 +2319,11 @@ function ExchangePhotoSheet({
     <div style={styles.exchangeBackdrop} onClick={onClose}>
       <section
         style={styles.exchangePanel}
-        aria-label="届いた猫写真"
+        aria-label="とどいたねがお"
         onClick={(event) => event.stopPropagation()}
       >
         <div style={styles.exchangeHeader}>
-          <span style={styles.exchangeKicker}>寝顔が届きました</span>
+          <span style={styles.exchangeKicker}>ねがおがとどきました</span>
         </div>
         <div style={styles.exchangePhotoFrame}>
           <img src={photo.src} alt="" style={styles.exchangePhoto} />
@@ -2367,12 +2366,12 @@ function ExchangeSharePermissionSheet({
     <div style={styles.exchangeBackdrop}>
       <section style={styles.exchangePanel} aria-label="写真を届ける確認">
         <div style={styles.exchangeHeader}>
-          <span style={styles.exchangeKicker}>この寝顔を入れます</span>
+          <span style={styles.exchangeKicker}>このねがおを入れます</span>
         </div>
         <p style={styles.exchangeLead}>
           {canReceivePhoto
-            ? "入れると、とどいた寝顔が1枚届きます。"
-            : `とった寝顔にはいつでも入ります。次に届くのは ${deliveryRemaining}。`}
+            ? "入れると、とどいたねがおが1枚とどきます。"
+            : `とったねがおにはいつでも入ります。つぎにとどくのは ${deliveryRemaining}。`}
         </p>
         <div style={styles.exchangeSharePreview}>
           <img src={photo.src} alt="" style={styles.exchangePhoto} />
@@ -2413,7 +2412,7 @@ function ExchangeSharePermissionSheet({
             onChange={(event) => setIsPrivate(event.currentTarget.checked)}
             style={styles.exchangePrivateCheckbox}
           />
-          <span>この写真は届かないようにする</span>
+          <span>この写真はとどかないようにする</span>
         </label>
         <div style={styles.exchangeActions}>
           <button
@@ -2422,10 +2421,10 @@ function ExchangeSharePermissionSheet({
             onClick={isPrivate ? onPrivate : onConfirm}
           >
             {isPrivate
-              ? "とった寝顔に入れる"
+              ? "とったねがおに入れる"
               : canReceivePhoto
-                ? "入れて、1枚受け取る"
-                : "とった寝顔に入れる"}
+                ? "入れて、1枚うけとる"
+                : "とったねがおに入れる"}
           </button>
         </div>
       </section>
@@ -2953,14 +2952,14 @@ function buildHomeSleepingBoxStats({
 
   return [
     {
-      label: "とった寝顔",
+      label: "とったねがお",
       value: formatPhotoCount(ownSleepingCount),
       detail: "",
     },
     {
-      label: "とどいた寝顔",
+      label: "とどいたねがお",
       value: formatPhotoCount(keptOtherCount),
-      detail: deliveryRemaining ? `次に届くまで ${deliveryRemaining}` : "",
+      detail: deliveryRemaining ? `つぎにとどくまで ${deliveryRemaining}` : "",
     },
     {
       label: "ねてるねこ",
@@ -3417,7 +3416,7 @@ function buildHomeBoardItems({
       id: "sleeping-counter",
       kind: "mission",
       priority: 7,
-      title: "寝てる猫",
+      title: "ねてるねこ",
       body: sleepingCounterRemaining
         ? `あと ${sleepingCounterRemaining}`
         : `${catName}も加わる`,
@@ -3601,18 +3600,34 @@ function createExchangePhoto({
   excludePhotoId?: string;
 }): ExchangePhoto {
   const normalizedTheme = theme.toLowerCase();
-  const exchangePool = [...readSharedExchangePhotos(), ...EXCHANGE_PHOTO_POOL].filter(
+  const sharedPool = readSharedExchangePhotos().filter(
     (photo) => photo.id !== excludePhotoId,
   );
-  const candidates = exchangePool.filter((photo) =>
+  const samplePool = EXCHANGE_PHOTO_POOL.filter(
+    (photo) => photo.id !== excludePhotoId,
+  );
+  const sharedCandidates = sharedPool.filter((photo) =>
     photo.tags.some(
       (tag) =>
         tag.toLowerCase() === normalizedTheme ||
         tag === triggerLabel ||
         tag === category,
     ),
-      );
-  const pool = candidates.length > 0 ? candidates : EXCHANGE_PHOTO_POOL;
+  );
+  const sampleCandidates = samplePool.filter((photo) =>
+    photo.tags.some(
+      (tag) =>
+        tag.toLowerCase() === normalizedTheme ||
+        tag === triggerLabel ||
+        tag === category,
+    ),
+  );
+  const pool =
+    sharedCandidates.length > 0
+      ? sharedCandidates
+      : sampleCandidates.length > 0
+        ? sampleCandidates
+        : samplePool;
   const index = hashText(`${seed}:${triggerLabel}:${theme}`) % pool.length;
   const selected = pool[index];
 
@@ -3712,7 +3727,7 @@ function saveSharedExchangePhoto(
     const sharedPhoto: ExchangePhotoPoolItem = {
       id: `shared-sleeping-${Date.now()}`,
       src: photo.src,
-      title: "ほかの猫の寝顔",
+      title: "とったねがお",
       subtitle: "",
       tags: ["sleeping", "ねてる"],
     };
@@ -3751,10 +3766,10 @@ function isValidExchangePhotoPoolItem(
   photo: Partial<ExchangePhotoPoolItem>,
 ): photo is ExchangePhotoPoolItem {
   return Boolean(
-    photo.id &&
-      photo.src &&
-      photo.title &&
-      photo.subtitle &&
+    typeof photo.id === "string" &&
+      typeof photo.src === "string" &&
+      typeof photo.title === "string" &&
+      typeof photo.subtitle === "string" &&
       Array.isArray(photo.tags),
   );
 }
@@ -3855,7 +3870,7 @@ function setSleepingCounterLock(catId: string): LockData {
   const lockData = readLockData(catId);
   const nextData: LockData = {
     ...lockData,
-    sleepingCounterLockedUntil: Date.now() + MIKKE_LOCK_MS,
+    sleepingCounterLockedUntil: Date.now() + SLEEPING_DELIVERY_LOCK_MS,
   };
 
   saveLockData(catId, nextData);
@@ -3958,7 +3973,7 @@ function getSleepingCounterCooldownProgress(
     return null;
   }
 
-  return Math.min(1, remaining / MIKKE_LOCK_MS);
+  return Math.min(1, remaining / SLEEPING_DELIVERY_LOCK_MS);
 }
 
 function isLocked(lockData: LockData, type: LockType, now = Date.now()) {
@@ -5117,15 +5132,20 @@ const styles = {
       "0 0 0 14px rgba(255,255,255,0.52), 0 18px 38px rgba(119,101,73,0.18)",
   },
   sleepingLibraryButton: {
-    border: "none",
-    background: "transparent",
-    color: "#575147",
-    fontFamily: "\"Shippori Mincho B1\", \"Hiragino Mincho ProN\", \"Yu Mincho\", serif",
-    fontSize: "12px",
-    fontWeight: 500,
+    position: "absolute",
+    top: "-34px",
+    right: "8px",
+    border: "0.5px solid rgba(86,78,64,0.12)",
+    borderRadius: "999px",
+    background: "rgba(255,255,255,0.42)",
+    color: "#8a8174",
+    fontSize: "10px",
+    fontWeight: 560,
     lineHeight: 1,
     cursor: "pointer",
-    padding: "4px 10px",
+    padding: "5px 9px",
+    backdropFilter: "blur(12px)",
+    WebkitBackdropFilter: "blur(12px)",
   },
   sleepingStatCards: {
     display: "grid",
