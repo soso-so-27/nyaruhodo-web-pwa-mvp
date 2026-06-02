@@ -23,7 +23,11 @@ export type AppIconName =
   | "lock"
   | "sparkles"
   | "chevronRight"
-  | "close";
+  | "close"
+  | "eyeOff"
+  | "flag"
+  | "send"
+  | "trash";
 
 const defaultIconStyle: CSSProperties = {
   display: "block",
@@ -76,6 +80,14 @@ export function AppIcon({
       return <ChevronRightIcon size={size} style={style} />;
     case "close":
       return <CloseIcon size={size} style={style} />;
+    case "eyeOff":
+      return <EyeOffIcon size={size} style={style} />;
+    case "flag":
+      return <FlagIcon size={size} style={style} />;
+    case "send":
+      return <SendIcon size={size} style={style} />;
+    case "trash":
+      return <TrashIcon size={size} style={style} />;
     default:
       return null;
   }
@@ -568,6 +580,134 @@ export function CloseIcon({ size = 24, style }: IconProps) {
         d="m6 6 12 12"
         stroke="currentColor"
         strokeWidth="2"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
+}
+
+export function EyeOffIcon({ size = 24, style }: IconProps) {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      width={size}
+      height={size}
+      fill="none"
+      style={mergeStyle(style)}
+      aria-hidden="true"
+    >
+      <path
+        d="M3 3l18 18"
+        stroke="currentColor"
+        strokeWidth="1.8"
+        strokeLinecap="round"
+      />
+      <path
+        d="M10.7 5.1A10.7 10.7 0 0 1 12 5c5.2 0 8.5 4.6 9.4 6.1a1.7 1.7 0 0 1 0 1.8 15.1 15.1 0 0 1-2.5 3"
+        stroke="currentColor"
+        strokeWidth="1.8"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+      <path
+        d="M6.2 6.8A15 15 0 0 0 2.6 11.1a1.7 1.7 0 0 0 0 1.8C3.5 14.4 6.8 19 12 19a9.8 9.8 0 0 0 3.3-.6"
+        stroke="currentColor"
+        strokeWidth="1.8"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+      <path
+        d="M10.2 10.2a2.8 2.8 0 0 0 3.6 3.6"
+        stroke="currentColor"
+        strokeWidth="1.8"
+        strokeLinecap="round"
+      />
+    </svg>
+  );
+}
+
+export function FlagIcon({ size = 24, style }: IconProps) {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      width={size}
+      height={size}
+      fill="none"
+      style={mergeStyle(style)}
+      aria-hidden="true"
+    >
+      <path
+        d="M6 21V4.5"
+        stroke="currentColor"
+        strokeWidth="1.9"
+        strokeLinecap="round"
+      />
+      <path
+        d="M6 5h9.4c1 0 1.5 1.1.9 1.9l-1 1.3c-.3.4-.3 1 0 1.4l1 1.3c.6.8.1 1.9-.9 1.9H6"
+        stroke="currentColor"
+        strokeWidth="1.9"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
+}
+
+export function SendIcon({ size = 24, style }: IconProps) {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      width={size}
+      height={size}
+      fill="none"
+      style={mergeStyle(style)}
+      aria-hidden="true"
+    >
+      <path
+        d="M20.2 4.3 4.1 11.2c-.9.4-.8 1.7.1 2l6 1.8 1.8 6c.3.9 1.6 1 2 .1l6.9-16.1c.3-.7-.4-1.4-1.1-1.1Z"
+        stroke="currentColor"
+        strokeWidth="1.8"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+      <path
+        d="m10.4 14.6 4.2-4.2"
+        stroke="currentColor"
+        strokeWidth="1.8"
+        strokeLinecap="round"
+      />
+    </svg>
+  );
+}
+
+export function TrashIcon({ size = 24, style }: IconProps) {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      width={size}
+      height={size}
+      fill="none"
+      style={mergeStyle(style)}
+      aria-hidden="true"
+    >
+      <path
+        d="M4.5 7h15"
+        stroke="currentColor"
+        strokeWidth="1.9"
+        strokeLinecap="round"
+      />
+      <path
+        d="M9.5 7V5.5c0-.8.7-1.5 1.5-1.5h2c.8 0 1.5.7 1.5 1.5V7"
+        stroke="currentColor"
+        strokeWidth="1.9"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+      <path
+        d="m8 10 .6 8.1c.1 1 1 1.9 2 1.9h4.8c1 0 1.9-.8 2-1.9L18 10"
+        stroke="currentColor"
+        strokeWidth="1.9"
         strokeLinecap="round"
         strokeLinejoin="round"
       />

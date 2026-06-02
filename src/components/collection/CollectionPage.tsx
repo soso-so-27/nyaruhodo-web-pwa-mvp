@@ -921,6 +921,9 @@ function BoxPhotoDetailSheet({
   const title = kind === "sleeping" ? "とったねがお" : "とどいたねがお";
   const currentPhoto =
     photos[Math.max(0, Math.min(currentPhotoIndex, photos.length - 1))] ?? null;
+  const deliveryActionLabel = currentPhoto?.shared
+    ? "自分だけにする"
+    : "とどくようにする";
 
   return (
     <AppBottomSheet title={title} onClose={onClose}>
@@ -964,46 +967,61 @@ function BoxPhotoDetailSheet({
       {currentPhoto ? (
         kind === "sleeping" ? (
           <div style={styles.boxDetailActions}>
-            <div style={styles.boxPhotoStatusRow}>
-              <span style={styles.boxPhotoStatusLabel}>届く設定</span>
-              <span style={styles.boxPhotoStatusValue}>
-                {currentPhoto.shared ? "とどく" : "自分だけ"}
-              </span>
+            <div style={styles.boxIconActionBar} aria-label="写真の操作">
+              <button
+                type="button"
+                aria-label={deliveryActionLabel}
+                title={deliveryActionLabel}
+                style={{
+                  ...styles.boxIconActionButton,
+                  ...(currentPhoto.shared ? {} : styles.boxIconActionButtonActive),
+                }}
+                onClick={() => onToggleSleepingDelivery(currentPhoto)}
+              >
+                <AppIcon
+                  name={currentPhoto.shared ? "eyeOff" : "send"}
+                  size={20}
+                />
+              </button>
+              <button
+                type="button"
+                aria-label="とったねがおから外す"
+                title="とったねがおから外す"
+                style={{
+                  ...styles.boxIconActionButton,
+                  ...styles.boxIconActionButtonDanger,
+                }}
+                onClick={() => onDeleteSleepingPhoto(currentPhoto)}
+              >
+                <AppIcon name="trash" size={20} />
+              </button>
             </div>
-            <button
-              type="button"
-              style={styles.btnPrimary}
-              onClick={() => onToggleSleepingDelivery(currentPhoto)}
-            >
-              {currentPhoto.shared ? "自分だけにする" : "とどくようにする"}
-            </button>
-            <button
-              type="button"
-              style={styles.btnSecondary}
-              onClick={() => onDeleteSleepingPhoto(currentPhoto)}
-            >
-              とったねがおから外す
-            </button>
           </div>
         ) : (
           <div style={styles.boxDetailActions}>
-            <p style={styles.boxDetailNote}>
-              不安な写真は、反応せずに非表示にできます。
-            </p>
-            <button
-              type="button"
-              style={styles.btnPrimary}
-              onClick={() => onReportOtherPhoto(currentPhoto)}
-            >
-              通報して非表示
-            </button>
-            <button
-              type="button"
-              style={styles.btnSecondary}
-              onClick={() => onHideOtherPhoto(currentPhoto)}
-            >
-              アルバムから外す
-            </button>
+            <div style={styles.boxIconActionBar} aria-label="写真の操作">
+              <button
+                type="button"
+                aria-label="通報して非表示"
+                title="通報して非表示"
+                style={{
+                  ...styles.boxIconActionButton,
+                  ...styles.boxIconActionButtonDanger,
+                }}
+                onClick={() => onReportOtherPhoto(currentPhoto)}
+              >
+                <AppIcon name="flag" size={20} />
+              </button>
+              <button
+                type="button"
+                aria-label="アルバムから外す"
+                title="アルバムから外す"
+                style={styles.boxIconActionButton}
+                onClick={() => onHideOtherPhoto(currentPhoto)}
+              >
+                <AppIcon name="close" size={20} />
+              </button>
+            </div>
           </div>
         )
       ) : null}
@@ -3020,6 +3038,32 @@ const styles = {
     display: "grid",
     gap: "8px",
     padding: "12px 16px 0",
+  },
+  boxIconActionBar: {
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: "12px",
+  },
+  boxIconActionButton: {
+    display: "grid",
+    placeItems: "center",
+    width: "48px",
+    height: "48px",
+    borderRadius: "50%",
+    border: "0.5px solid rgba(255,255,255,0.18)",
+    background: "rgba(255,255,255,0.10)",
+    color: COLLECTION_TEXT_STRONG,
+    boxShadow: "inset 0 1px 0 rgba(255,255,255,0.12)",
+    cursor: "pointer",
+  },
+  boxIconActionButtonActive: {
+    background: "rgba(255,255,255,0.84)",
+    color: "#2a2823",
+    border: "0.5px solid rgba(255,255,255,0.72)",
+  },
+  boxIconActionButtonDanger: {
+    color: "#f0d3ca",
   },
   boxPhotoStatusRow: {
     display: "flex",
