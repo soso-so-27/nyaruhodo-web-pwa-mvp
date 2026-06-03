@@ -143,6 +143,10 @@ export type AccountSyncOverview = {
   isLoggedIn: boolean;
   hasLocalData: boolean;
   localCats: number;
+  localRecords: number;
+  localCollectionPhotos: number;
+  localOwnSleepingPhotos: number;
+  localKeptExchangePhotos: number;
   remoteCats: number;
   remoteRecords: number;
   remoteCollectionPhotos: number;
@@ -151,6 +155,7 @@ export type AccountSyncOverview = {
   lastPushAt: string | null;
   lastPullAt: string | null;
   shouldSuggestRestore: boolean;
+  errors: string[];
 };
 
 const CAT_PHOTOS_BUCKET = "cat-photos";
@@ -161,6 +166,10 @@ export async function getAccountSyncOverview(): Promise<AccountSyncOverview> {
     isLoggedIn: false,
     hasLocalData: false,
     localCats: 0,
+    localRecords: 0,
+    localCollectionPhotos: 0,
+    localOwnSleepingPhotos: 0,
+    localKeptExchangePhotos: 0,
     remoteCats: 0,
     remoteRecords: 0,
     remoteCollectionPhotos: 0,
@@ -169,6 +178,7 @@ export async function getAccountSyncOverview(): Promise<AccountSyncOverview> {
     lastPushAt: null,
     lastPullAt: null,
     shouldSuggestRestore: false,
+    errors: [],
   };
 
   if (typeof window === "undefined") {
@@ -177,17 +187,38 @@ export async function getAccountSyncOverview(): Promise<AccountSyncOverview> {
 
   const snapshot = readLocalSnapshot();
   const localCats = snapshot.profiles.length;
+  const localRecords = countLocalRecords(snapshot.recordLogsByCatId);
+  const localCollectionPhotos = countLocalCollectionPhotos(snapshot.collectionPhotos);
+  const localOwnSleepingPhotos = snapshot.ownSleepingPhotos.length;
+  const localKeptExchangePhotos = snapshot.keptExchangePhotos.length;
   const hasLocalData = hasMeaningfulLocalData(snapshot);
   const supabase = createBrowserSupabaseClient();
 
   if (!supabase) {
-    return { ...emptyOverview, hasLocalData, localCats };
+    return {
+      ...emptyOverview,
+      hasLocalData,
+      localCats,
+      localRecords,
+      localCollectionPhotos,
+      localOwnSleepingPhotos,
+      localKeptExchangePhotos,
+    };
   }
 
   const { data, error } = await supabase.auth.getUser();
 
   if (error || !data.user) {
-    return { ...emptyOverview, hasLocalData, localCats };
+    return {
+      ...emptyOverview,
+      hasLocalData,
+      localCats,
+      localRecords,
+      localCollectionPhotos,
+      localOwnSleepingPhotos,
+      localKeptExchangePhotos,
+      errors: error ? [error.message] : [],
+    };
   }
 
   const userId = data.user.id;
@@ -233,14 +264,34 @@ export async function getAccountSyncOverview(): Promise<AccountSyncOverview> {
   const remoteCollectionPhotos = collectionResult.count ?? 0;
   const remoteOwnSleepingPhotos = ownSleepingResult.count ?? 0;
   const remoteKeptExchangePhotos = keptExchangeResult.count ?? 0;
+  const errors = [
+    catsResult.error ? `cats: ${catsResult.error.message}` : null,
+    recordsResult.error ? `records: ${recordsResult.error.message}` : null,
+    collectionResult.error ? `collection_photos: ${collectionResult.error.message}` : null,
+    ownSleepingResult.error ? `cat_moments: ${ownSleepingResult.error.message}` : null,
+    keptExchangeResult.error
+      ? `cat_moment_deliveries: ${keptExchangeResult.error.message}`
+      : null,
+    syncStateResult.error ? `account_sync_state: ${syncStateResult.error.message}` : null,
+  ].filter((message): message is string => Boolean(message));
   const syncState = syncStateResult.data as
     | { last_push_at?: string | null; last_pull_at?: string | null }
     | null;
+  const hasRemoteData =
+    remoteCats > 0 ||
+    remoteRecords > 0 ||
+    remoteCollectionPhotos > 0 ||
+    remoteOwnSleepingPhotos > 0 ||
+    remoteKeptExchangePhotos > 0;
 
   return {
     isLoggedIn: true,
     hasLocalData,
     localCats,
+    localRecords,
+    localCollectionPhotos,
+    localOwnSleepingPhotos,
+    localKeptExchangePhotos,
     remoteCats,
     remoteRecords,
     remoteCollectionPhotos,
@@ -249,11 +300,14 @@ export async function getAccountSyncOverview(): Promise<AccountSyncOverview> {
     lastPushAt: syncState?.last_push_at ?? null,
     lastPullAt: syncState?.last_pull_at ?? null,
     shouldSuggestRestore:
-      remoteCats > 0 &&
+      hasRemoteData &&
       (!hasLocalData ||
         remoteCats > localCats ||
-        remoteOwnSleepingPhotos > snapshot.ownSleepingPhotos.length ||
-        remoteKeptExchangePhotos > snapshot.keptExchangePhotos.length),
+        remoteRecords > localRecords ||
+        remoteCollectionPhotos > localCollectionPhotos ||
+        remoteOwnSleepingPhotos > localOwnSleepingPhotos ||
+        remoteKeptExchangePhotos > localKeptExchangePhotos),
+    errors,
   };
 }
 
@@ -451,6 +505,32 @@ function hasMeaningfulLocalData(snapshot: LocalSnapshot) {
       Array.isArray(photos) ? photos.length > 0 : Boolean(photos),
     ),
   ) || snapshot.ownSleepingPhotos.length > 0 || snapshot.keptExchangePhotos.length > 0;
+}
+
+function countLocalRecords(recordLogsByCatId: Map<string, LocalRecordLogItem[]>) {
+  let count = 0;
+
+  for (const records of recordLogsByCatId.values()) {
+    count += records.length;
+  }
+
+  return count;
+}
+
+function countLocalCollectionPhotos(collectionPhotos: LocalCollectionStore) {
+  let count = 0;
+
+  for (const catPhotos of Object.values(collectionPhotos)) {
+    for (const photos of Object.values(catPhotos)) {
+      if (Array.isArray(photos)) {
+        count += photos.filter(Boolean).length;
+      } else if (photos) {
+        count += 1;
+      }
+    }
+  }
+
+  return count;
 }
 
 async function ensureRemoteProfile(

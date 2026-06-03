@@ -213,6 +213,9 @@ export default function AccountCreatePage() {
                   {message}
                 </p>
               ) : null}
+              <p style={styles.authNote}>
+                Googleの画面が開きます。接続後、このアプリに戻ります。
+              </p>
 
               <div style={styles.actions}>
                 <button
@@ -223,7 +226,7 @@ export default function AccountCreatePage() {
                   style={styles.primaryButton}
                   disabled={isStartingAuth || isCheckingAccount}
                 >
-                  Googleで保存する
+                  {isStartingAuth ? "Googleを開いています..." : "Googleで接続する"}
                 </button>
                 <button
                   type="button"
@@ -316,6 +319,13 @@ const styles = {
     fontWeight: 600,
     lineHeight: 1.6,
     padding: "10px 12px",
+  },
+  authNote: {
+    margin: "0 0 14px",
+    color: "#8a8a80",
+    fontSize: "12px",
+    fontWeight: 500,
+    lineHeight: 1.6,
   },
   connectedEmail: {
     margin: "0 0 18px",

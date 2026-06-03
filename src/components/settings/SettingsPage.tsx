@@ -6,7 +6,7 @@ import {
   getAccountSyncOverview,
   syncLocalDataWithAccount,
 } from "../../lib/accountSync";
-import type { AccountSyncOverview } from "../../lib/accountSync";
+import type { AccountSyncOverview, AccountSyncResult } from "../../lib/accountSync";
 import { trackProductEvent } from "../../lib/analytics/productAnalytics";
 import { createBrowserSupabaseClient } from "../../lib/supabase/browser";
 import {
@@ -77,19 +77,7 @@ export function SettingsPage() {
 
     const result = await syncLocalDataWithAccount({ restoreIfLocalEmpty: true });
 
-    if (result.status === "synced") {
-      setSyncMessage(
-        result.restoredCats > 0
-          ? "アカウントとこの端末のデータを同期しました。"
-          : "この端末のデータをアカウントに保存しました。",
-      );
-    } else if (result.status === "restored") {
-      setSyncMessage("アカウントのデータをこの端末に復元しました。");
-    } else if (result.status === "error") {
-      setSyncMessage("同期できませんでした。少し時間をおいてもう一度お試しください。");
-    } else {
-      setSyncMessage("同期できるデータはまだありません。");
-    }
+    setSyncMessage(getSyncResultMessage(result, "sync"));
 
     await refreshSyncOverview();
     trackProductEvent("settings_account_sync_completed", {
@@ -140,13 +128,7 @@ export function SettingsPage() {
       restoreIfLocalEmpty: true,
     });
 
-    if (result.status === "restored") {
-      setSyncMessage("アカウントのデータをこの端末に復元しました。");
-    } else if (result.status === "error") {
-      setSyncMessage("復元できませんでした。少し時間をおいてもう一度お試しください。");
-    } else {
-      setSyncMessage("復元できるアカウントデータはまだありません。");
-    }
+    setSyncMessage(getSyncResultMessage(result, "restore"));
 
     await refreshSyncOverview();
     trackProductEvent("settings_account_restore_completed", {
@@ -188,27 +170,7 @@ export function SettingsPage() {
                 <div style={styles.divider} />
                 {syncOverview ? (
                   <>
-                    <div style={styles.syncOverview}>
-                      <div>
-                        <p style={styles.syncOverviewLabel}>アカウント保存</p>
-                        <p style={styles.syncOverviewText}>
-                          猫 {syncOverview.remoteCats} ・ 記録{" "}
-                          {syncOverview.remoteRecords}
-                          {syncOverview.remoteCollectionPhotos > 0
-                            ? ` ・ 写真 ${syncOverview.remoteCollectionPhotos}`
-                            : ""}
-                          {syncOverview.remoteOwnSleepingPhotos > 0
-                            ? ` ・ とったねがお ${syncOverview.remoteOwnSleepingPhotos}`
-                            : ""}
-                          {syncOverview.remoteKeptExchangePhotos > 0
-                            ? ` ・ とどいたねがお ${syncOverview.remoteKeptExchangePhotos}`
-                            : ""}
-                        </p>
-                      </div>
-                      {syncOverview.shouldSuggestRestore ? (
-                        <span style={styles.syncOverviewBadge}>復元できます</span>
-                      ) : null}
-                    </div>
+                    <SyncStatusPanel overview={syncOverview} />
                     <div style={styles.divider} />
                   </>
                 ) : null}
@@ -220,7 +182,7 @@ export function SettingsPage() {
                   style={styles.primaryButton}
                   disabled={isSyncing}
                 >
-                  {isSyncing ? "同期中..." : "この端末のデータを同期する"}
+                  {isSyncing ? "保存中..." : "この端末を保存する"}
                 </button>
                 <button
                   type="button"
@@ -326,6 +288,140 @@ export function SettingsPage() {
       </div>
     </main>
   );
+}
+
+function SyncStatusPanel({ overview }: { overview: AccountSyncOverview }) {
+  return (
+    <div style={styles.syncStatusPanel}>
+      <div style={styles.syncStatusHeader}>
+        <div>
+          <p style={styles.syncOverviewLabel}>同期の状態</p>
+          <p style={styles.syncOverviewText}>
+            {overview.shouldSuggestRestore
+              ? "アカウント側に復元できるデータがあります。"
+              : "この端末とアカウントの件数を確認できます。"}
+          </p>
+        </div>
+        {overview.shouldSuggestRestore ? (
+          <span style={styles.syncOverviewBadge}>復元できます</span>
+        ) : null}
+      </div>
+
+      <div style={styles.syncCompareGrid}>
+        <SyncCountColumn
+          title="この端末"
+          cats={overview.localCats}
+          records={overview.localRecords}
+          collectionPhotos={overview.localCollectionPhotos}
+          ownSleepingPhotos={overview.localOwnSleepingPhotos}
+          keptExchangePhotos={overview.localKeptExchangePhotos}
+        />
+        <SyncCountColumn
+          title="アカウント"
+          cats={overview.remoteCats}
+          records={overview.remoteRecords}
+          collectionPhotos={overview.remoteCollectionPhotos}
+          ownSleepingPhotos={overview.remoteOwnSleepingPhotos}
+          keptExchangePhotos={overview.remoteKeptExchangePhotos}
+        />
+      </div>
+
+      <div style={styles.syncMetaGrid}>
+        <span>保存 {formatSyncDate(overview.lastPushAt)}</span>
+        <span>復元 {formatSyncDate(overview.lastPullAt)}</span>
+      </div>
+
+      {overview.errors.length > 0 ? (
+        <p style={styles.syncWarning}>一部の同期状態を確認できませんでした。</p>
+      ) : null}
+    </div>
+  );
+}
+
+function SyncCountColumn({
+  title,
+  cats,
+  records,
+  collectionPhotos,
+  ownSleepingPhotos,
+  keptExchangePhotos,
+}: {
+  title: string;
+  cats: number;
+  records: number;
+  collectionPhotos: number;
+  ownSleepingPhotos: number;
+  keptExchangePhotos: number;
+}) {
+  return (
+    <div style={styles.syncCountColumn}>
+      <p style={styles.syncCountTitle}>{title}</p>
+      <div style={styles.syncCountRows}>
+        <SyncCountRow label="猫" value={cats} />
+        <SyncCountRow label="記録" value={records} />
+        <SyncCountRow label="写真" value={collectionPhotos} />
+        <SyncCountRow label="とったねがお" value={ownSleepingPhotos} />
+        <SyncCountRow label="とどいたねがお" value={keptExchangePhotos} />
+      </div>
+    </div>
+  );
+}
+
+function SyncCountRow({ label, value }: { label: string; value: number }) {
+  return (
+    <div style={styles.syncCountRow}>
+      <span>{label}</span>
+      <span style={styles.syncCountValue}>{value}</span>
+    </div>
+  );
+}
+
+function getSyncResultMessage(
+  result: AccountSyncResult,
+  action: "sync" | "restore",
+) {
+  const hasPartialErrors = result.errors.length > 0;
+
+  if (result.status === "synced") {
+    return hasPartialErrors
+      ? "保存しました。一部のねがお写真はあとで再同期されます。"
+      : "この端末のデータをアカウントに保存しました。";
+  }
+
+  if (result.status === "restored") {
+    return hasPartialErrors
+      ? "復元しました。一部のねがお写真はあとで再同期されます。"
+      : "アカウントのデータをこの端末に復元しました。";
+  }
+
+  if (result.status === "error") {
+    return action === "restore"
+      ? "復元できませんでした。ログイン状態を確認してください。"
+      : "保存できませんでした。ログイン状態を確認してください。";
+  }
+
+  return action === "restore"
+    ? "アカウント側に復元できるデータはまだありません。"
+    : "この端末に保存できるデータはまだありません。";
+}
+
+function formatSyncDate(value: string | null) {
+  if (!value) {
+    return "まだ";
+  }
+
+  const date = new Date(value);
+
+  if (Number.isNaN(date.getTime())) {
+    return "不明";
+  }
+
+  return new Intl.DateTimeFormat("ja-JP", {
+    month: "numeric",
+    day: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+  }).format(date);
 }
 
 const styles = {
@@ -450,6 +546,17 @@ const styles = {
     padding: "0 0 12px",
     textAlign: "center" as const,
   },
+  syncStatusPanel: {
+    padding: "14px 0",
+    display: "grid",
+    gap: "12px",
+  },
+  syncStatusHeader: {
+    display: "flex",
+    alignItems: "flex-start",
+    justifyContent: "space-between",
+    gap: "12px",
+  },
   syncOverview: {
     display: "flex",
     alignItems: "center",
@@ -477,6 +584,55 @@ const styles = {
     fontSize: "11px",
     fontWeight: 600,
     padding: "4px 8px",
+  },
+  syncCompareGrid: {
+    display: "grid",
+    gridTemplateColumns: "repeat(2, minmax(0, 1fr))",
+    gap: "10px",
+  },
+  syncCountColumn: {
+    border: "1px solid #f0ede8",
+    borderRadius: "16px",
+    padding: "10px",
+    background: "rgba(255,255,255,0.52)",
+  },
+  syncCountTitle: {
+    margin: "0 0 8px",
+    fontSize: "12px",
+    fontWeight: 700,
+    color: "#2a2a28",
+  },
+  syncCountRows: {
+    display: "grid",
+    gap: "6px",
+  },
+  syncCountRow: {
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: "6px",
+    color: "#8a8a80",
+    fontSize: "11.5px",
+    lineHeight: 1.25,
+  },
+  syncCountValue: {
+    color: "#2a2a28",
+    fontWeight: 700,
+    fontVariantNumeric: "tabular-nums",
+  },
+  syncMetaGrid: {
+    display: "grid",
+    gridTemplateColumns: "repeat(2, minmax(0, 1fr))",
+    gap: "8px",
+    color: "#9a9890",
+    fontSize: "11.5px",
+    lineHeight: 1.4,
+  },
+  syncWarning: {
+    margin: 0,
+    color: "#a66d3f",
+    fontSize: "11.5px",
+    lineHeight: 1.5,
   },
   primaryButton: {
     display: "block",
