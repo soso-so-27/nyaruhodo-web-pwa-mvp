@@ -1,5 +1,5 @@
 import { redirect } from "next/navigation";
 
-export default function TorisetuPage() {
+export default function LegacyCatsRedirectPage() {
   redirect("/cats");
 }

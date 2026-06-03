@@ -164,16 +164,11 @@ Common icons:
 
 Keep page-local SVG only when the shape is content-specific, such as collection silhouettes. Those are not generic UI icons.
 
-### Torisetu Diagnosis Catalog
+### Legacy Diagnosis Catalog
 
-Diagnosis definitions live in `src/lib/torisetu/diagnosisCatalog.ts`.
-
-- `source: "onboarding"` means the result can be shown from existing onboarding diagnosis data.
-- `source: "future"` means the card is a locked sample or future diagnostic entry point.
-- Unlock logic belongs in the catalog or a Torisetu helper, not in Home.
-- Home may recommend a next action, but learned results and diagnosis result cards belong in Torisetu.
-- Home should not keep a permanent Torisetu card in the recommendation rail. Surface Torisetu only when there is a concrete new result or unread knowledge.
-- The Home recommendation should not simply repeat user-entered records. Convert records into a small observation point under `うちの子らしさ`.
+The old Torisetu diagnosis catalog has been removed from the app code. Keep this
+memo as historical context only; current implementation should use the `とる`,
+`アルバム`, and `ねこ` surfaces.
 
 ### Checkpoint Before Push
 

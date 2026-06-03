@@ -72,8 +72,8 @@
 ### scoring.ts
 
 - `src/lib/diagnosisOnboarding/scoring.ts`: オンボーディング回答からタイプ、モディファイア、理解度を作る。
-- `src/core/logic/scoring.ts`: 日々の診断スコアを作る。
-- 2つの scoring は現時点で接続されていない。
+- 旧 `src/core/logic/scoring.ts` は、ねてるねこ方針への移行で削除済み。
+- オンボーディング scoring は、現時点では猫プロフィール用の型・表示補助として残っている。
 
 ## 3. 精度への活用状況
 

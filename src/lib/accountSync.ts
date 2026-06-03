@@ -9,6 +9,7 @@ import {
   type OwnSleepingPhoto,
 } from "./home/sleepingPhotos";
 import {
+  CAT_PHOTOS_BUCKET,
   downloadStoragePath,
   getDataUrlExtension,
   sanitizePathSegment,
@@ -170,6 +171,11 @@ export type AccountSyncOverview = {
   errors: string[];
 };
 
+export type AccountDeleteResult = {
+  status: "deleted" | "skipped" | "error";
+  errors: string[];
+};
+
 const SYNC_METADATA = { source: "localStorage-v1" };
 
 export async function getAccountSyncOverview(): Promise<AccountSyncOverview> {
@@ -244,7 +250,7 @@ export async function getAccountSyncOverview(): Promise<AccountSyncOverview> {
     await Promise.all([
       supabase
         .from("cats")
-        .select("id", { count: "exact", head: true })
+        .select("*")
         .eq("owner_user_id", userId),
       supabase
         .from("record_logs")
@@ -270,7 +276,9 @@ export async function getAccountSyncOverview(): Promise<AccountSyncOverview> {
         .maybeSingle(),
     ]);
 
-  const remoteCats = catsResult.count ?? 0;
+  const remoteCats = filterRestorableRemoteCats(
+    ((catsResult.data ?? []) as RemoteCatRow[]).filter(Boolean),
+  ).length;
   const remoteRecords = recordsResult.count ?? 0;
   const remoteCollectionPhotos = collectionResult.count ?? 0;
   const remoteOwnSleepingPhotos = ownSleepingResult.count ?? 0;
@@ -496,6 +504,54 @@ export async function deleteAccountCollectionPhoto(localPhotoId: string) {
   if (error) {
     throw new Error(`Collection photo delete failed: ${error.message}`);
   }
+}
+
+export async function deleteAccountStoredData(): Promise<AccountDeleteResult> {
+  if (typeof window === "undefined") {
+    return { status: "skipped", errors: [] };
+  }
+
+  const supabase = createBrowserSupabaseClient();
+
+  if (!supabase) {
+    return { status: "skipped", errors: [] };
+  }
+
+  const { data, error: authError } = await supabase.auth.getUser();
+
+  if (authError || !data.user) {
+    return {
+      status: authError ? "error" : "skipped",
+      errors: authError ? [authError.message] : [],
+    };
+  }
+
+  const userId = data.user.id;
+  const errors: string[] = [];
+
+  await deleteStorageFolder(supabase, userId, errors);
+
+  const deleteSteps = [
+    supabase.from("cat_moment_deliveries").delete().eq("user_id", userId),
+    supabase.from("cat_moments").delete().eq("user_id", userId),
+    supabase.from("collection_photos").delete().eq("user_id", userId),
+    supabase.from("record_logs").delete().eq("user_id", userId),
+    supabase.from("account_sync_state").delete().eq("user_id", userId),
+    supabase.from("cats").delete().eq("owner_user_id", userId),
+  ];
+
+  const results = await Promise.all(deleteSteps);
+
+  results.forEach((result, index) => {
+    if (result.error) {
+      errors.push(`delete step ${index + 1}: ${result.error.message}`);
+    }
+  });
+
+  return {
+    status: errors.length > 0 ? "error" : "deleted",
+    errors,
+  };
 }
 
 function hasRestoredAccountData(result: AccountSyncResult) {
@@ -1083,9 +1139,9 @@ async function restoreRemoteSnapshot(
     throw new Error(`Cat restore failed: ${catsError.message}`);
   }
 
-  const remoteCats = filterRestorableRemoteCats(
-    ((cats ?? []) as RemoteCatRow[]).filter(Boolean),
-  );
+  const fetchedRemoteCats = ((cats ?? []) as RemoteCatRow[]).filter(Boolean);
+  await deleteAccidentalDefaultRemoteCats(supabase, fetchedRemoteCats, result);
+  const remoteCats = filterRestorableRemoteCats(fetchedRemoteCats);
   const remoteIdToLocalId = new Map<string, string>();
 
   if (remoteCats.length === 0) {
@@ -1570,6 +1626,30 @@ function filterRestorableRemoteCats(cats: RemoteCatRow[]) {
   return cats.filter((cat) => !isAccidentalDefaultRemoteCat(cat));
 }
 
+async function deleteAccidentalDefaultRemoteCats(
+  supabase: NonNullable<ReturnType<typeof createBrowserSupabaseClient>>,
+  cats: RemoteCatRow[],
+  result: AccountSyncResult,
+) {
+  if (cats.length <= 1) {
+    return;
+  }
+
+  const defaultCatIds = cats
+    .filter((cat) => isAccidentalDefaultRemoteCat(cat))
+    .map((cat) => cat.id);
+
+  if (defaultCatIds.length === 0) {
+    return;
+  }
+
+  const { error } = await supabase.from("cats").delete().in("id", defaultCatIds);
+
+  if (error) {
+    result.errors.push(`Default cat cleanup failed: ${error.message}`);
+  }
+}
+
 function isAccidentalDefaultRemoteCat(cat: RemoteCatRow) {
   return (
     cat.name === "ミケ" &&
@@ -1588,6 +1668,62 @@ function isAccidentalDefaultRemoteCat(cat: RemoteCatRow) {
 
 function isEmptyObject(value: Record<string, unknown> | null | undefined) {
   return !value || Object.keys(value).length === 0;
+}
+
+async function deleteStorageFolder(
+  supabase: NonNullable<ReturnType<typeof createBrowserSupabaseClient>>,
+  prefix: string,
+  errors: string[],
+) {
+  const paths = await listStoragePaths(supabase, prefix, errors);
+
+  for (let index = 0; index < paths.length; index += 100) {
+    const chunk = paths.slice(index, index + 100);
+
+    if (chunk.length === 0) {
+      continue;
+    }
+
+    const { error } = await supabase.storage.from(CAT_PHOTOS_BUCKET).remove(chunk);
+
+    if (error) {
+      errors.push(`storage remove: ${error.message}`);
+    }
+  }
+}
+
+async function listStoragePaths(
+  supabase: NonNullable<ReturnType<typeof createBrowserSupabaseClient>>,
+  prefix: string,
+  errors: string[],
+  depth = 0,
+): Promise<string[]> {
+  if (depth > 8) {
+    return [];
+  }
+
+  const { data, error } = await supabase.storage
+    .from(CAT_PHOTOS_BUCKET)
+    .list(prefix, { limit: 1000 });
+
+  if (error) {
+    errors.push(`storage list ${prefix}: ${error.message}`);
+    return [];
+  }
+
+  const paths: string[] = [];
+
+  for (const item of data ?? []) {
+    const itemPath = `${prefix}/${item.name}`;
+
+    if (item.id) {
+      paths.push(itemPath);
+    } else {
+      paths.push(...(await listStoragePaths(supabase, itemPath, errors, depth + 1)));
+    }
+  }
+
+  return paths;
 }
 
 function readJson<T>(key: string): T | null {

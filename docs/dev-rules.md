@@ -21,24 +21,22 @@ Do not implement everything at once.
 
 ## TypeScript
 
-- Prefer explicit domain types for diagnosis inputs and outputs.
+- Prefer explicit domain types for cat, photo, account sync, and album data.
 - Avoid stringly typed logic when a union type is practical.
-- Keep scoring logic easy to test.
-- Run `npx.cmd tsc --noEmit` before handing off TypeScript changes.
+- Run `npm.cmd run typecheck` before handing off TypeScript changes.
 
 ## Tests
 
-- Run core scenario tests with `npm.cmd run test:core`.
-- Core tests compile `src/core/**/*.ts` into `.test-build` and run the compiled scenario test with Node's built-in test API.
-- Scenario tests live under `src/core/logic/__tests__/`.
+- Run `npm.cmd run typecheck` after code changes.
+- Run `npm.cmd run check:release` when account sync, Supabase, or release readiness changes.
+- Run `npm.cmd run build` for larger UI, routing, or data changes.
 
 ## UI
 
-- Keep Home minimal.
-- Home may show only the next useful quick actions: `みっけ`, `おせわ`, and one contextual card.
-- The primary contextual card should use `うちの子らしさ`: it should offer a small observation point, not restate raw input counts.
-- Keep learned results, diagnosis cards, and reading-heavy knowledge in Torisetu.
-- Follow the gray-based design direction with at most one accent color.
+- Keep the `とる` screen focused on taking one sleeping face photo.
+- Keep album sections photo-first; titles and counts should stay quiet.
+- Keep `ねこ` as the cat profile and record surface.
+- Follow the paper-like quiet design direction.
 - Keep buttons flat, rounded, and spacious.
 
 ## Logic

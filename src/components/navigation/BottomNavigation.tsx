@@ -7,7 +7,7 @@ import type { CSSProperties, MouseEvent, ReactNode } from "react";
 import { BoxIcon, CameraIcon } from "../ui/AppIcons";
 
 type BottomNavigationProps = {
-  active: "home" | "today" | "torisetu" | "collection" | "cats" | "together";
+  active: "home" | "today" | "collection" | "cats";
 };
 
 type NavItem = {
@@ -27,8 +27,7 @@ export function BottomNavigation({ active }: BottomNavigationProps) {
   const router = useRouter();
   const pathname = usePathname();
   const [pendingKey, setPendingKey] = useState<NavItem["key"] | null>(null);
-  const activeKey =
-    active === "today" ? "home" : active === "together" ? "collection" : active;
+  const activeKey = active === "today" ? "home" : active;
   const items: readonly NavItem[] = [
     {
       key: "home",

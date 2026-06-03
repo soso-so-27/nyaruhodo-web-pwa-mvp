@@ -3,12 +3,15 @@
 import { useEffect, useState } from "react";
 import type { CSSProperties } from "react";
 import {
+  deleteAccountStoredData,
   getAccountSyncOverview,
   syncLocalDataWithAccount,
 } from "../../lib/accountSync";
 import type { AccountSyncOverview, AccountSyncResult } from "../../lib/accountSync";
 import { trackProductEvent } from "../../lib/analytics/productAnalytics";
 import {
+  AUTH_CODE_VERIFIER_STORAGE_KEY,
+  AUTH_STORAGE_KEY,
   buildAuthDebugSnapshot,
   type AuthDebugSnapshot,
 } from "../../lib/authDebug";
@@ -29,8 +32,10 @@ export function SettingsPage() {
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [isSyncing, setIsSyncing] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
   const [email, setEmail] = useState<string | null>(null);
   const [syncMessage, setSyncMessage] = useState("");
+  const [deleteMessage, setDeleteMessage] = useState("");
   const [lastSyncResult, setLastSyncResult] = useState<{
     action: "sync" | "restore";
     result: AccountSyncResult;
@@ -173,6 +178,51 @@ export function SettingsPage() {
       error_count: result.errors.length,
     });
     setIsSyncing(false);
+  }
+
+  function handleDeleteLocalData() {
+    if (
+      !window.confirm(
+        "この端末の猫データと写真を削除します。アカウントに保存済みのデータは残ります。",
+      )
+    ) {
+      return;
+    }
+
+    clearLocalAppData();
+    trackProductEvent("settings_local_data_deleted", {
+      display_environment: displayEnvironment,
+    });
+    window.location.href = "/home";
+  }
+
+  async function handleDeleteAccountData() {
+    if (
+      !window.confirm(
+        "アカウントに保存した猫データと写真を削除します。この端末のデータも消えます。元に戻せません。",
+      )
+    ) {
+      return;
+    }
+
+    setIsDeleting(true);
+    setDeleteMessage("");
+    const result = await deleteAccountStoredData();
+
+    trackProductEvent("settings_account_data_deleted", {
+      status: result.status,
+      error_count: result.errors.length,
+    });
+
+    if (result.status === "deleted") {
+      clearLocalAppData();
+      setDeleteMessage("アカウントに保存したデータを削除しました。");
+      window.location.href = "/home";
+      return;
+    }
+
+    setDeleteMessage("アカウントのデータを削除できませんでした。ログイン状態を確認してください。");
+    setIsDeleting(false);
   }
 
   return (
@@ -322,20 +372,37 @@ export function SettingsPage() {
           <div style={styles.card}>
             <button
               type="button"
-              onClick={() => {
-                if (
-                  window.confirm(
-                    "すべてのデータを削除しますか？この操作は元に戻せません。",
-                  )
-                ) {
-                  localStorage.clear();
-                  window.location.href = "/";
-                }
-              }}
+              onClick={handleDeleteLocalData}
               style={styles.dangerButton}
             >
-              データをすべて削除する
+              この端末のデータを削除する
             </button>
+            <p style={styles.deleteHelp}>
+              アカウントに保存済みの写真は残ります。新しいPWAで復元できます。
+            </p>
+            {isLoggedIn ? (
+              <>
+                <div style={styles.divider} />
+                <button
+                  type="button"
+                  onClick={() => {
+                    void handleDeleteAccountData();
+                  }}
+                  style={styles.dangerButtonStrong}
+                  disabled={isDeleting}
+                >
+                  {isDeleting ? "削除中..." : "アカウントの保存データも削除する"}
+                </button>
+                <p style={styles.deleteHelp}>
+                  アカウントに保存した猫、写真、とった寝顔、とどいた寝顔を削除します。
+                </p>
+              </>
+            ) : null}
+            {deleteMessage ? (
+              <p style={styles.syncMessage} role="status">
+                {deleteMessage}
+              </p>
+            ) : null}
           </div>
         </section>
 
@@ -344,12 +411,24 @@ export function SettingsPage() {
           <div style={styles.card}>
             <div style={styles.row}>
               <span style={styles.rowLabel}>バージョン</span>
-              <span style={styles.rowValue}>1.0.0</span>
+              <span style={styles.rowValue}>1.0.0-beta.4</span>
+            </div>
+            <div style={styles.divider} />
+            <div style={styles.betaNote}>
+              <p style={styles.betaNoteTitle}>更新が反映されないとき</p>
+              <p style={styles.betaNoteText}>
+                iPhone PWAは古い画面が残ることがあります。ホーム画面から一度閉じて開き直すか、Safariで本番URLを開いてからPWAを起動してください。
+              </p>
             </div>
             <div style={styles.divider} />
             <div style={styles.row}>
               <span style={styles.rowLabel}>ねてるねこ</span>
               <span style={styles.rowValue}>寝顔を撮ると、ほかの寝顔が届くアプリ</span>
+            </div>
+            <div style={styles.divider} />
+            <div style={styles.row}>
+              <span style={styles.rowLabel}>不具合・問い合わせ</span>
+              <span style={styles.rowValue}>告知文の連絡先へ</span>
             </div>
             <div style={styles.divider} />
             <div style={styles.betaNote}>
@@ -365,6 +444,21 @@ export function SettingsPage() {
       </div>
     </main>
   );
+}
+
+function clearLocalAppData() {
+  if (typeof window === "undefined") {
+    return;
+  }
+
+  const preservedKeys = new Set([AUTH_STORAGE_KEY, AUTH_CODE_VERIFIER_STORAGE_KEY]);
+
+  for (const key of Object.keys(window.localStorage)) {
+    if (key.startsWith("sb-") || preservedKeys.has(key)) {
+      continue;
+    }
+    window.localStorage.removeItem(key);
+  }
 }
 
 function AuthDebugPanel({ snapshot }: { snapshot: AuthDebugSnapshot | null }) {
@@ -1041,6 +1135,25 @@ const styles = {
     border: "none",
     textAlign: "center" as const,
     cursor: "pointer",
+  },
+  dangerButtonStrong: {
+    display: "block",
+    width: "100%",
+    padding: "14px 0",
+    fontSize: "15px",
+    fontWeight: 700,
+    color: "#b53f23",
+    background: "rgba(216,90,48,0.08)",
+    border: "1px solid rgba(216,90,48,0.18)",
+    borderRadius: "16px",
+    textAlign: "center" as const,
+    cursor: "pointer",
+  },
+  deleteHelp: {
+    margin: "8px 0 0",
+    color: "#8a8a80",
+    fontSize: "12px",
+    lineHeight: 1.55,
   },
   betaNote: {
     padding: "14px 0",

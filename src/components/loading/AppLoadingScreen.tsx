@@ -2,23 +2,20 @@ import type { CSSProperties } from "react";
 import { BottomNavigation } from "../navigation/BottomNavigation";
 
 type AppLoadingScreenProps = {
-  variant: "home" | "collection" | "cats" | "torisetu" | "account" | "startup";
+  variant: "home" | "collection" | "cats" | "account" | "startup";
 };
 
 export function AppLoadingScreen({ variant }: AppLoadingScreenProps) {
   const isHome = variant === "home";
   const isCats = variant === "cats";
   const isCollection = variant === "collection";
-  const isTorisetu = variant === "torisetu";
   const isAccount = variant === "account";
   const isStartup = variant === "startup";
   const activeNav = isHome
     ? "today"
     : isCollection
       ? "collection"
-      : isCats
-        ? "cats"
-        : "torisetu";
+      : "cats";
 
   return (
     <main style={styles.page}>
@@ -30,7 +27,6 @@ export function AppLoadingScreen({ variant }: AppLoadingScreenProps) {
         {isHome ? <HomeLoading /> : null}
         {isCollection ? <CollectionLoading /> : null}
         {isCats ? <CatsLoading /> : null}
-        {isTorisetu ? <TorisetuLoading /> : null}
         {isAccount ? <AccountLoading /> : null}
         {isStartup ? <StartupLoading /> : null}
       </div>
@@ -108,22 +104,6 @@ function CatsLoading() {
       </div>
       <div style={styles.infoList}>
         <div style={styles.infoRow} />
-        <div style={styles.infoRow} />
-        <div style={styles.infoRow} />
-      </div>
-    </section>
-  );
-}
-
-function TorisetuLoading() {
-  return (
-    <section style={styles.pageStage} aria-label="読み込み中">
-      <div style={styles.pageTitleLine} />
-      <div style={styles.albumSection}>
-        <div style={styles.sectionTitleLine} />
-        <div style={styles.copyBlock} />
-      </div>
-      <div style={styles.infoList}>
         <div style={styles.infoRow} />
         <div style={styles.infoRow} />
       </div>
