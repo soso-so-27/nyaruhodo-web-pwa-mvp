@@ -260,6 +260,8 @@ export function HomeInput({ recentEvents: _recentEvents }: HomeInputProps) {
     remoteCats: number;
     remoteRecords: number;
     remoteCollectionPhotos: number;
+    remoteOwnSleepingPhotos: number;
+    remoteKeptExchangePhotos: number;
   } | null>(null);
   const [isDiscoverySheetOpen, setIsDiscoverySheetOpen] = useState(false);
   const [isRecentChangeSheetOpen, setIsRecentChangeSheetOpen] = useState(false);
@@ -424,9 +426,13 @@ export function HomeInput({ recentEvents: _recentEvents }: HomeInputProps) {
         pushed_cats: syncResult.pushedCats,
         pushed_records: syncResult.pushedRecords,
         pushed_collection_photos: syncResult.pushedCollectionPhotos,
+        pushed_own_sleeping_photos: syncResult.pushedOwnSleepingPhotos,
+        pushed_kept_exchange_photos: syncResult.pushedKeptExchangePhotos,
         restored_cats: syncResult.restoredCats,
         restored_records: syncResult.restoredRecords,
         restored_collection_photos: syncResult.restoredCollectionPhotos,
+        restored_own_sleeping_photos: syncResult.restoredOwnSleepingPhotos,
+        restored_kept_exchange_photos: syncResult.restoredKeptExchangePhotos,
         error_count: syncResult.errors.length,
       },
       {
@@ -435,7 +441,12 @@ export function HomeInput({ recentEvents: _recentEvents }: HomeInputProps) {
       },
     );
 
-    if (syncResult.status === "restored" && syncResult.restoredCats > 0) {
+    if (
+      syncResult.status === "restored" &&
+      (syncResult.restoredCats > 0 ||
+        syncResult.restoredOwnSleepingPhotos > 0 ||
+        syncResult.restoredKeptExchangePhotos > 0)
+    ) {
       refreshHomeFromLocalStorage();
     }
   }
@@ -615,6 +626,8 @@ export function HomeInput({ recentEvents: _recentEvents }: HomeInputProps) {
         remoteCats: overview.remoteCats,
         remoteRecords: overview.remoteRecords,
         remoteCollectionPhotos: overview.remoteCollectionPhotos,
+        remoteOwnSleepingPhotos: overview.remoteOwnSleepingPhotos,
+        remoteKeptExchangePhotos: overview.remoteKeptExchangePhotos,
       });
       setIsAccountRestoreSheetOpen(true);
       trackProductEvent(
@@ -624,6 +637,8 @@ export function HomeInput({ recentEvents: _recentEvents }: HomeInputProps) {
           remote_cats: overview.remoteCats,
           remote_records: overview.remoteRecords,
           remote_collection_photos: overview.remoteCollectionPhotos,
+          remote_own_sleeping_photos: overview.remoteOwnSleepingPhotos,
+          remote_kept_exchange_photos: overview.remoteKeptExchangePhotos,
         },
         { localCatId: activeCatId },
       );
@@ -752,6 +767,10 @@ export function HomeInput({ recentEvents: _recentEvents }: HomeInputProps) {
         remote_records: accountRestoreSummary?.remoteRecords ?? null,
         remote_collection_photos:
           accountRestoreSummary?.remoteCollectionPhotos ?? null,
+        remote_own_sleeping_photos:
+          accountRestoreSummary?.remoteOwnSleepingPhotos ?? null,
+        remote_kept_exchange_photos:
+          accountRestoreSummary?.remoteKeptExchangePhotos ?? null,
       },
       { localCatId: activeCatId },
     );
@@ -770,6 +789,10 @@ export function HomeInput({ recentEvents: _recentEvents }: HomeInputProps) {
         remote_records: accountRestoreSummary?.remoteRecords ?? null,
         remote_collection_photos:
           accountRestoreSummary?.remoteCollectionPhotos ?? null,
+        remote_own_sleeping_photos:
+          accountRestoreSummary?.remoteOwnSleepingPhotos ?? null,
+        remote_kept_exchange_photos:
+          accountRestoreSummary?.remoteKeptExchangePhotos ?? null,
       },
       { localCatId: activeCatId },
     );
@@ -788,12 +811,19 @@ export function HomeInput({ recentEvents: _recentEvents }: HomeInputProps) {
         restored_cats: result.restoredCats,
         restored_records: result.restoredRecords,
         restored_collection_photos: result.restoredCollectionPhotos,
+        restored_own_sleeping_photos: result.restoredOwnSleepingPhotos,
+        restored_kept_exchange_photos: result.restoredKeptExchangePhotos,
         error_count: result.errors.length,
       },
       { localCatId: activeCatId },
     );
 
-    if (result.status === "restored" && result.restoredCats > 0) {
+    if (
+      result.status === "restored" &&
+      (result.restoredCats > 0 ||
+        result.restoredOwnSleepingPhotos > 0 ||
+        result.restoredKeptExchangePhotos > 0)
+    ) {
       refreshHomeFromLocalStorage();
       window.localStorage.setItem(
         STORAGE_KEYS.accountRestorePromptDismissed,
@@ -2265,7 +2295,7 @@ function SleepingPhotoHome({
           onClick={onTakePhoto}
           aria-label="ねがおをとる"
         >
-          <AppIcon name="camera" size={42} />
+          <AppIcon name="camera" size={36} />
         </button>
 
       </div>
@@ -2536,6 +2566,8 @@ function AccountRestoreSheet({
     remoteCats: number;
     remoteRecords: number;
     remoteCollectionPhotos: number;
+    remoteOwnSleepingPhotos: number;
+    remoteKeptExchangePhotos: number;
   } | null;
   isRestoring: boolean;
   onRestore: () => void;
@@ -2552,6 +2584,8 @@ function AccountRestoreSheet({
             <span>猫 {summary.remoteCats}</span>
             <span>記録 {summary.remoteRecords}</span>
             <span>写真 {summary.remoteCollectionPhotos}</span>
+            <span>とったねがお {summary.remoteOwnSleepingPhotos}</span>
+            <span>とどいたねがお {summary.remoteKeptExchangePhotos}</span>
           </div>
         ) : null}
         <div style={styles.accountRestoreActions}>
@@ -4860,9 +4894,9 @@ const styles = {
     left: "50%",
     transform: "translateX(-50%)",
     zIndex: 22,
-    color: "#4a463e",
+    color: "#6b6257",
     fontFamily: "\"Shippori Mincho B1\", \"Hiragino Mincho ProN\", \"Yu Mincho\", serif",
-    fontSize: "18px",
+    fontSize: "16px",
     fontWeight: 400,
     letterSpacing: "0.16em",
     lineHeight: 1.4,
@@ -4873,7 +4907,7 @@ const styles = {
     position: "fixed",
     inset: 0,
     zIndex: 18,
-    color: "#202020",
+    color: "#39332d",
     pointerEvents: "none",
     textAlign: "center",
   },
@@ -4901,16 +4935,16 @@ const styles = {
     margin: 0,
     color: "#202020",
     fontFamily: "\"Shippori Mincho B1\", \"Hiragino Mincho ProN\", \"Yu Mincho\", serif",
-    fontSize: "28px",
-    fontWeight: 500,
+    fontSize: "25px",
+    fontWeight: 470,
     lineHeight: 1.25,
     letterSpacing: 0,
   },
   sleepingHomeLead: {
     margin: 0,
-    color: "#4d4940",
+    color: "#6a6258",
     fontFamily: "\"Shippori Mincho B1\", \"Hiragino Mincho ProN\", \"Yu Mincho\", serif",
-    fontSize: "14px",
+    fontSize: "13.5px",
     fontWeight: 400,
     lineHeight: 1.9,
   },
@@ -5012,20 +5046,20 @@ const styles = {
   },
   sleepingPhotoButton: {
     justifySelf: "center",
-    width: "154px",
-    height: "154px",
-    border: "1px solid rgba(96,86,69,0.12)",
+    width: "140px",
+    height: "140px",
+    border: "1px solid rgba(96,86,69,0.09)",
     borderRadius: "50%",
     background:
-      "radial-gradient(circle at 50% 48%, rgba(150,142,126,0.96), rgba(130,121,105,0.95))",
-    color: "rgba(255,255,255,0.94)",
+      "radial-gradient(circle at 50% 48%, rgba(164,155,138,0.86), rgba(139,130,113,0.88))",
+    color: "rgba(255,255,255,0.9)",
     display: "inline-flex",
     alignItems: "center",
     justifyContent: "center",
     cursor: "pointer",
     padding: 0,
     boxShadow:
-      "0 0 0 12px rgba(255,255,255,0.66), 0 18px 34px rgba(119,101,73,0.14), inset 0 4px 12px rgba(255,255,255,0.14)",
+      "0 0 0 9px rgba(255,255,255,0.58), 0 14px 26px rgba(119,101,73,0.1), inset 0 4px 10px rgba(255,255,255,0.12)",
   },
   sleepingLibraryButton: {
     position: "fixed",
@@ -5058,32 +5092,32 @@ const styles = {
   },
   sleepingStatCard: {
     minWidth: 0,
-    minHeight: "100px",
-    border: "1px solid rgba(144,126,102,0.11)",
+    minHeight: "92px",
+    border: "1px solid rgba(144,126,102,0.09)",
     borderRadius: "20px",
-    background: "rgba(255,253,248,0.64)",
+    background: "rgba(255,253,248,0.56)",
     color: "#2b2924",
     display: "grid",
     alignItems: "center",
     justifyContent: "center",
     justifyItems: "center",
-    gap: "5px",
-    padding: "12px 7px",
+    gap: "4px",
+    padding: "11px 7px",
     boxSizing: "border-box",
     backdropFilter: "blur(18px)",
     WebkitBackdropFilter: "blur(18px)",
-    boxShadow: "0 8px 18px rgba(90,76,60,0.045)",
+    boxShadow: "0 6px 14px rgba(90,76,60,0.035)",
   },
   sleepingStatIcon: {
     display: "inline-flex",
     alignItems: "center",
     justifyContent: "center",
-    width: "20px",
-    height: "20px",
-    color: "#8e7a63",
+    width: "18px",
+    height: "18px",
+    color: "#9a8a76",
   },
   sleepingStatLabel: {
-    color: "#4a463e",
+    color: "#665c51",
     fontSize: "10.5px",
     fontWeight: 540,
     lineHeight: 1.2,
@@ -5095,13 +5129,13 @@ const styles = {
     alignItems: "baseline",
     justifyContent: "center",
     gap: "3px",
-    minHeight: "30px",
+    minHeight: "28px",
   },
   sleepingStatValue: {
-    color: "#332c26",
+    color: "#4a3d32",
     fontFamily: "\"Shippori Mincho B1\", \"Hiragino Mincho ProN\", \"Yu Mincho\", serif",
-    fontSize: "30px",
-    fontWeight: 500,
+    fontSize: "26px",
+    fontWeight: 460,
     lineHeight: 1,
     fontVariantNumeric: "tabular-nums",
     textAlign: "center",

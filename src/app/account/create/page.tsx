@@ -160,10 +160,10 @@ export default function AccountCreatePage() {
           {isAccountConnected ? (
             <>
               <p style={styles.eyebrow}>アカウント</p>
-              <h1 style={styles.title}>アカウントに接続済みです</h1>
+              <h1 style={styles.title}>Googleアカウントに接続済みです</h1>
               <p style={styles.body}>
-                この端末の猫情報はそのまま使えます。
-                次のステップで、この子の記録を引き継げるようにします。
+                この端末のねがおを、アカウントに保存できます。
+                別の端末でも復元できます。
               </p>
               {connectedEmail ? (
                 <p style={styles.connectedEmail}>{connectedEmail}</p>
@@ -180,21 +180,21 @@ export default function AccountCreatePage() {
             </>
           ) : (
             <>
-              <p style={styles.eyebrow}>にゃるほどの保存</p>
+              <p style={styles.eyebrow}>ねてるねこの保存</p>
               <h1 style={styles.title}>
-                この子のことを、あとから見返せるように
+                ねがおを、あとから見返せるように
               </h1>
               <p style={styles.body}>
-                にゃるほどにアカウントを作ると、診断結果やプロフィールを残しておけます。
-                今はこの端末に保存されていますが、アカウント作成後は引き継げるようにしていきます。
+                Googleアカウントで接続すると、この端末のねがおを保存できます。
+                別の端末でも、とったねがおやとどいたねがおを復元できます。
               </p>
 
               <div style={styles.valueList} aria-label="保存できるもの">
                 {[
-                  "タイプ診断の結果",
+                  "とったねがお",
+                  "とどいたねがお",
                   "猫のプロフィール",
-                  "最近の様子",
-                  "コレクション",
+                  "写真と記録",
                 ].map((item) => (
                   <div key={item} style={styles.valueItem}>
                     <span style={styles.valueDot} aria-hidden="true" />
@@ -218,7 +218,7 @@ export default function AccountCreatePage() {
                   style={styles.primaryButton}
                   disabled={isStartingAuth || isCheckingAccount}
                 >
-                  無料で保存する
+                  Googleで保存する
                 </button>
                 <button
                   type="button"

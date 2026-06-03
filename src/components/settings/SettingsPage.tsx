@@ -71,6 +71,8 @@ export function SettingsPage() {
       remote_cats: syncOverview?.remoteCats ?? null,
       remote_records: syncOverview?.remoteRecords ?? null,
       remote_collection_photos: syncOverview?.remoteCollectionPhotos ?? null,
+      remote_own_sleeping_photos: syncOverview?.remoteOwnSleepingPhotos ?? null,
+      remote_kept_exchange_photos: syncOverview?.remoteKeptExchangePhotos ?? null,
     });
 
     const result = await syncLocalDataWithAccount({ restoreIfLocalEmpty: true });
@@ -95,9 +97,13 @@ export function SettingsPage() {
       pushed_cats: result.pushedCats,
       pushed_records: result.pushedRecords,
       pushed_collection_photos: result.pushedCollectionPhotos,
+      pushed_own_sleeping_photos: result.pushedOwnSleepingPhotos,
+      pushed_kept_exchange_photos: result.pushedKeptExchangePhotos,
       restored_cats: result.restoredCats,
       restored_records: result.restoredRecords,
       restored_collection_photos: result.restoredCollectionPhotos,
+      restored_own_sleeping_photos: result.restoredOwnSleepingPhotos,
+      restored_kept_exchange_photos: result.restoredKeptExchangePhotos,
       error_count: result.errors.length,
     });
     setIsSyncing(false);
@@ -108,6 +114,8 @@ export function SettingsPage() {
       remote_cats: syncOverview?.remoteCats ?? null,
       remote_records: syncOverview?.remoteRecords ?? null,
       remote_collection_photos: syncOverview?.remoteCollectionPhotos ?? null,
+      remote_own_sleeping_photos: syncOverview?.remoteOwnSleepingPhotos ?? null,
+      remote_kept_exchange_photos: syncOverview?.remoteKeptExchangePhotos ?? null,
     });
     if (
       !window.confirm(
@@ -117,6 +125,9 @@ export function SettingsPage() {
       trackProductEvent("settings_account_restore_cancelled", {
         remote_cats: syncOverview?.remoteCats ?? null,
         remote_records: syncOverview?.remoteRecords ?? null,
+        remote_collection_photos: syncOverview?.remoteCollectionPhotos ?? null,
+        remote_own_sleeping_photos: syncOverview?.remoteOwnSleepingPhotos ?? null,
+        remote_kept_exchange_photos: syncOverview?.remoteKeptExchangePhotos ?? null,
       });
       return;
     }
@@ -143,6 +154,8 @@ export function SettingsPage() {
       restored_cats: result.restoredCats,
       restored_records: result.restoredRecords,
       restored_collection_photos: result.restoredCollectionPhotos,
+      restored_own_sleeping_photos: result.restoredOwnSleepingPhotos,
+      restored_kept_exchange_photos: result.restoredKeptExchangePhotos,
       error_count: result.errors.length,
     });
     setIsSyncing(false);
@@ -183,6 +196,12 @@ export function SettingsPage() {
                           {syncOverview.remoteRecords}
                           {syncOverview.remoteCollectionPhotos > 0
                             ? ` ・ 写真 ${syncOverview.remoteCollectionPhotos}`
+                            : ""}
+                          {syncOverview.remoteOwnSleepingPhotos > 0
+                            ? ` ・ とったねがお ${syncOverview.remoteOwnSleepingPhotos}`
+                            : ""}
+                          {syncOverview.remoteKeptExchangePhotos > 0
+                            ? ` ・ とどいたねがお ${syncOverview.remoteKeptExchangePhotos}`
                             : ""}
                         </p>
                       </div>

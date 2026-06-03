@@ -98,6 +98,43 @@ export function readOwnSleepingPhotoCount(activeCatId: string | null) {
   return readOwnSleepingPhotos(activeCatId).length;
 }
 
+export function restoreSyncedSleepingPhotos({
+  ownPhotos,
+  keptPhotos,
+  mergeLocal,
+}: {
+  ownPhotos: OwnSleepingPhoto[];
+  keptPhotos: ExchangePhoto[];
+  mergeLocal: boolean;
+}) {
+  const existingOwnPhotos = mergeLocal
+    ? readStorageArray<OwnSleepingPhoto>(OWN_SLEEPING_PHOTO_STORAGE_KEY)
+    : [];
+  const existingKeptPhotos = mergeLocal ? readKeptExchangePhotos() : [];
+  const restoredOwnPhotos = mergeOwnSleepingPhotos(existingOwnPhotos, ownPhotos);
+  const restoredKeptPhotos = mergeExchangePhotos(existingKeptPhotos, keptPhotos);
+
+  try {
+    writeStorageArray(OWN_SLEEPING_PHOTO_STORAGE_KEY, restoredOwnPhotos.slice(0, 24));
+    writeStorageArray(KEPT_EXCHANGE_PHOTO_STORAGE_KEY, restoredKeptPhotos.slice(0, 50));
+
+    for (const photo of restoredOwnPhotos) {
+      if (photo.shared) {
+        addSharedSleepingPhoto(photo);
+      }
+    }
+
+    dispatchBoxPhotoStorageEvent();
+  } catch {
+    // Account restore should keep the rest of the sync result usable.
+  }
+
+  return {
+    ownCount: ownPhotos.length,
+    keptCount: keptPhotos.length,
+  };
+}
+
 export function toCatMomentRecord(moment: CatMoment): CatMomentRecord {
   return {
     id: moment.id,
@@ -524,6 +561,41 @@ function removeSharedSleepingPhoto(photo: OwnSleepingPhoto) {
   );
 
   writeStorageArray(SHARED_EXCHANGE_PHOTO_STORAGE_KEY, nextPhotos);
+}
+
+function mergeOwnSleepingPhotos(
+  existingPhotos: OwnSleepingPhoto[],
+  restoredPhotos: OwnSleepingPhoto[],
+) {
+  const byId = new Map<string, OwnSleepingPhoto>();
+
+  for (const photo of [...existingPhotos, ...restoredPhotos]) {
+    if (!isValidOwnSleepingPhoto(photo)) {
+      continue;
+    }
+
+    const normalized = normalizeOwnSleepingPhoto(photo);
+    byId.set(normalized.id, normalized);
+  }
+
+  return [...byId.values()].sort((a, b) => b.createdAt - a.createdAt);
+}
+
+function mergeExchangePhotos(
+  existingPhotos: ExchangePhoto[],
+  restoredPhotos: ExchangePhoto[],
+) {
+  const byId = new Map<string, ExchangePhoto>();
+
+  for (const photo of [...existingPhotos, ...restoredPhotos]) {
+    if (!isValidExchangePhoto(photo)) {
+      continue;
+    }
+
+    byId.set(photo.id, photo);
+  }
+
+  return [...byId.values()].sort((a, b) => b.deliveredAt - a.deliveredAt);
 }
 
 function addExchangePhotoIdsFromStorage(blockedIds: Set<string>, key: string) {
