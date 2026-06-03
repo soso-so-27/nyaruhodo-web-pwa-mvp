@@ -357,29 +357,75 @@ export function HomeInput({ recentEvents: _recentEvents }: HomeInputProps) {
     const params = new URLSearchParams(window.location.search);
     const shouldOpenMikke = params.get("mikke") === "1";
     const authStatus = params.get("auth");
+    const authCode = params.get("code");
     const hasPendingGoogleAuth = Boolean(
       window.localStorage.getItem(STORAGE_KEYS.authGooglePending),
     );
 
-    if (authStatus === "google_success" || hasPendingGoogleAuth) {
-      void trackGoogleAuthSuccess(
-        authStatus === "google_success" ? "callback_marker" : "pending_marker",
-      );
-      params.delete("auth");
+    async function handleUrlState() {
+      let shouldTrackGoogleAuth =
+        authStatus === "google_success" || hasPendingGoogleAuth;
+
+      if (authCode) {
+        const supabase = createBrowserSupabaseClient();
+
+        if (!supabase) {
+          trackProductEvent("auth_google_failed", {
+            error_type: "missing_supabase_client",
+          });
+          window.location.replace("/account/create?error=auth");
+          return;
+        }
+
+        const { error } = await supabase.auth.exchangeCodeForSession(authCode);
+
+        params.delete("code");
+        params.delete("error");
+        params.delete("error_code");
+        params.delete("error_description");
+
+        if (error) {
+          window.localStorage.removeItem(STORAGE_KEYS.authGooglePending);
+          trackProductEvent("auth_google_failed", {
+            error_type: "code_exchange_failed",
+            error_message: error.message,
+          });
+          window.location.replace("/account/create?error=auth");
+          return;
+        }
+
+        shouldTrackGoogleAuth = true;
+      }
+
+      if (shouldTrackGoogleAuth) {
+        await trackGoogleAuthSuccess(
+          authStatus === "google_success" || authCode
+            ? "callback_marker"
+            : "pending_marker",
+        );
+        params.delete("auth");
+      }
+
+      if (shouldOpenMikke) {
+        setIsYousuOpen(true);
+        params.delete("mikke");
+      }
+
+      if (
+        !shouldOpenMikke &&
+        authStatus !== "google_success" &&
+        !authCode &&
+        !hasPendingGoogleAuth
+      ) {
+        return;
+      }
+
+      const nextSearch = params.toString();
+      const nextUrl = `${window.location.pathname}${nextSearch ? `?${nextSearch}` : ""}`;
+      window.history.replaceState(null, "", nextUrl);
     }
 
-    if (shouldOpenMikke) {
-      setIsYousuOpen(true);
-      params.delete("mikke");
-    }
-
-    if (!shouldOpenMikke && authStatus !== "google_success") {
-      return;
-    }
-
-    const nextSearch = params.toString();
-    const nextUrl = `${window.location.pathname}${nextSearch ? `?${nextSearch}` : ""}`;
-    window.history.replaceState(null, "", nextUrl);
+    void handleUrlState();
   }, []);
 
   async function trackGoogleAuthSuccess(trigger: "callback_marker" | "pending_marker") {

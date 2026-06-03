@@ -134,7 +134,7 @@ export default function AccountCreatePage() {
     const { error } = await supabase.auth.signInWithOAuth({
       provider: "google",
       options: {
-        redirectTo: `${getSiteUrl()}/auth/callback?next=/home`,
+        redirectTo: `${getSiteUrl()}/home?auth=google_success`,
       },
     });
 
