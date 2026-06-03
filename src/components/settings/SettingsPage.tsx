@@ -9,6 +9,10 @@ import {
 import type { AccountSyncOverview, AccountSyncResult } from "../../lib/accountSync";
 import { trackProductEvent } from "../../lib/analytics/productAnalytics";
 import {
+  buildAuthDebugSnapshot,
+  type AuthDebugSnapshot,
+} from "../../lib/authDebug";
+import {
   getDisplayEnvironment,
   getDisplayEnvironmentLabel,
   type DisplayEnvironment,
@@ -28,6 +32,7 @@ export function SettingsPage() {
   const [email, setEmail] = useState<string | null>(null);
   const [syncMessage, setSyncMessage] = useState("");
   const [syncOverview, setSyncOverview] = useState<AccountSyncOverview | null>(null);
+  const [authDebug, setAuthDebug] = useState<AuthDebugSnapshot | null>(null);
   const [displayEnvironment, setDisplayEnvironment] =
     useState<DisplayEnvironment>("unknown");
 
@@ -39,6 +44,7 @@ export function SettingsPage() {
   async function checkAuthState() {
     const supabase = createBrowserSupabaseClient();
     if (!supabase) {
+      await refreshAuthDebug(null);
       setIsLoading(false);
       return;
     }
@@ -46,6 +52,7 @@ export function SettingsPage() {
     const { data } = await supabase.auth.getUser();
     setIsLoggedIn(Boolean(data.user));
     setEmail(data.user?.email ?? null);
+    await refreshAuthDebug(supabase);
     if (data.user) {
       await refreshSyncOverview();
     }
@@ -58,6 +65,16 @@ export function SettingsPage() {
       setSyncOverview(overview.isLoggedIn ? overview : null);
     } catch {
       setSyncOverview(null);
+    }
+  }
+
+  async function refreshAuthDebug(
+    supabase = createBrowserSupabaseClient(),
+  ) {
+    try {
+      setAuthDebug(await buildAuthDebugSnapshot(supabase));
+    } catch {
+      setAuthDebug(null);
     }
   }
 
@@ -256,6 +273,23 @@ export function SettingsPage() {
         </section>
 
         <section style={styles.section}>
+          <p style={styles.sectionLabel}>ログイン診断</p>
+          <div style={styles.card}>
+            <AuthDebugPanel snapshot={authDebug} />
+            <div style={styles.divider} />
+            <button
+              type="button"
+              onClick={() => {
+                void refreshAuthDebug();
+              }}
+              style={styles.secondaryButton}
+            >
+              診断を更新
+            </button>
+          </div>
+        </section>
+
+        <section style={styles.section}>
           <p style={styles.sectionLabel}>安心とルール</p>
           <div style={styles.card}>
             <a href="/privacy" style={styles.linkRow}>
@@ -317,6 +351,76 @@ export function SettingsPage() {
         </section>
       </div>
     </main>
+  );
+}
+
+function AuthDebugPanel({ snapshot }: { snapshot: AuthDebugSnapshot | null }) {
+  if (!snapshot) {
+    return <p style={styles.loadingText}>診断を読み込み中...</p>;
+  }
+
+  const latestDetails = snapshot.latestEvent?.details
+    ? JSON.stringify(snapshot.latestEvent.details)
+    : "";
+
+  return (
+    <div style={styles.authDebugPanel}>
+      <p style={styles.syncOverviewText}>
+        実機でログインが続かない原因を見るための一時表示です。
+      </p>
+      <div style={styles.authDebugRows}>
+        <AuthDebugRow label="表示" value={snapshot.environment} />
+        <AuthDebugRow label="URL" value={snapshot.origin} />
+        <AuthDebugRow label="場所" value={snapshot.path} />
+        <AuthDebugRow
+          label="保存キー"
+          value={
+            snapshot.authStoragePresent
+              ? `あり (${snapshot.authStorageLength})`
+              : "なし"
+          }
+        />
+        <AuthDebugRow
+          label="code verifier"
+          value={snapshot.codeVerifierPresent ? "あり" : "なし"}
+        />
+        <AuthDebugRow
+          label="保留マーク"
+          value={snapshot.pendingMarkerPresent ? "あり" : "なし"}
+        />
+        <AuthDebugRow
+          label="getSession"
+          value={snapshot.sessionPresent ? "あり" : "なし"}
+        />
+        <AuthDebugRow
+          label="getUser"
+          value={snapshot.userPresent ? "あり" : "なし"}
+        />
+        <AuthDebugRow label="email" value={snapshot.userEmail ?? "-"} />
+        <AuthDebugRow
+          label="最後"
+          value={snapshot.latestEvent?.event ?? "-"}
+        />
+        <AuthDebugRow
+          label="詳細"
+          value={
+            latestDetails ||
+            snapshot.userError ||
+            snapshot.sessionError ||
+            "-"
+          }
+        />
+      </div>
+    </div>
+  );
+}
+
+function AuthDebugRow({ label, value }: { label: string; value: string }) {
+  return (
+    <div style={styles.authDebugRow}>
+      <span style={styles.authDebugLabel}>{label}</span>
+      <span style={styles.authDebugValue}>{value}</span>
+    </div>
   );
 }
 
@@ -672,6 +776,32 @@ const styles = {
     fontSize: "11.5px",
     lineHeight: 1.5,
   },
+  authDebugPanel: {
+    padding: "14px 0",
+    display: "grid",
+    gap: "12px",
+  },
+  authDebugRows: {
+    display: "grid",
+    gap: "7px",
+  },
+  authDebugRow: {
+    display: "grid",
+    gridTemplateColumns: "94px minmax(0, 1fr)",
+    gap: "8px",
+    alignItems: "start",
+    fontSize: "11.5px",
+    lineHeight: 1.45,
+  },
+  authDebugLabel: {
+    color: "#9a9890",
+    fontWeight: 700,
+  },
+  authDebugValue: {
+    color: "#2a2a28",
+    overflowWrap: "anywhere" as const,
+    fontVariantNumeric: "tabular-nums",
+  },
   primaryButton: {
     display: "block",
     width: "100%",
@@ -680,6 +810,19 @@ const styles = {
     fontSize: "15px",
     fontWeight: 600,
     color: APP_ACCENT,
+    background: "transparent",
+    border: "none",
+    textDecoration: "none",
+    cursor: "pointer",
+  },
+  secondaryButton: {
+    display: "block",
+    width: "100%",
+    textAlign: "center" as const,
+    padding: "12px 0",
+    fontSize: "13px",
+    fontWeight: 600,
+    color: "#8a8a80",
     background: "transparent",
     border: "none",
     textDecoration: "none",

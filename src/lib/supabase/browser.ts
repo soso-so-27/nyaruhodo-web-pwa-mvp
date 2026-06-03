@@ -1,5 +1,6 @@
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 
+import { AUTH_STORAGE_KEY } from "../authDebug";
 import { getSupabasePublicConfig } from "./config";
 
 let browserClient: SupabaseClient | null = null;
@@ -18,7 +19,7 @@ export function createBrowserSupabaseClient() {
       flowType: "pkce",
       persistSession: true,
       storage: window.localStorage,
-      storageKey: "nyaruhodo_supabase_auth",
+      storageKey: AUTH_STORAGE_KEY,
     },
   });
 

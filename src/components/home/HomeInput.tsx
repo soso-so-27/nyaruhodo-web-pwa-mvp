@@ -7,6 +7,7 @@ import {
   syncLocalDataWithAccount,
 } from "../../lib/accountSync";
 import { trackProductEvent } from "../../lib/analytics/productAnalytics";
+import { writeAuthDebugEvent } from "../../lib/authDebug";
 import {
   getCollectionSlotPhotoSlug,
   getDailyCollectionTarget,
@@ -370,6 +371,10 @@ export function HomeInput({ recentEvents: _recentEvents }: HomeInputProps) {
         const supabase = createBrowserSupabaseClient();
 
         if (!supabase) {
+          writeAuthDebugEvent("home_auth_missing_supabase_client", {
+            hasCode: true,
+            hasPendingGoogleAuth,
+          });
           trackProductEvent("auth_google_failed", {
             error_type: "missing_supabase_client",
           });
@@ -377,6 +382,11 @@ export function HomeInput({ recentEvents: _recentEvents }: HomeInputProps) {
           return;
         }
 
+        writeAuthDebugEvent("home_auth_code_exchange_started", {
+          hasPendingGoogleAuth,
+          origin: window.location.origin,
+          path: window.location.pathname,
+        });
         const { error } = await supabase.auth.exchangeCodeForSession(authCode);
 
         params.delete("code");
@@ -386,6 +396,9 @@ export function HomeInput({ recentEvents: _recentEvents }: HomeInputProps) {
 
         if (error) {
           window.localStorage.removeItem(STORAGE_KEYS.authGooglePending);
+          writeAuthDebugEvent("home_auth_code_exchange_failed", {
+            message: error.message,
+          });
           trackProductEvent("auth_google_failed", {
             error_type: "code_exchange_failed",
             error_message: error.message,
@@ -394,6 +407,13 @@ export function HomeInput({ recentEvents: _recentEvents }: HomeInputProps) {
           return;
         }
 
+        const { data: sessionData, error: sessionError } =
+          await supabase.auth.getSession();
+        writeAuthDebugEvent("home_auth_code_exchange_succeeded", {
+          hasSession: Boolean(sessionData.session),
+          hasSessionUser: Boolean(sessionData.session?.user),
+          sessionError: sessionError?.message ?? null,
+        });
         shouldTrackGoogleAuth = true;
       }
 
@@ -444,11 +464,24 @@ export function HomeInput({ recentEvents: _recentEvents }: HomeInputProps) {
     const userId = data.user?.id ?? null;
 
     if (!userId) {
+      const { data: sessionData, error: sessionError } =
+        await supabase.auth.getSession();
+      writeAuthDebugEvent("home_auth_success_without_user", {
+        trigger,
+        hasSession: Boolean(sessionData.session),
+        hasSessionUser: Boolean(sessionData.session?.user),
+        sessionError: sessionError?.message ?? null,
+      });
       return;
     }
 
     hasTrackedGoogleAuthSuccess.current = true;
     window.localStorage.removeItem(STORAGE_KEYS.authGooglePending);
+    writeAuthDebugEvent("home_auth_user_confirmed", {
+      trigger,
+      userId,
+      email: data.user?.email ?? null,
+    });
     trackProductEvent(
       "auth_google_succeeded",
       {
