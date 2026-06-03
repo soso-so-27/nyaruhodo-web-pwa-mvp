@@ -114,25 +114,34 @@ export function restoreSyncedSleepingPhotos({
   const existingKeptPhotos = mergeLocal ? readKeptExchangePhotos() : [];
   const restoredOwnPhotos = mergeOwnSleepingPhotos(existingOwnPhotos, ownPhotos);
   const restoredKeptPhotos = mergeExchangePhotos(existingKeptPhotos, keptPhotos);
+  const savedOwnPhotos = writeStorageArrayWithFallback(
+    OWN_SLEEPING_PHOTO_STORAGE_KEY,
+    restoredOwnPhotos,
+    [24, 12, 6, 1],
+  );
+  const savedKeptPhotos = writeStorageArrayWithFallback(
+    KEPT_EXCHANGE_PHOTO_STORAGE_KEY,
+    restoredKeptPhotos,
+    [50, 24, 12, 6, 1],
+  );
 
-  try {
-    writeStorageArray(OWN_SLEEPING_PHOTO_STORAGE_KEY, restoredOwnPhotos.slice(0, 24));
-    writeStorageArray(KEPT_EXCHANGE_PHOTO_STORAGE_KEY, restoredKeptPhotos.slice(0, 50));
-
-    for (const photo of restoredOwnPhotos) {
+  for (const photo of savedOwnPhotos) {
+    try {
       if (photo.shared) {
         addSharedSleepingPhoto(photo);
       }
+    } catch {
+      // Shared-photo history is optional during account restore.
     }
+  }
 
+  if (savedOwnPhotos.length > 0 || savedKeptPhotos.length > 0) {
     dispatchBoxPhotoStorageEvent();
-  } catch {
-    // Account restore should keep the rest of the sync result usable.
   }
 
   return {
-    ownCount: ownPhotos.length,
-    keptCount: keptPhotos.length,
+    ownCount: savedOwnPhotos.length,
+    keptCount: savedKeptPhotos.length,
   };
 }
 
@@ -629,6 +638,25 @@ function readStorageArray<T>(key: string) {
 
 function writeStorageArray<T>(key: string, value: T[]) {
   window.localStorage.setItem(key, JSON.stringify(value));
+}
+
+function writeStorageArrayWithFallback<T>(
+  key: string,
+  value: T[],
+  keepCounts: number[],
+) {
+  for (const keepCount of keepCounts) {
+    const nextValue = value.slice(0, keepCount);
+
+    try {
+      writeStorageArray(key, nextValue);
+      return nextValue;
+    } catch {
+      // Try again with fewer photos when iOS PWA storage is tight.
+    }
+  }
+
+  return [] as T[];
 }
 
 function hashText(value: string) {

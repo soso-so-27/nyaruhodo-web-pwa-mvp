@@ -5,6 +5,12 @@ import {
   toCatMomentRecord,
   type OwnSleepingPhoto,
 } from "./sleepingPhotos";
+import {
+  getDataUrlExtension,
+  sanitizePathSegment,
+  toStoragePhotoUrl,
+  uploadDataUrl,
+} from "../photoStorage";
 
 export async function backupOwnSleepingPhotoMoment(photo: OwnSleepingPhoto) {
   if (typeof window === "undefined") {
@@ -23,6 +29,18 @@ export async function backupOwnSleepingPhotoMoment(photo: OwnSleepingPhoto) {
     const anonymousId = userId ? null : getOrCreateAnonymousId();
     const moment = ownSleepingPhotoToCatMoment(photo);
     const record = toCatMomentRecord(moment);
+    const photoUrl =
+      userId && record.photo_url.startsWith("data:")
+        ? toStoragePhotoUrl(
+            await uploadDataUrl(
+              supabase,
+              `${userId}/${sanitizePathSegment(photo.ownerCatId)}/sleeping/${sanitizePathSegment(
+                record.id,
+              )}.${getDataUrlExtension(record.photo_url)}`,
+              record.photo_url,
+            ),
+          )
+        : record.photo_url;
 
     const row = {
       user_id: userId,
@@ -30,7 +48,7 @@ export async function backupOwnSleepingPhotoMoment(photo: OwnSleepingPhoto) {
       local_moment_id: record.id,
       local_cat_id: photo.catId,
       owner_cat_id: record.owner_cat_id,
-      photo_url: record.photo_url,
+      photo_url: photoUrl,
       state: record.state,
       visibility: record.visibility,
       delivery_status: record.delivery_status,
