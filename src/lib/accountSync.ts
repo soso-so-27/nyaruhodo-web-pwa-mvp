@@ -710,89 +710,97 @@ async function syncSleepingPhotos(
   snapshot: LocalSnapshot,
   result: AccountSyncResult,
 ) {
-  const momentRows = snapshot.ownSleepingPhotos.map((photo) => ({
-    user_id: userId,
-    anonymous_id: null,
-    local_moment_id: photo.id,
-    local_cat_id: photo.catId,
-    owner_cat_id: photo.ownerCatId,
-    photo_url: photo.src,
-    state: photo.state,
-    visibility: photo.visibility,
-    delivery_status: photo.deliveryStatus,
-    source_moment_id: photo.sourceMomentId ?? null,
-    metadata: {
-      ...SYNC_METADATA,
-      trigger_label: photo.triggerLabel,
-      theme: photo.theme,
-      shared: photo.shared,
-    },
-    captured_at: new Date(photo.createdAt).toISOString(),
-    created_at: new Date(photo.createdAt).toISOString(),
-  }));
+  try {
+    const momentRows = snapshot.ownSleepingPhotos.map((photo) => ({
+      user_id: userId,
+      anonymous_id: null,
+      local_moment_id: photo.id,
+      local_cat_id: photo.catId,
+      owner_cat_id: photo.ownerCatId,
+      photo_url: photo.src,
+      state: photo.state,
+      visibility: photo.visibility,
+      delivery_status: photo.deliveryStatus,
+      source_moment_id: photo.sourceMomentId ?? null,
+      metadata: {
+        ...SYNC_METADATA,
+        trigger_label: photo.triggerLabel,
+        theme: photo.theme,
+        shared: photo.shared,
+      },
+      captured_at: new Date(photo.createdAt).toISOString(),
+      created_at: new Date(photo.createdAt).toISOString(),
+    }));
 
-  if (momentRows.length > 0) {
-    const localMomentIds = momentRows.map((row) => row.local_moment_id);
+    if (momentRows.length > 0) {
+      const localMomentIds = momentRows.map((row) => row.local_moment_id);
+      const { error: deleteError } = await supabase
+        .from("cat_moments")
+        .delete()
+        .eq("user_id", userId)
+        .in("local_moment_id", localMomentIds);
+
+      if (deleteError) {
+        throw new Error(`Sleeping photo cleanup failed: ${deleteError.message}`);
+      }
+
+      const { error } = await supabase.from("cat_moments").insert(momentRows);
+
+      if (error) {
+        throw new Error(`Sleeping photo sync failed: ${error.message}`);
+      }
+
+      result.pushedOwnSleepingPhotos += momentRows.length;
+    }
+
+    const deliveryRows = snapshot.keptExchangePhotos.map((photo) => ({
+      user_id: userId,
+      anonymous_id: null,
+      local_delivery_id: photo.id,
+      source_moment_id: null,
+      source_photo_id: photo.sourcePhotoId ?? null,
+      recipient_local_cat_id: null,
+      photo_url: photo.src,
+      status: "kept",
+      metadata: {
+        ...SYNC_METADATA,
+        title: photo.title,
+        subtitle: photo.subtitle,
+        trigger_label: photo.triggerLabel,
+        theme: photo.theme,
+      },
+      delivered_at: new Date(photo.deliveredAt).toISOString(),
+    }));
+
+    if (deliveryRows.length === 0) {
+      return;
+    }
+
+    const localDeliveryIds = deliveryRows.map((row) => row.local_delivery_id);
     const { error: deleteError } = await supabase
-      .from("cat_moments")
+      .from("cat_moment_deliveries")
       .delete()
       .eq("user_id", userId)
-      .in("local_moment_id", localMomentIds);
+      .in("local_delivery_id", localDeliveryIds);
 
     if (deleteError) {
-      throw new Error(`Sleeping photo cleanup failed: ${deleteError.message}`);
+      throw new Error(`Kept photo cleanup failed: ${deleteError.message}`);
     }
 
-    const { error } = await supabase.from("cat_moments").insert(momentRows);
+    const { error } = await supabase
+      .from("cat_moment_deliveries")
+      .insert(deliveryRows);
 
     if (error) {
-      throw new Error(`Sleeping photo sync failed: ${error.message}`);
+      throw new Error(`Kept photo sync failed: ${error.message}`);
     }
 
-    result.pushedOwnSleepingPhotos += momentRows.length;
+    result.pushedKeptExchangePhotos += deliveryRows.length;
+  } catch (error) {
+    result.errors.push(
+      error instanceof Error ? error.message : "Sleeping photo sync failed",
+    );
   }
-
-  const deliveryRows = snapshot.keptExchangePhotos.map((photo) => ({
-    user_id: userId,
-    anonymous_id: null,
-    local_delivery_id: photo.id,
-    source_moment_id: null,
-    source_photo_id: photo.sourcePhotoId ?? null,
-    recipient_local_cat_id: null,
-    photo_url: photo.src,
-    status: "kept",
-    metadata: {
-      ...SYNC_METADATA,
-      title: photo.title,
-      subtitle: photo.subtitle,
-      trigger_label: photo.triggerLabel,
-      theme: photo.theme,
-    },
-    delivered_at: new Date(photo.deliveredAt).toISOString(),
-  }));
-
-  if (deliveryRows.length === 0) {
-    return;
-  }
-
-  const localDeliveryIds = deliveryRows.map((row) => row.local_delivery_id);
-  const { error: deleteError } = await supabase
-    .from("cat_moment_deliveries")
-    .delete()
-    .eq("user_id", userId)
-    .in("local_delivery_id", localDeliveryIds);
-
-  if (deleteError) {
-    throw new Error(`Kept photo cleanup failed: ${deleteError.message}`);
-  }
-
-  const { error } = await supabase.from("cat_moment_deliveries").insert(deliveryRows);
-
-  if (error) {
-    throw new Error(`Kept photo sync failed: ${error.message}`);
-  }
-
-  result.pushedKeptExchangePhotos += deliveryRows.length;
 }
 
 async function restoreRemoteSnapshot(
@@ -1026,12 +1034,16 @@ async function restoreSleepingPhotos(
       .limit(50),
   ]);
 
-  if (momentsResult.error) {
-    throw new Error(`Sleeping photo restore failed: ${momentsResult.error.message}`);
-  }
-
-  if (deliveriesResult.error) {
-    throw new Error(`Kept photo restore failed: ${deliveriesResult.error.message}`);
+  if (momentsResult.error || deliveriesResult.error) {
+    if (momentsResult.error) {
+      result.errors.push(
+        `Sleeping photo restore skipped: ${momentsResult.error.message}`,
+      );
+    }
+    if (deliveriesResult.error) {
+      result.errors.push(`Kept photo restore skipped: ${deliveriesResult.error.message}`);
+    }
+    return;
   }
 
   const ownPhotos = ((momentsResult.data ?? []) as RemoteCatMomentRow[])
