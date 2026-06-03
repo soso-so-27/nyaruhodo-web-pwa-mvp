@@ -442,10 +442,11 @@ export function HomeInput({ recentEvents: _recentEvents }: HomeInputProps) {
     );
 
     if (
-      syncResult.status === "restored" &&
-      (syncResult.restoredCats > 0 ||
-        syncResult.restoredOwnSleepingPhotos > 0 ||
-        syncResult.restoredKeptExchangePhotos > 0)
+      syncResult.status === "synced" ||
+      (syncResult.status === "restored" &&
+        (syncResult.restoredCats > 0 ||
+          syncResult.restoredOwnSleepingPhotos > 0 ||
+          syncResult.restoredKeptExchangePhotos > 0))
     ) {
       refreshHomeFromLocalStorage();
     }

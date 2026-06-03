@@ -1,6 +1,7 @@
 import { STORAGE_KEYS, getRecordLogKey } from "./storage";
 import { createBrowserSupabaseClient } from "./supabase/browser";
 import {
+  dispatchBoxPhotoStorageEvent,
   readKeptExchangePhotos,
   readOwnSleepingPhotos,
   restoreSyncedSleepingPhotos,
@@ -347,7 +348,7 @@ export async function syncLocalDataWithAccount(options?: {
 
     if (shouldForceRestore) {
       await restoreRemoteSnapshot(supabase, data.user.id, result, {
-        mergeLocal: false,
+        mergeLocal: true,
       });
       if (hasRestoredAccountData(result)) {
         await saveSyncState(supabase, data.user.id, {
@@ -374,7 +375,7 @@ export async function syncLocalDataWithAccount(options?: {
 
     if (shouldRestore) {
       await restoreRemoteSnapshot(supabase, data.user.id, result, {
-        mergeLocal: false,
+        mergeLocal: true,
       });
       if (hasRestoredAccountData(result)) {
         await saveSyncState(supabase, data.user.id, {
@@ -963,7 +964,7 @@ async function restoreRemoteSnapshot(
   const nextActiveCatId =
     options.mergeLocal &&
     previousActiveCatId &&
-    remoteLocalCatIds.includes(previousActiveCatId)
+    profiles.some((profile) => profile.id === previousActiveCatId)
       ? previousActiveCatId
       : remoteLocalCatIds[0] ?? profiles[0].id;
 
@@ -1084,6 +1085,7 @@ async function restoreCollectionPhotos(
       STORAGE_KEYS.collectionPhotos,
       JSON.stringify(collectionStore),
     );
+    dispatchBoxPhotoStorageEvent();
   }
 }
 

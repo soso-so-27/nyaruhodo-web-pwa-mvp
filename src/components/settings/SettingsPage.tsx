@@ -107,7 +107,7 @@ export function SettingsPage() {
     });
     if (
       !window.confirm(
-        "この端末の猫データを、アカウントに保存されているデータで復元しますか？",
+        "アカウントに保存されているデータを、この端末に追加で復元しますか？",
       )
     ) {
       trackProductEvent("settings_account_restore_cancelled", {

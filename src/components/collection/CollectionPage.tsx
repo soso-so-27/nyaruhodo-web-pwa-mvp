@@ -135,7 +135,7 @@ export function CollectionPage() {
     }
 
     setCollectionPhotos(readCollectionPhotos(activeCatId));
-  }, [activeCatId]);
+  }, [activeCatId, boxRefreshTick]);
 
   useEffect(() => {
     return () => {
