@@ -3,6 +3,7 @@
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import type { CSSProperties } from "react";
+import { AppLoadingScreen } from "../../../components/loading/AppLoadingScreen";
 import {
   APP_ACCENT,
   APP_ACCENT_SOFT_BG,
@@ -151,6 +152,10 @@ export default function AccountCreatePage() {
       }),
     );
     router.push("/home");
+  }
+
+  if (isCheckingAccount) {
+    return <AppLoadingScreen variant="account" />;
   }
 
   return (

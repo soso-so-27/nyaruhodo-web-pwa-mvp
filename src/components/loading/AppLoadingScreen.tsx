@@ -2,7 +2,7 @@ import type { CSSProperties } from "react";
 import { BottomNavigation } from "../navigation/BottomNavigation";
 
 type AppLoadingScreenProps = {
-  variant: "home" | "collection" | "cats" | "torisetu";
+  variant: "home" | "collection" | "cats" | "torisetu" | "account";
 };
 
 export function AppLoadingScreen({ variant }: AppLoadingScreenProps) {
@@ -10,6 +10,7 @@ export function AppLoadingScreen({ variant }: AppLoadingScreenProps) {
   const isCats = variant === "cats";
   const isCollection = variant === "collection";
   const isTorisetu = variant === "torisetu";
+  const isAccount = variant === "account";
   const activeNav = isHome
     ? "today"
     : isCollection
@@ -29,6 +30,7 @@ export function AppLoadingScreen({ variant }: AppLoadingScreenProps) {
         {isCollection ? <CollectionLoading /> : null}
         {isCats ? <CatsLoading /> : null}
         {isTorisetu ? <TorisetuLoading /> : null}
+        {isAccount ? <AccountLoading /> : null}
       </div>
 
       <style>{`
@@ -37,7 +39,7 @@ export function AppLoadingScreen({ variant }: AppLoadingScreenProps) {
           100% { background-position: -180% 0; }
         }
       `}</style>
-      <BottomNavigation active={activeNav} />
+      {isAccount ? null : <BottomNavigation active={activeNav} />}
     </main>
   );
 }
@@ -127,19 +129,36 @@ function TorisetuLoading() {
   );
 }
 
+function AccountLoading() {
+  return (
+    <section style={styles.accountStage} aria-label="アカウントを確認中">
+      <div style={styles.accountMark}>
+        <div style={styles.accountDot} />
+      </div>
+      <div style={styles.accountTitleLine} />
+      <div style={styles.accountCopyLine} />
+      <div style={styles.accountList}>
+        <div style={styles.accountRow} />
+        <div style={styles.accountRow} />
+        <div style={styles.accountRow} />
+      </div>
+    </section>
+  );
+}
+
 const shimmerBase: CSSProperties = {
   background:
-    "linear-gradient(90deg, rgba(169,149,126,0.08) 25%, rgba(255,253,248,0.7) 50%, rgba(169,149,126,0.08) 75%)",
+    "linear-gradient(90deg, rgba(169,149,126,0.055) 25%, rgba(255,253,248,0.58) 50%, rgba(169,149,126,0.055) 75%)",
   backgroundSize: "200% 100%",
-  animation: "paperLoading 1.55s infinite",
-  border: "1px solid rgba(144,126,102,0.1)",
-  boxShadow: "0 8px 18px rgba(90,76,60,0.045)",
+  animation: "paperLoading 1.9s infinite",
+  border: "1px solid rgba(144,126,102,0.08)",
+  boxShadow: "0 6px 14px rgba(90,76,60,0.03)",
 };
 
 const paperCard: CSSProperties = {
-  background: "rgba(255,253,248,0.64)",
-  border: "1px solid rgba(144,126,102,0.11)",
-  boxShadow: "0 8px 18px rgba(90,76,60,0.045)",
+  background: "rgba(255,253,248,0.54)",
+  border: "1px solid rgba(144,126,102,0.09)",
+  boxShadow: "0 6px 14px rgba(90,76,60,0.03)",
 };
 
 const styles = {
@@ -179,9 +198,9 @@ const styles = {
     left: "50%",
     transform: "translateX(-50%)",
     zIndex: 3,
-    color: "#4a463e",
+    color: "#6b6257",
     fontFamily: '"Shippori Mincho B1", "Hiragino Mincho ProN", "Yu Mincho", serif',
-    fontSize: "18px",
+    fontSize: "16px",
     fontWeight: 400,
     letterSpacing: "0.16em",
     lineHeight: 1.4,
@@ -232,14 +251,14 @@ const styles = {
     position: "absolute",
     top: "calc(clamp(284px, 38dvh, 348px) + env(safe-area-inset-top))",
     left: "50%",
-    width: "154px",
-    height: "154px",
+    width: "140px",
+    height: "140px",
     transform: "translateX(-50%)",
     borderRadius: "50%",
     display: "grid",
     placeItems: "center",
     boxShadow:
-      "0 0 0 12px rgba(255,255,255,0.66), 0 18px 34px rgba(119,101,73,0.14)",
+      "0 0 0 9px rgba(255,255,255,0.54), 0 14px 26px rgba(119,101,73,0.09)",
   },
   cameraIconLine: {
     width: "42px",
@@ -259,8 +278,61 @@ const styles = {
   },
   statCard: {
     ...paperCard,
-    minHeight: "100px",
+    minHeight: "92px",
     borderRadius: "20px",
+  },
+  accountStage: {
+    minHeight: "100%",
+    padding:
+      "calc(128px + env(safe-area-inset-top)) 24px calc(72px + env(safe-area-inset-bottom))",
+    display: "grid",
+    alignContent: "center",
+    justifyItems: "center",
+    gap: "16px",
+    boxSizing: "border-box",
+  },
+  accountMark: {
+    width: "54px",
+    height: "54px",
+    borderRadius: "50%",
+    border: "1px solid rgba(144,126,102,0.12)",
+    background: "rgba(255,253,248,0.58)",
+    display: "grid",
+    placeItems: "center",
+    boxShadow: "0 8px 18px rgba(90,76,60,0.035)",
+  },
+  accountDot: {
+    width: "8px",
+    height: "8px",
+    borderRadius: "50%",
+    background: "#8d806f",
+    boxShadow: "0 0 0 8px rgba(169,149,126,0.12)",
+  },
+  accountTitleLine: {
+    ...shimmerBase,
+    width: "152px",
+    height: "24px",
+    borderRadius: "999px",
+    marginTop: "4px",
+  },
+  accountCopyLine: {
+    ...shimmerBase,
+    width: "218px",
+    height: "12px",
+    borderRadius: "999px",
+    opacity: 0.74,
+  },
+  accountList: {
+    width: "100%",
+    maxWidth: "310px",
+    display: "grid",
+    gap: "10px",
+    marginTop: "10px",
+  },
+  accountRow: {
+    ...paperCard,
+    height: "42px",
+    borderRadius: "15px",
   },
   pageStage: {
     padding:
