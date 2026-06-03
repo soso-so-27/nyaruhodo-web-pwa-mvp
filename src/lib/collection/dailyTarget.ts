@@ -7,7 +7,7 @@ export function getCollectionSlotPhotoSlug(slot: CollectionSlot) {
 
 export function getDailyCollectionTarget(
   catId: string | null | undefined,
-  collectionPhotos: Record<string, string[]> = {},
+  collectionPhotos: Record<string, unknown[]> = {},
 ) {
   const slots = COLLECTION_GROUPS.flatMap((group) => group.slots);
 
@@ -39,7 +39,7 @@ export function readStoredCollectionPhotos(catId: string) {
 
     const all = JSON.parse(raw) as Record<
       string,
-      Record<string, string[] | string>
+      Record<string, StoredCollectionPhoto[] | StoredCollectionPhoto | string[] | string>
     >;
     const catPhotos = all[catId] ?? {};
     const photosForDisplay =
@@ -56,15 +56,37 @@ export function readStoredCollectionPhotos(catId: string) {
   }
 }
 
-function normalizeStoredPhotoList(value: string[] | string | undefined) {
+type StoredCollectionPhoto = {
+  id?: string;
+  src?: string;
+};
+
+function normalizeStoredPhotoList(
+  value: StoredCollectionPhoto[] | StoredCollectionPhoto | string[] | string | undefined,
+) {
   if (typeof value === "string") {
     return [value];
   }
 
-  return value ?? [];
+  const values = Array.isArray(value) ? value : value ? [value] : [];
+
+  return values
+    .map((photo) => {
+      if (typeof photo === "string") {
+        return photo;
+      }
+
+      return typeof photo.src === "string" ? photo.src : null;
+    })
+    .filter((photo): photo is string => Boolean(photo));
 }
 
-function countStoredPhotos(photosBySlug: Record<string, string[] | string>) {
+function countStoredPhotos(
+  photosBySlug: Record<
+    string,
+    StoredCollectionPhoto[] | StoredCollectionPhoto | string[] | string
+  >,
+) {
   return Object.values(photosBySlug).reduce(
     (count, value) => count + normalizeStoredPhotoList(value).length,
     0,
@@ -72,7 +94,10 @@ function countStoredPhotos(photosBySlug: Record<string, string[] | string>) {
 }
 
 function mergeAllCollectionPhotos(
-  allPhotos: Record<string, Record<string, string[] | string>>,
+  allPhotos: Record<
+    string,
+    Record<string, StoredCollectionPhoto[] | StoredCollectionPhoto | string[] | string>
+  >,
 ) {
   const merged: Record<string, string[]> = {};
 

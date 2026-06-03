@@ -8,6 +8,11 @@ import {
 } from "../../lib/collection/dailyTarget";
 import { trackProductEvent } from "../../lib/analytics/productAnalytics";
 import {
+  deleteAccountCollectionPhoto,
+  deleteAccountSleepingPhoto,
+  hideAccountKeptExchangePhoto,
+} from "../../lib/accountSync";
+import {
   BOX_PHOTO_STORAGE_EVENT,
   deleteOwnSleepingPhoto,
   hideKeptExchangePhoto,
@@ -93,6 +98,11 @@ type BoxPreviewPhoto = {
   deliveredAt?: number;
 };
 
+type StoredCollectionPhotoEntry = {
+  id: string;
+  src: string;
+};
+
 type BoxDetailKind = "sleeping" | "other";
 
 export function CollectionPage() {
@@ -101,9 +111,9 @@ export function CollectionPage() {
   const [activeGroupId, setActiveGroupId] = useState<CollectionGroupId>("pose");
   const [activeView, setActiveView] = useState<CollectionView>("collect");
   const [hasLoaded, setHasLoaded] = useState(false);
-  const [collectionPhotos, setCollectionPhotos] = useState<Record<string, string[]>>(
-    {},
-  );
+  const [collectionPhotos, setCollectionPhotos] = useState<
+    Record<string, StoredCollectionPhotoEntry[]>
+  >({});
   const [selectedSlug, setSelectedSlug] = useState<string | null>(null);
   const [completedSlug, setCompletedSlug] = useState<string | null>(null);
   const [currentPhotoIndex, setCurrentPhotoIndex] = useState(0);
@@ -372,6 +382,9 @@ export function CollectionPage() {
 
   function handleDeleteSleepingPhoto(photo: BoxPreviewPhoto) {
     deleteOwnSleepingPhoto(photo.id);
+    void deleteAccountSleepingPhoto(photo.id).catch(() => {
+      // Local delete should still feel immediate; restore checks expose remote issues.
+    });
     setBoxRefreshTick((value) => value + 1);
     setCurrentBoxPhotoIndex((current) =>
       Math.max(0, Math.min(current, sleepingBoxPhotos.length - 2)),
@@ -386,6 +399,9 @@ export function CollectionPage() {
 
   function handleHideOtherPhoto(photo: BoxPreviewPhoto, reason: "hide" | "report") {
     hideKeptExchangePhoto(photo.id, reason);
+    void hideAccountKeptExchangePhoto(photo.id, reason).catch(() => {
+      // Local hide/report should stay instant even if the account sync retries later.
+    });
     setBoxRefreshTick((value) => value + 1);
     setCurrentBoxPhotoIndex((current) =>
       Math.max(0, Math.min(current, otherBoxPhotos.length - 2)),
@@ -496,10 +512,10 @@ export function CollectionPage() {
         return;
       }
 
-      addCollectionPhoto(activeCatId, slug, dataUrl);
+      const addedPhoto = addCollectionPhoto(activeCatId, slug, dataUrl);
       setCollectionPhotos((current) => ({
         ...current,
-        [slug]: [...(current[slug] ?? []), dataUrl],
+        [slug]: [...(current[slug] ?? []), addedPhoto],
       }));
       trackProductEvent(
         "collection_photo_added",
@@ -604,7 +620,7 @@ export function CollectionPage() {
 
       const all = JSON.parse(raw) as Record<
         string,
-        Record<string, string[] | string>
+        Record<string, StoredCollectionPhotoEntry[] | StoredCollectionPhotoEntry | string[] | string>
       >;
       const catPhotos = normalizeStoredPhotoList(all[activeCatId]?.[slug]);
 
@@ -613,6 +629,7 @@ export function CollectionPage() {
       }
 
       const slot = getCollectionSlotBySlug(slug);
+      const photoToDelete = catPhotos[index];
       const photoCountBefore = catPhotos.length;
       catPhotos.splice(index, 1);
 
@@ -623,6 +640,11 @@ export function CollectionPage() {
       }
 
       window.localStorage.setItem(STORAGE_KEYS.collectionPhotos, JSON.stringify(all));
+      if (photoToDelete?.id) {
+        void deleteAccountCollectionPhoto(photoToDelete.id).catch(() => {
+          // The local album should update immediately; account checks surface sync issues.
+        });
+      }
       setCollectionPhotos((current) => {
         const next = { ...current };
 
@@ -1806,7 +1828,9 @@ function groupPhotosBySlot(photos: CollectionPhoto[]) {
   return map;
 }
 
-function buildStoredCollectionPhotos(collectionPhotos: Record<string, string[]>) {
+function buildStoredCollectionPhotos(
+  collectionPhotos: Record<string, StoredCollectionPhotoEntry[]>,
+) {
   const photos: CollectionPhoto[] = [];
 
   COLLECTION_GROUPS.forEach((group) => {
@@ -1814,11 +1838,11 @@ function buildStoredCollectionPhotos(collectionPhotos: Record<string, string[]>)
       const slug = getCollectionPhotoSlug(slot);
       const slotPhotos = collectionPhotos[slug] ?? [];
 
-      slotPhotos.forEach((src, index) => {
+      slotPhotos.forEach((photo, index) => {
         photos.push({
-          id: `local-${slug}-${index}`,
+          id: photo.id,
           slotId: slot.id,
-          src,
+          src: photo.src,
           storageSlug: slug,
           localIndex: index,
         });
@@ -1875,7 +1899,7 @@ function buildNextCollectionTargets(
     .slice(0, 4);
 }
 
-function readCollectionPhotos(catId: string): Record<string, string[]> {
+function readCollectionPhotos(catId: string): Record<string, StoredCollectionPhotoEntry[]> {
   try {
     const raw = window.localStorage.getItem(STORAGE_KEYS.collectionPhotos);
 
@@ -1885,7 +1909,7 @@ function readCollectionPhotos(catId: string): Record<string, string[]> {
 
     const all = JSON.parse(raw) as Record<
       string,
-      Record<string, string[] | string>
+      Record<string, StoredCollectionPhotoEntry[] | StoredCollectionPhotoEntry | string[] | string>
     >;
     const catPhotos = all[catId] ?? {};
     const photosForDisplay =
@@ -1894,7 +1918,7 @@ function readCollectionPhotos(catId: string): Record<string, string[]> {
     return Object.fromEntries(
       Object.entries(photosForDisplay).map(([slug, value]) => [
         slug,
-        normalizeStoredPhotoList(value),
+        normalizeStoredPhotoList(value, catId, slug),
       ]),
     );
   } catch {
@@ -1903,53 +1927,105 @@ function readCollectionPhotos(catId: string): Record<string, string[]> {
 }
 
 function addCollectionPhoto(catId: string, slug: string, dataUrl: string) {
+  const photo: StoredCollectionPhotoEntry = {
+    id: createCollectionPhotoId(catId, slug),
+    src: dataUrl,
+  };
+
   try {
     const raw = window.localStorage.getItem(STORAGE_KEYS.collectionPhotos);
     const all = raw
-      ? (JSON.parse(raw) as Record<string, Record<string, string[] | string>>)
+      ? (JSON.parse(raw) as Record<
+          string,
+          Record<string, StoredCollectionPhotoEntry[] | StoredCollectionPhotoEntry | string[] | string>
+        >)
       : {};
 
     if (!all[catId]) {
       all[catId] = {};
     }
 
-    all[catId][slug] = [...normalizeStoredPhotoList(all[catId][slug]), dataUrl];
+    all[catId][slug] = [...normalizeStoredPhotoList(all[catId][slug], catId, slug), photo];
     window.localStorage.setItem(STORAGE_KEYS.collectionPhotos, JSON.stringify(all));
   } catch {
     // Ignore localStorage quota or parse failures for this MVP fallback.
   }
+
+  return photo;
 }
 
-function normalizeStoredPhotoList(value: string[] | string | undefined) {
+function normalizeStoredPhotoList(
+  value:
+    | StoredCollectionPhotoEntry[]
+    | StoredCollectionPhotoEntry
+    | string[]
+    | string
+    | undefined,
+  catId = "cat",
+  slug = "photo",
+) {
   if (typeof value === "string") {
-    return [value];
+    return [{ id: `${catId}:${slug}:0`, src: value }];
   }
 
-  return value ?? [];
+  const values = Array.isArray(value) ? value : value ? [value] : [];
+
+  return values
+    .map((photo, index): StoredCollectionPhotoEntry | null => {
+      if (typeof photo === "string") {
+        return photo ? { id: `${catId}:${slug}:${index}`, src: photo } : null;
+      }
+
+      if (photo && typeof photo.src === "string" && photo.src) {
+        return {
+          id: photo.id || `${catId}:${slug}:${index}`,
+          src: photo.src,
+        };
+      }
+
+      return null;
+    })
+    .filter((photo): photo is StoredCollectionPhotoEntry => Boolean(photo));
 }
 
-function countStoredPhotos(photosBySlug: Record<string, string[] | string>) {
-  return Object.values(photosBySlug).reduce(
-    (count, value) => count + normalizeStoredPhotoList(value).length,
+function countStoredPhotos(
+  photosBySlug: Record<
+    string,
+    StoredCollectionPhotoEntry[] | StoredCollectionPhotoEntry | string[] | string
+  >,
+) {
+  return Object.entries(photosBySlug).reduce(
+    (count, [slug, value]) => count + normalizeStoredPhotoList(value, "cat", slug).length,
     0,
   );
 }
 
 function mergeAllCollectionPhotos(
-  allPhotos: Record<string, Record<string, string[] | string>>,
+  allPhotos: Record<
+    string,
+    Record<string, StoredCollectionPhotoEntry[] | StoredCollectionPhotoEntry | string[] | string>
+  >,
 ) {
-  const merged: Record<string, string[]> = {};
+  const merged: Record<string, StoredCollectionPhotoEntry[]> = {};
 
-  for (const photosBySlug of Object.values(allPhotos)) {
+  for (const [catId, photosBySlug] of Object.entries(allPhotos)) {
     for (const [slug, value] of Object.entries(photosBySlug)) {
       merged[slug] = [
         ...(merged[slug] ?? []),
-        ...normalizeStoredPhotoList(value),
+        ...normalizeStoredPhotoList(value, catId, slug),
       ];
     }
   }
 
   return merged;
+}
+
+function createCollectionPhotoId(catId: string, slug: string) {
+  const random =
+    globalThis.crypto?.randomUUID?.() ??
+    `id-${Date.now()}-${Math.random().toString(16).slice(2)}`;
+
+  return `${catId}:${slug}:${random}`;
 }
 
 function resizeAndEncode(file: File, maxSize = 800): Promise<string> {

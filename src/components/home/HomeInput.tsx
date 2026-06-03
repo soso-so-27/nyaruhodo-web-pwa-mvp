@@ -92,6 +92,7 @@ const MIKKE_CATEGORIES: MikkeWindowCategory[] = ["place", "pose", "sign"];
 const MIKKE_LOCK_MS = 60 * 60 * 1000;
 const SLEEPING_DELIVERY_LOCK_MS = 6 * 60 * 60 * 1000;
 const HOME_SLEEPING_COUNTER_BASE_COUNT = 75;
+const SHOW_SLEEPING_LIBRARY_ADMIN = process.env.NODE_ENV !== "production";
 
 type RecordLogItem = {
   id: string;
@@ -2352,23 +2353,25 @@ function SleepingPhotoHome({
         ねてるねこ
       </div>
       <section style={styles.sleepingHome} aria-label="しゃしん">
-      <button
-        type="button"
-        style={styles.sleepingLibraryButton}
-        onClick={onSelectPhoto}
-      >
-        管理用
-      </button>
-      <div style={styles.sleepingHomeHeader}>
-        <h1 style={styles.sleepingHomeTitle}>
-          ねがおをとる
-        </h1>
-        <p style={styles.sleepingHomeLead}>
-          ねてるねこを見つけたら、
-          <br />
-          ここから入れておく
-        </p>
-      </div>
+        {SHOW_SLEEPING_LIBRARY_ADMIN ? (
+          <button
+            type="button"
+            style={styles.sleepingLibraryButton}
+            onClick={onSelectPhoto}
+          >
+            管理用
+          </button>
+        ) : null}
+        <div style={styles.sleepingHomeHeader}>
+          <h1 style={styles.sleepingHomeTitle}>
+            ねがおをとる
+          </h1>
+          <p style={styles.sleepingHomeLead}>
+            ねてるねこを見つけたら、
+            <br />
+            ここから入れておく
+          </p>
+        </div>
 
       <div style={styles.sleepingActionGroup}>
         <button
@@ -3702,13 +3705,20 @@ function saveCollectionPhoto(catId: string, slug: string, dataUrl: string) {
   try {
     const raw = window.localStorage.getItem(STORAGE_KEYS.collectionPhotos);
     const all = raw
-      ? (JSON.parse(raw) as Record<string, Record<string, string[] | string>>)
+      ? (JSON.parse(raw) as Record<
+          string,
+          Record<string, StoredCollectionPhoto[] | StoredCollectionPhoto | string[] | string>
+        >)
       : {};
+    const photo: StoredCollectionPhoto = {
+      id: createCollectionPhotoId(catId, slug),
+      src: dataUrl,
+    };
 
     all[catId] ??= {};
     all[catId][slug] = [
-      ...normalizeStoredPhotoList(all[catId][slug]),
-      dataUrl,
+      ...normalizeStoredPhotoList(all[catId][slug], catId, slug),
+      photo,
     ];
     window.localStorage.setItem(STORAGE_KEYS.collectionPhotos, JSON.stringify(all));
   } catch {
@@ -3774,12 +3784,46 @@ function markSleepingSafetyNoticeAccepted() {
   }
 }
 
-function normalizeStoredPhotoList(value: string[] | string | undefined) {
+type StoredCollectionPhoto = {
+  id?: string;
+  src?: string;
+};
+
+function normalizeStoredPhotoList(
+  value: StoredCollectionPhoto[] | StoredCollectionPhoto | string[] | string | undefined,
+  catId = "cat",
+  slug = "photo",
+) {
   if (typeof value === "string") {
-    return [value];
+    return [{ id: `${catId}:${slug}:0`, src: value }];
   }
 
-  return value ?? [];
+  const values = Array.isArray(value) ? value : value ? [value] : [];
+
+  return values
+    .map((photo, index): StoredCollectionPhoto | null => {
+      if (typeof photo === "string") {
+        return photo ? { id: `${catId}:${slug}:${index}`, src: photo } : null;
+      }
+
+      if (photo && typeof photo.src === "string" && photo.src) {
+        return {
+          id: photo.id || `${catId}:${slug}:${index}`,
+          src: photo.src,
+        };
+      }
+
+      return null;
+    })
+    .filter((photo): photo is StoredCollectionPhoto => Boolean(photo));
+}
+
+function createCollectionPhotoId(catId: string, slug: string) {
+  const random =
+    globalThis.crypto?.randomUUID?.() ??
+    `id-${Date.now()}-${Math.random().toString(16).slice(2)}`;
+
+  return `${catId}:${slug}:${random}`;
 }
 
 function getFileSizeBucket(size: number) {

@@ -31,6 +31,10 @@ export function SettingsPage() {
   const [isSyncing, setIsSyncing] = useState(false);
   const [email, setEmail] = useState<string | null>(null);
   const [syncMessage, setSyncMessage] = useState("");
+  const [lastSyncResult, setLastSyncResult] = useState<{
+    action: "sync" | "restore";
+    result: AccountSyncResult;
+  } | null>(null);
   const [syncOverview, setSyncOverview] = useState<AccountSyncOverview | null>(null);
   const [authDebug, setAuthDebug] = useState<AuthDebugSnapshot | null>(null);
   const [displayEnvironment, setDisplayEnvironment] =
@@ -86,6 +90,7 @@ export function SettingsPage() {
     setIsLoggedIn(false);
     setEmail(null);
     setSyncMessage("");
+    setLastSyncResult(null);
     setSyncOverview(null);
   }
 
@@ -103,6 +108,7 @@ export function SettingsPage() {
     const result = await syncLocalDataWithAccount({ restoreIfLocalEmpty: false });
 
     setSyncMessage(getSyncResultMessage(result, "sync"));
+    setLastSyncResult({ action: "sync", result });
 
     await refreshSyncOverview();
     trackProductEvent("settings_account_sync_completed", {
@@ -154,6 +160,7 @@ export function SettingsPage() {
     });
 
     setSyncMessage(getSyncResultMessage(result, "restore"));
+    setLastSyncResult({ action: "restore", result });
 
     await refreshSyncOverview();
     trackProductEvent("settings_account_restore_completed", {
@@ -245,6 +252,12 @@ export function SettingsPage() {
                   <p style={styles.syncMessage} role="status">
                     {syncMessage}
                   </p>
+                ) : null}
+                {lastSyncResult ? (
+                  <SyncResultDetails
+                    action={lastSyncResult.action}
+                    result={lastSyncResult.result}
+                  />
                 ) : null}
                 <div style={styles.divider} />
                 <button
@@ -510,6 +523,98 @@ function SyncCountRow({ label, value }: { label: string; value: number }) {
   );
 }
 
+function SyncResultDetails({
+  action,
+  result,
+}: {
+  action: "sync" | "restore";
+  result: AccountSyncResult;
+}) {
+  const rows =
+    action === "sync"
+      ? [
+          ["アルバム写真", result.pushedCollectionPhotos, "枚"],
+          ["とったねがお", result.pushedOwnSleepingPhotos, "枚"],
+          ["とどいたねがお", result.pushedKeptExchangePhotos, "枚"],
+          ["猫", result.pushedCats, "匹"],
+          ["記録", result.pushedRecords, "件"],
+        ]
+      : [
+          ["アルバム写真", result.restoredCollectionPhotos, "枚"],
+          ["とったねがお", result.restoredOwnSleepingPhotos, "枚"],
+          ["とどいたねがお", result.restoredKeptExchangePhotos, "枚"],
+          ["猫", result.restoredCats, "匹"],
+          ["記録", result.restoredRecords, "件"],
+        ];
+  const visibleRows = rows.filter(([, value]) => Number(value) > 0);
+  const title = action === "sync" ? "保存結果" : "復元結果";
+  const photoTotal =
+    action === "sync"
+      ? result.pushedCollectionPhotos +
+        result.pushedOwnSleepingPhotos +
+        result.pushedKeptExchangePhotos
+      : result.restoredCollectionPhotos +
+        result.restoredOwnSleepingPhotos +
+        result.restoredKeptExchangePhotos;
+
+  return (
+    <div style={styles.syncResultDetails} role="status">
+      <p style={styles.syncResultTitle}>{title}</p>
+      <p style={styles.syncResultSummary}>
+        {getSyncPhotoSummary(action, photoTotal, result.status)}
+      </p>
+      {visibleRows.length > 0 ? (
+        <div style={styles.syncResultRows}>
+          {visibleRows.map(([label, value, unit]) => (
+            <span key={String(label)} style={styles.syncResultChip}>
+              {label} {value}
+              {unit}
+            </span>
+          ))}
+        </div>
+      ) : (
+        <p style={styles.syncResultEmpty}>
+          {action === "sync"
+            ? "アカウントへ新しく保存されたデータはありません。"
+            : "この端末へ新しく復元されたデータはありません。"}
+        </p>
+      )}
+      {result.errors.length > 0 ? (
+        <div style={styles.syncErrorBox}>
+          <p style={styles.syncErrorTitle}>確認が必要です</p>
+          {result.errors.slice(0, 3).map((error, index) => (
+            <p key={`${error}-${index}`} style={styles.syncErrorText}>
+              {formatSyncError(error)}
+            </p>
+          ))}
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
+function getSyncPhotoSummary(
+  action: "sync" | "restore",
+  photoTotal: number,
+  status: AccountSyncResult["status"],
+) {
+  if (photoTotal > 0) {
+    return action === "sync"
+      ? `写真 ${photoTotal}枚をアカウントに保存しました。`
+      : `写真 ${photoTotal}枚をこの端末に戻しました。`;
+  }
+
+  if (status === "synced" || status === "restored") {
+    return action === "sync"
+      ? "猫や記録は保存しました。写真は新しく保存されていません。"
+      : "猫や記録は戻りました。写真は新しく戻っていません。";
+  }
+
+  return action === "sync"
+    ? "新しく保存された写真はありません。"
+    : "新しく戻った写真はありません。";
+}
+
 function getSyncResultMessage(
   result: AccountSyncResult,
   action: "sync" | "restore",
@@ -537,6 +642,30 @@ function getSyncResultMessage(
   return action === "restore"
     ? "アカウント側に復元できるデータはまだありません。"
     : "この端末に保存できるデータはまだありません。";
+}
+
+function formatSyncError(error: string) {
+  if (error.includes("cat_moments") || error.includes("Sleeping photo")) {
+    return "とったねがおの保存先を確認できませんでした。";
+  }
+
+  if (error.includes("cat_moment_deliveries") || error.includes("Kept photo")) {
+    return "とどいたねがおの保存先を確認できませんでした。";
+  }
+
+  if (error.includes("collection_photos") || error.includes("Collection photo")) {
+    return "写真の保存先を確認できませんでした。";
+  }
+
+  if (error.includes("Photo upload")) {
+    return "写真をアカウントへ保存できませんでした。";
+  }
+
+  if (error.includes("auth") || error.includes("JWT")) {
+    return "ログイン状態を確認できませんでした。";
+  }
+
+  return "同期中にエラーがありました。";
 }
 
 function formatSyncDate(value: string | null) {
@@ -687,6 +816,66 @@ const styles = {
     margin: "0",
     padding: "0 0 12px",
     textAlign: "center" as const,
+  },
+  syncResultDetails: {
+    margin: "0 0 12px",
+    padding: "12px",
+    borderRadius: "16px",
+    background: "rgba(255,255,255,0.56)",
+    border: "1px solid #f0ede8",
+    display: "grid",
+    gap: "8px",
+  },
+  syncResultTitle: {
+    margin: 0,
+    fontSize: "12px",
+    fontWeight: 700,
+    color: "#2a2a28",
+  },
+  syncResultSummary: {
+    margin: 0,
+    color: "#5f584f",
+    fontSize: "12.5px",
+    lineHeight: 1.5,
+  },
+  syncResultRows: {
+    display: "flex",
+    flexWrap: "wrap" as const,
+    gap: "6px",
+  },
+  syncResultChip: {
+    borderRadius: "999px",
+    background: "#f7f2ea",
+    color: "#5f584f",
+    fontSize: "11.5px",
+    fontWeight: 700,
+    padding: "5px 8px",
+    lineHeight: 1,
+  },
+  syncResultEmpty: {
+    margin: 0,
+    color: "#8a8a80",
+    fontSize: "11.5px",
+    lineHeight: 1.5,
+  },
+  syncErrorBox: {
+    marginTop: "2px",
+    borderRadius: "12px",
+    background: "#fff7ee",
+    border: "1px solid #f0d9bf",
+    padding: "9px 10px",
+  },
+  syncErrorTitle: {
+    margin: "0 0 4px",
+    color: "#8f5f35",
+    fontSize: "11.5px",
+    fontWeight: 800,
+  },
+  syncErrorText: {
+    margin: "2px 0 0",
+    color: "#8f5f35",
+    fontSize: "11.5px",
+    lineHeight: 1.5,
   },
   syncStatusPanel: {
     padding: "14px 0",

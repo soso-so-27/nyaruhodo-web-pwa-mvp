@@ -45,7 +45,11 @@ type LocalRecordLogItem = {
   metadata?: Record<string, unknown>;
 };
 
-type LocalCollectionStore = Record<string, Record<string, string[] | string>>;
+type LocalCollectionPhoto = string | { id?: string; src?: string };
+type LocalCollectionStore = Record<
+  string,
+  Record<string, LocalCollectionPhoto[] | LocalCollectionPhoto>
+>;
 
 type LocalSnapshot = {
   activeCatId: string | null;
@@ -356,6 +360,9 @@ export async function syncLocalDataWithAccount(options?: {
       await restoreRemoteSnapshot(supabase, data.user.id, result, {
         mergeLocal: true,
       });
+      if (result.errors.length > 0) {
+        return { ...result, status: "error" };
+      }
       if (hasRestoredAccountData(result)) {
         await saveSyncState(supabase, data.user.id, {
           last_pull_at: new Date().toISOString(),
@@ -367,6 +374,9 @@ export async function syncLocalDataWithAccount(options?: {
 
     if (shouldPush) {
       await pushLocalSnapshot(supabase, data.user.id, snapshot, result);
+      if (result.errors.length > 0) {
+        return { ...result, status: "error" };
+      }
       await saveSyncState(supabase, data.user.id, {
         last_push_at: new Date().toISOString(),
       });
@@ -377,6 +387,9 @@ export async function syncLocalDataWithAccount(options?: {
       await restoreRemoteSnapshot(supabase, data.user.id, result, {
         mergeLocal: true,
       });
+      if (result.errors.length > 0) {
+        return { ...result, status: "error" };
+      }
       if (hasRestoredAccountData(result)) {
         await saveSyncState(supabase, data.user.id, {
           last_pull_at: new Date().toISOString(),
@@ -394,6 +407,93 @@ export async function syncLocalDataWithAccount(options?: {
         syncError instanceof Error ? syncError.message : "Unknown account sync error",
       ],
     };
+  }
+}
+
+export async function deleteAccountSleepingPhoto(photoId: string) {
+  if (typeof window === "undefined") {
+    return;
+  }
+
+  const supabase = createBrowserSupabaseClient();
+
+  if (!supabase) {
+    return;
+  }
+
+  const { data, error: authError } = await supabase.auth.getUser();
+
+  if (authError || !data.user) {
+    return;
+  }
+
+  const { error } = await supabase
+    .from("cat_moments")
+    .delete()
+    .eq("user_id", data.user.id)
+    .eq("local_moment_id", photoId);
+
+  if (error) {
+    throw new Error(`Sleeping photo delete failed: ${error.message}`);
+  }
+}
+
+export async function hideAccountKeptExchangePhoto(
+  photoId: string,
+  reason: "hide" | "report",
+) {
+  if (typeof window === "undefined") {
+    return;
+  }
+
+  const supabase = createBrowserSupabaseClient();
+
+  if (!supabase) {
+    return;
+  }
+
+  const { data, error: authError } = await supabase.auth.getUser();
+
+  if (authError || !data.user) {
+    return;
+  }
+
+  const { error } = await supabase
+    .from("cat_moment_deliveries")
+    .update({ status: reason === "report" ? "reported" : "hidden" })
+    .eq("user_id", data.user.id)
+    .eq("local_delivery_id", photoId);
+
+  if (error) {
+    throw new Error(`Kept photo hide failed: ${error.message}`);
+  }
+}
+
+export async function deleteAccountCollectionPhoto(localPhotoId: string) {
+  if (typeof window === "undefined") {
+    return;
+  }
+
+  const supabase = createBrowserSupabaseClient();
+
+  if (!supabase) {
+    return;
+  }
+
+  const { data, error: authError } = await supabase.auth.getUser();
+
+  if (authError || !data.user) {
+    return;
+  }
+
+  const { error } = await supabase
+    .from("collection_photos")
+    .delete()
+    .eq("user_id", data.user.id)
+    .eq("local_photo_id", localPhotoId);
+
+  if (error) {
+    throw new Error(`Collection photo delete failed: ${error.message}`);
   }
 }
 
@@ -523,11 +623,7 @@ function countLocalCollectionPhotos(collectionPhotos: LocalCollectionStore) {
 
   for (const catPhotos of Object.values(collectionPhotos)) {
     for (const photos of Object.values(catPhotos)) {
-      if (Array.isArray(photos)) {
-        count += photos.filter(Boolean).length;
-      } else if (photos) {
-        count += 1;
-      }
+      count += normalizeCollectionPhotoEntries(photos).length;
     }
   }
 
@@ -735,14 +831,16 @@ async function syncCollectionPhotos(
     }
 
     for (const [slotSlug, rawPhotos] of Object.entries(photosBySlot)) {
-      const photos = Array.isArray(rawPhotos) ? rawPhotos : [rawPhotos];
+      const photos = normalizeCollectionPhotoEntries(rawPhotos);
 
-      for (const [index, src] of photos.entries()) {
-        if (!src?.startsWith("data:")) {
+      for (const [index, photo] of photos.entries()) {
+        const src = photo.src;
+
+        if (!src.startsWith("data:")) {
           continue;
         }
 
-        const localPhotoId = `${localCatId}:${slotSlug}:${index}`;
+        const localPhotoId = photo.id || `${localCatId}:${slotSlug}:${index}`;
         const storagePath = await uploadDataUrl(
           supabase,
           `${userId}/${remoteCatId}/collection/${sanitizePathSegment(
@@ -1133,8 +1231,15 @@ async function restoreCollectionPhotos(
 
     collectionStore[localCatId] ??= {};
     const current = collectionStore[localCatId][photo.slot_slug];
-    const photos = Array.isArray(current) ? current : current ? [current] : [];
-    photos.push(photoSrc);
+    const photos = normalizeCollectionPhotoEntries(current);
+    const restoredPhoto = {
+      id: photo.local_photo_id ?? photo.id,
+      src: photoSrc,
+    };
+
+    if (!photos.some((storedPhoto) => storedPhoto.id === restoredPhoto.id)) {
+      photos.push(restoredPhoto);
+    }
     collectionStore[localCatId][photo.slot_slug] = photos;
   }
 
@@ -1444,12 +1549,32 @@ function trimCollectionStore(
     trimmedStore[catId] = {};
 
     for (const [slotSlug, rawPhotos] of Object.entries(photosBySlot)) {
-      const photos = Array.isArray(rawPhotos) ? rawPhotos : rawPhotos ? [rawPhotos] : [];
+      const photos = normalizeCollectionPhotoEntries(rawPhotos);
       trimmedStore[catId][slotSlug] = photos.slice(0, maxPhotosPerSlot);
     }
   }
 
   return trimmedStore;
+}
+
+function normalizeCollectionPhotoEntries(
+  value: LocalCollectionPhoto[] | LocalCollectionPhoto | null | undefined,
+) {
+  const list = Array.isArray(value) ? value : value ? [value] : [];
+
+  return list
+    .map((photo): { id?: string; src: string } | null => {
+      if (typeof photo === "string") {
+        return photo ? { src: photo } : null;
+      }
+
+      if (photo && typeof photo.src === "string" && photo.src) {
+        return { id: photo.id, src: photo.src };
+      }
+
+      return null;
+    })
+    .filter((photo): photo is { id?: string; src: string } => Boolean(photo));
 }
 
 function toJsonObject(value: Record<string, unknown> | null | undefined) {
