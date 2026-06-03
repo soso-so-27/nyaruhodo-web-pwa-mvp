@@ -1,10 +1,5 @@
-import { TorisetuPage } from "../../components/torisetu/TorisetuPage";
-import { getRecentEvents } from "../../lib/supabase/queries";
+import { redirect } from "next/navigation";
 
-export const dynamic = "force-dynamic";
-
-export default async function Torisetu() {
-  const recentEvents = await getRecentEvents();
-
-  return <TorisetuPage recentEvents={recentEvents} />;
+export default function TorisetuPage() {
+  redirect("/cats");
 }

@@ -286,7 +286,7 @@ export function SettingsPage() {
         </section>
 
         <section style={styles.section}>
-          <p style={styles.sectionLabel}>ログイン診断</p>
+          <p style={styles.sectionLabel}>ログイン状態</p>
           <div style={styles.card}>
             <AuthDebugPanel snapshot={authDebug} />
             <div style={styles.divider} />
@@ -297,7 +297,7 @@ export function SettingsPage() {
               }}
               style={styles.secondaryButton}
             >
-              診断を更新
+              状態を更新
             </button>
           </div>
         </section>
@@ -348,16 +348,16 @@ export function SettingsPage() {
             </div>
             <div style={styles.divider} />
             <div style={styles.row}>
-              <span style={styles.rowLabel}>にゃるほど</span>
-              <span style={styles.rowValue}>猫と話せない人のためのアプリ</span>
+              <span style={styles.rowLabel}>ねてるねこ</span>
+              <span style={styles.rowValue}>寝顔を撮ると、ほかの寝顔が届くアプリ</span>
             </div>
             <div style={styles.divider} />
             <div style={styles.betaNote}>
               <p style={styles.betaNoteTitle}>現在ベータ版として無料公開中</p>
               <p style={styles.betaNoteText}>
-                むぎの記録を長く残すためのデータ保管プランを準備しています。
-                正式版リリース時に、記録の長期保存に関する有料プランを導入予定です。
-                現在ご利用の記録データは引き続き大切にお預かりします。
+                写真を長く置けるように、保存容量の拡張や家族共有の準備をしています。
+                正式版リリース時に、有料プランを導入する場合があります。
+                現在の写真と猫データは、引き続き大切に扱います。
               </p>
             </div>
           </div>
@@ -369,7 +369,7 @@ export function SettingsPage() {
 
 function AuthDebugPanel({ snapshot }: { snapshot: AuthDebugSnapshot | null }) {
   if (!snapshot) {
-    return <p style={styles.loadingText}>診断を読み込み中...</p>;
+    return <p style={styles.loadingText}>ログイン状態を読み込み中...</p>;
   }
 
   const latestDetails = snapshot.latestEvent?.details

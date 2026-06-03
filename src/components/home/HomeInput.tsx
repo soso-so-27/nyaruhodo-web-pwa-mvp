@@ -1034,7 +1034,7 @@ export function HomeInput({ recentEvents: _recentEvents }: HomeInputProps) {
     closeBoardInput(setIsYousuOpen, {
       itemId: "today-mikke",
       title: option.label,
-      surfaceText: "みっけ",
+      surfaceText: "写真",
     });
   }
 
@@ -1231,7 +1231,7 @@ export function HomeInput({ recentEvents: _recentEvents }: HomeInputProps) {
       return;
     }
     if (actionType === "go_torisetu") {
-      window.location.href = "/torisetu";
+      window.location.href = "/cats";
       return;
     }
     if (actionType === "go_collection") {
@@ -1631,7 +1631,7 @@ export function HomeInput({ recentEvents: _recentEvents }: HomeInputProps) {
 
       {isYousuOpen ? (
         <MikkeAllSheet
-          title={`${catName}のみっけ`}
+          title={`${catName}の写真`}
           source={boardSheetSource}
           returnCompletion={boardSheetReturn}
           isReturning={isBoardSheetReturning}
@@ -2781,12 +2781,12 @@ function HomeBulletinBoard({
             id: "fallback",
             kind: "mission",
             priority: 999,
-            title: "みっけ",
-            body: "ようす",
+            title: "ねてるねこ",
+            body: "写真",
             icon: "paw",
-            actionLabel: "ようす",
+            actionLabel: "写真",
             actionType: "open_mikke",
-            surfaceText: "ようす",
+            surfaceText: "写真",
           } satisfies HomeBoardItem,
         ];
   const peekItems = getBoardPeekItems(displayItems);
@@ -3085,7 +3085,7 @@ function buildBoardShelfStats(
   if (yousuCount > 0) {
     stats.push({
       icon: "paw",
-      label: "みっけ",
+      label: "写真",
       value: String(yousuCount),
       unit: "回",
       detail: "残った",
@@ -3410,8 +3410,8 @@ function buildPersonalityInsight(
 
   if (!latestRecord) {
     return {
-      title: "にゃるほど",
-      body: `${catName}の姿が、ここに少しずつ集まります。`,
+      title: "ねてるねこ",
+      body: `${catName}の写真が、ここに少しずつ集まります。`,
       surfaceText: "これから",
       sheetBody:
         "最初から何かを分かろうとしなくて大丈夫です。見かけた姿が少しずつ増えると、あとからこの子らしさとして見返しやすくなります。",
@@ -3420,7 +3420,7 @@ function buildPersonalityInsight(
 
   if (latestRecord.type === "mugi") {
     return {
-      title: "にゃるほど",
+      title: "ねてるねこ",
       body: `「${latestRecord.value}」のあとも、サインとして見返せます。`,
       surfaceText: "サイン",
       sheetBody:
@@ -3436,7 +3436,7 @@ function buildPersonalityInsight(
   ) {
     if (topYousu.value === "ねてる") {
       return {
-        title: "にゃるほど",
+        title: "ねてるねこ",
         body: "「ねてる」が少し多め。起きた直後があると、違いも残ります。",
         surfaceText: "違いを見る",
         sheetBody:
@@ -3445,7 +3445,7 @@ function buildPersonalityInsight(
     }
 
     return {
-      title: "にゃるほど",
+      title: "ねてるねこ",
       body: `「${topYousu.value}」が何度か出ています。前後があると、比べやすくなります。`,
       surfaceText: "くり返し",
       sheetBody:
@@ -3455,7 +3455,7 @@ function buildPersonalityInsight(
 
   if (latestRecord.type === "yousu") {
     return {
-      title: "にゃるほど",
+      title: "ねてるねこ",
       body: `「${latestRecord.value}」が残っています。前後があると、あとで見やすくなります。`,
       surfaceText: "前後を見る",
       sheetBody:
@@ -3465,7 +3465,7 @@ function buildPersonalityInsight(
 
   if (recordLog.length >= 7) {
     return {
-      title: "にゃるほど",
+      title: "ねてるねこ",
       body: "場面が増えてきました。違う時間もあると、幅が残ります。",
       surfaceText: "幅を見る",
       sheetBody:
@@ -3474,7 +3474,7 @@ function buildPersonalityInsight(
   }
 
   return {
-    title: "にゃるほど",
+    title: "ねてるねこ",
     body: `${catName}の違う場面も残ると、あとで見返しやすくなります。`,
     surfaceText: "少しずつ",
     sheetBody:
@@ -3527,22 +3527,7 @@ function buildHomeBoardItems({
   sleepingCounterCooldownProgress: number | null;
 }): HomeBoardItem[] {
   const items: HomeBoardItem[] = [];
-  const latestRecord = recordLog[0];
-  const personalityInsight = buildPersonalityInsight(recordLog, catName);
   const sleepingCounter = homeCatCounters.find((counter) => counter.id === "sleeping");
-
-  items.push({
-    id: "today-mikke",
-    kind: "mission",
-    priority: 5,
-    title: `${catName}のようす`,
-    body: mikkeRemaining ? `あと ${mikkeRemaining}` : mikkeWindow.question.prompt,
-    icon: "paw",
-    actionLabel: mikkeRemaining ? "待ち時間" : "ぜんぶ",
-    actionType: "open_mikke",
-    surfaceText: "選ぶ",
-    cooldownProgress: mikkeCooldownProgress ?? undefined,
-  });
 
   if (sleepingCounter) {
     items.push({
@@ -3561,33 +3546,6 @@ function buildHomeBoardItems({
         : `${formatSleepingCounterCount(sleepingCounter.count)}・${catName}も加わる`,
       isDisabled: Boolean(sleepingCounterRemaining),
       cooldownProgress: sleepingCounterCooldownProgress ?? undefined,
-    });
-  }
-
-  if (discoveryAvailable) {
-    items.push({
-      id: "daily-discovery",
-      kind: "insight",
-      priority: 10,
-      title: personalityInsight.title,
-      body: personalityInsight.body,
-      icon: "heart",
-      actionLabel: "見返す",
-      actionType: "open_discovery",
-      isUnread: true,
-      surfaceText: personalityInsight.surfaceText,
-    });
-  } else {
-    items.push({
-      id: "personality-insight",
-      kind: "insight",
-      priority: 10,
-      title: personalityInsight.title,
-      body: personalityInsight.body,
-      icon: "heart",
-      actionLabel: "見返す",
-      actionType: "open_recent_change",
-      surfaceText: latestRecord ? personalityInsight.surfaceText : "はじめる",
     });
   }
 

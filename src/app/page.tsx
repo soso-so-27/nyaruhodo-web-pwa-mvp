@@ -3,7 +3,6 @@
 import { useRouter } from "next/navigation";
 import { useEffect } from "react";
 import { AppLoadingScreen } from "../components/loading/AppLoadingScreen";
-import { STORAGE_KEYS } from "../lib/storage";
 
 const ATTRIBUTION_PARAMS = [
   "source",
@@ -18,17 +17,13 @@ export default function Page() {
   const router = useRouter();
 
   useEffect(() => {
-    const completed =
-      window.localStorage.getItem(STORAGE_KEYS.onboardingCompleted) === "true";
-    const pathname = completed ? "/home" : "/diagnosis-onboarding";
-
-    router.replace(buildRedirectTarget(pathname));
+    router.replace(buildRedirectTarget("/home"));
   }, [router]);
 
   return <AppLoadingScreen variant="startup" />;
 }
 
-function buildRedirectTarget(pathname: "/home" | "/diagnosis-onboarding") {
+function buildRedirectTarget(pathname: "/home") {
   const currentParams = new URLSearchParams(window.location.search);
   const nextParams = new URLSearchParams();
 

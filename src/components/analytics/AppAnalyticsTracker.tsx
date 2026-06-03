@@ -92,7 +92,7 @@ function getActiveTab(pathname: string) {
     return "home";
   }
   if (pathname.startsWith("/torisetu")) {
-    return "torisetu";
+    return "cats";
   }
   if (pathname.startsWith("/collection")) {
     return "collection";
@@ -104,7 +104,7 @@ function getActiveTab(pathname: string) {
     return "account";
   }
   if (pathname.startsWith("/diagnosis-onboarding")) {
-    return "diagnosis_onboarding";
+    return "cats";
   }
   return "other";
 }

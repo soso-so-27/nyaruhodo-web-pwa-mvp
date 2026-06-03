@@ -1,10 +1,5 @@
-import { TogetherPage } from "../../components/together/TogetherPage";
-import { getRecentEvents } from "../../lib/supabase/queries";
+import { redirect } from "next/navigation";
 
-export const dynamic = "force-dynamic";
-
-export default async function TogetherRoute() {
-  const recentEvents = await getRecentEvents();
-
-  return <TogetherPage recentEvents={recentEvents} />;
+export default function TogetherRoute() {
+  redirect("/collection");
 }

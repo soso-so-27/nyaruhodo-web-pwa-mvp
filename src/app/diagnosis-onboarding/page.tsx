@@ -1,5 +1,5 @@
-import { DiagnosisOnboardingFlow } from "../../components/diagnosisOnboarding/DiagnosisOnboardingFlow";
+import { redirect } from "next/navigation";
 
 export default function DiagnosisOnboardingPage() {
-  return <DiagnosisOnboardingFlow />;
+  redirect("/cats");
 }
