@@ -1,17 +1,26 @@
-import { createBrowserClient } from "@supabase/ssr";
+import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 
 import { getSupabasePublicConfig } from "./config";
 
-let browserClient: ReturnType<typeof createBrowserClient> | null = null;
+let browserClient: SupabaseClient | null = null;
 
 export function createBrowserSupabaseClient() {
   const config = getSupabasePublicConfig();
 
-  if (!config) {
+  if (!config || typeof window === "undefined") {
     return null;
   }
 
-  browserClient ??= createBrowserClient(config.url, config.anonKey);
+  browserClient ??= createClient(config.url, config.anonKey, {
+    auth: {
+      autoRefreshToken: true,
+      detectSessionInUrl: false,
+      flowType: "pkce",
+      persistSession: true,
+      storage: window.localStorage,
+      storageKey: "nyaruhodo_supabase_auth",
+    },
+  });
 
   return browserClient;
 }
