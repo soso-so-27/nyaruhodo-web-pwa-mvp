@@ -359,6 +359,7 @@ export async function syncLocalDataWithAccount(options?: {
     if (shouldForceRestore) {
       await restoreRemoteSnapshot(supabase, data.user.id, result, {
         mergeLocal: true,
+        replaceLocalCats: true,
       });
       if (result.errors.length > 0) {
         return { ...result, status: "error" };
@@ -572,6 +573,19 @@ function normalizeProfiles(
 }
 
 function hasMeaningfulLocalData(snapshot: LocalSnapshot) {
+  const meaningfulProfiles = snapshot.profiles.filter(
+    (profile) => !isLocalDefaultCatProfile(profile),
+  );
+
+  if (meaningfulProfiles.length === 0) {
+    return (
+      hasLocalCollectionPhotos(snapshot.collectionPhotos) ||
+      snapshot.ownSleepingPhotos.length > 0 ||
+      snapshot.keptExchangePhotos.length > 0 ||
+      [...snapshot.recordLogsByCatId.values()].some((records) => records.length > 0)
+    );
+  }
+
   if (snapshot.profiles.length === 0) {
     return false;
   }
@@ -581,16 +595,7 @@ function hasMeaningfulLocalData(snapshot: LocalSnapshot) {
   }
 
   if (
-    snapshot.profiles.some(
-      (profile) =>
-        profile.typeKey ||
-        profile.typeLabel ||
-        profile.avatarDataUrl ||
-        profile.homePhotoDataUrl ||
-        profile.basicInfo ||
-        profile.onboarding ||
-        profile.understanding,
-    )
+    meaningfulProfiles.some((profile) => hasMeaningfulCatProfileDetails(profile))
   ) {
     return true;
   }
@@ -601,11 +606,32 @@ function hasMeaningfulLocalData(snapshot: LocalSnapshot) {
     }
   }
 
-  return Object.values(snapshot.collectionPhotos).some((catPhotos) =>
-    Object.values(catPhotos).some((photos) =>
-      Array.isArray(photos) ? photos.length > 0 : Boolean(photos),
+  return (
+    hasLocalCollectionPhotos(snapshot.collectionPhotos) ||
+    snapshot.ownSleepingPhotos.length > 0 ||
+    snapshot.keptExchangePhotos.length > 0
+  );
+}
+
+function hasMeaningfulCatProfileDetails(profile: LocalCatProfile) {
+  return Boolean(
+    profile.typeKey ||
+      profile.typeLabel ||
+      profile.avatarDataUrl ||
+      profile.homePhotoDataUrl ||
+      !isEmptyObject(profile.basicInfo) ||
+      !isEmptyObject(profile.appearance) ||
+      !isEmptyObject(profile.onboarding) ||
+      !isEmptyObject(profile.understanding),
+  );
+}
+
+function hasLocalCollectionPhotos(collectionPhotos: LocalCollectionStore) {
+  return Object.values(collectionPhotos).some((catPhotos) =>
+    Object.values(catPhotos).some(
+      (photos) => normalizeCollectionPhotoEntries(photos).length > 0,
     ),
-  ) || snapshot.ownSleepingPhotos.length > 0 || snapshot.keptExchangePhotos.length > 0;
+  );
 }
 
 function countLocalRecords(recordLogsByCatId: Map<string, LocalRecordLogItem[]>) {
@@ -1045,7 +1071,7 @@ async function restoreRemoteSnapshot(
   supabase: NonNullable<ReturnType<typeof createBrowserSupabaseClient>>,
   userId: string,
   result: AccountSyncResult,
-  options: { mergeLocal: boolean },
+  options: { mergeLocal: boolean; replaceLocalCats?: boolean },
 ) {
   const { data: cats, error: catsError } = await supabase
     .from("cats")
@@ -1057,7 +1083,9 @@ async function restoreRemoteSnapshot(
     throw new Error(`Cat restore failed: ${catsError.message}`);
   }
 
-  const remoteCats = ((cats ?? []) as RemoteCatRow[]).filter(Boolean);
+  const remoteCats = filterRestorableRemoteCats(
+    ((cats ?? []) as RemoteCatRow[]).filter(Boolean),
+  );
   const remoteIdToLocalId = new Map<string, string>();
 
   if (remoteCats.length === 0) {
@@ -1072,7 +1100,8 @@ async function restoreRemoteSnapshot(
         ),
       )
     : [];
-  const profiles: LocalCatProfile[] = shouldReplaceLocalDefaultCats(localProfiles)
+  const profiles: LocalCatProfile[] =
+    options.replaceLocalCats || shouldReplaceLocalDefaultCats(localProfiles)
     ? []
     : [...localProfiles];
   const remoteLocalCatIds: string[] = [];
@@ -1516,6 +1545,10 @@ function shouldReplaceLocalDefaultCats(profiles: LocalCatProfile[]) {
 
   const [profile] = profiles;
 
+  return isLocalDefaultCatProfile(profile);
+}
+
+function isLocalDefaultCatProfile(profile: LocalCatProfile) {
   return (
     typeof profile.id === "string" &&
     profile.id.startsWith("local-cat-") &&
@@ -1527,6 +1560,34 @@ function shouldReplaceLocalDefaultCats(profiles: LocalCatProfile[]) {
     !profile.typeKey &&
     !profile.typeLabel
   );
+}
+
+function filterRestorableRemoteCats(cats: RemoteCatRow[]) {
+  if (cats.length <= 1) {
+    return cats;
+  }
+
+  return cats.filter((cat) => !isAccidentalDefaultRemoteCat(cat));
+}
+
+function isAccidentalDefaultRemoteCat(cat: RemoteCatRow) {
+  return (
+    cat.name === "ミケ" &&
+    typeof cat.local_cat_id === "string" &&
+    cat.local_cat_id.startsWith("local-cat-") &&
+    !cat.avatar_storage_path &&
+    !cat.home_photo_storage_path &&
+    !cat.type_key &&
+    !cat.type_label &&
+    isEmptyObject(cat.basic_info) &&
+    isEmptyObject(cat.appearance) &&
+    isEmptyObject(cat.onboarding) &&
+    isEmptyObject(cat.understanding)
+  );
+}
+
+function isEmptyObject(value: Record<string, unknown> | null | undefined) {
+  return !value || Object.keys(value).length === 0;
 }
 
 function readJson<T>(key: string): T | null {
