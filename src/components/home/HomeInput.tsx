@@ -73,6 +73,7 @@ import {
   AppIcon,
   type AppIconName,
 } from "../ui/AppIcons";
+import { StoredPhotoImage } from "../ui/StoredPhotoImage";
 
 type HomeInputProps = {
   recentEvents: RecentEvent[];
@@ -2481,7 +2482,7 @@ function ExchangePhotoSheet({
           </button>
         </div>
         <div style={styles.exchangePhotoFrame}>
-          <img src={photo.src} alt="" style={styles.exchangePhoto} />
+          <StoredPhotoImage src={photo.src} alt="" style={styles.exchangePhoto} />
         </div>
         <div style={styles.exchangeActions}>
           <button type="button" style={styles.exchangeKeepButton} onClick={onKeep}>
@@ -2529,7 +2530,7 @@ function ExchangeSharePermissionSheet({
             : `とったねがおにはいつでも入ります。つぎにとどくのは ${deliveryRemaining}。`}
         </p>
         <div style={styles.exchangeSharePreview}>
-          <img src={photo.src} alt="" style={styles.exchangePhoto} />
+          <StoredPhotoImage src={photo.src} alt="" style={styles.exchangePhoto} />
         </div>
         {shouldShowCatPicker ? (
           <div style={styles.exchangeCatPicker} aria-label="入れる猫">

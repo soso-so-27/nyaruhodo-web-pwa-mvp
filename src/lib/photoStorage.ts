@@ -30,6 +30,21 @@ export async function resolveStoredPhotoUrl(
   return downloadStoragePath(supabase, storagePath);
 }
 
+export async function createSignedStorageUrl(
+  supabase: BrowserSupabaseClient,
+  path: string,
+) {
+  const { data, error } = await supabase.storage
+    .from(CAT_PHOTOS_BUCKET)
+    .createSignedUrl(path, 60 * 60 * 24 * 365);
+
+  if (error || !data?.signedUrl) {
+    return undefined;
+  }
+
+  return data.signedUrl;
+}
+
 export async function uploadDataUrl(
   supabase: BrowserSupabaseClient,
   path: string,

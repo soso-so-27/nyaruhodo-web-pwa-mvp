@@ -34,6 +34,7 @@ import type { CatProfile } from "../home/homeInputHelpers";
 import { BottomNavigation } from "../navigation/BottomNavigation";
 import { AppBottomSheet } from "../ui/AppBottomSheet";
 import { AppIcon } from "../ui/AppIcons";
+import { StoredPhotoImage } from "../ui/StoredPhotoImage";
 
 const COLLECTION_TEXT = "#2d2b27";
 const COLLECTION_TEXT_STRONG = "#1f1d1a";
@@ -874,7 +875,7 @@ function BoxSummaryCard({
       <div style={styles.boxPhotoStrip}>
         {visiblePhotos.map((photo) => (
           <span key={photo.id} style={styles.boxPhotoThumb}>
-            <img src={photo.src} alt="" style={styles.boxPhotoImg} />
+            <StoredPhotoImage src={photo.src} alt="" style={styles.boxPhotoImg} />
           </span>
         ))}
         {showAddSlot ? (
@@ -929,7 +930,7 @@ function BoxPhotoDetailSheet({
           <div style={styles.photoScroll} onScroll={onPhotoScroll}>
             {photos.map((photo) => (
               <div key={photo.id} style={styles.photoSlide}>
-                <img src={photo.src} alt="" style={styles.photoImg} />
+                <StoredPhotoImage src={photo.src} alt="" style={styles.photoImg} />
                 {kind === "sleeping" ? (
                   <span style={styles.boxPhotoStateBadge}>
                     {photo.shared ? "とどく" : "自分だけ"}
@@ -1193,7 +1194,7 @@ function CollectionShareView({
             style={styles.shareFeedCard}
           >
             {item.src ? (
-              <img src={item.src} alt="" style={styles.shareFeedPhoto} />
+              <StoredPhotoImage src={item.src} alt="" style={styles.shareFeedPhoto} />
             ) : (
               <span style={styles.shareSuggestionVisual} aria-hidden="true">
                 {item.iconPath ? (
@@ -1368,7 +1369,7 @@ function CollectionCard({
         onClick={() => onOpenSlot(slot)}
         style={{ ...styles.collectionCard, ...styles.photoCard }}
       >
-        <img src={firstPhoto.src} alt="" style={styles.cardPhoto} />
+        <StoredPhotoImage src={firstPhoto.src} alt="" style={styles.cardPhoto} />
         <span style={styles.cardPhotoFade} aria-hidden="true" />
         {photos.length > 1 ? (
           <span style={styles.cardCountBadge}>{photos.length}枚</span>
@@ -1427,7 +1428,7 @@ function CollectionPhotoSheet({
           <div style={styles.photoScroll} onScroll={onPhotoScroll}>
             {photos.map((photo, index) => (
               <div key={photo.id} style={styles.photoSlide}>
-                <img src={photo.src} alt="" style={styles.photoImg} />
+                <StoredPhotoImage src={photo.src} alt="" style={styles.photoImg} />
                 {photo.localIndex !== undefined ? (
                   <button
                     type="button"

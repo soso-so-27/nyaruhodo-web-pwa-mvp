@@ -11,7 +11,6 @@ import {
 import {
   downloadStoragePath,
   getDataUrlExtension,
-  resolveStoredPhotoUrl,
   sanitizePathSegment,
   toStoragePhotoUrl,
   uploadDataUrl,
@@ -1126,16 +1125,16 @@ async function restoreCollectionPhotos(
       continue;
     }
 
-    const dataUrl = await downloadStoragePath(supabase, photo.storage_path);
+    const photoSrc = toStoragePhotoUrl(photo.storage_path);
 
-    if (!dataUrl) {
+    if (!photoSrc) {
       continue;
     }
 
     collectionStore[localCatId] ??= {};
     const current = collectionStore[localCatId][photo.slot_slug];
     const photos = Array.isArray(current) ? current : current ? [current] : [];
-    photos.push(dataUrl);
+    photos.push(photoSrc);
     collectionStore[localCatId][photo.slot_slug] = photos;
   }
 
@@ -1198,9 +1197,7 @@ async function restoreSleepingPhotos(
         moment.owner_cat_id;
       const metadata = moment.metadata ?? {};
       const createdAt = new Date(moment.captured_at ?? moment.created_at).getTime();
-      const photoSrc = moment.photo_url
-        ? await resolveStoredPhotoUrl(supabase, moment.photo_url)
-        : undefined;
+      const photoSrc = moment.photo_url || undefined;
 
       if (!localCatId || !photoSrc || Number.isNaN(createdAt)) {
         return null;
@@ -1232,9 +1229,7 @@ async function restoreSleepingPhotos(
         async (delivery): Promise<ExchangePhoto | null> => {
       const metadata = delivery.metadata ?? {};
       const deliveredAt = new Date(delivery.delivered_at).getTime();
-      const photoSrc = delivery.photo_url
-        ? await resolveStoredPhotoUrl(supabase, delivery.photo_url)
-        : undefined;
+      const photoSrc = delivery.photo_url || undefined;
 
       if (!photoSrc || Number.isNaN(deliveredAt)) {
         return null;
