@@ -2,7 +2,7 @@ import type { CSSProperties } from "react";
 import { BottomNavigation } from "../navigation/BottomNavigation";
 
 type AppLoadingScreenProps = {
-  variant: "home" | "collection" | "cats" | "torisetu" | "account";
+  variant: "home" | "collection" | "cats" | "torisetu" | "account" | "startup";
 };
 
 export function AppLoadingScreen({ variant }: AppLoadingScreenProps) {
@@ -11,6 +11,7 @@ export function AppLoadingScreen({ variant }: AppLoadingScreenProps) {
   const isCollection = variant === "collection";
   const isTorisetu = variant === "torisetu";
   const isAccount = variant === "account";
+  const isStartup = variant === "startup";
   const activeNav = isHome
     ? "today"
     : isCollection
@@ -23,7 +24,7 @@ export function AppLoadingScreen({ variant }: AppLoadingScreenProps) {
     <main style={styles.page}>
       <div style={styles.paperBackground} aria-hidden="true" />
       <div style={styles.paperNoise} aria-hidden="true" />
-      <div style={styles.topBar}>ねてるねこ</div>
+      {isStartup ? null : <div style={styles.topBar}>ねてるねこ</div>}
 
       <div style={styles.container}>
         {isHome ? <HomeLoading /> : null}
@@ -31,6 +32,7 @@ export function AppLoadingScreen({ variant }: AppLoadingScreenProps) {
         {isCats ? <CatsLoading /> : null}
         {isTorisetu ? <TorisetuLoading /> : null}
         {isAccount ? <AccountLoading /> : null}
+        {isStartup ? <StartupLoading /> : null}
       </div>
 
       <style>{`
@@ -39,7 +41,7 @@ export function AppLoadingScreen({ variant }: AppLoadingScreenProps) {
           100% { background-position: -180% 0; }
         }
       `}</style>
-      {isAccount ? null : <BottomNavigation active={activeNav} />}
+      {isAccount || isStartup ? null : <BottomNavigation active={activeNav} />}
     </main>
   );
 }
@@ -142,6 +144,18 @@ function AccountLoading() {
         <div style={styles.accountRow} />
         <div style={styles.accountRow} />
       </div>
+    </section>
+  );
+}
+
+function StartupLoading() {
+  return (
+    <section style={styles.startupStage} aria-label="ねてるねこを起動中">
+      <div style={styles.startupMark}>
+        <div style={styles.startupMarkInner} />
+      </div>
+      <p style={styles.startupTitle}>ねてるねこ</p>
+      <div style={styles.startupLine} />
     </section>
   );
 }
@@ -333,6 +347,49 @@ const styles = {
     ...paperCard,
     height: "42px",
     borderRadius: "15px",
+  },
+  startupStage: {
+    minHeight: "100%",
+    padding:
+      "calc(64px + env(safe-area-inset-top)) 24px calc(64px + env(safe-area-inset-bottom))",
+    display: "grid",
+    alignContent: "center",
+    justifyItems: "center",
+    gap: "18px",
+    boxSizing: "border-box",
+  },
+  startupMark: {
+    width: "68px",
+    height: "68px",
+    borderRadius: "50%",
+    border: "1px solid rgba(144,126,102,0.13)",
+    background: "rgba(255,253,248,0.58)",
+    display: "grid",
+    placeItems: "center",
+    boxShadow: "0 10px 22px rgba(90,76,60,0.04)",
+  },
+  startupMarkInner: {
+    width: "10px",
+    height: "10px",
+    borderRadius: "50%",
+    background: "#8d806f",
+    boxShadow: "0 0 0 10px rgba(169,149,126,0.11)",
+  },
+  startupTitle: {
+    margin: "2px 0 0",
+    color: "#4a463e",
+    fontFamily: '"Shippori Mincho B1", "Hiragino Mincho ProN", "Yu Mincho", serif',
+    fontSize: "22px",
+    fontWeight: 400,
+    letterSpacing: "0.18em",
+    lineHeight: 1.5,
+  },
+  startupLine: {
+    ...shimmerBase,
+    width: "112px",
+    height: "2px",
+    borderRadius: "999px",
+    opacity: 0.52,
   },
   pageStage: {
     padding:

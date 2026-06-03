@@ -2,6 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { useEffect } from "react";
+import { AppLoadingScreen } from "../components/loading/AppLoadingScreen";
 import { STORAGE_KEYS } from "../lib/storage";
 
 const ATTRIBUTION_PARAMS = [
@@ -24,7 +25,7 @@ export default function Page() {
     router.replace(buildRedirectTarget(pathname));
   }, [router]);
 
-  return null;
+  return <AppLoadingScreen variant="startup" />;
 }
 
 function buildRedirectTarget(pathname: "/home" | "/diagnosis-onboarding") {
