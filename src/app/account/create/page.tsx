@@ -13,17 +13,54 @@ import {
 } from "../../../components/ui/appTheme";
 import { STORAGE_KEYS } from "../../../lib/storage";
 import { trackProductEvent } from "../../../lib/analytics/productAnalytics";
+import { writeAuthDebugEvent } from "../../../lib/authDebug";
 import {
   getDisplayEnvironment,
   getDisplayEnvironmentLabel,
   type DisplayEnvironment,
 } from "../../../lib/displayEnvironment";
 import { createBrowserSupabaseClient } from "../../../lib/supabase/browser";
-import { getSiteUrl } from "../../../lib/supabase/config";
 
 const ACCOUNT_CREATE_PROMPT_DISMISSED_KEY =
   STORAGE_KEYS.accountCreatePromptDismissed;
 const ACCOUNT_CREATE_PROMPT_DISMISSED_MS = 7 * 24 * 60 * 60 * 1000;
+const GOOGLE_CLIENT_ID = process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID ?? "";
+const GOOGLE_ID_SCRIPT_SRC = "https://accounts.google.com/gsi/client";
+
+type GoogleCredentialResponse = {
+  credential?: string;
+  select_by?: string;
+};
+
+type GoogleAccountsId = {
+  initialize(options: {
+    client_id: string;
+    callback: (response: GoogleCredentialResponse) => void;
+    use_fedcm_for_prompt?: boolean;
+  }): void;
+  renderButton(
+    parent: HTMLElement,
+    options: {
+      theme?: "outline" | "filled_blue" | "filled_black";
+      size?: "large" | "medium" | "small";
+      shape?: "rectangular" | "pill" | "circle" | "square";
+      text?: "signin_with" | "signup_with" | "continue_with" | "signin";
+      width?: number;
+      locale?: string;
+    },
+  ): void;
+  prompt(): void;
+};
+
+declare global {
+  interface Window {
+    google?: {
+      accounts?: {
+        id?: GoogleAccountsId;
+      };
+    };
+  }
+}
 
 export default function AccountCreatePage() {
   const router = useRouter();
@@ -34,8 +71,10 @@ export default function AccountCreatePage() {
   const [connectedEmail, setConnectedEmail] = useState("");
   const [displayEnvironment, setDisplayEnvironment] =
     useState<DisplayEnvironment>("unknown");
+  const googleButtonRef = useRef<HTMLDivElement | null>(null);
   const hasTrackedCtaView = useRef(false);
   const hasTrackedCallbackError = useRef(false);
+  const hasInitializedGoogleButton = useRef(false);
 
   useEffect(() => {
     setDisplayEnvironment(getDisplayEnvironment());
@@ -104,10 +143,102 @@ export default function AccountCreatePage() {
     );
   }, []);
 
+  useEffect(() => {
+    if (isCheckingAccount || isAccountConnected) {
+      return;
+    }
+
+    if (!GOOGLE_CLIENT_ID) {
+      setMessage("Googleログインの設定がまだ入っていません。");
+      return;
+    }
+
+    let isCancelled = false;
+
+    async function setupGoogleButton() {
+      try {
+        await loadGoogleIdentityScript();
+
+        if (
+          isCancelled ||
+          hasInitializedGoogleButton.current ||
+          !googleButtonRef.current ||
+          !window.google?.accounts?.id
+        ) {
+          return;
+        }
+
+        hasInitializedGoogleButton.current = true;
+        window.google.accounts.id.initialize({
+          client_id: GOOGLE_CLIENT_ID,
+          callback: (response) => {
+            void handleGoogleCredential(response);
+          },
+          use_fedcm_for_prompt: true,
+        });
+        window.google.accounts.id.renderButton(googleButtonRef.current, {
+          theme: "outline",
+          size: "large",
+          shape: "pill",
+          text: "continue_with",
+          width: 320,
+          locale: "ja",
+        });
+      } catch (error) {
+        const message =
+          error instanceof Error ? error.message : "Google script load failed";
+
+        writeAuthDebugEvent("gis_script_failed", { message });
+        setMessage("Googleログインの読み込みに失敗しました。もう一度お試しください。");
+      }
+    }
+
+    void setupGoogleButton();
+
+    return () => {
+      isCancelled = true;
+    };
+  }, [isAccountConnected, isCheckingAccount]);
+
   async function handleGoogleSignIn() {
+    if (!GOOGLE_CLIENT_ID) {
+      setMessage("Googleログインの設定がまだ入っていません。");
+      return;
+    }
+
+    try {
+      await loadGoogleIdentityScript();
+
+      if (!window.google?.accounts?.id) {
+        setMessage("Googleログインを読み込めませんでした。もう一度お試しください。");
+        return;
+      }
+
+      if (!hasInitializedGoogleButton.current) {
+        hasInitializedGoogleButton.current = true;
+        window.google.accounts.id.initialize({
+          client_id: GOOGLE_CLIENT_ID,
+          callback: (response) => {
+            void handleGoogleCredential(response);
+          },
+          use_fedcm_for_prompt: true,
+        });
+      }
+
+      window.google.accounts.id.prompt();
+    } catch (error) {
+      const message =
+        error instanceof Error ? error.message : "Google script load failed";
+
+      writeAuthDebugEvent("gis_prompt_failed", { message });
+      setMessage("Googleログインの読み込みに失敗しました。もう一度お試しください。");
+    }
+  }
+
+  async function handleGoogleCredential(response: GoogleCredentialResponse) {
     trackProductEvent("account_create_cta_clicked", {
       route: "/account/create",
-      trigger: "account_create_page",
+      trigger: "google_identity_button",
     });
 
     const supabase = createBrowserSupabaseClient();
@@ -121,33 +252,60 @@ export default function AccountCreatePage() {
     setMessage("");
     trackProductEvent("auth_google_started", {
       route: "/account/create",
+      method: "id_token",
+    });
+
+    if (!response.credential) {
+      writeAuthDebugEvent("gis_credential_missing", {
+        selectBy: response.select_by ?? null,
+      });
+      trackProductEvent("auth_google_failed", {
+        error_type: "missing_google_credential",
+      });
+      setIsStartingAuth(false);
+      setMessage("Googleログイン情報を受け取れませんでした。もう一度お試しください。");
+      return;
+    }
+
+    writeAuthDebugEvent("gis_credential_received", {
+      selectBy: response.select_by ?? null,
+    });
+
+    const { data, error } = await supabase.auth.signInWithIdToken({
+      provider: "google",
+      token: response.credential,
+    });
+
+    if (error) {
+      writeAuthDebugEvent("gis_id_token_failed", {
+        message: error.message,
+      });
+      trackProductEvent("auth_google_failed", {
+        error_type: "id_token_sign_in_failed",
+        error_message: error.message,
+      });
+      setIsStartingAuth(false);
+      setMessage(
+        "Googleログインを開始できませんでした。少し時間をおいてもう一度お試しください。",
+      );
+      return;
+    }
+
+    writeAuthDebugEvent("gis_id_token_succeeded", {
+      hasSession: Boolean(data.session),
+      hasUser: Boolean(data.user),
+      email: data.user?.email ?? null,
     });
     window.localStorage.setItem(
       STORAGE_KEYS.authGooglePending,
       JSON.stringify({
         provider: "google",
         route: "/account/create",
+        method: "id_token",
         startedAt: new Date().toISOString(),
       }),
     );
-
-    const { error } = await supabase.auth.signInWithOAuth({
-      provider: "google",
-      options: {
-        redirectTo: `${getSiteUrl()}/home?auth=google_success`,
-      },
-    });
-
-    if (error) {
-      window.localStorage.removeItem(STORAGE_KEYS.authGooglePending);
-      trackProductEvent("auth_google_failed", {
-        error_type: "oauth_start_failed",
-      });
-      setIsStartingAuth(false);
-      setMessage(
-        "Googleログインを開始できませんでした。少し時間をおいてもう一度お試しください。",
-      );
-    }
+    router.replace("/home?auth=google_success");
   }
 
   function handleLater() {
@@ -184,6 +342,7 @@ export default function AccountCreatePage() {
               ) : null}
               <EnvironmentNotice environment={displayEnvironment} />
               <div style={styles.actions}>
+                <div ref={googleButtonRef} style={styles.googleButtonMount} />
                 <button
                   type="button"
                   onClick={() => router.push("/home")}
@@ -253,6 +412,43 @@ export default function AccountCreatePage() {
       </div>
     </main>
   );
+}
+
+function loadGoogleIdentityScript() {
+  return new Promise<void>((resolve, reject) => {
+    if (typeof window === "undefined") {
+      reject(new Error("window is not available"));
+      return;
+    }
+
+    if (window.google?.accounts?.id) {
+      resolve();
+      return;
+    }
+
+    const existingScript = document.querySelector<HTMLScriptElement>(
+      `script[src="${GOOGLE_ID_SCRIPT_SRC}"]`,
+    );
+
+    if (existingScript) {
+      existingScript.addEventListener("load", () => resolve(), { once: true });
+      existingScript.addEventListener(
+        "error",
+        () => reject(new Error("Google Identity script failed")),
+        { once: true },
+      );
+      return;
+    }
+
+    const script = document.createElement("script");
+
+    script.src = GOOGLE_ID_SCRIPT_SRC;
+    script.async = true;
+    script.defer = true;
+    script.onload = () => resolve();
+    script.onerror = () => reject(new Error("Google Identity script failed"));
+    document.head.appendChild(script);
+  });
 }
 
 function EnvironmentNotice({
@@ -398,6 +594,11 @@ const styles = {
   actions: {
     display: "grid",
     gap: "10px",
+  },
+  googleButtonMount: {
+    minHeight: "44px",
+    display: "grid",
+    placeItems: "center",
   },
   primaryButton: {
     width: "100%",
