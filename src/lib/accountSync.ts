@@ -361,14 +361,8 @@ export async function syncLocalDataWithAccount(options?: {
 
     if (shouldPush) {
       await pushLocalSnapshot(supabase, data.user.id, snapshot, result);
-      await restoreRemoteSnapshot(supabase, data.user.id, result, {
-        mergeLocal: true,
-      });
       await saveSyncState(supabase, data.user.id, {
         last_push_at: new Date().toISOString(),
-        ...(hasRestoredAccountData(result)
-          ? { last_pull_at: new Date().toISOString() }
-          : {}),
       });
       return { ...result, status: "synced" };
     }
@@ -815,23 +809,33 @@ async function syncSleepingPhotos(
 
     if (momentRows.length > 0) {
       const localMomentIds = momentRows.map((row) => row.local_moment_id);
-      const { error: deleteError } = await supabase
-        .from("cat_moments")
-        .delete()
-        .eq("user_id", userId)
-        .in("local_moment_id", localMomentIds);
+      const existingMomentIds = await findExistingLocalIds(
+        supabase,
+        "cat_moments",
+        userId,
+        "local_moment_id",
+        localMomentIds,
+      );
+      const momentRowsToInsert = momentRows.filter(
+        (row) => !existingMomentIds.has(row.local_moment_id),
+      );
+      const momentRowsToUpdate = momentRows.filter((row) =>
+        existingMomentIds.has(row.local_moment_id),
+      );
 
-      if (deleteError) {
-        throw new Error(`Sleeping photo cleanup failed: ${deleteError.message}`);
-      }
+      await updateCatMomentRows(supabase, userId, momentRowsToUpdate);
 
-      const { error } = await supabase.from("cat_moments").insert(momentRows);
+      const { error } =
+        momentRowsToInsert.length > 0
+          ? await supabase.from("cat_moments").insert(momentRowsToInsert)
+          : { error: null };
 
       if (error) {
         throw new Error(`Sleeping photo sync failed: ${error.message}`);
       }
 
-      result.pushedOwnSleepingPhotos += momentRows.length;
+      result.pushedOwnSleepingPhotos +=
+        momentRowsToInsert.length + momentRowsToUpdate.length;
     }
 
     const deliveryRows = snapshot.keptExchangePhotos.map((photo) => ({
@@ -858,25 +862,33 @@ async function syncSleepingPhotos(
     }
 
     const localDeliveryIds = deliveryRows.map((row) => row.local_delivery_id);
-    const { error: deleteError } = await supabase
-      .from("cat_moment_deliveries")
-      .delete()
-      .eq("user_id", userId)
-      .in("local_delivery_id", localDeliveryIds);
+    const existingDeliveryIds = await findExistingLocalIds(
+      supabase,
+      "cat_moment_deliveries",
+      userId,
+      "local_delivery_id",
+      localDeliveryIds,
+    );
+    const deliveryRowsToInsert = deliveryRows.filter(
+      (row) => !existingDeliveryIds.has(row.local_delivery_id),
+    );
+    const deliveryRowsToUpdate = deliveryRows.filter((row) =>
+      existingDeliveryIds.has(row.local_delivery_id),
+    );
 
-    if (deleteError) {
-      throw new Error(`Kept photo cleanup failed: ${deleteError.message}`);
-    }
+    await updateCatMomentDeliveryRows(supabase, userId, deliveryRowsToUpdate);
 
-    const { error } = await supabase
-      .from("cat_moment_deliveries")
-      .insert(deliveryRows);
+    const { error } =
+      deliveryRowsToInsert.length > 0
+        ? await supabase.from("cat_moment_deliveries").insert(deliveryRowsToInsert)
+        : { error: null };
 
     if (error) {
       throw new Error(`Kept photo sync failed: ${error.message}`);
     }
 
-    result.pushedKeptExchangePhotos += deliveryRows.length;
+    result.pushedKeptExchangePhotos +=
+      deliveryRowsToInsert.length + deliveryRowsToUpdate.length;
   } catch (error) {
     result.errors.push(
       error instanceof Error ? error.message : "Sleeping photo sync failed",
@@ -1245,6 +1257,78 @@ async function filterRowsMissingByLocalId<T extends Record<string, unknown>>(
     const localId = row[idField];
     return !(typeof localId === "string" && existingIds.has(localId));
   });
+}
+
+async function findExistingLocalIds(
+  supabase: NonNullable<ReturnType<typeof createBrowserSupabaseClient>>,
+  table: "cat_moments" | "cat_moment_deliveries",
+  userId: string,
+  idField: "local_moment_id" | "local_delivery_id",
+  localIds: string[],
+) {
+  const ids = localIds.filter((id) => id.length > 0);
+
+  if (ids.length === 0) {
+    return new Set<string>();
+  }
+
+  const { data, error } = await supabase
+    .from(table)
+    .select(idField)
+    .eq("user_id", userId)
+    .in(idField, ids);
+
+  if (error) {
+    throw new Error(`Existing ${table} lookup failed: ${error.message}`);
+  }
+
+  return new Set(
+    ((data ?? []) as Record<string, string | null>[])
+      .map((row) => row[idField])
+      .filter((id): id is string => typeof id === "string"),
+  );
+}
+
+async function updateCatMomentRows(
+  supabase: NonNullable<ReturnType<typeof createBrowserSupabaseClient>>,
+  userId: string,
+  rows: {
+    local_moment_id: string;
+    [key: string]: unknown;
+  }[],
+) {
+  for (const row of rows) {
+    const { error } = await supabase
+      .from("cat_moments")
+      .update(row)
+      .eq("user_id", userId)
+      .eq("local_moment_id", row.local_moment_id);
+
+    if (error) {
+      throw new Error(`Sleeping photo update failed: ${error.message}`);
+    }
+  }
+}
+
+async function updateCatMomentDeliveryRows(
+  supabase: NonNullable<ReturnType<typeof createBrowserSupabaseClient>>,
+  userId: string,
+  rows: {
+    local_delivery_id: string;
+    [key: string]: unknown;
+  }[],
+) {
+  for (const row of rows) {
+    const { error } = await supabase
+      .from("cat_moment_deliveries")
+      .update(row)
+      .eq("user_id", userId)
+      .eq("local_delivery_id", row.local_delivery_id);
+
+    if (error) {
+      throw new Error(`Kept photo update failed: ${error.message}`);
+    }
+  }
 }
 
 async function uploadDataUrl(

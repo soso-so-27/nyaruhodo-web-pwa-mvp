@@ -8,6 +8,11 @@ import {
 } from "../../lib/accountSync";
 import type { AccountSyncOverview, AccountSyncResult } from "../../lib/accountSync";
 import { trackProductEvent } from "../../lib/analytics/productAnalytics";
+import {
+  getDisplayEnvironment,
+  getDisplayEnvironmentLabel,
+  type DisplayEnvironment,
+} from "../../lib/displayEnvironment";
 import { createBrowserSupabaseClient } from "../../lib/supabase/browser";
 import {
   APP_ACCENT,
@@ -23,8 +28,11 @@ export function SettingsPage() {
   const [email, setEmail] = useState<string | null>(null);
   const [syncMessage, setSyncMessage] = useState("");
   const [syncOverview, setSyncOverview] = useState<AccountSyncOverview | null>(null);
+  const [displayEnvironment, setDisplayEnvironment] =
+    useState<DisplayEnvironment>("unknown");
 
   useEffect(() => {
+    setDisplayEnvironment(getDisplayEnvironment());
     void checkAuthState();
   }, []);
 
@@ -75,7 +83,7 @@ export function SettingsPage() {
       remote_kept_exchange_photos: syncOverview?.remoteKeptExchangePhotos ?? null,
     });
 
-    const result = await syncLocalDataWithAccount({ restoreIfLocalEmpty: true });
+    const result = await syncLocalDataWithAccount({ restoreIfLocalEmpty: false });
 
     setSyncMessage(getSyncResultMessage(result, "sync"));
 
@@ -152,6 +160,28 @@ export function SettingsPage() {
           </a>
           <h1 style={styles.title}>設定</h1>
         </div>
+
+        <section style={styles.section}>
+          <p style={styles.sectionLabel}>保存場所</p>
+          <div style={styles.card}>
+            <div style={styles.row}>
+              <span style={styles.rowLabel}>
+                {getDisplayEnvironmentLabel(displayEnvironment)}
+              </span>
+              <span style={styles.rowValue}>
+                {displayEnvironment === "standalone"
+                  ? "アプリ側"
+                  : displayEnvironment === "browser"
+                    ? "Web側"
+                    : ""}
+              </span>
+            </div>
+            <div style={styles.divider} />
+            <p style={styles.storageNote}>
+              iPhoneでは、ホーム画面アプリとSafari/Webで写真の保存場所が分かれることがあります。写真が見えないときは、撮ったときと同じ入口から開いてください。
+            </p>
+          </div>
+        </section>
 
         <section style={styles.section}>
           <p style={styles.sectionLabel}>アカウント</p>
@@ -537,6 +567,14 @@ const styles = {
     color: "#9a9890",
     padding: "14px 0",
     margin: 0,
+  },
+  storageNote: {
+    margin: 0,
+    padding: "12px 0 14px",
+    color: "#8a8a80",
+    fontSize: "12px",
+    fontWeight: 500,
+    lineHeight: 1.65,
   },
   syncMessage: {
     fontSize: "12px",

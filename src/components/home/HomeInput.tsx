@@ -416,7 +416,7 @@ export function HomeInput({ recentEvents: _recentEvents }: HomeInputProps) {
     );
 
     const syncResult = await syncLocalDataWithAccount({
-      restoreIfLocalEmpty: true,
+      restoreIfLocalEmpty: false,
     });
 
     trackProductEvent(

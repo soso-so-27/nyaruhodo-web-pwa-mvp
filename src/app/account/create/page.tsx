@@ -13,6 +13,11 @@ import {
 } from "../../../components/ui/appTheme";
 import { STORAGE_KEYS } from "../../../lib/storage";
 import { trackProductEvent } from "../../../lib/analytics/productAnalytics";
+import {
+  getDisplayEnvironment,
+  getDisplayEnvironmentLabel,
+  type DisplayEnvironment,
+} from "../../../lib/displayEnvironment";
 import { createBrowserSupabaseClient } from "../../../lib/supabase/browser";
 import { getSiteUrl } from "../../../lib/supabase/config";
 
@@ -27,10 +32,14 @@ export default function AccountCreatePage() {
   const [isCheckingAccount, setIsCheckingAccount] = useState(true);
   const [isAccountConnected, setIsAccountConnected] = useState(false);
   const [connectedEmail, setConnectedEmail] = useState("");
+  const [displayEnvironment, setDisplayEnvironment] =
+    useState<DisplayEnvironment>("unknown");
   const hasTrackedCtaView = useRef(false);
   const hasTrackedCallbackError = useRef(false);
 
   useEffect(() => {
+    setDisplayEnvironment(getDisplayEnvironment());
+
     let isMounted = true;
 
     async function checkAccountConnection() {
@@ -173,6 +182,7 @@ export default function AccountCreatePage() {
               {connectedEmail ? (
                 <p style={styles.connectedEmail}>{connectedEmail}</p>
               ) : null}
+              <EnvironmentNotice environment={displayEnvironment} />
               <div style={styles.actions}>
                 <button
                   type="button"
@@ -207,6 +217,7 @@ export default function AccountCreatePage() {
                   </div>
                 ))}
               </div>
+              <EnvironmentNotice environment={displayEnvironment} />
 
               {message ? (
                 <p style={styles.message} role="status">
@@ -241,6 +252,27 @@ export default function AccountCreatePage() {
         </section>
       </div>
     </main>
+  );
+}
+
+function EnvironmentNotice({
+  environment,
+}: {
+  environment: DisplayEnvironment;
+}) {
+  const isStandalone = environment === "standalone";
+
+  return (
+    <div style={isStandalone ? styles.environmentNote : styles.environmentWarning}>
+      <p style={styles.environmentTitle}>
+        {getDisplayEnvironmentLabel(environment)}で開いています
+      </p>
+      <p style={styles.environmentText}>
+        {isStandalone
+          ? "この中の写真と記録をアカウントに保存できます。"
+          : "ホーム画面アプリで撮った写真を保存したい場合は、ホーム画面のねてるねこから開いてください。"}
+      </p>
+    </div>
   );
 }
 
@@ -308,6 +340,34 @@ const styles = {
     borderRadius: "50%",
     background: APP_ACCENT,
     flexShrink: 0,
+  },
+  environmentNote: {
+    margin: "0 0 16px",
+    border: "1px solid rgba(169,149,126,0.26)",
+    borderRadius: "16px",
+    background: "rgba(255,253,248,0.62)",
+    padding: "12px",
+  },
+  environmentWarning: {
+    margin: "0 0 16px",
+    border: "1px solid rgba(216,151,88,0.35)",
+    borderRadius: "16px",
+    background: "rgba(255,246,234,0.82)",
+    padding: "12px",
+  },
+  environmentTitle: {
+    margin: "0 0 4px",
+    color: "#2a2a28",
+    fontSize: "13px",
+    fontWeight: 700,
+    lineHeight: 1.4,
+  },
+  environmentText: {
+    margin: 0,
+    color: "#7d766e",
+    fontSize: "12px",
+    fontWeight: 500,
+    lineHeight: 1.6,
   },
   message: {
     margin: "0 0 14px",
