@@ -86,12 +86,13 @@ const OWN_SLEEPING_PHOTO_STORAGE_KEY =
 export function readOwnSleepingPhotos(activeCatId: string | null = null) {
   const photos = readStorageArray<OwnSleepingPhoto>(OWN_SLEEPING_PHOTO_STORAGE_KEY)
     .filter(isValidOwnSleepingPhoto)
-    .map(normalizeOwnSleepingPhoto)
-    .filter((photo) =>
-      activeCatId && photo.ownerCatId ? photo.ownerCatId === activeCatId : true,
-    );
+    .map(normalizeOwnSleepingPhoto);
 
-  return photos.slice(0, 24);
+  const activeCatPhotos = activeCatId
+    ? photos.filter((photo) => photo.ownerCatId === activeCatId)
+    : photos;
+
+  return (activeCatPhotos.length > 0 ? activeCatPhotos : photos).slice(0, 24);
 }
 
 export function readOwnSleepingPhotoCount(activeCatId: string | null) {

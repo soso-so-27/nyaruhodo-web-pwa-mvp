@@ -1887,9 +1887,11 @@ function readCollectionPhotos(catId: string): Record<string, string[]> {
       Record<string, string[] | string>
     >;
     const catPhotos = all[catId] ?? {};
+    const photosForDisplay =
+      countStoredPhotos(catPhotos) > 0 ? catPhotos : mergeAllCollectionPhotos(all);
 
     return Object.fromEntries(
-      Object.entries(catPhotos).map(([slug, value]) => [
+      Object.entries(photosForDisplay).map(([slug, value]) => [
         slug,
         normalizeStoredPhotoList(value),
       ]),
@@ -1923,6 +1925,30 @@ function normalizeStoredPhotoList(value: string[] | string | undefined) {
   }
 
   return value ?? [];
+}
+
+function countStoredPhotos(photosBySlug: Record<string, string[] | string>) {
+  return Object.values(photosBySlug).reduce(
+    (count, value) => count + normalizeStoredPhotoList(value).length,
+    0,
+  );
+}
+
+function mergeAllCollectionPhotos(
+  allPhotos: Record<string, Record<string, string[] | string>>,
+) {
+  const merged: Record<string, string[]> = {};
+
+  for (const photosBySlug of Object.values(allPhotos)) {
+    for (const [slug, value] of Object.entries(photosBySlug)) {
+      merged[slug] = [
+        ...(merged[slug] ?? []),
+        ...normalizeStoredPhotoList(value),
+      ];
+    }
+  }
+
+  return merged;
 }
 
 function resizeAndEncode(file: File, maxSize = 800): Promise<string> {
