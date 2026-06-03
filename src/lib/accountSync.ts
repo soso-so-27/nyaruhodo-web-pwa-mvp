@@ -1072,7 +1072,9 @@ async function restoreRemoteSnapshot(
         ),
       )
     : [];
-  const profiles: LocalCatProfile[] = [...localProfiles];
+  const profiles: LocalCatProfile[] = shouldReplaceLocalDefaultCats(localProfiles)
+    ? []
+    : [...localProfiles];
   const remoteLocalCatIds: string[] = [];
 
   for (const cat of remoteCats) {
@@ -1505,6 +1507,26 @@ function mergeRecordLogs(
   }
 
   return [...byId.values()].sort((a, b) => (b.timestamp ?? 0) - (a.timestamp ?? 0));
+}
+
+function shouldReplaceLocalDefaultCats(profiles: LocalCatProfile[]) {
+  if (profiles.length !== 1) {
+    return false;
+  }
+
+  const [profile] = profiles;
+
+  return (
+    typeof profile.id === "string" &&
+    profile.id.startsWith("local-cat-") &&
+    (profile.name === "ミケ" || !profile.name) &&
+    !profile.homePhotoDataUrl &&
+    !profile.avatarDataUrl &&
+    !profile.basicInfo &&
+    !profile.appearance &&
+    !profile.typeKey &&
+    !profile.typeLabel
+  );
 }
 
 function readJson<T>(key: string): T | null {

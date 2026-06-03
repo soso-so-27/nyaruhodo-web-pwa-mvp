@@ -33,7 +33,7 @@ export function BottomNavigation({ active }: BottomNavigationProps) {
     {
       key: "home",
       href: "/home",
-      label: "しゃしん",
+      label: "とる",
       icon: <CameraIcon style={{ ...styles.svgIcon, ...styles.cameraSvgIcon }} />,
     },
     {
