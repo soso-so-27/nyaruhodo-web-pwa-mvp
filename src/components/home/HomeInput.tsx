@@ -445,6 +445,7 @@ export function HomeInput({ recentEvents: _recentEvents }: HomeInputProps) {
       syncResult.status === "synced" ||
       (syncResult.status === "restored" &&
         (syncResult.restoredCats > 0 ||
+          syncResult.restoredCollectionPhotos > 0 ||
           syncResult.restoredOwnSleepingPhotos > 0 ||
           syncResult.restoredKeptExchangePhotos > 0))
     ) {
@@ -673,6 +674,7 @@ export function HomeInput({ recentEvents: _recentEvents }: HomeInputProps) {
     setActiveCat(active);
     saveActiveCatId(active.id);
     hydrateCatState(active.id);
+    setCollectionRefreshTick((value) => value + 1);
   }
 
   function showToast(message: string) {
@@ -822,6 +824,7 @@ export function HomeInput({ recentEvents: _recentEvents }: HomeInputProps) {
     if (
       result.status === "restored" &&
       (result.restoredCats > 0 ||
+        result.restoredCollectionPhotos > 0 ||
         result.restoredOwnSleepingPhotos > 0 ||
         result.restoredKeptExchangePhotos > 0)
     ) {
