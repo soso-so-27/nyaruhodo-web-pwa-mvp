@@ -64,28 +64,21 @@ export function OnboardingFlow() {
       setMessage("");
 
       try {
-        const dataUrl = await resizeAndEncode(file, 1100, 0.78);
         const profiles = readCatProfiles();
         const activeProfile = getActiveCatProfile(profiles, readActiveCatId());
         const catId = activeProfile.id;
 
         saveActiveCatId(catId);
-        setSelectedPhotoSrc(dataUrl);
+        const savedResult = await saveSleepingPhotoWithFallback(file, catId);
 
-        const ownPhoto = saveOwnSleepingPhoto({
-          catId,
-          src: dataUrl,
-          triggerLabel: "ねがお",
-          theme: "sleeping",
-          shared: true,
-        });
-
-        if (!ownPhoto) {
-          setMessage("写真を保存できませんでした。");
+        if (!savedResult) {
+          setMessage("写真を小さくしても保存できませんでした。");
           setState("intro");
           return;
         }
 
+        const { dataUrl, ownPhoto } = savedResult;
+        setSelectedPhotoSrc(dataUrl);
         saveSharedExchangePhoto({ ownPhoto });
 
         const selected = selectDeliverableSleepingPhoto({
@@ -301,6 +294,31 @@ function resizeAndEncode(
 
     image.src = url;
   });
+}
+
+async function saveSleepingPhotoWithFallback(file: File, catId: string) {
+  const attempts = [
+    { maxSize: 760, quality: 0.72 },
+    { maxSize: 560, quality: 0.68 },
+    { maxSize: 420, quality: 0.62 },
+  ];
+
+  for (const attempt of attempts) {
+    const dataUrl = await resizeAndEncode(file, attempt.maxSize, attempt.quality);
+    const ownPhoto = saveOwnSleepingPhoto({
+      catId,
+      src: dataUrl,
+      triggerLabel: "ねがお",
+      theme: "sleeping",
+      shared: true,
+    });
+
+    if (ownPhoto) {
+      return { dataUrl, ownPhoto };
+    }
+  }
+
+  return null;
 }
 
 const SERIF =

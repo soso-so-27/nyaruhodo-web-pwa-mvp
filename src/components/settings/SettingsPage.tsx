@@ -268,8 +268,7 @@ export function SettingsPage() {
 
       try {
         for (const file of files.slice(0, 30)) {
-          const dataUrl = await resizeAndEncode(file, 760, 0.72);
-          const saved = saveSharedExchangeStockPhoto({ src: dataUrl });
+          const saved = await saveStockPhotoWithFallback(file);
 
           if (saved) {
             savedCount += 1;
@@ -617,6 +616,25 @@ function resizeAndEncode(
 
     image.src = url;
   });
+}
+
+async function saveStockPhotoWithFallback(file: File) {
+  const attempts = [
+    { maxSize: 760, quality: 0.72 },
+    { maxSize: 560, quality: 0.68 },
+    { maxSize: 420, quality: 0.62 },
+  ];
+
+  for (const attempt of attempts) {
+    const dataUrl = await resizeAndEncode(file, attempt.maxSize, attempt.quality);
+    const saved = saveSharedExchangeStockPhoto({ src: dataUrl });
+
+    if (saved) {
+      return saved;
+    }
+  }
+
+  return null;
 }
 
 function AuthDebugPanel({ snapshot }: { snapshot: AuthDebugSnapshot | null }) {
