@@ -2436,7 +2436,7 @@ function SleepingPhotoHome({
 }) {
   const deliveryLabel = deliveryRemaining
     ? `つぎ ${deliveryRemaining}`
-    : "入れると1枚とどく";
+    : null;
   const saveLabel =
     saveState === "account" ? "アカウント接続中" : "この端末に保存";
 
@@ -2460,7 +2460,7 @@ function SleepingPhotoHome({
             ねがおをとる
           </h1>
           <p style={styles.sleepingHomeLead}>
-            入れると、1枚とどく
+            ねてるねこを見つけたら
           </p>
         </div>
 
@@ -2486,7 +2486,9 @@ function SleepingPhotoHome({
             <span>とどく</span>
           </span>
         </div>
-        <div style={styles.sleepingDeliveryChip}>{deliveryLabel}</div>
+        {deliveryLabel ? (
+          <div style={styles.sleepingDeliveryChip}>{deliveryLabel}</div>
+        ) : null}
       </div>
 
       <div style={styles.sleepingStatCards} aria-label="ねがお">
