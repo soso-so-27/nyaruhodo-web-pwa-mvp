@@ -9,6 +9,7 @@ import {
   readSharedExchangePhotos,
   saveOwnSleepingPhoto,
   saveSharedExchangePhoto,
+  saveSharedExchangeStockPhoto,
   selectDeliverableSleepingPhoto,
   type ExchangePhoto,
   type ExchangePhotoPoolItem,
@@ -30,6 +31,7 @@ export function OnboardingFlow() {
   const [selectedPhotoSrc, setSelectedPhotoSrc] = useState("");
   const [deliveredPhoto, setDeliveredPhoto] = useState<ExchangePhoto | null>(null);
   const [message, setMessage] = useState("");
+  const [isCandidateAdding, setIsCandidateAdding] = useState(false);
 
   async function handleSelectSleepingPhoto() {
     if (state === "saving") {
@@ -144,6 +146,68 @@ export function OnboardingFlow() {
     setState("kept");
   }
 
+  async function handleAddCandidatePhoto() {
+    if (isCandidateAdding) {
+      return;
+    }
+
+    const input = document.createElement("input");
+    input.type = "file";
+    input.accept = "image/*";
+    input.tabIndex = -1;
+    input.setAttribute("aria-hidden", "true");
+    input.style.position = "fixed";
+    input.style.left = "-9999px";
+    input.style.top = "0";
+    input.style.width = "1px";
+    input.style.height = "1px";
+    input.style.opacity = "0";
+
+    const cleanupInput = () => {
+      window.setTimeout(() => {
+        input.remove();
+      }, 0);
+    };
+
+    input.onchange = async () => {
+      const file = input.files?.[0];
+
+      if (!file || !isLikelyImageFile(file)) {
+        setMessage("写真を選べませんでした。別の写真でもう一度試してください。");
+        cleanupInput();
+        return;
+      }
+
+      setIsCandidateAdding(true);
+      setMessage("");
+
+      try {
+        const saved = await saveStockCandidateWithFallback(file);
+
+        if (!saved) {
+          setMessage("候補写真を保存できませんでした。別の写真でもう一度試してください。");
+          return;
+        }
+
+        setDeliveredPhoto(toDeliveredExchangePhoto(saved));
+        setState("delivered");
+      } catch {
+        setMessage("候補写真を保存できませんでした。");
+      } finally {
+        setIsCandidateAdding(false);
+        cleanupInput();
+      }
+    };
+
+    document.body.appendChild(input);
+    input.click();
+    window.setTimeout(() => {
+      if (!input.files?.length) {
+        input.remove();
+      }
+    }, 60000);
+  }
+
   function handleGoHome() {
     window.localStorage.setItem(STORAGE_KEYS.onboardingCompleted, "true");
     router.push("/home");
@@ -226,11 +290,18 @@ export function OnboardingFlow() {
               <img src={selectedPhotoSrc} alt="" style={styles.savedPhoto} />
             ) : null}
             <p style={styles.resultText}>
-              とどく候補がまだありません。設定からテスト用のねがおを追加できます。
+              とどく候補がまだありません。テスト用に、ここで候補を追加できます。
             </p>
-            <a href="/settings" style={styles.primaryLink}>
-              設定で追加する
-            </a>
+            <button
+              type="button"
+              onClick={() => {
+                void handleAddCandidatePhoto();
+              }}
+              style={styles.primaryButton}
+              disabled={isCandidateAdding}
+            >
+              {isCandidateAdding ? "追加しています..." : "とどく候補を追加する"}
+            </button>
             <button type="button" onClick={handleGoHome} style={styles.textButton}>
               ホームへ
             </button>
@@ -322,6 +393,26 @@ async function saveSleepingPhotoWithFallback(file: File, catId: string) {
 
     if (ownPhoto) {
       return { dataUrl, ownPhoto };
+    }
+  }
+
+  return null;
+}
+
+async function saveStockCandidateWithFallback(file: File) {
+  const attempts = [
+    { maxSize: 560, quality: 0.66 },
+    { maxSize: 420, quality: 0.58 },
+    { maxSize: 320, quality: 0.5 },
+    { maxSize: 240, quality: 0.42 },
+  ];
+
+  for (const attempt of attempts) {
+    const dataUrl = await resizeAndEncode(file, attempt.maxSize, attempt.quality);
+    const saved = saveSharedExchangeStockPhoto({ src: dataUrl });
+
+    if (saved) {
+      return saved;
     }
   }
 
