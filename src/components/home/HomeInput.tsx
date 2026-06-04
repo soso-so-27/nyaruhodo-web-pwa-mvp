@@ -2446,6 +2446,7 @@ function SleepingPhotoHome({
   const deliveryLabel = deliveryRemaining
     ? `つぎにとどくまで ${deliveryRemaining}`
     : null;
+  const deliveryStatus = deliveryRemaining ?? "とると届く";
 
   return (
     <>
@@ -2469,6 +2470,15 @@ function SleepingPhotoHome({
           <p style={styles.sleepingHomeLead}>
             とると、1枚とどく
           </p>
+          <div style={styles.sleepingFlow} aria-hidden="true">
+            <span style={styles.sleepingFlowIcon}>
+              <AppIcon name="camera" size={20} />
+            </span>
+            <span style={styles.sleepingFlowDots} />
+            <span style={styles.sleepingFlowIconAccent}>
+              <AppIcon name="mail" size={20} />
+            </span>
+          </div>
         </div>
 
       <div style={styles.sleepingActionGroup}>
@@ -2482,16 +2492,32 @@ function SleepingPhotoHome({
         >
           <AppIcon name="camera" size={36} />
         </button>
-        {deliveryLabel ? (
-          <div style={styles.sleepingDeliveryChip}>{deliveryLabel}</div>
-        ) : null}
       </div>
 
-      <div style={styles.sleepingWorldCount} aria-label={`ねてるねこ ${sleepingCounter}匹`}>
-        <AppIcon name="sleep" size={15} />
-        <span>ねてるねこ</span>
-        <strong style={styles.sleepingWorldCountValue}>{sleepingCounter}</strong>
-        <span>匹</span>
+      <div style={styles.sleepingStatusStack}>
+        <div style={styles.sleepingWorldCard} aria-label={`今日ねてるねこ ${sleepingCounter}匹`}>
+          <div style={styles.sleepingCardIcon}>
+            <AppIcon name="sleep" size={24} />
+          </div>
+          <div style={styles.sleepingCardText}>
+            <span style={styles.sleepingCardLabel}>今日ねてるねこ</span>
+            <span style={styles.sleepingWorldCountValue}>
+              {sleepingCounter}
+              <span style={styles.sleepingWorldCountUnit}>匹</span>
+            </span>
+          </div>
+        </div>
+        <div style={styles.sleepingDeliveryCard} aria-label={deliveryLabel ?? "とると届く"}>
+          <div style={styles.sleepingCardIconAccent}>
+            <AppIcon name="mail" size={23} />
+          </div>
+          <div style={styles.sleepingCardText}>
+            <span style={styles.sleepingCardLabel}>
+              {deliveryRemaining ? "つぎのねがおまで" : "つぎのねがお"}
+            </span>
+            <span style={styles.sleepingDeliveryValue}>{deliveryStatus}</span>
+          </div>
+        </div>
       </div>
       </section>
     </>
@@ -5092,13 +5118,13 @@ const styles = {
   },
   sleepingHomeHeader: {
     position: "fixed",
-    top: "calc(clamp(120px, 18dvh, 168px) + env(safe-area-inset-top))",
+    top: "calc(clamp(116px, 17dvh, 156px) + env(safe-area-inset-top))",
     left: "50%",
     zIndex: 18,
     width: HOME_NAV_FRAME_WIDTH,
     transform: "translateX(-50%)",
     display: "grid",
-    gap: "9px",
+    gap: "10px",
     padding: "0 16px",
     boxSizing: "border-box",
     pointerEvents: "none",
@@ -5114,22 +5140,61 @@ const styles = {
     margin: 0,
     color: "#202020",
     fontFamily: "\"Shippori Mincho B1\", \"Hiragino Mincho ProN\", \"Yu Mincho\", serif",
-    fontSize: "25px",
+    fontSize: "31px",
     fontWeight: 470,
     lineHeight: 1.25,
-    letterSpacing: 0,
+    letterSpacing: "0.08em",
   },
   sleepingHomeLead: {
     margin: 0,
     color: "#6a6258",
     fontFamily: "\"Shippori Mincho B1\", \"Hiragino Mincho ProN\", \"Yu Mincho\", serif",
-    fontSize: "13.5px",
+    fontSize: "15px",
     fontWeight: 400,
-    lineHeight: 1.9,
+    lineHeight: 1.55,
+    letterSpacing: "0.06em",
+  },
+  sleepingFlow: {
+    display: "inline-flex",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: "12px",
+    justifySelf: "center",
+    marginTop: "6px",
+    color: "#8b8173",
+  },
+  sleepingFlowIcon: {
+    width: "44px",
+    height: "44px",
+    borderRadius: "999px",
+    display: "inline-flex",
+    alignItems: "center",
+    justifyContent: "center",
+    background: "rgba(239,229,214,0.78)",
+    color: "#746b5f",
+    border: "1px solid rgba(120,108,94,0.12)",
+  },
+  sleepingFlowIconAccent: {
+    width: "44px",
+    height: "44px",
+    borderRadius: "999px",
+    display: "inline-flex",
+    alignItems: "center",
+    justifyContent: "center",
+    background: "rgba(244,228,221,0.76)",
+    color: "#b98678",
+    border: "1px solid rgba(178,132,116,0.12)",
+  },
+  sleepingFlowDots: {
+    width: "62px",
+    height: "2px",
+    borderRadius: "999px",
+    background:
+      "repeating-linear-gradient(90deg, rgba(142,128,110,0.42) 0 4px, transparent 4px 10px)",
   },
   sleepingActionGroup: {
     position: "fixed",
-    top: "calc(clamp(270px, 36dvh, 330px) + env(safe-area-inset-top))",
+    top: "calc(clamp(334px, 43dvh, 398px) + env(safe-area-inset-top))",
     left: "50%",
     zIndex: 19,
     transform: "translateX(-50%)",
@@ -5225,8 +5290,8 @@ const styles = {
   },
   sleepingPhotoButton: {
     justifySelf: "center",
-    width: "140px",
-    height: "140px",
+    width: "148px",
+    height: "148px",
     border: "1px solid rgba(96,86,69,0.09)",
     borderRadius: "50%",
     background:
@@ -5272,35 +5337,102 @@ const styles = {
     fontWeight: 540,
     lineHeight: 1,
   },
-  sleepingWorldCount: {
+  sleepingStatusStack: {
     position: "fixed",
     left: "50%",
-    top: "calc(clamp(496px, 67dvh, 604px) + env(safe-area-inset-top))",
+    top: "calc(clamp(500px, 66dvh, 594px) + env(safe-area-inset-top))",
     zIndex: 19,
     transform: "translateX(-50%)",
+    width: "min(calc(100vw - 48px), 410px)",
+    display: "grid",
+    gap: "12px",
+    pointerEvents: "none",
+  },
+  sleepingWorldCard: {
+    display: "grid",
+    gridTemplateColumns: "52px 1fr",
+    alignItems: "center",
+    gap: "12px",
+    minHeight: "76px",
+    padding: "12px 18px",
+    border: "1px solid rgba(120,108,94,0.11)",
+    borderRadius: "26px",
+    background: "rgba(255,253,248,0.64)",
+    boxShadow: "0 10px 26px rgba(90,76,60,0.06)",
+    backdropFilter: "blur(10px)",
+    WebkitBackdropFilter: "blur(10px)",
+    boxSizing: "border-box",
+  },
+  sleepingDeliveryCard: {
+    display: "grid",
+    gridTemplateColumns: "52px 1fr",
+    alignItems: "center",
+    gap: "12px",
+    minHeight: "72px",
+    padding: "12px 18px",
+    border: "1px solid rgba(120,108,94,0.1)",
+    borderRadius: "24px",
+    background: "rgba(255,253,248,0.54)",
+    boxShadow: "0 8px 22px rgba(90,76,60,0.05)",
+    backdropFilter: "blur(10px)",
+    WebkitBackdropFilter: "blur(10px)",
+    boxSizing: "border-box",
+  },
+  sleepingCardIcon: {
+    width: "44px",
+    height: "44px",
+    borderRadius: "999px",
     display: "inline-flex",
     alignItems: "center",
     justifyContent: "center",
-    gap: "6px",
-    minHeight: "30px",
-    padding: "0 12px",
-    border: "0.5px solid rgba(95,82,62,0.1)",
+    background: "rgba(239,229,214,0.72)",
+    color: "#9d8d76",
+  },
+  sleepingCardIconAccent: {
+    width: "44px",
+    height: "44px",
     borderRadius: "999px",
-    background: "rgba(255,253,248,0.42)",
-    color: "#8a8174",
-    fontSize: "11px",
-    fontWeight: 520,
-    lineHeight: 1,
-    pointerEvents: "none",
-    whiteSpace: "nowrap",
+    display: "inline-flex",
+    alignItems: "center",
+    justifyContent: "center",
+    background: "rgba(244,228,221,0.72)",
+    color: "#b98678",
+  },
+  sleepingCardText: {
+    minWidth: 0,
+    display: "grid",
+    gap: "4px",
+    justifyItems: "start",
+    textAlign: "left",
+  },
+  sleepingCardLabel: {
+    color: "#756b5f",
+    fontFamily: "\"Shippori Mincho B1\", \"Hiragino Mincho ProN\", \"Yu Mincho\", serif",
+    fontSize: "12px",
+    fontWeight: 400,
+    lineHeight: 1.25,
+    letterSpacing: "0.08em",
   },
   sleepingWorldCountValue: {
     color: "#5b4d40",
     fontFamily: "\"Shippori Mincho B1\", \"Hiragino Mincho ProN\", \"Yu Mincho\", serif",
-    fontSize: "18px",
+    fontSize: "31px",
     fontWeight: 460,
     lineHeight: 1,
     fontVariantNumeric: "tabular-nums",
+  },
+  sleepingWorldCountUnit: {
+    marginLeft: "5px",
+    color: "#6b6257",
+    fontSize: "14px",
+  },
+  sleepingDeliveryValue: {
+    color: "#5b4d40",
+    fontFamily: "\"Shippori Mincho B1\", \"Hiragino Mincho ProN\", \"Yu Mincho\", serif",
+    fontSize: "21px",
+    fontWeight: 430,
+    lineHeight: 1.2,
+    letterSpacing: "0.06em",
   },
   sleepingBoxPills: {
     display: "flex",
