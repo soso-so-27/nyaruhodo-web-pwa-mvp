@@ -857,7 +857,7 @@ const styles = {
     width: "min(100%, 430px)",
     margin: "0 auto",
     padding:
-      "calc(20px + env(safe-area-inset-top)) 24px calc(118px + env(safe-area-inset-bottom))",
+      "calc(20px + env(safe-area-inset-top)) 24px calc(156px + env(safe-area-inset-bottom))",
   },
   pageHeader: {
     display: "flex",
