@@ -734,7 +734,7 @@ export function CollectionPage() {
       <div style={styles.container}>
         <header style={styles.header}>
           <div style={styles.pageHeader}>
-            <h1 style={styles.pageTitle}>ねてるねこ</h1>
+            <h1 style={styles.pageTitle}>アルバム</h1>
             <div style={styles.pageHeaderActions}>
               <button
                 type="button"
@@ -845,7 +845,6 @@ function BoxOverview({
       <BoxSummaryCard
         title="おきてる写真"
         photos={awakePhotos}
-        showAddSlot={true}
       />
       <BoxSummaryCard
         title="とどいたねがお"
@@ -859,62 +858,60 @@ function BoxOverview({
 function BoxSummaryCard({
   title,
   photos,
-  showAddSlot = false,
   onOpen,
 }: {
   title: string;
   photos: BoxPreviewPhoto[];
-  showAddSlot?: boolean;
   onOpen?: () => void;
 }) {
   const visiblePhotos = photos.slice(0, 4);
-  const emptySlotCount = Math.max(
-    0,
-    4 - visiblePhotos.length - (showAddSlot ? 1 : 0),
-  );
-  const isOtherBox = title === "とどいたねがお";
-  const countLabel = photos.length > 0 ? `${photos.length}枚` : "まだなし";
+  const hasPhotos = photos.length > 0;
+  const isInteractive = Boolean(onOpen && hasPhotos);
+  const countLabel = hasPhotos ? `${photos.length}枚` : "";
+  const emptyText =
+    title === "とったねがお"
+      ? "ねがおをとると並びます"
+      : title === "とどいたねがお"
+        ? "とっておくと並びます"
+        : "おきてる写真はここに";
 
   return (
     <button
       type="button"
       style={{
         ...styles.boxSummaryCard,
-        ...(onOpen ? styles.boxSummaryButton : styles.boxSummaryStatic),
+        ...(isInteractive ? styles.boxSummaryButton : styles.boxSummaryStatic),
       }}
-      onClick={onOpen}
-      disabled={!onOpen}
+      onClick={isInteractive ? onOpen : undefined}
+      disabled={!isInteractive}
     >
       <div style={styles.boxSummaryHeader}>
         <div>
           <h2 style={styles.boxSummaryTitle}>{title}</h2>
         </div>
-        <span style={styles.boxSummaryMeta}>
-          <span style={styles.boxSummaryCount}>{countLabel}</span>
-          <span style={styles.boxSummaryArrow}>›</span>
-        </span>
-      </div>
-      <div style={styles.boxPhotoStrip}>
-        {visiblePhotos.map((photo) => (
-          <span key={photo.id} style={styles.boxPhotoThumb}>
-            <StoredPhotoImage src={photo.src} alt="" style={styles.boxPhotoImg} />
-          </span>
-        ))}
-        {showAddSlot ? (
-          <span style={styles.boxAddSlot} aria-label="おきてる写真を追加">
-            +
+        {countLabel || isInteractive ? (
+          <span style={styles.boxSummaryMeta}>
+            {countLabel ? (
+              <span style={styles.boxSummaryCount}>{countLabel}</span>
+            ) : null}
+            {isInteractive ? <span style={styles.boxSummaryArrow}>›</span> : null}
           </span>
         ) : null}
-        {Array.from({ length: emptySlotCount }).map((_, index) => (
-          <span
-            key={`${title}-empty-${index}`}
-            style={isOtherBox ? styles.boxLockedSlot : styles.boxEmptySlot}
-            aria-hidden="true"
-          >
-            {isOtherBox ? <AppIcon name="lock" size={16} /> : null}
-          </span>
-        ))}
       </div>
+      {hasPhotos ? (
+        <div style={styles.boxPhotoStrip}>
+          {visiblePhotos.map((photo) => (
+            <span key={photo.id} style={styles.boxPhotoThumb}>
+              <StoredPhotoImage src={photo.src} alt="" style={styles.boxPhotoImg} />
+            </span>
+          ))}
+        </div>
+      ) : (
+        <div style={styles.boxSummaryEmpty}>
+          <span style={styles.boxSummaryEmptyLine} />
+          <span style={styles.boxSummaryEmptyText}>{emptyText}</span>
+        </div>
+      )}
     </button>
   );
 }
@@ -2407,45 +2404,24 @@ const styles = {
     objectFit: "cover",
     display: "block",
   },
-  boxAddSlot: {
-    aspectRatio: "1 / 1",
-    minWidth: 0,
-    display: "inline-flex",
+  boxSummaryEmpty: {
+    display: "grid",
+    gridTemplateColumns: "72px minmax(0, 1fr)",
     alignItems: "center",
-    justifyContent: "center",
-    borderRadius: "10px",
-    background: "rgba(255,255,255,0.32)",
-    border: "1px dashed rgba(104,96,84,0.2)",
-    color: "#777166",
-    fontSize: "26px",
-    fontWeight: 300,
+    gap: "12px",
+    minHeight: "64px",
+    color: COLLECTION_MUTED,
   },
-  boxEmptySlot: {
-    aspectRatio: "1 / 1",
-    minWidth: 0,
-    borderRadius: "10px",
-    background: "rgba(255,255,255,0.22)",
-    border: "0.5px solid rgba(104,96,84,0.05)",
+  boxSummaryEmptyLine: {
+    height: "1px",
+    borderRadius: "999px",
+    background: "rgba(79,73,63,0.12)",
   },
-  boxLockedSlot: {
-    aspectRatio: "1 / 1",
-    minWidth: 0,
-    display: "inline-flex",
-    alignItems: "center",
-    justifyContent: "center",
-    borderRadius: "10px",
-    background: "rgba(231,226,216,0.44)",
-    border: "0.5px solid rgba(104,96,84,0.05)",
-    color: "rgba(138,131,120,0.7)",
-  },
-  boxLockedIcon: {
+  boxSummaryEmptyText: {
     color: "#8a8378",
-  },
-  boxEmptyText: {
-    gridColumn: "1 / -1",
-    color: "rgba(255,255,255,0.52)",
-    fontSize: "12px",
-    fontWeight: 540,
+    fontSize: "12.5px",
+    fontWeight: 500,
+    lineHeight: 1.35,
   },
   catSheetGrid: {
     display: "flex",
