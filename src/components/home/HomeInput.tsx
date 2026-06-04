@@ -1564,7 +1564,7 @@ export function HomeInput({ recentEvents: _recentEvents }: HomeInputProps) {
     setPendingExchangeSharePhoto(null);
     setPendingExchangeCatId(null);
     if (deliveryRemaining) {
-      showToast(`とったねがおに入りました。つぎにとどくのは ${deliveryRemaining}`);
+      showToast(`とったねがおに入りました。つぎにとどくまで ${deliveryRemaining}`);
       trackProductEvent(
         "home_exchange_share_photo_confirmed",
         {
@@ -1634,20 +1634,8 @@ export function HomeInput({ recentEvents: _recentEvents }: HomeInputProps) {
   const sleepingCounterItem = homeCatCounters.find(
     (counter) => counter.id === "sleeping",
   );
-  const homeSleepingBoxStats = useMemo(
-    () =>
-      buildHomeSleepingBoxStats({
-        activeCatId,
-        sleepingCounter:
-          sleepingCounterItem?.count ?? HOME_SLEEPING_COUNTER_BASE_COUNT,
-        deliveryRemaining: sleepingCounterRemaining,
-      }),
-    [
-      activeCatId,
-      collectionRefreshTick,
-      sleepingCounterItem?.count,
-      sleepingCounterRemaining,
-    ],
+  const sleepingCounterCount = formatSleepingCounterCount(
+    sleepingCounterItem?.count ?? HOME_SLEEPING_COUNTER_BASE_COUNT,
   );
 
   return (
@@ -1656,7 +1644,7 @@ export function HomeInput({ recentEvents: _recentEvents }: HomeInputProps) {
       <div style={styles.paperNoise} aria-hidden="true" />
 
       <SleepingPhotoHome
-        stats={homeSleepingBoxStats}
+        sleepingCounter={sleepingCounterCount}
         deliveryRemaining={sleepingCounterRemaining}
         saveState={homeSaveState}
         onTakePhoto={() => handleSleepingPhotoStart("camera")}
@@ -2422,20 +2410,20 @@ function InfoSheet({
 }
 
 function SleepingPhotoHome({
-  stats,
+  sleepingCounter,
   deliveryRemaining,
   saveState,
   onTakePhoto,
   onSelectPhoto,
 }: {
-  stats: BoardShelfStat[];
+  sleepingCounter: string;
   deliveryRemaining: string | null;
   saveState: HomeSaveState;
   onTakePhoto: () => void;
   onSelectPhoto: () => void;
 }) {
   const deliveryLabel = deliveryRemaining
-    ? `つぎ ${deliveryRemaining}`
+    ? `つぎにとどくまで ${deliveryRemaining}`
     : null;
   const saveLabel =
     saveState === "account" ? "アカウント接続中" : "この端末に保存";
@@ -2460,7 +2448,7 @@ function SleepingPhotoHome({
             ねがおをとる
           </h1>
           <p style={styles.sleepingHomeLead}>
-            ねてるねこを見つけたら
+            とると、1枚とどく
           </p>
         </div>
 
@@ -2475,38 +2463,16 @@ function SleepingPhotoHome({
         >
           <AppIcon name="camera" size={36} />
         </button>
-        <div style={styles.sleepingFlowCue} aria-label="ねがおを入れると、1枚とどく">
-          <span style={styles.sleepingFlowItem}>
-            <AppIcon name="photo" size={15} />
-            <span>ねがお</span>
-          </span>
-          <span style={styles.sleepingFlowArrow} aria-hidden="true">→</span>
-          <span style={styles.sleepingFlowItem}>
-            <AppIcon name="mail" size={15} />
-            <span>とどく</span>
-          </span>
-        </div>
         {deliveryLabel ? (
           <div style={styles.sleepingDeliveryChip}>{deliveryLabel}</div>
         ) : null}
       </div>
 
-      <div style={styles.sleepingStatCards} aria-label="ねがお">
-        {stats.map((stat) => (
-          <span key={stat.label} style={styles.sleepingStatCard}>
-            <span style={styles.sleepingStatIcon} aria-hidden="true">
-              <AppIcon name={stat.icon} size={18} />
-            </span>
-            <span style={styles.sleepingStatLabel}>{stat.label}</span>
-            <span style={styles.sleepingStatValueRow}>
-              <span style={styles.sleepingStatValue}>{stat.value}</span>
-              <span style={styles.sleepingStatUnit}>{stat.unit}</span>
-            </span>
-            {stat.detail ? (
-              <span style={styles.sleepingStatDetail}>{stat.detail}</span>
-            ) : null}
-          </span>
-        ))}
+      <div style={styles.sleepingWorldCount} aria-label={`ねてるねこ ${sleepingCounter}匹`}>
+        <AppIcon name="sleep" size={15} />
+        <span>ねてるねこ</span>
+        <strong style={styles.sleepingWorldCountValue}>{sleepingCounter}</strong>
+        <span>匹</span>
       </div>
       <div style={styles.sleepingSaveHint} aria-label={saveLabel}>
         <AppIcon name="lock" size={13} />
@@ -2647,7 +2613,7 @@ function ExchangeSharePermissionSheet({
         <p style={styles.exchangeLead}>
           {canReceivePhoto
             ? "とったねがおに入り、1枚とどきます。"
-            : `とったねがおには入ります。つぎにとどくのは ${deliveryRemaining}。`}
+            : `とったねがおには入ります。つぎにとどくまで ${deliveryRemaining}。`}
         </p>
         <div style={styles.exchangeSharePreview}>
           <StoredPhotoImage src={photo.src} alt="" style={styles.exchangePhoto} />
@@ -2693,9 +2659,9 @@ function ExchangeSharePermissionSheet({
           >
             <AppIcon name="send" size={16} />
             <span style={styles.exchangeModeText}>
-              <span style={styles.exchangeModeLabel}>とどく</span>
+              <span style={styles.exchangeModeLabel}>とどける</span>
               <span style={styles.exchangeModeSub}>
-                {canReceivePhoto ? "1枚うけとる" : "あとで届く"}
+                {canReceivePhoto ? "1枚うけとる" : "あとでとどく"}
               </span>
             </span>
           </button>
@@ -3246,43 +3212,6 @@ function buildBoardShelfStats(
   }
 
   return stats;
-}
-
-function buildHomeSleepingBoxStats({
-  activeCatId,
-  sleepingCounter,
-  deliveryRemaining,
-}: {
-  activeCatId: string | null;
-  sleepingCounter: number;
-  deliveryRemaining: string | null;
-}): BoardShelfStat[] {
-  const ownSleepingCount = readOwnSleepingPhotoCount(activeCatId);
-  const keptOtherCount = readKeptExchangePhotoCount();
-
-  return [
-    {
-      icon: "photo",
-      label: "とったねがお",
-      value: String(ownSleepingCount),
-      unit: "枚",
-      detail: "",
-    },
-    {
-      icon: "mail",
-      label: "とどいたねがお",
-      value: String(keptOtherCount),
-      unit: "枚",
-      detail: deliveryRemaining ? `つぎにとどくまで ${deliveryRemaining}` : "",
-    },
-    {
-      icon: "sleep",
-      label: "ねてるねこ",
-      value: formatSleepingCounterCount(sleepingCounter),
-      unit: "匹",
-      detail: "",
-    },
-  ];
 }
 
 function getBoardTransitionSource(
@@ -5307,34 +5236,6 @@ const styles = {
     backdropFilter: "blur(12px)",
     WebkitBackdropFilter: "blur(12px)",
   },
-  sleepingFlowCue: {
-    display: "inline-flex",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: "8px",
-    minHeight: "30px",
-    padding: "0 12px",
-    border: "0.5px solid rgba(95,82,62,0.12)",
-    borderRadius: "999px",
-    background: "rgba(255,253,248,0.56)",
-    color: "#6f665a",
-    fontSize: "11.5px",
-    fontWeight: 560,
-    lineHeight: 1,
-    backdropFilter: "blur(14px)",
-    WebkitBackdropFilter: "blur(14px)",
-  },
-  sleepingFlowItem: {
-    display: "inline-flex",
-    alignItems: "center",
-    gap: "5px",
-    whiteSpace: "nowrap",
-  },
-  sleepingFlowArrow: {
-    color: "#aaa096",
-    fontSize: "13px",
-    lineHeight: 1,
-  },
   sleepingDeliveryChip: {
     minHeight: "26px",
     display: "inline-flex",
@@ -5349,85 +5250,40 @@ const styles = {
     fontWeight: 540,
     lineHeight: 1,
   },
-  sleepingStatCards: {
+  sleepingWorldCount: {
     position: "fixed",
     left: "50%",
-    top: "calc(clamp(474px, 66dvh, 596px) + env(safe-area-inset-top))",
+    top: "calc(clamp(496px, 67dvh, 604px) + env(safe-area-inset-top))",
     zIndex: 19,
     transform: "translateX(-50%)",
-    display: "grid",
-    gridTemplateColumns: "repeat(3, minmax(0, 1fr))",
-    gap: "12px",
-    width: "min(100%, 380px)",
-    pointerEvents: "auto",
-  },
-  sleepingStatCard: {
-    minWidth: 0,
-    minHeight: "92px",
-    border: "1px solid rgba(144,126,102,0.09)",
-    borderRadius: "20px",
-    background: "rgba(255,253,248,0.56)",
-    color: "#2b2924",
-    display: "grid",
-    alignItems: "center",
-    justifyContent: "center",
-    justifyItems: "center",
-    gap: "4px",
-    padding: "11px 7px",
-    boxSizing: "border-box",
-    backdropFilter: "blur(18px)",
-    WebkitBackdropFilter: "blur(18px)",
-    boxShadow: "0 6px 14px rgba(90,76,60,0.035)",
-  },
-  sleepingStatIcon: {
     display: "inline-flex",
     alignItems: "center",
     justifyContent: "center",
-    width: "18px",
-    height: "18px",
-    color: "#9a8a76",
-  },
-  sleepingStatLabel: {
-    color: "#665c51",
-    fontSize: "10.5px",
-    fontWeight: 540,
-    lineHeight: 1.2,
+    gap: "6px",
+    minHeight: "30px",
+    padding: "0 12px",
+    border: "0.5px solid rgba(95,82,62,0.1)",
+    borderRadius: "999px",
+    background: "rgba(255,253,248,0.42)",
+    color: "#8a8174",
+    fontSize: "11px",
+    fontWeight: 520,
+    lineHeight: 1,
+    pointerEvents: "none",
     whiteSpace: "nowrap",
-    textAlign: "center",
   },
-  sleepingStatValueRow: {
-    display: "inline-flex",
-    alignItems: "baseline",
-    justifyContent: "center",
-    gap: "3px",
-    minHeight: "28px",
-  },
-  sleepingStatValue: {
-    color: "#4a3d32",
+  sleepingWorldCountValue: {
+    color: "#5b4d40",
     fontFamily: "\"Shippori Mincho B1\", \"Hiragino Mincho ProN\", \"Yu Mincho\", serif",
-    fontSize: "26px",
+    fontSize: "18px",
     fontWeight: 460,
     lineHeight: 1,
     fontVariantNumeric: "tabular-nums",
-    textAlign: "center",
-  },
-  sleepingStatUnit: {
-    color: "#746a5f",
-    fontSize: "10.5px",
-    fontWeight: 560,
-    lineHeight: 1,
-  },
-  sleepingStatDetail: {
-    color: "#7f786d",
-    fontSize: "9.5px",
-    fontWeight: 520,
-    lineHeight: 1.25,
-    textAlign: "center",
   },
   sleepingSaveHint: {
     position: "fixed",
     left: "50%",
-    top: "calc(clamp(578px, 80dvh, 704px) + env(safe-area-inset-top))",
+    top: "calc(clamp(536px, 73dvh, 650px) + env(safe-area-inset-top))",
     zIndex: 19,
     transform: "translateX(-50%)",
     display: "inline-flex",
