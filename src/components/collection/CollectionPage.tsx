@@ -139,7 +139,6 @@ export function CollectionPage() {
   const [selectedSlug, setSelectedSlug] = useState<string | null>(null);
   const [completedSlug, setCompletedSlug] = useState<string | null>(null);
   const [currentPhotoIndex, setCurrentPhotoIndex] = useState(0);
-  const [isCatSheetOpen, setIsCatSheetOpen] = useState(false);
   const [toastText, setToastText] = useState("");
   const [boxRefreshTick, setBoxRefreshTick] = useState(0);
   const [selectedBoxKind, setSelectedBoxKind] = useState<BoxDetailKind | null>(
@@ -451,50 +450,6 @@ export function CollectionPage() {
     );
   }
 
-  function handleCatSelect(catId: string) {
-    const nextActiveProfile = getActiveCatProfile(catProfiles, catId);
-
-    trackProductEvent(
-      "collection_cat_selected",
-      {
-        previous_cat_id: activeCatId,
-        next_cat_id: nextActiveProfile.id,
-      },
-      { localCatId: nextActiveProfile.id },
-    );
-    saveActiveCatId(nextActiveProfile.id);
-    setActiveCatId(nextActiveProfile.id);
-    setSelectedSlug(null);
-    setSelectedBoxKind(null);
-    setSelectedBoxDateKey(null);
-    setCompletedSlug(null);
-    setCurrentPhotoIndex(0);
-    setCurrentBoxPhotoIndex(0);
-    setIsCatSheetOpen(false);
-  }
-
-  function openCatSheet() {
-    trackProductEvent(
-      "collection_cat_switcher_opened",
-      {
-        cat_count: catProfiles.length,
-      },
-      { localCatId: activeCatId },
-    );
-    setIsCatSheetOpen(true);
-  }
-
-  function closeCatSheet() {
-    trackProductEvent(
-      "collection_cat_switcher_closed",
-      {
-        cat_count: catProfiles.length,
-      },
-      { localCatId: activeCatId },
-    );
-    setIsCatSheetOpen(false);
-  }
-
   function handleGroupSelect(groupId: CollectionGroupId) {
     setActiveGroupId(groupId);
     trackProductEvent(
@@ -770,16 +725,6 @@ export function CollectionPage() {
         <header style={styles.header}>
           <div style={styles.pageHeader}>
             <h1 style={styles.pageTitle}>アルバム</h1>
-            <div style={styles.pageHeaderActions}>
-              <button
-                type="button"
-                onClick={openCatSheet}
-                style={styles.catNameBtn}
-                aria-label="猫を切り替える"
-              >
-                ☰
-              </button>
-            </div>
           </div>
         </header>
 
@@ -817,14 +762,6 @@ export function CollectionPage() {
           }}
           onDeletePhoto={handleDeletePhoto}
           onPhotoScroll={handlePhotoScroll}
-        />
-      ) : null}
-      {isCatSheetOpen ? (
-        <CollectionCatSheet
-          profiles={catProfiles}
-          activeCatId={activeCatId}
-          onClose={closeCatSheet}
-          onSelect={handleCatSelect}
         />
       ) : null}
       {completedSlot ? (
@@ -1676,67 +1613,6 @@ function CollectionCompletionSheet({
   );
 }
 
-function CollectionCatSheet({
-  profiles,
-  activeCatId,
-  onClose,
-  onSelect,
-}: {
-  profiles: CatProfile[];
-  activeCatId: string | null;
-  onClose: () => void;
-  onSelect: (catId: string) => void;
-}) {
-  return (
-    <AppBottomSheet title="ねこを選ぶ" onClose={onClose}>
-      <div style={styles.catSheetGrid}>
-        {profiles.map((profile) => {
-          const isSelected = profile.id === activeCatId;
-          const age = formatCatAge(profile.basicInfo?.birthDate);
-          const gender = formatCatGender(profile.basicInfo?.gender);
-          const meta = [gender, age].filter(Boolean).join("・");
-
-          return (
-            <button
-              key={profile.id}
-              type="button"
-              onClick={() => onSelect(profile.id)}
-              style={styles.catSheetItem}
-            >
-              <div
-                style={
-                  isSelected
-                    ? { ...styles.catSheetAvatar, ...styles.catSheetAvatarActive }
-                    : styles.catSheetAvatar
-                }
-              >
-                {profile.avatarDataUrl ? (
-                  <img
-                    src={profile.avatarDataUrl}
-                    alt={profile.name}
-                    style={styles.catSheetAvatarPhoto}
-                  />
-                ) : (
-                  <img
-                    src={getCatAvatarSrc(profile.appearance?.coat)}
-                    alt={profile.name}
-                    style={styles.catSheetAvatarImg}
-                  />
-                )}
-              </div>
-              <span style={styles.catSheetName}>{profile.name}</span>
-              {meta ? <span style={styles.catSheetMeta}>{meta}</span> : null}
-            </button>
-          );
-        })}
-      </div>
-      <a href="/cats" style={styles.catSheetLink} onClick={onClose}>
-        ねこタブで管理する ›
-      </a>
-    </AppBottomSheet>
-  );
-}
-
 function CollectionSilhouette({ slot }: { slot: CollectionSlot }) {
   const shape = getSilhouetteShape(slot.silhouetteKey, slot.group);
 
@@ -2456,50 +2332,6 @@ function getProgressPercent(collected: number, total: number) {
   return Math.min(100, Math.max(0, Math.round((collected / total) * 100)));
 }
 
-function getCatAvatarSrc(coat?: string): string {
-  const coatMap: Record<string, string> = {
-    saba: "/sample-cats/saba.png",
-    gray: "/sample-cats/gray.png",
-    orange_tabby: "/sample-cats/orange_tabby.png",
-    black: "/sample-cats/black.png",
-    white: "/sample-cats/white.png",
-    calico: "/sample-cats/calico.png",
-    cream: "/sample-cats/saba.png",
-  };
-
-  return coatMap[coat ?? ""] ?? "/sample-cats/saba.png";
-}
-
-function formatCatAge(birthDate?: string): string {
-  if (!birthDate) {
-    return "";
-  }
-
-  const birth = new Date(birthDate);
-  const now = new Date();
-  const totalMonths =
-    (now.getFullYear() - birth.getFullYear()) * 12 +
-    (now.getMonth() - birth.getMonth());
-
-  if (totalMonths < 12) {
-    return `${totalMonths}ヶ月`;
-  }
-
-  return `${Math.floor(totalMonths / 12)}歳`;
-}
-
-function formatCatGender(gender?: string): string {
-  if (gender === "male") {
-    return "男の子";
-  }
-
-  if (gender === "female") {
-    return "女の子";
-  }
-
-  return "";
-}
-
 const styles = {
   page: {
     position: "relative",
@@ -2553,16 +2385,6 @@ const styles = {
     marginBottom: "0",
     position: "relative",
   },
-  pageHeaderActions: {
-    position: "absolute",
-    right: 0,
-    top: "50%",
-    transform: "translateY(-50%)",
-    display: "flex",
-    alignItems: "center",
-    gap: "8px",
-    flexShrink: 0,
-  },
   pageTitle: {
     margin: 0,
     color: COLLECTION_TEXT_STRONG,
@@ -2596,18 +2418,6 @@ const styles = {
     background: "rgba(255,255,255,0.92)",
     color: "#2a2a28",
     boxShadow: "0 7px 18px rgba(0,0,0,0.16)",
-  },
-  catNameBtn: {
-    width: "34px",
-    height: "34px",
-    border: "none",
-    background: "transparent",
-    fontSize: "23px",
-    fontWeight: 300,
-    color: "#4d4942",
-    borderRadius: "50%",
-    padding: 0,
-    cursor: "pointer",
   },
   boxOverview: {
     display: "grid",
@@ -2900,71 +2710,6 @@ const styles = {
     fontSize: "12.5px",
     fontWeight: 500,
     lineHeight: 1.35,
-  },
-  catSheetGrid: {
-    display: "flex",
-    gap: "16px",
-    overflowX: "auto",
-    paddingBottom: "8px",
-    scrollbarWidth: "none",
-    marginBottom: "16px",
-  },
-  catSheetItem: {
-    display: "flex",
-    flexDirection: "column",
-    alignItems: "center",
-    gap: "5px",
-    flexShrink: 0,
-    background: "transparent",
-    border: "none",
-    cursor: "pointer",
-    padding: 0,
-    minWidth: "64px",
-  },
-  catSheetAvatar: {
-    width: "64px",
-    height: "64px",
-    borderRadius: "50%",
-    border: "3px solid transparent",
-    overflow: "hidden",
-    background: "rgba(255,255,255,0.12)",
-    flexShrink: 0,
-  },
-  catSheetAvatarActive: {
-    border: "3px solid rgba(255,255,255,0.78)",
-  },
-  catSheetAvatarPhoto: {
-    width: "100%",
-    height: "100%",
-    objectFit: "cover",
-    borderRadius: "50%",
-  },
-  catSheetAvatarImg: {
-    width: "52px",
-    height: "52px",
-    objectFit: "contain",
-    display: "block",
-    margin: "6px auto",
-  },
-  catSheetName: {
-    fontSize: "12px",
-    fontWeight: 500,
-    color: COLLECTION_TEXT,
-    maxWidth: "72px",
-    textAlign: "center",
-    wordBreak: "break-all",
-  },
-  catSheetMeta: {
-    fontSize: "10px",
-    color: COLLECTION_MUTED,
-  },
-  catSheetLink: {
-    display: "block",
-    textAlign: "center",
-    fontSize: "13px",
-    color: COLLECTION_TEXT,
-    textDecoration: "none",
-    padding: "10px 0",
   },
   title: {
     margin: 0,
