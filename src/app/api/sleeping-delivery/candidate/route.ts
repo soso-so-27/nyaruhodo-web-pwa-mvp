@@ -30,62 +30,14 @@ type RemoteCatMomentRow = {
   created_at: string;
 };
 
-const SEED_PHOTOS: ExchangePhotoPoolItem[] = [
-  {
-    id: "seed-sleeping-saba",
-    sourceCatId: "seed-stock",
-    src: "/sample-cats/saba.png",
-    title: "ほかの猫のねがお",
-    subtitle: "",
-    tags: ["sleeping", "ねてる"],
-  },
-  {
-    id: "seed-sleeping-orange",
-    sourceCatId: "seed-stock",
-    src: "/sample-cats/orange_tabby.png",
-    title: "ほかの猫のねがお",
-    subtitle: "",
-    tags: ["sleeping", "ねてる"],
-  },
-  {
-    id: "seed-sleeping-calico",
-    sourceCatId: "seed-stock",
-    src: "/sample-cats/calico.png",
-    title: "ほかの猫のねがお",
-    subtitle: "",
-    tags: ["sleeping", "ねてる"],
-  },
-  {
-    id: "seed-sleeping-black",
-    sourceCatId: "seed-stock",
-    src: "/sample-cats/black.png",
-    title: "ほかの猫のねがお",
-    subtitle: "",
-    tags: ["sleeping", "ねてる"],
-  },
-  {
-    id: "seed-sleeping-gray",
-    sourceCatId: "seed-stock",
-    src: "/sample-cats/gray.png",
-    title: "ほかの猫のねがお",
-    subtitle: "",
-    tags: ["sleeping", "ねてる"],
-  },
-];
-
 export async function POST(request: Request) {
   const input = await readCandidateRequest(request);
   const remoteCandidates = await readRemoteCandidates(input);
-  const fallbackCandidates = SEED_PHOTOS.filter((photo) =>
-    isCandidateAvailable(photo, input),
-  );
-  const candidates =
-    remoteCandidates.length > 0 ? remoteCandidates : fallbackCandidates;
-  const selected = selectCandidate(candidates, input);
+  const selected = selectCandidate(remoteCandidates, input);
 
   return NextResponse.json({
     photo: selected,
-    source: remoteCandidates.length > 0 ? "remote" : "seed",
+    source: selected ? "remote" : "none",
   });
 }
 

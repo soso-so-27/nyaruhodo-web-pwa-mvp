@@ -8,7 +8,7 @@ import { createBrowserSupabaseClient } from "../supabase/browser";
 
 type RemoteCandidateResponse = {
   photo?: ExchangePhotoPoolItem | null;
-  source?: "remote" | "seed";
+  source?: "remote" | "none";
 };
 
 type RemoteStockResponse = {
@@ -17,7 +17,7 @@ type RemoteStockResponse = {
 
 type RemoteCandidateResult = {
   photo: ExchangePhotoPoolItem | null;
-  source?: "remote" | "seed";
+  source?: "remote" | "none";
 };
 
 export async function selectDeliveryCandidate(
