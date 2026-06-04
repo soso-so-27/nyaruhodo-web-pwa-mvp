@@ -6,10 +6,12 @@ import type { CSSProperties } from "react";
 import { STORAGE_KEYS } from "../../lib/storage";
 import {
   keepExchangePhoto,
+  readSharedExchangePhotos,
   saveOwnSleepingPhoto,
   saveSharedExchangePhoto,
   selectDeliverableSleepingPhoto,
   type ExchangePhoto,
+  type ExchangePhotoPoolItem,
 } from "../../lib/home/sleepingPhotos";
 import { trackProductEvent } from "../../lib/analytics/productAnalytics";
 import {
@@ -94,22 +96,22 @@ export function OnboardingFlow() {
           has_delivered_photo: Boolean(selected.photo),
         });
 
-        if (!selected.photo) {
+        const fallbackPhoto = selected.photo
+          ? null
+          : findFallbackExchangePhoto({
+              excludePhotoId: ownPhoto.id,
+              excludeSrc: ownPhoto.src,
+              recipientCatId: catId,
+            });
+        const exchangePhoto = selected.photo ?? fallbackPhoto;
+
+        if (!exchangePhoto) {
           setMessage("ねがおは入りました。とどく候補がまだありません。");
           setState("empty");
           return;
         }
 
-        setDeliveredPhoto({
-          id: `onboarding-delivered-${selected.photo.id}-${Date.now()}`,
-          sourcePhotoId: selected.photo.id,
-          src: selected.photo.src,
-          title: selected.photo.title,
-          subtitle: selected.photo.subtitle,
-          triggerLabel: "ねがお",
-          theme: "sleeping",
-          deliveredAt: Date.now(),
-        });
+        setDeliveredPhoto(toDeliveredExchangePhoto(exchangePhoto));
         setState("delivered");
       } catch {
         setMessage("写真を保存できませんでした。");
@@ -322,6 +324,39 @@ async function saveSleepingPhotoWithFallback(file: File, catId: string) {
   }
 
   return null;
+}
+
+function findFallbackExchangePhoto({
+  excludePhotoId,
+  excludeSrc,
+  recipientCatId,
+}: {
+  excludePhotoId: string;
+  excludeSrc: string;
+  recipientCatId: string | null;
+}) {
+  return (
+    readSharedExchangePhotos().find(
+      (photo) =>
+        photo.id !== excludePhotoId &&
+        photo.sourceOwnPhotoId !== excludePhotoId &&
+        photo.src !== excludeSrc &&
+        photo.sourceCatId !== recipientCatId,
+    ) ?? null
+  );
+}
+
+function toDeliveredExchangePhoto(photo: ExchangePhotoPoolItem): ExchangePhoto {
+  return {
+    id: `onboarding-delivered-${photo.id}-${Date.now()}`,
+    sourcePhotoId: photo.id,
+    src: photo.src,
+    title: photo.title,
+    subtitle: photo.subtitle,
+    triggerLabel: "ねがお",
+    theme: "sleeping",
+    deliveredAt: Date.now(),
+  };
 }
 
 const SERIF =

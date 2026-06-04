@@ -27,7 +27,10 @@ import {
   APP_PILL,
   APP_SURFACE,
 } from "../ui/appTheme";
-import { saveSharedExchangeStockPhoto } from "../../lib/home/sleepingPhotos";
+import {
+  readSharedExchangePhotos,
+  saveSharedExchangeStockPhoto,
+} from "../../lib/home/sleepingPhotos";
 
 export function SettingsPage() {
   const [isLoggedIn, setIsLoggedIn] = useState(false);
@@ -47,9 +50,11 @@ export function SettingsPage() {
     useState<DisplayEnvironment>("unknown");
   const [isStockAdding, setIsStockAdding] = useState(false);
   const [stockMessage, setStockMessage] = useState("");
+  const [stockPhotoCount, setStockPhotoCount] = useState(0);
 
   useEffect(() => {
     setDisplayEnvironment(getDisplayEnvironment());
+    setStockPhotoCount(readSharedExchangePhotos().length);
     void checkAuthState();
   }, []);
 
@@ -284,12 +289,14 @@ export function SettingsPage() {
             ? `とどくねがおを${savedCount}枚入れました。`
             : "写真を保存できませんでした。",
         );
+        setStockPhotoCount(readSharedExchangePhotos().length);
       } catch {
         setStockMessage(
           savedCount > 0
             ? `とどくねがおを${savedCount}枚入れました。`
             : "写真を保存できませんでした。",
         );
+        setStockPhotoCount(readSharedExchangePhotos().length);
       } finally {
         setIsStockAdding(false);
         cleanupInput();
@@ -449,6 +456,11 @@ export function SettingsPage() {
               <span style={styles.rowLabel}>オンボーディングを試す</span>
               <span style={styles.rowChevron}>›</span>
             </a>
+            <div style={styles.divider} />
+            <div style={styles.row}>
+              <span style={styles.rowLabel}>とどく候補</span>
+              <span style={styles.rowValue}>{stockPhotoCount}枚</span>
+            </div>
             <div style={styles.divider} />
             <button
               type="button"
