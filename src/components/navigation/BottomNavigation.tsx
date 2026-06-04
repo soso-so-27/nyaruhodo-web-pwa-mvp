@@ -156,7 +156,7 @@ const styles = {
     background: "#efe5d6",
     boxShadow: "inset 0 1px 0 rgba(255,255,255,0.72)",
     pointerEvents: "none",
-    transition: "transform 0.42s cubic-bezier(0.22, 1, 0.36, 1)",
+    transition: "transform 0.24s cubic-bezier(0.22, 1, 0.36, 1)",
     willChange: "transform",
   },
   navButton: {
@@ -174,7 +174,7 @@ const styles = {
     textDecoration: "none",
     cursor: "pointer",
     transition:
-      "color 0.24s ease, transform 0.32s cubic-bezier(0.22, 1, 0.36, 1)",
+      "color 0.18s ease, transform 0.22s cubic-bezier(0.22, 1, 0.36, 1)",
   },
   activeNavButton: {
     position: "relative",
@@ -192,7 +192,7 @@ const styles = {
     cursor: "pointer",
     transform: "translateY(-1px)",
     transition:
-      "color 0.24s ease, transform 0.32s cubic-bezier(0.22, 1, 0.36, 1)",
+      "color 0.18s ease, transform 0.22s cubic-bezier(0.22, 1, 0.36, 1)",
   },
   navIcon: {
     display: "inline-flex",
@@ -202,7 +202,7 @@ const styles = {
     height: "22px",
     color: "#777872",
     lineHeight: 1,
-    transition: "color 0.24s ease, transform 0.32s cubic-bezier(0.22, 1, 0.36, 1)",
+    transition: "color 0.18s ease, transform 0.22s cubic-bezier(0.22, 1, 0.36, 1)",
   },
   activeNavIcon: {
     display: "inline-flex",
@@ -213,7 +213,7 @@ const styles = {
     color: "#566052",
     lineHeight: 1,
     transform: "scale(1.02)",
-    transition: "color 0.24s ease, transform 0.32s cubic-bezier(0.22, 1, 0.36, 1)",
+    transition: "color 0.18s ease, transform 0.22s cubic-bezier(0.22, 1, 0.36, 1)",
   },
   svgIcon: {
     width: "21px",
