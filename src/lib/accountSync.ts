@@ -46,7 +46,7 @@ type LocalRecordLogItem = {
   metadata?: Record<string, unknown>;
 };
 
-type LocalCollectionPhoto = string | { id?: string; src?: string };
+type LocalCollectionPhoto = string | { id?: string; src?: string; createdAt?: string };
 type LocalCollectionStore = Record<
   string,
   Record<string, LocalCollectionPhoto[] | LocalCollectionPhoto>
@@ -938,6 +938,7 @@ async function syncCollectionPhotos(
           local_photo_id: localPhotoId,
           slot_slug: slotSlug,
           storage_path: storagePath,
+          captured_at: toIsoStringOrNull(photo.createdAt),
           metadata: SYNC_METADATA,
         });
       }
@@ -1322,6 +1323,7 @@ async function restoreCollectionPhotos(
     const restoredPhoto = {
       id: photo.local_photo_id ?? photo.id,
       src: photoSrc,
+      createdAt: photo.captured_at ?? photo.created_at,
     };
 
     if (!photos.some((storedPhoto) => storedPhoto.id === restoredPhoto.id)) {
@@ -1782,18 +1784,18 @@ function normalizeCollectionPhotoEntries(
   const list = Array.isArray(value) ? value : value ? [value] : [];
 
   return list
-    .map((photo): { id?: string; src: string } | null => {
+    .map((photo): { id?: string; src: string; createdAt?: string } | null => {
       if (typeof photo === "string") {
         return photo ? { src: photo } : null;
       }
 
       if (photo && typeof photo.src === "string" && photo.src) {
-        return { id: photo.id, src: photo.src };
+        return { id: photo.id, src: photo.src, createdAt: photo.createdAt };
       }
 
       return null;
     })
-    .filter((photo): photo is { id?: string; src: string } => Boolean(photo));
+    .filter((photo): photo is { id?: string; src: string; createdAt?: string } => Boolean(photo));
 }
 
 function toJsonObject(value: Record<string, unknown> | null | undefined) {

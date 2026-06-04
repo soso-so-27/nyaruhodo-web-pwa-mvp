@@ -3754,6 +3754,7 @@ function saveCollectionPhoto(catId: string, slug: string, dataUrl: string) {
     const photo: StoredCollectionPhoto = {
       id: createCollectionPhotoId(catId, slug),
       src: dataUrl,
+      createdAt: new Date().toISOString(),
     };
 
     all[catId] ??= {};
@@ -3831,6 +3832,7 @@ function markSleepingSafetyNoticeAccepted() {
 type StoredCollectionPhoto = {
   id?: string;
   src?: string;
+  createdAt?: string;
 };
 
 function normalizeStoredPhotoList(
@@ -3854,6 +3856,7 @@ function normalizeStoredPhotoList(
         return {
           id: photo.id || `${catId}:${slug}:${index}`,
           src: photo.src,
+          createdAt: photo.createdAt,
         };
       }
 

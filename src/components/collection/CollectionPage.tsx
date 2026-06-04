@@ -101,9 +101,40 @@ type BoxPreviewPhoto = {
 type StoredCollectionPhotoEntry = {
   id: string;
   src: string;
+  createdAt?: string;
 };
 
 type BoxDetailKind = "sleeping" | "other";
+type AlbumPhotoKind = "sleeping" | "awake" | "other";
+
+type AlbumMomentPhoto = BoxPreviewPhoto & {
+  kind: AlbumPhotoKind;
+  timestamp: number;
+  slotId?: string;
+};
+
+type AlbumDaySection = {
+  kind: AlbumPhotoKind;
+  label: string;
+  photos: AlbumMomentPhoto[];
+};
+
+type AlbumDayGroup = {
+  key: string;
+  label: string;
+  subLabel: string;
+  sections: AlbumDaySection[];
+  total: number;
+};
+
+type AlbumMonthGroup = {
+  key: string;
+  label: string;
+  total: number;
+  sleepingCount: number;
+  otherCount: number;
+  awakeCount: number;
+};
 
 export function CollectionPage() {
   const [catProfiles, setCatProfiles] = useState<CatProfile[]>([]);
@@ -121,6 +152,9 @@ export function CollectionPage() {
   const [toastText, setToastText] = useState("");
   const [boxRefreshTick, setBoxRefreshTick] = useState(0);
   const [selectedBoxKind, setSelectedBoxKind] = useState<BoxDetailKind | null>(
+    null,
+  );
+  const [selectedBoxDateKey, setSelectedBoxDateKey] = useState<string | null>(
     null,
   );
   const [currentBoxPhotoIndex, setCurrentBoxPhotoIndex] = useState(0);
@@ -225,20 +259,30 @@ export function CollectionPage() {
     () => readKeptExchangePhotos(),
     [boxRefreshTick, hasLoaded],
   );
-  const selectedBoxPhotos =
-    selectedBoxKind === "sleeping"
-      ? sleepingBoxPhotos
-      : selectedBoxKind === "other"
-        ? otherBoxPhotos
-        : [];
   const awakeBoxPhotos = useMemo(
     () =>
       storedCollectionPhotos.map((photo) => ({
         id: photo.id,
         src: photo.src,
+        createdAt: getCollectionPhotoTimestamp(photo),
+        sourcePhotoId: photo.slotId,
       })),
     [storedCollectionPhotos],
   );
+  const albumDayGroups = useMemo(
+    () => buildAlbumDayGroups(sleepingBoxPhotos, awakeBoxPhotos, otherBoxPhotos),
+    [awakeBoxPhotos, otherBoxPhotos, sleepingBoxPhotos],
+  );
+  const albumMonthGroups = useMemo(
+    () => buildAlbumMonthGroups(albumDayGroups),
+    [albumDayGroups],
+  );
+  const selectedBoxPhotos =
+    selectedBoxKind === "sleeping"
+      ? filterBoxPhotosByDate(sleepingBoxPhotos, selectedBoxDateKey)
+      : selectedBoxKind === "other"
+        ? filterBoxPhotosByDate(otherBoxPhotos, selectedBoxDateKey)
+        : [];
 
   useEffect(() => {
     if (!hasLoaded || !activeCatId || trackedViewCatIdRef.current === activeCatId) {
@@ -324,12 +368,13 @@ export function CollectionPage() {
     setSelectedSlug(null);
   }
 
-  function openBoxDetail(kind: BoxDetailKind) {
+  function openBoxDetail(kind: BoxDetailKind, dateKey: string | null = null) {
     setSelectedBoxKind(kind);
+    setSelectedBoxDateKey(dateKey);
     setCurrentBoxPhotoIndex(0);
     trackProductEvent(
       "collection_box_detail_opened",
-      { kind },
+      { kind, date_key: dateKey },
       { localCatId: activeCatId },
     );
   }
@@ -340,6 +385,7 @@ export function CollectionPage() {
         "collection_box_detail_closed",
         {
           kind: selectedBoxKind,
+          date_key: selectedBoxDateKey,
           current_photo_index: currentBoxPhotoIndex,
           photo_count: selectedBoxPhotos.length,
         },
@@ -348,6 +394,7 @@ export function CollectionPage() {
     }
 
     setSelectedBoxKind(null);
+    setSelectedBoxDateKey(null);
     setCurrentBoxPhotoIndex(0);
   }
 
@@ -432,6 +479,7 @@ export function CollectionPage() {
     setActiveCatId(nextActiveProfile.id);
     setSelectedSlug(null);
     setSelectedBoxKind(null);
+    setSelectedBoxDateKey(null);
     setCompletedSlug(null);
     setCurrentPhotoIndex(0);
     setCurrentBoxPhotoIndex(0);
@@ -749,15 +797,18 @@ export function CollectionPage() {
         </header>
 
         <BoxOverview
-          sleepingPhotos={sleepingBoxPhotos}
-          awakePhotos={awakeBoxPhotos}
-          otherPhotos={otherBoxPhotos}
+          dayGroups={albumDayGroups}
+          monthGroups={albumMonthGroups}
+          keptPhotos={otherBoxPhotos}
           onOpenBox={openBoxDetail}
         />
       </div>
       {selectedBoxKind ? (
         <BoxPhotoDetailSheet
           kind={selectedBoxKind}
+          dayLabel={
+            selectedBoxDateKey ? getAlbumDateLabelFromKey(selectedBoxDateKey) : null
+          }
           photos={selectedBoxPhotos}
           currentPhotoIndex={currentBoxPhotoIndex}
           onClose={closeBoxDetail}
@@ -825,99 +876,250 @@ function PageBackdrop() {
 }
 
 function BoxOverview({
-  sleepingPhotos,
-  awakePhotos,
-  otherPhotos,
+  dayGroups,
+  monthGroups,
+  keptPhotos,
   onOpenBox,
 }: {
-  sleepingPhotos: BoxPreviewPhoto[];
-  awakePhotos: BoxPreviewPhoto[];
-  otherPhotos: BoxPreviewPhoto[];
-  onOpenBox: (kind: BoxDetailKind) => void;
+  dayGroups: AlbumDayGroup[];
+  monthGroups: AlbumMonthGroup[];
+  keptPhotos: BoxPreviewPhoto[];
+  onOpenBox: (kind: BoxDetailKind, dateKey?: string | null) => void;
 }) {
+  const todayKey = getLocalDateKey(Date.now());
+  const todayGroup =
+    dayGroups.find((group) => group.key === todayKey) ?? createEmptyTodayAlbumGroup();
+  const recentGroups = dayGroups.filter((group) => group.key !== todayKey).slice(0, 5);
+  const visibleKeptPhotos = keptPhotos.slice(0, 4);
+
   return (
     <section style={styles.boxOverview} aria-label="アルバム">
-      <BoxSummaryCard
-        title="とったねがお"
-        photos={sleepingPhotos}
-        onOpen={() => onOpenBox("sleeping")}
+      <AlbumTodayCard
+        group={todayGroup}
+        onOpenBox={onOpenBox}
       />
-      <BoxSummaryCard
-        title="おきてる写真"
-        photos={awakePhotos}
+
+      <AlbumRecentSection
+        groups={recentGroups}
+        onOpenBox={onOpenBox}
       />
-      <BoxSummaryCard
-        title="とどいたねがお"
-        photos={otherPhotos}
-        onOpen={() => onOpenBox("other")}
-      />
+
+      <section style={styles.albumSection}>
+        <div style={styles.albumSectionHeader}>
+          <h2 style={styles.albumSectionTitle}>とっておいた</h2>
+          {keptPhotos.length > 0 ? (
+            <button
+              type="button"
+              style={styles.albumSectionAction}
+              onClick={() => onOpenBox("other")}
+            >
+              {keptPhotos.length}枚
+              <span style={styles.boxSummaryArrow}>›</span>
+            </button>
+          ) : null}
+        </div>
+        {keptPhotos.length > 0 ? (
+          <div style={styles.boxPhotoStrip}>
+            {visibleKeptPhotos.map((photo) => (
+              <span key={photo.id} style={styles.boxPhotoThumb}>
+                <StoredPhotoImage src={photo.src} alt="" style={styles.boxPhotoImg} />
+              </span>
+            ))}
+          </div>
+        ) : (
+          <AlbumEmptyLine text="とどいたねがおをとっておくと並びます" />
+        )}
+      </section>
+
+      <AlbumMonthSection monthGroups={monthGroups} />
     </section>
   );
 }
 
-function BoxSummaryCard({
-  title,
-  photos,
-  onOpen,
+function AlbumTodayCard({
+  group,
+  onOpenBox,
 }: {
-  title: string;
-  photos: BoxPreviewPhoto[];
-  onOpen?: () => void;
+  group: AlbumDayGroup;
+  onOpenBox: (kind: BoxDetailKind, dateKey?: string | null) => void;
 }) {
-  const visiblePhotos = photos.slice(0, 4);
-  const hasPhotos = photos.length > 0;
-  const isInteractive = Boolean(onOpen && hasPhotos);
-  const countLabel = hasPhotos ? `${photos.length}枚` : "";
-  const emptyText =
-    title === "とったねがお"
-      ? "ねがおをとると並びます"
-      : title === "とどいたねがお"
-        ? "とっておくと並びます"
-        : "おきてる写真はここに";
+  return (
+    <section style={styles.todayAlbumCard} aria-label="今日のアルバム">
+      <div style={styles.todayAlbumHeader}>
+        <div>
+          <p style={styles.albumKicker}>今日</p>
+          <h2 style={styles.todayAlbumTitle}>今日のねこ</h2>
+        </div>
+        {group.total > 0 ? (
+          <span style={styles.todayAlbumCount}>{group.total}枚</span>
+        ) : null}
+      </div>
+      {group.total > 0 ? (
+        <AlbumDaySections group={group} onOpenBox={onOpenBox} />
+      ) : (
+        <div style={styles.todayAlbumEmpty}>
+          <span style={styles.todayAlbumEmptyLine} />
+          <p style={styles.todayAlbumEmptyText}>
+            ねがおをとると、今日に残ります
+          </p>
+        </div>
+      )}
+    </section>
+  );
+}
+
+function AlbumRecentSection({
+  groups,
+  onOpenBox,
+}: {
+  groups: AlbumDayGroup[];
+  onOpenBox: (kind: BoxDetailKind, dateKey?: string | null) => void;
+}) {
+  if (groups.length === 0) {
+    return null;
+  }
+
+  return (
+    <section style={styles.albumSection} aria-label="最近">
+      <div style={styles.albumSectionHeader}>
+        <h2 style={styles.albumSectionTitle}>最近</h2>
+      </div>
+      <div style={styles.recentDayList}>
+        {groups.map((group) => (
+          <AlbumDayCard key={group.key} group={group} onOpenBox={onOpenBox} />
+        ))}
+      </div>
+    </section>
+  );
+}
+
+function AlbumDayCard({
+  group,
+  onOpenBox,
+}: {
+  group: AlbumDayGroup;
+  onOpenBox: (kind: BoxDetailKind, dateKey?: string | null) => void;
+}) {
+  return (
+    <article style={styles.recentDayCard}>
+      <div style={styles.recentDayHeader}>
+        <div>
+          <h3 style={styles.recentDayTitle}>{group.label}</h3>
+          <p style={styles.recentDaySub}>{group.subLabel}</p>
+        </div>
+        <span style={styles.recentDayCount}>{group.total}枚</span>
+      </div>
+      <AlbumDaySections group={group} onOpenBox={onOpenBox} compact />
+    </article>
+  );
+}
+
+function AlbumDaySections({
+  group,
+  onOpenBox,
+  compact = false,
+}: {
+  group: AlbumDayGroup;
+  onOpenBox: (kind: BoxDetailKind, dateKey?: string | null) => void;
+  compact?: boolean;
+}) {
+  return (
+    <div style={compact ? styles.daySectionListCompact : styles.daySectionList}>
+      {group.sections.map((section) => (
+        <AlbumDaySectionRow
+          key={`${group.key}-${section.kind}`}
+          groupKey={group.key}
+          section={section}
+          onOpenBox={onOpenBox}
+        />
+      ))}
+    </div>
+  );
+}
+
+function AlbumDaySectionRow({
+  groupKey,
+  section,
+  onOpenBox,
+}: {
+  groupKey: string;
+  section: AlbumDaySection;
+  onOpenBox: (kind: BoxDetailKind, dateKey?: string | null) => void;
+}) {
+  const visiblePhotos = section.photos.slice(0, 4);
+  const boxKind = section.kind === "sleeping" || section.kind === "other"
+    ? section.kind
+    : null;
+  const rowContent = (
+    <>
+      <div style={styles.daySectionHeader}>
+        <span style={styles.daySectionTitle}>{section.label}</span>
+        <span style={styles.daySectionCount}>{section.photos.length}枚</span>
+      </div>
+      <div style={styles.dayPhotoStrip}>
+        {visiblePhotos.map((photo) => (
+          <span key={photo.id} style={styles.dayPhotoThumb}>
+            <StoredPhotoImage src={photo.src} alt="" style={styles.boxPhotoImg} />
+          </span>
+        ))}
+      </div>
+    </>
+  );
+
+  if (!boxKind) {
+    return <div style={styles.daySectionRow}>{rowContent}</div>;
+  }
 
   return (
     <button
       type="button"
-      style={{
-        ...styles.boxSummaryCard,
-        ...(isInteractive ? styles.boxSummaryButton : styles.boxSummaryStatic),
-      }}
-      onClick={isInteractive ? onOpen : undefined}
-      disabled={!isInteractive}
+      style={{ ...styles.daySectionRow, ...styles.daySectionButton }}
+      onClick={() => onOpenBox(boxKind, groupKey)}
     >
-      <div style={styles.boxSummaryHeader}>
-        <div>
-          <h2 style={styles.boxSummaryTitle}>{title}</h2>
-        </div>
-        {countLabel || isInteractive ? (
-          <span style={styles.boxSummaryMeta}>
-            {countLabel ? (
-              <span style={styles.boxSummaryCount}>{countLabel}</span>
-            ) : null}
-            {isInteractive ? <span style={styles.boxSummaryArrow}>›</span> : null}
-          </span>
-        ) : null}
-      </div>
-      {hasPhotos ? (
-        <div style={styles.boxPhotoStrip}>
-          {visiblePhotos.map((photo) => (
-            <span key={photo.id} style={styles.boxPhotoThumb}>
-              <StoredPhotoImage src={photo.src} alt="" style={styles.boxPhotoImg} />
-            </span>
-          ))}
-        </div>
-      ) : (
-        <div style={styles.boxSummaryEmpty}>
-          <span style={styles.boxSummaryEmptyLine} />
-          <span style={styles.boxSummaryEmptyText}>{emptyText}</span>
-        </div>
-      )}
+      {rowContent}
     </button>
+  );
+}
+
+function AlbumMonthSection({ monthGroups }: { monthGroups: AlbumMonthGroup[] }) {
+  if (monthGroups.length === 0) {
+    return null;
+  }
+
+  return (
+    <section style={styles.albumSection} aria-label="月ごと">
+      <div style={styles.albumSectionHeader}>
+        <h2 style={styles.albumSectionTitle}>月ごと</h2>
+      </div>
+      <div style={styles.monthList}>
+        {monthGroups.slice(0, 6).map((month) => (
+          <div key={month.key} style={styles.monthRow}>
+            <div>
+              <p style={styles.monthTitle}>{month.label}</p>
+              <p style={styles.monthSub}>
+                とった{month.sleepingCount} ・ とどいた{month.otherCount} ・ ようす{month.awakeCount}
+              </p>
+            </div>
+            <span style={styles.monthCount}>{month.total}枚</span>
+          </div>
+        ))}
+      </div>
+    </section>
+  );
+}
+
+function AlbumEmptyLine({ text }: { text: string }) {
+  return (
+    <div style={styles.boxSummaryEmpty}>
+      <span style={styles.boxSummaryEmptyLine} />
+      <span style={styles.boxSummaryEmptyText}>{text}</span>
+    </div>
   );
 }
 
 function BoxPhotoDetailSheet({
   kind,
+  dayLabel,
   photos,
   currentPhotoIndex,
   onClose,
@@ -927,6 +1129,7 @@ function BoxPhotoDetailSheet({
   onHideOtherPhoto,
 }: {
   kind: BoxDetailKind;
+  dayLabel?: string | null;
   photos: BoxPreviewPhoto[];
   currentPhotoIndex: number;
   onClose: () => void;
@@ -935,7 +1138,8 @@ function BoxPhotoDetailSheet({
   onDeleteSleepingPhoto: (photo: BoxPreviewPhoto) => void;
   onHideOtherPhoto: (photo: BoxPreviewPhoto) => void;
 }) {
-  const title = kind === "sleeping" ? "とったねがお" : "とどいたねがお";
+  const baseTitle = kind === "sleeping" ? "とったねがお" : "とどいたねがお";
+  const title = dayLabel ? `${dayLabel}の${baseTitle}` : baseTitle;
   const currentPhoto =
     photos[Math.max(0, Math.min(currentPhotoIndex, photos.length - 1))] ?? null;
   const deliveryActionLabel = currentPhoto?.shared
@@ -1826,6 +2030,209 @@ function groupPhotosBySlot(photos: CollectionPhoto[]) {
   return map;
 }
 
+function buildAlbumDayGroups(
+  sleepingPhotos: BoxPreviewPhoto[],
+  awakePhotos: BoxPreviewPhoto[],
+  otherPhotos: BoxPreviewPhoto[],
+): AlbumDayGroup[] {
+  const items: AlbumMomentPhoto[] = [
+    ...sleepingPhotos.map((photo) => ({
+      ...photo,
+      kind: "sleeping" as const,
+      timestamp: getBoxPhotoTimestamp(photo),
+    })),
+    ...otherPhotos.map((photo) => ({
+      ...photo,
+      kind: "other" as const,
+      timestamp: getBoxPhotoTimestamp(photo),
+    })),
+    ...awakePhotos.map((photo) => ({
+      ...photo,
+      kind: "awake" as const,
+      timestamp: getBoxPhotoTimestamp(photo),
+      slotId: photo.sourcePhotoId,
+    })),
+  ]
+    .filter((photo) => Number.isFinite(photo.timestamp))
+    .sort((a, b) => b.timestamp - a.timestamp);
+
+  const groups = new Map<string, AlbumMomentPhoto[]>();
+
+  for (const photo of items) {
+    const key = getLocalDateKey(photo.timestamp);
+    groups.set(key, [...(groups.get(key) ?? []), photo]);
+  }
+
+  return [...groups.entries()].map(([key, photos]) => {
+    const sections: AlbumDaySection[] = (
+      [
+      {
+        kind: "sleeping",
+        label: "とったねがお",
+        photos: photos.filter((photo) => photo.kind === "sleeping"),
+      },
+      {
+        kind: "other",
+        label: "とどいたねがお",
+        photos: photos.filter((photo) => photo.kind === "other"),
+      },
+      {
+        kind: "awake",
+        label: "今日のようす",
+        photos: photos.filter((photo) => photo.kind === "awake"),
+      },
+    ] satisfies AlbumDaySection[]
+    ).filter((section) => section.photos.length > 0);
+
+    return {
+      key,
+      label: getAlbumDateLabelFromKey(key),
+      subLabel: getAlbumDateSubLabelFromKey(key),
+      sections,
+      total: photos.length,
+    };
+  });
+}
+
+function createEmptyTodayAlbumGroup(): AlbumDayGroup {
+  const key = getLocalDateKey(Date.now());
+
+  return {
+    key,
+    label: "今日",
+    subLabel: getAlbumDateSubLabelFromKey(key),
+    sections: [],
+    total: 0,
+  };
+}
+
+function buildAlbumMonthGroups(dayGroups: AlbumDayGroup[]): AlbumMonthGroup[] {
+  const groups = new Map<string, AlbumMonthGroup>();
+
+  for (const dayGroup of dayGroups) {
+    const key = dayGroup.key.slice(0, 7);
+    const existing =
+      groups.get(key) ?? {
+        key,
+        label: getAlbumMonthLabelFromKey(key),
+        total: 0,
+        sleepingCount: 0,
+        otherCount: 0,
+        awakeCount: 0,
+      };
+
+    for (const section of dayGroup.sections) {
+      if (section.kind === "sleeping") {
+        existing.sleepingCount += section.photos.length;
+      } else if (section.kind === "other") {
+        existing.otherCount += section.photos.length;
+      } else {
+        existing.awakeCount += section.photos.length;
+      }
+      existing.total += section.photos.length;
+    }
+
+    groups.set(key, existing);
+  }
+
+  return [...groups.values()];
+}
+
+function filterBoxPhotosByDate(
+  photos: BoxPreviewPhoto[],
+  dateKey: string | null,
+) {
+  if (!dateKey) {
+    return photos;
+  }
+
+  return photos.filter((photo) => getLocalDateKey(getBoxPhotoTimestamp(photo)) === dateKey);
+}
+
+function getCollectionPhotoTimestamp(photo: CollectionPhoto) {
+  if (photo.createdAt) {
+    const timestamp = new Date(photo.createdAt).getTime();
+
+    if (!Number.isNaN(timestamp)) {
+      return timestamp;
+    }
+  }
+
+  return parseTimestampFromId(photo.id) ?? Date.now();
+}
+
+function getBoxPhotoTimestamp(photo: BoxPreviewPhoto) {
+  return photo.deliveredAt ?? photo.createdAt ?? parseTimestampFromId(photo.id) ?? Date.now();
+}
+
+function getLocalDateKey(timestamp: number) {
+  const date = new Date(timestamp);
+  const year = date.getFullYear();
+  const month = `${date.getMonth() + 1}`.padStart(2, "0");
+  const day = `${date.getDate()}`.padStart(2, "0");
+
+  return `${year}-${month}-${day}`;
+}
+
+function getAlbumDateLabelFromKey(key: string) {
+  const todayKey = getLocalDateKey(Date.now());
+  const yesterdayKey = getLocalDateKey(Date.now() - 24 * 60 * 60 * 1000);
+
+  if (key === todayKey) {
+    return "今日";
+  }
+
+  if (key === yesterdayKey) {
+    return "きのう";
+  }
+
+  const [, month, day] = key.split("-");
+  return `${Number(month)}月${Number(day)}日`;
+}
+
+function getAlbumDateSubLabelFromKey(key: string) {
+  const date = new Date(`${key}T00:00:00`);
+  const weekday = ["日", "月", "火", "水", "木", "金", "土"][date.getDay()];
+
+  return `${weekday}曜日`;
+}
+
+function getAlbumMonthLabelFromKey(key: string) {
+  const [year, month] = key.split("-");
+  const currentYear = new Date().getFullYear();
+  const yearLabel = Number(year) === currentYear ? "" : `${Number(year)}年`;
+
+  return `${yearLabel}${Number(month)}月`;
+}
+
+function parseTimestampFromId(id: string | undefined) {
+  if (!id) {
+    return null;
+  }
+
+  const match = id.match(/(?:^|[-:])(\d{13})(?:[-:]|$)/);
+
+  if (!match) {
+    return null;
+  }
+
+  const timestamp = Number(match[1]);
+  return Number.isFinite(timestamp) ? timestamp : null;
+}
+
+function getStoredCollectionPhotoCreatedAt(photo: StoredCollectionPhotoEntry) {
+  if (photo.createdAt) {
+    const timestamp = new Date(photo.createdAt).getTime();
+
+    if (!Number.isNaN(timestamp)) {
+      return new Date(timestamp).toISOString();
+    }
+  }
+
+  const parsedTimestamp = parseTimestampFromId(photo.id);
+  return parsedTimestamp ? new Date(parsedTimestamp).toISOString() : null;
+}
+
 function buildStoredCollectionPhotos(
   collectionPhotos: Record<string, StoredCollectionPhotoEntry[]>,
 ) {
@@ -1843,6 +2250,7 @@ function buildStoredCollectionPhotos(
           src: photo.src,
           storageSlug: slug,
           localIndex: index,
+          createdAt: photo.createdAt,
         });
       });
     });
@@ -1928,6 +2336,7 @@ function addCollectionPhoto(catId: string, slug: string, dataUrl: string) {
   const photo: StoredCollectionPhotoEntry = {
     id: createCollectionPhotoId(catId, slug),
     src: dataUrl,
+    createdAt: new Date().toISOString(),
   };
 
   try {
@@ -1975,9 +2384,12 @@ function normalizeStoredPhotoList(
       }
 
       if (photo && typeof photo.src === "string" && photo.src) {
+        const parsedCreatedAt = getStoredCollectionPhotoCreatedAt(photo);
+
         return {
           id: photo.id || `${catId}:${slug}:${index}`,
           src: photo.src,
+          ...(parsedCreatedAt ? { createdAt: parsedCreatedAt } : {}),
         };
       }
 
@@ -2313,7 +2725,221 @@ const styles = {
   },
   boxOverview: {
     display: "grid",
-    gap: "0",
+    gap: "20px",
+  },
+  todayAlbumCard: {
+    ...COLLECTION_SURFACE_SOFT,
+    display: "grid",
+    gap: "18px",
+    borderRadius: "26px",
+    padding: "22px 20px 24px",
+  },
+  todayAlbumHeader: {
+    display: "flex",
+    alignItems: "flex-start",
+    justifyContent: "space-between",
+    gap: "16px",
+  },
+  albumKicker: {
+    margin: "0 0 5px",
+    color: COLLECTION_MUTED,
+    fontSize: "11px",
+    fontWeight: 520,
+    lineHeight: 1.2,
+  },
+  todayAlbumTitle: {
+    margin: 0,
+    color: COLLECTION_TEXT_STRONG,
+    fontFamily: "\"Shippori Mincho B1\", \"Hiragino Mincho ProN\", \"Yu Mincho\", serif",
+    fontSize: "25px",
+    fontWeight: 500,
+    lineHeight: 1.25,
+    letterSpacing: "0.04em",
+  },
+  todayAlbumCount: {
+    color: COLLECTION_MUTED,
+    fontSize: "12px",
+    fontWeight: 500,
+    lineHeight: 1.4,
+    whiteSpace: "nowrap",
+  },
+  todayAlbumEmpty: {
+    display: "grid",
+    gridTemplateColumns: "76px minmax(0, 1fr)",
+    alignItems: "center",
+    gap: "14px",
+    minHeight: "94px",
+  },
+  todayAlbumEmptyLine: {
+    height: "1px",
+    borderRadius: "999px",
+    background: "rgba(79,73,63,0.14)",
+  },
+  todayAlbumEmptyText: {
+    margin: 0,
+    color: COLLECTION_MUTED,
+    fontSize: "13px",
+    fontWeight: 500,
+    lineHeight: 1.55,
+  },
+  albumSection: {
+    display: "grid",
+    gap: "13px",
+  },
+  albumSectionHeader: {
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: "14px",
+  },
+  albumSectionTitle: {
+    margin: 0,
+    color: COLLECTION_TEXT_STRONG,
+    fontFamily: "\"Shippori Mincho B1\", \"Hiragino Mincho ProN\", \"Yu Mincho\", serif",
+    fontSize: "20px",
+    fontWeight: 500,
+    lineHeight: 1.3,
+    letterSpacing: "0.04em",
+  },
+  albumSectionAction: {
+    display: "inline-flex",
+    alignItems: "center",
+    gap: "8px",
+    border: "none",
+    background: "transparent",
+    color: COLLECTION_MUTED,
+    font: "inherit",
+    fontSize: "12px",
+    fontWeight: 500,
+    lineHeight: 1,
+    cursor: "pointer",
+    padding: "4px 0",
+  },
+  recentDayList: {
+    display: "grid",
+    gap: "10px",
+  },
+  recentDayCard: {
+    ...COLLECTION_SURFACE_SOFT,
+    display: "grid",
+    gap: "13px",
+    borderRadius: "20px",
+    padding: "15px",
+  },
+  recentDayHeader: {
+    display: "flex",
+    alignItems: "flex-start",
+    justifyContent: "space-between",
+    gap: "12px",
+  },
+  recentDayTitle: {
+    margin: 0,
+    color: COLLECTION_TEXT_STRONG,
+    fontSize: "15px",
+    fontWeight: 560,
+    lineHeight: 1.25,
+  },
+  recentDaySub: {
+    margin: "3px 0 0",
+    color: COLLECTION_MUTED,
+    fontSize: "11px",
+    fontWeight: 500,
+    lineHeight: 1.25,
+  },
+  recentDayCount: {
+    color: COLLECTION_MUTED,
+    fontSize: "11.5px",
+    fontWeight: 500,
+    lineHeight: 1.3,
+    whiteSpace: "nowrap",
+  },
+  daySectionList: {
+    display: "grid",
+    gap: "14px",
+  },
+  daySectionListCompact: {
+    display: "grid",
+    gap: "10px",
+  },
+  daySectionRow: {
+    display: "grid",
+    gap: "8px",
+    width: "100%",
+    border: "none",
+    background: "transparent",
+    color: COLLECTION_TEXT,
+    font: "inherit",
+    textAlign: "left",
+    padding: 0,
+  },
+  daySectionButton: {
+    cursor: "pointer",
+  },
+  daySectionHeader: {
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: "10px",
+  },
+  daySectionTitle: {
+    color: COLLECTION_MUTED,
+    fontSize: "12px",
+    fontWeight: 520,
+    lineHeight: 1.2,
+  },
+  daySectionCount: {
+    color: "#8a8378",
+    fontSize: "11px",
+    fontWeight: 500,
+    lineHeight: 1.2,
+  },
+  dayPhotoStrip: {
+    display: "grid",
+    gridTemplateColumns: "repeat(4, minmax(0, 1fr))",
+    gap: "8px",
+    alignItems: "center",
+  },
+  dayPhotoThumb: {
+    aspectRatio: "1 / 1",
+    minWidth: 0,
+    borderRadius: "11px",
+    overflow: "hidden",
+    background: "rgba(255,255,255,0.46)",
+    border: "0.5px solid rgba(85,75,62,0.08)",
+    boxShadow: "0 4px 12px rgba(83,72,55,0.05)",
+  },
+  monthList: {
+    display: "grid",
+    borderTop: "0.5px solid rgba(79,73,63,0.13)",
+  },
+  monthRow: {
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: "16px",
+    minHeight: "58px",
+    borderBottom: "0.5px solid rgba(79,73,63,0.13)",
+  },
+  monthTitle: {
+    margin: 0,
+    color: COLLECTION_TEXT_STRONG,
+    fontSize: "14px",
+    fontWeight: 560,
+    lineHeight: 1.35,
+  },
+  monthSub: {
+    margin: "3px 0 0",
+    color: COLLECTION_MUTED,
+    fontSize: "11px",
+    fontWeight: 500,
+    lineHeight: 1.35,
+  },
+  monthCount: {
+    color: COLLECTION_MUTED,
+    fontSize: "12px",
+    fontWeight: 500,
+    lineHeight: 1,
+    whiteSpace: "nowrap",
   },
   boxSummaryCard: {
     position: "relative",
