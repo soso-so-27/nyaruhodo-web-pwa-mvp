@@ -92,7 +92,7 @@ const MIKKE_CATEGORIES: MikkeWindowCategory[] = ["place", "pose", "sign"];
 const MIKKE_LOCK_MS = 60 * 60 * 1000;
 const SLEEPING_DELIVERY_LOCK_MS = 6 * 60 * 60 * 1000;
 const HOME_SLEEPING_COUNTER_BASE_COUNT = 75;
-const SHOW_SLEEPING_LIBRARY_ADMIN = process.env.NODE_ENV !== "production";
+const SHOW_SLEEPING_LIBRARY_ADMIN = true;
 
 type RecordLogItem = {
   id: string;
