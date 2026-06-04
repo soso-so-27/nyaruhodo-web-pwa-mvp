@@ -838,9 +838,6 @@ function AlbumTodayCard({
           <h2 style={styles.todayAlbumTitle}>今日</h2>
           <p style={styles.albumKicker}>{group.subLabel}</p>
         </div>
-        {group.total > 0 ? (
-          <span style={styles.todayAlbumCount}>{group.total}枚</span>
-        ) : null}
       </div>
       {group.total > 0 ? (
         <AlbumDaySections group={group} onOpenBox={onOpenBox} />
@@ -895,7 +892,6 @@ function AlbumDayCard({
           <h3 style={styles.recentDayTitle}>{group.label}</h3>
           <p style={styles.recentDaySub}>{group.subLabel}</p>
         </div>
-        <span style={styles.recentDayCount}>{group.total}枚</span>
       </div>
       <AlbumDaySections group={group} onOpenBox={onOpenBox} compact />
     </article>
@@ -942,7 +938,6 @@ function AlbumDaySectionRow({
     <>
       <div style={styles.daySectionHeader}>
         <span style={styles.daySectionTitle}>{section.label}</span>
-        <span style={styles.daySectionCount}>{section.photos.length}枚</span>
       </div>
       <div style={styles.dayPhotoStrip}>
         {visiblePhotos.map((photo) => (
@@ -2438,24 +2433,20 @@ const styles = {
   albumKicker: {
     margin: "4px 0 0",
     color: COLLECTION_MUTED,
-    fontSize: "11px",
-    fontWeight: 520,
-    lineHeight: 1.2,
+    fontFamily: "\"Shippori Mincho B1\", \"Hiragino Mincho ProN\", \"Yu Mincho\", serif",
+    fontSize: "12px",
+    fontWeight: 400,
+    lineHeight: 1.45,
+    letterSpacing: "0.08em",
   },
   todayAlbumTitle: {
     margin: 0,
     color: COLLECTION_TEXT_STRONG,
-    fontSize: "17px",
-    fontWeight: 560,
-    lineHeight: 1.25,
-    letterSpacing: 0,
-  },
-  todayAlbumCount: {
-    color: COLLECTION_MUTED,
-    fontSize: "12px",
+    fontFamily: "\"Shippori Mincho B1\", \"Hiragino Mincho ProN\", \"Yu Mincho\", serif",
+    fontSize: "19px",
     fontWeight: 500,
-    lineHeight: 1.4,
-    whiteSpace: "nowrap",
+    lineHeight: 1.25,
+    letterSpacing: "0.1em",
   },
   todayAlbumEmpty: {
     display: "grid",
@@ -2491,10 +2482,11 @@ const styles = {
   albumSectionTitle: {
     margin: 0,
     color: COLLECTION_TEXT_STRONG,
-    fontSize: "15px",
-    fontWeight: 560,
+    fontFamily: "\"Shippori Mincho B1\", \"Hiragino Mincho ProN\", \"Yu Mincho\", serif",
+    fontSize: "16px",
+    fontWeight: 500,
     lineHeight: 1.3,
-    letterSpacing: 0,
+    letterSpacing: "0.08em",
   },
   albumSectionAction: {
     display: "inline-flex",
@@ -2530,23 +2522,20 @@ const styles = {
   recentDayTitle: {
     margin: 0,
     color: COLLECTION_TEXT_STRONG,
-    fontSize: "13.5px",
-    fontWeight: 560,
-    lineHeight: 1.25,
+    fontFamily: "\"Shippori Mincho B1\", \"Hiragino Mincho ProN\", \"Yu Mincho\", serif",
+    fontSize: "15px",
+    fontWeight: 500,
+    lineHeight: 1.32,
+    letterSpacing: "0.06em",
   },
   recentDaySub: {
     margin: "3px 0 0",
     color: COLLECTION_MUTED,
-    fontSize: "11px",
-    fontWeight: 500,
-    lineHeight: 1.25,
-  },
-  recentDayCount: {
-    color: COLLECTION_MUTED,
+    fontFamily: "\"Shippori Mincho B1\", \"Hiragino Mincho ProN\", \"Yu Mincho\", serif",
     fontSize: "11.5px",
-    fontWeight: 500,
-    lineHeight: 1.3,
-    whiteSpace: "nowrap",
+    fontWeight: 400,
+    lineHeight: 1.35,
+    letterSpacing: "0.08em",
   },
   daySectionList: {
     display: "grid",
@@ -2578,15 +2567,10 @@ const styles = {
   },
   daySectionTitle: {
     color: COLLECTION_MUTED,
-    fontSize: "11.5px",
-    fontWeight: 520,
-    lineHeight: 1.2,
-  },
-  daySectionCount: {
-    color: "#8a8378",
     fontSize: "11px",
     fontWeight: 500,
     lineHeight: 1.2,
+    letterSpacing: "0.04em",
   },
   dayPhotoStrip: {
     display: "grid",
