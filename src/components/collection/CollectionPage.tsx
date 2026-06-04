@@ -127,15 +127,6 @@ type AlbumDayGroup = {
   total: number;
 };
 
-type AlbumMonthGroup = {
-  key: string;
-  label: string;
-  total: number;
-  sleepingCount: number;
-  otherCount: number;
-  awakeCount: number;
-};
-
 export function CollectionPage() {
   const [catProfiles, setCatProfiles] = useState<CatProfile[]>([]);
   const [activeCatId, setActiveCatId] = useState<string | null>(null);
@@ -272,10 +263,6 @@ export function CollectionPage() {
   const albumDayGroups = useMemo(
     () => buildAlbumDayGroups(sleepingBoxPhotos, awakeBoxPhotos, otherBoxPhotos),
     [awakeBoxPhotos, otherBoxPhotos, sleepingBoxPhotos],
-  );
-  const albumMonthGroups = useMemo(
-    () => buildAlbumMonthGroups(albumDayGroups),
-    [albumDayGroups],
   );
   const selectedBoxPhotos =
     selectedBoxKind === "sleeping"
@@ -798,8 +785,6 @@ export function CollectionPage() {
 
         <BoxOverview
           dayGroups={albumDayGroups}
-          monthGroups={albumMonthGroups}
-          keptPhotos={otherBoxPhotos}
           onOpenBox={openBoxDetail}
         />
       </div>
@@ -877,20 +862,15 @@ function PageBackdrop() {
 
 function BoxOverview({
   dayGroups,
-  monthGroups,
-  keptPhotos,
   onOpenBox,
 }: {
   dayGroups: AlbumDayGroup[];
-  monthGroups: AlbumMonthGroup[];
-  keptPhotos: BoxPreviewPhoto[];
   onOpenBox: (kind: BoxDetailKind, dateKey?: string | null) => void;
 }) {
   const todayKey = getLocalDateKey(Date.now());
   const todayGroup =
     dayGroups.find((group) => group.key === todayKey) ?? createEmptyTodayAlbumGroup();
   const recentGroups = dayGroups.filter((group) => group.key !== todayKey).slice(0, 5);
-  const visibleKeptPhotos = keptPhotos.slice(0, 4);
 
   return (
     <section style={styles.boxOverview} aria-label="アルバム">
@@ -903,35 +883,6 @@ function BoxOverview({
         groups={recentGroups}
         onOpenBox={onOpenBox}
       />
-
-      <section style={styles.albumSection}>
-        <div style={styles.albumSectionHeader}>
-          <h2 style={styles.albumSectionTitle}>とっておいた</h2>
-          {keptPhotos.length > 0 ? (
-            <button
-              type="button"
-              style={styles.albumSectionAction}
-              onClick={() => onOpenBox("other")}
-            >
-              {keptPhotos.length}枚
-              <span style={styles.boxSummaryArrow}>›</span>
-            </button>
-          ) : null}
-        </div>
-        {keptPhotos.length > 0 ? (
-          <div style={styles.boxPhotoStrip}>
-            {visibleKeptPhotos.map((photo) => (
-              <span key={photo.id} style={styles.boxPhotoThumb}>
-                <StoredPhotoImage src={photo.src} alt="" style={styles.boxPhotoImg} />
-              </span>
-            ))}
-          </div>
-        ) : (
-          <AlbumEmptyLine text="とどいたねがおをとっておくと並びます" />
-        )}
-      </section>
-
-      <AlbumMonthSection monthGroups={monthGroups} />
     </section>
   );
 }
@@ -947,8 +898,8 @@ function AlbumTodayCard({
     <section style={styles.todayAlbumCard} aria-label="今日のアルバム">
       <div style={styles.todayAlbumHeader}>
         <div>
-          <p style={styles.albumKicker}>今日</p>
-          <h2 style={styles.todayAlbumTitle}>今日のねこ</h2>
+          <h2 style={styles.todayAlbumTitle}>今日</h2>
+          <p style={styles.albumKicker}>{group.subLabel}</p>
         </div>
         {group.total > 0 ? (
           <span style={styles.todayAlbumCount}>{group.total}枚</span>
@@ -960,7 +911,7 @@ function AlbumTodayCard({
         <div style={styles.todayAlbumEmpty}>
           <span style={styles.todayAlbumEmptyLine} />
           <p style={styles.todayAlbumEmptyText}>
-            ねがおをとると、今日に残ります
+            ねがおをとるとここに並びます
           </p>
         </div>
       )}
@@ -1078,33 +1029,6 @@ function AlbumDaySectionRow({
     >
       {rowContent}
     </button>
-  );
-}
-
-function AlbumMonthSection({ monthGroups }: { monthGroups: AlbumMonthGroup[] }) {
-  if (monthGroups.length === 0) {
-    return null;
-  }
-
-  return (
-    <section style={styles.albumSection} aria-label="月ごと">
-      <div style={styles.albumSectionHeader}>
-        <h2 style={styles.albumSectionTitle}>月ごと</h2>
-      </div>
-      <div style={styles.monthList}>
-        {monthGroups.slice(0, 6).map((month) => (
-          <div key={month.key} style={styles.monthRow}>
-            <div>
-              <p style={styles.monthTitle}>{month.label}</p>
-              <p style={styles.monthSub}>
-                とった{month.sleepingCount} ・ とどいた{month.otherCount} ・ ようす{month.awakeCount}
-              </p>
-            </div>
-            <span style={styles.monthCount}>{month.total}枚</span>
-          </div>
-        ))}
-      </div>
-    </section>
   );
 }
 
@@ -2068,7 +1992,7 @@ function buildAlbumDayGroups(
       [
       {
         kind: "sleeping",
-        label: "とったねがお",
+        label: "うちのねがお",
         photos: photos.filter((photo) => photo.kind === "sleeping"),
       },
       {
@@ -2078,7 +2002,7 @@ function buildAlbumDayGroups(
       },
       {
         kind: "awake",
-        label: "今日のようす",
+        label: "ようす",
         photos: photos.filter((photo) => photo.kind === "awake"),
       },
     ] satisfies AlbumDaySection[]
@@ -2104,38 +2028,6 @@ function createEmptyTodayAlbumGroup(): AlbumDayGroup {
     sections: [],
     total: 0,
   };
-}
-
-function buildAlbumMonthGroups(dayGroups: AlbumDayGroup[]): AlbumMonthGroup[] {
-  const groups = new Map<string, AlbumMonthGroup>();
-
-  for (const dayGroup of dayGroups) {
-    const key = dayGroup.key.slice(0, 7);
-    const existing =
-      groups.get(key) ?? {
-        key,
-        label: getAlbumMonthLabelFromKey(key),
-        total: 0,
-        sleepingCount: 0,
-        otherCount: 0,
-        awakeCount: 0,
-      };
-
-    for (const section of dayGroup.sections) {
-      if (section.kind === "sleeping") {
-        existing.sleepingCount += section.photos.length;
-      } else if (section.kind === "other") {
-        existing.otherCount += section.photos.length;
-      } else {
-        existing.awakeCount += section.photos.length;
-      }
-      existing.total += section.photos.length;
-    }
-
-    groups.set(key, existing);
-  }
-
-  return [...groups.values()];
 }
 
 function filterBoxPhotosByDate(
@@ -2195,14 +2087,6 @@ function getAlbumDateSubLabelFromKey(key: string) {
   const weekday = ["日", "月", "火", "水", "木", "金", "土"][date.getDay()];
 
   return `${weekday}曜日`;
-}
-
-function getAlbumMonthLabelFromKey(key: string) {
-  const [year, month] = key.split("-");
-  const currentYear = new Date().getFullYear();
-  const yearLabel = Number(year) === currentYear ? "" : `${Number(year)}年`;
-
-  return `${yearLabel}${Number(month)}月`;
 }
 
 function parseTimestampFromId(id: string | undefined) {
@@ -2623,6 +2507,8 @@ const styles = {
     background: "#f7f5ef",
     color: COLLECTION_TEXT,
     overflowX: "hidden",
+    overflowY: "auto",
+    WebkitOverflowScrolling: "touch",
   },
   ambientBackground: {
     position: "fixed" as const,
@@ -2653,7 +2539,7 @@ const styles = {
     width: "min(100%, 480px)",
     margin: "0 auto",
     padding:
-      "calc(18px + env(safe-area-inset-top)) 24px calc(118px + env(safe-area-inset-bottom))",
+      "calc(18px + env(safe-area-inset-top)) 24px calc(168px + env(safe-area-inset-bottom))",
   },
   header: {
     marginBottom: "28px",
@@ -2725,14 +2611,13 @@ const styles = {
   },
   boxOverview: {
     display: "grid",
-    gap: "20px",
+    gap: "22px",
   },
   todayAlbumCard: {
-    ...COLLECTION_SURFACE_SOFT,
     display: "grid",
-    gap: "18px",
-    borderRadius: "26px",
-    padding: "22px 20px 24px",
+    gap: "14px",
+    padding: "0 0 22px",
+    borderBottom: "0.5px solid rgba(79,73,63,0.16)",
   },
   todayAlbumHeader: {
     display: "flex",
@@ -2741,7 +2626,7 @@ const styles = {
     gap: "16px",
   },
   albumKicker: {
-    margin: "0 0 5px",
+    margin: "4px 0 0",
     color: COLLECTION_MUTED,
     fontSize: "11px",
     fontWeight: 520,
@@ -2750,11 +2635,10 @@ const styles = {
   todayAlbumTitle: {
     margin: 0,
     color: COLLECTION_TEXT_STRONG,
-    fontFamily: "\"Shippori Mincho B1\", \"Hiragino Mincho ProN\", \"Yu Mincho\", serif",
-    fontSize: "25px",
-    fontWeight: 500,
+    fontSize: "17px",
+    fontWeight: 560,
     lineHeight: 1.25,
-    letterSpacing: "0.04em",
+    letterSpacing: 0,
   },
   todayAlbumCount: {
     color: COLLECTION_MUTED,
@@ -2765,10 +2649,10 @@ const styles = {
   },
   todayAlbumEmpty: {
     display: "grid",
-    gridTemplateColumns: "76px minmax(0, 1fr)",
+    gridTemplateColumns: "56px minmax(0, 1fr)",
     alignItems: "center",
-    gap: "14px",
-    minHeight: "94px",
+    gap: "12px",
+    minHeight: "58px",
   },
   todayAlbumEmptyLine: {
     height: "1px",
@@ -2778,13 +2662,15 @@ const styles = {
   todayAlbumEmptyText: {
     margin: 0,
     color: COLLECTION_MUTED,
-    fontSize: "13px",
+    fontSize: "12px",
     fontWeight: 500,
-    lineHeight: 1.55,
+    lineHeight: 1.45,
   },
   albumSection: {
     display: "grid",
-    gap: "13px",
+    gap: "12px",
+    padding: "0 0 22px",
+    borderBottom: "0.5px solid rgba(79,73,63,0.16)",
   },
   albumSectionHeader: {
     display: "flex",
@@ -2795,11 +2681,10 @@ const styles = {
   albumSectionTitle: {
     margin: 0,
     color: COLLECTION_TEXT_STRONG,
-    fontFamily: "\"Shippori Mincho B1\", \"Hiragino Mincho ProN\", \"Yu Mincho\", serif",
-    fontSize: "20px",
-    fontWeight: 500,
+    fontSize: "15px",
+    fontWeight: 560,
     lineHeight: 1.3,
-    letterSpacing: "0.04em",
+    letterSpacing: 0,
   },
   albumSectionAction: {
     display: "inline-flex",
@@ -2817,14 +2702,14 @@ const styles = {
   },
   recentDayList: {
     display: "grid",
-    gap: "10px",
+    gap: "0",
+    borderTop: "0.5px solid rgba(79,73,63,0.12)",
   },
   recentDayCard: {
-    ...COLLECTION_SURFACE_SOFT,
     display: "grid",
-    gap: "13px",
-    borderRadius: "20px",
-    padding: "15px",
+    gap: "11px",
+    padding: "14px 0 16px",
+    borderBottom: "0.5px solid rgba(79,73,63,0.12)",
   },
   recentDayHeader: {
     display: "flex",
@@ -2835,7 +2720,7 @@ const styles = {
   recentDayTitle: {
     margin: 0,
     color: COLLECTION_TEXT_STRONG,
-    fontSize: "15px",
+    fontSize: "13.5px",
     fontWeight: 560,
     lineHeight: 1.25,
   },
@@ -2855,11 +2740,11 @@ const styles = {
   },
   daySectionList: {
     display: "grid",
-    gap: "14px",
+    gap: "12px",
   },
   daySectionListCompact: {
     display: "grid",
-    gap: "10px",
+    gap: "9px",
   },
   daySectionRow: {
     display: "grid",
@@ -2883,7 +2768,7 @@ const styles = {
   },
   daySectionTitle: {
     color: COLLECTION_MUTED,
-    fontSize: "12px",
+    fontSize: "11.5px",
     fontWeight: 520,
     lineHeight: 1.2,
   },
@@ -2895,51 +2780,18 @@ const styles = {
   },
   dayPhotoStrip: {
     display: "grid",
-    gridTemplateColumns: "repeat(4, minmax(0, 1fr))",
+    gridTemplateColumns: "repeat(5, minmax(0, 1fr))",
     gap: "8px",
     alignItems: "center",
   },
   dayPhotoThumb: {
     aspectRatio: "1 / 1",
     minWidth: 0,
-    borderRadius: "11px",
+    borderRadius: "9px",
     overflow: "hidden",
     background: "rgba(255,255,255,0.46)",
     border: "0.5px solid rgba(85,75,62,0.08)",
     boxShadow: "0 4px 12px rgba(83,72,55,0.05)",
-  },
-  monthList: {
-    display: "grid",
-    borderTop: "0.5px solid rgba(79,73,63,0.13)",
-  },
-  monthRow: {
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "space-between",
-    gap: "16px",
-    minHeight: "58px",
-    borderBottom: "0.5px solid rgba(79,73,63,0.13)",
-  },
-  monthTitle: {
-    margin: 0,
-    color: COLLECTION_TEXT_STRONG,
-    fontSize: "14px",
-    fontWeight: 560,
-    lineHeight: 1.35,
-  },
-  monthSub: {
-    margin: "3px 0 0",
-    color: COLLECTION_MUTED,
-    fontSize: "11px",
-    fontWeight: 500,
-    lineHeight: 1.35,
-  },
-  monthCount: {
-    color: COLLECTION_MUTED,
-    fontSize: "12px",
-    fontWeight: 500,
-    lineHeight: 1,
-    whiteSpace: "nowrap",
   },
   boxSummaryCard: {
     position: "relative",
