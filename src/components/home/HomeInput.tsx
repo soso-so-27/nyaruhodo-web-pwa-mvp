@@ -5376,6 +5376,7 @@ const styles = {
   },
   exchangePhotoFrame: {
     width: "100%",
+    height: "clamp(220px, 48vh, 360px)",
     borderRadius: "20px",
     overflow: "hidden",
     background: "rgba(47,42,35,0.06)",
@@ -5383,17 +5384,19 @@ const styles = {
     display: "flex",
     alignItems: "center",
     justifyContent: "center",
+    boxSizing: "border-box",
   },
   exchangePhoto: {
-    width: "auto",
-    height: "auto",
+    width: "100%",
+    height: "100%",
     maxWidth: "100%",
-    maxHeight: "min(45vh, 360px)",
+    maxHeight: "100%",
     objectFit: "contain",
     display: "block",
   },
   exchangeSharePreview: {
     width: "100%",
+    height: "clamp(220px, 48vh, 360px)",
     borderRadius: "20px",
     overflow: "hidden",
     background: "rgba(47,42,35,0.06)",
@@ -5401,6 +5404,7 @@ const styles = {
     display: "flex",
     alignItems: "center",
     justifyContent: "center",
+    boxSizing: "border-box",
   },
   exchangeCatPicker: {
     display: "flex",
