@@ -57,7 +57,8 @@ export function OnboardingFlow() {
     input.onchange = async () => {
       const file = input.files?.[0];
 
-      if (!file || !file.type.startsWith("image/")) {
+      if (!file || !isLikelyImageFile(file)) {
+        setMessage("写真を選べませんでした。別の写真でもう一度試してください。");
         cleanupInput();
         return;
       }
@@ -303,9 +304,10 @@ function resizeAndEncode(
 
 async function saveSleepingPhotoWithFallback(file: File, catId: string) {
   const attempts = [
-    { maxSize: 760, quality: 0.72 },
-    { maxSize: 560, quality: 0.68 },
-    { maxSize: 420, quality: 0.62 },
+    { maxSize: 560, quality: 0.66 },
+    { maxSize: 420, quality: 0.58 },
+    { maxSize: 320, quality: 0.5 },
+    { maxSize: 240, quality: 0.42 },
   ];
 
   for (const attempt of attempts) {
@@ -324,6 +326,14 @@ async function saveSleepingPhotoWithFallback(file: File, catId: string) {
   }
 
   return null;
+}
+
+function isLikelyImageFile(file: File) {
+  if (file.type) {
+    return file.type.startsWith("image/");
+  }
+
+  return /\.(avif|gif|heic|heif|jpe?g|png|webp)$/i.test(file.name);
 }
 
 function findFallbackExchangePhoto({

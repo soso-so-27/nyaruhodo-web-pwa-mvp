@@ -258,11 +258,11 @@ export function SettingsPage() {
     };
 
     input.onchange = async () => {
-      const files = Array.from(input.files ?? []).filter((file) =>
-        file.type.startsWith("image/"),
-      );
+      const selectedFiles = Array.from(input.files ?? []);
+      const files = selectedFiles.filter(isLikelyImageFile);
 
       if (files.length === 0) {
+        setStockMessage("写真を選べませんでした。別の写真でもう一度試してください。");
         cleanupInput();
         return;
       }
@@ -281,7 +281,8 @@ export function SettingsPage() {
         }
 
         trackProductEvent("settings_stock_photos_imported", {
-          selected_count: files.length,
+          selected_count: selectedFiles.length,
+          accepted_count: files.length,
           saved_count: savedCount,
         });
         setStockMessage(
@@ -289,14 +290,18 @@ export function SettingsPage() {
             ? `とどくねがおを${savedCount}枚入れました。`
             : "写真を保存できませんでした。",
         );
-        setStockPhotoCount(readSharedExchangePhotos().length);
+        setStockPhotoCount((count) =>
+          Math.max(readSharedExchangePhotos().length, count + savedCount),
+        );
       } catch {
         setStockMessage(
           savedCount > 0
             ? `とどくねがおを${savedCount}枚入れました。`
             : "写真を保存できませんでした。",
         );
-        setStockPhotoCount(readSharedExchangePhotos().length);
+        setStockPhotoCount((count) =>
+          Math.max(readSharedExchangePhotos().length, count + savedCount),
+        );
       } finally {
         setIsStockAdding(false);
         cleanupInput();
@@ -632,9 +637,10 @@ function resizeAndEncode(
 
 async function saveStockPhotoWithFallback(file: File) {
   const attempts = [
-    { maxSize: 760, quality: 0.72 },
-    { maxSize: 560, quality: 0.68 },
-    { maxSize: 420, quality: 0.62 },
+    { maxSize: 560, quality: 0.66 },
+    { maxSize: 420, quality: 0.58 },
+    { maxSize: 320, quality: 0.5 },
+    { maxSize: 240, quality: 0.42 },
   ];
 
   for (const attempt of attempts) {
@@ -647,6 +653,14 @@ async function saveStockPhotoWithFallback(file: File) {
   }
 
   return null;
+}
+
+function isLikelyImageFile(file: File) {
+  if (file.type) {
+    return file.type.startsWith("image/");
+  }
+
+  return /\.(avif|gif|heic|heif|jpe?g|png|webp)$/i.test(file.name);
 }
 
 function AuthDebugPanel({ snapshot }: { snapshot: AuthDebugSnapshot | null }) {
