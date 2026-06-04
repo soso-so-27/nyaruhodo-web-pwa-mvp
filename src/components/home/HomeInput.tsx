@@ -190,6 +190,8 @@ type BoardShelfStat = {
   detail: string;
 };
 
+type HomeSaveState = "local" | "account";
+
 type HomeCatCounter = {
   id: "sleeping" | "window" | "loaf";
   label: string;
@@ -298,6 +300,7 @@ export function HomeInput({ recentEvents: _recentEvents }: HomeInputProps) {
     useState<SleepingPhotoSource>("camera");
   const [collectionRefreshTick, setCollectionRefreshTick] = useState(0);
   const [discoveryDismissedToday, setDiscoveryDismissedToday] = useState(false);
+  const [homeSaveState, setHomeSaveState] = useState<HomeSaveState>("local");
   const hasTrackedHomeView = useRef(false);
   const hasTrackedGoogleAuthSuccess = useRef(false);
   const toastTimerRef = useRef<number | null>(null);
@@ -323,6 +326,36 @@ export function HomeInput({ recentEvents: _recentEvents }: HomeInputProps) {
     }, 1000);
 
     return () => window.clearInterval(intervalId);
+  }, []);
+
+  useEffect(() => {
+    const supabase = createBrowserSupabaseClient();
+    if (!supabase) {
+      setHomeSaveState("local");
+      return;
+    }
+
+    const client = supabase;
+    let isCancelled = false;
+
+    async function refreshSaveState() {
+      const { data } = await client.auth.getSession();
+      if (!isCancelled) {
+        setHomeSaveState(data.session ? "account" : "local");
+      }
+    }
+
+    void refreshSaveState();
+    const { data: authListener } = client.auth.onAuthStateChange(
+      (_event, session) => {
+        setHomeSaveState(session ? "account" : "local");
+      },
+    );
+
+    return () => {
+      isCancelled = true;
+      authListener.subscription.unsubscribe();
+    };
   }, []);
 
   useEffect(() => {
@@ -686,10 +719,36 @@ export function HomeInput({ recentEvents: _recentEvents }: HomeInputProps) {
         has_active_cat: true,
         has_home_photo: Boolean(activeCat.homePhotoDataUrl),
         record_count: recordLog.length,
+        own_sleeping_photo_count: readOwnSleepingPhotoCount(activeCatId),
+        kept_exchange_photo_count: readKeptExchangePhotoCount(),
+        delivery_remaining: sleepingCounterRemaining ?? null,
       },
       { localCatId: activeCatId },
     );
-  }, [activeCat, activeCatId, catProfiles.length, recordLog.length]);
+  }, [
+    activeCat,
+    activeCatId,
+    catProfiles.length,
+    recordLog.length,
+    sleepingCounterRemaining,
+  ]);
+
+  useEffect(() => {
+    if (!pendingExchangeSharePhoto || !activeCatId) {
+      return;
+    }
+
+    trackProductEvent(
+      "home_exchange_share_sheet_viewed",
+      {
+        theme: pendingExchangeSharePhoto.theme,
+        trigger_label: pendingExchangeSharePhoto.triggerLabel,
+        delivery_available: !sleepingCounterRemaining,
+        delivery_remaining: sleepingCounterRemaining ?? null,
+      },
+      { localCatId: activeCatId },
+    );
+  }, [activeCatId, pendingExchangeSharePhoto, sleepingCounterRemaining]);
 
   useEffect(() => {
     if (!activeCatId || isAccountRestoreDismissed()) {
@@ -1315,6 +1374,17 @@ export function HomeInput({ recentEvents: _recentEvents }: HomeInputProps) {
   }
 
   function handleSleepingPhotoStart(source: SleepingPhotoSource = "camera") {
+    trackProductEvent(
+      "home_sleeping_photo_start_clicked",
+      {
+        source,
+        has_accepted_safety: hasAcceptedSleepingSafety,
+        delivery_available: !sleepingCounterRemaining,
+        delivery_remaining: sleepingCounterRemaining ?? null,
+      },
+      { localCatId: activeCatId },
+    );
+
     if (!hasAcceptedSleepingSafety) {
       setPendingSleepingPhotoSource(source);
       setIsSleepingSafetyChecked(false);
@@ -1587,6 +1657,8 @@ export function HomeInput({ recentEvents: _recentEvents }: HomeInputProps) {
 
       <SleepingPhotoHome
         stats={homeSleepingBoxStats}
+        deliveryRemaining={sleepingCounterRemaining}
+        saveState={homeSaveState}
         onTakePhoto={() => handleSleepingPhotoStart("camera")}
         onSelectPhoto={handleSleepingLibraryPhotoStart}
       />
@@ -1620,6 +1692,17 @@ export function HomeInput({ recentEvents: _recentEvents }: HomeInputProps) {
           selectedCatId={pendingExchangeCatId ?? activeCatId}
           deliveryRemaining={sleepingCounterRemaining}
           onCatSelect={setPendingExchangeCatId}
+          onModeChange={(mode) => {
+            trackProductEvent(
+              "home_exchange_share_mode_selected",
+              {
+                mode,
+                delivery_available: !sleepingCounterRemaining,
+                delivery_remaining: sleepingCounterRemaining ?? null,
+              },
+              { localCatId: pendingExchangeCatId ?? activeCatId },
+            );
+          }}
           onConfirm={() =>
             handleConfirmExchangeSharePhoto(pendingExchangeSharePhoto)
           }
@@ -2340,13 +2423,23 @@ function InfoSheet({
 
 function SleepingPhotoHome({
   stats,
+  deliveryRemaining,
+  saveState,
   onTakePhoto,
   onSelectPhoto,
 }: {
   stats: BoardShelfStat[];
+  deliveryRemaining: string | null;
+  saveState: HomeSaveState;
   onTakePhoto: () => void;
   onSelectPhoto: () => void;
 }) {
+  const deliveryLabel = deliveryRemaining
+    ? `つぎ ${deliveryRemaining}`
+    : "入れると1枚とどく";
+  const saveLabel =
+    saveState === "account" ? "アカウント接続中" : "この端末に保存";
+
   return (
     <>
       <div style={styles.sleepingTopBar} aria-hidden="true">
@@ -2367,9 +2460,7 @@ function SleepingPhotoHome({
             ねがおをとる
           </h1>
           <p style={styles.sleepingHomeLead}>
-            ねてるねこを見つけたら、
-            <br />
-            ここから入れておく
+            入れると、1枚とどく
           </p>
         </div>
 
@@ -2384,7 +2475,18 @@ function SleepingPhotoHome({
         >
           <AppIcon name="camera" size={36} />
         </button>
-
+        <div style={styles.sleepingFlowCue} aria-label="ねがおを入れると、1枚とどく">
+          <span style={styles.sleepingFlowItem}>
+            <AppIcon name="photo" size={15} />
+            <span>ねがお</span>
+          </span>
+          <span style={styles.sleepingFlowArrow} aria-hidden="true">→</span>
+          <span style={styles.sleepingFlowItem}>
+            <AppIcon name="mail" size={15} />
+            <span>とどく</span>
+          </span>
+        </div>
+        <div style={styles.sleepingDeliveryChip}>{deliveryLabel}</div>
       </div>
 
       <div style={styles.sleepingStatCards} aria-label="ねがお">
@@ -2403,6 +2505,10 @@ function SleepingPhotoHome({
             ) : null}
           </span>
         ))}
+      </div>
+      <div style={styles.sleepingSaveHint} aria-label={saveLabel}>
+        <AppIcon name="lock" size={13} />
+        <span>{saveLabel}</span>
       </div>
       </section>
     </>
@@ -2487,6 +2593,7 @@ function ExchangePhotoSheet({
         <div style={styles.exchangePhotoFrame}>
           <StoredPhotoImage src={photo.src} alt="" style={styles.exchangePhoto} />
         </div>
+        <p style={styles.exchangeAssurance}>とっておくと、アルバムに入ります。</p>
         <div style={styles.exchangeActions}>
           <button type="button" style={styles.exchangeKeepButton} onClick={onKeep}>
             とっておく
@@ -2506,6 +2613,7 @@ function ExchangeSharePermissionSheet({
   selectedCatId,
   deliveryRemaining,
   onCatSelect,
+  onModeChange,
   onConfirm,
   onPrivate,
 }: {
@@ -2514,12 +2622,19 @@ function ExchangeSharePermissionSheet({
   selectedCatId: string | null;
   deliveryRemaining: string | null;
   onCatSelect: (catId: string) => void;
+  onModeChange: (mode: "shared" | "private") => void;
   onConfirm: () => void;
   onPrivate: () => void;
 }) {
   const shouldShowCatPicker = catProfiles.length > 1;
   const canReceivePhoto = !deliveryRemaining;
-  const [isPrivate, setIsPrivate] = useState(false);
+  const [mode, setMode] = useState<"shared" | "private">("shared");
+  const isPrivate = mode === "private";
+
+  function selectMode(nextMode: "shared" | "private") {
+    setMode(nextMode);
+    onModeChange(nextMode);
+  }
 
   return (
     <div style={styles.exchangeBackdrop}>
@@ -2529,8 +2644,8 @@ function ExchangeSharePermissionSheet({
         </div>
         <p style={styles.exchangeLead}>
           {canReceivePhoto
-            ? "入れると、とどいたねがおが1枚とどきます。"
-            : `とったねがおにはいつでも入ります。つぎにとどくのは ${deliveryRemaining}。`}
+            ? "とったねがおに入り、1枚とどきます。"
+            : `とったねがおには入ります。つぎにとどくのは ${deliveryRemaining}。`}
         </p>
         <div style={styles.exchangeSharePreview}>
           <StoredPhotoImage src={photo.src} alt="" style={styles.exchangePhoto} />
@@ -2564,15 +2679,41 @@ function ExchangeSharePermissionSheet({
             })}
           </div>
         ) : null}
-        <label style={styles.exchangePrivateCheck}>
-          <input
-            type="checkbox"
-            checked={isPrivate}
-            onChange={(event) => setIsPrivate(event.currentTarget.checked)}
-            style={styles.exchangePrivateCheckbox}
-          />
-          <span>この写真はとどかないようにする</span>
-        </label>
+        <div style={styles.exchangeModeGroup} aria-label="ねがおの入れ方">
+          <button
+            type="button"
+            style={{
+              ...styles.exchangeModeButton,
+              ...(mode === "shared" ? styles.exchangeModeButtonActive : {}),
+            }}
+            onClick={() => selectMode("shared")}
+            aria-pressed={mode === "shared"}
+          >
+            <AppIcon name="send" size={16} />
+            <span style={styles.exchangeModeText}>
+              <span style={styles.exchangeModeLabel}>とどく</span>
+              <span style={styles.exchangeModeSub}>
+                {canReceivePhoto ? "1枚うけとる" : "あとで届く"}
+              </span>
+            </span>
+          </button>
+          <button
+            type="button"
+            style={{
+              ...styles.exchangeModeButton,
+              ...(mode === "private" ? styles.exchangeModeButtonActive : {}),
+            }}
+            onClick={() => selectMode("private")}
+            aria-pressed={mode === "private"}
+          >
+            <AppIcon name="eyeOff" size={16} />
+            <span style={styles.exchangeModeText}>
+              <span style={styles.exchangeModeLabel}>自分だけ</span>
+              <span style={styles.exchangeModeSub}>外には出ない</span>
+            </span>
+          </button>
+        </div>
+        <p style={styles.exchangeAssurance}>名前は出ません。</p>
         <div style={styles.exchangeActions}>
           <button
             type="button"
@@ -5036,13 +5177,13 @@ const styles = {
   },
   sleepingActionGroup: {
     position: "fixed",
-    top: "calc(clamp(284px, 38dvh, 348px) + env(safe-area-inset-top))",
+    top: "calc(clamp(270px, 36dvh, 330px) + env(safe-area-inset-top))",
     left: "50%",
     zIndex: 19,
     transform: "translateX(-50%)",
     display: "grid",
     justifyItems: "center",
-    gap: "16px",
+    gap: "13px",
     pointerEvents: "auto",
   },
   sleepingBoxStack: {
@@ -5164,10 +5305,52 @@ const styles = {
     backdropFilter: "blur(12px)",
     WebkitBackdropFilter: "blur(12px)",
   },
+  sleepingFlowCue: {
+    display: "inline-flex",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: "8px",
+    minHeight: "30px",
+    padding: "0 12px",
+    border: "0.5px solid rgba(95,82,62,0.12)",
+    borderRadius: "999px",
+    background: "rgba(255,253,248,0.56)",
+    color: "#6f665a",
+    fontSize: "11.5px",
+    fontWeight: 560,
+    lineHeight: 1,
+    backdropFilter: "blur(14px)",
+    WebkitBackdropFilter: "blur(14px)",
+  },
+  sleepingFlowItem: {
+    display: "inline-flex",
+    alignItems: "center",
+    gap: "5px",
+    whiteSpace: "nowrap",
+  },
+  sleepingFlowArrow: {
+    color: "#aaa096",
+    fontSize: "13px",
+    lineHeight: 1,
+  },
+  sleepingDeliveryChip: {
+    minHeight: "26px",
+    display: "inline-flex",
+    alignItems: "center",
+    justifyContent: "center",
+    padding: "0 11px",
+    border: "0.5px solid rgba(95,82,62,0.1)",
+    borderRadius: "999px",
+    background: "rgba(255,255,255,0.34)",
+    color: "#8a8174",
+    fontSize: "10.5px",
+    fontWeight: 540,
+    lineHeight: 1,
+  },
   sleepingStatCards: {
     position: "fixed",
     left: "50%",
-    top: "calc(clamp(456px, 64dvh, 584px) + env(safe-area-inset-top))",
+    top: "calc(clamp(474px, 66dvh, 596px) + env(safe-area-inset-top))",
     zIndex: 19,
     transform: "translateX(-50%)",
     display: "grid",
@@ -5238,6 +5421,23 @@ const styles = {
     fontWeight: 520,
     lineHeight: 1.25,
     textAlign: "center",
+  },
+  sleepingSaveHint: {
+    position: "fixed",
+    left: "50%",
+    top: "calc(clamp(578px, 80dvh, 704px) + env(safe-area-inset-top))",
+    zIndex: 19,
+    transform: "translateX(-50%)",
+    display: "inline-flex",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: "5px",
+    color: "#8a8174",
+    fontSize: "10.5px",
+    fontWeight: 540,
+    lineHeight: 1,
+    pointerEvents: "none",
+    whiteSpace: "nowrap",
   },
   sleepingBoxPills: {
     display: "flex",
@@ -5497,6 +5697,58 @@ const styles = {
     height: "16px",
     accentColor: "#292721",
     flexShrink: 0,
+  },
+  exchangeModeGroup: {
+    display: "grid",
+    gridTemplateColumns: "repeat(2, minmax(0, 1fr))",
+    gap: "8px",
+    margin: "10px 0 8px",
+  },
+  exchangeModeButton: {
+    minWidth: 0,
+    minHeight: "54px",
+    border: "0.5px solid rgba(86,78,64,0.12)",
+    borderRadius: "16px",
+    background: "rgba(255,255,255,0.46)",
+    color: "#716b60",
+    display: "inline-flex",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: "8px",
+    padding: "8px 9px",
+    cursor: "pointer",
+  },
+  exchangeModeButtonActive: {
+    border: "0.5px solid rgba(61,54,44,0.22)",
+    background: "rgba(255,255,255,0.9)",
+    color: "#292721",
+    boxShadow: "0 8px 18px rgba(90,76,60,0.06)",
+  },
+  exchangeModeText: {
+    minWidth: 0,
+    display: "grid",
+    gap: "3px",
+    textAlign: "left",
+  },
+  exchangeModeLabel: {
+    fontSize: "13px",
+    fontWeight: 680,
+    lineHeight: 1.1,
+    whiteSpace: "nowrap",
+  },
+  exchangeModeSub: {
+    color: "#8a8174",
+    fontSize: "10.5px",
+    fontWeight: 520,
+    lineHeight: 1.1,
+    whiteSpace: "nowrap",
+  },
+  exchangeAssurance: {
+    margin: "0 2px 12px",
+    color: "#8a8174",
+    fontSize: "11.5px",
+    fontWeight: 500,
+    lineHeight: 1.35,
   },
   exchangeActions: {
     display: "grid",
