@@ -249,6 +249,9 @@ export function OnboardingFlow() {
             <a href="/account/create" style={styles.primaryLink}>
               うちのねこページを作る
             </a>
+            <a href="/collection" style={styles.secondaryLink}>
+              アルバムで見る
+            </a>
             <button type="button" onClick={handleGoHome} style={styles.textButton}>
               ホームへ
             </button>
@@ -455,6 +458,13 @@ const styles = {
     display: "inline-flex",
     alignItems: "center",
     justifyContent: "center",
+  },
+  secondaryLink: {
+    color: "#6a6258",
+    fontSize: "13px",
+    fontWeight: 600,
+    textDecoration: "none",
+    padding: "4px 12px",
   },
   textButton: {
     border: "none",

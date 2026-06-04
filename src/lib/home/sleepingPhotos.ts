@@ -315,6 +315,7 @@ export function keepExchangePhoto(photo: ExchangePhoto) {
       KEPT_EXCHANGE_PHOTO_STORAGE_KEY,
       [photo, ...saved].slice(0, 50),
     );
+    dispatchBoxPhotoStorageEvent();
   } catch {
     // The received photo is a soft reward, so storage failure should not block.
   }
