@@ -836,7 +836,9 @@ function AlbumTodayCard({
       <div style={styles.todayAlbumHeader}>
         <div>
           <h2 style={styles.todayAlbumTitle}>今日</h2>
-          <p style={styles.albumKicker}>{group.subLabel}</p>
+          {group.subLabel ? (
+            <p style={styles.albumKicker}>{group.subLabel}</p>
+          ) : null}
         </div>
       </div>
       {group.total > 0 ? (
@@ -890,7 +892,9 @@ function AlbumDayCard({
       <div style={styles.recentDayHeader}>
         <div>
           <h3 style={styles.recentDayTitle}>{group.label}</h3>
-          <p style={styles.recentDaySub}>{group.subLabel}</p>
+          {group.subLabel ? (
+            <p style={styles.recentDaySub}>{group.subLabel}</p>
+          ) : null}
         </div>
       </div>
       <AlbumDaySections group={group} onOpenBox={onOpenBox} compact />
@@ -1953,11 +1957,8 @@ function getAlbumDateLabelFromKey(key: string) {
   return `${Number(month)}月${Number(day)}日`;
 }
 
-function getAlbumDateSubLabelFromKey(key: string) {
-  const date = new Date(`${key}T00:00:00`);
-  const weekday = ["日", "月", "火", "水", "木", "金", "土"][date.getDay()];
-
-  return `${weekday}曜日`;
+function getAlbumDateSubLabelFromKey(_key: string) {
+  return "";
 }
 
 function parseTimestampFromId(id: string | undefined) {
