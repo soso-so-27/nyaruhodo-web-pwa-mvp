@@ -272,6 +272,11 @@ export function SettingsPage() {
                   <span style={styles.rowValue}>{email ?? ""}</span>
                 </div>
                 <div style={styles.divider} />
+                <div style={styles.row}>
+                  <span style={styles.rowLabel}>写真の保存先</span>
+                  <span style={styles.rowValue}>アカウント接続中</span>
+                </div>
+                <div style={styles.divider} />
                 {syncOverview ? (
                   <>
                     <SyncStatusPanel overview={syncOverview} />
@@ -325,6 +330,11 @@ export function SettingsPage() {
                     <span style={{ ...styles.statusDot, ...styles.statusDotOff }} />
                     <span style={styles.rowLabel}>未接続</span>
                   </div>
+                </div>
+                <div style={styles.divider} />
+                <div style={styles.row}>
+                  <span style={styles.rowLabel}>写真の保存先</span>
+                  <span style={styles.rowValue}>この端末</span>
                 </div>
                 <div style={styles.divider} />
                 <a href="/account/create" style={styles.primaryButton}>

@@ -45,9 +45,9 @@ import {
   reportExchangePhoto,
   saveOwnSleepingPhoto,
   saveSharedExchangePhoto,
+  saveSharedExchangeStockPhoto,
   selectDeliverableSleepingPhoto,
   type ExchangePhoto,
-  type ExchangePhotoPoolItem,
 } from "../../lib/home/sleepingPhotos";
 import { backupOwnSleepingPhotoMoment } from "../../lib/home/sleepingPhotoBackup";
 import {
@@ -190,8 +190,6 @@ type BoardShelfStat = {
   detail: string;
 };
 
-type HomeSaveState = "local" | "account";
-
 type HomeCatCounter = {
   id: "sleeping" | "window" | "loaf";
   label: string;
@@ -205,48 +203,10 @@ type PendingExchangeSharePhoto = {
   fileSizeBucket: string;
 };
 
-type SleepingPhotoSource = "camera" | "library";
+type SleepingPhotoSource = "camera";
 
 const SLEEPING_SAFETY_ACCEPTED_STORAGE_KEY =
   "nyaruhodo_sleeping_safety_accepted";
-
-const EXCHANGE_PHOTO_POOL: ExchangePhotoPoolItem[] = [
-  {
-    id: "sleeping-loaf",
-    src: "/sample-cats/pose-loaf.png",
-    title: "ほかの猫のねがお",
-    subtitle: "",
-    tags: ["sleeping", "ねてる", "loaf", "香箱", "curled-up", "まるまり", "bed"],
-  },
-  {
-    id: "sleeping-belly",
-    src: "/sample-cats/pose-belly.png",
-    title: "ほかの猫のねがお",
-    subtitle: "",
-    tags: ["sleeping", "ねてる", "belly-up", "へそ天", "weird-sleep"],
-  },
-  {
-    id: "stretch-cat",
-    src: "/sample-cats/pose-stretch.png",
-    title: "ほかの猫のねがお",
-    subtitle: "",
-    tags: ["stretch", "のびー", "pose"],
-  },
-  {
-    id: "box-cat",
-    src: "/sample-cats/pose-box.png",
-    title: "ほかの猫のねがお",
-    subtitle: "",
-    tags: ["box-bag", "箱・袋", "hideout", "隠れ場所"],
-  },
-  {
-    id: "window-cat",
-    src: "/sample-cats/mugi-portrait.png",
-    title: "ほかの猫のねがお",
-    subtitle: "",
-    tags: ["window", "窓辺", "watching", "見ている", "high-place", "高いところ"],
-  },
-];
 
 export function HomeInput({ recentEvents: _recentEvents }: HomeInputProps) {
   const [catProfiles, setCatProfiles] = useState<CatProfile[]>([]);
@@ -300,7 +260,6 @@ export function HomeInput({ recentEvents: _recentEvents }: HomeInputProps) {
     useState<SleepingPhotoSource>("camera");
   const [collectionRefreshTick, setCollectionRefreshTick] = useState(0);
   const [discoveryDismissedToday, setDiscoveryDismissedToday] = useState(false);
-  const [homeSaveState, setHomeSaveState] = useState<HomeSaveState>("local");
   const hasTrackedHomeView = useRef(false);
   const hasTrackedGoogleAuthSuccess = useRef(false);
   const toastTimerRef = useRef<number | null>(null);
@@ -326,36 +285,6 @@ export function HomeInput({ recentEvents: _recentEvents }: HomeInputProps) {
     }, 1000);
 
     return () => window.clearInterval(intervalId);
-  }, []);
-
-  useEffect(() => {
-    const supabase = createBrowserSupabaseClient();
-    if (!supabase) {
-      setHomeSaveState("local");
-      return;
-    }
-
-    const client = supabase;
-    let isCancelled = false;
-
-    async function refreshSaveState() {
-      const { data } = await client.auth.getSession();
-      if (!isCancelled) {
-        setHomeSaveState(data.session ? "account" : "local");
-      }
-    }
-
-    void refreshSaveState();
-    const { data: authListener } = client.auth.onAuthStateChange(
-      (_event, session) => {
-        setHomeSaveState(session ? "account" : "local");
-      },
-    );
-
-    return () => {
-      isCancelled = true;
-      authListener.subscription.unsubscribe();
-    };
   }, []);
 
   useEffect(() => {
@@ -1373,6 +1302,85 @@ export function HomeInput({ recentEvents: _recentEvents }: HomeInputProps) {
     }, 60000);
   }
 
+  async function handleSleepingStockPhotoImport() {
+    if (isExchangePhotoAdding) {
+      return;
+    }
+
+    const input = document.createElement("input");
+    input.type = "file";
+    input.accept = "image/*";
+    input.multiple = true;
+    input.tabIndex = -1;
+    input.setAttribute("aria-hidden", "true");
+    input.style.position = "fixed";
+    input.style.left = "-9999px";
+    input.style.top = "0";
+    input.style.width = "1px";
+    input.style.height = "1px";
+    input.style.opacity = "0";
+
+    const cleanupInput = () => {
+      window.setTimeout(() => {
+        input.remove();
+      }, 0);
+    };
+
+    input.onchange = async () => {
+      const files = Array.from(input.files ?? []).filter((file) =>
+        file.type.startsWith("image/"),
+      );
+      if (files.length === 0) {
+        cleanupInput();
+        return;
+      }
+
+      setIsExchangePhotoAdding(true);
+      let savedCount = 0;
+
+      try {
+        for (const file of files.slice(0, 30)) {
+          const dataUrl = await resizeAndEncode(file, 760, 0.72);
+          const saved = saveSharedExchangeStockPhoto({ src: dataUrl });
+          if (saved) {
+            savedCount += 1;
+          }
+        }
+
+        trackProductEvent(
+          "home_exchange_stock_photos_imported",
+          {
+            selected_count: files.length,
+            saved_count: savedCount,
+          },
+          { localCatId: activeCatId },
+        );
+        showToast(
+          savedCount > 0
+            ? `とどくねがおを${savedCount}枚入れました`
+            : "写真を保存できませんでした",
+        );
+      } catch {
+        showToast(
+          savedCount > 0
+            ? `とどくねがおを${savedCount}枚入れました`
+            : "写真を保存できませんでした",
+        );
+      } finally {
+        setIsExchangePhotoAdding(false);
+        cleanupInput();
+      }
+    };
+
+    document.body.appendChild(input);
+    input.click();
+    window.setTimeout(() => {
+      if (!input.files?.length) {
+        input.remove();
+      }
+    }, 60000);
+  }
+
   function handleSleepingPhotoStart(source: SleepingPhotoSource = "camera") {
     trackProductEvent(
       "home_sleeping_photo_start_clicked",
@@ -1393,10 +1401,6 @@ export function HomeInput({ recentEvents: _recentEvents }: HomeInputProps) {
     }
 
     void handleSleepingExchangePhotoSelect(source);
-  }
-
-  function handleSleepingLibraryPhotoStart() {
-    handleSleepingPhotoStart("library");
   }
 
   function handleAcceptSleepingSafety() {
@@ -1475,6 +1479,20 @@ export function HomeInput({ recentEvents: _recentEvents }: HomeInputProps) {
       excludePhotoId,
       recipientCatId: localCatId ?? activeCatId,
     });
+
+    if (!photo) {
+      showToast("とどくねがおを準備中です");
+      trackProductEvent(
+        "home_exchange_photo_delivery_empty",
+        {
+          trigger_label: triggerLabel,
+          theme,
+          category,
+        },
+        { localCatId: localCatId ?? activeCatId },
+      );
+      return;
+    }
 
     setDeliveredExchangePhoto(photo);
     trackProductEvent(
@@ -1646,9 +1664,10 @@ export function HomeInput({ recentEvents: _recentEvents }: HomeInputProps) {
       <SleepingPhotoHome
         sleepingCounter={sleepingCounterCount}
         deliveryRemaining={sleepingCounterRemaining}
-        saveState={homeSaveState}
         onTakePhoto={() => handleSleepingPhotoStart("camera")}
-        onSelectPhoto={handleSleepingLibraryPhotoStart}
+        onSelectPhoto={() => {
+          void handleSleepingStockPhotoImport();
+        }}
       />
 
       {isSleepingSafetySheetOpen ? (
@@ -2412,21 +2431,17 @@ function InfoSheet({
 function SleepingPhotoHome({
   sleepingCounter,
   deliveryRemaining,
-  saveState,
   onTakePhoto,
   onSelectPhoto,
 }: {
   sleepingCounter: string;
   deliveryRemaining: string | null;
-  saveState: HomeSaveState;
   onTakePhoto: () => void;
   onSelectPhoto: () => void;
 }) {
   const deliveryLabel = deliveryRemaining
     ? `つぎにとどくまで ${deliveryRemaining}`
     : null;
-  const saveLabel =
-    saveState === "account" ? "アカウント接続中" : "この端末に保存";
 
   return (
     <>
@@ -2440,7 +2455,7 @@ function SleepingPhotoHome({
             style={styles.sleepingLibraryButton}
             onClick={onSelectPhoto}
           >
-            管理用
+            ストック
           </button>
         ) : null}
         <div style={styles.sleepingHomeHeader}>
@@ -2473,10 +2488,6 @@ function SleepingPhotoHome({
         <span>ねてるねこ</span>
         <strong style={styles.sleepingWorldCountValue}>{sleepingCounter}</strong>
         <span>匹</span>
-      </div>
-      <div style={styles.sleepingSaveHint} aria-label={saveLabel}>
-        <AppIcon name="lock" size={13} />
-        <span>{saveLabel}</span>
       </div>
       </section>
     </>
@@ -3770,17 +3781,20 @@ function createExchangePhoto({
   seed: string;
   excludePhotoId?: string;
   recipientCatId?: string | null;
-}): ExchangePhoto {
+}): ExchangePhoto | null {
   const selected =
     selectDeliverableSleepingPhoto({
       triggerLabel,
       theme,
       category,
       seed,
-      samplePool: EXCHANGE_PHOTO_POOL,
       excludePhotoId,
       recipientCatId,
-    }).photo ?? EXCHANGE_PHOTO_POOL[0];
+    }).photo;
+
+  if (!selected) {
+    return null;
+  }
 
   return {
     id: `${selected.id}-${Date.now()}`,
@@ -5233,6 +5247,7 @@ const styles = {
     lineHeight: 1,
     cursor: "pointer",
     padding: "5px 9px",
+    pointerEvents: "auto",
     backdropFilter: "blur(12px)",
     WebkitBackdropFilter: "blur(12px)",
   },
@@ -5279,23 +5294,6 @@ const styles = {
     fontWeight: 460,
     lineHeight: 1,
     fontVariantNumeric: "tabular-nums",
-  },
-  sleepingSaveHint: {
-    position: "fixed",
-    left: "50%",
-    top: "calc(clamp(536px, 73dvh, 650px) + env(safe-area-inset-top))",
-    zIndex: 19,
-    transform: "translateX(-50%)",
-    display: "inline-flex",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: "5px",
-    color: "#8a8174",
-    fontSize: "10.5px",
-    fontWeight: 540,
-    lineHeight: 1,
-    pointerEvents: "none",
-    whiteSpace: "nowrap",
   },
   sleepingBoxPills: {
     display: "flex",

@@ -62,14 +62,13 @@ export type DeliverableSleepingPhotoInput = {
   theme: string;
   category: string;
   seed: string;
-  samplePool: readonly ExchangePhotoPoolItem[];
   excludePhotoId?: string;
   recipientCatId?: string | null;
 };
 
 export type DeliverableSleepingPhotoResult = {
   photo: ExchangePhotoPoolItem | null;
-  source: "shared" | "sample" | "fallback" | "none";
+  source: "shared" | "none";
 };
 
 export const BOX_PHOTO_STORAGE_EVENT = "nyaruhodo_box_photos_updated";
@@ -408,7 +407,7 @@ export function hideKeptExchangePhoto(
 export function readSharedExchangePhotos() {
   return readStorageArray<ExchangePhotoPoolItem>(SHARED_EXCHANGE_PHOTO_STORAGE_KEY)
     .filter(isValidExchangePhotoPoolItem)
-    .slice(0, 30);
+    .slice(0, 60);
 }
 
 export function saveSharedExchangePhoto({
@@ -434,14 +433,52 @@ export function saveSharedExchangePhoto({
       tags,
     };
 
-    writeStorageArray(
+    writeStorageArrayWithFallback(
       SHARED_EXCHANGE_PHOTO_STORAGE_KEY,
-      [sharedPhoto, ...current].slice(0, 30),
+      [sharedPhoto, ...current],
+      [60, 40, 30, 20, 12, 6, 1],
     );
 
     return sharedPhoto;
   } catch {
     // Sharing is optional, so keep the main recording flow alive.
+    return null;
+  }
+}
+
+export function saveSharedExchangeStockPhoto({
+  src,
+  title = "ほかの猫のねがお",
+  subtitle = "",
+  tags = ["sleeping", "ねてる"],
+}: {
+  src: string;
+  title?: string;
+  subtitle?: string;
+  tags?: readonly string[];
+}) {
+  try {
+    const current = readSharedExchangePhotos();
+    const createdAt = Date.now();
+    const sharedPhoto: ExchangePhotoPoolItem = {
+      id: `stock-sleeping-${createdAt}-${Math.random().toString(16).slice(2)}`,
+      sourceCatId: "admin-stock",
+      src,
+      title,
+      subtitle,
+      tags,
+    };
+    const savedPhotos = writeStorageArrayWithFallback(
+      SHARED_EXCHANGE_PHOTO_STORAGE_KEY,
+      [sharedPhoto, ...current],
+      [60, 40, 30, 20, 12, 6, 1],
+    );
+
+    dispatchBoxPhotoStorageEvent();
+    return savedPhotos.some((photo) => photo.id === sharedPhoto.id)
+      ? sharedPhoto
+      : null;
+  } catch {
     return null;
   }
 }
@@ -471,7 +508,6 @@ export function selectDeliverableSleepingPhoto({
   theme,
   category,
   seed,
-  samplePool,
   excludePhotoId,
   recipientCatId,
 }: DeliverableSleepingPhotoInput): DeliverableSleepingPhotoResult {
@@ -484,23 +520,7 @@ export function selectDeliverableSleepingPhoto({
       photo.sourceCatId !== recipientCatId &&
       !isExchangePoolItemBlocked(photo, blockedPhotoIds),
   );
-  const availableSamplePool = samplePool.filter(
-    (photo) =>
-      photo.id !== excludePhotoId &&
-      !isExchangePoolItemBlocked(photo, blockedPhotoIds),
-  );
-  const fallbackSamplePool = samplePool.filter(
-    (photo) => photo.id !== excludePhotoId,
-  );
   const sharedCandidates = sharedPool.filter((photo) =>
-    photo.tags.some(
-      (tag) =>
-        tag.toLowerCase() === normalizedTheme ||
-        tag === triggerLabel ||
-        tag === category,
-    ),
-  );
-  const sampleCandidates = availableSamplePool.filter((photo) =>
     photo.tags.some(
       (tag) =>
         tag.toLowerCase() === normalizedTheme ||
@@ -511,11 +531,7 @@ export function selectDeliverableSleepingPhoto({
   const selection =
     sharedCandidates.length > 0
       ? { pool: sharedCandidates, source: "shared" as const }
-      : sampleCandidates.length > 0
-        ? { pool: sampleCandidates, source: "sample" as const }
-        : availableSamplePool.length > 0
-          ? { pool: availableSamplePool, source: "sample" as const }
-          : { pool: fallbackSamplePool, source: "fallback" as const };
+      : { pool: sharedPool, source: "shared" as const };
 
   if (selection.pool.length === 0) {
     return { photo: null, source: "none" };
