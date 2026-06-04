@@ -3,131 +3,261 @@
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import type { CSSProperties } from "react";
-import {
-  APP_ACCENT,
-  APP_PAGE_BACKGROUND,
-  APP_SUBTLE_SURFACE,
-} from "../ui/appTheme";
 import { STORAGE_KEYS } from "../../lib/storage";
+import {
+  keepExchangePhoto,
+  saveOwnSleepingPhoto,
+  saveSharedExchangePhoto,
+  selectDeliverableSleepingPhoto,
+  type ExchangePhoto,
+} from "../../lib/home/sleepingPhotos";
+import { trackProductEvent } from "../../lib/analytics/productAnalytics";
+import {
+  getActiveCatProfile,
+  readActiveCatId,
+  readCatProfiles,
+  saveActiveCatId,
+} from "../home/homeInputHelpers";
+import { AppIcon } from "../ui/AppIcons";
 
-const concernOptions = [
-  "\u9cf4\u3044\u3066\u308b",
-  "\u3064\u3044\u3066\u304f\u308b",
-  "\u843d\u3061\u7740\u304b\u306a\u3044",
-  "\u5143\u6c17\u306a\u3044",
-  "\u30b1\u30f3\u30ab\u3057\u3066\u308b",
-  "\u3088\u304f\u308f\u304b\u3089\u306a\u3044",
-];
-
-const timingOptions = [
-  "\u591c",
-  "\u98df\u5f8c",
-  "\u3088\u304f\u308f\u304b\u3089\u306a\u3044",
-];
-
-const reasons = [
-  "\u591c\u306f\u904a\u3073\u305f\u3044\u6c17\u6301\u3061\u304c\u51fa\u3084\u3059\u3044\u6642\u9593\u3067\u3059",
-  "\u9cf4\u304f\u884c\u52d5\u306f\u304b\u307e\u3063\u3066\u307b\u3057\u3044\u6642\u306b\u3082\u898b\u3089\u308c\u307e\u3059",
-];
+type OnboardingState = "intro" | "saving" | "delivered" | "empty" | "kept";
 
 export function OnboardingFlow() {
   const router = useRouter();
-  const [step, setStep] = useState(1);
+  const [state, setState] = useState<OnboardingState>("intro");
+  const [selectedPhotoSrc, setSelectedPhotoSrc] = useState("");
+  const [deliveredPhoto, setDeliveredPhoto] = useState<ExchangePhoto | null>(null);
+  const [message, setMessage] = useState("");
 
-  function nextStep() {
-    setStep((current) => Math.min(current + 1, 5));
+  async function handleSelectSleepingPhoto() {
+    if (state === "saving") {
+      return;
+    }
+
+    const input = document.createElement("input");
+    input.type = "file";
+    input.accept = "image/*";
+    input.tabIndex = -1;
+    input.setAttribute("aria-hidden", "true");
+    input.style.position = "fixed";
+    input.style.left = "-9999px";
+    input.style.top = "0";
+    input.style.width = "1px";
+    input.style.height = "1px";
+    input.style.opacity = "0";
+
+    const cleanupInput = () => {
+      window.setTimeout(() => {
+        input.remove();
+      }, 0);
+    };
+
+    input.onchange = async () => {
+      const file = input.files?.[0];
+
+      if (!file || !file.type.startsWith("image/")) {
+        cleanupInput();
+        return;
+      }
+
+      setState("saving");
+      setMessage("");
+
+      try {
+        const dataUrl = await resizeAndEncode(file, 1100, 0.78);
+        const profiles = readCatProfiles();
+        const activeProfile = getActiveCatProfile(profiles, readActiveCatId());
+        const catId = activeProfile.id;
+
+        saveActiveCatId(catId);
+        setSelectedPhotoSrc(dataUrl);
+
+        const ownPhoto = saveOwnSleepingPhoto({
+          catId,
+          src: dataUrl,
+          triggerLabel: "ねがお",
+          theme: "sleeping",
+          shared: true,
+        });
+
+        if (!ownPhoto) {
+          setMessage("写真を保存できませんでした。");
+          setState("intro");
+          return;
+        }
+
+        saveSharedExchangePhoto({ ownPhoto });
+
+        const selected = selectDeliverableSleepingPhoto({
+          triggerLabel: "ねがお",
+          theme: "sleeping",
+          category: "sleeping",
+          seed: `${ownPhoto.id}:${Date.now()}`,
+          excludePhotoId: ownPhoto.id,
+          recipientCatId: catId,
+        });
+
+        trackProductEvent("onboarding_sleeping_photo_delivered", {
+          has_delivered_photo: Boolean(selected.photo),
+        });
+
+        if (!selected.photo) {
+          setMessage("ねがおは入りました。とどく候補がまだありません。");
+          setState("empty");
+          return;
+        }
+
+        setDeliveredPhoto({
+          id: `onboarding-delivered-${selected.photo.id}-${Date.now()}`,
+          sourcePhotoId: selected.photo.id,
+          src: selected.photo.src,
+          title: selected.photo.title,
+          subtitle: selected.photo.subtitle,
+          triggerLabel: "ねがお",
+          theme: "sleeping",
+          deliveredAt: Date.now(),
+        });
+        setState("delivered");
+      } catch {
+        setMessage("写真を保存できませんでした。");
+        setState("intro");
+      } finally {
+        cleanupInput();
+      }
+    };
+
+    document.body.appendChild(input);
+    input.click();
+    window.setTimeout(() => {
+      if (!input.files?.length) {
+        input.remove();
+      }
+    }, 60000);
   }
 
-  function completeOnboarding() {
+  function handleKeepDeliveredPhoto() {
+    if (!deliveredPhoto) {
+      return;
+    }
+
+    keepExchangePhoto(deliveredPhoto);
     window.localStorage.setItem(STORAGE_KEYS.onboardingCompleted, "true");
-    window.localStorage.setItem(STORAGE_KEYS.lastInputSignal, "meowing");
-    window.localStorage.setItem(
-      STORAGE_KEYS.lastContext,
-      JSON.stringify({ time: "night" }),
-    );
-    window.localStorage.setItem(STORAGE_KEYS.lastPrimaryCategory, "play");
-    window.localStorage.setItem(
-      STORAGE_KEYS.latestHypothesis,
-      JSON.stringify({
-        source: "onboarding",
-        text: "\u904a\u3073\u305f\u3044\u53ef\u80fd\u6027\u304c\u3042\u308a\u307e\u3059",
-        category: "play",
-        createdAt: new Date().toISOString(),
-      }),
-    );
+    trackProductEvent("onboarding_delivered_photo_kept", {
+      source_photo_id: deliveredPhoto.sourcePhotoId ?? null,
+    });
+    setState("kept");
+  }
+
+  function handleGoHome() {
+    window.localStorage.setItem(STORAGE_KEYS.onboardingCompleted, "true");
     router.push("/home");
   }
 
   return (
     <main style={styles.page}>
+      <div style={styles.paperBackground} aria-hidden="true" />
       <div style={styles.container}>
-        {step === 1 ? (
-          <StepWithOptions
-            title={"\u307e\u305a\u3001\u30df\u30b1\u306e\u3053\u3068\u3067\u6c17\u306b\u306a\u308b\u3053\u3068\u306f\uff1f"}
-            options={concernOptions}
-            onSelect={nextStep}
-          />
-        ) : null}
+        <p style={styles.brand}>ねてるねこ</p>
 
-        {step === 2 ? (
-          <StepWithOptions
-            title={"\u3069\u3093\u306a\u6642\u306b\u591a\u3044\u3067\u3059\u304b\uff1f"}
-            options={timingOptions}
-            onSelect={nextStep}
-          />
-        ) : null}
-
-        {step === 3 ? (
-          <section>
+        {state === "intro" || state === "saving" ? (
+          <section style={styles.hero} aria-label="ねてるねこのはじめかた">
+            <div style={styles.flow} aria-hidden="true">
+              <span style={styles.flowIcon}>
+                <AppIcon name="camera" size={20} />
+              </span>
+              <span style={styles.flowDots} />
+              <span style={styles.flowIconAccent}>
+                <AppIcon name="mail" size={20} />
+              </span>
+            </div>
             <h1 style={styles.title}>
-              {"\u904a\u3073\u305f\u3044\u53ef\u80fd\u6027\u304c\u9ad8\u3044\u3067\u3059"}
+              だれかのねがおが
+              <br />
+              1枚とどきます
             </h1>
-            <ul style={styles.reasonList}>
-              {reasons.map((reason) => (
-                <li key={reason} style={styles.reasonItem}>
-                  {reason}
-                </li>
-              ))}
-            </ul>
-            <button type="button" onClick={nextStep} style={styles.primaryButton}>
-              {"\u6b21\u3078"}
+            <p style={styles.lead}>
+              うちのねがおを届けると、
+              <br />
+              ほかのねがおがひとつ届きます。
+            </p>
+            <button
+              type="button"
+              onClick={() => {
+                void handleSelectSleepingPhoto();
+              }}
+              style={styles.primaryButton}
+              disabled={state === "saving"}
+            >
+              {state === "saving" ? "届けています..." : "うちのねがおを届ける"}
+            </button>
+            <button type="button" onClick={handleGoHome} style={styles.textButton}>
+              あとで
+            </button>
+            {message ? <p style={styles.message}>{message}</p> : null}
+          </section>
+        ) : null}
+
+        {state === "delivered" && deliveredPhoto ? (
+          <section style={styles.result} aria-label="とどいたねがお">
+            <p style={styles.kicker}>ねがおがとどきました</p>
+            <div style={styles.photoPair}>
+              {selectedPhotoSrc ? (
+                <img src={selectedPhotoSrc} alt="" style={styles.ownPhoto} />
+              ) : null}
+              <span style={styles.pairDots} />
+              <img src={deliveredPhoto.src} alt="" style={styles.deliveredPhoto} />
+            </div>
+            <p style={styles.resultText}>
+              とっておくと、アルバムに入ります。
+            </p>
+            <button
+              type="button"
+              onClick={handleKeepDeliveredPhoto}
+              style={styles.primaryButton}
+            >
+              とっておく
+            </button>
+            <button type="button" onClick={handleGoHome} style={styles.textButton}>
+              閉じる
             </button>
           </section>
         ) : null}
 
-        {step === 4 ? (
-          <section>
-            <h1 style={styles.title}>
-              {"\u307e\u305a\u306f\u5c11\u3057\u904a\u3093\u3067\u307f\u307e\u3057\u3087\u3046"}
-            </h1>
-            <div style={styles.grid}>
-              <button type="button" onClick={nextStep} style={styles.button}>
-                {"\u904a\u3093\u3060"}
-              </button>
-              <button type="button" onClick={nextStep} style={styles.button}>
-                {"\u307e\u3060\u9cf4\u3044\u3066\u3044\u308b"}
-              </button>
-            </div>
+        {state === "empty" ? (
+          <section style={styles.result} aria-label="ねがおを保存しました">
+            <p style={styles.kicker}>ねがおが入りました</p>
+            {selectedPhotoSrc ? (
+              <img src={selectedPhotoSrc} alt="" style={styles.savedPhoto} />
+            ) : null}
+            <p style={styles.resultText}>
+              とどく候補がまだありません。設定からテスト用のねがおを追加できます。
+            </p>
+            <a href="/settings" style={styles.primaryLink}>
+              設定で追加する
+            </a>
+            <button type="button" onClick={handleGoHome} style={styles.textButton}>
+              ホームへ
+            </button>
+            {message ? <p style={styles.message}>{message}</p> : null}
           </section>
         ) : null}
 
-        {step === 5 ? (
-          <section>
-            <h1 style={styles.title}>{"\u30df\u30b1\u306e\u7406\u89e3\u5ea6 10%"}</h1>
-            <p style={styles.bodyText}>
-              {"\u5c11\u3057\u305a\u3064\u30df\u30b1\u306e\u3053\u3068\u304c\u308f\u304b\u3063\u3066\u304d\u307e\u3059\u3002"}
-            </p>
-            <p style={styles.bodyText}>
-              {"\u3053\u308c\u304b\u3089\u306f\u3001\u8a18\u9332\u304c\u5897\u3048\u308b\u307b\u3069"}
+        {state === "kept" ? (
+          <section style={styles.result} aria-label="保存しました">
+            <p style={styles.kicker}>とっておきました</p>
+            <h2 style={styles.subTitle}>
+              うちのねこページを
               <br />
-              {"\u300c\u4eca\u3053\u3046\u304b\u3082\u300d\u3092\u51fa\u305b\u308b\u3088\u3046\u306b\u306a\u308a\u307e\u3059\u3002"}
+              作れます
+            </h2>
+            <p style={styles.resultText}>
+              アカウントに接続すると、ねがおをあとから見返せます。
             </p>
-            <button
-              type="button"
-              onClick={completeOnboarding}
-              style={styles.primaryButton}
-            >
-              {"\u306f\u3058\u3081\u308b"}
+            <a href="/account/create" style={styles.primaryLink}>
+              うちのねこページを作る
+            </a>
+            <button type="button" onClick={handleGoHome} style={styles.textButton}>
+              ホームへ
             </button>
           </section>
         ) : null}
@@ -136,101 +266,265 @@ export function OnboardingFlow() {
   );
 }
 
-function StepWithOptions({
-  title,
-  options,
-  onSelect,
-}: {
-  title: string;
-  options: string[];
-  onSelect: () => void;
-}) {
-  return (
-    <section>
-      <h1 style={styles.title}>{title}</h1>
-      <div style={styles.grid}>
-        {options.map((option) => (
-          <button
-            key={option}
-            type="button"
-            onClick={onSelect}
-            style={styles.button}
-          >
-            {option}
-          </button>
-        ))}
-      </div>
-    </section>
-  );
+function resizeAndEncode(
+  file: File,
+  maxSize = 1100,
+  quality = 0.78,
+): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const image = new Image();
+    const url = URL.createObjectURL(file);
+
+    image.onload = () => {
+      const scale = Math.min(1, maxSize / Math.max(image.width, image.height));
+      const canvas = document.createElement("canvas");
+
+      canvas.width = Math.max(1, Math.round(image.width * scale));
+      canvas.height = Math.max(1, Math.round(image.height * scale));
+
+      const context = canvas.getContext("2d");
+      if (!context) {
+        URL.revokeObjectURL(url);
+        reject(new Error("Canvas context unavailable"));
+        return;
+      }
+
+      context.drawImage(image, 0, 0, canvas.width, canvas.height);
+      URL.revokeObjectURL(url);
+      resolve(canvas.toDataURL("image/jpeg", quality));
+    };
+
+    image.onerror = () => {
+      URL.revokeObjectURL(url);
+      reject(new Error("Image load failed"));
+    };
+
+    image.src = url;
+  });
 }
+
+const SERIF =
+  '"Shippori Mincho B1", "Hiragino Mincho ProN", "Yu Mincho", serif';
 
 const styles = {
   page: {
-    minHeight: "100vh",
-    background: APP_PAGE_BACKGROUND,
-    color: "#27272a",
+    position: "relative",
+    minHeight: "100dvh",
+    overflow: "hidden",
+    color: "#2f2a25",
+    background: "#f7f1e7",
     fontFamily:
-      '-apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
+      '-apple-system, BlinkMacSystemFont, "Hiragino Sans", "Noto Sans JP", sans-serif',
+  },
+  paperBackground: {
+    position: "fixed",
+    inset: 0,
+    zIndex: 0,
+    background:
+      "linear-gradient(180deg, #fffdf8 0%, #f8f2e8 52%, #f2e8d9 100%)",
   },
   container: {
+    position: "relative",
+    zIndex: 1,
     width: "min(100%, 430px)",
+    minHeight: "100dvh",
     margin: "0 auto",
-    padding: "44px 20px",
+    padding:
+      "calc(42px + env(safe-area-inset-top)) 28px calc(34px + env(safe-area-inset-bottom))",
+    display: "grid",
+    alignContent: "center",
+    boxSizing: "border-box",
+  },
+  brand: {
+    position: "fixed",
+    top: "calc(42px + env(safe-area-inset-top))",
+    left: "50%",
+    transform: "translateX(-50%)",
+    margin: 0,
+    color: "#6b6257",
+    fontFamily: SERIF,
+    fontSize: "16px",
+    fontWeight: 400,
+    letterSpacing: "0.16em",
+    lineHeight: 1.4,
+  },
+  hero: {
+    display: "grid",
+    justifyItems: "center",
+    textAlign: "center",
+    gap: "18px",
+  },
+  flow: {
+    display: "inline-flex",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: "12px",
+    color: "#8b8173",
+    marginBottom: "2px",
+  },
+  flowIcon: {
+    width: "46px",
+    height: "46px",
+    borderRadius: "999px",
+    display: "inline-flex",
+    alignItems: "center",
+    justifyContent: "center",
+    background: "rgba(239,229,214,0.8)",
+    color: "#746b5f",
+    border: "1px solid rgba(120,108,94,0.12)",
+  },
+  flowIconAccent: {
+    width: "46px",
+    height: "46px",
+    borderRadius: "999px",
+    display: "inline-flex",
+    alignItems: "center",
+    justifyContent: "center",
+    background: "rgba(244,228,221,0.78)",
+    color: "#b98678",
+    border: "1px solid rgba(178,132,116,0.12)",
+  },
+  flowDots: {
+    width: "60px",
+    height: "2px",
+    borderRadius: "999px",
+    background:
+      "repeating-linear-gradient(90deg, rgba(142,128,110,0.42) 0 4px, transparent 4px 10px)",
   },
   title: {
-    margin: "0 0 28px",
-    fontSize: "24px",
-    fontWeight: 600,
-    lineHeight: 1.5,
-    letterSpacing: 0,
+    margin: "8px 0 0",
+    color: "#202020",
+    fontFamily: SERIF,
+    fontSize: "30px",
+    fontWeight: 470,
+    lineHeight: 1.42,
+    letterSpacing: "0.08em",
   },
-  grid: {
-    display: "grid",
-    gridTemplateColumns: "repeat(2, minmax(0, 1fr))",
-    gap: "12px",
-  },
-  button: {
-    ...APP_SUBTLE_SURFACE,
-    minHeight: "60px",
-    borderRadius: "14px",
-    color: "#27272a",
-    fontSize: "15px",
-    fontWeight: 500,
-    letterSpacing: 0,
-    cursor: "pointer",
+  lead: {
+    margin: 0,
+    color: "#6a6258",
+    fontFamily: SERIF,
+    fontSize: "14.5px",
+    fontWeight: 400,
+    lineHeight: 1.9,
+    letterSpacing: "0.06em",
   },
   primaryButton: {
-    width: "100%",
-    minHeight: "60px",
-    marginTop: "28px",
-    border: "none",
-    borderRadius: "14px",
-    background: APP_ACCENT,
-    color: "#ffffff",
-    fontSize: "16px",
+    width: "min(100%, 280px)",
+    minHeight: "54px",
+    marginTop: "18px",
+    border: "1px solid rgba(120,108,94,0.12)",
+    borderRadius: "999px",
+    background: "rgba(255,253,248,0.86)",
+    color: "#403a33",
+    boxShadow: "0 10px 24px rgba(90,76,60,0.08)",
+    fontSize: "15px",
     fontWeight: 600,
-    letterSpacing: 0,
     cursor: "pointer",
   },
-  reasonList: {
-    display: "grid",
-    gap: "12px",
+  primaryLink: {
+    width: "min(100%, 280px)",
+    minHeight: "54px",
+    marginTop: "14px",
+    border: "1px solid rgba(120,108,94,0.12)",
+    borderRadius: "999px",
+    background: "rgba(255,253,248,0.86)",
+    color: "#403a33",
+    boxShadow: "0 10px 24px rgba(90,76,60,0.08)",
+    fontSize: "15px",
+    fontWeight: 600,
+    textDecoration: "none",
+    display: "inline-flex",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  textButton: {
+    border: "none",
+    background: "transparent",
+    color: "#8a8174",
+    fontSize: "12px",
+    fontWeight: 500,
+    cursor: "pointer",
+    padding: "8px 12px",
+  },
+  message: {
     margin: 0,
-    padding: 0,
-    listStyle: "none",
+    color: "#8a8174",
+    fontSize: "12px",
+    lineHeight: 1.6,
   },
-  reasonItem: {
-    ...APP_SUBTLE_SURFACE,
-    borderRadius: "14px",
-    padding: "16px",
-    fontSize: "15px",
-    lineHeight: 1.7,
+  result: {
+    display: "grid",
+    justifyItems: "center",
+    textAlign: "center",
+    gap: "16px",
   },
-  bodyText: {
-    margin: "0 0 18px",
-    color: "#52525b",
+  kicker: {
+    margin: 0,
+    color: "#6a6258",
+    fontFamily: SERIF,
     fontSize: "15px",
-    lineHeight: 1.8,
-    letterSpacing: 0,
+    fontWeight: 400,
+    lineHeight: 1.5,
+    letterSpacing: "0.12em",
+  },
+  subTitle: {
+    margin: "6px 0 0",
+    color: "#202020",
+    fontFamily: SERIF,
+    fontSize: "26px",
+    fontWeight: 470,
+    lineHeight: 1.45,
+    letterSpacing: "0.08em",
+  },
+  photoPair: {
+    display: "grid",
+    gridTemplateColumns: "96px 34px 128px",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: "8px",
+    width: "100%",
+  },
+  ownPhoto: {
+    width: "96px",
+    height: "96px",
+    objectFit: "cover",
+    borderRadius: "22px",
+    opacity: 0.72,
+    border: "6px solid rgba(255,253,248,0.74)",
+    boxShadow: "0 8px 20px rgba(90,76,60,0.08)",
+  },
+  deliveredPhoto: {
+    width: "128px",
+    height: "128px",
+    objectFit: "cover",
+    borderRadius: "26px",
+    border: "7px solid rgba(255,253,248,0.82)",
+    boxShadow: "0 14px 34px rgba(90,76,60,0.12)",
+  },
+  savedPhoto: {
+    width: "min(100%, 260px)",
+    aspectRatio: "4 / 3",
+    objectFit: "cover",
+    borderRadius: "26px",
+    border: "7px solid rgba(255,253,248,0.82)",
+    boxShadow: "0 14px 34px rgba(90,76,60,0.12)",
+  },
+  pairDots: {
+    width: "30px",
+    height: "2px",
+    borderRadius: "999px",
+    background:
+      "repeating-linear-gradient(90deg, rgba(142,128,110,0.42) 0 4px, transparent 4px 10px)",
+  },
+  resultText: {
+    width: "min(100%, 286px)",
+    margin: 0,
+    color: "#6a6258",
+    fontFamily: SERIF,
+    fontSize: "13.5px",
+    fontWeight: 400,
+    lineHeight: 1.75,
+    letterSpacing: "0.06em",
   },
 } satisfies Record<string, CSSProperties>;

@@ -446,6 +446,11 @@ export function SettingsPage() {
         <section style={styles.section}>
           <p style={styles.sectionLabel}>テスト</p>
           <div style={styles.card}>
+            <a href="/onboarding?test=1" style={styles.linkRow}>
+              <span style={styles.rowLabel}>オンボーディングを試す</span>
+              <span style={styles.rowChevron}>›</span>
+            </a>
+            <div style={styles.divider} />
             <button
               type="button"
               onClick={() => {
