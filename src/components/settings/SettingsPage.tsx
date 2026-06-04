@@ -27,6 +27,7 @@ import {
   APP_PILL,
   APP_SURFACE,
 } from "../ui/appTheme";
+import { saveSharedExchangeStockPhoto } from "../../lib/home/sleepingPhotos";
 
 export function SettingsPage() {
   const [isLoggedIn, setIsLoggedIn] = useState(false);
@@ -44,6 +45,8 @@ export function SettingsPage() {
   const [authDebug, setAuthDebug] = useState<AuthDebugSnapshot | null>(null);
   const [displayEnvironment, setDisplayEnvironment] =
     useState<DisplayEnvironment>("unknown");
+  const [isStockAdding, setIsStockAdding] = useState(false);
+  const [stockMessage, setStockMessage] = useState("");
 
   useEffect(() => {
     setDisplayEnvironment(getDisplayEnvironment());
@@ -225,6 +228,84 @@ export function SettingsPage() {
     setIsDeleting(false);
   }
 
+  async function handleStockPhotoImport() {
+    if (isStockAdding) {
+      return;
+    }
+
+    const input = document.createElement("input");
+    input.type = "file";
+    input.accept = "image/*";
+    input.multiple = true;
+    input.tabIndex = -1;
+    input.setAttribute("aria-hidden", "true");
+    input.style.position = "fixed";
+    input.style.left = "-9999px";
+    input.style.top = "0";
+    input.style.width = "1px";
+    input.style.height = "1px";
+    input.style.opacity = "0";
+
+    const cleanupInput = () => {
+      window.setTimeout(() => {
+        input.remove();
+      }, 0);
+    };
+
+    input.onchange = async () => {
+      const files = Array.from(input.files ?? []).filter((file) =>
+        file.type.startsWith("image/"),
+      );
+
+      if (files.length === 0) {
+        cleanupInput();
+        return;
+      }
+
+      setIsStockAdding(true);
+      setStockMessage("");
+      let savedCount = 0;
+
+      try {
+        for (const file of files.slice(0, 30)) {
+          const dataUrl = await resizeAndEncode(file, 760, 0.72);
+          const saved = saveSharedExchangeStockPhoto({ src: dataUrl });
+
+          if (saved) {
+            savedCount += 1;
+          }
+        }
+
+        trackProductEvent("settings_stock_photos_imported", {
+          selected_count: files.length,
+          saved_count: savedCount,
+        });
+        setStockMessage(
+          savedCount > 0
+            ? `とどくねがおを${savedCount}枚入れました。`
+            : "写真を保存できませんでした。",
+        );
+      } catch {
+        setStockMessage(
+          savedCount > 0
+            ? `とどくねがおを${savedCount}枚入れました。`
+            : "写真を保存できませんでした。",
+        );
+      } finally {
+        setIsStockAdding(false);
+        cleanupInput();
+      }
+    };
+
+    document.body.appendChild(input);
+    input.click();
+    window.setTimeout(() => {
+      if (!input.files?.length) {
+        input.remove();
+      }
+    }, 60000);
+  }
+
   return (
     <main style={styles.page}>
       <div style={styles.container}>
@@ -363,6 +444,31 @@ export function SettingsPage() {
         </section>
 
         <section style={styles.section}>
+          <p style={styles.sectionLabel}>テスト</p>
+          <div style={styles.card}>
+            <button
+              type="button"
+              onClick={() => {
+                void handleStockPhotoImport();
+              }}
+              style={styles.secondaryButton}
+              disabled={isStockAdding}
+            >
+              {isStockAdding ? "追加中..." : "とどくねがおを追加する"}
+            </button>
+            <div style={styles.divider} />
+            <p style={styles.storageNote}>
+              本番前の確認用です。ここで入れた写真は、とどくねがおの候補になります。
+            </p>
+            {stockMessage ? (
+              <p style={styles.syncMessage} role="status">
+                {stockMessage}
+              </p>
+            ) : null}
+          </div>
+        </section>
+
+        <section style={styles.section}>
           <p style={styles.sectionLabel}>安心とルール</p>
           <div style={styles.card}>
             <a href="/privacy" style={styles.linkRow}>
@@ -469,6 +575,43 @@ function clearLocalAppData() {
     }
     window.localStorage.removeItem(key);
   }
+}
+
+function resizeAndEncode(
+  file: File,
+  maxSize = 800,
+  quality = 0.82,
+): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const image = new Image();
+    const url = URL.createObjectURL(file);
+
+    image.onload = () => {
+      const scale = Math.min(1, maxSize / Math.max(image.width, image.height));
+      const canvas = document.createElement("canvas");
+
+      canvas.width = Math.max(1, Math.round(image.width * scale));
+      canvas.height = Math.max(1, Math.round(image.height * scale));
+
+      const context = canvas.getContext("2d");
+      if (!context) {
+        URL.revokeObjectURL(url);
+        reject(new Error("Canvas context unavailable"));
+        return;
+      }
+
+      context.drawImage(image, 0, 0, canvas.width, canvas.height);
+      URL.revokeObjectURL(url);
+      resolve(canvas.toDataURL("image/jpeg", quality));
+    };
+
+    image.onerror = () => {
+      URL.revokeObjectURL(url);
+      reject(new Error("Image load failed"));
+    };
+
+    image.src = url;
+  });
 }
 
 function AuthDebugPanel({ snapshot }: { snapshot: AuthDebugSnapshot | null }) {
