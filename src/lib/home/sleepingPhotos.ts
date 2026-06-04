@@ -513,14 +513,33 @@ export function selectDeliverableSleepingPhoto({
 }: DeliverableSleepingPhotoInput): DeliverableSleepingPhotoResult {
   const normalizedTheme = theme.toLowerCase();
   const blockedPhotoIds = readBlockedExchangePhotoIds();
-  const sharedPool = readSharedExchangePhotos().filter(
+  const allSharedPhotos = readSharedExchangePhotos().filter(
     (photo) =>
       photo.id !== excludePhotoId &&
-      photo.sourceOwnPhotoId !== excludePhotoId &&
+      photo.sourceOwnPhotoId !== excludePhotoId,
+  );
+  const sharedPool = allSharedPhotos.filter(
+    (photo) =>
       photo.sourceCatId !== recipientCatId &&
       !isExchangePoolItemBlocked(photo, blockedPhotoIds),
   );
+  const relaxedUnblockedPool =
+    sharedPool.length > 0
+      ? sharedPool
+      : allSharedPhotos.filter(
+          (photo) => !isExchangePoolItemBlocked(photo, blockedPhotoIds),
+        );
+  const relaxedRepeatablePool =
+    relaxedUnblockedPool.length > 0 ? relaxedUnblockedPool : allSharedPhotos;
   const sharedCandidates = sharedPool.filter((photo) =>
+    photo.tags.some(
+      (tag) =>
+        tag.toLowerCase() === normalizedTheme ||
+        tag === triggerLabel ||
+        tag === category,
+    ),
+  );
+  const relaxedCandidates = relaxedRepeatablePool.filter((photo) =>
     photo.tags.some(
       (tag) =>
         tag.toLowerCase() === normalizedTheme ||
@@ -531,7 +550,9 @@ export function selectDeliverableSleepingPhoto({
   const selection =
     sharedCandidates.length > 0
       ? { pool: sharedCandidates, source: "shared" as const }
-      : { pool: sharedPool, source: "shared" as const };
+      : relaxedCandidates.length > 0
+        ? { pool: relaxedCandidates, source: "shared" as const }
+        : { pool: relaxedRepeatablePool, source: "shared" as const };
 
   if (selection.pool.length === 0) {
     return { photo: null, source: "none" };

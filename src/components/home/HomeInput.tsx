@@ -1470,7 +1470,7 @@ export function HomeInput({ recentEvents: _recentEvents }: HomeInputProps) {
     category: MikkeWindowCategory | "sleep";
     localCatId?: string | null;
     excludePhotoId?: string;
-  }) {
+  }): boolean {
     const photo = createExchangePhoto({
       triggerLabel,
       theme,
@@ -1491,7 +1491,7 @@ export function HomeInput({ recentEvents: _recentEvents }: HomeInputProps) {
         },
         { localCatId: localCatId ?? activeCatId },
       );
-      return;
+      return false;
     }
 
     setDeliveredExchangePhoto(photo);
@@ -1505,6 +1505,7 @@ export function HomeInput({ recentEvents: _recentEvents }: HomeInputProps) {
       },
       { localCatId: localCatId ?? activeCatId },
     );
+    return true;
   }
 
   function handleKeepExchangePhoto(photo: ExchangePhoto) {
@@ -1596,15 +1597,18 @@ export function HomeInput({ recentEvents: _recentEvents }: HomeInputProps) {
       return;
     }
 
-    recordSleepingCounterAnswer(targetCatId);
     window.setTimeout(() => {
-      deliverExchangePhoto({
+      const didDeliver = deliverExchangePhoto({
         triggerLabel: photo.triggerLabel,
         theme: photo.theme,
         category: "pose",
         localCatId: targetCatId,
         excludePhotoId: sharedPhoto?.id,
       });
+
+      if (didDeliver) {
+        recordSleepingCounterAnswer(targetCatId);
+      }
     }, 280);
     trackProductEvent(
       "home_exchange_share_photo_confirmed",
