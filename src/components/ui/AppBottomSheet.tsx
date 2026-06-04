@@ -16,7 +16,7 @@ export function AppBottomSheet({
   children,
   onClose,
   closeLabel = "閉じる",
-  variant = "dark",
+  variant = "paper",
 }: AppBottomSheetProps) {
   const isPaper = variant === "paper";
 
@@ -71,7 +71,7 @@ const styles = {
   backdropPaper: {
     position: "fixed",
     inset: 0,
-    background: "rgba(47,42,35,0.22)",
+    background: "rgba(54,45,34,0.16)",
     zIndex: 60,
     backdropFilter: "blur(2px)",
     WebkitBackdropFilter: "blur(2px)",
@@ -97,14 +97,13 @@ const styles = {
     willChange: "transform, opacity",
   },
   sheetPaper: {
-    background:
-      "linear-gradient(180deg, rgba(255,253,248,0.98), rgba(246,239,228,0.98))",
+    background: "#FFFDF8",
     color: "#332c26",
     border: "0.5px solid rgba(120,108,94,0.18)",
     borderBottom: "none",
-    boxShadow: "0 -18px 44px rgba(90,76,60,0.16)",
-    backdropFilter: "blur(20px)",
-    WebkitBackdropFilter: "blur(20px)",
+    boxShadow: "0 -18px 42px rgba(90,76,60,0.14)",
+    backdropFilter: "none",
+    WebkitBackdropFilter: "none",
   },
   handle: {
     width: "42px",
