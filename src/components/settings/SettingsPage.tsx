@@ -31,6 +31,7 @@ import {
   readSharedExchangePhotos,
   saveSharedExchangeStockPhoto,
 } from "../../lib/home/sleepingPhotos";
+import { saveRemoteDeliveryStockPhoto } from "../../lib/home/deliveryCandidates";
 
 export function SettingsPage() {
   const [isLoggedIn, setIsLoggedIn] = useState(false);
@@ -645,7 +646,9 @@ async function saveStockPhotoWithFallback(file: File) {
 
   for (const attempt of attempts) {
     const dataUrl = await resizeAndEncode(file, attempt.maxSize, attempt.quality);
-    const saved = saveSharedExchangeStockPhoto({ src: dataUrl });
+    const remoteSaved = await saveRemoteDeliveryStockPhoto(dataUrl);
+    const localSaved = saveSharedExchangeStockPhoto({ src: dataUrl });
+    const saved = remoteSaved ?? localSaved;
 
     if (saved) {
       return saved;

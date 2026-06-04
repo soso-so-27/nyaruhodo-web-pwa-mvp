@@ -5,12 +5,15 @@ import { useState } from "react";
 import type { CSSProperties } from "react";
 import { STORAGE_KEYS } from "../../lib/storage";
 import {
+  saveRemoteDeliveryStockPhoto,
+  selectDeliveryCandidate,
+} from "../../lib/home/deliveryCandidates";
+import {
   keepExchangePhoto,
   readSharedExchangePhotos,
   saveOwnSleepingPhoto,
   saveSharedExchangePhoto,
   saveSharedExchangeStockPhoto,
-  selectDeliverableSleepingPhoto,
   type ExchangePhoto,
   type ExchangePhotoPoolItem,
 } from "../../lib/home/sleepingPhotos";
@@ -86,7 +89,7 @@ export function OnboardingFlow() {
         setSelectedPhotoSrc(dataUrl);
         saveSharedExchangePhoto({ ownPhoto });
 
-        const selected = selectDeliverableSleepingPhoto({
+        const selected = await selectDeliveryCandidate({
           triggerLabel: "ねがお",
           theme: "sleeping",
           category: "sleeping",
@@ -96,17 +99,17 @@ export function OnboardingFlow() {
         });
 
         trackProductEvent("onboarding_sleeping_photo_delivered", {
-          has_delivered_photo: Boolean(selected.photo),
+          has_delivered_photo: Boolean(selected),
         });
 
-        const fallbackPhoto = selected.photo
+        const fallbackPhoto = selected
           ? null
           : findFallbackExchangePhoto({
               excludePhotoId: ownPhoto.id,
               excludeSrc: ownPhoto.src,
               recipientCatId: catId,
             });
-        const exchangePhoto = selected.photo ?? fallbackPhoto;
+        const exchangePhoto = selected ?? fallbackPhoto;
 
         if (!exchangePhoto) {
           setMessage("ねがおは入りました。とどく候補がまだありません。");
@@ -409,7 +412,9 @@ async function saveStockCandidateWithFallback(file: File) {
 
   for (const attempt of attempts) {
     const dataUrl = await resizeAndEncode(file, attempt.maxSize, attempt.quality);
-    const saved = saveSharedExchangeStockPhoto({ src: dataUrl });
+    const remoteSaved = await saveRemoteDeliveryStockPhoto(dataUrl);
+    const localSaved = saveSharedExchangeStockPhoto({ src: dataUrl });
+    const saved = remoteSaved ?? localSaved;
 
     if (saved) {
       return saved;

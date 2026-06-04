@@ -37,6 +37,10 @@ import {
   submitMikkeWindowAnswer,
 } from "../../lib/home/mikkeWindowResults";
 import {
+  saveRemoteDeliveryStockPhoto,
+  selectDeliveryCandidate,
+} from "../../lib/home/deliveryCandidates";
+import {
   BOX_PHOTO_STORAGE_EVENT,
   dismissExchangePhoto,
   keepExchangePhoto,
@@ -46,7 +50,6 @@ import {
   saveOwnSleepingPhoto,
   saveSharedExchangePhoto,
   saveSharedExchangeStockPhoto,
-  selectDeliverableSleepingPhoto,
   type ExchangePhoto,
 } from "../../lib/home/sleepingPhotos";
 import { backupOwnSleepingPhotoMoment } from "../../lib/home/sleepingPhotoBackup";
@@ -1340,7 +1343,9 @@ export function HomeInput({ recentEvents: _recentEvents }: HomeInputProps) {
       try {
         for (const file of files.slice(0, 30)) {
           const dataUrl = await resizeAndEncode(file, 760, 0.72);
-          const saved = saveSharedExchangeStockPhoto({ src: dataUrl });
+          const remoteSaved = await saveRemoteDeliveryStockPhoto(dataUrl);
+          const localSaved = saveSharedExchangeStockPhoto({ src: dataUrl });
+          const saved = remoteSaved ?? localSaved;
           if (saved) {
             savedCount += 1;
           }
@@ -1457,7 +1462,7 @@ export function HomeInput({ recentEvents: _recentEvents }: HomeInputProps) {
     );
   }
 
-  function deliverExchangePhoto({
+  async function deliverExchangePhoto({
     triggerLabel,
     theme,
     category,
@@ -1469,8 +1474,8 @@ export function HomeInput({ recentEvents: _recentEvents }: HomeInputProps) {
     category: MikkeWindowCategory | "sleep";
     localCatId?: string | null;
     excludePhotoId?: string;
-  }): boolean {
-    const photo = createExchangePhoto({
+  }): Promise<boolean> {
+    const photo = await createExchangePhoto({
       triggerLabel,
       theme,
       category,
@@ -1597,17 +1602,17 @@ export function HomeInput({ recentEvents: _recentEvents }: HomeInputProps) {
     }
 
     window.setTimeout(() => {
-      const didDeliver = deliverExchangePhoto({
+      void deliverExchangePhoto({
         triggerLabel: photo.triggerLabel,
         theme: photo.theme,
         category: "pose",
         localCatId: targetCatId,
         excludePhotoId: sharedPhoto?.id,
+      }).then((didDeliver) => {
+        if (didDeliver) {
+          recordSleepingCounterAnswer(targetCatId);
+        }
       });
-
-      if (didDeliver) {
-        recordSleepingCounterAnswer(targetCatId);
-      }
     }, 280);
     trackProductEvent(
       "home_exchange_share_photo_confirmed",
@@ -3783,7 +3788,7 @@ function saveCollectionPhoto(catId: string, slug: string, dataUrl: string) {
   }
 }
 
-function createExchangePhoto({
+async function createExchangePhoto({
   triggerLabel,
   theme,
   category,
@@ -3797,16 +3802,16 @@ function createExchangePhoto({
   seed: string;
   excludePhotoId?: string;
   recipientCatId?: string | null;
-}): ExchangePhoto | null {
+}): Promise<ExchangePhoto | null> {
   const selected =
-    selectDeliverableSleepingPhoto({
+    await selectDeliveryCandidate({
       triggerLabel,
       theme,
       category,
       seed,
       excludePhotoId,
       recipientCatId,
-    }).photo;
+    });
 
   if (!selected) {
     return null;

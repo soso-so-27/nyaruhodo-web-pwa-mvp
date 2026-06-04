@@ -980,14 +980,17 @@ async function syncSleepingPhotos(
         local_moment_id: photo.id,
         local_cat_id: photo.catId,
         owner_cat_id: photo.ownerCatId,
-        photo_url: await prepareRemoteSleepingPhotoUrl(
-          supabase,
-          userId,
-          "sleeping",
-          photo.ownerCatId,
-          photo.id,
-          photo.src,
-        ),
+        photo_url:
+          photo.visibility === "shared" || photo.shared
+            ? photo.src
+            : await prepareRemoteSleepingPhotoUrl(
+                supabase,
+                userId,
+                "sleeping",
+                photo.ownerCatId,
+                photo.id,
+                photo.src,
+              ),
         state: photo.state,
         visibility: photo.visibility,
         delivery_status: photo.deliveryStatus,
