@@ -8,6 +8,7 @@ type AppBottomSheetProps = {
   children: ReactNode;
   onClose: () => void;
   closeLabel?: string;
+  variant?: "dark" | "paper";
 };
 
 export function AppBottomSheet({
@@ -15,18 +16,37 @@ export function AppBottomSheet({
   children,
   onClose,
   closeLabel = "閉じる",
+  variant = "dark",
 }: AppBottomSheetProps) {
+  const isPaper = variant === "paper";
+
   return (
     <>
-      <div style={styles.backdrop} onClick={onClose} />
-      <section style={styles.sheet} role="dialog" aria-modal="true">
-        <div style={styles.handle} aria-hidden="true" />
+      <div
+        style={isPaper ? styles.backdropPaper : styles.backdrop}
+        onClick={onClose}
+      />
+      <section
+        style={isPaper ? { ...styles.sheet, ...styles.sheetPaper } : styles.sheet}
+        role="dialog"
+        aria-modal="true"
+      >
+        <div
+          style={isPaper ? { ...styles.handle, ...styles.handlePaper } : styles.handle}
+          aria-hidden="true"
+        />
         <div style={styles.header}>
-          <p style={styles.title}>{title}</p>
+          <p style={isPaper ? { ...styles.title, ...styles.titlePaper } : styles.title}>
+            {title}
+          </p>
           <button
             type="button"
             onClick={onClose}
-            style={styles.closeButton}
+            style={
+              isPaper
+                ? { ...styles.closeButton, ...styles.closeButtonPaper }
+                : styles.closeButton
+            }
             aria-label={closeLabel}
           >
             <CloseIcon size={18} />
@@ -43,6 +63,15 @@ const styles = {
     position: "fixed",
     inset: 0,
     background: "rgba(0,0,0,0.34)",
+    zIndex: 60,
+    backdropFilter: "blur(2px)",
+    WebkitBackdropFilter: "blur(2px)",
+    willChange: "opacity",
+  },
+  backdropPaper: {
+    position: "fixed",
+    inset: 0,
+    background: "rgba(47,42,35,0.22)",
     zIndex: 60,
     backdropFilter: "blur(2px)",
     WebkitBackdropFilter: "blur(2px)",
@@ -67,12 +96,25 @@ const styles = {
     animation: "slideUp 0.28s cubic-bezier(0.2, 0.8, 0.2, 1)",
     willChange: "transform, opacity",
   },
+  sheetPaper: {
+    background:
+      "linear-gradient(180deg, rgba(255,253,248,0.98), rgba(246,239,228,0.98))",
+    color: "#332c26",
+    border: "0.5px solid rgba(120,108,94,0.18)",
+    borderBottom: "none",
+    boxShadow: "0 -18px 44px rgba(90,76,60,0.16)",
+    backdropFilter: "blur(20px)",
+    WebkitBackdropFilter: "blur(20px)",
+  },
   handle: {
     width: "42px",
     height: "4px",
     borderRadius: "999px",
     background: "rgba(255,255,255,0.38)",
     margin: "2px auto 14px",
+  },
+  handlePaper: {
+    background: "rgba(120,108,94,0.28)",
   },
   header: {
     display: "flex",
@@ -88,6 +130,9 @@ const styles = {
     margin: 0,
     letterSpacing: 0,
   },
+  titlePaper: {
+    color: "#332c26",
+  },
   closeButton: {
     width: "34px",
     height: "34px",
@@ -100,6 +145,11 @@ const styles = {
     justifyContent: "center",
     cursor: "pointer",
     flexShrink: 0,
+  },
+  closeButtonPaper: {
+    border: "0.5px solid rgba(120,108,94,0.16)",
+    background: "rgba(255,255,255,0.52)",
+    color: "#746a5f",
   },
 } satisfies Record<string, CSSProperties>;
 

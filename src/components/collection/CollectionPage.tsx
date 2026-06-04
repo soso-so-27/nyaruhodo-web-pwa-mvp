@@ -946,7 +946,7 @@ function BoxPhotoDetailSheet({
     : "とどくようにする";
 
   return (
-    <AppBottomSheet title={title} onClose={onClose}>
+    <AppBottomSheet title={title} onClose={onClose} variant="paper">
       {photos.length > 0 ? (
         <div style={styles.sheetPhotoArea}>
           <div style={styles.photoScroll} onScroll={onPhotoScroll}>
@@ -1444,6 +1444,7 @@ function CollectionPhotoSheet({
     <AppBottomSheet
       title={getCollectionSlotLabel(slot)}
       onClose={onClose}
+      variant="paper"
     >
       {photos.length > 0 ? (
         <div style={styles.sheetPhotoArea}>
@@ -3054,11 +3055,13 @@ const styles = {
     position: "relative",
     flexShrink: 0,
     width: "100%",
-    height: "clamp(260px, 54vh, 420px)",
+    height: "min(62vh, 520px)",
     borderRadius: "16px",
     overflow: "hidden",
     scrollSnapAlign: "start",
-    background: "rgba(255,253,248,0.5)",
+    background:
+      "linear-gradient(180deg, rgba(250,246,238,0.86), rgba(239,229,214,0.58))",
+    border: "0.5px solid rgba(120,108,94,0.12)",
   },
   photoImg: {
     width: "100%",
@@ -3101,12 +3104,12 @@ const styles = {
     width: "5px",
     height: "5px",
     borderRadius: "99px",
-    background: "rgba(255,255,255,0.22)",
+    background: "rgba(120,108,94,0.24)",
     transition: "width 0.2s",
   },
   photoDotActive: {
     width: "14px",
-    background: "rgba(255,255,255,0.86)",
+    background: "rgba(83,72,55,0.58)",
   },
   photoEmpty: {
     display: "flex",
@@ -3144,19 +3147,19 @@ const styles = {
     width: "48px",
     height: "48px",
     borderRadius: "50%",
-    border: "0.5px solid rgba(255,255,255,0.18)",
-    background: "rgba(255,255,255,0.10)",
-    color: COLLECTION_TEXT_STRONG,
-    boxShadow: "inset 0 1px 0 rgba(255,255,255,0.12)",
+    border: "0.5px solid rgba(120,108,94,0.18)",
+    background: "rgba(255,253,248,0.64)",
+    color: "#746a5f",
+    boxShadow: "inset 0 1px 0 rgba(255,255,255,0.42)",
     cursor: "pointer",
   },
   boxIconActionButtonActive: {
-    background: "rgba(255,255,255,0.84)",
+    background: "rgba(255,253,248,0.92)",
     color: "#2a2823",
-    border: "0.5px solid rgba(255,255,255,0.72)",
+    border: "0.5px solid rgba(120,108,94,0.2)",
   },
   boxIconActionButtonDanger: {
-    color: "#f0d3ca",
+    color: "#a85536",
   },
   boxPhotoStatusRow: {
     display: "flex",
@@ -3214,9 +3217,9 @@ const styles = {
     paddingTop: "4px",
   },
   btnPrimary: {
-    border: "none",
+    border: "0.5px solid rgba(120,108,94,0.14)",
     borderRadius: "12px",
-    background: "rgba(255,255,255,0.92)",
+    background: "rgba(255,253,248,0.92)",
     color: "#2a2a28",
     fontSize: "13px",
     fontWeight: 560,
@@ -3224,10 +3227,10 @@ const styles = {
     cursor: "pointer",
   },
   btnSecondary: {
-    border: "0.5px solid rgba(255,255,255,0.16)",
+    border: "0.5px solid rgba(120,108,94,0.16)",
     borderRadius: "12px",
-    background: "rgba(255,255,255,0.10)",
-    color: COLLECTION_TEXT,
+    background: "rgba(255,253,248,0.38)",
+    color: "#746a5f",
     fontSize: "13px",
     fontWeight: 500,
     padding: "12px",
