@@ -2,8 +2,12 @@ import { NextResponse } from "next/server";
 import type { SupabaseClient } from "@supabase/supabase-js";
 
 import {
+  getDataUrlExtension,
   getStoragePhotoPath,
   isUsablePhotoSrc,
+  sanitizePathSegment,
+  toStoragePhotoUrl,
+  uploadDataUrl,
 } from "../../../../lib/photoStorage";
 import { createSupabaseAdminClient } from "../../../../lib/supabase/admin";
 import { createServerSupabaseClient } from "../../../../lib/supabase/server";
@@ -76,6 +80,14 @@ export async function POST(request: Request) {
   const ownPhoto = input.ownPhoto;
   const createdAt = new Date(ownPhoto.createdAt ?? Date.now()).toISOString();
   const ownerCatId = ownPhoto.ownerCatId || ownPhoto.catId;
+  const ownPhotoUrl = await prepareExchangeMomentPhotoUrl({
+    supabase,
+    userId,
+    anonymousId,
+    ownerCatId,
+    localMomentId: ownPhoto.id,
+    src: ownPhoto.src,
+  });
 
   await deleteExistingMoment({
     supabase,
@@ -90,7 +102,7 @@ export async function POST(request: Request) {
     local_moment_id: ownPhoto.id,
     local_cat_id: ownPhoto.catId,
     owner_cat_id: ownerCatId,
-    photo_url: ownPhoto.src,
+    photo_url: ownPhotoUrl,
     state: "sleeping",
     visibility: "shared",
     delivery_status: "available",
@@ -352,6 +364,37 @@ async function resolvePhotoUrl(photoUrl: string) {
   }
 
   return data.signedUrl;
+}
+
+async function prepareExchangeMomentPhotoUrl({
+  supabase,
+  userId,
+  anonymousId,
+  ownerCatId,
+  localMomentId,
+  src,
+}: {
+  supabase: SupabaseClient;
+  userId: string | null;
+  anonymousId: string | null;
+  ownerCatId: string;
+  localMomentId: string;
+  src: string;
+}) {
+  if (!src.startsWith("data:image/")) {
+    return src;
+  }
+
+  const ownerKey = userId ?? anonymousId ?? "anonymous";
+  const storagePath = await uploadDataUrl(
+    supabase,
+    `${sanitizePathSegment(ownerKey)}/${sanitizePathSegment(ownerCatId)}/sleeping/${sanitizePathSegment(
+      localMomentId,
+    )}.${getDataUrlExtension(src)}`,
+    src,
+  );
+
+  return toStoragePhotoUrl(storagePath);
 }
 
 function selectCandidate(candidates: Candidate[], input: Required<ExchangeRequest>) {

@@ -29,10 +29,8 @@ export async function backupOwnSleepingPhotoMoment(photo: OwnSleepingPhoto) {
     const anonymousId = userId ? null : getOrCreateAnonymousId();
     const moment = ownSleepingPhotoToCatMoment(photo);
     const record = toCatMomentRecord(moment);
-    const keepInlineForDelivery =
-      photo.shared || record.visibility === "shared";
     const photoUrl =
-      !keepInlineForDelivery && userId && record.photo_url.startsWith("data:")
+      userId && record.photo_url.startsWith("data:")
         ? toStoragePhotoUrl(
             await uploadDataUrl(
               supabase,

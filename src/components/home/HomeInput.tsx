@@ -8,6 +8,7 @@ import {
 } from "../../lib/accountSync";
 import { trackProductEvent } from "../../lib/analytics/productAnalytics";
 import { writeAuthDebugEvent } from "../../lib/authDebug";
+import { storeAccountPhotoDataUrl } from "../../lib/photoStorageClient";
 import {
   getCollectionSlotPhotoSlug,
   getDailyCollectionTarget,
@@ -1040,12 +1041,17 @@ export function HomeInput({ recentEvents: _recentEvents }: HomeInputProps) {
 
       try {
         const dataUrl = await resizeAndEncode(file, 1600);
+        const photoSrc = await storeAccountPhotoDataUrl({
+          dataUrl,
+          pathSegments: [activeCatId, "home"],
+          fileName: "home",
+        });
         const profiles = readCatProfiles();
         const nextProfiles = profiles.map((profile) =>
           profile.id === activeCatId
             ? {
                 ...profile,
-                homePhotoDataUrl: dataUrl,
+                homePhotoDataUrl: photoSrc,
                 homePhotoPosition: profile.homePhotoPosition ?? "center 38%",
                 updatedAt: new Date().toISOString(),
               }
@@ -1101,8 +1107,13 @@ export function HomeInput({ recentEvents: _recentEvents }: HomeInputProps) {
       try {
         const slug = getCollectionSlotPhotoSlug(slot);
         const dataUrl = await resizeAndEncode(file, 560, 0.76);
+        const photoSrc = await storeAccountPhotoDataUrl({
+          dataUrl,
+          pathSegments: [activeCatId, "collection", slug],
+          fileName: `photo-${Date.now()}`,
+        });
 
-        saveCollectionPhoto(activeCatId, slug, dataUrl);
+        saveCollectionPhoto(activeCatId, slug, photoSrc);
         setCollectionRefreshTick((value) => value + 1);
         closeBoardInput(setIsCollectionPhotoSheetOpen, {
           itemId: "daily-collection-target",
@@ -1158,8 +1169,13 @@ export function HomeInput({ recentEvents: _recentEvents }: HomeInputProps) {
       try {
         const slug = getCollectionSlotPhotoSlug(slot);
         const dataUrl = await resizeAndEncode(file, 900);
+        const photoSrc = await storeAccountPhotoDataUrl({
+          dataUrl,
+          pathSegments: [activeCatId, "collection", slug],
+          fileName: `photo-${Date.now()}`,
+        });
 
-        saveCollectionPhoto(activeCatId, slug, dataUrl);
+        saveCollectionPhoto(activeCatId, slug, photoSrc);
         setCollectionRefreshTick((value) => value + 1);
         showToast(`${slot.label}を見つけた`);
         trackProductEvent(

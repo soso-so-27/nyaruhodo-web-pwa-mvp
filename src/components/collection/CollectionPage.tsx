@@ -12,6 +12,7 @@ import {
   deleteAccountSleepingPhoto,
   hideAccountKeptExchangePhoto,
 } from "../../lib/accountSync";
+import { storeAccountPhotoDataUrl } from "../../lib/photoStorageClient";
 import {
   BOX_PHOTO_STORAGE_EVENT,
   deleteOwnSleepingPhoto,
@@ -502,7 +503,12 @@ export function CollectionPage() {
         return;
       }
 
-      const addedPhoto = addCollectionPhoto(activeCatId, slug, dataUrl);
+      const photoSrc = await storeAccountPhotoDataUrl({
+        dataUrl,
+        pathSegments: [activeCatId, "collection", slug],
+        fileName: `photo-${Date.now()}`,
+      });
+      const addedPhoto = addCollectionPhoto(activeCatId, slug, photoSrc);
       setCollectionPhotos((current) => ({
         ...current,
         [slug]: [...(current[slug] ?? []), addedPhoto],

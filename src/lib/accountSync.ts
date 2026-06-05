@@ -10,8 +10,8 @@ import {
 } from "./home/sleepingPhotos";
 import {
   CAT_PHOTOS_BUCKET,
-  downloadStoragePath,
   getDataUrlExtension,
+  getStoragePhotoPath,
   sanitizePathSegment,
   toStoragePhotoUrl,
   uploadDataUrl,
@@ -824,6 +824,11 @@ async function syncCatProfile(
       `${userId}/${remoteCatId}/avatar/avatar.${getDataUrlExtension(profile.avatarDataUrl)}`,
       profile.avatarDataUrl,
     );
+  } else if (profile.avatarDataUrl) {
+    const storagePath = getStoragePhotoPath(profile.avatarDataUrl);
+    if (storagePath) {
+      photoUpdates.avatar_storage_path = storagePath;
+    }
   }
 
   if (profile.homePhotoDataUrl?.startsWith("data:")) {
@@ -832,6 +837,11 @@ async function syncCatProfile(
       `${userId}/${remoteCatId}/home/home.${getDataUrlExtension(profile.homePhotoDataUrl)}`,
       profile.homePhotoDataUrl,
     );
+  } else if (profile.homePhotoDataUrl) {
+    const storagePath = getStoragePhotoPath(profile.homePhotoDataUrl);
+    if (storagePath) {
+      photoUpdates.home_photo_storage_path = storagePath;
+    }
   }
 
   if (Object.keys(photoUpdates).length > 0) {
@@ -918,18 +928,22 @@ async function syncCollectionPhotos(
       for (const [index, photo] of photos.entries()) {
         const src = photo.src;
 
-        if (!src.startsWith("data:")) {
+        const existingStoragePath = getStoragePhotoPath(src);
+
+        if (!src.startsWith("data:") && !existingStoragePath) {
           continue;
         }
 
         const localPhotoId = photo.id || `${localCatId}:${slotSlug}:${index}`;
-        const storagePath = await uploadDataUrl(
-          supabase,
-          `${userId}/${remoteCatId}/collection/${sanitizePathSegment(
-            slotSlug,
-          )}/${sanitizePathSegment(localPhotoId)}.${getDataUrlExtension(src)}`,
-          src,
-        );
+        const storagePath =
+          existingStoragePath ??
+          (await uploadDataUrl(
+            supabase,
+            `${userId}/${remoteCatId}/collection/${sanitizePathSegment(
+              slotSlug,
+            )}/${sanitizePathSegment(localPhotoId)}.${getDataUrlExtension(src)}`,
+            src,
+          ));
 
         rows.push({
           user_id: userId,
@@ -981,16 +995,14 @@ async function syncSleepingPhotos(
         local_cat_id: photo.catId,
         owner_cat_id: photo.ownerCatId,
         photo_url:
-          photo.visibility === "shared" || photo.shared
-            ? photo.src
-            : await prepareRemoteSleepingPhotoUrl(
-                supabase,
-                userId,
-                "sleeping",
-                photo.ownerCatId,
-                photo.id,
-                photo.src,
-              ),
+          await prepareRemoteSleepingPhotoUrl(
+            supabase,
+            userId,
+            "sleeping",
+            photo.ownerCatId,
+            photo.id,
+            photo.src,
+          ),
         state: photo.state,
         visibility: photo.visibility,
         delivery_status: photo.deliveryStatus,
@@ -1177,11 +1189,11 @@ async function restoreRemoteSnapshot(
       createdAt: cat.local_created_at ?? cat.created_at,
       updatedAt: cat.local_updated_at ?? cat.updated_at,
       homePhotoDataUrl: cat.home_photo_storage_path
-        ? await downloadStoragePath(supabase, cat.home_photo_storage_path)
+        ? toStoragePhotoUrl(cat.home_photo_storage_path)
         : undefined,
       homePhotoPosition: cat.home_photo_position ?? undefined,
       avatarDataUrl: cat.avatar_storage_path
-        ? await downloadStoragePath(supabase, cat.avatar_storage_path)
+        ? toStoragePhotoUrl(cat.avatar_storage_path)
         : undefined,
       basicInfo: cat.basic_info ?? undefined,
       appearance: cat.appearance ?? undefined,

@@ -2,9 +2,11 @@
 
 import { useEffect, useState } from "react";
 import type { CSSProperties } from "react";
+import { storeAccountPhotoDataUrl } from "../../lib/photoStorageClient";
 import { STORAGE_KEYS } from "../../lib/storage";
 import { BottomNavigation } from "../navigation/BottomNavigation";
 import { AppIcon } from "../ui/AppIcons";
+import { StoredPhotoImage } from "../ui/StoredPhotoImage";
 import {
   addCatProfile,
   getActiveCatProfile,
@@ -205,6 +207,11 @@ export function CatsPage() {
   }
 
   async function handleAvatarUpload() {
+    if (!activeCatId) {
+      return;
+    }
+
+    const targetCatId = activeCatId;
     const input = document.createElement("input");
 
     input.type = "file";
@@ -218,6 +225,11 @@ export function CatsPage() {
 
       try {
         const dataUrl = await resizeAndEncode(file, 800);
+        const photoSrc = await storeAccountPhotoDataUrl({
+          dataUrl,
+          pathSegments: [targetCatId, "avatar"],
+          fileName: "avatar",
+        });
         const raw = window.localStorage.getItem(STORAGE_KEYS.catProfiles);
 
         if (!raw) {
@@ -225,7 +237,7 @@ export function CatsPage() {
         }
 
         const profiles = JSON.parse(raw) as CatProfile[];
-        const index = profiles.findIndex((profile) => profile.id === activeCatId);
+        const index = profiles.findIndex((profile) => profile.id === targetCatId);
 
         if (index === -1) {
           return;
@@ -235,7 +247,7 @@ export function CatsPage() {
           profileIndex === index
             ? {
                 ...profile,
-                avatarDataUrl: dataUrl,
+                avatarDataUrl: photoSrc,
                 updatedAt: new Date().toISOString(),
               }
             : profile,
@@ -255,6 +267,11 @@ export function CatsPage() {
   }
 
   async function handleHomePhotoUpload() {
+    if (!activeCatId) {
+      return;
+    }
+
+    const targetCatId = activeCatId;
     const input = document.createElement("input");
 
     input.type = "file";
@@ -268,6 +285,11 @@ export function CatsPage() {
 
       try {
         const dataUrl = await resizeAndEncode(file, 1600);
+        const photoSrc = await storeAccountPhotoDataUrl({
+          dataUrl,
+          pathSegments: [targetCatId, "home"],
+          fileName: "home",
+        });
         const raw = window.localStorage.getItem(STORAGE_KEYS.catProfiles);
 
         if (!raw) {
@@ -275,7 +297,7 @@ export function CatsPage() {
         }
 
         const profiles = JSON.parse(raw) as CatProfile[];
-        const index = profiles.findIndex((profile) => profile.id === activeCatId);
+        const index = profiles.findIndex((profile) => profile.id === targetCatId);
 
         if (index === -1) {
           return;
@@ -285,7 +307,7 @@ export function CatsPage() {
           profileIndex === index
             ? {
                 ...profile,
-                homePhotoDataUrl: dataUrl,
+                homePhotoDataUrl: photoSrc,
                 homePhotoPosition: profile.homePhotoPosition ?? "center 38%",
                 updatedAt: new Date().toISOString(),
               }
@@ -347,7 +369,7 @@ export function CatsPage() {
                   }
                 >
                   {profile.avatarDataUrl ? (
-                    <img
+                    <StoredPhotoImage
                       src={profile.avatarDataUrl}
                       alt={profile.name}
                       style={styles.catAvatarPhoto}
@@ -414,7 +436,7 @@ export function CatsPage() {
                 onClick={() => void handleAvatarUpload()}
                 aria-label={`${activeCatProfile.name}のアイコン写真を変更`}
               >
-                <img
+                <StoredPhotoImage
                   src={activeAvatarSrc}
                   alt=""
                   style={
@@ -448,7 +470,7 @@ export function CatsPage() {
             <div style={styles.homePhotoSection}>
               <div style={styles.homePhotoPreview}>
                 {activeCatProfile.homePhotoDataUrl ? (
-                  <img
+                  <StoredPhotoImage
                     src={activeCatProfile.homePhotoDataUrl}
                     alt=""
                     style={styles.homePhotoPreviewImg}
