@@ -12,7 +12,7 @@ import {
   keepExchangePhoto,
   saveOwnSleepingPhoto,
   type ExchangePhoto,
-  type ExchangePhotoPoolItem,
+  type OwnSleepingPhoto,
 } from "../../lib/home/sleepingPhotos";
 import { trackProductEvent } from "../../lib/analytics/productAnalytics";
 import { isUsablePhotoSrc } from "../../lib/photoStorage";
@@ -32,6 +32,7 @@ export function OnboardingFlow() {
   const [state, setState] = useState<OnboardingState>("intro");
   const [selectedPhotoSrc, setSelectedPhotoSrc] = useState("");
   const [deliveredPhoto, setDeliveredPhoto] = useState<ExchangePhoto | null>(null);
+  const [pendingOwnPhoto, setPendingOwnPhoto] = useState<OwnSleepingPhoto | null>(null);
   const [message, setMessage] = useState("");
   const [isCandidateAdding, setIsCandidateAdding] = useState(false);
   const [isTestMode, setIsTestMode] = useState(false);
@@ -91,21 +92,17 @@ export function OnboardingFlow() {
 
         const { dataUrl, ownPhoto } = savedResult;
         setSelectedPhotoSrc(dataUrl);
+        setPendingOwnPhoto(ownPhoto);
 
-        const exchangeResult = await createSleepingExchange({
+        const delivered = await deliverOwnSleepingPhoto({
           ownPhoto,
-          triggerLabel: "ねがお",
-          theme: "sleeping",
-          category: "sleeping",
-          seed: `${ownPhoto.id}:${Date.now()}`,
           recipientCatId: catId,
+          emptyMessage: isTestMode
+            ? "ねがおは入りました。とどく候補がまだありません。テスト用に候補を追加できます。"
+            : "ねがおは入りました。いまとどく候補がありません。少しあとで確認してください。",
         });
 
-        trackProductEvent("onboarding_sleeping_photo_delivered", {
-          has_delivered_photo: Boolean(exchangeResult?.photo),
-        });
-
-        if (!exchangeResult?.photo) {
+        if (!delivered) {
           setMessage(
             isTestMode
               ? "ねがおは入りました。とどく候補がまだありません。テスト用に候補を追加できます。"
@@ -114,17 +111,6 @@ export function OnboardingFlow() {
           setState("empty");
           return;
         }
-
-        const keepResult = await keepExchangePhotoForAlbum(exchangeResult.photo);
-        setDeliveredPhoto(keepResult.photo);
-        trackProductEvent("onboarding_delivered_photo_auto_kept", {
-          source_photo_id: keepResult.photo.sourcePhotoId ?? null,
-          saved_to_album: keepResult.saved,
-        });
-        if (!keepResult.saved) {
-          setMessage("ねがおは届きましたが、アルバムに保存できませんでした。設定の保存状態を確認してください。");
-        }
-        setState("delivered");
       } catch {
         setMessage("写真を保存できませんでした。");
         setState("intro");
@@ -160,6 +146,49 @@ export function OnboardingFlow() {
 
     window.localStorage.setItem(STORAGE_KEYS.onboardingCompleted, "true");
     setState("kept");
+  }
+
+  async function deliverOwnSleepingPhoto({
+    ownPhoto,
+    recipientCatId,
+    emptyMessage,
+  }: {
+    ownPhoto: OwnSleepingPhoto;
+    recipientCatId: string;
+    emptyMessage: string;
+  }) {
+    const exchangeResult = await createSleepingExchange({
+      ownPhoto,
+      triggerLabel: "ねがお",
+      theme: "sleeping",
+      category: "sleeping",
+      seed: `${ownPhoto.id}:${Date.now()}`,
+      recipientCatId,
+    });
+
+    trackProductEvent("onboarding_sleeping_photo_delivered", {
+      has_delivered_photo: Boolean(exchangeResult?.photo),
+      candidate_count: exchangeResult?.diagnostics?.candidateCount ?? null,
+      available_count: exchangeResult?.diagnostics?.availableCount ?? null,
+      excluded_count: exchangeResult?.diagnostics?.excludedCount ?? null,
+    });
+
+    if (!exchangeResult?.photo) {
+      setMessage(emptyMessage);
+      return false;
+    }
+
+    const keepResult = await keepExchangePhotoForAlbum(exchangeResult.photo);
+    setDeliveredPhoto(keepResult.photo);
+    trackProductEvent("onboarding_delivered_photo_auto_kept", {
+      source_photo_id: keepResult.photo.sourcePhotoId ?? null,
+      saved_to_album: keepResult.saved,
+    });
+    if (!keepResult.saved) {
+      setMessage("ねがおは届きましたが、アルバムに保存できませんでした。設定の保存状態を確認してください。");
+    }
+    setState("delivered");
+    return true;
   }
 
   async function handleAddCandidatePhoto() {
@@ -205,18 +234,26 @@ export function OnboardingFlow() {
           return;
         }
 
-        const keepResult = await keepExchangePhotoForAlbum(
-          toDeliveredExchangePhoto(saved),
-        );
-        setDeliveredPhoto(keepResult.photo);
-        trackProductEvent("onboarding_test_candidate_auto_kept", {
-          source_photo_id: keepResult.photo.sourcePhotoId ?? null,
-          saved_to_album: keepResult.saved,
+        trackProductEvent("onboarding_test_candidate_added", {
+          source_photo_id: saved.sourceOwnPhotoId ?? saved.id,
         });
-        if (!keepResult.saved) {
-          setMessage("候補は追加できましたが、アルバムに保存できませんでした。設定の保存状態を確認してください。");
+
+        if (!pendingOwnPhoto) {
+          setMessage("とどく候補を追加しました。もう一度ねてるねこを入れると届きます。");
+          setState("intro");
+          return;
         }
-        setState("delivered");
+
+        const delivered = await deliverOwnSleepingPhoto({
+          ownPhoto: pendingOwnPhoto,
+          recipientCatId: pendingOwnPhoto.catId,
+          emptyMessage:
+            "とどく候補を追加しましたが、まだ受け取れませんでした。設定のとどく状態を確認してください。",
+        });
+
+        if (!delivered) {
+          setState("empty");
+        }
       } catch {
         setMessage("候補写真を保存できませんでした。");
       } finally {
@@ -518,19 +555,6 @@ function isLikelyImageFile(file: File) {
   }
 
   return /\.(avif|gif|heic|heif|jpe?g|png|webp)$/i.test(file.name);
-}
-
-function toDeliveredExchangePhoto(photo: ExchangePhotoPoolItem): ExchangePhoto {
-  return {
-    id: `onboarding-delivered-${photo.id}-${Date.now()}`,
-    sourcePhotoId: photo.id,
-    src: photo.src,
-    title: photo.title,
-    subtitle: photo.subtitle,
-    triggerLabel: "ねがお",
-    theme: "sleeping",
-    deliveredAt: Date.now(),
-  };
 }
 
 async function keepExchangePhotoForAlbum(photo: ExchangePhoto) {

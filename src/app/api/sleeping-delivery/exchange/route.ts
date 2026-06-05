@@ -352,7 +352,7 @@ async function resolvePhotoUrl(photoUrl: string) {
   const supabase = createSupabaseAdminClient();
 
   if (!supabase) {
-    return null;
+    return photoUrl;
   }
 
   const { data, error } = await supabase.storage
@@ -360,7 +360,7 @@ async function resolvePhotoUrl(photoUrl: string) {
     .createSignedUrl(storagePath, 60 * 60 * 24);
 
   if (error || !data?.signedUrl) {
-    return null;
+    return photoUrl;
   }
 
   return data.signedUrl;
