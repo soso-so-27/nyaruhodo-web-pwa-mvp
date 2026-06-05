@@ -115,11 +115,15 @@ export function OnboardingFlow() {
 
         const albumPhoto = await prepareExchangePhotoForAlbum(exchangeResult.photo);
 
-        keepExchangePhoto(albumPhoto);
+        const didKeepPhoto = keepExchangePhoto(albumPhoto);
         setDeliveredPhoto(albumPhoto);
         trackProductEvent("onboarding_delivered_photo_auto_kept", {
           source_photo_id: albumPhoto.sourcePhotoId ?? null,
+          saved_to_album: didKeepPhoto,
         });
+        if (!didKeepPhoto) {
+          setMessage("ねがおは届きましたが、アルバムに保存できませんでした。設定の保存状態を確認してください。");
+        }
         setState("delivered");
       } catch {
         setMessage("写真を保存できませんでした。");
@@ -205,11 +209,15 @@ export function OnboardingFlow() {
           toDeliveredExchangePhoto(saved),
         );
 
-        keepExchangePhoto(deliveredCandidate);
+        const didKeepCandidate = keepExchangePhoto(deliveredCandidate);
         setDeliveredPhoto(deliveredCandidate);
         trackProductEvent("onboarding_test_candidate_auto_kept", {
           source_photo_id: deliveredCandidate.sourcePhotoId ?? null,
+          saved_to_album: didKeepCandidate,
         });
+        if (!didKeepCandidate) {
+          setMessage("候補は追加できましたが、アルバムに保存できませんでした。設定の保存状態を確認してください。");
+        }
         setState("delivered");
       } catch {
         setMessage("候補写真を保存できませんでした。");
@@ -305,6 +313,7 @@ export function OnboardingFlow() {
             <button type="button" onClick={handleGoHome} style={styles.textButton}>
               閉じる
             </button>
+            {message ? <p style={styles.message}>{message}</p> : null}
           </section>
         ) : null}
 

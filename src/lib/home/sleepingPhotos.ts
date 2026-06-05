@@ -71,6 +71,19 @@ export type DeliverableSleepingPhotoResult = {
   source: "shared" | "none";
 };
 
+export type KeptExchangePhotoStorageDebug = {
+  rawLength: number;
+  totalCount: number;
+  validCount: number;
+  invalidCount: number;
+  latestId: string | null;
+  latestSourcePhotoId: string | null;
+  latestSrcKind: "data" | "storage" | "http" | "empty" | "other";
+  latestSrcLength: number;
+  latestSrcPrefix: string;
+  parseError: string | null;
+};
+
 export const BOX_PHOTO_STORAGE_EVENT = "nyaruhodo_box_photos_updated";
 
 const KEPT_EXCHANGE_PHOTO_STORAGE_KEY = "nyaruhodo_exchange_kept_photos";
@@ -284,6 +297,46 @@ export function readKeptExchangePhotoCount() {
   return readKeptExchangePhotos().length;
 }
 
+export function readKeptExchangePhotoStorageDebug(): KeptExchangePhotoStorageDebug {
+  if (typeof window === "undefined") {
+    return createEmptyKeptExchangeDebug(0, "window_unavailable");
+  }
+
+  const raw = window.localStorage.getItem(KEPT_EXCHANGE_PHOTO_STORAGE_KEY) ?? "";
+
+  try {
+    const parsed = raw ? (JSON.parse(raw) as unknown) : [];
+    const photos = Array.isArray(parsed)
+      ? (parsed as Partial<ExchangePhoto>[])
+      : [];
+    const validPhotos = photos.filter(isValidExchangePhoto);
+    const latestPhoto = photos[0] ?? null;
+    const latestSrc =
+      typeof latestPhoto?.src === "string" ? latestPhoto.src : "";
+
+    return {
+      rawLength: raw.length,
+      totalCount: photos.length,
+      validCount: validPhotos.length,
+      invalidCount: Math.max(0, photos.length - validPhotos.length),
+      latestId: typeof latestPhoto?.id === "string" ? latestPhoto.id : null,
+      latestSourcePhotoId:
+        typeof latestPhoto?.sourcePhotoId === "string"
+          ? latestPhoto.sourcePhotoId
+          : null,
+      latestSrcKind: getPhotoSrcKind(latestSrc),
+      latestSrcLength: latestSrc.length,
+      latestSrcPrefix: latestSrc.slice(0, 42),
+      parseError: null,
+    };
+  } catch (error) {
+    return createEmptyKeptExchangeDebug(
+      raw.length,
+      error instanceof Error ? error.message : "parse_error",
+    );
+  }
+}
+
 export function keepExchangePhoto(photo: ExchangePhoto) {
   if (!isValidExchangePhoto(photo)) {
     return false;
@@ -316,6 +369,41 @@ export function keepExchangePhoto(photo: ExchangePhoto) {
   }
 
   return false;
+}
+
+function createEmptyKeptExchangeDebug(
+  rawLength: number,
+  parseError: string | null,
+): KeptExchangePhotoStorageDebug {
+  return {
+    rawLength,
+    totalCount: 0,
+    validCount: 0,
+    invalidCount: 0,
+    latestId: null,
+    latestSourcePhotoId: null,
+    latestSrcKind: "empty",
+    latestSrcLength: 0,
+    latestSrcPrefix: "",
+    parseError,
+  };
+}
+
+function getPhotoSrcKind(src: string): KeptExchangePhotoStorageDebug["latestSrcKind"] {
+  if (!src) {
+    return "empty";
+  }
+  if (src.startsWith("data:image/")) {
+    return "data";
+  }
+  if (src.startsWith("storage://")) {
+    return "storage";
+  }
+  if (src.startsWith("http://") || src.startsWith("https://")) {
+    return "http";
+  }
+
+  return "other";
 }
 
 export function dismissExchangePhoto(photo: ExchangePhoto) {

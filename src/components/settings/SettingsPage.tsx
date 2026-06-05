@@ -28,6 +28,10 @@ import {
   APP_SURFACE,
 } from "../ui/appTheme";
 import {
+  readKeptExchangePhotoStorageDebug,
+  type KeptExchangePhotoStorageDebug,
+} from "../../lib/home/sleepingPhotos";
+import {
   readSleepingDeliveryDiagnostics,
   saveRemoteDeliveryStockPhoto,
   type SleepingDeliveryDiagnostics,
@@ -56,9 +60,12 @@ export function SettingsPage() {
   const [stockPhotoCount, setStockPhotoCount] = useState(0);
   const [deliveryDiagnostics, setDeliveryDiagnostics] =
     useState<SleepingDeliveryDiagnostics | null>(null);
+  const [keptExchangeDebug, setKeptExchangeDebug] =
+    useState<KeptExchangePhotoStorageDebug | null>(null);
 
   useEffect(() => {
     setDisplayEnvironment(getDisplayEnvironment());
+    refreshKeptExchangeDebug();
     void checkAuthState();
     void refreshDeliveryDiagnostics();
   }, []);
@@ -334,6 +341,10 @@ export function SettingsPage() {
     setIsDeliveryDiagnosticsLoading(false);
   }
 
+  function refreshKeptExchangeDebug() {
+    setKeptExchangeDebug(readKeptExchangePhotoStorageDebug());
+  }
+
   return (
     <main style={styles.page}>
       <div style={styles.container}>
@@ -486,10 +497,13 @@ export function SettingsPage() {
             <div style={styles.divider} />
             <DeliveryDiagnosticsPanel diagnostics={deliveryDiagnostics} />
             <div style={styles.divider} />
+            <KeptExchangeDebugPanel debug={keptExchangeDebug} />
+            <div style={styles.divider} />
             <button
               type="button"
               onClick={() => {
                 void refreshDeliveryDiagnostics();
+                refreshKeptExchangeDebug();
               }}
               style={styles.secondaryButton}
               disabled={isDeliveryDiagnosticsLoading}
@@ -818,6 +832,47 @@ function DeliveryDiagnosticsPanel({
         />
         {diagnostics.lastError ? (
           <AuthDebugRow label="エラー" value={diagnostics.lastError} />
+        ) : null}
+      </div>
+    </div>
+  );
+}
+
+function KeptExchangeDebugPanel({
+  debug,
+}: {
+  debug: KeptExchangePhotoStorageDebug | null;
+}) {
+  if (!debug) {
+    return (
+      <div style={styles.authDebugPanel}>
+        <p style={styles.syncOverviewText}>
+          とどいたねがおの保存状態をまだ確認していません。
+        </p>
+      </div>
+    );
+  }
+
+  return (
+    <div style={styles.authDebugPanel}>
+      <p style={styles.syncOverviewText}>
+        アルバムに出る「とどいたねがお」の端末内保存状態です。
+      </p>
+      <div style={styles.authDebugRows}>
+        <AuthDebugRow label="保存件数" value={`${debug.validCount}枚`} />
+        <AuthDebugRow label="保存枠" value={`${debug.totalCount}件`} />
+        <AuthDebugRow label="不正枠" value={`${debug.invalidCount}件`} />
+        <AuthDebugRow label="保存量" value={`${debug.rawLength}文字`} />
+        <AuthDebugRow label="画像形式" value={debug.latestSrcKind} />
+        <AuthDebugRow label="画像長さ" value={`${debug.latestSrcLength}文字`} />
+        <AuthDebugRow label="最新ID" value={debug.latestId ?? "-"} />
+        <AuthDebugRow
+          label="元ID"
+          value={debug.latestSourcePhotoId ?? "-"}
+        />
+        <AuthDebugRow label="先頭" value={debug.latestSrcPrefix || "-"} />
+        {debug.parseError ? (
+          <AuthDebugRow label="エラー" value={debug.parseError} />
         ) : null}
       </div>
     </div>
