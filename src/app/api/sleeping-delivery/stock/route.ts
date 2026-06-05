@@ -56,6 +56,7 @@ export async function POST(request: Request) {
     source_moment_id: null,
     metadata: {
       source: "admin-stock",
+      pool_kind: "admin_stock",
       trigger_label: "ねがお",
       theme: "sleeping",
       shared: true,

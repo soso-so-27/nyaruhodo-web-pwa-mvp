@@ -5,15 +5,12 @@ import { useState } from "react";
 import type { CSSProperties } from "react";
 import { STORAGE_KEYS } from "../../lib/storage";
 import {
+  createSleepingExchange,
   saveRemoteDeliveryStockPhoto,
-  selectDeliveryCandidate,
 } from "../../lib/home/deliveryCandidates";
 import {
   keepExchangePhoto,
-  readSharedExchangePhotos,
   saveOwnSleepingPhoto,
-  saveSharedExchangePhoto,
-  saveSharedExchangeStockPhoto,
   type ExchangePhoto,
   type ExchangePhotoPoolItem,
 } from "../../lib/home/sleepingPhotos";
@@ -87,37 +84,27 @@ export function OnboardingFlow() {
 
         const { dataUrl, ownPhoto } = savedResult;
         setSelectedPhotoSrc(dataUrl);
-        saveSharedExchangePhoto({ ownPhoto });
 
-        const selected = await selectDeliveryCandidate({
+        const exchangeResult = await createSleepingExchange({
+          ownPhoto,
           triggerLabel: "ねがお",
           theme: "sleeping",
           category: "sleeping",
           seed: `${ownPhoto.id}:${Date.now()}`,
-          excludePhotoId: ownPhoto.id,
           recipientCatId: catId,
         });
 
         trackProductEvent("onboarding_sleeping_photo_delivered", {
-          has_delivered_photo: Boolean(selected),
+          has_delivered_photo: Boolean(exchangeResult?.photo),
         });
 
-        const fallbackPhoto = selected
-          ? null
-          : findFallbackExchangePhoto({
-              excludePhotoId: ownPhoto.id,
-              excludeSrc: ownPhoto.src,
-              recipientCatId: catId,
-            });
-        const exchangePhoto = selected ?? fallbackPhoto;
-
-        if (!exchangePhoto) {
+        if (!exchangeResult?.photo) {
           setMessage("ねがおは入りました。とどく候補がまだありません。");
           setState("empty");
           return;
         }
 
-        setDeliveredPhoto(toDeliveredExchangePhoto(exchangePhoto));
+        setDeliveredPhoto(exchangeResult.photo);
         setState("delivered");
       } catch {
         setMessage("写真を保存できませんでした。");
@@ -412,9 +399,7 @@ async function saveStockCandidateWithFallback(file: File) {
 
   for (const attempt of attempts) {
     const dataUrl = await resizeAndEncode(file, attempt.maxSize, attempt.quality);
-    const remoteSaved = await saveRemoteDeliveryStockPhoto(dataUrl);
-    const localSaved = saveSharedExchangeStockPhoto({ src: dataUrl });
-    const saved = remoteSaved ?? localSaved;
+    const saved = await saveRemoteDeliveryStockPhoto(dataUrl);
 
     if (saved) {
       return saved;
@@ -430,26 +415,6 @@ function isLikelyImageFile(file: File) {
   }
 
   return /\.(avif|gif|heic|heif|jpe?g|png|webp)$/i.test(file.name);
-}
-
-function findFallbackExchangePhoto({
-  excludePhotoId,
-  excludeSrc,
-  recipientCatId,
-}: {
-  excludePhotoId: string;
-  excludeSrc: string;
-  recipientCatId: string | null;
-}) {
-  return (
-    readSharedExchangePhotos().find(
-      (photo) =>
-        photo.id !== excludePhotoId &&
-        photo.sourceOwnPhotoId !== excludePhotoId &&
-        photo.src !== excludeSrc &&
-        photo.sourceCatId !== recipientCatId,
-    ) ?? null
-  );
 }
 
 function toDeliveredExchangePhoto(photo: ExchangePhotoPoolItem): ExchangePhoto {

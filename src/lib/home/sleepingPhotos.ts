@@ -78,7 +78,6 @@ const DISMISSED_EXCHANGE_PHOTO_STORAGE_KEY =
   "nyaruhodo_exchange_dismissed_photos";
 const REPORTED_EXCHANGE_PHOTO_STORAGE_KEY =
   "nyaruhodo_exchange_reported_photos";
-const SHARED_EXCHANGE_PHOTO_STORAGE_KEY = "nyaruhodo_exchange_shared_photos";
 const OWN_SLEEPING_PHOTO_STORAGE_KEY =
   "nyaruhodo_exchange_own_sleeping_photos";
 
@@ -123,16 +122,6 @@ export function restoreSyncedSleepingPhotos({
     restoredKeptPhotos,
     [50, 24, 12, 6, 1],
   );
-
-  for (const photo of savedOwnPhotos) {
-    try {
-      if (photo.shared) {
-        addSharedSleepingPhoto(photo);
-      }
-    } catch {
-      // Shared-photo history is optional during account restore.
-    }
-  }
 
   if (savedOwnPhotos.length > 0 || savedKeptPhotos.length > 0) {
     dispatchBoxPhotoStorageEvent();
@@ -262,14 +251,6 @@ export function updateOwnSleepingPhotoDelivery(photoId: string, shared: boolean)
 
     writeStorageArray(OWN_SLEEPING_PHOTO_STORAGE_KEY, nextPhotos);
 
-    if (updatedTargetPhoto?.src) {
-      if (shared) {
-        addSharedSleepingPhoto(updatedTargetPhoto);
-      } else {
-        removeSharedSleepingPhoto(updatedTargetPhoto);
-      }
-    }
-
     dispatchBoxPhotoStorageEvent();
     return updatedTargetPhoto;
   } catch {
@@ -286,10 +267,6 @@ export function deleteOwnSleepingPhoto(photoId: string) {
     const nextPhotos = photos.filter((photo) => photo.id !== photoId);
 
     writeStorageArray(OWN_SLEEPING_PHOTO_STORAGE_KEY, nextPhotos);
-
-    if (targetPhoto?.src) {
-      removeSharedSleepingPhoto(targetPhoto);
-    }
 
     dispatchBoxPhotoStorageEvent();
   } catch {
@@ -405,85 +382,6 @@ export function hideKeptExchangePhoto(
   }
 }
 
-export function readSharedExchangePhotos() {
-  return readStorageArray<ExchangePhotoPoolItem>(SHARED_EXCHANGE_PHOTO_STORAGE_KEY)
-    .filter(isValidExchangePhotoPoolItem)
-    .slice(0, 60);
-}
-
-export function saveSharedExchangePhoto({
-  ownPhoto,
-  title = "とったねがお",
-  subtitle = "",
-  tags = ["sleeping", "ねてる"],
-}: {
-  ownPhoto: OwnSleepingPhoto;
-  title?: string;
-  subtitle?: string;
-  tags?: readonly string[];
-}) {
-  try {
-    const current = readSharedExchangePhotos();
-    const sharedPhoto: ExchangePhotoPoolItem = {
-      id: `shared-sleeping-${Date.now()}`,
-      sourceOwnPhotoId: ownPhoto.id,
-      sourceCatId: ownPhoto.catId,
-      src: ownPhoto.src,
-      title,
-      subtitle,
-      tags,
-    };
-
-    writeStorageArrayWithFallback(
-      SHARED_EXCHANGE_PHOTO_STORAGE_KEY,
-      [sharedPhoto, ...current],
-      [60, 40, 30, 20, 12, 6, 1],
-    );
-
-    return sharedPhoto;
-  } catch {
-    // Sharing is optional, so keep the main recording flow alive.
-    return null;
-  }
-}
-
-export function saveSharedExchangeStockPhoto({
-  src,
-  title = "ほかの猫のねがお",
-  subtitle = "",
-  tags = ["sleeping", "ねてる"],
-}: {
-  src: string;
-  title?: string;
-  subtitle?: string;
-  tags?: readonly string[];
-}) {
-  try {
-    const current = readSharedExchangePhotos();
-    const createdAt = Date.now();
-    const sharedPhoto: ExchangePhotoPoolItem = {
-      id: `stock-sleeping-${createdAt}-${Math.random().toString(16).slice(2)}`,
-      sourceCatId: "admin-stock",
-      src,
-      title,
-      subtitle,
-      tags,
-    };
-    const savedPhotos = writeStorageArrayWithFallback(
-      SHARED_EXCHANGE_PHOTO_STORAGE_KEY,
-      [sharedPhoto, ...current],
-      [60, 40, 30, 20, 12, 6, 1],
-    );
-
-    dispatchBoxPhotoStorageEvent();
-    return savedPhotos.some((photo) => photo.id === sharedPhoto.id)
-      ? sharedPhoto
-      : null;
-  } catch {
-    return null;
-  }
-}
-
 export function readBlockedExchangePhotoIds() {
   const blockedIds = new Set<string>();
 
@@ -494,121 +392,12 @@ export function readBlockedExchangePhotoIds() {
   return blockedIds;
 }
 
-export function isExchangePoolItemBlocked(
-  photo: ExchangePhotoPoolItem,
-  blockedIds: Set<string>,
-) {
-  return (
-    blockedIds.has(photo.id) ||
-    Boolean(photo.sourceOwnPhotoId && blockedIds.has(photo.sourceOwnPhotoId))
-  );
-}
-
-export function selectDeliverableSleepingPhoto({
-  triggerLabel,
-  theme,
-  category,
-  seed,
-  excludePhotoId,
-  recipientCatId,
-}: DeliverableSleepingPhotoInput): DeliverableSleepingPhotoResult {
-  const normalizedTheme = theme.toLowerCase();
-  const blockedPhotoIds = readBlockedExchangePhotoIds();
-  const allSharedPhotos = readSharedExchangePhotos().filter(
-    (photo) =>
-      photo.id !== excludePhotoId &&
-      photo.sourceOwnPhotoId !== excludePhotoId,
-  );
-  const sharedPool = allSharedPhotos.filter(
-    (photo) =>
-      photo.sourceCatId !== recipientCatId &&
-      !isExchangePoolItemBlocked(photo, blockedPhotoIds),
-  );
-  const relaxedUnblockedPool =
-    sharedPool.length > 0
-      ? sharedPool
-      : allSharedPhotos.filter(
-          (photo) => !isExchangePoolItemBlocked(photo, blockedPhotoIds),
-        );
-  const relaxedRepeatablePool =
-    relaxedUnblockedPool.length > 0 ? relaxedUnblockedPool : allSharedPhotos;
-  const sharedCandidates = sharedPool.filter((photo) =>
-    photo.tags.some(
-      (tag) =>
-        tag.toLowerCase() === normalizedTheme ||
-        tag === triggerLabel ||
-        tag === category,
-    ),
-  );
-  const relaxedCandidates = relaxedRepeatablePool.filter((photo) =>
-    photo.tags.some(
-      (tag) =>
-        tag.toLowerCase() === normalizedTheme ||
-        tag === triggerLabel ||
-        tag === category,
-    ),
-  );
-  const selection =
-    sharedCandidates.length > 0
-      ? { pool: sharedCandidates, source: "shared" as const }
-      : relaxedCandidates.length > 0
-        ? { pool: relaxedCandidates, source: "shared" as const }
-        : { pool: relaxedRepeatablePool, source: "shared" as const };
-
-  if (selection.pool.length === 0) {
-    return { photo: null, source: "none" };
-  }
-
-  const index =
-    hashText(`${seed}:${triggerLabel}:${theme}`) % selection.pool.length;
-
-  return {
-    photo: selection.pool[index],
-    source: selection.source,
-  };
-}
-
 export function dispatchBoxPhotoStorageEvent() {
   if (typeof window === "undefined") {
     return;
   }
 
   window.dispatchEvent(new Event(BOX_PHOTO_STORAGE_EVENT));
-}
-
-function addSharedSleepingPhoto(photo: OwnSleepingPhoto) {
-  const sharedPhotos = readSharedExchangePhotos();
-
-  if (sharedPhotos.some((sharedPhoto) => sharedPhoto.src === photo.src)) {
-    return;
-  }
-
-  const sharedPhoto: ExchangePhotoPoolItem = {
-    id: `shared-sleeping-${Date.now()}`,
-    sourceOwnPhotoId: photo.id,
-    sourceCatId: photo.catId,
-    src: photo.src,
-    title: "とったねがお",
-    subtitle: "",
-    tags: ["sleeping", "ねてる"],
-  };
-
-  writeStorageArray(
-    SHARED_EXCHANGE_PHOTO_STORAGE_KEY,
-    [sharedPhoto, ...sharedPhotos].slice(0, 30),
-  );
-}
-
-function removeSharedSleepingPhoto(photo: OwnSleepingPhoto) {
-  const sharedPhotos = readStorageArray<ExchangePhotoPoolItem>(
-    SHARED_EXCHANGE_PHOTO_STORAGE_KEY,
-  );
-  const nextPhotos = sharedPhotos.filter(
-    (sharedPhoto) =>
-      sharedPhoto.sourceOwnPhotoId !== photo.id && sharedPhoto.src !== photo.src,
-  );
-
-  writeStorageArray(SHARED_EXCHANGE_PHOTO_STORAGE_KEY, nextPhotos);
 }
 
 function mergeOwnSleepingPhotos(
@@ -697,17 +486,6 @@ function writeStorageArrayWithFallback<T>(
   return [] as T[];
 }
 
-function hashText(value: string) {
-  let hash = 0;
-
-  for (let index = 0; index < value.length; index += 1) {
-    hash = (hash << 5) - hash + value.charCodeAt(index);
-    hash |= 0;
-  }
-
-  return Math.abs(hash);
-}
-
 function isValidOwnSleepingPhoto(photo: Partial<OwnSleepingPhoto>) {
   return Boolean(
     typeof photo.id === "string" &&
@@ -734,16 +512,4 @@ function normalizeOwnSleepingPhoto(photo: OwnSleepingPhoto): OwnSleepingPhoto {
 
 function isValidExchangePhoto(photo: Partial<ExchangePhoto>) {
   return Boolean(typeof photo.id === "string" && typeof photo.src === "string");
-}
-
-function isValidExchangePhotoPoolItem(
-  photo: Partial<ExchangePhotoPoolItem>,
-): photo is ExchangePhotoPoolItem {
-  return Boolean(
-    typeof photo.id === "string" &&
-      typeof photo.src === "string" &&
-      typeof photo.title === "string" &&
-      typeof photo.subtitle === "string" &&
-      Array.isArray(photo.tags),
-  );
 }

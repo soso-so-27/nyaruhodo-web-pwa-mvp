@@ -28,10 +28,10 @@ import {
   APP_SURFACE,
 } from "../ui/appTheme";
 import {
-  readSharedExchangePhotos,
-  saveSharedExchangeStockPhoto,
-} from "../../lib/home/sleepingPhotos";
-import { saveRemoteDeliveryStockPhoto } from "../../lib/home/deliveryCandidates";
+  readSleepingDeliveryDiagnostics,
+  saveRemoteDeliveryStockPhoto,
+  type SleepingDeliveryDiagnostics,
+} from "../../lib/home/deliveryCandidates";
 
 export function SettingsPage() {
   const [isLoggedIn, setIsLoggedIn] = useState(false);
@@ -50,13 +50,17 @@ export function SettingsPage() {
   const [displayEnvironment, setDisplayEnvironment] =
     useState<DisplayEnvironment>("unknown");
   const [isStockAdding, setIsStockAdding] = useState(false);
+  const [isDeliveryDiagnosticsLoading, setIsDeliveryDiagnosticsLoading] =
+    useState(false);
   const [stockMessage, setStockMessage] = useState("");
   const [stockPhotoCount, setStockPhotoCount] = useState(0);
+  const [deliveryDiagnostics, setDeliveryDiagnostics] =
+    useState<SleepingDeliveryDiagnostics | null>(null);
 
   useEffect(() => {
     setDisplayEnvironment(getDisplayEnvironment());
-    setStockPhotoCount(readSharedExchangePhotos().length);
     void checkAuthState();
+    void refreshDeliveryDiagnostics();
   }, []);
 
   async function checkAuthState() {
@@ -292,8 +296,9 @@ export function SettingsPage() {
             : "写真を保存できませんでした。",
         );
         setStockPhotoCount((count) =>
-          Math.max(readSharedExchangePhotos().length, count + savedCount),
+          count + savedCount,
         );
+        void refreshDeliveryDiagnostics();
       } catch {
         setStockMessage(
           savedCount > 0
@@ -301,8 +306,9 @@ export function SettingsPage() {
             : "写真を保存できませんでした。",
         );
         setStockPhotoCount((count) =>
-          Math.max(readSharedExchangePhotos().length, count + savedCount),
+          count + savedCount,
         );
+        void refreshDeliveryDiagnostics();
       } finally {
         setIsStockAdding(false);
         cleanupInput();
@@ -316,6 +322,16 @@ export function SettingsPage() {
         input.remove();
       }
     }, 60000);
+  }
+
+  async function refreshDeliveryDiagnostics() {
+    setIsDeliveryDiagnosticsLoading(true);
+    const diagnostics = await readSleepingDeliveryDiagnostics();
+    setDeliveryDiagnostics(diagnostics);
+    if (diagnostics) {
+      setStockPhotoCount(diagnostics.adminStockCount);
+    }
+    setIsDeliveryDiagnosticsLoading(false);
   }
 
   return (
@@ -467,6 +483,19 @@ export function SettingsPage() {
               <span style={styles.rowLabel}>とどく候補</span>
               <span style={styles.rowValue}>{stockPhotoCount}枚</span>
             </div>
+            <div style={styles.divider} />
+            <DeliveryDiagnosticsPanel diagnostics={deliveryDiagnostics} />
+            <div style={styles.divider} />
+            <button
+              type="button"
+              onClick={() => {
+                void refreshDeliveryDiagnostics();
+              }}
+              style={styles.secondaryButton}
+              disabled={isDeliveryDiagnosticsLoading}
+            >
+              {isDeliveryDiagnosticsLoading ? "確認中..." : "とどく状態を確認する"}
+            </button>
             <div style={styles.divider} />
             <button
               type="button"
@@ -646,9 +675,7 @@ async function saveStockPhotoWithFallback(file: File) {
 
   for (const attempt of attempts) {
     const dataUrl = await resizeAndEncode(file, attempt.maxSize, attempt.quality);
-    const remoteSaved = await saveRemoteDeliveryStockPhoto(dataUrl);
-    const localSaved = saveSharedExchangeStockPhoto({ src: dataUrl });
-    const saved = remoteSaved ?? localSaved;
+    const saved = await saveRemoteDeliveryStockPhoto(dataUrl);
 
     if (saved) {
       return saved;
@@ -732,6 +759,67 @@ function AuthDebugRow({ label, value }: { label: string; value: string }) {
     <div style={styles.authDebugRow}>
       <span style={styles.authDebugLabel}>{label}</span>
       <span style={styles.authDebugValue}>{value}</span>
+    </div>
+  );
+}
+
+function DeliveryDiagnosticsPanel({
+  diagnostics,
+}: {
+  diagnostics: SleepingDeliveryDiagnostics | null;
+}) {
+  if (!diagnostics) {
+    return (
+      <div style={styles.authDebugPanel}>
+        <p style={styles.syncOverviewText}>
+          とどく候補の状態をまだ確認していません。
+        </p>
+      </div>
+    );
+  }
+
+  return (
+    <div style={styles.authDebugPanel}>
+      <p style={styles.syncOverviewText}>
+        とどく候補はSupabaseだけを見ています。localStorageの候補は使いません。
+      </p>
+      <div style={styles.authDebugRows}>
+        <AuthDebugRow
+          label="取得元"
+          value={
+            diagnostics.source === "remote"
+              ? "Supabase"
+              : diagnostics.source === "error"
+                ? "エラー"
+                : "候補なし"
+          }
+        />
+        <AuthDebugRow
+          label="DB読込"
+          value={diagnostics.rlsReadable ? "可" : "不可"}
+        />
+        <AuthDebugRow label="候補" value={`${diagnostics.candidateCount}枚`} />
+        <AuthDebugRow label="利用可" value={`${diagnostics.availableCount}枚`} />
+        <AuthDebugRow label="除外" value={`${diagnostics.excludedCount}枚`} />
+        <AuthDebugRow label="ブロック" value={`${diagnostics.blockedCount}枚`} />
+        <AuthDebugRow
+          label="管理"
+          value={`${diagnostics.adminStockCount}枚`}
+        />
+        <AuthDebugRow
+          label="通常"
+          value={`${diagnostics.userSharedCount}枚`}
+        />
+        <AuthDebugRow label="非表示" value={`${diagnostics.hiddenCount}枚`} />
+        <AuthDebugRow label="通報" value={`${diagnostics.reportedCount}枚`} />
+        <AuthDebugRow
+          label="確認"
+          value={formatSyncDate(diagnostics.checkedAt)}
+        />
+        {diagnostics.lastError ? (
+          <AuthDebugRow label="エラー" value={diagnostics.lastError} />
+        ) : null}
+      </div>
     </div>
   );
 }
