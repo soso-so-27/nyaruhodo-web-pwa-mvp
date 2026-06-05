@@ -56,6 +56,7 @@ export function CatsPage() {
   const [isEditingCatName, setIsEditingCatName] = useState(false);
   const [isEditingProfile, setIsEditingProfile] = useState(false);
   const [isAddingCat, setIsAddingCat] = useState(false);
+  const [isOnboardingMode, setIsOnboardingMode] = useState(false);
   const [editBirthDate, setEditBirthDate] = useState("");
   const [editGender, setEditGender] = useState<EditableGender>("");
   const [editBreed, setEditBreed] = useState("");
@@ -76,6 +77,8 @@ export function CatsPage() {
     getCatAvatarSrc(activeCatProfile?.appearance?.coat);
 
   useEffect(() => {
+    const onboardingMode =
+      new URLSearchParams(window.location.search).get("onboarding") === "1";
     const savedCatProfiles = readCatProfiles();
     const savedActiveCatId = readActiveCatId();
     const activeProfile = getActiveCatProfile(
@@ -86,6 +89,11 @@ export function CatsPage() {
     setCatProfiles(savedCatProfiles);
     setActiveCatId(activeProfile.id);
     setCatNameInput(getCatName(activeProfile));
+    setIsOnboardingMode(onboardingMode);
+    if (onboardingMode) {
+      setIsEditingCatName(true);
+      setIsEditingProfile(true);
+    }
     saveActiveCatId(activeProfile.id);
   }, []);
 
@@ -199,7 +207,9 @@ export function CatsPage() {
       setCatNameInput(nextProfile.name);
       setIsEditingCatName(false);
       setIsEditingProfile(false);
-      setSaveMessage("保存しました。");
+      setSaveMessage(
+        isOnboardingMode ? "アルバムができました。" : "保存しました。",
+      );
       setTimeout(() => setSaveMessage(""), 2000);
     } catch {
       return;
@@ -341,6 +351,27 @@ export function CatsPage() {
             <AppIcon name="settings" size={24} />
           </a>
         </div>
+
+        {isOnboardingMode ? (
+          <section style={styles.onboardingPanel} aria-label="オンボーディング">
+            <p style={styles.onboardingKicker}>
+              {isEditingProfile ? "このねこの場所" : "アルバムができました"}
+            </p>
+            <h2 style={styles.onboardingTitle}>
+              {isEditingProfile ? "このねこの名前は？" : "また寝ていたら、ここへ。"}
+            </h2>
+            <p style={styles.onboardingText}>
+              {isEditingProfile
+                ? "名前だけで大丈夫です。このねこの場所として見返せます。"
+                : "次に寝ていたら、すぐ入れられるように。"}
+            </p>
+            {!isEditingProfile ? (
+              <a href="/home" style={styles.onboardingHomeLink}>
+                ホームへ
+              </a>
+            ) : null}
+          </section>
+        ) : null}
 
         <div style={styles.catGrid}>
           {catProfiles.map((profile) => {
@@ -925,6 +956,53 @@ const styles = {
     color: CATS_MUTED,
     margin: 0,
     lineHeight: 1.6,
+  },
+  onboardingPanel: {
+    ...CATS_SURFACE_SOFT,
+    borderRadius: "22px",
+    padding: "18px 18px 17px",
+    marginBottom: "20px",
+    textAlign: "center",
+  },
+  onboardingKicker: {
+    margin: "0 0 8px",
+    color: CATS_MUTED,
+    fontSize: "11px",
+    fontWeight: 700,
+    lineHeight: 1.4,
+    letterSpacing: "0.08em",
+  },
+  onboardingTitle: {
+    margin: 0,
+    color: CATS_TEXT_STRONG,
+    fontFamily: CATS_SERIF,
+    fontSize: "25px",
+    fontWeight: 500,
+    lineHeight: 1.45,
+    letterSpacing: "0.08em",
+  },
+  onboardingText: {
+    margin: "10px auto 0",
+    maxWidth: "280px",
+    color: CATS_MUTED,
+    fontSize: "13px",
+    fontWeight: 500,
+    lineHeight: 1.7,
+  },
+  onboardingHomeLink: {
+    display: "inline-flex",
+    alignItems: "center",
+    justifyContent: "center",
+    minHeight: "42px",
+    marginTop: "14px",
+    padding: "0 22px",
+    borderRadius: "999px",
+    border: "1px solid rgba(120,108,94,0.16)",
+    background: "rgba(255,253,248,0.78)",
+    color: CATS_TEXT,
+    textDecoration: "none",
+    fontSize: "13px",
+    fontWeight: 700,
   },
   catGrid: {
     display: "flex",

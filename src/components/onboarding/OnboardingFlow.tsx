@@ -246,6 +246,27 @@ export function OnboardingFlow() {
 
   return (
     <main style={styles.page}>
+      <style>{`
+        @keyframes onboardingDots {
+          0% { transform: translateX(-10px); opacity: 0.24; }
+          45% { opacity: 0.72; }
+          100% { transform: translateX(10px); opacity: 0.24; }
+        }
+        @keyframes deliveredEnvelope {
+          0% { transform: translateY(8px) scale(0.94); opacity: 0; }
+          55% { transform: translateY(-2px) scale(1.02); opacity: 1; }
+          100% { transform: translateY(0) scale(1); opacity: 1; }
+        }
+        @keyframes deliveredPhotoIn {
+          0% { transform: translateY(18px) scale(0.9); opacity: 0; filter: blur(5px); }
+          65% { transform: translateY(-2px) scale(1.015); opacity: 1; filter: blur(0); }
+          100% { transform: translateY(0) scale(1); opacity: 1; filter: blur(0); }
+        }
+        @keyframes ownPhotoSend {
+          0% { transform: translateX(0) scale(1); opacity: 0.74; }
+          100% { transform: translateX(7px) scale(0.96); opacity: 0.54; }
+        }
+      `}</style>
       <div style={styles.paperBackground} aria-hidden="true" />
       <div style={styles.container}>
         <p style={styles.brand}>ねてるねこ</p>
@@ -262,15 +283,22 @@ export function OnboardingFlow() {
               </span>
             </div>
             <h1 style={styles.title}>
-              だれかのねがおが
+              ねてるねこを入れると
+              <br />
+              どこかのねこの
+              <br />
+              ねがおが
               <br />
               1枚とどきます
             </h1>
             <p style={styles.lead}>
-              うちのねがおを届けると、
+              いいねもコメントもなく、
               <br />
-              ほかのねがおがひとつ届きます。
+              ただ1枚だけ。
             </p>
+            {state === "saving" ? (
+              <DeliveryWaiting />
+            ) : null}
             <button
               type="button"
               onClick={() => {
@@ -279,7 +307,7 @@ export function OnboardingFlow() {
               style={styles.primaryButton}
               disabled={state === "saving"}
             >
-              {state === "saving" ? "届けています..." : "うちのねがおを届ける"}
+              {state === "saving" ? "とどけています..." : "ねてるねこを入れる"}
             </button>
             <button type="button" onClick={handleGoHome} style={styles.textButton}>
               あとで
@@ -290,14 +318,28 @@ export function OnboardingFlow() {
 
         {state === "delivered" && deliveredPhoto ? (
           <section style={styles.result} aria-label="とどいたねがお">
-            <p style={styles.kicker}>ねがおがとどきました</p>
-            <div style={styles.photoPair}>
-              {selectedPhotoSrc ? (
-                <img src={selectedPhotoSrc} alt="" style={styles.ownPhoto} />
-              ) : null}
-              <span style={styles.pairDots} />
-              <StoredPhotoImage src={deliveredPhoto.src} alt="" style={styles.deliveredPhoto} />
+            <p style={styles.kicker}>ねがおが届きました</p>
+            <div style={styles.deliveryEnvelope} aria-hidden="true">
+              <AppIcon name="mail" size={24} />
             </div>
+            {selectedPhotoSrc ? (
+              <div style={styles.photoPair}>
+                <div style={styles.photoItem}>
+                  <img src={selectedPhotoSrc} alt="" style={styles.ownPhoto} />
+                  <span style={styles.photoLabel}>入れた1枚</span>
+                </div>
+                <span style={styles.pairDots} />
+                <div style={styles.photoItem}>
+                  <StoredPhotoImage src={deliveredPhoto.src} alt="" style={styles.deliveredPhoto} />
+                  <span style={styles.photoLabel}>届いた1枚</span>
+                </div>
+              </div>
+            ) : (
+              <div style={styles.singleDeliveredPhoto}>
+                <StoredPhotoImage src={deliveredPhoto.src} alt="" style={styles.deliveredPhoto} />
+                <span style={styles.photoLabel}>届いた1枚</span>
+              </div>
+            )}
             <p style={styles.resultText}>
               とっておくと、アルバムに入ります。
             </p>
@@ -347,17 +389,17 @@ export function OnboardingFlow() {
 
         {state === "kept" ? (
           <section style={styles.result} aria-label="保存しました">
-            <p style={styles.kicker}>とっておきました</p>
+            <p style={styles.kicker}>この2枚をとっておく</p>
             <h2 style={styles.subTitle}>
-              うちのねこページを
+              アルバムに残すために
               <br />
-              作れます
+              接続します
             </h2>
             <p style={styles.resultText}>
-              アカウントに接続すると、ねがおをあとから見返せます。
+              接続すると、今日の2枚とこのねこの場所をあとから見返せます。
             </p>
-            <a href="/account/create" style={styles.primaryLink}>
-              うちのねこページを作る
+            <a href="/account/create?from=onboarding" style={styles.primaryLink}>
+              この2枚をとっておく
             </a>
             <a href="/collection" style={styles.secondaryLink}>
               アルバムで見る
@@ -369,6 +411,17 @@ export function OnboardingFlow() {
         ) : null}
       </div>
     </main>
+  );
+}
+
+function DeliveryWaiting() {
+  return (
+    <div style={styles.deliveryWaiting} aria-live="polite">
+      <span style={styles.deliveryWaitingLine}>
+        <span style={styles.deliveryWaitingDot} />
+      </span>
+      <span style={styles.deliveryWaitingText}>どこかのねがおを受け取っています</span>
+    </div>
   );
 }
 
@@ -668,6 +721,39 @@ const styles = {
     lineHeight: 1.9,
     letterSpacing: "0.06em",
   },
+  deliveryWaiting: {
+    display: "grid",
+    justifyItems: "center",
+    gap: "8px",
+    margin: "0 0 -4px",
+  },
+  deliveryWaitingLine: {
+    position: "relative",
+    width: "112px",
+    height: "2px",
+    borderRadius: "999px",
+    overflow: "hidden",
+    background:
+      "repeating-linear-gradient(90deg, rgba(142,128,110,0.24) 0 4px, transparent 4px 10px)",
+  },
+  deliveryWaitingDot: {
+    position: "absolute",
+    top: "-2px",
+    left: "50%",
+    width: "6px",
+    height: "6px",
+    borderRadius: "999px",
+    background: "rgba(154,134,107,0.7)",
+    animation: "onboardingDots 1.1s ease-in-out infinite alternate",
+  },
+  deliveryWaitingText: {
+    color: "#8a8174",
+    fontFamily: SERIF,
+    fontSize: "12px",
+    fontWeight: 400,
+    lineHeight: 1.4,
+    letterSpacing: "0.08em",
+  },
   primaryButton: {
     width: "min(100%, 280px)",
     minHeight: "54px",
@@ -743,13 +829,37 @@ const styles = {
     lineHeight: 1.45,
     letterSpacing: "0.08em",
   },
+  deliveryEnvelope: {
+    width: "54px",
+    height: "54px",
+    margin: "-2px 0 -2px",
+    borderRadius: "999px",
+    display: "inline-flex",
+    alignItems: "center",
+    justifyContent: "center",
+    background: "rgba(244,228,221,0.72)",
+    color: "#b98678",
+    border: "1px solid rgba(178,132,116,0.14)",
+    boxShadow: "0 10px 24px rgba(90,76,60,0.08)",
+    animation: "deliveredEnvelope 460ms cubic-bezier(0.22, 1, 0.36, 1) both",
+  },
   photoPair: {
     display: "grid",
-    gridTemplateColumns: "96px 34px 128px",
+    gridTemplateColumns: "104px 32px 136px",
     alignItems: "center",
     justifyContent: "center",
     gap: "8px",
     width: "100%",
+  },
+  photoItem: {
+    display: "grid",
+    justifyItems: "center",
+    gap: "8px",
+  },
+  singleDeliveredPhoto: {
+    display: "grid",
+    justifyItems: "center",
+    gap: "8px",
   },
   ownPhoto: {
     width: "96px",
@@ -759,6 +869,7 @@ const styles = {
     opacity: 0.72,
     border: "6px solid rgba(255,253,248,0.74)",
     boxShadow: "0 8px 20px rgba(90,76,60,0.08)",
+    animation: "ownPhotoSend 560ms ease-out both",
   },
   deliveredPhoto: {
     width: "128px",
@@ -767,6 +878,14 @@ const styles = {
     borderRadius: "26px",
     border: "7px solid rgba(255,253,248,0.82)",
     boxShadow: "0 14px 34px rgba(90,76,60,0.12)",
+    animation: "deliveredPhotoIn 620ms 120ms cubic-bezier(0.22, 1, 0.36, 1) both",
+  },
+  photoLabel: {
+    color: "#8a8174",
+    fontSize: "11px",
+    fontWeight: 600,
+    lineHeight: 1.3,
+    letterSpacing: "0.04em",
   },
   savedPhoto: {
     width: "min(100%, 260px)",

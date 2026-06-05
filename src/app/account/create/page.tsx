@@ -71,6 +71,7 @@ export default function AccountCreatePage() {
   const [connectedEmail, setConnectedEmail] = useState("");
   const [displayEnvironment, setDisplayEnvironment] =
     useState<DisplayEnvironment>("unknown");
+  const [isFromOnboarding, setIsFromOnboarding] = useState(false);
   const googleButtonRef = useRef<HTMLDivElement | null>(null);
   const hasTrackedCtaView = useRef(false);
   const hasTrackedCallbackError = useRef(false);
@@ -78,6 +79,9 @@ export default function AccountCreatePage() {
 
   useEffect(() => {
     setDisplayEnvironment(getDisplayEnvironment());
+    setIsFromOnboarding(
+      new URLSearchParams(window.location.search).get("from") === "onboarding",
+    );
 
     let isMounted = true;
 
@@ -305,7 +309,9 @@ export default function AccountCreatePage() {
         startedAt: new Date().toISOString(),
       }),
     );
-    router.replace("/home?auth=google_success");
+    router.replace(
+      isFromOnboarding ? "/cats?onboarding=1" : "/home?auth=google_success",
+    );
   }
 
   function handleLater() {
@@ -332,10 +338,15 @@ export default function AccountCreatePage() {
           {isAccountConnected ? (
             <>
               <p style={styles.eyebrow}>アカウント</p>
-              <h1 style={styles.title}>Googleアカウントに接続済みです</h1>
+              <h1 style={styles.title}>
+                {isFromOnboarding
+                  ? "この2枚をとっておけます"
+                  : "Googleアカウントに接続済みです"}
+              </h1>
               <p style={styles.body}>
-                この端末のねがおを、アカウントに保存できます。
-                別の端末でも復元できます。
+                {isFromOnboarding
+                  ? "今日の2枚と、このねこの場所をあとから見返せます。"
+                  : "この端末のねがおを、アカウントに保存できます。別の端末でも復元できます。"}
               </p>
               {connectedEmail ? (
                 <p style={styles.connectedEmail}>{connectedEmail}</p>
@@ -345,22 +356,29 @@ export default function AccountCreatePage() {
                 <div ref={googleButtonRef} style={styles.googleButtonMount} />
                 <button
                   type="button"
-                  onClick={() => router.push("/home")}
+                  onClick={() =>
+                    router.push(isFromOnboarding ? "/cats?onboarding=1" : "/home")
+                  }
                   style={styles.primaryButton}
                 >
-                  ホームへ戻る
+                  {isFromOnboarding ? "このねこの名前へ" : "ホームへ戻る"}
                 </button>
               </div>
             </>
           ) : (
             <>
-              <p style={styles.eyebrow}>ねてるねこの保存</p>
+              <p style={styles.eyebrow}>
+                {isFromOnboarding ? "この2枚をとっておく" : "ねてるねこの保存"}
+              </p>
               <h1 style={styles.title}>
-                ねがおを、あとから見返せるように
+                {isFromOnboarding
+                  ? "アルバムに残すために接続します"
+                  : "ねがおを、あとから見返せるように"}
               </h1>
               <p style={styles.body}>
-                Googleアカウントで接続すると、この端末のねがおを保存できます。
-                別の端末でも、とったねがおやとどいたねがおを復元できます。
+                {isFromOnboarding
+                  ? "Googleで続けると、今日の2枚とこのねこの場所をあとから見返せます。"
+                  : "Googleアカウントで接続すると、この端末のねがおを保存できます。別の端末でも、とったねがおやとどいたねがおを復元できます。"}
               </p>
 
               <div style={styles.valueList} aria-label="保存できるもの">
@@ -396,7 +414,7 @@ export default function AccountCreatePage() {
                   style={styles.primaryButton}
                   disabled={isStartingAuth || isCheckingAccount}
                 >
-                  {isStartingAuth ? "Googleを開いています..." : "Googleで接続する"}
+                  {isStartingAuth ? "Googleを開いています..." : "Googleで続ける"}
                 </button>
                 <button
                   type="button"
