@@ -107,6 +107,7 @@ type StoredCollectionPhotoEntry = {
 
 type BoxDetailKind = "sleeping" | "other";
 type AlbumPhotoKind = "sleeping" | "awake" | "other";
+type AlbumScope = "taken" | "delivered";
 
 type AlbumMomentPhoto = BoxPreviewPhoto & {
   kind: AlbumPhotoKind;
@@ -133,6 +134,8 @@ export function CollectionPage() {
   const [activeCatId, setActiveCatId] = useState<string | null>(null);
   const [activeGroupId, setActiveGroupId] = useState<CollectionGroupId>("pose");
   const [activeView, setActiveView] = useState<CollectionView>("collect");
+  const [activeAlbumScope, setActiveAlbumScope] =
+    useState<AlbumScope>("taken");
   const [hasLoaded, setHasLoaded] = useState(false);
   const [collectionPhotos, setCollectionPhotos] = useState<
     Record<string, StoredCollectionPhotoEntry[]>
@@ -736,6 +739,8 @@ export function CollectionPage() {
 
         <BoxOverview
           dayGroups={albumDayGroups}
+          activeScope={activeAlbumScope}
+          onScopeChange={setActiveAlbumScope}
           onOpenBox={openBoxDetail}
         />
       </div>
@@ -805,20 +810,33 @@ function PageBackdrop() {
 
 function BoxOverview({
   dayGroups,
+  activeScope,
+  onScopeChange,
   onOpenBox,
 }: {
   dayGroups: AlbumDayGroup[];
+  activeScope: AlbumScope;
+  onScopeChange: (scope: AlbumScope) => void;
   onOpenBox: (kind: BoxDetailKind, dateKey?: string | null) => void;
 }) {
+  const scopedDayGroups = useMemo(
+    () => filterAlbumDayGroupsByScope(dayGroups, activeScope),
+    [activeScope, dayGroups],
+  );
   const todayKey = getLocalDateKey(Date.now());
   const todayGroup =
-    dayGroups.find((group) => group.key === todayKey) ?? createEmptyTodayAlbumGroup();
-  const recentGroups = dayGroups.filter((group) => group.key !== todayKey).slice(0, 5);
+    scopedDayGroups.find((group) => group.key === todayKey) ??
+    createEmptyTodayAlbumGroup();
+  const recentGroups = scopedDayGroups
+    .filter((group) => group.key !== todayKey)
+    .slice(0, 5);
 
   return (
     <section style={styles.boxOverview} aria-label="アルバム">
+      <AlbumScopeTabs activeScope={activeScope} onScopeChange={onScopeChange} />
       <AlbumTodayCard
         group={todayGroup}
+        scope={activeScope}
         onOpenBox={onOpenBox}
       />
 
@@ -832,9 +850,11 @@ function BoxOverview({
 
 function AlbumTodayCard({
   group,
+  scope,
   onOpenBox,
 }: {
   group: AlbumDayGroup;
+  scope: AlbumScope;
   onOpenBox: (kind: BoxDetailKind, dateKey?: string | null) => void;
 }) {
   return (
@@ -853,11 +873,50 @@ function AlbumTodayCard({
         <div style={styles.todayAlbumEmpty}>
           <span style={styles.todayAlbumEmptyLine} />
           <p style={styles.todayAlbumEmptyText}>
-            ねがおをとるとここに並びます
+            {scope === "taken"
+              ? "写真を入れるとここに並びます"
+              : "ねがおが届くとここに並びます"}
           </p>
         </div>
       )}
     </section>
+  );
+}
+
+function AlbumScopeTabs({
+  activeScope,
+  onScopeChange,
+}: {
+  activeScope: AlbumScope;
+  onScopeChange: (scope: AlbumScope) => void;
+}) {
+  const tabs: Array<{ key: AlbumScope; label: string }> = [
+    { key: "taken", label: "とった" },
+    { key: "delivered", label: "とどいた" },
+  ];
+
+  return (
+    <div style={styles.albumScopeTabs} role="tablist" aria-label="アルバムの切り替え">
+      {tabs.map((tab) => {
+        const isActive = tab.key === activeScope;
+
+        return (
+          <button
+            key={tab.key}
+            type="button"
+            role="tab"
+            aria-selected={isActive}
+            style={{
+              ...styles.albumScopeTab,
+              ...(isActive ? styles.albumScopeTabActive : {}),
+            }}
+            onClick={() => onScopeChange(tab.key)}
+          >
+            {tab.label}
+          </button>
+        );
+      })}
+    </div>
   );
 }
 
@@ -1911,6 +1970,31 @@ function createEmptyTodayAlbumGroup(): AlbumDayGroup {
   };
 }
 
+function filterAlbumDayGroupsByScope(
+  groups: AlbumDayGroup[],
+  scope: AlbumScope,
+) {
+  return groups
+    .map((group) => {
+      const sections = group.sections.filter((section) =>
+        scope === "taken"
+          ? section.kind === "sleeping" || section.kind === "awake"
+          : section.kind === "other",
+      );
+      const total = sections.reduce(
+        (sum, section) => sum + section.photos.length,
+        0,
+      );
+
+      return {
+        ...group,
+        sections,
+        total,
+      };
+    })
+    .filter((group) => group.total > 0);
+}
+
 function filterBoxPhotosByDate(
   photos: BoxPreviewPhoto[],
   dateKey: string | null,
@@ -2423,7 +2507,37 @@ const styles = {
   },
   boxOverview: {
     display: "grid",
-    gap: "22px",
+    gap: "18px",
+  },
+  albumScopeTabs: {
+    width: "min(230px, 100%)",
+    display: "grid",
+    gridTemplateColumns: "repeat(2, minmax(0, 1fr))",
+    gap: "4px",
+    margin: "0 auto 2px",
+    padding: "4px",
+    borderRadius: "999px",
+    background: "rgba(255,253,248,0.56)",
+    border: "0.5px solid rgba(98,87,72,0.16)",
+    boxShadow: "0 8px 20px rgba(90,76,60,0.06)",
+  },
+  albumScopeTab: {
+    minHeight: "34px",
+    border: "none",
+    borderRadius: "999px",
+    background: "transparent",
+    color: COLLECTION_MUTED,
+    font: "inherit",
+    fontSize: "13px",
+    fontWeight: 500,
+    lineHeight: 1,
+    letterSpacing: "0.04em",
+    cursor: "pointer",
+  },
+  albumScopeTabActive: {
+    background: "rgba(255,253,248,0.96)",
+    color: COLLECTION_TEXT_STRONG,
+    boxShadow: "0 7px 16px rgba(90,76,60,0.08)",
   },
   todayAlbumCard: {
     display: "grid",
