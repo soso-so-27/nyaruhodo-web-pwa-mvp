@@ -12,6 +12,7 @@ import {
 import { createSupabaseAdminClient } from "../../../../lib/supabase/admin";
 import { createServerSupabaseClient } from "../../../../lib/supabase/server";
 import type { ExchangePhoto } from "../../../../lib/home/sleepingPhotos";
+import { isBlockedDeliveryPoolRow } from "../../../../lib/home/deliveryPoolGuards";
 
 export const dynamic = "force-dynamic";
 
@@ -32,6 +33,7 @@ type ExchangeRequest = {
   recipientCatId?: string | null;
   anonymousId?: string | null;
   blockedPhotoIds?: string[];
+  preferredSourcePhotoId?: string | null;
   debugDryRun?: boolean;
 };
 
@@ -248,6 +250,7 @@ async function readExchangeRequest(request: Request): Promise<Required<ExchangeR
     blockedPhotoIds: Array.isArray(body.blockedPhotoIds)
       ? body.blockedPhotoIds.filter((id) => typeof id === "string")
       : [],
+    preferredSourcePhotoId: toStringOrNull(body.preferredSourcePhotoId),
     debugDryRun: body.debugDryRun === true,
   };
 }
@@ -325,6 +328,9 @@ function isRowDeliverable(
     blockedPhotoIds: Set<string>;
   },
 ) {
+  if (isBlockedDeliveryPoolRow(row)) {
+    return false;
+  }
   if (!isUsablePhotoSrc(row.photo_url) || row.delivery_status !== "available") {
     return false;
   }
@@ -351,6 +357,9 @@ function isAdminStockFallbackDeliverable(
   row: RemoteCatMomentRow,
   context: Parameters<typeof isRowDeliverable>[1],
 ) {
+  if (isBlockedDeliveryPoolRow(row)) {
+    return false;
+  }
   if (readPoolKind(row.metadata) !== "admin_stock") {
     return false;
   }
@@ -445,6 +454,18 @@ async function prepareExchangeMomentPhotoUrl({
 function selectCandidate(candidates: Candidate[], input: Required<ExchangeRequest>) {
   if (candidates.length === 0) {
     return null;
+  }
+
+  if (input.preferredSourcePhotoId) {
+    const preferredCandidate = candidates.find(
+      (candidate) =>
+        candidate.row.id === input.preferredSourcePhotoId ||
+        candidate.row.local_moment_id === input.preferredSourcePhotoId,
+    );
+
+    if (preferredCandidate) {
+      return preferredCandidate;
+    }
   }
 
   const index =

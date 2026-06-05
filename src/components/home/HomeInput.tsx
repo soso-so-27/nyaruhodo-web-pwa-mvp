@@ -1571,7 +1571,7 @@ export function HomeInput({ recentEvents: _recentEvents }: HomeInputProps) {
     );
   }
 
-  function handleConfirmExchangeSharePhoto(photo: PendingExchangeSharePhoto) {
+  async function handleConfirmExchangeSharePhoto(photo: PendingExchangeSharePhoto) {
     const targetCatId = pendingExchangeCatId ?? activeCatId;
     if (!targetCatId) return;
 
@@ -1582,7 +1582,7 @@ export function HomeInput({ recentEvents: _recentEvents }: HomeInputProps) {
       Date.now(),
     );
 
-    const ownPhoto = saveOwnSleepingPhoto({
+    const ownPhoto = await saveOwnSleepingPhotoWithCompressedFallback({
       catId: targetCatId,
       src: photo.src,
       triggerLabel: photo.triggerLabel,
@@ -1637,11 +1637,11 @@ export function HomeInput({ recentEvents: _recentEvents }: HomeInputProps) {
     );
   }
 
-  function handleKeepExchangeSharePhotoPrivate(photo: PendingExchangeSharePhoto) {
+  async function handleKeepExchangeSharePhotoPrivate(photo: PendingExchangeSharePhoto) {
     const targetCatId = pendingExchangeCatId ?? activeCatId;
     if (!targetCatId) return;
 
-    const ownPhoto = saveOwnSleepingPhoto({
+    const ownPhoto = await saveOwnSleepingPhotoWithCompressedFallback({
       catId: targetCatId,
       src: photo.src,
       triggerLabel: photo.triggerLabel,
@@ -3893,6 +3893,90 @@ function createCollectionPhotoId(catId: string, slug: string) {
     `id-${Date.now()}-${Math.random().toString(16).slice(2)}`;
 
   return `${catId}:${slug}:${random}`;
+}
+
+async function saveOwnSleepingPhotoWithCompressedFallback({
+  catId,
+  src,
+  triggerLabel,
+  theme,
+  shared,
+}: {
+  catId: string;
+  src: string;
+  triggerLabel: string;
+  theme: string;
+  shared: boolean;
+}) {
+  const triedSrcs = new Set<string>();
+  const candidates = [
+    src,
+    ...(src.startsWith("data:image/")
+      ? await Promise.all([
+          resizeDataUrl(src, 420, 0.62),
+          resizeDataUrl(src, 320, 0.54),
+          resizeDataUrl(src, 240, 0.46),
+          resizeDataUrl(src, 180, 0.4),
+        ])
+      : []),
+  ];
+
+  for (const candidateSrc of candidates) {
+    if (!candidateSrc || triedSrcs.has(candidateSrc)) {
+      continue;
+    }
+
+    triedSrcs.add(candidateSrc);
+    const ownPhoto = saveOwnSleepingPhoto({
+      catId,
+      src: candidateSrc,
+      triggerLabel,
+      theme,
+      shared,
+    });
+
+    if (ownPhoto) {
+      return ownPhoto;
+    }
+  }
+
+  return null;
+}
+
+function resizeDataUrl(
+  src: string,
+  maxSize = 420,
+  quality = 0.62,
+): Promise<string | null> {
+  return new Promise((resolve) => {
+    const image = new Image();
+
+    image.onload = () => {
+      const scale = Math.min(1, maxSize / Math.max(image.width, image.height));
+      const canvas = document.createElement("canvas");
+      canvas.width = Math.max(1, Math.round(image.width * scale));
+      canvas.height = Math.max(1, Math.round(image.height * scale));
+
+      const context = canvas.getContext("2d");
+      if (!context) {
+        resolve(null);
+        return;
+      }
+
+      context.drawImage(image, 0, 0, canvas.width, canvas.height);
+      try {
+        resolve(canvas.toDataURL("image/jpeg", quality));
+      } catch {
+        resolve(null);
+      }
+    };
+
+    image.onerror = () => {
+      resolve(null);
+    };
+
+    image.src = src;
+  });
 }
 
 function getFileSizeBucket(size: number) {

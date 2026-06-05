@@ -632,6 +632,35 @@ export function getActiveCatProfile(
   );
 }
 
+export function isCatProfileNameUnset(profile: CatProfile | null | undefined) {
+  const name = profile?.name?.trim();
+
+  if (!name) {
+    return true;
+  }
+
+  if (name !== DEFAULT_CAT_NAME) {
+    return false;
+  }
+
+  if (!profile) {
+    return true;
+  }
+
+  return !hasUserProfileDetails(profile);
+}
+
+function hasUserProfileDetails(profile: CatProfile) {
+  return Boolean(
+    profile.avatarDataUrl ||
+      profile.homePhotoDataUrl ||
+      profile.basicInfo?.birthDate ||
+      profile.basicInfo?.gender ||
+      profile.basicInfo?.breed?.trim() ||
+      profile.appearance?.coat,
+  );
+}
+
 export function addCatProfile(profiles: CatProfile[], name: string) {
   const trimmedName = name.trim();
 

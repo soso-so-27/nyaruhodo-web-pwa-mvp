@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 
 import { isUsablePhotoSrc } from "../../../../lib/photoStorage";
+import { isBlockedDeliveryPoolRow } from "../../../../lib/home/deliveryPoolGuards";
 import { createSupabaseAdminClient } from "../../../../lib/supabase/admin";
 import { createServerSupabaseClient } from "../../../../lib/supabase/server";
 
@@ -49,7 +50,10 @@ export async function POST(request: Request) {
   }
 
   const rows = (data ?? []) as RemoteCatMomentRow[];
-  const availableRows = rows.filter((row) => row.delivery_status === "available");
+  const blockedPoolRows = rows.filter(isBlockedDeliveryPoolRow);
+  const availableRows = rows.filter(
+    (row) => row.delivery_status === "available" && !isBlockedDeliveryPoolRow(row),
+  );
   const unusableRows = availableRows.filter(
     (row) => !isUsablePhotoSrc(row.photo_url),
   );
@@ -91,6 +95,7 @@ export async function POST(request: Request) {
     ).length,
     hiddenCount: rows.filter((row) => row.delivery_status === "hidden").length,
     reportedCount: rows.filter((row) => row.delivery_status === "reported").length,
+    blockedPoolCount: blockedPoolRows.length,
     rlsReadable: true,
     lastError: null,
     checkedAt: new Date().toISOString(),
@@ -112,6 +117,7 @@ function buildEmptyDiagnostics(source: "none" | "error", lastError: string) {
     userSharedCount: 0,
     hiddenCount: 0,
     reportedCount: 0,
+    blockedPoolCount: 0,
     rlsReadable: false,
     lastError,
     checkedAt: new Date().toISOString(),

@@ -7,6 +7,7 @@ import {
   isUsablePhotoSrc,
 } from "../../../../lib/photoStorage";
 import type { ExchangePhotoPoolItem } from "../../../../lib/home/sleepingPhotos";
+import { isBlockedDeliveryPoolRow } from "../../../../lib/home/deliveryPoolGuards";
 
 export const dynamic = "force-dynamic";
 
@@ -138,6 +139,9 @@ async function readRemoteCandidates(input: CandidateRequest) {
 }
 
 function isRowDeliverable(row: RemoteCatMomentRow, context: CandidateFilterContext) {
+  if (isBlockedDeliveryPoolRow(row)) {
+    return false;
+  }
   if (!isUsablePhotoSrc(row.photo_url)) {
     return false;
   }
@@ -166,6 +170,9 @@ function isAdminStockFallbackDeliverable(
   row: RemoteCatMomentRow,
   context: CandidateFilterContext,
 ) {
+  if (isBlockedDeliveryPoolRow(row)) {
+    return false;
+  }
   if (readPoolKind(row.metadata) !== "admin_stock") {
     return false;
   }

@@ -8,6 +8,7 @@ import {
   toStoragePhotoUrl,
   uploadDataUrl,
 } from "../../../../lib/photoStorage";
+import { requireStockAdminAccess } from "../../../../lib/adminAccess";
 import { createSupabaseAdminClient } from "../../../../lib/supabase/admin";
 import { createServerSupabaseClient } from "../../../../lib/supabase/server";
 import type { ExchangePhotoPoolItem } from "../../../../lib/home/sleepingPhotos";
@@ -19,6 +20,15 @@ type StockRequest = {
 };
 
 export async function POST(request: Request) {
+  const adminAccess = await requireStockAdminAccess(request);
+
+  if (!adminAccess.allowed) {
+    return NextResponse.json(
+      { photo: null, error: adminAccess.error },
+      { status: adminAccess.status },
+    );
+  }
+
   const adminSupabase = createSupabaseAdminClient();
   const supabase = adminSupabase ?? (await createServerSupabaseClient());
   const body = (await request.json().catch(() => null)) as StockRequest | null;

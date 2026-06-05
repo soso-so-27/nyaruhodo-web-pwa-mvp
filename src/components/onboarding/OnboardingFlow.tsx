@@ -3,6 +3,7 @@
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import type { CSSProperties } from "react";
+import { readClientAdminCapabilities } from "../../lib/adminCapabilitiesClient";
 import { STORAGE_KEYS } from "../../lib/storage";
 import {
   createSleepingExchange,
@@ -38,7 +39,27 @@ export function OnboardingFlow() {
   const [isTestMode, setIsTestMode] = useState(false);
 
   useEffect(() => {
-    setIsTestMode(new URLSearchParams(window.location.search).has("test"));
+    let isMounted = true;
+
+    async function resolveTestMode() {
+      const requestedTestMode = new URLSearchParams(window.location.search).has("test");
+
+      if (!requestedTestMode) {
+        return;
+      }
+
+      const capabilities = await readClientAdminCapabilities();
+
+      if (isMounted) {
+        setIsTestMode(capabilities.testToolsEnabled);
+      }
+    }
+
+    void resolveTestMode();
+
+    return () => {
+      isMounted = false;
+    };
   }, []);
 
   async function handleSelectSleepingPhoto() {
@@ -128,16 +149,23 @@ export function OnboardingFlow() {
     }, 60000);
   }
 
-  function handleContinueAfterDelivery() {
+  async function handleContinueAfterDelivery() {
     if (!deliveredPhoto) {
       return;
     }
 
-    keepExchangePhoto(deliveredPhoto);
+    const keepResult = await keepExchangePhotoForAlbum(deliveredPhoto);
+    setDeliveredPhoto(keepResult.photo);
     trackProductEvent("onboarding_delivered_photo_confirmed", {
-      source_photo_id: deliveredPhoto.sourcePhotoId ?? null,
+      source_photo_id: keepResult.photo.sourcePhotoId ?? null,
+      saved_to_album: keepResult.saved,
       test_mode: isTestMode,
     });
+
+    if (!keepResult.saved) {
+      setMessage("ねがおは届きましたが、アルバムに保存できませんでした。設定の保存状態を確認してください。");
+      return;
+    }
 
     if (isTestMode) {
       router.push("/collection");
@@ -152,10 +180,12 @@ export function OnboardingFlow() {
     ownPhoto,
     recipientCatId,
     emptyMessage,
+    preferredSourcePhotoId,
   }: {
     ownPhoto: OwnSleepingPhoto;
     recipientCatId: string;
     emptyMessage: string;
+    preferredSourcePhotoId?: string | null;
   }) {
     const exchangeResult = await createSleepingExchange({
       ownPhoto,
@@ -164,6 +194,7 @@ export function OnboardingFlow() {
       category: "sleeping",
       seed: `${ownPhoto.id}:${Date.now()}`,
       recipientCatId,
+      preferredSourcePhotoId,
     });
 
     trackProductEvent("onboarding_sleeping_photo_delivered", {
@@ -178,20 +209,16 @@ export function OnboardingFlow() {
       return false;
     }
 
-    const keepResult = await keepExchangePhotoForAlbum(exchangeResult.photo);
-    setDeliveredPhoto(keepResult.photo);
-    trackProductEvent("onboarding_delivered_photo_auto_kept", {
-      source_photo_id: keepResult.photo.sourcePhotoId ?? null,
-      saved_to_album: keepResult.saved,
-    });
-    if (!keepResult.saved) {
-      setMessage("ねがおは届きましたが、アルバムに保存できませんでした。設定の保存状態を確認してください。");
-    }
+    setDeliveredPhoto(exchangeResult.photo);
     setState("delivered");
     return true;
   }
 
   async function handleAddCandidatePhoto() {
+    if (!isTestMode) {
+      return;
+    }
+
     if (isCandidateAdding) {
       return;
     }
@@ -247,6 +274,7 @@ export function OnboardingFlow() {
         const delivered = await deliverOwnSleepingPhoto({
           ownPhoto: pendingOwnPhoto,
           recipientCatId: pendingOwnPhoto.catId,
+          preferredSourcePhotoId: saved.sourceOwnPhotoId ?? saved.id,
           emptyMessage:
             "とどく候補を追加しましたが、まだ受け取れませんでした。設定のとどく状態を確認してください。",
         });
@@ -385,7 +413,7 @@ export function OnboardingFlow() {
               onClick={handleContinueAfterDelivery}
               style={styles.primaryButton}
             >
-              {isTestMode ? "アルバムで見る" : "つぎへ"}
+              {isTestMode ? "アルバムで見る" : "この2枚をとっておく"}
             </button>
             <button type="button" onClick={handleGoHome} style={styles.textButton}>
               閉じる
@@ -425,21 +453,20 @@ export function OnboardingFlow() {
         ) : null}
 
         {state === "kept" ? (
-          <section style={styles.result} aria-label="保存しました">
-            <p style={styles.kicker}>この2枚をとっておく</p>
+          <section style={styles.result} aria-label="とっておきました">
+            <p style={styles.kicker}>とっておきました</p>
             <h2 style={styles.subTitle}>
-              アルバムに残すために
+              また寝ていたら、
               <br />
-              接続します
+              ここへ。
             </h2>
             <p style={styles.resultText}>
-              接続すると、今日の2枚とこのねこの場所をあとから見返せます。
+              入れるたびに、
+              <br />
+              どこかのねがおが届きます。
             </p>
             <a href="/account/create?from=onboarding" style={styles.primaryLink}>
-              この2枚をとっておく
-            </a>
-            <a href="/collection" style={styles.secondaryLink}>
-              アルバムで見る
+              このねこのアルバムをつくる
             </a>
             <button type="button" onClick={handleGoHome} style={styles.textButton}>
               ホームへ

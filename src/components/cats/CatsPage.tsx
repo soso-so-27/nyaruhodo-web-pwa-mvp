@@ -11,6 +11,7 @@ import {
   addCatProfile,
   getActiveCatProfile,
   getCatName,
+  isCatProfileNameUnset,
   readActiveCatId,
   readCatProfiles,
   saveActiveCatId,
@@ -57,6 +58,8 @@ export function CatsPage() {
   const [isEditingProfile, setIsEditingProfile] = useState(false);
   const [isAddingCat, setIsAddingCat] = useState(false);
   const [isOnboardingMode, setIsOnboardingMode] = useState(false);
+  const [isOnboardingExistingCat, setIsOnboardingExistingCat] = useState(false);
+  const [isOnboardingAlbumCreated, setIsOnboardingAlbumCreated] = useState(false);
   const [editBirthDate, setEditBirthDate] = useState("");
   const [editGender, setEditGender] = useState<EditableGender>("");
   const [editBreed, setEditBreed] = useState("");
@@ -75,6 +78,7 @@ export function CatsPage() {
   const activeAvatarSrc =
     activeCatProfile?.avatarDataUrl ??
     getCatAvatarSrc(activeCatProfile?.appearance?.coat);
+  const isOnboardingProfileSetup = isOnboardingMode && isEditingProfile;
 
   useEffect(() => {
     const onboardingMode =
@@ -90,7 +94,10 @@ export function CatsPage() {
     setActiveCatId(activeProfile.id);
     setCatNameInput(getCatName(activeProfile));
     setIsOnboardingMode(onboardingMode);
-    if (onboardingMode) {
+    const shouldEditOnboardingProfile =
+      onboardingMode && isCatProfileNameUnset(activeProfile);
+    setIsOnboardingExistingCat(onboardingMode && !shouldEditOnboardingProfile);
+    if (shouldEditOnboardingProfile) {
       setIsEditingCatName(true);
       setIsEditingProfile(true);
     }
@@ -106,6 +113,7 @@ export function CatsPage() {
     setIsAddingCat(false);
     setIsEditingCatName(false);
     setIsEditingProfile(false);
+    setIsOnboardingAlbumCreated(false);
     setMessage("");
     setSaveMessage("");
   }
@@ -207,9 +215,13 @@ export function CatsPage() {
       setCatNameInput(nextProfile.name);
       setIsEditingCatName(false);
       setIsEditingProfile(false);
-      setSaveMessage(
-        isOnboardingMode ? "アルバムができました。" : "保存しました。",
-      );
+      if (isOnboardingMode) {
+        setIsOnboardingAlbumCreated(true);
+        setSaveMessage("");
+        return;
+      }
+
+      setSaveMessage("保存しました。");
       setTimeout(() => setSaveMessage(""), 2000);
     } catch {
       return;
@@ -355,14 +367,18 @@ export function CatsPage() {
         {isOnboardingMode ? (
           <section style={styles.onboardingPanel} aria-label="オンボーディング">
             <p style={styles.onboardingKicker}>
-              {isEditingProfile ? "このねこの場所" : "アルバムができました"}
+              {isEditingProfile
+                ? "このねこの場所"
+                : isOnboardingExistingCat && !isOnboardingAlbumCreated
+                  ? "アルバムに入りました"
+                  : "アルバムができました"}
             </p>
             <h2 style={styles.onboardingTitle}>
               {isEditingProfile ? "このねこの名前は？" : "また寝ていたら、ここへ。"}
             </h2>
             <p style={styles.onboardingText}>
               {isEditingProfile
-                ? "名前だけで大丈夫です。このねこの場所として見返せます。"
+                ? "名前だけで大丈夫です。あとから変えられます。"
                 : "次に寝ていたら、すぐ入れられるように。"}
             </p>
             {!isEditingProfile ? (
@@ -373,58 +389,60 @@ export function CatsPage() {
           </section>
         ) : null}
 
-        <div style={styles.catGrid}>
-          {catProfiles.map((profile) => {
-            const isActive = profile.id === activeCatId;
+        {!isOnboardingProfileSetup ? (
+          <div style={styles.catGrid}>
+            {catProfiles.map((profile) => {
+              const isActive = profile.id === activeCatId;
 
-            return (
-              <button
-                key={profile.id}
-                type="button"
-                style={styles.catGridItem}
-                onClick={() => handleCatSelect(profile.id)}
-              >
-                <div
-                  style={
-                    isActive
-                      ? { ...styles.catAvatar, ...styles.catAvatarActive }
-                      : styles.catAvatar
-                  }
-                  onClick={
-                    isActive
-                      ? (event) => {
-                          event.stopPropagation();
-                          void handleAvatarUpload();
-                        }
-                      : undefined
-                  }
+              return (
+                <button
+                  key={profile.id}
+                  type="button"
+                  style={styles.catGridItem}
+                  onClick={() => handleCatSelect(profile.id)}
                 >
-                  {profile.avatarDataUrl ? (
-                    <StoredPhotoImage
-                      src={profile.avatarDataUrl}
-                      alt={profile.name}
-                      style={styles.catAvatarPhoto}
-                    />
-                  ) : (
-                    <img
-                      src={getCatAvatarSrc(profile.appearance?.coat)}
-                      alt={profile.name}
-                      style={styles.catAvatarImg}
-                    />
-                  )}
-                </div>
-                <span style={styles.catGridName}>{profile.name}</span>
-              </button>
-            );
-          })}
+                  <div
+                    style={
+                      isActive
+                        ? { ...styles.catAvatar, ...styles.catAvatarActive }
+                        : styles.catAvatar
+                    }
+                    onClick={
+                      isActive
+                        ? (event) => {
+                            event.stopPropagation();
+                            void handleAvatarUpload();
+                          }
+                        : undefined
+                    }
+                  >
+                    {profile.avatarDataUrl ? (
+                      <StoredPhotoImage
+                        src={profile.avatarDataUrl}
+                        alt={profile.name}
+                        style={styles.catAvatarPhoto}
+                      />
+                    ) : (
+                      <img
+                        src={getCatAvatarSrc(profile.appearance?.coat)}
+                        alt={profile.name}
+                        style={styles.catAvatarImg}
+                      />
+                    )}
+                  </div>
+                  <span style={styles.catGridName}>{profile.name}</span>
+                </button>
+              );
+            })}
 
-          <button type="button" style={styles.catGridItem} onClick={startAddingCat}>
-            <div style={styles.catAvatarAdd}>
-              <span style={styles.catAvatarAddMark}>＋</span>
-            </div>
-            <span style={{ ...styles.catGridName, color: CATS_MUTED }}>追加</span>
-          </button>
-        </div>
+            <button type="button" style={styles.catGridItem} onClick={startAddingCat}>
+              <div style={styles.catAvatarAdd}>
+                <span style={styles.catAvatarAddMark}>＋</span>
+              </div>
+              <span style={{ ...styles.catGridName, color: CATS_MUTED }}>追加</span>
+            </button>
+          </div>
+        ) : null}
 
         {isAddingCat ? (
           <div style={styles.editor}>
@@ -460,127 +478,131 @@ export function CatsPage() {
 
         {activeCatProfile ? (
           <div style={styles.profileCard}>
-            <div style={styles.profileHero}>
-              <button
-                type="button"
-                style={styles.profileHeroAvatar}
-                onClick={() => void handleAvatarUpload()}
-                aria-label={`${activeCatProfile.name}のアイコン写真を変更`}
-              >
-                <StoredPhotoImage
-                  src={activeAvatarSrc}
-                  alt=""
-                  style={
-                    activeCatProfile.avatarDataUrl
-                      ? styles.profileHeroAvatarPhoto
-                      : styles.profileHeroAvatarImg
-                  }
-                />
-              </button>
-              <div style={styles.profileHeroInfo}>
-                <p style={styles.profileKicker}>プロフィール</p>
-                <div style={styles.profileName}>{activeCatProfile.name}</div>
-                {activeMeta ? (
-                  <p style={styles.profileMeta}>{activeMeta}</p>
-                ) : (
-                  <p style={styles.profileMeta}>編集から基本情報を追加できます</p>
-                )}
-              </div>
-              <button
-                type="button"
-                style={styles.editBtn}
-                onClick={handleStartEdit}
-              >
-                編集
-              </button>
-            </div>
-
-            <hr style={styles.divider} />
-
-            <p style={styles.sectionTitle}>うちの背景</p>
-            <div style={styles.homePhotoSection}>
-              <div style={styles.homePhotoPreview}>
-                {activeCatProfile.homePhotoDataUrl ? (
-                  <StoredPhotoImage
-                    src={activeCatProfile.homePhotoDataUrl}
-                    alt=""
-                    style={styles.homePhotoPreviewImg}
-                  />
-                ) : (
-                  <span style={styles.homePhotoPreviewText}>ホーム写真</span>
-                )}
-              </div>
-              <div style={styles.homePhotoInfo}>
-                <p style={styles.homePhotoTitle}>うちの背景</p>
-                <p style={styles.homePhotoSub}>
-                  この子の暮らしが見える写真です。
-                </p>
-                <div style={styles.homePhotoActions}>
+            {!isOnboardingProfileSetup ? (
+              <>
+                <div style={styles.profileHero}>
                   <button
                     type="button"
-                    onClick={() => void handleHomePhotoUpload()}
-                    style={styles.homePhotoButton}
+                    style={styles.profileHeroAvatar}
+                    onClick={() => void handleAvatarUpload()}
+                    aria-label={`${activeCatProfile.name}のアイコン写真を変更`}
                   >
-                    写真を選ぶ
+                    <StoredPhotoImage
+                      src={activeAvatarSrc}
+                      alt=""
+                      style={
+                        activeCatProfile.avatarDataUrl
+                          ? styles.profileHeroAvatarPhoto
+                          : styles.profileHeroAvatarImg
+                      }
+                    />
+                  </button>
+                  <div style={styles.profileHeroInfo}>
+                    <p style={styles.profileKicker}>プロフィール</p>
+                    <div style={styles.profileName}>{activeCatProfile.name}</div>
+                    {activeMeta ? (
+                      <p style={styles.profileMeta}>{activeMeta}</p>
+                    ) : (
+                      <p style={styles.profileMeta}>編集から基本情報を追加できます</p>
+                    )}
+                  </div>
+                  <button
+                    type="button"
+                    style={styles.editBtn}
+                    onClick={handleStartEdit}
+                  >
+                    編集
                   </button>
                 </div>
-              </div>
-            </div>
 
-            <hr style={styles.divider} />
+                <hr style={styles.divider} />
 
-            <p style={styles.sectionTitle}>基本情報</p>
-            {activeCatProfile.basicInfo?.birthDate ? (
-              <div style={styles.infoRow}>
-                <span style={styles.infoLabel}>誕生日</span>
-                <span style={styles.infoValue}>
-                  {formatBirthDate(activeCatProfile.basicInfo.birthDate)}
-                </span>
-              </div>
-            ) : null}
-            {activeCatProfile.basicInfo?.birthDate ? (
-              <div style={styles.infoRow}>
-                <span style={styles.infoLabel}>年齢</span>
-                <span style={styles.infoValue}>
-                  {formatAge(activeCatProfile.basicInfo.birthDate)}
-                </span>
-              </div>
-            ) : null}
-            {activeCatProfile.basicInfo?.breed ? (
-              <div style={styles.infoRow}>
-                <span style={styles.infoLabel}>猫種</span>
-                <span style={styles.infoValue}>
-                  {activeCatProfile.basicInfo.breed}
-                </span>
-              </div>
-            ) : null}
-            {activeCatProfile.appearance?.coat ? (
-              <div style={styles.infoRow}>
-                <span style={styles.infoLabel}>毛色</span>
-                <div style={styles.coatRow}>
-                  <div
-                    style={{
-                      ...styles.coatDot,
-                      background: getCoatColor(activeCatProfile.appearance.coat),
-                    }}
-                  />
-                  <span style={styles.infoValue}>
-                    {getCoatLabel(activeCatProfile.appearance.coat)}
-                  </span>
+                <p style={styles.sectionTitle}>うちの背景</p>
+                <div style={styles.homePhotoSection}>
+                  <div style={styles.homePhotoPreview}>
+                    {activeCatProfile.homePhotoDataUrl ? (
+                      <StoredPhotoImage
+                        src={activeCatProfile.homePhotoDataUrl}
+                        alt=""
+                        style={styles.homePhotoPreviewImg}
+                      />
+                    ) : (
+                      <span style={styles.homePhotoPreviewText}>ホーム写真</span>
+                    )}
+                  </div>
+                  <div style={styles.homePhotoInfo}>
+                    <p style={styles.homePhotoTitle}>うちの背景</p>
+                    <p style={styles.homePhotoSub}>
+                      この子の暮らしが見える写真です。
+                    </p>
+                    <div style={styles.homePhotoActions}>
+                      <button
+                        type="button"
+                        onClick={() => void handleHomePhotoUpload()}
+                        style={styles.homePhotoButton}
+                      >
+                        写真を選ぶ
+                      </button>
+                    </div>
+                  </div>
                 </div>
-              </div>
-            ) : null}
-            {!activeCatProfile.basicInfo?.birthDate &&
-            !activeCatProfile.basicInfo?.breed &&
-            !activeCatProfile.appearance?.coat ? (
-              <p style={styles.emptyInfoText}>
-                編集から基本情報を追加できます。
-              </p>
+
+                <hr style={styles.divider} />
+
+                <p style={styles.sectionTitle}>基本情報</p>
+                {activeCatProfile.basicInfo?.birthDate ? (
+                  <div style={styles.infoRow}>
+                    <span style={styles.infoLabel}>誕生日</span>
+                    <span style={styles.infoValue}>
+                      {formatBirthDate(activeCatProfile.basicInfo.birthDate)}
+                    </span>
+                  </div>
+                ) : null}
+                {activeCatProfile.basicInfo?.birthDate ? (
+                  <div style={styles.infoRow}>
+                    <span style={styles.infoLabel}>年齢</span>
+                    <span style={styles.infoValue}>
+                      {formatAge(activeCatProfile.basicInfo.birthDate)}
+                    </span>
+                  </div>
+                ) : null}
+                {activeCatProfile.basicInfo?.breed ? (
+                  <div style={styles.infoRow}>
+                    <span style={styles.infoLabel}>猫種</span>
+                    <span style={styles.infoValue}>
+                      {activeCatProfile.basicInfo.breed}
+                    </span>
+                  </div>
+                ) : null}
+                {activeCatProfile.appearance?.coat ? (
+                  <div style={styles.infoRow}>
+                    <span style={styles.infoLabel}>毛色</span>
+                    <div style={styles.coatRow}>
+                      <div
+                        style={{
+                          ...styles.coatDot,
+                          background: getCoatColor(activeCatProfile.appearance.coat),
+                        }}
+                      />
+                      <span style={styles.infoValue}>
+                        {getCoatLabel(activeCatProfile.appearance.coat)}
+                      </span>
+                    </div>
+                  </div>
+                ) : null}
+                {!activeCatProfile.basicInfo?.birthDate &&
+                !activeCatProfile.basicInfo?.breed &&
+                !activeCatProfile.appearance?.coat ? (
+                  <p style={styles.emptyInfoText}>
+                    編集から基本情報を追加できます。
+                  </p>
+                ) : null}
+              </>
             ) : null}
 
             {isEditingProfile ? (
               <>
-                <hr style={styles.divider} />
+                {!isOnboardingProfileSetup ? <hr style={styles.divider} /> : null}
                 {isEditingCatName ? (
                   <div style={styles.editor}>
                     <label style={styles.label} htmlFor="cat-name">
@@ -594,81 +616,91 @@ export function CatsPage() {
                       placeholder={"例：ミケ"}
                       style={styles.input}
                     />
-                    <p style={styles.editLabel}>生年月日</p>
-                    <input
-                      type="date"
-                      value={editBirthDate}
-                      onChange={(event) => setEditBirthDate(event.target.value)}
-                      max={new Date().toISOString().split("T")[0]}
-                      style={styles.editInput}
-                    />
+                    {!isOnboardingProfileSetup ? (
+                      <>
+                        <p style={styles.editLabel}>生年月日</p>
+                        <input
+                          type="date"
+                          value={editBirthDate}
+                          onChange={(event) => setEditBirthDate(event.target.value)}
+                          max={new Date().toISOString().split("T")[0]}
+                          style={styles.editInput}
+                        />
 
-                    <p style={styles.editLabel}>性別</p>
-                    <div style={styles.genderButtons}>
-                      {[
-                        { value: "male", label: "男の子" },
-                        { value: "female", label: "女の子" },
-                        { value: "unknown", label: "わからない" },
-                      ].map((option) => (
-                        <button
-                          key={option.value}
-                          type="button"
-                          onClick={() =>
-                            setEditGender(option.value as EditableGender)
-                          }
-                          style={
-                            editGender === option.value
-                              ? { ...styles.genderBtn, ...styles.genderBtnActive }
-                              : styles.genderBtn
-                          }
-                        >
-                          {option.label}
-                        </button>
-                      ))}
-                    </div>
+                        <p style={styles.editLabel}>性別</p>
+                        <div style={styles.genderButtons}>
+                          {[
+                            { value: "male", label: "男の子" },
+                            { value: "female", label: "女の子" },
+                            { value: "unknown", label: "わからない" },
+                          ].map((option) => (
+                            <button
+                              key={option.value}
+                              type="button"
+                              onClick={() =>
+                                setEditGender(option.value as EditableGender)
+                              }
+                              style={
+                                editGender === option.value
+                                  ? { ...styles.genderBtn, ...styles.genderBtnActive }
+                                  : styles.genderBtn
+                              }
+                            >
+                              {option.label}
+                            </button>
+                          ))}
+                        </div>
 
-                    <p style={styles.editLabel}>猫種</p>
-                    <input
-                      type="text"
-                      value={editBreed}
-                      onChange={(event) => setEditBreed(event.target.value)}
-                      placeholder="例：サバトラ、雑種・ミックス"
-                      style={styles.editInput}
-                    />
+                        <p style={styles.editLabel}>猫種</p>
+                        <input
+                          type="text"
+                          value={editBreed}
+                          onChange={(event) => setEditBreed(event.target.value)}
+                          placeholder="例：サバトラ、雑種・ミックス"
+                          style={styles.editInput}
+                        />
+                      </>
+                    ) : null}
 
                     <div style={styles.actions}>
                       <button type="button" onClick={handleSaveProfile} style={styles.saveButton}>
-                        {"保存"}
+                        {isOnboardingProfileSetup ? "アルバムをつくる" : "保存"}
                       </button>
-                      <button type="button" onClick={cancelEditingCatName} style={styles.cancelButton}>
-                        {"キャンセル"}
-                      </button>
+                      {!isOnboardingProfileSetup ? (
+                        <button type="button" onClick={cancelEditingCatName} style={styles.cancelButton}>
+                          {"キャンセル"}
+                        </button>
+                      ) : null}
                     </div>
                   </div>
                 ) : null}
 
-                <CoatSelector
-                  currentCoat={editCoat || selectedCoat}
-                  onSelect={setEditCoat}
-                  onClose={() => {
-                    setIsEditingProfile(false);
-                    setIsEditingCatName(false);
-                  }}
-                />
+                {!isOnboardingProfileSetup ? (
+                  <CoatSelector
+                    currentCoat={editCoat || selectedCoat}
+                    onSelect={setEditCoat}
+                    onClose={() => {
+                      setIsEditingProfile(false);
+                      setIsEditingCatName(false);
+                    }}
+                  />
+                ) : null}
               </>
             ) : null}
           </div>
         ) : null}
 
-        <div style={styles.settingsSection}>
-          <p style={styles.settingsSectionLabel}>設定</p>
-          <div style={styles.settingsCard}>
-            <a href="/settings" style={styles.settingsRow}>
-              <span style={styles.settingsRowLabel}>アカウントと設定</span>
-              <span style={styles.settingsRowChevron}>›</span>
-            </a>
+        {!isOnboardingProfileSetup ? (
+          <div style={styles.settingsSection}>
+            <p style={styles.settingsSectionLabel}>設定</p>
+            <div style={styles.settingsCard}>
+              <a href="/settings" style={styles.settingsRow}>
+                <span style={styles.settingsRowLabel}>アカウントと設定</span>
+                <span style={styles.settingsRowChevron}>›</span>
+              </a>
+            </div>
           </div>
-        </div>
+        ) : null}
 
         {message ? <p style={styles.message}>{message}</p> : null}
         {saveMessage ? <p style={styles.message}>{saveMessage}</p> : null}

@@ -8,6 +8,10 @@ import {
   syncLocalDataWithAccount,
 } from "../../lib/accountSync";
 import type { AccountSyncOverview, AccountSyncResult } from "../../lib/accountSync";
+import {
+  readClientAdminCapabilities,
+  type ClientAdminCapabilities,
+} from "../../lib/adminCapabilitiesClient";
 import { trackProductEvent } from "../../lib/analytics/productAnalytics";
 import {
   AUTH_CODE_VERIFIER_STORAGE_KEY,
@@ -62,12 +66,18 @@ export function SettingsPage() {
     useState<SleepingDeliveryDiagnostics | null>(null);
   const [keptExchangeDebug, setKeptExchangeDebug] =
     useState<KeptExchangePhotoStorageDebug | null>(null);
+  const [adminCapabilities, setAdminCapabilities] =
+    useState<ClientAdminCapabilities>({
+      isAdmin: false,
+      testToolsEnabled: false,
+      stockAdminEnabled: false,
+    });
 
   useEffect(() => {
     setDisplayEnvironment(getDisplayEnvironment());
     refreshKeptExchangeDebug();
     void checkAuthState();
-    void refreshDeliveryDiagnostics();
+    void refreshAdminCapabilities();
   }, []);
 
   async function checkAuthState() {
@@ -341,6 +351,15 @@ export function SettingsPage() {
     setIsDeliveryDiagnosticsLoading(false);
   }
 
+  async function refreshAdminCapabilities() {
+    const capabilities = await readClientAdminCapabilities();
+
+    setAdminCapabilities(capabilities);
+    if (capabilities.testToolsEnabled || capabilities.stockAdminEnabled) {
+      void refreshDeliveryDiagnostics();
+    }
+  }
+
   function refreshKeptExchangeDebug() {
     setKeptExchangeDebug(readKeptExchangePhotoStorageDebug());
   }
@@ -482,56 +501,66 @@ export function SettingsPage() {
           </div>
         </section>
 
-        <section style={styles.section}>
-          <p style={styles.sectionLabel}>テスト</p>
-          <div style={styles.card}>
-            <a href="/onboarding?test=1" style={styles.linkRow}>
-              <span style={styles.rowLabel}>オンボーディングを試す</span>
-              <span style={styles.rowChevron}>›</span>
-            </a>
-            <div style={styles.divider} />
-            <div style={styles.row}>
-              <span style={styles.rowLabel}>とどく候補</span>
-              <span style={styles.rowValue}>{stockPhotoCount}枚</span>
+        {adminCapabilities.testToolsEnabled || adminCapabilities.stockAdminEnabled ? (
+          <section style={styles.section}>
+            <p style={styles.sectionLabel}>テスト</p>
+            <div style={styles.card}>
+              {adminCapabilities.testToolsEnabled ? (
+                <>
+                  <a href="/onboarding?test=1" style={styles.linkRow}>
+                    <span style={styles.rowLabel}>オンボーディングを試す</span>
+                    <span style={styles.rowChevron}>›</span>
+                  </a>
+                  <div style={styles.divider} />
+                </>
+              ) : null}
+              <div style={styles.row}>
+                <span style={styles.rowLabel}>とどく候補</span>
+                <span style={styles.rowValue}>{stockPhotoCount}枚</span>
+              </div>
+              <div style={styles.divider} />
+              <DeliveryDiagnosticsPanel diagnostics={deliveryDiagnostics} />
+              <div style={styles.divider} />
+              <KeptExchangeDebugPanel debug={keptExchangeDebug} />
+              <div style={styles.divider} />
+              <button
+                type="button"
+                onClick={() => {
+                  void refreshDeliveryDiagnostics();
+                  refreshKeptExchangeDebug();
+                }}
+                style={styles.secondaryButton}
+                disabled={isDeliveryDiagnosticsLoading}
+              >
+                {isDeliveryDiagnosticsLoading ? "確認中..." : "とどく状態を確認する"}
+              </button>
+              {adminCapabilities.stockAdminEnabled ? (
+                <>
+                  <div style={styles.divider} />
+                  <button
+                    type="button"
+                    onClick={() => {
+                      void handleStockPhotoImport();
+                    }}
+                    style={styles.secondaryButton}
+                    disabled={isStockAdding}
+                  >
+                    {isStockAdding ? "追加中..." : "とどくねがおを追加する"}
+                  </button>
+                  <div style={styles.divider} />
+                  <p style={styles.storageNote}>
+                    本番前の確認用です。ここで入れた写真は、とどくねがおの候補になります。
+                  </p>
+                </>
+              ) : null}
+              {stockMessage ? (
+                <p style={styles.syncMessage} role="status">
+                  {stockMessage}
+                </p>
+              ) : null}
             </div>
-            <div style={styles.divider} />
-            <DeliveryDiagnosticsPanel diagnostics={deliveryDiagnostics} />
-            <div style={styles.divider} />
-            <KeptExchangeDebugPanel debug={keptExchangeDebug} />
-            <div style={styles.divider} />
-            <button
-              type="button"
-              onClick={() => {
-                void refreshDeliveryDiagnostics();
-                refreshKeptExchangeDebug();
-              }}
-              style={styles.secondaryButton}
-              disabled={isDeliveryDiagnosticsLoading}
-            >
-              {isDeliveryDiagnosticsLoading ? "確認中..." : "とどく状態を確認する"}
-            </button>
-            <div style={styles.divider} />
-            <button
-              type="button"
-              onClick={() => {
-                void handleStockPhotoImport();
-              }}
-              style={styles.secondaryButton}
-              disabled={isStockAdding}
-            >
-              {isStockAdding ? "追加中..." : "とどくねがおを追加する"}
-            </button>
-            <div style={styles.divider} />
-            <p style={styles.storageNote}>
-              本番前の確認用です。ここで入れた写真は、とどくねがおの候補になります。
-            </p>
-            {stockMessage ? (
-              <p style={styles.syncMessage} role="status">
-                {stockMessage}
-              </p>
-            ) : null}
-          </div>
-        </section>
+          </section>
+        ) : null}
 
         <section style={styles.section}>
           <p style={styles.sectionLabel}>安心とルール</p>

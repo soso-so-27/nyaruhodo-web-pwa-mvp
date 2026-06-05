@@ -19,7 +19,9 @@ import {
   getDisplayEnvironmentLabel,
   type DisplayEnvironment,
 } from "../../../lib/displayEnvironment";
+import { readOwnSleepingPhotos } from "../../../lib/home/sleepingPhotos";
 import { createBrowserSupabaseClient } from "../../../lib/supabase/browser";
+import { StoredPhotoImage } from "../../../components/ui/StoredPhotoImage";
 
 const ACCOUNT_CREATE_PROMPT_DISMISSED_KEY =
   STORAGE_KEYS.accountCreatePromptDismissed;
@@ -72,6 +74,7 @@ export default function AccountCreatePage() {
   const [displayEnvironment, setDisplayEnvironment] =
     useState<DisplayEnvironment>("unknown");
   const [isFromOnboarding, setIsFromOnboarding] = useState(false);
+  const [onboardingPhotoSrc, setOnboardingPhotoSrc] = useState("");
   const googleButtonRef = useRef<HTMLDivElement | null>(null);
   const hasTrackedCtaView = useRef(false);
   const hasTrackedCallbackError = useRef(false);
@@ -79,9 +82,13 @@ export default function AccountCreatePage() {
 
   useEffect(() => {
     setDisplayEnvironment(getDisplayEnvironment());
-    setIsFromOnboarding(
-      new URLSearchParams(window.location.search).get("from") === "onboarding",
-    );
+    const fromOnboarding =
+      new URLSearchParams(window.location.search).get("from") === "onboarding";
+
+    setIsFromOnboarding(fromOnboarding);
+    if (fromOnboarding) {
+      setOnboardingPhotoSrc(readOwnSleepingPhotos()[0]?.src ?? "");
+    }
 
     let isMounted = true;
 
@@ -340,14 +347,17 @@ export default function AccountCreatePage() {
               <p style={styles.eyebrow}>アカウント</p>
               <h1 style={styles.title}>
                 {isFromOnboarding
-                  ? "この2枚をとっておけます"
+                  ? "このねこのアルバムをつくる"
                   : "Googleアカウントに接続済みです"}
               </h1>
               <p style={styles.body}>
                 {isFromOnboarding
-                  ? "今日の2枚と、このねこの場所をあとから見返せます。"
+                  ? "今日の2枚をあとから見返せるようにします。"
                   : "この端末のねがおを、アカウントに保存できます。別の端末でも復元できます。"}
               </p>
+              {isFromOnboarding && onboardingPhotoSrc ? (
+                <OnboardingPhotoPreview src={onboardingPhotoSrc} />
+              ) : null}
               {connectedEmail ? (
                 <p style={styles.connectedEmail}>{connectedEmail}</p>
               ) : null}
@@ -361,25 +371,28 @@ export default function AccountCreatePage() {
                   }
                   style={styles.primaryButton}
                 >
-                  {isFromOnboarding ? "このねこの名前へ" : "ホームへ戻る"}
+                  {isFromOnboarding ? "つづける" : "ホームへ戻る"}
                 </button>
               </div>
             </>
           ) : (
             <>
               <p style={styles.eyebrow}>
-                {isFromOnboarding ? "この2枚をとっておく" : "ねてるねこの保存"}
+                {isFromOnboarding ? "とっておいた2枚" : "ねてるねこの保存"}
               </p>
               <h1 style={styles.title}>
                 {isFromOnboarding
-                  ? "アルバムに残すために接続します"
+                  ? "このねこのアルバムをつくる"
                   : "ねがおを、あとから見返せるように"}
               </h1>
               <p style={styles.body}>
                 {isFromOnboarding
-                  ? "Googleで続けると、今日の2枚とこのねこの場所をあとから見返せます。"
+                  ? "今日の2枚を\nあとから見返せるようにします。"
                   : "Googleアカウントで接続すると、この端末のねがおを保存できます。別の端末でも、とったねがおやとどいたねがおを復元できます。"}
               </p>
+              {isFromOnboarding && onboardingPhotoSrc ? (
+                <OnboardingPhotoPreview src={onboardingPhotoSrc} />
+              ) : null}
 
               <div style={styles.valueList} aria-label="保存できるもの">
                 {[
@@ -402,7 +415,9 @@ export default function AccountCreatePage() {
                 </p>
               ) : null}
               <p style={styles.authNote}>
-                Googleの画面が開きます。接続後、このアプリに戻ります。
+                {isFromOnboarding
+                  ? "ログインすると、アルバムに残せます。名前や場所は公開されません。"
+                  : "Googleの画面が開きます。接続後、このアプリに戻ります。"}
               </p>
 
               <div style={styles.actions}>
@@ -414,7 +429,11 @@ export default function AccountCreatePage() {
                   style={styles.primaryButton}
                   disabled={isStartingAuth || isCheckingAccount}
                 >
-                  {isStartingAuth ? "Googleを開いています..." : "Googleで続ける"}
+                  {isStartingAuth
+                    ? "Googleを開いています..."
+                    : isFromOnboarding
+                      ? "Googleでつづける"
+                      : "Googleで続ける"}
                 </button>
                 <button
                   type="button"
@@ -467,6 +486,14 @@ function loadGoogleIdentityScript() {
     script.onerror = () => reject(new Error("Google Identity script failed"));
     document.head.appendChild(script);
   });
+}
+
+function OnboardingPhotoPreview({ src }: { src: string }) {
+  return (
+    <div style={styles.onboardingPhotoPreview} aria-label="入れたねがお">
+      <StoredPhotoImage src={src} alt="" style={styles.onboardingPhoto} />
+    </div>
+  );
 }
 
 function EnvironmentNotice({
@@ -530,6 +557,22 @@ const styles = {
     fontSize: "15px",
     lineHeight: 1.75,
     letterSpacing: 0,
+    whiteSpace: "pre-line",
+  },
+  onboardingPhotoPreview: {
+    width: "72px",
+    height: "72px",
+    margin: "-4px 0 18px",
+    borderRadius: "22px",
+    overflow: "hidden",
+    border: "6px solid rgba(255,253,248,0.74)",
+    boxShadow: "0 10px 24px rgba(90,76,60,0.1)",
+    background: APP_ACCENT_SOFT_BG,
+  },
+  onboardingPhoto: {
+    width: "100%",
+    height: "100%",
+    objectFit: "cover",
   },
   valueList: {
     display: "grid",

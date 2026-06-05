@@ -1,0 +1,108 @@
+import { expect, test } from "@playwright/test";
+
+const testSvg = Buffer.from(
+  `<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="1200" viewBox="0 0 1200 1200">
+    <rect width="1200" height="1200" fill="#f4eadc"/>
+    ${Array.from({ length: 900 }, (_, index) => {
+      const x = (index * 37) % 1200;
+      const y = (index * 53) % 1200;
+      const hue = (index * 29) % 360;
+      return `<rect x="${x}" y="${y}" width="46" height="46" fill="hsl(${hue},70%,55%)"/>`;
+    }).join("")}
+  </svg>`,
+);
+
+const deliveredDataUrl =
+  "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAGQAAABkCAYAAABw4pVUAAAAAXNSR0IArs4c6QAAAARnQU1BAACxjwv8YQUAAAAJcEhZcwAADsMAAA7DAcdvqGQAAAEJSURBVHhe7dExEcAgAMBAJKKuTpnpjoLA/fACchlrzv2C+a0njDPsVmfYrQyJMSTGkBhDYgyJMSTGkBhDYgyJMSTGkBhDYgyJMSTGkBhDYgyJMSTGkBhDYgyJMSTGkBhDYgyJMSTGkBhDYgyJMSTGkBhDYgyJMSTGkBhDYgyJMSTGkBhDYgyJMSTGkBhDYgyJMSTGkBhDYgyJMSTGkBhDYgyJMSTGkBhDYgyJMSTGkBhDYgyJMSTGkBhDYgyJMSTGkBhDYgyJMSTGkBhDYgyJMSTGkBhDYgyJMSTmB4RCEqdGtA/tAAAAAElFTkSuQmCC";
+
+test.describe("home sleeping exchange flow", () => {
+  test("saves the taken photo with compression fallback and keeps the delivered photo", async ({
+    page,
+  }) => {
+    let exchangeCalls = 0;
+
+    await page.addInitScript(() => {
+      window.localStorage.setItem("nyaruhodo_sleeping_safety_accepted", "1");
+
+      const originalSetItem = Storage.prototype.setItem;
+      let ownPhotoWriteFailures = 0;
+
+      Storage.prototype.setItem = function patchedSetItem(key, value) {
+        if (
+          key === "nyaruhodo_exchange_own_sleeping_photos" &&
+          ownPhotoWriteFailures < 4
+        ) {
+          ownPhotoWriteFailures += 1;
+          throw new DOMException("Quota exceeded for test", "QuotaExceededError");
+        }
+
+        return originalSetItem.call(this, key, value);
+      };
+    });
+
+    await page.route("**/api/sleeping-delivery/exchange", async (route) => {
+      exchangeCalls += 1;
+      await route.fulfill({
+        contentType: "application/json",
+        body: JSON.stringify({
+          photo: {
+            id: `delivered-test-${Date.now()}`,
+            sourcePhotoId: "source-test-photo",
+            src: deliveredDataUrl,
+            title: "",
+            subtitle: "",
+            triggerLabel: "sleeping",
+            theme: "sleeping",
+            deliveredAt: Date.now(),
+          },
+          source: "remote",
+          diagnostics: {
+            source: "remote",
+            candidateCount: 1,
+            normalCandidateCount: 1,
+            fallbackCandidateCount: 0,
+            fallbackActive: false,
+          },
+        }),
+      });
+    });
+
+    await page.goto("/home");
+    await page.waitForLoadState("networkidle");
+
+    await page.locator("section").first().locator("button").first().click();
+    await page.locator('input[type="file"]').last().setInputFiles({
+      name: "home-sleeping.svg",
+      mimeType: "image/svg+xml",
+      buffer: testSvg,
+    });
+
+    await expect(page.locator("section").last().locator("img")).toBeVisible();
+    await page.locator("section").last().locator("button").last().click();
+
+    await expect.poll(() => exchangeCalls).toBe(1);
+    await expect(page.locator("section").last().locator("img")).toBeVisible();
+    await page.locator("section").last().locator("button").nth(1).click();
+
+    const storage = await page.evaluate(() => {
+      const readArray = (key: string) => {
+        try {
+          const parsed = JSON.parse(window.localStorage.getItem(key) ?? "[]");
+          return Array.isArray(parsed) ? parsed : [];
+        } catch {
+          return [];
+        }
+      };
+
+      return {
+        ownSleepingPhotos: readArray("nyaruhodo_exchange_own_sleeping_photos"),
+        keptExchangePhotos: readArray("nyaruhodo_exchange_kept_photos"),
+      };
+    });
+
+    expect(storage.ownSleepingPhotos.length).toBeGreaterThan(0);
+    expect(storage.keptExchangePhotos.length).toBeGreaterThan(0);
+    expect(storage.ownSleepingPhotos[0]?.src).toMatch(/^data:image\//);
+    expect(storage.keptExchangePhotos[0]?.src).toMatch(/^data:image\//);
+  });
+});

@@ -63,8 +63,10 @@ export async function createSleepingExchange({
   category,
   seed,
   recipientCatId,
+  preferredSourcePhotoId,
 }: DeliverableSleepingPhotoInput & {
   ownPhoto: OwnSleepingPhoto;
+  preferredSourcePhotoId?: string | null;
 }): Promise<SleepingExchangeResponse | null> {
   if (typeof window === "undefined") {
     return null;
@@ -91,6 +93,7 @@ export async function createSleepingExchange({
         recipientCatId,
         anonymousId: getOrCreateAnonymousId(),
         blockedPhotoIds: [...readBlockedExchangePhotoIds()],
+        preferredSourcePhotoId,
       }),
     });
 
@@ -110,9 +113,21 @@ export async function saveRemoteDeliveryStockPhoto(src: string) {
   }
 
   try {
+    const headers = new Headers({ "Content-Type": "application/json" });
+    const supabase = createBrowserSupabaseClient();
+
+    if (supabase) {
+      const { data } = await supabase.auth.getSession();
+      const accessToken = data.session?.access_token;
+
+      if (accessToken) {
+        headers.set("Authorization", `Bearer ${accessToken}`);
+      }
+    }
+
     const response = await fetch("/api/sleeping-delivery/stock", {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers,
       body: JSON.stringify({ src }),
     });
 
