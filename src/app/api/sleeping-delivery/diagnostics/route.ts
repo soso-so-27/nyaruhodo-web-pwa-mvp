@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 
+import { isUsablePhotoSrc } from "../../../../lib/photoStorage";
 import { createSupabaseAdminClient } from "../../../../lib/supabase/admin";
 import { createServerSupabaseClient } from "../../../../lib/supabase/server";
 
@@ -49,12 +50,15 @@ export async function POST(request: Request) {
 
   const rows = (data ?? []) as RemoteCatMomentRow[];
   const availableRows = rows.filter((row) => row.delivery_status === "available");
+  const unusableRows = availableRows.filter(
+    (row) => !isUsablePhotoSrc(row.photo_url),
+  );
   const blockedRows = availableRows.filter(
     (row) => blockedPhotoIds.has(row.id) || blockedPhotoIds.has(row.local_moment_id),
   );
   const candidateRows = availableRows.filter(
     (row) =>
-      Boolean(row.photo_url) &&
+      isUsablePhotoSrc(row.photo_url) &&
       !blockedPhotoIds.has(row.id) &&
       !blockedPhotoIds.has(row.local_moment_id),
   );
@@ -64,6 +68,7 @@ export async function POST(request: Request) {
     availableCount: availableRows.length,
     candidateCount: candidateRows.length,
     excludedCount: Math.max(0, availableRows.length - candidateRows.length),
+    unusableCount: unusableRows.length,
     blockedCount: blockedRows.length,
     adminStockCount: availableRows.filter(
       (row) => readPoolKind(row.metadata) === "admin_stock",
@@ -85,6 +90,7 @@ function buildEmptyDiagnostics(source: "none" | "error", lastError: string) {
     availableCount: 0,
     candidateCount: 0,
     excludedCount: 0,
+    unusableCount: 0,
     blockedCount: 0,
     adminStockCount: 0,
     userSharedCount: 0,

@@ -33,6 +33,7 @@ export type SleepingDeliveryDiagnostics = {
   availableCount: number;
   candidateCount: number;
   excludedCount: number;
+  unusableCount: number;
   blockedCount: number;
   adminStockCount: number;
   userSharedCount: number;

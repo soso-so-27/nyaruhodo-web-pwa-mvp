@@ -815,6 +815,7 @@ function DeliveryDiagnosticsPanel({
         <AuthDebugRow label="候補" value={`${diagnostics.candidateCount}枚`} />
         <AuthDebugRow label="利用可" value={`${diagnostics.availableCount}枚`} />
         <AuthDebugRow label="除外" value={`${diagnostics.excludedCount}枚`} />
+        <AuthDebugRow label="壊れ" value={`${diagnostics.unusableCount}枚`} />
         <AuthDebugRow label="ブロック" value={`${diagnostics.blockedCount}枚`} />
         <AuthDebugRow
           label="管理"

@@ -1,3 +1,5 @@
+import { isUsablePhotoSrc } from "../photoStorage";
+
 export type CatMomentState = "sleeping";
 export type CatMomentVisibility = "private" | "shared";
 export type CatMomentDeliveryStatus = "available" | "hidden" | "reported";
@@ -599,7 +601,8 @@ function isValidOwnSleepingPhoto(photo: Partial<OwnSleepingPhoto>) {
     typeof photo.id === "string" &&
       (typeof photo.catId === "string" ||
         typeof photo.ownerCatId === "string") &&
-      typeof photo.src === "string",
+      typeof photo.src === "string" &&
+      isUsablePhotoSrc(photo.src),
   );
 }
 
@@ -622,6 +625,6 @@ function isValidExchangePhoto(photo: Partial<ExchangePhoto>) {
   return Boolean(
     typeof photo.id === "string" &&
       typeof photo.src === "string" &&
-      photo.src.trim().length > 0,
+      isUsablePhotoSrc(photo.src),
   );
 }

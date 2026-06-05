@@ -17,6 +17,30 @@ export function getStoragePhotoPath(value: string) {
     : null;
 }
 
+export function isUsablePhotoSrc(value: string) {
+  const src = value.trim();
+
+  if (!src) {
+    return false;
+  }
+
+  const storagePath = getStoragePhotoPath(src);
+  if (storagePath !== null) {
+    return storagePath.length > 0;
+  }
+
+  if (src.startsWith("http://") || src.startsWith("https://")) {
+    return true;
+  }
+
+  if (!src.startsWith("data:image/")) {
+    return false;
+  }
+
+  return /^data:image\/(?:jpeg|jpg|png|webp);base64,[a-zA-Z0-9+/=]+$/.test(src) &&
+    src.length >= 200;
+}
+
 export async function resolveStoredPhotoUrl(
   supabase: BrowserSupabaseClient,
   value: string,

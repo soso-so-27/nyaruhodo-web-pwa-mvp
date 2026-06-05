@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 
+import { isUsablePhotoSrc } from "../../../../lib/photoStorage";
 import { createSupabaseAdminClient } from "../../../../lib/supabase/admin";
 import { createServerSupabaseClient } from "../../../../lib/supabase/server";
 import type { ExchangePhotoPoolItem } from "../../../../lib/home/sleepingPhotos";
@@ -76,9 +77,5 @@ export async function POST(request: Request) {
 }
 
 function isSupportedPhotoSrc(src: string) {
-  return (
-    src.startsWith("data:image/jpeg;") ||
-    src.startsWith("data:image/png;") ||
-    src.startsWith("data:image/webp;")
-  );
+  return isUsablePhotoSrc(src);
 }

@@ -1,7 +1,10 @@
 import { NextResponse } from "next/server";
 import type { SupabaseClient } from "@supabase/supabase-js";
 
-import { getStoragePhotoPath } from "../../../../lib/photoStorage";
+import {
+  getStoragePhotoPath,
+  isUsablePhotoSrc,
+} from "../../../../lib/photoStorage";
 import { createSupabaseAdminClient } from "../../../../lib/supabase/admin";
 import { createServerSupabaseClient } from "../../../../lib/supabase/server";
 import type { ExchangePhoto } from "../../../../lib/home/sleepingPhotos";
@@ -285,7 +288,7 @@ function isRowDeliverable(
     blockedPhotoIds: Set<string>;
   },
 ) {
-  if (!row.photo_url || row.delivery_status !== "available") {
+  if (!isUsablePhotoSrc(row.photo_url) || row.delivery_status !== "available") {
     return false;
   }
   if (userId && row.user_id === userId) {
@@ -312,7 +315,7 @@ async function buildCandidates(rows: RemoteCatMomentRow[]) {
     rows.map(async (row): Promise<Candidate | null> => {
       const src = await resolvePhotoUrl(row.photo_url);
 
-      if (!src) {
+      if (!src || !isUsablePhotoSrc(src)) {
         return null;
       }
 
@@ -368,12 +371,16 @@ function buildDiagnostics(
   blockedPhotoIds: Set<string>,
 ) {
   const availableRows = rows.filter((row) => row.delivery_status === "available");
+  const usableAvailableRows = availableRows.filter((row) =>
+    isUsablePhotoSrc(row.photo_url),
+  );
 
   return {
     source: "none" as const,
     availableCount: availableRows.length,
-    candidateCount: availableRows.length,
+    candidateCount: usableAvailableRows.length,
     excludedCount: 0,
+    unusableCount: Math.max(0, availableRows.length - usableAvailableRows.length),
     blockedCount: availableRows.filter(
       (row) => blockedPhotoIds.has(row.id) || blockedPhotoIds.has(row.local_moment_id),
     ).length,

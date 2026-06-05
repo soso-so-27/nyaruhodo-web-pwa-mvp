@@ -2,7 +2,10 @@ import { NextResponse } from "next/server";
 
 import { createSupabaseAdminClient } from "../../../../lib/supabase/admin";
 import { createServerSupabaseClient } from "../../../../lib/supabase/server";
-import { getStoragePhotoPath } from "../../../../lib/photoStorage";
+import {
+  getStoragePhotoPath,
+  isUsablePhotoSrc,
+} from "../../../../lib/photoStorage";
 import type { ExchangePhotoPoolItem } from "../../../../lib/home/sleepingPhotos";
 
 export const dynamic = "force-dynamic";
@@ -86,7 +89,7 @@ async function readRemoteCandidates(input: CandidateRequest) {
 
   const blockedIds = new Set(input.blockedPhotoIds ?? []);
   const rows = (data as RemoteCatMomentRow[]).filter((row) => {
-    if (!row.photo_url) {
+    if (!isUsablePhotoSrc(row.photo_url)) {
       return false;
     }
     if (input.excludeUserId && row.user_id === input.excludeUserId) {
@@ -113,7 +116,7 @@ async function readRemoteCandidates(input: CandidateRequest) {
     rows.map(async (row): Promise<ExchangePhotoPoolItem | null> => {
       const src = await resolvePhotoUrl(row.photo_url);
 
-      if (!src) {
+      if (!src || !isUsablePhotoSrc(src)) {
         return null;
       }
 
