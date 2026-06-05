@@ -291,15 +291,27 @@ export function keepExchangePhoto(photo: ExchangePhoto) {
         savedPhoto.id !== photo.id &&
         (!photo.sourcePhotoId || savedPhoto.sourcePhotoId !== photo.sourcePhotoId),
     );
-
-    writeStorageArray(
+    const savedPhotos = writeStorageArrayWithFallback(
       KEPT_EXCHANGE_PHOTO_STORAGE_KEY,
-      [photo, ...saved].slice(0, 50),
+      [photo, ...saved],
+      [50, 30, 20, 12, 6, 1],
     );
-    dispatchBoxPhotoStorageEvent();
+
+    if (
+      savedPhotos.some(
+        (savedPhoto) =>
+          savedPhoto.id === photo.id ||
+          Boolean(photo.sourcePhotoId && savedPhoto.sourcePhotoId === photo.sourcePhotoId),
+      )
+    ) {
+      dispatchBoxPhotoStorageEvent();
+      return true;
+    }
   } catch {
     // The received photo is a soft reward, so storage failure should not block.
   }
+
+  return false;
 }
 
 export function dismissExchangePhoto(photo: ExchangePhoto) {

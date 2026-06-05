@@ -199,7 +199,13 @@ export function OnboardingFlow() {
           return;
         }
 
-        setDeliveredPhoto(toDeliveredExchangePhoto(saved));
+        const deliveredCandidate = toDeliveredExchangePhoto(saved);
+
+        keepExchangePhoto(deliveredCandidate);
+        setDeliveredPhoto(deliveredCandidate);
+        trackProductEvent("onboarding_test_candidate_auto_kept", {
+          source_photo_id: deliveredCandidate.sourcePhotoId ?? null,
+        });
         setState("delivered");
       } catch {
         setMessage("候補写真を保存できませんでした。");
