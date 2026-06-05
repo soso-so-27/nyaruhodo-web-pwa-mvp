@@ -64,7 +64,8 @@ export async function POST(request: Request) {
     : { data: { user: null } };
   const userId = userData.user?.id ?? null;
   const anonymousId = userId ? null : input.anonymousId;
-  const supabase = createSupabaseAdminClient() ?? serverSupabase;
+  const adminSupabase = createSupabaseAdminClient();
+  const supabase = adminSupabase ?? serverSupabase;
 
   if (!supabase) {
     return NextResponse.json(
@@ -91,6 +92,7 @@ export async function POST(request: Request) {
       ownerCatId,
       localMomentId: ownPhoto.id,
       src: ownPhoto.src,
+      canUseStorage: Boolean(adminSupabase),
     });
 
     await deleteExistingMoment({
@@ -410,6 +412,7 @@ async function prepareExchangeMomentPhotoUrl({
   ownerCatId,
   localMomentId,
   src,
+  canUseStorage,
 }: {
   supabase: SupabaseClient;
   userId: string | null;
@@ -417,21 +420,26 @@ async function prepareExchangeMomentPhotoUrl({
   ownerCatId: string;
   localMomentId: string;
   src: string;
+  canUseStorage: boolean;
 }) {
-  if (!src.startsWith("data:image/")) {
+  if (!src.startsWith("data:image/") || !canUseStorage) {
     return src;
   }
 
   const ownerKey = userId ?? anonymousId ?? "anonymous";
-  const storagePath = await uploadDataUrl(
-    supabase,
-    `${sanitizePathSegment(ownerKey)}/${sanitizePathSegment(ownerCatId)}/sleeping/${sanitizePathSegment(
-      localMomentId,
-    )}.${getDataUrlExtension(src)}`,
-    src,
-  );
+  try {
+    const storagePath = await uploadDataUrl(
+      supabase,
+      `${sanitizePathSegment(ownerKey)}/${sanitizePathSegment(ownerCatId)}/sleeping/${sanitizePathSegment(
+        localMomentId,
+      )}.${getDataUrlExtension(src)}`,
+      src,
+    );
 
-  return toStoragePhotoUrl(storagePath);
+    return toStoragePhotoUrl(storagePath);
+  } catch {
+    return src;
+  }
 }
 
 function selectCandidate(candidates: Candidate[], input: Required<ExchangeRequest>) {

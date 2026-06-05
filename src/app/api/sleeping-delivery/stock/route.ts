@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import type { SupabaseClient } from "@supabase/supabase-js";
 
 import {
   getDataUrlExtension,
@@ -18,8 +19,8 @@ type StockRequest = {
 };
 
 export async function POST(request: Request) {
-  const supabase =
-    createSupabaseAdminClient() ?? (await createServerSupabaseClient());
+  const adminSupabase = createSupabaseAdminClient();
+  const supabase = adminSupabase ?? (await createServerSupabaseClient());
   const body = (await request.json().catch(() => null)) as StockRequest | null;
   const src = typeof body?.src === "string" ? body.src : "";
 
@@ -41,7 +42,12 @@ export async function POST(request: Request) {
   const localMomentId = `stock-sleeping-${createdAt}-${Math.random()
     .toString(16)
     .slice(2)}`;
-  const photoUrl = await prepareStockPhotoUrl(supabase, localMomentId, src);
+  const photoUrl = await prepareStockPhotoUrl({
+    supabase,
+    localMomentId,
+    src,
+    canUseStorage: Boolean(adminSupabase),
+  });
   const photo: ExchangePhotoPoolItem = {
     id: `remote-stock-${localMomentId}`,
     sourceOwnPhotoId: localMomentId,
@@ -87,20 +93,30 @@ function isSupportedPhotoSrc(src: string) {
   return isUsablePhotoSrc(src);
 }
 
-async function prepareStockPhotoUrl(
-  supabase: NonNullable<ReturnType<typeof createSupabaseAdminClient>>,
-  localMomentId: string,
-  src: string,
-) {
-  if (!src.startsWith("data:image/")) {
+async function prepareStockPhotoUrl({
+  supabase,
+  localMomentId,
+  src,
+  canUseStorage,
+}: {
+  supabase: SupabaseClient;
+  localMomentId: string;
+  src: string;
+  canUseStorage: boolean;
+}) {
+  if (!src.startsWith("data:image/") || !canUseStorage) {
     return src;
   }
 
-  const storagePath = await uploadDataUrl(
-    supabase,
-    `admin-stock/sleeping/${sanitizePathSegment(localMomentId)}.${getDataUrlExtension(src)}`,
-    src,
-  );
+  try {
+    const storagePath = await uploadDataUrl(
+      supabase,
+      `admin-stock/sleeping/${sanitizePathSegment(localMomentId)}.${getDataUrlExtension(src)}`,
+      src,
+    );
 
-  return toStoragePhotoUrl(storagePath);
+    return toStoragePhotoUrl(storagePath);
+  } catch {
+    return src;
+  }
 }
