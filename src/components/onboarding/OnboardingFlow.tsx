@@ -113,10 +113,12 @@ export function OnboardingFlow() {
           return;
         }
 
-        keepExchangePhoto(exchangeResult.photo);
-        setDeliveredPhoto(exchangeResult.photo);
+        const albumPhoto = await prepareExchangePhotoForAlbum(exchangeResult.photo);
+
+        keepExchangePhoto(albumPhoto);
+        setDeliveredPhoto(albumPhoto);
         trackProductEvent("onboarding_delivered_photo_auto_kept", {
-          source_photo_id: exchangeResult.photo.sourcePhotoId ?? null,
+          source_photo_id: albumPhoto.sourcePhotoId ?? null,
         });
         setState("delivered");
       } catch {
@@ -199,7 +201,9 @@ export function OnboardingFlow() {
           return;
         }
 
-        const deliveredCandidate = toDeliveredExchangePhoto(saved);
+        const deliveredCandidate = await prepareExchangePhotoForAlbum(
+          toDeliveredExchangePhoto(saved),
+        );
 
         keepExchangePhoto(deliveredCandidate);
         setDeliveredPhoto(deliveredCandidate);
@@ -463,6 +467,49 @@ function toDeliveredExchangePhoto(photo: ExchangePhotoPoolItem): ExchangePhoto {
     theme: "sleeping",
     deliveredAt: Date.now(),
   };
+}
+
+async function prepareExchangePhotoForAlbum(photo: ExchangePhoto) {
+  if (!photo.src.startsWith("data:image/")) {
+    return photo;
+  }
+
+  const compressedSrc = await resizeDataUrl(photo.src, 420, 0.62);
+
+  return compressedSrc ? { ...photo, src: compressedSrc } : photo;
+}
+
+function resizeDataUrl(
+  src: string,
+  maxSize = 420,
+  quality = 0.62,
+): Promise<string | null> {
+  return new Promise((resolve) => {
+    const image = new Image();
+
+    image.onload = () => {
+      const scale = Math.min(1, maxSize / Math.max(image.width, image.height));
+      const canvas = document.createElement("canvas");
+
+      canvas.width = Math.max(1, Math.round(image.width * scale));
+      canvas.height = Math.max(1, Math.round(image.height * scale));
+
+      const context = canvas.getContext("2d");
+      if (!context) {
+        resolve(null);
+        return;
+      }
+
+      context.drawImage(image, 0, 0, canvas.width, canvas.height);
+      resolve(canvas.toDataURL("image/jpeg", quality));
+    };
+
+    image.onerror = () => {
+      resolve(null);
+    };
+
+    image.src = src;
+  });
 }
 
 const SERIF =

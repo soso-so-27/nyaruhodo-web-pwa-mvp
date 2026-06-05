@@ -285,6 +285,10 @@ export function readKeptExchangePhotoCount() {
 }
 
 export function keepExchangePhoto(photo: ExchangePhoto) {
+  if (!isValidExchangePhoto(photo)) {
+    return false;
+  }
+
   try {
     const saved = readKeptExchangePhotos().filter(
       (savedPhoto) =>
@@ -527,5 +531,9 @@ function normalizeOwnSleepingPhoto(photo: OwnSleepingPhoto): OwnSleepingPhoto {
 }
 
 function isValidExchangePhoto(photo: Partial<ExchangePhoto>) {
-  return Boolean(typeof photo.id === "string" && typeof photo.src === "string");
+  return Boolean(
+    typeof photo.id === "string" &&
+      typeof photo.src === "string" &&
+      photo.src.trim().length > 0,
+  );
 }
