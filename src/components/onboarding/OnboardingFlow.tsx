@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import type { CSSProperties } from "react";
 import { STORAGE_KEYS } from "../../lib/storage";
 import {
@@ -32,6 +32,11 @@ export function OnboardingFlow() {
   const [deliveredPhoto, setDeliveredPhoto] = useState<ExchangePhoto | null>(null);
   const [message, setMessage] = useState("");
   const [isCandidateAdding, setIsCandidateAdding] = useState(false);
+  const [isTestMode, setIsTestMode] = useState(false);
+
+  useEffect(() => {
+    setIsTestMode(new URLSearchParams(window.location.search).has("test"));
+  }, []);
 
   async function handleSelectSleepingPhoto() {
     if (state === "saving") {
@@ -99,12 +104,20 @@ export function OnboardingFlow() {
         });
 
         if (!exchangeResult?.photo) {
-          setMessage("ねがおは入りました。とどく候補がまだありません。");
+          setMessage(
+            isTestMode
+              ? "ねがおは入りました。とどく候補がまだありません。テスト用に候補を追加できます。"
+              : "ねがおは入りました。いまとどく候補がありません。少しあとで確認してください。",
+          );
           setState("empty");
           return;
         }
 
+        keepExchangePhoto(exchangeResult.photo);
         setDeliveredPhoto(exchangeResult.photo);
+        trackProductEvent("onboarding_delivered_photo_auto_kept", {
+          source_photo_id: exchangeResult.photo.sourcePhotoId ?? null,
+        });
         setState("delivered");
       } catch {
         setMessage("写真を保存できませんでした。");
@@ -123,16 +136,23 @@ export function OnboardingFlow() {
     }, 60000);
   }
 
-  function handleKeepDeliveredPhoto() {
+  function handleContinueAfterDelivery() {
     if (!deliveredPhoto) {
       return;
     }
 
     keepExchangePhoto(deliveredPhoto);
-    window.localStorage.setItem(STORAGE_KEYS.onboardingCompleted, "true");
-    trackProductEvent("onboarding_delivered_photo_kept", {
+    trackProductEvent("onboarding_delivered_photo_confirmed", {
       source_photo_id: deliveredPhoto.sourcePhotoId ?? null,
+      test_mode: isTestMode,
     });
+
+    if (isTestMode) {
+      router.push("/collection");
+      return;
+    }
+
+    window.localStorage.setItem(STORAGE_KEYS.onboardingCompleted, "true");
     setState("kept");
   }
 
@@ -199,6 +219,11 @@ export function OnboardingFlow() {
   }
 
   function handleGoHome() {
+    if (isTestMode) {
+      router.push("/settings");
+      return;
+    }
+
     window.localStorage.setItem(STORAGE_KEYS.onboardingCompleted, "true");
     router.push("/home");
   }
@@ -262,10 +287,10 @@ export function OnboardingFlow() {
             </p>
             <button
               type="button"
-              onClick={handleKeepDeliveredPhoto}
+              onClick={handleContinueAfterDelivery}
               style={styles.primaryButton}
             >
-              とっておく
+              {isTestMode ? "アルバムで見る" : "つぎへ"}
             </button>
             <button type="button" onClick={handleGoHome} style={styles.textButton}>
               閉じる
@@ -280,18 +305,22 @@ export function OnboardingFlow() {
               <img src={selectedPhotoSrc} alt="" style={styles.savedPhoto} />
             ) : null}
             <p style={styles.resultText}>
-              とどく候補がまだありません。テスト用に、ここで候補を追加できます。
+              {isTestMode
+                ? "とどく候補がまだありません。テスト用に、ここで候補を追加できます。"
+                : "ねがおは保存されています。次に届く候補が増えるまで、少し待ってください。"}
             </p>
-            <button
-              type="button"
-              onClick={() => {
-                void handleAddCandidatePhoto();
-              }}
-              style={styles.primaryButton}
-              disabled={isCandidateAdding}
-            >
-              {isCandidateAdding ? "追加しています..." : "とどく候補を追加する"}
-            </button>
+            {isTestMode ? (
+              <button
+                type="button"
+                onClick={() => {
+                  void handleAddCandidatePhoto();
+                }}
+                style={styles.primaryButton}
+                disabled={isCandidateAdding}
+              >
+                {isCandidateAdding ? "追加しています..." : "とどく候補を追加する"}
+              </button>
+            ) : null}
             <button type="button" onClick={handleGoHome} style={styles.textButton}>
               ホームへ
             </button>

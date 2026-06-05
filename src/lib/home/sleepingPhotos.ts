@@ -286,7 +286,11 @@ export function readKeptExchangePhotoCount() {
 
 export function keepExchangePhoto(photo: ExchangePhoto) {
   try {
-    const saved = readKeptExchangePhotos();
+    const saved = readKeptExchangePhotos().filter(
+      (savedPhoto) =>
+        savedPhoto.id !== photo.id &&
+        (!photo.sourcePhotoId || savedPhoto.sourcePhotoId !== photo.sourcePhotoId),
+    );
 
     writeStorageArray(
       KEPT_EXCHANGE_PHOTO_STORAGE_KEY,
