@@ -1,6 +1,12 @@
 import { NextResponse } from "next/server";
 
-import { isUsablePhotoSrc } from "../../../../lib/photoStorage";
+import {
+  getDataUrlExtension,
+  isUsablePhotoSrc,
+  sanitizePathSegment,
+  toStoragePhotoUrl,
+  uploadDataUrl,
+} from "../../../../lib/photoStorage";
 import { createSupabaseAdminClient } from "../../../../lib/supabase/admin";
 import { createServerSupabaseClient } from "../../../../lib/supabase/server";
 import type { ExchangePhotoPoolItem } from "../../../../lib/home/sleepingPhotos";
@@ -35,11 +41,12 @@ export async function POST(request: Request) {
   const localMomentId = `stock-sleeping-${createdAt}-${Math.random()
     .toString(16)
     .slice(2)}`;
+  const photoUrl = await prepareStockPhotoUrl(supabase, localMomentId, src);
   const photo: ExchangePhotoPoolItem = {
     id: `remote-stock-${localMomentId}`,
     sourceOwnPhotoId: localMomentId,
     sourceCatId: "admin-stock",
-    src,
+    src: photoUrl,
     title: "ほかの猫のねがお",
     subtitle: "",
     tags: ["sleeping", "ねてる"],
@@ -50,7 +57,7 @@ export async function POST(request: Request) {
     local_moment_id: localMomentId,
     local_cat_id: "admin-stock",
     owner_cat_id: "admin-stock",
-    photo_url: src,
+    photo_url: photoUrl,
     state: "sleeping",
     visibility: "shared",
     delivery_status: "available",
@@ -78,4 +85,22 @@ export async function POST(request: Request) {
 
 function isSupportedPhotoSrc(src: string) {
   return isUsablePhotoSrc(src);
+}
+
+async function prepareStockPhotoUrl(
+  supabase: NonNullable<ReturnType<typeof createSupabaseAdminClient>>,
+  localMomentId: string,
+  src: string,
+) {
+  if (!src.startsWith("data:image/")) {
+    return src;
+  }
+
+  const storagePath = await uploadDataUrl(
+    supabase,
+    `admin-stock/sleeping/${sanitizePathSegment(localMomentId)}.${getDataUrlExtension(src)}`,
+    src,
+  );
+
+  return toStoragePhotoUrl(storagePath);
 }

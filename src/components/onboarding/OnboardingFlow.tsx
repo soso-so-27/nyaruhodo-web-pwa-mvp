@@ -23,6 +23,7 @@ import {
   saveActiveCatId,
 } from "../home/homeInputHelpers";
 import { AppIcon } from "../ui/AppIcons";
+import { StoredPhotoImage } from "../ui/StoredPhotoImage";
 
 type OnboardingState = "intro" | "saving" | "delivered" | "empty" | "kept";
 
@@ -114,15 +115,13 @@ export function OnboardingFlow() {
           return;
         }
 
-        const albumPhoto = await prepareExchangePhotoForAlbum(exchangeResult.photo);
-
-        const didKeepPhoto = keepExchangePhoto(albumPhoto);
-        setDeliveredPhoto(albumPhoto);
+        const keepResult = await keepExchangePhotoForAlbum(exchangeResult.photo);
+        setDeliveredPhoto(keepResult.photo);
         trackProductEvent("onboarding_delivered_photo_auto_kept", {
-          source_photo_id: albumPhoto.sourcePhotoId ?? null,
-          saved_to_album: didKeepPhoto,
+          source_photo_id: keepResult.photo.sourcePhotoId ?? null,
+          saved_to_album: keepResult.saved,
         });
-        if (!didKeepPhoto) {
+        if (!keepResult.saved) {
           setMessage("ねがおは届きましたが、アルバムに保存できませんでした。設定の保存状態を確認してください。");
         }
         setState("delivered");
@@ -206,17 +205,15 @@ export function OnboardingFlow() {
           return;
         }
 
-        const deliveredCandidate = await prepareExchangePhotoForAlbum(
+        const keepResult = await keepExchangePhotoForAlbum(
           toDeliveredExchangePhoto(saved),
         );
-
-        const didKeepCandidate = keepExchangePhoto(deliveredCandidate);
-        setDeliveredPhoto(deliveredCandidate);
+        setDeliveredPhoto(keepResult.photo);
         trackProductEvent("onboarding_test_candidate_auto_kept", {
-          source_photo_id: deliveredCandidate.sourcePhotoId ?? null,
-          saved_to_album: didKeepCandidate,
+          source_photo_id: keepResult.photo.sourcePhotoId ?? null,
+          saved_to_album: keepResult.saved,
         });
-        if (!didKeepCandidate) {
+        if (!keepResult.saved) {
           setMessage("候補は追加できましたが、アルバムに保存できませんでした。設定の保存状態を確認してください。");
         }
         setState("delivered");
@@ -299,7 +296,7 @@ export function OnboardingFlow() {
                 <img src={selectedPhotoSrc} alt="" style={styles.ownPhoto} />
               ) : null}
               <span style={styles.pairDots} />
-              <img src={deliveredPhoto.src} alt="" style={styles.deliveredPhoto} />
+              <StoredPhotoImage src={deliveredPhoto.src} alt="" style={styles.deliveredPhoto} />
             </div>
             <p style={styles.resultText}>
               とっておくと、アルバムに入ります。
@@ -483,16 +480,49 @@ function toDeliveredExchangePhoto(photo: ExchangePhotoPoolItem): ExchangePhoto {
   };
 }
 
-async function prepareExchangePhotoForAlbum(photo: ExchangePhoto) {
-  if (!photo.src.startsWith("data:image/")) {
-    return photo;
+async function keepExchangePhotoForAlbum(photo: ExchangePhoto) {
+  const candidates = await createAlbumPhotoCandidates(photo);
+
+  for (const candidate of candidates) {
+    if (keepExchangePhoto(candidate)) {
+      return { photo: candidate, saved: true };
+    }
   }
 
-  const compressedSrc = await resizeDataUrl(photo.src, 420, 0.62);
+  return { photo: candidates[0] ?? photo, saved: false };
+}
 
-  return compressedSrc && isUsablePhotoSrc(compressedSrc)
-    ? { ...photo, src: compressedSrc }
-    : photo;
+async function createAlbumPhotoCandidates(photo: ExchangePhoto) {
+  if (!photo.src.startsWith("data:image/")) {
+    return [photo];
+  }
+
+  const candidates: ExchangePhoto[] = [];
+  const seenSrcs = new Set<string>();
+
+  for (const attempt of [
+    { maxSize: 420, quality: 0.62 },
+    { maxSize: 320, quality: 0.56 },
+    { maxSize: 240, quality: 0.5 },
+    { maxSize: 180, quality: 0.44 },
+  ]) {
+    const compressedSrc = await resizeDataUrl(
+      photo.src,
+      attempt.maxSize,
+      attempt.quality,
+    );
+
+    if (compressedSrc && isUsablePhotoSrc(compressedSrc) && !seenSrcs.has(compressedSrc)) {
+      seenSrcs.add(compressedSrc);
+      candidates.push({ ...photo, src: compressedSrc });
+    }
+  }
+
+  if (isUsablePhotoSrc(photo.src) && !seenSrcs.has(photo.src)) {
+    candidates.push(photo);
+  }
+
+  return candidates;
 }
 
 function resizeDataUrl(
