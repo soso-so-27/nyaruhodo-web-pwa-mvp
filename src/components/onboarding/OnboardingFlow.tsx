@@ -15,6 +15,7 @@ import {
   type ExchangePhotoPoolItem,
 } from "../../lib/home/sleepingPhotos";
 import { trackProductEvent } from "../../lib/analytics/productAnalytics";
+import { isUsablePhotoSrc } from "../../lib/photoStorage";
 import {
   getActiveCatProfile,
   readActiveCatId,
@@ -399,7 +400,11 @@ function resizeAndEncode(
 
       context.drawImage(image, 0, 0, canvas.width, canvas.height);
       URL.revokeObjectURL(url);
-      resolve(canvas.toDataURL("image/jpeg", quality));
+      try {
+        resolve(canvas.toDataURL("image/jpeg", quality));
+      } catch (error) {
+        reject(error);
+      }
     };
 
     image.onerror = () => {
@@ -485,7 +490,9 @@ async function prepareExchangePhotoForAlbum(photo: ExchangePhoto) {
 
   const compressedSrc = await resizeDataUrl(photo.src, 420, 0.62);
 
-  return compressedSrc ? { ...photo, src: compressedSrc } : photo;
+  return compressedSrc && isUsablePhotoSrc(compressedSrc)
+    ? { ...photo, src: compressedSrc }
+    : photo;
 }
 
 function resizeDataUrl(
@@ -510,7 +517,11 @@ function resizeDataUrl(
       }
 
       context.drawImage(image, 0, 0, canvas.width, canvas.height);
-      resolve(canvas.toDataURL("image/jpeg", quality));
+      try {
+        resolve(canvas.toDataURL("image/jpeg", quality));
+      } catch {
+        resolve(null);
+      }
     };
 
     image.onerror = () => {

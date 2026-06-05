@@ -208,10 +208,14 @@ export function saveOwnSleepingPhoto({
   theme: string;
   shared: boolean;
 }) {
+  if (!isUsablePhotoSrc(src)) {
+    return null;
+  }
+
   try {
-    const saved = readStorageArray<OwnSleepingPhoto>(
-      OWN_SLEEPING_PHOTO_STORAGE_KEY,
-    );
+    const saved = readStorageArray<OwnSleepingPhoto>(OWN_SLEEPING_PHOTO_STORAGE_KEY)
+      .filter(isValidOwnSleepingPhoto)
+      .map(normalizeOwnSleepingPhoto);
     const createdAt = Date.now();
     const ownPhoto: OwnSleepingPhoto = {
       id: `own-sleeping-${createdAt}`,
