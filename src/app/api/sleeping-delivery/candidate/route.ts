@@ -33,6 +33,13 @@ type RemoteCatMomentRow = {
   created_at: string;
 };
 
+type CandidateFilterContext = {
+  excludeUserId?: string | null;
+  recipientCatId?: string | null;
+  excludePhotoId?: string;
+  blockedIds: Set<string>;
+};
+
 export async function POST(request: Request) {
   const input = await readCandidateRequest(request);
   const remoteCandidates = await readRemoteCandidates(input);
@@ -88,53 +95,85 @@ async function readRemoteCandidates(input: CandidateRequest) {
   }
 
   const blockedIds = new Set(input.blockedPhotoIds ?? []);
-  const rows = (data as RemoteCatMomentRow[]).filter((row) => {
-    if (!isUsablePhotoSrc(row.photo_url)) {
-      return false;
-    }
-    if (input.excludeUserId && row.user_id === input.excludeUserId) {
-      return false;
-    }
-    if (
-      input.recipientCatId &&
-      (row.local_cat_id === input.recipientCatId ||
-        row.owner_cat_id === input.recipientCatId)
-    ) {
-      return false;
-    }
-    if (
-      input.excludePhotoId &&
-      (row.id === input.excludePhotoId || row.local_moment_id === input.excludePhotoId)
-    ) {
-      return false;
-    }
-
-    return !blockedIds.has(row.id) && !blockedIds.has(row.local_moment_id);
-  });
+  const allRows = data as RemoteCatMomentRow[];
+  const filterContext: CandidateFilterContext = {
+    excludeUserId: input.excludeUserId,
+    recipientCatId: input.recipientCatId,
+    excludePhotoId: input.excludePhotoId,
+    blockedIds,
+  };
+  const rows = allRows.filter((row) => isRowDeliverable(row, filterContext));
+  const fallbackRows =
+    rows.length === 0 && blockedIds.size > 0
+      ? allRows.filter((row) =>
+          isAdminStockFallbackDeliverable(row, filterContext),
+        )
+      : [];
 
   const candidates = await Promise.all(
-    rows.map(async (row): Promise<ExchangePhotoPoolItem | null> => {
-      const src = await resolvePhotoUrl(row.photo_url);
+    (rows.length > 0 ? rows : fallbackRows).map(
+      async (row): Promise<ExchangePhotoPoolItem | null> => {
+        const src = await resolvePhotoUrl(row.photo_url);
 
-      if (!src || !isUsablePhotoSrc(src)) {
-        return null;
-      }
+        if (!src || !isUsablePhotoSrc(src)) {
+          return null;
+        }
 
-      return {
-        id: `remote-${row.id}`,
-        sourceOwnPhotoId: row.local_moment_id,
-        sourceCatId: row.local_cat_id || row.owner_cat_id,
-        src,
-        title: "ほかの猫のねがお",
-        subtitle: "",
-        tags: readTags(row.metadata),
-      };
-    }),
+        return {
+          id: `remote-${row.id}`,
+          sourceOwnPhotoId: row.local_moment_id,
+          sourceCatId: row.local_cat_id || row.owner_cat_id,
+          src,
+          title: "ほかの猫のねがお",
+          subtitle: "",
+          tags: readTags(row.metadata),
+        };
+      },
+    ),
   );
 
   return candidates.filter(
     (candidate): candidate is ExchangePhotoPoolItem => Boolean(candidate),
   );
+}
+
+function isRowDeliverable(row: RemoteCatMomentRow, context: CandidateFilterContext) {
+  if (!isUsablePhotoSrc(row.photo_url)) {
+    return false;
+  }
+  if (context.excludeUserId && row.user_id === context.excludeUserId) {
+    return false;
+  }
+  if (
+    context.recipientCatId &&
+    (row.local_cat_id === context.recipientCatId ||
+      row.owner_cat_id === context.recipientCatId)
+  ) {
+    return false;
+  }
+  if (
+    context.excludePhotoId &&
+    (row.id === context.excludePhotoId ||
+      row.local_moment_id === context.excludePhotoId)
+  ) {
+    return false;
+  }
+
+  return !context.blockedIds.has(row.id) && !context.blockedIds.has(row.local_moment_id);
+}
+
+function isAdminStockFallbackDeliverable(
+  row: RemoteCatMomentRow,
+  context: CandidateFilterContext,
+) {
+  if (readPoolKind(row.metadata) !== "admin_stock") {
+    return false;
+  }
+
+  return isRowDeliverable(row, {
+    ...context,
+    blockedIds: new Set<string>(),
+  });
 }
 
 async function resolvePhotoUrl(photoUrl: string) {
@@ -209,6 +248,16 @@ function readTags(metadata: Record<string, unknown> | null) {
   }
 
   return [...new Set(tags)];
+}
+
+function readPoolKind(metadata: Record<string, unknown> | null) {
+  const poolKind = metadata?.pool_kind;
+
+  if (poolKind === "admin_stock" || poolKind === "user_shared") {
+    return poolKind;
+  }
+
+  return "unknown";
 }
 
 function hashText(value: string) {

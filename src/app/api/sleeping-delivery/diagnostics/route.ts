@@ -62,12 +62,25 @@ export async function POST(request: Request) {
       !blockedPhotoIds.has(row.id) &&
       !blockedPhotoIds.has(row.local_moment_id),
   );
+  const fallbackRows =
+    candidateRows.length === 0 && blockedPhotoIds.size > 0
+      ? availableRows.filter(
+          (row) =>
+            readPoolKind(row.metadata) === "admin_stock" &&
+            isUsablePhotoSrc(row.photo_url),
+        )
+      : [];
+  const effectiveCandidateRows =
+    candidateRows.length > 0 ? candidateRows : fallbackRows;
 
   return NextResponse.json({
-    source: candidateRows.length > 0 ? "remote" : "none",
+    source: effectiveCandidateRows.length > 0 ? "remote" : "none",
     availableCount: availableRows.length,
-    candidateCount: candidateRows.length,
-    excludedCount: Math.max(0, availableRows.length - candidateRows.length),
+    candidateCount: effectiveCandidateRows.length,
+    normalCandidateCount: candidateRows.length,
+    fallbackCandidateCount: fallbackRows.length,
+    fallbackActive: candidateRows.length === 0 && fallbackRows.length > 0,
+    excludedCount: Math.max(0, availableRows.length - effectiveCandidateRows.length),
     unusableCount: unusableRows.length,
     blockedCount: blockedRows.length,
     adminStockCount: availableRows.filter(
@@ -89,6 +102,9 @@ function buildEmptyDiagnostics(source: "none" | "error", lastError: string) {
     source,
     availableCount: 0,
     candidateCount: 0,
+    normalCandidateCount: 0,
+    fallbackCandidateCount: 0,
+    fallbackActive: false,
     excludedCount: 0,
     unusableCount: 0,
     blockedCount: 0,

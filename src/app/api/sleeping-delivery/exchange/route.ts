@@ -32,6 +32,7 @@ type ExchangeRequest = {
   recipientCatId?: string | null;
   anonymousId?: string | null;
   blockedPhotoIds?: string[];
+  debugDryRun?: boolean;
 };
 
 type RemoteCatMomentRow = {
@@ -55,6 +56,8 @@ type Candidate = {
 
 export async function POST(request: Request) {
   const input = await readExchangeRequest(request);
+  const debugDryRun =
+    input.debugDryRun === true && process.env.NODE_ENV !== "production";
   const serverSupabase = await createServerSupabaseClient();
   const { data: userData } = serverSupabase
     ? await serverSupabase.auth.getUser()
@@ -80,67 +83,78 @@ export async function POST(request: Request) {
   const ownPhoto = input.ownPhoto;
   const createdAt = new Date(ownPhoto.createdAt ?? Date.now()).toISOString();
   const ownerCatId = ownPhoto.ownerCatId || ownPhoto.catId;
-  const ownPhotoUrl = await prepareExchangeMomentPhotoUrl({
-    supabase,
-    userId,
-    anonymousId,
-    ownerCatId,
-    localMomentId: ownPhoto.id,
-    src: ownPhoto.src,
-  });
+  if (!debugDryRun) {
+    const ownPhotoUrl = await prepareExchangeMomentPhotoUrl({
+      supabase,
+      userId,
+      anonymousId,
+      ownerCatId,
+      localMomentId: ownPhoto.id,
+      src: ownPhoto.src,
+    });
 
-  await deleteExistingMoment({
-    supabase,
-    userId,
-    anonymousId,
-    localMomentId: ownPhoto.id,
-  });
+    await deleteExistingMoment({
+      supabase,
+      userId,
+      anonymousId,
+      localMomentId: ownPhoto.id,
+    });
 
-  const { error: momentError } = await supabase.from("cat_moments").insert({
-    user_id: userId,
-    anonymous_id: anonymousId,
-    local_moment_id: ownPhoto.id,
-    local_cat_id: ownPhoto.catId,
-    owner_cat_id: ownerCatId,
-    photo_url: ownPhotoUrl,
-    state: "sleeping",
-    visibility: "shared",
-    delivery_status: "available",
-    source_moment_id: null,
-    metadata: {
-      source: "user",
-      pool_kind: "user_shared",
-      trigger_label: input.triggerLabel,
-      theme: input.theme,
-      category: input.category,
-      shared: true,
-    },
-    captured_at: createdAt,
-    created_at: createdAt,
-  });
+    const { error: momentError } = await supabase.from("cat_moments").insert({
+      user_id: userId,
+      anonymous_id: anonymousId,
+      local_moment_id: ownPhoto.id,
+      local_cat_id: ownPhoto.catId,
+      owner_cat_id: ownerCatId,
+      photo_url: ownPhotoUrl,
+      state: "sleeping",
+      visibility: "shared",
+      delivery_status: "available",
+      source_moment_id: null,
+      metadata: {
+        source: "user",
+        pool_kind: "user_shared",
+        trigger_label: input.triggerLabel,
+        theme: input.theme,
+        category: input.category,
+        shared: true,
+      },
+      captured_at: createdAt,
+      created_at: createdAt,
+    });
 
-  if (momentError) {
-    return NextResponse.json(
-      { photo: null, source: "none", error: momentError.message },
-      { status: 500 },
-    );
+    if (momentError) {
+      return NextResponse.json(
+        { photo: null, source: "none", error: momentError.message },
+        { status: 500 },
+      );
+    }
   }
 
   const blockedPhotoIds = new Set(input.blockedPhotoIds ?? []);
   const remoteRows = await readRemoteCandidateRows(supabase);
   const diagnosticsBase = buildDiagnostics(remoteRows, blockedPhotoIds);
+  const deliverableContext = {
+    userId,
+    anonymousId,
+    recipientCatId: input.recipientCatId,
+    excludePhotoId: ownPhoto.id,
+    blockedPhotoIds,
+  };
   const candidates = await buildCandidates(
-    remoteRows.filter((row) =>
-      isRowDeliverable(row, {
-        userId,
-        anonymousId,
-        recipientCatId: input.recipientCatId,
-        excludePhotoId: ownPhoto.id,
-        blockedPhotoIds,
-      }),
-    ),
+    remoteRows.filter((row) => isRowDeliverable(row, deliverableContext)),
   );
-  const selected = selectCandidate(candidates, input);
+  const fallbackCandidates =
+    candidates.length === 0 && blockedPhotoIds.size > 0
+      ? await buildCandidates(
+          remoteRows.filter((row) =>
+            isAdminStockFallbackDeliverable(row, deliverableContext),
+          ),
+        )
+      : [];
+  const candidatePool =
+    candidates.length > 0 ? candidates : fallbackCandidates;
+  const selected = selectCandidate(candidatePool, input);
 
   if (!selected) {
     return NextResponse.json({
@@ -149,8 +163,11 @@ export async function POST(request: Request) {
       diagnostics: {
         ...diagnosticsBase,
         source: "none",
-        candidateCount: candidates.length,
-        excludedCount: Math.max(0, diagnosticsBase.availableCount - candidates.length),
+        candidateCount: candidatePool.length,
+        normalCandidateCount: candidates.length,
+        fallbackCandidateCount: fallbackCandidates.length,
+        fallbackActive: candidates.length === 0 && fallbackCandidates.length > 0,
+        excludedCount: Math.max(0, diagnosticsBase.availableCount - candidatePool.length),
       },
     });
   }
@@ -170,32 +187,34 @@ export async function POST(request: Request) {
     deliveredAt: deliveredAt.getTime(),
   };
 
-  const { error: deliveryError } = await supabase
-    .from("cat_moment_deliveries")
-    .insert({
-      user_id: userId,
-      anonymous_id: anonymousId,
-      local_delivery_id: localDeliveryId,
-      source_moment_id: selected.row.id,
-      source_photo_id: selected.row.local_moment_id,
-      recipient_local_cat_id: input.recipientCatId,
-      photo_url: selected.row.photo_url,
-      status: "delivered",
-      metadata: {
-        source: "server_exchange",
-        source_pool_kind: readPoolKind(selected.row.metadata),
-        trigger_label: input.triggerLabel,
-        theme: input.theme,
-        category: input.category,
-      },
-      delivered_at: deliveredAt.toISOString(),
-    });
+  if (!debugDryRun) {
+    const { error: deliveryError } = await supabase
+      .from("cat_moment_deliveries")
+      .insert({
+        user_id: userId,
+        anonymous_id: anonymousId,
+        local_delivery_id: localDeliveryId,
+        source_moment_id: selected.row.id,
+        source_photo_id: selected.row.local_moment_id,
+        recipient_local_cat_id: input.recipientCatId,
+        photo_url: selected.row.photo_url,
+        status: "delivered",
+        metadata: {
+          source: "server_exchange",
+          source_pool_kind: readPoolKind(selected.row.metadata),
+          trigger_label: input.triggerLabel,
+          theme: input.theme,
+          category: input.category,
+        },
+        delivered_at: deliveredAt.toISOString(),
+      });
 
-  if (deliveryError) {
-    return NextResponse.json(
-      { photo: null, source: "none", error: deliveryError.message },
-      { status: 500 },
-    );
+    if (deliveryError) {
+      return NextResponse.json(
+        { photo: null, source: "none", error: deliveryError.message },
+        { status: 500 },
+      );
+    }
   }
 
   return NextResponse.json({
@@ -204,8 +223,11 @@ export async function POST(request: Request) {
     diagnostics: {
       ...diagnosticsBase,
       source: "remote",
-      candidateCount: candidates.length,
-      excludedCount: Math.max(0, diagnosticsBase.availableCount - candidates.length),
+      candidateCount: candidatePool.length,
+      normalCandidateCount: candidates.length,
+      fallbackCandidateCount: fallbackCandidates.length,
+      fallbackActive: candidates.length === 0 && fallbackCandidates.length > 0,
+      excludedCount: Math.max(0, diagnosticsBase.availableCount - candidatePool.length),
     },
   });
 }
@@ -224,6 +246,7 @@ async function readExchangeRequest(request: Request): Promise<Required<ExchangeR
     blockedPhotoIds: Array.isArray(body.blockedPhotoIds)
       ? body.blockedPhotoIds.filter((id) => typeof id === "string")
       : [],
+    debugDryRun: body.debugDryRun === true,
   };
 }
 
@@ -320,6 +343,20 @@ function isRowDeliverable(
   }
 
   return !blockedPhotoIds.has(row.id) && !blockedPhotoIds.has(row.local_moment_id);
+}
+
+function isAdminStockFallbackDeliverable(
+  row: RemoteCatMomentRow,
+  context: Parameters<typeof isRowDeliverable>[1],
+) {
+  if (readPoolKind(row.metadata) !== "admin_stock") {
+    return false;
+  }
+
+  return isRowDeliverable(row, {
+    ...context,
+    blockedPhotoIds: new Set<string>(),
+  });
 }
 
 async function buildCandidates(rows: RemoteCatMomentRow[]) {
@@ -422,6 +459,9 @@ function buildDiagnostics(
     source: "none" as const,
     availableCount: availableRows.length,
     candidateCount: usableAvailableRows.length,
+    normalCandidateCount: usableAvailableRows.length,
+    fallbackCandidateCount: 0,
+    fallbackActive: false,
     excludedCount: 0,
     unusableCount: Math.max(0, availableRows.length - usableAvailableRows.length),
     blockedCount: availableRows.filter(
