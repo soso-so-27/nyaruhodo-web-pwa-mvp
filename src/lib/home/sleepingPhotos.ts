@@ -260,7 +260,7 @@ export function saveOwnSleepingPhoto({
       .map(normalizeOwnSleepingPhoto);
     const createdAt = Date.now();
     const ownPhoto: OwnSleepingPhoto = {
-      id: `own-sleeping-${createdAt}`,
+      id: createOwnSleepingPhotoId(createdAt),
       ownerCatId: catId,
       catId,
       src,
@@ -597,6 +597,14 @@ function mergeOwnSleepingPhotos(
   }
 
   return [...byId.values()].sort((a, b) => b.createdAt - a.createdAt);
+}
+
+function createOwnSleepingPhotoId(createdAt: number) {
+  const random =
+    globalThis.crypto?.randomUUID?.() ??
+    Math.random().toString(16).slice(2);
+
+  return `own-sleeping-${createdAt}-${random}`;
 }
 
 function mergeOwnSleepingPhoto(

@@ -320,4 +320,84 @@ test.describe("home sleeping exchange flow", () => {
       ),
     ).toBe(true);
   });
+
+  test("keeps separate taken photos even when saved in the same millisecond", async ({
+    page,
+  }) => {
+    const fixedNow = Date.now();
+
+    await page.addInitScript((now) => {
+      const originalDateNow = Date.now.bind(Date);
+
+      Date.now = () => now;
+      window.localStorage.setItem("nyaruhodo_sleeping_safety_accepted", "1");
+      window.localStorage.setItem("active_cat_id", "same-ms-cat");
+      window.localStorage.setItem(
+        "cat_profiles",
+        JSON.stringify([
+          {
+            id: "same-ms-cat",
+            name: "same ms cat",
+            createdAt: new Date(originalDateNow()).toISOString(),
+            updatedAt: new Date(originalDateNow()).toISOString(),
+          },
+        ]),
+      );
+      window.localStorage.setItem(
+        "lock_data_same-ms-cat",
+        JSON.stringify({
+          sleepingCounterLockedUntil: originalDateNow() + 6 * 60 * 60 * 1000,
+        }),
+      );
+    }, fixedNow);
+
+    await page.goto("/home");
+    await page.waitForLoadState("networkidle");
+
+    for (const index of [1, 2]) {
+      await page.evaluate(() => {
+        const buttons = [...document.querySelectorAll("button")].filter((button) => {
+          const rect = button.getBoundingClientRect();
+          return rect.width > 80 && rect.height > 80;
+        });
+
+        buttons[0]?.click();
+      });
+      await page.locator('input[type="file"]').last().setInputFiles({
+        name: `same-ms-${index}.svg`,
+        mimeType: "image/svg+xml",
+        buffer: testSvg,
+      });
+      await expect(page.locator("section").last().locator("img")).toBeVisible();
+      await page.evaluate(() => {
+        const buttons = [...document.querySelectorAll("button")].filter((button) => {
+          const rect = button.getBoundingClientRect();
+          return rect.width > 0 && rect.height > 0;
+        });
+
+        buttons[3]?.click();
+      });
+      await page.waitForTimeout(500);
+    }
+
+    const storage = await page.evaluate(() => {
+      const parsed = JSON.parse(
+        window.localStorage.getItem("nyaruhodo_exchange_own_sleeping_photos") ??
+          "[]",
+      );
+
+      return Array.isArray(parsed)
+        ? parsed.map((photo) => ({ id: photo.id, src: photo.src }))
+        : [];
+    });
+
+    expect(storage).toHaveLength(2);
+    expect(new Set(storage.map((photo) => photo.id)).size).toBe(2);
+    expect(storage.every((photo) => String(photo.src).startsWith("data:image/"))).toBe(true);
+
+    await page.goto("/collection");
+    await page.waitForLoadState("networkidle");
+
+    await expect(page.locator("main img")).toHaveCount(2);
+  });
 });
