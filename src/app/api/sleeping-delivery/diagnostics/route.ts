@@ -5,6 +5,7 @@ import {
   isBlockedDeliveryPoolRow,
   isStorageDeliveryPhotoUrl,
 } from "../../../../lib/home/deliveryPoolGuards";
+import { getAdminCapabilitiesForRequest } from "../../../../lib/adminAccess";
 import { createSupabaseAdminClient } from "../../../../lib/supabase/admin";
 import { createServerSupabaseClient } from "../../../../lib/supabase/server";
 
@@ -23,6 +24,15 @@ type RemoteCatMomentRow = {
 };
 
 export async function POST(request: Request) {
+  const capabilities = await getAdminCapabilitiesForRequest(request);
+
+  if (!capabilities.testToolsEnabled) {
+    return NextResponse.json(
+      { source: "error", error: "admin_required" },
+      { status: 403 },
+    );
+  }
+
   const body = (await request.json().catch(() => ({}))) as DiagnosticsRequest;
   const blockedPhotoIds = new Set(
     Array.isArray(body.blockedPhotoIds)

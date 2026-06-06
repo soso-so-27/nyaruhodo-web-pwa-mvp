@@ -16,6 +16,11 @@ const redBlueTestPhotoUrl =
 const normalCatLikePhotoUrl =
   "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAGQAAABkCAYAAABw4pVUAAAAAXNSR0IArs4c6QAAAARnQU1BAACxjwv8YQUAAAAJcEhZcwAADsMAAA7DAcdvqGQAAAEJSURBVHhe7dExEcAgAMBAJKKuTpnpjoLA/fACchlrzv2C+a0njDPsVmfYrQyJMSTGkBhDYgyJMSTGkBhDYgyJMSTGkBhDYgyJMSTGkBhDYgyJMSTGkBhDYgyJMSTGkBhDYgyJMSTGkBhDYgyJMSTGkBhDYgyJMSTGkBhDYgyJMSTGkBhDYgyJMSTGkBhDYgyJMSTGkBhDYgyJMSTGkBhDYgyJMSTGkBhDYgyJMSTGkBhDYgyJMSTGkBhDYgyJMSTGkBhDYgyJMSTGkBhDYgyJMSTGkBhDYgyJMSTmB4RCEqdGtA/tAAAAAElFTkSuQmCC";
 
+const minimalWebpDataUrl = `data:image/webp;base64,${Buffer.from([
+  0x52, 0x49, 0x46, 0x46, 0x0c, 0x00, 0x00, 0x00, 0x57, 0x45, 0x42, 0x50,
+  0x56, 0x50, 0x38, 0x20,
+]).toString("base64")}`;
+
 type CandidateResponse = {
   photo?: {
     id?: string;
@@ -33,21 +38,6 @@ type ExchangeResponse = {
     src: string;
   } | null;
   source?: "remote" | "none";
-};
-
-type DiagnosticsResponse = {
-  candidateCount: number;
-  normalCandidateCount: number;
-  fallbackCandidateCount: number;
-  fallbackActive: boolean;
-  excludedCount: number;
-  totalSharedRows: number;
-  blockedRows: number;
-  storageExcludedRows: number;
-  deliverableRows: number;
-  dataImageDeliverableRows: number;
-  httpDeliverableRows: number;
-  storageRows: number;
 };
 
 test.describe("sleeping delivery pool guards", () => {
@@ -103,32 +93,98 @@ test.describe("sleeping delivery pool guards", () => {
     expect(isStorageDeliveryPhotoUrl("https://example.com/photo.jpg")).toBe(false);
   });
 
-  test("reports diagnostics using the same storage exclusion as delivery", async ({
-    request,
-  }) => {
+  test("requires admin access for delivery diagnostics", async ({ request }) => {
     const response = await request.post("/api/sleeping-delivery/diagnostics", {
       data: { blockedPhotoIds: [] },
     });
 
-    expect(response.ok()).toBeTruthy();
-    const diagnostics = (await response.json()) as DiagnosticsResponse;
+    expect(response.ok()).toBeFalsy();
+    expect([403, 404]).toContain(response.status());
 
-    expect(diagnostics.candidateCount).toBe(diagnostics.deliverableRows);
-    expect(diagnostics.normalCandidateCount).toBe(diagnostics.deliverableRows);
-    expect(diagnostics.fallbackCandidateCount).toBe(0);
-    expect(diagnostics.fallbackActive).toBe(false);
-    expect(diagnostics.deliverableRows).toBe(
-      diagnostics.dataImageDeliverableRows + diagnostics.httpDeliverableRows,
+    const bodyText = await response.text();
+
+    expect(bodyText).not.toContain("ADMIN_EMAILS");
+    expect(bodyText).not.toContain("ENABLE_TEST_TOOLS");
+  });
+
+  test("accepts supported exchange data urls", async ({ request }) => {
+    for (const [index, src] of [
+      redBlueTestPhotoUrl,
+      normalCatLikePhotoUrl,
+      minimalWebpDataUrl,
+    ].entries()) {
+      const response = await request.post("/api/sleeping-delivery/exchange", {
+        data: buildExchangeRequest(src, `valid-${Date.now()}-${index}`),
+      });
+
+      expect(response.status()).not.toBe(400);
+      expect(response.status()).not.toBe(413);
+      expect(response.status()).not.toBe(415);
+      expect(response.status()).not.toBe(429);
+    }
+  });
+
+  test("rejects unsupported exchange photo sources", async ({ request }) => {
+    for (const [src, expectedStatus] of [
+      [
+        "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciLz4=",
+        415,
+      ],
+      ["data:image/heic;base64,AAAA", 415],
+      ["https://example.com/cat.jpg", 415],
+      ["storage:user/cat/sleeping/photo.jpg", 415],
+    ] as const) {
+      const response = await request.post("/api/sleeping-delivery/exchange", {
+        data: buildExchangeRequest(src, `invalid-${Date.now()}-${expectedStatus}`),
+      });
+
+      expect(response.status()).toBe(expectedStatus);
+    }
+  });
+
+  test("rejects oversized exchange payload fields", async ({ request }) => {
+    const oversizedDataUrl = `data:image/png;base64,${"A".repeat(2 * 1024 * 1024)}`;
+    const oversizedPhotoResponse = await request.post(
+      "/api/sleeping-delivery/exchange",
+      {
+        data: buildExchangeRequest(oversizedDataUrl, `oversized-${Date.now()}`),
+      },
     );
-    expect(diagnostics.storageRows).toBeGreaterThanOrEqual(
-      diagnostics.storageExcludedRows,
+
+    expect(oversizedPhotoResponse.status()).toBe(413);
+
+    const blockedIdsResponse = await request.post(
+      "/api/sleeping-delivery/exchange",
+      {
+        data: {
+          ...buildExchangeRequest(
+            normalCatLikePhotoUrl,
+            `blocked-ids-${Date.now()}`,
+          ),
+          blockedPhotoIds: Array.from({ length: 101 }, (_, index) => `id-${index}`),
+        },
+      },
     );
-    expect(diagnostics.excludedCount).toBeGreaterThanOrEqual(
-      diagnostics.storageExcludedRows,
-    );
-    expect(diagnostics.totalSharedRows).toBeGreaterThanOrEqual(
-      diagnostics.blockedRows + diagnostics.storageRows,
-    );
+
+    expect(blockedIdsResponse.status()).toBe(400);
+  });
+
+  test("rate limits repeated exchange calls", async ({ request }) => {
+    const anonymousId = `rate-limit-${Date.now()}`;
+    let lastStatus = 0;
+
+    for (let index = 0; index < 11; index += 1) {
+      const response = await request.post("/api/sleeping-delivery/exchange", {
+        data: buildExchangeRequest(
+          normalCatLikePhotoUrl,
+          `${anonymousId}-${index}`,
+          anonymousId,
+        ),
+      });
+      lastStatus = response.status();
+    }
+
+    expect(lastStatus).toBe(429);
   });
 
   test("does not return known test or debug pool rows", async ({ request }) => {
@@ -214,4 +270,30 @@ function expectCandidateIsNotTestPoolPhoto(photo: {
   if (photo.sourceCatId === "admin-stock") {
     expect(photo.src ?? "").toMatch(/^data:image\//);
   }
+}
+
+function buildExchangeRequest(
+  src: string,
+  id: string,
+  anonymousId = `guard-anonymous-${id}`,
+) {
+  return {
+    ownPhoto: {
+      id: `guard-own-${id}`,
+      catId: `guard-cat-${id}`,
+      ownerCatId: `guard-cat-${id}`,
+      src,
+      createdAt: Date.now(),
+      triggerLabel: "sleeping",
+      theme: "sleeping",
+    },
+    triggerLabel: "sleeping",
+    theme: "sleeping",
+    category: "sleeping",
+    seed: `guard-${id}`,
+    recipientCatId: `guard-cat-${id}`,
+    anonymousId,
+    blockedPhotoIds: [],
+    debugDryRun: true,
+  };
 }
