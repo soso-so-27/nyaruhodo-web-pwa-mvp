@@ -2,6 +2,7 @@ import { createBrowserSupabaseClient } from "./supabase/browser";
 
 export const CAT_PHOTOS_BUCKET = "cat-photos";
 const STORAGE_PHOTO_PREFIX = "storage:";
+const LEGACY_STORAGE_PHOTO_PREFIX = "storage://";
 
 type BrowserSupabaseClient = NonNullable<
   ReturnType<typeof createBrowserSupabaseClient>
@@ -12,6 +13,10 @@ export function toStoragePhotoUrl(path: string) {
 }
 
 export function getStoragePhotoPath(value: string) {
+  if (value.startsWith(LEGACY_STORAGE_PHOTO_PREFIX)) {
+    return value.slice(LEGACY_STORAGE_PHOTO_PREFIX.length);
+  }
+
   return value.startsWith(STORAGE_PHOTO_PREFIX)
     ? value.slice(STORAGE_PHOTO_PREFIX.length)
     : null;
@@ -73,7 +78,7 @@ export function normalizePersistentPhotoSrc(value: string) {
   const storagePath = getStoragePhotoPath(src);
 
   if (storagePath !== null) {
-    return storagePath.length > 0 ? src : null;
+    return storagePath.length > 0 ? toStoragePhotoUrl(storagePath) : null;
   }
 
   if (src.startsWith("data:image/")) {
