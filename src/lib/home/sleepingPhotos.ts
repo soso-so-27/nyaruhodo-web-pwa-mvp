@@ -1,4 +1,8 @@
-import { isUsablePhotoSrc, normalizePersistentPhotoSrc } from "../photoStorage";
+import {
+  getStoragePhotoPath,
+  isUsablePhotoSrc,
+  normalizePersistentPhotoSrc,
+} from "../photoStorage";
 
 export type CatMomentState = "sleeping";
 export type CatMomentVisibility = "private" | "shared";
@@ -535,7 +539,7 @@ function mergeOwnSleepingPhotos(
 ) {
   const byId = new Map<string, OwnSleepingPhoto>();
 
-  for (const photo of [...existingPhotos, ...restoredPhotos]) {
+  for (const photo of existingPhotos) {
     if (!isValidOwnSleepingPhoto(photo)) {
       continue;
     }
@@ -544,7 +548,43 @@ function mergeOwnSleepingPhotos(
     byId.set(normalized.id, normalized);
   }
 
+  for (const photo of restoredPhotos) {
+    if (!isValidOwnSleepingPhoto(photo)) {
+      continue;
+    }
+
+    const restored = normalizeOwnSleepingPhoto(photo);
+    const existing = byId.get(restored.id);
+    byId.set(
+      restored.id,
+      existing ? mergeOwnSleepingPhoto(existing, restored) : restored,
+    );
+  }
+
   return [...byId.values()].sort((a, b) => b.createdAt - a.createdAt);
+}
+
+function mergeOwnSleepingPhoto(
+  existing: OwnSleepingPhoto,
+  restored: OwnSleepingPhoto,
+) {
+  if (isDataImageSrc(existing.src) && isStoragePhotoSrc(restored.src)) {
+    return {
+      ...existing,
+      ...restored,
+      src: existing.src,
+    };
+  }
+
+  return restored;
+}
+
+function isDataImageSrc(src: string) {
+  return src.startsWith("data:image/");
+}
+
+function isStoragePhotoSrc(src: string) {
+  return getStoragePhotoPath(src) !== null;
 }
 
 function mergeExchangePhotos(
