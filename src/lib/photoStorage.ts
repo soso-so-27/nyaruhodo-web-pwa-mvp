@@ -17,6 +17,81 @@ export function getStoragePhotoPath(value: string) {
     : null;
 }
 
+export function getStoragePhotoPathFromUrl(value: string) {
+  try {
+    const url = new URL(value);
+    const segments = url.pathname.split("/").filter(Boolean);
+    const objectIndex = segments.findIndex(
+      (segment, index) =>
+        segment === "object" &&
+        segments[index - 1] === "v1" &&
+        segments[index - 2] === "storage",
+    );
+
+    if (objectIndex < 0) {
+      return null;
+    }
+
+    const bucketIndex = objectIndex + 2;
+    const bucket = segments[bucketIndex];
+    const pathSegments = segments.slice(bucketIndex + 1);
+
+    if (bucket !== CAT_PHOTOS_BUCKET || pathSegments.length === 0) {
+      return null;
+    }
+
+    return pathSegments.map((segment) => decodeURIComponent(segment)).join("/");
+  } catch {
+    return null;
+  }
+}
+
+export function isLikelySignedPhotoUrl(value: string) {
+  try {
+    const url = new URL(value);
+    const signedParams = [
+      "token",
+      "expires",
+      "expires_at",
+      "expiresAt",
+      "signature",
+      "X-Amz-Signature",
+      "X-Amz-Expires",
+    ];
+
+    return (
+      url.pathname.includes("/storage/v1/object/sign/") ||
+      signedParams.some((param) => url.searchParams.has(param))
+    );
+  } catch {
+    return false;
+  }
+}
+
+export function normalizePersistentPhotoSrc(value: string) {
+  const src = value.trim();
+  const storagePath = getStoragePhotoPath(src);
+
+  if (storagePath !== null) {
+    return storagePath.length > 0 ? src : null;
+  }
+
+  if (src.startsWith("data:image/")) {
+    return src;
+  }
+
+  const urlStoragePath = getStoragePhotoPathFromUrl(src);
+  if (urlStoragePath) {
+    return toStoragePhotoUrl(urlStoragePath);
+  }
+
+  if (isLikelySignedPhotoUrl(src)) {
+    return null;
+  }
+
+  return src;
+}
+
 export function isUsablePhotoSrc(value: string) {
   const src = value.trim();
 

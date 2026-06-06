@@ -12,6 +12,7 @@ import {
   CAT_PHOTOS_BUCKET,
   getDataUrlExtension,
   getStoragePhotoPath,
+  normalizePersistentPhotoSrc,
   sanitizePathSegment,
   toStoragePhotoUrl,
   uploadDataUrl,
@@ -987,36 +988,45 @@ async function syncSleepingPhotos(
   result: AccountSyncResult,
 ) {
   try {
-    const momentRows = await Promise.all(
-      snapshot.ownSleepingPhotos.map(async (photo) => ({
-        user_id: userId,
-        anonymous_id: null,
-        local_moment_id: photo.id,
-        local_cat_id: photo.catId,
-        owner_cat_id: photo.ownerCatId,
-        photo_url:
-          await prepareRemoteSleepingPhotoUrl(
+    const momentRows = (
+      await Promise.all(
+        snapshot.ownSleepingPhotos.map(async (photo) => {
+          const photoUrl = await prepareRemoteSleepingPhotoUrl(
             supabase,
             userId,
             "sleeping",
             photo.ownerCatId,
             photo.id,
             photo.src,
-          ),
-        state: photo.state,
-        visibility: photo.visibility,
-        delivery_status: photo.deliveryStatus,
-        source_moment_id: photo.sourceMomentId ?? null,
-        metadata: {
-          ...SYNC_METADATA,
-          trigger_label: photo.triggerLabel,
-          theme: photo.theme,
-          shared: photo.shared,
-        },
-        captured_at: new Date(photo.createdAt).toISOString(),
-        created_at: new Date(photo.createdAt).toISOString(),
-      })),
-    );
+          );
+
+          if (!photoUrl) {
+            return null;
+          }
+
+          return {
+            user_id: userId,
+            anonymous_id: null,
+            local_moment_id: photo.id,
+            local_cat_id: photo.catId,
+            owner_cat_id: photo.ownerCatId,
+            photo_url: photoUrl,
+            state: photo.state,
+            visibility: photo.visibility,
+            delivery_status: photo.deliveryStatus,
+            source_moment_id: photo.sourceMomentId ?? null,
+            metadata: {
+              ...SYNC_METADATA,
+              trigger_label: photo.triggerLabel,
+              theme: photo.theme,
+              shared: photo.shared,
+            },
+            captured_at: new Date(photo.createdAt).toISOString(),
+            created_at: new Date(photo.createdAt).toISOString(),
+          };
+        }),
+      )
+    ).filter((row): row is NonNullable<typeof row> => Boolean(row));
 
     if (momentRows.length > 0) {
       const localMomentIds = momentRows.map((row) => row.local_moment_id);
@@ -1049,33 +1059,43 @@ async function syncSleepingPhotos(
         momentRowsToInsert.length + momentRowsToUpdate.length;
     }
 
-    const deliveryRows = await Promise.all(
-      snapshot.keptExchangePhotos.map(async (photo) => ({
-        user_id: userId,
-        anonymous_id: null,
-        local_delivery_id: photo.id,
-        source_moment_id: null,
-        source_photo_id: photo.sourcePhotoId ?? null,
-        recipient_local_cat_id: null,
-        photo_url: await prepareRemoteSleepingPhotoUrl(
-          supabase,
-          userId,
-          "deliveries",
-          "kept",
-          photo.id,
-          photo.src,
-        ),
-        status: "kept",
-        metadata: {
-          ...SYNC_METADATA,
-          title: photo.title,
-          subtitle: photo.subtitle,
-          trigger_label: photo.triggerLabel,
-          theme: photo.theme,
-        },
-        delivered_at: new Date(photo.deliveredAt).toISOString(),
-      })),
-    );
+    const deliveryRows = (
+      await Promise.all(
+        snapshot.keptExchangePhotos.map(async (photo) => {
+          const photoUrl = await prepareRemoteSleepingPhotoUrl(
+            supabase,
+            userId,
+            "deliveries",
+            "kept",
+            photo.id,
+            photo.src,
+          );
+
+          if (!photoUrl) {
+            return null;
+          }
+
+          return {
+            user_id: userId,
+            anonymous_id: null,
+            local_delivery_id: photo.id,
+            source_moment_id: null,
+            source_photo_id: photo.sourcePhotoId ?? null,
+            recipient_local_cat_id: null,
+            photo_url: photoUrl,
+            status: "kept",
+            metadata: {
+              ...SYNC_METADATA,
+              title: photo.title,
+              subtitle: photo.subtitle,
+              trigger_label: photo.triggerLabel,
+              theme: photo.theme,
+            },
+            delivered_at: new Date(photo.deliveredAt).toISOString(),
+          };
+        }),
+      )
+    ).filter((row): row is NonNullable<typeof row> => Boolean(row));
 
     if (deliveryRows.length === 0) {
       return;
@@ -1124,16 +1144,22 @@ async function prepareRemoteSleepingPhotoUrl(
   photoId: string,
   src: string,
 ) {
-  if (!src.startsWith("data:")) {
-    return src;
+  const persistentSrc = normalizePersistentPhotoSrc(src);
+
+  if (!persistentSrc) {
+    return null;
+  }
+
+  if (!persistentSrc.startsWith("data:")) {
+    return persistentSrc;
   }
 
   const storagePath = await uploadDataUrl(
     supabase,
     `${userId}/${sanitizePathSegment(catId)}/${group}/${sanitizePathSegment(
       photoId,
-    )}.${getDataUrlExtension(src)}`,
-    src,
+    )}.${getDataUrlExtension(persistentSrc)}`,
+    persistentSrc,
   );
 
   return toStoragePhotoUrl(storagePath);

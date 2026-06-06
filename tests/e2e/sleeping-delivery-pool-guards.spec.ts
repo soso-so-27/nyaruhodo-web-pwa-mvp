@@ -4,6 +4,10 @@ import {
   isBlockedDeliveryPhotoUrl,
   isBlockedDeliveryPoolRow,
 } from "../../src/lib/home/deliveryPoolGuards";
+import {
+  normalizePersistentPhotoSrc,
+  toStoragePhotoUrl,
+} from "../../src/lib/photoStorage";
 
 const redBlueTestPhotoUrl =
   "data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD/4gHYSUNDX1BST0ZJTEUAAQEAAAHIAAAAAAQwAABtbnRyUkdCIFhZWiAH4AABAAEAAAAAAABhY3NwAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAQAA9tYAAQAAAADTLQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAlkZXNjAAAA8AAAACRyWFlaAAABFAAAABRnWFlaAAABKAAAABRiWFlaAAABPAAAABR3dHB0AAABUAAAABRyVFJDAAABZAAAAChnVFJDAAABZAAAAChiVFJDAAABZAAAAChjcHJ0AAABjAAAADxtbHVjAAAAAAAAAAEAAAAMZW5VUwAAAAgAAAAcAHMAUgBHAEJYWVogAAAAAAAAb6IAADj1AAADkFhZWiAAAAAAAABimQAAt4UAABjaWFlaIAAAAAAAACSgAAAPhAAAts9YWVogAAAAAAAA9tYAAQAAAADTLXBhcmEAAAAAAAQAAAACZmYAAPKnAAANWQAAE9AAAApbAAAAAAAAAABtbHVjAAAAAAAAAAEAAAAMZW5VUwAAACAAAAAcAEcAbwBvAGcAbABlACAASQBuAGMALgAgADIAMAAxADb/2wBDAAsHCAoIBwsKCQoMDAsNEBsSEA8PECEYGRQbJyMpKScjJiUsMT81LC47LyUmNko3O0FDRkdGKjRNUkxEUj9FRkP/2wBDAQwMDBAOECASEiBDLSYtQ0NDQ0NDQ0NDQ0NDQ0NDQ0NDQ0NDQ0NDQ0NDQ0NDQ0NDQ0NDQ0NDQ0NDQ0NDQ0NDQ0P/wAARCABkAGQDASIAAhEBAxEB/8QAGQABAQEBAQEAAAAAAAAAAAAAAAIHAwQB/8QAFxABAAMAAAAAAAAAAAAAAAAAAAEDMv/EABkBAQADAQEAAAAAAAAAAAAAAAADBgcEBf/EACgRAQAAAggGAwEAAAAAAAAAAAABBAIDFBViobHhETM0YXFyEhMxkf/aAAwDAQACEQMRAD8A+gPMXcAAAB2rxCk14hS5yvIoeIaM2nuqrfaOsQBO5AAAAHnAUVqgAAADtXiFJrxClzleRQ8Q0ZtPdVW+0dYgCdyAAAAPOAorVAAAAHavEKTXiFLnK8ih4hozae6qt9o6xAE7kAAAAecBRWqAAAAO1eIUmvEKXOV5FDxDRm091Vb7R1iAJ3IAAAA84CitUAAAAdq8QpNeIUucryKHiGjNp7qq32jrEATuQAAAB5xkIp9n7rxfODPZrwyELP3L5wZ7NeGQhZ+5fODPZsleIUxkezVT/wBdXRofH8hCH7srdfL/AHVtKs48OMYx/sWzDGRJeWHPZFYsWTZhjIXlhz2LFiybMMZC8sOexYsWQA8t3AAAAAAAAAAAAP/Z";
@@ -31,6 +35,28 @@ type ExchangeResponse = {
 };
 
 test.describe("sleeping delivery pool guards", () => {
+  test("normalizes expiring storage urls before persistent photo saves", () => {
+    const storageSrc = "storage:user/cat/sleeping/photo.jpg";
+    const signedUrl =
+      "https://example.supabase.co/storage/v1/object/sign/cat-photos/user/cat/sleeping/photo.jpg?token=temporary-token";
+
+    expect(normalizePersistentPhotoSrc(storageSrc)).toBe(storageSrc);
+    expect(normalizePersistentPhotoSrc(signedUrl)).toBe(
+      toStoragePhotoUrl("user/cat/sleeping/photo.jpg"),
+    );
+    expect(normalizePersistentPhotoSrc(redBlueTestPhotoUrl)).toBe(
+      redBlueTestPhotoUrl,
+    );
+    expect(
+      normalizePersistentPhotoSrc(
+        "https://example.com/photo.jpg?token=temporary-token",
+      ),
+    ).toBe(null);
+    expect(normalizePersistentPhotoSrc("https://example.com/photo.jpg")).toBe(
+      "https://example.com/photo.jpg",
+    );
+  });
+
   test("blocks known red-blue test photo ids and matching data urls only", () => {
     expect(
       isBlockedDeliveryPoolRow({

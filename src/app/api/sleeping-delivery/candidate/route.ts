@@ -2,10 +2,7 @@ import { NextResponse } from "next/server";
 
 import { createSupabaseAdminClient } from "../../../../lib/supabase/admin";
 import { createServerSupabaseClient } from "../../../../lib/supabase/server";
-import {
-  getStoragePhotoPath,
-  isUsablePhotoSrc,
-} from "../../../../lib/photoStorage";
+import { isUsablePhotoSrc } from "../../../../lib/photoStorage";
 import type { ExchangePhotoPoolItem } from "../../../../lib/home/sleepingPhotos";
 import { isBlockedDeliveryPoolRow } from "../../../../lib/home/deliveryPoolGuards";
 
@@ -184,27 +181,7 @@ function isAdminStockFallbackDeliverable(
 }
 
 async function resolvePhotoUrl(photoUrl: string) {
-  const storagePath = getStoragePhotoPath(photoUrl);
-
-  if (!storagePath) {
-    return photoUrl;
-  }
-
-  const supabase = createSupabaseAdminClient();
-
-  if (!supabase) {
-    return photoUrl;
-  }
-
-  const { data, error } = await supabase.storage
-    .from("cat-photos")
-    .createSignedUrl(storagePath, 60 * 60 * 24);
-
-  if (error || !data?.signedUrl) {
-    return photoUrl;
-  }
-
-  return data.signedUrl;
+  return photoUrl;
 }
 
 function selectCandidate(

@@ -1,4 +1,4 @@
-import { isUsablePhotoSrc } from "../photoStorage";
+import { isUsablePhotoSrc, normalizePersistentPhotoSrc } from "../photoStorage";
 
 export type CatMomentState = "sleeping";
 export type CatMomentVisibility = "private" | "shared";
@@ -348,23 +348,38 @@ export function keepExchangePhoto(photo: ExchangePhoto) {
     return false;
   }
 
+  const persistentSrc = normalizePersistentPhotoSrc(photo.src);
+
+  if (!persistentSrc || !isUsablePhotoSrc(persistentSrc)) {
+    return false;
+  }
+
+  const persistentPhoto = {
+    ...photo,
+    src: persistentSrc,
+  };
+
   try {
     const saved = readKeptExchangePhotos().filter(
       (savedPhoto) =>
-        savedPhoto.id !== photo.id &&
-        (!photo.sourcePhotoId || savedPhoto.sourcePhotoId !== photo.sourcePhotoId),
+        savedPhoto.id !== persistentPhoto.id &&
+        (!persistentPhoto.sourcePhotoId ||
+          savedPhoto.sourcePhotoId !== persistentPhoto.sourcePhotoId),
     );
     const savedPhotos = writeStorageArrayWithFallback(
       KEPT_EXCHANGE_PHOTO_STORAGE_KEY,
-      [photo, ...saved],
+      [persistentPhoto, ...saved],
       [50, 30, 20, 12, 6, 1],
     );
 
     if (
       savedPhotos.some(
         (savedPhoto) =>
-          savedPhoto.id === photo.id ||
-          Boolean(photo.sourcePhotoId && savedPhoto.sourcePhotoId === photo.sourcePhotoId),
+          savedPhoto.id === persistentPhoto.id ||
+          Boolean(
+            persistentPhoto.sourcePhotoId &&
+              savedPhoto.sourcePhotoId === persistentPhoto.sourcePhotoId,
+          ),
       )
     ) {
       dispatchBoxPhotoStorageEvent();

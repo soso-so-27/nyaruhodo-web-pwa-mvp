@@ -3,7 +3,6 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 
 import {
   getDataUrlExtension,
-  getStoragePhotoPath,
   isUsablePhotoSrc,
   sanitizePathSegment,
   toStoragePhotoUrl,
@@ -396,27 +395,7 @@ async function buildCandidates(rows: RemoteCatMomentRow[]) {
 }
 
 async function resolvePhotoUrl(photoUrl: string) {
-  const storagePath = getStoragePhotoPath(photoUrl);
-
-  if (!storagePath) {
-    return photoUrl;
-  }
-
-  const supabase = createSupabaseAdminClient();
-
-  if (!supabase) {
-    return photoUrl;
-  }
-
-  const { data, error } = await supabase.storage
-    .from("cat-photos")
-    .createSignedUrl(storagePath, 60 * 60 * 24);
-
-  if (error || !data?.signedUrl) {
-    return photoUrl;
-  }
-
-  return data.signedUrl;
+  return photoUrl;
 }
 
 async function prepareExchangeMomentPhotoUrl({
