@@ -46,6 +46,7 @@ import {
   dismissExchangePhoto,
   keepExchangePhoto,
   readKeptExchangePhotoCount,
+  readOwnSleepingPhotos,
   readOwnSleepingPhotoCount,
   reportExchangePhoto,
   saveOwnSleepingPhoto,
@@ -209,6 +210,15 @@ type SleepingPhotoSource = "camera";
 
 const SLEEPING_SAFETY_ACCEPTED_STORAGE_KEY =
   "nyaruhodo_sleeping_safety_accepted";
+const HOME_INSTALL_HINT_DISMISSED_STORAGE_KEY =
+  "neteruneko_home_install_hint_dismissed";
+
+type BeforeInstallPromptEvent = Event & {
+  prompt: () => Promise<void>;
+  userChoice: Promise<{ outcome: "accepted" | "dismissed"; platform: string }>;
+};
+
+type HomeInstallPlatform = "ios" | "android";
 
 export function HomeInput({ recentEvents: _recentEvents }: HomeInputProps) {
   const [catProfiles, setCatProfiles] = useState<CatProfile[]>([]);
@@ -260,6 +270,12 @@ export function HomeInput({ recentEvents: _recentEvents }: HomeInputProps) {
   const [isSleepingSafetyChecked, setIsSleepingSafetyChecked] = useState(false);
   const [pendingSleepingPhotoSource, setPendingSleepingPhotoSource] =
     useState<SleepingPhotoSource>("camera");
+  const [homeInstallPlatform, setHomeInstallPlatform] =
+    useState<HomeInstallPlatform | null>(null);
+  const [homeInstallPrompt, setHomeInstallPrompt] =
+    useState<BeforeInstallPromptEvent | null>(null);
+  const [isHomeInstallHintVisible, setIsHomeInstallHintVisible] = useState(false);
+  const [isHomeInstallGuideOpen, setIsHomeInstallGuideOpen] = useState(false);
   const [collectionRefreshTick, setCollectionRefreshTick] = useState(0);
   const [discoveryDismissedToday, setDiscoveryDismissedToday] = useState(false);
   const hasTrackedHomeView = useRef(false);
@@ -287,6 +303,52 @@ export function HomeInput({ recentEvents: _recentEvents }: HomeInputProps) {
     }, 1000);
 
     return () => window.clearInterval(intervalId);
+  }, []);
+
+  useEffect(() => {
+    if (isStandaloneDisplay()) {
+      dismissHomeInstallHint();
+      return;
+    }
+
+    if (
+      window.localStorage.getItem(HOME_INSTALL_HINT_DISMISSED_STORAGE_KEY) ===
+        "true" ||
+      window.localStorage.getItem(STORAGE_KEYS.onboardingCompleted) !== "true"
+    ) {
+      return;
+    }
+
+    const platform = getHomeInstallPlatform();
+    if (!platform) {
+      return;
+    }
+
+    setHomeInstallPlatform(platform);
+    setIsHomeInstallHintVisible(true);
+
+    const handleBeforeInstallPrompt = (event: Event) => {
+      event.preventDefault();
+      setHomeInstallPrompt(event as BeforeInstallPromptEvent);
+      if (getHomeInstallPlatform() === "android" && !isStandaloneDisplay()) {
+        setHomeInstallPlatform("android");
+        setIsHomeInstallHintVisible(
+          window.localStorage.getItem(HOME_INSTALL_HINT_DISMISSED_STORAGE_KEY) !==
+            "true",
+        );
+      }
+    };
+    const handleAppInstalled = () => {
+      dismissHomeInstallHint();
+    };
+
+    window.addEventListener("beforeinstallprompt", handleBeforeInstallPrompt);
+    window.addEventListener("appinstalled", handleAppInstalled);
+
+    return () => {
+      window.removeEventListener("beforeinstallprompt", handleBeforeInstallPrompt);
+      window.removeEventListener("appinstalled", handleAppInstalled);
+    };
   }, []);
 
   useEffect(() => {
@@ -1571,6 +1633,28 @@ export function HomeInput({ recentEvents: _recentEvents }: HomeInputProps) {
     );
   }
 
+  function dismissHomeInstallHint() {
+    window.localStorage.setItem(HOME_INSTALL_HINT_DISMISSED_STORAGE_KEY, "true");
+    setIsHomeInstallHintVisible(false);
+    setIsHomeInstallGuideOpen(false);
+    setHomeInstallPrompt(null);
+  }
+
+  async function handleHomeInstallPrimaryAction() {
+    if (homeInstallPlatform === "android" && homeInstallPrompt) {
+      const promptEvent = homeInstallPrompt;
+      setHomeInstallPrompt(null);
+      await promptEvent.prompt();
+      const choice = await promptEvent.userChoice.catch(() => null);
+      if (choice?.outcome === "accepted" || choice?.outcome === "dismissed") {
+        dismissHomeInstallHint();
+      }
+      return;
+    }
+
+    setIsHomeInstallGuideOpen(true);
+  }
+
   async function handleConfirmExchangeSharePhoto(photo: PendingExchangeSharePhoto) {
     const targetCatId = pendingExchangeCatId ?? activeCatId;
     if (!targetCatId) return;
@@ -1685,6 +1769,22 @@ export function HomeInput({ recentEvents: _recentEvents }: HomeInputProps) {
         deliveryRemaining={sleepingCounterRemaining}
         onTakePhoto={() => handleSleepingPhotoStart("camera")}
       />
+
+      {isHomeInstallHintVisible && homeInstallPlatform ? (
+        <HomeInstallHintCard
+          platform={homeInstallPlatform}
+          canPrompt={Boolean(homeInstallPrompt)}
+          onPrimary={handleHomeInstallPrimaryAction}
+          onDismiss={dismissHomeInstallHint}
+        />
+      ) : null}
+
+      {isHomeInstallGuideOpen && homeInstallPlatform ? (
+        <HomeInstallGuideSheet
+          platform={homeInstallPlatform}
+          onClose={dismissHomeInstallHint}
+        />
+      ) : null}
 
       {isSleepingSafetySheetOpen ? (
         <SleepingSafetySheet
@@ -2525,6 +2625,97 @@ function SleepingPhotoHome({
       </div>
       </section>
     </>
+  );
+}
+
+function HomeInstallHintCard({
+  platform,
+  canPrompt,
+  onPrimary,
+  onDismiss,
+}: {
+  platform: HomeInstallPlatform;
+  canPrompt: boolean;
+  onPrimary: () => void;
+  onDismiss: () => void;
+}) {
+  const primaryLabel = platform === "android" && canPrompt ? "追加する" : "置き方を見る";
+
+  return (
+    <section style={styles.homeInstallHintCard} aria-label="ホーム画面に追加">
+      <div style={styles.homeInstallHintText}>
+        <p style={styles.homeInstallHintTitle}>
+          次に寝ていたら、
+          <br />
+          すぐ開けるように
+        </p>
+        <p style={styles.homeInstallHintBody}>
+          ねてるねこを
+          <br />
+          ホームに置けます
+        </p>
+      </div>
+      <div style={styles.homeInstallHintActions}>
+        <button
+          type="button"
+          style={styles.homeInstallHintPrimary}
+          onClick={onPrimary}
+        >
+          {primaryLabel}
+        </button>
+        <button
+          type="button"
+          style={styles.homeInstallHintSecondary}
+          onClick={onDismiss}
+        >
+          あとで
+        </button>
+      </div>
+    </section>
+  );
+}
+
+function HomeInstallGuideSheet({
+  platform,
+  onClose,
+}: {
+  platform: HomeInstallPlatform;
+  onClose: () => void;
+}) {
+  const title =
+    platform === "ios" ? "iPhoneでホームに置く" : "Androidでホームに置く";
+  const steps =
+    platform === "ios"
+      ? [
+          "画面下の共有ボタンを押す",
+          "「ホーム画面に追加」を選ぶ",
+          "追加を押す",
+        ]
+      : [
+          "Chromeのメニューを開く",
+          "「アプリをインストール」または「ホーム画面に追加」を選ぶ",
+          "追加を押す",
+        ];
+
+  return (
+    <AppBottomSheet title={title} onClose={onClose} variant="paper">
+      <div style={styles.homeInstallGuideBody}>
+        <ol style={styles.homeInstallGuideList}>
+          {steps.map((step) => (
+            <li key={step} style={styles.homeInstallGuideItem}>
+              {step}
+            </li>
+          ))}
+        </ol>
+        <button
+          type="button"
+          style={styles.homeInstallGuideButton}
+          onClick={onClose}
+        >
+          わかりました
+        </button>
+      </div>
+    </AppBottomSheet>
   );
 }
 
@@ -3854,6 +4045,44 @@ function markSleepingSafetyNoticeAccepted() {
   }
 }
 
+function getHomeInstallPlatform(): HomeInstallPlatform | null {
+  if (typeof window === "undefined") {
+    return null;
+  }
+
+  const userAgent = window.navigator.userAgent.toLowerCase();
+  const isIos =
+    /iphone|ipad|ipod/.test(userAgent) ||
+    (window.navigator.platform === "MacIntel" &&
+      window.navigator.maxTouchPoints > 1);
+
+  if (isIos) {
+    return "ios";
+  }
+
+  if (/android/.test(userAgent)) {
+    return "android";
+  }
+
+  return null;
+}
+
+function isStandaloneDisplay() {
+  if (typeof window === "undefined") {
+    return false;
+  }
+
+  const navigatorWithStandalone = window.navigator as Navigator & {
+    standalone?: boolean;
+  };
+
+  return (
+    window.matchMedia?.("(display-mode: standalone)").matches ||
+    window.matchMedia?.("(display-mode: fullscreen)").matches ||
+    navigatorWithStandalone.standalone === true
+  );
+}
+
 type StoredCollectionPhoto = {
   id?: string;
   src?: string;
@@ -3912,6 +4141,8 @@ async function saveOwnSleepingPhotoWithCompressedFallback({
   shared: boolean;
 }) {
   const triedSrcs = new Set<string>();
+  const currentSavedCount = readOwnSleepingPhotos().length;
+  const minRetainedCount = Math.min(currentSavedCount + 1, 12);
   const candidates = [
     src,
     ...(src.startsWith("data:image/")
@@ -3936,6 +4167,7 @@ async function saveOwnSleepingPhotoWithCompressedFallback({
       triggerLabel,
       theme,
       shared,
+      minRetainedCount,
     });
 
     if (ownPhoto) {
@@ -4367,6 +4599,112 @@ const styles = {
     backgroundImage:
       "linear-gradient(90deg, rgba(88,73,50,0.035) 1px, transparent 1px), linear-gradient(0deg, rgba(88,73,50,0.03) 1px, transparent 1px)",
     backgroundSize: "28px 28px",
+  },
+  homeInstallHintCard: {
+    position: "fixed",
+    left: "50%",
+    bottom: "calc(98px + env(safe-area-inset-bottom))",
+    zIndex: 17,
+    width: HOME_NAV_FRAME_WIDTH,
+    maxWidth: "calc(100vw - 32px)",
+    boxSizing: "border-box",
+    transform: "translateX(-50%)",
+    display: "grid",
+    gridTemplateColumns: "minmax(0, 1fr) auto",
+    alignItems: "center",
+    gap: "14px",
+    padding: "14px 14px 14px 17px",
+    borderRadius: "22px",
+    border: "1px solid rgba(144,126,102,0.15)",
+    background:
+      "linear-gradient(145deg, rgba(255,253,248,0.94), rgba(246,238,224,0.88))",
+    boxShadow:
+      "0 14px 34px rgba(90,76,60,0.12), inset 0 1px 0 rgba(255,255,255,0.72)",
+    backdropFilter: "blur(18px)",
+    WebkitBackdropFilter: "blur(18px)",
+  },
+  homeInstallHintText: {
+    display: "grid",
+    gap: "4px",
+    minWidth: 0,
+  },
+  homeInstallHintTitle: {
+    margin: 0,
+    color: "#332c26",
+    fontFamily:
+      '"Hiragino Mincho ProN", "Yu Mincho", YuMincho, "Noto Serif JP", serif',
+    fontSize: "15px",
+    fontWeight: 500,
+    lineHeight: 1.45,
+    letterSpacing: "0.04em",
+  },
+  homeInstallHintBody: {
+    margin: 0,
+    color: "#746a5f",
+    fontSize: "11.5px",
+    fontWeight: 440,
+    lineHeight: 1.45,
+    letterSpacing: "0.02em",
+  },
+  homeInstallHintActions: {
+    display: "flex",
+    alignItems: "center",
+    gap: "8px",
+    flexShrink: 0,
+  },
+  homeInstallHintPrimary: {
+    minHeight: "38px",
+    padding: "0 14px",
+    borderRadius: "999px",
+    border: "1px solid rgba(144,126,102,0.18)",
+    background: "rgba(169,149,126,0.92)",
+    color: "#fffdf8",
+    fontSize: "12.5px",
+    fontWeight: 650,
+    letterSpacing: "0.03em",
+    boxShadow: "0 8px 18px rgba(90,76,60,0.12)",
+    cursor: "pointer",
+    whiteSpace: "nowrap",
+  },
+  homeInstallHintSecondary: {
+    minHeight: "38px",
+    padding: "0 4px",
+    border: "none",
+    background: "transparent",
+    color: "#8b8175",
+    fontSize: "12px",
+    fontWeight: 560,
+    cursor: "pointer",
+    whiteSpace: "nowrap",
+  },
+  homeInstallGuideBody: {
+    display: "grid",
+    gap: "22px",
+    padding: "4px 6px 8px",
+  },
+  homeInstallGuideList: {
+    margin: 0,
+    padding: "0 0 0 22px",
+    color: "#4f463d",
+    fontSize: "15px",
+    lineHeight: 1.85,
+    letterSpacing: "0.02em",
+  },
+  homeInstallGuideItem: {
+    paddingLeft: "4px",
+  },
+  homeInstallGuideButton: {
+    width: "100%",
+    minHeight: "52px",
+    borderRadius: "999px",
+    border: "1px solid rgba(144,126,102,0.14)",
+    background: "rgba(255,253,248,0.92)",
+    color: "#332c26",
+    fontSize: "15px",
+    fontWeight: 680,
+    letterSpacing: "0.03em",
+    boxShadow: "0 10px 24px rgba(90,76,60,0.08)",
+    cursor: "pointer",
   },
   boardPeek: {
     position: "fixed",

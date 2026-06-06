@@ -205,12 +205,14 @@ export function saveOwnSleepingPhoto({
   triggerLabel,
   theme,
   shared,
+  minRetainedCount = 1,
 }: {
   catId: string;
   src: string;
   triggerLabel: string;
   theme: string;
   shared: boolean;
+  minRetainedCount?: number;
 }) {
   if (!isUsablePhotoSrc(src)) {
     return null;
@@ -237,8 +239,15 @@ export function saveOwnSleepingPhoto({
     const normalizedOwnPhoto = normalizeOwnSleepingPhoto(ownPhoto);
     const nextPhotos = [normalizedOwnPhoto, ...saved];
     const keepCounts = [24, 12, 6, 1];
+    const minimumCount = Math.max(1, Math.min(minRetainedCount, nextPhotos.length));
 
     for (const keepCount of keepCounts) {
+      const retainedCount = Math.min(keepCount, nextPhotos.length);
+
+      if (retainedCount < minimumCount) {
+        continue;
+      }
+
       try {
         writeStorageArray(
           OWN_SLEEPING_PHOTO_STORAGE_KEY,
