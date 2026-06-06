@@ -1,6 +1,12 @@
 "use client";
 
-import { useEffect, useMemo, useState, type CSSProperties } from "react";
+import {
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type CSSProperties,
+} from "react";
 
 import {
   createSignedStorageUrl,
@@ -29,6 +35,8 @@ export function StoredPhotoImage({
   const initialSrc = getInitialDisplaySrc(src);
   const [displaySrc, setDisplaySrc] = useState(initialSrc);
   const [isLoaded, setIsLoaded] = useState(false);
+  const imageRef = useRef<HTMLImageElement | null>(null);
+  const isInlineImage = displaySrc.startsWith("data:image/");
   const frameStyle = useMemo<CSSProperties>(
     () => ({
       ...containerStyle,
@@ -81,6 +89,14 @@ export function StoredPhotoImage({
     };
   }, [src]);
 
+  useEffect(() => {
+    const image = imageRef.current;
+
+    if (image?.complete && image.naturalWidth > 0) {
+      setIsLoaded(true);
+    }
+  }, [displaySrc]);
+
   if (!displaySrc) {
     return <span aria-hidden="true" style={frameStyle} />;
   }
@@ -88,10 +104,11 @@ export function StoredPhotoImage({
   return (
     <span style={frameStyle}>
       <img
+        ref={imageRef}
         src={displaySrc}
         alt={alt}
-        loading="lazy"
-        decoding="async"
+        loading={isInlineImage ? "eager" : "lazy"}
+        decoding={isInlineImage ? "sync" : "async"}
         onLoad={() => setIsLoaded(true)}
         style={{
           width: "100%",
@@ -100,7 +117,7 @@ export function StoredPhotoImage({
           filter,
           mixBlendMode,
           display: "block",
-          opacity: isLoaded ? 1 : 0,
+          opacity: isInlineImage || isLoaded ? 1 : 0,
           transition: "opacity 180ms ease",
         }}
       />
