@@ -17,6 +17,28 @@ import { createBrowserSupabaseClient } from "../../lib/supabase/browser";
 const signedUrlCache = new Map<string, string>();
 const signedUrlPromiseCache = new Map<string, Promise<string | null>>();
 
+const fallbackFrameStyle: CSSProperties = {
+  display: "grid",
+  placeItems: "center",
+};
+
+const fallbackOverlayStyle: CSSProperties = {
+  position: "absolute",
+  inset: 0,
+  display: "grid",
+  placeItems: "center",
+};
+
+const fallbackTextStyle: CSSProperties = {
+  maxWidth: "80%",
+  color: "rgba(116, 106, 95, 0.78)",
+  fontSize: 12,
+  fontWeight: 600,
+  letterSpacing: "0.04em",
+  lineHeight: 1.5,
+  textAlign: "center",
+};
+
 export function StoredPhotoImage({
   src,
   alt,
@@ -35,6 +57,7 @@ export function StoredPhotoImage({
   const initialSrc = getInitialDisplaySrc(src);
   const [displaySrc, setDisplaySrc] = useState(initialSrc);
   const [isLoaded, setIsLoaded] = useState(false);
+  const [hasError, setHasError] = useState(false);
   const imageRef = useRef<HTMLImageElement | null>(null);
   const isInlineImage = displaySrc.startsWith("data:image/");
   const frameStyle = useMemo<CSSProperties>(
@@ -55,6 +78,7 @@ export function StoredPhotoImage({
     const storagePath = getStoragePhotoPath(src);
 
     setIsLoaded(false);
+    setHasError(false);
 
     if (!storagePath) {
       setDisplaySrc(src);
@@ -80,7 +104,12 @@ export function StoredPhotoImage({
       }
 
       if (isActive) {
-        setDisplaySrc(signedUrl ?? "");
+        if (signedUrl) {
+          setDisplaySrc(signedUrl);
+        } else {
+          setDisplaySrc("");
+          setHasError(true);
+        }
       }
     });
 
@@ -92,13 +121,51 @@ export function StoredPhotoImage({
   useEffect(() => {
     const image = imageRef.current;
 
-    if (image?.complete && image.naturalWidth > 0) {
-      setIsLoaded(true);
+    if (!image) {
+      return;
     }
+
+    const updateImageState = () => {
+      if (!image.complete) {
+        return false;
+      }
+
+      if (image.naturalWidth > 0) {
+        setIsLoaded(true);
+      } else {
+        setIsLoaded(false);
+        setHasError(true);
+      }
+
+      return true;
+    };
+
+    if (updateImageState()) {
+      return;
+    }
+
+    let checkCount = 0;
+    const checkTimer = window.setInterval(() => {
+      checkCount += 1;
+
+      if (updateImageState() || checkCount >= 25) {
+        if (!image.complete || image.naturalWidth === 0) {
+          setIsLoaded(false);
+          setHasError(true);
+        }
+        window.clearInterval(checkTimer);
+      }
+    }, 400);
+
+    return () => window.clearInterval(checkTimer);
   }, [displaySrc]);
 
   if (!displaySrc) {
-    return <span aria-hidden="true" style={frameStyle} />;
+    return hasError ? (
+      <PhotoFallback style={frameStyle} />
+    ) : (
+      <span aria-hidden="true" style={frameStyle} />
+    );
   }
 
   return (
@@ -110,6 +177,10 @@ export function StoredPhotoImage({
         loading={isInlineImage ? "eager" : "lazy"}
         decoding={isInlineImage ? "sync" : "async"}
         onLoad={() => setIsLoaded(true)}
+        onError={() => {
+          setIsLoaded(false);
+          setHasError(true);
+        }}
         style={{
           width: "100%",
           height: "100%",
@@ -117,10 +188,19 @@ export function StoredPhotoImage({
           filter,
           mixBlendMode,
           display: "block",
-          opacity: isInlineImage || isLoaded ? 1 : 0,
+          opacity: !hasError && (isInlineImage || isLoaded) ? 1 : 0,
           transition: "opacity 180ms ease",
         }}
       />
+      {hasError ? <PhotoFallback style={fallbackOverlayStyle} /> : null}
+    </span>
+  );
+}
+
+function PhotoFallback({ style }: { style: CSSProperties }) {
+  return (
+    <span style={{ ...style, ...fallbackFrameStyle }}>
+      <span style={fallbackTextStyle}>写真を表示できません</span>
     </span>
   );
 }
