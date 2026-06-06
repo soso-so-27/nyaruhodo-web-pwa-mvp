@@ -201,8 +201,9 @@ test.describe("home sleeping exchange flow", () => {
     page,
   }) => {
     let exchangeCalls = 0;
+    const existingLargePhotoSrc = deliveredDataUrl;
 
-    await page.addInitScript(() => {
+    await page.addInitScript((largePhotoSrc) => {
       window.localStorage.setItem("nyaruhodo_sleeping_safety_accepted", "1");
       window.localStorage.setItem("active_cat_id", "quota-cat");
       window.localStorage.setItem(
@@ -222,16 +223,39 @@ test.describe("home sleeping exchange flow", () => {
           sleepingCounterLockedUntil: Date.now() + 6 * 60 * 60 * 1000,
         }),
       );
+      window.localStorage.setItem(
+        "nyaruhodo_exchange_own_sleeping_photos",
+        JSON.stringify([
+          {
+            id: "existing-large-sleeping-photo",
+            ownerCatId: "quota-cat",
+            catId: "quota-cat",
+            src: largePhotoSrc,
+            state: "sleeping",
+            visibility: "private",
+            deliveryStatus: "available",
+            triggerLabel: "sleeping",
+            theme: "sleeping",
+            shared: false,
+            createdAt: Date.now() - 1000,
+          },
+        ]),
+      );
 
       const originalSetItem = Storage.prototype.setItem;
-      let rejectedMultiPhotoWrites = 0;
 
       Storage.prototype.setItem = function patchedSetItem(key, value) {
         if (key === "nyaruhodo_exchange_own_sleeping_photos") {
           try {
             const parsed = JSON.parse(String(value));
-            if (Array.isArray(parsed) && parsed.length > 1 && rejectedMultiPhotoWrites < 3) {
-              rejectedMultiPhotoWrites += 1;
+            if (
+              Array.isArray(parsed) &&
+              parsed.length > 1 &&
+              parsed.some((photo) =>
+                photo?.id === "existing-large-sleeping-photo" &&
+                String(photo?.src ?? "") === largePhotoSrc,
+              )
+            ) {
               throw new DOMException("Quota exceeded for test", "QuotaExceededError");
             }
           } catch (error) {
@@ -243,7 +267,7 @@ test.describe("home sleeping exchange flow", () => {
 
         return originalSetItem.call(this, key, value);
       };
-    });
+    }, existingLargePhotoSrc);
 
     await page.route("**/api/sleeping-delivery/exchange", async (route) => {
       exchangeCalls += 1;
@@ -256,17 +280,15 @@ test.describe("home sleeping exchange flow", () => {
     await page.goto("/home");
     await page.waitForLoadState("networkidle");
 
-    for (const index of [1, 2]) {
-      await page.locator("section").first().locator("button").first().click();
-      await page.locator('input[type="file"]').last().setInputFiles({
-        name: `home-sleeping-${index}.svg`,
-        mimeType: "image/svg+xml",
-        buffer: testSvg,
-      });
-      await expect(page.locator("section").last().locator("img")).toBeVisible();
-      await page.locator("section").last().locator("button").last().click();
-      await page.waitForTimeout(200);
-    }
+    await page.locator("section").first().locator("button").first().click();
+    await page.locator('input[type="file"]').last().setInputFiles({
+      name: "home-sleeping-new.svg",
+      mimeType: "image/svg+xml",
+      buffer: testSvg,
+    });
+    await expect(page.locator("section").last().locator("img")).toBeVisible();
+    await page.locator("section").last().locator("button").last().click();
+    await page.waitForTimeout(200);
 
     expect(exchangeCalls).toBe(0);
 
@@ -289,5 +311,13 @@ test.describe("home sleeping exchange flow", () => {
     expect(storage).toHaveLength(2);
     expect(new Set(storage.map((photo) => photo.id)).size).toBe(2);
     expect(storage.every((photo) => String(photo.src).startsWith("data:image/"))).toBe(true);
+    expect(storage.some((photo) => photo.id === "existing-large-sleeping-photo")).toBe(true);
+    expect(
+      storage.some(
+        (photo) =>
+          photo.id === "existing-large-sleeping-photo" &&
+          String(photo.src) !== existingLargePhotoSrc,
+      ),
+    ).toBe(true);
   });
 });

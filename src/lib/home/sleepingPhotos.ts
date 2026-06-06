@@ -152,6 +152,32 @@ export function restoreSyncedSleepingPhotos({
   };
 }
 
+export function writeOwnSleepingPhotosWithFallback(
+  photos: OwnSleepingPhoto[],
+  keepCounts = [24, 12, 6, 1],
+  minRetainedCount = 1,
+) {
+  const normalizedPhotos = photos
+    .filter(isValidOwnSleepingPhoto)
+    .map(normalizeOwnSleepingPhoto);
+  const minimumCount = Math.max(
+    1,
+    Math.min(minRetainedCount, normalizedPhotos.length),
+  );
+  const savedPhotos = writeStorageArrayWithFallback(
+    OWN_SLEEPING_PHOTO_STORAGE_KEY,
+    normalizedPhotos,
+    keepCounts,
+    minimumCount,
+  );
+
+  if (savedPhotos.length > 0) {
+    dispatchBoxPhotoStorageEvent();
+  }
+
+  return savedPhotos;
+}
+
 export function toCatMomentRecord(moment: CatMoment): CatMomentRecord {
   return {
     id: moment.id,
@@ -238,26 +264,16 @@ export function saveOwnSleepingPhoto({
     };
     const normalizedOwnPhoto = normalizeOwnSleepingPhoto(ownPhoto);
     const nextPhotos = [normalizedOwnPhoto, ...saved];
-    const keepCounts = [24, 12, 6, 1];
-    const minimumCount = Math.max(1, Math.min(minRetainedCount, nextPhotos.length));
+    const savedPhotos = writeStorageArrayWithFallback(
+      OWN_SLEEPING_PHOTO_STORAGE_KEY,
+      nextPhotos,
+      [24, 12, 6, 1],
+      minRetainedCount,
+    );
 
-    for (const keepCount of keepCounts) {
-      const retainedCount = Math.min(keepCount, nextPhotos.length);
-
-      if (retainedCount < minimumCount) {
-        continue;
-      }
-
-      try {
-        writeStorageArray(
-          OWN_SLEEPING_PHOTO_STORAGE_KEY,
-          nextPhotos.slice(0, keepCount),
-        );
-        dispatchBoxPhotoStorageEvent();
+    if (savedPhotos.some((photo) => photo.id === normalizedOwnPhoto.id)) {
+      dispatchBoxPhotoStorageEvent();
         return normalizedOwnPhoto;
-      } catch {
-        // Retry with fewer older photos if local storage is near its limit.
-      }
     }
   } catch {
     // The calling flow handles a null result.
@@ -649,9 +665,16 @@ function writeStorageArrayWithFallback<T>(
   key: string,
   value: T[],
   keepCounts: number[],
+  minRetainedCount = 1,
 ) {
+  const minimumCount = Math.max(1, Math.min(minRetainedCount, value.length));
+
   for (const keepCount of keepCounts) {
     const nextValue = value.slice(0, keepCount);
+
+    if (nextValue.length < minimumCount) {
+      continue;
+    }
 
     try {
       writeStorageArray(key, nextValue);

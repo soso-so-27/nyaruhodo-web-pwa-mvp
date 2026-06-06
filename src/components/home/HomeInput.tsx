@@ -50,6 +50,7 @@ import {
   readOwnSleepingPhotoCount,
   reportExchangePhoto,
   saveOwnSleepingPhoto,
+  writeOwnSleepingPhotosWithFallback,
   type ExchangePhoto,
   type OwnSleepingPhoto,
 } from "../../lib/home/sleepingPhotos";
@@ -4175,7 +4176,85 @@ async function saveOwnSleepingPhotoWithCompressedFallback({
     }
   }
 
+  const didCompactExisting = await compactExistingOwnSleepingPhotos({
+    minRetainedCount: Math.min(currentSavedCount, 12),
+  });
+
+  if (!didCompactExisting) {
+    return null;
+  }
+
+  for (const candidateSrc of candidates) {
+    if (!candidateSrc) {
+      continue;
+    }
+
+    const ownPhoto = saveOwnSleepingPhoto({
+      catId,
+      src: candidateSrc,
+      triggerLabel,
+      theme,
+      shared,
+      minRetainedCount,
+    });
+
+    if (ownPhoto) {
+      return ownPhoto;
+    }
+  }
+
   return null;
+}
+
+async function compactExistingOwnSleepingPhotos({
+  minRetainedCount,
+}: {
+  minRetainedCount: number;
+}) {
+  if (minRetainedCount <= 0) {
+    return false;
+  }
+
+  const existingPhotos = readOwnSleepingPhotos();
+
+  if (existingPhotos.length === 0) {
+    return false;
+  }
+
+  const attempts = [
+    { maxSize: 320, quality: 0.54 },
+    { maxSize: 240, quality: 0.46 },
+    { maxSize: 180, quality: 0.4 },
+  ];
+
+  for (const attempt of attempts) {
+    const compactedPhotos = await Promise.all(
+      existingPhotos.map(async (photo) => {
+        if (!photo.src.startsWith("data:image/")) {
+          return photo;
+        }
+
+        const compactedSrc = await resizeDataUrl(
+          photo.src,
+          attempt.maxSize,
+          attempt.quality,
+        );
+
+        return compactedSrc ? { ...photo, src: compactedSrc } : photo;
+      }),
+    );
+    const savedPhotos = writeOwnSleepingPhotosWithFallback(
+      compactedPhotos,
+      [24, 12, 6, 1],
+      minRetainedCount,
+    );
+
+    if (savedPhotos.length >= minRetainedCount) {
+      return true;
+    }
+  }
+
+  return false;
 }
 
 function resizeDataUrl(
