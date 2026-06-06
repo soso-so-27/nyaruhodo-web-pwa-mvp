@@ -1598,7 +1598,7 @@ export function HomeInput({ recentEvents: _recentEvents }: HomeInputProps) {
     setPendingExchangeSharePhoto(null);
     setPendingExchangeCatId(null);
     if (deliveryRemaining) {
-      showToast(`とったねがおに入りました。つぎにとどくまで ${deliveryRemaining}`);
+      showToast(`とったねがおに入りました。つぎのねがおまで あと ${deliveryRemaining}`);
       trackProductEvent(
         "home_exchange_share_photo_confirmed",
         {
@@ -2453,10 +2453,13 @@ function SleepingPhotoHome({
   deliveryRemaining: string | null;
   onTakePhoto: () => void;
 }) {
+  const isDeliveryLocked = Boolean(deliveryRemaining);
   const deliveryLabel = deliveryRemaining
-    ? `つぎにとどくまで ${deliveryRemaining}`
-    : null;
-  const deliveryStatus = deliveryRemaining ?? "とると届く";
+    ? `つぎのねがおまで あと ${deliveryRemaining}`
+    : "とると届く";
+  const deliveryStatus = deliveryRemaining
+    ? `あと ${deliveryRemaining}`
+    : "とると届く";
 
   return (
     <>
@@ -2469,7 +2472,7 @@ function SleepingPhotoHome({
             ねがおをとる
           </h1>
           <p style={styles.sleepingHomeLead}>
-            とると、1枚とどく
+            {isDeliveryLocked ? "とったねがおに入ります" : "とると、1枚とどく"}
           </p>
           <div style={styles.sleepingFlow} aria-hidden="true">
             <span style={styles.sleepingFlowIcon}>
@@ -2508,7 +2511,7 @@ function SleepingPhotoHome({
             </span>
           </div>
         </div>
-        <div style={styles.sleepingDeliveryCard} aria-label={deliveryLabel ?? "とると届く"}>
+        <div style={styles.sleepingDeliveryCard} aria-label={deliveryLabel}>
           <div style={styles.sleepingCardIconAccent}>
             <AppIcon name="mail" size={18} />
           </div>
@@ -2655,7 +2658,7 @@ function ExchangeSharePermissionSheet({
         <p style={styles.exchangeLead}>
           {canReceivePhoto
             ? "とったねがおに入り、1枚とどきます。"
-            : `とったねがおには入ります。つぎにとどくまで ${deliveryRemaining}。`}
+            : `とったねがおには入ります。つぎのねがおまで あと ${deliveryRemaining}。`}
         </p>
         <div style={styles.exchangeSharePreview}>
           <StoredPhotoImage src={photo.src} alt="" style={styles.exchangePhoto} />
@@ -2703,7 +2706,7 @@ function ExchangeSharePermissionSheet({
             <span style={styles.exchangeModeText}>
               <span style={styles.exchangeModeLabel}>とどける</span>
               <span style={styles.exchangeModeSub}>
-                {canReceivePhoto ? "1枚うけとる" : "あとでとどく"}
+                {canReceivePhoto ? "1枚うけとる" : "まだ届かない"}
               </span>
             </span>
           </button>

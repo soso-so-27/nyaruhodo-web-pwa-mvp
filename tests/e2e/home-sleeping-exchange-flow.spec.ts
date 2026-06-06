@@ -105,4 +105,95 @@ test.describe("home sleeping exchange flow", () => {
     expect(storage.ownSleepingPhotos[0]?.src).toMatch(/^data:image\//);
     expect(storage.keptExchangePhotos[0]?.src).toMatch(/^data:image\//);
   });
+
+  test("keeps the taken photo without promising delivery while delivery is locked", async ({
+    page,
+  }) => {
+    let exchangeCalls = 0;
+
+    await page.addInitScript(() => {
+      window.localStorage.setItem("nyaruhodo_sleeping_safety_accepted", "1");
+      window.localStorage.setItem("active_cat_id", "locked-cat");
+      window.localStorage.setItem(
+        "cat_profiles",
+        JSON.stringify([
+          {
+            id: "locked-cat",
+            name: "むぎ",
+            createdAt: new Date().toISOString(),
+            updatedAt: new Date().toISOString(),
+          },
+        ]),
+      );
+      window.localStorage.setItem(
+        "lock_data_locked-cat",
+        JSON.stringify({
+          sleepingCounterLockedUntil: Date.now() + 6 * 60 * 60 * 1000,
+        }),
+      );
+    });
+
+    await page.route("**/api/sleeping-delivery/exchange", async (route) => {
+      exchangeCalls += 1;
+      await route.fulfill({
+        contentType: "application/json",
+        body: JSON.stringify({
+          photo: {
+            id: `delivered-test-${Date.now()}`,
+            sourcePhotoId: "source-test-photo",
+            src: deliveredDataUrl,
+            title: "",
+            subtitle: "",
+            triggerLabel: "sleeping",
+            theme: "sleeping",
+            deliveredAt: Date.now(),
+          },
+          source: "remote",
+        }),
+      });
+    });
+
+    await page.goto("/home");
+    await page.waitForLoadState("networkidle");
+
+    await expect(page.getByText("とると、1枚とどく", { exact: true })).toHaveCount(0);
+    await expect(page.getByText("とったねがおに入ります")).toBeVisible();
+    await expect(page.getByText("つぎのねがおまで")).toBeVisible();
+    await expect(page.getByText(/あと .*時間/)).toBeVisible();
+
+    await page.locator("section").first().locator("button").first().click();
+    await page.locator('input[type="file"]').last().setInputFiles({
+      name: "home-sleeping.svg",
+      mimeType: "image/svg+xml",
+      buffer: testSvg,
+    });
+
+    await expect(page.locator("section").last().locator("img")).toBeVisible();
+    await expect(page.getByText("とったねがおには入ります。")).toBeVisible();
+    await expect(page.getByText("まだ届かない")).toBeVisible();
+    await page.locator("section").last().locator("button").last().click();
+
+    await page.waitForTimeout(500);
+    expect(exchangeCalls).toBe(0);
+    await expect(page.getByText("ねがおがとどきました")).toHaveCount(0);
+
+    const storage = await page.evaluate(() => {
+      const readArray = (key: string) => {
+        try {
+          const parsed = JSON.parse(window.localStorage.getItem(key) ?? "[]");
+          return Array.isArray(parsed) ? parsed : [];
+        } catch {
+          return [];
+        }
+      };
+
+      return {
+        ownSleepingPhotos: readArray("nyaruhodo_exchange_own_sleeping_photos"),
+        keptExchangePhotos: readArray("nyaruhodo_exchange_kept_photos"),
+      };
+    });
+
+    expect(storage.ownSleepingPhotos.length).toBeGreaterThan(0);
+    expect(storage.keptExchangePhotos).toHaveLength(0);
+  });
 });
