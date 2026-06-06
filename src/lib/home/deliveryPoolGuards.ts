@@ -1,9 +1,17 @@
+import { createHash } from "node:crypto";
+
 type DeliveryPoolRow = {
   local_moment_id: string;
   photo_url: string;
 };
 
 const BLOCKED_DELIVERY_LOCAL_MOMENT_IDS = new Set([
+  "own-sleeping-1780670253932",
+  "own-sleeping-1780669954498",
+  "own-sleeping-1780668154273",
+  "own-sleeping-1780668121905",
+  "own-sleeping-1780667901727",
+  "own-sleeping-1780667802425",
   "stock-sleeping-1780668154655-b6ebb7421ee0e",
   "stock-sleeping-1780668122297-e5eb05d072a45",
   "stock-sleeping-1780667902062-8cc5f82a733e5",
@@ -25,8 +33,16 @@ const BLOCKED_DELIVERY_LOCAL_MOMENT_IDS = new Set([
   "stock-sleeping-1780585036999-e8f8c233cc9c68",
 ]);
 
+const BLOCKED_DELIVERY_PHOTO_SHA256 = new Set([
+  "691ca42e3f1be9391bcd85298a9389ef00d6971d95a13ec1f3ddd339e064fcba",
+]);
+
 export function isBlockedDeliveryPoolRow(row: DeliveryPoolRow) {
   if (BLOCKED_DELIVERY_LOCAL_MOMENT_IDS.has(row.local_moment_id)) {
+    return true;
+  }
+
+  if (isBlockedDeliveryPhotoUrl(row.photo_url)) {
     return true;
   }
 
@@ -35,4 +51,22 @@ export function isBlockedDeliveryPoolRow(row: DeliveryPoolRow) {
   }
 
   return /^(e2e|prod-e2e|debug|fallback)-/.test(row.local_moment_id);
+}
+
+export function isBlockedDeliveryPhotoUrl(photoUrl: string) {
+  const match = photoUrl.match(/^data:image\/[a-zA-Z0-9.+-]+;base64,([a-zA-Z0-9+/=]+)$/);
+
+  if (!match) {
+    return false;
+  }
+
+  try {
+    const digest = createHash("sha256")
+      .update(Buffer.from(match[1], "base64"))
+      .digest("hex");
+
+    return BLOCKED_DELIVERY_PHOTO_SHA256.has(digest);
+  } catch {
+    return false;
+  }
 }

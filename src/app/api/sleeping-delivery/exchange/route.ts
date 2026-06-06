@@ -12,7 +12,10 @@ import {
 import { createSupabaseAdminClient } from "../../../../lib/supabase/admin";
 import { createServerSupabaseClient } from "../../../../lib/supabase/server";
 import type { ExchangePhoto } from "../../../../lib/home/sleepingPhotos";
-import { isBlockedDeliveryPoolRow } from "../../../../lib/home/deliveryPoolGuards";
+import {
+  isBlockedDeliveryPhotoUrl,
+  isBlockedDeliveryPoolRow,
+} from "../../../../lib/home/deliveryPoolGuards";
 
 export const dynamic = "force-dynamic";
 
@@ -86,7 +89,9 @@ export async function POST(request: Request) {
   const ownPhoto = input.ownPhoto;
   const createdAt = new Date(ownPhoto.createdAt ?? Date.now()).toISOString();
   const ownerCatId = ownPhoto.ownerCatId || ownPhoto.catId;
-  if (!debugDryRun) {
+  const shouldAddOwnPhotoToPool = !isBlockedDeliveryPhotoUrl(ownPhoto.src);
+
+  if (!debugDryRun && shouldAddOwnPhotoToPool) {
     const ownPhotoUrl = await prepareExchangeMomentPhotoUrl({
       supabase,
       userId,
