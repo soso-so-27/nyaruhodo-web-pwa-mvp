@@ -1,7 +1,10 @@
 import { NextResponse } from "next/server";
 
 import { isUsablePhotoSrc } from "../../../../lib/photoStorage";
-import { isBlockedDeliveryPoolRow } from "../../../../lib/home/deliveryPoolGuards";
+import {
+  isBlockedDeliveryPoolRow,
+  isStorageDeliveryPhotoUrl,
+} from "../../../../lib/home/deliveryPoolGuards";
 import { createSupabaseAdminClient } from "../../../../lib/supabase/admin";
 import { createServerSupabaseClient } from "../../../../lib/supabase/server";
 
@@ -50,17 +53,30 @@ export async function POST(request: Request) {
   }
 
   const rows = (data ?? []) as RemoteCatMomentRow[];
+  const totalSharedRows = rows.length;
   const blockedPoolRows = rows.filter(isBlockedDeliveryPoolRow);
+  const unblockedRows = rows.filter((row) => !isBlockedDeliveryPoolRow(row));
   const availableRows = rows.filter(
     (row) => row.delivery_status === "available" && !isBlockedDeliveryPoolRow(row),
   );
-  const unusableRows = availableRows.filter(
-    (row) => !isUsablePhotoSrc(row.photo_url),
+  const storageRows = unblockedRows.filter((row) =>
+    isStorageDeliveryPhotoUrl(row.photo_url),
   );
-  const blockedRows = availableRows.filter(
+  const storageExcludedRows = availableRows.filter((row) =>
+    isStorageDeliveryPhotoUrl(row.photo_url),
+  );
+  const exchangeAvailableRows = availableRows.filter(
+    (row) => !isStorageDeliveryPhotoUrl(row.photo_url),
+  );
+  const unusableRows = availableRows.filter(
+    (row) =>
+      !isStorageDeliveryPhotoUrl(row.photo_url) &&
+      !isUsablePhotoSrc(row.photo_url),
+  );
+  const blockedRows = exchangeAvailableRows.filter(
     (row) => blockedPhotoIds.has(row.id) || blockedPhotoIds.has(row.local_moment_id),
   );
-  const candidateRows = availableRows.filter(
+  const candidateRows = exchangeAvailableRows.filter(
     (row) =>
       isUsablePhotoSrc(row.photo_url) &&
       !blockedPhotoIds.has(row.id) &&
@@ -68,7 +84,7 @@ export async function POST(request: Request) {
   );
   const fallbackRows =
     candidateRows.length === 0 && blockedPhotoIds.size > 0
-      ? availableRows.filter(
+      ? exchangeAvailableRows.filter(
           (row) =>
             readPoolKind(row.metadata) === "admin_stock" &&
             isUsablePhotoSrc(row.photo_url),
@@ -96,6 +112,17 @@ export async function POST(request: Request) {
     hiddenCount: rows.filter((row) => row.delivery_status === "hidden").length,
     reportedCount: rows.filter((row) => row.delivery_status === "reported").length,
     blockedPoolCount: blockedPoolRows.length,
+    totalSharedRows,
+    blockedRows: blockedPoolRows.length,
+    storageExcludedRows: storageExcludedRows.length,
+    deliverableRows: effectiveCandidateRows.length,
+    dataImageDeliverableRows: effectiveCandidateRows.filter((row) =>
+      row.photo_url.startsWith("data:image/"),
+    ).length,
+    httpDeliverableRows: effectiveCandidateRows.filter((row) =>
+      row.photo_url.startsWith("http://") || row.photo_url.startsWith("https://"),
+    ).length,
+    storageRows: storageRows.length,
     rlsReadable: true,
     lastError: null,
     checkedAt: new Date().toISOString(),
@@ -118,6 +145,13 @@ function buildEmptyDiagnostics(source: "none" | "error", lastError: string) {
     hiddenCount: 0,
     reportedCount: 0,
     blockedPoolCount: 0,
+    totalSharedRows: 0,
+    blockedRows: 0,
+    storageExcludedRows: 0,
+    deliverableRows: 0,
+    dataImageDeliverableRows: 0,
+    httpDeliverableRows: 0,
+    storageRows: 0,
     rlsReadable: false,
     lastError,
     checkedAt: new Date().toISOString(),

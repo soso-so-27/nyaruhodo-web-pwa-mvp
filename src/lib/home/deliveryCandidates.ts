@@ -39,6 +39,13 @@ export type SleepingDeliveryDiagnostics = {
   userSharedCount: number;
   hiddenCount: number;
   reportedCount: number;
+  totalSharedRows?: number;
+  blockedRows?: number;
+  storageExcludedRows?: number;
+  deliverableRows?: number;
+  dataImageDeliverableRows?: number;
+  httpDeliverableRows?: number;
+  storageRows?: number;
   rlsReadable: boolean;
   lastError?: string | null;
   checkedAt: string;

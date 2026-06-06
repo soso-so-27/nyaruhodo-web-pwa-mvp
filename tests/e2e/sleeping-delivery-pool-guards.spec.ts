@@ -35,6 +35,21 @@ type ExchangeResponse = {
   source?: "remote" | "none";
 };
 
+type DiagnosticsResponse = {
+  candidateCount: number;
+  normalCandidateCount: number;
+  fallbackCandidateCount: number;
+  fallbackActive: boolean;
+  excludedCount: number;
+  totalSharedRows: number;
+  blockedRows: number;
+  storageExcludedRows: number;
+  deliverableRows: number;
+  dataImageDeliverableRows: number;
+  httpDeliverableRows: number;
+  storageRows: number;
+};
+
 test.describe("sleeping delivery pool guards", () => {
   test("normalizes expiring storage urls before persistent photo saves", () => {
     const storageSrc = "storage:user/cat/sleeping/photo.jpg";
@@ -86,6 +101,34 @@ test.describe("sleeping delivery pool guards", () => {
     );
     expect(isStorageDeliveryPhotoUrl(normalCatLikePhotoUrl)).toBe(false);
     expect(isStorageDeliveryPhotoUrl("https://example.com/photo.jpg")).toBe(false);
+  });
+
+  test("reports diagnostics using the same storage exclusion as delivery", async ({
+    request,
+  }) => {
+    const response = await request.post("/api/sleeping-delivery/diagnostics", {
+      data: { blockedPhotoIds: [] },
+    });
+
+    expect(response.ok()).toBeTruthy();
+    const diagnostics = (await response.json()) as DiagnosticsResponse;
+
+    expect(diagnostics.candidateCount).toBe(diagnostics.deliverableRows);
+    expect(diagnostics.normalCandidateCount).toBe(diagnostics.deliverableRows);
+    expect(diagnostics.fallbackCandidateCount).toBe(0);
+    expect(diagnostics.fallbackActive).toBe(false);
+    expect(diagnostics.deliverableRows).toBe(
+      diagnostics.dataImageDeliverableRows + diagnostics.httpDeliverableRows,
+    );
+    expect(diagnostics.storageRows).toBeGreaterThanOrEqual(
+      diagnostics.storageExcludedRows,
+    );
+    expect(diagnostics.excludedCount).toBeGreaterThanOrEqual(
+      diagnostics.storageExcludedRows,
+    );
+    expect(diagnostics.totalSharedRows).toBeGreaterThanOrEqual(
+      diagnostics.blockedRows + diagnostics.storageRows,
+    );
   });
 
   test("does not return known test or debug pool rows", async ({ request }) => {
