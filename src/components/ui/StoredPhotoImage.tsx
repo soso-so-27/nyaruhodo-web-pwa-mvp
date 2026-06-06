@@ -53,13 +53,6 @@ export function StoredPhotoImage({
       return;
     }
 
-    const supabase = createBrowserSupabaseClient();
-
-    if (!supabase) {
-      setDisplaySrc("");
-      return;
-    }
-
     const cachedUrl = signedUrlCache.get(storagePath);
     if (cachedUrl) {
       setDisplaySrc(cachedUrl);
@@ -68,9 +61,7 @@ export function StoredPhotoImage({
 
     const signedUrlPromise =
       signedUrlPromiseCache.get(storagePath) ??
-      createSignedStorageUrl(supabase, storagePath).then(
-        (signedUrl) => signedUrl ?? null,
-      );
+      resolveStoragePhotoForDisplay(src, storagePath);
     signedUrlPromiseCache.set(storagePath, signedUrlPromise);
 
     void signedUrlPromise.then((signedUrl) => {
@@ -124,4 +115,48 @@ function getInitialDisplaySrc(src: string) {
   }
 
   return signedUrlCache.get(storagePath) ?? "";
+}
+
+async function resolveStoragePhotoForDisplay(src: string, storagePath: string) {
+  const supabase = createBrowserSupabaseClient();
+
+  if (supabase) {
+    const signedUrl = await createSignedStorageUrl(supabase, storagePath);
+
+    if (signedUrl) {
+      return signedUrl;
+    }
+  }
+
+  return readSignedUrlFromApi(src, supabase);
+}
+
+async function readSignedUrlFromApi(
+  src: string,
+  supabase: ReturnType<typeof createBrowserSupabaseClient>,
+) {
+  const accessToken = supabase
+    ? (await supabase.auth.getSession()).data.session?.access_token
+    : null;
+
+  const response = await fetch("/api/photo-storage/signed-url", {
+    method: "POST",
+    headers: {
+      "content-type": "application/json",
+      ...(accessToken ? { authorization: `Bearer ${accessToken}` } : {}),
+    },
+    body: JSON.stringify({ src }),
+  }).catch(() => null);
+
+  if (!response?.ok) {
+    return null;
+  }
+
+  const body = (await response.json().catch(() => null)) as {
+    signedUrl?: unknown;
+  } | null;
+
+  return typeof body?.signedUrl === "string" && body.signedUrl
+    ? body.signedUrl
+    : null;
 }

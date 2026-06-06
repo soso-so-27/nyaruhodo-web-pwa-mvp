@@ -68,4 +68,86 @@ test.describe("collection album flow", () => {
 
     await expect(page.locator("main img")).toHaveCount(2);
   });
+
+  test("shows restored storage sleeping photos alongside latest local photos", async ({
+    page,
+  }) => {
+    const now = Date.now();
+
+    await page.route("**/api/photo-storage/signed-url", async (route) => {
+      const body = route.request().postDataJSON() as { src?: string };
+
+      if (body.src === "storage:user-1/current-cat/sleeping/restored.jpg") {
+        await route.fulfill({
+          contentType: "application/json",
+          body: JSON.stringify({ signedUrl: photoDataUrl }),
+        });
+        return;
+      }
+
+      await route.fulfill({
+        status: 404,
+        contentType: "application/json",
+        body: JSON.stringify({ signedUrl: null }),
+      });
+    });
+
+    await page.addInitScript(
+      ({ currentCatId, src, createdAt }) => {
+        window.localStorage.setItem("active_cat_id", currentCatId);
+        window.localStorage.setItem(
+          "cat_profiles",
+          JSON.stringify([
+            {
+              id: currentCatId,
+              name: "current cat",
+              createdAt: new Date(createdAt).toISOString(),
+              updatedAt: new Date(createdAt).toISOString(),
+            },
+          ]),
+        );
+        window.localStorage.setItem(
+          "nyaruhodo_exchange_own_sleeping_photos",
+          JSON.stringify([
+            {
+              id: `own-sleeping-${createdAt}`,
+              ownerCatId: currentCatId,
+              catId: currentCatId,
+              src,
+              state: "sleeping",
+              visibility: "private",
+              deliveryStatus: "available",
+              triggerLabel: "sleeping",
+              theme: "sleeping",
+              shared: false,
+              createdAt,
+            },
+            {
+              id: `own-sleeping-${createdAt - 1000}`,
+              ownerCatId: currentCatId,
+              catId: currentCatId,
+              src: "storage:user-1/current-cat/sleeping/restored.jpg",
+              state: "sleeping",
+              visibility: "private",
+              deliveryStatus: "available",
+              triggerLabel: "sleeping",
+              theme: "sleeping",
+              shared: false,
+              createdAt: createdAt - 1000,
+            },
+          ]),
+        );
+      },
+      {
+        currentCatId: "current-cat",
+        src: photoDataUrl,
+        createdAt: now,
+      },
+    );
+
+    await page.goto("/collection");
+    await page.waitForLoadState("networkidle");
+
+    await expect(page.locator("main img")).toHaveCount(2);
+  });
 });
