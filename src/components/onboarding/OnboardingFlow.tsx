@@ -120,14 +120,14 @@ export function OnboardingFlow() {
           recipientCatId: catId,
           emptyMessage: isTestMode
             ? "ねがおは入りました。とどく候補がまだありません。テスト用に候補を追加できます。"
-            : "ねがおは入りました。いまとどく候補がありません。少しあとで確認してください。",
+            : "ねがおは入りました。今日はまだ、とどくねがおを準備中です。",
         });
 
         if (!delivered) {
           setMessage(
             isTestMode
               ? "ねがおは入りました。とどく候補がまだありません。テスト用に候補を追加できます。"
-              : "ねがおは入りました。いまとどく候補がありません。少しあとで確認してください。",
+              : "ねがおは入りました。今日はまだ、とどくねがおを準備中です。",
           );
           setState("empty");
           return;
@@ -431,7 +431,7 @@ export function OnboardingFlow() {
             <p style={styles.resultText}>
               {isTestMode
                 ? "とどく候補がまだありません。テスト用に、ここで候補を追加できます。"
-                : "ねがおは保存されています。次に届く候補が増えるまで、少し待ってください。"}
+                : "今日はまだ\nとどくねがおを準備中です。"}
             </p>
             {isTestMode ? (
               <button

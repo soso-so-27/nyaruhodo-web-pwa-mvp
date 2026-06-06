@@ -380,7 +380,7 @@ export default function AccountCreatePage() {
                   }
                   style={styles.primaryButton}
                 >
-                  {isFromOnboarding ? "つづける" : "ホームへ戻る"}
+                  {isFromOnboarding ? "アルバムへ進む" : "ホームへ戻る"}
                 </button>
               </div>
             </>
