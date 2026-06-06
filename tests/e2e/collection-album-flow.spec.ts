@@ -1,0 +1,71 @@
+import { expect, test } from "@playwright/test";
+
+const photoDataUrl =
+  "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAGQAAABkCAYAAABw4pVUAAAAAXNSR0IArs4c6QAAAARnQU1BAACxjwv8YQUAAAAJcEhZcwAADsMAAA7DAcdvqGQAAAEJSURBVHhe7dExEcAgAMBAJKKuTpnpjoLA/fACchlrzv2C+a0njDPsVmfYrQyJMSTGkBhDYgyJMSTGkBhDYgyJMSTGkBhDYgyJMSTGkBhDYgyJMSTGkBhDYgyJMSTGkBhDYgyJMSTGkBhDYgyJMSTGkBhDYgyJMSTGkBhDYgyJMSTGkBhDYgyJMSTGkBhDYgyJMSTGkBhDYgyJMSTGkBhDYgyJMSTGkBhDYgyJMSTGkBhDYgyJMSTGkBhDYgyJMSTmB4RCEqdGtA/tAAAAAElFTkSuQmCC";
+
+test.describe("collection album flow", () => {
+  test("shows taken sleeping photos even when older photos belong to a previous cat id", async ({
+    page,
+  }) => {
+    const now = Date.now();
+
+    await page.addInitScript(
+      ({ currentCatId, previousCatId, src, createdAt }) => {
+        window.localStorage.setItem("active_cat_id", currentCatId);
+        window.localStorage.setItem(
+          "cat_profiles",
+          JSON.stringify([
+            {
+              id: currentCatId,
+              name: "current cat",
+              createdAt: new Date(createdAt).toISOString(),
+              updatedAt: new Date(createdAt).toISOString(),
+            },
+          ]),
+        );
+        window.localStorage.setItem(
+          "nyaruhodo_exchange_own_sleeping_photos",
+          JSON.stringify([
+            {
+              id: `own-sleeping-${createdAt}`,
+              ownerCatId: currentCatId,
+              catId: currentCatId,
+              src,
+              state: "sleeping",
+              visibility: "private",
+              deliveryStatus: "available",
+              triggerLabel: "sleeping",
+              theme: "sleeping",
+              shared: false,
+              createdAt,
+            },
+            {
+              id: `own-sleeping-${createdAt - 1000}`,
+              ownerCatId: previousCatId,
+              catId: previousCatId,
+              src,
+              state: "sleeping",
+              visibility: "private",
+              deliveryStatus: "available",
+              triggerLabel: "sleeping",
+              theme: "sleeping",
+              shared: false,
+              createdAt: createdAt - 1000,
+            },
+          ]),
+        );
+      },
+      {
+        currentCatId: "current-cat",
+        previousCatId: "previous-cat",
+        src: photoDataUrl,
+        createdAt: now,
+      },
+    );
+
+    await page.goto("/collection");
+    await page.waitForLoadState("networkidle");
+
+    await expect(page.locator("main img")).toHaveCount(2);
+  });
+});

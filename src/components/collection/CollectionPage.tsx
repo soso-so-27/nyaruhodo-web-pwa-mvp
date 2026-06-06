@@ -246,8 +246,8 @@ export function CollectionPage() {
     [catName, shareSuggestionSlot, storedCollectionPhotos],
   );
   const sleepingBoxPhotos = useMemo(
-    () => readOwnSleepingPhotos(activeCatId),
-    [activeCatId, boxRefreshTick, hasLoaded],
+    () => readOwnSleepingPhotos(),
+    [boxRefreshTick, hasLoaded],
   );
   const otherBoxPhotos = useMemo(
     () => readKeptExchangePhotos(),
