@@ -159,8 +159,13 @@ export default function AccountCreatePage() {
       return;
     }
 
+    const fromOnboarding =
+      new URLSearchParams(window.location.search).get("from") === "onboarding";
+
     if (!GOOGLE_CLIENT_ID) {
-      setMessage("Googleログインの設定がまだ入っていません。");
+      if (!fromOnboarding) {
+        setMessage("Googleログインの設定がまだ入っていません。");
+      }
       return;
     }
 
@@ -213,7 +218,9 @@ export default function AccountCreatePage() {
 
   async function handleGoogleSignIn() {
     if (!GOOGLE_CLIENT_ID) {
-      setMessage("Googleログインの設定がまだ入っていません。");
+      if (!isFromOnboarding) {
+        setMessage("Googleログインの設定がまだ入っていません。");
+      }
       return;
     }
 
@@ -361,7 +368,9 @@ export default function AccountCreatePage() {
               {connectedEmail ? (
                 <p style={styles.connectedEmail}>{connectedEmail}</p>
               ) : null}
-              <EnvironmentNotice environment={displayEnvironment} />
+              {!isFromOnboarding ? (
+                <EnvironmentNotice environment={displayEnvironment} />
+              ) : null}
               <div style={styles.actions}>
                 <div ref={googleButtonRef} style={styles.googleButtonMount} />
                 <button
@@ -407,7 +416,9 @@ export default function AccountCreatePage() {
                   </div>
                 ))}
               </div>
-              <EnvironmentNotice environment={displayEnvironment} />
+              {!isFromOnboarding ? (
+                <EnvironmentNotice environment={displayEnvironment} />
+              ) : null}
 
               {message ? (
                 <p style={styles.message} role="status">

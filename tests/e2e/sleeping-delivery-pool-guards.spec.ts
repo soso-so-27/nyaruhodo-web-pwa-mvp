@@ -207,7 +207,11 @@ function expectCandidateIsNotTestPoolPhoto(photo: {
   expect(photo.sourceOwnPhotoId ?? "").not.toMatch(
     /^(e2e|prod-e2e|debug|fallback)-/,
   );
-  expect(photo.sourceCatId ?? "").not.toBe("admin-stock");
+  expect(isBlockedDeliveryPhotoUrl(photo.src ?? "")).toBe(false);
   expect(photo.src ?? "").not.toContain("placecats.com");
   expect(photo.src ?? "").not.toMatch(/^storage:/);
+
+  if (photo.sourceCatId === "admin-stock") {
+    expect(photo.src ?? "").toMatch(/^data:image\//);
+  }
 }

@@ -302,7 +302,7 @@ test.describe("onboarding delivery flow", () => {
 
     await expect(page.getByText("アルバムができました")).toBeVisible();
     await expect(page.getByText("また寝ていたら、ここへ。")).toBeVisible();
-    await expect(page.getByRole("link", { name: "ホームへ" })).toBeVisible();
+    await expect(page.getByRole("link", { name: "ねてるねこへ" })).toBeVisible();
     await expect(page.getByText("このねこの名前は？")).toHaveCount(0);
     await expect(page.getByRole("button", { name: "アルバムをつくる" })).toHaveCount(0);
   });

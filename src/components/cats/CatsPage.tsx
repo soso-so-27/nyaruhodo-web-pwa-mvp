@@ -90,12 +90,15 @@ export function CatsPage() {
       savedActiveCatId,
     );
 
-    setCatProfiles(savedCatProfiles);
-    setActiveCatId(activeProfile.id);
-    setCatNameInput(getCatName(activeProfile));
-    setIsOnboardingMode(onboardingMode);
     const shouldEditOnboardingProfile =
       onboardingMode && isCatProfileNameUnset(activeProfile);
+
+    setCatProfiles(savedCatProfiles);
+    setActiveCatId(activeProfile.id);
+    setCatNameInput(
+      shouldEditOnboardingProfile ? "" : getCatName(activeProfile),
+    );
+    setIsOnboardingMode(onboardingMode);
     setIsOnboardingExistingCat(onboardingMode && !shouldEditOnboardingProfile);
     if (shouldEditOnboardingProfile) {
       setIsEditingCatName(true);
@@ -376,14 +379,14 @@ export function CatsPage() {
             <h2 style={styles.onboardingTitle}>
               {isEditingProfile ? "このねこの名前は？" : "また寝ていたら、ここへ。"}
             </h2>
-            <p style={styles.onboardingText}>
-              {isEditingProfile
-                ? "名前だけで大丈夫です。あとから変えられます。"
-                : "次に寝ていたら、すぐ入れられるように。"}
-            </p>
+            {isEditingProfile ? (
+              <p style={styles.onboardingText}>
+                名前だけで大丈夫です。あとから変えられます。
+              </p>
+            ) : null}
             {!isEditingProfile ? (
               <a href="/home" style={styles.onboardingHomeLink}>
-                ホームへ
+                ねてるねこへ
               </a>
             ) : null}
           </section>
@@ -613,7 +616,7 @@ export function CatsPage() {
                       type="text"
                       value={catNameInput}
                       onChange={(event) => setCatNameInput(event.target.value)}
-                      placeholder={"例：ミケ"}
+                      placeholder={isOnboardingProfileSetup ? "例：むぎ" : "例：ミケ"}
                       style={styles.input}
                     />
                     {!isOnboardingProfileSetup ? (
