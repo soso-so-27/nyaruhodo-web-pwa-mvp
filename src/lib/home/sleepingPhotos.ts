@@ -131,15 +131,21 @@ export function restoreSyncedSleepingPhotos({
   const existingKeptPhotos = mergeLocal ? readKeptExchangePhotos() : [];
   const restoredOwnPhotos = mergeOwnSleepingPhotos(existingOwnPhotos, ownPhotos);
   const restoredKeptPhotos = mergeExchangePhotos(existingKeptPhotos, keptPhotos);
+  const minimumOwnRetainedCount = mergeLocal
+    ? getValidOwnSleepingPhotoCount(existingOwnPhotos)
+    : 1;
+  const minimumKeptRetainedCount = mergeLocal ? existingKeptPhotos.length : 1;
   const savedOwnPhotos = writeStorageArrayWithFallback(
     OWN_SLEEPING_PHOTO_STORAGE_KEY,
     restoredOwnPhotos,
     [24, 12, 6, 1],
+    minimumOwnRetainedCount,
   );
   const savedKeptPhotos = writeStorageArrayWithFallback(
     KEPT_EXCHANGE_PHOTO_STORAGE_KEY,
     restoredKeptPhotos,
     [50, 24, 12, 6, 1],
+    minimumKeptRetainedCount,
   );
 
   if (savedOwnPhotos.length > 0 || savedKeptPhotos.length > 0) {
@@ -150,6 +156,10 @@ export function restoreSyncedSleepingPhotos({
     ownCount: savedOwnPhotos.length,
     keptCount: savedKeptPhotos.length,
   };
+}
+
+function getValidOwnSleepingPhotoCount(photos: OwnSleepingPhoto[]) {
+  return photos.filter(isValidOwnSleepingPhoto).length;
 }
 
 export function writeOwnSleepingPhotosWithFallback(
