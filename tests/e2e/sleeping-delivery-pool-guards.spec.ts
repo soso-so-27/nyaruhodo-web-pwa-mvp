@@ -3,6 +3,7 @@ import { expect, test, type APIRequestContext } from "@playwright/test";
 import {
   isBlockedDeliveryPhotoUrl,
   isBlockedDeliveryPoolRow,
+  isStorageDeliveryPhotoUrl,
 } from "../../src/lib/home/deliveryPoolGuards";
 import {
   normalizePersistentPhotoSrc,
@@ -79,6 +80,14 @@ test.describe("sleeping delivery pool guards", () => {
     ).toBe(false);
   });
 
+  test("treats storage paths as non-deliverable for beta exchange", () => {
+    expect(isStorageDeliveryPhotoUrl("storage:user/cat/sleeping/photo.jpg")).toBe(
+      true,
+    );
+    expect(isStorageDeliveryPhotoUrl(normalCatLikePhotoUrl)).toBe(false);
+    expect(isStorageDeliveryPhotoUrl("https://example.com/photo.jpg")).toBe(false);
+  });
+
   test("does not return known test or debug pool rows", async ({ request }) => {
     for (let index = 0; index < 12; index += 1) {
       const result = await readCandidate(request, index);
@@ -88,6 +97,7 @@ test.describe("sleeping delivery pool guards", () => {
       }
 
       expectCandidateIsNotTestPoolPhoto(result.photo);
+      expect(result.photo.src ?? "").not.toMatch(/^storage:/);
     }
 
     const createdAt = Date.now();
@@ -124,6 +134,7 @@ test.describe("sleeping delivery pool guards", () => {
         sourceOwnPhotoId: exchange.photo.sourcePhotoId,
         src: exchange.photo.src,
       });
+      expect(exchange.photo.src).not.toMatch(/^storage:/);
     }
   });
 });
@@ -155,4 +166,5 @@ function expectCandidateIsNotTestPoolPhoto(photo: {
   );
   expect(photo.sourceCatId ?? "").not.toBe("admin-stock");
   expect(photo.src ?? "").not.toContain("placecats.com");
+  expect(photo.src ?? "").not.toMatch(/^storage:/);
 }

@@ -14,6 +14,7 @@ import type { ExchangePhoto } from "../../../../lib/home/sleepingPhotos";
 import {
   isBlockedDeliveryPhotoUrl,
   isBlockedDeliveryPoolRow,
+  isStorageDeliveryPhotoUrl,
 } from "../../../../lib/home/deliveryPoolGuards";
 
 export const dynamic = "force-dynamic";
@@ -333,6 +334,9 @@ function isRowDeliverable(
   },
 ) {
   if (isBlockedDeliveryPoolRow(row)) {
+    return false;
+  }
+  if (isStorageDeliveryPhotoUrl(row.photo_url)) {
     return false;
   }
   if (!isUsablePhotoSrc(row.photo_url) || row.delivery_status !== "available") {

@@ -1,5 +1,7 @@
 import { createHash } from "node:crypto";
 
+import { getStoragePhotoPath } from "../photoStorage";
+
 type DeliveryPoolRow = {
   local_moment_id: string;
   photo_url: string;
@@ -69,4 +71,8 @@ export function isBlockedDeliveryPhotoUrl(photoUrl: string) {
   } catch {
     return false;
   }
+}
+
+export function isStorageDeliveryPhotoUrl(photoUrl: string) {
+  return getStoragePhotoPath(photoUrl) !== null;
 }
