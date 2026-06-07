@@ -28,6 +28,8 @@ const ACCOUNT_CREATE_PROMPT_DISMISSED_KEY =
 const ACCOUNT_CREATE_PROMPT_DISMISSED_MS = 7 * 24 * 60 * 60 * 1000;
 const GOOGLE_CLIENT_ID = process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID ?? "";
 const GOOGLE_ID_SCRIPT_SRC = "https://accounts.google.com/gsi/client";
+const ONBOARDING_ALBUM_COMPLETION_READY_KEY =
+  "neteruneko_onboarding_album_completion_ready";
 
 type GoogleCredentialResponse = {
   credential?: string;
@@ -78,6 +80,10 @@ export default function AccountCreatePage() {
   const googleButtonRef = useRef<HTMLDivElement | null>(null);
   const hasTrackedCtaView = useRef(false);
   const hasTrackedCallbackError = useRef(false);
+
+  function markOnboardingAlbumCompletionReady() {
+    window.sessionStorage.setItem(ONBOARDING_ALBUM_COMPLETION_READY_KEY, "true");
+  }
   const hasInitializedGoogleButton = useRef(false);
 
   useEffect(() => {
@@ -323,6 +329,9 @@ export default function AccountCreatePage() {
         startedAt: new Date().toISOString(),
       }),
     );
+    if (isFromOnboarding) {
+      markOnboardingAlbumCompletionReady();
+    }
     router.replace(
       isFromOnboarding ? "/cats?onboarding=1" : "/home?auth=google_success",
     );
@@ -359,7 +368,7 @@ export default function AccountCreatePage() {
               </h1>
               <p style={styles.body}>
                 {isFromOnboarding
-                  ? "今日の2枚をあとから見返せるようにします。"
+                  ? "今日の2枚を\nあとから見返せるようにします。"
                   : "この端末のねがおを、アカウントに保存できます。別の端末でも復元できます。"}
               </p>
               {isFromOnboarding && onboardingPhotoSrc ? (
@@ -375,9 +384,12 @@ export default function AccountCreatePage() {
                 <div ref={googleButtonRef} style={styles.googleButtonMount} />
                 <button
                   type="button"
-                  onClick={() =>
-                    router.push(isFromOnboarding ? "/cats?onboarding=1" : "/home")
-                  }
+                  onClick={() => {
+                    if (isFromOnboarding) {
+                      markOnboardingAlbumCompletionReady();
+                    }
+                    router.push(isFromOnboarding ? "/cats?onboarding=1" : "/home");
+                  }}
                   style={styles.primaryButton}
                 >
                   {isFromOnboarding ? "アルバムへ進む" : "ホームへ戻る"}
@@ -403,19 +415,21 @@ export default function AccountCreatePage() {
                 <OnboardingPhotoPreview src={onboardingPhotoSrc} />
               ) : null}
 
-              <div style={styles.valueList} aria-label="保存できるもの">
-                {[
-                  "とったねがお",
-                  "とどいたねがお",
-                  "猫のプロフィール",
-                  "写真と記録",
-                ].map((item) => (
-                  <div key={item} style={styles.valueItem}>
-                    <span style={styles.valueDot} aria-hidden="true" />
-                    <span>{item}</span>
-                  </div>
-                ))}
-              </div>
+              {!isFromOnboarding ? (
+                <div style={styles.valueList} aria-label="保存できるもの">
+                  {[
+                    "とったねがお",
+                    "とどいたねがお",
+                    "猫のプロフィール",
+                    "写真と記録",
+                  ].map((item) => (
+                    <div key={item} style={styles.valueItem}>
+                      <span style={styles.valueDot} aria-hidden="true" />
+                      <span>{item}</span>
+                    </div>
+                  ))}
+                </div>
+              ) : null}
               {!isFromOnboarding ? (
                 <EnvironmentNotice environment={displayEnvironment} />
               ) : null}
@@ -427,7 +441,7 @@ export default function AccountCreatePage() {
               ) : null}
               <p style={styles.authNote}>
                 {isFromOnboarding
-                  ? "ログインすると、アルバムに残せます。名前や場所は公開されません。"
+                  ? "名前や場所は公開されません。"
                   : "Googleの画面が開きます。接続後、このアプリに戻ります。"}
               </p>
 

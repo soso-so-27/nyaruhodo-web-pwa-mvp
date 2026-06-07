@@ -28,15 +28,23 @@ import { StoredPhotoImage } from "../ui/StoredPhotoImage";
 
 type OnboardingState = "intro" | "saving" | "delivered" | "empty" | "kept";
 
+const ONBOARDING_ALBUM_COMPLETION_READY_KEY =
+  "neteruneko_onboarding_album_completion_ready";
+
 export function OnboardingFlow() {
   const router = useRouter();
   const [state, setState] = useState<OnboardingState>("intro");
   const [selectedPhotoSrc, setSelectedPhotoSrc] = useState("");
   const [deliveredPhoto, setDeliveredPhoto] = useState<ExchangePhoto | null>(null);
+  const [isDeliveredPhotoKept, setIsDeliveredPhotoKept] = useState(false);
   const [pendingOwnPhoto, setPendingOwnPhoto] = useState<OwnSleepingPhoto | null>(null);
   const [message, setMessage] = useState("");
   const [isCandidateAdding, setIsCandidateAdding] = useState(false);
   const [isTestMode, setIsTestMode] = useState(false);
+
+  function markOnboardingAlbumCompletionReady() {
+    window.sessionStorage.setItem(ONBOARDING_ALBUM_COMPLETION_READY_KEY, "true");
+  }
 
   useEffect(() => {
     let isMounted = true;
@@ -114,6 +122,7 @@ export function OnboardingFlow() {
         const { dataUrl, ownPhoto } = savedResult;
         setSelectedPhotoSrc(dataUrl);
         setPendingOwnPhoto(ownPhoto);
+        setIsDeliveredPhotoKept(false);
 
         const delivered = await deliverOwnSleepingPhoto({
           ownPhoto,
@@ -163,12 +172,12 @@ export function OnboardingFlow() {
     });
 
     if (!keepResult.saved) {
-      setMessage("ねがおは届きましたが、アルバムに保存できませんでした。設定の保存状態を確認してください。");
+      setMessage("ねがおはとどきましたが、アルバムに保存できませんでした。設定の保存状態を確認してください。");
       return;
     }
 
     if (isTestMode) {
-      router.push("/collection");
+      setIsDeliveredPhotoKept(true);
       return;
     }
 
@@ -210,6 +219,7 @@ export function OnboardingFlow() {
     }
 
     setDeliveredPhoto(exchangeResult.photo);
+    setIsDeliveredPhotoKept(false);
     setState("delivered");
     return true;
   }
@@ -266,7 +276,7 @@ export function OnboardingFlow() {
         });
 
         if (!pendingOwnPhoto) {
-          setMessage("とどく候補を追加しました。もう一度ねてるねこを入れると届きます。");
+          setMessage("とどく候補を追加しました。もう一度ねてるねこを入れるととどきます。");
           setState("intro");
           return;
         }
@@ -383,7 +393,7 @@ export function OnboardingFlow() {
 
         {state === "delivered" && deliveredPhoto ? (
           <section style={styles.result} aria-label="とどいたねがお">
-            <p style={styles.kicker}>ねがおが届きました</p>
+            <p style={styles.kicker}>ねがおがとどきました</p>
             <div style={styles.deliveryEnvelope} aria-hidden="true">
               <AppIcon name="mail" size={24} />
             </div>
@@ -396,24 +406,30 @@ export function OnboardingFlow() {
                 <span style={styles.pairDots} />
                 <div style={styles.photoItem}>
                   <StoredPhotoImage src={deliveredPhoto.src} alt="" style={styles.deliveredPhoto} />
-                  <span style={styles.photoLabel}>届いた1枚</span>
+                  <span style={styles.photoLabel}>とどいた1枚</span>
                 </div>
               </div>
             ) : (
               <div style={styles.singleDeliveredPhoto}>
                 <StoredPhotoImage src={deliveredPhoto.src} alt="" style={styles.deliveredPhoto} />
-                <span style={styles.photoLabel}>届いた1枚</span>
+                <span style={styles.photoLabel}>とどいた1枚</span>
               </div>
             )}
             <p style={styles.resultText}>
-              とっておくと、アルバムに入ります。
+              {isDeliveredPhotoKept
+                ? "アルバムに入りました。"
+                : "とっておくと、アルバムに入ります。"}
             </p>
             <button
               type="button"
-              onClick={handleContinueAfterDelivery}
+              onClick={
+                isDeliveredPhotoKept
+                  ? () => router.push("/collection")
+                  : handleContinueAfterDelivery
+              }
               style={styles.primaryButton}
             >
-              {isTestMode ? "アルバムで見る" : "この2枚をとっておく"}
+              {isDeliveredPhotoKept ? "アルバムで見る" : "この2枚をとっておく"}
             </button>
             <button type="button" onClick={handleGoHome} style={styles.textButton}>
               閉じる
@@ -446,7 +462,7 @@ export function OnboardingFlow() {
               </button>
             ) : null}
             <button type="button" onClick={handleGoHome} style={styles.textButton}>
-              ホームへ
+              ねてるねこへ
             </button>
             {message ? <p style={styles.message}>{message}</p> : null}
           </section>
@@ -463,13 +479,17 @@ export function OnboardingFlow() {
             <p style={styles.resultText}>
               入れるたびに、
               <br />
-              どこかのねがおが届きます。
+              どこかのねがおがとどきます。
             </p>
-            <a href="/account/create?from=onboarding" style={styles.primaryLink}>
+            <a
+              href="/account/create?from=onboarding"
+              onClick={markOnboardingAlbumCompletionReady}
+              style={styles.primaryLink}
+            >
               このねこのアルバムをつくる
             </a>
             <button type="button" onClick={handleGoHome} style={styles.textButton}>
-              ホームへ
+              ねてるねこへ
             </button>
           </section>
         ) : null}

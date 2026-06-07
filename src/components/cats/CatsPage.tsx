@@ -48,6 +48,8 @@ const CATS_SURFACE_SOFT: CSSProperties = {
   background: "rgba(255,253,248,0.62)",
   boxShadow: "0 8px 18px rgba(90,76,60,0.05)",
 };
+const ONBOARDING_ALBUM_COMPLETION_READY_KEY =
+  "neteruneko_onboarding_album_completion_ready";
 
 export function CatsPage() {
   const [catProfiles, setCatProfiles] = useState<CatProfile[]>([]);
@@ -58,6 +60,8 @@ export function CatsPage() {
   const [isEditingProfile, setIsEditingProfile] = useState(false);
   const [isAddingCat, setIsAddingCat] = useState(false);
   const [isOnboardingMode, setIsOnboardingMode] = useState(false);
+  const [isOnboardingCompletionReady, setIsOnboardingCompletionReady] =
+    useState(false);
   const [isOnboardingExistingCat, setIsOnboardingExistingCat] = useState(false);
   const [isOnboardingAlbumCreated, setIsOnboardingAlbumCreated] = useState(false);
   const [editBirthDate, setEditBirthDate] = useState("");
@@ -79,10 +83,18 @@ export function CatsPage() {
     activeCatProfile?.avatarDataUrl ??
     getCatAvatarSrc(activeCatProfile?.appearance?.coat);
   const isOnboardingProfileSetup = isOnboardingMode && isEditingProfile;
+  const isOnboardingCompletionView =
+    isOnboardingMode && isOnboardingCompletionReady && !isEditingProfile;
 
   useEffect(() => {
-    const onboardingMode =
+    const requestedOnboardingMode =
       new URLSearchParams(window.location.search).get("onboarding") === "1";
+    const onboardingCompletionReady =
+      requestedOnboardingMode &&
+      window.sessionStorage.getItem(ONBOARDING_ALBUM_COMPLETION_READY_KEY) ===
+        "true";
+    const onboardingMode =
+      requestedOnboardingMode && onboardingCompletionReady;
     const savedCatProfiles = readCatProfiles();
     const savedActiveCatId = readActiveCatId();
     const activeProfile = getActiveCatProfile(
@@ -99,6 +111,7 @@ export function CatsPage() {
       shouldEditOnboardingProfile ? "" : getCatName(activeProfile),
     );
     setIsOnboardingMode(onboardingMode);
+    setIsOnboardingCompletionReady(onboardingCompletionReady);
     setIsOnboardingExistingCat(onboardingMode && !shouldEditOnboardingProfile);
     if (shouldEditOnboardingProfile) {
       setIsEditingCatName(true);
@@ -106,6 +119,18 @@ export function CatsPage() {
     }
     saveActiveCatId(activeProfile.id);
   }, []);
+
+  useEffect(() => {
+    if (!isOnboardingCompletionView) {
+      return;
+    }
+
+    window.sessionStorage.removeItem(ONBOARDING_ALBUM_COMPLETION_READY_KEY);
+  }, [isOnboardingCompletionView]);
+
+  function clearOnboardingAlbumCompletionReady() {
+    window.sessionStorage.removeItem(ONBOARDING_ALBUM_COMPLETION_READY_KEY);
+  }
 
   function handleCatSelect(catId: string) {
     const nextActiveProfile = getActiveCatProfile(catProfiles, catId);
@@ -362,9 +387,11 @@ export function CatsPage() {
       <div style={styles.container}>
         <div style={styles.pageHeader}>
           <h1 style={styles.pageTitle}>ねてるねこ</h1>
-          <a href="/settings" style={styles.headerIconLink} aria-label="設定">
-            <AppIcon name="settings" size={24} />
-          </a>
+          {!isOnboardingCompletionView ? (
+            <a href="/settings" style={styles.headerIconLink} aria-label="設定">
+              <AppIcon name="settings" size={24} />
+            </a>
+          ) : null}
         </div>
 
         {isOnboardingMode ? (
@@ -385,14 +412,18 @@ export function CatsPage() {
               </p>
             ) : null}
             {!isEditingProfile ? (
-              <a href="/home" style={styles.onboardingHomeLink}>
+              <a
+                href="/home"
+                onClick={clearOnboardingAlbumCompletionReady}
+                style={styles.onboardingHomeLink}
+              >
                 ねてるねこへ
               </a>
             ) : null}
           </section>
         ) : null}
 
-        {!isOnboardingProfileSetup ? (
+        {!isOnboardingProfileSetup && !isOnboardingCompletionView ? (
           <div style={styles.catGrid}>
             {catProfiles.map((profile) => {
               const isActive = profile.id === activeCatId;
@@ -447,7 +478,7 @@ export function CatsPage() {
           </div>
         ) : null}
 
-        {isAddingCat ? (
+        {isAddingCat && !isOnboardingCompletionView ? (
           <div style={styles.editor}>
             <label style={styles.label} htmlFor="new-cat-name">
               {"この子の名前"}
@@ -479,7 +510,7 @@ export function CatsPage() {
           </div>
         ) : null}
 
-        {activeCatProfile ? (
+        {activeCatProfile && !isOnboardingCompletionView ? (
           <div style={styles.profileCard}>
             {!isOnboardingProfileSetup ? (
               <>
@@ -693,7 +724,7 @@ export function CatsPage() {
           </div>
         ) : null}
 
-        {!isOnboardingProfileSetup ? (
+        {!isOnboardingProfileSetup && !isOnboardingCompletionView ? (
           <div style={styles.settingsSection}>
             <p style={styles.settingsSectionLabel}>設定</p>
             <div style={styles.settingsCard}>
@@ -708,7 +739,7 @@ export function CatsPage() {
         {message ? <p style={styles.message}>{message}</p> : null}
         {saveMessage ? <p style={styles.message}>{saveMessage}</p> : null}
       </div>
-      <BottomNavigation active="cats" />
+      {!isOnboardingCompletionView ? <BottomNavigation active="cats" /> : null}
     </main>
   );
 }

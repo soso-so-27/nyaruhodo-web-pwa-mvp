@@ -185,10 +185,17 @@ test.describe("onboarding delivery flow", () => {
       error: null,
     });
     await expectVisibleNonBlackImage(page.locator("main img").last());
+    await expect(page.getByText("とっておくと、アルバムに入ります。")).toBeVisible();
+    await expect(
+      page.getByRole("button", { name: "この2枚をとっておく" }),
+    ).toBeVisible();
+    await expect.poll(() => readKeptExchangePhotoCount(page)).toBe(0);
+    await page.getByRole("button", { name: "この2枚をとっておく" }).click();
+    await expect(page.getByText("アルバムに入りました。")).toBeVisible();
     await expect(
       page.getByRole("button", { name: "アルバムで見る" }),
     ).toBeVisible();
-    await expect.poll(() => readKeptExchangePhotoCount(page)).toBe(0);
+    await expect.poll(() => readKeptExchangePhotoCount(page)).toBe(1);
     await page.getByRole("button", { name: "アルバムで見る" }).click();
     await expect(page).toHaveURL(/\/collection/);
 
@@ -237,6 +244,7 @@ test.describe("onboarding delivery flow", () => {
     await expect(
       page.getByRole("button", { name: "この2枚をとっておく" }),
     ).toBeVisible();
+    await expect(page.getByText("とっておくと、アルバムに入ります。")).toBeVisible();
     await expect.poll(() => readKeptExchangePhotoCount(page)).toBe(0);
 
     await page.getByRole("button", { name: "閉じる" }).click();
@@ -245,6 +253,7 @@ test.describe("onboarding delivery flow", () => {
   });
 
   test("skips the name entry for an existing named cat", async ({ page }) => {
+    await seedOnboardingAlbumCompletionReady(page);
     await seedCatProfileBeforeLoad(page, {
       id: "local-cat-existing",
       name: "むぎ",
@@ -255,12 +264,31 @@ test.describe("onboarding delivery flow", () => {
     await expect(page.getByText("アルバムに入りました")).toBeVisible();
     await expect(page.getByText("また寝ていたら、ここへ。")).toBeVisible();
     await expect(page.getByText("このねこの名前は？")).toHaveCount(0);
+    await expect(page.getByText("プロフィール")).toHaveCount(0);
+    await expect(page.getByText("うちの背景")).toHaveCount(0);
+    await expect(page.getByText("基本情報")).toHaveCount(0);
+    await expect(page.getByText("アカウントと設定")).toHaveCount(0);
     await expect(page.getByRole("button", { name: "アルバムをつくる" })).toHaveCount(0);
+  });
+
+  test("does not show the onboarding completion panel on direct cats access", async ({
+    page,
+  }) => {
+    await seedCatProfileBeforeLoad(page, {
+      id: "local-cat-direct",
+      name: "むぎ",
+    });
+
+    await page.goto("/cats?onboarding=1");
+
+    await expect(page.getByText("アルバムに入りました")).toHaveCount(0);
+    await expect(page.getByText("アルバムができました")).toHaveCount(0);
   });
 
   test("treats the default cat name with profile details as an existing cat", async ({
     page,
   }) => {
+    await seedOnboardingAlbumCompletionReady(page);
     await seedCatProfileBeforeLoad(page, {
       id: "local-cat-default-with-details",
       name: "ミケ",
@@ -276,6 +304,7 @@ test.describe("onboarding delivery flow", () => {
   test("asks for a name when the default cat has no profile details", async ({
     page,
   }) => {
+    await seedOnboardingAlbumCompletionReady(page);
     await seedCatProfileBeforeLoad(page, {
       id: "local-cat-default-empty",
       name: "ミケ",
@@ -290,6 +319,7 @@ test.describe("onboarding delivery flow", () => {
   test("shows a persistent completion panel after creating an onboarding album", async ({
     page,
   }) => {
+    await seedOnboardingAlbumCompletionReady(page);
     await seedCatProfileBeforeLoad(page, {
       id: "local-cat-default-empty",
       name: "ミケ",
@@ -304,10 +334,15 @@ test.describe("onboarding delivery flow", () => {
     await expect(page.getByText("また寝ていたら、ここへ。")).toBeVisible();
     await expect(page.getByRole("link", { name: "ねてるねこへ" })).toBeVisible();
     await expect(page.getByText("このねこの名前は？")).toHaveCount(0);
+    await expect(page.getByText("プロフィール")).toHaveCount(0);
+    await expect(page.getByText("うちの背景")).toHaveCount(0);
+    await expect(page.getByText("基本情報")).toHaveCount(0);
+    await expect(page.getByText("アカウントと設定")).toHaveCount(0);
     await expect(page.getByRole("button", { name: "アルバムをつくる" })).toHaveCount(0);
   });
 
   test("asks for a name when the cat name is empty", async ({ page }) => {
+    await seedOnboardingAlbumCompletionReady(page);
     await seedCatProfileBeforeLoad(page, {
       id: "local-cat-empty-name",
       name: "",
@@ -319,6 +354,15 @@ test.describe("onboarding delivery flow", () => {
     await expect(page.getByRole("button", { name: "アルバムをつくる" })).toBeVisible();
   });
 });
+
+async function seedOnboardingAlbumCompletionReady(page: Page) {
+  await page.addInitScript(() => {
+    window.sessionStorage.setItem(
+      "neteruneko_onboarding_album_completion_ready",
+      "true",
+    );
+  });
+}
 
 async function seedCatProfileBeforeLoad(page: Page, input: {
   id: string;
