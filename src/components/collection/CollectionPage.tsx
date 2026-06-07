@@ -1063,8 +1063,7 @@ function BoxPhotoDetailSheet({
   onDeleteSleepingPhoto: (photo: BoxPreviewPhoto) => void;
   onHideOtherPhoto: (photo: BoxPreviewPhoto) => void;
 }) {
-  const baseTitle = kind === "sleeping" ? "とったねがお" : "とどいたねがお";
-  const title = dayLabel ? `${dayLabel}の${baseTitle}` : baseTitle;
+  const title = dayLabel ?? "アルバム";
   const currentPhoto =
     photos[Math.max(0, Math.min(currentPhotoIndex, photos.length - 1))] ?? null;
   const deliveryActionLabel = currentPhoto?.shared
@@ -1079,11 +1078,6 @@ function BoxPhotoDetailSheet({
             {photos.map((photo) => (
               <div key={photo.id} style={styles.photoSlide}>
                 <StoredPhotoImage src={photo.src} alt="" style={styles.photoImg} />
-                {kind === "sleeping" ? (
-                  <span style={styles.boxPhotoStateBadge}>
-                    {photo.shared ? "とどく" : "自分だけ"}
-                  </span>
-                ) : null}
               </div>
             ))}
           </div>
@@ -3372,19 +3366,6 @@ const styles = {
     height: "100%",
     objectFit: "contain",
     display: "block",
-  },
-  boxPhotoStateBadge: {
-    position: "absolute",
-    left: "12px",
-    top: "12px",
-    borderRadius: "999px",
-    background: "rgba(255,255,255,0.88)",
-    color: "#2a2a28",
-    fontSize: "12px",
-    fontWeight: 620,
-    lineHeight: 1,
-    padding: "6px 10px",
-    boxShadow: "0 6px 18px rgba(0,0,0,0.14)",
   },
   deleteBtn: {
     position: "absolute",
