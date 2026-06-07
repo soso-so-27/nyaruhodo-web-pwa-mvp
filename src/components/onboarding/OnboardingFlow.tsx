@@ -339,7 +339,7 @@ export function OnboardingFlow() {
         }
         @keyframes ownPhotoSend {
           0% { transform: translateX(0) scale(1); opacity: 0.74; }
-          100% { transform: translateX(7px) scale(0.96); opacity: 0.54; }
+          100% { transform: translateX(4px) scale(1); opacity: 0.64; }
         }
       `}</style>
       <div style={styles.paperBackground} aria-hidden="true" />
@@ -476,11 +476,6 @@ export function OnboardingFlow() {
               <br />
               ここへ。
             </h2>
-            <p style={styles.resultText}>
-              入れるたびに、
-              <br />
-              どこかのねがおがとどきます。
-            </p>
             <a
               href="/account/create?from=onboarding"
               onClick={markOnboardingAlbumCompletionReady}
@@ -739,7 +734,7 @@ const styles = {
     display: "grid",
     justifyItems: "center",
     textAlign: "center",
-    gap: "18px",
+    gap: "14px",
   },
   flow: {
     display: "inline-flex",
@@ -779,12 +774,12 @@ const styles = {
       "repeating-linear-gradient(90deg, rgba(142,128,110,0.42) 0 4px, transparent 4px 10px)",
   },
   title: {
-    margin: "8px 0 0",
+    margin: "6px 0 0",
     color: "#202020",
     fontFamily: SERIF,
-    fontSize: "30px",
+    fontSize: "29px",
     fontWeight: 470,
-    lineHeight: 1.42,
+    lineHeight: 1.3,
     letterSpacing: "0.08em",
   },
   lead: {
@@ -793,14 +788,19 @@ const styles = {
     fontFamily: SERIF,
     fontSize: "14.5px",
     fontWeight: 400,
-    lineHeight: 1.9,
+    lineHeight: 1.72,
     letterSpacing: "0.06em",
   },
   deliveryWaiting: {
     display: "grid",
     justifyItems: "center",
-    gap: "8px",
-    margin: "0 0 -4px",
+    gap: "9px",
+    margin: "4px 0 -2px",
+    padding: "12px 18px 13px",
+    border: "1px solid rgba(144,126,102,0.12)",
+    borderRadius: "20px",
+    background: "rgba(255,253,248,0.54)",
+    boxShadow: "0 8px 20px rgba(90,76,60,0.05)",
   },
   deliveryWaitingLine: {
     position: "relative",
@@ -822,22 +822,22 @@ const styles = {
     animation: "onboardingDots 1.1s ease-in-out infinite alternate",
   },
   deliveryWaitingText: {
-    color: "#8a8174",
+    color: "#746a5f",
     fontFamily: SERIF,
-    fontSize: "12px",
+    fontSize: "13px",
     fontWeight: 400,
-    lineHeight: 1.4,
+    lineHeight: 1.45,
     letterSpacing: "0.08em",
   },
   primaryButton: {
     width: "min(100%, 280px)",
     minHeight: "54px",
-    marginTop: "18px",
+    marginTop: "16px",
     border: "1px solid rgba(120,108,94,0.12)",
     borderRadius: "999px",
     background: "rgba(255,253,248,0.86)",
     color: "#403a33",
-    boxShadow: "0 10px 24px rgba(90,76,60,0.08)",
+    boxShadow: "0 8px 20px rgba(90,76,60,0.07)",
     fontSize: "15px",
     fontWeight: 600,
     cursor: "pointer",
@@ -845,12 +845,12 @@ const styles = {
   primaryLink: {
     width: "min(100%, 280px)",
     minHeight: "54px",
-    marginTop: "14px",
+    marginTop: "20px",
     border: "1px solid rgba(120,108,94,0.12)",
     borderRadius: "999px",
     background: "rgba(255,253,248,0.86)",
     color: "#403a33",
-    boxShadow: "0 10px 24px rgba(90,76,60,0.08)",
+    boxShadow: "0 8px 20px rgba(90,76,60,0.07)",
     fontSize: "15px",
     fontWeight: 600,
     textDecoration: "none",
@@ -868,9 +868,9 @@ const styles = {
   textButton: {
     border: "none",
     background: "transparent",
-    color: "#8a8174",
+    color: "#9c9388",
     fontSize: "12px",
-    fontWeight: 500,
+    fontWeight: 480,
     cursor: "pointer",
     padding: "8px 12px",
   },
@@ -884,7 +884,7 @@ const styles = {
     display: "grid",
     justifyItems: "center",
     textAlign: "center",
-    gap: "16px",
+    gap: "15px",
   },
   kicker: {
     margin: 0,
@@ -899,9 +899,9 @@ const styles = {
     margin: "6px 0 0",
     color: "#202020",
     fontFamily: SERIF,
-    fontSize: "26px",
+    fontSize: "28px",
     fontWeight: 470,
-    lineHeight: 1.45,
+    lineHeight: 1.38,
     letterSpacing: "0.08em",
   },
   deliveryEnvelope: {
@@ -920,10 +920,10 @@ const styles = {
   },
   photoPair: {
     display: "grid",
-    gridTemplateColumns: "104px 32px 136px",
+    gridTemplateColumns: "118px 28px 118px",
     alignItems: "center",
     justifyContent: "center",
-    gap: "8px",
+    gap: "7px",
     width: "100%",
   },
   photoItem: {
@@ -937,22 +937,22 @@ const styles = {
     gap: "8px",
   },
   ownPhoto: {
-    width: "96px",
-    height: "96px",
+    width: "112px",
+    height: "112px",
     objectFit: "cover",
-    borderRadius: "22px",
+    borderRadius: "24px",
     opacity: 0.72,
-    border: "6px solid rgba(255,253,248,0.74)",
-    boxShadow: "0 8px 20px rgba(90,76,60,0.08)",
+    border: "6px solid rgba(255,253,248,0.76)",
+    boxShadow: "0 10px 24px rgba(90,76,60,0.09)",
     animation: "ownPhotoSend 560ms ease-out both",
   },
   deliveredPhoto: {
-    width: "128px",
-    height: "128px",
+    width: "112px",
+    height: "112px",
     objectFit: "cover",
-    borderRadius: "26px",
-    border: "7px solid rgba(255,253,248,0.82)",
-    boxShadow: "0 14px 34px rgba(90,76,60,0.12)",
+    borderRadius: "24px",
+    border: "6px solid rgba(255,253,248,0.82)",
+    boxShadow: "0 10px 24px rgba(90,76,60,0.09)",
     animation: "deliveredPhotoIn 620ms 120ms cubic-bezier(0.22, 1, 0.36, 1) both",
   },
   photoLabel: {
