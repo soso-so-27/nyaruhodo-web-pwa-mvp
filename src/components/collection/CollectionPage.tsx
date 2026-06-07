@@ -117,7 +117,6 @@ type AlbumMomentPhoto = BoxPreviewPhoto & {
 
 type AlbumDaySection = {
   kind: AlbumPhotoKind;
-  label: string;
   photos: AlbumMomentPhoto[];
 };
 
@@ -1005,9 +1004,6 @@ function AlbumDaySectionRow({
     : null;
   const rowContent = (
     <>
-      <div style={styles.daySectionHeader}>
-        <span style={styles.daySectionTitle}>{section.label}</span>
-      </div>
       <div style={styles.dayPhotoStrip}>
         {visiblePhotos.map((photo) => (
           <span key={photo.id} style={styles.dayPhotoThumb}>
@@ -1926,17 +1922,14 @@ function buildAlbumDayGroups(
       [
       {
         kind: "sleeping",
-        label: "うちのねがお",
         photos: photos.filter((photo) => photo.kind === "sleeping"),
       },
       {
         kind: "other",
-        label: "とどいたねがお",
         photos: photos.filter((photo) => photo.kind === "other"),
       },
       {
         kind: "awake",
-        label: "ようす",
         photos: photos.filter((photo) => photo.kind === "awake"),
       },
     ] satisfies AlbumDaySection[]
@@ -2673,19 +2666,6 @@ const styles = {
   },
   daySectionButton: {
     cursor: "pointer",
-  },
-  daySectionHeader: {
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "space-between",
-    gap: "10px",
-  },
-  daySectionTitle: {
-    color: COLLECTION_MUTED,
-    fontSize: "11px",
-    fontWeight: 500,
-    lineHeight: 1.2,
-    letterSpacing: "0.04em",
   },
   dayPhotoStrip: {
     display: "grid",
