@@ -48,12 +48,20 @@ export async function POST(request: Request) {
     return billingError("already_active", 409);
   }
 
-  const customerId =
-    existing?.stripeCustomerId ??
-    (await createStripeCustomer({
-      email: user.email,
-      userId: user.id,
-    })).id;
+  let customerId = existing?.stripeCustomerId ?? null;
+
+  if (!customerId) {
+    try {
+      customerId = (
+        await createStripeCustomer({
+          email: user.email,
+          userId: user.id,
+        })
+      ).id;
+    } catch {
+      return billingError("stripe_customer_failed", 500);
+    }
+  }
 
   const stored = await upsertCheckoutStartedSubscription({
     supabase,
@@ -72,9 +80,9 @@ export async function POST(request: Request) {
     userId: user.id,
     successUrl: `${baseUrl}/settings?billing=success`,
     cancelUrl: `${baseUrl}/settings?billing=cancel`,
-  });
+  }).catch(() => null);
 
-  if (!session.url) {
+  if (!session?.url) {
     return billingError("checkout_session_failed", 500);
   }
 
