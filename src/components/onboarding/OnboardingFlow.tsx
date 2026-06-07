@@ -382,7 +382,7 @@ export function OnboardingFlow() {
               style={styles.primaryButton}
               disabled={state === "saving"}
             >
-              {state === "saving" ? "とどけています..." : "ねてるねこを入れる"}
+              {state === "saving" ? "とどいています..." : "ねてるねこを入れる"}
             </button>
             <button type="button" onClick={handleGoHome} style={styles.textButton}>
               あとで
@@ -504,7 +504,11 @@ function DeliveryWaiting() {
       <span style={styles.deliveryWaitingLine}>
         <span style={styles.deliveryWaitingDot} />
       </span>
-      <span style={styles.deliveryWaitingText}>どこかのねがおを受け取っています</span>
+      <span style={styles.deliveryWaitingText}>
+        ねがおが
+        <br />
+        とどいています
+      </span>
     </div>
   );
 }
