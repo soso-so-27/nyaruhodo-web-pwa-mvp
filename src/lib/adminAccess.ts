@@ -72,7 +72,7 @@ export async function requireStockAdminAccess(
   return { allowed: true, capabilities, user };
 }
 
-async function getAuthenticatedUserForRequest(request: Request) {
+export async function getAuthenticatedUserForRequest(request: Request) {
   const bearerToken = getBearerToken(request);
 
   if (bearerToken) {

@@ -12,6 +12,42 @@ test.describe("admin test tool guards", () => {
     expect([403, 404, 503]).toContain(response.status());
   });
 
+  test("rejects beta feedback without login", async ({ request }) => {
+    const response = await request.post("/api/beta/feedback", {
+      data: {
+        category: "bug",
+        message: "settings feedback guard smoke test",
+        kind: "beta_feedback",
+      },
+    });
+
+    expect(response.ok()).toBeFalsy();
+    expect([401, 403]).toContain(response.status());
+  });
+
+  test("rejects billing session creation without login", async ({ request }) => {
+    const checkout = await request.post("/api/billing/create-checkout-session");
+    const portal = await request.post("/api/billing/create-portal-session");
+
+    expect(checkout.ok()).toBeFalsy();
+    expect(portal.ok()).toBeFalsy();
+    expect(checkout.status()).toBe(401);
+    expect(portal.status()).toBe(401);
+  });
+
+  test("rejects stripe webhooks without a valid signature", async ({ request }) => {
+    const response = await request.post("/api/stripe/webhook", {
+      data: {
+        id: "evt_e2e_fake",
+        type: "checkout.session.completed",
+        data: { object: {} },
+      },
+    });
+
+    expect(response.ok()).toBeFalsy();
+    expect([400, 503]).toContain(response.status());
+  });
+
   test("hides settings test tools for non-admin users", async ({ page }) => {
     await page.route("**/api/admin/capabilities", async (route) => {
       await route.fulfill({
@@ -20,6 +56,29 @@ test.describe("admin test tool guards", () => {
           isAdmin: false,
           testToolsEnabled: false,
           stockAdminEnabled: false,
+        }),
+      });
+    });
+    await page.route("**/api/beta/capabilities", async (route) => {
+      await route.fulfill({
+        contentType: "application/json",
+        body: JSON.stringify({
+          isLoggedIn: false,
+          isBetaParticipant: false,
+          feedbackEnabled: false,
+          supporterVoiceEnabled: false,
+        }),
+      });
+    });
+    await page.route("**/api/billing/status", async (route) => {
+      await route.fulfill({
+        contentType: "application/json",
+        body: JSON.stringify({
+          isLoggedIn: false,
+          billingConfigured: false,
+          isBetaSupporter: false,
+          status: "none",
+          canManageBilling: false,
         }),
       });
     });
@@ -46,6 +105,29 @@ test.describe("admin test tool guards", () => {
           isAdmin: false,
           testToolsEnabled: false,
           stockAdminEnabled: false,
+        }),
+      });
+    });
+    await page.route("**/api/beta/capabilities", async (route) => {
+      await route.fulfill({
+        contentType: "application/json",
+        body: JSON.stringify({
+          isLoggedIn: false,
+          isBetaParticipant: false,
+          feedbackEnabled: false,
+          supporterVoiceEnabled: false,
+        }),
+      });
+    });
+    await page.route("**/api/billing/status", async (route) => {
+      await route.fulfill({
+        contentType: "application/json",
+        body: JSON.stringify({
+          isLoggedIn: false,
+          billingConfigured: false,
+          isBetaSupporter: false,
+          status: "none",
+          canManageBilling: false,
         }),
       });
     });
@@ -103,6 +185,30 @@ test.describe("admin test tool guards", () => {
         }),
       });
     });
+    await page.route("**/api/beta/capabilities", async (route) => {
+      await route.fulfill({
+        contentType: "application/json",
+        body: JSON.stringify({
+          isLoggedIn: true,
+          isBetaParticipant: true,
+          feedbackEnabled: true,
+          supporterVoiceEnabled: false,
+          isBetaSupporter: false,
+        }),
+      });
+    });
+    await page.route("**/api/billing/status", async (route) => {
+      await route.fulfill({
+        contentType: "application/json",
+        body: JSON.stringify({
+          isLoggedIn: true,
+          billingConfigured: false,
+          isBetaSupporter: false,
+          status: "none",
+          canManageBilling: false,
+        }),
+      });
+    });
     await page.route("**/api/sleeping-delivery/diagnostics", async (route) => {
       await route.fulfill({
         contentType: "application/json",
@@ -130,6 +236,96 @@ test.describe("admin test tool guards", () => {
     await expect(
       page.getByRole("button", { name: "とどくねがおを追加する" }),
     ).toBeVisible();
+  });
+
+  test("shows beta feedback entry for beta participants", async ({ page }) => {
+    await page.route("**/api/admin/capabilities", async (route) => {
+      await route.fulfill({
+        contentType: "application/json",
+        body: JSON.stringify({
+          isAdmin: false,
+          testToolsEnabled: false,
+          stockAdminEnabled: false,
+        }),
+      });
+    });
+    await page.route("**/api/beta/capabilities", async (route) => {
+      await route.fulfill({
+        contentType: "application/json",
+        body: JSON.stringify({
+          isLoggedIn: true,
+          isBetaParticipant: true,
+          feedbackEnabled: true,
+          supporterVoiceEnabled: false,
+          isBetaSupporter: false,
+        }),
+      });
+    });
+    await page.route("**/api/billing/status", async (route) => {
+      await route.fulfill({
+        contentType: "application/json",
+        body: JSON.stringify({
+          isLoggedIn: true,
+          billingConfigured: false,
+          isBetaSupporter: false,
+          status: "none",
+          canManageBilling: false,
+        }),
+      });
+    });
+
+    await page.goto("/settings");
+    await page.waitForLoadState("networkidle");
+
+    await expect(page.getByRole("button", { name: "意見を送る" })).toBeVisible();
+    await expect(page.getByText("βサポーター", { exact: true })).toBeVisible();
+    await expect(page.getByText("支払い導線は準備中です。")).toBeVisible();
+  });
+
+  test("shows supporter voice for active beta supporters", async ({ page }) => {
+    await page.route("**/api/admin/capabilities", async (route) => {
+      await route.fulfill({
+        contentType: "application/json",
+        body: JSON.stringify({
+          isAdmin: false,
+          testToolsEnabled: false,
+          stockAdminEnabled: false,
+        }),
+      });
+    });
+    await page.route("**/api/beta/capabilities", async (route) => {
+      await route.fulfill({
+        contentType: "application/json",
+        body: JSON.stringify({
+          isLoggedIn: true,
+          isBetaParticipant: true,
+          feedbackEnabled: true,
+          supporterVoiceEnabled: true,
+          isBetaSupporter: true,
+        }),
+      });
+    });
+    await page.route("**/api/billing/status", async (route) => {
+      await route.fulfill({
+        contentType: "application/json",
+        body: JSON.stringify({
+          isLoggedIn: true,
+          billingConfigured: true,
+          isBetaSupporter: true,
+          status: "active",
+          canManageBilling: true,
+        }),
+      });
+    });
+
+    await page.goto("/settings");
+    await page.waitForLoadState("networkidle");
+
+    await expect(page.getByText("βサポーターです")).toBeVisible();
+    await expect(
+      page.getByRole("button", { name: "サポーターの声を送る" }),
+    ).toBeVisible();
+    await expect(page.getByRole("button", { name: "支払いを管理" })).toBeVisible();
   });
 });
 

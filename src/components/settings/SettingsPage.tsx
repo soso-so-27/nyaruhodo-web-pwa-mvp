@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import type { CSSProperties } from "react";
+import type { CSSProperties, FormEvent } from "react";
 import {
   deleteAccountStoredData,
   getAccountSyncOverview,
@@ -13,6 +13,18 @@ import {
   type ClientAdminCapabilities,
 } from "../../lib/adminCapabilitiesClient";
 import { trackProductEvent } from "../../lib/analytics/productAnalytics";
+import {
+  readClientBetaCapabilities,
+  sendBetaFeedback,
+  type BetaFeedbackCategory,
+  type ClientBetaCapabilities,
+} from "../../lib/betaClient";
+import {
+  openBillingPortal,
+  readClientBillingStatus,
+  startBetaSupporterCheckout,
+  type ClientBillingStatus,
+} from "../../lib/billingClient";
 import {
   AUTH_CODE_VERIFIER_STORAGE_KEY,
   AUTH_STORAGE_KEY,
@@ -72,12 +84,41 @@ export function SettingsPage() {
       testToolsEnabled: false,
       stockAdminEnabled: false,
     });
+  const [betaCapabilities, setBetaCapabilities] =
+    useState<ClientBetaCapabilities>({
+      isLoggedIn: false,
+      isBetaParticipant: false,
+      feedbackEnabled: false,
+      supporterVoiceEnabled: false,
+      isBetaSupporter: false,
+    });
+  const [isFeedbackOpen, setIsFeedbackOpen] = useState(false);
+  const [feedbackKind, setFeedbackKind] =
+    useState<"beta_feedback" | "supporter_voice">("beta_feedback");
+  const [feedbackCategory, setFeedbackCategory] =
+    useState<BetaFeedbackCategory>("good");
+  const [feedbackMessage, setFeedbackMessage] = useState("");
+  const [feedbackStatus, setFeedbackStatus] = useState("");
+  const [isFeedbackSending, setIsFeedbackSending] = useState(false);
+  const [billingStatus, setBillingStatus] = useState<ClientBillingStatus>({
+    isLoggedIn: false,
+    billingConfigured: false,
+    isBetaSupporter: false,
+    status: "none",
+    currentPeriodEnd: null,
+    cancelAtPeriodEnd: false,
+    canManageBilling: false,
+  });
+  const [billingMessage, setBillingMessage] = useState("");
+  const [isBillingLoading, setIsBillingLoading] = useState(false);
 
   useEffect(() => {
     setDisplayEnvironment(getDisplayEnvironment());
     refreshKeptExchangeDebug();
     void checkAuthState();
     void refreshAdminCapabilities();
+    void refreshBetaCapabilities();
+    void refreshBillingStatus();
   }, []);
 
   async function checkAuthState() {
@@ -127,6 +168,22 @@ export function SettingsPage() {
     setSyncMessage("");
     setLastSyncResult(null);
     setSyncOverview(null);
+    setBetaCapabilities({
+      isLoggedIn: false,
+      isBetaParticipant: false,
+      feedbackEnabled: false,
+      supporterVoiceEnabled: false,
+      isBetaSupporter: false,
+    });
+    setBillingStatus({
+      isLoggedIn: false,
+      billingConfigured: false,
+      isBetaSupporter: false,
+      status: "none",
+      currentPeriodEnd: null,
+      cancelAtPeriodEnd: false,
+      canManageBilling: false,
+    });
   }
 
   async function handleSyncNow() {
@@ -360,6 +417,80 @@ export function SettingsPage() {
     }
   }
 
+  async function refreshBetaCapabilities() {
+    const capabilities = await readClientBetaCapabilities();
+
+    setBetaCapabilities(capabilities);
+  }
+
+  async function refreshBillingStatus() {
+    setBillingStatus(await readClientBillingStatus());
+  }
+
+  async function handleFeedbackSubmit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+
+    const message = feedbackMessage.trim();
+
+    if (!message) {
+      setFeedbackStatus("感じたことを入力してください。");
+      return;
+    }
+
+    if (message.length > 2000) {
+      setFeedbackStatus("2000文字以内で送ってください。");
+      return;
+    }
+
+    setIsFeedbackSending(true);
+    setFeedbackStatus("");
+
+    const ok = await sendBetaFeedback({
+      category: feedbackCategory,
+      message,
+      kind: feedbackKind,
+    });
+
+    if (ok) {
+      setFeedbackMessage("");
+      setFeedbackStatus("届きました。\nβに参加してくれてありがとう。");
+    } else {
+      setFeedbackStatus("送信できませんでした。ログイン状態を確認してください。");
+    }
+
+    setIsFeedbackSending(false);
+  }
+
+  async function handleStartBetaSupporter() {
+    setIsBillingLoading(true);
+    setBillingMessage("Stripeへ移動しています");
+
+    const url = await startBetaSupporterCheckout();
+
+    if (url) {
+      window.location.href = url;
+      return;
+    }
+
+    setBillingMessage("支払いページを開けませんでした。ログイン状態を確認してください。");
+    setIsBillingLoading(false);
+  }
+
+  async function handleOpenBillingPortal() {
+    setIsBillingLoading(true);
+    setBillingMessage("Stripeへ移動しています");
+
+    const url = await openBillingPortal();
+
+    if (url) {
+      window.location.href = url;
+      return;
+    }
+
+    setBillingMessage("支払い管理を開けませんでした。");
+    setIsBillingLoading(false);
+  }
+
   function refreshKeptExchangeDebug() {
     setKeptExchangeDebug(readKeptExchangePhotoStorageDebug());
   }
@@ -375,7 +506,7 @@ export function SettingsPage() {
         </div>
 
         <section style={styles.section}>
-          <p style={styles.sectionLabel}>保存場所</p>
+          <p style={styles.sectionLabel}>アプリ</p>
           <div style={styles.card}>
             <div style={styles.row}>
               <span style={styles.rowLabel}>
@@ -485,6 +616,91 @@ export function SettingsPage() {
         </section>
 
         <section style={styles.section}>
+          <p style={styles.sectionLabel}>β</p>
+          <div style={styles.card}>
+            {betaCapabilities.feedbackEnabled ? (
+              <>
+                <div style={styles.betaNote}>
+                  <p style={styles.betaNoteTitle}>感じたことを送る</p>
+                  <p style={styles.betaNoteText}>
+                    よかったこと、分かりにくかったこと、
+                    バグっぽいことを送れます。
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setFeedbackKind("beta_feedback");
+                    setIsFeedbackOpen((open) => !open);
+                    setFeedbackStatus("");
+                  }}
+                  style={styles.primaryButton}
+                >
+                  意見を送る
+                </button>
+                {isFeedbackOpen ? (
+                  <BetaFeedbackForm
+                    category={feedbackCategory}
+                    message={feedbackMessage}
+                    status={feedbackStatus}
+                    isSending={isFeedbackSending}
+                    onCategoryChange={setFeedbackCategory}
+                    onMessageChange={setFeedbackMessage}
+                    onSubmit={handleFeedbackSubmit}
+                  />
+                ) : null}
+                <div style={styles.divider} />
+              </>
+            ) : (
+              <>
+                <div style={styles.betaNote}>
+                  <p style={styles.betaNoteTitle}>感じたことを送る</p>
+                  <p style={styles.betaNoteText}>
+                    β参加者は、よかったことや分かりにくかったことを送れます。
+                  </p>
+                </div>
+                {!isLoggedIn ? (
+                  <a href="/account/create" style={styles.primaryButton}>
+                    ログインして参加する
+                  </a>
+                ) : null}
+                <div style={styles.divider} />
+              </>
+            )}
+            <BetaSupporterPanel
+              billingStatus={billingStatus}
+              betaCapabilities={betaCapabilities}
+              isBillingLoading={isBillingLoading}
+              billingMessage={billingMessage}
+              isFeedbackOpen={isFeedbackOpen && feedbackKind === "supporter_voice"}
+              feedbackCategory={feedbackCategory}
+              feedbackMessage={feedbackMessage}
+              feedbackStatus={feedbackStatus}
+              isFeedbackSending={isFeedbackSending}
+              onStartSupporter={handleStartBetaSupporter}
+              onOpenPortal={handleOpenBillingPortal}
+              onOpenSupporterVoice={() => {
+                setFeedbackKind("supporter_voice");
+                setIsFeedbackOpen((open) =>
+                  feedbackKind === "supporter_voice" ? !open : true,
+                );
+                setFeedbackStatus("");
+              }}
+              onCategoryChange={setFeedbackCategory}
+              onMessageChange={setFeedbackMessage}
+              onSubmit={handleFeedbackSubmit}
+            />
+            <div style={styles.divider} />
+            <div style={styles.betaNote}>
+              <p style={styles.betaNoteTitle}>βのお知らせ</p>
+              <p style={styles.betaNoteText}>
+                β期間中の変更やお願いは、ここに少しずつ置いていきます。
+              </p>
+            </div>
+          </div>
+        </section>
+
+        <section style={styles.section}>
           <p style={styles.sectionLabel}>ログイン状態</p>
           <div style={styles.card}>
             <AuthDebugPanel snapshot={authDebug} />
@@ -503,7 +719,7 @@ export function SettingsPage() {
 
         {adminCapabilities.testToolsEnabled || adminCapabilities.stockAdminEnabled ? (
           <section style={styles.section}>
-            <p style={styles.sectionLabel}>テスト</p>
+            <p style={styles.sectionLabel}>管理者</p>
             <div style={styles.card}>
               {adminCapabilities.testToolsEnabled ? (
                 <>
@@ -668,6 +884,251 @@ export function SettingsPage() {
         </section>
       </div>
     </main>
+  );
+}
+
+function BetaSupporterPanel({
+  billingStatus,
+  betaCapabilities,
+  isBillingLoading,
+  billingMessage,
+  isFeedbackOpen,
+  feedbackCategory,
+  feedbackMessage,
+  feedbackStatus,
+  isFeedbackSending,
+  onStartSupporter,
+  onOpenPortal,
+  onOpenSupporterVoice,
+  onCategoryChange,
+  onMessageChange,
+  onSubmit,
+}: {
+  billingStatus: ClientBillingStatus;
+  betaCapabilities: ClientBetaCapabilities;
+  isBillingLoading: boolean;
+  billingMessage: string;
+  isFeedbackOpen: boolean;
+  feedbackCategory: BetaFeedbackCategory;
+  feedbackMessage: string;
+  feedbackStatus: string;
+  isFeedbackSending: boolean;
+  onStartSupporter: () => void;
+  onOpenPortal: () => void;
+  onOpenSupporterVoice: () => void;
+  onCategoryChange: (category: BetaFeedbackCategory) => void;
+  onMessageChange: (message: string) => void;
+  onSubmit: (event: FormEvent<HTMLFormElement>) => void;
+}) {
+  const isPaymentProblem =
+    billingStatus.status === "past_due" || billingStatus.status === "unpaid";
+  const isCanceled =
+    billingStatus.status === "canceled" ||
+    billingStatus.status === "incomplete_expired";
+
+  if (billingStatus.isBetaSupporter) {
+    return (
+      <div style={styles.betaNote}>
+        <p style={styles.betaNoteTitle}>βサポーターです</p>
+        <p style={styles.betaNoteText}>
+          ねてるねこを支えてくれてありがとう。
+        </p>
+        <button
+          type="button"
+          onClick={onOpenSupporterVoice}
+          style={styles.primaryButton}
+        >
+          サポーターの声を送る
+        </button>
+        {isFeedbackOpen ? (
+          <BetaFeedbackForm
+            category={feedbackCategory}
+            message={feedbackMessage}
+            status={feedbackStatus}
+            isSending={isFeedbackSending}
+            onCategoryChange={onCategoryChange}
+            onMessageChange={onMessageChange}
+            onSubmit={onSubmit}
+          />
+        ) : null}
+        <button
+          type="button"
+          onClick={onOpenPortal}
+          style={styles.secondaryButton}
+          disabled={isBillingLoading || !billingStatus.canManageBilling}
+        >
+          支払いを管理
+        </button>
+        {billingMessage ? (
+          <p style={styles.syncMessage} role="status">
+            {billingMessage}
+          </p>
+        ) : null}
+      </div>
+    );
+  }
+
+  if (isPaymentProblem) {
+    return (
+      <div style={styles.betaNote}>
+        <p style={styles.betaNoteTitle}>お支払いを確認してください</p>
+        <p style={styles.betaNoteText}>
+          βサポーターの状態を続けるには、支払い方法を確認してください。
+        </p>
+        <button
+          type="button"
+          onClick={onOpenPortal}
+          style={styles.primaryButton}
+          disabled={isBillingLoading || !billingStatus.canManageBilling}
+        >
+          支払いを管理
+        </button>
+        {billingMessage ? (
+          <p style={styles.syncMessage} role="status">
+            {billingMessage}
+          </p>
+        ) : null}
+      </div>
+    );
+  }
+
+  if (isCanceled) {
+    return (
+      <div style={styles.betaNote}>
+        <p style={styles.betaNoteTitle}>βサポーターは終了しています</p>
+        <button
+          type="button"
+          onClick={onStartSupporter}
+          style={styles.primaryButton}
+          disabled={isBillingLoading || !billingStatus.billingConfigured}
+        >
+          もう一度サポートする
+        </button>
+        {billingMessage ? (
+          <p style={styles.syncMessage} role="status">
+            {billingMessage}
+          </p>
+        ) : null}
+      </div>
+    );
+  }
+
+  return (
+    <div style={styles.betaNote}>
+      <p style={styles.betaNoteTitle}>βサポーター</p>
+      <p style={styles.betaNoteText}>
+        ねてるねこを
+        <br />
+        静かな場所のまま続けるための応援です。
+        <br />
+        <br />
+        月 1,480円
+        <br />
+        <br />
+        お礼として、サポーターの声を送れます。
+      </p>
+      <div style={styles.legalLinks}>
+        <a href="/terms" style={styles.legalLink}>
+          利用規約
+        </a>
+        <a href="/privacy" style={styles.legalLink}>
+          プライバシーポリシー
+        </a>
+        <a href="/contact" style={styles.legalLink}>
+          問い合わせ
+        </a>
+        <a href="/cancellation" style={styles.legalLink}>
+          解約方法
+        </a>
+        <span style={styles.legalMuted}>特商法表記は準備中</span>
+      </div>
+      {betaCapabilities.isBetaParticipant ? (
+        <button
+          type="button"
+          onClick={onStartSupporter}
+          style={styles.primaryButton}
+          disabled={isBillingLoading || !billingStatus.billingConfigured}
+        >
+          {isBillingLoading ? "Stripeへ移動しています" : "βサポーターになる"}
+        </button>
+      ) : (
+        <p style={styles.betaNoteText}>
+          β参加者としてログインすると、サポーター導線を使えます。
+        </p>
+      )}
+      {!billingStatus.billingConfigured ? (
+        <p style={styles.syncMessage} role="status">
+          支払い導線は準備中です。
+        </p>
+      ) : billingMessage ? (
+        <p style={styles.syncMessage} role="status">
+          {billingMessage}
+        </p>
+      ) : null}
+    </div>
+  );
+}
+
+function BetaFeedbackForm({
+  category,
+  message,
+  status,
+  isSending,
+  onCategoryChange,
+  onMessageChange,
+  onSubmit,
+}: {
+  category: BetaFeedbackCategory;
+  message: string;
+  status: string;
+  isSending: boolean;
+  onCategoryChange: (category: BetaFeedbackCategory) => void;
+  onMessageChange: (message: string) => void;
+  onSubmit: (event: FormEvent<HTMLFormElement>) => void;
+}) {
+  return (
+    <form onSubmit={onSubmit} style={styles.feedbackForm}>
+      <label style={styles.feedbackField}>
+        <span style={styles.feedbackLabel}>種類</span>
+        <select
+          value={category}
+          onChange={(event) =>
+            onCategoryChange(event.target.value as BetaFeedbackCategory)
+          }
+          style={styles.feedbackSelect}
+        >
+          <option value="good">よかった</option>
+          <option value="confusing">わかりにくい</option>
+          <option value="bug">バグっぽい</option>
+          <option value="request">要望</option>
+          <option value="other">その他</option>
+        </select>
+      </label>
+      <label style={styles.feedbackField}>
+        <span style={styles.feedbackLabel}>本文</span>
+        <textarea
+          value={message}
+          onChange={(event) => onMessageChange(event.target.value)}
+          maxLength={2000}
+          required
+          rows={5}
+          placeholder="感じたことを書いてください"
+          style={styles.feedbackTextarea}
+        />
+      </label>
+      <button
+        type="submit"
+        style={styles.primaryButton}
+        disabled={isSending}
+      >
+        {isSending ? "送っています..." : "送る"}
+      </button>
+      {status ? (
+        <p style={styles.feedbackStatus} role="status">
+          {status}
+        </p>
+      ) : null}
+    </form>
   );
 }
 
@@ -1565,5 +2026,66 @@ const styles = {
     color: "#8a8a80",
     lineHeight: 1.7,
     margin: 0,
+  },
+  feedbackForm: {
+    padding: "0 0 14px",
+    display: "grid",
+    gap: "12px",
+  },
+  feedbackField: {
+    display: "grid",
+    gap: "6px",
+  },
+  feedbackLabel: {
+    color: "#8a8a80",
+    fontSize: "12px",
+    fontWeight: 700,
+  },
+  feedbackSelect: {
+    width: "100%",
+    border: "1px solid #eee8df",
+    borderRadius: "14px",
+    background: "rgba(255,255,255,0.62)",
+    color: "#2a2a28",
+    fontSize: "14px",
+    fontWeight: 600,
+    padding: "11px 12px",
+  },
+  feedbackTextarea: {
+    width: "100%",
+    border: "1px solid #eee8df",
+    borderRadius: "16px",
+    background: "rgba(255,255,255,0.62)",
+    color: "#2a2a28",
+    fontSize: "14px",
+    lineHeight: 1.65,
+    padding: "12px",
+    resize: "vertical",
+    boxSizing: "border-box",
+  },
+  feedbackStatus: {
+    margin: 0,
+    whiteSpace: "pre-line" as const,
+    color: "#8a8a80",
+    fontSize: "12px",
+    lineHeight: 1.6,
+    textAlign: "center" as const,
+  },
+  legalLinks: {
+    display: "flex",
+    flexWrap: "wrap" as const,
+    gap: "8px 12px",
+    padding: "4px 0",
+  },
+  legalLink: {
+    color: APP_ACCENT,
+    fontSize: "12px",
+    fontWeight: 700,
+    textDecoration: "none",
+  },
+  legalMuted: {
+    color: "#9a9890",
+    fontSize: "12px",
+    fontWeight: 600,
   },
 } satisfies Record<string, CSSProperties>;
