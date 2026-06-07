@@ -563,15 +563,30 @@ export function SettingsPage() {
         ) : null}
 
         <section style={styles.section}>
-          <p style={styles.sectionLabel}>安心とルール</p>
+          <p style={styles.sectionLabel}>安心</p>
           <div style={styles.card}>
+            <a href="/terms" style={styles.linkRow}>
+              <span style={styles.rowLabel}>利用規約</span>
+              <span style={styles.rowChevron}>›</span>
+            </a>
+            <div style={styles.divider} />
             <a href="/privacy" style={styles.linkRow}>
               <span style={styles.rowLabel}>プライバシーポリシー</span>
               <span style={styles.rowChevron}>›</span>
             </a>
             <div style={styles.divider} />
-            <a href="/terms" style={styles.linkRow}>
-              <span style={styles.rowLabel}>利用規約</span>
+            <div style={styles.row}>
+              <span style={styles.rowLabel}>特商法表記</span>
+              <span style={styles.rowValue}>準備中</span>
+            </div>
+            <div style={styles.divider} />
+            <a href="/contact" style={styles.linkRow}>
+              <span style={styles.rowLabel}>問い合わせ</span>
+              <span style={styles.rowChevron}>›</span>
+            </a>
+            <div style={styles.divider} />
+            <a href="/cancellation" style={styles.linkRow}>
+              <span style={styles.rowLabel}>解約方法</span>
               <span style={styles.rowChevron}>›</span>
             </a>
           </div>

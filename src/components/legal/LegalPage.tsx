@@ -116,6 +116,55 @@ const termsSections = [
   },
 ] as const satisfies readonly LegalSection[];
 
+const contactSections = [
+  {
+    title: "問い合わせ方法",
+    body: [
+      "ベータ期間中の意見、不具合、分かりにくかった点は、設定画面の「意見を送る」から送信できます。",
+      "ログインしているβ参加者は、種類を選んで本文を送れます。すべてに返信できるとは限りませんが、改善の参考にします。",
+    ],
+  },
+  {
+    title: "送れる内容",
+    bullets: [
+      "よかったこと",
+      "分かりにくかったこと",
+      "バグっぽいこと",
+      "要望",
+      "その他の連絡",
+    ],
+  },
+  {
+    title: "正式な連絡先について",
+    body: [
+      "正式公開時には、問い合わせ先メールアドレスまたは問い合わせフォームをこのページに追記します。",
+    ],
+  },
+] as const satisfies readonly LegalSection[];
+
+const cancellationSections = [
+  {
+    title: "解約方法",
+    body: [
+      "βサポーターは、Stripeの支払い管理画面から解約できます。",
+      "設定画面を開き、「βサポーター」内の「支払いを管理」からStripe Customer Portalへ進んでください。",
+    ],
+  },
+  {
+    title: "反映タイミング",
+    body: [
+      "解約手続き後、Stripeからの通知を受けてサポーター状態が更新されます。反映まで少し時間がかかる場合があります。",
+    ],
+  },
+  {
+    title: "解約後の扱い",
+    body: [
+      "βサポーターを解約しても、ねてるねこの基本体験はそのまま使えます。",
+      "撮る、届く、とっておく、アルバム、猫プロフィールは、サポーター状態によって制限しません。",
+    ],
+  },
+] as const satisfies readonly LegalSection[];
+
 export function PrivacyPage() {
   return (
     <LegalPage
@@ -134,6 +183,28 @@ export function TermsPage() {
       lead="ねてるねこベータ版を安心して使うための、最小限のルールです。"
       updatedAt="2026年6月3日"
       sections={termsSections}
+    />
+  );
+}
+
+export function ContactPage() {
+  return (
+    <LegalPage
+      title="問い合わせ"
+      lead="ベータ期間中の連絡方法についてまとめています。"
+      updatedAt="2026年6月7日"
+      sections={contactSections}
+    />
+  );
+}
+
+export function CancellationPage() {
+  return (
+    <LegalPage
+      title="解約方法"
+      lead="βサポーターの支払い管理と解約についてまとめています。"
+      updatedAt="2026年6月7日"
+      sections={cancellationSections}
     />
   );
 }
