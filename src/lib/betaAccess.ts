@@ -5,6 +5,7 @@ import {
   getAuthenticatedUserForRequest,
 } from "./adminAccess";
 import { isUserBetaSupporter } from "./billing/subscriptions";
+import { createSupabaseAdminClient } from "./supabase/admin";
 
 export type BetaCapabilities = {
   isLoggedIn: boolean;
@@ -36,7 +37,10 @@ export async function getBetaCapabilitiesForRequest(
   const user = await getAuthenticatedUserForRequest(request);
   const adminCapabilities = await getAdminCapabilitiesForRequest(request);
   const isBetaParticipant =
-    Boolean(user) && (adminCapabilities.isAdmin || isBetaTesterEmail(user?.email));
+    Boolean(user) &&
+    (adminCapabilities.isAdmin ||
+      isBetaTesterEmail(user?.email) ||
+      (await isActiveBetaParticipantEmail(user?.email)));
   const isBetaSupporter = user ? await isUserBetaSupporter(user.id) : false;
 
   return {
@@ -86,7 +90,7 @@ export async function requireBetaFeedbackAccess(
 }
 
 function isBetaTesterEmail(email: string | null | undefined) {
-  const normalizedEmail = email?.trim().toLowerCase();
+  const normalizedEmail = normalizeEmail(email);
 
   if (!normalizedEmail) {
     return false;
@@ -102,4 +106,31 @@ function getBetaTesterEmails() {
       .map((email) => email.trim().toLowerCase())
       .filter(Boolean),
   );
+}
+
+async function isActiveBetaParticipantEmail(email: string | null | undefined) {
+  const normalizedEmail = normalizeEmail(email);
+
+  if (!normalizedEmail) {
+    return false;
+  }
+
+  const supabase = createSupabaseAdminClient();
+
+  if (!supabase) {
+    return false;
+  }
+
+  const { data, error } = await supabase
+    .from("beta_participants")
+    .select("id")
+    .eq("email", normalizedEmail)
+    .eq("status", "active")
+    .maybeSingle();
+
+  return !error && Boolean(data);
+}
+
+function normalizeEmail(email: string | null | undefined) {
+  return email?.trim().toLowerCase() || null;
 }
