@@ -13,6 +13,7 @@ import {
   createStripeCustomer,
   getStripePriceId,
   isStripeBillingConfigured,
+  readStripeRequestErrorDetails,
 } from "../../../../lib/billing/stripe";
 import { createSupabaseAdminClient } from "../../../../lib/supabase/admin";
 
@@ -58,8 +59,12 @@ export async function POST(request: Request) {
           userId: user.id,
         })
       ).id;
-    } catch {
-      return billingError("stripe_customer_failed", 500);
+    } catch (error) {
+      return billingError(
+        "stripe_customer_failed",
+        500,
+        readStripeRequestErrorDetails(error),
+      );
     }
   }
 
@@ -74,16 +79,21 @@ export async function POST(request: Request) {
   }
 
   const baseUrl = getBillingBaseUrl(new URL(request.url).origin);
+  let checkoutError: ReturnType<typeof readStripeRequestErrorDetails> | null =
+    null;
   const session = await createStripeCheckoutSession({
     customerId,
     priceId,
     userId: user.id,
     successUrl: `${baseUrl}/settings?billing=success`,
     cancelUrl: `${baseUrl}/settings?billing=cancel`,
-  }).catch(() => null);
+  }).catch((error) => {
+    checkoutError = readStripeRequestErrorDetails(error);
+    return null;
+  });
 
   if (!session?.url) {
-    return billingError("checkout_session_failed", 500);
+    return billingError("checkout_session_failed", 500, checkoutError);
   }
 
   return NextResponse.json({ url: session.url });
@@ -92,6 +102,15 @@ export async function POST(request: Request) {
 function billingError(
   error: string,
   status: 401 | 403 | 409 | 500 | 503,
+  details?: {
+    status: number;
+    type: string | null;
+    code: string | null;
+    param: string | null;
+  } | null,
 ) {
-  return NextResponse.json({ ok: false, error }, { status });
+  return NextResponse.json(
+    { ok: false, error, ...(details ? { stripe: details } : {}) },
+    { status },
+  );
 }

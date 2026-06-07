@@ -39,6 +39,33 @@ export type StripeWebhookEvent = {
 };
 
 const STRIPE_API_BASE = "https://api.stripe.com/v1";
+
+export class StripeRequestError extends Error {
+  constructor(
+    message: string,
+    public readonly status: number,
+    public readonly stripeType: string | null,
+    public readonly code: string | null,
+    public readonly param: string | null,
+  ) {
+    super(message);
+    this.name = "StripeRequestError";
+  }
+}
+
+export function readStripeRequestErrorDetails(error: unknown) {
+  if (!(error instanceof StripeRequestError)) {
+    return null;
+  }
+
+  return {
+    status: error.status,
+    type: error.stripeType,
+    code: error.code,
+    param: error.param,
+  };
+}
+
 export function isStripeBillingConfigured() {
   return Boolean(
     isEnvFlagEnabled("ENABLE_BETA_SUPPORTER_BILLING") &&
@@ -202,10 +229,39 @@ async function stripeRequest<T>(
   const json = (await response.json().catch(() => null)) as T | null;
 
   if (!response.ok || !json) {
-    throw new Error("stripe_request_failed");
+    const stripeError = readStripeError(json);
+
+    throw new StripeRequestError(
+      "stripe_request_failed",
+      response.status,
+      stripeError?.type ?? null,
+      stripeError?.code ?? null,
+      stripeError?.param ?? null,
+    );
   }
 
   return json;
+}
+
+function readStripeError(json: unknown) {
+  if (!json || typeof json !== "object" || !("error" in json)) {
+    return null;
+  }
+
+  const error = json.error;
+
+  if (!error || typeof error !== "object") {
+    return null;
+  }
+
+  return {
+    type:
+      "type" in error && typeof error.type === "string" ? error.type : null,
+    code:
+      "code" in error && typeof error.code === "string" ? error.code : null,
+    param:
+      "param" in error && typeof error.param === "string" ? error.param : null,
+  };
 }
 
 function getStripeSecretKey() {
