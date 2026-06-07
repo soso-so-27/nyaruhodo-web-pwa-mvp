@@ -111,6 +111,8 @@ export function SettingsPage() {
   });
   const [billingMessage, setBillingMessage] = useState("");
   const [isBillingLoading, setIsBillingLoading] = useState(false);
+  const showsAdminSection =
+    adminCapabilities.testToolsEnabled || adminCapabilities.stockAdminEnabled;
 
   useEffect(() => {
     setDisplayEnvironment(getDisplayEnvironment());
@@ -700,27 +702,22 @@ export function SettingsPage() {
           </div>
         </section>
 
-        <section style={styles.section}>
-          <p style={styles.sectionLabel}>ログイン状態</p>
-          <div style={styles.card}>
-            <AuthDebugPanel snapshot={authDebug} />
-            <div style={styles.divider} />
-            <button
-              type="button"
-              onClick={() => {
-                void refreshAuthDebug();
-              }}
-              style={styles.secondaryButton}
-            >
-              状態を更新
-            </button>
-          </div>
-        </section>
-
-        {adminCapabilities.testToolsEnabled || adminCapabilities.stockAdminEnabled ? (
+        {showsAdminSection ? (
           <section style={styles.section}>
             <p style={styles.sectionLabel}>管理者</p>
             <div style={styles.card}>
+              <AuthDebugPanel snapshot={authDebug} />
+              <div style={styles.divider} />
+              <button
+                type="button"
+                onClick={() => {
+                  void refreshAuthDebug();
+                }}
+                style={styles.secondaryButton}
+              >
+                ログイン状態を更新する
+              </button>
+              <div style={styles.divider} />
               {adminCapabilities.testToolsEnabled ? (
                 <>
                   <a href="/onboarding?test=1" style={styles.linkRow}>
@@ -791,10 +788,10 @@ export function SettingsPage() {
               <span style={styles.rowChevron}>›</span>
             </a>
             <div style={styles.divider} />
-            <div style={styles.row}>
+            <a href="/commercial-transactions" style={styles.linkRow}>
               <span style={styles.rowLabel}>特商法表記</span>
-              <span style={styles.rowValue}>準備中</span>
-            </div>
+              <span style={styles.rowChevron}>›</span>
+            </a>
             <div style={styles.divider} />
             <a href="/contact" style={styles.linkRow}>
               <span style={styles.rowLabel}>問い合わせ</span>
@@ -996,14 +993,18 @@ function BetaSupporterPanel({
     return (
       <div style={styles.betaNote}>
         <p style={styles.betaNoteTitle}>βサポーターは終了しています</p>
-        <button
-          type="button"
-          onClick={onStartSupporter}
-          style={styles.primaryButton}
-          disabled={isBillingLoading || !billingStatus.billingConfigured}
-        >
-          もう一度サポートする
-        </button>
+        {billingStatus.billingConfigured ? (
+          <button
+            type="button"
+            onClick={onStartSupporter}
+            style={styles.primaryButton}
+            disabled={isBillingLoading}
+          >
+            もう一度サポートする
+          </button>
+        ) : (
+          <p style={styles.betaNoteText}>準備中です。</p>
+        )}
         {billingMessage ? (
           <p style={styles.syncMessage} role="status">
             {billingMessage}
@@ -1040,9 +1041,11 @@ function BetaSupporterPanel({
         <a href="/cancellation" style={styles.legalLink}>
           解約方法
         </a>
-        <span style={styles.legalMuted}>特商法表記は準備中</span>
+        <a href="/commercial-transactions" style={styles.legalLink}>
+          特商法表記
+        </a>
       </div>
-      {betaCapabilities.isBetaParticipant ? (
+      {billingStatus.billingConfigured && betaCapabilities.isBetaParticipant ? (
         <button
           type="button"
           onClick={onStartSupporter}
@@ -1053,14 +1056,12 @@ function BetaSupporterPanel({
         </button>
       ) : (
         <p style={styles.betaNoteText}>
-          β参加者としてログインすると、サポーター導線を使えます。
+          {billingStatus.billingConfigured
+            ? "β参加者としてログインすると、サポーター導線を使えます。"
+            : "準備中です。"}
         </p>
       )}
-      {!billingStatus.billingConfigured ? (
-        <p style={styles.syncMessage} role="status">
-          支払い導線は準備中です。
-        </p>
-      ) : billingMessage ? (
+      {billingMessage ? (
         <p style={styles.syncMessage} role="status">
           {billingMessage}
         </p>

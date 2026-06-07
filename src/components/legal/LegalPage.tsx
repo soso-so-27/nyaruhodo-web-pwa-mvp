@@ -165,6 +165,83 @@ const cancellationSections = [
   },
 ] as const satisfies readonly LegalSection[];
 
+const commercialTransactionsSections = [
+  {
+    title: "サービス名",
+    body: ["ねてるねこ"],
+  },
+  {
+    title: "事業者名",
+    body: ["請求があった場合、遅滞なく開示します。"],
+  },
+  {
+    title: "運営責任者",
+    body: ["請求があった場合、遅滞なく開示します。"],
+  },
+  {
+    title: "所在地",
+    body: ["請求があった場合、遅滞なく開示します。"],
+  },
+  {
+    title: "電話番号",
+    body: ["請求があった場合、遅滞なく開示します。"],
+  },
+  {
+    title: "お問い合わせ先",
+    body: [
+      "/contact よりお問い合わせください。",
+      "請求があった場合、遅滞なく必要事項を開示します。",
+    ],
+  },
+  {
+    title: "販売価格",
+    body: ["月額 1,480円（税込）"],
+  },
+  {
+    title: "商品代金以外の必要料金",
+    body: [
+      "インターネット接続料金、通信料金はお客様のご負担となります。",
+    ],
+  },
+  {
+    title: "支払方法",
+    body: ["クレジットカード決済（Stripe）"],
+  },
+  {
+    title: "支払時期",
+    body: [
+      "申込み時に初回決済が行われ、以後毎月自動更新されます。",
+    ],
+  },
+  {
+    title: "サービス提供時期",
+    body: [
+      "決済完了後、すぐにβサポーター機能をご利用いただけます。",
+    ],
+  },
+  {
+    title: "解約方法",
+    body: [
+      "設定画面の「支払いを管理」から解約できます。",
+      "解約後も、現在の請求期間の終了まではβサポーターとして利用できます。",
+    ],
+  },
+  {
+    title: "返金・キャンセル",
+    body: [
+      "サービスの性質上、決済完了後の返金は原則として行いません。",
+      "ただし、法令に基づき必要な場合はこの限りではありません。",
+    ],
+  },
+  {
+    title: "動作環境",
+    body: [
+      "スマートフォンの主要ブラウザで利用できます。",
+      "PWAとしてホーム画面に追加して利用できます。",
+    ],
+  },
+] as const satisfies readonly LegalSection[];
+
 export function PrivacyPage() {
   return (
     <LegalPage
@@ -205,6 +282,17 @@ export function CancellationPage() {
       lead="βサポーターの支払い管理と解約についてまとめています。"
       updatedAt="2026年6月7日"
       sections={cancellationSections}
+    />
+  );
+}
+
+export function CommercialTransactionsPage() {
+  return (
+    <LegalPage
+      title="特定商取引法に基づく表記"
+      lead="βサポーターの支払いに関する表示です。"
+      updatedAt="2026年6月7日"
+      sections={commercialTransactionsSections}
     />
   );
 }

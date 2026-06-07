@@ -279,7 +279,10 @@ test.describe("admin test tool guards", () => {
 
     await expect(page.getByRole("button", { name: "意見を送る" })).toBeVisible();
     await expect(page.getByText("βサポーター", { exact: true })).toBeVisible();
-    await expect(page.getByText("支払い導線は準備中です。")).toBeVisible();
+    await expect(page.getByText("準備中です。")).toBeVisible();
+    await expect(
+      page.getByRole("button", { name: "βサポーターになる" }),
+    ).toBeHidden();
   });
 
   test("shows supporter voice for active beta supporters", async ({ page }) => {
