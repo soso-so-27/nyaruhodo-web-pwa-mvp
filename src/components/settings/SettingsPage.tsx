@@ -41,8 +41,8 @@ import {
   APP_ACCENT,
   APP_PAGE_BACKGROUND,
   APP_PILL,
-  APP_SURFACE,
 } from "../ui/appTheme";
+import { AppCard } from "../ui/AppCard";
 import {
   readKeptExchangePhotoStorageDebug,
   type KeptExchangePhotoStorageDebug,
@@ -507,9 +507,9 @@ export function SettingsPage() {
           <h1 style={styles.title}>設定</h1>
         </div>
 
-        <section style={styles.section}>
+        <section style={{ ...styles.section, order: 1 }}>
           <p style={styles.sectionLabel}>アプリ</p>
-          <div style={styles.card}>
+          <AppCard variant="soft" padding="sm" style={styles.card}>
             <div style={styles.row}>
               <span style={styles.rowLabel}>
                 {getDisplayEnvironmentLabel(displayEnvironment)}
@@ -526,12 +526,12 @@ export function SettingsPage() {
             <p style={styles.storageNote}>
               iPhoneでは、ホーム画面アプリとSafari/Webで写真の保存場所が分かれることがあります。写真が見えないときは、撮ったときと同じ入口から開いてください。
             </p>
-          </div>
+          </AppCard>
         </section>
 
-        <section style={styles.section}>
+        <section style={{ ...styles.section, order: 2 }}>
           <p style={styles.sectionLabel}>アカウント</p>
-          <div style={styles.card}>
+          <AppCard variant="soft" padding="sm" style={styles.card}>
             {isLoading ? (
               <p style={styles.loadingText}>確認中...</p>
             ) : isLoggedIn ? (
@@ -614,12 +614,12 @@ export function SettingsPage() {
                 </a>
               </>
             )}
-          </div>
+          </AppCard>
         </section>
 
-        <section style={styles.section}>
+        <section style={{ ...styles.section, order: 6 }}>
           <p style={styles.sectionLabel}>β</p>
-          <div style={styles.card}>
+          <AppCard variant="soft" padding="sm" style={{ ...styles.card, ...styles.betaCard }}>
             {betaCapabilities.feedbackEnabled ? (
               <>
                 <div style={styles.betaNote}>
@@ -699,13 +699,17 @@ export function SettingsPage() {
                 β期間中の変更やお願いは、ここに少しずつ置いていきます。
               </p>
             </div>
-          </div>
+          </AppCard>
         </section>
 
         {showsAdminSection ? (
-          <section style={styles.section}>
+          <section style={{ ...styles.section, ...styles.adminSection, order: 7 }}>
             <p style={styles.sectionLabel}>管理者</p>
-            <div style={styles.card}>
+            <AppCard
+              variant="outlined"
+              padding="sm"
+              style={{ ...styles.card, ...styles.adminCard }}
+            >
               <AuthDebugPanel snapshot={authDebug} />
               <div style={styles.divider} />
               <button
@@ -771,13 +775,13 @@ export function SettingsPage() {
                   {stockMessage}
                 </p>
               ) : null}
-            </div>
+            </AppCard>
           </section>
         ) : null}
 
-        <section style={styles.section}>
+        <section style={{ ...styles.section, order: 3 }}>
           <p style={styles.sectionLabel}>安心</p>
-          <div style={styles.card}>
+          <AppCard variant="soft" padding="sm" style={styles.card}>
             <a href="/terms" style={styles.linkRow}>
               <span style={styles.rowLabel}>利用規約</span>
               <span style={styles.rowChevron}>›</span>
@@ -802,12 +806,12 @@ export function SettingsPage() {
               <span style={styles.rowLabel}>解約方法</span>
               <span style={styles.rowChevron}>›</span>
             </a>
-          </div>
+          </AppCard>
         </section>
 
-        <section style={styles.section}>
+        <section style={{ ...styles.section, order: 4 }}>
           <p style={styles.sectionLabel}>データ</p>
-          <div style={styles.card}>
+          <AppCard variant="soft" padding="sm" style={{ ...styles.card, ...styles.dataCard }}>
             <button
               type="button"
               onClick={handleDeleteLocalData}
@@ -841,12 +845,12 @@ export function SettingsPage() {
                 {deleteMessage}
               </p>
             ) : null}
-          </div>
+          </AppCard>
         </section>
 
-        <section style={styles.section}>
+        <section style={{ ...styles.section, order: 5 }}>
           <p style={styles.sectionLabel}>このアプリについて</p>
-          <div style={styles.card}>
+          <AppCard variant="soft" padding="sm" style={styles.card}>
             <div style={styles.row}>
               <span style={styles.rowLabel}>バージョン</span>
               <span style={styles.rowValue}>1.0.0-beta.4</span>
@@ -877,7 +881,7 @@ export function SettingsPage() {
                 現在の写真と猫データは、引き続き大切に扱います。
               </p>
             </div>
-          </div>
+          </AppCard>
         </section>
       </div>
     </main>
@@ -1643,6 +1647,8 @@ const styles = {
     color: "#242522",
   },
   container: {
+    display: "flex",
+    flexDirection: "column" as const,
     width: "min(100%, 430px)",
     margin: "0 auto",
     padding: "0 16px 40px",
@@ -1677,31 +1683,47 @@ const styles = {
     margin: 0,
   },
   section: {
-    marginBottom: "20px",
+    marginBottom: "16px",
   },
   sectionLabel: {
-    fontSize: "13px",
+    fontSize: "11.5px",
     fontWeight: 600,
-    color: "#9a9890",
-    margin: "0 0 8px 4px",
-    letterSpacing: "0.04em",
+    color: "#aaa196",
+    margin: "0 0 7px 6px",
+    letterSpacing: "0.08em",
   },
   card: {
-    ...APP_SURFACE,
-    borderRadius: "20px",
-    padding: "4px 16px",
+    borderRadius: "18px",
+    padding: "2px 14px",
+    background: "rgba(255,253,248,0.58)",
+    border: "1px solid rgba(120,108,94,0.10)",
+    boxShadow: "0 4px 12px rgba(90,76,60,0.025)",
+  },
+  betaCard: {
+    background: "rgba(255,253,248,0.50)",
+  },
+  dataCard: {
+    background: "rgba(255,253,248,0.62)",
+  },
+  adminSection: {
+    marginTop: "8px",
+  },
+  adminCard: {
+    background: "rgba(255,253,248,0.38)",
+    border: "1px dashed rgba(120,108,94,0.14)",
+    boxShadow: "none",
   },
   row: {
     display: "flex",
     alignItems: "center",
     justifyContent: "space-between",
-    padding: "14px 0",
+    padding: "12px 0",
   },
   linkRow: {
     display: "flex",
     alignItems: "center",
     justifyContent: "space-between",
-    padding: "14px 0",
+    padding: "12px 0",
     textDecoration: "none",
     color: "#2a2a28",
   },
@@ -1711,7 +1733,7 @@ const styles = {
     gap: "8px",
   },
   rowLabel: {
-    fontSize: "15px",
+    fontSize: "14px",
     color: "#2a2a28",
     fontWeight: 500,
   },
@@ -1741,8 +1763,8 @@ const styles = {
   },
   divider: {
     height: "0.5px",
-    background: "#f0ede8",
-    margin: "0 -16px",
+    background: "rgba(120,108,94,0.09)",
+    margin: "0 -14px",
   },
   loadingText: {
     fontSize: "13px",
@@ -1752,7 +1774,7 @@ const styles = {
   },
   storageNote: {
     margin: 0,
-    padding: "12px 0 14px",
+    padding: "10px 0 12px",
     color: "#8a8a80",
     fontSize: "12px",
     fontWeight: 500,
@@ -1944,8 +1966,8 @@ const styles = {
     display: "block",
     width: "100%",
     textAlign: "center" as const,
-    padding: "14px 0",
-    fontSize: "15px",
+    padding: "13px 0",
+    fontSize: "14px",
     fontWeight: 600,
     color: APP_ACCENT,
     background: "transparent",
@@ -1957,8 +1979,8 @@ const styles = {
     display: "block",
     width: "100%",
     textAlign: "center" as const,
-    padding: "12px 0",
-    fontSize: "13px",
+    padding: "11px 0",
+    fontSize: "12.5px",
     fontWeight: 600,
     color: "#8a8a80",
     background: "transparent",
@@ -1982,10 +2004,10 @@ const styles = {
   dangerButton: {
     display: "block",
     width: "100%",
-    padding: "14px 0",
-    fontSize: "15px",
+    padding: "13px 0",
+    fontSize: "14px",
     fontWeight: 600,
-    color: "#d85a30",
+    color: "#9b4a3d",
     background: "transparent",
     border: "none",
     textAlign: "center" as const,
@@ -1994,38 +2016,38 @@ const styles = {
   dangerButtonStrong: {
     display: "block",
     width: "100%",
-    padding: "14px 0",
-    fontSize: "15px",
-    fontWeight: 700,
-    color: "#b53f23",
-    background: "rgba(216,90,48,0.08)",
-    border: "1px solid rgba(216,90,48,0.18)",
-    borderRadius: "16px",
+    padding: "13px 0",
+    fontSize: "14px",
+    fontWeight: 650,
+    color: "#9b4a3d",
+    background: "rgba(155,74,61,0.07)",
+    border: "1px solid rgba(155,74,61,0.16)",
+    borderRadius: "14px",
     textAlign: "center" as const,
     cursor: "pointer",
   },
   deleteHelp: {
-    margin: "8px 0 0",
+    margin: "6px 0 0",
     color: "#8a8a80",
-    fontSize: "12px",
+    fontSize: "11.5px",
     lineHeight: 1.55,
   },
   betaNote: {
-    padding: "14px 0",
+    padding: "12px 0",
     display: "flex",
     flexDirection: "column" as const,
-    gap: "6px",
+    gap: "5px",
   },
   betaNoteTitle: {
-    fontSize: "14px",
+    fontSize: "13px",
     fontWeight: 600,
     color: APP_ACCENT,
     margin: 0,
   },
   betaNoteText: {
-    fontSize: "13px",
+    fontSize: "12.5px",
     color: "#8a8a80",
-    lineHeight: 1.7,
+    lineHeight: 1.65,
     margin: 0,
   },
   feedbackForm: {
