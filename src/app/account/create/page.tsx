@@ -19,9 +19,7 @@ import {
   getDisplayEnvironmentLabel,
   type DisplayEnvironment,
 } from "../../../lib/displayEnvironment";
-import { readOwnSleepingPhotos } from "../../../lib/home/sleepingPhotos";
 import { createBrowserSupabaseClient } from "../../../lib/supabase/browser";
-import { StoredPhotoImage } from "../../../components/ui/StoredPhotoImage";
 
 const ACCOUNT_CREATE_PROMPT_DISMISSED_KEY =
   STORAGE_KEYS.accountCreatePromptDismissed;
@@ -76,7 +74,6 @@ export default function AccountCreatePage() {
   const [displayEnvironment, setDisplayEnvironment] =
     useState<DisplayEnvironment>("unknown");
   const [isFromOnboarding, setIsFromOnboarding] = useState(false);
-  const [onboardingPhotoSrc, setOnboardingPhotoSrc] = useState("");
   const googleButtonRef = useRef<HTMLDivElement | null>(null);
   const hasTrackedCtaView = useRef(false);
   const hasTrackedCallbackError = useRef(false);
@@ -92,9 +89,6 @@ export default function AccountCreatePage() {
       new URLSearchParams(window.location.search).get("from") === "onboarding";
 
     setIsFromOnboarding(fromOnboarding);
-    if (fromOnboarding) {
-      setOnboardingPhotoSrc(readOwnSleepingPhotos()[0]?.src ?? "");
-    }
 
     let isMounted = true;
 
@@ -371,9 +365,6 @@ export default function AccountCreatePage() {
                   ? "今日の2枚を\nあとから見返せるようにします。"
                   : "この端末のねがおを、アカウントに保存できます。別の端末でも復元できます。"}
               </p>
-              {isFromOnboarding && onboardingPhotoSrc ? (
-                <OnboardingPhotoPreview src={onboardingPhotoSrc} />
-              ) : null}
               {connectedEmail ? (
                 <p style={styles.connectedEmail}>{connectedEmail}</p>
               ) : null}
@@ -411,10 +402,6 @@ export default function AccountCreatePage() {
                   ? "今日の2枚を\nあとから見返せるようにします。"
                   : "Googleアカウントで接続すると、この端末のねがおを保存できます。別の端末でも、とったねがおやとどいたねがおを復元できます。"}
               </p>
-              {isFromOnboarding && onboardingPhotoSrc ? (
-                <OnboardingPhotoPreview src={onboardingPhotoSrc} />
-              ) : null}
-
               {!isFromOnboarding ? (
                 <div style={styles.valueList} aria-label="保存できるもの">
                   {[
@@ -513,14 +500,6 @@ function loadGoogleIdentityScript() {
   });
 }
 
-function OnboardingPhotoPreview({ src }: { src: string }) {
-  return (
-    <div style={styles.onboardingPhotoPreview} aria-label="入れたねがお">
-      <StoredPhotoImage src={src} alt="" style={styles.onboardingPhoto} />
-    </div>
-  );
-}
-
 function EnvironmentNotice({
   environment,
 }: {
@@ -558,9 +537,9 @@ const styles = {
   },
   card: {
     ...APP_SURFACE,
-    borderRadius: "26px",
-    padding: "28px 22px 22px",
-    boxShadow: "0 8px 22px rgba(52, 50, 46, 0.06), inset 0 1px 0 rgba(255,255,255,0.42)",
+    borderRadius: "24px",
+    padding: "26px 22px 22px",
+    boxShadow: "0 5px 14px rgba(52, 50, 46, 0.035), inset 0 1px 0 rgba(255,255,255,0.34)",
   },
   eyebrow: {
     margin: "0 0 10px",
@@ -572,8 +551,8 @@ const styles = {
   title: {
     margin: "0 0 12px",
     color: "#2a2a28",
-    fontSize: "22px",
-    fontWeight: 660,
+    fontSize: "20px",
+    fontWeight: 600,
     lineHeight: 1.4,
     letterSpacing: 0,
   },
@@ -584,21 +563,6 @@ const styles = {
     lineHeight: 1.75,
     letterSpacing: 0,
     whiteSpace: "pre-line",
-  },
-  onboardingPhotoPreview: {
-    width: "72px",
-    height: "72px",
-    margin: "-2px auto 20px",
-    borderRadius: "20px",
-    overflow: "hidden",
-    border: "5px solid rgba(255,253,248,0.76)",
-    boxShadow: "0 8px 18px rgba(90,76,60,0.08)",
-    background: APP_ACCENT_SOFT_BG,
-  },
-  onboardingPhoto: {
-    width: "100%",
-    height: "100%",
-    objectFit: "cover",
   },
   valueList: {
     display: "grid",
@@ -686,16 +650,17 @@ const styles = {
     minHeight: "46px",
     display: "grid",
     placeItems: "center",
+    opacity: 0.94,
   },
   primaryButton: {
     width: "100%",
-    minHeight: "50px",
-    border: "none",
+    minHeight: "48px",
+    border: "1px solid rgba(58, 72, 56, 0.08)",
     borderRadius: "999px",
     background: APP_ACCENT,
     color: "#ffffff",
     fontSize: "15px",
-    fontWeight: 650,
+    fontWeight: 600,
     cursor: "pointer",
   },
   secondaryButton: {

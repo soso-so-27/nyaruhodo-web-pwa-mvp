@@ -870,7 +870,9 @@ function AlbumTodayCard({
         <AlbumDaySections group={group} onOpenBox={onOpenBox} />
       ) : (
         <div style={styles.todayAlbumEmpty}>
-          <span style={styles.todayAlbumEmptyLine} />
+          <span style={styles.todayAlbumEmptyMark} aria-hidden="true">
+            <span style={styles.todayAlbumEmptyLine} />
+          </span>
           <p style={styles.todayAlbumEmptyText}>
             {scope === "taken"
               ? "写真を入れるとここに並びます"
@@ -2558,15 +2560,27 @@ const styles = {
   },
   todayAlbumEmpty: {
     display: "grid",
-    gridTemplateColumns: "56px minmax(0, 1fr)",
+    gridTemplateColumns: "48px minmax(0, 1fr)",
     alignItems: "center",
-    gap: "12px",
-    minHeight: "58px",
+    gap: "13px",
+    minHeight: "64px",
+  },
+  todayAlbumEmptyMark: {
+    width: "44px",
+    height: "44px",
+    borderRadius: "14px",
+    border: "1px solid rgba(79,73,63,0.075)",
+    background: "rgba(255,253,248,0.28)",
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    boxShadow: "inset 0 1px 0 rgba(255,255,255,0.26)",
   },
   todayAlbumEmptyLine: {
+    width: "18px",
     height: "1px",
     borderRadius: "999px",
-    background: "rgba(79,73,63,0.14)",
+    background: "rgba(79,73,63,0.16)",
   },
   todayAlbumEmptyText: {
     margin: 0,

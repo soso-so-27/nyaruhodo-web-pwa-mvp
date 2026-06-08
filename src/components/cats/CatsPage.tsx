@@ -40,13 +40,13 @@ const CATS_SERIF =
 const CATS_SURFACE: CSSProperties = {
   position: "relative",
   background: "rgba(255,253,248,0.86)",
-  border: `1px solid ${CATS_BORDER}`,
-  boxShadow: "0 10px 24px rgba(90,76,60,0.07)",
+  border: "1px solid rgba(120,108,94,0.12)",
+  boxShadow: "0 8px 18px rgba(90,76,60,0.045)",
 };
 const CATS_SURFACE_SOFT: CSSProperties = {
   ...CATS_SURFACE,
-  background: "rgba(255,253,248,0.62)",
-  boxShadow: "0 8px 18px rgba(90,76,60,0.05)",
+  background: "rgba(255,253,248,0.54)",
+  boxShadow: "0 6px 14px rgba(90,76,60,0.035)",
 };
 const ONBOARDING_ALBUM_COMPLETION_READY_KEY =
   "neteruneko_onboarding_album_completion_ready";
@@ -739,7 +739,9 @@ export function CatsPage() {
         {message ? <p style={styles.message}>{message}</p> : null}
         {saveMessage ? <p style={styles.message}>{saveMessage}</p> : null}
       </div>
-      {!isOnboardingCompletionView ? <BottomNavigation active="cats" /> : null}
+      {!isOnboardingProfileSetup && !isOnboardingCompletionView ? (
+        <BottomNavigation active="cats" />
+      ) : null}
     </main>
   );
 }
@@ -996,10 +998,10 @@ const styles = {
   },
   pageTitle: {
     fontFamily: CATS_SERIF,
-    fontSize: "19px",
-    fontWeight: 500,
-    color: CATS_TEXT_STRONG,
-    lineHeight: 1.24,
+    fontSize: "18px",
+    fontWeight: 400,
+    color: CATS_MUTED,
+    lineHeight: 1.34,
     letterSpacing: "0.18em",
     margin: 0,
   },
@@ -1043,9 +1045,9 @@ const styles = {
     margin: 0,
     color: CATS_TEXT_STRONG,
     fontFamily: CATS_SERIF,
-    fontSize: "26px",
+    fontSize: "22px",
     fontWeight: 500,
-    lineHeight: 1.38,
+    lineHeight: 1.45,
     letterSpacing: "0.08em",
   },
   onboardingText: {
@@ -1142,29 +1144,29 @@ const styles = {
   },
   profileCard: {
     ...CATS_SURFACE,
-    borderRadius: "22px",
-    padding: "20px 18px",
+    borderRadius: "21px",
+    padding: "18px 17px",
     marginBottom: "12px",
   },
   profileHero: {
     display: "grid",
-    gridTemplateColumns: "64px 1fr auto",
+    gridTemplateColumns: "70px 1fr auto",
     alignItems: "center",
-    gap: "13px",
+    gap: "14px",
   },
   profileHeroAvatar: {
-    width: "64px",
-    height: "64px",
+    width: "70px",
+    height: "70px",
     borderRadius: "50%",
-    border: "1px solid rgba(120,108,94,0.18)",
-    background: "rgba(255,253,248,0.68)",
+    border: "1px solid rgba(120,108,94,0.12)",
+    background: "rgba(255,253,248,0.58)",
     overflow: "hidden",
     display: "flex",
     alignItems: "center",
     justifyContent: "center",
     padding: 0,
     cursor: "pointer",
-    boxShadow: "0 6px 16px rgba(90,76,60,0.08)",
+    boxShadow: "0 4px 12px rgba(90,76,60,0.045)",
   },
   profileHeroAvatarPhoto: {
     width: "100%",
@@ -1172,20 +1174,20 @@ const styles = {
     objectFit: "cover",
   },
   profileHeroAvatarImg: {
-    width: "52px",
-    height: "52px",
+    width: "56px",
+    height: "56px",
     objectFit: "contain",
   },
   profileHeroInfo: {
     minWidth: 0,
   },
   profileKicker: {
-    margin: "0 0 4px",
-    color: CATS_MUTED,
+    margin: "0 0 3px",
+    color: CATS_FAINT,
     fontFamily: CATS_SERIF,
-    fontSize: "11.5px",
+    fontSize: "10.5px",
     fontWeight: 400,
-    letterSpacing: "0.08em",
+    letterSpacing: "0.06em",
   },
   profileName: {
     fontFamily: CATS_SERIF,
@@ -1206,12 +1208,12 @@ const styles = {
     letterSpacing: "0.06em",
   },
   editBtn: {
-    fontSize: "12px",
-    color: CATS_MUTED,
-    border: `1px solid ${CATS_BORDER}`,
-    background: "rgba(255,253,248,0.68)",
+    fontSize: "11.5px",
+    color: CATS_FAINT,
+    border: "1px solid rgba(120,108,94,0.1)",
+    background: "rgba(255,253,248,0.42)",
     borderRadius: "999px",
-    padding: "7px 14px",
+    padding: "6px 12px",
     cursor: "pointer",
   },
   homePhotoSection: {
@@ -1224,9 +1226,9 @@ const styles = {
     margin: "0 0 10px",
     color: CATS_MUTED,
     fontFamily: CATS_SERIF,
-    fontSize: "13px",
-    fontWeight: 500,
-    letterSpacing: "0.08em",
+    fontSize: "12px",
+    fontWeight: 400,
+    letterSpacing: "0.07em",
   },
   homePhotoPreview: {
     width: "86px",
@@ -1285,8 +1287,8 @@ const styles = {
   },
   divider: {
     border: "none",
-    borderTop: "1px solid rgba(120,108,94,0.14)",
-    margin: "18px -18px",
+    borderTop: "1px solid rgba(120,108,94,0.1)",
+    margin: "17px -17px",
   },
   infoRow: {
     display: "flex",
