@@ -524,7 +524,13 @@ export function CatsPage() {
         ) : null}
 
         {activeCatProfile && !isOnboardingCompletionView ? (
-          <div style={styles.profileCard}>
+          <div
+            style={
+              isOnboardingProfileSetup
+                ? styles.profileCard
+                : styles.profilePlaceCard
+            }
+          >
             {!isOnboardingProfileSetup ? (
               <>
                 <div style={styles.profileHero}>
@@ -750,12 +756,12 @@ export function CatsPage() {
         {!isOnboardingProfileSetup && !isOnboardingCompletionView ? (
           <div style={styles.settingsSection}>
             <p style={styles.settingsSectionLabel}>設定</p>
-            <div style={styles.settingsCard}>
+            <AppCard variant="outlined" padding="sm" style={styles.settingsCard}>
               <a href="/settings" style={styles.settingsRow}>
                 <span style={styles.settingsRowLabel}>アカウントと設定</span>
                 <span style={styles.settingsRowChevron}>›</span>
               </a>
-            </div>
+            </AppCard>
           </div>
         ) : null}
 
@@ -1101,11 +1107,11 @@ const styles = {
   },
   catGrid: {
     display: "flex",
-    gap: "14px",
+    gap: "12px",
     overflowX: "auto",
-    paddingBottom: "8px",
+    paddingBottom: "10px",
     scrollbarWidth: "none",
-    marginBottom: "24px",
+    marginBottom: "18px",
   },
   catGridItem: {
     display: "flex",
@@ -1122,24 +1128,24 @@ const styles = {
   },
   catAvatar: {
     position: "relative",
-    width: "68px",
-    height: "68px",
+    width: "64px",
+    height: "64px",
     borderRadius: "50%",
-    background: "rgba(255,253,248,0.72)",
-    border: "1px solid rgba(120,108,94,0.18)",
+    background: "rgba(255,253,248,0.5)",
+    border: "1px solid rgba(120,108,94,0.12)",
     overflow: "hidden",
     display: "flex",
     alignItems: "center",
     justifyContent: "center",
   },
   catAvatarActive: {
-    border: "1.5px solid rgba(86,78,66,0.72)",
-    boxShadow: "0 0 0 4px rgba(255,253,248,0.72)",
+    border: "1px solid rgba(86,78,66,0.34)",
+    boxShadow: "0 0 0 4px rgba(255,253,248,0.48)",
     cursor: "pointer",
   },
   catAvatarImg: {
-    width: "60px",
-    height: "60px",
+    width: "56px",
+    height: "56px",
     objectFit: "contain",
   },
   catAvatarPhoto: {
@@ -1149,11 +1155,11 @@ const styles = {
     borderRadius: "50%",
   },
   catAvatarAdd: {
-    width: "68px",
-    height: "68px",
+    width: "64px",
+    height: "64px",
     borderRadius: "50%",
-    border: "1.5px dashed rgba(120,108,94,0.3)",
-    background: "rgba(255,253,248,0.42)",
+    border: "1px dashed rgba(120,108,94,0.18)",
+    background: "rgba(255,253,248,0.26)",
     display: "flex",
     alignItems: "center",
     justifyContent: "center",
@@ -1164,8 +1170,8 @@ const styles = {
     color: CATS_FAINT,
   },
   catGridName: {
-    fontSize: "12px",
-    color: CATS_TEXT,
+    fontSize: "11.5px",
+    color: CATS_MUTED,
     fontWeight: 500,
   },
   profileCard: {
@@ -1174,25 +1180,32 @@ const styles = {
     padding: "18px 17px",
     marginBottom: "12px",
   },
+  profilePlaceCard: {
+    ...CATS_SURFACE_SOFT,
+    borderRadius: "24px",
+    padding: "18px 16px 16px",
+    marginBottom: "12px",
+    boxShadow: "0 6px 14px rgba(90,76,60,0.035)",
+  },
   profileHero: {
     display: "grid",
-    gridTemplateColumns: "70px 1fr auto",
+    gridTemplateColumns: "82px 1fr auto",
     alignItems: "center",
-    gap: "14px",
+    gap: "15px",
   },
   profileHeroAvatar: {
-    width: "70px",
-    height: "70px",
+    width: "82px",
+    height: "82px",
     borderRadius: "50%",
-    border: "1px solid rgba(120,108,94,0.12)",
-    background: "rgba(255,253,248,0.58)",
+    border: "1px solid rgba(120,108,94,0.10)",
+    background: "rgba(255,253,248,0.5)",
     overflow: "hidden",
     display: "flex",
     alignItems: "center",
     justifyContent: "center",
     padding: 0,
     cursor: "pointer",
-    boxShadow: "0 4px 12px rgba(90,76,60,0.045)",
+    boxShadow: "0 5px 12px rgba(90,76,60,0.035)",
   },
   profileHeroAvatarPhoto: {
     width: "100%",
@@ -1200,24 +1213,24 @@ const styles = {
     objectFit: "cover",
   },
   profileHeroAvatarImg: {
-    width: "56px",
-    height: "56px",
+    width: "66px",
+    height: "66px",
     objectFit: "contain",
   },
   profileHeroInfo: {
     minWidth: 0,
   },
   profileKicker: {
-    margin: "0 0 3px",
+    margin: "0 0 4px",
     color: CATS_FAINT,
     fontFamily: CATS_SERIF,
-    fontSize: "10.5px",
+    fontSize: "10px",
     fontWeight: 400,
-    letterSpacing: "0.06em",
+    letterSpacing: "0.04em",
   },
   profileName: {
     fontFamily: CATS_SERIF,
-    fontSize: "24px",
+    fontSize: "26px",
     fontWeight: 500,
     color: CATS_TEXT_STRONG,
     display: "flex",
@@ -1228,37 +1241,37 @@ const styles = {
     margin: "4px 0 0",
     color: CATS_MUTED,
     fontFamily: CATS_SERIF,
-    fontSize: "12px",
+    fontSize: "11.5px",
     fontWeight: 400,
     lineHeight: 1.55,
     letterSpacing: "0.06em",
   },
   editBtn: {
-    fontSize: "11.5px",
+    fontSize: "11px",
     color: CATS_FAINT,
-    border: "1px solid rgba(120,108,94,0.1)",
-    background: "rgba(255,253,248,0.42)",
+    border: "1px solid rgba(120,108,94,0.08)",
+    background: "rgba(255,253,248,0.28)",
     borderRadius: "999px",
-    padding: "6px 12px",
+    padding: "5px 10px",
     cursor: "pointer",
   },
   homePhotoSection: {
     display: "flex",
-    gap: "12px",
+    gap: "11px",
     alignItems: "center",
-    padding: "2px 0",
+    padding: "1px 0",
   },
   sectionTitle: {
-    margin: "0 0 10px",
-    color: CATS_MUTED,
+    margin: "0 0 9px",
+    color: CATS_FAINT,
     fontFamily: CATS_SERIF,
-    fontSize: "12px",
+    fontSize: "11px",
     fontWeight: 400,
     letterSpacing: "0.07em",
   },
   homePhotoPreview: {
-    width: "86px",
-    height: "112px",
+    width: "76px",
+    height: "98px",
     borderRadius: "16px",
     overflow: "hidden",
     ...CATS_SURFACE_SOFT,
@@ -1282,10 +1295,10 @@ const styles = {
   },
   homePhotoTitle: {
     fontFamily: CATS_SERIF,
-    fontSize: "15px",
+    fontSize: "13.5px",
     fontWeight: 500,
     letterSpacing: "0.06em",
-    color: CATS_TEXT_STRONG,
+    color: CATS_TEXT,
     margin: "0 0 4px",
   },
   homePhotoSub: {
@@ -1302,35 +1315,35 @@ const styles = {
   },
   homePhotoButton: {
     width: "fit-content",
-    border: `1px solid ${CATS_BORDER}`,
+    border: "1px solid rgba(120,108,94,0.12)",
     borderRadius: "99px",
-    background: "rgba(255,253,248,0.68)",
+    background: "rgba(255,253,248,0.46)",
     color: CATS_MUTED,
-    fontSize: "12px",
-    fontWeight: 560,
-    padding: "6px 12px",
+    fontSize: "11.5px",
+    fontWeight: 520,
+    padding: "6px 11px",
     cursor: "pointer",
   },
   divider: {
     border: "none",
-    borderTop: "1px solid rgba(120,108,94,0.1)",
-    margin: "17px -17px",
+    borderTop: "1px solid rgba(120,108,94,0.075)",
+    margin: "15px -16px",
   },
   infoRow: {
     display: "flex",
     alignItems: "center",
     justifyContent: "space-between",
-    padding: "8px 0",
+    padding: "6px 0",
   },
   infoLabel: {
-    fontSize: "13px",
-    color: CATS_MUTED,
+    fontSize: "11.5px",
+    color: CATS_FAINT,
     fontFamily: CATS_SERIF,
     letterSpacing: "0.06em",
   },
   infoValue: {
-    fontSize: "13px",
-    color: CATS_TEXT,
+    fontSize: "12.5px",
+    color: CATS_MUTED,
     fontWeight: 500,
   },
   emptyInfoText: {
@@ -1352,35 +1365,36 @@ const styles = {
     borderRadius: "50%",
   },
   settingsSection: {
-    marginTop: "16px",
+    marginTop: "14px",
   },
   settingsSectionLabel: {
-    fontSize: "12px",
+    fontSize: "10.5px",
     fontWeight: 500,
-    color: CATS_MUTED,
-    margin: "0 0 8px 4px",
-    letterSpacing: "0.04em",
+    color: CATS_FAINT,
+    margin: "0 0 6px 4px",
+    letterSpacing: "0.06em",
   },
   settingsCard: {
-    ...CATS_SURFACE,
     borderRadius: "18px",
     overflow: "hidden",
+    background: "rgba(255,253,248,0.38)",
+    boxShadow: "0 4px 10px rgba(90,76,60,0.025)",
   },
   settingsRow: {
     display: "flex",
     alignItems: "center",
     justifyContent: "space-between",
-    padding: "14px 16px",
+    padding: "11px 14px",
     textDecoration: "none",
     color: CATS_TEXT,
   },
   settingsRowLabel: {
-    fontSize: "14px",
+    fontSize: "12.5px",
     fontWeight: 500,
-    color: CATS_TEXT,
+    color: CATS_MUTED,
   },
   settingsRowChevron: {
-    fontSize: "18px",
+    fontSize: "16px",
     color: CATS_FAINT,
   },
   sectionLabel: {
