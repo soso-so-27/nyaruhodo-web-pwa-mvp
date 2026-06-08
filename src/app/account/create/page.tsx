@@ -9,7 +9,6 @@ import { AppCard } from "../../../components/ui/AppCard";
 import { WordmarkHeader } from "../../../components/ui/AppHeader";
 import {
   APP_ACCENT,
-  APP_ACCENT_SOFT_BG,
   APP_PAGE_BACKGROUND,
   APP_SUBTLE_SURFACE,
   APP_SURFACE,
@@ -167,7 +166,7 @@ export default function AccountCreatePage() {
 
     if (!GOOGLE_CLIENT_ID) {
       if (!fromOnboarding) {
-        setMessage("Googleログインの設定がまだ入っていません。");
+        setMessage("Googleログインを準備できませんでした。少し時間をおいてもう一度お試しください。");
       }
       return;
     }
@@ -222,7 +221,7 @@ export default function AccountCreatePage() {
   async function handleGoogleSignIn() {
     if (!GOOGLE_CLIENT_ID) {
       if (!isFromOnboarding) {
-        setMessage("Googleログインの設定がまだ入っていません。");
+        setMessage("Googleログインを準備できませんでした。少し時間をおいてもう一度お試しください。");
       }
       return;
     }
@@ -659,14 +658,15 @@ const styles = {
   },
   message: {
     margin: "0 0 14px",
-    border: "1px solid rgba(200,197,190,0.9)",
-    borderRadius: "14px",
-    background: APP_ACCENT_SOFT_BG,
-    color: APP_ACCENT,
-    fontSize: "14px",
-    fontWeight: 600,
+    border: "1px solid rgba(120,108,94,0.12)",
+    borderRadius: "16px",
+    background: "rgba(255,253,248,0.68)",
+    color: "#746a5f",
+    fontSize: "13px",
+    fontWeight: 560,
     lineHeight: 1.6,
-    padding: "10px 12px",
+    padding: "11px 12px",
+    boxShadow: "0 4px 12px rgba(90,76,60,0.025)",
   },
   authNote: {
     margin: "2px 0 16px",

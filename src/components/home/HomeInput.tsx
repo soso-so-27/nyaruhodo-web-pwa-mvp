@@ -99,6 +99,10 @@ const MIKKE_CATEGORIES: MikkeWindowCategory[] = ["place", "pose", "sign"];
 const MIKKE_LOCK_MS = 60 * 60 * 1000;
 const SLEEPING_DELIVERY_LOCK_MS = 6 * 60 * 60 * 1000;
 const HOME_SLEEPING_COUNTER_BASE_COUNT = 75;
+const PHOTO_SAVE_FAILURE_MESSAGE =
+  "写真を保存できませんでした。少し時間をおいて、もう一度試してください";
+const PHOTO_INPUT_FAILURE_MESSAGE =
+  "写真を読み込めませんでした。JPEGやPNGの写真で、もう一度試してください";
 
 type RecordLogItem = {
   id: string;
@@ -1137,7 +1141,7 @@ export function HomeInput({ recentEvents: _recentEvents }: HomeInputProps) {
         );
         showToast("写真を残したよ");
       } catch {
-        showToast("写真を保存できませんでした");
+        showToast(PHOTO_SAVE_FAILURE_MESSAGE);
       }
     };
 
@@ -1197,7 +1201,7 @@ export function HomeInput({ recentEvents: _recentEvents }: HomeInputProps) {
           { localCatId: activeCatId },
         );
       } catch {
-        showToast("写真を保存できませんでした");
+        showToast(PHOTO_SAVE_FAILURE_MESSAGE);
       } finally {
         setIsCollectionPhotoAdding(false);
       }
@@ -1255,7 +1259,7 @@ export function HomeInput({ recentEvents: _recentEvents }: HomeInputProps) {
           { localCatId: activeCatId },
         );
       } catch {
-        showToast("写真を保存できませんでした");
+        showToast(PHOTO_SAVE_FAILURE_MESSAGE);
       } finally {
         setIsCollectionPhotoAdding(false);
       }
@@ -1368,7 +1372,7 @@ export function HomeInput({ recentEvents: _recentEvents }: HomeInputProps) {
           { localCatId: activeCatId },
         );
       } catch {
-        showToast("写真を読み込めませんでした");
+        showToast(PHOTO_INPUT_FAILURE_MESSAGE);
       } finally {
         setIsExchangePhotoAdding(false);
         cleanupInput();
@@ -1440,13 +1444,13 @@ export function HomeInput({ recentEvents: _recentEvents }: HomeInputProps) {
         showToast(
           savedCount > 0
             ? `とどくねがおを${savedCount}枚入れました`
-            : "写真を保存できませんでした",
+            : PHOTO_SAVE_FAILURE_MESSAGE,
         );
       } catch {
         showToast(
           savedCount > 0
             ? `とどくねがおを${savedCount}枚入れました`
-            : "写真を保存できませんでした",
+            : PHOTO_SAVE_FAILURE_MESSAGE,
         );
       } finally {
         setIsExchangePhotoAdding(false);
@@ -1678,7 +1682,7 @@ export function HomeInput({ recentEvents: _recentEvents }: HomeInputProps) {
     });
 
     if (!ownPhoto) {
-      showToast("写真を保存できませんでした");
+      showToast(PHOTO_SAVE_FAILURE_MESSAGE);
       return;
     }
     setCollectionRefreshTick((value) => value + 1);
@@ -1737,7 +1741,7 @@ export function HomeInput({ recentEvents: _recentEvents }: HomeInputProps) {
     });
 
     if (!ownPhoto) {
-      showToast("写真を保存できませんでした");
+      showToast(PHOTO_SAVE_FAILURE_MESSAGE);
       return;
     }
     void backupOwnSleepingPhotoMoment(ownPhoto);
@@ -7064,12 +7068,18 @@ const styles = {
     top: "calc(18px + env(safe-area-inset-top))",
     left: "50%",
     zIndex: 120,
-    borderRadius: "99px",
-    background: "#2A2A28",
-    color: "#FFFFFF",
-    padding: "8px 20px",
+    transform: "translateX(-50%)",
+    maxWidth: "min(312px, calc(100vw - 40px))",
+    border: "1px solid rgba(120,108,94,0.14)",
+    borderRadius: "18px",
+    background: "rgba(255,253,248,0.94)",
+    color: "#5f574e",
+    boxShadow: "0 6px 16px rgba(90,76,60,0.08)",
+    padding: "10px 14px",
     fontSize: "13px",
-    fontWeight: 560,
+    fontWeight: 520,
+    lineHeight: 1.45,
+    textAlign: "center",
     animation: "toastIn 0.2s ease-out",
   },
 } satisfies Record<string, CSSProperties>;

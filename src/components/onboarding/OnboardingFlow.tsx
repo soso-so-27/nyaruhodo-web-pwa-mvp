@@ -99,7 +99,7 @@ export function OnboardingFlow() {
       const file = input.files?.[0];
 
       if (!file || !isLikelyImageFile(file)) {
-        setMessage("写真を選べませんでした。別の写真でもう一度試してください。");
+        setMessage("写真を読み込めませんでした。JPEGやPNGの写真で、もう一度試してください。");
         cleanupInput();
         return;
       }
@@ -116,7 +116,7 @@ export function OnboardingFlow() {
         const savedResult = await saveSleepingPhotoWithFallback(file, catId);
 
         if (!savedResult) {
-          setMessage("写真を小さくしても保存できませんでした。");
+          setMessage("写真を保存できませんでした。JPEGやPNGの写真で、もう一度試してください。");
           setState("intro");
           return;
         }
@@ -144,7 +144,7 @@ export function OnboardingFlow() {
           return;
         }
       } catch {
-        setMessage("写真を保存できませんでした。");
+        setMessage("写真を保存できませんでした。JPEGやPNGの写真で、もう一度試してください。");
         setState("intro");
       } finally {
         cleanupInput();
@@ -887,10 +887,17 @@ const styles = {
     padding: "8px 12px",
   },
   message: {
-    margin: 0,
-    color: "#8a8174",
+    margin: "2px 0 0",
+    width: "min(100%, 280px)",
+    border: "1px solid rgba(120,108,94,0.12)",
+    borderRadius: "14px",
+    background: "rgba(255,253,248,0.64)",
+    color: "#746a5f",
     fontSize: "12px",
-    lineHeight: 1.6,
+    fontWeight: 500,
+    lineHeight: 1.55,
+    padding: "10px 12px",
+    boxShadow: "0 4px 12px rgba(90,76,60,0.025)",
   },
   result: {
     display: "grid",

@@ -13,6 +13,7 @@ import {
   getStoragePhotoPath,
 } from "../../lib/photoStorage";
 import { createBrowserSupabaseClient } from "../../lib/supabase/browser";
+import { color, radius, shadow, typography } from "./designTokens";
 
 const signedUrlCache = new Map<string, string>();
 const signedUrlPromiseCache = new Map<string, Promise<string | null>>();
@@ -20,6 +21,11 @@ const signedUrlPromiseCache = new Map<string, Promise<string | null>>();
 const fallbackFrameStyle: CSSProperties = {
   display: "grid",
   placeItems: "center",
+  border: `1px solid ${color.border}`,
+  borderRadius: radius.lg,
+  background:
+    "linear-gradient(180deg, rgba(255,253,248,0.92), rgba(247,241,231,0.72))",
+  boxShadow: shadow.soft,
 };
 
 const fallbackOverlayStyle: CSSProperties = {
@@ -31,12 +37,21 @@ const fallbackOverlayStyle: CSSProperties = {
 
 const fallbackTextStyle: CSSProperties = {
   maxWidth: "80%",
-  color: "rgba(116, 106, 95, 0.78)",
-  fontSize: 12,
-  fontWeight: 600,
-  letterSpacing: "0.04em",
-  lineHeight: 1.5,
+  color: color.textMuted,
+  fontFamily: typography.fontSans,
+  fontSize: typography.caption.fontSize,
+  fontWeight: typography.caption.fontWeight,
+  letterSpacing: 0,
+  lineHeight: typography.caption.lineHeight,
   textAlign: "center",
+};
+
+const fallbackHelpStyle: CSSProperties = {
+  display: "block",
+  marginTop: 4,
+  color: color.textFaint,
+  fontSize: 11,
+  fontWeight: 500,
 };
 
 export function StoredPhotoImage({
@@ -199,8 +214,11 @@ export function StoredPhotoImage({
 
 function PhotoFallback({ style }: { style: CSSProperties }) {
   return (
-    <span style={{ ...style, ...fallbackFrameStyle }}>
-      <span style={fallbackTextStyle}>写真を表示できません</span>
+    <span style={{ ...fallbackFrameStyle, ...style }}>
+      <span style={fallbackTextStyle}>
+        写真を表示できません
+        <span style={fallbackHelpStyle}>もう一度開いてみてください</span>
+      </span>
     </span>
   );
 }
