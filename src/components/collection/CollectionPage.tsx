@@ -39,7 +39,10 @@ import {
 import type { CatProfile } from "../home/homeInputHelpers";
 import { BottomNavigation } from "../navigation/BottomNavigation";
 import { AppBottomSheet } from "../ui/AppBottomSheet";
+import { AppCard } from "../ui/AppCard";
+import { AppHeader } from "../ui/AppHeader";
 import { AppIcon } from "../ui/AppIcons";
+import { EmptyState } from "../ui/EmptyState";
 import { StoredPhotoImage } from "../ui/StoredPhotoImage";
 
 const COLLECTION_TEXT = "#2d2b27";
@@ -698,10 +701,10 @@ export function CollectionPage() {
       <main style={styles.page}>
         <PageBackdrop />
         <div style={styles.container}>
-          <section style={styles.emptyCard}>
+          <AppCard variant="soft" padding="lg" style={styles.emptyCard}>
             <h1 style={styles.emptyTitle}>アルバム</h1>
             <p style={styles.emptyText}>準備しています</p>
-          </section>
+          </AppCard>
         </div>
         <BottomNavigation active="collection" />
       </main>
@@ -713,13 +716,13 @@ export function CollectionPage() {
       <main style={styles.page}>
         <PageBackdrop />
         <div style={styles.container}>
-          <section style={styles.emptyCard}>
+          <AppCard variant="soft" padding="lg" style={styles.emptyCard}>
             <h1 style={styles.emptyTitle}>アルバム</h1>
             <p style={styles.emptyText}>一緒に暮らしている猫を登録しましょう</p>
             <a href="/cats" style={styles.primaryLink}>
               猫を登録する
             </a>
-          </section>
+          </AppCard>
         </div>
         <BottomNavigation active="collection" />
       </main>
@@ -730,11 +733,11 @@ export function CollectionPage() {
     <main style={styles.page}>
       <PageBackdrop />
       <div style={styles.container}>
-        <header style={styles.header}>
-          <div style={styles.pageHeader}>
-            <h1 style={styles.pageTitle}>アルバム</h1>
-          </div>
-        </header>
+        <AppHeader
+          variant="pageTitle"
+          title="アルバム"
+          style={styles.header}
+        />
 
         <BoxOverview
           dayGroups={albumDayGroups}
@@ -869,16 +872,14 @@ function AlbumTodayCard({
       {group.total > 0 ? (
         <AlbumDaySections group={group} onOpenBox={onOpenBox} />
       ) : (
-        <div style={styles.todayAlbumEmpty}>
-          <span style={styles.todayAlbumEmptyMark} aria-hidden="true">
-            <span style={styles.todayAlbumEmptyLine} />
-          </span>
-          <p style={styles.todayAlbumEmptyText}>
-            {scope === "taken"
+        <EmptyState
+          description={
+            scope === "taken"
               ? "写真を入れるとここに並びます"
-              : "ねがおが届くとここに並びます"}
-          </p>
-        </div>
+              : "ねがおが届くとここに並びます"
+          }
+          style={styles.todayAlbumEmptyState}
+        />
       )}
     </section>
   );
@@ -2588,6 +2589,12 @@ const styles = {
     fontSize: "12px",
     fontWeight: 500,
     lineHeight: 1.45,
+  },
+  todayAlbumEmptyState: {
+    minHeight: "64px",
+    justifyItems: "start",
+    textAlign: "left",
+    padding: "8px 0",
   },
   albumSection: {
     display: "grid",

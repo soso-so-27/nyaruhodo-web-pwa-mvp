@@ -78,6 +78,8 @@ import {
   AppIcon,
   type AppIconName,
 } from "../ui/AppIcons";
+import { AppButton } from "../ui/AppButton";
+import { AppCard } from "../ui/AppCard";
 import { StoredPhotoImage } from "../ui/StoredPhotoImage";
 
 type HomeInputProps = {
@@ -2643,7 +2645,12 @@ function HomeInstallHintCard({
   const primaryLabel = platform === "android" && canPrompt ? "追加する" : "置き方を見る";
 
   return (
-    <section style={styles.homeInstallHintCard} aria-label="ホーム画面に追加">
+    <AppCard
+      variant="soft"
+      padding="md"
+      style={styles.homeInstallHintCard}
+      aria-label="ホーム画面に追加"
+    >
       <div style={styles.homeInstallHintText}>
         <p style={styles.homeInstallHintTitle}>
           次に寝ていたら、
@@ -2657,22 +2664,26 @@ function HomeInstallHintCard({
         </p>
       </div>
       <div style={styles.homeInstallHintActions}>
-        <button
+        <AppButton
           type="button"
+          variant="secondary"
+          size="md"
           style={styles.homeInstallHintPrimary}
           onClick={onPrimary}
         >
           {primaryLabel}
-        </button>
-        <button
+        </AppButton>
+        <AppButton
           type="button"
+          variant="quiet"
+          size="md"
           style={styles.homeInstallHintSecondary}
           onClick={onDismiss}
         >
           あとで
-        </button>
+        </AppButton>
       </div>
-    </section>
+    </AppCard>
   );
 }
 

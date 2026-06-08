@@ -24,8 +24,9 @@ import {
   saveActiveCatId,
 } from "../home/homeInputHelpers";
 import { AppButton } from "../ui/AppButton";
+import { PhotoTile } from "../ui/PhotoTile";
+import { WordmarkHeader } from "../ui/AppHeader";
 import { AppIcon } from "../ui/AppIcons";
-import { StoredPhotoImage } from "../ui/StoredPhotoImage";
 
 type OnboardingState = "intro" | "saving" | "delivered" | "empty" | "kept";
 
@@ -345,7 +346,7 @@ export function OnboardingFlow() {
       `}</style>
       <div style={styles.paperBackground} aria-hidden="true" />
       <div style={styles.container}>
-        <p style={styles.brand}>ねてるねこ</p>
+        <WordmarkHeader style={styles.brandHeader} />
 
         {state === "intro" || state === "saving" ? (
           <section style={styles.hero} aria-label="ねてるねこのはじめかた">
@@ -401,21 +402,25 @@ export function OnboardingFlow() {
             </div>
             {selectedPhotoSrc ? (
               <div style={styles.photoPair}>
-                <div style={styles.photoItem}>
-                  <img src={selectedPhotoSrc} alt="" style={styles.ownPhoto} />
-                  <span style={styles.photoLabel}>入れた1枚</span>
-                </div>
+                <PhotoTile
+                  src={selectedPhotoSrc}
+                  label="入れた1枚"
+                  muted
+                  imageStyle={styles.ownPhoto}
+                />
                 <span style={styles.pairDots} />
-                <div style={styles.photoItem}>
-                  <StoredPhotoImage src={deliveredPhoto.src} alt="" style={styles.deliveredPhoto} />
-                  <span style={styles.photoLabel}>とどいた1枚</span>
-                </div>
+                <PhotoTile
+                  src={deliveredPhoto.src}
+                  label="とどいた1枚"
+                  imageStyle={styles.deliveredPhoto}
+                />
               </div>
             ) : (
-              <div style={styles.singleDeliveredPhoto}>
-                <StoredPhotoImage src={deliveredPhoto.src} alt="" style={styles.deliveredPhoto} />
-                <span style={styles.photoLabel}>とどいた1枚</span>
-              </div>
+              <PhotoTile
+                src={deliveredPhoto.src}
+                label="とどいた1枚"
+                imageStyle={styles.deliveredPhoto}
+              />
             )}
             <p style={styles.resultText}>
               {isDeliveredPhotoKept
@@ -722,18 +727,12 @@ const styles = {
     alignContent: "center",
     boxSizing: "border-box",
   },
-  brand: {
+  brandHeader: {
     position: "fixed",
     top: "calc(42px + env(safe-area-inset-top))",
     left: "50%",
     transform: "translateX(-50%)",
-    margin: 0,
-    color: "#6b6257",
-    fontFamily: SERIF,
-    fontSize: "18px",
-    fontWeight: 400,
-    letterSpacing: "0.16em",
-    lineHeight: 1.34,
+    paddingTop: 0,
   },
   hero: {
     display: "grid",

@@ -5,6 +5,8 @@ import { useEffect, useRef, useState } from "react";
 import type { CSSProperties } from "react";
 import { AppLoadingScreen } from "../../../components/loading/AppLoadingScreen";
 import { AppButton } from "../../../components/ui/AppButton";
+import { AppCard } from "../../../components/ui/AppCard";
+import { WordmarkHeader } from "../../../components/ui/AppHeader";
 import {
   APP_ACCENT,
   APP_ACCENT_SOFT_BG,
@@ -352,7 +354,8 @@ export default function AccountCreatePage() {
   return (
     <main style={styles.page}>
       <div style={styles.container}>
-        <section style={styles.card}>
+        {isFromOnboarding ? <WordmarkHeader style={styles.wordmarkHeader} /> : null}
+        <AppCard variant="paper" padding="lg" style={styles.card}>
           {isAccountConnected ? (
             <>
               <p style={styles.eyebrow}>アカウント</p>
@@ -491,7 +494,7 @@ export default function AccountCreatePage() {
               </div>
             </>
           )}
-        </section>
+        </AppCard>
       </div>
     </main>
   );
@@ -568,6 +571,10 @@ const styles = {
     margin: "0 auto",
     padding: "28px 16px 120px",
     boxSizing: "border-box",
+  },
+  wordmarkHeader: {
+    marginBottom: "18px",
+    paddingTop: "calc(10px + env(safe-area-inset-top))",
   },
   card: {
     ...APP_SURFACE,

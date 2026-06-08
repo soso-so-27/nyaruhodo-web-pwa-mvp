@@ -6,6 +6,8 @@ import { storeAccountPhotoDataUrl } from "../../lib/photoStorageClient";
 import { STORAGE_KEYS } from "../../lib/storage";
 import { BottomNavigation } from "../navigation/BottomNavigation";
 import { AppButton } from "../ui/AppButton";
+import { AppCard } from "../ui/AppCard";
+import { AppHeader } from "../ui/AppHeader";
 import { AppIcon } from "../ui/AppIcons";
 import { StoredPhotoImage } from "../ui/StoredPhotoImage";
 import {
@@ -386,17 +388,25 @@ export function CatsPage() {
     <main style={styles.page}>
       <PageBackdrop />
       <div style={styles.container}>
-        <div style={styles.pageHeader}>
-          <h1 style={styles.pageTitle}>ねてるねこ</h1>
-          {!isOnboardingCompletionView ? (
-            <a href="/settings" style={styles.headerIconLink} aria-label="設定">
-              <AppIcon name="settings" size={24} />
-            </a>
-          ) : null}
-        </div>
+        <AppHeader
+          title="ねてるねこ"
+          style={styles.pageHeader}
+          right={
+            !isOnboardingCompletionView ? (
+              <a href="/settings" style={styles.headerIconLink} aria-label="設定">
+                <AppIcon name="settings" size={24} />
+              </a>
+            ) : null
+          }
+        />
 
         {isOnboardingMode ? (
-          <section style={styles.onboardingPanel} aria-label="オンボーディング">
+          <AppCard
+            variant="soft"
+            padding="md"
+            style={styles.onboardingPanel}
+            aria-label="オンボーディング"
+          >
             <p style={styles.onboardingKicker}>
               {isEditingProfile
                 ? "このねこの場所"
@@ -423,7 +433,7 @@ export function CatsPage() {
                 ねてるねこへ
               </AppButton>
             ) : null}
-          </section>
+          </AppCard>
         ) : null}
 
         {!isOnboardingProfileSetup && !isOnboardingCompletionView ? (
