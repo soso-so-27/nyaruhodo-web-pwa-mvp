@@ -39,11 +39,13 @@ import {
 import type { CatProfile } from "../home/homeInputHelpers";
 import { BottomNavigation } from "../navigation/BottomNavigation";
 import { AppBottomSheet } from "../ui/AppBottomSheet";
+import { AppButton } from "../ui/AppButton";
 import { AppCard } from "../ui/AppCard";
 import { AppHeader } from "../ui/AppHeader";
 import { AppIcon } from "../ui/AppIcons";
 import { EmptyState } from "../ui/EmptyState";
 import { StoredPhotoImage } from "../ui/StoredPhotoImage";
+import { color, radius, shadow } from "../ui/designTokens";
 
 const COLLECTION_TEXT = "#2d2b27";
 const COLLECTION_TEXT_STRONG = "#1f1d1a";
@@ -55,7 +57,7 @@ const COLLECTION_SURFACE: CSSProperties = {
   WebkitBackdropFilter: "blur(24px)",
   border: "0.5px solid rgba(78,70,58,0.12)",
   boxShadow: [
-    "0 10px 26px rgba(86,76,58,0.08)",
+    "0 8px 18px rgba(86,76,58,0.045)",
     "inset 0 1px 0 rgba(255,255,255,0.72)",
   ].join(", "),
 };
@@ -63,7 +65,7 @@ const COLLECTION_SURFACE_SOFT: CSSProperties = {
   ...COLLECTION_SURFACE,
   background: "rgba(255,255,255,0.46)",
   boxShadow: [
-    "0 8px 20px rgba(86,76,58,0.06)",
+    "0 5px 14px rgba(86,76,58,0.035)",
     "inset 0 1px 0 rgba(255,255,255,0.64)",
   ].join(", "),
 };
@@ -1605,21 +1607,27 @@ function CollectionPhotoSheet({
       )}
 
       <div style={styles.sheetActions}>
-        <button type="button" style={styles.btnPrimary} onClick={onAddPhoto}>
-          写真を追加
-        </button>
-        <button
+        <AppButton
           type="button"
+          variant="primary"
+          size="md"
+          fullWidth
+          style={styles.sheetActionButton}
+          onClick={onAddPhoto}
+        >
+          写真を追加
+        </AppButton>
+        <AppButton
+          type="button"
+          variant="secondary"
+          size="md"
+          fullWidth
           onClick={onShare}
-          style={
-            photos.length > 0
-              ? styles.btnSecondary
-              : { ...styles.btnSecondary, ...styles.btnDisabled }
-          }
+          style={styles.sheetActionButton}
           disabled={photos.length === 0}
         >
           シェアに並べる
-        </button>
+        </AppButton>
       </div>
     </AppBottomSheet>
   );
@@ -1658,12 +1666,26 @@ function CollectionCompletionSheet({
           を見つけた
         </p>
         <div style={styles.completionActions}>
-          <button type="button" style={styles.btnPrimary} onClick={onOpenAlbum}>
+          <AppButton
+            type="button"
+            variant="primary"
+            size="md"
+            fullWidth
+            style={styles.sheetActionButton}
+            onClick={onOpenAlbum}
+          >
             アルバムを見る
-          </button>
-          <button type="button" style={styles.btnSecondary} onClick={onOpenShare}>
+          </AppButton>
+          <AppButton
+            type="button"
+            variant="secondary"
+            size="md"
+            fullWidth
+            style={styles.sheetActionButton}
+            onClick={onOpenShare}
+          >
             シェアに並べる
-          </button>
+          </AppButton>
         </div>
       </div>
     </AppBottomSheet>
@@ -2493,7 +2515,7 @@ const styles = {
   viewTabActive: {
     background: "rgba(255,255,255,0.92)",
     color: "#2a2a28",
-    boxShadow: "0 7px 18px rgba(0,0,0,0.16)",
+    boxShadow: shadow.soft,
   },
   boxOverview: {
     display: "grid",
@@ -2509,7 +2531,7 @@ const styles = {
     borderRadius: "999px",
     background: "rgba(255,253,248,0.56)",
     border: "0.5px solid rgba(98,87,72,0.16)",
-    boxShadow: "0 8px 20px rgba(90,76,60,0.06)",
+    boxShadow: shadow.soft,
   },
   albumScopeTab: {
     minHeight: "34px",
@@ -2527,7 +2549,7 @@ const styles = {
   albumScopeTabActive: {
     background: "rgba(255,253,248,0.96)",
     color: COLLECTION_TEXT_STRONG,
-    boxShadow: "0 7px 16px rgba(90,76,60,0.08)",
+    boxShadow: "0 4px 12px rgba(90,76,60,0.045)",
   },
   todayAlbumCard: {
     display: "grid",
@@ -2594,7 +2616,11 @@ const styles = {
     minHeight: "64px",
     justifyItems: "start",
     textAlign: "left",
-    padding: "8px 0",
+    alignContent: "center",
+    padding: "12px 14px",
+    borderRadius: radius.lg,
+    background: "rgba(255,253,248,0.34)",
+    border: "1px solid rgba(120,108,94,0.08)",
   },
   albumSection: {
     display: "grid",
@@ -2697,11 +2723,11 @@ const styles = {
   dayPhotoThumb: {
     aspectRatio: "1 / 1",
     minWidth: 0,
-    borderRadius: "9px",
+    borderRadius: radius.lg,
     overflow: "hidden",
-    background: "rgba(255,255,255,0.46)",
-    border: "0.5px solid rgba(85,75,62,0.08)",
-    boxShadow: "0 4px 12px rgba(83,72,55,0.05)",
+    background: color.surfaceSoft,
+    border: "4px solid rgba(255,253,248,0.74)",
+    boxShadow: shadow.soft,
   },
   boxSummaryCard: {
     position: "relative",
@@ -2780,11 +2806,11 @@ const styles = {
   boxPhotoThumb: {
     aspectRatio: "1 / 1",
     minWidth: 0,
-    borderRadius: "10px",
+    borderRadius: radius.lg,
     overflow: "hidden",
-    background: "rgba(255,255,255,0.52)",
-    border: "0.5px solid rgba(85,75,62,0.08)",
-    boxShadow: "0 4px 12px rgba(83,72,55,0.05)",
+    background: color.surfaceSoft,
+    border: "4px solid rgba(255,253,248,0.76)",
+    boxShadow: shadow.soft,
   },
   boxPhotoImg: {
     width: "100%",
@@ -2803,7 +2829,7 @@ const styles = {
   boxSummaryEmptyLine: {
     height: "1px",
     borderRadius: "999px",
-    background: "rgba(79,73,63,0.12)",
+    background: "rgba(79,73,63,0.10)",
   },
   boxSummaryEmptyText: {
     color: "#8a8378",
@@ -3189,7 +3215,9 @@ const styles = {
     display: "block",
     aspectRatio: "1 / 1",
     ...COLLECTION_SURFACE_SOFT,
-    borderRadius: "18px",
+    borderRadius: radius.xl,
+    border: "1px solid rgba(120,108,94,0.10)",
+    boxShadow: shadow.card,
     overflow: "hidden",
     font: "inherit",
     cursor: "pointer",
@@ -3201,9 +3229,9 @@ const styles = {
     alignItems: "center",
     justifyContent: "center",
     padding: 0,
-    background: "rgba(255,255,255,0.055)",
-    border: "0.5px solid rgba(255,255,255,0.10)",
-    boxShadow: "inset 0 1px 0 rgba(255,255,255,0.08)",
+    background: "rgba(255,253,248,0.42)",
+    border: `1px solid ${color.border}`,
+    boxShadow: shadow.none,
   },
   emptySlotContent: {
     display: "flex",
@@ -3226,7 +3254,7 @@ const styles = {
   photoCard: {
     display: "flex",
     alignItems: "flex-end",
-    padding: "12px",
+    padding: "11px",
     textAlign: "left",
   },
   cardPhoto: {
@@ -3242,7 +3270,7 @@ const styles = {
     position: "absolute",
     inset: 0,
     background:
-      "linear-gradient(180deg, rgba(255,255,255,0.02) 0%, rgba(35,34,31,0.04) 48%, rgba(35,34,31,0.48) 100%)",
+      "linear-gradient(180deg, rgba(255,255,255,0.02) 0%, rgba(35,34,31,0.02) 52%, rgba(35,34,31,0.34) 100%)",
   },
   photoCardText: {
     position: "relative",
@@ -3256,8 +3284,8 @@ const styles = {
     right: "10px",
     zIndex: 2,
     borderRadius: "99px",
-    background: "rgba(0,0,0,0.45)",
-    color: "#fff",
+    background: "rgba(255,253,248,0.82)",
+    color: color.text,
     fontSize: "11px",
     fontWeight: 560,
     lineHeight: 1,
@@ -3280,8 +3308,8 @@ const styles = {
   photoCardLabel: {
     margin: 0,
     color: "#ffffff",
-    fontSize: "15px",
-    fontWeight: 620,
+    fontSize: "13px",
+    fontWeight: 560,
     lineHeight: 1.2,
     textShadow: "0 1px 8px rgba(0,0,0,0.24)",
   },
@@ -3341,26 +3369,27 @@ const styles = {
     cursor: "pointer",
   },
   sheetPhotoArea: {
-    margin: "12px 16px",
+    margin: "10px 18px 2px",
   },
   photoScroll: {
     display: "flex",
     overflowX: "auto",
     scrollSnapType: "x mandatory",
     scrollbarWidth: "none",
-    gap: "8px",
+    gap: "10px",
   },
   photoSlide: {
     position: "relative",
     flexShrink: 0,
     width: "100%",
     height: "min(62vh, 520px)",
-    borderRadius: "16px",
+    borderRadius: radius.card,
     overflow: "hidden",
     scrollSnapAlign: "start",
     background:
-      "linear-gradient(180deg, rgba(250,246,238,0.86), rgba(239,229,214,0.58))",
-    border: "0.5px solid rgba(120,108,94,0.12)",
+      "linear-gradient(180deg, rgba(255,253,248,0.92), rgba(246,239,228,0.64))",
+    border: "6px solid rgba(255,253,248,0.78)",
+    boxShadow: shadow.card,
   },
   photoImg: {
     width: "100%",
@@ -3370,15 +3399,17 @@ const styles = {
   },
   deleteBtn: {
     position: "absolute",
-    top: "10px",
-    right: "10px",
-    border: "none",
+    top: "12px",
+    right: "12px",
+    border: "1px solid rgba(155,74,61,0.18)",
     borderRadius: "99px",
-    background: "rgba(0,0,0,0.5)",
-    color: "#fff",
+    background: "rgba(255,253,248,0.82)",
+    color: color.danger,
     fontSize: "11px",
-    padding: "4px 10px",
+    fontWeight: 600,
+    padding: "5px 10px",
     cursor: "pointer",
+    boxShadow: shadow.soft,
   },
   photoDots: {
     display: "flex",
@@ -3403,18 +3434,27 @@ const styles = {
     justifyContent: "center",
     aspectRatio: "1",
     margin: "12px 16px",
-    borderRadius: "16px",
-    ...COLLECTION_SURFACE_SOFT,
+    borderRadius: radius.card,
+    background: "rgba(255,253,248,0.44)",
+    border: `1px solid ${color.border}`,
+    boxShadow: shadow.none,
   },
   photoEmptyText: {
     color: COLLECTION_MUTED,
-    fontSize: "14px",
+    fontSize: "12.5px",
+    fontWeight: 520,
   },
   sheetActions: {
     display: "grid",
     gridTemplateColumns: "1fr 1fr",
     gap: "8px",
     padding: "12px 16px 0",
+  },
+  sheetActionButton: {
+    minHeight: 42,
+    padding: "0 12px",
+    fontSize: "13px",
+    fontWeight: 580,
   },
   boxDetailActions: {
     display: "grid",
@@ -3430,22 +3470,24 @@ const styles = {
   boxIconActionButton: {
     display: "grid",
     placeItems: "center",
-    width: "48px",
-    height: "48px",
+    width: "46px",
+    height: "46px",
     borderRadius: "50%",
-    border: "0.5px solid rgba(120,108,94,0.18)",
-    background: "rgba(255,253,248,0.64)",
-    color: "#746a5f",
-    boxShadow: "inset 0 1px 0 rgba(255,255,255,0.42)",
+    border: `1px solid ${color.border}`,
+    background: "rgba(255,253,248,0.72)",
+    color: color.textMuted,
+    boxShadow: shadow.soft,
     cursor: "pointer",
   },
   boxIconActionButtonActive: {
     background: "rgba(255,253,248,0.92)",
-    color: "#2a2823",
-    border: "0.5px solid rgba(120,108,94,0.2)",
+    color: color.textStrong,
+    border: "1px solid rgba(120,108,94,0.16)",
   },
   boxIconActionButtonDanger: {
-    color: "#a85536",
+    color: color.danger,
+    background: "rgba(155,74,61,0.07)",
+    border: "1px solid rgba(155,74,61,0.14)",
   },
   boxPhotoStatusRow: {
     display: "flex",
