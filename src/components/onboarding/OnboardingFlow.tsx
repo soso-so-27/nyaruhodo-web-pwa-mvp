@@ -23,6 +23,7 @@ import {
   readCatProfiles,
   saveActiveCatId,
 } from "../home/homeInputHelpers";
+import { AppButton } from "../ui/AppButton";
 import { AppIcon } from "../ui/AppIcons";
 import { StoredPhotoImage } from "../ui/StoredPhotoImage";
 
@@ -374,19 +375,20 @@ export function OnboardingFlow() {
             {state === "saving" ? (
               <DeliveryWaiting />
             ) : null}
-            <button
+            <AppButton
               type="button"
               onClick={() => {
                 void handleSelectSleepingPhoto();
               }}
-              style={styles.primaryButton}
+              fullWidth
+              style={styles.onboardingCta}
               disabled={state === "saving"}
             >
               {state === "saving" ? "とどいています..." : "ねてるねこを入れる"}
-            </button>
-            <button type="button" onClick={handleGoHome} style={styles.textButton}>
+            </AppButton>
+            <AppButton type="button" variant="quiet" size="md" onClick={handleGoHome}>
               あとで
-            </button>
+            </AppButton>
             {message ? <p style={styles.message}>{message}</p> : null}
           </section>
         ) : null}
@@ -420,20 +422,21 @@ export function OnboardingFlow() {
                 ? "アルバムに入りました。"
                 : "とっておくと、アルバムに入ります。"}
             </p>
-            <button
+            <AppButton
               type="button"
               onClick={
                 isDeliveredPhotoKept
                   ? () => router.push("/collection")
                   : handleContinueAfterDelivery
               }
-              style={styles.primaryButton}
+              fullWidth
+              style={styles.onboardingCta}
             >
               {isDeliveredPhotoKept ? "アルバムで見る" : "この2枚をとっておく"}
-            </button>
-            <button type="button" onClick={handleGoHome} style={styles.textButton}>
+            </AppButton>
+            <AppButton type="button" variant="quiet" size="md" onClick={handleGoHome}>
               閉じる
-            </button>
+            </AppButton>
             {message ? <p style={styles.message}>{message}</p> : null}
           </section>
         ) : null}
@@ -450,20 +453,21 @@ export function OnboardingFlow() {
                 : "今日はまだ\nとどくねがおを準備中です。"}
             </p>
             {isTestMode ? (
-              <button
+              <AppButton
                 type="button"
                 onClick={() => {
                   void handleAddCandidatePhoto();
                 }}
-                style={styles.primaryButton}
+                fullWidth
+                style={styles.onboardingCta}
                 disabled={isCandidateAdding}
               >
                 {isCandidateAdding ? "追加しています..." : "とどく候補を追加する"}
-              </button>
+              </AppButton>
             ) : null}
-            <button type="button" onClick={handleGoHome} style={styles.textButton}>
+            <AppButton type="button" variant="quiet" size="md" onClick={handleGoHome}>
               ねてるねこへ
-            </button>
+            </AppButton>
             {message ? <p style={styles.message}>{message}</p> : null}
           </section>
         ) : null}
@@ -476,16 +480,17 @@ export function OnboardingFlow() {
               <br />
               ここへ。
             </h2>
-            <a
+            <AppButton
               href="/account/create?from=onboarding"
               onClick={markOnboardingAlbumCompletionReady}
-              style={styles.primaryLink}
+              fullWidth
+              style={styles.onboardingCtaLink}
             >
               このねこのアルバムをつくる
-            </a>
-            <button type="button" onClick={handleGoHome} style={styles.textButton}>
+            </AppButton>
+            <AppButton type="button" variant="quiet" size="md" onClick={handleGoHome}>
               ねてるねこへ
-            </button>
+            </AppButton>
           </section>
         ) : null}
       </div>
@@ -828,6 +833,14 @@ const styles = {
     fontWeight: 400,
     lineHeight: 1.45,
     letterSpacing: "0.08em",
+  },
+  onboardingCta: {
+    width: "min(100%, 280px)",
+    marginTop: "16px",
+  },
+  onboardingCtaLink: {
+    width: "min(100%, 280px)",
+    marginTop: "20px",
   },
   primaryButton: {
     width: "min(100%, 280px)",

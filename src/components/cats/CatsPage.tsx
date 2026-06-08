@@ -5,6 +5,7 @@ import type { CSSProperties } from "react";
 import { storeAccountPhotoDataUrl } from "../../lib/photoStorageClient";
 import { STORAGE_KEYS } from "../../lib/storage";
 import { BottomNavigation } from "../navigation/BottomNavigation";
+import { AppButton } from "../ui/AppButton";
 import { AppIcon } from "../ui/AppIcons";
 import { StoredPhotoImage } from "../ui/StoredPhotoImage";
 import {
@@ -412,13 +413,15 @@ export function CatsPage() {
               </p>
             ) : null}
             {!isEditingProfile ? (
-              <a
+              <AppButton
                 href="/home"
                 onClick={clearOnboardingAlbumCompletionReady}
-                style={styles.onboardingHomeLink}
+                variant="secondary"
+                size="md"
+                style={styles.onboardingHomeButton}
               >
                 ねてるねこへ
-              </a>
+              </AppButton>
             ) : null}
           </section>
         ) : null}
@@ -697,9 +700,19 @@ export function CatsPage() {
                     ) : null}
 
                     <div style={styles.actions}>
-                      <button type="button" onClick={handleSaveProfile} style={styles.saveButton}>
-                        {isOnboardingProfileSetup ? "アルバムをつくる" : "保存"}
-                      </button>
+                      {isOnboardingProfileSetup ? (
+                        <AppButton
+                          type="button"
+                          onClick={handleSaveProfile}
+                          size="md"
+                        >
+                          アルバムをつくる
+                        </AppButton>
+                      ) : (
+                        <button type="button" onClick={handleSaveProfile} style={styles.saveButton}>
+                          保存
+                        </button>
+                      )}
                       {!isOnboardingProfileSetup ? (
                         <button type="button" onClick={cancelEditingCatName} style={styles.cancelButton}>
                           {"キャンセル"}
@@ -1072,6 +1085,9 @@ const styles = {
     textDecoration: "none",
     fontSize: "13px",
     fontWeight: 650,
+  },
+  onboardingHomeButton: {
+    marginTop: "18px",
   },
   catGrid: {
     display: "flex",

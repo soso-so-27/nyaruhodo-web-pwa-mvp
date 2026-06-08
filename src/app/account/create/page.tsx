@@ -4,6 +4,7 @@ import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import type { CSSProperties } from "react";
 import { AppLoadingScreen } from "../../../components/loading/AppLoadingScreen";
+import { AppButton } from "../../../components/ui/AppButton";
 import {
   APP_ACCENT,
   APP_ACCENT_SOFT_BG,
@@ -373,18 +374,28 @@ export default function AccountCreatePage() {
               ) : null}
               <div style={styles.actions}>
                 <div ref={googleButtonRef} style={styles.googleButtonMount} />
-                <button
-                  type="button"
-                  onClick={() => {
-                    if (isFromOnboarding) {
+                {isFromOnboarding ? (
+                  <AppButton
+                    type="button"
+                    onClick={() => {
                       markOnboardingAlbumCompletionReady();
-                    }
-                    router.push(isFromOnboarding ? "/cats?onboarding=1" : "/home");
-                  }}
-                  style={styles.primaryButton}
-                >
-                  {isFromOnboarding ? "アルバムへ進む" : "ホームへ戻る"}
-                </button>
+                      router.push("/cats?onboarding=1");
+                    }}
+                    fullWidth
+                  >
+                    アルバムへ進む
+                  </AppButton>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      router.push("/home");
+                    }}
+                    style={styles.primaryButton}
+                  >
+                    ホームへ戻る
+                  </button>
+                )}
               </div>
             </>
           ) : (
@@ -433,27 +444,50 @@ export default function AccountCreatePage() {
               </p>
 
               <div style={styles.actions}>
-                <button
-                  type="button"
-                  onClick={() => {
-                    void handleGoogleSignIn();
-                  }}
-                  style={styles.primaryButton}
-                  disabled={isStartingAuth || isCheckingAccount}
-                >
-                  {isStartingAuth
-                    ? "Googleを開いています..."
-                    : isFromOnboarding
-                      ? "Googleでつづける"
-                      : "Googleで続ける"}
-                </button>
-                <button
-                  type="button"
-                  onClick={handleLater}
-                  style={styles.secondaryButton}
-                >
-                  あとで
-                </button>
+                {isFromOnboarding ? (
+                  <>
+                    <AppButton
+                      type="button"
+                      onClick={() => {
+                        void handleGoogleSignIn();
+                      }}
+                      variant="accent"
+                      fullWidth
+                      disabled={isStartingAuth || isCheckingAccount}
+                    >
+                      {isStartingAuth ? "Googleを開いています..." : "Googleでつづける"}
+                    </AppButton>
+                    <AppButton
+                      type="button"
+                      variant="quiet"
+                      size="md"
+                      onClick={handleLater}
+                      fullWidth
+                    >
+                      あとで
+                    </AppButton>
+                  </>
+                ) : (
+                  <>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        void handleGoogleSignIn();
+                      }}
+                      style={styles.primaryButton}
+                      disabled={isStartingAuth || isCheckingAccount}
+                    >
+                      {isStartingAuth ? "Googleを開いています..." : "Googleで続ける"}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={handleLater}
+                      style={styles.secondaryButton}
+                    >
+                      あとで
+                    </button>
+                  </>
+                )}
               </div>
             </>
           )}
