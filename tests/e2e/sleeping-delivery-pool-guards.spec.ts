@@ -268,7 +268,7 @@ function expectCandidateIsNotTestPoolPhoto(photo: {
   expect(photo.src ?? "").not.toMatch(/^storage:/);
 
   if (photo.sourceCatId === "admin-stock") {
-    expect(photo.src ?? "").toMatch(/^data:image\//);
+    expect(photo.src ?? "").toMatch(/^(data:image\/|https?:\/\/)/);
   }
 }
 

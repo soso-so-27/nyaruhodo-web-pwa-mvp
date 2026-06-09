@@ -2,12 +2,17 @@ import { NextResponse } from "next/server";
 
 import { createSupabaseAdminClient } from "../../../../lib/supabase/admin";
 import { createServerSupabaseClient } from "../../../../lib/supabase/server";
-import { isUsablePhotoSrc } from "../../../../lib/photoStorage";
+import {
+  CAT_PHOTOS_BUCKET,
+  getStoragePhotoPath,
+  isUsablePhotoSrc,
+} from "../../../../lib/photoStorage";
 import type { ExchangePhotoPoolItem } from "../../../../lib/home/sleepingPhotos";
 import {
   isBlockedDeliveryPoolRow,
   isStorageDeliveryPhotoUrl,
 } from "../../../../lib/home/deliveryPoolGuards";
+import type { SupabaseClient } from "@supabase/supabase-js";
 
 export const dynamic = "force-dynamic";
 
@@ -114,7 +119,7 @@ async function readRemoteCandidates(input: CandidateRequest) {
   const candidates = await Promise.all(
     (rows.length > 0 ? rows : fallbackRows).map(
       async (row): Promise<ExchangePhotoPoolItem | null> => {
-        const src = await resolvePhotoUrl(row.photo_url);
+        const src = await resolvePhotoUrl(row.photo_url, supabase);
 
         if (!src || !isUsablePhotoSrc(src)) {
           return null;
@@ -142,7 +147,10 @@ function isRowDeliverable(row: RemoteCatMomentRow, context: CandidateFilterConte
   if (isBlockedDeliveryPoolRow(row)) {
     return false;
   }
-  if (isStorageDeliveryPhotoUrl(row.photo_url)) {
+  if (
+    isStorageDeliveryPhotoUrl(row.photo_url) &&
+    readPoolKind(row.metadata) !== "admin_stock"
+  ) {
     return false;
   }
   if (!isUsablePhotoSrc(row.photo_url)) {
@@ -186,7 +194,21 @@ function isAdminStockFallbackDeliverable(
   });
 }
 
-async function resolvePhotoUrl(photoUrl: string) {
+async function resolvePhotoUrl(photoUrl: string, supabase: SupabaseClient) {
+  const storagePath = getStoragePhotoPath(photoUrl);
+
+  if (storagePath) {
+    const { data, error } = await supabase.storage
+      .from(CAT_PHOTOS_BUCKET)
+      .createSignedUrl(storagePath, 60 * 60 * 24 * 365);
+
+    if (error || !data?.signedUrl) {
+      return null;
+    }
+
+    return data.signedUrl;
+  }
+
   return photoUrl;
 }
 

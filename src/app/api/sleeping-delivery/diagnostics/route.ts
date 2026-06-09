@@ -72,15 +72,20 @@ export async function POST(request: Request) {
   const storageRows = unblockedRows.filter((row) =>
     isStorageDeliveryPhotoUrl(row.photo_url),
   );
-  const storageExcludedRows = availableRows.filter((row) =>
-    isStorageDeliveryPhotoUrl(row.photo_url),
+  const storageExcludedRows = availableRows.filter(
+    (row) =>
+      isStorageDeliveryPhotoUrl(row.photo_url) &&
+      readPoolKind(row.metadata) !== "admin_stock",
   );
   const exchangeAvailableRows = availableRows.filter(
-    (row) => !isStorageDeliveryPhotoUrl(row.photo_url),
+    (row) =>
+      !isStorageDeliveryPhotoUrl(row.photo_url) ||
+      readPoolKind(row.metadata) === "admin_stock",
   );
   const unusableRows = availableRows.filter(
     (row) =>
-      !isStorageDeliveryPhotoUrl(row.photo_url) &&
+      (!isStorageDeliveryPhotoUrl(row.photo_url) ||
+        readPoolKind(row.metadata) === "admin_stock") &&
       !isUsablePhotoSrc(row.photo_url),
   );
   const blockedRows = exchangeAvailableRows.filter(

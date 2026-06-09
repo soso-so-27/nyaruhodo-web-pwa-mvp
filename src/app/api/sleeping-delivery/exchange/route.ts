@@ -2,7 +2,9 @@ import { NextResponse } from "next/server";
 import type { SupabaseClient } from "@supabase/supabase-js";
 
 import {
+  CAT_PHOTOS_BUCKET,
   getDataUrlExtension,
+  getStoragePhotoPath,
   isUsablePhotoSrc,
   sanitizePathSegment,
   toStoragePhotoUrl,
@@ -214,6 +216,7 @@ export async function POST(request: Request) {
   };
   const candidates = await buildCandidates(
     remoteRows.filter((row) => isRowDeliverable(row, deliverableContext)),
+    supabase,
   );
   const fallbackCandidates =
     candidates.length === 0 && blockedPhotoIds.size > 0
@@ -221,6 +224,7 @@ export async function POST(request: Request) {
           remoteRows.filter((row) =>
             isAdminStockFallbackDeliverable(row, deliverableContext),
           ),
+          supabase,
         )
       : [];
   const candidatePool =
@@ -617,7 +621,10 @@ function isRowDeliverable(
   if (isBlockedDeliveryPoolRow(row)) {
     return false;
   }
-  if (isStorageDeliveryPhotoUrl(row.photo_url)) {
+  if (
+    isStorageDeliveryPhotoUrl(row.photo_url) &&
+    readPoolKind(row.metadata) !== "admin_stock"
+  ) {
     return false;
   }
   if (!isUsablePhotoSrc(row.photo_url) || row.delivery_status !== "available") {
@@ -659,10 +666,13 @@ function isAdminStockFallbackDeliverable(
   });
 }
 
-async function buildCandidates(rows: RemoteCatMomentRow[]) {
+async function buildCandidates(
+  rows: RemoteCatMomentRow[],
+  supabase: SupabaseClient,
+) {
   const candidates = await Promise.all(
     rows.map(async (row): Promise<Candidate | null> => {
-      const src = await resolvePhotoUrl(row.photo_url);
+      const src = await resolvePhotoUrl(row.photo_url, supabase);
 
       if (!src || !isUsablePhotoSrc(src)) {
         return null;
@@ -679,7 +689,21 @@ async function buildCandidates(rows: RemoteCatMomentRow[]) {
   return candidates.filter((candidate): candidate is Candidate => Boolean(candidate));
 }
 
-async function resolvePhotoUrl(photoUrl: string) {
+async function resolvePhotoUrl(photoUrl: string, supabase: SupabaseClient) {
+  const storagePath = getStoragePhotoPath(photoUrl);
+
+  if (storagePath) {
+    const { data, error } = await supabase.storage
+      .from(CAT_PHOTOS_BUCKET)
+      .createSignedUrl(storagePath, 60 * 60 * 24 * 365);
+
+    if (error || !data?.signedUrl) {
+      return null;
+    }
+
+    return data.signedUrl;
+  }
+
   return photoUrl;
 }
 
