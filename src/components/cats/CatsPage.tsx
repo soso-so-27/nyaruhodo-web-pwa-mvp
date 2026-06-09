@@ -450,33 +450,35 @@ export function CatsPage() {
                   </button>
                   <div style={styles.profileHeroInfo}>
                     <div style={styles.profileName}>{activeCatProfile.name}</div>
-                    <p style={styles.profileSubtitle}>との記録</p>
                   </div>
                   <div style={styles.profileHeroActions}>
                     {shouldShowCatSwitchButton ? (
                       <button
                         type="button"
-                        style={styles.switchCatBtn}
+                        style={styles.iconActionBtn}
                         onClick={() => setIsCatSwitcherOpen(true)}
+                        aria-label="ほかのねこを見る"
                       >
-                        ほかのねこ
+                        <CatSwitchIcon />
                       </button>
                     ) : null}
                     {shouldShowSingleCatAdd ? (
                       <button
                         type="button"
-                        style={styles.switchCatBtn}
+                        style={styles.iconActionBtn}
                         onClick={startAddingCat}
+                        aria-label="ねこを追加"
                       >
-                        追加
+                        <AddSmallIcon />
                       </button>
                     ) : null}
                     <button
                       type="button"
-                      style={styles.editBtn}
+                      style={styles.iconActionBtn}
                       onClick={handleStartEdit}
+                      aria-label={`${activeCatProfile.name}を編集`}
                     >
-                      編集
+                      <PencilSmallIcon />
                     </button>
                   </div>
                 </div>
@@ -535,7 +537,7 @@ export function CatsPage() {
                 !activeCatProfile.appearance?.coat &&
                 !activeGender ? (
                   <p style={styles.emptyInfoText}>
-                    編集から誕生日などを追加できます。
+                    右上から誕生日などを追加できます。
                   </p>
                 ) : null}
               </>
@@ -718,6 +720,88 @@ function PageBackdrop() {
       <div style={styles.ambientHighlight} aria-hidden="true" />
       <div style={styles.backgroundVeil} aria-hidden="true" />
     </>
+  );
+}
+
+function CatSwitchIcon() {
+  return (
+    <svg
+      viewBox="0 0 28 24"
+      width="21"
+      height="21"
+      fill="none"
+      aria-hidden="true"
+      style={{ display: "block" }}
+    >
+      <path
+        d="M6.4 18.2c1.1-1.3 1.7-3.2 1.5-5.7-.1-1.6.8-2.8 2.2-3.1l.7-2.4 2 2.1c1 .3 1.8 1 2.4 2"
+        stroke="currentColor"
+        strokeWidth="1.55"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+      <path
+        d="M4.7 18.2h8.1M15.2 18.2c1.1-1.3 1.7-3.2 1.5-5.7-.1-1.6.8-2.8 2.2-3.1l.7-2.4 2 2.1c1.5.4 2.6 1.6 3.1 3.1"
+        stroke="currentColor"
+        strokeWidth="1.55"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+      <path
+        d="M13.7 5.5c1.2-1 2.7-1.4 4.1-1.1M18.1 3.1l1.6 1.6-1.8 1.4"
+        stroke="currentColor"
+        strokeWidth="1.35"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
+}
+
+function PencilSmallIcon() {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      width="19"
+      height="19"
+      fill="none"
+      aria-hidden="true"
+      style={{ display: "block" }}
+    >
+      <path
+        d="m5.4 16.9-.8 2.9 2.9-.8 9.7-9.7-2.1-2.1-9.7 9.7Z"
+        stroke="currentColor"
+        strokeWidth="1.75"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+      <path
+        d="m13.8 8.5 2.1 2.1"
+        stroke="currentColor"
+        strokeWidth="1.75"
+        strokeLinecap="round"
+      />
+    </svg>
+  );
+}
+
+function AddSmallIcon() {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      width="19"
+      height="19"
+      fill="none"
+      aria-hidden="true"
+      style={{ display: "block" }}
+    >
+      <path
+        d="M12 6.5v11M6.5 12h11"
+        stroke="currentColor"
+        strokeWidth="1.8"
+        strokeLinecap="round"
+      />
+    </svg>
   );
 }
 
@@ -1141,36 +1225,23 @@ const styles = {
     alignItems: "center",
     gap: "8px",
   },
-  profileSubtitle: {
-    margin: "4px 0 0",
-    color: CATS_FAINT,
-    fontSize: "11px",
-    fontWeight: 500,
-    lineHeight: 1.35,
-    letterSpacing: "0.04em",
-  },
   profileHeroActions: {
     display: "flex",
-    flexDirection: "column",
+    flexDirection: "row",
     alignItems: "flex-end",
-    gap: "6px",
+    gap: "7px",
   },
-  switchCatBtn: {
-    fontSize: "11px",
-    color: CATS_MUTED,
-    border: "1px solid rgba(120,108,94,0.10)",
-    background: "rgba(255,253,248,0.38)",
-    borderRadius: "999px",
-    padding: "5px 10px",
-    cursor: "pointer",
-  },
-  editBtn: {
-    fontSize: "11px",
+  iconActionBtn: {
+    width: "32px",
+    height: "32px",
     color: CATS_FAINT,
     border: "1px solid rgba(120,108,94,0.08)",
     background: "rgba(255,253,248,0.28)",
     borderRadius: "999px",
-    padding: "5px 10px",
+    padding: 0,
+    display: "inline-flex",
+    alignItems: "center",
+    justifyContent: "center",
     cursor: "pointer",
   },
   recordList: {
