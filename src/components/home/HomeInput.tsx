@@ -5606,7 +5606,7 @@ const styles = {
   },
   sleepingTopBar: {
     position: "fixed",
-    top: "calc(44px + env(safe-area-inset-top))",
+    top: "calc(32px + env(safe-area-inset-top))",
     left: "50%",
     transform: "translateX(-50%)",
     zIndex: 22,
