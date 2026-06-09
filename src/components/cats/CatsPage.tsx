@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import type { CSSProperties } from "react";
 import { storeAccountPhotoDataUrl } from "../../lib/photoStorageClient";
 import { STORAGE_KEYS } from "../../lib/storage";
+import { readOwnSleepingPhotos } from "../../lib/home/sleepingPhotos";
 import { BottomNavigation } from "../navigation/BottomNavigation";
 import { AppButton } from "../ui/AppButton";
 import { AppCard } from "../ui/AppCard";
@@ -82,6 +83,10 @@ export function CatsPage() {
   const activeGender = formatGender(activeCatProfile?.basicInfo?.gender);
   const activeAge = formatAge(activeCatProfile?.basicInfo?.birthDate);
   const activeMeta = [activeGender, activeAge].filter(Boolean).join("・");
+  const familyDays = formatFamilyDays(activeCatProfile?.createdAt);
+  const takenSleepingPhotoCount = activeCatId
+    ? readOwnSleepingPhotos(activeCatId).length
+    : 0;
   const activeAvatarSrc =
     activeCatProfile?.avatarDataUrl ??
     getCatAvatarSrc(activeCatProfile?.appearance?.coat);
@@ -319,69 +324,6 @@ export function CatsPage() {
     input.click();
   }
 
-  async function handleHomePhotoUpload() {
-    if (!activeCatId) {
-      return;
-    }
-
-    const targetCatId = activeCatId;
-    const input = document.createElement("input");
-
-    input.type = "file";
-    input.accept = "image/*";
-    input.onchange = async () => {
-      const file = input.files?.[0];
-
-      if (!file) {
-        return;
-      }
-
-      try {
-        const dataUrl = await resizeAndEncode(file, 1600);
-        const photoSrc = await storeAccountPhotoDataUrl({
-          dataUrl,
-          pathSegments: [targetCatId, "home"],
-          fileName: "home",
-        });
-        const raw = window.localStorage.getItem(STORAGE_KEYS.catProfiles);
-
-        if (!raw) {
-          return;
-        }
-
-        const profiles = JSON.parse(raw) as CatProfile[];
-        const index = profiles.findIndex((profile) => profile.id === targetCatId);
-
-        if (index === -1) {
-          return;
-        }
-
-        const nextProfiles = profiles.map((profile, profileIndex) =>
-          profileIndex === index
-            ? {
-                ...profile,
-                homePhotoDataUrl: photoSrc,
-                homePhotoPosition: profile.homePhotoPosition ?? "center 38%",
-                updatedAt: new Date().toISOString(),
-              }
-            : profile,
-        );
-
-        window.localStorage.setItem(
-          STORAGE_KEYS.catProfiles,
-          JSON.stringify(nextProfiles),
-        );
-        setCatProfiles(nextProfiles);
-        setSaveMessage("ホーム写真を保存しました。");
-        setTimeout(() => setSaveMessage(""), 2000);
-      } catch {
-        return;
-      }
-    };
-
-    input.click();
-  }
-
   const selectedCoat = activeCatProfile?.appearance?.coat;
 
   return (
@@ -551,12 +493,12 @@ export function CatsPage() {
                     />
                   </button>
                   <div style={styles.profileHeroInfo}>
-                    <p style={styles.profileKicker}>プロフィール</p>
+                    <p style={styles.profileKicker}>このねこ</p>
                     <div style={styles.profileName}>{activeCatProfile.name}</div>
                     {activeMeta ? (
                       <p style={styles.profileMeta}>{activeMeta}</p>
                     ) : (
-                      <p style={styles.profileMeta}>編集から基本情報を追加できます</p>
+                      <p style={styles.profileMeta}>編集から誕生日などを追加できます</p>
                     )}
                   </div>
                   <button
@@ -570,84 +512,56 @@ export function CatsPage() {
 
                 <hr style={styles.divider} />
 
-                <p style={styles.sectionTitle}>うちの背景</p>
-                <div style={styles.homePhotoSection}>
-                  <div style={styles.homePhotoPreview}>
-                    {activeCatProfile.homePhotoDataUrl ? (
-                      <StoredPhotoImage
-                        src={activeCatProfile.homePhotoDataUrl}
-                        alt=""
-                        style={styles.homePhotoPreviewImg}
-                      />
-                    ) : (
-                      <span style={styles.homePhotoPreviewText}>ホーム写真</span>
-                    )}
+                <p style={styles.sectionTitle}>{activeCatProfile.name}との記録</p>
+                <div style={styles.recordGrid}>
+                  <div style={styles.recordHeroItem}>
+                    <span style={styles.recordLabel}>家族になって</span>
+                    <span style={styles.recordValue}>{familyDays}</span>
                   </div>
-                  <div style={styles.homePhotoInfo}>
-                    <p style={styles.homePhotoTitle}>うちの背景</p>
-                    <p style={styles.homePhotoSub}>
-                      この子の暮らしが見える写真です。
-                    </p>
-                    <div style={styles.homePhotoActions}>
-                      <button
-                        type="button"
-                        onClick={() => void handleHomePhotoUpload()}
-                        style={styles.homePhotoButton}
-                      >
-                        写真を選ぶ
-                      </button>
-                    </div>
+                  <div style={styles.recordHeroItem}>
+                    <span style={styles.recordLabel}>とったねがお</span>
+                    <span style={styles.recordValue}>
+                      {takenSleepingPhotoCount}枚
+                    </span>
+                  </div>
+                  <div style={styles.recordSubItem}>
+                    <span style={styles.recordLabel}>誕生日</span>
+                    <span style={styles.recordSubValue}>
+                      {activeCatProfile.basicInfo?.birthDate
+                        ? formatBirthDate(activeCatProfile.basicInfo.birthDate)
+                        : "未設定"}
+                    </span>
+                  </div>
+                  <div style={styles.recordSubItem}>
+                    <span style={styles.recordLabel}>年齢</span>
+                    <span style={styles.recordSubValue}>
+                      {activeCatProfile.basicInfo?.birthDate
+                        ? formatAge(activeCatProfile.basicInfo.birthDate)
+                        : "未設定"}
+                    </span>
                   </div>
                 </div>
-
-                <hr style={styles.divider} />
-
-                <p style={styles.sectionTitle}>基本情報</p>
-                {activeCatProfile.basicInfo?.birthDate ? (
-                  <div style={styles.infoRow}>
-                    <span style={styles.infoLabel}>誕生日</span>
-                    <span style={styles.infoValue}>
-                      {formatBirthDate(activeCatProfile.basicInfo.birthDate)}
-                    </span>
-                  </div>
-                ) : null}
-                {activeCatProfile.basicInfo?.birthDate ? (
-                  <div style={styles.infoRow}>
-                    <span style={styles.infoLabel}>年齢</span>
-                    <span style={styles.infoValue}>
-                      {formatAge(activeCatProfile.basicInfo.birthDate)}
-                    </span>
-                  </div>
-                ) : null}
-                {activeCatProfile.basicInfo?.breed ? (
-                  <div style={styles.infoRow}>
-                    <span style={styles.infoLabel}>猫種</span>
-                    <span style={styles.infoValue}>
+                <div style={styles.profileNotes}>
+                  {activeGender ? (
+                    <span style={styles.profileNote}>{activeGender}</span>
+                  ) : null}
+                  {activeCatProfile.basicInfo?.breed ? (
+                    <span style={styles.profileNote}>
                       {activeCatProfile.basicInfo.breed}
                     </span>
-                  </div>
-                ) : null}
-                {activeCatProfile.appearance?.coat ? (
-                  <div style={styles.infoRow}>
-                    <span style={styles.infoLabel}>毛色</span>
-                    <div style={styles.coatRow}>
-                      <div
-                        style={{
-                          ...styles.coatDot,
-                          background: getCoatColor(activeCatProfile.appearance.coat),
-                        }}
-                      />
-                      <span style={styles.infoValue}>
-                        {getCoatLabel(activeCatProfile.appearance.coat)}
-                      </span>
-                    </div>
-                  </div>
-                ) : null}
+                  ) : null}
+                  {activeCatProfile.appearance?.coat ? (
+                    <span style={styles.profileNote}>
+                      {getCoatLabel(activeCatProfile.appearance.coat)}
+                    </span>
+                  ) : null}
+                </div>
                 {!activeCatProfile.basicInfo?.birthDate &&
                 !activeCatProfile.basicInfo?.breed &&
-                !activeCatProfile.appearance?.coat ? (
+                !activeCatProfile.appearance?.coat &&
+                !activeGender ? (
                   <p style={styles.emptyInfoText}>
-                    編集から基本情報を追加できます。
+                    編集から誕生日などを追加できます。
                   </p>
                 ) : null}
               </>
@@ -848,6 +762,35 @@ function formatBirthDate(birthDate: string): string {
   }
 
   return `${date.getFullYear()}年${date.getMonth() + 1}月${date.getDate()}日`;
+}
+
+function formatFamilyDays(createdAt?: string): string {
+  if (!createdAt) {
+    return "1日";
+  }
+
+  const created = new Date(createdAt);
+
+  if (Number.isNaN(created.getTime())) {
+    return "1日";
+  }
+
+  const today = new Date();
+  const createdDate = new Date(
+    created.getFullYear(),
+    created.getMonth(),
+    created.getDate(),
+  );
+  const todayDate = new Date(
+    today.getFullYear(),
+    today.getMonth(),
+    today.getDate(),
+  );
+  const elapsedDays = Math.floor(
+    (todayDate.getTime() - createdDate.getTime()) / 86_400_000,
+  );
+
+  return `${Math.max(1, elapsedDays + 1)}日`;
 }
 
 function formatAge(birthDate?: string): string {
@@ -1254,6 +1197,69 @@ const styles = {
     borderRadius: "999px",
     padding: "5px 10px",
     cursor: "pointer",
+  },
+  recordGrid: {
+    display: "grid",
+    gridTemplateColumns: "repeat(2, minmax(0, 1fr))",
+    gap: "9px",
+  },
+  recordHeroItem: {
+    minHeight: "82px",
+    borderRadius: "18px",
+    border: "1px solid rgba(120,108,94,0.10)",
+    background: "rgba(255,253,248,0.58)",
+    display: "grid",
+    alignContent: "center",
+    gap: "6px",
+    padding: "12px 12px",
+  },
+  recordSubItem: {
+    minHeight: "62px",
+    borderRadius: "15px",
+    border: "1px solid rgba(120,108,94,0.08)",
+    background: "rgba(255,253,248,0.34)",
+    display: "grid",
+    alignContent: "center",
+    gap: "5px",
+    padding: "10px 12px",
+  },
+  recordLabel: {
+    color: CATS_FAINT,
+    fontFamily: CATS_SERIF,
+    fontSize: "10.5px",
+    fontWeight: 400,
+    lineHeight: 1.35,
+    letterSpacing: "0.06em",
+  },
+  recordValue: {
+    color: CATS_TEXT_STRONG,
+    fontFamily: CATS_SERIF,
+    fontSize: "24px",
+    fontWeight: 500,
+    lineHeight: 1.15,
+    letterSpacing: "0.04em",
+  },
+  recordSubValue: {
+    color: CATS_MUTED,
+    fontSize: "12.5px",
+    fontWeight: 560,
+    lineHeight: 1.35,
+  },
+  profileNotes: {
+    display: "flex",
+    flexWrap: "wrap",
+    gap: "7px",
+    marginTop: "10px",
+  },
+  profileNote: {
+    border: "1px solid rgba(120,108,94,0.10)",
+    borderRadius: "999px",
+    background: "rgba(255,253,248,0.32)",
+    color: CATS_MUTED,
+    fontSize: "11px",
+    fontWeight: 500,
+    lineHeight: 1,
+    padding: "6px 9px",
   },
   homePhotoSection: {
     display: "flex",

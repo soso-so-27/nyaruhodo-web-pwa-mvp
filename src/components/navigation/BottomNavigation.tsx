@@ -45,7 +45,11 @@ export function BottomNavigation({ active }: BottomNavigationProps) {
       key: "cats",
       href: "/cats",
       label: "ねこ",
-      icon: <span style={styles.catImageIcon} />,
+      icon: (
+        <span style={styles.recordIcon}>
+          <span style={styles.recordIconDot} />
+        </span>
+      ),
     },
   ];
   const displayActiveKey = pendingKey ?? activeKey;
@@ -228,20 +232,23 @@ const styles = {
     width: "21px",
     height: "21px",
   },
-  catImageIcon: {
+  recordIcon: {
     width: "21px",
     height: "21px",
-    display: "block",
-    backgroundColor: "currentColor",
-    maskImage: "url('/icons/cat-tab-mask.png')",
-    maskPosition: "center",
-    maskRepeat: "no-repeat",
-    maskSize: "contain",
-    WebkitMaskImage: "url('/icons/cat-tab-mask.png')",
-    WebkitMaskPosition: "center",
-    WebkitMaskRepeat: "no-repeat",
-    WebkitMaskSize: "contain",
+    display: "inline-flex",
+    alignItems: "center",
+    justifyContent: "center",
+    position: "relative",
+    boxSizing: "border-box",
+    border: "2px solid currentColor",
+    borderRadius: "6px",
     transform: "translateY(0.5px)",
+  },
+  recordIconDot: {
+    width: "5px",
+    height: "5px",
+    borderRadius: "50%",
+    background: "currentColor",
   },
   navLabel: {
     color: "currentColor",
