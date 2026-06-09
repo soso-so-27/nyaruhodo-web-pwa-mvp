@@ -61,6 +61,18 @@ export type OwnSleepingPhoto = CatMoment & {
   createdAt: number;
 };
 
+export const CAT_SLEEPING_MILESTONE_TARGETS = [1, 10, 50, 100] as const;
+
+export type CatSleepingMilestoneTarget =
+  (typeof CAT_SLEEPING_MILESTONE_TARGETS)[number];
+
+export type CatSleepingMilestone = {
+  target: CatSleepingMilestoneTarget;
+  photoId: string;
+  src: string;
+  reachedAt: number;
+};
+
 export type HiddenExchangePhotoReason = "hide" | "report";
 
 export type DeliverableSleepingPhotoInput = {
@@ -99,6 +111,9 @@ const REPORTED_EXCHANGE_PHOTO_STORAGE_KEY =
   "nyaruhodo_exchange_reported_photos";
 const OWN_SLEEPING_PHOTO_STORAGE_KEY =
   "nyaruhodo_exchange_own_sleeping_photos";
+const CAT_SLEEPING_STATS_STORAGE_KEY = "neteruneko_cat_sleeping_stats";
+const CAT_SLEEPING_MILESTONES_STORAGE_KEY =
+  "neteruneko_cat_sleeping_milestones";
 
 export function readOwnSleepingPhotos(activeCatId: string | null = null) {
   const photos = readStorageArray<OwnSleepingPhoto>(OWN_SLEEPING_PHOTO_STORAGE_KEY)
@@ -117,9 +132,62 @@ export function readOwnSleepingPhotoCount(activeCatId: string | null) {
     .filter(isValidOwnSleepingPhoto)
     .map(normalizeOwnSleepingPhoto);
 
-  return activeCatId
-    ? photos.filter((photo) => photo.ownerCatId === activeCatId).length
-    : photos.length;
+  if (activeCatId) {
+    return getOwnSleepingPhotoCountForCat(activeCatId, photos);
+  }
+
+  const stats = readCatSleepingStats();
+  const statTotal = Object.values(stats).reduce(
+    (total, stat) => total + Math.max(0, stat.takenCount ?? 0),
+    0,
+  );
+
+  return Math.max(statTotal, photos.length);
+}
+
+export function readCatSleepingMilestones(
+  activeCatId: string | null,
+): CatSleepingMilestone[] {
+  if (!activeCatId) {
+    return createEmptyCatSleepingMilestones();
+  }
+
+  const stored = readCatSleepingMilestoneStore()[activeCatId] ?? [];
+  const byTarget = new Map<CatSleepingMilestoneTarget, CatSleepingMilestone>();
+
+  for (const milestone of stored) {
+    if (isValidCatSleepingMilestone(milestone)) {
+      byTarget.set(milestone.target, milestone);
+    }
+  }
+
+  const photos = readStorageArray<OwnSleepingPhoto>(OWN_SLEEPING_PHOTO_STORAGE_KEY)
+    .filter(isValidOwnSleepingPhoto)
+    .map(normalizeOwnSleepingPhoto)
+    .filter((photo) => photo.ownerCatId === activeCatId)
+    .sort((a, b) => a.createdAt - b.createdAt);
+
+  for (const target of CAT_SLEEPING_MILESTONE_TARGETS) {
+    if (byTarget.has(target)) {
+      continue;
+    }
+
+    const photo = photos[target - 1];
+
+    if (photo) {
+      byTarget.set(target, createCatSleepingMilestone(target, photo));
+    }
+  }
+
+  return CAT_SLEEPING_MILESTONE_TARGETS.map(
+    (target) =>
+      byTarget.get(target) ?? {
+        target,
+        photoId: "",
+        src: "",
+        reachedAt: 0,
+      },
+  );
 }
 
 export function restoreSyncedSleepingPhotos({
@@ -166,6 +234,108 @@ export function restoreSyncedSleepingPhotos({
 
 function getValidOwnSleepingPhotoCount(photos: OwnSleepingPhoto[]) {
   return photos.filter(isValidOwnSleepingPhoto).length;
+}
+
+type CatSleepingStatsStore = Record<string, { takenCount: number }>;
+type CatSleepingMilestoneStore = Record<string, CatSleepingMilestone[]>;
+
+function getOwnSleepingPhotoCountForCat(
+  activeCatId: string,
+  photos: OwnSleepingPhoto[],
+) {
+  const storedCount =
+    readCatSleepingStats()[activeCatId]?.takenCount ?? 0;
+  const visibleCount = photos.filter(
+    (photo) => photo.ownerCatId === activeCatId,
+  ).length;
+
+  return Math.max(storedCount, visibleCount);
+}
+
+function recordOwnSleepingPhotoTaken(
+  photo: OwnSleepingPhoto,
+  nextTakenCount: number,
+) {
+  const catId = photo.ownerCatId;
+  const stats = readCatSleepingStats();
+  const currentCount = stats[catId]?.takenCount ?? 0;
+  const savedCount = Math.max(currentCount, nextTakenCount);
+
+  writeStorageValue(CAT_SLEEPING_STATS_STORAGE_KEY, {
+    ...stats,
+    [catId]: { takenCount: savedCount },
+  });
+
+  if (!isCatSleepingMilestoneTarget(savedCount)) {
+    return;
+  }
+
+  const milestoneStore = readCatSleepingMilestoneStore();
+  const milestones = milestoneStore[catId] ?? [];
+
+  if (milestones.some((milestone) => milestone.target === savedCount)) {
+    return;
+  }
+
+  writeStorageValue(CAT_SLEEPING_MILESTONES_STORAGE_KEY, {
+    ...milestoneStore,
+    [catId]: [
+      ...milestones,
+      createCatSleepingMilestone(savedCount, photo),
+    ].sort((a, b) => a.target - b.target),
+  });
+}
+
+function createCatSleepingMilestone(
+  target: CatSleepingMilestoneTarget,
+  photo: OwnSleepingPhoto,
+): CatSleepingMilestone {
+  return {
+    target,
+    photoId: photo.id,
+    src: normalizePersistentPhotoSrc(photo.src) || photo.src,
+    reachedAt: photo.createdAt,
+  };
+}
+
+function createEmptyCatSleepingMilestones() {
+  return CAT_SLEEPING_MILESTONE_TARGETS.map((target) => ({
+    target,
+    photoId: "",
+    src: "",
+    reachedAt: 0,
+  }));
+}
+
+function readCatSleepingStats(): CatSleepingStatsStore {
+  return readStorageObject<CatSleepingStatsStore>(
+    CAT_SLEEPING_STATS_STORAGE_KEY,
+  );
+}
+
+function readCatSleepingMilestoneStore(): CatSleepingMilestoneStore {
+  return readStorageObject<CatSleepingMilestoneStore>(
+    CAT_SLEEPING_MILESTONES_STORAGE_KEY,
+  );
+}
+
+function isCatSleepingMilestoneTarget(
+  value: number,
+): value is CatSleepingMilestoneTarget {
+  return CAT_SLEEPING_MILESTONE_TARGETS.some((target) => target === value);
+}
+
+function isValidCatSleepingMilestone(
+  milestone: Partial<CatSleepingMilestone>,
+): milestone is CatSleepingMilestone {
+  return Boolean(
+    isCatSleepingMilestoneTarget(milestone.target ?? 0) &&
+      typeof milestone.photoId === "string" &&
+      typeof milestone.src === "string" &&
+      isUsablePhotoSrc(milestone.src) &&
+      typeof milestone.reachedAt === "number" &&
+      Number.isFinite(milestone.reachedAt),
+  );
 }
 
 export function writeOwnSleepingPhotosWithFallback(
@@ -264,6 +434,7 @@ export function saveOwnSleepingPhoto({
     const saved = readStorageArray<OwnSleepingPhoto>(OWN_SLEEPING_PHOTO_STORAGE_KEY)
       .filter(isValidOwnSleepingPhoto)
       .map(normalizeOwnSleepingPhoto);
+    const previousTakenCount = getOwnSleepingPhotoCountForCat(catId, saved);
     const createdAt = Date.now();
     const ownPhoto: OwnSleepingPhoto = {
       id: createOwnSleepingPhotoId(createdAt),
@@ -288,6 +459,7 @@ export function saveOwnSleepingPhoto({
     );
 
     if (savedPhotos.some((photo) => photo.id === normalizedOwnPhoto.id)) {
+      recordOwnSleepingPhotoTaken(normalizedOwnPhoto, previousTakenCount + 1);
       dispatchBoxPhotoStorageEvent();
         return normalizedOwnPhoto;
     }
@@ -681,7 +853,28 @@ function readStorageArray<T>(key: string) {
   }
 }
 
+function readStorageObject<T extends Record<string, unknown>>(key: string): T {
+  if (typeof window === "undefined") {
+    return {} as T;
+  }
+
+  try {
+    const raw = window.localStorage.getItem(key);
+    const parsed = raw ? (JSON.parse(raw) as unknown) : {};
+
+    return parsed && typeof parsed === "object" && !Array.isArray(parsed)
+      ? (parsed as T)
+      : ({} as T);
+  } catch {
+    return {} as T;
+  }
+}
+
 function writeStorageArray<T>(key: string, value: T[]) {
+  window.localStorage.setItem(key, JSON.stringify(value));
+}
+
+function writeStorageValue<T>(key: string, value: T) {
   window.localStorage.setItem(key, JSON.stringify(value));
 }
 

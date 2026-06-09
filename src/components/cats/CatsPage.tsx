@@ -4,7 +4,11 @@ import { useEffect, useState } from "react";
 import type { CSSProperties } from "react";
 import { storeAccountPhotoDataUrl } from "../../lib/photoStorageClient";
 import { STORAGE_KEYS } from "../../lib/storage";
-import { readOwnSleepingPhotoCount } from "../../lib/home/sleepingPhotos";
+import {
+  readCatSleepingMilestones,
+  readOwnSleepingPhotoCount,
+  type CatSleepingMilestone,
+} from "../../lib/home/sleepingPhotos";
 import { BottomNavigation } from "../navigation/BottomNavigation";
 import { AppButton } from "../ui/AppButton";
 import { AppBottomSheet } from "../ui/AppBottomSheet";
@@ -91,6 +95,7 @@ export function CatsPage() {
   const takenSleepingPhotoCount = activeCatId
     ? readOwnSleepingPhotoCount(activeCatId)
     : 0;
+  const sleepingMilestones = readCatSleepingMilestones(activeCatId);
   const activeAvatarSrc =
     activeCatProfile?.avatarDataUrl ??
     getCatAvatarSrc(activeCatProfile?.appearance?.coat);
@@ -524,6 +529,17 @@ export function CatsPage() {
                     </span>
                   </div>
                 </div>
+                <div style={styles.footprintsSection}>
+                  <p style={styles.footprintsTitle}>あしあと</p>
+                  <div style={styles.footprintsGrid}>
+                    {sleepingMilestones.map((milestone) => (
+                      <FootprintCard
+                        key={milestone.target}
+                        milestone={milestone}
+                      />
+                    ))}
+                  </div>
+                </div>
                 <div style={styles.profileNotes}>
                   {activeGender ? (
                     <span style={styles.profileNote}>{activeGender}</span>
@@ -723,6 +739,60 @@ function PageBackdrop() {
       <div style={styles.backgroundVeil} aria-hidden="true" />
     </>
   );
+}
+
+function FootprintCard({ milestone }: { milestone: CatSleepingMilestone }) {
+  const isReached = Boolean(milestone.src && milestone.reachedAt);
+
+  return (
+    <div style={isReached ? styles.footprintCard : styles.footprintCardEmpty}>
+      <div style={styles.footprintHeader}>
+        <span style={styles.footprintMark}>あしあと</span>
+        <span style={styles.footprintName}>
+          {getFootprintMilestoneTitle(milestone.target)}
+        </span>
+      </div>
+      {isReached ? (
+        <>
+          <StoredPhotoImage
+            src={milestone.src}
+            alt=""
+            style={styles.footprintPhoto}
+          />
+          <span style={styles.footprintDate}>
+            {formatFootprintDate(milestone.reachedAt)}
+          </span>
+        </>
+      ) : (
+        <div style={styles.footprintPlaceholder} aria-hidden="true" />
+      )}
+    </div>
+  );
+}
+
+function getFootprintMilestoneTitle(target: CatSleepingMilestone["target"]) {
+  if (target === 1) {
+    return "はじめてとった";
+  }
+
+  return `${target}枚目`;
+}
+
+function formatFootprintDate(timestamp: number) {
+  if (!timestamp) {
+    return "";
+  }
+
+  const date = new Date(timestamp);
+
+  if (Number.isNaN(date.getTime())) {
+    return "";
+  }
+
+  return `${date.getFullYear()}/${String(date.getMonth() + 1).padStart(
+    2,
+    "0",
+  )}/${String(date.getDate()).padStart(2, "0")}`;
 }
 
 function CatSwitchIcon() {
@@ -1261,6 +1331,82 @@ const styles = {
     lineHeight: 1.35,
     textAlign: "right",
     letterSpacing: 0,
+  },
+  footprintsSection: {
+    marginTop: "13px",
+  },
+  footprintsTitle: {
+    margin: "0 0 8px",
+    color: CATS_FAINT,
+    fontFamily: CATS_SERIF,
+    fontSize: "11px",
+    fontWeight: 400,
+    lineHeight: 1.35,
+    letterSpacing: "0.07em",
+  },
+  footprintsGrid: {
+    display: "grid",
+    gridTemplateColumns: "repeat(2, minmax(0, 1fr))",
+    gap: "9px",
+  },
+  footprintCard: {
+    minHeight: "118px",
+    border: "1px solid rgba(120,108,94,0.09)",
+    borderRadius: "17px",
+    background: "rgba(255,253,248,0.38)",
+    padding: "9px",
+    display: "grid",
+    gap: "7px",
+  },
+  footprintCardEmpty: {
+    minHeight: "118px",
+    border: "1px dashed rgba(120,108,94,0.12)",
+    borderRadius: "17px",
+    background: "rgba(255,253,248,0.20)",
+    padding: "9px",
+    display: "grid",
+    gap: "7px",
+  },
+  footprintHeader: {
+    display: "grid",
+    gap: "3px",
+  },
+  footprintMark: {
+    color: CATS_FAINT,
+    fontSize: "9.5px",
+    fontWeight: 500,
+    lineHeight: 1,
+  },
+  footprintName: {
+    color: CATS_TEXT,
+    fontFamily: CATS_SERIF,
+    fontSize: "12px",
+    fontWeight: 500,
+    lineHeight: 1.35,
+    letterSpacing: "0.04em",
+  },
+  footprintPhoto: {
+    width: "100%",
+    aspectRatio: "1 / 1",
+    minHeight: "64px",
+    borderRadius: "13px",
+    objectFit: "cover",
+    background: "rgba(255,253,248,0.56)",
+  },
+  footprintDate: {
+    color: CATS_MUTED,
+    fontSize: "10.5px",
+    fontWeight: 500,
+    lineHeight: 1,
+  },
+  footprintPlaceholder: {
+    width: "100%",
+    aspectRatio: "1 / 1",
+    minHeight: "64px",
+    borderRadius: "13px",
+    border: "1px solid rgba(120,108,94,0.08)",
+    background:
+      "linear-gradient(135deg, rgba(255,253,248,0.22), rgba(247,241,231,0.28))",
   },
   profileNotes: {
     display: "flex",
