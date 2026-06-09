@@ -88,7 +88,6 @@ export function CatsPage() {
       : null;
   const catName = getCatName(activeCatProfile);
   const activeGender = formatGender(activeCatProfile?.basicInfo?.gender);
-  const activeAge = formatAge(activeCatProfile?.basicInfo?.birthDate);
   const familyDays = formatFamilyDays(
     activeCatProfile?.basicInfo?.familySinceDate,
   );
@@ -529,23 +528,9 @@ export function CatsPage() {
                     </span>
                   </div>
                 </div>
-                <div style={styles.footprintsSection}>
-                  <p style={styles.footprintsTitle}>あしあと</p>
-                  <div style={styles.footprintsGrid}>
-                    {sleepingMilestones.map((milestone) => (
-                      <FootprintCard
-                        key={milestone.target}
-                        milestone={milestone}
-                      />
-                    ))}
-                  </div>
-                </div>
                 <div style={styles.profileNotes}>
                   {activeGender ? (
                     <span style={styles.profileNote}>{activeGender}</span>
-                  ) : null}
-                  {activeAge ? (
-                    <span style={styles.profileNote}>{activeAge}</span>
                   ) : null}
                   {activeCatProfile.basicInfo?.breed ? (
                     <span style={styles.profileNote}>
@@ -557,6 +542,17 @@ export function CatsPage() {
                       {getCoatLabel(activeCatProfile.appearance.coat)}
                     </span>
                   ) : null}
+                </div>
+                <div style={styles.footprintsSection}>
+                  <p style={styles.footprintsTitle}>あしあと</p>
+                  <div style={styles.footprintsScroller}>
+                    {sleepingMilestones.map((milestone) => (
+                      <FootprintCard
+                        key={milestone.target}
+                        milestone={milestone}
+                      />
+                    ))}
+                  </div>
                 </div>
                 {!activeCatProfile.basicInfo?.familySinceDate &&
                 !activeCatProfile.basicInfo?.birthDate &&
@@ -1334,6 +1330,7 @@ const styles = {
   },
   footprintsSection: {
     marginTop: "13px",
+    marginRight: "-16px",
   },
   footprintsTitle: {
     margin: "0 0 8px",
@@ -1344,28 +1341,37 @@ const styles = {
     lineHeight: 1.35,
     letterSpacing: "0.07em",
   },
-  footprintsGrid: {
-    display: "grid",
-    gridTemplateColumns: "repeat(2, minmax(0, 1fr))",
+  footprintsScroller: {
+    display: "flex",
     gap: "9px",
+    overflowX: "auto",
+    padding: "0 16px 2px 0",
+    scrollSnapType: "x proximity",
+    scrollbarWidth: "none",
   },
   footprintCard: {
-    minHeight: "118px",
+    width: "132px",
+    minHeight: "128px",
     border: "1px solid rgba(120,108,94,0.09)",
     borderRadius: "17px",
     background: "rgba(255,253,248,0.38)",
     padding: "9px",
     display: "grid",
     gap: "7px",
+    flex: "0 0 auto",
+    scrollSnapAlign: "start",
   },
   footprintCardEmpty: {
-    minHeight: "118px",
+    width: "132px",
+    minHeight: "128px",
     border: "1px dashed rgba(120,108,94,0.12)",
     borderRadius: "17px",
     background: "rgba(255,253,248,0.20)",
     padding: "9px",
     display: "grid",
     gap: "7px",
+    flex: "0 0 auto",
+    scrollSnapAlign: "start",
   },
   footprintHeader: {
     display: "grid",
