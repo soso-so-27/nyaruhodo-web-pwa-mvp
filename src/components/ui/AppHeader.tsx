@@ -53,12 +53,12 @@ const styles = {
     display: "flex",
     alignItems: "center",
     justifyContent: "center",
-    minHeight: 34,
+    minHeight: 40,
     paddingTop: `calc(${spacing.sm}px + env(safe-area-inset-top))`,
     boxSizing: "border-box",
   },
   pageTitleHeader: {
-    minHeight: 42,
+    minHeight: 40,
   },
   wordmark: {
     margin: 0,
@@ -71,12 +71,12 @@ const styles = {
   },
   pageTitle: {
     margin: 0,
-    color: color.textStrong,
+    color: color.textMuted,
     fontFamily: typography.fontSerif,
-    fontSize: typography.title.fontSize,
-    fontWeight: typography.title.fontWeight,
-    lineHeight: typography.title.lineHeight,
-    letterSpacing: "0.12em",
+    fontSize: typography.brand.fontSize,
+    fontWeight: typography.brand.fontWeight,
+    lineHeight: typography.brand.lineHeight,
+    letterSpacing: typography.brand.letterSpacing,
   },
   right: {
     position: "absolute",

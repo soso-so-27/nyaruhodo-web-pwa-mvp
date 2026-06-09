@@ -2472,8 +2472,8 @@ const styles = {
       "calc(18px + env(safe-area-inset-top)) 24px calc(168px + env(safe-area-inset-bottom))",
   },
   header: {
-    marginBottom: "28px",
-    padding: "2px 0 0",
+    marginBottom: "24px",
+    paddingTop: "2px",
   },
   pageHeader: {
     display: "flex",

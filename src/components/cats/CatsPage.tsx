@@ -743,7 +743,6 @@ function FootprintCard({ milestone }: { milestone: CatSleepingMilestone }) {
   return (
     <div style={isReached ? styles.footprintCard : styles.footprintCardEmpty}>
       <div style={styles.footprintHeader}>
-        <span style={styles.footprintMark}>あしあと</span>
         <span style={styles.footprintName}>
           {getFootprintMilestoneTitle(milestone.target)}
         </span>
@@ -768,7 +767,7 @@ function FootprintCard({ milestone }: { milestone: CatSleepingMilestone }) {
 
 function getFootprintMilestoneTitle(target: CatSleepingMilestone["target"]) {
   if (target === 1) {
-    return "はじめてとった";
+    return "はじめてのねがお";
   }
 
   return `${target}枚目`;
@@ -1313,17 +1312,17 @@ const styles = {
     borderBottom: "none",
   },
   recordLabel: {
-    color: CATS_FAINT,
+    color: CATS_MUTED,
     fontFamily: CATS_SERIF,
-    fontSize: "11px",
-    fontWeight: 400,
+    fontSize: "11.5px",
+    fontWeight: 500,
     lineHeight: 1.35,
-    letterSpacing: "0.06em",
+    letterSpacing: "0.04em",
   },
   recordMetricValue: {
-    color: CATS_TEXT,
+    color: CATS_MUTED,
     fontSize: "14px",
-    fontWeight: 560,
+    fontWeight: 520,
     lineHeight: 1.35,
     textAlign: "right",
     letterSpacing: 0,
@@ -1376,12 +1375,6 @@ const styles = {
   footprintHeader: {
     display: "grid",
     gap: "3px",
-  },
-  footprintMark: {
-    color: CATS_FAINT,
-    fontSize: "9.5px",
-    fontWeight: 500,
-    lineHeight: 1,
   },
   footprintName: {
     color: CATS_TEXT,
