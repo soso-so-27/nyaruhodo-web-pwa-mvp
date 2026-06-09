@@ -59,6 +59,7 @@ export type CatProfile = {
 };
 
 export type CatBasicInfo = {
+  familySinceDate?: string;
   birthDate?: string;
   gender?: "male" | "female" | "unknown";
   breed?: string;
@@ -654,6 +655,7 @@ function hasUserProfileDetails(profile: CatProfile) {
   return Boolean(
     profile.avatarDataUrl ||
       profile.homePhotoDataUrl ||
+      profile.basicInfo?.familySinceDate ||
       profile.basicInfo?.birthDate ||
       profile.basicInfo?.gender ||
       profile.basicInfo?.breed?.trim() ||
@@ -986,12 +988,16 @@ function normalizeCatBasicInfo(
     ? basicInfo.gender
     : undefined;
   const nextBasicInfo: CatBasicInfo = {
+    familySinceDate: basicInfo.familySinceDate || undefined,
     birthDate: basicInfo.birthDate || undefined,
     gender,
     breed: basicInfo.breed || undefined,
   };
 
-  return nextBasicInfo.birthDate || nextBasicInfo.gender || nextBasicInfo.breed
+  return nextBasicInfo.familySinceDate ||
+    nextBasicInfo.birthDate ||
+    nextBasicInfo.gender ||
+    nextBasicInfo.breed
     ? nextBasicInfo
     : undefined;
 }

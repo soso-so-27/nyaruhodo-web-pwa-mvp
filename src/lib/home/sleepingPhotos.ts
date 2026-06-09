@@ -113,7 +113,13 @@ export function readOwnSleepingPhotos(activeCatId: string | null = null) {
 }
 
 export function readOwnSleepingPhotoCount(activeCatId: string | null) {
-  return readOwnSleepingPhotos(activeCatId).length;
+  const photos = readStorageArray<OwnSleepingPhoto>(OWN_SLEEPING_PHOTO_STORAGE_KEY)
+    .filter(isValidOwnSleepingPhoto)
+    .map(normalizeOwnSleepingPhoto);
+
+  return activeCatId
+    ? photos.filter((photo) => photo.ownerCatId === activeCatId).length
+    : photos.length;
 }
 
 export function restoreSyncedSleepingPhotos({

@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import type { CSSProperties } from "react";
 import { storeAccountPhotoDataUrl } from "../../lib/photoStorageClient";
 import { STORAGE_KEYS } from "../../lib/storage";
-import { readOwnSleepingPhotos } from "../../lib/home/sleepingPhotos";
+import { readOwnSleepingPhotoCount } from "../../lib/home/sleepingPhotos";
 import { BottomNavigation } from "../navigation/BottomNavigation";
 import { AppButton } from "../ui/AppButton";
 import { AppCard } from "../ui/AppCard";
@@ -68,6 +68,7 @@ export function CatsPage() {
     useState(false);
   const [isOnboardingExistingCat, setIsOnboardingExistingCat] = useState(false);
   const [isOnboardingAlbumCreated, setIsOnboardingAlbumCreated] = useState(false);
+  const [editFamilySinceDate, setEditFamilySinceDate] = useState("");
   const [editBirthDate, setEditBirthDate] = useState("");
   const [editGender, setEditGender] = useState<EditableGender>("");
   const [editBreed, setEditBreed] = useState("");
@@ -83,9 +84,11 @@ export function CatsPage() {
   const activeGender = formatGender(activeCatProfile?.basicInfo?.gender);
   const activeAge = formatAge(activeCatProfile?.basicInfo?.birthDate);
   const activeMeta = [activeGender, activeAge].filter(Boolean).join("・");
-  const familyDays = formatFamilyDays(activeCatProfile?.createdAt);
+  const familyDays = formatFamilyDays(
+    activeCatProfile?.basicInfo?.familySinceDate,
+  );
   const takenSleepingPhotoCount = activeCatId
-    ? readOwnSleepingPhotos(activeCatId).length
+    ? readOwnSleepingPhotoCount(activeCatId)
     : 0;
   const activeAvatarSrc =
     activeCatProfile?.avatarDataUrl ??
@@ -93,6 +96,10 @@ export function CatsPage() {
   const isOnboardingProfileSetup = isOnboardingMode && isEditingProfile;
   const isOnboardingCompletionView =
     isOnboardingMode && isOnboardingCompletionReady && !isEditingProfile;
+  const shouldShowCatSwitcher =
+    catProfiles.length > 1 && !isOnboardingProfileSetup && !isOnboardingCompletionView;
+  const shouldShowSingleCatAdd =
+    catProfiles.length === 1 && !isOnboardingProfileSetup && !isOnboardingCompletionView;
 
   useEffect(() => {
     const requestedOnboardingMode =
@@ -190,6 +197,7 @@ export function CatsPage() {
 
   function handleStartEdit() {
     setCatNameInput(activeCatProfile?.name ?? catName);
+    setEditFamilySinceDate(activeCatProfile?.basicInfo?.familySinceDate ?? "");
     setEditBirthDate(activeCatProfile?.basicInfo?.birthDate ?? "");
     setEditGender(activeCatProfile?.basicInfo?.gender ?? "");
     setEditBreed(activeCatProfile?.basicInfo?.breed ?? "");
@@ -228,6 +236,7 @@ export function CatsPage() {
         ...profiles[index],
         name: catNameInput.trim() || profiles[index].name,
         basicInfo: {
+          familySinceDate: editFamilySinceDate || undefined,
           birthDate: editBirthDate || undefined,
           gender: editGender || undefined,
           breed: editBreed.trim() || undefined,
@@ -378,7 +387,7 @@ export function CatsPage() {
           </AppCard>
         ) : null}
 
-        {!isOnboardingProfileSetup && !isOnboardingCompletionView ? (
+        {shouldShowCatSwitcher ? (
           <div style={styles.catGrid}>
             {catProfiles.map((profile) => {
               const isActive = profile.id === activeCatId;
@@ -429,6 +438,14 @@ export function CatsPage() {
                 <span style={styles.catAvatarAddMark}>＋</span>
               </div>
               <span style={{ ...styles.catGridName, color: CATS_MUTED }}>追加</span>
+            </button>
+          </div>
+        ) : null}
+
+        {shouldShowSingleCatAdd ? (
+          <div style={styles.singleCatAddRow}>
+            <button type="button" style={styles.singleCatAddButton} onClick={startAddingCat}>
+              追加
             </button>
           </div>
         ) : null}
@@ -553,7 +570,8 @@ export function CatsPage() {
                     </span>
                   ) : null}
                 </div>
-                {!activeCatProfile.basicInfo?.birthDate &&
+                {!activeCatProfile.basicInfo?.familySinceDate &&
+                !activeCatProfile.basicInfo?.birthDate &&
                 !activeCatProfile.basicInfo?.breed &&
                 !activeCatProfile.appearance?.coat &&
                 !activeGender ? (
@@ -582,6 +600,17 @@ export function CatsPage() {
                     />
                     {!isOnboardingProfileSetup ? (
                       <>
+                        <p style={styles.editLabel}>家に来た日</p>
+                        <input
+                          type="date"
+                          value={editFamilySinceDate}
+                          onChange={(event) =>
+                            setEditFamilySinceDate(event.target.value)
+                          }
+                          max={new Date().toISOString().split("T")[0]}
+                          style={styles.editInput}
+                        />
+
                         <p style={styles.editLabel}>生年月日</p>
                         <input
                           type="date"
@@ -749,23 +778,14 @@ function formatBirthDate(birthDate: string): string {
   return `${date.getFullYear()}年${date.getMonth() + 1}月${date.getDate()}日`;
 }
 
-function formatFamilyDays(createdAt?: string): string {
-  if (!createdAt) {
-    return "1日";
-  }
+function formatFamilyDays(familySinceDate?: string): string {
+  const createdDate = parseLocalDate(familySinceDate);
 
-  const created = new Date(createdAt);
-
-  if (Number.isNaN(created.getTime())) {
-    return "1日";
+  if (!createdDate) {
+    return "未設定";
   }
 
   const today = new Date();
-  const createdDate = new Date(
-    created.getFullYear(),
-    created.getMonth(),
-    created.getDate(),
-  );
   const todayDate = new Date(
     today.getFullYear(),
     today.getMonth(),
@@ -776,6 +796,31 @@ function formatFamilyDays(createdAt?: string): string {
   );
 
   return `${Math.max(1, elapsedDays + 1)}日`;
+}
+
+function parseLocalDate(value?: string): Date | null {
+  if (!value) {
+    return null;
+  }
+
+  const [year, month, day] = value.split("-").map(Number);
+
+  if (!year || !month || !day) {
+    return null;
+  }
+
+  const date = new Date(year, month - 1, day);
+
+  if (
+    Number.isNaN(date.getTime()) ||
+    date.getFullYear() !== year ||
+    date.getMonth() !== month - 1 ||
+    date.getDate() !== day
+  ) {
+    return null;
+  }
+
+  return date;
 }
 
 function formatAge(birthDate?: string): string {
@@ -1102,6 +1147,20 @@ const styles = {
     color: CATS_MUTED,
     fontWeight: 500,
   },
+  singleCatAddRow: {
+    display: "flex",
+    justifyContent: "flex-end",
+    margin: "-4px 2px 8px",
+  },
+  singleCatAddButton: {
+    border: "none",
+    background: "transparent",
+    color: CATS_FAINT,
+    fontSize: "11px",
+    fontWeight: 500,
+    padding: "5px 8px",
+    cursor: "pointer",
+  },
   profileCard: {
     ...CATS_SURFACE,
     borderRadius: "21px",
@@ -1150,7 +1209,7 @@ const styles = {
   },
   profileName: {
     fontFamily: CATS_SERIF,
-    fontSize: "23px",
+    fontSize: "21px",
     fontWeight: 500,
     color: CATS_TEXT_STRONG,
     display: "flex",
@@ -1172,7 +1231,7 @@ const styles = {
     gap: "10px",
   },
   recordHeroItem: {
-    minHeight: "84px",
+    minHeight: "82px",
     borderRadius: "18px",
     border: "1px solid rgba(120,108,94,0.10)",
     background: "rgba(255,253,248,0.58)",
@@ -1202,7 +1261,7 @@ const styles = {
   recordValue: {
     color: CATS_TEXT_STRONG,
     fontFamily: CATS_SERIF,
-    fontSize: "21px",
+    fontSize: "19px",
     fontWeight: 500,
     lineHeight: 1.15,
     letterSpacing: "0.04em",
