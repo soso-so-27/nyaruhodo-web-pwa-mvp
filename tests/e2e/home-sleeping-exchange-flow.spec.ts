@@ -78,7 +78,7 @@ test.describe("home sleeping exchange flow", () => {
     });
 
     await expect(page.locator("section").last().locator("img")).toBeVisible();
-    await page.locator("section").last().locator("button").last().click();
+    await page.getByRole("button", { name: "とっておく" }).click();
 
     await expect.poll(() => exchangeCalls).toBe(1);
     await expect(page.locator("section").last().locator("img")).toBeVisible();
@@ -169,9 +169,8 @@ test.describe("home sleeping exchange flow", () => {
     });
 
     await expect(page.locator("section").last().locator("img")).toBeVisible();
-    await expect(page.getByText("とったねがおには入ります。")).toBeVisible();
-    await expect(page.getByText("まだ届かない")).toBeVisible();
-    await page.locator("section").last().locator("button").last().click();
+    await expect(page.getByText(/とっておくと、アルバムに入ります。つぎのねがおまで/)).toBeVisible();
+    await page.getByRole("button", { name: "とっておく" }).click();
 
     await page.waitForTimeout(500);
     expect(exchangeCalls).toBe(0);
@@ -287,7 +286,7 @@ test.describe("home sleeping exchange flow", () => {
       buffer: testSvg,
     });
     await expect(page.locator("section").last().locator("img")).toBeVisible();
-    await page.locator("section").last().locator("button").last().click();
+    await page.getByRole("button", { name: "とっておく" }).click();
     await page.waitForTimeout(200);
 
     expect(exchangeCalls).toBe(0);
@@ -369,14 +368,7 @@ test.describe("home sleeping exchange flow", () => {
         buffer: testSvg,
       });
       await expect(page.locator("section").last().locator("img")).toBeVisible();
-      await page.evaluate(() => {
-        const buttons = [...document.querySelectorAll("button")].filter((button) => {
-          const rect = button.getBoundingClientRect();
-          return rect.width > 0 && rect.height > 0;
-        });
-
-        buttons[3]?.click();
-      });
+      await page.getByRole("button", { name: "とっておく" }).click();
       await page.waitForTimeout(500);
     }
 

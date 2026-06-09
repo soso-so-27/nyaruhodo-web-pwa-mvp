@@ -1839,6 +1839,10 @@ export function HomeInput({ recentEvents: _recentEvents }: HomeInputProps) {
           onPrivate={() =>
             handleKeepExchangeSharePhotoPrivate(pendingExchangeSharePhoto)
           }
+          onClose={() => {
+            setPendingExchangeSharePhoto(null);
+            setPendingExchangeCatId(null);
+          }}
         />
       ) : null}
 
@@ -2836,6 +2840,7 @@ function ExchangeSharePermissionSheet({
   onModeChange,
   onConfirm,
   onPrivate,
+  onClose,
 }: {
   photo: PendingExchangeSharePhoto;
   catProfiles: CatProfile[];
@@ -2845,6 +2850,7 @@ function ExchangeSharePermissionSheet({
   onModeChange: (mode: "shared" | "private") => void;
   onConfirm: () => void;
   onPrivate: () => void;
+  onClose: () => void;
 }) {
   const shouldShowCatPicker = catProfiles.length > 1;
   const canReceivePhoto = !deliveryRemaining;
@@ -2858,18 +2864,28 @@ function ExchangeSharePermissionSheet({
 
   return (
     <div style={styles.exchangeBackdrop}>
-      <section style={styles.exchangePanel} aria-label="写真を届ける確認">
+      <section style={styles.exchangePanel} aria-label="ねがおを入れる確認">
         <div style={styles.exchangeHeader}>
-          <span style={styles.exchangeKicker}>このねがおを入れます</span>
+          <span aria-hidden="true" />
+          <button
+            type="button"
+            style={styles.exchangeCloseButton}
+            onClick={onClose}
+            aria-label="閉じる"
+          >
+            <AppIcon name="close" size={16} />
+          </button>
         </div>
-        <p style={styles.exchangeLead}>
-          {canReceivePhoto
-            ? "とったねがおに入り、1枚とどきます。"
-            : `とったねがおには入ります。つぎのねがおまで あと ${deliveryRemaining}。`}
-        </p>
         <div style={styles.exchangeSharePreview}>
           <StoredPhotoImage src={photo.src} alt="" style={styles.exchangePhoto} />
         </div>
+        <p style={styles.exchangeLead}>
+          {isPrivate
+            ? "とっておくと、アルバムにだけ入ります。"
+            : canReceivePhoto
+              ? "とっておくと、1枚とどきます。"
+              : `とっておくと、アルバムに入ります。つぎのねがおまで あと ${deliveryRemaining}。`}
+        </p>
         {shouldShowCatPicker ? (
           <div style={styles.exchangeCatPicker} aria-label="入れる猫">
             {catProfiles.map((profile) => {
@@ -2899,52 +2915,31 @@ function ExchangeSharePermissionSheet({
             })}
           </div>
         ) : null}
-        <div style={styles.exchangeModeGroup} aria-label="ねがおの入れ方">
-          <button
-            type="button"
-            style={{
-              ...styles.exchangeModeButton,
-              ...(mode === "shared" ? styles.exchangeModeButtonActive : {}),
-            }}
-            onClick={() => selectMode("shared")}
-            aria-pressed={mode === "shared"}
-          >
-            <AppIcon name="send" size={16} />
-            <span style={styles.exchangeModeText}>
-              <span style={styles.exchangeModeLabel}>とどける</span>
-              <span style={styles.exchangeModeSub}>
-                {canReceivePhoto ? "1枚うけとる" : "まだ届かない"}
-              </span>
+        {canReceivePhoto ? (
+          <label style={styles.exchangePrivateToggle}>
+            <input
+              type="checkbox"
+              checked={isPrivate}
+              onChange={(event) =>
+                selectMode(event.currentTarget.checked ? "private" : "shared")
+              }
+              style={styles.exchangePrivateToggleInput}
+            />
+            <span style={styles.exchangePrivateToggleText}>
+              とどけずにとっておく
             </span>
-          </button>
-          <button
-            type="button"
-            style={{
-              ...styles.exchangeModeButton,
-              ...(mode === "private" ? styles.exchangeModeButtonActive : {}),
-            }}
-            onClick={() => selectMode("private")}
-            aria-pressed={mode === "private"}
-          >
-            <AppIcon name="eyeOff" size={16} />
-            <span style={styles.exchangeModeText}>
-              <span style={styles.exchangeModeLabel}>自分だけ</span>
-              <span style={styles.exchangeModeSub}>外には出ない</span>
-            </span>
-          </button>
-        </div>
-        <p style={styles.exchangeAssurance}>名前は出ません。</p>
+          </label>
+        ) : null}
         <div style={styles.exchangeActions}>
           <button
             type="button"
             style={styles.exchangeKeepButton}
             onClick={isPrivate ? onPrivate : onConfirm}
           >
-            {isPrivate
-              ? "とったねがおに入れる"
-              : canReceivePhoto
-                ? "入れて、1枚うけとる"
-                : "とったねがおに入れる"}
+            とっておく
+          </button>
+          <button type="button" style={styles.exchangePlainButton} onClick={onClose}>
+            閉じる
           </button>
         </div>
       </section>
@@ -6050,13 +6045,25 @@ const styles = {
     alignItems: "center",
     justifyContent: "space-between",
     gap: "12px",
-    marginBottom: "5px",
+    marginBottom: "10px",
   },
   exchangeKicker: {
     color: "#292721",
     fontSize: "14px",
     fontWeight: 620,
     lineHeight: 1.2,
+  },
+  exchangeCloseButton: {
+    display: "grid",
+    placeItems: "center",
+    width: "30px",
+    height: "30px",
+    border: "0.5px solid rgba(86,78,64,0.12)",
+    borderRadius: "50%",
+    background: "rgba(255,255,255,0.52)",
+    color: "#716b60",
+    cursor: "pointer",
+    flexShrink: 0,
   },
   exchangeReportButton: {
     display: "grid",
@@ -6071,7 +6078,7 @@ const styles = {
     flexShrink: 0,
   },
   exchangeLead: {
-    margin: "0 0 12px",
+    margin: "0 2px 10px",
     color: "#716b60",
     fontSize: "12px",
     fontWeight: 460,
@@ -6099,7 +6106,7 @@ const styles = {
   },
   exchangeSharePreview: {
     width: "100%",
-    height: "clamp(220px, 48vh, 360px)",
+    height: "clamp(230px, 46vh, 340px)",
     borderRadius: "20px",
     overflow: "hidden",
     background: "rgba(47,42,35,0.06)",
@@ -6108,6 +6115,7 @@ const styles = {
     alignItems: "center",
     justifyContent: "center",
     boxSizing: "border-box",
+    marginBottom: "10px",
   },
   exchangeCatPicker: {
     display: "flex",
@@ -6131,9 +6139,10 @@ const styles = {
     flexShrink: 0,
   },
   exchangeCatOptionActive: {
-    border: "0.5px solid rgba(61,54,44,0.22)",
-    background: "rgba(255,255,255,0.88)",
+    border: "1px solid rgba(61,54,44,0.28)",
+    background: "rgba(255,253,248,0.96)",
     color: "#292721",
+    boxShadow: "0 7px 16px rgba(90,76,60,0.07)",
   },
   exchangeCatThumb: {
     width: "34px",
@@ -6157,6 +6166,30 @@ const styles = {
     whiteSpace: "nowrap",
     fontSize: "13px",
     fontWeight: 650,
+  },
+  exchangePrivateToggle: {
+    display: "inline-flex",
+    alignItems: "center",
+    justifySelf: "start",
+    gap: "9px",
+    minHeight: "32px",
+    margin: "0 2px 12px",
+    color: "#716b60",
+    fontSize: "12px",
+    fontWeight: 540,
+    lineHeight: 1.3,
+    cursor: "pointer",
+  },
+  exchangePrivateToggleInput: {
+    width: "16px",
+    height: "16px",
+    margin: 0,
+    accentColor: "#5b4d40",
+    flexShrink: 0,
+  },
+  exchangePrivateToggleText: {
+    display: "inline-flex",
+    alignItems: "center",
   },
   exchangeText: {
     display: "grid",
@@ -6260,14 +6293,15 @@ const styles = {
     gap: "10px",
   },
   exchangeKeepButton: {
-    minHeight: "48px",
-    border: "none",
-    borderRadius: "16px",
-    background: "#292721",
-    color: "rgba(255,255,255,0.94)",
+    minHeight: "50px",
+    border: "0.5px solid rgba(86,78,64,0.14)",
+    borderRadius: "999px",
+    background: "rgba(255,253,248,0.94)",
+    color: "#292721",
     fontSize: "15px",
     fontWeight: 620,
     cursor: "pointer",
+    boxShadow: "0 8px 20px rgba(90,76,60,0.07)",
   },
   exchangePlainButton: {
     minHeight: "28px",
