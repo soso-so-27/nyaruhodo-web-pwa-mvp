@@ -493,13 +493,7 @@ export function CatsPage() {
                     />
                   </button>
                   <div style={styles.profileHeroInfo}>
-                    <p style={styles.profileKicker}>このねこ</p>
                     <div style={styles.profileName}>{activeCatProfile.name}</div>
-                    {activeMeta ? (
-                      <p style={styles.profileMeta}>{activeMeta}</p>
-                    ) : (
-                      <p style={styles.profileMeta}>編集から誕生日などを追加できます</p>
-                    )}
                   </div>
                   <button
                     type="button"
@@ -544,6 +538,9 @@ export function CatsPage() {
                 <div style={styles.profileNotes}>
                   {activeGender ? (
                     <span style={styles.profileNote}>{activeGender}</span>
+                  ) : null}
+                  {activeAge ? (
+                    <span style={styles.profileNote}>{activeAge}</span>
                   ) : null}
                   {activeCatProfile.basicInfo?.breed ? (
                     <span style={styles.profileNote}>
@@ -664,18 +661,6 @@ export function CatsPage() {
                 ) : null}
               </>
             ) : null}
-          </div>
-        ) : null}
-
-        {!isOnboardingProfileSetup && !isOnboardingCompletionView ? (
-          <div style={styles.settingsSection}>
-            <p style={styles.settingsSectionLabel}>設定</p>
-            <AppCard variant="outlined" padding="sm" style={styles.settingsCard}>
-              <a href="/settings" style={styles.settingsRow}>
-                <span style={styles.settingsRowLabel}>アカウントと設定</span>
-                <span style={styles.settingsRowChevron}>›</span>
-              </a>
-            </AppCard>
           </div>
         ) : null}
 
@@ -1163,31 +1148,14 @@ const styles = {
   profileHeroInfo: {
     minWidth: 0,
   },
-  profileKicker: {
-    margin: "0 0 4px",
-    color: CATS_FAINT,
-    fontFamily: CATS_SERIF,
-    fontSize: "10px",
-    fontWeight: 400,
-    letterSpacing: "0.04em",
-  },
   profileName: {
     fontFamily: CATS_SERIF,
-    fontSize: "26px",
+    fontSize: "23px",
     fontWeight: 500,
     color: CATS_TEXT_STRONG,
     display: "flex",
     alignItems: "center",
     gap: "8px",
-  },
-  profileMeta: {
-    margin: "4px 0 0",
-    color: CATS_MUTED,
-    fontFamily: CATS_SERIF,
-    fontSize: "11.5px",
-    fontWeight: 400,
-    lineHeight: 1.55,
-    letterSpacing: "0.06em",
   },
   editBtn: {
     fontSize: "11px",
@@ -1201,27 +1169,27 @@ const styles = {
   recordGrid: {
     display: "grid",
     gridTemplateColumns: "repeat(2, minmax(0, 1fr))",
-    gap: "9px",
+    gap: "10px",
   },
   recordHeroItem: {
-    minHeight: "82px",
+    minHeight: "84px",
     borderRadius: "18px",
     border: "1px solid rgba(120,108,94,0.10)",
     background: "rgba(255,253,248,0.58)",
     display: "grid",
     alignContent: "center",
-    gap: "6px",
-    padding: "12px 12px",
+    gap: "8px",
+    padding: "14px 13px",
   },
   recordSubItem: {
-    minHeight: "62px",
+    minHeight: "66px",
     borderRadius: "15px",
     border: "1px solid rgba(120,108,94,0.08)",
     background: "rgba(255,253,248,0.34)",
     display: "grid",
     alignContent: "center",
-    gap: "5px",
-    padding: "10px 12px",
+    gap: "7px",
+    padding: "12px 13px",
   },
   recordLabel: {
     color: CATS_FAINT,
@@ -1234,7 +1202,7 @@ const styles = {
   recordValue: {
     color: CATS_TEXT_STRONG,
     fontFamily: CATS_SERIF,
-    fontSize: "24px",
+    fontSize: "21px",
     fontWeight: 500,
     lineHeight: 1.15,
     letterSpacing: "0.04em",
@@ -1248,8 +1216,8 @@ const styles = {
   profileNotes: {
     display: "flex",
     flexWrap: "wrap",
-    gap: "7px",
-    marginTop: "10px",
+    gap: "8px",
+    marginTop: "12px",
   },
   profileNote: {
     border: "1px solid rgba(120,108,94,0.10)",
@@ -1369,39 +1337,6 @@ const styles = {
     width: "14px",
     height: "14px",
     borderRadius: "50%",
-  },
-  settingsSection: {
-    marginTop: "14px",
-  },
-  settingsSectionLabel: {
-    fontSize: "10.5px",
-    fontWeight: 500,
-    color: CATS_FAINT,
-    margin: "0 0 6px 4px",
-    letterSpacing: "0.06em",
-  },
-  settingsCard: {
-    borderRadius: "18px",
-    overflow: "hidden",
-    background: "rgba(255,253,248,0.38)",
-    boxShadow: "0 4px 10px rgba(90,76,60,0.025)",
-  },
-  settingsRow: {
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "space-between",
-    padding: "11px 14px",
-    textDecoration: "none",
-    color: CATS_TEXT,
-  },
-  settingsRowLabel: {
-    fontSize: "12.5px",
-    fontWeight: 500,
-    color: CATS_MUTED,
-  },
-  settingsRowChevron: {
-    fontSize: "16px",
-    color: CATS_FAINT,
   },
   sectionLabel: {
     margin: "0 0 5px",
