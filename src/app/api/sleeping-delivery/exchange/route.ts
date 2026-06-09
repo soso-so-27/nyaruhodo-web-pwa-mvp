@@ -219,10 +219,10 @@ export async function POST(request: Request) {
     supabase,
   );
   const fallbackCandidates =
-    candidates.length === 0 && blockedPhotoIds.size > 0
+    candidates.length === 0
       ? await buildCandidates(
           remoteRows.filter((row) =>
-            isAdminStockFallbackDeliverable(row, deliverableContext),
+            isFallbackDeliverable(row, deliverableContext),
           ),
           supabase,
         )
@@ -649,21 +649,22 @@ function isRowDeliverable(
   return !blockedPhotoIds.has(row.id) && !blockedPhotoIds.has(row.local_moment_id);
 }
 
-function isAdminStockFallbackDeliverable(
+function isFallbackDeliverable(
   row: RemoteCatMomentRow,
   context: Parameters<typeof isRowDeliverable>[1],
 ) {
   if (isBlockedDeliveryPoolRow(row)) {
     return false;
   }
-  if (readPoolKind(row.metadata) !== "admin_stock") {
+  if (!isUsablePhotoSrc(row.photo_url) || row.delivery_status !== "available") {
+    return false;
+  }
+  if (row.id === context.excludePhotoId || row.local_moment_id === context.excludePhotoId) {
     return false;
   }
 
-  return isRowDeliverable(row, {
-    ...context,
-    blockedPhotoIds: new Set<string>(),
-  });
+  return readPoolKind(row.metadata) === "admin_stock" ||
+    readPoolKind(row.metadata) === "user_shared";
 }
 
 async function buildCandidates(

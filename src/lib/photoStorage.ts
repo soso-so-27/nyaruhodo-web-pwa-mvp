@@ -156,11 +156,21 @@ export async function uploadDataUrl(
 ) {
   const response = await fetch(dataUrl);
   const blob = await response.blob();
+
+  return uploadBlob(supabase, path, blob, blob.type || "image/jpeg");
+}
+
+export async function uploadBlob(
+  supabase: BrowserSupabaseClient,
+  path: string,
+  blob: Blob,
+  contentType?: string,
+) {
   const { error } = await supabase.storage
     .from(CAT_PHOTOS_BUCKET)
     .upload(path, blob, {
       cacheControl: "3600",
-      contentType: blob.type || "image/jpeg",
+      contentType: contentType || blob.type || "image/jpeg",
       upsert: true,
     });
 

@@ -28,6 +28,8 @@ type RemoteCandidateResult = {
   source?: "remote" | "none";
 };
 
+const MAX_BLOCKED_PHOTO_IDS = 100;
+
 export type SleepingDeliveryDiagnostics = {
   source: "remote" | "none" | "error";
   availableCount: number;
@@ -99,7 +101,7 @@ export async function createSleepingExchange({
         seed,
         recipientCatId,
         anonymousId: getOrCreateAnonymousId(),
-        blockedPhotoIds: [...readBlockedExchangePhotoIds()],
+        blockedPhotoIds: readBlockedExchangePhotoIdList(),
         preferredSourcePhotoId,
       }),
     });
@@ -173,7 +175,7 @@ export async function readSleepingDeliveryDiagnostics() {
       headers,
       body: JSON.stringify({
         anonymousId: getOrCreateAnonymousId(),
-        blockedPhotoIds: [...readBlockedExchangePhotoIds()],
+        blockedPhotoIds: readBlockedExchangePhotoIdList(),
       }),
     });
 
@@ -220,7 +222,7 @@ async function fetchRemoteDeliveryCandidate(
       body: JSON.stringify({
         ...input,
         excludeUserId: data.user?.id ?? null,
-        blockedPhotoIds: [...readBlockedExchangePhotoIds()],
+        blockedPhotoIds: readBlockedExchangePhotoIdList(),
       }),
     });
 
@@ -237,4 +239,8 @@ async function fetchRemoteDeliveryCandidate(
   } catch {
     return null;
   }
+}
+
+function readBlockedExchangePhotoIdList() {
+  return [...readBlockedExchangePhotoIds()].slice(0, MAX_BLOCKED_PHOTO_IDS);
 }

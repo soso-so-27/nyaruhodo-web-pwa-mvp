@@ -12,7 +12,11 @@ import {
   deleteAccountSleepingPhoto,
   hideAccountKeptExchangePhoto,
 } from "../../lib/accountSync";
-import { storeAccountPhotoDataUrl } from "../../lib/photoStorageClient";
+import {
+  storeAccountPhotoDataUrl,
+  storeAccountPhotoFile,
+} from "../../lib/photoStorageClient";
+import { isUsablePhotoSrc } from "../../lib/photoStorage";
 import {
   BOX_PHOTO_STORAGE_EVENT,
   deleteOwnSleepingPhoto,
@@ -74,6 +78,9 @@ type CollectionPhoto = {
   id: string;
   slotId: string;
   src: string;
+  thumbnailSrc?: string;
+  displaySrc?: string;
+  originalSrc?: string;
   localIndex?: number;
   storageSlug?: string;
   createdAt?: string;
@@ -97,6 +104,9 @@ type CollectionShareFeedItem = {
 type BoxPreviewPhoto = {
   id: string;
   src: string;
+  thumbnailSrc?: string;
+  displaySrc?: string;
+  originalSrc?: string;
   catId?: string;
   shared?: boolean;
   createdAt?: number;
@@ -107,6 +117,9 @@ type BoxPreviewPhoto = {
 type StoredCollectionPhotoEntry = {
   id: string;
   src: string;
+  thumbnailSrc?: string;
+  displaySrc?: string;
+  originalSrc?: string;
   createdAt?: string;
 };
 
@@ -503,19 +516,18 @@ export function CollectionPage() {
         return;
       }
 
-      const dataUrl = await resizeAndEncode(file);
       const slug = getCollectionPhotoSlug(slot);
-
-      if (!dataUrl) {
-        return;
-      }
-
-      const photoSrc = await storeAccountPhotoDataUrl({
-        dataUrl,
+      const photoVariants = await createStoredCollectionPhotoVariantSet({
+        file,
         pathSegments: [activeCatId, "collection", slug],
         fileName: `photo-${Date.now()}`,
       });
-      const addedPhoto = addCollectionPhoto(activeCatId, slug, photoSrc);
+
+      if (!photoVariants.src) {
+        return;
+      }
+
+      const addedPhoto = addCollectionPhoto(activeCatId, slug, photoVariants);
       setCollectionPhotos((current) => ({
         ...current,
         [slug]: [...(current[slug] ?? []), addedPhoto],
@@ -1012,7 +1024,11 @@ function AlbumDaySectionRow({
       <div style={styles.dayPhotoStrip}>
         {visiblePhotos.map((photo) => (
           <span key={photo.id} style={styles.dayPhotoThumb}>
-            <StoredPhotoImage src={photo.src} alt="" style={styles.boxPhotoImg} />
+            <StoredPhotoImage
+              src={getPhotoThumbnailSrc(photo)}
+              alt=""
+              style={styles.boxPhotoImg}
+            />
           </span>
         ))}
       </div>
@@ -1078,7 +1094,11 @@ function BoxPhotoDetailSheet({
           <div style={styles.photoScroll} onScroll={onPhotoScroll}>
             {photos.map((photo) => (
               <div key={photo.id} style={styles.photoSlide}>
-                <StoredPhotoImage src={photo.src} alt="" style={styles.photoImg} />
+                <StoredPhotoImage
+                  src={getPhotoDetailSrc(photo)}
+                  alt=""
+                  style={styles.photoImg}
+                />
               </div>
             ))}
           </div>
@@ -1512,7 +1532,11 @@ function CollectionCard({
         onClick={() => onOpenSlot(slot)}
         style={{ ...styles.collectionCard, ...styles.photoCard }}
       >
-        <StoredPhotoImage src={firstPhoto.src} alt="" style={styles.cardPhoto} />
+        <StoredPhotoImage
+          src={getPhotoThumbnailSrc(firstPhoto)}
+          alt=""
+          style={styles.cardPhoto}
+        />
         <span style={styles.cardPhotoFade} aria-hidden="true" />
         {photos.length > 1 ? (
           <span style={styles.cardCountBadge}>{photos.length}枚</span>
@@ -1572,7 +1596,11 @@ function CollectionPhotoSheet({
           <div style={styles.photoScroll} onScroll={onPhotoScroll}>
             {photos.map((photo, index) => (
               <div key={photo.id} style={styles.photoSlide}>
-                <StoredPhotoImage src={photo.src} alt="" style={styles.photoImg} />
+                <StoredPhotoImage
+                  src={getPhotoDetailSrc(photo)}
+                  alt=""
+                  style={styles.photoImg}
+                />
                 {photo.localIndex !== undefined ? (
                   <button
                     type="button"
@@ -2034,6 +2062,26 @@ function getBoxPhotoTimestamp(photo: BoxPreviewPhoto) {
   return photo.deliveredAt ?? photo.createdAt ?? parseTimestampFromId(photo.id) ?? Date.now();
 }
 
+function getPhotoThumbnailSrc(photo: { src: string; thumbnailSrc?: string }) {
+  return isUsableStoredPhotoSrc(photo.thumbnailSrc) ? photo.thumbnailSrc : photo.src;
+}
+
+function getPhotoDetailSrc(photo: {
+  src: string;
+  displaySrc?: string;
+  originalSrc?: string;
+}) {
+  if (isUsableStoredPhotoSrc(photo.displaySrc)) {
+    return photo.displaySrc;
+  }
+
+  return photo.src;
+}
+
+function isUsableStoredPhotoSrc(src: string | null | undefined): src is string {
+  return typeof src === "string" && isUsablePhotoSrc(src);
+}
+
 function getLocalDateKey(timestamp: number) {
   const date = new Date(timestamp);
   const year = date.getFullYear();
@@ -2106,6 +2154,9 @@ function buildStoredCollectionPhotos(
           id: photo.id,
           slotId: slot.id,
           src: photo.src,
+          thumbnailSrc: photo.thumbnailSrc,
+          displaySrc: photo.displaySrc,
+          originalSrc: photo.originalSrc,
           storageSlug: slug,
           localIndex: index,
           createdAt: photo.createdAt,
@@ -2190,10 +2241,17 @@ function readCollectionPhotos(catId: string): Record<string, StoredCollectionPho
   }
 }
 
-function addCollectionPhoto(catId: string, slug: string, dataUrl: string) {
+function addCollectionPhoto(
+  catId: string,
+  slug: string,
+  photoInput: Pick<
+    StoredCollectionPhotoEntry,
+    "src" | "thumbnailSrc" | "displaySrc" | "originalSrc"
+  >,
+) {
   const photo: StoredCollectionPhotoEntry = {
     id: createCollectionPhotoId(catId, slug),
-    src: dataUrl,
+    ...photoInput,
     createdAt: new Date().toISOString(),
   };
 
@@ -2247,6 +2305,15 @@ function normalizeStoredPhotoList(
         return {
           id: photo.id || `${catId}:${slug}:${index}`,
           src: photo.src,
+          ...(isUsableStoredPhotoSrc(photo.thumbnailSrc)
+            ? { thumbnailSrc: photo.thumbnailSrc }
+            : {}),
+          ...(isUsableStoredPhotoSrc(photo.displaySrc)
+            ? { displaySrc: photo.displaySrc }
+            : {}),
+          ...(isUsableStoredPhotoSrc(photo.originalSrc)
+            ? { originalSrc: photo.originalSrc }
+            : {}),
           ...(parsedCreatedAt ? { createdAt: parsedCreatedAt } : {}),
         };
       }
@@ -2296,7 +2363,64 @@ function createCollectionPhotoId(catId: string, slug: string) {
   return `${catId}:${slug}:${random}`;
 }
 
-function resizeAndEncode(file: File, maxSize = 800): Promise<string> {
+async function createStoredCollectionPhotoVariantSet({
+  file,
+  pathSegments,
+  fileName,
+}: {
+  file: File;
+  pathSegments: string[];
+  fileName: string;
+}): Promise<
+  Pick<
+    StoredCollectionPhotoEntry,
+    "src" | "thumbnailSrc" | "displaySrc" | "originalSrc"
+  >
+> {
+  const [thumbnailDataUrl, displayDataUrl] = await Promise.all([
+    resizeAndEncode(file, 420, 0.72),
+    resizeAndEncode(file, 1800, 0.9),
+  ]);
+  const localDisplaySrc =
+    displayDataUrl.length <= 1_900_000
+      ? displayDataUrl
+      : await resizeAndEncode(file, 1100, 0.8);
+  const [originalSrc, storedDisplaySrc] = await Promise.all([
+    storeAccountPhotoFile({
+      file,
+      pathSegments: [...pathSegments, "original"],
+      fileName,
+    }),
+    storeAccountPhotoDataUrl({
+      dataUrl: displayDataUrl,
+      pathSegments: [...pathSegments, "display"],
+      fileName,
+    }),
+  ]);
+  const canStoreVariants = isStoragePhotoReference(storedDisplaySrc);
+  const thumbnailSrc = canStoreVariants
+    ? await storeAccountPhotoDataUrl({
+        dataUrl: thumbnailDataUrl,
+        pathSegments: [...pathSegments, "thumbnail"],
+        fileName,
+      })
+    : null;
+
+  return {
+    src: canStoreVariants ? storedDisplaySrc : localDisplaySrc,
+    ...(canStoreVariants ? { displaySrc: storedDisplaySrc } : {}),
+    ...(thumbnailSrc && isStoragePhotoReference(thumbnailSrc)
+      ? { thumbnailSrc }
+      : {}),
+    ...(originalSrc ? { originalSrc } : {}),
+  };
+}
+
+function isStoragePhotoReference(src: string | null | undefined) {
+  return Boolean(src?.startsWith("storage:") || src?.startsWith("storage://"));
+}
+
+function resizeAndEncode(file: File, maxSize = 800, quality = 0.85): Promise<string> {
   return new Promise((resolve) => {
     const img = new Image();
     const url = URL.createObjectURL(file);
@@ -2318,7 +2442,7 @@ function resizeAndEncode(file: File, maxSize = 800): Promise<string> {
 
       ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
       URL.revokeObjectURL(url);
-      resolve(canvas.toDataURL("image/jpeg", 0.85));
+      resolve(canvas.toDataURL("image/jpeg", quality));
     };
 
     img.src = url;

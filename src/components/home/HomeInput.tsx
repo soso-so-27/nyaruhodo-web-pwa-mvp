@@ -8,7 +8,10 @@ import {
 } from "../../lib/accountSync";
 import { trackProductEvent } from "../../lib/analytics/productAnalytics";
 import { writeAuthDebugEvent } from "../../lib/authDebug";
-import { storeAccountPhotoDataUrl } from "../../lib/photoStorageClient";
+import {
+  storeAccountPhotoDataUrl,
+  storeAccountPhotoFile,
+} from "../../lib/photoStorageClient";
 import {
   getCollectionSlotPhotoSlug,
   getDailyCollectionTarget,
@@ -208,6 +211,10 @@ type HomeCatCounter = {
 
 type PendingExchangeSharePhoto = {
   src: string;
+  exchangeSrc: string;
+  thumbnailSrc?: string;
+  displaySrc?: string;
+  originalSrc?: string;
   triggerLabel: string;
   theme: string;
   fileSizeBucket: string;
@@ -1352,11 +1359,15 @@ export function HomeInput({ recentEvents: _recentEvents }: HomeInputProps) {
       setIsExchangePhotoAdding(true);
 
       try {
-        const dataUrl = await resizeAndEncode(file, 560, 0.76);
+        const photoVariants = await createStoredPhotoVariantSet({
+          file,
+          pathSegments: [activeCatId, "sleeping"],
+          fileName: `sleeping-${Date.now()}`,
+        });
         const fileSizeBucket = getFileSizeBucket(file.size);
 
         setPendingExchangeSharePhoto({
-          src: dataUrl,
+          ...photoVariants,
           triggerLabel: "ねてる",
           theme: "sleeping",
           fileSizeBucket,
@@ -1426,7 +1437,7 @@ export function HomeInput({ recentEvents: _recentEvents }: HomeInputProps) {
 
       try {
         for (const file of files.slice(0, 30)) {
-          const dataUrl = await resizeAndEncode(file, 760, 0.72);
+          const dataUrl = await resizeAndEncode(file, 1400, 0.86);
           const saved = await saveRemoteDeliveryStockPhoto(dataUrl);
           if (saved) {
             savedCount += 1;
@@ -1676,6 +1687,9 @@ export function HomeInput({ recentEvents: _recentEvents }: HomeInputProps) {
     const ownPhoto = await saveOwnSleepingPhotoWithCompressedFallback({
       catId: targetCatId,
       src: photo.src,
+      thumbnailSrc: photo.thumbnailSrc,
+      displaySrc: photo.displaySrc,
+      originalSrc: photo.originalSrc,
       triggerLabel: photo.triggerLabel,
       theme: photo.theme,
       shared: true,
@@ -1705,7 +1719,7 @@ export function HomeInput({ recentEvents: _recentEvents }: HomeInputProps) {
 
     window.setTimeout(() => {
       void deliverExchangePhoto({
-        ownPhoto,
+        ownPhoto: { ...ownPhoto, src: photo.exchangeSrc },
         triggerLabel: photo.triggerLabel,
         theme: photo.theme,
         category: "pose",
@@ -1735,6 +1749,9 @@ export function HomeInput({ recentEvents: _recentEvents }: HomeInputProps) {
     const ownPhoto = await saveOwnSleepingPhotoWithCompressedFallback({
       catId: targetCatId,
       src: photo.src,
+      thumbnailSrc: photo.thumbnailSrc,
+      displaySrc: photo.displaySrc,
+      originalSrc: photo.originalSrc,
       triggerLabel: photo.triggerLabel,
       theme: photo.theme,
       shared: false,
@@ -4136,12 +4153,18 @@ function createCollectionPhotoId(catId: string, slug: string) {
 async function saveOwnSleepingPhotoWithCompressedFallback({
   catId,
   src,
+  thumbnailSrc,
+  displaySrc,
+  originalSrc,
   triggerLabel,
   theme,
   shared,
 }: {
   catId: string;
   src: string;
+  thumbnailSrc?: string;
+  displaySrc?: string;
+  originalSrc?: string;
   triggerLabel: string;
   theme: string;
   shared: boolean;
@@ -4170,6 +4193,9 @@ async function saveOwnSleepingPhotoWithCompressedFallback({
     const ownPhoto = saveOwnSleepingPhoto({
       catId,
       src: candidateSrc,
+      thumbnailSrc,
+      displaySrc,
+      originalSrc,
       triggerLabel,
       theme,
       shared,
@@ -4197,6 +4223,9 @@ async function saveOwnSleepingPhotoWithCompressedFallback({
     const ownPhoto = saveOwnSleepingPhoto({
       catId,
       src: candidateSrc,
+      thumbnailSrc,
+      displaySrc,
+      originalSrc,
       triggerLabel,
       theme,
       shared,
@@ -4306,6 +4335,63 @@ function getFileSizeBucket(size: number) {
     return "medium";
   }
   return "large";
+}
+
+async function createStoredPhotoVariantSet({
+  file,
+  pathSegments,
+  fileName,
+}: {
+  file: File;
+  pathSegments: string[];
+  fileName: string;
+}) {
+  const [thumbnailDataUrl, displayDataUrl] = await Promise.all([
+    resizeAndEncode(file, 420, 0.72),
+    resizeAndEncode(file, 1800, 0.9),
+  ]);
+  const exchangeDataUrl =
+    displayDataUrl.length <= 1_900_000
+      ? displayDataUrl
+      : await resizeAndEncode(file, 1100, 0.8);
+  const [originalSrc, storedDisplaySrc] = await Promise.all([
+    storeAccountPhotoFile({
+      file,
+      pathSegments: [...pathSegments, "original"],
+      fileName,
+    }),
+    storeAccountPhotoDataUrl({
+      dataUrl: displayDataUrl,
+      pathSegments: [...pathSegments, "display"],
+      fileName,
+    }),
+  ]);
+  const canStoreVariants = isStoragePhotoReference(storedDisplaySrc);
+  const thumbnailSrc = canStoreVariants
+    ? await storeAccountPhotoDataUrl({
+        dataUrl: thumbnailDataUrl,
+        pathSegments: [...pathSegments, "thumbnail"],
+        fileName,
+      })
+    : null;
+
+  return {
+    src: isStoragePhotoReference(storedDisplaySrc)
+      ? storedDisplaySrc
+      : exchangeDataUrl,
+    exchangeSrc: exchangeDataUrl,
+    ...(isStoragePhotoReference(storedDisplaySrc)
+      ? { displaySrc: storedDisplaySrc }
+      : {}),
+    ...(thumbnailSrc && isStoragePhotoReference(thumbnailSrc)
+      ? { thumbnailSrc }
+      : {}),
+    ...(originalSrc ? { originalSrc } : {}),
+  };
+}
+
+function isStoragePhotoReference(src: string | null | undefined) {
+  return Boolean(src?.startsWith("storage:") || src?.startsWith("storage://"));
 }
 
 function resizeAndEncode(

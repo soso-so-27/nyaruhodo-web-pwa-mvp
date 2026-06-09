@@ -159,7 +159,10 @@ test.describe("collection album flow", () => {
     await page.route("**/api/photo-storage/signed-url", async (route) => {
       const body = route.request().postDataJSON() as { src?: string };
 
-      if (body.src === "storage://user-1/current-cat/sleeping/restored.jpg") {
+      if (
+        body.src === "storage://user-1/current-cat/sleeping/restored.jpg" ||
+        body.src === "storage:user-1/current-cat/sleeping/restored.jpg"
+      ) {
         await route.fulfill({
           contentType: "application/json",
           body: JSON.stringify({ signedUrl: photoDataUrl }),

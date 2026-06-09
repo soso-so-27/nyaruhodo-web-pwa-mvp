@@ -110,9 +110,9 @@ async function readRemoteCandidates(input: CandidateRequest) {
   };
   const rows = allRows.filter((row) => isRowDeliverable(row, filterContext));
   const fallbackRows =
-    rows.length === 0 && blockedIds.size > 0
+    rows.length === 0
       ? allRows.filter((row) =>
-          isAdminStockFallbackDeliverable(row, filterContext),
+          isFallbackDeliverable(row, filterContext),
         )
       : [];
 
@@ -177,21 +177,26 @@ function isRowDeliverable(row: RemoteCatMomentRow, context: CandidateFilterConte
   return !context.blockedIds.has(row.id) && !context.blockedIds.has(row.local_moment_id);
 }
 
-function isAdminStockFallbackDeliverable(
+function isFallbackDeliverable(
   row: RemoteCatMomentRow,
   context: CandidateFilterContext,
 ) {
   if (isBlockedDeliveryPoolRow(row)) {
     return false;
   }
-  if (readPoolKind(row.metadata) !== "admin_stock") {
+  if (!isUsablePhotoSrc(row.photo_url)) {
+    return false;
+  }
+  if (
+    context.excludePhotoId &&
+    (row.id === context.excludePhotoId ||
+      row.local_moment_id === context.excludePhotoId)
+  ) {
     return false;
   }
 
-  return isRowDeliverable(row, {
-    ...context,
-    blockedIds: new Set<string>(),
-  });
+  return readPoolKind(row.metadata) === "admin_stock" ||
+    readPoolKind(row.metadata) === "user_shared";
 }
 
 async function resolvePhotoUrl(photoUrl: string, supabase: SupabaseClient) {

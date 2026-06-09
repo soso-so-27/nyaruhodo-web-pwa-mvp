@@ -98,11 +98,13 @@ export async function POST(request: Request) {
       !blockedPhotoIds.has(row.local_moment_id),
   );
   const fallbackRows =
-    candidateRows.length === 0 && blockedPhotoIds.size > 0
-      ? exchangeAvailableRows.filter(
+    candidateRows.length === 0
+      ? availableRows.filter(
           (row) =>
-            readPoolKind(row.metadata) === "admin_stock" &&
-            isUsablePhotoSrc(row.photo_url),
+            (readPoolKind(row.metadata) === "admin_stock" ||
+              readPoolKind(row.metadata) === "user_shared") &&
+            isUsablePhotoSrc(row.photo_url) &&
+            !isBlockedDeliveryPoolRow(row),
         )
       : [];
   const effectiveCandidateRows =

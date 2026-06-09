@@ -12,6 +12,9 @@ export type CatMoment = {
   id: string;
   ownerCatId: string;
   src: string;
+  thumbnailSrc?: string;
+  displaySrc?: string;
+  originalSrc?: string;
   state: CatMomentState;
   visibility: CatMomentVisibility;
   deliveryStatus: CatMomentDeliveryStatus;
@@ -34,6 +37,9 @@ export type ExchangePhoto = {
   id: string;
   sourcePhotoId?: string;
   src: string;
+  thumbnailSrc?: string;
+  displaySrc?: string;
+  originalSrc?: string;
   title: string;
   subtitle: string;
   triggerLabel: string;
@@ -46,6 +52,9 @@ export type ExchangePhotoPoolItem = {
   sourceOwnPhotoId?: string;
   sourceCatId?: string;
   src: string;
+  thumbnailSrc?: string;
+  displaySrc?: string;
+  originalSrc?: string;
   title: string;
   subtitle: string;
   tags: readonly string[];
@@ -55,6 +64,9 @@ export type OwnSleepingPhoto = CatMoment & {
   id: string;
   catId: string;
   src: string;
+  thumbnailSrc?: string;
+  displaySrc?: string;
+  originalSrc?: string;
   triggerLabel: string;
   theme: string;
   shared: boolean;
@@ -293,7 +305,7 @@ function createCatSleepingMilestone(
   return {
     target,
     photoId: photo.id,
-    src: normalizePersistentPhotoSrc(photo.src) || photo.src,
+    src: photo.src,
     reachedAt: photo.createdAt,
   };
 }
@@ -384,6 +396,9 @@ export function ownSleepingPhotoToCatMoment(photo: OwnSleepingPhoto): CatMoment 
     id: normalized.id,
     ownerCatId: normalized.ownerCatId,
     src: normalized.src,
+    thumbnailSrc: normalized.thumbnailSrc,
+    displaySrc: normalized.displaySrc,
+    originalSrc: normalized.originalSrc,
     state: normalized.state,
     visibility: normalized.visibility,
     deliveryStatus: normalized.deliveryStatus,
@@ -414,6 +429,9 @@ export function fromCatMomentRecord(record: CatMomentRecord): CatMoment {
 export function saveOwnSleepingPhoto({
   catId,
   src,
+  thumbnailSrc,
+  displaySrc,
+  originalSrc,
   triggerLabel,
   theme,
   shared,
@@ -421,6 +439,9 @@ export function saveOwnSleepingPhoto({
 }: {
   catId: string;
   src: string;
+  thumbnailSrc?: string | null;
+  displaySrc?: string | null;
+  originalSrc?: string | null;
   triggerLabel: string;
   theme: string;
   shared: boolean;
@@ -436,11 +457,17 @@ export function saveOwnSleepingPhoto({
       .map(normalizeOwnSleepingPhoto);
     const previousTakenCount = getOwnSleepingPhotoCountForCat(catId, saved);
     const createdAt = Date.now();
+    const normalizedThumbnailSrc = normalizeOptionalPhotoSrc(thumbnailSrc);
+    const normalizedDisplaySrc = normalizeOptionalPhotoSrc(displaySrc);
+    const normalizedOriginalSrc = normalizeOptionalPhotoSrc(originalSrc);
     const ownPhoto: OwnSleepingPhoto = {
       id: createOwnSleepingPhotoId(createdAt),
       ownerCatId: catId,
       catId,
       src,
+      ...(normalizedThumbnailSrc ? { thumbnailSrc: normalizedThumbnailSrc } : {}),
+      ...(normalizedDisplaySrc ? { displaySrc: normalizedDisplaySrc } : {}),
+      ...(normalizedOriginalSrc ? { originalSrc: normalizedOriginalSrc } : {}),
       state: "sleeping",
       visibility: shared ? "shared" : "private",
       deliveryStatus: "available",
@@ -917,15 +944,26 @@ function isValidOwnSleepingPhoto(photo: Partial<OwnSleepingPhoto>) {
 function normalizeOwnSleepingPhoto(photo: OwnSleepingPhoto): OwnSleepingPhoto {
   const ownerCatId = photo.ownerCatId ?? photo.catId;
   const shared = photo.shared ?? photo.visibility === "shared";
+  const thumbnailSrc = normalizeOptionalPhotoSrc(photo.thumbnailSrc);
+  const displaySrc = normalizeOptionalPhotoSrc(photo.displaySrc);
+  const originalSrc = normalizeOptionalPhotoSrc(photo.originalSrc);
 
   return {
-    ...photo,
+    id: photo.id,
     ownerCatId,
     catId: photo.catId ?? ownerCatId,
+    src: normalizePersistentPhotoSrc(photo.src) || photo.src,
+    ...(thumbnailSrc ? { thumbnailSrc } : {}),
+    ...(displaySrc ? { displaySrc } : {}),
+    ...(originalSrc ? { originalSrc } : {}),
     state: photo.state ?? "sleeping",
     visibility: photo.visibility ?? (shared ? "shared" : "private"),
     deliveryStatus: photo.deliveryStatus ?? "available",
+    triggerLabel: photo.triggerLabel ?? "ねがお",
+    theme: photo.theme ?? "sleeping",
     shared,
+    createdAt: photo.createdAt ?? Date.now(),
+    sourceMomentId: photo.sourceMomentId,
   };
 }
 
@@ -935,4 +973,13 @@ function isValidExchangePhoto(photo: Partial<ExchangePhoto>) {
       typeof photo.src === "string" &&
       isUsablePhotoSrc(photo.src),
   );
+}
+
+function normalizeOptionalPhotoSrc(src: string | null | undefined) {
+  if (typeof src !== "string") {
+    return null;
+  }
+
+  const normalized = normalizePersistentPhotoSrc(src);
+  return normalized && isUsablePhotoSrc(normalized) ? normalized : null;
 }
