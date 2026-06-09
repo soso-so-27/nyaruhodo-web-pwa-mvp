@@ -7,6 +7,7 @@ import { STORAGE_KEYS } from "../../lib/storage";
 import { readOwnSleepingPhotoCount } from "../../lib/home/sleepingPhotos";
 import { BottomNavigation } from "../navigation/BottomNavigation";
 import { AppButton } from "../ui/AppButton";
+import { AppBottomSheet } from "../ui/AppBottomSheet";
 import { AppCard } from "../ui/AppCard";
 import { AppHeader } from "../ui/AppHeader";
 import { AppIcon } from "../ui/AppIcons";
@@ -63,6 +64,7 @@ export function CatsPage() {
   const [isEditingCatName, setIsEditingCatName] = useState(false);
   const [isEditingProfile, setIsEditingProfile] = useState(false);
   const [isAddingCat, setIsAddingCat] = useState(false);
+  const [isCatSwitcherOpen, setIsCatSwitcherOpen] = useState(false);
   const [isOnboardingMode, setIsOnboardingMode] = useState(false);
   const [isOnboardingCompletionReady, setIsOnboardingCompletionReady] =
     useState(false);
@@ -83,7 +85,6 @@ export function CatsPage() {
   const catName = getCatName(activeCatProfile);
   const activeGender = formatGender(activeCatProfile?.basicInfo?.gender);
   const activeAge = formatAge(activeCatProfile?.basicInfo?.birthDate);
-  const activeMeta = [activeGender, activeAge].filter(Boolean).join("・");
   const familyDays = formatFamilyDays(
     activeCatProfile?.basicInfo?.familySinceDate,
   );
@@ -96,10 +97,9 @@ export function CatsPage() {
   const isOnboardingProfileSetup = isOnboardingMode && isEditingProfile;
   const isOnboardingCompletionView =
     isOnboardingMode && isOnboardingCompletionReady && !isEditingProfile;
-  const shouldShowCatSwitcher =
-    catProfiles.length > 1 && !isOnboardingProfileSetup && !isOnboardingCompletionView;
-  const shouldShowSingleCatAdd =
-    catProfiles.length === 1 && !isOnboardingProfileSetup && !isOnboardingCompletionView;
+  const canManageCats = !isOnboardingProfileSetup && !isOnboardingCompletionView;
+  const shouldShowCatSwitchButton = catProfiles.length > 1 && canManageCats;
+  const shouldShowSingleCatAdd = catProfiles.length === 1 && canManageCats;
 
   useEffect(() => {
     const requestedOnboardingMode =
@@ -154,6 +154,7 @@ export function CatsPage() {
     setActiveCatId(nextActiveProfile.id);
     setCatNameInput(getCatName(nextActiveProfile));
     setIsAddingCat(false);
+    setIsCatSwitcherOpen(false);
     setIsEditingCatName(false);
     setIsEditingProfile(false);
     setIsOnboardingAlbumCreated(false);
@@ -166,6 +167,7 @@ export function CatsPage() {
     setMessage("");
     setSaveMessage("");
     setIsAddingCat(true);
+    setIsCatSwitcherOpen(false);
     setIsEditingCatName(false);
     setIsEditingProfile(false);
   }
@@ -387,69 +389,6 @@ export function CatsPage() {
           </AppCard>
         ) : null}
 
-        {shouldShowCatSwitcher ? (
-          <div style={styles.catGrid}>
-            {catProfiles.map((profile) => {
-              const isActive = profile.id === activeCatId;
-
-              return (
-                <button
-                  key={profile.id}
-                  type="button"
-                  style={styles.catGridItem}
-                  onClick={() => handleCatSelect(profile.id)}
-                >
-                  <div
-                    style={
-                      isActive
-                        ? { ...styles.catAvatar, ...styles.catAvatarActive }
-                        : styles.catAvatar
-                    }
-                    onClick={
-                      isActive
-                        ? (event) => {
-                            event.stopPropagation();
-                            void handleAvatarUpload();
-                          }
-                        : undefined
-                    }
-                  >
-                    {profile.avatarDataUrl ? (
-                      <StoredPhotoImage
-                        src={profile.avatarDataUrl}
-                        alt={profile.name}
-                        style={styles.catAvatarPhoto}
-                      />
-                    ) : (
-                      <img
-                        src={getCatAvatarSrc(profile.appearance?.coat)}
-                        alt={profile.name}
-                        style={styles.catAvatarImg}
-                      />
-                    )}
-                  </div>
-                  <span style={styles.catGridName}>{profile.name}</span>
-                </button>
-              );
-            })}
-
-            <button type="button" style={styles.catGridItem} onClick={startAddingCat}>
-              <div style={styles.catAvatarAdd}>
-                <span style={styles.catAvatarAddMark}>＋</span>
-              </div>
-              <span style={{ ...styles.catGridName, color: CATS_MUTED }}>追加</span>
-            </button>
-          </div>
-        ) : null}
-
-        {shouldShowSingleCatAdd ? (
-          <div style={styles.singleCatAddRow}>
-            <button type="button" style={styles.singleCatAddButton} onClick={startAddingCat}>
-              追加
-            </button>
-          </div>
-        ) : null}
-
         {isAddingCat && !isOnboardingCompletionView ? (
           <div style={styles.editor}>
             <label style={styles.label} htmlFor="new-cat-name">
@@ -511,41 +450,61 @@ export function CatsPage() {
                   </button>
                   <div style={styles.profileHeroInfo}>
                     <div style={styles.profileName}>{activeCatProfile.name}</div>
+                    <p style={styles.profileSubtitle}>との記録</p>
                   </div>
-                  <button
-                    type="button"
-                    style={styles.editBtn}
-                    onClick={handleStartEdit}
-                  >
-                    編集
-                  </button>
+                  <div style={styles.profileHeroActions}>
+                    {shouldShowCatSwitchButton ? (
+                      <button
+                        type="button"
+                        style={styles.switchCatBtn}
+                        onClick={() => setIsCatSwitcherOpen(true)}
+                      >
+                        ほかのねこ
+                      </button>
+                    ) : null}
+                    {shouldShowSingleCatAdd ? (
+                      <button
+                        type="button"
+                        style={styles.switchCatBtn}
+                        onClick={startAddingCat}
+                      >
+                        追加
+                      </button>
+                    ) : null}
+                    <button
+                      type="button"
+                      style={styles.editBtn}
+                      onClick={handleStartEdit}
+                    >
+                      編集
+                    </button>
+                  </div>
                 </div>
 
                 <hr style={styles.divider} />
 
-                <p style={styles.sectionTitle}>{activeCatProfile.name}との記録</p>
-                <div style={styles.recordGrid}>
-                  <div style={styles.recordHeroItem}>
+                <div style={styles.recordList}>
+                  <div style={styles.recordRow}>
                     <span style={styles.recordLabel}>家族になって</span>
-                    <span style={styles.recordValue}>{familyDays}</span>
+                    <span style={styles.recordMetricValue}>{familyDays}</span>
                   </div>
-                  <div style={styles.recordHeroItem}>
+                  <div style={styles.recordRow}>
                     <span style={styles.recordLabel}>とったねがお</span>
-                    <span style={styles.recordValue}>
+                    <span style={styles.recordMetricValue}>
                       {takenSleepingPhotoCount}枚
                     </span>
                   </div>
-                  <div style={styles.recordSubItem}>
+                  <div style={styles.recordRow}>
                     <span style={styles.recordLabel}>誕生日</span>
-                    <span style={styles.recordSubValue}>
+                    <span style={styles.recordMetricValue}>
                       {activeCatProfile.basicInfo?.birthDate
                         ? formatBirthDate(activeCatProfile.basicInfo.birthDate)
                         : "未設定"}
                     </span>
                   </div>
-                  <div style={styles.recordSubItem}>
+                  <div style={{ ...styles.recordRow, ...styles.recordRowLast }}>
                     <span style={styles.recordLabel}>年齢</span>
-                    <span style={styles.recordSubValue}>
+                    <span style={styles.recordMetricValue}>
                       {activeCatProfile.basicInfo?.birthDate
                         ? formatAge(activeCatProfile.basicInfo.birthDate)
                         : "未設定"}
@@ -698,6 +657,55 @@ export function CatsPage() {
       </div>
       {!isOnboardingProfileSetup && !isOnboardingCompletionView ? (
         <BottomNavigation active="cats" />
+      ) : null}
+      {isCatSwitcherOpen ? (
+        <AppBottomSheet
+          title="ねこを選ぶ"
+          onClose={() => setIsCatSwitcherOpen(false)}
+        >
+          <div style={styles.catSheetList}>
+            {catProfiles.map((profile) => {
+              const isActive = profile.id === activeCatId;
+              const avatarSrc =
+                profile.avatarDataUrl ?? getCatAvatarSrc(profile.appearance?.coat);
+
+              return (
+                <button
+                  key={profile.id}
+                  type="button"
+                  style={
+                    isActive
+                      ? { ...styles.catSheetOption, ...styles.catSheetOptionActive }
+                      : styles.catSheetOption
+                  }
+                  onClick={() => handleCatSelect(profile.id)}
+                  aria-pressed={isActive}
+                >
+                  <StoredPhotoImage
+                    src={avatarSrc}
+                    alt=""
+                    style={
+                      profile.avatarDataUrl
+                        ? styles.catSheetPhoto
+                        : styles.catSheetAvatar
+                    }
+                  />
+                  <span style={styles.catSheetName}>{profile.name}</span>
+                  {isActive ? (
+                    <span style={styles.catSheetCurrent}>いま</span>
+                  ) : null}
+                </button>
+              );
+            })}
+            <button
+              type="button"
+              style={styles.catSheetAdd}
+              onClick={startAddingCat}
+            >
+              追加
+            </button>
+          </div>
+        </AppBottomSheet>
       ) : null}
     </main>
   );
@@ -1078,89 +1086,6 @@ const styles = {
   onboardingHomeButton: {
     marginTop: "18px",
   },
-  catGrid: {
-    display: "flex",
-    gap: "12px",
-    overflowX: "auto",
-    paddingBottom: "10px",
-    scrollbarWidth: "none",
-    marginBottom: "18px",
-  },
-  catGridItem: {
-    display: "flex",
-    flexDirection: "column",
-    alignItems: "center",
-    gap: "5px",
-    position: "relative",
-    flexShrink: 0,
-    cursor: "pointer",
-    border: "none",
-    background: "transparent",
-    padding: 0,
-    font: "inherit",
-  },
-  catAvatar: {
-    position: "relative",
-    width: "64px",
-    height: "64px",
-    borderRadius: "50%",
-    background: "rgba(255,253,248,0.5)",
-    border: "1px solid rgba(120,108,94,0.12)",
-    overflow: "hidden",
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  catAvatarActive: {
-    border: "1px solid rgba(86,78,66,0.34)",
-    boxShadow: "0 0 0 4px rgba(255,253,248,0.48)",
-    cursor: "pointer",
-  },
-  catAvatarImg: {
-    width: "56px",
-    height: "56px",
-    objectFit: "contain",
-  },
-  catAvatarPhoto: {
-    width: "100%",
-    height: "100%",
-    objectFit: "cover",
-    borderRadius: "50%",
-  },
-  catAvatarAdd: {
-    width: "64px",
-    height: "64px",
-    borderRadius: "50%",
-    border: "1px dashed rgba(120,108,94,0.18)",
-    background: "rgba(255,253,248,0.26)",
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "center",
-    cursor: "pointer",
-  },
-  catAvatarAddMark: {
-    fontSize: "22px",
-    color: CATS_FAINT,
-  },
-  catGridName: {
-    fontSize: "11.5px",
-    color: CATS_MUTED,
-    fontWeight: 500,
-  },
-  singleCatAddRow: {
-    display: "flex",
-    justifyContent: "flex-end",
-    margin: "-4px 2px 8px",
-  },
-  singleCatAddButton: {
-    border: "none",
-    background: "transparent",
-    color: CATS_FAINT,
-    fontSize: "11px",
-    fontWeight: 500,
-    padding: "5px 8px",
-    cursor: "pointer",
-  },
   profileCard: {
     ...CATS_SURFACE,
     borderRadius: "21px",
@@ -1170,29 +1095,29 @@ const styles = {
   profilePlaceCard: {
     ...CATS_SURFACE_SOFT,
     borderRadius: "24px",
-    padding: "18px 16px 16px",
+    padding: "17px 16px 16px",
     marginBottom: "12px",
     boxShadow: "0 6px 14px rgba(90,76,60,0.035)",
   },
   profileHero: {
     display: "grid",
-    gridTemplateColumns: "82px 1fr auto",
+    gridTemplateColumns: "64px 1fr auto",
     alignItems: "center",
-    gap: "15px",
+    gap: "13px",
   },
   profileHeroAvatar: {
-    width: "82px",
-    height: "82px",
-    borderRadius: "50%",
+    width: "64px",
+    height: "64px",
+    borderRadius: "19px",
     border: "1px solid rgba(120,108,94,0.10)",
-    background: "rgba(255,253,248,0.5)",
+    background: "rgba(255,253,248,0.46)",
     overflow: "hidden",
     display: "flex",
     alignItems: "center",
     justifyContent: "center",
     padding: 0,
     cursor: "pointer",
-    boxShadow: "0 5px 12px rgba(90,76,60,0.035)",
+    boxShadow: "0 4px 10px rgba(90,76,60,0.028)",
   },
   profileHeroAvatarPhoto: {
     width: "100%",
@@ -1200,8 +1125,8 @@ const styles = {
     objectFit: "cover",
   },
   profileHeroAvatarImg: {
-    width: "66px",
-    height: "66px",
+    width: "50px",
+    height: "50px",
     objectFit: "contain",
   },
   profileHeroInfo: {
@@ -1209,12 +1134,35 @@ const styles = {
   },
   profileName: {
     fontFamily: CATS_SERIF,
-    fontSize: "21px",
+    fontSize: "20px",
     fontWeight: 500,
     color: CATS_TEXT_STRONG,
     display: "flex",
     alignItems: "center",
     gap: "8px",
+  },
+  profileSubtitle: {
+    margin: "4px 0 0",
+    color: CATS_FAINT,
+    fontSize: "11px",
+    fontWeight: 500,
+    lineHeight: 1.35,
+    letterSpacing: "0.04em",
+  },
+  profileHeroActions: {
+    display: "flex",
+    flexDirection: "column",
+    alignItems: "flex-end",
+    gap: "6px",
+  },
+  switchCatBtn: {
+    fontSize: "11px",
+    color: CATS_MUTED,
+    border: "1px solid rgba(120,108,94,0.10)",
+    background: "rgba(255,253,248,0.38)",
+    borderRadius: "999px",
+    padding: "5px 10px",
+    cursor: "pointer",
   },
   editBtn: {
     fontSize: "11px",
@@ -1225,52 +1173,38 @@ const styles = {
     padding: "5px 10px",
     cursor: "pointer",
   },
-  recordGrid: {
-    display: "grid",
-    gridTemplateColumns: "repeat(2, minmax(0, 1fr))",
-    gap: "10px",
-  },
-  recordHeroItem: {
-    minHeight: "82px",
+  recordList: {
     borderRadius: "18px",
-    border: "1px solid rgba(120,108,94,0.10)",
-    background: "rgba(255,253,248,0.58)",
-    display: "grid",
-    alignContent: "center",
-    gap: "8px",
-    padding: "14px 13px",
+    border: "1px solid rgba(120,108,94,0.09)",
+    background: "rgba(255,253,248,0.40)",
+    padding: "6px 13px",
   },
-  recordSubItem: {
-    minHeight: "66px",
-    borderRadius: "15px",
-    border: "1px solid rgba(120,108,94,0.08)",
-    background: "rgba(255,253,248,0.34)",
+  recordRow: {
     display: "grid",
-    alignContent: "center",
-    gap: "7px",
-    padding: "12px 13px",
+    gridTemplateColumns: "1fr auto",
+    alignItems: "center",
+    gap: "12px",
+    minHeight: "38px",
+    borderBottom: "1px solid rgba(120,108,94,0.065)",
+  },
+  recordRowLast: {
+    borderBottom: "none",
   },
   recordLabel: {
     color: CATS_FAINT,
     fontFamily: CATS_SERIF,
-    fontSize: "10.5px",
+    fontSize: "11px",
     fontWeight: 400,
     lineHeight: 1.35,
     letterSpacing: "0.06em",
   },
-  recordValue: {
-    color: CATS_TEXT_STRONG,
-    fontFamily: CATS_SERIF,
-    fontSize: "19px",
-    fontWeight: 500,
-    lineHeight: 1.15,
-    letterSpacing: "0.04em",
-  },
-  recordSubValue: {
-    color: CATS_MUTED,
-    fontSize: "12.5px",
+  recordMetricValue: {
+    color: CATS_TEXT,
+    fontSize: "14px",
     fontWeight: 560,
     lineHeight: 1.35,
+    textAlign: "right",
+    letterSpacing: 0,
   },
   profileNotes: {
     display: "flex",
@@ -1287,6 +1221,65 @@ const styles = {
     fontWeight: 500,
     lineHeight: 1,
     padding: "6px 9px",
+  },
+  catSheetList: {
+    display: "grid",
+    gap: "8px",
+  },
+  catSheetOption: {
+    minHeight: "54px",
+    border: "1px solid rgba(120,108,94,0.09)",
+    borderRadius: "17px",
+    background: "rgba(255,253,248,0.44)",
+    color: CATS_TEXT,
+    display: "grid",
+    gridTemplateColumns: "42px 1fr auto",
+    alignItems: "center",
+    gap: "10px",
+    padding: "7px 11px 7px 7px",
+    cursor: "pointer",
+    textAlign: "left",
+  },
+  catSheetOptionActive: {
+    background: "rgba(247,241,231,0.78)",
+    border: "1px solid rgba(120,108,94,0.16)",
+  },
+  catSheetPhoto: {
+    width: "42px",
+    height: "42px",
+    borderRadius: "13px",
+    objectFit: "cover",
+    background: "rgba(255,253,248,0.58)",
+  },
+  catSheetAvatar: {
+    width: "42px",
+    height: "42px",
+    borderRadius: "13px",
+    objectFit: "contain",
+    background: "rgba(255,253,248,0.58)",
+    padding: "5px",
+    boxSizing: "border-box",
+  },
+  catSheetName: {
+    fontFamily: CATS_SERIF,
+    fontSize: "15px",
+    fontWeight: 500,
+    color: CATS_TEXT_STRONG,
+  },
+  catSheetCurrent: {
+    color: CATS_FAINT,
+    fontSize: "11px",
+    fontWeight: 500,
+  },
+  catSheetAdd: {
+    minHeight: "42px",
+    border: "1px dashed rgba(120,108,94,0.14)",
+    borderRadius: "15px",
+    background: "rgba(255,253,248,0.24)",
+    color: CATS_MUTED,
+    fontSize: "12px",
+    fontWeight: 560,
+    cursor: "pointer",
   },
   homePhotoSection: {
     display: "flex",
