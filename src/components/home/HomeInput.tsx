@@ -2902,14 +2902,12 @@ function ExchangeSharePermissionSheet({
                   onClick={() => onCatSelect(profile.id)}
                   aria-pressed={isSelected}
                 >
-                  <span style={styles.exchangeCatThumb} aria-hidden="true">
-                    <img
-                      src={getHomeCatThumbSrc(profile)}
-                      alt=""
-                      style={styles.exchangeCatThumbImage}
-                    />
-                  </span>
                   <span style={styles.exchangeCatName}>{getCatName(profile)}</span>
+                  {isSelected ? (
+                    <span style={styles.exchangeCatSelectedMark} aria-hidden="true">
+                      ✓
+                    </span>
+                  ) : null}
                 </button>
               );
             })}
@@ -2937,9 +2935,6 @@ function ExchangeSharePermissionSheet({
             onClick={isPrivate ? onPrivate : onConfirm}
           >
             とっておく
-          </button>
-          <button type="button" style={styles.exchangePlainButton} onClick={onClose}>
-            閉じる
           </button>
         </div>
       </section>
@@ -6122,50 +6117,43 @@ const styles = {
     gap: "8px",
     overflowX: "auto",
     scrollbarWidth: "none",
-    padding: "10px 1px 2px",
+    padding: "8px 1px 4px",
   },
   exchangeCatOption: {
     display: "inline-flex",
     alignItems: "center",
-    gap: "8px",
-    minWidth: "94px",
-    minHeight: "42px",
+    justifyContent: "center",
+    gap: "7px",
+    minWidth: "74px",
+    minHeight: "36px",
     border: "0.5px solid rgba(86,78,64,0.12)",
     borderRadius: "999px",
-    background: "rgba(255,255,255,0.56)",
+    background: "rgba(255,255,255,0.38)",
     color: "#716b60",
-    padding: "4px 11px 4px 4px",
+    padding: "0 14px",
     cursor: "pointer",
     flexShrink: 0,
   },
   exchangeCatOptionActive: {
-    border: "1px solid rgba(61,54,44,0.28)",
-    background: "rgba(255,253,248,0.96)",
+    border: "1px solid rgba(61,54,44,0.34)",
+    background: "rgba(86,78,64,0.12)",
     color: "#292721",
-    boxShadow: "0 7px 16px rgba(90,76,60,0.07)",
-  },
-  exchangeCatThumb: {
-    width: "34px",
-    height: "34px",
-    borderRadius: "50%",
-    overflow: "hidden",
-    background: "rgba(47,42,35,0.08)",
-    flexShrink: 0,
-  },
-  exchangeCatThumbImage: {
-    width: "100%",
-    height: "100%",
-    objectFit: "cover",
-    display: "block",
+    boxShadow: "inset 0 1px 0 rgba(255,255,255,0.46)",
   },
   exchangeCatName: {
     minWidth: 0,
-    maxWidth: "88px",
+    maxWidth: "116px",
     overflow: "hidden",
     textOverflow: "ellipsis",
     whiteSpace: "nowrap",
-    fontSize: "13px",
-    fontWeight: 650,
+    fontSize: "12.5px",
+    fontWeight: 640,
+  },
+  exchangeCatSelectedMark: {
+    color: "#5b4d40",
+    fontSize: "11px",
+    fontWeight: 720,
+    lineHeight: 1,
   },
   exchangePrivateToggle: {
     display: "inline-flex",
