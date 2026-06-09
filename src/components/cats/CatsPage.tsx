@@ -474,9 +474,20 @@ export function CatsPage() {
                     ) : null}
                     <button
                       type="button"
-                      style={styles.iconActionBtn}
-                      onClick={handleStartEdit}
-                      aria-label={`${activeCatProfile.name}を編集`}
+                      style={
+                        isEditingProfile
+                          ? { ...styles.iconActionBtn, ...styles.iconActionBtnActive }
+                          : styles.iconActionBtn
+                      }
+                      onClick={
+                        isEditingProfile ? cancelEditingCatName : handleStartEdit
+                      }
+                      aria-label={
+                        isEditingProfile
+                          ? `${activeCatProfile.name}の編集を閉じる`
+                          : `${activeCatProfile.name}を編集`
+                      }
+                      aria-pressed={isEditingProfile}
                     >
                       <PencilSmallIcon />
                     </button>
@@ -630,11 +641,6 @@ export function CatsPage() {
                           保存
                         </button>
                       )}
-                      {!isOnboardingProfileSetup ? (
-                        <button type="button" onClick={cancelEditingCatName} style={styles.cancelButton}>
-                          {"キャンセル"}
-                        </button>
-                      ) : null}
                     </div>
                   </div>
                 ) : null}
@@ -643,10 +649,6 @@ export function CatsPage() {
                   <CoatSelector
                     currentCoat={editCoat || selectedCoat}
                     onSelect={setEditCoat}
-                    onClose={() => {
-                      setIsEditingProfile(false);
-                      setIsEditingCatName(false);
-                    }}
                   />
                 ) : null}
               </>
@@ -724,38 +726,7 @@ function PageBackdrop() {
 }
 
 function CatSwitchIcon() {
-  return (
-    <svg
-      viewBox="0 0 28 24"
-      width="21"
-      height="21"
-      fill="none"
-      aria-hidden="true"
-      style={{ display: "block" }}
-    >
-      <path
-        d="M6.4 18.2c1.1-1.3 1.7-3.2 1.5-5.7-.1-1.6.8-2.8 2.2-3.1l.7-2.4 2 2.1c1 .3 1.8 1 2.4 2"
-        stroke="currentColor"
-        strokeWidth="1.55"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
-      <path
-        d="M4.7 18.2h8.1M15.2 18.2c1.1-1.3 1.7-3.2 1.5-5.7-.1-1.6.8-2.8 2.2-3.1l.7-2.4 2 2.1c1.5.4 2.6 1.6 3.1 3.1"
-        stroke="currentColor"
-        strokeWidth="1.55"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
-      <path
-        d="M13.7 5.5c1.2-1 2.7-1.4 4.1-1.1M18.1 3.1l1.6 1.6-1.8 1.4"
-        stroke="currentColor"
-        strokeWidth="1.35"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
-    </svg>
-  );
+  return <span style={styles.catSwitchMaskIcon} aria-hidden="true" />;
 }
 
 function PencilSmallIcon() {
@@ -808,19 +779,14 @@ function AddSmallIcon() {
 function CoatSelector({
   currentCoat,
   onSelect,
-  onClose,
 }: {
   currentCoat?: CatCoat;
   onSelect: (coat: CatCoat) => void;
-  onClose: () => void;
 }) {
   return (
     <div style={styles.coatSection}>
       <div style={styles.coatHeader}>
         <p style={styles.sectionLabel}>{"毛色"}</p>
-        <button type="button" onClick={onClose} style={styles.closeEditBtn}>
-          閉じる
-        </button>
       </div>
       <div style={styles.coatOptions}>
         {COAT_OPTIONS.map((option) => {
@@ -1244,6 +1210,25 @@ const styles = {
     justifyContent: "center",
     cursor: "pointer",
   },
+  iconActionBtnActive: {
+    color: CATS_MUTED,
+    border: "1px solid rgba(120,108,94,0.16)",
+    background: "rgba(255,253,248,0.62)",
+  },
+  catSwitchMaskIcon: {
+    width: "20px",
+    height: "20px",
+    display: "block",
+    backgroundColor: "currentColor",
+    maskImage: "url('/icons/cat-tab-mask.png')",
+    maskPosition: "center",
+    maskRepeat: "no-repeat",
+    maskSize: "contain",
+    WebkitMaskImage: "url('/icons/cat-tab-mask.png')",
+    WebkitMaskPosition: "center",
+    WebkitMaskRepeat: "no-repeat",
+    WebkitMaskSize: "contain",
+  },
   recordList: {
     borderRadius: "18px",
     border: "1px solid rgba(120,108,94,0.09)",
@@ -1469,9 +1454,11 @@ const styles = {
     lineHeight: 1.5,
   },
   coatSection: {
-    marginBottom: "14px",
-    borderBottom: "1px solid rgba(120,108,94,0.14)",
-    paddingBottom: "14px",
+    marginTop: "10px",
+    border: "1px solid rgba(120,108,94,0.08)",
+    borderRadius: "18px",
+    background: "rgba(255,253,248,0.30)",
+    padding: "12px 13px",
   },
   coatHeader: {
     display: "flex",
@@ -1479,13 +1466,6 @@ const styles = {
     justifyContent: "space-between",
     gap: "10px",
     marginBottom: "8px",
-  },
-  closeEditBtn: {
-    border: "none",
-    background: "transparent",
-    color: CATS_MUTED,
-    fontSize: "12px",
-    cursor: "pointer",
   },
   coatOptions: {
     display: "flex",
@@ -1522,12 +1502,18 @@ const styles = {
   },
   editor: {
     marginTop: "10px",
+    border: "1px solid rgba(120,108,94,0.08)",
+    borderRadius: "18px",
+    background: "rgba(255,253,248,0.36)",
+    padding: "13px",
+    display: "grid",
+    gap: "10px",
   },
   label: {
     display: "block",
-    marginBottom: "8px",
+    margin: 0,
     color: CATS_MUTED,
-    fontSize: "13px",
+    fontSize: "12px",
     fontWeight: 520,
     letterSpacing: 0,
   },
@@ -1535,45 +1521,44 @@ const styles = {
     width: "100%",
     boxSizing: "border-box",
     minHeight: "48px",
-    border: `1px solid ${CATS_BORDER}`,
-    borderRadius: "12px",
-    background: "rgba(255,253,248,0.82)",
+    border: "1px solid rgba(120,108,94,0.14)",
+    borderRadius: "13px",
+    background: "rgba(255,253,248,0.72)",
     color: CATS_TEXT,
-    fontSize: "15px",
+    fontSize: "14px",
     fontWeight: 500,
     letterSpacing: 0,
     padding: "0 14px",
   },
   editLabel: {
-    fontSize: "12px",
+    fontSize: "11.5px",
     fontWeight: 500,
     color: CATS_MUTED,
-    margin: "0 0 6px",
+    margin: "2px 0 -4px",
   },
   editInput: {
     width: "100%",
     boxSizing: "border-box",
-    minHeight: "48px",
-    border: `1px solid ${CATS_BORDER}`,
-    borderRadius: "12px",
-    background: "rgba(255,253,248,0.82)",
+    minHeight: "44px",
+    border: "1px solid rgba(120,108,94,0.14)",
+    borderRadius: "13px",
+    background: "rgba(255,253,248,0.72)",
     color: CATS_TEXT,
-    fontSize: "15px",
+    fontSize: "14px",
     padding: "0 14px",
   },
   genderButtons: {
     display: "grid",
     gridTemplateColumns: "repeat(3, 1fr)",
     gap: "6px",
-    marginBottom: "12px",
   },
   genderBtn: {
-    minHeight: "40px",
-    border: `1px solid ${CATS_BORDER}`,
-    borderRadius: "10px",
-    background: "rgba(255,253,248,0.64)",
+    minHeight: "36px",
+    border: "1px solid rgba(120,108,94,0.12)",
+    borderRadius: "999px",
+    background: "rgba(255,253,248,0.42)",
     color: CATS_TEXT,
-    fontSize: "12px",
+    fontSize: "11.5px",
     fontWeight: 500,
     cursor: "pointer",
   },
@@ -1586,16 +1571,16 @@ const styles = {
   actions: {
     display: "flex",
     gap: "10px",
-    marginTop: "10px",
+    marginTop: "2px",
   },
   saveButton: {
-    minHeight: "40px",
-    padding: "0 18px",
-    border: "1px solid rgba(120,108,94,0.28)",
-    borderRadius: "12px",
-    background: CATS_PAPER,
+    minHeight: "42px",
+    padding: "0 20px",
+    border: "1px solid rgba(120,108,94,0.16)",
+    borderRadius: "999px",
+    background: "rgba(255,253,248,0.72)",
     color: "#2a2a28",
-    fontSize: "14px",
+    fontSize: "13px",
     fontWeight: 560,
     letterSpacing: 0,
     cursor: "pointer",
