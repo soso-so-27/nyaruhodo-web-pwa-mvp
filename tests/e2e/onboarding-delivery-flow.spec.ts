@@ -184,6 +184,11 @@ test.describe("onboarding delivery flow", () => {
       sourcePhotoId: stockResponses[0].sourceOwnPhotoId,
       error: null,
     });
+    await expect(page.getByText("ねがおが")).toBeVisible();
+    await expect(page.getByText("とどいています")).toBeVisible();
+    await page.getByRole("button", { name: "そっとひらく" }).click();
+    await expect(page.getByText("どこかの ねがお")).toBeVisible();
+    await page.waitForTimeout(1600);
     await expectVisibleNonBlackImage(page.locator("main img").last());
     await expect(page.getByText("とっておくと、アルバムに入ります。")).toBeVisible();
     await expect(
@@ -196,6 +201,16 @@ test.describe("onboarding delivery flow", () => {
       page.getByRole("button", { name: "アルバムで見る" }),
     ).toBeVisible();
     await expect.poll(() => readKeptExchangePhotoCount(page)).toBe(1);
+    const eveningDeliveryDays = await page.evaluate(() => {
+      const parsed = JSON.parse(
+        window.localStorage.getItem("neteruneko_evening_delivery_days") ?? "{}",
+      );
+
+      return Object.values(parsed).filter((day) =>
+        Boolean((day as { targetOwnPhotoId?: string }).targetOwnPhotoId),
+      ).length;
+    });
+    expect(eveningDeliveryDays).toBeGreaterThan(0);
     await page.getByRole("button", { name: "アルバムで見る" }).click();
     await expect(page).toHaveURL(/\/collection/);
 
@@ -241,6 +256,9 @@ test.describe("onboarding delivery flow", () => {
       buffer: testPng,
     });
 
+    await expect(page.getByRole("button", { name: "そっとひらく" })).toBeVisible();
+    await page.getByRole("button", { name: "そっとひらく" }).click();
+    await page.waitForTimeout(1600);
     await expect(
       page.getByRole("button", { name: "この2枚をとっておく" }),
     ).toBeVisible();

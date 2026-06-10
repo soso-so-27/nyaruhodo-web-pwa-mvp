@@ -159,10 +159,15 @@ export const MIKKE_WINDOW_QUESTIONS: MikkeWindowQuestion[] = [
 ];
 
 export function getCurrentMikkeWindow(now = Date.now()): MikkeWindow {
-  const startsAt = Math.floor(now / HOUR_MS) * HOUR_MS;
+  const safeNow = Number.isFinite(now) ? now : new Date().getTime();
+  const startsAt = Math.floor(safeNow / HOUR_MS) * HOUR_MS;
   const windowNumber = Math.floor(startsAt / HOUR_MS);
+  const questionIndex =
+    ((windowNumber % MIKKE_WINDOW_QUESTIONS.length) +
+      MIKKE_WINDOW_QUESTIONS.length) %
+    MIKKE_WINDOW_QUESTIONS.length;
   const question =
-    MIKKE_WINDOW_QUESTIONS[windowNumber % MIKKE_WINDOW_QUESTIONS.length];
+    MIKKE_WINDOW_QUESTIONS[questionIndex] ?? MIKKE_WINDOW_QUESTIONS[0];
 
   return {
     id: `${question.id}-${new Date(startsAt).toISOString().slice(0, 13)}`,

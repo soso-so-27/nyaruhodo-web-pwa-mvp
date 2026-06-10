@@ -125,7 +125,7 @@ type StoredCollectionPhotoEntry = {
 
 type BoxDetailKind = "sleeping" | "other";
 type AlbumPhotoKind = "sleeping" | "awake" | "other";
-type AlbumScope = "taken" | "delivered";
+type AlbumScope = "daily" | "own";
 
 type AlbumMomentPhoto = BoxPreviewPhoto & {
   kind: AlbumPhotoKind;
@@ -152,7 +152,7 @@ export function CollectionPage() {
   const [activeGroupId, setActiveGroupId] = useState<CollectionGroupId>("pose");
   const [activeView, setActiveView] = useState<CollectionView>("collect");
   const [activeAlbumScope, setActiveAlbumScope] =
-    useState<AlbumScope>("taken");
+    useState<AlbumScope>("daily");
   const [hasLoaded, setHasLoaded] = useState(false);
   const [collectionPhotos, setCollectionPhotos] = useState<
     Record<string, StoredCollectionPhotoEntry[]>
@@ -756,6 +756,7 @@ export function CollectionPage() {
         <BoxOverview
           dayGroups={albumDayGroups}
           activeScope={activeAlbumScope}
+          catName={catName}
           onScopeChange={setActiveAlbumScope}
           onOpenBox={openBoxDetail}
         />
@@ -827,11 +828,13 @@ function PageBackdrop() {
 function BoxOverview({
   dayGroups,
   activeScope,
+  catName,
   onScopeChange,
   onOpenBox,
 }: {
   dayGroups: AlbumDayGroup[];
   activeScope: AlbumScope;
+  catName: string;
   onScopeChange: (scope: AlbumScope) => void;
   onOpenBox: (kind: BoxDetailKind, dateKey?: string | null) => void;
 }) {
@@ -853,11 +856,14 @@ function BoxOverview({
       <AlbumTodayCard
         group={todayGroup}
         scope={activeScope}
+        catName={catName}
         onOpenBox={onOpenBox}
       />
 
       <AlbumRecentSection
         groups={recentGroups}
+        scope={activeScope}
+        catName={catName}
         onOpenBox={onOpenBox}
       />
     </section>
@@ -867,30 +873,37 @@ function BoxOverview({
 function AlbumTodayCard({
   group,
   scope,
+  catName,
   onOpenBox,
 }: {
   group: AlbumDayGroup;
   scope: AlbumScope;
+  catName: string;
   onOpenBox: (kind: BoxDetailKind, dateKey?: string | null) => void;
 }) {
   return (
-    <section style={styles.todayAlbumCard} aria-label="今日のアルバム">
+    <section style={styles.todayAlbumCard} aria-label="きょうのアルバム">
       <div style={styles.todayAlbumHeader}>
         <div>
-          <h2 style={styles.todayAlbumTitle}>今日</h2>
+          <h2 style={styles.todayAlbumTitle}>きょう</h2>
           {group.subLabel ? (
             <p style={styles.albumKicker}>{group.subLabel}</p>
           ) : null}
         </div>
       </div>
       {group.total > 0 ? (
-        <AlbumDaySections group={group} onOpenBox={onOpenBox} />
+        <AlbumDaySections
+          group={group}
+          scope={scope}
+          catName={catName}
+          onOpenBox={onOpenBox}
+        />
       ) : (
         <EmptyState
           description={
-            scope === "taken"
+            scope === "own"
               ? "写真を入れるとここに並びます"
-              : "ねがおが届くとここに並びます"
+              : "ねがおを入れると、よる8じにここへ届きます"
           }
           style={styles.todayAlbumEmptyState}
         />
@@ -907,8 +920,8 @@ function AlbumScopeTabs({
   onScopeChange: (scope: AlbumScope) => void;
 }) {
   const tabs: Array<{ key: AlbumScope; label: string }> = [
-    { key: "taken", label: "とった" },
-    { key: "delivered", label: "とどいた" },
+    { key: "daily", label: "まいにち" },
+    { key: "own", label: "うちのこ" },
   ];
 
   return (
@@ -938,9 +951,13 @@ function AlbumScopeTabs({
 
 function AlbumRecentSection({
   groups,
+  scope,
+  catName,
   onOpenBox,
 }: {
   groups: AlbumDayGroup[];
+  scope: AlbumScope;
+  catName: string;
   onOpenBox: (kind: BoxDetailKind, dateKey?: string | null) => void;
 }) {
   if (groups.length === 0) {
@@ -948,13 +965,16 @@ function AlbumRecentSection({
   }
 
   return (
-    <section style={styles.albumSection} aria-label="最近">
-      <div style={styles.albumSectionHeader}>
-        <h2 style={styles.albumSectionTitle}>最近</h2>
-      </div>
+    <section style={styles.albumSection} aria-label="過去のアルバム">
       <div style={styles.recentDayList}>
         {groups.map((group) => (
-          <AlbumDayCard key={group.key} group={group} onOpenBox={onOpenBox} />
+          <AlbumDayCard
+            key={group.key}
+            group={group}
+            scope={scope}
+            catName={catName}
+            onOpenBox={onOpenBox}
+          />
         ))}
       </div>
     </section>
@@ -963,9 +983,13 @@ function AlbumRecentSection({
 
 function AlbumDayCard({
   group,
+  scope,
+  catName,
   onOpenBox,
 }: {
   group: AlbumDayGroup;
+  scope: AlbumScope;
+  catName: string;
   onOpenBox: (kind: BoxDetailKind, dateKey?: string | null) => void;
 }) {
   return (
@@ -978,30 +1002,171 @@ function AlbumDayCard({
           ) : null}
         </div>
       </div>
-      <AlbumDaySections group={group} onOpenBox={onOpenBox} compact />
+      <AlbumDaySections
+        group={group}
+        scope={scope}
+        catName={catName}
+        onOpenBox={onOpenBox}
+        compact
+      />
     </article>
   );
 }
 
 function AlbumDaySections({
   group,
+  scope,
+  catName,
   onOpenBox,
   compact = false,
 }: {
   group: AlbumDayGroup;
+  scope: AlbumScope;
+  catName: string;
   onOpenBox: (kind: BoxDetailKind, dateKey?: string | null) => void;
   compact?: boolean;
 }) {
+  if (scope === "daily") {
+    return (
+      <AlbumDailyPair
+        group={group}
+        catName={catName}
+        onOpenBox={onOpenBox}
+        compact={compact}
+      />
+    );
+  }
+
   return (
-    <div style={compact ? styles.daySectionListCompact : styles.daySectionList}>
-      {group.sections.map((section) => (
-        <AlbumDaySectionRow
-          key={`${group.key}-${section.kind}`}
-          groupKey={group.key}
-          section={section}
-          onOpenBox={onOpenBox}
-        />
+    <AlbumOwnGrid
+      group={group}
+      onOpenBox={onOpenBox}
+    />
+  );
+}
+
+function AlbumOwnGrid({
+  group,
+  onOpenBox,
+}: {
+  group: AlbumDayGroup;
+  onOpenBox: (kind: BoxDetailKind, dateKey?: string | null) => void;
+}) {
+  const photos = group.sections
+    .filter((section) => section.kind === "sleeping" || section.kind === "awake")
+    .flatMap((section) => section.photos);
+
+  return (
+    <div style={styles.ownPhotoGrid}>
+      {photos.map((photo) => (
+        <button
+          key={photo.id}
+          type="button"
+          style={{
+            ...styles.ownPhotoGridItem,
+            ...(photo.kind !== "sleeping" ? styles.ownPhotoGridItemStatic : {}),
+          }}
+          onClick={() => {
+            if (photo.kind === "sleeping") {
+              onOpenBox("sleeping", group.key);
+            }
+          }}
+          disabled={photo.kind !== "sleeping"}
+          aria-label="うちのこ写真"
+        >
+          <StoredPhotoImage
+            src={getPhotoThumbnailSrc(photo)}
+            alt=""
+            style={styles.ownPhotoGridImage}
+          />
+        </button>
       ))}
+    </div>
+  );
+}
+
+function AlbumDailyPair({
+  group,
+  catName,
+  onOpenBox,
+  compact = false,
+}: {
+  group: AlbumDayGroup;
+  catName: string;
+  onOpenBox: (kind: BoxDetailKind, dateKey?: string | null) => void;
+  compact?: boolean;
+}) {
+  const ownPhotos = group.sections
+    .filter((section) => section.kind === "sleeping" || section.kind === "awake")
+    .flatMap((section) => section.photos);
+  const deliveredPhotos =
+    group.sections.find((section) => section.kind === "other")?.photos ?? [];
+  const targetPhoto = ownPhotos[0] ?? null;
+  const deliveredPhoto = targetPhoto ? deliveredPhotos[0] ?? null : null;
+  const extraPhotos = ownPhotos.slice(1);
+
+  return (
+    <div style={compact ? styles.dailyPairCompact : styles.dailyPair}>
+      <div style={styles.dailyPairMain}>
+        <button
+          type="button"
+          style={styles.dailyPairTile}
+          onClick={() => targetPhoto && onOpenBox("sleeping", group.key)}
+          disabled={!targetPhoto}
+          aria-label="うちのねがお"
+        >
+          {targetPhoto ? (
+            <StoredPhotoImage
+              src={getPhotoThumbnailSrc(targetPhoto)}
+              alt=""
+              style={styles.dailyPairImage}
+            />
+          ) : (
+            <span style={styles.dailyPairPlaceholder}>この日は おやすみ</span>
+          )}
+          <span style={styles.dailyPairLabel}>{catName}</span>
+        </button>
+        <span style={styles.dailyPairDots} aria-hidden="true" />
+        <button
+          type="button"
+          style={styles.dailyPairTile}
+          onClick={() => deliveredPhoto && onOpenBox("other", group.key)}
+          disabled={!deliveredPhoto}
+          aria-label="どこかのねがお"
+        >
+          {deliveredPhoto ? (
+            <StoredPhotoImage
+              src={getPhotoThumbnailSrc(deliveredPhoto)}
+              alt=""
+              style={styles.dailyPairImage}
+            />
+          ) : group.key === getLocalDateKey(Date.now()) ? (
+            <span style={styles.dailyPairPlaceholder}>よる8じに</span>
+          ) : (
+            <span style={styles.dailyPairPlaceholder}>この日は おやすみ</span>
+          )}
+          <span style={styles.dailyPairLabel}>どこかのこ</span>
+        </button>
+      </div>
+      {extraPhotos.length > 0 ? (
+        <button
+          type="button"
+          style={styles.dailyExtras}
+          onClick={() => onOpenBox("sleeping", group.key)}
+        >
+          <span style={styles.dailyExtrasLabel}>ほかのねがお</span>
+          <span style={styles.dailyExtrasStrip}>
+            {extraPhotos.slice(0, 4).map((photo) => (
+              <StoredPhotoImage
+                key={photo.id}
+                src={getPhotoThumbnailSrc(photo)}
+                alt=""
+                style={styles.dailyExtraImage}
+              />
+            ))}
+          </span>
+        </button>
+      ) : null}
     </div>
   );
 }
@@ -2017,9 +2182,9 @@ function filterAlbumDayGroupsByScope(
   return groups
     .map((group) => {
       const sections = group.sections.filter((section) =>
-        scope === "taken"
+        scope === "own"
           ? section.kind === "sleeping" || section.kind === "awake"
-          : section.kind === "other",
+          : true,
       );
       const total = sections.reduce(
         (sum, section) => sum + section.photos.length,
@@ -2823,6 +2988,125 @@ const styles = {
   daySectionListCompact: {
     display: "grid",
     gap: "9px",
+  },
+  dailyPair: {
+    display: "grid",
+    gap: "14px",
+  },
+  dailyPairCompact: {
+    display: "grid",
+    gap: "10px",
+  },
+  dailyPairMain: {
+    display: "grid",
+    gridTemplateColumns: "1fr 24px 1fr",
+    alignItems: "center",
+    gap: "8px",
+  },
+  dailyPairTile: {
+    display: "grid",
+    gap: "8px",
+    justifyItems: "center",
+    width: "100%",
+    border: "none",
+    background: "transparent",
+    color: COLLECTION_TEXT,
+    font: "inherit",
+    padding: 0,
+    cursor: "pointer",
+  },
+  dailyPairImage: {
+    width: "100%",
+    aspectRatio: "1 / 1",
+    borderRadius: radius.xl,
+    objectFit: "cover",
+    overflow: "hidden",
+    background: color.surfaceSoft,
+    border: "6px solid rgba(255,253,248,0.74)",
+    boxShadow: shadow.soft,
+  },
+  dailyPairPlaceholder: {
+    width: "100%",
+    aspectRatio: "1 / 1",
+    borderRadius: radius.xl,
+    display: "grid",
+    placeItems: "center",
+    padding: "12px",
+    boxSizing: "border-box",
+    background: "rgba(255,253,248,0.48)",
+    border: "1px dashed rgba(120,108,94,0.18)",
+    color: color.textFaint,
+    fontSize: "12px",
+    fontWeight: 500,
+    lineHeight: 1.45,
+  },
+  dailyPairLabel: {
+    color: COLLECTION_MUTED,
+    fontSize: "12px",
+    fontWeight: 560,
+    lineHeight: 1,
+  },
+  dailyPairDots: {
+    width: "24px",
+    height: "2px",
+    borderRadius: "999px",
+    background:
+      "repeating-linear-gradient(90deg, rgba(142,128,110,0.42) 0 4px, transparent 4px 10px)",
+  },
+  dailyExtras: {
+    width: "100%",
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: "12px",
+    border: "1px solid rgba(120,108,94,0.08)",
+    borderRadius: radius.lg,
+    background: "rgba(255,253,248,0.38)",
+    padding: "9px 10px",
+    color: COLLECTION_MUTED,
+    cursor: "pointer",
+  },
+  dailyExtrasLabel: {
+    fontSize: "12px",
+    fontWeight: 560,
+    whiteSpace: "nowrap",
+  },
+  dailyExtrasStrip: {
+    display: "flex",
+    justifyContent: "flex-end",
+    gap: "5px",
+    minWidth: 0,
+  },
+  dailyExtraImage: {
+    width: "32px",
+    height: "32px",
+    borderRadius: radius.md,
+    objectFit: "cover",
+    background: color.surfaceSoft,
+  },
+  ownPhotoGrid: {
+    display: "grid",
+    gridTemplateColumns: "repeat(3, minmax(0, 1fr))",
+    gap: "8px",
+  },
+  ownPhotoGridItem: {
+    aspectRatio: "1 / 1",
+    border: "none",
+    borderRadius: radius.lg,
+    overflow: "hidden",
+    background: color.surfaceSoft,
+    padding: 0,
+    boxShadow: shadow.soft,
+    cursor: "pointer",
+  },
+  ownPhotoGridItemStatic: {
+    cursor: "default",
+  },
+  ownPhotoGridImage: {
+    width: "100%",
+    height: "100%",
+    objectFit: "cover",
+    display: "block",
   },
   daySectionRow: {
     display: "grid",

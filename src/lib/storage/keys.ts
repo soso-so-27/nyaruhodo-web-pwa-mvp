@@ -11,6 +11,7 @@ export const STORAGE_KEYS = {
   currentCatHintSuppression: "current_cat_hint_suppression",
   diagnosisOnboardingHomeHint: "diagnosis_onboarding_home_hint",
   homeVisitCount: "home_visit_count",
+  eveningDeliveryDays: "neteruneko_evening_delivery_days",
   lastContext: "last_context",
   lastInputSignal: "last_input_signal",
   lastPrimaryCategory: "last_primary_category",

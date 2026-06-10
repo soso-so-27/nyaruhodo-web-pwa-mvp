@@ -111,10 +111,11 @@ const styles = {
     boxShadow: shadow.soft,
   },
   accent: {
-    border: "1px solid rgba(86,96,82,0.10)",
-    background: color.accent,
-    color: "#ffffff",
-    boxShadow: shadow.soft,
+    border: "1px solid rgba(154,101,82,0.16)",
+    background:
+      "linear-gradient(180deg, rgba(186,128,107,0.96), rgba(157,96,78,0.96))",
+    color: color.paper,
+    boxShadow: "0 6px 16px rgba(154,101,82,0.10)",
   },
   secondary: {
     border: `1px solid ${color.border}`,

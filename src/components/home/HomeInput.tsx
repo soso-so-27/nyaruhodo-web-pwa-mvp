@@ -45,6 +45,17 @@ import {
   saveRemoteDeliveryStockPhoto,
 } from "../../lib/home/deliveryCandidates";
 import {
+  buildEveningHomeState,
+  getPendingEveningDeliveryDay,
+  isTodaySleepingCounterVisible,
+  markEveningDeliveryKept,
+  markEveningDeliveryOpened,
+  recordEveningDeliveryTarget,
+  setAppBadge,
+  setEveningDeliveredPhoto,
+  type EveningHomeState,
+} from "../../lib/home/eveningDelivery";
+import {
   BOX_PHOTO_STORAGE_EVENT,
   dismissExchangePhoto,
   keepExchangePhoto,
@@ -100,7 +111,6 @@ type LockType = "yousu" | "mugi";
 
 const MIKKE_CATEGORIES: MikkeWindowCategory[] = ["place", "pose", "sign"];
 const MIKKE_LOCK_MS = 60 * 60 * 1000;
-const SLEEPING_DELIVERY_LOCK_MS = 6 * 60 * 60 * 1000;
 const HOME_SLEEPING_COUNTER_BASE_COUNT = 75;
 const PHOTO_SAVE_FAILURE_MESSAGE =
   "写真を保存できませんでした。少し時間をおいて、もう一度試してください";
@@ -239,7 +249,7 @@ export function HomeInput({ recentEvents: _recentEvents }: HomeInputProps) {
   const [activeCatId, setActiveCatId] = useState<string | null>(null);
   const [activeCat, setActiveCat] = useState<CatProfile | null>(null);
   const [lockData, setLockData] = useState<LockData>({});
-  const [tick, setTick] = useState(Date.now());
+  const [tick, setTick] = useState(0);
   const [isYousuOpen, setIsYousuOpen] = useState(false);
   const [isCollectionPhotoSheetOpen, setIsCollectionPhotoSheetOpen] =
     useState(false);
@@ -271,6 +281,8 @@ export function HomeInput({ recentEvents: _recentEvents }: HomeInputProps) {
   const [isBoardSheetReturning, setIsBoardSheetReturning] = useState(false);
   const [deliveredExchangePhoto, setDeliveredExchangePhoto] =
     useState<ExchangePhoto | null>(null);
+  const [openingEveningDelivery, setOpeningEveningDelivery] =
+    useState<Extract<EveningHomeState, { kind: "delivered" }> | null>(null);
   const [pendingExchangeSharePhoto, setPendingExchangeSharePhoto] =
     useState<PendingExchangeSharePhoto | null>(null);
   const [pendingExchangeCatId, setPendingExchangeCatId] = useState<string | null>(
@@ -291,8 +303,10 @@ export function HomeInput({ recentEvents: _recentEvents }: HomeInputProps) {
   const [isHomeInstallHintVisible, setIsHomeInstallHintVisible] = useState(false);
   const [isHomeInstallGuideOpen, setIsHomeInstallGuideOpen] = useState(false);
   const [collectionRefreshTick, setCollectionRefreshTick] = useState(0);
+  const [eveningRefreshTick, setEveningRefreshTick] = useState(0);
   const [discoveryDismissedToday, setDiscoveryDismissedToday] = useState(false);
   const hasTrackedHomeView = useRef(false);
+  const pendingEveningDeliveryKeysRef = useRef(new Set<string>());
   const hasTrackedGoogleAuthSuccess = useRef(false);
   const toastTimerRef = useRef<number | null>(null);
   const completedBoardTimerRef = useRef<number | null>(null);
@@ -312,6 +326,8 @@ export function HomeInput({ recentEvents: _recentEvents }: HomeInputProps) {
   }, []);
 
   useEffect(() => {
+    setTick(Date.now());
+
     const intervalId = window.setInterval(() => {
       setTick(Date.now());
     }, 1000);
@@ -320,7 +336,25 @@ export function HomeInput({ recentEvents: _recentEvents }: HomeInputProps) {
   }, []);
 
   useEffect(() => {
+    function refreshEveningDeliveryState() {
+      setEveningRefreshTick((value) => value + 1);
+    }
+
+    window.addEventListener("neteruneko_evening_delivery_updated", refreshEveningDeliveryState);
+    window.addEventListener("storage", refreshEveningDeliveryState);
+
+    return () => {
+      window.removeEventListener(
+        "neteruneko_evening_delivery_updated",
+        refreshEveningDeliveryState,
+      );
+      window.removeEventListener("storage", refreshEveningDeliveryState);
+    };
+  }, []);
+
+  useEffect(() => {
     if (isStandaloneDisplay()) {
+      void requestDeliveryNotificationPermission();
       dismissHomeInstallHint();
       return;
     }
@@ -353,6 +387,7 @@ export function HomeInput({ recentEvents: _recentEvents }: HomeInputProps) {
       }
     };
     const handleAppInstalled = () => {
+      void requestDeliveryNotificationPermission();
       dismissHomeInstallHint();
     };
 
@@ -595,10 +630,20 @@ export function HomeInput({ recentEvents: _recentEvents }: HomeInputProps) {
   const mikkeWindowRemaining = mikkeAnswer
     ? formatRemainingMs(mikkeWindow.endsAt - tick)
     : null;
-  const sleepingCounterRemaining = getSleepingCounterRemaining(lockData, tick);
-  const sleepingCounterCooldownProgress = getSleepingCounterCooldownProgress(
-    lockData,
-    tick,
+  const sleepingCounterRemaining = null;
+  const sleepingCounterCooldownProgress = null;
+  const ownSleepingPhotosForHome = useMemo(
+    () => readOwnSleepingPhotos(activeCatId),
+    [activeCatId, collectionRefreshTick, eveningRefreshTick],
+  );
+  const eveningHomeState = useMemo(
+    () =>
+      buildEveningHomeState({
+        activeCatId,
+        ownPhotos: ownSleepingPhotosForHome,
+        now: tick,
+      }),
+    [activeCatId, eveningRefreshTick, ownSleepingPhotosForHome, tick],
   );
   const homeCatCounters = useMemo(
     () =>
@@ -756,6 +801,69 @@ export function HomeInput({ recentEvents: _recentEvents }: HomeInputProps) {
       { localCatId: activeCatId },
     );
   }, [activeCatId, pendingExchangeSharePhoto, sleepingCounterRemaining]);
+
+  useEffect(() => {
+    const pendingDay = getPendingEveningDeliveryDay(tick);
+
+    if (!pendingDay?.targetOwnPhotoId || !activeCatId) {
+      return;
+    }
+
+    if (pendingEveningDeliveryKeysRef.current.has(pendingDay.dateKey)) {
+      return;
+    }
+
+    const ownPhoto = ownSleepingPhotosForHome.find(
+      (photo) => photo.id === pendingDay.targetOwnPhotoId,
+    );
+
+    if (!ownPhoto) {
+      return;
+    }
+
+    pendingEveningDeliveryKeysRef.current.add(pendingDay.dateKey);
+
+    void createExchangePhoto({
+      ownPhoto: {
+        ...ownPhoto,
+        src: ownPhoto.originalSrc ?? ownPhoto.displaySrc ?? ownPhoto.src,
+      },
+      triggerLabel: ownPhoto.triggerLabel,
+      theme: ownPhoto.theme,
+      category: "sleep",
+      seed: `${pendingDay.dateKey}:${ownPhoto.id}`,
+      recipientCatId: pendingDay.targetCatId ?? activeCatId,
+    }).then((photo) => {
+      if (!photo) {
+        pendingEveningDeliveryKeysRef.current.delete(pendingDay.dateKey);
+        trackProductEvent(
+          "delivery_sent",
+          {
+            delivery_date_key: pendingDay.dateKey,
+            poolSource: "none",
+            isOnboardingInstant: false,
+            isDay1Evening: false,
+          },
+          { localCatId: pendingDay.targetCatId ?? activeCatId },
+        );
+        return;
+      }
+
+      setEveningDeliveredPhoto(pendingDay.dateKey, photo, Date.now());
+      void setAppBadge(1);
+      setEveningRefreshTick((value) => value + 1);
+      trackProductEvent(
+        "delivery_sent",
+        {
+          delivery_date_key: pendingDay.dateKey,
+          poolSource: "normal",
+          isOnboardingInstant: false,
+          isDay1Evening: false,
+        },
+        { localCatId: pendingDay.targetCatId ?? activeCatId },
+      );
+    });
+  }, [activeCatId, ownSleepingPhotosForHome, tick]);
 
   useEffect(() => {
     if (!activeCatId || isAccountRestoreDismissed()) {
@@ -1510,101 +1618,6 @@ export function HomeInput({ recentEvents: _recentEvents }: HomeInputProps) {
     void handleSleepingExchangePhotoSelect(source);
   }
 
-  function recordSleepingCounterAnswer(targetCatId = activeCatId) {
-    if (!targetCatId) {
-      return;
-    }
-
-    const targetLockData =
-      targetCatId === activeCatId ? lockData : readLockData(targetCatId);
-    if (getSleepingCounterRemaining(targetLockData, Date.now())) {
-      return;
-    }
-
-    const targetProfile = getActiveCatProfile(catProfiles, targetCatId);
-    const nextLockData = setSleepingCounterLock(targetProfile.id);
-
-    saveRecord(targetProfile.id, {
-      type: "yousu",
-      value: "ねてる",
-      metadata: {
-        homeCounterId: "sleeping",
-      },
-    });
-    trackProductEvent(
-      "home_sleeping_counter_joined",
-      {
-        counter_id: "sleeping",
-        window_id: mikkeWindow.id,
-      },
-      { localCatId: targetProfile.id },
-    );
-    saveActiveCatId(targetProfile.id);
-    setActiveCatId(targetProfile.id);
-    setActiveCat(targetProfile);
-    setSelectedYousu("ねてる");
-    setRecordLog(readRecordLog(targetProfile.id));
-    setLockData(nextLockData);
-    const sleepingCounter = homeCatCounters.find(
-      (counter) => counter.id === "sleeping",
-    );
-    showBoardCompletion(
-      "sleeping-counter",
-      formatSleepingCounterCount((sleepingCounter?.count ?? 0) + 1),
-      `${getCatName(targetProfile)}も加わりました`,
-    );
-  }
-
-  async function deliverExchangePhoto({
-    ownPhoto,
-    triggerLabel,
-    theme,
-    category,
-    localCatId,
-  }: {
-    ownPhoto: OwnSleepingPhoto;
-    triggerLabel: string;
-    theme: string;
-    category: MikkeWindowCategory | "sleep";
-    localCatId?: string | null;
-  }): Promise<boolean> {
-    const photo = await createExchangePhoto({
-      ownPhoto,
-      triggerLabel,
-      theme,
-      category,
-      seed: `${localCatId ?? activeCatId ?? "cat"}:${Date.now()}`,
-      recipientCatId: localCatId ?? activeCatId,
-    });
-
-    if (!photo) {
-      showToast("とどくねがおを準備中です");
-      trackProductEvent(
-        "home_exchange_photo_delivery_empty",
-        {
-          trigger_label: triggerLabel,
-          theme,
-          category,
-        },
-        { localCatId: localCatId ?? activeCatId },
-      );
-      return false;
-    }
-
-    setDeliveredExchangePhoto(photo);
-    trackProductEvent(
-      "home_exchange_photo_delivered",
-      {
-        trigger_label: triggerLabel,
-        theme,
-        category,
-        photo_id: photo.id,
-      },
-      { localCatId: localCatId ?? activeCatId },
-    );
-    return true;
-  }
-
   function handleKeepExchangePhoto(photo: ExchangePhoto) {
     keepExchangePhoto(photo);
     setCollectionRefreshTick((value) => value + 1);
@@ -1651,11 +1664,58 @@ export function HomeInput({ recentEvents: _recentEvents }: HomeInputProps) {
     );
   }
 
+  function handleOpenEveningDelivery(
+    deliveryState: Extract<EveningHomeState, { kind: "delivered" }>,
+  ) {
+    setOpeningEveningDelivery(deliveryState);
+    markEveningDeliveryOpened(deliveryState.dateKey);
+    setEveningRefreshTick((value) => value + 1);
+    trackProductEvent(
+      "envelope_opened",
+      { delivery_date_key: deliveryState.dateKey },
+      {
+        localCatId: activeCatId,
+      },
+    );
+  }
+
+  function handleKeepEveningDelivery(dateKey: string, photo: ExchangePhoto) {
+    keepExchangePhoto(photo);
+    markEveningDeliveryKept(dateKey);
+    setOpeningEveningDelivery(null);
+    setCollectionRefreshTick((value) => value + 1);
+    setEveningRefreshTick((value) => value + 1);
+    trackProductEvent(
+      "keep_tapped",
+      {
+        delivery_date_key: dateKey,
+        photo_id: photo.id,
+      },
+      { localCatId: activeCatId },
+    );
+  }
+
   function dismissHomeInstallHint() {
     window.localStorage.setItem(HOME_INSTALL_HINT_DISMISSED_STORAGE_KEY, "true");
     setIsHomeInstallHintVisible(false);
     setIsHomeInstallGuideOpen(false);
     setHomeInstallPrompt(null);
+  }
+
+  async function requestDeliveryNotificationPermission() {
+    if (!("Notification" in window) || Notification.permission !== "default") {
+      return;
+    }
+
+    const permission = await Notification.requestPermission().catch(() => null);
+    trackProductEvent(
+      "push_permission",
+      {
+        permission,
+        trigger: "home_install",
+      },
+      { localCatId: activeCatId },
+    );
   }
 
   async function handleHomeInstallPrimaryAction() {
@@ -1677,13 +1737,6 @@ export function HomeInput({ recentEvents: _recentEvents }: HomeInputProps) {
     const targetCatId = pendingExchangeCatId ?? activeCatId;
     if (!targetCatId) return;
 
-    const targetLockData =
-      targetCatId === activeCatId ? lockData : readLockData(targetCatId);
-    const deliveryRemaining = getSleepingCounterRemaining(
-      targetLockData,
-      Date.now(),
-    );
-
     const ownPhoto = await saveOwnSleepingPhotoWithCompressedFallback({
       catId: targetCatId,
       src: photo.src,
@@ -1699,44 +1752,33 @@ export function HomeInput({ recentEvents: _recentEvents }: HomeInputProps) {
       showToast(PHOTO_SAVE_FAILURE_MESSAGE);
       return;
     }
+    void backupOwnSleepingPhotoMoment(ownPhoto);
+    const deliveryTarget = recordEveningDeliveryTarget(ownPhoto);
     setCollectionRefreshTick((value) => value + 1);
+    setEveningRefreshTick((value) => value + 1);
     setPendingExchangeSharePhoto(null);
     setPendingExchangeCatId(null);
-    if (deliveryRemaining) {
-      showToast(`とったねがおに入りました。つぎのねがおまで あと ${deliveryRemaining}`);
-      trackProductEvent(
-        "home_exchange_share_photo_confirmed",
-        {
-          theme: photo.theme,
-          trigger_label: photo.triggerLabel,
-          file_size_bucket: photo.fileSizeBucket,
-          delivery_available: false,
-        },
-        { localCatId: targetCatId },
-      );
-      return;
-    }
 
-    window.setTimeout(() => {
-      void deliverExchangePhoto({
-        ownPhoto: { ...ownPhoto, src: photo.exchangeSrc },
-        triggerLabel: photo.triggerLabel,
-        theme: photo.theme,
-        category: "pose",
-        localCatId: targetCatId,
-      }).then((didDeliver) => {
-        if (didDeliver) {
-          recordSleepingCounterAnswer(targetCatId);
-        }
-      });
-    }, 280);
+    if (!deliveryTarget.isExchangeTarget) {
+      showToast("とったねがおに入りました。");
+    }
+    trackProductEvent(
+      "take_photo",
+      {
+        catId: targetCatId,
+        hour: new Date().getHours(),
+        isExchangeTarget: deliveryTarget.isExchangeTarget,
+      },
+      { localCatId: targetCatId },
+    );
     trackProductEvent(
       "home_exchange_share_photo_confirmed",
       {
         theme: photo.theme,
         trigger_label: photo.triggerLabel,
         file_size_bucket: photo.fileSizeBucket,
-        delivery_available: true,
+        delivery_available: deliveryTarget.isExchangeTarget,
+        delivery_date_key: deliveryTarget.dateKey,
       },
       { localCatId: targetCatId },
     );
@@ -1782,31 +1824,57 @@ export function HomeInput({ recentEvents: _recentEvents }: HomeInputProps) {
   const sleepingCounterCount = formatSleepingCounterCount(
     sleepingCounterItem?.count ?? HOME_SLEEPING_COUNTER_BASE_COUNT,
   );
+  const shouldShowHomeInstallHint =
+    isHomeInstallHintVisible &&
+    Boolean(homeInstallPlatform) &&
+    eveningHomeState.kind !== "before";
 
   return (
     <main style={styles.page}>
-      <div style={styles.paperBackground} aria-hidden="true" />
-      <div style={styles.paperNoise} aria-hidden="true" />
+      <div
+        aria-hidden={openingEveningDelivery ? true : undefined}
+        style={styles.homeContentLayer}
+      >
+        <div style={styles.paperBackground} aria-hidden="true" />
+        <div style={styles.paperNoise} aria-hidden="true" />
 
-      <SleepingPhotoHome
-        sleepingCounter={sleepingCounterCount}
-        deliveryRemaining={sleepingCounterRemaining}
-        onTakePhoto={() => handleSleepingPhotoStart("camera")}
-      />
-
-      {isHomeInstallHintVisible && homeInstallPlatform ? (
-        <HomeInstallHintCard
-          platform={homeInstallPlatform}
-          canPrompt={Boolean(homeInstallPrompt)}
-          onPrimary={handleHomeInstallPrimaryAction}
-          onDismiss={dismissHomeInstallHint}
+        <SleepingPhotoHome
+          catName={catName}
+          sleepingCounter={sleepingCounterCount}
+          eveningState={eveningHomeState}
+          isInstallHintVisible={shouldShowHomeInstallHint}
+          showSleepingCounter={isTodaySleepingCounterVisible(sleepingCounterCount)}
+          onTakePhoto={() => handleSleepingPhotoStart("camera")}
+          onOpenDelivery={handleOpenEveningDelivery}
         />
-      ) : null}
 
-      {isHomeInstallGuideOpen && homeInstallPlatform ? (
-        <HomeInstallGuideSheet
-          platform={homeInstallPlatform}
-          onClose={dismissHomeInstallHint}
+        {shouldShowHomeInstallHint && homeInstallPlatform ? (
+          <HomeInstallHintCard
+            platform={homeInstallPlatform}
+            canPrompt={Boolean(homeInstallPrompt)}
+            onPrimary={handleHomeInstallPrimaryAction}
+            onDismiss={dismissHomeInstallHint}
+          />
+        ) : null}
+
+        {isHomeInstallGuideOpen && homeInstallPlatform ? (
+          <HomeInstallGuideSheet
+            platform={homeInstallPlatform}
+            onClose={dismissHomeInstallHint}
+          />
+        ) : null}
+      </div>
+
+      {openingEveningDelivery ? (
+        <EveningDeliveryOpening
+          state={openingEveningDelivery}
+          catName={catName}
+          onKeep={() =>
+            handleKeepEveningDelivery(
+              openingEveningDelivery.dateKey,
+              openingEveningDelivery.deliveredPhoto,
+            )
+          }
         />
       ) : null}
 
@@ -1837,15 +1905,20 @@ export function HomeInput({ recentEvents: _recentEvents }: HomeInputProps) {
           photo={pendingExchangeSharePhoto}
           catProfiles={catProfiles}
           selectedCatId={pendingExchangeCatId ?? activeCatId}
-          deliveryRemaining={sleepingCounterRemaining}
+          isExchangeTargetAvailable={eveningHomeState.kind === "before"}
+          deliveryCopy={
+            eveningHomeState.kind === "before" && eveningHomeState.isTodayDelivery
+              ? "よる8じごろ とどきます。"
+              : "あしたのよるに とどきます。"
+          }
           onCatSelect={setPendingExchangeCatId}
           onModeChange={(mode) => {
             trackProductEvent(
               "home_exchange_share_mode_selected",
               {
                 mode,
-                delivery_available: !sleepingCounterRemaining,
-                delivery_remaining: sleepingCounterRemaining ?? null,
+                delivery_available: eveningHomeState.kind === "before",
+                delivery_date_key: eveningHomeState.dateKey,
               },
               { localCatId: pendingExchangeCatId ?? activeCatId },
             );
@@ -1924,9 +1997,18 @@ export function HomeInput({ recentEvents: _recentEvents }: HomeInputProps) {
         />
       ) : null}
 
-      {toastText ? <div style={styles.toast}>{toastText}</div> : null}
+      {toastText ? (
+        <div
+          aria-hidden={openingEveningDelivery ? true : undefined}
+          style={styles.toast}
+        >
+          {toastText}
+        </div>
+      ) : null}
 
-      <BottomNavigation active="today" />
+      <div aria-hidden={openingEveningDelivery ? true : undefined}>
+        <BottomNavigation active="today" />
+      </div>
       <style>{`
         @keyframes slideUp {
           from {
@@ -2573,21 +2655,49 @@ function InfoSheet({
 }
 
 function SleepingPhotoHome({
+  catName,
   sleepingCounter,
-  deliveryRemaining,
+  eveningState,
+  isInstallHintVisible,
+  showSleepingCounter,
   onTakePhoto,
+  onOpenDelivery,
 }: {
+  catName: string;
   sleepingCounter: string;
-  deliveryRemaining: string | null;
+  eveningState: EveningHomeState;
+  isInstallHintVisible: boolean;
+  showSleepingCounter: boolean;
   onTakePhoto: () => void;
+  onOpenDelivery: (state: Extract<EveningHomeState, { kind: "delivered" }>) => void;
 }) {
-  const isDeliveryLocked = Boolean(deliveryRemaining);
-  const deliveryLabel = deliveryRemaining
-    ? `つぎのねがおまで あと ${deliveryRemaining}`
-    : "とると届く";
-  const deliveryStatus = deliveryRemaining
-    ? `あと ${deliveryRemaining}`
-    : "とると届く";
+  const isBefore = eveningState.kind === "before";
+  const isWaiting = eveningState.kind === "waiting";
+  const isDelivered = eveningState.kind === "delivered";
+  const isOpened = eveningState.kind === "opened";
+  const title =
+    isBefore && catName
+      ? `${catName}、ねてる？`
+      : isWaiting
+        ? "ねがおを おあずかりしました"
+        : isDelivered
+          ? "ねがおが とどいています"
+          : "きょうの 2まい";
+  const lead =
+    isBefore
+      ? eveningState.isTodayDelivery
+        ? "とると、よる8じごろ とどく"
+        : "いまとると、あしたのよるに とどく"
+      : isWaiting
+        ? eveningState.isTodayDelivery
+        ? "よる8じごろ、どこかのねがおが とどきます"
+        : "あしたのよるに、どこかのねがおが とどきます"
+        : isDelivered
+          ? ""
+          : "また、ねていたら。";
+  const targetPhoto = isWaiting || isDelivered || isOpened
+    ? eveningState.targetPhoto
+    : null;
 
   return (
     <>
@@ -2596,63 +2706,204 @@ function SleepingPhotoHome({
       </div>
       <section style={styles.sleepingHome} aria-label="しゃしん">
         <div style={styles.sleepingHomeHeader}>
-          <h1 style={styles.sleepingHomeTitle}>
-            ねがおをとる
-          </h1>
-          <p style={styles.sleepingHomeLead}>
-            {isDeliveryLocked ? "とったねがおに入ります" : "とると、1枚とどく"}
-          </p>
-          <div style={styles.sleepingFlow} aria-hidden="true">
-            <span style={styles.sleepingFlowIcon}>
-              <AppIcon name="camera" size={20} />
-            </span>
-            <span style={styles.sleepingFlowDots} />
-            <span style={styles.sleepingFlowIconAccent}>
-              <AppIcon name="mail" size={20} />
-            </span>
-          </div>
+          <h1 style={styles.sleepingHomeTitle}>{title}</h1>
+          {lead ? (
+            <p style={styles.sleepingHomeLead}>
+              {lead}
+            </p>
+          ) : null}
+          {isBefore ? (
+            <div style={styles.sleepingFlow} aria-hidden="true">
+              <span style={styles.sleepingFlowIcon}>
+                <AppIcon name="camera" size={20} />
+              </span>
+              <span style={styles.sleepingFlowDots} />
+              <span style={styles.sleepingFlowIconAccent}>
+                <AppIcon name="mail" size={20} />
+              </span>
+            </div>
+          ) : null}
         </div>
 
-      <div style={styles.sleepingActionGroup}>
-        <button
-          type="button"
-          style={{
-            ...styles.sleepingPhotoButton,
-          }}
-          onClick={onTakePhoto}
-          aria-label="ねがおをとる"
-        >
-          <AppIcon name="camera" size={36} />
-        </button>
-      </div>
+        {isBefore ? (
+          <div style={styles.sleepingActionGroup}>
+            <button
+              type="button"
+              style={styles.sleepingPhotoButton}
+              onClick={onTakePhoto}
+              aria-label="ねがおをとる"
+            >
+              <AppIcon name="camera" size={36} />
+            </button>
+          </div>
+        ) : null}
 
-      <div style={styles.sleepingStatusStack}>
-        <div style={styles.sleepingWorldCard} aria-label={`今日ねてるねこ ${sleepingCounter}匹`}>
-          <div style={styles.sleepingCardIcon}>
-            <AppIcon name="sleep" size={18} />
+        {isWaiting && targetPhoto ? (
+          <div style={styles.sleepingTodayPhotoArea}>
+            <StoredPhotoImage
+              src={getPhotoDetailSrc(targetPhoto)}
+              alt=""
+              style={styles.sleepingTodayPhoto}
+            />
           </div>
-          <div style={styles.sleepingCardText}>
-            <span style={styles.sleepingCardLabel}>今日ねてるねこ</span>
-            <span style={styles.sleepingWorldCountValue}>
-              {sleepingCounter}
-              <span style={styles.sleepingWorldCountUnit}>匹</span>
-            </span>
+        ) : null}
+
+        {isDelivered ? (
+          <button
+            type="button"
+            style={styles.sleepingEnvelopeButton}
+            onClick={() => onOpenDelivery(eveningState)}
+            aria-label="ねがおをひらく"
+          >
+            <AppIcon name="mail" size={34} />
+            <span>そっとひらく</span>
+          </button>
+        ) : null}
+
+        {isOpened ? (
+          <div style={styles.sleepingPairCard} aria-label="きょうの2まい">
+            <div style={styles.sleepingPairTile}>
+              {targetPhoto ? (
+                <StoredPhotoImage
+                  src={getPhotoThumbnailSrc(targetPhoto)}
+                  alt=""
+                  style={styles.sleepingPairImage}
+                />
+              ) : null}
+              <span style={styles.sleepingPairLabel}>{catName}</span>
+            </div>
+            <span style={styles.sleepingPairDots} aria-hidden="true" />
+            <div style={styles.sleepingPairTile}>
+              <StoredPhotoImage
+                src={getPhotoThumbnailSrc(eveningState.deliveredPhoto)}
+                alt=""
+                style={styles.sleepingPairImage}
+              />
+              <span style={styles.sleepingPairLabel}>どこかのこ</span>
+            </div>
           </div>
-        </div>
-        <div style={styles.sleepingDeliveryCard} aria-label={deliveryLabel}>
-          <div style={styles.sleepingCardIconAccent}>
-            <AppIcon name="mail" size={18} />
+        ) : null}
+
+        {!isBefore && !isInstallHintVisible ? (
+          <button
+            type="button"
+            style={styles.sleepingSecondaryPhotoButton}
+            onClick={onTakePhoto}
+          >
+            <AppIcon name="camera" size={18} />
+            <span>いまとると、アルバムに はいります</span>
+          </button>
+        ) : null}
+
+        {isBefore ? (
+          <div
+            style={{
+              ...styles.sleepingStatusStack,
+              ...(!showSleepingCounter ? styles.sleepingStatusStackSingle : {}),
+            }}
+          >
+            {showSleepingCounter ? (
+              <div
+                style={styles.sleepingWorldCard}
+                aria-label={`今日ねてるねこ ${sleepingCounter}匹`}
+              >
+                <div style={styles.sleepingCardIcon}>
+                  <AppIcon name="sleep" size={18} />
+                </div>
+                <div style={styles.sleepingCardText}>
+                  <span style={styles.sleepingCardLabel}>今日ねてるねこ</span>
+                  <span style={styles.sleepingWorldCountValue}>
+                    {sleepingCounter}
+                    <span style={styles.sleepingWorldCountUnit}>匹</span>
+                  </span>
+                </div>
+              </div>
+            ) : null}
+            <div style={styles.sleepingDeliveryCard} aria-label="つぎのねがお">
+              <div style={styles.sleepingCardIconAccent}>
+                <AppIcon name="mail" size={18} />
+              </div>
+              <div style={styles.sleepingCardText}>
+                <span style={styles.sleepingCardLabel}>つぎのねがお</span>
+                <span style={styles.sleepingDeliveryValue}>
+                  {eveningState.isTodayDelivery ? "よる8じごろ" : "あしたのよる"}
+                </span>
+              </div>
+            </div>
           </div>
-          <div style={styles.sleepingCardText}>
-            <span style={styles.sleepingCardLabel}>
-              {deliveryRemaining ? "つぎのねがおまで" : "つぎのねがお"}
-            </span>
-            <span style={styles.sleepingDeliveryValue}>{deliveryStatus}</span>
-          </div>
-        </div>
-      </div>
+        ) : null}
       </section>
     </>
+  );
+}
+
+function EveningDeliveryOpening({
+  state,
+  catName,
+  onKeep,
+}: {
+  state: Extract<EveningHomeState, { kind: "delivered" }>;
+  catName: string;
+  onKeep: () => void;
+}) {
+  const [stage, setStage] = useState<"photo" | "pair">("photo");
+
+  useEffect(() => {
+    const timer = window.setTimeout(() => {
+      setStage("pair");
+    }, 1400);
+
+    trackProductEvent("envelope_shown", {
+      delivery_date_key: state.dateKey,
+    });
+
+    return () => window.clearTimeout(timer);
+  }, [state.dateKey]);
+
+  return (
+    <div style={styles.eveningOpeningOverlay} aria-live="polite">
+      {stage === "photo" ? (
+        <div style={styles.eveningOpeningPhotoStage}>
+          <StoredPhotoImage
+            src={getPhotoDetailSrc(state.deliveredPhoto)}
+            alt=""
+            style={styles.eveningOpeningPhoto}
+          />
+          <p style={styles.eveningOpeningCaption}>どこかの ねがお</p>
+        </div>
+      ) : (
+        <div
+          style={styles.eveningOpeningPairStage}
+          data-testid="evening-opening-pair"
+        >
+          <h2 style={styles.eveningOpeningTitle}>きょうの 2まい</h2>
+          <div style={styles.eveningOpeningPairCard}>
+            <div style={styles.sleepingPairTile}>
+              {state.targetPhoto ? (
+                <StoredPhotoImage
+                  src={getPhotoThumbnailSrc(state.targetPhoto)}
+                  alt=""
+                  style={styles.sleepingPairImage}
+                />
+              ) : null}
+              <span style={styles.sleepingPairLabel}>{catName}</span>
+            </div>
+            <span style={styles.sleepingPairDots} aria-hidden="true" />
+            <div style={styles.sleepingPairTile}>
+              <StoredPhotoImage
+                src={getPhotoThumbnailSrc(state.deliveredPhoto)}
+                alt=""
+                style={styles.sleepingPairImage}
+              />
+              <span style={styles.sleepingPairLabel}>どこかのこ</span>
+            </div>
+          </div>
+          <AppButton type="button" fullWidth onClick={onKeep}>
+            とっておく
+          </AppButton>
+        </div>
+      )}
+    </div>
   );
 }
 
@@ -2678,14 +2929,11 @@ function HomeInstallHintCard({
     >
       <div style={styles.homeInstallHintText}>
         <p style={styles.homeInstallHintTitle}>
-          次に寝ていたら、
+          こんやの ねがおを
           <br />
-          すぐ開けるように
-        </p>
-        <p style={styles.homeInstallHintBody}>
-          ねてるねこを
+          うけとる ポストを、
           <br />
-          ホームに置けます
+          ホームがめんに おきませんか
         </p>
       </div>
       <div style={styles.homeInstallHintActions}>
@@ -2852,7 +3100,8 @@ function ExchangeSharePermissionSheet({
   photo,
   catProfiles,
   selectedCatId,
-  deliveryRemaining,
+  isExchangeTargetAvailable,
+  deliveryCopy,
   onCatSelect,
   onModeChange,
   onConfirm,
@@ -2862,7 +3111,8 @@ function ExchangeSharePermissionSheet({
   photo: PendingExchangeSharePhoto;
   catProfiles: CatProfile[];
   selectedCatId: string | null;
-  deliveryRemaining: string | null;
+  isExchangeTargetAvailable: boolean;
+  deliveryCopy: string;
   onCatSelect: (catId: string) => void;
   onModeChange: (mode: "shared" | "private") => void;
   onConfirm: () => void;
@@ -2870,9 +3120,8 @@ function ExchangeSharePermissionSheet({
   onClose: () => void;
 }) {
   const shouldShowCatPicker = catProfiles.length > 1;
-  const canReceivePhoto = !deliveryRemaining;
   const [mode, setMode] = useState<"shared" | "private">("shared");
-  const isPrivate = mode === "private";
+  const isPrivate = mode === "private" || !isExchangeTargetAvailable;
 
   function selectMode(nextMode: "shared" | "private") {
     setMode(nextMode);
@@ -2886,11 +3135,11 @@ function ExchangeSharePermissionSheet({
           <span aria-hidden="true" />
           <button
             type="button"
-            style={styles.exchangeCloseButton}
+            style={styles.exchangeCloseTextButton}
             onClick={onClose}
             aria-label="閉じる"
           >
-            <AppIcon name="close" size={16} />
+            閉じる
           </button>
         </div>
         <div style={styles.exchangeSharePreview}>
@@ -2899,9 +3148,7 @@ function ExchangeSharePermissionSheet({
         <p style={styles.exchangeLead}>
           {isPrivate
             ? "とっておくと、アルバムにだけ入ります。"
-            : canReceivePhoto
-              ? "とっておくと、1枚とどきます。"
-              : `とっておくと、アルバムに入ります。つぎのねがおまで あと ${deliveryRemaining}。`}
+            : `とっておくと、${deliveryCopy}`}
         </p>
         {shouldShowCatPicker ? (
           <div style={styles.exchangeCatPicker} aria-label="入れる猫">
@@ -2930,20 +3177,18 @@ function ExchangeSharePermissionSheet({
             })}
           </div>
         ) : null}
-        {canReceivePhoto ? (
-          <label style={styles.exchangePrivateToggle}>
-            <input
-              type="checkbox"
-              checked={isPrivate}
-              onChange={(event) =>
-                selectMode(event.currentTarget.checked ? "private" : "shared")
-              }
-              style={styles.exchangePrivateToggleInput}
-            />
-            <span style={styles.exchangePrivateToggleText}>
-              とどけずにとっておく
-            </span>
-          </label>
+        {isExchangeTargetAvailable ? (
+          <button
+            type="button"
+            style={{
+              ...styles.exchangePrivateToggleButton,
+              ...(isPrivate ? styles.exchangePrivateToggleButtonActive : {}),
+            }}
+            onClick={() => selectMode(isPrivate ? "shared" : "private")}
+            aria-pressed={isPrivate}
+          >
+            {isPrivate ? "この1まいは、とどけません" : "この1まいは、とどけない"}
+          </button>
         ) : null}
         <div style={styles.exchangeActions}>
           <button
@@ -4048,6 +4293,21 @@ async function createExchangePhoto({
   return result.photo;
 }
 
+function getPhotoThumbnailSrc(
+  photo: Pick<OwnSleepingPhoto | ExchangePhoto, "src" | "thumbnailSrc" | "displaySrc">,
+) {
+  return photo.thumbnailSrc ?? photo.displaySrc ?? photo.src;
+}
+
+function getPhotoDetailSrc(
+  photo: Pick<
+    OwnSleepingPhoto | ExchangePhoto,
+    "src" | "displaySrc" | "originalSrc"
+  >,
+) {
+  return photo.originalSrc ?? photo.displaySrc ?? photo.src;
+}
+
 function hasAcceptedSleepingSafetyNotice() {
   if (typeof window === "undefined") {
     return false;
@@ -4459,17 +4719,6 @@ function setMikkeCategoryLock(
   return nextData;
 }
 
-function setSleepingCounterLock(catId: string): LockData {
-  const lockData = readLockData(catId);
-  const nextData: LockData = {
-    ...lockData,
-    sleepingCounterLockedUntil: Date.now() + SLEEPING_DELIVERY_LOCK_MS,
-  };
-
-  saveLockData(catId, nextData);
-  return nextData;
-}
-
 function isMikkeCategoryLocked(
   lockData: LockData,
   category: MikkeWindowCategory,
@@ -4550,23 +4799,6 @@ function getAllMikkeCategoriesCooldownProgress(
   }
 
   return Math.min(1, Math.min(...remainingMs) / MIKKE_LOCK_MS);
-}
-
-function getSleepingCounterRemaining(lockData: LockData, now = Date.now()) {
-  return formatRemainingMs((lockData.sleepingCounterLockedUntil || 0) - now);
-}
-
-function getSleepingCounterCooldownProgress(
-  lockData: LockData,
-  now = Date.now(),
-) {
-  const remaining = (lockData.sleepingCounterLockedUntil || 0) - now;
-
-  if (remaining <= 0) {
-    return null;
-  }
-
-  return Math.min(1, remaining / SLEEPING_DELIVERY_LOCK_MS);
 }
 
 function isLocked(lockData: LockData, type: LockType, now = Date.now()) {
@@ -4748,6 +4980,9 @@ const styles = {
     color: "#202020",
     fontFamily:
       'Outfit, "Zen Kaku Gothic New", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
+  },
+  homeContentLayer: {
+    display: "contents",
   },
   paperBackground: {
     position: "fixed",
@@ -5924,6 +6159,112 @@ const styles = {
     fontWeight: 540,
     lineHeight: 1,
   },
+  sleepingTodayPhotoArea: {
+    position: "fixed",
+    top: "calc(clamp(316px, 42dvh, 390px) + env(safe-area-inset-top))",
+    left: "50%",
+    zIndex: 19,
+    transform: "translateX(-50%)",
+    width: "min(54vw, 216px)",
+    aspectRatio: "1 / 1",
+    borderRadius: "30px",
+    overflow: "hidden",
+    border: "8px solid rgba(255,253,248,0.72)",
+    background: "rgba(255,253,248,0.58)",
+    boxShadow: "0 16px 38px rgba(96,78,54,0.12)",
+    pointerEvents: "none",
+  },
+  sleepingTodayPhoto: {
+    width: "100%",
+    height: "100%",
+    objectFit: "cover",
+    display: "block",
+  },
+  sleepingEnvelopeButton: {
+    position: "fixed",
+    top: "calc(clamp(338px, 44dvh, 410px) + env(safe-area-inset-top))",
+    left: "50%",
+    zIndex: 19,
+    transform: "translateX(-50%)",
+    display: "grid",
+    placeItems: "center",
+    gap: "12px",
+    width: "150px",
+    height: "150px",
+    border: "1px solid rgba(178,132,116,0.14)",
+    borderRadius: "999px",
+    background: "rgba(244,228,221,0.72)",
+    color: "#b98678",
+    boxShadow:
+      "0 0 0 12px rgba(255,253,248,0.44), 0 16px 34px rgba(110,86,60,0.09)",
+    cursor: "pointer",
+    pointerEvents: "auto",
+    fontSize: "13px",
+    fontWeight: 560,
+  },
+  sleepingSecondaryPhotoButton: {
+    position: "fixed",
+    left: "50%",
+    top: "calc(clamp(600px, 74dvh, 656px) + env(safe-area-inset-top))",
+    zIndex: 19,
+    transform: "translateX(-50%)",
+    minHeight: "42px",
+    display: "inline-flex",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: "8px",
+    padding: "0 16px",
+    border: "1px solid rgba(120,108,94,0.1)",
+    borderRadius: "999px",
+    background: "rgba(255,253,248,0.54)",
+    color: "#746a5f",
+    boxShadow: "0 8px 18px rgba(90,76,60,0.035)",
+    cursor: "pointer",
+    pointerEvents: "auto",
+    fontSize: "12px",
+    fontWeight: 560,
+  },
+  sleepingPairCard: {
+    position: "fixed",
+    top: "calc(clamp(314px, 42dvh, 388px) + env(safe-area-inset-top))",
+    left: "50%",
+    zIndex: 19,
+    transform: "translateX(-50%)",
+    width: "min(calc(100vw - 62px), 340px)",
+    display: "grid",
+    gridTemplateColumns: "1fr 28px 1fr",
+    alignItems: "center",
+    gap: "10px",
+    pointerEvents: "none",
+  },
+  sleepingPairTile: {
+    display: "grid",
+    gap: "8px",
+    justifyItems: "center",
+  },
+  sleepingPairImage: {
+    width: "100%",
+    aspectRatio: "1 / 1",
+    borderRadius: "24px",
+    objectFit: "cover",
+    overflow: "hidden",
+    border: "7px solid rgba(255,253,248,0.68)",
+    background: "rgba(255,253,248,0.58)",
+    boxShadow: "0 14px 30px rgba(96,78,54,0.11)",
+  },
+  sleepingPairLabel: {
+    color: "#746a5f",
+    fontSize: "12px",
+    fontWeight: 560,
+    lineHeight: 1,
+  },
+  sleepingPairDots: {
+    width: "28px",
+    height: "2px",
+    borderRadius: "999px",
+    background:
+      "repeating-linear-gradient(90deg, rgba(142,128,110,0.42) 0 4px, transparent 4px 10px)",
+  },
   sleepingStatusStack: {
     position: "fixed",
     left: "50%",
@@ -5935,6 +6276,10 @@ const styles = {
     gridTemplateColumns: "repeat(2, minmax(0, 1fr))",
     gap: "8px",
     pointerEvents: "none",
+  },
+  sleepingStatusStackSingle: {
+    gridTemplateColumns: "minmax(0, 1fr)",
+    width: "min(calc(100vw - 96px), 260px)",
   },
   sleepingWorldCard: {
     display: "grid",
@@ -6092,6 +6437,62 @@ const styles = {
     color: "rgba(255,255,255,0.44)",
     cursor: "default",
   },
+  eveningOpeningOverlay: {
+    position: "fixed",
+    inset: 0,
+    zIndex: 88,
+    display: "grid",
+    placeItems: "center",
+    padding: "calc(52px + env(safe-area-inset-top)) 24px calc(36px + env(safe-area-inset-bottom))",
+    boxSizing: "border-box",
+    background: "linear-gradient(180deg, #fdfcf9, #f7f1e7)",
+    color: "#292721",
+  },
+  eveningOpeningPhotoStage: {
+    width: "min(calc(100vw - 54px), 420px)",
+    display: "grid",
+    gap: "18px",
+    justifyItems: "center",
+  },
+  eveningOpeningPhoto: {
+    width: "100%",
+    maxHeight: "68vh",
+    objectFit: "contain",
+    borderRadius: "28px",
+    background: "rgba(255,253,248,0.72)",
+    boxShadow: "0 18px 46px rgba(96,78,54,0.12)",
+    animation: "exchangePhotoIn 1.1s cubic-bezier(0.22, 1, 0.36, 1) both",
+  },
+  eveningOpeningCaption: {
+    margin: 0,
+    color: "#746a5f",
+    fontFamily: "\"Shippori Mincho B1\", \"Hiragino Mincho ProN\", \"Yu Mincho\", serif",
+    fontSize: "17px",
+    fontWeight: 430,
+    letterSpacing: "0.08em",
+  },
+  eveningOpeningPairStage: {
+    width: "min(calc(100vw - 54px), 380px)",
+    display: "grid",
+    gap: "24px",
+    justifyItems: "center",
+  },
+  eveningOpeningPairCard: {
+    width: "100%",
+    display: "grid",
+    gridTemplateColumns: "1fr 28px 1fr",
+    alignItems: "center",
+    gap: "10px",
+  },
+  eveningOpeningTitle: {
+    margin: 0,
+    color: "#292721",
+    fontFamily: "\"Shippori Mincho B1\", \"Hiragino Mincho ProN\", \"Yu Mincho\", serif",
+    fontSize: "22px",
+    fontWeight: 470,
+    lineHeight: 1.42,
+    letterSpacing: "0.08em",
+  },
   exchangeBackdrop: {
     position: "fixed",
     inset: 0,
@@ -6145,6 +6546,16 @@ const styles = {
     color: "#716b60",
     cursor: "pointer",
     flexShrink: 0,
+  },
+  exchangeCloseTextButton: {
+    border: "none",
+    background: "transparent",
+    color: "#9c9286",
+    fontSize: "12px",
+    fontWeight: 540,
+    cursor: "pointer",
+    padding: "4px 2px",
+    lineHeight: 1,
   },
   exchangeReportButton: {
     display: "grid",
@@ -6241,18 +6652,22 @@ const styles = {
     fontWeight: 720,
     lineHeight: 1,
   },
-  exchangePrivateToggle: {
-    display: "inline-flex",
-    alignItems: "center",
+  exchangePrivateToggleButton: {
     justifySelf: "start",
-    gap: "9px",
     minHeight: "32px",
     margin: "0 2px 12px",
-    color: "#716b60",
+    border: "none",
+    background: "transparent",
+    color: "#8b8175",
     fontSize: "12px",
     fontWeight: 540,
-    lineHeight: 1.3,
+    lineHeight: 1.35,
     cursor: "pointer",
+    padding: 0,
+    textAlign: "left",
+  },
+  exchangePrivateToggleButtonActive: {
+    color: "#5f564b",
   },
   exchangePrivateToggleInput: {
     width: "16px",

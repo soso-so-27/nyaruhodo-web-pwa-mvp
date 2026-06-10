@@ -921,150 +921,17 @@ function BetaSupporterPanel({
   onMessageChange: (message: string) => void;
   onSubmit: (event: FormEvent<HTMLFormElement>) => void;
 }) {
-  const isPaymentProblem =
-    billingStatus.status === "past_due" || billingStatus.status === "unpaid";
-  const isCanceled =
-    billingStatus.status === "canceled" ||
-    billingStatus.status === "incomplete_expired";
-
-  if (billingStatus.isBetaSupporter) {
-    return (
-      <div style={styles.betaNote}>
-        <p style={styles.betaNoteTitle}>βサポーターです</p>
-        <p style={styles.betaNoteText}>
-          ねてるねこを支えてくれてありがとう。
-        </p>
-        <button
-          type="button"
-          onClick={onOpenSupporterVoice}
-          style={styles.primaryButton}
-        >
-          サポーターの声を送る
-        </button>
-        {isFeedbackOpen ? (
-          <BetaFeedbackForm
-            category={feedbackCategory}
-            message={feedbackMessage}
-            status={feedbackStatus}
-            isSending={isFeedbackSending}
-            onCategoryChange={onCategoryChange}
-            onMessageChange={onMessageChange}
-            onSubmit={onSubmit}
-          />
-        ) : null}
-        <button
-          type="button"
-          onClick={onOpenPortal}
-          style={styles.secondaryButton}
-          disabled={isBillingLoading || !billingStatus.canManageBilling}
-        >
-          支払いを管理
-        </button>
-        {billingMessage ? (
-          <p style={styles.syncMessage} role="status">
-            {billingMessage}
-          </p>
-        ) : null}
-      </div>
-    );
-  }
-
-  if (isPaymentProblem) {
-    return (
-      <div style={styles.betaNote}>
-        <p style={styles.betaNoteTitle}>お支払いを確認してください</p>
-        <p style={styles.betaNoteText}>
-          βサポーターの状態を続けるには、支払い方法を確認してください。
-        </p>
-        <button
-          type="button"
-          onClick={onOpenPortal}
-          style={styles.primaryButton}
-          disabled={isBillingLoading || !billingStatus.canManageBilling}
-        >
-          支払いを管理
-        </button>
-        {billingMessage ? (
-          <p style={styles.syncMessage} role="status">
-            {billingMessage}
-          </p>
-        ) : null}
-      </div>
-    );
-  }
-
-  if (isCanceled) {
-    return (
-      <div style={styles.betaNote}>
-        <p style={styles.betaNoteTitle}>βサポーターは終了しています</p>
-        {billingStatus.billingConfigured ? (
-          <button
-            type="button"
-            onClick={onStartSupporter}
-            style={styles.primaryButton}
-            disabled={isBillingLoading}
-          >
-            もう一度サポートする
-          </button>
-        ) : (
-          <p style={styles.betaNoteText}>準備中です。</p>
-        )}
-        {billingMessage ? (
-          <p style={styles.syncMessage} role="status">
-            {billingMessage}
-          </p>
-        ) : null}
-      </div>
-    );
-  }
-
   return (
     <div style={styles.betaNote}>
-      <p style={styles.betaNoteTitle}>βサポーター</p>
-      <p style={styles.betaNoteText}>
-        ねてるねこを
-        <br />
-        静かな場所のまま続けるための応援です。
-        <br />
-        <br />
-        月 1,480円
-        <br />
-        <br />
-        お礼として、サポーターの声を送れます。
+      <p style={styles.betaNoteTitle}>
+        {billingStatus.isBetaSupporter ? "βサポーターです" : "βサポーター"}
       </p>
-      <div style={styles.legalLinks}>
-        <a href="/terms" style={styles.legalLink}>
-          利用規約
-        </a>
-        <a href="/privacy" style={styles.legalLink}>
-          プライバシーポリシー
-        </a>
-        <a href="/contact" style={styles.legalLink}>
-          問い合わせ
-        </a>
-        <a href="/cancellation" style={styles.legalLink}>
-          解約方法
-        </a>
-        <a href="/commercial-transactions" style={styles.legalLink}>
-          特商法表記
-        </a>
-      </div>
-      {billingStatus.billingConfigured && betaCapabilities.isBetaParticipant ? (
-        <button
-          type="button"
-          onClick={onStartSupporter}
-          style={styles.primaryButton}
-          disabled={isBillingLoading || !billingStatus.billingConfigured}
-        >
-          {isBillingLoading ? "Stripeへ移動しています" : "βサポーターになる"}
-        </button>
-      ) : (
-        <p style={styles.betaNoteText}>
-          {billingStatus.billingConfigured
-            ? "β参加者としてログインすると、サポーター導線を使えます。"
-            : "準備中です。"}
-        </p>
-      )}
+      <p style={styles.betaNoteText}>
+        これからの ねてるねこと、応援の使いみちを見られます。
+      </p>
+      <a href="/beta-supporter" style={styles.primaryButton}>
+        これからの ねてるねこ
+      </a>
       {billingMessage ? (
         <p style={styles.syncMessage} role="status">
           {billingMessage}

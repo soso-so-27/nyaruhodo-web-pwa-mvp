@@ -279,7 +279,9 @@ test.describe("admin test tool guards", () => {
 
     await expect(page.getByRole("button", { name: "意見を送る" })).toBeVisible();
     await expect(page.getByText("βサポーター", { exact: true })).toBeVisible();
-    await expect(page.getByText("準備中です。")).toBeVisible();
+    await expect(
+      page.getByRole("link", { name: "これからの ねてるねこ" }),
+    ).toBeVisible();
     await expect(
       page.getByRole("button", { name: "βサポーターになる" }),
     ).toBeHidden();
@@ -326,9 +328,63 @@ test.describe("admin test tool guards", () => {
 
     await expect(page.getByText("βサポーターです")).toBeVisible();
     await expect(
-      page.getByRole("button", { name: "サポーターの声を送る" }),
+      page.getByRole("link", { name: "これからの ねてるねこ" }),
     ).toBeVisible();
+    await expect(page.getByRole("button", { name: "支払いを管理" })).toBeHidden();
+
+    await page.getByRole("link", { name: "これからの ねてるねこ" }).click();
+    await page.waitForURL("**/beta-supporter");
+    await expect(page.getByText("これからの ねてるねこ").first()).toBeVisible();
     await expect(page.getByRole("button", { name: "支払いを管理" })).toBeVisible();
+    await expect(
+      page.getByText("機能は なにも せいげんしません。"),
+    ).toBeVisible();
+  });
+
+  test("shows supporter checkout entry for beta participants who are not supporters yet", async ({
+    page,
+  }) => {
+    await page.route("**/api/admin/capabilities", async (route) => {
+      await route.fulfill({
+        contentType: "application/json",
+        body: JSON.stringify({
+          isAdmin: false,
+          testToolsEnabled: false,
+          stockAdminEnabled: false,
+        }),
+      });
+    });
+    await page.route("**/api/beta/capabilities", async (route) => {
+      await route.fulfill({
+        contentType: "application/json",
+        body: JSON.stringify({
+          isLoggedIn: true,
+          isBetaParticipant: true,
+          feedbackEnabled: true,
+          supporterVoiceEnabled: false,
+          isBetaSupporter: false,
+        }),
+      });
+    });
+    await page.route("**/api/billing/status", async (route) => {
+      await route.fulfill({
+        contentType: "application/json",
+        body: JSON.stringify({
+          isLoggedIn: true,
+          billingConfigured: true,
+          isBetaSupporter: false,
+          status: "none",
+          canManageBilling: false,
+        }),
+      });
+    });
+
+    await page.goto("/beta-supporter");
+    await page.waitForLoadState("networkidle");
+
+    await expect(page.getByText("これからの ねてるねこ").first()).toBeVisible();
+    await expect(page.getByRole("button", { name: "応援する" })).toBeVisible();
+    await expect(page.getByRole("button", { name: "支払いを管理" })).toBeHidden();
   });
 });
 

@@ -15,6 +15,10 @@ import {
   type ExchangePhoto,
   type OwnSleepingPhoto,
 } from "../../lib/home/sleepingPhotos";
+import {
+  getEveningDeliveryCompletionCopy,
+  recordEveningDeliveryTarget,
+} from "../../lib/home/eveningDelivery";
 import { trackProductEvent } from "../../lib/analytics/productAnalytics";
 import { isUsablePhotoSrc } from "../../lib/photoStorage";
 import {
@@ -28,7 +32,14 @@ import { PhotoTile } from "../ui/PhotoTile";
 import { WordmarkHeader } from "../ui/AppHeader";
 import { AppIcon } from "../ui/AppIcons";
 
-type OnboardingState = "intro" | "saving" | "delivered" | "empty" | "kept";
+type OnboardingState =
+  | "intro"
+  | "saving"
+  | "envelope"
+  | "revealing"
+  | "delivered"
+  | "empty"
+  | "kept";
 
 const ONBOARDING_ALBUM_COMPLETION_READY_KEY =
   "neteruneko_onboarding_album_completion_ready";
@@ -43,6 +54,7 @@ export function OnboardingFlow() {
   const [message, setMessage] = useState("");
   const [isCandidateAdding, setIsCandidateAdding] = useState(false);
   const [isTestMode, setIsTestMode] = useState(false);
+  const [completionCopy, setCompletionCopy] = useState("");
 
   function markOnboardingAlbumCompletionReady() {
     window.sessionStorage.setItem(ONBOARDING_ALBUM_COMPLETION_READY_KEY, "true");
@@ -125,6 +137,14 @@ export function OnboardingFlow() {
         setSelectedPhotoSrc(dataUrl);
         setPendingOwnPhoto(ownPhoto);
         setIsDeliveredPhotoKept(false);
+        const eveningTarget = recordEveningDeliveryTarget(ownPhoto);
+        trackProductEvent("take_photo", {
+          catId,
+          hour: new Date().getHours(),
+          isExchangeTarget: eveningTarget.isExchangeTarget,
+          source: "onboarding",
+          delivery_date_key: eveningTarget.dateKey,
+        });
 
         const delivered = await deliverOwnSleepingPhoto({
           ownPhoto,
@@ -184,7 +204,23 @@ export function OnboardingFlow() {
     }
 
     window.localStorage.setItem(STORAGE_KEYS.onboardingCompleted, "true");
+    setCompletionCopy(getEveningDeliveryCompletionCopy());
     setState("kept");
+  }
+
+  function handleOpenEnvelope() {
+    if (!deliveredPhoto) {
+      return;
+    }
+
+    trackProductEvent("envelope_opened", {
+      source: "onboarding",
+      photo_id: deliveredPhoto.id,
+    });
+    setState("revealing");
+    window.setTimeout(() => {
+      setState("delivered");
+    }, 1400);
   }
 
   async function deliverOwnSleepingPhoto({
@@ -222,7 +258,11 @@ export function OnboardingFlow() {
 
     setDeliveredPhoto(exchangeResult.photo);
     setIsDeliveredPhotoKept(false);
-    setState("delivered");
+    trackProductEvent("envelope_shown", {
+      source: "onboarding",
+      photo_id: exchangeResult.photo.id,
+    });
+    setState("envelope");
     return true;
   }
 
@@ -385,7 +425,7 @@ export function OnboardingFlow() {
               style={styles.onboardingCta}
               disabled={state === "saving"}
             >
-              {state === "saving" ? "とどいています..." : "ねてるねこを入れる"}
+              {state === "saving" ? "おあずかりしています..." : "ねてるねこを入れる"}
             </AppButton>
             <AppButton type="button" variant="quiet" size="md" onClick={handleGoHome}>
               あとで
@@ -394,12 +434,39 @@ export function OnboardingFlow() {
           </section>
         ) : null}
 
+        {state === "envelope" && deliveredPhoto ? (
+          <section style={styles.result} aria-label="ねがおがとどいています">
+            <h2 style={styles.subTitle}>
+              ねがおが
+              <br />
+              とどいています
+            </h2>
+            <button
+              type="button"
+              onClick={handleOpenEnvelope}
+              style={styles.deliveryEnvelopeButton}
+            >
+              <AppIcon name="mail" size={34} />
+              そっとひらく
+            </button>
+          </section>
+        ) : null}
+
+        {state === "revealing" && deliveredPhoto ? (
+          <section style={styles.result} aria-label="どこかのねがお">
+            <div style={styles.revealingPhotoFrame}>
+              <PhotoTile
+                src={deliveredPhoto.src}
+                label="どこかの ねがお"
+                imageStyle={styles.revealingPhoto}
+              />
+            </div>
+          </section>
+        ) : null}
+
         {state === "delivered" && deliveredPhoto ? (
           <section style={styles.result} aria-label="とどいたねがお">
-            <p style={styles.kicker}>ねがおがとどきました</p>
-            <div style={styles.deliveryEnvelope} aria-hidden="true">
-              <AppIcon name="mail" size={24} />
-            </div>
+            <p style={styles.kicker}>きょうの 2まい</p>
             {selectedPhotoSrc ? (
               <div style={styles.photoPair}>
                 <PhotoTile
@@ -480,6 +547,9 @@ export function OnboardingFlow() {
         {state === "kept" ? (
           <section style={styles.result} aria-label="とっておきました">
             <p style={styles.kicker}>とっておきました</p>
+            {completionCopy ? (
+              <p style={styles.resultText}>{completionCopy}</p>
+            ) : null}
             <h2 style={styles.subTitle}>
               また寝ていたら、
               <br />
@@ -510,9 +580,9 @@ function DeliveryWaiting() {
         <span style={styles.deliveryWaitingDot} />
       </span>
       <span style={styles.deliveryWaitingText}>
-        ねがおが
+        ねがおを
         <br />
-        とどいています
+        おあずかりしました
       </span>
     </div>
   );
@@ -936,6 +1006,39 @@ const styles = {
     border: "1px solid rgba(178,132,116,0.14)",
     boxShadow: "0 10px 24px rgba(90,76,60,0.08)",
     animation: "deliveredEnvelope 460ms cubic-bezier(0.22, 1, 0.36, 1) both",
+  },
+  deliveryEnvelopeButton: {
+    width: "min(46vw, 164px)",
+    height: "min(46vw, 164px)",
+    border: "1px solid rgba(178,132,116,0.16)",
+    borderRadius: "999px",
+    background: "rgba(244,228,221,0.72)",
+    color: "#b98678",
+    display: "inline-flex",
+    flexDirection: "column",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: "16px",
+    boxShadow: "0 16px 38px rgba(90,76,60,0.09)",
+    fontFamily: "-apple-system, BlinkMacSystemFont, \"Segoe UI\", sans-serif",
+    fontSize: "14px",
+    fontWeight: 650,
+    lineHeight: 1,
+    cursor: "pointer",
+    animation: "deliveredEnvelope 460ms cubic-bezier(0.22, 1, 0.36, 1) both",
+  },
+  revealingPhotoFrame: {
+    width: "min(100%, 292px)",
+    display: "grid",
+    justifyItems: "center",
+    animation: "deliveredPhotoIn 780ms cubic-bezier(0.22, 1, 0.36, 1) both",
+  },
+  revealingPhoto: {
+    width: "min(72vw, 268px)",
+    height: "min(72vw, 268px)",
+    objectFit: "cover",
+    borderRadius: "28px",
+    boxShadow: "0 18px 44px rgba(90,76,60,0.12)",
   },
   photoPair: {
     display: "grid",

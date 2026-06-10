@@ -16,12 +16,19 @@ const deliveredDataUrl =
   "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAGQAAABkCAYAAABw4pVUAAAAAXNSR0IArs4c6QAAAARnQU1BAACxjwv8YQUAAAAJcEhZcwAADsMAAA7DAcdvqGQAAAEJSURBVHhe7dExEcAgAMBAJKKuTpnpjoLA/fACchlrzv2C+a0njDPsVmfYrQyJMSTGkBhDYgyJMSTGkBhDYgyJMSTGkBhDYgyJMSTGkBhDYgyJMSTGkBhDYgyJMSTGkBhDYgyJMSTGkBhDYgyJMSTGkBhDYgyJMSTGkBhDYgyJMSTGkBhDYgyJMSTGkBhDYgyJMSTGkBhDYgyJMSTGkBhDYgyJMSTGkBhDYgyJMSTGkBhDYgyJMSTGkBhDYgyJMSTGkBhDYgyJMSTGkBhDYgyJMSTGkBhDYgyJMSTmB4RCEqdGtA/tAAAAAElFTkSuQmCC";
 
 test.describe("home sleeping exchange flow", () => {
-  test("saves the taken photo with compression fallback and keeps the delivered photo", async ({
+  test("saves the taken photo, waits until evening, then keeps the delivered photo", async ({
     page,
   }) => {
     let exchangeCalls = 0;
+    const beforeDelivery = Date.parse("2026-06-10T10:59:00.000Z");
+    const afterDelivery = Date.parse("2026-06-10T11:01:00.000Z");
 
-    await page.addInitScript(() => {
+    await page.addInitScript((now) => {
+      (window as typeof window & { __testNow?: number }).__testNow = now;
+      const originalDateNow = Date.now.bind(Date);
+      Date.now = () =>
+        (window as typeof window & { __testNow?: number }).__testNow ??
+        originalDateNow();
       window.localStorage.setItem("nyaruhodo_sleeping_safety_accepted", "1");
 
       const originalSetItem = Storage.prototype.setItem;
@@ -38,7 +45,7 @@ test.describe("home sleeping exchange flow", () => {
 
         return originalSetItem.call(this, key, value);
       };
-    });
+    }, beforeDelivery);
 
     await page.route("**/api/sleeping-delivery/exchange", async (route) => {
       exchangeCalls += 1;
@@ -70,7 +77,7 @@ test.describe("home sleeping exchange flow", () => {
     await page.goto("/home");
     await page.waitForLoadState("networkidle");
 
-    await page.locator("section").first().locator("button").first().click();
+    await page.getByRole("button", { name: "ねがおをとる" }).click();
     await page.locator('input[type="file"]').last().setInputFiles({
       name: "home-sleeping.svg",
       mimeType: "image/svg+xml",
@@ -80,9 +87,22 @@ test.describe("home sleeping exchange flow", () => {
     await expect(page.locator("section").last().locator("img")).toBeVisible();
     await page.getByRole("button", { name: "とっておく" }).click();
 
+    await page.waitForTimeout(500);
+    expect(exchangeCalls).toBe(0);
+    await expect(
+      page.getByRole("heading", { name: "ねがおを おあずかりしました" }),
+    ).toBeVisible();
+
+    await page.evaluate((now) => {
+      (window as typeof window & { __testNow?: number }).__testNow = now;
+    }, afterDelivery);
+
     await expect.poll(() => exchangeCalls).toBe(1);
-    await expect(page.locator("section").last().locator("img")).toBeVisible();
-    await page.locator("section").last().locator("button").nth(1).click();
+    await expect(page.getByText("ねがおが とどいています")).toBeVisible();
+    await page.getByRole("button", { name: "ねがおをひらく" }).click();
+    await expect(page.getByText("きょうの 2まい")).toBeVisible();
+    await expect(page.getByTestId("evening-opening-pair").locator("img")).toHaveCount(2);
+    await page.getByRole("button", { name: "とっておく" }).click();
 
     const storage = await page.evaluate(() => {
       const readArray = (key: string) => {
@@ -106,12 +126,18 @@ test.describe("home sleeping exchange flow", () => {
     expect(storage.keptExchangePhotos[0]?.src).toMatch(/^data:image\//);
   });
 
-  test("keeps the taken photo without promising delivery while delivery is locked", async ({
+  test("ignores the legacy six-hour lock and uses evening delivery copy", async ({
     page,
   }) => {
     let exchangeCalls = 0;
+    const beforeDelivery = Date.parse("2026-06-10T10:50:00.000Z");
 
-    await page.addInitScript(() => {
+    await page.addInitScript((now) => {
+      (window as typeof window & { __testNow?: number }).__testNow = now;
+      const originalDateNow = Date.now.bind(Date);
+      Date.now = () =>
+        (window as typeof window & { __testNow?: number }).__testNow ??
+        originalDateNow();
       window.localStorage.setItem("nyaruhodo_sleeping_safety_accepted", "1");
       window.localStorage.setItem("active_cat_id", "locked-cat");
       window.localStorage.setItem(
@@ -131,7 +157,7 @@ test.describe("home sleeping exchange flow", () => {
           sleepingCounterLockedUntil: Date.now() + 6 * 60 * 60 * 1000,
         }),
       );
-    });
+    }, beforeDelivery);
 
     await page.route("**/api/sleeping-delivery/exchange", async (route) => {
       exchangeCalls += 1;
@@ -157,11 +183,11 @@ test.describe("home sleeping exchange flow", () => {
     await page.waitForLoadState("networkidle");
 
     await expect(page.getByText("とると、1枚とどく", { exact: true })).toHaveCount(0);
-    await expect(page.getByText("とったねがおに入ります")).toBeVisible();
-    await expect(page.getByText("つぎのねがおまで")).toBeVisible();
-    await expect(page.getByText(/あと .*時間/)).toBeVisible();
+    await expect(page.getByText("とると、よる8じごろ とどく")).toBeVisible();
+    await expect(page.getByText("つぎのねがお")).toBeVisible();
+    await expect(page.getByText(/あと .*時間/)).toHaveCount(0);
 
-    await page.locator("section").first().locator("button").first().click();
+    await page.getByRole("button", { name: "ねがおをとる" }).click();
     await page.locator('input[type="file"]').last().setInputFiles({
       name: "home-sleeping.svg",
       mimeType: "image/svg+xml",
@@ -169,12 +195,12 @@ test.describe("home sleeping exchange flow", () => {
     });
 
     await expect(page.locator("section").last().locator("img")).toBeVisible();
-    await expect(page.getByText(/とっておくと、アルバムに入ります。つぎのねがおまで/)).toBeVisible();
+    await expect(page.getByText(/とっておくと、よる8じごろ とどきます。/)).toBeVisible();
     await page.getByRole("button", { name: "とっておく" }).click();
 
     await page.waitForTimeout(500);
     expect(exchangeCalls).toBe(0);
-    await expect(page.getByText("ねがおがとどきました")).toHaveCount(0);
+    await expect(page.getByText("ねがおが とどいています")).toHaveCount(0);
 
     const storage = await page.evaluate(() => {
       const readArray = (key: string) => {
@@ -194,6 +220,232 @@ test.describe("home sleeping exchange flow", () => {
 
     expect(storage.ownSleepingPhotos.length).toBeGreaterThan(0);
     expect(storage.keptExchangePhotos).toHaveLength(0);
+  });
+
+  test("treats photos after 8pm as tomorrow delivery", async ({ page }) => {
+    let exchangeCalls = 0;
+    const afterDelivery = Date.parse("2026-06-10T11:10:00.000Z");
+
+    await page.addInitScript((now) => {
+      (window as typeof window & { __testNow?: number }).__testNow = now;
+      const originalDateNow = Date.now.bind(Date);
+      Date.now = () =>
+        (window as typeof window & { __testNow?: number }).__testNow ??
+        originalDateNow();
+      window.localStorage.setItem("nyaruhodo_sleeping_safety_accepted", "1");
+      window.localStorage.setItem("active_cat_id", "after-eight-cat");
+      window.localStorage.setItem(
+        "cat_profiles",
+        JSON.stringify([
+          {
+            id: "after-eight-cat",
+            name: "むぎ",
+            createdAt: new Date(now).toISOString(),
+            updatedAt: new Date(now).toISOString(),
+          },
+        ]),
+      );
+    }, afterDelivery);
+
+    await page.route("**/api/sleeping-delivery/exchange", async (route) => {
+      exchangeCalls += 1;
+      await route.fulfill({
+        contentType: "application/json",
+        body: JSON.stringify({ photo: null, source: "none" }),
+      });
+    });
+
+    await page.goto("/home");
+    await page.waitForLoadState("networkidle");
+
+    await expect(
+      page.getByText("いまとると、あしたのよるに とどく", { exact: true }),
+    ).toBeVisible();
+    await page.getByRole("button", { name: "ねがおをとる" }).click();
+    await page.locator('input[type="file"]').last().setInputFiles({
+      name: "after-eight.svg",
+      mimeType: "image/svg+xml",
+      buffer: testSvg,
+    });
+
+    await expect(page.locator("section").last().locator("img")).toBeVisible();
+    await expect(page.getByText(/とっておくと、あしたのよるに とどきます。/)).toBeVisible();
+    await page.getByRole("button", { name: "とっておく" }).click();
+    await page.waitForTimeout(500);
+
+    expect(exchangeCalls).toBe(0);
+
+    const store = await page.evaluate(() => {
+      const parsed = JSON.parse(
+        window.localStorage.getItem("neteruneko_evening_delivery_days") ?? "{}",
+      );
+
+      return Object.keys(parsed);
+    });
+
+    expect(store).toContain("2026-06-11");
+    expect(store).not.toContain("2026-06-10");
+  });
+
+  test("returns to the before state after an opened delivery rolls over to a new day", async ({
+    page,
+  }) => {
+    const nextMorning = Date.parse("2026-06-11T00:30:00.000Z");
+
+    await page.addInitScript((now) => {
+      (window as typeof window & { __testNow?: number }).__testNow = now;
+      const originalDateNow = Date.now.bind(Date);
+      Date.now = () =>
+        (window as typeof window & { __testNow?: number }).__testNow ??
+        originalDateNow();
+      window.localStorage.setItem("nyaruhodo_sleeping_safety_accepted", "1");
+      window.localStorage.setItem("active_cat_id", "rollover-cat");
+      window.localStorage.setItem(
+        "cat_profiles",
+        JSON.stringify([
+          {
+            id: "rollover-cat",
+            name: "むぎ",
+            createdAt: new Date(now).toISOString(),
+            updatedAt: new Date(now).toISOString(),
+          },
+        ]),
+      );
+      window.localStorage.setItem(
+        "neteruneko_evening_delivery_days",
+        JSON.stringify({
+          "2026-06-10": {
+            dateKey: "2026-06-10",
+            targetOwnPhotoId: "old-own",
+            targetCatId: "rollover-cat",
+            deliveredPhoto: {
+              id: "old-delivered",
+              src: "data:image/png;base64,iVBORw0KGgo=",
+              title: "",
+              subtitle: "",
+              triggerLabel: "sleeping",
+              theme: "sleeping",
+              deliveredAt: now - 1000,
+            },
+            openedAt: now - 500,
+            keptAt: now - 400,
+          },
+        }),
+      );
+    }, nextMorning);
+
+    await page.goto("/home");
+    await page.waitForLoadState("networkidle");
+
+    await expect(page.getByText("ねがおが とどいています")).toHaveCount(0);
+    await expect(page.getByText("きょうの 2まい")).toHaveCount(0);
+    await expect(page.getByText("とると、よる8じごろ とどく")).toBeVisible();
+  });
+
+  test("keeps the latest missed evening delivery waiting after a day away", async ({
+    page,
+  }) => {
+    let exchangeCalls = 0;
+    const nextMorning = Date.parse("2026-06-11T01:00:00.000Z");
+
+    await page.addInitScript((payload) => {
+      const { now, photoSrc } = payload as { now: number; photoSrc: string };
+      (window as typeof window & { __testNow?: number }).__testNow = now;
+      const originalDateNow = Date.now.bind(Date);
+      Date.now = () =>
+        (window as typeof window & { __testNow?: number }).__testNow ??
+        originalDateNow();
+      window.localStorage.setItem("nyaruhodo_sleeping_safety_accepted", "1");
+      window.localStorage.setItem("active_cat_id", "missed-cat");
+      window.localStorage.setItem(
+        "cat_profiles",
+        JSON.stringify([
+          {
+            id: "missed-cat",
+            name: "むぎ",
+            createdAt: new Date(now).toISOString(),
+            updatedAt: new Date(now).toISOString(),
+          },
+        ]),
+      );
+      window.localStorage.setItem(
+        "neteruneko_evening_delivery_days",
+        JSON.stringify({
+          "2026-06-09": {
+            dateKey: "2026-06-09",
+            targetOwnPhotoId: "older-own",
+            targetCatId: "missed-cat",
+            targetCapturedAt: now - 2 * 24 * 60 * 60 * 1000,
+          },
+          "2026-06-10": {
+            dateKey: "2026-06-10",
+            targetOwnPhotoId: "latest-own",
+            targetCatId: "missed-cat",
+            targetCapturedAt: now - 24 * 60 * 60 * 1000,
+          },
+        }),
+      );
+      window.localStorage.setItem(
+        "nyaruhodo_exchange_own_sleeping_photos",
+        JSON.stringify([
+          {
+            id: "older-own",
+            catId: "missed-cat",
+            ownerCatId: "missed-cat",
+            src: photoSrc,
+            triggerLabel: "sleeping",
+            theme: "sleeping",
+            createdAt: now - 2 * 24 * 60 * 60 * 1000,
+          },
+          {
+            id: "latest-own",
+            catId: "missed-cat",
+            ownerCatId: "missed-cat",
+            src: photoSrc,
+            triggerLabel: "sleeping",
+            theme: "sleeping",
+            createdAt: now - 24 * 60 * 60 * 1000,
+          },
+        ]),
+      );
+    }, { now: nextMorning, photoSrc: deliveredDataUrl });
+
+    await page.route("**/api/sleeping-delivery/exchange", async (route) => {
+      exchangeCalls += 1;
+      await route.fulfill({
+        contentType: "application/json",
+        body: JSON.stringify({
+          photo: {
+            id: "missed-delivered",
+            sourcePhotoId: "missed-source",
+            src: deliveredDataUrl,
+            title: "",
+            subtitle: "",
+            triggerLabel: "sleeping",
+            theme: "sleeping",
+            deliveredAt: nextMorning,
+          },
+          source: "remote",
+        }),
+      });
+    });
+
+    await page.goto("/home");
+    await page.waitForLoadState("networkidle");
+
+    await expect(page.getByText("ねがおが とどいています")).toBeVisible({
+      timeout: 15000,
+    });
+    expect(exchangeCalls).toBe(1);
+
+    const store = await page.evaluate(() =>
+      JSON.parse(
+        window.localStorage.getItem("neteruneko_evening_delivery_days") ?? "{}",
+      ),
+    );
+
+    expect(store["2026-06-10"]?.deliveredPhoto?.id).toBe("missed-delivered");
+    expect(store["2026-06-09"]?.skippedAt).toBeTruthy();
   });
 
   test("keeps multiple taken photos when iOS storage rejects the first multi-photo write", async ({
@@ -279,7 +531,7 @@ test.describe("home sleeping exchange flow", () => {
     await page.goto("/home");
     await page.waitForLoadState("networkidle");
 
-    await page.locator("section").first().locator("button").first().click();
+    await page.getByRole("button", { name: "ねがおをとる" }).click();
     await page.locator('input[type="file"]').last().setInputFiles({
       name: "home-sleeping-new.svg",
       mimeType: "image/svg+xml",
@@ -354,14 +606,11 @@ test.describe("home sleeping exchange flow", () => {
     await page.waitForLoadState("networkidle");
 
     for (const index of [1, 2]) {
-      await page.evaluate(() => {
-        const buttons = [...document.querySelectorAll("button")].filter((button) => {
-          const rect = button.getBoundingClientRect();
-          return rect.width > 80 && rect.height > 80;
-        });
-
-        buttons[0]?.click();
-      });
+      await page
+        .getByRole("button", {
+          name: index === 1 ? "ねがおをとる" : "いまとると、アルバムに はいります",
+        })
+        .click();
       await page.locator('input[type="file"]').last().setInputFiles({
         name: `same-ms-${index}.svg`,
         mimeType: "image/svg+xml",
