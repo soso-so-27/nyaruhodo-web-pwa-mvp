@@ -17,6 +17,7 @@ import {
   getDailyCollectionTarget,
   readStoredCollectionPhotos,
 } from "../../lib/collection/dailyTarget";
+import { resolveStoredPhotoUrl } from "../../lib/photoStorage";
 import {
   COLLECTION_GROUPS,
   type CollectionSlot,
@@ -883,49 +884,51 @@ export function HomeInput({ recentEvents: _recentEvents }: HomeInputProps) {
       return;
     }
 
-    const exchangePhotoSrc = getExchangePhotoUploadSrc(ownPhoto);
-    const selectedPhotoSrcKind = getTracePhotoSrcKind(exchangePhotoSrc ?? ownPhoto.src);
+    pendingEveningDeliveryKeysRef.current.add(pendingDay.dateKey);
+    void (async () => {
+      const uploadSrc = await resolveExchangePhotoUploadSrc(ownPhoto);
 
-    if (!exchangePhotoSrc) {
+      if (!uploadSrc.src) {
+        recordEveningDeliveryTrace({
+          ...traceBase,
+          gate:
+            selectedPhotoSource === "legacy"
+              ? "legacy_photo_not_data"
+              : "photo_not_data",
+          directOwnPhotoFound: Boolean(directOwnPhoto),
+          targetPhotoFallbackUsed: Boolean(targetPhoto),
+          legacyFallbackUsed: selectedPhotoSource === "legacy",
+          legacyFallbackReason: "non_data_src",
+          selectedPhotoSource,
+          selectedPhotoSrcKind: uploadSrc.srcKind,
+        });
+        pendingEveningDeliveryKeysRef.current.delete(pendingDay.dateKey);
+        return;
+      }
+
       recordEveningDeliveryTrace({
         ...traceBase,
-        gate:
-          selectedPhotoSource === "legacy"
-            ? "legacy_photo_not_data"
-            : "photo_not_data",
+        gate: "exchange_started",
         directOwnPhotoFound: Boolean(directOwnPhoto),
         targetPhotoFallbackUsed: Boolean(targetPhoto),
-        legacyFallbackUsed: selectedPhotoSource === "legacy",
-        legacyFallbackReason: "non_data_src",
+        legacyFallbackUsed: Boolean(legacyPhoto),
         selectedPhotoSource,
-        selectedPhotoSrcKind,
+        selectedPhotoSrcKind: uploadSrc.srcKind,
+        exchangeCalled: true,
       });
-      return;
-    }
 
-    pendingEveningDeliveryKeysRef.current.add(pendingDay.dateKey);
-    recordEveningDeliveryTrace({
-      ...traceBase,
-      gate: "exchange_started",
-      directOwnPhotoFound: Boolean(directOwnPhoto),
-      targetPhotoFallbackUsed: Boolean(targetPhoto),
-      legacyFallbackUsed: Boolean(legacyPhoto),
-      selectedPhotoSource,
-      selectedPhotoSrcKind,
-      exchangeCalled: true,
-    });
+      const result = await createExchangePhoto({
+        ownPhoto: {
+          ...ownPhoto,
+          src: uploadSrc.src,
+        },
+        triggerLabel: ownPhoto.triggerLabel,
+        theme: ownPhoto.theme,
+        category: "sleep",
+        seed: `${pendingDay.dateKey}:${ownPhoto.id}`,
+        recipientCatId: pendingDay.targetCatId ?? activeCatId,
+      });
 
-    void createExchangePhoto({
-      ownPhoto: {
-        ...ownPhoto,
-        src: exchangePhotoSrc,
-      },
-      triggerLabel: ownPhoto.triggerLabel,
-      theme: ownPhoto.theme,
-      category: "sleep",
-      seed: `${pendingDay.dateKey}:${ownPhoto.id}`,
-      recipientCatId: pendingDay.targetCatId ?? activeCatId,
-    }).then((result) => {
       recordEveningDeliveryTrace({
         ...traceBase,
         gate: "exchange_completed",
@@ -933,7 +936,7 @@ export function HomeInput({ recentEvents: _recentEvents }: HomeInputProps) {
         targetPhotoFallbackUsed: Boolean(targetPhoto),
         legacyFallbackUsed: Boolean(legacyPhoto),
         selectedPhotoSource,
-        selectedPhotoSrcKind,
+        selectedPhotoSrcKind: uploadSrc.srcKind,
         exchangeCalled: true,
         exchangeStatus: result.httpStatus,
         exchangePhotoReceived: Boolean(result.photo),
@@ -965,9 +968,9 @@ export function HomeInput({ recentEvents: _recentEvents }: HomeInputProps) {
           isOnboardingInstant: false,
           isDay1Evening: false,
         },
-        { localCatId: pendingDay.targetCatId ?? activeCatId },
-      );
-    });
+          { localCatId: pendingDay.targetCatId ?? activeCatId },
+        );
+    })();
   }, [activeCatId, ownSleepingPhotosForHome, tick]);
 
   useEffect(() => {
@@ -3282,6 +3285,46 @@ function getExchangePhotoUploadSrc(photo: OwnSleepingPhoto) {
     ].find((src): src is string => Boolean(src && isDeliverableDataPhotoSrc(src))) ??
     null
   );
+}
+
+async function resolveExchangePhotoUploadSrc(photo: OwnSleepingPhoto): Promise<{
+  src: string | null;
+  srcKind: ReturnType<typeof getTracePhotoSrcKind>;
+}> {
+  const dataSrc = getExchangePhotoUploadSrc(photo);
+
+  if (dataSrc) {
+    return { src: dataSrc, srcKind: "data" };
+  }
+
+  const candidates = [
+    photo.src,
+    photo.displaySrc,
+    photo.thumbnailSrc,
+    photo.originalSrc,
+  ].filter((src): src is string => Boolean(src));
+  const firstKind = getTracePhotoSrcKind(candidates[0]);
+  const supabase = createBrowserSupabaseClient();
+
+  if (!supabase) {
+    return { src: null, srcKind: firstKind };
+  }
+
+  for (const candidate of candidates) {
+    if (!isStoragePhotoReference(candidate)) {
+      continue;
+    }
+
+    const resolved = await resolveStoredPhotoUrl(supabase, candidate).catch(
+      () => undefined,
+    );
+
+    if (resolved && isDeliverableDataPhotoSrc(resolved)) {
+      return { src: resolved, srcKind: "storage" };
+    }
+  }
+
+  return { src: null, srcKind: firstKind };
 }
 
 function getTracePhotoSrcKind(src: string | null | undefined) {

@@ -660,6 +660,110 @@ test.describe("home sleeping exchange flow", () => {
     await expect.poll(() => exchangeCalls).toBe(1);
   });
 
+  test("downloads a storage-only direct evening photo before exchange", async ({
+    page,
+  }) => {
+    let exchangeCalls = 0;
+    const afterDelivery = Date.parse("2026-06-11T11:14:00.000Z");
+    const capturedAt = Date.parse("2026-06-11T09:45:00.000Z");
+    const imageBytes = Buffer.from(deliveredDataUrl.split(",")[1] ?? "", "base64");
+
+    await page.addInitScript(
+      ({ now, capturedAtValue }) => {
+        const originalDateNow = Date.now.bind(Date);
+        (window as typeof window & { __testNow?: number }).__testNow = now;
+        Date.now = () =>
+          (window as typeof window & { __testNow?: number }).__testNow ??
+          originalDateNow();
+        window.localStorage.setItem("nyaruhodo_sleeping_safety_accepted", "1");
+        window.localStorage.setItem("neteruneko_onboarding_completed", "true");
+        window.localStorage.setItem("active_cat_id", "storage-only-cat");
+        window.localStorage.setItem(
+          "cat_profiles",
+          JSON.stringify([
+            {
+              id: "storage-only-cat",
+              name: "storage only cat",
+              createdAt: new Date(capturedAtValue).toISOString(),
+              updatedAt: new Date(capturedAtValue).toISOString(),
+            },
+          ]),
+        );
+        window.localStorage.setItem(
+          "neteruneko_evening_delivery_days",
+          JSON.stringify({
+            "2026-06-11": {
+              dateKey: "2026-06-11",
+              targetOwnPhotoId: "storage-only-photo",
+              targetCatId: "storage-only-cat",
+              targetCapturedAt: capturedAtValue,
+            },
+          }),
+        );
+        window.localStorage.setItem(
+          "nyaruhodo_exchange_own_sleeping_photos",
+          JSON.stringify([
+            {
+              id: "storage-only-photo",
+              ownerCatId: "storage-only-cat",
+              catId: "storage-only-cat",
+              src: "storage:test-user/storage-only-cat/sleeping/display.jpg",
+              originalSrc:
+                "storage:test-user/storage-only-cat/sleeping/original.jpg",
+              triggerLabel: "sleeping",
+              theme: "sleeping",
+              shared: true,
+              createdAt: capturedAtValue,
+            },
+          ]),
+        );
+      },
+      { now: afterDelivery, capturedAtValue: capturedAt },
+    );
+
+    await page.route("**/storage/v1/object/**", async (route) => {
+      await route.fulfill({
+        contentType: "image/png",
+        body: imageBytes,
+      });
+    });
+    await page.route("**/api/presence", async (route) => {
+      await route.fulfill({
+        contentType: "application/json",
+        body: JSON.stringify({ count: null }),
+      });
+    });
+    await page.route("**/api/sleeping-delivery/exchange", async (route) => {
+      exchangeCalls += 1;
+      const body = route.request().postDataJSON() as {
+        ownPhoto?: { id?: string; src?: string };
+      };
+      expect(body.ownPhoto?.id).toBe("storage-only-photo");
+      expect(body.ownPhoto?.src).toMatch(/^data:image\/png;base64,/);
+      await route.fulfill({
+        contentType: "application/json",
+        body: JSON.stringify({
+          photo: {
+            id: "storage-only-delivered",
+            sourcePhotoId: "storage-only-source",
+            src: deliveredDataUrl,
+            title: "",
+            subtitle: "",
+            triggerLabel: "sleeping",
+            theme: "sleeping",
+            deliveredAt: afterDelivery,
+          },
+          source: "remote",
+        }),
+      });
+    });
+
+    await page.goto("/home");
+    await page.waitForLoadState("networkidle");
+
+    await expect.poll(() => exchangeCalls).toBe(1);
+  });
+
   test("delivers from the stored target photo when a logged-in restore has no own photo row", async ({
     page,
   }) => {
