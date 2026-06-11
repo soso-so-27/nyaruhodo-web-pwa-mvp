@@ -883,15 +883,22 @@ export function HomeInput({ recentEvents: _recentEvents }: HomeInputProps) {
       return;
     }
 
-    if (selectedPhotoSource === "legacy" && !isDeliverableDataPhotoSrc(ownPhoto.src)) {
+    const exchangePhotoSrc = getExchangePhotoUploadSrc(ownPhoto);
+    const selectedPhotoSrcKind = getTracePhotoSrcKind(exchangePhotoSrc ?? ownPhoto.src);
+
+    if (!exchangePhotoSrc) {
       recordEveningDeliveryTrace({
         ...traceBase,
-        gate: "legacy_photo_not_data",
-        directOwnPhotoFound: false,
-        targetPhotoFallbackUsed: false,
-        legacyFallbackUsed: true,
+        gate:
+          selectedPhotoSource === "legacy"
+            ? "legacy_photo_not_data"
+            : "photo_not_data",
+        directOwnPhotoFound: Boolean(directOwnPhoto),
+        targetPhotoFallbackUsed: Boolean(targetPhoto),
+        legacyFallbackUsed: selectedPhotoSource === "legacy",
         legacyFallbackReason: "non_data_src",
         selectedPhotoSource,
+        selectedPhotoSrcKind,
       });
       return;
     }
@@ -904,13 +911,14 @@ export function HomeInput({ recentEvents: _recentEvents }: HomeInputProps) {
       targetPhotoFallbackUsed: Boolean(targetPhoto),
       legacyFallbackUsed: Boolean(legacyPhoto),
       selectedPhotoSource,
+      selectedPhotoSrcKind,
       exchangeCalled: true,
     });
 
     void createExchangePhoto({
       ownPhoto: {
         ...ownPhoto,
-        src: ownPhoto.originalSrc ?? ownPhoto.displaySrc ?? ownPhoto.src,
+        src: exchangePhotoSrc,
       },
       triggerLabel: ownPhoto.triggerLabel,
       theme: ownPhoto.theme,
@@ -925,6 +933,7 @@ export function HomeInput({ recentEvents: _recentEvents }: HomeInputProps) {
         targetPhotoFallbackUsed: Boolean(targetPhoto),
         legacyFallbackUsed: Boolean(legacyPhoto),
         selectedPhotoSource,
+        selectedPhotoSrcKind,
         exchangeCalled: true,
         exchangeStatus: result.httpStatus,
         exchangePhotoReceived: Boolean(result.photo),
@@ -3261,6 +3270,28 @@ function findLegacyEveningDeliveryPhoto(
 
 function isDeliverableDataPhotoSrc(src: string) {
   return /^data:image\//.test(src);
+}
+
+function getExchangePhotoUploadSrc(photo: OwnSleepingPhoto) {
+  return (
+    [
+      photo.src,
+      photo.displaySrc,
+      photo.thumbnailSrc,
+      photo.originalSrc,
+    ].find((src): src is string => Boolean(src && isDeliverableDataPhotoSrc(src))) ??
+    null
+  );
+}
+
+function getTracePhotoSrcKind(src: string | null | undefined) {
+  if (!src) return "empty" as const;
+  if (src.startsWith("data:image/")) return "data" as const;
+  if (src.startsWith("storage:") || src.startsWith("storage://")) {
+    return "storage" as const;
+  }
+  if (src.startsWith("http://") || src.startsWith("https://")) return "http" as const;
+  return "other" as const;
 }
 
 function getDayCycleState(eveningState: EveningHomeState): DayCycleState {

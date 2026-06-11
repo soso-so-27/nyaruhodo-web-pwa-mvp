@@ -1179,6 +1179,7 @@ function EveningDeliveryTracePanel({
           }
         />
         <AuthDebugRow label="選択" value={latest.selectedPhotoSource} />
+        <AuthDebugRow label="送信画像" value={latest.selectedPhotoSrcKind ?? "-"} />
         <AuthDebugRow
           label="exchange"
           value={
@@ -1515,6 +1516,8 @@ function formatTraceGate(gate: EveningDeliveryTraceEntry["gate"]) {
       return "already pending";
     case "missing_photo":
       return "missing photo";
+    case "photo_not_data":
+      return "photo non-data";
     case "legacy_photo_not_data":
       return "legacy non-data";
     case "exchange_started":

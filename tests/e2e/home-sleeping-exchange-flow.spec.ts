@@ -563,6 +563,103 @@ test.describe("home sleeping exchange flow", () => {
     expect(store["2026-06-11"]?.deliveredPhoto?.id).toBe("legacy-delivered");
   });
 
+  test("uses a data image variant for direct evening delivery matches", async ({
+    page,
+  }) => {
+    let exchangeCalls = 0;
+    const afterDelivery = Date.parse("2026-06-11T11:12:00.000Z");
+    const capturedAt = Date.parse("2026-06-11T09:40:00.000Z");
+
+    await page.addInitScript(
+      ({ now, capturedAtValue, photoSrc }) => {
+        const originalDateNow = Date.now.bind(Date);
+        (window as typeof window & { __testNow?: number }).__testNow = now;
+        Date.now = () =>
+          (window as typeof window & { __testNow?: number }).__testNow ??
+          originalDateNow();
+        window.localStorage.setItem("nyaruhodo_sleeping_safety_accepted", "1");
+        window.localStorage.setItem("neteruneko_onboarding_completed", "true");
+        window.localStorage.setItem("active_cat_id", "direct-storage-cat");
+        window.localStorage.setItem(
+          "cat_profiles",
+          JSON.stringify([
+            {
+              id: "direct-storage-cat",
+              name: "direct storage cat",
+              createdAt: new Date(capturedAtValue).toISOString(),
+              updatedAt: new Date(capturedAtValue).toISOString(),
+            },
+          ]),
+        );
+        window.localStorage.setItem(
+          "neteruneko_evening_delivery_days",
+          JSON.stringify({
+            "2026-06-11": {
+              dateKey: "2026-06-11",
+              targetOwnPhotoId: "direct-photo-with-storage-original",
+              targetCatId: "direct-storage-cat",
+              targetCapturedAt: capturedAtValue,
+            },
+          }),
+        );
+        window.localStorage.setItem(
+          "nyaruhodo_exchange_own_sleeping_photos",
+          JSON.stringify([
+            {
+              id: "direct-photo-with-storage-original",
+              ownerCatId: "direct-storage-cat",
+              catId: "direct-storage-cat",
+              src: photoSrc,
+              originalSrc: "storage://direct-storage-cat/sleeping/original.jpg",
+              displaySrc: "storage://direct-storage-cat/sleeping/display.jpg",
+              triggerLabel: "sleeping",
+              theme: "sleeping",
+              shared: true,
+              createdAt: capturedAtValue,
+            },
+          ]),
+        );
+      },
+      { now: afterDelivery, capturedAtValue: capturedAt, photoSrc: deliveredDataUrl },
+    );
+
+    await page.route("**/api/presence", async (route) => {
+      await route.fulfill({
+        contentType: "application/json",
+        body: JSON.stringify({ count: null }),
+      });
+    });
+    await page.route("**/api/sleeping-delivery/exchange", async (route) => {
+      exchangeCalls += 1;
+      const body = route.request().postDataJSON() as {
+        ownPhoto?: { id?: string; src?: string };
+      };
+      expect(body.ownPhoto?.id).toBe("direct-photo-with-storage-original");
+      expect(body.ownPhoto?.src).toMatch(/^data:image\//);
+      await route.fulfill({
+        contentType: "application/json",
+        body: JSON.stringify({
+          photo: {
+            id: "direct-storage-delivered",
+            sourcePhotoId: "direct-storage-source",
+            src: deliveredDataUrl,
+            title: "",
+            subtitle: "",
+            triggerLabel: "sleeping",
+            theme: "sleeping",
+            deliveredAt: afterDelivery,
+          },
+          source: "remote",
+        }),
+      });
+    });
+
+    await page.goto("/home");
+    await page.waitForLoadState("networkidle");
+
+    await expect.poll(() => exchangeCalls).toBe(1);
+  });
+
   test("delivers from the stored target photo when a logged-in restore has no own photo row", async ({
     page,
   }) => {

@@ -9,6 +9,7 @@ export type EveningDeliveryTraceEntry = {
     | "missing_target_or_cat"
     | "already_pending"
     | "missing_photo"
+    | "photo_not_data"
     | "legacy_photo_not_data"
     | "exchange_started"
     | "exchange_completed";
@@ -24,6 +25,7 @@ export type EveningDeliveryTraceEntry = {
   legacyFallbackUsed: boolean;
   legacyFallbackReason?: string;
   selectedPhotoSource: "direct" | "targetPhoto" | "legacy" | "none";
+  selectedPhotoSrcKind?: "data" | "storage" | "http" | "other" | "empty";
   exchangeCalled: boolean;
   exchangeStatus?: number | null;
   exchangePhotoReceived?: boolean;
