@@ -2730,7 +2730,7 @@ function SleepingPhotoHome({
     isBefore && catName
       ? `${catName}、ねてる？`
       : isWaiting
-        ? "ねがおを おあずかりしました"
+        ? "おあずかり中"
         : isDelivered
           ? "ねがおが とどいています"
           : "きょうの 2まい";

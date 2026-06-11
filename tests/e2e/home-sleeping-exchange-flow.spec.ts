@@ -90,7 +90,7 @@ test.describe("home sleeping exchange flow", () => {
     await page.waitForTimeout(500);
     expect(exchangeCalls).toBe(0);
     await expect(
-      page.getByRole("heading", { name: "ねがおを おあずかりしました" }),
+      page.getByRole("heading", { name: "おあずかり中" }),
     ).toBeVisible();
 
     await page.evaluate((now) => {
