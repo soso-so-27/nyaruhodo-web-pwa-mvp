@@ -75,7 +75,7 @@ test.describe("sleeping delivery pool guards", () => {
     ).toBe(false);
   });
 
-  test("treats storage paths as non-deliverable for beta exchange", () => {
+  test("detects storage paths used by delivery exchange", () => {
     expect(isStorageDeliveryPhotoUrl("storage:user/cat/sleeping/photo.jpg")).toBe(
       true,
     );
@@ -225,7 +225,6 @@ test.describe("sleeping delivery pool guards", () => {
         sourceOwnPhotoId: exchange.photo.sourcePhotoId,
         src: exchange.photo.src,
       });
-      expect(exchange.photo.src).not.toMatch(/^storage:/);
     }
   });
 });
@@ -241,11 +240,7 @@ function expectCandidateIsNotTestPoolPhoto(photo: {
   );
   expect(isBlockedDeliveryPhotoUrl(photo.src ?? "")).toBe(false);
   expect(photo.src ?? "").not.toContain("placecats.com");
-  expect(photo.src ?? "").not.toMatch(/^storage:/);
-
-  if (photo.sourceCatId === "admin-stock") {
-    expect(photo.src ?? "").toMatch(/^(data:image\/|https?:\/\/)/);
-  }
+  expect(photo.src ?? "").toMatch(/^(data:image\/|https?:\/\/|storage:)/);
 }
 
 function buildExchangeRequest(

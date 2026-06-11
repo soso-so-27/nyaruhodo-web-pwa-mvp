@@ -102,6 +102,7 @@ const RATE_LIMIT_PER_HOUR = 60;
 const RATE_LIMIT_WINDOW_MINUTE_MS = 60 * 1000;
 const RATE_LIMIT_WINDOW_HOUR_MS = 60 * 60 * 1000;
 const RATE_LIMIT_MAX_BUCKETS = 1000;
+const FAST_STORAGE_CANDIDATE_LIMIT = 80;
 const exchangeRateLimitBuckets = new Map<string, RateLimitBucket>();
 
 export async function POST(request: Request) {
@@ -117,7 +118,9 @@ export async function POST(request: Request) {
 }
 
 async function handleExchangePost(request: Request) {
+  const timing = createExchangeTiming();
   const parsedInput = await readExchangeRequest(request);
+  markExchangeTiming(timing, "read_request");
 
   if (!parsedInput.ok) {
     return exchangeError(parsedInput.error, parsedInput.status);
@@ -156,6 +159,7 @@ async function handleExchangePost(request: Request) {
   const user = shouldAddOwnPhotoToPool
     ? await getAuthenticatedUserForRequest(request)
     : null;
+  markExchangeTiming(timing, "auth");
   const userId = user?.id ?? null;
   const anonymousId = userId ? null : input.anonymousId;
   const adminSupabase = createSupabaseAdminClient();
@@ -224,10 +228,9 @@ async function handleExchangePost(request: Request) {
       );
     }
   }
+  markExchangeTiming(timing, "own_photo");
 
   const blockedPhotoIds = new Set(input.blockedPhotoIds ?? []);
-  const remoteRows = await readRemoteCandidateRows(supabase);
-  const diagnosticsBase = buildDiagnostics(remoteRows, blockedPhotoIds);
   const deliverableContext = {
     userId,
     anonymousId,
@@ -235,24 +238,51 @@ async function handleExchangePost(request: Request) {
     excludePhotoId: ownPhoto.id,
     blockedPhotoIds,
   };
-  const candidates = remoteRows.filter((row) =>
+
+  const fastRows = await readFastStorageCandidateRows(supabase);
+  markExchangeTiming(timing, "read_fast_storage");
+  const fastCandidates = fastRows.filter((row) =>
     isRowDeliverable(row, deliverableContext),
   );
-  const fallbackCandidates =
-    candidates.length === 0
-      ? remoteRows.filter((row) =>
-          isFallbackDeliverable(row, deliverableContext),
-        )
-      : [];
-  const candidatePool =
-    candidates.length > 0 ? candidates : fallbackCandidates;
-  const selected = await selectCandidate(
-    preferStorageCandidates(candidatePool),
-    input,
-    supabase,
-  );
+  let diagnosticsBase = buildDiagnostics(fastRows, blockedPhotoIds);
+  let candidates = fastCandidates;
+  let fallbackCandidates: RemoteCatMomentRow[] = [];
+  let candidatePool = fastCandidates;
+  let selected = await selectCandidate(fastCandidates, input, supabase);
+  let fastPathActive = Boolean(selected);
+  markExchangeTiming(timing, "select_fast_storage");
 
   if (!selected) {
+    const remoteRows = await readRemoteCandidateRows(supabase);
+    markExchangeTiming(timing, "read_full_pool");
+    diagnosticsBase = buildDiagnostics(remoteRows, blockedPhotoIds);
+    candidates = remoteRows.filter((row) =>
+      isRowDeliverable(row, deliverableContext),
+    );
+    fallbackCandidates =
+      candidates.length === 0
+        ? remoteRows.filter((row) =>
+            isFallbackDeliverable(row, deliverableContext),
+          )
+        : [];
+    candidatePool =
+      candidates.length > 0 ? candidates : fallbackCandidates;
+    selected = await selectCandidate(
+      preferStorageCandidates(candidatePool),
+      input,
+      supabase,
+    );
+    fastPathActive = false;
+    markExchangeTiming(timing, "select_full_pool");
+  }
+
+  if (!selected) {
+    logExchangeTiming(timing, {
+      result: "none",
+      fastPathActive,
+      fastCandidateCount: fastCandidates.length,
+      candidateCount: candidatePool.length,
+    });
     return NextResponse.json({
       photo: null,
       source: "none",
@@ -264,6 +294,9 @@ async function handleExchangePost(request: Request) {
         fallbackCandidateCount: fallbackCandidates.length,
         fallbackActive: candidates.length === 0 && fallbackCandidates.length > 0,
         excludedCount: Math.max(0, diagnosticsBase.availableCount - candidatePool.length),
+        fastPathActive,
+        fastCandidateCount: fastCandidates.length,
+        timing,
       },
     });
   }
@@ -278,6 +311,7 @@ async function handleExchangePost(request: Request) {
     resolvedSrc: selected.src,
     canUseStorage: Boolean(adminSupabase),
   });
+  markExchangeTiming(timing, "delivery_photo");
   const photo: ExchangePhoto = {
     id: localDeliveryId,
     sourcePhotoId: selected.row.local_moment_id,
@@ -318,6 +352,14 @@ async function handleExchangePost(request: Request) {
       );
     }
   }
+  markExchangeTiming(timing, "insert_delivery");
+  logExchangeTiming(timing, {
+    result: "remote",
+    fastPathActive,
+    fastCandidateCount: fastCandidates.length,
+    candidateCount: candidatePool.length,
+    selectedStorage: Boolean(getStoragePhotoPath(selected.row.photo_url)),
+  });
 
   return NextResponse.json({
     photo,
@@ -330,6 +372,9 @@ async function handleExchangePost(request: Request) {
       fallbackCandidateCount: fallbackCandidates.length,
       fallbackActive: candidates.length === 0 && fallbackCandidates.length > 0,
       excludedCount: Math.max(0, diagnosticsBase.availableCount - candidatePool.length),
+      fastPathActive,
+      fastCandidateCount: fastCandidates.length,
+      timing,
     },
   });
 }
@@ -648,6 +693,24 @@ async function readRemoteCandidateRows(
   return (data ?? []) as RemoteCatMomentRow[];
 }
 
+async function readFastStorageCandidateRows(
+  supabase: SupabaseClient,
+) {
+  const { data } = await supabase
+    .from("cat_moments")
+    .select(
+      "id, user_id, anonymous_id, local_moment_id, local_cat_id, owner_cat_id, photo_url, delivery_status, metadata, created_at",
+    )
+    .eq("visibility", "shared")
+    .eq("delivery_status", "available")
+    .eq("metadata->>pool_kind", "admin_stock")
+    .like("photo_url", "storage%")
+    .order("created_at", { ascending: false })
+    .limit(FAST_STORAGE_CANDIDATE_LIMIT);
+
+  return (data ?? []) as RemoteCatMomentRow[];
+}
+
 function isRowDeliverable(
   row: RemoteCatMomentRow,
   {
@@ -853,6 +916,14 @@ async function toResolvedCandidate(
   row: RemoteCatMomentRow,
   supabase: SupabaseClient,
 ): Promise<Candidate | null> {
+  if (getStoragePhotoPath(row.photo_url)) {
+    return {
+      row,
+      src: row.photo_url,
+      tags: readTags(row.metadata),
+    };
+  }
+
   const src = await resolvePhotoUrl(row.photo_url, supabase);
 
   if (!src || !isUsablePhotoSrc(src)) {
@@ -934,6 +1005,31 @@ function hashText(value: string) {
   }
 
   return Math.abs(hash);
+}
+
+function createExchangeTiming() {
+  return {
+    startedAt: Date.now(),
+    marks: [] as { label: string; elapsedMs: number }[],
+  };
+}
+
+function markExchangeTiming(
+  timing: ReturnType<typeof createExchangeTiming>,
+  label: string,
+) {
+  timing.marks.push({ label, elapsedMs: Date.now() - timing.startedAt });
+}
+
+function logExchangeTiming(
+  timing: ReturnType<typeof createExchangeTiming>,
+  details: Record<string, unknown>,
+) {
+  console.info("[sleeping-delivery/exchange] timing", {
+    ...details,
+    totalMs: Date.now() - timing.startedAt,
+    marks: timing.marks,
+  });
 }
 
 function toStringOrDefault(value: unknown, fallback: string) {
