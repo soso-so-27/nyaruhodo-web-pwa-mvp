@@ -56,6 +56,8 @@ type RemoteCatMomentRow = {
   created_at: string;
 };
 
+type FastStockCandidateRow = Omit<RemoteCatMomentRow, "photo_url">;
+
 type Candidate = {
   row: RemoteCatMomentRow;
   src: string;
@@ -103,6 +105,7 @@ const RATE_LIMIT_WINDOW_MINUTE_MS = 60 * 1000;
 const RATE_LIMIT_WINDOW_HOUR_MS = 60 * 60 * 1000;
 const RATE_LIMIT_MAX_BUCKETS = 1000;
 const FAST_STORAGE_CANDIDATE_LIMIT = 80;
+const FAST_STORAGE_CANDIDATE_PROBE_LIMIT = 12;
 const exchangeRateLimitBuckets = new Map<string, RateLimitBucket>();
 
 export async function POST(request: Request) {
@@ -239,16 +242,21 @@ async function handleExchangePost(request: Request) {
     blockedPhotoIds,
   };
 
-  const fastRows = await readFastStorageCandidateRows(supabase);
+  const fastRows = await readFastStockCandidateRows(supabase);
   markExchangeTiming(timing, "read_fast_storage");
   const fastCandidates = fastRows.filter((row) =>
-    isRowDeliverable(row, deliverableContext),
+    isFastStockCandidateDeliverable(row, deliverableContext),
   );
-  let diagnosticsBase = buildDiagnostics(fastRows, blockedPhotoIds);
-  let candidates = fastCandidates;
+  let diagnosticsBase = buildDiagnostics([], blockedPhotoIds);
+  let candidates: RemoteCatMomentRow[] = [];
   let fallbackCandidates: RemoteCatMomentRow[] = [];
-  let candidatePool = fastCandidates;
-  let selected = await selectCandidate(fastCandidates, input, supabase);
+  let candidatePool: RemoteCatMomentRow[] = [];
+  let selected = await selectFastStorageCandidate(
+    fastCandidates,
+    input,
+    supabase,
+    deliverableContext,
+  );
   let fastPathActive = Boolean(selected);
   markExchangeTiming(timing, "select_fast_storage");
 
@@ -274,6 +282,10 @@ async function handleExchangePost(request: Request) {
     );
     fastPathActive = false;
     markExchangeTiming(timing, "select_full_pool");
+  } else {
+    diagnosticsBase = buildDiagnostics([selected.row], blockedPhotoIds);
+    candidates = [selected.row];
+    candidatePool = [selected.row];
   }
 
   if (!selected) {
@@ -693,22 +705,56 @@ async function readRemoteCandidateRows(
   return (data ?? []) as RemoteCatMomentRow[];
 }
 
-async function readFastStorageCandidateRows(
+async function readFastStockCandidateRows(
   supabase: SupabaseClient,
 ) {
   const { data } = await supabase
     .from("cat_moments")
     .select(
-      "id, user_id, anonymous_id, local_moment_id, local_cat_id, owner_cat_id, photo_url, delivery_status, metadata, created_at",
+      "id, user_id, anonymous_id, local_moment_id, local_cat_id, owner_cat_id, delivery_status, metadata, created_at",
     )
     .eq("visibility", "shared")
     .eq("delivery_status", "available")
-    .eq("metadata->>pool_kind", "admin_stock")
-    .like("photo_url", "storage%")
+    .like("local_moment_id", "stock-sleeping-%")
     .order("created_at", { ascending: false })
     .limit(FAST_STORAGE_CANDIDATE_LIMIT);
 
-  return (data ?? []) as RemoteCatMomentRow[];
+  return (data ?? []) as FastStockCandidateRow[];
+}
+
+function isFastStockCandidateDeliverable(
+  row: FastStockCandidateRow,
+  {
+    userId,
+    anonymousId,
+    recipientCatId,
+    excludePhotoId,
+    blockedPhotoIds,
+  }: {
+    userId: string | null;
+    anonymousId: string | null;
+    recipientCatId: string | null;
+    excludePhotoId: string;
+    blockedPhotoIds: Set<string>;
+  },
+) {
+  if (userId && row.user_id === userId) {
+    return false;
+  }
+  if (!userId && anonymousId && row.anonymous_id === anonymousId) {
+    return false;
+  }
+  if (
+    recipientCatId &&
+    (row.local_cat_id === recipientCatId || row.owner_cat_id === recipientCatId)
+  ) {
+    return false;
+  }
+  if (row.id === excludePhotoId || row.local_moment_id === excludePhotoId) {
+    return false;
+  }
+
+  return !blockedPhotoIds.has(row.id) && !blockedPhotoIds.has(row.local_moment_id);
 }
 
 function isRowDeliverable(
@@ -910,6 +956,77 @@ async function selectCandidate(
   }
 
   return null;
+}
+
+async function selectFastStorageCandidate(
+  rows: FastStockCandidateRow[],
+  input: Required<ExchangeRequest>,
+  supabase: SupabaseClient,
+  deliverableContext: Parameters<typeof isRowDeliverable>[1],
+) {
+  if (rows.length === 0) {
+    return null;
+  }
+
+  if (input.preferredSourcePhotoId) {
+    const preferredRow = rows.find(
+      (row) =>
+        row.id === input.preferredSourcePhotoId ||
+        row.local_moment_id === input.preferredSourcePhotoId,
+    );
+    const preferredCandidate = preferredRow
+      ? await fetchFastStorageCandidate(preferredRow, supabase, deliverableContext)
+      : null;
+
+    if (preferredCandidate) {
+      return preferredCandidate;
+    }
+  }
+
+  const startIndex =
+    hashText(`${input.seed}:${input.triggerLabel}:${input.theme}`) %
+    rows.length;
+  const probeCount = Math.min(rows.length, FAST_STORAGE_CANDIDATE_PROBE_LIMIT);
+
+  for (let offset = 0; offset < probeCount; offset += 1) {
+    const row = rows[(startIndex + offset) % rows.length];
+    const candidate = await fetchFastStorageCandidate(
+      row,
+      supabase,
+      deliverableContext,
+    );
+
+    if (candidate) {
+      return candidate;
+    }
+  }
+
+  return null;
+}
+
+async function fetchFastStorageCandidate(
+  row: FastStockCandidateRow,
+  supabase: SupabaseClient,
+  deliverableContext: Parameters<typeof isRowDeliverable>[1],
+) {
+  const { data } = await supabase
+    .from("cat_moments")
+    .select(
+      "id, user_id, anonymous_id, local_moment_id, local_cat_id, owner_cat_id, photo_url, delivery_status, metadata, created_at",
+    )
+    .eq("id", row.id)
+    .maybeSingle();
+  const fullRow = data as RemoteCatMomentRow | null;
+
+  if (
+    !fullRow ||
+    !getStoragePhotoPath(fullRow.photo_url) ||
+    !isRowDeliverable(fullRow, deliverableContext)
+  ) {
+    return null;
+  }
+
+  return toResolvedCandidate(fullRow, supabase);
 }
 
 async function toResolvedCandidate(
