@@ -451,6 +451,136 @@ test.describe("home sleeping exchange flow", () => {
     expect(store["2026-06-09"]?.skippedAt).toBeTruthy();
   });
 
+  test("delivers from the stored target photo when a logged-in restore has no own photo row", async ({
+    page,
+  }) => {
+    let exchangeCalls = 0;
+    const afterDelivery = Date.parse("2026-06-11T11:05:00.000Z");
+
+    await page.addInitScript(
+      ({ now, photoSrc }) => {
+        const originalDateNow = Date.now.bind(Date);
+        (window as typeof window & { __testNow?: number }).__testNow = now;
+        Date.now = () =>
+          (window as typeof window & { __testNow?: number }).__testNow ??
+          originalDateNow();
+        window.localStorage.setItem("nyaruhodo_sleeping_safety_accepted", "1");
+        window.localStorage.setItem("neteruneko_onboarding_completed", "true");
+        window.localStorage.setItem("active_cat_id", "logged-in-cat");
+        window.localStorage.setItem(
+          "cat_profiles",
+          JSON.stringify([
+            {
+              id: "logged-in-cat",
+              name: "login cat",
+              createdAt: new Date(now).toISOString(),
+              updatedAt: new Date(now).toISOString(),
+            },
+          ]),
+        );
+        window.localStorage.setItem(
+          "neteruneko_evening_delivery_days",
+          JSON.stringify({
+            "2026-06-11": {
+              dateKey: "2026-06-11",
+              targetOwnPhotoId: "restored-target-only",
+              targetCatId: "logged-in-cat",
+              targetCapturedAt: now - 2 * 60 * 60 * 1000,
+              targetPhoto: {
+                id: "restored-target-only",
+                ownerCatId: "logged-in-cat",
+                catId: "logged-in-cat",
+                src: photoSrc,
+                triggerLabel: "sleeping",
+                theme: "sleeping",
+                shared: true,
+                createdAt: now - 2 * 60 * 60 * 1000,
+              },
+            },
+          }),
+        );
+        window.localStorage.removeItem("nyaruhodo_exchange_own_sleeping_photos");
+      },
+      { now: afterDelivery, photoSrc: deliveredDataUrl },
+    );
+
+    await page.route("**/api/admin/capabilities", async (route) => {
+      await route.fulfill({
+        contentType: "application/json",
+        body: JSON.stringify({
+          isAdmin: false,
+          testToolsEnabled: false,
+          stockAdminEnabled: false,
+        }),
+      });
+    });
+    await page.route("**/api/beta/capabilities", async (route) => {
+      await route.fulfill({
+        contentType: "application/json",
+        body: JSON.stringify({
+          isLoggedIn: true,
+          isBetaParticipant: true,
+          feedbackEnabled: true,
+          supporterVoiceEnabled: true,
+        }),
+      });
+    });
+    await page.route("**/api/billing/status", async (route) => {
+      await route.fulfill({
+        contentType: "application/json",
+        body: JSON.stringify({
+          isLoggedIn: true,
+          billingConfigured: true,
+          isBetaSupporter: false,
+          status: "none",
+          canManageBilling: false,
+        }),
+      });
+    });
+    await page.route("**/api/presence", async (route) => {
+      await route.fulfill({
+        contentType: "application/json",
+        body: JSON.stringify({ count: null }),
+      });
+    });
+    await page.route("**/api/sleeping-delivery/exchange", async (route) => {
+      exchangeCalls += 1;
+      const body = route.request().postDataJSON() as {
+        ownPhoto?: { id?: string };
+      };
+      expect(body.ownPhoto?.id).toBe("restored-target-only");
+      await route.fulfill({
+        contentType: "application/json",
+        body: JSON.stringify({
+          photo: {
+            id: "restored-delivered",
+            sourcePhotoId: "restored-source",
+            src: deliveredDataUrl,
+            title: "",
+            subtitle: "",
+            triggerLabel: "sleeping",
+            theme: "sleeping",
+            deliveredAt: afterDelivery,
+          },
+          source: "remote",
+        }),
+      });
+    });
+
+    await page.goto("/home");
+    await page.waitForLoadState("networkidle");
+
+    await expect.poll(() => exchangeCalls).toBe(1);
+
+    const store = await page.evaluate(() =>
+      JSON.parse(
+        window.localStorage.getItem("neteruneko_evening_delivery_days") ?? "{}",
+      ),
+    );
+
+    expect(store["2026-06-11"]?.deliveredPhoto?.id).toBe("restored-delivered");
+  });
+
   test("keeps multiple taken photos when iOS storage rejects the first multi-photo write", async ({
     page,
   }) => {

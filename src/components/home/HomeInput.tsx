@@ -825,9 +825,10 @@ export function HomeInput({ recentEvents: _recentEvents }: HomeInputProps) {
       return;
     }
 
-    const ownPhoto = ownSleepingPhotosForHome.find(
-      (photo) => photo.id === pendingDay.targetOwnPhotoId,
-    );
+    const ownPhoto =
+      ownSleepingPhotosForHome.find(
+        (photo) => photo.id === pendingDay.targetOwnPhotoId,
+      ) ?? pendingDay.targetPhoto;
 
     if (!ownPhoto) {
       return;
