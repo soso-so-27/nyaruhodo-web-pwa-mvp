@@ -352,12 +352,14 @@ function findTargetPhoto(
 }
 
 function findLatestVisibleDeliveredDay(store: EveningDeliveryStore, now: number) {
+  const todayKey = getJstDateKey(now);
+
   return (
     Object.values(store)
       .filter(
         (day) =>
           day.deliveredPhoto &&
-          !day.keptAt &&
+          (!day.keptAt || day.dateKey === todayKey) &&
           now >= getJstDeliveryTime(day.dateKey),
       )
       .sort((a, b) => b.dateKey.localeCompare(a.dateKey))[0] ?? null

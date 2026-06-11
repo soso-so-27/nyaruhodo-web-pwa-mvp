@@ -345,6 +345,92 @@ test.describe("home sleeping exchange flow", () => {
     await expect(page.getByText("とると、よる8じごろ とどく")).toBeVisible();
   });
 
+  test("keeps today's kept evening delivery open on the home screen", async ({
+    page,
+  }) => {
+    let exchangeCalls = 0;
+    const afterDelivery = Date.parse("2026-06-10T12:30:00.000Z");
+
+    await page.route("**/api/sleeping-delivery/exchange", async (route) => {
+      exchangeCalls += 1;
+      await route.fulfill({
+        contentType: "application/json",
+        body: JSON.stringify({ photo: null, source: "none" }),
+      });
+    });
+
+    await page.addInitScript(
+      ({ now, photoSrc }) => {
+        (window as typeof window & { __testNow?: number }).__testNow = now;
+        const originalDateNow = Date.now.bind(Date);
+        Date.now = () =>
+          (window as typeof window & { __testNow?: number }).__testNow ??
+          originalDateNow();
+        window.localStorage.setItem("nyaruhodo_sleeping_safety_accepted", "1");
+        window.localStorage.setItem("active_cat_id", "kept-today-cat");
+        window.localStorage.setItem(
+          "cat_profiles",
+          JSON.stringify([
+            {
+              id: "kept-today-cat",
+              name: "kept today cat",
+              createdAt: new Date(now).toISOString(),
+              updatedAt: new Date(now).toISOString(),
+            },
+          ]),
+        );
+        window.localStorage.setItem(
+          "nyaruhodo_exchange_own_sleeping_photos",
+          JSON.stringify([
+            {
+              id: "kept-today-own",
+              ownerCatId: "kept-today-cat",
+              catId: "kept-today-cat",
+              src: photoSrc,
+              triggerLabel: "sleeping",
+              theme: "sleeping",
+              shared: true,
+              createdAt: now - 60 * 60 * 1000,
+            },
+          ]),
+        );
+        window.localStorage.setItem(
+          "neteruneko_evening_delivery_days",
+          JSON.stringify({
+            "2026-06-10": {
+              dateKey: "2026-06-10",
+              targetOwnPhotoId: "kept-today-own",
+              targetCatId: "kept-today-cat",
+              targetCapturedAt: now - 60 * 60 * 1000,
+              deliveredPhoto: {
+                id: "kept-today-delivered",
+                sourcePhotoId: "kept-today-source",
+                src: photoSrc,
+                title: "",
+                subtitle: "",
+                triggerLabel: "sleeping",
+                theme: "sleeping",
+                deliveredAt: now - 1000,
+              },
+              openedAt: now - 900,
+              keptAt: now - 800,
+            },
+          }),
+        );
+      },
+      { now: afterDelivery, photoSrc: deliveredDataUrl },
+    );
+
+    await page.goto("/home");
+    await page.waitForLoadState("networkidle");
+
+    await expect(page.getByTestId("day-cycle-indicator")).toHaveAttribute(
+      "data-state",
+      "4",
+    );
+    await expect.poll(() => exchangeCalls).toBe(0);
+  });
+
   test("keeps the latest missed evening delivery waiting after a day away", async ({
     page,
   }) => {
