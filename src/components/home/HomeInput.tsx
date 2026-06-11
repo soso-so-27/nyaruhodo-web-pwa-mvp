@@ -2810,6 +2810,41 @@ function SleepingPhotoHome({
             reserveSubcopySpace={shouldHideRoutineSubcopy}
             onOpen={handleMotifOpen}
           />
+
+          {isWaiting && targetPhoto ? (
+            <div style={styles.sleepingWaitingContent}>
+              <div
+                data-testid="sleeping-today-photo-area"
+                style={styles.sleepingTodayPhotoArea}
+              >
+                <StoredPhotoImage
+                  src={getPhotoDetailSrc(targetPhoto)}
+                  alt=""
+                  style={styles.sleepingTodayPhoto}
+                />
+                <p style={styles.sleepingTodayPhotoLabel}>
+                  {catName ? `${catName}の きょうのねがお` : "きょうのねがお"}
+                </p>
+              </div>
+
+              {!isInstallHintVisible ? (
+                <div style={styles.sleepingWaitingSecondaryActionGroup}>
+                  <button
+                    type="button"
+                    style={styles.sleepingSecondaryPhotoButton}
+                    onClick={onTakePhoto}
+                  >
+                    <span>いまとると、アルバムに はいります</span>
+                  </button>
+                  {showSleepingCounter ? (
+                    <p style={styles.sleepingPresenceLine}>
+                      {formatSleepingPresenceLine(sleepingCounter)}
+                    </p>
+                  ) : null}
+                </div>
+              ) : null}
+            </div>
+          ) : null}
         </div>
 
         {isBefore ? (
@@ -2828,19 +2863,6 @@ function SleepingPhotoHome({
                 {formatSleepingPresenceLine(sleepingCounter)}
               </p>
             ) : null}
-          </div>
-        ) : null}
-
-        {isWaiting && targetPhoto ? (
-          <div style={styles.sleepingTodayPhotoArea}>
-            <StoredPhotoImage
-              src={getPhotoDetailSrc(targetPhoto)}
-              alt=""
-              style={styles.sleepingTodayPhoto}
-            />
-            <p style={styles.sleepingTodayPhotoLabel}>
-              {catName ? `${catName}の きょうのねがお` : "きょうのねがお"}
-            </p>
           </div>
         ) : null}
 
@@ -2880,7 +2902,7 @@ function SleepingPhotoHome({
           </div>
         ) : null}
 
-        {!isBefore && !isInstallHintVisible ? (
+        {!isBefore && !isWaiting && !isInstallHintVisible ? (
           <div style={styles.sleepingSecondaryActionGroup}>
             <button
               type="button"
@@ -6537,12 +6559,13 @@ const styles = {
     fontWeight: 540,
     lineHeight: 1,
   },
+  sleepingWaitingContent: {
+    display: "grid",
+    justifyItems: "center",
+    gap: "18px",
+    marginTop: "18px",
+  },
   sleepingTodayPhotoArea: {
-    position: "fixed",
-    top: "calc(clamp(304px, 38dvh, 360px) + env(safe-area-inset-top))",
-    left: "50%",
-    zIndex: 19,
-    transform: "translateX(-50%)",
     width: "min(54vw, 216px)",
     display: "grid",
     justifyItems: "center",
@@ -6567,6 +6590,13 @@ const styles = {
     fontSize: "12px",
     fontWeight: 560,
     lineHeight: 1,
+  },
+  sleepingWaitingSecondaryActionGroup: {
+    display: "grid",
+    justifyItems: "center",
+    gap: "14px",
+    width: "min(calc(100vw - 48px), 360px)",
+    pointerEvents: "none",
   },
   sleepingEnvelopeButton: {
     position: "fixed",

@@ -215,6 +215,43 @@ test.describe("home day cycle indicator", () => {
     );
     await expect(page.getByText(/きょうも、.*ねこが ねています/)).toHaveCount(0);
   });
+
+  test("keeps the waiting motif separated from the photo on mobile viewports", async ({
+    page,
+  }) => {
+    for (const viewport of [
+      { width: 390, height: 844 },
+      { width: 430, height: 932 },
+    ]) {
+      await page.setViewportSize(viewport);
+      await seedHomeState(page, {
+        now: wellBeforeEight,
+        eveningDay: {
+          dateKey: "2026-06-10",
+          targetOwnPhotoId: "own-today",
+          targetCatId: "cat-home",
+          targetCapturedAt: beforeEight,
+        },
+      });
+
+      await page.goto("/home");
+      await page.waitForLoadState("networkidle");
+      await expect(page.getByTestId("day-cycle-indicator")).toHaveAttribute(
+        "data-state",
+        "2",
+      );
+
+      const motifBox = await page.getByTestId("day-cycle-indicator").boundingBox();
+      const photoBox = await page.getByTestId("sleeping-today-photo-area").boundingBox();
+
+      expect(motifBox).not.toBeNull();
+      expect(photoBox).not.toBeNull();
+      const verticalGap =
+        (photoBox?.y ?? 0) - ((motifBox?.y ?? 0) + (motifBox?.height ?? 0));
+
+      expect(Math.round(verticalGap)).toBeGreaterThanOrEqual(16);
+    }
+  });
 });
 
 async function seedHomeState(
