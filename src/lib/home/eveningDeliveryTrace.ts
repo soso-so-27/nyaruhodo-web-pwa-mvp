@@ -28,6 +28,7 @@ export type EveningDeliveryTraceEntry = {
   selectedPhotoSrcKind?: "data" | "storage" | "http" | "other" | "empty";
   exchangeCalled: boolean;
   exchangeStatus?: number | null;
+  exchangeError?: string | null;
   exchangePhotoReceived?: boolean;
 };
 

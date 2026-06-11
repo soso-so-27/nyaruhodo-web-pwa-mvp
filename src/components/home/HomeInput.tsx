@@ -123,6 +123,7 @@ const MOTIF_STATE_SHOWN_STORAGE_PREFIX = "neteruneko_motif_state_shown";
 const SUBCOPY_HIDDEN_COHORT_STORAGE_KEY =
   "neteruneko_subcopy_hidden_cohort_tracked";
 const PRESENCE_SESSION_STORAGE_KEY = "neteruneko_presence_count";
+const EXCHANGE_UPLOAD_MAX_DATA_URL_LENGTH = 1_800_000;
 
 type DayCycleState = "1" | "1b" | "2" | "3" | "4";
 const PHOTO_SAVE_FAILURE_MESSAGE =
@@ -939,6 +940,7 @@ export function HomeInput({ recentEvents: _recentEvents }: HomeInputProps) {
         selectedPhotoSrcKind: uploadSrc.srcKind,
         exchangeCalled: true,
         exchangeStatus: result.httpStatus,
+        exchangeError: result.error,
         exchangePhotoReceived: Boolean(result.photo),
       });
 
@@ -3272,7 +3274,7 @@ function findLegacyEveningDeliveryPhoto(
 }
 
 function isDeliverableDataPhotoSrc(src: string) {
-  return /^data:image\//.test(src);
+  return /^data:image\/(?:jpeg|jpg|png|webp);base64,/.test(src);
 }
 
 function getExchangePhotoUploadSrc(photo: OwnSleepingPhoto) {
@@ -3294,7 +3296,7 @@ async function resolveExchangePhotoUploadSrc(photo: OwnSleepingPhoto): Promise<{
   const dataSrc = getExchangePhotoUploadSrc(photo);
 
   if (dataSrc) {
-    return { src: dataSrc, srcKind: "data" };
+    return { src: await prepareExchangeUploadDataUrl(dataSrc), srcKind: "data" };
   }
 
   const candidates = [
@@ -3319,12 +3321,42 @@ async function resolveExchangePhotoUploadSrc(photo: OwnSleepingPhoto): Promise<{
       () => undefined,
     );
 
-    if (resolved && isDeliverableDataPhotoSrc(resolved)) {
-      return { src: resolved, srcKind: "storage" };
+    if (resolved && resolved.startsWith("data:image/")) {
+      return {
+        src: await prepareExchangeUploadDataUrl(resolved),
+        srcKind: "storage",
+      };
     }
   }
 
   return { src: null, srcKind: firstKind };
+}
+
+async function prepareExchangeUploadDataUrl(dataUrl: string) {
+  if (!dataUrl.startsWith("data:image/")) {
+    return null;
+  }
+
+  const attempts = [
+    dataUrl,
+    await resizeDataUrl(dataUrl, 900, 0.72),
+    await resizeDataUrl(dataUrl, 560, 0.64),
+    await resizeDataUrl(dataUrl, 420, 0.58),
+    await resizeDataUrl(dataUrl, 320, 0.52),
+    await resizeDataUrl(dataUrl, 240, 0.46),
+    await resizeDataUrl(dataUrl, 180, 0.4),
+  ];
+
+  return (
+    attempts.find(
+      (candidate): candidate is string =>
+        Boolean(
+          candidate &&
+            isDeliverableDataPhotoSrc(candidate) &&
+            candidate.length <= EXCHANGE_UPLOAD_MAX_DATA_URL_LENGTH,
+        ),
+    ) ?? null
+  );
 }
 
 function getTracePhotoSrcKind(src: string | null | undefined) {
@@ -4830,7 +4862,11 @@ async function createExchangePhoto({
   category: MikkeWindowCategory | "sleep";
   seed: string;
   recipientCatId?: string | null;
-}): Promise<{ photo: ExchangePhoto | null; httpStatus: number | null }> {
+}): Promise<{
+  photo: ExchangePhoto | null;
+  httpStatus: number | null;
+  error: string | null;
+}> {
   const result =
     await createSleepingExchange({
       ownPhoto,
@@ -4845,12 +4881,14 @@ async function createExchangePhoto({
     return {
       photo: null,
       httpStatus: result?.httpStatus ?? null,
+      error: result?.error ?? null,
     };
   }
 
   return {
     photo: result.photo,
     httpStatus: result.httpStatus ?? null,
+    error: result.error ?? null,
   };
 }
 

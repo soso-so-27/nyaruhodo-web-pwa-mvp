@@ -17,6 +17,7 @@ type SleepingExchangeResponse = {
   source?: "remote" | "none";
   diagnostics?: SleepingDeliveryDiagnostics;
   httpStatus?: number | null;
+  error?: string | null;
 };
 
 const MAX_BLOCKED_PHOTO_IDS = 100;
@@ -95,8 +96,13 @@ export async function createSleepingExchange({
 
     const body = (await response.json()) as SleepingExchangeResponse;
     return { ...body, httpStatus: response.status };
-  } catch {
-    return null;
+  } catch (error) {
+    return {
+      photo: null,
+      source: "none",
+      httpStatus: null,
+      error: error instanceof Error ? error.message : "fetch_failed",
+    };
   }
 }
 

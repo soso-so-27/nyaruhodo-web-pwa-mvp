@@ -666,7 +666,14 @@ test.describe("home sleeping exchange flow", () => {
     let exchangeCalls = 0;
     const afterDelivery = Date.parse("2026-06-11T11:14:00.000Z");
     const capturedAt = Date.parse("2026-06-11T09:45:00.000Z");
-    const imageBytes = Buffer.from(deliveredDataUrl.split(",")[1] ?? "", "base64");
+    const storageSvg = Buffer.from(
+      `<svg xmlns="http://www.w3.org/2000/svg" width="1600" height="1600" viewBox="0 0 1600 1600">
+        <rect width="1600" height="1600" fill="#f6efe4"/>
+        <circle cx="800" cy="800" r="520" fill="#b8917a"/>
+        <circle cx="620" cy="680" r="90" fill="#2f2924"/>
+        <circle cx="980" cy="680" r="90" fill="#2f2924"/>
+      </svg>`,
+    );
 
     await page.addInitScript(
       ({ now, capturedAtValue }) => {
@@ -723,8 +730,8 @@ test.describe("home sleeping exchange flow", () => {
 
     await page.route("**/storage/v1/object/**", async (route) => {
       await route.fulfill({
-        contentType: "image/png",
-        body: imageBytes,
+        contentType: "image/svg+xml",
+        body: storageSvg,
       });
     });
     await page.route("**/api/presence", async (route) => {
@@ -739,7 +746,8 @@ test.describe("home sleeping exchange flow", () => {
         ownPhoto?: { id?: string; src?: string };
       };
       expect(body.ownPhoto?.id).toBe("storage-only-photo");
-      expect(body.ownPhoto?.src).toMatch(/^data:image\/png;base64,/);
+      expect(body.ownPhoto?.src).toMatch(/^data:image\/jpeg;base64,/);
+      expect(body.ownPhoto?.src?.length ?? 0).toBeLessThan(1_800_000);
       await route.fulfill({
         contentType: "application/json",
         body: JSON.stringify({

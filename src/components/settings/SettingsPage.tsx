@@ -1186,7 +1186,7 @@ function EveningDeliveryTracePanel({
             latest.exchangeCalled
               ? `called / ${latest.exchangeStatus ?? "-"} / photo:${formatTraceBool(
                   Boolean(latest.exchangePhotoReceived),
-                )}`
+                )}${latest.exchangeError ? ` / ${latest.exchangeError}` : ""}`
               : "not called"
           }
         />
