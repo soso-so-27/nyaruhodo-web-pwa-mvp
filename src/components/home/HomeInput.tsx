@@ -47,6 +47,7 @@ import {
 import {
   buildEveningHomeState,
   getPendingEveningDeliveryDay,
+  getJstDateKey,
   isTodaySleepingCounterVisible,
   markEveningDeliveryKept,
   markEveningDeliveryOpened,
@@ -111,12 +112,12 @@ type LockType = "yousu" | "mugi";
 
 const MIKKE_CATEGORIES: MikkeWindowCategory[] = ["place", "pose", "sign"];
 const MIKKE_LOCK_MS = 60 * 60 * 1000;
-const HOME_SLEEPING_COUNTER_BASE_COUNT = 75;
 const SHOW_HOME_WORDMARK = false;
 const SUBCOPY_HIDE_EXCHANGE_COUNT = 10;
 const MOTIF_STATE_SHOWN_STORAGE_PREFIX = "neteruneko_motif_state_shown";
 const SUBCOPY_HIDDEN_COHORT_STORAGE_KEY =
   "neteruneko_subcopy_hidden_cohort_tracked";
+const PRESENCE_SESSION_STORAGE_KEY = "neteruneko_presence_count";
 
 type DayCycleState = "1" | "1b" | "2" | "3" | "4";
 const PHOTO_SAVE_FAILURE_MESSAGE =
@@ -1829,12 +1830,11 @@ export function HomeInput({ recentEvents: _recentEvents }: HomeInputProps) {
     );
   }
 
-  const sleepingCounterItem = homeCatCounters.find(
-    (counter) => counter.id === "sleeping",
-  );
-  const sleepingCounterCount = formatSleepingCounterCount(
-    sleepingCounterItem?.count ?? HOME_SLEEPING_COUNTER_BASE_COUNT,
-  );
+  const sleepingPresenceCount = useSleepingPresenceCount();
+  const sleepingCounterCount =
+    typeof sleepingPresenceCount === "number"
+      ? formatSleepingCounterCount(sleepingPresenceCount)
+      : "";
   const shouldShowHomeInstallHint =
     isHomeInstallHintVisible &&
     Boolean(homeInstallPlatform) &&
@@ -1855,7 +1855,10 @@ export function HomeInput({ recentEvents: _recentEvents }: HomeInputProps) {
           eveningState={eveningHomeState}
           keptExchangePhotoCount={keptExchangePhotoCount}
           isInstallHintVisible={shouldShowHomeInstallHint}
-          showSleepingCounter={isTodaySleepingCounterVisible(sleepingCounterCount)}
+          showSleepingCounter={
+            typeof sleepingPresenceCount === "number" &&
+            isTodaySleepingCounterVisible(sleepingCounterCount)
+          }
           onTakePhoto={() => handleSleepingPhotoStart("camera")}
           onOpenDelivery={handleOpenEveningDelivery}
         />
@@ -2835,6 +2838,9 @@ function SleepingPhotoHome({
               alt=""
               style={styles.sleepingTodayPhoto}
             />
+            <p style={styles.sleepingTodayPhotoLabel}>
+              {catName ? `${catName}の きょうのねがお` : "きょうのねがお"}
+            </p>
           </div>
         ) : null}
 
@@ -2881,7 +2887,6 @@ function SleepingPhotoHome({
               style={styles.sleepingSecondaryPhotoButton}
               onClick={onTakePhoto}
             >
-              <AppIcon name="camera" size={18} />
               <span>いまとると、アルバムに はいります</span>
             </button>
             {showSleepingCounter ? (
@@ -2907,6 +2912,7 @@ function DayCycleIndicator({
 }) {
   const isCameraFilled = state === "2" || state === "3" || state === "4";
   const isEnvelopeFilled = state === "3" || state === "4";
+  const isEnvelopeWaiting = state === "2";
   const isInteractive = state === "3";
   const prefersReducedMotion = usePrefersReducedMotion();
   const shouldAnimateFlow = state === "2" && !prefersReducedMotion;
@@ -2940,6 +2946,7 @@ function DayCycleIndicator({
         style={{
           ...styles.dayCycleCircle,
           ...styles.dayCycleEnvelope,
+          ...(isEnvelopeWaiting ? styles.dayCycleEnvelopeWaiting : {}),
           ...(isEnvelopeFilled ? styles.dayCycleEnvelopeFilled : {}),
         }}
         aria-hidden="true"
@@ -2996,6 +3003,80 @@ function usePrefersReducedMotion() {
   }, []);
 
   return prefersReducedMotion;
+}
+
+function useSleepingPresenceCount() {
+  const [count, setCount] = useState<number | null>(null);
+
+  useEffect(() => {
+    let isActive = true;
+    const dateKey = getJstDateKey(Date.now());
+
+    try {
+      const cached = window.sessionStorage.getItem(PRESENCE_SESSION_STORAGE_KEY);
+      if (cached) {
+        const parsed = JSON.parse(cached) as {
+          dateKey?: unknown;
+          count?: unknown;
+        };
+        if (
+          parsed.dateKey === dateKey &&
+          typeof parsed.count === "number" &&
+          Number.isFinite(parsed.count)
+        ) {
+          setCount(parsed.count);
+          return;
+        }
+      }
+    } catch {
+      // Presence is ambient; cache failures should not affect the home screen.
+    }
+
+    const controller = new AbortController();
+
+    fetch("/api/presence", {
+      method: "GET",
+      signal: controller.signal,
+      headers: {
+        Accept: "application/json",
+      },
+    })
+      .then((response) => (response.ok ? response.json() : { count: null }))
+      .then((body: { count?: unknown }) => {
+        if (!isActive) return;
+
+        const nextCount =
+          typeof body.count === "number" && Number.isFinite(body.count)
+            ? body.count
+            : null;
+        setCount(nextCount);
+
+        if (nextCount === null) {
+          return;
+        }
+
+        try {
+          window.sessionStorage.setItem(
+            PRESENCE_SESSION_STORAGE_KEY,
+            JSON.stringify({ dateKey, count: nextCount }),
+          );
+        } catch {
+          // Ignore cache write failures; the next visit can fetch again.
+        }
+      })
+      .catch(() => {
+        if (isActive) {
+          setCount(null);
+        }
+      });
+
+    return () => {
+      isActive = false;
+      controller.abort();
+    };
+  }, []);
+
+  return count;
 }
 
 function getDayCycleState(eveningState: EveningHomeState): DayCycleState {
@@ -4079,11 +4160,7 @@ function buildHomeCatCounters({
     {
       id: "sleeping",
       label: "いま寝てる猫",
-      count:
-        Math.max(
-          HOME_SLEEPING_COUNTER_BASE_COUNT,
-          sumCounts(poseResult, sleepingIds),
-        ) + localSleepingCount,
+      count: sumCounts(poseResult, sleepingIds) + localSleepingCount,
     },
     {
       id: "window",
@@ -6163,7 +6240,7 @@ const styles = {
   },
   sleepingHomeHeader: {
     position: "fixed",
-    top: "calc(clamp(136px, 19dvh, 176px) + env(safe-area-inset-top))",
+    top: "calc(clamp(132px, 21dvh, 188px) + env(safe-area-inset-top))",
     left: "50%",
     zIndex: 18,
     width: HOME_NAV_FRAME_WIDTH,
@@ -6251,6 +6328,10 @@ const styles = {
   dayCycleEnvelope: {
     borderColor: "rgba(153,53,86,0.16)",
     color: "rgba(153,53,86,0.38)",
+  },
+  dayCycleEnvelopeWaiting: {
+    borderColor: "rgba(153,53,86,0.24)",
+    color: "rgba(153,53,86,0.5)",
   },
   dayCycleEnvelopeFilled: {
     background: "rgba(153,53,86,0.82)",
@@ -6458,24 +6539,34 @@ const styles = {
   },
   sleepingTodayPhotoArea: {
     position: "fixed",
-    top: "calc(clamp(316px, 42dvh, 390px) + env(safe-area-inset-top))",
+    top: "calc(clamp(304px, 38dvh, 360px) + env(safe-area-inset-top))",
     left: "50%",
     zIndex: 19,
     transform: "translateX(-50%)",
     width: "min(54vw, 216px)",
+    display: "grid",
+    justifyItems: "center",
+    gap: "9px",
+    pointerEvents: "none",
+  },
+  sleepingTodayPhoto: {
+    width: "100%",
     aspectRatio: "1 / 1",
+    height: "auto",
+    objectFit: "cover",
+    display: "block",
     borderRadius: "30px",
     overflow: "hidden",
     border: "8px solid rgba(255,253,248,0.72)",
     background: "rgba(255,253,248,0.58)",
     boxShadow: "0 16px 38px rgba(96,78,54,0.12)",
-    pointerEvents: "none",
   },
-  sleepingTodayPhoto: {
-    width: "100%",
-    height: "100%",
-    objectFit: "cover",
-    display: "block",
+  sleepingTodayPhotoLabel: {
+    margin: 0,
+    color: "#746a5f",
+    fontSize: "12px",
+    fontWeight: 560,
+    lineHeight: 1,
   },
   sleepingEnvelopeButton: {
     position: "fixed",
@@ -6502,7 +6593,7 @@ const styles = {
   sleepingSecondaryActionGroup: {
     position: "fixed",
     left: "50%",
-    top: "calc(clamp(600px, 74dvh, 656px) + env(safe-area-inset-top))",
+    top: "calc(clamp(558px, 68dvh, 620px) + env(safe-area-inset-top))",
     zIndex: 19,
     transform: "translateX(-50%)",
     display: "grid",
@@ -6512,21 +6603,20 @@ const styles = {
     pointerEvents: "none",
   },
   sleepingSecondaryPhotoButton: {
-    minHeight: "42px",
+    minHeight: "44px",
     display: "inline-flex",
     alignItems: "center",
     justifyContent: "center",
-    gap: "8px",
-    padding: "0 16px",
-    border: "1px solid rgba(120,108,94,0.1)",
-    borderRadius: "999px",
-    background: "rgba(255,253,248,0.54)",
-    color: "#746a5f",
-    boxShadow: "0 8px 18px rgba(90,76,60,0.035)",
+    padding: "0 8px",
+    border: "none",
+    borderRadius: 0,
+    background: "transparent",
+    color: "#8a8174",
+    boxShadow: "none",
     cursor: "pointer",
     pointerEvents: "auto",
     fontSize: "12px",
-    fontWeight: 560,
+    fontWeight: 540,
   },
   sleepingPairCard: {
     position: "fixed",

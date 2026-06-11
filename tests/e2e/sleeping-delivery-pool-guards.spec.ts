@@ -97,6 +97,20 @@ test.describe("sleeping delivery pool guards", () => {
     expect(bodyText).not.toContain("ENABLE_TEST_TOOLS");
   });
 
+  test("presence api does not expose server diagnostics", async ({ request }) => {
+    const response = await request.get("/api/presence");
+
+    expect(response.status()).toBe(200);
+
+    const bodyText = await response.text();
+
+    expect(bodyText).not.toContain("SUPABASE_SERVICE_ROLE_KEY");
+    expect(bodyText).not.toContain("ADMIN_EMAILS");
+    expect(bodyText).not.toContain("select ");
+    expect(bodyText).not.toContain("cat_moments");
+    expect(bodyText).not.toContain("Error:");
+  });
+
   test("accepts supported exchange data urls", async ({ request }) => {
     for (const [index, src] of [
       redBlueTestPhotoUrl,

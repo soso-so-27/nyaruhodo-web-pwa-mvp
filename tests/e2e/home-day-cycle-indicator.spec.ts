@@ -161,6 +161,60 @@ test.describe("home day cycle indicator", () => {
     await page.waitForLoadState("networkidle");
     await expect(page.getByText("ねてるねこ", { exact: true }).first()).toBeVisible();
   });
+
+  test("shows the presence line only when the presence api returns a count", async ({
+    page,
+  }) => {
+    await page.route("/api/presence", async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({ count: 124 }),
+      });
+    });
+    await seedHomeState(page, { now: beforeEight });
+
+    await page.goto("/home");
+    await page.waitForLoadState("networkidle");
+
+    await expect(
+      page.getByText("きょうも、124ひきの ねこが ねています"),
+    ).toBeVisible();
+  });
+
+  test("omits the presence line when the presence api returns null", async ({
+    page,
+  }) => {
+    await page.route("/api/presence", async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({ count: null }),
+      });
+    });
+    await seedHomeState(page, { now: beforeEight });
+
+    await page.goto("/home");
+    await page.waitForLoadState("networkidle");
+
+    await expect(page.getByText(/きょうも、.*ねこが ねています/)).toHaveCount(0);
+  });
+
+  test("keeps the home usable when the presence fetch fails", async ({ page }) => {
+    await page.route("/api/presence", async (route) => {
+      await route.abort();
+    });
+    await seedHomeState(page, { now: beforeEight });
+
+    await page.goto("/home");
+    await page.waitForLoadState("networkidle");
+
+    await expect(page.getByTestId("day-cycle-indicator")).toHaveAttribute(
+      "data-state",
+      "1",
+    );
+    await expect(page.getByText(/きょうも、.*ねこが ねています/)).toHaveCount(0);
+  });
 });
 
 async function seedHomeState(

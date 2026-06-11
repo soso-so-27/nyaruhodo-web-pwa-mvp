@@ -1183,7 +1183,12 @@ function AlbumDailyPair({
                   style={styles.dailyPairImage}
                 />
               ) : group.key === getLocalDateKey(Date.now()) ? (
-                <span style={styles.dailyPairPlaceholder}>よる8じに</span>
+                <span style={styles.dailyPairPlaceholder}>
+                  <span style={styles.dailyPairPlaceholderContent}>
+                    <AppIcon name="mail" size={18} style={styles.dailyPairPlaceholderIcon} />
+                    <span>よる8じに</span>
+                  </span>
+                </span>
               ) : (
                 <span style={styles.dailyPairPlaceholder}>この日は おやすみ</span>
               )}
@@ -2825,7 +2830,7 @@ const styles = {
     width: "min(100%, 480px)",
     margin: "0 auto",
     padding:
-      "calc(18px + env(safe-area-inset-top)) 24px calc(168px + env(safe-area-inset-bottom))",
+      "calc(18px + env(safe-area-inset-top)) 24px calc(var(--bottom-nav-height) + var(--bottom-nav-bottom-offset) + 24px + env(safe-area-inset-bottom))",
   },
   header: {
     marginBottom: "24px",
@@ -3016,7 +3021,6 @@ const styles = {
   recentDayList: {
     display: "grid",
     gap: "0",
-    borderTop: "0.5px solid rgba(79,73,63,0.12)",
   },
   recentDayCard: {
     display: "grid",
@@ -3071,7 +3075,7 @@ const styles = {
     gap: "8px",
   },
   dailyPairMainSingle: {
-    gridTemplateColumns: "1fr",
+    gridTemplateColumns: "calc((100% - 40px) / 2) minmax(0, 1fr)",
   },
   dailyPairTile: {
     display: "grid",
@@ -3109,6 +3113,14 @@ const styles = {
     fontSize: "12px",
     fontWeight: 500,
     lineHeight: 1.45,
+  },
+  dailyPairPlaceholderContent: {
+    display: "inline-grid",
+    justifyItems: "center",
+    gap: "7px",
+  },
+  dailyPairPlaceholderIcon: {
+    color: "rgba(120,108,94,0.34)",
   },
   dailyPairLabel: {
     color: COLLECTION_MUTED,

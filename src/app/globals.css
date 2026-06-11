@@ -1,3 +1,8 @@
+html {
+  --bottom-nav-height: 76px;
+  --bottom-nav-bottom-offset: 16px;
+}
+
 html,
 body {
   margin: 0;
