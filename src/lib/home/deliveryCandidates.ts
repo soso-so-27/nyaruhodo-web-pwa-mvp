@@ -16,6 +16,7 @@ type SleepingExchangeResponse = {
   photo?: ExchangePhoto | null;
   source?: "remote" | "none";
   diagnostics?: SleepingDeliveryDiagnostics;
+  httpStatus?: number | null;
 };
 
 const MAX_BLOCKED_PHOTO_IDS = 100;
@@ -85,10 +86,15 @@ export async function createSleepingExchange({
     });
 
     if (!response.ok) {
-      return null;
+      return {
+        photo: null,
+        source: "none",
+        httpStatus: response.status,
+      };
     }
 
-    return (await response.json()) as SleepingExchangeResponse;
+    const body = (await response.json()) as SleepingExchangeResponse;
+    return { ...body, httpStatus: response.status };
   } catch {
     return null;
   }

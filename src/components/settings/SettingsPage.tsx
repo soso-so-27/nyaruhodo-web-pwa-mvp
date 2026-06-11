@@ -49,8 +49,16 @@ import {
   saveRemoteDeliveryStockPhoto,
   type SleepingDeliveryDiagnostics,
 } from "../../lib/home/deliveryCandidates";
+import {
+  readEveningDeliveryTrace,
+  type EveningDeliveryTraceEntry,
+} from "../../lib/home/eveningDeliveryTrace";
 
 type SettingsTab = "general" | "admin";
+const APP_BUILD_SHA =
+  process.env.NEXT_PUBLIC_VERCEL_GIT_COMMIT_SHA ??
+  process.env.NEXT_PUBLIC_COMMIT_SHA ??
+  "local";
 
 export function SettingsPage() {
   const [isLoggedIn, setIsLoggedIn] = useState(false);
@@ -75,6 +83,9 @@ export function SettingsPage() {
     useState<SleepingDeliveryDiagnostics | null>(null);
   const [keptExchangeDebug, setKeptExchangeDebug] =
     useState<KeptExchangePhotoStorageDebug | null>(null);
+  const [eveningDeliveryTrace, setEveningDeliveryTrace] = useState<
+    EveningDeliveryTraceEntry[]
+  >([]);
   const [adminCapabilities, setAdminCapabilities] =
     useState<ClientAdminCapabilities>({
       isAdmin: false,
@@ -116,6 +127,7 @@ export function SettingsPage() {
   useEffect(() => {
     setDisplayEnvironment(getDisplayEnvironment());
     refreshKeptExchangeDebug();
+    refreshEveningDeliveryTrace();
     void checkAuthState();
     void refreshAdminCapabilities();
     void refreshBetaCapabilities();
@@ -368,6 +380,10 @@ export function SettingsPage() {
       setStockPhotoCount(diagnostics.adminStockCount);
     }
     setIsDeliveryDiagnosticsLoading(false);
+  }
+
+  function refreshEveningDeliveryTrace() {
+    setEveningDeliveryTrace(readEveningDeliveryTrace());
   }
 
   async function refreshAdminCapabilities() {
@@ -707,6 +723,8 @@ export function SettingsPage() {
             >
               <AuthDebugPanel snapshot={authDebug} />
               <div style={styles.divider} />
+              <BuildInfoPanel buildSha={APP_BUILD_SHA} />
+              <div style={styles.divider} />
               <button
                 type="button"
                 onClick={() => {
@@ -733,6 +751,8 @@ export function SettingsPage() {
               <div style={styles.divider} />
               <DeliveryDiagnosticsPanel diagnostics={deliveryDiagnostics} />
               <div style={styles.divider} />
+              <EveningDeliveryTracePanel entries={eveningDeliveryTrace} />
+              <div style={styles.divider} />
               <KeptExchangeDebugPanel debug={keptExchangeDebug} />
               <div style={styles.divider} />
               <button
@@ -740,6 +760,7 @@ export function SettingsPage() {
                 onClick={() => {
                   void refreshDeliveryDiagnostics();
                   refreshKeptExchangeDebug();
+                  refreshEveningDeliveryTrace();
                 }}
                 style={styles.secondaryButton}
                 disabled={isDeliveryDiagnosticsLoading}
@@ -1089,6 +1110,91 @@ function AuthDebugRow({ label, value }: { label: string; value: string }) {
   );
 }
 
+function BuildInfoPanel({ buildSha }: { buildSha: string }) {
+  return (
+    <div style={styles.authDebugPanel}>
+      <p style={styles.syncOverviewText}>管理用のビルド識別です。</p>
+      <div style={styles.authDebugRows}>
+        <AuthDebugRow
+          label="commit"
+          value={buildSha === "local" ? "local" : buildSha.slice(0, 12)}
+        />
+      </div>
+    </div>
+  );
+}
+
+function EveningDeliveryTracePanel({
+  entries,
+}: {
+  entries: EveningDeliveryTraceEntry[];
+}) {
+  if (entries.length === 0) {
+    return (
+      <div style={styles.authDebugPanel}>
+        <p style={styles.syncOverviewText}>
+          配達トレースはまだありません。ホームを開くと直近20件まで記録されます。
+        </p>
+      </div>
+    );
+  }
+
+  const latest = entries[0];
+
+  return (
+    <div style={styles.authDebugPanel}>
+      <p style={styles.syncOverviewText}>
+        配達effectの直近ゲートです。写真データや秘密情報は保存しません。
+      </p>
+      <div style={styles.authDebugRows}>
+        <AuthDebugRow label="記録" value={formatSyncDate(latest.checkedAt)} />
+        <AuthDebugRow label="日付" value={latest.dateKey} />
+        <AuthDebugRow label="ゲート" value={formatTraceGate(latest.gate)} />
+        <AuthDebugRow
+          label="当日エントリ"
+          value={formatTraceBool(latest.hasTodayEntry)}
+        />
+        <AuthDebugRow
+          label="配達済み"
+          value={formatTraceBool(latest.hasDeliveredPhoto)}
+        />
+        <AuthDebugRow
+          label="20時以降"
+          value={formatTraceBool(latest.isAfterDeliveryTime)}
+        />
+        <AuthDebugRow
+          label="写真一致"
+          value={formatTraceBool(latest.directOwnPhotoFound)}
+        />
+        <AuthDebugRow
+          label="targetPhoto"
+          value={formatTraceBool(latest.targetPhotoFallbackUsed)}
+        />
+        <AuthDebugRow
+          label="旧形式救済"
+          value={
+            latest.legacyFallbackReason
+              ? `${formatTraceBool(latest.legacyFallbackUsed)} (${latest.legacyFallbackReason})`
+              : formatTraceBool(latest.legacyFallbackUsed)
+          }
+        />
+        <AuthDebugRow label="選択" value={latest.selectedPhotoSource} />
+        <AuthDebugRow
+          label="exchange"
+          value={
+            latest.exchangeCalled
+              ? `called / ${latest.exchangeStatus ?? "-"} / photo:${formatTraceBool(
+                  Boolean(latest.exchangePhotoReceived),
+                )}`
+              : "not called"
+          }
+        />
+        <AuthDebugRow label="件数" value={`${entries.length}件`} />
+      </div>
+    </div>
+  );
+}
+
 function DeliveryDiagnosticsPanel({
   diagnostics,
 }: {
@@ -1393,6 +1499,31 @@ function formatSyncDate(value: string | null) {
     hour: "2-digit",
     minute: "2-digit",
   }).format(date);
+}
+
+function formatTraceBool(value: boolean) {
+  return value ? "yes" : "no";
+}
+
+function formatTraceGate(gate: EveningDeliveryTraceEntry["gate"]) {
+  switch (gate) {
+    case "no_pending_day":
+      return "no pending";
+    case "missing_target_or_cat":
+      return "missing target/cat";
+    case "already_pending":
+      return "already pending";
+    case "missing_photo":
+      return "missing photo";
+    case "legacy_photo_not_data":
+      return "legacy non-data";
+    case "exchange_started":
+      return "exchange started";
+    case "exchange_completed":
+      return "exchange completed";
+    default:
+      return gate;
+  }
 }
 
 const styles = {

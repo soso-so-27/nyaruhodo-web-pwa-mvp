@@ -451,6 +451,118 @@ test.describe("home sleeping exchange flow", () => {
     expect(store["2026-06-09"]?.skippedAt).toBeTruthy();
   });
 
+  test("rescues a legacy evening target by matching the latest same-day own photo", async ({
+    page,
+  }) => {
+    let exchangeCalls = 0;
+    const afterDelivery = Date.parse("2026-06-11T11:08:00.000Z");
+    const capturedAt = Date.parse("2026-06-11T09:32:00.000Z");
+
+    await page.addInitScript(
+      ({ now, capturedAtValue, photoSrc }) => {
+        const originalDateNow = Date.now.bind(Date);
+        (window as typeof window & { __testNow?: number }).__testNow = now;
+        Date.now = () =>
+          (window as typeof window & { __testNow?: number }).__testNow ??
+          originalDateNow();
+        window.localStorage.setItem("nyaruhodo_sleeping_safety_accepted", "1");
+        window.localStorage.setItem("neteruneko_onboarding_completed", "true");
+        window.localStorage.setItem("active_cat_id", "legacy-cat");
+        window.localStorage.setItem(
+          "cat_profiles",
+          JSON.stringify([
+            {
+              id: "legacy-cat",
+              name: "legacy cat",
+              createdAt: new Date(capturedAtValue).toISOString(),
+              updatedAt: new Date(capturedAtValue).toISOString(),
+            },
+          ]),
+        );
+        window.localStorage.setItem(
+          "neteruneko_evening_delivery_days",
+          JSON.stringify({
+            "2026-06-11": {
+              dateKey: "2026-06-11",
+              targetOwnPhotoId: "missing-legacy-id",
+              targetCatId: "legacy-cat",
+              targetCapturedAt: capturedAtValue,
+            },
+          }),
+        );
+        window.localStorage.setItem(
+          "nyaruhodo_exchange_own_sleeping_photos",
+          JSON.stringify([
+            {
+              id: "old-photo-yesterday",
+              ownerCatId: "legacy-cat",
+              catId: "legacy-cat",
+              src: photoSrc,
+              triggerLabel: "sleeping",
+              theme: "sleeping",
+              shared: true,
+              createdAt: capturedAtValue - 24 * 60 * 60 * 1000,
+            },
+            {
+              id: "legacy-same-day-photo",
+              ownerCatId: "legacy-cat",
+              catId: "legacy-cat",
+              src: photoSrc,
+              triggerLabel: "sleeping",
+              theme: "sleeping",
+              shared: true,
+              createdAt: capturedAtValue + 5 * 60 * 1000,
+            },
+          ]),
+        );
+      },
+      { now: afterDelivery, capturedAtValue: capturedAt, photoSrc: deliveredDataUrl },
+    );
+
+    await page.route("**/api/presence", async (route) => {
+      await route.fulfill({
+        contentType: "application/json",
+        body: JSON.stringify({ count: null }),
+      });
+    });
+    await page.route("**/api/sleeping-delivery/exchange", async (route) => {
+      exchangeCalls += 1;
+      const body = route.request().postDataJSON() as {
+        ownPhoto?: { id?: string };
+      };
+      expect(body.ownPhoto?.id).toBe("legacy-same-day-photo");
+      await route.fulfill({
+        contentType: "application/json",
+        body: JSON.stringify({
+          photo: {
+            id: "legacy-delivered",
+            sourcePhotoId: "legacy-source",
+            src: deliveredDataUrl,
+            title: "",
+            subtitle: "",
+            triggerLabel: "sleeping",
+            theme: "sleeping",
+            deliveredAt: afterDelivery,
+          },
+          source: "remote",
+        }),
+      });
+    });
+
+    await page.goto("/home");
+    await page.waitForLoadState("networkidle");
+
+    await expect.poll(() => exchangeCalls).toBe(1);
+
+    const store = await page.evaluate(() =>
+      JSON.parse(
+        window.localStorage.getItem("neteruneko_evening_delivery_days") ?? "{}",
+      ),
+    );
+
+    expect(store["2026-06-11"]?.deliveredPhoto?.id).toBe("legacy-delivered");
+  });
+
   test("delivers from the stored target photo when a logged-in restore has no own photo row", async ({
     page,
   }) => {
