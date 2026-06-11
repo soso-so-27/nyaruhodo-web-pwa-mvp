@@ -268,10 +268,16 @@ async function handleExchangePost(request: Request) {
     .toString(16)
     .slice(2)}`;
   const deliveredAt = new Date();
+  const deliveryPhotoSrc = await prepareExchangeDeliveryPhotoSrc({
+    supabase,
+    row: selected.row,
+    resolvedSrc: selected.src,
+    canUseStorage: Boolean(adminSupabase),
+  });
   const photo: ExchangePhoto = {
     id: localDeliveryId,
     sourcePhotoId: selected.row.local_moment_id,
-    src: selected.src,
+    src: deliveryPhotoSrc,
     title: "ほかの猫のねがお",
     subtitle: "",
     triggerLabel: input.triggerLabel,
@@ -289,7 +295,7 @@ async function handleExchangePost(request: Request) {
         source_moment_id: selected.row.id,
         source_photo_id: selected.row.local_moment_id,
         recipient_local_cat_id: input.recipientCatId,
-        photo_url: selected.row.photo_url,
+        photo_url: deliveryPhotoSrc,
         status: "delivered",
         metadata: {
           source: "server_exchange",
@@ -755,6 +761,40 @@ async function prepareExchangeMomentPhotoUrl({
     return toStoragePhotoUrl(storagePath);
   } catch {
     return src;
+  }
+}
+
+async function prepareExchangeDeliveryPhotoSrc({
+  supabase,
+  row,
+  resolvedSrc,
+  canUseStorage,
+}: {
+  supabase: SupabaseClient;
+  row: RemoteCatMomentRow;
+  resolvedSrc: string;
+  canUseStorage: boolean;
+}) {
+  if (getStoragePhotoPath(row.photo_url)) {
+    return row.photo_url;
+  }
+
+  if (!row.photo_url.startsWith("data:image/") || !canUseStorage) {
+    return resolvedSrc;
+  }
+
+  try {
+    const storagePath = await uploadDataUrl(
+      supabase,
+      `delivery-cache/${sanitizePathSegment(row.local_moment_id)}.${getDataUrlExtension(
+        row.photo_url,
+      )}`,
+      row.photo_url,
+    );
+
+    return toStoragePhotoUrl(storagePath);
+  } catch {
+    return resolvedSrc;
   }
 }
 
