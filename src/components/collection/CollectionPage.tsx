@@ -25,6 +25,7 @@ import {
   readOwnSleepingPhotos,
   updateOwnSleepingPhotoDelivery,
 } from "../../lib/home/sleepingPhotos";
+import { getFirstEveningDeliveryTargetDateKey } from "../../lib/home/eveningDelivery";
 import { backupOwnSleepingPhotoMoment } from "../../lib/home/sleepingPhotoBackup";
 import { STORAGE_KEYS } from "../../lib/storage";
 import {
@@ -283,6 +284,10 @@ export function CollectionPage() {
   const albumDayGroups = useMemo(
     () => buildAlbumDayGroups(sleepingBoxPhotos, awakeBoxPhotos, otherBoxPhotos),
     [awakeBoxPhotos, otherBoxPhotos, sleepingBoxPhotos],
+  );
+  const firstEveningDeliveryTargetDateKey = useMemo(
+    () => getFirstEveningDeliveryTargetDateKey(),
+    [boxRefreshTick],
   );
   const selectedBoxPhotos =
     selectedBoxKind === "sleeping"
@@ -756,6 +761,7 @@ export function CollectionPage() {
         <BoxOverview
           dayGroups={albumDayGroups}
           activeScope={activeAlbumScope}
+          firstEveningDeliveryTargetDateKey={firstEveningDeliveryTargetDateKey}
           catName={catName}
           onScopeChange={setActiveAlbumScope}
           onOpenBox={openBoxDetail}
@@ -828,24 +834,31 @@ function PageBackdrop() {
 function BoxOverview({
   dayGroups,
   activeScope,
+  firstEveningDeliveryTargetDateKey,
   catName,
   onScopeChange,
   onOpenBox,
 }: {
   dayGroups: AlbumDayGroup[];
   activeScope: AlbumScope;
+  firstEveningDeliveryTargetDateKey: string | null;
   catName: string;
   onScopeChange: (scope: AlbumScope) => void;
   onOpenBox: (kind: BoxDetailKind, dateKey?: string | null) => void;
 }) {
   const scopedDayGroups = useMemo(
-    () => filterAlbumDayGroupsByScope(dayGroups, activeScope),
-    [activeScope, dayGroups],
+    () =>
+      filterAlbumDayGroupsByScope(
+        dayGroups,
+        activeScope,
+        firstEveningDeliveryTargetDateKey,
+      ),
+    [activeScope, dayGroups, firstEveningDeliveryTargetDateKey],
   );
   const todayKey = getLocalDateKey(Date.now());
   const todayGroup =
     scopedDayGroups.find((group) => group.key === todayKey) ??
-    createEmptyTodayAlbumGroup();
+    (activeScope === "daily" ? createEmptyTodayAlbumGroup() : null);
   const recentGroups = scopedDayGroups
     .filter((group) => group.key !== todayKey)
     .slice(0, 5);
@@ -853,16 +866,20 @@ function BoxOverview({
   return (
     <section style={styles.boxOverview} aria-label="アルバム">
       <AlbumScopeTabs activeScope={activeScope} onScopeChange={onScopeChange} />
-      <AlbumTodayCard
-        group={todayGroup}
-        scope={activeScope}
-        catName={catName}
-        onOpenBox={onOpenBox}
-      />
+      {todayGroup ? (
+        <AlbumTodayCard
+          group={todayGroup}
+          scope={activeScope}
+          catName={catName}
+          firstEveningDeliveryTargetDateKey={firstEveningDeliveryTargetDateKey}
+          onOpenBox={onOpenBox}
+        />
+      ) : null}
 
       <AlbumRecentSection
         groups={recentGroups}
         scope={activeScope}
+        firstEveningDeliveryTargetDateKey={firstEveningDeliveryTargetDateKey}
         catName={catName}
         onOpenBox={onOpenBox}
       />
@@ -874,11 +891,13 @@ function AlbumTodayCard({
   group,
   scope,
   catName,
+  firstEveningDeliveryTargetDateKey,
   onOpenBox,
 }: {
   group: AlbumDayGroup;
   scope: AlbumScope;
   catName: string;
+  firstEveningDeliveryTargetDateKey: string | null;
   onOpenBox: (kind: BoxDetailKind, dateKey?: string | null) => void;
 }) {
   return (
@@ -896,14 +915,15 @@ function AlbumTodayCard({
           group={group}
           scope={scope}
           catName={catName}
+          firstEveningDeliveryTargetDateKey={firstEveningDeliveryTargetDateKey}
           onOpenBox={onOpenBox}
         />
       ) : (
         <EmptyState
           description={
             scope === "own"
-              ? "写真を入れるとここに並びます"
-              : "ねがおを入れると、よる8じにここへ届きます"
+              ? "ねがおを入れると、ここに ならびます"
+              : "ねがおを入れると、よる8じに ここへ とどきます"
           }
           style={styles.todayAlbumEmptyState}
         />
@@ -952,11 +972,13 @@ function AlbumScopeTabs({
 function AlbumRecentSection({
   groups,
   scope,
+  firstEveningDeliveryTargetDateKey,
   catName,
   onOpenBox,
 }: {
   groups: AlbumDayGroup[];
   scope: AlbumScope;
+  firstEveningDeliveryTargetDateKey: string | null;
   catName: string;
   onOpenBox: (kind: BoxDetailKind, dateKey?: string | null) => void;
 }) {
@@ -973,6 +995,7 @@ function AlbumRecentSection({
             group={group}
             scope={scope}
             catName={catName}
+            firstEveningDeliveryTargetDateKey={firstEveningDeliveryTargetDateKey}
             onOpenBox={onOpenBox}
           />
         ))}
@@ -984,11 +1007,13 @@ function AlbumRecentSection({
 function AlbumDayCard({
   group,
   scope,
+  firstEveningDeliveryTargetDateKey,
   catName,
   onOpenBox,
 }: {
   group: AlbumDayGroup;
   scope: AlbumScope;
+  firstEveningDeliveryTargetDateKey: string | null;
   catName: string;
   onOpenBox: (kind: BoxDetailKind, dateKey?: string | null) => void;
 }) {
@@ -1006,6 +1031,7 @@ function AlbumDayCard({
         group={group}
         scope={scope}
         catName={catName}
+        firstEveningDeliveryTargetDateKey={firstEveningDeliveryTargetDateKey}
         onOpenBox={onOpenBox}
         compact
       />
@@ -1019,12 +1045,14 @@ function AlbumDaySections({
   catName,
   onOpenBox,
   compact = false,
+  firstEveningDeliveryTargetDateKey,
 }: {
   group: AlbumDayGroup;
   scope: AlbumScope;
   catName: string;
   onOpenBox: (kind: BoxDetailKind, dateKey?: string | null) => void;
   compact?: boolean;
+  firstEveningDeliveryTargetDateKey: string | null;
 }) {
   if (scope === "daily") {
     return (
@@ -1032,6 +1060,7 @@ function AlbumDaySections({
         group={group}
         catName={catName}
         onOpenBox={onOpenBox}
+        firstEveningDeliveryTargetDateKey={firstEveningDeliveryTargetDateKey}
         compact={compact}
       />
     );
@@ -1089,11 +1118,13 @@ function AlbumDailyPair({
   group,
   catName,
   onOpenBox,
+  firstEveningDeliveryTargetDateKey,
   compact = false,
 }: {
   group: AlbumDayGroup;
   catName: string;
   onOpenBox: (kind: BoxDetailKind, dateKey?: string | null) => void;
+  firstEveningDeliveryTargetDateKey: string | null;
   compact?: boolean;
 }) {
   const ownPhotos = group.sections
@@ -1101,13 +1132,22 @@ function AlbumDailyPair({
     .flatMap((section) => section.photos);
   const deliveredPhotos =
     group.sections.find((section) => section.kind === "other")?.photos ?? [];
+  const shouldShowOtherSlot = shouldShowOtherDeliverySlot(
+    group.key,
+    firstEveningDeliveryTargetDateKey,
+  );
   const targetPhoto = ownPhotos[0] ?? null;
-  const deliveredPhoto = targetPhoto ? deliveredPhotos[0] ?? null : null;
+  const deliveredPhoto = deliveredPhotos[0] ?? null;
   const extraPhotos = ownPhotos.slice(1);
 
   return (
     <div style={compact ? styles.dailyPairCompact : styles.dailyPair}>
-      <div style={styles.dailyPairMain}>
+      <div
+        style={{
+          ...styles.dailyPairMain,
+          ...(shouldShowOtherSlot ? {} : styles.dailyPairMainSingle),
+        }}
+      >
         <button
           type="button"
           style={styles.dailyPairTile}
@@ -1126,27 +1166,31 @@ function AlbumDailyPair({
           )}
           <span style={styles.dailyPairLabel}>{catName}</span>
         </button>
-        <span style={styles.dailyPairDots} aria-hidden="true" />
-        <button
-          type="button"
-          style={styles.dailyPairTile}
-          onClick={() => deliveredPhoto && onOpenBox("other", group.key)}
-          disabled={!deliveredPhoto}
-          aria-label="どこかのねがお"
-        >
-          {deliveredPhoto ? (
-            <StoredPhotoImage
-              src={getPhotoThumbnailSrc(deliveredPhoto)}
-              alt=""
-              style={styles.dailyPairImage}
-            />
-          ) : group.key === getLocalDateKey(Date.now()) ? (
-            <span style={styles.dailyPairPlaceholder}>よる8じに</span>
-          ) : (
-            <span style={styles.dailyPairPlaceholder}>この日は おやすみ</span>
-          )}
-          <span style={styles.dailyPairLabel}>どこかのこ</span>
-        </button>
+        {shouldShowOtherSlot ? (
+          <>
+            <span style={styles.dailyPairDots} aria-hidden="true" />
+            <button
+              type="button"
+              style={styles.dailyPairTile}
+              onClick={() => deliveredPhoto && onOpenBox("other", group.key)}
+              disabled={!deliveredPhoto}
+              aria-label="どこかのこを開く"
+            >
+              {deliveredPhoto ? (
+                <StoredPhotoImage
+                  src={getPhotoThumbnailSrc(deliveredPhoto)}
+                  alt=""
+                  style={styles.dailyPairImage}
+                />
+              ) : group.key === getLocalDateKey(Date.now()) ? (
+                <span style={styles.dailyPairPlaceholder}>よる8じに</span>
+              ) : (
+                <span style={styles.dailyPairPlaceholder}>この日は おやすみ</span>
+              )}
+              <span style={styles.dailyPairLabel}>どこかのこ</span>
+            </button>
+          </>
+        ) : null}
       </div>
       {extraPhotos.length > 0 ? (
         <button
@@ -2178,14 +2222,26 @@ function createEmptyTodayAlbumGroup(): AlbumDayGroup {
 function filterAlbumDayGroupsByScope(
   groups: AlbumDayGroup[],
   scope: AlbumScope,
+  firstEveningDeliveryTargetDateKey: string | null,
 ) {
   return groups
     .map((group) => {
-      const sections = group.sections.filter((section) =>
+      let sections = group.sections.filter((section) =>
         scope === "own"
           ? section.kind === "sleeping" || section.kind === "awake"
           : true,
       );
+
+      if (
+        scope === "daily" &&
+        !shouldShowOtherDeliverySlot(
+          group.key,
+          firstEveningDeliveryTargetDateKey,
+        )
+      ) {
+        sections = sections.filter((section) => section.kind !== "other");
+      }
+
       const total = sections.reduce(
         (sum, section) => sum + section.photos.length,
         0,
@@ -2198,6 +2254,17 @@ function filterAlbumDayGroupsByScope(
       };
     })
     .filter((group) => group.total > 0);
+}
+
+function shouldShowOtherDeliverySlot(
+  groupKey: string,
+  firstEveningDeliveryTargetDateKey: string | null,
+) {
+  if (!firstEveningDeliveryTargetDateKey) {
+    return false;
+  }
+
+  return groupKey >= firstEveningDeliveryTargetDateKey;
 }
 
 function filterBoxPhotosByDate(
@@ -3003,6 +3070,9 @@ const styles = {
     alignItems: "center",
     gap: "8px",
   },
+  dailyPairMainSingle: {
+    gridTemplateColumns: "1fr",
+  },
   dailyPairTile: {
     display: "grid",
     gap: "8px",
@@ -3073,7 +3143,7 @@ const styles = {
   },
   dailyExtrasStrip: {
     display: "flex",
-    justifyContent: "flex-end",
+    justifyContent: "flex-start",
     gap: "5px",
     minWidth: 0,
   },

@@ -235,4 +235,92 @@ test.describe("collection album flow", () => {
 
     await expect(page.locator("main img")).toHaveCount(2);
   });
+
+  test("hides the other slot before the first evening delivery target day", async ({
+    page,
+  }) => {
+    const now = Date.parse("2026-06-10T10:00:00.000Z");
+    const todayKey = "2026-06-10";
+    const yesterdayAt = now - 24 * 60 * 60 * 1000;
+
+    await page.addInitScript(
+      ({ currentCatId, src, createdAt, olderCreatedAt, targetDateKey }) => {
+        const originalDateNow = Date.now.bind(Date);
+        (window as typeof window & { __testNow?: number }).__testNow =
+          createdAt;
+        Date.now = () =>
+          (window as typeof window & { __testNow?: number }).__testNow ??
+          originalDateNow();
+        window.localStorage.setItem("active_cat_id", currentCatId);
+        window.localStorage.setItem(
+          "cat_profiles",
+          JSON.stringify([
+            {
+              id: currentCatId,
+              name: "ミケ",
+              createdAt: new Date(createdAt).toISOString(),
+              updatedAt: new Date(createdAt).toISOString(),
+            },
+          ]),
+        );
+        window.localStorage.setItem(
+          "neteruneko_evening_delivery_days",
+          JSON.stringify({
+            [targetDateKey]: {
+              dateKey: targetDateKey,
+              targetOwnPhotoId: "own-sleeping-today",
+              targetCatId: currentCatId,
+              targetCapturedAt: createdAt,
+            },
+          }),
+        );
+        window.localStorage.setItem(
+          "nyaruhodo_exchange_own_sleeping_photos",
+          JSON.stringify([
+            {
+              id: "own-sleeping-today",
+              ownerCatId: currentCatId,
+              catId: currentCatId,
+              src,
+              state: "sleeping",
+              visibility: "private",
+              deliveryStatus: "available",
+              triggerLabel: "sleeping",
+              theme: "sleeping",
+              shared: true,
+              createdAt,
+            },
+            {
+              id: "own-sleeping-yesterday",
+              ownerCatId: currentCatId,
+              catId: currentCatId,
+              src,
+              state: "sleeping",
+              visibility: "private",
+              deliveryStatus: "available",
+              triggerLabel: "sleeping",
+              theme: "sleeping",
+              shared: true,
+              createdAt: olderCreatedAt,
+            },
+          ]),
+        );
+      },
+      {
+        currentCatId: "current-cat",
+        src: photoDataUrl,
+        createdAt: now,
+        olderCreatedAt: yesterdayAt,
+        targetDateKey: todayKey,
+      },
+    );
+
+    await page.goto("/collection");
+    await page.waitForLoadState("networkidle");
+
+    await expect(page.locator('button[aria-label="どこかのこを開く"]')).toHaveCount(
+      1,
+    );
+    await expect(page.getByText("この日は おやすみ")).toHaveCount(0);
+  });
 });

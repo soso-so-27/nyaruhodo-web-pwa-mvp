@@ -77,6 +77,17 @@ export function readEveningDeliveryStore(): EveningDeliveryStore {
   }
 }
 
+export function getFirstEveningDeliveryTargetDateKey(): string | null {
+  const store = readEveningDeliveryStore();
+  const targetDateKeys = Object.values(store)
+    .filter((day) => Boolean(day.targetOwnPhotoId))
+    .map((day) => day.dateKey)
+    .filter(isValidDateKey)
+    .sort();
+
+  return targetDateKeys[0] ?? null;
+}
+
 export function writeEveningDeliveryStore(store: EveningDeliveryStore) {
   if (typeof window === "undefined") {
     return;

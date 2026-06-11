@@ -88,7 +88,7 @@ export function CatsPage() {
       : null;
   const catName = getCatName(activeCatProfile);
   const activeGender = formatGender(activeCatProfile?.basicInfo?.gender);
-  const familyDays = formatFamilyDays(
+  const familyDuration = formatFamilyDuration(
     activeCatProfile?.basicInfo?.familySinceDate,
   );
   const takenSleepingPhotoCount = activeCatId
@@ -503,7 +503,16 @@ export function CatsPage() {
                 <div style={styles.recordList}>
                   <div style={styles.recordRow}>
                     <span style={styles.recordLabel}>家族になって</span>
-                    <span style={styles.recordMetricValue}>{familyDays}</span>
+                    <span style={styles.recordMetricValueGroup}>
+                      <span style={styles.recordMetricValue}>
+                        {familyDuration.primary}
+                      </span>
+                      {familyDuration.secondary ? (
+                        <span style={styles.recordMetricSub}>
+                          {familyDuration.secondary}
+                        </span>
+                      ) : null}
+                    </span>
                   </div>
                   <div style={styles.recordRow}>
                     <span style={styles.recordLabel}>とったねがお</span>
@@ -713,15 +722,15 @@ export function CatsPage() {
                 </button>
               );
             })}
-            <button
-              type="button"
-              style={styles.catSheetAdd}
-              onClick={startAddingCat}
-            >
-              追加
-            </button>
-          </div>
-        </AppBottomSheet>
+                <button
+                  type="button"
+                  style={styles.catSheetAdd}
+                  onClick={startAddingCat}
+                >
+                  ねこを ふやす
+                </button>
+              </div>
+            </AppBottomSheet>
       ) : null}
     </main>
   );
@@ -901,11 +910,16 @@ function formatBirthDate(birthDate: string): string {
   return `${date.getFullYear()}年${date.getMonth() + 1}月${date.getDate()}日`;
 }
 
-function formatFamilyDays(familySinceDate?: string): string {
+function formatFamilyDuration(familySinceDate?: string): {
+  primary: string;
+  secondary: string;
+} {
   const createdDate = parseLocalDate(familySinceDate);
-
   if (!createdDate) {
-    return "未設定";
+    return {
+      primary: "未設定",
+      secondary: "",
+    };
   }
 
   const today = new Date();
@@ -914,11 +928,41 @@ function formatFamilyDays(familySinceDate?: string): string {
     today.getMonth(),
     today.getDate(),
   );
-  const elapsedDays = Math.floor(
-    (todayDate.getTime() - createdDate.getTime()) / 86_400_000,
+  const dayCount = Math.max(
+    1,
+    Math.floor((todayDate.getTime() - createdDate.getTime()) / 86_400_000) + 1,
   );
 
-  return `${Math.max(1, elapsedDays + 1)}日`;
+  let years = 0;
+  while (addYearsSafe(createdDate, years + 1) <= todayDate) {
+    years += 1;
+  }
+
+  const milestoneDate = addYearsSafe(createdDate, years);
+  const extraDays = Math.floor(
+    (todayDate.getTime() - milestoneDate.getTime()) / 86_400_000,
+  );
+
+  let secondary = "";
+  if (years > 0) {
+    secondary = `${years}年`;
+    if (extraDays > 0) {
+      secondary = `${years}年と${extraDays}日`;
+    }
+  }
+
+  return {
+    primary: `${dayCount}日`,
+    secondary,
+  };
+}
+
+function addYearsSafe(date: Date, years: number) {
+  const year = date.getFullYear() + years;
+  const month = date.getMonth();
+  const lastDay = new Date(year, month + 1, 0).getDate();
+  const safeDay = Math.min(date.getDate(), lastDay);
+  return new Date(year, month, safeDay);
 }
 
 function parseLocalDate(value?: string): Date | null {
@@ -1326,6 +1370,18 @@ const styles = {
     lineHeight: 1.35,
     textAlign: "right",
     letterSpacing: 0,
+  },
+  recordMetricValueGroup: {
+    display: "grid",
+    justifyItems: "end",
+    gap: "2px",
+  },
+  recordMetricSub: {
+    color: CATS_FAINT,
+    fontSize: "10.5px",
+    fontWeight: 480,
+    lineHeight: 1.2,
+    letterSpacing: "0.02em",
   },
   footprintsSection: {
     marginTop: "13px",
