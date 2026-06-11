@@ -765,13 +765,6 @@ export function SettingsPage() {
               onMessageChange={setFeedbackMessage}
               onSubmit={handleFeedbackSubmit}
             />
-            <div style={styles.divider} />
-            <div style={styles.betaNote}>
-              <p style={styles.betaNoteTitle}>βのお知らせ</p>
-              <p style={styles.betaNoteText}>
-                β期間中の変更やお願いは、ここに少しずつ置いていきます。
-              </p>
-            </div>
           </AppCard>
         </section>
           </>

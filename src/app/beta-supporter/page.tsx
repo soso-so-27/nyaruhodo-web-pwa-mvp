@@ -19,13 +19,13 @@ import { color, radius, spacing, typography } from "../../components/ui/designTo
 
 const dreams = [
   {
-    text: "かぞくを さがしている ほごねこの ねがおが、とくべつな ふうとうで とどく",
+    text: "家族を探している保護猫の寝顔が、特別な封筒で届く",
     done: false,
   },
-  { text: "ねぞうの ずかん（香箱、アンモニャイト、へそ天…）", done: false },
-  { text: "つきの おわりに とどく「◯月のねがお」", done: false },
-  { text: "としの おわりに、1さつの「ねがおの本」", done: false },
-  { text: "ねがおに そえる、3びょうの ねいき", done: false },
+  { text: "寝相の図鑑（香箱、アンモニャイト、へそ天など）", done: false },
+  { text: "月の終わりに届く「◯月の寝顔」", done: false },
+  { text: "年の終わりに、1冊の「寝顔の本」", done: false },
+  { text: "寝顔に添える、3秒の寝息", done: false },
 ] as const;
 
 export default function BetaSupporterPage() {
@@ -115,16 +115,19 @@ export default function BetaSupporterPage() {
     <main style={styles.page}>
       <div style={styles.backdrop} aria-hidden="true" />
       <div style={styles.container}>
+        <a href="/settings" style={styles.backLink}>
+          ‹ 設定
+        </a>
         <AppHeader variant="pageTitle" title="ねてるねこ" />
 
         <AppCard variant="soft" padding="xl" style={styles.hero}>
           <p style={styles.kicker}>βサポーター</p>
-          <h1 style={styles.title}>これからの ねてるねこ</h1>
+          <h1 style={styles.title}>これからのねてるねこ</h1>
           <p style={styles.lead}>
-            サポーターの おうえんは、サーバーと、写真のおあずかりと、この場所の しずけさに つかわれます。
+            サポーターの応援は、サーバー費用、写真のお預かり、この場所を静かに保つために使います。
           </p>
           <p style={styles.lead}>
-            そして すこしずつ、こんな ゆめを かたちに していきます。
+            そのうえで、少しずつ形にしたいことがあります。
           </p>
         </AppCard>
 
@@ -144,17 +147,17 @@ export default function BetaSupporterPage() {
 
         <AppCard variant="outlined" padding="lg" style={styles.card}>
           <p style={styles.note}>
-            これは やくそくではなく、ゆめの メモです。
+            これは約束ではなく、アイデアのメモです。
             <br />
-            かたちが かわることも、じゅんばんが かわることも あります。
+            内容や順番は変わることがあります。
           </p>
-          <p style={styles.closing}>できたものから、みんなに とどきます。</p>
+          <p style={styles.closing}>できたものから、みんなに届きます。</p>
         </AppCard>
 
         <AppCard variant="soft" padding="lg" style={styles.card}>
           <p style={styles.price}>月 1,480円</p>
           <p style={styles.note}>
-            機能は なにも せいげんしません。
+            機能は何も制限しません。
             <br />
             応援してもしなくても、ねてるねこは同じように使えます。
           </p>
@@ -182,7 +185,7 @@ export default function BetaSupporterPage() {
             <p style={styles.note}>
               {billingStatus.billingConfigured
                 ? "β参加者としてログインすると、サポーター導線を使えます。"
-                : "準備中です。"}
+                : "現在、支払い導線は準備中です。"}
             </p>
           )}
           {message ? <p style={styles.message}>{message}</p> : null}
@@ -223,12 +226,21 @@ const styles = {
     padding: `calc(${spacing.md}px + env(safe-area-inset-top)) ${spacing.screenX}px calc(44px + env(safe-area-inset-bottom))`,
     boxSizing: "border-box",
     display: "grid",
-    gap: spacing.lg,
+    gap: spacing.md,
+  },
+  backLink: {
+    justifySelf: "start",
+    color: color.textMuted,
+    fontSize: typography.body.fontSize,
+    fontWeight: 520,
+    lineHeight: 1.4,
+    textDecoration: "none",
+    padding: "8px 2px",
   },
   hero: {
     display: "grid",
-    gap: spacing.md,
-    marginTop: spacing.lg,
+    gap: spacing.sm,
+    marginTop: spacing.sm,
   },
   card: {
     display: "grid",
@@ -237,18 +249,16 @@ const styles = {
   kicker: {
     margin: 0,
     color: color.textMuted,
-    fontSize: typography.caption.fontSize,
+    fontSize: typography.body.fontSize,
     fontWeight: 600,
-    lineHeight: 1.4,
+    lineHeight: typography.body.lineHeight,
   },
   title: {
     margin: 0,
     color: color.textStrong,
-    fontFamily: typography.fontSerif,
-    fontSize: 24,
-    fontWeight: 500,
-    lineHeight: 1.42,
-    letterSpacing: "0.06em",
+    fontSize: 18,
+    fontWeight: 650,
+    lineHeight: 1.5,
   },
   lead: {
     margin: 0,
@@ -271,7 +281,7 @@ const styles = {
     gap: spacing.sm,
     color: color.text,
     fontSize: typography.body.fontSize,
-    lineHeight: 1.68,
+    lineHeight: typography.body.lineHeight,
   },
   dreamDot: {
     width: 5,
@@ -296,25 +306,23 @@ const styles = {
   note: {
     margin: 0,
     color: color.textMuted,
-    fontSize: 13.5,
-    fontWeight: 450,
-    lineHeight: 1.72,
+    fontSize: typography.body.fontSize,
+    fontWeight: typography.body.fontWeight,
+    lineHeight: typography.body.lineHeight,
   },
   closing: {
     margin: 0,
     color: color.textStrong,
-    fontFamily: typography.fontSerif,
-    fontSize: 17,
-    fontWeight: 470,
-    lineHeight: 1.55,
-    letterSpacing: "0.06em",
+    fontSize: typography.body.fontSize,
+    fontWeight: 600,
+    lineHeight: typography.body.lineHeight,
   },
   price: {
     margin: 0,
     color: color.textStrong,
-    fontSize: 16,
+    fontSize: typography.body.fontSize,
     fontWeight: 650,
-    lineHeight: 1.4,
+    lineHeight: typography.body.lineHeight,
   },
   message: {
     margin: 0,
