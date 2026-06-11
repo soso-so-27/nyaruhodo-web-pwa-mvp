@@ -2,109 +2,72 @@
 
 ## Project Goal
 
-This repository implements an MVP Web/PWA app for logging and interpreting cat behavior.
+This repository implements `ねてるねこ`, a quiet Web/PWA where a user takes a cat sleeping photo, leaves it with the app, and receives another sleeping photo around 8pm.
 
-The first validation target is Web/PWA. The architecture must keep future migration to Expo React Native realistic by separating UI, domain logic, data access, and platform-specific concerns.
+The core product model is:
+
+- Take a sleeping photo.
+- Keep the user's own photo locally and, when account sync is enabled, in the user's account.
+- Share only the server-selected delivery flow through `/api/sleeping-delivery/exchange`.
+- Deliver one sleeping photo as a small evening letter.
+- Let the user keep the delivered photo in the album.
+
+The app should feel calm, private, and small. Avoid adding loud engagement loops, feed-like browsing, public galleries, or growth mechanics.
 
 ## Tech Stack
 
-- Next.js
+- Next.js App Router
 - TypeScript
 - Supabase
 - Vercel
-- Future Expo React Native migration in mind
+- Browser localStorage as the primary MVP client store
+- Optional account sync for persistence across installs/devices
 
-## Required Architecture
+There is currently no Service Worker. The PWA is manifest-only, so do not assume offline support or push notification handling exists.
 
-- Put diagnosis logic, scoring, comprehension/confidence calculation, and shared types under `/core`.
-- Keep UI components free of diagnosis logic.
-- Access Supabase only through `/lib/supabase`.
-- Keep domain logic framework-independent wherever possible.
-- Prefer functions that can be reused from Web and future React Native.
+## Product Principles
 
-## MVP Scope
+- The home screen answers three questions only:
+  - What do I do now? Heading + camera button.
+  - How far did today progress? Day-cycle motif.
+  - Am I alone? Quiet presence line.
+- Night delivery is centered around the 8pm letter model.
+- Do not expose the delivery pool directly to the browser. Use server APIs for selection.
+- Do not turn supporter/payment features into functional restrictions. Supporter copy may explain what support helps sustain, but core features remain available.
+- Write user-facing copy in natural Japanese. Do not over-hiraganize text unless the specific screen intentionally uses a childlike voice.
 
-Implement only these screens first:
+## Data And Privacy Rules
 
-1. Home
-2. Meowing diagnosis flow
-3. Diagnosis result
-4. Result feedback
-
-Home is an input surface only. Do not show action recommendations on Home.
-
-## Home Categories
-
-Home has only two categories:
-
-- いまの様子
-- 気になること
-
-Do not add these categories to Home:
-
-- 記録する
-- 今やること
-
-## Home Options
-
-### いまの様子
-
-- ねてる
-- 遊んでる
-- グルーミング
-- ご飯たべた
-- トイレした
-- ゴロゴロしてる
-
-### 気になること
-
-- 鳴いてる
-- ついてくる
-- 落ち着かない
-- 元気ない
-- ケンカしてる
-- よくわからない
-
-## Design Rules
-
-- Use a gray-based visual system.
-- Use at most one accent color.
-- Do not encode too much meaning with color.
-- Use no shadow or minimal shadow.
-- Buttons should be rounded and flat.
-- Use generous spacing.
-- Avoid adding excessive information.
-- Home is for input; action recommendations appear only on diagnosis result screens.
-
-## Diagnosis Logic Rules
-
-- Decisions are made by deterministic logic.
-- AI may assist only with explanation text, suggestion text, and perceived helpfulness.
-- Do not force a single cause when scores are close.
-- If the top two score difference is less than 10, show two candidates.
-- Health-related flags override ordinary scoring and prioritize `health`.
+- Photos are sensitive. Treat every photo URL, data URL, storage path, and signed URL as private unless the current flow explicitly shares it into the delivery pool.
+- Browser anon clients must not directly read the shared delivery pool from `cat_moments`.
+- Delivery selection must go through `/api/sleeping-delivery/exchange`.
+- Do not reintroduce `/api/sleeping-delivery/candidate` or any direct browser-readable candidate route.
+- Account data must remain scoped to the authenticated user's own rows through RLS.
+- Avoid adding destructive delete actions to ordinary settings unless the product explicitly asks for them again.
 
 ## Supabase Rules
 
-- Data access must go through `/lib/supabase`.
-- Do not write Supabase calls inside UI components.
-- Before creating or running DB migrations, RLS policies, or SQL operations, ask the user for confirmation.
-- Destructive operations are prohibited unless explicitly approved.
+- Browser/client Supabase access is acceptable only for authenticated self-owned data, anon inserts explicitly covered by RLS, or storage operations covered by the bucket policy.
+- Server-side delivery/admin/billing routes may use server/admin clients where the route performs its own validation and privacy filtering.
+- Before running remote DB operations, migrations, RLS changes, SQL scripts, or destructive data operations, ask the user for confirmation.
 - Never run `supabase db reset`.
+
+## Architecture Rules
+
+- Keep domain logic in `src/lib` or focused helper modules, not inside large UI components when it can be reasonably separated.
+- Keep UI components aligned with existing app patterns before adding new abstractions.
+- Prefer existing storage keys/constants over hard-coded localStorage strings.
+- If a test seeds app state, prefer shared helpers/constants so key renames fail loudly.
+
+## Testing Rules
+
+- Time-sensitive behavior must be tested with fixed clocks or explicit time overrides.
+- Delivery flow tests should cover `/api/sleeping-delivery/exchange`, not removed candidate routes.
+- Security/privacy changes need API-level tests where possible, plus a documented manual verification step when a live Supabase policy must be checked.
+- Before release, run `npm run build` and at least one full E2E pass. For public release candidates, also run one E2E pass against `next start`.
 
 ## Change Management
 
-- Any product, logic, UI, schema, or architecture decision change must be recorded in `docs/decisions.md`.
-- Keep documentation updated before or during implementation, not after large drift has accumulated.
-
-## Development Order
-
-Follow this order:
-
-1. Create `AGENTS.md` and docs.
-2. Create the Next.js directory structure.
-3. Implement only the Home UI.
-4. Implement `/core` scoring functions.
-5. Connect "鳴いてる" to the diagnosis result flow.
-
-Move in small increments. Do not implement everything at once.
+- Keep important product, privacy, schema, RLS, and architecture decisions documented in `docs/decisions.md` or a focused doc.
+- Leave historical migrations intact; add new migrations for DB/RLS changes.
+- Do not commit generated review bundles under `artifacts/`.

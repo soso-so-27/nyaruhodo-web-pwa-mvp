@@ -45,6 +45,30 @@ for (const table of requiredTables) {
   }
 }
 
+console.log("Checking cat_moments delivery pool is not anon-readable...");
+const deliveryPoolResponse = await fetch(
+  `${supabaseUrl}/rest/v1/cat_moments?select=id&visibility=eq.shared&delivery_status=eq.available&limit=1`,
+  {
+    headers: {
+      apikey: anonKey,
+      Authorization: `Bearer ${anonKey}`,
+    },
+  },
+);
+
+if (deliveryPoolResponse.status === 200) {
+  const rows = await deliveryPoolResponse.json().catch(() => null);
+
+  if (Array.isArray(rows) && rows.length > 0) {
+    fail("cat_moments shared delivery pool is readable with the anon key.");
+  }
+} else if (![401, 403].includes(deliveryPoolResponse.status)) {
+  const body = await deliveryPoolResponse.text();
+  fail(
+    `cat_moments anon delivery-pool check returned unexpected HTTP ${deliveryPoolResponse.status}: ${body}`,
+  );
+}
+
 console.log("Checking cat-photos storage bucket...");
 const bucketResponse = await fetch(`${supabaseUrl}/storage/v1/object/list/cat-photos`, {
   method: "POST",

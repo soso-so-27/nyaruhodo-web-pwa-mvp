@@ -6,14 +6,12 @@
     "typecheck": "tsc --noEmit",
     "e2e": "playwright test",
     "e2e:headed": "playwright test --headed",
-    "generate:icons": "node scripts/generate-cat-action-icons.mjs",
     "check:release": "node scripts/check-release-readiness.mjs"
   },
   "dependencies": {
     "@supabase/ssr": "0.10.3",
     "@supabase/supabase-js": "2.105.4",
     "next": "16.2.4",
-    "openai": "6.35.0",
     "react": "19.2.5",
     "react-dom": "19.2.5"
   },

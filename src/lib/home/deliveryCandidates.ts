@@ -8,11 +8,6 @@ import {
 import { createBrowserSupabaseClient } from "../supabase/browser";
 import { STORAGE_KEYS } from "../storage";
 
-type RemoteCandidateResponse = {
-  photo?: ExchangePhotoPoolItem | null;
-  source?: "remote" | "none";
-};
-
 type RemoteStockResponse = {
   photo?: ExchangePhotoPoolItem | null;
 };
@@ -21,11 +16,6 @@ type SleepingExchangeResponse = {
   photo?: ExchangePhoto | null;
   source?: "remote" | "none";
   diagnostics?: SleepingDeliveryDiagnostics;
-};
-
-type RemoteCandidateResult = {
-  photo: ExchangePhotoPoolItem | null;
-  source?: "remote" | "none";
 };
 
 const MAX_BLOCKED_PHOTO_IDS = 100;
@@ -52,18 +42,6 @@ export type SleepingDeliveryDiagnostics = {
   lastError?: string | null;
   checkedAt: string;
 };
-
-export async function selectDeliveryCandidate(
-  input: DeliverableSleepingPhotoInput,
-): Promise<ExchangePhotoPoolItem | null> {
-  const remotePhoto = await fetchRemoteDeliveryCandidate(input);
-
-  if (remotePhoto?.source === "remote" && remotePhoto.photo) {
-    return remotePhoto.photo;
-  }
-
-  return null;
-}
 
 export async function createSleepingExchange({
   ownPhoto,
@@ -202,43 +180,6 @@ function getOrCreateAnonymousId() {
 
   window.localStorage.setItem(STORAGE_KEYS.analyticsAnonymousId, nextId);
   return nextId;
-}
-
-async function fetchRemoteDeliveryCandidate(
-  input: DeliverableSleepingPhotoInput,
-): Promise<RemoteCandidateResult | null> {
-  if (typeof window === "undefined") {
-    return null;
-  }
-
-  try {
-    const supabase = createBrowserSupabaseClient();
-    const { data } = supabase
-      ? await supabase.auth.getUser()
-      : { data: { user: null } };
-    const response = await fetch("/api/sleeping-delivery/candidate", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        ...input,
-        excludeUserId: data.user?.id ?? null,
-        blockedPhotoIds: readBlockedExchangePhotoIdList(),
-      }),
-    });
-
-    if (!response.ok) {
-      return null;
-    }
-
-    const result = (await response.json()) as RemoteCandidateResponse;
-
-    return {
-      photo: result.photo ?? null,
-      source: result.source,
-    };
-  } catch {
-    return null;
-  }
 }
 
 function readBlockedExchangePhotoIdList() {

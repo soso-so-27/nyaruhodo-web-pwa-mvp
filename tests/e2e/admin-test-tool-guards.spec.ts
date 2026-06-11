@@ -231,6 +231,7 @@ test.describe("admin test tool guards", () => {
 
     await page.goto("/settings");
     await page.waitForLoadState("networkidle");
+    await page.getByRole("tab", { name: "管理" }).click();
 
     await expect(page.locator('a[href="/onboarding?test=1"]')).toHaveCount(1);
     await expect(
@@ -334,10 +335,10 @@ test.describe("admin test tool guards", () => {
 
     await page.getByRole("link", { name: "これからの ねてるねこ" }).click();
     await page.waitForURL("**/beta-supporter");
-    await expect(page.getByText("これからの ねてるねこ").first()).toBeVisible();
+    await expect(page.getByText("これからのねてるねこ").first()).toBeVisible();
     await expect(page.getByRole("button", { name: "支払いを管理" })).toBeVisible();
     await expect(
-      page.getByText("機能は なにも せいげんしません。"),
+      page.getByText("機能は何も制限しません。"),
     ).toBeVisible();
   });
 
@@ -382,7 +383,7 @@ test.describe("admin test tool guards", () => {
     await page.goto("/beta-supporter");
     await page.waitForLoadState("networkidle");
 
-    await expect(page.getByText("これからの ねてるねこ").first()).toBeVisible();
+    await expect(page.getByText("これからのねてるねこ").first()).toBeVisible();
     await expect(page.getByRole("button", { name: "応援する" })).toBeVisible();
     await expect(page.getByRole("button", { name: "支払いを管理" })).toBeHidden();
   });

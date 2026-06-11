@@ -1,4 +1,4 @@
-import { expect, test, type APIRequestContext } from "@playwright/test";
+import { expect, test } from "@playwright/test";
 
 import {
   isBlockedDeliveryPhotoUrl,
@@ -20,16 +20,6 @@ const minimalWebpDataUrl = `data:image/webp;base64,${Buffer.from([
   0x52, 0x49, 0x46, 0x46, 0x0c, 0x00, 0x00, 0x00, 0x57, 0x45, 0x42, 0x50,
   0x56, 0x50, 0x38, 0x20,
 ]).toString("base64")}`;
-
-type CandidateResponse = {
-  photo?: {
-    id?: string;
-    sourceOwnPhotoId?: string;
-    sourceCatId?: string;
-    src?: string;
-  } | null;
-  source?: "remote" | "none";
-};
 
 type ExchangeResponse = {
   photo?: {
@@ -171,34 +161,22 @@ test.describe("sleeping delivery pool guards", () => {
 
   test("rate limits repeated exchange calls", async ({ request }) => {
     const anonymousId = `rate-limit-${Date.now()}`;
-    let lastStatus = 0;
+    const responses = await Promise.all(
+      Array.from({ length: 11 }, (_, index) =>
+        request.post("/api/sleeping-delivery/exchange", {
+          data: buildExchangeRequest(
+            normalCatLikePhotoUrl,
+            `${anonymousId}-${index}`,
+            anonymousId,
+          ),
+        }),
+      ),
+    );
 
-    for (let index = 0; index < 11; index += 1) {
-      const response = await request.post("/api/sleeping-delivery/exchange", {
-        data: buildExchangeRequest(
-          normalCatLikePhotoUrl,
-          `${anonymousId}-${index}`,
-          anonymousId,
-        ),
-      });
-      lastStatus = response.status();
-    }
-
-    expect(lastStatus).toBe(429);
+    expect(responses.map((response) => response.status())).toContain(429);
   });
 
   test("does not return known test or debug pool rows", async ({ request }) => {
-    for (let index = 0; index < 12; index += 1) {
-      const result = await readCandidate(request, index);
-
-      if (!result.photo) {
-        continue;
-      }
-
-      expectCandidateIsNotTestPoolPhoto(result.photo);
-      expect(result.photo.src ?? "").not.toMatch(/^storage:/);
-    }
-
     const createdAt = Date.now();
     const exchangeResponse = await request.post(
       "/api/sleeping-delivery/exchange",
@@ -237,22 +215,6 @@ test.describe("sleeping delivery pool guards", () => {
     }
   });
 });
-
-async function readCandidate(request: APIRequestContext, index: number) {
-  const response = await request.post("/api/sleeping-delivery/candidate", {
-    data: {
-      seed: `guard-candidate-${index}`,
-      triggerLabel: "ねがお",
-      theme: "sleeping",
-      category: "sleeping",
-      recipientCatId: `guard-recipient-${index}`,
-      blockedPhotoIds: [],
-    },
-  });
-
-  expect(response.ok()).toBeTruthy();
-  return (await response.json()) as CandidateResponse;
-}
 
 function expectCandidateIsNotTestPoolPhoto(photo: {
   id?: string;
