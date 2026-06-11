@@ -246,7 +246,11 @@ async function handleExchangePost(request: Request) {
       : [];
   const candidatePool =
     candidates.length > 0 ? candidates : fallbackCandidates;
-  const selected = await selectCandidate(candidatePool, input, supabase);
+  const selected = await selectCandidate(
+    preferStorageCandidates(candidatePool),
+    input,
+    supabase,
+  );
 
   if (!selected) {
     return NextResponse.json({
@@ -796,6 +800,12 @@ async function prepareExchangeDeliveryPhotoSrc({
   } catch {
     return resolvedSrc;
   }
+}
+
+function preferStorageCandidates(rows: RemoteCatMomentRow[]) {
+  const storageRows = rows.filter((row) => getStoragePhotoPath(row.photo_url));
+
+  return storageRows.length > 0 ? storageRows : rows;
 }
 
 async function selectCandidate(
