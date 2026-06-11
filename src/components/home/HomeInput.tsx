@@ -112,6 +112,13 @@ type LockType = "yousu" | "mugi";
 const MIKKE_CATEGORIES: MikkeWindowCategory[] = ["place", "pose", "sign"];
 const MIKKE_LOCK_MS = 60 * 60 * 1000;
 const HOME_SLEEPING_COUNTER_BASE_COUNT = 75;
+const SHOW_HOME_WORDMARK = false;
+const SUBCOPY_HIDE_EXCHANGE_COUNT = 10;
+const MOTIF_STATE_SHOWN_STORAGE_PREFIX = "neteruneko_motif_state_shown";
+const SUBCOPY_HIDDEN_COHORT_STORAGE_KEY =
+  "neteruneko_subcopy_hidden_cohort_tracked";
+
+type DayCycleState = "1" | "1b" | "2" | "3" | "4";
 const PHOTO_SAVE_FAILURE_MESSAGE =
   "写真を保存できませんでした。少し時間をおいて、もう一度試してください";
 const PHOTO_INPUT_FAILURE_MESSAGE =
@@ -644,6 +651,10 @@ export function HomeInput({ recentEvents: _recentEvents }: HomeInputProps) {
         now: tick,
       }),
     [activeCatId, eveningRefreshTick, ownSleepingPhotosForHome, tick],
+  );
+  const keptExchangePhotoCount = useMemo(
+    () => readKeptExchangePhotoCount(),
+    [collectionRefreshTick, eveningRefreshTick],
   );
   const homeCatCounters = useMemo(
     () =>
@@ -1842,6 +1853,7 @@ export function HomeInput({ recentEvents: _recentEvents }: HomeInputProps) {
           catName={catName}
           sleepingCounter={sleepingCounterCount}
           eveningState={eveningHomeState}
+          keptExchangePhotoCount={keptExchangePhotoCount}
           isInstallHintVisible={shouldShowHomeInstallHint}
           showSleepingCounter={isTodaySleepingCounterVisible(sleepingCounterCount)}
           onTakePhoto={() => handleSleepingPhotoStart("camera")}
@@ -2080,6 +2092,43 @@ export function HomeInput({ recentEvents: _recentEvents }: HomeInputProps) {
             filter: blur(0);
           }
         }
+        @keyframes dayCycleDotFlow {
+          0%, 100% { opacity: 0.3; }
+          50% { opacity: 0.7; }
+        }
+        @keyframes dayCycleCameraFill {
+          from { opacity: 0; }
+          to { opacity: 1; }
+        }
+        .day-cycle-indicator {
+          transition: opacity 300ms ease-out;
+          -webkit-tap-highlight-color: transparent;
+        }
+        .day-cycle-dot-flow {
+          animation: dayCycleDotFlow 2.4s linear infinite;
+        }
+        .day-cycle-dot-flow:nth-child(2) {
+          animation-delay: 0.18s;
+        }
+        .day-cycle-dot-flow:nth-child(3) {
+          animation-delay: 0.36s;
+        }
+        .day-cycle-dot-flow:nth-child(4) {
+          animation-delay: 0.54s;
+        }
+        .day-cycle-dot-flow:nth-child(5) {
+          animation-delay: 0.72s;
+        }
+        .day-cycle-camera-fill {
+          animation: dayCycleCameraFill 600ms ease-out both;
+        }
+        .sleeping-photo-button {
+          transition: transform 100ms ease-out;
+          -webkit-tap-highlight-color: transparent;
+        }
+        .sleeping-photo-button:active {
+          transform: scale(0.97);
+        }
         .mikke-all-body {
           scrollbar-width: none;
         }
@@ -2094,8 +2143,8 @@ export function HomeInput({ recentEvents: _recentEvents }: HomeInputProps) {
         }
         @media (prefers-reduced-motion: reduce) {
           * {
-            animation-duration: 0.01ms !important;
-            transition-duration: 0.01ms !important;
+            animation: none !important;
+            transition: none !important;
           }
         }
       `}</style>
@@ -2658,6 +2707,7 @@ function SleepingPhotoHome({
   catName,
   sleepingCounter,
   eveningState,
+  keptExchangePhotoCount,
   isInstallHintVisible,
   showSleepingCounter,
   onTakePhoto,
@@ -2666,6 +2716,7 @@ function SleepingPhotoHome({
   catName: string;
   sleepingCounter: string;
   eveningState: EveningHomeState;
+  keptExchangePhotoCount: number;
   isInstallHintVisible: boolean;
   showSleepingCounter: boolean;
   onTakePhoto: () => void;
@@ -2698,31 +2749,64 @@ function SleepingPhotoHome({
   const targetPhoto = isWaiting || isDelivered || isOpened
     ? eveningState.targetPhoto
     : null;
+  const dayCycleState = getDayCycleState(eveningState);
+  const shouldHideRoutineSubcopy =
+    dayCycleState === "1" &&
+    keptExchangePhotoCount >= SUBCOPY_HIDE_EXCHANGE_COUNT;
+  const visibleLead = shouldHideRoutineSubcopy ? "" : lead;
+
+  useEffect(() => {
+    trackMotifStateShown(dayCycleState, eveningState.dateKey);
+  }, [dayCycleState, eveningState.dateKey]);
+
+  useEffect(() => {
+    if (keptExchangePhotoCount < SUBCOPY_HIDE_EXCHANGE_COUNT) {
+      return;
+    }
+
+    trackSubcopyHiddenCohort(keptExchangePhotoCount);
+  }, [keptExchangePhotoCount]);
+
+  function handleTakePhotoPress() {
+    if (typeof navigator !== "undefined" && "vibrate" in navigator) {
+      navigator.vibrate?.(10);
+    }
+    onTakePhoto();
+  }
+
+  function handleMotifOpen() {
+    if (!isDelivered) {
+      return;
+    }
+
+    trackProductEvent("motif_tapped", {
+      state: dayCycleState,
+      delivery_date_key: eveningState.dateKey,
+    });
+    onOpenDelivery(eveningState);
+  }
 
   return (
     <>
-      <div style={styles.sleepingTopBar} aria-hidden="true">
+      <div
+        style={SHOW_HOME_WORDMARK ? styles.sleepingTopBar : styles.sleepingTopBarHidden}
+        aria-hidden="true"
+      >
         ねてるねこ
       </div>
       <section style={styles.sleepingHome} aria-label="しゃしん">
         <div style={styles.sleepingHomeHeader}>
           <h1 style={styles.sleepingHomeTitle}>{title}</h1>
-          {lead ? (
+          {visibleLead ? (
             <p style={styles.sleepingHomeLead}>
-              {lead}
+              {visibleLead}
             </p>
           ) : null}
-          {isBefore ? (
-            <div style={styles.sleepingFlow} aria-hidden="true">
-              <span style={styles.sleepingFlowIcon}>
-                <AppIcon name="camera" size={20} />
-              </span>
-              <span style={styles.sleepingFlowDots} />
-              <span style={styles.sleepingFlowIconAccent}>
-                <AppIcon name="mail" size={20} />
-              </span>
-            </div>
-          ) : null}
+          <DayCycleIndicator
+            state={dayCycleState}
+            reserveSubcopySpace={shouldHideRoutineSubcopy}
+            onOpen={handleMotifOpen}
+          />
         </div>
 
         {isBefore ? (
@@ -2730,11 +2814,17 @@ function SleepingPhotoHome({
             <button
               type="button"
               style={styles.sleepingPhotoButton}
-              onClick={onTakePhoto}
+              className="sleeping-photo-button"
+              onClick={handleTakePhotoPress}
               aria-label="ねがおをとる"
             >
               <AppIcon name="camera" size={36} />
             </button>
+            {showSleepingCounter ? (
+              <p style={styles.sleepingPresenceLine}>
+                {formatSleepingPresenceLine(sleepingCounter)}
+              </p>
+            ) : null}
           </div>
         ) : null}
 
@@ -2785,56 +2875,170 @@ function SleepingPhotoHome({
         ) : null}
 
         {!isBefore && !isInstallHintVisible ? (
-          <button
-            type="button"
-            style={styles.sleepingSecondaryPhotoButton}
-            onClick={onTakePhoto}
-          >
-            <AppIcon name="camera" size={18} />
-            <span>いまとると、アルバムに はいります</span>
-          </button>
-        ) : null}
-
-        {isBefore ? (
-          <div
-            style={{
-              ...styles.sleepingStatusStack,
-              ...(!showSleepingCounter ? styles.sleepingStatusStackSingle : {}),
-            }}
-          >
+          <div style={styles.sleepingSecondaryActionGroup}>
+            <button
+              type="button"
+              style={styles.sleepingSecondaryPhotoButton}
+              onClick={onTakePhoto}
+            >
+              <AppIcon name="camera" size={18} />
+              <span>いまとると、アルバムに はいります</span>
+            </button>
             {showSleepingCounter ? (
-              <div
-                style={styles.sleepingWorldCard}
-                aria-label={`今日ねてるねこ ${sleepingCounter}匹`}
-              >
-                <div style={styles.sleepingCardIcon}>
-                  <AppIcon name="sleep" size={18} />
-                </div>
-                <div style={styles.sleepingCardText}>
-                  <span style={styles.sleepingCardLabel}>今日ねてるねこ</span>
-                  <span style={styles.sleepingWorldCountValue}>
-                    {sleepingCounter}
-                    <span style={styles.sleepingWorldCountUnit}>匹</span>
-                  </span>
-                </div>
-              </div>
+              <p style={styles.sleepingPresenceLine}>
+                {formatSleepingPresenceLine(sleepingCounter)}
+              </p>
             ) : null}
-            <div style={styles.sleepingDeliveryCard} aria-label="つぎのねがお">
-              <div style={styles.sleepingCardIconAccent}>
-                <AppIcon name="mail" size={18} />
-              </div>
-              <div style={styles.sleepingCardText}>
-                <span style={styles.sleepingCardLabel}>つぎのねがお</span>
-                <span style={styles.sleepingDeliveryValue}>
-                  {eveningState.isTodayDelivery ? "よる8じごろ" : "あしたのよる"}
-                </span>
-              </div>
-            </div>
           </div>
         ) : null}
       </section>
     </>
   );
+}
+
+function DayCycleIndicator({
+  state,
+  reserveSubcopySpace,
+  onOpen,
+}: {
+  state: DayCycleState;
+  reserveSubcopySpace: boolean;
+  onOpen: () => void;
+}) {
+  const isCameraFilled = state === "2" || state === "3" || state === "4";
+  const isEnvelopeFilled = state === "3" || state === "4";
+  const isInteractive = state === "3";
+  const content = (
+    <>
+      <span
+        style={{
+          ...styles.dayCycleCircle,
+          ...(isCameraFilled ? styles.dayCycleCircleFilled : {}),
+        }}
+        className={state === "2" ? "day-cycle-camera-fill" : undefined}
+        aria-hidden="true"
+      >
+        <AppIcon name="camera" size={20} />
+      </span>
+      <span style={styles.dayCycleDots} aria-hidden="true">
+        {Array.from({ length: 5 }, (_, index) => (
+          <span
+            key={index}
+            style={{
+              ...styles.dayCycleDot,
+              ...(state === "1" || state === "1b" || state === "2"
+                ? {}
+                : styles.dayCycleDotStrong),
+            }}
+            className={state === "2" ? "day-cycle-dot-flow" : undefined}
+          />
+        ))}
+      </span>
+      <span
+        style={{
+          ...styles.dayCycleCircle,
+          ...styles.dayCycleEnvelope,
+          ...(isEnvelopeFilled ? styles.dayCycleEnvelopeFilled : {}),
+        }}
+        aria-hidden="true"
+      >
+        <AppIcon name="mail" size={20} />
+      </span>
+    </>
+  );
+
+  if (isInteractive) {
+    return (
+      <button
+        type="button"
+        data-testid="day-cycle-indicator"
+        data-state={state}
+        className={`day-cycle-indicator day-cycle-indicator--state-${state}`}
+        style={{
+          ...styles.dayCycleButton,
+          ...(reserveSubcopySpace ? styles.dayCycleReserveSubcopySpace : {}),
+        }}
+        aria-label={getDayCycleAriaLabel(state)}
+        onClick={onOpen}
+      >
+        {content}
+      </button>
+    );
+  }
+
+  return (
+    <div
+      data-testid="day-cycle-indicator"
+      data-state={state}
+      className={`day-cycle-indicator day-cycle-indicator--state-${state}`}
+      style={{
+        ...styles.dayCycleStatic,
+        ...(reserveSubcopySpace ? styles.dayCycleReserveSubcopySpace : {}),
+      }}
+      aria-label={getDayCycleAriaLabel(state)}
+    >
+      {content}
+    </div>
+  );
+}
+
+function getDayCycleState(eveningState: EveningHomeState): DayCycleState {
+  if (eveningState.kind === "waiting") return "2";
+  if (eveningState.kind === "delivered") return "3";
+  if (eveningState.kind === "opened") return "4";
+  return eveningState.isTodayDelivery ? "1" : "1b";
+}
+
+function getDayCycleAriaLabel(state: DayCycleState) {
+  switch (state) {
+    case "2":
+      return "ねがおをおあずかり中。よる8じごろにとどきます";
+    case "3":
+      return "ねがおがとどいています";
+    case "4":
+      return "きょうの2まいを受け取りました";
+    case "1":
+    case "1b":
+    default:
+      return "まだ撮っていません";
+  }
+}
+
+function formatSleepingPresenceLine(sleepingCounter: string) {
+  return `きょうも、${sleepingCounter}ひきの ねこが ねています`;
+}
+
+function trackMotifStateShown(state: DayCycleState, dateKey: string) {
+  if (typeof window === "undefined") return;
+
+  try {
+    const storageKey = `${MOTIF_STATE_SHOWN_STORAGE_PREFIX}:${dateKey}:${state}`;
+    if (window.localStorage.getItem(storageKey) === "1") {
+      return;
+    }
+    window.localStorage.setItem(storageKey, "1");
+    trackProductEvent("motif_state_shown", { state });
+  } catch {
+    trackProductEvent("motif_state_shown", { state });
+  }
+}
+
+function trackSubcopyHiddenCohort(keptExchangePhotoCount: number) {
+  if (typeof window === "undefined") return;
+
+  try {
+    if (window.localStorage.getItem(SUBCOPY_HIDDEN_COHORT_STORAGE_KEY) === "1") {
+      return;
+    }
+    window.localStorage.setItem(SUBCOPY_HIDDEN_COHORT_STORAGE_KEY, "1");
+    trackProductEvent("subcopy_hidden_cohort", {
+      kept_exchange_photo_count: keptExchangePhotoCount,
+    });
+  } catch {
+    trackProductEvent("subcopy_hidden_cohort", {
+      kept_exchange_photo_count: keptExchangePhotoCount,
+    });
+  }
 }
 
 function EveningDeliveryOpening({
@@ -5930,6 +6134,9 @@ const styles = {
     pointerEvents: "none",
     whiteSpace: "nowrap",
   },
+  sleepingTopBarHidden: {
+    display: "none",
+  },
   sleepingHome: {
     position: "fixed",
     inset: 0,
@@ -5940,7 +6147,7 @@ const styles = {
   },
   sleepingHomeHeader: {
     position: "fixed",
-    top: "calc(clamp(116px, 17dvh, 156px) + env(safe-area-inset-top))",
+    top: "calc(clamp(104px, 15dvh, 150px) + env(safe-area-inset-top))",
     left: "50%",
     zIndex: 18,
     width: HOME_NAV_FRAME_WIDTH,
@@ -5968,13 +6175,87 @@ const styles = {
     letterSpacing: "0.08em",
   },
   sleepingHomeLead: {
-    margin: 0,
+    margin: "8px 0 0",
     color: "#6a6258",
     fontFamily: "\"Shippori Mincho B1\", \"Hiragino Mincho ProN\", \"Yu Mincho\", serif",
     fontSize: "15px",
     fontWeight: 400,
     lineHeight: 1.55,
     letterSpacing: "0.06em",
+  },
+  dayCycleStatic: {
+    justifySelf: "center",
+    marginTop: "24px",
+    display: "inline-grid",
+    gridTemplateColumns: "44px 66px 44px",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 0,
+    border: "none",
+    background: "transparent",
+    color: "#746b5f",
+    pointerEvents: "none",
+  },
+  dayCycleButton: {
+    justifySelf: "center",
+    marginTop: "24px",
+    display: "inline-grid",
+    gridTemplateColumns: "44px 66px 44px",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: "10px",
+    border: "none",
+    background: "transparent",
+    color: "#746b5f",
+    cursor: "pointer",
+    pointerEvents: "auto",
+    padding: 0,
+  },
+  dayCycleReserveSubcopySpace: {
+    marginTop: "55px",
+  },
+  dayCycleCircle: {
+    width: "44px",
+    height: "44px",
+    borderRadius: "999px",
+    display: "inline-flex",
+    alignItems: "center",
+    justifyContent: "center",
+    boxSizing: "border-box",
+    border: "1px solid rgba(120,108,94,0.22)",
+    background: "rgba(255,253,248,0.18)",
+    color: "#8b8173",
+    overflow: "hidden",
+  },
+  dayCycleCircleFilled: {
+    background: "rgba(151,140,120,0.78)",
+    borderColor: "rgba(120,108,94,0.08)",
+    color: "rgba(255,255,255,0.92)",
+  },
+  dayCycleEnvelope: {
+    borderColor: "rgba(153,53,86,0.16)",
+    color: "rgba(153,53,86,0.38)",
+  },
+  dayCycleEnvelopeFilled: {
+    background: "rgba(153,53,86,0.82)",
+    borderColor: "rgba(153,53,86,0.08)",
+    color: "rgba(255,255,255,0.93)",
+  },
+  dayCycleDots: {
+    display: "inline-flex",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: "7px",
+  },
+  dayCycleDot: {
+    width: "5px",
+    height: "5px",
+    borderRadius: "999px",
+    background: "#8e806e",
+    opacity: 0.3,
+  },
+  dayCycleDotStrong: {
+    opacity: 0.72,
   },
   sleepingFlow: {
     display: "inline-flex",
@@ -6022,7 +6303,7 @@ const styles = {
     transform: "translateX(-50%)",
     display: "grid",
     justifyItems: "center",
-    gap: "13px",
+    gap: "20px",
     pointerEvents: "auto",
   },
   sleepingBoxStack: {
@@ -6202,12 +6483,19 @@ const styles = {
     fontSize: "13px",
     fontWeight: 560,
   },
-  sleepingSecondaryPhotoButton: {
+  sleepingSecondaryActionGroup: {
     position: "fixed",
     left: "50%",
     top: "calc(clamp(600px, 74dvh, 656px) + env(safe-area-inset-top))",
     zIndex: 19,
     transform: "translateX(-50%)",
+    display: "grid",
+    justifyItems: "center",
+    gap: "20px",
+    width: "min(calc(100vw - 48px), 360px)",
+    pointerEvents: "none",
+  },
+  sleepingSecondaryPhotoButton: {
     minHeight: "42px",
     display: "inline-flex",
     alignItems: "center",
@@ -6234,7 +6522,7 @@ const styles = {
     display: "grid",
     gridTemplateColumns: "1fr 28px 1fr",
     alignItems: "center",
-    gap: "10px",
+    gap: 0,
     pointerEvents: "none",
   },
   sleepingPairTile: {
@@ -6264,6 +6552,18 @@ const styles = {
     borderRadius: "999px",
     background:
       "repeating-linear-gradient(90deg, rgba(142,128,110,0.42) 0 4px, transparent 4px 10px)",
+  },
+  sleepingPresenceLine: {
+    width: "min(calc(100vw - 48px), 360px)",
+    margin: 0,
+    textAlign: "center",
+    color: "#8d8579",
+    fontFamily: "\"Shippori Mincho B1\", \"Hiragino Mincho ProN\", \"Yu Mincho\", serif",
+    fontSize: "12px",
+    fontWeight: 400,
+    lineHeight: 1.5,
+    letterSpacing: "0.04em",
+    pointerEvents: "none",
   },
   sleepingStatusStack: {
     position: "fixed",
@@ -6464,7 +6764,7 @@ const styles = {
     animation: "exchangePhotoIn 1.1s cubic-bezier(0.22, 1, 0.36, 1) both",
   },
   eveningOpeningCaption: {
-    margin: 0,
+    margin: "8px 0 0",
     color: "#746a5f",
     fontFamily: "\"Shippori Mincho B1\", \"Hiragino Mincho ProN\", \"Yu Mincho\", serif",
     fontSize: "17px",

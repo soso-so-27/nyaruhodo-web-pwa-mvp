@@ -184,7 +184,10 @@ test.describe("home sleeping exchange flow", () => {
 
     await expect(page.getByText("とると、1枚とどく", { exact: true })).toHaveCount(0);
     await expect(page.getByText("とると、よる8じごろ とどく")).toBeVisible();
-    await expect(page.getByText("つぎのねがお")).toBeVisible();
+    await expect(page.getByTestId("day-cycle-indicator")).toHaveAttribute(
+      "data-state",
+      "1",
+    );
     await expect(page.getByText(/あと .*時間/)).toHaveCount(0);
 
     await page.getByRole("button", { name: "ねがおをとる" }).click();
