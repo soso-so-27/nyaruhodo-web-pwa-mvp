@@ -23,6 +23,10 @@ export async function POST(request: Request) {
     return NextResponse.json({ signedUrl: null, error: "invalid_photo" }, { status: 400 });
   }
 
+  if (isSharedDeliveryStoragePath(storagePath)) {
+    return createStorageSignedUrlResponse(storagePath, null);
+  }
+
   const bearerToken = getBearerToken(request);
 
   if (!bearerToken) {
@@ -52,26 +56,7 @@ export async function POST(request: Request) {
     return NextResponse.json({ signedUrl: null, error: "forbidden_photo" }, { status: 403 });
   }
 
-  const signingSupabase =
-    createSupabaseAdminClient() ??
-    createClient(config.url, config.anonKey, {
-      auth: {
-        autoRefreshToken: false,
-        persistSession: false,
-      },
-      global: {
-        headers: {
-          authorization: `Bearer ${bearerToken}`,
-        },
-      },
-    });
-  const signedUrl = await createSignedStorageUrl(signingSupabase, storagePath);
-
-  if (!signedUrl) {
-    return NextResponse.json({ signedUrl: null, error: "photo_unavailable" }, { status: 404 });
-  }
-
-  return NextResponse.json({ bucket: CAT_PHOTOS_BUCKET, signedUrl });
+  return createStorageSignedUrlResponse(storagePath, bearerToken);
 }
 
 function getBearerToken(request: Request) {
@@ -83,4 +68,44 @@ function getBearerToken(request: Request) {
 
 function isOwnStoragePath(path: string, userId: string) {
   return path.split("/")[0] === userId;
+}
+
+function isSharedDeliveryStoragePath(path: string) {
+  return path.startsWith("admin-stock/sleeping/");
+}
+
+async function createStorageSignedUrlResponse(
+  storagePath: string,
+  bearerToken: string | null,
+) {
+  const config = getSupabasePublicConfig();
+
+  if (!config) {
+    return NextResponse.json({ signedUrl: null, error: "server_unavailable" }, { status: 503 });
+  }
+
+  const signingSupabase =
+    createSupabaseAdminClient() ??
+    createClient(config.url, config.anonKey, {
+      auth: {
+        autoRefreshToken: false,
+        persistSession: false,
+      },
+      ...(bearerToken
+        ? {
+            global: {
+              headers: {
+                authorization: `Bearer ${bearerToken}`,
+              },
+            },
+          }
+        : {}),
+    });
+  const signedUrl = await createSignedStorageUrl(signingSupabase, storagePath);
+
+  if (!signedUrl) {
+    return NextResponse.json({ signedUrl: null, error: "photo_unavailable" }, { status: 404 });
+  }
+
+  return NextResponse.json({ bucket: CAT_PHOTOS_BUCKET, signedUrl });
 }
