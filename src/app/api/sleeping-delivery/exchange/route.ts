@@ -10,6 +10,7 @@ import {
   toStoragePhotoUrl,
   uploadDataUrl,
 } from "../../../../lib/photoStorage";
+import { getAuthenticatedUserForRequest } from "../../../../lib/adminAccess";
 import { createSupabaseAdminClient } from "../../../../lib/supabase/admin";
 import { createServerSupabaseClient } from "../../../../lib/supabase/server";
 import type { ExchangePhoto } from "../../../../lib/home/sleepingPhotos";
@@ -127,13 +128,11 @@ export async function POST(request: Request) {
 
   const debugDryRun =
     input.debugDryRun === true && process.env.NODE_ENV !== "production";
-  const serverSupabase = await createServerSupabaseClient();
-  const { data: userData } = serverSupabase
-    ? await serverSupabase.auth.getUser()
-    : { data: { user: null } };
-  const userId = userData.user?.id ?? null;
+  const user = await getAuthenticatedUserForRequest(request);
+  const userId = user?.id ?? null;
   const anonymousId = userId ? null : input.anonymousId;
   const adminSupabase = createSupabaseAdminClient();
+  const serverSupabase = await createServerSupabaseClient();
   const supabase = adminSupabase ?? serverSupabase;
 
   if (!supabase) {
@@ -153,6 +152,21 @@ export async function POST(request: Request) {
   const ownPhoto = input.ownPhoto;
   const createdAt = new Date(ownPhoto.createdAt ?? Date.now()).toISOString();
   const ownerCatId = ownPhoto.ownerCatId || ownPhoto.catId;
+  const ownPhotoStoragePath = getStoragePhotoPath(ownPhoto.src);
+
+  if (
+    ownPhotoStoragePath &&
+    !isAuthorizedOwnPhotoStoragePath(ownPhotoStoragePath, {
+      userId,
+      ownerCatId,
+    })
+  ) {
+    return NextResponse.json(
+      { photo: null, source: "none", error: "invalid_exchange_request" },
+      { status: 400 },
+    );
+  }
+
   const shouldAddOwnPhotoToPool = !isBlockedDeliveryPhotoUrl(ownPhoto.src);
 
   if (!debugDryRun && shouldAddOwnPhotoToPool) {
@@ -421,6 +435,12 @@ function validateExchangeRequest(
 }
 
 function validateOwnPhotoDataUrl(src: string): ExchangeValidationResult {
+  const storagePath = getStoragePhotoPath(src);
+
+  if (storagePath !== null) {
+    return validateOwnPhotoStoragePath(storagePath);
+  }
+
   if (!src || !src.startsWith("data:")) {
     return { ok: false, status: 415, error: "unsupported_media_type" };
   }
@@ -457,6 +477,44 @@ function validateOwnPhotoDataUrl(src: string): ExchangeValidationResult {
   }
 
   return { ok: true };
+}
+
+function validateOwnPhotoStoragePath(path: string): ExchangeValidationResult {
+  if (
+    !path ||
+    path.length > 512 ||
+    path.includes("\\") ||
+    path.split("/").some((segment) => segment === "" || segment === "." || segment === "..")
+  ) {
+    return { ok: false, status: 400, error: "invalid_exchange_request" };
+  }
+
+  return { ok: true };
+}
+
+function isAuthorizedOwnPhotoStoragePath(
+  path: string,
+  {
+    userId,
+    ownerCatId,
+  }: {
+    userId: string | null;
+    ownerCatId: string;
+  },
+) {
+  if (!userId) {
+    return false;
+  }
+
+  const segments = path.split("/");
+  const ownerKey = sanitizePathSegment(userId);
+  const catKey = sanitizePathSegment(ownerCatId);
+
+  return (
+    segments[0] === ownerKey &&
+    segments.includes(catKey) &&
+    segments.includes("sleeping")
+  );
 }
 
 function hasExpectedImageMagicNumber(mime: string, header: Buffer) {

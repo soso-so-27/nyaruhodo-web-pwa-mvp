@@ -62,9 +62,21 @@ export async function createSleepingExchange({
   }
 
   try {
+    const headers = new Headers({ "Content-Type": "application/json" });
+    const supabase = createBrowserSupabaseClient();
+
+    if (supabase) {
+      const { data } = await supabase.auth.getSession();
+      const accessToken = data.session?.access_token;
+
+      if (accessToken) {
+        headers.set("Authorization", `Bearer ${accessToken}`);
+      }
+    }
+
     const response = await fetch("/api/sleeping-delivery/exchange", {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers,
       body: JSON.stringify({
         ownPhoto: {
           id: ownPhoto.id,

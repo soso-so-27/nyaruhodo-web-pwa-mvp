@@ -3296,6 +3296,12 @@ async function resolveExchangePhotoUploadSrc(photo: OwnSleepingPhoto): Promise<{
   src: string | null;
   srcKind: ReturnType<typeof getTracePhotoSrcKind>;
 }> {
+  const storageSrc = getExchangePhotoStorageSrc(photo);
+
+  if (storageSrc) {
+    return { src: storageSrc, srcKind: "storage" };
+  }
+
   const dataSrc = getExchangePhotoUploadSrc(photo);
 
   if (dataSrc) {
@@ -3333,6 +3339,18 @@ async function resolveExchangePhotoUploadSrc(photo: OwnSleepingPhoto): Promise<{
   }
 
   return { src: null, srcKind: firstKind };
+}
+
+function getExchangePhotoStorageSrc(photo: OwnSleepingPhoto) {
+  return (
+    [
+      photo.src,
+      photo.displaySrc,
+      photo.thumbnailSrc,
+      photo.originalSrc,
+    ].find((src): src is string => Boolean(src && isStoragePhotoReference(src))) ??
+    null
+  );
 }
 
 async function prepareExchangeUploadDataUrl(dataUrl: string) {

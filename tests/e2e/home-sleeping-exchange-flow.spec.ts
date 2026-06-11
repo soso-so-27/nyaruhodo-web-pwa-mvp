@@ -563,7 +563,7 @@ test.describe("home sleeping exchange flow", () => {
     expect(store["2026-06-11"]?.deliveredPhoto?.id).toBe("legacy-delivered");
   });
 
-  test("uses a data image variant for direct evening delivery matches", async ({
+  test("uses a storage reference for direct evening delivery matches", async ({
     page,
   }) => {
     let exchangeCalls = 0;
@@ -635,7 +635,9 @@ test.describe("home sleeping exchange flow", () => {
         ownPhoto?: { id?: string; src?: string };
       };
       expect(body.ownPhoto?.id).toBe("direct-photo-with-storage-original");
-      expect(body.ownPhoto?.src).toMatch(/^data:image\//);
+      expect(body.ownPhoto?.src).toBe(
+        "storage:direct-storage-cat/sleeping/display.jpg",
+      );
       await route.fulfill({
         contentType: "application/json",
         body: JSON.stringify({
@@ -660,7 +662,7 @@ test.describe("home sleeping exchange flow", () => {
     await expect.poll(() => exchangeCalls).toBe(1);
   });
 
-  test("downloads a storage-only direct evening photo before exchange", async ({
+  test("sends a storage-only direct evening photo reference to exchange", async ({
     page,
   }) => {
     let exchangeCalls = 0;
@@ -746,8 +748,9 @@ test.describe("home sleeping exchange flow", () => {
         ownPhoto?: { id?: string; src?: string };
       };
       expect(body.ownPhoto?.id).toBe("storage-only-photo");
-      expect(body.ownPhoto?.src).toMatch(/^data:image\/jpeg;base64,/);
-      expect(body.ownPhoto?.src?.length ?? 0).toBeLessThan(500_000);
+      expect(body.ownPhoto?.src).toBe(
+        "storage:test-user/storage-only-cat/sleeping/display.jpg",
+      );
       await route.fulfill({
         contentType: "application/json",
         body: JSON.stringify({
