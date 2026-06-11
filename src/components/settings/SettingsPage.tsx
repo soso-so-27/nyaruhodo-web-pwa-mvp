@@ -556,8 +556,8 @@ export function SettingsPage() {
 
         {activeSettingsTab === "general" ? (
           <>
-        <section style={{ ...styles.section, order: 1 }}>
-          <p style={styles.sectionLabel}>アプリ</p>
+        <section style={{ ...styles.section, order: 2 }}>
+          <p style={styles.sectionLabel}>保存とデータ</p>
           <AppCard variant="soft" padding="sm" style={styles.card}>
             <div style={styles.row}>
               <span style={styles.rowLabel}>
@@ -575,10 +575,44 @@ export function SettingsPage() {
             <p style={styles.storageNote}>
               iPhoneでは、ホーム画面アプリとSafari/Webで写真の保存場所が分かれることがあります。写真が見えないときは、撮ったときと同じ入口から開いてください。
             </p>
+            <div style={styles.divider} />
+            <button
+              type="button"
+              onClick={handleDeleteLocalData}
+              style={styles.dangerButton}
+            >
+              この端末のデータを削除する
+            </button>
+            <p style={styles.deleteHelp}>
+              アカウントに保存済みの写真は残ります。新しいPWAで復元できます。
+            </p>
+            {isLoggedIn ? (
+              <>
+                <div style={styles.divider} />
+                <button
+                  type="button"
+                  onClick={() => {
+                    void handleDeleteAccountData();
+                  }}
+                  style={styles.dangerButtonStrong}
+                  disabled={isDeleting}
+                >
+                  {isDeleting ? "削除中..." : "アカウントの保存データも削除する"}
+                </button>
+                <p style={styles.deleteHelp}>
+                  アカウントに保存した猫、写真、とった寝顔、とどいた寝顔を削除します。
+                </p>
+              </>
+            ) : null}
+            {deleteMessage ? (
+              <p style={styles.syncMessage} role="status">
+                {deleteMessage}
+              </p>
+            ) : null}
           </AppCard>
         </section>
 
-        <section style={{ ...styles.section, order: 2 }}>
+        <section style={{ ...styles.section, order: 1 }}>
           <p style={styles.sectionLabel}>アカウント</p>
           <AppCard variant="soft" padding="sm" style={styles.card}>
             {isLoading ? (
@@ -591,11 +625,6 @@ export function SettingsPage() {
                     <span style={styles.rowLabel}>接続済み</span>
                   </div>
                   <span style={styles.rowValue}>{email ?? ""}</span>
-                </div>
-                <div style={styles.divider} />
-                <div style={styles.row}>
-                  <span style={styles.rowLabel}>写真の保存先</span>
-                  <span style={styles.rowValue}>アカウント接続中</span>
                 </div>
                 <div style={styles.divider} />
                 {syncOverview ? (
@@ -653,11 +682,6 @@ export function SettingsPage() {
                   </div>
                 </div>
                 <div style={styles.divider} />
-                <div style={styles.row}>
-                  <span style={styles.rowLabel}>写真の保存先</span>
-                  <span style={styles.rowValue}>この端末</span>
-                </div>
-                <div style={styles.divider} />
                 <a href="/account/create" style={styles.primaryButton}>
                   アカウントを作成する
                 </a>
@@ -666,8 +690,8 @@ export function SettingsPage() {
           </AppCard>
         </section>
 
-        <section style={{ ...styles.section, order: 6 }}>
-          <p style={styles.sectionLabel}>β</p>
+        <section style={{ ...styles.section, order: 5 }}>
+          <p style={styles.sectionLabel}>βへの参加</p>
           <AppCard variant="soft" padding="sm" style={{ ...styles.card, ...styles.betaCard }}>
             {betaCapabilities.feedbackEnabled ? (
               <>
@@ -833,7 +857,7 @@ export function SettingsPage() {
         {activeSettingsTab === "general" ? (
           <>
         <section style={{ ...styles.section, order: 3 }}>
-          <p style={styles.sectionLabel}>安心</p>
+          <p style={styles.sectionLabel}>サポート・規約</p>
           <AppCard variant="soft" padding="sm" style={styles.card}>
             <a href="/terms" style={styles.linkRow}>
               <span style={styles.rowLabel}>利用規約</span>
@@ -863,46 +887,7 @@ export function SettingsPage() {
         </section>
 
         <section style={{ ...styles.section, order: 4 }}>
-          <p style={styles.sectionLabel}>データ</p>
-          <AppCard variant="soft" padding="sm" style={{ ...styles.card, ...styles.dataCard }}>
-            <button
-              type="button"
-              onClick={handleDeleteLocalData}
-              style={styles.dangerButton}
-            >
-              この端末のデータを削除する
-            </button>
-            <p style={styles.deleteHelp}>
-              アカウントに保存済みの写真は残ります。新しいPWAで復元できます。
-            </p>
-            {isLoggedIn ? (
-              <>
-                <div style={styles.divider} />
-                <button
-                  type="button"
-                  onClick={() => {
-                    void handleDeleteAccountData();
-                  }}
-                  style={styles.dangerButtonStrong}
-                  disabled={isDeleting}
-                >
-                  {isDeleting ? "削除中..." : "アカウントの保存データも削除する"}
-                </button>
-                <p style={styles.deleteHelp}>
-                  アカウントに保存した猫、写真、とった寝顔、とどいた寝顔を削除します。
-                </p>
-              </>
-            ) : null}
-            {deleteMessage ? (
-              <p style={styles.syncMessage} role="status">
-                {deleteMessage}
-              </p>
-            ) : null}
-          </AppCard>
-        </section>
-
-        <section style={{ ...styles.section, order: 5 }}>
-          <p style={styles.sectionLabel}>このアプリについて</p>
+          <p style={styles.sectionLabel}>アプリ情報</p>
           <AppCard variant="soft" padding="sm" style={styles.card}>
             <div style={styles.row}>
               <span style={styles.rowLabel}>バージョン</span>
@@ -914,16 +899,6 @@ export function SettingsPage() {
               <p style={styles.betaNoteText}>
                 iPhone PWAは古い画面が残ることがあります。ホーム画面から一度閉じて開き直すか、Safariで本番URLを開いてからPWAを起動してください。
               </p>
-            </div>
-            <div style={styles.divider} />
-            <div style={styles.row}>
-              <span style={styles.rowLabel}>ねてるねこ</span>
-              <span style={styles.rowValue}>寝顔を撮ると、ほかの寝顔が届くアプリ</span>
-            </div>
-            <div style={styles.divider} />
-            <div style={styles.row}>
-              <span style={styles.rowLabel}>不具合・問い合わせ</span>
-              <span style={styles.rowValue}>告知文の連絡先へ</span>
             </div>
             <div style={styles.divider} />
             <div style={styles.betaNote}>
@@ -1649,9 +1624,6 @@ const styles = {
   },
   betaCard: {
     background: "rgba(255,253,248,0.50)",
-  },
-  dataCard: {
-    background: "rgba(255,253,248,0.62)",
   },
   adminSection: {
     marginTop: "8px",
