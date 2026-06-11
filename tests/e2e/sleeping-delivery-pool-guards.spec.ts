@@ -256,6 +256,22 @@ test.describe("sleeping delivery pool guards", () => {
     expect(bodyText).not.toContain("Error:");
   });
 
+  test("keeps exchange response under the delivery latency budget", async ({
+    request,
+  }) => {
+    const startedAt = performance.now();
+    const response = await request.post("/api/sleeping-delivery/exchange", {
+      data: buildExchangeRequest(
+        normalCatLikePhotoUrl,
+        `latency-${Date.now()}`,
+      ),
+    });
+    const elapsedMs = performance.now() - startedAt;
+
+    expect(response.status()).not.toBe(429);
+    expect(elapsedMs).toBeLessThan(3000);
+  });
+
   test("keeps exchange idempotent for the same anonymous id and delivery date", async ({
     request,
   }) => {
