@@ -9,9 +9,9 @@ import {
 } from "react";
 
 import {
-  createSignedStorageUrl,
   getStoragePhotoPath,
 } from "../../lib/photoStorage";
+import { STORAGE_KEYS } from "../../lib/storage";
 import { createBrowserSupabaseClient } from "../../lib/supabase/browser";
 import { color, radius, shadow, typography } from "./designTokens";
 
@@ -235,14 +235,6 @@ function getInitialDisplaySrc(src: string) {
 async function resolveStoragePhotoForDisplay(src: string, storagePath: string) {
   const supabase = createBrowserSupabaseClient();
 
-  if (supabase) {
-    const signedUrl = await createSignedStorageUrl(supabase, storagePath);
-
-    if (signedUrl) {
-      return signedUrl;
-    }
-  }
-
   return readSignedUrlFromApi(src, supabase);
 }
 
@@ -260,7 +252,10 @@ async function readSignedUrlFromApi(
       "content-type": "application/json",
       ...(accessToken ? { authorization: `Bearer ${accessToken}` } : {}),
     },
-    body: JSON.stringify({ src }),
+    body: JSON.stringify({
+      anonymousId: readAnalyticsAnonymousId(),
+      src,
+    }),
   }).catch(() => null);
 
   if (!response?.ok) {
@@ -274,4 +269,12 @@ async function readSignedUrlFromApi(
   return typeof body?.signedUrl === "string" && body.signedUrl
     ? body.signedUrl
     : null;
+}
+
+function readAnalyticsAnonymousId() {
+  try {
+    return window.localStorage.getItem(STORAGE_KEYS.analyticsAnonymousId);
+  } catch {
+    return null;
+  }
 }

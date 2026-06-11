@@ -930,6 +930,7 @@ export function HomeInput({ recentEvents: _recentEvents }: HomeInputProps) {
         theme: ownPhoto.theme,
         category: "sleep",
         seed: `${pendingDay.dateKey}:${ownPhoto.id}`,
+        deliveryDateKey: pendingDay.dateKey,
         recipientCatId: pendingDay.targetCatId ?? activeCatId,
       });
 
@@ -4875,6 +4876,7 @@ async function createExchangePhoto({
   theme,
   category,
   seed,
+  deliveryDateKey,
   recipientCatId,
 }: {
   ownPhoto: OwnSleepingPhoto;
@@ -4882,6 +4884,7 @@ async function createExchangePhoto({
   theme: string;
   category: MikkeWindowCategory | "sleep";
   seed: string;
+  deliveryDateKey?: string;
   recipientCatId?: string | null;
 }): Promise<{
   photo: ExchangePhoto | null;
@@ -4895,6 +4898,7 @@ async function createExchangePhoto({
       theme,
       category,
       seed,
+      deliveryDateKey,
       recipientCatId,
     });
 

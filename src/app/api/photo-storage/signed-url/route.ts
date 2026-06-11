@@ -1,4 +1,4 @@
-import { createClient } from "@supabase/supabase-js";
+import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import { NextResponse } from "next/server";
 
 import {
@@ -6,12 +6,19 @@ import {
   createSignedStorageUrl,
   getStoragePhotoPath,
 } from "../../../../lib/photoStorage";
+import {
+  hasDeliveredStoragePhoto,
+  isAuthorizedStoragePhotoPath,
+  isSafeStoragePath,
+  normalizeAnonymousId,
+} from "../../../../lib/photoStorageAuthorization";
 import { createSupabaseAdminClient } from "../../../../lib/supabase/admin";
 import { getSupabasePublicConfig } from "../../../../lib/supabase/config";
 
 export const dynamic = "force-dynamic";
 
 type SignedUrlRequest = {
+  anonymousId?: unknown;
   src?: string;
 };
 
@@ -19,12 +26,8 @@ export async function POST(request: Request) {
   const body = (await request.json().catch(() => null)) as SignedUrlRequest | null;
   const storagePath = getStoragePhotoPath(typeof body?.src === "string" ? body.src : "");
 
-  if (!storagePath) {
+  if (!storagePath || !isSafeStoragePath(storagePath)) {
     return NextResponse.json({ signedUrl: null, error: "invalid_photo" }, { status: 400 });
-  }
-
-  if (isSharedDeliveryStoragePath(storagePath)) {
-    return createStorageSignedUrlResponse(storagePath, null);
   }
 
   const bearerToken = getBearerToken(request);
@@ -52,11 +55,37 @@ export async function POST(request: Request) {
     return NextResponse.json({ signedUrl: null, error: "auth_required" }, { status: 401 });
   }
 
-  if (!isOwnStoragePath(storagePath, userId)) {
+  const signingSupabase =
+    createSupabaseAdminClient() ??
+    createClient(config.url, config.anonKey, {
+      auth: {
+        autoRefreshToken: false,
+        persistSession: false,
+      },
+      global: {
+        headers: {
+          authorization: `Bearer ${bearerToken}`,
+        },
+      },
+    });
+  const isAuthorized = await isAuthorizedStoragePhotoPath({
+    storagePath,
+    userId,
+    anonymousId: normalizeAnonymousId(body?.anonymousId),
+    hasDeliveredPhoto: (photoUrlVariants, checkedUserId, anonymousId) =>
+      hasDeliveredStoragePhoto({
+        supabase: signingSupabase,
+        photoUrlVariants,
+        userId: checkedUserId,
+        anonymousId,
+      }),
+  });
+
+  if (!isAuthorized) {
     return NextResponse.json({ signedUrl: null, error: "forbidden_photo" }, { status: 403 });
   }
 
-  return createStorageSignedUrlResponse(storagePath, bearerToken);
+  return createStorageSignedUrlResponse(storagePath, signingSupabase);
 }
 
 function getBearerToken(request: Request) {
@@ -66,41 +95,10 @@ function getBearerToken(request: Request) {
   return match?.[1]?.trim() || null;
 }
 
-function isOwnStoragePath(path: string, userId: string) {
-  return path.split("/")[0] === userId;
-}
-
-function isSharedDeliveryStoragePath(path: string) {
-  return path.startsWith("admin-stock/sleeping/");
-}
-
 async function createStorageSignedUrlResponse(
   storagePath: string,
-  bearerToken: string | null,
+  signingSupabase: SupabaseClient,
 ) {
-  const config = getSupabasePublicConfig();
-
-  if (!config) {
-    return NextResponse.json({ signedUrl: null, error: "server_unavailable" }, { status: 503 });
-  }
-
-  const signingSupabase =
-    createSupabaseAdminClient() ??
-    createClient(config.url, config.anonKey, {
-      auth: {
-        autoRefreshToken: false,
-        persistSession: false,
-      },
-      ...(bearerToken
-        ? {
-            global: {
-              headers: {
-                authorization: `Bearer ${bearerToken}`,
-              },
-            },
-          }
-        : {}),
-    });
   const signedUrl = await createSignedStorageUrl(signingSupabase, storagePath);
 
   if (!signedUrl) {

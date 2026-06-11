@@ -92,6 +92,7 @@ export type DeliverableSleepingPhotoInput = {
   theme: string;
   category: string;
   seed: string;
+  deliveryDateKey?: string;
   excludePhotoId?: string;
   recipientCatId?: string | null;
 };

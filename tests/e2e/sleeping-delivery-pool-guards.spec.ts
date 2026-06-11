@@ -1,4 +1,7 @@
 import { expect, test } from "@playwright/test";
+import { createClient } from "@supabase/supabase-js";
+import fs from "node:fs";
+import path from "node:path";
 
 import {
   isBlockedDeliveryPhotoUrl,
@@ -9,6 +12,12 @@ import {
   normalizePersistentPhotoSrc,
   toStoragePhotoUrl,
 } from "../../src/lib/photoStorage";
+import {
+  getStoragePhotoUrlVariants,
+  isAuthorizedStoragePhotoPath,
+  isSafeStoragePath,
+  normalizeAnonymousId,
+} from "../../src/lib/photoStorageAuthorization";
 
 const redBlueTestPhotoUrl =
   "data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD/4gHYSUNDX1BST0ZJTEUAAQEAAAHIAAAAAAQwAABtbnRyUkdCIFhZWiAH4AABAAEAAAAAAABhY3NwAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAQAA9tYAAQAAAADTLQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAlkZXNjAAAA8AAAACRyWFlaAAABFAAAABRnWFlaAAABKAAAABRiWFlaAAABPAAAABR3dHB0AAABUAAAABRyVFJDAAABZAAAAChnVFJDAAABZAAAAChiVFJDAAABZAAAAChjcHJ0AAABjAAAADxtbHVjAAAAAAAAAAEAAAAMZW5VUwAAAAgAAAAcAHMAUgBHAEJYWVogAAAAAAAAb6IAADj1AAADkFhZWiAAAAAAAABimQAAt4UAABjaWFlaIAAAAAAAACSgAAAPhAAAts9YWVogAAAAAAAA9tYAAQAAAADTLXBhcmEAAAAAAAQAAAACZmYAAPKnAAANWQAAE9AAAApbAAAAAAAAAABtbHVjAAAAAAAAAAEAAAAMZW5VUwAAACAAAAAcAEcAbwBvAGcAbABlACAASQBuAGMALgAgADIAMAAxADb/2wBDAAsHCAoIBwsKCQoMDAsNEBsSEA8PECEYGRQbJyMpKScjJiUsMT81LC47LyUmNko3O0FDRkdGKjRNUkxEUj9FRkP/2wBDAQwMDBAOECASEiBDLSYtQ0NDQ0NDQ0NDQ0NDQ0NDQ0NDQ0NDQ0NDQ0NDQ0NDQ0NDQ0NDQ0NDQ0NDQ0NDQ0NDQ0P/wAARCABkAGQDASIAAhEBAxEB/8QAGQABAQEBAQEAAAAAAAAAAAAAAAIHAwQB/8QAFxABAAMAAAAAAAAAAAAAAAAAAAEDMv/EABkBAQADAQEAAAAAAAAAAAAAAAADBgcEBf/EACgRAQAAAggGAwEAAAAAAAAAAAABBAIDFBViobHhETM0YXFyEhMxkf/aAAwDAQACEQMRAD8A+gPMXcAAAB2rxCk14hS5yvIoeIaM2nuqrfaOsQBO5AAAAHnAUVqgAAADtXiFJrxClzleRQ8Q0ZtPdVW+0dYgCdyAAAAPOAorVAAAAHavEKTXiFLnK8ih4hozae6qt9o6xAE7kAAAAecBRWqAAAAO1eIUmvEKXOV5FDxDRm091Vb7R1iAJ3IAAAA84CitUAAAAdq8QpNeIUucryKHiGjNp7qq32jrEATuQAAAB5xkIp9n7rxfODPZrwyELP3L5wZ7NeGQhZ+5fODPZsleIUxkezVT/wBdXRofH8hCH7srdfL/AHVtKs48OMYx/sWzDGRJeWHPZFYsWTZhjIXlhz2LFiybMMZC8sOexYsWQA8t3AAAAAAAAAAAAP/Z";
@@ -29,6 +38,8 @@ type ExchangeResponse = {
   } | null;
   source?: "remote" | "none";
 };
+
+type LocalEnv = Record<string, string>;
 
 test.describe("sleeping delivery pool guards", () => {
   test("normalizes expiring storage urls before persistent photo saves", () => {
@@ -111,6 +122,85 @@ test.describe("sleeping delivery pool guards", () => {
     expect(bodyText).not.toContain("Error:");
   });
 
+  test("signed photo url api rejects unauthenticated shared delivery paths without leaks", async ({
+    request,
+  }) => {
+    const response = await request.post("/api/photo-storage/signed-url", {
+      data: { src: "storage:admin-stock/sleeping/photo.jpg" },
+    });
+
+    expect(response.status()).toBe(401);
+
+    const bodyText = await response.text();
+    expect(bodyText).not.toContain("SUPABASE_SERVICE_ROLE_KEY");
+    expect(bodyText).not.toContain("cat-photos");
+    expect(bodyText).not.toContain("storage.objects");
+    expect(bodyText).not.toContain("cat_moment_deliveries");
+    expect(bodyText).not.toContain("Error:");
+  });
+
+  test("signed photo url api rejects unsafe storage paths without leaks", async ({
+    request,
+  }) => {
+    for (const src of [
+      "storage:../admin-stock/sleeping/photo.jpg",
+      "storage:admin-stock//sleeping/photo.jpg",
+      "storage:admin-stock/sleeping/..",
+      "storage:admin-stock\\sleeping\\photo.jpg",
+    ]) {
+      const response = await request.post("/api/photo-storage/signed-url", {
+        data: { src },
+      });
+
+      expect(response.status()).toBe(400);
+      const bodyText = await response.text();
+      expect(bodyText).not.toContain("SUPABASE_SERVICE_ROLE_KEY");
+      expect(bodyText).not.toContain("cat-photos");
+      expect(bodyText).not.toContain("storage.objects");
+      expect(bodyText).not.toContain("Error:");
+    }
+  });
+
+  test("authorizes only own or delivered storage photo paths", async () => {
+    const deliveredVariants: string[][] = [];
+    const authorize = (storagePath: string, anonymousId: string | null) =>
+      isAuthorizedStoragePhotoPath({
+        storagePath,
+        userId: "user-1",
+        anonymousId,
+        hasDeliveredPhoto: async (variants, userId, deliveredAnonymousId) => {
+          deliveredVariants.push(variants);
+          return (
+            userId === "user-1" &&
+            deliveredAnonymousId === "anon-1" &&
+            variants.includes("storage:admin-stock/sleeping/delivered.jpg")
+          );
+        },
+      });
+
+    await expect(authorize("user-1/cat/photo.jpg", null)).resolves.toBe(true);
+    await expect(
+      authorize("admin-stock/sleeping/delivered.jpg", "anon-1"),
+    ).resolves.toBe(true);
+    await expect(
+      authorize("admin-stock/sleeping/not-delivered.jpg", "anon-1"),
+    ).resolves.toBe(false);
+    await expect(
+      authorize("other-user/cat/photo.jpg", "anon-1"),
+    ).resolves.toBe(false);
+    await expect(authorize("../admin-stock/sleeping/photo.jpg", "anon-1")).resolves.toBe(
+      false,
+    );
+
+    expect(deliveredVariants).toContainEqual(
+      getStoragePhotoUrlVariants("admin-stock/sleeping/delivered.jpg"),
+    );
+    expect(isSafeStoragePath("admin-stock/sleeping/photo.jpg")).toBe(true);
+    expect(isSafeStoragePath("admin-stock/sleeping/../photo.jpg")).toBe(false);
+    expect(normalizeAnonymousId(" anon-1 ")).toBe("anon-1");
+    expect(normalizeAnonymousId("")).toBe(null);
+  });
+
   test("accepts supported exchange data urls", async ({ request }) => {
     for (const [index, src] of [
       redBlueTestPhotoUrl,
@@ -143,6 +233,115 @@ test.describe("sleeping delivery pool guards", () => {
       });
 
       expect(response.status()).toBe(expectedStatus);
+    }
+  });
+
+  test("requires authentication for storage-backed exchange photos", async ({
+    request,
+  }) => {
+    const response = await request.post("/api/sleeping-delivery/exchange", {
+      data: buildExchangeRequest(
+        "storage:user-1/cat/sleeping/photo.jpg",
+        `storage-auth-${Date.now()}`,
+      ),
+    });
+
+    expect(response.status()).toBe(401);
+
+    const bodyText = await response.text();
+    expect(bodyText).toContain("auth_required");
+    expect(bodyText).not.toContain("SUPABASE_SERVICE_ROLE_KEY");
+    expect(bodyText).not.toContain("cat_moments");
+    expect(bodyText).not.toContain("storage.objects");
+    expect(bodyText).not.toContain("Error:");
+  });
+
+  test("keeps exchange idempotent for the same anonymous id and delivery date", async ({
+    request,
+  }) => {
+    const adminSupabase = createAdminSupabaseClientFromEnv();
+
+    test.skip(
+      !adminSupabase,
+      "SUPABASE_SERVICE_ROLE_KEY is required for the idempotency smoke test.",
+    );
+
+    if (!adminSupabase) {
+      return;
+    }
+
+    const createdAt = Date.now();
+    const anonymousId = `idem-anonymous-${createdAt}`;
+    const candidateId = `idem-candidate-${createdAt}`;
+    const ownId = `idem-own-${createdAt}`;
+    const catId = `idem-cat-${createdAt}`;
+    const deliveryDateKey = "2026-06-12";
+
+    try {
+      const { error: insertError } = await adminSupabase.from("cat_moments").insert({
+        anonymous_id: `idem-source-${createdAt}`,
+        local_moment_id: candidateId,
+        local_cat_id: `idem-source-cat-${createdAt}`,
+        owner_cat_id: `idem-source-cat-${createdAt}`,
+        photo_url: normalCatLikePhotoUrl,
+        state: "sleeping",
+        visibility: "shared",
+        delivery_status: "available",
+        source_moment_id: null,
+        metadata: {
+          source: "e2e-idempotency",
+          pool_kind: "user_shared",
+          theme: "sleeping",
+          trigger_label: "sleeping",
+        },
+        captured_at: new Date(createdAt - 60_000).toISOString(),
+        created_at: new Date(createdAt - 60_000).toISOString(),
+      });
+
+      expect(insertError).toBeNull();
+
+      const payload = {
+        ...buildExchangeRequest(normalCatLikePhotoUrl, ownId, anonymousId),
+        debugDryRun: false,
+        deliveryDateKey,
+        preferredSourcePhotoId: candidateId,
+        seed: `${deliveryDateKey}:${ownId}`,
+        recipientCatId: catId,
+      };
+
+      const firstResponse = await request.post("/api/sleeping-delivery/exchange", {
+        data: payload,
+      });
+      expect(firstResponse.status()).toBe(200);
+      const firstBody = (await firstResponse.json()) as ExchangeResponse;
+      expect(firstBody.photo).toBeTruthy();
+
+      const secondResponse = await request.post("/api/sleeping-delivery/exchange", {
+        data: payload,
+      });
+      expect(secondResponse.status()).toBe(200);
+      const secondBody = (await secondResponse.json()) as ExchangeResponse;
+
+      expect(secondBody.photo?.id).toBe(firstBody.photo?.id);
+      expect(secondBody.photo?.sourcePhotoId).toBe(candidateId);
+
+      const { count, error: countError } = await adminSupabase
+        .from("cat_moment_deliveries")
+        .select("id", { count: "exact", head: true })
+        .eq("anonymous_id", anonymousId)
+        .eq("local_delivery_id", firstBody.photo?.id ?? "");
+
+      expect(countError).toBeNull();
+      expect(count).toBe(1);
+    } finally {
+      await adminSupabase
+        .from("cat_moment_deliveries")
+        .delete()
+        .eq("anonymous_id", anonymousId);
+      await adminSupabase
+        .from("cat_moments")
+        .delete()
+        .in("local_moment_id", [candidateId, ownId]);
     }
   });
 
@@ -267,4 +466,52 @@ function buildExchangeRequest(
     blockedPhotoIds: [],
     debugDryRun: true,
   };
+}
+
+function createAdminSupabaseClientFromEnv() {
+  const env = readLocalEnv();
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL ?? env.NEXT_PUBLIC_SUPABASE_URL;
+  const serviceRoleKey =
+    process.env.SUPABASE_SERVICE_ROLE_KEY ?? env.SUPABASE_SERVICE_ROLE_KEY;
+
+  if (!url || !serviceRoleKey) {
+    return null;
+  }
+
+  return createClient(url, serviceRoleKey, {
+    auth: {
+      autoRefreshToken: false,
+      persistSession: false,
+    },
+  });
+}
+
+function readLocalEnv(): LocalEnv {
+  const envPath = path.join(process.cwd(), ".env.local");
+
+  if (!fs.existsSync(envPath)) {
+    return {};
+  }
+
+  return fs
+    .readFileSync(envPath, "utf8")
+    .split(/\r?\n/)
+    .reduce<LocalEnv>((env, line) => {
+      const trimmed = line.trim();
+
+      if (!trimmed || trimmed.startsWith("#")) {
+        return env;
+      }
+
+      const equalsIndex = trimmed.indexOf("=");
+
+      if (equalsIndex <= 0) {
+        return env;
+      }
+
+      const key = trimmed.slice(0, equalsIndex).trim();
+      const rawValue = trimmed.slice(equalsIndex + 1).trim();
+      env[key] = rawValue.replace(/^['"]|['"]$/g, "");
+      return env;
+    }, {});
 }

@@ -10,6 +10,10 @@ import {
   toStoragePhotoUrl,
   uploadDataUrl,
 } from "../../../../lib/photoStorage";
+import {
+  isOwnStoragePath,
+  isSafeStoragePath,
+} from "../../../../lib/photoStorageAuthorization";
 import { getAuthenticatedUserForRequest } from "../../../../lib/adminAccess";
 import { createSupabaseAdminClient } from "../../../../lib/supabase/admin";
 import { createServerSupabaseClient } from "../../../../lib/supabase/server";
@@ -36,6 +40,7 @@ type ExchangeRequest = {
   theme?: string;
   category?: string;
   seed?: string;
+  deliveryDateKey?: string | null;
   recipientCatId?: string | null;
   anonymousId?: string | null;
   blockedPhotoIds?: string[];
@@ -58,6 +63,18 @@ type RemoteCatMomentRow = {
 
 type FastStockCandidateRow = Omit<RemoteCatMomentRow, "photo_url">;
 
+type RemoteDeliveryRow = {
+  id: string;
+  local_delivery_id: string;
+  source_moment_id: string | null;
+  source_photo_id: string | null;
+  recipient_local_cat_id: string | null;
+  photo_url: string;
+  status: string;
+  metadata: Record<string, unknown> | null;
+  delivered_at: string;
+};
+
 type Candidate = {
   row: RemoteCatMomentRow;
   src: string;
@@ -76,10 +93,12 @@ type ExchangeValidationResult =
   | { ok: true }
   | {
       ok: false;
-      status: 400 | 413 | 415;
+      status: 400 | 401 | 403 | 413 | 415;
       error:
         | "invalid_exchange_request"
         | "payload_too_large"
+        | "auth_required"
+        | "forbidden_photo"
         | "unsupported_media_type";
     };
 
@@ -106,6 +125,7 @@ const RATE_LIMIT_WINDOW_HOUR_MS = 60 * 60 * 1000;
 const RATE_LIMIT_MAX_BUCKETS = 1000;
 const FAST_STORAGE_CANDIDATE_LIMIT = 80;
 const FAST_STORAGE_CANDIDATE_PROBE_LIMIT = 12;
+const DELIVERY_DATE_KEY_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
 const exchangeRateLimitBuckets = new Map<string, RateLimitBucket>();
 
 export async function POST(request: Request) {
@@ -159,10 +179,25 @@ async function handleExchangePost(request: Request) {
     !ownPhotoStoragePath && !isBlockedDeliveryPhotoUrl(ownPhoto.src);
   const debugDryRun =
     input.debugDryRun === true && process.env.NODE_ENV !== "production";
-  const user = shouldAddOwnPhotoToPool
+  const user = shouldAddOwnPhotoToPool || ownPhotoStoragePath
     ? await getAuthenticatedUserForRequest(request)
     : null;
   markExchangeTiming(timing, "auth");
+
+  if (ownPhotoStoragePath) {
+    // Storage-backed own photos are account-owned. Do not accept anonymousId
+    // alone here; otherwise a forged anonymousId could send someone else's path.
+    if (!isSafeStoragePath(ownPhotoStoragePath)) {
+      return exchangeError("invalid_exchange_request", 400);
+    }
+    if (!user) {
+      return exchangeError("auth_required", 401);
+    }
+    if (!isOwnStoragePath(ownPhotoStoragePath, user.id)) {
+      return exchangeError("forbidden_photo", 403);
+    }
+  }
+
   const userId = user?.id ?? null;
   const anonymousId = userId ? null : input.anonymousId;
   const adminSupabase = createSupabaseAdminClient();
@@ -181,6 +216,49 @@ async function handleExchangePost(request: Request) {
       { photo: null, source: "none", error: "server_unavailable" },
       { status: 503 },
     );
+  }
+
+  const idempotentDeliveryId =
+    input.deliveryDateKey && !debugDryRun
+      ? buildIdempotentDeliveryId({
+          userId,
+          anonymousId,
+          deliveryDateKey: input.deliveryDateKey,
+        })
+      : null;
+
+  if (idempotentDeliveryId) {
+    const existingDelivery = await readExistingDelivery({
+      supabase,
+      userId,
+      anonymousId,
+      localDeliveryId: idempotentDeliveryId,
+    });
+
+    if (existingDelivery) {
+      markExchangeTiming(timing, "read_existing_delivery");
+      logExchangeTiming(timing, {
+        result: "existing",
+        deliveryDateKey: input.deliveryDateKey,
+      });
+      return NextResponse.json({
+        photo: toExchangePhotoFromDelivery(existingDelivery, input),
+        source: "remote",
+        diagnostics: {
+          ...buildDiagnostics([], new Set(input.blockedPhotoIds ?? [])),
+          source: "remote",
+          candidateCount: 1,
+          normalCandidateCount: 1,
+          fallbackCandidateCount: 0,
+          fallbackActive: false,
+          excludedCount: 0,
+          fastPathActive: false,
+          fastCandidateCount: 0,
+          idempotentReplay: true,
+          timing,
+        },
+      });
+    }
   }
 
   if (!debugDryRun && shouldAddOwnPhotoToPool) {
@@ -313,9 +391,9 @@ async function handleExchangePost(request: Request) {
     });
   }
 
-  const localDeliveryId = `delivered-sleeping-${Date.now()}-${Math.random()
-    .toString(16)
-    .slice(2)}`;
+  const localDeliveryId =
+    idempotentDeliveryId ??
+    `delivered-sleeping-${Date.now()}-${Math.random().toString(16).slice(2)}`;
   const deliveredAt = new Date();
   const deliveryPhotoSrc = await prepareExchangeDeliveryPhotoSrc({
     supabase,
@@ -353,11 +431,50 @@ async function handleExchangePost(request: Request) {
           trigger_label: input.triggerLabel,
           theme: input.theme,
           category: input.category,
+          delivery_date_key: input.deliveryDateKey,
         },
         delivered_at: deliveredAt.toISOString(),
       });
 
     if (deliveryError) {
+      if (idempotentDeliveryId && isUniqueDeliveryError(deliveryError)) {
+        const existingDelivery = await readExistingDelivery({
+          supabase,
+          userId,
+          anonymousId,
+          localDeliveryId: idempotentDeliveryId,
+        });
+
+        if (existingDelivery) {
+          markExchangeTiming(timing, "read_duplicate_delivery");
+          logExchangeTiming(timing, {
+            result: "existing_after_duplicate",
+            deliveryDateKey: input.deliveryDateKey,
+          });
+          return NextResponse.json({
+            photo: toExchangePhotoFromDelivery(existingDelivery, input),
+            source: "remote",
+            diagnostics: {
+              ...diagnosticsBase,
+              source: "remote",
+              candidateCount: candidatePool.length,
+              normalCandidateCount: candidates.length,
+              fallbackCandidateCount: fallbackCandidates.length,
+              fallbackActive:
+                candidates.length === 0 && fallbackCandidates.length > 0,
+              excludedCount: Math.max(
+                0,
+                diagnosticsBase.availableCount - candidatePool.length,
+              ),
+              fastPathActive,
+              fastCandidateCount: fastCandidates.length,
+              idempotentReplay: true,
+              timing,
+            },
+          });
+        }
+      }
+
       return NextResponse.json(
         { photo: null, source: "none", error: deliveryError.message },
         { status: 500 },
@@ -421,6 +538,7 @@ async function readExchangeRequest(request: Request): Promise<ExchangeRequestPar
       theme: toStringOrDefault(body.theme, "sleeping"),
       category: toStringOrDefault(body.category, "sleeping"),
       seed: toStringOrDefault(body.seed, String(Date.now())),
+      deliveryDateKey: toStringOrNull(body.deliveryDateKey),
       recipientCatId: toStringOrNull(body.recipientCatId),
       anonymousId: toStringOrNull(body.anonymousId),
       blockedPhotoIds: Array.isArray(body.blockedPhotoIds)
@@ -477,6 +595,7 @@ function validateExchangeRequest(
     input.theme,
     input.category,
     input.seed,
+    input.deliveryDateKey,
     ownPhoto.triggerLabel,
     ownPhoto.theme,
   ].filter((value): value is string => typeof value === "string");
@@ -488,6 +607,13 @@ function validateExchangeRequest(
   if (
     input.blockedPhotoIds.length > MAX_BLOCKED_PHOTO_IDS ||
     input.blockedPhotoIds.some((id) => id.length > MAX_ID_LENGTH)
+  ) {
+    return { ok: false, status: 400, error: "invalid_exchange_request" };
+  }
+
+  if (
+    input.deliveryDateKey &&
+    !DELIVERY_DATE_KEY_PATTERN.test(input.deliveryDateKey)
   ) {
     return { ok: false, status: 400, error: "invalid_exchange_request" };
   }
@@ -663,8 +789,91 @@ function pruneRateLimitBuckets(now: number) {
   }
 }
 
-function exchangeError(error: string, status: 400 | 413 | 415 | 429) {
+function exchangeError(error: string, status: 400 | 401 | 403 | 413 | 415 | 429) {
   return NextResponse.json({ photo: null, source: "none", error }, { status });
+}
+
+function buildIdempotentDeliveryId({
+  userId,
+  anonymousId,
+  deliveryDateKey,
+}: {
+  userId: string | null;
+  anonymousId: string | null;
+  deliveryDateKey: string;
+}) {
+  const recipientIdentity = userId ? `user:${userId}` : `anon:${anonymousId ?? ""}`;
+  const digest = hashText(`${recipientIdentity}:${deliveryDateKey}`).toString(36);
+
+  return `delivered-sleeping-${deliveryDateKey}-${digest}`;
+}
+
+async function readExistingDelivery({
+  supabase,
+  userId,
+  anonymousId,
+  localDeliveryId,
+}: {
+  supabase: SupabaseClient;
+  userId: string | null;
+  anonymousId: string | null;
+  localDeliveryId: string;
+}) {
+  let query = supabase
+    .from("cat_moment_deliveries")
+    .select(
+      "id, local_delivery_id, source_moment_id, source_photo_id, recipient_local_cat_id, photo_url, status, metadata, delivered_at",
+    )
+    .eq("local_delivery_id", localDeliveryId)
+    .limit(1);
+
+  query = userId
+    ? query.eq("user_id", userId)
+    : query.eq("anonymous_id", anonymousId ?? "").is("user_id", null);
+
+  const { data, error } = await query.maybeSingle();
+
+  if (error) {
+    console.warn("[sleeping-delivery/exchange] existing delivery lookup failed", {
+      code: error.code,
+    });
+    return null;
+  }
+
+  return data as RemoteDeliveryRow | null;
+}
+
+function toExchangePhotoFromDelivery(
+  delivery: RemoteDeliveryRow,
+  input: Required<ExchangeRequest>,
+): ExchangePhoto {
+  const metadata = delivery.metadata ?? {};
+  const triggerLabel =
+    typeof metadata.trigger_label === "string"
+      ? metadata.trigger_label
+      : input.triggerLabel;
+  const theme = typeof metadata.theme === "string" ? metadata.theme : input.theme;
+  const deliveredAt = Date.parse(delivery.delivered_at);
+
+  return {
+    id: delivery.local_delivery_id,
+    sourcePhotoId: delivery.source_photo_id ?? delivery.source_moment_id ?? "",
+    src: delivery.photo_url,
+    title: "縺ｻ縺九・迪ｫ縺ｮ縺ｭ縺後♀",
+    subtitle: "",
+    triggerLabel,
+    theme,
+    deliveredAt: Number.isFinite(deliveredAt) ? deliveredAt : Date.now(),
+  };
+}
+
+function isUniqueDeliveryError(error: { code?: string; message?: string }) {
+  return (
+    error.code === "23505" ||
+    /cat_moment_deliveries_(?:user|anonymous)_local_delivery_uidx/i.test(
+      error.message ?? "",
+    )
+  );
 }
 
 async function deleteExistingMoment({
