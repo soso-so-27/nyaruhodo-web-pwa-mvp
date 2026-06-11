@@ -2818,7 +2818,7 @@ function SleepingPhotoHome({
               onClick={handleTakePhotoPress}
               aria-label="ねがおをとる"
             >
-              <AppIcon name="camera" size={36} />
+              <AppIcon name="camera" size={29} />
             </button>
             {showSleepingCounter ? (
               <p style={styles.sleepingPresenceLine}>
@@ -2908,6 +2908,8 @@ function DayCycleIndicator({
   const isCameraFilled = state === "2" || state === "3" || state === "4";
   const isEnvelopeFilled = state === "3" || state === "4";
   const isInteractive = state === "3";
+  const prefersReducedMotion = usePrefersReducedMotion();
+  const shouldAnimateFlow = state === "2" && !prefersReducedMotion;
   const content = (
     <>
       <span
@@ -2915,7 +2917,7 @@ function DayCycleIndicator({
           ...styles.dayCycleCircle,
           ...(isCameraFilled ? styles.dayCycleCircleFilled : {}),
         }}
-        className={state === "2" ? "day-cycle-camera-fill" : undefined}
+        className={shouldAnimateFlow ? "day-cycle-camera-fill" : undefined}
         aria-hidden="true"
       >
         <AppIcon name="camera" size={20} />
@@ -2930,7 +2932,7 @@ function DayCycleIndicator({
                 ? {}
                 : styles.dayCycleDotStrong),
             }}
-            className={state === "2" ? "day-cycle-dot-flow" : undefined}
+            className={shouldAnimateFlow ? "day-cycle-dot-flow" : undefined}
           />
         ))}
       </span>
@@ -2980,6 +2982,20 @@ function DayCycleIndicator({
       {content}
     </div>
   );
+}
+
+function usePrefersReducedMotion() {
+  const [prefersReducedMotion, setPrefersReducedMotion] = useState(false);
+
+  useEffect(() => {
+    const media = window.matchMedia("(prefers-reduced-motion: reduce)");
+    const update = () => setPrefersReducedMotion(media.matches);
+    update();
+    media.addEventListener("change", update);
+    return () => media.removeEventListener("change", update);
+  }, []);
+
+  return prefersReducedMotion;
 }
 
 function getDayCycleState(eveningState: EveningHomeState): DayCycleState {
@@ -6147,7 +6163,7 @@ const styles = {
   },
   sleepingHomeHeader: {
     position: "fixed",
-    top: "calc(clamp(104px, 15dvh, 150px) + env(safe-area-inset-top))",
+    top: "calc(clamp(136px, 19dvh, 176px) + env(safe-area-inset-top))",
     left: "50%",
     zIndex: 18,
     width: HOME_NAV_FRAME_WIDTH,
@@ -6303,7 +6319,7 @@ const styles = {
     transform: "translateX(-50%)",
     display: "grid",
     justifyItems: "center",
-    gap: "20px",
+    gap: "16px",
     pointerEvents: "auto",
   },
   sleepingBoxStack: {
@@ -6395,18 +6411,18 @@ const styles = {
     justifySelf: "center",
     width: "148px",
     height: "148px",
-    border: "1px solid rgba(96,86,69,0.09)",
+    border: "1px solid rgba(146,124,91,0.12)",
     borderRadius: "50%",
     background:
-      "radial-gradient(circle at 50% 48%, rgba(164,155,138,0.86), rgba(139,130,113,0.88))",
-    color: "rgba(255,255,255,0.9)",
+      "radial-gradient(circle at 50% 22%, rgba(255,255,255,0.09), rgba(255,255,255,0) 38%), radial-gradient(circle at 50% 54%, rgba(196,184,164,0.96), rgba(180,164,138,0.94))",
+    color: "#f2eadc",
     display: "inline-flex",
     alignItems: "center",
     justifyContent: "center",
     cursor: "pointer",
     padding: 0,
     boxShadow:
-      "0 0 0 9px rgba(255,255,255,0.58), 0 14px 26px rgba(119,101,73,0.1), inset 0 4px 10px rgba(255,255,255,0.12)",
+      "0 0 0 9px rgba(255,255,255,0.58), 0 14px 26px rgba(119,101,73,0.1), inset 0 4px 12px rgba(0,0,0,0.06), inset 0 1px 4px rgba(255,255,255,0.08)",
   },
   sleepingLibraryButton: {
     position: "fixed",
@@ -6491,7 +6507,7 @@ const styles = {
     transform: "translateX(-50%)",
     display: "grid",
     justifyItems: "center",
-    gap: "20px",
+    gap: "16px",
     width: "min(calc(100vw - 48px), 360px)",
     pointerEvents: "none",
   },

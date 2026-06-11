@@ -91,7 +91,7 @@ test.describe("home day cycle indicator", () => {
     await expect(page.getByTestId("evening-opening-pair")).toBeVisible();
   });
 
-  test("stops motif animation when reduced motion is enabled", async ({
+  test("omits motif animation classes when reduced motion is enabled", async ({
     page,
   }) => {
     await page.emulateMedia({ reducedMotion: "reduce" });
@@ -108,11 +108,8 @@ test.describe("home day cycle indicator", () => {
     await page.goto("/home");
     await page.waitForLoadState("networkidle");
 
-    const animationName = await page
-      .locator(".day-cycle-dot-flow")
-      .first()
-      .evaluate((element) => getComputedStyle(element).animationName);
-    expect(animationName).toBe("none");
+    await expect(page.locator(".day-cycle-dot-flow")).toHaveCount(0);
+    await expect(page.locator(".day-cycle-camera-fill")).toHaveCount(0);
   });
 
   test("hides routine subcopy after ten exchanges but keeps tomorrow notice", async ({
