@@ -228,22 +228,18 @@ export async function POST(request: Request) {
     excludePhotoId: ownPhoto.id,
     blockedPhotoIds,
   };
-  const candidates = await buildCandidates(
-    remoteRows.filter((row) => isRowDeliverable(row, deliverableContext)),
-    supabase,
+  const candidates = remoteRows.filter((row) =>
+    isRowDeliverable(row, deliverableContext),
   );
   const fallbackCandidates =
     candidates.length === 0
-      ? await buildCandidates(
-          remoteRows.filter((row) =>
-            isFallbackDeliverable(row, deliverableContext),
-          ),
-          supabase,
+      ? remoteRows.filter((row) =>
+          isFallbackDeliverable(row, deliverableContext),
         )
       : [];
   const candidatePool =
     candidates.length > 0 ? candidates : fallbackCandidates;
-  const selected = selectCandidate(candidatePool, input);
+  const selected = await selectCandidate(candidatePool, input, supabase);
 
   if (!selected) {
     return NextResponse.json({
@@ -725,29 +721,6 @@ function isFallbackDeliverable(
     readPoolKind(row.metadata) === "user_shared";
 }
 
-async function buildCandidates(
-  rows: RemoteCatMomentRow[],
-  supabase: SupabaseClient,
-) {
-  const candidates = await Promise.all(
-    rows.map(async (row): Promise<Candidate | null> => {
-      const src = await resolvePhotoUrl(row.photo_url, supabase);
-
-      if (!src || !isUsablePhotoSrc(src)) {
-        return null;
-      }
-
-      return {
-        row,
-        src,
-        tags: readTags(row.metadata),
-      };
-    }),
-  );
-
-  return candidates.filter((candidate): candidate is Candidate => Boolean(candidate));
-}
-
 async function resolvePhotoUrl(photoUrl: string, supabase: SupabaseClient) {
   const storagePath = getStoragePhotoPath(photoUrl);
 
@@ -803,28 +776,62 @@ async function prepareExchangeMomentPhotoUrl({
   }
 }
 
-function selectCandidate(candidates: Candidate[], input: Required<ExchangeRequest>) {
-  if (candidates.length === 0) {
+async function selectCandidate(
+  rows: RemoteCatMomentRow[],
+  input: Required<ExchangeRequest>,
+  supabase: SupabaseClient,
+) {
+  if (rows.length === 0) {
     return null;
   }
 
   if (input.preferredSourcePhotoId) {
-    const preferredCandidate = candidates.find(
-      (candidate) =>
-        candidate.row.id === input.preferredSourcePhotoId ||
-        candidate.row.local_moment_id === input.preferredSourcePhotoId,
+    const preferredRow = rows.find(
+      (row) =>
+        row.id === input.preferredSourcePhotoId ||
+        row.local_moment_id === input.preferredSourcePhotoId,
     );
+
+    const preferredCandidate = preferredRow
+      ? await toResolvedCandidate(preferredRow, supabase)
+      : null;
 
     if (preferredCandidate) {
       return preferredCandidate;
     }
   }
 
-  const index =
+  const startIndex =
     hashText(`${input.seed}:${input.triggerLabel}:${input.theme}`) %
-    candidates.length;
+    rows.length;
 
-  return candidates[index];
+  for (let offset = 0; offset < rows.length; offset += 1) {
+    const row = rows[(startIndex + offset) % rows.length];
+    const candidate = await toResolvedCandidate(row, supabase);
+
+    if (candidate) {
+      return candidate;
+    }
+  }
+
+  return null;
+}
+
+async function toResolvedCandidate(
+  row: RemoteCatMomentRow,
+  supabase: SupabaseClient,
+): Promise<Candidate | null> {
+  const src = await resolvePhotoUrl(row.photo_url, supabase);
+
+  if (!src || !isUsablePhotoSrc(src)) {
+    return null;
+  }
+
+  return {
+    row,
+    src,
+    tags: readTags(row.metadata),
+  };
 }
 
 function buildDiagnostics(

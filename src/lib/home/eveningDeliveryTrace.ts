@@ -27,6 +27,7 @@ export type EveningDeliveryTraceEntry = {
   selectedPhotoSource: "direct" | "targetPhoto" | "legacy" | "none";
   selectedPhotoSrcKind?: "data" | "storage" | "http" | "other" | "empty";
   exchangePayloadLength?: number | null;
+  exchangeElapsedMs?: number | null;
   exchangeCalled: boolean;
   exchangeStatus?: number | null;
   exchangeError?: string | null;

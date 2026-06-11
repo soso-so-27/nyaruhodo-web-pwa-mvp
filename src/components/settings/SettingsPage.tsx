@@ -1189,6 +1189,14 @@ function EveningDeliveryTracePanel({
           }
         />
         <AuthDebugRow
+          label="所要"
+          value={
+            typeof latest.exchangeElapsedMs === "number"
+              ? `${latest.exchangeElapsedMs}ms`
+              : "-"
+          }
+        />
+        <AuthDebugRow
           label="exchange"
           value={
             latest.exchangeCalled

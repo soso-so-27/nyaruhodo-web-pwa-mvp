@@ -920,6 +920,7 @@ export function HomeInput({ recentEvents: _recentEvents }: HomeInputProps) {
         exchangeCalled: true,
       });
 
+      const exchangeStartedAt = Date.now();
       const result = await createExchangePhoto({
         ownPhoto: {
           ...ownPhoto,
@@ -941,6 +942,7 @@ export function HomeInput({ recentEvents: _recentEvents }: HomeInputProps) {
         selectedPhotoSource,
         selectedPhotoSrcKind: uploadSrc.srcKind,
         exchangePayloadLength: uploadSrc.src.length,
+        exchangeElapsedMs: Date.now() - exchangeStartedAt,
         exchangeCalled: true,
         exchangeStatus: result.httpStatus,
         exchangeError: result.error,
