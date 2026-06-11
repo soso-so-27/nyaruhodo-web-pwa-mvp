@@ -123,7 +123,7 @@ const MOTIF_STATE_SHOWN_STORAGE_PREFIX = "neteruneko_motif_state_shown";
 const SUBCOPY_HIDDEN_COHORT_STORAGE_KEY =
   "neteruneko_subcopy_hidden_cohort_tracked";
 const PRESENCE_SESSION_STORAGE_KEY = "neteruneko_presence_count";
-const EXCHANGE_UPLOAD_MAX_DATA_URL_LENGTH = 1_800_000;
+const EXCHANGE_UPLOAD_MAX_DATA_URL_LENGTH = 500_000;
 
 type DayCycleState = "1" | "1b" | "2" | "3" | "4";
 const PHOTO_SAVE_FAILURE_MESSAGE =
@@ -899,10 +899,11 @@ export function HomeInput({ recentEvents: _recentEvents }: HomeInputProps) {
           directOwnPhotoFound: Boolean(directOwnPhoto),
           targetPhotoFallbackUsed: Boolean(targetPhoto),
           legacyFallbackUsed: selectedPhotoSource === "legacy",
-          legacyFallbackReason: "non_data_src",
-          selectedPhotoSource,
-          selectedPhotoSrcKind: uploadSrc.srcKind,
-        });
+        legacyFallbackReason: "non_data_src",
+        selectedPhotoSource,
+        selectedPhotoSrcKind: uploadSrc.srcKind,
+        exchangePayloadLength: null,
+      });
         pendingEveningDeliveryKeysRef.current.delete(pendingDay.dateKey);
         return;
       }
@@ -915,6 +916,7 @@ export function HomeInput({ recentEvents: _recentEvents }: HomeInputProps) {
         legacyFallbackUsed: Boolean(legacyPhoto),
         selectedPhotoSource,
         selectedPhotoSrcKind: uploadSrc.srcKind,
+        exchangePayloadLength: uploadSrc.src.length,
         exchangeCalled: true,
       });
 
@@ -938,6 +940,7 @@ export function HomeInput({ recentEvents: _recentEvents }: HomeInputProps) {
         legacyFallbackUsed: Boolean(legacyPhoto),
         selectedPhotoSource,
         selectedPhotoSrcKind: uploadSrc.srcKind,
+        exchangePayloadLength: uploadSrc.src.length,
         exchangeCalled: true,
         exchangeStatus: result.httpStatus,
         exchangeError: result.error,
@@ -3338,13 +3341,11 @@ async function prepareExchangeUploadDataUrl(dataUrl: string) {
   }
 
   const attempts = [
-    dataUrl,
-    await resizeDataUrl(dataUrl, 900, 0.72),
-    await resizeDataUrl(dataUrl, 560, 0.64),
     await resizeDataUrl(dataUrl, 420, 0.58),
     await resizeDataUrl(dataUrl, 320, 0.52),
     await resizeDataUrl(dataUrl, 240, 0.46),
     await resizeDataUrl(dataUrl, 180, 0.4),
+    dataUrl,
   ];
 
   return (

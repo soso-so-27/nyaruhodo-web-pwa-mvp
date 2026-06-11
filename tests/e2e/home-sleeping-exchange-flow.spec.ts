@@ -747,7 +747,7 @@ test.describe("home sleeping exchange flow", () => {
       };
       expect(body.ownPhoto?.id).toBe("storage-only-photo");
       expect(body.ownPhoto?.src).toMatch(/^data:image\/jpeg;base64,/);
-      expect(body.ownPhoto?.src?.length ?? 0).toBeLessThan(1_800_000);
+      expect(body.ownPhoto?.src?.length ?? 0).toBeLessThan(500_000);
       await route.fulfill({
         contentType: "application/json",
         body: JSON.stringify({

@@ -26,6 +26,7 @@ export type EveningDeliveryTraceEntry = {
   legacyFallbackReason?: string;
   selectedPhotoSource: "direct" | "targetPhoto" | "legacy" | "none";
   selectedPhotoSrcKind?: "data" | "storage" | "http" | "other" | "empty";
+  exchangePayloadLength?: number | null;
   exchangeCalled: boolean;
   exchangeStatus?: number | null;
   exchangeError?: string | null;

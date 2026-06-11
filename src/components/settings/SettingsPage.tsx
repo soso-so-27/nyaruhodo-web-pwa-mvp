@@ -1181,6 +1181,14 @@ function EveningDeliveryTracePanel({
         <AuthDebugRow label="選択" value={latest.selectedPhotoSource} />
         <AuthDebugRow label="送信画像" value={latest.selectedPhotoSrcKind ?? "-"} />
         <AuthDebugRow
+          label="送信長"
+          value={
+            typeof latest.exchangePayloadLength === "number"
+              ? `${latest.exchangePayloadLength}文字`
+              : "-"
+          }
+        />
+        <AuthDebugRow
           label="exchange"
           value={
             latest.exchangeCalled
