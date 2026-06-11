@@ -57,6 +57,7 @@ import {
   recordEveningDeliveryTarget,
   setAppBadge,
   setEveningDeliveredPhoto,
+  updateEveningDeliveredPhotoDataUrl,
   type EveningHomeState,
   type EveningDeliveryDay,
 } from "../../lib/home/eveningDelivery";
@@ -70,6 +71,7 @@ import {
   readOwnSleepingPhotoCount,
   reportExchangePhoto,
   saveOwnSleepingPhoto,
+  updateKeptExchangePhotoDataUrl,
   writeOwnSleepingPhotosWithFallback,
   type ExchangePhoto,
   type OwnSleepingPhoto,
@@ -1811,6 +1813,38 @@ export function HomeInput({ recentEvents: _recentEvents }: HomeInputProps) {
     );
   }
 
+  function handleEveningDeliveryDataUrl(dateKey: string, dataUrl: string) {
+    const nextPhoto = updateEveningDeliveredPhotoDataUrl(dateKey, dataUrl);
+
+    if (!nextPhoto) {
+      return;
+    }
+
+    setOpeningEveningDelivery((current) =>
+      current?.dateKey === dateKey
+        ? {
+            ...current,
+            deliveredPhoto: nextPhoto,
+          }
+        : current,
+    );
+    setEveningRefreshTick((value) => value + 1);
+  }
+
+  function handleDeliveredExchangeDataUrl(dataUrl: string) {
+    setDeliveredExchangePhoto((photo) =>
+      photo
+        ? {
+            ...photo,
+            src: dataUrl,
+            thumbnailSrc: dataUrl,
+            displaySrc: dataUrl,
+            originalSrc: dataUrl,
+          }
+        : photo,
+    );
+  }
+
   function dismissHomeInstallHint() {
     window.localStorage.setItem(HOME_INSTALL_HINT_DISMISSED_STORAGE_KEY, "true");
     setIsHomeInstallHintVisible(false);
@@ -1988,6 +2022,9 @@ export function HomeInput({ recentEvents: _recentEvents }: HomeInputProps) {
         <EveningDeliveryOpening
           state={openingEveningDelivery}
           catName={catName}
+          onStorageDataUrl={(dataUrl) =>
+            handleEveningDeliveryDataUrl(openingEveningDelivery.dateKey, dataUrl)
+          }
           onKeep={() =>
             handleKeepEveningDelivery(
               openingEveningDelivery.dateKey,
@@ -2013,6 +2050,7 @@ export function HomeInput({ recentEvents: _recentEvents }: HomeInputProps) {
       {deliveredExchangePhoto ? (
         <ExchangePhotoSheet
           photo={deliveredExchangePhoto}
+          onStorageDataUrl={handleDeliveredExchangeDataUrl}
           onKeep={() => handleKeepExchangePhoto(deliveredExchangePhoto)}
           onClose={() => handleCloseExchangePhoto(deliveredExchangePhoto)}
           onReport={() => handleReportExchangePhoto(deliveredExchangePhoto)}
@@ -3000,6 +3038,12 @@ function SleepingPhotoHome({
                 src={getPhotoThumbnailSrc(eveningState.deliveredPhoto)}
                 alt=""
                 style={styles.sleepingPairImage}
+                onStorageDataUrl={(dataUrl) =>
+                  updateKeptExchangePhotoDataUrl(
+                    eveningState.deliveredPhoto,
+                    dataUrl,
+                  )
+                }
               />
               <span style={styles.sleepingPairLabel}>どこかのこ</span>
             </div>
@@ -3453,10 +3497,12 @@ function trackSubcopyHiddenCohort(keptExchangePhotoCount: number) {
 function EveningDeliveryOpening({
   state,
   catName,
+  onStorageDataUrl,
   onKeep,
 }: {
   state: Extract<EveningHomeState, { kind: "delivered" }>;
   catName: string;
+  onStorageDataUrl: (dataUrl: string) => void;
   onKeep: () => void;
 }) {
   const [stage, setStage] = useState<"photo" | "pair">("photo");
@@ -3481,6 +3527,7 @@ function EveningDeliveryOpening({
             src={getPhotoDetailSrc(state.deliveredPhoto)}
             alt=""
             style={styles.eveningOpeningPhoto}
+            onStorageDataUrl={onStorageDataUrl}
           />
           <p style={styles.eveningOpeningCaption}>どこかの ねがお</p>
         </div>
@@ -3507,6 +3554,7 @@ function EveningDeliveryOpening({
                 src={getPhotoThumbnailSrc(state.deliveredPhoto)}
                 alt=""
                 style={styles.sleepingPairImage}
+                onStorageDataUrl={onStorageDataUrl}
               />
               <span style={styles.sleepingPairLabel}>どこかのこ</span>
             </div>
@@ -3664,11 +3712,13 @@ function SleepingSafetySheet({
 
 function ExchangePhotoSheet({
   photo,
+  onStorageDataUrl,
   onKeep,
   onClose,
   onReport,
 }: {
   photo: ExchangePhoto;
+  onStorageDataUrl: (dataUrl: string) => void;
   onKeep: () => void;
   onClose: () => void;
   onReport: () => void;
@@ -3693,7 +3743,12 @@ function ExchangePhotoSheet({
           </button>
         </div>
         <div style={styles.exchangePhotoFrame}>
-          <StoredPhotoImage src={photo.src} alt="" style={styles.exchangePhoto} />
+          <StoredPhotoImage
+            src={getPhotoDetailSrc(photo)}
+            alt=""
+            style={styles.exchangePhoto}
+            onStorageDataUrl={onStorageDataUrl}
+          />
         </div>
         <p style={styles.exchangeAssurance}>とっておくと、アルバムに入ります。</p>
         <div style={styles.exchangeActions}>

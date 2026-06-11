@@ -58,10 +58,12 @@ export function StoredPhotoImage({
   src,
   alt,
   style,
+  onStorageDataUrl,
 }: {
   src: string;
   alt: string;
   style?: CSSProperties;
+  onStorageDataUrl?: (dataUrl: string) => void;
 }) {
   const {
     objectFit,
@@ -71,9 +73,11 @@ export function StoredPhotoImage({
   } = style ?? {};
   const initialSrc = getInitialDisplaySrc(src);
   const [displaySrc, setDisplaySrc] = useState(initialSrc);
+  const [storageDataUrl, setStorageDataUrl] = useState<string | null>(null);
   const [isLoaded, setIsLoaded] = useState(false);
   const [hasError, setHasError] = useState(false);
   const imageRef = useRef<HTMLImageElement | null>(null);
+  const persistedDataUrlRef = useRef("");
   const isInlineImage = displaySrc.startsWith("data:image/");
   const frameStyle = useMemo<CSSProperties>(
     () => ({
@@ -94,6 +98,7 @@ export function StoredPhotoImage({
 
     setIsLoaded(false);
     setHasError(false);
+    setStorageDataUrl(null);
 
     if (!storagePath) {
       setDisplaySrc(src);
@@ -174,6 +179,36 @@ export function StoredPhotoImage({
 
     return () => window.clearInterval(checkTimer);
   }, [displaySrc]);
+
+  useEffect(() => {
+    if (!onStorageDataUrl || !canReadDisplayDataUrl(displaySrc)) {
+      return;
+    }
+
+    let isActive = true;
+    void readDisplayDataUrl(displaySrc).then((dataUrl) => {
+      if (isActive && dataUrl) {
+        setStorageDataUrl(dataUrl);
+      }
+    });
+
+    return () => {
+      isActive = false;
+    };
+  }, [displaySrc, onStorageDataUrl]);
+
+  useEffect(() => {
+    if (!storageDataUrl || !onStorageDataUrl) {
+      return;
+    }
+
+    if (persistedDataUrlRef.current === storageDataUrl) {
+      return;
+    }
+
+    persistedDataUrlRef.current = storageDataUrl;
+    onStorageDataUrl(storageDataUrl);
+  }, [onStorageDataUrl, storageDataUrl]);
 
   if (!displaySrc) {
     return hasError ? (
@@ -269,6 +304,44 @@ async function readSignedUrlFromApi(
   return typeof body?.signedUrl === "string" && body.signedUrl
     ? body.signedUrl
     : null;
+}
+
+async function readDisplayDataUrl(displaySrc: string) {
+  if (displaySrc.startsWith("data:image/")) {
+    return displaySrc;
+  }
+
+  const response = await fetch(displaySrc).catch(() => null);
+
+  if (!response?.ok) {
+    return null;
+  }
+
+  const blob = await response.blob().catch(() => null);
+
+  if (!blob?.type.startsWith("image/")) {
+    return null;
+  }
+
+  return blobToDataUrl(blob);
+}
+
+function canReadDisplayDataUrl(displaySrc: string) {
+  return (
+    displaySrc.startsWith("data:image/") ||
+    displaySrc.startsWith("https://") ||
+    displaySrc.startsWith("http://")
+  );
+}
+
+function blobToDataUrl(blob: Blob) {
+  return new Promise<string | null>((resolve) => {
+    const reader = new FileReader();
+    reader.onload = () =>
+      resolve(typeof reader.result === "string" ? reader.result : null);
+    reader.onerror = () => resolve(null);
+    reader.readAsDataURL(blob);
+  });
 }
 
 function readAnalyticsAnonymousId() {

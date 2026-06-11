@@ -151,6 +151,139 @@ test.describe("collection album flow", () => {
     await expect(page.locator("main img")).toHaveCount(2);
   });
 
+  test("writes delivered storage photos back as data urls for offline album display", async ({
+    page,
+  }) => {
+    const now = Date.now();
+    let allowSignedUrl = true;
+
+    await page.route("**/api/photo-storage/signed-url", async (route) => {
+      const body = route.request().postDataJSON() as { src?: string };
+
+      if (
+        allowSignedUrl &&
+        body.src === "storage:admin-stock/sleeping/offline-delivered.jpg"
+      ) {
+        await route.fulfill({
+          contentType: "application/json",
+          body: JSON.stringify({ signedUrl: photoDataUrl }),
+        });
+        return;
+      }
+
+      await route.fulfill({
+        status: 404,
+        contentType: "application/json",
+        body: JSON.stringify({ signedUrl: null }),
+      });
+    });
+
+    await page.addInitScript(
+      ({ currentCatId, src, createdAt }) => {
+        if (window.localStorage.getItem("offline_writeback_seeded") === "1") {
+          return;
+        }
+
+        window.localStorage.setItem("offline_writeback_seeded", "1");
+        const dateKey = new Date(createdAt).toISOString().slice(0, 10);
+        window.localStorage.setItem("active_cat_id", currentCatId);
+        window.localStorage.setItem(
+          "cat_profiles",
+          JSON.stringify([
+            {
+              id: currentCatId,
+              name: "current cat",
+              createdAt: new Date(createdAt).toISOString(),
+              updatedAt: new Date(createdAt).toISOString(),
+            },
+          ]),
+        );
+        window.localStorage.setItem(
+          "nyaruhodo_exchange_own_sleeping_photos",
+          JSON.stringify([
+            {
+              id: `own-sleeping-${createdAt}`,
+              ownerCatId: currentCatId,
+              catId: currentCatId,
+              src,
+              state: "sleeping",
+              visibility: "private",
+              deliveryStatus: "available",
+              triggerLabel: "sleeping",
+              theme: "sleeping",
+              shared: false,
+              createdAt,
+            },
+          ]),
+        );
+        window.localStorage.setItem(
+          "nyaruhodo_exchange_kept_photos",
+          JSON.stringify([
+            {
+              id: "delivered-storage-offline",
+              sourcePhotoId: "stock-offline",
+              src: "storage:admin-stock/sleeping/offline-delivered.jpg",
+              title: "とどいたねがお",
+              subtitle: "",
+              triggerLabel: "sleeping",
+              theme: "sleeping",
+              deliveredAt: createdAt,
+            },
+          ]),
+        );
+        window.localStorage.setItem(
+          "neteruneko_evening_delivery_days",
+          JSON.stringify({
+            [dateKey]: {
+              dateKey,
+              targetOwnPhotoId: `own-sleeping-${createdAt}`,
+              targetCatId: currentCatId,
+              targetCapturedAt: createdAt,
+              deliveredPhoto: {
+                id: "delivered-storage-offline",
+                sourcePhotoId: "stock-offline",
+                src: "storage:admin-stock/sleeping/offline-delivered.jpg",
+                title: "とどいたねがお",
+                subtitle: "",
+                triggerLabel: "sleeping",
+                theme: "sleeping",
+                deliveredAt: createdAt,
+              },
+              deliveredAt: createdAt,
+              openedAt: createdAt + 1,
+              keptAt: createdAt + 2,
+            },
+          }),
+        );
+      },
+      {
+        currentCatId: "current-cat",
+        src: photoDataUrl,
+        createdAt: now,
+      },
+    );
+
+    await page.goto("/collection");
+    await page.waitForLoadState("networkidle");
+
+    await expect
+      .poll(() =>
+        page.evaluate(() => {
+          const photos = JSON.parse(
+            window.localStorage.getItem("nyaruhodo_exchange_kept_photos") ?? "[]",
+          ) as { src?: string }[];
+          return photos[0]?.src ?? "";
+        }),
+      )
+      .toMatch(/^data:image\//);
+
+    allowSignedUrl = false;
+    await page.reload();
+    await page.waitForLoadState("networkidle");
+
+    await expect(page.locator('main img[src^="data:image/"]')).toHaveCount(2);
+  });
+
   test("shows legacy storage-url sleeping photos alongside latest local photos", async ({
     page,
   }) => {

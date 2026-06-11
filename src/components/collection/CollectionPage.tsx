@@ -23,6 +23,7 @@ import {
   hideKeptExchangePhoto,
   readKeptExchangePhotos,
   readOwnSleepingPhotos,
+  updateKeptExchangePhotoDataUrl,
   updateOwnSleepingPhotoDelivery,
 } from "../../lib/home/sleepingPhotos";
 import { getFirstEveningDeliveryTargetDateKey } from "../../lib/home/eveningDelivery";
@@ -1181,6 +1182,9 @@ function AlbumDailyPair({
                   src={getPhotoThumbnailSrc(deliveredPhoto)}
                   alt=""
                   style={styles.dailyPairImage}
+                  onStorageDataUrl={(dataUrl) =>
+                    writeBackDeliveredPhotoDataUrl(deliveredPhoto, dataUrl)
+                  }
                 />
               ) : group.key === getLocalDateKey(Date.now()) ? (
                 <span style={styles.dailyPairPlaceholder}>
@@ -1242,6 +1246,11 @@ function AlbumDaySectionRow({
               src={getPhotoThumbnailSrc(photo)}
               alt=""
               style={styles.boxPhotoImg}
+              onStorageDataUrl={
+                section.kind === "other"
+                  ? (dataUrl) => writeBackDeliveredPhotoDataUrl(photo, dataUrl)
+                  : undefined
+              }
             />
           </span>
         ))}
@@ -1312,6 +1321,11 @@ function BoxPhotoDetailSheet({
                   src={getPhotoDetailSrc(photo)}
                   alt=""
                   style={styles.photoImg}
+                  onStorageDataUrl={
+                    kind === "other"
+                      ? (dataUrl) => writeBackDeliveredPhotoDataUrl(photo, dataUrl)
+                      : undefined
+                  }
                 />
               </div>
             ))}
@@ -2313,6 +2327,13 @@ function getPhotoDetailSrc(photo: {
   }
 
   return photo.src;
+}
+
+function writeBackDeliveredPhotoDataUrl(photo: BoxPreviewPhoto, dataUrl: string) {
+  updateKeptExchangePhotoDataUrl(
+    { id: photo.id, sourcePhotoId: photo.sourcePhotoId },
+    dataUrl,
+  );
 }
 
 function isUsableStoredPhotoSrc(src: string | null | undefined): src is string {

@@ -1,4 +1,4 @@
-import { expect, test } from "@playwright/test";
+import { expect, test, type Page } from "@playwright/test";
 
 const testSvg = Buffer.from(
   `<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="1200" viewBox="0 0 1200 1200">
@@ -124,6 +124,156 @@ test.describe("home sleeping exchange flow", () => {
     expect(storage.keptExchangePhotos.length).toBeGreaterThan(0);
     expect(storage.ownSleepingPhotos[0]?.src).toMatch(/^data:image\//);
     expect(storage.keptExchangePhotos[0]?.src).toMatch(/^data:image\//);
+  });
+
+  test("lets anonymous users open storage deliveries without signed-url API auth", async ({
+    page,
+  }) => {
+    let exchangeCalls = 0;
+    let signedUrlCalls = 0;
+    const beforeDelivery = Date.parse("2026-06-10T10:59:00.000Z");
+    const afterDelivery = Date.parse("2026-06-10T11:01:00.000Z");
+    const transientUrl = "https://delivery.example/anonymous-delivered.png";
+    const storageSrc = "storage:admin-stock/sleeping/anonymous-delivered.png";
+    const deliveredImage = Buffer.from(deliveredDataUrl.split(",")[1], "base64");
+
+    await page.addInitScript(({ now, ownDataUrl }) => {
+      (window as typeof window & { __testNow?: number }).__testNow = now;
+      const originalDateNow = Date.now.bind(Date);
+      Date.now = () =>
+        (window as typeof window & { __testNow?: number }).__testNow ??
+        originalDateNow();
+      const catId = "anonymous-storage-cat";
+      const ownPhotoId = "anonymous-storage-own-photo";
+      const dateKey = "2026-06-10";
+      window.localStorage.setItem("nyaruhodo_sleeping_safety_accepted", "1");
+      window.localStorage.setItem("active_cat_id", catId);
+      window.localStorage.setItem(
+        "cat_profiles",
+        JSON.stringify([
+          {
+            id: catId,
+            name: "anonymous cat",
+            createdAt: new Date(now).toISOString(),
+            updatedAt: new Date(now).toISOString(),
+          },
+        ]),
+      );
+      const ownPhoto = {
+        id: ownPhotoId,
+        ownerCatId: catId,
+        catId,
+        src: ownDataUrl,
+        state: "sleeping",
+        visibility: "private",
+        deliveryStatus: "available",
+        triggerLabel: "sleeping",
+        theme: "sleeping",
+        shared: false,
+        createdAt: now,
+      };
+      window.localStorage.setItem(
+        "nyaruhodo_exchange_own_sleeping_photos",
+        JSON.stringify([ownPhoto]),
+      );
+      window.localStorage.setItem(
+        "neteruneko_evening_delivery_days",
+        JSON.stringify({
+          [dateKey]: {
+            dateKey,
+            targetOwnPhotoId: ownPhotoId,
+            targetCatId: catId,
+            targetCapturedAt: now,
+            targetPhoto: ownPhoto,
+          },
+        }),
+      );
+    }, { now: beforeDelivery, ownDataUrl: deliveredDataUrl });
+
+    await page.route("**/api/photo-storage/signed-url", async (route) => {
+      signedUrlCalls += 1;
+      await route.fulfill({
+        status: 401,
+        contentType: "application/json",
+        body: JSON.stringify({ signedUrl: null, error: "auth_required" }),
+      });
+    });
+    await page.route(transientUrl, async (route) => {
+      await route.fulfill({
+        contentType: "image/png",
+        body: deliveredImage,
+      });
+    });
+    await page.route("**/api/sleeping-delivery/exchange", async (route) => {
+      exchangeCalls += 1;
+      await route.fulfill({
+        contentType: "application/json",
+        body: JSON.stringify({
+          photo: {
+            id: `delivered-anon-storage-${Date.now()}`,
+            sourcePhotoId: "stock-anonymous-storage",
+            src: storageSrc,
+            thumbnailSrc: transientUrl,
+            displaySrc: transientUrl,
+            originalSrc: transientUrl,
+            title: "",
+            subtitle: "",
+            triggerLabel: "sleeping",
+            theme: "sleeping",
+            deliveredAt: Date.now(),
+          },
+          source: "remote",
+          diagnostics: {
+            source: "remote",
+            candidateCount: 1,
+            normalCandidateCount: 1,
+            fallbackCandidateCount: 0,
+            fallbackActive: false,
+          },
+        }),
+      });
+    });
+
+    await page.goto("/home");
+    await page.waitForLoadState("networkidle");
+
+    await page.evaluate((now) => {
+      (window as typeof window & { __testNow?: number }).__testNow = now;
+    }, afterDelivery);
+
+    await expect.poll(() => exchangeCalls).toBe(1);
+    await page.locator("main button").first().click();
+    await expect(page.getByTestId("evening-opening-pair")).toBeVisible();
+    await expect(page.getByTestId("evening-opening-pair").locator("img")).toHaveCount(2);
+
+    await expect
+      .poll(() =>
+        page.evaluate(() => {
+          const store = JSON.parse(
+            window.localStorage.getItem("neteruneko_evening_delivery_days") ?? "{}",
+          ) as Record<string, { deliveredPhoto?: { src?: string } }>;
+          const deliveredDay = Object.values(store).find((day) =>
+            Boolean(day.deliveredPhoto),
+          );
+          return deliveredDay?.deliveredPhoto?.src ?? "";
+        }),
+      )
+      .toMatch(/^data:image\//);
+
+    await page.getByTestId("evening-opening-pair").locator("button").last().click();
+    await expect.poll(() => readKeptExchangePhotoCount(page)).toBe(1);
+    await page.goto("/collection");
+    await page.waitForLoadState("networkidle");
+    await expect(page.locator('main img[src^="data:image/"]')).toHaveCount(2);
+
+    await page.unroute(transientUrl);
+    await page.route(transientUrl, async (route) => {
+      await route.fulfill({ status: 404, body: "" });
+    });
+    await page.reload();
+    await page.waitForLoadState("networkidle");
+    await expect(page.locator('main img[src^="data:image/"]')).toHaveCount(2);
+    expect(signedUrlCalls).toBe(0);
   });
 
   test("ignores the legacy six-hour lock and uses evening delivery copy", async ({
@@ -1185,3 +1335,17 @@ test.describe("home sleeping exchange flow", () => {
     await expect(page.locator("main img")).toHaveCount(2);
   });
 });
+
+async function readKeptExchangePhotoCount(page: Page) {
+  return page.evaluate(() => {
+    try {
+      const parsed = JSON.parse(
+        window.localStorage.getItem("nyaruhodo_exchange_kept_photos") ?? "[]",
+      );
+
+      return Array.isArray(parsed) ? parsed.length : 0;
+    } catch {
+      return 0;
+    }
+  });
+}

@@ -12,7 +12,8 @@ export type EveningDeliveryTraceEntry = {
     | "photo_not_data"
     | "legacy_photo_not_data"
     | "exchange_started"
-    | "exchange_completed";
+    | "exchange_completed"
+    | "storage_writeback";
   dateKey: string;
   hasTodayEntry: boolean;
   hasPendingDay: boolean;
@@ -55,6 +56,36 @@ export function recordEveningDeliveryTrace(
   } catch {
     // Delivery must never depend on debug trace persistence.
   }
+}
+
+export function recordDeliveryStorageWritebackTrace({
+  photoId,
+  sourcePhotoId,
+  status,
+}: {
+  photoId: string;
+  sourcePhotoId?: string;
+  status: "saved" | "quota" | "ignored";
+}) {
+  recordEveningDeliveryTrace({
+    gate: "storage_writeback",
+    dateKey: "",
+    hasTodayEntry: false,
+    hasPendingDay: false,
+    hasDeliveredPhoto: false,
+    isAfterDeliveryTime: false,
+    activeCatIdPresent: false,
+    targetOwnPhotoIdPresent: false,
+    directOwnPhotoFound: false,
+    targetPhotoFallbackUsed: false,
+    legacyFallbackUsed: false,
+    selectedPhotoSource: "none",
+    selectedPhotoSrcKind: "data",
+    exchangePayloadLength: null,
+    exchangeCalled: false,
+    exchangeError: `${status}:${photoId}${sourcePhotoId ? `:${sourcePhotoId}` : ""}`,
+    exchangePhotoReceived: false,
+  });
 }
 
 export function readEveningDeliveryTrace(): EveningDeliveryTraceEntry[] {

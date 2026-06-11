@@ -1,8 +1,10 @@
 import {
   getStoragePhotoPath,
+  isLikelySignedPhotoUrl,
   isUsablePhotoSrc,
   normalizePersistentPhotoSrc,
 } from "../photoStorage";
+import { recordDeliveryStorageWritebackTrace } from "./eveningDeliveryTrace";
 
 export type CatMomentState = "sleeping";
 export type CatMomentVisibility = "private" | "shared";
@@ -602,6 +604,9 @@ export function keepExchangePhoto(photo: ExchangePhoto) {
   const persistentPhoto = {
     ...photo,
     src: persistentSrc,
+    thumbnailSrc: normalizePersistentExchangePhotoSrc(photo.thumbnailSrc),
+    displaySrc: normalizePersistentExchangePhotoSrc(photo.displaySrc),
+    originalSrc: normalizePersistentExchangePhotoSrc(photo.originalSrc),
   };
 
   try {
@@ -635,6 +640,83 @@ export function keepExchangePhoto(photo: ExchangePhoto) {
   }
 
   return false;
+}
+
+export function updateKeptExchangePhotoDataUrl(
+  photo: Pick<ExchangePhoto, "id" | "sourcePhotoId">,
+  dataUrl: string,
+) {
+  if (!dataUrl.startsWith("data:image/")) {
+    return "ignored" as const;
+  }
+
+  try {
+    const saved = readKeptExchangePhotos();
+    const targetIndex = saved.findIndex(
+      (savedPhoto) =>
+        savedPhoto.id === photo.id ||
+        Boolean(
+          photo.sourcePhotoId &&
+            savedPhoto.sourcePhotoId === photo.sourcePhotoId,
+        ),
+    );
+
+    if (targetIndex < 0) {
+      return "ignored" as const;
+    }
+
+    const target = saved[targetIndex];
+
+    if (target.src === dataUrl) {
+      return "ignored" as const;
+    }
+
+    const nextPhotos = [...saved];
+    nextPhotos[targetIndex] = {
+      ...target,
+      src: dataUrl,
+      thumbnailSrc: dataUrl,
+      displaySrc: dataUrl,
+      originalSrc: dataUrl,
+    };
+    const savedPhotos = writeStorageArrayWithFallback(
+      KEPT_EXCHANGE_PHOTO_STORAGE_KEY,
+      nextPhotos,
+      [50, 30, 20, 12, 6, 1],
+      saved.length,
+    );
+    const didSave = savedPhotos.some(
+      (savedPhoto) => savedPhoto.id === target.id && savedPhoto.src === dataUrl,
+    );
+    const status = didSave ? "saved" : "quota";
+
+    recordDeliveryStorageWritebackTrace({
+      photoId: photo.id,
+      sourcePhotoId: photo.sourcePhotoId,
+      status,
+    });
+
+    if (didSave) {
+      dispatchBoxPhotoStorageEvent();
+    }
+
+    return status;
+  } catch {
+    recordDeliveryStorageWritebackTrace({
+      photoId: photo.id,
+      sourcePhotoId: photo.sourcePhotoId,
+      status: "quota",
+    });
+    return "quota" as const;
+  }
+}
+
+function normalizePersistentExchangePhotoSrc(src: string | undefined) {
+  if (!src || isLikelySignedPhotoUrl(src)) {
+    return undefined;
+  }
+
+  return normalizeOptionalPhotoSrc(src) ?? undefined;
 }
 
 function createEmptyKeptExchangeDebug(

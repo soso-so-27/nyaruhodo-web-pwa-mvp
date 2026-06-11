@@ -1540,6 +1540,8 @@ function formatTraceGate(gate: EveningDeliveryTraceEntry["gate"]) {
       return "exchange started";
     case "exchange_completed":
       return "exchange completed";
+    case "storage_writeback":
+      return "storage writeback";
     default:
       return gate;
   }

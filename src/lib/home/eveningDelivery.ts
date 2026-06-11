@@ -196,6 +196,39 @@ export function markEveningDeliveryKept(dateKey: string, keptAt = Date.now()) {
   clearAppBadge();
 }
 
+export function updateEveningDeliveredPhotoDataUrl(
+  dateKey: string,
+  dataUrl: string,
+) {
+  if (!dataUrl.startsWith("data:image/")) {
+    return null;
+  }
+
+  const store = readEveningDeliveryStore();
+  const day = store[dateKey];
+  const deliveredPhoto = day?.deliveredPhoto;
+
+  if (!day || !deliveredPhoto || deliveredPhoto.src === dataUrl) {
+    return deliveredPhoto ?? null;
+  }
+
+  const nextPhoto = {
+    ...deliveredPhoto,
+    src: dataUrl,
+    thumbnailSrc: dataUrl,
+    displaySrc: dataUrl,
+    originalSrc: dataUrl,
+  };
+
+  store[dateKey] = {
+    ...day,
+    deliveredPhoto: nextPhoto,
+  };
+  writeEveningDeliveryStore(store);
+
+  return nextPhoto;
+}
+
 export function buildEveningHomeState({
   activeCatId,
   ownPhotos,

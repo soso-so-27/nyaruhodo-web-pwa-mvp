@@ -125,8 +125,10 @@ const RATE_LIMIT_WINDOW_HOUR_MS = 60 * 60 * 1000;
 const RATE_LIMIT_MAX_BUCKETS = 1000;
 const FAST_STORAGE_CANDIDATE_LIMIT = 80;
 const FAST_STORAGE_CANDIDATE_PROBE_LIMIT = 12;
+const TRANSIENT_DELIVERY_SIGNED_URL_SECONDS = 10 * 60;
 const DELIVERY_DATE_KEY_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
 const exchangeRateLimitBuckets = new Map<string, RateLimitBucket>();
+type FastCandidateMode = "admin_storage" | "off";
 
 export async function POST(request: Request) {
   try {
@@ -241,8 +243,12 @@ async function handleExchangePost(request: Request) {
         result: "existing",
         deliveryDateKey: input.deliveryDateKey,
       });
+      const existingPhoto = await attachTransientDeliverySignedUrl(
+        toExchangePhotoFromDelivery(existingDelivery, input),
+        supabase,
+      );
       return NextResponse.json({
-        photo: toExchangePhotoFromDelivery(existingDelivery, input),
+        photo: existingPhoto,
         source: "remote",
         diagnostics: {
           ...buildDiagnostics([], new Set(input.blockedPhotoIds ?? [])),
@@ -451,8 +457,12 @@ async function handleExchangePost(request: Request) {
             result: "existing_after_duplicate",
             deliveryDateKey: input.deliveryDateKey,
           });
+          const existingPhoto = await attachTransientDeliverySignedUrl(
+            toExchangePhotoFromDelivery(existingDelivery, input),
+            supabase,
+          );
           return NextResponse.json({
-            photo: toExchangePhotoFromDelivery(existingDelivery, input),
+            photo: existingPhoto,
             source: "remote",
             diagnostics: {
               ...diagnosticsBase,
@@ -491,7 +501,7 @@ async function handleExchangePost(request: Request) {
   });
 
   return NextResponse.json({
-    photo,
+    photo: await attachTransientDeliverySignedUrl(photo, supabase),
     source: "remote",
     diagnostics: {
       ...diagnosticsBase,
@@ -867,6 +877,45 @@ function toExchangePhotoFromDelivery(
   };
 }
 
+async function attachTransientDeliverySignedUrl(
+  photo: ExchangePhoto,
+  supabase: SupabaseClient,
+) {
+  const storagePath = getStoragePhotoPath(photo.src);
+
+  if (!storagePath) {
+    return photo;
+  }
+
+  const signedUrl = await createTransientDeliverySignedUrl(supabase, storagePath);
+
+  if (!signedUrl) {
+    return photo;
+  }
+
+  return {
+    ...photo,
+    thumbnailSrc: signedUrl,
+    displaySrc: signedUrl,
+    originalSrc: signedUrl,
+  };
+}
+
+async function createTransientDeliverySignedUrl(
+  supabase: SupabaseClient,
+  storagePath: string,
+) {
+  const { data, error } = await supabase.storage
+    .from(CAT_PHOTOS_BUCKET)
+    .createSignedUrl(storagePath, TRANSIENT_DELIVERY_SIGNED_URL_SECONDS);
+
+  if (error || !data?.signedUrl) {
+    return null;
+  }
+
+  return data.signedUrl;
+}
+
 function isUniqueDeliveryError(error: { code?: string; message?: string }) {
   return (
     error.code === "23505" ||
@@ -917,6 +966,12 @@ async function readRemoteCandidateRows(
 async function readFastStockCandidateRows(
   supabase: SupabaseClient,
 ) {
+  const mode = readFastCandidateMode();
+
+  if (mode === "off") {
+    return [];
+  }
+
   const { data } = await supabase
     .from("cat_moments")
     .select(
@@ -929,6 +984,16 @@ async function readFastStockCandidateRows(
     .limit(FAST_STORAGE_CANDIDATE_LIMIT);
 
   return (data ?? []) as FastStockCandidateRow[];
+}
+
+function readFastCandidateMode(): FastCandidateMode {
+  const raw = process.env.SLEEPING_DELIVERY_FAST_CANDIDATES;
+
+  if (raw === "off") {
+    return "off";
+  }
+
+  return "admin_storage";
 }
 
 function isFastStockCandidateDeliverable(
