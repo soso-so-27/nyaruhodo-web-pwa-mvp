@@ -53,6 +53,8 @@ import {
   type SleepingDeliveryDiagnostics,
 } from "../../lib/home/deliveryCandidates";
 
+type SettingsTab = "general" | "admin";
+
 export function SettingsPage() {
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
@@ -113,6 +115,8 @@ export function SettingsPage() {
   const [isBillingLoading, setIsBillingLoading] = useState(false);
   const showsAdminSection =
     adminCapabilities.testToolsEnabled || adminCapabilities.stockAdminEnabled;
+  const [activeSettingsTab, setActiveSettingsTab] =
+    useState<SettingsTab>("general");
 
   useEffect(() => {
     setDisplayEnvironment(getDisplayEnvironment());
@@ -122,6 +126,12 @@ export function SettingsPage() {
     void refreshBetaCapabilities();
     void refreshBillingStatus();
   }, []);
+
+  useEffect(() => {
+    if (!showsAdminSection && activeSettingsTab === "admin") {
+      setActiveSettingsTab("general");
+    }
+  }, [activeSettingsTab, showsAdminSection]);
 
   async function checkAuthState() {
     const supabase = createBrowserSupabaseClient();
@@ -507,6 +517,45 @@ export function SettingsPage() {
           <h1 style={styles.title}>設定</h1>
         </div>
 
+        {showsAdminSection ? (
+          <div
+            style={styles.settingsTabs}
+            role="tablist"
+            aria-label="設定の表示"
+          >
+            <button
+              type="button"
+              role="tab"
+              aria-selected={activeSettingsTab === "general"}
+              onClick={() => setActiveSettingsTab("general")}
+              style={{
+                ...styles.settingsTab,
+                ...(activeSettingsTab === "general"
+                  ? styles.settingsTabActive
+                  : {}),
+              }}
+            >
+              通常
+            </button>
+            <button
+              type="button"
+              role="tab"
+              aria-selected={activeSettingsTab === "admin"}
+              onClick={() => setActiveSettingsTab("admin")}
+              style={{
+                ...styles.settingsTab,
+                ...(activeSettingsTab === "admin"
+                  ? styles.settingsTabActive
+                  : {}),
+              }}
+            >
+              管理
+            </button>
+          </div>
+        ) : null}
+
+        {activeSettingsTab === "general" ? (
+          <>
         <section style={{ ...styles.section, order: 1 }}>
           <p style={styles.sectionLabel}>アプリ</p>
           <AppCard variant="soft" padding="sm" style={styles.card}>
@@ -701,8 +750,10 @@ export function SettingsPage() {
             </div>
           </AppCard>
         </section>
+          </>
+        ) : null}
 
-        {showsAdminSection ? (
+        {showsAdminSection && activeSettingsTab === "admin" ? (
           <section style={{ ...styles.section, ...styles.adminSection, order: 7 }}>
             <p style={styles.sectionLabel}>管理者</p>
             <AppCard
@@ -779,6 +830,8 @@ export function SettingsPage() {
           </section>
         ) : null}
 
+        {activeSettingsTab === "general" ? (
+          <>
         <section style={{ ...styles.section, order: 3 }}>
           <p style={styles.sectionLabel}>安心</p>
           <AppCard variant="soft" padding="sm" style={styles.card}>
@@ -883,6 +936,8 @@ export function SettingsPage() {
             </div>
           </AppCard>
         </section>
+          </>
+        ) : null}
       </div>
     </main>
   );
@@ -1548,6 +1603,32 @@ const styles = {
     fontWeight: 680,
     color: "#2a2a28",
     margin: 0,
+  },
+  settingsTabs: {
+    display: "grid",
+    gridTemplateColumns: "1fr 1fr",
+    gap: "6px",
+    margin: "0 0 16px",
+    padding: "4px",
+    borderRadius: "999px",
+    background: "rgba(255,253,248,0.56)",
+    border: "1px solid rgba(120,108,94,0.10)",
+    boxShadow: "0 4px 12px rgba(90,76,60,0.025)",
+  },
+  settingsTab: {
+    minHeight: "34px",
+    border: "none",
+    borderRadius: "999px",
+    background: "transparent",
+    color: "#83796d",
+    fontSize: "13px",
+    fontWeight: 620,
+    cursor: "pointer",
+  },
+  settingsTabActive: {
+    background: "rgba(234,224,209,0.86)",
+    color: "#2f2c27",
+    boxShadow: "0 2px 8px rgba(90,76,60,0.045)",
   },
   section: {
     marginBottom: "16px",
