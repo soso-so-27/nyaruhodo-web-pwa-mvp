@@ -575,6 +575,55 @@ export function SettingsPage() {
             <p style={styles.storageNote}>
               iPhoneでは、ホーム画面アプリとSafari/Webで写真の保存場所が分かれることがあります。写真が見えないときは、撮ったときと同じ入口から開いてください。
             </p>
+            {isLoggedIn ? (
+              <>
+                <div style={styles.divider} />
+                {syncOverview ? (
+                  <SyncStatusPanel overview={syncOverview} />
+                ) : (
+                  <p style={styles.storageNote}>アカウント保存の状態を確認中です。</p>
+                )}
+                <div style={styles.actionStack}>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      void handleSyncNow();
+                    }}
+                    style={{
+                      ...styles.primaryButton,
+                      ...(isSyncing ? styles.disabledButton : {}),
+                    }}
+                    disabled={isSyncing}
+                  >
+                    {isSyncing ? "保存中..." : "この端末をアカウントに保存"}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      void handleRestoreFromAccount();
+                    }}
+                    style={{
+                      ...styles.secondaryButton,
+                      ...(isSyncing ? styles.disabledButton : {}),
+                    }}
+                    disabled={isSyncing}
+                  >
+                    アカウントからこの端末に復元
+                  </button>
+                </div>
+                {syncMessage ? (
+                  <p style={styles.syncMessage} role="status">
+                    {syncMessage}
+                  </p>
+                ) : null}
+                {lastSyncResult ? (
+                  <SyncResultDetails
+                    action={lastSyncResult.action}
+                    result={lastSyncResult.result}
+                  />
+                ) : null}
+              </>
+            ) : null}
             <div style={styles.divider} />
             <button
               type="button"
@@ -594,7 +643,10 @@ export function SettingsPage() {
                   onClick={() => {
                     void handleDeleteAccountData();
                   }}
-                  style={styles.dangerButtonStrong}
+                  style={{
+                    ...styles.dangerButtonStrong,
+                    ...(isDeleting ? styles.disabledButton : {}),
+                  }}
                   disabled={isDeleting}
                 >
                   {isDeleting ? "削除中..." : "アカウントの保存データも削除する"}
@@ -627,44 +679,6 @@ export function SettingsPage() {
                   <span style={styles.rowValue}>{email ?? ""}</span>
                 </div>
                 <div style={styles.divider} />
-                {syncOverview ? (
-                  <>
-                    <SyncStatusPanel overview={syncOverview} />
-                    <div style={styles.divider} />
-                  </>
-                ) : null}
-                <button
-                  type="button"
-                  onClick={() => {
-                    void handleSyncNow();
-                  }}
-                  style={styles.primaryButton}
-                  disabled={isSyncing}
-                >
-                  {isSyncing ? "保存中..." : "この端末を保存する"}
-                </button>
-                <button
-                  type="button"
-                  onClick={() => {
-                    void handleRestoreFromAccount();
-                  }}
-                  style={styles.restoreButton}
-                  disabled={isSyncing}
-                >
-                  アカウントから復元する
-                </button>
-                {syncMessage ? (
-                  <p style={styles.syncMessage} role="status">
-                    {syncMessage}
-                  </p>
-                ) : null}
-                {lastSyncResult ? (
-                  <SyncResultDetails
-                    action={lastSyncResult.action}
-                    result={lastSyncResult.result}
-                  />
-                ) : null}
-                <div style={styles.divider} />
                 <button
                   type="button"
                   onClick={handleLogout}
@@ -691,7 +705,7 @@ export function SettingsPage() {
         </section>
 
         <section style={{ ...styles.section, order: 5 }}>
-          <p style={styles.sectionLabel}>βへの参加</p>
+          <p style={styles.sectionLabel}>βサポーターについて</p>
           <AppCard variant="soft" padding="sm" style={{ ...styles.card, ...styles.betaCard }}>
             {betaCapabilities.feedbackEnabled ? (
               <>
@@ -1281,87 +1295,40 @@ function KeptExchangeDebugPanel({
 }
 
 function SyncStatusPanel({ overview }: { overview: AccountSyncOverview }) {
+  const localPhotoTotal =
+    overview.localCollectionPhotos +
+    overview.localOwnSleepingPhotos +
+    overview.localKeptExchangePhotos;
+  const remotePhotoTotal =
+    overview.remoteCollectionPhotos +
+    overview.remoteOwnSleepingPhotos +
+    overview.remoteKeptExchangePhotos;
+  const statusText = overview.shouldSuggestRestore
+    ? "アカウントに、この端末へ戻せるデータがあります。"
+    : "この端末の写真と記録をアカウントに保存できます。";
+
   return (
     <div style={styles.syncStatusPanel}>
       <div style={styles.syncStatusHeader}>
         <div>
-          <p style={styles.syncOverviewLabel}>同期の状態</p>
-          <p style={styles.syncOverviewText}>
-            {overview.shouldSuggestRestore
-              ? "アカウント側に復元できるデータがあります。"
-              : "この端末とアカウントの件数を確認できます。"}
-          </p>
+          <p style={styles.syncOverviewLabel}>アカウント保存</p>
+          <p style={styles.syncOverviewText}>{statusText}</p>
         </div>
         {overview.shouldSuggestRestore ? (
           <span style={styles.syncOverviewBadge}>復元できます</span>
         ) : null}
       </div>
 
-      <div style={styles.syncCompareGrid}>
-        <SyncCountColumn
-          title="この端末"
-          cats={overview.localCats}
-          records={overview.localRecords}
-          collectionPhotos={overview.localCollectionPhotos}
-          ownSleepingPhotos={overview.localOwnSleepingPhotos}
-          keptExchangePhotos={overview.localKeptExchangePhotos}
-        />
-        <SyncCountColumn
-          title="アカウント"
-          cats={overview.remoteCats}
-          records={overview.remoteRecords}
-          collectionPhotos={overview.remoteCollectionPhotos}
-          ownSleepingPhotos={overview.remoteOwnSleepingPhotos}
-          keptExchangePhotos={overview.remoteKeptExchangePhotos}
-        />
-      </div>
-
       <div style={styles.syncMetaGrid}>
-        <span>保存 {formatSyncDate(overview.lastPushAt)}</span>
-        <span>復元 {formatSyncDate(overview.lastPullAt)}</span>
+        <span>この端末: 写真 {localPhotoTotal}枚 / 猫 {overview.localCats}匹</span>
+        <span>アカウント: 写真 {remotePhotoTotal}枚 / 猫 {overview.remoteCats}匹</span>
+        <span>最終保存: {formatSyncDate(overview.lastPushAt)}</span>
+        <span>最終復元: {formatSyncDate(overview.lastPullAt)}</span>
       </div>
 
       {overview.errors.length > 0 ? (
         <p style={styles.syncWarning}>一部の同期状態を確認できませんでした。</p>
       ) : null}
-    </div>
-  );
-}
-
-function SyncCountColumn({
-  title,
-  cats,
-  records,
-  collectionPhotos,
-  ownSleepingPhotos,
-  keptExchangePhotos,
-}: {
-  title: string;
-  cats: number;
-  records: number;
-  collectionPhotos: number;
-  ownSleepingPhotos: number;
-  keptExchangePhotos: number;
-}) {
-  return (
-    <div style={styles.syncCountColumn}>
-      <p style={styles.syncCountTitle}>{title}</p>
-      <div style={styles.syncCountRows}>
-        <SyncCountRow label="猫" value={cats} />
-        <SyncCountRow label="記録" value={records} />
-        <SyncCountRow label="写真" value={collectionPhotos} />
-        <SyncCountRow label="とったねがお" value={ownSleepingPhotos} />
-        <SyncCountRow label="とどいたねがお" value={keptExchangePhotos} />
-      </div>
-    </div>
-  );
-}
-
-function SyncCountRow({ label, value }: { label: string; value: number }) {
-  return (
-    <div style={styles.syncCountRow}>
-      <span>{label}</span>
-      <span style={styles.syncCountValue}>{value}</span>
     </div>
   );
 }
@@ -1698,7 +1665,7 @@ const styles = {
     color: "#8a8a80",
     lineHeight: 1.6,
     margin: "0",
-    padding: "0 0 12px",
+    padding: "2px 0 0",
     textAlign: "center" as const,
   },
   syncResultDetails: {
@@ -1762,9 +1729,9 @@ const styles = {
     lineHeight: 1.5,
   },
   syncStatusPanel: {
-    padding: "14px 0",
+    padding: "12px 0",
     display: "grid",
-    gap: "12px",
+    gap: "10px",
   },
   syncStatusHeader: {
     display: "flex",
@@ -1800,45 +1767,9 @@ const styles = {
     fontWeight: 600,
     padding: "4px 8px",
   },
-  syncCompareGrid: {
-    display: "grid",
-    gridTemplateColumns: "repeat(2, minmax(0, 1fr))",
-    gap: "10px",
-  },
-  syncCountColumn: {
-    border: "1px solid #f0ede8",
-    borderRadius: "16px",
-    padding: "10px",
-    background: "rgba(255,255,255,0.52)",
-  },
-  syncCountTitle: {
-    margin: "0 0 8px",
-    fontSize: "12px",
-    fontWeight: 700,
-    color: "#2a2a28",
-  },
-  syncCountRows: {
-    display: "grid",
-    gap: "6px",
-  },
-  syncCountRow: {
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "space-between",
-    gap: "6px",
-    color: "#8a8a80",
-    fontSize: "11.5px",
-    lineHeight: 1.25,
-  },
-  syncCountValue: {
-    color: "#2a2a28",
-    fontWeight: 700,
-    fontVariantNumeric: "tabular-nums",
-  },
   syncMetaGrid: {
     display: "grid",
-    gridTemplateColumns: "repeat(2, minmax(0, 1fr))",
-    gap: "8px",
+    gap: "5px",
     color: "#9a9890",
     fontSize: "11.5px",
     lineHeight: 1.4,
@@ -1879,12 +1810,14 @@ const styles = {
     display: "block",
     width: "100%",
     textAlign: "center" as const,
-    padding: "13px 0",
+    boxSizing: "border-box" as const,
+    padding: "12px 14px",
     fontSize: "14px",
-    fontWeight: 600,
-    color: APP_ACCENT,
-    background: "transparent",
-    border: "none",
+    fontWeight: 700,
+    color: "#fffdf8",
+    background: APP_ACCENT,
+    border: `1px solid ${APP_ACCENT}`,
+    borderRadius: "14px",
     textDecoration: "none",
     cursor: "pointer",
   },
@@ -1892,44 +1825,45 @@ const styles = {
     display: "block",
     width: "100%",
     textAlign: "center" as const,
-    padding: "11px 0",
-    fontSize: "12.5px",
-    fontWeight: 600,
-    color: "#8a8a80",
-    background: "transparent",
-    border: "none",
+    boxSizing: "border-box" as const,
+    padding: "12px 14px",
+    fontSize: "14px",
+    fontWeight: 650,
+    color: "#5f584f",
+    background: "rgba(255,253,248,0.72)",
+    border: "1px solid rgba(120,108,94,0.16)",
+    borderRadius: "14px",
     textDecoration: "none",
     cursor: "pointer",
   },
-  restoreButton: {
-    display: "block",
-    width: "100%",
-    textAlign: "center" as const,
-    padding: "0 0 14px",
-    fontSize: "13px",
-    fontWeight: 500,
-    color: "#8a8a80",
-    background: "transparent",
-    border: "none",
-    textDecoration: "none",
-    cursor: "pointer",
+  actionStack: {
+    display: "grid",
+    gap: "10px",
+    padding: "0 0 12px",
+  },
+  disabledButton: {
+    opacity: 0.52,
+    cursor: "default",
   },
   dangerButton: {
     display: "block",
     width: "100%",
-    padding: "13px 0",
+    boxSizing: "border-box" as const,
+    padding: "12px 14px",
     fontSize: "14px",
-    fontWeight: 600,
+    fontWeight: 650,
     color: "#9b4a3d",
-    background: "transparent",
-    border: "none",
+    background: "rgba(255,253,248,0.46)",
+    border: "1px solid rgba(155,74,61,0.14)",
+    borderRadius: "14px",
     textAlign: "center" as const,
     cursor: "pointer",
   },
   dangerButtonStrong: {
     display: "block",
     width: "100%",
-    padding: "13px 0",
+    boxSizing: "border-box" as const,
+    padding: "12px 14px",
     fontSize: "14px",
     fontWeight: 650,
     color: "#9b4a3d",
