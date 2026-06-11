@@ -3,7 +3,6 @@
 import { useEffect, useState } from "react";
 import type { CSSProperties, FormEvent } from "react";
 import {
-  deleteAccountStoredData,
   getAccountSyncOverview,
   syncLocalDataWithAccount,
 } from "../../lib/accountSync";
@@ -26,8 +25,6 @@ import {
   type ClientBillingStatus,
 } from "../../lib/billingClient";
 import {
-  AUTH_CODE_VERIFIER_STORAGE_KEY,
-  AUTH_STORAGE_KEY,
   buildAuthDebugSnapshot,
   type AuthDebugSnapshot,
 } from "../../lib/authDebug";
@@ -59,10 +56,8 @@ export function SettingsPage() {
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [isSyncing, setIsSyncing] = useState(false);
-  const [isDeleting, setIsDeleting] = useState(false);
   const [email, setEmail] = useState<string | null>(null);
   const [syncMessage, setSyncMessage] = useState("");
-  const [deleteMessage, setDeleteMessage] = useState("");
   const [lastSyncResult, setLastSyncResult] = useState<{
     action: "sync" | "restore";
     result: AccountSyncResult;
@@ -277,51 +272,6 @@ export function SettingsPage() {
       error_count: result.errors.length,
     });
     setIsSyncing(false);
-  }
-
-  function handleDeleteLocalData() {
-    if (
-      !window.confirm(
-        "この端末の猫データと写真を削除します。アカウントに保存済みのデータは残ります。",
-      )
-    ) {
-      return;
-    }
-
-    clearLocalAppData();
-    trackProductEvent("settings_local_data_deleted", {
-      display_environment: displayEnvironment,
-    });
-    window.location.href = "/home";
-  }
-
-  async function handleDeleteAccountData() {
-    if (
-      !window.confirm(
-        "アカウントに保存した猫データと写真を削除します。この端末のデータも消えます。元に戻せません。",
-      )
-    ) {
-      return;
-    }
-
-    setIsDeleting(true);
-    setDeleteMessage("");
-    const result = await deleteAccountStoredData();
-
-    trackProductEvent("settings_account_data_deleted", {
-      status: result.status,
-      error_count: result.errors.length,
-    });
-
-    if (result.status === "deleted") {
-      clearLocalAppData();
-      setDeleteMessage("アカウントに保存したデータを削除しました。");
-      window.location.href = "/home";
-      return;
-    }
-
-    setDeleteMessage("アカウントのデータを削除できませんでした。ログイン状態を確認してください。");
-    setIsDeleting(false);
   }
 
   async function handleStockPhotoImport() {
@@ -623,43 +573,6 @@ export function SettingsPage() {
                   />
                 ) : null}
               </>
-            ) : null}
-            <div style={styles.divider} />
-            <button
-              type="button"
-              onClick={handleDeleteLocalData}
-              style={styles.dangerButton}
-            >
-              この端末のデータを削除する
-            </button>
-            <p style={styles.deleteHelp}>
-              アカウントに保存済みの写真は残ります。新しいPWAで復元できます。
-            </p>
-            {isLoggedIn ? (
-              <>
-                <div style={styles.divider} />
-                <button
-                  type="button"
-                  onClick={() => {
-                    void handleDeleteAccountData();
-                  }}
-                  style={{
-                    ...styles.dangerButtonStrong,
-                    ...(isDeleting ? styles.disabledButton : {}),
-                  }}
-                  disabled={isDeleting}
-                >
-                  {isDeleting ? "削除中..." : "アカウントの保存データも削除する"}
-                </button>
-                <p style={styles.deleteHelp}>
-                  アカウントに保存した猫、写真、とった寝顔、とどいた寝顔を削除します。
-                </p>
-              </>
-            ) : null}
-            {deleteMessage ? (
-              <p style={styles.syncMessage} role="status">
-                {deleteMessage}
-              </p>
             ) : null}
           </AppCard>
         </section>
@@ -1039,21 +952,6 @@ function BetaFeedbackForm({
       ) : null}
     </form>
   );
-}
-
-function clearLocalAppData() {
-  if (typeof window === "undefined") {
-    return;
-  }
-
-  const preservedKeys = new Set([AUTH_STORAGE_KEY, AUTH_CODE_VERIFIER_STORAGE_KEY]);
-
-  for (const key of Object.keys(window.localStorage)) {
-    if (key.startsWith("sb-") || preservedKeys.has(key)) {
-      continue;
-    }
-    window.localStorage.removeItem(key);
-  }
 }
 
 function resizeAndEncode(
@@ -1858,26 +1756,6 @@ const styles = {
     borderRadius: "14px",
     textAlign: "center" as const,
     cursor: "pointer",
-  },
-  dangerButtonStrong: {
-    display: "block",
-    width: "100%",
-    boxSizing: "border-box" as const,
-    padding: "12px 14px",
-    fontSize: "14px",
-    fontWeight: 650,
-    color: "#9b4a3d",
-    background: "rgba(155,74,61,0.07)",
-    border: "1px solid rgba(155,74,61,0.16)",
-    borderRadius: "14px",
-    textAlign: "center" as const,
-    cursor: "pointer",
-  },
-  deleteHelp: {
-    margin: "6px 0 0",
-    color: "#8a8a80",
-    fontSize: "11.5px",
-    lineHeight: 1.55,
   },
   betaNote: {
     padding: "12px 0",
