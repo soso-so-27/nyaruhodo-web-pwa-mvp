@@ -105,6 +105,18 @@ const RATE_LIMIT_MAX_BUCKETS = 1000;
 const exchangeRateLimitBuckets = new Map<string, RateLimitBucket>();
 
 export async function POST(request: Request) {
+  try {
+    return await handleExchangePost(request);
+  } catch (error) {
+    console.error("[sleeping-delivery/exchange] unhandled error", error);
+    return NextResponse.json(
+      { photo: null, source: "none", error: "exchange_failed" },
+      { status: 500 },
+    );
+  }
+}
+
+async function handleExchangePost(request: Request) {
   const parsedInput = await readExchangeRequest(request);
 
   if (!parsedInput.ok) {
@@ -126,23 +138,7 @@ export async function POST(request: Request) {
     return exchangeError("too_many_requests", 429);
   }
 
-  const debugDryRun =
-    input.debugDryRun === true && process.env.NODE_ENV !== "production";
-  const user = await getAuthenticatedUserForRequest(request);
-  const userId = user?.id ?? null;
-  const anonymousId = userId ? null : input.anonymousId;
-  const adminSupabase = createSupabaseAdminClient();
-  const serverSupabase = await createServerSupabaseClient();
-  const supabase = adminSupabase ?? serverSupabase;
-
-  if (!supabase) {
-    return NextResponse.json(
-      { photo: null, source: "none", error: "server_unavailable" },
-      { status: 503 },
-    );
-  }
-
-  if (!isValidOwnPhotoInput(input) || (!userId && !anonymousId)) {
+  if (!isValidOwnPhotoInput(input)) {
     return NextResponse.json(
       { photo: null, source: "none", error: "invalid_exchange_request" },
       { status: 400 },
@@ -153,21 +149,32 @@ export async function POST(request: Request) {
   const createdAt = new Date(ownPhoto.createdAt ?? Date.now()).toISOString();
   const ownerCatId = ownPhoto.ownerCatId || ownPhoto.catId;
   const ownPhotoStoragePath = getStoragePhotoPath(ownPhoto.src);
+  const shouldAddOwnPhotoToPool =
+    !ownPhotoStoragePath && !isBlockedDeliveryPhotoUrl(ownPhoto.src);
+  const debugDryRun =
+    input.debugDryRun === true && process.env.NODE_ENV !== "production";
+  const user = shouldAddOwnPhotoToPool
+    ? await getAuthenticatedUserForRequest(request)
+    : null;
+  const userId = user?.id ?? null;
+  const anonymousId = userId ? null : input.anonymousId;
+  const adminSupabase = createSupabaseAdminClient();
+  const serverSupabase = adminSupabase ? null : await createServerSupabaseClient();
+  const supabase = adminSupabase ?? serverSupabase;
 
-  if (
-    ownPhotoStoragePath &&
-    !isAuthorizedOwnPhotoStoragePath(ownPhotoStoragePath, {
-      userId,
-      ownerCatId,
-    })
-  ) {
+  if (!userId && !anonymousId) {
     return NextResponse.json(
       { photo: null, source: "none", error: "invalid_exchange_request" },
       { status: 400 },
     );
   }
 
-  const shouldAddOwnPhotoToPool = !isBlockedDeliveryPhotoUrl(ownPhoto.src);
+  if (!supabase) {
+    return NextResponse.json(
+      { photo: null, source: "none", error: "server_unavailable" },
+      { status: 503 },
+    );
+  }
 
   if (!debugDryRun && shouldAddOwnPhotoToPool) {
     const ownPhotoUrl = await prepareExchangeMomentPhotoUrl({
@@ -486,31 +493,6 @@ function validateOwnPhotoStoragePath(path: string): ExchangeValidationResult {
   }
 
   return { ok: true };
-}
-
-function isAuthorizedOwnPhotoStoragePath(
-  path: string,
-  {
-    userId,
-    ownerCatId,
-  }: {
-    userId: string | null;
-    ownerCatId: string;
-  },
-) {
-  if (!userId) {
-    return false;
-  }
-
-  const segments = path.split("/");
-  const ownerKey = sanitizePathSegment(userId);
-  const catKey = sanitizePathSegment(ownerCatId);
-
-  return (
-    segments[0] === ownerKey &&
-    segments.includes(catKey) &&
-    segments.includes("sleeping")
-  );
 }
 
 function hasExpectedImageMagicNumber(mime: string, header: Buffer) {

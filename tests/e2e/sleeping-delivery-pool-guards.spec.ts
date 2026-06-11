@@ -116,6 +116,7 @@ test.describe("sleeping delivery pool guards", () => {
       redBlueTestPhotoUrl,
       normalCatLikePhotoUrl,
       minimalWebpDataUrl,
+      "storage:user/cat/sleeping/photo.jpg",
     ].entries()) {
       const response = await request.post("/api/sleeping-delivery/exchange", {
         data: buildExchangeRequest(src, `valid-${Date.now()}-${index}`),
@@ -136,7 +137,6 @@ test.describe("sleeping delivery pool guards", () => {
       ],
       ["data:image/heic;base64,AAAA", 415],
       ["https://example.com/cat.jpg", 415],
-      ["storage:user/cat/sleeping/photo.jpg", 400],
     ] as const) {
       const response = await request.post("/api/sleeping-delivery/exchange", {
         data: buildExchangeRequest(src, `invalid-${Date.now()}-${expectedStatus}`),

@@ -99,10 +99,12 @@ export async function createSleepingExchange({
     });
 
     if (!response.ok) {
+      const error = await readExchangeError(response);
       return {
         photo: null,
         source: "none",
         httpStatus: response.status,
+        error,
       };
     }
 
@@ -113,9 +115,29 @@ export async function createSleepingExchange({
       photo: null,
       source: "none",
       httpStatus: null,
-      error: error instanceof Error ? error.message : "fetch_failed",
+      error: formatFetchFailure(error),
     };
   }
+}
+
+async function readExchangeError(response: Response) {
+  try {
+    const body = (await response.json()) as { error?: unknown };
+    return typeof body.error === "string" ? body.error : null;
+  } catch {
+    return null;
+  }
+}
+
+function formatFetchFailure(error: unknown) {
+  const name = error instanceof Error ? error.name : "Error";
+  const message = error instanceof Error ? error.message : "fetch_failed";
+  const online =
+    typeof navigator === "undefined" ? "unknown" : String(navigator.onLine);
+  const visibility =
+    typeof document === "undefined" ? "unknown" : document.visibilityState;
+
+  return `${name}: ${message}; online:${online}; visibility:${visibility}`;
 }
 
 export async function saveRemoteDeliveryStockPhoto(src: string) {
