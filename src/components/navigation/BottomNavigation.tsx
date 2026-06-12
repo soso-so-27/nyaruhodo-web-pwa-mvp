@@ -156,7 +156,8 @@ function TodayPairIcon({ state }: { state: "1" | "1b" | "2" | "3" | "4" }) {
         height="14"
         rx="3"
         data-testid="today-pair-nav-slot"
-        fill={firstFilled ? "currentColor" : "rgba(255,253,248,0.48)"}
+        fill={firstFilled ? "currentColor" : "var(--surface)"}
+        fillOpacity={firstFilled ? 1 : 0.48}
         stroke="currentColor"
         strokeWidth="1.6"
         strokeDasharray={firstFilled ? undefined : "2.2 2"}
@@ -169,7 +170,8 @@ function TodayPairIcon({ state }: { state: "1" | "1b" | "2" | "3" | "4" }) {
         height="14"
         rx="3"
         data-testid="today-pair-nav-slot"
-        fill={secondFilled ? "currentColor" : "rgba(255,253,248,0.48)"}
+        fill={secondFilled ? "currentColor" : "var(--surface)"}
+        fillOpacity={secondFilled ? 1 : 0.48}
         stroke="currentColor"
         strokeWidth="1.6"
         strokeDasharray={secondFilled ? undefined : "2.2 2"}
@@ -192,11 +194,10 @@ const styles = {
     width: "min(calc(100% - 48px), 410px)",
     height: "var(--bottom-nav-height)",
     transform: "translateX(-50%)",
-    border: "1px solid rgba(120, 108, 94, 0.14)",
-    borderRadius: "999px",
-    background: "rgba(255, 253, 248, 0.88)",
-    boxShadow:
-      "0 14px 40px rgba(90, 76, 60, 0.12), inset 0 1px 0 rgba(255,255,255,0.74)",
+    border: "1px solid var(--line)",
+    borderRadius: "var(--radius-tile)",
+    background: "color-mix(in srgb, var(--surface) 88%, transparent)",
+    boxShadow: "var(--shadow-float)",
     padding: "8px",
     backdropFilter: "blur(14px)",
     viewTransitionName: "bottom-nav",
@@ -207,11 +208,11 @@ const styles = {
     bottom: "8px",
     left: "8px",
     width: "calc((100% - 20px) / 3)",
-    borderRadius: "999px",
-    background: "#efe5d6",
-    boxShadow: "inset 0 1px 0 rgba(255,255,255,0.72)",
+    borderRadius: "var(--radius-tile)",
+    background: "var(--bg-evening)",
+    boxShadow: "var(--shadow-rest)",
     pointerEvents: "none",
-    transition: "transform 0.24s cubic-bezier(0.22, 1, 0.36, 1)",
+    transition: "transform var(--dur-instant) var(--ease-settle)",
     willChange: "transform",
   },
   navButton: {
@@ -223,13 +224,13 @@ const styles = {
     justifyContent: "center",
     gap: "3px",
     minHeight: "60px",
-    borderRadius: "999px",
+    borderRadius: "var(--radius-tile)",
     background: "transparent",
-    color: "#777872",
+    color: "var(--sub)",
     textDecoration: "none",
     cursor: "pointer",
     transition:
-      "color 0.18s ease, transform 0.22s cubic-bezier(0.22, 1, 0.36, 1)",
+      "color var(--dur-instant) var(--ease-gentle), transform var(--dur-instant) var(--ease-settle)",
   },
   activeNavButton: {
     position: "relative",
@@ -240,14 +241,14 @@ const styles = {
     justifyContent: "center",
     gap: "3px",
     minHeight: "60px",
-    borderRadius: "999px",
+    borderRadius: "var(--radius-tile)",
     background: "transparent",
-    color: "#3f433d",
+    color: "var(--ink)",
     textDecoration: "none",
     cursor: "pointer",
     transform: "translateY(-1px)",
     transition:
-      "color 0.18s ease, transform 0.22s cubic-bezier(0.22, 1, 0.36, 1)",
+      "color var(--dur-instant) var(--ease-gentle), transform var(--dur-instant) var(--ease-settle)",
   },
   navIcon: {
     display: "inline-flex",
@@ -255,9 +256,9 @@ const styles = {
     justifyContent: "center",
     width: "22px",
     height: "22px",
-    color: "#777872",
+    color: "var(--sub)",
     lineHeight: 1,
-    transition: "color 0.18s ease, transform 0.22s cubic-bezier(0.22, 1, 0.36, 1)",
+    transition: "color var(--dur-instant) var(--ease-gentle), transform var(--dur-instant) var(--ease-settle)",
   },
   activeNavIcon: {
     display: "inline-flex",
@@ -265,10 +266,10 @@ const styles = {
     justifyContent: "center",
     width: "22px",
     height: "22px",
-    color: "#566052",
+    color: "var(--ink)",
     lineHeight: 1,
     transform: "scale(1.02)",
-    transition: "color 0.18s ease, transform 0.22s cubic-bezier(0.22, 1, 0.36, 1)",
+    transition: "color var(--dur-instant) var(--ease-gentle), transform var(--dur-instant) var(--ease-settle)",
   },
   svgIcon: {
     width: "21px",

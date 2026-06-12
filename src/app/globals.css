@@ -1,3 +1,5 @@
+@import "./tokens.css";
+
 html {
   --bottom-nav-height: 76px;
   --bottom-nav-bottom-offset: 16px;
@@ -8,7 +10,7 @@ body {
   margin: 0;
   width: 100%;
   min-height: 100%;
-  background-color: #f7f3ea;
+  background-color: var(--bg-day);
   background-image: var(--home-bg-image, none);
   background-position: center 30%;
   background-size: cover;
@@ -76,17 +78,17 @@ body {
 }
 
 ::view-transition-old(root) {
-  animation: routeViewOld 120ms ease-out both;
+  animation: routeViewOld var(--dur-instant) var(--ease-settle) both;
 }
 
 ::view-transition-new(root) {
-  animation: routeViewNew 160ms ease-out both;
+  animation: routeViewNew var(--dur-instant) var(--ease-settle) both;
 }
 
 ::view-transition-old(bottom-nav),
 ::view-transition-new(bottom-nav) {
-  animation-duration: 220ms;
-  animation-timing-function: cubic-bezier(0.22, 1, 0.36, 1);
+  animation-duration: var(--dur-instant);
+  animation-timing-function: var(--ease-settle);
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -94,6 +96,6 @@ body {
   ::view-transition-new(root),
   ::view-transition-old(bottom-nav),
   ::view-transition-new(bottom-nav) {
-    animation-duration: 0.01ms;
+    animation: none;
   }
 }

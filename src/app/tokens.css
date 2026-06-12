@@ -1,0 +1,47 @@
+:root {
+  /* ===== 色: 基調 ===== */
+  --ink: #4a4338;
+  --sub: #9a9183;
+  --faint: #c5bcab;
+  --line: #e7dfd0;
+  --surface: #fffdf8;
+  --surface-dim: #f4eee2;
+
+  /* ===== 色: 背景の時間ランプ ===== */
+  --bg-morning: #faf6ec;
+  --bg-day: #f7f3ea;
+  --bg-dusk: #f3eadf;
+  --bg-evening: #efe4d7;
+  --bg-night: #ece0d4;
+
+  /* ===== 色: ローズ ===== */
+  --rose: #c2607c;
+  --rose-deep: #a84e68;
+  --rose-soft: #e8c9d3;
+  --rose-mist: #f5e7eb;
+
+  /* ===== 色: 手紙 ===== */
+  --letter-paper: #fbf6f1;
+  --letter-flap: rgba(194, 96, 124, 0.08);
+  --letter-fill-0: rgba(194, 96, 124, 0.14);
+  --letter-fill-1: rgba(194, 96, 124, 0.30);
+  --letter-meniscus: rgba(194, 96, 124, 0.40);
+
+  /* ===== 影 ===== */
+  --shadow-rest: 0 6px 14px rgba(140, 112, 90, 0.10);
+  --shadow-float: 0 12px 26px rgba(160, 105, 115, 0.18);
+
+  /* ===== 角丸 ===== */
+  --radius-tile: 24px;
+  --radius-img: 17px;
+  --radius-s: 13px;
+
+  /* ===== 動き ===== */
+  --ease-settle: cubic-bezier(0.22, 1, 0.36, 1);
+  --ease-gentle: cubic-bezier(0.4, 0, 0.2, 1);
+  --ease-breathe: ease-in-out;
+  --dur-instant: 180ms;
+  --dur-move: 420ms;
+  --dur-reveal: 900ms;
+  --dur-develop: 1600ms;
+}

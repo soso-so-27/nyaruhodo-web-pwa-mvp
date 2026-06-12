@@ -58,6 +58,10 @@ import {
   HOME_DESK_MODEL_OVERRIDE_STORAGE_KEY,
   readHomeDeskModelOverride,
 } from "../../lib/home/homeDeskModelFlag";
+import {
+  readOpenSoundEnabled,
+  saveOpenSoundEnabled,
+} from "../../lib/openSound";
 
 type SettingsTab = "general" | "admin";
 const APP_BUILD_SHA =
@@ -127,6 +131,7 @@ export function SettingsPage() {
   const [homeDeskModelEnabled, setHomeDeskModelEnabled] = useState(
     HOME_DESK_MODEL_ENABLED,
   );
+  const [openSoundEnabled, setOpenSoundEnabled] = useState(true);
   const showsAdminSection =
     adminCapabilities.testToolsEnabled || adminCapabilities.stockAdminEnabled;
   const [activeSettingsTab, setActiveSettingsTab] =
@@ -137,6 +142,7 @@ export function SettingsPage() {
     setHomeDeskModelEnabled(
       readHomeDeskModelOverride() ?? HOME_DESK_MODEL_ENABLED,
     );
+    setOpenSoundEnabled(readOpenSoundEnabled());
     refreshKeptExchangeDebug();
     refreshEveningDeliveryTrace();
     void checkAuthState();
@@ -173,6 +179,11 @@ export function SettingsPage() {
         readHomeDeskModelOverride() ?? HOME_DESK_MODEL_ENABLED,
       );
     }
+  }
+
+  function updateOpenSoundEnabled(enabled: boolean) {
+    saveOpenSoundEnabled(enabled);
+    setOpenSoundEnabled(enabled);
   }
 
   async function checkAuthState() {
@@ -665,6 +676,29 @@ export function SettingsPage() {
                 </a>
               </>
             )}
+          </AppCard>
+        </section>
+
+        <section style={{ ...styles.section, order: 4 }}>
+          <p style={styles.sectionLabel}>音</p>
+          <AppCard variant="soft" padding="sm" style={styles.card}>
+            <div style={styles.row}>
+              <div style={styles.rowLeft}>
+                <span style={styles.rowLabel}>ひらく音</span>
+                <span style={styles.rowValue}>手紙をひらいたときだけ</span>
+              </div>
+              <button
+                type="button"
+                onClick={() => updateOpenSoundEnabled(!openSoundEnabled)}
+                style={{
+                  ...styles.flagToggleButton,
+                  ...(openSoundEnabled ? styles.flagToggleButtonActive : {}),
+                }}
+                aria-pressed={openSoundEnabled}
+              >
+                {openSoundEnabled ? "ON" : "OFF"}
+              </button>
+            </div>
           </AppCard>
         </section>
 

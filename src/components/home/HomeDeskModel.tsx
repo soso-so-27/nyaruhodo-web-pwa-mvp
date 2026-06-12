@@ -16,6 +16,7 @@ import type {
   OwnSleepingPhoto,
 } from "../../lib/home/sleepingPhotos";
 import { trackProductEvent } from "../../lib/analytics/productAnalytics";
+import { playOpenSound } from "../../lib/openSound";
 import { BottomNavigation } from "../navigation/BottomNavigation";
 import { AppIcon } from "../ui/AppIcons";
 import { StoredPhotoImage } from "../ui/StoredPhotoImage";
@@ -122,6 +123,7 @@ export function HomeDeskModel({
     event.currentTarget.setPointerCapture(event.pointerId);
 
     if (prefersReducedMotion) {
+      void playOpenSound();
       onOpenDelivery(eveningState);
       return;
     }
@@ -133,6 +135,7 @@ export function HomeDeskModel({
       holdTimerRef.current = window.setTimeout(() => {
       holdTimerRef.current = null;
       setHoldProgress(false);
+      void playOpenSound();
       onOpenDelivery(eveningState);
     }, HOLD_OPEN_MS);
   }
@@ -148,6 +151,7 @@ export function HomeDeskModel({
 
   function handleFallbackOpen() {
     if (eveningState.kind === "delivered") {
+      void playOpenSound();
       onOpenDelivery(eveningState);
     }
   }
@@ -357,15 +361,15 @@ export function HomeDeskModel({
 
       <style>{`
         @keyframes deskFrameBreathe {
-          0%, 100% { border-color: #cfc4ae; box-shadow: 0 9px 20px rgba(120,104,80,0.08); }
-          50% { border-color: #bfb39d; box-shadow: 0 10px 22px rgba(120,104,80,0.10); }
+          0%, 100% { border-color: var(--faint); box-shadow: var(--shadow-rest); }
+          50% { border-color: var(--sub); box-shadow: var(--shadow-rest); }
         }
         @keyframes deskLetterShimmer {
           0%, 100% { opacity: 0.58; transform: translateX(-4px); }
           50% { opacity: 1; transform: translateX(4px); }
         }
         .desk-frame-breathe {
-          animation: deskFrameBreathe 4.2s ease-in-out infinite;
+          animation: deskFrameBreathe calc(var(--dur-move) * 10) var(--ease-breathe) infinite;
         }
         .desk-letter-fill::before {
           content: "";
@@ -374,9 +378,9 @@ export function HomeDeskModel({
           right: 0;
           top: 0;
           height: 2px;
-          background: linear-gradient(90deg, rgba(194, 96, 124, 0.18), rgba(194, 96, 124, 0.62), rgba(194, 96, 124, 0.18));
-          box-shadow: 0 1px 4px rgba(194, 96, 124, 0.22);
-          animation: deskLetterShimmer 3.4s ease-in-out infinite;
+          background: linear-gradient(90deg, transparent, var(--letter-meniscus), transparent);
+          box-shadow: var(--shadow-rest);
+          animation: deskLetterShimmer calc(var(--dur-reveal) * 4) var(--ease-breathe) infinite;
         }
         .desk-letter-holding [data-develop-photo="true"] {
           opacity: 1 !important;
@@ -548,16 +552,16 @@ const deskStyles = {
     alignItems: "center",
     padding:
       "calc(34px + env(safe-area-inset-top)) 22px calc(var(--bottom-nav-height) + var(--bottom-nav-bottom-offset) + 30px + env(safe-area-inset-bottom))",
-    color: "#4a4338",
-    background: "#f7f3ea",
+    color: "var(--ink)",
+    background: "var(--bg-current, var(--bg-day))",
   },
   duskLayer: {
     position: "absolute",
     inset: 0,
     pointerEvents: "none",
-    background: "linear-gradient(180deg, #f3e6da, #ebdcd3)",
+    background: "linear-gradient(180deg, var(--bg-dusk), var(--bg-evening))",
     opacity: "var(--desk-dusk)",
-    transition: "opacity 300ms ease-out",
+    transition: "opacity var(--dur-instant) var(--ease-settle)",
   },
   stage: {
     position: "relative",
@@ -603,11 +607,11 @@ const deskStyles = {
     boxSizing: "border-box",
     display: "grid",
     placeItems: "center",
-    border: "1px dashed #cfc4ae",
-    borderRadius: "24px",
-    background: "rgba(255,253,248,0.55)",
-    color: "#b3a890",
-    boxShadow: "0 9px 20px rgba(120,104,80,0.08)",
+    border: "1px dashed var(--faint)",
+    borderRadius: "var(--radius-tile)",
+    background: "color-mix(in srgb, var(--surface) 55%, transparent)",
+    color: "var(--sub)",
+    boxShadow: "var(--shadow-rest)",
     cursor: "pointer",
     WebkitTapHighlightColor: "transparent",
   },
@@ -616,13 +620,14 @@ const deskStyles = {
     width: "108px",
     height: "72px",
     overflow: "hidden",
-    border: "1px solid #ecdcd2",
-    borderRadius: "13px",
-    background: "#fbf4ef",
-    boxShadow: "0 6px 14px rgba(140,100,90,0.10)",
+    border: "1px solid var(--line)",
+    borderRadius: "var(--radius-s)",
+    background: "var(--letter-paper)",
+    boxShadow: "var(--shadow-rest)",
     transform: "rotate(-2.5deg)",
     opacity: 0.55,
-    transition: "transform 300ms ease-out, opacity 300ms ease-out",
+    transition:
+      "transform var(--dur-instant) var(--ease-gentle), opacity var(--dur-instant) var(--ease-gentle)",
     WebkitTapHighlightColor: "transparent",
   },
   letterFullClosed: {
@@ -638,23 +643,23 @@ const deskStyles = {
     right: 0,
     height: "52%",
     clipPath: "polygon(0 0,100% 0,50% 100%)",
-    background: "rgba(194,96,124,0.12)",
-    borderBottom: "1px solid rgba(194,96,124,0.14)",
+    background: "var(--letter-flap)",
+    borderBottom: "1px solid var(--letter-fill-0)",
   },
   letterFill: {
     position: "absolute",
     left: 0,
     right: 0,
     bottom: 0,
-    background: "linear-gradient(180deg, rgba(194,96,124,0.16), rgba(194,96,124,0.34))",
-    transition: "height 250ms ease-out",
+    background: "linear-gradient(180deg, var(--letter-fill-0), var(--letter-fill-1))",
+    transition: "height var(--dur-instant) var(--ease-gentle)",
   },
   letterHint: {
     minHeight: "16px",
-    color: "#9a9183",
+    color: "var(--sub)",
     fontSize: "11.5px",
     letterSpacing: "0.06em",
-    transition: "opacity 300ms ease-out",
+    transition: "opacity var(--dur-instant) var(--ease-gentle)",
   },
   deliveredLetterWrap: {
     display: "flex",
@@ -668,10 +673,10 @@ const deskStyles = {
     height: "130px",
     overflow: "hidden",
     border: "none",
-    borderRadius: "16px",
-    background: "linear-gradient(180deg, #f3dde4, #eccdd7)",
-    color: "#a84e68",
-    boxShadow: "0 12px 26px rgba(170,90,115,0.22)",
+    borderRadius: "var(--radius-tile)",
+    background: "linear-gradient(180deg, var(--rose-mist), var(--rose-soft))",
+    color: "var(--rose-deep)",
+    boxShadow: "var(--shadow-float)",
     transform: "rotate(-2deg)",
     cursor: "pointer",
     WebkitTapHighlightColor: "transparent",
@@ -682,9 +687,9 @@ const deskStyles = {
     left: "50%",
     width: "16px",
     height: "16px",
-    borderRadius: "50%",
-    background: "#c2607c",
-    boxShadow: "0 1px 3px rgba(120,40,65,0.3)",
+    borderRadius: "var(--radius-tile)",
+    background: "var(--rose)",
+    boxShadow: "var(--shadow-rest)",
     transform: "translate(-50%,-50%)",
   },
   developPhoto: {
@@ -693,13 +698,14 @@ const deskStyles = {
     opacity: 0,
     filter: "blur(18px)",
     transform: "scale(1.05)",
-    transition: "opacity 1600ms ease, filter 1600ms ease, transform 1600ms ease",
+    transition:
+      "opacity var(--dur-develop) var(--ease-gentle), filter var(--dur-develop) var(--ease-gentle), transform var(--dur-develop) var(--ease-gentle)",
     pointerEvents: "none",
   },
   developImage: {
     width: "100%",
     height: "100%",
-    borderRadius: "16px",
+    borderRadius: "var(--radius-img)",
   },
   holdLabel: {
     position: "absolute",
@@ -713,10 +719,10 @@ const deskStyles = {
   fallbackOpenButton: {
     minHeight: "40px",
     padding: "0 18px",
-    border: "1px solid rgba(168,78,104,0.22)",
-    borderRadius: "999px",
-    background: "rgba(255,253,248,0.72)",
-    color: "#a84e68",
+    border: "1px solid var(--rose-soft)",
+    borderRadius: "var(--radius-tile)",
+    background: "color-mix(in srgb, var(--surface) 72%, transparent)",
+    color: "var(--rose-deep)",
     fontSize: "13px",
     fontWeight: 700,
   },
@@ -728,9 +734,9 @@ const deskStyles = {
   },
   photoTile: {
     padding: "8px",
-    borderRadius: "24px",
-    background: "#fffdf8",
-    boxShadow: "0 9px 20px rgba(120,104,80,0.12)",
+    borderRadius: "var(--radius-tile)",
+    background: "var(--surface)",
+    boxShadow: "var(--shadow-rest)",
   },
   normalPhotoTile: {
     width: "144px",
@@ -739,26 +745,26 @@ const deskStyles = {
   },
   miniTile: {
     padding: "5px",
-    borderRadius: "16px",
-    boxShadow: "0 5px 12px rgba(120,104,80,0.10)",
+    borderRadius: "var(--radius-img)",
+    boxShadow: "var(--shadow-rest)",
   },
   tileImage: {
     width: "min(36vw, 128px)",
     height: "min(36vw, 128px)",
-    borderRadius: "17px",
+    borderRadius: "var(--radius-img)",
   },
   smallImage: {
     width: "92px",
     height: "92px",
-    borderRadius: "14px",
+    borderRadius: "var(--radius-s)",
   },
   miniImage: {
     width: "54px",
     height: "54px",
-    borderRadius: "12px",
+    borderRadius: "var(--radius-s)",
   },
   tileLabel: {
-    color: "#a89f92",
+    color: "var(--sub)",
     fontSize: "11.5px",
     fontWeight: 560,
     letterSpacing: "0.04em",
@@ -766,7 +772,7 @@ const deskStyles = {
   guidanceCopy: {
     minHeight: "18px",
     margin: "0",
-    color: "#9a9183",
+    color: "var(--sub)",
     fontSize: "11.5px",
     fontWeight: 520,
     letterSpacing: "0.03em",
@@ -784,7 +790,7 @@ const deskStyles = {
     height: "128px",
     flexShrink: 0,
     background:
-      "radial-gradient(circle, #c5bcab 0 2px, transparent 2.6px) center / 10px 10px repeat-x",
+      "radial-gradient(circle, var(--faint) 0 2px, transparent 2.6px) center / 10px 10px repeat-x",
     opacity: 0.75,
     alignSelf: "center",
   },
@@ -792,13 +798,13 @@ const deskStyles = {
     width: "min(100%, 330px)",
     minHeight: "58px",
     marginTop: "10px",
-    border: "1px solid rgba(120,108,94,0.14)",
-    borderRadius: "999px",
-    background: "rgba(255,253,248,0.78)",
-    color: "#4a4338",
+    border: "1px solid var(--line)",
+    borderRadius: "var(--radius-tile)",
+    background: "color-mix(in srgb, var(--surface) 78%, transparent)",
+    color: "var(--ink)",
     fontSize: "18px",
     fontWeight: 720,
-    boxShadow: "0 8px 18px rgba(90,76,60,0.06)",
+    boxShadow: "var(--shadow-rest)",
   },
   yesterday: {
     display: "flex",
@@ -817,10 +823,10 @@ const deskStyles = {
     width: "20px",
     height: "8px",
     background:
-      "radial-gradient(circle, #c5bcab 0 1.8px, transparent 2.2px) center / 7px 7px repeat-x",
+      "radial-gradient(circle, var(--faint) 0 1.8px, transparent 2.2px) center / 7px 7px repeat-x",
   },
   yesterdayLabel: {
-    color: "#b2a897",
+    color: "var(--faint)",
     fontSize: "10px",
     letterSpacing: "0.1em",
   },
@@ -830,7 +836,7 @@ const deskStyles = {
     width: "min(100%, 390px)",
     minHeight: "18px",
     margin: "0 0 16px",
-    color: "#b4aa98",
+    color: "var(--faint)",
     fontSize: "10.5px",
     letterSpacing: "0.08em",
     textAlign: "center",

@@ -67,6 +67,16 @@ test.describe("home desk model", () => {
   test("opens the delivered letter only after the hold completes", async ({
     page,
   }) => {
+    await page.addInitScript(() => {
+      (window as typeof window & { __openSoundCallCount?: number })
+        .__openSoundCallCount = 0;
+      window.addEventListener("neteruneko:open-sound-play-requested", () => {
+        (window as typeof window & { __openSoundCallCount?: number })
+          .__openSoundCallCount =
+          ((window as typeof window & { __openSoundCallCount?: number })
+            .__openSoundCallCount ?? 0) + 1;
+      });
+    });
     await seedDeskState(page, "3");
     await page.goto("/home");
     await page.waitForLoadState("networkidle");
@@ -92,6 +102,15 @@ test.describe("home desk model", () => {
     await page.mouse.up();
 
     await expect(page.getByTestId("evening-opening-pair")).toBeVisible();
+    await expect
+      .poll(() =>
+        page.evaluate(
+          () =>
+            (window as typeof window & { __openSoundCallCount?: number })
+              .__openSoundCallCount ?? 0,
+        ),
+      )
+      .toBe(1);
   });
 
   test("hides week-one copy after the habit threshold", async ({ page }) => {
