@@ -17,7 +17,6 @@ import {
   getDailyCollectionTarget,
   readStoredCollectionPhotos,
 } from "../../lib/collection/dailyTarget";
-import { resolveStoredPhotoUrl } from "../../lib/photoStorage";
 import {
   COLLECTION_GROUPS,
   type CollectionSlot,
@@ -42,26 +41,21 @@ import {
   submitMikkeWindowAnswer,
 } from "../../lib/home/mikkeWindowResults";
 import {
-  createSleepingExchange,
   saveRemoteDeliveryStockPhoto,
 } from "../../lib/home/deliveryCandidates";
 import {
   buildEveningHomeState,
-  getPendingEveningDeliveryDay,
   getJstDateKey,
-  getJstDeliveryTime,
   isTodaySleepingCounterVisible,
   markEveningDeliveryKept,
   markEveningDeliveryOpened,
   readEveningDeliveryStore,
   recordEveningDeliveryTarget,
-  setAppBadge,
   setEveningDeliveredPhoto,
   updateEveningDeliveredPhotoDataUrl,
   type EveningHomeState,
-  type EveningDeliveryDay,
 } from "../../lib/home/eveningDelivery";
-import { recordEveningDeliveryTrace } from "../../lib/home/eveningDeliveryTrace";
+import { useEveningDelivery } from "../../lib/home/useEveningDelivery";
 import {
   BOX_PHOTO_STORAGE_EVENT,
   dismissExchangePhoto,
@@ -125,7 +119,6 @@ const MOTIF_STATE_SHOWN_STORAGE_PREFIX = "neteruneko_motif_state_shown";
 const SUBCOPY_HIDDEN_COHORT_STORAGE_KEY =
   "neteruneko_subcopy_hidden_cohort_tracked";
 const PRESENCE_SESSION_STORAGE_KEY = "neteruneko_presence_count";
-const EXCHANGE_UPLOAD_MAX_DATA_URL_LENGTH = 500_000;
 
 type DayCycleState = "1" | "1b" | "2" | "3" | "4";
 const PHOTO_SAVE_FAILURE_MESSAGE =
@@ -322,7 +315,6 @@ export function HomeInput({ recentEvents: _recentEvents }: HomeInputProps) {
   const [eveningRefreshTick, setEveningRefreshTick] = useState(0);
   const [discoveryDismissedToday, setDiscoveryDismissedToday] = useState(false);
   const hasTrackedHomeView = useRef(false);
-  const pendingEveningDeliveryKeysRef = useRef(new Set<string>());
   const hasTrackedGoogleAuthSuccess = useRef(false);
   const toastTimerRef = useRef<number | null>(null);
   const completedBoardTimerRef = useRef<number | null>(null);
@@ -652,6 +644,13 @@ export function HomeInput({ recentEvents: _recentEvents }: HomeInputProps) {
     () => readOwnSleepingPhotos(activeCatId),
     [activeCatId, collectionRefreshTick, eveningRefreshTick],
   );
+  const eveningDelivery = useEveningDelivery({
+    activeCatId,
+    ownSleepingPhotos: ownSleepingPhotosForHome,
+    tick,
+  });
+  const eveningDeliveryRefreshTick =
+    eveningRefreshTick + eveningDelivery.refreshToken;
   const eveningHomeState = useMemo(
     () =>
       buildEveningHomeState({
@@ -659,11 +658,11 @@ export function HomeInput({ recentEvents: _recentEvents }: HomeInputProps) {
         ownPhotos: ownSleepingPhotosForHome,
         now: tick,
       }),
-    [activeCatId, eveningRefreshTick, ownSleepingPhotosForHome, tick],
+    [activeCatId, eveningDeliveryRefreshTick, ownSleepingPhotosForHome, tick],
   );
   const keptExchangePhotoCount = useMemo(
     () => readKeptExchangePhotoCount(),
-    [collectionRefreshTick, eveningRefreshTick],
+    [collectionRefreshTick, eveningDeliveryRefreshTick],
   );
   const homeCatCounters = useMemo(
     () =>
@@ -821,167 +820,6 @@ export function HomeInput({ recentEvents: _recentEvents }: HomeInputProps) {
       { localCatId: activeCatId },
     );
   }, [activeCatId, pendingExchangeSharePhoto, sleepingCounterRemaining]);
-
-  useEffect(() => {
-    const now = tick || Date.now();
-    const todayKey = getJstDateKey(now);
-    const store = readEveningDeliveryStore();
-    const todayDay = store[todayKey];
-    const pendingDay = getPendingEveningDeliveryDay(now);
-    const traceBase = buildEveningDeliveryTraceBase({
-      activeCatId,
-      now,
-      pendingDay,
-      todayDay,
-      todayKey,
-    });
-
-    if (!pendingDay?.targetOwnPhotoId || !activeCatId) {
-      if (todayDay && now >= getJstDeliveryTime(todayKey)) {
-        recordEveningDeliveryTrace({
-          ...traceBase,
-          gate: pendingDay ? "missing_target_or_cat" : "no_pending_day",
-        });
-      }
-      return;
-    }
-
-    if (pendingEveningDeliveryKeysRef.current.has(pendingDay.dateKey)) {
-      recordEveningDeliveryTrace({
-        ...traceBase,
-        gate: "already_pending",
-      });
-      return;
-    }
-
-    const directOwnPhoto = ownSleepingPhotosForHome.find(
-      (photo) => photo.id === pendingDay.targetOwnPhotoId,
-    );
-    const targetPhoto = directOwnPhoto ? null : pendingDay.targetPhoto;
-    const legacyPhoto =
-      directOwnPhoto || targetPhoto
-        ? null
-        : findLegacyEveningDeliveryPhoto(
-            pendingDay,
-            ownSleepingPhotosForHome,
-            activeCatId,
-          );
-    const ownPhoto = directOwnPhoto ?? targetPhoto ?? legacyPhoto;
-    const selectedPhotoSource = directOwnPhoto
-      ? "direct"
-      : targetPhoto
-        ? "targetPhoto"
-        : legacyPhoto
-          ? "legacy"
-          : "none";
-
-    if (!ownPhoto) {
-      recordEveningDeliveryTrace({
-        ...traceBase,
-        gate: "missing_photo",
-        directOwnPhotoFound: Boolean(directOwnPhoto),
-        targetPhotoFallbackUsed: Boolean(targetPhoto),
-        legacyFallbackUsed: Boolean(legacyPhoto),
-        selectedPhotoSource,
-      });
-      return;
-    }
-
-    pendingEveningDeliveryKeysRef.current.add(pendingDay.dateKey);
-    void (async () => {
-      const uploadSrc = await resolveExchangePhotoUploadSrc(ownPhoto);
-
-      if (!uploadSrc.src) {
-        recordEveningDeliveryTrace({
-          ...traceBase,
-          gate:
-            selectedPhotoSource === "legacy"
-              ? "legacy_photo_not_data"
-              : "photo_not_data",
-          directOwnPhotoFound: Boolean(directOwnPhoto),
-          targetPhotoFallbackUsed: Boolean(targetPhoto),
-          legacyFallbackUsed: selectedPhotoSource === "legacy",
-        legacyFallbackReason: "non_data_src",
-        selectedPhotoSource,
-        selectedPhotoSrcKind: uploadSrc.srcKind,
-        exchangePayloadLength: null,
-      });
-        pendingEveningDeliveryKeysRef.current.delete(pendingDay.dateKey);
-        return;
-      }
-
-      recordEveningDeliveryTrace({
-        ...traceBase,
-        gate: "exchange_started",
-        directOwnPhotoFound: Boolean(directOwnPhoto),
-        targetPhotoFallbackUsed: Boolean(targetPhoto),
-        legacyFallbackUsed: Boolean(legacyPhoto),
-        selectedPhotoSource,
-        selectedPhotoSrcKind: uploadSrc.srcKind,
-        exchangePayloadLength: uploadSrc.src.length,
-        exchangeCalled: true,
-      });
-
-      const exchangeStartedAt = Date.now();
-      const result = await createExchangePhoto({
-        ownPhoto: {
-          ...ownPhoto,
-          src: uploadSrc.src,
-        },
-        triggerLabel: ownPhoto.triggerLabel,
-        theme: ownPhoto.theme,
-        category: "sleep",
-        seed: `${pendingDay.dateKey}:${ownPhoto.id}`,
-        deliveryDateKey: pendingDay.dateKey,
-        recipientCatId: pendingDay.targetCatId ?? activeCatId,
-      });
-
-      recordEveningDeliveryTrace({
-        ...traceBase,
-        gate: "exchange_completed",
-        directOwnPhotoFound: Boolean(directOwnPhoto),
-        targetPhotoFallbackUsed: Boolean(targetPhoto),
-        legacyFallbackUsed: Boolean(legacyPhoto),
-        selectedPhotoSource,
-        selectedPhotoSrcKind: uploadSrc.srcKind,
-        exchangePayloadLength: uploadSrc.src.length,
-        exchangeElapsedMs: Date.now() - exchangeStartedAt,
-        exchangeCalled: true,
-        exchangeStatus: result.httpStatus,
-        exchangeError: result.error,
-        exchangePhotoReceived: Boolean(result.photo),
-      });
-
-      if (!result.photo) {
-        pendingEveningDeliveryKeysRef.current.delete(pendingDay.dateKey);
-        trackProductEvent(
-          "delivery_sent",
-          {
-            delivery_date_key: pendingDay.dateKey,
-            poolSource: "none",
-            isOnboardingInstant: false,
-            isDay1Evening: false,
-          },
-          { localCatId: pendingDay.targetCatId ?? activeCatId },
-        );
-        return;
-      }
-
-      setEveningDeliveredPhoto(pendingDay.dateKey, result.photo, Date.now());
-      void setAppBadge(1);
-      setEveningRefreshTick((value) => value + 1);
-      trackProductEvent(
-        "delivery_sent",
-        {
-          delivery_date_key: pendingDay.dateKey,
-          poolSource: "normal",
-          isOnboardingInstant: false,
-          isDay1Evening: false,
-        },
-          { localCatId: pendingDay.targetCatId ?? activeCatId },
-        );
-    })();
-  }, [activeCatId, ownSleepingPhotosForHome, tick]);
 
   useEffect(() => {
     if (!activeCatId || isAccountRestoreDismissed()) {
@@ -3249,192 +3087,6 @@ function useSleepingPresenceCount() {
   return count;
 }
 
-function buildEveningDeliveryTraceBase({
-  activeCatId,
-  now,
-  pendingDay,
-  todayDay,
-  todayKey,
-}: {
-  activeCatId: string | null;
-  now: number;
-  pendingDay: EveningDeliveryDay | null;
-  todayDay?: EveningDeliveryDay;
-  todayKey: string;
-}) {
-  const traceDateKey = pendingDay?.dateKey ?? todayDay?.dateKey ?? todayKey;
-  return {
-    dateKey: traceDateKey,
-    hasTodayEntry: Boolean(todayDay),
-    hasPendingDay: Boolean(pendingDay),
-    hasDeliveredPhoto: Boolean(todayDay?.deliveredPhoto),
-    isAfterDeliveryTime: now >= getJstDeliveryTime(traceDateKey),
-    activeCatIdPresent: Boolean(activeCatId),
-    targetOwnPhotoIdPresent: Boolean(pendingDay?.targetOwnPhotoId),
-    directOwnPhotoFound: false,
-    targetPhotoFallbackUsed: false,
-    legacyFallbackUsed: false,
-    selectedPhotoSource: "none" as const,
-    exchangeCalled: false,
-    exchangeStatus: null,
-    exchangePhotoReceived: false,
-  };
-}
-
-function findLegacyEveningDeliveryPhoto(
-  pendingDay: EveningDeliveryDay,
-  ownPhotos: OwnSleepingPhoto[],
-  activeCatId: string,
-) {
-  const targetCatId = pendingDay.targetCatId ?? activeCatId;
-  const sameDayPhotos = ownPhotos
-    .filter((photo) => {
-      const photoCatId = photo.ownerCatId ?? photo.catId;
-      return (
-        photoCatId === targetCatId &&
-        Number.isFinite(photo.createdAt) &&
-        getJstDateKey(photo.createdAt) === pendingDay.dateKey
-      );
-    })
-    .sort((a, b) => b.createdAt - a.createdAt);
-
-  if (sameDayPhotos.length === 0) {
-    return null;
-  }
-
-  if (typeof pendingDay.targetCapturedAt === "number") {
-    const nearCapturedAt = sameDayPhotos
-      .filter(
-        (photo) =>
-          Math.abs(photo.createdAt - pendingDay.targetCapturedAt!) <=
-          6 * 60 * 60 * 1000,
-      )
-      .sort(
-        (a, b) =>
-          Math.abs(a.createdAt - pendingDay.targetCapturedAt!) -
-          Math.abs(b.createdAt - pendingDay.targetCapturedAt!),
-      )[0];
-
-    if (nearCapturedAt) {
-      return nearCapturedAt;
-    }
-  }
-
-  return sameDayPhotos[0] ?? null;
-}
-
-function isDeliverableDataPhotoSrc(src: string) {
-  return /^data:image\/(?:jpeg|jpg|png|webp);base64,/.test(src);
-}
-
-function getExchangePhotoUploadSrc(photo: OwnSleepingPhoto) {
-  return (
-    [
-      photo.src,
-      photo.displaySrc,
-      photo.thumbnailSrc,
-      photo.originalSrc,
-    ].find((src): src is string => Boolean(src && isDeliverableDataPhotoSrc(src))) ??
-    null
-  );
-}
-
-async function resolveExchangePhotoUploadSrc(photo: OwnSleepingPhoto): Promise<{
-  src: string | null;
-  srcKind: ReturnType<typeof getTracePhotoSrcKind>;
-}> {
-  const storageSrc = getExchangePhotoStorageSrc(photo);
-
-  if (storageSrc) {
-    return { src: storageSrc, srcKind: "storage" };
-  }
-
-  const dataSrc = getExchangePhotoUploadSrc(photo);
-
-  if (dataSrc) {
-    return { src: await prepareExchangeUploadDataUrl(dataSrc), srcKind: "data" };
-  }
-
-  const candidates = [
-    photo.src,
-    photo.displaySrc,
-    photo.thumbnailSrc,
-    photo.originalSrc,
-  ].filter((src): src is string => Boolean(src));
-  const firstKind = getTracePhotoSrcKind(candidates[0]);
-  const supabase = createBrowserSupabaseClient();
-
-  if (!supabase) {
-    return { src: null, srcKind: firstKind };
-  }
-
-  for (const candidate of candidates) {
-    if (!isStoragePhotoReference(candidate)) {
-      continue;
-    }
-
-    const resolved = await resolveStoredPhotoUrl(supabase, candidate).catch(
-      () => undefined,
-    );
-
-    if (resolved && resolved.startsWith("data:image/")) {
-      return {
-        src: await prepareExchangeUploadDataUrl(resolved),
-        srcKind: "storage",
-      };
-    }
-  }
-
-  return { src: null, srcKind: firstKind };
-}
-
-function getExchangePhotoStorageSrc(photo: OwnSleepingPhoto) {
-  return (
-    [
-      photo.src,
-      photo.displaySrc,
-      photo.thumbnailSrc,
-      photo.originalSrc,
-    ].find((src): src is string => Boolean(src && isStoragePhotoReference(src))) ??
-    null
-  );
-}
-
-async function prepareExchangeUploadDataUrl(dataUrl: string) {
-  if (!dataUrl.startsWith("data:image/")) {
-    return null;
-  }
-
-  const attempts = [
-    await resizeDataUrl(dataUrl, 420, 0.58),
-    await resizeDataUrl(dataUrl, 320, 0.52),
-    await resizeDataUrl(dataUrl, 240, 0.46),
-    await resizeDataUrl(dataUrl, 180, 0.4),
-    dataUrl,
-  ];
-
-  return (
-    attempts.find(
-      (candidate): candidate is string =>
-        Boolean(
-          candidate &&
-            isDeliverableDataPhotoSrc(candidate) &&
-            candidate.length <= EXCHANGE_UPLOAD_MAX_DATA_URL_LENGTH,
-        ),
-    ) ?? null
-  );
-}
-
-function getTracePhotoSrcKind(src: string | null | undefined) {
-  if (!src) return "empty" as const;
-  if (src.startsWith("data:image/")) return "data" as const;
-  if (src.startsWith("storage:") || src.startsWith("storage://")) {
-    return "storage" as const;
-  }
-  if (src.startsWith("http://") || src.startsWith("https://")) return "http" as const;
-  return "other" as const;
-}
-
 function getDayCycleState(eveningState: EveningHomeState): DayCycleState {
   if (eveningState.kind === "waiting") return "2";
   if (eveningState.kind === "delivered") return "3";
@@ -4923,53 +4575,6 @@ function saveCollectionPhoto(catId: string, slug: string, dataUrl: string) {
   } catch {
     // Keep the home flow usable even if local photo storage fails.
   }
-}
-
-async function createExchangePhoto({
-  ownPhoto,
-  triggerLabel,
-  theme,
-  category,
-  seed,
-  deliveryDateKey,
-  recipientCatId,
-}: {
-  ownPhoto: OwnSleepingPhoto;
-  triggerLabel: string;
-  theme: string;
-  category: MikkeWindowCategory | "sleep";
-  seed: string;
-  deliveryDateKey?: string;
-  recipientCatId?: string | null;
-}): Promise<{
-  photo: ExchangePhoto | null;
-  httpStatus: number | null;
-  error: string | null;
-}> {
-  const result =
-    await createSleepingExchange({
-      ownPhoto,
-      triggerLabel,
-      theme,
-      category,
-      seed,
-      deliveryDateKey,
-      recipientCatId,
-    });
-
-  if (!result?.photo) {
-    return {
-      photo: null,
-      httpStatus: result?.httpStatus ?? null,
-      error: result?.error ?? null,
-    };
-  }
-
-  return {
-    photo: result.photo,
-    httpStatus: result.httpStatus ?? null,
-    error: result.error ?? null,
-  };
 }
 
 function getPhotoThumbnailSrc(

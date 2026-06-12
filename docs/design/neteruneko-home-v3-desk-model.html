@@ -1,0 +1,406 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ねてるねこ — ホームv3「机モデル」改</title>
+<style>
+  :root{
+    --bg:#f7f3ea; --card:#fffdf8; --ink:#4a4338; --sub:#9a9183; --faint:#c5bcab;
+    --rose:#c2607c; --rose-deep:#a84e68; --line:#e7dfd0;
+  }
+  *{box-sizing:border-box;}
+  body{margin:0;background:#efe9dc;color:var(--ink);
+    font-family:-apple-system,BlinkMacSystemFont,"Hiragino Sans","Yu Gothic","Noto Sans JP",sans-serif;
+    padding:28px 20px 60px;}
+  header{max-width:1680px;margin:0 auto 22px;}
+  header h1{font-size:17px;font-weight:600;margin:0 0 6px;}
+  header p{font-size:12.5px;color:var(--sub);margin:0 0 14px;max-width:820px;line-height:1.8;}
+  .controls{display:flex;gap:10px;flex-wrap:wrap;align-items:center;}
+  .toggle{display:inline-flex;background:#fff;border-radius:999px;padding:4px;border:1px solid var(--line);}
+  .toggle button{border:0;background:transparent;border-radius:999px;padding:7px 16px;font-size:12.5px;color:var(--sub);cursor:pointer;font-family:inherit;}
+  body.mode-week1 .toggle .t-week1,
+  body.mode-habit .toggle .t-habit{background:var(--bg);color:var(--ink);font-weight:600;}
+  .loader{display:inline-flex;gap:8px;}
+  .loader label{
+    font-size:12px;border:1px solid var(--line);background:#fff;border-radius:999px;
+    padding:8px 14px;cursor:pointer;color:var(--ink);
+  }
+  .loader input{display:none;}
+
+  .row{display:flex;gap:26px;align-items:flex-start;max-width:1680px;margin:0 auto;overflow-x:auto;padding-bottom:10px;}
+  .col{flex:0 0 300px;}
+
+  .phone{width:300px;height:640px;border-radius:42px;border:1px solid #d9d0bf;position:relative;overflow:hidden;
+    box-shadow:0 14px 30px rgba(90,78,60,.10);display:flex;flex-direction:column;padding:26px 20px 16px;}
+  .phone.s1{background:linear-gradient(180deg,#fbf7ed,#f7f3ea);}
+  .phone.s2{background:linear-gradient(180deg,#f8f3e9,#f5efe3);}
+  .phone.s2 .dusk{position:absolute;inset:0;background:linear-gradient(180deg,#f3e6da,#eeddd2);opacity:0;pointer-events:none;transition:opacity .3s;}
+  .phone.s3{background:linear-gradient(180deg,#f4ebe1,#eedfd6);}
+  .phone.s4{background:linear-gradient(180deg,#f1e7dd,#ebdcd3);}
+  .phone.alb{background:var(--bg);}
+  .clock{font-size:11px;color:var(--faint);letter-spacing:.06em;position:relative;z-index:2;}
+
+  .stage{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;position:relative;z-index:2;}
+  .desk{display:flex;align-items:center;justify-content:center;gap:18px;}
+  .slot{display:flex;flex-direction:column;align-items:center;gap:7px;}
+  .label{font-size:11.5px;color:var(--sub);letter-spacing:.04em;}
+  body.mode-habit .copy-week1{display:none;}
+
+  /* 写真タイル */
+  .tile{border-radius:24px;background:var(--card);padding:8px;box-shadow:0 9px 20px rgba(120,104,80,.12);}
+  .tile .img{border-radius:17px;position:relative;overflow:hidden;background-size:cover;background-position:center;}
+  .img-own{background-image:
+    radial-gradient(ellipse at 30% 25%,rgba(255,255,255,.35),transparent 50%),
+    radial-gradient(ellipse at 75% 80%,rgba(60,45,30,.30),transparent 55%),
+    linear-gradient(140deg,#cbbda6,#a8967c 60%,#7d6f5a);}
+  .img-them{background-image:
+    radial-gradient(ellipse at 65% 20%,rgba(255,255,255,.4),transparent 45%),
+    radial-gradient(ellipse at 25% 75%,rgba(70,50,40,.28),transparent 55%),
+    linear-gradient(140deg,#dccdb9,#b4a187 55%,#8b7b63);}
+
+  /* 空フレーム(呼吸・点線は自分側だけ) */
+  .frame-empty{border-radius:24px;border:1.6px dashed #cfc4ae;background:rgba(255,253,248,.55);
+    display:flex;align-items:center;justify-content:center;color:#b3a890;cursor:pointer;
+    animation:breathe 4.2s ease-in-out infinite;}
+  .frame-empty svg{width:26px;height:26px;}
+  @keyframes breathe{0%,100%{transform:scale(1);}50%{transform:scale(1.016);}}
+
+  /* 封筒 = 手紙比率の「物」(スロットを満たさない) */
+  .letter{
+    width:136px;height:94px;border-radius:13px;position:relative;overflow:hidden;
+    background:#fbf4ef;border:1px solid #ecdcd2;
+    transform:rotate(-2.5deg);
+    box-shadow:0 6px 14px rgba(140,100,90,.10);
+    display:flex;align-items:flex-end;justify-content:center;
+  }
+  .letter .flap{position:absolute;top:0;left:0;right:0;height:52%;
+    clip-path:polygon(0 0,100% 0,50% 100%);background:rgba(194,96,124,.08);
+    border-bottom:1px solid rgba(194,96,124,.10);}
+  .letter .fill{position:absolute;left:0;right:0;bottom:0;height:0%;
+    background:linear-gradient(180deg,rgba(194,96,124,.10),rgba(194,96,124,.26));
+    transition:height .25s;}
+  .letter .fill::before{content:"";position:absolute;top:0;left:0;right:0;height:2px;
+    background:rgba(194,96,124,.35);animation:shimmer 3.4s ease-in-out infinite;}
+  @keyframes shimmer{0%,100%{opacity:.35;}50%{opacity:.85;}}
+
+  .letter.arrived{
+    width:188px;height:130px;border-radius:16px;transform:rotate(-2deg);
+    background:linear-gradient(180deg,#f3dde4,#eccdd7);border:none;cursor:pointer;
+    box-shadow:0 12px 26px rgba(170,90,115,.22);
+    animation:arrive-pulse 2.8s ease-in-out infinite;
+  }
+  .letter.arrived .flap{background:rgba(168,78,104,.16);height:50%;}
+  .letter.arrived .seal{position:absolute;top:46%;left:50%;transform:translate(-50%,-50%);
+    width:16px;height:16px;border-radius:50%;background:var(--rose);box-shadow:0 1px 3px rgba(120,40,65,.3);}
+  @keyframes arrive-pulse{0%,100%{box-shadow:0 12px 26px rgba(170,90,115,.22);}50%{box-shadow:0 12px 34px rgba(170,90,115,.36);}}
+  .letter .develop{position:absolute;inset:0;opacity:0;filter:blur(18px);transform:scale(1.05);
+    transition:opacity 1.6s ease,filter 1.6s ease,transform 1.6s ease;pointer-events:none;}
+  .letter .develop .img{position:absolute;inset:0;border-radius:inherit;background-size:cover;background-position:center;}
+  .letter.holding .develop{opacity:1;filter:blur(0);transform:scale(1);}
+  .holdhint{font-size:12px;color:var(--rose-deep);letter-spacing:.14em;}
+  .asklabel{font-size:11.5px;color:var(--sub);height:16px;letter-spacing:.06em;transition:opacity .3s;opacity:0;}
+  .asklabel.show{opacity:1;}
+
+  /* きのうミニ */
+  .yesterday{display:flex;flex-direction:column;align-items:center;gap:6px;margin-top:4px;opacity:.78;}
+  .yesterday .pairmini{display:flex;align-items:center;gap:6px;}
+  .yesterday .tile{padding:5px;border-radius:16px;box-shadow:0 5px 12px rgba(120,104,80,.10);}
+  .yesterday .img{border-radius:12px;width:54px;height:54px;}
+  .yesterday .dots{display:flex;gap:3px;}
+  .yesterday .dots i{width:3px;height:3px;border-radius:50%;background:var(--faint);}
+  .yesterday .ylabel{font-size:10px;color:var(--faint);letter-spacing:.1em;}
+
+  .cap{font-size:13px;color:var(--ink);letter-spacing:.05em;text-align:center;}
+  .cap.small{font-size:11.5px;color:var(--sub);}
+  .presence{font-size:10.5px;color:var(--faint);letter-spacing:.08em;text-align:center;margin-top:auto;padding:10px 0 8px;position:relative;z-index:2;}
+  body.mode-habit .presence{opacity:.65;}
+
+  .nav{background:#fffdf8;border:1px solid #efe7d7;border-radius:999px;display:flex;padding:5px;gap:2px;position:relative;z-index:2;}
+  .nav a{flex:1;display:flex;flex-direction:column;align-items:center;gap:3px;padding:8px 0 7px;border-radius:999px;text-decoration:none;color:#8d8474;font-size:10px;}
+  .nav a.active{background:#efe7d6;color:#5d543f;}
+  .nav svg{width:18px;height:18px;}
+  .nav .mini-pair{display:flex;gap:3px;height:18px;align-items:center;}
+  .nav .mini-pair b{width:8px;height:8px;border-radius:3px;border:1.4px solid currentColor;display:block;}
+
+  /* state2 デモ用 時間スライダー */
+  .timedemo{display:flex;flex-direction:column;gap:4px;align-items:center;margin-top:12px;}
+  .timedemo input{width:200px;accent-color:var(--rose);}
+  .timedemo span{font-size:10px;color:var(--faint);letter-spacing:.1em;}
+
+  /* アルバム静音版 */
+  .alb-head{font-family:"Hiragino Mincho ProN","Yu Mincho",serif;font-size:16px;letter-spacing:.3em;text-align:center;margin:4px 0 14px;}
+  .alb-sec{font-family:"Hiragino Mincho ProN","Yu Mincho",serif;font-size:14px;letter-spacing:.12em;margin:10px 0 10px;}
+  .alb-row{display:flex;gap:12px;align-items:flex-start;margin-bottom:18px;}
+  .alb-row .tile{padding:6px;border-radius:18px;}
+  .alb-row .img{width:104px;height:104px;border-radius:13px;}
+  .alb-empty{width:116px;height:116px;border-radius:18px;border:1.4px dashed #d6ccb8;background:rgba(255,253,248,.4);cursor:pointer;}
+  .alb-divider{height:1px;background:#e6ddcb;margin:4px 0 14px;}
+
+  .note{font-size:11.5px;line-height:1.75;color:#6f6757;margin-top:14px;padding:0 4px;}
+  .note b{color:var(--ink);font-weight:600;}
+  .statelabel{font-size:12px;font-weight:600;margin:0 0 10px;}
+  .statelabel span{color:var(--sub);font-weight:400;margin-left:6px;}
+  .legend{max-width:1680px;margin:30px auto 0;font-size:12px;color:#6f6757;line-height:1.9;border-top:1px solid #ded5c2;padding-top:16px;}
+
+  @media (prefers-reduced-motion: reduce){
+    .frame-empty,.letter.arrived,.letter .fill::before{animation:none;}
+    .letter .develop{transition:opacity .3s ease;}
+  }
+</style>
+</head>
+<body class="mode-habit">
+
+<header>
+  <h1>ねてるねこ — ホームv3「机モデル」改</h1>
+  <p>v2への指摘を反映: 封筒は<b>手紙の比率の「物」</b>に(正方形タイル化をやめ、机に置かれた手紙として少し傾く)。ラベルは段階表示へ降格。state2は<b>時間スライダー</b>で「満ちていく感」を体験できます。<b>下のボタンから実際の写真を入れて</b>、本物の印象を確かめてください(写真は端末内で表示するだけで、どこにも送信されません)。</p>
+  <div class="controls">
+    <div class="toggle" role="group" aria-label="表示モード">
+      <button class="t-week1" onclick="document.body.className='mode-week1'">はじめの7日(ことば あり)</button>
+      <button class="t-habit" onclick="document.body.className='mode-habit'">習慣後(ことば なし)</button>
+    </div>
+    <div class="loader">
+      <label>うちのこの写真を入れる<input type="file" accept="image/*" id="loadOwn"></label>
+      <label>とどく側の写真を入れる<input type="file" accept="image/*" id="loadThem"></label>
+    </div>
+  </div>
+</header>
+
+<div class="row">
+
+  <!-- ============ STATE 1 ============ -->
+  <div class="col">
+    <p class="statelabel">state 1<span>朝・空のフレーム</span></p>
+    <div class="phone s1">
+      <div class="clock">8:31</div>
+      <div class="stage">
+        <div class="desk">
+          <div class="slot">
+            <button class="frame-empty" style="width:128px;height:128px;border-width:1.6px;" aria-label="ねがおをとる">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><rect x="3" y="7" width="18" height="13" rx="3"/><circle cx="12" cy="13.5" r="3.6"/><path d="M8.5 7l1.2-2h4.6l1.2 2"/></svg>
+            </button>
+            <span class="label copy-week1">むぎ</span>
+          </div>
+          <div class="slot">
+            <div class="letter" style="opacity:.55;" aria-label="よる8じに とどく手紙">
+              <span class="flap" aria-hidden="true"></span>
+            </div>
+            <span class="label copy-week1">よる8じに</span>
+          </div>
+        </div>
+        <p class="cap copy-week1">むぎ、ねてる?</p>
+
+        <div class="yesterday">
+          <div class="pairmini">
+            <div class="tile"><div class="img img-own own-img"></div></div>
+            <div class="dots"><i></i><i></i><i></i></div>
+            <div class="tile"><div class="img img-them them-img"></div></div>
+          </div>
+          <span class="ylabel">きのう</span>
+        </div>
+      </div>
+
+      <p class="presence">きょうも、206ひきの ねこが ねています</p>
+
+      <nav class="nav">
+        <a class="active" href="#"><span class="mini-pair"><b style="border-style:dashed;"></b><b style="border-style:dashed;"></b></span>きょう</a>
+        <a href="#"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><rect x="4" y="7" width="16" height="13" rx="3"/><path d="M8 7V5.5A1.5 1.5 0 019.5 4h5A1.5 1.5 0 0116 5.5V7"/></svg>アルバム</a>
+        <a href="#"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M9 20c-1-5 0-9 2-11 0 0-2-3-1-5 0 0 2 0 3 2 1-1 3-1 4 0 1-2 3-2 3-2 1 2-1 5-1 5 2 2 2 6 1 11z"/></svg>ねこ</a>
+      </nav>
+    </div>
+    <p class="note"><b>v2からの修正</b>: 点線は自分のフレーム<b>だけ</b>(点線×2=ワイヤーフレーム見えの原因を除去)。封筒は<b>横長の手紙</b>として淡く置かれ、少し傾く——「枠」ではなく「物」。zzzは削除。ラベル「むぎ」は段階表示に降格(自分の猫に名札は不要)。</p>
+  </div>
+
+  <!-- ============ STATE 2 ============ -->
+  <div class="col">
+    <p class="statelabel">state 2<span>満ちていく手紙(スライダーで体験)</span></p>
+    <div class="phone s2">
+      <div class="dusk" id="dusk"></div>
+      <div class="clock" id="s2clock">14:20</div>
+      <div class="stage">
+        <div class="desk">
+          <div class="slot">
+            <div class="tile"><div class="img img-own own-img" style="width:118px;height:118px;"></div></div>
+          </div>
+          <div class="slot">
+            <button class="letter" id="s2letter" style="border-width:1px;background:#fbf4ef;cursor:pointer;font-family:inherit;" aria-label="よる8じごろ とどきます">
+              <span class="flap" aria-hidden="true"></span>
+              <span class="fill" id="s2fill" aria-hidden="true"></span>
+            </button>
+            <span class="asklabel" id="s2ask">よる8じごろ</span>
+          </div>
+        </div>
+        <div class="timedemo">
+          <input type="range" id="timeslider" min="480" max="1200" value="860" aria-label="時刻デモ">
+          <span>← 朝 8:00 ──── よる 8:00 →(デモ用)</span>
+        </div>
+      </div>
+
+      <p class="presence">きょうも、206ひきの ねこが ねています</p>
+
+      <nav class="nav">
+        <a class="active" href="#"><span class="mini-pair"><b></b><b style="border-style:dashed;"></b></span>きょう</a>
+        <a href="#"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><rect x="4" y="7" width="16" height="13" rx="3"/><path d="M8 7V5.5A1.5 1.5 0 019.5 4h5A1.5 1.5 0 0116 5.5V7"/></svg>アルバム</a>
+        <a href="#"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M9 20c-1-5 0-9 2-11 0 0-2-3-1-5 0 0 2 0 3 2 1-1 3-1 4 0 1-2 3-2 3-2 1 2-1 5-1 5 2 2 2 6 1 11z"/></svg>ねこ</a>
+      </nav>
+    </div>
+    <p class="note"><b>たまってる感の3点セット</b>: (1)手紙の中身が時刻に比例して満ち、満水=20時(=読める時計)。(2)手紙がわずかに育つ(scale .94→1)。(3)背景が夕方へ暮れる。さらに<b>手紙をタップすると一言だけ答える</b>(「よる8じごろ」が2秒表示)——言葉は常設せず、聞かれたら答える。</p>
+  </div>
+
+  <!-- ============ STATE 3 ============ -->
+  <div class="col">
+    <p class="statelabel">state 3<span>よる・長押し開封(動きます)</span></p>
+    <div class="phone s3">
+      <div class="clock">20:05</div>
+      <div class="stage">
+        <div class="desk" style="flex-direction:column;gap:16px;">
+          <div class="slot">
+            <button class="letter arrived" id="holdenv" style="font-family:inherit;" aria-label="おさえて ひらく">
+              <span class="flap" aria-hidden="true"></span>
+              <span class="seal" aria-hidden="true"></span>
+              <span class="develop" aria-hidden="true"><span class="img img-them them-img"></span></span>
+            </button>
+            <span class="label holdhint" id="holdlabel">おさえて ひらく</span>
+          </div>
+          <div class="slot" style="opacity:.6;">
+            <div class="tile" style="padding:5px;"><div class="img img-own own-img" style="width:72px;height:72px;border-radius:12px;"></div></div>
+          </div>
+        </div>
+      </div>
+
+      <p class="presence" style="visibility:hidden;">.</p>
+
+      <nav class="nav">
+        <a class="active" href="#"><span class="mini-pair"><b></b><b style="border-color:#c2607c;"></b></span>きょう</a>
+        <a href="#"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><rect x="4" y="7" width="16" height="13" rx="3"/><path d="M8 7V5.5A1.5 1.5 0 019.5 4h5A1.5 1.5 0 0116 5.5V7"/></svg>アルバム</a>
+        <a href="#"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M9 20c-1-5 0-9 2-11 0 0-2-3-1-5 0 0 2 0 3 2 1-1 3-1 4 0 1-2 3-2 3-2 1 2-1 5-1 5 2 2 2 6 1 11z"/></svg>ねこ</a>
+      </nav>
+    </div>
+    <p class="note"><b>封筒が今夜の主役</b>: 手紙比率のまま大きくなり、封蝋がつく。自分の写真は下に小さく退く。<b>おさえているあいだだけ現像</b>、途中で離すと閉じる(実装済みの現像ブラーを長押しに接続)。完了後はそのまま開いた状態に。</p>
+  </div>
+
+  <!-- ============ STATE 4 ============ -->
+  <div class="col">
+    <p class="statelabel">state 4<span>開封後・そろった</span></p>
+    <div class="phone s4">
+      <div class="clock">20:08</div>
+      <div class="stage">
+        <div class="desk">
+          <div class="slot">
+            <div class="tile"><div class="img img-own own-img" style="width:118px;height:118px;"></div></div>
+          </div>
+          <div class="slot">
+            <div class="tile"><div class="img img-them them-img" style="width:118px;height:118px;"></div></div>
+            <span class="label copy-week1">どこかのこ</span>
+          </div>
+        </div>
+      </div>
+
+      <p class="presence">きょうも、206ひきの ねこが ねています</p>
+
+      <nav class="nav">
+        <a class="active" href="#"><span class="mini-pair"><b></b><b></b></span>きょう</a>
+        <a href="#"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><rect x="4" y="7" width="16" height="13" rx="3"/><path d="M8 7V5.5A1.5 1.5 0 019.5 4h5A1.5 1.5 0 0116 5.5V7"/></svg>アルバム</a>
+        <a href="#"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M9 20c-1-5 0-9 2-11 0 0-2-3-1-5 0 0 2 0 3 2 1-1 3-1 4 0 1-2 3-2 3-2 1 2-1 5-1 5 2 2 2 6 1 11z"/></svg>ねこ</a>
+      </nav>
+    </div>
+    <p class="note"><b>ラベル整理</b>: 自分側は無記名(自分の猫に名札は要らない)。「どこかのこ」だけ段階表示で残す——届いた写真の出自は最初の7日は説明が要るが、文法を覚えたら消える。検証ポイント: <b>実写真を入れた状態</b>で2枚並びの圧を確認。</p>
+  </div>
+
+  <!-- ============ ALBUM(静音版) ============ -->
+  <div class="col">
+    <p class="statelabel">参考<span>アルバム側の静音化(台帳)</span></p>
+    <div class="phone alb">
+      <div class="clock">20:12</div>
+      <div class="alb-head">アルバム</div>
+      <p class="alb-sec">きょう</p>
+      <div class="alb-row">
+        <div class="tile"><div class="img img-own own-img"></div></div>
+        <div class="tile"><div class="img img-them them-img"></div></div>
+      </div>
+      <div class="alb-divider"></div>
+      <p class="alb-sec">6月9日</p>
+      <div class="alb-row">
+        <div class="tile"><div class="img img-own own-img"></div></div>
+        <button class="alb-empty" aria-label="ねがおをとる"></button>
+      </div>
+      <p class="presence" style="margin-top:auto;">　</p>
+      <nav class="nav">
+        <a href="#"><span class="mini-pair"><b></b><b></b></span>きょう</a>
+        <a class="active" href="#"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><rect x="4" y="7" width="16" height="13" rx="3"/><path d="M8 7V5.5A1.5 1.5 0 019.5 4h5A1.5 1.5 0 0116 5.5V7"/></svg>アルバム</a>
+        <a href="#"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M9 20c-1-5 0-9 2-11 0 0-2-3-1-5 0 0 2 0 3 2 1-1 3-1 4 0 1-2 3-2 3-2 1 2-1 5-1 5 2 2 2 6 1 11z"/></svg>ねこ</a>
+      </nav>
+    </div>
+    <p class="note"><b>重複の解き方=役割分担</b>: ホームは舞台(生きている・動く・封筒の演出)、アルバムは台帳(静的・全行同サイズ・演出なし)。きょうの行も過去日と同じ大きさになり、封筒やコピーの演出はホームへ集約。空きスロット(点線)は撮影への導線としてだけ残る。猫名ラベルは多頭飼い時のみ表示。</p>
+  </div>
+
+</div>
+
+<div class="legend">
+  <b>ラベリングの検証結果</b>: ラベルの役割は「区別」。左=自分/右=とどく、は一度覚えれば自明なので、ラベルは訓練輪=段階表示(7日)が正しい置き場。「むぎ」(固有名)と「どこかのこ」(句)の非対称は、ラベルを常設しないことで問題自体が消える。アルバム(台帳)では記録メタデータとして両方残す。<br>
+  <b>実写真の検証</b>: 上のボタンで自分の写真を全タイルに差し込めます。確認すべきは(1)白フチ(タイルの余白)が騒がしい実写を鎮められているか、(2)state4の2枚並びの圧、(3)手紙の淡い色が実写の隣で安っぽく見えないか。<br>
+  <b>state 1b(20時以降・未撮影)</b>: 手紙は満水のまま封が閉じた表示。フレームの呼吸は続く(明日の分)。week1のみ「いまとると、あしたのよるに とどく」。<br>
+  <b>アクセシビリティ</b>: 全要素にaria-label。長押し不可の場合はタップで開くフォールバック。prefers-reduced-motionで全アニメーション停止。E2Eはdata-state検証へ。
+</div>
+
+<script>
+  // 長押し開封
+  const env = document.getElementById('holdenv');
+  let opened = false;
+  const start = (e)=>{ if(opened) return; e.preventDefault(); env.classList.add('holding'); };
+  const stop = ()=>{ if(opened) return; env.classList.remove('holding'); };
+  env.addEventListener('pointerdown', start);
+  env.addEventListener('pointerup', stop);
+  env.addEventListener('pointerleave', stop);
+  env.addEventListener('pointercancel', stop);
+  env.querySelector('.develop').addEventListener('transitionend', (ev)=>{
+    if(ev.propertyName==='opacity' && env.classList.contains('holding')){
+      opened = true;
+      document.getElementById('holdlabel').textContent = 'ひらいた';
+    }
+  });
+
+  // state2 時間スライダー: 満ち・育ち・暮れ
+  const slider = document.getElementById('timeslider');
+  const fill = document.getElementById('s2fill');
+  const letter2 = document.getElementById('s2letter');
+  const dusk = document.getElementById('dusk');
+  const s2clock = document.getElementById('s2clock');
+  function applyTime(){
+    const t = Number(slider.value);            // 480(8:00) - 1200(20:00)
+    const p = (t - 480) / 720;                 // 0..1
+    fill.style.height = (p * 100).toFixed(0) + '%';
+    letter2.style.transform = `rotate(-2.5deg) scale(${(0.94 + p * 0.06).toFixed(3)})`;
+    dusk.style.opacity = (p * 0.85).toFixed(2);
+    const h = Math.floor(t / 60), m = String(t % 60).padStart(2,'0');
+    s2clock.textContent = `${h}:${m}`;
+  }
+  slider.addEventListener('input', applyTime);
+  applyTime();
+
+  // 手紙タップで一言だけ答える
+  const ask = document.getElementById('s2ask');
+  let askTimer;
+  letter2.addEventListener('click', ()=>{
+    ask.classList.add('show');
+    clearTimeout(askTimer);
+    askTimer = setTimeout(()=>ask.classList.remove('show'), 2000);
+  });
+
+  // 実写真の差し込み
+  function bindLoader(inputId, cls){
+    document.getElementById(inputId).addEventListener('change', (e)=>{
+      const f = e.target.files && e.target.files[0];
+      if(!f) return;
+      const url = URL.createObjectURL(f);
+      document.querySelectorAll('.' + cls).forEach(el=>{
+        el.style.backgroundImage = `url(${url})`;
+      });
+    });
+  }
+  bindLoader('loadOwn','own-img');
+  bindLoader('loadThem','them-img');
+</script>
+
+</body>
+</html>
