@@ -242,6 +242,70 @@ test.describe("home desk model", () => {
     await expect(page.getByText(/\u3080\u304e/)).toHaveCount(0);
   });
 
+  test("moves state4 keep and report actions into the full-screen viewer", async ({
+    page,
+  }) => {
+    let reportCalls = 0;
+    await page.addInitScript(() => {
+      (window as typeof window & { __shareCalled?: number }).__shareCalled = 0;
+      Object.defineProperty(navigator, "canShare", {
+        configurable: true,
+        value: () => true,
+      });
+      Object.defineProperty(navigator, "share", {
+        configurable: true,
+        value: async () => {
+          (window as typeof window & { __shareCalled?: number }).__shareCalled =
+            ((window as typeof window & { __shareCalled?: number })
+              .__shareCalled ?? 0) + 1;
+        },
+      });
+    });
+    await seedDeskState(page, "4");
+    await page.route("**/api/reports", async (route) => {
+      reportCalls += 1;
+      await route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({ ok: true }),
+      });
+    });
+    await page.goto("/home");
+    await page.waitForLoadState("networkidle");
+
+    await expect(page.getByTestId("home-desk-model")).toHaveAttribute(
+      "data-state",
+      "4",
+    );
+    await expect(page.getByRole("button", { name: "とっておく" })).toHaveCount(0);
+    await expect(page.getByText("きょうも、124ひきの ねこが ねています")).toBeVisible();
+
+    await page.getByRole("button", { name: "どこかのこの写真を大きく見る" }).click();
+    await expect(page.getByTestId("desk-photo-viewer")).toBeVisible();
+    await page.getByRole("button", { name: "とっておく" }).click();
+    await expect
+      .poll(() =>
+        page.evaluate(
+          () => (window as typeof window & { __shareCalled?: number }).__shareCalled ?? 0,
+        ),
+      )
+      .toBe(1);
+
+    await page.getByRole("button", { name: "写真のメニュー" }).click();
+    await page.getByRole("button", { name: "この写真を報告" }).click();
+    await page.getByRole("button", { name: "不快な内容" }).click();
+
+    await expect(page.getByTestId("desk-empty-delivered-slot")).toBeVisible();
+    expect(reportCalls).toBe(1);
+
+    await page.reload();
+    await page.waitForLoadState("networkidle");
+    await expect(page.getByTestId("desk-empty-delivered-slot")).toBeVisible();
+    await expect(
+      page.getByRole("button", { name: "どこかのこの写真を大きく見る" }),
+    ).toHaveCount(0);
+  });
+
   test("shows yesterday mini when previous delivery data exists", async ({
     page,
   }) => {

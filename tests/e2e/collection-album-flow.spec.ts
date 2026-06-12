@@ -1,4 +1,4 @@
-import { expect, test } from "@playwright/test";
+import { expect, test, type Page } from "@playwright/test";
 
 const photoDataUrl =
   "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAGQAAABkCAYAAABw4pVUAAAAAXNSR0IArs4c6QAAAARnQU1BAACxjwv8YQUAAAAJcEhZcwAADsMAAA7DAcdvqGQAAAEJSURBVHhe7dExEcAgAMBAJKKuTpnpjoLA/fACchlrzv2C+a0njDPsVmfYrQyJMSTGkBhDYgyJMSTGkBhDYgyJMSTGkBhDYgyJMSTGkBhDYgyJMSTGkBhDYgyJMSTGkBhDYgyJMSTGkBhDYgyJMSTGkBhDYgyJMSTGkBhDYgyJMSTGkBhDYgyJMSTGkBhDYgyJMSTGkBhDYgyJMSTGkBhDYgyJMSTGkBhDYgyJMSTGkBhDYgyJMSTGkBhDYgyJMSTmB4RCEqdGtA/tAAAAAElFTkSuQmCC";
@@ -284,6 +284,70 @@ test.describe("collection album flow", () => {
     await expect(page.locator('main img[src^="data:image/"]')).toHaveCount(2);
   });
 
+  test("keeps unopened evening deliveries as a sealed envelope until opened", async ({
+    page,
+  }) => {
+    const now = Date.parse("2026-06-10T11:05:00.000Z");
+    const dateKey = "2026-06-10";
+
+    await seedCollectionEveningDelivery(page, {
+      now,
+      dateKey,
+      opened: false,
+    });
+
+    await page.goto("/collection");
+    await page.waitForLoadState("networkidle");
+
+    await expect(page.getByTestId("album-sealed-delivery")).toBeVisible();
+    await expect(page.locator('button[aria-label="どこかのこを開く"]')).toHaveCount(
+      0,
+    );
+    await expect(page.locator("main img")).toHaveCount(1);
+
+    await seedCollectionEveningDelivery(page, {
+      now,
+      dateKey,
+      opened: true,
+    });
+
+    await page.reload();
+    await page.waitForLoadState("networkidle");
+
+    await expect(page.getByTestId("album-sealed-delivery")).toHaveCount(0);
+    await expect(page.locator('button[aria-label="どこかのこを開く"]')).toBeVisible();
+    await expect(page.locator("main img")).toHaveCount(2);
+  });
+
+  test("auto-opens yesterday's unopened evening delivery after 5am", async ({
+    page,
+  }) => {
+    await seedCollectionEveningDelivery(page, {
+      now: Date.parse("2026-06-10T20:01:00.000Z"),
+      deliveredAt: Date.parse("2026-06-10T11:05:00.000Z"),
+      dateKey: "2026-06-10",
+      opened: false,
+    });
+
+    await page.goto("/collection");
+    await page.waitForLoadState("networkidle");
+
+    await expect(page.getByTestId("album-sealed-delivery")).toHaveCount(0);
+    await expect(page.locator('button[aria-label="どこかのこを開く"]')).toBeVisible();
+    await expect(page.locator("main img")).toHaveCount(2);
+    await expect
+      .poll(() =>
+        page.evaluate(() => {
+          const store = JSON.parse(
+            window.localStorage.getItem("neteruneko_evening_delivery_days") ??
+              "{}",
+          ) as Record<string, { openedAt?: number }>;
+          return Boolean(store["2026-06-10"]?.openedAt);
+        }),
+      )
+      .toBe(true);
+  });
+
   test("shows legacy storage-url sleeping photos alongside latest local photos", async ({
     page,
   }) => {
@@ -457,3 +521,91 @@ test.describe("collection album flow", () => {
     await expect(page.getByText("この日は おやすみ")).toHaveCount(0);
   });
 });
+
+async function seedCollectionEveningDelivery(
+  page: Page,
+  {
+    now,
+    deliveredAt = now,
+    dateKey,
+    opened,
+  }: {
+    now: number;
+    deliveredAt?: number;
+    dateKey: string;
+    opened: boolean;
+  },
+) {
+  await page.addInitScript(
+    ({ currentCatId, src, currentNow, deliveredAt, targetDateKey, opened }) => {
+      const originalDateNow = Date.now.bind(Date);
+      (window as typeof window & { __testNow?: number }).__testNow = currentNow;
+      Date.now = () =>
+        (window as typeof window & { __testNow?: number }).__testNow ??
+        originalDateNow();
+
+      window.localStorage.setItem("active_cat_id", currentCatId);
+      window.localStorage.setItem(
+        "cat_profiles",
+        JSON.stringify([
+          {
+            id: currentCatId,
+            name: "current cat",
+            createdAt: new Date(deliveredAt).toISOString(),
+            updatedAt: new Date(deliveredAt).toISOString(),
+          },
+        ]),
+      );
+      window.localStorage.setItem(
+        "nyaruhodo_exchange_own_sleeping_photos",
+        JSON.stringify([
+          {
+            id: "own-sleeping-today",
+            ownerCatId: currentCatId,
+            catId: currentCatId,
+            src,
+            state: "sleeping",
+            visibility: "private",
+            deliveryStatus: "available",
+            triggerLabel: "sleeping",
+            theme: "sleeping",
+            shared: true,
+            createdAt: deliveredAt,
+          },
+        ]),
+      );
+      window.localStorage.setItem("nyaruhodo_exchange_kept_photos", "[]");
+      window.localStorage.setItem(
+        "neteruneko_evening_delivery_days",
+        JSON.stringify({
+          [targetDateKey]: {
+            dateKey: targetDateKey,
+            targetOwnPhotoId: "own-sleeping-today",
+            targetCatId: currentCatId,
+            targetCapturedAt: deliveredAt,
+            deliveredPhoto: {
+              id: "delivered-unopened-test",
+              sourcePhotoId: "stock-unopened-test",
+              src,
+              title: "",
+              subtitle: "",
+              triggerLabel: "sleeping",
+              theme: "sleeping",
+              deliveredAt,
+            },
+            deliveredAt,
+            ...(opened ? { openedAt: deliveredAt + 1 } : {}),
+          },
+        }),
+      );
+    },
+    {
+      currentCatId: "current-cat",
+      src: photoDataUrl,
+      currentNow: now,
+      deliveredAt,
+      targetDateKey: dateKey,
+      opened,
+    },
+  );
+}

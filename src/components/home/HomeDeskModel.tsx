@@ -11,9 +11,11 @@ import {
   type EveningHomeState,
 } from "../../lib/home/eveningDelivery";
 import type {
+  ExchangePhotoReportReason,
   ExchangePhoto,
   OwnSleepingPhoto,
 } from "../../lib/home/sleepingPhotos";
+import { isExchangePhotoLocallyBlocked } from "../../lib/home/sleepingPhotos";
 import { trackProductEvent } from "../../lib/analytics/productAnalytics";
 import { playOpenSound } from "../../lib/openSound";
 import { BottomNavigation } from "../navigation/BottomNavigation";
@@ -27,6 +29,18 @@ type YesterdayMini = {
   deliveredPhoto: ExchangePhoto | null;
 };
 
+type DeskViewerPhoto =
+  | {
+      kind: "own";
+      dateKey: string;
+      photo: OwnSleepingPhoto;
+    }
+  | {
+      kind: "other";
+      dateKey: string;
+      photo: ExchangePhoto;
+    };
+
 type HomeDeskModelProps = {
   catName: string;
   eveningState: EveningHomeState;
@@ -38,6 +52,11 @@ type HomeDeskModelProps = {
   onTakePhoto: () => void;
   onOpenDelivery: (state: Extract<EveningHomeState, { kind: "delivered" }>) => void;
   onKeepOpenedDelivery: (dateKey: string, photo: ExchangePhoto) => void;
+  onReportOpenedDelivery: (
+    dateKey: string,
+    photo: ExchangePhoto,
+    reason: ExchangePhotoReportReason,
+  ) => void;
   onDeliveredStorageDataUrl: (
     dateKey: string,
     photo: ExchangePhoto,
@@ -66,6 +85,7 @@ export function HomeDeskModel({
   onTakePhoto,
   onOpenDelivery,
   onKeepOpenedDelivery,
+  onReportOpenedDelivery,
   onDeliveredStorageDataUrl,
 }: HomeDeskModelProps) {
   const deskState = getDeskState(eveningState);
@@ -74,6 +94,10 @@ export function HomeDeskModel({
   const [holdProgress, setHoldProgress] = useState(false);
   const [developPhotoMounted, setDevelopPhotoMounted] = useState(false);
   const [isRewindingHold, setIsRewindingHold] = useState(false);
+  const [viewerPhoto, setViewerPhoto] = useState<DeskViewerPhoto | null>(null);
+  const [reportedDeliveredIds, setReportedDeliveredIds] = useState<Set<string>>(
+    () => new Set(),
+  );
   const hintTimerRef = useRef<number | null>(null);
   const holdTimerRef = useRef<number | null>(null);
   const rewindTimerRef = useRef<number | null>(null);
@@ -98,6 +122,12 @@ export function HomeDeskModel({
   const deliveredPhoto =
     eveningState.kind === "delivered" || eveningState.kind === "opened"
       ? eveningState.deliveredPhoto
+      : null;
+  const visibleDeliveredPhoto =
+    deliveredPhoto &&
+    !reportedDeliveredIds.has(getExchangePhotoIdentity(deliveredPhoto)) &&
+    !isExchangePhotoLocallyBlocked(deliveredPhoto)
+      ? deliveredPhoto
       : null;
   useEffect(() => {
     trackDeskStateShown(deskState, eveningState.dateKey);
@@ -353,28 +383,44 @@ export function HomeDeskModel({
           </p>
         ) : null}
 
-        {deskState === "4" && targetPhoto && deliveredPhoto ? (
+        {deskState === "4" && targetPhoto ? (
           <div style={deskStyles.openedPair} aria-label="きょうの2まい">
-            <PhotoTile photo={targetPhoto} />
-            <span style={deskStyles.pairDots} aria-hidden="true" />
             <PhotoTile
-              photo={deliveredPhoto}
-              label={showGuidanceCopy ? "どこかのこ" : undefined}
-              onStorageDataUrl={(dataUrl) =>
-                onDeliveredStorageDataUrl(eveningState.dateKey, deliveredPhoto, dataUrl)
+              photo={targetPhoto}
+              onClick={() =>
+                setViewerPhoto({
+                  kind: "own",
+                  photo: targetPhoto,
+                  dateKey: eveningState.dateKey,
+                })
               }
+              ariaLabel="うちのこの写真を大きく見る"
             />
+            <span style={deskStyles.pairDots} aria-hidden="true" />
+            {visibleDeliveredPhoto ? (
+              <PhotoTile
+                photo={visibleDeliveredPhoto}
+                label={showGuidanceCopy ? "どこかのこ" : undefined}
+                onClick={() =>
+                  setViewerPhoto({
+                    kind: "other",
+                    photo: visibleDeliveredPhoto,
+                    dateKey: eveningState.dateKey,
+                  })
+                }
+                ariaLabel="どこかのこの写真を大きく見る"
+                onStorageDataUrl={(dataUrl) =>
+                  onDeliveredStorageDataUrl(
+                    eveningState.dateKey,
+                    visibleDeliveredPhoto,
+                    dataUrl,
+                  )
+                }
+              />
+            ) : (
+              <EmptyDeliveredSlot />
+            )}
           </div>
-        ) : null}
-
-        {deskState === "4" && deliveredPhoto ? (
-          <button
-            type="button"
-            style={deskStyles.keepButton}
-            onClick={() => onKeepOpenedDelivery(eveningState.dateKey, deliveredPhoto)}
-          >
-            とっておく
-          </button>
         ) : null}
 
         {isBefore && yesterdayMini ? (
@@ -412,6 +458,30 @@ export function HomeDeskModel({
       ) : null}
 
       <BottomNavigation active="today" homeVariant="desk" homeState={deskState} />
+
+      {viewerPhoto ? (
+        <DeskPhotoViewer
+          viewerPhoto={viewerPhoto}
+          onClose={() => setViewerPhoto(null)}
+          onSave={() => {
+            if (viewerPhoto.kind === "other") {
+              onKeepOpenedDelivery(viewerPhoto.dateKey, viewerPhoto.photo);
+            }
+          }}
+          onReport={(reason) => {
+            if (viewerPhoto.kind !== "other") {
+              return;
+            }
+            onReportOpenedDelivery(viewerPhoto.dateKey, viewerPhoto.photo, reason);
+            setReportedDeliveredIds((current) => {
+              const next = new Set(current);
+              next.add(getExchangePhotoIdentity(viewerPhoto.photo));
+              return next;
+            });
+            setViewerPhoto(null);
+          }}
+        />
+      ) : null}
 
       <style>{`
         @keyframes deskFrameBreathe {
@@ -451,6 +521,8 @@ function PhotoTile({
   photo,
   label,
   size = "normal",
+  onClick,
+  ariaLabel,
   onStorageDataUrl,
 }: {
   photo: Pick<
@@ -459,6 +531,8 @@ function PhotoTile({
   >;
   label?: string;
   size?: "normal" | "small" | "mini";
+  onClick?: () => void;
+  ariaLabel?: string;
   onStorageDataUrl?: (dataUrl: string) => void;
 }) {
   const imageSize =
@@ -467,24 +541,192 @@ function PhotoTile({
     size === "normal"
       ? { ...deskStyles.photoTile, ...deskStyles.normalPhotoTile }
       : deskStyles.photoTile;
+  const tileStyle = {
+    ...tileFrameStyle,
+    ...(size === "mini" ? deskStyles.miniTile : {}),
+    ...(onClick ? deskStyles.photoTileButton : {}),
+  };
+  const image = (
+    <StoredPhotoImage
+      src={getPhotoThumbnailSrc(photo)}
+      alt=""
+      style={imageSize}
+      onStorageDataUrl={onStorageDataUrl}
+    />
+  );
 
   return (
     <div style={deskStyles.photoTileWrap}>
-      <div
-        data-testid={size === "normal" ? "desk-photo-tile" : undefined}
-        style={{
-          ...tileFrameStyle,
-          ...(size === "mini" ? deskStyles.miniTile : {}),
-        }}
-      >
-        <StoredPhotoImage
-          src={getPhotoThumbnailSrc(photo)}
-          alt=""
-          style={imageSize}
-          onStorageDataUrl={onStorageDataUrl}
-        />
-      </div>
+      {onClick ? (
+        <button
+          type="button"
+          data-testid={size === "normal" ? "desk-photo-tile" : undefined}
+          style={tileStyle}
+          onClick={onClick}
+          aria-label={ariaLabel}
+        >
+          {image}
+        </button>
+      ) : (
+        <div
+          data-testid={size === "normal" ? "desk-photo-tile" : undefined}
+          style={tileStyle}
+        >
+          {image}
+        </div>
+      )}
       {label ? <span style={deskStyles.tileLabel}>{label}</span> : null}
+    </div>
+  );
+}
+
+function EmptyDeliveredSlot() {
+  return (
+    <div style={deskStyles.emptyDeliveredSlot} data-testid="desk-empty-delivered-slot">
+      <span style={deskStyles.emptyDeliveredSlotText}>きょうは おやすみ</span>
+    </div>
+  );
+}
+
+function DeskPhotoViewer({
+  viewerPhoto,
+  onClose,
+  onSave,
+  onReport,
+}: {
+  viewerPhoto: DeskViewerPhoto;
+  onClose: () => void;
+  onSave: () => void;
+  onReport: (reason: ExchangePhotoReportReason) => void;
+}) {
+  const [isMenuOpen, setIsMenuOpen] = useState(false);
+  const [isReportSheetOpen, setIsReportSheetOpen] = useState(false);
+  const [saveState, setSaveState] = useState<"idle" | "saved">("idle");
+
+  async function handleSave() {
+    onSave();
+    await savePhotoToDevice(viewerPhoto.photo);
+    setSaveState("saved");
+    window.setTimeout(() => {
+      setSaveState("idle");
+    }, 2000);
+  }
+
+  return (
+    <div
+      data-testid="desk-photo-viewer"
+      style={deskStyles.viewerBackdrop}
+      onClick={onClose}
+    >
+      <section
+        style={deskStyles.viewerPanel}
+        aria-label={
+          viewerPhoto.kind === "other"
+            ? "どこかのこの写真"
+            : "うちのこの写真"
+        }
+        onClick={(event) => event.stopPropagation()}
+      >
+        <button
+          type="button"
+          style={deskStyles.viewerCloseButton}
+          onClick={onClose}
+          aria-label="閉じる"
+        >
+          閉じる
+        </button>
+        {viewerPhoto.kind === "other" ? (
+          <div style={deskStyles.viewerMenuWrap}>
+            <button
+              type="button"
+              style={deskStyles.viewerMenuButton}
+              aria-label="写真のメニュー"
+              onClick={() => setIsMenuOpen((open) => !open)}
+            >
+              …
+            </button>
+            {isMenuOpen ? (
+              <div style={deskStyles.viewerMenuSheet}>
+                <button
+                  type="button"
+                  style={deskStyles.viewerMenuItem}
+                  onClick={() => {
+                    setIsMenuOpen(false);
+                    setIsReportSheetOpen(true);
+                  }}
+                >
+                  この写真を報告
+                </button>
+                <button
+                  type="button"
+                  style={deskStyles.viewerMenuItem}
+                  onClick={() => setIsMenuOpen(false)}
+                >
+                  キャンセル
+                </button>
+              </div>
+            ) : null}
+          </div>
+        ) : null}
+        <div style={deskStyles.viewerImageFrame}>
+          <StoredPhotoImage
+            src={getPhotoDetailSrc(viewerPhoto.photo)}
+            alt=""
+            style={deskStyles.viewerImage}
+          />
+        </div>
+        <button
+          type="button"
+          style={{
+            ...deskStyles.viewerSaveButton,
+            ...(saveState === "saved" ? deskStyles.viewerSaveButtonSaved : {}),
+          }}
+          onClick={handleSave}
+        >
+          {saveState === "saved" ? "とっておいた" : "とっておく"}
+        </button>
+      </section>
+      {isReportSheetOpen && viewerPhoto.kind === "other" ? (
+        <div
+          style={deskStyles.reportSheetBackdrop}
+          onClick={() => setIsReportSheetOpen(false)}
+        >
+          <section
+            style={deskStyles.reportSheet}
+            aria-label="この写真を報告"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <button
+              type="button"
+              style={deskStyles.reportReasonButton}
+              onClick={() => onReport("not_cat")}
+            >
+              ねこの写真ではない
+            </button>
+            <button
+              type="button"
+              style={deskStyles.reportReasonButton}
+              onClick={() => onReport("uncomfortable")}
+            >
+              不快な内容
+            </button>
+            <button
+              type="button"
+              style={deskStyles.reportReasonButton}
+              onClick={() => onReport("other")}
+            >
+              その他
+            </button>
+            <button
+              type="button"
+              style={deskStyles.reportCancelButton}
+              onClick={() => setIsReportSheetOpen(false)}
+            >
+              キャンセル
+            </button>
+          </section>
+        </div>
+      ) : null}
     </div>
   );
 }
@@ -623,6 +865,73 @@ function getPhotoDetailSrc(
   >,
 ) {
   return photo.originalSrc ?? photo.displaySrc ?? photo.src;
+}
+
+async function savePhotoToDevice(
+  photo: Pick<OwnSleepingPhoto | ExchangePhoto, "id" | "src" | "displaySrc" | "originalSrc">,
+) {
+  const src = getPhotoDetailSrc(photo);
+  const blob = await readPhotoBlob(src);
+
+  if (blob) {
+    const file = new File([blob], `${photo.id || "neteruneko"}.jpg`, {
+      type: blob.type || "image/jpeg",
+    });
+    const shareNavigator = navigator as Navigator & {
+      canShare?: (data: ShareData) => boolean;
+      share?: (data: ShareData) => Promise<void>;
+    };
+
+    if (
+      shareNavigator.share &&
+      (!shareNavigator.canShare || shareNavigator.canShare({ files: [file] }))
+    ) {
+      await shareNavigator.share({ files: [file], title: "ねてるねこ" });
+      return "share" as const;
+    }
+
+    triggerDownload(URL.createObjectURL(blob), `${photo.id || "neteruneko"}.jpg`, true);
+    return "download" as const;
+  }
+
+  triggerDownload(src, `${photo.id || "neteruneko"}.jpg`);
+  return "download" as const;
+}
+
+async function readPhotoBlob(src: string) {
+  try {
+    if (src.startsWith("data:image/")) {
+      const response = await fetch(src);
+      return await response.blob();
+    }
+
+    if (src.startsWith("http://") || src.startsWith("https://")) {
+      const response = await fetch(src);
+      return response.ok ? await response.blob() : null;
+    }
+  } catch {
+    return null;
+  }
+
+  return null;
+}
+
+function triggerDownload(src: string, fileName: string, revoke = false) {
+  const anchor = document.createElement("a");
+  anchor.href = src;
+  anchor.download = fileName;
+  anchor.rel = "noopener";
+  document.body.appendChild(anchor);
+  anchor.click();
+  anchor.remove();
+
+  if (revoke) {
+    window.setTimeout(() => URL.revokeObjectURL(src), 5000);
+  }
+}
+
+function getExchangePhotoIdentity(photo: Pick<ExchangePhoto, "id" | "sourcePhotoId">) {
+  return photo.sourcePhotoId ?? photo.id;
 }
 
 function trackDeskStateShown(state: DeskState, dateKey: string) {
@@ -820,6 +1129,11 @@ const deskStyles = {
     borderRadius: "var(--radius-tile)",
     background: "var(--paper)",
     boxShadow: "var(--shadow-rest)",
+    border: "none",
+  },
+  photoTileButton: {
+    cursor: "pointer",
+    WebkitTapHighlightColor: "transparent",
   },
   normalPhotoTile: {
     width: "144px",
@@ -852,6 +1166,25 @@ const deskStyles = {
     fontFamily: "var(--font-serif)",
     fontWeight: 400,
     letterSpacing: "var(--tracking-label)",
+  },
+  emptyDeliveredSlot: {
+    width: "144px",
+    height: "144px",
+    boxSizing: "border-box",
+    display: "grid",
+    placeItems: "center",
+    padding: "12px",
+    border: "1px solid var(--line)",
+    borderRadius: "var(--radius-tile)",
+    background: "color-mix(in srgb, var(--paper) 72%, transparent)",
+    boxShadow: "var(--shadow-rest)",
+  },
+  emptyDeliveredSlotText: {
+    color: "var(--ink-faint)",
+    fontFamily: "var(--font-serif)",
+    fontSize: "12px",
+    letterSpacing: "var(--tracking-label)",
+    textAlign: "center",
   },
   guidanceCopy: {
     minHeight: "18px",
@@ -892,6 +1225,137 @@ const deskStyles = {
     fontWeight: 400,
     letterSpacing: "var(--tracking-label)",
     boxShadow: "var(--shadow-rest)",
+  },
+  viewerBackdrop: {
+    position: "fixed",
+    inset: 0,
+    zIndex: 50,
+    display: "grid",
+    placeItems: "center",
+    padding: "calc(24px + env(safe-area-inset-top)) 18px calc(24px + env(safe-area-inset-bottom))",
+    background: "rgba(251, 250, 247, 0.96)",
+  },
+  viewerPanel: {
+    position: "relative",
+    width: "min(100%, 430px)",
+    height: "100%",
+    display: "flex",
+    flexDirection: "column",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: "22px",
+  },
+  viewerCloseButton: {
+    position: "absolute",
+    top: 0,
+    left: 0,
+    border: "none",
+    background: "transparent",
+    color: "var(--ink-soft)",
+    fontFamily: "var(--font-serif)",
+    fontSize: "13px",
+    letterSpacing: "var(--tracking-label)",
+  },
+  viewerMenuWrap: {
+    position: "absolute",
+    top: 0,
+    right: 0,
+  },
+  viewerMenuButton: {
+    width: "44px",
+    height: "44px",
+    border: "none",
+    background: "transparent",
+    color: "var(--ink)",
+    fontSize: "24px",
+    lineHeight: 1,
+  },
+  viewerMenuSheet: {
+    position: "absolute",
+    top: "44px",
+    right: 0,
+    minWidth: "180px",
+    padding: "8px",
+    border: "1px solid var(--line)",
+    borderRadius: "var(--radius-s)",
+    background: "var(--paper)",
+    boxShadow: "var(--shadow-float)",
+  },
+  viewerMenuItem: {
+    width: "100%",
+    minHeight: "42px",
+    border: "none",
+    background: "transparent",
+    color: "var(--ink)",
+    fontFamily: "var(--font-serif)",
+    fontSize: "13px",
+    letterSpacing: "var(--tracking-body)",
+    textAlign: "left",
+  },
+  viewerImageFrame: {
+    width: "min(100%, 360px)",
+    aspectRatio: "1 / 1",
+    padding: "8px",
+    borderRadius: "var(--radius-tile)",
+    background: "var(--paper)",
+    boxShadow: "var(--shadow-rest)",
+  },
+  viewerImage: {
+    width: "100%",
+    height: "100%",
+    borderRadius: "var(--radius-img)",
+  },
+  viewerSaveButton: {
+    width: "min(100%, 330px)",
+    minHeight: "54px",
+    border: "1px solid var(--line)",
+    borderRadius: "var(--radius-tile)",
+    background: "transparent",
+    color: "var(--ink)",
+    fontFamily: "var(--font-serif)",
+    fontSize: "16px",
+    letterSpacing: "var(--tracking-label)",
+    transition: "opacity var(--dur-reveal) var(--ease-gentle)",
+  },
+  viewerSaveButtonSaved: {
+    opacity: 0,
+  },
+  reportSheetBackdrop: {
+    position: "fixed",
+    inset: 0,
+    zIndex: 60,
+    display: "grid",
+    alignItems: "end",
+    background: "rgba(63, 58, 51, 0.18)",
+  },
+  reportSheet: {
+    display: "flex",
+    flexDirection: "column",
+    gap: "8px",
+    padding: "18px 18px calc(18px + env(safe-area-inset-bottom))",
+    borderTopLeftRadius: "var(--radius-tile)",
+    borderTopRightRadius: "var(--radius-tile)",
+    background: "var(--paper)",
+    boxShadow: "var(--shadow-float)",
+  },
+  reportReasonButton: {
+    minHeight: "46px",
+    border: "1px solid var(--line)",
+    borderRadius: "var(--radius-s)",
+    background: "transparent",
+    color: "var(--ink)",
+    fontFamily: "var(--font-serif)",
+    fontSize: "14px",
+    letterSpacing: "var(--tracking-body)",
+  },
+  reportCancelButton: {
+    minHeight: "46px",
+    border: "none",
+    background: "transparent",
+    color: "var(--ink-soft)",
+    fontFamily: "var(--font-serif)",
+    fontSize: "14px",
+    letterSpacing: "var(--tracking-body)",
   },
   yesterday: {
     display: "flex",

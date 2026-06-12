@@ -581,7 +581,7 @@ test.describe("home sleeping exchange flow", () => {
     await expect.poll(() => exchangeCalls).toBe(0);
   });
 
-  test("keeps the latest missed evening delivery waiting after a day away", async ({
+  test("auto-opens the latest missed evening delivery after the 5am reset", async ({
     page,
   }) => {
     let exchangeCalls = 0;
@@ -672,9 +672,11 @@ test.describe("home sleeping exchange flow", () => {
     await page.goto("/home");
     await page.waitForLoadState("networkidle");
 
-    await expect(page.getByText("ねがおが とどいています")).toBeVisible({
-      timeout: 15000,
-    });
+    await expect(page.getByTestId("day-cycle-indicator")).toHaveAttribute(
+      "data-state",
+      "4",
+      { timeout: 15000 },
+    );
     expect(exchangeCalls).toBe(1);
 
     const store = await page.evaluate(() =>
@@ -684,6 +686,7 @@ test.describe("home sleeping exchange flow", () => {
     );
 
     expect(store["2026-06-10"]?.deliveredPhoto?.id).toBe("missed-delivered");
+    expect(store["2026-06-10"]?.openedAt).toBeTruthy();
     expect(store["2026-06-09"]?.skippedAt).toBeTruthy();
   });
 

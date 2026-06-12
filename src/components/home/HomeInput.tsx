@@ -73,6 +73,7 @@ import {
   updateKeptExchangePhotoDataUrl,
   writeOwnSleepingPhotosWithFallback,
   type ExchangePhoto,
+  type ExchangePhotoReportReason,
   type OwnSleepingPhoto,
 } from "../../lib/home/sleepingPhotos";
 import { backupOwnSleepingPhotoMoment } from "../../lib/home/sleepingPhotoBackup";
@@ -1663,6 +1664,31 @@ export function HomeInput({ recentEvents: _recentEvents }: HomeInputProps) {
     );
   }
 
+  function handleReportEveningDelivery(
+    dateKey: string,
+    photo: ExchangePhoto,
+    reason: ExchangePhotoReportReason,
+  ) {
+    reportExchangePhoto(photo, reason);
+    setOpeningEveningDelivery(null);
+    setCollectionRefreshTick((value) => value + 1);
+    setEveningRefreshTick((value) => value + 1);
+    showToast("うけつけました");
+    void sendPhotoReport(photo, reason).catch(() => {
+      // Local reporting hides the photo immediately; remote moderation can retry later.
+    });
+    trackProductEvent(
+      "home_evening_delivery_photo_reported",
+      {
+        delivery_date_key: dateKey,
+        photo_id: photo.id,
+        source_photo_id: photo.sourcePhotoId ?? null,
+        reason,
+      },
+      { localCatId: activeCatId },
+    );
+  }
+
   function handleEveningDeliveryDataUrl(dateKey: string, dataUrl: string) {
     const nextPhoto = updateEveningDeliveredPhotoDataUrl(dateKey, dataUrl);
 
@@ -1865,6 +1891,7 @@ export function HomeInput({ recentEvents: _recentEvents }: HomeInputProps) {
             onTakePhoto={() => handleSleepingPhotoStart("camera")}
             onOpenDelivery={handleOpenEveningDelivery}
             onKeepOpenedDelivery={handleKeepEveningDelivery}
+            onReportOpenedDelivery={handleReportEveningDelivery}
             onDeliveredStorageDataUrl={handleDeskDeliveredPhotoDataUrl}
           />
         ) : (
@@ -4169,6 +4196,52 @@ function getBoardCounterSecondaryText(surfaceText?: string) {
 
 function formatSleepingCounterCount(count: number) {
   return String(count);
+}
+
+async function sendPhotoReport(
+  photo: ExchangePhoto,
+  reason: ExchangePhotoReportReason,
+) {
+  const headers = new Headers({ "content-type": "application/json" });
+  const supabase = createBrowserSupabaseClient();
+
+  if (supabase) {
+    const { data } = await supabase.auth.getSession();
+    const accessToken = data.session?.access_token;
+
+    if (accessToken) {
+      headers.set("authorization", `Bearer ${accessToken}`);
+    }
+  }
+
+  await fetch("/api/reports", {
+    method: "POST",
+    headers,
+    body: JSON.stringify({
+      photoId: photo.id,
+      sourcePhotoId: photo.sourcePhotoId ?? null,
+      anonymousId: getOrCreateReportAnonymousId(),
+      reason,
+    }),
+  });
+}
+
+function getOrCreateReportAnonymousId() {
+  try {
+    const existing = window.localStorage.getItem(STORAGE_KEYS.analyticsAnonymousId);
+    if (existing) {
+      return existing;
+    }
+
+    const nextId =
+      typeof crypto !== "undefined" && "randomUUID" in crypto
+        ? crypto.randomUUID()
+        : `anon-${Date.now()}-${Math.random().toString(16).slice(2)}`;
+    window.localStorage.setItem(STORAGE_KEYS.analyticsAnonymousId, nextId);
+    return nextId;
+  } catch {
+    return `anon-${Date.now()}-${Math.random().toString(16).slice(2)}`;
+  }
 }
 
 function buildHomeCatCounters({

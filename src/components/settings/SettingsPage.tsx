@@ -67,6 +67,15 @@ import {
 } from "../../lib/openSound";
 
 type SettingsTab = "general" | "admin";
+type PhotoReportSummary = {
+  id: string;
+  photo_id: string;
+  source_photo_id: string | null;
+  reporter_user_id: string | null;
+  reporter_anonymous_id: string | null;
+  reason: string;
+  created_at: string;
+};
 const APP_BUILD_SHA =
   process.env.NEXT_PUBLIC_VERCEL_GIT_COMMIT_SHA ??
   process.env.NEXT_PUBLIC_COMMIT_SHA ??
@@ -98,6 +107,7 @@ export function SettingsPage() {
   const [eveningDeliveryTrace, setEveningDeliveryTrace] = useState<
     EveningDeliveryTraceEntry[]
   >([]);
+  const [photoReports, setPhotoReports] = useState<PhotoReportSummary[]>([]);
   const [adminCapabilities, setAdminCapabilities] =
     useState<ClientAdminCapabilities>({
       isAdmin: false,
@@ -449,7 +459,13 @@ export function SettingsPage() {
     setAdminCapabilities(capabilities);
     if (capabilities.testToolsEnabled || capabilities.stockAdminEnabled) {
       void refreshDeliveryDiagnostics();
+      void refreshPhotoReports();
     }
+  }
+
+  async function refreshPhotoReports() {
+    const reports = await readPhotoReports();
+    setPhotoReports(reports);
   }
 
   async function refreshBetaCapabilities() {
@@ -857,6 +873,8 @@ export function SettingsPage() {
               <div style={styles.divider} />
               <DeliveryDiagnosticsPanel diagnostics={deliveryDiagnostics} />
               <div style={styles.divider} />
+              <PhotoReportsPanel reports={photoReports} />
+              <div style={styles.divider} />
               <EveningDeliveryTracePanel entries={eveningDeliveryTrace} />
               <div style={styles.divider} />
               <KeptExchangeDebugPanel debug={keptExchangeDebug} />
@@ -865,6 +883,7 @@ export function SettingsPage() {
                 type="button"
                 onClick={() => {
                   void refreshDeliveryDiagnostics();
+                  void refreshPhotoReports();
                   refreshKeptExchangeDebug();
                   refreshEveningDeliveryTrace();
                 }}
@@ -1437,6 +1456,28 @@ function DeliveryDiagnosticsPanel({
   );
 }
 
+function PhotoReportsPanel({ reports }: { reports: PhotoReportSummary[] }) {
+  return (
+    <div style={styles.authDebugPanel}>
+      <p style={styles.syncOverviewText}>
+        報告された写真の直近一覧です。2件以上の報告で配達プールから外れます。
+      </p>
+      <div style={styles.authDebugRows}>
+        <AuthDebugRow label="件数" value={`${reports.length}件`} />
+        {reports.slice(0, 10).map((report) => (
+          <AuthDebugRow
+            key={report.id}
+            label={formatReportReason(report.reason)}
+            value={`${report.source_photo_id ?? report.photo_id} / ${formatReportDate(
+              report.created_at,
+            )}`}
+          />
+        ))}
+      </div>
+    </div>
+  );
+}
+
 function KeptExchangeDebugPanel({
   debug,
 }: {
@@ -1476,6 +1517,60 @@ function KeptExchangeDebugPanel({
       </div>
     </div>
   );
+}
+
+async function readPhotoReports() {
+  const headers = new Headers();
+  const supabase = createBrowserSupabaseClient();
+
+  if (supabase) {
+    const { data } = await supabase.auth.getSession();
+    const accessToken = data.session?.access_token;
+
+    if (accessToken) {
+      headers.set("authorization", `Bearer ${accessToken}`);
+    }
+  }
+
+  try {
+    const response = await fetch("/api/reports", { headers });
+    if (!response.ok) {
+      return [] as PhotoReportSummary[];
+    }
+
+    const body = (await response.json().catch(() => null)) as {
+      reports?: PhotoReportSummary[];
+    } | null;
+
+    return Array.isArray(body?.reports) ? body.reports : [];
+  } catch {
+    return [] as PhotoReportSummary[];
+  }
+}
+
+function formatReportReason(reason: string) {
+  if (reason === "not_cat") {
+    return "ねこ以外";
+  }
+  if (reason === "uncomfortable") {
+    return "不快";
+  }
+  return "その他";
+}
+
+function formatReportDate(value: string) {
+  const timestamp = Date.parse(value);
+
+  if (!Number.isFinite(timestamp)) {
+    return "-";
+  }
+
+  return new Intl.DateTimeFormat("ja-JP", {
+    month: "numeric",
+    day: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+  }).format(timestamp);
 }
 
 function SyncStatusPanel({ overview }: { overview: AccountSyncOverview }) {

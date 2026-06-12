@@ -179,6 +179,32 @@ export function markEveningDeliveryOpened(dateKey: string, openedAt = Date.now()
   clearAppBadge();
 }
 
+export function autoOpenExpiredEveningDeliveries(now = Date.now()) {
+  const store = readEveningDeliveryStore();
+  let hasChanged = false;
+
+  for (const [dateKey, day] of Object.entries(store)) {
+    if (
+      day.deliveredPhoto &&
+      !day.openedAt &&
+      now >= getJstAutoOpenTime(dateKey)
+    ) {
+      store[dateKey] = {
+        ...day,
+        openedAt: getJstAutoOpenTime(dateKey),
+      };
+      hasChanged = true;
+    }
+  }
+
+  if (hasChanged) {
+    writeEveningDeliveryStore(store);
+    clearAppBadge();
+  }
+
+  return hasChanged;
+}
+
 export function markEveningDeliveryKept(dateKey: string, keptAt = Date.now()) {
   const store = readEveningDeliveryStore();
   const day = store[dateKey];
@@ -238,6 +264,7 @@ export function buildEveningHomeState({
   ownPhotos: OwnSleepingPhoto[];
   now?: number;
 }): EveningHomeState {
+  autoOpenExpiredEveningDeliveries(now);
   const todayKey = getJstDateKey(now);
   const store = readEveningDeliveryStore();
   const visibleDeliveredDay = findLatestVisibleDeliveredDay(store, now);
@@ -330,6 +357,10 @@ export function addJstDays(dateKey: string, days: number) {
 
 export function getJstDeliveryTime(dateKey: string) {
   return getJstDayStartTime(dateKey) + EVENING_DELIVERY_HOUR * 60 * 60 * 1000;
+}
+
+function getJstAutoOpenTime(dateKey: string) {
+  return getJstDayStartTime(addJstDays(dateKey, 1)) + 5 * 60 * 60 * 1000;
 }
 
 export function getEveningDeliveryCompletionCopy(now = Date.now()) {

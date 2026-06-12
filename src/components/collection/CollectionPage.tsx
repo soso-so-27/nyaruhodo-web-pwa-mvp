@@ -26,7 +26,11 @@ import {
   updateKeptExchangePhotoDataUrl,
   updateOwnSleepingPhotoDelivery,
 } from "../../lib/home/sleepingPhotos";
-import { getFirstEveningDeliveryTargetDateKey } from "../../lib/home/eveningDelivery";
+import {
+  autoOpenExpiredEveningDeliveries,
+  getFirstEveningDeliveryTargetDateKey,
+  readEveningDeliveryStore,
+} from "../../lib/home/eveningDelivery";
 import { backupOwnSleepingPhotoMoment } from "../../lib/home/sleepingPhotoBackup";
 import { STORAGE_KEYS } from "../../lib/storage";
 import {
@@ -146,6 +150,7 @@ type AlbumDayGroup = {
   subLabel: string;
   sections: AlbumDaySection[];
   total: number;
+  hasUnopenedOtherDelivery?: boolean;
 };
 
 export function CollectionPage() {
@@ -268,9 +273,21 @@ export function CollectionPage() {
     () => readOwnSleepingPhotos(),
     [boxRefreshTick, hasLoaded],
   );
-  const otherBoxPhotos = useMemo(
-    () => readKeptExchangePhotos(),
+  const openedEveningDeliveryPhotos = useMemo(
+    () => readOpenedEveningDeliveryBoxPhotos(),
     [boxRefreshTick, hasLoaded],
+  );
+  const unopenedEveningDeliveryDateKeys = useMemo(
+    () => readUnopenedEveningDeliveryDateKeys(),
+    [boxRefreshTick, hasLoaded],
+  );
+  const otherBoxPhotos = useMemo(
+    () =>
+      mergeBoxPreviewPhotos(
+        openedEveningDeliveryPhotos,
+        readKeptExchangePhotos(),
+      ),
+    [boxRefreshTick, hasLoaded, openedEveningDeliveryPhotos],
   );
   const awakeBoxPhotos = useMemo(
     () =>
@@ -283,8 +300,14 @@ export function CollectionPage() {
     [storedCollectionPhotos],
   );
   const albumDayGroups = useMemo(
-    () => buildAlbumDayGroups(sleepingBoxPhotos, awakeBoxPhotos, otherBoxPhotos),
-    [awakeBoxPhotos, otherBoxPhotos, sleepingBoxPhotos],
+    () =>
+      buildAlbumDayGroups(
+        sleepingBoxPhotos,
+        awakeBoxPhotos,
+        otherBoxPhotos,
+        unopenedEveningDeliveryDateKeys,
+      ),
+    [awakeBoxPhotos, otherBoxPhotos, sleepingBoxPhotos, unopenedEveningDeliveryDateKeys],
   );
   const firstEveningDeliveryTargetDateKey = useMemo(
     () => getFirstEveningDeliveryTargetDateKey(),
@@ -1115,6 +1138,19 @@ function AlbumOwnGrid({
   );
 }
 
+function AlbumSealedDeliveryMiniature() {
+  return (
+    <span
+      data-testid="album-sealed-delivery"
+      style={styles.dailyPairSealedEnvelope}
+      aria-hidden="true"
+    >
+      <span style={styles.dailyPairSealedEnvelopeFlap} />
+      <span style={styles.dailyPairSealedEnvelopeSeal} />
+    </span>
+  );
+}
+
 function AlbumDailyPair({
   group,
   catName,
@@ -1140,6 +1176,7 @@ function AlbumDailyPair({
   const targetPhoto = ownPhotos[0] ?? null;
   const deliveredPhoto = deliveredPhotos[0] ?? null;
   const extraPhotos = ownPhotos.slice(1);
+  const hasUnopenedOtherDelivery = Boolean(group.hasUnopenedOtherDelivery);
 
   return (
     <div style={compact ? styles.dailyPairCompact : styles.dailyPair}>
@@ -1173,9 +1210,21 @@ function AlbumDailyPair({
             <button
               type="button"
               style={styles.dailyPairTile}
-              onClick={() => deliveredPhoto && onOpenBox("other", group.key)}
-              disabled={!deliveredPhoto}
-              aria-label="どこかのこを開く"
+              onClick={() => {
+                if (deliveredPhoto) {
+                  onOpenBox("other", group.key);
+                  return;
+                }
+                if (hasUnopenedOtherDelivery) {
+                  window.location.assign("/home");
+                }
+              }}
+              disabled={!deliveredPhoto && !hasUnopenedOtherDelivery}
+              aria-label={
+                hasUnopenedOtherDelivery && !deliveredPhoto
+                  ? "届いた封筒をホームで開く"
+                  : "どこかのこを開く"
+              }
             >
               {deliveredPhoto ? (
                 <StoredPhotoImage
@@ -1186,6 +1235,8 @@ function AlbumDailyPair({
                     writeBackDeliveredPhotoDataUrl(deliveredPhoto, dataUrl)
                   }
                 />
+              ) : hasUnopenedOtherDelivery ? (
+                <AlbumSealedDeliveryMiniature />
               ) : group.key === getLocalDateKey(Date.now()) ? (
                 <span style={styles.dailyPairPlaceholder}>
                   <span style={styles.dailyPairPlaceholderContent}>
@@ -2169,6 +2220,7 @@ function buildAlbumDayGroups(
   sleepingPhotos: BoxPreviewPhoto[],
   awakePhotos: BoxPreviewPhoto[],
   otherPhotos: BoxPreviewPhoto[],
+  unopenedOtherDeliveryDateKeys = new Set<string>(),
 ): AlbumDayGroup[] {
   const items: AlbumMomentPhoto[] = [
     ...sleepingPhotos.map((photo) => ({
@@ -2198,7 +2250,14 @@ function buildAlbumDayGroups(
     groups.set(key, [...(groups.get(key) ?? []), photo]);
   }
 
+  for (const key of unopenedOtherDeliveryDateKeys) {
+    if (!groups.has(key)) {
+      groups.set(key, []);
+    }
+  }
+
   return [...groups.entries()].map(([key, photos]) => {
+    const hasUnopenedOtherDelivery = unopenedOtherDeliveryDateKeys.has(key);
     const sections: AlbumDaySection[] = (
       [
       {
@@ -2221,9 +2280,56 @@ function buildAlbumDayGroups(
       label: getAlbumDateLabelFromKey(key),
       subLabel: getAlbumDateSubLabelFromKey(key),
       sections,
-      total: photos.length,
+      total: photos.length + (hasUnopenedOtherDelivery ? 1 : 0),
+      hasUnopenedOtherDelivery,
     };
   });
+}
+
+function readOpenedEveningDeliveryBoxPhotos(): BoxPreviewPhoto[] {
+  autoOpenExpiredEveningDeliveries();
+  const store = readEveningDeliveryStore();
+
+  return Object.values(store)
+    .filter((day) => Boolean(day.deliveredPhoto && day.openedAt))
+    .map((day) => ({
+      ...day.deliveredPhoto!,
+      deliveredAt: day.deliveredAt ?? day.deliveredPhoto!.deliveredAt,
+    }))
+    .filter((photo) => isUsableStoredPhotoSrc(photo.src));
+}
+
+function readUnopenedEveningDeliveryDateKeys() {
+  autoOpenExpiredEveningDeliveries();
+  const store = readEveningDeliveryStore();
+  const keys = new Set<string>();
+
+  for (const day of Object.values(store)) {
+    if (day.deliveredPhoto && !day.openedAt) {
+      keys.add(day.dateKey);
+    }
+  }
+
+  return keys;
+}
+
+function mergeBoxPreviewPhotos(
+  primaryPhotos: BoxPreviewPhoto[],
+  replacementPhotos: BoxPreviewPhoto[],
+) {
+  const byKey = new Map<string, BoxPreviewPhoto>();
+
+  for (const photo of [...primaryPhotos, ...replacementPhotos]) {
+    byKey.set(getBoxPhotoIdentity(photo), photo);
+  }
+
+  return [...byKey.values()].sort(
+    (a, b) => getBoxPhotoTimestamp(b) - getBoxPhotoTimestamp(a),
+  );
+}
+
+function getBoxPhotoIdentity(photo: BoxPreviewPhoto) {
+  return photo.sourcePhotoId ? `source:${photo.sourcePhotoId}` : `id:${photo.id}`;
 }
 
 function createEmptyTodayAlbumGroup(): AlbumDayGroup {
@@ -3142,6 +3248,38 @@ const styles = {
   },
   dailyPairPlaceholderIcon: {
     color: "rgba(120,108,94,0.34)",
+  },
+  dailyPairSealedEnvelope: {
+    position: "relative",
+    width: "100%",
+    aspectRatio: "1 / 1",
+    borderRadius: radius.xl,
+    display: "grid",
+    placeItems: "center",
+    boxSizing: "border-box",
+    background: "var(--paper-card)",
+    border: "6px solid rgba(255,253,248,0.74)",
+    boxShadow: shadow.soft,
+    overflow: "hidden",
+  },
+  dailyPairSealedEnvelopeFlap: {
+    position: "absolute",
+    inset: "22% 18% auto",
+    height: "35%",
+    border: "1px solid var(--line)",
+    borderRadius: radius.md,
+    background: "color-mix(in srgb, var(--paper) 58%, transparent)",
+    clipPath: "polygon(0 0,100% 0,50% 100%)",
+  },
+  dailyPairSealedEnvelopeSeal: {
+    position: "absolute",
+    left: "50%",
+    top: "52%",
+    width: "14px",
+    height: "14px",
+    borderRadius: "999px",
+    background: "var(--seal)",
+    transform: "translate(-50%, -50%)",
   },
   dailyPairLabel: {
     color: COLLECTION_MUTED,

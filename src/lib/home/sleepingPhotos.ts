@@ -88,6 +88,7 @@ export type CatSleepingMilestone = {
 };
 
 export type HiddenExchangePhotoReason = "hide" | "report";
+export type ExchangePhotoReportReason = "not_cat" | "uncomfortable" | "other";
 
 export type DeliverableSleepingPhotoInput = {
   triggerLabel: string;
@@ -775,7 +776,10 @@ export function dismissExchangePhoto(photo: ExchangePhoto) {
   }
 }
 
-export function reportExchangePhoto(photo: ExchangePhoto) {
+export function reportExchangePhoto(
+  photo: ExchangePhoto,
+  reason: ExchangePhotoReportReason = "other",
+) {
   try {
     const reported = readStorageArray<Partial<ExchangePhoto>>(
       REPORTED_EXCHANGE_PHOTO_STORAGE_KEY,
@@ -786,6 +790,7 @@ export function reportExchangePhoto(photo: ExchangePhoto) {
     const reportedPhoto = {
       ...photo,
       reportedAt: Date.now(),
+      reportReason: reason,
     };
     const dismissedPhoto = {
       id: photo.id,
@@ -961,6 +966,17 @@ function readStorageArray<T>(key: string) {
   } catch {
     return [] as T[];
   }
+}
+
+export function isExchangePhotoLocallyBlocked(
+  photo: Pick<ExchangePhoto, "id" | "sourcePhotoId">,
+) {
+  const blockedIds = readBlockedExchangePhotoIds();
+
+  return (
+    blockedIds.has(photo.id) ||
+    Boolean(photo.sourcePhotoId && blockedIds.has(photo.sourcePhotoId))
+  );
 }
 
 function readStorageObject<T extends Record<string, unknown>>(key: string): T {
