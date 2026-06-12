@@ -143,20 +143,39 @@ function TodayPairIcon({ state }: { state: "1" | "1b" | "2" | "3" | "4" }) {
   const secondFilled = state === "3" || state === "4";
 
   return (
-    <span style={styles.todayPairIcon} aria-hidden="true">
-      <span
-        style={{
-          ...styles.todayPairSlot,
-          ...(firstFilled ? styles.todayPairSlotFilled : styles.todayPairSlotEmpty),
-        }}
+    <svg
+      viewBox="0 0 28 22"
+      style={styles.todayPairIcon}
+      data-testid="today-pair-nav-icon"
+      aria-hidden="true"
+    >
+      <rect
+        x="3"
+        y="4"
+        width="9"
+        height="14"
+        rx="3"
+        data-testid="today-pair-nav-slot"
+        fill={firstFilled ? "currentColor" : "rgba(255,253,248,0.48)"}
+        stroke="currentColor"
+        strokeWidth="1.6"
+        strokeDasharray={firstFilled ? undefined : "2.2 2"}
+        opacity={firstFilled ? 0.86 : 0.82}
       />
-      <span
-        style={{
-          ...styles.todayPairSlot,
-          ...(secondFilled ? styles.todayPairSlotFilled : styles.todayPairSlotEmpty),
-        }}
+      <rect
+        x="16"
+        y="4"
+        width="9"
+        height="14"
+        rx="3"
+        data-testid="today-pair-nav-slot"
+        fill={secondFilled ? "currentColor" : "rgba(255,253,248,0.48)"}
+        stroke="currentColor"
+        strokeWidth="1.6"
+        strokeDasharray={secondFilled ? undefined : "2.2 2"}
+        opacity={secondFilled ? 0.86 : 0.82}
       />
-    </span>
+    </svg>
   );
 }
 
@@ -280,27 +299,10 @@ const styles = {
     transform: "translateY(0.5px)",
   },
   todayPairIcon: {
-    display: "inline-flex",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: "3px",
-    width: "22px",
-    height: "22px",
-  },
-  todayPairSlot: {
     display: "block",
-    width: "8px",
-    height: "10px",
-    borderRadius: "3px",
-    border: "1.5px solid currentColor",
-  },
-  todayPairSlotEmpty: {
-    borderStyle: "dashed",
-    opacity: 0.72,
-  },
-  todayPairSlotFilled: {
-    background: "currentColor",
-    opacity: 0.82,
+    width: "26px",
+    height: "22px",
+    overflow: "visible",
   },
   navLabel: {
     color: "currentColor",

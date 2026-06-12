@@ -19,6 +19,32 @@ test.describe("home desk model", () => {
     }
   });
 
+  test("shows the state2 letter fill and the today mini tile icon", async ({
+    page,
+  }) => {
+    await seedDeskState(page, "2");
+    await page.goto("/home");
+    await page.waitForLoadState("networkidle");
+
+    await expect(page.getByTestId("home-desk-model")).toHaveAttribute(
+      "data-state",
+      "2",
+    );
+    await expect(page.getByTestId("desk-letter")).toBeVisible();
+    const fillHeight = await page.getByTestId("desk-letter-fill").evaluate((node) =>
+      Number.parseFloat(window.getComputedStyle(node).height),
+    );
+    expect(fillHeight).toBeGreaterThan(30);
+    expect(fillHeight).toBeLessThan(38);
+    await expect(page.getByTestId("today-pair-nav-icon")).toBeVisible();
+    await expect(page.getByTestId("today-pair-nav-slot")).toHaveCount(2);
+    for (const slot of await page.getByTestId("today-pair-nav-slot").all()) {
+      const box = await slot.boundingBox();
+      expect(box?.width).toBeGreaterThanOrEqual(8);
+      expect(box?.height).toBeGreaterThanOrEqual(11);
+    }
+  });
+
   test("opens the delivered letter only after the hold completes", async ({
     page,
   }) => {

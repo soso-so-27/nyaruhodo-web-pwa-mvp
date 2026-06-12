@@ -241,6 +241,7 @@ export function HomeDeskModel({
             <div style={deskStyles.slot}>
               <button
                 type="button"
+                data-testid="desk-letter"
                 style={{
                   ...deskStyles.letter,
                   ...(deskState === "2"
@@ -261,6 +262,7 @@ export function HomeDeskModel({
               >
                 <span style={deskStyles.letterFlap} aria-hidden="true" />
                 <span
+                  data-testid="desk-letter-fill"
                   style={{
                     ...deskStyles.letterFill,
                     height:
@@ -270,11 +272,7 @@ export function HomeDeskModel({
                           ? "100%"
                           : "0%",
                   }}
-                  className={
-                    deskState === "2" && !prefersReducedMotion
-                      ? "desk-letter-fill"
-                      : undefined
-                  }
+                  className={deskState === "2" ? "desk-letter-fill" : undefined}
                   aria-hidden="true"
                 />
               </button>
@@ -363,8 +361,8 @@ export function HomeDeskModel({
           50% { transform: scale(1.016); }
         }
         @keyframes deskLetterShimmer {
-          0%, 100% { opacity: 0.35; }
-          50% { opacity: 0.85; }
+          0%, 100% { opacity: 0.58; transform: translateX(-4px); }
+          50% { opacity: 1; transform: translateX(4px); }
         }
         .desk-frame-breathe {
           animation: deskFrameBreathe 4.2s ease-in-out infinite;
@@ -376,7 +374,8 @@ export function HomeDeskModel({
           right: 0;
           top: 0;
           height: 2px;
-          background: rgba(194, 96, 124, 0.35);
+          background: linear-gradient(90deg, rgba(194, 96, 124, 0.18), rgba(194, 96, 124, 0.62), rgba(194, 96, 124, 0.18));
+          box-shadow: 0 1px 4px rgba(194, 96, 124, 0.22);
           animation: deskLetterShimmer 3.4s ease-in-out infinite;
         }
         .desk-letter-holding [data-develop-photo="true"] {
@@ -563,9 +562,10 @@ const deskStyles = {
     display: "flex",
     flexDirection: "column",
     alignItems: "center",
-    justifyContent: "center",
-    gap: "16px",
-    paddingTop: "18px",
+    justifyContent: "flex-start",
+    gap: "18px",
+    paddingTop:
+      "clamp(176px, calc(40svh - 106px - env(safe-area-inset-top)), 276px)",
   },
   desk: {
     display: "flex",
@@ -606,8 +606,8 @@ const deskStyles = {
   },
   letter: {
     position: "relative",
-    width: "136px",
-    height: "94px",
+    width: "108px",
+    height: "72px",
     overflow: "hidden",
     border: "1px solid #ecdcd2",
     borderRadius: "13px",
@@ -631,15 +631,15 @@ const deskStyles = {
     right: 0,
     height: "52%",
     clipPath: "polygon(0 0,100% 0,50% 100%)",
-    background: "rgba(194,96,124,0.08)",
-    borderBottom: "1px solid rgba(194,96,124,0.10)",
+    background: "rgba(194,96,124,0.12)",
+    borderBottom: "1px solid rgba(194,96,124,0.14)",
   },
   letterFill: {
     position: "absolute",
     left: 0,
     right: 0,
     bottom: 0,
-    background: "linear-gradient(180deg, rgba(194,96,124,0.10), rgba(194,96,124,0.26))",
+    background: "linear-gradient(180deg, rgba(194,96,124,0.16), rgba(194,96,124,0.34))",
     transition: "height 250ms ease-out",
   },
   letterHint: {
