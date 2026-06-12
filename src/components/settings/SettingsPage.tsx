@@ -55,6 +55,7 @@ import {
 } from "../../lib/home/eveningDeliveryTrace";
 import {
   HOME_DESK_MODEL_ENABLED,
+  HOME_DESK_MODEL_OVERRIDE_STORAGE_KEY,
   readHomeDeskModelOverride,
 } from "../../lib/home/homeDeskModelFlag";
 
@@ -149,6 +150,30 @@ export function SettingsPage() {
       setActiveSettingsTab("general");
     }
   }, [activeSettingsTab, showsAdminSection]);
+
+  function updateHomeDeskModelOverride(enabled: boolean | null) {
+    if (typeof window === "undefined") {
+      return;
+    }
+
+    try {
+      if (enabled === null) {
+        window.localStorage.removeItem(HOME_DESK_MODEL_OVERRIDE_STORAGE_KEY);
+        setHomeDeskModelEnabled(HOME_DESK_MODEL_ENABLED);
+        return;
+      }
+
+      window.localStorage.setItem(
+        HOME_DESK_MODEL_OVERRIDE_STORAGE_KEY,
+        enabled ? "1" : "0",
+      );
+      setHomeDeskModelEnabled(enabled);
+    } catch {
+      setHomeDeskModelEnabled(
+        readHomeDeskModelOverride() ?? HOME_DESK_MODEL_ENABLED,
+      );
+    }
+  }
 
   async function checkAuthState() {
     const supabase = createBrowserSupabaseClient();
@@ -736,6 +761,8 @@ export function SettingsPage() {
               <BuildInfoPanel
                 buildSha={APP_BUILD_SHA}
                 homeDeskModelEnabled={homeDeskModelEnabled}
+                homeDeskModelDefaultEnabled={HOME_DESK_MODEL_ENABLED}
+                onSetHomeDeskModel={updateHomeDeskModelOverride}
               />
               <div style={styles.divider} />
               <button
@@ -1131,9 +1158,13 @@ function AuthDebugRow({ label, value }: { label: string; value: string }) {
 function BuildInfoPanel({
   buildSha,
   homeDeskModelEnabled,
+  homeDeskModelDefaultEnabled,
+  onSetHomeDeskModel,
 }: {
   buildSha: string;
   homeDeskModelEnabled: boolean;
+  homeDeskModelDefaultEnabled: boolean;
+  onSetHomeDeskModel: (enabled: boolean | null) => void;
 }) {
   return (
     <div style={styles.authDebugPanel}>
@@ -1147,7 +1178,45 @@ function BuildInfoPanel({
           label="home v3"
           value={homeDeskModelEnabled ? "on" : "off"}
         />
+        <AuthDebugRow
+          label="default"
+          value={homeDeskModelDefaultEnabled ? "on" : "off"}
+        />
       </div>
+      <div style={styles.flagToggleGroup} aria-label="ホームv3切り替え">
+        <button
+          type="button"
+          onClick={() => onSetHomeDeskModel(true)}
+          style={{
+            ...styles.flagToggleButton,
+            ...(homeDeskModelEnabled ? styles.flagToggleButtonActive : null),
+          }}
+          aria-pressed={homeDeskModelEnabled}
+        >
+          v3を使う
+        </button>
+        <button
+          type="button"
+          onClick={() => onSetHomeDeskModel(false)}
+          style={{
+            ...styles.flagToggleButton,
+            ...(!homeDeskModelEnabled ? styles.flagToggleButtonActive : null),
+          }}
+          aria-pressed={!homeDeskModelEnabled}
+        >
+          旧ホーム
+        </button>
+      </div>
+      <button
+        type="button"
+        onClick={() => onSetHomeDeskModel(null)}
+        style={styles.secondaryButton}
+      >
+        環境設定に戻す
+      </button>
+      <p style={styles.syncOverviewText}>
+        この端末だけの切り替えです。ホームへ戻ると反映されます。
+      </p>
     </div>
   );
 }
@@ -1866,6 +1935,26 @@ const styles = {
   authDebugRows: {
     display: "grid",
     gap: "7px",
+  },
+  flagToggleGroup: {
+    display: "grid",
+    gridTemplateColumns: "1fr 1fr",
+    gap: "8px",
+  },
+  flagToggleButton: {
+    minHeight: "44px",
+    borderRadius: "14px",
+    border: "1px solid rgba(120,108,94,0.16)",
+    background: "rgba(255,253,248,0.72)",
+    color: "#6f695f",
+    fontSize: "13px",
+    fontWeight: 700,
+    cursor: "pointer",
+  },
+  flagToggleButtonActive: {
+    border: `1px solid ${APP_ACCENT}`,
+    background: "rgba(153,53,86,0.1)",
+    color: APP_ACCENT,
   },
   authDebugRow: {
     display: "grid",
