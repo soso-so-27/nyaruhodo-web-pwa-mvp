@@ -45,6 +45,25 @@ test.describe("home desk model", () => {
     }
   });
 
+  test("keeps the left desk slot size stable before and after taking a photo", async ({
+    page,
+  }) => {
+    await seedDeskState(page, "1");
+    await page.goto("/home");
+    await page.waitForLoadState("networkidle");
+    const emptyBox = await page.getByTestId("desk-empty-frame").boundingBox();
+    expect(emptyBox).not.toBeNull();
+
+    await seedDeskState(page, "2");
+    await page.goto("/home");
+    await page.waitForLoadState("networkidle");
+    const photoBox = await page.getByTestId("desk-photo-tile").first().boundingBox();
+    expect(photoBox).not.toBeNull();
+
+    expect(Math.round(photoBox!.width)).toBe(Math.round(emptyBox!.width));
+    expect(Math.round(photoBox!.height)).toBe(Math.round(emptyBox!.height));
+  });
+
   test("opens the delivered letter only after the hold completes", async ({
     page,
   }) => {

@@ -185,6 +185,7 @@ export function HomeDeskModel({
             ) : (
               <button
                 type="button"
+                data-testid="desk-empty-frame"
                 style={deskStyles.emptyFrame}
                 className={prefersReducedMotion ? undefined : "desk-frame-breathe"}
                 onClick={onTakePhoto}
@@ -356,8 +357,8 @@ export function HomeDeskModel({
 
       <style>{`
         @keyframes deskFrameBreathe {
-          0%, 100% { transform: scale(1); }
-          50% { transform: scale(1.016); }
+          0%, 100% { border-color: #cfc4ae; box-shadow: 0 9px 20px rgba(120,104,80,0.08); }
+          50% { border-color: #bfb39d; box-shadow: 0 10px 22px rgba(120,104,80,0.10); }
         }
         @keyframes deskLetterShimmer {
           0%, 100% { opacity: 0.58; transform: translateX(-4px); }
@@ -412,12 +413,17 @@ function PhotoTile({
 }) {
   const imageSize =
     size === "mini" ? deskStyles.miniImage : size === "small" ? deskStyles.smallImage : deskStyles.tileImage;
+  const tileFrameStyle =
+    size === "normal"
+      ? { ...deskStyles.photoTile, ...deskStyles.normalPhotoTile }
+      : deskStyles.photoTile;
 
   return (
     <div style={deskStyles.photoTileWrap}>
       <div
+        data-testid={size === "normal" ? "desk-photo-tile" : undefined}
         style={{
-          ...deskStyles.photoTile,
+          ...tileFrameStyle,
           ...(size === "mini" ? deskStyles.miniTile : {}),
         }}
       >
@@ -585,17 +591,19 @@ const deskStyles = {
     flexDirection: "column",
     alignItems: "center",
     gap: "7px",
+    width: "144px",
   },
   slotRetreated: {
     opacity: 0.62,
     transform: "scale(0.76)",
   },
   emptyFrame: {
-    width: "128px",
-    height: "128px",
+    width: "144px",
+    height: "144px",
+    boxSizing: "border-box",
     display: "grid",
     placeItems: "center",
-    border: "1.6px dashed #cfc4ae",
+    border: "1px dashed #cfc4ae",
     borderRadius: "24px",
     background: "rgba(255,253,248,0.55)",
     color: "#b3a890",
@@ -723,6 +731,11 @@ const deskStyles = {
     borderRadius: "24px",
     background: "#fffdf8",
     boxShadow: "0 9px 20px rgba(120,104,80,0.12)",
+  },
+  normalPhotoTile: {
+    width: "144px",
+    height: "144px",
+    boxSizing: "border-box",
   },
   miniTile: {
     padding: "5px",
