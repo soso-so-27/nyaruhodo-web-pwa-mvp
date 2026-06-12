@@ -28,13 +28,15 @@ There is currently no Service Worker. The PWA is manifest-only, so do not assume
 ## Product Principles
 
 - The home screen answers three questions only:
-  - What do I do now? Heading + camera button.
-  - How far did today progress? Day-cycle motif.
+  - What do I do now? The two-slot desk model: today's frame + night's letter.
+  - How far did today progress? The state of those two slots.
   - Am I alone? Quiet presence line.
+- The current home v3 model has no standalone heading, no central camera button, and no separate day-cycle motif.
 - Night delivery is centered around the 8pm letter model.
 - Do not expose the delivery pool directly to the browser. Use server APIs for selection.
 - Do not turn supporter/payment features into functional restrictions. Supporter copy may explain what support helps sustain, but core features remain available.
-- Write user-facing copy in natural Japanese. Do not over-hiraganize text unless the specific screen intentionally uses a childlike voice.
+- Write user-facing copy in natural Japanese. `ねてるねこ` user-facing screens intentionally use a quiet, hiragana-forward voice; settings, legal, diagnostics, and admin surfaces should stay clearer and less childlike.
+- The design reference is 日とと記 (`diary.aaaaaso.com`): colorless quiet, serif + tracking, buttons as words, at most one filled surface per screen, and specialness made by copy and spacing rather than decoration. Use paper and ink only; photos carry color.
 
 ## Data And Privacy Rules
 
