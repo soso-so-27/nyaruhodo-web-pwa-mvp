@@ -156,7 +156,7 @@ function TodayPairIcon({ state }: { state: "1" | "1b" | "2" | "3" | "4" }) {
         height="14"
         rx="3"
         data-testid="today-pair-nav-slot"
-        fill={firstFilled ? "currentColor" : "var(--surface)"}
+        fill={firstFilled ? "currentColor" : "var(--paper)"}
         fillOpacity={firstFilled ? 1 : 0.48}
         stroke="currentColor"
         strokeWidth="1.6"
@@ -170,7 +170,7 @@ function TodayPairIcon({ state }: { state: "1" | "1b" | "2" | "3" | "4" }) {
         height="14"
         rx="3"
         data-testid="today-pair-nav-slot"
-        fill={secondFilled ? "currentColor" : "var(--surface)"}
+        fill={secondFilled ? "currentColor" : "var(--paper)"}
         fillOpacity={secondFilled ? 1 : 0.48}
         stroke="currentColor"
         strokeWidth="1.6"
@@ -196,7 +196,7 @@ const styles = {
     transform: "translateX(-50%)",
     border: "1px solid var(--line)",
     borderRadius: "var(--radius-tile)",
-    background: "color-mix(in srgb, var(--surface) 88%, transparent)",
+    background: "color-mix(in srgb, var(--paper) 88%, transparent)",
     boxShadow: "var(--shadow-float)",
     padding: "8px",
     backdropFilter: "blur(14px)",
@@ -209,7 +209,7 @@ const styles = {
     left: "8px",
     width: "calc((100% - 20px) / 3)",
     borderRadius: "var(--radius-tile)",
-    background: "var(--bg-evening)",
+    background: "var(--paper-card)",
     boxShadow: "var(--shadow-rest)",
     pointerEvents: "none",
     transition: "transform var(--dur-instant) var(--ease-settle)",
@@ -226,7 +226,7 @@ const styles = {
     minHeight: "60px",
     borderRadius: "var(--radius-tile)",
     background: "transparent",
-    color: "var(--sub)",
+    color: "var(--ink-soft)",
     textDecoration: "none",
     cursor: "pointer",
     transition:
@@ -256,7 +256,7 @@ const styles = {
     justifyContent: "center",
     width: "22px",
     height: "22px",
-    color: "var(--sub)",
+    color: "var(--ink-soft)",
     lineHeight: 1,
     transition: "color var(--dur-instant) var(--ease-gentle), transform var(--dur-instant) var(--ease-settle)",
   },
@@ -307,16 +307,18 @@ const styles = {
   },
   navLabel: {
     color: "currentColor",
+    fontFamily: "var(--font-serif)",
     fontSize: "10px",
-    fontWeight: 520,
+    fontWeight: 400,
     lineHeight: 1,
-    letterSpacing: 0,
+    letterSpacing: "var(--tracking-label)",
   },
   activeNavLabel: {
     color: "currentColor",
+    fontFamily: "var(--font-serif)",
     fontSize: "10px",
-    fontWeight: 640,
+    fontWeight: 400,
     lineHeight: 1,
-    letterSpacing: 0,
+    letterSpacing: "var(--tracking-label)",
   },
 } satisfies Record<string, CSSProperties>;

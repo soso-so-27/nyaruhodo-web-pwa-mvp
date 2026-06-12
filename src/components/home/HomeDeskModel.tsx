@@ -229,8 +229,15 @@ export function HomeDeskModel({
                     />
                   </span>
                 ) : null}
-                <span style={deskStyles.holdLabel}>おさえて ひらく</span>
               </button>
+              <span
+                style={{
+                  ...deskStyles.holdLabel,
+                  ...(holdProgress ? deskStyles.holdLabelActive : {}),
+                }}
+              >
+                おさえて ひらく
+              </span>
               {canTapOpen ? (
                 <button
                   type="button"
@@ -361,15 +368,15 @@ export function HomeDeskModel({
 
       <style>{`
         @keyframes deskFrameBreathe {
-          0%, 100% { border-color: var(--faint); box-shadow: var(--shadow-rest); }
-          50% { border-color: var(--sub); box-shadow: var(--shadow-rest); }
+          0%, 100% { border-color: var(--ink-faint); box-shadow: var(--shadow-rest); }
+          50% { border-color: var(--ink-soft); box-shadow: var(--shadow-rest); }
         }
         @keyframes deskLetterShimmer {
           0%, 100% { opacity: 0.58; transform: translateX(-4px); }
           50% { opacity: 1; transform: translateX(4px); }
         }
         .desk-frame-breathe {
-          animation: deskFrameBreathe calc(var(--dur-move) * 10) var(--ease-breathe) infinite;
+          animation: deskFrameBreathe calc(var(--dur-move) * 10) var(--ease-gentle) infinite;
         }
         .desk-letter-fill::before {
           content: "";
@@ -378,9 +385,9 @@ export function HomeDeskModel({
           right: 0;
           top: 0;
           height: 2px;
-          background: linear-gradient(90deg, transparent, var(--letter-meniscus), transparent);
+          background: linear-gradient(90deg, transparent, color-mix(in srgb, var(--ink-soft) 42%, transparent), transparent);
           box-shadow: var(--shadow-rest);
-          animation: deskLetterShimmer calc(var(--dur-reveal) * 4) var(--ease-breathe) infinite;
+          animation: deskLetterShimmer calc(var(--dur-reveal) * 4) var(--ease-gentle) infinite;
         }
         .desk-letter-holding [data-develop-photo="true"] {
           opacity: 1 !important;
@@ -553,13 +560,13 @@ const deskStyles = {
     padding:
       "calc(34px + env(safe-area-inset-top)) 22px calc(var(--bottom-nav-height) + var(--bottom-nav-bottom-offset) + 30px + env(safe-area-inset-bottom))",
     color: "var(--ink)",
-    background: "var(--bg-current, var(--bg-day))",
+    background: "var(--bg-gradient)",
   },
   duskLayer: {
     position: "absolute",
     inset: 0,
     pointerEvents: "none",
-    background: "linear-gradient(180deg, var(--bg-dusk), var(--bg-evening))",
+    background: "var(--paper-warm)",
     opacity: "var(--desk-dusk)",
     transition: "opacity var(--dur-instant) var(--ease-settle)",
   },
@@ -607,10 +614,10 @@ const deskStyles = {
     boxSizing: "border-box",
     display: "grid",
     placeItems: "center",
-    border: "1px dashed var(--faint)",
+    border: "1px dashed var(--ink-faint)",
     borderRadius: "var(--radius-tile)",
-    background: "color-mix(in srgb, var(--surface) 55%, transparent)",
-    color: "var(--sub)",
+    background: "color-mix(in srgb, var(--paper) 55%, transparent)",
+    color: "var(--ink-soft)",
     boxShadow: "var(--shadow-rest)",
     cursor: "pointer",
     WebkitTapHighlightColor: "transparent",
@@ -622,7 +629,7 @@ const deskStyles = {
     overflow: "hidden",
     border: "1px solid var(--line)",
     borderRadius: "var(--radius-s)",
-    background: "var(--letter-paper)",
+    background: "var(--paper-card)",
     boxShadow: "var(--shadow-rest)",
     transform: "rotate(-2.5deg)",
     opacity: 0.55,
@@ -643,20 +650,22 @@ const deskStyles = {
     right: 0,
     height: "52%",
     clipPath: "polygon(0 0,100% 0,50% 100%)",
-    background: "var(--letter-flap)",
-    borderBottom: "1px solid var(--letter-fill-0)",
+    background: "color-mix(in srgb, var(--ink) 4%, transparent)",
+    borderBottom: "1px solid var(--line)",
   },
   letterFill: {
     position: "absolute",
     left: 0,
     right: 0,
     bottom: 0,
-    background: "linear-gradient(180deg, var(--letter-fill-0), var(--letter-fill-1))",
+    background:
+      "linear-gradient(180deg, color-mix(in srgb, var(--ink-soft) 10%, transparent), color-mix(in srgb, var(--ink-soft) 20%, transparent))",
     transition: "height var(--dur-instant) var(--ease-gentle)",
   },
   letterHint: {
     minHeight: "16px",
-    color: "var(--sub)",
+    color: "var(--ink-soft)",
+    fontFamily: "var(--font-serif)",
     fontSize: "11.5px",
     letterSpacing: "0.06em",
     transition: "opacity var(--dur-instant) var(--ease-gentle)",
@@ -674,8 +683,8 @@ const deskStyles = {
     overflow: "hidden",
     border: "none",
     borderRadius: "var(--radius-tile)",
-    background: "linear-gradient(180deg, var(--rose-mist), var(--rose-soft))",
-    color: "var(--rose-deep)",
+    background: "var(--paper-card)",
+    color: "var(--seal)",
     boxShadow: "var(--shadow-float)",
     transform: "rotate(-2deg)",
     cursor: "pointer",
@@ -688,7 +697,7 @@ const deskStyles = {
     width: "16px",
     height: "16px",
     borderRadius: "var(--radius-tile)",
-    background: "var(--rose)",
+    background: "var(--seal)",
     boxShadow: "var(--shadow-rest)",
     transform: "translate(-50%,-50%)",
   },
@@ -708,23 +717,26 @@ const deskStyles = {
     borderRadius: "var(--radius-img)",
   },
   holdLabel: {
-    position: "absolute",
-    left: 0,
-    right: 0,
-    bottom: "22px",
+    color: "var(--ink-soft)",
+    fontFamily: "var(--font-serif)",
     fontSize: "12px",
-    fontWeight: 700,
-    letterSpacing: "0.14em",
+    fontWeight: 400,
+    letterSpacing: "var(--tracking-label)",
+  },
+  holdLabelActive: {
+    color: "var(--seal)",
   },
   fallbackOpenButton: {
     minHeight: "40px",
     padding: "0 18px",
-    border: "1px solid var(--rose-soft)",
+    border: "1px solid var(--line)",
     borderRadius: "var(--radius-tile)",
-    background: "color-mix(in srgb, var(--surface) 72%, transparent)",
-    color: "var(--rose-deep)",
+    background: "color-mix(in srgb, var(--paper) 72%, transparent)",
+    color: "var(--ink-soft)",
+    fontFamily: "var(--font-serif)",
     fontSize: "13px",
-    fontWeight: 700,
+    fontWeight: 400,
+    letterSpacing: "var(--tracking-label)",
   },
   photoTileWrap: {
     display: "flex",
@@ -735,7 +747,7 @@ const deskStyles = {
   photoTile: {
     padding: "8px",
     borderRadius: "var(--radius-tile)",
-    background: "var(--surface)",
+    background: "var(--paper)",
     boxShadow: "var(--shadow-rest)",
   },
   normalPhotoTile: {
@@ -764,18 +776,20 @@ const deskStyles = {
     borderRadius: "var(--radius-s)",
   },
   tileLabel: {
-    color: "var(--sub)",
+    color: "var(--ink-soft)",
     fontSize: "11.5px",
-    fontWeight: 560,
-    letterSpacing: "0.04em",
+    fontFamily: "var(--font-serif)",
+    fontWeight: 400,
+    letterSpacing: "var(--tracking-label)",
   },
   guidanceCopy: {
     minHeight: "18px",
     margin: "0",
-    color: "var(--sub)",
+    color: "var(--ink-soft)",
     fontSize: "11.5px",
-    fontWeight: 520,
-    letterSpacing: "0.03em",
+    fontFamily: "var(--font-serif)",
+    fontWeight: 400,
+    letterSpacing: "var(--tracking-label)",
     textAlign: "center",
   },
   openedPair: {
@@ -790,7 +804,7 @@ const deskStyles = {
     height: "128px",
     flexShrink: 0,
     background:
-      "radial-gradient(circle, var(--faint) 0 2px, transparent 2.6px) center / 10px 10px repeat-x",
+      "radial-gradient(circle, var(--ink-faint) 0 2px, transparent 2.6px) center / 10px 10px repeat-x",
     opacity: 0.75,
     alignSelf: "center",
   },
@@ -800,10 +814,12 @@ const deskStyles = {
     marginTop: "10px",
     border: "1px solid var(--line)",
     borderRadius: "var(--radius-tile)",
-    background: "color-mix(in srgb, var(--surface) 78%, transparent)",
+    background: "color-mix(in srgb, var(--paper) 78%, transparent)",
     color: "var(--ink)",
     fontSize: "18px",
-    fontWeight: 720,
+    fontFamily: "var(--font-serif)",
+    fontWeight: 400,
+    letterSpacing: "var(--tracking-label)",
     boxShadow: "var(--shadow-rest)",
   },
   yesterday: {
@@ -823,12 +839,13 @@ const deskStyles = {
     width: "20px",
     height: "8px",
     background:
-      "radial-gradient(circle, var(--faint) 0 1.8px, transparent 2.2px) center / 7px 7px repeat-x",
+      "radial-gradient(circle, var(--ink-faint) 0 1.8px, transparent 2.2px) center / 7px 7px repeat-x",
   },
   yesterdayLabel: {
-    color: "var(--faint)",
+    color: "var(--ink-faint)",
     fontSize: "10px",
-    letterSpacing: "0.1em",
+    fontFamily: "var(--font-serif)",
+    letterSpacing: "var(--tracking-label)",
   },
   presence: {
     position: "relative",
@@ -836,9 +853,10 @@ const deskStyles = {
     width: "min(100%, 390px)",
     minHeight: "18px",
     margin: "0 0 16px",
-    color: "var(--faint)",
+    color: "var(--ink-faint)",
     fontSize: "10.5px",
-    letterSpacing: "0.08em",
+    fontFamily: "var(--font-serif)",
+    letterSpacing: "var(--tracking-label)",
     textAlign: "center",
   },
 } satisfies Record<string, CSSProperties>;

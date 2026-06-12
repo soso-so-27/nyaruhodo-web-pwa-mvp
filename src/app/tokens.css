@@ -1,45 +1,37 @@
 :root {
-  /* ===== 色: 基調 ===== */
-  --ink: #4a4338;
-  --sub: #9a9183;
-  --faint: #c5bcab;
-  --line: #e7dfd0;
-  --surface: #fffdf8;
-  --surface-dim: #f4eee2;
+  /* ===== 紙とインク(これが全て) ===== */
+  --paper: #fbfaf7;
+  --paper-warm: #f4f1ea;
+  --paper-card: #f1efe9;
+  --ink: #3f3a33;
+  --ink-soft: #8a847a;
+  --ink-faint: #b8b2a6;
+  --line: #e3dfd5;
 
-  /* ===== 色: 背景の時間ランプ ===== */
-  --bg-morning: #faf6ec;
-  --bg-day: #f7f3ea;
-  --bg-dusk: #f3eadf;
-  --bg-evening: #efe4d7;
-  --bg-night: #ece0d4;
+  /* ===== 唯一の深色(封蝋と削除系のみ。面に塗らない) ===== */
+  --seal: #a8584e;
 
-  /* ===== 色: ローズ ===== */
-  --rose: #c2607c;
-  --rose-deep: #a84e68;
-  --rose-soft: #e8c9d3;
-  --rose-mist: #f5e7eb;
+  /* ===== 背景: 紙に当たる光(フラット禁止・全画面共通) ===== */
+  --bg-gradient: linear-gradient(180deg, var(--paper) 0%, var(--paper-warm) 100%);
 
-  /* ===== 色: 手紙 ===== */
-  --letter-paper: #fbf6f1;
-  --letter-flap: rgba(194, 96, 124, 0.08);
-  --letter-fill-0: rgba(194, 96, 124, 0.14);
-  --letter-fill-1: rgba(194, 96, 124, 0.30);
-  --letter-meniscus: rgba(194, 96, 124, 0.40);
+  /* ===== 影(2段・さらに弱く) ===== */
+  --shadow-rest: 0 4px 12px rgba(120, 110, 95, 0.08);
+  --shadow-float: 0 10px 24px rgba(120, 110, 95, 0.14);
 
-  /* ===== 影 ===== */
-  --shadow-rest: 0 6px 14px rgba(140, 112, 90, 0.10);
-  --shadow-float: 0 12px 26px rgba(160, 105, 115, 0.18);
-
-  /* ===== 角丸 ===== */
+  /* ===== 角丸(3段・据え置き) ===== */
   --radius-tile: 24px;
   --radius-img: 17px;
   --radius-s: 13px;
 
+  /* ===== 文字 ===== */
+  --font-serif: "Hiragino Mincho ProN", "Yu Mincho", serif;
+  --font-sans: -apple-system, "Hiragino Sans", sans-serif;
+  --tracking-label: 0.18em;
+  --tracking-body: 0.06em;
+
   /* ===== 動き ===== */
   --ease-settle: cubic-bezier(0.22, 1, 0.36, 1);
   --ease-gentle: cubic-bezier(0.4, 0, 0.2, 1);
-  --ease-breathe: ease-in-out;
   --dur-instant: 180ms;
   --dur-move: 420ms;
   --dur-reveal: 900ms;

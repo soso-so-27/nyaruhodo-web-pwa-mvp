@@ -1,7 +1,6 @@
 export const typography = {
-  fontSans: '-apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
-  fontSerif:
-    '"Shippori Mincho B1", "Hiragino Mincho ProN", "Yu Mincho", serif',
+  fontSans: 'var(--font-sans)',
+  fontSerif: 'var(--font-serif)',
 
   brand: {
     fontSize: 18,
@@ -26,30 +25,30 @@ export const typography = {
   },
   caption: {
     fontSize: 12,
-    fontWeight: 500,
+    fontWeight: 400,
     lineHeight: 1.45,
   },
   cta: {
     fontSize: 15,
-    fontWeight: 600,
+    fontWeight: 400,
     lineHeight: 1,
   },
 } as const;
 
 export const color = {
-  bg: "#f7f1e7",
-  pageBg: "linear-gradient(180deg, #fdfcf9 0%, #f7f5ef 100%)",
-  paper: "#fffdf8",
-  surface: "rgba(255,253,248,0.86)",
-  surfaceSoft: "rgba(255,253,248,0.54)",
-  text: "#332c26",
-  textStrong: "#202020",
-  textMuted: "#746a5f",
-  textFaint: "#9c9286",
-  accent: "#566052",
-  accentWarm: "#9a866b",
-  border: "rgba(120,108,94,0.12)",
-  danger: "#9b4a3d",
+  bg: "var(--paper-warm)",
+  pageBg: "var(--bg-gradient)",
+  paper: "var(--paper)",
+  surface: "var(--paper)",
+  surfaceSoft: "var(--paper-card)",
+  text: "var(--ink)",
+  textStrong: "var(--ink)",
+  textMuted: "var(--ink-soft)",
+  textFaint: "var(--ink-faint)",
+  accent: "var(--ink)",
+  accentWarm: "var(--ink-soft)",
+  border: "var(--line)",
+  danger: "var(--seal)",
 } as const;
 
 export const radius = {
@@ -64,9 +63,9 @@ export const radius = {
 
 export const shadow = {
   none: "none",
-  soft: "0 4px 12px rgba(90,76,60,0.035)",
-  card: "0 8px 18px rgba(90,76,60,0.045)",
-  floating: "0 14px 34px rgba(90,76,60,0.10)",
+  soft: "var(--shadow-rest)",
+  card: "var(--shadow-rest)",
+  floating: "var(--shadow-float)",
 } as const;
 
 export const spacing = {

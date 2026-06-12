@@ -17,6 +17,9 @@ const expectedShotNames = [
   "state4_2010_habit.png",
   "state1b_2030.png",
   "album_today.png",
+  "settings.png",
+  "cats.png",
+  "onboarding_intro.png",
   "nav_close_up.png",
 ];
 
@@ -164,6 +167,26 @@ test.describe("home desk model shots", () => {
       },
     });
   });
+
+  for (const shot of [
+    { name: "settings", route: "/settings" },
+    { name: "cats", route: "/cats" },
+    { name: "onboarding_intro", route: "/onboarding?test=1" },
+  ] as const) {
+    test(shot.name, async ({ page }) => {
+      await seedReviewState(page, {
+        now: Date.parse("2026-06-10T05:00:00.000Z"),
+        state: "2",
+        habit: false,
+      });
+      await page.goto(shot.route);
+      await page.waitForLoadState("networkidle");
+      await page.screenshot({
+        path: path.join(shotsDir, `${shot.name}.png`),
+        fullPage: true,
+      });
+    });
+  }
 });
 
 async function seedReviewState(
