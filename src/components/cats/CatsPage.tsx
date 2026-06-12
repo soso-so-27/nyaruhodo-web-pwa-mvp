@@ -38,24 +38,23 @@ const COAT_OPTIONS: { value: CatCoat; label: string; color: string }[] = [
 type EditableGender = "male" | "female" | "unknown" | "";
 type EditableCoat = CatCoat | "";
 
-const CATS_TEXT = "#2d2b27";
-const CATS_TEXT_STRONG = "#1f1d1a";
-const CATS_MUTED = "#777166";
-const CATS_FAINT = "#a49b8f";
-const CATS_PAPER = "#fffdf8";
-const CATS_BORDER = "#e8ddd0";
-const CATS_SERIF =
-  '"Shippori Mincho B1", "Hiragino Mincho ProN", "Yu Mincho", serif';
+const CATS_TEXT = "var(--ink)";
+const CATS_TEXT_STRONG = "var(--ink)";
+const CATS_MUTED = "var(--ink-soft)";
+const CATS_FAINT = "var(--ink-faint)";
+const CATS_PAPER = "var(--paper)";
+const CATS_BORDER = "var(--line)";
+const CATS_SERIF = "var(--font-serif)";
 const CATS_SURFACE: CSSProperties = {
   position: "relative",
-  background: "rgba(255,253,248,0.86)",
-  border: "1px solid rgba(120,108,94,0.12)",
-  boxShadow: "0 8px 18px rgba(90,76,60,0.045)",
+  background: "color-mix(in srgb, var(--paper) 86%, transparent)",
+  border: "1px solid var(--line)",
+  boxShadow: "var(--shadow-rest)",
 };
 const CATS_SURFACE_SOFT: CSSProperties = {
   ...CATS_SURFACE,
-  background: "rgba(255,253,248,0.54)",
-  boxShadow: "0 6px 14px rgba(90,76,60,0.035)",
+  background: "color-mix(in srgb, var(--paper) 54%, transparent)",
+  boxShadow: "var(--shadow-rest)",
 };
 const ONBOARDING_ALBUM_COMPLETION_READY_KEY =
   "neteruneko_onboarding_album_completion_ready";
@@ -1161,18 +1160,16 @@ const styles = {
   page: {
     position: "relative",
     minHeight: "100vh",
-    background: "#f7f1e7",
+    background: "var(--bg-gradient)",
     color: CATS_TEXT,
     overflowX: "hidden",
-    fontFamily:
-      '-apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
+    fontFamily: "var(--font-sans)",
   },
   ambientBackground: {
     position: "fixed" as const,
     inset: 0,
     zIndex: 0,
-    background:
-      "linear-gradient(180deg, #fffdf8 0%, #f8f2e8 52%, #f2e8d9 100%)",
+    background: "var(--bg-gradient)",
   },
   ambientHighlight: {
     position: "fixed" as const,
@@ -1180,7 +1177,7 @@ const styles = {
     zIndex: 0,
     pointerEvents: "none" as const,
     background:
-      "linear-gradient(115deg, rgba(255,255,255,0.46) 0%, rgba(255,255,255,0) 42%, rgba(180,156,120,0.09) 100%)",
+      "linear-gradient(115deg, color-mix(in srgb, var(--paper) 46%, transparent) 0%, transparent 42%, color-mix(in srgb, var(--ink-soft) 9%, transparent) 100%)",
   },
   backgroundVeil: {
     position: "fixed" as const,
@@ -1188,7 +1185,7 @@ const styles = {
     zIndex: 1,
     pointerEvents: "none" as const,
     background:
-      "linear-gradient(to bottom, rgba(255,255,255,0.18) 0%, rgba(255,255,255,0) 46%, rgba(180,158,126,0.08) 100%)",
+      "linear-gradient(to bottom, color-mix(in srgb, var(--paper) 18%, transparent) 0%, transparent 46%, color-mix(in srgb, var(--ink-soft) 8%, transparent) 100%)",
   },
   container: {
     position: "relative",
@@ -1211,7 +1208,7 @@ const styles = {
     margin: "0 0 5px",
     color: CATS_MUTED,
     fontSize: "11px",
-    fontWeight: 620,
+    fontWeight: 400,
     letterSpacing: "0.12em",
   },
   pageTitle: {
@@ -1245,17 +1242,17 @@ const styles = {
   },
   onboardingPanel: {
     ...CATS_SURFACE_SOFT,
-    borderRadius: "24px",
+    borderRadius: "var(--radius-tile)",
     padding: "20px 18px 18px",
     marginBottom: "22px",
     textAlign: "center",
-    boxShadow: "0 8px 18px rgba(90,76,60,0.045)",
+    boxShadow: "var(--shadow-rest)",
   },
   onboardingKicker: {
     margin: "0 0 8px",
     color: CATS_MUTED,
     fontSize: "11px",
-    fontWeight: 700,
+    fontWeight: 400,
     lineHeight: 1.4,
     letterSpacing: "0.08em",
   },
@@ -1264,7 +1261,7 @@ const styles = {
     color: CATS_TEXT_STRONG,
     fontFamily: CATS_SERIF,
     fontSize: "22px",
-    fontWeight: 500,
+    fontWeight: 400,
     lineHeight: 1.45,
     letterSpacing: "0.08em",
   },
@@ -1284,28 +1281,30 @@ const styles = {
     marginTop: "18px",
     padding: "0 22px",
     borderRadius: "999px",
-    border: "1px solid rgba(120,108,94,0.12)",
-    background: "rgba(255,253,248,0.66)",
+    border: "1px solid var(--line)",
+    background: "color-mix(in srgb, var(--paper) 66%, transparent)",
     color: CATS_TEXT,
     textDecoration: "none",
     fontSize: "13px",
-    fontWeight: 650,
+    fontFamily: "var(--font-serif)",
+    letterSpacing: "var(--tracking-label)",
+    fontWeight: 400,
   },
   onboardingHomeButton: {
     marginTop: "18px",
   },
   profileCard: {
     ...CATS_SURFACE,
-    borderRadius: "21px",
+    borderRadius: "var(--radius-tile)",
     padding: "18px 17px",
     marginBottom: "12px",
   },
   profilePlaceCard: {
     ...CATS_SURFACE_SOFT,
-    borderRadius: "24px",
+    borderRadius: "var(--radius-tile)",
     padding: "17px 16px 16px",
     marginBottom: "12px",
-    boxShadow: "0 6px 14px rgba(90,76,60,0.035)",
+    boxShadow: "var(--shadow-rest)",
   },
   profileHero: {
     display: "grid",
@@ -1316,16 +1315,16 @@ const styles = {
   profileHeroAvatar: {
     width: "64px",
     height: "64px",
-    borderRadius: "19px",
-    border: "1px solid rgba(120,108,94,0.10)",
-    background: "rgba(255,253,248,0.46)",
+    borderRadius: "var(--radius-img)",
+    border: "1px solid var(--line)",
+    background: "color-mix(in srgb, var(--paper) 46%, transparent)",
     overflow: "hidden",
     display: "flex",
     alignItems: "center",
     justifyContent: "center",
     padding: 0,
     cursor: "pointer",
-    boxShadow: "0 4px 10px rgba(90,76,60,0.028)",
+    boxShadow: "var(--shadow-rest)",
   },
   profileHeroAvatarPhoto: {
     width: "100%",
@@ -1359,8 +1358,8 @@ const styles = {
     width: "32px",
     height: "32px",
     color: CATS_FAINT,
-    border: "1px solid rgba(120,108,94,0.08)",
-    background: "rgba(255,253,248,0.28)",
+    border: "1px solid var(--line)",
+    background: "color-mix(in srgb, var(--paper) 28%, transparent)",
     borderRadius: "999px",
     padding: 0,
     display: "inline-flex",
@@ -1370,8 +1369,8 @@ const styles = {
   },
   iconActionBtnActive: {
     color: CATS_MUTED,
-    border: "1px solid rgba(120,108,94,0.16)",
-    background: "rgba(255,253,248,0.62)",
+    border: "1px solid var(--line)",
+    background: "color-mix(in srgb, var(--paper) 62%, transparent)",
   },
   catSwitchMaskIcon: {
     width: "20px",
@@ -1388,9 +1387,9 @@ const styles = {
     WebkitMaskSize: "contain",
   },
   recordList: {
-    borderRadius: "18px",
-    border: "1px solid rgba(120,108,94,0.09)",
-    background: "rgba(255,253,248,0.40)",
+    borderRadius: "var(--radius-s)",
+    border: "1px solid var(--line)",
+    background: "color-mix(in srgb, var(--paper) 40%, transparent)",
     padding: "6px 13px",
   },
   recordRow: {
@@ -1399,7 +1398,7 @@ const styles = {
     alignItems: "center",
     gap: "12px",
     minHeight: "38px",
-    borderBottom: "1px solid rgba(120,108,94,0.065)",
+    borderBottom: "1px solid color-mix(in srgb, var(--line) 65%, transparent)",
   },
   recordRowLast: {
     borderBottom: "none",
@@ -1456,9 +1455,9 @@ const styles = {
   footprintCard: {
     width: "132px",
     minHeight: "128px",
-    border: "1px solid rgba(120,108,94,0.09)",
-    borderRadius: "17px",
-    background: "rgba(255,253,248,0.38)",
+    border: "1px solid var(--line)",
+    borderRadius: "var(--radius-img)",
+    background: "color-mix(in srgb, var(--paper) 38%, transparent)",
     padding: "9px",
     display: "grid",
     gap: "7px",
@@ -1468,9 +1467,9 @@ const styles = {
   footprintCardEmpty: {
     width: "132px",
     minHeight: "128px",
-    border: "1px dashed rgba(120,108,94,0.12)",
-    borderRadius: "17px",
-    background: "rgba(255,253,248,0.20)",
+    border: "1px dashed var(--line)",
+    borderRadius: "var(--radius-img)",
+    background: "color-mix(in srgb, var(--paper) 20%, transparent)",
     padding: "9px",
     display: "grid",
     gap: "7px",
@@ -1493,9 +1492,9 @@ const styles = {
     width: "100%",
     aspectRatio: "1 / 1",
     minHeight: "64px",
-    borderRadius: "13px",
+    borderRadius: "var(--radius-s)",
     objectFit: "cover",
-    background: "rgba(255,253,248,0.56)",
+    background: "color-mix(in srgb, var(--paper) 56%, transparent)",
   },
   footprintDate: {
     color: CATS_MUTED,
@@ -1507,10 +1506,10 @@ const styles = {
     width: "100%",
     aspectRatio: "1 / 1",
     minHeight: "64px",
-    borderRadius: "13px",
-    border: "1px solid rgba(120,108,94,0.08)",
+    borderRadius: "var(--radius-s)",
+    border: "1px solid var(--line)",
     background:
-      "linear-gradient(135deg, rgba(255,253,248,0.22), rgba(247,241,231,0.28))",
+      "linear-gradient(135deg, color-mix(in srgb, var(--paper) 22%, transparent), color-mix(in srgb, var(--paper-warm) 28%, transparent))",
   },
   profileNotes: {
     display: "flex",
@@ -1519,9 +1518,9 @@ const styles = {
     marginTop: "12px",
   },
   profileNote: {
-    border: "1px solid rgba(120,108,94,0.10)",
+    border: "1px solid var(--line)",
     borderRadius: "999px",
-    background: "rgba(255,253,248,0.32)",
+    background: "color-mix(in srgb, var(--paper) 32%, transparent)",
     color: CATS_MUTED,
     fontSize: "11px",
     fontWeight: 500,
@@ -1534,9 +1533,9 @@ const styles = {
   },
   catSheetOption: {
     minHeight: "54px",
-    border: "1px solid rgba(120,108,94,0.09)",
-    borderRadius: "17px",
-    background: "rgba(255,253,248,0.44)",
+    border: "1px solid var(--line)",
+    borderRadius: "var(--radius-img)",
+    background: "color-mix(in srgb, var(--paper) 44%, transparent)",
     color: CATS_TEXT,
     display: "grid",
     gridTemplateColumns: "42px 1fr auto",
@@ -1547,22 +1546,22 @@ const styles = {
     textAlign: "left",
   },
   catSheetOptionActive: {
-    background: "rgba(247,241,231,0.78)",
-    border: "1px solid rgba(120,108,94,0.16)",
+    background: "color-mix(in srgb, var(--paper-warm) 78%, transparent)",
+    border: "1px solid var(--line)",
   },
   catSheetPhoto: {
     width: "42px",
     height: "42px",
-    borderRadius: "13px",
+    borderRadius: "var(--radius-s)",
     objectFit: "cover",
-    background: "rgba(255,253,248,0.58)",
+    background: "color-mix(in srgb, var(--paper) 58%, transparent)",
   },
   catSheetAvatar: {
     width: "42px",
     height: "42px",
-    borderRadius: "13px",
+    borderRadius: "var(--radius-s)",
     objectFit: "contain",
-    background: "rgba(255,253,248,0.58)",
+    background: "color-mix(in srgb, var(--paper) 58%, transparent)",
     padding: "5px",
     boxSizing: "border-box",
   },
@@ -1579,9 +1578,9 @@ const styles = {
   },
   catSheetAdd: {
     minHeight: "42px",
-    border: "1px dashed rgba(120,108,94,0.14)",
-    borderRadius: "15px",
-    background: "rgba(255,253,248,0.24)",
+    border: "1px dashed var(--line)",
+    borderRadius: "var(--radius-s)",
+    background: "color-mix(in srgb, var(--paper) 24%, transparent)",
     color: CATS_MUTED,
     fontSize: "12px",
     fontWeight: 560,
@@ -1604,7 +1603,7 @@ const styles = {
   homePhotoPreview: {
     width: "76px",
     height: "98px",
-    borderRadius: "16px",
+    borderRadius: "var(--radius-img)",
     overflow: "hidden",
     ...CATS_SURFACE_SOFT,
     display: "flex",
@@ -1647,9 +1646,9 @@ const styles = {
   },
   homePhotoButton: {
     width: "fit-content",
-    border: "1px solid rgba(120,108,94,0.12)",
+    border: "1px solid var(--line)",
     borderRadius: "99px",
-    background: "rgba(255,253,248,0.46)",
+    background: "color-mix(in srgb, var(--paper) 46%, transparent)",
     color: CATS_MUTED,
     fontSize: "11.5px",
     fontWeight: 520,
@@ -1658,7 +1657,7 @@ const styles = {
   },
   divider: {
     border: "none",
-    borderTop: "1px solid rgba(120,108,94,0.075)",
+    borderTop: "1px solid color-mix(in srgb, var(--line) 75%, transparent)",
     margin: "15px -16px",
   },
   infoRow: {
@@ -1705,9 +1704,9 @@ const styles = {
   },
   coatSection: {
     marginTop: "10px",
-    border: "1px solid rgba(120,108,94,0.08)",
-    borderRadius: "18px",
-    background: "rgba(255,253,248,0.30)",
+    border: "1px solid var(--line)",
+    borderRadius: "var(--radius-s)",
+    background: "color-mix(in srgb, var(--paper) 30%, transparent)",
     padding: "12px 13px",
   },
   coatHeader: {
@@ -1729,7 +1728,7 @@ const styles = {
     minHeight: "34px",
     border: `1px solid ${CATS_BORDER}`,
     borderRadius: "999px",
-    background: "rgba(255,253,248,0.64)",
+    background: "color-mix(in srgb, var(--paper) 64%, transparent)",
     color: CATS_TEXT,
     fontSize: "13px",
     fontWeight: 540,
@@ -1738,23 +1737,23 @@ const styles = {
     cursor: "pointer",
   },
   coatButtonActive: {
-    borderColor: "rgba(120,108,94,0.42)",
+    borderColor: "var(--ink-soft)",
     background: CATS_PAPER,
-    color: "#2a2a28",
+    color: CATS_TEXT,
   },
   coatSwatch: {
     display: "inline-block",
     width: "14px",
     height: "14px",
-    border: "1px solid rgba(120,108,94,0.2)",
+    border: "1px solid var(--line)",
     borderRadius: "999px",
     flex: "0 0 auto",
   },
   editor: {
     marginTop: "10px",
-    border: "1px solid rgba(120,108,94,0.08)",
-    borderRadius: "18px",
-    background: "rgba(255,253,248,0.36)",
+    border: "1px solid var(--line)",
+    borderRadius: "var(--radius-s)",
+    background: "color-mix(in srgb, var(--paper) 36%, transparent)",
     padding: "13px",
     display: "grid",
     gap: "10px",
@@ -1771,9 +1770,9 @@ const styles = {
     width: "100%",
     boxSizing: "border-box",
     minHeight: "48px",
-    border: "1px solid rgba(120,108,94,0.14)",
-    borderRadius: "13px",
-    background: "rgba(255,253,248,0.72)",
+    border: "1px solid var(--line)",
+    borderRadius: "var(--radius-s)",
+    background: "color-mix(in srgb, var(--paper) 72%, transparent)",
     color: CATS_TEXT,
     fontSize: "14px",
     fontWeight: 500,
@@ -1782,7 +1781,7 @@ const styles = {
   },
   duplicateCatWarning: {
     margin: "-2px 0 0",
-    color: "#8a6d5b",
+    color: CATS_MUTED,
     fontSize: "12px",
     lineHeight: 1.6,
   },
@@ -1796,9 +1795,9 @@ const styles = {
     width: "100%",
     boxSizing: "border-box",
     minHeight: "44px",
-    border: "1px solid rgba(120,108,94,0.14)",
-    borderRadius: "13px",
-    background: "rgba(255,253,248,0.72)",
+    border: "1px solid var(--line)",
+    borderRadius: "var(--radius-s)",
+    background: "color-mix(in srgb, var(--paper) 72%, transparent)",
     color: CATS_TEXT,
     fontSize: "14px",
     padding: "0 14px",
@@ -1810,18 +1809,18 @@ const styles = {
   },
   genderBtn: {
     minHeight: "36px",
-    border: "1px solid rgba(120,108,94,0.12)",
+    border: "1px solid var(--line)",
     borderRadius: "999px",
-    background: "rgba(255,253,248,0.42)",
+    background: "color-mix(in srgb, var(--paper) 42%, transparent)",
     color: CATS_TEXT,
     fontSize: "11.5px",
     fontWeight: 500,
     cursor: "pointer",
   },
   genderBtnActive: {
-    border: "1px solid rgba(120,108,94,0.42)",
+    border: "1px solid var(--ink-soft)",
     background: CATS_PAPER,
-    color: "#2a2a28",
+    color: CATS_TEXT,
     fontWeight: 600,
   },
   actions: {
@@ -1832,10 +1831,10 @@ const styles = {
   saveButton: {
     minHeight: "42px",
     padding: "0 20px",
-    border: "1px solid rgba(120,108,94,0.16)",
+    border: "1px solid var(--line)",
     borderRadius: "999px",
-    background: "rgba(255,253,248,0.72)",
-    color: "#2a2a28",
+    background: "color-mix(in srgb, var(--paper) 72%, transparent)",
+    color: CATS_TEXT,
     fontSize: "13px",
     fontWeight: 560,
     letterSpacing: 0,
@@ -1845,8 +1844,8 @@ const styles = {
     minHeight: "40px",
     padding: "0 18px",
     border: `1px solid ${CATS_BORDER}`,
-    borderRadius: "12px",
-    background: "rgba(255,253,248,0.5)",
+    borderRadius: "var(--radius-s)",
+    background: "color-mix(in srgb, var(--paper) 50%, transparent)",
     color: CATS_TEXT,
     fontSize: "14px",
     fontWeight: 520,

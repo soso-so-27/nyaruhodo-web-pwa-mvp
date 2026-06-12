@@ -747,7 +747,7 @@ export function SettingsPage() {
                   </p>
                 </div>
                 {!isLoggedIn ? (
-                  <a href="/account/create" style={styles.primaryButton}>
+                  <a href="/account/create" style={styles.secondaryButton}>
                     ログインして参加する
                   </a>
                 ) : null}
@@ -979,7 +979,7 @@ function BetaSupporterPanel({
       <p style={styles.betaNoteText}>
         これからの ねてるねこと、応援の使いみちを見られます。
       </p>
-      <a href="/beta-supporter" style={styles.primaryButton}>
+      <a href="/beta-supporter" style={styles.secondaryButton}>
         これからの ねてるねこ
       </a>
       {billingMessage ? (
@@ -1986,9 +1986,9 @@ const styles = {
     cursor: "pointer",
   },
   flagToggleButtonActive: {
-    border: `1px solid ${APP_ACCENT}`,
-    background: "rgba(153,53,86,0.1)",
-    color: APP_ACCENT,
+    border: "1px solid var(--line)",
+    background: "var(--paper-card)",
+    color: "var(--ink)",
   },
   authDebugRow: {
     display: "grid",
@@ -2029,10 +2029,12 @@ const styles = {
     boxSizing: "border-box" as const,
     padding: "12px 14px",
     fontSize: "14px",
-    fontWeight: 650,
-    color: "#5f584f",
-    background: "rgba(255,253,248,0.72)",
-    border: "1px solid rgba(120,108,94,0.16)",
+    fontFamily: "var(--font-serif)",
+    letterSpacing: "var(--tracking-label)",
+    fontWeight: 400,
+    color: "var(--ink-soft)",
+    background: "color-mix(in srgb, var(--paper) 72%, transparent)",
+    border: "1px solid var(--line)",
     borderRadius: "14px",
     textDecoration: "none",
     cursor: "pointer",
