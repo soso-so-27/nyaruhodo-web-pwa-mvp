@@ -20,8 +20,8 @@ const expectedShotNames = [
   "nav_close_up.png",
 ];
 
-const ownDataUrl = readFixtureDataUrl("cat-photo-mugi.svg");
-const deliveredDataUrl = readFixtureDataUrl("cat-photo-letter.svg");
+const ownDataUrl = readFixtureDataUrl("cat-photo-mugi.jpg");
+const deliveredDataUrl = readFixtureDataUrl("cat-photo-letter.jpg");
 
 test.beforeAll(() => {
   const normalizedShotsDir = path.normalize(shotsDir);
@@ -188,7 +188,6 @@ async function seedReviewState(
 
       const catId = "cat-shot-mugi";
       const dateKey = "2026-06-10";
-      const yesterdayKey = "2026-06-09";
       const ownPhoto = {
         id: "own-shot-today",
         ownerCatId: catId,
@@ -202,11 +201,6 @@ async function seedReviewState(
         shared: true,
         createdAt: Date.parse("2026-06-10T02:40:00.000Z"),
       };
-      const yesterdayPhoto = {
-        ...ownPhoto,
-        id: "own-shot-yesterday",
-        createdAt: Date.parse("2026-06-09T02:40:00.000Z"),
-      };
       const deliveredPhoto = {
         id: "delivered-shot-today",
         sourcePhotoId: "source-shot-today",
@@ -217,26 +211,7 @@ async function seedReviewState(
         theme: "sleeping",
         deliveredAt: Date.parse("2026-06-10T11:05:00.000Z"),
       };
-      const yesterdayDeliveredPhoto = {
-        ...deliveredPhoto,
-        id: "delivered-shot-yesterday",
-        sourcePhotoId: "source-shot-yesterday",
-        deliveredAt: Date.parse("2026-06-09T11:05:00.000Z"),
-      };
       const store: Record<string, unknown> = {};
-
-      if (state === "1" || state === "1b") {
-        store[yesterdayKey] = {
-          dateKey: yesterdayKey,
-          targetOwnPhotoId: yesterdayPhoto.id,
-          targetCatId: catId,
-          targetCapturedAt: yesterdayPhoto.createdAt,
-          targetPhoto: yesterdayPhoto,
-          deliveredPhoto: yesterdayDeliveredPhoto,
-          deliveredAt: yesterdayDeliveredPhoto.deliveredAt,
-          openedAt: yesterdayDeliveredPhoto.deliveredAt + 1000,
-        };
-      }
 
       window.localStorage.setItem("neteruneko_home_desk_model", "1");
       window.localStorage.setItem("nyaruhodo_sleeping_safety_accepted", "1");
@@ -253,7 +228,7 @@ async function seedReviewState(
         ]),
       );
 
-      const ownPhotos = [yesterdayPhoto];
+      const ownPhotos = [] as typeof ownPhoto[];
       if (state !== "1" && state !== "1b") {
         ownPhotos.unshift(ownPhoto);
         store[dateKey] = {
@@ -315,6 +290,6 @@ async function seedReviewState(
 
 function readFixtureDataUrl(fileName: string) {
   const filePath = path.resolve(workspaceRoot, "tests", "fixtures", fileName);
-  const svg = fs.readFileSync(filePath);
-  return `data:image/svg+xml;base64,${svg.toString("base64")}`;
+  const jpeg = fs.readFileSync(filePath);
+  return `data:image/jpeg;base64,${jpeg.toString("base64")}`;
 }

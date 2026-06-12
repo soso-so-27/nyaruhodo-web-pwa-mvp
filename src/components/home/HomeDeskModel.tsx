@@ -181,7 +181,6 @@ export function HomeDeskModel({
               <PhotoTile
                 photo={targetPhoto}
                 size={deskState === "3" ? "small" : "normal"}
-                label={deskState === "4" && showGuidanceCopy ? catName : undefined}
               />
             ) : (
               <button
@@ -297,7 +296,7 @@ export function HomeDeskModel({
 
         {deskState === "4" && targetPhoto && deliveredPhoto ? (
           <div style={deskStyles.openedPair} aria-label="きょうの2まい">
-            <PhotoTile photo={targetPhoto} label={showGuidanceCopy ? catName : undefined} />
+            <PhotoTile photo={targetPhoto} />
             <span style={deskStyles.pairDots} aria-hidden="true" />
             <PhotoTile
               photo={deliveredPhoto}
@@ -746,18 +745,18 @@ const deskStyles = {
     borderRadius: "12px",
   },
   tileLabel: {
-    color: "#9a9183",
+    color: "#a89f92",
     fontSize: "11.5px",
-    fontWeight: 650,
+    fontWeight: 560,
     letterSpacing: "0.04em",
   },
   guidanceCopy: {
     minHeight: "18px",
     margin: "0",
-    color: "#8f8678",
-    fontSize: "13px",
-    fontWeight: 560,
-    letterSpacing: "0.04em",
+    color: "#9a9183",
+    fontSize: "11.5px",
+    fontWeight: 520,
+    letterSpacing: "0.03em",
     textAlign: "center",
   },
   openedPair: {

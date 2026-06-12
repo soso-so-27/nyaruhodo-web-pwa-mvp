@@ -65,6 +65,8 @@ export function CatsPage() {
   const [activeCatId, setActiveCatId] = useState<string | null>(null);
   const [catNameInput, setCatNameInput] = useState("");
   const [newCatNameInput, setNewCatNameInput] = useState("");
+  const [duplicateCatNameToConfirm, setDuplicateCatNameToConfirm] =
+    useState<string | null>(null);
   const [isEditingCatName, setIsEditingCatName] = useState(false);
   const [isEditingProfile, setIsEditingProfile] = useState(false);
   const [isAddingCat, setIsAddingCat] = useState(false);
@@ -168,6 +170,7 @@ export function CatsPage() {
 
   function startAddingCat() {
     setNewCatNameInput("");
+    setDuplicateCatNameToConfirm(null);
     setMessage("");
     setSaveMessage("");
     setIsAddingCat(true);
@@ -178,10 +181,23 @@ export function CatsPage() {
 
   function cancelAddingCat() {
     setNewCatNameInput("");
+    setDuplicateCatNameToConfirm(null);
     setIsAddingCat(false);
   }
 
   function handleAddCatSave() {
+    const trimmedName = newCatNameInput.trim();
+    const duplicateProfile = findDuplicateCatName(catProfiles, trimmedName);
+
+    if (
+      duplicateProfile &&
+      duplicateCatNameToConfirm !== normalizeCatNameForMatch(trimmedName)
+    ) {
+      setDuplicateCatNameToConfirm(normalizeCatNameForMatch(trimmedName));
+      setMessage("");
+      return;
+    }
+
     const result = addCatProfile(catProfiles, newCatNameInput);
 
     if (!result) {
@@ -197,6 +213,7 @@ export function CatsPage() {
     setActiveCatId(result.activeCatId);
     setCatNameInput(activeProfile.name);
     setNewCatNameInput("");
+    setDuplicateCatNameToConfirm(null);
     setIsAddingCat(false);
     setMessage("保存しました。");
   }
@@ -402,17 +419,25 @@ export function CatsPage() {
               id="new-cat-name"
               type="text"
               value={newCatNameInput}
-              onChange={(event) => setNewCatNameInput(event.target.value)}
+              onChange={(event) => {
+                setNewCatNameInput(event.target.value);
+                setDuplicateCatNameToConfirm(null);
+              }}
               placeholder={"例：麦"}
               style={styles.input}
             />
+            {duplicateCatNameToConfirm ? (
+              <p style={styles.duplicateCatWarning}>
+                おなじこかもしれません。別のねことして保存しますか？
+              </p>
+            ) : null}
             <div style={styles.actions}>
               <button
                 type="button"
                 onClick={handleAddCatSave}
                 style={styles.saveButton}
               >
-                {"保存"}
+                {duplicateCatNameToConfirm ? "別のねことして保存" : "保存"}
               </button>
               <button
                 type="button"
@@ -797,6 +822,30 @@ function formatFootprintDate(timestamp: number) {
     2,
     "0",
   )}/${String(date.getDate()).padStart(2, "0")}`;
+}
+
+function findDuplicateCatName(profiles: CatProfile[], name: string) {
+  const normalizedName = normalizeCatNameForMatch(name);
+
+  if (!normalizedName) {
+    return null;
+  }
+
+  return (
+    profiles.find(
+      (profile) => normalizeCatNameForMatch(profile.name) === normalizedName,
+    ) ?? null
+  );
+}
+
+function normalizeCatNameForMatch(name: string) {
+  return name
+    .trim()
+    .normalize("NFKC")
+    .replace(/[\u3041-\u3096]/g, (char) =>
+      String.fromCharCode(char.charCodeAt(0) + 0x60),
+    )
+    .toLocaleLowerCase("ja-JP");
 }
 
 function CatSwitchIcon() {
@@ -1730,6 +1779,12 @@ const styles = {
     fontWeight: 500,
     letterSpacing: 0,
     padding: "0 14px",
+  },
+  duplicateCatWarning: {
+    margin: "-2px 0 0",
+    color: "#8a6d5b",
+    fontSize: "12px",
+    lineHeight: 1.6,
   },
   editLabel: {
     fontSize: "11.5px",

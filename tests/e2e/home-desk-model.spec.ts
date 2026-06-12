@@ -90,6 +90,35 @@ test.describe("home desk model", () => {
     await expect(page.getByText("むぎ、ねてる?")).toHaveCount(0);
   });
 
+  test("only labels the delivered tile during week one", async ({ page }) => {
+    await seedDeskState(page, "4");
+    await page.goto("/home");
+    await page.waitForLoadState("networkidle");
+
+    await expect(page.getByTestId("home-desk-model")).toHaveAttribute(
+      "data-state",
+      "4",
+    );
+    await expect(page.getByText(/\u3069\u3053\u304b\u306e\u3053/)).toBeVisible();
+    await expect(page.getByText(/\u3080\u304e/)).toHaveCount(0);
+  });
+
+  test("hides desk labels after the habit threshold", async ({ page }) => {
+    await seedDeskState(page, "4", {
+      keptExchangePhotoCount: 6,
+      firstTargetDateKey: "2026-06-01",
+    });
+    await page.goto("/home");
+    await page.waitForLoadState("networkidle");
+
+    await expect(page.getByTestId("home-desk-model")).toHaveAttribute(
+      "data-state",
+      "4",
+    );
+    await expect(page.getByText(/\u3069\u3053\u304b\u306e\u3053/)).toHaveCount(0);
+    await expect(page.getByText(/\u3080\u304e/)).toHaveCount(0);
+  });
+
   test("shows yesterday mini when previous delivery data exists", async ({
     page,
   }) => {

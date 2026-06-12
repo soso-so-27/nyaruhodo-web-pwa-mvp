@@ -923,8 +923,8 @@ function AlbumTodayCard({
         <EmptyState
           description={
             scope === "own"
-              ? "ねがおを入れると、ここに ならびます"
-              : "ねがおを入れると、よる8じに ここへ とどきます"
+              ? "ねがおをとると、ここに ならびます"
+              : "ねがおをとると、よる8じに ここへ とどきます"
           }
           style={styles.todayAlbumEmptyState}
         />
@@ -1348,7 +1348,7 @@ function BoxPhotoDetailSheet({
       ) : (
         <div style={styles.photoEmpty}>
           <span style={styles.photoEmptyText}>
-            {kind === "sleeping" ? "ねがおを入れると、ここに並びます" : "とっておくと、ここに並びます"}
+            {kind === "sleeping" ? "ねがおをとると、ここに並びます" : "とっておくと、ここに並びます"}
           </span>
         </div>
       )}
