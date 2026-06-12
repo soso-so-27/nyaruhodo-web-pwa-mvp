@@ -341,8 +341,9 @@ test.describe("collection album flow", () => {
           const store = JSON.parse(
             window.localStorage.getItem("neteruneko_evening_delivery_days") ??
               "{}",
-          ) as Record<string, { openedAt?: number }>;
-          return Boolean(store["2026-06-10"]?.openedAt);
+          ) as Record<string, { openedAt?: number; openedBy?: string }>;
+          const day = store["2026-06-10"];
+          return Boolean(day?.openedAt) && day?.openedBy === "system";
         }),
       )
       .toBe(true);

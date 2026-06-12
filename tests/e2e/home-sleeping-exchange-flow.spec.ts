@@ -581,7 +581,7 @@ test.describe("home sleeping exchange flow", () => {
     await expect.poll(() => exchangeCalls).toBe(0);
   });
 
-  test("auto-opens the latest missed evening delivery after the 5am reset", async ({
+  test("auto-opens missed delivery after 5am without keeping it on the home desk", async ({
     page,
   }) => {
     let exchangeCalls = 0;
@@ -674,7 +674,7 @@ test.describe("home sleeping exchange flow", () => {
 
     await expect(page.getByTestId("day-cycle-indicator")).toHaveAttribute(
       "data-state",
-      "4",
+      "1",
       { timeout: 15000 },
     );
     expect(exchangeCalls).toBe(1);
@@ -687,6 +687,7 @@ test.describe("home sleeping exchange flow", () => {
 
     expect(store["2026-06-10"]?.deliveredPhoto?.id).toBe("missed-delivered");
     expect(store["2026-06-10"]?.openedAt).toBeTruthy();
+    expect(store["2026-06-10"]?.openedBy).toBe("system");
     expect(store["2026-06-09"]?.skippedAt).toBeTruthy();
   });
 

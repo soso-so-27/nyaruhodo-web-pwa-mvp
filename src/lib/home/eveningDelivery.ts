@@ -16,6 +16,7 @@ export type EveningDeliveryDay = {
   deliveredPhoto?: ExchangePhoto;
   deliveredAt?: number;
   openedAt?: number;
+  openedBy?: "user" | "system";
   keptAt?: number;
   skippedAt?: number;
 };
@@ -163,7 +164,11 @@ export function setEveningDeliveredPhoto(
   writeEveningDeliveryStore(store);
 }
 
-export function markEveningDeliveryOpened(dateKey: string, openedAt = Date.now()) {
+export function markEveningDeliveryOpened(
+  dateKey: string,
+  openedAt = Date.now(),
+  openedBy: "user" | "system" = "user",
+) {
   const store = readEveningDeliveryStore();
   const day = store[dateKey];
 
@@ -174,6 +179,7 @@ export function markEveningDeliveryOpened(dateKey: string, openedAt = Date.now()
   store[dateKey] = {
     ...day,
     openedAt,
+    openedBy,
   };
   writeEveningDeliveryStore(store);
   clearAppBadge();
@@ -192,6 +198,7 @@ export function autoOpenExpiredEveningDeliveries(now = Date.now()) {
       store[dateKey] = {
         ...day,
         openedAt: getJstAutoOpenTime(dateKey),
+        openedBy: "system",
       };
       hasChanged = true;
     }
@@ -216,6 +223,7 @@ export function markEveningDeliveryKept(dateKey: string, keptAt = Date.now()) {
   store[dateKey] = {
     ...day,
     openedAt: day.openedAt ?? keptAt,
+    openedBy: day.openedBy ?? "user",
     keptAt,
   };
   writeEveningDeliveryStore(store);
@@ -439,15 +447,13 @@ function findTargetPhoto(
 }
 
 function findLatestVisibleDeliveredDay(store: EveningDeliveryStore, now: number) {
-  const todayKey = getJstDateKey(now);
-
   return (
     Object.values(store)
       .filter(
         (day) =>
           day.deliveredPhoto &&
-          (!day.keptAt || day.dateKey === todayKey) &&
-          now >= getJstDeliveryTime(day.dateKey),
+          now >= getJstDeliveryTime(day.dateKey) &&
+          now < getJstAutoOpenTime(day.dateKey),
       )
       .sort((a, b) => b.dateKey.localeCompare(a.dateKey))[0] ?? null
   );
@@ -481,6 +487,7 @@ function isEveningDeliveryDay(value: unknown): value is EveningDeliveryDay {
     isOptionalFiniteNumber(day.targetCapturedAt) &&
     isOptionalFiniteNumber(day.deliveredAt) &&
     isOptionalFiniteNumber(day.openedAt) &&
+    isOptionalOpenedBy(day.openedBy) &&
     isOptionalFiniteNumber(day.keptAt) &&
     isOptionalFiniteNumber(day.skippedAt)
   );
@@ -496,4 +503,8 @@ function isOptionalString(value: unknown) {
 
 function isOptionalFiniteNumber(value: unknown) {
   return value === undefined || (typeof value === "number" && Number.isFinite(value));
+}
+
+function isOptionalOpenedBy(value: unknown) {
+  return value === undefined || value === "user" || value === "system";
 }
