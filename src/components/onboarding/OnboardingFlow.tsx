@@ -242,6 +242,7 @@ export function OnboardingFlow() {
       seed: `${ownPhoto.id}:${Date.now()}`,
       recipientCatId,
       preferredSourcePhotoId,
+      mode: "onboarding",
     });
 
     trackProductEvent("onboarding_sleeping_photo_delivered", {

@@ -13,6 +13,7 @@ import {
   readEveningDeliveryStore,
   setAppBadge,
   setEveningDeliveredPhoto,
+  markEveningDeliverySkipped,
   type EveningDeliveryDay,
 } from "./eveningDelivery";
 import { recordEveningDeliveryTrace } from "./eveningDeliveryTrace";
@@ -161,6 +162,29 @@ export function useEveningDelivery({
 
       if (!result.photo) {
         pendingEveningDeliveryKeysRef.current.delete(pendingDay.dateKey);
+        if (result.error === "delivery_not_yet") {
+          trackProductEvent(
+            "exchange_rejected_not_yet",
+            {
+              delivery_date_key: pendingDay.dateKey,
+              http_status: result.httpStatus,
+            },
+            { localCatId: pendingDay.targetCatId ?? activeCatId },
+          );
+          return;
+        }
+        if (result.error === "delivery_window_expired") {
+          markEveningDeliverySkipped(pendingDay.dateKey);
+          trackProductEvent(
+            "exchange_rejected_expired",
+            {
+              delivery_date_key: pendingDay.dateKey,
+              http_status: result.httpStatus,
+            },
+            { localCatId: pendingDay.targetCatId ?? activeCatId },
+          );
+          return;
+        }
         trackProductEvent(
           "delivery_sent",
           {
@@ -184,9 +208,20 @@ export function useEveningDelivery({
           poolSource: "normal",
           isOnboardingInstant: false,
           isDay1Evening: false,
+          tier: result.tier ?? null,
         },
         { localCatId: pendingDay.targetCatId ?? activeCatId },
       );
+      if (result.tier) {
+        trackProductEvent(
+          "delivery_tier_served",
+          {
+            delivery_date_key: pendingDay.dateKey,
+            tier: result.tier,
+          },
+          { localCatId: pendingDay.targetCatId ?? activeCatId },
+        );
+      }
     })();
   }, [activeCatId, ownSleepingPhotos, tick]);
 
@@ -293,6 +328,7 @@ async function createEveningExchangePhoto({
       photo: null,
       httpStatus: result?.httpStatus ?? null,
       error: result?.error ?? null,
+      tier: null,
     };
   }
 
@@ -300,6 +336,7 @@ async function createEveningExchangePhoto({
     photo: result.photo,
     httpStatus: result.httpStatus ?? null,
     error: result.error ?? null,
+    tier: result.tier ?? null,
   };
 }
 

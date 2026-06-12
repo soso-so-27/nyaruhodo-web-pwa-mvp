@@ -76,6 +76,14 @@ type PhotoReportSummary = {
   reason: string;
   created_at: string;
 };
+type ModerationQueueItem = {
+  id: string;
+  localMomentId: string;
+  photoSrc: string | null;
+  moderationStatus: string;
+  deliveryStatus: string;
+  createdAt: string;
+};
 const APP_BUILD_SHA =
   process.env.NEXT_PUBLIC_VERCEL_GIT_COMMIT_SHA ??
   process.env.NEXT_PUBLIC_COMMIT_SHA ??
@@ -108,6 +116,8 @@ export function SettingsPage() {
     EveningDeliveryTraceEntry[]
   >([]);
   const [photoReports, setPhotoReports] = useState<PhotoReportSummary[]>([]);
+  const [moderationQueue, setModerationQueue] = useState<ModerationQueueItem[]>([]);
+  const [moderationMessage, setModerationMessage] = useState("");
   const [adminCapabilities, setAdminCapabilities] =
     useState<ClientAdminCapabilities>({
       isAdmin: false,
@@ -460,12 +470,31 @@ export function SettingsPage() {
     if (capabilities.testToolsEnabled || capabilities.stockAdminEnabled) {
       void refreshDeliveryDiagnostics();
       void refreshPhotoReports();
+      void refreshModerationQueue();
     }
   }
 
   async function refreshPhotoReports() {
     const reports = await readPhotoReports();
     setPhotoReports(reports);
+  }
+
+  async function refreshModerationQueue() {
+    const moments = await readModerationQueue();
+    setModerationQueue(moments);
+  }
+
+  async function handleModerationDecision(momentId: string, decision: "approved" | "rejected") {
+    setModerationMessage("");
+    const ok = await decideModerationMoment(momentId, decision);
+    setModerationMessage(ok ? "moderation updated" : "moderation failed");
+    if (ok) {
+      trackProductEvent("moderation_decided", {
+        decision,
+        moment_id: momentId,
+      });
+    }
+    await refreshModerationQueue();
   }
 
   async function refreshBetaCapabilities() {
@@ -873,6 +902,14 @@ export function SettingsPage() {
               <div style={styles.divider} />
               <DeliveryDiagnosticsPanel diagnostics={deliveryDiagnostics} />
               <div style={styles.divider} />
+              <ModerationQueuePanel
+                moments={moderationQueue}
+                message={moderationMessage}
+                onDecide={(momentId, decision) => {
+                  void handleModerationDecision(momentId, decision);
+                }}
+              />
+              <div style={styles.divider} />
               <PhotoReportsPanel reports={photoReports} />
               <div style={styles.divider} />
               <EveningDeliveryTracePanel entries={eveningDeliveryTrace} />
@@ -884,6 +921,7 @@ export function SettingsPage() {
                 onClick={() => {
                   void refreshDeliveryDiagnostics();
                   void refreshPhotoReports();
+                  void refreshModerationQueue();
                   refreshKeptExchangeDebug();
                   refreshEveningDeliveryTrace();
                 }}
@@ -1478,6 +1516,62 @@ function PhotoReportsPanel({ reports }: { reports: PhotoReportSummary[] }) {
   );
 }
 
+function ModerationQueuePanel({
+  moments,
+  message,
+  onDecide,
+}: {
+  moments: ModerationQueueItem[];
+  message: string;
+  onDecide: (momentId: string, decision: "approved" | "rejected") => void;
+}) {
+  return (
+    <div style={styles.authDebugPanel}>
+      <p style={styles.syncOverviewText}>
+        配達プールに入る前の写真を確認します。承認したものだけが候補になります。
+      </p>
+      <div style={styles.authDebugRows}>
+        <AuthDebugRow label="未審査" value={`${moments.length}件`} />
+        {message ? <AuthDebugRow label="結果" value={message} /> : null}
+      </div>
+      {moments.slice(0, 6).map((moment) => (
+        <div key={moment.id} style={styles.moderationItem}>
+          {moment.photoSrc ? (
+            <img
+              src={moment.photoSrc}
+              alt=""
+              style={styles.moderationImage}
+              loading="lazy"
+            />
+          ) : (
+            <div style={styles.moderationImageFallback}>no image</div>
+          )}
+          <div style={styles.moderationBody}>
+            <span style={styles.rowValue}>{moment.localMomentId}</span>
+            <span style={styles.rowValue}>{formatReportDate(moment.createdAt)}</span>
+            <div style={styles.moderationActions}>
+              <button
+                type="button"
+                style={styles.secondaryButton}
+                onClick={() => onDecide(moment.id, "approved")}
+              >
+                approve
+              </button>
+              <button
+                type="button"
+                style={styles.dangerButton}
+                onClick={() => onDecide(moment.id, "rejected")}
+              >
+                reject
+              </button>
+            </div>
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
 function KeptExchangeDebugPanel({
   debug,
 }: {
@@ -1546,6 +1640,61 @@ async function readPhotoReports() {
   } catch {
     return [] as PhotoReportSummary[];
   }
+}
+
+async function readModerationQueue() {
+  const headers = await buildAuthorizedHeaders();
+
+  try {
+    const response = await fetch("/api/moderation/queue", { headers });
+    if (!response.ok) {
+      return [] as ModerationQueueItem[];
+    }
+
+    const body = (await response.json().catch(() => null)) as {
+      moments?: ModerationQueueItem[];
+    } | null;
+
+    return Array.isArray(body?.moments) ? body.moments : [];
+  } catch {
+    return [] as ModerationQueueItem[];
+  }
+}
+
+async function decideModerationMoment(
+  momentId: string,
+  decision: "approved" | "rejected",
+) {
+  const headers = await buildAuthorizedHeaders();
+  headers.set("content-type", "application/json");
+
+  try {
+    const response = await fetch("/api/moderation/decide", {
+      method: "POST",
+      headers,
+      body: JSON.stringify({ momentId, decision }),
+    });
+
+    return response.ok;
+  } catch {
+    return false;
+  }
+}
+
+async function buildAuthorizedHeaders() {
+  const headers = new Headers();
+  const supabase = createBrowserSupabaseClient();
+
+  if (supabase) {
+    const { data } = await supabase.auth.getSession();
+    const accessToken = data.session?.access_token;
+
+    if (accessToken) {
+      headers.set("authorization", `Bearer ${accessToken}`);
+    }
+  }
+
+  return headers;
 }
 
 function formatReportReason(reason: string) {
@@ -2096,6 +2245,41 @@ const styles = {
   authDebugRows: {
     display: "grid",
     gap: "7px",
+  },
+  moderationItem: {
+    display: "grid",
+    gridTemplateColumns: "72px minmax(0, 1fr)",
+    gap: "10px",
+    alignItems: "start",
+    padding: "10px 0",
+    borderTop: "1px solid var(--line)",
+  },
+  moderationImage: {
+    width: "72px",
+    height: "72px",
+    objectFit: "cover" as const,
+    borderRadius: "14px",
+    background: "var(--paper-card)",
+  },
+  moderationImageFallback: {
+    width: "72px",
+    height: "72px",
+    display: "grid",
+    placeItems: "center",
+    borderRadius: "14px",
+    background: "var(--paper-card)",
+    color: "var(--ink-faint)",
+    fontSize: "11px",
+  },
+  moderationBody: {
+    display: "grid",
+    gap: "7px",
+    minWidth: 0,
+  },
+  moderationActions: {
+    display: "grid",
+    gridTemplateColumns: "1fr 1fr",
+    gap: "8px",
   },
   flagToggleGroup: {
     display: "grid",

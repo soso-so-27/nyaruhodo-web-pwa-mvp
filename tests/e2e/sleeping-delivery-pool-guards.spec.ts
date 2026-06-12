@@ -256,6 +256,66 @@ test.describe("sleeping delivery pool guards", () => {
     expect(bodyText).not.toContain("Error:");
   });
 
+  test("rejects normal exchange before the server delivery date", async ({
+    request,
+  }) => {
+    const response = await request.post("/api/sleeping-delivery/exchange", {
+      data: {
+        ...buildExchangeRequest(normalCatLikePhotoUrl, `future-${Date.now()}`),
+        debugDryRun: false,
+        deliveryDateKey: "2099-01-01",
+      },
+    });
+
+    expect(response.status()).toBe(422);
+    const body = (await response.json()) as { error?: string; serverDateKey?: string };
+    expect(body.error).toBe("delivery_not_yet");
+    expect(body.serverDateKey).toMatch(/^\d{4}-\d{2}-\d{2}$/);
+  });
+
+  test("allows first onboarding exchange without a delivery date key", async ({
+    request,
+  }) => {
+    const adminSupabase = createAdminSupabaseClientFromEnv();
+
+    test.skip(
+      !adminSupabase,
+      "SUPABASE_SERVICE_ROLE_KEY is required for the onboarding exchange smoke test.",
+    );
+
+    if (!adminSupabase) {
+      return;
+    }
+
+    const createdAt = Date.now();
+    const anonymousId = `onboarding-anonymous-${createdAt}`;
+
+    try {
+      const response = await request.post("/api/sleeping-delivery/exchange", {
+        data: {
+          ...buildExchangeRequest(
+            redBlueTestPhotoUrl,
+            `onboarding-${createdAt}`,
+            anonymousId,
+          ),
+          debugDryRun: false,
+          mode: "onboarding",
+        },
+      });
+
+      expect(response.status()).not.toBe(422);
+    } finally {
+      await adminSupabase
+        .from("cat_moment_deliveries")
+        .delete()
+        .eq("anonymous_id", anonymousId);
+      await adminSupabase
+        .from("cat_moments")
+        .delete()
+        .eq("anonymous_id", anonymousId);
+    }
+  });
+
   test("keeps exchange response under the delivery latency budget", async ({
     request,
   }) => {
@@ -270,6 +330,71 @@ test.describe("sleeping delivery pool guards", () => {
 
     expect(response.status()).not.toBe(429);
     expect(elapsedMs).toBeLessThan(3000);
+  });
+
+  test("does not deliver pending moderation rows", async ({ request }) => {
+    const adminSupabase = createAdminSupabaseClientFromEnv();
+
+    test.skip(
+      !adminSupabase,
+      "SUPABASE_SERVICE_ROLE_KEY is required for the moderation smoke test.",
+    );
+
+    if (!adminSupabase) {
+      return;
+    }
+
+    const createdAt = Date.now();
+    const candidateId = `pending-candidate-${createdAt}`;
+    const anonymousId = `pending-anonymous-${createdAt}`;
+
+    try {
+      const { error: insertError } = await adminSupabase.from("cat_moments").insert({
+        anonymous_id: `pending-source-${createdAt}`,
+        local_moment_id: candidateId,
+        local_cat_id: `pending-source-cat-${createdAt}`,
+        owner_cat_id: `pending-source-cat-${createdAt}`,
+        photo_url: normalCatLikePhotoUrl,
+        state: "sleeping",
+        visibility: "shared",
+        delivery_status: "available",
+        moderation_status: "pending",
+        source_moment_id: null,
+        metadata: {
+          source: "e2e-moderation",
+          pool_kind: "user_shared",
+          theme: "sleeping",
+          trigger_label: "sleeping",
+        },
+        captured_at: new Date(createdAt - 60_000).toISOString(),
+        created_at: new Date(createdAt - 60_000).toISOString(),
+      });
+
+      expect(insertError).toBeNull();
+
+      const response = await request.post("/api/sleeping-delivery/exchange", {
+        data: {
+          ...buildExchangeRequest(
+            normalCatLikePhotoUrl,
+            `pending-own-${createdAt}`,
+            anonymousId,
+          ),
+          debugDryRun: false,
+          deliveryDateKey: getYesterdayJstDateKey(),
+          preferredSourcePhotoId: candidateId,
+        },
+      });
+
+      expect(response.status()).toBe(200);
+      const body = (await response.json()) as ExchangeResponse;
+      expect(body.photo?.sourcePhotoId).not.toBe(candidateId);
+    } finally {
+      await adminSupabase
+        .from("cat_moment_deliveries")
+        .delete()
+        .eq("anonymous_id", anonymousId);
+      await adminSupabase.from("cat_moments").delete().eq("local_moment_id", candidateId);
+    }
   });
 
   test("keeps exchange idempotent for the same anonymous id and delivery date", async ({
@@ -291,7 +416,7 @@ test.describe("sleeping delivery pool guards", () => {
     const candidateId = `idem-candidate-${createdAt}`;
     const ownId = `idem-own-${createdAt}`;
     const catId = `idem-cat-${createdAt}`;
-    const deliveryDateKey = "2026-06-12";
+    const deliveryDateKey = getYesterdayJstDateKey();
 
     try {
       const { error: insertError } = await adminSupabase.from("cat_moments").insert({
@@ -303,6 +428,9 @@ test.describe("sleeping delivery pool guards", () => {
         state: "sleeping",
         visibility: "shared",
         delivery_status: "available",
+        moderation_status: "approved",
+        moderated_at: new Date(createdAt - 60_000).toISOString(),
+        moderated_by: "e2e",
         source_moment_id: null,
         metadata: {
           source: "e2e-idempotency",
@@ -406,13 +534,27 @@ test.describe("sleeping delivery pool guards", () => {
   });
 
   test("does not return known test or debug pool rows", async ({ request }) => {
+    const adminSupabase = createAdminSupabaseClientFromEnv();
+
+    test.skip(
+      !adminSupabase,
+      "SUPABASE_SERVICE_ROLE_KEY is required for the production guard exchange test.",
+    );
+
+    if (!adminSupabase) {
+      return;
+    }
+
     const createdAt = Date.now();
-    const exchangeResponse = await request.post(
+    const anonymousId = `guard-anonymous-${createdAt}`;
+    const ownId = `guard-own-${createdAt}`;
+    try {
+      const exchangeResponse = await request.post(
       "/api/sleeping-delivery/exchange",
       {
         data: {
           ownPhoto: {
-            id: `guard-own-${createdAt}`,
+            id: ownId,
             catId: `guard-cat-${createdAt}`,
             ownerCatId: `guard-cat-${createdAt}`,
             src: "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAGQAAABkCAYAAABw4pVUAAAAAXNSR0IArs4c6QAAAARnQU1BAACxjwv8YQUAAAAJcEhZcwAADsMAAA7DAcdvqGQAAAEJSURBVHhe7dExEcAgAMBAJKKuTpnpjoLA/fACchlrzv2C+a0njDPsVmfYrQyJMSTGkBhDYgyJMSTGkBhDYgyJMSTGkBhDYgyJMSTGkBhDYgyJMSTGkBhDYgyJMSTGkBhDYgyJMSTGkBhDYgyJMSTGkBhDYgyJMSTGkBhDYgyJMSTGkBhDYgyJMSTGkBhDYgyJMSTGkBhDYgyJMSTGkBhDYgyJMSTGkBhDYgyJMSTGkBhDYgyJMSTGkBhDYgyJMSTGkBhDYgyJMSTGkBhDYgyJMSTGkBhDYgyJMSTmB4RCEqdGtA/tAAAAAElFTkSuQmCC",
@@ -425,8 +567,8 @@ test.describe("sleeping delivery pool guards", () => {
           category: "sleeping",
           seed: `guard-${createdAt}`,
           recipientCatId: `guard-cat-${createdAt}`,
-          anonymousId: `guard-anonymous-${createdAt}`,
-          debugDryRun: true,
+          anonymousId,
+          deliveryDateKey: getYesterdayJstDateKey(),
         },
       },
     );
@@ -440,6 +582,13 @@ test.describe("sleeping delivery pool guards", () => {
         sourceOwnPhotoId: exchange.photo.sourcePhotoId,
         src: exchange.photo.src,
       });
+    }
+    } finally {
+      await adminSupabase
+        .from("cat_moment_deliveries")
+        .delete()
+        .eq("anonymous_id", anonymousId);
+      await adminSupabase.from("cat_moments").delete().eq("local_moment_id", ownId);
     }
   });
 });
@@ -482,6 +631,15 @@ function buildExchangeRequest(
     blockedPhotoIds: [],
     debugDryRun: true,
   };
+}
+
+function getYesterdayJstDateKey() {
+  const jstNow = Date.now() + 9 * 60 * 60 * 1000;
+  const date = new Date(jstNow - 24 * 60 * 60 * 1000);
+  const year = date.getUTCFullYear();
+  const month = String(date.getUTCMonth() + 1).padStart(2, "0");
+  const day = String(date.getUTCDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
 }
 
 function createAdminSupabaseClientFromEnv() {

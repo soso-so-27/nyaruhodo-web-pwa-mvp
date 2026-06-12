@@ -77,6 +77,9 @@ export async function POST(request: Request) {
     state: "sleeping",
     visibility: "shared",
     delivery_status: "available",
+    moderation_status: "approved",
+    moderated_at: new Date(createdAt).toISOString(),
+    moderated_by: adminAccess.user.email ?? adminAccess.user.id,
     source_moment_id: null,
     metadata: {
       source: "admin-stock",

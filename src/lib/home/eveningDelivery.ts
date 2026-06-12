@@ -185,6 +185,21 @@ export function markEveningDeliveryOpened(
   clearAppBadge();
 }
 
+export function markEveningDeliverySkipped(dateKey: string, skippedAt = Date.now()) {
+  const store = readEveningDeliveryStore();
+  const day = store[dateKey];
+
+  if (!day) {
+    return;
+  }
+
+  store[dateKey] = {
+    ...day,
+    skippedAt,
+  };
+  writeEveningDeliveryStore(store);
+}
+
 export function autoOpenExpiredEveningDeliveries(now = Date.now()) {
   const store = readEveningDeliveryStore();
   let hasChanged = false;

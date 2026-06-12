@@ -21,8 +21,12 @@ import type { ExchangePhoto } from "../../../../lib/home/sleepingPhotos";
 import {
   isBlockedDeliveryPhotoUrl,
   isBlockedDeliveryPoolRow,
-  isStorageDeliveryPhotoUrl,
 } from "../../../../lib/home/deliveryPoolGuards";
+import {
+  getServerJstDateKey,
+  isServerDateKey,
+  validateServerDeliveryDateKey,
+} from "../../../../lib/home/eveningDeliveryServer";
 
 export const dynamic = "force-dynamic";
 
@@ -46,6 +50,7 @@ type ExchangeRequest = {
   blockedPhotoIds?: string[];
   preferredSourcePhotoId?: string | null;
   debugDryRun?: boolean;
+  mode?: "onboarding" | null;
 };
 
 type RemoteCatMomentRow = {
@@ -57,6 +62,9 @@ type RemoteCatMomentRow = {
   owner_cat_id: string;
   photo_url: string;
   delivery_status: "available" | "hidden" | "reported";
+  moderation_status?: "pending" | "approved" | "rejected";
+  pool_date?: string | null;
+  delivery_count?: number | null;
   metadata: Record<string, unknown> | null;
   created_at: string;
 };
@@ -79,7 +87,10 @@ type Candidate = {
   row: RemoteCatMomentRow;
   src: string;
   tags: string[];
+  tier: DeliveryTier;
 };
+
+type DeliveryTier = 1 | 2 | 3;
 
 type ExchangeRequestParseResult =
   | { ok: true; input: Required<ExchangeRequest> }
@@ -125,10 +136,10 @@ const RATE_LIMIT_WINDOW_HOUR_MS = 60 * 60 * 1000;
 const RATE_LIMIT_MAX_BUCKETS = 1000;
 const FAST_STORAGE_CANDIDATE_LIMIT = 80;
 const FAST_STORAGE_CANDIDATE_PROBE_LIMIT = 12;
+const TIERED_CANDIDATE_LIMIT = 240;
 const TRANSIENT_DELIVERY_SIGNED_URL_SECONDS = 10 * 60;
-const DELIVERY_DATE_KEY_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
 const exchangeRateLimitBuckets = new Map<string, RateLimitBucket>();
-type FastCandidateMode = "admin_storage" | "off";
+type FastCandidateMode = "admin_storage" | "tiered";
 
 export async function POST(request: Request) {
   try {
@@ -220,6 +231,27 @@ async function handleExchangePost(request: Request) {
     );
   }
 
+  const deliveryDateValidation = await validateExchangeDeliveryDateKey({
+    supabase,
+    userId,
+    anonymousId,
+    deliveryDateKey: input.deliveryDateKey,
+    mode: input.mode,
+    debugDryRun,
+  });
+
+  if (!deliveryDateValidation.ok) {
+    return NextResponse.json(
+      {
+        photo: null,
+        source: "none",
+        error: deliveryDateValidation.error,
+        serverDateKey: deliveryDateValidation.serverDateKey,
+      },
+      { status: 422 },
+    );
+  }
+
   const idempotentDeliveryId =
     input.deliveryDateKey && !debugDryRun
       ? buildIdempotentDeliveryId({
@@ -261,8 +293,10 @@ async function handleExchangePost(request: Request) {
           fastPathActive: false,
           fastCandidateCount: 0,
           idempotentReplay: true,
+          tier: null,
           timing,
         },
+        tier: null,
       });
     }
   }
@@ -318,15 +352,26 @@ async function handleExchangePost(request: Request) {
   markExchangeTiming(timing, "own_photo");
 
   const blockedPhotoIds = new Set(input.blockedPhotoIds ?? []);
+  const deliveredSourceMomentIds = await readDeliveredSourceMomentIds({
+    supabase,
+    userId,
+    anonymousId,
+  });
+  markExchangeTiming(timing, "read_delivered_sources");
   const deliverableContext = {
     userId,
     anonymousId,
     recipientCatId: input.recipientCatId,
     excludePhotoId: ownPhoto.id,
     blockedPhotoIds,
+    deliveredSourceMomentIds,
   };
 
-  const fastRows = await readFastStockCandidateRows(supabase);
+  const fastCandidateMode = readFastCandidateMode();
+  const fastRows =
+    fastCandidateMode === "admin_storage"
+      ? await readFastStockCandidateRows(supabase)
+      : [];
   markExchangeTiming(timing, "read_fast_storage");
   const fastCandidates = fastRows.filter((row) =>
     isFastStockCandidateDeliverable(row, deliverableContext),
@@ -335,12 +380,15 @@ async function handleExchangePost(request: Request) {
   let candidates: RemoteCatMomentRow[] = [];
   let fallbackCandidates: RemoteCatMomentRow[] = [];
   let candidatePool: RemoteCatMomentRow[] = [];
-  let selected = await selectFastStorageCandidate(
-    fastCandidates,
-    input,
-    supabase,
-    deliverableContext,
-  );
+  let selected =
+    fastCandidateMode === "admin_storage"
+      ? await selectFastStorageCandidate(
+          fastCandidates,
+          input,
+          supabase,
+          deliverableContext,
+        )
+      : null;
   let fastPathActive = Boolean(selected);
   markExchangeTiming(timing, "select_fast_storage");
 
@@ -348,22 +396,16 @@ async function handleExchangePost(request: Request) {
     const remoteRows = await readRemoteCandidateRows(supabase);
     markExchangeTiming(timing, "read_full_pool");
     diagnosticsBase = buildDiagnostics(remoteRows, blockedPhotoIds);
-    candidates = remoteRows.filter((row) =>
-      isRowDeliverable(row, deliverableContext),
-    );
-    fallbackCandidates =
-      candidates.length === 0
-        ? remoteRows.filter((row) =>
-            isFallbackDeliverable(row, deliverableContext),
-          )
-        : [];
-    candidatePool =
-      candidates.length > 0 ? candidates : fallbackCandidates;
-    selected = await selectCandidate(
-      preferStorageCandidates(candidatePool),
+    const tieredRows = sortTieredCandidates(
+      remoteRows.filter((row) => isRowDeliverable(row, deliverableContext)),
       input,
-      supabase,
     );
+    candidates = tieredRows.filter((row) => getDeliveryTier(row, input) < 3);
+    fallbackCandidates = tieredRows.filter(
+      (row) => getDeliveryTier(row, input) === 3,
+    );
+    candidatePool = tieredRows;
+    selected = await selectCandidate(candidatePool, input, supabase);
     fastPathActive = false;
     markExchangeTiming(timing, "select_full_pool");
   } else {
@@ -390,6 +432,7 @@ async function handleExchangePost(request: Request) {
         fallbackCandidateCount: fallbackCandidates.length,
         fallbackActive: candidates.length === 0 && fallbackCandidates.length > 0,
         excludedCount: Math.max(0, diagnosticsBase.availableCount - candidatePool.length),
+        duplicateExcludedCount: deliveredSourceMomentIds.size,
         fastPathActive,
         fastCandidateCount: fastCandidates.length,
         timing,
@@ -438,6 +481,7 @@ async function handleExchangePost(request: Request) {
           theme: input.theme,
           category: input.category,
           delivery_date_key: input.deliveryDateKey,
+          delivery_tier: selected.tier,
         },
         delivered_at: deliveredAt.toISOString(),
       });
@@ -476,11 +520,14 @@ async function handleExchangePost(request: Request) {
                 0,
                 diagnosticsBase.availableCount - candidatePool.length,
               ),
+              duplicateExcludedCount: deliveredSourceMomentIds.size,
               fastPathActive,
               fastCandidateCount: fastCandidates.length,
               idempotentReplay: true,
+              tier: selected.tier,
               timing,
             },
+            tier: selected.tier,
           });
         }
       }
@@ -490,6 +537,11 @@ async function handleExchangePost(request: Request) {
         { status: 500 },
       );
     }
+
+    await incrementDeliveryCount({
+      supabase,
+      row: selected.row,
+    });
   }
   markExchangeTiming(timing, "insert_delivery");
   logExchangeTiming(timing, {
@@ -498,11 +550,13 @@ async function handleExchangePost(request: Request) {
     fastCandidateCount: fastCandidates.length,
     candidateCount: candidatePool.length,
     selectedStorage: Boolean(getStoragePhotoPath(selected.row.photo_url)),
+    tier: selected.tier,
   });
 
   return NextResponse.json({
     photo: await attachTransientDeliverySignedUrl(photo, supabase),
     source: "remote",
+    tier: selected.tier,
     diagnostics: {
       ...diagnosticsBase,
       source: "remote",
@@ -511,8 +565,10 @@ async function handleExchangePost(request: Request) {
       fallbackCandidateCount: fallbackCandidates.length,
       fallbackActive: candidates.length === 0 && fallbackCandidates.length > 0,
       excludedCount: Math.max(0, diagnosticsBase.availableCount - candidatePool.length),
+      duplicateExcludedCount: deliveredSourceMomentIds.size,
       fastPathActive,
       fastCandidateCount: fastCandidates.length,
+      tier: selected.tier,
       timing,
     },
   });
@@ -556,6 +612,7 @@ async function readExchangeRequest(request: Request): Promise<ExchangeRequestPar
         : [],
       preferredSourcePhotoId: toStringOrNull(body.preferredSourcePhotoId),
       debugDryRun: body.debugDryRun === true,
+      mode: body.mode === "onboarding" ? "onboarding" : null,
     },
   };
 }
@@ -606,6 +663,7 @@ function validateExchangeRequest(
     input.category,
     input.seed,
     input.deliveryDateKey,
+    input.mode,
     ownPhoto.triggerLabel,
     ownPhoto.theme,
   ].filter((value): value is string => typeof value === "string");
@@ -623,7 +681,7 @@ function validateExchangeRequest(
 
   if (
     input.deliveryDateKey &&
-    !DELIVERY_DATE_KEY_PATTERN.test(input.deliveryDateKey)
+    !isServerDateKey(input.deliveryDateKey)
   ) {
     return { ok: false, status: 400, error: "invalid_exchange_request" };
   }
@@ -803,6 +861,75 @@ function exchangeError(error: string, status: 400 | 401 | 403 | 413 | 415 | 429)
   return NextResponse.json({ photo: null, source: "none", error }, { status });
 }
 
+async function validateExchangeDeliveryDateKey({
+  supabase,
+  userId,
+  anonymousId,
+  deliveryDateKey,
+  mode,
+  debugDryRun,
+}: {
+  supabase: SupabaseClient;
+  userId: string | null;
+  anonymousId: string | null;
+  deliveryDateKey: string | null;
+  mode: "onboarding" | null;
+  debugDryRun: boolean;
+}) {
+  const serverDateKey = getServerJstDateKey();
+
+  if (debugDryRun) {
+    return { ok: true as const };
+  }
+
+  const canUseOnboardingException =
+    mode === "onboarding" &&
+    (await hasNoPriorDeliveries({ supabase, userId, anonymousId }));
+
+  if (canUseOnboardingException) {
+    return { ok: true as const };
+  }
+
+  if (!deliveryDateKey) {
+    return {
+      ok: false as const,
+      error: "delivery_not_yet" as const,
+      serverDateKey,
+    };
+  }
+
+  return validateServerDeliveryDateKey({ deliveryDateKey });
+}
+
+async function hasNoPriorDeliveries({
+  supabase,
+  userId,
+  anonymousId,
+}: {
+  supabase: SupabaseClient;
+  userId: string | null;
+  anonymousId: string | null;
+}) {
+  let query = supabase
+    .from("cat_moment_deliveries")
+    .select("id", { count: "exact", head: true });
+
+  query = userId
+    ? query.eq("user_id", userId)
+    : query.is("user_id", null).eq("anonymous_id", anonymousId ?? "");
+
+  const { count, error } = await query;
+
+  if (error) {
+    console.warn("[sleeping-delivery/exchange] onboarding delivery count failed", {
+      code: error.code,
+    });
+    return false;
+  }
+
+  return (count ?? 0) === 0;
+}
+
 function buildIdempotentDeliveryId({
   userId,
   anonymousId,
@@ -851,6 +978,43 @@ async function readExistingDelivery({
   }
 
   return data as RemoteDeliveryRow | null;
+}
+
+async function readDeliveredSourceMomentIds({
+  supabase,
+  userId,
+  anonymousId,
+}: {
+  supabase: SupabaseClient;
+  userId: string | null;
+  anonymousId: string | null;
+}) {
+  let query = supabase
+    .from("cat_moment_deliveries")
+    .select("source_moment_id")
+    .not("source_moment_id", "is", null)
+    .limit(1000);
+
+  query = userId
+    ? query.eq("user_id", userId)
+    : query.is("user_id", null).eq("anonymous_id", anonymousId ?? "");
+
+  const { data, error } = await query;
+
+  if (error) {
+    console.warn("[sleeping-delivery/exchange] delivered source lookup failed", {
+      code: error.code,
+    });
+    return new Set<string>();
+  }
+
+  return new Set(
+    (data ?? [])
+      .map((row) =>
+        typeof row.source_moment_id === "string" ? row.source_moment_id : null,
+      )
+      .filter((value): value is string => Boolean(value)),
+  );
 }
 
 function toExchangePhotoFromDelivery(
@@ -953,12 +1117,13 @@ async function readRemoteCandidateRows(
   const { data } = await supabase
     .from("cat_moments")
     .select(
-      "id, user_id, anonymous_id, local_moment_id, local_cat_id, owner_cat_id, photo_url, delivery_status, metadata, created_at",
+      "id, user_id, anonymous_id, local_moment_id, local_cat_id, owner_cat_id, photo_url, delivery_status, moderation_status, pool_date, delivery_count, metadata, created_at",
     )
     .eq("visibility", "shared")
     .in("delivery_status", ["available", "hidden", "reported"])
+    .order("delivery_count", { ascending: true })
     .order("created_at", { ascending: false })
-    .limit(160);
+    .limit(TIERED_CANDIDATE_LIMIT);
 
   return (data ?? []) as RemoteCatMomentRow[];
 }
@@ -968,17 +1133,18 @@ async function readFastStockCandidateRows(
 ) {
   const mode = readFastCandidateMode();
 
-  if (mode === "off") {
+  if (mode !== "admin_storage") {
     return [];
   }
 
   const { data } = await supabase
     .from("cat_moments")
     .select(
-      "id, user_id, anonymous_id, local_moment_id, local_cat_id, owner_cat_id, delivery_status, metadata, created_at",
+      "id, user_id, anonymous_id, local_moment_id, local_cat_id, owner_cat_id, delivery_status, moderation_status, pool_date, delivery_count, metadata, created_at",
     )
     .eq("visibility", "shared")
     .eq("delivery_status", "available")
+    .eq("moderation_status", "approved")
     .like("local_moment_id", "stock-sleeping-%")
     .order("created_at", { ascending: false })
     .limit(FAST_STORAGE_CANDIDATE_LIMIT);
@@ -989,11 +1155,11 @@ async function readFastStockCandidateRows(
 function readFastCandidateMode(): FastCandidateMode {
   const raw = process.env.SLEEPING_DELIVERY_FAST_CANDIDATES;
 
-  if (raw === "off") {
-    return "off";
+  if (raw === "admin_storage") {
+    return "admin_storage";
   }
 
-  return "admin_storage";
+  return "tiered";
 }
 
 function isFastStockCandidateDeliverable(
@@ -1004,12 +1170,14 @@ function isFastStockCandidateDeliverable(
     recipientCatId,
     excludePhotoId,
     blockedPhotoIds,
+    deliveredSourceMomentIds,
   }: {
     userId: string | null;
     anonymousId: string | null;
     recipientCatId: string | null;
     excludePhotoId: string;
     blockedPhotoIds: Set<string>;
+    deliveredSourceMomentIds: Set<string>;
   },
 ) {
   if (userId && row.user_id === userId) {
@@ -1025,6 +1193,12 @@ function isFastStockCandidateDeliverable(
     return false;
   }
   if (row.id === excludePhotoId || row.local_moment_id === excludePhotoId) {
+    return false;
+  }
+  if (
+    deliveredSourceMomentIds.has(row.id) ||
+    deliveredSourceMomentIds.has(row.local_moment_id)
+  ) {
     return false;
   }
 
@@ -1039,21 +1213,20 @@ function isRowDeliverable(
     recipientCatId,
     excludePhotoId,
     blockedPhotoIds,
+    deliveredSourceMomentIds,
   }: {
     userId: string | null;
     anonymousId: string | null;
     recipientCatId: string | null;
     excludePhotoId: string;
     blockedPhotoIds: Set<string>;
+    deliveredSourceMomentIds: Set<string>;
   },
 ) {
   if (isBlockedDeliveryPoolRow(row)) {
     return false;
   }
-  if (
-    isStorageDeliveryPhotoUrl(row.photo_url) &&
-    readPoolKind(row.metadata) !== "admin_stock"
-  ) {
+  if (row.moderation_status !== "approved") {
     return false;
   }
   if (!isUsablePhotoSrc(row.photo_url) || row.delivery_status !== "available") {
@@ -1074,26 +1247,14 @@ function isRowDeliverable(
   if (row.id === excludePhotoId || row.local_moment_id === excludePhotoId) {
     return false;
   }
+  if (
+    deliveredSourceMomentIds.has(row.id) ||
+    deliveredSourceMomentIds.has(row.local_moment_id)
+  ) {
+    return false;
+  }
 
   return !blockedPhotoIds.has(row.id) && !blockedPhotoIds.has(row.local_moment_id);
-}
-
-function isFallbackDeliverable(
-  row: RemoteCatMomentRow,
-  context: Parameters<typeof isRowDeliverable>[1],
-) {
-  if (isBlockedDeliveryPoolRow(row)) {
-    return false;
-  }
-  if (!isUsablePhotoSrc(row.photo_url) || row.delivery_status !== "available") {
-    return false;
-  }
-  if (row.id === context.excludePhotoId || row.local_moment_id === context.excludePhotoId) {
-    return false;
-  }
-
-  return readPoolKind(row.metadata) === "admin_stock" ||
-    readPoolKind(row.metadata) === "user_shared";
 }
 
 async function resolvePhotoUrl(photoUrl: string, supabase: SupabaseClient) {
@@ -1185,10 +1346,59 @@ async function prepareExchangeDeliveryPhotoSrc({
   }
 }
 
-function preferStorageCandidates(rows: RemoteCatMomentRow[]) {
-  const storageRows = rows.filter((row) => getStoragePhotoPath(row.photo_url));
+async function incrementDeliveryCount({
+  supabase,
+  row,
+}: {
+  supabase: SupabaseClient;
+  row: RemoteCatMomentRow;
+}) {
+  const nextDeliveryCount = Math.max(0, row.delivery_count ?? 0) + 1;
+  const { error } = await supabase
+    .from("cat_moments")
+    .update({ delivery_count: nextDeliveryCount })
+    .eq("id", row.id);
 
-  return storageRows.length > 0 ? storageRows : rows;
+  if (error) {
+    console.warn("[sleeping-delivery/exchange] delivery_count update failed", {
+      code: error.code,
+    });
+  }
+}
+
+function sortTieredCandidates(
+  rows: RemoteCatMomentRow[],
+  input: Required<ExchangeRequest>,
+) {
+  return [...rows].sort((a, b) => {
+    const tierDelta = getDeliveryTier(a, input) - getDeliveryTier(b, input);
+
+    if (tierDelta !== 0) {
+      return tierDelta;
+    }
+
+    const countDelta = (a.delivery_count ?? 0) - (b.delivery_count ?? 0);
+
+    if (countDelta !== 0) {
+      return countDelta;
+    }
+
+    return (
+      hashText(`${input.seed}:${a.id}:${a.local_moment_id}`) -
+      hashText(`${input.seed}:${b.id}:${b.local_moment_id}`)
+    );
+  });
+}
+
+function getDeliveryTier(
+  row: RemoteCatMomentRow,
+  input: Required<ExchangeRequest>,
+): DeliveryTier {
+  if (readPoolKind(row.metadata) === "admin_stock") {
+    return 3;
+  }
+
+  return input.deliveryDateKey && row.pool_date === input.deliveryDateKey ? 1 : 2;
 }
 
 async function selectCandidate(
@@ -1208,7 +1418,7 @@ async function selectCandidate(
     );
 
     const preferredCandidate = preferredRow
-      ? await toResolvedCandidate(preferredRow, supabase)
+      ? await toResolvedCandidate(preferredRow, supabase, getDeliveryTier(preferredRow, input))
       : null;
 
     if (preferredCandidate) {
@@ -1222,7 +1432,7 @@ async function selectCandidate(
 
   for (let offset = 0; offset < rows.length; offset += 1) {
     const row = rows[(startIndex + offset) % rows.length];
-    const candidate = await toResolvedCandidate(row, supabase);
+    const candidate = await toResolvedCandidate(row, supabase, getDeliveryTier(row, input));
 
     if (candidate) {
       return candidate;
@@ -1286,7 +1496,7 @@ async function fetchFastStorageCandidate(
   const { data } = await supabase
     .from("cat_moments")
     .select(
-      "id, user_id, anonymous_id, local_moment_id, local_cat_id, owner_cat_id, photo_url, delivery_status, metadata, created_at",
+      "id, user_id, anonymous_id, local_moment_id, local_cat_id, owner_cat_id, photo_url, delivery_status, moderation_status, pool_date, delivery_count, metadata, created_at",
     )
     .eq("id", row.id)
     .maybeSingle();
@@ -1300,18 +1510,20 @@ async function fetchFastStorageCandidate(
     return null;
   }
 
-  return toResolvedCandidate(fullRow, supabase);
+  return toResolvedCandidate(fullRow, supabase, 3);
 }
 
 async function toResolvedCandidate(
   row: RemoteCatMomentRow,
   supabase: SupabaseClient,
+  tier: DeliveryTier,
 ): Promise<Candidate | null> {
   if (getStoragePhotoPath(row.photo_url)) {
     return {
       row,
       src: row.photo_url,
       tags: readTags(row.metadata),
+      tier,
     };
   }
 
@@ -1325,6 +1537,7 @@ async function toResolvedCandidate(
     row,
     src,
     tags: readTags(row.metadata),
+    tier,
   };
 }
 
@@ -1335,6 +1548,15 @@ function buildDiagnostics(
   const availableRows = rows.filter((row) => row.delivery_status === "available");
   const usableAvailableRows = availableRows.filter((row) =>
     isUsablePhotoSrc(row.photo_url),
+  );
+  const approvedRows = rows.filter((row) => row.moderation_status === "approved");
+  const pendingRows = rows.filter((row) => row.moderation_status === "pending");
+  const rejectedRows = rows.filter((row) => row.moderation_status === "rejected");
+  const tier1Rows = usableAvailableRows.filter(
+    (row) => readPoolKind(row.metadata) !== "admin_stock" && row.pool_date,
+  );
+  const tier3Rows = usableAvailableRows.filter(
+    (row) => readPoolKind(row.metadata) === "admin_stock",
   );
 
   return {
@@ -1357,6 +1579,15 @@ function buildDiagnostics(
     ).length,
     hiddenCount: rows.filter((row) => row.delivery_status === "hidden").length,
     reportedCount: rows.filter((row) => row.delivery_status === "reported").length,
+    moderationPendingCount: pendingRows.length,
+    moderationApprovedCount: approvedRows.length,
+    moderationRejectedCount: rejectedRows.length,
+    tier1CandidateCount: tier1Rows.length,
+    tier2CandidateCount: Math.max(
+      0,
+      usableAvailableRows.length - tier1Rows.length - tier3Rows.length,
+    ),
+    tier3CandidateCount: tier3Rows.length,
     rlsReadable: true,
     checkedAt: new Date().toISOString(),
   };

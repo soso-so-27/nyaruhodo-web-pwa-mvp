@@ -16,9 +16,11 @@ type RemoteStockResponse = {
 type SleepingExchangeResponse = {
   photo?: ExchangePhoto | null;
   source?: "remote" | "none";
+  tier?: 1 | 2 | 3 | null;
   diagnostics?: SleepingDeliveryDiagnostics;
   httpStatus?: number | null;
   error?: string | null;
+  serverDateKey?: string | null;
 };
 
 const MAX_BLOCKED_PHOTO_IDS = 100;
@@ -34,6 +36,13 @@ export type SleepingDeliveryDiagnostics = {
   userSharedCount: number;
   hiddenCount: number;
   reportedCount: number;
+  moderationPendingCount?: number;
+  moderationApprovedCount?: number;
+  moderationRejectedCount?: number;
+  tier1CandidateCount?: number;
+  tier2CandidateCount?: number;
+  tier3CandidateCount?: number;
+  duplicateExcludedCount?: number;
   totalSharedRows?: number;
   blockedRows?: number;
   storageExcludedRows?: number;
@@ -55,9 +64,11 @@ export async function createSleepingExchange({
   deliveryDateKey,
   recipientCatId,
   preferredSourcePhotoId,
+  mode,
 }: DeliverableSleepingPhotoInput & {
   ownPhoto: OwnSleepingPhoto;
   preferredSourcePhotoId?: string | null;
+  mode?: "onboarding";
 }): Promise<SleepingExchangeResponse | null> {
   if (typeof window === "undefined") {
     return null;
@@ -99,6 +110,7 @@ export async function createSleepingExchange({
         anonymousId: getOrCreateAnonymousId(),
         blockedPhotoIds: readBlockedExchangePhotoIdList(),
         preferredSourcePhotoId,
+        mode,
       }),
     });
 
