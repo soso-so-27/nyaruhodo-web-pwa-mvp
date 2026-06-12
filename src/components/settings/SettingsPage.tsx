@@ -60,7 +60,10 @@ import {
 } from "../../lib/home/homeDeskModelFlag";
 import {
   readOpenSoundEnabled,
+  readSelectedOpenSoundCandidate,
   saveOpenSoundEnabled,
+  saveSelectedOpenSoundCandidate,
+  type OpenSoundCandidateId,
 } from "../../lib/openSound";
 
 type SettingsTab = "general" | "admin";
@@ -132,6 +135,8 @@ export function SettingsPage() {
     HOME_DESK_MODEL_ENABLED,
   );
   const [openSoundEnabled, setOpenSoundEnabled] = useState(true);
+  const [openSoundCandidate, setOpenSoundCandidate] =
+    useState<OpenSoundCandidateId>("1");
   const showsAdminSection =
     adminCapabilities.testToolsEnabled || adminCapabilities.stockAdminEnabled;
   const [activeSettingsTab, setActiveSettingsTab] =
@@ -143,6 +148,7 @@ export function SettingsPage() {
       readHomeDeskModelOverride() ?? HOME_DESK_MODEL_ENABLED,
     );
     setOpenSoundEnabled(readOpenSoundEnabled());
+    setOpenSoundCandidate(readSelectedOpenSoundCandidate());
     refreshKeptExchangeDebug();
     refreshEveningDeliveryTrace();
     void checkAuthState();
@@ -184,6 +190,11 @@ export function SettingsPage() {
   function updateOpenSoundEnabled(enabled: boolean) {
     saveOpenSoundEnabled(enabled);
     setOpenSoundEnabled(enabled);
+  }
+
+  function updateOpenSoundCandidate(candidate: OpenSoundCandidateId) {
+    saveSelectedOpenSoundCandidate(candidate);
+    setOpenSoundCandidate(candidate);
   }
 
   async function checkAuthState() {
@@ -798,6 +809,27 @@ export function SettingsPage() {
                 homeDeskModelDefaultEnabled={HOME_DESK_MODEL_ENABLED}
                 onSetHomeDeskModel={updateHomeDeskModelOverride}
               />
+              <div style={styles.divider} />
+              <div style={styles.row}>
+                <div style={styles.rowLeft}>
+                  <span style={styles.rowLabel}>ひらく音 候補</span>
+                  <span style={styles.rowValue}>実機A/B用</span>
+                </div>
+                <select
+                  value={openSoundCandidate}
+                  onChange={(event) =>
+                    updateOpenSoundCandidate(
+                      event.currentTarget.value as OpenSoundCandidateId,
+                    )
+                  }
+                  style={styles.soundCandidateSelect}
+                  aria-label="ひらく音の候補"
+                >
+                  <option value="1">候補1</option>
+                  <option value="2">候補2</option>
+                  <option value="3">候補3</option>
+                </select>
+              </div>
               <div style={styles.divider} />
               <button
                 type="button"
@@ -1989,6 +2021,18 @@ const styles = {
     border: "1px solid var(--line)",
     background: "var(--paper-card)",
     color: "var(--ink)",
+  },
+  soundCandidateSelect: {
+    minHeight: "38px",
+    border: "1px solid var(--line)",
+    borderRadius: "14px",
+    background: "color-mix(in srgb, var(--paper) 72%, transparent)",
+    color: "var(--ink)",
+    fontFamily: "var(--font-serif)",
+    fontSize: "13px",
+    fontWeight: 400,
+    letterSpacing: "var(--tracking-label)",
+    padding: "0 10px",
   },
   authDebugRow: {
     display: "grid",

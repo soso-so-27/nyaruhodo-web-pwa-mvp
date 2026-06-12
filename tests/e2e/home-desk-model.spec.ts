@@ -19,7 +19,7 @@ test.describe("home desk model", () => {
     }
   });
 
-  test("shows the state2 letter fill and the today mini tile icon", async ({
+  test("shows the steady state2 letter and the today mini tile icon", async ({
     page,
   }) => {
     await seedDeskState(page, "2");
@@ -31,11 +31,7 @@ test.describe("home desk model", () => {
       "2",
     );
     await expect(page.getByTestId("desk-letter")).toBeVisible();
-    const fillHeight = await page.getByTestId("desk-letter-fill").evaluate((node) =>
-      Number.parseFloat(window.getComputedStyle(node).height),
-    );
-    expect(fillHeight).toBeGreaterThan(30);
-    expect(fillHeight).toBeLessThan(38);
+    await expect(page.getByTestId("desk-letter-fill")).toHaveCount(0);
     await expect(page.getByTestId("today-pair-nav-icon")).toBeVisible();
     await expect(page.getByTestId("today-pair-nav-slot")).toHaveCount(2);
     for (const slot of await page.getByTestId("today-pair-nav-slot").all()) {
@@ -43,6 +39,91 @@ test.describe("home desk model", () => {
       expect(box?.width).toBeGreaterThanOrEqual(8);
       expect(box?.height).toBeGreaterThanOrEqual(11);
     }
+  });
+
+  test("moves the home ambient light by time without changing the state2 letter", async ({
+    page,
+  }) => {
+    await seedDeskState(page, "2", { now: Date.parse("2026-06-10T00:00:00.000Z") });
+    await page.goto("/home");
+    await page.waitForLoadState("networkidle");
+
+    await expect(page.getByTestId("home-desk-model")).toHaveCSS(
+      "--home-bg-bottom",
+      "rgb(244, 241, 235)",
+    );
+    const morningLetterBox = await page.getByTestId("desk-letter").boundingBox();
+    expect(morningLetterBox).not.toBeNull();
+
+    await seedDeskState(page, "2", { now: Date.parse("2026-06-10T09:00:00.000Z") });
+    await page.goto("/home");
+    await page.waitForLoadState("networkidle");
+
+    await expect(page.getByTestId("home-desk-model")).toHaveCSS(
+      "--home-bg-bottom",
+      "rgb(241, 235, 224)",
+    );
+    const eveningLetterBox = await page.getByTestId("desk-letter").boundingBox();
+    expect(eveningLetterBox).not.toBeNull();
+    expect(Math.round(eveningLetterBox!.width)).toBe(
+      Math.round(morningLetterBox!.width),
+    );
+    expect(Math.round(eveningLetterBox!.height)).toBe(
+      Math.round(morningLetterBox!.height),
+    );
+  });
+
+  test("shows the evening line from 17:00 until the 20:00 delivery", async ({
+    page,
+  }) => {
+    await seedDeskState(page, "2", { now: Date.parse("2026-06-10T07:59:00.000Z") });
+    await mockDeskExchange(page);
+    await page.goto("/home");
+    await page.waitForLoadState("networkidle");
+
+    await expect(page.getByText("もうすぐ、とどく")).toHaveCount(0);
+
+    await page.evaluate(() => {
+      (window as typeof window & { __testNow?: number }).__testNow = Date.parse(
+        "2026-06-10T08:00:00.000Z",
+      );
+    });
+    await expect(page.getByText("もうすぐ、とどく")).toBeVisible();
+
+    await page.evaluate(() => {
+      (window as typeof window & { __testNow?: number }).__testNow = Date.parse(
+        "2026-06-10T11:00:00.000Z",
+      );
+    });
+    await expect(page.getByTestId("home-desk-model")).toHaveAttribute(
+      "data-state",
+      "3",
+    );
+  });
+
+  test("shows the evening line in habit mode and disables the 2-second letter hint", async ({
+    page,
+  }) => {
+    await seedDeskState(page, "2", {
+      now: Date.parse("2026-06-10T09:00:00.000Z"),
+      keptExchangePhotoCount: 6,
+      firstTargetDateKey: "2026-06-01",
+    });
+    await page.goto("/home");
+    await page.waitForLoadState("networkidle");
+
+    await expect(page.getByText("もうすぐ、とどく")).toBeVisible();
+    await page.getByTestId("desk-letter").click({ force: true });
+    await expect(page.getByTestId("desk-letter-hint")).toHaveCSS("opacity", "0");
+  });
+
+  test("keeps the 2-second letter hint before 17:00", async ({ page }) => {
+    await seedDeskState(page, "2", { now: Date.parse("2026-06-10T06:30:00.000Z") });
+    await page.goto("/home");
+    await page.waitForLoadState("networkidle");
+
+    await page.getByTestId("desk-letter").click();
+    await expect(page.getByTestId("desk-letter-hint")).toHaveCSS("opacity", "1");
   });
 
   test("keeps the left desk slot size stable before and after taking a photo", async ({
@@ -84,17 +165,21 @@ test.describe("home desk model", () => {
     const letter = page.getByRole("button", { name: "おさえて ひらく" });
     const box = await letter.boundingBox();
     expect(box).not.toBeNull();
+    await expect(letter.locator('[data-develop-photo="true"]')).toHaveCount(0);
 
     await page.mouse.move(box!.x + box!.width / 2, box!.y + box!.height / 2);
     await page.mouse.down();
     await page.waitForTimeout(500);
+    await expect(letter.locator('[data-develop-photo="true"]')).toHaveCount(1);
     await page.mouse.up();
+    await page.waitForTimeout(1100);
 
     await expect(page.getByTestId("home-desk-model")).toHaveAttribute(
       "data-state",
       "3",
     );
     await expect(page.getByTestId("evening-opening-pair")).toHaveCount(0);
+    await expect(letter.locator('[data-develop-photo="true"]')).toHaveCount(0);
 
     await page.mouse.move(box!.x + box!.width / 2, box!.y + box!.height / 2);
     await page.mouse.down();
@@ -183,17 +268,19 @@ async function seedDeskState(
   page: Page,
   state: "1" | "1b" | "2" | "3" | "4",
   options: {
+    now?: number;
     keptExchangePhotoCount?: number;
     firstTargetDateKey?: string;
     withYesterday?: boolean;
   } = {},
 ) {
   const now =
-    state === "1b"
+    options.now ??
+    (state === "1b"
       ? Date.parse("2026-06-10T12:05:00.000Z")
       : state === "3" || state === "4"
         ? Date.parse("2026-06-10T11:05:00.000Z")
-        : Date.parse("2026-06-10T03:00:00.000Z");
+        : Date.parse("2026-06-10T03:00:00.000Z"));
 
   await page.addInitScript(
     ({ now, state, ownDataUrl, deliveredDataUrl, options }) => {
@@ -318,6 +405,35 @@ async function seedDeskState(
       status: 200,
       contentType: "application/json",
       body: JSON.stringify({ count: 124 }),
+    });
+  });
+}
+
+async function mockDeskExchange(page: Page) {
+  await page.route("**/api/sleeping-delivery/exchange", async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify({
+        photo: {
+          id: "delivered-desk-from-exchange",
+          sourcePhotoId: "source-desk-from-exchange",
+          src: deliveredDataUrl,
+          title: "",
+          subtitle: "",
+          triggerLabel: "sleeping",
+          theme: "sleeping",
+          deliveredAt: Date.parse("2026-06-10T11:00:00.000Z"),
+        },
+        source: "remote",
+        diagnostics: {
+          source: "remote",
+          candidateCount: 1,
+          normalCandidateCount: 1,
+          fallbackCandidateCount: 0,
+          fallbackActive: false,
+        },
+      }),
     });
   });
 }

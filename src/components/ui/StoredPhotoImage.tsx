@@ -54,6 +54,12 @@ const fallbackHelpStyle: CSSProperties = {
   fontWeight: 500,
 };
 
+const imageSelectionLockStyle = {
+  userSelect: "none",
+  WebkitUserSelect: "none",
+  WebkitUserDrag: "none",
+} as CSSProperties;
+
 export function StoredPhotoImage({
   src,
   alt,
@@ -224,6 +230,7 @@ export function StoredPhotoImage({
         ref={imageRef}
         src={displaySrc}
         alt={alt}
+        draggable={false}
         loading={isInlineImage ? "eager" : "lazy"}
         decoding={isInlineImage ? "sync" : "async"}
         onLoad={() => setIsLoaded(true)}
@@ -240,6 +247,7 @@ export function StoredPhotoImage({
           display: "block",
           opacity: !hasError && (isInlineImage || isLoaded) ? 1 : 0,
           transition: "opacity 180ms ease",
+          ...imageSelectionLockStyle,
         }}
       />
       {hasError ? <PhotoFallback style={fallbackOverlayStyle} /> : null}

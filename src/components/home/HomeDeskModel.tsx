@@ -6,7 +6,6 @@ import type { CSSProperties, PointerEvent } from "react";
 import {
   addJstDays,
   getJstDateKey,
-  getJstDeliveryTime,
   getJstHour,
   readEveningDeliveryStore,
   type EveningHomeState,
@@ -47,6 +46,14 @@ type HomeDeskModelProps = {
 };
 
 const HOLD_OPEN_MS = 1600;
+const HOLD_REWIND_MS = 1000;
+const EVENING_SOON_COPY = "もうすぐ、とどく";
+const HOME_DAYLIGHT_ANCHORS = [
+  { minute: 5 * 60, top: "#fcfbf9", bottom: "#f5f2ec" },
+  { minute: 12 * 60, top: "#fbfaf7", bottom: "#f4f1ea" },
+  { minute: 17 * 60 + 30, top: "#faf7f1", bottom: "#f1ebdf" },
+  { minute: 20 * 60, top: "#f8f6f1", bottom: "#efece4" },
+] as const;
 
 export function HomeDeskModel({
   catName,
@@ -65,17 +72,22 @@ export function HomeDeskModel({
   const prefersReducedMotion = usePrefersReducedMotion();
   const [letterHintVisible, setLetterHintVisible] = useState(false);
   const [holdProgress, setHoldProgress] = useState(false);
-  const [holdAttemptCount, setHoldAttemptCount] = useState(0);
+  const [developPhotoMounted, setDevelopPhotoMounted] = useState(false);
+  const [isRewindingHold, setIsRewindingHold] = useState(false);
   const hintTimerRef = useRef<number | null>(null);
   const holdTimerRef = useRef<number | null>(null);
+  const rewindTimerRef = useRef<number | null>(null);
   const yesterdayMini = useYesterdayMini(now, ownSleepingPhotos);
-  const deliveryProgress = useMemo(
-    () => getDeliveryProgress(eveningState.dateKey, now),
-    [eveningState.dateKey, now],
-  );
+  const daylightStyle = useDaylight(now);
   const shouldHidePresence =
     deskState === "3" || getJstHour(now) < 5 || !showSleepingCounter;
   const guidanceCopy = getGuidanceCopy(deskState, catName);
+  const isEveningSoon = deskState === "2" && isEveningSoonWindow(now);
+  const visibleGuidanceCopy = isEveningSoon
+    ? EVENING_SOON_COPY
+    : showGuidanceCopy
+      ? guidanceCopy
+      : "";
   const isBefore = deskState === "1" || deskState === "1b";
   const targetPhoto =
     eveningState.kind === "waiting" ||
@@ -87,9 +99,6 @@ export function HomeDeskModel({
     eveningState.kind === "delivered" || eveningState.kind === "opened"
       ? eveningState.deliveredPhoto
       : null;
-  const canTapOpen = holdAttemptCount >= 3 || prefersReducedMotion;
-  const backgroundTone = deskState === "2" ? deliveryProgress : deskState === "3" ? 1 : 0;
-
   useEffect(() => {
     trackDeskStateShown(deskState, eveningState.dateKey);
   }, [deskState, eveningState.dateKey]);
@@ -102,10 +111,35 @@ export function HomeDeskModel({
       if (holdTimerRef.current) {
         window.clearTimeout(holdTimerRef.current);
       }
+      if (rewindTimerRef.current) {
+        window.clearTimeout(rewindTimerRef.current);
+      }
     };
   }, []);
 
+  useEffect(() => {
+    if (eveningState.kind === "delivered") {
+      return;
+    }
+
+    setHoldProgress(false);
+    setDevelopPhotoMounted(false);
+    setIsRewindingHold(false);
+    if (holdTimerRef.current) {
+      window.clearTimeout(holdTimerRef.current);
+      holdTimerRef.current = null;
+    }
+    if (rewindTimerRef.current) {
+      window.clearTimeout(rewindTimerRef.current);
+      rewindTimerRef.current = null;
+    }
+  }, [eveningState.kind]);
+
   function showLetterHint() {
+    if (isEveningSoon) {
+      return;
+    }
+
     setLetterHintVisible(true);
     if (hintTimerRef.current) {
       window.clearTimeout(hintTimerRef.current);
@@ -120,7 +154,13 @@ export function HomeDeskModel({
       return;
     }
 
+    event.preventDefault();
+    event.stopPropagation();
     event.currentTarget.setPointerCapture(event.pointerId);
+    if (rewindTimerRef.current) {
+      window.clearTimeout(rewindTimerRef.current);
+      rewindTimerRef.current = null;
+    }
 
     if (prefersReducedMotion) {
       void playOpenSound();
@@ -128,6 +168,8 @@ export function HomeDeskModel({
       return;
     }
 
+    setDevelopPhotoMounted(true);
+    setIsRewindingHold(false);
     setHoldProgress(true);
     if (holdTimerRef.current) {
       window.clearTimeout(holdTimerRef.current);
@@ -140,21 +182,33 @@ export function HomeDeskModel({
     }, HOLD_OPEN_MS);
   }
 
-  function cancelHold() {
+  function cancelHold(event?: PointerEvent<HTMLButtonElement>) {
+    if (event) {
+      event.preventDefault();
+      event.stopPropagation();
+      if (event.currentTarget.hasPointerCapture(event.pointerId)) {
+        event.currentTarget.releasePointerCapture(event.pointerId);
+      }
+    }
+
     if (holdTimerRef.current) {
       window.clearTimeout(holdTimerRef.current);
       holdTimerRef.current = null;
-      setHoldAttemptCount((count) => Math.min(3, count + 1));
     }
     setHoldProgress(false);
-  }
-
-  function handleFallbackOpen() {
-    if (eveningState.kind === "delivered") {
-      void playOpenSound();
-      onOpenDelivery(eveningState);
+    if (developPhotoMounted) {
+      setIsRewindingHold(true);
+      if (rewindTimerRef.current) {
+        window.clearTimeout(rewindTimerRef.current);
+      }
+      rewindTimerRef.current = window.setTimeout(() => {
+        rewindTimerRef.current = null;
+        setDevelopPhotoMounted(false);
+        setIsRewindingHold(false);
+      }, HOLD_REWIND_MS);
     }
   }
+
 
   return (
     <section
@@ -162,11 +216,10 @@ export function HomeDeskModel({
       data-state={deskState}
       style={{
         ...deskStyles.page,
-        "--desk-dusk": String(backgroundTone),
+        ...daylightStyle,
       } as CSSProperties}
       aria-label="きょう"
     >
-      <div style={deskStyles.duskLayer} aria-hidden="true" />
       <div style={deskStyles.stage}>
         <div
           style={{
@@ -201,31 +254,48 @@ export function HomeDeskModel({
           </div>
 
           {deskState === "3" ? (
-            <div style={deskStyles.deliveredLetterWrap}>
+            <div
+              style={{
+                ...deskStyles.selectionLockedStage,
+                ...deskStyles.deliveredLetterWrap,
+              }}
+              onContextMenu={(event) => event.preventDefault()}
+            >
               <button
                 type="button"
                 role="button"
+                data-testid="desk-open-letter"
                 aria-label="おさえて ひらく"
-                style={deskStyles.arrivedLetterButton}
+                style={{
+                  ...deskStyles.selectionLockedStage,
+                  ...deskStyles.arrivedLetterButton,
+                }}
                 className={holdProgress ? "desk-letter-holding" : undefined}
                 onPointerDown={startHold}
                 onPointerUp={cancelHold}
                 onPointerCancel={cancelHold}
                 onPointerLeave={cancelHold}
-                onClick={canTapOpen ? handleFallbackOpen : undefined}
+                onContextMenu={(event) => event.preventDefault()}
               >
                 <span style={deskStyles.letterFlap} aria-hidden="true" />
                 <span style={deskStyles.letterSeal} aria-hidden="true" />
-                {deliveredPhoto ? (
+                {deliveredPhoto && developPhotoMounted ? (
                   <span
                     data-develop-photo="true"
-                    style={deskStyles.developPhoto}
+                    style={{
+                      ...deskStyles.selectionLockedStage,
+                      ...deskStyles.developPhoto,
+                      ...(isRewindingHold ? deskStyles.developPhotoRewinding : {}),
+                    }}
                     aria-hidden="true"
                   >
                     <StoredPhotoImage
                       src={getPhotoDetailSrc(deliveredPhoto)}
                       alt=""
-                      style={deskStyles.developImage}
+                      style={{
+                        ...deskStyles.selectionLockedStage,
+                        ...deskStyles.developImage,
+                      }}
                     />
                   </span>
                 ) : null}
@@ -238,15 +308,6 @@ export function HomeDeskModel({
               >
                 おさえて ひらく
               </span>
-              {canTapOpen ? (
-                <button
-                  type="button"
-                  style={deskStyles.fallbackOpenButton}
-                  onClick={handleFallbackOpen}
-                >
-                  タップでひらく
-                </button>
-              ) : null}
             </div>
           ) : (
             <div style={deskStyles.slot}>
@@ -255,39 +316,20 @@ export function HomeDeskModel({
                 data-testid="desk-letter"
                 style={{
                   ...deskStyles.letter,
-                  ...(deskState === "2"
-                    ? {
-                        transform: `rotate(-2.5deg) scale(${0.94 + deliveryProgress * 0.06})`,
-                      }
-                    : {}),
-                  ...(deskState === "1b" ? deskStyles.letterFullClosed : {}),
                   ...(deskState === "4" ? deskStyles.letterHidden : {}),
                 }}
-                onClick={deskState === "2" ? showLetterHint : undefined}
+                onClick={deskState === "2" && !isEveningSoon ? showLetterHint : undefined}
                 aria-label={
                   deskState === "2"
                     ? "よる8じごろに とどきます"
                     : "よる8じに とどく手紙"
                 }
-                tabIndex={deskState === "2" ? 0 : -1}
+                tabIndex={deskState === "2" && !isEveningSoon ? 0 : -1}
               >
                 <span style={deskStyles.letterFlap} aria-hidden="true" />
-                <span
-                  data-testid="desk-letter-fill"
-                  style={{
-                    ...deskStyles.letterFill,
-                    height:
-                      deskState === "2"
-                        ? `${Math.round(deliveryProgress * 100)}%`
-                        : deskState === "1b"
-                          ? "100%"
-                          : "0%",
-                  }}
-                  className={deskState === "2" ? "desk-letter-fill" : undefined}
-                  aria-hidden="true"
-                />
               </button>
               <span
+                data-testid="desk-letter-hint"
                 style={{
                   ...deskStyles.letterHint,
                   opacity: letterHintVisible ? 1 : 0,
@@ -300,9 +342,14 @@ export function HomeDeskModel({
           )}
         </div>
 
-        {showGuidanceCopy && guidanceCopy ? (
-          <p style={deskStyles.guidanceCopy}>
-            {guidanceCopy}
+        {visibleGuidanceCopy ? (
+          <p
+            style={deskStyles.guidanceCopy}
+            className={
+              isEveningSoon && !prefersReducedMotion ? "desk-evening-soon-copy" : undefined
+            }
+          >
+            {visibleGuidanceCopy}
           </p>
         ) : null}
 
@@ -371,23 +418,15 @@ export function HomeDeskModel({
           0%, 100% { border-color: var(--ink-faint); box-shadow: var(--shadow-rest); }
           50% { border-color: var(--ink-soft); box-shadow: var(--shadow-rest); }
         }
-        @keyframes deskLetterShimmer {
-          0%, 100% { opacity: 0.58; transform: translateX(-4px); }
-          50% { opacity: 1; transform: translateX(4px); }
+        @keyframes deskEveningSoonCopyIn {
+          from { opacity: 0; }
+          to { opacity: 1; }
         }
         .desk-frame-breathe {
           animation: deskFrameBreathe calc(var(--dur-move) * 10) var(--ease-gentle) infinite;
         }
-        .desk-letter-fill::before {
-          content: "";
-          position: absolute;
-          left: 0;
-          right: 0;
-          top: 0;
-          height: 2px;
-          background: linear-gradient(90deg, transparent, color-mix(in srgb, var(--ink-soft) 42%, transparent), transparent);
-          box-shadow: var(--shadow-rest);
-          animation: deskLetterShimmer calc(var(--dur-reveal) * 4) var(--ease-gentle) infinite;
+        .desk-evening-soon-copy {
+          animation: deskEveningSoonCopyIn 1200ms var(--ease-gentle) both;
         }
         .desk-letter-holding [data-develop-photo="true"] {
           opacity: 1 !important;
@@ -396,7 +435,7 @@ export function HomeDeskModel({
         }
         @media (prefers-reduced-motion: reduce) {
           .desk-frame-breathe,
-          .desk-letter-fill::before {
+          .desk-evening-soon-copy {
             animation: none;
           }
           .desk-letter-holding [data-develop-photo="true"] {
@@ -491,6 +530,17 @@ function usePrefersReducedMotion() {
   return prefersReducedMotion;
 }
 
+function useDaylight(now: number) {
+  const minuteKey = Math.floor(now / 60000);
+  return useMemo(() => {
+    const colors = getDaylightColors(minuteKey * 60000);
+    return {
+      "--home-bg-top": colors.top,
+      "--home-bg-bottom": colors.bottom,
+    } as CSSProperties;
+  }, [minuteKey]);
+}
+
 function getDeskState(eveningState: EveningHomeState): DeskState {
   if (eveningState.kind === "waiting") return "2";
   if (eveningState.kind === "delivered") return "3";
@@ -498,10 +548,50 @@ function getDeskState(eveningState: EveningHomeState): DeskState {
   return eveningState.isTodayDelivery ? "1" : "1b";
 }
 
-function getDeliveryProgress(dateKey: string, now: number) {
-  const deliveryAt = getJstDeliveryTime(dateKey);
-  const startsAt = deliveryAt - 15 * 60 * 60 * 1000;
-  return Math.min(1, Math.max(0, (now - startsAt) / (deliveryAt - startsAt)));
+function isEveningSoonWindow(now: number) {
+  const minute = getJstMinuteOfDay(now);
+  return minute >= 17 * 60 && minute < 20 * 60;
+}
+
+function getDaylightColors(now: number) {
+  const minute = getJstMinuteOfDay(now);
+
+  if (minute < HOME_DAYLIGHT_ANCHORS[0].minute) {
+    return HOME_DAYLIGHT_ANCHORS[HOME_DAYLIGHT_ANCHORS.length - 1];
+  }
+
+  for (let index = 0; index < HOME_DAYLIGHT_ANCHORS.length - 1; index += 1) {
+    const start = HOME_DAYLIGHT_ANCHORS[index];
+    const end = HOME_DAYLIGHT_ANCHORS[index + 1];
+    if (minute >= start.minute && minute <= end.minute) {
+      const progress = (minute - start.minute) / (end.minute - start.minute);
+      return {
+        top: interpolateHexColor(start.top, end.top, progress),
+        bottom: interpolateHexColor(start.bottom, end.bottom, progress),
+      };
+    }
+  }
+
+  return HOME_DAYLIGHT_ANCHORS[HOME_DAYLIGHT_ANCHORS.length - 1];
+}
+
+function getJstMinuteOfDay(timestamp: number) {
+  const date = new Date(timestamp + 9 * 60 * 60 * 1000);
+  return date.getUTCHours() * 60 + date.getUTCMinutes();
+}
+
+function interpolateHexColor(from: string, to: string, progress: number) {
+  const fromRgb = parseHexColor(from);
+  const toRgb = parseHexColor(to);
+  return `rgb(${fromRgb
+    .map((channel, index) =>
+      Math.round(channel + (toRgb[index] - channel) * progress),
+    )
+    .join(", ")})`;
+}
+
+function parseHexColor(hex: string) {
+  return [1, 3, 5].map((start) => Number.parseInt(hex.slice(start, start + 2), 16));
 }
 
 function getGuidanceCopy(state: DeskState, catName: string) {
@@ -560,15 +650,8 @@ const deskStyles = {
     padding:
       "calc(34px + env(safe-area-inset-top)) 22px calc(var(--bottom-nav-height) + var(--bottom-nav-bottom-offset) + 30px + env(safe-area-inset-bottom))",
     color: "var(--ink)",
-    background: "var(--bg-gradient)",
-  },
-  duskLayer: {
-    position: "absolute",
-    inset: 0,
-    pointerEvents: "none",
-    background: "var(--paper-warm)",
-    opacity: "var(--desk-dusk)",
-    transition: "opacity var(--dur-instant) var(--ease-settle)",
+    background:
+      "linear-gradient(180deg, var(--home-bg-top, var(--paper)) 0%, var(--home-bg-bottom, var(--paper-warm)) 100%)",
   },
   stage: {
     position: "relative",
@@ -637,9 +720,6 @@ const deskStyles = {
       "transform var(--dur-instant) var(--ease-gentle), opacity var(--dur-instant) var(--ease-gentle)",
     WebkitTapHighlightColor: "transparent",
   },
-  letterFullClosed: {
-    opacity: 0.78,
-  },
   letterHidden: {
     display: "none",
   },
@@ -653,15 +733,6 @@ const deskStyles = {
     background: "color-mix(in srgb, var(--ink) 4%, transparent)",
     borderBottom: "1px solid var(--line)",
   },
-  letterFill: {
-    position: "absolute",
-    left: 0,
-    right: 0,
-    bottom: 0,
-    background:
-      "linear-gradient(180deg, color-mix(in srgb, var(--ink-soft) 10%, transparent), color-mix(in srgb, var(--ink-soft) 20%, transparent))",
-    transition: "height var(--dur-instant) var(--ease-gentle)",
-  },
   letterHint: {
     minHeight: "16px",
     color: "var(--ink-soft)",
@@ -670,6 +741,13 @@ const deskStyles = {
     letterSpacing: "0.06em",
     transition: "opacity var(--dur-instant) var(--ease-gentle)",
   },
+  selectionLockedStage: {
+    userSelect: "none",
+    WebkitUserSelect: "none",
+    WebkitTouchCallout: "none",
+    WebkitUserDrag: "none",
+    touchAction: "none",
+  } as CSSProperties,
   deliveredLetterWrap: {
     display: "flex",
     flexDirection: "column",
@@ -711,10 +789,15 @@ const deskStyles = {
       "opacity var(--dur-develop) var(--ease-gentle), filter var(--dur-develop) var(--ease-gentle), transform var(--dur-develop) var(--ease-gentle)",
     pointerEvents: "none",
   },
+  developPhotoRewinding: {
+    transition:
+      "opacity calc(var(--dur-develop) / 1.6) var(--ease-gentle), filter calc(var(--dur-develop) / 1.6) var(--ease-gentle), transform calc(var(--dur-develop) / 1.6) var(--ease-gentle)",
+  },
   developImage: {
     width: "100%",
     height: "100%",
     borderRadius: "var(--radius-img)",
+    pointerEvents: "none",
   },
   holdLabel: {
     color: "var(--ink-soft)",
@@ -725,18 +808,6 @@ const deskStyles = {
   },
   holdLabelActive: {
     color: "var(--seal)",
-  },
-  fallbackOpenButton: {
-    minHeight: "40px",
-    padding: "0 18px",
-    border: "1px solid var(--line)",
-    borderRadius: "var(--radius-tile)",
-    background: "color-mix(in srgb, var(--paper) 72%, transparent)",
-    color: "var(--ink-soft)",
-    fontFamily: "var(--font-serif)",
-    fontSize: "13px",
-    fontWeight: 400,
-    letterSpacing: "var(--tracking-label)",
   },
   photoTileWrap: {
     display: "flex",

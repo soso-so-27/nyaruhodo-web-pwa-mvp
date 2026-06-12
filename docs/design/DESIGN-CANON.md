@@ -44,6 +44,19 @@ Attached token canon:
 - `docs/design/neteruneko-design-tokens-v2.md`
 - `src/app/tokens.css`
 
+## 1.1 Home State 2: Daylight And One Evening Line
+
+Owner decision, 2026-06-12:
+
+- The state2 letter/envelope does not fill, swell, grow, pulse, shimmer, or otherwise change with time.
+- Time is expressed only through the whole-home ambient paper gradient.
+- From 17:00 through 19:59 JST, state2 shows one line below the letter: `もうすぐ、とどく`.
+- This line is not guidance copy and must not pass through `shouldShowGuidanceCopy()`.
+- Before 17:00, the letter may answer a tap with the temporary `よる8じごろ` hint. From 17:00 onward that tap hint is disabled.
+- At 20:00 the existing state3 sealed-letter/opening behavior takes over.
+
+This section supersedes older desk-model prototype and brief text that described state2 letter filling, growing, waterline shimmer, or plump-envelope behavior.
+
 ## 2. Canon Priority
 
 When documents conflict, use this order:
