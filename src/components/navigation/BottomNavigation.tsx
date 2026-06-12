@@ -8,6 +8,8 @@ import { BoxIcon, CameraIcon } from "../ui/AppIcons";
 
 type BottomNavigationProps = {
   active: "home" | "today" | "collection" | "cats";
+  homeVariant?: "default" | "desk";
+  homeState?: "1" | "1b" | "2" | "3" | "4";
 };
 
 type NavItem = {
@@ -23,7 +25,11 @@ type ViewTransitionDocument = Document & {
   };
 };
 
-export function BottomNavigation({ active }: BottomNavigationProps) {
+export function BottomNavigation({
+  active,
+  homeVariant = "default",
+  homeState = "1",
+}: BottomNavigationProps) {
   const router = useRouter();
   const pathname = usePathname();
   const [pendingKey, setPendingKey] = useState<NavItem["key"] | null>(null);
@@ -98,13 +104,21 @@ export function BottomNavigation({ active }: BottomNavigationProps) {
       />
       {items.map((item) => {
         const isActive = displayActiveKey === item.key;
+        const displayLabel =
+          item.key === "home" && homeVariant === "desk" ? "きょう" : item.label;
+        const displayIcon =
+          item.key === "home" && homeVariant === "desk" ? (
+            <TodayPairIcon state={homeState} />
+          ) : (
+            item.icon
+          );
         return (
           <Link
             key={item.key}
             href={item.href}
             prefetch={true}
             style={isActive ? styles.activeNavButton : styles.navButton}
-            aria-label={item.label}
+            aria-label={displayLabel}
             aria-current={activeKey === item.key ? "page" : undefined}
             onClick={(event) => handleNavClick(event, item, isActive)}
           >
@@ -112,15 +126,37 @@ export function BottomNavigation({ active }: BottomNavigationProps) {
               style={isActive ? styles.activeNavIcon : styles.navIcon}
               aria-hidden="true"
             >
-              {item.icon}
+              {displayIcon}
             </span>
             <span style={isActive ? styles.activeNavLabel : styles.navLabel}>
-              {item.label}
+              {displayLabel}
             </span>
           </Link>
         );
       })}
     </nav>
+  );
+}
+
+function TodayPairIcon({ state }: { state: "1" | "1b" | "2" | "3" | "4" }) {
+  const firstFilled = state === "2" || state === "3" || state === "4";
+  const secondFilled = state === "3" || state === "4";
+
+  return (
+    <span style={styles.todayPairIcon} aria-hidden="true">
+      <span
+        style={{
+          ...styles.todayPairSlot,
+          ...(firstFilled ? styles.todayPairSlotFilled : styles.todayPairSlotEmpty),
+        }}
+      />
+      <span
+        style={{
+          ...styles.todayPairSlot,
+          ...(secondFilled ? styles.todayPairSlotFilled : styles.todayPairSlotEmpty),
+        }}
+      />
+    </span>
   );
 }
 
@@ -242,6 +278,29 @@ const styles = {
     WebkitMaskRepeat: "no-repeat",
     WebkitMaskSize: "contain",
     transform: "translateY(0.5px)",
+  },
+  todayPairIcon: {
+    display: "inline-flex",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: "3px",
+    width: "22px",
+    height: "22px",
+  },
+  todayPairSlot: {
+    display: "block",
+    width: "8px",
+    height: "10px",
+    borderRadius: "3px",
+    border: "1.5px solid currentColor",
+  },
+  todayPairSlotEmpty: {
+    borderStyle: "dashed",
+    opacity: 0.72,
+  },
+  todayPairSlotFilled: {
+    background: "currentColor",
+    opacity: 0.82,
   },
   navLabel: {
     color: "currentColor",

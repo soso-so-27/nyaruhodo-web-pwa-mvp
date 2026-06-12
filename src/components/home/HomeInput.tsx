@@ -52,9 +52,14 @@ import {
   readEveningDeliveryStore,
   recordEveningDeliveryTarget,
   setEveningDeliveredPhoto,
+  shouldShowGuidanceCopy,
   updateEveningDeliveredPhotoDataUrl,
   type EveningHomeState,
 } from "../../lib/home/eveningDelivery";
+import {
+  HOME_DESK_MODEL_ENABLED,
+  readHomeDeskModelOverride,
+} from "../../lib/home/homeDeskModelFlag";
 import { useEveningDelivery } from "../../lib/home/useEveningDelivery";
 import {
   BOX_PHOTO_STORAGE_EVENT,
@@ -80,6 +85,7 @@ import {
 import type { RecentEvent } from "../../lib/supabase/queries";
 import { createBrowserSupabaseClient } from "../../lib/supabase/browser";
 import { BottomNavigation } from "../navigation/BottomNavigation";
+import { HomeDeskModel } from "./HomeDeskModel";
 import {
   getActiveCatProfile,
   getCatName,
@@ -311,6 +317,9 @@ export function HomeInput({ recentEvents: _recentEvents }: HomeInputProps) {
     useState<BeforeInstallPromptEvent | null>(null);
   const [isHomeInstallHintVisible, setIsHomeInstallHintVisible] = useState(false);
   const [isHomeInstallGuideOpen, setIsHomeInstallGuideOpen] = useState(false);
+  const [isHomeDeskModelEnabled, setIsHomeDeskModelEnabled] = useState(
+    HOME_DESK_MODEL_ENABLED,
+  );
   const [collectionRefreshTick, setCollectionRefreshTick] = useState(0);
   const [eveningRefreshTick, setEveningRefreshTick] = useState(0);
   const [discoveryDismissedToday, setDiscoveryDismissedToday] = useState(false);
@@ -331,6 +340,9 @@ export function HomeInput({ recentEvents: _recentEvents }: HomeInputProps) {
     saveActiveCatId(active.id);
     hydrateCatState(active.id);
     setHasAcceptedSleepingSafety(hasAcceptedSleepingSafetyNotice());
+    setIsHomeDeskModelEnabled(
+      readHomeDeskModelOverride() ?? HOME_DESK_MODEL_ENABLED,
+    );
   }, []);
 
   useEffect(() => {
@@ -1669,6 +1681,15 @@ export function HomeInput({ recentEvents: _recentEvents }: HomeInputProps) {
     setEveningRefreshTick((value) => value + 1);
   }
 
+  function handleDeskDeliveredPhotoDataUrl(
+    dateKey: string,
+    photo: ExchangePhoto,
+    dataUrl: string,
+  ) {
+    handleEveningDeliveryDataUrl(dateKey, dataUrl);
+    updateKeptExchangePhotoDataUrl(photo, dataUrl);
+  }
+
   function handleDeliveredExchangeDataUrl(dataUrl: string) {
     setDeliveredExchangePhoto((photo) =>
       photo
@@ -1815,6 +1836,10 @@ export function HomeInput({ recentEvents: _recentEvents }: HomeInputProps) {
     isHomeInstallHintVisible &&
     Boolean(homeInstallPlatform) &&
     eveningHomeState.kind !== "before";
+  const shouldShowDeskGuidanceCopy = shouldShowGuidanceCopy({
+    keptExchangePhotoCount,
+    now: tick || Date.now(),
+  });
 
   return (
     <main style={styles.page}>
@@ -1825,19 +1850,38 @@ export function HomeInput({ recentEvents: _recentEvents }: HomeInputProps) {
         <div style={styles.paperBackground} aria-hidden="true" />
         <div style={styles.paperNoise} aria-hidden="true" />
 
-        <SleepingPhotoHome
-          catName={catName}
-          sleepingCounter={sleepingCounterCount}
-          eveningState={eveningHomeState}
-          keptExchangePhotoCount={keptExchangePhotoCount}
-          isInstallHintVisible={shouldShowHomeInstallHint}
-          showSleepingCounter={
-            typeof sleepingPresenceCount === "number" &&
-            isTodaySleepingCounterVisible(sleepingCounterCount)
-          }
-          onTakePhoto={() => handleSleepingPhotoStart("camera")}
-          onOpenDelivery={handleOpenEveningDelivery}
-        />
+        {isHomeDeskModelEnabled ? (
+          <HomeDeskModel
+            catName={catName}
+            eveningState={eveningHomeState}
+            ownSleepingPhotos={ownSleepingPhotosForHome}
+            sleepingCounter={sleepingCounterCount}
+            showGuidanceCopy={shouldShowDeskGuidanceCopy}
+            showSleepingCounter={
+              typeof sleepingPresenceCount === "number" &&
+              isTodaySleepingCounterVisible(sleepingCounterCount)
+            }
+            now={tick || Date.now()}
+            onTakePhoto={() => handleSleepingPhotoStart("camera")}
+            onOpenDelivery={handleOpenEveningDelivery}
+            onKeepOpenedDelivery={handleKeepEveningDelivery}
+            onDeliveredStorageDataUrl={handleDeskDeliveredPhotoDataUrl}
+          />
+        ) : (
+          <SleepingPhotoHome
+            catName={catName}
+            sleepingCounter={sleepingCounterCount}
+            eveningState={eveningHomeState}
+            keptExchangePhotoCount={keptExchangePhotoCount}
+            isInstallHintVisible={shouldShowHomeInstallHint}
+            showSleepingCounter={
+              typeof sleepingPresenceCount === "number" &&
+              isTodaySleepingCounterVisible(sleepingCounterCount)
+            }
+            onTakePhoto={() => handleSleepingPhotoStart("camera")}
+            onOpenDelivery={handleOpenEveningDelivery}
+          />
+        )}
 
         {shouldShowHomeInstallHint && homeInstallPlatform ? (
           <HomeInstallHintCard
@@ -2002,7 +2046,7 @@ export function HomeInput({ recentEvents: _recentEvents }: HomeInputProps) {
       ) : null}
 
       <div aria-hidden={openingEveningDelivery ? true : undefined}>
-        <BottomNavigation active="today" />
+        {isHomeDeskModelEnabled ? null : <BottomNavigation active="today" />}
       </div>
       <style>{`
         @keyframes slideUp {

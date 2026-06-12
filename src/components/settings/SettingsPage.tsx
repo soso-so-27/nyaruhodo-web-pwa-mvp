@@ -53,6 +53,10 @@ import {
   readEveningDeliveryTrace,
   type EveningDeliveryTraceEntry,
 } from "../../lib/home/eveningDeliveryTrace";
+import {
+  HOME_DESK_MODEL_ENABLED,
+  readHomeDeskModelOverride,
+} from "../../lib/home/homeDeskModelFlag";
 
 type SettingsTab = "general" | "admin";
 const APP_BUILD_SHA =
@@ -119,6 +123,9 @@ export function SettingsPage() {
   });
   const [billingMessage, setBillingMessage] = useState("");
   const [isBillingLoading, setIsBillingLoading] = useState(false);
+  const [homeDeskModelEnabled, setHomeDeskModelEnabled] = useState(
+    HOME_DESK_MODEL_ENABLED,
+  );
   const showsAdminSection =
     adminCapabilities.testToolsEnabled || adminCapabilities.stockAdminEnabled;
   const [activeSettingsTab, setActiveSettingsTab] =
@@ -126,6 +133,9 @@ export function SettingsPage() {
 
   useEffect(() => {
     setDisplayEnvironment(getDisplayEnvironment());
+    setHomeDeskModelEnabled(
+      readHomeDeskModelOverride() ?? HOME_DESK_MODEL_ENABLED,
+    );
     refreshKeptExchangeDebug();
     refreshEveningDeliveryTrace();
     void checkAuthState();
@@ -723,7 +733,10 @@ export function SettingsPage() {
             >
               <AuthDebugPanel snapshot={authDebug} />
               <div style={styles.divider} />
-              <BuildInfoPanel buildSha={APP_BUILD_SHA} />
+              <BuildInfoPanel
+                buildSha={APP_BUILD_SHA}
+                homeDeskModelEnabled={homeDeskModelEnabled}
+              />
               <div style={styles.divider} />
               <button
                 type="button"
@@ -800,6 +813,11 @@ export function SettingsPage() {
         <section style={{ ...styles.section, order: 3 }}>
           <p style={styles.sectionLabel}>サポート・規約</p>
           <AppCard variant="soft" padding="sm" style={styles.card}>
+            <a href="/how-to-use" style={styles.linkRow}>
+              <span style={styles.rowLabel}>使い方</span>
+              <span style={styles.rowChevron}>›</span>
+            </a>
+            <div style={styles.divider} />
             <a href="/terms" style={styles.linkRow}>
               <span style={styles.rowLabel}>利用規約</span>
               <span style={styles.rowChevron}>›</span>
@@ -1110,7 +1128,13 @@ function AuthDebugRow({ label, value }: { label: string; value: string }) {
   );
 }
 
-function BuildInfoPanel({ buildSha }: { buildSha: string }) {
+function BuildInfoPanel({
+  buildSha,
+  homeDeskModelEnabled,
+}: {
+  buildSha: string;
+  homeDeskModelEnabled: boolean;
+}) {
   return (
     <div style={styles.authDebugPanel}>
       <p style={styles.syncOverviewText}>管理用のビルド識別です。</p>
@@ -1118,6 +1142,10 @@ function BuildInfoPanel({ buildSha }: { buildSha: string }) {
         <AuthDebugRow
           label="commit"
           value={buildSha === "local" ? "local" : buildSha.slice(0, 12)}
+        />
+        <AuthDebugRow
+          label="home v3"
+          value={homeDeskModelEnabled ? "on" : "off"}
         />
       </div>
     </div>

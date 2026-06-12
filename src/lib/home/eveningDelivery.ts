@@ -319,6 +319,10 @@ export function getJstDateKey(timestamp = Date.now()) {
   return `${year}-${month}-${day}`;
 }
 
+export function getJstHour(timestamp = Date.now()) {
+  return new Date(timestamp + JST_OFFSET_MS).getUTCHours();
+}
+
 export function addJstDays(dateKey: string, days: number) {
   const base = getJstDayStartTime(dateKey);
   return getJstDateKey(base + days * 24 * 60 * 60 * 1000);
@@ -337,6 +341,25 @@ export function getEveningDeliveryCompletionCopy(now = Date.now()) {
 export function isTodaySleepingCounterVisible(countText: string) {
   const numeric = Number.parseInt(countText.replace(/[^\d]/g, ""), 10);
   return Number.isFinite(numeric) && numeric >= EVENING_DELIVERY_VISIBLE_THRESHOLD;
+}
+
+export function shouldShowGuidanceCopy({
+  keptExchangePhotoCount,
+  now = Date.now(),
+}: {
+  keptExchangePhotoCount: number;
+  now?: number;
+}) {
+  if (keptExchangePhotoCount < 5) {
+    return true;
+  }
+
+  const firstTargetDateKey = getFirstEveningDeliveryTargetDateKey();
+  if (!firstTargetDateKey) {
+    return true;
+  }
+
+  return now - getJstDayStartTime(firstTargetDateKey) < 7 * 24 * 60 * 60 * 1000;
 }
 
 export async function setAppBadge(count = 1) {
