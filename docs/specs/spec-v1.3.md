@@ -1,4 +1,4 @@
-# ねてるねこ 実装仕様 spec v1.3
+# ねてるねこ 実装仕様 spec v1.3.1
 
 最終更新:2026-06-13
 対象リポジトリ:`web-pwa-mvp-agents-md-docs`
@@ -127,11 +127,11 @@ exchange の候補条件に `moderation_status = 'approved'` を追加する(③
 ```sql
 alter table cat_moments
   add column pool_date date generated always as
-    (((created_at at time zone 'utc') at time zone 'Asia/Tokyo' + interval '4 hours')::date) stored;
+    (((created_at at time zone 'UTC') + interval '13 hours')::date) stored;
 create index idx_cat_moments_pool on cat_moments (pool_date, moderation_status, delivery_status, visibility);
 ```
 
-※ 生成列の式はSupabase/Postgresのバージョンで `at time zone` の挙動を確認の上、同値になるよう調整してよい。意図は「created_at のJST時刻が20:00以降なら翌日扱い」。
+※ 生成列の式はSupabase/Postgresで実際に適用できるか確認すること。通らない場合は、**BEFORE INSERT トリガーで通常カラム `pool_date date not null` を設定する方式**へフォールバックする。API/アプリ側でのinsert時設定は、`cat_moments` がクライアントからRLS経由で直接insertされるため不採用。どちらの方式でも、マイグレーション適用後にSQLレベルで境界テスト(19:59 JST→当日 / 20:00 JST→翌日)を検証する。
 
 **配信負荷分散用カラム:**
 
@@ -157,7 +157,7 @@ create index idx_deliveries_anon_source on cat_moment_deliveries (anonymous_id, 
 
 ## 3.4 候補選定クエリ
 
-3段を逐次クエリにせず、**単一クエリ**で実現する(latency budget内に収めるため):
+候補選定は2クエリ方式で実装する。まず受取人の配達済み `source_moment_id` 一覧を1クエリで取得し、その後の候補選定クエリで除外する。既存の冪等キー読み取りと統合可能なら統合してよい。単一クエリ案は不採用。
 
 - 条件:`visibility='shared'` AND `delivery_status='available'` AND `moderation_status='approved'` AND 既存の除外(自分自身・同一identity・同一受取猫・blocked・pool guard)AND 重複配達除外(3.3)
 - 並び:`tier ASC, delivery_count ASC, random()`
@@ -324,7 +324,7 @@ Storage参照候補(一般ユーザーのstorage ref写真)の安全な解決は
 
 # 10. Codexへの確認依頼事項(実装前に回答すること)
 
-1. `pool_date` 生成列の式が、使用中のPostgresバージョンで意図どおり(JST 20:00境界)動くか。動かない場合は代替実装(insert時にAPI/トリガーで設定)を提案すること
-2. 重複配達除外(§3.3)を単一クエリに含めた場合のlatency実測。budget超過する場合は「配達済みID一覧を先に1クエリで取得→NOT INで除外」の2クエリ案との比較を提示すること
-3. オンボーディング即時交換(`mode:"onboarding"`)の現在の呼び出し箇所で、identityが確立する前にexchangeが呼ばれるケース(anonymous_id未生成等)がないか確認すること
-4. 既存pending化バックフィル対象の一般ユーザー投稿の件数(本番)。レビュー作業量の見積りに使う
+1. `pool_date` 生成列の式は本仕様§3.2で確定済み。Supabase/Postgresで生成列として通らない場合は、BEFORE INSERT トリガー方式へフォールバックする。
+2. 重複配達除外は本仕様§3.4で2クエリ方式に確定済み。latency budget テストは維持する。
+3. オンボーディング即時交換(`mode:"onboarding"`)の現在の呼び出し箇所は、`createSleepingExchange()` が送信直前に `getOrCreateAnonymousId()` を呼ぶため、anonymous_id未生成のままexchangeが呼ばれる通常ケースはない。追加対応不要。
+4. 既存pending化バックフィル対象の一般ユーザー投稿件数は人間側でSQL実行する。実装はこれをブロックしない。
