@@ -95,7 +95,7 @@ exchange の候補条件に `moderation_status = 'approved'` を追加する(③
 設定画面の管理パネル(`src/components/settings/SettingsPage.tsx`、`ADMIN_EMAILS` ゲート)に追加:
 
 - **API**:
-  - `GET /api/moderation/queue`:`moderation_status='pending'` の `cat_moments` を `created_at` 昇順で最大50件。写真は署名URLまたはdata URLで返す。admin clientで実行、管理者ゲート必須
+  - `GET /api/moderation/queue`:`moderation_status='pending'` AND `visibility='shared'` AND `delivery_status='available'` の `cat_moments` を `created_at` 降順(新しい順)で最大50件。写真は署名URLまたはdata URLで返す。admin clientで実行、管理者ゲート必須。pending件数バッジも同条件でカウントする
   - `POST /api/moderation/decide`:`{ momentId, decision: 'approved' | 'rejected' }`。`moderated_at`/`moderated_by`(管理者email)を記録。`rejected` の場合は `delivery_status='hidden'` も同時に設定
 - **UI**:写真サムネイル+承認/却下の2ボタンの簡素なリスト。1件ずつでよい(一括は不要)。pending件数バッジを管理パネル見出しに表示
 - 既存の通報一覧(`GET /api/reports`)と同一セクションにまとめてよい

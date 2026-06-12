@@ -117,6 +117,7 @@ export function SettingsPage() {
   >([]);
   const [photoReports, setPhotoReports] = useState<PhotoReportSummary[]>([]);
   const [moderationQueue, setModerationQueue] = useState<ModerationQueueItem[]>([]);
+  const [moderationPendingCount, setModerationPendingCount] = useState(0);
   const [moderationMessage, setModerationMessage] = useState("");
   const [adminCapabilities, setAdminCapabilities] =
     useState<ClientAdminCapabilities>({
@@ -480,8 +481,9 @@ export function SettingsPage() {
   }
 
   async function refreshModerationQueue() {
-    const moments = await readModerationQueue();
-    setModerationQueue(moments);
+    const queue = await readModerationQueue();
+    setModerationQueue(queue.moments);
+    setModerationPendingCount(queue.pendingCount);
   }
 
   async function handleModerationDecision(momentId: string, decision: "approved" | "rejected") {
@@ -904,6 +906,7 @@ export function SettingsPage() {
               <div style={styles.divider} />
               <ModerationQueuePanel
                 moments={moderationQueue}
+                pendingCount={moderationPendingCount}
                 message={moderationMessage}
                 onDecide={(momentId, decision) => {
                   void handleModerationDecision(momentId, decision);
@@ -1518,10 +1521,12 @@ function PhotoReportsPanel({ reports }: { reports: PhotoReportSummary[] }) {
 
 function ModerationQueuePanel({
   moments,
+  pendingCount,
   message,
   onDecide,
 }: {
   moments: ModerationQueueItem[];
+  pendingCount: number;
   message: string;
   onDecide: (momentId: string, decision: "approved" | "rejected") => void;
 }) {
@@ -1531,7 +1536,7 @@ function ModerationQueuePanel({
         配達プールに入る前の写真を確認します。承認したものだけが候補になります。
       </p>
       <div style={styles.authDebugRows}>
-        <AuthDebugRow label="未審査" value={`${moments.length}件`} />
+        <AuthDebugRow label="未審査" value={`${pendingCount}件`} />
         {message ? <AuthDebugRow label="結果" value={message} /> : null}
       </div>
       {moments.slice(0, 6).map((moment) => (
@@ -1644,20 +1649,27 @@ async function readPhotoReports() {
 
 async function readModerationQueue() {
   const headers = await buildAuthorizedHeaders();
+  const fallback = { moments: [] as ModerationQueueItem[], pendingCount: 0 };
 
   try {
     const response = await fetch("/api/moderation/queue", { headers });
     if (!response.ok) {
-      return [] as ModerationQueueItem[];
+      return fallback;
     }
 
     const body = (await response.json().catch(() => null)) as {
       moments?: ModerationQueueItem[];
+      pendingCount?: number;
     } | null;
 
-    return Array.isArray(body?.moments) ? body.moments : [];
+    const moments = Array.isArray(body?.moments) ? body.moments : [];
+    return {
+      moments,
+      pendingCount:
+        typeof body?.pendingCount === "number" ? body.pendingCount : moments.length,
+    };
   } catch {
-    return [] as ModerationQueueItem[];
+    return fallback;
   }
 }
 

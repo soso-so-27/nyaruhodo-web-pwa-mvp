@@ -34,17 +34,20 @@ export async function GET(request: Request) {
     return NextResponse.json({ moments: [] }, { status: 503 });
   }
 
-  const { data, error } = await supabase
+  const { data, error, count } = await supabase
     .from("cat_moments")
     .select(
       "id, local_moment_id, local_cat_id, owner_cat_id, photo_url, moderation_status, delivery_status, metadata, created_at",
+      { count: "exact" },
     )
     .eq("moderation_status", "pending")
-    .order("created_at", { ascending: true })
+    .eq("visibility", "shared")
+    .eq("delivery_status", "available")
+    .order("created_at", { ascending: false })
     .limit(50);
 
   if (error) {
-    return NextResponse.json({ moments: [] }, { status: 200 });
+    return NextResponse.json({ moments: [], pendingCount: 0 }, { status: 200 });
   }
 
   const moments = await Promise.all(
@@ -61,7 +64,7 @@ export async function GET(request: Request) {
     })),
   );
 
-  return NextResponse.json({ moments });
+  return NextResponse.json({ moments, pendingCount: count ?? moments.length });
 }
 
 async function resolveModerationPhotoSrc(photoUrl: string) {
