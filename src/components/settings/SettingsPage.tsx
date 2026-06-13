@@ -1970,7 +1970,7 @@ const styles = {
   page: {
     minHeight: "100vh",
     background: APP_PAGE_BACKGROUND,
-    color: "#242522",
+    color: "var(--ink)",
   },
   container: {
     display: "flex",
@@ -1994,18 +1994,18 @@ const styles = {
     height: "36px",
     borderRadius: "50%",
     textDecoration: "none",
-    color: "#2a2a28",
+    color: "var(--ink)",
     flexShrink: 0,
   },
   backIcon: {
     fontSize: "20px",
     lineHeight: 1,
-    color: "#2a2a28",
+    color: "var(--ink)",
   },
   title: {
     fontSize: "21px",
     fontWeight: 680,
-    color: "#2a2a28",
+    color: "var(--ink)",
     margin: 0,
   },
   settingsTabs: {
@@ -2024,14 +2024,14 @@ const styles = {
     border: "none",
     borderRadius: "999px",
     background: "transparent",
-    color: "#83796d",
+    color: "var(--ink-soft)",
     fontSize: "13px",
     fontWeight: 620,
     cursor: "pointer",
   },
   settingsTabActive: {
     background: "rgba(234,224,209,0.86)",
-    color: "#2f2c27",
+    color: "var(--ink)",
     boxShadow: "0 2px 8px rgba(90,76,60,0.045)",
   },
   section: {
@@ -2040,7 +2040,7 @@ const styles = {
   sectionLabel: {
     fontSize: "11.5px",
     fontWeight: 600,
-    color: "#aaa196",
+    color: "var(--ink-soft)",
     margin: "0 0 7px 6px",
     letterSpacing: "0.08em",
   },
@@ -2074,7 +2074,7 @@ const styles = {
     justifyContent: "space-between",
     padding: "12px 0",
     textDecoration: "none",
-    color: "#2a2a28",
+    color: "var(--ink)",
   },
   rowLeft: {
     display: "flex",
@@ -2083,12 +2083,12 @@ const styles = {
   },
   rowLabel: {
     fontSize: "14px",
-    color: "#2a2a28",
+    color: "var(--ink)",
     fontWeight: 500,
   },
   rowValue: {
     fontSize: "13px",
-    color: "#9a9890",
+    color: "var(--ink-soft)",
     maxWidth: "160px",
     textAlign: "right" as const,
     overflow: "hidden",
@@ -2098,7 +2098,7 @@ const styles = {
   rowChevron: {
     fontSize: "18px",
     lineHeight: 1,
-    color: "#c8c5be",
+    color: "var(--ink-soft)",
   },
   statusDot: {
     width: "8px",
@@ -2117,21 +2117,21 @@ const styles = {
   },
   loadingText: {
     fontSize: "13px",
-    color: "#9a9890",
+    color: "var(--ink-soft)",
     padding: "14px 0",
     margin: 0,
   },
   storageNote: {
     margin: 0,
     padding: "10px 0 12px",
-    color: "#8a8a80",
+    color: "var(--ink-soft)",
     fontSize: "12px",
     fontWeight: 500,
     lineHeight: 1.65,
   },
   syncMessage: {
     fontSize: "12px",
-    color: "#8a8a80",
+    color: "var(--ink-soft)",
     lineHeight: 1.6,
     margin: "0",
     padding: "2px 0 0",
@@ -2224,7 +2224,7 @@ const styles = {
   syncOverviewText: {
     fontSize: "12px",
     fontWeight: 500,
-    color: "#8a8a80",
+    color: "var(--ink-soft)",
     margin: 0,
   },
   syncOverviewBadge: {
@@ -2239,7 +2239,7 @@ const styles = {
   syncMetaGrid: {
     display: "grid",
     gap: "5px",
-    color: "#9a9890",
+    color: "var(--ink-soft)",
     fontSize: "11.5px",
     lineHeight: 1.4,
   },
@@ -2303,7 +2303,7 @@ const styles = {
     borderRadius: "14px",
     border: "1px solid rgba(120,108,94,0.16)",
     background: "rgba(255,253,248,0.72)",
-    color: "#6f695f",
+    color: "var(--ink-soft)",
     fontSize: "13px",
     fontWeight: 700,
     cursor: "pointer",
@@ -2334,11 +2334,11 @@ const styles = {
     lineHeight: 1.45,
   },
   authDebugLabel: {
-    color: "#9a9890",
+    color: "var(--ink-soft)",
     fontWeight: 700,
   },
   authDebugValue: {
-    color: "#2a2a28",
+    color: "var(--ink)",
     overflowWrap: "anywhere" as const,
     fontVariantNumeric: "tabular-nums",
   },
@@ -2367,12 +2367,13 @@ const styles = {
     fontFamily: "var(--font-serif)",
     letterSpacing: "var(--tracking-label)",
     fontWeight: 400,
-    color: "var(--ink-soft)",
-    background: "color-mix(in srgb, var(--paper) 72%, transparent)",
+    color: "var(--ink)",
+    background: "var(--paper)",
     border: "1px solid var(--line)",
     borderRadius: "14px",
     textDecoration: "none",
     cursor: "pointer",
+    boxShadow: "var(--shadow-rest)",
   },
   actionStack: {
     display: "grid",
@@ -2411,7 +2412,7 @@ const styles = {
   },
   betaNoteText: {
     fontSize: "12.5px",
-    color: "#8a8a80",
+    color: "var(--ink-soft)",
     lineHeight: 1.65,
     margin: 0,
   },
@@ -2425,7 +2426,7 @@ const styles = {
     gap: "6px",
   },
   feedbackLabel: {
-    color: "#8a8a80",
+    color: "var(--ink-soft)",
     fontSize: "12px",
     fontWeight: 700,
   },
@@ -2454,7 +2455,7 @@ const styles = {
   feedbackStatus: {
     margin: 0,
     whiteSpace: "pre-line" as const,
-    color: "#8a8a80",
+    color: "var(--ink-soft)",
     fontSize: "12px",
     lineHeight: 1.6,
     textAlign: "center" as const,
@@ -2472,7 +2473,7 @@ const styles = {
     textDecoration: "none",
   },
   legalMuted: {
-    color: "#9a9890",
+    color: "var(--ink-soft)",
     fontSize: "12px",
     fontWeight: 600,
   },
