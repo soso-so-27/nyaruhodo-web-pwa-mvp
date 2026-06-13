@@ -266,6 +266,8 @@ export function HomeInput({ recentEvents: _recentEvents }: HomeInputProps) {
   const [activeCat, setActiveCat] = useState<CatProfile | null>(null);
   const [lockData, setLockData] = useState<LockData>({});
   const [tick, setTick] = useState(0);
+  const isHomeClockReady = tick > 0;
+  const homeNow = isHomeClockReady ? tick : 0;
   const [isYousuOpen, setIsYousuOpen] = useState(false);
   const [isCollectionPhotoSheetOpen, setIsCollectionPhotoSheetOpen] =
     useState(false);
@@ -347,13 +349,26 @@ export function HomeInput({ recentEvents: _recentEvents }: HomeInputProps) {
   }, []);
 
   useEffect(() => {
-    setTick(Date.now());
-
-    const intervalId = window.setInterval(() => {
+    function refreshTick() {
       setTick(Date.now());
-    }, 1000);
+    }
 
-    return () => window.clearInterval(intervalId);
+    refreshTick();
+
+    const intervalId = window.setInterval(refreshTick, 1000);
+    window.addEventListener("focus", refreshTick);
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === "visible") {
+        refreshTick();
+      }
+    };
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+
+    return () => {
+      window.clearInterval(intervalId);
+      window.removeEventListener("focus", refreshTick);
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+    };
   }, []);
 
   useEffect(() => {
@@ -669,9 +684,9 @@ export function HomeInput({ recentEvents: _recentEvents }: HomeInputProps) {
       buildEveningHomeState({
         activeCatId,
         ownPhotos: ownSleepingPhotosForHome,
-        now: tick,
+        now: homeNow,
       }),
-    [activeCatId, eveningDeliveryRefreshTick, ownSleepingPhotosForHome, tick],
+    [activeCatId, eveningDeliveryRefreshTick, homeNow, ownSleepingPhotosForHome],
   );
   const keptExchangePhotoCount = useMemo(
     () => readKeptExchangePhotoCount(),
@@ -1859,12 +1874,13 @@ export function HomeInput({ recentEvents: _recentEvents }: HomeInputProps) {
       ? formatSleepingCounterCount(sleepingPresenceCount)
       : "";
   const shouldShowHomeInstallHint =
+    isHomeClockReady &&
     isHomeInstallHintVisible &&
     Boolean(homeInstallPlatform) &&
     eveningHomeState.kind !== "before";
   const shouldShowDeskGuidanceCopy = shouldShowGuidanceCopy({
     keptExchangePhotoCount,
-    now: tick || Date.now(),
+    now: homeNow,
   });
 
   return (
@@ -1876,7 +1892,9 @@ export function HomeInput({ recentEvents: _recentEvents }: HomeInputProps) {
         <div style={styles.paperBackground} aria-hidden="true" />
         <div style={styles.paperNoise} aria-hidden="true" />
 
-        {isHomeDeskModelEnabled ? (
+        {!isHomeClockReady ? (
+          <HomeClockHydrationPlaceholder desk={isHomeDeskModelEnabled} />
+        ) : isHomeDeskModelEnabled ? (
           <HomeDeskModel
             catName={catName}
             eveningState={eveningHomeState}
@@ -1887,7 +1905,7 @@ export function HomeInput({ recentEvents: _recentEvents }: HomeInputProps) {
               typeof sleepingPresenceCount === "number" &&
               isTodaySleepingCounterVisible(sleepingCounterCount)
             }
-            now={tick || Date.now()}
+            now={homeNow}
             onTakePhoto={() => handleSleepingPhotoStart("camera")}
             onOpenDelivery={handleOpenEveningDelivery}
             onKeepOpenedDelivery={handleKeepEveningDelivery}
@@ -2977,6 +2995,46 @@ function SleepingPhotoHome({
         ) : null}
       </section>
     </>
+  );
+}
+
+function HomeClockHydrationPlaceholder({ desk }: { desk: boolean }) {
+  if (desk) {
+    return (
+      <section
+        data-testid="home-clock-placeholder"
+        aria-label="きょう"
+        style={styles.clockDeskPlaceholder}
+      >
+        <div style={styles.clockDeskPlaceholderStage}>
+          <div style={styles.clockDeskPlaceholderSlot}>
+            <div style={styles.clockDeskPlaceholderFrame} />
+          </div>
+          <div style={styles.clockDeskPlaceholderSlot}>
+            <div style={styles.clockDeskPlaceholderLetter} />
+          </div>
+        </div>
+        <BottomNavigation active="today" homeVariant="desk" homeState="1" />
+      </section>
+    );
+  }
+
+  return (
+    <section
+      data-testid="home-clock-placeholder"
+      aria-label="しゃしん"
+      style={styles.sleepingHome}
+    >
+      <div style={styles.sleepingHomeHeader}>
+        <div style={styles.clockLegacyPlaceholderTitle} />
+        <div style={styles.clockLegacyPlaceholderLead} />
+        <div style={styles.clockLegacyPlaceholderMotif}>
+          <span style={styles.clockLegacyPlaceholderCircle} />
+          <span style={styles.clockLegacyPlaceholderDots} />
+          <span style={styles.clockLegacyPlaceholderCircle} />
+        </div>
+      </div>
+    </section>
   );
 }
 
@@ -5412,6 +5470,50 @@ const styles = {
       "linear-gradient(90deg, rgba(88,73,50,0.035) 1px, transparent 1px), linear-gradient(0deg, rgba(88,73,50,0.03) 1px, transparent 1px)",
     backgroundSize: "28px 28px",
   },
+  clockDeskPlaceholder: {
+    position: "fixed",
+    inset: 0,
+    zIndex: 18,
+    display: "grid",
+    gridTemplateRows: "minmax(0, 1fr) auto",
+    alignItems: "center",
+    justifyItems: "center",
+    padding: "calc(env(safe-area-inset-top) + 34px) 24px calc(env(safe-area-inset-bottom) + 116px)",
+    boxSizing: "border-box",
+    color: "var(--ink-soft)",
+  },
+  clockDeskPlaceholderStage: {
+    width: "min(76vw, 330px)",
+    display: "grid",
+    gridTemplateColumns: "minmax(0, 1fr) minmax(0, 0.75fr)",
+    alignItems: "center",
+    justifyItems: "center",
+    gap: "32px",
+    transform: "translateY(-2vh)",
+  },
+  clockDeskPlaceholderSlot: {
+    width: "100%",
+    aspectRatio: "1 / 1",
+    display: "grid",
+    placeItems: "center",
+  },
+  clockDeskPlaceholderFrame: {
+    width: "100%",
+    aspectRatio: "1 / 1",
+    borderRadius: "var(--radius-tile)",
+    border: "1px solid var(--line)",
+    background: "var(--paper)",
+    boxShadow: "var(--shadow-rest)",
+  },
+  clockDeskPlaceholderLetter: {
+    width: "100%",
+    aspectRatio: "1.48 / 1",
+    borderRadius: "var(--radius-s)",
+    border: "1px solid var(--line)",
+    background: "var(--paper-card)",
+    boxShadow: "var(--shadow-rest)",
+    transform: "rotate(-2.5deg)",
+  },
   homeInstallHintCard: {
     position: "fixed",
     left: "50%",
@@ -6398,6 +6500,48 @@ const styles = {
     background: "transparent",
     color: "#746b5f",
     pointerEvents: "none",
+  },
+  clockLegacyPlaceholderTitle: {
+    justifySelf: "center",
+    width: "11em",
+    height: "36px",
+    borderRadius: "999px",
+    background: "var(--paper)",
+    border: "1px solid var(--line)",
+  },
+  clockLegacyPlaceholderLead: {
+    justifySelf: "center",
+    width: "17em",
+    maxWidth: "80%",
+    height: "22px",
+    borderRadius: "999px",
+    background: "var(--paper)",
+    border: "1px solid var(--line)",
+  },
+  clockLegacyPlaceholderMotif: {
+    justifySelf: "center",
+    marginTop: "24px",
+    display: "inline-grid",
+    gridTemplateColumns: "44px 66px 44px",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 0,
+    opacity: 0.62,
+  },
+  clockLegacyPlaceholderCircle: {
+    width: "44px",
+    height: "44px",
+    borderRadius: "50%",
+    border: "1px solid var(--line)",
+    background: "var(--paper)",
+  },
+  clockLegacyPlaceholderDots: {
+    justifySelf: "center",
+    width: "48px",
+    height: "4px",
+    borderRadius: "999px",
+    background:
+      "repeating-linear-gradient(90deg, var(--ink-faint) 0 4px, transparent 4px 11px)",
   },
   dayCycleButton: {
     justifySelf: "center",

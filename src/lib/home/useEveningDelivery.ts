@@ -34,7 +34,11 @@ export function useEveningDelivery({
   const [refreshToken, setRefreshToken] = useState(0);
 
   useEffect(() => {
-    const now = tick || Date.now();
+    if (!tick) {
+      return;
+    }
+
+    const now = tick;
     const todayKey = getJstDateKey(now);
     const store = readEveningDeliveryStore();
     const todayDay = store[todayKey];

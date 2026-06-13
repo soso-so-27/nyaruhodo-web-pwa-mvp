@@ -41,6 +41,39 @@ test.describe("home desk model", () => {
     }
   });
 
+  test("hydrates the clock-dependent home state without mismatch warnings", async ({
+    page,
+  }) => {
+    const hydrationMessages: string[] = [];
+    page.on("console", (message) => {
+      if (message.type() === "error") {
+        hydrationMessages.push(message.text());
+      }
+    });
+    page.on("pageerror", (error) => {
+      hydrationMessages.push(error.message);
+    });
+
+    await seedDeskState(page, "2", {
+      now: Date.parse("2026-06-10T10:59:58.000Z"),
+    });
+    await page.goto("/home");
+    await page.waitForLoadState("networkidle");
+
+    await expect(page.getByTestId("home-desk-model")).toHaveAttribute(
+      "data-state",
+      "2",
+    );
+    expect(
+      hydrationMessages.filter(
+        (message) =>
+          message.includes("Hydration failed") ||
+          message.includes("DayCycleIndicator") ||
+          message.includes("HomeInput"),
+      ),
+    ).toEqual([]);
+  });
+
   test("shows only the active bottom navigation label", async ({ page }) => {
     await seedDeskState(page, "1");
     await page.goto("/home");
