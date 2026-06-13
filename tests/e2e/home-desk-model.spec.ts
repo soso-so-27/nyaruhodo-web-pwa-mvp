@@ -404,6 +404,32 @@ test.describe("home desk model", () => {
 
     await expect(page.locator(".desk-frame-breathe")).toHaveCount(0);
   });
+
+  test("delivers a past sleeping photo as an omoide letter and keeps it in the cat tab", async ({
+    page,
+  }) => {
+    await seedDeskState(page, "1b", {
+      now: Date.parse("2026-06-10T11:05:00.000Z"),
+      withOmoideCandidate: true,
+    });
+
+    await page.goto("/home");
+    await page.waitForLoadState("networkidle");
+
+    await expect(page.getByTestId("omoide-arrival-letter")).toBeVisible();
+    await page.getByTestId("omoide-arrival-letter").click();
+    await expect(page.getByTestId("omoide-memory-viewer")).toBeVisible();
+    await expect(page.getByText("1週間前の、きょう。")).toBeVisible();
+    await page.getByRole("button", { name: "そっと しまう" }).click();
+    await expect(page.getByTestId("omoide-memory-viewer")).toHaveCount(0);
+
+    await page.goto("/cats");
+    await page.waitForLoadState("networkidle");
+    const bunbako = page.getByTestId("omoide-bunbako");
+    await expect(bunbako).toBeVisible();
+    await expect(bunbako.getByText("とどいた思い出")).toBeVisible();
+    await expect(bunbako.getByText("1週間前の、きょう。")).toBeVisible();
+  });
 });
 
 async function seedDeskState(
@@ -414,6 +440,7 @@ async function seedDeskState(
     keptExchangePhotoCount?: number;
     firstTargetDateKey?: string;
     withYesterday?: boolean;
+    withOmoideCandidate?: boolean;
   } = {},
 ) {
   const now =
@@ -475,9 +502,14 @@ async function seedDeskState(
       );
 
       const ownPhotos = state === "1" || state === "1b" ? [] : [ownPhoto];
+      const omoidePhoto = {
+        ...ownPhoto,
+        id: "own-omoide-week",
+        createdAt: Date.parse("2026-06-03T03:00:00.000Z"),
+      };
       window.localStorage.setItem(
         "nyaruhodo_exchange_own_sleeping_photos",
-        JSON.stringify(ownPhotos),
+        JSON.stringify(options.withOmoideCandidate ? [omoidePhoto, ...ownPhotos] : ownPhotos),
       );
 
       if (state === "2" || state === "3" || state === "4") {

@@ -9,6 +9,14 @@ import {
   readOwnSleepingPhotoCount,
   type CatSleepingMilestone,
 } from "../../lib/home/sleepingPhotos";
+import {
+  disableOmoideMemories,
+  hideOmoideDate,
+  pauseOmoideMemories,
+  readOmoideMemoriesForCat,
+  readOmoideMemoryControls,
+  type OmoideMemory,
+} from "../../lib/home/omoideDelivery";
 import { BottomNavigation } from "../navigation/BottomNavigation";
 import { AppButton } from "../ui/AppButton";
 import { AppBottomSheet } from "../ui/AppBottomSheet";
@@ -82,6 +90,9 @@ export function CatsPage() {
   const [editCoat, setEditCoat] = useState<EditableCoat>("");
   const [message, setMessage] = useState("");
   const [saveMessage, setSaveMessage] = useState("");
+  const [omoideRefreshTick, setOmoideRefreshTick] = useState(0);
+  const [selectedOmoideMemory, setSelectedOmoideMemory] =
+    useState<OmoideMemory | null>(null);
 
   const activeCatProfile =
     catProfiles.length > 0
@@ -99,6 +110,9 @@ export function CatsPage() {
   const takenSleepingPhotoCount = activeCatId
     ? readOwnSleepingPhotoCount(activeCatId)
     : 0;
+  const omoideMemories = readOmoideMemoriesForCat(activeCatId);
+  const omoideControls = readOmoideMemoryControls();
+  void omoideRefreshTick;
   const sleepingMilestones = readCatSleepingMilestones(activeCatId);
   const activeAvatarSrc =
     activeCatProfile?.avatarDataUrl ??
@@ -555,6 +569,22 @@ export function CatsPage() {
 
                 <div style={styles.recordList}>
                   <div style={styles.recordRow}>
+                    <span style={styles.recordLabel}>
+                      {getCurrentSeasonCountLabel(
+                        activeCatProfile.basicInfo?.familySinceDate,
+                      )}
+                    </span>
+                    <span style={styles.recordMetricValue}>
+                      {getCurrentSeasonName()}
+                    </span>
+                  </div>
+                  <div style={styles.recordRow}>
+                    <span style={styles.recordLabel}>とどいた思い出</span>
+                    <span style={styles.recordMetricValue}>
+                      {omoideMemories.length}通
+                    </span>
+                  </div>
+                  <div style={styles.recordRow}>
                     <span style={styles.recordLabel}>とったねがお</span>
                     <span style={styles.recordMetricValue}>
                       {takenSleepingPhotoCount}枚
@@ -608,6 +638,39 @@ export function CatsPage() {
                     ))}
                   </div>
                 </div>
+                <OmoideBunbako
+                  catName={catName}
+                  memories={omoideMemories}
+                  controls={omoideControls}
+                  onOpen={(memory) => setSelectedOmoideMemory(memory)}
+                  onPause={() => {
+                    pauseOmoideMemories();
+                    setOmoideRefreshTick((value) => value + 1);
+                    setMessage("思い出を しばらく お休みします。");
+                  }}
+                  onDisable={() => {
+                    disableOmoideMemories(!omoideControls.disabled);
+                    setOmoideRefreshTick((value) => value + 1);
+                  }}
+                />
+                <section style={styles.daysThread}>
+                  <p style={styles.bunbakoSectionTitle}>{catName}との 日々</p>
+                  <div style={styles.threadLine}>
+                    <div style={styles.threadNode}>
+                      <span style={styles.threadNodeTitle}>今月の {catName}</span>
+                      <span style={styles.threadNodeText}>
+                        ここから、{catName}との 日々が はじまります。
+                      </span>
+                    </div>
+                    <div style={styles.threadNode}>
+                      <span style={styles.threadNodeTitle}>これまで</span>
+                      <span style={styles.threadNodeText}>
+                        思い出 {omoideMemories.length}通 ・ ねがお{" "}
+                        {takenSleepingPhotoCount}枚
+                      </span>
+                    </div>
+                  </div>
+                </section>
                 {!activeCatProfile.basicInfo?.familySinceDate &&
                 !activeCatProfile.basicInfo?.birthDate &&
                 !activeCatProfile.basicInfo?.breed &&
@@ -777,6 +840,17 @@ export function CatsPage() {
               </div>
             </AppBottomSheet>
       ) : null}
+      {selectedOmoideMemory ? (
+        <OmoideMemorySheet
+          memory={selectedOmoideMemory}
+          onClose={() => setSelectedOmoideMemory(null)}
+          onHideDate={() => {
+            hideOmoideDate(selectedOmoideMemory.sourceDateKey);
+            setOmoideRefreshTick((value) => value + 1);
+            setSelectedOmoideMemory(null);
+          }}
+        />
+      ) : null}
     </main>
   );
 }
@@ -816,6 +890,112 @@ function FootprintCard({ milestone }: { milestone: CatSleepingMilestone }) {
         <div style={styles.footprintPlaceholder} aria-hidden="true" />
       )}
     </div>
+  );
+}
+
+function OmoideBunbako({
+  catName,
+  memories,
+  controls,
+  onOpen,
+  onPause,
+  onDisable,
+}: {
+  catName: string;
+  memories: OmoideMemory[];
+  controls: ReturnType<typeof readOmoideMemoryControls>;
+  onOpen: (memory: OmoideMemory) => void;
+  onPause: () => void;
+  onDisable: () => void;
+}) {
+  return (
+    <section style={styles.bunbakoSection} data-testid="omoide-bunbako">
+      <div style={styles.bunbakoHeader}>
+        <div>
+          <p style={styles.bunbakoSectionTitle}>とどいた思い出</p>
+          <p style={styles.sectionNote}>
+            配達で とどくたび、この箱に 積もっていきます
+          </p>
+        </div>
+      </div>
+      {memories.length > 0 ? (
+        <div style={styles.bunbakoScroller}>
+          {memories.map((memory) => (
+            <button
+              key={memory.id}
+              type="button"
+              style={styles.bunbakoLetter}
+              onClick={() => onOpen(memory)}
+            >
+              <span style={styles.bunbakoPostmark}>{memory.title}</span>
+              <span style={styles.bunbakoWindow}>
+                <StoredPhotoImage
+                  src={
+                    memory.photo.thumbnailSrc ??
+                    memory.photo.displaySrc ??
+                    memory.photo.src
+                  }
+                  alt=""
+                  style={styles.bunbakoPhoto}
+                />
+              </span>
+              <span style={styles.bunbakoSeal} aria-hidden="true" />
+            </button>
+          ))}
+        </div>
+      ) : (
+        <p style={styles.bunbakoEmpty}>
+          はじめての思い出は、これから届きます。
+        </p>
+      )}
+      <div style={styles.omoideControls}>
+        <button type="button" style={styles.omoideControlButton} onClick={onPause}>
+          思い出を しばらく お休みする
+        </button>
+        <button type="button" style={styles.omoideControlButton} onClick={onDisable}>
+          {controls.disabled
+            ? "思い出を 受け取る"
+            : "思い出を 受け取らない"}
+        </button>
+      </div>
+      <p style={styles.guardFooter}>
+        {catName}に届いた思い出を、この箱に そっと置いておきます。
+      </p>
+    </section>
+  );
+}
+
+function OmoideMemorySheet({
+  memory,
+  onClose,
+  onHideDate,
+}: {
+  memory: OmoideMemory;
+  onClose: () => void;
+  onHideDate: () => void;
+}) {
+  return (
+    <AppBottomSheet title="思い出が、とどきました" onClose={onClose}>
+      <div style={styles.omoideSheet}>
+        <p style={styles.omoideSheetTitle}>{memory.title}</p>
+        <div style={styles.omoideSheetImageFrame}>
+          <StoredPhotoImage
+            src={memory.photo.displaySrc ?? memory.photo.src}
+            alt=""
+            style={styles.omoideSheetImage}
+          />
+        </div>
+        <p style={styles.omoideSheetVoice}>{memory.voice}</p>
+        <p style={styles.omoideSheetBridge}>{memory.bridge}</p>
+        <button
+          type="button"
+          style={styles.omoideControlButton}
+          onClick={onHideDate}
+        >
+          この日を 見せない
+        </button>
+      </div>
+    </AppBottomSheet>
   );
 }
 
@@ -1024,6 +1204,25 @@ function formatFamilyDuration(familySinceDate?: string): {
     primary: `${dayCount}日`,
     secondary,
   };
+}
+
+function getCurrentSeasonName() {
+  const month = new Date().getMonth() + 1;
+  if (month >= 3 && month <= 5) return "春";
+  if (month >= 6 && month <= 8) return "夏";
+  if (month >= 9 && month <= 11) return "秋";
+  return "冬";
+}
+
+function getCurrentSeasonCountLabel(familySinceDate?: string) {
+  const start = parseLocalDate(familySinceDate);
+  if (!start) {
+    return `1回目の${getCurrentSeasonName()}`;
+  }
+
+  const now = new Date();
+  const count = Math.max(1, now.getFullYear() - start.getFullYear() + 1);
+  return `${count}回目の${getCurrentSeasonName()}`;
 }
 
 function getBirthdayStatus(
@@ -1983,6 +2182,186 @@ const styles = {
     fontWeight: 520,
     letterSpacing: 0,
     cursor: "pointer",
+  },
+  bunbakoSection: {
+    marginTop: "18px",
+    padding: "16px",
+    border: "1px solid var(--line)",
+    borderRadius: "var(--radius-tile)",
+    background: "color-mix(in srgb, var(--paper) 58%, transparent)",
+    boxShadow: "var(--shadow-rest)",
+  },
+  bunbakoHeader: {
+    display: "flex",
+    alignItems: "flex-start",
+    justifyContent: "space-between",
+    gap: "12px",
+    marginBottom: "12px",
+  },
+  bunbakoSectionTitle: {
+    margin: 0,
+    color: CATS_TEXT,
+    fontFamily: CATS_SERIF,
+    fontSize: "17px",
+    fontWeight: 400,
+    letterSpacing: "var(--tracking-label)",
+  },
+  sectionNote: {
+    margin: "5px 0 0",
+    color: CATS_MUTED,
+    fontSize: "11px",
+    lineHeight: 1.7,
+  },
+  bunbakoScroller: {
+    display: "flex",
+    gap: "12px",
+    overflowX: "auto",
+    padding: "4px 2px 8px",
+    WebkitOverflowScrolling: "touch",
+  },
+  bunbakoLetter: {
+    position: "relative",
+    flex: "0 0 152px",
+    minHeight: "118px",
+    display: "grid",
+    gridTemplateRows: "auto 1fr",
+    gap: "8px",
+    padding: "12px",
+    border: "1px solid var(--line)",
+    borderRadius: "var(--radius-s)",
+    background: "var(--paper-card)",
+    color: CATS_TEXT,
+    boxShadow: "var(--shadow-rest)",
+    textAlign: "left",
+    transform: "rotate(-1deg)",
+  },
+  bunbakoPostmark: {
+    color: CATS_MUTED,
+    fontFamily: CATS_SERIF,
+    fontSize: "10.5px",
+    letterSpacing: "var(--tracking-body)",
+    lineHeight: 1.45,
+  },
+  bunbakoWindow: {
+    width: "72px",
+    height: "54px",
+    alignSelf: "end",
+    overflow: "hidden",
+    border: "1px solid var(--line)",
+    borderRadius: "var(--radius-s)",
+    background: CATS_PAPER,
+  },
+  bunbakoPhoto: {
+    width: "100%",
+    height: "100%",
+    borderRadius: "var(--radius-s)",
+  },
+  bunbakoSeal: {
+    position: "absolute",
+    right: "14px",
+    bottom: "18px",
+    width: "12px",
+    height: "12px",
+    borderRadius: "50%",
+    background: "var(--seal)",
+  },
+  bunbakoEmpty: {
+    margin: "4px 0 12px",
+    color: CATS_MUTED,
+    fontFamily: CATS_SERIF,
+    fontSize: "13px",
+    letterSpacing: "var(--tracking-body)",
+    lineHeight: 1.7,
+  },
+  omoideControls: {
+    display: "flex",
+    flexDirection: "column",
+    gap: "8px",
+    marginTop: "12px",
+  },
+  omoideControlButton: {
+    minHeight: "40px",
+    border: "1px solid var(--line)",
+    borderRadius: "999px",
+    background: "transparent",
+    color: CATS_MUTED,
+    fontFamily: CATS_SERIF,
+    fontSize: "12px",
+    letterSpacing: "var(--tracking-body)",
+  },
+  guardFooter: {
+    margin: "12px 0 0",
+    color: CATS_FAINT,
+    fontFamily: CATS_SERIF,
+    fontSize: "10.5px",
+    letterSpacing: "var(--tracking-body)",
+    lineHeight: 1.7,
+  },
+  daysThread: {
+    marginTop: "18px",
+    padding: "16px",
+    border: "1px solid var(--line)",
+    borderRadius: "var(--radius-tile)",
+    background: "color-mix(in srgb, var(--paper) 44%, transparent)",
+  },
+  threadLine: {
+    display: "grid",
+    gap: "12px",
+    marginTop: "12px",
+    paddingLeft: "14px",
+    borderLeft: "1px solid var(--line)",
+  },
+  threadNode: {
+    display: "grid",
+    gap: "4px",
+  },
+  threadNodeTitle: {
+    color: CATS_TEXT,
+    fontFamily: CATS_SERIF,
+    fontSize: "13px",
+    letterSpacing: "var(--tracking-label)",
+  },
+  threadNodeText: {
+    color: CATS_MUTED,
+    fontSize: "12px",
+    lineHeight: 1.7,
+  },
+  omoideSheet: {
+    display: "grid",
+    gap: "12px",
+    justifyItems: "center",
+  },
+  omoideSheetTitle: {
+    margin: 0,
+    color: CATS_TEXT,
+    fontFamily: CATS_SERIF,
+    fontSize: "18px",
+    letterSpacing: "var(--tracking-label)",
+  },
+  omoideSheetImageFrame: {
+    width: "min(70vw, 260px)",
+    aspectRatio: "1 / 1",
+    padding: "8px",
+    borderRadius: "var(--radius-tile)",
+    background: CATS_PAPER,
+    boxShadow: "var(--shadow-rest)",
+  },
+  omoideSheetImage: {
+    width: "100%",
+    height: "100%",
+    borderRadius: "var(--radius-img)",
+  },
+  omoideSheetVoice: {
+    margin: 0,
+    color: CATS_TEXT,
+    fontFamily: CATS_SERIF,
+    fontSize: "13px",
+    letterSpacing: "var(--tracking-body)",
+  },
+  omoideSheetBridge: {
+    margin: 0,
+    color: CATS_MUTED,
+    fontSize: "12px",
   },
   message: {
     margin: "10px 0 0",

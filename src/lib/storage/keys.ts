@@ -12,6 +12,8 @@ export const STORAGE_KEYS = {
   diagnosisOnboardingHomeHint: "diagnosis_onboarding_home_hint",
   homeVisitCount: "home_visit_count",
   eveningDeliveryDays: "neteruneko_evening_delivery_days",
+  omoideMemories: "neteruneko_omoide_memories",
+  omoideMemoryControls: "neteruneko_omoide_memory_controls",
   lastContext: "last_context",
   lastInputSignal: "last_input_signal",
   lastPrimaryCategory: "last_primary_category",

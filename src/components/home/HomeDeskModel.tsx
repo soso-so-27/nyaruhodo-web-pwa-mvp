@@ -15,6 +15,7 @@ import type {
   ExchangePhoto,
   OwnSleepingPhoto,
 } from "../../lib/home/sleepingPhotos";
+import type { OmoideMemory } from "../../lib/home/omoideDelivery";
 import { isExchangePhotoLocallyBlocked } from "../../lib/home/sleepingPhotos";
 import { trackProductEvent } from "../../lib/analytics/productAnalytics";
 import { playOpenSound } from "../../lib/openSound";
@@ -62,6 +63,9 @@ type HomeDeskModelProps = {
     photo: ExchangePhoto,
     dataUrl: string,
   ) => void;
+  omoideMemory?: OmoideMemory | null;
+  onOpenOmoideMemory?: (memory: OmoideMemory) => void;
+  onDismissOmoideMemory?: (memory: OmoideMemory) => void;
 };
 
 const HOLD_OPEN_MS = 1600;
@@ -87,6 +91,9 @@ export function HomeDeskModel({
   onKeepOpenedDelivery,
   onReportOpenedDelivery,
   onDeliveredStorageDataUrl,
+  omoideMemory,
+  onOpenOmoideMemory,
+  onDismissOmoideMemory,
 }: HomeDeskModelProps) {
   const deskState = getDeskState(eveningState);
   const prefersReducedMotion = usePrefersReducedMotion();
@@ -95,6 +102,8 @@ export function HomeDeskModel({
   const [developPhotoMounted, setDevelopPhotoMounted] = useState(false);
   const [isRewindingHold, setIsRewindingHold] = useState(false);
   const [viewerPhoto, setViewerPhoto] = useState<DeskViewerPhoto | null>(null);
+  const [openingOmoideMemory, setOpeningOmoideMemory] =
+    useState<OmoideMemory | null>(null);
   const [reportedDeliveredIds, setReportedDeliveredIds] = useState<Set<string>>(
     () => new Set(),
   );
@@ -132,6 +141,17 @@ export function HomeDeskModel({
   useEffect(() => {
     trackDeskStateShown(deskState, eveningState.dateKey);
   }, [deskState, eveningState.dateKey]);
+
+  useEffect(() => {
+    if (!omoideMemory) {
+      return;
+    }
+
+    trackProductEvent("omoide_arrival_shown", {
+      memory_id: omoideMemory.id,
+      lookback: omoideMemory.lookback,
+    });
+  }, [omoideMemory]);
 
   useEffect(() => {
     return () => {
@@ -394,6 +414,32 @@ export function HomeDeskModel({
           </p>
         ) : null}
 
+        {omoideMemory ? (
+          <button
+            type="button"
+            data-testid="omoide-arrival-letter"
+            style={deskStyles.omoideArrival}
+            onClick={() => {
+              setOpeningOmoideMemory(omoideMemory);
+              onOpenOmoideMemory?.(omoideMemory);
+            }}
+            aria-label="思い出が、とどきました"
+          >
+            <span style={deskStyles.omoideLetterIcon} aria-hidden="true">
+              思
+            </span>
+            <span style={deskStyles.omoideArrivalText}>
+              <span style={deskStyles.omoideArrivalKicker}>
+                今夜は、思い出が とどきました
+              </span>
+              <span style={deskStyles.omoideArrivalTitle}>過去から、一通。</span>
+              <span style={deskStyles.omoideArrivalSub}>
+                {omoideMemory.subtitle}
+              </span>
+            </span>
+          </button>
+        ) : null}
+
         {deskState === "4" && targetPhoto ? (
           <div style={deskStyles.openedPair} aria-label="きょうの2まい">
             <PhotoTile
@@ -494,6 +540,29 @@ export function HomeDeskModel({
         />
       ) : null}
 
+      {openingOmoideMemory ? (
+        <OmoideMemoryViewer
+          memory={openingOmoideMemory}
+          alreadyRecordedToday={Boolean(targetPhoto)}
+          onClose={() => setOpeningOmoideMemory(null)}
+          onDismiss={() => {
+            onDismissOmoideMemory?.(openingOmoideMemory);
+            setOpeningOmoideMemory(null);
+          }}
+          onCue={() => {
+            trackProductEvent(
+              "omoide_cue_tapped",
+              { led_to_capture: !targetPhoto },
+              { localCatId: openingOmoideMemory.catId },
+            );
+            setOpeningOmoideMemory(null);
+            if (!targetPhoto) {
+              onTakePhoto();
+            }
+          }}
+        />
+      ) : null}
+
       <style>{`
         @keyframes deskFrameBreathe {
           0%, 100% { box-shadow: var(--shadow-rest); }
@@ -529,6 +598,82 @@ export function HomeDeskModel({
         }
       `}</style>
     </section>
+  );
+}
+
+function OmoideMemoryViewer({
+  memory,
+  alreadyRecordedToday,
+  onClose,
+  onDismiss,
+  onCue,
+}: {
+  memory: OmoideMemory;
+  alreadyRecordedToday: boolean;
+  onClose: () => void;
+  onDismiss: () => void;
+  onCue: () => void;
+}) {
+  return (
+    <div
+      data-testid="omoide-memory-viewer"
+      style={deskStyles.omoideViewerBackdrop}
+      onClick={onClose}
+    >
+      <section
+        style={deskStyles.omoideViewerPanel}
+        aria-label="思い出が、とどきました"
+        onClick={(event) => event.stopPropagation()}
+      >
+        <p style={deskStyles.omoideViewerKicker}>思い出が、とどきました</p>
+        <h2 style={deskStyles.omoideViewerTitle}>{memory.title}</h2>
+        <p style={deskStyles.omoideViewerDate}>
+          {formatOmoideDate(memory.sourceDateKey)}
+        </p>
+        <div style={deskStyles.omoideViewerImageFrame}>
+          <StoredPhotoImage
+            src={getPhotoDetailSrc(memory.photo)}
+            alt=""
+            style={deskStyles.omoideViewerImage}
+          />
+        </div>
+        <p style={deskStyles.omoideViewerVoice}>{memory.voice}</p>
+        <p style={deskStyles.omoideViewerBridge}>{memory.bridge}</p>
+        <p style={deskStyles.omoideViewerQuestion}>
+          きょうの {memory.catName}は、どんな ねがお？
+        </p>
+        <button
+          type="button"
+          style={deskStyles.omoideViewerPrimary}
+          onClick={onCue}
+        >
+          {alreadyRecordedToday
+            ? `きょうの ${memory.catName}を みる`
+            : `いまの ${memory.catName}を のこす`}
+        </button>
+        <button
+          type="button"
+          style={deskStyles.omoideViewerQuiet}
+          onClick={onDismiss}
+        >
+          そっと しまう
+        </button>
+      </section>
+      <style>{`
+        [data-testid="omoide-memory-viewer"] img {
+          animation: omoideDevelop var(--dur-develop) var(--ease-settle) both;
+        }
+        @keyframes omoideDevelop {
+          from { opacity: 0; filter: blur(14px); transform: scale(0.985) rotate(-1deg); }
+          to { opacity: 1; filter: blur(0); transform: scale(1) rotate(-1deg); }
+        }
+        @media (prefers-reduced-motion: reduce) {
+          [data-testid="omoide-memory-viewer"] img {
+            animation: none;
+          }
+        }
+      `}</style>
+    </div>
   );
 }
 
@@ -963,6 +1108,18 @@ function trackDeskStateShown(state: DeskState, dateKey: string) {
   trackProductEvent("motif_state_shown", { state });
 }
 
+function formatOmoideDate(dateKey: string) {
+  const [year, month, day] = dateKey.split("-").map(Number);
+  if (!year || !month || !day) {
+    return dateKey;
+  }
+
+  const weekday = ["日", "月", "火", "水", "木", "金", "土"][
+    new Date(Date.UTC(year, month - 1, day)).getUTCDay()
+  ];
+  return `${year}年${month}月${day}日 ・ ${weekday}よう日`;
+}
+
 const deskStyles = {
   page: {
     position: "relative",
@@ -1231,6 +1388,59 @@ const deskStyles = {
     letterSpacing: "var(--tracking-label)",
     textAlign: "center",
   },
+  omoideArrival: {
+    width: "min(100%, 330px)",
+    display: "grid",
+    gridTemplateColumns: "52px 1fr",
+    alignItems: "center",
+    gap: "12px",
+    marginTop: "2px",
+    padding: "12px 14px",
+    border: "1px solid var(--line)",
+    borderRadius: "var(--radius-tile)",
+    background: "color-mix(in srgb, var(--paper) 82%, transparent)",
+    color: "var(--ink)",
+    boxShadow: "var(--shadow-rest)",
+    textAlign: "left",
+    cursor: "pointer",
+    WebkitTapHighlightColor: "transparent",
+  },
+  omoideLetterIcon: {
+    width: "48px",
+    height: "34px",
+    display: "inline-flex",
+    alignItems: "center",
+    justifyContent: "center",
+    border: "1px solid var(--line)",
+    borderRadius: "var(--radius-s)",
+    background: "var(--paper-card)",
+    color: "var(--seal)",
+    fontFamily: "var(--font-serif)",
+    fontSize: "16px",
+    letterSpacing: "0",
+    transform: "rotate(-2deg)",
+  },
+  omoideArrivalText: {
+    display: "grid",
+    gap: "2px",
+  },
+  omoideArrivalKicker: {
+    color: "var(--ink-soft)",
+    fontFamily: "var(--font-serif)",
+    fontSize: "10.5px",
+    letterSpacing: "var(--tracking-label)",
+  },
+  omoideArrivalTitle: {
+    color: "var(--ink)",
+    fontFamily: "var(--font-serif)",
+    fontSize: "15px",
+    letterSpacing: "var(--tracking-label)",
+  },
+  omoideArrivalSub: {
+    color: "var(--ink-soft)",
+    fontSize: "11px",
+    lineHeight: 1.55,
+  },
   openedPair: {
     display: "flex",
     alignItems: "flex-start",
@@ -1391,6 +1601,115 @@ const deskStyles = {
     fontFamily: "var(--font-serif)",
     fontSize: "14px",
     letterSpacing: "var(--tracking-body)",
+  },
+  omoideViewerBackdrop: {
+    position: "fixed",
+    inset: 0,
+    zIndex: 60,
+    display: "grid",
+    placeItems: "center",
+    padding:
+      "calc(24px + env(safe-area-inset-top)) 18px calc(24px + env(safe-area-inset-bottom))",
+    background: "var(--bg-gradient)",
+  },
+  omoideViewerPanel: {
+    width: "min(100%, 430px)",
+    minHeight: "100%",
+    display: "flex",
+    flexDirection: "column",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: "12px",
+    color: "var(--ink)",
+  },
+  omoideViewerKicker: {
+    margin: "0 0 2px",
+    color: "var(--ink-soft)",
+    fontFamily: "var(--font-serif)",
+    fontSize: "11px",
+    letterSpacing: "var(--tracking-label)",
+  },
+  omoideViewerTitle: {
+    margin: 0,
+    color: "var(--ink)",
+    fontFamily: "var(--font-serif)",
+    fontSize: "25px",
+    fontWeight: 400,
+    letterSpacing: "var(--tracking-label)",
+    lineHeight: 1.4,
+    textAlign: "center",
+  },
+  omoideViewerDate: {
+    margin: "0 0 8px",
+    color: "var(--ink-soft)",
+    fontFamily: "var(--font-serif)",
+    fontSize: "12px",
+    letterSpacing: "var(--tracking-body)",
+  },
+  omoideViewerImageFrame: {
+    width: "min(72vw, 280px)",
+    aspectRatio: "1 / 1",
+    padding: "9px",
+    borderRadius: "var(--radius-tile)",
+    background: "var(--paper)",
+    boxShadow: "var(--shadow-float)",
+    transform: "rotate(-1deg)",
+  },
+  omoideViewerImage: {
+    width: "100%",
+    height: "100%",
+    borderRadius: "var(--radius-img)",
+  },
+  omoideViewerVoice: {
+    margin: "16px 0 0",
+    color: "var(--ink)",
+    fontFamily: "var(--font-serif)",
+    fontSize: "14px",
+    letterSpacing: "var(--tracking-label)",
+    textAlign: "center",
+  },
+  omoideViewerBridge: {
+    margin: 0,
+    color: "var(--ink-soft)",
+    fontFamily: "var(--font-serif)",
+    fontSize: "12px",
+    letterSpacing: "var(--tracking-body)",
+  },
+  omoideViewerQuestion: {
+    margin: "4px 0 0",
+    color: "var(--ink-soft)",
+    fontFamily: "var(--font-serif)",
+    fontSize: "13px",
+    letterSpacing: "var(--tracking-body)",
+    textAlign: "center",
+  },
+  omoideViewerPrimary: {
+    width: "min(100%, 320px)",
+    minHeight: "48px",
+    marginTop: "8px",
+    border: "1px solid var(--line)",
+    borderRadius: "999px",
+    background: "var(--paper)",
+    color: "var(--ink)",
+    fontFamily: "var(--font-serif)",
+    fontSize: "14px",
+    letterSpacing: "var(--tracking-label)",
+    boxShadow: "var(--shadow-rest)",
+  },
+  omoideViewerQuiet: {
+    border: "none",
+    background: "transparent",
+    color: "var(--ink-soft)",
+    fontFamily: "var(--font-serif)",
+    fontSize: "13px",
+    letterSpacing: "var(--tracking-label)",
+  },
+  omoideViewerGuard: {
+    margin: "6px 0 0",
+    color: "var(--ink-faint)",
+    fontSize: "11px",
+    letterSpacing: "var(--tracking-body)",
+    textAlign: "center",
   },
   yesterday: {
     display: "flex",

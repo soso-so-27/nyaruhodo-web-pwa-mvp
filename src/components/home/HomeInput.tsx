@@ -57,6 +57,12 @@ import {
   type EveningHomeState,
 } from "../../lib/home/eveningDelivery";
 import {
+  ensureOmoideMemoryArrival,
+  markOmoideMemoryDismissed,
+  markOmoideMemoryOpened,
+  readLatestArrivedOmoideMemory,
+} from "../../lib/home/omoideDelivery";
+import {
   HOME_DESK_MODEL_ENABLED,
   readHomeDeskModelOverride,
 } from "../../lib/home/homeDeskModelFlag";
@@ -325,6 +331,7 @@ export function HomeInput({ recentEvents: _recentEvents }: HomeInputProps) {
   );
   const [collectionRefreshTick, setCollectionRefreshTick] = useState(0);
   const [eveningRefreshTick, setEveningRefreshTick] = useState(0);
+  const [omoideRefreshTick, setOmoideRefreshTick] = useState(0);
   const [discoveryDismissedToday, setDiscoveryDismissedToday] = useState(false);
   const hasTrackedHomeView = useRef(false);
   const hasTrackedGoogleAuthSuccess = useRef(false);
@@ -385,6 +392,23 @@ export function HomeInput({ recentEvents: _recentEvents }: HomeInputProps) {
         refreshEveningDeliveryState,
       );
       window.removeEventListener("storage", refreshEveningDeliveryState);
+    };
+  }, []);
+
+  useEffect(() => {
+    function refreshOmoideState() {
+      setOmoideRefreshTick((value) => value + 1);
+    }
+
+    window.addEventListener("neteruneko_omoide_memories_updated", refreshOmoideState);
+    window.addEventListener("storage", refreshOmoideState);
+
+    return () => {
+      window.removeEventListener(
+        "neteruneko_omoide_memories_updated",
+        refreshOmoideState,
+      );
+      window.removeEventListener("storage", refreshOmoideState);
     };
   }, []);
 
@@ -687,6 +711,33 @@ export function HomeInput({ recentEvents: _recentEvents }: HomeInputProps) {
         now: homeNow,
       }),
     [activeCatId, eveningDeliveryRefreshTick, homeNow, ownSleepingPhotosForHome],
+  );
+  useEffect(() => {
+    if (!isHomeClockReady || !activeCatId || !activeCat) {
+      return;
+    }
+
+    const memory = ensureOmoideMemoryArrival({
+      catId: activeCatId,
+      catName,
+      familySinceDate: activeCat.basicInfo?.familySinceDate,
+      ownPhotos: ownSleepingPhotosForHome,
+      now: homeNow,
+    });
+    if (memory) {
+      setOmoideRefreshTick((value) => value + 1);
+    }
+  }, [
+    activeCat,
+    activeCatId,
+    catName,
+    homeNow,
+    isHomeClockReady,
+    ownSleepingPhotosForHome,
+  ]);
+  const arrivedOmoideMemory = useMemo(
+    () => readLatestArrivedOmoideMemory(activeCatId, homeNow),
+    [activeCatId, homeNow, omoideRefreshTick],
   );
   const keptExchangePhotoCount = useMemo(
     () => readKeptExchangePhotoCount(),
@@ -1911,6 +1962,15 @@ export function HomeInput({ recentEvents: _recentEvents }: HomeInputProps) {
             onKeepOpenedDelivery={handleKeepEveningDelivery}
             onReportOpenedDelivery={handleReportEveningDelivery}
             onDeliveredStorageDataUrl={handleDeskDeliveredPhotoDataUrl}
+            omoideMemory={arrivedOmoideMemory}
+            onOpenOmoideMemory={(memory) => {
+              markOmoideMemoryOpened(memory.id, homeNow);
+              setOmoideRefreshTick((value) => value + 1);
+            }}
+            onDismissOmoideMemory={(memory) => {
+              markOmoideMemoryDismissed(memory.id, homeNow);
+              setOmoideRefreshTick((value) => value + 1);
+            }}
           />
         ) : (
           <SleepingPhotoHome
