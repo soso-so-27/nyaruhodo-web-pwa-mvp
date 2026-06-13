@@ -4,7 +4,7 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import type { CSSProperties, MouseEvent, ReactNode } from "react";
-import { BoxIcon, CameraIcon } from "../ui/AppIcons";
+import { BoxIcon } from "../ui/AppIcons";
 
 type BottomNavigationProps = {
   active: "home" | "today" | "collection" | "cats";
@@ -27,7 +27,6 @@ type ViewTransitionDocument = Document & {
 
 export function BottomNavigation({
   active,
-  homeVariant = "default",
   homeState = "1",
 }: BottomNavigationProps) {
   const router = useRouter();
@@ -38,8 +37,8 @@ export function BottomNavigation({
     {
       key: "home",
       href: "/home",
-      label: "とる",
-      icon: <CameraIcon style={{ ...styles.svgIcon, ...styles.cameraSvgIcon }} />,
+      label: "きょう",
+      icon: <TodayPairIcon state={homeState} />,
     },
     {
       key: "collection",
@@ -104,14 +103,7 @@ export function BottomNavigation({
       />
       {items.map((item) => {
         const isActive = displayActiveKey === item.key;
-        const displayLabel =
-          item.key === "home" && homeVariant === "desk" ? "きょう" : item.label;
-        const displayIcon =
-          item.key === "home" && homeVariant === "desk" ? (
-            <TodayPairIcon state={homeState} />
-          ) : (
-            item.icon
-          );
+        const displayLabel = item.label;
         return (
           <Link
             key={item.key}
@@ -126,7 +118,7 @@ export function BottomNavigation({
               style={isActive ? styles.activeNavIcon : styles.navIcon}
               aria-hidden="true"
             >
-              {displayIcon}
+              {item.icon}
             </span>
             <span style={isActive ? styles.activeNavLabel : styles.navLabel}>
               {displayLabel}
@@ -276,10 +268,6 @@ const styles = {
     height: "21px",
     display: "block",
   },
-  cameraSvgIcon: {
-    width: "20px",
-    height: "20px",
-  },
   boxSvgIcon: {
     width: "21px",
     height: "21px",
@@ -306,6 +294,7 @@ const styles = {
     overflow: "visible",
   },
   navLabel: {
+    display: "none",
     color: "currentColor",
     fontFamily: "var(--font-serif)",
     fontSize: "10px",

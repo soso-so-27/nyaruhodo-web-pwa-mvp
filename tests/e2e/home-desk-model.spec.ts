@@ -41,6 +41,35 @@ test.describe("home desk model", () => {
     }
   });
 
+  test("shows only the active bottom navigation label", async ({ page }) => {
+    await seedDeskState(page, "1");
+    await page.goto("/home");
+    await page.waitForLoadState("networkidle");
+
+    const nav = page.getByRole("navigation", { name: "下部ナビゲーション" });
+    await expect(nav.getByRole("link", { name: "きょう" })).toHaveAttribute(
+      "aria-current",
+      "page",
+    );
+    await expect(nav.getByText("きょう", { exact: true })).toBeVisible();
+    await expect(nav.getByText("アルバム", { exact: true })).toBeHidden();
+    await expect(nav.getByText("ねこ", { exact: true })).toBeHidden();
+
+    await nav.getByRole("link", { name: "アルバム" }).click();
+    await expect(page).toHaveURL(/\/collection$/);
+    const collectionNav = page.getByRole("navigation", {
+      name: "下部ナビゲーション",
+    });
+    await expect(
+      collectionNav.getByRole("link", { name: "きょう" }),
+    ).not.toHaveAttribute("aria-current", "page");
+    await expect(
+      collectionNav.getByRole("link", { name: "アルバム" }),
+    ).toHaveAttribute("aria-current", "page");
+    await expect(collectionNav.getByText("アルバム", { exact: true })).toBeVisible();
+    await expect(collectionNav.getByText("きょう", { exact: true })).toBeHidden();
+  });
+
   test("moves the home ambient light by time without changing the state2 letter", async ({
     page,
   }) => {
