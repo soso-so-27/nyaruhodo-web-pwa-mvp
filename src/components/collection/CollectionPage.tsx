@@ -179,6 +179,7 @@ export function CollectionPage() {
   const toastTimerRef = useRef<number | null>(null);
   const trackedViewCatIdRef = useRef<string | null>(null);
   const trackedDailyTargetRef = useRef<string | null>(null);
+  const albumScopeSwitchStartedAtRef = useRef<number | null>(null);
 
   useEffect(() => {
     const profiles = readCatProfiles();
@@ -518,6 +519,32 @@ export function CollectionPage() {
     );
   }
 
+  function handleAlbumScopeChange(scope: AlbumScope) {
+    if (scope === activeAlbumScope) {
+      return;
+    }
+
+    albumScopeSwitchStartedAtRef.current = performance.now();
+    setActiveAlbumScope(scope);
+    window.requestAnimationFrame(() => {
+      const startedAt = albumScopeSwitchStartedAtRef.current;
+      if (startedAt === null) {
+        return;
+      }
+
+      trackProductEvent(
+        "tab_switch_completed",
+        {
+          tab_group: "collection_album_scope",
+          target_tab: scope,
+          elapsed_ms: Math.max(0, Math.round(performance.now() - startedAt)),
+        },
+        { localCatId: activeCatId },
+      );
+      albumScopeSwitchStartedAtRef.current = null;
+    });
+  }
+
   async function handlePhotoAdd(slot: CollectionSlot) {
     if (!activeCatId) {
       return;
@@ -787,7 +814,7 @@ export function CollectionPage() {
           activeScope={activeAlbumScope}
           firstEveningDeliveryTargetDateKey={firstEveningDeliveryTargetDateKey}
           catName={catName}
-          onScopeChange={setActiveAlbumScope}
+          onScopeChange={handleAlbumScopeChange}
           onOpenBox={openBoxDetail}
         />
       </div>
@@ -2742,13 +2769,13 @@ async function createStoredCollectionPhotoVariantSet({
   >
 > {
   const [thumbnailDataUrl, displayDataUrl] = await Promise.all([
-    resizeAndEncode(file, 420, 0.72),
-    resizeAndEncode(file, 1800, 0.9),
+    resizeAndEncode(file, 400, 0.7, "image/webp"),
+    resizeAndEncode(file, 1200, 0.8, "image/webp"),
   ]);
   const localDisplaySrc =
     displayDataUrl.length <= 1_900_000
       ? displayDataUrl
-      : await resizeAndEncode(file, 1100, 0.8);
+      : await resizeAndEncode(file, 900, 0.76, "image/webp");
   const [originalSrc, storedDisplaySrc] = await Promise.all([
     storeAccountPhotoFile({
       file,
@@ -2784,7 +2811,12 @@ function isStoragePhotoReference(src: string | null | undefined) {
   return Boolean(src?.startsWith("storage:") || src?.startsWith("storage://"));
 }
 
-function resizeAndEncode(file: File, maxSize = 800, quality = 0.85): Promise<string> {
+function resizeAndEncode(
+  file: File,
+  maxSize = 800,
+  quality = 0.85,
+  mimeType = "image/jpeg",
+): Promise<string> {
   return new Promise((resolve) => {
     const img = new Image();
     const url = URL.createObjectURL(file);
@@ -2806,7 +2838,12 @@ function resizeAndEncode(file: File, maxSize = 800, quality = 0.85): Promise<str
 
       ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
       URL.revokeObjectURL(url);
-      resolve(canvas.toDataURL("image/jpeg", quality));
+      const encoded = canvas.toDataURL(mimeType, quality);
+      resolve(
+        encoded.startsWith(`data:${mimeType};`)
+          ? encoded
+          : canvas.toDataURL("image/jpeg", quality),
+      );
     };
 
     img.src = url;

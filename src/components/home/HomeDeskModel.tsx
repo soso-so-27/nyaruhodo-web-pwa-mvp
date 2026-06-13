@@ -279,6 +279,7 @@ export function HomeDeskModel({
                 aria-label="ねがおをとる"
               >
                 <AppIcon name="camera" size={28} />
+                <span style={deskStyles.emptyFrameLabel}>とる</span>
               </button>
             )}
           </div>
@@ -1006,6 +1007,7 @@ const deskStyles = {
     boxSizing: "border-box",
     display: "grid",
     placeItems: "center",
+    gap: "6px",
     border: "1px dashed var(--ink-faint)",
     borderRadius: "var(--radius-tile)",
     background: "color-mix(in srgb, var(--paper) 55%, transparent)",
@@ -1013,6 +1015,12 @@ const deskStyles = {
     boxShadow: "var(--shadow-rest)",
     cursor: "pointer",
     WebkitTapHighlightColor: "transparent",
+  },
+  emptyFrameLabel: {
+    fontFamily: "var(--font-serif)",
+    fontSize: "13px",
+    letterSpacing: "var(--tracking-label)",
+    color: "var(--ink-soft)",
   },
   letter: {
     position: "relative",

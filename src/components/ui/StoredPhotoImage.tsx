@@ -6,11 +6,13 @@ import {
   useRef,
   useState,
   type CSSProperties,
+  type MutableRefObject,
 } from "react";
 
 import {
   getStoragePhotoPath,
 } from "../../lib/photoStorage";
+import { trackProductEvent } from "../../lib/analytics/productAnalytics";
 import { STORAGE_KEYS } from "../../lib/storage";
 import { createBrowserSupabaseClient } from "../../lib/supabase/browser";
 import { color, radius, shadow, typography } from "./designTokens";
@@ -26,6 +28,15 @@ const fallbackFrameStyle: CSSProperties = {
   background:
     "linear-gradient(180deg, rgba(255,253,248,0.92), rgba(247,241,231,0.72))",
   boxShadow: shadow.soft,
+};
+
+const developOverlayStyle: CSSProperties = {
+  position: "absolute",
+  inset: 0,
+  pointerEvents: "none",
+  background:
+    "linear-gradient(180deg, rgba(251,250,247,0.28), rgba(244,241,234,0.18))",
+  transition: "opacity 420ms var(--ease-gentle)",
 };
 
 const fallbackOverlayStyle: CSSProperties = {
@@ -83,6 +94,8 @@ export function StoredPhotoImage({
   const [isLoaded, setIsLoaded] = useState(false);
   const [hasError, setHasError] = useState(false);
   const imageRef = useRef<HTMLImageElement | null>(null);
+  const loadStartedAtRef = useRef<number>(performance.now());
+  const trackedDisplaySrcRef = useRef("");
   const persistedDataUrlRef = useRef("");
   const isInlineImage = displaySrc.startsWith("data:image/");
   const frameStyle = useMemo<CSSProperties>(
@@ -102,6 +115,8 @@ export function StoredPhotoImage({
     let isActive = true;
     const storagePath = getStoragePhotoPath(src);
 
+    loadStartedAtRef.current = performance.now();
+    trackedDisplaySrcRef.current = "";
     setIsLoaded(false);
     setHasError(false);
     setStorageDataUrl(null);
@@ -143,6 +158,11 @@ export function StoredPhotoImage({
       isActive = false;
     };
   }, [src]);
+
+  useEffect(() => {
+    loadStartedAtRef.current = performance.now();
+    trackedDisplaySrcRef.current = "";
+  }, [displaySrc]);
 
   useEffect(() => {
     const image = imageRef.current;
@@ -233,7 +253,14 @@ export function StoredPhotoImage({
         draggable={false}
         loading={isInlineImage ? "eager" : "lazy"}
         decoding={isInlineImage ? "sync" : "async"}
-        onLoad={() => setIsLoaded(true)}
+        onLoad={() => {
+          setIsLoaded(true);
+          trackImageLoadCompleted({
+            displaySrc,
+            startedAt: loadStartedAtRef.current,
+            trackedRef: trackedDisplaySrcRef,
+          });
+        }}
         onError={() => {
           setIsLoaded(false);
           setHasError(true);
@@ -242,17 +269,74 @@ export function StoredPhotoImage({
           width: "100%",
           height: "100%",
           objectFit: objectFit ?? "cover",
-          filter,
+          filter: buildDevelopFilter(filter, isLoaded, hasError),
           mixBlendMode,
           display: "block",
-          opacity: !hasError && (isInlineImage || isLoaded) ? 1 : 0,
-          transition: "opacity 180ms ease",
+          opacity: hasError ? 0 : 1,
+          transform: isLoaded ? "scale(1)" : "scale(1.018)",
+          transition:
+            "filter 420ms var(--ease-gentle), opacity 180ms var(--ease-gentle), transform 420ms var(--ease-gentle)",
           ...imageSelectionLockStyle,
         }}
       />
+      {!hasError ? (
+        <span
+          aria-hidden="true"
+          style={{
+            ...developOverlayStyle,
+            opacity: isLoaded ? 0 : 1,
+          }}
+        />
+      ) : null}
       {hasError ? <PhotoFallback style={fallbackOverlayStyle} /> : null}
     </span>
   );
+}
+
+function buildDevelopFilter(
+  baseFilter: CSSProperties["filter"],
+  isLoaded: boolean,
+  hasError: boolean,
+) {
+  const filters = [
+    baseFilter,
+    !hasError && !isLoaded ? "blur(14px) saturate(0.9)" : null,
+  ].filter(Boolean);
+
+  return filters.length > 0 ? filters.join(" ") : undefined;
+}
+
+function trackImageLoadCompleted({
+  displaySrc,
+  startedAt,
+  trackedRef,
+}: {
+  displaySrc: string;
+  startedAt: number;
+  trackedRef: MutableRefObject<string>;
+}) {
+  if (!displaySrc || trackedRef.current === displaySrc) {
+    return;
+  }
+
+  trackedRef.current = displaySrc;
+  trackProductEvent("image_load_completed", {
+    source_kind: getImageSourceKind(displaySrc),
+    elapsed_ms: Math.max(0, Math.round(performance.now() - startedAt)),
+  });
+}
+
+function getImageSourceKind(displaySrc: string) {
+  if (displaySrc.startsWith("data:image/")) {
+    return "data";
+  }
+  if (displaySrc.startsWith("blob:")) {
+    return "blob";
+  }
+  if (displaySrc.startsWith("http://") || displaySrc.startsWith("https://")) {
+    return "remote";
+  }
+  return "other";
 }
 
 function PhotoFallback({ style }: { style: CSSProperties }) {

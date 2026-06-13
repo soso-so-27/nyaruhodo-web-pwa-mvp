@@ -5008,13 +5008,13 @@ async function createStoredPhotoVariantSet({
   fileName: string;
 }) {
   const [thumbnailDataUrl, displayDataUrl] = await Promise.all([
-    resizeAndEncode(file, 420, 0.72),
-    resizeAndEncode(file, 1800, 0.9),
+    resizeAndEncode(file, 400, 0.7, "image/webp"),
+    resizeAndEncode(file, 1200, 0.8, "image/webp"),
   ]);
   const exchangeDataUrl =
     displayDataUrl.length <= 1_900_000
       ? displayDataUrl
-      : await resizeAndEncode(file, 1100, 0.8);
+      : await resizeAndEncode(file, 900, 0.76, "image/webp");
   const [originalSrc, storedDisplaySrc] = await Promise.all([
     storeAccountPhotoFile({
       file,
@@ -5059,6 +5059,7 @@ function resizeAndEncode(
   file: File,
   maxSize = 1200,
   quality = 0.86,
+  mimeType = "image/jpeg",
 ): Promise<string> {
   return new Promise((resolve, reject) => {
     const img = new Image();
@@ -5079,7 +5080,12 @@ function resizeAndEncode(
 
       ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
       URL.revokeObjectURL(url);
-      resolve(canvas.toDataURL("image/jpeg", quality));
+      const encoded = canvas.toDataURL(mimeType, quality);
+      resolve(
+        encoded.startsWith(`data:${mimeType};`)
+          ? encoded
+          : canvas.toDataURL("image/jpeg", quality),
+      );
     };
 
     img.onerror = () => {
