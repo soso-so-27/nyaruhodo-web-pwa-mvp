@@ -65,9 +65,9 @@ test("shows birthday countdown and zukan hint on the cat page", async ({
   await page.goto("/cats");
   await page.waitForLoadState("networkidle");
 
-  await expect(page.getByText("たんじょうびまで あと3日")).toBeVisible();
+  await expect(page.getByText("むぎの日まで あと3日")).toBeVisible();
   await expect(
-    page.getByText("たんじょうびには とくべつな おたよりが とどきます"),
+    page.getByText("誕生日は、むぎ自身の日として そっと置いておきます。"),
   ).toBeVisible();
   await expect(page.getByText("ずかんで つかわれます")).toBeVisible();
 });
@@ -81,7 +81,7 @@ test("shows the special birthday text on the cat birthday", async ({ page }) => 
   await page.goto("/cats");
   await page.waitForLoadState("networkidle");
 
-  await expect(page.getByText("きょうは むぎの たんじょうび")).toBeVisible();
+  await expect(page.getByText("きょうは むぎの日")).toBeVisible();
 });
 
 async function seedCatProfile(

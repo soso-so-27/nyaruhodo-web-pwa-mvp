@@ -552,21 +552,6 @@ export function CatsPage() {
                   ) : null}
                 </div>
 
-                {birthdayStatus ? (
-                  <div
-                    style={
-                      birthdayStatus.isToday
-                        ? { ...styles.birthdayPanel, ...styles.birthdayPanelToday }
-                        : styles.birthdayPanel
-                    }
-                  >
-                    <span style={styles.birthdayText}>{birthdayStatus.copy}</span>
-                    <span style={styles.birthdayHint}>
-                      たんじょうびには とくべつな おたよりが とどきます
-                    </span>
-                  </div>
-                ) : null}
-
                 <div style={styles.recordList}>
                   <div style={styles.recordRow}>
                     <span style={styles.recordLabel}>
@@ -590,23 +575,27 @@ export function CatsPage() {
                       {takenSleepingPhotoCount}枚
                     </span>
                   </div>
-                  <div style={styles.recordRow}>
-                    <span style={styles.recordLabel}>誕生日</span>
-                    <span style={styles.recordMetricValue}>
-                      {activeCatProfile.basicInfo?.birthDate
-                        ? formatBirthDate(activeCatProfile.basicInfo.birthDate)
-                        : "未設定"}
-                    </span>
-                  </div>
                   <div style={{ ...styles.recordRow, ...styles.recordRowLast }}>
-                    <span style={styles.recordLabel}>年齢</span>
+                    <span style={styles.recordLabel}>関係の記録</span>
                     <span style={styles.recordMetricValue}>
-                      {activeCatProfile.basicInfo?.birthDate
-                        ? formatAge(activeCatProfile.basicInfo.birthDate)
-                        : "未設定"}
+                      迎えた日から
                     </span>
                   </div>
                 </div>
+                {birthdayStatus ? (
+                  <div
+                    style={
+                      birthdayStatus.isToday
+                        ? { ...styles.catDayNote, ...styles.catDayNoteToday }
+                        : styles.catDayNote
+                    }
+                  >
+                    <span style={styles.catDayText}>{birthdayStatus.copy}</span>
+                    <span style={styles.catDayHint}>
+                      誕生日は、{catName}自身の日として そっと置いておきます。
+                    </span>
+                  </div>
+                ) : null}
                 <div style={styles.profileNotes}>
                   {activeGender ? (
                     <span style={styles.profileNote}>{activeGender}</span>
@@ -680,7 +669,7 @@ export function CatsPage() {
                 !activeCatProfile.appearance?.coat &&
                 !activeGender ? (
                   <p style={styles.emptyInfoText}>
-                    右上から誕生日などを追加できます。
+                    必要なことだけ、右上からそっと足せます。
                   </p>
                 ) : null}
               </>
@@ -1183,16 +1172,6 @@ function CoatSelector({
   );
 }
 
-function formatBirthDate(birthDate: string): string {
-  const date = new Date(birthDate);
-
-  if (Number.isNaN(date.getTime())) {
-    return "";
-  }
-
-  return `${date.getFullYear()}年${date.getMonth() + 1}月${date.getDate()}日`;
-}
-
 function formatFamilyDuration(familySinceDate?: string): {
   primary: string;
   secondary: string;
@@ -1293,13 +1272,13 @@ function getBirthdayStatus(
 
   if (daysUntil === 0) {
     return {
-      copy: `きょうは ${catName}の たんじょうび`,
+      copy: `きょうは ${catName}の日`,
       isToday: true,
     };
   }
 
   return {
-    copy: `たんじょうびまで あと${daysUntil}日`,
+    copy: `${catName}の日まで あと${daysUntil}日`,
     isToday: false,
   };
 }
@@ -1335,41 +1314,6 @@ function parseLocalDate(value?: string): Date | null {
   }
 
   return date;
-}
-
-function formatAge(birthDate?: string): string {
-  if (!birthDate) {
-    return "";
-  }
-
-  const birth = new Date(birthDate);
-
-  if (Number.isNaN(birth.getTime())) {
-    return "";
-  }
-
-  const now = new Date();
-  let totalMonths =
-    (now.getFullYear() - birth.getFullYear()) * 12 +
-    (now.getMonth() - birth.getMonth());
-
-  if (now.getDate() < birth.getDate()) {
-    totalMonths -= 1;
-  }
-
-  if (totalMonths < 0) {
-    return "";
-  }
-
-  if (totalMonths < 12) {
-    return `${totalMonths}ヶ月`;
-  }
-
-  if (totalMonths < 24) {
-    return "1歳";
-  }
-
-  return `${Math.floor(totalMonths / 12)}歳`;
 }
 
 function formatGender(gender?: string): string {
@@ -1719,33 +1663,29 @@ const styles = {
     lineHeight: 1.35,
     letterSpacing: "var(--tracking-body)",
   },
-  birthdayPanel: {
+  catDayNote: {
     display: "grid",
-    gap: "5px",
-    marginBottom: "12px",
-    padding: "12px 13px",
-    border: "1px solid var(--line)",
-    borderRadius: "var(--radius-s)",
-    background: "color-mix(in srgb, var(--paper) 38%, transparent)",
+    gap: "3px",
+    margin: "10px 0 0",
+    padding: "0 2px",
   },
-  birthdayPanelToday: {
-    background: "color-mix(in srgb, var(--paper-card) 74%, transparent)",
-    boxShadow: "var(--shadow-rest)",
+  catDayNoteToday: {
+    color: "var(--seal)",
   },
-  birthdayText: {
-    color: CATS_TEXT_STRONG,
-    fontFamily: CATS_SERIF,
-    fontSize: "13px",
-    fontWeight: 400,
-    lineHeight: 1.45,
-    letterSpacing: "var(--tracking-label)",
-  },
-  birthdayHint: {
+  catDayText: {
     color: CATS_MUTED,
     fontFamily: CATS_SERIF,
-    fontSize: "11px",
+    fontSize: "11.5px",
     fontWeight: 400,
-    lineHeight: 1.55,
+    lineHeight: 1.45,
+    letterSpacing: "var(--tracking-body)",
+  },
+  catDayHint: {
+    color: CATS_FAINT,
+    fontFamily: CATS_SERIF,
+    fontSize: "10.5px",
+    fontWeight: 400,
+    lineHeight: 1.5,
     letterSpacing: "var(--tracking-body)",
   },
   recordList: {
