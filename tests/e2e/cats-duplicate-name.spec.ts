@@ -53,3 +53,68 @@ test("asks for confirmation before saving a duplicate cat name", async ({
     )
     .toBe(2);
 });
+
+test("shows birthday countdown and zukan hint on the cat page", async ({
+  page,
+}) => {
+  await seedCatProfile(page, {
+    now: "2026-06-10T00:00:00.000Z",
+    birthDate: "2020-06-13",
+  });
+
+  await page.goto("/cats");
+  await page.waitForLoadState("networkidle");
+
+  await expect(page.getByText("たんじょうびまで あと3日")).toBeVisible();
+  await expect(
+    page.getByText("たんじょうびには とくべつな おたよりが とどきます"),
+  ).toBeVisible();
+  await expect(page.getByText("ずかんで つかわれます")).toBeVisible();
+});
+
+test("shows the special birthday text on the cat birthday", async ({ page }) => {
+  await seedCatProfile(page, {
+    now: "2026-06-13T00:00:00.000Z",
+    birthDate: "2020-06-13",
+  });
+
+  await page.goto("/cats");
+  await page.waitForLoadState("networkidle");
+
+  await expect(page.getByText("きょうは むぎの たんじょうび")).toBeVisible();
+});
+
+async function seedCatProfile(
+  page: import("@playwright/test").Page,
+  { now, birthDate }: { now: string; birthDate: string },
+) {
+  await page.addInitScript(
+    ({ now, birthDate }) => {
+      const nowValue = Date.parse(now);
+      const originalDateNow = Date.now.bind(Date);
+      Date.now = () => nowValue || originalDateNow();
+      window.localStorage.setItem(
+        "cat_profiles",
+        JSON.stringify([
+          {
+            id: "cat-mugi",
+            name: "むぎ",
+            createdAt: now,
+            updatedAt: now,
+            basicInfo: {
+              familySinceDate: "2022-09-25",
+              birthDate,
+              gender: "female",
+              breed: "ミックス",
+            },
+            appearance: {
+              coat: "orange_tabby",
+            },
+          },
+        ]),
+      );
+      window.localStorage.setItem("active_cat_id", "cat-mugi");
+    },
+    { now, birthDate },
+  );
+}

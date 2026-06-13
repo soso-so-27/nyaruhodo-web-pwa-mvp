@@ -92,6 +92,10 @@ export function CatsPage() {
   const familyDuration = formatFamilyDuration(
     activeCatProfile?.basicInfo?.familySinceDate,
   );
+  const birthdayStatus = getBirthdayStatus(
+    activeCatProfile?.basicInfo?.birthDate,
+    activeCatProfile?.name ?? catName,
+  );
   const takenSleepingPhotoCount = activeCatId
     ? readOwnSleepingPhotoCount(activeCatId)
     : 0;
@@ -524,20 +528,32 @@ export function CatsPage() {
 
                 <hr style={styles.divider} />
 
-                <div style={styles.recordList}>
-                  <div style={styles.recordRow}>
-                    <span style={styles.recordLabel}>家族になって</span>
-                    <span style={styles.recordMetricValueGroup}>
-                      <span style={styles.recordMetricValue}>
-                        {familyDuration.primary}
-                      </span>
-                      {familyDuration.secondary ? (
-                        <span style={styles.recordMetricSub}>
-                          {familyDuration.secondary}
-                        </span>
-                      ) : null}
+                <div style={styles.familyHero}>
+                  <span style={styles.familyHeroLabel}>家族になって</span>
+                  <span style={styles.familyHeroDays}>{familyDuration.primary}</span>
+                  {familyDuration.secondary ? (
+                    <span style={styles.familyHeroSub}>
+                      {familyDuration.secondary}
+                    </span>
+                  ) : null}
+                </div>
+
+                {birthdayStatus ? (
+                  <div
+                    style={
+                      birthdayStatus.isToday
+                        ? { ...styles.birthdayPanel, ...styles.birthdayPanelToday }
+                        : styles.birthdayPanel
+                    }
+                  >
+                    <span style={styles.birthdayText}>{birthdayStatus.copy}</span>
+                    <span style={styles.birthdayHint}>
+                      たんじょうびには とくべつな おたよりが とどきます
                     </span>
                   </div>
+                ) : null}
+
+                <div style={styles.recordList}>
                   <div style={styles.recordRow}>
                     <span style={styles.recordLabel}>とったねがお</span>
                     <span style={styles.recordMetricValue}>
@@ -576,6 +592,11 @@ export function CatsPage() {
                     </span>
                   ) : null}
                 </div>
+                {activeGender ||
+                activeCatProfile.basicInfo?.breed ||
+                activeCatProfile.appearance?.coat ? (
+                  <p style={styles.zukanHint}>ずかんで つかわれます</p>
+                ) : null}
                 <div style={styles.footprintsSection}>
                   <p style={styles.footprintsTitle}>あしあと</p>
                   <div style={styles.footprintsScroller}>
@@ -1005,6 +1026,45 @@ function formatFamilyDuration(familySinceDate?: string): {
   };
 }
 
+function getBirthdayStatus(
+  birthDate: string | undefined,
+  catName: string,
+): { copy: string; isToday: boolean } | null {
+  const birth = parseLocalDate(birthDate);
+
+  if (!birth) {
+    return null;
+  }
+
+  const now = new Date(Date.now());
+  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const thisYearBirthday = new Date(
+    today.getFullYear(),
+    birth.getMonth(),
+    birth.getDate(),
+  );
+  const nextBirthday =
+    thisYearBirthday < today
+      ? new Date(today.getFullYear() + 1, birth.getMonth(), birth.getDate())
+      : thisYearBirthday;
+  const daysUntil = Math.max(
+    0,
+    Math.round((nextBirthday.getTime() - today.getTime()) / 86_400_000),
+  );
+
+  if (daysUntil === 0) {
+    return {
+      copy: `きょうは ${catName}の たんじょうび`,
+      isToday: true,
+    };
+  }
+
+  return {
+    copy: `たんじょうびまで あと${daysUntil}日`,
+    isToday: false,
+  };
+}
+
 function addYearsSafe(date: Date, years: number) {
   const year = date.getFullYear() + years;
   const month = date.getMonth();
@@ -1386,6 +1446,69 @@ const styles = {
     WebkitMaskRepeat: "no-repeat",
     WebkitMaskSize: "contain",
   },
+  familyHero: {
+    display: "grid",
+    justifyItems: "center",
+    gap: "4px",
+    marginBottom: "14px",
+    padding: "16px 12px 14px",
+    border: "1px solid var(--line)",
+    borderRadius: "var(--radius-img)",
+    background: "color-mix(in srgb, var(--paper) 44%, transparent)",
+  },
+  familyHeroLabel: {
+    color: CATS_MUTED,
+    fontFamily: CATS_SERIF,
+    fontSize: "12px",
+    fontWeight: 400,
+    lineHeight: 1.3,
+    letterSpacing: "var(--tracking-label)",
+  },
+  familyHeroDays: {
+    color: CATS_TEXT_STRONG,
+    fontFamily: CATS_SERIF,
+    fontSize: "52px",
+    fontWeight: 400,
+    lineHeight: 1,
+    letterSpacing: "0.08em",
+  },
+  familyHeroSub: {
+    color: CATS_MUTED,
+    fontFamily: CATS_SERIF,
+    fontSize: "12px",
+    fontWeight: 400,
+    lineHeight: 1.35,
+    letterSpacing: "var(--tracking-body)",
+  },
+  birthdayPanel: {
+    display: "grid",
+    gap: "5px",
+    marginBottom: "12px",
+    padding: "12px 13px",
+    border: "1px solid var(--line)",
+    borderRadius: "var(--radius-s)",
+    background: "color-mix(in srgb, var(--paper) 38%, transparent)",
+  },
+  birthdayPanelToday: {
+    background: "color-mix(in srgb, var(--paper-card) 74%, transparent)",
+    boxShadow: "var(--shadow-rest)",
+  },
+  birthdayText: {
+    color: CATS_TEXT_STRONG,
+    fontFamily: CATS_SERIF,
+    fontSize: "13px",
+    fontWeight: 400,
+    lineHeight: 1.45,
+    letterSpacing: "var(--tracking-label)",
+  },
+  birthdayHint: {
+    color: CATS_MUTED,
+    fontFamily: CATS_SERIF,
+    fontSize: "11px",
+    fontWeight: 400,
+    lineHeight: 1.55,
+    letterSpacing: "var(--tracking-body)",
+  },
   recordList: {
     borderRadius: "var(--radius-s)",
     border: "1px solid var(--line)",
@@ -1526,6 +1649,15 @@ const styles = {
     fontWeight: 500,
     lineHeight: 1,
     padding: "6px 9px",
+  },
+  zukanHint: {
+    margin: "8px 0 0",
+    color: CATS_FAINT,
+    fontFamily: CATS_SERIF,
+    fontSize: "11px",
+    fontWeight: 400,
+    lineHeight: 1.4,
+    letterSpacing: "var(--tracking-body)",
   },
   catSheetList: {
     display: "grid",
