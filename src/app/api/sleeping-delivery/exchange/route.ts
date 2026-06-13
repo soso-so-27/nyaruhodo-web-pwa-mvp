@@ -1120,7 +1120,8 @@ async function readRemoteCandidateRows(
       "id, user_id, anonymous_id, local_moment_id, local_cat_id, owner_cat_id, photo_url, delivery_status, moderation_status, pool_date, delivery_count, metadata, created_at",
     )
     .eq("visibility", "shared")
-    .in("delivery_status", ["available", "hidden", "reported"])
+    .eq("delivery_status", "available")
+    .eq("moderation_status", "approved")
     .order("delivery_count", { ascending: true })
     .order("created_at", { ascending: false })
     .limit(TIERED_CANDIDATE_LIMIT);
