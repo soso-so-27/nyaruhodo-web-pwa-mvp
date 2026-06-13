@@ -65,6 +65,7 @@ test.describe("collection album flow", () => {
 
     await page.goto("/collection");
     await page.waitForLoadState("networkidle");
+    await page.getByRole("tab", { name: "うちのこ" }).click();
 
     await expect(page.locator("main img")).toHaveCount(2);
   });
@@ -147,6 +148,7 @@ test.describe("collection album flow", () => {
 
     await page.goto("/collection");
     await page.waitForLoadState("networkidle");
+    await page.getByRole("tab", { name: "うちのこ" }).click();
 
     await expect(page.locator("main img")).toHaveCount(2);
   });
@@ -430,6 +432,7 @@ test.describe("collection album flow", () => {
 
     await page.goto("/collection");
     await page.waitForLoadState("networkidle");
+    await page.getByRole("tab", { name: "うちのこ" }).click();
 
     await expect(page.locator("main img")).toHaveCount(2);
   });
@@ -520,6 +523,82 @@ test.describe("collection album flow", () => {
       1,
     );
     await expect(page.getByText("この日は おやすみ")).toHaveCount(0);
+  });
+
+  test("renders daily entries as opened letter cards with a missing-letter slot", async ({
+    page,
+  }) => {
+    const now = Date.parse("2026-06-10T10:00:00.000Z");
+    const todayKey = "2026-06-10";
+
+    await page.addInitScript(
+      ({ currentCatId, src, createdAt, targetDateKey }) => {
+        const originalDateNow = Date.now.bind(Date);
+        (window as typeof window & { __testNow?: number }).__testNow =
+          createdAt;
+        Date.now = () =>
+          (window as typeof window & { __testNow?: number }).__testNow ??
+          originalDateNow();
+        window.localStorage.setItem("active_cat_id", currentCatId);
+        window.localStorage.setItem(
+          "cat_profiles",
+          JSON.stringify([
+            {
+              id: currentCatId,
+              name: "むぎ",
+              createdAt: new Date(createdAt).toISOString(),
+              updatedAt: new Date(createdAt).toISOString(),
+            },
+          ]),
+        );
+        window.localStorage.setItem(
+          "neteruneko_evening_delivery_days",
+          JSON.stringify({
+            [targetDateKey]: {
+              dateKey: targetDateKey,
+              targetOwnPhotoId: "own-sleeping-today",
+              targetCatId: currentCatId,
+              targetCapturedAt: createdAt,
+            },
+          }),
+        );
+        window.localStorage.setItem(
+          "nyaruhodo_exchange_own_sleeping_photos",
+          JSON.stringify([
+            {
+              id: "own-sleeping-today",
+              ownerCatId: currentCatId,
+              catId: currentCatId,
+              src,
+              thumbnailSrc: src,
+              state: "sleeping",
+              visibility: "private",
+              deliveryStatus: "available",
+              triggerLabel: "sleeping",
+              theme: "sleeping",
+              shared: true,
+              createdAt,
+            },
+          ]),
+        );
+      },
+      {
+        currentCatId: "current-cat",
+        src: photoDataUrl,
+        createdAt: now,
+        targetDateKey: todayKey,
+      },
+    );
+
+    await page.goto("/collection");
+    await page.waitForLoadState("networkidle");
+
+    await expect(page.getByTestId("album-daily-letter-card")).toBeVisible();
+    await expect(page.getByTestId("album-daily-missing-letter")).toContainText(
+      "おたよりは ありませんでした",
+    );
+    await expect(page.getByText("ほかのねがお")).toHaveCount(0);
+    await expect(page.locator("main img")).toHaveCount(1);
   });
 });
 

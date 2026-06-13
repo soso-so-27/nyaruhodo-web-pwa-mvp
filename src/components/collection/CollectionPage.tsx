@@ -1202,11 +1202,13 @@ function AlbumDailyPair({
   );
   const targetPhoto = ownPhotos[0] ?? null;
   const deliveredPhoto = deliveredPhotos[0] ?? null;
-  const extraPhotos = ownPhotos.slice(1);
   const hasUnopenedOtherDelivery = Boolean(group.hasUnopenedOtherDelivery);
 
   return (
-    <div style={compact ? styles.dailyPairCompact : styles.dailyPair}>
+    <div
+      data-testid="album-daily-letter-card"
+      style={compact ? styles.dailyPairCompact : styles.dailyPair}
+    >
       <div
         style={{
           ...styles.dailyPairMain,
@@ -1232,8 +1234,7 @@ function AlbumDailyPair({
           <span style={styles.dailyPairLabel}>{catName}</span>
         </button>
         {shouldShowOtherSlot ? (
-          <>
-            <span style={styles.dailyPairDots} aria-hidden="true" />
+          <div style={styles.dailyPairLetterColumn}>
             <button
               type="button"
               style={styles.dailyPairTile}
@@ -1265,39 +1266,25 @@ function AlbumDailyPair({
               ) : hasUnopenedOtherDelivery ? (
                 <AlbumSealedDeliveryMiniature />
               ) : group.key === getLocalDateKey(Date.now()) ? (
-                <span style={styles.dailyPairPlaceholder}>
-                  <span style={styles.dailyPairPlaceholderContent}>
-                    <AppIcon name="mail" size={18} style={styles.dailyPairPlaceholderIcon} />
-                    <span>よる8じに</span>
-                  </span>
+                <span
+                  data-testid="album-daily-missing-letter"
+                  style={styles.dailyPairPlaceholder}
+                >
+                  おたよりは ありませんでした
                 </span>
               ) : (
-                <span style={styles.dailyPairPlaceholder}>この日は おやすみ</span>
+                <span
+                  data-testid="album-daily-missing-letter"
+                  style={styles.dailyPairPlaceholder}
+                >
+                  おたよりは ありませんでした
+                </span>
               )}
               <span style={styles.dailyPairLabel}>どこかのこ</span>
             </button>
-          </>
+          </div>
         ) : null}
       </div>
-      {extraPhotos.length > 0 ? (
-        <button
-          type="button"
-          style={styles.dailyExtras}
-          onClick={() => onOpenBox("sleeping", group.key)}
-        >
-          <span style={styles.dailyExtrasLabel}>ほかのねがお</span>
-          <span style={styles.dailyExtrasStrip}>
-            {extraPhotos.slice(0, 4).map((photo) => (
-              <StoredPhotoImage
-                key={photo.id}
-                src={getPhotoThumbnailSrc(photo)}
-                alt=""
-                style={styles.dailyExtraImage}
-              />
-            ))}
-          </span>
-        </button>
-      ) : null}
     </div>
   );
 }
@@ -3227,19 +3214,29 @@ const styles = {
   dailyPair: {
     display: "grid",
     gap: "14px",
+    padding: "16px",
+    border: "1px solid var(--line)",
+    borderRadius: "var(--radius-tile)",
+    background: "color-mix(in srgb, var(--paper) 82%, var(--paper-card))",
+    boxShadow: "var(--shadow-rest)",
   },
   dailyPairCompact: {
     display: "grid",
-    gap: "10px",
+    gap: "14px",
+    padding: "16px",
+    border: "1px solid var(--line)",
+    borderRadius: "var(--radius-tile)",
+    background: "color-mix(in srgb, var(--paper) 82%, var(--paper-card))",
+    boxShadow: "var(--shadow-rest)",
   },
   dailyPairMain: {
     display: "grid",
-    gridTemplateColumns: "1fr 24px 1fr",
+    gridTemplateColumns: "minmax(0, 1fr) minmax(0, 1fr)",
     alignItems: "center",
-    gap: "8px",
+    gap: "14px",
   },
   dailyPairMainSingle: {
-    gridTemplateColumns: "calc((100% - 40px) / 2) minmax(0, 1fr)",
+    gridTemplateColumns: "minmax(0, calc((100% - 14px) / 2)) minmax(0, 1fr)",
   },
   dailyPairTile: {
     display: "grid",
@@ -3263,6 +3260,9 @@ const styles = {
     border: "6px solid rgba(255,253,248,0.74)",
     boxShadow: shadow.soft,
   },
+  dailyPairLetterColumn: {
+    minWidth: 0,
+  },
   dailyPairPlaceholder: {
     width: "100%",
     aspectRatio: "1 / 1",
@@ -3271,20 +3271,15 @@ const styles = {
     placeItems: "center",
     padding: "12px",
     boxSizing: "border-box",
-    background: "rgba(255,253,248,0.48)",
-    border: "1px dashed rgba(120,108,94,0.18)",
-    color: color.textFaint,
+    background: "color-mix(in srgb, var(--paper) 76%, transparent)",
+    border: "1px solid var(--line)",
+    color: "var(--ink-soft)",
     fontSize: "12px",
-    fontWeight: 500,
+    fontFamily: "var(--font-serif)",
+    fontWeight: 400,
     lineHeight: 1.45,
-  },
-  dailyPairPlaceholderContent: {
-    display: "inline-grid",
-    justifyItems: "center",
-    gap: "7px",
-  },
-  dailyPairPlaceholderIcon: {
-    color: "rgba(120,108,94,0.34)",
+    letterSpacing: "var(--tracking-body)",
+    textAlign: "center",
   },
   dailyPairSealedEnvelope: {
     position: "relative",
@@ -3323,44 +3318,6 @@ const styles = {
     fontSize: "12px",
     fontWeight: 560,
     lineHeight: 1,
-  },
-  dailyPairDots: {
-    width: "24px",
-    height: "2px",
-    borderRadius: "999px",
-    background:
-      "repeating-linear-gradient(90deg, rgba(142,128,110,0.42) 0 4px, transparent 4px 10px)",
-  },
-  dailyExtras: {
-    width: "100%",
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "space-between",
-    gap: "12px",
-    border: "1px solid rgba(120,108,94,0.08)",
-    borderRadius: radius.lg,
-    background: "rgba(255,253,248,0.38)",
-    padding: "9px 10px",
-    color: COLLECTION_MUTED,
-    cursor: "pointer",
-  },
-  dailyExtrasLabel: {
-    fontSize: "12px",
-    fontWeight: 560,
-    whiteSpace: "nowrap",
-  },
-  dailyExtrasStrip: {
-    display: "flex",
-    justifyContent: "flex-start",
-    gap: "5px",
-    minWidth: 0,
-  },
-  dailyExtraImage: {
-    width: "32px",
-    height: "32px",
-    borderRadius: radius.md,
-    objectFit: "cover",
-    background: color.surfaceSoft,
   },
   ownPhotoGrid: {
     display: "grid",
