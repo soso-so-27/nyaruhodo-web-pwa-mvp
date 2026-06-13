@@ -274,7 +274,11 @@ export function HomeDeskModel({
                 type="button"
                 data-testid="desk-empty-frame"
                 style={deskStyles.emptyFrame}
-                className={prefersReducedMotion ? undefined : "desk-frame-breathe"}
+                className={
+                  prefersReducedMotion
+                    ? "desk-frame-action"
+                    : "desk-frame-action desk-frame-breathe"
+                }
                 onClick={onTakePhoto}
                 aria-label="ねがおをとる"
               >
@@ -347,6 +351,7 @@ export function HomeDeskModel({
                 data-testid="desk-letter"
                 style={{
                   ...deskStyles.letter,
+                  ...(deskState === "1" ? deskStyles.letterStateOne : {}),
                   ...(deskState === "4" ? deskStyles.letterHidden : {}),
                 }}
                 onClick={deskState === "2" && !isEveningSoon ? showLetterHint : undefined}
@@ -359,6 +364,11 @@ export function HomeDeskModel({
               >
                 <span style={deskStyles.letterFlap} aria-hidden="true" />
               </button>
+              {deskState === "1" ? (
+                <span style={deskStyles.letterTimeLabel}>
+                  よる8じに とどきます
+                </span>
+              ) : null}
               <span
                 data-testid="desk-letter-hint"
                 style={{
@@ -486,8 +496,8 @@ export function HomeDeskModel({
 
       <style>{`
         @keyframes deskFrameBreathe {
-          0%, 100% { border-color: var(--ink-faint); box-shadow: var(--shadow-rest); }
-          50% { border-color: var(--ink-soft); box-shadow: var(--shadow-rest); }
+          0%, 100% { box-shadow: var(--shadow-rest); }
+          50% { box-shadow: var(--shadow-float); }
         }
         @keyframes deskEveningSoonCopyIn {
           from { opacity: 0; }
@@ -495,6 +505,10 @@ export function HomeDeskModel({
         }
         .desk-frame-breathe {
           animation: deskFrameBreathe calc(var(--dur-move) * 10) var(--ease-gentle) infinite;
+        }
+        .desk-frame-action:active {
+          transform: scale(0.96);
+          box-shadow: var(--shadow-rest) !important;
         }
         .desk-evening-soon-copy {
           animation: deskEveningSoonCopyIn 1200ms var(--ease-gentle) both;
@@ -1008,12 +1022,14 @@ const deskStyles = {
     display: "grid",
     placeItems: "center",
     gap: "6px",
-    border: "1px dashed var(--ink-faint)",
+    border: "1px solid var(--line)",
     borderRadius: "var(--radius-tile)",
-    background: "color-mix(in srgb, var(--paper) 55%, transparent)",
-    color: "var(--ink-soft)",
-    boxShadow: "var(--shadow-rest)",
+    background: "var(--paper)",
+    color: "var(--ink)",
+    boxShadow: "var(--shadow-float)",
     cursor: "pointer",
+    transition:
+      "transform var(--dur-instant) var(--ease-settle), box-shadow var(--dur-instant) var(--ease-gentle)",
     WebkitTapHighlightColor: "transparent",
   },
   emptyFrameLabel: {
@@ -1040,6 +1056,10 @@ const deskStyles = {
   letterHidden: {
     display: "none",
   },
+  letterStateOne: {
+    opacity: 1,
+    background: "var(--paper-card)",
+  },
   letterFlap: {
     position: "absolute",
     top: 0,
@@ -1057,6 +1077,13 @@ const deskStyles = {
     fontSize: "11.5px",
     letterSpacing: "0.06em",
     transition: "opacity var(--dur-instant) var(--ease-gentle)",
+  },
+  letterTimeLabel: {
+    minHeight: "16px",
+    color: "var(--ink-soft)",
+    fontFamily: "var(--font-serif)",
+    fontSize: "11.5px",
+    letterSpacing: "var(--tracking-label)",
   },
   selectionLockedStage: {
     userSelect: "none",

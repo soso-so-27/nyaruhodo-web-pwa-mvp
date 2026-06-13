@@ -155,6 +155,22 @@ test.describe("home desk model", () => {
     await expect(page.getByTestId("desk-letter-hint")).toHaveCSS("opacity", "1");
   });
 
+  test("shows a clear state1 letter time and tappable camera frame", async ({
+    page,
+  }) => {
+    await seedDeskState(page, "1");
+    await page.goto("/home");
+    await page.waitForLoadState("networkidle");
+
+    await expect(page.getByText("よる8じに とどきます")).toBeVisible();
+    await expect(page.getByTestId("desk-letter")).toHaveCSS("opacity", "1");
+    await expect(page.getByTestId("desk-empty-frame")).toHaveCSS(
+      "border-style",
+      "solid",
+    );
+    await expect(page.getByTestId("desk-empty-frame")).toHaveCSS("cursor", "pointer");
+  });
+
   test("keeps the left desk slot size stable before and after taking a photo", async ({
     page,
   }) => {
