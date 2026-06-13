@@ -290,6 +290,7 @@ function selectOmoideCandidate({
         reason: "first_seed",
         title: "はじめての、ねがお。",
         now,
+        familySinceDate,
       });
     }
   }
@@ -313,6 +314,7 @@ function selectOmoideCandidate({
       reason: "same_day",
       title: getOmoideTitle(lookback),
       now,
+      familySinceDate,
     });
   }
 
@@ -327,6 +329,7 @@ function createOmoideCandidate({
   reason,
   title,
   now,
+  familySinceDate,
 }: {
   catName: string;
   photo: OwnSleepingPhoto;
@@ -335,6 +338,7 @@ function createOmoideCandidate({
   reason: OmoideReason;
   title: string;
   now: number;
+  familySinceDate?: string;
 }) {
   const days = Math.max(
     1,
@@ -356,7 +360,7 @@ function createOmoideCandidate({
     voice:
       reason === "first_seed"
         ? "はじめての、ねがお。"
-        : `${getSeasonCountLabel(sourceDateKey)}の ${season} の、ある日。`,
+        : `${getSeasonCountLabel(sourceDateKey, familySinceDate)}の ${season} の、ある日。`,
     bridge:
       days >= 365
         ? `あれから、${Math.max(1, Math.floor(days / 365))}年。`
@@ -437,7 +441,14 @@ function getSeasonName(dateKey: string) {
   return "冬";
 }
 
-function getSeasonCountLabel(dateKey: string) {
+function getSeasonCountLabel(dateKey: string, familySinceDate?: string) {
+  const joinedAt = parseLocalDateStart(familySinceDate);
+  if (joinedAt) {
+    const joinedYear = Number(getJstDateKey(joinedAt).slice(0, 4));
+    const photoYear = Number(dateKey.slice(0, 4));
+    return `${Math.max(1, photoYear - joinedYear + 1)}回目`;
+  }
+
   const year = Number(dateKey.slice(0, 4));
   const currentYear = Number(getJstDateKey().slice(0, 4));
   return `${Math.max(1, currentYear - year + 1)}回目`;

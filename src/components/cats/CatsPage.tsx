@@ -659,7 +659,10 @@ export function CatsPage() {
                     <div style={styles.threadNode}>
                       <span style={styles.threadNodeTitle}>今月の {catName}</span>
                       <span style={styles.threadNodeText}>
-                        ここから、{catName}との 日々が はじまります。
+                        {getDaysThreadIntro(
+                          catName,
+                          activeCatProfile.basicInfo?.familySinceDate,
+                        )}
                       </span>
                     </div>
                     <div style={styles.threadNode}>
@@ -908,6 +911,8 @@ function OmoideBunbako({
   onPause: () => void;
   onDisable: () => void;
 }) {
+  const [isControlsOpen, setIsControlsOpen] = useState(false);
+
   return (
     <section style={styles.bunbakoSection} data-testid="omoide-bunbako">
       <div style={styles.bunbakoHeader}>
@@ -917,6 +922,14 @@ function OmoideBunbako({
             配達で とどくたび、この箱に 積もっていきます
           </p>
         </div>
+        <button
+          type="button"
+          style={styles.bunbakoMenuButton}
+          onClick={() => setIsControlsOpen(true)}
+          aria-label="思い出の設定"
+        >
+          …
+        </button>
       </div>
       {memories.length > 0 ? (
         <div style={styles.bunbakoScroller}>
@@ -948,19 +961,40 @@ function OmoideBunbako({
           はじめての思い出は、これから届きます。
         </p>
       )}
-      <div style={styles.omoideControls}>
-        <button type="button" style={styles.omoideControlButton} onClick={onPause}>
-          思い出を しばらく お休みする
-        </button>
-        <button type="button" style={styles.omoideControlButton} onClick={onDisable}>
-          {controls.disabled
-            ? "思い出を 受け取る"
-            : "思い出を 受け取らない"}
-        </button>
-      </div>
       <p style={styles.guardFooter}>
         {catName}に届いた思い出を、この箱に そっと置いておきます。
       </p>
+      {isControlsOpen ? (
+        <AppBottomSheet
+          title="思い出の設定"
+          onClose={() => setIsControlsOpen(false)}
+        >
+          <div style={styles.omoideControls}>
+            <button
+              type="button"
+              style={styles.omoideControlButton}
+              onClick={() => {
+                onPause();
+                setIsControlsOpen(false);
+              }}
+            >
+              思い出を しばらく お休みする
+            </button>
+            <button
+              type="button"
+              style={styles.omoideControlButton}
+              onClick={() => {
+                onDisable();
+                setIsControlsOpen(false);
+              }}
+            >
+              {controls.disabled
+                ? "思い出を 受け取る"
+                : "思い出を 受け取らない"}
+            </button>
+          </div>
+        </AppBottomSheet>
+      ) : null}
     </section>
   );
 }
@@ -1223,6 +1257,12 @@ function getCurrentSeasonCountLabel(familySinceDate?: string) {
   const now = new Date();
   const count = Math.max(1, now.getFullYear() - start.getFullYear() + 1);
   return `${count}回目の${getCurrentSeasonName()}`;
+}
+
+function getDaysThreadIntro(catName: string, familySinceDate?: string) {
+  return parseLocalDate(familySinceDate)
+    ? `${catName}と過ごしてきた時間を、ここに少しずつ置いていきます。`
+    : `ここから、${catName}との 日々が はじまります。`;
 }
 
 function getBirthdayStatus(
@@ -2197,6 +2237,17 @@ const styles = {
     justifyContent: "space-between",
     gap: "12px",
     marginBottom: "12px",
+  },
+  bunbakoMenuButton: {
+    width: "36px",
+    height: "36px",
+    border: "1px solid var(--line)",
+    borderRadius: "999px",
+    background: "transparent",
+    color: CATS_MUTED,
+    fontSize: "20px",
+    lineHeight: 1,
+    flex: "0 0 auto",
   },
   bunbakoSectionTitle: {
     margin: 0,
