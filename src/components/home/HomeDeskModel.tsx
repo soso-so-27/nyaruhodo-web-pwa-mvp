@@ -20,6 +20,7 @@ import { isExchangePhotoLocallyBlocked } from "../../lib/home/sleepingPhotos";
 import { trackProductEvent } from "../../lib/analytics/productAnalytics";
 import { playOpenSound } from "../../lib/openSound";
 import { BottomNavigation } from "../navigation/BottomNavigation";
+import { AppButton } from "../ui/AppButton";
 import { AppIcon } from "../ui/AppIcons";
 import { StoredPhotoImage } from "../ui/StoredPhotoImage";
 
@@ -645,22 +646,24 @@ function OmoideMemoryViewer({
         <p style={deskStyles.omoideViewerQuestion}>
           きょうの {memory.catName}は、どんな ねがお？
         </p>
-        <button
+        <AppButton
           type="button"
-          style={deskStyles.omoideViewerPrimary}
+          variant="primary"
+          fullWidth
+          style={deskStyles.omoideViewerButton}
           onClick={onCue}
         >
           {alreadyRecordedToday
             ? `きょうの ${memory.catName}を みる`
             : `いまの ${memory.catName}を のこす`}
-        </button>
-        <button
+        </AppButton>
+        <AppButton
           type="button"
-          style={deskStyles.omoideViewerQuiet}
+          variant="quiet"
           onClick={onDismiss}
         >
           そっと しまう
-        </button>
+        </AppButton>
       </section>
       <style>{`
         [data-testid="omoide-memory-viewer"] img {
@@ -790,28 +793,35 @@ function DeskPhotoViewer({
         }
         onClick={(event) => event.stopPropagation()}
       >
-        <button
+        <AppButton
           type="button"
+          variant="quiet"
+          size="sm"
           style={deskStyles.viewerCloseButton}
           onClick={onClose}
           aria-label="閉じる"
         >
           閉じる
-        </button>
+        </AppButton>
         {viewerPhoto.kind === "other" ? (
           <div style={deskStyles.viewerMenuWrap}>
-            <button
+            <AppButton
               type="button"
-              style={deskStyles.viewerMenuButton}
+              variant="ghost"
+              size="icon"
+              iconOnly
               aria-label="写真のメニュー"
               onClick={() => setIsMenuOpen((open) => !open)}
             >
               …
-            </button>
+            </AppButton>
             {isMenuOpen ? (
               <div style={deskStyles.viewerMenuSheet}>
-                <button
+                <AppButton
                   type="button"
+                  variant="quiet"
+                  size="sm"
+                  fullWidth
                   style={deskStyles.viewerMenuItem}
                   onClick={() => {
                     setIsMenuOpen(false);
@@ -819,14 +829,17 @@ function DeskPhotoViewer({
                   }}
                 >
                   この写真を報告
-                </button>
-                <button
+                </AppButton>
+                <AppButton
                   type="button"
+                  variant="quiet"
+                  size="sm"
+                  fullWidth
                   style={deskStyles.viewerMenuItem}
                   onClick={() => setIsMenuOpen(false)}
                 >
                   キャンセル
-                </button>
+                </AppButton>
               </div>
             ) : null}
           </div>
@@ -838,16 +851,19 @@ function DeskPhotoViewer({
             style={deskStyles.viewerImage}
           />
         </div>
-        <button
+        <AppButton
           type="button"
+          variant="secondary"
+          size="lg"
+          fullWidth
           style={{
-            ...deskStyles.viewerSaveButton,
+            ...deskStyles.viewerSaveButtonLayout,
             ...(saveState === "saved" ? deskStyles.viewerSaveButtonSaved : {}),
           }}
           onClick={handleSave}
         >
           {saveState === "saved" ? "とっておいた" : "とっておく"}
-        </button>
+        </AppButton>
       </section>
       {isReportSheetOpen && viewerPhoto.kind === "other" ? (
         <div
@@ -859,34 +875,38 @@ function DeskPhotoViewer({
             aria-label="この写真を報告"
             onClick={(event) => event.stopPropagation()}
           >
-            <button
+            <AppButton
               type="button"
-              style={deskStyles.reportReasonButton}
+              variant="danger"
+              fullWidth
               onClick={() => onReport("not_cat")}
             >
               ねこの写真ではない
-            </button>
-            <button
+            </AppButton>
+            <AppButton
               type="button"
-              style={deskStyles.reportReasonButton}
+              variant="danger"
+              fullWidth
               onClick={() => onReport("uncomfortable")}
             >
               不快な内容
-            </button>
-            <button
+            </AppButton>
+            <AppButton
               type="button"
-              style={deskStyles.reportReasonButton}
+              variant="danger"
+              fullWidth
               onClick={() => onReport("other")}
             >
               その他
-            </button>
-            <button
+            </AppButton>
+            <AppButton
               type="button"
-              style={deskStyles.reportCancelButton}
+              variant="quiet"
+              fullWidth
               onClick={() => setIsReportSheetOpen(false)}
             >
               キャンセル
-            </button>
+            </AppButton>
           </section>
         </div>
       ) : null}
@@ -1466,20 +1486,6 @@ const deskStyles = {
     opacity: 0.75,
     alignSelf: "center",
   },
-  keepButton: {
-    width: "min(100%, 330px)",
-    minHeight: "56px",
-    marginTop: "12px",
-    border: "1px solid var(--line)",
-    borderRadius: "var(--radius-xl)",
-    background: "color-mix(in srgb, var(--paper) 78%, transparent)",
-    color: "var(--ink)",
-    fontSize: "18px",
-    fontFamily: "var(--font-ui)",
-    fontWeight: 400,
-    letterSpacing: "var(--tracking-label)",
-    boxShadow: "var(--shadow-e1)",
-  },
   viewerBackdrop: {
     position: "fixed",
     inset: 0,
@@ -1503,26 +1509,11 @@ const deskStyles = {
     position: "absolute",
     top: 0,
     left: 0,
-    border: "none",
-    background: "transparent",
-    color: "var(--ink-soft)",
-    fontFamily: "var(--font-ui)",
-    fontSize: "13px",
-    letterSpacing: "var(--tracking-label)",
   },
   viewerMenuWrap: {
     position: "absolute",
     top: 0,
     right: 0,
-  },
-  viewerMenuButton: {
-    width: "44px",
-    height: "44px",
-    border: "none",
-    background: "transparent",
-    color: "var(--ink)",
-    fontSize: "24px",
-    lineHeight: 1,
   },
   viewerMenuSheet: {
     position: "absolute",
@@ -1536,14 +1527,7 @@ const deskStyles = {
     boxShadow: "var(--shadow-e2)",
   },
   viewerMenuItem: {
-    width: "100%",
-    minHeight: "40px",
-    border: "none",
-    background: "transparent",
-    color: "var(--ink)",
-    fontFamily: "var(--font-ui)",
-    fontSize: "13px",
-    letterSpacing: "var(--tracking-body)",
+    justifyContent: "flex-start",
     textAlign: "left",
   },
   viewerImageFrame: {
@@ -1559,16 +1543,8 @@ const deskStyles = {
     height: "100%",
     borderRadius: "var(--radius-lg)",
   },
-  viewerSaveButton: {
+  viewerSaveButtonLayout: {
     width: "min(100%, 330px)",
-    minHeight: "56px",
-    border: "1px solid var(--line)",
-    borderRadius: "var(--radius-xl)",
-    background: "transparent",
-    color: "var(--ink)",
-    fontFamily: "var(--font-ui)",
-    fontSize: "15px",
-    letterSpacing: "var(--tracking-label)",
     transition: "opacity var(--dur-reveal) var(--ease-gentle)",
   },
   viewerSaveButtonSaved: {
@@ -1591,25 +1567,6 @@ const deskStyles = {
     borderTopRightRadius: "var(--radius-2xl)",
     background: "var(--paper)",
     boxShadow: "var(--shadow-e2)",
-  },
-  reportReasonButton: {
-    minHeight: "48px",
-    border: "1px solid var(--line)",
-    borderRadius: "var(--radius-sm)",
-    background: "transparent",
-    color: "var(--ink)",
-    fontFamily: "var(--font-ui)",
-    fontSize: "15px",
-    letterSpacing: "var(--tracking-body)",
-  },
-  reportCancelButton: {
-    minHeight: "48px",
-    border: "none",
-    background: "transparent",
-    color: "var(--ink-soft)",
-    fontFamily: "var(--font-ui)",
-    fontSize: "15px",
-    letterSpacing: "var(--tracking-body)",
   },
   omoideViewerBackdrop: {
     position: "fixed",
@@ -1692,26 +1649,9 @@ const deskStyles = {
     letterSpacing: "var(--tracking-body)",
     textAlign: "center",
   },
-  omoideViewerPrimary: {
+  omoideViewerButton: {
     width: "min(100%, 320px)",
-    minHeight: "48px",
     marginTop: "8px",
-    border: "1px solid var(--line)",
-    borderRadius: "var(--radius-full)",
-    background: "var(--paper)",
-    color: "var(--ink)",
-    fontFamily: "var(--font-ui)",
-    fontSize: "15px",
-    letterSpacing: "var(--tracking-label)",
-    boxShadow: "var(--shadow-e1)",
-  },
-  omoideViewerQuiet: {
-    border: "none",
-    background: "transparent",
-    color: "var(--ink-soft)",
-    fontFamily: "var(--font-display)",
-    fontSize: "13px",
-    letterSpacing: "var(--tracking-label)",
   },
   omoideViewerGuard: {
     margin: "8px 0 0",

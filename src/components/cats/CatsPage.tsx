@@ -384,9 +384,9 @@ export function CatsPage() {
           style={styles.pageHeader}
           right={
             !isOnboardingCompletionView ? (
-              <a href="/settings" style={styles.headerIconLink} aria-label="設定">
+              <AppButton href="/settings" variant="ghost" size="icon" iconOnly aria-label="設定">
                 <AppIcon name="settings" size={24} />
-              </a>
+              </AppButton>
             ) : null
           }
         />
@@ -449,20 +449,22 @@ export function CatsPage() {
               </p>
             ) : null}
             <div style={styles.actions}>
-              <button
+              <AppButton
                 type="button"
                 onClick={handleAddCatSave}
-                style={styles.saveButton}
+                variant="primary"
+                size="md"
               >
                 {duplicateCatNameToConfirm ? "別のねことして保存" : "保存"}
-              </button>
-              <button
+              </AppButton>
+              <AppButton
                 type="button"
                 onClick={cancelAddingCat}
-                style={styles.cancelButton}
+                variant="quiet"
+                size="md"
               >
                 {"キャンセル"}
-              </button>
+              </AppButton>
             </div>
           </div>
         ) : null}
@@ -499,32 +501,35 @@ export function CatsPage() {
                   </div>
                   <div style={styles.profileHeroActions}>
                     {shouldShowCatSwitchButton ? (
-                      <button
+                      <AppButton
                         type="button"
-                        style={styles.iconActionBtn}
+                        variant="ghost"
+                        size="icon"
+                        iconOnly
                         onClick={() => setIsCatSwitcherOpen(true)}
                         aria-label="ほかのねこを見る"
                       >
                         <CatSwitchIcon />
-                      </button>
+                      </AppButton>
                     ) : null}
                     {shouldShowSingleCatAdd ? (
-                      <button
+                      <AppButton
                         type="button"
-                        style={styles.iconActionBtn}
+                        variant="ghost"
+                        size="icon"
+                        iconOnly
                         onClick={startAddingCat}
                         aria-label="ねこを追加"
                       >
                         <AddSmallIcon />
-                      </button>
+                      </AppButton>
                     ) : null}
-                    <button
+                    <AppButton
                       type="button"
-                      style={
-                        isEditingProfile
-                          ? { ...styles.iconActionBtn, ...styles.iconActionBtnActive }
-                          : styles.iconActionBtn
-                      }
+                      variant="ghost"
+                      size="icon"
+                      iconOnly
+                      pressed={isEditingProfile}
                       onClick={
                         isEditingProfile ? cancelEditingCatName : handleStartEdit
                       }
@@ -536,7 +541,7 @@ export function CatsPage() {
                       aria-pressed={isEditingProfile}
                     >
                       <PencilSmallIcon />
-                    </button>
+                    </AppButton>
                   </div>
                 </div>
 
@@ -758,9 +763,9 @@ export function CatsPage() {
                           アルバムをつくる
                         </AppButton>
                       ) : (
-                        <button type="button" onClick={handleSaveProfile} style={styles.saveButton}>
+                        <AppButton type="button" onClick={handleSaveProfile} variant="primary" size="md">
                           保存
-                        </button>
+                        </AppButton>
                       )}
                     </div>
                   </div>
@@ -822,13 +827,14 @@ export function CatsPage() {
                 </button>
               );
             })}
-                <button
+                <AppButton
                   type="button"
-                  style={styles.catSheetAdd}
+                  variant="secondary"
+                  fullWidth
                   onClick={startAddingCat}
                 >
                   ねこを ふやす
-                </button>
+                </AppButton>
               </div>
             </AppBottomSheet>
       ) : null}
@@ -911,14 +917,16 @@ function OmoideBunbako({
             配達で とどくたび、この箱に 積もっていきます
           </p>
         </div>
-        <button
+        <AppButton
           type="button"
-          style={styles.bunbakoMenuButton}
+          variant="ghost"
+          size="icon"
+          iconOnly
           onClick={() => setIsControlsOpen(true)}
           aria-label="思い出の設定"
         >
           …
-        </button>
+        </AppButton>
       </div>
       {memories.length > 0 ? (
         <div style={styles.bunbakoScroller}>
@@ -959,19 +967,21 @@ function OmoideBunbako({
           onClose={() => setIsControlsOpen(false)}
         >
           <div style={styles.omoideControls}>
-            <button
+            <AppButton
               type="button"
-              style={styles.omoideControlButton}
+              variant="secondary"
+              fullWidth
               onClick={() => {
                 onPause();
                 setIsControlsOpen(false);
               }}
             >
               思い出を しばらく お休みする
-            </button>
-            <button
+            </AppButton>
+            <AppButton
               type="button"
-              style={styles.omoideControlButton}
+              variant="secondary"
+              fullWidth
               onClick={() => {
                 onDisable();
                 setIsControlsOpen(false);
@@ -980,7 +990,7 @@ function OmoideBunbako({
               {controls.disabled
                 ? "思い出を 受け取る"
                 : "思い出を 受け取らない"}
-            </button>
+            </AppButton>
           </div>
         </AppBottomSheet>
       ) : null}
@@ -1010,13 +1020,14 @@ function OmoideMemorySheet({
         </div>
         <p style={styles.omoideSheetVoice}>{memory.voice}</p>
         <p style={styles.omoideSheetBridge}>{memory.bridge}</p>
-        <button
+        <AppButton
           type="button"
-          style={styles.omoideControlButton}
+          variant="secondary"
+          fullWidth
           onClick={onHideDate}
         >
           この日を 見せない
-        </button>
+        </AppButton>
       </div>
     </AppBottomSheet>
   );
@@ -1463,20 +1474,6 @@ const styles = {
     letterSpacing: "0.18em",
     margin: 0,
   },
-  headerIconLink: {
-    position: "absolute",
-    right: 0,
-    top: "50%",
-    transform: "translateY(-50%)",
-    width: "34px",
-    height: "34px",
-    display: "inline-flex",
-    alignItems: "center",
-    justifyContent: "center",
-    color: CATS_MUTED,
-    textDecoration: "none",
-    borderRadius: "50%",
-  },
   pageSub: {
     fontSize: "13px",
     color: CATS_MUTED,
@@ -1596,24 +1593,6 @@ const styles = {
     flexDirection: "row",
     alignItems: "flex-end",
     gap: "7px",
-  },
-  iconActionBtn: {
-    width: "32px",
-    height: "32px",
-    color: CATS_FAINT,
-    border: "1px solid var(--line)",
-    background: "color-mix(in srgb, var(--paper) 28%, transparent)",
-    borderRadius: "var(--radius-full)",
-    padding: 0,
-    display: "inline-flex",
-    alignItems: "center",
-    justifyContent: "center",
-    cursor: "pointer",
-  },
-  iconActionBtnActive: {
-    color: CATS_MUTED,
-    border: "1px solid var(--line)",
-    background: "color-mix(in srgb, var(--paper) 62%, transparent)",
   },
   catSwitchMaskIcon: {
     width: "20px",
@@ -1887,16 +1866,6 @@ const styles = {
     fontSize: "12px",
     fontWeight: 500,
   },
-  catSheetAdd: {
-    minHeight: "42px",
-    border: "1px dashed var(--line)",
-    borderRadius: "var(--radius-md)",
-    background: "color-mix(in srgb, var(--paper) 24%, transparent)",
-    color: CATS_MUTED,
-    fontSize: "12px",
-    fontWeight: 500,
-    cursor: "pointer",
-  },
   homePhotoSection: {
     display: "flex",
     gap: "11px",
@@ -2139,30 +2108,6 @@ const styles = {
     gap: "10px",
     marginTop: "2px",
   },
-  saveButton: {
-    minHeight: "42px",
-    padding: "0 20px",
-    border: "1px solid var(--line)",
-    borderRadius: "var(--radius-full)",
-    background: "color-mix(in srgb, var(--paper) 72%, transparent)",
-    color: CATS_TEXT,
-    fontSize: "13px",
-    fontWeight: 500,
-    letterSpacing: 0,
-    cursor: "pointer",
-  },
-  cancelButton: {
-    minHeight: "40px",
-    padding: "0 18px",
-    border: `1px solid ${CATS_BORDER}`,
-    borderRadius: "var(--radius-md)",
-    background: "color-mix(in srgb, var(--paper) 50%, transparent)",
-    color: CATS_TEXT,
-    fontSize: "13px",
-    fontWeight: 500,
-    letterSpacing: 0,
-    cursor: "pointer",
-  },
   bunbakoSection: {
     marginTop: "18px",
     padding: "16px",
@@ -2177,17 +2122,6 @@ const styles = {
     justifyContent: "space-between",
     gap: "12px",
     marginBottom: "12px",
-  },
-  bunbakoMenuButton: {
-    width: "36px",
-    height: "36px",
-    border: "1px solid var(--line)",
-    borderRadius: "var(--radius-full)",
-    background: "transparent",
-    color: CATS_MUTED,
-    fontSize: "18px",
-    lineHeight: 1,
-    flex: "0 0 auto",
   },
   bunbakoSectionTitle: {
     margin: 0,
@@ -2269,16 +2203,6 @@ const styles = {
     flexDirection: "column",
     gap: "8px",
     marginTop: "12px",
-  },
-  omoideControlButton: {
-    minHeight: "40px",
-    border: "1px solid var(--line)",
-    borderRadius: "var(--radius-full)",
-    background: "transparent",
-    color: CATS_MUTED,
-    fontFamily: CATS_SERIF,
-    fontSize: "12px",
-    letterSpacing: "var(--tracking-body)",
   },
   guardFooter: {
     margin: "12px 0 0",

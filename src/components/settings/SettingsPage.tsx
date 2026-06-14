@@ -37,8 +37,8 @@ import { createBrowserSupabaseClient } from "../../lib/supabase/browser";
 import {
   APP_ACCENT,
   APP_PAGE_BACKGROUND,
-  APP_PILL,
 } from "../ui/appTheme";
+import { AppButton } from "../ui/AppButton";
 import { AppCard } from "../ui/AppCard";
 import {
   readKeptExchangePhotoStorageDebug,
@@ -546,9 +546,9 @@ export function SettingsPage() {
     <main style={styles.page}>
       <div style={styles.container}>
         <div style={styles.header}>
-          <a href="/home" style={styles.backButton}>
+          <AppButton href="/home" variant="ghost" size="icon" iconOnly aria-label="ホームへ戻る">
             <span style={styles.backIcon}>‹</span>
-          </a>
+          </AppButton>
           <h1 style={styles.title}>設定</h1>
         </div>
 
@@ -619,32 +619,30 @@ export function SettingsPage() {
                   <p style={styles.storageNote}>アカウント保存の状態を確認中です。</p>
                 )}
                 <div style={styles.actionStack}>
-                  <button
+                  <AppButton
                     type="button"
+                    variant="primary"
+                    fullWidth
+                    loading={isSyncing}
                     onClick={() => {
                       void handleSyncNow();
-                    }}
-                    style={{
-                      ...styles.primaryButton,
-                      ...(isSyncing ? styles.disabledButton : {}),
                     }}
                     disabled={isSyncing}
                   >
                     {isSyncing ? "保存中..." : "この端末をアカウントに保存"}
-                  </button>
-                  <button
+                  </AppButton>
+                  <AppButton
                     type="button"
+                    variant="secondary"
+                    fullWidth
+                    loading={isSyncing}
                     onClick={() => {
                       void handleRestoreFromAccount();
-                    }}
-                    style={{
-                      ...styles.secondaryButton,
-                      ...(isSyncing ? styles.disabledButton : {}),
                     }}
                     disabled={isSyncing}
                   >
                     アカウントからこの端末に復元
-                  </button>
+                  </AppButton>
                 </div>
                 {syncMessage ? (
                   <p style={styles.syncMessage} role="status">
@@ -677,13 +675,14 @@ export function SettingsPage() {
                   <span style={styles.rowValue}>{email ?? ""}</span>
                 </div>
                 <div style={styles.divider} />
-                <button
+                <AppButton
                   type="button"
+                  variant="danger"
+                  fullWidth
                   onClick={handleLogout}
-                  style={styles.dangerButton}
                 >
                   ログアウト
-                </button>
+                </AppButton>
               </>
             ) : (
               <>
@@ -694,9 +693,9 @@ export function SettingsPage() {
                   </div>
                 </div>
                 <div style={styles.divider} />
-                <a href="/account/create" style={styles.primaryButton}>
+                <AppButton href="/account/create" variant="primary" fullWidth>
                   アカウントを作成する
-                </a>
+                </AppButton>
               </>
             )}
           </AppCard>
@@ -737,17 +736,18 @@ export function SettingsPage() {
                     バグっぽいことを送れます。
                   </p>
                 </div>
-                <button
+                <AppButton
                   type="button"
+                  variant="primary"
+                  fullWidth
                   onClick={() => {
                     setFeedbackKind("beta_feedback");
                     setIsFeedbackOpen((open) => !open);
                     setFeedbackStatus("");
                   }}
-                  style={styles.primaryButton}
                 >
                   意見を送る
-                </button>
+                </AppButton>
                 {isFeedbackOpen ? (
                   <BetaFeedbackForm
                     category={feedbackCategory}
@@ -770,9 +770,9 @@ export function SettingsPage() {
                   </p>
                 </div>
                 {!isLoggedIn ? (
-                  <a href="/account/create" style={styles.secondaryButton}>
+                  <AppButton href="/account/create" variant="secondary" fullWidth>
                     ログインして参加する
-                  </a>
+                  </AppButton>
                 ) : null}
                 <div style={styles.divider} />
               </>
@@ -840,15 +840,16 @@ export function SettingsPage() {
                 </select>
               </div>
               <div style={styles.divider} />
-              <button
+              <AppButton
                 type="button"
+                variant="secondary"
+                fullWidth
                 onClick={() => {
                   void refreshAuthDebug();
                 }}
-                style={styles.secondaryButton}
               >
                 ログイン状態を更新する
-              </button>
+              </AppButton>
               <div style={styles.divider} />
               {adminCapabilities.testToolsEnabled ? (
                 <>
@@ -881,8 +882,11 @@ export function SettingsPage() {
               <div style={styles.divider} />
               <KeptExchangeDebugPanel debug={keptExchangeDebug} />
               <div style={styles.divider} />
-              <button
+              <AppButton
                 type="button"
+                variant="secondary"
+                fullWidth
+                loading={isDeliveryDiagnosticsLoading}
                 onClick={() => {
                   void refreshDeliveryDiagnostics();
                   void refreshPhotoReports();
@@ -890,24 +894,25 @@ export function SettingsPage() {
                   refreshKeptExchangeDebug();
                   refreshEveningDeliveryTrace();
                 }}
-                style={styles.secondaryButton}
                 disabled={isDeliveryDiagnosticsLoading}
               >
                 {isDeliveryDiagnosticsLoading ? "確認中..." : "とどく状態を確認する"}
-              </button>
+              </AppButton>
               {adminCapabilities.stockAdminEnabled ? (
                 <>
                   <div style={styles.divider} />
-                  <button
+                  <AppButton
                     type="button"
+                    variant="secondary"
+                    fullWidth
+                    loading={isStockAdding}
                     onClick={() => {
                       void handleStockPhotoImport();
                     }}
-                    style={styles.secondaryButton}
                     disabled={isStockAdding}
                   >
                     {isStockAdding ? "追加中..." : "とどくねがおを追加する"}
-                  </button>
+                  </AppButton>
                   <div style={styles.divider} />
                   <p style={styles.storageNote}>
                     本番前の確認用です。ここで入れた写真は、とどくねがおの候補になります。
@@ -1033,9 +1038,9 @@ function BetaSupporterPanel({
       <p style={styles.betaNoteText}>
         これからの ねてるねこと、応援の使いみちを見られます。
       </p>
-      <a href="/beta-supporter" style={styles.secondaryButton}>
+      <AppButton href="/beta-supporter" variant="secondary" fullWidth>
         これからの ねてるねこ
-      </a>
+      </AppButton>
       {billingMessage ? (
         <p style={styles.syncMessage} role="status">
           {billingMessage}
@@ -1092,13 +1097,15 @@ function BetaFeedbackForm({
           style={styles.feedbackTextarea}
         />
       </label>
-      <button
+      <AppButton
         type="submit"
-        style={styles.primaryButton}
+        variant="primary"
+        fullWidth
+        loading={isSending}
         disabled={isSending}
       >
         {isSending ? "送っています..." : "送る"}
-      </button>
+      </AppButton>
       {status ? (
         <p style={styles.feedbackStatus} role="status">
           {status}
@@ -1465,20 +1472,24 @@ function ModerationQueuePanel({
             <span style={styles.rowValue}>{moment.localMomentId}</span>
             <span style={styles.rowValue}>{formatReportDate(moment.createdAt)}</span>
             <div style={styles.moderationActions}>
-              <button
+              <AppButton
                 type="button"
-                style={styles.secondaryButton}
+                variant="secondary"
+                size="sm"
+                fullWidth
                 onClick={() => onDecide(moment.id, "approved")}
               >
                 approve
-              </button>
-              <button
+              </AppButton>
+              <AppButton
                 type="button"
-                style={styles.dangerButton}
+                variant="danger"
+                size="sm"
+                fullWidth
                 onClick={() => onDecide(moment.id, "rejected")}
               >
                 reject
-              </button>
+              </AppButton>
             </div>
           </div>
         </div>
@@ -1895,18 +1906,6 @@ const styles = {
     gap: "12px",
     padding: "16px 0 20px",
   },
-  backButton: {
-    ...APP_PILL,
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "center",
-    width: "36px",
-    height: "36px",
-    borderRadius: "50%",
-    textDecoration: "none",
-    color: "var(--ink)",
-    flexShrink: 0,
-  },
   backIcon: {
     fontSize: "18px",
     lineHeight: 1,
@@ -2252,61 +2251,10 @@ const styles = {
     overflowWrap: "anywhere" as const,
     fontVariantNumeric: "tabular-nums",
   },
-  primaryButton: {
-    display: "block",
-    width: "100%",
-    textAlign: "center" as const,
-    boxSizing: "border-box" as const,
-    padding: "12px 14px",
-    fontSize: "13px",
-    fontWeight: 500,
-    color: "#fffdf8",
-    background: APP_ACCENT,
-    border: `1px solid ${APP_ACCENT}`,
-    borderRadius: "var(--radius-md)",
-    textDecoration: "none",
-    cursor: "pointer",
-  },
-  secondaryButton: {
-    display: "block",
-    width: "100%",
-    textAlign: "center" as const,
-    boxSizing: "border-box" as const,
-    padding: "12px 14px",
-    fontSize: "13px",
-    fontFamily: "var(--font-display)",
-    letterSpacing: "var(--tracking-label)",
-    fontWeight: 400,
-    color: "var(--ink)",
-    background: "var(--paper)",
-    border: "1px solid var(--line)",
-    borderRadius: "var(--radius-md)",
-    textDecoration: "none",
-    cursor: "pointer",
-    boxShadow: "var(--shadow-e1)",
-  },
   actionStack: {
     display: "grid",
     gap: "10px",
     padding: "0 0 12px",
-  },
-  disabledButton: {
-    opacity: 0.52,
-    cursor: "default",
-  },
-  dangerButton: {
-    display: "block",
-    width: "100%",
-    boxSizing: "border-box" as const,
-    padding: "12px 14px",
-    fontSize: "13px",
-    fontWeight: 500,
-    color: "#9b4a3d",
-    background: "rgba(255,253,248,0.46)",
-    border: "1px solid rgba(155,74,61,0.14)",
-    borderRadius: "var(--radius-md)",
-    textAlign: "center" as const,
-    cursor: "pointer",
   },
   betaNote: {
     padding: "12px 0",

@@ -115,9 +115,9 @@ export default function BetaSupporterPage() {
     <main style={styles.page}>
       <div style={styles.backdrop} aria-hidden="true" />
       <div style={styles.container}>
-        <a href="/settings" style={styles.backLink}>
+        <AppButton href="/settings" variant="quiet" size="sm" style={styles.backLink}>
           ‹ 設定
-        </a>
+        </AppButton>
         <AppHeader variant="pageTitle" title="ねてるねこ" />
 
         <AppCard variant="soft" padding="xl" style={styles.hero}>
@@ -192,11 +192,11 @@ export default function BetaSupporterPage() {
         </AppCard>
 
         <nav style={styles.legalLinks} aria-label="法務リンク">
-          <a href="/terms" style={styles.legalLink}>利用規約</a>
-          <a href="/privacy" style={styles.legalLink}>プライバシーポリシー</a>
-          <a href="/contact" style={styles.legalLink}>問い合わせ</a>
-          <a href="/cancellation" style={styles.legalLink}>解約方法</a>
-          <a href="/commercial-transactions" style={styles.legalLink}>特商法表記</a>
+          <AppButton href="/terms" variant="quiet" size="sm">利用規約</AppButton>
+          <AppButton href="/privacy" variant="quiet" size="sm">プライバシーポリシー</AppButton>
+          <AppButton href="/contact" variant="quiet" size="sm">問い合わせ</AppButton>
+          <AppButton href="/cancellation" variant="quiet" size="sm">解約方法</AppButton>
+          <AppButton href="/commercial-transactions" variant="quiet" size="sm">特商法表記</AppButton>
         </nav>
       </div>
     </main>
@@ -230,12 +230,6 @@ const styles = {
   },
   backLink: {
     justifySelf: "start",
-    color: color.textMuted,
-    fontSize: typography.body.fontSize,
-    fontWeight: 500,
-    lineHeight: 1.4,
-    textDecoration: "none",
-    padding: "8px 2px",
   },
   hero: {
     display: "grid",
@@ -337,11 +331,5 @@ const styles = {
     justifyContent: "center",
     gap: `${spacing.sm}px ${spacing.md}px`,
     padding: `${spacing.sm}px 0 0`,
-  },
-  legalLink: {
-    color: color.textFaint,
-    fontSize: 12,
-    fontWeight: 500,
-    textDecoration: "none",
   },
 } satisfies Record<string, CSSProperties>;

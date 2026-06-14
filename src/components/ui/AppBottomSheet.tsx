@@ -1,6 +1,7 @@
 ﻿"use client";
 
 import type { CSSProperties, ReactNode } from "react";
+import { AppButton } from "./AppButton";
 import { CloseIcon } from "./AppIcons";
 
 type AppBottomSheetProps = {
@@ -39,18 +40,16 @@ export function AppBottomSheet({
           <p style={isPaper ? { ...styles.title, ...styles.titlePaper } : styles.title}>
             {title}
           </p>
-          <button
+          <AppButton
             type="button"
             onClick={onClose}
-            style={
-              isPaper
-                ? { ...styles.closeButton, ...styles.closeButtonPaper }
-                : styles.closeButton
-            }
+            variant="ghost"
+            size="icon"
+            iconOnly
             aria-label={closeLabel}
           >
             <CloseIcon size={18} />
-          </button>
+          </AppButton>
         </div>
         {children}
       </section>
@@ -132,24 +131,6 @@ const styles = {
   },
   titlePaper: {
     color: "var(--ink)",
-  },
-  closeButton: {
-    width: "34px",
-    height: "34px",
-    borderRadius: "var(--radius-full)",
-    border: "1px solid var(--line)",
-    background: "var(--paper-card)",
-    color: "var(--ink-soft)",
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "center",
-    cursor: "pointer",
-    flexShrink: 0,
-  },
-  closeButtonPaper: {
-    border: "1px solid var(--line)",
-    background: "var(--paper-card)",
-    color: "var(--ink-soft)",
   },
 } satisfies Record<string, CSSProperties>;
 

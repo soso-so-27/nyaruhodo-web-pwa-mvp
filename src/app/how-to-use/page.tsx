@@ -1,12 +1,13 @@
 import type { CSSProperties } from "react";
+import { AppButton } from "../../components/ui/AppButton";
 
 export default function HowToUsePage() {
   return (
     <main style={styles.page}>
       <div style={styles.container}>
-        <a href="/settings" style={styles.backLink}>
+        <AppButton href="/settings" variant="quiet" size="sm" style={styles.backLink}>
           ‹ 設定にもどる
-        </a>
+        </AppButton>
         <h1 style={styles.title}>使い方</h1>
 
         <section style={styles.section}>
@@ -61,14 +62,7 @@ const styles = {
     margin: "0 auto",
   },
   backLink: {
-    display: "inline-flex",
-    alignItems: "center",
-    minHeight: "40px",
     marginBottom: "18px",
-    color: "#776f63",
-    fontSize: "13px",
-    fontWeight: 500,
-    textDecoration: "none",
   },
   title: {
     margin: "0 0 26px",

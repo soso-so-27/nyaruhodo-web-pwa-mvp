@@ -796,9 +796,9 @@ export function CollectionPage() {
           <AppCard variant="soft" padding="lg" style={styles.emptyCard}>
             <h1 style={styles.emptyTitle}>アルバム</h1>
             <p style={styles.emptyText}>一緒に暮らしている猫を登録しましょう</p>
-            <a href="/cats" style={styles.primaryLink}>
+            <AppButton href="/cats" variant="primary" fullWidth>
               猫を登録する
-            </a>
+            </AppButton>
           </AppCard>
         </div>
         <BottomNavigation active="collection" />
@@ -1441,50 +1441,47 @@ function BoxPhotoDetailSheet({
         kind === "sleeping" ? (
           <div style={styles.boxDetailActions}>
             <div style={styles.boxIconActionBar} aria-label="写真の操作">
-              <button
+              <AppButton
                 type="button"
                 aria-label={deliveryActionLabel}
                 title={deliveryActionLabel}
-                style={{
-                  ...styles.boxIconActionButton,
-                  ...(currentPhoto.shared ? {} : styles.boxIconActionButtonActive),
-                }}
+                variant={currentPhoto.shared ? "ghost" : "secondary"}
+                size="icon"
+                iconOnly
                 onClick={() => onToggleSleepingDelivery(currentPhoto)}
               >
                 <AppIcon
                   name={currentPhoto.shared ? "eyeOff" : "send"}
                   size={20}
                 />
-              </button>
-              <button
+              </AppButton>
+              <AppButton
                 type="button"
                 aria-label="とったねがおから外す"
                 title="とったねがおから外す"
-                style={{
-                  ...styles.boxIconActionButton,
-                  ...styles.boxIconActionButtonDanger,
-                }}
+                variant="danger"
+                size="icon"
+                iconOnly
                 onClick={() => onDeleteSleepingPhoto(currentPhoto)}
               >
                 <AppIcon name="trash" size={20} />
-              </button>
+              </AppButton>
             </div>
           </div>
         ) : (
           <div style={styles.boxDetailActions}>
             <div style={styles.boxIconActionBar} aria-label="写真の操作">
-              <button
+              <AppButton
                 type="button"
                 aria-label="アルバムから外す"
                 title="アルバムから外す"
-                style={{
-                  ...styles.boxIconActionButton,
-                  ...styles.boxIconActionButtonDanger,
-                }}
+                variant="danger"
+                size="icon"
+                iconOnly
                 onClick={() => onHideOtherPhoto(currentPhoto)}
               >
                 <AppIcon name="trash" size={20} />
-              </button>
+              </AppButton>
             </div>
           </div>
         )
@@ -1620,9 +1617,9 @@ function CollectionShareView({
       <section style={styles.shareEmptyCard}>
         <p style={styles.shareEmptyTitle}>まだ写真がありません</p>
         <p style={styles.shareEmptyText}>写真を見つけると、ここに自分の一枚が並びます。</p>
-        <button type="button" style={styles.shareEmptyButton} onClick={onGoCollect}>
+        <AppButton type="button" variant="primary" fullWidth onClick={onGoCollect}>
           写真を入れる
-        </button>
+        </AppButton>
       </section>
     );
   }
@@ -1914,13 +1911,14 @@ function CollectionPhotoSheet({
                   style={styles.photoImg}
                 />
                 {photo.localIndex !== undefined ? (
-                  <button
+                  <AppButton
                     type="button"
-                    style={styles.deleteBtn}
+                    variant="danger"
+                    size="sm"
                     onClick={() => onDeletePhoto(slug, photo.localIndex ?? index)}
                   >
                     削除
-                  </button>
+                  </AppButton>
                 ) : null}
               </div>
             ))}
@@ -3909,20 +3907,6 @@ const styles = {
     lineHeight: 1.55,
     fontWeight: 500,
   },
-  shareEmptyButton: {
-    marginTop: "14px",
-    minHeight: "38px",
-    border: "0.5px solid rgba(255,255,255,0.2)",
-    borderRadius: "var(--radius-full)",
-    background: "rgba(255,255,255,0.88)",
-    color: "#2a2a28",
-    font: "inherit",
-    fontSize: "13px",
-    fontWeight: 500,
-    lineHeight: 1,
-    padding: "0 16px",
-    cursor: "pointer",
-  },
   collectionCard: {
     position: "relative",
     display: "block",
@@ -4110,20 +4094,6 @@ const styles = {
     objectFit: "contain",
     display: "block",
   },
-  deleteBtn: {
-    position: "absolute",
-    top: "12px",
-    right: "12px",
-    border: "1px solid rgba(155,74,61,0.18)",
-    borderRadius: "var(--radius-full)",
-    background: "rgba(255,253,248,0.82)",
-    color: color.danger,
-    fontSize: "12px",
-    fontWeight: 500,
-    padding: "5px 10px",
-    cursor: "pointer",
-    boxShadow: shadow.soft,
-  },
   photoDots: {
     display: "flex",
     justifyContent: "center",
@@ -4180,28 +4150,6 @@ const styles = {
     justifyContent: "center",
     gap: "12px",
   },
-  boxIconActionButton: {
-    display: "grid",
-    placeItems: "center",
-    width: "46px",
-    height: "46px",
-    borderRadius: "50%",
-    border: `1px solid ${color.border}`,
-    background: "rgba(255,253,248,0.72)",
-    color: color.textMuted,
-    boxShadow: shadow.soft,
-    cursor: "pointer",
-  },
-  boxIconActionButtonActive: {
-    background: "rgba(255,253,248,0.92)",
-    color: color.textStrong,
-    border: "1px solid rgba(120,108,94,0.16)",
-  },
-  boxIconActionButtonDanger: {
-    color: color.danger,
-    background: "rgba(155,74,61,0.07)",
-    border: "1px solid rgba(155,74,61,0.14)",
-  },
   boxPhotoStatusRow: {
     display: "flex",
     alignItems: "center",
@@ -4257,30 +4205,6 @@ const styles = {
     width: "100%",
     paddingTop: "4px",
   },
-  btnPrimary: {
-    border: "0.5px solid rgba(120,108,94,0.14)",
-    borderRadius: "var(--radius-md)",
-    background: "rgba(255,253,248,0.92)",
-    color: "#2a2a28",
-    fontSize: "13px",
-    fontWeight: 500,
-    padding: "12px",
-    cursor: "pointer",
-  },
-  btnSecondary: {
-    border: "0.5px solid rgba(120,108,94,0.16)",
-    borderRadius: "var(--radius-md)",
-    background: "rgba(255,253,248,0.38)",
-    color: "#746a5f",
-    fontSize: "13px",
-    fontWeight: 500,
-    padding: "12px",
-    cursor: "pointer",
-  },
-  btnDisabled: {
-    opacity: 0.4,
-    cursor: "not-allowed",
-  },
   toast: {
     position: "fixed",
     left: "50%",
@@ -4315,20 +4239,6 @@ const styles = {
     color: COLLECTION_MUTED,
     fontSize: "13px",
     lineHeight: 1.65,
-    fontWeight: 500,
-  },
-  primaryLink: {
-    display: "inline-flex",
-    alignItems: "center",
-    justifyContent: "center",
-    minHeight: "44px",
-    borderRadius: "var(--radius-full)",
-    border: "1px solid rgba(255,255,255,0.42)",
-    background: "rgba(255,255,255,0.92)",
-    color: "#2a2a28",
-    padding: "0 18px",
-    textDecoration: "none",
-    fontSize: "13px",
     fontWeight: 500,
   },
 } satisfies Record<string, CSSProperties>;

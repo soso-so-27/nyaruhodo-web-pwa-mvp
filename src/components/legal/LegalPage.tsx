@@ -3,9 +3,9 @@
 import type { CSSProperties } from "react";
 import {
   APP_PAGE_BACKGROUND,
-  APP_PILL,
   APP_SURFACE,
 } from "../ui/appTheme";
+import { AppButton } from "../ui/AppButton";
 
 type LegalSection = {
   title: string;
@@ -302,9 +302,9 @@ function LegalPage({ title, lead, updatedAt, sections }: LegalPageProps) {
     <main style={styles.page}>
       <div style={styles.container}>
         <div style={styles.header}>
-          <a href="/settings" style={styles.backButton} aria-label="設定へ戻る">
-            <span style={styles.backIcon}>‹</span>
-          </a>
+          <AppButton href="/settings" variant="ghost" size="icon" iconOnly aria-label="設定へ戻る">
+            <span aria-hidden="true">‹</span>
+          </AppButton>
           <div>
             <h1 style={styles.title}>{title}</h1>
             <p style={styles.updatedAt}>最終更新: {updatedAt}</p>
@@ -360,22 +360,6 @@ const styles = {
     alignItems: "center",
     gap: "12px",
     padding: "16px 0 14px",
-  },
-  backButton: {
-    ...APP_PILL,
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "center",
-    width: "36px",
-    height: "36px",
-    borderRadius: "50%",
-    textDecoration: "none",
-    color: "#2a2a28",
-    flexShrink: 0,
-  },
-  backIcon: {
-    fontSize: "24px",
-    lineHeight: 1,
   },
   title: {
     fontSize: "24px",

@@ -388,15 +388,16 @@ export default function AccountCreatePage() {
                     アルバムへ進む
                   </AppButton>
                 ) : (
-                  <button
+                  <AppButton
                     type="button"
                     onClick={() => {
                       router.push("/home");
                     }}
-                    style={styles.primaryButton}
+                    variant="primary"
+                    fullWidth
                   >
                     ホームへ戻る
-                  </button>
+                  </AppButton>
                 )}
               </div>
             </>
@@ -471,23 +472,26 @@ export default function AccountCreatePage() {
                   </>
                 ) : (
                   <>
-                    <button
+                    <AppButton
                       type="button"
                       onClick={() => {
                         void handleGoogleSignIn();
                       }}
-                      style={styles.primaryButton}
+                      variant="primary"
+                      fullWidth
                       disabled={isStartingAuth || isCheckingAccount}
                     >
                       {isStartingAuth ? "Googleを開いています..." : "Googleで続ける"}
-                    </button>
-                    <button
+                    </AppButton>
+                    <AppButton
                       type="button"
                       onClick={handleLater}
-                      style={styles.secondaryButton}
+                      variant="quiet"
+                      size="md"
+                      fullWidth
                     >
                       あとで
-                    </button>
+                    </AppButton>
                   </>
                 )}
               </div>
@@ -692,27 +696,5 @@ const styles = {
     display: "grid",
     placeItems: "center",
     opacity: 0.94,
-  },
-  primaryButton: {
-    width: "100%",
-    minHeight: "48px",
-    border: "1px solid rgba(58, 72, 56, 0.08)",
-    borderRadius: "var(--radius-full)",
-    background: APP_ACCENT,
-    color: "#ffffff",
-    fontSize: "15px",
-    fontWeight: 500,
-    cursor: "pointer",
-  },
-  secondaryButton: {
-    width: "100%",
-    minHeight: "46px",
-    border: "none",
-    borderRadius: "var(--radius-md)",
-    background: "transparent",
-    color: "#8a8a80",
-    fontSize: "13px",
-    fontWeight: 500,
-    cursor: "pointer",
   },
 } satisfies Record<string, CSSProperties>;
