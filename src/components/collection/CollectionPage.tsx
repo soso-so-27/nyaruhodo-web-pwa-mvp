@@ -1240,7 +1240,7 @@ function AlbumDailyPair({
             />
           ) : (
             <span style={styles.dailyPairPlaceholder}>
-              {"この日の ねがおは\nありません"}
+              {"この日の ねがおは ありません"}
             </span>
           )}
           <span style={styles.dailyPairLabel}>{catName}</span>
@@ -1282,21 +1282,21 @@ function AlbumDailyPair({
                   data-testid="album-daily-undeliverable-letter"
                   style={styles.dailyPairPlaceholder}
                 >
-                  {"おとどけ\nできませんでした"}
+                  {"おとどけ できませんでした"}
                 </span>
               ) : group.key === getLocalDateKey(Date.now()) ? (
                 <span
                   data-testid="album-daily-missing-letter"
                   style={styles.dailyPairPlaceholder}
                 >
-                  {"おたよりは\nとどきませんでした"}
+                  {"おたよりは とどきませんでした"}
                 </span>
               ) : (
                 <span
                   data-testid="album-daily-missing-letter"
                   style={styles.dailyPairPlaceholder}
                 >
-                  {"おたよりは\nとどきませんでした"}
+                  {"おたよりは とどきませんでした"}
                 </span>
               )}
               <span style={styles.dailyPairLabel}>どこかのこ</span>
@@ -3347,7 +3347,9 @@ const styles = {
     lineHeight: 1.45,
     letterSpacing: "var(--tracking-body)",
     textAlign: "center",
-    whiteSpace: "pre-line",
+    whiteSpace: "normal",
+    overflowWrap: "break-word",
+    wordBreak: "keep-all",
   },
   dailyPairSealedEnvelope: {
     position: "relative",

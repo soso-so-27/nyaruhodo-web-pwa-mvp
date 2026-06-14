@@ -18,6 +18,10 @@ const expectedShotNames = [
   "state4_2010_habit.png",
   "state1b_2030.png",
   "album_today.png",
+  "album_missing_cases.png",
+  "album_missing_a.png",
+  "album_missing_b.png",
+  "album_missing_c.png",
   "settings.png",
   "cats.png",
   "onboarding_intro.png",
@@ -152,6 +156,40 @@ test.describe("home desk model shots", () => {
       });
     });
   }
+
+  test("album_missing_cases", async ({ page }) => {
+    await seedCollectionMissingCases(page);
+    await page.goto("/collection");
+    await page.waitForLoadState("networkidle");
+    await expect(page.getByText("おたよりは とどきませんでした")).toBeVisible();
+    await expect(page.getByText("おとどけ できませんでした")).toHaveCount(2);
+    await expect(page.getByText("この日の ねがおは ありません")).toBeVisible();
+    await page.screenshot({
+      path: path.join(shotsDir, "album_missing_cases.png"),
+      fullPage: true,
+    });
+    const missingA = page.getByTestId("album-daily-missing-letter").nth(0);
+    const missingB = page.getByTestId("album-daily-undeliverable-letter").nth(0);
+    const missingC = page.getByText("この日の ねがおは ありません");
+    await missingA.evaluate((element) =>
+      element.scrollIntoView({ block: "center", inline: "center" }),
+    );
+    await missingA.screenshot({
+      path: path.join(shotsDir, "album_missing_a.png"),
+    });
+    await missingB.evaluate((element) =>
+      element.scrollIntoView({ block: "center", inline: "center" }),
+    );
+    await missingB.screenshot({
+      path: path.join(shotsDir, "album_missing_b.png"),
+    });
+    await missingC.evaluate((element) =>
+      element.scrollIntoView({ block: "center", inline: "center" }),
+    );
+    await missingC.screenshot({
+      path: path.join(shotsDir, "album_missing_c.png"),
+    });
+  });
 
   test("nav_close_up", async ({ page }) => {
     await seedReviewState(page, {
@@ -308,6 +346,107 @@ async function seedReviewState(
       );
     },
     { now, state, habit, ownDataUrl, deliveredDataUrl },
+  );
+
+  await page.route("/api/presence", async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify({ count: 124 }),
+    });
+  });
+}
+
+async function seedCollectionMissingCases(page: Page) {
+  await page.addInitScript(
+    ({ ownDataUrl }) => {
+      const now = Date.parse("2026-06-10T12:00:00.000Z");
+      (window as typeof window & { __testNow?: number }).__testNow = now;
+      const originalDateNow = Date.now.bind(Date);
+      Date.now = () =>
+        (window as typeof window & { __testNow?: number }).__testNow ??
+        originalDateNow();
+
+      const catId = "cat-shot-mugi";
+      window.localStorage.setItem("neteruneko_home_desk_model", "1");
+      window.localStorage.setItem("nyaruhodo_sleeping_safety_accepted", "1");
+      window.localStorage.setItem("active_cat_id", catId);
+      window.localStorage.setItem(
+        "cat_profiles",
+        JSON.stringify([
+          {
+            id: catId,
+            name: "むぎ",
+            createdAt: new Date(Date.parse("2026-06-01T00:00:00.000Z")).toISOString(),
+            updatedAt: new Date(Date.parse("2026-06-01T00:00:00.000Z")).toISOString(),
+          },
+        ]),
+      );
+
+      const ownPhotos = [
+        {
+          id: "own-shot-missing-a",
+          ownerCatId: catId,
+          catId,
+          src: ownDataUrl,
+          state: "sleeping",
+          visibility: "private",
+          deliveryStatus: "available",
+          triggerLabel: "sleeping",
+          theme: "sleeping",
+          shared: true,
+          createdAt: Date.parse("2026-06-10T02:40:00.000Z"),
+        },
+        {
+          id: "own-shot-undeliverable-b",
+          ownerCatId: catId,
+          catId,
+          src: ownDataUrl,
+          state: "sleeping",
+          visibility: "private",
+          deliveryStatus: "available",
+          triggerLabel: "sleeping",
+          theme: "sleeping",
+          shared: true,
+          createdAt: Date.parse("2026-06-09T02:40:00.000Z"),
+        },
+      ];
+
+      window.localStorage.setItem(
+        "nyaruhodo_exchange_own_sleeping_photos",
+        JSON.stringify(ownPhotos),
+      );
+      window.localStorage.setItem(
+        "neteruneko_evening_delivery_days",
+        JSON.stringify({
+          "2026-06-10": {
+            dateKey: "2026-06-10",
+            targetOwnPhotoId: "own-shot-missing-a",
+            targetCatId: catId,
+            targetCapturedAt: Date.parse("2026-06-10T02:40:00.000Z"),
+            targetPhoto: ownPhotos[0],
+          },
+          "2026-06-09": {
+            dateKey: "2026-06-09",
+            targetOwnPhotoId: "own-shot-undeliverable-b",
+            targetCatId: catId,
+            targetCapturedAt: Date.parse("2026-06-09T02:40:00.000Z"),
+            targetPhoto: ownPhotos[1],
+            openedAt: Date.parse("2026-06-09T11:10:00.000Z"),
+            openedBy: "system",
+          },
+          "2026-06-08": {
+            dateKey: "2026-06-08",
+            targetOwnPhotoId: "missing-own-shot-c",
+            targetCatId: catId,
+            targetCapturedAt: Date.parse("2026-06-08T02:40:00.000Z"),
+            openedAt: Date.parse("2026-06-08T11:10:00.000Z"),
+            openedBy: "system",
+          },
+        }),
+      );
+    },
+    { ownDataUrl },
   );
 
   await page.route("/api/presence", async (route) => {
