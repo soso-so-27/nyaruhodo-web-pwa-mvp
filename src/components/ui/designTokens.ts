@@ -2,34 +2,34 @@
 export const typography = {
   fontDisplay: "var(--font-display)",
   fontUi: "var(--font-ui)",
-  fontSans: 'var(--font-sans)',
-  fontSerif: 'var(--font-serif)',
+  fontSans: "var(--font-ui)",
+  fontSerif: "var(--font-display)",
 
   brand: {
     fontSize: 18,
     fontWeight: 400,
-    lineHeight: 1.34,
+    lineHeight: 1.4,
     letterSpacing: "0.16em",
   },
   hero: {
-    fontSize: 23,
-    fontWeight: 470,
-    lineHeight: 1.45,
+    fontSize: 24,
+    fontWeight: 500,
+    lineHeight: 1.4,
   },
   title: {
-    fontSize: 20,
+    fontSize: 18,
     fontWeight: 500,
     lineHeight: 1.4,
   },
   body: {
-    fontSize: 14.5,
+    fontSize: 15,
     fontWeight: 400,
-    lineHeight: 1.7,
+    lineHeight: 1.6,
   },
   caption: {
-    fontSize: 12,
+    fontSize: 13,
     fontWeight: 400,
-    lineHeight: 1.45,
+    lineHeight: 1.5,
   },
   cta: {
     fontSize: 15,
@@ -76,11 +76,11 @@ export const radius = {
   lg16: 16,
   xl20: 20,
   xxl24: 24,
-  sm: 10,
-  md: 14,
-  lg: 18,
-  xl: 22,
-  card: 24,
+  sm: 8,
+  md: 12,
+  lg: 16,
+  xl: 20,
+  card: 20,
   pill: 999,
   circle: "50%",
 } as const;
@@ -90,9 +90,9 @@ export const shadow = {
   e0: "var(--shadow-e0)",
   e1: "var(--shadow-e1)",
   e2: "var(--shadow-e2)",
-  soft: "var(--shadow-rest)",
-  card: "var(--shadow-rest)",
-  floating: "var(--shadow-float)",
+  soft: "var(--shadow-e1)",
+  card: "var(--shadow-e1)",
+  floating: "var(--shadow-e2)",
 } as const;
 
 export const spacingScale = {

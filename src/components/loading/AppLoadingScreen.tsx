@@ -193,8 +193,8 @@ const styles = {
     transform: "translateX(-50%)",
     zIndex: 3,
     color: "#6b6257",
-    fontFamily: '"Shippori Mincho B1", "Hiragino Mincho ProN", "Yu Mincho", serif',
-    fontSize: "16px",
+    fontFamily: "var(--font-display)",
+    fontSize: "15px",
     fontWeight: 400,
     letterSpacing: "0.16em",
     lineHeight: 1.4,
@@ -226,19 +226,19 @@ const styles = {
     ...shimmerBase,
     width: "160px",
     height: "34px",
-    borderRadius: "999px",
+    borderRadius: "var(--radius-full)",
   },
   copyLine: {
     ...shimmerBase,
     width: "172px",
     height: "12px",
-    borderRadius: "999px",
+    borderRadius: "var(--radius-full)",
   },
   copyLineShort: {
     ...shimmerBase,
     width: "136px",
     height: "12px",
-    borderRadius: "999px",
+    borderRadius: "var(--radius-full)",
   },
   cameraCircle: {
     ...shimmerBase,
@@ -257,7 +257,7 @@ const styles = {
   cameraIconLine: {
     width: "42px",
     height: "30px",
-    borderRadius: "10px",
+    borderRadius: "var(--radius-sm)",
     background: "rgba(255,253,248,0.58)",
   },
   statGrid: {
@@ -273,7 +273,7 @@ const styles = {
   statCard: {
     ...paperCard,
     minHeight: "92px",
-    borderRadius: "20px",
+    borderRadius: "var(--radius-xl)",
   },
   accountStage: {
     minHeight: "100%",
@@ -306,14 +306,14 @@ const styles = {
     ...shimmerBase,
     width: "152px",
     height: "24px",
-    borderRadius: "999px",
+    borderRadius: "var(--radius-full)",
     marginTop: "4px",
   },
   accountCopyLine: {
     ...shimmerBase,
     width: "218px",
     height: "12px",
-    borderRadius: "999px",
+    borderRadius: "var(--radius-full)",
     opacity: 0.74,
   },
   accountList: {
@@ -326,7 +326,7 @@ const styles = {
   accountRow: {
     ...paperCard,
     height: "42px",
-    borderRadius: "15px",
+    borderRadius: "var(--radius-md)",
   },
   startupStage: {
     minHeight: "100%",
@@ -358,8 +358,8 @@ const styles = {
   startupTitle: {
     margin: "2px 0 0",
     color: "#4a463e",
-    fontFamily: '"Shippori Mincho B1", "Hiragino Mincho ProN", "Yu Mincho", serif',
-    fontSize: "22px",
+    fontFamily: "var(--font-display)",
+    fontSize: "24px",
     fontWeight: 400,
     letterSpacing: "0.18em",
     lineHeight: 1.5,
@@ -368,7 +368,7 @@ const styles = {
     ...shimmerBase,
     width: "112px",
     height: "2px",
-    borderRadius: "999px",
+    borderRadius: "var(--radius-full)",
     opacity: 0.52,
   },
   pageStage: {
@@ -381,12 +381,12 @@ const styles = {
     ...shimmerBase,
     width: "132px",
     height: "32px",
-    borderRadius: "999px",
+    borderRadius: "var(--radius-full)",
     margin: "0 auto 8px",
   },
   albumSection: {
     ...paperCard,
-    borderRadius: "24px",
+    borderRadius: "var(--radius-2xl)",
     padding: "18px",
     display: "grid",
     gap: "14px",
@@ -395,13 +395,13 @@ const styles = {
     ...shimmerBase,
     width: "108px",
     height: "20px",
-    borderRadius: "999px",
+    borderRadius: "var(--radius-full)",
   },
   sectionTitleLineShort: {
     ...shimmerBase,
     width: "86px",
     height: "20px",
-    borderRadius: "999px",
+    borderRadius: "var(--radius-full)",
   },
   thumbRow: {
     display: "grid",
@@ -411,12 +411,12 @@ const styles = {
   thumb: {
     ...shimmerBase,
     aspectRatio: "1 / 1",
-    borderRadius: "16px",
+    borderRadius: "var(--radius-lg)",
   },
   thumbMuted: {
     ...shimmerBase,
     aspectRatio: "1 / 1",
-    borderRadius: "16px",
+    borderRadius: "var(--radius-lg)",
     opacity: 0.56,
   },
   avatarRail: {
@@ -433,7 +433,7 @@ const styles = {
   },
   profileCard: {
     ...paperCard,
-    borderRadius: "24px",
+    borderRadius: "var(--radius-2xl)",
     padding: "20px",
     display: "flex",
     alignItems: "center",
@@ -454,17 +454,17 @@ const styles = {
     ...shimmerBase,
     width: "104px",
     height: "26px",
-    borderRadius: "999px",
+    borderRadius: "var(--radius-full)",
   },
   profileSmallLine: {
     ...shimmerBase,
     width: "78px",
     height: "14px",
-    borderRadius: "999px",
+    borderRadius: "var(--radius-full)",
   },
   infoList: {
     ...paperCard,
-    borderRadius: "24px",
+    borderRadius: "var(--radius-2xl)",
     overflow: "hidden",
   },
   infoRow: {
@@ -474,6 +474,6 @@ const styles = {
   copyBlock: {
     ...shimmerBase,
     height: "128px",
-    borderRadius: "18px",
+    borderRadius: "var(--radius-lg)",
   },
 } satisfies Record<string, CSSProperties>;

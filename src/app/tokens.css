@@ -19,8 +19,6 @@
   --shadow-e0: none;
   --shadow-e1: 0 4px 12px rgba(120, 110, 90, 0.08);
   --shadow-e2: 0 8px 24px rgba(120, 110, 90, 0.12);
-  --shadow-rest: 0 4px 12px rgba(120, 110, 95, 0.08);
-  --shadow-float: 0 10px 24px rgba(120, 110, 95, 0.14);
 
   /* ===== 角丸(3段・据え置き) ===== */
   --radius-sm: 8px;
@@ -29,14 +27,10 @@
   --radius-xl: 20px;
   --radius-2xl: 24px;
   --radius-full: 999px;
-  --radius-tile: 24px;
-  --radius-img: 17px;
-  --radius-s: 13px;
 
   /* ===== 文字 ===== */
   --font-display: var(--font-klee-one), "Klee One", sans-serif;
   --font-ui: var(--font-zen-kaku), "Zen Kaku Gothic New", -apple-system, "Hiragino Sans", sans-serif;
-  --font-serif: "Hiragino Mincho ProN", "Yu Mincho", serif;
   --font-sans: -apple-system, "Hiragino Sans", sans-serif;
   --tracking-label: 0.18em;
   --tracking-body: 0.06em;

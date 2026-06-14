@@ -82,7 +82,7 @@ const styles = {
     justifyContent: "center",
     gap: spacing.sm,
     borderRadius: radius.pill,
-    fontFamily: typography.fontSerif,
+    fontFamily: typography.fontDisplay,
     fontSize: typography.cta.fontSize,
     fontWeight: typography.cta.fontWeight,
     lineHeight: typography.cta.lineHeight,

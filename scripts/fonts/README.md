@@ -38,10 +38,10 @@ committed runtime artifact.
 - `jinmeiyo.txt`: Jinmeiyo kanji list from `jinmeiyo-kanji@1.0.0` (MIT).
 
 The generator also scans app source files and includes fixed copy characters for
-Zen Kaku Gothic New so that app-specific text is not missed. Klee One does not
-use this broad source scan; it only adds the current home/nav display-copy files
-plus `klee-one-glyphs.txt`. Add display-copy text to `klee-one-glyphs.txt` before
-regenerating if Step C expands where `--font-display` is used beyond home.
+Zen Kaku Gothic New so that app-specific text is not missed. Klee One scans app
+and component source text plus `klee-one-glyphs.txt`; keep `--font-display`
+limited to fixed display copy and labels. If Klee One is applied to new dynamic
+text later, add representative text to `klee-one-glyphs.txt` before regenerating.
 
 ## Regenerate
 

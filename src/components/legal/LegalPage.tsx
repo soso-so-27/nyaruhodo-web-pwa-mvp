@@ -374,12 +374,12 @@ const styles = {
     flexShrink: 0,
   },
   backIcon: {
-    fontSize: "21px",
+    fontSize: "24px",
     lineHeight: 1,
   },
   title: {
-    fontSize: "21px",
-    fontWeight: 680,
+    fontSize: "24px",
+    fontWeight: 500,
     color: "#2a2a28",
     margin: "0 0 3px",
   },
@@ -389,14 +389,14 @@ const styles = {
     margin: 0,
   },
   lead: {
-    fontSize: "14px",
+    fontSize: "13px",
     lineHeight: 1.75,
     color: "#6a6a62",
     margin: "0 0 14px",
   },
   card: {
     ...APP_SURFACE,
-    borderRadius: "20px",
+    borderRadius: "var(--radius-xl)",
     padding: "4px 16px",
   },
   section: {
@@ -404,7 +404,7 @@ const styles = {
   },
   sectionTitle: {
     fontSize: "15px",
-    fontWeight: 620,
+    fontWeight: 500,
     color: "#2a2a28",
     margin: "0 0 8px",
   },

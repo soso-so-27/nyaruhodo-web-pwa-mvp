@@ -72,7 +72,9 @@ APP_TEXT_GLOBS = [
     "docs/**/*.{md,html}",
 ]
 
-KLEE_HOME_TEXT_GLOBS = [
+KLEE_DISPLAY_TEXT_GLOBS = [
+    "src/app/**/*.{ts,tsx}",
+    "src/components/**/*.{ts,tsx}",
     "src/components/home/HomeDeskModel.tsx",
     "src/components/navigation/BottomNavigation.tsx",
 ]
@@ -135,7 +137,7 @@ def collect_text(destination: Path, patterns: list[str]) -> None:
 def combined_text_file(
     names: list[str],
     app_text: Path,
-    home_text: Path,
+    display_text: Path,
     destination: Path,
     *,
     include_app_text: bool,
@@ -143,7 +145,7 @@ def combined_text_file(
 ) -> None:
     chars: set[str] = set(app_text.read_text(encoding="utf-8")) if include_app_text else set()
     if include_home_text:
-        chars.update(home_text.read_text(encoding="utf-8"))
+        chars.update(display_text.read_text(encoding="utf-8"))
     for name in names:
         chars.update((FONT_DIR / name).read_text(encoding="utf-8"))
     destination.write_text("".join(sorted(chars)), encoding="utf-8")
@@ -192,15 +194,15 @@ def main() -> None:
     build_dir.mkdir(parents=True, exist_ok=True)
     app_text = build_dir / "app-text.txt"
     collect_text(app_text, APP_TEXT_GLOBS)
-    home_text = build_dir / "klee-home-text.txt"
-    collect_text(home_text, KLEE_HOME_TEXT_GLOBS)
+    display_text = build_dir / "klee-display-text.txt"
+    collect_text(display_text, KLEE_DISPLAY_TEXT_GLOBS)
 
     for item in OUTPUTS:
         text_file = build_dir / f"{Path(item['output']).stem}.txt"
         combined_text_file(
             item["text_files"],
             app_text,
-            home_text,
+            display_text,
             text_file,
             include_app_text=item["include_app_text"],
             include_home_text=item["include_home_text"],

@@ -79,8 +79,8 @@ const styles = {
   label: {
     color: color.textMuted,
     fontFamily: typography.fontSans,
-    fontSize: 12.5,
-    fontWeight: 560,
+    fontSize: 13,
+    fontWeight: 500,
     lineHeight: 1.3,
     letterSpacing: "0.04em",
   },

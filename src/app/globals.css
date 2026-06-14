@@ -30,14 +30,7 @@ body {
   overscroll-behavior-y: auto;
   touch-action: pan-y;
   -webkit-overflow-scrolling: touch;
-  font-family:
-    -apple-system,
-    BlinkMacSystemFont,
-    "Hiragino Sans",
-    "Yu Gothic",
-    "Noto Sans JP",
-    "Segoe UI",
-    sans-serif;
+  font-family: var(--font-ui);
   font-synthesis-weight: none;
 }
 

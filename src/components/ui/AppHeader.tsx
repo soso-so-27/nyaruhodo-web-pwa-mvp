@@ -63,7 +63,7 @@ const styles = {
   wordmark: {
     margin: 0,
     color: color.textMuted,
-    fontFamily: typography.fontSerif,
+    fontFamily: typography.fontDisplay,
     fontSize: typography.brand.fontSize,
     fontWeight: typography.brand.fontWeight,
     lineHeight: typography.brand.lineHeight,
@@ -72,7 +72,7 @@ const styles = {
   pageTitle: {
     margin: 0,
     color: color.textMuted,
-    fontFamily: typography.fontSerif,
+    fontFamily: typography.fontDisplay,
     fontSize: typography.brand.fontSize,
     fontWeight: typography.brand.fontWeight,
     lineHeight: typography.brand.lineHeight,

@@ -11,20 +11,20 @@ export const APP_SURFACE: CSSProperties = {
   backdropFilter: "blur(20px)",
   WebkitBackdropFilter: "blur(20px)",
   border: "1px solid var(--line)",
-  boxShadow: "var(--shadow-rest)",
+  boxShadow: "var(--shadow-e1)",
   position: "relative",
 };
 
 export const APP_SUBTLE_SURFACE: CSSProperties = {
   ...APP_SURFACE,
   background: "color-mix(in srgb, var(--paper) 86%, transparent)",
-  boxShadow: "var(--shadow-rest)",
+  boxShadow: "var(--shadow-e1)",
 };
 
 export const APP_PILL: CSSProperties = {
   ...APP_SURFACE,
   background: "color-mix(in srgb, var(--paper) 90%, transparent)",
-  borderRadius: "999px",
+  borderRadius: "var(--radius-full)",
 };
 
 export const APP_SHEET: CSSProperties = {
@@ -32,7 +32,7 @@ export const APP_SHEET: CSSProperties = {
   backdropFilter: "blur(20px)",
   WebkitBackdropFilter: "blur(20px)",
   border: "1px solid var(--line)",
-  boxShadow: "var(--shadow-float)",
+  boxShadow: "var(--shadow-e2)",
 };
 
 export const APP_SHEET_OVERLAY: CSSProperties = {

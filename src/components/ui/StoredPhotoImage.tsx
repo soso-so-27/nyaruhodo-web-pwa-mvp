@@ -61,7 +61,7 @@ const fallbackHelpStyle: CSSProperties = {
   display: "block",
   marginTop: 4,
   color: color.textFaint,
-  fontSize: 11,
+  fontSize: 12,
   fontWeight: 500,
 };
 
