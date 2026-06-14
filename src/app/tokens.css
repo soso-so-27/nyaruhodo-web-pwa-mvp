@@ -11,6 +11,8 @@
   /* ===== 唯一の深色(封蝋と削除系のみ。面に塗らない) ===== */
   --seal: #a8584e;
   --seal-soft: #d8a99b;
+  --danger: #9e4a43;
+  --danger-line: rgba(158, 74, 67, 0.22);
 
   /* ===== 背景: 紙に当たる光(フラット禁止・全画面共通) ===== */
   --bg-gradient: linear-gradient(180deg, var(--paper) 0%, var(--paper-warm) 100%);

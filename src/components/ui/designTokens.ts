@@ -65,7 +65,8 @@ export const color = {
   accent: "var(--ink)",
   accentWarm: "var(--ink-soft)",
   border: "var(--line)",
-  danger: "var(--seal)",
+  danger: "var(--danger)",
+  dangerLine: "var(--danger-line)",
   seal: "var(--seal)",
   sealSoft: "var(--seal-soft)",
 } as const;

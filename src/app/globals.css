@@ -70,6 +70,12 @@ body {
   }
 }
 
+@keyframes appButtonSpin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
 ::view-transition-old(root) {
   animation: routeViewOld var(--dur-instant) var(--ease-settle) both;
 }
