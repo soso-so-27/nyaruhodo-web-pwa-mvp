@@ -257,8 +257,17 @@ export function updateEveningDeliveredPhotoDataUrl(
   const day = store[dateKey];
   const deliveredPhoto = day?.deliveredPhoto;
 
-  if (!day || !deliveredPhoto || deliveredPhoto.src === dataUrl) {
+  if (!day || !deliveredPhoto) {
     return deliveredPhoto ?? null;
+  }
+
+  if (
+    deliveredPhoto.src === dataUrl &&
+    deliveredPhoto.thumbnailSrc === dataUrl &&
+    deliveredPhoto.displaySrc === dataUrl &&
+    deliveredPhoto.originalSrc === dataUrl
+  ) {
+    return deliveredPhoto;
   }
 
   const nextPhoto = {

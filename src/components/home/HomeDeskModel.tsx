@@ -70,7 +70,7 @@ type HomeDeskModelProps = {
 
 const HOLD_OPEN_MS = 1600;
 const HOLD_REWIND_MS = 1000;
-const EVENING_SOON_COPY = "もうすぐ、とどく";
+const EVENING_SOON_COPY = "もうすぐ とどきます";
 const HOME_DAYLIGHT_ANCHORS = [
   { minute: 5 * 60, top: "#fcfbf9", bottom: "#f5f2ec" },
   { minute: 12 * 60, top: "#fbfaf7", bottom: "#f4f1ea" },
@@ -114,7 +114,7 @@ export function HomeDeskModel({
   const daylightStyle = useDaylight(now);
   const shouldHidePresence =
     deskState === "3" || getJstHour(now) < 5 || !showSleepingCounter;
-  const guidanceCopy = getGuidanceCopy(deskState, catName);
+  const guidanceCopy = getGuidanceCopyV2(deskState, catName);
   const isEveningSoon = deskState === "2" && isEveningSoonWindow(now);
   const visibleGuidanceCopy = isEveningSoon
     ? EVENING_SOON_COPY
@@ -364,7 +364,7 @@ export function HomeDeskModel({
                 おさえて ひらく
               </span>
             </div>
-          ) : (
+          ) : deskState === "1b" || deskState === "4" ? null : (
             <div style={deskStyles.slot}>
               <button
                 type="button"
@@ -372,17 +372,17 @@ export function HomeDeskModel({
                 style={{
                   ...deskStyles.letter,
                   ...(deskState === "1" ? deskStyles.letterStateOne : {}),
-                  ...(deskState === "4" ? deskStyles.letterHidden : {}),
                 }}
                 onClick={deskState === "2" && !isEveningSoon ? showLetterHint : undefined}
                 aria-label={
                   deskState === "2"
-                    ? "よる8じごろに とどきます"
+                    ? "よる8じに とどきます"
                     : "よる8じに とどく手紙"
                 }
                 tabIndex={deskState === "2" && !isEveningSoon ? 0 : -1}
               >
                 <span style={deskStyles.letterFlap} aria-hidden="true" />
+                <span style={deskStyles.letterSeal} aria-hidden="true" />
               </button>
               {deskState === "1" ? (
                 <span style={deskStyles.letterTimeLabel}>
@@ -397,7 +397,7 @@ export function HomeDeskModel({
                 }}
                 aria-live="polite"
               >
-                よる8じごろ
+                よる8じに とどきます
               </span>
             </div>
           )}
@@ -743,7 +743,7 @@ function PhotoTile({
 function EmptyDeliveredSlot() {
   return (
     <div style={deskStyles.emptyDeliveredSlot} data-testid="desk-empty-delivered-slot">
-      <span style={deskStyles.emptyDeliveredSlotText}>きょうは おやすみ</span>
+      <span style={deskStyles.emptyDeliveredSlotText}>おとどけ できませんでした</span>
     </div>
   );
 }
@@ -996,14 +996,16 @@ function parseHexColor(hex: string) {
   return [1, 3, 5].map((start) => Number.parseInt(hex.slice(start, start + 2), 16));
 }
 
-function getGuidanceCopy(state: DeskState, catName: string) {
+function getGuidanceCopyV2(state: DeskState, catName: string) {
   switch (state) {
     case "1":
       return `${catName}、ねてる?`;
     case "1b":
-      return "いまとると、あしたのよるに とどく";
+      return "いまとると、あした よる8じに とどきます";
     case "2":
-      return "よる8じごろ とどく";
+      return "よる8じに とどきます";
+    case "4":
+      return "また あした";
     default:
       return "";
   }

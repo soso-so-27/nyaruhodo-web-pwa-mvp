@@ -21,6 +21,7 @@ import {
   BOX_PHOTO_STORAGE_EVENT,
   deleteOwnSleepingPhoto,
   hideKeptExchangePhoto,
+  isExchangePhotoLocallyBlocked,
   readKeptExchangePhotos,
   readOwnSleepingPhotos,
   updateKeptExchangePhotoDataUrl,
@@ -151,6 +152,7 @@ type AlbumDayGroup = {
   sections: AlbumDaySection[];
   total: number;
   hasUnopenedOtherDelivery?: boolean;
+  hasUndeliverableOtherDelivery?: boolean;
 };
 
 export function CollectionPage() {
@@ -282,6 +284,10 @@ export function CollectionPage() {
     () => readUnopenedEveningDeliveryDateKeys(),
     [boxRefreshTick, hasLoaded],
   );
+  const undeliverableEveningDeliveryDateKeys = useMemo(
+    () => readUndeliverableEveningDeliveryDateKeys(),
+    [boxRefreshTick, hasLoaded],
+  );
   const otherBoxPhotos = useMemo(
     () =>
       mergeBoxPreviewPhotos(
@@ -307,8 +313,15 @@ export function CollectionPage() {
         awakeBoxPhotos,
         otherBoxPhotos,
         unopenedEveningDeliveryDateKeys,
+        undeliverableEveningDeliveryDateKeys,
       ),
-    [awakeBoxPhotos, otherBoxPhotos, sleepingBoxPhotos, unopenedEveningDeliveryDateKeys],
+    [
+      awakeBoxPhotos,
+      otherBoxPhotos,
+      sleepingBoxPhotos,
+      unopenedEveningDeliveryDateKeys,
+      undeliverableEveningDeliveryDateKeys,
+    ],
   );
   const firstEveningDeliveryTargetDateKey = useMemo(
     () => getFirstEveningDeliveryTargetDateKey(),
@@ -1203,6 +1216,9 @@ function AlbumDailyPair({
   const targetPhoto = ownPhotos[0] ?? null;
   const deliveredPhoto = deliveredPhotos[0] ?? null;
   const hasUnopenedOtherDelivery = Boolean(group.hasUnopenedOtherDelivery);
+  const hasUndeliverableOtherDelivery = Boolean(
+    group.hasUndeliverableOtherDelivery,
+  );
 
   return (
     <div
@@ -1229,7 +1245,9 @@ function AlbumDailyPair({
               style={styles.dailyPairImage}
             />
           ) : (
-            <span style={styles.dailyPairPlaceholder}>この日は おやすみ</span>
+            <span style={styles.dailyPairPlaceholder}>
+              この日の ねがおは ありません
+            </span>
           )}
           <span style={styles.dailyPairLabel}>{catName}</span>
         </button>
@@ -1265,19 +1283,26 @@ function AlbumDailyPair({
                 />
               ) : hasUnopenedOtherDelivery ? (
                 <AlbumSealedDeliveryMiniature />
+              ) : hasUndeliverableOtherDelivery ? (
+                <span
+                  data-testid="album-daily-undeliverable-letter"
+                  style={styles.dailyPairPlaceholder}
+                >
+                  おとどけ できませんでした
+                </span>
               ) : group.key === getLocalDateKey(Date.now()) ? (
                 <span
                   data-testid="album-daily-missing-letter"
                   style={styles.dailyPairPlaceholder}
                 >
-                  おたよりは ありませんでした
+                  おたよりは とどきませんでした
                 </span>
               ) : (
                 <span
                   data-testid="album-daily-missing-letter"
                   style={styles.dailyPairPlaceholder}
                 >
-                  おたよりは ありませんでした
+                  おたよりは とどきませんでした
                 </span>
               )}
               <span style={styles.dailyPairLabel}>どこかのこ</span>
@@ -2235,6 +2260,7 @@ function buildAlbumDayGroups(
   awakePhotos: BoxPreviewPhoto[],
   otherPhotos: BoxPreviewPhoto[],
   unopenedOtherDeliveryDateKeys = new Set<string>(),
+  undeliverableOtherDeliveryDateKeys = new Set<string>(),
 ): AlbumDayGroup[] {
   const items: AlbumMomentPhoto[] = [
     ...sleepingPhotos.map((photo) => ({
@@ -2270,8 +2296,16 @@ function buildAlbumDayGroups(
     }
   }
 
+  for (const key of undeliverableOtherDeliveryDateKeys) {
+    if (!groups.has(key)) {
+      groups.set(key, []);
+    }
+  }
+
   return [...groups.entries()].map(([key, photos]) => {
     const hasUnopenedOtherDelivery = unopenedOtherDeliveryDateKeys.has(key);
+    const hasUndeliverableOtherDelivery =
+      undeliverableOtherDeliveryDateKeys.has(key);
     const sections: AlbumDaySection[] = (
       [
       {
@@ -2294,8 +2328,12 @@ function buildAlbumDayGroups(
       label: getAlbumDateLabelFromKey(key),
       subLabel: getAlbumDateSubLabelFromKey(key),
       sections,
-      total: photos.length + (hasUnopenedOtherDelivery ? 1 : 0),
+      total:
+        photos.length +
+        (hasUnopenedOtherDelivery ? 1 : 0) +
+        (hasUndeliverableOtherDelivery ? 1 : 0),
       hasUnopenedOtherDelivery,
+      hasUndeliverableOtherDelivery,
     };
   });
 }
@@ -2306,11 +2344,44 @@ function readOpenedEveningDeliveryBoxPhotos(): BoxPreviewPhoto[] {
 
   return Object.values(store)
     .filter((day) => Boolean(day.deliveredPhoto && day.openedAt))
-    .map((day) => ({
-      ...day.deliveredPhoto!,
-      deliveredAt: day.deliveredAt ?? day.deliveredPhoto!.deliveredAt,
-    }))
+    .filter((day) => !isExchangePhotoLocallyBlocked(day.deliveredPhoto!))
+    .map((day) => {
+      const deliveredPhoto = day.deliveredPhoto!;
+      const deliveredAt = day.deliveredAt ?? deliveredPhoto.deliveredAt;
+
+      if (deliveredPhoto.src.startsWith("data:image/")) {
+        return {
+          ...deliveredPhoto,
+          thumbnailSrc: deliveredPhoto.src,
+          displaySrc: deliveredPhoto.src,
+          originalSrc: deliveredPhoto.src,
+          deliveredAt,
+        };
+      }
+
+      return {
+        ...deliveredPhoto,
+        deliveredAt,
+      };
+    })
     .filter((photo) => isUsableStoredPhotoSrc(photo.src));
+}
+
+function readUndeliverableEveningDeliveryDateKeys() {
+  autoOpenExpiredEveningDeliveries();
+  const store = readEveningDeliveryStore();
+  const keys = new Set<string>();
+
+  for (const day of Object.values(store)) {
+    if (
+      day.openedAt &&
+      (!day.deliveredPhoto || isExchangePhotoLocallyBlocked(day.deliveredPhoto))
+    ) {
+      keys.add(day.dateKey);
+    }
+  }
+
+  return keys;
 }
 
 function readUnopenedEveningDeliveryDateKeys() {
@@ -2384,7 +2455,9 @@ function filterAlbumDayGroupsByScope(
       const total = sections.reduce(
         (sum, section) => sum + section.photos.length,
         0,
-      );
+      ) +
+        (group.hasUnopenedOtherDelivery ? 1 : 0) +
+        (group.hasUndeliverableOtherDelivery ? 1 : 0);
 
       return {
         ...group,

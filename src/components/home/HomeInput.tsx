@@ -62,10 +62,6 @@ import {
   markOmoideMemoryOpened,
   readLatestArrivedOmoideMemory,
 } from "../../lib/home/omoideDelivery";
-import {
-  HOME_DESK_MODEL_ENABLED,
-  readHomeDeskModelOverride,
-} from "../../lib/home/homeDeskModelFlag";
 import { useEveningDelivery } from "../../lib/home/useEveningDelivery";
 import {
   BOX_PHOTO_STORAGE_EVENT,
@@ -126,14 +122,8 @@ type LockType = "yousu" | "mugi";
 
 const MIKKE_CATEGORIES: MikkeWindowCategory[] = ["place", "pose", "sign"];
 const MIKKE_LOCK_MS = 60 * 60 * 1000;
-const SHOW_HOME_WORDMARK = false;
-const SUBCOPY_HIDE_EXCHANGE_COUNT = 10;
-const MOTIF_STATE_SHOWN_STORAGE_PREFIX = "neteruneko_motif_state_shown";
-const SUBCOPY_HIDDEN_COHORT_STORAGE_KEY =
-  "neteruneko_subcopy_hidden_cohort_tracked";
 const PRESENCE_SESSION_STORAGE_KEY = "neteruneko_presence_count";
 
-type DayCycleState = "1" | "1b" | "2" | "3" | "4";
 const PHOTO_SAVE_FAILURE_MESSAGE =
   "写真を保存できませんでした。少し時間をおいて、もう一度試してください";
 const PHOTO_INPUT_FAILURE_MESSAGE =
@@ -326,9 +316,6 @@ export function HomeInput({ recentEvents: _recentEvents }: HomeInputProps) {
     useState<BeforeInstallPromptEvent | null>(null);
   const [isHomeInstallHintVisible, setIsHomeInstallHintVisible] = useState(false);
   const [isHomeInstallGuideOpen, setIsHomeInstallGuideOpen] = useState(false);
-  const [isHomeDeskModelEnabled, setIsHomeDeskModelEnabled] = useState(
-    HOME_DESK_MODEL_ENABLED,
-  );
   const [collectionRefreshTick, setCollectionRefreshTick] = useState(0);
   const [eveningRefreshTick, setEveningRefreshTick] = useState(0);
   const [omoideRefreshTick, setOmoideRefreshTick] = useState(0);
@@ -350,9 +337,6 @@ export function HomeInput({ recentEvents: _recentEvents }: HomeInputProps) {
     saveActiveCatId(active.id);
     hydrateCatState(active.id);
     setHasAcceptedSleepingSafety(hasAcceptedSleepingSafetyNotice());
-    setIsHomeDeskModelEnabled(
-      readHomeDeskModelOverride() ?? HOME_DESK_MODEL_ENABLED,
-    );
   }, []);
 
   useEffect(() => {
@@ -1944,8 +1928,8 @@ export function HomeInput({ recentEvents: _recentEvents }: HomeInputProps) {
         <div style={styles.paperNoise} aria-hidden="true" />
 
         {!isHomeClockReady ? (
-          <HomeClockHydrationPlaceholder desk={isHomeDeskModelEnabled} />
-        ) : isHomeDeskModelEnabled ? (
+          <HomeClockHydrationPlaceholder />
+        ) : (
           <HomeDeskModel
             catName={catName}
             eveningState={eveningHomeState}
@@ -1971,20 +1955,6 @@ export function HomeInput({ recentEvents: _recentEvents }: HomeInputProps) {
               markOmoideMemoryDismissed(memory.id, homeNow);
               setOmoideRefreshTick((value) => value + 1);
             }}
-          />
-        ) : (
-          <SleepingPhotoHome
-            catName={catName}
-            sleepingCounter={sleepingCounterCount}
-            eveningState={eveningHomeState}
-            keptExchangePhotoCount={keptExchangePhotoCount}
-            isInstallHintVisible={shouldShowHomeInstallHint}
-            showSleepingCounter={
-              typeof sleepingPresenceCount === "number" &&
-              isTodaySleepingCounterVisible(sleepingCounterCount)
-            }
-            onTakePhoto={() => handleSleepingPhotoStart("camera")}
-            onOpenDelivery={handleOpenEveningDelivery}
           />
         )}
 
@@ -2012,12 +1982,7 @@ export function HomeInput({ recentEvents: _recentEvents }: HomeInputProps) {
           onStorageDataUrl={(dataUrl) =>
             handleEveningDeliveryDataUrl(openingEveningDelivery.dateKey, dataUrl)
           }
-          onKeep={() =>
-            handleKeepEveningDelivery(
-              openingEveningDelivery.dateKey,
-              openingEveningDelivery.deliveredPhoto,
-            )
-          }
+          onClose={() => setOpeningEveningDelivery(null)}
         />
       ) : null}
 
@@ -2052,8 +2017,8 @@ export function HomeInput({ recentEvents: _recentEvents }: HomeInputProps) {
           isExchangeTargetAvailable={eveningHomeState.kind === "before"}
           deliveryCopy={
             eveningHomeState.kind === "before" && eveningHomeState.isTodayDelivery
-              ? "よる8じごろ とどきます。"
-              : "あしたのよるに とどきます。"
+              ? "よる8じに とどきます。"
+              : "あした よる8じに とどきます。"
           }
           onCatSelect={setPendingExchangeCatId}
           onModeChange={(mode) => {
@@ -2150,9 +2115,6 @@ export function HomeInput({ recentEvents: _recentEvents }: HomeInputProps) {
         </div>
       ) : null}
 
-      <div aria-hidden={openingEveningDelivery ? true : undefined}>
-        {isHomeDeskModelEnabled ? null : <BottomNavigation active="today" />}
-      </div>
       <style>{`
         @keyframes slideUp {
           from {
@@ -2223,43 +2185,6 @@ export function HomeInput({ recentEvents: _recentEvents }: HomeInputProps) {
             transform: translate3d(0, 0, 0) scale(1);
             filter: blur(0);
           }
-        }
-        @keyframes dayCycleDotFlow {
-          0%, 100% { opacity: 0.3; }
-          50% { opacity: 0.7; }
-        }
-        @keyframes dayCycleCameraFill {
-          from { opacity: 0; }
-          to { opacity: 1; }
-        }
-        .day-cycle-indicator {
-          transition: opacity 300ms ease-out;
-          -webkit-tap-highlight-color: transparent;
-        }
-        .day-cycle-dot-flow {
-          animation: dayCycleDotFlow 2.4s linear infinite;
-        }
-        .day-cycle-dot-flow:nth-child(2) {
-          animation-delay: 0.18s;
-        }
-        .day-cycle-dot-flow:nth-child(3) {
-          animation-delay: 0.36s;
-        }
-        .day-cycle-dot-flow:nth-child(4) {
-          animation-delay: 0.54s;
-        }
-        .day-cycle-dot-flow:nth-child(5) {
-          animation-delay: 0.72s;
-        }
-        .day-cycle-camera-fill {
-          animation: dayCycleCameraFill 600ms ease-out both;
-        }
-        .sleeping-photo-button {
-          transition: transform 100ms ease-out;
-          -webkit-tap-highlight-color: transparent;
-        }
-        .sleeping-photo-button:active {
-          transform: scale(0.97);
         }
         .mikke-all-body {
           scrollbar-width: none;
@@ -2835,371 +2760,24 @@ function InfoSheet({
   );
 }
 
-function SleepingPhotoHome({
-  catName,
-  sleepingCounter,
-  eveningState,
-  keptExchangePhotoCount,
-  isInstallHintVisible,
-  showSleepingCounter,
-  onTakePhoto,
-  onOpenDelivery,
-}: {
-  catName: string;
-  sleepingCounter: string;
-  eveningState: EveningHomeState;
-  keptExchangePhotoCount: number;
-  isInstallHintVisible: boolean;
-  showSleepingCounter: boolean;
-  onTakePhoto: () => void;
-  onOpenDelivery: (state: Extract<EveningHomeState, { kind: "delivered" }>) => void;
-}) {
-  const isBefore = eveningState.kind === "before";
-  const isWaiting = eveningState.kind === "waiting";
-  const isDelivered = eveningState.kind === "delivered";
-  const isOpened = eveningState.kind === "opened";
-  const title =
-    isBefore && catName
-      ? `${catName}、ねてる？`
-      : isWaiting
-        ? "おあずかり中"
-        : isDelivered
-          ? "ねがおが とどいています"
-          : "きょうの 2まい";
-  const lead =
-    isBefore
-      ? eveningState.isTodayDelivery
-        ? "とると、よる8じごろ とどく"
-        : "いまとると、あしたのよるに とどく"
-      : isWaiting
-        ? eveningState.isTodayDelivery
-        ? "よる8じごろ、どこかのねがおが とどきます"
-        : "あしたのよるに、どこかのねがおが とどきます"
-        : isDelivered
-          ? ""
-          : "また、ねていたら。";
-  const targetPhoto = isWaiting || isDelivered || isOpened
-    ? eveningState.targetPhoto
-    : null;
-  const dayCycleState = getDayCycleState(eveningState);
-  const shouldHideRoutineSubcopy =
-    dayCycleState === "1" &&
-    keptExchangePhotoCount >= SUBCOPY_HIDE_EXCHANGE_COUNT;
-  const visibleLead = shouldHideRoutineSubcopy ? "" : lead;
-
-  useEffect(() => {
-    trackMotifStateShown(dayCycleState, eveningState.dateKey);
-  }, [dayCycleState, eveningState.dateKey]);
-
-  useEffect(() => {
-    if (keptExchangePhotoCount < SUBCOPY_HIDE_EXCHANGE_COUNT) {
-      return;
-    }
-
-    trackSubcopyHiddenCohort(keptExchangePhotoCount);
-  }, [keptExchangePhotoCount]);
-
-  function handleTakePhotoPress() {
-    if (typeof navigator !== "undefined" && "vibrate" in navigator) {
-      navigator.vibrate?.(10);
-    }
-    onTakePhoto();
-  }
-
-  function handleMotifOpen() {
-    if (!isDelivered) {
-      return;
-    }
-
-    trackProductEvent("motif_tapped", {
-      state: dayCycleState,
-      delivery_date_key: eveningState.dateKey,
-    });
-    onOpenDelivery(eveningState);
-  }
-
-  return (
-    <>
-      <div
-        style={SHOW_HOME_WORDMARK ? styles.sleepingTopBar : styles.sleepingTopBarHidden}
-        aria-hidden="true"
-      >
-        ねてるねこ
-      </div>
-      <section style={styles.sleepingHome} aria-label="しゃしん">
-        <div style={styles.sleepingHomeHeader}>
-          <h1 style={styles.sleepingHomeTitle}>{title}</h1>
-          {visibleLead ? (
-            <p style={styles.sleepingHomeLead}>
-              {visibleLead}
-            </p>
-          ) : null}
-          <DayCycleIndicator
-            state={dayCycleState}
-            reserveSubcopySpace={shouldHideRoutineSubcopy}
-            onOpen={handleMotifOpen}
-          />
-
-          {isWaiting && targetPhoto ? (
-            <div style={styles.sleepingWaitingContent}>
-              <div
-                data-testid="sleeping-today-photo-area"
-                style={styles.sleepingTodayPhotoArea}
-              >
-                <StoredPhotoImage
-                  src={getPhotoDetailSrc(targetPhoto)}
-                  alt=""
-                  style={styles.sleepingTodayPhoto}
-                />
-                <p style={styles.sleepingTodayPhotoLabel}>
-                  {catName ? `${catName}の きょうのねがお` : "きょうのねがお"}
-                </p>
-              </div>
-
-              {!isInstallHintVisible ? (
-                <div style={styles.sleepingWaitingSecondaryActionGroup}>
-                  <button
-                    type="button"
-                    style={styles.sleepingSecondaryPhotoButton}
-                    onClick={onTakePhoto}
-                  >
-                    <span>いまとると、アルバムに はいります</span>
-                  </button>
-                  {showSleepingCounter ? (
-                    <p style={styles.sleepingPresenceLine}>
-                      {formatSleepingPresenceLine(sleepingCounter)}
-                    </p>
-                  ) : null}
-                </div>
-              ) : null}
-            </div>
-          ) : null}
-        </div>
-
-        {isBefore ? (
-          <div style={styles.sleepingActionGroup}>
-            <button
-              type="button"
-              style={styles.sleepingPhotoButton}
-              className="sleeping-photo-button"
-              onClick={handleTakePhotoPress}
-              aria-label="ねがおをとる"
-            >
-              <AppIcon name="camera" size={29} />
-            </button>
-            {showSleepingCounter ? (
-              <p style={styles.sleepingPresenceLine}>
-                {formatSleepingPresenceLine(sleepingCounter)}
-              </p>
-            ) : null}
-          </div>
-        ) : null}
-
-        {isDelivered ? (
-          <button
-            type="button"
-            style={styles.sleepingEnvelopeButton}
-            onClick={() => onOpenDelivery(eveningState)}
-            aria-label="ねがおをひらく"
-          >
-            <AppIcon name="mail" size={34} />
-            <span>そっとひらく</span>
-          </button>
-        ) : null}
-
-        {isOpened ? (
-          <div style={styles.sleepingPairCard} aria-label="きょうの2まい">
-            <div style={styles.sleepingPairTile}>
-              {targetPhoto ? (
-                <StoredPhotoImage
-                  src={getPhotoThumbnailSrc(targetPhoto)}
-                  alt=""
-                  style={styles.sleepingPairImage}
-                />
-              ) : null}
-              <span style={styles.sleepingPairLabel}>{catName}</span>
-            </div>
-            <span style={styles.sleepingPairDots} aria-hidden="true" />
-            <div style={styles.sleepingPairTile}>
-              <StoredPhotoImage
-                src={getPhotoThumbnailSrc(eveningState.deliveredPhoto)}
-                alt=""
-                style={styles.sleepingPairImage}
-                onStorageDataUrl={(dataUrl) =>
-                  updateKeptExchangePhotoDataUrl(
-                    eveningState.deliveredPhoto,
-                    dataUrl,
-                  )
-                }
-              />
-              <span style={styles.sleepingPairLabel}>どこかのこ</span>
-            </div>
-          </div>
-        ) : null}
-
-        {!isBefore && !isWaiting && !isInstallHintVisible ? (
-          <div style={styles.sleepingSecondaryActionGroup}>
-            <button
-              type="button"
-              style={styles.sleepingSecondaryPhotoButton}
-              onClick={onTakePhoto}
-            >
-              <span>いまとると、アルバムに はいります</span>
-            </button>
-            {showSleepingCounter ? (
-              <p style={styles.sleepingPresenceLine}>
-                {formatSleepingPresenceLine(sleepingCounter)}
-              </p>
-            ) : null}
-          </div>
-        ) : null}
-      </section>
-    </>
-  );
-}
-
-function HomeClockHydrationPlaceholder({ desk }: { desk: boolean }) {
-  if (desk) {
-    return (
-      <section
-        data-testid="home-clock-placeholder"
-        aria-label="きょう"
-        style={styles.clockDeskPlaceholder}
-      >
-        <div style={styles.clockDeskPlaceholderStage}>
-          <div style={styles.clockDeskPlaceholderSlot}>
-            <div style={styles.clockDeskPlaceholderFrame} />
-          </div>
-          <div style={styles.clockDeskPlaceholderSlot}>
-            <div style={styles.clockDeskPlaceholderLetter} />
-          </div>
-        </div>
-        <BottomNavigation active="today" homeVariant="desk" homeState="1" />
-      </section>
-    );
-  }
-
+function HomeClockHydrationPlaceholder() {
   return (
     <section
       data-testid="home-clock-placeholder"
-      aria-label="しゃしん"
-      style={styles.sleepingHome}
+      aria-label="きょう"
+      style={styles.clockDeskPlaceholder}
     >
-      <div style={styles.sleepingHomeHeader}>
-        <div style={styles.clockLegacyPlaceholderTitle} />
-        <div style={styles.clockLegacyPlaceholderLead} />
-        <div style={styles.clockLegacyPlaceholderMotif}>
-          <span style={styles.clockLegacyPlaceholderCircle} />
-          <span style={styles.clockLegacyPlaceholderDots} />
-          <span style={styles.clockLegacyPlaceholderCircle} />
+      <div style={styles.clockDeskPlaceholderStage}>
+        <div style={styles.clockDeskPlaceholderSlot}>
+          <div style={styles.clockDeskPlaceholderFrame} />
+        </div>
+        <div style={styles.clockDeskPlaceholderSlot}>
+          <div style={styles.clockDeskPlaceholderLetter} />
         </div>
       </div>
+      <BottomNavigation active="today" homeVariant="desk" homeState="1" />
     </section>
   );
-}
-
-function DayCycleIndicator({
-  state,
-  reserveSubcopySpace,
-  onOpen,
-}: {
-  state: DayCycleState;
-  reserveSubcopySpace: boolean;
-  onOpen: () => void;
-}) {
-  const isCameraFilled = state === "2" || state === "3" || state === "4";
-  const isEnvelopeFilled = state === "3" || state === "4";
-  const isEnvelopeWaiting = state === "2";
-  const isInteractive = state === "3";
-  const prefersReducedMotion = usePrefersReducedMotion();
-  const shouldAnimateFlow = state === "2" && !prefersReducedMotion;
-  const content = (
-    <>
-      <span
-        style={{
-          ...styles.dayCycleCircle,
-          ...(isCameraFilled ? styles.dayCycleCircleFilled : {}),
-        }}
-        className={shouldAnimateFlow ? "day-cycle-camera-fill" : undefined}
-        aria-hidden="true"
-      >
-        <AppIcon name="camera" size={20} />
-      </span>
-      <span style={styles.dayCycleDots} aria-hidden="true">
-        {Array.from({ length: 5 }, (_, index) => (
-          <span
-            key={index}
-            style={{
-              ...styles.dayCycleDot,
-              ...(state === "1" || state === "1b" || state === "2"
-                ? {}
-                : styles.dayCycleDotStrong),
-            }}
-            className={shouldAnimateFlow ? "day-cycle-dot-flow" : undefined}
-          />
-        ))}
-      </span>
-      <span
-        style={{
-          ...styles.dayCycleCircle,
-          ...styles.dayCycleEnvelope,
-          ...(isEnvelopeWaiting ? styles.dayCycleEnvelopeWaiting : {}),
-          ...(isEnvelopeFilled ? styles.dayCycleEnvelopeFilled : {}),
-        }}
-        aria-hidden="true"
-      >
-        <AppIcon name="mail" size={20} />
-      </span>
-    </>
-  );
-
-  if (isInteractive) {
-    return (
-      <button
-        type="button"
-        data-testid="day-cycle-indicator"
-        data-state={state}
-        className={`day-cycle-indicator day-cycle-indicator--state-${state}`}
-        style={{
-          ...styles.dayCycleButton,
-          ...(reserveSubcopySpace ? styles.dayCycleReserveSubcopySpace : {}),
-        }}
-        aria-label={getDayCycleAriaLabel(state)}
-        onClick={onOpen}
-      >
-        {content}
-      </button>
-    );
-  }
-
-  return (
-    <div
-      data-testid="day-cycle-indicator"
-      data-state={state}
-      className={`day-cycle-indicator day-cycle-indicator--state-${state}`}
-      style={{
-        ...styles.dayCycleStatic,
-        ...(reserveSubcopySpace ? styles.dayCycleReserveSubcopySpace : {}),
-      }}
-      aria-label={getDayCycleAriaLabel(state)}
-    >
-      {content}
-    </div>
-  );
-}
-
-function usePrefersReducedMotion() {
-  const [prefersReducedMotion, setPrefersReducedMotion] = useState(false);
-
-  useEffect(() => {
-    const media = window.matchMedia("(prefers-reduced-motion: reduce)");
-    const update = () => setPrefersReducedMotion(media.matches);
-    update();
-    media.addEventListener("change", update);
-    return () => media.removeEventListener("change", update);
-  }, []);
-
-  return prefersReducedMotion;
 }
 
 function useSleepingPresenceCount() {
@@ -3276,135 +2854,55 @@ function useSleepingPresenceCount() {
   return count;
 }
 
-function getDayCycleState(eveningState: EveningHomeState): DayCycleState {
-  if (eveningState.kind === "waiting") return "2";
-  if (eveningState.kind === "delivered") return "3";
-  if (eveningState.kind === "opened") return "4";
-  return eveningState.isTodayDelivery ? "1" : "1b";
-}
-
-function getDayCycleAriaLabel(state: DayCycleState) {
-  switch (state) {
-    case "2":
-      return "ねがおをおあずかり中。よる8じごろにとどきます";
-    case "3":
-      return "ねがおがとどいています";
-    case "4":
-      return "きょうの2まいを受け取りました";
-    case "1":
-    case "1b":
-    default:
-      return "まだ撮っていません";
-  }
-}
-
-function formatSleepingPresenceLine(sleepingCounter: string) {
-  return `きょうも、${sleepingCounter}ひきの ねこが ねています`;
-}
-
-function trackMotifStateShown(state: DayCycleState, dateKey: string) {
-  if (typeof window === "undefined") return;
-
-  try {
-    const storageKey = `${MOTIF_STATE_SHOWN_STORAGE_PREFIX}:${dateKey}:${state}`;
-    if (window.localStorage.getItem(storageKey) === "1") {
-      return;
-    }
-    window.localStorage.setItem(storageKey, "1");
-    trackProductEvent("motif_state_shown", { state });
-  } catch {
-    trackProductEvent("motif_state_shown", { state });
-  }
-}
-
-function trackSubcopyHiddenCohort(keptExchangePhotoCount: number) {
-  if (typeof window === "undefined") return;
-
-  try {
-    if (window.localStorage.getItem(SUBCOPY_HIDDEN_COHORT_STORAGE_KEY) === "1") {
-      return;
-    }
-    window.localStorage.setItem(SUBCOPY_HIDDEN_COHORT_STORAGE_KEY, "1");
-    trackProductEvent("subcopy_hidden_cohort", {
-      kept_exchange_photo_count: keptExchangePhotoCount,
-    });
-  } catch {
-    trackProductEvent("subcopy_hidden_cohort", {
-      kept_exchange_photo_count: keptExchangePhotoCount,
-    });
-  }
-}
-
 function EveningDeliveryOpening({
   state,
   catName,
   onStorageDataUrl,
-  onKeep,
+  onClose,
 }: {
   state: Extract<EveningHomeState, { kind: "delivered" }>;
   catName: string;
   onStorageDataUrl: (dataUrl: string) => void;
-  onKeep: () => void;
+  onClose: () => void;
 }) {
-  const [stage, setStage] = useState<"photo" | "pair">("photo");
-
   useEffect(() => {
-    const timer = window.setTimeout(() => {
-      setStage("pair");
-    }, 1400);
-
     trackProductEvent("envelope_shown", {
       delivery_date_key: state.dateKey,
     });
-
-    return () => window.clearTimeout(timer);
   }, [state.dateKey]);
 
   return (
     <div style={styles.eveningOpeningOverlay} aria-live="polite">
-      {stage === "photo" ? (
-        <div style={styles.eveningOpeningPhotoStage}>
-          <StoredPhotoImage
-            src={getPhotoDetailSrc(state.deliveredPhoto)}
-            alt=""
-            style={styles.eveningOpeningPhoto}
-            onStorageDataUrl={onStorageDataUrl}
-          />
-          <p style={styles.eveningOpeningCaption}>どこかの ねがお</p>
-        </div>
-      ) : (
-        <div
-          style={styles.eveningOpeningPairStage}
-          data-testid="evening-opening-pair"
-        >
-          <h2 style={styles.eveningOpeningTitle}>きょうの 2まい</h2>
-          <div style={styles.eveningOpeningPairCard}>
-            <div style={styles.sleepingPairTile}>
-              {state.targetPhoto ? (
-                <StoredPhotoImage
-                  src={getPhotoThumbnailSrc(state.targetPhoto)}
-                  alt=""
-                  style={styles.sleepingPairImage}
-                />
-              ) : null}
-              <span style={styles.sleepingPairLabel}>{catName}</span>
-            </div>
-            <span style={styles.sleepingPairDots} aria-hidden="true" />
-            <div style={styles.sleepingPairTile}>
+      <div
+        style={styles.eveningOpeningPairStage}
+        data-testid="evening-opening-pair"
+      >
+        <div style={styles.eveningOpeningPairCard}>
+          <div style={styles.sleepingPairTile}>
+            {state.targetPhoto ? (
               <StoredPhotoImage
-                src={getPhotoThumbnailSrc(state.deliveredPhoto)}
+                src={getPhotoThumbnailSrc(state.targetPhoto)}
                 alt=""
                 style={styles.sleepingPairImage}
-                onStorageDataUrl={onStorageDataUrl}
               />
-              <span style={styles.sleepingPairLabel}>どこかのこ</span>
-            </div>
+            ) : null}
+            <span style={styles.sleepingPairLabel}>{catName}</span>
           </div>
-          <AppButton type="button" fullWidth onClick={onKeep}>
-            とっておく
-          </AppButton>
+          <span style={styles.sleepingPairDots} aria-hidden="true" />
+          <div style={styles.sleepingPairTile}>
+            <StoredPhotoImage
+              src={getPhotoThumbnailSrc(state.deliveredPhoto)}
+              alt=""
+              style={styles.sleepingPairImage}
+              onStorageDataUrl={onStorageDataUrl}
+            />
+            <span style={styles.sleepingPairLabel}>どこかのこ</span>
+          </div>
         </div>
-      )}
+        <AppButton type="button" fullWidth onClick={onClose}>
+          また あした
+        </AppButton>
+      </div>
     </div>
   );
 }

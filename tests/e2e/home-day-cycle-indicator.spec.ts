@@ -7,12 +7,12 @@ const beforeEight = Date.parse("2026-06-10T10:30:00.000Z");
 const wellBeforeEight = Date.parse("2026-06-10T09:00:00.000Z");
 const afterEight = Date.parse("2026-06-10T11:10:00.000Z");
 
-test.describe("home day cycle indicator", () => {
+test.describe("home desk state cycle", () => {
   test("maps home states to day-cycle indicator classes", async ({ page }) => {
     await seedHomeState(page, { now: beforeEight });
     await page.goto("/home");
     await page.waitForLoadState("networkidle");
-    await expect(page.getByTestId("day-cycle-indicator")).toHaveAttribute(
+    await expect(page.getByTestId("home-desk-model")).toHaveAttribute(
       "data-state",
       "1",
     );
@@ -28,7 +28,7 @@ test.describe("home day cycle indicator", () => {
     });
     await page.goto("/home");
     await page.waitForLoadState("networkidle");
-    await expect(page.getByTestId("day-cycle-indicator")).toHaveAttribute(
+    await expect(page.getByTestId("home-desk-model")).toHaveAttribute(
       "data-state",
       "2",
     );
@@ -46,7 +46,7 @@ test.describe("home day cycle indicator", () => {
     });
     await page.goto("/home");
     await page.waitForLoadState("networkidle");
-    await expect(page.getByTestId("day-cycle-indicator")).toHaveAttribute(
+    await expect(page.getByTestId("home-desk-model")).toHaveAttribute(
       "data-state",
       "3",
     );
@@ -65,13 +65,13 @@ test.describe("home day cycle indicator", () => {
     });
     await page.goto("/home");
     await page.waitForLoadState("networkidle");
-    await expect(page.getByTestId("day-cycle-indicator")).toHaveAttribute(
+    await expect(page.getByTestId("home-desk-model")).toHaveAttribute(
       "data-state",
       "4",
     );
   });
 
-  test("opens delivery from the state 3 motif shortcut", async ({ page }) => {
+  test("opens delivery from the state 3 desk letter", async ({ page }) => {
     await seedHomeState(page, {
       now: afterEight,
       eveningDay: {
@@ -86,7 +86,13 @@ test.describe("home day cycle indicator", () => {
 
     await page.goto("/home");
     await page.waitForLoadState("networkidle");
-    await page.getByRole("button", { name: "ねがおがとどいています" }).click();
+    const openButton = page.getByTestId("desk-open-letter");
+    const box = await openButton.boundingBox();
+    expect(box).not.toBeNull();
+    await page.mouse.move(box!.x + box!.width / 2, box!.y + box!.height / 2);
+    await page.mouse.down();
+    await page.waitForTimeout(1700);
+    await page.mouse.up();
 
     await expect(page.getByTestId("evening-opening-pair")).toBeVisible();
   });
@@ -122,11 +128,11 @@ test.describe("home day cycle indicator", () => {
     await page.goto("/home");
     await page.waitForLoadState("networkidle");
 
-    await expect(page.getByTestId("day-cycle-indicator")).toHaveAttribute(
+    await expect(page.getByTestId("home-desk-model")).toHaveAttribute(
       "data-state",
       "1",
     );
-    await expect(page.getByText("とると、よる8じごろ とどく")).toHaveCount(0);
+    await expect(page.getByText("むぎ、ねてる?")).toHaveCount(0);
 
     await seedHomeState(page, {
       now: afterEight,
@@ -135,12 +141,12 @@ test.describe("home day cycle indicator", () => {
     await page.goto("/home");
     await page.waitForLoadState("networkidle");
 
-    await expect(page.getByTestId("day-cycle-indicator")).toHaveAttribute(
+    await expect(page.getByTestId("home-desk-model")).toHaveAttribute(
       "data-state",
       "1b",
     );
     await expect(
-      page.getByText("いまとると、あしたのよるに とどく"),
+      page.getByText("いまとると、あした よる8じに とどきます"),
     ).toBeVisible();
   });
 
@@ -209,14 +215,14 @@ test.describe("home day cycle indicator", () => {
     await page.goto("/home");
     await page.waitForLoadState("networkidle");
 
-    await expect(page.getByTestId("day-cycle-indicator")).toHaveAttribute(
+    await expect(page.getByTestId("home-desk-model")).toHaveAttribute(
       "data-state",
       "1",
     );
     await expect(page.getByText(/きょうも、.*ねこが ねています/)).toHaveCount(0);
   });
 
-  test("keeps the waiting motif separated from the photo on mobile viewports", async ({
+  test("keeps the waiting desk slots separated on mobile viewports", async ({
     page,
   }) => {
     for (const viewport of [
@@ -236,20 +242,20 @@ test.describe("home day cycle indicator", () => {
 
       await page.goto("/home");
       await page.waitForLoadState("networkidle");
-      await expect(page.getByTestId("day-cycle-indicator")).toHaveAttribute(
+      await expect(page.getByTestId("home-desk-model")).toHaveAttribute(
         "data-state",
         "2",
       );
 
-      const motifBox = await page.getByTestId("day-cycle-indicator").boundingBox();
-      const photoBox = await page.getByTestId("sleeping-today-photo-area").boundingBox();
+      const photoBox = await page.getByTestId("desk-photo-tile").first().boundingBox();
+      const letterBox = await page.getByTestId("desk-letter").boundingBox();
 
-      expect(motifBox).not.toBeNull();
       expect(photoBox).not.toBeNull();
-      const verticalGap =
-        (photoBox?.y ?? 0) - ((motifBox?.y ?? 0) + (motifBox?.height ?? 0));
+      expect(letterBox).not.toBeNull();
+      const horizontalGap =
+        (letterBox?.x ?? 0) - ((photoBox?.x ?? 0) + (photoBox?.width ?? 0));
 
-      expect(Math.round(verticalGap)).toBeGreaterThanOrEqual(16);
+      expect(Math.round(horizontalGap)).toBeGreaterThanOrEqual(16);
     }
   });
 });

@@ -16,7 +16,7 @@ const deliveredDataUrl =
   "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAGQAAABkCAYAAABw4pVUAAAAAXNSR0IArs4c6QAAAARnQU1BAACxjwv8YQUAAAAJcEhZcwAADsMAAA7DAcdvqGQAAAEJSURBVHhe7dExEcAgAMBAJKKuTpnpjoLA/fACchlrzv2C+a0njDPsVmfYrQyJMSTGkBhDYgyJMSTGkBhDYgyJMSTGkBhDYgyJMSTGkBhDYgyJMSTGkBhDYgyJMSTGkBhDYgyJMSTGkBhDYgyJMSTGkBhDYgyJMSTGkBhDYgyJMSTGkBhDYgyJMSTGkBhDYgyJMSTGkBhDYgyJMSTGkBhDYgyJMSTGkBhDYgyJMSTGkBhDYgyJMSTGkBhDYgyJMSTGkBhDYgyJMSTGkBhDYgyJMSTGkBhDYgyJMSTmB4RCEqdGtA/tAAAAAElFTkSuQmCC";
 
 test.describe("home sleeping exchange flow", () => {
-  test("saves the taken photo, waits until evening, then keeps the delivered photo", async ({
+  test("saves the taken photo, waits until evening, then opens the delivered pair", async ({
     page,
   }) => {
     let exchangeCalls = 0;
@@ -60,7 +60,7 @@ test.describe("home sleeping exchange flow", () => {
             subtitle: "",
             triggerLabel: "sleeping",
             theme: "sleeping",
-            deliveredAt: Date.now(),
+            deliveredAt: afterDelivery,
           },
           source: "remote",
           diagnostics: {
@@ -89,20 +89,33 @@ test.describe("home sleeping exchange flow", () => {
 
     await page.waitForTimeout(500);
     expect(exchangeCalls).toBe(0);
-    await expect(
-      page.getByRole("heading", { name: "おあずかり中" }),
-    ).toBeVisible();
+    await expect(page.getByTestId("home-desk-model")).toHaveAttribute(
+      "data-state",
+      "2",
+    );
 
     await page.evaluate((now) => {
       (window as typeof window & { __testNow?: number }).__testNow = now;
     }, afterDelivery);
 
     await expect.poll(() => exchangeCalls).toBe(1);
-    await expect(page.getByText("ねがおが とどいています")).toBeVisible();
-    await page.getByRole("button", { name: "ねがおをひらく" }).click();
-    await expect(page.getByText("きょうの 2まい")).toBeVisible();
+    await expect(page.getByTestId("home-desk-model")).toHaveAttribute(
+      "data-state",
+      "3",
+    );
+    const openButton = page.getByTestId("desk-open-letter");
+    const box = await openButton.boundingBox();
+    expect(box).not.toBeNull();
+    await page.mouse.move(box!.x + box!.width / 2, box!.y + box!.height / 2);
+    await page.mouse.down();
+    await page.waitForTimeout(1700);
+    await page.mouse.up();
     await expect(page.getByTestId("evening-opening-pair").locator("img")).toHaveCount(2);
-    await page.getByRole("button", { name: "とっておく" }).click();
+    await page.getByRole("button", { name: "また あした" }).click();
+    await expect(page.getByTestId("home-desk-model")).toHaveAttribute(
+      "data-state",
+      "4",
+    );
 
     const storage = await page.evaluate(() => {
       const readArray = (key: string) => {
@@ -116,14 +129,15 @@ test.describe("home sleeping exchange flow", () => {
 
       return {
         ownSleepingPhotos: readArray("nyaruhodo_exchange_own_sleeping_photos"),
-        keptExchangePhotos: readArray("nyaruhodo_exchange_kept_photos"),
+        eveningDeliveryDays: JSON.parse(
+          window.localStorage.getItem("neteruneko_evening_delivery_days") ?? "{}",
+        ),
       };
     });
 
     expect(storage.ownSleepingPhotos.length).toBeGreaterThan(0);
-    expect(storage.keptExchangePhotos.length).toBeGreaterThan(0);
     expect(storage.ownSleepingPhotos[0]?.src).toMatch(/^data:image\//);
-    expect(storage.keptExchangePhotos[0]?.src).toMatch(/^data:image\//);
+    expect(storage.eveningDeliveryDays["2026-06-10"]?.openedAt).toBeTruthy();
   });
 
   test("lets anonymous users open storage deliveries without signed-url API auth", async ({
@@ -220,7 +234,7 @@ test.describe("home sleeping exchange flow", () => {
             subtitle: "",
             triggerLabel: "sleeping",
             theme: "sleeping",
-            deliveredAt: Date.now(),
+            deliveredAt: afterDelivery,
           },
           source: "remote",
           diagnostics: {
@@ -242,7 +256,13 @@ test.describe("home sleeping exchange flow", () => {
     }, afterDelivery);
 
     await expect.poll(() => exchangeCalls).toBe(1);
-    await page.locator("main button").first().click();
+    const openButton = page.getByTestId("desk-open-letter");
+    const box = await openButton.boundingBox();
+    expect(box).not.toBeNull();
+    await page.mouse.move(box!.x + box!.width / 2, box!.y + box!.height / 2);
+    await page.mouse.down();
+    await page.waitForTimeout(1700);
+    await page.mouse.up();
     await expect(page.getByTestId("evening-opening-pair")).toBeVisible();
     await expect(page.getByTestId("evening-opening-pair").locator("img")).toHaveCount(2);
 
@@ -260,19 +280,15 @@ test.describe("home sleeping exchange flow", () => {
       )
       .toMatch(/^data:image\//);
 
-    await page.getByTestId("evening-opening-pair").locator("button").last().click();
-    await expect.poll(() => readKeptExchangePhotoCount(page)).toBe(1);
-    await page.goto("/collection");
-    await page.waitForLoadState("networkidle");
-    await expect(page.locator('main img[src^="data:image/"]')).toHaveCount(2);
-
-    await page.unroute(transientUrl);
-    await page.route(transientUrl, async (route) => {
-      await route.fulfill({ status: 404, body: "" });
+    const openedDelivery = await page.evaluate(() => {
+      const store = JSON.parse(
+        window.localStorage.getItem("neteruneko_evening_delivery_days") ?? "{}",
+      ) as Record<string, { openedAt?: number; deliveredPhoto?: { src?: string } }>;
+      return Object.values(store).find((day) => Boolean(day.deliveredPhoto));
     });
-    await page.reload();
-    await page.waitForLoadState("networkidle");
-    await expect(page.locator('main img[src^="data:image/"]')).toHaveCount(2);
+    expect(openedDelivery?.openedAt).toBeTruthy();
+
+    await page.getByTestId("evening-opening-pair").locator("button").last().click();
     expect(signedUrlCalls).toBe(0);
   });
 
@@ -333,8 +349,8 @@ test.describe("home sleeping exchange flow", () => {
     await page.waitForLoadState("networkidle");
 
     await expect(page.getByText("とると、1枚とどく", { exact: true })).toHaveCount(0);
-    await expect(page.getByText("とると、よる8じごろ とどく")).toBeVisible();
-    await expect(page.getByTestId("day-cycle-indicator")).toHaveAttribute(
+    await expect(page.getByText("よる8じに とどきます").first()).toBeVisible();
+    await expect(page.getByTestId("home-desk-model")).toHaveAttribute(
       "data-state",
       "1",
     );
@@ -348,12 +364,15 @@ test.describe("home sleeping exchange flow", () => {
     });
 
     await expect(page.locator("section").last().locator("img")).toBeVisible();
-    await expect(page.getByText(/とっておくと、よる8じごろ とどきます。/)).toBeVisible();
+    await expect(page.getByText(/よる8じに とどきます。/)).toBeVisible();
     await page.getByRole("button", { name: "とっておく" }).click();
 
     await page.waitForTimeout(500);
     expect(exchangeCalls).toBe(0);
-    await expect(page.getByText("ねがおが とどいています")).toHaveCount(0);
+    await expect(page.getByTestId("home-desk-model")).toHaveAttribute(
+      "data-state",
+      "2",
+    );
 
     const storage = await page.evaluate(() => {
       const readArray = (key: string) => {
@@ -412,7 +431,9 @@ test.describe("home sleeping exchange flow", () => {
     await page.waitForLoadState("networkidle");
 
     await expect(
-      page.getByText("いまとると、あしたのよるに とどく", { exact: true }),
+      page.getByText("いまとると、あした よる8じに とどきます", {
+        exact: true,
+      }),
     ).toBeVisible();
     await page.getByRole("button", { name: "ねがおをとる" }).click();
     await page.locator('input[type="file"]').last().setInputFiles({
@@ -422,7 +443,7 @@ test.describe("home sleeping exchange flow", () => {
     });
 
     await expect(page.locator("section").last().locator("img")).toBeVisible();
-    await expect(page.getByText(/とっておくと、あしたのよるに とどきます。/)).toBeVisible();
+    await expect(page.getByText(/あした よる8じに とどきます。/)).toBeVisible();
     await page.getByRole("button", { name: "とっておく" }).click();
     await page.waitForTimeout(500);
 
@@ -490,9 +511,11 @@ test.describe("home sleeping exchange flow", () => {
     await page.goto("/home");
     await page.waitForLoadState("networkidle");
 
-    await expect(page.getByText("ねがおが とどいています")).toHaveCount(0);
-    await expect(page.getByText("きょうの 2まい")).toHaveCount(0);
-    await expect(page.getByText("とると、よる8じごろ とどく")).toBeVisible();
+    await expect(page.getByTestId("home-desk-model")).toHaveAttribute(
+      "data-state",
+      "1",
+    );
+    await expect(page.getByText("よる8じに とどきます").first()).toBeVisible();
   });
 
   test("keeps today's kept evening delivery open on the home screen", async ({
@@ -574,7 +597,7 @@ test.describe("home sleeping exchange flow", () => {
     await page.goto("/home");
     await page.waitForLoadState("networkidle");
 
-    await expect(page.getByTestId("day-cycle-indicator")).toHaveAttribute(
+    await expect(page.getByTestId("home-desk-model")).toHaveAttribute(
       "data-state",
       "4",
     );
@@ -672,7 +695,7 @@ test.describe("home sleeping exchange flow", () => {
     await page.goto("/home");
     await page.waitForLoadState("networkidle");
 
-    await expect(page.getByTestId("day-cycle-indicator")).toHaveAttribute(
+    await expect(page.getByTestId("home-desk-model")).toHaveAttribute(
       "data-state",
       "1",
       { timeout: 15000 },
@@ -1305,7 +1328,7 @@ test.describe("home sleeping exchange flow", () => {
     for (const index of [1, 2]) {
       await page
         .getByRole("button", {
-          name: index === 1 ? "ねがおをとる" : "いまとると、アルバムに はいります",
+          name: "ねがおをとる",
         })
         .click();
       await page.locator('input[type="file"]').last().setInputFiles({
@@ -1316,6 +1339,13 @@ test.describe("home sleeping exchange flow", () => {
       await expect(page.locator("section").last().locator("img")).toBeVisible();
       await page.getByRole("button", { name: "とっておく" }).click();
       await page.waitForTimeout(500);
+      if (index === 1) {
+        await page.evaluate(() => {
+          window.localStorage.removeItem("neteruneko_evening_delivery_days");
+        });
+        await page.goto("/home");
+        await page.waitForLoadState("networkidle");
+      }
     }
 
     const storage = await page.evaluate(() => {

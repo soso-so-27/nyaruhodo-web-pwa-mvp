@@ -522,7 +522,7 @@ test.describe("collection album flow", () => {
     await expect(page.locator('button[aria-label="どこかのこを開く"]')).toHaveCount(
       1,
     );
-    await expect(page.getByText("この日は おやすみ")).toHaveCount(0);
+    await expect(page.getByText("この日の ねがおは ありません")).toHaveCount(0);
   });
 
   test("renders daily entries as opened letter cards with a missing-letter slot", async ({
@@ -595,7 +595,7 @@ test.describe("collection album flow", () => {
 
     await expect(page.getByTestId("album-daily-letter-card")).toBeVisible();
     await expect(page.getByTestId("album-daily-missing-letter")).toContainText(
-      "おたよりは ありませんでした",
+      "おたよりは とどきませんでした",
     );
     await expect(page.getByText("ほかのねがお")).toHaveCount(0);
     await expect(page.locator("main img")).toHaveCount(1);

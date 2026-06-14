@@ -448,7 +448,7 @@ export function OnboardingFlow() {
               style={styles.deliveryEnvelopeButton}
             >
               <AppIcon name="mail" size={34} />
-              そっとひらく
+              おさえて ひらく
             </button>
           </section>
         ) : null}
@@ -467,7 +467,7 @@ export function OnboardingFlow() {
 
         {state === "delivered" && deliveredPhoto ? (
           <section style={styles.result} aria-label="とどいたねがお">
-            <p style={styles.kicker}>きょうの 2まい</p>
+            <p style={styles.kicker}>きょうの2まい</p>
             {selectedPhotoSrc ? (
               <div style={styles.photoPair}>
                 <PhotoTile

@@ -54,11 +54,6 @@ import {
   type EveningDeliveryTraceEntry,
 } from "../../lib/home/eveningDeliveryTrace";
 import {
-  HOME_DESK_MODEL_ENABLED,
-  HOME_DESK_MODEL_OVERRIDE_STORAGE_KEY,
-  readHomeDeskModelOverride,
-} from "../../lib/home/homeDeskModelFlag";
-import {
   readOpenSoundEnabled,
   readSelectedOpenSoundCandidate,
   saveOpenSoundEnabled,
@@ -152,9 +147,6 @@ export function SettingsPage() {
   });
   const [billingMessage, setBillingMessage] = useState("");
   const [isBillingLoading, setIsBillingLoading] = useState(false);
-  const [homeDeskModelEnabled, setHomeDeskModelEnabled] = useState(
-    HOME_DESK_MODEL_ENABLED,
-  );
   const [openSoundEnabled, setOpenSoundEnabled] = useState(true);
   const [openSoundCandidate, setOpenSoundCandidate] =
     useState<OpenSoundCandidateId>("1");
@@ -165,9 +157,6 @@ export function SettingsPage() {
 
   useEffect(() => {
     setDisplayEnvironment(getDisplayEnvironment());
-    setHomeDeskModelEnabled(
-      readHomeDeskModelOverride() ?? HOME_DESK_MODEL_ENABLED,
-    );
     setOpenSoundEnabled(readOpenSoundEnabled());
     setOpenSoundCandidate(readSelectedOpenSoundCandidate());
     refreshKeptExchangeDebug();
@@ -183,30 +172,6 @@ export function SettingsPage() {
       setActiveSettingsTab("general");
     }
   }, [activeSettingsTab, showsAdminSection]);
-
-  function updateHomeDeskModelOverride(enabled: boolean | null) {
-    if (typeof window === "undefined") {
-      return;
-    }
-
-    try {
-      if (enabled === null) {
-        window.localStorage.removeItem(HOME_DESK_MODEL_OVERRIDE_STORAGE_KEY);
-        setHomeDeskModelEnabled(HOME_DESK_MODEL_ENABLED);
-        return;
-      }
-
-      window.localStorage.setItem(
-        HOME_DESK_MODEL_OVERRIDE_STORAGE_KEY,
-        enabled ? "1" : "0",
-      );
-      setHomeDeskModelEnabled(enabled);
-    } catch {
-      setHomeDeskModelEnabled(
-        readHomeDeskModelOverride() ?? HOME_DESK_MODEL_ENABLED,
-      );
-    }
-  }
 
   function updateOpenSoundEnabled(enabled: boolean) {
     saveOpenSoundEnabled(enabled);
@@ -852,9 +817,6 @@ export function SettingsPage() {
               <div style={styles.divider} />
               <BuildInfoPanel
                 buildSha={APP_BUILD_SHA}
-                homeDeskModelEnabled={homeDeskModelEnabled}
-                homeDeskModelDefaultEnabled={HOME_DESK_MODEL_ENABLED}
-                onSetHomeDeskModel={updateHomeDeskModelOverride}
               />
               <div style={styles.divider} />
               <div style={styles.row}>
@@ -1281,17 +1243,7 @@ function AuthDebugRow({ label, value }: { label: string; value: string }) {
   );
 }
 
-function BuildInfoPanel({
-  buildSha,
-  homeDeskModelEnabled,
-  homeDeskModelDefaultEnabled,
-  onSetHomeDeskModel,
-}: {
-  buildSha: string;
-  homeDeskModelEnabled: boolean;
-  homeDeskModelDefaultEnabled: boolean;
-  onSetHomeDeskModel: (enabled: boolean | null) => void;
-}) {
+function BuildInfoPanel({ buildSha }: { buildSha: string }) {
   return (
     <div style={styles.authDebugPanel}>
       <p style={styles.syncOverviewText}>管理用のビルド識別です。</p>
@@ -1300,49 +1252,7 @@ function BuildInfoPanel({
           label="commit"
           value={buildSha === "local" ? "local" : buildSha.slice(0, 12)}
         />
-        <AuthDebugRow
-          label="home v3"
-          value={homeDeskModelEnabled ? "on" : "off"}
-        />
-        <AuthDebugRow
-          label="default"
-          value={homeDeskModelDefaultEnabled ? "on" : "off"}
-        />
       </div>
-      <div style={styles.flagToggleGroup} aria-label="ホームv3切り替え">
-        <button
-          type="button"
-          onClick={() => onSetHomeDeskModel(true)}
-          style={{
-            ...styles.flagToggleButton,
-            ...(homeDeskModelEnabled ? styles.flagToggleButtonActive : null),
-          }}
-          aria-pressed={homeDeskModelEnabled}
-        >
-          v3を使う
-        </button>
-        <button
-          type="button"
-          onClick={() => onSetHomeDeskModel(false)}
-          style={{
-            ...styles.flagToggleButton,
-            ...(!homeDeskModelEnabled ? styles.flagToggleButtonActive : null),
-          }}
-          aria-pressed={!homeDeskModelEnabled}
-        >
-          旧ホーム
-        </button>
-      </div>
-      <button
-        type="button"
-        onClick={() => onSetHomeDeskModel(null)}
-        style={styles.secondaryButton}
-      >
-        環境設定に戻す
-      </button>
-      <p style={styles.syncOverviewText}>
-        この端末だけの切り替えです。ホームへ戻ると反映されます。
-      </p>
     </div>
   );
 }

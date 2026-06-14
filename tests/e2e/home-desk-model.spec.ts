@@ -143,14 +143,14 @@ test.describe("home desk model", () => {
     await page.goto("/home");
     await page.waitForLoadState("networkidle");
 
-    await expect(page.getByText("もうすぐ、とどく")).toHaveCount(0);
+    await expect(page.getByText("もうすぐ とどきます")).toHaveCount(0);
 
     await page.evaluate(() => {
       (window as typeof window & { __testNow?: number }).__testNow = Date.parse(
         "2026-06-10T08:00:00.000Z",
       );
     });
-    await expect(page.getByText("もうすぐ、とどく")).toBeVisible();
+    await expect(page.getByText("もうすぐ とどきます")).toBeVisible();
 
     await page.evaluate(() => {
       (window as typeof window & { __testNow?: number }).__testNow = Date.parse(
@@ -174,7 +174,7 @@ test.describe("home desk model", () => {
     await page.goto("/home");
     await page.waitForLoadState("networkidle");
 
-    await expect(page.getByText("もうすぐ、とどく")).toBeVisible();
+    await expect(page.getByText("もうすぐ とどきます")).toBeVisible();
     await page.getByTestId("desk-letter").click({ force: true });
     await expect(page.getByTestId("desk-letter-hint")).toHaveCSS("opacity", "0");
   });
@@ -195,13 +195,31 @@ test.describe("home desk model", () => {
     await page.goto("/home");
     await page.waitForLoadState("networkidle");
 
-    await expect(page.getByText("よる8じに とどきます")).toBeVisible();
+    await expect(page.getByText("よる8じに とどきます").first()).toBeVisible();
     await expect(page.getByTestId("desk-letter")).toHaveCSS("opacity", "1");
     await expect(page.getByTestId("desk-empty-frame")).toHaveCSS(
       "border-style",
       "solid",
     );
     await expect(page.getByTestId("desk-empty-frame")).toHaveCSS("cursor", "pointer");
+  });
+
+  test("shows state1b as tomorrow capture without an exchange letter", async ({
+    page,
+  }) => {
+    await seedDeskState(page, "1b");
+    await page.goto("/home");
+    await page.waitForLoadState("networkidle");
+
+    await expect(page.getByTestId("home-desk-model")).toHaveAttribute(
+      "data-state",
+      "1b",
+    );
+    await expect(page.getByTestId("desk-empty-frame")).toBeVisible();
+    await expect(page.getByTestId("desk-letter")).toHaveCount(0);
+    await expect(
+      page.getByText("いまとると、あした よる8じに とどきます"),
+    ).toBeVisible();
   });
 
   test("keeps the left desk slot size stable before and after taking a photo", async ({

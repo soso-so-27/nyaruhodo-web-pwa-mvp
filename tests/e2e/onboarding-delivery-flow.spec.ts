@@ -186,7 +186,7 @@ test.describe("onboarding delivery flow", () => {
     });
     await expect(page.getByText("ねがおが")).toBeVisible();
     await expect(page.getByText("とどいています")).toBeVisible();
-    await page.getByRole("button", { name: "そっとひらく" }).click();
+    await page.getByRole("button", { name: "おさえて ひらく" }).click();
     await expect(page.getByText("どこかの ねがお")).toBeVisible();
     await page.waitForTimeout(1600);
     await expectVisibleNonBlackImage(page.locator("main img").last());
@@ -256,8 +256,8 @@ test.describe("onboarding delivery flow", () => {
       buffer: testPng,
     });
 
-    await expect(page.getByRole("button", { name: "そっとひらく" })).toBeVisible();
-    await page.getByRole("button", { name: "そっとひらく" }).click();
+    await expect(page.getByRole("button", { name: "おさえて ひらく" })).toBeVisible();
+    await page.getByRole("button", { name: "おさえて ひらく" }).click();
     await page.waitForTimeout(1600);
     await expect(
       page.getByRole("button", { name: "この2枚をとっておく" }),
