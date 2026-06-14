@@ -1,6 +1,41 @@
 import "./globals.css";
 import type { Metadata, Viewport } from "next";
+import localFont from "next/font/local";
 import { AppAnalyticsTracker } from "../components/analytics/AppAnalyticsTracker";
+
+const kleeOne = localFont({
+  src: [
+    {
+      path: "../../public/fonts/klee-one-400-subset.woff2",
+      weight: "400",
+      style: "normal",
+    },
+    {
+      path: "../../public/fonts/klee-one-600-subset.woff2",
+      weight: "600",
+      style: "normal",
+    },
+  ],
+  variable: "--font-klee-one",
+  display: "swap",
+});
+
+const zenKakuGothicNew = localFont({
+  src: [
+    {
+      path: "../../public/fonts/zen-kaku-gothic-new-400-subset.woff2",
+      weight: "400",
+      style: "normal",
+    },
+    {
+      path: "../../public/fonts/zen-kaku-gothic-new-500-subset.woff2",
+      weight: "500",
+      style: "normal",
+    },
+  ],
+  variable: "--font-zen-kaku",
+  display: "swap",
+});
 
 export const metadata: Metadata = {
   metadataBase: new URL(
@@ -37,7 +72,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="ja">
+    <html lang="ja" className={`${kleeOne.variable} ${zenKakuGothicNew.variable}`}>
       <head>
         <meta name="apple-mobile-web-app-capable" content="yes" />
         <meta

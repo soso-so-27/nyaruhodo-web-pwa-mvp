@@ -6,3 +6,5 @@ tsconfig.tsbuildinfo
 supabase/.temp/
 playwright-report/
 test-results/
+scripts/fonts/src/
+scripts/fonts/.build/
