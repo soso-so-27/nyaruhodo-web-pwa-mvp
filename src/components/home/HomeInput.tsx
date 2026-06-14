@@ -2922,7 +2922,7 @@ function HomeInstallHintCard({
 
   return (
     <AppCard
-      variant="soft"
+      variant="floating"
       padding="md"
       style={styles.homeInstallHintCard}
       aria-label="ホーム画面に追加"
@@ -5086,12 +5086,6 @@ const styles = {
     alignItems: "center",
     gap: "11px",
     padding: "11px 12px 11px 14px",
-    borderRadius: "var(--radius-xl)",
-    border: "1px solid rgba(144,126,102,0.075)",
-    background:
-      "linear-gradient(145deg, rgba(255,253,248,0.68), rgba(249,245,238,0.46))",
-    boxShadow:
-      "0 4px 12px rgba(90,76,60,0.032), inset 0 1px 0 rgba(255,255,255,0.42)",
     backdropFilter: "blur(16px)",
     WebkitBackdropFilter: "blur(16px)",
   },

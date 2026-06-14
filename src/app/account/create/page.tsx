@@ -11,7 +11,6 @@ import {
   APP_ACCENT,
   APP_PAGE_BACKGROUND,
   APP_SUBTLE_SURFACE,
-  APP_SURFACE,
 } from "../../../components/ui/appTheme";
 import { STORAGE_KEYS } from "../../../lib/storage";
 import { trackProductEvent } from "../../../lib/analytics/productAnalytics";
@@ -354,7 +353,7 @@ export default function AccountCreatePage() {
     <main style={styles.page}>
       <div style={styles.container}>
         {isFromOnboarding ? <WordmarkHeader style={styles.wordmarkHeader} /> : null}
-        <AppCard variant="paper" padding="lg" style={styles.card}>
+        <AppCard variant="section" padding="lg" style={styles.card}>
           {isAccountConnected ? (
             <>
               <p style={styles.eyebrow}>アカウント</p>
@@ -580,10 +579,7 @@ const styles = {
     paddingTop: "calc(10px + env(safe-area-inset-top))",
   },
   card: {
-    ...APP_SURFACE,
-    borderRadius: "var(--radius-2xl)",
     padding: "26px 22px 22px",
-    boxShadow: "0 5px 14px rgba(52, 50, 46, 0.035), inset 0 1px 0 rgba(255,255,255,0.34)",
   },
   eyebrow: {
     margin: "0 0 10px",

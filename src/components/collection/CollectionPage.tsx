@@ -778,7 +778,7 @@ export function CollectionPage() {
       <main style={styles.page}>
         <PageBackdrop />
         <div style={styles.container}>
-          <AppCard variant="soft" padding="lg" style={styles.emptyCard}>
+          <AppCard variant="section" padding="lg" style={styles.emptyCard}>
             <h1 style={styles.emptyTitle}>アルバム</h1>
             <p style={styles.emptyText}>準備しています</p>
           </AppCard>
@@ -793,7 +793,7 @@ export function CollectionPage() {
       <main style={styles.page}>
         <PageBackdrop />
         <div style={styles.container}>
-          <AppCard variant="soft" padding="lg" style={styles.emptyCard}>
+          <AppCard variant="section" padding="lg" style={styles.emptyCard}>
             <h1 style={styles.emptyTitle}>アルバム</h1>
             <p style={styles.emptyText}>一緒に暮らしている猫を登録しましょう</p>
             <AppButton href="/cats" variant="primary" fullWidth>
@@ -4223,8 +4223,6 @@ const styles = {
     WebkitBackdropFilter: "blur(18px)",
   },
   emptyCard: {
-    ...COLLECTION_SURFACE,
-    borderRadius: "var(--radius-2xl)",
     padding: "20px",
   },
   emptyTitle: {

@@ -120,7 +120,7 @@ export default function BetaSupporterPage() {
         </AppButton>
         <AppHeader variant="pageTitle" title="ねてるねこ" />
 
-        <AppCard variant="soft" padding="xl" style={styles.hero}>
+        <AppCard variant="section" padding="xl" style={styles.hero}>
           <p style={styles.kicker}>βサポーター</p>
           <h1 style={styles.title}>これからのねてるねこ</h1>
           <p style={styles.lead}>
@@ -131,7 +131,7 @@ export default function BetaSupporterPage() {
           </p>
         </AppCard>
 
-        <AppCard variant="soft" padding="lg" style={styles.card}>
+        <AppCard variant="section" padding="lg" style={styles.card}>
           <ul style={styles.dreamList}>
             {dreams.map((dream) => (
               <li key={dream.text} style={styles.dreamItem}>
@@ -154,7 +154,7 @@ export default function BetaSupporterPage() {
           <p style={styles.closing}>できたものから、みんなに届きます。</p>
         </AppCard>
 
-        <AppCard variant="soft" padding="lg" style={styles.card}>
+        <AppCard variant="section" padding="lg" style={styles.card}>
           <p style={styles.price}>月 1,480円</p>
           <p style={styles.note}>
             機能は何も制限しません。

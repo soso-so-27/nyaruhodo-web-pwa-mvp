@@ -593,7 +593,7 @@ export function SettingsPage() {
           <>
         <section style={{ ...styles.section, order: 2 }}>
           <p style={styles.sectionLabel}>保存とデータ</p>
-          <AppCard variant="soft" padding="sm" style={styles.card}>
+          <AppCard variant="section" padding="sm" style={styles.card}>
             <div style={styles.row}>
               <span style={styles.rowLabel}>
                 {getDisplayEnvironmentLabel(displayEnvironment)}
@@ -662,7 +662,7 @@ export function SettingsPage() {
 
         <section style={{ ...styles.section, order: 1 }}>
           <p style={styles.sectionLabel}>アカウント</p>
-          <AppCard variant="soft" padding="sm" style={styles.card}>
+          <AppCard variant="section" padding="sm" style={styles.card}>
             {isLoading ? (
               <p style={styles.loadingText}>確認中...</p>
             ) : isLoggedIn ? (
@@ -703,7 +703,7 @@ export function SettingsPage() {
 
         <section style={{ ...styles.section, order: 4 }}>
           <p style={styles.sectionLabel}>音</p>
-          <AppCard variant="soft" padding="sm" style={styles.card}>
+          <AppCard variant="section" padding="sm" style={styles.card}>
             <div style={styles.row}>
               <div style={styles.rowLeft}>
                 <span style={styles.rowLabel}>ひらく音</span>
@@ -726,7 +726,7 @@ export function SettingsPage() {
 
         <section style={{ ...styles.section, order: 5 }}>
           <p style={styles.sectionLabel}>βサポーターについて</p>
-          <AppCard variant="soft" padding="sm" style={{ ...styles.card, ...styles.betaCard }}>
+          <AppCard variant="section" padding="sm" style={{ ...styles.card, ...styles.betaCard }}>
             {betaCapabilities.feedbackEnabled ? (
               <>
                 <div style={styles.betaNote}>
@@ -932,7 +932,7 @@ export function SettingsPage() {
           <>
         <section style={{ ...styles.section, order: 3 }}>
           <p style={styles.sectionLabel}>サポート・規約</p>
-          <AppCard variant="soft" padding="sm" style={styles.card}>
+          <AppCard variant="section" padding="sm" style={styles.card}>
             <a href="/how-to-use" style={styles.linkRow}>
               <span style={styles.rowLabel}>使い方</span>
               <span style={styles.rowChevron}>›</span>
@@ -967,7 +967,7 @@ export function SettingsPage() {
 
         <section style={{ ...styles.section, order: 4 }}>
           <p style={styles.sectionLabel}>アプリ情報</p>
-          <AppCard variant="soft" padding="sm" style={styles.card}>
+          <AppCard variant="section" padding="sm" style={styles.card}>
             <div style={styles.row}>
               <span style={styles.rowLabel}>バージョン</span>
               <span style={styles.rowValue}>1.0.0-beta.4</span>
@@ -1954,15 +1954,9 @@ const styles = {
     letterSpacing: "0.08em",
   },
   card: {
-    borderRadius: "var(--radius-lg)",
     padding: "2px 14px",
-    background: "rgba(255,253,248,0.58)",
-    border: "1px solid rgba(120,108,94,0.10)",
-    boxShadow: "0 4px 12px rgba(90,76,60,0.025)",
   },
-  betaCard: {
-    background: "rgba(255,253,248,0.50)",
-  },
+  betaCard: {},
   adminSection: {
     marginTop: "8px",
   },

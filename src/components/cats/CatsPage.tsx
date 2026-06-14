@@ -393,7 +393,7 @@ export function CatsPage() {
 
         {isOnboardingMode ? (
           <AppCard
-            variant="soft"
+            variant="section"
             padding="md"
             style={styles.onboardingPanel}
             aria-label="オンボーディング"
@@ -1481,12 +1481,9 @@ const styles = {
     lineHeight: 1.6,
   },
   onboardingPanel: {
-    ...CATS_SURFACE_SOFT,
-    borderRadius: "var(--radius-xl)",
     padding: "20px 18px 18px",
     marginBottom: "22px",
     textAlign: "center",
-    boxShadow: "var(--shadow-e1)",
   },
   onboardingKicker: {
     margin: "0 0 8px",
