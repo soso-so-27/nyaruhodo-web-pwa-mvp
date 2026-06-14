@@ -27,24 +27,28 @@ OUTPUTS = [
         "output": "klee-one-400-subset.woff2",
         "text_files": ["klee-one-glyphs.txt"],
         "include_app_text": False,
+        "include_home_text": True,
     },
     {
         "source": "KleeOne-SemiBold.ttf",
         "output": "klee-one-600-subset.woff2",
         "text_files": ["klee-one-glyphs.txt"],
         "include_app_text": False,
+        "include_home_text": True,
     },
     {
         "source": "ZenKakuGothicNew-Regular.ttf",
         "output": "zen-kaku-gothic-new-400-subset.woff2",
         "text_files": ["joyo.txt", "jinmeiyo.txt"],
         "include_app_text": True,
+        "include_home_text": False,
     },
     {
         "source": "ZenKakuGothicNew-Medium.ttf",
         "output": "zen-kaku-gothic-new-500-subset.woff2",
         "text_files": ["joyo.txt", "jinmeiyo.txt"],
         "include_app_text": True,
+        "include_home_text": False,
     },
 ]
 
@@ -66,6 +70,11 @@ APP_TEXT_GLOBS = [
     "src/components/**/*.{ts,tsx,css}",
     "src/lib/**/*.{ts,tsx}",
     "docs/**/*.{md,html}",
+]
+
+KLEE_HOME_TEXT_GLOBS = [
+    "src/components/home/HomeDeskModel.tsx",
+    "src/components/navigation/BottomNavigation.tsx",
 ]
 
 IGNORED_PARTS = {
@@ -101,9 +110,9 @@ def ensure_sources(src_dir: Path, out_dir: Path) -> None:
         download(OFL_URL, ofl_path)
 
 
-def app_source_files() -> list[Path]:
+def source_files(patterns: list[str]) -> list[Path]:
     files: set[Path] = set()
-    for pattern in APP_TEXT_GLOBS:
+    for pattern in patterns:
         files.update(ROOT.glob(pattern))
     return sorted(
         path
@@ -112,9 +121,9 @@ def app_source_files() -> list[Path]:
     )
 
 
-def collect_app_text(destination: Path) -> None:
+def collect_text(destination: Path, patterns: list[str]) -> None:
     chars: set[str] = set()
-    for path in app_source_files():
+    for path in source_files(patterns):
         try:
             text = path.read_text(encoding="utf-8")
         except UnicodeDecodeError:
@@ -124,9 +133,17 @@ def collect_app_text(destination: Path) -> None:
 
 
 def combined_text_file(
-    names: list[str], app_text: Path, destination: Path, *, include_app_text: bool
+    names: list[str],
+    app_text: Path,
+    home_text: Path,
+    destination: Path,
+    *,
+    include_app_text: bool,
+    include_home_text: bool,
 ) -> None:
     chars: set[str] = set(app_text.read_text(encoding="utf-8")) if include_app_text else set()
+    if include_home_text:
+        chars.update(home_text.read_text(encoding="utf-8"))
     for name in names:
         chars.update((FONT_DIR / name).read_text(encoding="utf-8"))
     destination.write_text("".join(sorted(chars)), encoding="utf-8")
@@ -174,15 +191,19 @@ def main() -> None:
     build_dir = FONT_DIR / ".build"
     build_dir.mkdir(parents=True, exist_ok=True)
     app_text = build_dir / "app-text.txt"
-    collect_app_text(app_text)
+    collect_text(app_text, APP_TEXT_GLOBS)
+    home_text = build_dir / "klee-home-text.txt"
+    collect_text(home_text, KLEE_HOME_TEXT_GLOBS)
 
     for item in OUTPUTS:
         text_file = build_dir / f"{Path(item['output']).stem}.txt"
         combined_text_file(
             item["text_files"],
             app_text,
+            home_text,
             text_file,
             include_app_text=item["include_app_text"],
+            include_home_text=item["include_home_text"],
         )
         subset_font(args.src_dir / item["source"], args.out_dir / item["output"], text_file)
 

@@ -39,8 +39,9 @@ committed runtime artifact.
 
 The generator also scans app source files and includes fixed copy characters for
 Zen Kaku Gothic New so that app-specific text is not missed. Klee One does not
-use this broad source scan; add display-copy text to `klee-one-glyphs.txt` before
-regenerating if Step C expands where `--font-display` is used.
+use this broad source scan; it only adds the current home/nav display-copy files
+plus `klee-one-glyphs.txt`. Add display-copy text to `klee-one-glyphs.txt` before
+regenerating if Step C expands where `--font-display` is used beyond home.
 
 ## Regenerate
 
