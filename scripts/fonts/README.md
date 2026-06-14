@@ -32,11 +32,15 @@ committed runtime artifact.
 
 ## Character sets
 
+- `klee-one-glyphs.txt`: curated display-copy text for Klee One. Klee One is
+  intentionally narrow and does not include the full Joyo set.
 - `joyo.txt`: Joyo kanji list from `joyo-kanji@0.2.1` (MIT).
 - `jinmeiyo.txt`: Jinmeiyo kanji list from `jinmeiyo-kanji@1.0.0` (MIT).
 
-The generator also scans app source files and includes fixed copy characters so
-that app-specific text is not missed.
+The generator also scans app source files and includes fixed copy characters for
+Zen Kaku Gothic New so that app-specific text is not missed. Klee One does not
+use this broad source scan; add display-copy text to `klee-one-glyphs.txt` before
+regenerating if Step C expands where `--font-display` is used.
 
 ## Regenerate
 

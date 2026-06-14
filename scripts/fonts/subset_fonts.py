@@ -25,22 +25,26 @@ OUTPUTS = [
     {
         "source": "KleeOne-Regular.ttf",
         "output": "klee-one-400-subset.woff2",
-        "text_files": ["joyo.txt"],
+        "text_files": ["klee-one-glyphs.txt"],
+        "include_app_text": False,
     },
     {
         "source": "KleeOne-SemiBold.ttf",
         "output": "klee-one-600-subset.woff2",
-        "text_files": ["joyo.txt"],
+        "text_files": ["klee-one-glyphs.txt"],
+        "include_app_text": False,
     },
     {
         "source": "ZenKakuGothicNew-Regular.ttf",
         "output": "zen-kaku-gothic-new-400-subset.woff2",
         "text_files": ["joyo.txt", "jinmeiyo.txt"],
+        "include_app_text": True,
     },
     {
         "source": "ZenKakuGothicNew-Medium.ttf",
         "output": "zen-kaku-gothic-new-500-subset.woff2",
         "text_files": ["joyo.txt", "jinmeiyo.txt"],
+        "include_app_text": True,
     },
 ]
 
@@ -119,8 +123,10 @@ def collect_app_text(destination: Path) -> None:
     destination.write_text("".join(sorted(chars)), encoding="utf-8")
 
 
-def combined_text_file(names: list[str], app_text: Path, destination: Path) -> None:
-    chars: set[str] = set(app_text.read_text(encoding="utf-8"))
+def combined_text_file(
+    names: list[str], app_text: Path, destination: Path, *, include_app_text: bool
+) -> None:
+    chars: set[str] = set(app_text.read_text(encoding="utf-8")) if include_app_text else set()
     for name in names:
         chars.update((FONT_DIR / name).read_text(encoding="utf-8"))
     destination.write_text("".join(sorted(chars)), encoding="utf-8")
@@ -172,7 +178,12 @@ def main() -> None:
 
     for item in OUTPUTS:
         text_file = build_dir / f"{Path(item['output']).stem}.txt"
-        combined_text_file(item["text_files"], app_text, text_file)
+        combined_text_file(
+            item["text_files"],
+            app_text,
+            text_file,
+            include_app_text=item["include_app_text"],
+        )
         subset_font(args.src_dir / item["source"], args.out_dir / item["output"], text_file)
 
     for item in OUTPUTS:
