@@ -1190,7 +1190,7 @@ function AuthDebugPanel({ snapshot }: { snapshot: AuthDebugSnapshot | null }) {
     : "";
 
   return (
-    <div style={styles.authDebugPanel}>
+    <AppCard as="div" variant="inset" padding="sm" style={styles.authDebugPanel}>
       <p style={styles.syncOverviewText}>
         実機でログインが続かない原因を見るための一時表示です。
       </p>
@@ -1237,7 +1237,7 @@ function AuthDebugPanel({ snapshot }: { snapshot: AuthDebugSnapshot | null }) {
           }
         />
       </div>
-    </div>
+    </AppCard>
   );
 }
 
@@ -1252,7 +1252,7 @@ function AuthDebugRow({ label, value }: { label: string; value: string }) {
 
 function BuildInfoPanel({ buildSha }: { buildSha: string }) {
   return (
-    <div style={styles.authDebugPanel}>
+    <AppCard as="div" variant="inset" padding="sm" style={styles.authDebugPanel}>
       <p style={styles.syncOverviewText}>管理用のビルド識別です。</p>
       <div style={styles.authDebugRows}>
         <AuthDebugRow
@@ -1260,7 +1260,7 @@ function BuildInfoPanel({ buildSha }: { buildSha: string }) {
           value={buildSha === "local" ? "local" : buildSha.slice(0, 12)}
         />
       </div>
-    </div>
+    </AppCard>
   );
 }
 
@@ -1271,18 +1271,18 @@ function EveningDeliveryTracePanel({
 }) {
   if (entries.length === 0) {
     return (
-      <div style={styles.authDebugPanel}>
+      <AppCard as="div" variant="inset" padding="sm" style={styles.authDebugPanel}>
         <p style={styles.syncOverviewText}>
           配達トレースはまだありません。ホームを開くと直近20件まで記録されます。
         </p>
-      </div>
+      </AppCard>
     );
   }
 
   const latest = entries[0];
 
   return (
-    <div style={styles.authDebugPanel}>
+    <AppCard as="div" variant="inset" padding="sm" style={styles.authDebugPanel}>
       <p style={styles.syncOverviewText}>
         配達effectの直近ゲートです。写真データや秘密情報は保存しません。
       </p>
@@ -1348,7 +1348,7 @@ function EveningDeliveryTracePanel({
         />
         <AuthDebugRow label="件数" value={`${entries.length}件`} />
       </div>
-    </div>
+    </AppCard>
   );
 }
 
@@ -1359,16 +1359,16 @@ function DeliveryDiagnosticsPanel({
 }) {
   if (!diagnostics) {
     return (
-      <div style={styles.authDebugPanel}>
+      <AppCard as="div" variant="inset" padding="sm" style={styles.authDebugPanel}>
         <p style={styles.syncOverviewText}>
           とどく候補の状態をまだ確認していません。
         </p>
-      </div>
+      </AppCard>
     );
   }
 
   return (
-    <div style={styles.authDebugPanel}>
+    <AppCard as="div" variant="inset" padding="sm" style={styles.authDebugPanel}>
       <p style={styles.syncOverviewText}>
         とどく候補はSupabaseだけを見ています。localStorageの候補は使いません。
       </p>
@@ -1410,13 +1410,13 @@ function DeliveryDiagnosticsPanel({
           <AuthDebugRow label="エラー" value={diagnostics.lastError} />
         ) : null}
       </div>
-    </div>
+    </AppCard>
   );
 }
 
 function PhotoReportsPanel({ reports }: { reports: PhotoReportSummary[] }) {
   return (
-    <div style={styles.authDebugPanel}>
+    <AppCard as="div" variant="inset" padding="sm" style={styles.authDebugPanel}>
       <p style={styles.syncOverviewText}>
         報告された写真の直近一覧です。2件以上の報告で配達プールから外れます。
       </p>
@@ -1432,7 +1432,7 @@ function PhotoReportsPanel({ reports }: { reports: PhotoReportSummary[] }) {
           />
         ))}
       </div>
-    </div>
+    </AppCard>
   );
 }
 
@@ -1448,7 +1448,7 @@ function ModerationQueuePanel({
   onDecide: (momentId: string, decision: "approved" | "rejected") => void;
 }) {
   return (
-    <div style={styles.authDebugPanel}>
+    <AppCard as="div" variant="inset" padding="sm" style={styles.authDebugPanel}>
       <p style={styles.syncOverviewText}>
         配達プールに入る前の写真を確認します。承認したものだけが候補になります。
       </p>
@@ -1494,7 +1494,7 @@ function ModerationQueuePanel({
           </div>
         </div>
       ))}
-    </div>
+    </AppCard>
   );
 }
 
@@ -1505,16 +1505,16 @@ function KeptExchangeDebugPanel({
 }) {
   if (!debug) {
     return (
-      <div style={styles.authDebugPanel}>
+      <AppCard as="div" variant="inset" padding="sm" style={styles.authDebugPanel}>
         <p style={styles.syncOverviewText}>
           とどいたねがおの保存状態をまだ確認していません。
         </p>
-      </div>
+      </AppCard>
     );
   }
 
   return (
-    <div style={styles.authDebugPanel}>
+    <AppCard as="div" variant="inset" padding="sm" style={styles.authDebugPanel}>
       <p style={styles.syncOverviewText}>
         アルバムに出る「とどいたねがお」の端末内保存状態です。
       </p>
@@ -1535,7 +1535,7 @@ function KeptExchangeDebugPanel({
           <AuthDebugRow label="エラー" value={debug.parseError} />
         ) : null}
       </div>
-    </div>
+    </AppCard>
   );
 }
 
@@ -1751,14 +1751,14 @@ function SyncResultDetails({
         </p>
       )}
       {result.errors.length > 0 ? (
-        <div style={styles.syncErrorBox}>
+        <AppCard as="div" variant="inset" padding="sm" style={styles.syncErrorBox}>
           <p style={styles.syncErrorTitle}>確認が必要です</p>
           {result.errors.slice(0, 3).map((error, index) => (
             <p key={`${error}-${index}`} style={styles.syncErrorText}>
               {formatSyncError(error)}
             </p>
           ))}
-        </div>
+        </AppCard>
       ) : null}
     </div>
   );
@@ -2083,10 +2083,8 @@ const styles = {
   },
   syncErrorBox: {
     marginTop: "2px",
-    borderRadius: "var(--radius-md)",
-    background: "#fff7ee",
-    border: "1px solid #f0d9bf",
-    padding: "9px 10px",
+    display: "grid",
+    gap: "6px",
   },
   syncErrorTitle: {
     margin: "0 0 4px",
@@ -2153,7 +2151,6 @@ const styles = {
     lineHeight: 1.5,
   },
   authDebugPanel: {
-    padding: "14px 0",
     display: "grid",
     gap: "12px",
   },

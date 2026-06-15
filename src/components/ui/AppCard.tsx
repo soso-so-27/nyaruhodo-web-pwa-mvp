@@ -5,7 +5,7 @@ import { color, radius, shadow, spacing } from "./designTokens";
 
 type AppCardVariant = "section" | "outlined" | "inset" | "floating";
 type AppCardPadding = "none" | "sm" | "md" | "standard" | "lg" | "xl";
-type AppCardElement = "section" | "article" | "div";
+type AppCardElement = "section" | "article" | "div" | "button";
 
 type AppCardProps = {
   as?: AppCardElement;
@@ -20,7 +20,8 @@ type AppCardProps = {
    */
   style?: CSSProperties;
   className?: string;
-} & Omit<HTMLAttributes<HTMLElement>, "children" | "style" | "className">;
+  type?: "button" | "submit" | "reset";
+} & Omit<HTMLAttributes<HTMLElement>, "children" | "style" | "className" | "type">;
 
 export function AppCard({
   as: Element = "section",

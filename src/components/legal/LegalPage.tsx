@@ -1,11 +1,9 @@
 "use client";
 
 import type { CSSProperties } from "react";
-import {
-  APP_PAGE_BACKGROUND,
-  APP_SURFACE,
-} from "../ui/appTheme";
+import { APP_PAGE_BACKGROUND } from "../ui/appTheme";
 import { AppButton } from "../ui/AppButton";
+import { AppCard } from "../ui/AppCard";
 
 type LegalSection = {
   title: string;
@@ -313,7 +311,7 @@ function LegalPage({ title, lead, updatedAt, sections }: LegalPageProps) {
 
         <p style={styles.lead}>{lead}</p>
 
-        <div style={styles.card}>
+        <AppCard variant="section" padding="standard">
           {sections.map((section, sectionIndex) => (
             <section key={section.title} style={styles.section}>
               <h2 style={styles.sectionTitle}>{section.title}</h2>
@@ -334,7 +332,7 @@ function LegalPage({ title, lead, updatedAt, sections }: LegalPageProps) {
               {sectionIndex < sections.length - 1 ? <div style={styles.divider} /> : null}
             </section>
           ))}
-        </div>
+        </AppCard>
 
         <p style={styles.note}>
           このページはベータ版公開に向けた暫定版です。正式公開前に内容を更新することがあります。
@@ -377,11 +375,6 @@ const styles = {
     lineHeight: 1.75,
     color: "#6a6a62",
     margin: "0 0 14px",
-  },
-  card: {
-    ...APP_SURFACE,
-    borderRadius: "var(--radius-xl)",
-    padding: "4px 16px",
   },
   section: {
     padding: "14px 0",

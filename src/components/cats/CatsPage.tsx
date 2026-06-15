@@ -428,7 +428,7 @@ export function CatsPage() {
         ) : null}
 
         {isAddingCat && !isOnboardingCompletionView ? (
-          <div style={styles.editor}>
+          <AppCard as="div" variant="inset" padding="sm" style={styles.editor}>
             <label style={styles.label} htmlFor="new-cat-name">
               {"この子の名前"}
             </label>
@@ -466,11 +466,13 @@ export function CatsPage() {
                 {"キャンセル"}
               </AppButton>
             </div>
-          </div>
+          </AppCard>
         ) : null}
 
         {activeCatProfile && !isOnboardingCompletionView ? (
-          <div
+          <AppCard
+            variant="section"
+            padding="standard"
             style={
               isOnboardingProfileSetup
                 ? styles.profileCard
@@ -547,7 +549,7 @@ export function CatsPage() {
 
                 <hr style={styles.divider} />
 
-                <div style={styles.familyHero}>
+                <AppCard as="div" variant="inset" padding="md" style={styles.familyHero}>
                   <span style={styles.familyHeroLabel}>家族になって</span>
                   <span style={styles.familyHeroDays}>{familyDuration.primary}</span>
                   {familyDuration.secondary ? (
@@ -555,9 +557,9 @@ export function CatsPage() {
                       {familyDuration.secondary}
                     </span>
                   ) : null}
-                </div>
+                </AppCard>
 
-                <div style={styles.recordList}>
+                <AppCard as="div" variant="inset" padding="sm" style={styles.recordList}>
                   <div style={styles.recordRow}>
                     <span style={styles.recordLabel}>
                       {getCurrentSeasonCountLabel(
@@ -586,7 +588,7 @@ export function CatsPage() {
                       迎えた日から
                     </span>
                   </div>
-                </div>
+                </AppCard>
                 {birthdayStatus ? (
                   <div
                     style={
@@ -647,7 +649,7 @@ export function CatsPage() {
                     setOmoideRefreshTick((value) => value + 1);
                   }}
                 />
-                <section style={styles.daysThread}>
+                <AppCard as="section" variant="section" padding="md" style={styles.daysThread}>
                   <p style={styles.bunbakoSectionTitle}>{catName}との 日々</p>
                   <div style={styles.threadLine}>
                     <div style={styles.threadNode}>
@@ -667,7 +669,7 @@ export function CatsPage() {
                       </span>
                     </div>
                   </div>
-                </section>
+                </AppCard>
                 {!activeCatProfile.basicInfo?.familySinceDate &&
                 !activeCatProfile.basicInfo?.birthDate &&
                 !activeCatProfile.basicInfo?.breed &&
@@ -684,7 +686,7 @@ export function CatsPage() {
               <>
                 {!isOnboardingProfileSetup ? <hr style={styles.divider} /> : null}
                 {isEditingCatName ? (
-                  <div style={styles.editor}>
+                  <AppCard as="div" variant="inset" padding="sm" style={styles.editor}>
                     <label style={styles.label} htmlFor="cat-name">
                       {"この子の名前"}
                     </label>
@@ -768,7 +770,7 @@ export function CatsPage() {
                         </AppButton>
                       )}
                     </div>
-                  </div>
+                  </AppCard>
                 ) : null}
 
                 {!isOnboardingProfileSetup ? (
@@ -779,7 +781,7 @@ export function CatsPage() {
                 ) : null}
               </>
             ) : null}
-          </div>
+          </AppCard>
         ) : null}
 
         {message ? <p style={styles.message}>{message}</p> : null}
@@ -867,7 +869,12 @@ function FootprintCard({ milestone }: { milestone: CatSleepingMilestone }) {
   const isReached = Boolean(milestone.src && milestone.reachedAt);
 
   return (
-    <div style={isReached ? styles.footprintCard : styles.footprintCardEmpty}>
+    <AppCard
+      as="div"
+      variant={isReached ? "inset" : "outlined"}
+      padding="sm"
+      style={isReached ? styles.footprintCard : styles.footprintCardEmpty}
+    >
       <div style={styles.footprintHeader}>
         <span style={styles.footprintName}>
           {getFootprintMilestoneTitle(milestone.target)}
@@ -887,7 +894,7 @@ function FootprintCard({ milestone }: { milestone: CatSleepingMilestone }) {
       ) : (
         <div style={styles.footprintPlaceholder} aria-hidden="true" />
       )}
-    </div>
+    </AppCard>
   );
 }
 
@@ -909,7 +916,13 @@ function OmoideBunbako({
   const [isControlsOpen, setIsControlsOpen] = useState(false);
 
   return (
-    <section style={styles.bunbakoSection} data-testid="omoide-bunbako">
+    <AppCard
+      as="section"
+      variant="section"
+      padding="md"
+      style={styles.bunbakoSection}
+      data-testid="omoide-bunbako"
+    >
       <div style={styles.bunbakoHeader}>
         <div>
           <p style={styles.bunbakoSectionTitle}>とどいた思い出</p>
@@ -994,7 +1007,7 @@ function OmoideBunbako({
           </div>
         </AppBottomSheet>
       ) : null}
-    </section>
+    </AppCard>
   );
 }
 
@@ -1141,7 +1154,7 @@ function CoatSelector({
   onSelect: (coat: CatCoat) => void;
 }) {
   return (
-    <div style={styles.coatSection}>
+    <AppCard as="div" variant="inset" padding="sm" style={styles.coatSection}>
       <div style={styles.coatHeader}>
         <p style={styles.sectionLabel}>{"毛色"}</p>
       </div>
@@ -1179,7 +1192,7 @@ function CoatSelector({
           );
         })}
       </div>
-    </div>
+    </AppCard>
   );
 }
 
@@ -1531,17 +1544,10 @@ const styles = {
     marginTop: "18px",
   },
   profileCard: {
-    ...CATS_SURFACE,
-    borderRadius: "var(--radius-xl)",
-    padding: "18px 17px",
     marginBottom: "12px",
   },
   profilePlaceCard: {
-    ...CATS_SURFACE_SOFT,
-    borderRadius: "var(--radius-xl)",
-    padding: "17px 16px 16px",
     marginBottom: "12px",
-    boxShadow: "var(--shadow-e1)",
   },
   profileHero: {
     display: "grid",
@@ -1610,10 +1616,6 @@ const styles = {
     justifyItems: "center",
     gap: "4px",
     marginBottom: "14px",
-    padding: "16px 12px 14px",
-    border: "1px solid var(--line)",
-    borderRadius: "var(--radius-lg)",
-    background: "color-mix(in srgb, var(--paper) 44%, transparent)",
   },
   familyHeroLabel: {
     color: CATS_MUTED,
@@ -1665,10 +1667,7 @@ const styles = {
     letterSpacing: "var(--tracking-body)",
   },
   recordList: {
-    borderRadius: "var(--radius-md)",
-    border: "1px solid var(--line)",
-    background: "color-mix(in srgb, var(--paper) 40%, transparent)",
-    padding: "6px 13px",
+    display: "grid",
   },
   recordRow: {
     display: "grid",
@@ -1733,10 +1732,6 @@ const styles = {
   footprintCard: {
     width: "132px",
     minHeight: "128px",
-    border: "1px solid var(--line)",
-    borderRadius: "var(--radius-lg)",
-    background: "color-mix(in srgb, var(--paper) 38%, transparent)",
-    padding: "9px",
     display: "grid",
     gap: "7px",
     flex: "0 0 auto",
@@ -1745,10 +1740,6 @@ const styles = {
   footprintCardEmpty: {
     width: "132px",
     minHeight: "128px",
-    border: "1px dashed var(--line)",
-    borderRadius: "var(--radius-lg)",
-    background: "color-mix(in srgb, var(--paper) 20%, transparent)",
-    padding: "9px",
     display: "grid",
     gap: "7px",
     flex: "0 0 auto",
@@ -1981,10 +1972,6 @@ const styles = {
   },
   coatSection: {
     marginTop: "10px",
-    border: "1px solid var(--line)",
-    borderRadius: "var(--radius-md)",
-    background: "color-mix(in srgb, var(--paper) 30%, transparent)",
-    padding: "12px 13px",
   },
   coatHeader: {
     display: "flex",
@@ -2028,10 +2015,6 @@ const styles = {
   },
   editor: {
     marginTop: "10px",
-    border: "1px solid var(--line)",
-    borderRadius: "var(--radius-md)",
-    background: "color-mix(in srgb, var(--paper) 36%, transparent)",
-    padding: "13px",
     display: "grid",
     gap: "10px",
   },
@@ -2107,11 +2090,6 @@ const styles = {
   },
   bunbakoSection: {
     marginTop: "18px",
-    padding: "16px",
-    border: "1px solid var(--line)",
-    borderRadius: "var(--radius-xl)",
-    background: "color-mix(in srgb, var(--paper) 58%, transparent)",
-    boxShadow: "var(--shadow-e1)",
   },
   bunbakoHeader: {
     display: "flex",
@@ -2211,10 +2189,6 @@ const styles = {
   },
   daysThread: {
     marginTop: "18px",
-    padding: "16px",
-    border: "1px solid var(--line)",
-    borderRadius: "var(--radius-xl)",
-    background: "color-mix(in srgb, var(--paper) 44%, transparent)",
   },
   threadLine: {
     display: "grid",

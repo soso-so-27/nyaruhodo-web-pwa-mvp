@@ -1215,7 +1215,10 @@ function AlbumDailyPair({
   );
 
   return (
-    <div
+    <AppCard
+      as="article"
+      variant="section"
+      padding="md"
       data-testid="album-daily-letter-card"
       style={compact ? styles.dailyPairCompact : styles.dailyPair}
     >
@@ -1304,7 +1307,7 @@ function AlbumDailyPair({
           </div>
         ) : null}
       </div>
-    </div>
+    </AppCard>
   );
 }
 
@@ -1544,15 +1547,19 @@ function CollectionCollectView({
       ) : null}
 
       {nextTargetSlots.length > 0 ? (
-        <div style={styles.nextTargetBlock}>
+        <AppCard as="div" variant="section" padding="md" style={styles.nextTargetBlock}>
           <div style={styles.sectionHeadingRow}>
             <p style={styles.sectionHeading}>次に見つけたい姿</p>
           </div>
           <div style={styles.nextTargetRail}>
             {nextTargetSlots.map((slot) => (
-              <button
+              <AppCard
+                as="button"
                 key={slot.id}
                 type="button"
+                variant="inset"
+                padding="sm"
+                interactive
                 onClick={() => onOpenSlot(slot)}
                 style={styles.nextTargetCard}
               >
@@ -1560,10 +1567,10 @@ function CollectionCollectView({
                 <span style={styles.nextTargetName}>
                   {getCollectionSlotLabel(slot)}
                 </span>
-              </button>
+              </AppCard>
             ))}
           </div>
-        </div>
+        </AppCard>
       ) : null}
     </section>
   );
@@ -1614,13 +1621,13 @@ function CollectionShareView({
 }) {
   if (feedItems.length === 0) {
     return (
-      <section style={styles.shareEmptyCard}>
+      <AppCard as="section" variant="section" padding="standard" style={styles.shareEmptyCard}>
         <p style={styles.shareEmptyTitle}>まだ写真がありません</p>
         <p style={styles.shareEmptyText}>写真を見つけると、ここに自分の一枚が並びます。</p>
         <AppButton type="button" variant="primary" fullWidth onClick={onGoCollect}>
           写真を入れる
         </AppButton>
-      </section>
+      </AppCard>
     );
   }
 
@@ -1632,7 +1639,7 @@ function CollectionShareView({
 
   return (
     <section style={styles.shareView} aria-label="シェア">
-      <div style={styles.shareHeaderCard}>
+      <AppCard as="div" variant="inset" padding="md" style={styles.shareHeaderCard}>
         <p style={styles.shareHeaderKicker}>シェア準備</p>
         <p style={styles.shareHeaderTitle}>{headerTitle}</p>
         <div style={styles.shareSourceRow} aria-label="シェアに並ぶもの">
@@ -1656,7 +1663,7 @@ function CollectionShareView({
             とる候補
           </span>
         </div>
-      </div>
+      </AppCard>
       <div style={styles.shareFeed}>
         {feedItems.map((item) => (
           <button
@@ -1710,7 +1717,13 @@ function CollectionProgress({
   );
 
   return (
-    <section style={styles.progressBlock} aria-label="コレクションの進み具合">
+    <AppCard
+      as="section"
+      variant="section"
+      padding="md"
+      style={styles.progressBlock}
+      aria-label="コレクションの進み具合"
+    >
       <p style={styles.progressMain}>
         <span style={styles.progressNumber}>
           {progress.total.collected}
@@ -1761,7 +1774,7 @@ function CollectionProgress({
           );
         })}
       </div>
-    </section>
+    </AppCard>
   );
 }
 
@@ -1773,8 +1786,12 @@ function DailyCollectionTarget({
   onOpenSlot: (slot: CollectionSlot) => void;
 }) {
   return (
-    <button
+    <AppCard
+      as="button"
       type="button"
+      variant="section"
+      padding="md"
+      interactive
       style={styles.dailyTargetCard}
       onClick={() => onOpenSlot(slot)}
     >
@@ -1788,7 +1805,7 @@ function DailyCollectionTarget({
         </strong>
       </span>
       <span style={styles.dailyTargetHint}>見つける</span>
-    </button>
+    </AppCard>
   );
 }
 
@@ -3279,20 +3296,10 @@ const styles = {
   dailyPair: {
     display: "grid",
     gap: "14px",
-    padding: "16px",
-    border: "1px solid var(--line)",
-    borderRadius: "var(--radius-xl)",
-    background: "color-mix(in srgb, var(--paper) 82%, var(--paper-card))",
-    boxShadow: "var(--shadow-e1)",
   },
   dailyPairCompact: {
     display: "grid",
     gap: "14px",
-    padding: "16px",
-    border: "1px solid var(--line)",
-    borderRadius: "var(--radius-xl)",
-    background: "color-mix(in srgb, var(--paper) 82%, var(--paper-card))",
-    boxShadow: "var(--shadow-e1)",
   },
   dailyPairMain: {
     display: "grid",
@@ -3557,11 +3564,8 @@ const styles = {
     letterSpacing: 0,
   },
   progressBlock: {
-    ...COLLECTION_SURFACE_SOFT,
     display: "grid",
     gap: "8px",
-    borderRadius: "var(--radius-lg)",
-    padding: "11px 12px 12px",
     marginBottom: "12px",
   },
   progressMain: {
@@ -3638,13 +3642,10 @@ const styles = {
   },
   dailyTargetCard: {
     width: "100%",
-    ...COLLECTION_SURFACE_SOFT,
     display: "grid",
     gridTemplateColumns: "48px minmax(0, 1fr) auto",
     alignItems: "center",
     gap: "11px",
-    borderRadius: "var(--radius-lg)",
-    padding: "12px",
     color: COLLECTION_TEXT,
     font: "inherit",
     textAlign: "left",
@@ -3678,9 +3679,7 @@ const styles = {
     gap: "12px",
   },
   nextTargetBlock: {
-    ...COLLECTION_SURFACE_SOFT,
-    borderRadius: "var(--radius-lg)",
-    padding: "12px",
+    display: "grid",
   },
   sectionHeadingRow: {
     display: "flex",
@@ -3705,12 +3704,8 @@ const styles = {
     justifyItems: "center",
     gap: "6px",
     minHeight: "96px",
-    border: "0.5px solid rgba(255,255,255,0.12)",
-    borderRadius: "var(--radius-md)",
-    background: "rgba(255,255,255,0.07)",
     color: COLLECTION_TEXT,
     font: "inherit",
-    padding: "10px 6px",
     cursor: "pointer",
   },
   nextTargetIcon: {
@@ -3760,9 +3755,7 @@ const styles = {
     gap: "12px",
   },
   shareHeaderCard: {
-    ...COLLECTION_SURFACE_SOFT,
-    borderRadius: "var(--radius-lg)",
-    padding: "13px 14px",
+    display: "grid",
   },
   shareHeaderKicker: {
     margin: "0 0 4px",
@@ -3889,9 +3882,6 @@ const styles = {
     textShadow: "0 1px 8px rgba(0,0,0,0.26)",
   },
   shareEmptyCard: {
-    ...COLLECTION_SURFACE_SOFT,
-    borderRadius: "var(--radius-lg)",
-    padding: "18px",
     textAlign: "center",
   },
   shareEmptyTitle: {

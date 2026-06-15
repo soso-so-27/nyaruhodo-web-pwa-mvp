@@ -21,6 +21,7 @@ import { trackProductEvent } from "../../lib/analytics/productAnalytics";
 import { playOpenSound } from "../../lib/openSound";
 import { BottomNavigation } from "../navigation/BottomNavigation";
 import { AppButton } from "../ui/AppButton";
+import { AppCard } from "../ui/AppCard";
 import { AppIcon } from "../ui/AppIcons";
 import { StoredPhotoImage } from "../ui/StoredPhotoImage";
 
@@ -419,8 +420,12 @@ export function HomeDeskModel({
         ) : null}
 
         {omoideMemory ? (
-          <button
+          <AppCard
+            as="button"
             type="button"
+            variant="section"
+            padding="md"
+            interactive
             data-testid="omoide-arrival-letter"
             style={deskStyles.omoideArrival}
             onClick={() => {
@@ -441,7 +446,7 @@ export function HomeDeskModel({
                 {omoideMemory.subtitle}
               </span>
             </span>
-          </button>
+          </AppCard>
         ) : null}
 
         {deskState === "4" && targetPhoto ? (
@@ -816,7 +821,7 @@ function DeskPhotoViewer({
               …
             </AppButton>
             {isMenuOpen ? (
-              <div style={deskStyles.viewerMenuSheet}>
+              <AppCard as="div" variant="floating" padding="sm" style={deskStyles.viewerMenuSheet}>
                 <AppButton
                   type="button"
                   variant="quiet"
@@ -840,7 +845,7 @@ function DeskPhotoViewer({
                 >
                   キャンセル
                 </AppButton>
-              </div>
+              </AppCard>
             ) : null}
           </div>
         ) : null}
@@ -1424,15 +1429,8 @@ const deskStyles = {
     alignItems: "center",
     gap: "12px",
     marginTop: "4px",
-    padding: "12px 16px",
-    border: "1px solid var(--line)",
-    borderRadius: "var(--radius-xl)",
-    background: "color-mix(in srgb, var(--paper) 82%, transparent)",
     color: "var(--ink)",
-    boxShadow: "var(--shadow-e1)",
     textAlign: "left",
-    cursor: "pointer",
-    WebkitTapHighlightColor: "transparent",
   },
   omoideLetterIcon: {
     width: "48px",
@@ -1520,11 +1518,6 @@ const deskStyles = {
     top: "44px",
     right: 0,
     minWidth: "180px",
-    padding: "8px",
-    border: "1px solid var(--line)",
-    borderRadius: "var(--radius-sm)",
-    background: "var(--paper)",
-    boxShadow: "var(--shadow-e2)",
   },
   viewerMenuItem: {
     justifyContent: "flex-start",
