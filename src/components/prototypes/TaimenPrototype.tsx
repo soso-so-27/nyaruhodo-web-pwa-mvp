@@ -5,7 +5,7 @@ import { AppButton } from "../ui/AppButton";
 import { AppCard } from "../ui/AppCard";
 import { color, radius, shadow, spacing, typography } from "../ui/designTokens";
 
-type PrototypeMode = "a" | "b" | "c";
+type PrototypeMode = "b1" | "b2";
 type PhotoPattern = "mixed" | "portrait" | "landscape";
 type PrototypePhoto = {
   src: string;
@@ -54,19 +54,14 @@ const defaultPhotos: Record<PhotoPattern, { own: PrototypePhoto; delivered: Prot
 
 const modes: Array<{ id: PrototypeMode; label: string; caption: string }> = [
   {
-    id: "a",
-    label: "案A",
-    caption: "対等並置",
+    id: "b1",
+    label: "改1",
+    caption: "便箋として下に敷く",
   },
   {
-    id: "b",
-    label: "案B",
-    caption: "むぎ主役+手紙",
-  },
-  {
-    id: "c",
-    label: "案C",
-    caption: "1枚ずつめくる",
+    id: "b2",
+    label: "改2",
+    caption: "切手として隅に貼る",
   },
 ];
 
@@ -77,11 +72,10 @@ const patterns: Array<{ id: PhotoPattern; label: string }> = [
 ];
 
 export function TaimenPrototype() {
-  const [mode, setMode] = useState<PrototypeMode>("b");
+  const [mode, setMode] = useState<PrototypeMode>("b1");
   const [pattern, setPattern] = useState<PhotoPattern>("mixed");
   const [ownOverride, setOwnOverride] = useState<string | null>(null);
   const [deliveredOverride, setDeliveredOverride] = useState<string | null>(null);
-  const [pageIndex, setPageIndex] = useState(0);
   const photos = useMemo(() => {
     const base = defaultPhotos[pattern];
     return {
@@ -110,10 +104,10 @@ export function TaimenPrototype() {
   return (
     <main style={styles.page}>
       <section style={styles.header}>
-        <span style={styles.kicker}>taimen prototype</span>
-        <h1 style={styles.title}>対面表示の3案</h1>
+        <span style={styles.kicker}>taimen b refine</span>
+        <h1 style={styles.title}>対面表示 Bリファイン</h1>
         <p style={styles.lead}>
-          同じ2枚で、並置・主従・めくりを見比べます。実機では下の入力から、むぎの実写真に差し替えられます。
+          むぎを主役にしたまま、届いた寝顔を「便箋」か「切手」として添える静止比較です。実機では下の入力から、むぎの実写真に差し替えられます。
         </p>
       </section>
 
@@ -126,6 +120,7 @@ export function TaimenPrototype() {
               variant={mode === item.id ? "primary" : "quiet"}
               size="sm"
               selected={mode === item.id}
+              data-testid={`taimen-mode-button-${item.id}`}
               onClick={() => setMode(item.id)}
             >
               {item.label}
@@ -140,6 +135,7 @@ export function TaimenPrototype() {
               variant={pattern === item.id ? "secondary" : "quiet"}
               size="sm"
               selected={pattern === item.id}
+              data-testid={`taimen-pattern-button-${item.id}`}
               onClick={() => setPattern(item.id)}
             >
               {item.label}
@@ -185,123 +181,92 @@ export function TaimenPrototype() {
             {modes.find((item) => item.id === mode)?.caption}
           </span>
         </div>
-        {mode === "a" ? <EqualPair photos={photos} /> : null}
-        {mode === "b" ? <MainAndLetter photos={photos} /> : null}
-        {mode === "c" ? (
-          <PagedPair
-            photos={photos}
-            pageIndex={pageIndex}
-            onPageChange={(next) => setPageIndex(next)}
-          />
-        ) : null}
+        {mode === "b1" ? <LetterBelow photos={photos} /> : null}
+        {mode === "b2" ? <StampCorner photos={photos} /> : null}
       </section>
 
       <section style={styles.notes}>
         <PrototypeNote
-          title="見る観点"
-          body="むぎをもっと見たくなるか、届いた感じが残るか、従側の寝顔が読めるかを見ます。"
+          title="改1"
+          body="むぎ写真の下に便箋を置き、届いた寝顔を読める大きさで添えます。2匹を両方見る寄りです。"
         />
         <PrototypeNote
-          title="比率"
-          body="Aは1:1 cover、Bは主役を大きく・手紙側はcontain寄り、Cは全画面containです。"
+          title="改2"
+          body="むぎ写真を絵葉書の主役にし、届いた寝顔は切手のしるしとして隅に置きます。"
         />
       </section>
     </main>
   );
 }
 
-function EqualPair({
+function LetterBelow({
   photos,
 }: {
   photos: { own: PrototypePhoto; delivered: PrototypePhoto };
 }) {
   return (
-    <div style={styles.equalWrap} data-testid="taimen-mode-a">
-      <SquarePhoto photo={photos.own} fit="cover" />
-      <span style={styles.pairDots} aria-hidden="true">
-        ...
-      </span>
-      <SquarePhoto photo={photos.delivered} fit="cover" />
-    </div>
-  );
-}
-
-function MainAndLetter({
-  photos,
-}: {
-  photos: { own: PrototypePhoto; delivered: PrototypePhoto };
-}) {
-  return (
-    <div style={styles.mainLetterWrap} data-testid="taimen-mode-b">
-      <div style={styles.heroPhoto}>
-        <img src={photos.own.src} alt={photos.own.label} style={styles.heroImage} />
-      </div>
-      <div style={styles.letterCard} aria-label="届いた手紙">
-        <div style={styles.postmark}>1年前のきょう</div>
-        <div style={styles.letterWindow}>
+    <div style={styles.letterBelowWrap} data-testid="taimen-mode-b1">
+      <HeroPhoto photo={photos.own} aspect="3 / 4" fit="cover" />
+      <div style={styles.stationeryCard} aria-label="届いた便箋">
+        <div style={styles.stationeryPhotoFrame}>
           <img
             src={photos.delivered.src}
             alt={photos.delivered.label}
-            style={styles.letterImage}
+            style={styles.stationeryPhoto}
           />
         </div>
-        <div style={styles.letterCaption}>どこかのこから</div>
+        <div style={styles.stationeryText}>
+          <span>どこかのこから</span>
+        </div>
       </div>
-      <p style={styles.mainLetterCaption}>
-        むぎの今日に、ちいさな手紙が添わっています。
+      <p style={styles.variantCaption}>
+        むぎの下に、届いた手紙をそっと置きます。
       </p>
     </div>
   );
 }
 
-function PagedPair({
+function StampCorner({
   photos,
-  pageIndex,
-  onPageChange,
 }: {
   photos: { own: PrototypePhoto; delivered: PrototypePhoto };
-  pageIndex: number;
-  onPageChange: (index: number) => void;
 }) {
-  const active = pageIndex === 0 ? photos.own : photos.delivered;
   return (
-    <div style={styles.pagedWrap} data-testid="taimen-mode-c">
-      <div style={styles.pagedPhoto}>
-        <img src={active.src} alt={active.label} style={styles.pagedImage} />
+    <div style={styles.stampWrap} data-testid="taimen-mode-b2">
+      <div style={styles.postcardPhoto}>
+        <img src={photos.own.src} alt={photos.own.label} style={styles.postcardImage} />
+        <div style={styles.stampCard} aria-label="届いた切手">
+          <span style={styles.stampPerforation} aria-hidden="true" />
+          <img
+            src={photos.delivered.src}
+            alt={photos.delivered.label}
+            style={styles.stampImage}
+          />
+        </div>
       </div>
-      <div style={styles.pageTabs}>
-        <AppButton
-          type="button"
-          size="sm"
-          variant={pageIndex === 0 ? "primary" : "quiet"}
-          onClick={() => onPageChange(0)}
-        >
-          むぎ
-        </AppButton>
-        <AppButton
-          type="button"
-          size="sm"
-          variant={pageIndex === 1 ? "primary" : "quiet"}
-          onClick={() => onPageChange(1)}
-        >
-          手紙
-        </AppButton>
-      </div>
-      <p style={styles.pagedCaption}>
-        {pageIndex === 0 ? "まず、きょうのむぎ。" : "めくると、届いたねがお。"}
+      <p style={styles.variantCaption}>
+        むぎの絵葉書に、届いた寝顔の切手を貼ります。
       </p>
     </div>
   );
 }
 
-function SquarePhoto({ photo, fit }: { photo: PrototypePhoto; fit: "cover" | "contain" }) {
+function HeroPhoto({
+  photo,
+  aspect,
+  fit,
+}: {
+  photo: PrototypePhoto;
+  aspect: string;
+  fit: "cover" | "contain";
+}) {
   return (
-    <figure style={styles.squareFigure}>
-      <span style={styles.squareFrame}>
+    <figure style={styles.heroFigure}>
+      <span style={{ ...styles.heroFrame, aspectRatio: aspect }}>
         <img
           src={photo.src}
           alt={photo.label}
-          style={{ ...styles.squareImage, objectFit: fit }}
+          style={{ ...styles.heroImage, objectFit: fit }}
         />
       </span>
       <figcaption style={styles.photoLabel}>{photo.label}</figcaption>
@@ -380,6 +345,7 @@ const styles = {
     gap: spacing.md,
   },
   fileInput: {
+    position: "relative",
     display: "grid",
     gap: spacing.sm,
     color: color.textMuted,
@@ -413,7 +379,7 @@ const styles = {
   },
   phoneFrame: {
     width: "min(100%, 390px)",
-    minHeight: 600,
+    minHeight: 680,
     margin: `${spacing.xl}px auto 0`,
     padding: `${spacing.xl}px ${spacing.lg}px`,
     borderRadius: radius.xxl24,
@@ -440,31 +406,24 @@ const styles = {
     letterSpacing: "0.12em",
     color: color.textFaint,
   },
-  equalWrap: {
+  letterBelowWrap: {
     display: "grid",
-    gridTemplateColumns: "1fr auto 1fr",
-    alignItems: "center",
-    gap: spacing.sm,
-    paddingTop: spacing.xxl,
+    justifyItems: "center",
+    gap: spacing.lg,
   },
-  pairDots: {
-    color: color.textFaint,
-    fontFamily: typography.fontDisplay,
-    letterSpacing: "0.18em",
-  },
-  squareFigure: {
+  heroFigure: {
+    width: "82%",
     margin: 0,
     display: "grid",
     gap: spacing.md,
     justifyItems: "center",
   },
-  squareFrame: {
+  heroFrame: {
     ...photoFrameBase,
     width: "100%",
-    aspectRatio: "1 / 1",
-    borderRadius: radius.lg,
+    borderRadius: radius.xl,
   },
-  squareImage: {
+  heroImage: {
     width: "100%",
     height: "100%",
     display: "block",
@@ -475,66 +434,82 @@ const styles = {
     fontSize: 13,
     letterSpacing: "0.1em",
   },
-  mainLetterWrap: {
-    position: "relative",
-    display: "grid",
-    justifyItems: "center",
-    paddingTop: spacing.lg,
-    minHeight: 460,
-  },
-  heroPhoto: {
-    ...photoFrameBase,
+  stationeryCard: {
     width: "82%",
-    aspectRatio: "3 / 4",
+    padding: spacing.lg,
     borderRadius: radius.xl,
-  },
-  heroImage: {
-    width: "100%",
-    height: "100%",
-    objectFit: "cover",
-    display: "block",
-  },
-  letterCard: {
-    position: "absolute",
-    right: 0,
-    bottom: 64,
-    width: 150,
-    padding: spacing.md,
-    transform: "rotate(-3deg)",
-    borderRadius: radius.lg,
     background: color.surfaceSoft,
     boxShadow: shadow.e1,
     display: "grid",
-    gap: spacing.sm,
+    gridTemplateColumns: "minmax(0, 1fr)",
+    gap: spacing.md,
   },
-  postmark: {
-    justifySelf: "end",
-    color: color.textFaint,
-    fontSize: 12,
-    letterSpacing: "0.08em",
-  },
-  letterWindow: {
+  stationeryPhotoFrame: {
     overflow: "hidden",
     aspectRatio: "4 / 3",
-    borderRadius: radius.md,
+    borderRadius: radius.lg,
     background: color.paper,
     border: `1px solid ${color.border}`,
   },
-  letterImage: {
+  stationeryPhoto: {
     width: "100%",
     height: "100%",
     objectFit: "contain",
     display: "block",
   },
-  letterCaption: {
+  stationeryText: {
     color: color.textMuted,
     fontFamily: typography.fontDisplay,
     fontSize: 13,
     letterSpacing: "0.08em",
     textAlign: "center",
   },
-  mainLetterCaption: {
-    alignSelf: "end",
+  stampWrap: {
+    display: "grid",
+    justifyItems: "center",
+    gap: spacing.xl,
+    paddingTop: spacing.sm,
+  },
+  postcardPhoto: {
+    ...photoFrameBase,
+    position: "relative",
+    width: "88%",
+    aspectRatio: "3 / 4",
+    borderRadius: radius.xl,
+  },
+  postcardImage: {
+    width: "100%",
+    height: "100%",
+    objectFit: "cover",
+    display: "block",
+  },
+  stampCard: {
+    position: "absolute",
+    top: -8,
+    right: -8,
+    width: 88,
+    aspectRatio: "1 / 1",
+    padding: 6,
+    transform: "rotate(4deg)",
+    borderRadius: radius.md,
+    background: color.surfaceSoft,
+    boxShadow: shadow.e1,
+  },
+  stampPerforation: {
+    position: "absolute",
+    inset: 5,
+    border: `1px dashed ${color.border}`,
+    borderRadius: radius.sm,
+    pointerEvents: "none",
+  },
+  stampImage: {
+    width: "100%",
+    height: "100%",
+    objectFit: "cover",
+    display: "block",
+    borderRadius: radius.sm,
+  },
+  variantCaption: {
     margin: 0,
     maxWidth: 280,
     color: color.textMuted,
@@ -543,34 +518,6 @@ const styles = {
     letterSpacing: "0.08em",
     lineHeight: 1.7,
     textAlign: "center",
-  },
-  pagedWrap: {
-    display: "grid",
-    gap: spacing.lg,
-    justifyItems: "center",
-  },
-  pagedPhoto: {
-    ...photoFrameBase,
-    width: "100%",
-    height: 420,
-    borderRadius: radius.xl,
-  },
-  pagedImage: {
-    width: "100%",
-    height: "100%",
-    objectFit: "contain",
-    display: "block",
-  },
-  pageTabs: {
-    display: "flex",
-    gap: spacing.sm,
-  },
-  pagedCaption: {
-    margin: 0,
-    color: color.textMuted,
-    fontFamily: typography.fontDisplay,
-    fontSize: 13,
-    letterSpacing: "0.08em",
   },
   notes: {
     width: "min(100%, 720px)",

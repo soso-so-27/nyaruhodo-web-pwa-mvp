@@ -9,14 +9,14 @@ test.beforeAll(() => {
   fs.mkdirSync(shotsDir, { recursive: true });
 });
 
-test.describe("taimen prototype shots", () => {
+test.describe("taimen B refinement prototype shots", () => {
   for (const pattern of ["mixed", "portrait", "landscape"] as const) {
-    for (const mode of ["a", "b", "c"] as const) {
+    for (const mode of ["b1", "b2"] as const) {
       test(`${mode}_${pattern}`, async ({ page }) => {
         await page.goto("/prototypes/taimen");
         await page.waitForLoadState("networkidle");
-        await page.getByRole("button", { name: `案${mode.toUpperCase()}` }).click();
-        await page.getByRole("button", { name: patternLabel(pattern) }).click();
+        await page.getByTestId(`taimen-mode-button-${mode}`).click();
+        await page.getByTestId(`taimen-pattern-button-${pattern}`).click();
         await expect(page.getByTestId(`taimen-mode-${mode}`)).toBeVisible();
         await page.screenshot({
           path: path.join(shotsDir, `taimen_${mode}_${pattern}.png`),
@@ -25,23 +25,4 @@ test.describe("taimen prototype shots", () => {
       });
     }
   }
-
-  test("c_mixed_letter_page", async ({ page }) => {
-    await page.goto("/prototypes/taimen");
-    await page.waitForLoadState("networkidle");
-    await page.getByRole("button", { name: "案C" }).click();
-    await page.getByRole("button", { name: "縦横まぜ" }).click();
-    await page.getByRole("button", { name: "手紙" }).click();
-    await expect(page.getByTestId("taimen-mode-c")).toBeVisible();
-    await page.screenshot({
-      path: path.join(shotsDir, "taimen_c_mixed_letter_page.png"),
-      fullPage: true,
-    });
-  });
 });
-
-function patternLabel(pattern: "mixed" | "portrait" | "landscape") {
-  if (pattern === "mixed") return "縦横まぜ";
-  if (pattern === "portrait") return "縦長どうし";
-  return "横長どうし";
-}
