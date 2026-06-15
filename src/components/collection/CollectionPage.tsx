@@ -1724,8 +1724,7 @@ function CollectionProgress({
       </div>
       <style>
         {`.collection-tabs::-webkit-scrollbar{display:none}
-@keyframes fadeIn{from{opacity:0}to{opacity:1}}
-@keyframes slideUp{from{transform:translateY(100%)}to{transform:translateY(0)}}`}
+@keyframes fadeIn{from{opacity:0}to{opacity:1}}`}
       </style>
       <div
         role="tablist"

@@ -2116,16 +2116,6 @@ export function HomeInput({ recentEvents: _recentEvents }: HomeInputProps) {
       ) : null}
 
       <style>{`
-        @keyframes slideUp {
-          from {
-            opacity: 0;
-            transform: translate3d(0, 18px, 0) scale(0.985);
-          }
-          to {
-            opacity: 1;
-            transform: translate3d(0, 0, 0) scale(1);
-          }
-        }
         @keyframes toastIn {
           from { opacity: 0; transform: translate(-50%, -8px); }
           to { opacity: 1; transform: translate(-50%, 0); }
