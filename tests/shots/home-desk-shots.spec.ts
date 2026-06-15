@@ -17,6 +17,7 @@ const expectedShotNames = [
   "state4_2010_week1.png",
   "state4_2010_habit.png",
   "state4_stamp_viewer.png",
+  "state4_report_sheet.png",
   "state1b_2030.png",
   "album_today.png",
   "album_missing_cases.png",
@@ -214,6 +215,25 @@ test.describe("home desk model shots", () => {
     await page.waitForTimeout(500);
     await page.screenshot({
       path: path.join(shotsDir, "state4_stamp_viewer.png"),
+      fullPage: true,
+    });
+  });
+
+  test("state4_report_sheet", async ({ page }) => {
+    await seedReviewState(page, {
+      now: Date.parse("2026-06-10T11:10:00.000Z"),
+      state: "4",
+      habit: false,
+    });
+    await page.goto("/home");
+    await page.waitForLoadState("networkidle");
+    await page.getByTestId("desk-stamp-pair").locator("button").nth(1).click();
+    await page.getByLabel("写真のメニュー").click();
+    await page.getByRole("button", { name: "この写真を報告" }).click();
+    await expect(page.getByRole("dialog", { name: "この写真を報告" })).toBeVisible();
+    await page.waitForTimeout(500);
+    await page.screenshot({
+      path: path.join(shotsDir, "state4_report_sheet.png"),
       fullPage: true,
     });
   });

@@ -98,7 +98,7 @@ import {
   saveCatProfiles,
 } from "./homeInputHelpers";
 import type { CatProfile } from "./homeInputHelpers";
-import { AppBottomSheet } from "../ui/AppBottomSheet";
+import { AppBottomSheet, AppSheet } from "../ui/AppBottomSheet";
 import {
   AppIcon,
   type AppIconName,
@@ -3053,24 +3053,26 @@ function ExchangePhotoSheet({
   onReport: () => void;
 }) {
   return (
-    <div style={styles.exchangeBackdrop} onClick={onClose}>
-      <section
-        style={styles.exchangePanel}
-        aria-label="とどいたねがお"
-        onClick={(event) => event.stopPropagation()}
-      >
-        <div style={styles.exchangeHeader}>
-          <span style={styles.exchangeKicker}>ねがおがとどきました</span>
-          <button
-            type="button"
-            aria-label="通報して閉じる"
-            title="通報して閉じる"
-            style={styles.exchangeReportButton}
-            onClick={onReport}
-          >
-            <AppIcon name="flag" size={18} />
-          </button>
-        </div>
+    <AppSheet
+      placement="bottom"
+      title={"ねがおがとどきました"}
+      variant="dim"
+      onClose={onClose}
+      style={styles.exchangeSheetFrame}
+      headerAction={
+        <AppButton
+          type="button"
+          aria-label={"通報して閉じる"}
+          title={"通報して閉じる"}
+          variant="ghost"
+          size="icon"
+          iconOnly
+          onClick={onReport}
+        >
+          <AppIcon name="flag" size={18} />
+        </AppButton>
+      }
+    >
         <div style={styles.exchangePhotoFrame}>
           <StoredPhotoImage
             src={getPhotoDetailSrc(photo)}
@@ -3088,8 +3090,7 @@ function ExchangePhotoSheet({
             閉じる
           </button>
         </div>
-      </section>
-    </div>
+    </AppSheet>
   );
 }
 
@@ -3126,19 +3127,14 @@ function ExchangeSharePermissionSheet({
   }
 
   return (
-    <div style={styles.exchangeBackdrop}>
-      <section style={styles.exchangePanel} aria-label="ねがおを入れる確認">
-        <div style={styles.exchangeHeader}>
-          <span aria-hidden="true" />
-          <button
-            type="button"
-            style={styles.exchangeCloseTextButton}
-            onClick={onClose}
-            aria-label="閉じる"
-          >
-            閉じる
-          </button>
-        </div>
+    <AppSheet
+      placement="bottom"
+      title={"ねがおを入れる確認"}
+      variant="dim"
+      closeOnOverlay={false}
+      onClose={onClose}
+      style={styles.exchangeSheetFrame}
+    >
         <div style={styles.exchangeSharePreview}>
           <StoredPhotoImage src={photo.src} alt="" style={styles.exchangePhoto} />
         </div>
@@ -3196,8 +3192,7 @@ function ExchangeSharePermissionSheet({
             とっておく
           </button>
         </div>
-      </section>
-    </div>
+    </AppSheet>
   );
 }
 
@@ -6703,81 +6698,12 @@ const styles = {
     lineHeight: 1.42,
     letterSpacing: "0.08em",
   },
-  exchangeBackdrop: {
-    position: "fixed",
-    inset: 0,
-    zIndex: 72,
-    display: "flex",
-    alignItems: "flex-end",
-    justifyContent: "center",
-    padding: "0 14px calc(92px + env(safe-area-inset-bottom))",
-    boxSizing: "border-box",
-    background: "rgba(32,28,22,0.18)",
-    backdropFilter: "blur(4px)",
-    WebkitBackdropFilter: "blur(4px)",
-  },
-  exchangePanel: {
-    width: HOME_NAV_FRAME_WIDTH,
+  exchangeSheetFrame: {
+    left: "14px",
+    right: "14px",
+    width: "auto",
     maxWidth: "410px",
-    border: "0.5px solid rgba(86,78,64,0.14)",
-    borderRadius: "var(--radius-2xl)",
-    background:
-      "linear-gradient(145deg, rgba(255,253,248,0.96), rgba(244,239,229,0.96))",
-    color: "#292721",
-    padding: "14px",
-    boxSizing: "border-box",
-    boxShadow:
-      "0 22px 60px rgba(64,52,34,0.2), inset 0 1px 0 rgba(255,255,255,0.74)",
-    backdropFilter: "blur(26px)",
-    WebkitBackdropFilter: "blur(26px)",
-    animation: "exchangePhotoIn 0.44s cubic-bezier(0.22, 1, 0.36, 1) both",
-  },
-  exchangeHeader: {
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "space-between",
-    gap: "12px",
-    marginBottom: "10px",
-  },
-  exchangeKicker: {
-    color: "#292721",
-    fontSize: "13px",
-    fontWeight: 500,
-    lineHeight: 1.2,
-  },
-  exchangeCloseButton: {
-    display: "grid",
-    placeItems: "center",
-    width: "30px",
-    height: "30px",
-    border: "0.5px solid rgba(86,78,64,0.12)",
-    borderRadius: "50%",
-    background: "rgba(255,255,255,0.52)",
-    color: "#716b60",
-    cursor: "pointer",
-    flexShrink: 0,
-  },
-  exchangeCloseTextButton: {
-    border: "none",
-    background: "transparent",
-    color: "#9c9286",
-    fontSize: "12px",
-    fontWeight: 500,
-    cursor: "pointer",
-    padding: "4px 2px",
-    lineHeight: 1,
-  },
-  exchangeReportButton: {
-    display: "grid",
-    placeItems: "center",
-    width: "34px",
-    height: "34px",
-    border: "0.5px solid rgba(86,78,64,0.14)",
-    borderRadius: "50%",
-    background: "rgba(255,255,255,0.54)",
-    color: "#716b60",
-    cursor: "pointer",
-    flexShrink: 0,
+    margin: "0 auto",
   },
   exchangeLead: {
     margin: "0 2px 10px",

@@ -22,6 +22,7 @@ import { playOpenSound } from "../../lib/openSound";
 import { BottomNavigation } from "../navigation/BottomNavigation";
 import { AppButton } from "../ui/AppButton";
 import { AppCard } from "../ui/AppCard";
+import { AppSheet } from "../ui/AppBottomSheet";
 import { AppIcon } from "../ui/AppIcons";
 import { PhotoViewerFrame } from "../ui/PhotoTile";
 import { StampPair } from "../ui/StampPair";
@@ -879,15 +880,12 @@ function DeskPhotoViewer({
         </AppButton>
       </section>
       {isReportSheetOpen && viewerPhoto.kind === "other" ? (
-        <div
-          style={deskStyles.reportSheetBackdrop}
-          onClick={() => setIsReportSheetOpen(false)}
+        <AppSheet
+          placement="bottom"
+          title={"この写真を報告"}
+          onClose={() => setIsReportSheetOpen(false)}
         >
-          <section
-            style={deskStyles.reportSheet}
-            aria-label="この写真を報告"
-            onClick={(event) => event.stopPropagation()}
-          >
+          <div style={deskStyles.reportSheetActions}>
             <AppButton
               type="button"
               variant="danger"
@@ -920,8 +918,8 @@ function DeskPhotoViewer({
             >
               キャンセル
             </AppButton>
-          </section>
-        </div>
+          </div>
+        </AppSheet>
       ) : null}
     </div>
   );
@@ -1541,23 +1539,10 @@ const deskStyles = {
   viewerSaveButtonSaved: {
     opacity: 0,
   },
-  reportSheetBackdrop: {
-    position: "fixed",
-    inset: 0,
-    zIndex: 60,
-    display: "grid",
-    alignItems: "end",
-    background: "color-mix(in srgb, var(--ink) 18%, transparent)",
-  },
-  reportSheet: {
+  reportSheetActions: {
     display: "flex",
     flexDirection: "column",
     gap: "8px",
-    padding: "20px 20px calc(20px + env(safe-area-inset-bottom))",
-    borderTopLeftRadius: "var(--radius-2xl)",
-    borderTopRightRadius: "var(--radius-2xl)",
-    background: "var(--paper)",
-    boxShadow: "var(--shadow-e2)",
   },
   omoideViewerBackdrop: {
     position: "fixed",

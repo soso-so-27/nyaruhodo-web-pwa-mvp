@@ -30,6 +30,8 @@ export type AppSheetProps = {
   showHandle?: boolean;
   lockScroll?: boolean;
   initialFocusRef?: RefObject<HTMLElement>;
+  headerAction?: ReactNode;
+  style?: CSSProperties;
 };
 
 export type AppBottomSheetProps = Omit<
@@ -59,6 +61,8 @@ export function AppSheet({
   showHandle,
   lockScroll = true,
   initialFocusRef,
+  headerAction,
+  style,
 }: AppSheetProps) {
   const titleId = useId();
   const sheetRef = useRef<HTMLElement | null>(null);
@@ -148,6 +152,7 @@ export function AppSheet({
     ...(isBottom ? styles.bottomSheet : styles.centerSheet),
     ...styles[resolvedVariant],
     ...styles[size],
+    ...style,
   };
 
   return (
@@ -181,16 +186,19 @@ export function AppSheet({
           ) : (
             <span aria-hidden="true" />
           )}
-          <AppButton
-            type="button"
-            onClick={onClose}
-            variant="ghost"
-            size="icon"
-            iconOnly
-            aria-label={closeLabel}
-          >
-            <CloseIcon size={18} />
-          </AppButton>
+          <div style={styles.headerActions}>
+            {headerAction}
+            <AppButton
+              type="button"
+              onClick={onClose}
+              variant="ghost"
+              size="icon"
+              iconOnly
+              aria-label={closeLabel}
+            >
+              <CloseIcon size={18} />
+            </AppButton>
+          </div>
         </div>
         <div style={styles.body}>{children}</div>
       </section>
@@ -348,6 +356,12 @@ const styles = {
     color: "var(--ink)",
     margin: 0,
     letterSpacing: 0,
+  },
+  headerActions: {
+    display: "inline-flex",
+    alignItems: "center",
+    gap: "8px",
+    flex: "0 0 auto",
   },
   body: {
     minHeight: 0,
