@@ -40,6 +40,7 @@ import {
 } from "../ui/appTheme";
 import { AppButton } from "../ui/AppButton";
 import { AppCard } from "../ui/AppCard";
+import { PhotoTile } from "../ui/PhotoTile";
 import {
   readKeptExchangePhotoStorageDebug,
   type KeptExchangePhotoStorageDebug,
@@ -1459,11 +1460,13 @@ function ModerationQueuePanel({
       {moments.slice(0, 6).map((moment) => (
         <div key={moment.id} style={styles.moderationItem}>
           {moment.photoSrc ? (
-            <img
+            <PhotoTile
               src={moment.photoSrc}
               alt=""
-              style={styles.moderationImage}
-              loading="lazy"
+              variant="tile"
+              aspect="1 / 1"
+              style={styles.moderationImageRoot}
+              imageStyle={styles.moderationImage}
             />
           ) : (
             <div style={styles.moderationImageFallback}>no image</div>
@@ -2169,9 +2172,10 @@ const styles = {
   moderationImage: {
     width: "72px",
     height: "72px",
-    objectFit: "cover" as const,
-    borderRadius: "var(--radius-md)",
-    background: "var(--paper-card)",
+  },
+  moderationImageRoot: {
+    width: "72px",
+    height: "72px",
   },
   moderationImageFallback: {
     width: "72px",

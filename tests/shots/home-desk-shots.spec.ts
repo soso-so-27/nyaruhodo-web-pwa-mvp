@@ -24,7 +24,9 @@ const expectedShotNames = [
   "album_missing_b.png",
   "album_missing_c.png",
   "album_bottom.png",
+  "album_own_grid.png",
   "settings.png",
+  "settings_admin_moderation.png",
   "cats.png",
   "onboarding_intro.png",
   "nav_close_up.png",
@@ -236,6 +238,111 @@ test.describe("home desk model shots", () => {
         width: box!.width + 24,
         height: box!.height + 28,
       },
+    });
+  });
+
+  test("album_own_grid", async ({ page }) => {
+    await seedReviewState(page, {
+      now: Date.parse("2026-06-10T05:00:00.000Z"),
+      state: "4",
+      habit: false,
+    });
+    await page.goto("/collection");
+    await page.waitForLoadState("networkidle");
+    await page.getByRole("tab").nth(1).click();
+    await page.waitForTimeout(800);
+    await page.screenshot({
+      path: path.join(shotsDir, "album_own_grid.png"),
+      fullPage: true,
+    });
+  });
+
+  test("settings_admin_moderation", async ({ page }) => {
+    await page.route("**/api/admin/capabilities", async (route) => {
+      await route.fulfill({
+        contentType: "application/json",
+        body: JSON.stringify({
+          isAdmin: true,
+          testToolsEnabled: true,
+          stockAdminEnabled: true,
+        }),
+      });
+    });
+    await page.route("**/api/beta/capabilities", async (route) => {
+      await route.fulfill({
+        contentType: "application/json",
+        body: JSON.stringify({
+          isLoggedIn: true,
+          isBetaParticipant: true,
+          feedbackEnabled: true,
+          supporterVoiceEnabled: false,
+          isBetaSupporter: false,
+        }),
+      });
+    });
+    await page.route("**/api/billing/status", async (route) => {
+      await route.fulfill({
+        contentType: "application/json",
+        body: JSON.stringify({
+          isLoggedIn: true,
+          billingConfigured: false,
+          isBetaSupporter: false,
+          status: "none",
+          canManageBilling: false,
+        }),
+      });
+    });
+    await page.route("**/api/sleeping-delivery/diagnostics", async (route) => {
+      await route.fulfill({
+        contentType: "application/json",
+        body: JSON.stringify({
+          source: "remote",
+          availableCount: 0,
+          candidateCount: 0,
+          excludedCount: 0,
+          unusableCount: 0,
+          blockedCount: 0,
+          adminStockCount: 0,
+          userSharedCount: 0,
+          hiddenCount: 0,
+          reportedCount: 0,
+          rlsReadable: true,
+          checkedAt: new Date().toISOString(),
+        }),
+      });
+    });
+    await page.route("**/api/reports", async (route) => {
+      await route.fulfill({
+        contentType: "application/json",
+        body: JSON.stringify({ reports: [] }),
+      });
+    });
+    await page.route("**/api/moderation/queue", async (route) => {
+      await route.fulfill({
+        contentType: "application/json",
+        body: JSON.stringify({
+          moments: [
+            {
+              id: "moderation-shot-1",
+              localMomentId: "local-moderation-shot-1",
+              photoSrc: ownDataUrl,
+              moderationStatus: "pending",
+              deliveryStatus: "available",
+              createdAt: "2026-06-10T02:40:00.000Z",
+            },
+          ],
+          pendingCount: 1,
+        }),
+      });
+    });
+
+    await page.goto("/settings");
+    await page.waitForLoadState("networkidle");
+    await page.getByRole("tab", { name: "管理" }).click();
+    await page.waitForTimeout(800);
+    await page.screenshot({
+      path: path.join(shotsDir, "settings_admin_moderation.png"),
+      fullPage: true,
     });
   });
 

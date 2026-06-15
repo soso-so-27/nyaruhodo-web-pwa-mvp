@@ -23,6 +23,7 @@ import { AppBottomSheet } from "../ui/AppBottomSheet";
 import { AppCard } from "../ui/AppCard";
 import { AppHeader } from "../ui/AppHeader";
 import { AppIcon } from "../ui/AppIcons";
+import { PhotoTile } from "../ui/PhotoTile";
 import { StoredPhotoImage } from "../ui/StoredPhotoImage";
 import {
   addCatProfile,
@@ -488,13 +489,16 @@ export function CatsPage() {
                     onClick={() => void handleAvatarUpload()}
                     aria-label={`${activeCatProfile.name}のアイコン写真を変更`}
                   >
-                    <StoredPhotoImage
+                    <PhotoTile
                       src={activeAvatarSrc}
                       alt=""
-                      style={
+                      variant="avatar"
+                      fit={activeCatProfile.avatarDataUrl ? "cover" : "contain"}
+                      style={styles.profileHeroAvatarTileRoot}
+                      imageStyle={
                         activeCatProfile.avatarDataUrl
-                          ? styles.profileHeroAvatarPhoto
-                          : styles.profileHeroAvatarImg
+                          ? styles.profileHeroAvatarPhotoTile
+                          : styles.profileHeroAvatarIconTile
                       }
                     />
                   </button>
@@ -813,13 +817,16 @@ export function CatsPage() {
                   onClick={() => handleCatSelect(profile.id)}
                   aria-pressed={isActive}
                 >
-                  <StoredPhotoImage
+                  <PhotoTile
                     src={avatarSrc}
                     alt=""
-                    style={
+                    variant="avatar"
+                    fit={profile.avatarDataUrl ? "cover" : "contain"}
+                    style={styles.catSheetPhotoTileRoot}
+                    imageStyle={
                       profile.avatarDataUrl
-                        ? styles.catSheetPhoto
-                        : styles.catSheetAvatar
+                        ? styles.catSheetPhotoTile
+                        : styles.catSheetAvatarTile
                     }
                   />
                   <span style={styles.catSheetName}>{profile.name}</span>
@@ -882,10 +889,13 @@ function FootprintCard({ milestone }: { milestone: CatSleepingMilestone }) {
       </div>
       {isReached ? (
         <>
-          <StoredPhotoImage
+          <PhotoTile
             src={milestone.src}
             alt=""
-            style={styles.footprintPhoto}
+            variant="tile"
+            aspect="1 / 1"
+            style={styles.footprintPhotoRoot}
+            imageStyle={styles.footprintPhoto}
           />
           <span style={styles.footprintDate}>
             {formatFootprintDate(milestone.reachedAt)}
@@ -1558,26 +1568,27 @@ const styles = {
   profileHeroAvatar: {
     width: "64px",
     height: "64px",
-    borderRadius: "var(--radius-lg)",
-    border: "1px solid var(--line)",
-    background: "color-mix(in srgb, var(--paper) 46%, transparent)",
-    overflow: "hidden",
     display: "flex",
     alignItems: "center",
     justifyContent: "center",
     padding: 0,
+    border: "none",
+    background: "transparent",
     cursor: "pointer",
-    boxShadow: "var(--shadow-e1)",
   },
-  profileHeroAvatarPhoto: {
-    width: "100%",
-    height: "100%",
-    objectFit: "cover",
+  profileHeroAvatarTileRoot: {
+    width: "64px",
+    height: "64px",
   },
-  profileHeroAvatarImg: {
-    width: "50px",
-    height: "50px",
-    objectFit: "contain",
+  profileHeroAvatarPhotoTile: {
+    width: "64px",
+    height: "64px",
+  },
+  profileHeroAvatarIconTile: {
+    width: "64px",
+    height: "64px",
+    padding: "7px",
+    boxSizing: "border-box",
   },
   profileHeroInfo: {
     minWidth: 0,
@@ -1759,11 +1770,11 @@ const styles = {
   },
   footprintPhoto: {
     width: "100%",
+    height: "auto",
     aspectRatio: "1 / 1",
-    minHeight: "64px",
-    borderRadius: "var(--radius-md)",
-    objectFit: "cover",
-    background: "color-mix(in srgb, var(--paper) 56%, transparent)",
+  },
+  footprintPhotoRoot: {
+    width: "100%",
   },
   footprintDate: {
     color: CATS_MUTED,
@@ -1827,21 +1838,21 @@ const styles = {
     background: "color-mix(in srgb, var(--paper-warm) 78%, transparent)",
     border: "1px solid var(--line)",
   },
-  catSheetPhoto: {
+  catSheetPhotoTileRoot: {
     width: "42px",
     height: "42px",
-    borderRadius: "var(--radius-md)",
-    objectFit: "cover",
-    background: "color-mix(in srgb, var(--paper) 58%, transparent)",
   },
-  catSheetAvatar: {
+  catSheetPhotoTile: {
     width: "42px",
     height: "42px",
-    borderRadius: "var(--radius-md)",
-    objectFit: "contain",
-    background: "color-mix(in srgb, var(--paper) 58%, transparent)",
-    padding: "5px",
+    border: "3px solid var(--paper)",
+  },
+  catSheetAvatarTile: {
+    width: "42px",
+    height: "42px",
+    padding: "6px",
     boxSizing: "border-box",
+    border: "3px solid var(--paper)",
   },
   catSheetName: {
     fontFamily: CATS_SERIF,

@@ -55,6 +55,7 @@ import { AppCard } from "../ui/AppCard";
 import { AppHeader } from "../ui/AppHeader";
 import { AppIcon } from "../ui/AppIcons";
 import { EmptyState } from "../ui/EmptyState";
+import { PhotoTile } from "../ui/PhotoTile";
 import { StampPair } from "../ui/StampPair";
 import { StoredPhotoImage } from "../ui/StoredPhotoImage";
 import { color, radius, shadow } from "../ui/designTokens";
@@ -1162,10 +1163,13 @@ function AlbumOwnGrid({
           disabled={photo.kind !== "sleeping"}
           aria-label="うちのこ写真"
         >
-          <StoredPhotoImage
+          <PhotoTile
             src={getPhotoThumbnailSrc(photo)}
             alt=""
-            style={styles.ownPhotoGridImage}
+            variant="tile"
+            aspect="1 / 1"
+            style={styles.ownPhotoGridTileRoot}
+            imageStyle={styles.ownPhotoGridTile}
           />
         </button>
       ))}
@@ -1301,18 +1305,20 @@ function AlbumDaySectionRow({
     <>
       <div style={styles.dayPhotoStrip}>
         {visiblePhotos.map((photo) => (
-          <span key={photo.id} style={styles.dayPhotoThumb}>
-            <StoredPhotoImage
-              src={getPhotoThumbnailSrc(photo)}
-              alt=""
-              style={styles.boxPhotoImg}
-              onStorageDataUrl={
-                section.kind === "other"
-                  ? (dataUrl) => writeBackDeliveredPhotoDataUrl(photo, dataUrl)
-                  : undefined
-              }
-            />
-          </span>
+          <PhotoTile
+            key={photo.id}
+            src={getPhotoThumbnailSrc(photo)}
+            alt=""
+            variant="tile"
+            aspect="1 / 1"
+            style={styles.dayPhotoThumb}
+            imageStyle={styles.dayPhotoThumbTile}
+            onStorageDataUrl={
+              section.kind === "other"
+                ? (dataUrl) => writeBackDeliveredPhotoDataUrl(photo, dataUrl)
+                : undefined
+            }
+          />
         ))}
       </div>
     </>
@@ -3320,22 +3326,21 @@ const styles = {
     gap: "8px",
   },
   ownPhotoGridItem: {
-    aspectRatio: "1 / 1",
     border: "none",
-    borderRadius: radius.lg,
-    overflow: "hidden",
-    background: color.surfaceSoft,
+    background: "transparent",
     padding: 0,
-    boxShadow: shadow.soft,
     cursor: "pointer",
   },
   ownPhotoGridItemStatic: {
     cursor: "default",
   },
-  ownPhotoGridImage: {
+  ownPhotoGridTileRoot: {
     width: "100%",
-    height: "100%",
-    objectFit: "cover",
+  },
+  ownPhotoGridTile: {
+    width: "100%",
+    height: "auto",
+    aspectRatio: "1 / 1",
     display: "block",
   },
   daySectionRow: {
@@ -3359,13 +3364,13 @@ const styles = {
     alignItems: "center",
   },
   dayPhotoThumb: {
-    aspectRatio: "1 / 1",
+    width: "100%",
     minWidth: 0,
-    borderRadius: radius.lg,
-    overflow: "hidden",
-    background: color.surfaceSoft,
-    border: "4px solid rgba(255,253,248,0.74)",
-    boxShadow: shadow.soft,
+  },
+  dayPhotoThumbTile: {
+    width: "100%",
+    height: "auto",
+    aspectRatio: "1 / 1",
   },
   boxSummaryCard: {
     position: "relative",
