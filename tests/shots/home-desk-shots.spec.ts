@@ -23,6 +23,7 @@ const expectedShotNames = [
   "album_missing_a.png",
   "album_missing_b.png",
   "album_missing_c.png",
+  "album_bottom.png",
   "settings.png",
   "cats.png",
   "onboarding_intro.png",
@@ -189,6 +190,12 @@ test.describe("home desk model shots", () => {
     );
     await missingC.screenshot({
       path: path.join(shotsDir, "album_missing_c.png"),
+    });
+    await page.evaluate(() => window.scrollTo(0, document.body.scrollHeight));
+    await page.waitForTimeout(150);
+    await page.screenshot({
+      path: path.join(shotsDir, "album_bottom.png"),
+      fullPage: false,
     });
   });
 

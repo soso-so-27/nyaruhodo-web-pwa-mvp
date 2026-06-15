@@ -1230,7 +1230,7 @@ function AlbumDailyPair({
         }}
       >
         <StampPair
-          size="album"
+          size={compact ? "albumCompact" : "album"}
           ownPhoto={targetPhoto ? { src: getPhotoThumbnailSrc(targetPhoto) } : null}
           deliveredPhoto={
             deliveredPhoto ? { src: getPhotoThumbnailSrc(deliveredPhoto) } : null
@@ -1263,6 +1263,7 @@ function AlbumDailyPair({
               )
             ) : undefined
           }
+          deliveredFallbackPlacement={hasUnopenedOtherDelivery ? "stamp" : "below"}
           onOwnClick={targetPhoto ? () => onOpenBox("sleeping", group.key) : undefined}
           onDeliveredClick={
             deliveredPhoto
@@ -3035,7 +3036,7 @@ const styles = {
     width: "min(100%, 480px)",
     margin: "0 auto",
     padding:
-      "calc(18px + env(safe-area-inset-top)) 24px calc(var(--bottom-nav-height) + var(--bottom-nav-bottom-offset) + 24px + env(safe-area-inset-bottom))",
+      "calc(18px + env(safe-area-inset-top)) 24px calc(var(--bottom-nav-height) + var(--bottom-nav-bottom-offset) + 96px + env(safe-area-inset-bottom))",
   },
   header: {
     marginBottom: "24px",

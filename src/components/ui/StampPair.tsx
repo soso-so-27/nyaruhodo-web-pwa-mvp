@@ -4,7 +4,7 @@ import type { CSSProperties, MouseEvent, ReactNode } from "react";
 import { color, radius, shadow, spacing, typography } from "./designTokens";
 import { StoredPhotoImage } from "./StoredPhotoImage";
 
-type StampPairSize = "home" | "album";
+type StampPairSize = "home" | "album" | "albumCompact";
 
 type StampPairPhoto = {
   src: string;
@@ -22,6 +22,7 @@ type StampPairProps = {
   deliveredAriaLabel?: string;
   ownFallback?: ReactNode;
   deliveredFallback?: ReactNode;
+  deliveredFallbackPlacement?: "stamp" | "below";
   onOwnClick?: () => void;
   onDeliveredClick?: () => void;
   onDeliveredStorageDataUrl?: (dataUrl: string) => void;
@@ -42,6 +43,7 @@ export function StampPair({
   deliveredAriaLabel,
   ownFallback,
   deliveredFallback,
+  deliveredFallbackPlacement = "stamp",
   onOwnClick,
   onDeliveredClick,
   onDeliveredStorageDataUrl,
@@ -50,14 +52,31 @@ export function StampPair({
   "data-testid": testId,
 }: StampPairProps) {
   const isHome = size === "home";
-  const frameStyle = isHome ? styles.homeFrame : styles.albumFrame;
+  const isAlbumCompact = size === "albumCompact";
+  const frameStyle = isHome
+    ? styles.homeFrame
+    : isAlbumCompact
+      ? styles.albumCompactFrame
+      : styles.albumFrame;
   const stampStyle = isHome ? styles.homeStamp : styles.albumStamp;
+  const shouldShowStampFallback =
+    !deliveredPhoto &&
+    Boolean(deliveredFallback) &&
+    deliveredFallbackPlacement === "stamp";
+  const shouldShowBelowFallback =
+    !deliveredPhoto &&
+    Boolean(deliveredFallback) &&
+    deliveredFallbackPlacement === "below";
 
   return (
     <div
       style={{
         ...styles.root,
-        ...(isHome ? styles.homeRoot : styles.albumRoot),
+        ...(isHome
+          ? styles.homeRoot
+          : isAlbumCompact
+            ? styles.albumCompactRoot
+            : styles.albumRoot),
       }}
       data-testid={testId}
     >
@@ -95,7 +114,7 @@ export function StampPair({
               onStorageDataUrl={onDeliveredStorageDataUrl}
             />
           </PhotoButton>
-        ) : deliveredFallback ? (
+        ) : shouldShowStampFallback ? (
           <button
             type="button"
             style={{ ...styles.stampMissing, ...stampStyle, ...styles.buttonReset }}
@@ -114,6 +133,17 @@ export function StampPair({
             <span>{deliveredLabel}</span>
           ) : null}
         </div>
+      ) : null}
+      {shouldShowBelowFallback ? (
+        <button
+          type="button"
+          style={{ ...styles.belowNotice, ...styles.buttonReset }}
+          onClick={onDeliveredClick}
+          disabled={!onDeliveredClick}
+          aria-label={deliveredAriaLabel}
+        >
+          {deliveredFallback}
+        </button>
       ) : null}
     </div>
   );
@@ -160,6 +190,9 @@ const styles = {
   albumRoot: {
     width: "100%",
   },
+  albumCompactRoot: {
+    width: "min(100%, 300px)",
+  },
   ownFrame: {
     position: "relative",
     display: "block",
@@ -174,6 +207,11 @@ const styles = {
     borderRadius: radius.xl,
   },
   albumFrame: {
+    width: "100%",
+    aspectRatio: "1 / 1",
+    borderRadius: radius.lg,
+  },
+  albumCompactFrame: {
     width: "100%",
     aspectRatio: "1 / 1",
     borderRadius: radius.lg,
@@ -265,6 +303,22 @@ const styles = {
     letterSpacing: "var(--tracking-body)",
     textAlign: "center",
     boxShadow: shadow.e1,
+  },
+  belowNotice: {
+    maxWidth: "100%",
+    padding: `${spacing.xs} ${spacing.sm}`,
+    border: "none",
+    background: "transparent",
+    color: color.textMuted,
+    fontFamily: typography.fontDisplay,
+    fontSize: 12,
+    fontWeight: 400,
+    lineHeight: 1.65,
+    letterSpacing: "var(--tracking-body)",
+    textAlign: "center",
+    whiteSpace: "normal",
+    overflowWrap: "break-word",
+    wordBreak: "keep-all",
   },
   labels: {
     display: "flex",
