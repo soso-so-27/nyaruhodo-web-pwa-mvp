@@ -23,6 +23,9 @@ import { AppBottomSheet } from "../ui/AppBottomSheet";
 import { AppCard } from "../ui/AppCard";
 import { AppHeader } from "../ui/AppHeader";
 import { AppIcon } from "../ui/AppIcons";
+import { AppSegmented } from "../ui/AppSegmented";
+import { AppTag } from "../ui/AppTag";
+import { AppTextField } from "../ui/AppTextField";
 import { PhotoTile } from "../ui/PhotoTile";
 import { StoredPhotoImage } from "../ui/StoredPhotoImage";
 import {
@@ -52,7 +55,6 @@ const CATS_TEXT_STRONG = "var(--ink)";
 const CATS_MUTED = "var(--ink-soft)";
 const CATS_FAINT = "var(--ink-faint)";
 const CATS_PAPER = "var(--paper)";
-const CATS_BORDER = "var(--line)";
 const CATS_SERIF = "var(--font-display)";
 const CATS_SURFACE: CSSProperties = {
   position: "relative",
@@ -430,19 +432,16 @@ export function CatsPage() {
 
         {isAddingCat && !isOnboardingCompletionView ? (
           <AppCard as="div" variant="inset" padding="sm" style={styles.editor}>
-            <label style={styles.label} htmlFor="new-cat-name">
-              {"この子の名前"}
-            </label>
-            <input
+            <AppTextField
               id="new-cat-name"
               type="text"
+              label="この子の名前"
               value={newCatNameInput}
               onChange={(event) => {
                 setNewCatNameInput(event.target.value);
                 setDuplicateCatNameToConfirm(null);
               }}
               placeholder={"例：麦"}
-              style={styles.input}
             />
             {duplicateCatNameToConfirm ? (
               <p style={styles.duplicateCatWarning}>
@@ -609,17 +608,17 @@ export function CatsPage() {
                 ) : null}
                 <div style={styles.profileNotes}>
                   {activeGender ? (
-                    <span style={styles.profileNote}>{activeGender}</span>
+                    <AppTag>{activeGender}</AppTag>
                   ) : null}
                   {activeCatProfile.basicInfo?.breed ? (
-                    <span style={styles.profileNote}>
+                    <AppTag>
                       {activeCatProfile.basicInfo.breed}
-                    </span>
+                    </AppTag>
                   ) : null}
                   {activeCatProfile.appearance?.coat ? (
-                    <span style={styles.profileNote}>
+                    <AppTag>
                       {getCoatLabel(activeCatProfile.appearance.coat)}
-                    </span>
+                    </AppTag>
                   ) : null}
                 </div>
                 {activeGender ||
@@ -691,70 +690,52 @@ export function CatsPage() {
                 {!isOnboardingProfileSetup ? <hr style={styles.divider} /> : null}
                 {isEditingCatName ? (
                   <AppCard as="div" variant="inset" padding="sm" style={styles.editor}>
-                    <label style={styles.label} htmlFor="cat-name">
-                      {"この子の名前"}
-                    </label>
-                    <input
+                    <AppTextField
                       id="cat-name"
                       type="text"
+                      label="この子の名前"
                       value={catNameInput}
                       onChange={(event) => setCatNameInput(event.target.value)}
                       placeholder={isOnboardingProfileSetup ? "例：むぎ" : "例：ミケ"}
-                      style={styles.input}
                     />
                     {!isOnboardingProfileSetup ? (
                       <>
-                        <p style={styles.editLabel}>家に来た日</p>
-                        <input
+                        <AppTextField
                           type="date"
+                          label="家に来た日"
                           value={editFamilySinceDate}
                           onChange={(event) =>
                             setEditFamilySinceDate(event.target.value)
                           }
                           max={new Date().toISOString().split("T")[0]}
-                          style={styles.editInput}
                         />
 
-                        <p style={styles.editLabel}>生年月日</p>
-                        <input
+                        <AppTextField
                           type="date"
+                          label="生年月日"
                           value={editBirthDate}
                           onChange={(event) => setEditBirthDate(event.target.value)}
                           max={new Date().toISOString().split("T")[0]}
-                          style={styles.editInput}
                         />
 
-                        <p style={styles.editLabel}>性別</p>
-                        <div style={styles.genderButtons}>
-                          {[
+                        <AppSegmented<EditableGender>
+                          value={editGender}
+                          ariaLabel="性別"
+                          columns={3}
+                          onChange={setEditGender}
+                          options={[
                             { value: "male", label: "男の子" },
                             { value: "female", label: "女の子" },
                             { value: "unknown", label: "わからない" },
-                          ].map((option) => (
-                            <button
-                              key={option.value}
-                              type="button"
-                              onClick={() =>
-                                setEditGender(option.value as EditableGender)
-                              }
-                              style={
-                                editGender === option.value
-                                  ? { ...styles.genderBtn, ...styles.genderBtnActive }
-                                  : styles.genderBtn
-                              }
-                            >
-                              {option.label}
-                            </button>
-                          ))}
-                        </div>
+                          ]}
+                        />
 
-                        <p style={styles.editLabel}>猫種</p>
-                        <input
+                        <AppTextField
                           type="text"
+                          label="猫種"
                           value={editBreed}
                           onChange={(event) => setEditBreed(event.target.value)}
                           placeholder="例：サバトラ、雑種・ミックス"
-                          style={styles.editInput}
                         />
                       </>
                     ) : null}
@@ -1168,40 +1149,30 @@ function CoatSelector({
       <div style={styles.coatHeader}>
         <p style={styles.sectionLabel}>{"毛色"}</p>
       </div>
-      <div style={styles.coatOptions}>
-        {COAT_OPTIONS.map((option) => {
-          const isSelected = option.value === currentCoat;
-
-          return (
-            <button
-              key={option.value}
-              type="button"
-              onClick={() => onSelect(option.value)}
-              style={
-                isSelected
-                  ? {
-                      ...styles.coatButton,
-                      ...styles.coatButtonActive,
-                    }
-                  : styles.coatButton
-              }
-              aria-pressed={isSelected}
-            >
-              <span
-                style={{
-                  ...styles.coatSwatch,
-                  background:
-                    option.value === "calico"
-                      ? "linear-gradient(135deg, #faf6ee 0%, #faf6ee 38%, #e4cfb2 39%, #e4cfb2 64%, #d9d6cf 65%, #d9d6cf 100%)"
-                      : option.color,
-                }}
-                aria-hidden="true"
-              />
-              {option.label}
-            </button>
-          );
-        })}
-      </div>
+      <AppSegmented<EditableCoat>
+        value={currentCoat ?? ""}
+        ariaLabel="毛色"
+        onChange={(value) => {
+          if (value) {
+            onSelect(value);
+          }
+        }}
+        options={COAT_OPTIONS.map((option) => ({
+          value: option.value,
+          label: option.label,
+          leading: (
+            <span
+              style={{
+                ...styles.coatSwatch,
+                background:
+                  option.value === "calico"
+                    ? "linear-gradient(135deg, #faf6ee 0%, #faf6ee 38%, #e4cfb2 39%, #e4cfb2 64%, #d9d6cf 65%, #d9d6cf 100%)"
+                    : option.color,
+              }}
+            />
+          ),
+        }))}
+      />
     </AppCard>
   );
 }
@@ -1797,16 +1768,6 @@ const styles = {
     gap: "8px",
     marginTop: "12px",
   },
-  profileNote: {
-    border: "1px solid var(--line)",
-    borderRadius: "var(--radius-full)",
-    background: "color-mix(in srgb, var(--paper) 32%, transparent)",
-    color: CATS_MUTED,
-    fontSize: "12px",
-    fontWeight: 500,
-    lineHeight: 1,
-    padding: "6px 9px",
-  },
   zukanHint: {
     margin: "8px 0 0",
     color: CATS_FAINT,
@@ -1991,31 +1952,6 @@ const styles = {
     gap: "10px",
     marginBottom: "8px",
   },
-  coatOptions: {
-    display: "flex",
-    flexWrap: "wrap",
-    gap: "8px",
-  },
-  coatButton: {
-    display: "inline-flex",
-    alignItems: "center",
-    gap: "7px",
-    minHeight: "34px",
-    border: `1px solid ${CATS_BORDER}`,
-    borderRadius: "var(--radius-full)",
-    background: "color-mix(in srgb, var(--paper) 64%, transparent)",
-    color: CATS_TEXT,
-    fontSize: "13px",
-    fontWeight: 500,
-    letterSpacing: 0,
-    padding: "0 11px",
-    cursor: "pointer",
-  },
-  coatButtonActive: {
-    borderColor: "var(--ink-soft)",
-    background: CATS_PAPER,
-    color: CATS_TEXT,
-  },
   coatSwatch: {
     display: "inline-block",
     width: "14px",
@@ -2029,70 +1965,11 @@ const styles = {
     display: "grid",
     gap: "10px",
   },
-  label: {
-    display: "block",
-    margin: 0,
-    color: CATS_MUTED,
-    fontSize: "12px",
-    fontWeight: 500,
-    letterSpacing: 0,
-  },
-  input: {
-    width: "100%",
-    boxSizing: "border-box",
-    minHeight: "48px",
-    border: "1px solid var(--line)",
-    borderRadius: "var(--radius-md)",
-    background: "color-mix(in srgb, var(--paper) 72%, transparent)",
-    color: CATS_TEXT,
-    fontSize: "13px",
-    fontWeight: 500,
-    letterSpacing: 0,
-    padding: "0 14px",
-  },
   duplicateCatWarning: {
     margin: "-2px 0 0",
     color: CATS_MUTED,
     fontSize: "12px",
     lineHeight: 1.6,
-  },
-  editLabel: {
-    fontSize: "12px",
-    fontWeight: 500,
-    color: CATS_MUTED,
-    margin: "2px 0 -4px",
-  },
-  editInput: {
-    width: "100%",
-    boxSizing: "border-box",
-    minHeight: "44px",
-    border: "1px solid var(--line)",
-    borderRadius: "var(--radius-md)",
-    background: "color-mix(in srgb, var(--paper) 72%, transparent)",
-    color: CATS_TEXT,
-    fontSize: "13px",
-    padding: "0 14px",
-  },
-  genderButtons: {
-    display: "grid",
-    gridTemplateColumns: "repeat(3, 1fr)",
-    gap: "6px",
-  },
-  genderBtn: {
-    minHeight: "36px",
-    border: "1px solid var(--line)",
-    borderRadius: "var(--radius-full)",
-    background: "color-mix(in srgb, var(--paper) 42%, transparent)",
-    color: CATS_TEXT,
-    fontSize: "12px",
-    fontWeight: 500,
-    cursor: "pointer",
-  },
-  genderBtnActive: {
-    border: "1px solid var(--ink-soft)",
-    background: CATS_PAPER,
-    color: CATS_TEXT,
-    fontWeight: 500,
   },
   actions: {
     display: "flex",

@@ -40,6 +40,8 @@ import {
 } from "../ui/appTheme";
 import { AppButton } from "../ui/AppButton";
 import { AppCard } from "../ui/AppCard";
+import { AppTextField } from "../ui/AppTextField";
+import { AppToggle } from "../ui/AppToggle";
 import { PhotoTile } from "../ui/PhotoTile";
 import {
   readKeptExchangePhotoStorageDebug,
@@ -710,17 +712,11 @@ export function SettingsPage() {
                 <span style={styles.rowLabel}>ひらく音</span>
                 <span style={styles.rowValue}>手紙をひらいたときだけ</span>
               </div>
-              <button
-                type="button"
-                onClick={() => updateOpenSoundEnabled(!openSoundEnabled)}
-                style={{
-                  ...styles.flagToggleButton,
-                  ...(openSoundEnabled ? styles.flagToggleButtonActive : {}),
-                }}
-                aria-pressed={openSoundEnabled}
-              >
-                {openSoundEnabled ? "ON" : "OFF"}
-              </button>
+              <AppToggle
+                checked={openSoundEnabled}
+                onChange={updateOpenSoundEnabled}
+                label="ひらく音"
+              />
             </div>
           </AppCard>
         </section>
@@ -825,20 +821,21 @@ export function SettingsPage() {
                   <span style={styles.rowLabel}>ひらく音 候補</span>
                   <span style={styles.rowValue}>実機A/B用</span>
                 </div>
-                <select
+                <AppTextField
+                  as="select"
                   value={openSoundCandidate}
                   onChange={(event) =>
                     updateOpenSoundCandidate(
                       event.currentTarget.value as OpenSoundCandidateId,
                     )
                   }
-                  style={styles.soundCandidateSelect}
                   aria-label="ひらく音の候補"
+                  rootStyle={styles.soundCandidateField}
                 >
                   <option value="1">候補1</option>
                   <option value="2">候補2</option>
                   <option value="3">候補3</option>
-                </select>
+                </AppTextField>
               </div>
               <div style={styles.divider} />
               <AppButton
@@ -1070,34 +1067,30 @@ function BetaFeedbackForm({
 }) {
   return (
     <form onSubmit={onSubmit} style={styles.feedbackForm}>
-      <label style={styles.feedbackField}>
-        <span style={styles.feedbackLabel}>種類</span>
-        <select
-          value={category}
-          onChange={(event) =>
-            onCategoryChange(event.target.value as BetaFeedbackCategory)
-          }
-          style={styles.feedbackSelect}
-        >
-          <option value="good">よかった</option>
-          <option value="confusing">わかりにくい</option>
-          <option value="bug">バグっぽい</option>
-          <option value="request">要望</option>
-          <option value="other">その他</option>
-        </select>
-      </label>
-      <label style={styles.feedbackField}>
-        <span style={styles.feedbackLabel}>本文</span>
-        <textarea
-          value={message}
-          onChange={(event) => onMessageChange(event.target.value)}
-          maxLength={2000}
-          required
-          rows={5}
-          placeholder="感じたことを書いてください"
-          style={styles.feedbackTextarea}
-        />
-      </label>
+      <AppTextField
+        as="select"
+        label="種類"
+        value={category}
+        onChange={(event) =>
+          onCategoryChange(event.target.value as BetaFeedbackCategory)
+        }
+      >
+        <option value="good">よかった</option>
+        <option value="confusing">わかりにくい</option>
+        <option value="bug">バグっぽい</option>
+        <option value="request">要望</option>
+        <option value="other">その他</option>
+      </AppTextField>
+      <AppTextField
+        as="textarea"
+        label="本文"
+        value={message}
+        onChange={(event) => onMessageChange(event.target.value)}
+        maxLength={2000}
+        required
+        rows={5}
+        placeholder="感じたことを書いてください"
+      />
       <AppButton
         type="submit"
         variant="primary"
@@ -2202,32 +2195,8 @@ const styles = {
     gridTemplateColumns: "1fr 1fr",
     gap: "8px",
   },
-  flagToggleButton: {
-    minHeight: "44px",
-    borderRadius: "var(--radius-md)",
-    border: "1px solid rgba(120,108,94,0.16)",
-    background: "rgba(255,253,248,0.72)",
-    color: "var(--ink-soft)",
-    fontSize: "13px",
-    fontWeight: 500,
-    cursor: "pointer",
-  },
-  flagToggleButtonActive: {
-    border: "1px solid var(--line)",
-    background: "var(--paper-card)",
-    color: "var(--ink)",
-  },
-  soundCandidateSelect: {
-    minHeight: "38px",
-    border: "1px solid var(--line)",
-    borderRadius: "var(--radius-md)",
-    background: "color-mix(in srgb, var(--paper) 72%, transparent)",
-    color: "var(--ink)",
-    fontFamily: "var(--font-display)",
-    fontSize: "13px",
-    fontWeight: 400,
-    letterSpacing: "var(--tracking-label)",
-    padding: "0 10px",
+  soundCandidateField: {
+    minWidth: "112px",
   },
   authDebugRow: {
     display: "grid",
@@ -2273,37 +2242,6 @@ const styles = {
     padding: "0 0 14px",
     display: "grid",
     gap: "12px",
-  },
-  feedbackField: {
-    display: "grid",
-    gap: "6px",
-  },
-  feedbackLabel: {
-    color: "var(--ink-soft)",
-    fontSize: "12px",
-    fontWeight: 500,
-  },
-  feedbackSelect: {
-    width: "100%",
-    border: "1px solid #eee8df",
-    borderRadius: "var(--radius-md)",
-    background: "rgba(255,255,255,0.62)",
-    color: "#2a2a28",
-    fontSize: "13px",
-    fontWeight: 500,
-    padding: "11px 12px",
-  },
-  feedbackTextarea: {
-    width: "100%",
-    border: "1px solid #eee8df",
-    borderRadius: "var(--radius-lg)",
-    background: "rgba(255,255,255,0.62)",
-    color: "#2a2a28",
-    fontSize: "13px",
-    lineHeight: 1.65,
-    padding: "12px",
-    resize: "vertical",
-    boxSizing: "border-box",
   },
   feedbackStatus: {
     margin: 0,
