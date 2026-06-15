@@ -30,6 +30,8 @@ import {
 import {
   autoOpenExpiredEveningDeliveries,
   getFirstEveningDeliveryTargetDateKey,
+  getJstDateKey,
+  getJstDeliveryTime,
   readEveningDeliveryStore,
 } from "../../lib/home/eveningDelivery";
 import { backupOwnSleepingPhotoMoment } from "../../lib/home/sleepingPhotoBackup";
@@ -52,7 +54,6 @@ import { BottomNavigation } from "../navigation/BottomNavigation";
 import { AppBottomSheet } from "../ui/AppBottomSheet";
 import { AppButton } from "../ui/AppButton";
 import { AppCard } from "../ui/AppCard";
-import { AppHeader } from "../ui/AppHeader";
 import { AppIcon } from "../ui/AppIcons";
 import { EmptyState } from "../ui/EmptyState";
 import { PhotoTile } from "../ui/PhotoTile";
@@ -812,12 +813,6 @@ export function CollectionPage() {
     <main style={styles.page}>
       <PageBackdrop />
       <div style={styles.container}>
-        <AppHeader
-          variant="pageTitle"
-          title="アルバム"
-          style={styles.header}
-        />
-
         <BoxOverview
           dayGroups={albumDayGroups}
           activeScope={activeAlbumScope}
@@ -915,7 +910,7 @@ function BoxOverview({
       ),
     [activeScope, dayGroups, firstEveningDeliveryTargetDateKey],
   );
-  const todayKey = getLocalDateKey(Date.now());
+  const todayKey = getJstDateKey(Date.now());
   const todayGroup =
     scopedDayGroups.find((group) => group.key === todayKey) ??
     (activeScope === "daily" ? createEmptyTodayAlbumGroup() : null);
@@ -962,14 +957,6 @@ function AlbumTodayCard({
 }) {
   return (
     <section style={styles.todayAlbumCard} aria-label="きょうのアルバム">
-      <div style={styles.todayAlbumHeader}>
-        <div>
-          <h2 style={styles.todayAlbumTitle}>きょう</h2>
-          {group.subLabel ? (
-            <p style={styles.albumKicker}>{group.subLabel}</p>
-          ) : null}
-        </div>
-      </div>
       {group.total > 0 ? (
         <AlbumDaySections
           group={group}
@@ -1077,16 +1064,20 @@ function AlbumDayCard({
   catName: string;
   onOpenBox: (kind: BoxDetailKind, dateKey?: string | null) => void;
 }) {
+  const shouldShowHeading = /\d/.test(group.label);
+
   return (
     <article style={styles.recentDayCard}>
-      <div style={styles.recentDayHeader}>
-        <div>
-          <h3 style={styles.recentDayTitle}>{group.label}</h3>
-          {group.subLabel ? (
-            <p style={styles.recentDaySub}>{group.subLabel}</p>
-          ) : null}
+      {shouldShowHeading ? (
+        <div style={styles.recentDayHeader}>
+          <div>
+            <h3 style={styles.recentDayTitle}>{group.label}</h3>
+            {group.subLabel ? (
+              <p style={styles.recentDaySub}>{group.subLabel}</p>
+            ) : null}
+          </div>
         </div>
-      </div>
+      ) : null}
       <AlbumDaySections
         group={group}
         scope={scope}
@@ -1208,7 +1199,7 @@ function AlbumDailyPair({
     .flatMap((section) => section.photos);
   const deliveredPhotos =
     group.sections.find((section) => section.kind === "other")?.photos ?? [];
-  const shouldShowOtherSlot = shouldShowOtherDeliverySlot(
+  const shouldShowOtherSlot = shouldResolveOtherDeliverySlot(
     group.key,
     firstEveningDeliveryTargetDateKey,
   );
@@ -2405,7 +2396,7 @@ function getBoxPhotoIdentity(photo: BoxPreviewPhoto) {
 }
 
 function createEmptyTodayAlbumGroup(): AlbumDayGroup {
-  const key = getLocalDateKey(Date.now());
+  const key = getJstDateKey(Date.now());
 
   return {
     key,
@@ -2431,7 +2422,7 @@ function filterAlbumDayGroupsByScope(
 
       if (
         scope === "daily" &&
-        !shouldShowOtherDeliverySlot(
+        !shouldResolveOtherDeliverySlot(
           group.key,
           firstEveningDeliveryTargetDateKey,
         )
@@ -2466,6 +2457,24 @@ function shouldShowOtherDeliverySlot(
   return groupKey >= firstEveningDeliveryTargetDateKey;
 }
 
+function shouldResolveOtherDeliverySlot(
+  groupKey: string,
+  firstEveningDeliveryTargetDateKey: string | null,
+  now = Date.now(),
+) {
+  if (!shouldShowOtherDeliverySlot(groupKey, firstEveningDeliveryTargetDateKey)) {
+    return false;
+  }
+
+  const todayKey = getJstDateKey(now);
+
+  if (groupKey === todayKey && now < getJstDeliveryTime(todayKey)) {
+    return false;
+  }
+
+  return true;
+}
+
 function filterBoxPhotosByDate(
   photos: BoxPreviewPhoto[],
   dateKey: string | null,
@@ -2493,8 +2502,16 @@ function getBoxPhotoTimestamp(photo: BoxPreviewPhoto) {
   return photo.deliveredAt ?? photo.createdAt ?? parseTimestampFromId(photo.id) ?? Date.now();
 }
 
-function getPhotoThumbnailSrc(photo: { src: string; thumbnailSrc?: string }) {
-  return isUsableStoredPhotoSrc(photo.thumbnailSrc) ? photo.thumbnailSrc : photo.src;
+function getPhotoThumbnailSrc(photo: {
+  src: string;
+  thumbnailSrc?: string;
+  displaySrc?: string;
+}) {
+  if (isUsableStoredPhotoSrc(photo.thumbnailSrc)) {
+    return photo.thumbnailSrc;
+  }
+
+  return isUsableStoredPhotoSrc(photo.displaySrc) ? photo.displaySrc : photo.src;
 }
 
 function getPhotoDetailSrc(photo: {

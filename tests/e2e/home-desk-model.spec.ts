@@ -309,7 +309,7 @@ test.describe("home desk model", () => {
     await expect(page.getByText("むぎ、ねてる?")).toHaveCount(0);
   });
 
-  test("only labels the delivered tile during week one", async ({ page }) => {
+  test("omits visible photo labels in the opened pair", async ({ page }) => {
     await seedDeskState(page, "4");
     await page.goto("/home");
     await page.waitForLoadState("networkidle");
@@ -318,7 +318,7 @@ test.describe("home desk model", () => {
       "data-state",
       "4",
     );
-    await expect(page.getByText(/\u3069\u3053\u304b\u306e\u3053/)).toBeVisible();
+    await expect(page.getByText(/\u3069\u3053\u304b\u306e\u3053/)).toHaveCount(0);
     await expect(page.getByText(/\u3080\u304e/)).toHaveCount(0);
   });
 

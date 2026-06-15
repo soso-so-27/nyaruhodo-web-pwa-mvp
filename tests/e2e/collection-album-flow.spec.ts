@@ -520,15 +520,16 @@ test.describe("collection album flow", () => {
     await page.waitForLoadState("networkidle");
 
     await expect(page.locator('button[aria-label="どこかのこを開く"]')).toHaveCount(
-      1,
+      0,
     );
     await expect(page.getByText("この日の ねがおは ありません")).toHaveCount(0);
+    await expect(page.getByTestId("album-daily-missing-letter")).toHaveCount(0);
   });
 
   test("renders daily entries as opened letter cards with a missing-letter slot", async ({
     page,
   }) => {
-    const now = Date.parse("2026-06-10T10:00:00.000Z");
+    const now = Date.parse("2026-06-10T12:00:00.000Z");
     const todayKey = "2026-06-10";
 
     await page.addInitScript(

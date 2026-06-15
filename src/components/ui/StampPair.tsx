@@ -47,8 +47,8 @@ export function StampPair({
   onOwnClick,
   onDeliveredClick,
   onDeliveredStorageDataUrl,
-  showOwnLabel = true,
-  showDeliveredLabel = true,
+  showOwnLabel = false,
+  showDeliveredLabel = false,
   "data-testid": testId,
 }: StampPairProps) {
   const isHome = size === "home";

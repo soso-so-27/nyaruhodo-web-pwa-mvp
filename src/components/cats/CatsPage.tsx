@@ -106,10 +106,7 @@ export function CatsPage() {
   const familyDuration = formatFamilyDuration(
     activeCatProfile?.basicInfo?.familySinceDate,
   );
-  const birthdayStatus = getBirthdayStatus(
-    activeCatProfile?.basicInfo?.birthDate,
-    activeCatProfile?.name ?? catName,
-  );
+  const birthdayStatus = getBirthdayStatus(activeCatProfile?.basicInfo?.birthDate);
   const takenSleepingPhotoCount = activeCatId
     ? readOwnSleepingPhotoCount(activeCatId)
     : 0;
@@ -554,12 +551,9 @@ export function CatsPage() {
 
                 <AppCard as="div" variant="inset" padding="md" style={styles.familyHero}>
                   <span style={styles.familyHeroLabel}>家族になって</span>
-                  <span style={styles.familyHeroDays}>{familyDuration.primary}</span>
-                  {familyDuration.secondary ? (
-                    <span style={styles.familyHeroSub}>
-                      {familyDuration.secondary}
-                    </span>
-                  ) : null}
+                  <span style={styles.familyHeroDays}>
+                    {familyDuration.secondary || familyDuration.primary}
+                  </span>
                 </AppCard>
 
                 <AppCard as="div" variant="inset" padding="sm" style={styles.recordList}>
@@ -593,7 +587,10 @@ export function CatsPage() {
                   </div>
                 </AppCard>
                 {birthdayStatus ? (
-                  <div
+                  <AppCard
+                    as="div"
+                    variant="inset"
+                    padding="sm"
                     style={
                       birthdayStatus.isToday
                         ? { ...styles.catDayNote, ...styles.catDayNoteToday }
@@ -601,10 +598,7 @@ export function CatsPage() {
                     }
                   >
                     <span style={styles.catDayText}>{birthdayStatus.copy}</span>
-                    <span style={styles.catDayHint}>
-                      誕生日は、{catName}自身の日として そっと置いておきます。
-                    </span>
-                  </div>
+                  </AppCard>
                 ) : null}
                 <div style={styles.profileNotes}>
                   {activeGender ? (
@@ -621,11 +615,6 @@ export function CatsPage() {
                     </AppTag>
                   ) : null}
                 </div>
-                {activeGender ||
-                activeCatProfile.basicInfo?.breed ||
-                activeCatProfile.appearance?.coat ? (
-                  <p style={styles.zukanHint}>ずかんで つかわれます</p>
-                ) : null}
                 <div style={styles.footprintsSection}>
                   <p style={styles.footprintsTitle}>あしあと</p>
                   <div style={styles.footprintsScroller}>
@@ -638,7 +627,6 @@ export function CatsPage() {
                   </div>
                 </div>
                 <OmoideBunbako
-                  catName={catName}
                   memories={omoideMemories}
                   controls={omoideControls}
                   onOpen={(memory) => setSelectedOmoideMemory(memory)}
@@ -890,14 +878,12 @@ function FootprintCard({ milestone }: { milestone: CatSleepingMilestone }) {
 }
 
 function OmoideBunbako({
-  catName,
   memories,
   controls,
   onOpen,
   onPause,
   onDisable,
 }: {
-  catName: string;
   memories: OmoideMemory[];
   controls: ReturnType<typeof readOmoideMemoryControls>;
   onOpen: (memory: OmoideMemory) => void;
@@ -917,9 +903,6 @@ function OmoideBunbako({
       <div style={styles.bunbakoHeader}>
         <div>
           <p style={styles.bunbakoSectionTitle}>とどいた思い出</p>
-          <p style={styles.sectionNote}>
-            配達で とどくたび、この箱に 積もっていきます
-          </p>
         </div>
         <AppButton
           type="button"
@@ -962,9 +945,6 @@ function OmoideBunbako({
           はじめての思い出は、これから届きます。
         </p>
       )}
-      <p style={styles.guardFooter}>
-        {catName}に届いた思い出を、この箱に そっと置いておきます。
-      </p>
       {isControlsOpen ? (
         <AppBottomSheet
           title="思い出の設定"
@@ -1251,7 +1231,6 @@ function getDaysThreadIntro(catName: string, familySinceDate?: string) {
 
 function getBirthdayStatus(
   birthDate: string | undefined,
-  catName: string,
 ): { copy: string; isToday: boolean } | null {
   const birth = parseLocalDate(birthDate);
 
@@ -1277,13 +1256,13 @@ function getBirthdayStatus(
 
   if (daysUntil === 0) {
     return {
-      copy: `きょうは ${catName}の日`,
+      copy: "きょうは 誕生日",
       isToday: true,
     };
   }
 
   return {
-    copy: `${catName}の日まで あと${daysUntil}日`,
+    copy: `誕生日まで あと${daysUntil}日`,
     isToday: false,
   };
 }
@@ -1441,7 +1420,7 @@ const styles = {
     width: "min(100%, 430px)",
     margin: "0 auto",
     padding:
-      "calc(20px + env(safe-area-inset-top)) 24px calc(156px + env(safe-area-inset-bottom))",
+      "calc(20px + env(safe-area-inset-top)) 24px calc(220px + env(safe-area-inset-bottom))",
   },
   pageHeader: {
     display: "flex",
@@ -1610,24 +1589,15 @@ const styles = {
   familyHeroDays: {
     color: CATS_TEXT_STRONG,
     fontFamily: CATS_SERIF,
-    fontSize: "52px",
+    fontSize: "18px",
     fontWeight: 400,
-    lineHeight: 1,
-    letterSpacing: "0.08em",
-  },
-  familyHeroSub: {
-    color: CATS_MUTED,
-    fontFamily: CATS_SERIF,
-    fontSize: "12px",
-    fontWeight: 400,
-    lineHeight: 1.35,
+    lineHeight: 1.45,
     letterSpacing: "var(--tracking-body)",
   },
   catDayNote: {
     display: "grid",
     gap: "3px",
     margin: "10px 0 0",
-    padding: "0 2px",
   },
   catDayNoteToday: {
     color: "var(--seal)",
@@ -1638,14 +1608,6 @@ const styles = {
     fontSize: "12px",
     fontWeight: 400,
     lineHeight: 1.45,
-    letterSpacing: "var(--tracking-body)",
-  },
-  catDayHint: {
-    color: CATS_FAINT,
-    fontFamily: CATS_SERIF,
-    fontSize: "12px",
-    fontWeight: 400,
-    lineHeight: 1.5,
     letterSpacing: "var(--tracking-body)",
   },
   recordList: {
@@ -1994,12 +1956,6 @@ const styles = {
     fontWeight: 400,
     letterSpacing: "var(--tracking-label)",
   },
-  sectionNote: {
-    margin: "5px 0 0",
-    color: CATS_MUTED,
-    fontSize: "12px",
-    lineHeight: 1.7,
-  },
   bunbakoScroller: {
     display: "flex",
     gap: "12px",
@@ -2066,14 +2022,6 @@ const styles = {
     flexDirection: "column",
     gap: "8px",
     marginTop: "12px",
-  },
-  guardFooter: {
-    margin: "12px 0 0",
-    color: CATS_FAINT,
-    fontFamily: CATS_SERIF,
-    fontSize: "12px",
-    letterSpacing: "var(--tracking-body)",
-    lineHeight: 1.7,
   },
   daysThread: {
     marginTop: "18px",

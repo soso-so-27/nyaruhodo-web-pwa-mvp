@@ -54,7 +54,7 @@ test("asks for confirmation before saving a duplicate cat name", async ({
     .toBe(2);
 });
 
-test("shows birthday countdown and zukan hint on the cat page", async ({
+test("shows birthday countdown on the cat page", async ({
   page,
 }) => {
   await seedCatProfile(page, {
@@ -65,11 +65,9 @@ test("shows birthday countdown and zukan hint on the cat page", async ({
   await page.goto("/cats");
   await page.waitForLoadState("networkidle");
 
-  await expect(page.getByText("むぎの日まで あと3日")).toBeVisible();
-  await expect(
-    page.getByText("誕生日は、むぎ自身の日として そっと置いておきます。"),
-  ).toBeVisible();
-  await expect(page.getByText("ずかんで つかわれます")).toBeVisible();
+  await expect(page.getByText("誕生日まで あと3日")).toBeVisible();
+  await expect(page.getByText("むぎの日まで あと3日")).toHaveCount(0);
+  await expect(page.getByText("ずかんで つかわれます")).toHaveCount(0);
 });
 
 test("shows the special birthday text on the cat birthday", async ({ page }) => {
@@ -81,7 +79,7 @@ test("shows the special birthday text on the cat birthday", async ({ page }) => 
   await page.goto("/cats");
   await page.waitForLoadState("networkidle");
 
-  await expect(page.getByText("きょうは むぎの日")).toBeVisible();
+  await expect(page.getByText("きょうは 誕生日")).toBeVisible();
 });
 
 async function seedCatProfile(
