@@ -23,6 +23,8 @@ import { BottomNavigation } from "../navigation/BottomNavigation";
 import { AppButton } from "../ui/AppButton";
 import { AppCard } from "../ui/AppCard";
 import { AppIcon } from "../ui/AppIcons";
+import { PhotoViewerFrame } from "../ui/PhotoTile";
+import { StampPair } from "../ui/StampPair";
 import { StoredPhotoImage } from "../ui/StoredPhotoImage";
 
 type DeskState = "1" | "1b" | "2" | "3" | "4";
@@ -451,41 +453,47 @@ export function HomeDeskModel({
 
         {deskState === "4" && targetPhoto ? (
           <div style={deskStyles.openedPair} aria-label="きょうの2まい">
-            <PhotoTile
-              photo={targetPhoto}
-              onClick={() =>
+            <StampPair
+              size="home"
+              ownPhoto={{ src: getPhotoThumbnailSrc(targetPhoto) }}
+              deliveredPhoto={
+                visibleDeliveredPhoto
+                  ? { src: getPhotoThumbnailSrc(visibleDeliveredPhoto) }
+                  : null
+              }
+              ownLabel={catName}
+              deliveredLabel={showGuidanceCopy ? "どこかのこ" : undefined}
+              showOwnLabel={false}
+              deliveredFallback={<EmptyDeliveredSlot />}
+              onOwnClick={() =>
                 setViewerPhoto({
                   kind: "own",
                   photo: targetPhoto,
                   dateKey: eveningState.dateKey,
                 })
               }
-              ariaLabel="うちのこの写真を大きく見る"
+              onDeliveredClick={
+                visibleDeliveredPhoto
+                  ? () =>
+                      setViewerPhoto({
+                        kind: "other",
+                        photo: visibleDeliveredPhoto,
+                        dateKey: eveningState.dateKey,
+                      })
+                  : undefined
+              }
+              onDeliveredStorageDataUrl={
+                visibleDeliveredPhoto
+                  ? (dataUrl) =>
+                      onDeliveredStorageDataUrl(
+                        eveningState.dateKey,
+                        visibleDeliveredPhoto,
+                        dataUrl,
+                      )
+                  : undefined
+              }
+              data-testid="desk-stamp-pair"
             />
-            <span style={deskStyles.pairDots} aria-hidden="true" />
-            {visibleDeliveredPhoto ? (
-              <PhotoTile
-                photo={visibleDeliveredPhoto}
-                label={showGuidanceCopy ? "どこかのこ" : undefined}
-                onClick={() =>
-                  setViewerPhoto({
-                    kind: "other",
-                    photo: visibleDeliveredPhoto,
-                    dateKey: eveningState.dateKey,
-                  })
-                }
-                ariaLabel="どこかのこの写真を大きく見る"
-                onStorageDataUrl={(dataUrl) =>
-                  onDeliveredStorageDataUrl(
-                    eveningState.dateKey,
-                    visibleDeliveredPhoto,
-                    dataUrl,
-                  )
-                }
-              />
-            ) : (
-              <EmptyDeliveredSlot />
-            )}
           </div>
         ) : null}
 
@@ -849,13 +857,13 @@ function DeskPhotoViewer({
             ) : null}
           </div>
         ) : null}
-        <div style={deskStyles.viewerImageFrame}>
-          <StoredPhotoImage
-            src={getPhotoDetailSrc(viewerPhoto.photo)}
-            alt=""
-            style={deskStyles.viewerImage}
-          />
-        </div>
+        <PhotoViewerFrame
+          src={getPhotoDetailSrc(viewerPhoto.photo)}
+          alt=""
+          fit="contain"
+          style={deskStyles.viewerImageFrame}
+          imageStyle={deskStyles.viewerImage}
+        />
         <AppButton
           type="button"
           variant="secondary"
@@ -1469,20 +1477,10 @@ const deskStyles = {
     lineHeight: 1.55,
   },
   openedPair: {
-    display: "flex",
-    alignItems: "flex-start",
-    justifyContent: "center",
+    display: "grid",
+    justifyItems: "center",
     gap: "12px",
     width: "100%",
-  },
-  pairDots: {
-    width: "24px",
-    height: "128px",
-    flexShrink: 0,
-    background:
-      "radial-gradient(circle, var(--ink-faint) 0 2px, transparent 2.6px) center / 10px 10px repeat-x",
-    opacity: 0.75,
-    alignSelf: "center",
   },
   viewerBackdrop: {
     position: "fixed",

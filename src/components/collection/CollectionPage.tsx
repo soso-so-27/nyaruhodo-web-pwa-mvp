@@ -55,6 +55,7 @@ import { AppCard } from "../ui/AppCard";
 import { AppHeader } from "../ui/AppHeader";
 import { AppIcon } from "../ui/AppIcons";
 import { EmptyState } from "../ui/EmptyState";
+import { StampPair } from "../ui/StampPair";
 import { StoredPhotoImage } from "../ui/StoredPhotoImage";
 import { color, radius, shadow } from "../ui/designTokens";
 
@@ -1228,84 +1229,55 @@ function AlbumDailyPair({
           ...(shouldShowOtherSlot ? {} : styles.dailyPairMainSingle),
         }}
       >
-        <button
-          type="button"
-          style={styles.dailyPairTile}
-          onClick={() => targetPhoto && onOpenBox("sleeping", group.key)}
-          disabled={!targetPhoto}
-          aria-label="うちのねがお"
-        >
-          {targetPhoto ? (
-            <StoredPhotoImage
-              src={getPhotoThumbnailSrc(targetPhoto)}
-              alt=""
-              style={styles.dailyPairImage}
-            />
-          ) : (
-            <span style={styles.dailyPairPlaceholder}>
+        <StampPair
+          size="album"
+          ownPhoto={targetPhoto ? { src: getPhotoThumbnailSrc(targetPhoto) } : null}
+          deliveredPhoto={
+            deliveredPhoto ? { src: getPhotoThumbnailSrc(deliveredPhoto) } : null
+          }
+          ownLabel={catName}
+          deliveredLabel={deliveredPhoto ? "どこかのこ" : undefined}
+          ownAriaLabel="うちのねがお"
+          deliveredAriaLabel={
+            hasUnopenedOtherDelivery && !deliveredPhoto
+              ? "届いた封筒をホームで開く"
+              : "どこかのこを開く"
+          }
+          ownFallback={
+            <span data-testid="album-daily-own-missing-letter">
               {"この日の ねがおは ありません"}
             </span>
-          )}
-          <span style={styles.dailyPairLabel}>{catName}</span>
-        </button>
-        {shouldShowOtherSlot ? (
-          <div style={styles.dailyPairLetterColumn}>
-            <button
-              type="button"
-              style={styles.dailyPairTile}
-              onClick={() => {
-                if (deliveredPhoto) {
-                  onOpenBox("other", group.key);
-                  return;
-                }
-                if (hasUnopenedOtherDelivery) {
-                  window.location.assign("/home");
-                }
-              }}
-              disabled={!deliveredPhoto && !hasUnopenedOtherDelivery}
-              aria-label={
-                hasUnopenedOtherDelivery && !deliveredPhoto
-                  ? "届いた封筒をホームで開く"
-                  : "どこかのこを開く"
-              }
-            >
-              {deliveredPhoto ? (
-                <StoredPhotoImage
-                  src={getPhotoThumbnailSrc(deliveredPhoto)}
-                  alt=""
-                  style={styles.dailyPairImage}
-                  onStorageDataUrl={(dataUrl) =>
-                    writeBackDeliveredPhotoDataUrl(deliveredPhoto, dataUrl)
-                  }
-                />
-              ) : hasUnopenedOtherDelivery ? (
+          }
+          deliveredFallback={
+            shouldShowOtherSlot ? (
+              hasUnopenedOtherDelivery ? (
                 <AlbumSealedDeliveryMiniature />
               ) : hasUndeliverableOtherDelivery ? (
-                <span
-                  data-testid="album-daily-undeliverable-letter"
-                  style={styles.dailyPairPlaceholder}
-                >
+                <span data-testid="album-daily-undeliverable-letter">
                   {"おとどけ できませんでした"}
                 </span>
-              ) : group.key === getLocalDateKey(Date.now()) ? (
-                <span
-                  data-testid="album-daily-missing-letter"
-                  style={styles.dailyPairPlaceholder}
-                >
-                  {"おたよりは とどきませんでした"}
-                </span>
               ) : (
-                <span
-                  data-testid="album-daily-missing-letter"
-                  style={styles.dailyPairPlaceholder}
-                >
+                <span data-testid="album-daily-missing-letter">
                   {"おたよりは とどきませんでした"}
                 </span>
-              )}
-              <span style={styles.dailyPairLabel}>どこかのこ</span>
-            </button>
-          </div>
-        ) : null}
+              )
+            ) : undefined
+          }
+          onOwnClick={targetPhoto ? () => onOpenBox("sleeping", group.key) : undefined}
+          onDeliveredClick={
+            deliveredPhoto
+              ? () => onOpenBox("other", group.key)
+              : hasUnopenedOtherDelivery
+                ? () => window.location.assign("/home")
+                : undefined
+          }
+          onDeliveredStorageDataUrl={
+            deliveredPhoto
+              ? (dataUrl) => writeBackDeliveredPhotoDataUrl(deliveredPhoto, dataUrl)
+              : undefined
+          }
+          data-testid="album-daily-stamp-pair"
+        />
       </div>
     </AppCard>
   );
@@ -3303,58 +3275,11 @@ const styles = {
   },
   dailyPairMain: {
     display: "grid",
-    gridTemplateColumns: "minmax(0, 1fr) minmax(0, 1fr)",
-    alignItems: "center",
-    gap: "14px",
+    justifyItems: "center",
+    gap: "16px",
   },
   dailyPairMainSingle: {
-    gridTemplateColumns: "minmax(0, calc((100% - 14px) / 2)) minmax(0, 1fr)",
-  },
-  dailyPairTile: {
-    display: "grid",
-    gap: "8px",
     justifyItems: "center",
-    width: "100%",
-    border: "none",
-    background: "transparent",
-    color: COLLECTION_TEXT,
-    font: "inherit",
-    padding: 0,
-    cursor: "pointer",
-  },
-  dailyPairImage: {
-    width: "100%",
-    aspectRatio: "1 / 1",
-    borderRadius: radius.xl,
-    objectFit: "cover",
-    overflow: "hidden",
-    background: color.surfaceSoft,
-    border: "6px solid rgba(255,253,248,0.74)",
-    boxShadow: shadow.soft,
-  },
-  dailyPairLetterColumn: {
-    minWidth: 0,
-  },
-  dailyPairPlaceholder: {
-    width: "100%",
-    aspectRatio: "1 / 1",
-    borderRadius: radius.xl,
-    display: "grid",
-    placeItems: "center",
-    padding: "12px",
-    boxSizing: "border-box",
-    background: "color-mix(in srgb, var(--paper) 76%, transparent)",
-    border: "1px solid var(--line)",
-    color: "var(--ink-soft)",
-    fontSize: "12px",
-    fontFamily: "var(--font-display)",
-    fontWeight: 400,
-    lineHeight: 1.45,
-    letterSpacing: "var(--tracking-body)",
-    textAlign: "center",
-    whiteSpace: "normal",
-    overflowWrap: "break-word",
-    wordBreak: "keep-all",
   },
   dailyPairSealedEnvelope: {
     position: "relative",
@@ -3387,12 +3312,6 @@ const styles = {
     borderRadius: "var(--radius-full)",
     background: "var(--seal)",
     transform: "translate(-50%, -50%)",
-  },
-  dailyPairLabel: {
-    color: COLLECTION_MUTED,
-    fontSize: "12px",
-    fontWeight: 500,
-    lineHeight: 1,
   },
   ownPhotoGrid: {
     display: "grid",

@@ -16,6 +16,7 @@ const expectedShotNames = [
   "state3_2005_habit.png",
   "state4_2010_week1.png",
   "state4_2010_habit.png",
+  "state4_stamp_viewer.png",
   "state1b_2030.png",
   "album_today.png",
   "album_missing_cases.png",
@@ -188,6 +189,23 @@ test.describe("home desk model shots", () => {
     );
     await missingC.screenshot({
       path: path.join(shotsDir, "album_missing_c.png"),
+    });
+  });
+
+  test("state4_stamp_viewer", async ({ page }) => {
+    await seedReviewState(page, {
+      now: Date.parse("2026-06-10T11:10:00.000Z"),
+      state: "4",
+      habit: false,
+    });
+    await page.goto("/home");
+    await page.waitForLoadState("networkidle");
+    await page.getByTestId("desk-stamp-pair").locator("button").nth(1).click();
+    await expect(page.getByRole("button", { name: /とっておく/ })).toBeVisible();
+    await page.waitForTimeout(500);
+    await page.screenshot({
+      path: path.join(shotsDir, "state4_stamp_viewer.png"),
+      fullPage: true,
     });
   });
 
