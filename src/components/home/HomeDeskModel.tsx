@@ -3,20 +3,13 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { CSSProperties, PointerEvent } from "react";
 
-import {
-  addJstDays,
-  getJstDateKey,
-  getJstHour,
-  readEveningDeliveryStore,
-  type EveningHomeState,
-} from "../../lib/home/eveningDelivery";
+import { type EveningHomeState } from "../../lib/home/eveningDelivery";
 import type {
   ExchangePhotoReportReason,
   ExchangePhoto,
   OwnSleepingPhoto,
 } from "../../lib/home/sleepingPhotos";
 import type { OmoideMemory } from "../../lib/home/omoideDelivery";
-import { isExchangePhotoLocallyBlocked } from "../../lib/home/sleepingPhotos";
 import { trackProductEvent } from "../../lib/analytics/productAnalytics";
 import { playOpenSound } from "../../lib/openSound";
 import { BottomNavigation } from "../navigation/BottomNavigation";
@@ -25,15 +18,9 @@ import { AppCard } from "../ui/AppCard";
 import { AppSheet } from "../ui/AppBottomSheet";
 import { AppIcon } from "../ui/AppIcons";
 import { PhotoViewerFrame } from "../ui/PhotoTile";
-import { StampPair } from "../ui/StampPair";
 import { StoredPhotoImage } from "../ui/StoredPhotoImage";
 
 type DeskState = "1" | "1b" | "2" | "3" | "4";
-
-type YesterdayMini = {
-  ownPhoto: OwnSleepingPhoto | null;
-  deliveredPhoto: ExchangePhoto | null;
-};
 
 type DeskViewerPhoto =
   | {
@@ -75,7 +62,6 @@ type HomeDeskModelProps = {
 
 const HOLD_OPEN_MS = 1600;
 const HOLD_REWIND_MS = 1000;
-const EVENING_SOON_COPY = "もうすぐ とどきます";
 const HOME_DAYLIGHT_ANCHORS = [
   { minute: 5 * 60, top: "#fcfbf9", bottom: "#f5f2ec" },
   { minute: 12 * 60, top: "#fbfaf7", bottom: "#f4f1ea" },
@@ -88,45 +74,29 @@ export function HomeDeskModel({
   eveningState,
   ownSleepingPhotos,
   sleepingCounter,
-  showGuidanceCopy,
-  showSleepingCounter,
   now,
   onTakePhoto,
   onOpenDelivery,
   onKeepOpenedDelivery,
   onReportOpenedDelivery,
-  onDeliveredStorageDataUrl,
   omoideMemory,
   onOpenOmoideMemory,
   onDismissOmoideMemory,
 }: HomeDeskModelProps) {
   const deskState = getDeskState(eveningState);
   const prefersReducedMotion = usePrefersReducedMotion();
-  const [letterHintVisible, setLetterHintVisible] = useState(false);
   const [holdProgress, setHoldProgress] = useState(false);
   const [developPhotoMounted, setDevelopPhotoMounted] = useState(false);
   const [isRewindingHold, setIsRewindingHold] = useState(false);
   const [viewerPhoto, setViewerPhoto] = useState<DeskViewerPhoto | null>(null);
   const [openingOmoideMemory, setOpeningOmoideMemory] =
     useState<OmoideMemory | null>(null);
-  const [reportedDeliveredIds, setReportedDeliveredIds] = useState<Set<string>>(
+  const [, setReportedDeliveredIds] = useState<Set<string>>(
     () => new Set(),
   );
-  const hintTimerRef = useRef<number | null>(null);
   const holdTimerRef = useRef<number | null>(null);
   const rewindTimerRef = useRef<number | null>(null);
-  const yesterdayMini = useYesterdayMini(now, ownSleepingPhotos);
   const daylightStyle = useDaylight(now);
-  const shouldHidePresence =
-    deskState === "3" || getJstHour(now) < 5 || !showSleepingCounter;
-  const guidanceCopy = getGuidanceCopyV2(deskState, catName);
-  const isEveningSoon = deskState === "2" && isEveningSoonWindow(now);
-  const visibleGuidanceCopy = isEveningSoon
-    ? EVENING_SOON_COPY
-    : showGuidanceCopy
-      ? guidanceCopy
-      : "";
-  const isBefore = deskState === "1" || deskState === "1b";
   const targetPhoto =
     eveningState.kind === "waiting" ||
     eveningState.kind === "delivered" ||
@@ -137,12 +107,14 @@ export function HomeDeskModel({
     eveningState.kind === "delivered" || eveningState.kind === "opened"
       ? eveningState.deliveredPhoto
       : null;
-  const visibleDeliveredPhoto =
-    deliveredPhoto &&
-    !reportedDeliveredIds.has(getExchangePhotoIdentity(deliveredPhoto)) &&
-    !isExchangePhotoLocallyBlocked(deliveredPhoto)
-      ? deliveredPhoto
-      : null;
+  const latestOwnPhoto = useMemo(
+    () => getLatestOwnPhoto(ownSleepingPhotos),
+    [ownSleepingPhotos],
+  );
+  const homePhoto = targetPhoto ?? latestOwnPhoto;
+  const shouldHidePresence = true;
+  const guidanceCopy = getHomeStatusCopy(deskState, catName, now);
+  const isBefore = deskState === "1" || deskState === "1b";
   useEffect(() => {
     trackDeskStateShown(deskState, eveningState.dateKey);
   }, [deskState, eveningState.dateKey]);
@@ -160,9 +132,6 @@ export function HomeDeskModel({
 
   useEffect(() => {
     return () => {
-      if (hintTimerRef.current) {
-        window.clearTimeout(hintTimerRef.current);
-      }
       if (holdTimerRef.current) {
         window.clearTimeout(holdTimerRef.current);
       }
@@ -189,20 +158,6 @@ export function HomeDeskModel({
       rewindTimerRef.current = null;
     }
   }, [eveningState.kind]);
-
-  function showLetterHint() {
-    if (isEveningSoon) {
-      return;
-    }
-
-    setLetterHintVisible(true);
-    if (hintTimerRef.current) {
-      window.clearTimeout(hintTimerRef.current);
-    }
-    hintTimerRef.current = window.setTimeout(() => {
-      setLetterHintVisible(false);
-    }, 2000);
-  }
 
   function startHold(event: PointerEvent<HTMLButtonElement>) {
     if (eveningState.kind !== "delivered") {
@@ -278,40 +233,82 @@ export function HomeDeskModel({
       <div style={deskStyles.stage}>
         <div
           style={{
-            ...deskStyles.desk,
-            ...(deskState === "3" ? deskStyles.deskDelivered : {}),
-            ...(deskState === "4" ? deskStyles.deskOpened : {}),
+            ...deskStyles.homeHero,
+            ...(deskState === "3" ? deskStyles.homeHeroDelivered : {}),
+            ...(deskState === "4" ? deskStyles.homeHeroOpened : {}),
           }}
         >
-          <div
-            style={{
-              ...deskStyles.slot,
-              ...(deskState === "3" ? deskStyles.slotRetreated : {}),
-            }}
-          >
-            {targetPhoto ? (
-              <PhotoTile
-                photo={targetPhoto}
-                size={deskState === "3" ? "small" : "normal"}
-              />
-            ) : (
-              <button
-                type="button"
-                data-testid="desk-empty-frame"
-                style={deskStyles.emptyFrame}
-                className={
-                  prefersReducedMotion
-                    ? "desk-frame-action"
-                    : "desk-frame-action desk-frame-breathe"
-                }
-                onClick={onTakePhoto}
-                aria-label="ねがおをとる"
-              >
-                <AppIcon name="camera" size={28} />
-                <span style={deskStyles.emptyFrameLabel}>とる</span>
-              </button>
-            )}
+          {homePhoto ? (
+            <button
+              type="button"
+              data-testid="desk-home-frame"
+              style={deskStyles.homeFrameButton}
+              onClick={() =>
+                setViewerPhoto({
+                  kind: "own",
+                  photo: homePhoto,
+                  dateKey: eveningState.dateKey,
+                })
+              }
+              aria-label={`${catName}のねがおを大きく見る`}
+            >
+              <span style={deskStyles.homeFrame}>
+                <StoredPhotoImage
+                  src={getPhotoDisplaySrc(homePhoto)}
+                  alt=""
+                  style={deskStyles.homeFrameImage}
+                />
+              </span>
+            </button>
+          ) : (
+            <button
+              type="button"
+              data-testid="desk-empty-frame"
+              style={deskStyles.homeEmptyFrame}
+              className={
+                prefersReducedMotion
+                  ? "desk-frame-action"
+                  : "desk-frame-action desk-frame-breathe"
+              }
+              onClick={onTakePhoto}
+              aria-label="はじめての ねがおを とろう"
+            >
+              <AppIcon name="camera" size={32} />
+              <span style={deskStyles.homeEmptyTitle}>
+                はじめての ねがおを とろう
+              </span>
+              <span style={deskStyles.homeEmptySub}>
+                とると、ここに {catName}が すむ
+              </span>
+            </button>
+          )}
+
+          <div style={deskStyles.homeCopyWrap}>
+            <p
+              style={deskStyles.homeTitle}
+              className={
+                guidanceCopy.tone === "soon" && !prefersReducedMotion
+                  ? "desk-evening-soon-copy"
+                  : undefined
+              }
+            >
+              {guidanceCopy.title}
+            </p>
+            {guidanceCopy.sub ? (
+              <p style={deskStyles.homeSub}>{guidanceCopy.sub}</p>
+            ) : null}
           </div>
+
+          {isBefore ? (
+            <AppButton
+              variant="secondary"
+              size="md"
+              onClick={onTakePhoto}
+              style={deskStyles.homeCaptureButton}
+            >
+              ねがおを とる
+            </AppButton>
+          ) : null}
 
           {deskState === "3" ? (
             <div
@@ -325,7 +322,7 @@ export function HomeDeskModel({
                 type="button"
                 role="button"
                 data-testid="desk-open-letter"
-                aria-label="おさえて ひらく"
+                aria-label="そっと ひらく"
                 style={{
                   ...deskStyles.selectionLockedStage,
                   ...deskStyles.arrivedLetterButton,
@@ -369,58 +366,11 @@ export function HomeDeskModel({
                   ...(holdProgress ? deskStyles.holdLabelActive : {}),
                 }}
               >
-                おさえて ひらく
+                そっと ひらく
               </span>
             </div>
-          ) : deskState === "1b" || deskState === "4" ? null : (
-            <div style={deskStyles.slot}>
-              <button
-                type="button"
-                data-testid="desk-letter"
-                style={{
-                  ...deskStyles.letter,
-                  ...(deskState === "1" ? deskStyles.letterStateOne : {}),
-                }}
-                onClick={deskState === "2" && !isEveningSoon ? showLetterHint : undefined}
-                aria-label={
-                  deskState === "2"
-                    ? "よる8じに とどきます"
-                    : "よる8じに とどく手紙"
-                }
-                tabIndex={deskState === "2" && !isEveningSoon ? 0 : -1}
-              >
-                <span style={deskStyles.letterFlap} aria-hidden="true" />
-                <span style={deskStyles.letterSeal} aria-hidden="true" />
-              </button>
-              {deskState === "1" ? (
-                <span style={deskStyles.letterTimeLabel}>
-                  よる8じに とどきます
-                </span>
-              ) : null}
-              <span
-                data-testid="desk-letter-hint"
-                style={{
-                  ...deskStyles.letterHint,
-                  opacity: letterHintVisible ? 1 : 0,
-                }}
-                aria-live="polite"
-              >
-                よる8じに とどきます
-              </span>
-            </div>
-          )}
+          ) : null}
         </div>
-
-        {visibleGuidanceCopy ? (
-          <p
-            style={deskStyles.guidanceCopy}
-            className={
-              isEveningSoon && !prefersReducedMotion ? "desk-evening-soon-copy" : undefined
-            }
-          >
-            {visibleGuidanceCopy}
-          </p>
-        ) : null}
 
         {omoideMemory ? (
           <AppCard
@@ -444,7 +394,7 @@ export function HomeDeskModel({
               <span style={deskStyles.omoideArrivalKicker}>
                 今夜は、思い出が とどきました
               </span>
-              <span style={deskStyles.omoideArrivalTitle}>過去から、一通。</span>
+              <span style={deskStyles.omoideArrivalTitle}>過去から、ねがお。</span>
               <span style={deskStyles.omoideArrivalSub}>
                 {omoideMemory.subtitle}
               </span>
@@ -452,78 +402,6 @@ export function HomeDeskModel({
           </AppCard>
         ) : null}
 
-        {deskState === "4" && targetPhoto ? (
-          <div style={deskStyles.openedPair} aria-label="きょうの2まい">
-            <StampPair
-              size="home"
-              ownPhoto={{ src: getPhotoThumbnailSrc(targetPhoto) }}
-              deliveredPhoto={
-                visibleDeliveredPhoto
-                  ? { src: getPhotoThumbnailSrc(visibleDeliveredPhoto) }
-                  : null
-              }
-              ownLabel={catName}
-              deliveredLabel={showGuidanceCopy ? "どこかのこ" : undefined}
-              showOwnLabel={false}
-              deliveredFallback={<EmptyDeliveredSlot />}
-              onOwnClick={() =>
-                setViewerPhoto({
-                  kind: "own",
-                  photo: targetPhoto,
-                  dateKey: eveningState.dateKey,
-                })
-              }
-              onDeliveredClick={
-                visibleDeliveredPhoto
-                  ? () =>
-                      setViewerPhoto({
-                        kind: "other",
-                        photo: visibleDeliveredPhoto,
-                        dateKey: eveningState.dateKey,
-                      })
-                  : undefined
-              }
-              onDeliveredStorageDataUrl={
-                visibleDeliveredPhoto
-                  ? (dataUrl) =>
-                      onDeliveredStorageDataUrl(
-                        eveningState.dateKey,
-                        visibleDeliveredPhoto,
-                        dataUrl,
-                      )
-                  : undefined
-              }
-              data-testid="desk-stamp-pair"
-            />
-          </div>
-        ) : null}
-
-        {isBefore && yesterdayMini ? (
-          <div style={deskStyles.yesterday} aria-label="きのうの2まい">
-            <div style={deskStyles.yesterdayPair}>
-              {yesterdayMini.ownPhoto ? (
-                <PhotoTile photo={yesterdayMini.ownPhoto} size="mini" />
-              ) : null}
-              {yesterdayMini.ownPhoto && yesterdayMini.deliveredPhoto ? (
-                <span style={deskStyles.yesterdayDots} aria-hidden="true" />
-              ) : null}
-              {yesterdayMini.deliveredPhoto ? (
-                <PhotoTile
-                  photo={yesterdayMini.deliveredPhoto}
-                  size="mini"
-                  onStorageDataUrl={(dataUrl) =>
-                    onDeliveredStorageDataUrl(
-                      addJstDays(getJstDateKey(now), -1),
-                      yesterdayMini.deliveredPhoto!,
-                      dataUrl,
-                    )
-                  }
-                />
-              ) : null}
-            </div>
-            <span style={deskStyles.yesterdayLabel}>きのうの2まい</span>
-          </div>
-        ) : null}
       </div>
 
       {!shouldHidePresence ? (
@@ -697,77 +575,6 @@ function OmoideMemoryViewer({
   );
 }
 
-function PhotoTile({
-  photo,
-  label,
-  size = "normal",
-  onClick,
-  ariaLabel,
-  onStorageDataUrl,
-}: {
-  photo: Pick<
-    OwnSleepingPhoto | ExchangePhoto,
-    "src" | "thumbnailSrc" | "displaySrc" | "originalSrc"
-  >;
-  label?: string;
-  size?: "normal" | "small" | "mini";
-  onClick?: () => void;
-  ariaLabel?: string;
-  onStorageDataUrl?: (dataUrl: string) => void;
-}) {
-  const imageSize =
-    size === "mini" ? deskStyles.miniImage : size === "small" ? deskStyles.smallImage : deskStyles.tileImage;
-  const tileFrameStyle =
-    size === "normal"
-      ? { ...deskStyles.photoTile, ...deskStyles.normalPhotoTile }
-      : deskStyles.photoTile;
-  const tileStyle = {
-    ...tileFrameStyle,
-    ...(size === "mini" ? deskStyles.miniTile : {}),
-    ...(onClick ? deskStyles.photoTileButton : {}),
-  };
-  const image = (
-    <StoredPhotoImage
-      src={getPhotoThumbnailSrc(photo)}
-      alt=""
-      style={imageSize}
-      onStorageDataUrl={onStorageDataUrl}
-    />
-  );
-
-  return (
-    <div style={deskStyles.photoTileWrap}>
-      {onClick ? (
-        <button
-          type="button"
-          data-testid={size === "normal" ? "desk-photo-tile" : undefined}
-          style={tileStyle}
-          onClick={onClick}
-          aria-label={ariaLabel}
-        >
-          {image}
-        </button>
-      ) : (
-        <div
-          data-testid={size === "normal" ? "desk-photo-tile" : undefined}
-          style={tileStyle}
-        >
-          {image}
-        </div>
-      )}
-      {label ? <span style={deskStyles.tileLabel}>{label}</span> : null}
-    </div>
-  );
-}
-
-function EmptyDeliveredSlot() {
-  return (
-    <div style={deskStyles.emptyDeliveredSlot} data-testid="desk-empty-delivered-slot">
-      <span style={deskStyles.emptyDeliveredSlotText}>おとどけ できませんでした</span>
-    </div>
-  );
-}
-
 function DeskPhotoViewer({
   viewerPhoto,
   onClose,
@@ -925,33 +732,6 @@ function DeskPhotoViewer({
   );
 }
 
-function useYesterdayMini(
-  now: number,
-  ownSleepingPhotos: OwnSleepingPhoto[],
-): YesterdayMini | null {
-  return useMemo(() => {
-    const yesterdayKey = addJstDays(getJstDateKey(now), -1);
-    const day = readEveningDeliveryStore()[yesterdayKey];
-    if (!day?.targetOwnPhotoId && !day?.targetPhoto && !day?.deliveredPhoto) {
-      return null;
-    }
-
-    const ownPhoto =
-      ownSleepingPhotos.find((photo) => photo.id === day.targetOwnPhotoId) ??
-      day.targetPhoto ??
-      null;
-
-    if (!ownPhoto && !day.deliveredPhoto) {
-      return null;
-    }
-
-    return {
-      ownPhoto,
-      deliveredPhoto: day.deliveredPhoto ?? null,
-    };
-  }, [now, ownSleepingPhotos]);
-}
-
 function usePrefersReducedMotion() {
   const [prefersReducedMotion, setPrefersReducedMotion] = useState(false);
 
@@ -971,8 +751,8 @@ function useDaylight(now: number) {
   return useMemo(() => {
     const colors = getDaylightColors(minuteKey * 60000);
     return {
-      "--home-bg-top": colors.top,
-      "--home-bg-bottom": colors.bottom,
+      "--home-frame-light": colors.top,
+      "--home-frame-glow": colors.bottom,
     } as CSSProperties;
   }, [minuteKey]);
 }
@@ -1030,28 +810,51 @@ function parseHexColor(hex: string) {
   return [1, 3, 5].map((start) => Number.parseInt(hex.slice(start, start + 2), 16));
 }
 
-function getGuidanceCopyV2(state: DeskState, catName: string) {
+function getLatestOwnPhoto(photos: OwnSleepingPhoto[]) {
+  return photos.reduce<OwnSleepingPhoto | null>(
+    (latest, photo) =>
+      !latest || photo.createdAt > latest.createdAt ? photo : latest,
+    null,
+  );
+}
+
+function getHomeStatusCopy(
+  state: DeskState,
+  catName: string,
+  now: number,
+): { title: string; sub?: string; tone?: "soon" } {
   switch (state) {
     case "1":
-      return `${catName}、ねてる?`;
+      return { title: "きょうも すやすや" };
     case "1b":
-      return "いまとると、あした よる8じに とどきます";
+      return { title: "おやすみ", sub: "また、あした" };
     case "2":
-      return "よる8じに とどきます";
+      if (isEveningSoonWindow(now)) {
+        return { title: "そろそろ、とどくころ", tone: "soon" };
+      }
+      return {
+        title: `${catName}を おくった`,
+        sub: "よる、よその ねがお が とどく",
+      };
+    case "3":
+      return { title: "とどいた" };
     case "4":
-      return "また あした";
+      return {
+        title: "どこかの ねこも、ねてた",
+        sub: `${catName}の ねがおも、どこかへ`,
+      };
     default:
-      return "";
+      return { title: "" };
   }
 }
 
-function getPhotoThumbnailSrc(
+function getPhotoDisplaySrc(
   photo: Pick<
     OwnSleepingPhoto | ExchangePhoto,
-    "src" | "thumbnailSrc" | "displaySrc"
+    "src" | "thumbnailSrc" | "displaySrc" | "originalSrc"
   >,
 ) {
-  return photo.thumbnailSrc ?? photo.displaySrc ?? photo.src;
+  return photo.displaySrc ?? photo.thumbnailSrc ?? photo.src;
 }
 
 function getPhotoDetailSrc(
@@ -1165,10 +968,9 @@ const deskStyles = {
     flexDirection: "column",
     alignItems: "center",
     padding:
-      "calc(34px + env(safe-area-inset-top)) 22px calc(var(--bottom-nav-height) + var(--bottom-nav-bottom-offset) + 30px + env(safe-area-inset-bottom))",
+      "calc(24px + env(safe-area-inset-top)) 22px calc(var(--bottom-nav-height) + var(--bottom-nav-bottom-offset) + 30px + env(safe-area-inset-bottom))",
     color: "var(--ink)",
-    background:
-      "linear-gradient(180deg, var(--home-bg-top, var(--paper)) 0%, var(--home-bg-bottom, var(--paper-warm)) 100%)",
+    background: "linear-gradient(180deg, var(--paper) 0%, var(--paper-warm) 100%)",
   },
   stage: {
     position: "relative",
@@ -1178,10 +980,106 @@ const deskStyles = {
     display: "flex",
     flexDirection: "column",
     alignItems: "center",
-    justifyContent: "flex-start",
+    justifyContent: "center",
     gap: "20px",
-    paddingTop:
-      "clamp(176px, calc(40svh - 106px - env(safe-area-inset-top)), 276px)",
+    paddingTop: "12px",
+  },
+  homeHero: {
+    width: "100%",
+    display: "flex",
+    flexDirection: "column",
+    alignItems: "center",
+    gap: "20px",
+  },
+  homeHeroDelivered: {
+    gap: "18px",
+  },
+  homeHeroOpened: {
+    gap: "18px",
+  },
+  homeFrameButton: {
+    display: "block",
+    width: "100%",
+    border: "none",
+    padding: 0,
+    background: "transparent",
+    color: "inherit",
+    cursor: "pointer",
+    WebkitTapHighlightColor: "transparent",
+  },
+  homeFrame: {
+    position: "relative",
+    display: "block",
+    width: "min(100%, 430px)",
+    aspectRatio: "3 / 4",
+    padding: "10px",
+    borderRadius: "var(--radius-2xl)",
+    background: "var(--home-frame-light, var(--paper))",
+    boxShadow:
+      "0 20px 54px color-mix(in srgb, var(--home-frame-glow, var(--paper-warm)) 72%, transparent)",
+    overflow: "hidden",
+  },
+  homeFrameImage: {
+    width: "100%",
+    height: "100%",
+    borderRadius: "var(--radius-xl)",
+    objectFit: "cover",
+  },
+  homeEmptyFrame: {
+    width: "min(100%, 430px)",
+    aspectRatio: "3 / 4",
+    boxSizing: "border-box",
+    display: "grid",
+    placeItems: "center",
+    alignContent: "center",
+    gap: "12px",
+    padding: "24px",
+    border: "1px solid var(--line)",
+    borderRadius: "var(--radius-2xl)",
+    background: "var(--home-frame-light, var(--paper))",
+    color: "var(--ink-soft)",
+    boxShadow:
+      "0 20px 54px color-mix(in srgb, var(--home-frame-glow, var(--paper-warm)) 72%, transparent)",
+    cursor: "pointer",
+    WebkitTapHighlightColor: "transparent",
+  },
+  homeEmptyTitle: {
+    color: "var(--ink)",
+    fontFamily: "var(--font-display)",
+    fontSize: "18px",
+    letterSpacing: "var(--tracking-label)",
+  },
+  homeEmptySub: {
+    color: "var(--ink-soft)",
+    fontFamily: "var(--font-display)",
+    fontSize: "13px",
+    letterSpacing: "var(--tracking-body)",
+  },
+  homeCopyWrap: {
+    display: "grid",
+    justifyItems: "center",
+    gap: "8px",
+    minHeight: "54px",
+  },
+  homeTitle: {
+    margin: 0,
+    color: "var(--ink-soft)",
+    fontFamily: "var(--font-display)",
+    fontSize: "18px",
+    fontWeight: 400,
+    letterSpacing: "var(--tracking-label)",
+    textAlign: "center",
+  },
+  homeSub: {
+    margin: 0,
+    color: "var(--ink-faint)",
+    fontFamily: "var(--font-display)",
+    fontSize: "13px",
+    letterSpacing: "var(--tracking-body)",
+    textAlign: "center",
+  },
+  homeCaptureButton: {
+    minWidth: "176px",
   },
   desk: {
     display: "flex",

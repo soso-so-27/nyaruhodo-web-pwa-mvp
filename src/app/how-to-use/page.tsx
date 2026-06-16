@@ -25,7 +25,7 @@ export default function HowToUsePage() {
         <section style={styles.section}>
           <h2 style={styles.heading}>よる8じのルール</h2>
           <p style={styles.text}>
-            よる8じより前に撮った写真は、きょうの夜に届く手紙のもとになります。
+            よる8じより前に撮った写真は、きょうの夜に届くねこだよりのもとになります。
             よる8じをすぎてから撮った写真は、あしたの夜の分になります。
           </p>
           <p style={styles.text}>

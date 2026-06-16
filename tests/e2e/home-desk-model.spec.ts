@@ -19,7 +19,7 @@ test.describe("home desk model", () => {
     }
   });
 
-  test("shows the steady state2 letter and the today mini tile icon", async ({
+  test("shows the steady state2 home frame and the today mini tile icon", async ({
     page,
   }) => {
     await seedDeskState(page, "2");
@@ -30,8 +30,10 @@ test.describe("home desk model", () => {
       "data-state",
       "2",
     );
-    await expect(page.getByTestId("desk-letter")).toBeVisible();
-    await expect(page.getByTestId("desk-letter-fill")).toHaveCount(0);
+    await expect(page.getByTestId("desk-home-frame")).toBeVisible();
+    await expect(page.getByText("むぎを おくった")).toBeVisible();
+    await expect(page.getByText("よる、よその ねがお が とどく")).toBeVisible();
+    await expect(page.getByTestId("desk-letter")).toHaveCount(0);
     await expect(page.getByTestId("today-pair-nav-icon")).toBeVisible();
     await expect(page.getByTestId("today-pair-nav-slot")).toHaveCount(2);
     for (const slot of await page.getByTestId("today-pair-nav-slot").all()) {
@@ -103,35 +105,40 @@ test.describe("home desk model", () => {
     await expect(collectionNav.getByText("きょう", { exact: true })).toBeHidden();
   });
 
-  test("moves the home ambient light by time without changing the state2 letter", async ({
+  test("moves the home frame light by time without changing the state2 frame", async ({
     page,
   }) => {
     await seedDeskState(page, "2", { now: Date.parse("2026-06-10T00:00:00.000Z") });
     await page.goto("/home");
     await page.waitForLoadState("networkidle");
 
-    await expect(page.getByTestId("home-desk-model")).toHaveCSS(
-      "--home-bg-bottom",
-      "rgb(244, 241, 235)",
-    );
-    const morningLetterBox = await page.getByTestId("desk-letter").boundingBox();
-    expect(morningLetterBox).not.toBeNull();
+    const morningLight = await page
+      .getByTestId("home-desk-model")
+      .evaluate((element) =>
+        getComputedStyle(element).getPropertyValue("--home-frame-light").trim(),
+      );
+    expect(morningLight).not.toEqual("");
+    const morningFrameBox = await page.getByTestId("desk-home-frame").boundingBox();
+    expect(morningFrameBox).not.toBeNull();
 
     await seedDeskState(page, "2", { now: Date.parse("2026-06-10T09:00:00.000Z") });
     await page.goto("/home");
     await page.waitForLoadState("networkidle");
 
-    await expect(page.getByTestId("home-desk-model")).toHaveCSS(
-      "--home-bg-bottom",
-      "rgb(241, 235, 224)",
+    const eveningLight = await page
+      .getByTestId("home-desk-model")
+      .evaluate((element) =>
+        getComputedStyle(element).getPropertyValue("--home-frame-light").trim(),
+      );
+    expect(eveningLight).not.toEqual("");
+    expect(eveningLight).not.toEqual(morningLight);
+    const eveningFrameBox = await page.getByTestId("desk-home-frame").boundingBox();
+    expect(eveningFrameBox).not.toBeNull();
+    expect(Math.round(eveningFrameBox!.width)).toBe(
+      Math.round(morningFrameBox!.width),
     );
-    const eveningLetterBox = await page.getByTestId("desk-letter").boundingBox();
-    expect(eveningLetterBox).not.toBeNull();
-    expect(Math.round(eveningLetterBox!.width)).toBe(
-      Math.round(morningLetterBox!.width),
-    );
-    expect(Math.round(eveningLetterBox!.height)).toBe(
-      Math.round(morningLetterBox!.height),
+    expect(Math.round(eveningFrameBox!.height)).toBe(
+      Math.round(morningFrameBox!.height),
     );
   });
 
@@ -143,14 +150,14 @@ test.describe("home desk model", () => {
     await page.goto("/home");
     await page.waitForLoadState("networkidle");
 
-    await expect(page.getByText("もうすぐ とどきます")).toHaveCount(0);
+    await expect(page.getByText("そろそろ、とどくころ")).toHaveCount(0);
 
     await page.evaluate(() => {
       (window as typeof window & { __testNow?: number }).__testNow = Date.parse(
         "2026-06-10T08:00:00.000Z",
       );
     });
-    await expect(page.getByText("もうすぐ とどきます")).toBeVisible();
+    await expect(page.getByText("そろそろ、とどくころ")).toBeVisible();
 
     await page.evaluate(() => {
       (window as typeof window & { __testNow?: number }).__testNow = Date.parse(
@@ -163,7 +170,7 @@ test.describe("home desk model", () => {
     );
   });
 
-  test("shows the evening line in habit mode and disables the 2-second letter hint", async ({
+  test("shows the evening line in habit mode without the waiting letter hint", async ({
     page,
   }) => {
     await seedDeskState(page, "2", {
@@ -174,29 +181,30 @@ test.describe("home desk model", () => {
     await page.goto("/home");
     await page.waitForLoadState("networkidle");
 
-    await expect(page.getByText("もうすぐ とどきます")).toBeVisible();
-    await page.getByTestId("desk-letter").click({ force: true });
-    await expect(page.getByTestId("desk-letter-hint")).toHaveCSS("opacity", "0");
+    await expect(page.getByText("そろそろ、とどくころ")).toBeVisible();
+    await expect(page.getByTestId("desk-letter")).toHaveCount(0);
+    await expect(page.getByTestId("desk-letter-hint")).toHaveCount(0);
   });
 
-  test("keeps the 2-second letter hint before 17:00", async ({ page }) => {
+  test("does not show the removed 2-second letter hint before 17:00", async ({ page }) => {
     await seedDeskState(page, "2", { now: Date.parse("2026-06-10T06:30:00.000Z") });
     await page.goto("/home");
     await page.waitForLoadState("networkidle");
 
-    await page.getByTestId("desk-letter").click();
-    await expect(page.getByTestId("desk-letter-hint")).toHaveCSS("opacity", "1");
+    await expect(page.getByTestId("desk-letter")).toHaveCount(0);
+    await expect(page.getByTestId("desk-letter-hint")).toHaveCount(0);
   });
 
-  test("shows a clear state1 letter time and tappable camera frame", async ({
+  test("shows a quiet state1 empty frame and capture CTA", async ({
     page,
   }) => {
     await seedDeskState(page, "1");
     await page.goto("/home");
     await page.waitForLoadState("networkidle");
 
-    await expect(page.getByText("よる8じに とどきます").first()).toBeVisible();
-    await expect(page.getByTestId("desk-letter")).toHaveCSS("opacity", "1");
+    await expect(page.getByText("きょうも すやすや")).toBeVisible();
+    await expect(page.getByRole("button", { name: "ねがおを とる" })).toBeVisible();
+    await expect(page.getByTestId("desk-letter")).toHaveCount(0);
     await expect(page.getByTestId("desk-empty-frame")).toHaveCSS(
       "border-style",
       "solid",
@@ -217,9 +225,8 @@ test.describe("home desk model", () => {
     );
     await expect(page.getByTestId("desk-empty-frame")).toBeVisible();
     await expect(page.getByTestId("desk-letter")).toHaveCount(0);
-    await expect(
-      page.getByText("いまとると、あした よる8じに とどきます"),
-    ).toBeVisible();
+    await expect(page.getByText("おやすみ")).toBeVisible();
+    await expect(page.getByText("また、あした")).toBeVisible();
   });
 
   test("keeps the left desk slot size stable before and after taking a photo", async ({
@@ -234,7 +241,7 @@ test.describe("home desk model", () => {
     await seedDeskState(page, "2");
     await page.goto("/home");
     await page.waitForLoadState("networkidle");
-    const photoBox = await page.getByTestId("desk-photo-tile").first().boundingBox();
+    const photoBox = await page.getByTestId("desk-home-frame").boundingBox();
     expect(photoBox).not.toBeNull();
 
     expect(Math.round(photoBox!.width)).toBe(Math.round(emptyBox!.width));
@@ -258,7 +265,7 @@ test.describe("home desk model", () => {
     await page.goto("/home");
     await page.waitForLoadState("networkidle");
 
-    const letter = page.getByRole("button", { name: "おさえて ひらく" });
+    const letter = page.getByRole("button", { name: "そっと ひらく" });
     const box = await letter.boundingBox();
     expect(box).not.toBeNull();
     await expect(letter.locator('[data-develop-photo="true"]')).toHaveCount(0);
@@ -319,7 +326,7 @@ test.describe("home desk model", () => {
       "4",
     );
     await expect(page.getByText(/\u3069\u3053\u304b\u306e\u3053/)).toHaveCount(0);
-    await expect(page.getByText(/\u3080\u304e/)).toHaveCount(0);
+    await expect(page.getByTestId("evening-opening-pair")).toHaveCount(0);
   });
 
   test("hides desk labels after the habit threshold", async ({ page }) => {
@@ -335,37 +342,13 @@ test.describe("home desk model", () => {
       "4",
     );
     await expect(page.getByText(/\u3069\u3053\u304b\u306e\u3053/)).toHaveCount(0);
-    await expect(page.getByText(/\u3080\u304e/)).toHaveCount(0);
+    await expect(page.getByTestId("evening-opening-pair")).toHaveCount(0);
   });
 
-  test("moves state4 keep and report actions into the full-screen viewer", async ({
+  test("keeps state4 focused on the latest own cat photo", async ({
     page,
   }) => {
-    let reportCalls = 0;
-    await page.addInitScript(() => {
-      (window as typeof window & { __shareCalled?: number }).__shareCalled = 0;
-      Object.defineProperty(navigator, "canShare", {
-        configurable: true,
-        value: () => true,
-      });
-      Object.defineProperty(navigator, "share", {
-        configurable: true,
-        value: async () => {
-          (window as typeof window & { __shareCalled?: number }).__shareCalled =
-            ((window as typeof window & { __shareCalled?: number })
-              .__shareCalled ?? 0) + 1;
-        },
-      });
-    });
     await seedDeskState(page, "4");
-    await page.route("**/api/reports", async (route) => {
-      reportCalls += 1;
-      await route.fulfill({
-        status: 200,
-        contentType: "application/json",
-        body: JSON.stringify({ ok: true }),
-      });
-    });
     await page.goto("/home");
     await page.waitForLoadState("networkidle");
 
@@ -373,43 +356,23 @@ test.describe("home desk model", () => {
       "data-state",
       "4",
     );
+    await expect(page.getByTestId("desk-home-frame")).toBeVisible();
+    await expect(page.getByText("どこかの ねこも、ねてた")).toBeVisible();
+    await expect(page.getByText("むぎの ねがおも、どこかへ")).toBeVisible();
     await expect(page.getByRole("button", { name: "とっておく" })).toHaveCount(0);
-    await expect(page.getByText("きょうも、124ひきの ねこが ねています")).toBeVisible();
-
-    await page.getByRole("button", { name: "どこかのこの写真を大きく見る" }).click();
-    await expect(page.getByTestId("desk-photo-viewer")).toBeVisible();
-    await page.getByRole("button", { name: "とっておく" }).click();
-    await expect
-      .poll(() =>
-        page.evaluate(
-          () => (window as typeof window & { __shareCalled?: number }).__shareCalled ?? 0,
-        ),
-      )
-      .toBe(1);
-
-    await page.getByRole("button", { name: "写真のメニュー" }).click();
-    await page.getByRole("button", { name: "この写真を報告" }).click();
-    await page.getByRole("button", { name: "不快な内容" }).click();
-
-    await expect(page.getByTestId("desk-empty-delivered-slot")).toBeVisible();
-    expect(reportCalls).toBe(1);
-
-    await page.reload();
-    await page.waitForLoadState("networkidle");
-    await expect(page.getByTestId("desk-empty-delivered-slot")).toBeVisible();
     await expect(
       page.getByRole("button", { name: "どこかのこの写真を大きく見る" }),
     ).toHaveCount(0);
   });
 
-  test("shows yesterday mini when previous delivery data exists", async ({
+  test("does not show the removed yesterday mini on home", async ({
     page,
   }) => {
     await seedDeskState(page, "1", { withYesterday: true });
     await page.goto("/home");
     await page.waitForLoadState("networkidle");
 
-    await expect(page.getByLabel("きのうの2まい")).toBeVisible();
+    await expect(page.getByLabel("きのうの2まい")).toHaveCount(0);
   });
 
   test("does not attach motion classes when reduced motion is enabled", async ({

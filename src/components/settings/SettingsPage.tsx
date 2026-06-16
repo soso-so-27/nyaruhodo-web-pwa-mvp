@@ -710,7 +710,7 @@ export function SettingsPage() {
             <div style={styles.row}>
               <div style={styles.rowLeft}>
                 <span style={styles.rowLabel}>ひらく音</span>
-                <span style={styles.rowValue}>手紙をひらいたときだけ</span>
+                <span style={styles.rowValue}>ねこだよりをひらいたときだけ</span>
               </div>
               <AppToggle
                 checked={openSoundEnabled}

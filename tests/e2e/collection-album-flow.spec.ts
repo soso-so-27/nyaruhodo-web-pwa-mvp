@@ -156,7 +156,7 @@ test.describe("collection album flow", () => {
   test("writes delivered storage photos back as data urls for offline album display", async ({
     page,
   }) => {
-    const now = Date.now();
+    const now = Date.parse("2026-06-10T12:10:00.000Z");
     let allowSignedUrl = true;
 
     await page.route("**/api/photo-storage/signed-url", async (route) => {
@@ -182,6 +182,11 @@ test.describe("collection album flow", () => {
 
     await page.addInitScript(
       ({ currentCatId, src, createdAt }) => {
+        const originalDateNow = Date.now.bind(Date);
+        (window as typeof window & { __testNow?: number }).__testNow = createdAt;
+        Date.now = () =>
+          (window as typeof window & { __testNow?: number }).__testNow ??
+          originalDateNow();
         if (window.localStorage.getItem("offline_writeback_seeded") === "1") {
           return;
         }
@@ -213,7 +218,7 @@ test.describe("collection album flow", () => {
               deliveryStatus: "available",
               triggerLabel: "sleeping",
               theme: "sleeping",
-              shared: false,
+              shared: true,
               createdAt,
             },
           ]),
@@ -302,7 +307,7 @@ test.describe("collection album flow", () => {
     await page.waitForLoadState("networkidle");
 
     await expect(page.getByTestId("album-sealed-delivery")).toBeVisible();
-    await expect(page.locator('button[aria-label="どこかのこを開く"]')).toHaveCount(
+    await expect(page.locator('button[aria-label="とどいた ねがおを開く"]')).toHaveCount(
       0,
     );
     await expect(page.locator("main img")).toHaveCount(1);
@@ -317,7 +322,7 @@ test.describe("collection album flow", () => {
     await page.waitForLoadState("networkidle");
 
     await expect(page.getByTestId("album-sealed-delivery")).toHaveCount(0);
-    await expect(page.locator('button[aria-label="どこかのこを開く"]')).toBeVisible();
+    await expect(page.locator('button[aria-label="とどいた ねがおを開く"]')).toBeVisible();
     await expect(page.locator("main img")).toHaveCount(2);
   });
 
@@ -335,7 +340,7 @@ test.describe("collection album flow", () => {
     await page.waitForLoadState("networkidle");
 
     await expect(page.getByTestId("album-sealed-delivery")).toHaveCount(0);
-    await expect(page.locator('button[aria-label="どこかのこを開く"]')).toBeVisible();
+    await expect(page.locator('button[aria-label="とどいた ねがおを開く"]')).toBeVisible();
     await expect(page.locator("main img")).toHaveCount(2);
     await expect
       .poll(() =>
@@ -519,7 +524,7 @@ test.describe("collection album flow", () => {
     await page.goto("/collection");
     await page.waitForLoadState("networkidle");
 
-    await expect(page.locator('button[aria-label="どこかのこを開く"]')).toHaveCount(
+    await expect(page.locator('button[aria-label="とどいた ねがおを開く"]')).toHaveCount(
       0,
     );
     await expect(page.getByText("この日の ねがおは ありません")).toHaveCount(0);
@@ -596,7 +601,7 @@ test.describe("collection album flow", () => {
 
     await expect(page.getByTestId("album-daily-letter-card")).toBeVisible();
     await expect(page.getByTestId("album-daily-missing-letter")).toContainText(
-      "おたよりは とどきませんでした",
+      "ねこだよりは とどきませんでした",
     );
     await expect(page.getByText("ほかのねがお")).toHaveCount(0);
     await expect(page.locator("main img")).toHaveCount(1);

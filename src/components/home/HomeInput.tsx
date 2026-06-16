@@ -2876,7 +2876,6 @@ function EveningDeliveryOpening({
                 style={styles.sleepingPairImage}
               />
             ) : null}
-            <span style={styles.sleepingPairLabel}>{catName}</span>
           </div>
           <span style={styles.sleepingPairDots} aria-hidden="true" />
           <div style={styles.sleepingPairTile}>
@@ -2886,11 +2885,10 @@ function EveningDeliveryOpening({
               style={styles.sleepingPairImage}
               onStorageDataUrl={onStorageDataUrl}
             />
-            <span style={styles.sleepingPairLabel}>どこかのこ</span>
           </div>
         </div>
         <AppButton type="button" fullWidth onClick={onClose}>
-          また あした
+          また、あした
         </AppButton>
       </div>
     </div>

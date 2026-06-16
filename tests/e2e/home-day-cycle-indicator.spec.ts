@@ -118,7 +118,7 @@ test.describe("home desk state cycle", () => {
     await expect(page.locator(".day-cycle-camera-fill")).toHaveCount(0);
   });
 
-  test("hides routine subcopy after ten exchanges but keeps tomorrow notice", async ({
+  test("hides routine subcopy after ten exchanges but keeps the end-of-day copy", async ({
     page,
   }) => {
     await seedHomeState(page, {
@@ -145,9 +145,8 @@ test.describe("home desk state cycle", () => {
       "data-state",
       "1b",
     );
-    await expect(
-      page.getByText("いまとると、あした よる8じに とどきます"),
-    ).toBeVisible();
+    await expect(page.getByText("おやすみ")).toBeVisible();
+    await expect(page.getByText("また、あした")).toBeVisible();
   });
 
   test("removes the home wordmark while keeping page identity elsewhere", async ({
@@ -168,7 +167,7 @@ test.describe("home desk state cycle", () => {
     await expect(page.getByText("ねてるねこ", { exact: true }).first()).toBeVisible();
   });
 
-  test("shows the presence line only when the presence api returns a count", async ({
+  test("hides the presence line even when the presence api returns a count", async ({
     page,
   }) => {
     await page.route("/api/presence", async (route) => {
@@ -183,9 +182,7 @@ test.describe("home desk state cycle", () => {
     await page.goto("/home");
     await page.waitForLoadState("networkidle");
 
-    await expect(
-      page.getByText("きょうも、124ひきの ねこが ねています"),
-    ).toBeVisible();
+    await expect(page.getByText(/きょうも、.*ねこが ねています/)).toHaveCount(0);
   });
 
   test("omits the presence line when the presence api returns null", async ({
@@ -222,7 +219,7 @@ test.describe("home desk state cycle", () => {
     await expect(page.getByText(/きょうも、.*ねこが ねています/)).toHaveCount(0);
   });
 
-  test("keeps the waiting desk slots separated on mobile viewports", async ({
+  test("keeps the home frame usable on mobile viewports", async ({
     page,
   }) => {
     for (const viewport of [
@@ -247,15 +244,11 @@ test.describe("home desk state cycle", () => {
         "2",
       );
 
-      const photoBox = await page.getByTestId("desk-photo-tile").first().boundingBox();
-      const letterBox = await page.getByTestId("desk-letter").boundingBox();
-
-      expect(photoBox).not.toBeNull();
-      expect(letterBox).not.toBeNull();
-      const horizontalGap =
-        (letterBox?.x ?? 0) - ((photoBox?.x ?? 0) + (photoBox?.width ?? 0));
-
-      expect(Math.round(horizontalGap)).toBeGreaterThanOrEqual(16);
+      const frameBox = await page.getByTestId("desk-home-frame").boundingBox();
+      expect(frameBox).not.toBeNull();
+      expect(frameBox!.width).toBeLessThanOrEqual(viewport.width - 24);
+      expect(frameBox!.height).toBeGreaterThan(220);
+      await expect(page.getByTestId("desk-letter")).toHaveCount(0);
     }
   });
 });

@@ -1231,12 +1231,12 @@ function AlbumDailyPair({
             deliveredPhoto ? { src: getPhotoThumbnailSrc(deliveredPhoto) } : null
           }
           ownLabel={catName}
-          deliveredLabel={deliveredPhoto ? "どこかのこ" : undefined}
+          deliveredLabel={deliveredPhoto ? "とどいた" : undefined}
           ownAriaLabel="うちのねがお"
           deliveredAriaLabel={
             hasUnopenedOtherDelivery && !deliveredPhoto
               ? "届いた封筒をホームで開く"
-              : "どこかのこを開く"
+              : "とどいた ねがおを開く"
           }
           ownFallback={
             <span data-testid="album-daily-own-missing-letter">
@@ -1253,7 +1253,7 @@ function AlbumDailyPair({
                 </span>
               ) : (
                 <span data-testid="album-daily-missing-letter">
-                  {"おたよりは とどきませんでした"}
+                  {"ねこだよりは とどきませんでした"}
                 </span>
               )
             ) : undefined

@@ -16,8 +16,8 @@ const expectedShotNames = [
   "state3_2005_habit.png",
   "state4_2010_week1.png",
   "state4_2010_habit.png",
-  "state4_stamp_viewer.png",
-  "state4_report_sheet.png",
+  "state4_home_frame_viewer.png",
+  "state4_home_frame_viewer_close.png",
   "state1b_2030.png",
   "album_today.png",
   "album_missing_cases.png",
@@ -166,7 +166,7 @@ test.describe("home desk model shots", () => {
     await seedCollectionMissingCases(page);
     await page.goto("/collection");
     await page.waitForLoadState("networkidle");
-    await expect(page.getByText("おたよりは とどきませんでした")).toBeVisible();
+    await expect(page.getByText("ねこだよりは とどきませんでした")).toBeVisible();
     await expect(page.getByText("おとどけ できませんでした")).toHaveCount(2);
     await expect(page.getByText("この日の ねがおは ありません")).toBeVisible();
     await page.screenshot({
@@ -202,7 +202,7 @@ test.describe("home desk model shots", () => {
     });
   });
 
-  test("state4_stamp_viewer", async ({ page }) => {
+  test("state4_home_frame_viewer", async ({ page }) => {
     await seedReviewState(page, {
       now: Date.parse("2026-06-10T11:10:00.000Z"),
       state: "4",
@@ -210,16 +210,16 @@ test.describe("home desk model shots", () => {
     });
     await page.goto("/home");
     await page.waitForLoadState("networkidle");
-    await page.getByTestId("desk-stamp-pair").locator("button").nth(1).click();
+    await page.getByTestId("desk-home-frame").click();
     await expect(page.getByRole("button", { name: /とっておく/ })).toBeVisible();
     await page.waitForTimeout(500);
     await page.screenshot({
-      path: path.join(shotsDir, "state4_stamp_viewer.png"),
+      path: path.join(shotsDir, "state4_home_frame_viewer.png"),
       fullPage: true,
     });
   });
 
-  test("state4_report_sheet", async ({ page }) => {
+  test("state4_home_frame_viewer_close", async ({ page }) => {
     await seedReviewState(page, {
       now: Date.parse("2026-06-10T11:10:00.000Z"),
       state: "4",
@@ -227,13 +227,11 @@ test.describe("home desk model shots", () => {
     });
     await page.goto("/home");
     await page.waitForLoadState("networkidle");
-    await page.getByTestId("desk-stamp-pair").locator("button").nth(1).click();
-    await page.getByLabel("写真のメニュー").click();
-    await page.getByRole("button", { name: "この写真を報告" }).click();
-    await expect(page.getByRole("dialog", { name: "この写真を報告" })).toBeVisible();
+    await page.getByTestId("desk-home-frame").click();
+    await expect(page.getByRole("button", { name: "閉じる" })).toBeVisible();
     await page.waitForTimeout(500);
     await page.screenshot({
-      path: path.join(shotsDir, "state4_report_sheet.png"),
+      path: path.join(shotsDir, "state4_home_frame_viewer_close.png"),
       fullPage: true,
     });
   });
