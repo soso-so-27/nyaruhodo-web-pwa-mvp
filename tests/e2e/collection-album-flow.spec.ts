@@ -631,6 +631,105 @@ test.describe("collection album flow", () => {
       "true",
     );
   });
+
+  test("opens a mainichi day view and keeps a delivered photo from fullscreen", async ({
+    page,
+  }) => {
+    const now = Date.parse("2026-06-13T11:05:00.000Z");
+    const dateKey = "2026-06-13";
+
+    await page.addInitScript(
+      ({ currentCatId, src, createdAt, targetDateKey }) => {
+        window.localStorage.setItem("active_cat_id", currentCatId);
+        window.localStorage.setItem(
+          "cat_profiles",
+          JSON.stringify([
+            {
+              id: currentCatId,
+              name: "current cat",
+              createdAt: new Date(createdAt).toISOString(),
+              updatedAt: new Date(createdAt).toISOString(),
+            },
+          ]),
+        );
+        window.localStorage.setItem(
+          "nyaruhodo_exchange_own_sleeping_photos",
+          JSON.stringify([
+            {
+              id: `own-sleeping-${createdAt}`,
+              ownerCatId: currentCatId,
+              catId: currentCatId,
+              src,
+              state: "sleeping",
+              visibility: "shared",
+              deliveryStatus: "available",
+              triggerLabel: "sleeping",
+              theme: "sleeping",
+              shared: true,
+              createdAt,
+            },
+          ]),
+        );
+        window.localStorage.setItem(
+          "neteruneko_evening_delivery_days",
+          JSON.stringify({
+            [targetDateKey]: {
+              dateKey: targetDateKey,
+              targetOwnPhotoId: `own-sleeping-${createdAt}`,
+              targetCatId: currentCatId,
+              targetCapturedAt: createdAt,
+              deliveredPhoto: {
+                id: "delivered-mainichi-day",
+                sourcePhotoId: "stock-mainichi-day",
+                src,
+                title: "とどいたねがお",
+                subtitle: "",
+                triggerLabel: "sleeping",
+                theme: "sleeping",
+                deliveredAt: createdAt + 1,
+              },
+              deliveredAt: createdAt + 1,
+              openedAt: createdAt + 2,
+            },
+          }),
+        );
+      },
+      {
+        currentCatId: "current-cat",
+        src: photoDataUrl,
+        createdAt: now,
+        targetDateKey: dateKey,
+      },
+    );
+
+    await page.goto("/collection");
+    await page.waitForLoadState("networkidle");
+
+    await page.getByTestId("mainichi-board-photo-sent").click();
+    await expect(page.getByTestId("mainichi-day-sheet")).toBeVisible();
+    await expect(page.getByTestId("mainichi-day-photo-sent")).toBeVisible();
+    await expect(page.getByTestId("mainichi-day-photo-delivered")).toBeVisible();
+
+    await page.getByTestId("mainichi-day-photo-delivered").click();
+    await expect(page.getByTestId("mainichi-photo-viewer")).toBeVisible();
+    await page.getByRole("button", { name: "とっておく" }).click();
+
+    await expect
+      .poll(() =>
+        page.evaluate(() => {
+          const photos = JSON.parse(
+            window.localStorage.getItem("nyaruhodo_exchange_kept_photos") ?? "[]",
+          ) as { id?: string; sourcePhotoId?: string }[];
+
+          return photos.some(
+            (photo) =>
+              photo.id === "delivered-mainichi-day" ||
+              photo.sourcePhotoId === "stock-mainichi-day",
+          );
+        }),
+      )
+      .toBe(true);
+  });
 });
 
 async function seedCollectionEveningDelivery(

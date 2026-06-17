@@ -1,7 +1,7 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
-import type { CSSProperties, UIEvent } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import type { CSSProperties, MouseEvent, UIEvent } from "react";
 import {
   getCollectionSlotPhotoSlug,
   getDailyCollectionTarget,
@@ -22,10 +22,12 @@ import {
   deleteOwnSleepingPhoto,
   hideKeptExchangePhoto,
   isExchangePhotoLocallyBlocked,
+  keepExchangePhoto,
   readKeptExchangePhotos,
   readOwnSleepingPhotos,
   updateKeptExchangePhotoDataUrl,
   updateOwnSleepingPhotoDelivery,
+  type ExchangePhoto,
 } from "../../lib/home/sleepingPhotos";
 import {
   autoOpenExpiredEveningDeliveries,
@@ -57,7 +59,7 @@ import { AppCard } from "../ui/AppCard";
 import { AppIcon } from "../ui/AppIcons";
 import { AppSegmented } from "../ui/AppSegmented";
 import { EmptyState } from "../ui/EmptyState";
-import { PhotoTile } from "../ui/PhotoTile";
+import { PhotoTile, PhotoViewerFrame } from "../ui/PhotoTile";
 import { StampPair } from "../ui/StampPair";
 import { StoredPhotoImage } from "../ui/StoredPhotoImage";
 import { color, radius, shadow } from "../ui/designTokens";
@@ -223,6 +225,31 @@ type MainichiBoardMonth = {
   photos: MainichiBoardPhoto[];
 };
 
+type MainichiMorphSource = {
+  rect: {
+    left: number;
+    top: number;
+    width: number;
+    height: number;
+  };
+  photoKey: string;
+};
+
+type MainichiDayPhoto = {
+  id: string;
+  sourcePhotoId?: string;
+  src: string;
+  thumbnailSrc?: string;
+  displaySrc?: string;
+  originalSrc?: string;
+  timestamp: number;
+  kind: BoxDetailKind;
+  sideLabel: string;
+  catName?: string;
+  storageWriteback?: (dataUrl: string) => void;
+  deliveredAt?: number;
+};
+
 export function CollectionPage() {
   const [catProfiles, setCatProfiles] = useState<CatProfile[]>([]);
   const [activeCatId, setActiveCatId] = useState<string | null>(null);
@@ -245,6 +272,13 @@ export function CollectionPage() {
   const [selectedBoxDateKey, setSelectedBoxDateKey] = useState<string | null>(
     null,
   );
+  const [selectedMainichiDayKey, setSelectedMainichiDayKey] = useState<
+    string | null
+  >(null);
+  const [selectedMainichiSource, setSelectedMainichiSource] =
+    useState<MainichiMorphSource | null>(null);
+  const [selectedMainichiPhoto, setSelectedMainichiPhoto] =
+    useState<MainichiDayPhoto | null>(null);
   const [currentBoxPhotoIndex, setCurrentBoxPhotoIndex] = useState(0);
   const toastTimerRef = useRef<number | null>(null);
   const trackedViewCatIdRef = useRef<string | null>(null);
@@ -401,6 +435,21 @@ export function CollectionPage() {
       : selectedBoxKind === "other"
         ? filterBoxPhotosByDate(otherBoxPhotos, selectedBoxDateKey)
         : [];
+  const catNameById = useMemo(
+    () => new Map(catProfiles.map((profile) => [profile.id, getCatName(profile)])),
+    [catProfiles],
+  );
+  const selectedMainichiDayGroup =
+    selectedMainichiDayKey
+      ? albumDayGroups.find((group) => group.key === selectedMainichiDayKey) ?? null
+      : null;
+  const selectedMainichiDayPhotos = useMemo(
+    () =>
+      selectedMainichiDayGroup
+        ? buildMainichiDayPhotos(selectedMainichiDayGroup, catNameById)
+        : [],
+    [catNameById, selectedMainichiDayGroup],
+  );
 
   useEffect(() => {
     if (!hasLoaded || !activeCatId || trackedViewCatIdRef.current === activeCatId) {
@@ -514,6 +563,78 @@ export function CollectionPage() {
     setSelectedBoxKind(null);
     setSelectedBoxDateKey(null);
     setCurrentBoxPhotoIndex(0);
+  }
+
+  function openMainichiDay(
+    dateKey: string,
+    source: MainichiMorphSource | null = null,
+  ) {
+    setSelectedMainichiDayKey(dateKey);
+    setSelectedMainichiSource(source);
+    trackProductEvent(
+      "collection_mainichi_day_opened",
+      { date_key: dateKey, source_photo_key: source?.photoKey ?? null },
+      { localCatId: activeCatId },
+    );
+  }
+
+  function closeMainichiDay() {
+    if (selectedMainichiDayKey) {
+      trackProductEvent(
+        "collection_mainichi_day_closed",
+        {
+          date_key: selectedMainichiDayKey,
+          photo_count: selectedMainichiDayPhotos.length,
+        },
+        { localCatId: activeCatId },
+      );
+    }
+
+    setSelectedMainichiDayKey(null);
+    setSelectedMainichiSource(null);
+  }
+
+  function openMainichiFullscreenPhoto(photo: MainichiDayPhoto) {
+    setSelectedMainichiPhoto(photo);
+    trackProductEvent(
+      "collection_mainichi_photo_opened",
+      {
+        date_key: selectedMainichiDayKey,
+        kind: photo.kind,
+        photo_id: photo.id,
+        source_photo_id: photo.sourcePhotoId ?? null,
+      },
+      { localCatId: activeCatId },
+    );
+  }
+
+  function closeMainichiFullscreenPhoto() {
+    setSelectedMainichiPhoto(null);
+  }
+
+  function handleKeepMainichiPhoto(photo: MainichiDayPhoto) {
+    if (photo.kind !== "other") {
+      return false;
+    }
+
+    const saved = keepExchangePhoto(createExchangePhotoFromDayPhoto(photo));
+
+    if (saved) {
+      setBoxRefreshTick((value) => value + 1);
+      showToast("とっておきました");
+    }
+
+    trackProductEvent(
+      "collection_mainichi_photo_keep_tapped",
+      {
+        photo_id: photo.id,
+        source_photo_id: photo.sourcePhotoId ?? null,
+        saved,
+      },
+      { localCatId: activeCatId },
+    );
+
+    return saved;
   }
 
   function handleBoxPhotoScroll(event: UIEvent<HTMLDivElement>) {
@@ -892,8 +1013,25 @@ export function CollectionPage() {
           catName={catName}
           onScopeChange={handleAlbumScopeChange}
           onOpenBox={openBoxDetail}
+          onOpenMainichiDay={openMainichiDay}
         />
       </div>
+      {selectedMainichiDayGroup ? (
+        <MainichiDaySheet
+          group={selectedMainichiDayGroup}
+          photos={selectedMainichiDayPhotos}
+          source={selectedMainichiSource}
+          onClose={closeMainichiDay}
+          onOpenPhoto={openMainichiFullscreenPhoto}
+        />
+      ) : null}
+      {selectedMainichiPhoto ? (
+        <MainichiFullscreenPhoto
+          photo={selectedMainichiPhoto}
+          onClose={closeMainichiFullscreenPhoto}
+          onKeep={handleKeepMainichiPhoto}
+        />
+      ) : null}
       {selectedBoxKind ? (
         <BoxPhotoDetailSheet
           kind={selectedBoxKind}
@@ -966,6 +1104,7 @@ function BoxOverview({
   catName,
   onScopeChange,
   onOpenBox,
+  onOpenMainichiDay,
 }: {
   dayGroups: AlbumDayGroup[];
   activeScope: AlbumScope;
@@ -974,6 +1113,10 @@ function BoxOverview({
   catName: string;
   onScopeChange: (scope: AlbumScope) => void;
   onOpenBox: (kind: BoxDetailKind, dateKey?: string | null) => void;
+  onOpenMainichiDay: (
+    dateKey: string,
+    source?: MainichiMorphSource | null,
+  ) => void;
 }) {
   const [activeBoardSide, setActiveBoardSide] =
     useState<MainichiBoardSide>("sent");
@@ -1002,7 +1145,7 @@ function BoxOverview({
           onSideChange={setActiveBoardSide}
           firstEveningDeliveryTargetDateKey={firstEveningDeliveryTargetDateKey}
           catProfiles={catProfiles}
-          onOpenBox={onOpenBox}
+          onOpenDay={onOpenMainichiDay}
         />
       ) : (
         <>
@@ -1035,14 +1178,14 @@ function MainichiPhotoBoard({
   onSideChange,
   firstEveningDeliveryTargetDateKey,
   catProfiles,
-  onOpenBox,
+  onOpenDay,
 }: {
   dayGroups: AlbumDayGroup[];
   activeSide: MainichiBoardSide;
   onSideChange: (side: MainichiBoardSide) => void;
   firstEveningDeliveryTargetDateKey: string | null;
   catProfiles: CatProfile[];
-  onOpenBox: (kind: BoxDetailKind, dateKey?: string | null) => void;
+  onOpenDay: (dateKey: string, source?: MainichiMorphSource | null) => void;
 }) {
   const months = useMemo(
     () =>
@@ -1114,7 +1257,7 @@ function MainichiPhotoBoard({
               key={`${activeSide}-${month.key}`}
               month={month}
               pastingPhotoKey={pastingPhotoKey}
-              onOpenBox={onOpenBox}
+              onOpenDay={onOpenDay}
             />
           ))}
         </div>
@@ -1133,11 +1276,11 @@ function MainichiPhotoBoard({
 function MainichiMonthBoard({
   month,
   pastingPhotoKey,
-  onOpenBox,
+  onOpenDay,
 }: {
   month: MainichiBoardMonth;
   pastingPhotoKey: string | null;
-  onOpenBox: (kind: BoxDetailKind, dateKey?: string | null) => void;
+  onOpenDay: (dateKey: string, source?: MainichiMorphSource | null) => void;
 }) {
   return (
     <AppCard
@@ -1155,7 +1298,7 @@ function MainichiMonthBoard({
             photo={photo}
             index={index}
             shouldPaste={getMainichiBoardPhotoKey(photo) === pastingPhotoKey}
-            onOpenBox={onOpenBox}
+            onOpenDay={onOpenDay}
           />
         ))}
       </div>
@@ -1167,18 +1310,31 @@ function MainichiBoardPhotoCard({
   photo,
   index,
   shouldPaste,
-  onOpenBox,
+  onOpenDay,
 }: {
   photo: MainichiBoardPhoto;
   index: number;
   shouldPaste: boolean;
-  onOpenBox: (kind: BoxDetailKind, dateKey?: string | null) => void;
+  onOpenDay: (dateKey: string, source?: MainichiMorphSource | null) => void;
 }) {
-  const kind: BoxDetailKind = photo.side === "sent" ? "sleeping" : "other";
   const testId =
     photo.side === "sent"
       ? "mainichi-board-photo-sent"
       : "mainichi-board-photo-delivered";
+
+  function handleClick(event: MouseEvent<HTMLButtonElement>) {
+    const rect = event.currentTarget.getBoundingClientRect();
+
+    onOpenDay(photo.dateKey, {
+      rect: {
+        left: rect.left,
+        top: rect.top,
+        width: rect.width,
+        height: rect.height,
+      },
+      photoKey: getMainichiBoardPhotoKey(photo),
+    });
+  }
 
   return (
     <button
@@ -1190,7 +1346,7 @@ function MainichiBoardPhotoCard({
         "--mainichi-rotation": getMainichiBoardRotation(index),
         transform: "rotate(var(--mainichi-rotation))",
       } as CSSProperties}
-      onClick={() => onOpenBox(kind, photo.dateKey)}
+      onClick={handleClick}
       aria-label={photo.side === "sent" ? "おくった ねがおをひらく" : "とどいた ねがおをひらく"}
     >
       <span
@@ -1222,6 +1378,245 @@ function MainichiBoardPhotoCard({
         ) : null}
       </span>
     </button>
+  );
+}
+
+function MainichiDaySheet({
+  group,
+  photos,
+  source,
+  onClose,
+  onOpenPhoto,
+}: {
+  group: AlbumDayGroup;
+  photos: MainichiDayPhoto[];
+  source: MainichiMorphSource | null;
+  onClose: () => void;
+  onOpenPhoto: (photo: MainichiDayPhoto) => void;
+}) {
+  const panelRef = useRef<HTMLElement | null>(null);
+  const prefersReducedMotion = usePrefersReducedMotion();
+  const closeTimerRef = useRef<number | null>(null);
+  const [isClosing, setIsClosing] = useState(false);
+  const [motionStyle, setMotionStyle] = useState<CSSProperties>(() => ({
+    opacity: prefersReducedMotion ? 1 : 0,
+    transform: prefersReducedMotion ? "translate3d(0, 0, 0) scale(1)" : "translate3d(0, 16px, 0) scale(0.985)",
+  }));
+
+  function getSourceTransform() {
+    const panel = panelRef.current;
+
+    if (!panel || !source) {
+      return "translate3d(0, 16px, 0) scale(0.985)";
+    }
+
+    const target = panel.getBoundingClientRect();
+    const scaleX = source.rect.width / Math.max(target.width, 1);
+    const scaleY = source.rect.height / Math.max(target.height, 1);
+    const translateX = source.rect.left - target.left;
+    const translateY = source.rect.top - target.top;
+
+    return `translate3d(${translateX}px, ${translateY}px, 0) scale(${scaleX}, ${scaleY})`;
+  }
+
+  useLayoutEffect(() => {
+    if (prefersReducedMotion) {
+      setMotionStyle({
+        opacity: 1,
+        transform: "translate3d(0, 0, 0) scale(1)",
+      });
+      return;
+    }
+
+    setMotionStyle({
+      opacity: source ? 0.82 : 0,
+      transform: getSourceTransform(),
+      transition: "none",
+      borderRadius: source ? "var(--radius-lg)" : "var(--radius-2xl)",
+    });
+
+    const frame = window.requestAnimationFrame(() => {
+      setMotionStyle({
+        opacity: 1,
+        transform: "translate3d(0, 0, 0) scale(1)",
+        transition:
+          "transform 340ms cubic-bezier(0.2, 0.8, 0.2, 1), opacity 180ms ease-out, border-radius 340ms cubic-bezier(0.2, 0.8, 0.2, 1)",
+        borderRadius: "var(--radius-2xl)",
+      });
+    });
+
+    return () => window.cancelAnimationFrame(frame);
+  }, [group.key, prefersReducedMotion, source?.photoKey]);
+
+  useEffect(
+    () => () => {
+      if (closeTimerRef.current) {
+        window.clearTimeout(closeTimerRef.current);
+      }
+    },
+    [],
+  );
+
+  function handleClose() {
+    if (prefersReducedMotion || !source) {
+      onClose();
+      return;
+    }
+
+    setIsClosing(true);
+    setMotionStyle({
+      opacity: 0.84,
+      transform: getSourceTransform(),
+      transition:
+        "transform 280ms cubic-bezier(0.4, 0, 0.6, 1), opacity 220ms ease-in, border-radius 280ms cubic-bezier(0.4, 0, 0.6, 1)",
+      borderRadius: "var(--radius-lg)",
+    });
+    closeTimerRef.current = window.setTimeout(onClose, 260);
+  }
+
+  return (
+    <>
+      <div
+        style={{
+          ...styles.mainichiDayBackdrop,
+          ...(isClosing ? styles.mainichiDayBackdropClosing : null),
+        }}
+        onClick={handleClose}
+        aria-hidden="true"
+      />
+      <section
+        ref={panelRef}
+        style={{
+          ...styles.mainichiDaySheet,
+          ...motionStyle,
+        }}
+        role="dialog"
+        aria-modal="true"
+        aria-label={`${group.label} その日`}
+        data-testid="mainichi-day-sheet"
+      >
+        <div style={styles.mainichiDayHeader}>
+          <div>
+            <p style={styles.mainichiDayKicker}>その日</p>
+            <h2 style={styles.mainichiDayTitle}>{group.label}</h2>
+          </div>
+          <AppButton
+            type="button"
+            variant="ghost"
+            size="icon"
+            iconOnly
+            aria-label="閉じる"
+            onClick={handleClose}
+          >
+            ×
+          </AppButton>
+        </div>
+        {photos.length > 0 ? (
+          <div style={styles.mainichiDayTimeline}>
+            {photos.map((photo) => (
+              <button
+                key={`${photo.kind}-${photo.id}`}
+                type="button"
+                style={styles.mainichiDayPhotoRow}
+                onClick={() => onOpenPhoto(photo)}
+                data-testid={
+                  photo.kind === "sleeping"
+                    ? "mainichi-day-photo-sent"
+                    : "mainichi-day-photo-delivered"
+                }
+              >
+                <PhotoTile
+                  src={getPhotoThumbnailSrc(photo)}
+                  alt=""
+                  variant="tile"
+                  aspect="1 / 1"
+                  style={styles.mainichiDayPhotoTileRoot}
+                  imageStyle={styles.mainichiDayPhotoTile}
+                  onStorageDataUrl={photo.storageWriteback}
+                />
+                <span style={styles.mainichiDayPhotoText}>
+                  <span style={styles.mainichiDayPhotoSide}>{photo.sideLabel}</span>
+                  {photo.catName ? (
+                    <span style={styles.mainichiDayPhotoCat}>{photo.catName}</span>
+                  ) : null}
+                </span>
+              </button>
+            ))}
+          </div>
+        ) : (
+          <EmptyState
+            description="この日の ねがおは ありません"
+            style={styles.mainichiDayEmpty}
+          />
+        )}
+      </section>
+    </>
+  );
+}
+
+function MainichiFullscreenPhoto({
+  photo,
+  onClose,
+  onKeep,
+}: {
+  photo: MainichiDayPhoto;
+  onClose: () => void;
+  onKeep: (photo: MainichiDayPhoto) => boolean;
+}) {
+  const [saveState, setSaveState] = useState<"idle" | "saved">(() =>
+    photo.kind === "other" && isMainichiPhotoKept(photo) ? "saved" : "idle",
+  );
+
+  function handleKeep() {
+    if (photo.kind !== "other") {
+      return;
+    }
+
+    if (saveState === "saved") {
+      return;
+    }
+
+    if (onKeep(photo)) {
+      setSaveState("saved");
+    }
+  }
+
+  return (
+    <div style={styles.mainichiViewerOverlay} data-testid="mainichi-photo-viewer">
+      <div style={styles.mainichiViewerChrome}>
+        <AppButton
+          type="button"
+          variant="ghost"
+          size="icon"
+          iconOnly
+          aria-label="閉じる"
+          onClick={onClose}
+        >
+          ×
+        </AppButton>
+      </div>
+      <PhotoViewerFrame
+        src={getPhotoDetailSrc(photo)}
+        alt=""
+        fit="contain"
+        aspect="auto"
+        style={styles.mainichiViewerFrame}
+        imageStyle={styles.mainichiViewerImage}
+        onStorageDataUrl={photo.storageWriteback}
+      />
+      {photo.kind === "other" ? (
+        <AppButton
+          type="button"
+          variant="secondary"
+          size="lg"
+          fullWidth
+          style={styles.mainichiViewerKeepButton}
+          onClick={handleKeep}
+        >
+          {saveState === "saved" ? "とっておいた" : "とっておく"}
+        </AppButton>
+      ) : null}
+    </div>
   );
 }
 
@@ -2562,6 +2957,80 @@ function writeMainichiSeenPhotoKeys(keys: Set<string>) {
   }
 }
 
+function buildMainichiDayPhotos(
+  group: AlbumDayGroup,
+  catNameById: Map<string, string>,
+): MainichiDayPhoto[] {
+  const sentPhotos = group.sections
+    .filter((section) => section.kind === "sleeping")
+    .flatMap((section) => section.photos)
+    .sort((a, b) => a.timestamp - b.timestamp)
+    .map((photo) => {
+      const catId = photo.ownerCatId ?? photo.catId;
+
+      return {
+        id: photo.id,
+        sourcePhotoId: photo.sourcePhotoId,
+        src: photo.src,
+        thumbnailSrc: photo.thumbnailSrc,
+        displaySrc: photo.displaySrc,
+        originalSrc: photo.originalSrc,
+        timestamp: photo.timestamp,
+        kind: "sleeping" as const,
+        sideLabel: "おくった",
+        catName: catId ? catNameById.get(catId) : undefined,
+      };
+    });
+  const deliveredPhotos = group.sections
+    .filter((section) => section.kind === "other")
+    .flatMap((section) => section.photos)
+    .sort((a, b) => a.timestamp - b.timestamp)
+    .map((photo) => ({
+      id: photo.id,
+      sourcePhotoId: photo.sourcePhotoId,
+      src: photo.src,
+      thumbnailSrc: photo.thumbnailSrc,
+      displaySrc: photo.displaySrc,
+      originalSrc: photo.originalSrc,
+      timestamp: photo.timestamp,
+      kind: "other" as const,
+      sideLabel: "とどいた",
+      deliveredAt: photo.deliveredAt,
+      storageWriteback: (dataUrl: string) =>
+        writeBackDeliveredPhotoDataUrl(photo, dataUrl),
+    }));
+
+  return [...sentPhotos, ...deliveredPhotos];
+}
+
+function createExchangePhotoFromDayPhoto(photo: MainichiDayPhoto): ExchangePhoto {
+  return {
+    id: photo.id,
+    sourcePhotoId: photo.sourcePhotoId,
+    src: getPhotoDetailSrc(photo),
+    thumbnailSrc: photo.thumbnailSrc,
+    displaySrc: photo.displaySrc,
+    originalSrc: photo.originalSrc,
+    title: "とどいたねがお",
+    subtitle: "",
+    triggerLabel: "mainichi",
+    theme: "mainichi",
+    deliveredAt: photo.deliveredAt ?? photo.timestamp,
+  };
+}
+
+function isMainichiPhotoKept(photo: MainichiDayPhoto) {
+  if (photo.kind !== "other") {
+    return false;
+  }
+
+  return readKeptExchangePhotos().some(
+    (savedPhoto) =>
+      savedPhoto.id === photo.id ||
+      Boolean(photo.sourcePhotoId && savedPhoto.sourcePhotoId === photo.sourcePhotoId),
+  );
+}
+
 function buildMainichiBoardMonths(
   dayGroups: AlbumDayGroup[],
   side: MainichiBoardSide,
@@ -3648,6 +4117,137 @@ const styles = {
     minHeight: "180px",
     alignContent: "center",
     fontFamily: "var(--font-display)",
+  },
+  mainichiDayBackdrop: {
+    position: "fixed",
+    inset: 0,
+    zIndex: 68,
+    background: "color-mix(in srgb, var(--ink) 14%, transparent)",
+    backdropFilter: "blur(2px)",
+    WebkitBackdropFilter: "blur(2px)",
+    transition: "opacity 220ms ease",
+  },
+  mainichiDayBackdropClosing: {
+    opacity: 0,
+  },
+  mainichiDaySheet: {
+    position: "fixed",
+    left: "max(16px, calc((100vw - 480px) / 2 + 24px))",
+    right: "max(16px, calc((100vw - 480px) / 2 + 24px))",
+    bottom: "calc(var(--bottom-nav-height) + var(--bottom-nav-bottom-offset) + 20px + env(safe-area-inset-bottom))",
+    zIndex: 69,
+    maxHeight: "min(72svh, 560px)",
+    overflowY: "auto",
+    display: "grid",
+    gap: "20px",
+    padding: "22px 20px 24px",
+    borderRadius: "var(--radius-2xl)",
+    background: "color-mix(in srgb, var(--paper-card) 94%, transparent)",
+    boxShadow: "var(--shadow-e2)",
+    transformOrigin: "50% 50%",
+  },
+  mainichiDayHeader: {
+    display: "flex",
+    alignItems: "flex-start",
+    justifyContent: "space-between",
+    gap: "16px",
+  },
+  mainichiDayKicker: {
+    margin: "0 0 4px",
+    color: COLLECTION_MUTED,
+    fontFamily: "var(--font-display)",
+    fontSize: "13px",
+    fontWeight: 400,
+    lineHeight: 1.4,
+  },
+  mainichiDayTitle: {
+    margin: 0,
+    color: COLLECTION_TEXT_STRONG,
+    fontFamily: "var(--font-ui)",
+    fontSize: "18px",
+    fontWeight: 500,
+    lineHeight: 1.4,
+    fontVariantNumeric: "tabular-nums",
+  },
+  mainichiDayTimeline: {
+    display: "grid",
+    gap: "16px",
+  },
+  mainichiDayPhotoRow: {
+    display: "grid",
+    gridTemplateColumns: "96px minmax(0, 1fr)",
+    alignItems: "center",
+    gap: "16px",
+    minHeight: "116px",
+    padding: "12px",
+    border: "none",
+    borderRadius: "var(--radius-xl)",
+    background: "color-mix(in srgb, var(--paper) 78%, transparent)",
+    color: COLLECTION_TEXT,
+    font: "inherit",
+    textAlign: "left",
+    cursor: "pointer",
+  },
+  mainichiDayPhotoTileRoot: {
+    width: "96px",
+  },
+  mainichiDayPhotoTile: {
+    width: "96px",
+    height: "96px",
+  },
+  mainichiDayPhotoText: {
+    display: "grid",
+    gap: "6px",
+  },
+  mainichiDayPhotoSide: {
+    color: COLLECTION_TEXT_STRONG,
+    fontFamily: "var(--font-display)",
+    fontSize: "18px",
+    fontWeight: 400,
+    lineHeight: 1.35,
+  },
+  mainichiDayPhotoCat: {
+    color: COLLECTION_MUTED,
+    fontFamily: "var(--font-ui)",
+    fontSize: "13px",
+    fontWeight: 400,
+    lineHeight: 1.4,
+  },
+  mainichiDayEmpty: {
+    minHeight: "144px",
+    fontFamily: "var(--font-display)",
+  },
+  mainichiViewerOverlay: {
+    position: "fixed",
+    inset: 0,
+    zIndex: 82,
+    display: "grid",
+    gridTemplateRows: "auto minmax(0, 1fr) auto",
+    gap: "20px",
+    padding:
+      "calc(18px + env(safe-area-inset-top)) 20px calc(24px + env(safe-area-inset-bottom))",
+    background: "color-mix(in srgb, var(--paper) 98%, transparent)",
+  },
+  mainichiViewerChrome: {
+    display: "flex",
+    justifyContent: "flex-end",
+  },
+  mainichiViewerFrame: {
+    width: "min(100%, 560px)",
+    maxWidth: "100%",
+    height: "100%",
+    justifySelf: "center",
+    alignSelf: "center",
+    borderRadius: "var(--radius-2xl)",
+  },
+  mainichiViewerImage: {
+    width: "100%",
+    height: "100%",
+    maxHeight: "calc(100svh - 180px - env(safe-area-inset-top) - env(safe-area-inset-bottom))",
+  },
+  mainichiViewerKeepButton: {
+    width: "min(100%, 420px)",
+    justifySelf: "center",
   },
   todayAlbumCard: {
     display: "grid",
