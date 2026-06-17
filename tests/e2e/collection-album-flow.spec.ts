@@ -306,6 +306,114 @@ test.describe("collection album flow", () => {
     await expect(page.locator('main img[src^="data:image/"]')).toHaveCount(1);
   });
 
+  test("prefers delivered storage refs over stale signed display urls", async ({
+    page,
+  }) => {
+    const now = Date.parse("2026-06-15T11:20:00.000Z");
+    const dateKey = "2026-06-15";
+    const storageSrc = "storage:admin-stock/sleeping/delivered-2026-06-15.jpg";
+    const staleSignedSrc =
+      "https://example.invalid/storage/v1/object/sign/cat-photos/admin-stock/sleeping/delivered-2026-06-15.jpg?token=expired";
+    const signedUrlRequests: string[] = [];
+
+    await page.route("**/api/photo-storage/signed-url", async (route) => {
+      const body = route.request().postDataJSON() as { src?: string };
+      signedUrlRequests.push(body.src ?? "");
+
+      if (body.src === storageSrc) {
+        await route.fulfill({
+          contentType: "application/json",
+          body: JSON.stringify({ signedUrl: photoDataUrl }),
+        });
+        return;
+      }
+
+      await route.fulfill({
+        status: 404,
+        contentType: "application/json",
+        body: JSON.stringify({ signedUrl: null }),
+      });
+    });
+
+    await page.addInitScript(
+      ({ currentCatId, ownSrc, deliveredSrc, staleSrc, createdAt, targetDateKey }) => {
+        window.localStorage.setItem("active_cat_id", currentCatId);
+        window.localStorage.setItem(
+          "cat_profiles",
+          JSON.stringify([
+            {
+              id: currentCatId,
+              name: "current cat",
+              createdAt: new Date(createdAt).toISOString(),
+              updatedAt: new Date(createdAt).toISOString(),
+            },
+          ]),
+        );
+        window.localStorage.setItem(
+          "nyaruhodo_exchange_own_sleeping_photos",
+          JSON.stringify([
+            {
+              id: `own-sleeping-${createdAt}`,
+              ownerCatId: currentCatId,
+              catId: currentCatId,
+              src: ownSrc,
+              state: "sleeping",
+              visibility: "private",
+              deliveryStatus: "available",
+              triggerLabel: "sleeping",
+              theme: "sleeping",
+              shared: true,
+              createdAt,
+            },
+          ]),
+        );
+        window.localStorage.setItem(
+          "neteruneko_evening_delivery_days",
+          JSON.stringify({
+            [targetDateKey]: {
+              dateKey: targetDateKey,
+              targetOwnPhotoId: `own-sleeping-${createdAt}`,
+              targetCatId: currentCatId,
+              targetCapturedAt: createdAt,
+              deliveredPhoto: {
+                id: "delivered-stale-signed-url",
+                sourcePhotoId: "stock-stale-signed-url",
+                src: deliveredSrc,
+                thumbnailSrc: staleSrc,
+                displaySrc: staleSrc,
+                originalSrc: staleSrc,
+                title: "縺ｨ縺ｩ縺・◆縺ｭ縺後♀",
+                subtitle: "",
+                triggerLabel: "sleeping",
+                theme: "sleeping",
+                deliveredAt: createdAt + 1,
+              },
+              deliveredAt: createdAt + 1,
+              openedAt: createdAt + 2,
+            },
+          }),
+        );
+      },
+      {
+        currentCatId: "current-cat",
+        ownSrc: photoDataUrl,
+        deliveredSrc: storageSrc,
+        staleSrc: staleSignedSrc,
+        createdAt: now,
+        targetDateKey: dateKey,
+      },
+    );
+
+    await page.goto("/collection");
+    await page.waitForLoadState("networkidle");
+    await page.getByRole("radio").nth(1).click();
+
+    await expect(page.getByTestId("mainichi-board-photo-delivered")).toBeVisible();
+    await expect(page.locator('main img[src^="data:image/"]')).toHaveCount(1);
+    expect(signedUrlRequests).toContain(storageSrc);
+    expect(signedUrlRequests).not.toContain(staleSignedSrc);
+  });
+
   test("keeps unopened evening deliveries as a sealed envelope until opened", async ({
     page,
   }) => {

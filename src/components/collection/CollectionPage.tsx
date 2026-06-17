@@ -16,7 +16,7 @@ import {
   storeAccountPhotoDataUrl,
   storeAccountPhotoFile,
 } from "../../lib/photoStorageClient";
-import { isUsablePhotoSrc } from "../../lib/photoStorage";
+import { getStoragePhotoPath, isUsablePhotoSrc } from "../../lib/photoStorage";
 import {
   BOX_PHOTO_STORAGE_EVENT,
   deleteOwnSleepingPhoto,
@@ -3220,6 +3220,20 @@ function readOpenedEveningDeliveryBoxPhotos(): BoxPreviewPhoto[] {
         };
       }
 
+      if (getStoragePhotoPath(deliveredPhoto.src)) {
+        const {
+          thumbnailSrc: _thumbnailSrc,
+          displaySrc: _displaySrc,
+          originalSrc: _originalSrc,
+          ...persistentDeliveredPhoto
+        } = deliveredPhoto;
+
+        return {
+          ...persistentDeliveredPhoto,
+          deliveredAt,
+        };
+      }
+
       return {
         ...deliveredPhoto,
         deliveredAt,
@@ -3390,6 +3404,10 @@ function getPhotoThumbnailSrc(photo: {
   thumbnailSrc?: string;
   displaySrc?: string;
 }) {
+  if (getStoragePhotoPath(photo.src)) {
+    return photo.src;
+  }
+
   if (isUsableStoredPhotoSrc(photo.thumbnailSrc)) {
     return photo.thumbnailSrc;
   }
@@ -3402,6 +3420,10 @@ function getPhotoDetailSrc(photo: {
   displaySrc?: string;
   originalSrc?: string;
 }) {
+  if (getStoragePhotoPath(photo.src)) {
+    return photo.src;
+  }
+
   if (isUsableStoredPhotoSrc(photo.displaySrc)) {
     return photo.displaySrc;
   }
