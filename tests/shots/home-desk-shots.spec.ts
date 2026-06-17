@@ -166,32 +166,34 @@ test.describe("home desk model shots", () => {
     await seedCollectionMissingCases(page);
     await page.goto("/collection");
     await page.waitForLoadState("networkidle");
-    await expect(page.getByText("ねこだよりは とどきませんでした")).toBeVisible();
-    await expect(page.getByText("おとどけ できませんでした")).toHaveCount(2);
-    await expect(page.getByText("この日の ねがおは ありません")).toBeVisible();
+    await expect(page.getByTestId("mainichi-photo-board")).toBeVisible();
+    await expect(page.getByTestId("mainichi-board-photo-sent").first()).toBeVisible();
+    await expect(page.getByTestId("album-daily-missing-letter")).toHaveCount(0);
     await page.screenshot({
       path: path.join(shotsDir, "album_missing_cases.png"),
       fullPage: true,
     });
-    const missingA = page.getByTestId("album-daily-missing-letter").nth(0);
-    const missingB = page.getByTestId("album-daily-undeliverable-letter").nth(0);
-    const missingC = page.getByText("この日の ねがおは ありません");
-    await missingA.evaluate((element) =>
+    const sentPhoto = page.getByTestId("mainichi-board-photo-sent").first();
+    await sentPhoto.evaluate((element) =>
       element.scrollIntoView({ block: "center", inline: "center" }),
     );
-    await missingA.screenshot({
+    await sentPhoto.screenshot({
       path: path.join(shotsDir, "album_missing_a.png"),
     });
-    await missingB.evaluate((element) =>
+    await page.getByRole("radio").nth(1).click();
+    const deliveredBoard = page.getByTestId("mainichi-photo-board");
+    await expect(page.getByTestId("mainichi-board-empty")).toBeVisible();
+    await deliveredBoard.evaluate((element) =>
       element.scrollIntoView({ block: "center", inline: "center" }),
     );
-    await missingB.screenshot({
+    await deliveredBoard.screenshot({
       path: path.join(shotsDir, "album_missing_b.png"),
     });
-    await missingC.evaluate((element) =>
+    const board = page.getByTestId("mainichi-photo-board");
+    await board.evaluate((element) =>
       element.scrollIntoView({ block: "center", inline: "center" }),
     );
-    await missingC.screenshot({
+    await board.screenshot({
       path: path.join(shotsDir, "album_missing_c.png"),
     });
     await page.evaluate(() => window.scrollTo(0, document.body.scrollHeight));

@@ -55,6 +55,7 @@ import { AppBottomSheet } from "../ui/AppBottomSheet";
 import { AppButton } from "../ui/AppButton";
 import { AppCard } from "../ui/AppCard";
 import { AppIcon } from "../ui/AppIcons";
+import { AppSegmented } from "../ui/AppSegmented";
 import { EmptyState } from "../ui/EmptyState";
 import { PhotoTile } from "../ui/PhotoTile";
 import { StampPair } from "../ui/StampPair";
@@ -112,6 +113,7 @@ type BoxPreviewPhoto = {
   displaySrc?: string;
   originalSrc?: string;
   catId?: string;
+  ownerCatId?: string;
   shared?: boolean;
   createdAt?: number;
   sourcePhotoId?: string;
@@ -130,6 +132,7 @@ type StoredCollectionPhotoEntry = {
 type BoxDetailKind = "sleeping" | "other";
 type AlbumPhotoKind = "sleeping" | "awake" | "other";
 type AlbumScope = "daily" | "own";
+type MainichiBoardSide = "sent" | "delivered";
 
 type AlbumMomentPhoto = BoxPreviewPhoto & {
   kind: AlbumPhotoKind;
@@ -150,6 +153,23 @@ type AlbumDayGroup = {
   total: number;
   hasUnopenedOtherDelivery?: boolean;
   hasUndeliverableOtherDelivery?: boolean;
+};
+
+type MainichiBoardPhoto = {
+  id: string;
+  sourcePhotoId?: string;
+  dateKey: string;
+  dateLabel: string;
+  src: string;
+  timestamp: number;
+  side: MainichiBoardSide;
+  catName?: string;
+};
+
+type MainichiBoardMonth = {
+  key: string;
+  label: string;
+  photos: MainichiBoardPhoto[];
 };
 
 export function CollectionPage() {
@@ -817,6 +837,7 @@ export function CollectionPage() {
           dayGroups={albumDayGroups}
           activeScope={activeAlbumScope}
           firstEveningDeliveryTargetDateKey={firstEveningDeliveryTargetDateKey}
+          catProfiles={catProfiles}
           catName={catName}
           onScopeChange={handleAlbumScopeChange}
           onOpenBox={openBoxDetail}
@@ -890,6 +911,7 @@ function BoxOverview({
   dayGroups,
   activeScope,
   firstEveningDeliveryTargetDateKey,
+  catProfiles,
   catName,
   onScopeChange,
   onOpenBox,
@@ -897,48 +919,207 @@ function BoxOverview({
   dayGroups: AlbumDayGroup[];
   activeScope: AlbumScope;
   firstEveningDeliveryTargetDateKey: string | null;
+  catProfiles: CatProfile[];
   catName: string;
   onScopeChange: (scope: AlbumScope) => void;
   onOpenBox: (kind: BoxDetailKind, dateKey?: string | null) => void;
 }) {
-  const scopedDayGroups = useMemo(
+  const [activeBoardSide, setActiveBoardSide] =
+    useState<MainichiBoardSide>("sent");
+  const ownDayGroups = useMemo(
     () =>
       filterAlbumDayGroupsByScope(
         dayGroups,
-        activeScope,
+        "own",
         firstEveningDeliveryTargetDateKey,
       ),
-    [activeScope, dayGroups, firstEveningDeliveryTargetDateKey],
+    [dayGroups, firstEveningDeliveryTargetDateKey],
   );
   const todayKey = getJstDateKey(Date.now());
-  const todayGroup =
-    scopedDayGroups.find((group) => group.key === todayKey) ??
-    (activeScope === "daily" ? createEmptyTodayAlbumGroup() : null);
-  const recentGroups = scopedDayGroups
+  const todayGroup = ownDayGroups.find((group) => group.key === todayKey) ?? null;
+  const recentGroups = ownDayGroups
     .filter((group) => group.key !== todayKey)
     .slice(0, 5);
 
   return (
     <section style={styles.boxOverview} aria-label="アルバム">
       <AlbumScopeTabs activeScope={activeScope} onScopeChange={onScopeChange} />
-      {todayGroup ? (
-        <AlbumTodayCard
-          group={todayGroup}
-          scope={activeScope}
-          catName={catName}
+      {activeScope === "daily" ? (
+        <MainichiPhotoBoard
+          dayGroups={dayGroups}
+          activeSide={activeBoardSide}
+          onSideChange={setActiveBoardSide}
           firstEveningDeliveryTargetDateKey={firstEveningDeliveryTargetDateKey}
+          catProfiles={catProfiles}
           onOpenBox={onOpenBox}
         />
-      ) : null}
+      ) : (
+        <>
+          {todayGroup ? (
+            <AlbumTodayCard
+              group={todayGroup}
+              scope="own"
+              catName={catName}
+              firstEveningDeliveryTargetDateKey={firstEveningDeliveryTargetDateKey}
+              onOpenBox={onOpenBox}
+            />
+          ) : null}
 
-      <AlbumRecentSection
-        groups={recentGroups}
-        scope={activeScope}
-        firstEveningDeliveryTargetDateKey={firstEveningDeliveryTargetDateKey}
-        catName={catName}
-        onOpenBox={onOpenBox}
-      />
+          <AlbumRecentSection
+            groups={recentGroups}
+            scope="own"
+            firstEveningDeliveryTargetDateKey={firstEveningDeliveryTargetDateKey}
+            catName={catName}
+            onOpenBox={onOpenBox}
+          />
+        </>
+      )}
     </section>
+  );
+}
+
+function MainichiPhotoBoard({
+  dayGroups,
+  activeSide,
+  onSideChange,
+  firstEveningDeliveryTargetDateKey,
+  catProfiles,
+  onOpenBox,
+}: {
+  dayGroups: AlbumDayGroup[];
+  activeSide: MainichiBoardSide;
+  onSideChange: (side: MainichiBoardSide) => void;
+  firstEveningDeliveryTargetDateKey: string | null;
+  catProfiles: CatProfile[];
+  onOpenBox: (kind: BoxDetailKind, dateKey?: string | null) => void;
+}) {
+  const months = useMemo(
+    () =>
+      buildMainichiBoardMonths(
+        dayGroups,
+        activeSide,
+        firstEveningDeliveryTargetDateKey,
+        catProfiles,
+      ),
+    [activeSide, catProfiles, dayGroups, firstEveningDeliveryTargetDateKey],
+  );
+
+  return (
+    <section style={styles.mainichiBoard} data-testid="mainichi-photo-board">
+      <AppSegmented<MainichiBoardSide>
+        value={activeSide}
+        onChange={onSideChange}
+        ariaLabel="まいにちの面"
+        columns={2}
+        options={[
+          { value: "sent", label: "おくった" },
+          { value: "delivered", label: "とどいた" },
+        ]}
+        style={styles.mainichiBoardToggle}
+      />
+      {months.length > 0 ? (
+        <div style={styles.mainichiMonthList}>
+          {months.map((month) => (
+            <MainichiMonthBoard
+              key={`${activeSide}-${month.key}`}
+              month={month}
+              onOpenBox={onOpenBox}
+            />
+          ))}
+        </div>
+      ) : (
+        <div data-testid="mainichi-board-empty">
+          <EmptyState
+            description="ねがおが、すこしずつ ふえる"
+            style={styles.mainichiBoardEmpty}
+          />
+        </div>
+      )}
+    </section>
+  );
+}
+
+function MainichiMonthBoard({
+  month,
+  onOpenBox,
+}: {
+  month: MainichiBoardMonth;
+  onOpenBox: (kind: BoxDetailKind, dateKey?: string | null) => void;
+}) {
+  return (
+    <AppCard
+      as="section"
+      variant="section"
+      padding="md"
+      style={styles.mainichiMonthBoard}
+      data-testid="mainichi-month-board"
+    >
+      <h2 style={styles.mainichiMonthTitle}>{month.label}</h2>
+      <div style={styles.mainichiBoardPhotos}>
+        {month.photos.map((photo, index) => (
+          <MainichiBoardPhotoCard
+            key={photo.id}
+            photo={photo}
+            index={index}
+            onOpenBox={onOpenBox}
+          />
+        ))}
+      </div>
+    </AppCard>
+  );
+}
+
+function MainichiBoardPhotoCard({
+  photo,
+  index,
+  onOpenBox,
+}: {
+  photo: MainichiBoardPhoto;
+  index: number;
+  onOpenBox: (kind: BoxDetailKind, dateKey?: string | null) => void;
+}) {
+  const kind: BoxDetailKind = photo.side === "sent" ? "sleeping" : "other";
+  const testId =
+    photo.side === "sent"
+      ? "mainichi-board-photo-sent"
+      : "mainichi-board-photo-delivered";
+
+  return (
+    <button
+      type="button"
+      data-testid={testId}
+      style={{
+        ...styles.mainichiBoardPhotoButton,
+        transform: getMainichiBoardRotation(index),
+      }}
+      onClick={() => onOpenBox(kind, photo.dateKey)}
+      aria-label={photo.side === "sent" ? "おくった ねがおをひらく" : "とどいた ねがおをひらく"}
+    >
+      <span style={styles.mainichiBoardTape} aria-hidden="true" />
+      <PhotoTile
+        src={photo.src}
+        alt=""
+        variant="tile"
+        aspect="1 / 1"
+        style={styles.mainichiBoardPhotoTileRoot}
+        imageStyle={styles.mainichiBoardPhotoTile}
+        onStorageDataUrl={
+          photo.side === "delivered"
+            ? (dataUrl) =>
+                writeBackDeliveredPhotoDataUrl(
+                  { id: photo.id, sourcePhotoId: photo.sourcePhotoId, src: photo.src },
+                  dataUrl,
+                )
+            : undefined
+        }
+      />
+      <span style={styles.mainichiBoardPhotoMeta}>
+        <span style={styles.mainichiBoardPhotoDate}>{photo.dateLabel}</span>
+        {photo.catName ? (
+          <span style={styles.mainichiBoardPhotoCat}>{photo.catName}</span>
+        ) : null}
+      </span>
+    </button>
   );
 }
 
@@ -1106,15 +1287,7 @@ function AlbumDaySections({
   firstEveningDeliveryTargetDateKey: string | null;
 }) {
   if (scope === "daily") {
-    return (
-      <AlbumDailyPair
-        group={group}
-        catName={catName}
-        onOpenBox={onOpenBox}
-        firstEveningDeliveryTargetDateKey={firstEveningDeliveryTargetDateKey}
-        compact={compact}
-      />
-    );
+    return null;
   }
 
   return (
@@ -2233,6 +2406,87 @@ function groupPhotosBySlot(photos: CollectionPhoto[]) {
   return map;
 }
 
+function buildMainichiBoardMonths(
+  dayGroups: AlbumDayGroup[],
+  side: MainichiBoardSide,
+  firstEveningDeliveryTargetDateKey: string | null,
+  catProfiles: CatProfile[],
+): MainichiBoardMonth[] {
+  const catNameById = new Map(
+    catProfiles.map((profile) => [profile.id, getCatName(profile)]),
+  );
+  const photos = dayGroups.flatMap((group) => {
+    const sectionKind: AlbumPhotoKind = side === "sent" ? "sleeping" : "other";
+
+    if (
+      side === "delivered" &&
+      !shouldResolveOtherDeliverySlot(
+        group.key,
+        firstEveningDeliveryTargetDateKey,
+      )
+    ) {
+      return [];
+    }
+
+    return group.sections
+      .filter((section) => section.kind === sectionKind)
+      .flatMap((section) =>
+        section.photos.map((photo) =>
+          createMainichiBoardPhoto(photo, group.key, side, catNameById),
+        ),
+      );
+  });
+  const monthMap = new Map<string, MainichiBoardPhoto[]>();
+
+  for (const photo of photos) {
+    const monthKey = getMainichiMonthKey(photo.dateKey);
+    monthMap.set(monthKey, [...(monthMap.get(monthKey) ?? []), photo]);
+  }
+
+  return [...monthMap.entries()]
+    .map(([key, monthPhotos]) => ({
+      key,
+      label: formatMainichiMonthLabel(key),
+      photos: [...monthPhotos].sort((a, b) => b.timestamp - a.timestamp),
+    }))
+    .sort((a, b) => b.key.localeCompare(a.key));
+}
+
+function createMainichiBoardPhoto(
+  photo: AlbumMomentPhoto,
+  dateKey: string,
+  side: MainichiBoardSide,
+  catNameById: Map<string, string>,
+): MainichiBoardPhoto {
+  const catId = photo.ownerCatId ?? photo.catId;
+
+  return {
+    id: photo.id,
+    sourcePhotoId: photo.sourcePhotoId,
+    dateKey,
+    dateLabel: getAlbumDateLabelFromKey(dateKey),
+    src: getPhotoThumbnailSrc(photo),
+    timestamp: photo.timestamp,
+    side,
+    catName: side === "sent" && catId ? catNameById.get(catId) : undefined,
+  };
+}
+
+function getMainichiMonthKey(dateKey: string) {
+  return dateKey.slice(0, 7);
+}
+
+function formatMainichiMonthLabel(monthKey: string) {
+  const [year, month] = monthKey.split("-");
+  return `${year}年${Number(month)}月`;
+}
+
+function getMainichiBoardRotation(index: number) {
+  const rotations = ["rotate(-2.2deg)", "rotate(1.4deg)", "rotate(-0.8deg)", "rotate(2deg)", "rotate(-1.4deg)"];
+
+  return rotations[index % rotations.length];
+}
+
 function buildAlbumDayGroups(
   sleepingPhotos: BoxPreviewPhoto[],
   awakePhotos: BoxPreviewPhoto[],
@@ -3139,6 +3393,101 @@ const styles = {
     background: "rgba(255,253,248,0.96)",
     color: COLLECTION_TEXT_STRONG,
     boxShadow: "0 4px 12px rgba(90,76,60,0.045)",
+  },
+  mainichiBoard: {
+    display: "grid",
+    gap: "20px",
+  },
+  mainichiBoardToggle: {
+    width: "min(230px, 100%)",
+    justifySelf: "center",
+    gridTemplateColumns: "repeat(2, minmax(0, 1fr))",
+    gap: "4px",
+  },
+  mainichiMonthList: {
+    display: "grid",
+    gap: "24px",
+  },
+  mainichiMonthBoard: {
+    display: "grid",
+    gap: "18px",
+    paddingTop: "20px",
+    paddingBottom: "24px",
+    overflow: "hidden",
+  },
+  mainichiMonthTitle: {
+    margin: 0,
+    color: COLLECTION_TEXT_STRONG,
+    fontFamily: "var(--font-display)",
+    fontSize: "18px",
+    fontWeight: 500,
+    lineHeight: 1.32,
+    letterSpacing: "0.08em",
+  },
+  mainichiBoardPhotos: {
+    display: "grid",
+    gridTemplateColumns: "repeat(2, minmax(0, 1fr))",
+    gap: "20px 16px",
+    alignItems: "start",
+    padding: "4px 2px 2px",
+  },
+  mainichiBoardPhotoButton: {
+    position: "relative",
+    display: "grid",
+    gap: "8px",
+    minWidth: 0,
+    border: "none",
+    background: "transparent",
+    color: COLLECTION_TEXT,
+    font: "inherit",
+    textAlign: "left",
+    padding: "8px 6px 10px",
+    cursor: "pointer",
+    transformOrigin: "50% 22%",
+  },
+  mainichiBoardTape: {
+    position: "absolute",
+    zIndex: 2,
+    left: "50%",
+    top: "0",
+    width: "44px",
+    height: "14px",
+    borderRadius: radius.sm,
+    background: "color-mix(in srgb, var(--paper-card) 72%, transparent)",
+    boxShadow: "0 2px 8px rgba(120,110,90,0.08)",
+    transform: "translate(-50%, -15%) rotate(-3deg)",
+    pointerEvents: "none",
+  },
+  mainichiBoardPhotoTileRoot: {
+    width: "100%",
+  },
+  mainichiBoardPhotoTile: {
+    width: "100%",
+    height: "auto",
+    aspectRatio: "1 / 1",
+    display: "block",
+  },
+  mainichiBoardPhotoMeta: {
+    display: "grid",
+    gap: "2px",
+    justifyItems: "center",
+    color: COLLECTION_MUTED,
+    fontFamily: "var(--font-ui)",
+    fontSize: "12px",
+    fontWeight: 400,
+    lineHeight: 1.35,
+  },
+  mainichiBoardPhotoDate: {
+    color: COLLECTION_MUTED,
+    fontVariantNumeric: "tabular-nums",
+  },
+  mainichiBoardPhotoCat: {
+    color: "var(--ink-faint)",
+  },
+  mainichiBoardEmpty: {
+    minHeight: "180px",
+    alignContent: "center",
+    fontFamily: "var(--font-display)",
   },
   todayAlbumCard: {
     display: "grid",
