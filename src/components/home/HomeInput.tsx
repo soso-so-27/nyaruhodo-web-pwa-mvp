@@ -67,6 +67,7 @@ import {
   BOX_PHOTO_STORAGE_EVENT,
   dismissExchangePhoto,
   keepExchangePhoto,
+  readAllOwnSleepingPhotos,
   readKeptExchangePhotoCount,
   readOwnSleepingPhotos,
   readOwnSleepingPhotoCount,
@@ -248,6 +249,8 @@ const SLEEPING_SAFETY_ACCEPTED_STORAGE_KEY =
   "nyaruhodo_sleeping_safety_accepted";
 const HOME_INSTALL_HINT_DISMISSED_STORAGE_KEY =
   "neteruneko_home_install_hint_dismissed";
+const HOME_TODAY_CAT_SELECTION_STORAGE_KEY =
+  "neteruneko_home_today_cat_selection";
 
 type BeforeInstallPromptEvent = Event & {
   prompt: () => Promise<void>;
@@ -653,7 +656,25 @@ export function HomeInput({ recentEvents: _recentEvents }: HomeInputProps) {
     }
   }
 
-  const catName = activeCat ? getCatName(activeCat) : "ねこ";
+  const activeCatName = activeCat ? getCatName(activeCat) : "ねこ";
+  const homeDateKey = isHomeClockReady ? getJstDateKey(homeNow) : "";
+  const allOwnSleepingPhotos = useMemo(
+    () => readAllOwnSleepingPhotos(),
+    [collectionRefreshTick, eveningRefreshTick],
+  );
+  const homeDisplayCat = useMemo(
+    () =>
+      selectTodayHomeCat({
+        profiles: catProfiles,
+        activeCatId,
+        photos: allOwnSleepingPhotos,
+        dateKey: homeDateKey,
+      }),
+    [activeCatId, allOwnSleepingPhotos, catProfiles, homeDateKey],
+  );
+  const homeDisplayCatId = homeDisplayCat?.id ?? activeCatId;
+  const homeCatName = homeDisplayCat ? getCatName(homeDisplayCat) : activeCatName;
+  const catName = activeCatName;
   const mikkeCategoryRemaining = getMikkeCategoryRemainingMap(lockData, tick);
   const mikkeAllRemaining = getAllMikkeCategoriesLockedRemaining(lockData, tick);
   const mikkeWindowKey = Math.floor(tick / (60 * 60 * 1000));
@@ -677,12 +698,21 @@ export function HomeInput({ recentEvents: _recentEvents }: HomeInputProps) {
   const sleepingCounterRemaining = null;
   const sleepingCounterCooldownProgress = null;
   const ownSleepingPhotosForHome = useMemo(
+    () =>
+      homeDisplayCatId
+        ? allOwnSleepingPhotos
+            .filter((photo) => (photo.ownerCatId ?? photo.catId) === homeDisplayCatId)
+            .slice(0, 24)
+        : readOwnSleepingPhotos(null),
+    [allOwnSleepingPhotos, homeDisplayCatId],
+  );
+  const ownSleepingPhotosForDelivery = useMemo(
     () => readOwnSleepingPhotos(activeCatId),
     [activeCatId, collectionRefreshTick, eveningRefreshTick],
   );
   const eveningDelivery = useEveningDelivery({
     activeCatId,
-    ownSleepingPhotos: ownSleepingPhotosForHome,
+    ownSleepingPhotos: ownSleepingPhotosForDelivery,
     tick,
   });
   const eveningDeliveryRefreshTick =
@@ -690,11 +720,11 @@ export function HomeInput({ recentEvents: _recentEvents }: HomeInputProps) {
   const eveningHomeState = useMemo(
     () =>
       buildEveningHomeState({
-        activeCatId,
+        activeCatId: homeDisplayCatId,
         ownPhotos: ownSleepingPhotosForHome,
         now: homeNow,
       }),
-    [activeCatId, eveningDeliveryRefreshTick, homeNow, ownSleepingPhotosForHome],
+    [homeDisplayCatId, eveningDeliveryRefreshTick, homeNow, ownSleepingPhotosForHome],
   );
   useEffect(() => {
     if (!isHomeClockReady || !activeCatId || !activeCat) {
@@ -1931,7 +1961,7 @@ export function HomeInput({ recentEvents: _recentEvents }: HomeInputProps) {
           <HomeClockHydrationPlaceholder />
         ) : (
           <HomeDeskModel
-            catName={catName}
+            catName={homeCatName}
             eveningState={eveningHomeState}
             ownSleepingPhotos={ownSleepingPhotosForHome}
             sleepingCounter={sleepingCounterCount}
@@ -1978,7 +2008,7 @@ export function HomeInput({ recentEvents: _recentEvents }: HomeInputProps) {
       {openingEveningDelivery ? (
         <EveningDeliveryOpening
           state={openingEveningDelivery}
-          catName={catName}
+          catName={homeCatName}
           onStorageDataUrl={(dataUrl) =>
             handleEveningDeliveryDataUrl(openingEveningDelivery.dateKey, dataUrl)
           }
@@ -4006,6 +4036,117 @@ function sumCounts(
 
 function getCountByAnswerId(result: MikkeWindowResult, answerId: string) {
   return result.counts.find((count) => count.answerId === answerId)?.count ?? 0;
+}
+
+function selectTodayHomeCat({
+  profiles,
+  activeCatId,
+  photos,
+  dateKey,
+}: {
+  profiles: CatProfile[];
+  activeCatId: string | null;
+  photos: OwnSleepingPhoto[];
+  dateKey: string;
+}) {
+  if (profiles.length === 0) {
+    return null;
+  }
+
+  if (profiles.length === 1) {
+    return profiles[0];
+  }
+
+  const fallbackProfile = getActiveCatProfile(profiles, activeCatId);
+
+  if (!dateKey) {
+    return fallbackProfile;
+  }
+
+  const stored = readStoredTodayHomeCatSelection();
+  if (stored?.dateKey === dateKey) {
+    const storedProfile = profiles.find((profile) => profile.id === stored.catId);
+    if (storedProfile) {
+      return storedProfile;
+    }
+  }
+
+  const nextProfile = selectLeastRecentlyPhotographedCat(profiles, photos);
+  saveStoredTodayHomeCatSelection({
+    dateKey,
+    catId: nextProfile.id,
+  });
+
+  return nextProfile;
+}
+
+function selectLeastRecentlyPhotographedCat(
+  profiles: CatProfile[],
+  photos: OwnSleepingPhoto[],
+) {
+  const latestPhotoByCat = new Map<string, number>();
+
+  for (const photo of photos) {
+    const catId = photo.ownerCatId ?? photo.catId;
+    if (!catId) {
+      continue;
+    }
+
+    latestPhotoByCat.set(
+      catId,
+      Math.max(latestPhotoByCat.get(catId) ?? 0, photo.createdAt ?? 0),
+    );
+  }
+
+  return [...profiles].sort((left, right) => {
+    const leftLatest = latestPhotoByCat.get(left.id) ?? -1;
+    const rightLatest = latestPhotoByCat.get(right.id) ?? -1;
+
+    if (leftLatest !== rightLatest) {
+      return leftLatest - rightLatest;
+    }
+
+    return profiles.indexOf(left) - profiles.indexOf(right);
+  })[0];
+}
+
+function readStoredTodayHomeCatSelection() {
+  try {
+    const raw = window.localStorage.getItem(HOME_TODAY_CAT_SELECTION_STORAGE_KEY);
+    if (!raw) {
+      return null;
+    }
+
+    const parsed = JSON.parse(raw) as Partial<{
+      dateKey: string;
+      catId: string;
+    }>;
+
+    if (typeof parsed.dateKey !== "string" || typeof parsed.catId !== "string") {
+      return null;
+    }
+
+    return {
+      dateKey: parsed.dateKey,
+      catId: parsed.catId,
+    };
+  } catch {
+    return null;
+  }
+}
+
+function saveStoredTodayHomeCatSelection(selection: {
+  dateKey: string;
+  catId: string;
+}) {
+  try {
+    window.localStorage.setItem(
+      HOME_TODAY_CAT_SELECTION_STORAGE_KEY,
+      JSON.stringify(selection),
+    );
+  } catch {
+    // The home can still fall back to an in-memory selection when storage is full.
+  }
 }
 
 function buildPersonalityInsight(

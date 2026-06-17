@@ -132,9 +132,7 @@ const CAT_SLEEPING_MILESTONES_STORAGE_KEY =
   "neteruneko_cat_sleeping_milestones";
 
 export function readOwnSleepingPhotos(activeCatId: string | null = null) {
-  const photos = readStorageArray<OwnSleepingPhoto>(OWN_SLEEPING_PHOTO_STORAGE_KEY)
-    .filter(isValidOwnSleepingPhoto)
-    .map(normalizeOwnSleepingPhoto);
+  const photos = readAllOwnSleepingPhotos();
 
   const activeCatPhotos = activeCatId
     ? photos.filter((photo) => photo.ownerCatId === activeCatId)
@@ -143,10 +141,14 @@ export function readOwnSleepingPhotos(activeCatId: string | null = null) {
   return (activeCatPhotos.length > 0 ? activeCatPhotos : photos).slice(0, 24);
 }
 
-export function readOwnSleepingPhotoCount(activeCatId: string | null) {
-  const photos = readStorageArray<OwnSleepingPhoto>(OWN_SLEEPING_PHOTO_STORAGE_KEY)
+export function readAllOwnSleepingPhotos() {
+  return readStorageArray<OwnSleepingPhoto>(OWN_SLEEPING_PHOTO_STORAGE_KEY)
     .filter(isValidOwnSleepingPhoto)
     .map(normalizeOwnSleepingPhoto);
+}
+
+export function readOwnSleepingPhotoCount(activeCatId: string | null) {
+  const photos = readAllOwnSleepingPhotos();
 
   if (activeCatId) {
     return getOwnSleepingPhotoCountForCat(activeCatId, photos);

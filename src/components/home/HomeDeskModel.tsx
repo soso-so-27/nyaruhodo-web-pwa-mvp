@@ -1023,7 +1023,7 @@ const deskStyles = {
     width: "100%",
     height: "100%",
     borderRadius: "var(--radius-xl)",
-    objectFit: "cover",
+    objectFit: "contain",
   },
   homeEmptyFrame: {
     width: "min(100%, 430px)",
