@@ -1,14 +1,21 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import type { CSSProperties } from "react";
 import { storeAccountPhotoDataUrl } from "../../lib/photoStorageClient";
 import { STORAGE_KEYS } from "../../lib/storage";
 import {
   readCatSleepingMilestones,
+  readOwnSleepingPhotos,
   readOwnSleepingPhotoCount,
   type CatSleepingMilestone,
+  type OwnSleepingPhoto,
 } from "../../lib/home/sleepingPhotos";
+import {
+  readCatMomentsForCat,
+  type CatMomentForCat,
+} from "../../lib/supabase/catMomentCats";
+import { createBrowserSupabaseClient } from "../../lib/supabase/browser";
 import {
   disableOmoideMemories,
   hideOmoideDate,
@@ -49,6 +56,14 @@ const COAT_OPTIONS: { value: CatCoat; label: string; color: string }[] = [
 ];
 type EditableGender = "male" | "female" | "unknown" | "";
 type EditableCoat = CatCoat | "";
+type UchinokoLens = "cat" | "all";
+type LensPhoto = {
+  id: string;
+  src: string;
+  createdAt: number;
+  catIds: string[];
+  catNames: string[];
+};
 
 const CATS_TEXT = "var(--ink)";
 const CATS_TEXT_STRONG = "var(--ink)";
@@ -94,6 +109,12 @@ export function CatsPage() {
   const [message, setMessage] = useState("");
   const [saveMessage, setSaveMessage] = useState("");
   const [omoideRefreshTick, setOmoideRefreshTick] = useState(0);
+  const [activeLens, setActiveLens] = useState<UchinokoLens>("cat");
+  const [remoteLensPhotosByCat, setRemoteLensPhotosByCat] = useState<
+    Record<string, LensPhoto[]>
+  >({});
+  const [hasRemoteLensPhotosLoaded, setHasRemoteLensPhotosLoaded] =
+    useState(false);
   const [selectedOmoideMemory, setSelectedOmoideMemory] =
     useState<OmoideMemory | null>(null);
 
@@ -123,6 +144,33 @@ export function CatsPage() {
   const canManageCats = !isOnboardingProfileSetup && !isOnboardingCompletionView;
   const shouldShowCatSwitchButton = catProfiles.length > 1 && canManageCats;
   const shouldShowSingleCatAdd = catProfiles.length === 1 && canManageCats;
+  const shouldShowLensSwitch =
+    catProfiles.length > 1 &&
+    canManageCats &&
+    !isAddingCat &&
+    !isEditingProfile;
+  const localLensPhotos = useMemo(
+    () => createLocalLensPhotos(catProfiles),
+    [catProfiles],
+  );
+  const lensPhotosByCat = mergeLensPhotoSources(
+    localLensPhotos.byCat,
+    remoteLensPhotosByCat,
+    hasRemoteLensPhotosLoaded,
+  );
+  const activeCatLensPhotos = activeCatId
+    ? lensPhotosByCat[activeCatId] ?? []
+    : [];
+  const allLensPhotos = useMemo(
+    () =>
+      mergeAllLensPhotos(
+        hasRemoteLensPhotosLoaded
+          ? Object.values(remoteLensPhotosByCat).flat()
+          : [],
+        localLensPhotos.all,
+      ),
+    [hasRemoteLensPhotosLoaded, localLensPhotos.all, remoteLensPhotosByCat],
+  );
 
   useEffect(() => {
     const requestedOnboardingMode =
@@ -157,6 +205,92 @@ export function CatsPage() {
     }
     saveActiveCatId(activeProfile.id);
   }, []);
+
+  useEffect(() => {
+    if (catProfiles.length <= 1 && activeLens !== "cat") {
+      setActiveLens("cat");
+    }
+  }, [activeLens, catProfiles.length]);
+
+  useEffect(() => {
+    let isCancelled = false;
+
+    async function loadRemoteLensPhotos() {
+      if (catProfiles.length === 0) {
+        setRemoteLensPhotosByCat({});
+        setHasRemoteLensPhotosLoaded(false);
+        return;
+      }
+
+      const supabase = createBrowserSupabaseClient();
+
+      if (!supabase) {
+        setRemoteLensPhotosByCat({});
+        setHasRemoteLensPhotosLoaded(false);
+        return;
+      }
+
+      const { data: userResult } = await supabase.auth.getUser();
+
+      if (!userResult.user) {
+        if (!isCancelled) {
+          setRemoteLensPhotosByCat({});
+          setHasRemoteLensPhotosLoaded(false);
+        }
+        return;
+      }
+
+      const localCatIds = catProfiles.map((profile) => profile.id);
+      const { data: remoteCats, error } = await supabase
+        .from("cats")
+        .select("id, local_cat_id")
+        .in("local_cat_id", localCatIds);
+
+      if (error || !Array.isArray(remoteCats)) {
+        if (!isCancelled) {
+          setRemoteLensPhotosByCat({});
+          setHasRemoteLensPhotosLoaded(false);
+        }
+        return;
+      }
+
+      const remoteByLocalCatId = new Map<string, string>();
+
+      for (const row of remoteCats as { id: string; local_cat_id: string | null }[]) {
+        if (row.local_cat_id && row.id) {
+          remoteByLocalCatId.set(row.local_cat_id, row.id);
+        }
+      }
+
+      const nextPhotosByCat: Record<string, LensPhoto[]> = {};
+
+      await Promise.all(
+        catProfiles.map(async (profile) => {
+          const remoteCatId = remoteByLocalCatId.get(profile.id);
+
+          if (!remoteCatId) {
+            return;
+          }
+
+          const rows = await readCatMomentsForCat(supabase, remoteCatId);
+          nextPhotosByCat[profile.id] = rows.map((row) =>
+            createRemoteLensPhoto(row, profile),
+          );
+        }),
+      );
+
+      if (!isCancelled) {
+        setRemoteLensPhotosByCat(nextPhotosByCat);
+        setHasRemoteLensPhotosLoaded(true);
+      }
+    }
+
+    void loadRemoteLensPhotos();
+
+    return () => {
+      isCancelled = true;
+    };
+  }, [catProfiles]);
 
   useEffect(() => {
     if (!isOnboardingCompletionView) {
@@ -466,7 +600,21 @@ export function CatsPage() {
           </AppCard>
         ) : null}
 
-        {activeCatProfile && !isOnboardingCompletionView ? (
+        {shouldShowLensSwitch ? (
+          <AppSegmented<UchinokoLens>
+            value={activeLens}
+            ariaLabel="うちのこの見かた"
+            columns={2}
+            onChange={setActiveLens}
+            options={[
+              { value: "cat", label: "ねこ" },
+              { value: "all", label: "ぜんぶ" },
+            ]}
+            style={styles.lensSwitch}
+          />
+        ) : null}
+
+        {activeCatProfile && !isOnboardingCompletionView && activeLens === "cat" ? (
           <AppCard
             variant="section"
             padding="standard"
@@ -626,6 +774,13 @@ export function CatsPage() {
                     ))}
                   </div>
                 </div>
+                {shouldShowLensSwitch ? (
+                  <LensPhotoSection
+                    title={`${catName}の ねがお`}
+                    photos={activeCatLensPhotos}
+                    emptyCopy="このこに紐づく ねがおは、まだありません。"
+                  />
+                ) : null}
                 <OmoideBunbako
                   memories={omoideMemories}
                   controls={omoideControls}
@@ -757,6 +912,13 @@ export function CatsPage() {
           </AppCard>
         ) : null}
 
+        {activeCatProfile && !isOnboardingCompletionView && activeLens === "all" ? (
+          <AllCatsLensView
+            photos={allLensPhotos}
+            catCount={catProfiles.length}
+          />
+        ) : null}
+
         {message ? <p style={styles.message}>{message}</p> : null}
         {saveMessage ? <p style={styles.message}>{saveMessage}</p> : null}
       </div>
@@ -874,6 +1036,102 @@ function FootprintCard({ milestone }: { milestone: CatSleepingMilestone }) {
         <div style={styles.footprintPlaceholder} aria-hidden="true" />
       )}
     </AppCard>
+  );
+}
+
+function LensPhotoSection({
+  title,
+  photos,
+  emptyCopy,
+}: {
+  title: string;
+  photos: LensPhoto[];
+  emptyCopy: string;
+}) {
+  return (
+    <AppCard
+      as="section"
+      variant="inset"
+      padding="sm"
+      style={styles.lensPhotoSection}
+    >
+      <div style={styles.lensSectionHeader}>
+        <p style={styles.lensSectionTitle}>{title}</p>
+      </div>
+      <LensPhotoGrid
+        photos={photos}
+        emptyCopy={emptyCopy}
+        showCatNames={false}
+      />
+    </AppCard>
+  );
+}
+
+function AllCatsLensView({
+  photos,
+  catCount,
+}: {
+  photos: LensPhoto[];
+  catCount: number;
+}) {
+  return (
+    <AppCard
+      as="section"
+      variant="section"
+      padding="standard"
+      style={styles.allLensCard}
+    >
+      <div style={styles.lensSectionHeader}>
+        <p style={styles.lensSectionTitle}>ぜんぶの ねがお</p>
+        <p style={styles.lensSectionSub}>
+          {catCount}ひきの ねがおを、日付順に。
+        </p>
+      </div>
+      <LensPhotoGrid
+        photos={photos}
+        emptyCopy="まだ ねがおはありません。"
+        showCatNames
+      />
+    </AppCard>
+  );
+}
+
+function LensPhotoGrid({
+  photos,
+  emptyCopy,
+  showCatNames,
+}: {
+  photos: LensPhoto[];
+  emptyCopy: string;
+  showCatNames: boolean;
+}) {
+  if (photos.length === 0) {
+    return <p style={styles.lensPhotoEmpty}>{emptyCopy}</p>;
+  }
+
+  return (
+    <div style={styles.lensPhotoGrid}>
+      {photos.map((photo) => (
+        <div key={photo.id} style={styles.lensPhotoItem}>
+          <PhotoTile
+            src={photo.src}
+            alt=""
+            variant="tile"
+            aspect="1 / 1"
+            style={styles.lensPhotoTileRoot}
+            imageStyle={styles.lensPhotoTile}
+          />
+          <span style={styles.lensPhotoDate}>
+            {formatLensPhotoDate(photo.createdAt)}
+          </span>
+          {showCatNames && photo.catNames.length > 0 ? (
+            <span style={styles.lensPhotoCats}>
+              {photo.catNames.join("・")}
+            </span>
+          ) : null}
+        </div>
+      ))}
+    </div>
   );
 }
 
@@ -1040,6 +1298,143 @@ function formatFootprintDate(timestamp: number) {
     2,
     "0",
   )}/${String(date.getDate()).padStart(2, "0")}`;
+}
+
+function createLocalLensPhotos(catProfiles: CatProfile[]): {
+  byCat: Record<string, LensPhoto[]>;
+  all: LensPhoto[];
+} {
+  const profilesById = new Map(
+    catProfiles.map((profile) => [profile.id, profile]),
+  );
+  const byCat = Object.fromEntries(
+    catProfiles.map((profile) => [profile.id, [] as LensPhoto[]]),
+  );
+
+  for (const photo of readOwnSleepingPhotos(null)) {
+    const catId = photo.ownerCatId ?? photo.catId;
+    const profile = profilesById.get(catId);
+
+    if (!profile) {
+      continue;
+    }
+
+    const lensPhoto = createLocalLensPhoto(photo, profile);
+    byCat[profile.id].push(lensPhoto);
+  }
+
+  for (const catId of Object.keys(byCat)) {
+    byCat[catId] = dedupeLensPhotos(byCat[catId]);
+  }
+
+  return {
+    byCat,
+    all: dedupeLensPhotos(Object.values(byCat).flat()),
+  };
+}
+
+function createLocalLensPhoto(
+  photo: OwnSleepingPhoto,
+  profile: CatProfile,
+): LensPhoto {
+  return {
+    id: photo.id,
+    src: photo.thumbnailSrc ?? photo.displaySrc ?? photo.src,
+    createdAt: photo.createdAt,
+    catIds: [profile.id],
+    catNames: [getCatName(profile)],
+  };
+}
+
+function createRemoteLensPhoto(
+  row: CatMomentForCat,
+  profile: CatProfile,
+): LensPhoto {
+  return {
+    id: row.localMomentId || row.catMomentId,
+    src: row.photoUrl,
+    createdAt: parseRemoteLensPhotoDate(row.capturedAt ?? row.createdAt),
+    catIds: [profile.id],
+    catNames: [getCatName(profile)],
+  };
+}
+
+function mergeLensPhotoSources(
+  localByCat: Record<string, LensPhoto[]>,
+  remoteByCat: Record<string, LensPhoto[]>,
+  hasRemoteLoaded: boolean,
+) {
+  if (!hasRemoteLoaded) {
+    return localByCat;
+  }
+
+  const merged: Record<string, LensPhoto[]> = {};
+  const catIds = new Set([
+    ...Object.keys(localByCat),
+    ...Object.keys(remoteByCat),
+  ]);
+
+  for (const catId of catIds) {
+    const remotePhotos = remoteByCat[catId] ?? [];
+    merged[catId] = dedupeLensPhotos(
+      remotePhotos.length > 0 ? remotePhotos : localByCat[catId] ?? [],
+    );
+  }
+
+  return merged;
+}
+
+function mergeAllLensPhotos(remotePhotos: LensPhoto[], localPhotos: LensPhoto[]) {
+  return dedupeLensPhotos(remotePhotos.length > 0 ? remotePhotos : localPhotos);
+}
+
+function dedupeLensPhotos(photos: LensPhoto[]) {
+  const photoMap = new Map<string, LensPhoto>();
+
+  for (const photo of photos) {
+    const existing = photoMap.get(photo.id);
+
+    if (!existing) {
+      photoMap.set(photo.id, {
+        ...photo,
+        catIds: uniqueStrings(photo.catIds),
+        catNames: uniqueStrings(photo.catNames),
+      });
+      continue;
+    }
+
+    photoMap.set(photo.id, {
+      ...existing,
+      createdAt: Math.max(existing.createdAt, photo.createdAt),
+      catIds: uniqueStrings([...existing.catIds, ...photo.catIds]),
+      catNames: uniqueStrings([...existing.catNames, ...photo.catNames]),
+    });
+  }
+
+  return [...photoMap.values()].sort(
+    (left, right) => right.createdAt - left.createdAt,
+  );
+}
+
+function uniqueStrings(values: string[]) {
+  return [...new Set(values.filter(Boolean))];
+}
+
+function parseRemoteLensPhotoDate(dateValue: string | null) {
+  if (!dateValue) {
+    return 0;
+  }
+
+  const timestamp = new Date(dateValue).getTime();
+  return Number.isNaN(timestamp) ? 0 : timestamp;
+}
+
+function formatLensPhotoDate(timestamp: number) {
+  if (!timestamp) {
+    return "";
+  }
+
+  return formatFootprintDate(timestamp);
 }
 
 function findDuplicateCatName(profiles: CatProfile[], name: string) {
@@ -1509,6 +1904,9 @@ const styles = {
   profilePlaceCard: {
     marginBottom: "12px",
   },
+  lensSwitch: {
+    margin: "0 0 12px",
+  },
   profileHero: {
     display: "grid",
     gridTemplateColumns: "64px 1fr auto",
@@ -1729,6 +2127,77 @@ const styles = {
     flexWrap: "wrap",
     gap: "8px",
     marginTop: "12px",
+  },
+  lensPhotoSection: {
+    marginTop: "16px",
+  },
+  allLensCard: {
+    marginBottom: "12px",
+  },
+  lensSectionHeader: {
+    display: "grid",
+    gap: "4px",
+    marginBottom: "12px",
+  },
+  lensSectionTitle: {
+    margin: 0,
+    color: CATS_TEXT,
+    fontFamily: CATS_SERIF,
+    fontSize: "18px",
+    fontWeight: 400,
+    lineHeight: 1.45,
+    letterSpacing: "var(--tracking-label)",
+  },
+  lensSectionSub: {
+    margin: 0,
+    color: CATS_MUTED,
+    fontSize: "13px",
+    fontWeight: 400,
+    lineHeight: 1.6,
+  },
+  lensPhotoGrid: {
+    display: "grid",
+    gridTemplateColumns: "repeat(3, minmax(0, 1fr))",
+    gap: "12px",
+  },
+  lensPhotoItem: {
+    display: "grid",
+    gap: "6px",
+    minWidth: 0,
+  },
+  lensPhotoTileRoot: {
+    width: "100%",
+  },
+  lensPhotoTile: {
+    width: "100%",
+    height: "auto",
+    aspectRatio: "1 / 1",
+    border: "4px solid var(--paper)",
+  },
+  lensPhotoDate: {
+    color: CATS_MUTED,
+    fontSize: "12px",
+    fontWeight: 500,
+    lineHeight: 1.2,
+    letterSpacing: 0,
+  },
+  lensPhotoCats: {
+    color: CATS_FAINT,
+    fontSize: "12px",
+    fontWeight: 500,
+    lineHeight: 1.3,
+    overflow: "hidden",
+    textOverflow: "ellipsis",
+    whiteSpace: "nowrap",
+  },
+  lensPhotoEmpty: {
+    margin: 0,
+    color: CATS_MUTED,
+    fontFamily: CATS_SERIF,
+    fontSize: "13px",
+    fontWeight: 400,
+    lineHeight: 1.7,
+    letterSpacing: "var(--tracking-body)",
   },
   zukanHint: {
     margin: "8px 0 0",
