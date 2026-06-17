@@ -43,6 +43,7 @@ import {
   readActiveCatId,
   readCatProfiles,
   saveActiveCatId,
+  saveCatProfiles,
 } from "../home/homeInputHelpers";
 import type { CatCoat, CatProfile } from "../home/homeInputHelpers";
 
@@ -64,6 +65,13 @@ type LensPhoto = {
   catIds: string[];
   catNames: string[];
 };
+type DeleteCatTarget = {
+  profile: CatProfile;
+  photoCount: number;
+};
+type RemoteCatDeleteResult =
+  | { status: "deleted" | "skipped" }
+  | { status: "error"; message: string };
 
 const CATS_TEXT = "var(--ink)";
 const CATS_TEXT_STRONG = "var(--ink)";
@@ -110,6 +118,9 @@ export function CatsPage() {
   const [saveMessage, setSaveMessage] = useState("");
   const [omoideRefreshTick, setOmoideRefreshTick] = useState(0);
   const [activeLens, setActiveLens] = useState<UchinokoLens>("cat");
+  const [deleteCatTarget, setDeleteCatTarget] =
+    useState<DeleteCatTarget | null>(null);
+  const [isDeletingCat, setIsDeletingCat] = useState(false);
   const [remoteLensPhotosByCat, setRemoteLensPhotosByCat] = useState<
     Record<string, LensPhoto[]>
   >({});
@@ -507,6 +518,79 @@ export function CatsPage() {
     input.click();
   }
 
+  function startDeleteCat(profile: CatProfile) {
+    if (catProfiles.length <= 1) {
+      setMessage("最後の1匹は消せません");
+      return;
+    }
+
+    setDeleteCatTarget({
+      profile,
+      photoCount: getCatDeletePhotoCount(profile.id, lensPhotosByCat),
+    });
+    setMessage("");
+    setSaveMessage("");
+  }
+
+  async function confirmDeleteCat() {
+    if (!deleteCatTarget || isDeletingCat) {
+      return;
+    }
+
+    if (catProfiles.length <= 1) {
+      setMessage("最後の1匹は消せません");
+      setDeleteCatTarget(null);
+      return;
+    }
+
+    const target = deleteCatTarget.profile;
+    const nextProfiles = catProfiles.filter((profile) => profile.id !== target.id);
+    const nextActiveProfile =
+      activeCatId === target.id
+        ? nextProfiles[0]
+        : getActiveCatProfile(nextProfiles, activeCatId);
+
+    if (!nextActiveProfile) {
+      setMessage("最後の1匹は消せません");
+      setDeleteCatTarget(null);
+      return;
+    }
+
+    setIsDeletingCat(true);
+    const remoteDeleteResult = await deleteRemoteCatProfile(
+      target,
+      nextActiveProfile.id,
+    );
+
+    if (remoteDeleteResult.status === "error") {
+      setIsDeletingCat(false);
+      setMessage(`削除できませんでした。${remoteDeleteResult.message}`);
+      return;
+    }
+
+    saveCatProfiles(nextProfiles);
+    saveActiveCatId(nextActiveProfile.id);
+    setCatProfiles(nextProfiles);
+    setActiveCatId(nextActiveProfile.id);
+    setCatNameInput(getCatName(nextActiveProfile));
+    setDeleteCatTarget(null);
+    setIsDeletingCat(false);
+    setIsCatSwitcherOpen(false);
+    setIsAddingCat(false);
+    setIsEditingCatName(false);
+    setIsEditingProfile(false);
+    setSelectedOmoideMemory(null);
+    setRemoteLensPhotosByCat((current) => {
+      const next = { ...current };
+      delete next[target.id];
+      return next;
+    });
+    if (nextProfiles.length <= 1) {
+      setActiveLens("cat");
+    }
+    setMessage(`${getCatName(target)}を消しました`);
+  }
+
   const selectedCoat = activeCatProfile?.appearance?.coat;
 
   return (
@@ -763,6 +847,19 @@ export function CatsPage() {
                     </AppTag>
                   ) : null}
                 </div>
+                {canManageCats && catProfiles.length > 1 ? (
+                  <div style={styles.deleteCatAction}>
+                    <AppButton
+                      type="button"
+                      variant="danger"
+                      size="sm"
+                      fullWidth
+                      onClick={() => startDeleteCat(activeCatProfile)}
+                    >
+                      この子を消す
+                    </AppButton>
+                  </div>
+                ) : null}
                 <div style={styles.footprintsSection}>
                   <p style={styles.footprintsTitle}>あしあと</p>
                   <div style={styles.footprintsScroller}>
@@ -977,6 +1074,48 @@ export function CatsPage() {
                 </AppButton>
               </div>
             </AppBottomSheet>
+      ) : null}
+      {deleteCatTarget ? (
+        <AppBottomSheet
+          title="この子を消しますか？"
+          onClose={() => {
+            if (!isDeletingCat) {
+              setDeleteCatTarget(null);
+            }
+          }}
+        >
+          <div style={styles.deleteCatConfirm}>
+            <p style={styles.deleteCatConfirmTitle}>
+              {getCatName(deleteCatTarget.profile)}・写真
+              {deleteCatTarget.photoCount}枚 を消しますか？
+            </p>
+            <p style={styles.deleteCatConfirmText}>
+              {deleteCatTarget.photoCount > 0
+                ? "写真がある子です。写真そのものは消さず、この子との紐づきだけ外します。"
+                : "写真がまだない子です。プロフィールだけを消します。"}
+            </p>
+            <div style={styles.deleteCatConfirmActions}>
+              <AppButton
+                type="button"
+                variant="danger"
+                fullWidth
+                onClick={() => void confirmDeleteCat()}
+                disabled={isDeletingCat}
+              >
+                {isDeletingCat ? "消しています" : "消す"}
+              </AppButton>
+              <AppButton
+                type="button"
+                variant="quiet"
+                fullWidth
+                onClick={() => setDeleteCatTarget(null)}
+                disabled={isDeletingCat}
+              >
+                やめる
+              </AppButton>
+            </div>
+          </div>
+        </AppBottomSheet>
       ) : null}
       {selectedOmoideMemory ? (
         <OmoideMemorySheet
@@ -1310,17 +1449,20 @@ function createLocalLensPhotos(catProfiles: CatProfile[]): {
   const byCat = Object.fromEntries(
     catProfiles.map((profile) => [profile.id, [] as LensPhoto[]]),
   );
+  const allPhotos: LensPhoto[] = [];
 
   for (const photo of readOwnSleepingPhotos(null)) {
     const catId = photo.ownerCatId ?? photo.catId;
     const profile = profilesById.get(catId);
 
     if (!profile) {
+      allPhotos.push(createLocalOrphanLensPhoto(photo));
       continue;
     }
 
     const lensPhoto = createLocalLensPhoto(photo, profile);
     byCat[profile.id].push(lensPhoto);
+    allPhotos.push(lensPhoto);
   }
 
   for (const catId of Object.keys(byCat)) {
@@ -1329,7 +1471,7 @@ function createLocalLensPhotos(catProfiles: CatProfile[]): {
 
   return {
     byCat,
-    all: dedupeLensPhotos(Object.values(byCat).flat()),
+    all: dedupeLensPhotos(allPhotos),
   };
 }
 
@@ -1343,6 +1485,16 @@ function createLocalLensPhoto(
     createdAt: photo.createdAt,
     catIds: [profile.id],
     catNames: [getCatName(profile)],
+  };
+}
+
+function createLocalOrphanLensPhoto(photo: OwnSleepingPhoto): LensPhoto {
+  return {
+    id: photo.id,
+    src: photo.thumbnailSrc ?? photo.displaySrc ?? photo.src,
+    createdAt: photo.createdAt,
+    catIds: [],
+    catNames: [],
   };
 }
 
@@ -1435,6 +1587,131 @@ function formatLensPhotoDate(timestamp: number) {
   }
 
   return formatFootprintDate(timestamp);
+}
+
+function getLensPhotoCountForCat(
+  catId: string,
+  photosByCat: Record<string, LensPhoto[]>,
+) {
+  return dedupeLensPhotos(photosByCat[catId] ?? []).length;
+}
+
+function getCatDeletePhotoCount(
+  catId: string,
+  photosByCat: Record<string, LensPhoto[]>,
+) {
+  return Math.max(
+    getLensPhotoCountForCat(catId, photosByCat),
+    countStoredSleepingPhotosForCat(catId),
+  );
+}
+
+function countStoredSleepingPhotosForCat(catId: string) {
+  if (typeof window === "undefined") {
+    return 0;
+  }
+
+  try {
+    const raw = window.localStorage.getItem("nyaruhodo_exchange_own_sleeping_photos");
+    const photos = raw ? (JSON.parse(raw) as unknown) : [];
+
+    if (!Array.isArray(photos)) {
+      return 0;
+    }
+
+    return photos.filter((photo) => {
+      if (!photo || typeof photo !== "object") {
+        return false;
+      }
+
+      const candidate = photo as { ownerCatId?: unknown; catId?: unknown };
+      return candidate.ownerCatId === catId || candidate.catId === catId;
+    }).length;
+  } catch {
+    return 0;
+  }
+}
+
+async function deleteRemoteCatProfile(
+  profile: CatProfile,
+  fallbackLocalCatId: string,
+): Promise<RemoteCatDeleteResult> {
+  const supabase = createBrowserSupabaseClient();
+
+  if (!supabase) {
+    return { status: "skipped" };
+  }
+
+  const { data: userResult } = await supabase.auth.getUser();
+  const userId = userResult.user?.id;
+
+  if (!userId) {
+    return { status: "skipped" };
+  }
+
+  const { data: remoteCat, error: findError } = await supabase
+    .from("cats")
+    .select("id, local_cat_id")
+    .eq("owner_user_id", userId)
+    .eq("local_cat_id", profile.id)
+    .maybeSingle();
+
+  if (findError) {
+    return { status: "error", message: findError.message };
+  }
+
+  const remoteCatId =
+    remoteCat && typeof remoteCat === "object" && "id" in remoteCat
+      ? String((remoteCat as { id: string }).id)
+      : null;
+
+  if (!remoteCatId) {
+    return { status: "skipped" };
+  }
+
+  const { error: unlinkError } = await supabase
+    .from("cat_moment_cats")
+    .delete()
+    .eq("cat_id", remoteCatId);
+
+  if (unlinkError) {
+    return { status: "error", message: unlinkError.message };
+  }
+
+  const ownerIdsToRetire = [profile.id, remoteCatId];
+
+  for (const ownerId of ownerIdsToRetire) {
+    const { error } = await supabase
+      .from("cat_moments")
+      .update({ owner_cat_id: fallbackLocalCatId })
+      .eq("user_id", userId)
+      .eq("owner_cat_id", ownerId);
+
+    if (error) {
+      return { status: "error", message: error.message };
+    }
+  }
+
+  const { error: localCatIdError } = await supabase
+    .from("cat_moments")
+    .update({ local_cat_id: fallbackLocalCatId })
+    .eq("user_id", userId)
+    .eq("local_cat_id", profile.id);
+
+  if (localCatIdError) {
+    return { status: "error", message: localCatIdError.message };
+  }
+
+  const { error: deleteError } = await supabase
+    .from("cats")
+    .delete()
+    .eq("id", remoteCatId);
+
+  if (deleteError) {
+    return { status: "error", message: deleteError.message };
+  }
+
+  return { status: "deleted" };
 }
 
 function findDuplicateCatName(profiles: CatProfile[], name: string) {
@@ -2127,6 +2404,32 @@ const styles = {
     flexWrap: "wrap",
     gap: "8px",
     marginTop: "12px",
+  },
+  deleteCatAction: {
+    marginTop: "12px",
+  },
+  deleteCatConfirm: {
+    display: "grid",
+    gap: "16px",
+  },
+  deleteCatConfirmTitle: {
+    margin: 0,
+    color: CATS_TEXT_STRONG,
+    fontFamily: CATS_SERIF,
+    fontSize: "18px",
+    fontWeight: 500,
+    lineHeight: 1.45,
+  },
+  deleteCatConfirmText: {
+    margin: 0,
+    color: CATS_MUTED,
+    fontSize: "13px",
+    fontWeight: 400,
+    lineHeight: 1.7,
+  },
+  deleteCatConfirmActions: {
+    display: "grid",
+    gap: "8px",
   },
   lensPhotoSection: {
     marginTop: "16px",

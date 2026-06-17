@@ -82,6 +82,82 @@ test("shows the special birthday text on the cat birthday", async ({ page }) => 
   await expect(page.getByText("きょうは 誕生日")).toBeVisible();
 });
 
+test("deletes a cat after confirmation and moves the active cat", async ({
+  page,
+}) => {
+  await page.addInitScript(() => {
+    const now = new Date("2026-06-10T00:00:00.000Z").toISOString();
+    window.localStorage.setItem(
+      "cat_profiles",
+      JSON.stringify([
+        {
+          id: "cat-test",
+          name: "ムギ",
+          createdAt: now,
+          updatedAt: now,
+        },
+        {
+          id: "cat-mugi",
+          name: "むぎ",
+          createdAt: now,
+          updatedAt: now,
+        },
+      ]),
+    );
+    window.localStorage.setItem("active_cat_id", "cat-test");
+    window.localStorage.setItem(
+      "nyaruhodo_exchange_own_sleeping_photos",
+      JSON.stringify([
+        {
+          id: "photo-test-cat",
+          ownerCatId: "cat-test",
+          catId: "cat-test",
+          src:
+            "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADElEQVR42mP8z8BQDwAFgwJ/lw5tWQAAAABJRU5ErkJggg==",
+          state: "sleeping",
+          visibility: "private",
+          deliveryStatus: "available",
+          triggerLabel: "sleeping",
+          theme: "sleeping",
+          shared: false,
+          createdAt: Date.parse(now),
+        },
+      ]),
+    );
+  });
+
+  await page.goto("/cats");
+  await page.waitForLoadState("networkidle");
+
+  await page.getByRole("button", { name: "この子を消す" }).click();
+  await expect(page.getByText("ムギ・写真1枚 を消しますか？")).toBeVisible();
+  await page.getByRole("button", { name: /^消す$/ }).click();
+
+  await expect
+    .poll(() =>
+      page.evaluate(() => {
+        const profiles = JSON.parse(
+          window.localStorage.getItem("cat_profiles") ?? "[]",
+        ) as { id: string; name: string }[];
+
+        return {
+          activeCatId: window.localStorage.getItem("active_cat_id"),
+          names: profiles.map((profile) => profile.name),
+          photoCount: JSON.parse(
+            window.localStorage.getItem("nyaruhodo_exchange_own_sleeping_photos") ??
+              "[]",
+          ).length,
+        };
+      }),
+    )
+    .toEqual({
+      activeCatId: "cat-mugi",
+      names: ["むぎ"],
+      photoCount: 1,
+    });
+  await expect(page.getByRole("button", { name: "この子を消す" })).toHaveCount(0);
+});
+
 async function seedCatProfile(
   page: import("@playwright/test").Page,
   { now, birthDate }: { now: string; birthDate: string },
