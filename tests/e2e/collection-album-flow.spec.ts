@@ -69,9 +69,12 @@ test.describe("collection album flow", () => {
       },
     );
 
+    await page.emulateMedia({ reducedMotion: "reduce" });
     await page.goto("/collection");
     await page.waitForLoadState("networkidle");
+    const firstSentPhoto = page.getByTestId("mainichi-board-photo-sent").first();
     await expect(page.getByTestId("mainichi-board-photo-sent")).toHaveCount(2);
+    await expect(firstSentPhoto).not.toHaveAttribute("data-mainichi-paste", "true");
     await expect(page.getByText("current cat")).toBeVisible();
     await expect(page.getByText("previous cat")).toBeVisible();
     await page.getByRole("tab", { name: "うちのこ" }).click();
@@ -612,11 +615,21 @@ test.describe("collection album flow", () => {
 
     await expect(page.getByTestId("mainichi-photo-board")).toBeVisible();
     await expect(page.getByTestId("mainichi-month-board")).toBeVisible();
-    await expect(page.getByTestId("mainichi-board-photo-sent")).toBeVisible();
+    const sentPhoto = page.getByTestId("mainichi-board-photo-sent");
+    await expect(sentPhoto).toBeVisible();
+    await expect(sentPhoto).toHaveAttribute("data-mainichi-paste", "true");
     await expect(page.getByTestId("album-daily-letter-card")).toHaveCount(0);
     await expect(page.getByTestId("album-daily-missing-letter")).toHaveCount(0);
     await expect(page.getByText("ほかのねがお")).toHaveCount(0);
     await expect(page.locator("main img")).toHaveCount(1);
+
+    await page.reload();
+    await page.waitForLoadState("networkidle");
+    await expect(page.getByTestId("mainichi-board-photo-sent")).toBeVisible();
+    await expect(page.getByTestId("mainichi-board-photo-sent")).not.toHaveAttribute(
+      "data-mainichi-paste",
+      "true",
+    );
   });
 });
 

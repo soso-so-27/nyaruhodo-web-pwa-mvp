@@ -78,6 +78,57 @@ const COLLECTION_SURFACE_SOFT: CSSProperties = {
   background: "color-mix(in srgb, var(--paper-card) 76%, transparent)",
   boxShadow: "var(--shadow-e0)",
 };
+const MAINICHI_SEEN_PHOTO_KEYS_STORAGE_KEY = "neteruneko_mainichi_seen_photo_keys";
+const MAINICHI_PASTE_MOTION_CSS = `
+@keyframes mainichiPasteSettle {
+  0% {
+    opacity: 0;
+    transform: translateY(-28px) rotate(var(--mainichi-rotation)) scale(0.985);
+    filter: drop-shadow(0 18px 22px rgba(120,110,90,0.16));
+  }
+  58% {
+    opacity: 1;
+    transform: translateY(5px) rotate(var(--mainichi-rotation)) scale(1.006);
+    filter: drop-shadow(0 12px 16px rgba(120,110,90,0.11));
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0) rotate(var(--mainichi-rotation)) scale(1);
+    filter: drop-shadow(0 0 0 rgba(120,110,90,0));
+  }
+}
+
+@keyframes mainichiTapePress {
+  0% {
+    opacity: 0;
+    transform: translate(-50%, -80%) rotate(-3deg) scaleX(0.84);
+  }
+  42% {
+    opacity: 0.92;
+    transform: translate(-50%, -20%) rotate(-3deg) scaleX(1.04);
+  }
+  100% {
+    opacity: 1;
+    transform: translate(-50%, -15%) rotate(-3deg) scaleX(1);
+  }
+}
+
+[data-mainichi-paste="true"] {
+  animation: mainichiPasteSettle 720ms cubic-bezier(0.22, 1, 0.36, 1) both;
+  will-change: transform, filter, opacity;
+}
+
+[data-mainichi-paste-tape="true"] {
+  animation: mainichiTapePress 540ms 180ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  [data-mainichi-paste="true"],
+  [data-mainichi-paste-tape="true"] {
+    animation: none !important;
+  }
+}
+`;
 
 type CollectionPhoto = {
   id: string;
@@ -1003,9 +1054,48 @@ function MainichiPhotoBoard({
       ),
     [activeSide, catProfiles, dayGroups, firstEveningDeliveryTargetDateKey],
   );
+  const prefersReducedMotion = usePrefersReducedMotion();
+  const [pastingPhotoKey, setPastingPhotoKey] = useState<string | null>(null);
+
+  useEffect(() => {
+    const photos = months.flatMap((month) => month.photos);
+
+    if (photos.length === 0 || typeof window === "undefined") {
+      setPastingPhotoKey(null);
+      return;
+    }
+
+    const seenKeys = readMainichiSeenPhotoKeys();
+    const unseenPhotos = photos
+      .filter((photo) => !seenKeys.has(getMainichiBoardPhotoKey(photo)))
+      .sort((a, b) => b.timestamp - a.timestamp);
+    const photoToPaste = unseenPhotos[0] ?? null;
+    const nextSeenKeys = new Set(seenKeys);
+
+    for (const photo of photos) {
+      nextSeenKeys.add(getMainichiBoardPhotoKey(photo));
+    }
+
+    writeMainichiSeenPhotoKeys(nextSeenKeys);
+    if (photoToPaste && !prefersReducedMotion) {
+      setPastingPhotoKey(getMainichiBoardPhotoKey(photoToPaste));
+      return;
+    }
+
+    setPastingPhotoKey((currentKey) => {
+      if (prefersReducedMotion || !currentKey) {
+        return null;
+      }
+
+      return photos.some((photo) => getMainichiBoardPhotoKey(photo) === currentKey)
+        ? currentKey
+        : null;
+    });
+  }, [months, prefersReducedMotion]);
 
   return (
     <section style={styles.mainichiBoard} data-testid="mainichi-photo-board">
+      <style>{MAINICHI_PASTE_MOTION_CSS}</style>
       <AppSegmented<MainichiBoardSide>
         value={activeSide}
         onChange={onSideChange}
@@ -1023,6 +1113,7 @@ function MainichiPhotoBoard({
             <MainichiMonthBoard
               key={`${activeSide}-${month.key}`}
               month={month}
+              pastingPhotoKey={pastingPhotoKey}
               onOpenBox={onOpenBox}
             />
           ))}
@@ -1041,9 +1132,11 @@ function MainichiPhotoBoard({
 
 function MainichiMonthBoard({
   month,
+  pastingPhotoKey,
   onOpenBox,
 }: {
   month: MainichiBoardMonth;
+  pastingPhotoKey: string | null;
   onOpenBox: (kind: BoxDetailKind, dateKey?: string | null) => void;
 }) {
   return (
@@ -1061,6 +1154,7 @@ function MainichiMonthBoard({
             key={photo.id}
             photo={photo}
             index={index}
+            shouldPaste={getMainichiBoardPhotoKey(photo) === pastingPhotoKey}
             onOpenBox={onOpenBox}
           />
         ))}
@@ -1072,10 +1166,12 @@ function MainichiMonthBoard({
 function MainichiBoardPhotoCard({
   photo,
   index,
+  shouldPaste,
   onOpenBox,
 }: {
   photo: MainichiBoardPhoto;
   index: number;
+  shouldPaste: boolean;
   onOpenBox: (kind: BoxDetailKind, dateKey?: string | null) => void;
 }) {
   const kind: BoxDetailKind = photo.side === "sent" ? "sleeping" : "other";
@@ -1088,14 +1184,20 @@ function MainichiBoardPhotoCard({
     <button
       type="button"
       data-testid={testId}
+      data-mainichi-paste={shouldPaste ? "true" : undefined}
       style={{
         ...styles.mainichiBoardPhotoButton,
-        transform: getMainichiBoardRotation(index),
-      }}
+        "--mainichi-rotation": getMainichiBoardRotation(index),
+        transform: "rotate(var(--mainichi-rotation))",
+      } as CSSProperties}
       onClick={() => onOpenBox(kind, photo.dateKey)}
       aria-label={photo.side === "sent" ? "おくった ねがおをひらく" : "とどいた ねがおをひらく"}
     >
-      <span style={styles.mainichiBoardTape} aria-hidden="true" />
+      <span
+        data-mainichi-paste-tape={shouldPaste ? "true" : undefined}
+        style={styles.mainichiBoardTape}
+        aria-hidden="true"
+      />
       <PhotoTile
         src={photo.src}
         alt=""
@@ -2406,6 +2508,60 @@ function groupPhotosBySlot(photos: CollectionPhoto[]) {
   return map;
 }
 
+function usePrefersReducedMotion() {
+  const [prefersReducedMotion, setPrefersReducedMotion] = useState(false);
+
+  useEffect(() => {
+    if (typeof window === "undefined" || !window.matchMedia) {
+      return;
+    }
+
+    const media = window.matchMedia("(prefers-reduced-motion: reduce)");
+    const update = () => setPrefersReducedMotion(media.matches);
+
+    update();
+    media.addEventListener?.("change", update);
+
+    return () => media.removeEventListener?.("change", update);
+  }, []);
+
+  return prefersReducedMotion;
+}
+
+function readMainichiSeenPhotoKeys() {
+  if (typeof window === "undefined") {
+    return new Set<string>();
+  }
+
+  try {
+    const raw = window.localStorage.getItem(MAINICHI_SEEN_PHOTO_KEYS_STORAGE_KEY);
+    const values = raw ? JSON.parse(raw) : [];
+
+    return new Set(
+      Array.isArray(values)
+        ? values.filter((value): value is string => typeof value === "string")
+        : [],
+    );
+  } catch {
+    return new Set<string>();
+  }
+}
+
+function writeMainichiSeenPhotoKeys(keys: Set<string>) {
+  if (typeof window === "undefined") {
+    return;
+  }
+
+  try {
+    window.localStorage.setItem(
+      MAINICHI_SEEN_PHOTO_KEYS_STORAGE_KEY,
+      JSON.stringify([...keys].slice(-500)),
+    );
+  } catch {
+    // Local-only motion bookkeeping should never block the album.
+  }
+}
+
 function buildMainichiBoardMonths(
   dayGroups: AlbumDayGroup[],
   side: MainichiBoardSide,
@@ -2481,8 +2637,12 @@ function formatMainichiMonthLabel(monthKey: string) {
   return `${year}年${Number(month)}月`;
 }
 
+function getMainichiBoardPhotoKey(photo: MainichiBoardPhoto) {
+  return `${photo.side}:${photo.sourcePhotoId ?? photo.id}:${photo.dateKey}`;
+}
+
 function getMainichiBoardRotation(index: number) {
-  const rotations = ["rotate(-2.2deg)", "rotate(1.4deg)", "rotate(-0.8deg)", "rotate(2deg)", "rotate(-1.4deg)"];
+  const rotations = ["-2.2deg", "1.4deg", "-0.8deg", "2deg", "-1.4deg"];
 
   return rotations[index % rotations.length];
 }
