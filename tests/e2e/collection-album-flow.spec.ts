@@ -77,7 +77,6 @@ test.describe("collection album flow", () => {
     await expect(firstSentPhoto).not.toHaveAttribute("data-mainichi-paste", "true");
     await expect(page.getByText("current cat")).toBeVisible();
     await expect(page.getByText("previous cat")).toBeVisible();
-    await page.getByRole("tab", { name: "うちのこ" }).click();
 
     await expect(page.locator("main img")).toHaveCount(2);
   });
@@ -160,7 +159,6 @@ test.describe("collection album flow", () => {
 
     await page.goto("/collection");
     await page.waitForLoadState("networkidle");
-    await page.getByRole("tab", { name: "うちのこ" }).click();
 
     await expect(page.locator("main img")).toHaveCount(2);
   });
@@ -561,7 +559,6 @@ test.describe("collection album flow", () => {
 
     await page.goto("/collection");
     await page.waitForLoadState("networkidle");
-    await page.getByRole("tab", { name: "うちのこ" }).click();
 
     await expect(page.locator("main img")).toHaveCount(2);
   });

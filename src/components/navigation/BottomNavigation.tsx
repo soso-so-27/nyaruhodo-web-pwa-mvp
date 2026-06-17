@@ -43,13 +43,13 @@ export function BottomNavigation({
     {
       key: "collection",
       href: "/collection",
-      label: "アルバム",
+      label: "まいにち",
       icon: <BoxIcon style={{ ...styles.svgIcon, ...styles.boxSvgIcon }} />,
     },
     {
       key: "cats",
       href: "/cats",
-      label: "ねこ",
+      label: "うちのこ",
       icon: <span style={styles.catTabIcon} />,
     },
   ];

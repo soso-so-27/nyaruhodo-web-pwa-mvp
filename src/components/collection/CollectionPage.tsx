@@ -60,7 +60,6 @@ import { AppIcon } from "../ui/AppIcons";
 import { AppSegmented } from "../ui/AppSegmented";
 import { EmptyState } from "../ui/EmptyState";
 import { PhotoTile, PhotoViewerFrame } from "../ui/PhotoTile";
-import { StampPair } from "../ui/StampPair";
 import { StoredPhotoImage } from "../ui/StoredPhotoImage";
 import { color, radius, shadow } from "../ui/designTokens";
 
@@ -184,7 +183,6 @@ type StoredCollectionPhotoEntry = {
 
 type BoxDetailKind = "sleeping" | "other";
 type AlbumPhotoKind = "sleeping" | "awake" | "other";
-type AlbumScope = "daily" | "own";
 type MainichiBoardSide = "sent" | "delivered";
 
 type AlbumMomentPhoto = BoxPreviewPhoto & {
@@ -255,8 +253,6 @@ export function CollectionPage() {
   const [activeCatId, setActiveCatId] = useState<string | null>(null);
   const [activeGroupId, setActiveGroupId] = useState<CollectionGroupId>("pose");
   const [activeView, setActiveView] = useState<CollectionView>("collect");
-  const [activeAlbumScope, setActiveAlbumScope] =
-    useState<AlbumScope>("daily");
   const [hasLoaded, setHasLoaded] = useState(false);
   const [collectionPhotos, setCollectionPhotos] = useState<
     Record<string, StoredCollectionPhotoEntry[]>
@@ -283,7 +279,6 @@ export function CollectionPage() {
   const toastTimerRef = useRef<number | null>(null);
   const trackedViewCatIdRef = useRef<string | null>(null);
   const trackedDailyTargetRef = useRef<string | null>(null);
-  const albumScopeSwitchStartedAtRef = useRef<number | null>(null);
 
   useEffect(() => {
     const profiles = readCatProfiles();
@@ -721,32 +716,6 @@ export function CollectionPage() {
     );
   }
 
-  function handleAlbumScopeChange(scope: AlbumScope) {
-    if (scope === activeAlbumScope) {
-      return;
-    }
-
-    albumScopeSwitchStartedAtRef.current = performance.now();
-    setActiveAlbumScope(scope);
-    window.requestAnimationFrame(() => {
-      const startedAt = albumScopeSwitchStartedAtRef.current;
-      if (startedAt === null) {
-        return;
-      }
-
-      trackProductEvent(
-        "tab_switch_completed",
-        {
-          tab_group: "collection_album_scope",
-          target_tab: scope,
-          elapsed_ms: Math.max(0, Math.round(performance.now() - startedAt)),
-        },
-        { localCatId: activeCatId },
-      );
-      albumScopeSwitchStartedAtRef.current = null;
-    });
-  }
-
   async function handlePhotoAdd(slot: CollectionSlot) {
     if (!activeCatId) {
       return;
@@ -974,7 +943,7 @@ export function CollectionPage() {
         <PageBackdrop />
         <div style={styles.container}>
           <AppCard variant="section" padding="lg" style={styles.emptyCard}>
-            <h1 style={styles.emptyTitle}>アルバム</h1>
+            <h1 style={styles.emptyTitle}>まいにち</h1>
             <p style={styles.emptyText}>準備しています</p>
           </AppCard>
         </div>
@@ -989,7 +958,7 @@ export function CollectionPage() {
         <PageBackdrop />
         <div style={styles.container}>
           <AppCard variant="section" padding="lg" style={styles.emptyCard}>
-            <h1 style={styles.emptyTitle}>アルバム</h1>
+            <h1 style={styles.emptyTitle}>まいにち</h1>
             <p style={styles.emptyText}>一緒に暮らしている猫を登録しましょう</p>
             <AppButton href="/cats" variant="primary" fullWidth>
               猫を登録する
@@ -1007,12 +976,8 @@ export function CollectionPage() {
       <div style={styles.container}>
         <BoxOverview
           dayGroups={albumDayGroups}
-          activeScope={activeAlbumScope}
           firstEveningDeliveryTargetDateKey={firstEveningDeliveryTargetDateKey}
           catProfiles={catProfiles}
-          catName={catName}
-          onScopeChange={handleAlbumScopeChange}
-          onOpenBox={openBoxDetail}
           onOpenMainichiDay={openMainichiDay}
         />
       </div>
@@ -1098,21 +1063,13 @@ function PageBackdrop() {
 
 function BoxOverview({
   dayGroups,
-  activeScope,
   firstEveningDeliveryTargetDateKey,
   catProfiles,
-  catName,
-  onScopeChange,
-  onOpenBox,
   onOpenMainichiDay,
 }: {
   dayGroups: AlbumDayGroup[];
-  activeScope: AlbumScope;
   firstEveningDeliveryTargetDateKey: string | null;
   catProfiles: CatProfile[];
-  catName: string;
-  onScopeChange: (scope: AlbumScope) => void;
-  onOpenBox: (kind: BoxDetailKind, dateKey?: string | null) => void;
   onOpenMainichiDay: (
     dateKey: string,
     source?: MainichiMorphSource | null,
@@ -1120,54 +1077,17 @@ function BoxOverview({
 }) {
   const [activeBoardSide, setActiveBoardSide] =
     useState<MainichiBoardSide>("sent");
-  const ownDayGroups = useMemo(
-    () =>
-      filterAlbumDayGroupsByScope(
-        dayGroups,
-        "own",
-        firstEveningDeliveryTargetDateKey,
-      ),
-    [dayGroups, firstEveningDeliveryTargetDateKey],
-  );
-  const todayKey = getJstDateKey(Date.now());
-  const todayGroup = ownDayGroups.find((group) => group.key === todayKey) ?? null;
-  const recentGroups = ownDayGroups
-    .filter((group) => group.key !== todayKey)
-    .slice(0, 5);
 
   return (
-    <section style={styles.boxOverview} aria-label="アルバム">
-      <AlbumScopeTabs activeScope={activeScope} onScopeChange={onScopeChange} />
-      {activeScope === "daily" ? (
-        <MainichiPhotoBoard
-          dayGroups={dayGroups}
-          activeSide={activeBoardSide}
-          onSideChange={setActiveBoardSide}
-          firstEveningDeliveryTargetDateKey={firstEveningDeliveryTargetDateKey}
-          catProfiles={catProfiles}
-          onOpenDay={onOpenMainichiDay}
-        />
-      ) : (
-        <>
-          {todayGroup ? (
-            <AlbumTodayCard
-              group={todayGroup}
-              scope="own"
-              catName={catName}
-              firstEveningDeliveryTargetDateKey={firstEveningDeliveryTargetDateKey}
-              onOpenBox={onOpenBox}
-            />
-          ) : null}
-
-          <AlbumRecentSection
-            groups={recentGroups}
-            scope="own"
-            firstEveningDeliveryTargetDateKey={firstEveningDeliveryTargetDateKey}
-            catName={catName}
-            onOpenBox={onOpenBox}
-          />
-        </>
-      )}
+    <section style={styles.boxOverview} aria-label="まいにち">
+      <MainichiPhotoBoard
+        dayGroups={dayGroups}
+        activeSide={activeBoardSide}
+        onSideChange={setActiveBoardSide}
+        firstEveningDeliveryTargetDateKey={firstEveningDeliveryTargetDateKey}
+        catProfiles={catProfiles}
+        onOpenDay={onOpenMainichiDay}
+      />
     </section>
   );
 }
@@ -1620,395 +1540,6 @@ function MainichiFullscreenPhoto({
   );
 }
 
-function AlbumTodayCard({
-  group,
-  scope,
-  catName,
-  firstEveningDeliveryTargetDateKey,
-  onOpenBox,
-}: {
-  group: AlbumDayGroup;
-  scope: AlbumScope;
-  catName: string;
-  firstEveningDeliveryTargetDateKey: string | null;
-  onOpenBox: (kind: BoxDetailKind, dateKey?: string | null) => void;
-}) {
-  return (
-    <section style={styles.todayAlbumCard} aria-label="きょうのアルバム">
-      {group.total > 0 ? (
-        <AlbumDaySections
-          group={group}
-          scope={scope}
-          catName={catName}
-          firstEveningDeliveryTargetDateKey={firstEveningDeliveryTargetDateKey}
-          onOpenBox={onOpenBox}
-        />
-      ) : (
-        <EmptyState
-          description={
-            scope === "own"
-              ? "ねがおをとると、ここに ならびます"
-              : "ねがおをとると、よる8じに ここへ とどきます"
-          }
-          style={styles.todayAlbumEmptyState}
-        />
-      )}
-    </section>
-  );
-}
-
-function AlbumScopeTabs({
-  activeScope,
-  onScopeChange,
-}: {
-  activeScope: AlbumScope;
-  onScopeChange: (scope: AlbumScope) => void;
-}) {
-  const tabs: Array<{ key: AlbumScope; label: string }> = [
-    { key: "daily", label: "まいにち" },
-    { key: "own", label: "うちのこ" },
-  ];
-
-  return (
-    <div style={styles.albumScopeTabs} role="tablist" aria-label="アルバムの切り替え">
-      {tabs.map((tab) => {
-        const isActive = tab.key === activeScope;
-
-        return (
-          <button
-            key={tab.key}
-            type="button"
-            role="tab"
-            aria-selected={isActive}
-            style={{
-              ...styles.albumScopeTab,
-              ...(isActive ? styles.albumScopeTabActive : {}),
-            }}
-            onClick={() => onScopeChange(tab.key)}
-          >
-            {tab.label}
-          </button>
-        );
-      })}
-    </div>
-  );
-}
-
-function AlbumRecentSection({
-  groups,
-  scope,
-  firstEveningDeliveryTargetDateKey,
-  catName,
-  onOpenBox,
-}: {
-  groups: AlbumDayGroup[];
-  scope: AlbumScope;
-  firstEveningDeliveryTargetDateKey: string | null;
-  catName: string;
-  onOpenBox: (kind: BoxDetailKind, dateKey?: string | null) => void;
-}) {
-  if (groups.length === 0) {
-    return null;
-  }
-
-  return (
-    <section style={styles.albumSection} aria-label="過去のアルバム">
-      <div style={styles.recentDayList}>
-        {groups.map((group) => (
-          <AlbumDayCard
-            key={group.key}
-            group={group}
-            scope={scope}
-            catName={catName}
-            firstEveningDeliveryTargetDateKey={firstEveningDeliveryTargetDateKey}
-            onOpenBox={onOpenBox}
-          />
-        ))}
-      </div>
-    </section>
-  );
-}
-
-function AlbumDayCard({
-  group,
-  scope,
-  firstEveningDeliveryTargetDateKey,
-  catName,
-  onOpenBox,
-}: {
-  group: AlbumDayGroup;
-  scope: AlbumScope;
-  firstEveningDeliveryTargetDateKey: string | null;
-  catName: string;
-  onOpenBox: (kind: BoxDetailKind, dateKey?: string | null) => void;
-}) {
-  const shouldShowHeading = /\d/.test(group.label);
-
-  return (
-    <article style={styles.recentDayCard}>
-      {shouldShowHeading ? (
-        <div style={styles.recentDayHeader}>
-          <div>
-            <h3 style={styles.recentDayTitle}>{group.label}</h3>
-            {group.subLabel ? (
-              <p style={styles.recentDaySub}>{group.subLabel}</p>
-            ) : null}
-          </div>
-        </div>
-      ) : null}
-      <AlbumDaySections
-        group={group}
-        scope={scope}
-        catName={catName}
-        firstEveningDeliveryTargetDateKey={firstEveningDeliveryTargetDateKey}
-        onOpenBox={onOpenBox}
-        compact
-      />
-    </article>
-  );
-}
-
-function AlbumDaySections({
-  group,
-  scope,
-  catName,
-  onOpenBox,
-  compact = false,
-  firstEveningDeliveryTargetDateKey,
-}: {
-  group: AlbumDayGroup;
-  scope: AlbumScope;
-  catName: string;
-  onOpenBox: (kind: BoxDetailKind, dateKey?: string | null) => void;
-  compact?: boolean;
-  firstEveningDeliveryTargetDateKey: string | null;
-}) {
-  if (scope === "daily") {
-    return null;
-  }
-
-  return (
-    <AlbumOwnGrid
-      group={group}
-      onOpenBox={onOpenBox}
-    />
-  );
-}
-
-function AlbumOwnGrid({
-  group,
-  onOpenBox,
-}: {
-  group: AlbumDayGroup;
-  onOpenBox: (kind: BoxDetailKind, dateKey?: string | null) => void;
-}) {
-  const photos = group.sections
-    .filter((section) => section.kind === "sleeping" || section.kind === "awake")
-    .flatMap((section) => section.photos);
-
-  return (
-    <div style={styles.ownPhotoGrid}>
-      {photos.map((photo) => (
-        <button
-          key={photo.id}
-          type="button"
-          style={{
-            ...styles.ownPhotoGridItem,
-            ...(photo.kind !== "sleeping" ? styles.ownPhotoGridItemStatic : {}),
-          }}
-          onClick={() => {
-            if (photo.kind === "sleeping") {
-              onOpenBox("sleeping", group.key);
-            }
-          }}
-          disabled={photo.kind !== "sleeping"}
-          aria-label="うちのこ写真"
-        >
-          <PhotoTile
-            src={getPhotoThumbnailSrc(photo)}
-            alt=""
-            variant="tile"
-            aspect="1 / 1"
-            style={styles.ownPhotoGridTileRoot}
-            imageStyle={styles.ownPhotoGridTile}
-          />
-        </button>
-      ))}
-    </div>
-  );
-}
-
-function AlbumSealedDeliveryMiniature() {
-  return (
-    <span
-      data-testid="album-sealed-delivery"
-      style={styles.dailyPairSealedEnvelope}
-      aria-hidden="true"
-    >
-      <span style={styles.dailyPairSealedEnvelopeFlap} />
-      <span style={styles.dailyPairSealedEnvelopeSeal} />
-    </span>
-  );
-}
-
-function AlbumDailyPair({
-  group,
-  catName,
-  onOpenBox,
-  firstEveningDeliveryTargetDateKey,
-  compact = false,
-}: {
-  group: AlbumDayGroup;
-  catName: string;
-  onOpenBox: (kind: BoxDetailKind, dateKey?: string | null) => void;
-  firstEveningDeliveryTargetDateKey: string | null;
-  compact?: boolean;
-}) {
-  const ownPhotos = group.sections
-    .filter((section) => section.kind === "sleeping" || section.kind === "awake")
-    .flatMap((section) => section.photos);
-  const deliveredPhotos =
-    group.sections.find((section) => section.kind === "other")?.photos ?? [];
-  const shouldShowOtherSlot = shouldResolveOtherDeliverySlot(
-    group.key,
-    firstEveningDeliveryTargetDateKey,
-  );
-  const targetPhoto = ownPhotos[0] ?? null;
-  const deliveredPhoto = deliveredPhotos[0] ?? null;
-  const hasUnopenedOtherDelivery = Boolean(group.hasUnopenedOtherDelivery);
-  const hasUndeliverableOtherDelivery = Boolean(
-    group.hasUndeliverableOtherDelivery,
-  );
-
-  return (
-    <AppCard
-      as="article"
-      variant="section"
-      padding="md"
-      data-testid="album-daily-letter-card"
-      style={compact ? styles.dailyPairCompact : styles.dailyPair}
-    >
-      <div
-        style={{
-          ...styles.dailyPairMain,
-          ...(shouldShowOtherSlot ? {} : styles.dailyPairMainSingle),
-        }}
-      >
-        <StampPair
-          size={compact ? "albumCompact" : "album"}
-          ownPhoto={targetPhoto ? { src: getPhotoThumbnailSrc(targetPhoto) } : null}
-          deliveredPhoto={
-            deliveredPhoto ? { src: getPhotoThumbnailSrc(deliveredPhoto) } : null
-          }
-          ownLabel={catName}
-          deliveredLabel={deliveredPhoto ? "とどいた" : undefined}
-          ownAriaLabel="うちのねがお"
-          deliveredAriaLabel={
-            hasUnopenedOtherDelivery && !deliveredPhoto
-              ? "届いた封筒をホームで開く"
-              : "とどいた ねがおを開く"
-          }
-          ownFallback={
-            <span data-testid="album-daily-own-missing-letter">
-              {"この日の ねがおは ありません"}
-            </span>
-          }
-          deliveredFallback={
-            shouldShowOtherSlot ? (
-              hasUnopenedOtherDelivery ? (
-                <AlbumSealedDeliveryMiniature />
-              ) : hasUndeliverableOtherDelivery ? (
-                <span data-testid="album-daily-undeliverable-letter">
-                  {"おとどけ できませんでした"}
-                </span>
-              ) : (
-                <span data-testid="album-daily-missing-letter">
-                  {"ねこだよりは とどきませんでした"}
-                </span>
-              )
-            ) : undefined
-          }
-          deliveredFallbackPlacement={hasUnopenedOtherDelivery ? "stamp" : "below"}
-          onOwnClick={targetPhoto ? () => onOpenBox("sleeping", group.key) : undefined}
-          onDeliveredClick={
-            deliveredPhoto
-              ? () => onOpenBox("other", group.key)
-              : hasUnopenedOtherDelivery
-                ? () => window.location.assign("/home")
-                : undefined
-          }
-          onDeliveredStorageDataUrl={
-            deliveredPhoto
-              ? (dataUrl) => writeBackDeliveredPhotoDataUrl(deliveredPhoto, dataUrl)
-              : undefined
-          }
-          data-testid="album-daily-stamp-pair"
-        />
-      </div>
-    </AppCard>
-  );
-}
-
-function AlbumDaySectionRow({
-  groupKey,
-  section,
-  onOpenBox,
-}: {
-  groupKey: string;
-  section: AlbumDaySection;
-  onOpenBox: (kind: BoxDetailKind, dateKey?: string | null) => void;
-}) {
-  const visiblePhotos = section.photos.slice(0, 4);
-  const boxKind = section.kind === "sleeping" || section.kind === "other"
-    ? section.kind
-    : null;
-  const rowContent = (
-    <>
-      <div style={styles.dayPhotoStrip}>
-        {visiblePhotos.map((photo) => (
-          <PhotoTile
-            key={photo.id}
-            src={getPhotoThumbnailSrc(photo)}
-            alt=""
-            variant="tile"
-            aspect="1 / 1"
-            style={styles.dayPhotoThumb}
-            imageStyle={styles.dayPhotoThumbTile}
-            onStorageDataUrl={
-              section.kind === "other"
-                ? (dataUrl) => writeBackDeliveredPhotoDataUrl(photo, dataUrl)
-                : undefined
-            }
-          />
-        ))}
-      </div>
-    </>
-  );
-
-  if (!boxKind) {
-    return <div style={styles.daySectionRow}>{rowContent}</div>;
-  }
-
-  return (
-    <button
-      type="button"
-      style={{ ...styles.daySectionRow, ...styles.daySectionButton }}
-      onClick={() => onOpenBox(boxKind, groupKey)}
-    >
-      {rowContent}
-    </button>
-  );
-}
-
-function AlbumEmptyLine({ text }: { text: string }) {
-  return (
-    <div style={styles.boxSummaryEmpty}>
-      <span style={styles.boxSummaryEmptyLine} />
-      <span style={styles.boxSummaryEmptyText}>{text}</span>
-    </div>
-  );
-}
-
 function BoxPhotoDetailSheet({
   kind,
   dayLabel,
@@ -2030,7 +1561,7 @@ function BoxPhotoDetailSheet({
   onDeleteSleepingPhoto: (photo: BoxPreviewPhoto) => void;
   onHideOtherPhoto: (photo: BoxPreviewPhoto) => void;
 }) {
-  const title = dayLabel ?? "アルバム";
+  const title = dayLabel ?? "まいにち";
   const currentPhoto =
     photos[Math.max(0, Math.min(currentPhotoIndex, photos.length - 1))] ?? null;
   const deliveryActionLabel = currentPhoto?.shared
@@ -3304,45 +2835,6 @@ function createEmptyTodayAlbumGroup(): AlbumDayGroup {
   };
 }
 
-function filterAlbumDayGroupsByScope(
-  groups: AlbumDayGroup[],
-  scope: AlbumScope,
-  firstEveningDeliveryTargetDateKey: string | null,
-) {
-  return groups
-    .map((group) => {
-      let sections = group.sections.filter((section) =>
-        scope === "own"
-          ? section.kind === "sleeping" || section.kind === "awake"
-          : true,
-      );
-
-      if (
-        scope === "daily" &&
-        !shouldResolveOtherDeliverySlot(
-          group.key,
-          firstEveningDeliveryTargetDateKey,
-        )
-      ) {
-        sections = sections.filter((section) => section.kind !== "other");
-      }
-
-      const total = sections.reduce(
-        (sum, section) => sum + section.photos.length,
-        0,
-      ) +
-        (group.hasUnopenedOtherDelivery ? 1 : 0) +
-        (group.hasUndeliverableOtherDelivery ? 1 : 0);
-
-      return {
-        ...group,
-        sections,
-        total,
-      };
-    })
-    .filter((group) => group.total > 0);
-}
-
 function shouldShowOtherDeliverySlot(
   groupKey: string,
   firstEveningDeliveryTargetDateKey: string | null,
@@ -4014,36 +3506,6 @@ const styles = {
   boxOverview: {
     display: "grid",
     gap: "18px",
-  },
-  albumScopeTabs: {
-    width: "min(230px, 100%)",
-    display: "grid",
-    gridTemplateColumns: "repeat(2, minmax(0, 1fr))",
-    gap: "4px",
-    margin: "0 auto 2px",
-    padding: "4px",
-    borderRadius: "var(--radius-full)",
-    background: "rgba(255,253,248,0.56)",
-    border: "0.5px solid rgba(98,87,72,0.16)",
-    boxShadow: shadow.soft,
-  },
-  albumScopeTab: {
-    minHeight: "34px",
-    border: "none",
-    borderRadius: "var(--radius-full)",
-    background: "transparent",
-    color: COLLECTION_MUTED,
-    font: "inherit",
-    fontSize: "13px",
-    fontWeight: 500,
-    lineHeight: 1,
-    letterSpacing: "0.04em",
-    cursor: "pointer",
-  },
-  albumScopeTabActive: {
-    background: "rgba(255,253,248,0.96)",
-    color: COLLECTION_TEXT_STRONG,
-    boxShadow: "0 4px 12px rgba(90,76,60,0.045)",
   },
   mainichiBoard: {
     display: "grid",

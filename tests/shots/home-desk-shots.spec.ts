@@ -25,7 +25,6 @@ const expectedShotNames = [
   "album_missing_b.png",
   "album_missing_c.png",
   "album_bottom.png",
-  "album_own_grid.png",
   "settings.png",
   "settings_admin_moderation.png",
   "cats.png",
@@ -258,22 +257,6 @@ test.describe("home desk model shots", () => {
         width: box!.width + 24,
         height: box!.height + 28,
       },
-    });
-  });
-
-  test("album_own_grid", async ({ page }) => {
-    await seedReviewState(page, {
-      now: Date.parse("2026-06-10T05:00:00.000Z"),
-      state: "4",
-      habit: false,
-    });
-    await page.goto("/collection");
-    await page.waitForLoadState("networkidle");
-    await page.getByRole("tab").nth(1).click();
-    await page.waitForTimeout(800);
-    await page.screenshot({
-      path: path.join(shotsDir, "album_own_grid.png"),
-      fullPage: true,
     });
   });
 

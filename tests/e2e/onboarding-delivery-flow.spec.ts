@@ -237,8 +237,6 @@ test.describe("onboarding delivery flow", () => {
     expect(storage.keptExchangePhotos[0]?.src).toBeTruthy();
 
     await expectVisibleNonBlackImage(page.locator("main img").first());
-    await page.getByRole("tab").nth(1).click();
-    await expectVisibleNonBlackImage(page.locator("main img").first());
   });
 
   test("does not keep a delivered photo before the explicit keep action", async ({

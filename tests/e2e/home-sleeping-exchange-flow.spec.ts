@@ -1362,7 +1362,6 @@ test.describe("home sleeping exchange flow", () => {
 
     await page.goto("/collection");
     await page.waitForLoadState("networkidle");
-    await page.getByRole("tab", { name: "うちのこ" }).click();
 
     await expect(page.locator("main img")).toHaveCount(2);
   });

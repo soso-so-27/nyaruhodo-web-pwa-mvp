@@ -160,7 +160,7 @@ test.describe("home desk state cycle", () => {
 
     await page.goto("/collection");
     await page.waitForLoadState("networkidle");
-    await expect(page.getByText("アルバム", { exact: true }).first()).toBeVisible();
+    await expect(page.getByText("まいにち", { exact: true }).first()).toBeVisible();
 
     await page.goto("/cats");
     await page.waitForLoadState("networkidle");
