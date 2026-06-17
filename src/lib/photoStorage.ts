@@ -3,6 +3,7 @@ import { createBrowserSupabaseClient } from "./supabase/browser";
 export const CAT_PHOTOS_BUCKET = "cat-photos";
 const STORAGE_PHOTO_PREFIX = "storage:";
 const LEGACY_STORAGE_PHOTO_PREFIX = "storage://";
+const DISPLAY_SIGNED_URL_SECONDS = 60 * 60 * 24;
 
 type BrowserSupabaseClient = NonNullable<
   ReturnType<typeof createBrowserSupabaseClient>
@@ -140,7 +141,7 @@ export async function createSignedStorageUrl(
 ) {
   const { data, error } = await supabase.storage
     .from(CAT_PHOTOS_BUCKET)
-    .createSignedUrl(path, 60 * 60 * 24 * 365);
+    .createSignedUrl(path, DISPLAY_SIGNED_URL_SECONDS);
 
   if (error || !data?.signedUrl) {
     return undefined;
