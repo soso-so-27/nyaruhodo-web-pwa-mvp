@@ -21,6 +21,7 @@ import { PhotoViewerFrame } from "../ui/PhotoTile";
 import { StoredPhotoImage } from "../ui/StoredPhotoImage";
 
 type DeskState = "1" | "1b" | "2" | "3" | "4";
+type HomeDaylightStyle = CSSProperties & Record<`--${string}`, string>;
 
 type DeskViewerPhoto =
   | {
@@ -63,6 +64,11 @@ type HomeDeskModelProps = {
 const HOLD_OPEN_MS = 1600;
 const HOLD_REWIND_MS = 1000;
 const HOME_FRAME_TUNING = {
+  pagePaddingX: "16px",
+  pagePaddingTop: "10px",
+  stageMaxWidth: "430px",
+  stageGap: "14px",
+  heroGap: "14px",
   matWidth: "12px",
   outerRadius: "24px",
   innerRadius: "12px",
@@ -73,9 +79,11 @@ const HOME_FRAME_TUNING = {
   kenBurnsPanStartY: "-0.9%",
   kenBurnsPanEndX: "1.05%",
   kenBurnsPanEndY: "0.9%",
-  objectPosition: "50% 48%",
+  objectPosition: "50% 56%",
   daylightTransition: "1800ms",
 } as const;
+const HOME_SKY_BACKGROUND =
+  "radial-gradient(circle at 50% 12%, color-mix(in srgb, var(--home-sky-glow, var(--paper-warm)) 42%, transparent) 0%, transparent 50%), linear-gradient(180deg, var(--home-sky-top, var(--paper)) 0%, var(--home-sky-mid, var(--paper)) 46%, var(--home-sky-bottom, var(--paper-warm)) 100%)";
 const HOME_DAYLIGHT_ANCHORS = [
   {
     minute: 4 * 60 + 45,
@@ -155,6 +163,7 @@ export function HomeDeskModel({
   const holdTimerRef = useRef<number | null>(null);
   const rewindTimerRef = useRef<number | null>(null);
   const daylightStyle = useDaylight(now);
+  useHomeViewportBackground(daylightStyle);
   const targetPhoto =
     eveningState.kind === "waiting" ||
     eveningState.kind === "delivered" ||
@@ -310,7 +319,12 @@ export function HomeDeskModel({
               }
               aria-label={`${catName}のねがおを大きく見る`}
             >
-              <span style={deskStyles.homeFrame}>
+              <span
+                style={{
+                  ...deskStyles.homeFrame,
+                  ...(deskState === "3" ? deskStyles.homeFrameDelivered : {}),
+                }}
+              >
                 <StoredPhotoImage
                   src={getPhotoDisplaySrc(homePhoto)}
                   alt=""
@@ -841,6 +855,11 @@ function useDaylight(now: number) {
       "--home-sky-glow": colors.glow,
       "--home-frame-light": colors.mat,
       "--home-frame-glow": colors.glow,
+      "--home-page-padding-x": HOME_FRAME_TUNING.pagePaddingX,
+      "--home-page-padding-top": HOME_FRAME_TUNING.pagePaddingTop,
+      "--home-stage-max-width": HOME_FRAME_TUNING.stageMaxWidth,
+      "--home-stage-gap": HOME_FRAME_TUNING.stageGap,
+      "--home-hero-gap": HOME_FRAME_TUNING.heroGap,
       "--home-frame-mat-width": HOME_FRAME_TUNING.matWidth,
       "--home-frame-radius": HOME_FRAME_TUNING.outerRadius,
       "--home-frame-inner-radius": HOME_FRAME_TUNING.innerRadius,
@@ -853,8 +872,61 @@ function useDaylight(now: number) {
       "--home-photo-pan-end-y": HOME_FRAME_TUNING.kenBurnsPanEndY,
       "--home-photo-position": HOME_FRAME_TUNING.objectPosition,
       "--home-daylight-transition": HOME_FRAME_TUNING.daylightTransition,
-    } as CSSProperties;
+    } as HomeDaylightStyle;
   }, [minuteKey]);
+}
+
+function useHomeViewportBackground(daylightStyle: HomeDaylightStyle) {
+  useEffect(() => {
+    const root = document.documentElement;
+    const body = document.body;
+    const themeMeta = document.querySelector<HTMLMetaElement>(
+      'meta[name="theme-color"]',
+    );
+    const propertyNames = [
+      "--home-sky-top",
+      "--home-sky-mid",
+      "--home-sky-bottom",
+      "--home-sky-glow",
+      "--home-frame-light",
+      "--home-frame-glow",
+    ] as const;
+    const previousRootBackground = root.style.background;
+    const previousBodyBackground = body.style.background;
+    const previousThemeColor = themeMeta?.getAttribute("content") ?? null;
+
+    propertyNames.forEach((name) => {
+      const value = daylightStyle[name];
+      if (typeof value === "string") {
+        root.style.setProperty(name, value);
+        body.style.setProperty(name, value);
+      }
+    });
+
+    root.style.background = HOME_SKY_BACKGROUND;
+    body.style.background = HOME_SKY_BACKGROUND;
+
+    const themeColor = daylightStyle["--home-sky-top"];
+    if (themeMeta && typeof themeColor === "string") {
+      themeMeta.setAttribute("content", themeColor);
+    }
+
+    return () => {
+      propertyNames.forEach((name) => {
+        root.style.removeProperty(name);
+        body.style.removeProperty(name);
+      });
+      root.style.background = previousRootBackground;
+      body.style.background = previousBodyBackground;
+      if (themeMeta) {
+        if (previousThemeColor) {
+          themeMeta.setAttribute("content", previousThemeColor);
+        } else {
+          themeMeta.removeAttribute("content");
+        }
+      }
+    };
+  }, [daylightStyle]);
 }
 
 function getDeskState(eveningState: EveningHomeState): DeskState {
@@ -1079,10 +1151,9 @@ const deskStyles = {
     flexDirection: "column",
     alignItems: "center",
     padding:
-      "calc(24px + env(safe-area-inset-top)) 22px calc(var(--bottom-nav-height) + var(--bottom-nav-bottom-offset) + 30px + env(safe-area-inset-bottom))",
+      "calc(var(--home-page-padding-top, 10px) + env(safe-area-inset-top)) var(--home-page-padding-x, 16px) calc(var(--bottom-nav-height) + var(--bottom-nav-bottom-offset) + 24px + env(safe-area-inset-bottom))",
     color: "var(--ink)",
-    background:
-      "radial-gradient(circle at 50% 18%, color-mix(in srgb, var(--home-sky-glow, var(--paper-warm)) 32%, transparent) 0%, transparent 48%), linear-gradient(180deg, var(--home-sky-top, var(--paper)) 0%, var(--home-sky-mid, var(--paper)) 48%, var(--home-sky-bottom, var(--paper-warm)) 100%)",
+    background: HOME_SKY_BACKGROUND,
     transition:
       "background var(--home-daylight-transition, 1800ms) var(--ease-gentle)",
   },
@@ -1090,20 +1161,20 @@ const deskStyles = {
     position: "relative",
     zIndex: 1,
     flex: 1,
-    width: "min(100%, 390px)",
+    width: "min(100%, var(--home-stage-max-width, 430px))",
     display: "flex",
     flexDirection: "column",
     alignItems: "center",
-    justifyContent: "center",
-    gap: "20px",
-    paddingTop: "12px",
+    justifyContent: "flex-start",
+    gap: "var(--home-stage-gap, 14px)",
+    paddingTop: "0",
   },
   homeHero: {
     width: "100%",
     display: "flex",
     flexDirection: "column",
     alignItems: "center",
-    gap: "20px",
+    gap: "var(--home-hero-gap, 14px)",
   },
   homeHeroDelivered: {
     gap: "18px",
@@ -1124,16 +1195,20 @@ const deskStyles = {
   homeFrame: {
     position: "relative",
     display: "block",
-    width: "min(100%, 430px)",
+    width: "100%",
+    boxSizing: "border-box",
     aspectRatio: "3 / 4",
     padding: "var(--home-frame-mat-width, 12px)",
     borderRadius: "var(--home-frame-radius, var(--radius-2xl))",
     background: "var(--home-frame-light, var(--paper))",
     boxShadow:
-      "0 2px 0 color-mix(in srgb, var(--paper-card) 78%, transparent) inset, 0 28px 78px color-mix(in srgb, var(--home-frame-glow, var(--paper-warm)) 74%, transparent), 0 10px 28px color-mix(in srgb, var(--ink) 9%, transparent)",
+      "0 2px 0 color-mix(in srgb, var(--paper-card) 78%, transparent) inset, 0 34px 92px color-mix(in srgb, var(--home-frame-glow, var(--paper-warm)) 82%, transparent), 0 14px 36px color-mix(in srgb, var(--ink) 11%, transparent)",
     overflow: "hidden",
     transition:
       "background var(--home-daylight-transition, 1800ms) var(--ease-gentle), box-shadow var(--home-daylight-transition, 1800ms) var(--ease-gentle)",
+  },
+  homeFrameDelivered: {
+    width: "min(78%, 300px)",
   },
   homeFrameImage: {
     width: "100%",
@@ -1190,8 +1265,8 @@ const deskStyles = {
   homeCopyWrap: {
     display: "grid",
     justifyItems: "center",
-    gap: "8px",
-    minHeight: "54px",
+    gap: "4px",
+    minHeight: "44px",
   },
   homeTitle: {
     margin: 0,
