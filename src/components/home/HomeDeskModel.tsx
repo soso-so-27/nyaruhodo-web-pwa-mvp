@@ -62,11 +62,63 @@ type HomeDeskModelProps = {
 
 const HOLD_OPEN_MS = 1600;
 const HOLD_REWIND_MS = 1000;
+const HOME_FRAME_TUNING = {
+  matWidth: "12px",
+  outerRadius: "24px",
+  innerRadius: "12px",
+  kenBurnsDuration: "34s",
+  kenBurnsScale: "1.035",
+  daylightTransition: "1800ms",
+} as const;
 const HOME_DAYLIGHT_ANCHORS = [
-  { minute: 5 * 60, top: "#fcfbf9", bottom: "#f5f2ec" },
-  { minute: 12 * 60, top: "#fbfaf7", bottom: "#f4f1ea" },
-  { minute: 17 * 60 + 30, top: "#faf7f1", bottom: "#f1ebdf" },
-  { minute: 20 * 60, top: "#f8f6f1", bottom: "#efece4" },
+  {
+    minute: 4 * 60 + 45,
+    skyTop: "#f6ebe1",
+    skyMid: "#fbf4e9",
+    skyBottom: "#f2e8dc",
+    mat: "#fff9ef",
+    glow: "#e9c8ad",
+  },
+  {
+    minute: 7 * 60,
+    skyTop: "#fbf3e7",
+    skyMid: "#fffaf1",
+    skyBottom: "#f3eadb",
+    mat: "#fffaf1",
+    glow: "#efd7b5",
+  },
+  {
+    minute: 12 * 60,
+    skyTop: "#f7f8f4",
+    skyMid: "#fbfaf5",
+    skyBottom: "#ece8dd",
+    mat: "#fffdf8",
+    glow: "#d9d2c2",
+  },
+  {
+    minute: 17 * 60,
+    skyTop: "#f5dfc7",
+    skyMid: "#faead7",
+    skyBottom: "#e9d1bd",
+    mat: "#fff5e6",
+    glow: "#dfad84",
+  },
+  {
+    minute: 19 * 60 + 40,
+    skyTop: "#dfcbc3",
+    skyMid: "#eadcd2",
+    skyBottom: "#c8c0bd",
+    mat: "#f7ede4",
+    glow: "#c4928a",
+  },
+  {
+    minute: 22 * 60,
+    skyTop: "#bfc5cc",
+    skyMid: "#dad8d2",
+    skyBottom: "#aaa8a8",
+    mat: "#ede8df",
+    glow: "#8f94a4",
+  },
 ] as const;
 
 export function HomeDeskModel({
@@ -256,7 +308,12 @@ export function HomeDeskModel({
                 <StoredPhotoImage
                   src={getPhotoDisplaySrc(homePhoto)}
                   alt=""
-                  style={deskStyles.homeFrameImage}
+                  style={{
+                    ...deskStyles.homeFrameImage,
+                    ...(prefersReducedMotion
+                      ? {}
+                      : deskStyles.homeFrameImageMotion),
+                  }}
                 />
               </span>
             </button>
@@ -467,6 +524,14 @@ export function HomeDeskModel({
         @keyframes deskEveningSoonCopyIn {
           from { opacity: 0; }
           to { opacity: 1; }
+        }
+        @keyframes homeKenBurns {
+          0% {
+            transform: translate3d(-0.8%, -0.6%, 0) scale(1);
+          }
+          100% {
+            transform: translate3d(0.9%, 0.7%, 0) scale(var(--home-photo-pan-scale, 1.035));
+          }
         }
         .desk-frame-breathe {
           animation: deskFrameBreathe calc(var(--dur-move) * 10) var(--ease-gentle) infinite;
@@ -751,8 +816,18 @@ function useDaylight(now: number) {
   return useMemo(() => {
     const colors = getDaylightColors(minuteKey * 60000);
     return {
-      "--home-frame-light": colors.top,
-      "--home-frame-glow": colors.bottom,
+      "--home-sky-top": colors.skyTop,
+      "--home-sky-mid": colors.skyMid,
+      "--home-sky-bottom": colors.skyBottom,
+      "--home-sky-glow": colors.glow,
+      "--home-frame-light": colors.mat,
+      "--home-frame-glow": colors.glow,
+      "--home-frame-mat-width": HOME_FRAME_TUNING.matWidth,
+      "--home-frame-radius": HOME_FRAME_TUNING.outerRadius,
+      "--home-frame-inner-radius": HOME_FRAME_TUNING.innerRadius,
+      "--home-photo-pan-duration": HOME_FRAME_TUNING.kenBurnsDuration,
+      "--home-photo-pan-scale": HOME_FRAME_TUNING.kenBurnsScale,
+      "--home-daylight-transition": HOME_FRAME_TUNING.daylightTransition,
     } as CSSProperties;
   }, [minuteKey]);
 }
@@ -781,14 +856,25 @@ function getDaylightColors(now: number) {
     const end = HOME_DAYLIGHT_ANCHORS[index + 1];
     if (minute >= start.minute && minute <= end.minute) {
       const progress = (minute - start.minute) / (end.minute - start.minute);
-      return {
-        top: interpolateHexColor(start.top, end.top, progress),
-        bottom: interpolateHexColor(start.bottom, end.bottom, progress),
-      };
+      return interpolateDaylightAnchor(start, end, progress);
     }
   }
 
   return HOME_DAYLIGHT_ANCHORS[HOME_DAYLIGHT_ANCHORS.length - 1];
+}
+
+function interpolateDaylightAnchor(
+  from: (typeof HOME_DAYLIGHT_ANCHORS)[number],
+  to: (typeof HOME_DAYLIGHT_ANCHORS)[number],
+  progress: number,
+) {
+  return {
+    skyTop: interpolateHexColor(from.skyTop, to.skyTop, progress),
+    skyMid: interpolateHexColor(from.skyMid, to.skyMid, progress),
+    skyBottom: interpolateHexColor(from.skyBottom, to.skyBottom, progress),
+    mat: interpolateHexColor(from.mat, to.mat, progress),
+    glow: interpolateHexColor(from.glow, to.glow, progress),
+  };
 }
 
 function getJstMinuteOfDay(timestamp: number) {
@@ -970,7 +1056,10 @@ const deskStyles = {
     padding:
       "calc(24px + env(safe-area-inset-top)) 22px calc(var(--bottom-nav-height) + var(--bottom-nav-bottom-offset) + 30px + env(safe-area-inset-bottom))",
     color: "var(--ink)",
-    background: "linear-gradient(180deg, var(--paper) 0%, var(--paper-warm) 100%)",
+    background:
+      "radial-gradient(circle at 50% 18%, color-mix(in srgb, var(--home-sky-glow, var(--paper-warm)) 32%, transparent) 0%, transparent 48%), linear-gradient(180deg, var(--home-sky-top, var(--paper)) 0%, var(--home-sky-mid, var(--paper)) 48%, var(--home-sky-bottom, var(--paper-warm)) 100%)",
+    transition:
+      "background var(--home-daylight-transition, 1800ms) var(--ease-gentle)",
   },
   stage: {
     position: "relative",
@@ -1012,18 +1101,27 @@ const deskStyles = {
     display: "block",
     width: "min(100%, 430px)",
     aspectRatio: "3 / 4",
-    padding: "10px",
-    borderRadius: "var(--radius-2xl)",
+    padding: "var(--home-frame-mat-width, 12px)",
+    borderRadius: "var(--home-frame-radius, var(--radius-2xl))",
     background: "var(--home-frame-light, var(--paper))",
     boxShadow:
-      "0 20px 54px color-mix(in srgb, var(--home-frame-glow, var(--paper-warm)) 72%, transparent)",
+      "0 2px 0 color-mix(in srgb, var(--paper-card) 76%, transparent) inset, 0 22px 64px color-mix(in srgb, var(--home-frame-glow, var(--paper-warm)) 62%, transparent)",
     overflow: "hidden",
+    transition:
+      "background var(--home-daylight-transition, 1800ms) var(--ease-gentle), box-shadow var(--home-daylight-transition, 1800ms) var(--ease-gentle)",
   },
   homeFrameImage: {
     width: "100%",
     height: "100%",
-    borderRadius: "var(--radius-xl)",
+    borderRadius: "var(--home-frame-inner-radius, var(--radius-lg))",
     objectFit: "contain",
+    background: "color-mix(in srgb, var(--home-frame-light, var(--paper)) 78%, var(--paper) 22%)",
+    transformOrigin: "50% 50%",
+    willChange: "transform",
+  },
+  homeFrameImageMotion: {
+    animation:
+      "homeKenBurns var(--home-photo-pan-duration, 34s) var(--ease-gentle) infinite alternate",
   },
   homeEmptyFrame: {
     width: "min(100%, 430px)",
@@ -1035,13 +1133,15 @@ const deskStyles = {
     gap: "12px",
     padding: "24px",
     border: "1px solid var(--line)",
-    borderRadius: "var(--radius-2xl)",
+    borderRadius: "var(--home-frame-radius, var(--radius-2xl))",
     background: "var(--home-frame-light, var(--paper))",
     color: "var(--ink-soft)",
     boxShadow:
-      "0 20px 54px color-mix(in srgb, var(--home-frame-glow, var(--paper-warm)) 72%, transparent)",
+      "0 22px 64px color-mix(in srgb, var(--home-frame-glow, var(--paper-warm)) 62%, transparent)",
     cursor: "pointer",
     WebkitTapHighlightColor: "transparent",
+    transition:
+      "background var(--home-daylight-transition, 1800ms) var(--ease-gentle), box-shadow var(--home-daylight-transition, 1800ms) var(--ease-gentle)",
   },
   homeEmptyTitle: {
     color: "var(--ink)",
