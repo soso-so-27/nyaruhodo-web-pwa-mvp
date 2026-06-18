@@ -67,57 +67,63 @@ const HOME_FRAME_TUNING = {
   outerRadius: "24px",
   innerRadius: "12px",
   kenBurnsDuration: "34s",
-  kenBurnsScale: "1.035",
+  kenBurnsBaseScale: "1.065",
+  kenBurnsScale: "1.105",
+  kenBurnsPanStartX: "-1.05%",
+  kenBurnsPanStartY: "-0.9%",
+  kenBurnsPanEndX: "1.05%",
+  kenBurnsPanEndY: "0.9%",
+  objectPosition: "50% 48%",
   daylightTransition: "1800ms",
 } as const;
 const HOME_DAYLIGHT_ANCHORS = [
   {
     minute: 4 * 60 + 45,
-    skyTop: "#f6ebe1",
-    skyMid: "#fbf4e9",
-    skyBottom: "#f2e8dc",
-    mat: "#fff9ef",
-    glow: "#e9c8ad",
+    skyTop: "#efd8c9",
+    skyMid: "#f8eadb",
+    skyBottom: "#e8d5c5",
+    mat: "#fff5e7",
+    glow: "#dea985",
   },
   {
     minute: 7 * 60,
-    skyTop: "#fbf3e7",
-    skyMid: "#fffaf1",
-    skyBottom: "#f3eadb",
-    mat: "#fffaf1",
-    glow: "#efd7b5",
+    skyTop: "#f7e6cf",
+    skyMid: "#fff3df",
+    skyBottom: "#eadfce",
+    mat: "#fff6e8",
+    glow: "#e8bf8f",
   },
   {
     minute: 12 * 60,
-    skyTop: "#f7f8f4",
-    skyMid: "#fbfaf5",
-    skyBottom: "#ece8dd",
-    mat: "#fffdf8",
-    glow: "#d9d2c2",
+    skyTop: "#e9eee9",
+    skyMid: "#fbf4e4",
+    skyBottom: "#e4dac8",
+    mat: "#fff9ec",
+    glow: "#cdbb97",
   },
   {
     minute: 17 * 60,
-    skyTop: "#f5dfc7",
-    skyMid: "#faead7",
-    skyBottom: "#e9d1bd",
-    mat: "#fff5e6",
-    glow: "#dfad84",
+    skyTop: "#edc69f",
+    skyMid: "#f5ddbc",
+    skyBottom: "#d9b39d",
+    mat: "#fff0dc",
+    glow: "#cf8f62",
   },
   {
     minute: 19 * 60 + 40,
-    skyTop: "#dfcbc3",
-    skyMid: "#eadcd2",
-    skyBottom: "#c8c0bd",
-    mat: "#f7ede4",
-    glow: "#c4928a",
+    skyTop: "#c6b3bd",
+    skyMid: "#dcc9bf",
+    skyBottom: "#aaa4ad",
+    mat: "#f2e4d9",
+    glow: "#ac706f",
   },
   {
     minute: 22 * 60,
-    skyTop: "#bfc5cc",
-    skyMid: "#dad8d2",
-    skyBottom: "#aaa8a8",
-    mat: "#ede8df",
-    glow: "#8f94a4",
+    skyTop: "#9ea8b3",
+    skyMid: "#c5c4bd",
+    skyBottom: "#85868b",
+    mat: "#e5ded4",
+    glow: "#707894",
   },
 ] as const;
 
@@ -308,10 +314,11 @@ export function HomeDeskModel({
                 <StoredPhotoImage
                   src={getPhotoDisplaySrc(homePhoto)}
                   alt=""
-                  style={{
-                    ...deskStyles.homeFrameImage,
+                  style={deskStyles.homeFrameImage}
+                  imageStyle={{
+                    ...deskStyles.homeFrameImageSurface,
                     ...(prefersReducedMotion
-                      ? {}
+                      ? deskStyles.homeFrameImageReducedMotion
                       : deskStyles.homeFrameImageMotion),
                   }}
                 />
@@ -527,10 +534,22 @@ export function HomeDeskModel({
         }
         @keyframes homeKenBurns {
           0% {
-            transform: translate3d(-0.8%, -0.6%, 0) scale(1);
+            transform:
+              translate3d(
+                var(--home-photo-pan-start-x, -1.05%),
+                var(--home-photo-pan-start-y, -0.9%),
+                0
+              )
+              scale(var(--home-photo-base-scale, 1.065));
           }
           100% {
-            transform: translate3d(0.9%, 0.7%, 0) scale(var(--home-photo-pan-scale, 1.035));
+            transform:
+              translate3d(
+                var(--home-photo-pan-end-x, 1.05%),
+                var(--home-photo-pan-end-y, 0.9%),
+                0
+              )
+              scale(var(--home-photo-pan-scale, 1.105));
           }
         }
         .desk-frame-breathe {
@@ -826,7 +845,13 @@ function useDaylight(now: number) {
       "--home-frame-radius": HOME_FRAME_TUNING.outerRadius,
       "--home-frame-inner-radius": HOME_FRAME_TUNING.innerRadius,
       "--home-photo-pan-duration": HOME_FRAME_TUNING.kenBurnsDuration,
+      "--home-photo-base-scale": HOME_FRAME_TUNING.kenBurnsBaseScale,
       "--home-photo-pan-scale": HOME_FRAME_TUNING.kenBurnsScale,
+      "--home-photo-pan-start-x": HOME_FRAME_TUNING.kenBurnsPanStartX,
+      "--home-photo-pan-start-y": HOME_FRAME_TUNING.kenBurnsPanStartY,
+      "--home-photo-pan-end-x": HOME_FRAME_TUNING.kenBurnsPanEndX,
+      "--home-photo-pan-end-y": HOME_FRAME_TUNING.kenBurnsPanEndY,
+      "--home-photo-position": HOME_FRAME_TUNING.objectPosition,
       "--home-daylight-transition": HOME_FRAME_TUNING.daylightTransition,
     } as CSSProperties;
   }, [minuteKey]);
@@ -1105,7 +1130,7 @@ const deskStyles = {
     borderRadius: "var(--home-frame-radius, var(--radius-2xl))",
     background: "var(--home-frame-light, var(--paper))",
     boxShadow:
-      "0 2px 0 color-mix(in srgb, var(--paper-card) 76%, transparent) inset, 0 22px 64px color-mix(in srgb, var(--home-frame-glow, var(--paper-warm)) 62%, transparent)",
+      "0 2px 0 color-mix(in srgb, var(--paper-card) 78%, transparent) inset, 0 28px 78px color-mix(in srgb, var(--home-frame-glow, var(--paper-warm)) 74%, transparent), 0 10px 28px color-mix(in srgb, var(--ink) 9%, transparent)",
     overflow: "hidden",
     transition:
       "background var(--home-daylight-transition, 1800ms) var(--ease-gentle), box-shadow var(--home-daylight-transition, 1800ms) var(--ease-gentle)",
@@ -1114,14 +1139,21 @@ const deskStyles = {
     width: "100%",
     height: "100%",
     borderRadius: "var(--home-frame-inner-radius, var(--radius-lg))",
-    objectFit: "contain",
+    objectFit: "cover",
+    objectPosition: "var(--home-photo-position, 50% 48%)",
     background: "color-mix(in srgb, var(--home-frame-light, var(--paper)) 78%, var(--paper) 22%)",
+  },
+  homeFrameImageSurface: {
     transformOrigin: "50% 50%",
     willChange: "transform",
+    transform: "scale(var(--home-photo-base-scale, 1.065))",
   },
   homeFrameImageMotion: {
     animation:
       "homeKenBurns var(--home-photo-pan-duration, 34s) var(--ease-gentle) infinite alternate",
+  },
+  homeFrameImageReducedMotion: {
+    transform: "scale(var(--home-photo-base-scale, 1.065))",
   },
   homeEmptyFrame: {
     width: "min(100%, 430px)",

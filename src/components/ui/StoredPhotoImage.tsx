@@ -75,15 +75,18 @@ export function StoredPhotoImage({
   src,
   alt,
   style,
+  imageStyle,
   onStorageDataUrl,
 }: {
   src: string;
   alt: string;
   style?: CSSProperties;
+  imageStyle?: CSSProperties;
   onStorageDataUrl?: (dataUrl: string) => void;
 }) {
   const {
     objectFit,
+    objectPosition,
     filter,
     mixBlendMode,
     ...containerStyle
@@ -269,6 +272,7 @@ export function StoredPhotoImage({
           width: "100%",
           height: "100%",
           objectFit: objectFit ?? "cover",
+          objectPosition,
           filter: buildDevelopFilter(filter, isLoaded, hasError),
           mixBlendMode,
           display: "block",
@@ -276,6 +280,7 @@ export function StoredPhotoImage({
           transform: isLoaded ? "scale(1)" : "scale(1.018)",
           transition:
             "filter 420ms var(--ease-gentle), opacity 180ms var(--ease-gentle), transform 420ms var(--ease-gentle)",
+          ...imageStyle,
           ...imageSelectionLockStyle,
         }}
       />
