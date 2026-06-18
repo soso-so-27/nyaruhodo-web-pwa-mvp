@@ -72,14 +72,7 @@ const HOME_FRAME_TUNING = {
   matWidth: "12px",
   outerRadius: "24px",
   innerRadius: "12px",
-  kenBurnsDuration: "34s",
-  kenBurnsBaseScale: "1.065",
-  kenBurnsScale: "1.105",
-  kenBurnsPanStartX: "-1.05%",
-  kenBurnsPanStartY: "-0.9%",
-  kenBurnsPanEndX: "1.05%",
-  kenBurnsPanEndY: "0.9%",
-  objectPosition: "50% 56%",
+  skyMotionDuration: "52s",
   daylightTransition: "1800ms",
 } as const;
 const HOME_SKY_BACKGROUND =
@@ -181,6 +174,7 @@ export function HomeDeskModel({
   const homePhoto = targetPhoto ?? latestOwnPhoto;
   const shouldHidePresence = true;
   const guidanceCopy = getHomeStatusCopy(deskState, catName, now);
+  const homeCycleStatus = getHomeCycleStatus(deskState, Boolean(targetPhoto), now);
   const isBefore = deskState === "1" || deskState === "1b";
   useEffect(() => {
     trackDeskStateShown(deskState, eveningState.dateKey);
@@ -291,6 +285,7 @@ export function HomeDeskModel({
     <section
       data-testid="home-desk-model"
       data-state={deskState}
+      className={prefersReducedMotion ? undefined : "home-sky-flow"}
       style={{
         ...deskStyles.page,
         ...daylightStyle,
@@ -329,12 +324,6 @@ export function HomeDeskModel({
                   src={getPhotoDisplaySrc(homePhoto)}
                   alt=""
                   style={deskStyles.homeFrameImage}
-                  imageStyle={{
-                    ...deskStyles.homeFrameImageSurface,
-                    ...(prefersReducedMotion
-                      ? deskStyles.homeFrameImageReducedMotion
-                      : deskStyles.homeFrameImageMotion),
-                  }}
                 />
               </span>
             </button>
@@ -375,6 +364,21 @@ export function HomeDeskModel({
             {guidanceCopy.sub ? (
               <p style={deskStyles.homeSub}>{guidanceCopy.sub}</p>
             ) : null}
+          </div>
+
+          <div style={deskStyles.homeCycleStatus} aria-label="きょうの状態">
+            <span style={deskStyles.homeCyclePill}>
+              <span style={deskStyles.homeCycleLabel}>きょうのねがお</span>
+              <strong style={deskStyles.homeCycleValue}>
+                {homeCycleStatus.photo}
+              </strong>
+            </span>
+            <span style={deskStyles.homeCyclePill}>
+              <span style={deskStyles.homeCycleLabel}>8時</span>
+              <strong style={deskStyles.homeCycleValue}>
+                {homeCycleStatus.delivery}
+              </strong>
+            </span>
           </div>
 
           {isBefore ? (
@@ -546,25 +550,19 @@ export function HomeDeskModel({
           from { opacity: 0; }
           to { opacity: 1; }
         }
-        @keyframes homeKenBurns {
+        @keyframes homeSkyFlow {
           0% {
-            transform:
-              translate3d(
-                var(--home-photo-pan-start-x, -1.05%),
-                var(--home-photo-pan-start-y, -0.9%),
-                0
-              )
-              scale(var(--home-photo-base-scale, 1.065));
+            background-position: 48% 8%, 50% 50%;
+            filter: saturate(1);
           }
           100% {
-            transform:
-              translate3d(
-                var(--home-photo-pan-end-x, 1.05%),
-                var(--home-photo-pan-end-y, 0.9%),
-                0
-              )
-              scale(var(--home-photo-pan-scale, 1.105));
+            background-position: 54% 15%, 50% 50%;
+            filter: saturate(1.025);
           }
+        }
+        .home-sky-flow {
+          background-size: 122% 122%, 100% 100%;
+          animation: homeSkyFlow var(--home-sky-motion-duration, 52s) var(--ease-gentle) infinite alternate;
         }
         .desk-frame-breathe {
           animation: deskFrameBreathe calc(var(--dur-move) * 10) var(--ease-gentle) infinite;
@@ -583,8 +581,10 @@ export function HomeDeskModel({
         }
         @media (prefers-reduced-motion: reduce) {
           .desk-frame-breathe,
+          .home-sky-flow,
           .desk-evening-soon-copy {
             animation: none;
+            filter: none;
           }
           .desk-letter-holding [data-develop-photo="true"] {
             transition: none !important;
@@ -863,14 +863,7 @@ function useDaylight(now: number) {
       "--home-frame-mat-width": HOME_FRAME_TUNING.matWidth,
       "--home-frame-radius": HOME_FRAME_TUNING.outerRadius,
       "--home-frame-inner-radius": HOME_FRAME_TUNING.innerRadius,
-      "--home-photo-pan-duration": HOME_FRAME_TUNING.kenBurnsDuration,
-      "--home-photo-base-scale": HOME_FRAME_TUNING.kenBurnsBaseScale,
-      "--home-photo-pan-scale": HOME_FRAME_TUNING.kenBurnsScale,
-      "--home-photo-pan-start-x": HOME_FRAME_TUNING.kenBurnsPanStartX,
-      "--home-photo-pan-start-y": HOME_FRAME_TUNING.kenBurnsPanStartY,
-      "--home-photo-pan-end-x": HOME_FRAME_TUNING.kenBurnsPanEndX,
-      "--home-photo-pan-end-y": HOME_FRAME_TUNING.kenBurnsPanEndY,
-      "--home-photo-position": HOME_FRAME_TUNING.objectPosition,
+      "--home-sky-motion-duration": HOME_FRAME_TUNING.skyMotionDuration,
       "--home-daylight-transition": HOME_FRAME_TUNING.daylightTransition,
     } as HomeDaylightStyle;
   }, [minuteKey]);
@@ -1029,6 +1022,26 @@ function getHomeStatusCopy(
     default:
       return { title: "" };
   }
+}
+
+function getHomeCycleStatus(
+  state: DeskState,
+  hasTodayPhoto: boolean,
+  now: number,
+) {
+  const delivery =
+    state === "3"
+      ? "とどいた"
+      : state === "4"
+        ? "ひらいた"
+        : isEveningSoonWindow(now)
+          ? "もうすぐ"
+          : "よる とどく";
+
+  return {
+    photo: hasTodayPhoto ? "出した" : "まだ",
+    delivery,
+  };
 }
 
 function getPhotoDisplaySrc(
@@ -1214,21 +1227,11 @@ const deskStyles = {
     width: "100%",
     height: "100%",
     borderRadius: "var(--home-frame-inner-radius, var(--radius-lg))",
-    objectFit: "cover",
-    objectPosition: "var(--home-photo-position, 50% 48%)",
+    objectFit: "contain",
+    objectPosition: "center",
     background: "color-mix(in srgb, var(--home-frame-light, var(--paper)) 78%, var(--paper) 22%)",
-  },
-  homeFrameImageSurface: {
-    transformOrigin: "50% 50%",
-    willChange: "transform",
-    transform: "scale(var(--home-photo-base-scale, 1.065))",
-  },
-  homeFrameImageMotion: {
-    animation:
-      "homeKenBurns var(--home-photo-pan-duration, 34s) var(--ease-gentle) infinite alternate",
-  },
-  homeFrameImageReducedMotion: {
-    transform: "scale(var(--home-photo-base-scale, 1.065))",
+    boxShadow:
+      "0 0 0 1px color-mix(in srgb, var(--ink) 7%, transparent) inset, 0 0 22px color-mix(in srgb, var(--ink) 5%, transparent) inset",
   },
   homeEmptyFrame: {
     width: "min(100%, 430px)",
@@ -1287,6 +1290,36 @@ const deskStyles = {
   },
   homeCaptureButton: {
     minWidth: "176px",
+  },
+  homeCycleStatus: {
+    display: "flex",
+    flexWrap: "wrap",
+    justifyContent: "center",
+    gap: "8px",
+    marginTop: "-2px",
+  },
+  homeCyclePill: {
+    display: "inline-flex",
+    alignItems: "center",
+    gap: "6px",
+    minHeight: "28px",
+    padding: "4px 10px",
+    borderRadius: "var(--radius-full)",
+    background: "color-mix(in srgb, var(--paper-card) 54%, transparent)",
+    color: "var(--ink-soft)",
+    fontFamily: "var(--font-ui)",
+    fontSize: "12px",
+    letterSpacing: "var(--tracking-body)",
+    boxShadow:
+      "0 0 0 1px color-mix(in srgb, var(--line) 72%, transparent) inset",
+  },
+  homeCycleLabel: {
+    color: "var(--ink-faint)",
+    fontWeight: 400,
+  },
+  homeCycleValue: {
+    color: "var(--ink)",
+    fontWeight: 500,
   },
   desk: {
     display: "flex",
