@@ -14,6 +14,7 @@ const expectedShotNames = [
   "state2_1800_habit.png",
   "state3_2005_week1.png",
   "state3_2005_habit.png",
+  "state3_2005_with_omoide.png",
   "state4_2010_week1.png",
   "state4_2010_habit.png",
   "state4_home_frame_viewer.png",
@@ -118,6 +119,14 @@ test.describe("home desk model shots", () => {
       route: "/home",
     },
     {
+      name: "state3_2005_with_omoide",
+      state: "3",
+      now: "2026-06-10T11:05:00.000Z",
+      habit: true,
+      withOmoideCandidate: true,
+      route: "/home",
+    },
+    {
       name: "state4_2010_week1",
       state: "4",
       now: "2026-06-10T11:10:00.000Z",
@@ -151,6 +160,7 @@ test.describe("home desk model shots", () => {
         now: Date.parse(shot.now),
         state: shot.state,
         habit: shot.habit,
+        withOmoideCandidate: "withOmoideCandidate" in shot ? shot.withOmoideCandidate : false,
       });
       await page.goto(shot.route);
       await page.waitForLoadState("networkidle");
@@ -376,14 +386,16 @@ async function seedReviewState(
     now,
     state,
     habit,
+    withOmoideCandidate = false,
   }: {
     now: number;
     state: "1" | "1b" | "2" | "3" | "4";
     habit: boolean;
+    withOmoideCandidate?: boolean;
   },
 ) {
   await page.addInitScript(
-    ({ now, state, habit, ownDataUrl, deliveredDataUrl }) => {
+    ({ now, state, habit, withOmoideCandidate, ownDataUrl, deliveredDataUrl }) => {
       (window as typeof window & { __testNow?: number }).__testNow = now;
       const originalDateNow = Date.now.bind(Date);
       Date.now = () =>
@@ -433,6 +445,11 @@ async function seedReviewState(
       );
 
       const ownPhotos = [] as typeof ownPhoto[];
+      const omoidePhoto = {
+        ...ownPhoto,
+        id: "own-shot-omoide-week",
+        createdAt: Date.parse("2026-06-03T02:40:00.000Z"),
+      };
       if (state !== "1" && state !== "1b") {
         ownPhotos.unshift(ownPhoto);
         store[dateKey] = {
@@ -449,6 +466,9 @@ async function seedReviewState(
             : {}),
           ...(state === "4" ? { openedAt: deliveredPhoto.deliveredAt + 1000 } : {}),
         };
+      }
+      if (withOmoideCandidate) {
+        ownPhotos.push(omoidePhoto);
       }
 
       if (habit) {
@@ -480,7 +500,7 @@ async function seedReviewState(
         ),
       );
     },
-    { now, state, habit, ownDataUrl, deliveredDataUrl },
+    { now, state, habit, withOmoideCandidate, ownDataUrl, deliveredDataUrl },
   );
 
   await page.route("/api/presence", async (route) => {

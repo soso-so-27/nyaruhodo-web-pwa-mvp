@@ -202,6 +202,7 @@ export function HomeDeskModel({
   });
   const homePhoto = homeDay.photo;
   const subNotifications = omoideMemory ? [omoideMemory] : [];
+  const hasSplitTrayActions = homeDay.phase === "delivered" && subNotifications.length > 0;
   const shouldHidePresence = true;
   useEffect(() => {
     trackDeskStateShown(deskState, eveningState.dateKey);
@@ -430,38 +431,41 @@ export function HomeDeskModel({
             <div
               style={{
                 ...deskStyles.notificationRows,
+                ...(hasSplitTrayActions ? deskStyles.notificationRowsSplit : {}),
                 ...(subNotifications.length === 0
                   ? deskStyles.notificationRowsSingle
                   : {}),
               }}
             >
               {homeDay.phase === "delivered" ? (
-                <div
+                <button
+                  type="button"
+                  role="button"
+                  data-testid="desk-open-letter"
+                  aria-label="そっと ひらく"
                   style={{
                     ...deskStyles.notificationRow,
                     ...deskStyles.notificationRowPrimary,
+                    ...(hasSplitTrayActions ? deskStyles.notificationRowSplitCard : {}),
                   }}
+                  className={holdProgress ? "desk-letter-holding" : undefined}
+                  onPointerDown={startHold}
+                  onPointerUp={cancelHold}
+                  onPointerCancel={cancelHold}
+                  onPointerLeave={cancelHold}
+                  onMouseDown={startMouseHold}
+                  onMouseUp={cancelMouseHold}
+                  onMouseLeave={cancelMouseHold}
                   onContextMenu={(event) => event.preventDefault()}
                 >
-                  <button
-                    type="button"
-                    role="button"
-                    data-testid="desk-open-letter"
-                    aria-label="そっと ひらく"
+                  <span
+                    aria-hidden="true"
                     style={{
                       ...deskStyles.selectionLockedStage,
                       ...deskStyles.arrivedLetterButton,
                       ...deskStyles.trayLetterButton,
+                      ...(hasSplitTrayActions ? deskStyles.trayLetterButtonCompact : {}),
                     }}
-                    className={holdProgress ? "desk-letter-holding" : undefined}
-                    onPointerDown={startHold}
-                    onPointerUp={cancelHold}
-                    onPointerCancel={cancelHold}
-                    onPointerLeave={cancelHold}
-                    onMouseDown={startMouseHold}
-                    onMouseUp={cancelMouseHold}
-                    onMouseLeave={cancelMouseHold}
-                    onContextMenu={(event) => event.preventDefault()}
                   >
                     <span style={deskStyles.letterFlap} aria-hidden="true" />
                     <span
@@ -488,26 +492,33 @@ export function HomeDeskModel({
                         />
                       </span>
                     ) : null}
-                  </button>
-                  <div style={deskStyles.letterTrayCopy}>
+                  </span>
+                  <div
+                    style={{
+                      ...deskStyles.letterTrayCopy,
+                      ...(hasSplitTrayActions ? deskStyles.letterTrayCopySplit : {}),
+                    }}
+                  >
                     <strong
                       style={{
                         ...deskStyles.letterTrayTitle,
                         ...deskStyles.letterTrayTitlePrimary,
+                        ...(hasSplitTrayActions ? deskStyles.notificationTitleSplit : {}),
                       }}
                     >
-                      ねこだより、とどいた
+                      {hasSplitTrayActions ? "ねこだより" : "ねこだより、とどいた"}
                     </strong>
                     <span
                       style={{
                         ...deskStyles.letterTraySub,
                         ...deskStyles.letterTraySubPrimary,
+                        ...(hasSplitTrayActions ? deskStyles.notificationActionSplit : {}),
                       }}
                     >
                       ひらく
                     </span>
                   </div>
-                </div>
+                </button>
               ) : homeDay.phase === "opened" ? (
                 <a
                   href="/collection"
@@ -537,6 +548,7 @@ export function HomeDeskModel({
                   style={{
                     ...deskStyles.notificationRow,
                     ...deskStyles.notificationRowInteractive,
+                    ...(hasSplitTrayActions ? deskStyles.notificationRowSplitCard : {}),
                   }}
                   onClick={() => {
                     onOpenOmoideMemory?.(memory);
@@ -544,14 +556,33 @@ export function HomeDeskModel({
                   }}
                   aria-label="思い出が、とどきました。うちのこで見る"
                 >
-                  <span style={deskStyles.notificationIcon} aria-hidden="true">
-                    思
+                  <span style={deskStyles.notificationThumb} aria-hidden="true">
+                    <StoredPhotoImage
+                      src={getPhotoDisplaySrc(memory.photo)}
+                      alt=""
+                      style={deskStyles.notificationThumbImage}
+                    />
                   </span>
-                  <span style={deskStyles.notificationText}>
-                    <span style={deskStyles.notificationTitle}>
-                      思い出が、とどきました
+                  <span
+                    style={{
+                      ...deskStyles.notificationText,
+                      ...(hasSplitTrayActions ? deskStyles.notificationTextSplit : {}),
+                    }}
+                  >
+                    <span
+                      style={{
+                        ...deskStyles.notificationTitle,
+                        ...(hasSplitTrayActions ? deskStyles.notificationTitleSplit : {}),
+                      }}
+                    >
+                      {hasSplitTrayActions ? "思い出" : "思い出が、とどきました"}
                     </span>
-                    <span style={deskStyles.notificationAction}>
+                    <span
+                      style={{
+                        ...deskStyles.notificationAction,
+                        ...(hasSplitTrayActions ? deskStyles.notificationActionSplit : {}),
+                      }}
+                    >
                       うちのこで みる
                     </span>
                   </span>
@@ -1597,6 +1628,10 @@ const deskStyles = {
     alignContent: "center",
     gap: "8px",
   },
+  notificationRowsSplit: {
+    gridTemplateColumns: "minmax(0, 1fr) minmax(0, 1fr)",
+    alignItems: "stretch",
+  },
   notificationRowsSingle: {
     alignContent: "center",
   },
@@ -1616,6 +1651,16 @@ const deskStyles = {
     textDecoration: "none",
     textAlign: "left",
     WebkitTapHighlightColor: "transparent",
+  },
+  notificationRowSplitCard: {
+    minHeight: "102px",
+    gridTemplateColumns: "1fr",
+    justifyItems: "center",
+    alignItems: "center",
+    gap: "7px",
+    padding: "12px 10px",
+    alignContent: "center",
+    textAlign: "center",
   },
   notificationRowText: {
     gridTemplateColumns: "1fr",
@@ -1646,21 +1691,24 @@ const deskStyles = {
     boxShadow:
       "0 0 0 1px color-mix(in srgb, var(--line) 24%, transparent) inset",
   },
-  notificationIcon: {
-    width: "34px",
-    height: "34px",
-    display: "inline-flex",
-    alignItems: "center",
-    justifyContent: "center",
+  notificationThumb: {
+    width: "50px",
+    height: "42px",
+    display: "block",
     borderRadius: "var(--radius-md)",
+    overflow: "hidden",
     background: "color-mix(in srgb, var(--paper-card) 72%, transparent)",
-    color: "var(--seal)",
     boxShadow:
-      "0 0 0 1px color-mix(in srgb, var(--line) 40%, transparent) inset",
-    fontFamily: "var(--font-display)",
-    fontSize: "12px",
-    lineHeight: 1,
-    letterSpacing: "0",
+      "0 0 0 1px color-mix(in srgb, var(--line) 32%, transparent) inset, 0 8px 18px -16px color-mix(in srgb, var(--ink) 30%, transparent)",
+  },
+  notificationThumbImage: {
+    width: "100%",
+    height: "100%",
+    border: "0",
+    borderRadius: "inherit",
+    boxShadow: "none",
+    background: "transparent",
+    objectFit: "cover",
   },
   notificationText: {
     minWidth: 0,
@@ -1670,21 +1718,40 @@ const deskStyles = {
     fontFamily: "var(--font-display)",
     letterSpacing: "var(--tracking-body)",
   },
+  notificationTextSplit: {
+    justifyItems: "center",
+    textAlign: "center",
+    gap: "1px",
+  },
   notificationTitle: {
     minWidth: 0,
-    overflow: "hidden",
-    textOverflow: "ellipsis",
-    whiteSpace: "nowrap",
+    overflow: "visible",
+    textOverflow: "clip",
+    whiteSpace: "normal",
     color: "var(--ink)",
     fontSize: "13px",
     fontWeight: 400,
-    lineHeight: 1.45,
+    lineHeight: 1.38,
+  },
+  notificationTitleSplit: {
+    maxWidth: "9em",
+    color: "var(--ink)",
+    fontSize: "12px",
+    lineHeight: 1.35,
+    letterSpacing: "var(--tracking-label)",
+    textAlign: "center",
   },
   notificationAction: {
     color: "var(--ink)",
     fontSize: "12px",
     fontWeight: 400,
     lineHeight: 1.45,
+  },
+  notificationActionSplit: {
+    color: "var(--ink-soft)",
+    fontSize: "11px",
+    lineHeight: 1.35,
+    textAlign: "center",
   },
   notificationMoreRow: {
     minHeight: "32px",
@@ -1700,6 +1767,10 @@ const deskStyles = {
     gap: "2px",
     justifyItems: "start",
     textAlign: "left",
+  },
+  letterTrayCopySplit: {
+    justifyItems: "center",
+    textAlign: "center",
   },
   letterTrayLink: {
     display: "grid",
@@ -1750,6 +1821,11 @@ const deskStyles = {
     transform: "rotate(-1deg)",
     boxShadow:
       "0 0 0 1px color-mix(in srgb, var(--seal-soft) 28%, transparent) inset, 0 10px 20px -16px color-mix(in srgb, var(--seal) 42%, transparent)",
+  },
+  trayLetterButtonCompact: {
+    width: "50px",
+    height: "36px",
+    borderRadius: "var(--radius-md)",
   },
   homeCopyWrap: {
     display: "grid",
