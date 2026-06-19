@@ -3042,7 +3042,7 @@ function SleepingSafetySheet({
       <div style={styles.sleepingSafetyBody}>
         <div style={styles.sleepingSafetyList}>
           <p style={styles.sleepingSafetyItem}>
-            <span style={styles.sleepingSafetyLine}>送る写真は、よその人に</span>
+            <span style={styles.sleepingSafetyLine}>送る写真は、どこかのおうちに</span>
             <span style={styles.sleepingSafetyLine}>ねこだよりとして届きます。</span>
           </p>
           <p style={styles.sleepingSafetyItem}>
