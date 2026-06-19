@@ -76,6 +76,7 @@ const HOME_FRAME_TUNING = {
   stageMaxWidth: "460px",
   stageGap: "12px",
   heroGap: "10px",
+  frameAspectRatio: "9 / 14",
   matWidth: "0px",
   outerRadius: "24px",
   innerRadius: "24px",
@@ -899,6 +900,7 @@ function useDaylight(now: number) {
       "--home-stage-gap": HOME_FRAME_TUNING.stageGap,
       "--home-hero-gap": HOME_FRAME_TUNING.heroGap,
       "--home-frame-mat-width": HOME_FRAME_TUNING.matWidth,
+      "--home-frame-aspect-ratio": HOME_FRAME_TUNING.frameAspectRatio,
       "--home-frame-radius": HOME_FRAME_TUNING.outerRadius,
       "--home-frame-inner-radius": HOME_FRAME_TUNING.innerRadius,
       "--home-frame-shadow": HOME_FRAME_TUNING.frameShadow,
@@ -1272,7 +1274,7 @@ const deskStyles = {
     flexDirection: "column",
     alignItems: "center",
     padding:
-      "calc(var(--home-page-padding-top, 10px) + env(safe-area-inset-top)) var(--home-page-padding-x, 16px) calc(var(--bottom-nav-height) + var(--bottom-nav-bottom-offset) + 24px + env(safe-area-inset-bottom))",
+      "calc(var(--home-page-padding-top, 10px) + env(safe-area-inset-top)) var(--home-page-padding-x, 16px) calc(var(--bottom-nav-height) + var(--bottom-nav-safe-offset) + 24px)",
     color: "var(--ink)",
     background: HOME_SKY_BACKGROUND,
     transition:
@@ -1334,7 +1336,7 @@ const deskStyles = {
     display: "block",
     width: "100%",
     boxSizing: "border-box",
-    aspectRatio: "3 / 4",
+    aspectRatio: "var(--home-frame-aspect-ratio, 9 / 14)",
     padding: "var(--home-frame-mat-width, 12px)",
     borderRadius: "var(--home-frame-radius, var(--radius-2xl))",
     background: "transparent",
@@ -1376,7 +1378,7 @@ const deskStyles = {
   },
   homeEmptyFrame: {
     width: "100%",
-    aspectRatio: "3 / 4",
+    aspectRatio: "var(--home-frame-aspect-ratio, 9 / 14)",
     boxSizing: "border-box",
     display: "grid",
     placeItems: "center",

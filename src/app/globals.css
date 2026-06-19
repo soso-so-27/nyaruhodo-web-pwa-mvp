@@ -3,6 +3,10 @@
 html {
   --bottom-nav-height: 76px;
   --bottom-nav-bottom-offset: 16px;
+  --bottom-nav-safe-offset: max(
+    var(--bottom-nav-bottom-offset),
+    env(safe-area-inset-bottom)
+  );
 }
 
 html,

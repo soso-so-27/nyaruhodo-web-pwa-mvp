@@ -177,7 +177,7 @@ const styles = {
   bottomNav: {
     position: "fixed",
     left: "50%",
-    bottom: "calc(var(--bottom-nav-bottom-offset) + env(safe-area-inset-bottom))",
+    bottom: "var(--bottom-nav-safe-offset)",
     zIndex: 20,
     overflow: "hidden",
     display: "grid",
