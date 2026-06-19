@@ -3034,14 +3034,30 @@ function SleepingSafetySheet({
   onClose: () => void;
 }) {
   return (
-    <AppBottomSheet title="ねてるねこが安心できる場所であるために" onClose={onClose}>
+    <AppBottomSheet
+      title="ねこだよりの約束"
+      onClose={onClose}
+      showHandle={false}
+    >
       <div style={styles.sleepingSafetyBody}>
-        <p style={styles.sleepingSafetyText}>
-          とどいたねがおを、そのまま外に出すのは控えてください。
-        </p>
-        <p style={styles.sleepingSafetyText}>
-          不安なときは、自分だけに入れられます。
-        </p>
+        <div style={styles.sleepingSafetyList}>
+          <p style={styles.sleepingSafetyItem}>
+            <span style={styles.sleepingSafetyLine}>送る写真は、よその人に</span>
+            <span style={styles.sleepingSafetyLine}>ねこだよりとして届きます。</span>
+          </p>
+          <p style={styles.sleepingSafetyItem}>
+            <span style={styles.sleepingSafetyLine}>人の顔・住所・名前が写る写真は</span>
+            <span style={styles.sleepingSafetyLine}>送らないでください。</span>
+          </p>
+          <p style={styles.sleepingSafetyItem}>
+            <span style={styles.sleepingSafetyLine}>とどいた写真は、SNSなどに</span>
+            <span style={styles.sleepingSafetyLine}>公開しないでください。</span>
+          </p>
+          <p style={styles.sleepingSafetyItem}>
+            <span style={styles.sleepingSafetyLine}>人の顔・住所・名前が写っていたら</span>
+            <span style={styles.sleepingSafetyLine}>報告してください。</span>
+          </p>
+        </div>
         <label style={styles.sleepingSafetyCheck}>
           <input
             type="checkbox"
@@ -3049,7 +3065,7 @@ function SleepingSafetySheet({
             onChange={(event) => onCheckedChange(event.currentTarget.checked)}
             style={styles.sleepingSafetyCheckbox}
           />
-          読みました
+          確認しました
         </label>
         <button
           type="button"
@@ -6741,15 +6757,26 @@ const styles = {
   },
   sleepingSafetyBody: {
     display: "grid",
-    gap: "12px",
+    gap: "16px",
     padding: "4px 2px 0",
   },
-  sleepingSafetyText: {
+  sleepingSafetyList: {
+    display: "grid",
+    gap: "10px",
+    margin: 0,
+    padding: 0,
+  },
+  sleepingSafetyItem: {
     margin: 0,
     color: "var(--ink-soft)",
     fontSize: "13px",
-    fontWeight: 500,
+    fontWeight: 400,
     lineHeight: 1.7,
+    wordBreak: "normal",
+    overflowWrap: "normal",
+  },
+  sleepingSafetyLine: {
+    display: "block",
   },
   sleepingSafetyCheck: {
     display: "inline-flex",
@@ -6757,8 +6784,8 @@ const styles = {
     gap: "9px",
     color: "var(--ink)",
     fontSize: "13px",
-    fontWeight: 500,
-    marginTop: "4px",
+    fontWeight: 400,
+    marginTop: "2px",
   },
   sleepingSafetyCheckbox: {
     width: "18px",
