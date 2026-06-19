@@ -200,6 +200,7 @@ export function HomeDeskModel({
     now,
   });
   const homePhoto = homeDay.photo;
+  const subNotifications = omoideMemory ? [omoideMemory] : [];
   const shouldHidePresence = true;
   useEffect(() => {
     trackDeskStateShown(deskState, eveningState.dateKey);
@@ -383,111 +384,119 @@ export function HomeDeskModel({
           <section
             data-testid="home-letter-tray"
             data-phase={homeDay.phase}
-            style={{
-              ...deskStyles.letterTray,
-              ...(homeDay.phase === "delivered" ? deskStyles.letterTrayDelivered : {}),
-            }}
-            className={
-              homeDay.phase === "delivered" && !prefersReducedMotion
-                ? "home-letter-tray-glow"
-                : undefined
-            }
-            aria-label="ねこだより"
+            style={deskStyles.notificationTray}
+            aria-label="ホームのお知らせ"
           >
-            {homeDay.phase === "delivered" ? (
-              <div
-                style={deskStyles.letterTrayDeliveredLayout}
-                onContextMenu={(event) => event.preventDefault()}
-              >
-                <button
-                  type="button"
-                  role="button"
-                  data-testid="desk-open-letter"
-                  aria-label="そっと ひらく"
-                  style={{
-                    ...deskStyles.selectionLockedStage,
-                    ...deskStyles.arrivedLetterButton,
-                    ...deskStyles.trayLetterButton,
-                  }}
-                  className={holdProgress ? "desk-letter-holding" : undefined}
-                  onPointerDown={startHold}
-                  onPointerUp={cancelHold}
-                  onPointerCancel={cancelHold}
-                  onPointerLeave={cancelHold}
+            <div
+              style={{
+                ...deskStyles.letterTray,
+                ...(homeDay.phase === "delivered" ? deskStyles.letterTrayDelivered : {}),
+              }}
+              className={
+                homeDay.phase === "delivered" && !prefersReducedMotion
+                  ? "home-letter-tray-glow"
+                  : undefined
+              }
+              aria-label="ねこだより"
+            >
+              {homeDay.phase === "delivered" ? (
+                <div
+                  style={deskStyles.letterTrayDeliveredLayout}
                   onContextMenu={(event) => event.preventDefault()}
                 >
-                  <span style={deskStyles.letterFlap} aria-hidden="true" />
-                  <span
-                    style={{ ...deskStyles.letterSeal, ...deskStyles.letterSealActive }}
-                    aria-hidden="true"
-                  />
-                  {deliveredPhoto && developPhotoMounted ? (
+                  <button
+                    type="button"
+                    role="button"
+                    data-testid="desk-open-letter"
+                    aria-label="そっと ひらく"
+                    style={{
+                      ...deskStyles.selectionLockedStage,
+                      ...deskStyles.arrivedLetterButton,
+                      ...deskStyles.trayLetterButton,
+                    }}
+                    className={holdProgress ? "desk-letter-holding" : undefined}
+                    onPointerDown={startHold}
+                    onPointerUp={cancelHold}
+                    onPointerCancel={cancelHold}
+                    onPointerLeave={cancelHold}
+                    onContextMenu={(event) => event.preventDefault()}
+                  >
+                    <span style={deskStyles.letterFlap} aria-hidden="true" />
                     <span
-                      data-develop-photo="true"
-                      style={{
-                        ...deskStyles.selectionLockedStage,
-                        ...deskStyles.developPhoto,
-                        ...(isRewindingHold ? deskStyles.developPhotoRewinding : {}),
-                      }}
+                      style={{ ...deskStyles.letterSeal, ...deskStyles.letterSealActive }}
                       aria-hidden="true"
-                    >
-                      <StoredPhotoImage
-                        src={getPhotoDetailSrc(deliveredPhoto)}
-                        alt=""
+                    />
+                    {deliveredPhoto && developPhotoMounted ? (
+                      <span
+                        data-develop-photo="true"
                         style={{
                           ...deskStyles.selectionLockedStage,
-                          ...deskStyles.developImage,
+                          ...deskStyles.developPhoto,
+                          ...(isRewindingHold ? deskStyles.developPhotoRewinding : {}),
                         }}
-                      />
-                    </span>
-                  ) : null}
-                </button>
-                <div style={deskStyles.letterTrayCopy}>
-                  <strong style={deskStyles.letterTrayTitle}>
-                    ねこだより、とどいた
-                  </strong>
-                  <span style={deskStyles.letterTraySub}>ひらく</span>
+                        aria-hidden="true"
+                      >
+                        <StoredPhotoImage
+                          src={getPhotoDetailSrc(deliveredPhoto)}
+                          alt=""
+                          style={{
+                            ...deskStyles.selectionLockedStage,
+                            ...deskStyles.developImage,
+                          }}
+                        />
+                      </span>
+                    ) : null}
+                  </button>
+                  <div style={deskStyles.letterTrayCopy}>
+                    <strong style={deskStyles.letterTrayTitle}>
+                      ねこだより、とどいた
+                    </strong>
+                    <span style={deskStyles.letterTraySub}>ひらく</span>
+                  </div>
                 </div>
-              </div>
-            ) : homeDay.phase === "opened" ? (
-              <a href="/collection" style={deskStyles.letterTrayLink}>
+              ) : homeDay.phase === "opened" ? (
+                <a href="/collection" style={deskStyles.letterTrayLink}>
+                  <HomeLetterTrayText phase={homeDay.phase} />
+                </a>
+              ) : (
                 <HomeLetterTrayText phase={homeDay.phase} />
-              </a>
-            ) : (
-              <HomeLetterTrayText phase={homeDay.phase} />
-            )}
+              )}
+            </div>
+            {subNotifications.length > 0 ? (
+              <div
+                data-testid="home-sub-notifications"
+                style={deskStyles.subNotificationScroller}
+                aria-label="そのほかのお知らせ"
+              >
+                {subNotifications.map((memory) => (
+                  <button
+                    key={memory.id}
+                    type="button"
+                    data-testid="omoide-arrival-letter"
+                    style={deskStyles.omoideArrival}
+                    onClick={() => {
+                      onOpenOmoideMemory?.(memory);
+                      window.location.assign("/cats#omoide");
+                    }}
+                    aria-label="思い出が、とどきました。うちのこで見る"
+                  >
+                    <span style={deskStyles.omoideLetterIcon} aria-hidden="true">
+                      思
+                    </span>
+                    <span style={deskStyles.omoideArrivalText}>
+                      <span style={deskStyles.omoideArrivalTitle}>
+                        思い出が、とどきました
+                      </span>
+                      <span style={deskStyles.omoideArrivalSub}>
+                        うちのこで みる
+                      </span>
+                    </span>
+                  </button>
+                ))}
+              </div>
+            ) : null}
           </section>
         </div>
-
-        {omoideMemory ? (
-          <AppCard
-            as="button"
-            type="button"
-            variant="section"
-            padding="md"
-            interactive
-            data-testid="omoide-arrival-letter"
-            style={deskStyles.omoideArrival}
-            onClick={() => {
-              setOpeningOmoideMemory(omoideMemory);
-              onOpenOmoideMemory?.(omoideMemory);
-            }}
-            aria-label="思い出が、とどきました"
-          >
-            <span style={deskStyles.omoideLetterIcon} aria-hidden="true">
-              思
-            </span>
-            <span style={deskStyles.omoideArrivalText}>
-              <span style={deskStyles.omoideArrivalKicker}>
-                今夜は、思い出が とどきました
-              </span>
-              <span style={deskStyles.omoideArrivalTitle}>過去から、ねがお。</span>
-              <span style={deskStyles.omoideArrivalSub}>
-                {omoideMemory.subtitle}
-              </span>
-            </span>
-          </AppCard>
-        ) : null}
 
       </div>
 
@@ -610,6 +619,9 @@ export function HomeDeskModel({
         }
         .home-letter-tray-glow {
           animation: homeLetterTrayGlow 2200ms var(--ease-gentle) infinite alternate;
+        }
+        [data-testid="home-sub-notifications"]::-webkit-scrollbar {
+          display: none;
         }
         @keyframes homeLetterTrayGlow {
           from {
@@ -1486,6 +1498,11 @@ const deskStyles = {
     opacity: 0.9,
     userSelect: "none",
   },
+  notificationTray: {
+    width: "100%",
+    display: "grid",
+    gap: "8px",
+  },
   letterTray: {
     width: "100%",
     boxSizing: "border-box",
@@ -1561,6 +1578,16 @@ const deskStyles = {
     width: "92px",
     height: "60px",
     flex: "0 0 auto",
+  },
+  subNotificationScroller: {
+    width: "100%",
+    display: "flex",
+    gap: "8px",
+    overflowX: "auto",
+    padding: "0 2px 2px",
+    scrollSnapType: "x proximity",
+    scrollbarWidth: "none",
+    WebkitOverflowScrolling: "touch",
   },
   homeCopyWrap: {
     display: "grid",
@@ -1864,18 +1891,30 @@ const deskStyles = {
     textAlign: "center",
   },
   omoideArrival: {
-    width: "min(100%, 330px)",
+    width: "min(88%, 316px)",
+    flex: "0 0 min(88%, 316px)",
+    boxSizing: "border-box",
     display: "grid",
-    gridTemplateColumns: "52px 1fr",
+    gridTemplateColumns: "44px 1fr",
     alignItems: "center",
-    gap: "12px",
-    marginTop: "4px",
+    gap: "10px",
+    minHeight: "58px",
+    padding: "10px 12px",
+    border: "none",
+    borderRadius: "var(--radius-xl)",
+    background:
+      "color-mix(in srgb, var(--paper-card) 72%, transparent)",
     color: "var(--ink)",
     textAlign: "left",
+    boxShadow:
+      "0 0 0 1px color-mix(in srgb, var(--line) 38%, transparent) inset, 0 8px 20px -18px color-mix(in srgb, var(--home-frame-glow, var(--paper-warm)) 30%, transparent)",
+    scrollSnapAlign: "start",
+    cursor: "pointer",
+    WebkitTapHighlightColor: "transparent",
   },
   omoideLetterIcon: {
-    width: "48px",
-    height: "34px",
+    width: "40px",
+    height: "30px",
     display: "inline-flex",
     alignItems: "center",
     justifyContent: "center",
@@ -1884,13 +1923,13 @@ const deskStyles = {
     background: "var(--paper-card)",
     color: "var(--seal)",
     fontFamily: "var(--font-display)",
-    fontSize: "15px",
+    fontSize: "13px",
     letterSpacing: "0",
     transform: "rotate(-2deg)",
   },
   omoideArrivalText: {
     display: "grid",
-    gap: "4px",
+    gap: "2px",
   },
   omoideArrivalKicker: {
     color: "var(--ink-soft)",
@@ -1901,13 +1940,16 @@ const deskStyles = {
   omoideArrivalTitle: {
     color: "var(--ink)",
     fontFamily: "var(--font-display)",
-    fontSize: "15px",
+    fontSize: "13px",
+    lineHeight: 1.45,
     letterSpacing: "var(--tracking-label)",
   },
   omoideArrivalSub: {
     color: "var(--ink-soft)",
-    fontSize: "12px",
-    lineHeight: 1.55,
+    fontFamily: "var(--font-display)",
+    fontSize: "11px",
+    lineHeight: 1.45,
+    letterSpacing: "var(--tracking-body)",
   },
   openedPair: {
     display: "grid",

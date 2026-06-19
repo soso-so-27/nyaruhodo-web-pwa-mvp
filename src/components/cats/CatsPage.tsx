@@ -1291,6 +1291,7 @@ function OmoideBunbako({
 
   return (
     <AppCard
+      id="omoide"
       as="section"
       variant="section"
       padding="md"

@@ -409,13 +409,8 @@ test.describe("home desk model", () => {
 
     await expect(page.getByTestId("omoide-arrival-letter")).toBeVisible();
     await page.getByTestId("omoide-arrival-letter").click();
-    await expect(page.getByTestId("omoide-memory-viewer")).toBeVisible();
-    await expect(page.getByText("1週間前の、きょう。")).toBeVisible();
-    await page.getByRole("button", { name: "そっと しまう" }).click();
-    await expect(page.getByTestId("omoide-memory-viewer")).toHaveCount(0);
-
-    await page.goto("/cats");
     await page.waitForLoadState("networkidle");
+    await expect(page).toHaveURL(/\/cats#omoide$/);
     const bunbako = page.getByTestId("omoide-bunbako");
     await expect(bunbako).toBeVisible();
     await expect(bunbako.getByText("とどいた思い出")).toBeVisible();
