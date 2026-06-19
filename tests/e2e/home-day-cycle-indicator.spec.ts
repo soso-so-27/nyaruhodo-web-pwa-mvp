@@ -145,7 +145,7 @@ test.describe("home desk state cycle", () => {
       "data-state",
       "1b",
     );
-    await expect(page.getByText("きょうは おくらなかった")).toBeVisible();
+    await expect(page.getByText("きょうは とどかない")).toBeVisible();
     await expect(page.getByText("また あした")).toBeVisible();
   });
 

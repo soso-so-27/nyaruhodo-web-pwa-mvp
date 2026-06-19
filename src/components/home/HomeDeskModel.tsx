@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import type { CSSProperties, PointerEvent } from "react";
+import type { CSSProperties, PointerEvent, ReactNode } from "react";
 
 import { type EveningHomeState } from "../../lib/home/eveningDelivery";
 import type {
@@ -87,6 +87,10 @@ const HOME_FRAME_TUNING = {
   statusScrim:
     "linear-gradient(180deg, color-mix(in srgb, var(--ink) 19%, transparent) 0%, color-mix(in srgb, var(--ink) 9%, transparent) 42%, transparent 100%)",
   daylightTransition: "1800ms",
+  wax: "#c2745a",
+  emptyFrameStart: "#fbf5ea",
+  emptyFrameEnd: "#f1e7d6",
+  trayPaper: "#fdf9f1",
 } as const;
 const HOME_SKY_BACKGROUND =
   "radial-gradient(circle at var(--home-sky-glow-x, 50%) var(--home-sky-glow-y, 12%), color-mix(in srgb, var(--home-sky-glow, var(--paper-warm)) 58%, transparent) 0%, transparent 54%), linear-gradient(180deg, var(--home-sky-top, var(--paper)) 0%, var(--home-sky-mid, var(--paper)) 44%, var(--home-sky-bottom, var(--paper-warm)) 100%)";
@@ -94,48 +98,48 @@ const HOME_DAYLIGHT_ANCHORS = [
   {
     minute: 4 * 60 + 45,
     skyTop: "#e8cbbd",
-    skyMid: "#f7e2d2",
-    skyBottom: "#dfcabb",
+    skyMid: "#f3e9da",
+    skyBottom: "#eadfce",
     mat: "#fff7ee",
     glow: "#d89b76",
   },
   {
     minute: 7 * 60,
-    skyTop: "#efdcc2",
-    skyMid: "#fff0dc",
-    skyBottom: "#e4d6c4",
+    skyTop: "#f3e9dc",
+    skyMid: "#f7efe3",
+    skyBottom: "#ebe1d0",
     mat: "#fff8ef",
     glow: "#dfad7d",
   },
   {
     minute: 12 * 60,
-    skyTop: "#d9dfd6",
-    skyMid: "#f4ead8",
-    skyBottom: "#ddd0bd",
+    skyTop: "#f4eee3",
+    skyMid: "#f3eadc",
+    skyBottom: "#ece2d2",
     mat: "#fff9f0",
     glow: "#bca77f",
   },
   {
     minute: 17 * 60,
-    skyTop: "#dcae85",
-    skyMid: "#efd1ae",
-    skyBottom: "#c89a89",
+    skyTop: "#ecd7c0",
+    skyMid: "#f0dfcc",
+    skyBottom: "#e2cbbd",
     mat: "#fff3e8",
     glow: "#c97954",
   },
   {
     minute: 19 * 60 + 40,
-    skyTop: "#ae9aa8",
-    skyMid: "#d1b8ae",
-    skyBottom: "#8f8994",
+    skyTop: "#d2beb9",
+    skyMid: "#e3d2c8",
+    skyBottom: "#b9a9a8",
     mat: "#f2e8df",
     glow: "#9f6265",
   },
   {
     minute: 22 * 60,
-    skyTop: "#828d9a",
-    skyMid: "#b9b7ae",
-    skyBottom: "#6f747f",
+    skyTop: "#9fa2a3",
+    skyMid: "#c7c1b5",
+    skyBottom: "#878786",
     mat: "#e8e0d5",
     glow: "#59657f",
   },
@@ -181,7 +185,6 @@ export function HomeDeskModel({
       ? eveningState.deliveredPhoto
       : null;
   const homeDay = getHomeDayPresentation({
-    catName,
     eveningState,
     targetPhoto,
     now,
@@ -354,12 +357,13 @@ export function HomeDeskModel({
                 onClick={onTakePhoto}
                 aria-label={`${catName}の きょう、まだ。ねがおを とる`}
               >
-                <AppIcon name="camera" size={32} />
+                <SleepingCatPlaceholder />
                 <span style={deskStyles.homeEmptyTitle}>
-                  {catName}の きょう、まだ
+                  きょうの ねがお、まだ
                 </span>
-                <span style={deskStyles.homeEmptySub}>
-                  {homeDay.emptyActionCopy}
+                <span style={deskStyles.homeEmptyAction}>
+                  <AppIcon name="camera" size={16} />
+                  ねがおを とる
                 </span>
               </button>
             )}
@@ -431,23 +435,15 @@ export function HomeDeskModel({
                   <strong style={deskStyles.letterTrayTitle}>
                     ねこだより、とどいた
                   </strong>
-                  <span style={deskStyles.letterTraySub}>タップで ひらく</span>
+                  <span style={deskStyles.letterTraySub}>ひらく</span>
                 </div>
               </div>
             ) : homeDay.phase === "opened" ? (
               <a href="/collection" style={deskStyles.letterTrayLink}>
-                <strong style={deskStyles.letterTrayTitle}>{homeDay.trayTitle}</strong>
-                {homeDay.traySub ? (
-                  <span style={deskStyles.letterTraySub}>{homeDay.traySub}</span>
-                ) : null}
+                <HomeLetterTrayText phase={homeDay.phase} />
               </a>
             ) : (
-              <>
-                <strong style={deskStyles.letterTrayTitle}>{homeDay.trayTitle}</strong>
-                {homeDay.traySub ? (
-                  <span style={deskStyles.letterTraySub}>{homeDay.traySub}</span>
-                ) : null}
-              </>
+              <HomeLetterTrayText phase={homeDay.phase} />
             )}
           </section>
         </div>
@@ -910,6 +906,10 @@ function useDaylight(now: number) {
       "--home-sky-reduced-motion-duration":
         HOME_FRAME_TUNING.skyReducedMotionDuration,
       "--home-status-scrim": HOME_FRAME_TUNING.statusScrim,
+      "--home-wax": HOME_FRAME_TUNING.wax,
+      "--home-empty-frame-start": HOME_FRAME_TUNING.emptyFrameStart,
+      "--home-empty-frame-end": HOME_FRAME_TUNING.emptyFrameEnd,
+      "--home-tray-paper": HOME_FRAME_TUNING.trayPaper,
       "--home-sky-glow-x": "50%",
       "--home-sky-glow-y": "12%",
       "--home-daylight-transition": HOME_FRAME_TUNING.daylightTransition,
@@ -932,6 +932,10 @@ function useHomeViewportBackground(daylightStyle: HomeDaylightStyle) {
       "--home-frame-light",
       "--home-frame-glow",
       "--home-status-scrim",
+      "--home-wax",
+      "--home-empty-frame-start",
+      "--home-empty-frame-end",
+      "--home-tray-paper",
       "--home-sky-glow-x",
       "--home-sky-glow-y",
     ] as const;
@@ -951,8 +955,10 @@ function useHomeViewportBackground(daylightStyle: HomeDaylightStyle) {
 
     root.style.background = HOME_SKY_BACKGROUND;
     body.style.background = HOME_SKY_BACKGROUND;
-    root.style.minHeight = "calc(100% + env(safe-area-inset-top))";
-    body.style.minHeight = "calc(100dvh + env(safe-area-inset-top))";
+    root.style.minHeight =
+      "calc(100% + env(safe-area-inset-top) + env(safe-area-inset-bottom))";
+    body.style.minHeight =
+      "calc(100dvh + env(safe-area-inset-top) + env(safe-area-inset-bottom))";
 
     const themeColor = daylightStyle["--home-sky-top"];
     if (themeMeta && typeof themeColor === "string") {
@@ -987,21 +993,16 @@ function getDeskState(eveningState: EveningHomeState): DeskState {
 }
 
 function getHomeDayPresentation({
-  catName,
   eveningState,
   targetPhoto,
   now,
 }: {
-  catName: string;
   eveningState: EveningHomeState;
   targetPhoto: OwnSleepingPhoto | null;
   now: number;
 }): {
   phase: HomeTodayPhase;
   photo: OwnSleepingPhoto | null;
-  emptyActionCopy: string;
-  trayTitle: string;
-  traySub?: string;
 } {
   const afterDelivery = getJstMinuteOfDay(now) >= 20 * 60;
 
@@ -1009,9 +1010,6 @@ function getHomeDayPresentation({
     return {
       phase: "delivered",
       photo: targetPhoto,
-      emptyActionCopy: "タップして とる",
-      trayTitle: "ねこだより、とどいた",
-      traySub: "タップで ひらく",
     };
   }
 
@@ -1019,8 +1017,6 @@ function getHomeDayPresentation({
     return {
       phase: "opened",
       photo: targetPhoto,
-      emptyActionCopy: "タップして とる",
-      trayTitle: "きょうの ねこだより →",
     };
   }
 
@@ -1029,20 +1025,12 @@ function getHomeDayPresentation({
       return {
         phase: "late-sent",
         photo: targetPhoto,
-        emptyActionCopy: "まだ とれるよ",
-        trayTitle: "きょうは おくらなかった",
-        traySub: "また あした",
       };
     }
 
     return {
       phase: "sent-before",
       photo: targetPhoto,
-      emptyActionCopy: "タップして とる",
-      trayTitle: "おくった",
-      traySub: isEveningSoonWindow(now)
-        ? "もうすぐ、とどく"
-        : "よる8時に とどく",
     };
   }
 
@@ -1050,23 +1038,98 @@ function getHomeDayPresentation({
     return {
       phase: "empty-after",
       photo: null,
-      emptyActionCopy: "まだ とれるよ",
-      trayTitle: "きょうは おくらなかった",
-      traySub: "また あした",
     };
   }
 
   return {
     phase: "empty-before",
     photo: null,
-    emptyActionCopy: "タップして とる",
-    trayTitle: "とると、よる8時に とどく",
   };
 }
 
-function isEveningSoonWindow(now: number) {
-  const minute = getJstMinuteOfDay(now);
-  return minute >= 17 * 60 && minute < 20 * 60;
+function HomeLetterTrayText({ phase }: { phase: HomeTodayPhase }) {
+  const keyword = (children: ReactNode) => (
+    <span style={deskStyles.letterTrayKeyword}>{children}</span>
+  );
+
+  if (phase === "opened") {
+    return (
+      <strong style={deskStyles.letterTrayTitle}>
+        きょうの {keyword("ねこだより")}
+      </strong>
+    );
+  }
+
+  if (phase === "late-sent" || phase === "empty-after") {
+    return (
+      <>
+        <strong style={deskStyles.letterTrayTitle}>きょうは とどかない</strong>
+        <span style={deskStyles.letterTraySub}>また あした</span>
+      </>
+    );
+  }
+
+  if (phase === "sent-before") {
+    return (
+      <>
+        <strong style={deskStyles.letterTrayTitle}>おくった</strong>
+        <span style={deskStyles.letterTraySub}>
+          よる8時に {keyword("とどく")}
+        </span>
+      </>
+    );
+  }
+
+  return (
+    <strong style={deskStyles.letterTrayTitle}>
+      とると、よる8時に {keyword("ねこだより")}が {keyword("とどく")}
+    </strong>
+  );
+}
+
+function SleepingCatPlaceholder() {
+  return (
+    <svg
+      viewBox="0 0 200 150"
+      xmlns="http://www.w3.org/2000/svg"
+      aria-hidden="true"
+      style={deskStyles.sleepingCatPlaceholder}
+    >
+      <g fill="#cdb389">
+        <ellipse cx="105" cy="95" rx="72" ry="46" />
+        <circle cx="52" cy="103" r="30" />
+        <path d="M34 84 l-3 -20 20 12 z" />
+        <path d="M64 80 l7 -20 15 17 z" />
+      </g>
+      <path
+        d="M168 86 q38 18 16 54 q-12 18 -34 14"
+        fill="none"
+        stroke="#cdb389"
+        strokeWidth="19"
+        strokeLinecap="round"
+      />
+      <g
+        fill="none"
+        stroke="#9a7f54"
+        strokeWidth="2.6"
+        strokeLinecap="round"
+        opacity=".75"
+      >
+        <path d="M38 104 q10 6 22 1" />
+        <path d="M40 120 q15 6 31 1" />
+      </g>
+      <g
+        fill="none"
+        stroke="#bda078"
+        strokeWidth="3"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      >
+        <path d="M150 40 h9 l-9 11 h9" />
+        <path d="M168 24 h7 l-7 8 h7" />
+      </g>
+    </svg>
+  );
 }
 
 function getDaylightColors(now: number) {
@@ -1339,12 +1402,14 @@ const deskStyles = {
     alignContent: "center",
     gap: "12px",
     padding: "24px",
-    border: "1px dashed color-mix(in srgb, var(--ink-soft) 54%, transparent)",
+    border: "none",
+    outline: "1px solid rgba(160, 130, 90, 0.12)",
     borderRadius: "var(--home-frame-radius, var(--radius-2xl))",
-    background: "color-mix(in srgb, var(--home-frame-light, var(--paper)) 58%, transparent)",
+    background:
+      "radial-gradient(125% 95% at 50% 32%, var(--home-empty-frame-start, #fbf5ea), var(--home-empty-frame-end, #f1e7d6))",
     color: "var(--ink-soft)",
     boxShadow:
-      "0 22px 64px color-mix(in srgb, var(--home-frame-glow, var(--paper-warm)) 62%, transparent)",
+      "inset 0 2px 18px rgba(150, 110, 70, 0.10), 0 18px 48px -26px color-mix(in srgb, var(--home-frame-glow, var(--paper-warm)) 48%, transparent)",
     cursor: "pointer",
     WebkitTapHighlightColor: "transparent",
     transition:
@@ -1356,11 +1421,22 @@ const deskStyles = {
     fontSize: "18px",
     letterSpacing: "var(--tracking-label)",
   },
-  homeEmptySub: {
-    color: "var(--ink-soft)",
-    fontFamily: "var(--font-display)",
+  homeEmptyAction: {
+    display: "inline-flex",
+    alignItems: "center",
+    gap: "6px",
+    color: "var(--home-wax, #c2745a)",
+    fontFamily: "var(--font-ui)",
     fontSize: "13px",
+    fontWeight: 500,
     letterSpacing: "var(--tracking-body)",
+  },
+  sleepingCatPlaceholder: {
+    width: "min(34vw, 128px)",
+    maxWidth: "130px",
+    minWidth: "116px",
+    color: "var(--ink-faint)",
+    opacity: 0.86,
   },
   letterTray: {
     width: "100%",
@@ -1371,7 +1447,7 @@ const deskStyles = {
     minHeight: "92px",
     padding: "16px 18px",
     borderRadius: "17px",
-    background: "color-mix(in srgb, var(--paper-card) 88%, var(--home-frame-light, var(--paper)) 12%)",
+    background: "var(--home-tray-paper, #fdf9f1)",
     color: "var(--ink-soft)",
     boxShadow:
       "0 1px 0 color-mix(in srgb, var(--line) 56%, transparent) inset, 0 14px 34px -18px color-mix(in srgb, var(--home-frame-glow, var(--paper-warm)) 68%, transparent)",
@@ -1407,9 +1483,9 @@ const deskStyles = {
   },
   letterTrayTitle: {
     margin: 0,
-    color: "var(--ink)",
+    color: "var(--ink-soft)",
     fontFamily: "var(--font-display)",
-    fontSize: "18px",
+    fontSize: "13px",
     fontWeight: 400,
     letterSpacing: "var(--tracking-label)",
     textAlign: "center",
@@ -1417,9 +1493,12 @@ const deskStyles = {
   letterTraySub: {
     color: "var(--ink-soft)",
     fontFamily: "var(--font-display)",
-    fontSize: "13px",
+    fontSize: "12px",
     letterSpacing: "var(--tracking-body)",
     textAlign: "center",
+  },
+  letterTrayKeyword: {
+    color: "var(--ink)",
   },
   trayLetterButton: {
     width: "92px",

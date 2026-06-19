@@ -142,7 +142,7 @@ test.describe("home desk model", () => {
     );
   });
 
-  test("shows the evening line from 17:00 until the 20:00 delivery", async ({
+  test("keeps the sent-before letter tray copy until the 20:00 delivery", async ({
     page,
   }) => {
     await seedDeskState(page, "2", { now: Date.parse("2026-06-10T07:59:00.000Z") });
@@ -151,13 +151,15 @@ test.describe("home desk model", () => {
     await page.waitForLoadState("networkidle");
 
     await expect(page.getByText("もうすぐ、とどく")).toHaveCount(0);
+    await expect(page.getByText("よる8時に とどく")).toBeVisible();
 
     await page.evaluate(() => {
       (window as typeof window & { __testNow?: number }).__testNow = Date.parse(
         "2026-06-10T08:00:00.000Z",
       );
     });
-    await expect(page.getByText("もうすぐ、とどく")).toBeVisible();
+    await expect(page.getByText("もうすぐ、とどく")).toHaveCount(0);
+    await expect(page.getByText("よる8時に とどく")).toBeVisible();
 
     await page.evaluate(() => {
       (window as typeof window & { __testNow?: number }).__testNow = Date.parse(
@@ -170,7 +172,7 @@ test.describe("home desk model", () => {
     );
   });
 
-  test("shows the evening line in habit mode without the waiting letter hint", async ({
+  test("shows the sent-before line in habit mode without the waiting letter hint", async ({
     page,
   }) => {
     await seedDeskState(page, "2", {
@@ -181,7 +183,8 @@ test.describe("home desk model", () => {
     await page.goto("/home");
     await page.waitForLoadState("networkidle");
 
-    await expect(page.getByText("もうすぐ、とどく")).toBeVisible();
+    await expect(page.getByText("もうすぐ、とどく")).toHaveCount(0);
+    await expect(page.getByText("よる8時に とどく")).toBeVisible();
     await expect(page.getByTestId("desk-letter")).toHaveCount(0);
     await expect(page.getByTestId("desk-letter-hint")).toHaveCount(0);
   });
@@ -203,13 +206,15 @@ test.describe("home desk model", () => {
     await page.waitForLoadState("networkidle");
 
     await expect(page.getByText("きょうも すやすや")).toHaveCount(0);
-    await expect(page.getByText("むぎの きょう、まだ")).toBeVisible();
-    await expect(page.getByText("タップして とる")).toBeVisible();
-    await expect(page.getByText("とると、よる8時に とどく")).toBeVisible();
+    await expect(page.getByText("きょうの ねがお、まだ")).toBeVisible();
+    await expect(page.getByText("ねがおを とる")).toBeVisible();
+    await expect(
+      page.getByText("とると、よる8時に ねこだよりが とどく"),
+    ).toBeVisible();
     await expect(page.getByTestId("desk-letter")).toHaveCount(0);
     await expect(page.getByTestId("desk-empty-frame")).toHaveCSS(
       "border-style",
-      "dashed",
+      "none",
     );
     await expect(page.getByTestId("desk-empty-frame")).toHaveCSS("cursor", "pointer");
   });
@@ -227,7 +232,7 @@ test.describe("home desk model", () => {
     );
     await expect(page.getByTestId("desk-empty-frame")).toBeVisible();
     await expect(page.getByTestId("desk-letter")).toHaveCount(0);
-    await expect(page.getByText("きょうは おくらなかった")).toBeVisible();
+    await expect(page.getByText("きょうは とどかない")).toBeVisible();
     await expect(page.getByText("また あした")).toBeVisible();
   });
 
@@ -359,7 +364,7 @@ test.describe("home desk model", () => {
       "4",
     );
     await expect(page.getByTestId("desk-home-frame")).toBeVisible();
-    await expect(page.getByText("きょうの ねこだより →")).toBeVisible();
+    await expect(page.getByText("きょうの ねこだより")).toBeVisible();
     await expect(page.getByRole("button", { name: "とっておく" })).toHaveCount(0);
     await expect(
       page.getByRole("button", { name: "どこかのこの写真を大きく見る" }),
