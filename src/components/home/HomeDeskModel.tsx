@@ -1090,46 +1090,13 @@ function HomeLetterTrayText({ phase }: { phase: HomeTodayPhase }) {
 
 function SleepingCatPlaceholder() {
   return (
-    <svg
-      viewBox="0 0 200 150"
-      xmlns="http://www.w3.org/2000/svg"
+    <img
+      src="/illustrations/sleeping-cat-empty.png"
+      alt=""
       aria-hidden="true"
       style={deskStyles.sleepingCatPlaceholder}
-    >
-      <g fill="#cdb389">
-        <ellipse cx="105" cy="95" rx="72" ry="46" />
-        <circle cx="52" cy="103" r="30" />
-        <path d="M34 84 l-3 -20 20 12 z" />
-        <path d="M64 80 l7 -20 15 17 z" />
-      </g>
-      <path
-        d="M168 86 q38 18 16 54 q-12 18 -34 14"
-        fill="none"
-        stroke="#cdb389"
-        strokeWidth="19"
-        strokeLinecap="round"
-      />
-      <g
-        fill="none"
-        stroke="#9a7f54"
-        strokeWidth="2.6"
-        strokeLinecap="round"
-        opacity=".75"
-      >
-        <path d="M38 104 q10 6 22 1" />
-        <path d="M40 120 q15 6 31 1" />
-      </g>
-      <g
-        fill="none"
-        stroke="#bda078"
-        strokeWidth="3"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      >
-        <path d="M150 40 h9 l-9 11 h9" />
-        <path d="M168 24 h7 l-7 8 h7" />
-      </g>
-    </svg>
+      draggable={false}
+    />
   );
 }
 
@@ -1449,8 +1416,10 @@ const deskStyles = {
     width: "min(34vw, 128px)",
     maxWidth: "130px",
     minWidth: "116px",
-    color: "var(--ink-faint)",
-    opacity: 0.86,
+    height: "auto",
+    display: "block",
+    opacity: 0.9,
+    userSelect: "none",
   },
   letterTray: {
     width: "100%",
