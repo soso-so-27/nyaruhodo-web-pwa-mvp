@@ -455,10 +455,22 @@ export function HomeDeskModel({
                     ) : null}
                   </button>
                   <div style={deskStyles.letterTrayCopy}>
-                    <strong style={deskStyles.letterTrayTitle}>
+                    <strong
+                      style={{
+                        ...deskStyles.letterTrayTitle,
+                        ...deskStyles.letterTrayTitlePrimary,
+                      }}
+                    >
                       ねこだより、とどいた
                     </strong>
-                    <span style={deskStyles.letterTraySub}>ひらく</span>
+                    <span
+                      style={{
+                        ...deskStyles.letterTraySub,
+                        ...deskStyles.letterTraySubPrimary,
+                      }}
+                    >
+                      ひらく
+                    </span>
                   </div>
                 </div>
               ) : homeDay.phase === "opened" ? (
@@ -466,13 +478,19 @@ export function HomeDeskModel({
                   href="/collection"
                   style={{
                     ...deskStyles.notificationRow,
+                    ...deskStyles.notificationRowText,
                     ...deskStyles.notificationRowLink,
                   }}
                 >
                   <HomeLetterTrayText phase={homeDay.phase} />
                 </a>
               ) : (
-                <div style={deskStyles.notificationRow}>
+                <div
+                  style={{
+                    ...deskStyles.notificationRow,
+                    ...deskStyles.notificationRowText,
+                  }}
+                >
                   <HomeLetterTrayText phase={homeDay.phase} />
                 </div>
               )}
@@ -481,7 +499,10 @@ export function HomeDeskModel({
                   key={memory.id}
                   type="button"
                   data-testid="omoide-arrival-letter"
-                  style={deskStyles.notificationRow}
+                  style={{
+                    ...deskStyles.notificationRow,
+                    ...deskStyles.notificationRowInteractive,
+                  }}
                   onClick={() => {
                     onOpenOmoideMemory?.(memory);
                     window.location.assign("/cats#omoide");
@@ -1132,7 +1153,7 @@ function HomeLetterTrayText({ phase }: { phase: HomeTodayPhase }) {
   if (phase === "opened") {
     return (
       <strong style={deskStyles.letterTrayTitle}>
-        きょうの {keyword("ねこだより")}
+        きょうの {keyword("ねこだより")} →
       </strong>
     );
   }
@@ -1557,14 +1578,31 @@ const deskStyles = {
     textAlign: "left",
     WebkitTapHighlightColor: "transparent",
   },
+  notificationRowText: {
+    gridTemplateColumns: "1fr",
+    justifyItems: "center",
+    alignContent: "center",
+    gap: "2px",
+    minHeight: "46px",
+    padding: "4px 8px",
+    textAlign: "center",
+  },
   notificationRowPrimary: {
-    gridTemplateColumns: "58px minmax(0, 1fr)",
-    minHeight: "48px",
+    gridTemplateColumns: "72px minmax(0, 1fr)",
+    minHeight: "54px",
+    gap: "12px",
+    padding: "4px 8px",
+    background: "color-mix(in srgb, var(--seal-soft) 10%, transparent)",
+    boxShadow:
+      "0 0 0 1px color-mix(in srgb, var(--seal-soft) 24%, transparent) inset",
   },
   notificationRowLink: {
     gridTemplateColumns: "1fr",
     justifyItems: "center",
     textAlign: "center",
+  },
+  notificationRowInteractive: {
+    cursor: "pointer",
   },
   notificationIcon: {
     width: "28px",
@@ -1604,7 +1642,7 @@ const deskStyles = {
   },
   notificationAction: {
     flex: "0 0 auto",
-    color: "var(--ink-soft)",
+    color: "var(--ink)",
     fontSize: "11px",
     fontWeight: 400,
     lineHeight: 1.45,
@@ -1620,7 +1658,7 @@ const deskStyles = {
   },
   letterTrayCopy: {
     display: "grid",
-    gap: "4px",
+    gap: "2px",
     justifyItems: "start",
   },
   letterTrayLink: {
@@ -1642,6 +1680,14 @@ const deskStyles = {
     textAlign: "center",
     maxWidth: "20em",
   },
+  letterTrayTitlePrimary: {
+    color: "var(--ink)",
+    fontSize: "14px",
+  },
+  letterTraySubPrimary: {
+    color: "var(--ink)",
+    fontSize: "12px",
+  },
   letterTraySub: {
     color: "var(--ink-soft)",
     fontFamily: "var(--font-display)",
@@ -1657,9 +1703,13 @@ const deskStyles = {
     color: "var(--ink)",
   },
   trayLetterButton: {
-    width: "54px",
-    height: "36px",
+    width: "68px",
+    height: "44px",
     flex: "0 0 auto",
+    borderRadius: "var(--radius-md)",
+    transform: "rotate(-1deg)",
+    boxShadow:
+      "0 0 0 1px color-mix(in srgb, var(--seal-soft) 28%, transparent) inset, 0 10px 20px -16px color-mix(in srgb, var(--seal) 42%, transparent)",
   },
   homeCopyWrap: {
     display: "grid",
