@@ -208,9 +208,8 @@ test.describe("home desk model", () => {
     await expect(page.getByText("きょうも すやすや")).toHaveCount(0);
     await expect(page.getByText("きょうの ねがお、まだ")).toBeVisible();
     await expect(page.getByText("ねがおを とる")).toBeVisible();
-    await expect(
-      page.getByText("とると、よる8時に ねこだよりが とどく"),
-    ).toBeVisible();
+    await expect(page.getByText("とると、よる8時に")).toBeVisible();
+    await expect(page.getByText("ねこだよりが とどく")).toBeVisible();
     await expect(page.getByTestId("desk-letter")).toHaveCount(0);
     await expect(page.getByTestId("desk-empty-frame")).toHaveCSS(
       "border-style",

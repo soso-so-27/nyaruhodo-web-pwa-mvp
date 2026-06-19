@@ -74,10 +74,11 @@ const HOME_FRAME_TUNING = {
   pagePaddingX: "12px",
   pagePaddingTop: "8px",
   stageMaxWidth: "460px",
-  stageGap: "12px",
+  stageGap: "10px",
   heroGap: "10px",
   frameAspectRatio: "9 / 14",
-  emptyFrameAspectRatio: "2 / 3",
+  emptyFrameAspectRatio: "9 / 14",
+  emptyFrameMaxHeight: "660px",
   matWidth: "0px",
   outerRadius: "24px",
   innerRadius: "24px",
@@ -89,10 +90,17 @@ const HOME_FRAME_TUNING = {
   statusScrim:
     "linear-gradient(180deg, color-mix(in srgb, var(--ink) 19%, transparent) 0%, color-mix(in srgb, var(--ink) 9%, transparent) 42%, transparent 100%)",
   daylightTransition: "1800ms",
-  wax: "#c2745a",
+  wax: "#b9634f",
   emptyFrameStart: "#fbf5ea",
   emptyFrameEnd: "#f1e7d6",
   trayPaper: "#fdf9f1",
+  trayRadius: "18px",
+  trayMinHeight: "88px",
+  trayToNavGap: "32px",
+  emptyIllustrationWidth: "min(36vw, 124px)",
+  emptyIllustrationMinWidth: "112px",
+  emptyTitleSize: "20px",
+  emptyActionSize: "14px",
 } as const;
 const HOME_SKY_BACKGROUND =
   "radial-gradient(circle at var(--home-sky-glow-x, 50%) var(--home-sky-glow-y, 12%), color-mix(in srgb, var(--home-sky-glow, var(--paper-warm)) 58%, transparent) 0%, transparent 54%), linear-gradient(180deg, var(--home-sky-top, var(--paper)) 0%, var(--home-sky-mid, var(--paper)) 44%, var(--home-sky-bottom, var(--paper-warm)) 100%)";
@@ -123,19 +131,19 @@ const HOME_DAYLIGHT_ANCHORS = [
   },
   {
     minute: 17 * 60,
-    skyTop: "#ecd7c0",
-    skyMid: "#f0dfcc",
-    skyBottom: "#e2cbbd",
+    skyTop: "#ead8c7",
+    skyMid: "#eddfd0",
+    skyBottom: "#d9c8bc",
     mat: "#fff3e8",
-    glow: "#c97954",
+    glow: "#bd7b61",
   },
   {
     minute: 19 * 60 + 40,
-    skyTop: "#d2beb9",
-    skyMid: "#e3d2c8",
-    skyBottom: "#b9a9a8",
+    skyTop: "#d3c0ba",
+    skyMid: "#dfd0c8",
+    skyBottom: "#c5b3ad",
     mat: "#f2e8df",
-    glow: "#9f6265",
+    glow: "#a66d69",
   },
   {
     minute: 22 * 60,
@@ -903,6 +911,7 @@ function useDaylight(now: number) {
       "--home-frame-mat-width": HOME_FRAME_TUNING.matWidth,
       "--home-frame-aspect-ratio": HOME_FRAME_TUNING.frameAspectRatio,
       "--home-empty-frame-aspect-ratio": HOME_FRAME_TUNING.emptyFrameAspectRatio,
+      "--home-empty-frame-max-height": HOME_FRAME_TUNING.emptyFrameMaxHeight,
       "--home-frame-radius": HOME_FRAME_TUNING.outerRadius,
       "--home-frame-inner-radius": HOME_FRAME_TUNING.innerRadius,
       "--home-frame-shadow": HOME_FRAME_TUNING.frameShadow,
@@ -915,6 +924,14 @@ function useDaylight(now: number) {
       "--home-empty-frame-start": HOME_FRAME_TUNING.emptyFrameStart,
       "--home-empty-frame-end": HOME_FRAME_TUNING.emptyFrameEnd,
       "--home-tray-paper": HOME_FRAME_TUNING.trayPaper,
+      "--home-tray-radius": HOME_FRAME_TUNING.trayRadius,
+      "--home-tray-min-height": HOME_FRAME_TUNING.trayMinHeight,
+      "--home-tray-to-nav-gap": HOME_FRAME_TUNING.trayToNavGap,
+      "--home-empty-illustration-width": HOME_FRAME_TUNING.emptyIllustrationWidth,
+      "--home-empty-illustration-min-width":
+        HOME_FRAME_TUNING.emptyIllustrationMinWidth,
+      "--home-empty-title-size": HOME_FRAME_TUNING.emptyTitleSize,
+      "--home-empty-action-size": HOME_FRAME_TUNING.emptyActionSize,
       "--home-sky-glow-x": "50%",
       "--home-sky-glow-y": "12%",
       "--home-daylight-transition": HOME_FRAME_TUNING.daylightTransition,
@@ -941,6 +958,15 @@ function useHomeViewportBackground(daylightStyle: HomeDaylightStyle) {
       "--home-empty-frame-start",
       "--home-empty-frame-end",
       "--home-tray-paper",
+      "--home-tray-radius",
+      "--home-tray-min-height",
+      "--home-tray-to-nav-gap",
+      "--home-empty-frame-aspect-ratio",
+      "--home-empty-frame-max-height",
+      "--home-empty-illustration-width",
+      "--home-empty-illustration-min-width",
+      "--home-empty-title-size",
+      "--home-empty-action-size",
       "--home-sky-glow-x",
       "--home-sky-glow-y",
     ] as const;
@@ -1112,7 +1138,10 @@ function HomeLetterTrayText({ phase }: { phase: HomeTodayPhase }) {
 
   return (
     <strong style={deskStyles.letterTrayTitle}>
-      とると、よる8時に {keyword("ねこだより")}が {keyword("とどく")}
+      <span style={deskStyles.letterTrayLine}>とると、よる8時に</span>
+      <span style={deskStyles.letterTrayLine}>
+        {keyword("ねこだより")}が {keyword("とどく")}
+      </span>
     </strong>
   );
 }
@@ -1409,13 +1438,14 @@ const deskStyles = {
   },
   homeEmptyFrame: {
     width: "100%",
-    aspectRatio: "var(--home-empty-frame-aspect-ratio, 2 / 3)",
+    aspectRatio: "var(--home-empty-frame-aspect-ratio, 9 / 14)",
+    maxHeight: "var(--home-empty-frame-max-height, 660px)",
     boxSizing: "border-box",
     display: "grid",
     placeItems: "center",
     alignContent: "center",
-    gap: "12px",
-    padding: "24px 24px calc(24px + 24%)",
+    gap: "14px",
+    padding: "28px 24px 40px",
     border: "none",
     outline: "1px solid rgba(160, 130, 90, 0.12)",
     borderRadius: "var(--home-frame-radius, var(--radius-2xl))",
@@ -1432,23 +1462,25 @@ const deskStyles = {
   homeEmptyTitle: {
     color: "var(--ink)",
     fontFamily: "var(--font-display)",
-    fontSize: "18px",
+    fontSize: "var(--home-empty-title-size, 20px)",
     letterSpacing: "var(--tracking-label)",
   },
   homeEmptyAction: {
     display: "inline-flex",
     alignItems: "center",
     gap: "6px",
+    minHeight: "40px",
+    padding: "0 4px",
     color: "var(--home-wax, #c2745a)",
     fontFamily: "var(--font-ui)",
-    fontSize: "13px",
+    fontSize: "var(--home-empty-action-size, 14px)",
     fontWeight: 500,
     letterSpacing: "var(--tracking-body)",
   },
   sleepingCatPlaceholder: {
-    width: "min(40vw, 156px)",
-    maxWidth: "160px",
-    minWidth: "132px",
+    width: "var(--home-empty-illustration-width, min(36vw, 124px))",
+    maxWidth: "124px",
+    minWidth: "var(--home-empty-illustration-min-width, 112px)",
     height: "auto",
     display: "block",
     opacity: 0.9,
@@ -1459,16 +1491,17 @@ const deskStyles = {
     boxSizing: "border-box",
     display: "grid",
     justifyItems: "center",
-    gap: "6px",
-    minHeight: "76px",
-    padding: "12px 16px",
-    borderRadius: "17px",
+    alignItems: "center",
+    gap: "4px",
+    minHeight: "var(--home-tray-min-height, 88px)",
+    padding: "10px 18px",
+    borderRadius: "var(--home-tray-radius, 18px)",
     background:
-      "color-mix(in srgb, var(--home-tray-paper, #fdf9f1) 72%, transparent)",
+      "color-mix(in srgb, var(--home-tray-paper, #fdf9f1) 62%, transparent)",
     color: "var(--ink-soft)",
     boxShadow:
-      "0 1px 0 color-mix(in srgb, var(--line) 34%, transparent) inset, 0 12px 28px -24px color-mix(in srgb, var(--home-frame-glow, var(--paper-warm)) 48%, transparent)",
-    backdropFilter: "blur(8px)",
+      "0 1px 0 color-mix(in srgb, var(--line) 24%, transparent) inset, 0 10px 22px -20px color-mix(in srgb, var(--home-frame-glow, var(--paper-warm)) 38%, transparent)",
+    backdropFilter: "blur(6px)",
     transition:
       "background var(--home-daylight-transition, 1800ms) var(--ease-gentle), box-shadow var(--home-daylight-transition, 1800ms) var(--ease-gentle)",
   },
@@ -1505,15 +1538,21 @@ const deskStyles = {
     fontFamily: "var(--font-display)",
     fontSize: "13px",
     fontWeight: 400,
+    lineHeight: 1.55,
     letterSpacing: "var(--tracking-label)",
     textAlign: "center",
+    maxWidth: "20em",
   },
   letterTraySub: {
     color: "var(--ink-soft)",
     fontFamily: "var(--font-display)",
     fontSize: "12px",
+    lineHeight: 1.55,
     letterSpacing: "var(--tracking-body)",
     textAlign: "center",
+  },
+  letterTrayLine: {
+    display: "block",
   },
   letterTrayKeyword: {
     color: "var(--ink)",
