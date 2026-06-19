@@ -946,12 +946,17 @@ function useHomeViewportBackground(daylightStyle: HomeDaylightStyle) {
     ] as const;
     const previousRootBackground = root.style.background;
     const previousBodyBackground = body.style.background;
+    const previousRootBackgroundColor = root.style.backgroundColor;
+    const previousBodyBackgroundColor = body.style.backgroundColor;
     const previousRootHeight = root.style.height;
     const previousBodyHeight = body.style.height;
     const previousRootMinHeight = root.style.minHeight;
     const previousBodyMinHeight = body.style.minHeight;
     const previousRootOverflowY = root.style.overflowY;
     const previousBodyOverflowY = body.style.overflowY;
+    const previousBodyPosition = body.style.position;
+    const previousBodyInset = body.style.inset;
+    const previousBodyWidth = body.style.width;
     const previousThemeColor = themeMeta?.getAttribute("content") ?? null;
 
     propertyNames.forEach((name) => {
@@ -964,12 +969,17 @@ function useHomeViewportBackground(daylightStyle: HomeDaylightStyle) {
 
     root.style.background = HOME_SKY_BACKGROUND;
     body.style.background = HOME_SKY_BACKGROUND;
+    root.style.backgroundColor = daylightStyle["--home-sky-bottom"] ?? "";
+    body.style.backgroundColor = daylightStyle["--home-sky-bottom"] ?? "";
     root.style.height = "100dvh";
     body.style.height = "100dvh";
     root.style.minHeight = "100dvh";
     body.style.minHeight = "100dvh";
     root.style.overflowY = "hidden";
     body.style.overflowY = "hidden";
+    body.style.position = "fixed";
+    body.style.inset = "0";
+    body.style.width = "100%";
 
     const themeColor = daylightStyle["--home-sky-top"];
     if (themeMeta && typeof themeColor === "string") {
@@ -983,12 +993,17 @@ function useHomeViewportBackground(daylightStyle: HomeDaylightStyle) {
       });
       root.style.background = previousRootBackground;
       body.style.background = previousBodyBackground;
+      root.style.backgroundColor = previousRootBackgroundColor;
+      body.style.backgroundColor = previousBodyBackgroundColor;
       root.style.height = previousRootHeight;
       body.style.height = previousBodyHeight;
       root.style.minHeight = previousRootMinHeight;
       body.style.minHeight = previousBodyMinHeight;
       root.style.overflowY = previousRootOverflowY;
       body.style.overflowY = previousBodyOverflowY;
+      body.style.position = previousBodyPosition;
+      body.style.inset = previousBodyInset;
+      body.style.width = previousBodyWidth;
       if (themeMeta) {
         if (previousThemeColor) {
           themeMeta.setAttribute("content", previousThemeColor);
@@ -1279,10 +1294,12 @@ function formatOmoideDate(dateKey: string) {
 
 const deskStyles = {
   page: {
-    position: "relative",
-    minHeight: "100dvh",
-    height: "100dvh",
-    maxHeight: "100dvh",
+    position: "fixed",
+    inset: 0,
+    width: "100%",
+    minHeight: "auto",
+    height: "auto",
+    maxHeight: "none",
     overflow: "hidden",
     display: "flex",
     flexDirection: "column",
@@ -1302,8 +1319,8 @@ const deskStyles = {
     right: 0,
     bottom: "calc(-1 * env(safe-area-inset-bottom))",
     left: 0,
-    minHeight: "calc(100dvh + env(safe-area-inset-top) + env(safe-area-inset-bottom))",
     background: HOME_SKY_BACKGROUND,
+    backgroundColor: "var(--home-sky-bottom)",
     transition:
       "background var(--home-daylight-transition, 1800ms) var(--ease-gentle)",
   },
