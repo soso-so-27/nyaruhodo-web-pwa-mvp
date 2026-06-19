@@ -307,6 +307,7 @@ export function HomeDeskModel({
       } as CSSProperties}
       aria-label="きょう"
     >
+      <div style={deskStyles.viewportBackdrop} aria-hidden="true" />
       <div style={deskStyles.stage}>
         <div
           style={{
@@ -1306,6 +1307,19 @@ const deskStyles = {
     padding:
       "calc(var(--home-page-padding-top, 10px) + env(safe-area-inset-top)) var(--home-page-padding-x, 16px) calc(var(--bottom-nav-height) + var(--bottom-nav-bottom-offset) + 24px + env(safe-area-inset-bottom))",
     color: "var(--ink)",
+    background: HOME_SKY_BACKGROUND,
+    transition:
+      "background var(--home-daylight-transition, 1800ms) var(--ease-gentle)",
+  },
+  viewportBackdrop: {
+    position: "fixed",
+    zIndex: 0,
+    pointerEvents: "none",
+    top: "calc(-1 * env(safe-area-inset-top))",
+    right: 0,
+    bottom: "calc(-1 * env(safe-area-inset-bottom))",
+    left: 0,
+    minHeight: "calc(100dvh + env(safe-area-inset-top) + env(safe-area-inset-bottom))",
     background: HOME_SKY_BACKGROUND,
     transition:
       "background var(--home-daylight-transition, 1800ms) var(--ease-gentle)",
