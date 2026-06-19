@@ -64,67 +64,69 @@ type HomeDeskModelProps = {
 const HOLD_OPEN_MS = 1600;
 const HOLD_REWIND_MS = 1000;
 const HOME_FRAME_TUNING = {
-  pagePaddingX: "16px",
-  pagePaddingTop: "10px",
-  stageMaxWidth: "430px",
-  stageGap: "14px",
-  heroGap: "14px",
-  matWidth: "12px",
-  outerRadius: "24px",
-  innerRadius: "12px",
-  skyMotionDuration: "52s",
+  pagePaddingX: "12px",
+  pagePaddingTop: "8px",
+  stageMaxWidth: "460px",
+  stageGap: "12px",
+  heroGap: "10px",
+  matWidth: "4px",
+  outerRadius: "22px",
+  innerRadius: "18px",
+  skyMotionDuration: "16s",
+  statusScrim:
+    "linear-gradient(180deg, color-mix(in srgb, var(--ink) 19%, transparent) 0%, color-mix(in srgb, var(--ink) 9%, transparent) 42%, transparent 100%)",
   daylightTransition: "1800ms",
 } as const;
 const HOME_SKY_BACKGROUND =
-  "radial-gradient(circle at 50% 12%, color-mix(in srgb, var(--home-sky-glow, var(--paper-warm)) 42%, transparent) 0%, transparent 50%), linear-gradient(180deg, var(--home-sky-top, var(--paper)) 0%, var(--home-sky-mid, var(--paper)) 46%, var(--home-sky-bottom, var(--paper-warm)) 100%)";
+  "radial-gradient(circle at var(--home-sky-glow-x, 50%) var(--home-sky-glow-y, 12%), color-mix(in srgb, var(--home-sky-glow, var(--paper-warm)) 58%, transparent) 0%, transparent 54%), linear-gradient(180deg, var(--home-sky-top, var(--paper)) 0%, var(--home-sky-mid, var(--paper)) 44%, var(--home-sky-bottom, var(--paper-warm)) 100%)";
 const HOME_DAYLIGHT_ANCHORS = [
   {
     minute: 4 * 60 + 45,
-    skyTop: "#efd8c9",
-    skyMid: "#f8eadb",
-    skyBottom: "#e8d5c5",
-    mat: "#fff5e7",
-    glow: "#dea985",
+    skyTop: "#e8cbbd",
+    skyMid: "#f7e2d2",
+    skyBottom: "#dfcabb",
+    mat: "#fff7ee",
+    glow: "#d89b76",
   },
   {
     minute: 7 * 60,
-    skyTop: "#f7e6cf",
-    skyMid: "#fff3df",
-    skyBottom: "#eadfce",
-    mat: "#fff6e8",
-    glow: "#e8bf8f",
+    skyTop: "#efdcc2",
+    skyMid: "#fff0dc",
+    skyBottom: "#e4d6c4",
+    mat: "#fff8ef",
+    glow: "#dfad7d",
   },
   {
     minute: 12 * 60,
-    skyTop: "#e9eee9",
-    skyMid: "#fbf4e4",
-    skyBottom: "#e4dac8",
-    mat: "#fff9ec",
-    glow: "#cdbb97",
+    skyTop: "#d9dfd6",
+    skyMid: "#f4ead8",
+    skyBottom: "#ddd0bd",
+    mat: "#fff9f0",
+    glow: "#bca77f",
   },
   {
     minute: 17 * 60,
-    skyTop: "#edc69f",
-    skyMid: "#f5ddbc",
-    skyBottom: "#d9b39d",
-    mat: "#fff0dc",
-    glow: "#cf8f62",
+    skyTop: "#dcae85",
+    skyMid: "#efd1ae",
+    skyBottom: "#c89a89",
+    mat: "#fff3e8",
+    glow: "#c97954",
   },
   {
     minute: 19 * 60 + 40,
-    skyTop: "#c6b3bd",
-    skyMid: "#dcc9bf",
-    skyBottom: "#aaa4ad",
-    mat: "#f2e4d9",
-    glow: "#ac706f",
+    skyTop: "#ae9aa8",
+    skyMid: "#d1b8ae",
+    skyBottom: "#8f8994",
+    mat: "#f2e8df",
+    glow: "#9f6265",
   },
   {
     minute: 22 * 60,
-    skyTop: "#9ea8b3",
-    skyMid: "#c5c4bd",
-    skyBottom: "#85868b",
-    mat: "#e5ded4",
-    glow: "#707894",
+    skyTop: "#828d9a",
+    skyMid: "#b9b7ae",
+    skyBottom: "#6f747f",
+    mat: "#e8e0d5",
+    glow: "#59657f",
   },
 ] as const;
 
@@ -173,8 +175,9 @@ export function HomeDeskModel({
   );
   const homePhoto = targetPhoto ?? latestOwnPhoto;
   const shouldHidePresence = true;
-  const guidanceCopy = getHomeStatusCopy(deskState, catName, now);
-  const homeCycleStatus = getHomeCycleStatus(deskState, Boolean(targetPhoto), now);
+  const hasTodayPhoto = Boolean(targetPhoto);
+  const guidanceCopy = getHomeStatusCopy(deskState, catName, now, hasTodayPhoto);
+  const homeCycleStatus = getHomeCycleStatus(deskState, hasTodayPhoto, now);
   const isBefore = deskState === "1" || deskState === "1b";
   useEffect(() => {
     trackDeskStateShown(deskState, eveningState.dateKey);
@@ -285,7 +288,7 @@ export function HomeDeskModel({
     <section
       data-testid="home-desk-model"
       data-state={deskState}
-      className={prefersReducedMotion ? undefined : "home-sky-flow"}
+      className={prefersReducedMotion ? "home-sky-shell" : "home-sky-shell home-sky-flow"}
       style={{
         ...deskStyles.page,
         ...daylightStyle,
@@ -351,16 +354,18 @@ export function HomeDeskModel({
           )}
 
           <div style={deskStyles.homeCopyWrap}>
-            <p
-              style={deskStyles.homeTitle}
-              className={
-                guidanceCopy.tone === "soon" && !prefersReducedMotion
-                  ? "desk-evening-soon-copy"
-                  : undefined
-              }
-            >
-              {guidanceCopy.title}
-            </p>
+            {guidanceCopy.title ? (
+              <p
+                style={deskStyles.homeTitle}
+                className={
+                  guidanceCopy.tone === "soon" && !prefersReducedMotion
+                    ? "desk-evening-soon-copy"
+                    : undefined
+                }
+              >
+                {guidanceCopy.title}
+              </p>
+            ) : null}
             {guidanceCopy.sub ? (
               <p style={deskStyles.homeSub}>{guidanceCopy.sub}</p>
             ) : null}
@@ -374,7 +379,7 @@ export function HomeDeskModel({
               </strong>
             </span>
             <span style={deskStyles.homeCyclePill}>
-              <span style={deskStyles.homeCycleLabel}>8時</span>
+              <span style={deskStyles.homeCycleLabel}>ねこだより</span>
               <strong style={deskStyles.homeCycleValue}>
                 {homeCycleStatus.delivery}
               </strong>
@@ -383,7 +388,7 @@ export function HomeDeskModel({
 
           {isBefore ? (
             <AppButton
-              variant="secondary"
+              variant="primary"
               size="md"
               onClick={onTakePhoto}
               style={deskStyles.homeCaptureButton}
@@ -552,16 +557,37 @@ export function HomeDeskModel({
         }
         @keyframes homeSkyFlow {
           0% {
-            background-position: 48% 8%, 50% 50%;
+            --home-sky-glow-x: 38%;
+            --home-sky-glow-y: 7%;
+            background-position: 38% 7%, 50% 50%;
             filter: saturate(1);
           }
+          50% {
+            --home-sky-glow-x: 62%;
+            --home-sky-glow-y: 18%;
+            background-position: 62% 18%, 50% 50%;
+            filter: saturate(1.045);
+          }
           100% {
-            background-position: 54% 15%, 50% 50%;
-            filter: saturate(1.025);
+            --home-sky-glow-x: 46%;
+            --home-sky-glow-y: 28%;
+            background-position: 46% 28%, 50% 50%;
+            filter: saturate(1.02);
           }
         }
+        .home-sky-shell::before {
+          content: "";
+          position: fixed;
+          z-index: 0;
+          pointer-events: none;
+          top: 0;
+          left: 0;
+          right: 0;
+          height: calc(env(safe-area-inset-top) + 64px);
+          background: var(--home-status-scrim, transparent);
+        }
         .home-sky-flow {
-          background-size: 122% 122%, 100% 100%;
+          background-size: 150% 150%, 100% 100%;
           animation: homeSkyFlow var(--home-sky-motion-duration, 52s) var(--ease-gentle) infinite alternate;
         }
         .desk-frame-breathe {
@@ -864,6 +890,9 @@ function useDaylight(now: number) {
       "--home-frame-radius": HOME_FRAME_TUNING.outerRadius,
       "--home-frame-inner-radius": HOME_FRAME_TUNING.innerRadius,
       "--home-sky-motion-duration": HOME_FRAME_TUNING.skyMotionDuration,
+      "--home-status-scrim": HOME_FRAME_TUNING.statusScrim,
+      "--home-sky-glow-x": "50%",
+      "--home-sky-glow-y": "12%",
       "--home-daylight-transition": HOME_FRAME_TUNING.daylightTransition,
     } as HomeDaylightStyle;
   }, [minuteKey]);
@@ -883,9 +912,14 @@ function useHomeViewportBackground(daylightStyle: HomeDaylightStyle) {
       "--home-sky-glow",
       "--home-frame-light",
       "--home-frame-glow",
+      "--home-status-scrim",
+      "--home-sky-glow-x",
+      "--home-sky-glow-y",
     ] as const;
     const previousRootBackground = root.style.background;
     const previousBodyBackground = body.style.background;
+    const previousRootMinHeight = root.style.minHeight;
+    const previousBodyMinHeight = body.style.minHeight;
     const previousThemeColor = themeMeta?.getAttribute("content") ?? null;
 
     propertyNames.forEach((name) => {
@@ -898,6 +932,8 @@ function useHomeViewportBackground(daylightStyle: HomeDaylightStyle) {
 
     root.style.background = HOME_SKY_BACKGROUND;
     body.style.background = HOME_SKY_BACKGROUND;
+    root.style.minHeight = "calc(100% + env(safe-area-inset-top))";
+    body.style.minHeight = "calc(100dvh + env(safe-area-inset-top))";
 
     const themeColor = daylightStyle["--home-sky-top"];
     if (themeMeta && typeof themeColor === "string") {
@@ -911,6 +947,8 @@ function useHomeViewportBackground(daylightStyle: HomeDaylightStyle) {
       });
       root.style.background = previousRootBackground;
       body.style.background = previousBodyBackground;
+      root.style.minHeight = previousRootMinHeight;
+      body.style.minHeight = previousBodyMinHeight;
       if (themeMeta) {
         if (previousThemeColor) {
           themeMeta.setAttribute("content", previousThemeColor);
@@ -998,10 +1036,11 @@ function getHomeStatusCopy(
   state: DeskState,
   catName: string,
   now: number,
+  hasTodayPhoto: boolean,
 ): { title: string; sub?: string; tone?: "soon" } {
   switch (state) {
     case "1":
-      return { title: "きょうも すやすや" };
+      return hasTodayPhoto ? { title: "きょうも すやすや" } : { title: "" };
     case "1b":
       return { title: "おやすみ", sub: "また、あした" };
     case "2":
@@ -1010,7 +1049,7 @@ function getHomeStatusCopy(
       }
       return {
         title: `${catName}を おくった`,
-        sub: "よる、よその ねがお が とどく",
+        sub: "よる8時 とどく",
       };
     case "3":
       return { title: "とどいた" };
@@ -1036,7 +1075,7 @@ function getHomeCycleStatus(
         ? "ひらいた"
         : isEveningSoonWindow(now)
           ? "もうすぐ"
-          : "よる とどく";
+          : "よる8時 とどく";
 
   return {
     photo: hasTodayPhoto ? "出した" : "まだ",
@@ -1213,9 +1252,10 @@ const deskStyles = {
     aspectRatio: "3 / 4",
     padding: "var(--home-frame-mat-width, 12px)",
     borderRadius: "var(--home-frame-radius, var(--radius-2xl))",
-    background: "var(--home-frame-light, var(--paper))",
+    background:
+      "color-mix(in srgb, var(--home-frame-light, var(--paper)) 72%, transparent)",
     boxShadow:
-      "0 2px 0 color-mix(in srgb, var(--paper-card) 78%, transparent) inset, 0 34px 92px color-mix(in srgb, var(--home-frame-glow, var(--paper-warm)) 82%, transparent), 0 14px 36px color-mix(in srgb, var(--ink) 11%, transparent)",
+      "0 1px 0 color-mix(in srgb, var(--paper-card) 64%, transparent) inset, -10px 26px 54px color-mix(in srgb, var(--home-frame-glow, var(--paper-warm)) 72%, transparent), 0 14px 24px color-mix(in srgb, var(--ink) 14%, transparent)",
     overflow: "hidden",
     transition:
       "background var(--home-daylight-transition, 1800ms) var(--ease-gentle), box-shadow var(--home-daylight-transition, 1800ms) var(--ease-gentle)",
@@ -1229,12 +1269,13 @@ const deskStyles = {
     borderRadius: "var(--home-frame-inner-radius, var(--radius-lg))",
     objectFit: "contain",
     objectPosition: "center",
-    background: "color-mix(in srgb, var(--home-frame-light, var(--paper)) 78%, var(--paper) 22%)",
+    background:
+      "color-mix(in srgb, var(--home-frame-light, var(--paper)) 64%, var(--paper) 36%)",
     boxShadow:
-      "0 0 0 1px color-mix(in srgb, var(--ink) 7%, transparent) inset, 0 0 22px color-mix(in srgb, var(--ink) 5%, transparent) inset",
+      "0 0 0 1px color-mix(in srgb, var(--ink) 10%, transparent) inset, 0 0 18px color-mix(in srgb, var(--ink) 7%, transparent) inset",
   },
   homeEmptyFrame: {
-    width: "min(100%, 430px)",
+    width: "100%",
     aspectRatio: "3 / 4",
     boxSizing: "border-box",
     display: "grid",
@@ -1273,7 +1314,7 @@ const deskStyles = {
   },
   homeTitle: {
     margin: 0,
-    color: "var(--ink-soft)",
+    color: "var(--ink)",
     fontFamily: "var(--font-display)",
     fontSize: "18px",
     fontWeight: 400,
@@ -1282,7 +1323,7 @@ const deskStyles = {
   },
   homeSub: {
     margin: 0,
-    color: "var(--ink-faint)",
+    color: "var(--ink-soft)",
     fontFamily: "var(--font-display)",
     fontSize: "13px",
     letterSpacing: "var(--tracking-body)",
@@ -1306,7 +1347,7 @@ const deskStyles = {
     padding: "4px 10px",
     borderRadius: "var(--radius-full)",
     background: "color-mix(in srgb, var(--paper-card) 54%, transparent)",
-    color: "var(--ink-soft)",
+    color: "var(--ink)",
     fontFamily: "var(--font-ui)",
     fontSize: "12px",
     letterSpacing: "var(--tracking-body)",
@@ -1314,7 +1355,7 @@ const deskStyles = {
       "0 0 0 1px color-mix(in srgb, var(--line) 72%, transparent) inset",
   },
   homeCycleLabel: {
-    color: "var(--ink-faint)",
+    color: "var(--ink-soft)",
     fontWeight: 400,
   },
   homeCycleValue: {

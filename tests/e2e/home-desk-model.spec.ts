@@ -32,7 +32,7 @@ test.describe("home desk model", () => {
     );
     await expect(page.getByTestId("desk-home-frame")).toBeVisible();
     await expect(page.getByText("むぎを おくった")).toBeVisible();
-    await expect(page.getByText("よる、よその ねがお が とどく")).toBeVisible();
+    await expect(page.getByText("よる8時 とどく").first()).toBeVisible();
     await expect(page.getByTestId("desk-letter")).toHaveCount(0);
     await expect(page.getByTestId("today-pair-nav-icon")).toBeVisible();
     await expect(page.getByTestId("today-pair-nav-slot")).toHaveCount(2);
@@ -202,7 +202,9 @@ test.describe("home desk model", () => {
     await page.goto("/home");
     await page.waitForLoadState("networkidle");
 
-    await expect(page.getByText("きょうも すやすや")).toBeVisible();
+    await expect(page.getByText("きょうも すやすや")).toHaveCount(0);
+    await expect(page.getByText("きょうのねがお")).toBeVisible();
+    await expect(page.getByText("まだ")).toBeVisible();
     await expect(page.getByRole("button", { name: "ねがおを とる" })).toBeVisible();
     await expect(page.getByTestId("desk-letter")).toHaveCount(0);
     await expect(page.getByTestId("desk-empty-frame")).toHaveCSS(
