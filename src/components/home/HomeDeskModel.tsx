@@ -95,7 +95,7 @@ const HOME_FRAME_TUNING = {
   emptyFrameEnd: "#f1e7d6",
   trayPaper: "#fdf9f1",
   trayRadius: "18px",
-  trayMinHeight: "88px",
+  trayMinHeight: "104px",
   trayToNavGap: "32px",
   emptyIllustrationWidth: "min(36vw, 124px)",
   emptyIllustrationMinWidth: "112px",
@@ -384,24 +384,31 @@ export function HomeDeskModel({
           <section
             data-testid="home-letter-tray"
             data-phase={homeDay.phase}
-            style={deskStyles.notificationTray}
+            style={{
+              ...deskStyles.notificationTray,
+              ...(homeDay.phase === "delivered" ? deskStyles.notificationTrayDelivered : {}),
+            }}
+            className={
+              homeDay.phase === "delivered" && !prefersReducedMotion
+                ? "home-letter-tray-glow"
+                : undefined
+            }
             aria-label="ホームのお知らせ"
           >
             <div
               style={{
-                ...deskStyles.letterTray,
-                ...(homeDay.phase === "delivered" ? deskStyles.letterTrayDelivered : {}),
+                ...deskStyles.notificationRows,
+                ...(subNotifications.length === 0
+                  ? deskStyles.notificationRowsSingle
+                  : {}),
               }}
-              className={
-                homeDay.phase === "delivered" && !prefersReducedMotion
-                  ? "home-letter-tray-glow"
-                  : undefined
-              }
-              aria-label="ねこだより"
             >
               {homeDay.phase === "delivered" ? (
                 <div
-                  style={deskStyles.letterTrayDeliveredLayout}
+                  style={{
+                    ...deskStyles.notificationRow,
+                    ...deskStyles.notificationRowPrimary,
+                  }}
                   onContextMenu={(event) => event.preventDefault()}
                 >
                   <button
@@ -455,46 +462,51 @@ export function HomeDeskModel({
                   </div>
                 </div>
               ) : homeDay.phase === "opened" ? (
-                <a href="/collection" style={deskStyles.letterTrayLink}>
+                <a
+                  href="/collection"
+                  style={{
+                    ...deskStyles.notificationRow,
+                    ...deskStyles.notificationRowLink,
+                  }}
+                >
                   <HomeLetterTrayText phase={homeDay.phase} />
                 </a>
               ) : (
-                <HomeLetterTrayText phase={homeDay.phase} />
+                <div style={deskStyles.notificationRow}>
+                  <HomeLetterTrayText phase={homeDay.phase} />
+                </div>
               )}
+              {subNotifications.slice(0, 2).map((memory) => (
+                <button
+                  key={memory.id}
+                  type="button"
+                  data-testid="omoide-arrival-letter"
+                  style={deskStyles.notificationRow}
+                  onClick={() => {
+                    onOpenOmoideMemory?.(memory);
+                    window.location.assign("/cats#omoide");
+                  }}
+                  aria-label="思い出が、とどきました。うちのこで見る"
+                >
+                  <span style={deskStyles.notificationIcon} aria-hidden="true">
+                    思
+                  </span>
+                  <span style={deskStyles.notificationText}>
+                    <span style={deskStyles.notificationTitle}>
+                      思い出が、とどきました
+                    </span>
+                    <span style={deskStyles.notificationAction}>
+                      うちのこで みる
+                    </span>
+                  </span>
+                </button>
+              ))}
+              {subNotifications.length > 2 ? (
+                <div style={deskStyles.notificationMoreRow}>
+                  ほか {subNotifications.length - 2} 件
+                </div>
+              ) : null}
             </div>
-            {subNotifications.length > 0 ? (
-              <div
-                data-testid="home-sub-notifications"
-                style={deskStyles.subNotificationScroller}
-                aria-label="そのほかのお知らせ"
-              >
-                {subNotifications.map((memory) => (
-                  <button
-                    key={memory.id}
-                    type="button"
-                    data-testid="omoide-arrival-letter"
-                    style={deskStyles.omoideArrival}
-                    onClick={() => {
-                      onOpenOmoideMemory?.(memory);
-                      window.location.assign("/cats#omoide");
-                    }}
-                    aria-label="思い出が、とどきました。うちのこで見る"
-                  >
-                    <span style={deskStyles.omoideLetterIcon} aria-hidden="true">
-                      思
-                    </span>
-                    <span style={deskStyles.omoideArrivalText}>
-                      <span style={deskStyles.omoideArrivalTitle}>
-                        思い出が、とどきました
-                      </span>
-                      <span style={deskStyles.omoideArrivalSub}>
-                        うちのこで みる
-                      </span>
-                    </span>
-                  </button>
-                ))}
-              </div>
-            ) : null}
           </section>
         </div>
 
@@ -619,9 +631,6 @@ export function HomeDeskModel({
         }
         .home-letter-tray-glow {
           animation: homeLetterTrayGlow 2200ms var(--ease-gentle) infinite alternate;
-        }
-        [data-testid="home-sub-notifications"]::-webkit-scrollbar {
-          display: none;
         }
         @keyframes homeLetterTrayGlow {
           from {
@@ -1501,17 +1510,9 @@ const deskStyles = {
   notificationTray: {
     width: "100%",
     display: "grid",
-    gap: "8px",
-  },
-  letterTray: {
-    width: "100%",
     boxSizing: "border-box",
-    display: "grid",
-    justifyItems: "center",
-    alignItems: "center",
-    gap: "4px",
-    minHeight: "var(--home-tray-min-height, 88px)",
-    padding: "10px 18px",
+    minHeight: "var(--home-tray-min-height, 104px)",
+    padding: "10px 12px",
     borderRadius: "var(--home-tray-radius, 18px)",
     background:
       "color-mix(in srgb, var(--home-tray-paper, #fdf9f1) 62%, transparent)",
@@ -1522,19 +1523,100 @@ const deskStyles = {
     transition:
       "background var(--home-daylight-transition, 1800ms) var(--ease-gentle), box-shadow var(--home-daylight-transition, 1800ms) var(--ease-gentle)",
   },
-  letterTrayDelivered: {
+  notificationTrayDelivered: {
     color: "var(--ink)",
     background:
       "color-mix(in srgb, var(--paper-card) 92%, var(--home-frame-glow, var(--paper-warm)) 8%)",
     boxShadow:
       "0 0 0 1px color-mix(in srgb, var(--seal-soft) 42%, transparent) inset, 0 18px 44px -18px color-mix(in srgb, var(--seal) 40%, transparent), var(--shadow-e2)",
   },
-  letterTrayDeliveredLayout: {
+  notificationRows: {
     width: "100%",
-    display: "flex",
+    minHeight: "84px",
+    display: "grid",
+    alignContent: "center",
+    gap: "2px",
+  },
+  notificationRowsSingle: {
+    alignContent: "center",
+  },
+  notificationRow: {
+    width: "100%",
+    minHeight: "40px",
+    boxSizing: "border-box",
+    display: "grid",
+    gridTemplateColumns: "32px minmax(0, 1fr)",
+    alignItems: "center",
+    gap: "10px",
+    padding: "2px 8px",
+    border: "0",
+    borderRadius: "var(--radius-lg)",
+    background: "transparent",
+    color: "inherit",
+    textDecoration: "none",
+    textAlign: "left",
+    WebkitTapHighlightColor: "transparent",
+  },
+  notificationRowPrimary: {
+    gridTemplateColumns: "58px minmax(0, 1fr)",
+    minHeight: "48px",
+  },
+  notificationRowLink: {
+    gridTemplateColumns: "1fr",
+    justifyItems: "center",
+    textAlign: "center",
+  },
+  notificationIcon: {
+    width: "28px",
+    height: "24px",
+    display: "inline-flex",
     alignItems: "center",
     justifyContent: "center",
-    gap: "16px",
+    borderRadius: "var(--radius-sm)",
+    background: "color-mix(in srgb, var(--paper-card) 72%, transparent)",
+    color: "var(--seal)",
+    boxShadow:
+      "0 0 0 1px color-mix(in srgb, var(--line) 40%, transparent) inset",
+    fontFamily: "var(--font-display)",
+    fontSize: "12px",
+    lineHeight: 1,
+    letterSpacing: "0",
+  },
+  notificationText: {
+    minWidth: 0,
+    display: "flex",
+    alignItems: "baseline",
+    justifyContent: "space-between",
+    gap: "10px",
+    color: "inherit",
+    fontFamily: "var(--font-display)",
+    letterSpacing: "var(--tracking-body)",
+  },
+  notificationTitle: {
+    minWidth: 0,
+    overflow: "hidden",
+    textOverflow: "ellipsis",
+    whiteSpace: "nowrap",
+    color: "var(--ink)",
+    fontSize: "12px",
+    fontWeight: 400,
+    lineHeight: 1.45,
+  },
+  notificationAction: {
+    flex: "0 0 auto",
+    color: "var(--ink-soft)",
+    fontSize: "11px",
+    fontWeight: 400,
+    lineHeight: 1.45,
+  },
+  notificationMoreRow: {
+    minHeight: "32px",
+    display: "grid",
+    placeItems: "center",
+    color: "var(--ink-faint)",
+    fontFamily: "var(--font-display)",
+    fontSize: "11px",
+    letterSpacing: "var(--tracking-body)",
   },
   letterTrayCopy: {
     display: "grid",
@@ -1575,19 +1657,9 @@ const deskStyles = {
     color: "var(--ink)",
   },
   trayLetterButton: {
-    width: "92px",
-    height: "60px",
+    width: "54px",
+    height: "36px",
     flex: "0 0 auto",
-  },
-  subNotificationScroller: {
-    width: "100%",
-    display: "flex",
-    gap: "8px",
-    overflowX: "auto",
-    padding: "0 2px 2px",
-    scrollSnapType: "x proximity",
-    scrollbarWidth: "none",
-    WebkitOverflowScrolling: "touch",
   },
   homeCopyWrap: {
     display: "grid",
