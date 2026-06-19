@@ -235,28 +235,34 @@ test.describe("home desk model", () => {
     await expect(page.getByText("また あした")).toBeVisible();
   });
 
-  test("keeps the home frame width stable while the empty frame stays slightly shorter", async ({
+  test("keeps the home frame, tray, and bottom navigation separated", async ({
     page,
   }) => {
-    await seedDeskState(page, "1");
-    await page.goto("/home");
-    await page.waitForLoadState("networkidle");
-    const emptyBox = await page.getByTestId("desk-empty-frame").boundingBox();
-    expect(emptyBox).not.toBeNull();
+    const states = [
+      { state: "1" as const, frameTestId: "desk-empty-frame" },
+      { state: "2" as const, frameTestId: "desk-home-frame" },
+      { state: "4" as const, frameTestId: "desk-home-frame" },
+    ];
 
-    await seedDeskState(page, "2");
-    await page.goto("/home");
-    await page.waitForLoadState("networkidle");
-    const photoBox = await page.getByTestId("desk-home-frame").boundingBox();
-    expect(photoBox).not.toBeNull();
+    for (const { state, frameTestId } of states) {
+      await seedDeskState(page, state);
+      await page.goto("/home");
+      await page.waitForLoadState("networkidle");
 
-    expect(Math.round(photoBox!.width)).toBe(Math.round(emptyBox!.width));
-    expect(Math.round(emptyBox!.height)).toBeLessThan(
-      Math.round(photoBox!.height),
-    );
-    expect(Math.round(emptyBox!.height)).toBeGreaterThan(
-      Math.round(photoBox!.height * 0.9),
-    );
+      const frameBox = await page.getByTestId(frameTestId).boundingBox();
+      const trayBox = await page.getByTestId("home-letter-tray").boundingBox();
+      const navBox = await page.locator("nav").boundingBox();
+
+      expect(frameBox).not.toBeNull();
+      expect(trayBox).not.toBeNull();
+      expect(navBox).not.toBeNull();
+      expect(Math.round(frameBox!.y + frameBox!.height)).toBeLessThanOrEqual(
+        Math.round(trayBox!.y - 8),
+      );
+      expect(Math.round(trayBox!.y + trayBox!.height)).toBeLessThanOrEqual(
+        Math.round(navBox!.y - 16),
+      );
+    }
   });
 
   test("opens the delivered letter only after the hold completes", async ({

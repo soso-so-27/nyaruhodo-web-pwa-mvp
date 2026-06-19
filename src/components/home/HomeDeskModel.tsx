@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import type { CSSProperties, MouseEvent, PointerEvent, ReactNode } from "react";
 
 import { type EveningHomeState } from "../../lib/home/eveningDelivery";
@@ -22,6 +22,7 @@ import { StoredPhotoImage } from "../ui/StoredPhotoImage";
 
 type DeskState = "1" | "1b" | "2" | "3" | "4";
 type HomeDaylightStyle = CSSProperties & Record<`--${string}`, string>;
+type HomeFrameLayoutStyle = CSSProperties & Record<"--home-frame-layout-width", string>;
 type HomeTodayPhase =
   | "empty-before"
   | "sent-before"
@@ -97,7 +98,9 @@ const HOME_FRAME_TUNING = {
   trayRadius: "18px",
   trayMinHeight: "104px",
   trayToNavGap: "32px",
-  bottomClearance: "132px",
+  frameMinWidthPx: 248,
+  frameInitialWidth: "310px",
+  frameAspectWidthPerHeight: 9 / 14,
   emptyIllustrationWidth: "min(36vw, 124px)",
   emptyIllustrationMinWidth: "112px",
   emptyTitleSize: "20px",
@@ -185,6 +188,7 @@ export function HomeDeskModel({
   const rewindTimerRef = useRef<number | null>(null);
   const isHoldingRef = useRef(false);
   const daylightStyle = useDaylight(now);
+  const frameLayoutStyle = useHomeFrameLayout(deskState);
   useHomeViewportBackground(daylightStyle);
   const targetPhoto =
     eveningState.kind === "waiting" ||
@@ -349,6 +353,7 @@ export function HomeDeskModel({
       style={{
         ...deskStyles.page,
         ...daylightStyle,
+        ...frameLayoutStyle,
       } as CSSProperties}
       aria-label="きょう"
     >
@@ -1036,7 +1041,7 @@ function useDaylight(now: number) {
       "--home-tray-radius": HOME_FRAME_TUNING.trayRadius,
       "--home-tray-min-height": HOME_FRAME_TUNING.trayMinHeight,
       "--home-tray-to-nav-gap": HOME_FRAME_TUNING.trayToNavGap,
-      "--home-bottom-clearance": HOME_FRAME_TUNING.bottomClearance,
+      "--home-frame-layout-width": HOME_FRAME_TUNING.frameInitialWidth,
       "--home-empty-illustration-width": HOME_FRAME_TUNING.emptyIllustrationWidth,
       "--home-empty-illustration-min-width":
         HOME_FRAME_TUNING.emptyIllustrationMinWidth,
@@ -1047,6 +1052,104 @@ function useDaylight(now: number) {
       "--home-daylight-transition": HOME_FRAME_TUNING.daylightTransition,
     } as HomeDaylightStyle;
   }, [minuteKey]);
+}
+
+function useHomeFrameLayout(deskState: DeskState): HomeFrameLayoutStyle {
+  const [frameWidth, setFrameWidth] = useState<string>(
+    HOME_FRAME_TUNING.frameInitialWidth,
+  );
+
+  useLayoutEffect(() => {
+    let frame = 0;
+
+    const readPixels = (value: string | null | undefined, fallback = 0) => {
+      if (!value) {
+        return fallback;
+      }
+      const parsed = Number.parseFloat(value);
+      return Number.isFinite(parsed) ? parsed : fallback;
+    };
+
+    const updateFrameWidth = () => {
+      const pageElement = document.querySelector<HTMLElement>(
+        "[data-testid='home-desk-model']",
+      );
+      const trayElement = document.querySelector<HTMLElement>(
+        "[data-testid='home-letter-tray']",
+      );
+      const navElement = document.querySelector<HTMLElement>("nav");
+      if (!pageElement || !trayElement || !navElement) {
+        return;
+      }
+
+      const pageStyle = getComputedStyle(pageElement);
+      const viewportWidth = window.visualViewport?.width ?? window.innerWidth;
+      const paddingTop = readPixels(pageStyle.paddingTop);
+      const paddingX =
+        readPixels(pageStyle.paddingLeft) + readPixels(pageStyle.paddingRight);
+      const stageMaxWidth = readPixels(
+        pageStyle.getPropertyValue("--home-stage-max-width"),
+        460,
+      );
+      const stageWidth = Math.max(
+        0,
+        Math.min(viewportWidth - paddingX, stageMaxWidth),
+      );
+      const trayHeight =
+        trayElement.getBoundingClientRect().height ||
+        readPixels(pageStyle.getPropertyValue("--home-tray-min-height"), 104);
+      const trayToNavGap = readPixels(
+        pageStyle.getPropertyValue("--home-tray-to-nav-gap"),
+        32,
+      );
+      const heroGap =
+        deskState === "3" || deskState === "4"
+          ? 18
+          : readPixels(pageStyle.getPropertyValue("--home-hero-gap"), 10);
+      const navTop = navElement.getBoundingClientRect().top;
+      const availableFrameHeight =
+        navTop - paddingTop - trayHeight - heroGap - trayToNavGap;
+      const widthFromHeight =
+        availableFrameHeight * HOME_FRAME_TUNING.frameAspectWidthPerHeight;
+      const nextWidth = Math.round(
+        Math.max(
+          HOME_FRAME_TUNING.frameMinWidthPx,
+          Math.min(stageWidth, widthFromHeight),
+        ),
+      );
+
+      if (!Number.isFinite(nextWidth) || nextWidth <= 0) {
+        return;
+      }
+
+      setFrameWidth((current) => {
+        const next = `${nextWidth}px`;
+        return current === next ? current : next;
+      });
+    };
+
+    const scheduleUpdate = () => {
+      window.cancelAnimationFrame(frame);
+      frame = window.requestAnimationFrame(updateFrameWidth);
+    };
+
+    updateFrameWidth();
+    window.addEventListener("resize", scheduleUpdate);
+    window.visualViewport?.addEventListener("resize", scheduleUpdate);
+    window.visualViewport?.addEventListener("scroll", scheduleUpdate);
+
+    return () => {
+      window.cancelAnimationFrame(frame);
+      window.removeEventListener("resize", scheduleUpdate);
+      window.visualViewport?.removeEventListener("resize", scheduleUpdate);
+      window.visualViewport?.removeEventListener("scroll", scheduleUpdate);
+    };
+  }, [deskState]);
+
+  return useMemo(
+    () => ({ "--home-frame-layout-width": frameWidth }),
+    [frameWidth],
+  );
 }
 
 function useHomeViewportBackground(daylightStyle: HomeDaylightStyle) {
@@ -1444,7 +1547,7 @@ const deskStyles = {
     flexDirection: "column",
     alignItems: "center",
     padding:
-      "calc(var(--home-page-padding-top, 10px) + env(safe-area-inset-top)) var(--home-page-padding-x, 16px) calc(var(--bottom-nav-height) + var(--bottom-nav-safe-offset) + var(--home-bottom-clearance, 132px))",
+      "calc(var(--home-page-padding-top, 10px) + env(safe-area-inset-top)) var(--home-page-padding-x, 16px) calc(var(--bottom-nav-height) + var(--bottom-nav-safe-offset) + var(--home-tray-to-nav-gap, 32px))",
     color: "var(--ink)",
     background: HOME_SKY_BACKGROUND,
     transition:
@@ -1509,7 +1612,7 @@ const deskStyles = {
   homeFrame: {
     position: "relative",
     display: "block",
-    width: "100%",
+    width: "min(100%, var(--home-frame-layout-width, 100%))",
     margin: "0 auto",
     boxSizing: "border-box",
     aspectRatio: "var(--home-frame-aspect-ratio, 9 / 14)",
@@ -1553,7 +1656,7 @@ const deskStyles = {
       "0 0 0 1px color-mix(in srgb, var(--line) 72%, transparent) inset",
   },
   homeEmptyFrame: {
-    width: "100%",
+    width: "min(100%, var(--home-frame-layout-width, 100%))",
     aspectRatio: "var(--home-empty-frame-aspect-ratio, 9 / 14)",
     maxHeight: "var(--home-empty-frame-max-height, 660px)",
     boxSizing: "border-box",
