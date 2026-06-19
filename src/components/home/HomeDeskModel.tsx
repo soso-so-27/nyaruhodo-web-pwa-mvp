@@ -946,8 +946,12 @@ function useHomeViewportBackground(daylightStyle: HomeDaylightStyle) {
     ] as const;
     const previousRootBackground = root.style.background;
     const previousBodyBackground = body.style.background;
+    const previousRootHeight = root.style.height;
+    const previousBodyHeight = body.style.height;
     const previousRootMinHeight = root.style.minHeight;
     const previousBodyMinHeight = body.style.minHeight;
+    const previousRootOverflowY = root.style.overflowY;
+    const previousBodyOverflowY = body.style.overflowY;
     const previousThemeColor = themeMeta?.getAttribute("content") ?? null;
 
     propertyNames.forEach((name) => {
@@ -960,10 +964,12 @@ function useHomeViewportBackground(daylightStyle: HomeDaylightStyle) {
 
     root.style.background = HOME_SKY_BACKGROUND;
     body.style.background = HOME_SKY_BACKGROUND;
-    root.style.minHeight =
-      "calc(100% + env(safe-area-inset-top) + env(safe-area-inset-bottom))";
-    body.style.minHeight =
-      "calc(100dvh + env(safe-area-inset-top) + env(safe-area-inset-bottom))";
+    root.style.height = "100dvh";
+    body.style.height = "100dvh";
+    root.style.minHeight = "100dvh";
+    body.style.minHeight = "100dvh";
+    root.style.overflowY = "hidden";
+    body.style.overflowY = "hidden";
 
     const themeColor = daylightStyle["--home-sky-top"];
     if (themeMeta && typeof themeColor === "string") {
@@ -977,8 +983,12 @@ function useHomeViewportBackground(daylightStyle: HomeDaylightStyle) {
       });
       root.style.background = previousRootBackground;
       body.style.background = previousBodyBackground;
+      root.style.height = previousRootHeight;
+      body.style.height = previousBodyHeight;
       root.style.minHeight = previousRootMinHeight;
       body.style.minHeight = previousBodyMinHeight;
+      root.style.overflowY = previousRootOverflowY;
+      body.style.overflowY = previousBodyOverflowY;
       if (themeMeta) {
         if (previousThemeColor) {
           themeMeta.setAttribute("content", previousThemeColor);
@@ -1270,7 +1280,9 @@ function formatOmoideDate(dateKey: string) {
 const deskStyles = {
   page: {
     position: "relative",
-    minHeight: "100svh",
+    minHeight: "100dvh",
+    height: "100dvh",
+    maxHeight: "100dvh",
     overflow: "hidden",
     display: "flex",
     flexDirection: "column",
