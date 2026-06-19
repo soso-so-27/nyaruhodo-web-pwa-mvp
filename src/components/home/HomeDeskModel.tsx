@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import type { CSSProperties, PointerEvent, ReactNode } from "react";
+import type { CSSProperties, MouseEvent, PointerEvent, ReactNode } from "react";
 
 import { type EveningHomeState } from "../../lib/home/eveningDelivery";
 import type {
@@ -182,6 +182,7 @@ export function HomeDeskModel({
   );
   const holdTimerRef = useRef<number | null>(null);
   const rewindTimerRef = useRef<number | null>(null);
+  const isHoldingRef = useRef(false);
   const daylightStyle = useDaylight(now);
   useHomeViewportBackground(daylightStyle);
   const targetPhoto =
@@ -253,7 +254,30 @@ export function HomeDeskModel({
 
     event.preventDefault();
     event.stopPropagation();
-    event.currentTarget.setPointerCapture(event.pointerId);
+    beginHold();
+    try {
+      event.currentTarget.setPointerCapture(event.pointerId);
+    } catch {
+      // Pointer capture is best-effort; the hold state itself must still start.
+    }
+  }
+
+  function startMouseHold(event: MouseEvent<HTMLButtonElement>) {
+    if (eveningState.kind !== "delivered") {
+      return;
+    }
+
+    event.preventDefault();
+    event.stopPropagation();
+    beginHold();
+  }
+
+  function beginHold() {
+    if (eveningState.kind !== "delivered" || isHoldingRef.current) {
+      return;
+    }
+
+    isHoldingRef.current = true;
     if (rewindTimerRef.current) {
       window.clearTimeout(rewindTimerRef.current);
       rewindTimerRef.current = null;
@@ -271,8 +295,9 @@ export function HomeDeskModel({
     if (holdTimerRef.current) {
       window.clearTimeout(holdTimerRef.current);
     }
-      holdTimerRef.current = window.setTimeout(() => {
+    holdTimerRef.current = window.setTimeout(() => {
       holdTimerRef.current = null;
+      isHoldingRef.current = false;
       setHoldProgress(false);
       void playOpenSound();
       onOpenDelivery(eveningState);
@@ -292,6 +317,7 @@ export function HomeDeskModel({
       window.clearTimeout(holdTimerRef.current);
       holdTimerRef.current = null;
     }
+    isHoldingRef.current = false;
     setHoldProgress(false);
     if (developPhotoMounted) {
       setIsRewindingHold(true);
@@ -304,6 +330,12 @@ export function HomeDeskModel({
         setIsRewindingHold(false);
       }, HOLD_REWIND_MS);
     }
+  }
+
+  function cancelMouseHold(event: MouseEvent<HTMLButtonElement>) {
+    event.preventDefault();
+    event.stopPropagation();
+    cancelHold();
   }
 
 
@@ -426,6 +458,9 @@ export function HomeDeskModel({
                     onPointerUp={cancelHold}
                     onPointerCancel={cancelHold}
                     onPointerLeave={cancelHold}
+                    onMouseDown={startMouseHold}
+                    onMouseUp={cancelMouseHold}
+                    onMouseLeave={cancelMouseHold}
                     onContextMenu={(event) => event.preventDefault()}
                   >
                     <span style={deskStyles.letterFlap} aria-hidden="true" />
@@ -1422,9 +1457,12 @@ const deskStyles = {
   },
   todayPhotoZone: {
     width: "100%",
+    display: "grid",
+    justifyItems: "center",
   },
   homeFrameButton: {
-    display: "block",
+    display: "grid",
+    justifyItems: "center",
     width: "100%",
     border: "none",
     padding: 0,
@@ -1437,6 +1475,7 @@ const deskStyles = {
     position: "relative",
     display: "block",
     width: "100%",
+    margin: "0 auto",
     boxSizing: "border-box",
     aspectRatio: "var(--home-frame-aspect-ratio, 9 / 14)",
     padding: "var(--home-frame-mat-width, 12px)",
@@ -1448,7 +1487,7 @@ const deskStyles = {
       "background var(--home-daylight-transition, 1800ms) var(--ease-gentle), box-shadow var(--home-daylight-transition, 1800ms) var(--ease-gentle)",
   },
   homeFrameDelivered: {
-    width: "min(78%, 300px)",
+    width: "min(92%, 320px)",
   },
   homeFrameImage: {
     width: "100%",
@@ -1532,11 +1571,11 @@ const deskStyles = {
     width: "100%",
     display: "grid",
     boxSizing: "border-box",
-    minHeight: "var(--home-tray-min-height, 104px)",
-    padding: "10px 12px",
+    minHeight: "var(--home-tray-min-height, 96px)",
+    padding: "12px",
     borderRadius: "var(--home-tray-radius, 18px)",
     background:
-      "color-mix(in srgb, var(--home-tray-paper, #fdf9f1) 62%, transparent)",
+      "color-mix(in srgb, var(--home-tray-paper, #fdf9f1) 76%, transparent)",
     color: "var(--ink-soft)",
     boxShadow:
       "0 1px 0 color-mix(in srgb, var(--line) 24%, transparent) inset, 0 10px 22px -20px color-mix(in srgb, var(--home-frame-glow, var(--paper-warm)) 38%, transparent)",
@@ -1553,23 +1592,23 @@ const deskStyles = {
   },
   notificationRows: {
     width: "100%",
-    minHeight: "84px",
+    minHeight: "72px",
     display: "grid",
     alignContent: "center",
-    gap: "2px",
+    gap: "8px",
   },
   notificationRowsSingle: {
     alignContent: "center",
   },
   notificationRow: {
     width: "100%",
-    minHeight: "40px",
+    minHeight: "54px",
     boxSizing: "border-box",
     display: "grid",
-    gridTemplateColumns: "32px minmax(0, 1fr)",
+    gridTemplateColumns: "40px minmax(0, 1fr)",
     alignItems: "center",
-    gap: "10px",
-    padding: "2px 8px",
+    gap: "12px",
+    padding: "8px 10px",
     border: "0",
     borderRadius: "var(--radius-lg)",
     background: "transparent",
@@ -1588,11 +1627,11 @@ const deskStyles = {
     textAlign: "center",
   },
   notificationRowPrimary: {
-    gridTemplateColumns: "72px minmax(0, 1fr)",
-    minHeight: "54px",
+    gridTemplateColumns: "76px minmax(0, 1fr)",
+    minHeight: "64px",
     gap: "12px",
-    padding: "4px 8px",
-    background: "color-mix(in srgb, var(--seal-soft) 10%, transparent)",
+    padding: "8px 10px",
+    background: "color-mix(in srgb, var(--seal-soft) 12%, transparent)",
     boxShadow:
       "0 0 0 1px color-mix(in srgb, var(--seal-soft) 24%, transparent) inset",
   },
@@ -1603,14 +1642,17 @@ const deskStyles = {
   },
   notificationRowInteractive: {
     cursor: "pointer",
+    background: "color-mix(in srgb, var(--paper-card) 34%, transparent)",
+    boxShadow:
+      "0 0 0 1px color-mix(in srgb, var(--line) 24%, transparent) inset",
   },
   notificationIcon: {
-    width: "28px",
-    height: "24px",
+    width: "34px",
+    height: "34px",
     display: "inline-flex",
     alignItems: "center",
     justifyContent: "center",
-    borderRadius: "var(--radius-sm)",
+    borderRadius: "var(--radius-md)",
     background: "color-mix(in srgb, var(--paper-card) 72%, transparent)",
     color: "var(--seal)",
     boxShadow:
@@ -1622,10 +1664,8 @@ const deskStyles = {
   },
   notificationText: {
     minWidth: 0,
-    display: "flex",
-    alignItems: "baseline",
-    justifyContent: "space-between",
-    gap: "10px",
+    display: "grid",
+    gap: "2px",
     color: "inherit",
     fontFamily: "var(--font-display)",
     letterSpacing: "var(--tracking-body)",
@@ -1636,14 +1676,13 @@ const deskStyles = {
     textOverflow: "ellipsis",
     whiteSpace: "nowrap",
     color: "var(--ink)",
-    fontSize: "12px",
+    fontSize: "13px",
     fontWeight: 400,
     lineHeight: 1.45,
   },
   notificationAction: {
-    flex: "0 0 auto",
     color: "var(--ink)",
-    fontSize: "11px",
+    fontSize: "12px",
     fontWeight: 400,
     lineHeight: 1.45,
   },
@@ -1660,6 +1699,7 @@ const deskStyles = {
     display: "grid",
     gap: "2px",
     justifyItems: "start",
+    textAlign: "left",
   },
   letterTrayLink: {
     display: "grid",
@@ -1703,8 +1743,8 @@ const deskStyles = {
     color: "var(--ink)",
   },
   trayLetterButton: {
-    width: "68px",
-    height: "44px",
+    width: "72px",
+    height: "46px",
     flex: "0 0 auto",
     borderRadius: "var(--radius-md)",
     transform: "rotate(-1deg)",
