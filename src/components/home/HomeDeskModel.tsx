@@ -69,10 +69,14 @@ const HOME_FRAME_TUNING = {
   stageMaxWidth: "460px",
   stageGap: "12px",
   heroGap: "10px",
-  matWidth: "4px",
-  outerRadius: "22px",
-  innerRadius: "18px",
+  matWidth: "0px",
+  outerRadius: "24px",
+  innerRadius: "24px",
+  frameShadow:
+    "0 2px 6px rgba(70, 50, 30, 0.16), 0 16px 40px -10px rgba(70, 50, 30, 0.30)",
+  frameHairline: "inset 0 0 0 0.5px rgba(0, 0, 0, 0.05)",
   skyMotionDuration: "16s",
+  skyReducedMotionDuration: "42s",
   statusScrim:
     "linear-gradient(180deg, color-mix(in srgb, var(--ink) 19%, transparent) 0%, color-mix(in srgb, var(--ink) 9%, transparent) 42%, transparent 100%)",
   daylightTransition: "1800ms",
@@ -575,6 +579,14 @@ export function HomeDeskModel({
             filter: saturate(1.02);
           }
         }
+        @keyframes homeSkyBreath {
+          0% {
+            filter: brightness(0.985) saturate(1);
+          }
+          100% {
+            filter: brightness(1.025) saturate(1.025);
+          }
+        }
         .home-sky-shell::before {
           content: "";
           position: fixed;
@@ -607,10 +619,12 @@ export function HomeDeskModel({
         }
         @media (prefers-reduced-motion: reduce) {
           .desk-frame-breathe,
-          .home-sky-flow,
           .desk-evening-soon-copy {
             animation: none;
             filter: none;
+          }
+          .home-sky-shell {
+            animation: homeSkyBreath var(--home-sky-reduced-motion-duration, 42s) var(--ease-gentle) infinite alternate;
           }
           .desk-letter-holding [data-develop-photo="true"] {
             transition: none !important;
@@ -889,7 +903,11 @@ function useDaylight(now: number) {
       "--home-frame-mat-width": HOME_FRAME_TUNING.matWidth,
       "--home-frame-radius": HOME_FRAME_TUNING.outerRadius,
       "--home-frame-inner-radius": HOME_FRAME_TUNING.innerRadius,
+      "--home-frame-shadow": HOME_FRAME_TUNING.frameShadow,
+      "--home-frame-hairline": HOME_FRAME_TUNING.frameHairline,
       "--home-sky-motion-duration": HOME_FRAME_TUNING.skyMotionDuration,
+      "--home-sky-reduced-motion-duration":
+        HOME_FRAME_TUNING.skyReducedMotionDuration,
       "--home-status-scrim": HOME_FRAME_TUNING.statusScrim,
       "--home-sky-glow-x": "50%",
       "--home-sky-glow-y": "12%",
@@ -1252,10 +1270,8 @@ const deskStyles = {
     aspectRatio: "3 / 4",
     padding: "var(--home-frame-mat-width, 12px)",
     borderRadius: "var(--home-frame-radius, var(--radius-2xl))",
-    background:
-      "color-mix(in srgb, var(--home-frame-light, var(--paper)) 72%, transparent)",
-    boxShadow:
-      "0 1px 0 color-mix(in srgb, var(--paper-card) 64%, transparent) inset, -10px 26px 54px color-mix(in srgb, var(--home-frame-glow, var(--paper-warm)) 72%, transparent), 0 14px 24px color-mix(in srgb, var(--ink) 14%, transparent)",
+    background: "transparent",
+    boxShadow: "var(--home-frame-shadow)",
     overflow: "hidden",
     transition:
       "background var(--home-daylight-transition, 1800ms) var(--ease-gentle), box-shadow var(--home-daylight-transition, 1800ms) var(--ease-gentle)",
@@ -1270,9 +1286,8 @@ const deskStyles = {
     objectFit: "contain",
     objectPosition: "center",
     background:
-      "color-mix(in srgb, var(--home-frame-light, var(--paper)) 64%, var(--paper) 36%)",
-    boxShadow:
-      "0 0 0 1px color-mix(in srgb, var(--ink) 10%, transparent) inset, 0 0 18px color-mix(in srgb, var(--ink) 7%, transparent) inset",
+      "color-mix(in srgb, var(--home-frame-light, var(--paper)) 24%, transparent)",
+    boxShadow: "var(--home-frame-hairline)",
   },
   homeEmptyFrame: {
     width: "100%",

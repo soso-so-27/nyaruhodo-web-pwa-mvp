@@ -50,6 +50,9 @@ export const metadata: Metadata = {
     title: "ねてるねこ",
     statusBarStyle: "black-translucent",
   },
+  other: {
+    "apple-mobile-web-app-capable": "yes",
+  },
   icons: {
     icon: [
       { url: "/favicon.ico", sizes: "any" },
@@ -74,11 +77,6 @@ export default function RootLayout({
   return (
     <html lang="ja" className={`${kleeOne.variable} ${zenKakuGothicNew.variable}`}>
       <head>
-        <meta name="apple-mobile-web-app-capable" content="yes" />
-        <meta
-          name="apple-mobile-web-app-status-bar-style"
-          content="black-translucent"
-        />
         <link
           rel="stylesheet"
           href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@latest/tabler-icons.min.css"
