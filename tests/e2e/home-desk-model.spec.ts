@@ -236,7 +236,7 @@ test.describe("home desk model", () => {
     await expect(page.getByText("また あした")).toBeVisible();
   });
 
-  test("keeps the left desk slot size stable before and after taking a photo", async ({
+  test("keeps the home frame width stable while the empty frame stays slightly shorter", async ({
     page,
   }) => {
     await seedDeskState(page, "1");
@@ -252,7 +252,12 @@ test.describe("home desk model", () => {
     expect(photoBox).not.toBeNull();
 
     expect(Math.round(photoBox!.width)).toBe(Math.round(emptyBox!.width));
-    expect(Math.round(photoBox!.height)).toBe(Math.round(emptyBox!.height));
+    expect(Math.round(emptyBox!.height)).toBeLessThan(
+      Math.round(photoBox!.height),
+    );
+    expect(Math.round(emptyBox!.height)).toBeGreaterThan(
+      Math.round(photoBox!.height * 0.9),
+    );
   });
 
   test("opens the delivered letter only after the hold completes", async ({

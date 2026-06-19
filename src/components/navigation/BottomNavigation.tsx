@@ -97,7 +97,7 @@ export function BottomNavigation({
       <span
         style={{
           ...styles.activeNavIndicator,
-          transform: `translateX(calc(${activeIndex} * (100% + 2px)))`,
+          transform: `translateX(calc(${activeIndex} * (100% + 4px)))`,
         }}
         aria-hidden="true"
       />
@@ -188,21 +188,22 @@ const styles = {
     transform: "translateX(-50%)",
     border: "1px solid var(--line)",
     borderRadius: "var(--radius-full)",
-    background: "color-mix(in srgb, var(--paper) 88%, transparent)",
-    boxShadow: "var(--shadow-e2)",
-    padding: "8px",
+    background: "color-mix(in srgb, var(--paper) 74%, transparent)",
+    boxShadow:
+      "0 1px 0 color-mix(in srgb, var(--line) 44%, transparent) inset, 0 14px 34px -22px rgba(70, 50, 30, 0.22)",
+    padding: "6px",
     backdropFilter: "blur(14px)",
     viewTransitionName: "bottom-nav",
   },
   activeNavIndicator: {
     position: "absolute",
-    top: "8px",
-    bottom: "8px",
-    left: "8px",
-    width: "calc((100% - 24px) / 3)",
+    top: "6px",
+    bottom: "6px",
+    left: "6px",
+    width: "calc((100% - 20px) / 3)",
     borderRadius: "var(--radius-full)",
     background: "var(--paper-card)",
-    boxShadow: "var(--shadow-e1)",
+    boxShadow: "0 10px 24px -20px rgba(70, 50, 30, 0.24)",
     pointerEvents: "none",
     transition: "transform var(--dur-instant) var(--ease-settle)",
     willChange: "transform",
@@ -215,7 +216,7 @@ const styles = {
     alignItems: "center",
     justifyContent: "center",
     gap: "4px",
-    minHeight: "60px",
+    minHeight: "56px",
     borderRadius: "var(--radius-full)",
     background: "transparent",
     color: "var(--ink-soft)",
@@ -232,7 +233,7 @@ const styles = {
     alignItems: "center",
     justifyContent: "center",
     gap: "4px",
-    minHeight: "60px",
+    minHeight: "56px",
     borderRadius: "var(--radius-full)",
     background: "transparent",
     color: "var(--ink)",
