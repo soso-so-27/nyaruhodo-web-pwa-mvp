@@ -97,6 +97,7 @@ const HOME_FRAME_TUNING = {
   trayRadius: "18px",
   trayMinHeight: "104px",
   trayToNavGap: "32px",
+  bottomClearance: "132px",
   emptyIllustrationWidth: "min(36vw, 124px)",
   emptyIllustrationMinWidth: "112px",
   emptyTitleSize: "20px",
@@ -1035,6 +1036,7 @@ function useDaylight(now: number) {
       "--home-tray-radius": HOME_FRAME_TUNING.trayRadius,
       "--home-tray-min-height": HOME_FRAME_TUNING.trayMinHeight,
       "--home-tray-to-nav-gap": HOME_FRAME_TUNING.trayToNavGap,
+      "--home-bottom-clearance": HOME_FRAME_TUNING.bottomClearance,
       "--home-empty-illustration-width": HOME_FRAME_TUNING.emptyIllustrationWidth,
       "--home-empty-illustration-min-width":
         HOME_FRAME_TUNING.emptyIllustrationMinWidth,
@@ -1442,7 +1444,7 @@ const deskStyles = {
     flexDirection: "column",
     alignItems: "center",
     padding:
-      "calc(var(--home-page-padding-top, 10px) + env(safe-area-inset-top)) var(--home-page-padding-x, 16px) calc(var(--bottom-nav-height) + var(--bottom-nav-safe-offset) + 24px)",
+      "calc(var(--home-page-padding-top, 10px) + env(safe-area-inset-top)) var(--home-page-padding-x, 16px) calc(var(--bottom-nav-height) + var(--bottom-nav-safe-offset) + var(--home-bottom-clearance, 132px))",
     color: "var(--ink)",
     background: HOME_SKY_BACKGROUND,
     transition:
@@ -1466,6 +1468,7 @@ const deskStyles = {
     zIndex: 1,
     flex: 1,
     width: "min(100%, var(--home-stage-max-width, 430px))",
+    minHeight: 0,
     display: "flex",
     flexDirection: "column",
     alignItems: "center",
@@ -1475,6 +1478,7 @@ const deskStyles = {
   },
   homeHero: {
     width: "100%",
+    minHeight: 0,
     display: "flex",
     flexDirection: "column",
     alignItems: "center",
