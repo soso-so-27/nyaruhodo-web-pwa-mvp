@@ -350,8 +350,8 @@ test.describe("home sleeping exchange flow", () => {
 
     await expect(page.getByText("とると、1枚とどく", { exact: true })).toHaveCount(0);
     await expect(page.getByText("きょうも すやすや")).toHaveCount(0);
-    await expect(page.getByText("きょうのねがお")).toBeVisible();
-    await expect(page.getByText("まだ")).toBeVisible();
+    await expect(page.getByText("むぎの きょう、まだ")).toBeVisible();
+    await expect(page.getByText("タップして とる")).toBeVisible();
     await expect(page.getByTestId("home-desk-model")).toHaveAttribute(
       "data-state",
       "1",
@@ -432,8 +432,8 @@ test.describe("home sleeping exchange flow", () => {
     await page.goto("/home");
     await page.waitForLoadState("networkidle");
 
-    await expect(page.getByText("おやすみ", { exact: true })).toBeVisible();
-    await expect(page.getByText("また、あした", { exact: true })).toBeVisible();
+    await expect(page.getByText("きょうは おくらなかった", { exact: true })).toBeVisible();
+    await expect(page.getByText("また あした", { exact: true })).toBeVisible();
     await page.getByRole("button", { name: /ねがおを\s*とる/ }).click();
     await page.locator('input[type="file"]').last().setInputFiles({
       name: "after-eight.svg",
@@ -515,8 +515,8 @@ test.describe("home sleeping exchange flow", () => {
       "1",
     );
     await expect(page.getByText("きょうも すやすや")).toHaveCount(0);
-    await expect(page.getByText("きょうのねがお")).toBeVisible();
-    await expect(page.getByText("まだ")).toBeVisible();
+    await expect(page.getByText("むぎの きょう、まだ")).toBeVisible();
+    await expect(page.getByText("タップして とる")).toBeVisible();
   });
 
   test("keeps today's kept evening delivery open on the home screen", async ({

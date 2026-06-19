@@ -22,6 +22,13 @@ import { StoredPhotoImage } from "../ui/StoredPhotoImage";
 
 type DeskState = "1" | "1b" | "2" | "3" | "4";
 type HomeDaylightStyle = CSSProperties & Record<`--${string}`, string>;
+type HomeTodayPhase =
+  | "empty-before"
+  | "sent-before"
+  | "delivered"
+  | "opened"
+  | "empty-after"
+  | "late-sent";
 
 type DeskViewerPhoto =
   | {
@@ -173,16 +180,14 @@ export function HomeDeskModel({
     eveningState.kind === "delivered" || eveningState.kind === "opened"
       ? eveningState.deliveredPhoto
       : null;
-  const latestOwnPhoto = useMemo(
-    () => getLatestOwnPhoto(ownSleepingPhotos),
-    [ownSleepingPhotos],
-  );
-  const homePhoto = targetPhoto ?? latestOwnPhoto;
+  const homeDay = getHomeDayPresentation({
+    catName,
+    eveningState,
+    targetPhoto,
+    now,
+  });
+  const homePhoto = homeDay.photo;
   const shouldHidePresence = true;
-  const hasTodayPhoto = Boolean(targetPhoto);
-  const guidanceCopy = getHomeStatusCopy(deskState, catName, now, hasTodayPhoto);
-  const homeCycleStatus = getHomeCycleStatus(deskState, hasTodayPhoto, now);
-  const isBefore = deskState === "1" || deskState === "1b";
   useEffect(() => {
     trackDeskStateShown(deskState, eveningState.dateKey);
   }, [deskState, eveningState.dateKey]);
@@ -307,160 +312,144 @@ export function HomeDeskModel({
             ...(deskState === "4" ? deskStyles.homeHeroOpened : {}),
           }}
         >
-          {homePhoto ? (
-            <button
-              type="button"
-              data-testid="desk-home-frame"
-              style={deskStyles.homeFrameButton}
-              onClick={() =>
-                setViewerPhoto({
-                  kind: "own",
-                  photo: homePhoto,
-                  dateKey: eveningState.dateKey,
-                })
-              }
-              aria-label={`${catName}のねがおを大きく見る`}
-            >
-              <span
-                style={{
-                  ...deskStyles.homeFrame,
-                  ...(deskState === "3" ? deskStyles.homeFrameDelivered : {}),
-                }}
-              >
-                <StoredPhotoImage
-                  src={getPhotoDisplaySrc(homePhoto)}
-                  alt=""
-                  style={deskStyles.homeFrameImage}
-                />
-              </span>
-            </button>
-          ) : (
-            <button
-              type="button"
-              data-testid="desk-empty-frame"
-              style={deskStyles.homeEmptyFrame}
-              className={
-                prefersReducedMotion
-                  ? "desk-frame-action"
-                  : "desk-frame-action desk-frame-breathe"
-              }
-              onClick={onTakePhoto}
-              aria-label="はじめての ねがおを とろう"
-            >
-              <AppIcon name="camera" size={32} />
-              <span style={deskStyles.homeEmptyTitle}>
-                はじめての ねがおを とろう
-              </span>
-              <span style={deskStyles.homeEmptySub}>
-                とると、ここに {catName}が すむ
-              </span>
-            </button>
-          )}
-
-          <div style={deskStyles.homeCopyWrap}>
-            {guidanceCopy.title ? (
-              <p
-                style={deskStyles.homeTitle}
-                className={
-                  guidanceCopy.tone === "soon" && !prefersReducedMotion
-                    ? "desk-evening-soon-copy"
-                    : undefined
-                }
-              >
-                {guidanceCopy.title}
-              </p>
-            ) : null}
-            {guidanceCopy.sub ? (
-              <p style={deskStyles.homeSub}>{guidanceCopy.sub}</p>
-            ) : null}
-          </div>
-
-          <div style={deskStyles.homeCycleStatus} aria-label="きょうの状態">
-            <span style={deskStyles.homeCyclePill}>
-              <span style={deskStyles.homeCycleLabel}>きょうのねがお</span>
-              <strong style={deskStyles.homeCycleValue}>
-                {homeCycleStatus.photo}
-              </strong>
-            </span>
-            <span style={deskStyles.homeCyclePill}>
-              <span style={deskStyles.homeCycleLabel}>ねこだより</span>
-              <strong style={deskStyles.homeCycleValue}>
-                {homeCycleStatus.delivery}
-              </strong>
-            </span>
-          </div>
-
-          {isBefore ? (
-            <AppButton
-              variant="primary"
-              size="md"
-              onClick={onTakePhoto}
-              style={deskStyles.homeCaptureButton}
-            >
-              ねがおを とる
-            </AppButton>
-          ) : null}
-
-          {deskState === "3" ? (
-            <div
-              style={{
-                ...deskStyles.selectionLockedStage,
-                ...deskStyles.deliveredLetterWrap,
-              }}
-              onContextMenu={(event) => event.preventDefault()}
-            >
+          <div style={deskStyles.todayPhotoZone}>
+            {homePhoto ? (
               <button
                 type="button"
-                role="button"
-                data-testid="desk-open-letter"
-                aria-label="そっと ひらく"
-                style={{
-                  ...deskStyles.selectionLockedStage,
-                  ...deskStyles.arrivedLetterButton,
-                }}
-                className={holdProgress ? "desk-letter-holding" : undefined}
-                onPointerDown={startHold}
-                onPointerUp={cancelHold}
-                onPointerCancel={cancelHold}
-                onPointerLeave={cancelHold}
+                data-testid="desk-home-frame"
+                style={deskStyles.homeFrameButton}
+                onClick={() =>
+                  setViewerPhoto({
+                    kind: "own",
+                    photo: homePhoto,
+                    dateKey: eveningState.dateKey,
+                  })
+                }
+                aria-label={`${catName}のきょうのねがおを大きく見る`}
+              >
+                <span
+                  style={{
+                    ...deskStyles.homeFrame,
+                    ...(deskState === "3" ? deskStyles.homeFrameDelivered : {}),
+                  }}
+                >
+                  <StoredPhotoImage
+                    src={getPhotoDisplaySrc(homePhoto)}
+                    alt=""
+                    style={deskStyles.homeFrameImage}
+                  />
+                  <span style={deskStyles.todayTag}>きょう</span>
+                </span>
+              </button>
+            ) : (
+              <button
+                type="button"
+                data-testid="desk-empty-frame"
+                style={deskStyles.homeEmptyFrame}
+                className={
+                  prefersReducedMotion
+                    ? "desk-frame-action"
+                    : "desk-frame-action desk-frame-breathe"
+                }
+                onClick={onTakePhoto}
+                aria-label={`${catName}の きょう、まだ。ねがおを とる`}
+              >
+                <AppIcon name="camera" size={32} />
+                <span style={deskStyles.homeEmptyTitle}>
+                  {catName}の きょう、まだ
+                </span>
+                <span style={deskStyles.homeEmptySub}>
+                  {homeDay.emptyActionCopy}
+                </span>
+              </button>
+            )}
+          </div>
+
+          <section
+            data-testid="home-letter-tray"
+            data-phase={homeDay.phase}
+            style={{
+              ...deskStyles.letterTray,
+              ...(homeDay.phase === "delivered" ? deskStyles.letterTrayDelivered : {}),
+            }}
+            className={
+              homeDay.phase === "delivered" && !prefersReducedMotion
+                ? "home-letter-tray-glow"
+                : undefined
+            }
+            aria-label="ねこだより"
+          >
+            {homeDay.phase === "delivered" ? (
+              <div
+                style={deskStyles.letterTrayDeliveredLayout}
                 onContextMenu={(event) => event.preventDefault()}
               >
-                <span style={deskStyles.letterFlap} aria-hidden="true" />
-                <span
-                  style={{ ...deskStyles.letterSeal, ...deskStyles.letterSealActive }}
-                  aria-hidden="true"
-                />
-                {deliveredPhoto && developPhotoMounted ? (
+                <button
+                  type="button"
+                  role="button"
+                  data-testid="desk-open-letter"
+                  aria-label="そっと ひらく"
+                  style={{
+                    ...deskStyles.selectionLockedStage,
+                    ...deskStyles.arrivedLetterButton,
+                    ...deskStyles.trayLetterButton,
+                  }}
+                  className={holdProgress ? "desk-letter-holding" : undefined}
+                  onPointerDown={startHold}
+                  onPointerUp={cancelHold}
+                  onPointerCancel={cancelHold}
+                  onPointerLeave={cancelHold}
+                  onContextMenu={(event) => event.preventDefault()}
+                >
+                  <span style={deskStyles.letterFlap} aria-hidden="true" />
                   <span
-                    data-develop-photo="true"
-                    style={{
-                      ...deskStyles.selectionLockedStage,
-                      ...deskStyles.developPhoto,
-                      ...(isRewindingHold ? deskStyles.developPhotoRewinding : {}),
-                    }}
+                    style={{ ...deskStyles.letterSeal, ...deskStyles.letterSealActive }}
                     aria-hidden="true"
-                  >
-                    <StoredPhotoImage
-                      src={getPhotoDetailSrc(deliveredPhoto)}
-                      alt=""
+                  />
+                  {deliveredPhoto && developPhotoMounted ? (
+                    <span
+                      data-develop-photo="true"
                       style={{
                         ...deskStyles.selectionLockedStage,
-                        ...deskStyles.developImage,
+                        ...deskStyles.developPhoto,
+                        ...(isRewindingHold ? deskStyles.developPhotoRewinding : {}),
                       }}
-                    />
-                  </span>
+                      aria-hidden="true"
+                    >
+                      <StoredPhotoImage
+                        src={getPhotoDetailSrc(deliveredPhoto)}
+                        alt=""
+                        style={{
+                          ...deskStyles.selectionLockedStage,
+                          ...deskStyles.developImage,
+                        }}
+                      />
+                    </span>
+                  ) : null}
+                </button>
+                <div style={deskStyles.letterTrayCopy}>
+                  <strong style={deskStyles.letterTrayTitle}>
+                    ねこだより、とどいた
+                  </strong>
+                  <span style={deskStyles.letterTraySub}>タップで ひらく</span>
+                </div>
+              </div>
+            ) : homeDay.phase === "opened" ? (
+              <a href="/collection" style={deskStyles.letterTrayLink}>
+                <strong style={deskStyles.letterTrayTitle}>{homeDay.trayTitle}</strong>
+                {homeDay.traySub ? (
+                  <span style={deskStyles.letterTraySub}>{homeDay.traySub}</span>
                 ) : null}
-              </button>
-              <span
-                style={{
-                  ...deskStyles.holdLabel,
-                  ...(holdProgress ? deskStyles.holdLabelActive : {}),
-                }}
-              >
-                そっと ひらく
-              </span>
-            </div>
-          ) : null}
+              </a>
+            ) : (
+              <>
+                <strong style={deskStyles.letterTrayTitle}>{homeDay.trayTitle}</strong>
+                {homeDay.traySub ? (
+                  <span style={deskStyles.letterTraySub}>{homeDay.traySub}</span>
+                ) : null}
+              </>
+            )}
+          </section>
         </div>
 
         {omoideMemory ? (
@@ -612,6 +601,17 @@ export function HomeDeskModel({
         .desk-evening-soon-copy {
           animation: deskEveningSoonCopyIn 1200ms var(--ease-gentle) both;
         }
+        .home-letter-tray-glow {
+          animation: homeLetterTrayGlow 2200ms var(--ease-gentle) infinite alternate;
+        }
+        @keyframes homeLetterTrayGlow {
+          from {
+            filter: brightness(1);
+          }
+          to {
+            filter: brightness(1.035);
+          }
+        }
         .desk-letter-holding [data-develop-photo="true"] {
           opacity: 1 !important;
           filter: blur(0) !important;
@@ -619,7 +619,8 @@ export function HomeDeskModel({
         }
         @media (prefers-reduced-motion: reduce) {
           .desk-frame-breathe,
-          .desk-evening-soon-copy {
+          .desk-evening-soon-copy,
+          .home-letter-tray-glow {
             animation: none;
             filter: none;
           }
@@ -985,6 +986,84 @@ function getDeskState(eveningState: EveningHomeState): DeskState {
   return eveningState.isTodayDelivery ? "1" : "1b";
 }
 
+function getHomeDayPresentation({
+  catName,
+  eveningState,
+  targetPhoto,
+  now,
+}: {
+  catName: string;
+  eveningState: EveningHomeState;
+  targetPhoto: OwnSleepingPhoto | null;
+  now: number;
+}): {
+  phase: HomeTodayPhase;
+  photo: OwnSleepingPhoto | null;
+  emptyActionCopy: string;
+  trayTitle: string;
+  traySub?: string;
+} {
+  const afterDelivery = getJstMinuteOfDay(now) >= 20 * 60;
+
+  if (eveningState.kind === "delivered") {
+    return {
+      phase: "delivered",
+      photo: targetPhoto,
+      emptyActionCopy: "タップして とる",
+      trayTitle: "ねこだより、とどいた",
+      traySub: "タップで ひらく",
+    };
+  }
+
+  if (eveningState.kind === "opened") {
+    return {
+      phase: "opened",
+      photo: targetPhoto,
+      emptyActionCopy: "タップして とる",
+      trayTitle: "きょうの ねこだより →",
+    };
+  }
+
+  if (targetPhoto) {
+    if (eveningState.kind === "waiting" && !eveningState.isTodayDelivery) {
+      return {
+        phase: "late-sent",
+        photo: targetPhoto,
+        emptyActionCopy: "まだ とれるよ",
+        trayTitle: "きょうは おくらなかった",
+        traySub: "また あした",
+      };
+    }
+
+    return {
+      phase: "sent-before",
+      photo: targetPhoto,
+      emptyActionCopy: "タップして とる",
+      trayTitle: "おくった",
+      traySub: isEveningSoonWindow(now)
+        ? "もうすぐ、とどく"
+        : "よる8時に とどく",
+    };
+  }
+
+  if (afterDelivery || eveningState.kind === "before" && eveningState.afterTodayDelivery) {
+    return {
+      phase: "empty-after",
+      photo: null,
+      emptyActionCopy: "まだ とれるよ",
+      trayTitle: "きょうは おくらなかった",
+      traySub: "また あした",
+    };
+  }
+
+  return {
+    phase: "empty-before",
+    photo: null,
+    emptyActionCopy: "タップして とる",
+    trayTitle: "とると、よる8時に とどく",
+  };
+}
+
 function isEveningSoonWindow(now: number) {
   const minute = getJstMinuteOfDay(now);
   return minute >= 17 * 60 && minute < 20 * 60;
@@ -1040,65 +1119,6 @@ function interpolateHexColor(from: string, to: string, progress: number) {
 
 function parseHexColor(hex: string) {
   return [1, 3, 5].map((start) => Number.parseInt(hex.slice(start, start + 2), 16));
-}
-
-function getLatestOwnPhoto(photos: OwnSleepingPhoto[]) {
-  return photos.reduce<OwnSleepingPhoto | null>(
-    (latest, photo) =>
-      !latest || photo.createdAt > latest.createdAt ? photo : latest,
-    null,
-  );
-}
-
-function getHomeStatusCopy(
-  state: DeskState,
-  catName: string,
-  now: number,
-  hasTodayPhoto: boolean,
-): { title: string; sub?: string; tone?: "soon" } {
-  switch (state) {
-    case "1":
-      return hasTodayPhoto ? { title: "きょうも すやすや" } : { title: "" };
-    case "1b":
-      return { title: "おやすみ", sub: "また、あした" };
-    case "2":
-      if (isEveningSoonWindow(now)) {
-        return { title: "そろそろ、とどくころ", tone: "soon" };
-      }
-      return {
-        title: `${catName}を おくった`,
-        sub: "よる8時 とどく",
-      };
-    case "3":
-      return { title: "とどいた" };
-    case "4":
-      return {
-        title: "どこかの ねこも、ねてた",
-        sub: `${catName}の ねがおも、どこかへ`,
-      };
-    default:
-      return { title: "" };
-  }
-}
-
-function getHomeCycleStatus(
-  state: DeskState,
-  hasTodayPhoto: boolean,
-  now: number,
-) {
-  const delivery =
-    state === "3"
-      ? "とどいた"
-      : state === "4"
-        ? "ひらいた"
-        : isEveningSoonWindow(now)
-          ? "もうすぐ"
-          : "よる8時 とどく";
-
-  return {
-    photo: hasTodayPhoto ? "出した" : "まだ",
-    delivery,
-  };
 }
 
 function getPhotoDisplaySrc(
@@ -1252,6 +1272,9 @@ const deskStyles = {
   homeHeroOpened: {
     gap: "18px",
   },
+  todayPhotoZone: {
+    width: "100%",
+  },
   homeFrameButton: {
     display: "block",
     width: "100%",
@@ -1289,6 +1312,24 @@ const deskStyles = {
       "color-mix(in srgb, var(--home-frame-light, var(--paper)) 24%, transparent)",
     boxShadow: "var(--home-frame-hairline)",
   },
+  todayTag: {
+    position: "absolute",
+    top: "12px",
+    left: "12px",
+    minHeight: "28px",
+    display: "inline-flex",
+    alignItems: "center",
+    padding: "4px 10px",
+    borderRadius: "var(--radius-full)",
+    background: "color-mix(in srgb, var(--paper-card) 76%, transparent)",
+    color: "var(--ink)",
+    fontFamily: "var(--font-ui)",
+    fontSize: "12px",
+    fontWeight: 500,
+    letterSpacing: "var(--tracking-label)",
+    boxShadow:
+      "0 0 0 1px color-mix(in srgb, var(--line) 72%, transparent) inset",
+  },
   homeEmptyFrame: {
     width: "100%",
     aspectRatio: "3 / 4",
@@ -1298,9 +1339,9 @@ const deskStyles = {
     alignContent: "center",
     gap: "12px",
     padding: "24px",
-    border: "1px solid var(--line)",
+    border: "1px dashed color-mix(in srgb, var(--ink-soft) 54%, transparent)",
     borderRadius: "var(--home-frame-radius, var(--radius-2xl))",
-    background: "var(--home-frame-light, var(--paper))",
+    background: "color-mix(in srgb, var(--home-frame-light, var(--paper)) 58%, transparent)",
     color: "var(--ink-soft)",
     boxShadow:
       "0 22px 64px color-mix(in srgb, var(--home-frame-glow, var(--paper-warm)) 62%, transparent)",
@@ -1320,6 +1361,70 @@ const deskStyles = {
     fontFamily: "var(--font-display)",
     fontSize: "13px",
     letterSpacing: "var(--tracking-body)",
+  },
+  letterTray: {
+    width: "100%",
+    boxSizing: "border-box",
+    display: "grid",
+    justifyItems: "center",
+    gap: "6px",
+    minHeight: "92px",
+    padding: "16px 18px",
+    borderRadius: "17px",
+    background: "color-mix(in srgb, var(--paper-card) 88%, var(--home-frame-light, var(--paper)) 12%)",
+    color: "var(--ink-soft)",
+    boxShadow:
+      "0 1px 0 color-mix(in srgb, var(--line) 56%, transparent) inset, 0 14px 34px -18px color-mix(in srgb, var(--home-frame-glow, var(--paper-warm)) 68%, transparent)",
+    transition:
+      "background var(--home-daylight-transition, 1800ms) var(--ease-gentle), box-shadow var(--home-daylight-transition, 1800ms) var(--ease-gentle)",
+  },
+  letterTrayDelivered: {
+    color: "var(--ink)",
+    background:
+      "color-mix(in srgb, var(--paper-card) 92%, var(--home-frame-glow, var(--paper-warm)) 8%)",
+    boxShadow:
+      "0 0 0 1px color-mix(in srgb, var(--seal-soft) 42%, transparent) inset, 0 18px 44px -18px color-mix(in srgb, var(--seal) 40%, transparent), var(--shadow-e2)",
+  },
+  letterTrayDeliveredLayout: {
+    width: "100%",
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: "16px",
+  },
+  letterTrayCopy: {
+    display: "grid",
+    gap: "4px",
+    justifyItems: "start",
+  },
+  letterTrayLink: {
+    display: "grid",
+    justifyItems: "center",
+    gap: "6px",
+    color: "inherit",
+    textDecoration: "none",
+    WebkitTapHighlightColor: "transparent",
+  },
+  letterTrayTitle: {
+    margin: 0,
+    color: "var(--ink)",
+    fontFamily: "var(--font-display)",
+    fontSize: "18px",
+    fontWeight: 400,
+    letterSpacing: "var(--tracking-label)",
+    textAlign: "center",
+  },
+  letterTraySub: {
+    color: "var(--ink-soft)",
+    fontFamily: "var(--font-display)",
+    fontSize: "13px",
+    letterSpacing: "var(--tracking-body)",
+    textAlign: "center",
+  },
+  trayLetterButton: {
+    width: "92px",
+    height: "60px",
+    flex: "0 0 auto",
   },
   homeCopyWrap: {
     display: "grid",

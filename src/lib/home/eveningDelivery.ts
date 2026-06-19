@@ -297,7 +297,7 @@ export function buildEveningHomeState({
   now?: number;
 }): EveningHomeState {
   autoOpenExpiredEveningDeliveries(now);
-  const todayKey = getJstDateKey(now);
+  const todayKey = getHomeDisplayDateKey(now);
   const store = readEveningDeliveryStore();
   const visibleDeliveredDay = findLatestVisibleDeliveredDay(store, now);
 
@@ -380,6 +380,15 @@ export function getJstDateKey(timestamp = Date.now()) {
 
 export function getJstHour(timestamp = Date.now()) {
   return new Date(timestamp + JST_OFFSET_MS).getUTCHours();
+}
+
+function getHomeDisplayDateKey(timestamp = Date.now()) {
+  const todayKey = getJstDateKey(timestamp);
+  if (getJstHour(timestamp) >= 5) {
+    return todayKey;
+  }
+
+  return addJstDays(todayKey, -1);
 }
 
 export function addJstDays(dateKey: string, days: number) {
