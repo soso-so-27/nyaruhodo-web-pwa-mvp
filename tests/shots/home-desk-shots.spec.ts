@@ -21,6 +21,9 @@ const expectedShotNames = [
   "state4_home_frame_viewer_close.png",
   "state1b_2030.png",
   "album_today.png",
+  "mainichi_board_2.png",
+  "mainichi_board_12.png",
+  "mainichi_board_31.png",
   "album_missing_cases.png",
   "album_missing_a.png",
   "album_missing_b.png",
@@ -212,6 +215,20 @@ test.describe("home desk model shots", () => {
       fullPage: false,
     });
   });
+
+  for (const count of [2, 12, 31] as const) {
+    test(`mainichi_board_${count}`, async ({ page }) => {
+      await seedMainichiBoardPhotoCount(page, count);
+      await page.goto("/collection");
+      await page.waitForLoadState("networkidle");
+      await expect(page.getByTestId("mainichi-photo-board")).toBeVisible();
+      await expect(page.getByTestId("mainichi-board-photo-sent")).toHaveCount(count);
+      await page.screenshot({
+        path: path.join(shotsDir, `mainichi_board_${count}.png`),
+        fullPage: count <= 12,
+      });
+    });
+  }
 
   test("state4_home_frame_viewer", async ({ page }) => {
     await seedReviewState(page, {
@@ -611,6 +628,69 @@ async function seedCollectionMissingCases(page: Page) {
       body: JSON.stringify({ count: 124 }),
     });
   });
+}
+
+async function seedMainichiBoardPhotoCount(page: Page, count: number) {
+  await page.addInitScript(
+    ({ count, ownDataUrl, deliveredDataUrl }) => {
+      const now = Date.parse("2026-06-20T12:00:00.000Z");
+      (window as typeof window & { __testNow?: number }).__testNow = now;
+      const originalDateNow = Date.now.bind(Date);
+      Date.now = () =>
+        (window as typeof window & { __testNow?: number }).__testNow ??
+        originalDateNow();
+
+      const cats = [
+        {
+          id: "cat-shot-mugi",
+          name: "\u3080\u304e",
+          createdAt: new Date(Date.parse("2026-06-01T00:00:00.000Z")).toISOString(),
+          updatedAt: new Date(Date.parse("2026-06-01T00:00:00.000Z")).toISOString(),
+        },
+        {
+          id: "cat-shot-ame",
+          name: "\u3042\u3081",
+          createdAt: new Date(Date.parse("2026-06-01T00:00:00.000Z")).toISOString(),
+          updatedAt: new Date(Date.parse("2026-06-01T00:00:00.000Z")).toISOString(),
+        },
+      ];
+
+      const photos = Array.from({ length: count }, (_, index) => {
+        const month = count === 31 ? "07" : "06";
+        const day = count === 31 ? 31 - index : count - index;
+        const cat = cats[index % cats.length];
+        const createdAt = Date.parse(
+          `2026-${month}-${String(day).padStart(2, "0")}T${String(10 + (index % 9)).padStart(2, "0")}:00:00.000Z`,
+        );
+
+        return {
+          id: `mainichi-shot-${index}`,
+          ownerCatId: cat.id,
+          catId: cat.id,
+          src: index % 2 === 0 ? ownDataUrl : deliveredDataUrl,
+          state: "sleeping",
+          visibility: "private",
+          deliveryStatus: "available",
+          triggerLabel: "sleeping",
+          theme: "sleeping",
+          shared: true,
+          createdAt,
+        };
+      });
+
+      window.localStorage.setItem("neteruneko_home_desk_model", "1");
+      window.localStorage.setItem("nyaruhodo_sleeping_safety_accepted", "1");
+      window.localStorage.setItem("active_cat_id", cats[0].id);
+      window.localStorage.setItem("cat_profiles", JSON.stringify(cats));
+      window.localStorage.setItem(
+        "nyaruhodo_exchange_own_sleeping_photos",
+        JSON.stringify(photos),
+      );
+      window.localStorage.setItem("neteruneko_evening_delivery_days", "{}");
+      window.localStorage.setItem("nyaruhodo_exchange_kept_photos", "[]");
+    },
+    { count, ownDataUrl, deliveredDataUrl },
+  );
 }
 
 function readFixtureDataUrl(fileName: string) {

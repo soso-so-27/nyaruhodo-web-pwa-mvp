@@ -24,7 +24,7 @@ import {
   isExchangePhotoLocallyBlocked,
   keepExchangePhoto,
   readKeptExchangePhotos,
-  readOwnSleepingPhotos,
+  readAllOwnSleepingPhotos,
   updateKeptExchangePhotoDataUrl,
   updateOwnSleepingPhotoDelivery,
   type ExchangePhoto,
@@ -84,17 +84,17 @@ const MAINICHI_PASTE_MOTION_CSS = `
 @keyframes mainichiPasteSettle {
   0% {
     opacity: 0;
-    transform: translateY(-28px) rotate(var(--mainichi-rotation)) scale(0.985);
+    transform: translate(var(--mainichi-shift-x), calc(var(--mainichi-shift-y) - 28px)) rotate(var(--mainichi-rotation)) scale(0.985);
     filter: drop-shadow(0 18px 22px rgba(120,110,90,0.16));
   }
   58% {
     opacity: 1;
-    transform: translateY(5px) rotate(var(--mainichi-rotation)) scale(1.006);
+    transform: translate(var(--mainichi-shift-x), calc(var(--mainichi-shift-y) + 5px)) rotate(var(--mainichi-rotation)) scale(1.006);
     filter: drop-shadow(0 12px 16px rgba(120,110,90,0.11));
   }
   100% {
     opacity: 1;
-    transform: translateY(0) rotate(var(--mainichi-rotation)) scale(1);
+    transform: translate(var(--mainichi-shift-x), var(--mainichi-shift-y)) rotate(var(--mainichi-rotation)) scale(1);
     filter: drop-shadow(0 0 0 rgba(120,110,90,0));
   }
 }
@@ -102,15 +102,15 @@ const MAINICHI_PASTE_MOTION_CSS = `
 @keyframes mainichiTapePress {
   0% {
     opacity: 0;
-    transform: translate(-50%, -80%) rotate(-3deg) scaleX(0.84);
+    transform: translate(-50%, -80%) rotate(var(--mainichi-tape-rotation)) scaleX(0.84);
   }
   42% {
     opacity: 0.92;
-    transform: translate(-50%, -20%) rotate(-3deg) scaleX(1.04);
+    transform: translate(-50%, -20%) rotate(var(--mainichi-tape-rotation)) scaleX(1.04);
   }
   100% {
     opacity: 1;
-    transform: translate(-50%, -15%) rotate(-3deg) scaleX(1);
+    transform: translate(-50%, -15%) rotate(var(--mainichi-tape-rotation)) scaleX(1);
   }
 }
 
@@ -221,6 +221,16 @@ type MainichiBoardMonth = {
   key: string;
   label: string;
   photos: MainichiBoardPhoto[];
+};
+
+type MainichiBoardPhotoLayout = {
+  span: number;
+  justifySelf: CSSProperties["justifySelf"];
+  rotation: string;
+  shiftX: string;
+  shiftY: string;
+  tapeLeft: string;
+  tapeRotation: string;
 };
 
 type MainichiMorphSource = {
@@ -370,7 +380,7 @@ export function CollectionPage() {
     [catName, shareSuggestionSlot, storedCollectionPhotos],
   );
   const sleepingBoxPhotos = useMemo(
-    () => readOwnSleepingPhotos(),
+    () => readAllOwnSleepingPhotos(),
     [boxRefreshTick, hasLoaded],
   );
   const openedEveningDeliveryPhotos = useMemo(
@@ -1156,6 +1166,8 @@ function MainichiPhotoBoard({
     });
   }, [months, prefersReducedMotion]);
 
+  const showCatNames = activeSide === "sent" && catProfiles.length > 1;
+
   return (
     <section style={styles.mainichiBoard} data-testid="mainichi-photo-board">
       <style>{MAINICHI_PASTE_MOTION_CSS}</style>
@@ -1176,6 +1188,7 @@ function MainichiPhotoBoard({
             <MainichiMonthBoard
               key={`${activeSide}-${month.key}`}
               month={month}
+              showCatNames={showCatNames}
               pastingPhotoKey={pastingPhotoKey}
               onOpenDay={onOpenDay}
             />
@@ -1195,10 +1208,12 @@ function MainichiPhotoBoard({
 
 function MainichiMonthBoard({
   month,
+  showCatNames,
   pastingPhotoKey,
   onOpenDay,
 }: {
   month: MainichiBoardMonth;
+  showCatNames: boolean;
   pastingPhotoKey: string | null;
   onOpenDay: (dateKey: string, source?: MainichiMorphSource | null) => void;
 }) {
@@ -1211,12 +1226,14 @@ function MainichiMonthBoard({
       data-testid="mainichi-month-board"
     >
       <h2 style={styles.mainichiMonthTitle}>{month.label}</h2>
-      <div style={styles.mainichiBoardPhotos}>
+      <div style={{ ...styles.mainichiBoardPhotos, ...getMainichiBoardCanvasStyle(month.photos.length) }}>
         {month.photos.map((photo, index) => (
           <MainichiBoardPhotoCard
             key={photo.id}
             photo={photo}
             index={index}
+            total={month.photos.length}
+            showCatName={showCatNames && month.photos.length <= 3}
             shouldPaste={getMainichiBoardPhotoKey(photo) === pastingPhotoKey}
             onOpenDay={onOpenDay}
           />
@@ -1229,14 +1246,20 @@ function MainichiMonthBoard({
 function MainichiBoardPhotoCard({
   photo,
   index,
+  total,
+  showCatName,
   shouldPaste,
   onOpenDay,
 }: {
   photo: MainichiBoardPhoto;
   index: number;
+  total: number;
+  showCatName: boolean;
   shouldPaste: boolean;
   onOpenDay: (dateKey: string, source?: MainichiMorphSource | null) => void;
 }) {
+  const layout = getMainichiBoardPhotoLayout(index, total);
+  const showTape = shouldPaste || shouldShowMainichiBoardTape(index, total);
   const testId =
     photo.side === "sent"
       ? "mainichi-board-photo-sent"
@@ -1263,17 +1286,25 @@ function MainichiBoardPhotoCard({
       data-mainichi-paste={shouldPaste ? "true" : undefined}
       style={{
         ...styles.mainichiBoardPhotoButton,
-        "--mainichi-rotation": getMainichiBoardRotation(index),
-        transform: "rotate(var(--mainichi-rotation))",
+        ...layout.style,
+        "--mainichi-rotation": layout.rotation,
+        "--mainichi-shift-x": layout.shiftX,
+        "--mainichi-shift-y": layout.shiftY,
+        "--mainichi-tape-left": layout.tapeLeft,
+        "--mainichi-tape-rotation": layout.tapeRotation,
+        transform:
+          "translate(var(--mainichi-shift-x), var(--mainichi-shift-y)) rotate(var(--mainichi-rotation))",
       } as CSSProperties}
       onClick={handleClick}
       aria-label={photo.side === "sent" ? "おくった ねがおをひらく" : "とどいた ねがおをひらく"}
     >
-      <span
-        data-mainichi-paste-tape={shouldPaste ? "true" : undefined}
-        style={styles.mainichiBoardTape}
-        aria-hidden="true"
-      />
+      {showTape ? (
+        <span
+          data-mainichi-paste-tape={shouldPaste ? "true" : undefined}
+          style={styles.mainichiBoardTape}
+          aria-hidden="true"
+        />
+      ) : null}
       <PhotoTile
         src={photo.src}
         alt=""
@@ -1291,12 +1322,9 @@ function MainichiBoardPhotoCard({
             : undefined
         }
       />
-      <span style={styles.mainichiBoardPhotoMeta}>
-        <span style={styles.mainichiBoardPhotoDate}>{photo.dateLabel}</span>
-        {photo.catName ? (
-          <span style={styles.mainichiBoardPhotoCat}>{photo.catName}</span>
-        ) : null}
-      </span>
+      {showCatName && photo.catName ? (
+        <span style={styles.mainichiBoardPhotoCatBadge}>{photo.catName}</span>
+      ) : null}
     </button>
   );
 }
@@ -2641,10 +2669,276 @@ function getMainichiBoardPhotoKey(photo: MainichiBoardPhoto) {
   return `${photo.side}:${photo.sourcePhotoId ?? photo.id}:${photo.dateKey}`;
 }
 
-function getMainichiBoardRotation(index: number) {
-  const rotations = ["-2.2deg", "1.4deg", "-0.8deg", "2deg", "-1.4deg"];
+function getMainichiBoardCanvasStyle(total: number): CSSProperties {
+  if (total <= 0) {
+    return {};
+  }
 
-  return rotations[index % rotations.length];
+  if (total === 1) {
+    return {
+      minHeight: "360px",
+      alignContent: "center",
+    };
+  }
+
+  if (total <= 3) {
+    return {
+      minHeight: "460px",
+      alignContent: "start",
+      paddingTop: "18px",
+    };
+  }
+
+  if (total <= 8) {
+    return {
+      minHeight: "620px",
+    };
+  }
+
+  if (total <= 16) {
+    return {
+      minHeight: "880px",
+    };
+  }
+
+  return {
+    minHeight: "1180px",
+  };
+}
+
+function getMainichiBoardPhotoLayout(index: number, total: number) {
+  const single: MainichiBoardPhotoLayout = {
+    span: 4,
+    justifySelf: "center",
+    rotation: "-1.2deg",
+    shiftX: "0px",
+    shiftY: "0px",
+    tapeLeft: "52%",
+    tapeRotation: "-4deg",
+  };
+  const pair: MainichiBoardPhotoLayout[] = [
+    {
+      span: 3,
+      justifySelf: "start",
+      rotation: "-2.2deg",
+      shiftX: "-3px",
+      shiftY: "0px",
+      tapeLeft: "48%",
+      tapeRotation: "-5deg",
+    },
+    {
+      span: 3,
+      justifySelf: "end",
+      rotation: "1.8deg",
+      shiftX: "4px",
+      shiftY: "18px",
+      tapeLeft: "55%",
+      tapeRotation: "4deg",
+    },
+  ];
+  const sparse: MainichiBoardPhotoLayout[] = [
+    {
+      span: 3,
+      justifySelf: "start",
+      rotation: "-2.3deg",
+      shiftX: "-4px",
+      shiftY: "0px",
+      tapeLeft: "46%",
+      tapeRotation: "-5deg",
+    },
+    {
+      span: 3,
+      justifySelf: "end",
+      rotation: "1.7deg",
+      shiftX: "5px",
+      shiftY: "28px",
+      tapeLeft: "58%",
+      tapeRotation: "4deg",
+    },
+    {
+      span: 4,
+      justifySelf: "center",
+      rotation: "-1.1deg",
+      shiftX: "0px",
+      shiftY: "8px",
+      tapeLeft: "50%",
+      tapeRotation: "-3deg",
+    },
+  ];
+  const collage: MainichiBoardPhotoLayout[] = [
+    {
+      span: 3,
+      justifySelf: "start",
+      rotation: "-2.6deg",
+      shiftX: "-4px",
+      shiftY: "0px",
+      tapeLeft: "47%",
+      tapeRotation: "-5deg",
+    },
+    {
+      span: 3,
+      justifySelf: "end",
+      rotation: "1.7deg",
+      shiftX: "5px",
+      shiftY: "18px",
+      tapeLeft: "57%",
+      tapeRotation: "3deg",
+    },
+    {
+      span: 2,
+      justifySelf: "start",
+      rotation: "2.4deg",
+      shiftX: "2px",
+      shiftY: "4px",
+      tapeLeft: "51%",
+      tapeRotation: "5deg",
+    },
+    {
+      span: 4,
+      justifySelf: "end",
+      rotation: "-1.4deg",
+      shiftX: "-2px",
+      shiftY: "14px",
+      tapeLeft: "44%",
+      tapeRotation: "-4deg",
+    },
+    {
+      span: 3,
+      justifySelf: "start",
+      rotation: "1.2deg",
+      shiftX: "5px",
+      shiftY: "-2px",
+      tapeLeft: "58%",
+      tapeRotation: "4deg",
+    },
+    {
+      span: 3,
+      justifySelf: "end",
+      rotation: "-2deg",
+      shiftX: "-4px",
+      shiftY: "20px",
+      tapeLeft: "46%",
+      tapeRotation: "-6deg",
+    },
+    {
+      span: 4,
+      justifySelf: "start",
+      rotation: "1.9deg",
+      shiftX: "-2px",
+      shiftY: "6px",
+      tapeLeft: "53%",
+      tapeRotation: "3deg",
+    },
+    {
+      span: 2,
+      justifySelf: "end",
+      rotation: "-1deg",
+      shiftX: "3px",
+      shiftY: "18px",
+      tapeLeft: "50%",
+      tapeRotation: "-2deg",
+    },
+  ];
+  const dense: MainichiBoardPhotoLayout[] = [
+    {
+      span: 3,
+      justifySelf: "start",
+      rotation: "-1.8deg",
+      shiftX: "-3px",
+      shiftY: "0px",
+      tapeLeft: "48%",
+      tapeRotation: "-4deg",
+    },
+    {
+      span: 3,
+      justifySelf: "end",
+      rotation: "1.4deg",
+      shiftX: "4px",
+      shiftY: "16px",
+      tapeLeft: "56%",
+      tapeRotation: "3deg",
+    },
+    {
+      span: 2,
+      justifySelf: "start",
+      rotation: "2deg",
+      shiftX: "2px",
+      shiftY: "-1px",
+      tapeLeft: "50%",
+      tapeRotation: "4deg",
+    },
+    {
+      span: 4,
+      justifySelf: "end",
+      rotation: "-1.2deg",
+      shiftX: "-2px",
+      shiftY: "12px",
+      tapeLeft: "43%",
+      tapeRotation: "-3deg",
+    },
+    {
+      span: 3,
+      justifySelf: "start",
+      rotation: "1deg",
+      shiftX: "5px",
+      shiftY: "0px",
+      tapeLeft: "57%",
+      tapeRotation: "3deg",
+    },
+    {
+      span: 3,
+      justifySelf: "end",
+      rotation: "-1.7deg",
+      shiftX: "-4px",
+      shiftY: "18px",
+      tapeLeft: "45%",
+      tapeRotation: "-5deg",
+    },
+    {
+      span: 2,
+      justifySelf: "end",
+      rotation: "-0.8deg",
+      shiftX: "3px",
+      shiftY: "5px",
+      tapeLeft: "53%",
+      tapeRotation: "-2deg",
+    },
+    {
+      span: 4,
+      justifySelf: "start",
+      rotation: "1.5deg",
+      shiftX: "-2px",
+      shiftY: "15px",
+      tapeLeft: "51%",
+      tapeRotation: "2deg",
+    },
+  ];
+  const layout =
+    total <= 1
+      ? single
+      : total === 2
+        ? pair[index % pair.length]
+        : total <= 3
+          ? sparse[index % sparse.length]
+          : total > 18
+            ? dense[index % dense.length]
+            : collage[index % collage.length];
+
+  return {
+    ...layout,
+    style: {
+      gridColumn: `span ${layout.span}`,
+      justifySelf: layout.justifySelf,
+    } satisfies CSSProperties,
+  };
+}
+
+function shouldShowMainichiBoardTape(index: number, total: number) {
+  if (total <= 3) {
+    return true;
+  }
+
+  return index % 4 === 0 || index % 7 === 3;
 }
 
 function buildAlbumDayGroups(
@@ -3524,60 +3818,77 @@ const styles = {
   },
   mainichiMonthList: {
     display: "grid",
-    gap: "24px",
+    gap: "30px",
   },
   mainichiMonthBoard: {
     display: "grid",
-    gap: "18px",
-    paddingTop: "20px",
-    paddingBottom: "24px",
-    overflow: "hidden",
+    gap: "22px",
+    padding: "26px 18px 34px",
+    overflow: "visible",
+    borderRadius: "30px",
+    background:
+      "linear-gradient(180deg, color-mix(in srgb, var(--paper) 74%, transparent), color-mix(in srgb, var(--paper-warm) 46%, transparent)), var(--app-paper-background)",
+    backgroundSize:
+      "100% 100%, var(--app-paper-background-size)",
+    backgroundPosition:
+      "0 0, var(--app-paper-background-position)",
+    backgroundRepeat:
+      "no-repeat, var(--app-paper-background-repeat)",
+    boxShadow:
+      "0 1px 0 color-mix(in srgb, var(--paper-card) 64%, transparent) inset, 0 24px 52px -40px rgba(86,70,45,0.30)",
   },
   mainichiMonthTitle: {
     margin: 0,
-    color: COLLECTION_TEXT_STRONG,
+    color: COLLECTION_TEXT,
     fontFamily: "var(--font-display)",
     fontSize: "18px",
     fontWeight: 500,
     lineHeight: 1.32,
-    letterSpacing: "0.08em",
+    letterSpacing: "0.06em",
   },
   mainichiBoardPhotos: {
     display: "grid",
-    gridTemplateColumns: "repeat(2, minmax(0, 1fr))",
-    gap: "20px 16px",
+    gridTemplateColumns: "repeat(6, minmax(0, 1fr))",
+    gridAutoFlow: "dense",
+    gap: "32px 10px",
     alignItems: "start",
-    padding: "4px 2px 2px",
+    padding: "8px 4px 12px",
   },
   mainichiBoardPhotoButton: {
     position: "relative",
     display: "grid",
-    gap: "8px",
+    gap: "6px",
     minWidth: 0,
     border: "none",
     background: "transparent",
     color: COLLECTION_TEXT,
     font: "inherit",
     textAlign: "left",
-    padding: "8px 6px 10px",
+    padding: "10px 5px 8px",
     cursor: "pointer",
     transformOrigin: "50% 22%",
+    transition:
+      "transform var(--dur-instant) var(--ease-settle), filter var(--dur-instant) var(--ease-gentle)",
   },
   mainichiBoardTape: {
     position: "absolute",
     zIndex: 2,
-    left: "50%",
+    left: "var(--mainichi-tape-left, 50%)",
     top: "0",
-    width: "44px",
-    height: "14px",
+    width: "56px",
+    height: "15px",
     borderRadius: radius.sm,
-    background: "color-mix(in srgb, var(--paper-card) 72%, transparent)",
-    boxShadow: "0 2px 8px rgba(120,110,90,0.08)",
-    transform: "translate(-50%, -15%) rotate(-3deg)",
+    background:
+      "linear-gradient(90deg, color-mix(in srgb, var(--paper-card) 42%, transparent), color-mix(in srgb, var(--paper) 66%, transparent))",
+    boxShadow:
+      "0 1px 0 color-mix(in srgb, var(--paper-card) 60%, transparent) inset, 0 3px 9px rgba(120,110,90,0.09)",
+    transform: "translate(-50%, -15%) rotate(var(--mainichi-tape-rotation, -3deg))",
     pointerEvents: "none",
   },
   mainichiBoardPhotoTileRoot: {
     width: "100%",
+    boxShadow:
+      "0 1px 0 color-mix(in srgb, var(--paper-card) 72%, transparent) inset, 0 10px 20px -16px rgba(76,62,42,0.30)",
   },
   mainichiBoardPhotoTile: {
     width: "100%",
@@ -3585,22 +3896,18 @@ const styles = {
     aspectRatio: "1 / 1",
     display: "block",
   },
-  mainichiBoardPhotoMeta: {
-    display: "grid",
-    gap: "2px",
-    justifyItems: "center",
-    color: COLLECTION_MUTED,
+  mainichiBoardPhotoCatBadge: {
+    justifySelf: "center",
+    minHeight: "20px",
+    padding: "2px 8px",
+    borderRadius: "var(--radius-full)",
+    background: "color-mix(in srgb, var(--paper-card) 72%, transparent)",
+    color: "var(--ink-soft)",
+    boxShadow: "0 1px 0 color-mix(in srgb, var(--paper-card) 72%, transparent) inset",
     fontFamily: "var(--font-ui)",
-    fontSize: "12px",
-    fontWeight: 400,
-    lineHeight: 1.35,
-  },
-  mainichiBoardPhotoDate: {
-    color: COLLECTION_MUTED,
-    fontVariantNumeric: "tabular-nums",
-  },
-  mainichiBoardPhotoCat: {
-    color: "var(--ink-faint)",
+    fontSize: "10px",
+    fontWeight: 500,
+    lineHeight: 1.45,
   },
   mainichiBoardEmpty: {
     minHeight: "180px",
