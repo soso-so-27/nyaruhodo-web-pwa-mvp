@@ -107,7 +107,17 @@ const HOME_FRAME_TUNING = {
   emptyActionSize: "14px",
 } as const;
 const HOME_SKY_BACKGROUND =
-  "radial-gradient(circle at var(--home-sky-glow-x, 50%) var(--home-sky-glow-y, 12%), color-mix(in srgb, var(--home-sky-glow, var(--paper-warm)) 58%, transparent) 0%, transparent 54%), linear-gradient(180deg, var(--home-sky-top, var(--paper)) 0%, var(--home-sky-mid, var(--paper)) 44%, var(--home-sky-bottom, var(--paper-warm)) 100%)";
+  "linear-gradient(180deg, color-mix(in srgb, var(--home-sky-top, var(--paper)) 18%, transparent) 0%, color-mix(in srgb, var(--home-sky-mid, var(--paper)) 10%, transparent) 48%, color-mix(in srgb, var(--home-sky-bottom, var(--paper-warm)) 16%, transparent) 100%), var(--home-sky-image), radial-gradient(circle at var(--home-sky-glow-x, 50%) var(--home-sky-glow-y, 12%), color-mix(in srgb, var(--home-sky-glow, var(--paper-warm)) 38%, transparent) 0%, transparent 54%), linear-gradient(180deg, var(--home-sky-top, var(--paper)) 0%, var(--home-sky-mid, var(--paper)) 44%, var(--home-sky-bottom, var(--paper-warm)) 100%)";
+const HOME_SKY_BACKGROUND_SIZE = "cover, cover, 140% 140%, cover";
+const HOME_SKY_BACKGROUND_POSITION =
+  "50% 50%, 50% 50%, var(--home-sky-glow-x, 50%) var(--home-sky-glow-y, 12%), 50% 50%";
+const HOME_BACKGROUND_IMAGES = {
+  dawn: "url('/images/home-backgrounds/dawn.webp')",
+  morning: "url('/images/home-backgrounds/morning.webp')",
+  noon: "url('/images/home-backgrounds/noon.webp')",
+  evening: "url('/images/home-backgrounds/evening.webp')",
+  night: "url('/images/home-backgrounds/night.webp')",
+} as const;
 const HOME_DAYLIGHT_ANCHORS = [
   {
     minute: 4 * 60 + 45,
@@ -673,19 +683,19 @@ export function HomeDeskModel({
           0% {
             --home-sky-glow-x: 38%;
             --home-sky-glow-y: 7%;
-            background-position: 38% 7%, 50% 50%;
+            background-position: 50% 50%, 50% 50%, 38% 7%, 50% 50%;
             filter: saturate(1);
           }
           50% {
             --home-sky-glow-x: 62%;
             --home-sky-glow-y: 18%;
-            background-position: 62% 18%, 50% 50%;
+            background-position: 50% 50%, 50% 50%, 62% 18%, 50% 50%;
             filter: saturate(1.045);
           }
           100% {
             --home-sky-glow-x: 46%;
             --home-sky-glow-y: 28%;
-            background-position: 46% 28%, 50% 50%;
+            background-position: 50% 50%, 50% 50%, 46% 28%, 50% 50%;
             filter: saturate(1.02);
           }
         }
@@ -1009,8 +1019,11 @@ function usePrefersReducedMotion() {
 function useDaylight(now: number) {
   const minuteKey = Math.floor(now / 60000);
   return useMemo(() => {
-    const colors = getDaylightColors(minuteKey * 60000);
+    const timestamp = minuteKey * 60000;
+    const colors = getDaylightColors(timestamp);
+    const skyImage = getHomeBackgroundImage(timestamp);
     return {
+      "--home-sky-image": skyImage,
       "--home-sky-top": colors.skyTop,
       "--home-sky-mid": colors.skyMid,
       "--home-sky-bottom": colors.skyBottom,
@@ -1167,6 +1180,7 @@ function useHomeViewportBackground(daylightStyle: HomeDaylightStyle) {
       "--home-frame-light",
       "--home-frame-glow",
       "--home-status-scrim",
+      "--home-sky-image",
       "--home-wax",
       "--home-empty-frame-start",
       "--home-empty-frame-end",
@@ -1185,6 +1199,12 @@ function useHomeViewportBackground(daylightStyle: HomeDaylightStyle) {
     ] as const;
     const previousRootBackground = root.style.background;
     const previousBodyBackground = body.style.background;
+    const previousRootBackgroundSize = root.style.backgroundSize;
+    const previousBodyBackgroundSize = body.style.backgroundSize;
+    const previousRootBackgroundPosition = root.style.backgroundPosition;
+    const previousBodyBackgroundPosition = body.style.backgroundPosition;
+    const previousRootBackgroundRepeat = root.style.backgroundRepeat;
+    const previousBodyBackgroundRepeat = body.style.backgroundRepeat;
     const previousRootBackgroundColor = root.style.backgroundColor;
     const previousBodyBackgroundColor = body.style.backgroundColor;
     const previousRootHeight = root.style.height;
@@ -1208,6 +1228,12 @@ function useHomeViewportBackground(daylightStyle: HomeDaylightStyle) {
 
     root.style.background = HOME_SKY_BACKGROUND;
     body.style.background = HOME_SKY_BACKGROUND;
+    root.style.backgroundSize = HOME_SKY_BACKGROUND_SIZE;
+    body.style.backgroundSize = HOME_SKY_BACKGROUND_SIZE;
+    root.style.backgroundPosition = HOME_SKY_BACKGROUND_POSITION;
+    body.style.backgroundPosition = HOME_SKY_BACKGROUND_POSITION;
+    root.style.backgroundRepeat = "no-repeat";
+    body.style.backgroundRepeat = "no-repeat";
     root.style.backgroundColor = daylightStyle["--home-sky-bottom"] ?? "";
     body.style.backgroundColor = daylightStyle["--home-sky-bottom"] ?? "";
     root.style.height = "100dvh";
@@ -1232,6 +1258,12 @@ function useHomeViewportBackground(daylightStyle: HomeDaylightStyle) {
       });
       root.style.background = previousRootBackground;
       body.style.background = previousBodyBackground;
+      root.style.backgroundSize = previousRootBackgroundSize;
+      body.style.backgroundSize = previousBodyBackgroundSize;
+      root.style.backgroundPosition = previousRootBackgroundPosition;
+      body.style.backgroundPosition = previousBodyBackgroundPosition;
+      root.style.backgroundRepeat = previousRootBackgroundRepeat;
+      body.style.backgroundRepeat = previousBodyBackgroundRepeat;
       root.style.backgroundColor = previousRootBackgroundColor;
       body.style.backgroundColor = previousBodyBackgroundColor;
       root.style.height = previousRootHeight;
@@ -1388,6 +1420,27 @@ function getDaylightColors(now: number) {
   }
 
   return HOME_DAYLIGHT_ANCHORS[HOME_DAYLIGHT_ANCHORS.length - 1];
+}
+
+function getHomeBackgroundImage(now: number) {
+  const minute = getJstMinuteOfDay(now);
+
+  if (minute < 5 * 60 + 45) {
+    return HOME_BACKGROUND_IMAGES.night;
+  }
+  if (minute < 8 * 60) {
+    return HOME_BACKGROUND_IMAGES.dawn;
+  }
+  if (minute < 11 * 60) {
+    return HOME_BACKGROUND_IMAGES.morning;
+  }
+  if (minute < 16 * 60 + 30) {
+    return HOME_BACKGROUND_IMAGES.noon;
+  }
+  if (minute < 21 * 60) {
+    return HOME_BACKGROUND_IMAGES.evening;
+  }
+  return HOME_BACKGROUND_IMAGES.night;
 }
 
 function interpolateDaylightAnchor(
@@ -1550,6 +1603,9 @@ const deskStyles = {
       "calc(var(--home-page-padding-top, 10px) + env(safe-area-inset-top)) var(--home-page-padding-x, 16px) calc(var(--bottom-nav-height) + var(--bottom-nav-safe-offset) + var(--home-tray-to-nav-gap, 32px))",
     color: "var(--ink)",
     background: HOME_SKY_BACKGROUND,
+    backgroundSize: HOME_SKY_BACKGROUND_SIZE,
+    backgroundPosition: HOME_SKY_BACKGROUND_POSITION,
+    backgroundRepeat: "no-repeat",
     transition:
       "background var(--home-daylight-transition, 1800ms) var(--ease-gentle)",
   },
@@ -1563,6 +1619,9 @@ const deskStyles = {
     left: 0,
     background: HOME_SKY_BACKGROUND,
     backgroundColor: "var(--home-sky-bottom)",
+    backgroundSize: HOME_SKY_BACKGROUND_SIZE,
+    backgroundPosition: HOME_SKY_BACKGROUND_POSITION,
+    backgroundRepeat: "no-repeat",
     transition:
       "background var(--home-daylight-transition, 1800ms) var(--ease-gentle)",
   },
