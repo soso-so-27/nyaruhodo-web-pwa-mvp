@@ -996,9 +996,16 @@ function DeskPhotoViewer({
         <PhotoViewerFrame
           src={getPhotoDetailSrc(viewerPhoto.photo)}
           alt=""
-          fit="contain"
-          style={deskStyles.viewerImageFrame}
-          imageStyle={deskStyles.viewerImage}
+          aspect={isOwnPhoto ? "auto" : undefined}
+          fit={isOwnPhoto ? "cover" : "contain"}
+          style={
+            isOwnPhoto
+              ? deskStyles.viewerOwnImageFrame
+              : deskStyles.viewerImageFrame
+          }
+          imageStyle={
+            isOwnPhoto ? deskStyles.viewerOwnImage : deskStyles.viewerImage
+          }
         />
         <AppButton
           type="button"
@@ -2574,7 +2581,8 @@ const deskStyles = {
     gap: "24px",
   },
   viewerPanelOwn: {
-    gap: "18px",
+    width: "min(calc(100vw - 24px), 520px)",
+    gap: "12px",
   },
   viewerOwnHeader: {
     display: "grid",
@@ -2627,10 +2635,28 @@ const deskStyles = {
     background: "var(--paper)",
     boxShadow: "var(--shadow-e1)",
   },
+  viewerOwnImageFrame: {
+    width: "100%",
+    height:
+      "min(78dvh, calc(100dvh - 152px - env(safe-area-inset-top) - env(safe-area-inset-bottom)))",
+    minHeight: "min(520px, 68dvh)",
+    padding: "0",
+    border: "none",
+    borderRadius: "24px",
+    background: "transparent",
+    boxShadow:
+      "0 2px 6px rgba(70,50,30,.16), 0 16px 40px -10px rgba(70,50,30,.30)",
+  },
   viewerImage: {
     width: "100%",
     height: "100%",
     borderRadius: "var(--radius-lg)",
+  },
+  viewerOwnImage: {
+    width: "100%",
+    height: "100%",
+    borderRadius: "24px",
+    objectPosition: "center center",
   },
   viewerSaveButtonLayout: {
     width: "min(100%, 330px)",
