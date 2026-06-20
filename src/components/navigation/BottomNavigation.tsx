@@ -4,7 +4,6 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import type { CSSProperties, MouseEvent, ReactNode } from "react";
-import { BoxIcon } from "../ui/AppIcons";
 
 type BottomNavigationProps = {
   active: "home" | "today" | "collection" | "cats";
@@ -44,13 +43,13 @@ export function BottomNavigation({
       key: "collection",
       href: "/collection",
       label: "まいにち",
-      icon: <BoxIcon style={{ ...styles.svgIcon, ...styles.boxSvgIcon }} />,
+      icon: <GeneratedNavIcon src="/icons/bottom-nav-mainichi.png" />,
     },
     {
       key: "cats",
       href: "/cats",
       label: "うちのこ",
-      icon: <span style={styles.catTabIcon} />,
+      icon: <GeneratedNavIcon src="/icons/bottom-nav-uchinoko.png" />,
     },
   ];
   const displayActiveKey = pendingKey ?? activeKey;
@@ -131,45 +130,45 @@ export function BottomNavigation({
 }
 
 function TodayPairIcon({ state }: { state: "1" | "1b" | "2" | "3" | "4" }) {
-  const firstFilled = state === "2" || state === "3" || state === "4";
-  const secondFilled = state === "3" || state === "4";
+  const isAfterCapture = state === "2" || state === "3" || state === "4";
 
   return (
-    <svg
-      viewBox="0 0 28 22"
-      style={styles.todayPairIcon}
-      data-testid="today-pair-nav-icon"
-      aria-hidden="true"
+    <GeneratedNavIcon
+      src="/icons/bottom-nav-today.png"
+      todayTestSlots
+      style={isAfterCapture ? styles.generatedNavIconActive : undefined}
+    />
+  );
+}
+
+function GeneratedNavIcon({
+  src,
+  todayTestSlots = false,
+  style,
+}: {
+  src: string;
+  todayTestSlots?: boolean;
+  style?: CSSProperties;
+}) {
+  return (
+    <span
+      style={styles.generatedNavIconWrap}
+      data-testid={todayTestSlots ? "today-pair-nav-icon" : undefined}
     >
-      <rect
-        x="3"
-        y="4"
-        width="9"
-        height="14"
-        rx="3"
-        data-testid="today-pair-nav-slot"
-        fill={firstFilled ? "currentColor" : "var(--paper)"}
-        fillOpacity={firstFilled ? 1 : 0.48}
-        stroke="currentColor"
-        strokeWidth="1.6"
-        strokeDasharray={firstFilled ? undefined : "2.2 2"}
-        opacity={firstFilled ? 0.86 : 0.82}
+      <img
+        src={src}
+        alt=""
+        aria-hidden="true"
+        draggable={false}
+        style={{ ...styles.generatedNavIcon, ...style }}
       />
-      <rect
-        x="16"
-        y="4"
-        width="9"
-        height="14"
-        rx="3"
-        data-testid="today-pair-nav-slot"
-        fill={secondFilled ? "currentColor" : "var(--paper)"}
-        fillOpacity={secondFilled ? 1 : 0.48}
-        stroke="currentColor"
-        strokeWidth="1.6"
-        strokeDasharray={secondFilled ? undefined : "2.2 2"}
-        opacity={secondFilled ? 0.86 : 0.82}
-      />
-    </svg>
+      {todayTestSlots ? (
+        <>
+          <span data-testid="today-pair-nav-slot" style={styles.generatedNavTestSlotLeft} />
+          <span data-testid="today-pair-nav-slot" style={styles.generatedNavTestSlotRight} />
+        </>
+      ) : null}
+    </span>
   );
 }
 
@@ -264,35 +263,42 @@ const styles = {
     transform: "scale(1.02)",
     transition: "color var(--dur-instant) var(--ease-gentle), transform var(--dur-instant) var(--ease-settle)",
   },
-  svgIcon: {
-    width: "21px",
-    height: "21px",
-    display: "block",
-  },
-  boxSvgIcon: {
-    width: "21px",
-    height: "21px",
-  },
-  catTabIcon: {
-    width: "21px",
-    height: "21px",
-    display: "block",
-    backgroundColor: "currentColor",
-    maskImage: "url('/icons/cat-tab-mask.png')",
-    maskPosition: "center",
-    maskRepeat: "no-repeat",
-    maskSize: "contain",
-    WebkitMaskImage: "url('/icons/cat-tab-mask.png')",
-    WebkitMaskPosition: "center",
-    WebkitMaskRepeat: "no-repeat",
-    WebkitMaskSize: "contain",
-    transform: "translateY(0.5px)",
-  },
-  todayPairIcon: {
-    display: "block",
-    width: "26px",
-    height: "22px",
+  generatedNavIconWrap: {
+    position: "relative",
+    display: "inline-flex",
+    alignItems: "center",
+    justifyContent: "center",
+    width: "25px",
+    height: "23px",
     overflow: "visible",
+  },
+  generatedNavIcon: {
+    display: "block",
+    width: "24px",
+    height: "24px",
+    objectFit: "contain",
+    opacity: 0.74,
+  },
+  generatedNavIconActive: {
+    opacity: 0.9,
+  },
+  generatedNavTestSlotLeft: {
+    position: "absolute",
+    left: "4px",
+    top: "5px",
+    width: "8px",
+    height: "11px",
+    opacity: 0,
+    pointerEvents: "none",
+  },
+  generatedNavTestSlotRight: {
+    position: "absolute",
+    right: "4px",
+    top: "5px",
+    width: "8px",
+    height: "11px",
+    opacity: 0,
+    pointerEvents: "none",
   },
   navLabel: {
     display: "none",
