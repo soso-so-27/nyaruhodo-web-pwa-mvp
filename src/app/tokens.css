@@ -16,6 +16,18 @@
 
   /* ===== 背景: 紙に当たる光(フラット禁止・全画面共通) ===== */
   --bg-gradient: linear-gradient(180deg, var(--paper) 0%, var(--paper-warm) 100%);
+  --app-paper-image: url("/images/home-backgrounds/generated-noon-paper.png");
+  --app-paper-background: linear-gradient(
+      180deg,
+      color-mix(in srgb, var(--paper) 46%, transparent) 0%,
+      color-mix(in srgb, var(--paper-card) 22%, transparent) 54%,
+      color-mix(in srgb, var(--paper-warm) 30%, transparent) 100%
+    ),
+    var(--app-paper-image),
+    var(--bg-gradient);
+  --app-paper-background-size: 100% 100%, 100% 100%, 100% 100%;
+  --app-paper-background-position: 50% 50%, 50% 50%, 50% 50%;
+  --app-paper-background-repeat: no-repeat, no-repeat, no-repeat;
 
   /* ===== 影(2段・さらに弱く) ===== */
   --shadow-e0: none;

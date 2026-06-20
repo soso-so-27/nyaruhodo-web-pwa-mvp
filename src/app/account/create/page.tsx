@@ -564,6 +564,9 @@ const styles = {
   page: {
     minHeight: "100vh",
     background: APP_PAGE_BACKGROUND,
+    backgroundSize: "var(--app-paper-background-size)",
+    backgroundPosition: "var(--app-paper-background-position)",
+    backgroundRepeat: "var(--app-paper-background-repeat)",
     color: "#2a2a28",
     fontFamily:
       '-apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',

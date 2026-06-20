@@ -1887,6 +1887,9 @@ const styles = {
   page: {
     minHeight: "100vh",
     background: APP_PAGE_BACKGROUND,
+    backgroundSize: "var(--app-paper-background-size)",
+    backgroundPosition: "var(--app-paper-background-position)",
+    backgroundRepeat: "var(--app-paper-background-repeat)",
     color: "var(--ink)",
   },
   container: {

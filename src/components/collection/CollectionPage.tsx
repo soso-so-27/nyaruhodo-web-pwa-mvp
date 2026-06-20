@@ -3420,7 +3420,10 @@ const styles = {
   page: {
     position: "relative",
     minHeight: "100svh",
-    background: "#f7f5ef",
+    background: "var(--app-paper-background)",
+    backgroundSize: "var(--app-paper-background-size)",
+    backgroundPosition: "var(--app-paper-background-position)",
+    backgroundRepeat: "var(--app-paper-background-repeat)",
     color: COLLECTION_TEXT,
     overflowX: "hidden",
     overflowY: "auto",
@@ -3430,8 +3433,10 @@ const styles = {
     position: "fixed" as const,
     inset: 0,
     zIndex: 0,
-    background:
-      "linear-gradient(180deg, #fbfaf6 0%, #f2eee5 58%, #eee7dc 100%)",
+    background: "var(--app-paper-background)",
+    backgroundSize: "var(--app-paper-background-size)",
+    backgroundPosition: "var(--app-paper-background-position)",
+    backgroundRepeat: "var(--app-paper-background-repeat)",
   },
   ambientHighlight: {
     position: "fixed" as const,

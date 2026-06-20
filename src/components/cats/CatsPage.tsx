@@ -2060,7 +2060,10 @@ const styles = {
   page: {
     position: "relative",
     minHeight: "100vh",
-    background: "var(--bg-gradient)",
+    background: "var(--app-paper-background)",
+    backgroundSize: "var(--app-paper-background-size)",
+    backgroundPosition: "var(--app-paper-background-position)",
+    backgroundRepeat: "var(--app-paper-background-repeat)",
     color: CATS_TEXT,
     overflowX: "hidden",
     fontFamily: "var(--font-ui)",
@@ -2069,7 +2072,10 @@ const styles = {
     position: "fixed" as const,
     inset: 0,
     zIndex: 0,
-    background: "var(--bg-gradient)",
+    background: "var(--app-paper-background)",
+    backgroundSize: "var(--app-paper-background-size)",
+    backgroundPosition: "var(--app-paper-background-position)",
+    backgroundRepeat: "var(--app-paper-background-repeat)",
   },
   ambientHighlight: {
     position: "fixed" as const,

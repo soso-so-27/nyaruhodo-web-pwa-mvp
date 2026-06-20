@@ -4,7 +4,7 @@ export const APP_ACCENT = "var(--ink)";
 export const APP_ACCENT_MUTED = "var(--ink-soft)";
 export const APP_ACCENT_SOFT_BG = "var(--paper-card)";
 export const APP_ACCENT_SOFT_BORDER = "var(--line)";
-export const APP_PAGE_BACKGROUND = "var(--bg-gradient)";
+export const APP_PAGE_BACKGROUND = "var(--app-paper-background)";
 
 export const APP_SURFACE: CSSProperties = {
   background: "color-mix(in srgb, var(--paper) 93%, transparent)",

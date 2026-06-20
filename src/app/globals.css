@@ -14,11 +14,10 @@ body {
   margin: 0;
   width: 100%;
   min-height: 100%;
-  background: var(--bg-gradient);
-  background-image: var(--home-bg-image, none);
-  background-position: center 30%;
-  background-size: cover;
-  background-repeat: no-repeat;
+  background: var(--app-paper-background);
+  background-position: var(--app-paper-background-position);
+  background-size: var(--app-paper-background-size);
+  background-repeat: var(--app-paper-background-repeat);
   overflow-x: hidden;
   overscroll-behavior-x: none;
 }
