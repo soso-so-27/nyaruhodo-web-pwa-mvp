@@ -232,7 +232,8 @@ export function HomeDeskModel({
     homePhoto ? homePhotoAspect : null,
   );
   const subNotifications = omoideMemory ? [omoideMemory] : [];
-  const hasSplitTrayActions = homeDay.phase === "delivered" && subNotifications.length > 0;
+  const hasSplitTrayActions =
+    homeDay.phase === "delivered" && subNotifications.length > 0;
   const hasTrayActions = homeDay.phase === "delivered" || subNotifications.length > 0;
   const usesTextRibbonTray = !hasTrayActions;
   const shouldHidePresence = true;
@@ -490,6 +491,7 @@ export function HomeDeskModel({
             aria-label="ホームのお知らせ"
           >
             <div
+              className={hasSplitTrayActions ? "home-tray-action-carousel" : undefined}
               style={{
                 ...deskStyles.notificationRows,
                 ...(usesTextRibbonTray ? deskStyles.notificationRowsRibbon : {}),
@@ -568,7 +570,7 @@ export function HomeDeskModel({
                         ...(hasSplitTrayActions ? deskStyles.notificationTitleSplit : {}),
                       }}
                     >
-                      {hasSplitTrayActions ? "ねこだより" : "ねこだより、とどいた"}
+                      ねこだより、とどいた
                     </strong>
                     <span
                       style={{
@@ -577,7 +579,7 @@ export function HomeDeskModel({
                         ...(hasSplitTrayActions ? deskStyles.notificationActionSplit : {}),
                       }}
                     >
-                      ひらく
+                      おさえて ひらく
                     </span>
                   </div>
                 </button>
@@ -639,7 +641,7 @@ export function HomeDeskModel({
                         ...(hasSplitTrayActions ? deskStyles.notificationTitleSplit : {}),
                       }}
                     >
-                      {hasSplitTrayActions ? "思い出" : "思い出が、とどきました"}
+                      とどいた思い出
                     </span>
                     <span
                       style={{
@@ -647,7 +649,7 @@ export function HomeDeskModel({
                         ...(hasSplitTrayActions ? deskStyles.notificationActionSplit : {}),
                       }}
                     >
-                      うちのこで みる
+                      うちのこへ
                     </span>
                   </span>
                 </button>
@@ -795,6 +797,9 @@ export function HomeDeskModel({
           opacity: 1 !important;
           filter: blur(0) !important;
           transform: scale(1) !important;
+        }
+        .home-tray-action-carousel::-webkit-scrollbar {
+          display: none;
         }
         @media (prefers-reduced-motion: reduce) {
           .desk-frame-breathe,
@@ -1957,20 +1962,20 @@ const deskStyles = {
     backdropFilter: "none",
   },
   notificationTrayList: {
-    minHeight: "92px",
-    padding: "10px 12px",
+    minHeight: "78px",
+    padding: "10px",
     borderRadius: "18px",
     background:
-      "color-mix(in srgb, var(--home-tray-paper, #fdf9f1) 66%, transparent)",
+      "color-mix(in srgb, var(--home-tray-paper, #fdf9f1) 58%, transparent)",
     boxShadow:
-      "0 1px 0 color-mix(in srgb, var(--line) 18%, transparent) inset, 0 10px 24px -22px color-mix(in srgb, var(--ink) 24%, transparent)",
+      "0 1px 0 color-mix(in srgb, var(--line) 14%, transparent) inset, 0 8px 20px -18px color-mix(in srgb, var(--ink) 20%, transparent)",
   },
   notificationTrayDelivered: {
     color: "var(--ink)",
     background:
-      "color-mix(in srgb, var(--paper-card) 92%, var(--home-frame-glow, var(--paper-warm)) 8%)",
+      "color-mix(in srgb, var(--paper-card) 86%, var(--home-frame-glow, var(--paper-warm)) 14%)",
     boxShadow:
-      "0 0 0 1px color-mix(in srgb, var(--seal-soft) 42%, transparent) inset, 0 18px 44px -18px color-mix(in srgb, var(--seal) 40%, transparent), var(--shadow-e2)",
+      "0 0 0 1px color-mix(in srgb, var(--seal-soft) 24%, transparent) inset, 0 16px 38px -18px color-mix(in srgb, var(--seal) 34%, transparent), 0 10px 22px -20px color-mix(in srgb, var(--ink) 20%, transparent)",
   },
   notificationRows: {
     width: "100%",
@@ -1984,9 +1989,12 @@ const deskStyles = {
     gap: "0",
   },
   notificationRowsSplit: {
-    gridTemplateColumns: "1fr",
-    alignItems: "center",
-    gap: "8px",
+    display: "grid",
+    gridTemplateColumns: "repeat(2, minmax(0, 1fr))",
+    alignItems: "stretch",
+    gap: "10px",
+    overflow: "hidden",
+    paddingBottom: "1px",
   },
   notificationRowsSingle: {
     alignContent: "center",
@@ -2011,14 +2019,14 @@ const deskStyles = {
       "calc(var(--bottom-nav-height) + var(--bottom-nav-safe-offset) + 32px)",
   },
   notificationRowSplitCard: {
-    minHeight: "58px",
-    gridTemplateColumns: "56px minmax(0, 1fr)",
-    justifyItems: "stretch",
+    minHeight: "92px",
+    gridTemplateColumns: "1fr",
+    justifyItems: "center",
     alignItems: "center",
-    gap: "10px",
-    padding: "7px 10px",
+    gap: "7px",
+    padding: "10px 8px",
     alignContent: "center",
-    textAlign: "left",
+    textAlign: "center",
   },
   notificationRowText: {
     gridTemplateColumns: "1fr",
@@ -2037,13 +2045,13 @@ const deskStyles = {
     boxShadow: "none",
   },
   notificationRowPrimary: {
-    gridTemplateColumns: "76px minmax(0, 1fr)",
-    minHeight: "64px",
-    gap: "12px",
-    padding: "8px 10px",
-    background: "color-mix(in srgb, var(--seal-soft) 12%, transparent)",
+    gridTemplateColumns: "84px minmax(0, 1fr)",
+    minHeight: "70px",
+    gap: "14px",
+    padding: "10px 12px",
+    background: "color-mix(in srgb, var(--seal-soft) 8%, transparent)",
     boxShadow:
-      "0 0 0 1px color-mix(in srgb, var(--seal-soft) 24%, transparent) inset",
+      "0 0 0 1px color-mix(in srgb, var(--seal-soft) 18%, transparent) inset",
   },
   notificationRowLink: {
     gridTemplateColumns: "1fr",
@@ -2052,13 +2060,13 @@ const deskStyles = {
   },
   notificationRowInteractive: {
     cursor: "pointer",
-    background: "color-mix(in srgb, var(--paper-card) 34%, transparent)",
+    background: "color-mix(in srgb, var(--paper-card) 28%, transparent)",
     boxShadow:
-      "0 0 0 1px color-mix(in srgb, var(--line) 24%, transparent) inset",
+      "0 0 0 1px color-mix(in srgb, var(--line) 18%, transparent) inset",
   },
   notificationThumb: {
-    width: "50px",
-    height: "42px",
+    width: "54px",
+    height: "44px",
     display: "block",
     borderRadius: "var(--radius-md)",
     overflow: "hidden",
@@ -2084,9 +2092,9 @@ const deskStyles = {
     letterSpacing: "var(--tracking-body)",
   },
   notificationTextSplit: {
-    justifyItems: "start",
-    textAlign: "left",
-    gap: "0",
+    justifyItems: "center",
+    textAlign: "center",
+    gap: "1px",
   },
   notificationTitle: {
     minWidth: 0,
@@ -2101,10 +2109,10 @@ const deskStyles = {
   notificationTitleSplit: {
     maxWidth: "none",
     color: "var(--ink)",
-    fontSize: "12px",
+    fontSize: "11.5px",
     lineHeight: 1.35,
     letterSpacing: "var(--tracking-label)",
-    textAlign: "left",
+    textAlign: "center",
   },
   notificationAction: {
     color: "var(--ink)",
@@ -2114,9 +2122,9 @@ const deskStyles = {
   },
   notificationActionSplit: {
     color: "var(--ink-soft)",
-    fontSize: "11px",
+    fontSize: "10.5px",
     lineHeight: 1.35,
-    textAlign: "left",
+    textAlign: "center",
   },
   notificationMoreRow: {
     minHeight: "32px",
@@ -2158,11 +2166,11 @@ const deskStyles = {
   },
   letterTrayTitlePrimary: {
     color: "var(--ink)",
-    fontSize: "14px",
+    fontSize: "14.5px",
   },
   letterTraySubPrimary: {
-    color: "var(--ink)",
-    fontSize: "12px",
+    color: "var(--seal)",
+    fontSize: "12.5px",
   },
   letterTraySub: {
     color: "color-mix(in srgb, var(--ink) 62%, var(--ink-soft))",
@@ -2180,17 +2188,17 @@ const deskStyles = {
     fontWeight: 500,
   },
   trayLetterButton: {
-    width: "72px",
-    height: "46px",
+    width: "76px",
+    height: "48px",
     flex: "0 0 auto",
     borderRadius: "var(--radius-md)",
     transform: "rotate(-1deg)",
     boxShadow:
-      "0 0 0 1px color-mix(in srgb, var(--seal-soft) 28%, transparent) inset, 0 10px 20px -16px color-mix(in srgb, var(--seal) 42%, transparent)",
+      "0 0 0 1px color-mix(in srgb, var(--seal-soft) 20%, transparent) inset, 0 10px 20px -17px color-mix(in srgb, var(--seal) 36%, transparent)",
   },
   trayLetterButtonCompact: {
-    width: "48px",
-    height: "34px",
+    width: "58px",
+    height: "38px",
     borderRadius: "var(--radius-md)",
   },
   homeCopyWrap: {

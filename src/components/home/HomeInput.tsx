@@ -6586,6 +6586,7 @@ const styles = {
     pointerEvents: "none",
   },
   sleepingPairTile: {
+    width: "100%",
     display: "grid",
     gap: "8px",
     justifyItems: "center",
@@ -6593,12 +6594,13 @@ const styles = {
   sleepingPairImage: {
     width: "100%",
     aspectRatio: "1 / 1",
-    borderRadius: "var(--radius-2xl)",
+    borderRadius: "20px",
     objectFit: "cover",
     overflow: "hidden",
-    border: "7px solid rgba(255,253,248,0.68)",
-    background: "rgba(255,253,248,0.58)",
-    boxShadow: "0 14px 30px rgba(96,78,54,0.11)",
+    border: "6px solid color-mix(in srgb, var(--paper) 88%, transparent)",
+    background: "color-mix(in srgb, var(--paper) 72%, transparent)",
+    boxShadow:
+      "0 2px 8px rgba(70,50,30,0.10), 0 18px 34px -18px rgba(70,50,30,0.24)",
   },
   sleepingPairLabel: {
     color: "#746a5f",
@@ -6607,7 +6609,7 @@ const styles = {
     lineHeight: 1,
   },
   sleepingPairDots: {
-    width: "28px",
+    width: "22px",
     height: "2px",
     borderRadius: "var(--radius-full)",
     background:
@@ -6814,9 +6816,13 @@ const styles = {
     zIndex: 88,
     display: "grid",
     placeItems: "center",
-    padding: "calc(52px + env(safe-area-inset-top)) 24px calc(36px + env(safe-area-inset-bottom))",
+    padding:
+      "calc(44px + env(safe-area-inset-top)) 16px calc(28px + env(safe-area-inset-bottom))",
     boxSizing: "border-box",
-    background: "linear-gradient(180deg, #fdfcf9, #f7f1e7)",
+    background: "var(--app-paper-background)",
+    backgroundSize: "var(--app-paper-background-size)",
+    backgroundPosition: "var(--app-paper-background-position)",
+    backgroundRepeat: "var(--app-paper-background-repeat)",
     color: "#292721",
   },
   eveningOpeningPhotoStage: {
@@ -6843,17 +6849,17 @@ const styles = {
     letterSpacing: "0.08em",
   },
   eveningOpeningPairStage: {
-    width: "min(calc(100vw - 54px), 380px)",
+    width: "min(calc(100vw - 32px), 480px)",
     display: "grid",
-    gap: "24px",
+    gap: "18px",
     justifyItems: "center",
   },
   eveningOpeningPairCard: {
     width: "100%",
     display: "grid",
-    gridTemplateColumns: "1fr 28px 1fr",
+    gridTemplateColumns: "minmax(0, 1fr) 22px minmax(0, 1fr)",
     alignItems: "center",
-    gap: "10px",
+    gap: "12px",
   },
   eveningOpeningTitle: {
     margin: 0,
