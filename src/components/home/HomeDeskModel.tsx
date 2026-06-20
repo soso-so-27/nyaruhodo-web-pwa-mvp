@@ -211,13 +211,18 @@ export function HomeDeskModel({
     eveningState.kind === "opened"
       ? eveningState.targetPhoto
       : null;
+  const latestHomePhoto = useMemo(
+    () => findLatestHomeDisplayPhoto(ownSleepingPhotos, now),
+    [now, ownSleepingPhotos],
+  );
+  const displayPhoto = latestHomePhoto ?? targetPhoto;
   const deliveredPhoto =
     eveningState.kind === "delivered" || eveningState.kind === "opened"
       ? eveningState.deliveredPhoto
       : null;
   const homeDay = getHomeDayPresentation({
     eveningState,
-    targetPhoto,
+    targetPhoto: displayPhoto,
     now,
   });
   const homePhoto = homeDay.photo;
@@ -902,6 +907,7 @@ function DeskPhotoViewer({
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [isReportSheetOpen, setIsReportSheetOpen] = useState(false);
   const [saveState, setSaveState] = useState<"idle" | "saved">("idle");
+  const isOwnPhoto = viewerPhoto.kind === "own";
 
   async function handleSave() {
     onSave();
@@ -919,7 +925,10 @@ function DeskPhotoViewer({
       onClick={onClose}
     >
       <section
-        style={deskStyles.viewerPanel}
+        style={{
+          ...deskStyles.viewerPanel,
+          ...(isOwnPhoto ? deskStyles.viewerPanelOwn : {}),
+        }}
         aria-label={
           viewerPhoto.kind === "other"
             ? "どこかのこの写真"
@@ -937,6 +946,12 @@ function DeskPhotoViewer({
         >
           閉じる
         </AppButton>
+        {isOwnPhoto ? (
+          <div style={deskStyles.viewerOwnHeader}>
+            <p style={deskStyles.viewerOwnKicker}>きょうの ねがお</p>
+            <p style={deskStyles.viewerOwnNote}>写真は、まいにち と うちのこ に残ります</p>
+          </div>
+        ) : null}
         {viewerPhoto.kind === "other" ? (
           <div style={deskStyles.viewerMenuWrap}>
             <AppButton
@@ -992,6 +1007,7 @@ function DeskPhotoViewer({
           fullWidth
           style={{
             ...deskStyles.viewerSaveButtonLayout,
+            ...(isOwnPhoto ? deskStyles.viewerSaveButtonHidden : {}),
             ...(saveState === "saved" ? deskStyles.viewerSaveButtonSaved : {}),
           }}
           onClick={handleSave}
@@ -1390,6 +1406,16 @@ function getHomeDayPresentation({
       };
     }
 
+    if (
+      eveningState.kind === "before" &&
+      (afterDelivery || eveningState.afterTodayDelivery)
+    ) {
+      return {
+        phase: "late-sent",
+        photo: targetPhoto,
+      };
+    }
+
     return {
       phase: "sent-before",
       photo: targetPhoto,
@@ -1521,6 +1547,47 @@ function interpolateDaylightAnchor(
 function getJstMinuteOfDay(timestamp: number) {
   const date = new Date(timestamp + 9 * 60 * 60 * 1000);
   return date.getUTCHours() * 60 + date.getUTCMinutes();
+}
+
+function findLatestHomeDisplayPhoto(
+  photos: OwnSleepingPhoto[],
+  timestamp: number,
+) {
+  const homeDateKey = getHomeDisplayDateKey(timestamp);
+  let latestPhoto: OwnSleepingPhoto | null = null;
+
+  for (const photo of photos) {
+    if (getJstDateKey(photo.createdAt) !== homeDateKey) {
+      continue;
+    }
+
+    if (!latestPhoto || photo.createdAt > latestPhoto.createdAt) {
+      latestPhoto = photo;
+    }
+  }
+
+  return latestPhoto;
+}
+
+function getHomeDisplayDateKey(timestamp: number) {
+  const todayKey = getJstDateKey(timestamp);
+  return getJstMinuteOfDay(timestamp) >= 5 * 60
+    ? todayKey
+    : addJstDays(todayKey, -1);
+}
+
+function getJstDateKey(timestamp: number) {
+  const date = new Date(timestamp + 9 * 60 * 60 * 1000);
+  const year = date.getUTCFullYear();
+  const month = String(date.getUTCMonth() + 1).padStart(2, "0");
+  const day = String(date.getUTCDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+}
+
+function addJstDays(dateKey: string, days: number) {
+  const [year, month, day] = dateKey.split("-").map(Number);
+  const base = Date.UTC(year, month - 1, day) - 9 * 60 * 60 * 1000;
+  return getJstDateKey(base + days * 24 * 60 * 60 * 1000);
 }
 
 function interpolateHexColor(from: string, to: string, progress: number) {
@@ -1695,7 +1762,7 @@ const deskStyles = {
     display: "flex",
     flexDirection: "column",
     alignItems: "center",
-    justifyContent: "flex-start",
+    justifyContent: "center",
     gap: "var(--home-stage-gap, 14px)",
     paddingTop: "0",
   },
@@ -2506,6 +2573,32 @@ const deskStyles = {
     justifyContent: "center",
     gap: "24px",
   },
+  viewerPanelOwn: {
+    gap: "18px",
+  },
+  viewerOwnHeader: {
+    display: "grid",
+    justifyItems: "center",
+    gap: "4px",
+    paddingTop: "8px",
+    color: "var(--ink)",
+    textAlign: "center",
+  },
+  viewerOwnKicker: {
+    margin: 0,
+    fontFamily: "var(--font-display)",
+    fontSize: "20px",
+    letterSpacing: "var(--tracking-label)",
+    lineHeight: 1.45,
+  },
+  viewerOwnNote: {
+    margin: 0,
+    fontFamily: "var(--font-display)",
+    fontSize: "12px",
+    letterSpacing: "var(--tracking-body)",
+    lineHeight: 1.6,
+    color: "var(--ink-soft)",
+  },
   viewerCloseButton: {
     position: "absolute",
     top: 0,
@@ -2545,6 +2638,9 @@ const deskStyles = {
   },
   viewerSaveButtonSaved: {
     opacity: 0,
+  },
+  viewerSaveButtonHidden: {
+    display: "none",
   },
   reportSheetActions: {
     display: "flex",

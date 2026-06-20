@@ -1367,7 +1367,7 @@ test.describe("home sleeping exchange flow", () => {
     await page.goto("/collection");
     await page.waitForLoadState("networkidle");
 
-    await expect(page.locator("main img")).toHaveCount(2);
+    await expect(page.getByTestId("mainichi-board-photo-sent")).toHaveCount(2);
   });
 });
 

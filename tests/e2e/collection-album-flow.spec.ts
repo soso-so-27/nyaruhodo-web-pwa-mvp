@@ -78,7 +78,7 @@ test.describe("collection album flow", () => {
     await expect(page.getByText("current cat")).toBeVisible();
     await expect(page.getByText("previous cat")).toBeVisible();
 
-    await expect(page.locator("main img")).toHaveCount(2);
+    await expect(page.getByTestId("mainichi-board-photo-sent")).toHaveCount(2);
   });
 
   test("shows restored storage sleeping photos alongside latest local photos", async ({
@@ -160,7 +160,7 @@ test.describe("collection album flow", () => {
     await page.goto("/collection");
     await page.waitForLoadState("networkidle");
 
-    await expect(page.locator("main img")).toHaveCount(2);
+    await expect(page.getByTestId("mainichi-board-photo-sent")).toHaveCount(2);
   });
 
   test("writes delivered storage photos back as data urls for offline album display", async ({
@@ -430,7 +430,7 @@ test.describe("collection album flow", () => {
     await expect(page.getByTestId("mainichi-photo-board")).toBeVisible();
     await expect(page.getByTestId("album-sealed-delivery")).toHaveCount(0);
     await expect(page.getByTestId("mainichi-board-photo-delivered")).toHaveCount(0);
-    await expect(page.locator("main img")).toHaveCount(1);
+    await expect(page.getByTestId("mainichi-board-photo-sent")).toHaveCount(1);
 
     await seedCollectionEveningDelivery(page, {
       now,
@@ -444,7 +444,7 @@ test.describe("collection album flow", () => {
     await expect(page.getByTestId("album-sealed-delivery")).toHaveCount(0);
     await page.getByRole("radio").nth(1).click();
     await expect(page.getByTestId("mainichi-board-photo-delivered")).toBeVisible();
-    await expect(page.locator("main img")).toHaveCount(1);
+    await expect(page.getByTestId("mainichi-board-photo-delivered")).toHaveCount(1);
   });
 
   test("auto-opens yesterday's unopened evening delivery after 5am", async ({
@@ -463,7 +463,7 @@ test.describe("collection album flow", () => {
     await expect(page.getByTestId("album-sealed-delivery")).toHaveCount(0);
     await page.getByRole("radio").nth(1).click();
     await expect(page.getByTestId("mainichi-board-photo-delivered")).toBeVisible();
-    await expect(page.locator("main img")).toHaveCount(1);
+    await expect(page.getByTestId("mainichi-board-photo-delivered")).toHaveCount(1);
     await expect
       .poll(() =>
         page.evaluate(() => {
@@ -560,7 +560,7 @@ test.describe("collection album flow", () => {
     await page.goto("/collection");
     await page.waitForLoadState("networkidle");
 
-    await expect(page.locator("main img")).toHaveCount(2);
+    await expect(page.getByTestId("mainichi-board-photo-sent")).toHaveCount(2);
   });
 
   test("hides the other slot before the first evening delivery target day", async ({
@@ -726,7 +726,7 @@ test.describe("collection album flow", () => {
     await expect(page.getByTestId("album-daily-letter-card")).toHaveCount(0);
     await expect(page.getByTestId("album-daily-missing-letter")).toHaveCount(0);
     await expect(page.getByText("ほかのねがお")).toHaveCount(0);
-    await expect(page.locator("main img")).toHaveCount(1);
+    await expect(page.getByTestId("mainichi-board-photo-sent")).toHaveCount(1);
 
     await page.reload();
     await page.waitForLoadState("networkidle");
