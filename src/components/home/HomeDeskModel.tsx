@@ -434,7 +434,6 @@ export function HomeDeskModel({
                         );
                       }}
                     />
-                    <span style={deskStyles.todayTag}>きょう</span>
                   </span>
                 </button>
                 <button
@@ -941,22 +940,36 @@ function DeskPhotoViewer({
         }
         onClick={(event) => event.stopPropagation()}
       >
-        <AppButton
-          type="button"
-          variant="quiet"
-          size="sm"
-          style={deskStyles.viewerCloseButton}
-          onClick={onClose}
-          aria-label="閉じる"
-        >
-          閉じる
-        </AppButton>
         {isOwnPhoto ? (
-          <div style={deskStyles.viewerOwnHeader}>
-            <p style={deskStyles.viewerOwnKicker}>きょうの ねがお</p>
-            <p style={deskStyles.viewerOwnNote}>写真は、まいにち と うちのこ に残ります</p>
+          <div style={deskStyles.viewerOwnTopBar}>
+            <AppButton
+              type="button"
+              variant="quiet"
+              size="sm"
+              style={deskStyles.viewerOwnCloseButton}
+              onClick={onClose}
+              aria-label="閉じる"
+            >
+              閉じる
+            </AppButton>
+            <div style={deskStyles.viewerOwnHeader}>
+              <p style={deskStyles.viewerOwnKicker}>きょうの ねがお</p>
+              <p style={deskStyles.viewerOwnNote}>写真は、まいにち と うちのこ に残ります</p>
+            </div>
+            <span style={deskStyles.viewerOwnHeaderSpacer} aria-hidden="true" />
           </div>
-        ) : null}
+        ) : (
+          <AppButton
+            type="button"
+            variant="quiet"
+            size="sm"
+            style={deskStyles.viewerCloseButton}
+            onClick={onClose}
+            aria-label="閉じる"
+          >
+            閉じる
+          </AppButton>
+        )}
         {viewerPhoto.kind === "other" ? (
           <div style={deskStyles.viewerMenuWrap}>
             <AppButton
@@ -1869,24 +1882,6 @@ const deskStyles = {
     cursor: "pointer",
     WebkitTapHighlightColor: "transparent",
   },
-  todayTag: {
-    position: "absolute",
-    top: "12px",
-    left: "12px",
-    minHeight: "28px",
-    display: "inline-flex",
-    alignItems: "center",
-    padding: "4px 10px",
-    borderRadius: "var(--radius-full)",
-    background: "color-mix(in srgb, var(--paper-card) 76%, transparent)",
-    color: "var(--ink)",
-    fontFamily: "var(--font-ui)",
-    fontSize: "12px",
-    fontWeight: 500,
-    letterSpacing: "var(--tracking-label)",
-    boxShadow:
-      "0 0 0 1px color-mix(in srgb, var(--line) 72%, transparent) inset",
-  },
   homeEmptyFrame: {
     width: "min(100%, var(--home-frame-layout-width, 100%))",
     aspectRatio: "var(--home-empty-frame-aspect-ratio, 9 / 14)",
@@ -2592,11 +2587,27 @@ const deskStyles = {
     width: "min(calc(100vw - 24px), 520px)",
     gap: "12px",
   },
+  viewerOwnTopBar: {
+    width: "100%",
+    display: "grid",
+    gridTemplateColumns: "76px minmax(0, 1fr) 76px",
+    alignItems: "center",
+    gap: "6px",
+    minHeight: "56px",
+  },
+  viewerOwnCloseButton: {
+    justifySelf: "start",
+    color: "var(--ink-soft)",
+  },
+  viewerOwnHeaderSpacer: {
+    width: "76px",
+    height: "1px",
+    display: "block",
+  },
   viewerOwnHeader: {
     display: "grid",
     justifyItems: "center",
     gap: "4px",
-    paddingTop: "8px",
     color: "var(--ink)",
     textAlign: "center",
   },
