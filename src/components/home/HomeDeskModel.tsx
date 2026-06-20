@@ -198,7 +198,11 @@ export function HomeDeskModel({
   const rewindTimerRef = useRef<number | null>(null);
   const isHoldingRef = useRef(false);
   const daylightStyle = useDaylight(now);
-  const frameLayoutStyle = useHomeFrameLayout(deskState);
+  const hasSupplementalNotification = Boolean(omoideMemory);
+  const frameLayoutStyle = useHomeFrameLayout(
+    deskState,
+    hasSupplementalNotification,
+  );
   useHomeViewportBackground(daylightStyle);
   const targetPhoto =
     eveningState.kind === "waiting" ||
@@ -218,6 +222,8 @@ export function HomeDeskModel({
   const homePhoto = homeDay.photo;
   const subNotifications = omoideMemory ? [omoideMemory] : [];
   const hasSplitTrayActions = homeDay.phase === "delivered" && subNotifications.length > 0;
+  const hasTrayActions = homeDay.phase === "delivered" || subNotifications.length > 0;
+  const usesTextRibbonTray = !hasTrayActions;
   const shouldHidePresence = true;
   useEffect(() => {
     trackDeskStateShown(deskState, eveningState.dateKey);
@@ -435,6 +441,10 @@ export function HomeDeskModel({
             data-phase={homeDay.phase}
             style={{
               ...deskStyles.notificationTray,
+              ...(usesTextRibbonTray ? deskStyles.notificationTrayRibbon : {}),
+              ...(subNotifications.length > 0 && homeDay.phase !== "delivered"
+                ? deskStyles.notificationTrayList
+                : {}),
               ...(homeDay.phase === "delivered" ? deskStyles.notificationTrayDelivered : {}),
             }}
             className={
@@ -447,6 +457,7 @@ export function HomeDeskModel({
             <div
               style={{
                 ...deskStyles.notificationRows,
+                ...(usesTextRibbonTray ? deskStyles.notificationRowsRibbon : {}),
                 ...(hasSplitTrayActions ? deskStyles.notificationRowsSplit : {}),
                 ...(subNotifications.length === 0
                   ? deskStyles.notificationRowsSingle
@@ -542,6 +553,7 @@ export function HomeDeskModel({
                     ...deskStyles.notificationRow,
                     ...deskStyles.notificationRowText,
                     ...deskStyles.notificationRowLink,
+                    ...(usesTextRibbonTray ? deskStyles.notificationRowTextRibbon : {}),
                   }}
                 >
                   <HomeLetterTrayText phase={homeDay.phase} />
@@ -551,6 +563,7 @@ export function HomeDeskModel({
                   style={{
                     ...deskStyles.notificationRow,
                     ...deskStyles.notificationRowText,
+                    ...(usesTextRibbonTray ? deskStyles.notificationRowTextRibbon : {}),
                   }}
                 >
                   <HomeLetterTrayText phase={homeDay.phase} />
@@ -1067,7 +1080,10 @@ function useDaylight(now: number) {
   }, [minuteKey]);
 }
 
-function useHomeFrameLayout(deskState: DeskState): HomeFrameLayoutStyle {
+function useHomeFrameLayout(
+  deskState: DeskState,
+  hasSupplementalNotification: boolean,
+): HomeFrameLayoutStyle {
   const [frameWidth, setFrameWidth] = useState<string>(
     HOME_FRAME_TUNING.frameInitialWidth,
   );
@@ -1114,7 +1130,7 @@ function useHomeFrameLayout(deskState: DeskState): HomeFrameLayoutStyle {
       const trayToNavGap = readPixels(
         pageStyle.getPropertyValue("--home-tray-to-nav-gap"),
         32,
-      );
+      ) + (hasSupplementalNotification ? 20 : 0);
       const heroGap =
         deskState === "3" || deskState === "4"
           ? 18
@@ -1126,7 +1142,7 @@ function useHomeFrameLayout(deskState: DeskState): HomeFrameLayoutStyle {
         availableFrameHeight * HOME_FRAME_TUNING.frameAspectWidthPerHeight;
       const nextWidth = Math.round(
         Math.max(
-          HOME_FRAME_TUNING.frameMinWidthPx,
+          hasSupplementalNotification ? 220 : HOME_FRAME_TUNING.frameMinWidthPx,
           Math.min(stageWidth, widthFromHeight),
         ),
       );
@@ -1157,7 +1173,7 @@ function useHomeFrameLayout(deskState: DeskState): HomeFrameLayoutStyle {
       window.visualViewport?.removeEventListener("resize", scheduleUpdate);
       window.visualViewport?.removeEventListener("scroll", scheduleUpdate);
     };
-  }, [deskState]);
+  }, [deskState, hasSupplementalNotification]);
 
   return useMemo(
     () => ({ "--home-frame-layout-width": frameWidth }),
@@ -1780,6 +1796,23 @@ const deskStyles = {
     transition:
       "background var(--home-daylight-transition, 1800ms) var(--ease-gentle), box-shadow var(--home-daylight-transition, 1800ms) var(--ease-gentle)",
   },
+  notificationTrayRibbon: {
+    minHeight: "0",
+    padding: "0 10px",
+    borderRadius: 0,
+    background: "transparent",
+    boxShadow: "none",
+    backdropFilter: "none",
+  },
+  notificationTrayList: {
+    minHeight: "92px",
+    padding: "10px 12px",
+    borderRadius: "18px",
+    background:
+      "color-mix(in srgb, var(--home-tray-paper, #fdf9f1) 66%, transparent)",
+    boxShadow:
+      "0 1px 0 color-mix(in srgb, var(--line) 18%, transparent) inset, 0 10px 24px -22px color-mix(in srgb, var(--ink) 24%, transparent)",
+  },
   notificationTrayDelivered: {
     color: "var(--ink)",
     background:
@@ -1794,9 +1827,14 @@ const deskStyles = {
     alignContent: "center",
     gap: "8px",
   },
+  notificationRowsRibbon: {
+    minHeight: "0",
+    gap: "0",
+  },
   notificationRowsSplit: {
-    gridTemplateColumns: "minmax(0, 1fr) minmax(0, 1fr)",
-    alignItems: "stretch",
+    gridTemplateColumns: "1fr",
+    alignItems: "center",
+    gap: "8px",
   },
   notificationRowsSingle: {
     alignContent: "center",
@@ -1817,16 +1855,18 @@ const deskStyles = {
     textDecoration: "none",
     textAlign: "left",
     WebkitTapHighlightColor: "transparent",
+    scrollMarginBottom:
+      "calc(var(--bottom-nav-height) + var(--bottom-nav-safe-offset) + 32px)",
   },
   notificationRowSplitCard: {
-    minHeight: "102px",
-    gridTemplateColumns: "1fr",
-    justifyItems: "center",
+    minHeight: "58px",
+    gridTemplateColumns: "56px minmax(0, 1fr)",
+    justifyItems: "stretch",
     alignItems: "center",
-    gap: "7px",
-    padding: "12px 10px",
+    gap: "10px",
+    padding: "7px 10px",
     alignContent: "center",
-    textAlign: "center",
+    textAlign: "left",
   },
   notificationRowText: {
     gridTemplateColumns: "1fr",
@@ -1836,6 +1876,13 @@ const deskStyles = {
     minHeight: "46px",
     padding: "4px 8px",
     textAlign: "center",
+  },
+  notificationRowTextRibbon: {
+    minHeight: "0",
+    padding: "0",
+    gap: "1px",
+    background: "transparent",
+    boxShadow: "none",
   },
   notificationRowPrimary: {
     gridTemplateColumns: "76px minmax(0, 1fr)",
@@ -1885,9 +1932,9 @@ const deskStyles = {
     letterSpacing: "var(--tracking-body)",
   },
   notificationTextSplit: {
-    justifyItems: "center",
-    textAlign: "center",
-    gap: "1px",
+    justifyItems: "start",
+    textAlign: "left",
+    gap: "0",
   },
   notificationTitle: {
     minWidth: 0,
@@ -1900,12 +1947,12 @@ const deskStyles = {
     lineHeight: 1.38,
   },
   notificationTitleSplit: {
-    maxWidth: "9em",
+    maxWidth: "none",
     color: "var(--ink)",
     fontSize: "12px",
     lineHeight: 1.35,
     letterSpacing: "var(--tracking-label)",
-    textAlign: "center",
+    textAlign: "left",
   },
   notificationAction: {
     color: "var(--ink)",
@@ -1917,7 +1964,7 @@ const deskStyles = {
     color: "var(--ink-soft)",
     fontSize: "11px",
     lineHeight: 1.35,
-    textAlign: "center",
+    textAlign: "left",
   },
   notificationMoreRow: {
     minHeight: "32px",
@@ -1935,8 +1982,8 @@ const deskStyles = {
     textAlign: "left",
   },
   letterTrayCopySplit: {
-    justifyItems: "center",
-    textAlign: "center",
+    justifyItems: "start",
+    textAlign: "left",
   },
   letterTrayLink: {
     display: "grid",
@@ -1989,8 +2036,8 @@ const deskStyles = {
       "0 0 0 1px color-mix(in srgb, var(--seal-soft) 28%, transparent) inset, 0 10px 20px -16px color-mix(in srgb, var(--seal) 42%, transparent)",
   },
   trayLetterButtonCompact: {
-    width: "50px",
-    height: "36px",
+    width: "48px",
+    height: "34px",
     borderRadius: "var(--radius-md)",
   },
   homeCopyWrap: {
