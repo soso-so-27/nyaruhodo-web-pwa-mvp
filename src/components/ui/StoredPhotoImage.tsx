@@ -77,12 +77,14 @@ export function StoredPhotoImage({
   style,
   imageStyle,
   onStorageDataUrl,
+  onNaturalSize,
 }: {
   src: string;
   alt: string;
   style?: CSSProperties;
   imageStyle?: CSSProperties;
   onStorageDataUrl?: (dataUrl: string) => void;
+  onNaturalSize?: (size: { width: number; height: number }) => void;
 }) {
   const {
     objectFit,
@@ -258,6 +260,13 @@ export function StoredPhotoImage({
         decoding={isInlineImage ? "sync" : "async"}
         onLoad={() => {
           setIsLoaded(true);
+          const image = imageRef.current;
+          if (image?.naturalWidth && image.naturalHeight) {
+            onNaturalSize?.({
+              width: image.naturalWidth,
+              height: image.naturalHeight,
+            });
+          }
           trackImageLoadCompleted({
             displaySrc,
             startedAt: loadStartedAtRef.current,

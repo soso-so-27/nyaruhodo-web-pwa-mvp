@@ -22,7 +22,8 @@ import { StoredPhotoImage } from "../ui/StoredPhotoImage";
 
 type DeskState = "1" | "1b" | "2" | "3" | "4";
 type HomeDaylightStyle = CSSProperties & Record<`--${string}`, string>;
-type HomeFrameLayoutStyle = CSSProperties & Record<"--home-frame-layout-width", string>;
+type HomeFrameLayoutStyle = CSSProperties &
+  Record<"--home-frame-layout-width" | "--home-frame-aspect-ratio", string>;
 type HomeTodayPhase =
   | "empty-before"
   | "sent-before"
@@ -202,10 +203,7 @@ export function HomeDeskModel({
   const isHoldingRef = useRef(false);
   const daylightStyle = useDaylight(now);
   const hasSupplementalNotification = Boolean(omoideMemory);
-  const frameLayoutStyle = useHomeFrameLayout(
-    deskState,
-    hasSupplementalNotification,
-  );
+  const [homePhotoAspect, setHomePhotoAspect] = useState<number | null>(null);
   useHomeViewportBackground(daylightStyle);
   const targetPhoto =
     eveningState.kind === "waiting" ||
@@ -223,6 +221,11 @@ export function HomeDeskModel({
     now,
   });
   const homePhoto = homeDay.photo;
+  const frameLayoutStyle = useHomeFrameLayout(
+    deskState,
+    hasSupplementalNotification,
+    homePhoto ? homePhotoAspect : null,
+  );
   const subNotifications = omoideMemory ? [omoideMemory] : [];
   const hasSplitTrayActions = homeDay.phase === "delivered" && subNotifications.length > 0;
   const hasTrayActions = homeDay.phase === "delivered" || subNotifications.length > 0;
@@ -231,6 +234,10 @@ export function HomeDeskModel({
   useEffect(() => {
     trackDeskStateShown(deskState, eveningState.dateKey);
   }, [deskState, eveningState.dateKey]);
+
+  useEffect(() => {
+    setHomePhotoAspect(null);
+  }, [homePhoto?.id, homePhoto?.src]);
 
   useEffect(() => {
     if (!omoideMemory) {
@@ -387,33 +394,53 @@ export function HomeDeskModel({
         >
           <div style={deskStyles.todayPhotoZone}>
             {homePhoto ? (
-              <button
-                type="button"
-                data-testid="desk-home-frame"
-                style={deskStyles.homeFrameButton}
-                onClick={() =>
-                  setViewerPhoto({
-                    kind: "own",
-                    photo: homePhoto,
-                    dateKey: eveningState.dateKey,
-                  })
-                }
-                aria-label={`${catName}のきょうのねがおを大きく見る`}
-              >
-                <span
-                  style={{
-                    ...deskStyles.homeFrame,
-                    ...(deskState === "3" ? deskStyles.homeFrameDelivered : {}),
-                  }}
+              <div style={deskStyles.homeFrameShell}>
+                <button
+                  type="button"
+                  data-testid="desk-home-frame"
+                  style={deskStyles.homeFrameButton}
+                  onClick={() =>
+                    setViewerPhoto({
+                      kind: "own",
+                      photo: homePhoto,
+                      dateKey: eveningState.dateKey,
+                    })
+                  }
+                  aria-label={`${catName}のきょうのねがおを大きく見る`}
                 >
-                  <StoredPhotoImage
-                    src={getPhotoDisplaySrc(homePhoto)}
-                    alt=""
-                    style={deskStyles.homeFrameImage}
-                  />
-                  <span style={deskStyles.todayTag}>きょう</span>
-                </span>
-              </button>
+                  <span
+                    style={{
+                      ...deskStyles.homeFrame,
+                      ...(deskState === "3" ? deskStyles.homeFrameDelivered : {}),
+                    }}
+                  >
+                    <StoredPhotoImage
+                      src={getPhotoDisplaySrc(homePhoto)}
+                      alt=""
+                      style={deskStyles.homeFrameImage}
+                      onNaturalSize={({ width, height }) => {
+                        if (width <= 0 || height <= 0) return;
+                        const nextAspect = clampHomePhotoAspect(width / height);
+                        setHomePhotoAspect((current) =>
+                          current !== null && Math.abs(current - nextAspect) < 0.01
+                            ? current
+                            : nextAspect,
+                        );
+                      }}
+                    />
+                    <span style={deskStyles.todayTag}>きょう</span>
+                  </span>
+                </button>
+                <button
+                  type="button"
+                  style={deskStyles.homeAddPhotoButton}
+                  onClick={onTakePhoto}
+                  aria-label="ねがおを とる"
+                >
+                  <AppIcon name="camera" size={15} />
+                  <span>ねがおを とる</span>
+                </button>
+              </div>
             ) : (
               <button
                 type="button"
@@ -1083,9 +1110,18 @@ function useDaylight(now: number) {
   }, [minuteKey]);
 }
 
+function clampHomePhotoAspect(aspect: number) {
+  if (!Number.isFinite(aspect) || aspect <= 0) {
+    return HOME_FRAME_TUNING.frameAspectWidthPerHeight;
+  }
+
+  return Math.min(1.35, Math.max(0.62, aspect));
+}
+
 function useHomeFrameLayout(
   deskState: DeskState,
   hasSupplementalNotification: boolean,
+  photoAspect: number | null,
 ): HomeFrameLayoutStyle {
   const [frameWidth, setFrameWidth] = useState<string>(
     HOME_FRAME_TUNING.frameInitialWidth,
@@ -1141,8 +1177,9 @@ function useHomeFrameLayout(
       const navTop = navElement.getBoundingClientRect().top;
       const availableFrameHeight =
         navTop - paddingTop - trayHeight - heroGap - trayToNavGap;
-      const widthFromHeight =
-        availableFrameHeight * HOME_FRAME_TUNING.frameAspectWidthPerHeight;
+      const frameAspectWidthPerHeight =
+        photoAspect ?? HOME_FRAME_TUNING.frameAspectWidthPerHeight;
+      const widthFromHeight = availableFrameHeight * frameAspectWidthPerHeight;
       const nextWidth = Math.round(
         Math.max(
           hasSupplementalNotification ? 220 : HOME_FRAME_TUNING.frameMinWidthPx,
@@ -1176,11 +1213,16 @@ function useHomeFrameLayout(
       window.visualViewport?.removeEventListener("resize", scheduleUpdate);
       window.visualViewport?.removeEventListener("scroll", scheduleUpdate);
     };
-  }, [deskState, hasSupplementalNotification]);
+  }, [deskState, hasSupplementalNotification, photoAspect]);
 
   return useMemo(
-    () => ({ "--home-frame-layout-width": frameWidth }),
-    [frameWidth],
+    () => ({
+      "--home-frame-layout-width": frameWidth,
+      "--home-frame-aspect-ratio": photoAspect
+        ? `${photoAspect} / 1`
+        : HOME_FRAME_TUNING.frameAspectRatio,
+    }),
+    [frameWidth, photoAspect],
   );
 }
 
@@ -1687,10 +1729,17 @@ const deskStyles = {
     cursor: "pointer",
     WebkitTapHighlightColor: "transparent",
   },
+  homeFrameShell: {
+    position: "relative",
+    display: "grid",
+    justifyItems: "center",
+    width: "min(100%, var(--home-frame-layout-width, 100%))",
+    margin: "0 auto",
+  },
   homeFrame: {
     position: "relative",
     display: "block",
-    width: "min(100%, var(--home-frame-layout-width, 100%))",
+    width: "100%",
     margin: "0 auto",
     boxSizing: "border-box",
     aspectRatio: "var(--home-frame-aspect-ratio, 9 / 14)",
@@ -1714,6 +1763,32 @@ const deskStyles = {
     background:
       "color-mix(in srgb, var(--home-frame-light, var(--paper)) 24%, transparent)",
     boxShadow: "var(--home-frame-hairline)",
+  },
+  homeAddPhotoButton: {
+    position: "absolute",
+    right: "10px",
+    bottom: "10px",
+    zIndex: 2,
+    minHeight: "36px",
+    display: "inline-flex",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: "6px",
+    padding: "8px 12px",
+    border: "1px solid color-mix(in srgb, var(--home-wax, var(--seal)) 26%, transparent)",
+    borderRadius: "var(--radius-full)",
+    background: "color-mix(in srgb, var(--paper-card) 82%, transparent)",
+    color: "var(--home-wax, var(--seal))",
+    boxShadow:
+      "0 1px 0 color-mix(in srgb, var(--paper-card) 64%, transparent) inset, 0 10px 22px -18px rgba(70, 50, 30, 0.28)",
+    backdropFilter: "blur(12px)",
+    fontFamily: "var(--font-ui)",
+    fontSize: "12px",
+    fontWeight: 500,
+    lineHeight: 1,
+    letterSpacing: "var(--tracking-label)",
+    cursor: "pointer",
+    WebkitTapHighlightColor: "transparent",
   },
   todayTag: {
     position: "absolute",
