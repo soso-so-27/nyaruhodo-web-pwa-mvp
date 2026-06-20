@@ -3173,7 +3173,7 @@ function ExchangeSharePermissionSheet({
   return (
     <AppSheet
       placement="bottom"
-      title={"ねがおを入れる確認"}
+      title={"このねがおで よければ"}
       variant="dim"
       closeOnOverlay={false}
       onClose={onClose}

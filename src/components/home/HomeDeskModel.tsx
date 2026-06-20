@@ -101,23 +101,25 @@ const HOME_FRAME_TUNING = {
   frameMinWidthPx: 248,
   frameInitialWidth: "310px",
   frameAspectWidthPerHeight: 9 / 14,
-  emptyIllustrationWidth: "min(36vw, 124px)",
-  emptyIllustrationMinWidth: "112px",
-  emptyTitleSize: "20px",
+  emptyIllustrationWidth: "min(40vw, 136px)",
+  emptyIllustrationMinWidth: "120px",
+  emptyTitleSize: "21px",
   emptyActionSize: "14px",
 } as const;
 const HOME_SKY_BACKGROUND =
-  "url('/images/home-backgrounds/paper-grain.png'), linear-gradient(180deg, color-mix(in srgb, var(--home-sky-top, var(--paper)) 18%, transparent) 0%, color-mix(in srgb, var(--home-sky-mid, var(--paper)) 10%, transparent) 48%, color-mix(in srgb, var(--home-sky-bottom, var(--paper-warm)) 16%, transparent) 100%), var(--home-sky-image), radial-gradient(circle at var(--home-sky-glow-x, 50%) var(--home-sky-glow-y, 12%), color-mix(in srgb, var(--home-sky-glow, var(--paper-warm)) 38%, transparent) 0%, transparent 54%), linear-gradient(180deg, var(--home-sky-top, var(--paper)) 0%, var(--home-sky-mid, var(--paper)) 44%, var(--home-sky-bottom, var(--paper-warm)) 100%)";
+  "linear-gradient(180deg, color-mix(in srgb, var(--paper-card) 44%, transparent) 0%, color-mix(in srgb, var(--paper) 28%, transparent) 52%, color-mix(in srgb, var(--paper-warm) 24%, transparent) 100%), var(--home-sky-image), radial-gradient(circle at var(--home-sky-glow-x, 50%) var(--home-sky-glow-y, 12%), color-mix(in srgb, var(--home-sky-glow, var(--paper-warm)) 34%, transparent) 0%, transparent 54%), linear-gradient(180deg, var(--home-sky-top, var(--paper)) 0%, var(--home-sky-mid, var(--paper)) 44%, var(--home-sky-bottom, var(--paper-warm)) 100%)";
 const HOME_SKY_BACKGROUND_SIZE =
-  "100% 100%, 100% 100%, 100% 100%, 140% 140%, 100% 100%";
+  "100% 100%, 100% 100%, 140% 140%, 100% 100%";
 const HOME_SKY_BACKGROUND_POSITION =
-  "50% 50%, 50% 50%, 50% 50%, var(--home-sky-glow-x, 50%) var(--home-sky-glow-y, 12%), 50% 50%";
+  "50% 50%, 50% 50%, var(--home-sky-glow-x, 50%) var(--home-sky-glow-y, 12%), 50% 50%";
+const HOME_SKY_BACKGROUND_REPEAT =
+  "no-repeat, no-repeat, no-repeat, no-repeat";
 const HOME_BACKGROUND_IMAGES = {
-  dawn: "url('/images/home-backgrounds/dawn.webp')",
-  morning: "url('/images/home-backgrounds/morning.webp')",
-  noon: "url('/images/home-backgrounds/noon.webp')",
-  evening: "url('/images/home-backgrounds/evening.webp')",
-  night: "url('/images/home-backgrounds/night.webp')",
+  dawn: "url('/images/home-backgrounds/generated-dawn-paper.png')",
+  morning: "url('/images/home-backgrounds/generated-morning-paper.png')",
+  noon: "url('/images/home-backgrounds/generated-noon-paper.png')",
+  evening: "url('/images/home-backgrounds/generated-evening-paper.png')",
+  night: "url('/images/home-backgrounds/generated-night-paper.png')",
 } as const;
 const HOME_DAYLIGHT_ANCHORS = [
   {
@@ -138,11 +140,11 @@ const HOME_DAYLIGHT_ANCHORS = [
   },
   {
     minute: 12 * 60,
-    skyTop: "#f4eee3",
-    skyMid: "#f3eadc",
-    skyBottom: "#ece2d2",
-    mat: "#fff9f0",
-    glow: "#bca77f",
+    skyTop: "#f1eadf",
+    skyMid: "#f4ead8",
+    skyBottom: "#e7dbc8",
+    mat: "#fff8ee",
+    glow: "#c9ae80",
   },
   {
     minute: 17 * 60,
@@ -1249,8 +1251,8 @@ function useHomeViewportBackground(daylightStyle: HomeDaylightStyle) {
     body.style.backgroundSize = HOME_SKY_BACKGROUND_SIZE;
     root.style.backgroundPosition = HOME_SKY_BACKGROUND_POSITION;
     body.style.backgroundPosition = HOME_SKY_BACKGROUND_POSITION;
-    root.style.backgroundRepeat = "no-repeat";
-    body.style.backgroundRepeat = "no-repeat";
+    root.style.backgroundRepeat = HOME_SKY_BACKGROUND_REPEAT;
+    body.style.backgroundRepeat = HOME_SKY_BACKGROUND_REPEAT;
     root.style.backgroundColor = daylightStyle["--home-sky-bottom"] ?? "";
     body.style.backgroundColor = daylightStyle["--home-sky-bottom"] ?? "";
     root.style.height = "100dvh";
@@ -1622,7 +1624,7 @@ const deskStyles = {
     background: HOME_SKY_BACKGROUND,
     backgroundSize: HOME_SKY_BACKGROUND_SIZE,
     backgroundPosition: HOME_SKY_BACKGROUND_POSITION,
-    backgroundRepeat: "no-repeat",
+    backgroundRepeat: HOME_SKY_BACKGROUND_REPEAT,
     transition:
       "background var(--home-daylight-transition, 1800ms) var(--ease-gentle)",
   },
@@ -1638,7 +1640,7 @@ const deskStyles = {
     backgroundColor: "var(--home-sky-bottom)",
     backgroundSize: HOME_SKY_BACKGROUND_SIZE,
     backgroundPosition: HOME_SKY_BACKGROUND_POSITION,
-    backgroundRepeat: "no-repeat",
+    backgroundRepeat: HOME_SKY_BACKGROUND_REPEAT,
     transition:
       "background var(--home-daylight-transition, 1800ms) var(--ease-gentle)",
   },
@@ -1773,8 +1775,8 @@ const deskStyles = {
     letterSpacing: "var(--tracking-body)",
   },
   sleepingCatPlaceholder: {
-    width: "var(--home-empty-illustration-width, min(36vw, 124px))",
-    maxWidth: "124px",
+    width: "var(--home-empty-illustration-width, min(40vw, 136px))",
+    maxWidth: "136px",
     minWidth: "var(--home-empty-illustration-min-width, 112px)",
     height: "auto",
     display: "block",
@@ -1996,7 +1998,7 @@ const deskStyles = {
   },
   letterTrayTitle: {
     margin: 0,
-    color: "var(--ink-soft)",
+    color: "color-mix(in srgb, var(--ink) 78%, var(--ink-soft))",
     fontFamily: "var(--font-display)",
     fontSize: "13px",
     fontWeight: 400,
@@ -2014,7 +2016,7 @@ const deskStyles = {
     fontSize: "12px",
   },
   letterTraySub: {
-    color: "var(--ink-soft)",
+    color: "color-mix(in srgb, var(--ink) 62%, var(--ink-soft))",
     fontFamily: "var(--font-display)",
     fontSize: "12px",
     lineHeight: 1.55,
@@ -2026,6 +2028,7 @@ const deskStyles = {
   },
   letterTrayKeyword: {
     color: "var(--ink)",
+    fontWeight: 500,
   },
   trayLetterButton: {
     width: "72px",
