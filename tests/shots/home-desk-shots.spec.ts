@@ -24,6 +24,7 @@ const expectedShotNames = [
   "mainichi_board_2.png",
   "mainichi_board_12.png",
   "mainichi_board_31.png",
+  "mainichi_board_delivered_12.png",
   "album_missing_cases.png",
   "album_missing_a.png",
   "album_missing_b.png",
@@ -221,14 +222,31 @@ test.describe("home desk model shots", () => {
       await seedMainichiBoardPhotoCount(page, count);
       await page.goto("/collection");
       await page.waitForLoadState("networkidle");
-      await expect(page.getByTestId("mainichi-photo-board")).toBeVisible();
+      await hideBottomNavForBoardShot(page);
+      const board = page.getByTestId("mainichi-photo-board");
+      await expect(board).toBeVisible();
       await expect(page.getByTestId("mainichi-board-photo-sent")).toHaveCount(count);
-      await page.screenshot({
+      await page.waitForTimeout(500);
+      await board.screenshot({
         path: path.join(shotsDir, `mainichi_board_${count}.png`),
-        fullPage: count <= 12,
       });
     });
   }
+
+  test("mainichi_board_delivered_12", async ({ page }) => {
+    await seedMainichiBoardPhotoCount(page, 12, "delivered");
+    await page.goto("/collection");
+    await page.waitForLoadState("networkidle");
+    await hideBottomNavForBoardShot(page);
+    await page.getByRole("radio").nth(1).click();
+    const board = page.getByTestId("mainichi-photo-board");
+    await expect(board).toBeVisible();
+    await expect(page.getByTestId("mainichi-board-photo-delivered")).toHaveCount(12);
+    await page.waitForTimeout(500);
+    await board.screenshot({
+      path: path.join(shotsDir, "mainichi_board_delivered_12.png"),
+    });
+  });
 
   test("state4_home_frame_viewer", async ({ page }) => {
     await seedReviewState(page, {
@@ -529,6 +547,13 @@ async function seedReviewState(
   });
 }
 
+async function hideBottomNavForBoardShot(page: Page) {
+  await page.addStyleTag({
+    content:
+      'nav[aria-label="下部ナビゲーション"] { display: none !important; }',
+  });
+}
+
 async function seedCollectionMissingCases(page: Page) {
   await page.addInitScript(
     ({ ownDataUrl }) => {
@@ -630,9 +655,13 @@ async function seedCollectionMissingCases(page: Page) {
   });
 }
 
-async function seedMainichiBoardPhotoCount(page: Page, count: number) {
+async function seedMainichiBoardPhotoCount(
+  page: Page,
+  count: number,
+  side: "sent" | "delivered" = "sent",
+) {
   await page.addInitScript(
-    ({ count, ownDataUrl, deliveredDataUrl }) => {
+    ({ count, side, ownDataUrl, deliveredDataUrl }) => {
       const now = Date.parse("2026-06-20T12:00:00.000Z");
       (window as typeof window & { __testNow?: number }).__testNow = now;
       const originalDateNow = Date.now.bind(Date);
@@ -658,9 +687,10 @@ async function seedMainichiBoardPhotoCount(page: Page, count: number) {
       const photos = Array.from({ length: count }, (_, index) => {
         const month = count === 31 ? "07" : "06";
         const day = count === 31 ? 31 - index : count - index;
+        const dateKey = `2026-${month}-${String(day).padStart(2, "0")}`;
         const cat = cats[index % cats.length];
         const createdAt = Date.parse(
-          `2026-${month}-${String(day).padStart(2, "0")}T${String(10 + (index % 9)).padStart(2, "0")}:00:00.000Z`,
+          `${dateKey}T${String(10 + (index % 9)).padStart(2, "0")}:00:00.000Z`,
         );
 
         return {
@@ -675,8 +705,40 @@ async function seedMainichiBoardPhotoCount(page: Page, count: number) {
           theme: "sleeping",
           shared: true,
           createdAt,
+          dateKey,
         };
       });
+      const keptPhotos =
+        side === "delivered"
+          ? photos.map((photo, index) => ({
+              id: `kept-mainichi-shot-${index}`,
+              sourcePhotoId: `kept-mainichi-source-${index}`,
+              src: photo.src,
+              title: "\u3069\u3053\u304b\u306e\u306d\u304c\u304a",
+              subtitle: "",
+              triggerLabel: "sleeping",
+              theme: "sleeping",
+              deliveredAt: photo.createdAt,
+            }))
+          : [];
+      const eveningStore =
+        side === "delivered"
+          ? Object.fromEntries(
+              photos.map((photo, index) => [
+                photo.dateKey,
+                {
+                  dateKey: photo.dateKey,
+                  targetOwnPhotoId: `target-mainichi-shot-${index}`,
+                  targetCatId: cats[index % cats.length].id,
+                  targetCapturedAt: photo.createdAt - 1000 * 60 * 60,
+                  deliveredPhoto: keptPhotos[index],
+                  deliveredAt: photo.createdAt,
+                  openedAt: photo.createdAt + 1000,
+                  openedBy: "user",
+                },
+              ]),
+            )
+          : {};
 
       window.localStorage.setItem("neteruneko_home_desk_model", "1");
       window.localStorage.setItem("nyaruhodo_sleeping_safety_accepted", "1");
@@ -684,12 +746,18 @@ async function seedMainichiBoardPhotoCount(page: Page, count: number) {
       window.localStorage.setItem("cat_profiles", JSON.stringify(cats));
       window.localStorage.setItem(
         "nyaruhodo_exchange_own_sleeping_photos",
-        JSON.stringify(photos),
+        JSON.stringify(side === "sent" ? photos : []),
       );
-      window.localStorage.setItem("neteruneko_evening_delivery_days", "{}");
-      window.localStorage.setItem("nyaruhodo_exchange_kept_photos", "[]");
+      window.localStorage.setItem(
+        "neteruneko_evening_delivery_days",
+        JSON.stringify(eveningStore),
+      );
+      window.localStorage.setItem(
+        "nyaruhodo_exchange_kept_photos",
+        JSON.stringify(keptPhotos),
+      );
     },
-    { count, ownDataUrl, deliveredDataUrl },
+    { count, side, ownDataUrl, deliveredDataUrl },
   );
 }
 

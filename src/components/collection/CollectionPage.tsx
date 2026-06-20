@@ -224,8 +224,9 @@ type MainichiBoardMonth = {
 };
 
 type MainichiBoardPhotoLayout = {
-  span: number;
-  justifySelf: CSSProperties["justifySelf"];
+  left: string;
+  top: string;
+  width: string;
   rotation: string;
   shiftX: string;
   shiftY: string;
@@ -2676,40 +2677,38 @@ function getMainichiBoardCanvasStyle(total: number): CSSProperties {
 
   if (total === 1) {
     return {
-      minHeight: "360px",
-      alignContent: "center",
+      height: "300px",
     };
   }
 
   if (total <= 3) {
     return {
-      minHeight: "460px",
-      alignContent: "start",
-      paddingTop: "18px",
+      height: "390px",
     };
   }
 
   if (total <= 8) {
     return {
-      minHeight: "620px",
+      height: "690px",
     };
   }
 
   if (total <= 16) {
     return {
-      minHeight: "880px",
+      height: "1220px",
     };
   }
 
   return {
-    minHeight: "1180px",
+    height: `${Math.max(1420, 320 + Math.ceil(total / 3) * 132)}px`,
   };
 }
 
 function getMainichiBoardPhotoLayout(index: number, total: number) {
   const single: MainichiBoardPhotoLayout = {
-    span: 4,
-    justifySelf: "center",
+    left: "27%",
+    top: "72px",
+    width: "46%",
     rotation: "-1.2deg",
     shiftX: "0px",
     shiftY: "0px",
@@ -2718,8 +2717,9 @@ function getMainichiBoardPhotoLayout(index: number, total: number) {
   };
   const pair: MainichiBoardPhotoLayout[] = [
     {
-      span: 3,
-      justifySelf: "start",
+      left: "7%",
+      top: "70px",
+      width: "42%",
       rotation: "-2.2deg",
       shiftX: "-3px",
       shiftY: "0px",
@@ -2727,8 +2727,9 @@ function getMainichiBoardPhotoLayout(index: number, total: number) {
       tapeRotation: "-5deg",
     },
     {
-      span: 3,
-      justifySelf: "end",
+      left: "53%",
+      top: "145px",
+      width: "42%",
       rotation: "1.8deg",
       shiftX: "4px",
       shiftY: "18px",
@@ -2738,8 +2739,9 @@ function getMainichiBoardPhotoLayout(index: number, total: number) {
   ];
   const sparse: MainichiBoardPhotoLayout[] = [
     {
-      span: 3,
-      justifySelf: "start",
+      left: "7%",
+      top: "58px",
+      width: "40%",
       rotation: "-2.3deg",
       shiftX: "-4px",
       shiftY: "0px",
@@ -2747,8 +2749,9 @@ function getMainichiBoardPhotoLayout(index: number, total: number) {
       tapeRotation: "-5deg",
     },
     {
-      span: 3,
-      justifySelf: "end",
+      left: "55%",
+      top: "132px",
+      width: "40%",
       rotation: "1.7deg",
       shiftX: "5px",
       shiftY: "28px",
@@ -2756,8 +2759,9 @@ function getMainichiBoardPhotoLayout(index: number, total: number) {
       tapeRotation: "4deg",
     },
     {
-      span: 4,
-      justifySelf: "center",
+      left: "30%",
+      top: "250px",
+      width: "40%",
       rotation: "-1.1deg",
       shiftX: "0px",
       shiftY: "8px",
@@ -2767,8 +2771,9 @@ function getMainichiBoardPhotoLayout(index: number, total: number) {
   ];
   const collage: MainichiBoardPhotoLayout[] = [
     {
-      span: 3,
-      justifySelf: "start",
+      left: "6%",
+      top: "68px",
+      width: "37%",
       rotation: "-2.6deg",
       shiftX: "-4px",
       shiftY: "0px",
@@ -2776,8 +2781,9 @@ function getMainichiBoardPhotoLayout(index: number, total: number) {
       tapeRotation: "-5deg",
     },
     {
-      span: 3,
-      justifySelf: "end",
+      left: "55%",
+      top: "104px",
+      width: "37%",
       rotation: "1.7deg",
       shiftX: "5px",
       shiftY: "18px",
@@ -2785,8 +2791,9 @@ function getMainichiBoardPhotoLayout(index: number, total: number) {
       tapeRotation: "3deg",
     },
     {
-      span: 2,
-      justifySelf: "start",
+      left: "14%",
+      top: "286px",
+      width: "25%",
       rotation: "2.4deg",
       shiftX: "2px",
       shiftY: "4px",
@@ -2794,8 +2801,9 @@ function getMainichiBoardPhotoLayout(index: number, total: number) {
       tapeRotation: "5deg",
     },
     {
-      span: 4,
-      justifySelf: "end",
+      left: "43%",
+      top: "322px",
+      width: "47%",
       rotation: "-1.4deg",
       shiftX: "-2px",
       shiftY: "14px",
@@ -2803,8 +2811,9 @@ function getMainichiBoardPhotoLayout(index: number, total: number) {
       tapeRotation: "-4deg",
     },
     {
-      span: 3,
-      justifySelf: "start",
+      left: "8%",
+      top: "552px",
+      width: "38%",
       rotation: "1.2deg",
       shiftX: "5px",
       shiftY: "-2px",
@@ -2812,8 +2821,9 @@ function getMainichiBoardPhotoLayout(index: number, total: number) {
       tapeRotation: "4deg",
     },
     {
-      span: 3,
-      justifySelf: "end",
+      left: "58%",
+      top: "592px",
+      width: "35%",
       rotation: "-2deg",
       shiftX: "-4px",
       shiftY: "20px",
@@ -2821,8 +2831,9 @@ function getMainichiBoardPhotoLayout(index: number, total: number) {
       tapeRotation: "-6deg",
     },
     {
-      span: 4,
-      justifySelf: "start",
+      left: "7%",
+      top: "798px",
+      width: "48%",
       rotation: "1.9deg",
       shiftX: "-2px",
       shiftY: "6px",
@@ -2830,8 +2841,9 @@ function getMainichiBoardPhotoLayout(index: number, total: number) {
       tapeRotation: "3deg",
     },
     {
-      span: 2,
-      justifySelf: "end",
+      left: "66%",
+      top: "828px",
+      width: "24%",
       rotation: "-1deg",
       shiftX: "3px",
       shiftY: "18px",
@@ -2839,80 +2851,54 @@ function getMainichiBoardPhotoLayout(index: number, total: number) {
       tapeRotation: "-2deg",
     },
   ];
-  const dense: MainichiBoardPhotoLayout[] = [
-    {
-      span: 3,
-      justifySelf: "start",
-      rotation: "-1.8deg",
-      shiftX: "-3px",
-      shiftY: "0px",
-      tapeLeft: "48%",
-      tapeRotation: "-4deg",
-    },
-    {
-      span: 3,
-      justifySelf: "end",
-      rotation: "1.4deg",
-      shiftX: "4px",
-      shiftY: "16px",
-      tapeLeft: "56%",
-      tapeRotation: "3deg",
-    },
-    {
-      span: 2,
-      justifySelf: "start",
-      rotation: "2deg",
-      shiftX: "2px",
-      shiftY: "-1px",
-      tapeLeft: "50%",
-      tapeRotation: "4deg",
-    },
-    {
-      span: 4,
-      justifySelf: "end",
-      rotation: "-1.2deg",
-      shiftX: "-2px",
-      shiftY: "12px",
-      tapeLeft: "43%",
-      tapeRotation: "-3deg",
-    },
-    {
-      span: 3,
-      justifySelf: "start",
-      rotation: "1deg",
-      shiftX: "5px",
-      shiftY: "0px",
-      tapeLeft: "57%",
-      tapeRotation: "3deg",
-    },
-    {
-      span: 3,
-      justifySelf: "end",
-      rotation: "-1.7deg",
-      shiftX: "-4px",
-      shiftY: "18px",
-      tapeLeft: "45%",
-      tapeRotation: "-5deg",
-    },
-    {
-      span: 2,
-      justifySelf: "end",
-      rotation: "-0.8deg",
-      shiftX: "3px",
-      shiftY: "5px",
-      tapeLeft: "53%",
-      tapeRotation: "-2deg",
-    },
-    {
-      span: 4,
-      justifySelf: "start",
-      rotation: "1.5deg",
-      shiftX: "-2px",
-      shiftY: "15px",
-      tapeLeft: "51%",
-      tapeRotation: "2deg",
-    },
+  const denseLanes = [
+    { left: 6, width: 31, topOffset: 0, rotation: "-1.9deg", tapeLeft: "48%", tapeRotation: "-4deg" },
+    { left: 36, width: 29, topOffset: 44, rotation: "1.4deg", tapeLeft: "56%", tapeRotation: "3deg" },
+    { left: 64, width: 30, topOffset: 14, rotation: "-0.9deg", tapeLeft: "51%", tapeRotation: "-2deg" },
+    { left: 12, width: 24, topOffset: 8, rotation: "2.2deg", tapeLeft: "50%", tapeRotation: "4deg" },
+    { left: 42, width: 47, topOffset: 20, rotation: "-1.2deg", tapeLeft: "43%", tapeRotation: "-3deg" },
+    { left: 7, width: 42, topOffset: 2, rotation: "1.6deg", tapeLeft: "54%", tapeRotation: "3deg" },
+    { left: 58, width: 34, topOffset: 36, rotation: "-1.7deg", tapeLeft: "45%", tapeRotation: "-5deg" },
   ];
+
+  if (total > 18) {
+    const lane = denseLanes[index % denseLanes.length];
+    const row = Math.floor(index / 3);
+    const stagger = Math.floor(index / denseLanes.length) % 3;
+
+    return {
+      left: `${lane.left}%`,
+      top: `${76 + row * 132 + lane.topOffset + stagger * 18}px`,
+      width: `${lane.width}%`,
+      rotation: lane.rotation,
+      shiftX: `${(index % 2 === 0 ? -1 : 1) * (index % 5)}px`,
+      shiftY: `${(index % 3) * 4}px`,
+      tapeLeft: lane.tapeLeft,
+      tapeRotation: lane.tapeRotation,
+      style: {
+        left: `${lane.left}%`,
+        top: `${76 + row * 132 + lane.topOffset + stagger * 18}px`,
+        width: `${lane.width}%`,
+      } satisfies CSSProperties,
+    };
+  }
+
+  if (total > 8) {
+    const base = collage[index % collage.length];
+    const cycle = Math.floor(index / collage.length);
+    const top = Number.parseFloat(base.top) + cycle * 520;
+
+    return {
+      ...base,
+      top: `${top}px`,
+      style: {
+        left: base.left,
+        top: `${top}px`,
+        width: base.width,
+      } satisfies CSSProperties,
+    };
+  }
+
   const layout =
     total <= 1
       ? single
@@ -2920,15 +2906,14 @@ function getMainichiBoardPhotoLayout(index: number, total: number) {
         ? pair[index % pair.length]
         : total <= 3
           ? sparse[index % sparse.length]
-          : total > 18
-            ? dense[index % dense.length]
-            : collage[index % collage.length];
+          : collage[index % collage.length];
 
   return {
     ...layout,
     style: {
-      gridColumn: `span ${layout.span}`,
-      justifySelf: layout.justifySelf,
+      left: layout.left,
+      top: layout.top,
+      width: layout.width,
     } satisfies CSSProperties,
   };
 }
@@ -3847,24 +3832,24 @@ const styles = {
     letterSpacing: "0.06em",
   },
   mainichiBoardPhotos: {
-    display: "grid",
-    gridTemplateColumns: "repeat(6, minmax(0, 1fr))",
-    gridAutoFlow: "dense",
-    gap: "32px 10px",
-    alignItems: "start",
-    padding: "8px 4px 12px",
+    position: "relative",
+    overflow: "visible",
+    margin: "0 auto",
+    width: "100%",
+    maxWidth: "360px",
   },
   mainichiBoardPhotoButton: {
-    position: "relative",
+    position: "absolute",
     display: "grid",
     gap: "6px",
     minWidth: 0,
+    maxWidth: "190px",
     border: "none",
     background: "transparent",
     color: COLLECTION_TEXT,
     font: "inherit",
     textAlign: "left",
-    padding: "10px 5px 8px",
+    padding: "8px 4px 8px",
     cursor: "pointer",
     transformOrigin: "50% 22%",
     transition:
