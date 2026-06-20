@@ -108,7 +108,7 @@ const HOME_FRAME_TUNING = {
 } as const;
 const HOME_SKY_BACKGROUND =
   "linear-gradient(180deg, color-mix(in srgb, var(--home-sky-top, var(--paper)) 18%, transparent) 0%, color-mix(in srgb, var(--home-sky-mid, var(--paper)) 10%, transparent) 48%, color-mix(in srgb, var(--home-sky-bottom, var(--paper-warm)) 16%, transparent) 100%), var(--home-sky-image), radial-gradient(circle at var(--home-sky-glow-x, 50%) var(--home-sky-glow-y, 12%), color-mix(in srgb, var(--home-sky-glow, var(--paper-warm)) 38%, transparent) 0%, transparent 54%), linear-gradient(180deg, var(--home-sky-top, var(--paper)) 0%, var(--home-sky-mid, var(--paper)) 44%, var(--home-sky-bottom, var(--paper-warm)) 100%)";
-const HOME_SKY_BACKGROUND_SIZE = "cover, cover, 140% 140%, cover";
+const HOME_SKY_BACKGROUND_SIZE = "100% 100%, 100% 100%, 140% 140%, 100% 100%";
 const HOME_SKY_BACKGROUND_POSITION =
   "50% 50%, 50% 50%, var(--home-sky-glow-x, 50%) var(--home-sky-glow-y, 12%), 50% 50%";
 const HOME_BACKGROUND_IMAGES = {
@@ -732,7 +732,7 @@ export function HomeDeskModel({
           background: var(--home-status-scrim, transparent);
         }
         .home-sky-flow {
-          background-size: 150% 150%, 100% 100%;
+          background-size: ${HOME_SKY_BACKGROUND_SIZE};
           animation: homeSkyFlow var(--home-sky-motion-duration, 52s) var(--ease-gentle) infinite alternate;
         }
         .desk-frame-breathe {
