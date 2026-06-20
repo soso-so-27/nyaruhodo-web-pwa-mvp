@@ -1453,7 +1453,7 @@ function getHomeBackgroundImage(now: number) {
   if (minute < 16 * 60 + 30) {
     return HOME_BACKGROUND_IMAGES.noon;
   }
-  if (minute < 21 * 60) {
+  if (minute < 20 * 60) {
     return HOME_BACKGROUND_IMAGES.evening;
   }
   return HOME_BACKGROUND_IMAGES.night;
