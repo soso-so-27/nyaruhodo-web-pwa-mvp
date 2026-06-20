@@ -107,10 +107,11 @@ const HOME_FRAME_TUNING = {
   emptyActionSize: "14px",
 } as const;
 const HOME_SKY_BACKGROUND =
-  "linear-gradient(180deg, color-mix(in srgb, var(--home-sky-top, var(--paper)) 18%, transparent) 0%, color-mix(in srgb, var(--home-sky-mid, var(--paper)) 10%, transparent) 48%, color-mix(in srgb, var(--home-sky-bottom, var(--paper-warm)) 16%, transparent) 100%), var(--home-sky-image), radial-gradient(circle at var(--home-sky-glow-x, 50%) var(--home-sky-glow-y, 12%), color-mix(in srgb, var(--home-sky-glow, var(--paper-warm)) 38%, transparent) 0%, transparent 54%), linear-gradient(180deg, var(--home-sky-top, var(--paper)) 0%, var(--home-sky-mid, var(--paper)) 44%, var(--home-sky-bottom, var(--paper-warm)) 100%)";
-const HOME_SKY_BACKGROUND_SIZE = "100% 100%, 100% 100%, 140% 140%, 100% 100%";
+  "url('/images/home-backgrounds/paper-grain.png'), linear-gradient(180deg, color-mix(in srgb, var(--home-sky-top, var(--paper)) 18%, transparent) 0%, color-mix(in srgb, var(--home-sky-mid, var(--paper)) 10%, transparent) 48%, color-mix(in srgb, var(--home-sky-bottom, var(--paper-warm)) 16%, transparent) 100%), var(--home-sky-image), radial-gradient(circle at var(--home-sky-glow-x, 50%) var(--home-sky-glow-y, 12%), color-mix(in srgb, var(--home-sky-glow, var(--paper-warm)) 38%, transparent) 0%, transparent 54%), linear-gradient(180deg, var(--home-sky-top, var(--paper)) 0%, var(--home-sky-mid, var(--paper)) 44%, var(--home-sky-bottom, var(--paper-warm)) 100%)";
+const HOME_SKY_BACKGROUND_SIZE =
+  "100% 100%, 100% 100%, 100% 100%, 140% 140%, 100% 100%";
 const HOME_SKY_BACKGROUND_POSITION =
-  "50% 50%, 50% 50%, var(--home-sky-glow-x, 50%) var(--home-sky-glow-y, 12%), 50% 50%";
+  "50% 50%, 50% 50%, 50% 50%, var(--home-sky-glow-x, 50%) var(--home-sky-glow-y, 12%), 50% 50%";
 const HOME_BACKGROUND_IMAGES = {
   dawn: "url('/images/home-backgrounds/dawn.webp')",
   morning: "url('/images/home-backgrounds/morning.webp')",
@@ -696,19 +697,19 @@ export function HomeDeskModel({
           0% {
             --home-sky-glow-x: 38%;
             --home-sky-glow-y: 7%;
-            background-position: 50% 50%, 50% 50%, 38% 7%, 50% 50%;
+            background-position: 50% 50%, 50% 50%, 50% 50%, 38% 7%, 50% 50%;
             filter: saturate(1);
           }
           50% {
             --home-sky-glow-x: 62%;
             --home-sky-glow-y: 18%;
-            background-position: 50% 50%, 50% 50%, 62% 18%, 50% 50%;
+            background-position: 50% 50%, 50% 50%, 50% 50%, 62% 18%, 50% 50%;
             filter: saturate(1.045);
           }
           100% {
             --home-sky-glow-x: 46%;
             --home-sky-glow-y: 28%;
-            background-position: 50% 50%, 50% 50%, 46% 28%, 50% 50%;
+            background-position: 50% 50%, 50% 50%, 50% 50%, 46% 28%, 50% 50%;
             filter: saturate(1.02);
           }
         }
