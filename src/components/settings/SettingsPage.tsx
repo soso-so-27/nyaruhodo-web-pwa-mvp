@@ -1897,13 +1897,15 @@ const styles = {
     flexDirection: "column" as const,
     width: "min(100%, 430px)",
     margin: "0 auto",
-    padding: "0 16px 40px",
+    padding:
+      "calc(18px + env(safe-area-inset-top)) 16px calc(40px + env(safe-area-inset-bottom))",
   },
   header: {
     display: "flex",
     alignItems: "center",
     gap: "12px",
-    padding: "16px 0 20px",
+    minHeight: "48px",
+    padding: "0 0 20px",
   },
   backIcon: {
     fontSize: "18px",

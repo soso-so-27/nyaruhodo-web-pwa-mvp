@@ -28,8 +28,6 @@ import { BottomNavigation } from "../navigation/BottomNavigation";
 import { AppButton } from "../ui/AppButton";
 import { AppBottomSheet } from "../ui/AppBottomSheet";
 import { AppCard } from "../ui/AppCard";
-import { AppHeader } from "../ui/AppHeader";
-import { AppIcon } from "../ui/AppIcons";
 import { AppSegmented } from "../ui/AppSegmented";
 import { AppTag } from "../ui/AppTag";
 import { AppTextField } from "../ui/AppTextField";
@@ -598,18 +596,6 @@ export function CatsPage() {
     <main style={styles.page}>
       <PageBackdrop />
       <div style={styles.container}>
-        <AppHeader
-          showWordmark={false}
-          style={styles.pageHeader}
-          right={
-            !isOnboardingCompletionView ? (
-              <AppButton href="/settings" variant="ghost" size="icon" iconOnly aria-label="設定">
-                <AppIcon name="settings" size={24} />
-              </AppButton>
-            ) : null
-          }
-        />
-
         {isOnboardingMode ? (
           <AppCard
             variant="section"
@@ -1054,6 +1040,9 @@ export function CatsPage() {
             >
               アイコン写真を変える
             </AppButton>
+            <AppButton href="/settings" variant="quiet" fullWidth>
+              アプリの設定
+            </AppButton>
             {canManageCats && catProfiles.length > 1 ? (
               <AppButton
                 type="button"
@@ -1236,12 +1225,7 @@ function LensPhotoSection({
   emptyCopy: string;
 }) {
   return (
-    <AppCard
-      as="section"
-      variant="section"
-      padding="standard"
-      style={styles.lensPhotoSection}
-    >
+    <section style={styles.lensPhotoSection}>
       <div style={styles.lensSectionHeader}>
         <p style={styles.lensSectionTitle}>{title}</p>
       </div>
@@ -1250,7 +1234,7 @@ function LensPhotoSection({
         emptyCopy={emptyCopy}
         showCatNames={false}
       />
-    </AppCard>
+    </section>
   );
 }
 
@@ -1262,12 +1246,7 @@ function AllCatsLensView({
   catCount: number;
 }) {
   return (
-    <AppCard
-      as="section"
-      variant="section"
-      padding="standard"
-      style={styles.allLensCard}
-    >
+    <section style={styles.allLensCard}>
       <div style={styles.lensSectionHeader}>
         <p style={styles.lensSectionTitle}>ぜんぶの ねがお</p>
         <p style={styles.lensSectionSub}>
@@ -1279,7 +1258,7 @@ function AllCatsLensView({
         emptyCopy="まだ ねがおはありません。"
         showCatNames
       />
-    </AppCard>
+    </section>
   );
 }
 
@@ -2149,15 +2128,6 @@ const styles = {
     padding:
       "calc(20px + env(safe-area-inset-top)) 24px calc(220px + env(safe-area-inset-bottom))",
   },
-  pageHeader: {
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: "12px",
-    marginBottom: "24px",
-    paddingTop: "2px",
-    position: "relative",
-  },
   pageKicker: {
     margin: "0 0 5px",
     color: CATS_MUTED,
@@ -2504,15 +2474,17 @@ const styles = {
     letterSpacing: "var(--tracking-body)",
   },
   lensPhotoSection: {
-    marginBottom: "12px",
+    margin: "0 -6px 20px",
+    padding: "0 6px",
   },
   allLensCard: {
-    marginBottom: "12px",
+    margin: "0 -6px 20px",
+    padding: "0 6px",
   },
   lensSectionHeader: {
     display: "grid",
     gap: "4px",
-    marginBottom: "12px",
+    margin: "0 6px 10px",
   },
   lensSectionTitle: {
     margin: 0,
@@ -2532,12 +2504,12 @@ const styles = {
   },
   lensPhotoGrid: {
     display: "grid",
-    gridTemplateColumns: "repeat(2, minmax(0, 1fr))",
-    gap: "14px",
+    gridTemplateColumns: "repeat(3, minmax(0, 1fr))",
+    gap: "3px",
   },
   lensPhotoItem: {
     display: "grid",
-    gap: "7px",
+    gap: 0,
     minWidth: 0,
   },
   lensPhotoTileRoot: {
@@ -2547,11 +2519,12 @@ const styles = {
     width: "100%",
     height: "auto",
     aspectRatio: "1 / 1",
-    border: "6px solid color-mix(in srgb, var(--paper-card) 84%, white)",
-    boxShadow:
-      "0 2px 4px color-mix(in srgb, var(--ink) 8%, transparent), 0 10px 22px -14px color-mix(in srgb, var(--ink) 24%, transparent)",
+    border: "0",
+    borderRadius: "8px",
+    boxShadow: "none",
   },
   lensPhotoDate: {
+    display: "none",
     color: CATS_MUTED,
     fontSize: "12px",
     fontWeight: 500,
@@ -2559,6 +2532,7 @@ const styles = {
     letterSpacing: 0,
   },
   lensPhotoCats: {
+    display: "none",
     color: CATS_FAINT,
     fontSize: "12px",
     fontWeight: 500,
