@@ -17,13 +17,16 @@
   /* ===== 背景: 紙に当たる光(フラット禁止・全画面共通) ===== */
   --bg-gradient: linear-gradient(180deg, var(--paper) 0%, var(--paper-warm) 100%);
   --app-paper-image: url("/images/home-backgrounds/generated-noon-paper.png");
+  --app-paper-wash-top: #f1eadf;
+  --app-paper-wash-mid: #f5ecdc;
+  --app-paper-wash-bottom: #e7dbc8;
   --app-paper-grain: url("/images/home-backgrounds/paper-grain.png");
   --app-paper-background:
     linear-gradient(
       180deg,
-      color-mix(in srgb, var(--paper) 14%, transparent) 0%,
-      color-mix(in srgb, var(--paper-warm) 8%, transparent) 48%,
-      color-mix(in srgb, var(--ink-soft) 5%, transparent) 100%
+      color-mix(in srgb, var(--app-paper-wash-top) 24%, transparent) 0%,
+      color-mix(in srgb, var(--app-paper-wash-mid) 14%, transparent) 48%,
+      color-mix(in srgb, var(--app-paper-wash-bottom) 18%, transparent) 100%
     ),
     var(--app-paper-image),
     linear-gradient(

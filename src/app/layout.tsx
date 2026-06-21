@@ -2,6 +2,7 @@ import "./globals.css";
 import type { Metadata, Viewport } from "next";
 import localFont from "next/font/local";
 import { AppAnalyticsTracker } from "../components/analytics/AppAnalyticsTracker";
+import { AppPaperTheme } from "../components/ui/AppPaperTheme";
 
 const kleeOne = localFont({
   src: [
@@ -150,6 +151,7 @@ export default function RootLayout({
         <link rel="icon" href="/icon-192.png" type="image/png" />
       </head>
       <body>
+        <AppPaperTheme />
         <AppAnalyticsTracker />
         {children}
       </body>

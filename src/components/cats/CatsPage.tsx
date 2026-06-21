@@ -77,8 +77,9 @@ const CATS_MUTED = "var(--ink-soft)";
 const CATS_FAINT = "var(--ink-faint)";
 const CATS_PAPER = "var(--paper)";
 const CATS_SERIF = "var(--font-display)";
+const CATS_UI = "var(--font-ui)";
 const CATS_TITLE_SIZE = "18px";
-const CATS_DISPLAY_SIZE = "22px";
+const CATS_DISPLAY_SIZE = "23px";
 const CATS_BODY_SIZE = "14px";
 const CATS_META_SIZE = "12px";
 const CATS_TINY_SIZE = "11px";
@@ -2590,27 +2591,27 @@ const styles = {
   },
   summaryTileValue: {
     color: CATS_TEXT_STRONG,
-    fontFamily: CATS_SERIF,
+    fontFamily: CATS_UI,
     fontSize: CATS_TITLE_SIZE,
-    fontWeight: 400,
+    fontWeight: 500,
     lineHeight: 1.25,
-    letterSpacing: CATS_BODY_TRACKING,
+    letterSpacing: "0.01em",
   },
   summaryTileValueSmall: {
     color: CATS_TEXT,
-    fontFamily: CATS_SERIF,
+    fontFamily: CATS_UI,
     fontSize: CATS_BODY_SIZE,
-    fontWeight: 400,
+    fontWeight: 500,
     lineHeight: 1.45,
-    letterSpacing: CATS_BODY_TRACKING,
+    letterSpacing: "0.01em",
   },
   summaryTileLabel: {
     color: CATS_MUTED,
-    fontFamily: CATS_SERIF,
+    fontFamily: CATS_UI,
     fontSize: CATS_TINY_SIZE,
     fontWeight: 400,
     lineHeight: 1.35,
-    letterSpacing: CATS_META_TRACKING,
+    letterSpacing: "0.04em",
   },
   footprintsSection: {
     minWidth: 0,
@@ -2736,20 +2737,20 @@ const styles = {
   },
   basicInfoLabel: {
     color: CATS_MUTED,
-    fontFamily: CATS_SERIF,
+    fontFamily: CATS_UI,
     fontSize: CATS_META_SIZE,
     fontWeight: 400,
     lineHeight: 1.35,
-    letterSpacing: CATS_META_TRACKING,
+    letterSpacing: "0.03em",
   },
   basicInfoValue: {
     minWidth: 0,
     color: CATS_TEXT,
-    fontFamily: CATS_SERIF,
+    fontFamily: CATS_UI,
     fontSize: CATS_BODY_SIZE,
-    fontWeight: 400,
+    fontWeight: 500,
     lineHeight: 1.35,
-    letterSpacing: CATS_BODY_TRACKING,
+    letterSpacing: "0.01em",
     overflow: "hidden",
     textOverflow: "ellipsis",
     whiteSpace: "nowrap",
@@ -3038,13 +3039,15 @@ const styles = {
   infoLabel: {
     fontSize: "12px",
     color: CATS_FAINT,
-    fontFamily: CATS_SERIF,
-    letterSpacing: "0.06em",
+    fontFamily: CATS_UI,
+    letterSpacing: "0.03em",
   },
   infoValue: {
-    fontSize: "13px",
-    color: CATS_MUTED,
-    fontWeight: 400,
+    fontSize: CATS_BODY_SIZE,
+    color: CATS_TEXT,
+    fontFamily: CATS_UI,
+    fontWeight: 500,
+    letterSpacing: "0.01em",
   },
   emptyInfoText: {
     margin: "2px 0 0",
