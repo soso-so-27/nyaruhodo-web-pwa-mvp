@@ -2679,25 +2679,25 @@ function getMainichiBoardCanvasStyle(total: number): CSSProperties {
 
   if (total === 1) {
     return {
-      height: "300px",
+      height: "280px",
     };
   }
 
   if (total <= 3) {
     return {
-      height: "360px",
+      height: "330px",
     };
   }
 
   if (total <= 8) {
     return {
-      height: "460px",
+      height: "500px",
     };
   }
 
   if (total <= 16) {
     return {
-      height: "410px",
+      height: "560px",
     };
   }
 
@@ -2720,10 +2720,10 @@ function getMainichiBoardPhotoLayout(index: number, total: number) {
   };
 
   const sparse = [
-    { left: 24, top: 54, width: 52, rotation: "-1.2deg", tapeLeft: "52%", tapeRotation: "-4deg", zIndex: 2 },
-    { left: 8, top: 48, width: 45, rotation: "-2.3deg", shiftX: -2, tapeLeft: "48%", tapeRotation: "-5deg", zIndex: 2 },
-    { left: 50, top: 152, width: 43, rotation: "2.1deg", shiftX: 3, shiftY: 4, tapeLeft: "55%", tapeRotation: "4deg", zIndex: 3 },
-    { left: 28, top: 240, width: 42, rotation: "-1.4deg", shiftY: 4, tapeLeft: "50%", tapeRotation: "-3deg", zIndex: 1 },
+    { left: 24, top: 44, width: 52, rotation: "-1.2deg", tapeLeft: "52%", tapeRotation: "-4deg", zIndex: 2 },
+    { left: 8, top: 42, width: 46, rotation: "-2.2deg", shiftX: -2, tapeLeft: "48%", tapeRotation: "-5deg", zIndex: 2 },
+    { left: 51, top: 138, width: 43, rotation: "2.1deg", shiftX: 3, shiftY: 4, tapeLeft: "55%", tapeRotation: "4deg", zIndex: 3 },
+    { left: 22, top: 218, width: 42, rotation: "-1.4deg", shiftY: 4, tapeLeft: "50%", tapeRotation: "-3deg", zIndex: 1 },
   ] satisfies MainichiBoardSlot[];
   const loose = [
     { left: 6, top: 32, width: 40, rotation: "-2.4deg", shiftX: -2, tapeLeft: "47%", tapeRotation: "-5deg", zIndex: 3 },
@@ -2736,22 +2736,22 @@ function getMainichiBoardPhotoLayout(index: number, total: number) {
     { left: 66, top: 150, width: 25, rotation: "1.1deg", shiftX: 2, shiftY: 4, tapeLeft: "52%", tapeRotation: "2deg", zIndex: 1 },
   ] satisfies MainichiBoardSlot[];
   const medium = [
-    { left: 5, top: 28, width: 30, rotation: "-1.8deg", shiftX: -1, tapeLeft: "48%", tapeRotation: "-4deg", zIndex: 3 },
-    { left: 36, top: 54, width: 25, rotation: "1.2deg", shiftX: 1, tapeLeft: "56%", tapeRotation: "3deg", zIndex: 2 },
-    { left: 64, top: 32, width: 29, rotation: "-0.9deg", shiftX: 2, shiftY: 3, tapeLeft: "51%", tapeRotation: "-2deg", zIndex: 3 },
-    { left: 14, top: 126, width: 25, rotation: "2.2deg", tapeLeft: "50%", tapeRotation: "4deg", zIndex: 1 },
-    { left: 38, top: 144, width: 38, rotation: "-1.2deg", shiftX: -1, shiftY: 6, tapeLeft: "43%", tapeRotation: "-3deg", zIndex: 5 },
-    { left: 73, top: 174, width: 22, rotation: "1.8deg", shiftX: 2, shiftY: 2, tapeLeft: "54%", tapeRotation: "3deg", zIndex: 2 },
-    { left: 6, top: 246, width: 34, rotation: "1.5deg", shiftX: -1, shiftY: 3, tapeLeft: "52%", tapeRotation: "3deg", zIndex: 3 },
-    { left: 39, top: 286, width: 25, rotation: "-1.5deg", shiftX: 1, shiftY: 2, tapeLeft: "48%", tapeRotation: "-4deg", zIndex: 2 },
-    { left: 62, top: 258, width: 32, rotation: "1deg", shiftX: 1, tapeLeft: "55%", tapeRotation: "3deg", zIndex: 4 },
-    { left: 15, top: 384, width: 25, rotation: "-2deg", tapeLeft: "47%", tapeRotation: "-5deg", zIndex: 1 },
-    { left: 40, top: 392, width: 33, rotation: "1.4deg", shiftX: 1, shiftY: 4, tapeLeft: "57%", tapeRotation: "4deg", zIndex: 4 },
-    { left: 72, top: 366, width: 22, rotation: "-0.7deg", shiftX: 1, shiftY: 2, tapeLeft: "50%", tapeRotation: "-2deg", zIndex: 2 },
-    { left: 7, top: 78, width: 20, rotation: "1.8deg", shiftX: 2, shiftY: 1, tapeLeft: "51%", tapeRotation: "2deg", zIndex: 1 },
-    { left: 26, top: 218, width: 21, rotation: "-1.1deg", shiftX: -1, tapeLeft: "49%", tapeRotation: "-3deg", zIndex: 1 },
-    { left: 55, top: 222, width: 20, rotation: "2deg", shiftX: 1, tapeLeft: "52%", tapeRotation: "4deg", zIndex: 1 },
-    { left: 5, top: 430, width: 22, rotation: "0.9deg", tapeLeft: "55%", tapeRotation: "2deg", zIndex: 1 },
+    { left: 4, top: 28, width: 31, rotation: "-2.1deg", shiftX: -1, tapeLeft: "48%", tapeRotation: "-4deg", zIndex: 4 },
+    { left: 40, top: 54, width: 25, rotation: "1.3deg", shiftX: 1, tapeLeft: "56%", tapeRotation: "3deg", zIndex: 2 },
+    { left: 67, top: 36, width: 28, rotation: "-0.9deg", shiftX: 2, shiftY: 3, tapeLeft: "51%", tapeRotation: "-2deg", zIndex: 3 },
+    { left: 13, top: 126, width: 24, rotation: "2.2deg", tapeLeft: "50%", tapeRotation: "4deg", zIndex: 1 },
+    { left: 37, top: 154, width: 39, rotation: "-1.2deg", shiftX: -1, shiftY: 6, tapeLeft: "43%", tapeRotation: "-3deg", zIndex: 6 },
+    { left: 73, top: 186, width: 21, rotation: "1.8deg", shiftX: 2, shiftY: 2, tapeLeft: "54%", tapeRotation: "3deg", zIndex: 2 },
+    { left: 5, top: 270, width: 35, rotation: "1.5deg", shiftX: -1, shiftY: 3, tapeLeft: "52%", tapeRotation: "3deg", zIndex: 4 },
+    { left: 33, top: 318, width: 25, rotation: "-1.5deg", shiftX: 1, shiftY: 2, tapeLeft: "48%", tapeRotation: "-4deg", zIndex: 2 },
+    { left: 61, top: 282, width: 33, rotation: "1deg", shiftX: 1, tapeLeft: "55%", tapeRotation: "3deg", zIndex: 5 },
+    { left: 12, top: 440, width: 24, rotation: "-2deg", tapeLeft: "47%", tapeRotation: "-5deg", zIndex: 1 },
+    { left: 39, top: 420, width: 33, rotation: "1.4deg", shiftX: 1, shiftY: 4, tapeLeft: "57%", tapeRotation: "4deg", zIndex: 5 },
+    { left: 72, top: 404, width: 22, rotation: "-0.7deg", shiftX: 1, shiftY: 2, tapeLeft: "50%", tapeRotation: "-2deg", zIndex: 2 },
+    { left: 7, top: 86, width: 19, rotation: "1.8deg", shiftX: 2, shiftY: 1, tapeLeft: "51%", tapeRotation: "2deg", zIndex: 1 },
+    { left: 25, top: 228, width: 20, rotation: "-1.1deg", shiftX: -1, tapeLeft: "49%", tapeRotation: "-3deg", zIndex: 1 },
+    { left: 55, top: 234, width: 20, rotation: "2deg", shiftX: 1, tapeLeft: "52%", tapeRotation: "4deg", zIndex: 1 },
+    { left: 4, top: 492, width: 21, rotation: "0.9deg", tapeLeft: "55%", tapeRotation: "2deg", zIndex: 1 },
   ] satisfies MainichiBoardSlot[];
   const full = [
     { left: 3, top: 22, width: 24, rotation: "-2.1deg", shiftX: -1, tapeLeft: "48%", tapeRotation: "-4deg", zIndex: 4 },
@@ -2803,7 +2803,7 @@ function getMainichiBoardPhotoLayout(index: number, total: number) {
     total <= 8
       ? 0.88
       : total <= 16
-        ? 0.72
+        ? 0.98
         : 0.9;
   const top = Math.max(
     0,
@@ -3713,16 +3713,16 @@ const styles = {
   },
   mainichiMonthList: {
     display: "grid",
-    gap: "30px",
+    gap: "34px",
   },
   mainichiMonthBoard: {
     display: "grid",
-    gap: "12px",
-    padding: "24px 16px 30px",
+    gap: "14px",
+    padding: "24px 16px 34px",
     overflow: "visible",
     borderRadius: "30px",
     background:
-      "linear-gradient(180deg, color-mix(in srgb, var(--paper) 74%, transparent), color-mix(in srgb, var(--paper-warm) 46%, transparent)), var(--app-paper-background)",
+      "linear-gradient(180deg, color-mix(in srgb, var(--paper-card) 90%, transparent), color-mix(in srgb, var(--paper-warm) 62%, transparent)), var(--app-paper-background)",
     backgroundSize:
       "100% 100%, var(--app-paper-background-size)",
     backgroundPosition:
@@ -3730,7 +3730,7 @@ const styles = {
     backgroundRepeat:
       "no-repeat, var(--app-paper-background-repeat)",
     boxShadow:
-      "0 1px 0 color-mix(in srgb, var(--paper-card) 64%, transparent) inset, 0 24px 52px -40px rgba(86,70,45,0.30)",
+      "0 1px 0 color-mix(in srgb, var(--paper-card) 82%, transparent) inset, 0 0 0 1px color-mix(in srgb, var(--line) 38%, transparent), 0 28px 58px -42px rgba(86,70,45,0.34)",
   },
   mainichiMonthTitle: {
     margin: 0,
@@ -3746,20 +3746,20 @@ const styles = {
     overflow: "visible",
     margin: "0 auto",
     width: "100%",
-    maxWidth: "360px",
+    maxWidth: "372px",
   },
   mainichiBoardPhotoButton: {
     position: "absolute",
     display: "grid",
     gap: "6px",
     minWidth: 0,
-    maxWidth: "190px",
+    maxWidth: "198px",
     border: "none",
     background: "transparent",
     color: COLLECTION_TEXT,
     font: "inherit",
     textAlign: "left",
-    padding: "8px 4px 8px",
+    padding: "8px 3px 8px",
     cursor: "pointer",
     transformOrigin: "50% 22%",
     transition:
@@ -3774,16 +3774,16 @@ const styles = {
     height: "15px",
     borderRadius: radius.sm,
     background:
-      "linear-gradient(90deg, color-mix(in srgb, var(--paper-card) 42%, transparent), color-mix(in srgb, var(--paper) 66%, transparent))",
+      "linear-gradient(90deg, color-mix(in srgb, var(--paper-card) 50%, transparent), color-mix(in srgb, var(--paper) 72%, transparent))",
     boxShadow:
-      "0 1px 0 color-mix(in srgb, var(--paper-card) 60%, transparent) inset, 0 3px 9px rgba(120,110,90,0.09)",
+      "0 1px 0 color-mix(in srgb, var(--paper-card) 70%, transparent) inset, 0 4px 10px rgba(120,110,90,0.10)",
     transform: "translate(-50%, -15%) rotate(var(--mainichi-tape-rotation, -3deg))",
     pointerEvents: "none",
   },
   mainichiBoardPhotoTileRoot: {
     width: "100%",
     boxShadow:
-      "0 1px 0 color-mix(in srgb, var(--paper-card) 72%, transparent) inset, 0 10px 20px -16px rgba(76,62,42,0.30)",
+      "0 1px 0 color-mix(in srgb, var(--paper-card) 76%, transparent) inset, 0 12px 22px -16px rgba(76,62,42,0.34)",
   },
   mainichiBoardPhotoTile: {
     width: "100%",
