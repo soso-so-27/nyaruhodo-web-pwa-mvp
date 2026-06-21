@@ -70,7 +70,7 @@ type RemoteCatDeleteResult =
   | { status: "deleted" | "skipped" }
   | { status: "error"; message: string };
 
-const UCHINOKO_PHOTO_PREVIEW_LIMIT = 9;
+const UCHINOKO_PHOTO_PREVIEW_LIMIT = 6;
 const CATS_TEXT = "var(--ink)";
 const CATS_TEXT_STRONG = "var(--ink)";
 const CATS_MUTED = "var(--ink-soft)";
@@ -726,8 +726,6 @@ export function CatsPage() {
                     ) : null}
                   </div>
                 </div>
-
-                <BasicInfoTable profile={activeCatProfile} />
               </>
             ) : null}
 
@@ -830,11 +828,38 @@ export function CatsPage() {
         ) : null}
 
         {activeCatProfile && !isOnboardingCompletionView && activeLens === "cat" ? (
+          <CatSummaryPanel
+            familyDuration={familyDuration}
+            photoCount={takenSleepingPhotoCount}
+            omoideCount={omoideMemories.length}
+            familySinceDate={activeCatProfile.basicInfo?.familySinceDate}
+            birthdayStatus={birthdayStatus}
+          />
+        ) : null}
+
+        {activeCatProfile && !isOnboardingCompletionView && activeLens === "cat" ? (
           <LensPhotoSection
-            title="最近の ねがお"
+            title="最近の すがた"
             photos={activeCatLensPhotos}
             emptyCopy="このこに紐づく ねがおは、まだありません。"
           />
+        ) : null}
+
+        {activeCatProfile && !isOnboardingCompletionView && activeLens === "cat" ? (
+          <AppCard
+            as="section"
+            variant="section"
+            padding="md"
+            style={styles.basicInfoPanel}
+          >
+            <BasicInfoTable
+              profile={activeCatProfile}
+              onEdit={() => {
+                setIsEditingProfile(true);
+                setIsEditingCatName(true);
+              }}
+            />
+          </AppCard>
         ) : null}
 
         {activeCatProfile && !isOnboardingCompletionView && activeLens === "all" ? (
@@ -916,20 +941,6 @@ export function CatsPage() {
                   </span>
                 </div>
               </AppCard>
-              {birthdayStatus ? (
-                <AppCard
-                  as="div"
-                  variant="inset"
-                  padding="sm"
-                  style={
-                    birthdayStatus.isToday
-                      ? { ...styles.catDayNote, ...styles.catDayNoteToday }
-                      : styles.catDayNote
-                  }
-                >
-                  <span style={styles.catDayText}>{birthdayStatus.copy}</span>
-                </AppCard>
-              ) : null}
             </AppCard>
             <AppCard as="section" variant="section" padding="md" style={styles.daysThread}>
               <p style={styles.bunbakoSectionTitle}>{catName}との 日々</p>
@@ -1201,7 +1212,72 @@ function FootprintCard({ milestone }: { milestone: CatSleepingMilestone }) {
   );
 }
 
-function BasicInfoTable({ profile }: { profile: CatProfile }) {
+function CatSummaryPanel({
+  familyDuration,
+  photoCount,
+  omoideCount,
+  familySinceDate,
+  birthdayStatus,
+}: {
+  familyDuration: { primary: string; secondary: string };
+  photoCount: number;
+  omoideCount: number;
+  familySinceDate?: string;
+  birthdayStatus: { copy: string; isToday: boolean } | null;
+}) {
+  const familyCopy =
+    familyDuration.secondary ||
+    (familyDuration.primary === "未設定" ? "記録を育てる" : familyDuration.primary);
+  const seasonCopy = getCurrentSeasonCountLabel(familySinceDate);
+
+  return (
+    <AppCard
+      as="section"
+      variant="section"
+      padding="md"
+      style={styles.summaryPanel}
+    >
+      <div style={styles.summaryHeader}>
+        <p style={styles.summaryKicker}>この子のいま</p>
+        <p style={styles.summaryMain}>{familyCopy}</p>
+      </div>
+      <div style={styles.summaryGrid}>
+        <div style={styles.summaryTile}>
+          <span style={styles.summaryTileValue}>{photoCount}枚</span>
+          <span style={styles.summaryTileLabel}>すがた</span>
+        </div>
+        <div style={styles.summaryTile}>
+          <span style={styles.summaryTileValue}>{omoideCount}通</span>
+          <span style={styles.summaryTileLabel}>思い出</span>
+        </div>
+        <div style={styles.summaryTileWide}>
+          <span style={styles.summaryTileLabel}>季節</span>
+          <span style={styles.summaryTileValueSmall}>{seasonCopy}</span>
+        </div>
+        <div
+          style={
+            birthdayStatus?.isToday
+              ? { ...styles.summaryTileWide, ...styles.summaryTileAccent }
+              : styles.summaryTileWide
+          }
+        >
+          <span style={styles.summaryTileLabel}>誕生日</span>
+          <span style={styles.summaryTileValueSmall}>
+            {birthdayStatus?.copy ?? "未登録"}
+          </span>
+        </div>
+      </div>
+    </AppCard>
+  );
+}
+
+function BasicInfoTable({
+  profile,
+  onEdit,
+}: {
+  profile: CatProfile;
+  onEdit?: () => void;
+}) {
   const rows = [
     {
       label: "迎えた日",
@@ -1246,6 +1322,11 @@ function BasicInfoTable({ profile }: { profile: CatProfile }) {
           </div>
         ))}
       </div>
+      {rows.some((row) => !row.value) && onEdit ? (
+        <button type="button" style={styles.basicInfoEditLink} onClick={onEdit}>
+          未登録のことを足す
+        </button>
+      ) : null}
     </div>
   );
 }
@@ -2184,7 +2265,7 @@ const styles = {
     width: "min(100%, 430px)",
     margin: "0 auto",
     padding:
-      "calc(20px + env(safe-area-inset-top)) 24px calc(220px + env(safe-area-inset-bottom))",
+      "calc(20px + env(safe-area-inset-top)) 24px calc(280px + env(safe-area-inset-bottom))",
   },
   pageKicker: {
     margin: "0 0 5px",
@@ -2259,13 +2340,13 @@ const styles = {
     marginTop: "18px",
   },
   profileCard: {
-    marginBottom: "12px",
+    marginBottom: "10px",
   },
   profilePlaceCard: {
-    marginBottom: "12px",
+    marginBottom: "10px",
   },
   lensSwitch: {
-    margin: "0 0 10px",
+    margin: "0 0 12px",
   },
   profileHero: {
     display: "grid",
@@ -2419,6 +2500,88 @@ const styles = {
     marginBottom: "12px",
     overflow: "hidden",
   },
+  summaryPanel: {
+    marginBottom: "12px",
+    background:
+      "linear-gradient(145deg, color-mix(in srgb, var(--paper-card) 86%, transparent), color-mix(in srgb, var(--paper-warm) 40%, transparent))",
+  },
+  summaryHeader: {
+    display: "grid",
+    justifyItems: "center",
+    gap: "4px",
+    padding: "2px 0 12px",
+  },
+  summaryKicker: {
+    margin: 0,
+    color: CATS_MUTED,
+    fontFamily: CATS_SERIF,
+    fontSize: "12px",
+    fontWeight: 400,
+    lineHeight: 1.35,
+    letterSpacing: "0.1em",
+  },
+  summaryMain: {
+    margin: 0,
+    color: CATS_TEXT_STRONG,
+    fontFamily: CATS_SERIF,
+    fontSize: "26px",
+    fontWeight: 400,
+    lineHeight: 1.25,
+    letterSpacing: "0.08em",
+  },
+  summaryGrid: {
+    display: "grid",
+    gridTemplateColumns: "1fr 1fr",
+    gap: "8px",
+  },
+  summaryTile: {
+    minHeight: "62px",
+    display: "grid",
+    alignContent: "center",
+    justifyItems: "center",
+    gap: "3px",
+    borderRadius: "var(--radius-lg)",
+    border: "1px solid color-mix(in srgb, var(--line) 72%, transparent)",
+    background: "color-mix(in srgb, var(--paper) 42%, transparent)",
+  },
+  summaryTileWide: {
+    minHeight: "54px",
+    display: "grid",
+    alignContent: "center",
+    gap: "2px",
+    padding: "8px 12px",
+    borderRadius: "var(--radius-lg)",
+    border: "1px solid color-mix(in srgb, var(--line) 62%, transparent)",
+    background: "color-mix(in srgb, var(--paper) 30%, transparent)",
+  },
+  summaryTileAccent: {
+    borderColor: "color-mix(in srgb, var(--seal) 34%, var(--line))",
+    background: "color-mix(in srgb, var(--seal) 8%, var(--paper))",
+  },
+  summaryTileValue: {
+    color: CATS_TEXT_STRONG,
+    fontFamily: CATS_SERIF,
+    fontSize: "18px",
+    fontWeight: 500,
+    lineHeight: 1.25,
+    letterSpacing: "0.05em",
+  },
+  summaryTileValueSmall: {
+    color: CATS_TEXT,
+    fontFamily: CATS_SERIF,
+    fontSize: "13px",
+    fontWeight: 500,
+    lineHeight: 1.45,
+    letterSpacing: "0.04em",
+  },
+  summaryTileLabel: {
+    color: CATS_MUTED,
+    fontFamily: CATS_SERIF,
+    fontSize: "11px",
+    fontWeight: 400,
+    lineHeight: 1.35,
+    letterSpacing: "0.08em",
+  },
   footprintsSection: {
     minWidth: 0,
   },
@@ -2491,32 +2654,39 @@ const styles = {
       "linear-gradient(135deg, color-mix(in srgb, var(--paper) 22%, transparent), color-mix(in srgb, var(--paper-warm) 28%, transparent))",
   },
   basicInfoBlock: {
-    marginTop: "14px",
-    paddingTop: "14px",
-    borderTop: "1px solid color-mix(in srgb, var(--line) 68%, transparent)",
+    display: "grid",
+    gap: "9px",
+  },
+  basicInfoPanel: {
+    marginBottom: "12px",
   },
   basicInfoTitle: {
-    margin: "0 0 9px",
-    color: CATS_FAINT,
+    margin: 0,
+    color: CATS_TEXT,
     fontFamily: CATS_SERIF,
-    fontSize: "12px",
+    fontSize: "18px",
     fontWeight: 400,
-    lineHeight: 1.35,
-    letterSpacing: "0.07em",
+    lineHeight: 1.45,
+    letterSpacing: "var(--tracking-label)",
   },
   basicInfoTable: {
     display: "grid",
+    borderRadius: "var(--radius-lg)",
+    border: "1px solid color-mix(in srgb, var(--line) 62%, transparent)",
+    overflow: "hidden",
+    background: "color-mix(in srgb, var(--paper) 24%, transparent)",
   },
   basicInfoRow: {
     display: "grid",
-    gridTemplateColumns: "82px 1fr",
+    gridTemplateColumns: "86px 1fr",
     alignItems: "center",
     gap: "12px",
-    minHeight: "34px",
+    minHeight: "38px",
+    padding: "0 12px",
     borderBottom: "1px solid color-mix(in srgb, var(--line) 50%, transparent)",
   },
   basicInfoLabel: {
-    color: CATS_FAINT,
+    color: CATS_MUTED,
     fontFamily: CATS_SERIF,
     fontSize: "12px",
     fontWeight: 400,
@@ -2525,10 +2695,10 @@ const styles = {
   },
   basicInfoValue: {
     minWidth: 0,
-    color: CATS_MUTED,
+    color: CATS_TEXT,
     fontFamily: CATS_SERIF,
     fontSize: "13px",
-    fontWeight: 400,
+    fontWeight: 500,
     lineHeight: 1.35,
     letterSpacing: "var(--tracking-body)",
     overflow: "hidden",
@@ -2537,6 +2707,20 @@ const styles = {
   },
   basicInfoMissing: {
     color: CATS_FAINT,
+  },
+  basicInfoEditLink: {
+    width: "fit-content",
+    minHeight: "34px",
+    padding: "0 10px",
+    border: "none",
+    borderRadius: "var(--radius-full)",
+    background: "transparent",
+    color: "var(--seal)",
+    fontFamily: CATS_SERIF,
+    fontSize: "12px",
+    fontWeight: 500,
+    letterSpacing: "0.04em",
+    cursor: "pointer",
   },
   catManageSheet: {
     display: "grid",
@@ -2574,7 +2758,7 @@ const styles = {
     letterSpacing: "var(--tracking-body)",
   },
   lensPhotoSection: {
-    margin: "0 -6px 18px",
+    margin: "0 -6px 14px",
     padding: "0 6px",
   },
   allLensCard: {
