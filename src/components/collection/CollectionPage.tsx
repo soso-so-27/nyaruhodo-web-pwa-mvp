@@ -3829,13 +3829,16 @@ const styles = {
   },
   mainichiBoardPhotoTileRoot: {
     width: "100%",
-    boxShadow:
-      "0 1px 0 color-mix(in srgb, var(--paper-card) 76%, transparent) inset, 0 12px 22px -16px rgba(76,62,42,0.34)",
   },
   mainichiBoardPhotoTile: {
     width: "100%",
     height: "auto",
     display: "block",
+    border: "4px solid color-mix(in srgb, var(--paper-card) 88%, var(--paper-warm) 12%)",
+    borderRadius: "15px",
+    background: "color-mix(in srgb, var(--paper-card) 92%, var(--paper-warm) 8%)",
+    boxShadow:
+      "0 0 0 0.5px rgba(74,56,34,0.08) inset, 0 2px 5px rgba(86,70,45,0.10), 0 12px 22px -16px rgba(76,62,42,0.34)",
   },
   mainichiBoardPhotoCatBadge: {
     justifySelf: "center",
