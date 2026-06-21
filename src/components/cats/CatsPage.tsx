@@ -29,7 +29,6 @@ import { AppButton } from "../ui/AppButton";
 import { AppBottomSheet } from "../ui/AppBottomSheet";
 import { AppCard } from "../ui/AppCard";
 import { AppSegmented } from "../ui/AppSegmented";
-import { AppTag } from "../ui/AppTag";
 import { AppTextField } from "../ui/AppTextField";
 import { PhotoTile } from "../ui/PhotoTile";
 import { StoredPhotoImage } from "../ui/StoredPhotoImage";
@@ -728,21 +727,7 @@ export function CatsPage() {
                   </div>
                 </div>
 
-                <div style={styles.profileNotes}>
-                  {activeGender ? (
-                    <AppTag>{activeGender}</AppTag>
-                  ) : null}
-                  {activeCatProfile.basicInfo?.breed ? (
-                    <AppTag>
-                      {activeCatProfile.basicInfo.breed}
-                    </AppTag>
-                  ) : null}
-                  {activeCatProfile.appearance?.coat ? (
-                    <AppTag>
-                      {getCoatLabel(activeCatProfile.appearance.coat)}
-                    </AppTag>
-                  ) : null}
-                </div>
+                <BasicInfoTable profile={activeCatProfile} />
               </>
             ) : null}
 
@@ -900,7 +885,7 @@ export function CatsPage() {
               style={styles.recordPanel}
             >
               <p style={styles.bunbakoSectionTitle}>記録</p>
-              <p style={styles.sectionLead}>日付と枚数だけを、静かに残します。</p>
+              <p style={styles.sectionLead}>ねがおと思い出から、自動でたまります。</p>
               <AppCard as="div" variant="inset" padding="sm" style={styles.recordList}>
                 <div style={styles.recordRow}>
                   <span style={styles.recordLabel}>
@@ -1216,6 +1201,55 @@ function FootprintCard({ milestone }: { milestone: CatSleepingMilestone }) {
   );
 }
 
+function BasicInfoTable({ profile }: { profile: CatProfile }) {
+  const rows = [
+    {
+      label: "迎えた日",
+      value: formatBasicInfoDate(profile.basicInfo?.familySinceDate),
+    },
+    {
+      label: "誕生日",
+      value: formatBasicInfoDate(profile.basicInfo?.birthDate),
+    },
+    {
+      label: "性別",
+      value: formatGender(profile.basicInfo?.gender),
+    },
+    {
+      label: "猫種",
+      value: profile.basicInfo?.breed,
+    },
+    {
+      label: "毛色",
+      value: profile.appearance?.coat
+        ? getCoatLabel(profile.appearance.coat)
+        : "",
+    },
+  ];
+
+  return (
+    <div style={styles.basicInfoBlock}>
+      <p style={styles.basicInfoTitle}>基本情報</p>
+      <div style={styles.basicInfoTable}>
+        {rows.map((row) => (
+          <div key={row.label} style={styles.basicInfoRow}>
+            <span style={styles.basicInfoLabel}>{row.label}</span>
+            <span
+              style={
+                row.value
+                  ? styles.basicInfoValue
+                  : { ...styles.basicInfoValue, ...styles.basicInfoMissing }
+              }
+            >
+              {row.value || "未登録"}
+            </span>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 function LensPhotoSection({
   title,
   photos,
@@ -1469,6 +1503,19 @@ function formatFootprintDate(timestamp: number) {
   const date = new Date(timestamp);
 
   if (Number.isNaN(date.getTime())) {
+    return "";
+  }
+
+  return `${date.getFullYear()}/${String(date.getMonth() + 1).padStart(
+    2,
+    "0",
+  )}/${String(date.getDate()).padStart(2, "0")}`;
+}
+
+function formatBasicInfoDate(value?: string) {
+  const date = parseLocalDate(value);
+
+  if (!date) {
     return "";
   }
 
@@ -2443,11 +2490,53 @@ const styles = {
     background:
       "linear-gradient(135deg, color-mix(in srgb, var(--paper) 22%, transparent), color-mix(in srgb, var(--paper-warm) 28%, transparent))",
   },
-  profileNotes: {
-    display: "flex",
-    flexWrap: "wrap",
-    gap: "8px",
-    marginTop: "12px",
+  basicInfoBlock: {
+    marginTop: "14px",
+    paddingTop: "14px",
+    borderTop: "1px solid color-mix(in srgb, var(--line) 68%, transparent)",
+  },
+  basicInfoTitle: {
+    margin: "0 0 9px",
+    color: CATS_FAINT,
+    fontFamily: CATS_SERIF,
+    fontSize: "12px",
+    fontWeight: 400,
+    lineHeight: 1.35,
+    letterSpacing: "0.07em",
+  },
+  basicInfoTable: {
+    display: "grid",
+  },
+  basicInfoRow: {
+    display: "grid",
+    gridTemplateColumns: "82px 1fr",
+    alignItems: "center",
+    gap: "12px",
+    minHeight: "34px",
+    borderBottom: "1px solid color-mix(in srgb, var(--line) 50%, transparent)",
+  },
+  basicInfoLabel: {
+    color: CATS_FAINT,
+    fontFamily: CATS_SERIF,
+    fontSize: "12px",
+    fontWeight: 400,
+    lineHeight: 1.35,
+    letterSpacing: "0.04em",
+  },
+  basicInfoValue: {
+    minWidth: 0,
+    color: CATS_MUTED,
+    fontFamily: CATS_SERIF,
+    fontSize: "13px",
+    fontWeight: 400,
+    lineHeight: 1.35,
+    letterSpacing: "var(--tracking-body)",
+    overflow: "hidden",
+    textOverflow: "ellipsis",
+    whiteSpace: "nowrap",
+  },
+  basicInfoMissing: {
+    color: CATS_FAINT,
   },
   catManageSheet: {
     display: "grid",
