@@ -768,52 +768,6 @@ export function CatsPage() {
                   </div>
                 </div>
 
-                <hr style={styles.divider} />
-
-                <AppCard as="div" variant="inset" padding="sm" style={styles.recordList}>
-                  <div style={styles.recordRow}>
-                    <span style={styles.recordLabel}>
-                      {getCurrentSeasonCountLabel(
-                        activeCatProfile.basicInfo?.familySinceDate,
-                      )}
-                    </span>
-                    <span style={styles.recordMetricValue}>
-                      {getCurrentSeasonName()}
-                    </span>
-                  </div>
-                  <div style={styles.recordRow}>
-                    <span style={styles.recordLabel}>とどいた思い出</span>
-                    <span style={styles.recordMetricValue}>
-                      {omoideMemories.length}通
-                    </span>
-                  </div>
-                  <div style={styles.recordRow}>
-                    <span style={styles.recordLabel}>とったねがお</span>
-                    <span style={styles.recordMetricValue}>
-                      {takenSleepingPhotoCount}枚
-                    </span>
-                  </div>
-                  <div style={{ ...styles.recordRow, ...styles.recordRowLast }}>
-                    <span style={styles.recordLabel}>関係の記録</span>
-                    <span style={styles.recordMetricValue}>
-                      迎えた日から
-                    </span>
-                  </div>
-                </AppCard>
-                {birthdayStatus ? (
-                  <AppCard
-                    as="div"
-                    variant="inset"
-                    padding="sm"
-                    style={
-                      birthdayStatus.isToday
-                        ? { ...styles.catDayNote, ...styles.catDayNoteToday }
-                        : styles.catDayNote
-                    }
-                  >
-                    <span style={styles.catDayText}>{birthdayStatus.copy}</span>
-                  </AppCard>
-                ) : null}
                 <div style={styles.profileNotes}>
                   {activeGender ? (
                     <AppTag>{activeGender}</AppTag>
@@ -829,61 +783,6 @@ export function CatsPage() {
                     </AppTag>
                   ) : null}
                 </div>
-                <div style={styles.footprintsSection}>
-                  <p style={styles.footprintsTitle}>あしあと</p>
-                  <div style={styles.footprintsScroller}>
-                    {sleepingMilestones.map((milestone) => (
-                      <FootprintCard
-                        key={milestone.target}
-                        milestone={milestone}
-                      />
-                    ))}
-                  </div>
-                </div>
-                <OmoideBunbako
-                  memories={omoideMemories}
-                  controls={omoideControls}
-                  onOpen={(memory) => setSelectedOmoideMemory(memory)}
-                  onPause={() => {
-                    pauseOmoideMemories();
-                    setOmoideRefreshTick((value) => value + 1);
-                    setMessage("思い出を しばらく お休みします。");
-                  }}
-                  onDisable={() => {
-                    disableOmoideMemories(!omoideControls.disabled);
-                    setOmoideRefreshTick((value) => value + 1);
-                  }}
-                />
-                <AppCard as="section" variant="section" padding="md" style={styles.daysThread}>
-                  <p style={styles.bunbakoSectionTitle}>{catName}との 日々</p>
-                  <div style={styles.threadLine}>
-                    <div style={styles.threadNode}>
-                      <span style={styles.threadNodeTitle}>今月の {catName}</span>
-                      <span style={styles.threadNodeText}>
-                        {getDaysThreadIntro(
-                          catName,
-                          activeCatProfile.basicInfo?.familySinceDate,
-                        )}
-                      </span>
-                    </div>
-                    <div style={styles.threadNode}>
-                      <span style={styles.threadNodeTitle}>これまで</span>
-                      <span style={styles.threadNodeText}>
-                        思い出 {omoideMemories.length}通 ・ ねがお{" "}
-                        {takenSleepingPhotoCount}枚
-                      </span>
-                    </div>
-                  </div>
-                </AppCard>
-                {!activeCatProfile.basicInfo?.familySinceDate &&
-                !activeCatProfile.basicInfo?.birthDate &&
-                !activeCatProfile.basicInfo?.breed &&
-                !activeCatProfile.appearance?.coat &&
-                !activeGender ? (
-                  <p style={styles.emptyInfoText}>
-                    必要なことだけ、右上からそっと足せます。
-                  </p>
-                ) : null}
               </>
             ) : null}
 
@@ -969,6 +868,125 @@ export function CatsPage() {
               </>
             ) : null}
           </AppCard>
+        ) : null}
+
+        {activeCatProfile && !isOnboardingCompletionView && activeLens === "cat" ? (
+          <>
+            <AppCard
+              as="section"
+              variant="section"
+              padding="md"
+              style={styles.footprintsPanel}
+            >
+              <div style={styles.footprintsSection}>
+                <p style={styles.footprintsTitle}>あしあと</p>
+                <div style={styles.footprintsScroller}>
+                  {sleepingMilestones.map((milestone) => (
+                    <FootprintCard
+                      key={milestone.target}
+                      milestone={milestone}
+                    />
+                  ))}
+                </div>
+              </div>
+            </AppCard>
+            <OmoideBunbako
+              memories={omoideMemories}
+              controls={omoideControls}
+              onOpen={(memory) => setSelectedOmoideMemory(memory)}
+              onPause={() => {
+                pauseOmoideMemories();
+                setOmoideRefreshTick((value) => value + 1);
+                setMessage("思い出を しばらく お休みします。");
+              }}
+              onDisable={() => {
+                disableOmoideMemories(!omoideControls.disabled);
+                setOmoideRefreshTick((value) => value + 1);
+              }}
+            />
+            <AppCard
+              as="section"
+              variant="section"
+              padding="md"
+              style={styles.recordPanel}
+            >
+              <p style={styles.bunbakoSectionTitle}>記録</p>
+              <AppCard as="div" variant="inset" padding="sm" style={styles.recordList}>
+                <div style={styles.recordRow}>
+                  <span style={styles.recordLabel}>
+                    {getCurrentSeasonCountLabel(
+                      activeCatProfile.basicInfo?.familySinceDate,
+                    )}
+                  </span>
+                  <span style={styles.recordMetricValue}>
+                    {getCurrentSeasonName()}
+                  </span>
+                </div>
+                <div style={styles.recordRow}>
+                  <span style={styles.recordLabel}>とどいた思い出</span>
+                  <span style={styles.recordMetricValue}>
+                    {omoideMemories.length}通
+                  </span>
+                </div>
+                <div style={styles.recordRow}>
+                  <span style={styles.recordLabel}>とったねがお</span>
+                  <span style={styles.recordMetricValue}>
+                    {takenSleepingPhotoCount}枚
+                  </span>
+                </div>
+                <div style={{ ...styles.recordRow, ...styles.recordRowLast }}>
+                  <span style={styles.recordLabel}>関係の記録</span>
+                  <span style={styles.recordMetricValue}>
+                    迎えた日から
+                  </span>
+                </div>
+              </AppCard>
+              {birthdayStatus ? (
+                <AppCard
+                  as="div"
+                  variant="inset"
+                  padding="sm"
+                  style={
+                    birthdayStatus.isToday
+                      ? { ...styles.catDayNote, ...styles.catDayNoteToday }
+                      : styles.catDayNote
+                  }
+                >
+                  <span style={styles.catDayText}>{birthdayStatus.copy}</span>
+                </AppCard>
+              ) : null}
+            </AppCard>
+            <AppCard as="section" variant="section" padding="md" style={styles.daysThread}>
+              <p style={styles.bunbakoSectionTitle}>{catName}との 日々</p>
+              <div style={styles.threadLine}>
+                <div style={styles.threadNode}>
+                  <span style={styles.threadNodeTitle}>今月の {catName}</span>
+                  <span style={styles.threadNodeText}>
+                    {getDaysThreadIntro(
+                      catName,
+                      activeCatProfile.basicInfo?.familySinceDate,
+                    )}
+                  </span>
+                </div>
+                <div style={styles.threadNode}>
+                  <span style={styles.threadNodeTitle}>これまで</span>
+                  <span style={styles.threadNodeText}>
+                    思い出 {omoideMemories.length}通 ・ ねがお{" "}
+                    {takenSleepingPhotoCount}枚
+                  </span>
+                </div>
+              </div>
+            </AppCard>
+            {!activeCatProfile.basicInfo?.familySinceDate &&
+            !activeCatProfile.basicInfo?.birthDate &&
+            !activeCatProfile.basicInfo?.breed &&
+            !activeCatProfile.appearance?.coat &&
+            !activeGender ? (
+              <p style={styles.emptyInfoText}>
+                必要なことだけ、右上からそっと足せます。
+              </p>
+            ) : null}
+          </>
         ) : null}
 
         {message ? <p style={styles.message}>{message}</p> : null}
@@ -2362,9 +2380,15 @@ const styles = {
     lineHeight: 1.2,
     letterSpacing: "0.02em",
   },
+  recordPanel: {
+    marginBottom: "12px",
+  },
+  footprintsPanel: {
+    marginBottom: "12px",
+    overflow: "hidden",
+  },
   footprintsSection: {
-    marginTop: "13px",
-    marginRight: "-16px",
+    minWidth: 0,
   },
   footprintsTitle: {
     margin: "0 0 8px",
@@ -2379,7 +2403,7 @@ const styles = {
     display: "flex",
     gap: "9px",
     overflowX: "auto",
-    padding: "0 16px 2px 0",
+    padding: "0 2px 2px 0",
     scrollSnapType: "x proximity",
     scrollbarWidth: "none",
   },
