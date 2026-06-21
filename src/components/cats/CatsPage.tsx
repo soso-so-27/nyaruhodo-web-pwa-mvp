@@ -71,6 +71,7 @@ type RemoteCatDeleteResult =
   | { status: "deleted" | "skipped" }
   | { status: "error"; message: string };
 
+const UCHINOKO_PHOTO_PREVIEW_LIMIT = 9;
 const CATS_TEXT = "var(--ink)";
 const CATS_TEXT_STRONG = "var(--ink)";
 const CATS_MUTED = "var(--ink-soft)";
@@ -671,35 +672,6 @@ export function CatsPage() {
           </AppCard>
         ) : null}
 
-        {shouldShowLensSwitch ? (
-          <AppSegmented<UchinokoLens>
-            value={activeLens}
-            ariaLabel="うちのこの見かた"
-            columns={2}
-            onChange={setActiveLens}
-            options={[
-              { value: "cat", label: "ねこ" },
-              { value: "all", label: "ぜんぶ" },
-            ]}
-            style={styles.lensSwitch}
-          />
-        ) : null}
-
-        {activeCatProfile && !isOnboardingCompletionView && activeLens === "cat" ? (
-          <LensPhotoSection
-            title={`${catName}の ねがお`}
-            photos={activeCatLensPhotos}
-            emptyCopy="このこに紐づく ねがおは、まだありません。"
-          />
-        ) : null}
-
-        {activeCatProfile && !isOnboardingCompletionView && activeLens === "all" ? (
-          <AllCatsLensView
-            photos={allLensPhotos}
-            catCount={catProfiles.length}
-          />
-        ) : null}
-
         {activeCatProfile && !isOnboardingCompletionView && activeLens === "cat" ? (
           <AppCard
             variant="section"
@@ -856,6 +828,35 @@ export function CatsPage() {
               </>
             ) : null}
           </AppCard>
+        ) : null}
+
+        {shouldShowLensSwitch ? (
+          <AppSegmented<UchinokoLens>
+            value={activeLens}
+            ariaLabel="うちのこの見かた"
+            columns={2}
+            onChange={setActiveLens}
+            options={[
+              { value: "cat", label: "ねこ" },
+              { value: "all", label: "ぜんぶ" },
+            ]}
+            style={styles.lensSwitch}
+          />
+        ) : null}
+
+        {activeCatProfile && !isOnboardingCompletionView && activeLens === "cat" ? (
+          <LensPhotoSection
+            title="最近の ねがお"
+            photos={activeCatLensPhotos}
+            emptyCopy="このこに紐づく ねがおは、まだありません。"
+          />
+        ) : null}
+
+        {activeCatProfile && !isOnboardingCompletionView && activeLens === "all" ? (
+          <AllCatsLensView
+            photos={allLensPhotos}
+            catCount={catProfiles.length}
+          />
         ) : null}
 
         {activeCatProfile && !isOnboardingCompletionView && activeLens === "cat" ? (
@@ -1275,29 +1276,39 @@ function LensPhotoGrid({
     return <p style={styles.lensPhotoEmpty}>{emptyCopy}</p>;
   }
 
+  const visiblePhotos = photos.slice(0, UCHINOKO_PHOTO_PREVIEW_LIMIT);
+  const hiddenCount = Math.max(0, photos.length - visiblePhotos.length);
+
   return (
-    <div style={styles.lensPhotoGrid}>
-      {photos.map((photo) => (
-        <div key={photo.id} style={styles.lensPhotoItem}>
-          <PhotoTile
-            src={photo.src}
-            alt=""
-            variant="tile"
-            aspect="1 / 1"
-            style={styles.lensPhotoTileRoot}
-            imageStyle={styles.lensPhotoTile}
-          />
-          <span style={styles.lensPhotoDate}>
-            {formatLensPhotoDate(photo.createdAt)}
-          </span>
-          {showCatNames && photo.catNames.length > 0 ? (
-            <span style={styles.lensPhotoCats}>
-              {photo.catNames.join("・")}
+    <>
+      <div style={styles.lensPhotoGrid}>
+        {visiblePhotos.map((photo) => (
+          <div key={photo.id} style={styles.lensPhotoItem}>
+            <PhotoTile
+              src={photo.src}
+              alt=""
+              variant="tile"
+              aspect="1 / 1"
+              style={styles.lensPhotoTileRoot}
+              imageStyle={styles.lensPhotoTile}
+            />
+            <span style={styles.lensPhotoDate}>
+              {formatLensPhotoDate(photo.createdAt)}
             </span>
-          ) : null}
-        </div>
-      ))}
-    </div>
+            {showCatNames && photo.catNames.length > 0 ? (
+              <span style={styles.lensPhotoCats}>
+                {photo.catNames.join("・")}
+              </span>
+            ) : null}
+          </div>
+        ))}
+      </div>
+      {hiddenCount > 0 ? (
+        <p style={styles.lensPhotoMore}>
+          最近の{visiblePhotos.length}枚を表示中
+        </p>
+      ) : null}
+    </>
   );
 }
 
@@ -2474,11 +2485,11 @@ const styles = {
     letterSpacing: "var(--tracking-body)",
   },
   lensPhotoSection: {
-    margin: "0 -6px 20px",
+    margin: "0 -6px 18px",
     padding: "0 6px",
   },
   allLensCard: {
-    margin: "0 -6px 20px",
+    margin: "0 -6px 18px",
     padding: "0 6px",
   },
   lensSectionHeader: {
@@ -2548,6 +2559,15 @@ const styles = {
     fontSize: "13px",
     fontWeight: 400,
     lineHeight: 1.7,
+    letterSpacing: "var(--tracking-body)",
+  },
+  lensPhotoMore: {
+    margin: "8px 6px 0",
+    color: CATS_FAINT,
+    fontFamily: CATS_SERIF,
+    fontSize: "11px",
+    fontWeight: 400,
+    lineHeight: 1.45,
     letterSpacing: "var(--tracking-body)",
   },
   zukanHint: {
