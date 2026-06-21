@@ -838,14 +838,6 @@ export function CatsPage() {
         ) : null}
 
         {activeCatProfile && !isOnboardingCompletionView && activeLens === "cat" ? (
-          <LensPhotoSection
-            title="最近の すがた"
-            photos={activeCatLensPhotos}
-            emptyCopy="このこに紐づく ねがおは、まだありません。"
-          />
-        ) : null}
-
-        {activeCatProfile && !isOnboardingCompletionView && activeLens === "cat" ? (
           <AppCard
             as="section"
             variant="section"
@@ -860,6 +852,14 @@ export function CatsPage() {
               }}
             />
           </AppCard>
+        ) : null}
+
+        {activeCatProfile && !isOnboardingCompletionView && activeLens === "cat" ? (
+          <LensPhotoSection
+            title="最近のすがた"
+            photos={activeCatLensPhotos}
+            emptyCopy="このこに紐づく ねがおは、まだありません。"
+          />
         ) : null}
 
         {activeCatProfile && !isOnboardingCompletionView && activeLens === "all" ? (
@@ -1302,10 +1302,16 @@ function BasicInfoTable({
         : "",
     },
   ];
+  const registeredCount = rows.filter((row) => row.value).length;
 
   return (
     <div style={styles.basicInfoBlock}>
-      <p style={styles.basicInfoTitle}>基本情報</p>
+      <div style={styles.basicInfoHeader}>
+        <p style={styles.basicInfoTitle}>基本情報</p>
+        <span style={styles.basicInfoProgress}>
+          登録済み {registeredCount}/{rows.length}
+        </span>
+      </div>
       <div style={styles.basicInfoTable}>
         {rows.map((row) => (
           <div key={row.label} style={styles.basicInfoRow}>
@@ -2507,8 +2513,8 @@ const styles = {
   },
   summaryHeader: {
     display: "grid",
-    justifyItems: "center",
-    gap: "4px",
+    justifyItems: "start",
+    gap: "3px",
     padding: "2px 0 12px",
   },
   summaryKicker: {
@@ -2518,7 +2524,7 @@ const styles = {
     fontSize: "12px",
     fontWeight: 400,
     lineHeight: 1.35,
-    letterSpacing: "0.1em",
+    letterSpacing: "0.04em",
   },
   summaryMain: {
     margin: 0,
@@ -2527,7 +2533,7 @@ const styles = {
     fontSize: "26px",
     fontWeight: 400,
     lineHeight: 1.25,
-    letterSpacing: "0.08em",
+    letterSpacing: "0.02em",
   },
   summaryGrid: {
     display: "grid",
@@ -2538,8 +2544,9 @@ const styles = {
     minHeight: "62px",
     display: "grid",
     alignContent: "center",
-    justifyItems: "center",
+    justifyItems: "start",
     gap: "3px",
+    padding: "10px 12px",
     borderRadius: "var(--radius-lg)",
     border: "1px solid color-mix(in srgb, var(--line) 72%, transparent)",
     background: "color-mix(in srgb, var(--paper) 42%, transparent)",
@@ -2548,6 +2555,7 @@ const styles = {
     minHeight: "54px",
     display: "grid",
     alignContent: "center",
+    justifyItems: "start",
     gap: "2px",
     padding: "8px 12px",
     borderRadius: "var(--radius-lg)",
@@ -2564,7 +2572,7 @@ const styles = {
     fontSize: "18px",
     fontWeight: 500,
     lineHeight: 1.25,
-    letterSpacing: "0.05em",
+    letterSpacing: "0.01em",
   },
   summaryTileValueSmall: {
     color: CATS_TEXT,
@@ -2572,7 +2580,7 @@ const styles = {
     fontSize: "13px",
     fontWeight: 500,
     lineHeight: 1.45,
-    letterSpacing: "0.04em",
+    letterSpacing: "0.01em",
   },
   summaryTileLabel: {
     color: CATS_MUTED,
@@ -2580,7 +2588,7 @@ const styles = {
     fontSize: "11px",
     fontWeight: 400,
     lineHeight: 1.35,
-    letterSpacing: "0.08em",
+    letterSpacing: "0.03em",
   },
   footprintsSection: {
     minWidth: 0,
@@ -2660,6 +2668,12 @@ const styles = {
   basicInfoPanel: {
     marginBottom: "12px",
   },
+  basicInfoHeader: {
+    display: "flex",
+    alignItems: "baseline",
+    justifyContent: "space-between",
+    gap: "12px",
+  },
   basicInfoTitle: {
     margin: 0,
     color: CATS_TEXT,
@@ -2667,7 +2681,16 @@ const styles = {
     fontSize: "18px",
     fontWeight: 400,
     lineHeight: 1.45,
-    letterSpacing: "var(--tracking-label)",
+    letterSpacing: "0.04em",
+  },
+  basicInfoProgress: {
+    flex: "0 0 auto",
+    color: CATS_FAINT,
+    fontFamily: CATS_SERIF,
+    fontSize: "11px",
+    fontWeight: 400,
+    lineHeight: 1.35,
+    letterSpacing: "0.02em",
   },
   basicInfoTable: {
     display: "grid",
@@ -2678,7 +2701,7 @@ const styles = {
   },
   basicInfoRow: {
     display: "grid",
-    gridTemplateColumns: "86px 1fr",
+    gridTemplateColumns: "92px minmax(0, 1fr)",
     alignItems: "center",
     gap: "12px",
     minHeight: "38px",
@@ -2691,7 +2714,7 @@ const styles = {
     fontSize: "12px",
     fontWeight: 400,
     lineHeight: 1.35,
-    letterSpacing: "0.04em",
+    letterSpacing: "0.02em",
   },
   basicInfoValue: {
     minWidth: 0,
@@ -2700,7 +2723,7 @@ const styles = {
     fontSize: "13px",
     fontWeight: 500,
     lineHeight: 1.35,
-    letterSpacing: "var(--tracking-body)",
+    letterSpacing: "0.01em",
     overflow: "hidden",
     textOverflow: "ellipsis",
     whiteSpace: "nowrap",
@@ -2777,7 +2800,7 @@ const styles = {
     fontSize: "18px",
     fontWeight: 400,
     lineHeight: 1.45,
-    letterSpacing: "var(--tracking-label)",
+    letterSpacing: "0.04em",
   },
   lensSectionSub: {
     margin: 0,
