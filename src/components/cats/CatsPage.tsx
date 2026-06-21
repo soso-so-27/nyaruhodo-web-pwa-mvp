@@ -599,7 +599,7 @@ export function CatsPage() {
       <PageBackdrop />
       <div style={styles.container}>
         <AppHeader
-          title="ねてるねこ"
+          title="うちのこ"
           style={styles.pageHeader}
           right={
             !isOnboardingCompletionView ? (
@@ -748,9 +748,11 @@ export function CatsPage() {
                   </button>
                   <div style={styles.profileHeroInfo}>
                     <div style={styles.profileName}>{activeCatProfile.name}</div>
-                    <div style={styles.profileMetaLine}>
-                      {familyDuration.secondary || familyDuration.primary}
-                    </div>
+                    {familyDuration.primary !== "未設定" ? (
+                      <div style={styles.profileMetaLine}>
+                        {familyDuration.secondary || familyDuration.primary}
+                      </div>
+                    ) : null}
                   </div>
                   <div style={styles.profileHeroActions}>
                     {canManageCats ? (
@@ -911,6 +913,7 @@ export function CatsPage() {
               style={styles.recordPanel}
             >
               <p style={styles.bunbakoSectionTitle}>記録</p>
+              <p style={styles.sectionLead}>日付と枚数だけを、静かに残します。</p>
               <AppCard as="div" variant="inset" padding="sm" style={styles.recordList}>
                 <div style={styles.recordRow}>
                   <span style={styles.recordLabel}>
@@ -958,6 +961,7 @@ export function CatsPage() {
             </AppCard>
             <AppCard as="section" variant="section" padding="md" style={styles.daysThread}>
               <p style={styles.bunbakoSectionTitle}>{catName}との 日々</p>
+              <p style={styles.sectionLead}>ねがおがふえるほど、ここも育ちます。</p>
               <div style={styles.threadLine}>
                 <div style={styles.threadNode}>
                   <span style={styles.threadNodeTitle}>今月の {catName}</span>
@@ -2528,12 +2532,12 @@ const styles = {
   },
   lensPhotoGrid: {
     display: "grid",
-    gridTemplateColumns: "repeat(3, minmax(0, 1fr))",
-    gap: "12px",
+    gridTemplateColumns: "repeat(2, minmax(0, 1fr))",
+    gap: "14px",
   },
   lensPhotoItem: {
     display: "grid",
-    gap: "6px",
+    gap: "7px",
     minWidth: 0,
   },
   lensPhotoTileRoot: {
@@ -2543,7 +2547,9 @@ const styles = {
     width: "100%",
     height: "auto",
     aspectRatio: "1 / 1",
-    border: "4px solid var(--paper)",
+    border: "6px solid color-mix(in srgb, var(--paper-card) 84%, white)",
+    boxShadow:
+      "0 2px 4px color-mix(in srgb, var(--ink) 8%, transparent), 0 10px 22px -14px color-mix(in srgb, var(--ink) 24%, transparent)",
   },
   lensPhotoDate: {
     color: CATS_MUTED,
@@ -2795,6 +2801,15 @@ const styles = {
     fontSize: "18px",
     fontWeight: 400,
     letterSpacing: "var(--tracking-label)",
+  },
+  sectionLead: {
+    margin: "2px 0 12px",
+    color: CATS_MUTED,
+    fontFamily: CATS_SERIF,
+    fontSize: "12px",
+    fontWeight: 400,
+    letterSpacing: "var(--tracking-body)",
+    lineHeight: 1.6,
   },
   bunbakoScroller: {
     display: "flex",
