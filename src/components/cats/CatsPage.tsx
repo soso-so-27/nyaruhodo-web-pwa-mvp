@@ -77,15 +77,28 @@ const CATS_MUTED = "var(--ink-soft)";
 const CATS_FAINT = "var(--ink-faint)";
 const CATS_PAPER = "var(--paper)";
 const CATS_SERIF = "var(--font-display)";
+const CATS_TITLE_SIZE = "18px";
+const CATS_DISPLAY_SIZE = "23px";
+const CATS_BODY_SIZE = "13px";
+const CATS_META_SIZE = "12px";
+const CATS_TINY_SIZE = "11px";
+const CATS_TITLE_TRACKING = "0.03em";
+const CATS_BODY_TRACKING = "0.01em";
+const CATS_META_TRACKING = "0.02em";
+const CATS_PANEL_BACKGROUND =
+  "color-mix(in srgb, var(--paper-card) 64%, transparent)";
+const CATS_PANEL_BACKGROUND_SOFT =
+  "color-mix(in srgb, var(--paper-card) 48%, transparent)";
 const CATS_SURFACE: CSSProperties = {
   position: "relative",
-  background: "color-mix(in srgb, var(--paper) 86%, transparent)",
+  background: "color-mix(in srgb, var(--paper) 68%, transparent)",
   border: "1px solid var(--line)",
   boxShadow: "var(--shadow-e1)",
+  backdropFilter: "blur(2px)",
 };
 const CATS_SURFACE_SOFT: CSSProperties = {
   ...CATS_SURFACE,
-  background: "color-mix(in srgb, var(--paper) 54%, transparent)",
+  background: "color-mix(in srgb, var(--paper) 34%, transparent)",
   boxShadow: "var(--shadow-e1)",
 };
 const ONBOARDING_ALBUM_COMPLETION_READY_KEY =
@@ -2276,24 +2289,25 @@ const styles = {
   pageKicker: {
     margin: "0 0 5px",
     color: CATS_MUTED,
-    fontSize: "12px",
+    fontSize: CATS_META_SIZE,
     fontWeight: 400,
-    letterSpacing: "0.12em",
+    letterSpacing: CATS_META_TRACKING,
   },
   pageTitle: {
     fontFamily: CATS_SERIF,
-    fontSize: "18px",
+    fontSize: CATS_TITLE_SIZE,
     fontWeight: 400,
     color: CATS_MUTED,
     lineHeight: 1.34,
-    letterSpacing: "0.18em",
+    letterSpacing: CATS_TITLE_TRACKING,
     margin: 0,
   },
   pageSub: {
-    fontSize: "13px",
+    fontSize: CATS_BODY_SIZE,
     color: CATS_MUTED,
     margin: 0,
     lineHeight: 1.6,
+    letterSpacing: CATS_BODY_TRACKING,
   },
   onboardingPanel: {
     padding: "20px 18px 18px",
@@ -2322,7 +2336,7 @@ const styles = {
     maxWidth: "280px",
     color: CATS_MUTED,
     fontSize: "13px",
-    fontWeight: 500,
+    fontWeight: 400,
     lineHeight: 1.7,
   },
   onboardingHomeLink: {
@@ -2347,9 +2361,13 @@ const styles = {
   },
   profileCard: {
     marginBottom: "10px",
+    background: CATS_PANEL_BACKGROUND,
+    backdropFilter: "blur(2px)",
   },
   profilePlaceCard: {
     marginBottom: "10px",
+    background: CATS_PANEL_BACKGROUND,
+    backdropFilter: "blur(2px)",
   },
   lensSwitch: {
     margin: "0 0 12px",
@@ -2392,9 +2410,10 @@ const styles = {
   },
   profileName: {
     fontFamily: CATS_SERIF,
-    fontSize: "18px",
-    fontWeight: 500,
+    fontSize: CATS_TITLE_SIZE,
+    fontWeight: 400,
     color: CATS_TEXT_STRONG,
+    letterSpacing: CATS_TITLE_TRACKING,
     display: "flex",
     alignItems: "center",
     gap: "8px",
@@ -2428,18 +2447,18 @@ const styles = {
   familyHeroLabel: {
     color: CATS_MUTED,
     fontFamily: CATS_SERIF,
-    fontSize: "12px",
+    fontSize: CATS_META_SIZE,
     fontWeight: 400,
     lineHeight: 1.3,
-    letterSpacing: "var(--tracking-label)",
+    letterSpacing: CATS_META_TRACKING,
   },
   familyHeroDays: {
     color: CATS_TEXT_STRONG,
     fontFamily: CATS_SERIF,
-    fontSize: "18px",
+    fontSize: CATS_TITLE_SIZE,
     fontWeight: 400,
     lineHeight: 1.45,
-    letterSpacing: "var(--tracking-body)",
+    letterSpacing: CATS_TITLE_TRACKING,
   },
   catDayNote: {
     display: "grid",
@@ -2452,10 +2471,10 @@ const styles = {
   catDayText: {
     color: CATS_MUTED,
     fontFamily: CATS_SERIF,
-    fontSize: "12px",
+    fontSize: CATS_META_SIZE,
     fontWeight: 400,
     lineHeight: 1.45,
-    letterSpacing: "var(--tracking-body)",
+    letterSpacing: CATS_META_TRACKING,
   },
   recordList: {
     display: "grid",
@@ -2474,18 +2493,19 @@ const styles = {
   recordLabel: {
     color: CATS_MUTED,
     fontFamily: CATS_SERIF,
-    fontSize: "12px",
-    fontWeight: 500,
+    fontSize: CATS_META_SIZE,
+    fontWeight: 400,
     lineHeight: 1.35,
-    letterSpacing: "0.04em",
+    letterSpacing: CATS_META_TRACKING,
   },
   recordMetricValue: {
     color: CATS_MUTED,
-    fontSize: "13px",
-    fontWeight: 500,
+    fontFamily: CATS_SERIF,
+    fontSize: CATS_BODY_SIZE,
+    fontWeight: 400,
     lineHeight: 1.35,
     textAlign: "right",
-    letterSpacing: 0,
+    letterSpacing: CATS_BODY_TRACKING,
   },
   recordMetricValueGroup: {
     display: "grid",
@@ -2494,22 +2514,27 @@ const styles = {
   },
   recordMetricSub: {
     color: CATS_FAINT,
-    fontSize: "12px",
-    fontWeight: 500,
+    fontFamily: CATS_SERIF,
+    fontSize: CATS_META_SIZE,
+    fontWeight: 400,
     lineHeight: 1.2,
-    letterSpacing: "0.02em",
+    letterSpacing: CATS_META_TRACKING,
   },
   recordPanel: {
     marginBottom: "12px",
+    background: CATS_PANEL_BACKGROUND,
+    backdropFilter: "blur(2px)",
   },
   footprintsPanel: {
     marginBottom: "12px",
     overflow: "hidden",
+    background: CATS_PANEL_BACKGROUND,
+    backdropFilter: "blur(2px)",
   },
   summaryPanel: {
     marginBottom: "12px",
     background:
-      "linear-gradient(145deg, color-mix(in srgb, var(--paper-card) 86%, transparent), color-mix(in srgb, var(--paper-warm) 40%, transparent))",
+      "linear-gradient(145deg, color-mix(in srgb, var(--paper-card) 72%, transparent), color-mix(in srgb, var(--paper-warm) 30%, transparent))",
   },
   summaryHeader: {
     display: "grid",
@@ -2521,19 +2546,19 @@ const styles = {
     margin: 0,
     color: CATS_MUTED,
     fontFamily: CATS_SERIF,
-    fontSize: "12px",
+    fontSize: CATS_META_SIZE,
     fontWeight: 400,
     lineHeight: 1.35,
-    letterSpacing: "0.04em",
+    letterSpacing: CATS_META_TRACKING,
   },
   summaryMain: {
     margin: 0,
     color: CATS_TEXT_STRONG,
     fontFamily: CATS_SERIF,
-    fontSize: "26px",
+    fontSize: CATS_DISPLAY_SIZE,
     fontWeight: 400,
     lineHeight: 1.25,
-    letterSpacing: "0.02em",
+    letterSpacing: CATS_TITLE_TRACKING,
   },
   summaryGrid: {
     display: "grid",
@@ -2569,26 +2594,26 @@ const styles = {
   summaryTileValue: {
     color: CATS_TEXT_STRONG,
     fontFamily: CATS_SERIF,
-    fontSize: "18px",
-    fontWeight: 500,
+    fontSize: CATS_TITLE_SIZE,
+    fontWeight: 400,
     lineHeight: 1.25,
-    letterSpacing: "0.01em",
+    letterSpacing: CATS_BODY_TRACKING,
   },
   summaryTileValueSmall: {
     color: CATS_TEXT,
     fontFamily: CATS_SERIF,
-    fontSize: "13px",
-    fontWeight: 500,
+    fontSize: CATS_BODY_SIZE,
+    fontWeight: 400,
     lineHeight: 1.45,
-    letterSpacing: "0.01em",
+    letterSpacing: CATS_BODY_TRACKING,
   },
   summaryTileLabel: {
     color: CATS_MUTED,
     fontFamily: CATS_SERIF,
-    fontSize: "11px",
+    fontSize: CATS_TINY_SIZE,
     fontWeight: 400,
     lineHeight: 1.35,
-    letterSpacing: "0.03em",
+    letterSpacing: CATS_META_TRACKING,
   },
   footprintsSection: {
     minWidth: 0,
@@ -2633,10 +2658,10 @@ const styles = {
   footprintName: {
     color: CATS_TEXT,
     fontFamily: CATS_SERIF,
-    fontSize: "12px",
-    fontWeight: 500,
+    fontSize: CATS_META_SIZE,
+    fontWeight: 400,
     lineHeight: 1.35,
-    letterSpacing: "0.04em",
+    letterSpacing: CATS_META_TRACKING,
   },
   footprintPhoto: {
     width: "100%",
@@ -2648,9 +2673,11 @@ const styles = {
   },
   footprintDate: {
     color: CATS_MUTED,
-    fontSize: "12px",
-    fontWeight: 500,
+    fontFamily: CATS_SERIF,
+    fontSize: CATS_META_SIZE,
+    fontWeight: 400,
     lineHeight: 1,
+    letterSpacing: CATS_META_TRACKING,
   },
   footprintPlaceholder: {
     width: "100%",
@@ -2667,6 +2694,8 @@ const styles = {
   },
   basicInfoPanel: {
     marginBottom: "12px",
+    background: CATS_PANEL_BACKGROUND,
+    backdropFilter: "blur(2px)",
   },
   basicInfoHeader: {
     display: "flex",
@@ -2678,19 +2707,19 @@ const styles = {
     margin: 0,
     color: CATS_TEXT,
     fontFamily: CATS_SERIF,
-    fontSize: "18px",
+    fontSize: CATS_TITLE_SIZE,
     fontWeight: 400,
     lineHeight: 1.45,
-    letterSpacing: "0.04em",
+    letterSpacing: CATS_TITLE_TRACKING,
   },
   basicInfoProgress: {
     flex: "0 0 auto",
     color: CATS_FAINT,
     fontFamily: CATS_SERIF,
-    fontSize: "11px",
+    fontSize: CATS_TINY_SIZE,
     fontWeight: 400,
     lineHeight: 1.35,
-    letterSpacing: "0.02em",
+    letterSpacing: CATS_META_TRACKING,
   },
   basicInfoTable: {
     display: "grid",
@@ -2711,19 +2740,19 @@ const styles = {
   basicInfoLabel: {
     color: CATS_MUTED,
     fontFamily: CATS_SERIF,
-    fontSize: "12px",
+    fontSize: CATS_META_SIZE,
     fontWeight: 400,
     lineHeight: 1.35,
-    letterSpacing: "0.02em",
+    letterSpacing: CATS_META_TRACKING,
   },
   basicInfoValue: {
     minWidth: 0,
     color: CATS_TEXT,
     fontFamily: CATS_SERIF,
-    fontSize: "13px",
-    fontWeight: 500,
+    fontSize: CATS_BODY_SIZE,
+    fontWeight: 400,
     lineHeight: 1.35,
-    letterSpacing: "0.01em",
+    letterSpacing: CATS_BODY_TRACKING,
     overflow: "hidden",
     textOverflow: "ellipsis",
     whiteSpace: "nowrap",
@@ -2740,9 +2769,9 @@ const styles = {
     background: "transparent",
     color: "var(--seal)",
     fontFamily: CATS_SERIF,
-    fontSize: "12px",
-    fontWeight: 500,
-    letterSpacing: "0.04em",
+    fontSize: CATS_META_SIZE,
+    fontWeight: 400,
+    letterSpacing: CATS_META_TRACKING,
     cursor: "pointer",
   },
   catManageSheet: {
@@ -2758,7 +2787,7 @@ const styles = {
     color: CATS_TEXT_STRONG,
     fontFamily: CATS_SERIF,
     fontSize: "18px",
-    fontWeight: 500,
+    fontWeight: 400,
     lineHeight: 1.45,
   },
   deleteCatConfirmText: {
@@ -2797,17 +2826,19 @@ const styles = {
     margin: 0,
     color: CATS_TEXT,
     fontFamily: CATS_SERIF,
-    fontSize: "18px",
+    fontSize: CATS_TITLE_SIZE,
     fontWeight: 400,
     lineHeight: 1.45,
-    letterSpacing: "0.04em",
+    letterSpacing: CATS_TITLE_TRACKING,
   },
   lensSectionSub: {
     margin: 0,
     color: CATS_MUTED,
-    fontSize: "13px",
+    fontFamily: CATS_SERIF,
+    fontSize: CATS_BODY_SIZE,
     fontWeight: 400,
     lineHeight: 1.6,
+    letterSpacing: CATS_BODY_TRACKING,
   },
   lensPhotoGrid: {
     display: "grid",
@@ -2834,7 +2865,7 @@ const styles = {
     display: "none",
     color: CATS_MUTED,
     fontSize: "12px",
-    fontWeight: 500,
+    fontWeight: 400,
     lineHeight: 1.2,
     letterSpacing: 0,
   },
@@ -2842,7 +2873,7 @@ const styles = {
     display: "none",
     color: CATS_FAINT,
     fontSize: "12px",
-    fontWeight: 500,
+    fontWeight: 400,
     lineHeight: 1.3,
     overflow: "hidden",
     textOverflow: "ellipsis",
@@ -2852,19 +2883,19 @@ const styles = {
     margin: 0,
     color: CATS_MUTED,
     fontFamily: CATS_SERIF,
-    fontSize: "13px",
+    fontSize: CATS_BODY_SIZE,
     fontWeight: 400,
     lineHeight: 1.7,
-    letterSpacing: "var(--tracking-body)",
+    letterSpacing: CATS_BODY_TRACKING,
   },
   lensPhotoMore: {
     margin: "8px 6px 0",
     color: CATS_FAINT,
     fontFamily: CATS_SERIF,
-    fontSize: "11px",
+    fontSize: CATS_TINY_SIZE,
     fontWeight: 400,
     lineHeight: 1.45,
-    letterSpacing: "var(--tracking-body)",
+    letterSpacing: CATS_META_TRACKING,
   },
   zukanHint: {
     margin: "8px 0 0",
@@ -2916,13 +2947,16 @@ const styles = {
   catSheetName: {
     fontFamily: CATS_SERIF,
     fontSize: "15px",
-    fontWeight: 500,
+    fontWeight: 400,
     color: CATS_TEXT_STRONG,
+    letterSpacing: CATS_BODY_TRACKING,
   },
   catSheetCurrent: {
     color: CATS_FAINT,
-    fontSize: "12px",
-    fontWeight: 500,
+    fontFamily: CATS_SERIF,
+    fontSize: CATS_META_SIZE,
+    fontWeight: 400,
+    letterSpacing: CATS_META_TRACKING,
   },
   homePhotoSection: {
     display: "flex",
@@ -2934,9 +2968,9 @@ const styles = {
     margin: "0 0 9px",
     color: CATS_FAINT,
     fontFamily: CATS_SERIF,
-    fontSize: "12px",
+    fontSize: CATS_META_SIZE,
     fontWeight: 400,
-    letterSpacing: "0.07em",
+    letterSpacing: CATS_META_TRACKING,
   },
   homePhotoPreview: {
     width: "76px",
@@ -2964,18 +2998,18 @@ const styles = {
   },
   homePhotoTitle: {
     fontFamily: CATS_SERIF,
-    fontSize: "13px",
-    fontWeight: 500,
-    letterSpacing: "0.06em",
+    fontSize: CATS_BODY_SIZE,
+    fontWeight: 400,
+    letterSpacing: CATS_BODY_TRACKING,
     color: CATS_TEXT,
     margin: "0 0 4px",
   },
   homePhotoSub: {
-    fontSize: "12px",
+    fontSize: CATS_META_SIZE,
     color: CATS_MUTED,
     fontFamily: CATS_SERIF,
     lineHeight: 1.6,
-    letterSpacing: "0.06em",
+    letterSpacing: CATS_META_TRACKING,
     margin: "0 0 10px",
   },
   homePhotoActions: {
@@ -3013,7 +3047,7 @@ const styles = {
   infoValue: {
     fontSize: "13px",
     color: CATS_MUTED,
-    fontWeight: 500,
+    fontWeight: 400,
   },
   emptyInfoText: {
     margin: "2px 0 0",
@@ -3037,7 +3071,7 @@ const styles = {
     margin: "0 0 5px",
     color: CATS_MUTED,
     fontSize: "12px",
-    fontWeight: 500,
+    fontWeight: 400,
     lineHeight: 1.5,
   },
   coatSection: {
@@ -3076,6 +3110,8 @@ const styles = {
   },
   bunbakoSection: {
     marginTop: "18px",
+    background: CATS_PANEL_BACKGROUND,
+    backdropFilter: "blur(2px)",
   },
   bunbakoHeader: {
     display: "flex",
@@ -3088,17 +3124,17 @@ const styles = {
     margin: 0,
     color: CATS_TEXT,
     fontFamily: CATS_SERIF,
-    fontSize: "18px",
+    fontSize: CATS_TITLE_SIZE,
     fontWeight: 400,
-    letterSpacing: "var(--tracking-label)",
+    letterSpacing: CATS_TITLE_TRACKING,
   },
   sectionLead: {
     margin: "2px 0 12px",
     color: CATS_MUTED,
     fontFamily: CATS_SERIF,
-    fontSize: "12px",
+    fontSize: CATS_META_SIZE,
     fontWeight: 400,
-    letterSpacing: "var(--tracking-body)",
+    letterSpacing: CATS_META_TRACKING,
     lineHeight: 1.6,
   },
   bunbakoScroller: {
@@ -3127,8 +3163,8 @@ const styles = {
   bunbakoPostmark: {
     color: CATS_MUTED,
     fontFamily: CATS_SERIF,
-    fontSize: "12px",
-    letterSpacing: "var(--tracking-body)",
+    fontSize: CATS_META_SIZE,
+    letterSpacing: CATS_META_TRACKING,
     lineHeight: 1.45,
   },
   bunbakoWindow: {
@@ -3158,8 +3194,8 @@ const styles = {
     margin: "4px 0 12px",
     color: CATS_MUTED,
     fontFamily: CATS_SERIF,
-    fontSize: "13px",
-    letterSpacing: "var(--tracking-body)",
+    fontSize: CATS_BODY_SIZE,
+    letterSpacing: CATS_BODY_TRACKING,
     lineHeight: 1.7,
   },
   omoideControls: {
@@ -3170,6 +3206,8 @@ const styles = {
   },
   daysThread: {
     marginTop: "18px",
+    background: CATS_PANEL_BACKGROUND_SOFT,
+    backdropFilter: "blur(2px)",
   },
   threadLine: {
     display: "grid",
@@ -3185,13 +3223,15 @@ const styles = {
   threadNodeTitle: {
     color: CATS_TEXT,
     fontFamily: CATS_SERIF,
-    fontSize: "13px",
-    letterSpacing: "var(--tracking-label)",
+    fontSize: CATS_BODY_SIZE,
+    letterSpacing: CATS_BODY_TRACKING,
   },
   threadNodeText: {
     color: CATS_MUTED,
-    fontSize: "12px",
+    fontFamily: CATS_SERIF,
+    fontSize: CATS_META_SIZE,
     lineHeight: 1.7,
+    letterSpacing: CATS_META_TRACKING,
   },
   omoideSheet: {
     display: "grid",
@@ -3202,8 +3242,8 @@ const styles = {
     margin: 0,
     color: CATS_TEXT,
     fontFamily: CATS_SERIF,
-    fontSize: "18px",
-    letterSpacing: "var(--tracking-label)",
+    fontSize: CATS_TITLE_SIZE,
+    letterSpacing: CATS_TITLE_TRACKING,
   },
   omoideSheetImageFrame: {
     width: "min(70vw, 260px)",
