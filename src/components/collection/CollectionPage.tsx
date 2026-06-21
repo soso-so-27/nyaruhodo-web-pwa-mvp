@@ -2689,13 +2689,13 @@ function getMainichiBoardCanvasStyle(total: number): CSSProperties {
 
   if (total <= 8) {
     return {
-      height: "620px",
+      height: "560px",
     };
   }
 
   if (total <= 16) {
     return {
-      height: "680px",
+      height: "660px",
     };
   }
 
@@ -2705,204 +2705,101 @@ function getMainichiBoardCanvasStyle(total: number): CSSProperties {
 }
 
 function getMainichiBoardPhotoLayout(index: number, total: number) {
-  const single: MainichiBoardPhotoLayout = {
-    left: "27%",
-    top: "72px",
-    width: "46%",
-    rotation: "-1.2deg",
-    shiftX: "0px",
-    shiftY: "0px",
-    tapeLeft: "52%",
-    tapeRotation: "-4deg",
-  };
-  const pair: MainichiBoardPhotoLayout[] = [
-    {
-      left: "7%",
-      top: "70px",
-      width: "42%",
-      rotation: "-2.2deg",
-      shiftX: "-3px",
-      shiftY: "0px",
-      tapeLeft: "48%",
-      tapeRotation: "-5deg",
-    },
-    {
-      left: "53%",
-      top: "145px",
-      width: "42%",
-      rotation: "1.8deg",
-      shiftX: "4px",
-      shiftY: "18px",
-      tapeLeft: "55%",
-      tapeRotation: "4deg",
-    },
+  const sparse = [
+    { left: 27, top: 70, width: 46, rotation: "-1.2deg", shiftX: 0, shiftY: 0, tapeLeft: "52%", tapeRotation: "-4deg" },
+    { left: 7, top: 62, width: 42, rotation: "-2.2deg", shiftX: -3, shiftY: 0, tapeLeft: "48%", tapeRotation: "-5deg" },
+    { left: 53, top: 138, width: 42, rotation: "1.8deg", shiftX: 4, shiftY: 18, tapeLeft: "55%", tapeRotation: "4deg" },
+    { left: 30, top: 250, width: 40, rotation: "-1.1deg", shiftX: 0, shiftY: 8, tapeLeft: "50%", tapeRotation: "-3deg" },
   ];
-  const sparse: MainichiBoardPhotoLayout[] = [
-    {
-      left: "7%",
-      top: "58px",
-      width: "40%",
-      rotation: "-2.3deg",
-      shiftX: "-4px",
-      shiftY: "0px",
-      tapeLeft: "46%",
-      tapeRotation: "-5deg",
-    },
-    {
-      left: "55%",
-      top: "132px",
-      width: "40%",
-      rotation: "1.7deg",
-      shiftX: "5px",
-      shiftY: "28px",
-      tapeLeft: "58%",
-      tapeRotation: "4deg",
-    },
-    {
-      left: "30%",
-      top: "250px",
-      width: "40%",
-      rotation: "-1.1deg",
-      shiftX: "0px",
-      shiftY: "8px",
-      tapeLeft: "50%",
-      tapeRotation: "-3deg",
-    },
+  const loose = [
+    { left: 7, top: 48, width: 35, rotation: "-2.4deg", shiftX: -3, shiftY: 0, tapeLeft: "47%", tapeRotation: "-5deg" },
+    { left: 57, top: 72, width: 34, rotation: "1.7deg", shiftX: 4, shiftY: 16, tapeLeft: "57%", tapeRotation: "3deg" },
+    { left: 18, top: 218, width: 25, rotation: "2.4deg", shiftX: 2, shiftY: 4, tapeLeft: "51%", tapeRotation: "5deg" },
+    { left: 43, top: 252, width: 43, rotation: "-1.4deg", shiftX: -2, shiftY: 12, tapeLeft: "44%", tapeRotation: "-4deg" },
+    { left: 8, top: 414, width: 35, rotation: "1.2deg", shiftX: 5, shiftY: -2, tapeLeft: "58%", tapeRotation: "4deg" },
+    { left: 60, top: 440, width: 30, rotation: "-2deg", shiftX: -4, shiftY: 12, tapeLeft: "46%", tapeRotation: "-6deg" },
+    { left: 28, top: 356, width: 26, rotation: "-0.8deg", shiftX: 1, shiftY: 0, tapeLeft: "53%", tapeRotation: "-2deg" },
+    { left: 66, top: 206, width: 23, rotation: "1.1deg", shiftX: 3, shiftY: 8, tapeLeft: "52%", tapeRotation: "2deg" },
   ];
-  const collage: MainichiBoardPhotoLayout[] = [
-    {
-      left: "6%",
-      top: "68px",
-      width: "37%",
-      rotation: "-2.6deg",
-      shiftX: "-4px",
-      shiftY: "0px",
-      tapeLeft: "47%",
-      tapeRotation: "-5deg",
-    },
-    {
-      left: "55%",
-      top: "104px",
-      width: "37%",
-      rotation: "1.7deg",
-      shiftX: "5px",
-      shiftY: "18px",
-      tapeLeft: "57%",
-      tapeRotation: "3deg",
-    },
-    {
-      left: "14%",
-      top: "286px",
-      width: "25%",
-      rotation: "2.4deg",
-      shiftX: "2px",
-      shiftY: "4px",
-      tapeLeft: "51%",
-      tapeRotation: "5deg",
-    },
-    {
-      left: "43%",
-      top: "322px",
-      width: "47%",
-      rotation: "-1.4deg",
-      shiftX: "-2px",
-      shiftY: "14px",
-      tapeLeft: "44%",
-      tapeRotation: "-4deg",
-    },
-    {
-      left: "8%",
-      top: "552px",
-      width: "38%",
-      rotation: "1.2deg",
-      shiftX: "5px",
-      shiftY: "-2px",
-      tapeLeft: "58%",
-      tapeRotation: "4deg",
-    },
-    {
-      left: "58%",
-      top: "592px",
-      width: "35%",
-      rotation: "-2deg",
-      shiftX: "-4px",
-      shiftY: "20px",
-      tapeLeft: "46%",
-      tapeRotation: "-6deg",
-    },
-    {
-      left: "7%",
-      top: "798px",
-      width: "48%",
-      rotation: "1.9deg",
-      shiftX: "-2px",
-      shiftY: "6px",
-      tapeLeft: "53%",
-      tapeRotation: "3deg",
-    },
-    {
-      left: "66%",
-      top: "828px",
-      width: "24%",
-      rotation: "-1deg",
-      shiftX: "3px",
-      shiftY: "18px",
-      tapeLeft: "50%",
-      tapeRotation: "-2deg",
-    },
+  const medium = [
+    { left: 7, top: 42, width: 28, rotation: "-1.8deg", shiftX: -2, shiftY: 0, tapeLeft: "48%", tapeRotation: "-4deg" },
+    { left: 40, top: 78, width: 23, rotation: "1.2deg", shiftX: 2, shiftY: 0, tapeLeft: "56%", tapeRotation: "3deg" },
+    { left: 67, top: 48, width: 25, rotation: "-0.9deg", shiftX: 3, shiftY: 4, tapeLeft: "51%", tapeRotation: "-2deg" },
+    { left: 15, top: 184, width: 22, rotation: "2.2deg", shiftX: 1, shiftY: 0, tapeLeft: "50%", tapeRotation: "4deg" },
+    { left: 42, top: 198, width: 34, rotation: "-1.2deg", shiftX: -2, shiftY: 8, tapeLeft: "43%", tapeRotation: "-3deg" },
+    { left: 74, top: 232, width: 20, rotation: "1.8deg", shiftX: 2, shiftY: 3, tapeLeft: "54%", tapeRotation: "3deg" },
+    { left: 7, top: 342, width: 31, rotation: "1.5deg", shiftX: -2, shiftY: 4, tapeLeft: "52%", tapeRotation: "3deg" },
+    { left: 40, top: 376, width: 22, rotation: "-1.5deg", shiftX: 2, shiftY: 2, tapeLeft: "48%", tapeRotation: "-4deg" },
+    { left: 64, top: 348, width: 29, rotation: "1deg", shiftX: 1, shiftY: 0, tapeLeft: "55%", tapeRotation: "3deg" },
+    { left: 16, top: 500, width: 23, rotation: "-2deg", shiftX: -1, shiftY: 0, tapeLeft: "47%", tapeRotation: "-5deg" },
+    { left: 43, top: 512, width: 30, rotation: "1.4deg", shiftX: 2, shiftY: 5, tapeLeft: "57%", tapeRotation: "4deg" },
+    { left: 72, top: 486, width: 20, rotation: "-0.7deg", shiftX: 1, shiftY: 2, tapeLeft: "50%", tapeRotation: "-2deg" },
+    { left: 8, top: 98, width: 18, rotation: "1.8deg", shiftX: 2, shiftY: 1, tapeLeft: "51%", tapeRotation: "2deg" },
+    { left: 28, top: 292, width: 19, rotation: "-1.1deg", shiftX: -1, shiftY: 0, tapeLeft: "49%", tapeRotation: "-3deg" },
+    { left: 55, top: 292, width: 18, rotation: "2deg", shiftX: 1, shiftY: 0, tapeLeft: "52%", tapeRotation: "4deg" },
+    { left: 5, top: 552, width: 20, rotation: "0.9deg", shiftX: 0, shiftY: 0, tapeLeft: "55%", tapeRotation: "2deg" },
   ];
-  if (total > 8) {
-    const denseLanes =
-      total > 18
-        ? [
-            { left: 5, width: 22, topOffset: 0, rotation: "-1.7deg", tapeLeft: "48%", tapeRotation: "-4deg" },
-            { left: 28, width: 20, topOffset: 34, rotation: "1.3deg", tapeLeft: "56%", tapeRotation: "3deg" },
-            { left: 50, width: 24, topOffset: 8, rotation: "-0.9deg", tapeLeft: "51%", tapeRotation: "-2deg" },
-            { left: 75, width: 20, topOffset: 28, rotation: "1.8deg", tapeLeft: "50%", tapeRotation: "4deg" },
-          ]
-        : [
-            { left: 6, width: 31, topOffset: 0, rotation: "-1.9deg", tapeLeft: "48%", tapeRotation: "-4deg" },
-            { left: 38, width: 28, topOffset: 42, rotation: "1.4deg", tapeLeft: "56%", tapeRotation: "3deg" },
-            { left: 67, width: 27, topOffset: 14, rotation: "-0.9deg", tapeLeft: "51%", tapeRotation: "-2deg" },
-          ];
-    const lane = denseLanes[index % denseLanes.length];
-    const row = Math.floor(index / denseLanes.length);
-    const rowGap = total > 18 ? 76 : 124;
-    const stagger = Math.floor(index / (denseLanes.length * 2)) % 2;
-    const top = (total > 18 ? 52 : 54) + row * rowGap + lane.topOffset + stagger * 14;
-
-    return {
-      left: `${lane.left}%`,
-      top: `${top}px`,
-      width: `${lane.width}%`,
-      rotation: lane.rotation,
-      shiftX: `${(index % 2 === 0 ? -1 : 1) * (index % 5)}px`,
-      shiftY: `${(index % 3) * 4}px`,
-      tapeLeft: lane.tapeLeft,
-      tapeRotation: lane.tapeRotation,
-      style: {
-        left: `${lane.left}%`,
-        top: `${top}px`,
-        width: `${lane.width}%`,
-      } satisfies CSSProperties,
-    };
-  }
-
-  const layout =
+  const full = [
+    { left: 5, top: 42, width: 20, rotation: "-1.6deg", shiftX: -1, shiftY: 0, tapeLeft: "48%", tapeRotation: "-4deg" },
+    { left: 29, top: 68, width: 18, rotation: "1.3deg", shiftX: 2, shiftY: 0, tapeLeft: "56%", tapeRotation: "3deg" },
+    { left: 51, top: 44, width: 22, rotation: "-0.8deg", shiftX: 1, shiftY: 2, tapeLeft: "51%", tapeRotation: "-2deg" },
+    { left: 76, top: 82, width: 18, rotation: "1.8deg", shiftX: 2, shiftY: 3, tapeLeft: "50%", tapeRotation: "4deg" },
+    { left: 13, top: 138, width: 18, rotation: "2.2deg", shiftX: 0, shiftY: 0, tapeLeft: "50%", tapeRotation: "4deg" },
+    { left: 36, top: 150, width: 22, rotation: "-1.2deg", shiftX: -2, shiftY: 3, tapeLeft: "43%", tapeRotation: "-3deg" },
+    { left: 63, top: 142, width: 20, rotation: "1.6deg", shiftX: 1, shiftY: 0, tapeLeft: "54%", tapeRotation: "3deg" },
+    { left: 6, top: 228, width: 23, rotation: "-2deg", shiftX: -1, shiftY: 0, tapeLeft: "47%", tapeRotation: "-5deg" },
+    { left: 32, top: 246, width: 18, rotation: "1.4deg", shiftX: 1, shiftY: 0, tapeLeft: "57%", tapeRotation: "4deg" },
+    { left: 55, top: 226, width: 20, rotation: "-1deg", shiftX: 2, shiftY: 0, tapeLeft: "50%", tapeRotation: "-2deg" },
+    { left: 78, top: 262, width: 17, rotation: "1.1deg", shiftX: 1, shiftY: 0, tapeLeft: "52%", tapeRotation: "2deg" },
+    { left: 17, top: 320, width: 19, rotation: "-1.7deg", shiftX: -1, shiftY: 0, tapeLeft: "48%", tapeRotation: "-4deg" },
+    { left: 41, top: 326, width: 23, rotation: "1.5deg", shiftX: 1, shiftY: 2, tapeLeft: "56%", tapeRotation: "3deg" },
+    { left: 69, top: 342, width: 19, rotation: "-1.2deg", shiftX: 2, shiftY: 0, tapeLeft: "51%", tapeRotation: "-2deg" },
+    { left: 6, top: 412, width: 18, rotation: "2deg", shiftX: 0, shiftY: 0, tapeLeft: "50%", tapeRotation: "4deg" },
+    { left: 28, top: 396, width: 22, rotation: "-1deg", shiftX: -1, shiftY: 0, tapeLeft: "43%", tapeRotation: "-3deg" },
+    { left: 55, top: 424, width: 19, rotation: "1.3deg", shiftX: 1, shiftY: 2, tapeLeft: "54%", tapeRotation: "3deg" },
+    { left: 76, top: 402, width: 18, rotation: "-1.5deg", shiftX: 0, shiftY: 0, tapeLeft: "48%", tapeRotation: "-4deg" },
+    { left: 12, top: 494, width: 21, rotation: "1deg", shiftX: 1, shiftY: 0, tapeLeft: "52%", tapeRotation: "3deg" },
+    { left: 38, top: 482, width: 18, rotation: "-2deg", shiftX: -1, shiftY: 0, tapeLeft: "46%", tapeRotation: "-5deg" },
+    { left: 62, top: 500, width: 22, rotation: "1.7deg", shiftX: 2, shiftY: 1, tapeLeft: "57%", tapeRotation: "4deg" },
+    { left: 5, top: 594, width: 17, rotation: "-0.9deg", shiftX: 0, shiftY: 0, tapeLeft: "50%", tapeRotation: "-2deg" },
+    { left: 25, top: 560, width: 20, rotation: "1.5deg", shiftX: 1, shiftY: 0, tapeLeft: "53%", tapeRotation: "3deg" },
+    { left: 49, top: 584, width: 17, rotation: "-1.3deg", shiftX: -1, shiftY: 0, tapeLeft: "48%", tapeRotation: "-4deg" },
+    { left: 70, top: 558, width: 22, rotation: "1deg", shiftX: 1, shiftY: 0, tapeLeft: "55%", tapeRotation: "2deg" },
+    { left: 15, top: 626, width: 17, rotation: "2deg", shiftX: 0, shiftY: 0, tapeLeft: "52%", tapeRotation: "4deg" },
+    { left: 36, top: 612, width: 20, rotation: "-1.5deg", shiftX: -1, shiftY: 0, tapeLeft: "47%", tapeRotation: "-5deg" },
+    { left: 60, top: 628, width: 18, rotation: "1.2deg", shiftX: 1, shiftY: 0, tapeLeft: "56%", tapeRotation: "3deg" },
+    { left: 78, top: 604, width: 16, rotation: "-0.8deg", shiftX: 0, shiftY: 0, tapeLeft: "50%", tapeRotation: "-2deg" },
+    { left: 3, top: 630, width: 18, rotation: "-1.2deg", shiftX: 1, shiftY: 0, tapeLeft: "52%", tapeRotation: "3deg" },
+    { left: 48, top: 646, width: 15, rotation: "1.7deg", shiftX: 0, shiftY: 0, tapeLeft: "49%", tapeRotation: "4deg" },
+  ];
+  const template =
     total <= 1
-      ? single
-      : total === 2
-        ? pair[index % pair.length]
-        : total <= 3
-          ? sparse[index % sparse.length]
-          : collage[index % collage.length];
+      ? [sparse[0]]
+      : total <= 3
+        ? sparse.slice(1, total + 1)
+        : total <= 8
+          ? loose
+          : total <= 16
+            ? medium
+            : full;
+
+  const layout = template[index % template.length];
+  const repeat = Math.floor(index / template.length);
+  const top = layout.top + repeat * 18;
 
   return {
-    ...layout,
+    left: `${layout.left}%`,
+    top: `${top}px`,
+    width: `${layout.width}%`,
+    rotation: layout.rotation,
+    shiftX: `${layout.shiftX}px`,
+    shiftY: `${layout.shiftY}px`,
+    tapeLeft: layout.tapeLeft,
+    tapeRotation: layout.tapeRotation,
     style: {
-      left: layout.left,
-      top: layout.top,
-      width: layout.width,
+      left: `${layout.left}%`,
+      top: `${top}px`,
+      width: `${layout.width}%`,
     } satisfies CSSProperties,
   };
 }
