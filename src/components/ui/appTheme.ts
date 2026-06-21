@@ -7,9 +7,7 @@ export const APP_ACCENT_SOFT_BORDER = "var(--line)";
 export const APP_PAGE_BACKGROUND = "var(--app-paper-background)";
 
 export const APP_SURFACE: CSSProperties = {
-  background: "color-mix(in srgb, var(--paper) 93%, transparent)",
-  backdropFilter: "blur(20px)",
-  WebkitBackdropFilter: "blur(20px)",
+  background: "var(--app-page-surface-strong)",
   border: "1px solid var(--line)",
   boxShadow: "var(--shadow-e1)",
   position: "relative",
@@ -17,20 +15,20 @@ export const APP_SURFACE: CSSProperties = {
 
 export const APP_SUBTLE_SURFACE: CSSProperties = {
   ...APP_SURFACE,
-  background: "color-mix(in srgb, var(--paper) 86%, transparent)",
+  background: "var(--app-page-surface)",
   boxShadow: "var(--shadow-e1)",
 };
 
 export const APP_PILL: CSSProperties = {
   ...APP_SURFACE,
-  background: "color-mix(in srgb, var(--paper) 90%, transparent)",
+  background: "color-mix(in srgb, var(--paper) 66%, transparent)",
   borderRadius: "var(--radius-full)",
 };
 
 export const APP_SHEET: CSSProperties = {
-  background: "color-mix(in srgb, var(--paper) 94%, transparent)",
-  backdropFilter: "blur(20px)",
-  WebkitBackdropFilter: "blur(20px)",
+  background: "color-mix(in srgb, var(--paper) 82%, transparent)",
+  backdropFilter: "blur(8px)",
+  WebkitBackdropFilter: "blur(8px)",
   border: "1px solid var(--line)",
   boxShadow: "var(--shadow-e2)",
 };

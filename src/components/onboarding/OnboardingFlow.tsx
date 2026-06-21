@@ -775,7 +775,10 @@ const styles = {
     minHeight: "100dvh",
     overflow: "hidden",
     color: "#2f2a25",
-    background: "#f7f1e7",
+    background: "var(--app-paper-background)",
+    backgroundSize: "var(--app-paper-background-size)",
+    backgroundPosition: "var(--app-paper-background-position)",
+    backgroundRepeat: "var(--app-paper-background-repeat)",
     fontFamily:
       '-apple-system, BlinkMacSystemFont, "Hiragino Sans", "Noto Sans JP", sans-serif',
   },
@@ -783,8 +786,10 @@ const styles = {
     position: "fixed",
     inset: 0,
     zIndex: 0,
-    background:
-      "linear-gradient(180deg, #fffdf8 0%, #f8f2e8 52%, #f2e8d9 100%)",
+    background: "var(--app-paper-background)",
+    backgroundSize: "var(--app-paper-background-size)",
+    backgroundPosition: "var(--app-paper-background-position)",
+    backgroundRepeat: "var(--app-paper-background-repeat)",
   },
   container: {
     position: "relative",

@@ -53,7 +53,10 @@ export default function HowToUsePage() {
 const styles = {
   page: {
     minHeight: "100vh",
-    background: "#f7f3ea",
+    background: "var(--app-paper-background)",
+    backgroundSize: "var(--app-paper-background-size)",
+    backgroundPosition: "var(--app-paper-background-position)",
+    backgroundRepeat: "var(--app-paper-background-repeat)",
     color: "#2a2925",
     padding: "calc(24px + env(safe-area-inset-top)) 20px calc(40px + env(safe-area-inset-bottom))",
   },

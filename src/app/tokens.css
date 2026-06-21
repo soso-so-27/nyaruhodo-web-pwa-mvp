@@ -18,15 +18,25 @@
   --bg-gradient: linear-gradient(180deg, var(--paper) 0%, var(--paper-warm) 100%);
   --app-paper-image: url("/images/home-backgrounds/generated-noon-paper.png");
   --app-paper-grain: url("/images/home-backgrounds/paper-grain.png");
-  --app-paper-background: var(--app-paper-image),
+  --app-paper-background:
     linear-gradient(
       180deg,
-      color-mix(in srgb, var(--paper) 82%, var(--paper-warm)) 0%,
-      color-mix(in srgb, var(--paper-warm) 86%, var(--paper-card)) 100%
+      color-mix(in srgb, var(--paper) 14%, transparent) 0%,
+      color-mix(in srgb, var(--paper-warm) 8%, transparent) 48%,
+      color-mix(in srgb, var(--ink-soft) 5%, transparent) 100%
+    ),
+    var(--app-paper-image),
+    linear-gradient(
+      180deg,
+      color-mix(in srgb, var(--paper) 78%, var(--paper-warm)) 0%,
+      color-mix(in srgb, var(--paper-warm) 82%, var(--paper-card)) 100%
     );
-  --app-paper-background-size: cover, 100% 100%;
-  --app-paper-background-position: 50% 50%, 50% 50%;
-  --app-paper-background-repeat: no-repeat, no-repeat;
+  --app-paper-background-size: 100% 100%, cover, 100% 100%;
+  --app-paper-background-position: 50% 50%, 50% 50%, 50% 50%;
+  --app-paper-background-repeat: no-repeat, no-repeat, no-repeat;
+  --app-page-surface: color-mix(in srgb, var(--paper-card) 44%, transparent);
+  --app-page-surface-strong: color-mix(in srgb, var(--paper-card) 58%, transparent);
+  --app-page-surface-soft: color-mix(in srgb, var(--paper) 24%, transparent);
 
   /* ===== 影(2段・さらに弱く) ===== */
   --shadow-e0: none;
