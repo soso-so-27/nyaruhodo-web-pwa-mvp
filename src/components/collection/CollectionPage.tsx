@@ -2689,18 +2689,18 @@ function getMainichiBoardCanvasStyle(total: number): CSSProperties {
 
   if (total <= 8) {
     return {
-      height: "690px",
+      height: "620px",
     };
   }
 
   if (total <= 16) {
     return {
-      height: "1220px",
+      height: "680px",
     };
   }
 
   return {
-    height: `${Math.max(1420, 320 + Math.ceil(total / 3) * 132)}px`,
+    height: "760px",
   };
 }
 
@@ -2851,24 +2851,29 @@ function getMainichiBoardPhotoLayout(index: number, total: number) {
       tapeRotation: "-2deg",
     },
   ];
-  const denseLanes = [
-    { left: 6, width: 31, topOffset: 0, rotation: "-1.9deg", tapeLeft: "48%", tapeRotation: "-4deg" },
-    { left: 36, width: 29, topOffset: 44, rotation: "1.4deg", tapeLeft: "56%", tapeRotation: "3deg" },
-    { left: 64, width: 30, topOffset: 14, rotation: "-0.9deg", tapeLeft: "51%", tapeRotation: "-2deg" },
-    { left: 12, width: 24, topOffset: 8, rotation: "2.2deg", tapeLeft: "50%", tapeRotation: "4deg" },
-    { left: 42, width: 47, topOffset: 20, rotation: "-1.2deg", tapeLeft: "43%", tapeRotation: "-3deg" },
-    { left: 7, width: 42, topOffset: 2, rotation: "1.6deg", tapeLeft: "54%", tapeRotation: "3deg" },
-    { left: 58, width: 34, topOffset: 36, rotation: "-1.7deg", tapeLeft: "45%", tapeRotation: "-5deg" },
-  ];
-
-  if (total > 18) {
+  if (total > 8) {
+    const denseLanes =
+      total > 18
+        ? [
+            { left: 5, width: 22, topOffset: 0, rotation: "-1.7deg", tapeLeft: "48%", tapeRotation: "-4deg" },
+            { left: 28, width: 20, topOffset: 34, rotation: "1.3deg", tapeLeft: "56%", tapeRotation: "3deg" },
+            { left: 50, width: 24, topOffset: 8, rotation: "-0.9deg", tapeLeft: "51%", tapeRotation: "-2deg" },
+            { left: 75, width: 20, topOffset: 28, rotation: "1.8deg", tapeLeft: "50%", tapeRotation: "4deg" },
+          ]
+        : [
+            { left: 6, width: 31, topOffset: 0, rotation: "-1.9deg", tapeLeft: "48%", tapeRotation: "-4deg" },
+            { left: 38, width: 28, topOffset: 42, rotation: "1.4deg", tapeLeft: "56%", tapeRotation: "3deg" },
+            { left: 67, width: 27, topOffset: 14, rotation: "-0.9deg", tapeLeft: "51%", tapeRotation: "-2deg" },
+          ];
     const lane = denseLanes[index % denseLanes.length];
-    const row = Math.floor(index / 3);
-    const stagger = Math.floor(index / denseLanes.length) % 3;
+    const row = Math.floor(index / denseLanes.length);
+    const rowGap = total > 18 ? 76 : 124;
+    const stagger = Math.floor(index / (denseLanes.length * 2)) % 2;
+    const top = (total > 18 ? 52 : 54) + row * rowGap + lane.topOffset + stagger * 14;
 
     return {
       left: `${lane.left}%`,
-      top: `${76 + row * 132 + lane.topOffset + stagger * 18}px`,
+      top: `${top}px`,
       width: `${lane.width}%`,
       rotation: lane.rotation,
       shiftX: `${(index % 2 === 0 ? -1 : 1) * (index % 5)}px`,
@@ -2877,24 +2882,8 @@ function getMainichiBoardPhotoLayout(index: number, total: number) {
       tapeRotation: lane.tapeRotation,
       style: {
         left: `${lane.left}%`,
-        top: `${76 + row * 132 + lane.topOffset + stagger * 18}px`,
-        width: `${lane.width}%`,
-      } satisfies CSSProperties,
-    };
-  }
-
-  if (total > 8) {
-    const base = collage[index % collage.length];
-    const cycle = Math.floor(index / collage.length);
-    const top = Number.parseFloat(base.top) + cycle * 520;
-
-    return {
-      ...base,
-      top: `${top}px`,
-      style: {
-        left: base.left,
         top: `${top}px`,
-        width: base.width,
+        width: `${lane.width}%`,
       } satisfies CSSProperties,
     };
   }
