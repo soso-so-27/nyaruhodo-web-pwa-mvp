@@ -2810,11 +2810,17 @@ function getMainichiBoardPhotoLayout(index: number, total: number) {
     0,
     Math.round(layout.top * verticalScale) - (total > 1 ? 20 : 0) + repeat * 18,
   );
+  const width =
+    total > 16
+      ? Math.max(16, Math.round(layout.width * 0.88))
+      : total > 8
+        ? Math.max(20, Math.round(layout.width * 0.95))
+        : layout.width;
 
   return {
     left: `${layout.left}%`,
     top: `${top}px`,
-    width: `${layout.width}%`,
+    width: `${width}%`,
     rotation: layout.rotation,
     shiftX: `${layout.shiftX ?? 0}px`,
     shiftY: `${layout.shiftY ?? 0}px`,
@@ -2825,7 +2831,7 @@ function getMainichiBoardPhotoLayout(index: number, total: number) {
     style: {
       left: `${layout.left}%`,
       top: `${top}px`,
-      width: `${layout.width}%`,
+      width: `${width}%`,
     } satisfies CSSProperties,
   };
 }
@@ -3764,25 +3770,26 @@ const styles = {
   },
   mainichiMonthBoard: {
     display: "grid",
-    gap: "14px",
-    padding: "24px 12px 38px",
+    gap: "18px",
+    padding: "26px 14px 44px",
     overflow: "visible",
-    borderRadius: "30px",
+    borderRadius: "32px",
+    backgroundColor: "color-mix(in srgb, var(--paper-card) 82%, var(--paper-warm) 18%)",
     backgroundImage:
-      "linear-gradient(180deg, rgba(255,252,244,0.70), rgba(250,241,222,0.42)), url('/images/ui/mainichi-board-paper.webp')",
-    backgroundSize: "100% 100%, cover",
-    backgroundPosition: "0 0, center",
-    backgroundRepeat: "no-repeat",
+      "linear-gradient(180deg, rgba(255,252,244,0.42), rgba(245,232,207,0.22)), radial-gradient(120% 90% at 38% 18%, rgba(255,247,224,0.28), transparent 60%), url('/images/ui/mainichi-board-paper.webp')",
+    backgroundSize: "100% 100%, 100% 100%, 100% 100%",
+    backgroundPosition: "0 0, 0 0, center",
+    backgroundRepeat: "no-repeat, no-repeat, no-repeat",
     boxShadow:
-      "0 1px 0 rgba(255,255,255,0.56) inset, 0 0 0 1px rgba(120,96,62,0.08), 0 28px 58px -42px rgba(86,70,45,0.34)",
+      "0 1px 0 rgba(255,255,255,0.62) inset, 0 0 0 1px rgba(120,96,62,0.10), 0 30px 62px -44px rgba(86,70,45,0.36)",
   },
   mainichiMonthTitle: {
     margin: 0,
     color: COLLECTION_TEXT,
     fontFamily: "var(--font-display)",
-    fontSize: "18px",
-    fontWeight: 500,
-    lineHeight: 1.32,
+    fontSize: "19px",
+    fontWeight: 400,
+    lineHeight: 1.34,
     letterSpacing: "0.06em",
   },
   mainichiBoardPhotos: {
@@ -3803,7 +3810,7 @@ const styles = {
     color: COLLECTION_TEXT,
     font: "inherit",
     textAlign: "left",
-    padding: "8px 3px 8px",
+    padding: "9px 4px 9px",
     cursor: "pointer",
     transformOrigin: "50% 22%",
     transition:
@@ -3814,8 +3821,8 @@ const styles = {
     zIndex: 2,
     left: "var(--mainichi-tape-left, 50%)",
     top: "0",
-    width: "72px",
-    height: "20px",
+    width: "76px",
+    height: "22px",
     backgroundImage: "url('/images/ui/washi-tape-cream.png')",
     backgroundSize: "100% 100%",
     backgroundPosition: "center",
@@ -3823,7 +3830,7 @@ const styles = {
     boxShadow:
       "0 5px 10px -8px rgba(84,65,42,0.28)",
     filter: "saturate(0.82) brightness(1.04)",
-    opacity: 0.9,
+    opacity: 0.82,
     transform: "translate(-50%, -15%) rotate(var(--mainichi-tape-rotation, -3deg))",
     pointerEvents: "none",
   },
@@ -3834,11 +3841,11 @@ const styles = {
     width: "100%",
     height: "auto",
     display: "block",
-    border: "4px solid color-mix(in srgb, var(--paper-card) 88%, var(--paper-warm) 12%)",
-    borderRadius: "15px",
+    border: "5px solid color-mix(in srgb, var(--paper-card) 90%, var(--paper-warm) 10%)",
+    borderRadius: "16px",
     background: "color-mix(in srgb, var(--paper-card) 92%, var(--paper-warm) 8%)",
     boxShadow:
-      "0 0 0 0.5px rgba(74,56,34,0.08) inset, 0 2px 5px rgba(86,70,45,0.10), 0 12px 22px -16px rgba(76,62,42,0.34)",
+      "0 0 0 0.5px rgba(74,56,34,0.10) inset, 0 2px 5px rgba(86,70,45,0.12), 0 14px 26px -16px rgba(76,62,42,0.40)",
   },
   mainichiBoardPhotoCatBadge: {
     position: "absolute",

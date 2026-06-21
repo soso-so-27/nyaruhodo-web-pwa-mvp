@@ -78,12 +78,12 @@ const CATS_FAINT = "var(--ink-faint)";
 const CATS_PAPER = "var(--paper)";
 const CATS_SERIF = "var(--font-display)";
 const CATS_UI = "var(--font-ui)";
-const CATS_TITLE_SIZE = "18px";
-const CATS_DISPLAY_SIZE = "23px";
-const CATS_BODY_SIZE = "14px";
+const CATS_TITLE_SIZE = "20px";
+const CATS_DISPLAY_SIZE = "25px";
+const CATS_BODY_SIZE = "13px";
 const CATS_META_SIZE = "12px";
 const CATS_TINY_SIZE = "11px";
-const CATS_TITLE_TRACKING = "0.03em";
+const CATS_TITLE_TRACKING = "0.04em";
 const CATS_BODY_TRACKING = "0.02em";
 const CATS_META_TRACKING = "0.03em";
 const CATS_PANEL_BACKGROUND = "var(--app-page-surface-strong)";
@@ -2358,14 +2358,14 @@ const styles = {
     marginTop: "18px",
   },
   profileCard: {
-    marginBottom: "10px",
+    marginBottom: "14px",
     background: CATS_PANEL_BACKGROUND,
-    backdropFilter: "blur(2px)",
+    backdropFilter: "none",
   },
   profilePlaceCard: {
-    marginBottom: "10px",
+    marginBottom: "14px",
     background: CATS_PANEL_BACKGROUND,
-    backdropFilter: "blur(2px)",
+    backdropFilter: "none",
   },
   lensSwitch: {
     margin: "0 0 12px",
@@ -2490,20 +2490,20 @@ const styles = {
   },
   recordLabel: {
     color: CATS_MUTED,
-    fontFamily: CATS_SERIF,
+    fontFamily: CATS_UI,
     fontSize: CATS_META_SIZE,
     fontWeight: 400,
     lineHeight: 1.35,
-    letterSpacing: CATS_META_TRACKING,
+    letterSpacing: "0.02em",
   },
   recordMetricValue: {
-    color: CATS_MUTED,
-    fontFamily: CATS_SERIF,
+    color: CATS_TEXT,
+    fontFamily: CATS_UI,
     fontSize: CATS_BODY_SIZE,
-    fontWeight: 400,
+    fontWeight: 500,
     lineHeight: 1.35,
     textAlign: "right",
-    letterSpacing: CATS_BODY_TRACKING,
+    letterSpacing: "0.01em",
   },
   recordMetricValueGroup: {
     display: "grid",
@@ -2512,22 +2512,23 @@ const styles = {
   },
   recordMetricSub: {
     color: CATS_FAINT,
-    fontFamily: CATS_SERIF,
+    fontFamily: CATS_UI,
     fontSize: CATS_META_SIZE,
     fontWeight: 400,
     lineHeight: 1.2,
-    letterSpacing: CATS_META_TRACKING,
+    letterSpacing: "0.02em",
   },
   recordPanel: {
-    marginBottom: "12px",
+    marginTop: "24px",
+    marginBottom: "24px",
     background: CATS_PANEL_BACKGROUND,
-    backdropFilter: "blur(2px)",
+    backdropFilter: "none",
   },
   footprintsPanel: {
-    marginBottom: "12px",
+    marginBottom: "22px",
     overflow: "hidden",
     background: CATS_PANEL_BACKGROUND,
-    backdropFilter: "blur(2px)",
+    backdropFilter: "none",
   },
   summaryPanel: {
     marginBottom: "12px",
@@ -2691,9 +2692,9 @@ const styles = {
     gap: "9px",
   },
   basicInfoPanel: {
-    marginBottom: "12px",
+    marginBottom: "22px",
     background: CATS_PANEL_BACKGROUND,
-    backdropFilter: "blur(2px)",
+    backdropFilter: "none",
   },
   basicInfoHeader: {
     display: "flex",
@@ -3109,9 +3110,10 @@ const styles = {
     marginTop: "2px",
   },
   bunbakoSection: {
-    marginTop: "18px",
+    marginTop: "22px",
+    marginBottom: "28px",
     background: CATS_PANEL_BACKGROUND,
-    backdropFilter: "blur(2px)",
+    backdropFilter: "none",
   },
   bunbakoHeader: {
     display: "flex",
@@ -3129,12 +3131,12 @@ const styles = {
     letterSpacing: CATS_TITLE_TRACKING,
   },
   sectionLead: {
-    margin: "2px 0 12px",
+    margin: "4px 0 14px",
     color: CATS_MUTED,
-    fontFamily: CATS_SERIF,
+    fontFamily: CATS_UI,
     fontSize: CATS_META_SIZE,
     fontWeight: 400,
-    letterSpacing: CATS_META_TRACKING,
+    letterSpacing: "0.02em",
     lineHeight: 1.6,
   },
   bunbakoScroller: {
@@ -3205,9 +3207,10 @@ const styles = {
     marginTop: "12px",
   },
   daysThread: {
-    marginTop: "18px",
+    marginTop: "24px",
+    marginBottom: "12px",
     background: CATS_PANEL_BACKGROUND_SOFT,
-    backdropFilter: "blur(2px)",
+    backdropFilter: "none",
   },
   threadLine: {
     display: "grid",
@@ -3228,10 +3231,10 @@ const styles = {
   },
   threadNodeText: {
     color: CATS_MUTED,
-    fontFamily: CATS_SERIF,
+    fontFamily: CATS_UI,
     fontSize: CATS_META_SIZE,
     lineHeight: 1.7,
-    letterSpacing: CATS_META_TRACKING,
+    letterSpacing: "0.02em",
   },
   omoideSheet: {
     display: "grid",
