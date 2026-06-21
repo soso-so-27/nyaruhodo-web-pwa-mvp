@@ -18,18 +18,15 @@
   --bg-gradient: linear-gradient(180deg, var(--paper) 0%, var(--paper-warm) 100%);
   --app-paper-image: url("/images/home-backgrounds/generated-noon-paper.png");
   --app-paper-grain: url("/images/home-backgrounds/paper-grain.png");
-  --app-paper-background: linear-gradient(
+  --app-paper-background: var(--app-paper-image),
+    linear-gradient(
       180deg,
-      color-mix(in srgb, var(--paper) 34%, transparent) 0%,
-      color-mix(in srgb, var(--paper-card) 12%, transparent) 54%,
-      color-mix(in srgb, var(--paper-warm) 18%, transparent) 100%
-    ),
-    var(--app-paper-image),
-    var(--app-paper-grain),
-    var(--bg-gradient);
-  --app-paper-background-size: 100% 100%, 100% 100%, 260px 260px, 100% 100%;
-  --app-paper-background-position: 50% 50%, 50% 50%, 50% 50%, 50% 50%;
-  --app-paper-background-repeat: no-repeat, no-repeat, repeat, no-repeat;
+      color-mix(in srgb, var(--paper) 82%, var(--paper-warm)) 0%,
+      color-mix(in srgb, var(--paper-warm) 86%, var(--paper-card)) 100%
+    );
+  --app-paper-background-size: cover, 100% 100%;
+  --app-paper-background-position: 50% 50%, 50% 50%;
+  --app-paper-background-repeat: no-repeat, no-repeat;
 
   /* ===== 影(2段・さらに弱く) ===== */
   --shadow-e0: none;

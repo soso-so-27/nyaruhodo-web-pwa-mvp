@@ -77,28 +77,28 @@ const CATS_MUTED = "var(--ink-soft)";
 const CATS_FAINT = "var(--ink-faint)";
 const CATS_PAPER = "var(--paper)";
 const CATS_SERIF = "var(--font-display)";
-const CATS_TITLE_SIZE = "18px";
-const CATS_DISPLAY_SIZE = "23px";
+const CATS_TITLE_SIZE = "17px";
+const CATS_DISPLAY_SIZE = "22px";
 const CATS_BODY_SIZE = "13px";
 const CATS_META_SIZE = "12px";
 const CATS_TINY_SIZE = "11px";
-const CATS_TITLE_TRACKING = "0.03em";
+const CATS_TITLE_TRACKING = "0.02em";
 const CATS_BODY_TRACKING = "0.01em";
 const CATS_META_TRACKING = "0.02em";
 const CATS_PANEL_BACKGROUND =
-  "color-mix(in srgb, var(--paper-card) 64%, transparent)";
+  "color-mix(in srgb, var(--paper-card) 54%, transparent)";
 const CATS_PANEL_BACKGROUND_SOFT =
-  "color-mix(in srgb, var(--paper-card) 48%, transparent)";
+  "color-mix(in srgb, var(--paper-card) 38%, transparent)";
 const CATS_SURFACE: CSSProperties = {
   position: "relative",
-  background: "color-mix(in srgb, var(--paper) 68%, transparent)",
+  background: "color-mix(in srgb, var(--paper) 58%, transparent)",
   border: "1px solid var(--line)",
   boxShadow: "var(--shadow-e1)",
   backdropFilter: "blur(2px)",
 };
 const CATS_SURFACE_SOFT: CSSProperties = {
   ...CATS_SURFACE,
-  background: "color-mix(in srgb, var(--paper) 34%, transparent)",
+  background: "color-mix(in srgb, var(--paper) 26%, transparent)",
   boxShadow: "var(--shadow-e1)",
 };
 const ONBOARDING_ALBUM_COMPLETION_READY_KEY =
@@ -2268,7 +2268,7 @@ const styles = {
     zIndex: 0,
     pointerEvents: "none" as const,
     background:
-      "linear-gradient(115deg, color-mix(in srgb, var(--paper) 46%, transparent) 0%, transparent 42%, color-mix(in srgb, var(--ink-soft) 9%, transparent) 100%)",
+      "linear-gradient(115deg, color-mix(in srgb, var(--paper) 20%, transparent) 0%, transparent 44%, color-mix(in srgb, var(--ink-soft) 7%, transparent) 100%)",
   },
   backgroundVeil: {
     position: "fixed" as const,
@@ -2276,7 +2276,7 @@ const styles = {
     zIndex: 1,
     pointerEvents: "none" as const,
     background:
-      "linear-gradient(to bottom, color-mix(in srgb, var(--paper) 18%, transparent) 0%, transparent 46%, color-mix(in srgb, var(--ink-soft) 8%, transparent) 100%)",
+      "linear-gradient(to bottom, color-mix(in srgb, var(--paper) 8%, transparent) 0%, transparent 48%, color-mix(in srgb, var(--ink-soft) 6%, transparent) 100%)",
   },
   container: {
     position: "relative",
@@ -2534,7 +2534,7 @@ const styles = {
   summaryPanel: {
     marginBottom: "12px",
     background:
-      "linear-gradient(145deg, color-mix(in srgb, var(--paper-card) 72%, transparent), color-mix(in srgb, var(--paper-warm) 30%, transparent))",
+      "linear-gradient(145deg, color-mix(in srgb, var(--paper-card) 58%, transparent), color-mix(in srgb, var(--paper-warm) 22%, transparent))",
   },
   summaryHeader: {
     display: "grid",
@@ -2574,7 +2574,7 @@ const styles = {
     padding: "10px 12px",
     borderRadius: "var(--radius-lg)",
     border: "1px solid color-mix(in srgb, var(--line) 72%, transparent)",
-    background: "color-mix(in srgb, var(--paper) 42%, transparent)",
+    background: "color-mix(in srgb, var(--paper) 34%, transparent)",
   },
   summaryTileWide: {
     minHeight: "54px",
@@ -2585,7 +2585,7 @@ const styles = {
     padding: "8px 12px",
     borderRadius: "var(--radius-lg)",
     border: "1px solid color-mix(in srgb, var(--line) 62%, transparent)",
-    background: "color-mix(in srgb, var(--paper) 30%, transparent)",
+    background: "color-mix(in srgb, var(--paper) 24%, transparent)",
   },
   summaryTileAccent: {
     borderColor: "color-mix(in srgb, var(--seal) 34%, var(--line))",
@@ -2726,7 +2726,7 @@ const styles = {
     borderRadius: "var(--radius-lg)",
     border: "1px solid color-mix(in srgb, var(--line) 62%, transparent)",
     overflow: "hidden",
-    background: "color-mix(in srgb, var(--paper) 24%, transparent)",
+    background: "color-mix(in srgb, var(--paper) 18%, transparent)",
   },
   basicInfoRow: {
     display: "grid",
