@@ -1312,7 +1312,7 @@ function MainichiBoardPhotoCard({
         src={photo.src}
         alt=""
         variant="tile"
-        aspect="1 / 1"
+        aspect={layout.aspect}
         style={styles.mainichiBoardPhotoTileRoot}
         imageStyle={styles.mainichiBoardPhotoTile}
         onStorageDataUrl={
@@ -2717,6 +2717,7 @@ function getMainichiBoardPhotoLayout(index: number, total: number) {
     tapeLeft?: string;
     tapeRotation?: string;
     zIndex?: number;
+    aspect?: string;
   };
 
   const sparse = [
@@ -2786,7 +2787,7 @@ function getMainichiBoardPhotoLayout(index: number, total: number) {
     { left: 72, top: 492, width: 20, rotation: "-0.8deg", tapeLeft: "50%", tapeRotation: "-2deg", zIndex: 1 },
     { left: 2, top: 514, width: 19, rotation: "-1.2deg", shiftX: 1, tapeLeft: "52%", tapeRotation: "3deg", zIndex: 3 },
   ] satisfies MainichiBoardSlot[];
-  const template =
+  const template: MainichiBoardSlot[] =
     total <= 1
       ? [sparse[0]]
       : total <= 3
@@ -2820,12 +2821,58 @@ function getMainichiBoardPhotoLayout(index: number, total: number) {
     tapeLeft: layout.tapeLeft ?? "50%",
     tapeRotation: layout.tapeRotation ?? "-3deg",
     zIndex: layout.zIndex,
+    aspect: layout.aspect ?? getMainichiBoardPhotoAspect(index, total),
     style: {
       left: `${layout.left}%`,
       top: `${top}px`,
       width: `${layout.width}%`,
     } satisfies CSSProperties,
   };
+}
+
+function getMainichiBoardPhotoAspect(index: number, total: number) {
+  const sparse = ["1 / 1", "5 / 4", "4 / 5"];
+  const loose = ["1 / 1", "5 / 4", "4 / 5", "1 / 1", "6 / 5", "5 / 6", "1 / 1", "5 / 4"];
+  const medium = [
+    "1 / 1",
+    "5 / 4",
+    "4 / 5",
+    "1 / 1",
+    "6 / 5",
+    "5 / 6",
+    "1 / 1",
+    "4 / 5",
+    "5 / 4",
+    "1 / 1",
+    "6 / 5",
+    "5 / 6",
+  ];
+  const full = [
+    "1 / 1",
+    "5 / 4",
+    "4 / 5",
+    "1 / 1",
+    "6 / 5",
+    "5 / 6",
+    "1 / 1",
+    "5 / 4",
+    "4 / 5",
+    "1 / 1",
+  ];
+
+  if (total <= 3) {
+    return sparse[index % sparse.length];
+  }
+
+  if (total <= 8) {
+    return loose[index % loose.length];
+  }
+
+  if (total <= 16) {
+    return medium[index % medium.length];
+  }
+
+  return full[index % full.length];
 }
 
 function shouldShowMainichiBoardTape(index: number, total: number) {
@@ -3788,7 +3835,6 @@ const styles = {
   mainichiBoardPhotoTile: {
     width: "100%",
     height: "auto",
-    aspectRatio: "1 / 1",
     display: "block",
   },
   mainichiBoardPhotoCatBadge: {
