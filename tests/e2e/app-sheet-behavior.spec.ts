@@ -28,8 +28,9 @@ test("AppSheet locks scroll, traps focus, and closes with Escape", async ({ page
   await page.goto("/cats");
   await page.waitForLoadState("networkidle");
 
-  const trigger = page.getByLabel("ほかのねこを見る");
+  const trigger = page.getByLabel("うちのこを管理");
   await trigger.click();
+  await page.getByRole("button", { name: "ねこを切り替える" }).click();
 
   const dialog = page.getByRole("dialog", { name: "ねこを選ぶ" });
   await expect(dialog).toBeVisible();

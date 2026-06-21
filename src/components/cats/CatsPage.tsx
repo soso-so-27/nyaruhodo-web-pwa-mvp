@@ -104,6 +104,7 @@ export function CatsPage() {
   const [isEditingProfile, setIsEditingProfile] = useState(false);
   const [isAddingCat, setIsAddingCat] = useState(false);
   const [isCatSwitcherOpen, setIsCatSwitcherOpen] = useState(false);
+  const [isCatManageOpen, setIsCatManageOpen] = useState(false);
   const [isOnboardingMode, setIsOnboardingMode] = useState(false);
   const [isOnboardingCompletionReady, setIsOnboardingCompletionReady] =
     useState(false);
@@ -699,6 +700,21 @@ export function CatsPage() {
         ) : null}
 
         {activeCatProfile && !isOnboardingCompletionView && activeLens === "cat" ? (
+          <LensPhotoSection
+            title={`${catName}の ねがお`}
+            photos={activeCatLensPhotos}
+            emptyCopy="このこに紐づく ねがおは、まだありません。"
+          />
+        ) : null}
+
+        {activeCatProfile && !isOnboardingCompletionView && activeLens === "all" ? (
+          <AllCatsLensView
+            photos={allLensPhotos}
+            catCount={catProfiles.length}
+          />
+        ) : null}
+
+        {activeCatProfile && !isOnboardingCompletionView && activeLens === "cat" ? (
           <AppCard
             variant="section"
             padding="standard"
@@ -732,61 +748,27 @@ export function CatsPage() {
                   </button>
                   <div style={styles.profileHeroInfo}>
                     <div style={styles.profileName}>{activeCatProfile.name}</div>
+                    <div style={styles.profileMetaLine}>
+                      {familyDuration.secondary || familyDuration.primary}
+                    </div>
                   </div>
                   <div style={styles.profileHeroActions}>
-                    {shouldShowCatSwitchButton ? (
+                    {canManageCats ? (
                       <AppButton
                         type="button"
                         variant="ghost"
                         size="icon"
                         iconOnly
-                        onClick={() => setIsCatSwitcherOpen(true)}
-                        aria-label="ほかのねこを見る"
+                        onClick={() => setIsCatManageOpen(true)}
+                        aria-label="うちのこを管理"
                       >
-                        <CatSwitchIcon />
+                        …
                       </AppButton>
                     ) : null}
-                    {shouldShowSingleCatAdd ? (
-                      <AppButton
-                        type="button"
-                        variant="ghost"
-                        size="icon"
-                        iconOnly
-                        onClick={startAddingCat}
-                        aria-label="ねこを追加"
-                      >
-                        <AddSmallIcon />
-                      </AppButton>
-                    ) : null}
-                    <AppButton
-                      type="button"
-                      variant="ghost"
-                      size="icon"
-                      iconOnly
-                      pressed={isEditingProfile}
-                      onClick={
-                        isEditingProfile ? cancelEditingCatName : handleStartEdit
-                      }
-                      aria-label={
-                        isEditingProfile
-                          ? `${activeCatProfile.name}の編集を閉じる`
-                          : `${activeCatProfile.name}を編集`
-                      }
-                      aria-pressed={isEditingProfile}
-                    >
-                      <PencilSmallIcon />
-                    </AppButton>
                   </div>
                 </div>
 
                 <hr style={styles.divider} />
-
-                <AppCard as="div" variant="inset" padding="md" style={styles.familyHero}>
-                  <span style={styles.familyHeroLabel}>家族になって</span>
-                  <span style={styles.familyHeroDays}>
-                    {familyDuration.secondary || familyDuration.primary}
-                  </span>
-                </AppCard>
 
                 <AppCard as="div" variant="inset" padding="sm" style={styles.recordList}>
                   <div style={styles.recordRow}>
@@ -847,19 +829,6 @@ export function CatsPage() {
                     </AppTag>
                   ) : null}
                 </div>
-                {canManageCats && catProfiles.length > 1 ? (
-                  <div style={styles.deleteCatAction}>
-                    <AppButton
-                      type="button"
-                      variant="danger"
-                      size="sm"
-                      fullWidth
-                      onClick={() => startDeleteCat(activeCatProfile)}
-                    >
-                      この子を消す
-                    </AppButton>
-                  </div>
-                ) : null}
                 <div style={styles.footprintsSection}>
                   <p style={styles.footprintsTitle}>あしあと</p>
                   <div style={styles.footprintsScroller}>
@@ -871,13 +840,6 @@ export function CatsPage() {
                     ))}
                   </div>
                 </div>
-                {shouldShowLensSwitch ? (
-                  <LensPhotoSection
-                    title={`${catName}の ねがお`}
-                    photos={activeCatLensPhotos}
-                    emptyCopy="このこに紐づく ねがおは、まだありません。"
-                  />
-                ) : null}
                 <OmoideBunbako
                   memories={omoideMemories}
                   controls={omoideControls}
@@ -1009,18 +971,82 @@ export function CatsPage() {
           </AppCard>
         ) : null}
 
-        {activeCatProfile && !isOnboardingCompletionView && activeLens === "all" ? (
-          <AllCatsLensView
-            photos={allLensPhotos}
-            catCount={catProfiles.length}
-          />
-        ) : null}
-
         {message ? <p style={styles.message}>{message}</p> : null}
         {saveMessage ? <p style={styles.message}>{saveMessage}</p> : null}
       </div>
       {!isOnboardingProfileSetup && !isOnboardingCompletionView ? (
         <BottomNavigation active="cats" />
+      ) : null}
+      {isCatManageOpen && activeCatProfile ? (
+        <AppBottomSheet
+          title="うちのこを管理"
+          onClose={() => setIsCatManageOpen(false)}
+        >
+          <div style={styles.catManageSheet}>
+            {shouldShowCatSwitchButton ? (
+              <AppButton
+                type="button"
+                variant="secondary"
+                fullWidth
+                iconStart={<CatSwitchIcon />}
+                onClick={() => {
+                  setIsCatManageOpen(false);
+                  setIsCatSwitcherOpen(true);
+                }}
+              >
+                ねこを切り替える
+              </AppButton>
+            ) : null}
+            <AppButton
+              type="button"
+              variant="secondary"
+              fullWidth
+              iconStart={<AddSmallIcon />}
+              onClick={() => {
+                setIsCatManageOpen(false);
+                startAddingCat();
+              }}
+            >
+              ねこをふやす
+            </AppButton>
+            <AppButton
+              type="button"
+              variant="secondary"
+              fullWidth
+              iconStart={<PencilSmallIcon />}
+              onClick={() => {
+                setIsCatManageOpen(false);
+                handleStartEdit();
+              }}
+            >
+              名前や記録を編集
+            </AppButton>
+            <AppButton
+              type="button"
+              variant="quiet"
+              fullWidth
+              onClick={() => {
+                setIsCatManageOpen(false);
+                void handleAvatarUpload();
+              }}
+            >
+              アイコン写真を変える
+            </AppButton>
+            {canManageCats && catProfiles.length > 1 ? (
+              <AppButton
+                type="button"
+                variant="danger"
+                fullWidth
+                onClick={() => {
+                  setIsCatManageOpen(false);
+                  startDeleteCat(activeCatProfile);
+                }}
+              >
+                この子を消す
+              </AppButton>
+            ) : null}
+          </div>
+        </AppBottomSheet>
       ) : null}
       {isCatSwitcherOpen ? (
         <AppBottomSheet
@@ -1190,8 +1216,8 @@ function LensPhotoSection({
   return (
     <AppCard
       as="section"
-      variant="inset"
-      padding="sm"
+      variant="section"
+      padding="standard"
       style={styles.lensPhotoSection}
     >
       <div style={styles.lensSectionHeader}>
@@ -2189,17 +2215,17 @@ const styles = {
     marginBottom: "12px",
   },
   lensSwitch: {
-    margin: "0 0 12px",
+    margin: "0 0 10px",
   },
   profileHero: {
     display: "grid",
-    gridTemplateColumns: "64px 1fr auto",
+    gridTemplateColumns: "58px 1fr auto",
     alignItems: "center",
-    gap: "13px",
+    gap: "12px",
   },
   profileHeroAvatar: {
-    width: "64px",
-    height: "64px",
+    width: "58px",
+    height: "58px",
     display: "flex",
     alignItems: "center",
     justifyContent: "center",
@@ -2209,21 +2235,23 @@ const styles = {
     cursor: "pointer",
   },
   profileHeroAvatarTileRoot: {
-    width: "64px",
-    height: "64px",
+    width: "58px",
+    height: "58px",
   },
   profileHeroAvatarPhotoTile: {
-    width: "64px",
-    height: "64px",
+    width: "58px",
+    height: "58px",
   },
   profileHeroAvatarIconTile: {
-    width: "64px",
-    height: "64px",
+    width: "58px",
+    height: "58px",
     padding: "7px",
     boxSizing: "border-box",
   },
   profileHeroInfo: {
     minWidth: 0,
+    display: "grid",
+    gap: "3px",
   },
   profileName: {
     fontFamily: CATS_SERIF,
@@ -2412,8 +2440,9 @@ const styles = {
     gap: "8px",
     marginTop: "12px",
   },
-  deleteCatAction: {
-    marginTop: "12px",
+  catManageSheet: {
+    display: "grid",
+    gap: "9px",
   },
   deleteCatConfirm: {
     display: "grid",
@@ -2438,8 +2467,16 @@ const styles = {
     display: "grid",
     gap: "8px",
   },
+  profileMetaLine: {
+    color: CATS_MUTED,
+    fontFamily: CATS_SERIF,
+    fontSize: "12px",
+    fontWeight: 400,
+    lineHeight: 1.35,
+    letterSpacing: "var(--tracking-body)",
+  },
   lensPhotoSection: {
-    marginTop: "16px",
+    marginBottom: "12px",
   },
   allLensCard: {
     marginBottom: "12px",
