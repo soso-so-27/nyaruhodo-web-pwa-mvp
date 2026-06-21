@@ -3656,10 +3656,7 @@ const styles = {
   page: {
     position: "relative",
     minHeight: "100svh",
-    background: "var(--app-paper-background)",
-    backgroundSize: "var(--app-paper-background-size)",
-    backgroundPosition: "var(--app-paper-background-position)",
-    backgroundRepeat: "var(--app-paper-background-repeat)",
+    background: "#f3ead8",
     color: COLLECTION_TEXT,
     overflowX: "hidden",
     overflowY: "auto",
@@ -3669,10 +3666,11 @@ const styles = {
     position: "fixed" as const,
     inset: 0,
     zIndex: 0,
-    background: "var(--app-paper-background)",
-    backgroundSize: "var(--app-paper-background-size)",
-    backgroundPosition: "var(--app-paper-background-position)",
-    backgroundRepeat: "var(--app-paper-background-repeat)",
+    backgroundImage:
+      "linear-gradient(180deg, rgba(255,255,255,0.18), rgba(238,226,205,0.12)), url('/images/ui/mainichi-paper-bg.webp')",
+    backgroundSize: "100% 100%, cover",
+    backgroundPosition: "0 0, center",
+    backgroundRepeat: "no-repeat",
   },
   ambientHighlight: {
     position: "fixed" as const,
@@ -3680,7 +3678,7 @@ const styles = {
     zIndex: 0,
     pointerEvents: "none" as const,
     background:
-      "linear-gradient(115deg, rgba(255,255,255,0.54) 0%, rgba(255,255,255,0) 34%, rgba(205,184,150,0.14) 100%)",
+      "linear-gradient(115deg, rgba(255,255,255,0.42) 0%, rgba(255,255,255,0) 34%, rgba(205,184,150,0.10) 100%)",
   },
   backgroundVeil: {
     position: "fixed" as const,
@@ -3688,7 +3686,7 @@ const styles = {
     zIndex: 1,
     pointerEvents: "none" as const,
     background:
-      "linear-gradient(to bottom, rgba(255,255,255,0.22) 0%, rgba(255,255,255,0) 42%, rgba(203,188,164,0.14) 100%)",
+      "linear-gradient(to bottom, rgba(255,255,255,0.18) 0%, rgba(255,255,255,0) 44%, rgba(203,188,164,0.10) 100%)",
   },
   container: {
     position: "relative",
@@ -3768,16 +3766,13 @@ const styles = {
     padding: "24px 12px 38px",
     overflow: "visible",
     borderRadius: "30px",
-    background:
-      "linear-gradient(180deg, color-mix(in srgb, var(--paper-card) 90%, transparent), color-mix(in srgb, var(--paper-warm) 62%, transparent)), var(--app-paper-background)",
-    backgroundSize:
-      "100% 100%, var(--app-paper-background-size)",
-    backgroundPosition:
-      "0 0, var(--app-paper-background-position)",
-    backgroundRepeat:
-      "no-repeat, var(--app-paper-background-repeat)",
+    backgroundImage:
+      "linear-gradient(180deg, rgba(255,252,244,0.70), rgba(250,241,222,0.42)), url('/images/ui/mainichi-board-paper.webp')",
+    backgroundSize: "100% 100%, cover",
+    backgroundPosition: "0 0, center",
+    backgroundRepeat: "no-repeat",
     boxShadow:
-      "0 1px 0 color-mix(in srgb, var(--paper-card) 82%, transparent) inset, 0 0 0 1px color-mix(in srgb, var(--line) 38%, transparent), 0 28px 58px -42px rgba(86,70,45,0.34)",
+      "0 1px 0 rgba(255,255,255,0.56) inset, 0 0 0 1px rgba(120,96,62,0.08), 0 28px 58px -42px rgba(86,70,45,0.34)",
   },
   mainichiMonthTitle: {
     margin: 0,
