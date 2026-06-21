@@ -599,7 +599,7 @@ export function CatsPage() {
       <PageBackdrop />
       <div style={styles.container}>
         <AppHeader
-          title="うちのこ"
+          showWordmark={false}
           style={styles.pageHeader}
           right={
             !isOnboardingCompletionView ? (

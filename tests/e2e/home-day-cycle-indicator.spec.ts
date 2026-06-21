@@ -164,7 +164,7 @@ test.describe("home desk state cycle", () => {
 
     await page.goto("/cats");
     await page.waitForLoadState("networkidle");
-    await expect(page.getByText("うちのこ", { exact: true }).first()).toBeVisible();
+    await expect(page.getByRole("button", { name: "うちのこを管理" })).toBeVisible();
   });
 
   test("hides the presence line even when the presence api returns a count", async ({
