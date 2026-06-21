@@ -2685,24 +2685,24 @@ function getMainichiBoardCanvasStyle(total: number): CSSProperties {
 
   if (total <= 3) {
     return {
-      height: "330px",
+      height: "320px",
     };
   }
 
   if (total <= 8) {
     return {
-      height: "500px",
+      height: "480px",
     };
   }
 
   if (total <= 16) {
     return {
-      height: "560px",
+      height: "530px",
     };
   }
 
   return {
-    height: "560px",
+    height: "620px",
   };
 }
 
@@ -2721,71 +2721,71 @@ function getMainichiBoardPhotoLayout(index: number, total: number) {
   };
 
   const sparse = [
-    { left: 24, top: 44, width: 52, rotation: "-1.2deg", tapeLeft: "52%", tapeRotation: "-4deg", zIndex: 2 },
-    { left: 8, top: 42, width: 46, rotation: "-2.2deg", shiftX: -2, tapeLeft: "48%", tapeRotation: "-5deg", zIndex: 2 },
-    { left: 51, top: 138, width: 43, rotation: "2.1deg", shiftX: 3, shiftY: 4, tapeLeft: "55%", tapeRotation: "4deg", zIndex: 3 },
-    { left: 22, top: 218, width: 42, rotation: "-1.4deg", shiftY: 4, tapeLeft: "50%", tapeRotation: "-3deg", zIndex: 1 },
+    { left: 22, top: 46, width: 56, rotation: "-1.2deg", tapeLeft: "52%", tapeRotation: "-4deg", zIndex: 2 },
+    { left: 10, top: 58, width: 51, rotation: "-2.2deg", shiftX: -2, tapeLeft: "48%", tapeRotation: "-5deg", zIndex: 3 },
+    { left: 48, top: 136, width: 45, rotation: "2.1deg", shiftX: 3, shiftY: 4, tapeLeft: "55%", tapeRotation: "4deg", zIndex: 2 },
+    { left: 21, top: 182, width: 43, rotation: "-1.4deg", shiftY: 4, tapeLeft: "50%", tapeRotation: "-3deg", zIndex: 1 },
   ] satisfies MainichiBoardSlot[];
   const loose = [
-    { left: 6, top: 32, width: 40, rotation: "-2.4deg", shiftX: -2, tapeLeft: "47%", tapeRotation: "-5deg", zIndex: 3 },
-    { left: 53, top: 56, width: 39, rotation: "1.8deg", shiftX: 3, shiftY: 8, tapeLeft: "57%", tapeRotation: "3deg", zIndex: 2 },
-    { left: 18, top: 146, width: 30, rotation: "2.4deg", shiftX: 1, tapeLeft: "51%", tapeRotation: "5deg", zIndex: 1 },
-    { left: 42, top: 176, width: 45, rotation: "-1.5deg", shiftX: -1, shiftY: 6, tapeLeft: "44%", tapeRotation: "-4deg", zIndex: 4 },
-    { left: 7, top: 300, width: 37, rotation: "1.2deg", shiftX: 4, tapeLeft: "58%", tapeRotation: "4deg", zIndex: 2 },
-    { left: 60, top: 314, width: 32, rotation: "-2deg", shiftX: -3, shiftY: 6, tapeLeft: "46%", tapeRotation: "-6deg", zIndex: 3 },
-    { left: 31, top: 264, width: 28, rotation: "-0.8deg", shiftX: 1, tapeLeft: "53%", tapeRotation: "-2deg", zIndex: 1 },
-    { left: 66, top: 150, width: 25, rotation: "1.1deg", shiftX: 2, shiftY: 4, tapeLeft: "52%", tapeRotation: "2deg", zIndex: 1 },
+    { left: 4, top: 40, width: 44, rotation: "-2.4deg", shiftX: -2, tapeLeft: "47%", tapeRotation: "-5deg", zIndex: 4 },
+    { left: 55, top: 52, width: 40, rotation: "1.8deg", shiftX: 3, shiftY: 8, tapeLeft: "57%", tapeRotation: "3deg", zIndex: 2 },
+    { left: 25, top: 138, width: 32, rotation: "2.4deg", shiftX: 1, tapeLeft: "51%", tapeRotation: "5deg", zIndex: 1 },
+    { left: 36, top: 172, width: 48, rotation: "-1.5deg", shiftX: -1, shiftY: 6, tapeLeft: "44%", tapeRotation: "-4deg", zIndex: 5 },
+    { left: 4, top: 276, width: 39, rotation: "1.2deg", shiftX: 4, tapeLeft: "58%", tapeRotation: "4deg", zIndex: 3 },
+    { left: 57, top: 292, width: 35, rotation: "-2deg", shiftX: -3, shiftY: 6, tapeLeft: "46%", tapeRotation: "-6deg", zIndex: 4 },
+    { left: 31, top: 248, width: 30, rotation: "-0.8deg", shiftX: 1, tapeLeft: "53%", tapeRotation: "-2deg", zIndex: 2 },
+    { left: 70, top: 154, width: 25, rotation: "1.1deg", shiftX: 2, shiftY: 4, tapeLeft: "52%", tapeRotation: "2deg", zIndex: 1 },
   ] satisfies MainichiBoardSlot[];
   const medium = [
-    { left: 4, top: 28, width: 31, rotation: "-2.1deg", shiftX: -1, tapeLeft: "48%", tapeRotation: "-4deg", zIndex: 4 },
-    { left: 40, top: 54, width: 25, rotation: "1.3deg", shiftX: 1, tapeLeft: "56%", tapeRotation: "3deg", zIndex: 2 },
-    { left: 67, top: 36, width: 28, rotation: "-0.9deg", shiftX: 2, shiftY: 3, tapeLeft: "51%", tapeRotation: "-2deg", zIndex: 3 },
-    { left: 13, top: 126, width: 24, rotation: "2.2deg", tapeLeft: "50%", tapeRotation: "4deg", zIndex: 1 },
-    { left: 37, top: 154, width: 39, rotation: "-1.2deg", shiftX: -1, shiftY: 6, tapeLeft: "43%", tapeRotation: "-3deg", zIndex: 6 },
-    { left: 73, top: 186, width: 21, rotation: "1.8deg", shiftX: 2, shiftY: 2, tapeLeft: "54%", tapeRotation: "3deg", zIndex: 2 },
-    { left: 5, top: 270, width: 35, rotation: "1.5deg", shiftX: -1, shiftY: 3, tapeLeft: "52%", tapeRotation: "3deg", zIndex: 4 },
-    { left: 33, top: 318, width: 25, rotation: "-1.5deg", shiftX: 1, shiftY: 2, tapeLeft: "48%", tapeRotation: "-4deg", zIndex: 2 },
-    { left: 61, top: 282, width: 33, rotation: "1deg", shiftX: 1, tapeLeft: "55%", tapeRotation: "3deg", zIndex: 5 },
-    { left: 12, top: 440, width: 24, rotation: "-2deg", tapeLeft: "47%", tapeRotation: "-5deg", zIndex: 1 },
-    { left: 39, top: 420, width: 33, rotation: "1.4deg", shiftX: 1, shiftY: 4, tapeLeft: "57%", tapeRotation: "4deg", zIndex: 5 },
-    { left: 72, top: 404, width: 22, rotation: "-0.7deg", shiftX: 1, shiftY: 2, tapeLeft: "50%", tapeRotation: "-2deg", zIndex: 2 },
-    { left: 7, top: 86, width: 19, rotation: "1.8deg", shiftX: 2, shiftY: 1, tapeLeft: "51%", tapeRotation: "2deg", zIndex: 1 },
-    { left: 25, top: 228, width: 20, rotation: "-1.1deg", shiftX: -1, tapeLeft: "49%", tapeRotation: "-3deg", zIndex: 1 },
-    { left: 55, top: 234, width: 20, rotation: "2deg", shiftX: 1, tapeLeft: "52%", tapeRotation: "4deg", zIndex: 1 },
-    { left: 4, top: 492, width: 21, rotation: "0.9deg", tapeLeft: "55%", tapeRotation: "2deg", zIndex: 1 },
+    { left: 4, top: 34, width: 35, rotation: "-2.6deg", shiftX: -1, tapeLeft: "48%", tapeRotation: "-4deg", zIndex: 6 },
+    { left: 42, top: 38, width: 24, rotation: "1.4deg", shiftX: 1, tapeLeft: "56%", tapeRotation: "3deg", zIndex: 2 },
+    { left: 70, top: 44, width: 27, rotation: "-1deg", shiftX: 2, shiftY: 3, tapeLeft: "51%", tapeRotation: "-2deg", zIndex: 3 },
+    { left: 10, top: 126, width: 23, rotation: "2.2deg", tapeLeft: "50%", tapeRotation: "4deg", zIndex: 1 },
+    { left: 31, top: 150, width: 42, rotation: "-1.2deg", shiftX: -1, shiftY: 6, tapeLeft: "43%", tapeRotation: "-3deg", zIndex: 7 },
+    { left: 75, top: 168, width: 22, rotation: "1.8deg", shiftX: 2, shiftY: 2, tapeLeft: "54%", tapeRotation: "3deg", zIndex: 2 },
+    { left: 3, top: 258, width: 36, rotation: "1.5deg", shiftX: -1, shiftY: 3, tapeLeft: "52%", tapeRotation: "3deg", zIndex: 5 },
+    { left: 35, top: 316, width: 23, rotation: "-1.5deg", shiftX: 1, shiftY: 2, tapeLeft: "48%", tapeRotation: "-4deg", zIndex: 2 },
+    { left: 60, top: 274, width: 35, rotation: "1deg", shiftX: 1, tapeLeft: "55%", tapeRotation: "3deg", zIndex: 6 },
+    { left: 12, top: 398, width: 26, rotation: "-2deg", tapeLeft: "47%", tapeRotation: "-5deg", zIndex: 1 },
+    { left: 41, top: 372, width: 34, rotation: "1.4deg", shiftX: 1, shiftY: 4, tapeLeft: "57%", tapeRotation: "4deg", zIndex: 6 },
+    { left: 72, top: 386, width: 23, rotation: "-0.7deg", shiftX: 1, shiftY: 2, tapeLeft: "50%", tapeRotation: "-2deg", zIndex: 2 },
+    { left: 18, top: 82, width: 20, rotation: "1.8deg", shiftX: 2, shiftY: 1, tapeLeft: "51%", tapeRotation: "2deg", zIndex: 1 },
+    { left: 19, top: 214, width: 21, rotation: "-1.1deg", shiftX: -1, tapeLeft: "49%", tapeRotation: "-3deg", zIndex: 1 },
+    { left: 53, top: 226, width: 21, rotation: "2deg", shiftX: 1, tapeLeft: "52%", tapeRotation: "4deg", zIndex: 1 },
+    { left: 6, top: 452, width: 22, rotation: "0.9deg", tapeLeft: "55%", tapeRotation: "2deg", zIndex: 1 },
   ] satisfies MainichiBoardSlot[];
   const full = [
-    { left: 3, top: 22, width: 24, rotation: "-2.1deg", shiftX: -1, tapeLeft: "48%", tapeRotation: "-4deg", zIndex: 4 },
-    { left: 24, top: 42, width: 18, rotation: "1.5deg", shiftX: 2, tapeLeft: "56%", tapeRotation: "3deg", zIndex: 2 },
-    { left: 41, top: 14, width: 27, rotation: "-0.8deg", shiftY: 2, tapeLeft: "51%", tapeRotation: "-2deg", zIndex: 6 },
-    { left: 68, top: 42, width: 24, rotation: "1.8deg", shiftX: 2, shiftY: 3, tapeLeft: "50%", tapeRotation: "4deg", zIndex: 3 },
-    { left: 11, top: 92, width: 19, rotation: "2.3deg", tapeLeft: "50%", tapeRotation: "4deg", zIndex: 1 },
-    { left: 29, top: 104, width: 27, rotation: "-1.2deg", shiftX: -2, shiftY: 3, tapeLeft: "43%", tapeRotation: "-3deg", zIndex: 7 },
-    { left: 55, top: 92, width: 23, rotation: "1.6deg", shiftX: 1, tapeLeft: "54%", tapeRotation: "3deg", zIndex: 2 },
-    { left: 76, top: 116, width: 18, rotation: "-1.7deg", tapeLeft: "49%", tapeRotation: "-3deg", zIndex: 1 },
-    { left: 4, top: 168, width: 28, rotation: "-2deg", shiftX: -1, tapeLeft: "47%", tapeRotation: "-5deg", zIndex: 5 },
-    { left: 27, top: 186, width: 19, rotation: "1.4deg", shiftX: 1, tapeLeft: "57%", tapeRotation: "4deg", zIndex: 3 },
-    { left: 47, top: 164, width: 26, rotation: "-1deg", shiftX: 2, tapeLeft: "50%", tapeRotation: "-2deg", zIndex: 4 },
-    { left: 73, top: 190, width: 20, rotation: "1.1deg", shiftX: 1, tapeLeft: "52%", tapeRotation: "2deg", zIndex: 1 },
-    { left: 13, top: 248, width: 22, rotation: "-1.7deg", shiftX: -1, tapeLeft: "48%", tapeRotation: "-4deg", zIndex: 2 },
-    { left: 34, top: 246, width: 29, rotation: "1.5deg", shiftX: 1, shiftY: 2, tapeLeft: "56%", tapeRotation: "3deg", zIndex: 8 },
-    { left: 62, top: 264, width: 23, rotation: "-1.2deg", shiftX: 2, tapeLeft: "51%", tapeRotation: "-2deg", zIndex: 3 },
-    { left: 3, top: 318, width: 21, rotation: "2deg", tapeLeft: "50%", tapeRotation: "4deg", zIndex: 1 },
-    { left: 23, top: 306, width: 27, rotation: "-1deg", shiftX: -1, tapeLeft: "43%", tapeRotation: "-3deg", zIndex: 4 },
-    { left: 48, top: 330, width: 23, rotation: "1.3deg", shiftX: 1, shiftY: 2, tapeLeft: "54%", tapeRotation: "3deg", zIndex: 2 },
-    { left: 70, top: 308, width: 24, rotation: "-1.5deg", tapeLeft: "48%", tapeRotation: "-4deg", zIndex: 3 },
-    { left: 8, top: 386, width: 26, rotation: "1deg", shiftX: 1, tapeLeft: "52%", tapeRotation: "3deg", zIndex: 5 },
-    { left: 32, top: 374, width: 22, rotation: "-2deg", shiftX: -1, tapeLeft: "46%", tapeRotation: "-5deg", zIndex: 1 },
-    { left: 54, top: 398, width: 28, rotation: "1.7deg", shiftX: 2, shiftY: 1, tapeLeft: "57%", tapeRotation: "4deg", zIndex: 6 },
-    { left: 4, top: 468, width: 19, rotation: "-0.9deg", tapeLeft: "50%", tapeRotation: "-2deg", zIndex: 2 },
-    { left: 22, top: 444, width: 24, rotation: "1.5deg", shiftX: 1, tapeLeft: "53%", tapeRotation: "3deg", zIndex: 4 },
-    { left: 44, top: 468, width: 20, rotation: "-1.3deg", shiftX: -1, tapeLeft: "48%", tapeRotation: "-4deg", zIndex: 2 },
-    { left: 63, top: 444, width: 26, rotation: "1deg", shiftX: 1, tapeLeft: "55%", tapeRotation: "2deg", zIndex: 5 },
-    { left: 14, top: 516, width: 18, rotation: "2deg", tapeLeft: "52%", tapeRotation: "4deg", zIndex: 1 },
-    { left: 31, top: 500, width: 23, rotation: "-1.5deg", shiftX: -1, tapeLeft: "47%", tapeRotation: "-5deg", zIndex: 4 },
-    { left: 53, top: 514, width: 20, rotation: "1.2deg", shiftX: 1, tapeLeft: "56%", tapeRotation: "3deg", zIndex: 2 },
-    { left: 72, top: 492, width: 20, rotation: "-0.8deg", tapeLeft: "50%", tapeRotation: "-2deg", zIndex: 1 },
-    { left: 2, top: 514, width: 19, rotation: "-1.2deg", shiftX: 1, tapeLeft: "52%", tapeRotation: "3deg", zIndex: 3 },
+    { left: 1, top: 28, width: 28, rotation: "-2.1deg", shiftX: -1, tapeLeft: "48%", tapeRotation: "-4deg", zIndex: 5 },
+    { left: 25, top: 48, width: 19, rotation: "1.5deg", shiftX: 2, tapeLeft: "56%", tapeRotation: "3deg", zIndex: 2 },
+    { left: 42, top: 24, width: 30, rotation: "-0.8deg", shiftY: 2, tapeLeft: "51%", tapeRotation: "-2deg", zIndex: 7 },
+    { left: 71, top: 42, width: 24, rotation: "1.8deg", shiftX: 2, shiftY: 3, tapeLeft: "50%", tapeRotation: "4deg", zIndex: 3 },
+    { left: 10, top: 100, width: 20, rotation: "2.3deg", tapeLeft: "50%", tapeRotation: "4deg", zIndex: 1 },
+    { left: 29, top: 110, width: 30, rotation: "-1.2deg", shiftX: -2, shiftY: 3, tapeLeft: "43%", tapeRotation: "-3deg", zIndex: 8 },
+    { left: 56, top: 98, width: 24, rotation: "1.6deg", shiftX: 1, tapeLeft: "54%", tapeRotation: "3deg", zIndex: 2 },
+    { left: 78, top: 126, width: 18, rotation: "-1.7deg", tapeLeft: "49%", tapeRotation: "-3deg", zIndex: 1 },
+    { left: 3, top: 178, width: 31, rotation: "-2deg", shiftX: -1, tapeLeft: "47%", tapeRotation: "-5deg", zIndex: 6 },
+    { left: 25, top: 198, width: 20, rotation: "1.4deg", shiftX: 1, tapeLeft: "57%", tapeRotation: "4deg", zIndex: 3 },
+    { left: 45, top: 172, width: 29, rotation: "-1deg", shiftX: 2, tapeLeft: "50%", tapeRotation: "-2deg", zIndex: 5 },
+    { left: 74, top: 202, width: 21, rotation: "1.1deg", shiftX: 1, tapeLeft: "52%", tapeRotation: "2deg", zIndex: 1 },
+    { left: 12, top: 270, width: 23, rotation: "-1.7deg", shiftX: -1, tapeLeft: "48%", tapeRotation: "-4deg", zIndex: 2 },
+    { left: 32, top: 260, width: 32, rotation: "1.5deg", shiftX: 1, shiftY: 2, tapeLeft: "56%", tapeRotation: "3deg", zIndex: 9 },
+    { left: 63, top: 280, width: 24, rotation: "-1.2deg", shiftX: 2, tapeLeft: "51%", tapeRotation: "-2deg", zIndex: 3 },
+    { left: 1, top: 340, width: 22, rotation: "2deg", tapeLeft: "50%", tapeRotation: "4deg", zIndex: 1 },
+    { left: 22, top: 324, width: 28, rotation: "-1deg", shiftX: -1, tapeLeft: "43%", tapeRotation: "-3deg", zIndex: 4 },
+    { left: 48, top: 354, width: 24, rotation: "1.3deg", shiftX: 1, shiftY: 2, tapeLeft: "54%", tapeRotation: "3deg", zIndex: 2 },
+    { left: 71, top: 330, width: 25, rotation: "-1.5deg", tapeLeft: "48%", tapeRotation: "-4deg", zIndex: 4 },
+    { left: 6, top: 414, width: 27, rotation: "1deg", shiftX: 1, tapeLeft: "52%", tapeRotation: "3deg", zIndex: 5 },
+    { left: 32, top: 396, width: 22, rotation: "-2deg", shiftX: -1, tapeLeft: "46%", tapeRotation: "-5deg", zIndex: 1 },
+    { left: 54, top: 424, width: 29, rotation: "1.7deg", shiftX: 2, shiftY: 1, tapeLeft: "57%", tapeRotation: "4deg", zIndex: 6 },
+    { left: 0, top: 500, width: 20, rotation: "-0.9deg", tapeLeft: "50%", tapeRotation: "-2deg", zIndex: 2 },
+    { left: 20, top: 472, width: 25, rotation: "1.5deg", shiftX: 1, tapeLeft: "53%", tapeRotation: "3deg", zIndex: 4 },
+    { left: 43, top: 504, width: 21, rotation: "-1.3deg", shiftX: -1, tapeLeft: "48%", tapeRotation: "-4deg", zIndex: 2 },
+    { left: 64, top: 474, width: 27, rotation: "1deg", shiftX: 1, tapeLeft: "55%", tapeRotation: "2deg", zIndex: 5 },
+    { left: 12, top: 548, width: 19, rotation: "2deg", tapeLeft: "52%", tapeRotation: "4deg", zIndex: 1 },
+    { left: 30, top: 532, width: 24, rotation: "-1.5deg", shiftX: -1, tapeLeft: "47%", tapeRotation: "-5deg", zIndex: 4 },
+    { left: 52, top: 550, width: 21, rotation: "1.2deg", shiftX: 1, tapeLeft: "56%", tapeRotation: "3deg", zIndex: 2 },
+    { left: 72, top: 526, width: 21, rotation: "-0.8deg", tapeLeft: "50%", tapeRotation: "-2deg", zIndex: 1 },
+    { left: 2, top: 558, width: 19, rotation: "-1.2deg", shiftX: 1, tapeLeft: "52%", tapeRotation: "3deg", zIndex: 3 },
   ] satisfies MainichiBoardSlot[];
   const template: MainichiBoardSlot[] =
     total <= 1
@@ -2802,10 +2802,10 @@ function getMainichiBoardPhotoLayout(index: number, total: number) {
   const repeat = Math.floor(index / template.length);
   const verticalScale =
     total <= 8
-      ? 0.88
+      ? 0.92
       : total <= 16
-        ? 0.98
-        : 0.9;
+        ? 0.96
+        : 0.92;
   const top = Math.max(
     0,
     Math.round(layout.top * verticalScale) - (total > 1 ? 20 : 0) + repeat * 18,
@@ -3765,7 +3765,7 @@ const styles = {
   mainichiMonthBoard: {
     display: "grid",
     gap: "14px",
-    padding: "24px 16px 34px",
+    padding: "24px 12px 38px",
     overflow: "visible",
     borderRadius: "30px",
     background:
@@ -3793,7 +3793,7 @@ const styles = {
     overflow: "visible",
     margin: "0 auto",
     width: "100%",
-    maxWidth: "372px",
+    maxWidth: "430px",
   },
   mainichiBoardPhotoButton: {
     position: "absolute",
@@ -3844,13 +3844,19 @@ const styles = {
       "0 0 0 0.5px rgba(74,56,34,0.08) inset, 0 2px 5px rgba(86,70,45,0.10), 0 12px 22px -16px rgba(76,62,42,0.34)",
   },
   mainichiBoardPhotoCatBadge: {
+    position: "absolute",
+    zIndex: 3,
+    left: "50%",
+    bottom: "12px",
+    transform: "translateX(-50%)",
     justifySelf: "center",
     minHeight: "20px",
-    padding: "2px 8px",
+    padding: "2px 9px",
     borderRadius: "var(--radius-full)",
-    background: "color-mix(in srgb, var(--paper-card) 72%, transparent)",
+    background: "color-mix(in srgb, var(--paper-card) 84%, transparent)",
     color: "var(--ink-soft)",
-    boxShadow: "0 1px 0 color-mix(in srgb, var(--paper-card) 72%, transparent) inset",
+    boxShadow:
+      "0 1px 0 color-mix(in srgb, var(--paper-card) 74%, transparent) inset, 0 4px 10px -8px rgba(62,48,32,0.28)",
     fontFamily: "var(--font-ui)",
     fontSize: "10px",
     fontWeight: 500,
