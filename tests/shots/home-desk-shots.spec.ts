@@ -39,6 +39,9 @@ const expectedShotNames = [
 
 const ownDataUrl = readFixtureDataUrl("cat-photo-mugi.jpg");
 const deliveredDataUrl = readFixtureDataUrl("cat-photo-letter.jpg");
+const mainichiBoardDataUrls = Array.from({ length: 12 }, (_, index) =>
+  readFixtureDataUrl(`mainichi-board-${String(index + 1).padStart(2, "0")}.png`),
+);
 
 test.beforeAll(() => {
   const normalizedShotsDir = path.normalize(shotsDir);
@@ -661,7 +664,7 @@ async function seedMainichiBoardPhotoCount(
   side: "sent" | "delivered" = "sent",
 ) {
   await page.addInitScript(
-    ({ count, side, ownDataUrl, deliveredDataUrl }) => {
+    ({ count, side, ownDataUrl, deliveredDataUrl, mainichiBoardDataUrls }) => {
       const now = Date.parse("2026-06-20T12:00:00.000Z");
       (window as typeof window & { __testNow?: number }).__testNow = now;
       const originalDateNow = Date.now.bind(Date);
@@ -683,7 +686,6 @@ async function seedMainichiBoardPhotoCount(
           updatedAt: new Date(Date.parse("2026-06-01T00:00:00.000Z")).toISOString(),
         },
       ];
-
       const photos = Array.from({ length: count }, (_, index) => {
         const month = count === 31 ? "07" : "06";
         const day = count === 31 ? 31 - index : count - index;
@@ -697,7 +699,12 @@ async function seedMainichiBoardPhotoCount(
           id: `mainichi-shot-${index}`,
           ownerCatId: cat.id,
           catId: cat.id,
-          src: index % 2 === 0 ? ownDataUrl : deliveredDataUrl,
+          src:
+            index % 9 === 0
+              ? ownDataUrl
+              : index % 9 === 4
+                ? deliveredDataUrl
+                : mainichiBoardDataUrls[index % mainichiBoardDataUrls.length],
           state: "sleeping",
           visibility: "private",
           deliveryStatus: "available",
@@ -757,7 +764,7 @@ async function seedMainichiBoardPhotoCount(
         JSON.stringify(keptPhotos),
       );
     },
-    { count, side, ownDataUrl, deliveredDataUrl },
+    { count, side, ownDataUrl, deliveredDataUrl, mainichiBoardDataUrls },
   );
 }
 
