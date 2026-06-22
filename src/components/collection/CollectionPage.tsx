@@ -2814,18 +2814,18 @@ function getMainichiBoardPhotoLayout(index: number, total: number) {
   );
   const width =
     total > 16
-      ? Math.max(16, Math.round(layout.width * 0.88))
+      ? Math.max(20, Math.round(layout.width * 0.88))
       : total > 8
-        ? Math.max(20, Math.round(layout.width * 0.95))
+        ? Math.max(24, Math.round(layout.width * 0.95))
         : layout.width;
   const borderWidth =
-    width <= 22 ? "2px" : width <= 34 ? "3px" : "4px";
+    width <= 27 ? "2px" : width <= 34 ? "3px" : "4px";
   const tapedBorderWidth =
-    width <= 24 ? "2px" : "3px";
+    width <= 27 ? "2px" : "3px";
   const borderRadius =
-    width <= 22 ? "8px" : width <= 34 ? "10px" : "12px";
+    width <= 22 ? "7px" : width <= 27 ? "8px" : width <= 34 ? "10px" : "12px";
   const tapedBorderRadius =
-    width <= 24 ? "8px" : "10px";
+    width <= 24 ? "7px" : width <= 27 ? "8px" : "10px";
 
   return {
     left: `${layout.left}%`,
@@ -3788,14 +3788,14 @@ const styles = {
     padding: "26px 14px 44px",
     overflow: "visible",
     borderRadius: "32px",
-    backgroundColor: "color-mix(in srgb, var(--paper-card) 72%, var(--paper-warm) 28%)",
+    backgroundColor: "rgba(248, 243, 234, 0.9)",
     backgroundImage:
-      "linear-gradient(180deg, rgba(255,252,244,0.18), rgba(245,232,207,0.12)), radial-gradient(120% 90% at 38% 18%, rgba(255,247,224,0.12), transparent 60%), url('/images/ui/mainichi-board-paper-v2.webp')",
+      "linear-gradient(180deg, rgba(255,252,244,0.16), rgba(245,232,207,0.10)), radial-gradient(120% 90% at 38% 18%, rgba(255,247,224,0.10), transparent 62%), url('/images/ui/mainichi-board-paper-v2.webp')",
     backgroundSize: "100% 100%, 100% 100%, 100% 100%",
     backgroundPosition: "0 0, 0 0, center",
     backgroundRepeat: "no-repeat, no-repeat, no-repeat",
     boxShadow:
-      "0 1px 0 rgba(255,255,255,0.62) inset, 0 0 0 1px rgba(120,96,62,0.10), 0 30px 62px -44px rgba(86,70,45,0.36)",
+      "0 1px 0 rgba(255,255,255,0.58) inset, 0 0 0 1px rgba(128,104,72,0.10), 0 18px 44px -34px rgba(76,62,42,0.42)",
   },
   mainichiMonthTitle: {
     margin: 0,
