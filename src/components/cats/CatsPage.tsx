@@ -101,6 +101,7 @@ const CATS_SURFACE_SOFT: CSSProperties = {
 };
 const ONBOARDING_ALBUM_COMPLETION_READY_KEY =
   "neteruneko_onboarding_album_completion_ready";
+const SHOW_LEGACY_DETAIL_SECTIONS = false;
 
 export function CatsPage() {
   const [catProfiles, setCatProfiles] = useState<CatProfile[]>([]);
@@ -732,7 +733,7 @@ export function CatsPage() {
                         onClick={() => setIsCatManageOpen(true)}
                         aria-label="うちのこを管理"
                       >
-                        …
+                        <MoreDotsIcon />
                       </AppButton>
                     ) : null}
                   </div>
@@ -914,6 +915,8 @@ export function CatsPage() {
                 setOmoideRefreshTick((value) => value + 1);
               }}
             />
+            {SHOW_LEGACY_DETAIL_SECTIONS ? (
+              <>
             <AppCard
               as="section"
               variant="section"
@@ -975,6 +978,8 @@ export function CatsPage() {
                 </div>
               </div>
             </AppCard>
+              </>
+            ) : null}
             {!activeCatProfile.basicInfo?.familySinceDate &&
             !activeCatProfile.basicInfo?.birthDate &&
             !activeCatProfile.basicInfo?.breed &&
@@ -1480,7 +1485,7 @@ function OmoideBunbako({
           onClick={() => setIsControlsOpen(true)}
           aria-label="思い出の設定"
         >
-          …
+          <MoreDotsIcon />
         </AppButton>
       </div>
       {memories.length > 0 ? (
@@ -1949,6 +1954,24 @@ function PencilSmallIcon() {
         strokeWidth="1.75"
         strokeLinecap="round"
       />
+    </svg>
+  );
+}
+
+function MoreDotsIcon() {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      width="19"
+      height="19"
+      fill="none"
+      aria-hidden="true"
+      focusable="false"
+      style={{ display: "block" }}
+    >
+      <circle cx="6.5" cy="12" r="1.45" fill="currentColor" />
+      <circle cx="12" cy="12" r="1.45" fill="currentColor" />
+      <circle cx="17.5" cy="12" r="1.45" fill="currentColor" />
     </svg>
   );
 }
