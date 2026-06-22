@@ -178,7 +178,6 @@ export function CatsPage() {
     isOnboardingMode && isOnboardingCompletionReady && !isEditingProfile;
   const canManageCats = !isOnboardingProfileSetup && !isOnboardingCompletionView;
   const shouldShowCatSwitchButton = catProfiles.length > 1 && canManageCats;
-  const shouldShowSingleCatAdd = catProfiles.length === 1 && canManageCats;
   const shouldShowCatIconSwitcher =
     catProfiles.length > 1 &&
     canManageCats &&
@@ -693,9 +692,7 @@ export function CatsPage() {
         ) : null}
 
         {activeCatProfile && !isOnboardingCompletionView ? (
-          <AppCard
-            variant="section"
-            padding="standard"
+          <div
             style={
               isOnboardingProfileSetup
                 ? styles.profileCard
@@ -725,12 +722,17 @@ export function CatsPage() {
                     />
                   </button>
                   <div style={styles.profileHeroInfo}>
-                    <div style={styles.profileName}>{activeCatProfile.name}</div>
-                    {familyDuration.primary !== "未設定" ? (
-                      <div style={styles.profileMetaLine}>
-                        {familyDuration.secondary || familyDuration.primary}
-                      </div>
-                    ) : null}
+                    <div style={styles.profileNameRow}>
+                      <div style={styles.profileName}>{activeCatProfile.name}</div>
+                      {shouldShowCatIconSwitcher ? (
+                        <CatIconSwitcher
+                          profiles={catProfiles}
+                          activeCatId={activeCatId}
+                          onSelect={handleCatSelect}
+                          onOpenMore={() => setIsCatSwitcherOpen(true)}
+                        />
+                      ) : null}
+                    </div>
                   </div>
                   <div style={styles.profileHeroActions}>
                     {canManageCats ? (
@@ -747,14 +749,6 @@ export function CatsPage() {
                     ) : null}
                   </div>
                 </div>
-                {shouldShowCatIconSwitcher ? (
-                  <CatIconSwitcher
-                    profiles={catProfiles}
-                    activeCatId={activeCatId}
-                    onSelect={handleCatSelect}
-                    onOpenMore={() => setIsCatSwitcherOpen(true)}
-                  />
-                ) : null}
               </>
             ) : null}
 
@@ -839,21 +833,18 @@ export function CatsPage() {
                 ) : null}
               </>
             ) : null}
-          </AppCard>
+          </div>
         ) : null}
 
         {activeCatProfile && !isOnboardingCompletionView ? (
-          <AppSegmented<UchinokoSection>
+          <UchinokoSectionTabs
             value={activeSection}
-            ariaLabel="うちのこの中身"
-            columns={3}
             onChange={setActiveSection}
             options={[
               { value: "record", label: "記録" },
               { value: "photos", label: "写真" },
               { value: "basic", label: "基本情報" },
             ]}
-            style={styles.sectionSwitch}
           />
         ) : null}
 
@@ -1615,6 +1606,45 @@ function AllCatsLensView({
         onOpenAll={onOpenAll}
       />
     </section>
+  );
+}
+
+function UchinokoSectionTabs({
+  value,
+  onChange,
+  options,
+}: {
+  value: UchinokoSection;
+  onChange: (value: UchinokoSection) => void;
+  options: { value: UchinokoSection; label: string }[];
+}) {
+  return (
+    <div
+      role="radiogroup"
+      aria-label="うちのこの中身"
+      style={styles.sectionTabs}
+    >
+      {options.map((option) => {
+        const selected = option.value === value;
+
+        return (
+          <button
+            key={option.value}
+            type="button"
+            role="radio"
+            aria-checked={selected}
+            onClick={() => onChange(option.value)}
+            style={
+              selected
+                ? { ...styles.sectionTabButton, ...styles.sectionTabButtonActive }
+                : styles.sectionTabButton
+            }
+          >
+            {option.label}
+          </button>
+        );
+      })}
+    </div>
   );
 }
 
@@ -2800,13 +2830,19 @@ const styles = {
     marginTop: "18px",
   },
   profileCard: {
-    marginBottom: "14px",
-    background: CATS_PANEL_BACKGROUND,
+    marginBottom: "10px",
+    padding: "13px 16px",
+    borderRadius: "28px",
+    background: "color-mix(in srgb, var(--paper-card) 46%, transparent)",
+    boxShadow: "0 10px 30px -26px color-mix(in srgb, var(--ink) 22%, transparent)",
     backdropFilter: "none",
   },
   profilePlaceCard: {
-    marginBottom: "14px",
-    background: CATS_PANEL_BACKGROUND,
+    marginBottom: "10px",
+    padding: "13px 16px",
+    borderRadius: "28px",
+    background: "color-mix(in srgb, var(--paper-card) 46%, transparent)",
+    boxShadow: "0 10px 30px -26px color-mix(in srgb, var(--ink) 22%, transparent)",
     backdropFilter: "none",
   },
   sectionSwitch: {
@@ -2815,15 +2851,48 @@ const styles = {
   photoLensSwitch: {
     margin: "0 0 12px",
   },
+  sectionTabs: {
+    display: "grid",
+    gridTemplateColumns: "repeat(3, minmax(0, 1fr))",
+    alignItems: "center",
+    gap: 0,
+    minHeight: "44px",
+    margin: "0 0 12px",
+    padding: "3px",
+    borderRadius: "999px",
+    border: "1px solid color-mix(in srgb, var(--ink) 10%, transparent)",
+    background: "color-mix(in srgb, var(--paper-card) 34%, transparent)",
+    boxShadow: "inset 0 1px 0 color-mix(in srgb, var(--paper) 38%, transparent)",
+  },
+  sectionTabButton: {
+    minWidth: 0,
+    minHeight: "38px",
+    padding: "0 10px",
+    border: "none",
+    borderRadius: "999px",
+    background: "transparent",
+    color: CATS_MUTED,
+    fontFamily: CATS_UI,
+    fontSize: "13px",
+    fontWeight: 400,
+    letterSpacing: CATS_BODY_TRACKING,
+    cursor: "pointer",
+  },
+  sectionTabButtonActive: {
+    color: CATS_TEXT_STRONG,
+    background: "color-mix(in srgb, var(--paper-card) 78%, transparent)",
+    boxShadow:
+      "0 1px 2px color-mix(in srgb, var(--ink) 7%, transparent), 0 7px 18px -16px color-mix(in srgb, var(--ink) 22%, transparent)",
+  },
   profileHero: {
     display: "grid",
-    gridTemplateColumns: "58px 1fr auto",
+    gridTemplateColumns: "46px 1fr auto",
     alignItems: "center",
-    gap: "12px",
+    gap: "10px",
   },
   profileHeroAvatar: {
-    width: "58px",
-    height: "58px",
+    width: "46px",
+    height: "46px",
     display: "flex",
     alignItems: "center",
     justifyContent: "center",
@@ -2833,29 +2902,35 @@ const styles = {
     cursor: "pointer",
   },
   profileHeroAvatarTileRoot: {
-    width: "58px",
-    height: "58px",
+    width: "46px",
+    height: "46px",
   },
   profileHeroAvatarPhotoTile: {
-    width: "58px",
-    height: "58px",
-    border: "2px solid color-mix(in srgb, var(--paper-card) 88%, transparent)",
+    width: "46px",
+    height: "46px",
+    border: "1.5px solid color-mix(in srgb, var(--paper-card) 88%, transparent)",
     boxShadow:
-      "0 1px 3px color-mix(in srgb, var(--ink) 10%, transparent), 0 6px 18px -14px color-mix(in srgb, var(--ink) 24%, transparent)",
+      "0 1px 3px color-mix(in srgb, var(--ink) 8%, transparent), 0 6px 16px -14px color-mix(in srgb, var(--ink) 20%, transparent)",
   },
   profileHeroAvatarIconTile: {
-    width: "58px",
-    height: "58px",
+    width: "46px",
+    height: "46px",
     padding: "5px",
     boxSizing: "border-box",
-    border: "2px solid color-mix(in srgb, var(--paper-card) 88%, transparent)",
+    border: "1.5px solid color-mix(in srgb, var(--paper-card) 88%, transparent)",
     boxShadow:
-      "0 1px 3px color-mix(in srgb, var(--ink) 10%, transparent), 0 6px 18px -14px color-mix(in srgb, var(--ink) 24%, transparent)",
+      "0 1px 3px color-mix(in srgb, var(--ink) 8%, transparent), 0 6px 16px -14px color-mix(in srgb, var(--ink) 20%, transparent)",
   },
   profileHeroInfo: {
     minWidth: 0,
     display: "grid",
     gap: "3px",
+  },
+  profileNameRow: {
+    minWidth: 0,
+    display: "flex",
+    alignItems: "center",
+    gap: "12px",
   },
   profileName: {
     fontFamily: CATS_SERIF,
@@ -2876,22 +2951,20 @@ const styles = {
   catIconSwitcher: {
     display: "flex",
     alignItems: "center",
-    justifyContent: "center",
-    gap: "9px",
-    marginTop: "14px",
-    paddingTop: "12px",
-    borderTop: "1px solid color-mix(in srgb, var(--ink) 8%, transparent)",
+    justifyContent: "flex-start",
+    gap: "6px",
+    minWidth: 0,
   },
   catIconSwitchButton: {
-    width: "38px",
-    height: "38px",
+    width: "32px",
+    height: "32px",
     display: "inline-flex",
     alignItems: "center",
     justifyContent: "center",
-    padding: "6px",
+    padding: "5px",
     borderRadius: "999px",
     border: "1px solid color-mix(in srgb, var(--ink) 10%, transparent)",
-    background: "color-mix(in srgb, var(--paper-card) 70%, transparent)",
+    background: "color-mix(in srgb, var(--paper-card) 48%, transparent)",
     color: CATS_MUTED,
     boxShadow: "none",
     cursor: "pointer",
@@ -2900,20 +2973,20 @@ const styles = {
   catIconSwitchButtonActive: {
     opacity: 1,
     border: "1px solid color-mix(in srgb, var(--seal) 44%, transparent)",
-    background: "color-mix(in srgb, var(--paper-card) 92%, transparent)",
+    background: "color-mix(in srgb, var(--paper-card) 88%, transparent)",
     boxShadow:
-      "0 0 0 3px color-mix(in srgb, var(--seal) 10%, transparent), 0 6px 18px -15px color-mix(in srgb, var(--ink) 30%, transparent)",
+      "0 0 0 2px color-mix(in srgb, var(--seal) 10%, transparent), 0 6px 16px -15px color-mix(in srgb, var(--ink) 28%, transparent)",
   },
   catIconSwitchImage: {
-    width: "25px",
-    height: "25px",
+    width: "22px",
+    height: "22px",
     display: "block",
     objectFit: "contain",
   },
   catIconSwitchMore: {
-    width: "38px",
-    height: "38px",
-    minWidth: "38px",
+    width: "32px",
+    height: "32px",
+    minWidth: "32px",
   },
   catSwitchMaskIcon: {
     width: "20px",

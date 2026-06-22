@@ -390,6 +390,17 @@ export function HomeDeskModel({
       aria-label="きょう"
     >
       <div style={deskStyles.viewportBackdrop} aria-hidden="true" />
+      <AppButton
+        href="/settings"
+        variant="ghost"
+        size="icon"
+        shape="pill"
+        iconOnly
+        aria-label="設定"
+        style={deskStyles.settingsShortcut}
+      >
+        <AppIcon name="settings" size={16} />
+      </AppButton>
       <div style={deskStyles.stage}>
         <div
           style={{
@@ -1777,6 +1788,24 @@ const deskStyles = {
     backgroundRepeat: HOME_SKY_BACKGROUND_REPEAT,
     transition:
       "background var(--home-daylight-transition, 1800ms) var(--ease-gentle)",
+  },
+  settingsShortcut: {
+    position: "fixed",
+    zIndex: 8,
+    top: "calc(env(safe-area-inset-top) + 14px)",
+    right: "20px",
+    width: "34px",
+    height: "34px",
+    minWidth: "34px",
+    minHeight: "34px",
+    padding: 0,
+    color: "color-mix(in srgb, var(--ink) 66%, transparent)",
+    background:
+      "color-mix(in srgb, var(--paper-card) 48%, transparent)",
+    border: "1px solid color-mix(in srgb, var(--ink) 8%, transparent)",
+    boxShadow: "0 10px 24px -20px rgba(70, 50, 30, 0.38)",
+    backdropFilter: "blur(10px)",
+    WebkitBackdropFilter: "blur(10px)",
   },
   stage: {
     position: "relative",
