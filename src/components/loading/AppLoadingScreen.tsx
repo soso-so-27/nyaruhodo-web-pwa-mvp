@@ -7,56 +7,112 @@ type AppLoadingScreenProps = {
 
 export function AppLoadingScreen({ variant }: AppLoadingScreenProps) {
   const isHome = variant === "home";
-  const isCats = variant === "cats";
   const isCollection = variant === "collection";
+  const isCats = variant === "cats";
   const isAccount = variant === "account";
   const isStartup = variant === "startup";
-  const activeNav = isHome
-    ? "today"
-    : isCollection
-      ? "collection"
-      : "cats";
+  const activeNav = isHome ? "today" : isCollection ? "collection" : "cats";
 
   return (
-    <main style={styles.page}>
+    <main style={styles.page} aria-busy="true">
       <div style={styles.paperBackground} aria-hidden="true" />
-      <div style={styles.paperNoise} aria-hidden="true" />
-      {isStartup ? null : <div style={styles.topBar}>ねてるねこ</div>}
+      <div style={styles.paperBreath} className="loading-paper-breath" aria-hidden="true" />
 
       <div style={styles.container}>
+        {isStartup ? <StartupLoading /> : null}
         {isHome ? <HomeLoading /> : null}
         {isCollection ? <CollectionLoading /> : null}
         {isCats ? <CatsLoading /> : null}
         {isAccount ? <AccountLoading /> : null}
-        {isStartup ? <StartupLoading /> : null}
       </div>
 
       <style>{`
-        @keyframes paperLoading {
-          0% { background-position: 180% 0; }
-          100% { background-position: -180% 0; }
+        .loading-sheen {
+          position: relative;
+          overflow: hidden;
+        }
+
+        .loading-sheen::after {
+          content: "";
+          position: absolute;
+          inset: -24% -68%;
+          pointer-events: none;
+          transform: translateX(-140%);
+          background: linear-gradient(
+            105deg,
+            transparent 35%,
+            color-mix(in srgb, var(--paper, #fffdf8) 54%, transparent) 50%,
+            transparent 66%
+          );
+          animation: loadingSheen 2.8s ease-in-out infinite;
+        }
+
+        @keyframes loadingSheen {
+          0% { transform: translateX(-140%); opacity: 0; }
+          18% { opacity: .58; }
+          70% { opacity: .36; }
+          100% { transform: translateX(140%); opacity: 0; }
+        }
+
+        @keyframes loadingBreath {
+          0%, 100% { opacity: .5; transform: translate3d(-1.2%, -.7%, 0) scale(1); }
+          50% { opacity: .82; transform: translate3d(1.4%, .9%, 0) scale(1.03); }
+        }
+
+        @keyframes loadingEnvelopePulse {
+          0%, 100% { box-shadow: 0 10px 22px -18px rgba(120, 70, 52, .2); }
+          50% { box-shadow: 0 13px 26px -16px rgba(194, 116, 90, .28); }
+        }
+
+        @media (prefers-reduced-motion: reduce) {
+          .loading-sheen::after,
+          .loading-paper-breath,
+          .loading-envelope-pulse {
+            animation: none !important;
+          }
         }
       `}</style>
+
       {isAccount || isStartup ? null : <BottomNavigation active={activeNav} />}
     </main>
   );
 }
 
+function StartupLoading() {
+  return (
+    <section style={styles.startupStage} aria-label="ねてるねこを起動中">
+      <div style={styles.launchFrame} className="loading-sheen">
+        <img
+          src="/illustrations/sleeping-cat-empty.png"
+          alt=""
+          aria-hidden="true"
+          style={styles.launchCat}
+        />
+        <p style={styles.launchTitle}>ねてるねこ</p>
+      </div>
+    </section>
+  );
+}
+
 function HomeLoading() {
   return (
-    <section style={styles.homeStage} aria-label="しゃしんを読み込み中">
-      <div style={styles.homeCopy}>
-        <div style={styles.titleLineLarge} />
-        <div style={styles.copyLine} />
-        <div style={styles.copyLineShort} />
+    <section style={styles.homeStage} aria-label="きょうを読み込み中">
+      <div style={styles.homeFrame} className="loading-sheen">
+        <img
+          src="/illustrations/sleeping-cat-empty.png"
+          alt=""
+          aria-hidden="true"
+          style={styles.homeCat}
+        />
       </div>
-      <div style={styles.cameraCircle}>
-        <div style={styles.cameraIconLine} />
-      </div>
-      <div style={styles.statGrid}>
-        <div style={styles.statCard} />
-        <div style={styles.statCard} />
-        <div style={styles.statCard} />
+      <div style={styles.homeTray}>
+        <div style={styles.compactLetter} className="loading-envelope-pulse" aria-hidden="true">
+          <span style={styles.letterSeal} />
+        </div>
+        <div style={styles.trayLines} aria-hidden="true">
+          <span style={styles.trayLineLong} className="loading-sheen" />
+          <span style={styles.trayLineShort} className="loading-sheen" />
+        </div>
       </div>
     </section>
   );
@@ -64,22 +120,17 @@ function HomeLoading() {
 
 function CollectionLoading() {
   return (
-    <section style={styles.pageStage} aria-label="アルバムを読み込み中">
-      <div style={styles.pageTitleLine} />
-      <div style={styles.albumSection}>
-        <div style={styles.sectionTitleLine} />
-        <div style={styles.thumbRow}>
-          <div style={styles.thumb} />
-          <div style={styles.thumb} />
-          <div style={styles.thumb} />
-        </div>
+    <section style={styles.pageStage} aria-label="まいにちを読み込み中">
+      <div style={styles.segmentGhost} aria-hidden="true">
+        <span style={styles.segmentPill} />
+        <span style={styles.segmentPillSoft} />
       </div>
-      <div style={styles.albumSection}>
-        <div style={styles.sectionTitleLineShort} />
-        <div style={styles.thumbRow}>
-          <div style={styles.thumb} />
-          <div style={styles.thumb} />
-          <div style={styles.thumbMuted} />
+      <div style={styles.boardPaper}>
+        <span style={styles.monthLine} className="loading-sheen" />
+        <div style={styles.boardCluster}>
+          {boardPhotoLayouts.map((layout, index) => (
+            <span key={index} style={{ ...styles.boardPhoto, ...layout }} className="loading-sheen" />
+          ))}
         </div>
       </div>
     </section>
@@ -88,24 +139,26 @@ function CollectionLoading() {
 
 function CatsLoading() {
   return (
-    <section style={styles.pageStage} aria-label="ねこを読み込み中">
-      <div style={styles.pageTitleLine} />
-      <div style={styles.avatarRail}>
-        <div style={styles.avatarItem} />
-        <div style={styles.avatarItem} />
-        <div style={styles.avatarItem} />
+    <section style={styles.pageStage} aria-label="うちのこを読み込み中">
+      <div style={styles.catHeader}>
+        <span style={styles.avatarGhost} className="loading-sheen" />
+        <span style={styles.nameGhost} className="loading-sheen" />
+        <span style={styles.smallCircleGhost} />
       </div>
-      <div style={styles.profileCard}>
-        <div style={styles.profilePhoto} />
-        <div style={styles.profileLines}>
-          <div style={styles.profileNameLine} />
-          <div style={styles.profileSmallLine} />
+      <div style={styles.recordPaper}>
+        <span style={styles.kickerLine} className="loading-sheen" />
+        <span style={styles.titleLine} className="loading-sheen" />
+        <div style={styles.metricGrid}>
+          <span style={styles.metricGhost} />
+          <span style={styles.metricGhost} />
+          <span style={styles.metricGhost} />
+          <span style={styles.metricGhost} />
         </div>
       </div>
-      <div style={styles.infoList}>
-        <div style={styles.infoRow} />
-        <div style={styles.infoRow} />
-        <div style={styles.infoRow} />
+      <div style={styles.photoGridGhost}>
+        {Array.from({ length: 6 }, (_, index) => (
+          <span key={index} style={styles.squareGhost} className="loading-sheen" />
+        ))}
       </div>
     </section>
   );
@@ -114,368 +167,329 @@ function CatsLoading() {
 function AccountLoading() {
   return (
     <section style={styles.accountStage} aria-label="アカウントを確認中">
-      <div style={styles.accountMark}>
-        <div style={styles.accountDot} />
-      </div>
-      <div style={styles.accountTitleLine} />
-      <div style={styles.accountCopyLine} />
-      <div style={styles.accountList}>
-        <div style={styles.accountRow} />
-        <div style={styles.accountRow} />
-        <div style={styles.accountRow} />
+      <div style={styles.accountPaper}>
+        <span style={styles.accountSeal} />
+        <span style={styles.accountTitle} className="loading-sheen" />
+        <span style={styles.accountCopy} className="loading-sheen" />
       </div>
     </section>
   );
 }
 
-function StartupLoading() {
-  return (
-    <section style={styles.startupStage} aria-label="ねてるねこを起動中">
-      <div style={styles.startupMark}>
-        <div style={styles.startupMarkInner} />
-      </div>
-      <p style={styles.startupTitle}>ねてるねこ</p>
-      <div style={styles.startupLine} />
-    </section>
-  );
-}
-
-const shimmerBase: CSSProperties = {
-  background:
-    "linear-gradient(90deg, rgba(169,149,126,0.055) 25%, rgba(255,253,248,0.58) 50%, rgba(169,149,126,0.055) 75%)",
-  backgroundSize: "200% 100%",
-  animation: "paperLoading 1.9s infinite",
-  border: "1px solid rgba(144,126,102,0.08)",
-  boxShadow: "0 6px 14px rgba(90,76,60,0.03)",
+const paperSurface: CSSProperties = {
+  background: "color-mix(in srgb, var(--paper-card) 72%, rgba(255,255,255,.16))",
+  border: "1px solid color-mix(in srgb, var(--ink) 7%, transparent)",
+  boxShadow:
+    "0 1px 0 rgba(255,255,255,.46) inset, 0 18px 46px -34px rgba(70,50,30,.34)",
 };
 
-const paperCard: CSSProperties = {
-  background: "rgba(255,253,248,0.54)",
-  border: "1px solid rgba(144,126,102,0.09)",
-  boxShadow: "0 6px 14px rgba(90,76,60,0.03)",
+const shimmerSurface: CSSProperties = {
+  position: "relative",
+  overflow: "hidden",
+  background: "linear-gradient(180deg, rgba(255,253,248,.44), rgba(241,232,214,.28))",
+  border: "1px solid color-mix(in srgb, var(--ink) 7%, transparent)",
 };
+
+const boardPhotoLayouts: CSSProperties[] = [
+  { left: "11%", top: "24%", width: "116px", height: "112px", transform: "rotate(-5deg)" },
+  { left: "46%", top: "19%", width: "96px", height: "92px", transform: "rotate(3deg)" },
+  { left: "66%", top: "34%", width: "120px", height: "112px", transform: "rotate(4deg)" },
+  { left: "24%", top: "49%", width: "108px", height: "104px", transform: "rotate(6deg)" },
+  { left: "51%", top: "56%", width: "128px", height: "118px", transform: "rotate(-4deg)" },
+  { left: "15%", top: "71%", width: "92px", height: "88px", transform: "rotate(-3deg)" },
+  { left: "66%", top: "75%", width: "92px", height: "88px", transform: "rotate(5deg)" },
+];
 
 const styles = {
   page: {
     position: "relative",
+    minHeight: "100dvh",
     height: "100dvh",
     overflow: "hidden",
+    color: "var(--ink)",
+    fontFamily: "var(--font-ui)",
     background: "var(--app-paper-background)",
     backgroundSize: "var(--app-paper-background-size)",
     backgroundPosition: "var(--app-paper-background-position)",
     backgroundRepeat: "var(--app-paper-background-repeat)",
-    color: "#332c26",
-    fontFamily:
-      'Outfit, "Zen Kaku Gothic New", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
   },
   paperBackground: {
     position: "fixed",
     inset: 0,
-    zIndex: 0,
     pointerEvents: "none",
     background: "var(--app-paper-background)",
     backgroundSize: "var(--app-paper-background-size)",
     backgroundPosition: "var(--app-paper-background-position)",
     backgroundRepeat: "var(--app-paper-background-repeat)",
   },
-  paperNoise: {
+  paperBreath: {
     position: "fixed",
-    inset: 0,
-    zIndex: 1,
+    inset: "-8%",
     pointerEvents: "none",
-    opacity: 0.045,
-    backgroundImage:
-      "linear-gradient(90deg, rgba(88,73,50,0.035) 1px, transparent 1px), linear-gradient(0deg, rgba(88,73,50,0.03) 1px, transparent 1px)",
-    backgroundSize: "28px 28px",
-  },
-  topBar: {
-    position: "fixed",
-    top: "calc(58px + env(safe-area-inset-top))",
-    left: "50%",
-    transform: "translateX(-50%)",
-    zIndex: 3,
-    color: "#6b6257",
-    fontFamily: "var(--font-display)",
-    fontSize: "15px",
-    fontWeight: 400,
-    letterSpacing: "0.16em",
-    lineHeight: 1.4,
-    whiteSpace: "nowrap",
+    background:
+      "radial-gradient(60% 48% at 58% 18%, rgba(255,255,255,.22), transparent 62%), radial-gradient(52% 42% at 18% 78%, color-mix(in srgb, var(--app-paper-wash-bottom) 18%, transparent), transparent 68%)",
+    mixBlendMode: "soft-light",
+    animation: "loadingBreath 18s ease-in-out infinite",
   },
   container: {
     position: "relative",
-    zIndex: 2,
+    zIndex: 1,
     width: "min(calc(100% - 28px), 410px)",
-    height: "100%",
+    minHeight: "100%",
     margin: "0 auto",
   },
+  startupStage: {
+    minHeight: "100dvh",
+    display: "grid",
+    placeItems: "center",
+    padding: "calc(28px + env(safe-area-inset-top)) 0 calc(36px + env(safe-area-inset-bottom))",
+  },
+  launchFrame: {
+    ...paperSurface,
+    position: "relative",
+    width: "min(100%, 360px)",
+    aspectRatio: "4 / 5",
+    borderRadius: "32px",
+    display: "grid",
+    placeItems: "center",
+    gap: "18px",
+  },
+  launchCat: {
+    width: "126px",
+    opacity: 0.82,
+    filter: "drop-shadow(0 10px 18px rgba(70,50,30,.1))",
+  },
+  launchTitle: {
+    margin: 0,
+    fontFamily: "var(--font-serif)",
+    fontSize: "23px",
+    letterSpacing: ".08em",
+    color: "var(--ink-soft)",
+  },
   homeStage: {
-    position: "absolute",
-    inset: 0,
-    display: "grid",
-    justifyItems: "center",
-    textAlign: "center",
+    minHeight: "100dvh",
+    display: "flex",
+    flexDirection: "column",
+    justifyContent: "center",
+    gap: "18px",
+    padding: "calc(26px + env(safe-area-inset-top)) 4px calc(116px + env(safe-area-inset-bottom))",
   },
-  homeCopy: {
-    position: "absolute",
-    top: "calc(clamp(120px, 18dvh, 168px) + env(safe-area-inset-top))",
-    display: "grid",
-    justifyItems: "center",
-    gap: "13px",
+  homeFrame: {
+    ...paperSurface,
+    position: "relative",
     width: "100%",
-  },
-  titleLineLarge: {
-    ...shimmerBase,
-    width: "160px",
-    height: "34px",
-    borderRadius: "var(--radius-full)",
-  },
-  copyLine: {
-    ...shimmerBase,
-    width: "172px",
-    height: "12px",
-    borderRadius: "var(--radius-full)",
-  },
-  copyLineShort: {
-    ...shimmerBase,
-    width: "136px",
-    height: "12px",
-    borderRadius: "var(--radius-full)",
-  },
-  cameraCircle: {
-    ...shimmerBase,
-    position: "absolute",
-    top: "calc(clamp(284px, 38dvh, 348px) + env(safe-area-inset-top))",
-    left: "50%",
-    width: "140px",
-    height: "140px",
-    transform: "translateX(-50%)",
-    borderRadius: "50%",
+    minHeight: "clamp(500px, 62dvh, 606px)",
+    borderRadius: "30px",
     display: "grid",
     placeItems: "center",
-    boxShadow:
-      "0 0 0 9px rgba(255,255,255,0.54), 0 14px 26px rgba(119,101,73,0.09)",
   },
-  cameraIconLine: {
-    width: "42px",
-    height: "30px",
-    borderRadius: "var(--radius-sm)",
-    background: "rgba(255,253,248,0.58)",
+  homeCat: {
+    width: "118px",
+    opacity: 0.7,
+    filter: "drop-shadow(0 10px 18px rgba(70,50,30,.1))",
   },
-  statGrid: {
-    position: "absolute",
-    top: "calc(clamp(456px, 64dvh, 584px) + env(safe-area-inset-top))",
-    left: "50%",
-    width: "min(100%, 380px)",
-    transform: "translateX(-50%)",
+  homeTray: {
+    ...paperSurface,
+    width: "100%",
+    minHeight: "86px",
+    borderRadius: "22px",
     display: "grid",
-    gridTemplateColumns: "repeat(3, minmax(0, 1fr))",
-    gap: "12px",
+    gridTemplateColumns: "96px 1fr",
+    alignItems: "center",
+    gap: "18px",
+    padding: "14px 18px",
   },
-  statCard: {
-    ...paperCard,
-    minHeight: "92px",
-    borderRadius: "var(--radius-xl)",
-  },
-  accountStage: {
-    minHeight: "100%",
-    padding:
-      "calc(128px + env(safe-area-inset-top)) 24px calc(72px + env(safe-area-inset-bottom))",
-    display: "grid",
-    alignContent: "center",
-    justifyItems: "center",
-    gap: "16px",
-    boxSizing: "border-box",
-  },
-  accountMark: {
-    width: "54px",
-    height: "54px",
-    borderRadius: "50%",
-    border: "1px solid rgba(144,126,102,0.12)",
-    background: "rgba(255,253,248,0.58)",
+  compactLetter: {
+    width: "96px",
+    height: "48px",
+    borderRadius: "14px",
     display: "grid",
     placeItems: "center",
-    boxShadow: "0 8px 18px rgba(90,76,60,0.035)",
+    background:
+      "linear-gradient(145deg, rgba(255,253,248,.88), rgba(245,237,222,.7)), linear-gradient(32deg, transparent 49%, rgba(160,130,90,.12) 50%, transparent 51%)",
+    border: "1px solid color-mix(in srgb, var(--seal) 10%, transparent)",
   },
-  accountDot: {
-    width: "8px",
-    height: "8px",
-    borderRadius: "50%",
-    background: "#8d806f",
-    boxShadow: "0 0 0 8px rgba(169,149,126,0.12)",
+  letterSeal: {
+    width: "14px",
+    height: "14px",
+    borderRadius: "999px",
+    background: "var(--seal)",
+    opacity: 0.84,
   },
-  accountTitleLine: {
-    ...shimmerBase,
-    width: "152px",
-    height: "24px",
-    borderRadius: "var(--radius-full)",
-    marginTop: "4px",
-  },
-  accountCopyLine: {
-    ...shimmerBase,
-    width: "218px",
-    height: "12px",
-    borderRadius: "var(--radius-full)",
-    opacity: 0.74,
-  },
-  accountList: {
-    width: "100%",
-    maxWidth: "310px",
+  trayLines: {
     display: "grid",
     gap: "10px",
-    marginTop: "10px",
+    justifyItems: "start",
   },
-  accountRow: {
-    ...paperCard,
-    height: "42px",
-    borderRadius: "var(--radius-md)",
+  trayLineLong: {
+    ...shimmerSurface,
+    width: "min(100%, 172px)",
+    height: "11px",
+    borderRadius: "999px",
   },
-  startupStage: {
-    minHeight: "100%",
-    padding:
-      "calc(64px + env(safe-area-inset-top)) 24px calc(64px + env(safe-area-inset-bottom))",
-    display: "grid",
-    alignContent: "center",
-    justifyItems: "center",
-    gap: "18px",
-    boxSizing: "border-box",
-  },
-  startupMark: {
-    width: "68px",
-    height: "68px",
-    borderRadius: "50%",
-    border: "1px solid rgba(144,126,102,0.13)",
-    background: "rgba(255,253,248,0.58)",
-    display: "grid",
-    placeItems: "center",
-    boxShadow: "0 10px 22px rgba(90,76,60,0.04)",
-  },
-  startupMarkInner: {
-    width: "10px",
-    height: "10px",
-    borderRadius: "50%",
-    background: "#8d806f",
-    boxShadow: "0 0 0 10px rgba(169,149,126,0.11)",
-  },
-  startupTitle: {
-    margin: "2px 0 0",
-    color: "#4a463e",
-    fontFamily: "var(--font-display)",
-    fontSize: "24px",
-    fontWeight: 400,
-    letterSpacing: "0.18em",
-    lineHeight: 1.5,
-  },
-  startupLine: {
-    ...shimmerBase,
+  trayLineShort: {
+    ...shimmerSurface,
     width: "112px",
-    height: "2px",
-    borderRadius: "var(--radius-full)",
-    opacity: 0.52,
+    height: "10px",
+    borderRadius: "999px",
+    opacity: 0.8,
   },
   pageStage: {
-    padding:
-      "calc(128px + env(safe-area-inset-top)) 0 calc(118px + env(safe-area-inset-bottom))",
-    display: "grid",
+    minHeight: "100dvh",
+    padding: "calc(34px + env(safe-area-inset-top)) 0 calc(112px + env(safe-area-inset-bottom))",
+    display: "flex",
+    flexDirection: "column",
     gap: "18px",
   },
-  pageTitleLine: {
-    ...shimmerBase,
-    width: "132px",
-    height: "32px",
-    borderRadius: "var(--radius-full)",
-    margin: "0 auto 8px",
+  segmentGhost: {
+    alignSelf: "center",
+    display: "flex",
+    gap: "10px",
+    padding: "4px",
+    borderRadius: "999px",
+    background: "rgba(255,253,248,.42)",
+    border: "1px solid color-mix(in srgb, var(--ink) 7%, transparent)",
   },
-  albumSection: {
-    ...paperCard,
-    borderRadius: "var(--radius-2xl)",
-    padding: "18px",
+  segmentPill: {
+    width: "120px",
+    height: "44px",
+    borderRadius: "999px",
+    background: "rgba(255,253,248,.72)",
+    border: "1px solid color-mix(in srgb, var(--ink) 16%, transparent)",
+  },
+  segmentPillSoft: {
+    width: "120px",
+    height: "44px",
+    borderRadius: "999px",
+    background: "rgba(255,253,248,.3)",
+  },
+  boardPaper: {
+    ...paperSurface,
+    position: "relative",
+    minHeight: "min(66dvh, 620px)",
+    borderRadius: "30px",
+    padding: "28px 22px",
+  },
+  monthLine: {
+    ...shimmerSurface,
+    display: "block",
+    width: "148px",
+    height: "24px",
+    borderRadius: "999px",
+  },
+  boardCluster: {
+    position: "relative",
+    height: "calc(100% - 38px)",
+    minHeight: "480px",
+  },
+  boardPhoto: {
+    ...shimmerSurface,
+    position: "absolute",
+    borderRadius: "14px",
+    boxShadow: "0 12px 22px -18px rgba(70,50,30,.35)",
+  },
+  catHeader: {
+    ...paperSurface,
+    borderRadius: "28px",
+    minHeight: "104px",
     display: "grid",
+    gridTemplateColumns: "58px 1fr 48px",
+    alignItems: "center",
     gap: "14px",
+    padding: "18px 20px",
   },
-  sectionTitleLine: {
-    ...shimmerBase,
-    width: "108px",
-    height: "20px",
-    borderRadius: "var(--radius-full)",
+  avatarGhost: {
+    ...shimmerSurface,
+    width: "58px",
+    height: "58px",
+    borderRadius: "999px",
   },
-  sectionTitleLineShort: {
-    ...shimmerBase,
-    width: "86px",
-    height: "20px",
-    borderRadius: "var(--radius-full)",
+  nameGhost: {
+    ...shimmerSurface,
+    width: "92px",
+    height: "22px",
+    borderRadius: "999px",
   },
-  thumbRow: {
+  smallCircleGhost: {
+    width: "48px",
+    height: "48px",
+    borderRadius: "999px",
+    border: "1px solid color-mix(in srgb, var(--ink) 9%, transparent)",
+    background: "rgba(255,253,248,.4)",
+  },
+  recordPaper: {
+    ...paperSurface,
+    borderRadius: "28px",
+    padding: "24px",
+    display: "grid",
+    gap: "16px",
+  },
+  kickerLine: {
+    ...shimmerSurface,
+    width: "120px",
+    height: "13px",
+    borderRadius: "999px",
+  },
+  titleLine: {
+    ...shimmerSurface,
+    width: "190px",
+    height: "28px",
+    borderRadius: "999px",
+  },
+  metricGrid: {
+    display: "grid",
+    gridTemplateColumns: "1fr 1fr",
+    gap: "12px",
+  },
+  metricGhost: {
+    height: "74px",
+    borderRadius: "18px",
+    border: "1px solid color-mix(in srgb, var(--ink) 7%, transparent)",
+    background: "rgba(255,253,248,.34)",
+  },
+  photoGridGhost: {
     display: "grid",
     gridTemplateColumns: "repeat(3, 1fr)",
-    gap: "10px",
+    gap: "3px",
   },
-  thumb: {
-    ...shimmerBase,
+  squareGhost: {
+    ...shimmerSurface,
     aspectRatio: "1 / 1",
-    borderRadius: "var(--radius-lg)",
+    borderRadius: "8px",
   },
-  thumbMuted: {
-    ...shimmerBase,
-    aspectRatio: "1 / 1",
-    borderRadius: "var(--radius-lg)",
-    opacity: 0.56,
-  },
-  avatarRail: {
+  accountStage: {
+    minHeight: "100dvh",
     display: "grid",
-    gridTemplateColumns: "repeat(3, 72px)",
-    gap: "16px",
-    justifyContent: "center",
+    placeItems: "center",
+    padding: "calc(24px + env(safe-area-inset-top)) 0 calc(24px + env(safe-area-inset-bottom))",
   },
-  avatarItem: {
-    ...shimmerBase,
-    width: "72px",
-    height: "72px",
-    borderRadius: "50%",
-  },
-  profileCard: {
-    ...paperCard,
-    borderRadius: "var(--radius-2xl)",
-    padding: "20px",
-    display: "flex",
-    alignItems: "center",
+  accountPaper: {
+    ...paperSurface,
+    width: "min(100%, 340px)",
+    borderRadius: "28px",
+    padding: "28px",
+    display: "grid",
+    justifyItems: "center",
     gap: "16px",
   },
-  profilePhoto: {
-    ...shimmerBase,
-    width: "84px",
-    height: "84px",
-    borderRadius: "50%",
+  accountSeal: {
+    width: "34px",
+    height: "34px",
+    borderRadius: "999px",
+    background: "var(--seal)",
+    opacity: 0.64,
   },
-  profileLines: {
-    display: "grid",
-    gap: "12px",
-    flex: 1,
+  accountTitle: {
+    ...shimmerSurface,
+    width: "170px",
+    height: "18px",
+    borderRadius: "999px",
   },
-  profileNameLine: {
-    ...shimmerBase,
-    width: "104px",
-    height: "26px",
-    borderRadius: "var(--radius-full)",
-  },
-  profileSmallLine: {
-    ...shimmerBase,
-    width: "78px",
-    height: "14px",
-    borderRadius: "var(--radius-full)",
-  },
-  infoList: {
-    ...paperCard,
-    borderRadius: "var(--radius-2xl)",
-    overflow: "hidden",
-  },
-  infoRow: {
-    height: "58px",
-    borderBottom: "1px solid rgba(144,126,102,0.1)",
-  },
-  copyBlock: {
-    ...shimmerBase,
-    height: "128px",
-    borderRadius: "var(--radius-lg)",
+  accountCopy: {
+    ...shimmerSurface,
+    width: "230px",
+    height: "12px",
+    borderRadius: "999px",
+    opacity: 0.8,
   },
 } satisfies Record<string, CSSProperties>;

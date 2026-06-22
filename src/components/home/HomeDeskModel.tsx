@@ -411,7 +411,12 @@ export function HomeDeskModel({
         >
           <div style={deskStyles.todayPhotoZone}>
             {homePhoto ? (
-              <div style={deskStyles.homeFrameShell}>
+              <div
+                style={{
+                  ...deskStyles.homeFrameShell,
+                  ...(deskState === "3" ? deskStyles.homeFrameShellDelivered : {}),
+                }}
+              >
                 <button
                   type="button"
                   data-testid="desk-home-frame"
@@ -1857,6 +1862,9 @@ const deskStyles = {
     width: "min(100%, var(--home-frame-layout-width, 100%))",
     margin: "0 auto",
   },
+  homeFrameShellDelivered: {
+    width: "min(92%, 320px)",
+  },
   homeFrame: {
     position: "relative",
     display: "block",
@@ -1873,7 +1881,7 @@ const deskStyles = {
       "background var(--home-daylight-transition, 1800ms) var(--ease-gentle), box-shadow var(--home-daylight-transition, 1800ms) var(--ease-gentle)",
   },
   homeFrameDelivered: {
-    width: "min(92%, 320px)",
+    width: "100%",
   },
   homeFrameImage: {
     width: "100%",
@@ -1887,15 +1895,16 @@ const deskStyles = {
   },
   homeAddPhotoButton: {
     position: "absolute",
-    right: "10px",
-    bottom: "10px",
+    right: "clamp(8px, 3%, 12px)",
+    bottom: "clamp(8px, 3%, 12px)",
     zIndex: 2,
     minHeight: "36px",
+    maxWidth: "calc(100% - 16px)",
     display: "inline-flex",
     alignItems: "center",
     justifyContent: "center",
     gap: "6px",
-    padding: "8px 12px",
+    padding: "8px clamp(10px, 3.5vw, 12px)",
     border: "1px solid color-mix(in srgb, var(--home-wax, var(--seal)) 26%, transparent)",
     borderRadius: "var(--radius-full)",
     background: "color-mix(in srgb, var(--paper-card) 82%, transparent)",
@@ -1908,6 +1917,9 @@ const deskStyles = {
     fontWeight: 500,
     lineHeight: 1,
     letterSpacing: "var(--tracking-label)",
+    whiteSpace: "nowrap",
+    overflow: "hidden",
+    textOverflow: "ellipsis",
     cursor: "pointer",
     WebkitTapHighlightColor: "transparent",
   },
