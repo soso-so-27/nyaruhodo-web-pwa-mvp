@@ -61,6 +61,7 @@ type LensPhoto = {
   createdAt: number;
   catIds: string[];
   catNames: string[];
+  deliveryCount?: number;
 };
 type DeleteCatTarget = {
   profile: CatProfile;
@@ -68,6 +69,9 @@ type DeleteCatTarget = {
 };
 type RemoteCatDeleteResult =
   | { status: "deleted" | "skipped" }
+  | { status: "error"; message: string };
+type RemoteCatSaveResult =
+  | { status: "saved" | "skipped" }
   | { status: "error"; message: string };
 
 const UCHINOKO_PHOTO_PREVIEW_LIMIT = 6;
@@ -115,6 +119,7 @@ export function CatsPage() {
   const [isAddingCat, setIsAddingCat] = useState(false);
   const [isCatSwitcherOpen, setIsCatSwitcherOpen] = useState(false);
   const [isCatManageOpen, setIsCatManageOpen] = useState(false);
+  const [isCatManageEditing, setIsCatManageEditing] = useState(false);
   const [isOnboardingMode, setIsOnboardingMode] = useState(false);
   const [isOnboardingCompletionReady, setIsOnboardingCompletionReady] =
     useState(false);
@@ -132,6 +137,7 @@ export function CatsPage() {
   const [deleteCatTarget, setDeleteCatTarget] =
     useState<DeleteCatTarget | null>(null);
   const [isDeletingCat, setIsDeletingCat] = useState(false);
+  const [isSavingProfile, setIsSavingProfile] = useState(false);
   const [remoteLensPhotosByCat, setRemoteLensPhotosByCat] = useState<
     Record<string, LensPhoto[]>
   >({});
@@ -183,6 +189,9 @@ export function CatsPage() {
   const activeCatLensPhotos = activeCatId
     ? lensPhotosByCat[activeCatId] ?? []
     : [];
+  const deliveredSleepingPhotoCount = activeCatId
+    ? getDeliveredPhotoCount(activeCatLensPhotos)
+    : 0;
   const allLensPhotos = useMemo(
     () =>
       mergeAllLensPhotos(
@@ -405,15 +414,27 @@ export function CatsPage() {
     setIsEditingProfile(true);
   }
 
+  function openCatManageEditor() {
+    handleStartEdit();
+    setIsCatManageEditing(true);
+    setIsCatManageOpen(true);
+  }
+
   function cancelEditingCatName() {
     setCatNameInput(catName);
     setMessage("");
     setSaveMessage("");
     setIsEditingCatName(false);
     setIsEditingProfile(false);
+    setIsCatManageEditing(false);
   }
 
-  function handleSaveProfile() {
+  async function handleSaveProfile() {
+    if (isSavingProfile) {
+      return;
+    }
+
+    setIsSavingProfile(true);
     try {
       const raw = window.localStorage.getItem(STORAGE_KEYS.catProfiles);
 
@@ -454,18 +475,26 @@ export function CatsPage() {
       setCatProfiles(nextProfiles);
       setActiveCatId(nextProfile.id);
       setCatNameInput(nextProfile.name);
+      const remoteSaveResult = await saveRemoteCatProfile(nextProfile);
       setIsEditingCatName(false);
       setIsEditingProfile(false);
+      setIsCatManageEditing(false);
       if (isOnboardingMode) {
         setIsOnboardingAlbumCreated(true);
         setSaveMessage("");
         return;
       }
 
-      setSaveMessage("保存しました。");
+      setSaveMessage(
+        remoteSaveResult.status === "error"
+          ? "この端末には保存しました。Google連携への反映はあとでやり直します。"
+          : "保存しました。",
+      );
       setTimeout(() => setSaveMessage(""), 2000);
     } catch {
       return;
+    } finally {
+      setIsSavingProfile(false);
     }
   }
 
@@ -842,9 +871,8 @@ export function CatsPage() {
         {activeCatProfile && !isOnboardingCompletionView && activeLens === "cat" ? (
           <CatSummaryPanel
             familyDuration={familyDuration}
-            photoCount={takenSleepingPhotoCount}
+            deliveredCount={deliveredSleepingPhotoCount}
             omoideCount={omoideMemories.length}
-            familySinceDate={activeCatProfile.basicInfo?.familySinceDate}
             birthdayStatus={birthdayStatus}
           />
         ) : null}
@@ -858,10 +886,7 @@ export function CatsPage() {
           >
             <BasicInfoTable
               profile={activeCatProfile}
-              onEdit={() => {
-                setIsEditingProfile(true);
-                setIsEditingCatName(true);
-              }}
+              onEdit={openCatManageEditor}
             />
           </AppCard>
         ) : null}
@@ -1000,10 +1025,118 @@ export function CatsPage() {
       ) : null}
       {isCatManageOpen && activeCatProfile ? (
         <AppBottomSheet
-          title="うちのこを管理"
-          onClose={() => setIsCatManageOpen(false)}
+          title={isCatManageEditing ? "基本情報を編集" : "うちのこを管理"}
+          onClose={() => {
+            setIsCatManageOpen(false);
+            if (isCatManageEditing) {
+              cancelEditingCatName();
+            } else {
+              setIsCatManageEditing(false);
+            }
+          }}
         >
           <div style={styles.catManageSheet}>
+            {isCatManageEditing ? (
+              <div style={styles.catManageEditor}>
+                <div style={styles.catManageEditorHero}>
+                  <img
+                    src={activeAvatarSrc}
+                    alt=""
+                    aria-hidden="true"
+                    style={styles.catManageEditorAvatar}
+                  />
+                  <div style={styles.catManageEditorHeroText}>
+                    <p style={styles.catManageEditorKicker}>編集中</p>
+                    <p style={styles.catManageEditorName}>
+                      {catNameInput.trim() || activeCatProfile.name}
+                    </p>
+                  </div>
+                </div>
+
+                <section style={styles.catManageFormSection}>
+                  <p style={styles.catManageFormTitle}>名前</p>
+                  <AppTextField
+                    id="cat-manage-name"
+                    type="text"
+                    label="この子の名前"
+                    value={catNameInput}
+                    onChange={(event) => setCatNameInput(event.target.value)}
+                    placeholder="例：むぎ"
+                  />
+                </section>
+
+                <section style={styles.catManageFormSection}>
+                  <p style={styles.catManageFormTitle}>日付</p>
+                  <div style={styles.catManageDateGrid}>
+                    <AppTextField
+                      type="date"
+                      label="迎えた日"
+                      value={editFamilySinceDate}
+                      onChange={(event) =>
+                        setEditFamilySinceDate(event.target.value)
+                      }
+                      max={new Date().toISOString().split("T")[0]}
+                    />
+                    <AppTextField
+                      type="date"
+                      label="誕生日"
+                      value={editBirthDate}
+                      onChange={(event) => setEditBirthDate(event.target.value)}
+                      max={new Date().toISOString().split("T")[0]}
+                    />
+                  </div>
+                </section>
+
+                <section style={styles.catManageFormSection}>
+                  <p style={styles.catManageFormTitle}>からだの情報</p>
+                  <AppSegmented<EditableGender>
+                    value={editGender}
+                    ariaLabel="性別"
+                    columns={3}
+                    onChange={setEditGender}
+                    options={[
+                      { value: "male", label: "男の子" },
+                      { value: "female", label: "女の子" },
+                      { value: "unknown", label: "わからない" },
+                    ]}
+                  />
+                  <AppTextField
+                    type="text"
+                    label="猫種"
+                    value={editBreed}
+                    onChange={(event) => setEditBreed(event.target.value)}
+                    placeholder="例：サバトラ、雑種・ミックス"
+                  />
+                  <CoatSelector
+                    currentCoat={editCoat || selectedCoat}
+                    onSelect={setEditCoat}
+                  />
+                </section>
+
+                <div style={styles.catManageEditorActions}>
+                  <AppButton
+                    type="button"
+                    variant="quiet"
+                    fullWidth
+                    onClick={cancelEditingCatName}
+                    disabled={isSavingProfile}
+                  >
+                    戻る
+                  </AppButton>
+                  <AppButton
+                    type="button"
+                    variant="primary"
+                    fullWidth
+                    onClick={handleSaveProfile}
+                    loading={isSavingProfile}
+                    loadingLabel="保存中"
+                  >
+                    保存
+                  </AppButton>
+                </div>
+              </div>
+            ) : (
+              <>
             {shouldShowCatSwitchButton ? (
               <AppButton
                 type="button"
@@ -1034,14 +1167,13 @@ export function CatsPage() {
               type="button"
               variant="secondary"
               fullWidth
-              iconStart={<PencilSmallIcon />}
-              onClick={() => {
-                setIsCatManageOpen(false);
-                handleStartEdit();
-              }}
-            >
-              名前や記録を編集
-            </AppButton>
+                iconStart={<PencilSmallIcon />}
+                onClick={() => {
+                  openCatManageEditor();
+                }}
+              >
+                名前や記録を編集
+              </AppButton>
             <AppButton
               type="button"
               variant="quiet"
@@ -1052,9 +1184,6 @@ export function CatsPage() {
               }}
             >
               アイコン写真を変える
-            </AppButton>
-            <AppButton href="/settings" variant="quiet" fullWidth>
-              アプリの設定
             </AppButton>
             {canManageCats && catProfiles.length > 1 ? (
               <AppButton
@@ -1069,6 +1198,8 @@ export function CatsPage() {
                 この子を消す
               </AppButton>
             ) : null}
+              </>
+            )}
           </div>
         </AppBottomSheet>
       ) : null}
@@ -1230,21 +1361,18 @@ function FootprintCard({ milestone }: { milestone: CatSleepingMilestone }) {
 
 function CatSummaryPanel({
   familyDuration,
-  photoCount,
+  deliveredCount,
   omoideCount,
-  familySinceDate,
   birthdayStatus,
 }: {
   familyDuration: { primary: string; secondary: string };
-  photoCount: number;
+  deliveredCount: number;
   omoideCount: number;
-  familySinceDate?: string;
   birthdayStatus: { copy: string; isToday: boolean } | null;
 }) {
-  const familyCopy =
+  const familyDaysCopy =
     familyDuration.secondary ||
-    (familyDuration.primary === "未設定" ? "記録を育てる" : familyDuration.primary);
-  const seasonCopy = getCurrentSeasonCountLabel(familySinceDate);
+    (familyDuration.primary === "未設定" ? "未登録" : familyDuration.primary);
 
   return (
     <AppCard
@@ -1253,22 +1381,18 @@ function CatSummaryPanel({
       padding="md"
       style={styles.summaryPanel}
     >
-      <div style={styles.summaryHeader}>
-        <p style={styles.summaryKicker}>この子のいま</p>
-        <p style={styles.summaryMain}>{familyCopy}</p>
-      </div>
       <div style={styles.summaryGrid}>
         <div style={styles.summaryTile}>
-          <span style={styles.summaryTileValue}>{photoCount}枚</span>
-          <span style={styles.summaryTileLabel}>すがた</span>
+          <span style={styles.summaryTileValue}>{deliveredCount}枚</span>
+          <span style={styles.summaryTileLabel}>とどけた</span>
         </div>
         <div style={styles.summaryTile}>
           <span style={styles.summaryTileValue}>{omoideCount}通</span>
           <span style={styles.summaryTileLabel}>思い出</span>
         </div>
         <div style={styles.summaryTileWide}>
-          <span style={styles.summaryTileLabel}>季節</span>
-          <span style={styles.summaryTileValueSmall}>{seasonCopy}</span>
+          <span style={styles.summaryTileLabel}>家族になって</span>
+          <span style={styles.summaryTileValueSmall}>{familyDaysCopy}</span>
         </div>
         <div
           style={
@@ -1674,6 +1798,7 @@ function createLocalLensPhoto(
     createdAt: photo.createdAt,
     catIds: [profile.id],
     catNames: [getCatName(profile)],
+    deliveryCount: photo.shared ? 1 : 0,
   };
 }
 
@@ -1697,6 +1822,7 @@ function createRemoteLensPhoto(
     createdAt: parseRemoteLensPhotoDate(row.capturedAt ?? row.createdAt),
     catIds: [profile.id],
     catNames: [getCatName(profile)],
+    deliveryCount: row.deliveryCount,
   };
 }
 
@@ -1749,6 +1875,10 @@ function dedupeLensPhotos(photos: LensPhoto[]) {
       createdAt: Math.max(existing.createdAt, photo.createdAt),
       catIds: uniqueStrings([...existing.catIds, ...photo.catIds]),
       catNames: uniqueStrings([...existing.catNames, ...photo.catNames]),
+      deliveryCount: Math.max(
+        existing.deliveryCount ?? 0,
+        photo.deliveryCount ?? 0,
+      ),
     });
   }
 
@@ -1783,6 +1913,13 @@ function getLensPhotoCountForCat(
   photosByCat: Record<string, LensPhoto[]>,
 ) {
   return dedupeLensPhotos(photosByCat[catId] ?? []).length;
+}
+
+function getDeliveredPhotoCount(photos: LensPhoto[]) {
+  return dedupeLensPhotos(photos).reduce(
+    (total, photo) => total + Math.max(0, photo.deliveryCount ?? 0),
+    0,
+  );
 }
 
 function getCatDeletePhotoCount(
@@ -1901,6 +2038,76 @@ async function deleteRemoteCatProfile(
   }
 
   return { status: "deleted" };
+}
+
+async function saveRemoteCatProfile(
+  profile: CatProfile,
+): Promise<RemoteCatSaveResult> {
+  const supabase = createBrowserSupabaseClient();
+
+  if (!supabase) {
+    return { status: "skipped" };
+  }
+
+  const { data: userResult } = await supabase.auth.getUser();
+  const userId = userResult.user?.id;
+
+  if (!userId) {
+    return { status: "skipped" };
+  }
+
+  const payload = {
+    owner_user_id: userId,
+    local_cat_id: profile.id,
+    name: profile.name,
+    basic_info: toJsonObject(profile.basicInfo),
+    appearance: toJsonObject(profile.appearance),
+    local_created_at: profile.createdAt,
+    local_updated_at: profile.updatedAt,
+  };
+
+  const { data: remoteCat, error: findError } = await supabase
+    .from("cats")
+    .select("id")
+    .eq("owner_user_id", userId)
+    .eq("local_cat_id", profile.id)
+    .maybeSingle();
+
+  if (findError) {
+    return { status: "error", message: findError.message };
+  }
+
+  const remoteCatId =
+    remoteCat && typeof remoteCat === "object" && "id" in remoteCat
+      ? String((remoteCat as { id: string }).id)
+      : null;
+
+  if (remoteCatId) {
+    const { error } = await supabase
+      .from("cats")
+      .update(payload)
+      .eq("id", remoteCatId);
+
+    return error
+      ? { status: "error", message: error.message }
+      : { status: "saved" };
+  }
+
+  const { error } = await supabase.from("cats").insert(payload);
+
+  return error
+    ? { status: "error", message: error.message }
+    : { status: "saved" };
+}
+
+function toJsonObject(value: unknown): Record<string, unknown> {
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    return {};
+  }
+
+  return Object.fromEntries(
+    Object.entries(value).filter(([, entryValue]) => entryValue !== undefined),
+  );
 }
 
 function findDuplicateCatName(profiles: CatProfile[], name: string) {
@@ -2418,12 +2625,18 @@ const styles = {
   profileHeroAvatarPhotoTile: {
     width: "58px",
     height: "58px",
+    border: "2px solid color-mix(in srgb, var(--paper-card) 88%, transparent)",
+    boxShadow:
+      "0 1px 3px color-mix(in srgb, var(--ink) 10%, transparent), 0 6px 18px -14px color-mix(in srgb, var(--ink) 24%, transparent)",
   },
   profileHeroAvatarIconTile: {
     width: "58px",
     height: "58px",
-    padding: "7px",
+    padding: "5px",
     boxSizing: "border-box",
+    border: "2px solid color-mix(in srgb, var(--paper-card) 88%, transparent)",
+    boxShadow:
+      "0 1px 3px color-mix(in srgb, var(--ink) 10%, transparent), 0 6px 18px -14px color-mix(in srgb, var(--ink) 24%, transparent)",
   },
   profileHeroInfo: {
     minWidth: 0,
@@ -2642,13 +2855,13 @@ const styles = {
     minWidth: 0,
   },
   footprintsTitle: {
-    margin: "0 0 8px",
-    color: CATS_FAINT,
+    margin: "0 0 12px",
+    color: CATS_TEXT,
     fontFamily: CATS_SERIF,
-    fontSize: "12px",
+    fontSize: CATS_TITLE_SIZE,
     fontWeight: 400,
-    lineHeight: 1.35,
-    letterSpacing: "0.07em",
+    lineHeight: 1.45,
+    letterSpacing: CATS_TITLE_TRACKING,
   },
   footprintsScroller: {
     display: "flex",
@@ -2800,6 +3013,90 @@ const styles = {
   catManageSheet: {
     display: "grid",
     gap: "9px",
+  },
+  catManageEditor: {
+    display: "grid",
+    gap: "14px",
+  },
+  catManageEditorHero: {
+    display: "grid",
+    gridTemplateColumns: "44px minmax(0, 1fr)",
+    alignItems: "center",
+    gap: "12px",
+    padding: "10px 12px",
+    borderRadius: "var(--radius-lg)",
+    background:
+      "linear-gradient(135deg, color-mix(in srgb, var(--paper) 72%, transparent), color-mix(in srgb, var(--paper-warm) 48%, transparent))",
+    boxShadow: "inset 0 0 0 1px color-mix(in srgb, var(--line) 52%, transparent)",
+  },
+  catManageEditorAvatar: {
+    width: "44px",
+    height: "44px",
+    borderRadius: "50%",
+    objectFit: "cover",
+    background: "var(--paper-card)",
+    boxShadow:
+      "0 0 0 3px color-mix(in srgb, var(--paper-card) 82%, transparent), var(--shadow-e1)",
+  },
+  catManageEditorHeroText: {
+    display: "grid",
+    gap: "2px",
+    minWidth: 0,
+  },
+  catManageEditorKicker: {
+    margin: 0,
+    color: CATS_FAINT,
+    fontFamily: CATS_UI,
+    fontSize: CATS_TINY_SIZE,
+    fontWeight: 400,
+    lineHeight: 1.2,
+    letterSpacing: CATS_META_TRACKING,
+  },
+  catManageEditorName: {
+    margin: 0,
+    color: CATS_TEXT_STRONG,
+    fontFamily: CATS_SERIF,
+    fontSize: "20px",
+    fontWeight: 400,
+    lineHeight: 1.35,
+    letterSpacing: CATS_TITLE_TRACKING,
+    overflow: "hidden",
+    textOverflow: "ellipsis",
+    whiteSpace: "nowrap",
+  },
+  catManageFormSection: {
+    display: "grid",
+    gap: "10px",
+    padding: "12px",
+    borderRadius: "var(--radius-xl)",
+    background:
+      "linear-gradient(180deg, color-mix(in srgb, var(--paper-card) 86%, transparent), color-mix(in srgb, var(--paper) 74%, transparent))",
+    boxShadow: "inset 0 0 0 1px color-mix(in srgb, var(--line) 52%, transparent)",
+  },
+  catManageFormTitle: {
+    margin: 0,
+    color: CATS_MUTED,
+    fontFamily: CATS_UI,
+    fontSize: CATS_META_SIZE,
+    fontWeight: 400,
+    lineHeight: 1.2,
+    letterSpacing: CATS_META_TRACKING,
+  },
+  catManageDateGrid: {
+    display: "grid",
+    gridTemplateColumns: "repeat(2, minmax(0, 1fr))",
+    gap: "10px",
+  },
+  catManageEditorActions: {
+    position: "sticky",
+    bottom: "-1px",
+    display: "grid",
+    gridTemplateColumns: "1fr 1fr",
+    gap: "10px",
+    margin: "2px -2px 0",
+    padding: "10px 2px 2px",
+    background:
+      "linear-gradient(180deg, transparent, color-mix(in srgb, var(--paper-card) 92%, transparent) 42%)",
   },
   deleteCatConfirm: {
     display: "grid",

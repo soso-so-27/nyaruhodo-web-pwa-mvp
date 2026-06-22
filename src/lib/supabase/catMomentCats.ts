@@ -17,6 +17,7 @@ export type CatMomentForCat = {
   state: string;
   visibility: string;
   deliveryStatus: string;
+  deliveryCount: number;
   isPrimary: boolean;
   capturedAt: string | null;
   createdAt: string;
@@ -39,6 +40,7 @@ type CatMomentsForCatRow = {
   state: string;
   visibility: string;
   delivery_status: string;
+  delivery_count?: number | null;
   is_primary: boolean;
   captured_at: string | null;
   created_at: string;
@@ -86,6 +88,7 @@ export async function readCatMomentsForCat(
     state: row.state,
     visibility: row.visibility,
     deliveryStatus: row.delivery_status,
+    deliveryCount: Math.max(0, row.delivery_count ?? 0),
     isPrimary: Boolean(row.is_primary),
     capturedAt: row.captured_at,
     createdAt: row.created_at,
