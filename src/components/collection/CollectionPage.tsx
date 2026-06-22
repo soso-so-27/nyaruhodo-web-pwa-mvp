@@ -1295,6 +1295,7 @@ function MainichiBoardPhotoCard({
         "--mainichi-tape-left": layout.tapeLeft,
         "--mainichi-tape-rotation": layout.tapeRotation,
         "--mainichi-photo-border": showTape ? layout.tapedBorderWidth : layout.borderWidth,
+        "--mainichi-photo-radius": showTape ? layout.tapedBorderRadius : layout.borderRadius,
         zIndex: layout.zIndex,
         transform:
           "translate(var(--mainichi-shift-x), var(--mainichi-shift-y)) rotate(var(--mainichi-rotation))",
@@ -2821,6 +2822,10 @@ function getMainichiBoardPhotoLayout(index: number, total: number) {
     width <= 22 ? "2px" : width <= 34 ? "3px" : "4px";
   const tapedBorderWidth =
     width <= 24 ? "2px" : "3px";
+  const borderRadius =
+    width <= 22 ? "8px" : width <= 34 ? "10px" : "12px";
+  const tapedBorderRadius =
+    width <= 24 ? "8px" : "10px";
 
   return {
     left: `${layout.left}%`,
@@ -2833,6 +2838,8 @@ function getMainichiBoardPhotoLayout(index: number, total: number) {
     tapeRotation: layout.tapeRotation ?? "-3deg",
     borderWidth,
     tapedBorderWidth,
+    borderRadius,
+    tapedBorderRadius,
     zIndex: layout.zIndex,
     aspect: layout.aspect ?? getMainichiBoardPhotoAspect(index, total),
     style: {
@@ -3849,7 +3856,7 @@ const styles = {
     height: "auto",
     display: "block",
     border: "var(--mainichi-photo-border, 3px) solid color-mix(in srgb, var(--paper-card) 76%, var(--paper-warm) 24%)",
-    borderRadius: "14px",
+    borderRadius: "var(--mainichi-photo-radius, 10px)",
     background: "color-mix(in srgb, var(--paper-card) 84%, var(--paper-warm) 16%)",
     boxShadow:
       "0 0 0 0.5px rgba(74,56,34,0.12) inset, 0 1px 3px rgba(86,70,45,0.10), 0 12px 22px -17px rgba(76,62,42,0.36)",
