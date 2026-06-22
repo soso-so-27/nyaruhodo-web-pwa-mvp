@@ -207,8 +207,11 @@ const styles = {
   page: {
     minHeight: "100dvh",
     position: "relative",
-    overflow: "hidden",
-    background: color.pageBg,
+    overflowX: "hidden",
+    background: "var(--app-paper-background)",
+    backgroundSize: "var(--app-paper-background-size)",
+    backgroundPosition: "var(--app-paper-background-position)",
+    backgroundRepeat: "var(--app-paper-background-repeat)",
     color: color.text,
   },
   backdrop: {
@@ -216,17 +219,19 @@ const styles = {
     inset: 0,
     pointerEvents: "none",
     background:
-      "radial-gradient(circle at 50% 0%, rgba(255,255,255,0.9), transparent 34%), linear-gradient(180deg, rgba(255,253,248,0.82), rgba(247,241,231,0.92))",
+      "radial-gradient(76% 34% at 50% 0%, rgba(255,255,255,0.62), transparent 68%), linear-gradient(115deg, color-mix(in srgb, var(--paper) 10%, transparent) 0%, transparent 44%, color-mix(in srgb, var(--ink-soft) 4%, transparent) 100%)",
+    mixBlendMode: "soft-light",
+    opacity: 0.84,
   },
   container: {
     position: "relative",
     zIndex: 1,
     width: "min(100%, 430px)",
     margin: "0 auto",
-    padding: `calc(${spacing.md}px + env(safe-area-inset-top)) ${spacing.screenX}px calc(44px + env(safe-area-inset-bottom))`,
+    padding: `calc(${spacing.lg}px + env(safe-area-inset-top)) ${spacing.screenX}px calc(44px + env(safe-area-inset-bottom))`,
     boxSizing: "border-box",
     display: "grid",
-    gap: spacing.md,
+    gap: spacing.lg,
   },
   backLink: {
     justifySelf: "start",
@@ -235,10 +240,18 @@ const styles = {
     display: "grid",
     gap: spacing.sm,
     marginTop: spacing.sm,
+    background:
+      "linear-gradient(180deg, color-mix(in srgb, var(--paper-card) 76%, transparent), color-mix(in srgb, var(--paper) 58%, transparent))",
+    backdropFilter: "blur(4px)",
+    WebkitBackdropFilter: "blur(4px)",
   },
   card: {
     display: "grid",
     gap: spacing.md,
+    background:
+      "linear-gradient(180deg, color-mix(in srgb, var(--paper-card) 70%, transparent), color-mix(in srgb, var(--paper) 52%, transparent))",
+    backdropFilter: "blur(4px)",
+    WebkitBackdropFilter: "blur(4px)",
   },
   kicker: {
     margin: 0,
