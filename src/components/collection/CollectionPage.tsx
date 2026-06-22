@@ -1294,6 +1294,7 @@ function MainichiBoardPhotoCard({
         "--mainichi-shift-y": layout.shiftY,
         "--mainichi-tape-left": layout.tapeLeft,
         "--mainichi-tape-rotation": layout.tapeRotation,
+        "--mainichi-photo-border": showTape ? layout.tapedBorderWidth : layout.borderWidth,
         zIndex: layout.zIndex,
         transform:
           "translate(var(--mainichi-shift-x), var(--mainichi-shift-y)) rotate(var(--mainichi-rotation))",
@@ -2816,6 +2817,10 @@ function getMainichiBoardPhotoLayout(index: number, total: number) {
       : total > 8
         ? Math.max(20, Math.round(layout.width * 0.95))
         : layout.width;
+  const borderWidth =
+    width <= 22 ? "2px" : width <= 34 ? "3px" : "4px";
+  const tapedBorderWidth =
+    width <= 24 ? "2px" : "3px";
 
   return {
     left: `${layout.left}%`,
@@ -2826,6 +2831,8 @@ function getMainichiBoardPhotoLayout(index: number, total: number) {
     shiftY: `${layout.shiftY ?? 0}px`,
     tapeLeft: layout.tapeLeft ?? "50%",
     tapeRotation: layout.tapeRotation ?? "-3deg",
+    borderWidth,
+    tapedBorderWidth,
     zIndex: layout.zIndex,
     aspect: layout.aspect ?? getMainichiBoardPhotoAspect(index, total),
     style: {
@@ -3774,9 +3781,9 @@ const styles = {
     padding: "26px 14px 44px",
     overflow: "visible",
     borderRadius: "32px",
-    backgroundColor: "color-mix(in srgb, var(--paper-card) 82%, var(--paper-warm) 18%)",
+    backgroundColor: "color-mix(in srgb, var(--paper-card) 72%, var(--paper-warm) 28%)",
     backgroundImage:
-      "linear-gradient(180deg, rgba(255,252,244,0.42), rgba(245,232,207,0.22)), radial-gradient(120% 90% at 38% 18%, rgba(255,247,224,0.28), transparent 60%), url('/images/ui/mainichi-board-paper.webp')",
+      "linear-gradient(180deg, rgba(255,252,244,0.18), rgba(245,232,207,0.12)), radial-gradient(120% 90% at 38% 18%, rgba(255,247,224,0.12), transparent 60%), url('/images/ui/mainichi-board-paper-v2.webp')",
     backgroundSize: "100% 100%, 100% 100%, 100% 100%",
     backgroundPosition: "0 0, 0 0, center",
     backgroundRepeat: "no-repeat, no-repeat, no-repeat",
@@ -3841,11 +3848,11 @@ const styles = {
     width: "100%",
     height: "auto",
     display: "block",
-    border: "5px solid color-mix(in srgb, var(--paper-card) 90%, var(--paper-warm) 10%)",
-    borderRadius: "16px",
-    background: "color-mix(in srgb, var(--paper-card) 92%, var(--paper-warm) 8%)",
+    border: "var(--mainichi-photo-border, 3px) solid color-mix(in srgb, var(--paper-card) 76%, var(--paper-warm) 24%)",
+    borderRadius: "14px",
+    background: "color-mix(in srgb, var(--paper-card) 84%, var(--paper-warm) 16%)",
     boxShadow:
-      "0 0 0 0.5px rgba(74,56,34,0.10) inset, 0 2px 5px rgba(86,70,45,0.12), 0 14px 26px -16px rgba(76,62,42,0.40)",
+      "0 0 0 0.5px rgba(74,56,34,0.12) inset, 0 1px 3px rgba(86,70,45,0.10), 0 12px 22px -17px rgba(76,62,42,0.36)",
   },
   mainichiBoardPhotoCatBadge: {
     position: "absolute",
