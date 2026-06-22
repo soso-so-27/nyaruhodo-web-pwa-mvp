@@ -76,16 +76,16 @@ const CATS_TEXT_STRONG = "var(--ink)";
 const CATS_MUTED = "var(--ink-soft)";
 const CATS_FAINT = "var(--ink-faint)";
 const CATS_PAPER = "var(--paper)";
-const CATS_SERIF = "var(--font-display)";
 const CATS_UI = "var(--font-ui)";
+const CATS_SERIF = CATS_UI;
 const CATS_TITLE_SIZE = "20px";
 const CATS_DISPLAY_SIZE = "25px";
 const CATS_BODY_SIZE = "13px";
 const CATS_META_SIZE = "12px";
 const CATS_TINY_SIZE = "11px";
-const CATS_TITLE_TRACKING = "0.04em";
-const CATS_BODY_TRACKING = "0.02em";
-const CATS_META_TRACKING = "0.03em";
+const CATS_TITLE_TRACKING = "0.02em";
+const CATS_BODY_TRACKING = "0.01em";
+const CATS_META_TRACKING = "0.015em";
 const CATS_PANEL_BACKGROUND = "var(--app-page-surface-strong)";
 const CATS_PANEL_BACKGROUND_SOFT = "var(--app-page-surface)";
 const CATS_SURFACE: CSSProperties = {
@@ -2281,6 +2281,7 @@ const styles = {
     zIndex: 2,
     width: "min(100%, 430px)",
     margin: "0 auto",
+    fontSynthesis: "none",
     padding:
       "calc(20px + env(safe-area-inset-top)) 24px calc(280px + env(safe-area-inset-bottom))",
   },
@@ -2500,7 +2501,7 @@ const styles = {
     color: CATS_TEXT,
     fontFamily: CATS_UI,
     fontSize: CATS_BODY_SIZE,
-    fontWeight: 500,
+    fontWeight: 400,
     lineHeight: 1.35,
     textAlign: "right",
     letterSpacing: "0.01em",
@@ -2594,7 +2595,7 @@ const styles = {
     color: CATS_TEXT_STRONG,
     fontFamily: CATS_UI,
     fontSize: CATS_TITLE_SIZE,
-    fontWeight: 500,
+    fontWeight: 400,
     lineHeight: 1.25,
     letterSpacing: "0.01em",
   },
@@ -2602,7 +2603,7 @@ const styles = {
     color: CATS_TEXT,
     fontFamily: CATS_UI,
     fontSize: CATS_BODY_SIZE,
-    fontWeight: 500,
+    fontWeight: 400,
     lineHeight: 1.45,
     letterSpacing: "0.01em",
   },
@@ -2749,7 +2750,7 @@ const styles = {
     color: CATS_TEXT,
     fontFamily: CATS_UI,
     fontSize: CATS_BODY_SIZE,
-    fontWeight: 500,
+    fontWeight: 400,
     lineHeight: 1.35,
     letterSpacing: "0.01em",
     overflow: "hidden",
@@ -3047,7 +3048,7 @@ const styles = {
     fontSize: CATS_BODY_SIZE,
     color: CATS_TEXT,
     fontFamily: CATS_UI,
-    fontWeight: 500,
+    fontWeight: 400,
     letterSpacing: "0.01em",
   },
   emptyInfoText: {
