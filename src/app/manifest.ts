@@ -4,7 +4,7 @@ export default function manifest(): MetadataRoute.Manifest {
   return {
     name: "ねてるねこ",
     short_name: "ねてるねこ",
-    description: "寝顔を撮ると、ほかのねがおが届く猫の写真記録アプリ",
+    description: "ねがおを撮ると、よる8時にねこだよりが届く猫の写真記録アプリ",
     start_url: "/home",
     scope: "/",
     display: "standalone",
