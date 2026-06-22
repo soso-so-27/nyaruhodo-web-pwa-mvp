@@ -73,6 +73,7 @@ type RemoteCatDeleteResult =
 type RemoteCatSaveResult =
   | { status: "saved" | "skipped" }
   | { status: "error"; message: string };
+type PhotoSheetLens = "cat" | "all";
 
 const UCHINOKO_PHOTO_PREVIEW_LIMIT = 6;
 const CATS_TEXT = "var(--ink)";
@@ -138,6 +139,9 @@ export function CatsPage() {
     useState<DeleteCatTarget | null>(null);
   const [isDeletingCat, setIsDeletingCat] = useState(false);
   const [isSavingProfile, setIsSavingProfile] = useState(false);
+  const [photoSheetLens, setPhotoSheetLens] = useState<PhotoSheetLens | null>(
+    null,
+  );
   const [remoteLensPhotosByCat, setRemoteLensPhotosByCat] = useState<
     Record<string, LensPhoto[]>
   >({});
@@ -202,6 +206,10 @@ export function CatsPage() {
       ),
     [hasRemoteLensPhotosLoaded, localLensPhotos.all, remoteLensPhotosByCat],
   );
+  const photoSheetPhotos =
+    photoSheetLens === "all" ? allLensPhotos : activeCatLensPhotos;
+  const photoSheetTitle =
+    photoSheetLens === "all" ? "ぜんぶのねがお" : "すべてのすがた";
 
   useEffect(() => {
     const requestedOnboardingMode =
@@ -356,6 +364,8 @@ export function CatsPage() {
     setMessage("");
     setSaveMessage("");
     setIsAddingCat(true);
+    setIsCatManageOpen(true);
+    setIsCatManageEditing(false);
     setIsCatSwitcherOpen(false);
     setIsEditingCatName(false);
     setIsEditingProfile(false);
@@ -397,6 +407,7 @@ export function CatsPage() {
     setNewCatNameInput("");
     setDuplicateCatNameToConfirm(null);
     setIsAddingCat(false);
+    setIsCatManageOpen(false);
     setMessage("保存しました。");
   }
 
@@ -673,45 +684,6 @@ export function CatsPage() {
           </AppCard>
         ) : null}
 
-        {isAddingCat && !isOnboardingCompletionView ? (
-          <AppCard as="div" variant="inset" padding="sm" style={styles.editor}>
-            <AppTextField
-              id="new-cat-name"
-              type="text"
-              label="この子の名前"
-              value={newCatNameInput}
-              onChange={(event) => {
-                setNewCatNameInput(event.target.value);
-                setDuplicateCatNameToConfirm(null);
-              }}
-              placeholder={"例：麦"}
-            />
-            {duplicateCatNameToConfirm ? (
-              <p style={styles.duplicateCatWarning}>
-                おなじこかもしれません。別のねことして保存しますか？
-              </p>
-            ) : null}
-            <div style={styles.actions}>
-              <AppButton
-                type="button"
-                onClick={handleAddCatSave}
-                variant="primary"
-                size="md"
-              >
-                {duplicateCatNameToConfirm ? "別のねことして保存" : "保存"}
-              </AppButton>
-              <AppButton
-                type="button"
-                onClick={cancelAddingCat}
-                variant="quiet"
-                size="md"
-              >
-                {"キャンセル"}
-              </AppButton>
-            </div>
-          </AppCard>
-        ) : null}
-
         {activeCatProfile && !isOnboardingCompletionView && activeLens === "cat" ? (
           <AppCard
             variant="section"
@@ -896,6 +868,7 @@ export function CatsPage() {
             title="最近のすがた"
             photos={activeCatLensPhotos}
             emptyCopy="このこに紐づく ねがおは、まだありません。"
+            onOpenAll={() => setPhotoSheetLens("cat")}
           />
         ) : null}
 
@@ -903,6 +876,7 @@ export function CatsPage() {
           <AllCatsLensView
             photos={allLensPhotos}
             catCount={catProfiles.length}
+            onOpenAll={() => setPhotoSheetLens("all")}
           />
         ) : null}
 
@@ -1025,18 +999,79 @@ export function CatsPage() {
       ) : null}
       {isCatManageOpen && activeCatProfile ? (
         <AppBottomSheet
-          title={isCatManageEditing ? "基本情報を編集" : "うちのこを管理"}
+          title={
+            isCatManageEditing
+              ? "基本情報を編集"
+              : isAddingCat
+                ? "ねこをふやす"
+                : "うちのこを管理"
+          }
           onClose={() => {
             setIsCatManageOpen(false);
             if (isCatManageEditing) {
               cancelEditingCatName();
+            } else if (isAddingCat) {
+              cancelAddingCat();
             } else {
               setIsCatManageEditing(false);
             }
           }}
         >
           <div style={styles.catManageSheet}>
-            {isCatManageEditing ? (
+            {isAddingCat ? (
+              <div style={styles.catManageEditor}>
+                <div style={styles.catManageEditorHero}>
+                  <span style={styles.catManageAddAvatar} aria-hidden="true">
+                    <AddSmallIcon />
+                  </span>
+                  <div style={styles.catManageEditorHeroText}>
+                    <p style={styles.catManageEditorKicker}>新しい子</p>
+                    <p style={styles.catManageEditorName}>
+                      {newCatNameInput.trim() || "名前を入れる"}
+                    </p>
+                  </div>
+                </div>
+
+                <section style={styles.catManageFormSection}>
+                  <p style={styles.catManageFormTitle}>名前</p>
+                  <AppTextField
+                    id="new-cat-name"
+                    type="text"
+                    label="この子の名前"
+                    value={newCatNameInput}
+                    onChange={(event) => {
+                      setNewCatNameInput(event.target.value);
+                      setDuplicateCatNameToConfirm(null);
+                    }}
+                    placeholder="例：麦"
+                  />
+                  {duplicateCatNameToConfirm ? (
+                    <p style={styles.duplicateCatWarning}>
+                      おなじこかもしれません。別のねことして保存しますか？
+                    </p>
+                  ) : null}
+                </section>
+
+                <div style={styles.catManageEditorActions}>
+                  <AppButton
+                    type="button"
+                    variant="quiet"
+                    fullWidth
+                    onClick={cancelAddingCat}
+                  >
+                    戻る
+                  </AppButton>
+                  <AppButton
+                    type="button"
+                    variant="primary"
+                    fullWidth
+                    onClick={handleAddCatSave}
+                  >
+                    {duplicateCatNameToConfirm ? "別のねことして保存" : "保存"}
+                  </AppButton>
+                </div>
+              </div>
+            ) : isCatManageEditing ? (
               <div style={styles.catManageEditor}>
                 <div style={styles.catManageEditorHero}>
                   <img
@@ -1092,7 +1127,7 @@ export function CatsPage() {
                   <AppSegmented<EditableGender>
                     value={editGender}
                     ariaLabel="性別"
-                    columns={3}
+                    columns={1}
                     onChange={setEditGender}
                     options={[
                       { value: "male", label: "男の子" },
@@ -1157,7 +1192,6 @@ export function CatsPage() {
               fullWidth
               iconStart={<AddSmallIcon />}
               onClick={() => {
-                setIsCatManageOpen(false);
                 startAddingCat();
               }}
             >
@@ -1307,6 +1341,14 @@ export function CatsPage() {
             setOmoideRefreshTick((value) => value + 1);
             setSelectedOmoideMemory(null);
           }}
+        />
+      ) : null}
+      {photoSheetLens ? (
+        <PhotoListSheet
+          title={photoSheetTitle}
+          photos={photoSheetPhotos}
+          showCatNames={photoSheetLens === "all"}
+          onClose={() => setPhotoSheetLens(null)}
         />
       ) : null}
     </main>
@@ -1481,10 +1523,12 @@ function LensPhotoSection({
   title,
   photos,
   emptyCopy,
+  onOpenAll,
 }: {
   title: string;
   photos: LensPhoto[];
   emptyCopy: string;
+  onOpenAll?: () => void;
 }) {
   return (
     <section style={styles.lensPhotoSection}>
@@ -1495,6 +1539,7 @@ function LensPhotoSection({
         photos={photos}
         emptyCopy={emptyCopy}
         showCatNames={false}
+        onOpenAll={onOpenAll}
       />
     </section>
   );
@@ -1503,9 +1548,11 @@ function LensPhotoSection({
 function AllCatsLensView({
   photos,
   catCount,
+  onOpenAll,
 }: {
   photos: LensPhoto[];
   catCount: number;
+  onOpenAll?: () => void;
 }) {
   return (
     <section style={styles.allLensCard}>
@@ -1519,6 +1566,7 @@ function AllCatsLensView({
         photos={photos}
         emptyCopy="まだ ねがおはありません。"
         showCatNames
+        onOpenAll={onOpenAll}
       />
     </section>
   );
@@ -1528,10 +1576,12 @@ function LensPhotoGrid({
   photos,
   emptyCopy,
   showCatNames,
+  onOpenAll,
 }: {
   photos: LensPhoto[];
   emptyCopy: string;
   showCatNames: boolean;
+  onOpenAll?: () => void;
 }) {
   if (photos.length === 0) {
     return <p style={styles.lensPhotoEmpty}>{emptyCopy}</p>;
@@ -1565,11 +1615,67 @@ function LensPhotoGrid({
         ))}
       </div>
       {hiddenCount > 0 ? (
-        <p style={styles.lensPhotoMore}>
-          最近の{visiblePhotos.length}枚を表示中
-        </p>
+        <div style={styles.lensPhotoMoreRow}>
+          <span style={styles.lensPhotoMore}>
+            最近の{visiblePhotos.length}枚を表示中
+          </span>
+          {onOpenAll ? (
+            <AppButton
+              type="button"
+              variant="quiet"
+              size="sm"
+              onClick={onOpenAll}
+              style={styles.lensPhotoMoreButton}
+            >
+              すべて見る
+            </AppButton>
+          ) : null}
+        </div>
       ) : null}
     </>
+  );
+}
+
+function PhotoListSheet({
+  title,
+  photos,
+  showCatNames,
+  onClose,
+}: {
+  title: string;
+  photos: LensPhoto[];
+  showCatNames: boolean;
+  onClose: () => void;
+}) {
+  return (
+    <AppBottomSheet title={title} onClose={onClose}>
+      <div style={styles.photoListSheet}>
+        <p style={styles.photoListCount}>{photos.length}枚</p>
+        {photos.length === 0 ? (
+          <p style={styles.lensPhotoEmpty}>まだ ねがおはありません。</p>
+        ) : (
+          <div style={styles.photoListGrid}>
+            {photos.map((photo) => (
+              <div key={photo.id} style={styles.photoListItem}>
+                <PhotoTile
+                  src={photo.src}
+                  alt=""
+                  variant="tile"
+                  aspect="1 / 1"
+                  style={styles.photoListTileRoot}
+                  imageStyle={styles.photoListTile}
+                />
+                {showCatNames && photo.catNames.length > 0 ? (
+                  <span style={styles.photoListCatNames}>
+                    {photo.catNames.join("・")}
+                  </span>
+                ) : null}
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+    </AppBottomSheet>
   );
 }
 
@@ -2769,8 +2875,7 @@ const styles = {
   },
   summaryPanel: {
     marginBottom: "12px",
-    background:
-      "linear-gradient(145deg, color-mix(in srgb, var(--paper-card) 42%, transparent), color-mix(in srgb, var(--paper-warm) 14%, transparent))",
+    background: CATS_PANEL_BACKGROUND,
   },
   summaryHeader: {
     display: "grid",
@@ -3013,10 +3118,13 @@ const styles = {
   catManageSheet: {
     display: "grid",
     gap: "9px",
+    minWidth: 0,
+    overflowX: "hidden",
   },
   catManageEditor: {
     display: "grid",
     gap: "14px",
+    minWidth: 0,
   },
   catManageEditorHero: {
     display: "grid",
@@ -3037,6 +3145,18 @@ const styles = {
     background: "var(--paper-card)",
     boxShadow:
       "0 0 0 3px color-mix(in srgb, var(--paper-card) 82%, transparent), var(--shadow-e1)",
+  },
+  catManageAddAvatar: {
+    width: "44px",
+    height: "44px",
+    display: "inline-flex",
+    alignItems: "center",
+    justifyContent: "center",
+    borderRadius: "50%",
+    color: CATS_MUTED,
+    background: "color-mix(in srgb, var(--paper-card) 84%, transparent)",
+    boxShadow:
+      "0 0 0 2px color-mix(in srgb, var(--paper-card) 78%, transparent), var(--shadow-e1)",
   },
   catManageEditorHeroText: {
     display: "grid",
@@ -3067,6 +3187,7 @@ const styles = {
   catManageFormSection: {
     display: "grid",
     gap: "10px",
+    minWidth: 0,
     padding: "12px",
     borderRadius: "var(--radius-xl)",
     background:
@@ -3084,8 +3205,9 @@ const styles = {
   },
   catManageDateGrid: {
     display: "grid",
-    gridTemplateColumns: "repeat(2, minmax(0, 1fr))",
+    gridTemplateColumns: "minmax(0, 1fr)",
     gap: "10px",
+    minWidth: 0,
   },
   catManageEditorActions: {
     position: "sticky",
@@ -3209,13 +3331,81 @@ const styles = {
     letterSpacing: CATS_BODY_TRACKING,
   },
   lensPhotoMore: {
-    margin: "8px 6px 0",
+    margin: 0,
     color: CATS_FAINT,
     fontFamily: CATS_SERIF,
     fontSize: CATS_TINY_SIZE,
     fontWeight: 400,
     lineHeight: 1.45,
     letterSpacing: CATS_META_TRACKING,
+  },
+  lensPhotoMoreRow: {
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: "8px",
+    margin: "8px 6px 0",
+  },
+  lensPhotoMoreButton: {
+    flex: "0 0 auto",
+    minHeight: "34px",
+    padding: "0 12px",
+  },
+  photoListSheet: {
+    display: "grid",
+    gap: "10px",
+    minWidth: 0,
+  },
+  photoListCount: {
+    margin: "0 2px",
+    color: CATS_MUTED,
+    fontFamily: CATS_UI,
+    fontSize: CATS_META_SIZE,
+    fontWeight: 400,
+    lineHeight: 1.4,
+    letterSpacing: CATS_META_TRACKING,
+  },
+  photoListGrid: {
+    display: "grid",
+    gridTemplateColumns: "repeat(3, minmax(0, 1fr))",
+    gap: "2px",
+    minWidth: 0,
+  },
+  photoListItem: {
+    position: "relative",
+    minWidth: 0,
+    aspectRatio: "1 / 1",
+    overflow: "hidden",
+    background: "color-mix(in srgb, var(--paper-warm) 34%, transparent)",
+  },
+  photoListTileRoot: {
+    width: "100%",
+    height: "100%",
+    display: "block",
+  },
+  photoListTile: {
+    width: "100%",
+    height: "100%",
+    border: "none",
+    borderRadius: "0",
+    boxShadow: "none",
+  },
+  photoListCatNames: {
+    position: "absolute",
+    left: "4px",
+    bottom: "4px",
+    maxWidth: "calc(100% - 8px)",
+    padding: "2px 5px",
+    borderRadius: "var(--radius-full)",
+    background: "color-mix(in srgb, var(--paper-card) 78%, transparent)",
+    color: CATS_MUTED,
+    fontFamily: CATS_UI,
+    fontSize: "10px",
+    fontWeight: 400,
+    lineHeight: 1.25,
+    overflow: "hidden",
+    textOverflow: "ellipsis",
+    whiteSpace: "nowrap",
   },
   zukanHint: {
     margin: "8px 0 0",
