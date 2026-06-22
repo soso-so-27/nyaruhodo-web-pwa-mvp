@@ -2,8 +2,8 @@ import { STORAGE_KEYS, getRecordLogKey } from "./storage";
 import { createBrowserSupabaseClient } from "./supabase/browser";
 import {
   dispatchBoxPhotoStorageEvent,
+  readAllOwnSleepingPhotos,
   readKeptExchangePhotos,
-  readOwnSleepingPhotos,
   restoreSyncedSleepingPhotos,
   type ExchangePhoto,
   type OwnSleepingPhoto,
@@ -60,7 +60,13 @@ type LocalSnapshot = {
   collectionPhotos: LocalCollectionStore;
   ownSleepingPhotos: OwnSleepingPhoto[];
   keptExchangePhotos: ExchangePhoto[];
+  localState: LocalStateItem[];
   hasCompletedOnboarding: boolean;
+};
+
+type LocalStateItem = {
+  key: string;
+  value: unknown;
 };
 
 type RemoteCatRow = {
@@ -136,6 +142,11 @@ type RemoteCatMomentDeliveryRow = {
   delivered_at: string;
 };
 
+type RemoteLocalStateRow = {
+  state_key: string;
+  value: unknown;
+};
+
 type SyncStatus = "skipped" | "synced" | "restored" | "error";
 
 export type AccountSyncResult = {
@@ -145,11 +156,13 @@ export type AccountSyncResult = {
   pushedCollectionPhotos: number;
   pushedOwnSleepingPhotos: number;
   pushedKeptExchangePhotos: number;
+  pushedLocalState: number;
   restoredCats: number;
   restoredRecords: number;
   restoredCollectionPhotos: number;
   restoredOwnSleepingPhotos: number;
   restoredKeptExchangePhotos: number;
+  restoredLocalState: number;
   errors: string[];
 };
 
@@ -161,11 +174,13 @@ export type AccountSyncOverview = {
   localCollectionPhotos: number;
   localOwnSleepingPhotos: number;
   localKeptExchangePhotos: number;
+  localStateItems: number;
   remoteCats: number;
   remoteRecords: number;
   remoteCollectionPhotos: number;
   remoteOwnSleepingPhotos: number;
   remoteKeptExchangePhotos: number;
+  remoteLocalStateItems: number;
   lastPushAt: string | null;
   lastPullAt: string | null;
   shouldSuggestRestore: boolean;
@@ -178,6 +193,47 @@ export type AccountDeleteResult = {
 };
 
 const SYNC_METADATA = { source: "localStorage-v1" };
+const LOCAL_STATE_SOURCE = "account-local-state-v1";
+const SYNCABLE_LOCAL_STATE_KEYS = new Set([
+  STORAGE_KEYS.activeCatId,
+  STORAGE_KEYS.currentCatHintSuppression,
+  STORAGE_KEYS.eveningDeliveryDays,
+  STORAGE_KEYS.omoideMemories,
+  STORAGE_KEYS.omoideMemoryControls,
+  STORAGE_KEYS.onboardingCompleted,
+  "neteruneko_cat_sleeping_stats",
+  "neteruneko_cat_sleeping_milestones",
+  "neteruneko_open_sound_enabled",
+  "neteruneko_open_sound_candidate",
+  "nyaruhodo_exchange_dismissed_photos",
+  "nyaruhodo_exchange_reported_photos",
+  "nyaruhodo_sleeping_safety_accepted",
+  "neteruneko_home_install_hint_dismissed",
+]);
+const SYNCABLE_LOCAL_STATE_PREFIXES = [
+  "discovery_log_",
+  "light_data_",
+  "lock_data_",
+  "active_cat_id_mikke_window_answers_",
+];
+const LOCAL_STATE_SKIP_KEYS = new Set([
+  STORAGE_KEYS.accountCreatePromptDismissed,
+  STORAGE_KEYS.accountRestorePromptDismissed,
+  STORAGE_KEYS.analyticsAnonymousId,
+  STORAGE_KEYS.analyticsEventQueue,
+  STORAGE_KEYS.analyticsSession,
+  STORAGE_KEYS.authGooglePending,
+  STORAGE_KEYS.catProfiles,
+  STORAGE_KEYS.collectionPhotos,
+  STORAGE_KEYS.legacyCatProfile,
+  STORAGE_KEYS.lastContext,
+  STORAGE_KEYS.lastInputSignal,
+  STORAGE_KEYS.lastPrimaryCategory,
+  STORAGE_KEYS.latestHypothesis,
+  "nyaruhodo_exchange_own_sleeping_photos",
+  "nyaruhodo_exchange_kept_photos",
+  "neteruneko_mainichi_seen_photo_keys",
+]);
 
 export async function getAccountSyncOverview(): Promise<AccountSyncOverview> {
   const emptyOverview: AccountSyncOverview = {
@@ -188,11 +244,13 @@ export async function getAccountSyncOverview(): Promise<AccountSyncOverview> {
     localCollectionPhotos: 0,
     localOwnSleepingPhotos: 0,
     localKeptExchangePhotos: 0,
+    localStateItems: 0,
     remoteCats: 0,
     remoteRecords: 0,
     remoteCollectionPhotos: 0,
     remoteOwnSleepingPhotos: 0,
     remoteKeptExchangePhotos: 0,
+    remoteLocalStateItems: 0,
     lastPushAt: null,
     lastPullAt: null,
     shouldSuggestRestore: false,
@@ -209,6 +267,7 @@ export async function getAccountSyncOverview(): Promise<AccountSyncOverview> {
   const localCollectionPhotos = countLocalCollectionPhotos(snapshot.collectionPhotos);
   const localOwnSleepingPhotos = snapshot.ownSleepingPhotos.length;
   const localKeptExchangePhotos = snapshot.keptExchangePhotos.length;
+  const localStateItems = snapshot.localState.length;
   const hasLocalData = hasMeaningfulLocalData(snapshot);
   const supabase = createBrowserSupabaseClient();
 
@@ -221,6 +280,7 @@ export async function getAccountSyncOverview(): Promise<AccountSyncOverview> {
       localCollectionPhotos,
       localOwnSleepingPhotos,
       localKeptExchangePhotos,
+      localStateItems,
     };
   }
 
@@ -235,6 +295,7 @@ export async function getAccountSyncOverview(): Promise<AccountSyncOverview> {
       localCollectionPhotos,
       localOwnSleepingPhotos,
       localKeptExchangePhotos,
+      localStateItems,
       errors: error ? [error.message] : [],
     };
   }
@@ -246,6 +307,7 @@ export async function getAccountSyncOverview(): Promise<AccountSyncOverview> {
     collectionResult,
     ownSleepingResult,
     keptExchangeResult,
+    localStateResult,
     syncStateResult,
   ] =
     await Promise.all([
@@ -271,6 +333,10 @@ export async function getAccountSyncOverview(): Promise<AccountSyncOverview> {
         .eq("user_id", userId)
         .eq("status", "kept"),
       supabase
+        .from("account_local_state")
+        .select("state_key", { count: "exact", head: true })
+        .eq("user_id", userId),
+      supabase
         .from("account_sync_state")
         .select("last_push_at,last_pull_at")
         .eq("user_id", userId)
@@ -284,6 +350,7 @@ export async function getAccountSyncOverview(): Promise<AccountSyncOverview> {
   const remoteCollectionPhotos = collectionResult.count ?? 0;
   const remoteOwnSleepingPhotos = ownSleepingResult.count ?? 0;
   const remoteKeptExchangePhotos = keptExchangeResult.count ?? 0;
+  const remoteLocalStateItems = localStateResult.count ?? 0;
   const errors = [
     catsResult.error ? `cats: ${catsResult.error.message}` : null,
     recordsResult.error ? `records: ${recordsResult.error.message}` : null,
@@ -291,6 +358,9 @@ export async function getAccountSyncOverview(): Promise<AccountSyncOverview> {
     ownSleepingResult.error ? `cat_moments: ${ownSleepingResult.error.message}` : null,
     keptExchangeResult.error
       ? `cat_moment_deliveries: ${keptExchangeResult.error.message}`
+      : null,
+    localStateResult.error
+      ? `account_local_state: ${localStateResult.error.message}`
       : null,
     syncStateResult.error ? `account_sync_state: ${syncStateResult.error.message}` : null,
   ].filter((message): message is string => Boolean(message));
@@ -302,7 +372,8 @@ export async function getAccountSyncOverview(): Promise<AccountSyncOverview> {
     remoteRecords > 0 ||
     remoteCollectionPhotos > 0 ||
     remoteOwnSleepingPhotos > 0 ||
-    remoteKeptExchangePhotos > 0;
+    remoteKeptExchangePhotos > 0 ||
+    remoteLocalStateItems > 0;
 
   return {
     isLoggedIn: true,
@@ -312,11 +383,13 @@ export async function getAccountSyncOverview(): Promise<AccountSyncOverview> {
     localCollectionPhotos,
     localOwnSleepingPhotos,
     localKeptExchangePhotos,
+    localStateItems,
     remoteCats,
     remoteRecords,
     remoteCollectionPhotos,
     remoteOwnSleepingPhotos,
     remoteKeptExchangePhotos,
+    remoteLocalStateItems,
     lastPushAt: syncState?.last_push_at ?? null,
     lastPullAt: syncState?.last_pull_at ?? null,
     shouldSuggestRestore:
@@ -326,7 +399,8 @@ export async function getAccountSyncOverview(): Promise<AccountSyncOverview> {
         remoteRecords > localRecords ||
         remoteCollectionPhotos > localCollectionPhotos ||
         remoteOwnSleepingPhotos > localOwnSleepingPhotos ||
-        remoteKeptExchangePhotos > localKeptExchangePhotos),
+        remoteKeptExchangePhotos > localKeptExchangePhotos ||
+        remoteLocalStateItems > localStateItems),
     errors,
   };
 }
@@ -369,6 +443,7 @@ export async function syncLocalDataWithAccount(options?: {
       await restoreRemoteSnapshot(supabase, data.user.id, result, {
         mergeLocal: true,
         replaceLocalCats: true,
+        replaceLocalState: true,
       });
       if (result.errors.length > 0) {
         return { ...result, status: "error" };
@@ -561,7 +636,8 @@ function hasRestoredAccountData(result: AccountSyncResult) {
     result.restoredRecords > 0 ||
     result.restoredCollectionPhotos > 0 ||
     result.restoredOwnSleepingPhotos > 0 ||
-    result.restoredKeptExchangePhotos > 0
+    result.restoredKeptExchangePhotos > 0 ||
+    result.restoredLocalState > 0
   );
 }
 
@@ -573,11 +649,13 @@ function createEmptyResult(): AccountSyncResult {
     pushedCollectionPhotos: 0,
     pushedOwnSleepingPhotos: 0,
     pushedKeptExchangePhotos: 0,
+    pushedLocalState: 0,
     restoredCats: 0,
     restoredRecords: 0,
     restoredCollectionPhotos: 0,
     restoredOwnSleepingPhotos: 0,
     restoredKeptExchangePhotos: 0,
+    restoredLocalState: 0,
     errors: [],
   };
 }
@@ -590,8 +668,9 @@ function readLocalSnapshot(): LocalSnapshot {
   );
   const collectionPhotos =
     readJson<LocalCollectionStore>(STORAGE_KEYS.collectionPhotos) ?? {};
-  const ownSleepingPhotos = readOwnSleepingPhotos();
+  const ownSleepingPhotos = readAllOwnSleepingPhotos();
   const keptExchangePhotos = readKeptExchangePhotos();
+  const localState = readSyncableLocalState();
   const recordLogsByCatId = new Map<string, LocalRecordLogItem[]>();
 
   for (const profile of profiles) {
@@ -608,6 +687,7 @@ function readLocalSnapshot(): LocalSnapshot {
     collectionPhotos,
     ownSleepingPhotos,
     keptExchangePhotos,
+    localState,
     hasCompletedOnboarding:
       window.localStorage.getItem(STORAGE_KEYS.onboardingCompleted) === "true",
   };
@@ -756,7 +836,8 @@ async function pushLocalSnapshot(
     remoteCatIds,
     result,
   );
-  await syncSleepingPhotos(supabase, userId, snapshot, result);
+  await syncSleepingPhotos(supabase, userId, snapshot, remoteCatIds, result);
+  await syncLocalState(supabase, userId, snapshot.localState, result);
 }
 
 async function syncCatProfile(
@@ -985,6 +1066,7 @@ async function syncSleepingPhotos(
   supabase: NonNullable<ReturnType<typeof createBrowserSupabaseClient>>,
   userId: string,
   snapshot: LocalSnapshot,
+  remoteCatIds: Map<string, string>,
   result: AccountSyncResult,
 ) {
   try {
@@ -1057,6 +1139,8 @@ async function syncSleepingPhotos(
 
       result.pushedOwnSleepingPhotos +=
         momentRowsToInsert.length + momentRowsToUpdate.length;
+
+      await syncCatMomentCatLinks(supabase, userId, momentRows, remoteCatIds);
     }
 
     const deliveryRows = (
@@ -1136,6 +1220,127 @@ async function syncSleepingPhotos(
   }
 }
 
+async function syncCatMomentCatLinks(
+  supabase: NonNullable<ReturnType<typeof createBrowserSupabaseClient>>,
+  userId: string,
+  momentRows: {
+    local_moment_id: string;
+    local_cat_id: string | null | undefined;
+    owner_cat_id: string | null | undefined;
+  }[],
+  remoteCatIds: Map<string, string>,
+) {
+  const localMomentIds = momentRows
+    .map((row) => row.local_moment_id)
+    .filter((id) => id.length > 0);
+
+  if (localMomentIds.length === 0) {
+    return;
+  }
+
+  const remoteMomentIds = await fetchRemoteMomentIdsByLocalId(
+    supabase,
+    userId,
+    localMomentIds,
+  );
+  const rows = momentRows
+    .map((row) => {
+      const catMomentId = remoteMomentIds.get(row.local_moment_id);
+      const remoteCatId =
+        (row.local_cat_id ? remoteCatIds.get(row.local_cat_id) : undefined) ??
+        (row.owner_cat_id ? remoteCatIds.get(row.owner_cat_id) : undefined) ??
+        null;
+
+      if (!catMomentId || !remoteCatId) {
+        return null;
+      }
+
+      return {
+        user_id: userId,
+        cat_moment_id: catMomentId,
+        cat_id: remoteCatId,
+        is_primary: true,
+        metadata: SYNC_METADATA,
+      };
+    })
+    .filter((row): row is NonNullable<typeof row> => Boolean(row));
+
+  if (rows.length === 0) {
+    return;
+  }
+
+  const { error } = await supabase
+    .from("cat_moment_cats")
+    .upsert(rows, { onConflict: "cat_moment_id,cat_id" });
+
+  if (error) {
+    throw new Error(`Cat moment link sync failed: ${error.message}`);
+  }
+}
+
+async function fetchRemoteMomentIdsByLocalId(
+  supabase: NonNullable<ReturnType<typeof createBrowserSupabaseClient>>,
+  userId: string,
+  localMomentIds: string[],
+) {
+  const byLocalId = new Map<string, string>();
+  const chunkSize = 500;
+
+  for (let start = 0; start < localMomentIds.length; start += chunkSize) {
+    const chunk = localMomentIds.slice(start, start + chunkSize);
+    const { data, error } = await supabase
+      .from("cat_moments")
+      .select("id,local_moment_id")
+      .eq("user_id", userId)
+      .in("local_moment_id", chunk);
+
+    if (error) {
+      throw new Error(`Cat moment link lookup failed: ${error.message}`);
+    }
+
+    for (const row of (data ?? []) as {
+      id: string | null;
+      local_moment_id: string | null;
+    }[]) {
+      if (row.id && row.local_moment_id) {
+        byLocalId.set(row.local_moment_id, row.id);
+      }
+    }
+  }
+
+  return byLocalId;
+}
+
+async function syncLocalState(
+  supabase: NonNullable<ReturnType<typeof createBrowserSupabaseClient>>,
+  userId: string,
+  localState: LocalStateItem[],
+  result: AccountSyncResult,
+) {
+  if (localState.length === 0) {
+    return;
+  }
+
+  const rows = localState.map((item) => ({
+    user_id: userId,
+    state_key: item.key,
+    value: {
+      source: LOCAL_STATE_SOURCE,
+      value: item.value,
+    },
+  }));
+
+  const { error } = await supabase
+    .from("account_local_state")
+    .upsert(rows, { onConflict: "user_id,state_key" });
+
+  if (error) {
+    throw new Error(`Local state sync failed: ${error.message}`);
+  }
+
+  result.pushedLocalState += rows.length;
+}
+
 async function prepareRemoteSleepingPhotoUrl(
   supabase: NonNullable<ReturnType<typeof createBrowserSupabaseClient>>,
   userId: string,
@@ -1169,7 +1374,11 @@ async function restoreRemoteSnapshot(
   supabase: NonNullable<ReturnType<typeof createBrowserSupabaseClient>>,
   userId: string,
   result: AccountSyncResult,
-  options: { mergeLocal: boolean; replaceLocalCats?: boolean },
+  options: {
+    mergeLocal: boolean;
+    replaceLocalCats?: boolean;
+    replaceLocalState?: boolean;
+  },
 ) {
   const { data: cats, error: catsError } = await supabase
     .from("cats")
@@ -1188,6 +1397,7 @@ async function restoreRemoteSnapshot(
 
   if (remoteCats.length === 0) {
     await restoreSleepingPhotos(supabase, userId, remoteIdToLocalId, result, options);
+    await restoreLocalState(supabase, userId, result, options);
     return;
   }
 
@@ -1261,6 +1471,7 @@ async function restoreRemoteSnapshot(
   await restoreRecordLogs(supabase, userId, remoteIdToLocalId, result, options);
   await restoreCollectionPhotos(supabase, userId, remoteIdToLocalId, result, options);
   await restoreSleepingPhotos(supabase, userId, remoteIdToLocalId, result, options);
+  await restoreLocalState(supabase, userId, result, options);
 }
 
 async function restoreRecordLogs(
@@ -1390,41 +1601,19 @@ async function restoreSleepingPhotos(
   result: AccountSyncResult,
   options: { mergeLocal: boolean },
 ) {
-  const [momentsResult, deliveriesResult] = await Promise.all([
-    supabase
-      .from("cat_moments")
-      .select(
-        "id, local_moment_id, local_cat_id, owner_cat_id, photo_url, state, visibility, delivery_status, source_moment_id, metadata, captured_at, created_at",
-      )
-      .eq("user_id", userId)
-      .order("created_at", { ascending: false })
-      .limit(24),
-    supabase
-      .from("cat_moment_deliveries")
-      .select(
-        "id, local_delivery_id, source_moment_id, source_photo_id, recipient_local_cat_id, photo_url, status, metadata, delivered_at",
-      )
-      .eq("user_id", userId)
-      .eq("status", "kept")
-      .order("delivered_at", { ascending: false })
-      .limit(50),
-  ]);
+  const { moments, deliveries, errors } = await fetchAllSleepingPhotoRows(
+    supabase,
+    userId,
+  );
 
-  if (momentsResult.error || deliveriesResult.error) {
-    if (momentsResult.error) {
-      result.errors.push(
-        `Sleeping photo restore skipped: ${momentsResult.error.message}`,
-      );
-    }
-    if (deliveriesResult.error) {
-      result.errors.push(`Kept photo restore skipped: ${deliveriesResult.error.message}`);
-    }
+  if (errors.length > 0) {
+    result.errors.push(...errors);
     return;
   }
 
   const ownPhotos = (
     await Promise.all(
-      ((momentsResult.data ?? []) as RemoteCatMomentRow[]).map(
+      moments.map(
         async (moment): Promise<OwnSleepingPhoto | null> => {
       const localCatId =
         moment.local_cat_id ||
@@ -1460,7 +1649,7 @@ async function restoreSleepingPhotos(
 
   const keptPhotos = (
     await Promise.all(
-      ((deliveriesResult.data ?? []) as RemoteCatMomentDeliveryRow[]).map(
+      deliveries.map(
         async (delivery): Promise<ExchangePhoto | null> => {
       const metadata = delivery.metadata ?? {};
       const deliveredAt = new Date(delivery.delivered_at).getTime();
@@ -1495,6 +1684,135 @@ async function restoreSleepingPhotos(
 
   result.restoredOwnSleepingPhotos += restored.ownCount;
   result.restoredKeptExchangePhotos += restored.keptCount;
+}
+
+async function fetchAllSleepingPhotoRows(
+  supabase: NonNullable<ReturnType<typeof createBrowserSupabaseClient>>,
+  userId: string,
+) {
+  const [momentsResult, deliveriesResult] = await Promise.all([
+    fetchAllCatMomentRows(supabase, userId),
+    fetchAllKeptDeliveryRows(supabase, userId),
+  ]);
+
+  return {
+    moments: momentsResult.rows,
+    deliveries: deliveriesResult.rows,
+    errors: [...momentsResult.errors, ...deliveriesResult.errors],
+  };
+}
+
+async function fetchAllCatMomentRows(
+  supabase: NonNullable<ReturnType<typeof createBrowserSupabaseClient>>,
+  userId: string,
+) {
+  const rows: RemoteCatMomentRow[] = [];
+  const errors: string[] = [];
+  const pageSize = 1000;
+
+  for (let from = 0; ; from += pageSize) {
+    const { data, error } = await supabase
+      .from("cat_moments")
+      .select(
+        "id, local_moment_id, local_cat_id, owner_cat_id, photo_url, state, visibility, delivery_status, source_moment_id, metadata, captured_at, created_at",
+      )
+      .eq("user_id", userId)
+      .order("created_at", { ascending: false })
+      .range(from, from + pageSize - 1);
+
+    if (error) {
+      errors.push(`Sleeping photo restore skipped: ${error.message}`);
+      break;
+    }
+
+    const page = ((data ?? []) as RemoteCatMomentRow[]).filter(Boolean);
+    rows.push(...page);
+
+    if (page.length < pageSize) {
+      break;
+    }
+  }
+
+  return { rows, errors };
+}
+
+async function fetchAllKeptDeliveryRows(
+  supabase: NonNullable<ReturnType<typeof createBrowserSupabaseClient>>,
+  userId: string,
+) {
+  const rows: RemoteCatMomentDeliveryRow[] = [];
+  const errors: string[] = [];
+  const pageSize = 1000;
+
+  for (let from = 0; ; from += pageSize) {
+    const { data, error } = await supabase
+      .from("cat_moment_deliveries")
+      .select(
+        "id, local_delivery_id, source_moment_id, source_photo_id, recipient_local_cat_id, photo_url, status, metadata, delivered_at",
+      )
+      .eq("user_id", userId)
+      .eq("status", "kept")
+      .order("delivered_at", { ascending: false })
+      .range(from, from + pageSize - 1);
+
+    if (error) {
+      errors.push(`Kept photo restore skipped: ${error.message}`);
+      break;
+    }
+
+    const page = ((data ?? []) as RemoteCatMomentDeliveryRow[]).filter(Boolean);
+    rows.push(...page);
+
+    if (page.length < pageSize) {
+      break;
+    }
+  }
+
+  return { rows, errors };
+}
+
+async function restoreLocalState(
+  supabase: NonNullable<ReturnType<typeof createBrowserSupabaseClient>>,
+  userId: string,
+  result: AccountSyncResult,
+  options: { mergeLocal: boolean; replaceLocalState?: boolean },
+) {
+  const { data, error } = await supabase
+    .from("account_local_state")
+    .select("state_key,value")
+    .eq("user_id", userId);
+
+  if (error) {
+    result.errors.push(`Local state restore skipped: ${error.message}`);
+    return;
+  }
+
+  let restoredCount = 0;
+
+  for (const row of (data ?? []) as RemoteLocalStateRow[]) {
+    if (!isSyncableLocalStateKey(row.state_key)) {
+      continue;
+    }
+
+    if (
+      options.mergeLocal &&
+      !options.replaceLocalState &&
+      window.localStorage.getItem(row.state_key) !== null
+    ) {
+      continue;
+    }
+
+    const value = unwrapRemoteLocalStateValue(row.value);
+
+    try {
+      window.localStorage.setItem(row.state_key, serializeLocalStateValue(value));
+      restoredCount += 1;
+    } catch {
+      result.errors.push(`Local state restore skipped: ${row.state_key}`);
+    }
+  }
+
+  result.restoredLocalState += restoredCount;
 }
 
 async function saveSyncState(
@@ -1783,9 +2101,77 @@ function readJson<T>(key: string): T | null {
   }
 }
 
+function readSyncableLocalState(): LocalStateItem[] {
+  if (typeof window === "undefined") {
+    return [];
+  }
+
+  const items: LocalStateItem[] = [];
+
+  for (let index = 0; index < window.localStorage.length; index += 1) {
+    const key = window.localStorage.key(index);
+
+    if (!key || !isSyncableLocalStateKey(key)) {
+      continue;
+    }
+
+    const raw = window.localStorage.getItem(key);
+
+    if (raw === null) {
+      continue;
+    }
+
+    items.push({
+      key,
+      value: parseLocalStateValue(raw),
+    });
+  }
+
+  return items;
+}
+
+function isSyncableLocalStateKey(key: string) {
+  if (LOCAL_STATE_SKIP_KEYS.has(key)) {
+    return false;
+  }
+
+  return (
+    SYNCABLE_LOCAL_STATE_KEYS.has(key) ||
+    SYNCABLE_LOCAL_STATE_PREFIXES.some((prefix) => key.startsWith(prefix))
+  );
+}
+
+function parseLocalStateValue(raw: string) {
+  try {
+    return JSON.parse(raw) as unknown;
+  } catch {
+    return raw;
+  }
+}
+
+function unwrapRemoteLocalStateValue(value: unknown) {
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    return value;
+  }
+
+  const wrapped = value as { source?: unknown; value?: unknown };
+
+  if (wrapped.source === LOCAL_STATE_SOURCE && "value" in wrapped) {
+    return wrapped.value;
+  }
+
+  return value;
+}
+
+function serializeLocalStateValue(value: unknown) {
+  return typeof value === "string" ? value : JSON.stringify(value ?? null);
+}
+
 function writeCollectionStoreWithFallback(collectionStore: LocalCollectionStore) {
-  for (const maxPhotosPerSlot of [12, 8, 4, 2, 1]) {
-    const trimmedStore = trimCollectionStore(collectionStore, maxPhotosPerSlot);
+  for (const maxPhotosPerSlot of [Number.POSITIVE_INFINITY, 24, 12, 8, 4, 2, 1]) {
+    const trimmedStore = Number.isFinite(maxPhotosPerSlot)
+      ? trimCollectionStore(collectionStore, maxPhotosPerSlot)
+      : collectionStore;
 
     try {
       window.localStorage.setItem(

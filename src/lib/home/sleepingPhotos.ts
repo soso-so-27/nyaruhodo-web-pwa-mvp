@@ -1013,8 +1013,11 @@ function writeStorageArrayWithFallback<T>(
   minRetainedCount = 1,
 ) {
   const minimumCount = Math.max(1, Math.min(minRetainedCount, value.length));
+  const effectiveKeepCounts = [...new Set([value.length, ...keepCounts])]
+    .filter((keepCount) => keepCount > 0)
+    .sort((a, b) => b - a);
 
-  for (const keepCount of keepCounts) {
+  for (const keepCount of effectiveKeepCounts) {
     const nextValue = value.slice(0, keepCount);
 
     if (nextValue.length < minimumCount) {
