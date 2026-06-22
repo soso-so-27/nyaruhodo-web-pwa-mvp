@@ -55,6 +55,7 @@ const COAT_OPTIONS: { value: CatCoat; label: string; color: string }[] = [
 type EditableGender = "male" | "female" | "unknown" | "";
 type EditableCoat = CatCoat | "";
 type UchinokoLens = "cat" | "all";
+type UchinokoSection = "record" | "photos" | "basic";
 type LensPhoto = {
   id: string;
   src: string;
@@ -135,6 +136,8 @@ export function CatsPage() {
   const [saveMessage, setSaveMessage] = useState("");
   const [omoideRefreshTick, setOmoideRefreshTick] = useState(0);
   const [activeLens, setActiveLens] = useState<UchinokoLens>("cat");
+  const [activeSection, setActiveSection] =
+    useState<UchinokoSection>("record");
   const [deleteCatTarget, setDeleteCatTarget] =
     useState<DeleteCatTarget | null>(null);
   const [isDeletingCat, setIsDeletingCat] = useState(false);
@@ -176,7 +179,12 @@ export function CatsPage() {
   const canManageCats = !isOnboardingProfileSetup && !isOnboardingCompletionView;
   const shouldShowCatSwitchButton = catProfiles.length > 1 && canManageCats;
   const shouldShowSingleCatAdd = catProfiles.length === 1 && canManageCats;
-  const shouldShowLensSwitch =
+  const shouldShowCatIconSwitcher =
+    catProfiles.length > 1 &&
+    canManageCats &&
+    !isAddingCat &&
+    !isEditingProfile;
+  const shouldShowPhotoLensSwitch =
     catProfiles.length > 1 &&
     canManageCats &&
     !isAddingCat &&
@@ -684,7 +692,7 @@ export function CatsPage() {
           </AppCard>
         ) : null}
 
-        {activeCatProfile && !isOnboardingCompletionView && activeLens === "cat" ? (
+        {activeCatProfile && !isOnboardingCompletionView ? (
           <AppCard
             variant="section"
             padding="standard"
@@ -739,6 +747,14 @@ export function CatsPage() {
                     ) : null}
                   </div>
                 </div>
+                {shouldShowCatIconSwitcher ? (
+                  <CatIconSwitcher
+                    profiles={catProfiles}
+                    activeCatId={activeCatId}
+                    onSelect={handleCatSelect}
+                    onOpenMore={() => setIsCatSwitcherOpen(true)}
+                  />
+                ) : null}
               </>
             ) : null}
 
@@ -826,21 +842,24 @@ export function CatsPage() {
           </AppCard>
         ) : null}
 
-        {shouldShowLensSwitch ? (
-          <AppSegmented<UchinokoLens>
-            value={activeLens}
-            ariaLabel="うちのこの見かた"
-            columns={2}
-            onChange={setActiveLens}
+        {activeCatProfile && !isOnboardingCompletionView ? (
+          <AppSegmented<UchinokoSection>
+            value={activeSection}
+            ariaLabel="うちのこの中身"
+            columns={3}
+            onChange={setActiveSection}
             options={[
-              { value: "cat", label: "ねこ" },
-              { value: "all", label: "ぜんぶ" },
+              { value: "record", label: "記録" },
+              { value: "photos", label: "写真" },
+              { value: "basic", label: "基本情報" },
             ]}
-            style={styles.lensSwitch}
+            style={styles.sectionSwitch}
           />
         ) : null}
 
-        {activeCatProfile && !isOnboardingCompletionView && activeLens === "cat" ? (
+        {activeCatProfile &&
+        !isOnboardingCompletionView &&
+        activeSection === "record" ? (
           <CatSummaryPanel
             familyDuration={familyDuration}
             deliveredCount={deliveredSleepingPhotoCount}
@@ -849,7 +868,9 @@ export function CatsPage() {
           />
         ) : null}
 
-        {activeCatProfile && !isOnboardingCompletionView && activeLens === "cat" ? (
+        {activeCatProfile &&
+        !isOnboardingCompletionView &&
+        activeSection === "basic" ? (
           <AppCard
             as="section"
             variant="section"
@@ -863,7 +884,27 @@ export function CatsPage() {
           </AppCard>
         ) : null}
 
-        {activeCatProfile && !isOnboardingCompletionView && activeLens === "cat" ? (
+        {activeCatProfile &&
+        !isOnboardingCompletionView &&
+        activeSection === "photos" &&
+        shouldShowPhotoLensSwitch ? (
+          <AppSegmented<UchinokoLens>
+            value={activeLens}
+            ariaLabel="写真の見かた"
+            columns={2}
+            onChange={setActiveLens}
+            options={[
+              { value: "cat", label: "この子" },
+              { value: "all", label: "ぜんぶ" },
+            ]}
+            style={styles.photoLensSwitch}
+          />
+        ) : null}
+
+        {activeCatProfile &&
+        !isOnboardingCompletionView &&
+        activeSection === "photos" &&
+        activeLens === "cat" ? (
           <LensPhotoSection
             title="最近のすがた"
             photos={activeCatLensPhotos}
@@ -872,7 +913,10 @@ export function CatsPage() {
           />
         ) : null}
 
-        {activeCatProfile && !isOnboardingCompletionView && activeLens === "all" ? (
+        {activeCatProfile &&
+        !isOnboardingCompletionView &&
+        activeSection === "photos" &&
+        activeLens === "all" ? (
           <AllCatsLensView
             photos={allLensPhotos}
             catCount={catProfiles.length}
@@ -880,7 +924,9 @@ export function CatsPage() {
           />
         ) : null}
 
-        {activeCatProfile && !isOnboardingCompletionView && activeLens === "cat" ? (
+        {activeCatProfile &&
+        !isOnboardingCompletionView &&
+        activeSection === "record" ? (
           <>
             <AppCard
               as="section"
@@ -1569,6 +1615,65 @@ function AllCatsLensView({
         onOpenAll={onOpenAll}
       />
     </section>
+  );
+}
+
+function CatIconSwitcher({
+  profiles,
+  activeCatId,
+  onSelect,
+  onOpenMore,
+}: {
+  profiles: CatProfile[];
+  activeCatId: string | null;
+  onSelect: (catId: string) => void;
+  onOpenMore: () => void;
+}) {
+  const visibleProfiles = profiles.slice(0, 4);
+  const hasMore = profiles.length > visibleProfiles.length;
+
+  return (
+    <div style={styles.catIconSwitcher} aria-label="ねこの切り替え">
+      {visibleProfiles.map((profile, index) => {
+        const isActive = profile.id === activeCatId;
+
+        return (
+          <button
+            key={profile.id}
+            type="button"
+            style={
+              isActive
+                ? { ...styles.catIconSwitchButton, ...styles.catIconSwitchButtonActive }
+                : styles.catIconSwitchButton
+            }
+            onClick={() => onSelect(profile.id)}
+            aria-label={`${profile.name}を見る`}
+            aria-pressed={isActive}
+            title={profile.name || `ねこ ${index + 1}`}
+          >
+            <img
+              src="/icons/cat-switcher-generated.png"
+              alt=""
+              aria-hidden="true"
+              style={styles.catIconSwitchImage}
+            />
+          </button>
+        );
+      })}
+      {hasMore ? (
+        <AppButton
+          type="button"
+          variant="ghost"
+          size="icon"
+          iconOnly
+          onClick={onOpenMore}
+          aria-label="ほかのねこを選ぶ"
+          style={styles.catIconSwitchMore}
+        >
+          <MoreDotsIcon />
+        </AppButton>
+      ) : null}
+    </div>
   );
 }
 
@@ -2704,7 +2809,10 @@ const styles = {
     background: CATS_PANEL_BACKGROUND,
     backdropFilter: "none",
   },
-  lensSwitch: {
+  sectionSwitch: {
+    margin: "0 0 12px",
+  },
+  photoLensSwitch: {
     margin: "0 0 12px",
   },
   profileHero: {
@@ -2764,6 +2872,48 @@ const styles = {
     flexDirection: "row",
     alignItems: "flex-end",
     gap: "7px",
+  },
+  catIconSwitcher: {
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: "9px",
+    marginTop: "14px",
+    paddingTop: "12px",
+    borderTop: "1px solid color-mix(in srgb, var(--ink) 8%, transparent)",
+  },
+  catIconSwitchButton: {
+    width: "38px",
+    height: "38px",
+    display: "inline-flex",
+    alignItems: "center",
+    justifyContent: "center",
+    padding: "6px",
+    borderRadius: "999px",
+    border: "1px solid color-mix(in srgb, var(--ink) 10%, transparent)",
+    background: "color-mix(in srgb, var(--paper-card) 70%, transparent)",
+    color: CATS_MUTED,
+    boxShadow: "none",
+    cursor: "pointer",
+    opacity: 0.64,
+  },
+  catIconSwitchButtonActive: {
+    opacity: 1,
+    border: "1px solid color-mix(in srgb, var(--seal) 44%, transparent)",
+    background: "color-mix(in srgb, var(--paper-card) 92%, transparent)",
+    boxShadow:
+      "0 0 0 3px color-mix(in srgb, var(--seal) 10%, transparent), 0 6px 18px -15px color-mix(in srgb, var(--ink) 30%, transparent)",
+  },
+  catIconSwitchImage: {
+    width: "25px",
+    height: "25px",
+    display: "block",
+    objectFit: "contain",
+  },
+  catIconSwitchMore: {
+    width: "38px",
+    height: "38px",
+    minWidth: "38px",
   },
   catSwitchMaskIcon: {
     width: "20px",
