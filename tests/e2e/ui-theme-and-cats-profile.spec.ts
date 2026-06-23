@@ -105,15 +105,13 @@ test("keeps the cats photo tab clear of the fixed bottom navigation", async ({
   );
 });
 
-test("opens the cat switcher from the cover in one tap", async ({ page }) => {
+test("switches to the next cat from the cover in one tap", async ({ page }) => {
   await seedMultipleCatsProfile(page, Date.parse("2026-06-10T12:30:00+09:00"));
   await page.setViewportSize({ width: 390, height: 844 });
   await page.goto("/cats");
   await page.waitForLoadState("networkidle");
 
-  await page.getByRole("button", { name: "ねこを切り替える" }).click();
-  await expect(page.getByText("こむぎ")).toBeVisible();
-  await page.getByRole("button", { name: /こむぎ/ }).click();
+  await page.getByRole("button", { name: "次のねこに切り替える" }).click();
 
   await expect
     .poll(() =>

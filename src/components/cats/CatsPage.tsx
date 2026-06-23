@@ -204,19 +204,6 @@ export function CatsPage() {
   const activeCoverSrc = activeCoverPhoto?.src ?? activeAvatarSrc;
   const activeCoverFit =
     activeCoverPhoto || activeCatProfile?.avatarDataUrl ? "cover" : "contain";
-  const catSwitchPreviews = catProfiles.slice(0, 3).map((profile) => {
-    const firstPhoto = (lensPhotosByCat[profile.id] ?? [])[0] ?? null;
-    const src =
-      firstPhoto?.src ??
-      profile.avatarDataUrl ??
-      getCatAvatarSrc(profile.appearance?.coat);
-
-    return {
-      id: profile.id,
-      src,
-      fit: firstPhoto || profile.avatarDataUrl ? ("cover" as const) : ("contain" as const),
-    };
-  });
   const allLensPhotos = useMemo(
     () =>
       mergeAllLensPhotos(
@@ -387,6 +374,19 @@ export function CatsPage() {
     setIsOnboardingAlbumCreated(false);
     setMessage("");
     setSaveMessage("");
+  }
+
+  function handleCycleCat() {
+    if (catProfiles.length <= 1) {
+      return;
+    }
+
+    const currentIndex = catProfiles.findIndex(
+      (profile) => profile.id === activeCatId,
+    );
+    const nextIndex =
+      currentIndex >= 0 ? (currentIndex + 1) % catProfiles.length : 0;
+    handleCatSelect(catProfiles[nextIndex].id);
   }
 
   function startAddingCat() {
@@ -766,23 +766,14 @@ export function CatsPage() {
                       <button
                         type="button"
                         style={styles.profileCoverSwitchButton}
-                        onClick={() => setIsCatSwitcherOpen(true)}
-                        aria-label="ねこを切り替える"
+                        onClick={handleCycleCat}
+                        aria-label="次のねこに切り替える"
                       >
-                        <span style={styles.profileCoverSwitchStack} aria-hidden="true">
-                          {catSwitchPreviews.map((preview) => (
-                            <PhotoTile
-                              key={preview.id}
-                              src={preview.src}
-                              alt=""
-                              variant="bare"
-                              fit={preview.fit}
-                              aspect="1 / 1"
-                              style={styles.profileCoverSwitchThumbRoot}
-                              imageStyle={styles.profileCoverSwitchThumb}
-                            />
-                          ))}
-                        </span>
+                        <img
+                          src="/icons/cat-switch-generated.png"
+                          alt=""
+                          style={styles.profileCoverSwitchIcon}
+                        />
                         <span style={styles.profileCoverSwitchCount}>
                           {catProfiles.length}
                         </span>
@@ -1502,7 +1493,6 @@ function RecordOverview({
                   onOpenPhotos();
                 }}
               >
-                <span style={styles.recentTimelineDot} aria-hidden="true" />
                 <span style={styles.recentTimelineDate}>
                   {formatRecordShortDate(entry.timestamp)}
                 </span>
@@ -3073,7 +3063,7 @@ const styles = {
     color: CATS_TEXT,
     overflowX: "hidden",
     scrollPaddingBottom:
-      "calc(var(--bottom-nav-height) + var(--bottom-nav-safe-offset) + 96px)",
+      "calc(var(--bottom-nav-height) + var(--bottom-nav-safe-offset) + 48px)",
     fontFamily: "var(--font-ui)",
   },
   ambientBackground: {
@@ -3108,7 +3098,7 @@ const styles = {
     margin: "0 auto",
     fontSynthesis: "none",
     padding:
-      "calc(20px + env(safe-area-inset-top)) 24px calc(300px + env(safe-area-inset-bottom))",
+      "calc(20px + env(safe-area-inset-top)) 24px calc(var(--bottom-nav-height) + var(--bottom-nav-safe-offset) + 24px + env(safe-area-inset-bottom))",
   },
   pageKicker: {
     margin: "0 0 5px",
@@ -3294,13 +3284,16 @@ const styles = {
   profileCoverSwitchButton: {
     position: "absolute" as const,
     left: "12px",
-    bottom: "12px",
+    top: "12px",
     zIndex: 2,
-    minHeight: "40px",
+    width: "44px",
+    height: "44px",
+    minWidth: "44px",
     display: "inline-flex",
     alignItems: "center",
+    justifyContent: "center",
     gap: "7px",
-    padding: "5px 8px 5px 6px",
+    padding: "6px",
     borderRadius: "999px",
     border: "1px solid color-mix(in srgb, var(--paper) 74%, transparent)",
     background: "color-mix(in srgb, var(--paper-card) 82%, transparent)",
@@ -3312,30 +3305,27 @@ const styles = {
     backdropFilter: "blur(10px)",
     WebkitBackdropFilter: "blur(10px)",
   },
-  profileCoverSwitchStack: {
-    display: "inline-flex",
-    alignItems: "center",
-    paddingLeft: "6px",
-  },
-  profileCoverSwitchThumbRoot: {
-    width: "28px",
-    height: "28px",
-    marginLeft: "-6px",
-  },
-  profileCoverSwitchThumb: {
-    width: "28px",
-    height: "28px",
-    borderRadius: "999px",
-    border: "2px solid color-mix(in srgb, var(--paper-card) 92%, transparent)",
-    background: "color-mix(in srgb, var(--paper-card) 78%, transparent)",
-    boxShadow: "0 2px 8px -6px color-mix(in srgb, var(--ink) 38%, transparent)",
-    objectFit: "cover",
+  profileCoverSwitchIcon: {
+    width: "30px",
+    height: "30px",
+    display: "block",
+    objectFit: "contain",
   },
   profileCoverSwitchCount: {
+    position: "absolute" as const,
+    right: "-3px",
+    bottom: "-3px",
     minWidth: "18px",
-    color: CATS_TEXT,
+    height: "18px",
+    display: "inline-flex",
+    alignItems: "center",
+    justifyContent: "center",
+    borderRadius: "999px",
+    border: "1px solid color-mix(in srgb, var(--paper-card) 90%, transparent)",
+    background: "var(--seal)",
+    color: "var(--paper-card)",
     fontFamily: CATS_UI,
-    fontSize: "12px",
+    fontSize: "10px",
     fontWeight: 600,
     lineHeight: 1,
   },
@@ -3626,7 +3616,7 @@ const styles = {
   recentTimeline: {
     position: "relative" as const,
     display: "grid",
-    paddingLeft: "28px",
+    paddingLeft: 0,
   },
   recentTimelineRow: {
     position: "relative" as const,
@@ -3645,18 +3635,6 @@ const styles = {
     textAlign: "left",
     cursor: "pointer",
     WebkitTapHighlightColor: "transparent",
-  },
-  recentTimelineDot: {
-    position: "absolute" as const,
-    left: "-28px",
-    top: "50%",
-    width: "10px",
-    height: "10px",
-    borderRadius: "999px",
-    background: "var(--seal)",
-    transform: "translateY(-50%)",
-    boxShadow:
-      "0 -28px 0 -4px color-mix(in srgb, var(--seal) 22%, transparent)",
   },
   recentTimelineDate: {
     color: CATS_TEXT,
