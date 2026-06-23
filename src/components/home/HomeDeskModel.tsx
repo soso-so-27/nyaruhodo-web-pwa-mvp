@@ -491,13 +491,13 @@ export function HomeDeskModel({
                     {usesEnvelopeHome ? (
                       <>
                         <img
-                          src="/images/home/generated-envelope-wide.png"
+                          src="/images/home/generated-envelope-wide-v2.png"
                           alt=""
                           data-envelope-art="closed"
                           style={deskStyles.envelopeHomeArt}
                         />
                         <img
-                          src="/images/home/generated-envelope-open.png"
+                          src="/images/home/generated-envelope-open-v2.png"
                           alt=""
                           data-envelope-art="open"
                           style={{
@@ -2378,7 +2378,7 @@ const deskStyles = {
     fontSize: "14.5px",
   },
   envelopeHomeButton: {
-    width: "min(92vw, 420px)",
+    width: "min(82vw, 360px)",
     minHeight: "0",
     boxSizing: "border-box",
     display: "grid",
@@ -2398,7 +2398,7 @@ const deskStyles = {
     position: "relative",
     display: "block",
     width: "100%",
-    aspectRatio: "3.82 / 1",
+    aspectRatio: "1.946 / 1",
     overflow: "visible",
     borderRadius: 0,
     background: "transparent",
@@ -2420,8 +2420,10 @@ const deskStyles = {
   },
   envelopeHomeArtOpen: {
     opacity: 0,
-    height: "168%",
-    top: "-62%",
+    width: "112%",
+    height: "132%",
+    left: "-6%",
+    top: "-34%",
   },
   envelopeHomeFlap: {
     display: "none",
@@ -2431,10 +2433,10 @@ const deskStyles = {
   },
   envelopeHomeDevelopPhoto: {
     position: "absolute",
-    left: "25%",
-    right: "25%",
-    bottom: "18%",
-    height: "122%",
+    left: "30%",
+    right: "30%",
+    bottom: "30%",
+    height: "112%",
     overflow: "hidden",
     borderRadius: "16px",
     opacity: 0,
