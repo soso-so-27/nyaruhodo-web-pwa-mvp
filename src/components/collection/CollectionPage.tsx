@@ -3780,22 +3780,17 @@ const styles = {
   },
   mainichiMonthList: {
     display: "grid",
-    gap: "34px",
+    gap: "30px",
   },
   mainichiMonthBoard: {
     display: "grid",
-    gap: "18px",
-    padding: "26px 14px 44px",
+    gap: "16px",
+    padding: "8px 14px 34px",
     overflow: "visible",
-    borderRadius: "32px",
-    backgroundColor: "rgba(248, 243, 234, 0.9)",
-    backgroundImage:
-      "linear-gradient(180deg, rgba(255,252,244,0.16), rgba(245,232,207,0.10)), radial-gradient(120% 90% at 38% 18%, rgba(255,247,224,0.10), transparent 62%), url('/images/ui/mainichi-board-paper-v2.webp')",
-    backgroundSize: "100% 100%, 100% 100%, 100% 100%",
-    backgroundPosition: "0 0, 0 0, center",
-    backgroundRepeat: "no-repeat, no-repeat, no-repeat",
-    boxShadow:
-      "0 1px 0 rgba(255,255,255,0.58) inset, 0 0 0 1px rgba(128,104,72,0.10), 0 18px 44px -34px rgba(76,62,42,0.42)",
+    borderRadius: 0,
+    border: "none",
+    background: "transparent",
+    boxShadow: "none",
   },
   mainichiMonthTitle: {
     margin: 0,

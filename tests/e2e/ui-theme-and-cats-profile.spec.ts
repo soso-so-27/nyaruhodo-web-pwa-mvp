@@ -56,13 +56,13 @@ test("keeps the cats photo tab clear of the fixed bottom navigation", async ({
   await page.getByTestId("cats-section-tab-photos").click();
 
   const grid = page.getByTestId("cats-lens-photo-grid");
-  const moreRow = page.getByTestId("cats-lens-photo-more-row");
+  const photoItems = grid.locator(":scope > div");
   const tabs = page.getByTestId("cats-section-tabs");
   const cover = page.getByTestId("cats-profile-cover");
   const nav = page.getByRole("navigation");
 
   await expect(grid).toBeVisible();
-  await expect(moreRow).toBeVisible();
+  await expect(photoItems).toHaveCount(8);
   await expect
     .poll(() =>
       page.evaluate(() =>
@@ -91,17 +91,35 @@ test("keeps the cats photo tab clear of the fixed bottom navigation", async ({
   expect(coverBox?.width).toBeGreaterThanOrEqual(370);
   expect(navBoxBeforeScroll?.height).toBe(60);
 
-  await moreRow.scrollIntoViewIfNeeded();
-  const [moreBox, navBox] = await Promise.all([
-    moreRow.boundingBox(),
+  const lastPhoto = photoItems.last();
+  await lastPhoto.scrollIntoViewIfNeeded();
+  const [lastPhotoBox, navBox] = await Promise.all([
+    lastPhoto.boundingBox(),
     nav.boundingBox(),
   ]);
 
-  expect(moreBox).not.toBeNull();
+  expect(lastPhotoBox).not.toBeNull();
   expect(navBox).not.toBeNull();
-  expect((moreBox?.y ?? 0) + (moreBox?.height ?? 0)).toBeLessThan(
+  expect((lastPhotoBox?.y ?? 0) + (lastPhotoBox?.height ?? 0)).toBeLessThan(
     navBox?.y ?? 0,
   );
+});
+
+test("opens the cat switcher from the cover in one tap", async ({ page }) => {
+  await seedMultipleCatsProfile(page, Date.parse("2026-06-10T12:30:00+09:00"));
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto("/cats");
+  await page.waitForLoadState("networkidle");
+
+  await page.getByRole("button", { name: "ねこを切り替える" }).click();
+  await expect(page.getByText("こむぎ")).toBeVisible();
+  await page.getByRole("button", { name: /こむぎ/ }).click();
+
+  await expect
+    .poll(() =>
+      page.evaluate(() => window.localStorage.getItem("active_cat_id")),
+    )
+    .toBe("cat-komugi");
 });
 
 async function seedCatsProfile(page: Page, now: number, photoCount: number) {
@@ -152,6 +170,72 @@ async function seedCatsProfile(page: Page, now: number, photoCount: number) {
       );
     },
     { nowValue: now, src: photoDataUrl, count: photoCount },
+  );
+}
+
+async function seedMultipleCatsProfile(page: Page, now: number) {
+  await page.addInitScript(
+    ({ nowValue, src }) => {
+      (window as typeof window & { __testNow?: number }).__testNow = nowValue;
+      const nowIso = new Date(nowValue).toISOString();
+      window.localStorage.setItem("active_cat_id", "cat-mugi");
+      window.localStorage.setItem(
+        "cat_profiles",
+        JSON.stringify([
+          {
+            id: "cat-mugi",
+            name: "\u3080\u304e",
+            createdAt: nowIso,
+            updatedAt: nowIso,
+            basicInfo: {
+              familySinceDate: "2022-09-22",
+              birthDate: "2022-07-10",
+              gender: "male",
+              breed: "\u30df\u30c3\u30af\u30b9",
+            },
+            appearance: {
+              coat: "orange_tabby",
+            },
+          },
+          {
+            id: "cat-komugi",
+            name: "\u3053\u3080\u304e",
+            createdAt: nowIso,
+            updatedAt: nowIso,
+            basicInfo: {
+              familySinceDate: "2024-04-01",
+              birthDate: "2024-02-14",
+              gender: "female",
+              breed: "\u30df\u30c3\u30af\u30b9",
+            },
+            appearance: {
+              coat: "calico",
+            },
+          },
+        ]),
+      );
+      window.localStorage.setItem(
+        "nyaruhodo_exchange_own_sleeping_photos",
+        JSON.stringify([
+          {
+            id: "own-sleeping-mugi",
+            ownerCatId: "cat-mugi",
+            catId: "cat-mugi",
+            src,
+            thumbnailSrc: src,
+            displaySrc: src,
+            state: "sleeping",
+            visibility: "private",
+            deliveryStatus: "available",
+            triggerLabel: "sleeping",
+            theme: "sleeping",
+            shared: true,
+            createdAt: nowValue,
+          },
+        ]),
+      );
+    },
+    { nowValue: now, src: photoDataUrl },
   );
 }
 

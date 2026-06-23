@@ -81,7 +81,6 @@ type RecordPhotoPreview = {
   timestamp: number;
 };
 
-const UCHINOKO_PHOTO_PREVIEW_LIMIT = 6;
 const CATS_TEXT = "var(--ink)";
 const CATS_TEXT_STRONG = "var(--ink)";
 const CATS_MUTED = "var(--ink-soft)";
@@ -205,6 +204,19 @@ export function CatsPage() {
   const activeCoverSrc = activeCoverPhoto?.src ?? activeAvatarSrc;
   const activeCoverFit =
     activeCoverPhoto || activeCatProfile?.avatarDataUrl ? "cover" : "contain";
+  const catSwitchPreviews = catProfiles.slice(0, 3).map((profile) => {
+    const firstPhoto = (lensPhotosByCat[profile.id] ?? [])[0] ?? null;
+    const src =
+      firstPhoto?.src ??
+      profile.avatarDataUrl ??
+      getCatAvatarSrc(profile.appearance?.coat);
+
+    return {
+      id: profile.id,
+      src,
+      fit: firstPhoto || profile.avatarDataUrl ? ("cover" as const) : ("contain" as const),
+    };
+  });
   const allLensPhotos = useMemo(
     () =>
       mergeAllLensPhotos(
@@ -750,6 +762,32 @@ export function CatsPage() {
                         <PencilSmallIcon />
                       </button>
                     ) : null}
+                    {shouldShowCatSwitchButton ? (
+                      <button
+                        type="button"
+                        style={styles.profileCoverSwitchButton}
+                        onClick={() => setIsCatSwitcherOpen(true)}
+                        aria-label="ねこを切り替える"
+                      >
+                        <span style={styles.profileCoverSwitchStack} aria-hidden="true">
+                          {catSwitchPreviews.map((preview) => (
+                            <PhotoTile
+                              key={preview.id}
+                              src={preview.src}
+                              alt=""
+                              variant="bare"
+                              fit={preview.fit}
+                              aspect="1 / 1"
+                              style={styles.profileCoverSwitchThumbRoot}
+                              imageStyle={styles.profileCoverSwitchThumb}
+                            />
+                          ))}
+                        </span>
+                        <span style={styles.profileCoverSwitchCount}>
+                          {catProfiles.length}
+                        </span>
+                      </button>
+                    ) : null}
                   </div>
                 </div>
               </>
@@ -885,7 +923,6 @@ export function CatsPage() {
             title="最近のすがた"
             photos={activeCatLensPhotos}
             emptyCopy="このこに紐づく ねがおは、まだありません。"
-            onOpenAll={() => setPhotoSheetLens("cat")}
           />
         ) : null}
 
@@ -896,7 +933,6 @@ export function CatsPage() {
           <AllCatsLensView
             photos={allLensPhotos}
             catCount={catProfiles.length}
-            onOpenAll={() => setPhotoSheetLens("all")}
           />
         ) : null}
 
@@ -1403,6 +1439,7 @@ function RecordOverview({
     <div style={styles.recordOverview}>
       <section style={styles.recordBlock} aria-labelledby="cats-now-heading">
         <h2 id="cats-now-heading" style={styles.recordBlockTitle}>
+          <span style={styles.recordBlockTitleMark} aria-hidden="true" />
           いま
         </h2>
         <button
@@ -1434,6 +1471,7 @@ function RecordOverview({
 
       <section style={styles.recordBlock} aria-labelledby="cats-recent-heading">
         <h2 id="cats-recent-heading" style={styles.recordBlockTitle}>
+          <span style={styles.recordBlockTitleMark} aria-hidden="true" />
           最近
         </h2>
         <p style={styles.recordMonthLabel}>
@@ -1443,7 +1481,7 @@ function RecordOverview({
         </p>
         {recentEntries.length > 0 ? (
           <div style={styles.recentTimeline}>
-            {recentEntries.map((entry, index) => (
+            {recentEntries.map((entry) => (
               <button
                 key={entry.id}
                 type="button"
@@ -1469,7 +1507,7 @@ function RecordOverview({
                   {formatRecordShortDate(entry.timestamp)}
                 </span>
                 <span style={styles.recentTimelineTitle}>{entry.title}</span>
-                {index === 0 && entry.src ? (
+                {entry.src ? (
                   <span style={styles.recentTimelineThumb}>
                     <StoredPhotoImage
                       src={entry.src}
@@ -1489,7 +1527,8 @@ function RecordOverview({
 
       <section style={styles.recordBlock} aria-labelledby="cats-milestones-heading">
         <h2 id="cats-milestones-heading" style={styles.recordBlockTitle}>
-          節目
+          <span style={styles.recordBlockTitleMark} aria-hidden="true" />
+          記念
         </h2>
         <div style={styles.milestoneRail}>
           {milestoneItems.map((item) => (
@@ -1513,6 +1552,7 @@ function RecordOverview({
 
       <section style={styles.recordBlock} aria-labelledby="cats-archive-heading">
         <h2 id="cats-archive-heading" style={styles.recordBlockTitle}>
+          <span style={styles.recordBlockTitleMark} aria-hidden="true" />
           これまで
         </h2>
         <div style={styles.archiveTable}>
@@ -1697,12 +1737,10 @@ function LensPhotoSection({
   title,
   photos,
   emptyCopy,
-  onOpenAll,
 }: {
   title: string;
   photos: LensPhoto[];
   emptyCopy: string;
-  onOpenAll?: () => void;
 }) {
   return (
     <section style={styles.lensPhotoSection}>
@@ -1713,7 +1751,6 @@ function LensPhotoSection({
         photos={photos}
         emptyCopy={emptyCopy}
         showCatNames={false}
-        onOpenAll={onOpenAll}
       />
     </section>
   );
@@ -1722,11 +1759,9 @@ function LensPhotoSection({
 function AllCatsLensView({
   photos,
   catCount,
-  onOpenAll,
 }: {
   photos: LensPhoto[];
   catCount: number;
-  onOpenAll?: () => void;
 }) {
   return (
     <section style={styles.allLensCard}>
@@ -1740,7 +1775,6 @@ function AllCatsLensView({
         photos={photos}
         emptyCopy="まだ ねがおはありません。"
         showCatNames
-        onOpenAll={onOpenAll}
       />
     </section>
   );
@@ -1832,63 +1866,38 @@ function LensPhotoGrid({
   photos,
   emptyCopy,
   showCatNames,
-  onOpenAll,
 }: {
   photos: LensPhoto[];
   emptyCopy: string;
   showCatNames: boolean;
-  onOpenAll?: () => void;
 }) {
   if (photos.length === 0) {
     return <p style={styles.lensPhotoEmpty}>{emptyCopy}</p>;
   }
 
-  const visiblePhotos = photos.slice(0, UCHINOKO_PHOTO_PREVIEW_LIMIT);
-  const hiddenCount = Math.max(0, photos.length - visiblePhotos.length);
-
   return (
-    <>
-      <div data-testid="cats-lens-photo-grid" style={styles.lensPhotoGrid}>
-        {visiblePhotos.map((photo) => (
-          <div key={photo.id} style={styles.lensPhotoItem}>
-            <PhotoTile
-              src={photo.src}
-              alt=""
-              variant="tile"
-              aspect="1 / 1"
-              style={styles.lensPhotoTileRoot}
-              imageStyle={styles.lensPhotoTile}
-            />
-            <span style={styles.lensPhotoDate}>
-              {formatLensPhotoDate(photo.createdAt)}
-            </span>
-            {showCatNames && photo.catNames.length > 0 ? (
-              <span style={styles.lensPhotoCats}>
-                {photo.catNames.join("・")}
-              </span>
-            ) : null}
-          </div>
-        ))}
-      </div>
-      {hiddenCount > 0 ? (
-        <div data-testid="cats-lens-photo-more-row" style={styles.lensPhotoMoreRow}>
-          <span style={styles.lensPhotoMore}>
-            最近の{visiblePhotos.length}枚を表示中
+    <div data-testid="cats-lens-photo-grid" style={styles.lensPhotoGrid}>
+      {photos.map((photo) => (
+        <div key={photo.id} style={styles.lensPhotoItem}>
+          <PhotoTile
+            src={photo.src}
+            alt=""
+            variant="tile"
+            aspect="1 / 1"
+            style={styles.lensPhotoTileRoot}
+            imageStyle={styles.lensPhotoTile}
+          />
+          <span style={styles.lensPhotoDate}>
+            {formatLensPhotoDate(photo.createdAt)}
           </span>
-          {onOpenAll ? (
-            <AppButton
-              type="button"
-              variant="quiet"
-              size="sm"
-              onClick={onOpenAll}
-              style={styles.lensPhotoMoreButton}
-            >
-              すべて見る
-            </AppButton>
+          {showCatNames && photo.catNames.length > 0 ? (
+            <span style={styles.lensPhotoCats}>
+              {photo.catNames.join("・")}
+            </span>
           ) : null}
         </div>
-      ) : null}
-    </>
+      ))}
+    </div>
   );
 }
 
@@ -3282,6 +3291,54 @@ const styles = {
     cursor: "pointer",
     WebkitTapHighlightColor: "transparent",
   },
+  profileCoverSwitchButton: {
+    position: "absolute" as const,
+    left: "12px",
+    bottom: "12px",
+    zIndex: 2,
+    minHeight: "40px",
+    display: "inline-flex",
+    alignItems: "center",
+    gap: "7px",
+    padding: "5px 8px 5px 6px",
+    borderRadius: "999px",
+    border: "1px solid color-mix(in srgb, var(--paper) 74%, transparent)",
+    background: "color-mix(in srgb, var(--paper-card) 82%, transparent)",
+    color: CATS_TEXT_STRONG,
+    boxShadow:
+      "0 1px 0 color-mix(in srgb, var(--paper) 68%, transparent), 0 12px 24px -20px color-mix(in srgb, var(--ink) 34%, transparent)",
+    cursor: "pointer",
+    WebkitTapHighlightColor: "transparent",
+    backdropFilter: "blur(10px)",
+    WebkitBackdropFilter: "blur(10px)",
+  },
+  profileCoverSwitchStack: {
+    display: "inline-flex",
+    alignItems: "center",
+    paddingLeft: "6px",
+  },
+  profileCoverSwitchThumbRoot: {
+    width: "28px",
+    height: "28px",
+    marginLeft: "-6px",
+  },
+  profileCoverSwitchThumb: {
+    width: "28px",
+    height: "28px",
+    borderRadius: "999px",
+    border: "2px solid color-mix(in srgb, var(--paper-card) 92%, transparent)",
+    background: "color-mix(in srgb, var(--paper-card) 78%, transparent)",
+    boxShadow: "0 2px 8px -6px color-mix(in srgb, var(--ink) 38%, transparent)",
+    objectFit: "cover",
+  },
+  profileCoverSwitchCount: {
+    minWidth: "18px",
+    color: CATS_TEXT,
+    fontFamily: CATS_UI,
+    fontSize: "12px",
+    fontWeight: 600,
+    lineHeight: 1,
+  },
   profileHero: {
     display: "grid",
     gridTemplateColumns: "48px 1fr auto",
@@ -3505,6 +3562,17 @@ const styles = {
     fontWeight: 500,
     lineHeight: 1.35,
     letterSpacing: "0.02em",
+    display: "inline-flex",
+    alignItems: "center",
+    gap: "8px",
+  },
+  recordBlockTitleMark: {
+    width: "7px",
+    height: "7px",
+    borderRadius: "999px",
+    background: "var(--seal)",
+    boxShadow:
+      "0 0 0 4px color-mix(in srgb, var(--seal) 10%, transparent)",
   },
   recordMonthLabel: {
     margin: "-2px 0 2px",
