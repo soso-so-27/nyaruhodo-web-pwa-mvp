@@ -2860,8 +2860,8 @@ const styles = {
     margin: "0 0 12px",
     padding: "3px",
     borderRadius: "999px",
-    border: "1px solid color-mix(in srgb, var(--ink) 10%, transparent)",
-    background: "color-mix(in srgb, var(--paper-card) 34%, transparent)",
+    border: "1px solid color-mix(in srgb, var(--control-border) 78%, transparent)",
+    background: "color-mix(in srgb, var(--paper-card) 58%, transparent)",
     boxShadow: "inset 0 1px 0 color-mix(in srgb, var(--paper) 38%, transparent)",
   },
   sectionTabButton: {
@@ -2874,15 +2874,15 @@ const styles = {
     color: CATS_MUTED,
     fontFamily: CATS_UI,
     fontSize: "13px",
-    fontWeight: 400,
+    fontWeight: 500,
     letterSpacing: CATS_BODY_TRACKING,
     cursor: "pointer",
   },
   sectionTabButtonActive: {
     color: CATS_TEXT_STRONG,
-    background: "color-mix(in srgb, var(--paper-card) 78%, transparent)",
+    background: "var(--control-surface-selected)",
     boxShadow:
-      "0 1px 2px color-mix(in srgb, var(--ink) 7%, transparent), 0 7px 18px -16px color-mix(in srgb, var(--ink) 22%, transparent)",
+      "0 0 0 1px color-mix(in srgb, var(--control-border-selected) 28%, transparent), 0 7px 18px -16px color-mix(in srgb, var(--ink) 22%, transparent)",
   },
   profileHero: {
     display: "grid",
@@ -2963,12 +2963,12 @@ const styles = {
     justifyContent: "center",
     padding: "5px",
     borderRadius: "999px",
-    border: "1px solid color-mix(in srgb, var(--ink) 10%, transparent)",
-    background: "color-mix(in srgb, var(--paper-card) 48%, transparent)",
+    border: "1px solid color-mix(in srgb, var(--control-border) 74%, transparent)",
+    background: "color-mix(in srgb, var(--paper-card) 64%, transparent)",
     color: CATS_MUTED,
     boxShadow: "none",
     cursor: "pointer",
-    opacity: 0.64,
+    opacity: 0.78,
   },
   catIconSwitchButtonActive: {
     opacity: 1,
@@ -3049,7 +3049,7 @@ const styles = {
     alignItems: "center",
     gap: "12px",
     minHeight: "38px",
-    borderBottom: "1px solid color-mix(in srgb, var(--line) 65%, transparent)",
+    borderBottom: "1px solid color-mix(in srgb, var(--line-strong) 58%, transparent)",
   },
   recordRowLast: {
     borderBottom: "none",
@@ -3137,8 +3137,8 @@ const styles = {
     gap: "3px",
     padding: "10px 12px",
     borderRadius: "var(--radius-lg)",
-    border: "1px solid color-mix(in srgb, var(--line) 72%, transparent)",
-    background: "color-mix(in srgb, var(--paper) 24%, transparent)",
+    border: "1px solid color-mix(in srgb, var(--line-strong) 66%, transparent)",
+    background: "color-mix(in srgb, var(--paper) 46%, transparent)",
   },
   summaryTileWide: {
     minHeight: "54px",
@@ -3148,8 +3148,8 @@ const styles = {
     gap: "2px",
     padding: "8px 12px",
     borderRadius: "var(--radius-lg)",
-    border: "1px solid color-mix(in srgb, var(--line) 62%, transparent)",
-    background: "color-mix(in srgb, var(--paper) 18%, transparent)",
+    border: "1px solid color-mix(in srgb, var(--line-strong) 58%, transparent)",
+    background: "color-mix(in srgb, var(--paper) 40%, transparent)",
   },
   summaryTileAccent: {
     borderColor: "color-mix(in srgb, var(--seal) 34%, var(--line))",
@@ -3288,9 +3288,9 @@ const styles = {
   basicInfoTable: {
     display: "grid",
     borderRadius: "var(--radius-lg)",
-    border: "1px solid color-mix(in srgb, var(--line) 62%, transparent)",
+    border: "1px solid color-mix(in srgb, var(--line-strong) 62%, transparent)",
     overflow: "hidden",
-    background: "color-mix(in srgb, var(--paper) 12%, transparent)",
+    background: "color-mix(in srgb, var(--paper) 34%, transparent)",
   },
   basicInfoRow: {
     display: "grid",
@@ -3299,7 +3299,7 @@ const styles = {
     gap: "12px",
     minHeight: "38px",
     padding: "0 12px",
-    borderBottom: "1px solid color-mix(in srgb, var(--line) 50%, transparent)",
+    borderBottom: "1px solid color-mix(in srgb, var(--line-strong) 46%, transparent)",
   },
   basicInfoLabel: {
     color: CATS_MUTED,
@@ -3555,7 +3555,7 @@ const styles = {
   },
   lensPhotoMore: {
     margin: 0,
-    color: CATS_FAINT,
+    color: CATS_MUTED,
     fontFamily: CATS_SERIF,
     fontSize: CATS_TINY_SIZE,
     fontWeight: 400,
@@ -3573,6 +3573,7 @@ const styles = {
     flex: "0 0 auto",
     minHeight: "34px",
     padding: "0 12px",
+    color: CATS_MUTED,
   },
   photoListSheet: {
     display: "grid",

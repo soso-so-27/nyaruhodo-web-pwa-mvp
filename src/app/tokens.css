@@ -7,6 +7,11 @@
   --ink-soft: #8a847a;
   --ink-faint: #b8b2a6;
   --line: #e3dfd5;
+  --line-strong: #cfc7b9;
+  --control-surface: color-mix(in srgb, var(--paper) 88%, transparent);
+  --control-surface-selected: color-mix(in srgb, var(--paper) 96%, var(--paper-card) 4%);
+  --control-border: var(--line-strong);
+  --control-border-selected: var(--ink-soft);
 
   /* ===== 唯一の深色(封蝋と削除系のみ。面に塗らない) ===== */
   --seal: #a8584e;
@@ -20,13 +25,16 @@
   --app-paper-wash-top: #f1eadf;
   --app-paper-wash-mid: #f5ecdc;
   --app-paper-wash-bottom: #e7dbc8;
+  --app-paper-wash-top-strength: 24%;
+  --app-paper-wash-mid-strength: 14%;
+  --app-paper-wash-bottom-strength: 18%;
   --app-paper-grain: url("/images/home-backgrounds/paper-grain.png");
   --app-paper-background:
     linear-gradient(
       180deg,
-      color-mix(in srgb, var(--app-paper-wash-top) 24%, transparent) 0%,
-      color-mix(in srgb, var(--app-paper-wash-mid) 14%, transparent) 48%,
-      color-mix(in srgb, var(--app-paper-wash-bottom) 18%, transparent) 100%
+      color-mix(in srgb, var(--app-paper-wash-top) var(--app-paper-wash-top-strength), transparent) 0%,
+      color-mix(in srgb, var(--app-paper-wash-mid) var(--app-paper-wash-mid-strength), transparent) 48%,
+      color-mix(in srgb, var(--app-paper-wash-bottom) var(--app-paper-wash-bottom-strength), transparent) 100%
     ),
     var(--app-paper-image),
     linear-gradient(

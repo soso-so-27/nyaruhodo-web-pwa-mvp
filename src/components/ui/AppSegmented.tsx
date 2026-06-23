@@ -82,9 +82,9 @@ const styles = {
     minHeight: 44,
     borderWidth: 1,
     borderStyle: "solid",
-    borderColor: color.border,
+    borderColor: "var(--control-border)",
     borderRadius: radius.pill,
-    background: "color-mix(in srgb, var(--paper) 56%, transparent)",
+    background: "color-mix(in srgb, var(--paper) 78%, transparent)",
     color: color.text,
     cursor: "pointer",
     fontFamily: typography.fontUi,
@@ -93,11 +93,12 @@ const styles = {
     lineHeight: 1.2,
     padding: `0 ${spacing.md}px`,
     transition:
-      "background var(--dur-instant) var(--ease-gentle), border-color var(--dur-instant) var(--ease-gentle)",
+      "background var(--dur-instant) var(--ease-gentle), border-color var(--dur-instant) var(--ease-gentle), color var(--dur-instant) var(--ease-gentle)",
   },
   optionSelected: {
-    background: color.paper,
-    borderColor: color.textMuted,
+    background: "var(--control-surface-selected)",
+    borderColor: "var(--control-border-selected)",
+    color: color.textStrong,
   },
   optionDisabled: {
     cursor: "not-allowed",
