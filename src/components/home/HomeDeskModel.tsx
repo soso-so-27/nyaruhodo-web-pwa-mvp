@@ -70,7 +70,8 @@ type HomeDeskModelProps = {
   onDismissOmoideMemory?: (memory: OmoideMemory) => void;
 };
 
-const ENVELOPE_OPEN_MS = 980;
+const ENVELOPE_OPEN_MS = 2200;
+const ENVELOPE_SEAL_OPEN_MS = 1320;
 const HOME_FRAME_TUNING = {
   pagePaddingX: "12px",
   pagePaddingTop: "64px",
@@ -182,6 +183,7 @@ export function HomeDeskModel({
   onOpenDelivery,
   onKeepOpenedDelivery,
   onReportOpenedDelivery,
+  onDeliveredStorageDataUrl,
   omoideMemory,
   onOpenOmoideMemory,
   onDismissOmoideMemory,
@@ -525,9 +527,11 @@ export function HomeDeskModel({
                       }
                       aria-hidden="true"
                     />
-                    {deliveredPhoto && developPhotoMounted ? (
+                    {deliveredPhoto && (developPhotoMounted || usesEnvelopeHome) ? (
                       <span
-                        data-develop-photo="true"
+                        data-develop-photo={
+                          developPhotoMounted ? "true" : "preload"
+                        }
                         style={{
                           ...deskStyles.selectionLockedStage,
                           ...(usesEnvelopeHome
@@ -539,6 +543,14 @@ export function HomeDeskModel({
                         <StoredPhotoImage
                           src={getPhotoDetailSrc(deliveredPhoto)}
                           alt=""
+                          loading="eager"
+                          onStorageDataUrl={(dataUrl) => {
+                            onDeliveredStorageDataUrl(
+                              eveningState.dateKey,
+                              deliveredPhoto,
+                              dataUrl,
+                            );
+                          }}
                           style={{
                             ...deskStyles.selectionLockedStage,
                             ...deskStyles.developImage,
@@ -812,22 +824,22 @@ export function HomeDeskModel({
           letter-spacing: var(--tracking-body);
         }
         .desk-letter-opening [data-envelope-body="true"] {
-          animation: deskEnvelopeBodyOpen 980ms cubic-bezier(0.18, 0.92, 0.2, 1) both;
+          animation: deskEnvelopeBodyOpen ${ENVELOPE_OPEN_MS}ms cubic-bezier(0.18, 0.92, 0.2, 1) both;
         }
         .desk-letter-opening [data-envelope-art="closed"] {
-          animation: deskEnvelopeClosedArtOpen 980ms cubic-bezier(0.18, 0.92, 0.2, 1) both;
+          animation: deskEnvelopeClosedArtOpen ${ENVELOPE_OPEN_MS}ms cubic-bezier(0.18, 0.92, 0.2, 1) both;
         }
         .desk-letter-opening [data-envelope-art="open"] {
-          animation: deskEnvelopeOpenArtReveal 980ms cubic-bezier(0.18, 0.92, 0.2, 1) both;
+          animation: deskEnvelopeOpenArtReveal ${ENVELOPE_OPEN_MS}ms cubic-bezier(0.18, 0.92, 0.2, 1) both;
         }
         .desk-letter-opening [data-envelope-flap="true"] {
-          animation: deskEnvelopeFlapOpen 980ms cubic-bezier(0.16, 0.9, 0.22, 1) both;
+          animation: deskEnvelopeFlapOpen ${ENVELOPE_OPEN_MS}ms cubic-bezier(0.16, 0.9, 0.22, 1) both;
         }
         .desk-letter-opening [data-envelope-seal="true"] {
-          animation: deskEnvelopeSealPop 720ms cubic-bezier(0.18, 0.92, 0.2, 1) both;
+          animation: deskEnvelopeSealPop ${ENVELOPE_SEAL_OPEN_MS}ms cubic-bezier(0.18, 0.92, 0.2, 1) both;
         }
         .desk-letter-opening [data-develop-photo="true"] {
-          animation: deskEnvelopePhotoReveal 980ms cubic-bezier(0.18, 0.92, 0.2, 1) both;
+          animation: deskEnvelopePhotoReveal ${ENVELOPE_OPEN_MS}ms cubic-bezier(0.18, 0.92, 0.2, 1) both;
         }
         @keyframes homeLetterTrayGlow {
           from {

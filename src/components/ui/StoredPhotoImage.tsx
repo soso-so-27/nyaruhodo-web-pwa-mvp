@@ -76,6 +76,7 @@ export function StoredPhotoImage({
   alt,
   style,
   imageStyle,
+  loading,
   onStorageDataUrl,
   onNaturalSize,
 }: {
@@ -83,6 +84,7 @@ export function StoredPhotoImage({
   alt: string;
   style?: CSSProperties;
   imageStyle?: CSSProperties;
+  loading?: "eager" | "lazy";
   onStorageDataUrl?: (dataUrl: string) => void;
   onNaturalSize?: (size: { width: number; height: number }) => void;
 }) {
@@ -256,7 +258,7 @@ export function StoredPhotoImage({
         src={displaySrc}
         alt={alt}
         draggable={false}
-        loading={isInlineImage ? "eager" : "lazy"}
+        loading={loading ?? (isInlineImage ? "eager" : "lazy")}
         decoding={isInlineImage ? "sync" : "async"}
         onLoad={() => {
           setIsLoaded(true);

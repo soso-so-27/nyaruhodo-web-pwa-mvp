@@ -383,6 +383,10 @@ test.describe("home desk model", () => {
     await letter.click();
     await page.waitForTimeout(250);
     await expect(letter.locator('[data-develop-photo="true"]')).toHaveCount(1);
+    await expect(page.getByTestId("evening-opening-pair")).toHaveCount(0);
+
+    await page.waitForTimeout(1200);
+    await expect(page.getByTestId("evening-opening-pair")).toHaveCount(0);
 
     await expect(page.getByTestId("evening-opening-pair")).toBeVisible();
     await expect
