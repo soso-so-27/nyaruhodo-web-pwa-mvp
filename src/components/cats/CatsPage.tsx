@@ -75,6 +75,11 @@ type RemoteCatSaveResult =
   | { status: "saved" | "skipped" }
   | { status: "error"; message: string };
 type PhotoSheetLens = "cat" | "all";
+type RecordPhotoPreview = {
+  src: string;
+  title: string;
+  timestamp: number;
+};
 
 const UCHINOKO_PHOTO_PREVIEW_LIMIT = 6;
 const CATS_TEXT = "var(--ink)";
@@ -152,6 +157,8 @@ export function CatsPage() {
     useState(false);
   const [selectedOmoideMemory, setSelectedOmoideMemory] =
     useState<OmoideMemory | null>(null);
+  const [selectedRecordPhoto, setSelectedRecordPhoto] =
+    useState<RecordPhotoPreview | null>(null);
 
   const activeCatProfile =
     catProfiles.length > 0
@@ -743,16 +750,6 @@ export function CatsPage() {
                         <PencilSmallIcon />
                       </button>
                     ) : null}
-                    {shouldShowCatSwitchButton ? (
-                      <button
-                        type="button"
-                        style={styles.profileCoverSwitchButton}
-                        onClick={() => setIsCatSwitcherOpen(true)}
-                        aria-label={`${activeCatProfile.name}を切り替える`}
-                      >
-                        <ChevronDownIcon />
-                      </button>
-                    ) : null}
                   </div>
                 </div>
               </>
@@ -874,16 +871,9 @@ export function CatsPage() {
         !isOnboardingCompletionView &&
         activeSection === "photos" &&
         shouldShowPhotoLensSwitch ? (
-          <AppSegmented<UchinokoLens>
+          <PhotoLensFilter
             value={activeLens}
-            ariaLabel="写真の見かた"
-            columns={2}
             onChange={setActiveLens}
-            options={[
-              { value: "cat", label: "この子" },
-              { value: "all", label: "ぜんぶ" },
-            ]}
-            style={styles.photoLensSwitch}
           />
         ) : null}
 
@@ -919,9 +909,9 @@ export function CatsPage() {
             memories={omoideMemories}
             familyDuration={familyDuration}
             birthdayStatus={birthdayStatus}
-            familySinceDate={activeCatProfile.basicInfo?.familySinceDate}
             takenSleepingPhotoCount={takenSleepingPhotoCount}
             onOpenMemory={(memory) => setSelectedOmoideMemory(memory)}
+            onOpenPhoto={(photo) => setSelectedRecordPhoto(photo)}
             onOpenPhotos={() => setPhotoSheetLens("cat")}
           />
         ) : null}
@@ -1347,6 +1337,12 @@ export function CatsPage() {
           }}
         />
       ) : null}
+      {selectedRecordPhoto ? (
+        <RecordPhotoSheet
+          photo={selectedRecordPhoto}
+          onClose={() => setSelectedRecordPhoto(null)}
+        />
+      ) : null}
       {photoSheetLens ? (
         <PhotoListSheet
           title={photoSheetTitle}
@@ -1375,9 +1371,9 @@ function RecordOverview({
   memories,
   familyDuration,
   birthdayStatus,
-  familySinceDate,
   takenSleepingPhotoCount,
   onOpenMemory,
+  onOpenPhoto,
   onOpenPhotos,
 }: {
   photos: LensPhoto[];
@@ -1385,9 +1381,9 @@ function RecordOverview({
   memories: OmoideMemory[];
   familyDuration: { primary: string; secondary: string };
   birthdayStatus: { copy: string; isToday: boolean } | null;
-  familySinceDate?: string;
   takenSleepingPhotoCount: number;
   onOpenMemory: (memory: OmoideMemory) => void;
+  onOpenPhoto: (photo: RecordPhotoPreview) => void;
   onOpenPhotos: () => void;
 }) {
   const latestMemory = memories[0] ?? null;
@@ -1398,13 +1394,10 @@ function RecordOverview({
   const archiveRows = createYearArchiveRows(photos, memories).slice(0, 3);
   const milestoneItems = createRecordMilestones({
     milestones,
-    familySinceDate,
+    familyDuration,
     birthdayStatus,
     takenSleepingPhotoCount,
   });
-  const familyCopy =
-    familyDuration.secondary ||
-    (familyDuration.primary === "未設定" ? "未登録" : familyDuration.primary);
 
   return (
     <div style={styles.recordOverview}>
@@ -1460,6 +1453,14 @@ function RecordOverview({
                     onOpenMemory(entry.memory);
                     return;
                   }
+                  if (entry.src) {
+                    onOpenPhoto({
+                      src: entry.src,
+                      title: entry.title,
+                      timestamp: entry.timestamp,
+                    });
+                    return;
+                  }
                   onOpenPhotos();
                 }}
               >
@@ -1491,7 +1492,7 @@ function RecordOverview({
           節目
         </h2>
         <div style={styles.milestoneRail}>
-          {milestoneItems.map((item, index) => (
+          {milestoneItems.map((item) => (
             <div key={item.key} style={styles.milestoneItem}>
               <span
                 style={
@@ -1503,16 +1504,6 @@ function RecordOverview({
               >
                 {item.reached ? <CheckSmallIcon /> : null}
               </span>
-              {index < milestoneItems.length - 1 ? (
-                <span
-                  style={
-                    item.reached
-                      ? { ...styles.milestoneLine, ...styles.milestoneLineReached }
-                      : styles.milestoneLine
-                  }
-                  aria-hidden="true"
-                />
-              ) : null}
               <span style={styles.milestoneLabel}>{item.label}</span>
               <span style={styles.milestoneStatus}>{item.status}</span>
             </div>
@@ -1543,9 +1534,6 @@ function RecordOverview({
             <p style={styles.recordEmptyText}>これから少しずつたまります。</p>
           ) : null}
         </div>
-        {familyCopy !== "未登録" ? (
-          <p style={styles.recordTinyNote}>家族になって {familyCopy}</p>
-        ) : null}
       </section>
     </div>
   );
@@ -1799,6 +1787,47 @@ function UchinokoSectionTabs({
   );
 }
 
+function PhotoLensFilter({
+  value,
+  onChange,
+}: {
+  value: UchinokoLens;
+  onChange: (value: UchinokoLens) => void;
+}) {
+  const options: { value: UchinokoLens; label: string }[] = [
+    { value: "cat", label: "この子" },
+    { value: "all", label: "ぜんぶ" },
+  ];
+
+  return (
+    <div
+      role="radiogroup"
+      aria-label="写真の見かた"
+      style={styles.photoLensFilter}
+    >
+      {options.map((option) => {
+        const selected = option.value === value;
+        return (
+          <button
+            key={option.value}
+            type="button"
+            role="radio"
+            aria-checked={selected}
+            style={
+              selected
+                ? { ...styles.photoLensFilterButton, ...styles.photoLensFilterButtonActive }
+                : styles.photoLensFilterButton
+            }
+            onClick={() => onChange(option.value)}
+          >
+            {option.label}
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
 function LensPhotoGrid({
   photos,
   emptyCopy,
@@ -2042,6 +2071,29 @@ function OmoideMemorySheet({
         >
           この日を 見せない
         </AppButton>
+      </div>
+    </AppBottomSheet>
+  );
+}
+
+function RecordPhotoSheet({
+  photo,
+  onClose,
+}: {
+  photo: RecordPhotoPreview;
+  onClose: () => void;
+}) {
+  return (
+    <AppBottomSheet title={photo.title} onClose={onClose}>
+      <div style={styles.recordPhotoSheet}>
+        <div style={styles.recordPhotoFrame}>
+          <StoredPhotoImage
+            src={photo.src}
+            alt=""
+            style={styles.recordPhotoImage}
+          />
+        </div>
+        <p style={styles.recordPhotoDate}>{formatFootprintDate(photo.timestamp)}</p>
       </div>
     </AppBottomSheet>
   );
@@ -2351,20 +2403,29 @@ function createYearArchiveRows(photos: LensPhoto[], memories: OmoideMemory[]) {
 
 function createRecordMilestones({
   milestones,
-  familySinceDate,
+  familyDuration,
   birthdayStatus,
   takenSleepingPhotoCount,
 }: {
   milestones: CatSleepingMilestone[];
-  familySinceDate?: string;
+  familyDuration: { primary: string; secondary: string };
   birthdayStatus: { copy: string; isToday: boolean } | null;
   takenSleepingPhotoCount: number;
 }) {
   const fiftyMilestone = milestones.find((milestone) => milestone.target === 50);
   const hasReachedFifty = Boolean(fiftyMilestone?.reachedAt);
   const remainingFifty = Math.max(0, 50 - takenSleepingPhotoCount);
+  const familyCopy =
+    familyDuration.secondary ||
+    (familyDuration.primary === "未設定" ? "未登録" : familyDuration.primary);
 
   return [
+    {
+      key: "family-days",
+      label: "家族になって",
+      status: familyCopy,
+      reached: familyCopy !== "未登録",
+    },
     {
       key: "photos-50",
       label: "50枚",
@@ -2374,12 +2435,6 @@ function createRecordMilestones({
           ? `あと${remainingFifty}枚`
           : "もうすぐ",
       reached: hasReachedFifty,
-    },
-    {
-      key: "family-1",
-      label: "1年",
-      status: getFirstFamilyAnniversaryStatus(familySinceDate),
-      reached: hasReachedFirstFamilyAnniversary(familySinceDate),
     },
     {
       key: "birthday",
@@ -2413,40 +2468,6 @@ function formatRecordShortDate(timestamp: number) {
   }
 
   return `${date.getMonth() + 1}/${date.getDate()}`;
-}
-
-function hasReachedFirstFamilyAnniversary(familySinceDate?: string) {
-  const start = parseLocalDate(familySinceDate);
-  if (!start) {
-    return false;
-  }
-
-  const today = getLocalToday();
-  return addYearsSafe(start, 1) <= today;
-}
-
-function getFirstFamilyAnniversaryStatus(familySinceDate?: string) {
-  const start = parseLocalDate(familySinceDate);
-  if (!start) {
-    return "未登録";
-  }
-
-  const today = getLocalToday();
-  const firstAnniversary = addYearsSafe(start, 1);
-  if (firstAnniversary <= today) {
-    return "達成しました";
-  }
-
-  const daysUntil = Math.max(
-    0,
-    Math.round((firstAnniversary.getTime() - today.getTime()) / 86_400_000),
-  );
-  return `あと${daysUntil}日`;
-}
-
-function getLocalToday() {
-  const now = new Date();
-  return new Date(now.getFullYear(), now.getMonth(), now.getDate());
 }
 
 async function deleteRemoteCatProfile(
@@ -2723,28 +2744,6 @@ function PencilSmallIcon() {
         stroke="currentColor"
         strokeWidth="1.75"
         strokeLinecap="round"
-      />
-    </svg>
-  );
-}
-
-function ChevronDownIcon() {
-  return (
-    <svg
-      viewBox="0 0 24 24"
-      width="18"
-      height="18"
-      fill="none"
-      aria-hidden="true"
-      focusable="false"
-      style={{ display: "block" }}
-    >
-      <path
-        d="m7 9.5 5 5 5-5"
-        stroke="currentColor"
-        strokeWidth="1.8"
-        strokeLinecap="round"
-        strokeLinejoin="round"
       />
     </svg>
   );
@@ -3194,9 +3193,6 @@ const styles = {
   sectionSwitch: {
     margin: "0 0 12px",
   },
-  photoLensSwitch: {
-    margin: "0 0 12px",
-  },
   sectionTabs: {
     display: "grid",
     gridTemplateColumns: "repeat(3, minmax(0, 1fr))",
@@ -3284,28 +3280,6 @@ const styles = {
     boxShadow:
       "0 1px 0 color-mix(in srgb, var(--paper) 70%, transparent), 0 12px 24px -20px color-mix(in srgb, var(--ink) 36%, transparent)",
     cursor: "pointer",
-    WebkitTapHighlightColor: "transparent",
-  },
-  profileCoverSwitchButton: {
-    position: "absolute" as const,
-    left: "50%",
-    bottom: "-14px",
-    zIndex: 2,
-    width: "44px",
-    height: "32px",
-    minWidth: "44px",
-    display: "inline-flex",
-    alignItems: "center",
-    justifyContent: "center",
-    padding: 0,
-    borderRadius: "999px",
-    border: "1px solid color-mix(in srgb, var(--control-border) 72%, transparent)",
-    background: "color-mix(in srgb, var(--paper-card) 92%, transparent)",
-    color: CATS_MUTED,
-    boxShadow:
-      "0 1px 0 color-mix(in srgb, var(--paper) 72%, transparent), 0 10px 22px -18px color-mix(in srgb, var(--ink) 32%, transparent)",
-    cursor: "pointer",
-    transform: "translateX(-50%)",
     WebkitTapHighlightColor: "transparent",
   },
   profileHero: {
@@ -3516,28 +3490,28 @@ const styles = {
   },
   recordOverview: {
     display: "grid",
-    gap: "26px",
+    gap: "24px",
     padding: "0 0 24px",
   },
   recordBlock: {
     display: "grid",
-    gap: "10px",
+    gap: "9px",
   },
   recordBlockTitle: {
     margin: 0,
-    color: CATS_TEXT_STRONG,
+    color: CATS_TEXT,
     fontFamily: CATS_UI,
-    fontSize: "20px",
-    fontWeight: 600,
+    fontSize: "15px",
+    fontWeight: 500,
     lineHeight: 1.35,
-    letterSpacing: "0",
+    letterSpacing: "0.02em",
   },
   recordMonthLabel: {
     margin: "-2px 0 2px",
-    color: CATS_TEXT,
+    color: CATS_MUTED,
     fontFamily: CATS_UI,
-    fontSize: "14px",
-    fontWeight: 500,
+    fontSize: "13px",
+    fontWeight: 400,
     lineHeight: 1.4,
     letterSpacing: "0",
   },
@@ -3653,21 +3627,27 @@ const styles = {
     display: "grid",
     gridTemplateColumns: "repeat(3, minmax(0, 1fr))",
     alignItems: "start",
-    padding: "8px 12px 0",
+    gap: "8px",
+    padding: 0,
   },
   milestoneItem: {
     position: "relative" as const,
     display: "grid",
-    justifyItems: "center",
-    gap: "4px",
+    justifyItems: "start",
+    gap: "5px",
     minWidth: 0,
-    textAlign: "center",
+    minHeight: "76px",
+    padding: "10px",
+    borderRadius: "10px",
+    border: "1px solid color-mix(in srgb, var(--line) 78%, transparent)",
+    background: "color-mix(in srgb, var(--paper-card) 28%, transparent)",
+    textAlign: "left",
   },
   milestoneDot: {
     position: "relative" as const,
     zIndex: 1,
-    width: "18px",
-    height: "18px",
+    width: "20px",
+    height: "20px",
     display: "inline-flex",
     alignItems: "center",
     justifyContent: "center",
@@ -3678,31 +3658,20 @@ const styles = {
   milestoneDotReached: {
     background: "var(--seal)",
   },
-  milestoneLine: {
-    position: "absolute" as const,
-    top: "9px",
-    left: "calc(50% + 9px)",
-    width: "calc(100% - 18px)",
-    height: "1px",
-    borderTop: "1px dashed color-mix(in srgb, var(--ink-soft) 42%, transparent)",
-  },
-  milestoneLineReached: {
-    borderTop: "1px solid var(--seal)",
-  },
   milestoneLabel: {
-    marginTop: "4px",
+    marginTop: "2px",
     color: CATS_TEXT_STRONG,
     fontFamily: CATS_UI,
-    fontSize: "14px",
+    fontSize: "12px",
     fontWeight: 500,
     lineHeight: 1.35,
-    letterSpacing: "0",
+    letterSpacing: "0.01em",
   },
   milestoneStatus: {
     color: CATS_TEXT,
     fontFamily: CATS_UI,
-    fontSize: "12px",
-    fontWeight: 400,
+    fontSize: "13px",
+    fontWeight: 500,
     lineHeight: 1.35,
     letterSpacing: "0",
   },
@@ -3757,14 +3726,59 @@ const styles = {
     fontWeight: 400,
     lineHeight: 1.6,
   },
-  recordTinyNote: {
-    margin: "2px 0 0",
-    color: CATS_FAINT,
+  photoLensFilter: {
+    display: "inline-flex",
+    alignItems: "center",
+    justifySelf: "start",
+    gap: "6px",
+    minHeight: "36px",
+    margin: "-2px 0 10px",
+    padding: "2px",
+    borderRadius: "999px",
+    background: "color-mix(in srgb, var(--paper-card) 34%, transparent)",
+  },
+  photoLensFilterButton: {
+    minHeight: "32px",
+    padding: "0 12px",
+    border: "none",
+    borderRadius: "999px",
+    background: "transparent",
+    color: CATS_MUTED,
     fontFamily: CATS_UI,
-    fontSize: "11px",
+    fontSize: "12px",
+    fontWeight: 500,
+    letterSpacing: "0.02em",
+    cursor: "pointer",
+    WebkitTapHighlightColor: "transparent",
+  },
+  photoLensFilterButtonActive: {
+    background: "color-mix(in srgb, var(--paper-card) 76%, transparent)",
+    color: CATS_TEXT_STRONG,
+    boxShadow: "0 0 0 1px color-mix(in srgb, var(--line) 72%, transparent)",
+  },
+  recordPhotoSheet: {
+    display: "grid",
+    gap: "12px",
+  },
+  recordPhotoFrame: {
+    width: "100%",
+    overflow: "hidden",
+    borderRadius: "16px",
+    background: CATS_PANEL_BACKGROUND_SOFT,
+  },
+  recordPhotoImage: {
+    width: "100%",
+    aspectRatio: "4 / 3",
+    objectFit: "cover",
+    borderRadius: "16px",
+  },
+  recordPhotoDate: {
+    margin: 0,
+    color: CATS_MUTED,
+    fontFamily: CATS_UI,
+    fontSize: "12px",
     fontWeight: 400,
     lineHeight: 1.5,
-    letterSpacing: "0.02em",
   },
   footprintsPanel: {
     marginBottom: "22px",
