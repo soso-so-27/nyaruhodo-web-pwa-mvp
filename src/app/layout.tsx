@@ -57,9 +57,9 @@ export const metadata: Metadata = {
   icons: {
     icon: [
       { url: "/favicon.ico", sizes: "any" },
-      { url: "/icon-192.png", type: "image/png" },
+      { url: "/icon-envelope-v2-192.png", type: "image/png" },
     ],
-    apple: "/icon-180.png",
+    apple: "/icon-envelope-v2-180.png",
   },
 };
 
@@ -82,7 +82,7 @@ export default function RootLayout({
           rel="stylesheet"
           href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@latest/tabler-icons.min.css"
         />
-        <link rel="apple-touch-icon" href="/icon-180.png" />
+        <link rel="apple-touch-icon" href="/icon-envelope-v2-180.png" />
         <link
           rel="apple-touch-startup-image"
           href="/splash/v5/apple-splash-1170-2532.png"
@@ -148,7 +148,7 @@ export default function RootLayout({
           media="(device-width: 320px) and (device-height: 568px) and (-webkit-device-pixel-ratio: 2)"
         />
         <link rel="icon" href="/favicon.ico" sizes="any" />
-        <link rel="icon" href="/icon-192.png" type="image/png" />
+        <link rel="icon" href="/icon-envelope-v2-192.png" type="image/png" />
       </head>
       <body>
         <AppPaperTheme />
