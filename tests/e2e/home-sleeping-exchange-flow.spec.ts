@@ -104,12 +104,7 @@ test.describe("home sleeping exchange flow", () => {
       "3",
     );
     const openButton = page.getByTestId("desk-open-letter");
-    const box = await openButton.boundingBox();
-    expect(box).not.toBeNull();
-    await page.mouse.move(box!.x + box!.width / 2, box!.y + box!.height / 2);
-    await page.mouse.down();
-    await page.waitForTimeout(1700);
-    await page.mouse.up();
+    await openButton.click();
     await expect(page.getByTestId("evening-opening-pair").locator("img")).toHaveCount(2);
     await page.getByRole("button", { name: "また、あした" }).click();
     await expect(page.getByTestId("home-desk-model")).toHaveAttribute(
@@ -257,12 +252,7 @@ test.describe("home sleeping exchange flow", () => {
 
     await expect.poll(() => exchangeCalls).toBe(1);
     const openButton = page.getByTestId("desk-open-letter");
-    const box = await openButton.boundingBox();
-    expect(box).not.toBeNull();
-    await page.mouse.move(box!.x + box!.width / 2, box!.y + box!.height / 2);
-    await page.mouse.down();
-    await page.waitForTimeout(1700);
-    await page.mouse.up();
+    await openButton.click();
     await expect(page.getByTestId("evening-opening-pair")).toBeVisible();
     await expect(page.getByTestId("evening-opening-pair").locator("img")).toHaveCount(2);
 

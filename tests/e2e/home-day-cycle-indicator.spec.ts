@@ -87,12 +87,7 @@ test.describe("home desk state cycle", () => {
     await page.goto("/home");
     await page.waitForLoadState("networkidle");
     const openButton = page.getByTestId("desk-open-letter");
-    const box = await openButton.boundingBox();
-    expect(box).not.toBeNull();
-    await page.mouse.move(box!.x + box!.width / 2, box!.y + box!.height / 2);
-    await page.mouse.down();
-    await page.waitForTimeout(1700);
-    await page.mouse.up();
+    await openButton.click();
 
     await expect(page.getByTestId("evening-opening-pair")).toBeVisible();
   });

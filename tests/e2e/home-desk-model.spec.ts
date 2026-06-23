@@ -360,9 +360,7 @@ test.describe("home desk model", () => {
     }
   });
 
-  test("opens the delivered letter only after the hold completes", async ({
-    page,
-  }) => {
+  test("opens the delivered envelope after a tap animation", async ({ page }) => {
     await page.addInitScript(() => {
       (window as typeof window & { __openSoundCallCount?: number })
         .__openSoundCallCount = 0;
@@ -377,29 +375,14 @@ test.describe("home desk model", () => {
     await page.goto("/home");
     await page.waitForLoadState("networkidle");
 
-    const letter = page.getByRole("button", { name: "そっと ひらく" });
+    const letter = page.getByTestId("desk-open-letter");
     const box = await letter.boundingBox();
     expect(box).not.toBeNull();
     await expect(letter.locator('[data-develop-photo="true"]')).toHaveCount(0);
 
-    await page.mouse.move(box!.x + box!.width / 2, box!.y + box!.height / 2);
-    await page.mouse.down();
-    await page.waitForTimeout(500);
+    await letter.click();
+    await page.waitForTimeout(250);
     await expect(letter.locator('[data-develop-photo="true"]')).toHaveCount(1);
-    await page.mouse.up();
-    await page.waitForTimeout(1100);
-
-    await expect(page.getByTestId("home-desk-model")).toHaveAttribute(
-      "data-state",
-      "3",
-    );
-    await expect(page.getByTestId("evening-opening-pair")).toHaveCount(0);
-    await expect(letter.locator('[data-develop-photo="true"]')).toHaveCount(0);
-
-    await page.mouse.move(box!.x + box!.width / 2, box!.y + box!.height / 2);
-    await page.mouse.down();
-    await page.waitForTimeout(1700);
-    await page.mouse.up();
 
     await expect(page.getByTestId("evening-opening-pair")).toBeVisible();
     await expect

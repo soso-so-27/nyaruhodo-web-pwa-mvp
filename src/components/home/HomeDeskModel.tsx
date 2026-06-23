@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
-import type { CSSProperties, MouseEvent, PointerEvent, ReactNode } from "react";
+import type { CSSProperties, ReactNode } from "react";
 
 import { type EveningHomeState } from "../../lib/home/eveningDelivery";
 import type {
@@ -70,8 +70,7 @@ type HomeDeskModelProps = {
   onDismissOmoideMemory?: (memory: OmoideMemory) => void;
 };
 
-const HOLD_OPEN_MS = 1600;
-const HOLD_REWIND_MS = 1000;
+const ENVELOPE_OPEN_MS = 980;
 const HOME_FRAME_TUNING = {
   pagePaddingX: "12px",
   pagePaddingTop: "64px",
@@ -189,18 +188,16 @@ export function HomeDeskModel({
 }: HomeDeskModelProps) {
   const deskState = getDeskState(eveningState);
   const prefersReducedMotion = usePrefersReducedMotion();
-  const [holdProgress, setHoldProgress] = useState(false);
+  const [isEnvelopeOpening, setIsEnvelopeOpening] = useState(false);
   const [developPhotoMounted, setDevelopPhotoMounted] = useState(false);
-  const [isRewindingHold, setIsRewindingHold] = useState(false);
   const [viewerPhoto, setViewerPhoto] = useState<DeskViewerPhoto | null>(null);
   const [openingOmoideMemory, setOpeningOmoideMemory] =
     useState<OmoideMemory | null>(null);
   const [, setReportedDeliveredIds] = useState<Set<string>>(
     () => new Set(),
   );
-  const holdTimerRef = useRef<number | null>(null);
-  const rewindTimerRef = useRef<number | null>(null);
-  const isHoldingRef = useRef(false);
+  const envelopeOpenTimerRef = useRef<number | null>(null);
+  const isOpeningEnvelopeRef = useRef(false);
   const daylightStyle = useDaylight(now);
   const hasSupplementalNotification = Boolean(omoideMemory);
   const [homePhotoAspect, setHomePhotoAspect] = useState<number | null>(null);
@@ -236,6 +233,7 @@ export function HomeDeskModel({
     homeDay.phase === "delivered" && subNotifications.length > 0;
   const hasTrayActions = homeDay.phase === "delivered" || subNotifications.length > 0;
   const usesTextRibbonTray = !hasTrayActions;
+  const usesEnvelopeHome = homeDay.phase === "delivered" && !hasSplitTrayActions;
   const shouldHidePresence = true;
   useEffect(() => {
     trackDeskStateShown(deskState, eveningState.dateKey);
@@ -258,11 +256,8 @@ export function HomeDeskModel({
 
   useEffect(() => {
     return () => {
-      if (holdTimerRef.current) {
-        window.clearTimeout(holdTimerRef.current);
-      }
-      if (rewindTimerRef.current) {
-        window.clearTimeout(rewindTimerRef.current);
+      if (envelopeOpenTimerRef.current) {
+        window.clearTimeout(envelopeOpenTimerRef.current);
       }
     };
   }, []);
@@ -272,54 +267,25 @@ export function HomeDeskModel({
       return;
     }
 
-    setHoldProgress(false);
+    setIsEnvelopeOpening(false);
     setDevelopPhotoMounted(false);
-    setIsRewindingHold(false);
-    if (holdTimerRef.current) {
-      window.clearTimeout(holdTimerRef.current);
-      holdTimerRef.current = null;
-    }
-    if (rewindTimerRef.current) {
-      window.clearTimeout(rewindTimerRef.current);
-      rewindTimerRef.current = null;
+    isOpeningEnvelopeRef.current = false;
+    if (envelopeOpenTimerRef.current) {
+      window.clearTimeout(envelopeOpenTimerRef.current);
+      envelopeOpenTimerRef.current = null;
     }
   }, [eveningState.kind]);
 
-  function startHold(event: PointerEvent<HTMLButtonElement>) {
+  function openDeliveredLetter() {
     if (eveningState.kind !== "delivered") {
       return;
     }
 
-    event.preventDefault();
-    event.stopPropagation();
-    beginHold();
-    try {
-      event.currentTarget.setPointerCapture(event.pointerId);
-    } catch {
-      // Pointer capture is best-effort; the hold state itself must still start.
-    }
-  }
-
-  function startMouseHold(event: MouseEvent<HTMLButtonElement>) {
-    if (eveningState.kind !== "delivered") {
+    if (isOpeningEnvelopeRef.current) {
       return;
     }
 
-    event.preventDefault();
-    event.stopPropagation();
-    beginHold();
-  }
-
-  function beginHold() {
-    if (eveningState.kind !== "delivered" || isHoldingRef.current) {
-      return;
-    }
-
-    isHoldingRef.current = true;
-    if (rewindTimerRef.current) {
-      window.clearTimeout(rewindTimerRef.current);
-      rewindTimerRef.current = null;
-    }
+    isOpeningEnvelopeRef.current = true;
 
     if (prefersReducedMotion) {
       void playOpenSound();
@@ -328,52 +294,17 @@ export function HomeDeskModel({
     }
 
     setDevelopPhotoMounted(true);
-    setIsRewindingHold(false);
-    setHoldProgress(true);
-    if (holdTimerRef.current) {
-      window.clearTimeout(holdTimerRef.current);
+    setIsEnvelopeOpening(true);
+    if (envelopeOpenTimerRef.current) {
+      window.clearTimeout(envelopeOpenTimerRef.current);
     }
-    holdTimerRef.current = window.setTimeout(() => {
-      holdTimerRef.current = null;
-      isHoldingRef.current = false;
-      setHoldProgress(false);
+    envelopeOpenTimerRef.current = window.setTimeout(() => {
+      envelopeOpenTimerRef.current = null;
+      isOpeningEnvelopeRef.current = false;
+      setIsEnvelopeOpening(false);
       void playOpenSound();
       onOpenDelivery(eveningState);
-    }, HOLD_OPEN_MS);
-  }
-
-  function cancelHold(event?: PointerEvent<HTMLButtonElement>) {
-    if (event) {
-      event.preventDefault();
-      event.stopPropagation();
-      if (event.currentTarget.hasPointerCapture(event.pointerId)) {
-        event.currentTarget.releasePointerCapture(event.pointerId);
-      }
-    }
-
-    if (holdTimerRef.current) {
-      window.clearTimeout(holdTimerRef.current);
-      holdTimerRef.current = null;
-    }
-    isHoldingRef.current = false;
-    setHoldProgress(false);
-    if (developPhotoMounted) {
-      setIsRewindingHold(true);
-      if (rewindTimerRef.current) {
-        window.clearTimeout(rewindTimerRef.current);
-      }
-      rewindTimerRef.current = window.setTimeout(() => {
-        rewindTimerRef.current = null;
-        setDevelopPhotoMounted(false);
-        setIsRewindingHold(false);
-      }, HOLD_REWIND_MS);
-    }
-  }
-
-  function cancelMouseHold(event: MouseEvent<HTMLButtonElement>) {
-    event.preventDefault();
-    event.stopPropagation();
-    cancelHold();
+    }, ENVELOPE_OPEN_MS);
   }
 
 
@@ -411,7 +342,7 @@ export function HomeDeskModel({
           }}
         >
           <div style={deskStyles.todayPhotoZone}>
-            {homePhoto ? (
+            {usesEnvelopeHome ? null : homePhoto ? (
               <div
                 style={{
                   ...deskStyles.homeFrameShell,
@@ -498,6 +429,7 @@ export function HomeDeskModel({
                 ? deskStyles.notificationTrayList
                 : {}),
               ...(homeDay.phase === "delivered" ? deskStyles.notificationTrayDelivered : {}),
+              ...(usesEnvelopeHome ? deskStyles.notificationTrayEnvelopeHome : {}),
             }}
             className={
               homeDay.phase === "delivered" && !prefersReducedMotion
@@ -515,6 +447,7 @@ export function HomeDeskModel({
                 ...(subNotifications.length === 0
                   ? deskStyles.notificationRowsSingle
                   : {}),
+                ...(usesEnvelopeHome ? deskStyles.notificationRowsEnvelopeHome : {}),
               }}
             >
               {homeDay.phase === "delivered" ? (
@@ -522,34 +455,55 @@ export function HomeDeskModel({
                   type="button"
                   role="button"
                   data-testid="desk-open-letter"
-                  aria-label="そっと ひらく"
+                  aria-label="ねこだよりをひらく"
                   style={{
-                    ...deskStyles.notificationRow,
-                    ...deskStyles.notificationRowPrimary,
+                    ...(usesEnvelopeHome
+                      ? deskStyles.envelopeHomeButton
+                      : {
+                          ...deskStyles.notificationRow,
+                          ...deskStyles.notificationRowPrimary,
+                        }),
                     ...(hasSplitTrayActions ? deskStyles.notificationRowSplitCard : {}),
                   }}
-                  className={holdProgress ? "desk-letter-holding" : undefined}
-                  onPointerDown={startHold}
-                  onPointerUp={cancelHold}
-                  onPointerCancel={cancelHold}
-                  onPointerLeave={cancelHold}
-                  onMouseDown={startMouseHold}
-                  onMouseUp={cancelMouseHold}
-                  onMouseLeave={cancelMouseHold}
+                  className={[
+                    usesEnvelopeHome ? "desk-envelope-home" : null,
+                    isEnvelopeOpening ? "desk-letter-opening" : null,
+                  ]
+                    .filter(Boolean)
+                    .join(" ")}
+                  onClick={openDeliveredLetter}
                   onContextMenu={(event) => event.preventDefault()}
                 >
                   <span
+                    data-envelope-body={usesEnvelopeHome ? "true" : undefined}
                     aria-hidden="true"
                     style={{
                       ...deskStyles.selectionLockedStage,
-                      ...deskStyles.arrivedLetterButton,
-                      ...deskStyles.trayLetterButton,
+                      ...(usesEnvelopeHome
+                        ? deskStyles.envelopeHomeBody
+                        : {
+                            ...deskStyles.arrivedLetterButton,
+                            ...deskStyles.trayLetterButton,
+                          }),
                       ...(hasSplitTrayActions ? deskStyles.trayLetterButtonCompact : {}),
                     }}
                   >
-                    <span style={deskStyles.letterFlap} aria-hidden="true" />
                     <span
-                      style={{ ...deskStyles.letterSeal, ...deskStyles.letterSealActive }}
+                      data-envelope-flap="true"
+                      style={
+                        usesEnvelopeHome
+                          ? deskStyles.envelopeHomeFlap
+                          : deskStyles.letterFlap
+                      }
+                      aria-hidden="true"
+                    />
+                    <span
+                      data-envelope-seal="true"
+                      style={
+                        usesEnvelopeHome
+                          ? deskStyles.envelopeHomeSeal
+                          : { ...deskStyles.letterSeal, ...deskStyles.letterSealActive }
+                      }
                       aria-hidden="true"
                     />
                     {deliveredPhoto && developPhotoMounted ? (
@@ -557,8 +511,9 @@ export function HomeDeskModel({
                         data-develop-photo="true"
                         style={{
                           ...deskStyles.selectionLockedStage,
-                          ...deskStyles.developPhoto,
-                          ...(isRewindingHold ? deskStyles.developPhotoRewinding : {}),
+                          ...(usesEnvelopeHome
+                            ? deskStyles.envelopeHomeDevelopPhoto
+                            : deskStyles.developPhoto),
                         }}
                         aria-hidden="true"
                       >
@@ -575,27 +530,44 @@ export function HomeDeskModel({
                   </span>
                   <div
                     style={{
-                      ...deskStyles.letterTrayCopy,
-                      ...(hasSplitTrayActions ? deskStyles.letterTrayCopySplit : {}),
+                      ...(usesEnvelopeHome
+                        ? deskStyles.envelopeHomeCopy
+                        : {
+                            ...deskStyles.letterTrayCopy,
+                            ...(hasSplitTrayActions ? deskStyles.letterTrayCopySplit : {}),
+                          }),
                     }}
                   >
                     <strong
                       style={{
-                        ...deskStyles.letterTrayTitle,
-                        ...deskStyles.letterTrayTitlePrimary,
-                        ...(hasSplitTrayActions ? deskStyles.notificationTitleSplit : {}),
+                        ...(usesEnvelopeHome
+                          ? deskStyles.envelopeHomeTitle
+                          : {
+                              ...deskStyles.letterTrayTitle,
+                              ...deskStyles.letterTrayTitlePrimary,
+                              ...(hasSplitTrayActions
+                                ? deskStyles.notificationTitleSplit
+                                : {}),
+                            }),
                       }}
                     >
                       ねこだより、とどいた
                     </strong>
                     <span
+                      data-envelope-action={usesEnvelopeHome ? "true" : undefined}
                       style={{
-                        ...deskStyles.letterTraySub,
-                        ...deskStyles.letterTraySubPrimary,
-                        ...(hasSplitTrayActions ? deskStyles.notificationActionSplit : {}),
+                        ...(usesEnvelopeHome
+                          ? deskStyles.envelopeHomeAction
+                          : {
+                              ...deskStyles.letterTraySub,
+                              ...deskStyles.letterTraySubPrimary,
+                              ...(hasSplitTrayActions
+                                ? deskStyles.notificationActionSplit
+                                : {}),
+                            }),
                       }}
                     >
-                      おさえて ひらく
+                      ひらく
                     </span>
                   </div>
                 </button>
@@ -801,6 +773,37 @@ export function HomeDeskModel({
         .home-letter-tray-glow {
           animation: homeLetterTrayGlow 2200ms var(--ease-gentle) infinite alternate;
         }
+        .desk-envelope-home {
+          animation: deskEnvelopeArrive 720ms cubic-bezier(0.2, 0.8, 0.2, 1) both;
+        }
+        .desk-envelope-home:active [data-envelope-body="true"] {
+          transform: translateY(2px) scale(0.985);
+          box-shadow:
+            0 1px 0 rgba(255,255,255,0.54) inset,
+            0 0 0 1px color-mix(in srgb, var(--seal-soft) 18%, transparent) inset,
+            0 14px 34px -26px color-mix(in srgb, var(--ink) 40%, transparent);
+        }
+        .desk-envelope-home [data-envelope-action="true"]::before {
+          content: "ひらく";
+          display: block;
+          color: var(--seal);
+          font-size: 12px;
+          font-weight: 500;
+          line-height: 1.45;
+          letter-spacing: var(--tracking-body);
+        }
+        .desk-letter-opening [data-envelope-body="true"] {
+          animation: deskEnvelopeBodyOpen 980ms cubic-bezier(0.18, 0.92, 0.2, 1) both;
+        }
+        .desk-letter-opening [data-envelope-flap="true"] {
+          animation: deskEnvelopeFlapOpen 980ms cubic-bezier(0.16, 0.9, 0.22, 1) both;
+        }
+        .desk-letter-opening [data-envelope-seal="true"] {
+          animation: deskEnvelopeSealPop 720ms cubic-bezier(0.18, 0.92, 0.2, 1) both;
+        }
+        .desk-letter-opening [data-develop-photo="true"] {
+          animation: deskEnvelopePhotoReveal 980ms cubic-bezier(0.18, 0.92, 0.2, 1) both;
+        }
         @keyframes homeLetterTrayGlow {
           from {
             filter: brightness(1);
@@ -809,10 +812,82 @@ export function HomeDeskModel({
             filter: brightness(1.035);
           }
         }
-        .desk-letter-holding [data-develop-photo="true"] {
-          opacity: 1 !important;
-          filter: blur(0) !important;
-          transform: scale(1) !important;
+        @keyframes deskEnvelopeArrive {
+          from {
+            opacity: 0;
+            transform: translateY(12px) scale(0.98);
+            filter: blur(6px);
+          }
+          to {
+            opacity: 1;
+            transform: translateY(0) scale(1);
+            filter: blur(0);
+          }
+        }
+        @keyframes deskEnvelopeBodyOpen {
+          0% {
+            transform: translateY(0) scale(1);
+          }
+          22% {
+            transform: translateY(3px) scale(0.982);
+          }
+          52% {
+            transform: translateY(-5px) scale(1.012);
+          }
+          100% {
+            transform: translateY(-10px) scale(1.035);
+            filter: brightness(1.04);
+          }
+        }
+        @keyframes deskEnvelopeFlapOpen {
+          0% {
+            transform: rotateX(0deg) translateY(0);
+            filter: brightness(1);
+          }
+          34% {
+            transform: rotateX(0deg) translateY(0);
+          }
+          100% {
+            transform: rotateX(72deg) translateY(-10px);
+            filter: brightness(1.08);
+          }
+        }
+        @keyframes deskEnvelopeSealPop {
+          0% {
+            opacity: 1;
+            transform: translate(-50%, -50%) scale(1);
+          }
+          28% {
+            transform: translate(-50%, -50%) scale(1.18);
+          }
+          68% {
+            opacity: 0.92;
+            transform: translate(-50%, -68%) scale(0.82) rotate(-8deg);
+          }
+          100% {
+            opacity: 0;
+            transform: translate(-50%, -94%) scale(0.62) rotate(12deg);
+          }
+        }
+        @keyframes deskEnvelopePhotoReveal {
+          0% {
+            opacity: 0;
+            filter: blur(10px) saturate(0.94);
+            transform: translateY(26px) scale(0.9);
+          }
+          38% {
+            opacity: 0;
+          }
+          76% {
+            opacity: 1;
+            filter: blur(1px) saturate(1.02);
+            transform: translateY(-8px) scale(1.02);
+          }
+          100% {
+            opacity: 1;
+            filter: blur(0) saturate(1.04);
+            transform: translateY(-14px) scale(1.04);
+          }
         }
         .home-tray-action-carousel::-webkit-scrollbar {
           display: none;
@@ -820,14 +895,19 @@ export function HomeDeskModel({
         @media (prefers-reduced-motion: reduce) {
           .desk-frame-breathe,
           .desk-evening-soon-copy,
-          .home-letter-tray-glow {
+          .home-letter-tray-glow,
+          .desk-envelope-home,
+          .desk-letter-opening [data-envelope-body="true"],
+          .desk-letter-opening [data-envelope-flap="true"],
+          .desk-letter-opening [data-envelope-seal="true"],
+          .desk-letter-opening [data-develop-photo="true"] {
             animation: none;
             filter: none;
           }
           .home-sky-shell {
             animation: homeSkyBreath var(--home-sky-reduced-motion-duration, 42s) var(--ease-gentle) infinite alternate;
           }
-          .desk-letter-holding [data-develop-photo="true"] {
+          .desk-letter-opening [data-develop-photo="true"] {
             transition: none !important;
           }
         }
@@ -2018,12 +2098,26 @@ const deskStyles = {
     boxShadow:
       "0 0 0 1px color-mix(in srgb, var(--seal-soft) 24%, transparent) inset, 0 16px 38px -18px color-mix(in srgb, var(--seal) 34%, transparent), 0 10px 22px -20px color-mix(in srgb, var(--ink) 20%, transparent)",
   },
+  notificationTrayEnvelopeHome: {
+    minHeight: "min(44vh, 340px)",
+    padding: "0",
+    borderRadius: 0,
+    background: "transparent",
+    boxShadow: "none",
+    backdropFilter: "none",
+  },
   notificationRows: {
     width: "100%",
     minHeight: "72px",
     display: "grid",
     alignContent: "center",
     gap: "8px",
+  },
+  notificationRowsEnvelopeHome: {
+    minHeight: "min(44vh, 340px)",
+    placeItems: "center",
+    alignContent: "center",
+    gap: "14px",
   },
   notificationRowsRibbon: {
     minHeight: "0",
@@ -2208,6 +2302,103 @@ const deskStyles = {
   letterTrayTitlePrimary: {
     color: "var(--ink)",
     fontSize: "14.5px",
+  },
+  envelopeHomeButton: {
+    width: "min(78vw, 344px)",
+    minHeight: "0",
+    boxSizing: "border-box",
+    display: "grid",
+    justifyItems: "center",
+    alignContent: "center",
+    gap: "14px",
+    padding: "0",
+    border: "0",
+    background: "transparent",
+    color: "var(--ink)",
+    textAlign: "center",
+    cursor: "pointer",
+    WebkitTapHighlightColor: "transparent",
+    touchAction: "manipulation",
+  },
+  envelopeHomeBody: {
+    position: "relative",
+    display: "block",
+    width: "100%",
+    aspectRatio: "3.35 / 1",
+    overflow: "hidden",
+    borderRadius: "22px",
+    background:
+      "linear-gradient(154deg, transparent 0 49%, color-mix(in srgb, var(--seal-soft) 13%, transparent) 49.5% 50.5%, transparent 51% 100%), linear-gradient(206deg, transparent 0 49%, color-mix(in srgb, var(--seal-soft) 12%, transparent) 49.5% 50.5%, transparent 51% 100%), linear-gradient(180deg, color-mix(in srgb, var(--paper-card) 95%, var(--home-tray-paper, #fdf9f1) 5%) 0%, color-mix(in srgb, var(--paper-card) 82%, var(--home-frame-glow, var(--paper-warm)) 18%) 100%)",
+    boxShadow:
+      "0 1px 0 rgba(255,255,255,0.58) inset, 0 0 0 1px color-mix(in srgb, var(--seal-soft) 18%, transparent) inset, 0 22px 48px -30px color-mix(in srgb, var(--ink) 42%, transparent), 0 16px 34px -26px color-mix(in srgb, var(--seal) 30%, transparent)",
+    transformOrigin: "50% 62%",
+  },
+  envelopeHomeFlap: {
+    position: "absolute",
+    top: 0,
+    left: 0,
+    right: 0,
+    height: "58%",
+    clipPath: "polygon(0 0, 100% 0, 50% 100%)",
+    background:
+      "linear-gradient(180deg, color-mix(in srgb, var(--paper-card) 86%, transparent), color-mix(in srgb, var(--home-tray-paper, #fdf9f1) 62%, transparent))",
+    borderBottom: "1px solid color-mix(in srgb, var(--seal-soft) 14%, transparent)",
+    transformOrigin: "50% 0%",
+  },
+  envelopeHomeSeal: {
+    position: "absolute",
+    top: "48%",
+    left: "50%",
+    width: "22px",
+    height: "22px",
+    borderRadius: "var(--radius-full)",
+    background:
+      "radial-gradient(circle at 35% 32%, color-mix(in srgb, var(--paper-card) 42%, transparent), transparent 34%), var(--seal)",
+    boxShadow:
+      "0 0 0 4px color-mix(in srgb, var(--seal-soft) 24%, transparent), 0 9px 18px -13px color-mix(in srgb, var(--seal) 58%, transparent)",
+    transform: "translate(-50%, -50%)",
+    transformOrigin: "50% 50%",
+  },
+  envelopeHomeDevelopPhoto: {
+    position: "absolute",
+    left: "15%",
+    right: "15%",
+    bottom: "16%",
+    height: "64%",
+    overflow: "hidden",
+    borderRadius: "16px",
+    opacity: 0,
+    filter: "blur(10px) saturate(0.94)",
+    transform: "translateY(26px) scale(0.9)",
+    transformOrigin: "50% 80%",
+    boxShadow:
+      "0 0 0 1px color-mix(in srgb, var(--paper-card) 68%, transparent) inset, 0 12px 24px -18px color-mix(in srgb, var(--ink) 38%, transparent)",
+    pointerEvents: "none",
+  },
+  envelopeHomeCopy: {
+    display: "grid",
+    justifyItems: "center",
+    gap: "5px",
+    color: "var(--ink)",
+    fontFamily: "var(--font-display)",
+    textAlign: "center",
+    pointerEvents: "none",
+  },
+  envelopeHomeTitle: {
+    margin: 0,
+    color: "color-mix(in srgb, var(--ink) 86%, var(--ink-soft))",
+    fontSize: "17px",
+    fontWeight: 400,
+    lineHeight: 1.5,
+    letterSpacing: "var(--tracking-label)",
+  },
+  envelopeHomeAction: {
+    minHeight: "18px",
+    color: "transparent",
+    fontFamily: "var(--font-ui)",
+    fontSize: 0,
+    lineHeight: 1,
+    letterSpacing: "var(--tracking-body)",
   },
   letterTraySubPrimary: {
     color: "var(--seal)",
