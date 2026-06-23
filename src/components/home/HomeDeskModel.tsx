@@ -488,6 +488,25 @@ export function HomeDeskModel({
                       ...(hasSplitTrayActions ? deskStyles.trayLetterButtonCompact : {}),
                     }}
                   >
+                    {usesEnvelopeHome ? (
+                      <>
+                        <img
+                          src="/images/home/generated-envelope-wide.png"
+                          alt=""
+                          data-envelope-art="closed"
+                          style={deskStyles.envelopeHomeArt}
+                        />
+                        <img
+                          src="/images/home/generated-envelope-open.png"
+                          alt=""
+                          data-envelope-art="open"
+                          style={{
+                            ...deskStyles.envelopeHomeArt,
+                            ...deskStyles.envelopeHomeArtOpen,
+                          }}
+                        />
+                      </>
+                    ) : null}
                     <span
                       data-envelope-flap="true"
                       style={
@@ -795,6 +814,12 @@ export function HomeDeskModel({
         .desk-letter-opening [data-envelope-body="true"] {
           animation: deskEnvelopeBodyOpen 980ms cubic-bezier(0.18, 0.92, 0.2, 1) both;
         }
+        .desk-letter-opening [data-envelope-art="closed"] {
+          animation: deskEnvelopeClosedArtOpen 980ms cubic-bezier(0.18, 0.92, 0.2, 1) both;
+        }
+        .desk-letter-opening [data-envelope-art="open"] {
+          animation: deskEnvelopeOpenArtReveal 980ms cubic-bezier(0.18, 0.92, 0.2, 1) both;
+        }
         .desk-letter-opening [data-envelope-flap="true"] {
           animation: deskEnvelopeFlapOpen 980ms cubic-bezier(0.16, 0.9, 0.22, 1) both;
         }
@@ -837,6 +862,53 @@ export function HomeDeskModel({
           100% {
             transform: translateY(-10px) scale(1.035);
             filter: brightness(1.04);
+          }
+        }
+        @keyframes deskEnvelopeClosedArtOpen {
+          0% {
+            opacity: 1;
+            transform: translateY(0) scale(1);
+            filter:
+              drop-shadow(0 18px 30px color-mix(in srgb, var(--ink) 20%, transparent))
+              drop-shadow(0 6px 18px color-mix(in srgb, var(--seal) 10%, transparent));
+          }
+          30% {
+            opacity: 1;
+            transform: translateY(3px) scale(0.982);
+          }
+          56% {
+            opacity: 0.88;
+            transform: translateY(-8px) scale(1.018);
+          }
+          100% {
+            opacity: 0;
+            transform: translateY(-18px) scale(1.05);
+            filter:
+              drop-shadow(0 24px 36px color-mix(in srgb, var(--ink) 16%, transparent))
+              drop-shadow(0 8px 18px color-mix(in srgb, var(--seal) 8%, transparent));
+          }
+        }
+        @keyframes deskEnvelopeOpenArtReveal {
+          0% {
+            opacity: 0;
+            transform: translateY(18px) scale(0.96);
+            filter: blur(5px)
+              drop-shadow(0 14px 28px color-mix(in srgb, var(--ink) 14%, transparent));
+          }
+          38% {
+            opacity: 0;
+          }
+          68% {
+            opacity: 1;
+            transform: translateY(-7px) scale(1.018);
+            filter: blur(0)
+              drop-shadow(0 20px 32px color-mix(in srgb, var(--ink) 17%, transparent));
+          }
+          100% {
+            opacity: 1;
+            transform: translateY(-12px) scale(1.035);
+            filter: blur(0)
+              drop-shadow(0 24px 34px color-mix(in srgb, var(--ink) 18%, transparent));
           }
         }
         @keyframes deskEnvelopeFlapOpen {
@@ -898,6 +970,8 @@ export function HomeDeskModel({
           .home-letter-tray-glow,
           .desk-envelope-home,
           .desk-letter-opening [data-envelope-body="true"],
+          .desk-letter-opening [data-envelope-art="closed"],
+          .desk-letter-opening [data-envelope-art="open"],
           .desk-letter-opening [data-envelope-flap="true"],
           .desk-letter-opening [data-envelope-seal="true"],
           .desk-letter-opening [data-develop-photo="true"] {
@@ -2304,7 +2378,7 @@ const deskStyles = {
     fontSize: "14.5px",
   },
   envelopeHomeButton: {
-    width: "min(78vw, 344px)",
+    width: "min(92vw, 420px)",
     minHeight: "0",
     boxSizing: "border-box",
     display: "grid",
@@ -2324,47 +2398,43 @@ const deskStyles = {
     position: "relative",
     display: "block",
     width: "100%",
-    aspectRatio: "3.35 / 1",
-    overflow: "hidden",
-    borderRadius: "22px",
-    background:
-      "linear-gradient(154deg, transparent 0 49%, color-mix(in srgb, var(--seal-soft) 13%, transparent) 49.5% 50.5%, transparent 51% 100%), linear-gradient(206deg, transparent 0 49%, color-mix(in srgb, var(--seal-soft) 12%, transparent) 49.5% 50.5%, transparent 51% 100%), linear-gradient(180deg, color-mix(in srgb, var(--paper-card) 95%, var(--home-tray-paper, #fdf9f1) 5%) 0%, color-mix(in srgb, var(--paper-card) 82%, var(--home-frame-glow, var(--paper-warm)) 18%) 100%)",
-    boxShadow:
-      "0 1px 0 rgba(255,255,255,0.58) inset, 0 0 0 1px color-mix(in srgb, var(--seal-soft) 18%, transparent) inset, 0 22px 48px -30px color-mix(in srgb, var(--ink) 42%, transparent), 0 16px 34px -26px color-mix(in srgb, var(--seal) 30%, transparent)",
+    aspectRatio: "3.82 / 1",
+    overflow: "visible",
+    borderRadius: 0,
+    background: "transparent",
+    boxShadow: "none",
     transformOrigin: "50% 62%",
   },
-  envelopeHomeFlap: {
+  envelopeHomeArt: {
     position: "absolute",
-    top: 0,
-    left: 0,
-    right: 0,
-    height: "58%",
-    clipPath: "polygon(0 0, 100% 0, 50% 100%)",
-    background:
-      "linear-gradient(180deg, color-mix(in srgb, var(--paper-card) 86%, transparent), color-mix(in srgb, var(--home-tray-paper, #fdf9f1) 62%, transparent))",
-    borderBottom: "1px solid color-mix(in srgb, var(--seal-soft) 14%, transparent)",
-    transformOrigin: "50% 0%",
+    inset: 0,
+    width: "100%",
+    height: "100%",
+    display: "block",
+    objectFit: "contain",
+    objectPosition: "center",
+    filter:
+      "drop-shadow(0 18px 30px color-mix(in srgb, var(--ink) 20%, transparent)) drop-shadow(0 6px 18px color-mix(in srgb, var(--seal) 10%, transparent))",
+    transformOrigin: "50% 58%",
+    pointerEvents: "none",
+  },
+  envelopeHomeArtOpen: {
+    opacity: 0,
+    height: "168%",
+    top: "-62%",
+  },
+  envelopeHomeFlap: {
+    display: "none",
   },
   envelopeHomeSeal: {
-    position: "absolute",
-    top: "48%",
-    left: "50%",
-    width: "22px",
-    height: "22px",
-    borderRadius: "var(--radius-full)",
-    background:
-      "radial-gradient(circle at 35% 32%, color-mix(in srgb, var(--paper-card) 42%, transparent), transparent 34%), var(--seal)",
-    boxShadow:
-      "0 0 0 4px color-mix(in srgb, var(--seal-soft) 24%, transparent), 0 9px 18px -13px color-mix(in srgb, var(--seal) 58%, transparent)",
-    transform: "translate(-50%, -50%)",
-    transformOrigin: "50% 50%",
+    display: "none",
   },
   envelopeHomeDevelopPhoto: {
     position: "absolute",
-    left: "15%",
-    right: "15%",
-    bottom: "16%",
-    height: "64%",
+    left: "25%",
+    right: "25%",
+    bottom: "18%",
+    height: "122%",
     overflow: "hidden",
     borderRadius: "16px",
     opacity: 0,
