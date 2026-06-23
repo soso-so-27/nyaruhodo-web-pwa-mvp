@@ -58,7 +58,7 @@ test("keeps the cats photo tab clear of the fixed bottom navigation", async ({
   const grid = page.getByTestId("cats-lens-photo-grid");
   const moreRow = page.getByTestId("cats-lens-photo-more-row");
   const tabs = page.getByTestId("cats-section-tabs");
-  const avatar = page.getByTestId("cats-profile-avatar");
+  const cover = page.getByTestId("cats-profile-cover");
   const nav = page.getByRole("navigation");
 
   await expect(grid).toBeVisible();
@@ -81,14 +81,14 @@ test("keeps the cats photo tab clear of the fixed bottom navigation", async ({
   });
   expect(gridMetrics.columnGap).toBe("4px");
 
-  const [tabsBox, avatarBox, navBoxBeforeScroll] = await Promise.all([
+  const [tabsBox, coverBox, navBoxBeforeScroll] = await Promise.all([
     tabs.boundingBox(),
-    avatar.boundingBox(),
+    cover.boundingBox(),
     nav.boundingBox(),
   ]);
   expect(tabsBox?.height).toBe(48);
-  expect(avatarBox?.width).toBe(48);
-  expect(avatarBox?.height).toBe(48);
+  expect(coverBox?.height).toBe(188);
+  expect(coverBox?.width).toBeGreaterThanOrEqual(370);
   expect(navBoxBeforeScroll?.height).toBe(60);
 
   await moreRow.scrollIntoViewIfNeeded();

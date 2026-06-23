@@ -158,7 +158,6 @@ export function CatsPage() {
       ? getActiveCatProfile(catProfiles, activeCatId)
       : null;
   const catName = getCatName(activeCatProfile);
-  const activeGender = formatGender(activeCatProfile?.basicInfo?.gender);
   const familyDuration = formatFamilyDuration(
     activeCatProfile?.basicInfo?.familySinceDate,
   );
@@ -178,11 +177,6 @@ export function CatsPage() {
     isOnboardingMode && isOnboardingCompletionReady && !isEditingProfile;
   const canManageCats = !isOnboardingProfileSetup && !isOnboardingCompletionView;
   const shouldShowCatSwitchButton = catProfiles.length > 1 && canManageCats;
-  const shouldShowCatIconSwitcher =
-    catProfiles.length > 1 &&
-    canManageCats &&
-    !isAddingCat &&
-    !isEditingProfile;
   const shouldShowPhotoLensSwitch =
     catProfiles.length > 1 &&
     canManageCats &&
@@ -200,9 +194,10 @@ export function CatsPage() {
   const activeCatLensPhotos = activeCatId
     ? lensPhotosByCat[activeCatId] ?? []
     : [];
-  const deliveredSleepingPhotoCount = activeCatId
-    ? getDeliveredPhotoCount(activeCatLensPhotos)
-    : 0;
+  const activeCoverPhoto = activeCatLensPhotos[0] ?? null;
+  const activeCoverSrc = activeCoverPhoto?.src ?? activeAvatarSrc;
+  const activeCoverFit =
+    activeCoverPhoto || activeCatProfile?.avatarDataUrl ? "cover" : "contain";
   const allLensPhotos = useMemo(
     () =>
       mergeAllLensPhotos(
@@ -724,52 +719,39 @@ export function CatsPage() {
           >
             {!isOnboardingProfileSetup ? (
               <>
-                <div style={styles.profileHero}>
-                  <button
-                    type="button"
-                    data-testid="cats-profile-avatar"
-                    style={styles.profileHeroAvatar}
-                    onClick={() => void handleAvatarUpload()}
-                    aria-label={`${activeCatProfile.name}のアイコン写真を変更`}
+                <div style={styles.profileCoverHero}>
+                  <div
+                    data-testid="cats-profile-cover"
+                    style={styles.profileCoverFrame}
                   >
                     <PhotoTile
-                      src={activeAvatarSrc}
+                      src={activeCoverSrc}
                       alt=""
-                      variant="avatar"
-                      fit={activeCatProfile.avatarDataUrl ? "cover" : "contain"}
-                      style={styles.profileHeroAvatarTileRoot}
-                      imageStyle={
-                        activeCatProfile.avatarDataUrl
-                          ? styles.profileHeroAvatarPhotoTile
-                          : styles.profileHeroAvatarIconTile
-                      }
+                      variant="bare"
+                      fit={activeCoverFit}
+                      aspect="auto"
+                      style={styles.profileCoverTileRoot}
+                      imageStyle={styles.profileCoverImage}
                     />
-                  </button>
-                  <div style={styles.profileHeroInfo}>
-                    <div style={styles.profileNameRow}>
-                      <div style={styles.profileName}>{activeCatProfile.name}</div>
-                      {shouldShowCatIconSwitcher ? (
-                        <CatIconSwitcher
-                          profiles={catProfiles}
-                          activeCatId={activeCatId}
-                          onSelect={handleCatSelect}
-                          onOpenMore={() => setIsCatSwitcherOpen(true)}
-                        />
-                      ) : null}
-                    </div>
-                  </div>
-                  <div style={styles.profileHeroActions}>
                     {canManageCats ? (
-                      <AppButton
+                      <button
                         type="button"
-                        variant="ghost"
-                        size="icon"
-                        iconOnly
+                        style={styles.profileCoverEditButton}
                         onClick={() => setIsCatManageOpen(true)}
-                        aria-label="うちのこを管理"
+                        aria-label={`${activeCatProfile.name}を編集・管理`}
                       >
-                        <MoreDotsIcon />
-                      </AppButton>
+                        <PencilSmallIcon />
+                      </button>
+                    ) : null}
+                    {shouldShowCatSwitchButton ? (
+                      <button
+                        type="button"
+                        style={styles.profileCoverSwitchButton}
+                        onClick={() => setIsCatSwitcherOpen(true)}
+                        aria-label={`${activeCatProfile.name}を切り替える`}
+                      >
+                        <ChevronDownIcon />
+                      </button>
                     ) : null}
                   </div>
                 </div>
@@ -867,19 +849,8 @@ export function CatsPage() {
             options={[
               { value: "record", label: "記録" },
               { value: "photos", label: "写真" },
-              { value: "basic", label: "基本情報" },
+              { value: "basic", label: "基本" },
             ]}
-          />
-        ) : null}
-
-        {activeCatProfile &&
-        !isOnboardingCompletionView &&
-        activeSection === "record" ? (
-          <CatSummaryPanel
-            familyDuration={familyDuration}
-            deliveredCount={deliveredSleepingPhotoCount}
-            omoideCount={omoideMemories.length}
-            birthdayStatus={birthdayStatus}
           />
         ) : null}
 
@@ -942,41 +913,24 @@ export function CatsPage() {
         {activeCatProfile &&
         !isOnboardingCompletionView &&
         activeSection === "record" ? (
+          <RecordOverview
+            photos={activeCatLensPhotos}
+            milestones={sleepingMilestones}
+            memories={omoideMemories}
+            familyDuration={familyDuration}
+            birthdayStatus={birthdayStatus}
+            familySinceDate={activeCatProfile.basicInfo?.familySinceDate}
+            takenSleepingPhotoCount={takenSleepingPhotoCount}
+            onOpenMemory={(memory) => setSelectedOmoideMemory(memory)}
+            onOpenPhotos={() => setPhotoSheetLens("cat")}
+          />
+        ) : null}
+
+        {activeCatProfile &&
+        !isOnboardingCompletionView &&
+        activeSection === "record" &&
+        SHOW_LEGACY_DETAIL_SECTIONS ? (
           <>
-            <AppCard
-              as="section"
-              variant="section"
-              padding="md"
-              style={styles.footprintsPanel}
-            >
-              <div style={styles.footprintsSection}>
-                <p style={styles.footprintsTitle}>あしあと</p>
-                <div style={styles.footprintsScroller}>
-                  {sleepingMilestones.map((milestone) => (
-                    <FootprintCard
-                      key={milestone.target}
-                      milestone={milestone}
-                    />
-                  ))}
-                </div>
-              </div>
-            </AppCard>
-            <OmoideBunbako
-              memories={omoideMemories}
-              controls={omoideControls}
-              onOpen={(memory) => setSelectedOmoideMemory(memory)}
-              onPause={() => {
-                pauseOmoideMemories();
-                setOmoideRefreshTick((value) => value + 1);
-                setMessage("思い出を しばらく お休みします。");
-              }}
-              onDisable={() => {
-                disableOmoideMemories(!omoideControls.disabled);
-                setOmoideRefreshTick((value) => value + 1);
-              }}
-            />
-            {SHOW_LEGACY_DETAIL_SECTIONS ? (
-              <>
             <AppCard
               as="section"
               variant="section"
@@ -1038,17 +992,6 @@ export function CatsPage() {
                 </div>
               </div>
             </AppCard>
-              </>
-            ) : null}
-            {!activeCatProfile.basicInfo?.familySinceDate &&
-            !activeCatProfile.basicInfo?.birthDate &&
-            !activeCatProfile.basicInfo?.breed &&
-            !activeCatProfile.appearance?.coat &&
-            !activeGender ? (
-              <p style={styles.emptyInfoText}>
-                必要なことだけ、右上からそっと足せます。
-              </p>
-            ) : null}
           </>
         ) : null}
 
@@ -1426,6 +1369,188 @@ function PageBackdrop() {
   );
 }
 
+function RecordOverview({
+  photos,
+  milestones,
+  memories,
+  familyDuration,
+  birthdayStatus,
+  familySinceDate,
+  takenSleepingPhotoCount,
+  onOpenMemory,
+  onOpenPhotos,
+}: {
+  photos: LensPhoto[];
+  milestones: CatSleepingMilestone[];
+  memories: OmoideMemory[];
+  familyDuration: { primary: string; secondary: string };
+  birthdayStatus: { copy: string; isToday: boolean } | null;
+  familySinceDate?: string;
+  takenSleepingPhotoCount: number;
+  onOpenMemory: (memory: OmoideMemory) => void;
+  onOpenPhotos: () => void;
+}) {
+  const latestMemory = memories[0] ?? null;
+  const recentEntries = createRecordTimelineEntries(milestones, memories).slice(
+    0,
+    3,
+  );
+  const archiveRows = createYearArchiveRows(photos, memories).slice(0, 3);
+  const milestoneItems = createRecordMilestones({
+    milestones,
+    familySinceDate,
+    birthdayStatus,
+    takenSleepingPhotoCount,
+  });
+  const familyCopy =
+    familyDuration.secondary ||
+    (familyDuration.primary === "未設定" ? "未登録" : familyDuration.primary);
+
+  return (
+    <div style={styles.recordOverview}>
+      <section style={styles.recordBlock} aria-labelledby="cats-now-heading">
+        <h2 id="cats-now-heading" style={styles.recordBlockTitle}>
+          いま
+        </h2>
+        <button
+          type="button"
+          style={
+            latestMemory
+              ? styles.nowMemoryRow
+              : { ...styles.nowMemoryRow, ...styles.nowMemoryRowDisabled }
+          }
+          onClick={() => {
+            if (latestMemory) {
+              onOpenMemory(latestMemory);
+            }
+          }}
+          disabled={!latestMemory}
+        >
+          <EnvelopeSmallIcon />
+          <span style={styles.nowMemoryText}>
+            {latestMemory
+              ? `思い出が${memories.length}通届いています`
+              : "届いている思い出はありません"}
+          </span>
+          <span style={styles.nowMemoryAction}>
+            {latestMemory ? "読む" : "待つ"}
+          </span>
+          {latestMemory ? <ChevronRightSmallIcon /> : null}
+        </button>
+      </section>
+
+      <section style={styles.recordBlock} aria-labelledby="cats-recent-heading">
+        <h2 id="cats-recent-heading" style={styles.recordBlockTitle}>
+          最近
+        </h2>
+        <p style={styles.recordMonthLabel}>
+          {recentEntries[0]
+            ? formatRecordMonth(recentEntries[0].timestamp)
+            : formatRecordMonth(Date.now())}
+        </p>
+        {recentEntries.length > 0 ? (
+          <div style={styles.recentTimeline}>
+            {recentEntries.map((entry, index) => (
+              <button
+                key={entry.id}
+                type="button"
+                style={styles.recentTimelineRow}
+                onClick={() => {
+                  if (entry.memory) {
+                    onOpenMemory(entry.memory);
+                    return;
+                  }
+                  onOpenPhotos();
+                }}
+              >
+                <span style={styles.recentTimelineDot} aria-hidden="true" />
+                <span style={styles.recentTimelineDate}>
+                  {formatRecordShortDate(entry.timestamp)}
+                </span>
+                <span style={styles.recentTimelineTitle}>{entry.title}</span>
+                {index === 0 && entry.src ? (
+                  <span style={styles.recentTimelineThumb}>
+                    <StoredPhotoImage
+                      src={entry.src}
+                      alt=""
+                      style={styles.recentTimelineThumbImage}
+                    />
+                  </span>
+                ) : null}
+                <ChevronRightSmallIcon />
+              </button>
+            ))}
+          </div>
+        ) : (
+          <p style={styles.recordEmptyText}>最近の記録はまだありません。</p>
+        )}
+      </section>
+
+      <section style={styles.recordBlock} aria-labelledby="cats-milestones-heading">
+        <h2 id="cats-milestones-heading" style={styles.recordBlockTitle}>
+          節目
+        </h2>
+        <div style={styles.milestoneRail}>
+          {milestoneItems.map((item, index) => (
+            <div key={item.key} style={styles.milestoneItem}>
+              <span
+                style={
+                  item.reached
+                    ? { ...styles.milestoneDot, ...styles.milestoneDotReached }
+                    : styles.milestoneDot
+                }
+                aria-hidden="true"
+              >
+                {item.reached ? <CheckSmallIcon /> : null}
+              </span>
+              {index < milestoneItems.length - 1 ? (
+                <span
+                  style={
+                    item.reached
+                      ? { ...styles.milestoneLine, ...styles.milestoneLineReached }
+                      : styles.milestoneLine
+                  }
+                  aria-hidden="true"
+                />
+              ) : null}
+              <span style={styles.milestoneLabel}>{item.label}</span>
+              <span style={styles.milestoneStatus}>{item.status}</span>
+            </div>
+          ))}
+        </div>
+      </section>
+
+      <section style={styles.recordBlock} aria-labelledby="cats-archive-heading">
+        <h2 id="cats-archive-heading" style={styles.recordBlockTitle}>
+          これまで
+        </h2>
+        <div style={styles.archiveTable}>
+          {archiveRows.map((row) => (
+            <button
+              key={row.year}
+              type="button"
+              style={styles.archiveRow}
+              onClick={onOpenPhotos}
+            >
+              <span style={styles.archiveYear}>{row.year}年</span>
+              <span style={styles.archiveSummary}>
+                写真 {row.photoCount}枚・思い出 {row.memoryCount}通
+              </span>
+              <ChevronRightSmallIcon />
+            </button>
+          ))}
+          {archiveRows.length === 0 ? (
+            <p style={styles.recordEmptyText}>これから少しずつたまります。</p>
+          ) : null}
+        </div>
+        {familyCopy !== "未登録" ? (
+          <p style={styles.recordTinyNote}>家族になって {familyCopy}</p>
+        ) : null}
+      </section>
+    </div>
+  );
+}
+
 function FootprintCard({ milestone }: { milestone: CatSleepingMilestone }) {
   const isReached = Boolean(milestone.src && milestone.reachedAt);
 
@@ -1670,65 +1795,6 @@ function UchinokoSectionTabs({
           </button>
         );
       })}
-    </div>
-  );
-}
-
-function CatIconSwitcher({
-  profiles,
-  activeCatId,
-  onSelect,
-  onOpenMore,
-}: {
-  profiles: CatProfile[];
-  activeCatId: string | null;
-  onSelect: (catId: string) => void;
-  onOpenMore: () => void;
-}) {
-  const visibleProfiles = profiles.slice(0, 4);
-  const hasMore = profiles.length > visibleProfiles.length;
-
-  return (
-    <div style={styles.catIconSwitcher} aria-label="ねこの切り替え">
-      {visibleProfiles.map((profile, index) => {
-        const isActive = profile.id === activeCatId;
-
-        return (
-          <button
-            key={profile.id}
-            type="button"
-            style={
-              isActive
-                ? { ...styles.catIconSwitchButton, ...styles.catIconSwitchButtonActive }
-                : styles.catIconSwitchButton
-            }
-            onClick={() => onSelect(profile.id)}
-            aria-label={`${profile.name}を見る`}
-            aria-pressed={isActive}
-            title={profile.name || `ねこ ${index + 1}`}
-          >
-            <img
-              src="/icons/cat-switcher-generated.png"
-              alt=""
-              aria-hidden="true"
-              style={styles.catIconSwitchImage}
-            />
-          </button>
-        );
-      })}
-      {hasMore ? (
-        <AppButton
-          type="button"
-          variant="ghost"
-          size="icon"
-          iconOnly
-          onClick={onOpenMore}
-          aria-label="ほかのねこを選ぶ"
-          style={styles.catIconSwitchMore}
-        >
-          <MoreDotsIcon />
-        </AppButton>
-      ) : null}
     </div>
   );
 }
@@ -2225,6 +2291,164 @@ function countStoredSleepingPhotosForCat(catId: string) {
   }
 }
 
+type RecordTimelineEntry = {
+  id: string;
+  title: string;
+  timestamp: number;
+  src?: string;
+  memory?: OmoideMemory;
+};
+
+function createRecordTimelineEntries(
+  milestones: CatSleepingMilestone[],
+  memories: OmoideMemory[],
+): RecordTimelineEntry[] {
+  const milestoneEntries = milestones
+    .filter((milestone) => milestone.reachedAt)
+    .map((milestone) => ({
+      id: `milestone-${milestone.target}`,
+      title: getFootprintMilestoneTitle(milestone.target),
+      timestamp: milestone.reachedAt,
+      src: milestone.src,
+    }));
+  const memoryEntries = memories.map((memory) => ({
+    id: `memory-${memory.id}`,
+    title: "思い出が届いた",
+    timestamp: memory.deliveredAt,
+    src: memory.photo.thumbnailSrc ?? memory.photo.displaySrc ?? memory.photo.src,
+    memory,
+  }));
+
+  return [...milestoneEntries, ...memoryEntries]
+    .filter((entry) => entry.timestamp)
+    .sort((left, right) => right.timestamp - left.timestamp);
+}
+
+function createYearArchiveRows(photos: LensPhoto[], memories: OmoideMemory[]) {
+  const rows = new Map<number, { year: number; photoCount: number; memoryCount: number }>();
+
+  for (const photo of photos) {
+    const year = getYearFromTimestamp(photo.createdAt);
+    const row = rows.get(year) ?? { year, photoCount: 0, memoryCount: 0 };
+    row.photoCount += 1;
+    rows.set(year, row);
+  }
+
+  for (const memory of memories) {
+    const year = getYearFromTimestamp(memory.deliveredAt);
+    const row = rows.get(year) ?? { year, photoCount: 0, memoryCount: 0 };
+    row.memoryCount += 1;
+    rows.set(year, row);
+  }
+
+  if (rows.size === 0) {
+    const year = new Date().getFullYear();
+    rows.set(year, { year, photoCount: 0, memoryCount: 0 });
+  }
+
+  return [...rows.values()].sort((left, right) => right.year - left.year);
+}
+
+function createRecordMilestones({
+  milestones,
+  familySinceDate,
+  birthdayStatus,
+  takenSleepingPhotoCount,
+}: {
+  milestones: CatSleepingMilestone[];
+  familySinceDate?: string;
+  birthdayStatus: { copy: string; isToday: boolean } | null;
+  takenSleepingPhotoCount: number;
+}) {
+  const fiftyMilestone = milestones.find((milestone) => milestone.target === 50);
+  const hasReachedFifty = Boolean(fiftyMilestone?.reachedAt);
+  const remainingFifty = Math.max(0, 50 - takenSleepingPhotoCount);
+
+  return [
+    {
+      key: "photos-50",
+      label: "50枚",
+      status: hasReachedFifty
+        ? "達成しました"
+        : remainingFifty > 0
+          ? `あと${remainingFifty}枚`
+          : "もうすぐ",
+      reached: hasReachedFifty,
+    },
+    {
+      key: "family-1",
+      label: "1年",
+      status: getFirstFamilyAnniversaryStatus(familySinceDate),
+      reached: hasReachedFirstFamilyAnniversary(familySinceDate),
+    },
+    {
+      key: "birthday",
+      label: "誕生日",
+      status: birthdayStatus
+        ? birthdayStatus.copy.replace("誕生日まで ", "")
+        : "未登録",
+      reached: Boolean(birthdayStatus?.isToday),
+    },
+  ];
+}
+
+function getYearFromTimestamp(timestamp: number) {
+  const date = new Date(timestamp || Date.now());
+  return Number.isNaN(date.getTime()) ? new Date().getFullYear() : date.getFullYear();
+}
+
+function formatRecordMonth(timestamp: number) {
+  const date = new Date(timestamp);
+  if (Number.isNaN(date.getTime())) {
+    return "";
+  }
+
+  return `${date.getFullYear()}年${date.getMonth() + 1}月`;
+}
+
+function formatRecordShortDate(timestamp: number) {
+  const date = new Date(timestamp);
+  if (Number.isNaN(date.getTime())) {
+    return "";
+  }
+
+  return `${date.getMonth() + 1}/${date.getDate()}`;
+}
+
+function hasReachedFirstFamilyAnniversary(familySinceDate?: string) {
+  const start = parseLocalDate(familySinceDate);
+  if (!start) {
+    return false;
+  }
+
+  const today = getLocalToday();
+  return addYearsSafe(start, 1) <= today;
+}
+
+function getFirstFamilyAnniversaryStatus(familySinceDate?: string) {
+  const start = parseLocalDate(familySinceDate);
+  if (!start) {
+    return "未登録";
+  }
+
+  const today = getLocalToday();
+  const firstAnniversary = addYearsSafe(start, 1);
+  if (firstAnniversary <= today) {
+    return "達成しました";
+  }
+
+  const daysUntil = Math.max(
+    0,
+    Math.round((firstAnniversary.getTime() - today.getTime()) / 86_400_000),
+  );
+  return `あと${daysUntil}日`;
+}
+
+function getLocalToday() {
+  const now = new Date();
+  return new Date(now.getFullYear(), now.getMonth(), now.getDate());
+}
+
 async function deleteRemoteCatProfile(
   profile: CatProfile,
   fallbackLocalCatId: string,
@@ -2401,6 +2625,78 @@ function normalizeCatNameForMatch(name: string) {
     .toLocaleLowerCase("ja-JP");
 }
 
+function EnvelopeSmallIcon() {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      width="22"
+      height="22"
+      fill="none"
+      aria-hidden="true"
+      focusable="false"
+      style={{ display: "block" }}
+    >
+      <path
+        d="M4.5 7.5h15v10h-15v-10Z"
+        stroke="currentColor"
+        strokeWidth="1.55"
+        strokeLinejoin="round"
+      />
+      <path
+        d="m5.2 8.1 6.8 5.1 6.8-5.1"
+        stroke="currentColor"
+        strokeWidth="1.55"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
+}
+
+function ChevronRightSmallIcon() {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      width="18"
+      height="18"
+      fill="none"
+      aria-hidden="true"
+      focusable="false"
+      style={{ display: "block", flex: "0 0 auto" }}
+    >
+      <path
+        d="m9.5 6.8 5.2 5.2-5.2 5.2"
+        stroke="currentColor"
+        strokeWidth="1.8"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
+}
+
+function CheckSmallIcon() {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      width="14"
+      height="14"
+      fill="none"
+      aria-hidden="true"
+      focusable="false"
+      style={{ display: "block" }}
+    >
+      <path
+        d="m7.2 12.1 3 3 6.6-7"
+        stroke="currentColor"
+        strokeWidth="2"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
+}
+
 function CatSwitchIcon() {
   return <span style={styles.catSwitchMaskIcon} aria-hidden="true" />;
 }
@@ -2427,6 +2723,28 @@ function PencilSmallIcon() {
         stroke="currentColor"
         strokeWidth="1.75"
         strokeLinecap="round"
+      />
+    </svg>
+  );
+}
+
+function ChevronDownIcon() {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      width="18"
+      height="18"
+      fill="none"
+      aria-hidden="true"
+      focusable="false"
+      style={{ display: "block" }}
+    >
+      <path
+        d="m7 9.5 5 5 5-5"
+        stroke="currentColor"
+        strokeWidth="1.8"
+        strokeLinecap="round"
+        strokeLinejoin="round"
       />
     </svg>
   );
@@ -2866,11 +3184,11 @@ const styles = {
     backdropFilter: "none",
   },
   profilePlaceCard: {
-    marginBottom: "12px",
-    padding: "12px 16px",
-    borderRadius: "28px",
-    background: "color-mix(in srgb, var(--paper-card) 46%, transparent)",
-    boxShadow: "0 10px 30px -26px color-mix(in srgb, var(--ink) 22%, transparent)",
+    marginBottom: "8px",
+    padding: 0,
+    borderRadius: 0,
+    background: "transparent",
+    boxShadow: "none",
     backdropFilter: "none",
   },
   sectionSwitch: {
@@ -2884,20 +3202,23 @@ const styles = {
     gridTemplateColumns: "repeat(3, minmax(0, 1fr))",
     alignItems: "center",
     gap: 0,
-    minHeight: "46px",
-    margin: "0 0 12px",
-    padding: "4px",
-    borderRadius: "999px",
-    border: "1px solid color-mix(in srgb, var(--control-border) 78%, transparent)",
-    background: "color-mix(in srgb, var(--paper-card) 58%, transparent)",
-    boxShadow: "inset 0 1px 0 color-mix(in srgb, var(--paper) 38%, transparent)",
+    boxSizing: "border-box",
+    minHeight: "48px",
+    margin: "0 0 14px",
+    padding: 0,
+    borderRadius: 0,
+    border: "none",
+    borderBottom: "1px solid color-mix(in srgb, var(--line) 72%, transparent)",
+    background: "transparent",
+    boxShadow: "none",
   },
   sectionTabButton: {
     minWidth: 0,
-    minHeight: "38px",
-    padding: "0 12px",
+    minHeight: "47px",
+    padding: "0 12px 2px",
     border: "none",
-    borderRadius: "999px",
+    borderRadius: 0,
+    borderBottom: "2px solid transparent",
     background: "transparent",
     color: CATS_MUTED,
     fontFamily: CATS_UI,
@@ -2907,10 +3228,85 @@ const styles = {
     cursor: "pointer",
   },
   sectionTabButtonActive: {
-    color: CATS_TEXT_STRONG,
-    background: "var(--control-surface-selected)",
+    color: "var(--seal)",
+    borderBottom: "2px solid var(--seal)",
+    background: "transparent",
+    boxShadow: "none",
+  },
+  profileCoverHero: {
+    position: "relative" as const,
+    display: "block",
+    minHeight: "196px",
+  },
+  profileCoverFrame: {
+    position: "relative" as const,
+    display: "block",
+    width: "calc(100% + 32px)",
+    height: "188px",
+    marginLeft: "-16px",
+    overflow: "hidden",
+    borderRadius: "18px",
+    background: "color-mix(in srgb, var(--paper-card) 72%, transparent)",
+    border: "1px solid color-mix(in srgb, var(--paper) 72%, transparent)",
     boxShadow:
-      "0 0 0 1px color-mix(in srgb, var(--control-border-selected) 28%, transparent), 0 8px 20px -16px color-mix(in srgb, var(--ink) 22%, transparent)",
+      "0 1px 0 color-mix(in srgb, var(--paper) 76%, transparent), 0 16px 34px -30px color-mix(in srgb, var(--ink) 30%, transparent)",
+  },
+  profileCoverTileRoot: {
+    display: "block",
+    width: "100%",
+    height: "100%",
+  },
+  profileCoverImage: {
+    display: "block",
+    width: "100%",
+    height: "100%",
+    border: "none",
+    borderRadius: 0,
+    boxShadow: "none",
+    background: "color-mix(in srgb, var(--paper-card) 80%, transparent)",
+  },
+  profileCoverEditButton: {
+    position: "absolute" as const,
+    top: "12px",
+    right: "12px",
+    zIndex: 2,
+    width: "44px",
+    height: "44px",
+    minWidth: "44px",
+    display: "inline-flex",
+    alignItems: "center",
+    justifyContent: "center",
+    padding: 0,
+    borderRadius: "999px",
+    border: "1px solid color-mix(in srgb, var(--paper) 76%, transparent)",
+    background: "color-mix(in srgb, var(--paper-card) 88%, transparent)",
+    color: CATS_TEXT_STRONG,
+    boxShadow:
+      "0 1px 0 color-mix(in srgb, var(--paper) 70%, transparent), 0 12px 24px -20px color-mix(in srgb, var(--ink) 36%, transparent)",
+    cursor: "pointer",
+    WebkitTapHighlightColor: "transparent",
+  },
+  profileCoverSwitchButton: {
+    position: "absolute" as const,
+    left: "50%",
+    bottom: "-14px",
+    zIndex: 2,
+    width: "44px",
+    height: "32px",
+    minWidth: "44px",
+    display: "inline-flex",
+    alignItems: "center",
+    justifyContent: "center",
+    padding: 0,
+    borderRadius: "999px",
+    border: "1px solid color-mix(in srgb, var(--control-border) 72%, transparent)",
+    background: "color-mix(in srgb, var(--paper-card) 92%, transparent)",
+    color: CATS_MUTED,
+    boxShadow:
+      "0 1px 0 color-mix(in srgb, var(--paper) 72%, transparent), 0 10px 22px -18px color-mix(in srgb, var(--ink) 32%, transparent)",
+    cursor: "pointer",
+    transform: "translateX(-50%)",
+    WebkitTapHighlightColor: "transparent",
   },
   profileHero: {
     display: "grid",
@@ -3117,6 +3513,258 @@ const styles = {
     marginBottom: "24px",
     background: CATS_PANEL_BACKGROUND,
     backdropFilter: "none",
+  },
+  recordOverview: {
+    display: "grid",
+    gap: "26px",
+    padding: "0 0 24px",
+  },
+  recordBlock: {
+    display: "grid",
+    gap: "10px",
+  },
+  recordBlockTitle: {
+    margin: 0,
+    color: CATS_TEXT_STRONG,
+    fontFamily: CATS_UI,
+    fontSize: "20px",
+    fontWeight: 600,
+    lineHeight: 1.35,
+    letterSpacing: "0",
+  },
+  recordMonthLabel: {
+    margin: "-2px 0 2px",
+    color: CATS_TEXT,
+    fontFamily: CATS_UI,
+    fontSize: "14px",
+    fontWeight: 500,
+    lineHeight: 1.4,
+    letterSpacing: "0",
+  },
+  nowMemoryRow: {
+    width: "100%",
+    minHeight: "64px",
+    display: "grid",
+    gridTemplateColumns: "28px minmax(0, 1fr) auto 18px",
+    alignItems: "center",
+    gap: "12px",
+    padding: "0 16px",
+    borderRadius: "10px",
+    border: "1px solid color-mix(in srgb, var(--line-strong) 78%, transparent)",
+    background: "color-mix(in srgb, var(--paper-card) 36%, transparent)",
+    color: "var(--seal)",
+    boxShadow: "none",
+    cursor: "pointer",
+    textAlign: "left",
+    WebkitTapHighlightColor: "transparent",
+  },
+  nowMemoryRowDisabled: {
+    color: CATS_MUTED,
+    cursor: "default",
+    opacity: 0.72,
+  },
+  nowMemoryText: {
+    minWidth: 0,
+    color: CATS_TEXT_STRONG,
+    fontFamily: CATS_UI,
+    fontSize: "14px",
+    fontWeight: 500,
+    lineHeight: 1.45,
+    letterSpacing: "0",
+  },
+  nowMemoryAction: {
+    color: "var(--seal)",
+    fontFamily: CATS_UI,
+    fontSize: "13px",
+    fontWeight: 600,
+    lineHeight: 1.3,
+    letterSpacing: "0.02em",
+    whiteSpace: "nowrap",
+  },
+  recentTimeline: {
+    position: "relative" as const,
+    display: "grid",
+    paddingLeft: "28px",
+  },
+  recentTimelineRow: {
+    position: "relative" as const,
+    width: "100%",
+    minHeight: "56px",
+    display: "grid",
+    gridTemplateColumns: "54px minmax(0, 1fr) auto 18px",
+    alignItems: "center",
+    gap: "12px",
+    padding: "0 0 0 0",
+    border: "none",
+    borderBottom: "1px solid color-mix(in srgb, var(--line) 84%, transparent)",
+    background: "transparent",
+    color: CATS_TEXT,
+    font: "inherit",
+    textAlign: "left",
+    cursor: "pointer",
+    WebkitTapHighlightColor: "transparent",
+  },
+  recentTimelineDot: {
+    position: "absolute" as const,
+    left: "-28px",
+    top: "50%",
+    width: "10px",
+    height: "10px",
+    borderRadius: "999px",
+    background: "var(--seal)",
+    transform: "translateY(-50%)",
+    boxShadow:
+      "0 -28px 0 -4px color-mix(in srgb, var(--seal) 22%, transparent)",
+  },
+  recentTimelineDate: {
+    color: CATS_TEXT,
+    fontFamily: CATS_UI,
+    fontSize: "14px",
+    fontWeight: 500,
+    lineHeight: 1.35,
+    letterSpacing: "0",
+  },
+  recentTimelineTitle: {
+    minWidth: 0,
+    color: CATS_TEXT_STRONG,
+    fontFamily: CATS_UI,
+    fontSize: "14px",
+    fontWeight: 500,
+    lineHeight: 1.35,
+    letterSpacing: "0",
+    overflow: "hidden",
+    textOverflow: "ellipsis",
+    whiteSpace: "nowrap",
+  },
+  recentTimelineThumb: {
+    width: "56px",
+    height: "40px",
+    overflow: "hidden",
+    borderRadius: "8px",
+    background: CATS_PANEL_BACKGROUND_SOFT,
+  },
+  recentTimelineThumbImage: {
+    width: "100%",
+    height: "100%",
+    objectFit: "cover",
+    borderRadius: "8px",
+  },
+  milestoneRail: {
+    display: "grid",
+    gridTemplateColumns: "repeat(3, minmax(0, 1fr))",
+    alignItems: "start",
+    padding: "8px 12px 0",
+  },
+  milestoneItem: {
+    position: "relative" as const,
+    display: "grid",
+    justifyItems: "center",
+    gap: "4px",
+    minWidth: 0,
+    textAlign: "center",
+  },
+  milestoneDot: {
+    position: "relative" as const,
+    zIndex: 1,
+    width: "18px",
+    height: "18px",
+    display: "inline-flex",
+    alignItems: "center",
+    justifyContent: "center",
+    borderRadius: "999px",
+    background: "color-mix(in srgb, var(--ink-soft) 42%, var(--paper))",
+    color: "var(--paper)",
+  },
+  milestoneDotReached: {
+    background: "var(--seal)",
+  },
+  milestoneLine: {
+    position: "absolute" as const,
+    top: "9px",
+    left: "calc(50% + 9px)",
+    width: "calc(100% - 18px)",
+    height: "1px",
+    borderTop: "1px dashed color-mix(in srgb, var(--ink-soft) 42%, transparent)",
+  },
+  milestoneLineReached: {
+    borderTop: "1px solid var(--seal)",
+  },
+  milestoneLabel: {
+    marginTop: "4px",
+    color: CATS_TEXT_STRONG,
+    fontFamily: CATS_UI,
+    fontSize: "14px",
+    fontWeight: 500,
+    lineHeight: 1.35,
+    letterSpacing: "0",
+  },
+  milestoneStatus: {
+    color: CATS_TEXT,
+    fontFamily: CATS_UI,
+    fontSize: "12px",
+    fontWeight: 400,
+    lineHeight: 1.35,
+    letterSpacing: "0",
+  },
+  archiveTable: {
+    overflow: "hidden",
+    border: "1px solid color-mix(in srgb, var(--line-strong) 72%, transparent)",
+    borderRadius: "10px",
+    background: "color-mix(in srgb, var(--paper-card) 34%, transparent)",
+  },
+  archiveRow: {
+    width: "100%",
+    minHeight: "56px",
+    display: "grid",
+    gridTemplateColumns: "minmax(90px, auto) minmax(0, 1fr) 18px",
+    alignItems: "center",
+    gap: "12px",
+    padding: "0 14px",
+    border: "none",
+    borderBottom: "1px solid color-mix(in srgb, var(--line) 84%, transparent)",
+    background: "transparent",
+    color: CATS_TEXT,
+    font: "inherit",
+    textAlign: "left",
+    cursor: "pointer",
+  },
+  archiveYear: {
+    color: CATS_TEXT_STRONG,
+    fontFamily: CATS_UI,
+    fontSize: "17px",
+    fontWeight: 500,
+    lineHeight: 1.35,
+    letterSpacing: "0",
+  },
+  archiveSummary: {
+    minWidth: 0,
+    color: CATS_MUTED,
+    fontFamily: CATS_UI,
+    fontSize: "12px",
+    fontWeight: 500,
+    lineHeight: 1.35,
+    letterSpacing: "0",
+    textAlign: "right" as const,
+    overflow: "hidden",
+    textOverflow: "ellipsis",
+    whiteSpace: "nowrap",
+  },
+  recordEmptyText: {
+    margin: 0,
+    color: CATS_MUTED,
+    fontFamily: CATS_UI,
+    fontSize: "13px",
+    fontWeight: 400,
+    lineHeight: 1.6,
+  },
+  recordTinyNote: {
+    margin: "2px 0 0",
+    color: CATS_FAINT,
+    fontFamily: CATS_UI,
+    fontSize: "11px",
+    fontWeight: 400,
+    lineHeight: 1.5,
+    letterSpacing: "0.02em",
   },
   footprintsPanel: {
     marginBottom: "22px",
