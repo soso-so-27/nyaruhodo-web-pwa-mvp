@@ -64,10 +64,16 @@ export function AppLoadingScreen({ variant }: AppLoadingScreenProps) {
           50% { box-shadow: 0 13px 26px -16px rgba(194, 116, 90, .28); }
         }
 
+        @keyframes loadingSplashBreath {
+          0%, 100% { opacity: .98; transform: scale(1); }
+          50% { opacity: 1; transform: scale(1.006); }
+        }
+
         @media (prefers-reduced-motion: reduce) {
           .loading-sheen::after,
           .loading-paper-breath,
-          .loading-envelope-pulse {
+          .loading-envelope-pulse,
+          .loading-splash-breath {
             animation: none !important;
           }
         }
@@ -81,15 +87,7 @@ export function AppLoadingScreen({ variant }: AppLoadingScreenProps) {
 function StartupLoading() {
   return (
     <section style={styles.startupStage} aria-label="ねてるねこを起動中">
-      <div style={styles.launchFrame} className="loading-sheen">
-        <img
-          src="/illustrations/sleeping-cat-empty.png"
-          alt=""
-          aria-hidden="true"
-          style={styles.launchCat}
-        />
-        <p style={styles.launchTitle}>ねてるねこ</p>
-      </div>
+      <div style={styles.splashEnvelope} className="loading-splash-breath" aria-hidden="true" />
     </section>
   );
 }
@@ -240,31 +238,22 @@ const styles = {
   },
   startupStage: {
     minHeight: "100dvh",
-    display: "grid",
-    placeItems: "center",
-    padding: "calc(28px + env(safe-area-inset-top)) 0 calc(36px + env(safe-area-inset-bottom))",
-  },
-  launchFrame: {
-    ...paperSurface,
     position: "relative",
-    width: "min(100%, 360px)",
-    aspectRatio: "4 / 5",
-    borderRadius: "32px",
-    display: "grid",
-    placeItems: "center",
-    gap: "18px",
+    margin: "0 calc(50% - 50vw)",
+    width: "100vw",
+    overflow: "hidden",
+    backgroundImage: "url('/splash/v5/apple-splash-1170-2532.png')",
+    backgroundSize: "cover",
+    backgroundPosition: "center",
+    backgroundRepeat: "no-repeat",
   },
-  launchCat: {
-    width: "126px",
-    opacity: 0.82,
-    filter: "drop-shadow(0 10px 18px rgba(70,50,30,.1))",
-  },
-  launchTitle: {
-    margin: 0,
-    fontFamily: "var(--font-serif)",
-    fontSize: "23px",
-    letterSpacing: ".08em",
-    color: "var(--ink-soft)",
+  splashEnvelope: {
+    position: "absolute",
+    inset: 0,
+    background:
+      "radial-gradient(56% 36% at 50% 44%, rgba(255,255,255,.08), transparent 68%)",
+    mixBlendMode: "soft-light",
+    animation: "loadingSplashBreath 4.8s ease-in-out infinite",
   },
   homeStage: {
     minHeight: "100dvh",
