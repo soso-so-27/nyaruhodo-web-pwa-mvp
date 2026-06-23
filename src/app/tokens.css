@@ -28,6 +28,7 @@
   --app-paper-wash-top-strength: 24%;
   --app-paper-wash-mid-strength: 14%;
   --app-paper-wash-bottom-strength: 18%;
+  --app-theme-color: var(--paper-card);
   --app-paper-grain: url("/images/home-backgrounds/paper-grain.png");
   --app-paper-background:
     linear-gradient(

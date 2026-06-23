@@ -251,7 +251,9 @@ test.describe("home desk model", () => {
 
       const frameBox = await page.getByTestId(frameTestId).boundingBox();
       const trayBox = await page.getByTestId("home-letter-tray").boundingBox();
-      const navBox = await page.locator("nav").boundingBox();
+      const navBox = await page
+        .getByRole("navigation", { name: "下部ナビゲーション" })
+        .boundingBox();
 
       expect(frameBox).not.toBeNull();
       expect(trayBox).not.toBeNull();
@@ -263,6 +265,73 @@ test.describe("home desk model", () => {
         Math.round(navBox!.y - 16),
       );
     }
+  });
+
+  test("keeps the home skeleton aligned on the 4px grid", async ({ page }) => {
+    await seedDeskState(page, "1");
+    await page.goto("/home");
+    await page.waitForLoadState("networkidle");
+
+    const emptyFrame = page.getByTestId("desk-empty-frame");
+    const emptyAction = page.getByTestId("home-empty-action");
+    const settings = page.getByTestId("home-settings-shortcut");
+    const tray = page.getByTestId("home-letter-tray");
+    const nav = page.getByRole("navigation", { name: "下部ナビゲーション" });
+
+    const [frameBox, actionBox, settingsBox, trayBox, navBox] = await Promise.all([
+      emptyFrame.boundingBox(),
+      emptyAction.boundingBox(),
+      settings.boundingBox(),
+      tray.boundingBox(),
+      nav.boundingBox(),
+    ]);
+
+    expect(frameBox).not.toBeNull();
+    expect(actionBox).not.toBeNull();
+    expect(settingsBox).not.toBeNull();
+    expect(trayBox).not.toBeNull();
+    expect(navBox).not.toBeNull();
+
+    expect(settingsBox?.width).toBe(36);
+    expect(settingsBox?.height).toBe(36);
+    expect(actionBox?.height).toBe(44);
+    expect(navBox?.height).toBe(60);
+
+    const centers = [frameBox!, trayBox!, navBox!].map(
+      (box) => Math.round(box.x + box.width / 2),
+    );
+    expect(new Set(centers).size).toBe(1);
+
+    const styles = await page.evaluate(() => {
+      const frame = document.querySelector<HTMLElement>(
+        '[data-testid="desk-empty-frame"]',
+      );
+      const page = document.querySelector<HTMLElement>(
+        '[data-testid="home-desk-model"]',
+      );
+      const action = document.querySelector<HTMLElement>(
+        '[data-testid="home-empty-action"]',
+      );
+      const navElement = document.querySelector<HTMLElement>(
+        'nav[aria-label="下部ナビゲーション"]',
+      );
+
+      return {
+        frameGap: frame ? getComputedStyle(frame).gap : "",
+        actionColumnGap: action ? getComputedStyle(action).columnGap : "",
+        actionPaddingLeft: action ? getComputedStyle(action).paddingLeft : "",
+        trayRadiusToken: page
+          ? getComputedStyle(page).getPropertyValue("--home-tray-radius").trim()
+          : "",
+        navGap: navElement ? getComputedStyle(navElement).columnGap : "",
+      };
+    });
+
+    expect(styles.frameGap).toBe("16px");
+    expect(styles.actionColumnGap).toBe("8px");
+    expect(styles.actionPaddingLeft).toBe("20px");
+    expect(styles.trayRadiusToken).toBe("20px");
+    expect(styles.navGap).toBe("4px");
   });
 
   test("opens the delivered letter only after the hold completes", async ({

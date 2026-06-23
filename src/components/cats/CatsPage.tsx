@@ -219,6 +219,16 @@ export function CatsPage() {
     photoSheetLens === "all" ? "ぜんぶのねがお" : "すべてのすがた";
 
   useEffect(() => {
+    document.documentElement.classList.add("cats-scrollbar-quiet");
+    document.body.classList.add("cats-scrollbar-quiet");
+
+    return () => {
+      document.documentElement.classList.remove("cats-scrollbar-quiet");
+      document.body.classList.remove("cats-scrollbar-quiet");
+    };
+  }, []);
+
+  useEffect(() => {
     const requestedOnboardingMode =
       new URLSearchParams(window.location.search).get("onboarding") === "1";
     const onboardingCompletionReady =
@@ -652,7 +662,20 @@ export function CatsPage() {
   const selectedCoat = activeCatProfile?.appearance?.coat;
 
   return (
-    <main style={styles.page}>
+    <main className="cats-page" data-testid="cats-page" style={styles.page}>
+      <style>{`
+        .cats-scrollbar-quiet {
+          scrollbar-width: none;
+        }
+
+        .cats-scrollbar-quiet::-webkit-scrollbar,
+        .cats-page::-webkit-scrollbar,
+        .cats-page *::-webkit-scrollbar {
+          width: 0;
+          height: 0;
+          display: none;
+        }
+      `}</style>
       <PageBackdrop />
       <div style={styles.container}>
         {isOnboardingMode ? (
@@ -704,6 +727,7 @@ export function CatsPage() {
                 <div style={styles.profileHero}>
                   <button
                     type="button"
+                    data-testid="cats-profile-avatar"
                     style={styles.profileHeroAvatar}
                     onClick={() => void handleAvatarUpload()}
                     aria-label={`${activeCatProfile.name}のアイコン写真を変更`}
@@ -1621,6 +1645,7 @@ function UchinokoSectionTabs({
   return (
     <div
       role="radiogroup"
+      data-testid="cats-section-tabs"
       aria-label="うちのこの中身"
       style={styles.sectionTabs}
     >
@@ -1632,6 +1657,7 @@ function UchinokoSectionTabs({
             key={option.value}
             type="button"
             role="radio"
+            data-testid={`cats-section-tab-${option.value}`}
             aria-checked={selected}
             onClick={() => onChange(option.value)}
             style={
@@ -1727,7 +1753,7 @@ function LensPhotoGrid({
 
   return (
     <>
-      <div style={styles.lensPhotoGrid}>
+      <div data-testid="cats-lens-photo-grid" style={styles.lensPhotoGrid}>
         {visiblePhotos.map((photo) => (
           <div key={photo.id} style={styles.lensPhotoItem}>
             <PhotoTile
@@ -1750,7 +1776,7 @@ function LensPhotoGrid({
         ))}
       </div>
       {hiddenCount > 0 ? (
-        <div style={styles.lensPhotoMoreRow}>
+        <div data-testid="cats-lens-photo-more-row" style={styles.lensPhotoMoreRow}>
           <span style={styles.lensPhotoMore}>
             最近の{visiblePhotos.length}枚を表示中
           </span>
@@ -2720,6 +2746,8 @@ const styles = {
     backgroundRepeat: "var(--app-paper-background-repeat)",
     color: CATS_TEXT,
     overflowX: "hidden",
+    scrollPaddingBottom:
+      "calc(var(--bottom-nav-height) + var(--bottom-nav-safe-offset) + 96px)",
     fontFamily: "var(--font-ui)",
   },
   ambientBackground: {
@@ -2754,7 +2782,7 @@ const styles = {
     margin: "0 auto",
     fontSynthesis: "none",
     padding:
-      "calc(20px + env(safe-area-inset-top)) 24px calc(280px + env(safe-area-inset-bottom))",
+      "calc(20px + env(safe-area-inset-top)) 24px calc(300px + env(safe-area-inset-bottom))",
   },
   pageKicker: {
     margin: "0 0 5px",
@@ -2830,16 +2858,16 @@ const styles = {
     marginTop: "18px",
   },
   profileCard: {
-    marginBottom: "10px",
-    padding: "13px 16px",
+    marginBottom: "12px",
+    padding: "12px 16px",
     borderRadius: "28px",
     background: "color-mix(in srgb, var(--paper-card) 46%, transparent)",
     boxShadow: "0 10px 30px -26px color-mix(in srgb, var(--ink) 22%, transparent)",
     backdropFilter: "none",
   },
   profilePlaceCard: {
-    marginBottom: "10px",
-    padding: "13px 16px",
+    marginBottom: "12px",
+    padding: "12px 16px",
     borderRadius: "28px",
     background: "color-mix(in srgb, var(--paper-card) 46%, transparent)",
     boxShadow: "0 10px 30px -26px color-mix(in srgb, var(--ink) 22%, transparent)",
@@ -2856,9 +2884,9 @@ const styles = {
     gridTemplateColumns: "repeat(3, minmax(0, 1fr))",
     alignItems: "center",
     gap: 0,
-    minHeight: "44px",
+    minHeight: "46px",
     margin: "0 0 12px",
-    padding: "3px",
+    padding: "4px",
     borderRadius: "999px",
     border: "1px solid color-mix(in srgb, var(--control-border) 78%, transparent)",
     background: "color-mix(in srgb, var(--paper-card) 58%, transparent)",
@@ -2867,7 +2895,7 @@ const styles = {
   sectionTabButton: {
     minWidth: 0,
     minHeight: "38px",
-    padding: "0 10px",
+    padding: "0 12px",
     border: "none",
     borderRadius: "999px",
     background: "transparent",
@@ -2882,17 +2910,17 @@ const styles = {
     color: CATS_TEXT_STRONG,
     background: "var(--control-surface-selected)",
     boxShadow:
-      "0 0 0 1px color-mix(in srgb, var(--control-border-selected) 28%, transparent), 0 7px 18px -16px color-mix(in srgb, var(--ink) 22%, transparent)",
+      "0 0 0 1px color-mix(in srgb, var(--control-border-selected) 28%, transparent), 0 8px 20px -16px color-mix(in srgb, var(--ink) 22%, transparent)",
   },
   profileHero: {
     display: "grid",
-    gridTemplateColumns: "46px 1fr auto",
+    gridTemplateColumns: "48px 1fr auto",
     alignItems: "center",
-    gap: "10px",
+    gap: "12px",
   },
   profileHeroAvatar: {
-    width: "46px",
-    height: "46px",
+    width: "48px",
+    height: "48px",
     display: "flex",
     alignItems: "center",
     justifyContent: "center",
@@ -2902,20 +2930,20 @@ const styles = {
     cursor: "pointer",
   },
   profileHeroAvatarTileRoot: {
-    width: "46px",
-    height: "46px",
+    width: "48px",
+    height: "48px",
   },
   profileHeroAvatarPhotoTile: {
-    width: "46px",
-    height: "46px",
+    width: "48px",
+    height: "48px",
     border: "1.5px solid color-mix(in srgb, var(--paper-card) 88%, transparent)",
     boxShadow:
       "0 1px 3px color-mix(in srgb, var(--ink) 8%, transparent), 0 6px 16px -14px color-mix(in srgb, var(--ink) 20%, transparent)",
   },
   profileHeroAvatarIconTile: {
-    width: "46px",
-    height: "46px",
-    padding: "5px",
+    width: "48px",
+    height: "48px",
+    padding: "4px",
     boxSizing: "border-box",
     border: "1.5px solid color-mix(in srgb, var(--paper-card) 88%, transparent)",
     boxShadow:
@@ -2924,7 +2952,7 @@ const styles = {
   profileHeroInfo: {
     minWidth: 0,
     display: "grid",
-    gap: "3px",
+    gap: "4px",
   },
   profileNameRow: {
     minWidth: 0,
@@ -2946,13 +2974,13 @@ const styles = {
     display: "flex",
     flexDirection: "row",
     alignItems: "flex-end",
-    gap: "7px",
+    gap: "8px",
   },
   catIconSwitcher: {
     display: "flex",
     alignItems: "center",
     justifyContent: "flex-start",
-    gap: "6px",
+    gap: "8px",
     minWidth: 0,
   },
   catIconSwitchButton: {
@@ -2961,7 +2989,7 @@ const styles = {
     display: "inline-flex",
     alignItems: "center",
     justifyContent: "center",
-    padding: "5px",
+    padding: "4px",
     borderRadius: "999px",
     border: "1px solid color-mix(in srgb, var(--control-border) 74%, transparent)",
     background: "color-mix(in srgb, var(--paper-card) 64%, transparent)",
@@ -3130,22 +3158,22 @@ const styles = {
     gap: "8px",
   },
   summaryTile: {
-    minHeight: "62px",
+    minHeight: "64px",
     display: "grid",
     alignContent: "center",
     justifyItems: "start",
-    gap: "3px",
-    padding: "10px 12px",
+    gap: "4px",
+    padding: "12px",
     borderRadius: "var(--radius-lg)",
     border: "1px solid color-mix(in srgb, var(--line-strong) 66%, transparent)",
     background: "color-mix(in srgb, var(--paper) 46%, transparent)",
   },
   summaryTileWide: {
-    minHeight: "54px",
+    minHeight: "56px",
     display: "grid",
     alignContent: "center",
     justifyItems: "start",
-    gap: "2px",
+    gap: "4px",
     padding: "8px 12px",
     borderRadius: "var(--radius-lg)",
     border: "1px solid color-mix(in srgb, var(--line-strong) 58%, transparent)",
@@ -3193,7 +3221,7 @@ const styles = {
   },
   footprintsScroller: {
     display: "flex",
-    gap: "9px",
+    gap: "8px",
     overflowX: "auto",
     padding: "0 2px 2px 0",
     scrollSnapType: "x proximity",
@@ -3203,7 +3231,7 @@ const styles = {
     width: "132px",
     minHeight: "128px",
     display: "grid",
-    gap: "7px",
+    gap: "8px",
     flex: "0 0 auto",
     scrollSnapAlign: "start",
   },
@@ -3211,13 +3239,13 @@ const styles = {
     width: "132px",
     minHeight: "128px",
     display: "grid",
-    gap: "7px",
+    gap: "8px",
     flex: "0 0 auto",
     scrollSnapAlign: "start",
   },
   footprintHeader: {
     display: "grid",
-    gap: "3px",
+    gap: "4px",
   },
   footprintName: {
     color: CATS_TEXT,
@@ -3475,17 +3503,17 @@ const styles = {
     letterSpacing: "var(--tracking-body)",
   },
   lensPhotoSection: {
-    margin: "0 -6px 14px",
-    padding: "0 6px",
+    margin: "0 -8px 20px",
+    padding: "0 8px",
   },
   allLensCard: {
-    margin: "0 -6px 18px",
-    padding: "0 6px",
+    margin: "0 -8px 24px",
+    padding: "0 8px",
   },
   lensSectionHeader: {
     display: "grid",
     gap: "4px",
-    margin: "0 6px 10px",
+    margin: "0 8px 12px",
   },
   lensSectionTitle: {
     margin: 0,
@@ -3508,7 +3536,9 @@ const styles = {
   lensPhotoGrid: {
     display: "grid",
     gridTemplateColumns: "repeat(3, minmax(0, 1fr))",
-    gap: "3px",
+    gap: "4px",
+    overflow: "hidden",
+    borderRadius: "8px",
   },
   lensPhotoItem: {
     display: "grid",
@@ -3567,13 +3597,17 @@ const styles = {
     alignItems: "center",
     justifyContent: "space-between",
     gap: "8px",
-    margin: "8px 6px 0",
+    minHeight: "44px",
+    margin: "8px 8px 0",
+    padding: 0,
   },
   lensPhotoMoreButton: {
     flex: "0 0 auto",
-    minHeight: "34px",
-    padding: "0 12px",
-    color: CATS_MUTED,
+    minHeight: "40px",
+    padding: "0 16px",
+    border: "1px solid color-mix(in srgb, var(--control-border) 76%, transparent)",
+    background: "color-mix(in srgb, var(--paper) 70%, transparent)",
+    color: CATS_TEXT,
   },
   photoListSheet: {
     display: "grid",

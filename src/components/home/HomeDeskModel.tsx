@@ -76,8 +76,8 @@ const HOME_FRAME_TUNING = {
   pagePaddingX: "12px",
   pagePaddingTop: "8px",
   stageMaxWidth: "460px",
-  stageGap: "10px",
-  heroGap: "10px",
+  stageGap: "12px",
+  heroGap: "12px",
   frameAspectRatio: "9 / 14",
   emptyFrameAspectRatio: "9 / 14",
   emptyFrameMaxHeight: "660px",
@@ -96,11 +96,11 @@ const HOME_FRAME_TUNING = {
   emptyFrameStart: "#fbf5ea",
   emptyFrameEnd: "#f1e7d6",
   trayPaper: "#fdf9f1",
-  trayRadius: "18px",
+  trayRadius: "20px",
   trayMinHeight: "104px",
   trayToNavGap: "32px",
   frameMinWidthPx: 248,
-  frameInitialWidth: "310px",
+  frameInitialWidth: "312px",
   frameAspectWidthPerHeight: 9 / 14,
   emptyIllustrationWidth: "min(40vw, 136px)",
   emptyIllustrationMinWidth: "120px",
@@ -396,6 +396,7 @@ export function HomeDeskModel({
         size="icon"
         shape="pill"
         iconOnly
+        data-testid="home-settings-shortcut"
         aria-label="設定"
         style={deskStyles.settingsShortcut}
       >
@@ -479,7 +480,7 @@ export function HomeDeskModel({
                 <span style={deskStyles.homeEmptyTitle}>
                   きょうの ねがお、まだ
                 </span>
-                <span style={deskStyles.homeEmptyAction}>
+                <span data-testid="home-empty-action" style={deskStyles.homeEmptyAction}>
                   <AppIcon name="camera" size={16} />
                   ねがおを とる
                 </span>
@@ -1797,12 +1798,12 @@ const deskStyles = {
   settingsShortcut: {
     position: "fixed",
     zIndex: 8,
-    top: "calc(env(safe-area-inset-top) + 14px)",
+    top: "calc(env(safe-area-inset-top) + 16px)",
     right: "20px",
-    width: "34px",
-    height: "34px",
-    minWidth: "34px",
-    minHeight: "34px",
+    width: "36px",
+    height: "36px",
+    minWidth: "36px",
+    minHeight: "36px",
     padding: 0,
     color: "color-mix(in srgb, var(--ink) 66%, transparent)",
     background:
@@ -1931,7 +1932,7 @@ const deskStyles = {
     display: "grid",
     placeItems: "center",
     alignContent: "center",
-    gap: "14px",
+    gap: "16px",
     padding: "28px 24px 40px",
     border: "none",
     outline: "1px solid color-mix(in srgb, var(--line-strong) 62%, transparent)",
@@ -1956,9 +1957,9 @@ const deskStyles = {
     display: "inline-flex",
     alignItems: "center",
     justifyContent: "center",
-    gap: "6px",
+    gap: "8px",
     minHeight: "44px",
-    padding: "0 18px",
+    padding: "0 20px",
     border: "1px solid color-mix(in srgb, var(--home-wax, #c2745a) 42%, transparent)",
     borderRadius: "var(--radius-full)",
     background: "color-mix(in srgb, var(--paper) 74%, transparent)",
@@ -2002,9 +2003,9 @@ const deskStyles = {
     backdropFilter: "none",
   },
   notificationTrayList: {
-    minHeight: "78px",
-    padding: "10px",
-    borderRadius: "18px",
+    minHeight: "80px",
+    padding: "12px",
+    borderRadius: "20px",
     background:
       "color-mix(in srgb, var(--home-tray-paper, #fdf9f1) 58%, transparent)",
     boxShadow:
@@ -2032,9 +2033,9 @@ const deskStyles = {
     display: "grid",
     gridTemplateColumns: "repeat(2, minmax(0, 1fr))",
     alignItems: "stretch",
-    gap: "10px",
+    gap: "8px",
     overflow: "hidden",
-    paddingBottom: "1px",
+    paddingBottom: 0,
   },
   notificationRowsSingle: {
     alignContent: "center",
@@ -2063,8 +2064,8 @@ const deskStyles = {
     gridTemplateColumns: "1fr",
     justifyItems: "center",
     alignItems: "center",
-    gap: "7px",
-    padding: "10px 8px",
+    gap: "8px",
+    padding: "12px 8px",
     alignContent: "center",
     textAlign: "center",
   },
@@ -2072,8 +2073,8 @@ const deskStyles = {
     gridTemplateColumns: "1fr",
     justifyItems: "center",
     alignContent: "center",
-    gap: "2px",
-    minHeight: "46px",
+    gap: "4px",
+    minHeight: "48px",
     padding: "4px 8px",
     textAlign: "center",
   },
@@ -2086,9 +2087,9 @@ const deskStyles = {
   },
   notificationRowPrimary: {
     gridTemplateColumns: "84px minmax(0, 1fr)",
-    minHeight: "70px",
-    gap: "14px",
-    padding: "10px 12px",
+    minHeight: "72px",
+    gap: "16px",
+    padding: "12px",
     background: "color-mix(in srgb, var(--seal-soft) 8%, transparent)",
     boxShadow:
       "0 0 0 1px color-mix(in srgb, var(--seal-soft) 18%, transparent) inset",
@@ -2126,7 +2127,7 @@ const deskStyles = {
   notificationText: {
     minWidth: 0,
     display: "grid",
-    gap: "2px",
+    gap: "4px",
     color: "inherit",
     fontFamily: "var(--font-display)",
     letterSpacing: "var(--tracking-body)",
@@ -2134,7 +2135,7 @@ const deskStyles = {
   notificationTextSplit: {
     justifyItems: "center",
     textAlign: "center",
-    gap: "1px",
+    gap: "4px",
   },
   notificationTitle: {
     minWidth: 0,
@@ -2177,7 +2178,7 @@ const deskStyles = {
   },
   letterTrayCopy: {
     display: "grid",
-    gap: "2px",
+    gap: "4px",
     justifyItems: "start",
     textAlign: "left",
   },

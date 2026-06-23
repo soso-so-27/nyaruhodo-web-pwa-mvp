@@ -91,9 +91,13 @@ const PAPER_DAYLIGHT_ANCHORS = [
 export function AppPaperTheme() {
   useEffect(() => {
     const applyPaperTheme = () => {
-      const now = Date.now();
+      const now = getThemeTimestamp();
       const paper = getAppPaperTheme(now);
       const root = document.documentElement;
+      const themeColorMeta = document.querySelector<HTMLMetaElement>(
+        'meta[name="theme-color"]',
+      );
+
       root.style.setProperty("--app-paper-image", paper.image);
       root.style.setProperty("--app-paper-wash-top", paper.washTop);
       root.style.setProperty("--app-paper-wash-mid", paper.washMid);
@@ -118,7 +122,12 @@ export function AppPaperTheme() {
       root.style.setProperty("--line-strong", paper.lineStrong);
       root.style.setProperty("--control-border", paper.lineStrong);
       root.style.setProperty("--control-border-selected", paper.inkSoft);
+      root.style.setProperty("--app-theme-color", paper.themeColor);
       root.dataset.paperTheme = paper.key;
+
+      if (themeColorMeta) {
+        themeColorMeta.setAttribute("content", paper.themeColor);
+      }
     };
 
     applyPaperTheme();
@@ -129,12 +138,20 @@ export function AppPaperTheme() {
   return null;
 }
 
+function getThemeTimestamp() {
+  const testNow = (window as typeof window & { __testNow?: number }).__testNow;
+  return typeof testNow === "number" && Number.isFinite(testNow)
+    ? testNow
+    : Date.now();
+}
+
 function getAppPaperTheme(timestamp: number) {
   const minute = getJstMinuteOfDay(timestamp);
   const colors = getPaperDaylightColors(minute);
   return {
     key: getPaperThemeKey(minute),
     image: getPaperBackgroundImage(minute),
+    themeColor: colors.paperCard,
     ...colors,
   };
 }
