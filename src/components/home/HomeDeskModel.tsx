@@ -74,7 +74,7 @@ const HOLD_OPEN_MS = 1600;
 const HOLD_REWIND_MS = 1000;
 const HOME_FRAME_TUNING = {
   pagePaddingX: "12px",
-  pagePaddingTop: "8px",
+  pagePaddingTop: "64px",
   stageMaxWidth: "460px",
   stageGap: "12px",
   heroGap: "12px",

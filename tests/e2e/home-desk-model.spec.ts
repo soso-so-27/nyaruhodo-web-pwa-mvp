@@ -334,6 +334,32 @@ test.describe("home desk model", () => {
     expect(styles.navGap).toBe("4px");
   });
 
+  test("keeps the settings shortcut clear of the sleeping photo zone", async ({
+    page,
+  }) => {
+    for (const state of ["1", "2", "4"] as const) {
+      await seedDeskState(page, state);
+      await page.goto("/home");
+      await page.waitForLoadState("networkidle");
+
+      const zone = page.getByTestId(
+        state === "1" ? "desk-empty-frame" : "desk-home-frame",
+      );
+      const settings = page.getByTestId("home-settings-shortcut");
+      const [zoneBox, settingsBox] = await Promise.all([
+        zone.boundingBox(),
+        settings.boundingBox(),
+      ]);
+
+      expect(zoneBox).not.toBeNull();
+      expect(settingsBox).not.toBeNull();
+      expect(rectsOverlap(zoneBox!, settingsBox!)).toBe(false);
+      expect(Math.round(settingsBox!.y + settingsBox!.height)).toBeLessThanOrEqual(
+        Math.round(zoneBox!.y - 8),
+      );
+    }
+  });
+
   test("opens the delivered letter only after the hold completes", async ({
     page,
   }) => {
@@ -492,6 +518,18 @@ test.describe("home desk model", () => {
     await expect(bunbako.getByText("1週間前の、きょう。")).toBeVisible();
   });
 });
+
+function rectsOverlap(
+  first: { x: number; y: number; width: number; height: number },
+  second: { x: number; y: number; width: number; height: number },
+) {
+  return !(
+    first.x + first.width <= second.x ||
+    second.x + second.width <= first.x ||
+    first.y + first.height <= second.y ||
+    second.y + second.height <= first.y
+  );
+}
 
 async function seedDeskState(
   page: Page,
