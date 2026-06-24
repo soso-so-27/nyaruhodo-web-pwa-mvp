@@ -48,7 +48,6 @@ import {
   getJstDateKey,
   isTodaySleepingCounterVisible,
   markEveningDeliveryKept,
-  markEveningDeliveryOpened,
   readEveningDeliveryStore,
   recordEveningDeliveryTarget,
   setEveningDeliveredPhoto,
@@ -1717,11 +1716,17 @@ export function HomeInput({ recentEvents: _recentEvents }: HomeInputProps) {
     deliveryState: Extract<EveningHomeState, { kind: "delivered" }>,
   ) {
     setOpeningEveningDelivery(deliveryState);
-    markEveningDeliveryOpened(deliveryState.dateKey);
+    const wasSaved = keepExchangePhoto(deliveryState.deliveredPhoto);
+    markEveningDeliveryKept(deliveryState.dateKey);
+    setCollectionRefreshTick((value) => value + 1);
     setEveningRefreshTick((value) => value + 1);
     trackProductEvent(
       "envelope_opened",
-      { delivery_date_key: deliveryState.dateKey },
+      {
+        delivery_date_key: deliveryState.dateKey,
+        auto_saved: wasSaved,
+        photo_id: deliveryState.deliveredPhoto.id,
+      },
       {
         localCatId: activeCatId,
       },
@@ -2009,9 +2014,14 @@ export function HomeInput({ recentEvents: _recentEvents }: HomeInputProps) {
         <EveningDeliveryOpening
           state={openingEveningDelivery}
           catName={homeCatName}
-          onStorageDataUrl={(dataUrl) =>
-            handleEveningDeliveryDataUrl(openingEveningDelivery.dateKey, dataUrl)
-          }
+          onStorageDataUrl={(dataUrl) => {
+            handleEveningDeliveryDataUrl(openingEveningDelivery.dateKey, dataUrl);
+            updateKeptExchangePhotoDataUrl(
+              openingEveningDelivery.deliveredPhoto,
+              dataUrl,
+            );
+            setCollectionRefreshTick((value) => value + 1);
+          }}
           onClose={() => setOpeningEveningDelivery(null)}
         />
       ) : null}
@@ -2897,29 +2907,22 @@ function EveningDeliveryOpening({
         style={styles.eveningOpeningPairStage}
         data-testid="evening-opening-pair"
       >
-        <div style={styles.eveningOpeningPairCard}>
-          <div style={styles.sleepingPairTile}>
-            {state.targetPhoto ? (
-              <StoredPhotoImage
-                src={getPhotoThumbnailSrc(state.targetPhoto)}
-                alt=""
-                style={styles.sleepingPairImage}
-              />
-            ) : null}
-          </div>
-          <span style={styles.sleepingPairDots} aria-hidden="true" />
-          <div style={styles.sleepingPairTile}>
-            <StoredPhotoImage
-              src={getPhotoThumbnailSrc(state.deliveredPhoto)}
-              alt=""
-              style={styles.sleepingPairImage}
-              onStorageDataUrl={onStorageDataUrl}
-            />
-          </div>
+        <p style={styles.eveningOpeningTitle}>ねこだより、とどいた</p>
+        <div style={styles.eveningOpeningPhotoFrame}>
+          <StoredPhotoImage
+            src={getPhotoDetailSrc(state.deliveredPhoto)}
+            alt=""
+            style={styles.eveningOpeningPhoto}
+            onStorageDataUrl={onStorageDataUrl}
+          />
         </div>
+        <p style={styles.eveningOpeningSavedNote}>
+          まいにちに保存しました
+        </p>
         <AppButton type="button" fullWidth onClick={onClose}>
-          また、あした
+          閉じる
         </AppButton>
+        <p style={styles.eveningOpeningAfterword}>また、あした</p>
       </div>
     </div>
   );
@@ -6831,13 +6834,23 @@ const styles = {
     gap: "18px",
     justifyItems: "center",
   },
+  eveningOpeningPhotoFrame: {
+    width: "min(calc(100vw - 64px), 360px)",
+    aspectRatio: "1 / 1",
+    padding: "8px",
+    borderRadius: "24px",
+    background: "color-mix(in srgb, var(--paper-card) 84%, transparent)",
+    boxShadow:
+      "0 1px 0 rgba(255,255,255,.58) inset, 0 18px 46px rgba(96,78,54,0.14)",
+    boxSizing: "border-box",
+    overflow: "hidden",
+  },
   eveningOpeningPhoto: {
     width: "100%",
-    maxHeight: "68vh",
-    objectFit: "contain",
-    borderRadius: "var(--radius-2xl)",
+    height: "100%",
+    objectFit: "cover",
+    borderRadius: "18px",
     background: "rgba(255,253,248,0.72)",
-    boxShadow: "0 18px 46px rgba(96,78,54,0.12)",
     animation: "exchangePhotoIn 1.1s cubic-bezier(0.22, 1, 0.36, 1) both",
   },
   eveningOpeningCaption: {
@@ -6868,6 +6881,24 @@ const styles = {
     fontSize: "24px",
     fontWeight: 500,
     lineHeight: 1.42,
+    letterSpacing: "0.08em",
+  },
+  eveningOpeningSavedNote: {
+    margin: "-4px 0 0",
+    color: "#746a5f",
+    fontFamily: "var(--font-display)",
+    fontSize: "13px",
+    fontWeight: 400,
+    lineHeight: 1.5,
+    letterSpacing: "0.04em",
+  },
+  eveningOpeningAfterword: {
+    margin: "-4px 0 0",
+    color: "#a65045",
+    fontFamily: "var(--font-display)",
+    fontSize: "13px",
+    fontWeight: 400,
+    lineHeight: 1.5,
     letterSpacing: "0.08em",
   },
   exchangeSheetFrame: {

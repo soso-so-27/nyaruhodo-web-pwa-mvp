@@ -19,6 +19,8 @@ import { AppSheet } from "../ui/AppBottomSheet";
 import { AppIcon } from "../ui/AppIcons";
 import { PhotoViewerFrame } from "../ui/PhotoTile";
 import { StoredPhotoImage } from "../ui/StoredPhotoImage";
+import { HomeEnvelopeMotionArt } from "./HomeEnvelopeMotionArt";
+import { HOME_ENVELOPE_OPEN_MS } from "./homeEnvelopeMotionConfig";
 
 type DeskState = "1" | "1b" | "2" | "3" | "4";
 type HomeDaylightStyle = CSSProperties & Record<`--${string}`, string>;
@@ -70,7 +72,7 @@ type HomeDeskModelProps = {
   onDismissOmoideMemory?: (memory: OmoideMemory) => void;
 };
 
-const ENVELOPE_OPEN_MS = 2200;
+const ENVELOPE_OPEN_MS = HOME_ENVELOPE_OPEN_MS;
 const ENVELOPE_SEAL_OPEN_MS = 1320;
 const HOME_FRAME_TUNING = {
   pagePaddingX: "12px",
@@ -191,6 +193,7 @@ export function HomeDeskModel({
   const deskState = getDeskState(eveningState);
   const prefersReducedMotion = usePrefersReducedMotion();
   const [isEnvelopeOpening, setIsEnvelopeOpening] = useState(false);
+  const [envelopeOpenPlayKey, setEnvelopeOpenPlayKey] = useState(0);
   const [developPhotoMounted, setDevelopPhotoMounted] = useState(false);
   const [viewerPhoto, setViewerPhoto] = useState<DeskViewerPhoto | null>(null);
   const [openingOmoideMemory, setOpeningOmoideMemory] =
@@ -296,6 +299,7 @@ export function HomeDeskModel({
     }
 
     setDevelopPhotoMounted(true);
+    setEnvelopeOpenPlayKey((value) => value + 1);
     setIsEnvelopeOpening(true);
     if (envelopeOpenTimerRef.current) {
       window.clearTimeout(envelopeOpenTimerRef.current);
@@ -491,23 +495,10 @@ export function HomeDeskModel({
                     }}
                   >
                     {usesEnvelopeHome ? (
-                      <>
-                        <img
-                          src="/images/home/generated-envelope-wide-v2.png"
-                          alt=""
-                          data-envelope-art="closed"
-                          style={deskStyles.envelopeHomeArt}
-                        />
-                        <img
-                          src="/images/home/generated-envelope-open-v2.png"
-                          alt=""
-                          data-envelope-art="open"
-                          style={{
-                            ...deskStyles.envelopeHomeArt,
-                            ...deskStyles.envelopeHomeArtOpen,
-                          }}
-                        />
-                      </>
+                      <HomeEnvelopeMotionArt
+                        isOpening={isEnvelopeOpening}
+                        playKey={envelopeOpenPlayKey}
+                      />
                     ) : null}
                     <span
                       data-envelope-flap="true"
@@ -2453,6 +2444,7 @@ const deskStyles = {
     borderRadius: "16px",
     opacity: 0,
     filter: "blur(10px) saturate(0.94)",
+    zIndex: 12,
     transform: "translateY(26px) scale(0.9)",
     transformOrigin: "50% 80%",
     boxShadow:

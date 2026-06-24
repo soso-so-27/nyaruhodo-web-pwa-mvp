@@ -105,8 +105,8 @@ test.describe("home sleeping exchange flow", () => {
     );
     const openButton = page.getByTestId("desk-open-letter");
     await openButton.click();
-    await expect(page.getByTestId("evening-opening-pair").locator("img")).toHaveCount(2);
-    await page.getByRole("button", { name: "また、あした" }).click();
+    await expect(page.getByTestId("evening-opening-pair").locator("img")).toHaveCount(1);
+    await page.getByRole("button", { name: "閉じる" }).click();
     await expect(page.getByTestId("home-desk-model")).toHaveAttribute(
       "data-state",
       "4",
@@ -124,6 +124,7 @@ test.describe("home sleeping exchange flow", () => {
 
       return {
         ownSleepingPhotos: readArray("nyaruhodo_exchange_own_sleeping_photos"),
+        keptExchangePhotos: readArray("nyaruhodo_exchange_kept_photos"),
         eveningDeliveryDays: JSON.parse(
           window.localStorage.getItem("neteruneko_evening_delivery_days") ?? "{}",
         ),
@@ -132,7 +133,10 @@ test.describe("home sleeping exchange flow", () => {
 
     expect(storage.ownSleepingPhotos.length).toBeGreaterThan(0);
     expect(storage.ownSleepingPhotos[0]?.src).toMatch(/^data:image\//);
+    expect(storage.keptExchangePhotos.length).toBeGreaterThan(0);
+    expect(storage.keptExchangePhotos[0]?.src).toBeTruthy();
     expect(storage.eveningDeliveryDays["2026-06-10"]?.openedAt).toBeTruthy();
+    expect(storage.eveningDeliveryDays["2026-06-10"]?.keptAt).toBeTruthy();
   });
 
   test("lets anonymous users open storage deliveries without signed-url API auth", async ({
@@ -254,7 +258,7 @@ test.describe("home sleeping exchange flow", () => {
     const openButton = page.getByTestId("desk-open-letter");
     await openButton.click();
     await expect(page.getByTestId("evening-opening-pair")).toBeVisible();
-    await expect(page.getByTestId("evening-opening-pair").locator("img")).toHaveCount(2);
+    await expect(page.getByTestId("evening-opening-pair").locator("img")).toHaveCount(1);
 
     await expect
       .poll(() =>
@@ -273,10 +277,11 @@ test.describe("home sleeping exchange flow", () => {
     const openedDelivery = await page.evaluate(() => {
       const store = JSON.parse(
         window.localStorage.getItem("neteruneko_evening_delivery_days") ?? "{}",
-      ) as Record<string, { openedAt?: number; deliveredPhoto?: { src?: string } }>;
+      ) as Record<string, { openedAt?: number; keptAt?: number; deliveredPhoto?: { src?: string } }>;
       return Object.values(store).find((day) => Boolean(day.deliveredPhoto));
     });
     expect(openedDelivery?.openedAt).toBeTruthy();
+    expect(openedDelivery?.keptAt).toBeTruthy();
 
     await page.getByTestId("evening-opening-pair").locator("button").last().click();
     expect(signedUrlCalls).toBe(0);

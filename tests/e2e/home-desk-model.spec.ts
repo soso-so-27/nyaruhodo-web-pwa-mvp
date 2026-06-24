@@ -378,17 +378,28 @@ test.describe("home desk model", () => {
     const letter = page.getByTestId("desk-open-letter");
     const box = await letter.boundingBox();
     expect(box).not.toBeNull();
+    await expect(letter.locator('[data-envelope-motion-root="true"]')).toHaveCount(1);
     await expect(letter.locator('[data-develop-photo="true"]')).toHaveCount(0);
 
     await letter.click();
     await page.waitForTimeout(250);
     await expect(letter.locator('[data-develop-photo="true"]')).toHaveCount(1);
+    await expect
+      .poll(() =>
+        letter
+          .locator(".home-envelope-motion-wax-left")
+          .evaluate((element) => Number(getComputedStyle(element).opacity)),
+      )
+      .toBeGreaterThan(0);
     await expect(page.getByTestId("evening-opening-pair")).toHaveCount(0);
 
     await page.waitForTimeout(1200);
     await expect(page.getByTestId("evening-opening-pair")).toHaveCount(0);
 
-    await expect(page.getByTestId("evening-opening-pair")).toBeVisible();
+    const openingPair = page.getByTestId("evening-opening-pair");
+    await expect(openingPair).toBeVisible();
+    await expect(openingPair.locator("img")).toHaveCount(1);
+    await expect(page.getByRole("button", { name: "閉じる" })).toBeVisible();
     await expect
       .poll(() =>
         page.evaluate(
