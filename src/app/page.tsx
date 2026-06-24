@@ -11,6 +11,9 @@ const ATTRIBUTION_PARAMS = [
   "utm_campaign",
   "utm_content",
   "campaign",
+  "ref",
+  "referral",
+  "invite",
 ] as const;
 
 export default function Page() {

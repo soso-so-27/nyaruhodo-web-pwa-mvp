@@ -29,6 +29,11 @@ import {
   type AuthDebugSnapshot,
 } from "../../lib/authDebug";
 import {
+  claimPendingReferral,
+  readClientReferralSummary,
+  type ClientReferralSummary,
+} from "../../lib/referrals/client";
+import {
   getDisplayEnvironment,
   getDisplayEnvironmentLabel,
   type DisplayEnvironment,
@@ -150,6 +155,9 @@ export function SettingsPage() {
   });
   const [billingMessage, setBillingMessage] = useState("");
   const [isBillingLoading, setIsBillingLoading] = useState(false);
+  const [referralSummary, setReferralSummary] =
+    useState<ClientReferralSummary | null>(null);
+  const [referralMessage, setReferralMessage] = useState("");
   const [openSoundEnabled, setOpenSoundEnabled] = useState(true);
   const [openSoundCandidate, setOpenSoundCandidate] =
     useState<OpenSoundCandidateId>("1");
@@ -199,9 +207,16 @@ export function SettingsPage() {
     setEmail(data.user?.email ?? null);
     await refreshAuthDebug(supabase);
     if (data.user) {
+      await claimPendingReferral();
       await refreshSyncOverview();
+      await refreshReferralSummary();
     }
     setIsLoading(false);
+  }
+
+  async function refreshReferralSummary() {
+    const summary = await readClientReferralSummary();
+    setReferralSummary(summary.isLoggedIn ? summary : null);
   }
 
   async function refreshSyncOverview() {
@@ -249,6 +264,55 @@ export function SettingsPage() {
       cancelAtPeriodEnd: false,
       canManageBilling: false,
     });
+    setReferralSummary(null);
+    setReferralMessage("");
+  }
+
+  async function handleCopyReferralLink() {
+    const shareUrl = referralSummary?.shareUrl;
+
+    if (!shareUrl) {
+      setReferralMessage("紹介リンクを準備できませんでした。少し時間をおいてもう一度お試しください。");
+      return;
+    }
+
+    try {
+      await navigator.clipboard.writeText(shareUrl);
+      setReferralMessage("紹介リンクをコピーしました。");
+      trackProductEvent("referral_link_copied", {
+        code: referralSummary.code,
+      });
+    } catch {
+      setReferralMessage(shareUrl);
+    }
+  }
+
+  async function handleShareReferralLink() {
+    const shareUrl = referralSummary?.shareUrl;
+
+    if (!shareUrl) {
+      setReferralMessage("紹介リンクを準備できませんでした。少し時間をおいてもう一度お試しください。");
+      return;
+    }
+
+    if (navigator.share) {
+      try {
+        await navigator.share({
+          title: "ねてるねこ",
+          text: "ねこだよりを一緒に試してみませんか。",
+          url: shareUrl,
+        });
+        trackProductEvent("referral_link_shared", {
+          code: referralSummary.code,
+          method: "native_share",
+        });
+        return;
+      } catch {
+        // Native share can be cancelled; fall back to copy.
+      }
+    }
+
+    await handleCopyReferralLink();
   }
 
   async function handleSyncNow() {
@@ -703,6 +767,59 @@ export function SettingsPage() {
             )}
           </AppCard>
         </section>
+
+        {isLoggedIn && referralSummary?.referralEnabled ? (
+          <section style={{ ...styles.section, order: 2 }}>
+            <p style={styles.sectionLabel}>紹介</p>
+            <AppCard variant="section" padding="sm" style={styles.card}>
+              <div style={styles.betaNote}>
+                <p style={styles.betaNoteTitle}>ねこだよりを紹介する</p>
+                <p style={styles.betaNoteText}>
+                  ねてるねこを試してほしい人に、あなた専用のリンクを渡せます。
+                  登録されると、ここに紹介数が残ります。
+                </p>
+              </div>
+              <div style={styles.divider} />
+              <div style={styles.row}>
+                <span style={styles.rowLabel}>紹介コード</span>
+                <span style={styles.referralCode}>{referralSummary.code}</span>
+              </div>
+              <div style={styles.divider} />
+              <div style={styles.row}>
+                <span style={styles.rowLabel}>紹介された人</span>
+                <span style={styles.rowValue}>{referralSummary.acceptedCount}人</span>
+              </div>
+              <div style={styles.divider} />
+              <div style={styles.referralActions}>
+                <AppButton
+                  type="button"
+                  variant="secondary"
+                  fullWidth
+                  onClick={() => {
+                    void handleShareReferralLink();
+                  }}
+                >
+                  共有する
+                </AppButton>
+                <AppButton
+                  type="button"
+                  variant="quiet"
+                  fullWidth
+                  onClick={() => {
+                    void handleCopyReferralLink();
+                  }}
+                >
+                  リンクをコピー
+                </AppButton>
+              </div>
+              {referralMessage ? (
+                <p style={styles.syncMessage} role="status">
+                  {referralMessage}
+                </p>
+              ) : null}
+            </AppCard>
+          </section>
+        ) : null}
 
         <section style={{ ...styles.section, order: 4 }}>
           <p style={styles.sectionLabel}>音</p>
@@ -1998,6 +2115,23 @@ const styles = {
     overflow: "hidden",
     textOverflow: "ellipsis",
     whiteSpace: "nowrap" as const,
+  },
+  referralCode: {
+    borderRadius: "var(--radius-full)",
+    border: "1px solid rgba(120,108,94,0.16)",
+    background: "rgba(255,253,248,0.68)",
+    color: "var(--ink)",
+    fontSize: "12px",
+    fontWeight: 600,
+    letterSpacing: "0.12em",
+    lineHeight: 1,
+    padding: "7px 10px",
+  },
+  referralActions: {
+    display: "grid",
+    gridTemplateColumns: "1fr",
+    gap: "8px",
+    padding: "12px 0",
   },
   rowChevron: {
     fontSize: "18px",

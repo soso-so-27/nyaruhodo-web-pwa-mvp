@@ -2,6 +2,7 @@ import "./globals.css";
 import type { Metadata, Viewport } from "next";
 import localFont from "next/font/local";
 import { AppAnalyticsTracker } from "../components/analytics/AppAnalyticsTracker";
+import { AppReferralTracker } from "../components/analytics/AppReferralTracker";
 import { AppPaperTheme } from "../components/ui/AppPaperTheme";
 
 const kleeOne = localFont({
@@ -153,6 +154,7 @@ export default function RootLayout({
       <body>
         <AppPaperTheme />
         <AppAnalyticsTracker />
+        <AppReferralTracker />
         {children}
       </body>
     </html>

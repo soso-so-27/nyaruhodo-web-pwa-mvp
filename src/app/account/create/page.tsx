@@ -15,6 +15,7 @@ import {
 import { STORAGE_KEYS } from "../../../lib/storage";
 import { trackProductEvent } from "../../../lib/analytics/productAnalytics";
 import { writeAuthDebugEvent } from "../../../lib/authDebug";
+import { claimPendingReferral } from "../../../lib/referrals/client";
 import {
   getDisplayEnvironment,
   getDisplayEnvironmentLabel,
@@ -327,6 +328,7 @@ export default function AccountCreatePage() {
     if (isFromOnboarding) {
       markOnboardingAlbumCompletionReady();
     }
+    await claimPendingReferral();
     router.replace(
       isFromOnboarding ? "/cats?onboarding=1" : "/home?auth=google_success",
     );
