@@ -613,8 +613,8 @@ export function SettingsPage() {
     <main style={styles.page}>
       <div style={styles.container}>
         <div style={styles.header}>
-          <AppButton href="/home" variant="ghost" size="icon" iconOnly aria-label="ホームへ戻る">
-            <span style={styles.backIcon}>‹</span>
+          <AppButton href="/home" variant="quiet" size="sm" style={styles.backButton}>
+            ‹ ホーム
           </AppButton>
           <h1 style={styles.title}>設定</h1>
         </div>
@@ -659,8 +659,8 @@ export function SettingsPage() {
         {activeSettingsTab === "general" ? (
           <>
         <section style={{ ...styles.section, order: 2 }}>
-          <p style={styles.sectionLabel}>保存とデータ</p>
-          <AppCard variant="section" padding="sm" style={styles.card}>
+          <p style={styles.sectionLabel}>写真の保存</p>
+          <AppCard variant="outlined" padding="sm" style={styles.card}>
             <div style={styles.row}>
               <span style={styles.rowLabel}>
                 {getDisplayEnvironmentLabel(displayEnvironment)}
@@ -729,7 +729,7 @@ export function SettingsPage() {
 
         <section style={{ ...styles.section, order: 1 }}>
           <p style={styles.sectionLabel}>アカウント</p>
-          <AppCard variant="section" padding="sm" style={styles.card}>
+          <AppCard variant="outlined" padding="sm" style={styles.card}>
             {isLoading ? (
               <p style={styles.loadingText}>確認中...</p>
             ) : isLoggedIn ? (
@@ -769,9 +769,9 @@ export function SettingsPage() {
         </section>
 
         {isLoggedIn && referralSummary?.referralEnabled ? (
-          <section style={{ ...styles.section, order: 2 }}>
+          <section style={{ ...styles.section, order: 4 }}>
             <p style={styles.sectionLabel}>紹介</p>
-            <AppCard variant="section" padding="sm" style={styles.card}>
+            <AppCard variant="outlined" padding="sm" style={styles.card}>
               <div style={styles.betaNote}>
                 <p style={styles.betaNoteTitle}>ねこだよりを紹介する</p>
                 <p style={styles.betaNoteText}>
@@ -821,9 +821,9 @@ export function SettingsPage() {
           </section>
         ) : null}
 
-        <section style={{ ...styles.section, order: 4 }}>
+        <section style={{ ...styles.section, order: 3 }}>
           <p style={styles.sectionLabel}>音</p>
-          <AppCard variant="section" padding="sm" style={styles.card}>
+          <AppCard variant="outlined" padding="sm" style={styles.card}>
             <div style={styles.row}>
               <div style={styles.rowLeft}>
                 <span style={styles.rowLabel}>ひらく音</span>
@@ -839,8 +839,8 @@ export function SettingsPage() {
         </section>
 
         <section style={{ ...styles.section, order: 5 }}>
-          <p style={styles.sectionLabel}>βサポーターについて</p>
-          <AppCard variant="section" padding="sm" style={{ ...styles.card, ...styles.betaCard }}>
+          <p style={styles.sectionLabel}>参加と応援</p>
+          <AppCard variant="outlined" padding="sm" style={{ ...styles.card, ...styles.betaCard }}>
             {betaCapabilities.feedbackEnabled ? (
               <>
                 <div style={styles.betaNote}>
@@ -1045,9 +1045,9 @@ export function SettingsPage() {
 
         {activeSettingsTab === "general" ? (
           <>
-        <section style={{ ...styles.section, order: 3 }}>
-          <p style={styles.sectionLabel}>サポート・規約</p>
-          <AppCard variant="section" padding="sm" style={styles.card}>
+        <section style={{ ...styles.section, order: 6 }}>
+          <p style={styles.sectionLabel}>ヘルプと規約</p>
+          <AppCard variant="outlined" padding="sm" style={styles.card}>
             <a href="/how-to-use" style={styles.linkRow}>
               <span style={styles.rowLabel}>使い方</span>
               <span style={styles.rowChevron}>›</span>
@@ -1080,9 +1080,9 @@ export function SettingsPage() {
           </AppCard>
         </section>
 
-        <section style={{ ...styles.section, order: 4 }}>
-          <p style={styles.sectionLabel}>アプリ情報</p>
-          <AppCard variant="section" padding="sm" style={styles.card}>
+        <section style={{ ...styles.section, order: 7 }}>
+          <p style={styles.sectionLabel}>アプリについて</p>
+          <AppCard variant="outlined" padding="sm" style={styles.card}>
             <div style={styles.row}>
               <span style={styles.rowLabel}>バージョン</span>
               <span style={styles.rowValue}>1.0.0-beta.4</span>
@@ -2015,25 +2015,23 @@ const styles = {
     width: "min(100%, 430px)",
     margin: "0 auto",
     padding:
-      "calc(18px + env(safe-area-inset-top)) 16px calc(40px + env(safe-area-inset-bottom))",
+      "calc(18px + env(safe-area-inset-top)) 20px calc(40px + env(safe-area-inset-bottom))",
   },
   header: {
-    display: "flex",
-    alignItems: "center",
-    gap: "12px",
-    minHeight: "48px",
-    padding: "0 0 20px",
+    display: "grid",
+    gap: "18px",
+    justifyItems: "start",
+    padding: "0 0 24px",
   },
-  backIcon: {
-    fontSize: "18px",
-    lineHeight: 1,
-    color: "var(--ink)",
+  backButton: {
+    marginLeft: "-12px",
   },
   title: {
     fontSize: "24px",
     fontWeight: 500,
     color: "var(--ink)",
     margin: 0,
+    letterSpacing: "0.04em",
   },
   settingsTabs: {
     display: "grid",
@@ -2062,17 +2060,21 @@ const styles = {
     boxShadow: "0 2px 8px rgba(90,76,60,0.045)",
   },
   section: {
-    marginBottom: "16px",
+    marginBottom: "18px",
   },
   sectionLabel: {
-    fontSize: "12px",
+    fontSize: "11px",
     fontWeight: 500,
     color: "var(--ink-soft)",
-    margin: "0 0 7px 6px",
+    margin: "0 0 8px 2px",
     letterSpacing: "0.08em",
   },
   card: {
-    padding: "2px 14px",
+    padding: "0 12px",
+    borderRadius: "18px",
+    background: "rgba(255,253,248,0.42)",
+    border: "1px solid rgba(120,108,94,0.12)",
+    boxShadow: "none",
   },
   betaCard: {},
   adminSection: {
@@ -2087,13 +2089,15 @@ const styles = {
     display: "flex",
     alignItems: "center",
     justifyContent: "space-between",
-    padding: "12px 0",
+    minHeight: "52px",
+    padding: "8px 0",
   },
   linkRow: {
     display: "flex",
     alignItems: "center",
     justifyContent: "space-between",
-    padding: "12px 0",
+    minHeight: "50px",
+    padding: "7px 0",
     textDecoration: "none",
     color: "var(--ink)",
   },
@@ -2151,7 +2155,7 @@ const styles = {
   divider: {
     height: "0.5px",
     background: "rgba(120,108,94,0.09)",
-    margin: "0 -14px",
+    margin: "0 -12px",
   },
   loadingText: {
     fontSize: "13px",
@@ -2161,11 +2165,11 @@ const styles = {
   },
   storageNote: {
     margin: 0,
-    padding: "12px 0 14px",
+    padding: "12px 0",
     color: "var(--ink-soft)",
     fontSize: "12px",
     fontWeight: 500,
-    lineHeight: 1.85,
+    lineHeight: 1.7,
   },
   syncMessage: {
     fontSize: "12px",
@@ -2360,10 +2364,10 @@ const styles = {
     padding: "0 0 12px",
   },
   betaNote: {
-    padding: "14px 0",
+    padding: "12px 0",
     display: "flex",
     flexDirection: "column" as const,
-    gap: "7px",
+    gap: "6px",
   },
   betaNoteTitle: {
     fontSize: "13px",
@@ -2374,7 +2378,7 @@ const styles = {
   betaNoteText: {
     fontSize: "13px",
     color: "var(--ink-soft)",
-    lineHeight: 1.85,
+    lineHeight: 1.7,
     margin: 0,
   },
   feedbackForm: {
