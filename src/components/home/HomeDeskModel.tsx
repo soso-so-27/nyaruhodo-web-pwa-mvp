@@ -449,13 +449,9 @@ export function HomeDeskModel({
                 </button>
               </div>
             ) : (
-              <button
-                type="button"
+              <div
                 data-testid="desk-empty-frame"
                 style={deskStyles.homeEmptyFrame}
-                className="home-empty-frame-action"
-                onClick={onTakePhoto}
-                aria-label={`${catName}の きょう、まだ。ねがおを とる`}
               >
                 <span style={deskStyles.homeEmptyEnvelopeHint} aria-hidden="true">
                   <span style={deskStyles.homeEmptyEnvelopeFlap} />
@@ -464,11 +460,18 @@ export function HomeDeskModel({
                 <span style={deskStyles.homeEmptyTitle}>
                   きょうの ねがお、まだ
                 </span>
-                <span data-testid="home-empty-action" style={deskStyles.homeEmptyAction}>
+                <button
+                  type="button"
+                  data-testid="home-empty-action"
+                  className="home-empty-cta-action"
+                  style={deskStyles.homeEmptyAction}
+                  onClick={onTakePhoto}
+                  aria-label={`${catName}の ねがおを とる`}
+                >
                   <AppIcon name="camera" size={16} />
                   ねがおを とる
-                </span>
-              </button>
+                </button>
+              </div>
             )}
           </div>
 
@@ -836,7 +839,7 @@ export function HomeDeskModel({
           transform: scale(0.96);
           box-shadow: var(--shadow-e1) !important;
         }
-        .home-empty-frame-action:active [data-testid="home-empty-action"] {
+        .home-empty-cta-action:active {
           transform: translateY(1px) scale(0.985);
           box-shadow:
             0 1px 0 color-mix(in srgb, var(--paper-card) 72%, transparent) inset,
@@ -2177,8 +2180,6 @@ const deskStyles = {
     background: "transparent",
     color: "var(--ink-soft)",
     boxShadow: "none",
-    cursor: "pointer",
-    WebkitTapHighlightColor: "transparent",
     transition: "filter 220ms var(--ease-gentle)",
   },
   homeEmptyEnvelopeHint: {
@@ -2219,6 +2220,8 @@ const deskStyles = {
   homeEmptyAction: {
     position: "relative",
     zIndex: 1,
+    appearance: "none",
+    WebkitAppearance: "none",
     display: "inline-flex",
     alignItems: "center",
     justifyContent: "center",
@@ -2237,6 +2240,8 @@ const deskStyles = {
     fontSize: "var(--home-empty-action-size, 14px)",
     fontWeight: 600,
     letterSpacing: "var(--tracking-body)",
+    cursor: "pointer",
+    WebkitTapHighlightColor: "transparent",
     transition:
       "transform 140ms var(--ease-gentle), box-shadow 140ms var(--ease-gentle), background var(--home-daylight-transition, 1800ms) var(--ease-gentle)",
   },
