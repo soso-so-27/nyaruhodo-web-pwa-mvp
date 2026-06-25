@@ -2161,11 +2161,11 @@ const styles = {
   },
   storageNote: {
     margin: 0,
-    padding: "10px 0 12px",
+    padding: "12px 0 14px",
     color: "var(--ink-soft)",
     fontSize: "12px",
     fontWeight: 500,
-    lineHeight: 1.65,
+    lineHeight: 1.85,
   },
   syncMessage: {
     fontSize: "12px",
@@ -2360,10 +2360,10 @@ const styles = {
     padding: "0 0 12px",
   },
   betaNote: {
-    padding: "12px 0",
+    padding: "14px 0",
     display: "flex",
     flexDirection: "column" as const,
-    gap: "5px",
+    gap: "7px",
   },
   betaNoteTitle: {
     fontSize: "13px",
@@ -2374,7 +2374,7 @@ const styles = {
   betaNoteText: {
     fontSize: "13px",
     color: "var(--ink-soft)",
-    lineHeight: 1.65,
+    lineHeight: 1.85,
     margin: 0,
   },
   feedbackForm: {

@@ -10,7 +10,6 @@ import { WordmarkHeader } from "../../../components/ui/AppHeader";
 import {
   APP_ACCENT,
   APP_PAGE_BACKGROUND,
-  APP_SUBTLE_SURFACE,
 } from "../../../components/ui/appTheme";
 import { STORAGE_KEYS } from "../../../lib/storage";
 import { trackProductEvent } from "../../../lib/analytics/productAnalytics";
@@ -584,7 +583,8 @@ const styles = {
     paddingTop: "calc(10px + env(safe-area-inset-top))",
   },
   card: {
-    padding: "26px 22px 22px",
+    padding: "24px 20px 22px",
+    background: "rgba(255,253,248,0.62)",
   },
   eyebrow: {
     margin: "0 0 10px",
@@ -596,35 +596,36 @@ const styles = {
   title: {
     margin: "0 0 12px",
     color: "#2a2a28",
-    fontSize: "18px",
+    fontSize: "20px",
     fontWeight: 500,
-    lineHeight: 1.4,
-    letterSpacing: 0,
+    lineHeight: 1.5,
+    letterSpacing: "0.02em",
   },
   body: {
     margin: "0 0 20px",
     color: "#6a6a62",
-    fontSize: "15px",
-    lineHeight: 1.75,
+    fontSize: "13px",
+    fontWeight: 500,
+    lineHeight: 1.9,
     letterSpacing: 0,
     whiteSpace: "pre-line",
   },
   valueList: {
     display: "grid",
-    gap: "8px",
+    gap: 0,
     margin: "0 0 18px",
+    borderTop: "1px solid rgba(120,108,94,0.12)",
   },
   valueItem: {
-    ...APP_SUBTLE_SURFACE,
     display: "flex",
     alignItems: "center",
     gap: "9px",
-    minHeight: "38px",
-    borderRadius: "var(--radius-md)",
+    minHeight: "40px",
+    borderBottom: "1px solid rgba(120,108,94,0.12)",
     color: "#3f433d",
     fontSize: "13px",
     fontWeight: 500,
-    padding: "0 12px",
+    padding: "0 2px",
   },
   valueDot: {
     width: "7px",
@@ -659,7 +660,7 @@ const styles = {
     color: "#7d766e",
     fontSize: "12px",
     fontWeight: 500,
-    lineHeight: 1.6,
+    lineHeight: 1.75,
   },
   message: {
     margin: "0 0 14px",
@@ -669,7 +670,7 @@ const styles = {
     color: "#746a5f",
     fontSize: "13px",
     fontWeight: 500,
-    lineHeight: 1.6,
+    lineHeight: 1.75,
     padding: "11px 12px",
     boxShadow: "0 4px 12px rgba(90,76,60,0.025)",
   },
@@ -678,7 +679,7 @@ const styles = {
     color: "#8a8a80",
     fontSize: "12px",
     fontWeight: 500,
-    lineHeight: 1.6,
+    lineHeight: 1.75,
   },
   connectedEmail: {
     margin: "0 0 18px",

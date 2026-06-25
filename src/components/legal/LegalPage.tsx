@@ -3,7 +3,6 @@
 import type { CSSProperties } from "react";
 import { APP_PAGE_BACKGROUND } from "../ui/appTheme";
 import { AppButton } from "../ui/AppButton";
-import { AppCard } from "../ui/AppCard";
 
 type LegalSection = {
   title: string;
@@ -300,8 +299,8 @@ function LegalPage({ title, lead, updatedAt, sections }: LegalPageProps) {
     <main style={styles.page}>
       <div style={styles.container}>
         <div style={styles.header}>
-          <AppButton href="/settings" variant="ghost" size="icon" iconOnly aria-label="設定へ戻る">
-            <span aria-hidden="true">‹</span>
+          <AppButton href="/settings" variant="quiet" size="sm" style={styles.backLink}>
+            ‹ 設定にもどる
           </AppButton>
           <div>
             <h1 style={styles.title}>{title}</h1>
@@ -311,8 +310,7 @@ function LegalPage({ title, lead, updatedAt, sections }: LegalPageProps) {
 
         <p style={styles.lead}>{lead}</p>
 
-        <AppCard variant="section" padding="standard">
-          {sections.map((section, sectionIndex) => (
+        {sections.map((section) => (
             <section key={section.title} style={styles.section}>
               <h2 style={styles.sectionTitle}>{section.title}</h2>
               {section.body?.map((paragraph) => (
@@ -329,10 +327,8 @@ function LegalPage({ title, lead, updatedAt, sections }: LegalPageProps) {
                   ))}
                 </ul>
               ) : null}
-              {sectionIndex < sections.length - 1 ? <div style={styles.divider} /> : null}
             </section>
-          ))}
-        </AppCard>
+        ))}
 
         <p style={styles.note}>
           このページはベータ版公開に向けた暫定版です。正式公開前に内容を更新することがあります。
@@ -349,72 +345,82 @@ const styles = {
     backgroundSize: "var(--app-paper-background-size)",
     backgroundPosition: "var(--app-paper-background-position)",
     backgroundRepeat: "var(--app-paper-background-repeat)",
-    color: "#242522",
+    color: "#2a2925",
+    padding:
+      "calc(24px + env(safe-area-inset-top)) 20px calc(40px + env(safe-area-inset-bottom))",
   },
   container: {
     width: "min(100%, 430px)",
     margin: "0 auto",
-    padding: "0 16px 44px",
   },
   header: {
-    display: "flex",
-    alignItems: "center",
-    gap: "12px",
-    padding: "16px 0 14px",
+    display: "grid",
+    gap: "18px",
+    justifyItems: "start",
+    padding: "0 0 22px",
+  },
+  backLink: {
+    marginBottom: 0,
   },
   title: {
+    margin: "0 0 3px",
+    color: "#3f382e",
     fontSize: "24px",
     fontWeight: 500,
-    color: "#2a2a28",
-    margin: "0 0 3px",
+    letterSpacing: "0.04em",
   },
   updatedAt: {
-    fontSize: "12px",
-    color: "#9a9890",
     margin: 0,
+    fontSize: "12px",
+    color: "#8f8779",
+    fontWeight: 500,
+    lineHeight: 1.5,
   },
   lead: {
+    margin: "0 0 8px",
+    color: "#6f6757",
     fontSize: "13px",
-    lineHeight: 1.75,
-    color: "#6a6a62",
-    margin: "0 0 14px",
+    fontWeight: 500,
+    lineHeight: 1.9,
+    letterSpacing: 0,
   },
   section: {
-    padding: "14px 0",
+    padding: "18px 0",
+    borderTop: "1px solid rgba(120,108,94,0.14)",
   },
   sectionTitle: {
+    margin: "0 0 10px",
+    color: "#4a4338",
     fontSize: "15px",
     fontWeight: 500,
-    color: "#2a2a28",
-    margin: "0 0 8px",
+    letterSpacing: "0.03em",
   },
   paragraph: {
+    margin: "0 0 12px",
+    color: "#6f6757",
     fontSize: "13px",
-    lineHeight: 1.8,
-    color: "#6a6a62",
-    margin: "0 0 8px",
+    fontWeight: 500,
+    lineHeight: 1.9,
+    letterSpacing: 0,
   },
   list: {
     display: "flex",
     flexDirection: "column",
-    gap: "6px",
-    paddingLeft: "18px",
-    margin: "0 0 8px",
+    gap: "8px",
+    paddingLeft: "20px",
+    margin: "0 0 12px",
   },
   listItem: {
+    color: "#6f6757",
     fontSize: "13px",
-    lineHeight: 1.7,
-    color: "#6a6a62",
-  },
-  divider: {
-    height: "0.5px",
-    background: "#f0ede8",
-    margin: "14px -16px 0",
+    fontWeight: 500,
+    lineHeight: 1.85,
   },
   note: {
+    margin: "2px 0 0",
+    color: "#8f8779",
     fontSize: "12px",
-    lineHeight: 1.7,
-    color: "#9a9890",
-    margin: "14px 4px 0",
+    fontWeight: 500,
+    lineHeight: 1.75,
   },
 } satisfies Record<string, CSSProperties>;

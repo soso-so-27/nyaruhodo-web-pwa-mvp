@@ -13,9 +13,7 @@ import {
   type ClientBetaCapabilities,
 } from "../../lib/betaClient";
 import { AppButton } from "../../components/ui/AppButton";
-import { AppCard } from "../../components/ui/AppCard";
-import { AppHeader } from "../../components/ui/AppHeader";
-import { color, radius, spacing, typography } from "../../components/ui/designTokens";
+import { color, radius, spacing } from "../../components/ui/designTokens";
 
 const dreams = [
   {
@@ -118,20 +116,21 @@ export default function BetaSupporterPage() {
         <AppButton href="/settings" variant="quiet" size="sm" style={styles.backLink}>
           ‹ 設定
         </AppButton>
-        <AppHeader variant="pageTitle" title="ねてるねこ" />
 
-        <AppCard variant="section" padding="xl" style={styles.hero}>
-          <p style={styles.kicker}>βサポーター</p>
-          <h1 style={styles.title}>これからのねてるねこ</h1>
+        <h1 style={styles.title}>これからのねてるねこ</h1>
+
+        <section style={styles.hero}>
+          <h2 style={styles.heading}>βサポーター</h2>
           <p style={styles.lead}>
             サポーターの応援は、サーバー費用、写真のお預かり、この場所を静かに保つために使います。
           </p>
           <p style={styles.lead}>
             そのうえで、少しずつ形にしたいことがあります。
           </p>
-        </AppCard>
+        </section>
 
-        <AppCard variant="section" padding="lg" style={styles.card}>
+        <section style={styles.section}>
+          <h2 style={styles.heading}>形にしたいこと</h2>
           <ul style={styles.dreamList}>
             {dreams.map((dream) => (
               <li key={dream.text} style={styles.dreamItem}>
@@ -143,18 +142,20 @@ export default function BetaSupporterPage() {
               </li>
             ))}
           </ul>
-        </AppCard>
+        </section>
 
-        <AppCard variant="outlined" padding="lg" style={styles.card}>
+        <section style={styles.section}>
+          <h2 style={styles.heading}>小さなメモ</h2>
           <p style={styles.note}>
             これは約束ではなく、アイデアのメモです。
             <br />
             内容や順番は変わることがあります。
           </p>
           <p style={styles.closing}>できたものから、みんなに届きます。</p>
-        </AppCard>
+        </section>
 
-        <AppCard variant="section" padding="lg" style={styles.card}>
+        <section style={styles.actionSection}>
+          <h2 style={styles.heading}>支払い</h2>
           <p style={styles.price}>月 1,480円</p>
           <p style={styles.note}>
             機能は何も制限しません。
@@ -189,7 +190,7 @@ export default function BetaSupporterPage() {
             </p>
           )}
           {message ? <p style={styles.message}>{message}</p> : null}
-        </AppCard>
+        </section>
 
         <nav style={styles.legalLinks} aria-label="法務リンク">
           <AppButton href="/terms" variant="quiet" size="sm">利用規約</AppButton>
@@ -218,10 +219,8 @@ const styles = {
     position: "fixed",
     inset: 0,
     pointerEvents: "none",
-    background:
-      "radial-gradient(76% 34% at 50% 0%, rgba(255,255,255,0.62), transparent 68%), linear-gradient(115deg, color-mix(in srgb, var(--paper) 10%, transparent) 0%, transparent 44%, color-mix(in srgb, var(--ink-soft) 4%, transparent) 100%)",
-    mixBlendMode: "soft-light",
-    opacity: 0.84,
+    background: "transparent",
+    opacity: 0,
   },
   container: {
     position: "relative",
@@ -231,48 +230,55 @@ const styles = {
     padding: `calc(${spacing.lg}px + env(safe-area-inset-top)) ${spacing.screenX}px calc(44px + env(safe-area-inset-bottom))`,
     boxSizing: "border-box",
     display: "grid",
-    gap: spacing.lg,
+    gap: 0,
   },
   backLink: {
     justifySelf: "start",
+    marginBottom: "18px",
   },
   hero: {
     display: "grid",
-    gap: spacing.sm,
-    marginTop: spacing.sm,
-    background:
-      "linear-gradient(180deg, color-mix(in srgb, var(--paper-card) 76%, transparent), color-mix(in srgb, var(--paper) 58%, transparent))",
-    backdropFilter: "blur(4px)",
-    WebkitBackdropFilter: "blur(4px)",
+    gap: "10px",
+    padding: "18px 0",
+    borderTop: "1px solid rgba(120,108,94,0.14)",
   },
-  card: {
+  section: {
     display: "grid",
-    gap: spacing.md,
-    background:
-      "linear-gradient(180deg, color-mix(in srgb, var(--paper-card) 70%, transparent), color-mix(in srgb, var(--paper) 52%, transparent))",
-    backdropFilter: "blur(4px)",
-    WebkitBackdropFilter: "blur(4px)",
+    gap: "12px",
+    padding: "18px 0",
+    borderTop: "1px solid rgba(120,108,94,0.14)",
   },
-  kicker: {
-    margin: 0,
-    color: color.textMuted,
-    fontSize: typography.body.fontSize,
-    fontWeight: 500,
-    lineHeight: typography.body.lineHeight,
+  actionSection: {
+    display: "grid",
+    gap: "12px",
+    margin: "18px 0 0",
+    padding: "16px",
+    borderRadius: "var(--radius-lg)",
+    border: "1px solid rgba(120,108,94,0.16)",
+    background: "rgba(255,253,248,0.54)",
   },
-  title: {
+  heading: {
     margin: 0,
     color: color.textStrong,
-    fontSize: 18,
+    fontSize: 15,
     fontWeight: 500,
-    lineHeight: 1.5,
+    lineHeight: 1.6,
+    letterSpacing: "0.03em",
+  },
+  title: {
+    margin: "0 0 26px",
+    color: color.textStrong,
+    fontSize: 24,
+    fontWeight: 500,
+    lineHeight: 1.42,
+    letterSpacing: "0.04em",
   },
   lead: {
     margin: 0,
     color: color.textMuted,
-    fontSize: typography.body.fontSize,
-    fontWeight: typography.body.fontWeight,
-    lineHeight: typography.body.lineHeight,
+    fontSize: 13,
+    fontWeight: 500,
+    lineHeight: 1.9,
   },
   dreamList: {
     display: "grid",
@@ -287,8 +293,8 @@ const styles = {
     alignItems: "start",
     gap: spacing.sm,
     color: color.text,
-    fontSize: typography.body.fontSize,
-    lineHeight: typography.body.lineHeight,
+    fontSize: 13,
+    lineHeight: 1.85,
   },
   dreamDot: {
     width: 5,
@@ -313,23 +319,23 @@ const styles = {
   note: {
     margin: 0,
     color: color.textMuted,
-    fontSize: typography.body.fontSize,
-    fontWeight: typography.body.fontWeight,
-    lineHeight: typography.body.lineHeight,
+    fontSize: 13,
+    fontWeight: 500,
+    lineHeight: 1.9,
   },
   closing: {
     margin: 0,
     color: color.textStrong,
-    fontSize: typography.body.fontSize,
+    fontSize: 13,
     fontWeight: 500,
-    lineHeight: typography.body.lineHeight,
+    lineHeight: 1.9,
   },
   price: {
     margin: 0,
     color: color.textStrong,
-    fontSize: typography.body.fontSize,
+    fontSize: 15,
     fontWeight: 500,
-    lineHeight: typography.body.lineHeight,
+    lineHeight: 1.7,
   },
   message: {
     margin: 0,
@@ -343,6 +349,6 @@ const styles = {
     flexWrap: "wrap",
     justifyContent: "center",
     gap: `${spacing.sm}px ${spacing.md}px`,
-    padding: `${spacing.sm}px 0 0`,
+    padding: `18px 0 0`,
   },
 } satisfies Record<string, CSSProperties>;
