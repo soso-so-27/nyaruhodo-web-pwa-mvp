@@ -742,14 +742,17 @@ export function SettingsPage() {
                   <span style={styles.rowValue}>{email ?? ""}</span>
                 </div>
                 <div style={styles.divider} />
-                <AppButton
-                  type="button"
-                  variant="danger"
-                  fullWidth
-                  onClick={handleLogout}
-                >
-                  ログアウト
-                </AppButton>
+                <div style={styles.secondaryActionRow}>
+                  <AppButton
+                    type="button"
+                    variant="quiet"
+                    size="sm"
+                    style={styles.logoutButton}
+                    onClick={handleLogout}
+                  >
+                    ログアウト
+                  </AppButton>
+                </div>
               </>
             ) : (
               <>
@@ -2362,6 +2365,17 @@ const styles = {
     display: "grid",
     gap: "10px",
     padding: "0 0 12px",
+  },
+  secondaryActionRow: {
+    display: "flex",
+    justifyContent: "flex-end",
+    padding: "4px 0",
+  },
+  logoutButton: {
+    minHeight: "38px",
+    padding: "0 4px",
+    color: "var(--ink-soft)",
+    boxShadow: "none",
   },
   betaNote: {
     padding: "12px 0",
