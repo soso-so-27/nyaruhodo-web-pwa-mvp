@@ -1,5 +1,8 @@
 import { defineConfig } from "@playwright/test";
 
+const baseURL = process.env.PLAYWRIGHT_BASE_URL ?? "http://localhost:3000";
+const useExternalServer = Boolean(process.env.PLAYWRIGHT_BASE_URL);
+
 export default defineConfig({
   testDir: "./tests/shots",
   timeout: 45_000,
@@ -11,7 +14,7 @@ export default defineConfig({
   retries: 0,
   reporter: [["list"]],
   use: {
-    baseURL: "http://localhost:3000",
+    baseURL,
     viewport: { width: 390, height: 844 },
     deviceScaleFactor: 3,
     isMobile: true,
@@ -26,10 +29,12 @@ export default defineConfig({
       },
     },
   ],
-  webServer: {
-    command: process.platform === "win32" ? "npm.cmd run dev" : "npm run dev",
-    url: "http://localhost:3000",
-    reuseExistingServer: !process.env.CI,
-    timeout: 120_000,
-  },
+  webServer: useExternalServer
+    ? undefined
+    : {
+        command: process.platform === "win32" ? "npm.cmd run dev" : "npm run dev",
+        url: baseURL,
+        reuseExistingServer: !process.env.CI,
+        timeout: 120_000,
+      },
 });

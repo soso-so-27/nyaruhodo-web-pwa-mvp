@@ -24,7 +24,11 @@ const expectedShotNames = [
   "mainichi_board_2.png",
   "mainichi_board_12.png",
   "mainichi_board_31.png",
+  "mainichi_board_31_bundle_sheet.png",
+  "mainichi_board_62.png",
+  "mainichi_board_62_bundle_sheet.png",
   "mainichi_board_delivered_12.png",
+  "mainichi_month_picker_5_years.png",
   "album_missing_cases.png",
   "album_missing_a.png",
   "album_missing_b.png",
@@ -196,7 +200,7 @@ test.describe("home desk model shots", () => {
     await sentPhoto.screenshot({
       path: path.join(shotsDir, "album_missing_a.png"),
     });
-    await page.getByRole("radio").nth(1).click();
+    await page.getByRole("tab", { name: "とどいた" }).click();
     const deliveredBoard = page.getByTestId("mainichi-photo-board");
     await expect(page.getByTestId("mainichi-board-empty")).toBeVisible();
     await deliveredBoard.evaluate((element) =>
@@ -220,7 +224,7 @@ test.describe("home desk model shots", () => {
     });
   });
 
-  for (const count of [2, 12, 31] as const) {
+  for (const count of [2, 12, 31, 62] as const) {
     test(`mainichi_board_${count}`, async ({ page }) => {
       await seedMainichiBoardPhotoCount(page, count);
       await page.goto("/collection");
@@ -228,11 +232,25 @@ test.describe("home desk model shots", () => {
       await hideBottomNavForBoardShot(page);
       const board = page.getByTestId("mainichi-photo-board");
       await expect(board).toBeVisible();
-      await expect(page.getByTestId("mainichi-board-photo-sent")).toHaveCount(count);
+      await expect(page.getByTestId("mainichi-board-photo-sent")).toHaveCount(
+        count > 12 ? 8 : count,
+      );
+      if (count > 12) {
+        await expect(page.getByTestId("mainichi-month-bundle-open")).toBeVisible();
+      }
       await page.waitForTimeout(500);
       await board.screenshot({
         path: path.join(shotsDir, `mainichi_board_${count}.png`),
       });
+      if (count > 12) {
+        await page.getByTestId("mainichi-month-bundle-open").click();
+        const bundleDayCount = await page.getByTestId("mainichi-month-bundle-day").count();
+        expect(bundleDayCount).toBeGreaterThan(8);
+        await page.screenshot({
+          path: path.join(shotsDir, `mainichi_board_${count}_bundle_sheet.png`),
+          fullPage: false,
+        });
+      }
     });
   }
 
@@ -241,13 +259,33 @@ test.describe("home desk model shots", () => {
     await page.goto("/collection");
     await page.waitForLoadState("networkidle");
     await hideBottomNavForBoardShot(page);
-    await page.getByRole("radio").nth(1).click();
+    await page.getByRole("tab", { name: "とどいた" }).click();
     const board = page.getByTestId("mainichi-photo-board");
     await expect(board).toBeVisible();
     await expect(page.getByTestId("mainichi-board-photo-delivered")).toHaveCount(12);
     await page.waitForTimeout(500);
     await board.screenshot({
       path: path.join(shotsDir, "mainichi_board_delivered_12.png"),
+    });
+  });
+
+  test("mainichi_month_picker_5_years", async ({ page }) => {
+    await seedMainichiLongTermMonths(page);
+    await page.goto("/collection");
+    await page.waitForLoadState("networkidle");
+    await page.getByTestId("mainichi-month-select").click();
+    await expect(page.getByTestId("mainichi-month-picker-year-2030")).toBeVisible();
+    await expect(page.getByTestId("mainichi-month-picker-year-2026")).toBeVisible();
+    await expect(page.locator('[data-testid^="mainichi-month-picker-year-"]')).toHaveCount(
+      5,
+    );
+    await expect(page.locator('[data-testid^="mainichi-month-picker-row-"]')).toHaveCount(
+      12,
+    );
+    await page.waitForTimeout(500);
+    await page.screenshot({
+      path: path.join(shotsDir, "mainichi_month_picker_5_years.png"),
+      fullPage: false,
     });
   });
 
@@ -687,13 +725,14 @@ async function seedMainichiBoardPhotoCount(
         },
       ];
       const photos = Array.from({ length: count }, (_, index) => {
-        const month = count === 31 ? "07" : "06";
-        const day = count === 31 ? 31 - index : count - index;
+        const isFullMonthCase = count >= 31;
+        const month = isFullMonthCase ? "07" : "06";
+        const day = isFullMonthCase ? 31 - (index % 31) : count - index;
         const dateKey = `2026-${month}-${String(day).padStart(2, "0")}`;
         const cat = cats[index % cats.length];
-        const createdAt = Date.parse(
-          `${dateKey}T${String(10 + (index % 9)).padStart(2, "0")}:00:00.000Z`,
-        );
+        const createdAt =
+          Date.parse(`${dateKey}T03:00:00.000Z`) +
+          Math.floor(index / 31) * 1000 * 60 * 5;
 
         return {
           id: `mainichi-shot-${index}`,
@@ -766,6 +805,89 @@ async function seedMainichiBoardPhotoCount(
     },
     { count, side, ownDataUrl, deliveredDataUrl, mainichiBoardDataUrls },
   );
+}
+
+async function seedMainichiLongTermMonths(page: Page) {
+  await page.addInitScript(() => {
+    const now = Date.parse("2031-01-10T12:00:00.000Z");
+    (window as typeof window & { __testNow?: number }).__testNow = now;
+    const originalDateNow = Date.now.bind(Date);
+    Date.now = () =>
+      (window as typeof window & { __testNow?: number }).__testNow ??
+      originalDateNow();
+
+    const cats = [
+      {
+        id: "cat-shot-mugi",
+        name: "\u3080\u304e",
+        createdAt: new Date(Date.parse("2026-01-01T00:00:00.000Z")).toISOString(),
+        updatedAt: new Date(Date.parse("2026-01-01T00:00:00.000Z")).toISOString(),
+      },
+      {
+        id: "cat-shot-ame",
+        name: "\u3042\u3081",
+        createdAt: new Date(Date.parse("2026-01-01T00:00:00.000Z")).toISOString(),
+        updatedAt: new Date(Date.parse("2026-01-01T00:00:00.000Z")).toISOString(),
+      },
+    ];
+    const origin = window.location.origin;
+    const lightweightPhotoSrcs = [
+      `${origin}/images/ui/mainichi-board-paper.webp`,
+      `${origin}/images/ui/mainichi-board-paper-v2.webp`,
+      `${origin}/images/home/generated-envelope-wide.png`,
+    ];
+    const photos = [];
+
+    for (let monthIndex = 0; monthIndex < 60; monthIndex += 1) {
+      const date = new Date(Date.UTC(2030, 11 - monthIndex, 1, 3, 0, 0));
+      const year = date.getUTCFullYear();
+      const month = `${date.getUTCMonth() + 1}`.padStart(2, "0");
+      const monthPhotoCount =
+        monthIndex % 6 === 0
+          ? 31
+          : monthIndex % 5 === 0
+            ? 18
+            : monthIndex % 4 === 0
+              ? 12
+              : monthIndex % 3 === 0
+                ? 8
+                : monthIndex % 2 === 0
+                  ? 3
+                  : 1;
+
+      for (let index = 0; index < monthPhotoCount; index += 1) {
+        const day = `${Math.max(1, 28 - (index % 28))}`.padStart(2, "0");
+        const dateKey = `${year}-${month}-${day}`;
+        const cat = cats[(monthIndex + index) % cats.length];
+
+        photos.push({
+          id: `long-mainichi-${year}-${month}-${index}`,
+          ownerCatId: cat.id,
+          catId: cat.id,
+          src: lightweightPhotoSrcs[(monthIndex + index) % lightweightPhotoSrcs.length],
+          state: "sleeping",
+          visibility: "private",
+          deliveryStatus: "available",
+          triggerLabel: "sleeping",
+          theme: "sleeping",
+          shared: true,
+          createdAt: Date.parse(`${dateKey}T03:00:00.000Z`) + index * 1000 * 60,
+          dateKey,
+        });
+      }
+    }
+
+    window.localStorage.setItem("neteruneko_home_desk_model", "1");
+    window.localStorage.setItem("nyaruhodo_sleeping_safety_accepted", "1");
+    window.localStorage.setItem("active_cat_id", cats[0].id);
+    window.localStorage.setItem("cat_profiles", JSON.stringify(cats));
+    window.localStorage.setItem(
+      "nyaruhodo_exchange_own_sleeping_photos",
+      JSON.stringify(photos),
+    );
+    window.localStorage.setItem("neteruneko_evening_delivery_days", JSON.stringify({}));
+    window.localStorage.setItem("nyaruhodo_exchange_kept_photos", JSON.stringify([]));
+  });
 }
 
 function readFixtureDataUrl(fileName: string) {

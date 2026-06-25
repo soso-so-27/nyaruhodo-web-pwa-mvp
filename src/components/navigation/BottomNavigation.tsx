@@ -92,7 +92,11 @@ export function BottomNavigation({
   }
 
   return (
-    <nav style={styles.bottomNav} aria-label="下部ナビゲーション">
+    <nav
+      style={styles.bottomNav}
+      aria-label="下部ナビゲーション"
+      data-app-bottom-nav=""
+    >
       <span
         style={{
           ...styles.activeNavIndicator,

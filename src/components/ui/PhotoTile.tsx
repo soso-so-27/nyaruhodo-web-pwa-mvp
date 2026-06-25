@@ -99,6 +99,7 @@ type PhotoViewerFrameProps = {
   aspect?: PhotoTileAspect;
   fit?: PhotoTileFit;
   onStorageDataUrl?: (dataUrl: string) => void;
+  onNaturalSize?: (size: { width: number; height: number }) => void;
   style?: CSSProperties;
   imageStyle?: CSSProperties;
   children?: ReactNode;
@@ -110,6 +111,7 @@ export function PhotoViewerFrame({
   aspect = "1 / 1",
   fit = "cover",
   onStorageDataUrl,
+  onNaturalSize,
   style,
   imageStyle,
   children,
@@ -127,6 +129,7 @@ export function PhotoViewerFrame({
         alt={alt}
         style={{ ...styles.viewerImage, objectFit: fit, ...imageStyle }}
         onStorageDataUrl={onStorageDataUrl}
+        onNaturalSize={onNaturalSize}
       />
       {children}
     </span>

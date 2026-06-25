@@ -57,7 +57,6 @@ import { AppBottomSheet } from "../ui/AppBottomSheet";
 import { AppButton } from "../ui/AppButton";
 import { AppCard } from "../ui/AppCard";
 import { AppIcon } from "../ui/AppIcons";
-import { AppSegmented } from "../ui/AppSegmented";
 import { EmptyState } from "../ui/EmptyState";
 import { PhotoTile, PhotoViewerFrame } from "../ui/PhotoTile";
 import { StoredPhotoImage } from "../ui/StoredPhotoImage";
@@ -127,6 +126,22 @@ const MAINICHI_PASTE_MOTION_CSS = `
   [data-mainichi-paste="true"],
   [data-mainichi-paste-tape="true"] {
     animation: none !important;
+  }
+}
+`;
+const MAINICHI_MONTH_PICKER_CSS = `
+[data-app-bottom-nav] {
+  opacity: 0;
+  pointer-events: none;
+  transform: translateX(-50%) translateY(12px) scale(0.985) !important;
+  transition:
+    opacity var(--dur-instant) var(--ease-gentle),
+    transform var(--dur-instant) var(--ease-gentle);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  [data-app-bottom-nav] {
+    transition: none !important;
   }
 }
 `;
@@ -220,6 +235,13 @@ type MainichiBoardPhoto = {
 type MainichiBoardMonth = {
   key: string;
   label: string;
+  photos: MainichiBoardPhoto[];
+};
+
+type MainichiBoardDayBundle = {
+  key: string;
+  label: string;
+  timestamp: number;
   photos: MainichiBoardPhoto[];
 };
 
@@ -1129,11 +1151,56 @@ function MainichiPhotoBoard({
       ),
     [activeSide, catProfiles, dayGroups, firstEveningDeliveryTargetDateKey],
   );
+  const alternateMonths = useMemo(
+    () =>
+      buildMainichiBoardMonths(
+        dayGroups,
+        activeSide === "sent" ? "delivered" : "sent",
+        firstEveningDeliveryTargetDateKey,
+        catProfiles,
+      ),
+    [activeSide, catProfiles, dayGroups, firstEveningDeliveryTargetDateKey],
+  );
   const prefersReducedMotion = usePrefersReducedMotion();
   const [pastingPhotoKey, setPastingPhotoKey] = useState<string | null>(null);
+  const [selectedMonthKey, setSelectedMonthKey] = useState<string | null>(null);
+  const [isMonthPickerOpen, setIsMonthPickerOpen] = useState(false);
+  const hasAutoSelectedBoardSideRef = useRef(false);
+  const hasUserSelectedBoardSideRef = useRef(false);
 
   useEffect(() => {
-    const photos = months.flatMap((month) => month.photos);
+    if (
+      hasAutoSelectedBoardSideRef.current ||
+      hasUserSelectedBoardSideRef.current ||
+      months.length > 0 ||
+      alternateMonths.length === 0
+    ) {
+      return;
+    }
+
+    hasAutoSelectedBoardSideRef.current = true;
+    onSideChange(activeSide === "sent" ? "delivered" : "sent");
+  }, [activeSide, alternateMonths.length, months.length, onSideChange]);
+
+  useEffect(() => {
+    if (months.length === 0) {
+      setSelectedMonthKey(null);
+      return;
+    }
+
+    setSelectedMonthKey((currentKey) =>
+      currentKey && months.some((month) => month.key === currentKey)
+        ? currentKey
+        : months[0].key,
+    );
+  }, [months]);
+
+  const selectedMonth =
+    months.find((month) => month.key === selectedMonthKey) ?? months[0] ?? null;
+  const hasAnyBoardMonths = months.length > 0 || alternateMonths.length > 0;
+
+  useEffect(() => {
+    const photos = selectedMonth?.photos ?? [];
 
     if (photos.length === 0 || typeof window === "undefined") {
       setPastingPhotoKey(null);
@@ -1166,45 +1233,294 @@ function MainichiPhotoBoard({
         ? currentKey
         : null;
     });
-  }, [months, prefersReducedMotion]);
-
-  const showCatNames = activeSide === "sent" && catProfiles.length > 1;
+  }, [prefersReducedMotion, selectedMonth]);
 
   return (
     <section style={styles.mainichiBoard} data-testid="mainichi-photo-board">
       <style>{MAINICHI_PASTE_MOTION_CSS}</style>
-      <AppSegmented<MainichiBoardSide>
-        value={activeSide}
-        onChange={onSideChange}
-        ariaLabel="まいにちの面"
-        columns={2}
-        options={[
-          { value: "sent", label: "おくった" },
-          { value: "delivered", label: "とどいた" },
-        ]}
-        style={styles.mainichiBoardToggle}
-      />
-      {months.length > 0 ? (
+      {selectedMonth || hasAnyBoardMonths ? (
+        <MainichiBoardHeader
+          month={selectedMonth}
+          activeSide={activeSide}
+          onSideChange={(side) => {
+            hasUserSelectedBoardSideRef.current = true;
+            onSideChange(side);
+          }}
+          onOpenMonthPicker={() => setIsMonthPickerOpen(true)}
+        />
+      ) : null}
+      {selectedMonth ? (
         <div style={styles.mainichiMonthList}>
-          {months.map((month) => (
-            <MainichiMonthBoard
-              key={`${activeSide}-${month.key}`}
-              month={month}
-              showCatNames={showCatNames}
-              pastingPhotoKey={pastingPhotoKey}
-              onOpenDay={onOpenDay}
-            />
-          ))}
+          <MainichiMonthBoard
+            key={`${activeSide}-${selectedMonth.key}`}
+            month={selectedMonth}
+            showCatNames={false}
+            pastingPhotoKey={pastingPhotoKey}
+            onOpenDay={onOpenDay}
+          />
         </div>
       ) : (
         <div data-testid="mainichi-board-empty">
-          <EmptyState
-            description="ねがおが、すこしずつ ふえる"
-            style={styles.mainichiBoardEmpty}
-          />
+          <MainichiBoardEmptyState activeSide={activeSide} />
         </div>
       )}
+      {isMonthPickerOpen ? (
+        <MainichiMonthPickerSheet
+          months={months}
+          selectedMonthKey={selectedMonth?.key ?? null}
+          onSelect={(monthKey) => {
+            setSelectedMonthKey(monthKey);
+            setIsMonthPickerOpen(false);
+          }}
+          onClose={() => setIsMonthPickerOpen(false)}
+        />
+      ) : null}
     </section>
+  );
+}
+
+function MainichiBoardHeader({
+  month,
+  activeSide,
+  onSideChange,
+  onOpenMonthPicker,
+}: {
+  month: MainichiBoardMonth | null;
+  activeSide: MainichiBoardSide;
+  onSideChange: (side: MainichiBoardSide) => void;
+  onOpenMonthPicker: () => void;
+}) {
+  return (
+    <header style={styles.mainichiBoardHeader}>
+      {month ? (
+        <button
+          type="button"
+          data-testid="mainichi-month-select"
+          style={styles.mainichiMonthSelectButton}
+          onClick={onOpenMonthPicker}
+          aria-label={`${month.label}をえらぶ`}
+        >
+          <span style={styles.mainichiMonthSelectLabel}>{month.label}</span>
+          <span style={styles.mainichiMonthSelectChevron} aria-hidden="true">
+            ⌄
+          </span>
+        </button>
+      ) : null}
+      <MainichiSideTabs activeSide={activeSide} onSideChange={onSideChange} />
+    </header>
+  );
+}
+
+function MainichiSideTabs({
+  activeSide,
+  onSideChange,
+}: {
+  activeSide: MainichiBoardSide;
+  onSideChange: (side: MainichiBoardSide) => void;
+}) {
+  const tabs = [
+    { value: "sent" as const, label: "おくった" },
+    { value: "delivered" as const, label: "とどいた" },
+  ];
+
+  return (
+    <div style={styles.mainichiBoardTabs} role="tablist" aria-label="まいにちの面">
+      {tabs.map((tab) => {
+        const selected = activeSide === tab.value;
+
+        return (
+          <button
+            key={tab.value}
+            type="button"
+            role="tab"
+            aria-selected={selected}
+            style={{
+              ...styles.mainichiBoardTab,
+              ...(selected ? styles.mainichiBoardTabActive : {}),
+            }}
+            onClick={() => onSideChange(tab.value)}
+          >
+            {tab.label}
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
+function MainichiBoardEmptyState({ activeSide }: { activeSide: MainichiBoardSide }) {
+  const isSent = activeSide === "sent";
+
+  return (
+    <section style={styles.mainichiBoardEmpty} aria-label="まいにちの空の状態">
+      <span style={styles.mainichiBoardEmptyStack} aria-hidden="true">
+        <span
+          style={{
+            ...styles.mainichiBoardEmptySheet,
+            ...styles.mainichiBoardEmptySheetBack,
+          }}
+        />
+        <span
+          style={{
+            ...styles.mainichiBoardEmptySheet,
+            ...styles.mainichiBoardEmptySheetMiddle,
+          }}
+        />
+        <span
+          style={{
+            ...styles.mainichiBoardEmptySheet,
+            ...styles.mainichiBoardEmptySheetFront,
+          }}
+        >
+          <AppIcon name={isSent ? "camera" : "mail"} size={19} />
+        </span>
+      </span>
+      <p style={styles.mainichiBoardEmptyTitle}>{isSent ? "最初の一枚へ" : "届いたら、ここに"}</p>
+      <AppButton
+        href="/home"
+        variant="secondary"
+        size="sm"
+        iconStart={<AppIcon name={isSent ? "camera" : "home"} size={14} />}
+        style={styles.mainichiBoardEmptyButton}
+      >
+        {isSent ? "きょうへ" : "ホームへ"}
+      </AppButton>
+    </section>
+  );
+}
+
+function MainichiMonthPickerSheet({
+  months,
+  selectedMonthKey,
+  onSelect,
+  onClose,
+}: {
+  months: MainichiBoardMonth[];
+  selectedMonthKey: string | null;
+  onSelect: (monthKey: string) => void;
+  onClose: () => void;
+}) {
+  const years = useMemo(() => groupMainichiMonthsByYear(months), [months]);
+  const selectedYear = selectedMonthKey?.slice(0, 4) ?? years[0]?.year ?? null;
+  const [expandedYears, setExpandedYears] = useState<Set<string>>(
+    () => new Set(selectedYear ? [selectedYear] : []),
+  );
+
+  useEffect(() => {
+    if (!selectedYear) {
+      return;
+    }
+
+    setExpandedYears((currentYears) => {
+      if (currentYears.has(selectedYear)) {
+        return currentYears;
+      }
+
+      const nextYears = new Set(currentYears);
+      nextYears.add(selectedYear);
+      return nextYears;
+    });
+  }, [selectedYear]);
+
+  return (
+    <AppBottomSheet
+      title="月をえらぶ"
+      onClose={onClose}
+      variant="paper"
+      style={styles.mainichiMonthPickerSheet}
+    >
+      <style>{MAINICHI_MONTH_PICKER_CSS}</style>
+      <div style={styles.mainichiMonthPicker}>
+        {years.map((yearGroup) => (
+          <section key={yearGroup.year} style={styles.mainichiMonthPickerYear}>
+            <button
+              type="button"
+              data-testid={`mainichi-month-picker-year-${yearGroup.year}`}
+              style={{
+                ...styles.mainichiMonthPickerYearButton,
+                ...(expandedYears.has(yearGroup.year)
+                  ? styles.mainichiMonthPickerYearButtonOpen
+                  : {}),
+              }}
+              onClick={() => {
+                setExpandedYears((currentYears) => {
+                  const nextYears = new Set(currentYears);
+
+                  if (nextYears.has(yearGroup.year)) {
+                    nextYears.delete(yearGroup.year);
+                  } else {
+                    nextYears.add(yearGroup.year);
+                  }
+
+                  return nextYears;
+                });
+              }}
+              aria-expanded={expandedYears.has(yearGroup.year)}
+            >
+              <span style={styles.mainichiMonthPickerYearTitle}>{yearGroup.year}年</span>
+              <span style={styles.mainichiMonthPickerYearMeta}>
+                {yearGroup.months.length}か月
+              </span>
+              <span style={styles.mainichiMonthPickerYearChevron} aria-hidden="true">
+                {expandedYears.has(yearGroup.year) ? "⌃" : "⌄"}
+              </span>
+            </button>
+            {expandedYears.has(yearGroup.year) ? (
+              <div style={styles.mainichiMonthPickerRows}>
+                {yearGroup.months.map((month) => {
+                  const selected = month.key === selectedMonthKey;
+
+                  return (
+                    <button
+                      key={month.key}
+                      type="button"
+                      data-testid={`mainichi-month-picker-row-${month.key}`}
+                      style={{
+                        ...styles.mainichiMonthPickerRow,
+                        ...(selected ? styles.mainichiMonthPickerRowActive : {}),
+                      }}
+                      onClick={() => onSelect(month.key)}
+                      aria-current={selected ? "true" : undefined}
+                    >
+                      <span style={styles.mainichiMonthBundleMark} aria-hidden="true">
+                        <span
+                          style={{
+                            ...styles.mainichiMonthBundleSheet,
+                            ...styles.mainichiMonthBundleSheetBack,
+                          }}
+                        />
+                        <span
+                          style={{
+                            ...styles.mainichiMonthBundleSheet,
+                            ...styles.mainichiMonthBundleSheetMiddle,
+                          }}
+                        />
+                        <span
+                          style={{
+                            ...styles.mainichiMonthBundleSheet,
+                            ...styles.mainichiMonthBundleSheetFront,
+                          }}
+                        />
+                        <span style={styles.mainichiMonthBundleSeal} />
+                      </span>
+                      <span style={styles.mainichiMonthPickerRowLabel}>
+                        {formatMainichiMonthShortLabel(month.key)}
+                      </span>
+                      <span style={styles.mainichiMonthPickerRowCount}>
+                        {month.photos.length}枚
+                      </span>
+                      <span style={styles.mainichiMonthPickerRowChevron} aria-hidden="true">
+                        {selected ? "✓" : "›"}
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
+            ) : null}
+          </section>
+        ))}
+      </div>
+    </AppBottomSheet>
   );
 }
 
@@ -1219,29 +1535,195 @@ function MainichiMonthBoard({
   pastingPhotoKey: string | null;
   onOpenDay: (dateKey: string, source?: MainichiMorphSource | null) => void;
 }) {
+  const bundleSide = month.photos[0]?.side ?? "sent";
+  const visiblePhotos = getMainichiBoardVisiblePhotos(month.photos);
+  const isCondensedBundle = visiblePhotos.length < month.photos.length;
+  const bundleBaseStyle = {
+    ...styles.mainichiBundleBase,
+    ...getMainichiBundleBaseStyle(month.photos.length, bundleSide, isCondensedBundle),
+  };
+  const bundleLayers = (
+    <>
+      <span
+        style={{
+          ...styles.mainichiBundleLayer,
+          ...styles.mainichiBundleLayerBack,
+        }}
+      />
+      <span
+        style={{
+          ...styles.mainichiBundleLayer,
+          ...styles.mainichiBundleLayerMiddle,
+        }}
+      />
+      <span
+        style={{
+          ...styles.mainichiBundleLayer,
+          ...styles.mainichiBundleLayerFront,
+        }}
+      />
+      {isCondensedBundle ? <span style={styles.mainichiBundleLiftTab} /> : null}
+      <span style={styles.mainichiBundlePocket} />
+      <span
+        style={{
+          ...styles.mainichiBundleSeal,
+          ...(isCondensedBundle ? styles.mainichiBundleSealOpenable : {}),
+        }}
+      />
+    </>
+  );
+  const [isBundleSheetOpen, setIsBundleSheetOpen] = useState(false);
+
   return (
-    <AppCard
-      as="section"
-      variant="section"
-      padding="md"
-      style={styles.mainichiMonthBoard}
-      data-testid="mainichi-month-board"
+    <>
+      <AppCard
+        as="section"
+        variant="section"
+        padding="md"
+        style={styles.mainichiMonthBoard}
+        data-testid="mainichi-month-board"
+        aria-label={month.label}
+      >
+        <div
+          style={{
+            ...styles.mainichiBoardPhotos,
+            ...getMainichiBoardCanvasStyle(month.photos.length, isCondensedBundle),
+          }}
+        >
+          {isCondensedBundle ? (
+            <button
+              type="button"
+              data-testid="mainichi-month-bundle-open"
+              style={{
+                ...bundleBaseStyle,
+                ...styles.mainichiBundleOpenButton,
+              }}
+              onClick={() => setIsBundleSheetOpen(true)}
+              aria-label={`${month.label}の束をひらく`}
+            >
+              {bundleLayers}
+            </button>
+          ) : (
+            <span style={bundleBaseStyle} aria-hidden="true">
+              {bundleLayers}
+            </span>
+          )}
+          {visiblePhotos.map((photo, index) => (
+            <MainichiBoardPhotoCard
+              key={photo.id}
+              photo={photo}
+              index={index}
+              total={visiblePhotos.length}
+              showCatName={showCatNames && month.photos.length <= 3}
+              shouldPaste={getMainichiBoardPhotoKey(photo) === pastingPhotoKey}
+              onOpenDay={onOpenDay}
+            />
+          ))}
+        </div>
+      </AppCard>
+      {isBundleSheetOpen ? (
+        <MainichiMonthBundleSheet
+          month={month}
+          onClose={() => setIsBundleSheetOpen(false)}
+          onOpenDay={(dateKey) => {
+            setIsBundleSheetOpen(false);
+            onOpenDay(dateKey);
+          }}
+        />
+      ) : null}
+    </>
+  );
+}
+
+function MainichiMonthBundleSheet({
+  month,
+  onClose,
+  onOpenDay,
+}: {
+  month: MainichiBoardMonth;
+  onClose: () => void;
+  onOpenDay: (dateKey: string) => void;
+}) {
+  const dayBundles = useMemo(
+    () => groupMainichiBoardPhotosByDay(month.photos),
+    [month.photos],
+  );
+
+  return (
+    <AppBottomSheet
+      title={month.label}
+      onClose={onClose}
+      variant="paper"
+      style={styles.mainichiMonthBundleAppSheet}
     >
-      <h2 style={styles.mainichiMonthTitle}>{month.label}</h2>
-      <div style={{ ...styles.mainichiBoardPhotos, ...getMainichiBoardCanvasStyle(month.photos.length) }}>
-        {month.photos.map((photo, index) => (
-          <MainichiBoardPhotoCard
-            key={photo.id}
-            photo={photo}
-            index={index}
-            total={month.photos.length}
-            showCatName={showCatNames && month.photos.length <= 3}
-            shouldPaste={getMainichiBoardPhotoKey(photo) === pastingPhotoKey}
-            onOpenDay={onOpenDay}
-          />
+      <style>{MAINICHI_MONTH_PICKER_CSS}</style>
+      <div style={styles.mainichiMonthBundleDays}>
+        {dayBundles.map((bundle, index) => (
+          <button
+            key={bundle.key}
+            type="button"
+            style={{
+              ...styles.mainichiMonthBundleDay,
+              ...getMainichiMonthBundleDayStyle(index, bundle.photos.length),
+            }}
+            onClick={() => onOpenDay(bundle.key)}
+            data-testid="mainichi-month-bundle-day"
+            aria-label={`${bundle.label} ${bundle.photos.length}枚`}
+          >
+            <span style={styles.mainichiMonthBundleDayPhotos} aria-hidden="true">
+              {bundle.photos.slice(0, 3).map((photo, index) => (
+                <PhotoTile
+                  key={photo.id}
+                  src={photo.src}
+                  alt=""
+                  variant="tile"
+                  aspect="1 / 1"
+                  style={{
+                    ...styles.mainichiMonthBundleDayPhotoRoot,
+                    ...getMainichiMonthBundleDayPhotoStyle(
+                      index,
+                      Math.min(bundle.photos.length, 3),
+                    ),
+                  }}
+                  imageStyle={styles.mainichiMonthBundleDayPhoto}
+                  onStorageDataUrl={
+                    photo.side === "delivered"
+                      ? (dataUrl) =>
+                          writeBackDeliveredPhotoDataUrl(
+                            {
+                              id: photo.id,
+                              sourcePhotoId: photo.sourcePhotoId,
+                              src: photo.src,
+                            },
+                            dataUrl,
+                          )
+                      : undefined
+                  }
+                />
+              ))}
+            </span>
+            <span style={styles.mainichiMonthBundleDayText} aria-hidden="true">
+              <span style={styles.mainichiMonthBundleDayLabel}>
+                {getMainichiBundleDayNumber(bundle.key)}
+              </span>
+              {bundle.photos.length > 1 ? (
+                <span style={styles.mainichiMonthBundleDayStackDots}>
+                  {Array.from({ length: Math.min(bundle.photos.length, 3) }).map(
+                    (_, dotIndex) => (
+                      <span
+                        key={dotIndex}
+                        style={styles.mainichiMonthBundleDayStackDot}
+                      />
+                    ),
+                  )}
+                </span>
+              ) : null}
+            </span>
+            <span style={styles.mainichiMonthBundleDaySeal} aria-hidden="true" />
+          </button>
         ))}
       </div>
-    </AppCard>
+    </AppBottomSheet>
   );
 }
 
@@ -1466,11 +1948,14 @@ function MainichiDaySheet({
         </div>
         {photos.length > 0 ? (
           <div style={styles.mainichiDayTimeline}>
-            {photos.map((photo) => (
+            {photos.map((photo, index) => (
               <button
                 key={`${photo.kind}-${photo.id}`}
                 type="button"
-                style={styles.mainichiDayPhotoRow}
+                style={{
+                  ...styles.mainichiDayPhotoRow,
+                  transform: `rotate(${getMainichiDayPhotoRotation(index)})`,
+                }}
                 onClick={() => onOpenPhoto(photo)}
                 data-testid={
                   photo.kind === "sleeping"
@@ -1519,6 +2004,7 @@ function MainichiFullscreenPhoto({
   const [saveState, setSaveState] = useState<"idle" | "saved">(() =>
     photo.kind === "other" && isMainichiPhotoKept(photo) ? "saved" : "idle",
   );
+  const [photoAspectRatio, setPhotoAspectRatio] = useState("1 / 1");
 
   function handleKeep() {
     if (photo.kind !== "other") {
@@ -1553,9 +2039,17 @@ function MainichiFullscreenPhoto({
         alt=""
         fit="contain"
         aspect="auto"
-        style={styles.mainichiViewerFrame}
+        style={{
+          ...styles.mainichiViewerFrame,
+          aspectRatio: photoAspectRatio,
+        }}
         imageStyle={styles.mainichiViewerImage}
         onStorageDataUrl={photo.storageWriteback}
+        onNaturalSize={({ width, height }) => {
+          if (width > 0 && height > 0) {
+            setPhotoAspectRatio(`${width} / ${height}`);
+          }
+        }}
       />
       {photo.kind === "other" ? (
         <AppButton
@@ -2670,13 +3164,141 @@ function formatMainichiMonthLabel(monthKey: string) {
   return `${year}年${Number(month)}月`;
 }
 
+function formatMainichiMonthShortLabel(monthKey: string) {
+  const [, month] = monthKey.split("-");
+  return `${Number(month)}月`;
+}
+
+function groupMainichiMonthsByYear(months: MainichiBoardMonth[]) {
+  const yearMap = new Map<string, MainichiBoardMonth[]>();
+
+  for (const month of months) {
+    const year = month.key.slice(0, 4);
+    yearMap.set(year, [...(yearMap.get(year) ?? []), month]);
+  }
+
+  return [...yearMap.entries()]
+    .map(([year, yearMonths]) => ({
+      year,
+      months: [...yearMonths].sort((a, b) => b.key.localeCompare(a.key)),
+    }))
+    .sort((a, b) => b.year.localeCompare(a.year));
+}
+
+function getMainichiDayPhotoRotation(index: number) {
+  const rotations = ["-1.2deg", "1deg", "-0.5deg", "1.4deg"];
+  return rotations[index % rotations.length];
+}
+
+function getMainichiBundleDayNumber(dateKey: string) {
+  const day = dateKey.split("-").at(-1) ?? "";
+
+  return `${Number(day) || day}`;
+}
+
+function getMainichiMonthBundleDayPhotoStyle(
+  index: number,
+  total: number,
+): CSSProperties {
+  const layouts = {
+    1: [{ x: 0, y: 3, rotate: "-1.2deg", width: 66, z: 3 }],
+    2: [
+      { x: -12, y: 12, rotate: "-3deg", width: 54, z: 2 },
+      { x: 14, y: 3, rotate: "2.2deg", width: 60, z: 3 },
+    ],
+    3: [
+      { x: -17, y: 17, rotate: "-3.5deg", width: 48, z: 1 },
+      { x: 13, y: 11, rotate: "2.4deg", width: 52, z: 2 },
+      { x: -2, y: 3, rotate: "-0.8deg", width: 60, z: 3 },
+    ],
+  } satisfies Record<number, Array<{ x: number; y: number; rotate: string; width: number; z: number }>>;
+  const layoutKey = Math.min(Math.max(total, 1), 3) as 1 | 2 | 3;
+  const layout = layouts[layoutKey][index] ?? layouts[1][0];
+
+  return {
+    left: `calc(50% + ${layout.x}px)`,
+    top: `${layout.y}px`,
+    width: `${layout.width}px`,
+    zIndex: layout.z,
+    transform: `translateX(-50%) rotate(${layout.rotate})`,
+  };
+}
+
+function getMainichiMonthBundleDayStyle(
+  index: number,
+  photoCount: number,
+): CSSProperties {
+  const layouts = [
+    { rotate: "-2.1deg", y: 4, x: 0, width: "96%", justifySelf: "start" },
+    { rotate: "1.4deg", y: -4, x: -1, width: "88%", justifySelf: "center" },
+    { rotate: "-0.8deg", y: 9, x: 2, width: "94%", justifySelf: "end" },
+    { rotate: "1.9deg", y: 2, x: 3, width: "86%", justifySelf: "center" },
+    { rotate: "-1.5deg", y: 10, x: -2, width: "92%", justifySelf: "start" },
+    { rotate: "0.9deg", y: -2, x: 1, width: "90%", justifySelf: "end" },
+  ];
+  const layout = layouts[index % layouts.length];
+  const scale = photoCount > 1 ? 1.04 : 1;
+
+  return {
+    width: layout.width,
+    justifySelf: layout.justifySelf,
+    transform: `translate(${layout.x}px, ${layout.y}px) rotate(${layout.rotate}) scale(${scale})`,
+  };
+}
+
 function getMainichiBoardPhotoKey(photo: MainichiBoardPhoto) {
   return `${photo.side}:${photo.sourcePhotoId ?? photo.id}:${photo.dateKey}`;
 }
 
-function getMainichiBoardCanvasStyle(total: number): CSSProperties {
+function getMainichiBoardVisiblePhotos(photos: MainichiBoardPhoto[]) {
+  if (photos.length <= 12) {
+    return photos;
+  }
+
+  return photos.slice(0, 8);
+}
+
+function groupMainichiBoardPhotosByDay(
+  photos: MainichiBoardPhoto[],
+): MainichiBoardDayBundle[] {
+  const dayMap = new Map<string, MainichiBoardDayBundle>();
+
+  for (const photo of photos) {
+    const currentDay = dayMap.get(photo.dateKey);
+
+    if (currentDay) {
+      currentDay.photos.push(photo);
+      currentDay.timestamp = Math.max(currentDay.timestamp, photo.timestamp);
+    } else {
+      dayMap.set(photo.dateKey, {
+        key: photo.dateKey,
+        label: photo.dateLabel,
+        timestamp: photo.timestamp,
+        photos: [photo],
+      });
+    }
+  }
+
+  return [...dayMap.values()]
+    .map((day) => ({
+      ...day,
+      photos: [...day.photos].sort((a, b) => b.timestamp - a.timestamp),
+    }))
+    .sort((a, b) => b.timestamp - a.timestamp);
+}
+
+function getMainichiBoardCanvasStyle(
+  total: number,
+  isCondensedBundle = false,
+): CSSProperties {
   if (total <= 0) {
     return {};
+  }
+
+  if (isCondensedBundle) {
+    return {
+      height: "520px",
+    };
   }
 
   if (total === 1) {
@@ -2693,19 +3315,93 @@ function getMainichiBoardCanvasStyle(total: number): CSSProperties {
 
   if (total <= 8) {
     return {
-      height: "480px",
+      height: "460px",
     };
   }
 
   if (total <= 16) {
     return {
-      height: "530px",
+      height: "520px",
+    };
+  }
+
+  if (total <= 24) {
+    return {
+      height: "560px",
     };
   }
 
   return {
-    height: "620px",
+    height: "560px",
   };
+}
+
+function getMainichiBundleBaseStyle(
+  total: number,
+  side: MainichiBoardSide,
+  isCondensedBundle = false,
+): CSSProperties {
+  const depth =
+    isCondensedBundle
+      ? {
+          width: "88%",
+          height: "146px",
+          bottom: "18px",
+          opacity: 0.84,
+          edge: "18px",
+          pocket: 0.44,
+          shadow: 0.18,
+        }
+      : total <= 1
+      ? {
+          width: "58%",
+          height: "42px",
+          bottom: "62px",
+          opacity: 0.34,
+          edge: "4px",
+          pocket: 0.2,
+          shadow: 0.1,
+        }
+      : total <= 8
+        ? {
+            width: "72%",
+            height: "52px",
+            bottom: "54px",
+            opacity: 0.42,
+            edge: "6px",
+            pocket: 0.26,
+            shadow: 0.1,
+          }
+        : total <= 16
+          ? {
+              width: "82%",
+              height: "64px",
+              bottom: "46px",
+              opacity: 0.48,
+              edge: "8px",
+              pocket: 0.3,
+              shadow: 0.1,
+            }
+          : {
+              width: "88%",
+              height: "72px",
+              bottom: "44px",
+              opacity: 0.52,
+              edge: "11px",
+              pocket: 0.34,
+              shadow: 0.1,
+            };
+
+  return {
+    "--mainichi-bundle-width": depth.width,
+    "--mainichi-bundle-height": depth.height,
+    "--mainichi-bundle-bottom": depth.bottom,
+    "--mainichi-bundle-opacity": depth.opacity,
+    "--mainichi-bundle-edge": depth.edge,
+    "--mainichi-bundle-pocket-opacity": depth.pocket,
+    "--mainichi-bundle-shadow-alpha": depth.shadow,
+    "--mainichi-bundle-seal-x": side === "sent" ? "62%" : "38%",
+  } as CSSProperties;
 }
 
 function getMainichiBoardPhotoLayout(index: number, total: number) {
@@ -2786,7 +3482,7 @@ function getMainichiBoardPhotoLayout(index: number, total: number) {
     { left: 12, top: 548, width: 19, rotation: "2deg", tapeLeft: "52%", tapeRotation: "4deg", zIndex: 1 },
     { left: 30, top: 532, width: 24, rotation: "-1.5deg", shiftX: -1, tapeLeft: "47%", tapeRotation: "-5deg", zIndex: 4 },
     { left: 52, top: 550, width: 21, rotation: "1.2deg", shiftX: 1, tapeLeft: "56%", tapeRotation: "3deg", zIndex: 2 },
-    { left: 72, top: 526, width: 21, rotation: "-0.8deg", tapeLeft: "50%", tapeRotation: "-2deg", zIndex: 1 },
+    { left: 72, top: 536, width: 21, rotation: "-0.8deg", tapeLeft: "50%", tapeRotation: "-2deg", zIndex: 7 },
     { left: 2, top: 558, width: 19, rotation: "-1.2deg", shiftX: 1, tapeLeft: "52%", tapeRotation: "3deg", zIndex: 3 },
   ] satisfies MainichiBoardSlot[];
   const template: MainichiBoardSlot[] =
@@ -2806,17 +3502,21 @@ function getMainichiBoardPhotoLayout(index: number, total: number) {
     total <= 8
       ? 0.92
       : total <= 16
-        ? 0.96
-        : 0.92;
+        ? 0.94
+        : total <= 24
+          ? 0.86
+          : 0.82;
   const top = Math.max(
     0,
     Math.round(layout.top * verticalScale) - (total > 1 ? 20 : 0) + repeat * 18,
   );
   const width =
-    total > 16
-      ? Math.max(20, Math.round(layout.width * 0.88))
+    total > 24
+      ? Math.max(16, Math.round(layout.width * 0.76))
+      : total > 16
+        ? Math.max(18, Math.round(layout.width * 0.84))
       : total > 8
-        ? Math.max(24, Math.round(layout.width * 0.95))
+        ? Math.max(23, Math.round(layout.width * 0.94))
         : layout.width;
   const borderWidth =
     width <= 27 ? "2px" : width <= 34 ? "3px" : "4px";
@@ -3770,36 +4470,343 @@ const styles = {
   },
   mainichiBoard: {
     display: "grid",
-    gap: "20px",
+    gap: "12px",
   },
-  mainichiBoardToggle: {
-    width: "min(230px, 100%)",
-    justifySelf: "center",
+  mainichiBoardHeader: {
+    display: "grid",
+    gap: "14px",
+    padding: "18px 4px 2px",
+    boxSizing: "border-box",
+  },
+  mainichiMonthSelectButton: {
+    justifySelf: "start",
+    display: "inline-grid",
+    gridTemplateColumns: "auto auto",
+    alignItems: "center",
+    gap: "8px",
+    minHeight: "44px",
+    border: "1px solid color-mix(in srgb, var(--line) 46%, transparent)",
+    borderRadius: "var(--radius-full)",
+    background:
+      "linear-gradient(135deg, color-mix(in srgb, var(--paper-card) 30%, transparent), color-mix(in srgb, var(--paper-warm) 12%, transparent))",
+    color: COLLECTION_TEXT,
+    boxShadow:
+      "0 1px 0 color-mix(in srgb, white 34%, transparent) inset, 0 8px 18px -19px rgba(71,55,34,0.34)",
+    padding: "0 11px 0 13px",
+    font: "inherit",
+    cursor: "pointer",
+    WebkitTapHighlightColor: "transparent",
+  },
+  mainichiMonthSelectLabel: {
+    fontFamily: "var(--font-display)",
+    fontSize: "22px",
+    fontWeight: 400,
+    lineHeight: 1.1,
+    letterSpacing: "0.06em",
+  },
+  mainichiMonthSelectChevron: {
+    color: "color-mix(in srgb, var(--seal) 74%, var(--ink-soft) 26%)",
+    fontFamily: "var(--font-ui)",
+    fontSize: "16px",
+    fontWeight: 700,
+    lineHeight: 1,
+    transform: "translateY(-1px)",
+  },
+  mainichiBoardTabs: {
+    position: "relative",
+    display: "grid",
     gridTemplateColumns: "repeat(2, minmax(0, 1fr))",
-    gap: "4px",
+    alignItems: "end",
+    minHeight: "44px",
+    borderBottom: "1px solid color-mix(in srgb, var(--line) 70%, transparent)",
+  },
+  mainichiBoardTab: {
+    position: "relative",
+    minHeight: "44px",
+    border: "none",
+    borderRadius: 0,
+    background: "transparent",
+    color: COLLECTION_MUTED,
+    padding: "0 8px 12px",
+    fontFamily: "var(--font-display)",
+    fontSize: "15px",
+    fontWeight: 500,
+    lineHeight: 1.2,
+    letterSpacing: "0.08em",
+    cursor: "pointer",
+    WebkitTapHighlightColor: "transparent",
+  },
+  mainichiBoardTabActive: {
+    color: "color-mix(in srgb, var(--seal) 86%, var(--ink) 14%)",
+    boxShadow: "0 2px 0 color-mix(in srgb, var(--seal) 86%, var(--ink) 14%)",
   },
   mainichiMonthList: {
     display: "grid",
-    gap: "30px",
+    gap: "0",
   },
   mainichiMonthBoard: {
     display: "grid",
-    gap: "16px",
-    padding: "8px 14px 34px",
+    gap: "0",
+    padding: "8px 8px calc(28px + env(safe-area-inset-bottom))",
     overflow: "visible",
     borderRadius: 0,
     border: "none",
     background: "transparent",
     boxShadow: "none",
   },
-  mainichiMonthTitle: {
-    margin: 0,
+  mainichiMonthPickerSheet: {
+    zIndex: 120,
+    paddingBottom: "calc(30px + env(safe-area-inset-bottom))",
+  },
+  mainichiMonthBundleAppSheet: {
+    zIndex: 120,
+    paddingBottom: "calc(30px + env(safe-area-inset-bottom))",
+  },
+  mainichiMonthBundleDays: {
+    display: "grid",
+    gridTemplateColumns: "repeat(3, minmax(0, 1fr))",
+    columnGap: "10px",
+    rowGap: "10px",
+    padding: "4px 2px 28px",
+    alignItems: "start",
+  },
+  mainichiMonthBundleDay: {
+    display: "grid",
+    justifyItems: "center",
+    alignItems: "end",
+    gap: "6px",
+    minHeight: "116px",
+    border: "0",
+    borderRadius: "12px",
+    background: "transparent",
+    color: COLLECTION_TEXT,
+    boxShadow: "none",
+    padding: "6px 4px 8px",
+    font: "inherit",
+    textAlign: "center",
+    cursor: "pointer",
+    position: "relative",
+    overflow: "visible",
+    transformOrigin: "50% 46%",
+    WebkitTapHighlightColor: "transparent",
+  },
+  mainichiMonthBundleDayPhotos: {
+    position: "relative",
+    display: "block",
+    width: "100%",
+    height: "82px",
+  },
+  mainichiMonthBundleDayPhotoRoot: {
+    position: "absolute",
+    transformOrigin: "50% 50%",
+  },
+  mainichiMonthBundleDayPhoto: {
+    width: "100%",
+    height: "auto",
+    display: "block",
+    border: "2px solid color-mix(in srgb, var(--paper-card) 78%, var(--paper-warm) 22%)",
+    borderRadius: "10px",
+    background: "color-mix(in srgb, var(--paper-card) 86%, var(--paper-warm) 14%)",
+    boxShadow:
+      "0 0 0 0.5px rgba(74,56,34,0.10) inset, 0 12px 22px -15px rgba(76,62,42,0.46)",
+  },
+  mainichiMonthBundleDayText: {
+    display: "inline-grid",
+    justifyItems: "center",
+    gap: "3px",
+    minWidth: 0,
+    position: "relative",
+    zIndex: 4,
+    minHeight: "20px",
+    padding: "3px 9px 1px",
+    borderRadius: "999px",
+    background:
+      "linear-gradient(135deg, color-mix(in srgb, var(--paper-card) 42%, transparent), color-mix(in srgb, var(--paper-warm) 18%, transparent))",
+    boxShadow: "0 8px 18px -17px rgba(70,50,34,0.44)",
+  },
+  mainichiMonthBundleDayLabel: {
+    minWidth: 0,
+    color: "color-mix(in srgb, var(--ink) 72%, var(--seal) 28%)",
+    fontFamily: "var(--font-display)",
+    fontSize: "13px",
+    fontWeight: 400,
+    lineHeight: 1,
+    letterSpacing: "0.02em",
+  },
+  mainichiMonthBundleDayStackDots: {
+    display: "flex",
+    justifyContent: "center",
+    gap: "2px",
+  },
+  mainichiMonthBundleDayStackDot: {
+    width: "3px",
+    height: "3px",
+    borderRadius: "999px",
+    background: "color-mix(in srgb, var(--seal) 52%, var(--paper-card) 48%)",
+  },
+  mainichiMonthBundleDaySeal: {
+    position: "absolute",
+    display: "none",
+    right: "12px",
+    bottom: "11px",
+    width: "4px",
+    height: "4px",
+    borderRadius: "999px",
+    background: "color-mix(in srgb, var(--seal) 58%, var(--paper-card) 42%)",
+    boxShadow:
+      "0 1px 0 color-mix(in srgb, white 38%, transparent) inset, 0 4px 8px -6px rgba(70,50,36,0.44)",
+  },
+  mainichiMonthPicker: {
+    display: "grid",
+    gap: "22px",
+    padding: "4px 0 8px",
+  },
+  mainichiMonthPickerYear: {
+    display: "grid",
+    gap: "9px",
+  },
+  mainichiMonthPickerYearButton: {
+    display: "grid",
+    gridTemplateColumns: "minmax(0, 1fr) auto auto",
+    alignItems: "center",
+    gap: "10px",
+    minHeight: "46px",
+    border: "1px solid color-mix(in srgb, var(--line) 52%, transparent)",
+    borderRadius: "var(--radius-full)",
+    background:
+      "linear-gradient(135deg, color-mix(in srgb, var(--paper-card) 28%, transparent), color-mix(in srgb, var(--paper-warm) 12%, transparent))",
+    color: COLLECTION_TEXT,
+    padding: "0 14px 0 18px",
+    font: "inherit",
+    textAlign: "left",
+    cursor: "pointer",
+    WebkitTapHighlightColor: "transparent",
+  },
+  mainichiMonthPickerYearButtonOpen: {
+    borderColor: "color-mix(in srgb, var(--seal) 24%, var(--line) 76%)",
+    background:
+      "linear-gradient(135deg, color-mix(in srgb, var(--seal) 7%, transparent), color-mix(in srgb, var(--paper-card) 24%, transparent))",
+  },
+  mainichiMonthPickerYearTitle: {
+    minWidth: 0,
     color: COLLECTION_TEXT,
     fontFamily: "var(--font-display)",
-    fontSize: "19px",
+    fontSize: "18px",
     fontWeight: 400,
-    lineHeight: 1.34,
+    lineHeight: 1.3,
     letterSpacing: "0.06em",
+  },
+  mainichiMonthPickerYearMeta: {
+    color: "color-mix(in srgb, var(--seal) 66%, var(--ink-soft) 34%)",
+    fontFamily: "var(--font-ui)",
+    fontSize: "12px",
+    fontWeight: 700,
+    lineHeight: 1,
+    letterSpacing: "0.04em",
+  },
+  mainichiMonthPickerYearChevron: {
+    width: "18px",
+    color: COLLECTION_MUTED,
+    fontFamily: "var(--font-ui)",
+    fontSize: "16px",
+    fontWeight: 700,
+    lineHeight: 1,
+    textAlign: "right",
+  },
+  mainichiMonthPickerRows: {
+    display: "grid",
+    border: "1px solid color-mix(in srgb, var(--line) 76%, transparent)",
+    borderRadius: "var(--radius-lg)",
+    overflow: "hidden",
+    background: "color-mix(in srgb, var(--paper-card) 42%, transparent)",
+  },
+  mainichiMonthPickerRow: {
+    display: "grid",
+    gridTemplateColumns: "58px minmax(0, 1fr) auto auto",
+    alignItems: "center",
+    gap: "12px",
+    minHeight: "62px",
+    border: "none",
+    borderBottom: "1px solid color-mix(in srgb, var(--line) 64%, transparent)",
+    background: "transparent",
+    color: COLLECTION_TEXT,
+    padding: "0 14px",
+    font: "inherit",
+    textAlign: "left",
+    cursor: "pointer",
+    WebkitTapHighlightColor: "transparent",
+  },
+  mainichiMonthPickerRowActive: {
+    background:
+      "linear-gradient(90deg, color-mix(in srgb, var(--seal) 9%, transparent), color-mix(in srgb, var(--paper-card) 18%, transparent))",
+    boxShadow: "3px 0 0 color-mix(in srgb, var(--seal) 82%, var(--ink) 18%) inset",
+  },
+  mainichiMonthBundleMark: {
+    position: "relative",
+    width: "48px",
+    height: "28px",
+    display: "block",
+  },
+  mainichiMonthBundleSheet: {
+    position: "absolute",
+    inset: "6px 2px 2px 2px",
+    borderRadius: "5px",
+    border: "1px solid color-mix(in srgb, var(--line) 82%, transparent)",
+    background:
+      "linear-gradient(145deg, color-mix(in srgb, var(--paper-card) 90%, white 10%), color-mix(in srgb, var(--paper-warm) 72%, white 28%))",
+    boxShadow: "0 6px 10px -9px rgba(72,58,38,0.36)",
+  },
+  mainichiMonthBundleSheetBack: {
+    inset: "3px 8px 7px 0",
+    opacity: 0.48,
+    transform: "rotate(-4deg)",
+  },
+  mainichiMonthBundleSheetMiddle: {
+    inset: "5px 4px 4px 4px",
+    opacity: 0.72,
+    transform: "rotate(3deg)",
+  },
+  mainichiMonthBundleSheetFront: {
+    inset: "8px 0 1px 8px",
+    opacity: 0.96,
+    transform: "rotate(-1deg)",
+  },
+  mainichiMonthBundleSeal: {
+    position: "absolute",
+    right: "7px",
+    bottom: "4px",
+    width: "7px",
+    height: "7px",
+    borderRadius: "999px",
+    background: "color-mix(in srgb, var(--seal) 72%, var(--paper-card) 28%)",
+    boxShadow:
+      "0 1px 0 color-mix(in srgb, white 36%, transparent) inset, 0 3px 7px -5px rgba(70,50,36,0.42)",
+  },
+  mainichiMonthPickerRowLabel: {
+    minWidth: 0,
+    color: COLLECTION_TEXT,
+    fontFamily: "var(--font-display)",
+    fontSize: "20px",
+    fontWeight: 400,
+    lineHeight: 1.2,
+    letterSpacing: "0.04em",
+  },
+  mainichiMonthPickerRowCount: {
+    color: "color-mix(in srgb, var(--seal) 76%, var(--ink-soft) 24%)",
+    fontFamily: "var(--font-ui)",
+    fontSize: "13px",
+    fontWeight: 700,
+    lineHeight: 1,
+    letterSpacing: "0.04em",
+  },
+  mainichiMonthPickerRowChevron: {
+    width: "20px",
+    color: COLLECTION_MUTED,
+    fontFamily: "var(--font-ui)",
+    fontSize: "22px",
+    fontWeight: 500,
+    lineHeight: 1,
+    textAlign: "right",
   },
   mainichiBoardPhotos: {
     position: "relative",
@@ -3807,6 +4814,105 @@ const styles = {
     margin: "0 auto",
     width: "100%",
     maxWidth: "430px",
+  },
+  mainichiBundleBase: {
+    position: "absolute",
+    zIndex: 0,
+    left: "50%",
+    bottom: "var(--mainichi-bundle-bottom, 42px)",
+    width: "var(--mainichi-bundle-width, 82%)",
+    height: "var(--mainichi-bundle-height, 76px)",
+    transform: "translateX(-50%) rotate(-0.7deg)",
+    opacity: "var(--mainichi-bundle-opacity, 0.56)",
+    pointerEvents: "none",
+    filter:
+      "drop-shadow(0 12px 18px rgba(65, 52, 35, var(--mainichi-bundle-shadow-alpha, 0.1)))",
+  },
+  mainichiBundleOpenButton: {
+    border: "none",
+    background: "transparent",
+    padding: 0,
+    cursor: "pointer",
+    pointerEvents: "auto",
+    outlineOffset: "7px",
+    WebkitTapHighlightColor: "transparent",
+  },
+  mainichiBundleLayer: {
+    position: "absolute",
+    left: 0,
+    right: 0,
+    borderRadius: "12px",
+    border: "1px solid color-mix(in srgb, var(--line) 52%, transparent)",
+    background:
+      "linear-gradient(180deg, color-mix(in srgb, var(--paper-card) 34%, transparent), color-mix(in srgb, var(--paper-warm) 28%, transparent))",
+    boxShadow:
+      "0 1px 0 color-mix(in srgb, white 28%, transparent) inset",
+  },
+  mainichiBundleLayerBack: {
+    bottom: "calc(var(--mainichi-bundle-edge, 8px) * 2.15)",
+    height: "calc(var(--mainichi-bundle-edge, 8px) * 2.5 + 10px)",
+    transform: "translateX(-4px) rotate(-1.1deg)",
+    opacity: 0.34,
+  },
+  mainichiBundleLayerMiddle: {
+    bottom: "calc(var(--mainichi-bundle-edge, 8px) * 1.05)",
+    height: "calc(var(--mainichi-bundle-edge, 8px) * 2.9 + 12px)",
+    transform: "translateX(3px) rotate(0.75deg)",
+    opacity: 0.48,
+  },
+  mainichiBundleLayerFront: {
+    bottom: 0,
+    height: "calc(var(--mainichi-bundle-edge, 8px) * 3.2 + 13px)",
+    transform: "rotate(-0.25deg)",
+    opacity: 0.62,
+  },
+  mainichiBundlePocket: {
+    position: "absolute",
+    left: "9%",
+    right: "9%",
+    bottom: "2px",
+    height: "28%",
+    borderRadius: "0 0 13px 13px",
+    border: "1px solid color-mix(in srgb, var(--line) 45%, transparent)",
+    borderTop: "none",
+    background:
+      "linear-gradient(180deg, color-mix(in srgb, var(--paper-card) 4%, transparent), color-mix(in srgb, var(--paper-warm) 34%, transparent))",
+    opacity: "var(--mainichi-bundle-pocket-opacity, 0.46)",
+  },
+  mainichiBundleLiftTab: {
+    position: "absolute",
+    left: "50%",
+    bottom: "calc(var(--mainichi-bundle-edge, 8px) * 3.05 + 6px)",
+    width: "42px",
+    height: "13px",
+    borderRadius: "999px 999px 8px 8px",
+    transform: "translateX(-50%) rotate(-0.25deg)",
+    background:
+      "linear-gradient(180deg, color-mix(in srgb, var(--paper-card) 66%, white 34%), color-mix(in srgb, var(--paper-warm) 54%, transparent))",
+    border: "1px solid color-mix(in srgb, var(--line) 42%, transparent)",
+    boxShadow:
+      "0 1px 0 color-mix(in srgb, white 40%, transparent) inset, 0 8px 14px -13px rgba(73,55,36,0.48)",
+    opacity: 0.72,
+  },
+  mainichiBundleSeal: {
+    position: "absolute",
+    left: "var(--mainichi-bundle-seal-x, 62%)",
+    bottom: "10px",
+    width: "18px",
+    height: "18px",
+    borderRadius: "999px",
+    transform: "translateX(-50%) rotate(5deg)",
+    background:
+      "radial-gradient(circle at 34% 30%, color-mix(in srgb, var(--seal) 58%, white 28%), color-mix(in srgb, var(--seal) 82%, var(--ink) 18%) 72%)",
+    boxShadow:
+      "0 1px 0 color-mix(in srgb, white 32%, transparent) inset, 0 4px 8px -5px rgba(68,42,28,0.48)",
+  },
+  mainichiBundleSealOpenable: {
+    bottom: "8px",
+    width: "24px",
+    height: "24px",
+    boxShadow:
+      "0 1px 0 color-mix(in srgb, white 32%, transparent) inset, 0 0 0 4px color-mix(in srgb, var(--seal) 10%, transparent), 0 10px 16px -12px rgba(78,40,28,0.78)",
   },
   mainichiBoardPhotoButton: {
     position: "absolute",
@@ -3876,9 +4982,63 @@ const styles = {
     lineHeight: 1.45,
   },
   mainichiBoardEmpty: {
-    minHeight: "180px",
-    alignContent: "center",
+    minHeight: "clamp(300px, 44svh, 390px)",
+    display: "grid",
+    justifyItems: "center",
+    alignContent: "start",
+    gap: "15px",
+    padding: "68px 22px 0",
+    boxSizing: "border-box",
+    color: COLLECTION_TEXT,
     fontFamily: "var(--font-display)",
+    textAlign: "center",
+  },
+  mainichiBoardEmptyStack: {
+    position: "relative",
+    width: "132px",
+    height: "88px",
+    display: "block",
+    marginBottom: "2px",
+  },
+  mainichiBoardEmptySheet: {
+    position: "absolute",
+    display: "grid",
+    placeItems: "center",
+    borderRadius: "10px",
+    border: "1px solid color-mix(in srgb, var(--line) 80%, transparent)",
+    background:
+      "linear-gradient(145deg, color-mix(in srgb, var(--paper-card) 90%, white 10%), color-mix(in srgb, var(--paper-warm) 72%, white 28%))",
+    boxShadow:
+      "0 1px 0 color-mix(in srgb, white 42%, transparent) inset, 0 14px 24px -22px rgba(72,58,38,0.42)",
+  },
+  mainichiBoardEmptySheetBack: {
+    inset: "16px 34px 18px 8px",
+    opacity: 0.42,
+    transform: "rotate(-6deg)",
+  },
+  mainichiBoardEmptySheetMiddle: {
+    inset: "11px 21px 12px 20px",
+    opacity: 0.68,
+    transform: "rotate(4deg)",
+  },
+  mainichiBoardEmptySheetFront: {
+    inset: "8px 11px 7px 30px",
+    color: "color-mix(in srgb, var(--seal) 70%, var(--ink-soft) 30%)",
+    opacity: 0.94,
+    transform: "rotate(-1deg)",
+  },
+  mainichiBoardEmptyTitle: {
+    margin: 0,
+    color: COLLECTION_TEXT,
+    fontSize: "16px",
+    fontWeight: 400,
+    lineHeight: 1.45,
+    letterSpacing: "0.08em",
+  },
+  mainichiBoardEmptyButton: {
+    marginTop: "0",
+    minHeight: "42px",
+    padding: "0 18px",
   },
   mainichiDayBackdrop: {
     position: "fixed",
@@ -3933,47 +5093,59 @@ const styles = {
   },
   mainichiDayTimeline: {
     display: "grid",
-    gap: "16px",
+    gridTemplateColumns: "repeat(auto-fit, minmax(126px, 148px))",
+    justifyContent: "center",
+    alignItems: "start",
+    gap: "14px",
+    padding: "2px 0 4px",
   },
   mainichiDayPhotoRow: {
     display: "grid",
-    gridTemplateColumns: "96px minmax(0, 1fr)",
-    alignItems: "center",
-    gap: "16px",
-    minHeight: "116px",
-    padding: "12px",
-    border: "none",
-    borderRadius: "var(--radius-xl)",
-    background: "color-mix(in srgb, var(--paper) 78%, transparent)",
+    justifyItems: "center",
+    gap: "9px",
+    minHeight: "0",
+    padding: "9px 9px 11px",
+    border: "1px solid color-mix(in srgb, var(--line) 68%, transparent)",
+    borderRadius: "16px",
+    background:
+      "linear-gradient(145deg, color-mix(in srgb, var(--paper-card) 90%, white 10%), color-mix(in srgb, var(--paper-warm) 70%, white 30%))",
     color: COLLECTION_TEXT,
+    boxShadow:
+      "0 1px 0 color-mix(in srgb, white 38%, transparent) inset, 0 14px 24px -22px rgba(72,58,38,0.42)",
     font: "inherit",
-    textAlign: "left",
+    textAlign: "center",
     cursor: "pointer",
+    transformOrigin: "50% 42%",
+    transition:
+      "transform var(--dur-instant) var(--ease-settle), box-shadow var(--dur-instant) var(--ease-gentle)",
+    WebkitTapHighlightColor: "transparent",
   },
   mainichiDayPhotoTileRoot: {
-    width: "96px",
+    width: "118px",
   },
   mainichiDayPhotoTile: {
-    width: "96px",
-    height: "96px",
+    width: "118px",
+    height: "118px",
   },
   mainichiDayPhotoText: {
     display: "grid",
-    gap: "6px",
+    justifyItems: "center",
+    gap: "3px",
   },
   mainichiDayPhotoSide: {
     color: COLLECTION_TEXT_STRONG,
     fontFamily: "var(--font-display)",
-    fontSize: "18px",
+    fontSize: "14px",
     fontWeight: 400,
-    lineHeight: 1.35,
+    lineHeight: 1.3,
+    letterSpacing: "0.08em",
   },
   mainichiDayPhotoCat: {
     color: COLLECTION_MUTED,
     fontFamily: "var(--font-ui)",
-    fontSize: "13px",
+    fontSize: "11px",
     fontWeight: 400,
-    lineHeight: 1.4,
+    lineHeight: 1.3,
   },
   mainichiDayEmpty: {
     minHeight: "144px",
@@ -3988,7 +5160,10 @@ const styles = {
     gap: "20px",
     padding:
       "calc(18px + env(safe-area-inset-top)) 20px calc(24px + env(safe-area-inset-bottom))",
-    background: "color-mix(in srgb, var(--paper) 98%, transparent)",
+    background: "var(--app-paper-background)",
+    backgroundSize: "var(--app-paper-background-size)",
+    backgroundPosition: "var(--app-paper-background-position)",
+    backgroundRepeat: "var(--app-paper-background-repeat)",
   },
   mainichiViewerChrome: {
     display: "flex",
@@ -3997,7 +5172,7 @@ const styles = {
   mainichiViewerFrame: {
     width: "min(100%, 560px)",
     maxWidth: "100%",
-    height: "100%",
+    maxHeight: "calc(100svh - 180px - env(safe-area-inset-top) - env(safe-area-inset-bottom))",
     justifySelf: "center",
     alignSelf: "center",
     borderRadius: "var(--radius-2xl)",
@@ -4005,7 +5180,6 @@ const styles = {
   mainichiViewerImage: {
     width: "100%",
     height: "100%",
-    maxHeight: "calc(100svh - 180px - env(safe-area-inset-top) - env(safe-area-inset-bottom))",
   },
   mainichiViewerKeepButton: {
     width: "min(100%, 420px)",
