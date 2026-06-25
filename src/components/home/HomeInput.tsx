@@ -2149,7 +2149,7 @@ export function HomeInput({ recentEvents: _recentEvents }: HomeInputProps) {
 
       {!isInitialHomeVisualReady ? (
         <div style={styles.initialLoadingOverlay}>
-          <AppLoadingScreen variant="home" />
+          <AppLoadingScreen variant="startup" />
         </div>
       ) : null}
 
