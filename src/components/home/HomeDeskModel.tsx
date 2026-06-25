@@ -140,6 +140,7 @@ const HOME_DAYLIGHT_ANCHORS = [
     ambientCoolY: "92%",
     ambientWarmStrength: "30%",
     ambientCoolStrength: "12%",
+    envelopeLineOpacity: "0.33",
   },
   {
     minute: 7 * 60,
@@ -156,6 +157,7 @@ const HOME_DAYLIGHT_ANCHORS = [
     ambientCoolY: "94%",
     ambientWarmStrength: "24%",
     ambientCoolStrength: "10%",
+    envelopeLineOpacity: "0.34",
   },
   {
     minute: 12 * 60,
@@ -172,6 +174,7 @@ const HOME_DAYLIGHT_ANCHORS = [
     ambientCoolY: "92%",
     ambientWarmStrength: "14%",
     ambientCoolStrength: "8%",
+    envelopeLineOpacity: "0.36",
   },
   {
     minute: 17 * 60,
@@ -188,6 +191,7 @@ const HOME_DAYLIGHT_ANCHORS = [
     ambientCoolY: "90%",
     ambientWarmStrength: "28%",
     ambientCoolStrength: "12%",
+    envelopeLineOpacity: "0.32",
   },
   {
     minute: 19 * 60 + 40,
@@ -204,6 +208,7 @@ const HOME_DAYLIGHT_ANCHORS = [
     ambientCoolY: "88%",
     ambientWarmStrength: "22%",
     ambientCoolStrength: "20%",
+    envelopeLineOpacity: "0.26",
   },
   {
     minute: 22 * 60,
@@ -220,6 +225,7 @@ const HOME_DAYLIGHT_ANCHORS = [
     ambientCoolY: "90%",
     ambientWarmStrength: "10%",
     ambientCoolStrength: "28%",
+    envelopeLineOpacity: "0.18",
   },
 ] as const;
 
@@ -453,9 +459,7 @@ export function HomeDeskModel({
                 data-testid="desk-empty-frame"
                 style={deskStyles.homeEmptyFrame}
               >
-                <span style={deskStyles.homeEmptyEnvelopeHint} aria-hidden="true">
-                  <span style={deskStyles.homeEmptyEnvelopeFlap} />
-                </span>
+                <span style={deskStyles.homeEmptyEnvelopeHint} aria-hidden="true" />
                 <SleepingCatPlaceholder />
                 <span style={deskStyles.homeEmptyTitle}>
                   きょうの ねがお、まだ
@@ -1384,6 +1388,7 @@ function useDaylight(now: number) {
       "--home-ambient-cool-y": colors.ambientCoolY,
       "--home-ambient-warm-strength": colors.ambientWarmStrength,
       "--home-ambient-cool-strength": colors.ambientCoolStrength,
+      "--home-envelope-line-opacity": colors.envelopeLineOpacity,
       "--home-daylight-transition": HOME_FRAME_TUNING.daylightTransition,
     } as HomeDaylightStyle;
   }, [minuteKey]);
@@ -1544,6 +1549,7 @@ function useHomeViewportBackground(daylightStyle: HomeDaylightStyle) {
       "--home-ambient-cool-y",
       "--home-ambient-warm-strength",
       "--home-ambient-cool-strength",
+      "--home-envelope-line-opacity",
     ] as const;
     const previousRootBackground = root.style.background;
     const previousBodyBackground = body.style.background;
@@ -1821,6 +1827,7 @@ function interpolateDaylightAnchor(
     ambientCoolY: staticAnchor.ambientCoolY,
     ambientWarmStrength: staticAnchor.ambientWarmStrength,
     ambientCoolStrength: staticAnchor.ambientCoolStrength,
+    envelopeLineOpacity: staticAnchor.envelopeLineOpacity,
   };
 }
 
@@ -2185,29 +2192,24 @@ const deskStyles = {
   homeEmptyEnvelopeHint: {
     position: "absolute",
     zIndex: 0,
-    width: "min(86%, 330px)",
-    aspectRatio: "2.7 / 1",
-    top: "calc(50% - 102px)",
+    width: "min(138vw, 660px)",
+    aspectRatio: "852 / 1842",
+    top: "calc(50% - 60px)",
     left: "50%",
     transform: "translate(-50%, -50%)",
-    borderRadius: "10px",
-    border:
-      "1px solid color-mix(in srgb, var(--line-strong) 34%, transparent)",
-    background:
-      "linear-gradient(180deg, color-mix(in srgb, var(--paper-card) 35%, transparent) 0%, color-mix(in srgb, var(--paper) 20%, transparent) 100%)",
-    boxShadow:
-      "0 16px 34px -30px color-mix(in srgb, var(--home-frame-glow, var(--paper-warm)) 46%, transparent)",
-    opacity: 0.22,
+    borderRadius: "0",
+    border: "none",
+    backgroundImage: "url('/illustrations/home-envelope-flap-lines.png')",
+    backgroundRepeat: "no-repeat",
+    backgroundPosition: "50% 50%",
+    backgroundSize: "contain",
+    boxShadow: "none",
+    opacity: "var(--home-envelope-line-opacity, 0.34)",
+    filter:
+      "brightness(0.88) sepia(0.14) saturate(0.84) contrast(0.78) drop-shadow(0 1px 0 color-mix(in srgb, var(--paper-card) 28%, transparent))",
+    mixBlendMode: "multiply",
     overflow: "hidden",
     pointerEvents: "none",
-  },
-  homeEmptyEnvelopeFlap: {
-    position: "absolute",
-    inset: 0,
-    borderRadius: "inherit",
-    background:
-      "linear-gradient(145deg, transparent 49%, color-mix(in srgb, var(--line-strong) 32%, transparent) 50%, transparent 51%), linear-gradient(35deg, transparent 49%, color-mix(in srgb, var(--line-strong) 26%, transparent) 50%, transparent 51%)",
-    opacity: 0.56,
   },
   homeEmptyTitle: {
     position: "relative",
