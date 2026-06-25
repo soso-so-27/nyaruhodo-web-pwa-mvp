@@ -104,19 +104,19 @@ const HOME_FRAME_TUNING = {
   frameMinWidthPx: 248,
   frameInitialWidth: "312px",
   frameAspectWidthPerHeight: 9 / 14,
-  emptyIllustrationWidth: "min(40vw, 136px)",
-  emptyIllustrationMinWidth: "120px",
+  emptyIllustrationWidth: "min(42vw, 152px)",
+  emptyIllustrationMinWidth: "128px",
   emptyTitleSize: "21px",
   emptyActionSize: "14px",
 } as const;
 const HOME_SKY_BACKGROUND =
-  "linear-gradient(180deg, color-mix(in srgb, var(--paper-card) 44%, transparent) 0%, color-mix(in srgb, var(--paper) 28%, transparent) 52%, color-mix(in srgb, var(--paper-warm) 24%, transparent) 100%), var(--home-sky-image), radial-gradient(circle at var(--home-sky-glow-x, 50%) var(--home-sky-glow-y, 12%), color-mix(in srgb, var(--home-sky-glow, var(--paper-warm)) 34%, transparent) 0%, transparent 54%), linear-gradient(180deg, var(--home-sky-top, var(--paper)) 0%, var(--home-sky-mid, var(--paper)) 44%, var(--home-sky-bottom, var(--paper-warm)) 100%)";
+  "linear-gradient(180deg, color-mix(in srgb, var(--paper-card) 34%, transparent) 0%, color-mix(in srgb, var(--paper) 20%, transparent) 52%, color-mix(in srgb, var(--paper-warm) 18%, transparent) 100%), radial-gradient(88% 62% at var(--home-ambient-warm-x, 18%) var(--home-ambient-warm-y, 8%), color-mix(in srgb, var(--home-ambient-warm, var(--home-sky-glow)) var(--home-ambient-warm-strength, 26%), transparent) 0%, transparent 68%), radial-gradient(86% 58% at var(--home-ambient-cool-x, 86%) var(--home-ambient-cool-y, 94%), color-mix(in srgb, var(--home-ambient-cool, var(--home-sky-bottom)) var(--home-ambient-cool-strength, 16%), transparent) 0%, transparent 72%), var(--home-sky-image), radial-gradient(circle at var(--home-sky-glow-x, 50%) var(--home-sky-glow-y, 12%), color-mix(in srgb, var(--home-sky-glow, var(--paper-warm)) 24%, transparent) 0%, transparent 58%), linear-gradient(180deg, var(--home-sky-top, var(--paper)) 0%, var(--home-sky-mid, var(--paper)) 44%, var(--home-sky-bottom, var(--paper-warm)) 100%)";
 const HOME_SKY_BACKGROUND_SIZE =
-  "100% 100%, 100% 100%, 140% 140%, 100% 100%";
+  "100% 100%, 120% 120%, 120% 120%, 100% 100%, 140% 140%, 100% 100%";
 const HOME_SKY_BACKGROUND_POSITION =
-  "50% 50%, 50% 50%, var(--home-sky-glow-x, 50%) var(--home-sky-glow-y, 12%), 50% 50%";
+  "50% 50%, var(--home-ambient-warm-x, 18%) var(--home-ambient-warm-y, 8%), var(--home-ambient-cool-x, 86%) var(--home-ambient-cool-y, 94%), 50% 50%, var(--home-sky-glow-x, 50%) var(--home-sky-glow-y, 12%), 50% 50%";
 const HOME_SKY_BACKGROUND_REPEAT =
-  "no-repeat, no-repeat, no-repeat, no-repeat";
+  "no-repeat, no-repeat, no-repeat, no-repeat, no-repeat, no-repeat";
 const HOME_BACKGROUND_IMAGES = {
   dawn: "url('/images/home-backgrounds/generated-dawn-paper.png')",
   morning: "url('/images/home-backgrounds/generated-morning-paper.png')",
@@ -132,6 +132,14 @@ const HOME_DAYLIGHT_ANCHORS = [
     skyBottom: "#eadfce",
     mat: "#fff7ee",
     glow: "#d89b76",
+    ambientWarm: "#e7a07b",
+    ambientCool: "#d8c5bc",
+    ambientWarmX: "16%",
+    ambientWarmY: "8%",
+    ambientCoolX: "90%",
+    ambientCoolY: "92%",
+    ambientWarmStrength: "30%",
+    ambientCoolStrength: "12%",
   },
   {
     minute: 7 * 60,
@@ -140,6 +148,14 @@ const HOME_DAYLIGHT_ANCHORS = [
     skyBottom: "#ebe1d0",
     mat: "#fff8ef",
     glow: "#dfad7d",
+    ambientWarm: "#efbf88",
+    ambientCool: "#e1d0bf",
+    ambientWarmX: "18%",
+    ambientWarmY: "8%",
+    ambientCoolX: "86%",
+    ambientCoolY: "94%",
+    ambientWarmStrength: "24%",
+    ambientCoolStrength: "10%",
   },
   {
     minute: 12 * 60,
@@ -148,6 +164,14 @@ const HOME_DAYLIGHT_ANCHORS = [
     skyBottom: "#e7dbc8",
     mat: "#fff8ee",
     glow: "#c9ae80",
+    ambientWarm: "#e3c596",
+    ambientCool: "#d7c8b4",
+    ambientWarmX: "44%",
+    ambientWarmY: "2%",
+    ambientCoolX: "84%",
+    ambientCoolY: "92%",
+    ambientWarmStrength: "14%",
+    ambientCoolStrength: "8%",
   },
   {
     minute: 17 * 60,
@@ -156,6 +180,14 @@ const HOME_DAYLIGHT_ANCHORS = [
     skyBottom: "#d9c8bc",
     mat: "#fff3e8",
     glow: "#bd7b61",
+    ambientWarm: "#d58a68",
+    ambientCool: "#c7b6b4",
+    ambientWarmX: "12%",
+    ambientWarmY: "10%",
+    ambientCoolX: "88%",
+    ambientCoolY: "90%",
+    ambientWarmStrength: "28%",
+    ambientCoolStrength: "12%",
   },
   {
     minute: 19 * 60 + 40,
@@ -164,6 +196,14 @@ const HOME_DAYLIGHT_ANCHORS = [
     skyBottom: "#c5b3ad",
     mat: "#f2e8df",
     glow: "#a66d69",
+    ambientWarm: "#bc7469",
+    ambientCool: "#9aa0ad",
+    ambientWarmX: "18%",
+    ambientWarmY: "16%",
+    ambientCoolX: "88%",
+    ambientCoolY: "88%",
+    ambientWarmStrength: "22%",
+    ambientCoolStrength: "20%",
   },
   {
     minute: 22 * 60,
@@ -172,6 +212,14 @@ const HOME_DAYLIGHT_ANCHORS = [
     skyBottom: "#878786",
     mat: "#e8e0d5",
     glow: "#59657f",
+    ambientWarm: "#b88576",
+    ambientCool: "#66728c",
+    ambientWarmX: "50%",
+    ambientWarmY: "34%",
+    ambientCoolX: "82%",
+    ambientCoolY: "90%",
+    ambientWarmStrength: "10%",
+    ambientCoolStrength: "28%",
   },
 ] as const;
 
@@ -405,14 +453,13 @@ export function HomeDeskModel({
                 type="button"
                 data-testid="desk-empty-frame"
                 style={deskStyles.homeEmptyFrame}
-                className={
-                  prefersReducedMotion
-                    ? "desk-frame-action"
-                    : "desk-frame-action desk-frame-breathe"
-                }
+                className="home-empty-frame-action"
                 onClick={onTakePhoto}
                 aria-label={`${catName}の きょう、まだ。ねがおを とる`}
               >
+                <span style={deskStyles.homeEmptyEnvelopeHint} aria-hidden="true">
+                  <span style={deskStyles.homeEmptyEnvelopeFlap} />
+                </span>
                 <SleepingCatPlaceholder />
                 <span style={deskStyles.homeEmptyTitle}>
                   きょうの ねがお、まだ
@@ -788,6 +835,12 @@ export function HomeDeskModel({
         .desk-frame-action:active {
           transform: scale(0.96);
           box-shadow: var(--shadow-e1) !important;
+        }
+        .home-empty-frame-action:active [data-testid="home-empty-action"] {
+          transform: translateY(1px) scale(0.985);
+          box-shadow:
+            0 1px 0 color-mix(in srgb, var(--paper-card) 72%, transparent) inset,
+            0 8px 18px -16px color-mix(in srgb, var(--home-wax, #c2745a) 44%, transparent);
         }
         .desk-evening-soon-copy {
           animation: deskEveningSoonCopyIn 1200ms var(--ease-gentle) both;
@@ -1288,6 +1341,8 @@ function useDaylight(now: number) {
       "--home-sky-glow": colors.glow,
       "--home-frame-light": colors.mat,
       "--home-frame-glow": colors.glow,
+      "--home-ambient-warm": colors.ambientWarm,
+      "--home-ambient-cool": colors.ambientCool,
       "--home-page-padding-x": HOME_FRAME_TUNING.pagePaddingX,
       "--home-page-padding-top": HOME_FRAME_TUNING.pagePaddingTop,
       "--home-stage-max-width": HOME_FRAME_TUNING.stageMaxWidth,
@@ -1320,6 +1375,12 @@ function useDaylight(now: number) {
       "--home-empty-action-size": HOME_FRAME_TUNING.emptyActionSize,
       "--home-sky-glow-x": "50%",
       "--home-sky-glow-y": "12%",
+      "--home-ambient-warm-x": colors.ambientWarmX,
+      "--home-ambient-warm-y": colors.ambientWarmY,
+      "--home-ambient-cool-x": colors.ambientCoolX,
+      "--home-ambient-cool-y": colors.ambientCoolY,
+      "--home-ambient-warm-strength": colors.ambientWarmStrength,
+      "--home-ambient-cool-strength": colors.ambientCoolStrength,
       "--home-daylight-transition": HOME_FRAME_TUNING.daylightTransition,
     } as HomeDaylightStyle;
   }, [minuteKey]);
@@ -1455,6 +1516,8 @@ function useHomeViewportBackground(daylightStyle: HomeDaylightStyle) {
       "--home-sky-glow",
       "--home-frame-light",
       "--home-frame-glow",
+      "--home-ambient-warm",
+      "--home-ambient-cool",
       "--home-status-scrim",
       "--home-sky-image",
       "--home-wax",
@@ -1472,6 +1535,12 @@ function useHomeViewportBackground(daylightStyle: HomeDaylightStyle) {
       "--home-empty-action-size",
       "--home-sky-glow-x",
       "--home-sky-glow-y",
+      "--home-ambient-warm-x",
+      "--home-ambient-warm-y",
+      "--home-ambient-cool-x",
+      "--home-ambient-cool-y",
+      "--home-ambient-warm-strength",
+      "--home-ambient-cool-strength",
     ] as const;
     const previousRootBackground = root.style.background;
     const previousBodyBackground = body.style.background;
@@ -1734,12 +1803,21 @@ function interpolateDaylightAnchor(
   to: (typeof HOME_DAYLIGHT_ANCHORS)[number],
   progress: number,
 ) {
+  const staticAnchor = progress < 0.5 ? from : to;
   return {
     skyTop: interpolateHexColor(from.skyTop, to.skyTop, progress),
     skyMid: interpolateHexColor(from.skyMid, to.skyMid, progress),
     skyBottom: interpolateHexColor(from.skyBottom, to.skyBottom, progress),
     mat: interpolateHexColor(from.mat, to.mat, progress),
     glow: interpolateHexColor(from.glow, to.glow, progress),
+    ambientWarm: interpolateHexColor(from.ambientWarm, to.ambientWarm, progress),
+    ambientCool: interpolateHexColor(from.ambientCool, to.ambientCool, progress),
+    ambientWarmX: staticAnchor.ambientWarmX,
+    ambientWarmY: staticAnchor.ambientWarmY,
+    ambientCoolX: staticAnchor.ambientCoolX,
+    ambientCoolY: staticAnchor.ambientCoolY,
+    ambientWarmStrength: staticAnchor.ambientWarmStrength,
+    ambientCoolStrength: staticAnchor.ambientCoolStrength,
   };
 }
 
@@ -2082,57 +2160,95 @@ const deskStyles = {
     WebkitTapHighlightColor: "transparent",
   },
   homeEmptyFrame: {
-    width: "min(100%, var(--home-frame-layout-width, 100%))",
-    aspectRatio: "var(--home-empty-frame-aspect-ratio, 9 / 14)",
-    maxHeight: "var(--home-empty-frame-max-height, 660px)",
+    width: "min(100%, 390px)",
+    minHeight: "clamp(360px, 56dvh, 500px)",
     boxSizing: "border-box",
+    position: "relative",
+    appearance: "none",
+    WebkitAppearance: "none",
     display: "grid",
     placeItems: "center",
     alignContent: "center",
-    gap: "16px",
-    padding: "28px 24px 40px",
+    gap: "18px",
+    padding: "36px 18px",
     border: "none",
-    outline: "1px solid color-mix(in srgb, var(--line-strong) 62%, transparent)",
-    borderRadius: "var(--home-frame-radius, var(--radius-2xl))",
-    background:
-      "radial-gradient(125% 95% at 50% 32%, var(--home-empty-frame-start, #fbf5ea), var(--home-empty-frame-end, #f1e7d6))",
+    outline: "none",
+    borderRadius: 0,
+    background: "transparent",
     color: "var(--ink-soft)",
-    boxShadow:
-      "inset 0 2px 18px rgba(150, 110, 70, 0.10), 0 18px 48px -26px color-mix(in srgb, var(--home-frame-glow, var(--paper-warm)) 48%, transparent)",
+    boxShadow: "none",
     cursor: "pointer",
     WebkitTapHighlightColor: "transparent",
-    transition:
-      "background var(--home-daylight-transition, 1800ms) var(--ease-gentle), box-shadow var(--home-daylight-transition, 1800ms) var(--ease-gentle)",
+    transition: "filter 220ms var(--ease-gentle)",
+  },
+  homeEmptyEnvelopeHint: {
+    position: "absolute",
+    zIndex: 0,
+    width: "min(86%, 330px)",
+    aspectRatio: "2.7 / 1",
+    top: "calc(50% - 102px)",
+    left: "50%",
+    transform: "translate(-50%, -50%)",
+    borderRadius: "10px",
+    border:
+      "1px solid color-mix(in srgb, var(--line-strong) 34%, transparent)",
+    background:
+      "linear-gradient(180deg, color-mix(in srgb, var(--paper-card) 35%, transparent) 0%, color-mix(in srgb, var(--paper) 20%, transparent) 100%)",
+    boxShadow:
+      "0 16px 34px -30px color-mix(in srgb, var(--home-frame-glow, var(--paper-warm)) 46%, transparent)",
+    opacity: 0.22,
+    overflow: "hidden",
+    pointerEvents: "none",
+  },
+  homeEmptyEnvelopeFlap: {
+    position: "absolute",
+    inset: 0,
+    borderRadius: "inherit",
+    background:
+      "linear-gradient(145deg, transparent 49%, color-mix(in srgb, var(--line-strong) 32%, transparent) 50%, transparent 51%), linear-gradient(35deg, transparent 49%, color-mix(in srgb, var(--line-strong) 26%, transparent) 50%, transparent 51%)",
+    opacity: 0.56,
   },
   homeEmptyTitle: {
+    position: "relative",
+    zIndex: 1,
     color: "var(--ink)",
     fontFamily: "var(--font-display)",
     fontSize: "var(--home-empty-title-size, 20px)",
     letterSpacing: "var(--tracking-label)",
   },
   homeEmptyAction: {
+    position: "relative",
+    zIndex: 1,
     display: "inline-flex",
     alignItems: "center",
     justifyContent: "center",
     gap: "8px",
-    minHeight: "44px",
-    padding: "0 20px",
-    border: "1px solid color-mix(in srgb, var(--home-wax, #c2745a) 42%, transparent)",
+    minHeight: "48px",
+    padding: "0 24px",
+    border: "1px solid color-mix(in srgb, var(--home-wax, #c2745a) 56%, transparent)",
     borderRadius: "var(--radius-full)",
-    background: "color-mix(in srgb, var(--paper) 74%, transparent)",
+    background:
+      "color-mix(in srgb, var(--paper-card) 86%, var(--home-frame-glow, var(--paper-warm)) 14%)",
     color: "var(--home-wax, #c2745a)",
+    boxShadow:
+      "0 1px 0 color-mix(in srgb, var(--paper-card) 72%, transparent) inset, 0 12px 26px -20px color-mix(in srgb, var(--home-wax, #c2745a) 38%, transparent)",
+    backdropFilter: "blur(8px)",
     fontFamily: "var(--font-ui)",
     fontSize: "var(--home-empty-action-size, 14px)",
-    fontWeight: 500,
+    fontWeight: 600,
     letterSpacing: "var(--tracking-body)",
+    transition:
+      "transform 140ms var(--ease-gentle), box-shadow 140ms var(--ease-gentle), background var(--home-daylight-transition, 1800ms) var(--ease-gentle)",
   },
   sleepingCatPlaceholder: {
+    position: "relative",
+    zIndex: 1,
     width: "var(--home-empty-illustration-width, min(40vw, 136px))",
-    maxWidth: "136px",
+    maxWidth: "152px",
     minWidth: "var(--home-empty-illustration-min-width, 112px)",
     height: "auto",
     display: "block",
-    opacity: 0.9,
+    opacity: 0.96,
     userSelect: "none",
   },
   notificationTray: {
