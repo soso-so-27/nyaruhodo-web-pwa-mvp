@@ -777,27 +777,6 @@ export function CatsPage() {
                       style={styles.profileCoverTileRoot}
                       imageStyle={styles.profileCoverImage}
                     />
-                    {canManageCats ? (
-                      <button
-                        type="button"
-                        style={styles.profileCoverEditButton}
-                        onClick={() => setIsCatManageOpen(true)}
-                        aria-label={`${activeCatProfile.name}を編集・管理`}
-                      >
-                        <PencilSmallIcon />
-                      </button>
-                    ) : null}
-                    {canManageCats ? (
-                      <button
-                        type="button"
-                        data-testid="cats-thumbnail-picker-button"
-                        style={styles.profileCoverPhotoButton}
-                        onClick={() => setIsThumbnailPickerOpen(true)}
-                        aria-label={`${activeCatProfile.name}のサムネイル写真を選ぶ`}
-                      >
-                        <CameraSmallIcon />
-                      </button>
-                    ) : null}
                     {shouldShowCatSwitchButton ? (
                       <button
                         type="button"
@@ -922,9 +901,18 @@ export function CatsPage() {
             padding="md"
             style={styles.basicInfoPanel}
           >
-            <BasicInfoTable
+            <CatBasicProfilePanel
               profile={activeCatProfile}
+              coverSrc={activeCoverSrc}
+              coverFit={activeCoverFit}
+              hasCustomThumbnail={hasCustomThumbnail}
+              onOpenThumbnailPicker={() => setIsThumbnailPickerOpen(true)}
               onEdit={openCatManageEditor}
+              onManage={() => {
+                setIsCatManageEditing(false);
+                setIsAddingCat(false);
+                setIsCatManageOpen(true);
+              }}
             />
           </AppCard>
         ) : null}
@@ -1774,12 +1762,72 @@ function CatSummaryPanel({
   );
 }
 
+function CatBasicProfilePanel({
+  profile,
+  coverSrc,
+  coverFit,
+  hasCustomThumbnail,
+  onOpenThumbnailPicker,
+  onEdit,
+  onManage,
+}: {
+  profile: CatProfile;
+  coverSrc: string;
+  coverFit: "cover" | "contain";
+  hasCustomThumbnail: boolean;
+  onOpenThumbnailPicker: () => void;
+  onEdit?: () => void;
+  onManage?: () => void;
+}) {
+  return (
+    <div style={styles.basicProfilePanel}>
+      <section style={styles.basicPhotoSection}>
+        <PhotoTile
+          src={coverSrc}
+          alt=""
+          variant="tile"
+          fit={coverFit}
+          aspect="1 / 1"
+          style={styles.basicPhotoPreviewRoot}
+          imageStyle={styles.basicPhotoPreviewImage}
+        />
+        <div style={styles.basicPhotoInfo}>
+          <div style={styles.basicPhotoHeader}>
+            <p style={styles.basicPhotoTitle}>この子の写真</p>
+            <span style={styles.basicPhotoStatus}>
+              {hasCustomThumbnail ? "設定済み" : "自動表示"}
+            </span>
+          </div>
+          <p style={styles.basicPhotoCopy}>
+            うちのこページの上に出る写真です。
+          </p>
+          <div style={styles.basicPhotoActions}>
+            <button
+              type="button"
+              data-testid="cats-thumbnail-picker-button"
+              style={styles.basicPhotoButton}
+              onClick={onOpenThumbnailPicker}
+            >
+              <CameraSmallIcon />
+              <span>写真を選ぶ</span>
+            </button>
+          </div>
+        </div>
+      </section>
+
+      <BasicInfoTable profile={profile} onEdit={onEdit} onManage={onManage} />
+    </div>
+  );
+}
+
 function BasicInfoTable({
   profile,
   onEdit,
+  onManage,
 }: {
   profile: CatProfile;
   onEdit?: () => void;
+  onManage?: () => void;
 }) {
   const rows = [
     {
@@ -1811,9 +1859,22 @@ function BasicInfoTable({
     <div style={styles.basicInfoBlock}>
       <div style={styles.basicInfoHeader}>
         <p style={styles.basicInfoTitle}>基本情報</p>
-        <span style={styles.basicInfoProgress}>
-          登録済み {registeredCount}/{rows.length}
-        </span>
+        <div style={styles.basicInfoHeaderActions}>
+          <span style={styles.basicInfoProgress}>
+            登録済み {registeredCount}/{rows.length}
+          </span>
+          {onEdit ? (
+            <button
+              type="button"
+              style={styles.basicInfoEditButton}
+              onClick={onEdit}
+              aria-label="基本情報を編集"
+            >
+              <PencilSmallIcon />
+              <span>編集</span>
+            </button>
+          ) : null}
+        </div>
       </div>
       <div style={styles.basicInfoTable}>
         {rows.map((row) => (
@@ -1831,9 +1892,9 @@ function BasicInfoTable({
           </div>
         ))}
       </div>
-      {rows.some((row) => !row.value) && onEdit ? (
-        <button type="button" style={styles.basicInfoEditLink} onClick={onEdit}>
-          未登録のことを足す
+      {onManage ? (
+        <button type="button" style={styles.basicInfoManageButton} onClick={onManage}>
+          猫を追加・管理
         </button>
       ) : null}
     </div>
@@ -4288,6 +4349,97 @@ const styles = {
     display: "grid",
     gap: "9px",
   },
+  basicProfilePanel: {
+    display: "grid",
+    gap: "18px",
+  },
+  basicPhotoSection: {
+    display: "grid",
+    gridTemplateColumns: "86px minmax(0, 1fr)",
+    alignItems: "center",
+    gap: "13px",
+    padding: "12px",
+    borderRadius: "16px",
+    border: "1px solid color-mix(in srgb, var(--line-strong) 58%, transparent)",
+    background: "color-mix(in srgb, var(--paper) 30%, transparent)",
+  },
+  basicPhotoPreviewRoot: {
+    width: "86px",
+    height: "86px",
+    borderRadius: "14px",
+    overflow: "hidden",
+    background: "color-mix(in srgb, var(--paper-card) 78%, transparent)",
+    border: "1px solid color-mix(in srgb, var(--paper-card) 90%, transparent)",
+    boxShadow:
+      "0 1px 0 color-mix(in srgb, var(--paper) 80%, transparent), 0 12px 24px -20px color-mix(in srgb, var(--ink) 30%, transparent)",
+  },
+  basicPhotoPreviewImage: {
+    width: "100%",
+    height: "100%",
+    borderRadius: "14px",
+  },
+  basicPhotoInfo: {
+    display: "grid",
+    gap: "7px",
+    minWidth: 0,
+  },
+  basicPhotoHeader: {
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: "10px",
+    minWidth: 0,
+  },
+  basicPhotoTitle: {
+    margin: 0,
+    color: CATS_TEXT,
+    fontFamily: CATS_SERIF,
+    fontSize: CATS_BODY_SIZE,
+    fontWeight: 400,
+    lineHeight: 1.35,
+    letterSpacing: CATS_BODY_TRACKING,
+  },
+  basicPhotoStatus: {
+    flex: "0 0 auto",
+    color: CATS_FAINT,
+    fontFamily: CATS_UI,
+    fontSize: CATS_TINY_SIZE,
+    fontWeight: 500,
+    lineHeight: 1,
+    letterSpacing: "0",
+  },
+  basicPhotoCopy: {
+    margin: 0,
+    color: CATS_MUTED,
+    fontFamily: CATS_SERIF,
+    fontSize: CATS_META_SIZE,
+    fontWeight: 400,
+    lineHeight: 1.55,
+    letterSpacing: CATS_META_TRACKING,
+  },
+  basicPhotoActions: {
+    display: "flex",
+    alignItems: "center",
+    minWidth: 0,
+  },
+  basicPhotoButton: {
+    minHeight: "34px",
+    display: "inline-flex",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: "7px",
+    padding: "0 12px",
+    borderRadius: "999px",
+    border: "1px solid color-mix(in srgb, var(--seal) 32%, var(--line) 68%)",
+    background: "color-mix(in srgb, var(--paper-card) 62%, transparent)",
+    color: "var(--seal)",
+    fontFamily: CATS_UI,
+    fontSize: CATS_META_SIZE,
+    fontWeight: 600,
+    lineHeight: 1,
+    letterSpacing: "0",
+    cursor: "pointer",
+  },
   basicInfoPanel: {
     marginBottom: "22px",
     background: CATS_PANEL_BACKGROUND,
@@ -4295,9 +4447,16 @@ const styles = {
   },
   basicInfoHeader: {
     display: "flex",
-    alignItems: "baseline",
+    alignItems: "center",
     justifyContent: "space-between",
     gap: "12px",
+  },
+  basicInfoHeaderActions: {
+    display: "inline-flex",
+    alignItems: "center",
+    justifyContent: "flex-end",
+    gap: "8px",
+    minWidth: 0,
   },
   basicInfoTitle: {
     margin: 0,
@@ -4316,6 +4475,24 @@ const styles = {
     fontWeight: 400,
     lineHeight: 1.35,
     letterSpacing: CATS_META_TRACKING,
+  },
+  basicInfoEditButton: {
+    minHeight: "32px",
+    display: "inline-flex",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: "6px",
+    padding: "0 10px",
+    borderRadius: "999px",
+    border: "1px solid color-mix(in srgb, var(--line-strong) 60%, transparent)",
+    background: "color-mix(in srgb, var(--paper-card) 50%, transparent)",
+    color: CATS_MUTED,
+    fontFamily: CATS_UI,
+    fontSize: CATS_META_SIZE,
+    fontWeight: 600,
+    lineHeight: 1,
+    letterSpacing: "0",
+    cursor: "pointer",
   },
   basicInfoTable: {
     display: "grid",
@@ -4364,6 +4541,20 @@ const styles = {
     borderRadius: "var(--radius-full)",
     background: "transparent",
     color: "var(--seal)",
+    fontFamily: CATS_SERIF,
+    fontSize: CATS_META_SIZE,
+    fontWeight: 400,
+    letterSpacing: CATS_META_TRACKING,
+    cursor: "pointer",
+  },
+  basicInfoManageButton: {
+    width: "fit-content",
+    minHeight: "34px",
+    padding: "0 10px",
+    border: "none",
+    borderRadius: "var(--radius-full)",
+    background: "transparent",
+    color: CATS_MUTED,
     fontFamily: CATS_SERIF,
     fontSize: CATS_META_SIZE,
     fontWeight: 400,

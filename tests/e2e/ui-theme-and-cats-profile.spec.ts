@@ -128,6 +128,7 @@ test("lets the owner choose a cat thumbnail from existing photos", async ({
   await page.goto("/cats");
   await page.waitForLoadState("networkidle");
 
+  await page.getByTestId("cats-section-tab-basic").click();
   await page.getByTestId("cats-thumbnail-picker-button").click();
 
   await expect(page.getByRole("dialog", { name: "サムネイル写真" })).toBeVisible();
