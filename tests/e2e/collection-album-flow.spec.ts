@@ -811,7 +811,11 @@ test.describe("collection album flow", () => {
     await page.getByRole("tab", { name: "とどいた" }).click();
     await page.getByTestId("mainichi-board-photo-delivered").click();
     await expect(page.getByTestId("mainichi-photo-viewer")).toBeVisible();
-    await page.getByRole("button", { name: "非表示" }).click();
+    await page.getByRole("button", { name: "ねこだよりから外す" }).click();
+    await page
+      .getByRole("alertdialog")
+      .getByRole("button", { name: "外す" })
+      .click();
     await expect(page.getByTestId("mainichi-photo-viewer")).toHaveCount(0);
     await expect(page.getByTestId("mainichi-board-photo-delivered")).toHaveCount(0);
 
@@ -900,6 +904,7 @@ test.describe("collection album flow", () => {
       .toBe(true);
 
     await page.getByRole("button", { name: "削除" }).click();
+    await page.getByRole("alertdialog").getByRole("button", { name: "削除" }).click();
     await expect(page.getByTestId("mainichi-photo-viewer")).toHaveCount(0);
     await expect(page.getByTestId("mainichi-board-photo-sent")).toHaveCount(0);
   });

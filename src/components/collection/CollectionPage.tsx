@@ -890,7 +890,11 @@ export function CollectionPage() {
         index: Math.min(current.index, photos.length - 1),
       };
     });
-    showToast(reason === "report" ? "通報して非表示にしました" : "非表示にしました");
+    showToast(
+      reason === "report"
+        ? "通報してねこだよりから外しました"
+        : "ねこだよりから外しました",
+    );
     trackProductEvent(
       "collection_mainichi_delivered_photo_hidden",
       {
@@ -2281,14 +2285,41 @@ function MainichiFullscreenPhoto({
   onReportDeliveredPhoto: (photo: MainichiDayPhoto) => void;
 }) {
   const [photoAspectRatio, setPhotoAspectRatio] = useState("1 / 1");
+  const [pendingAction, setPendingAction] = useState<
+    "delete" | "hide" | "report" | null
+  >(null);
   const touchStartXRef = useRef<number | null>(null);
   const canNavigate = photoCount > 1;
   const deliveryActionLabel = photo.shared
     ? "自分だけにする"
     : "ねこだよりに使う";
+  const pendingActionCopy =
+    pendingAction === "delete"
+      ? {
+          title: "このねがおを削除しますか",
+          text: "ねこだよりとうちのこから外れます。",
+          confirm: "削除",
+          variant: "danger" as const,
+        }
+      : pendingAction === "report"
+        ? {
+            title: "この写真を通報しますか",
+            text: "この写真をねこだよりから外し、確認対象として送ります。",
+            confirm: "通報",
+            variant: "danger" as const,
+          }
+        : pendingAction === "hide"
+          ? {
+              title: "ねこだよりから外しますか",
+              text: "この写真はあなたのねこだよりに表示されなくなります。",
+              confirm: "外す",
+              variant: "secondary" as const,
+            }
+          : null;
 
   useEffect(() => {
     setPhotoAspectRatio("1 / 1");
+    setPendingAction(null);
   }, [photo.id, photo.kind, photo.sourcePhotoId]);
 
   function handleTouchStart(event: TouchEvent<HTMLDivElement>) {
@@ -2318,6 +2349,18 @@ function MainichiFullscreenPhoto({
     }
   }
 
+  function handleConfirmPendingAction() {
+    if (pendingAction === "delete") {
+      onDeleteSleepingPhoto(photo);
+    } else if (pendingAction === "hide") {
+      onHideDeliveredPhoto(photo);
+    } else if (pendingAction === "report") {
+      onReportDeliveredPhoto(photo);
+    }
+
+    setPendingAction(null);
+  }
+
   return (
     <div
       style={styles.mainichiViewerOverlay}
@@ -2331,7 +2374,7 @@ function MainichiFullscreenPhoto({
           <span style={styles.mainichiViewerSide}>{photo.sideLabel}</span>
           {monthLabel && canNavigate ? (
             <span style={styles.mainichiViewerCount}>
-              {monthLabel} {currentIndex + 1}/{photoCount}
+              {monthLabel}
             </span>
           ) : null}
         </div>
@@ -2347,19 +2390,6 @@ function MainichiFullscreenPhoto({
         </AppButton>
       </div>
       <div style={styles.mainichiViewerStage}>
-        {canNavigate ? (
-          <button
-            type="button"
-            style={{
-              ...styles.mainichiViewerNavButton,
-              ...styles.mainichiViewerNavButtonPrevious,
-            }}
-            onClick={onPrevious}
-            aria-label="前のねこだより"
-          >
-            ‹
-          </button>
-        ) : null}
         <PhotoViewerFrame
           src={getPhotoDetailSrc(photo)}
           alt=""
@@ -2378,17 +2408,37 @@ function MainichiFullscreenPhoto({
           }}
         />
         {canNavigate ? (
-          <button
-            type="button"
-            style={{
-              ...styles.mainichiViewerNavButton,
-              ...styles.mainichiViewerNavButtonNext,
-            }}
-            onClick={onNext}
-            aria-label="次のねこだより"
-          >
-            ›
-          </button>
+          <div style={styles.mainichiViewerPager} aria-label="写真を切り替える">
+            <AppButton
+              type="button"
+              variant="quiet"
+              size="icon"
+              iconOnly
+              aria-label="前のねこだより"
+              style={styles.mainichiViewerPagerButton}
+              onClick={onPrevious}
+            >
+              <AppIcon
+                name="chevronRight"
+                size={19}
+                style={{ transform: "rotate(180deg)" }}
+              />
+            </AppButton>
+            <span style={styles.mainichiViewerPagerCount}>
+              {currentIndex + 1}/{photoCount}
+            </span>
+            <AppButton
+              type="button"
+              variant="quiet"
+              size="icon"
+              iconOnly
+              aria-label="次のねこだより"
+              style={styles.mainichiViewerPagerButton}
+              onClick={onNext}
+            >
+              <AppIcon name="chevronRight" size={19} />
+            </AppButton>
+          </div>
         ) : null}
       </div>
       <div style={styles.mainichiViewerActions} aria-label="写真の操作">
@@ -2408,11 +2458,13 @@ function MainichiFullscreenPhoto({
             <AppButton
               type="button"
               variant="danger"
-              size="sm"
-              iconStart={<AppIcon name="trash" size={17} />}
-              onClick={() => onDeleteSleepingPhoto(photo)}
+              size="icon"
+              iconOnly
+              aria-label="削除"
+              title="削除"
+              onClick={() => setPendingAction("delete")}
             >
-              削除
+              <AppIcon name="trash" size={18} />
             </AppButton>
           </>
         ) : (
@@ -2420,24 +2472,70 @@ function MainichiFullscreenPhoto({
             <AppButton
               type="button"
               variant="ghost"
-              size="sm"
-              iconStart={<AppIcon name="eyeOff" size={17} />}
-              onClick={() => onHideDeliveredPhoto(photo)}
+              size="icon"
+              iconOnly
+              aria-label="ねこだよりから外す"
+              title="ねこだよりから外す"
+              onClick={() => setPendingAction("hide")}
             >
-              非表示
+              <AppIcon name="eyeOff" size={18} />
             </AppButton>
             <AppButton
               type="button"
               variant="danger"
-              size="sm"
-              iconStart={<AppIcon name="flag" size={17} />}
-              onClick={() => onReportDeliveredPhoto(photo)}
+              size="icon"
+              iconOnly
+              aria-label="通報"
+              title="通報"
+              onClick={() => setPendingAction("report")}
             >
-              通報
+              <AppIcon name="flag" size={18} />
             </AppButton>
           </>
         )}
       </div>
+      {pendingActionCopy ? (
+        <div style={styles.mainichiViewerConfirmBackdrop} role="presentation">
+          <section
+            role="alertdialog"
+            aria-modal="true"
+            aria-labelledby="mainichi-viewer-confirm-title"
+            aria-describedby="mainichi-viewer-confirm-text"
+            style={styles.mainichiViewerConfirm}
+          >
+            <h2
+              id="mainichi-viewer-confirm-title"
+              style={styles.mainichiViewerConfirmTitle}
+            >
+              {pendingActionCopy.title}
+            </h2>
+            <p
+              id="mainichi-viewer-confirm-text"
+              style={styles.mainichiViewerConfirmText}
+            >
+              {pendingActionCopy.text}
+            </p>
+            <div style={styles.mainichiViewerConfirmActions}>
+              <AppButton
+                type="button"
+                variant="ghost"
+                size="sm"
+                onClick={() => setPendingAction(null)}
+              >
+                キャンセル
+              </AppButton>
+              <AppButton
+                type="button"
+                variant={pendingActionCopy.variant}
+                size="sm"
+                onClick={handleConfirmPendingAction}
+              >
+                {pendingActionCopy.confirm}
+              </AppButton>
+            </div>
+          </section>
+        </div>
+      ) : null}
     </div>
   );
 }
@@ -5653,8 +5751,9 @@ const styles = {
   mainichiViewerStage: {
     position: "relative",
     display: "grid",
+    justifyItems: "center",
     alignItems: "center",
-    justifyContent: "flex-end",
+    gap: "14px",
   },
   mainichiViewerFrame: {
     width: "min(100%, 560px)",
@@ -5662,38 +5761,43 @@ const styles = {
     maxHeight: "calc(100svh - 180px - env(safe-area-inset-top) - env(safe-area-inset-bottom))",
     justifySelf: "center",
     alignSelf: "center",
-    borderRadius: "var(--radius-2xl)",
+    border: "1px solid color-mix(in srgb, var(--line) 72%, transparent)",
+    borderRadius: "var(--radius-xl)",
+    background: "color-mix(in srgb, var(--paper-card) 72%, transparent)",
+    boxShadow: "0 18px 42px -30px rgba(72,58,38,0.5)",
   },
   mainichiViewerImage: {
     width: "100%",
     height: "100%",
+    borderRadius: "calc(var(--radius-xl) - 2px)",
   },
-  mainichiViewerNavButton: {
-    position: "absolute",
-    top: "50%",
-    zIndex: 2,
-    width: "44px",
-    height: "44px",
-    display: "grid",
-    placeItems: "center",
-    border: "1px solid color-mix(in srgb, var(--line) 72%, transparent)",
+  mainichiViewerPager: {
+    display: "inline-grid",
+    gridTemplateColumns: "36px auto 36px",
+    alignItems: "center",
+    gap: "4px",
+    minHeight: "36px",
+    padding: "2px 6px",
+    border: "1px solid color-mix(in srgb, var(--line) 58%, transparent)",
     borderRadius: "999px",
-    background: "color-mix(in srgb, var(--paper-card) 84%, transparent)",
-    boxShadow: "0 10px 24px -18px rgba(72,58,38,0.46)",
-    color: COLLECTION_TEXT,
+    background: "color-mix(in srgb, var(--paper-card) 66%, transparent)",
+    boxShadow: "0 10px 24px -22px rgba(72,58,38,0.34)",
+  },
+  mainichiViewerPagerButton: {
+    width: "36px",
+    minWidth: "36px",
+    height: "36px",
+    minHeight: "36px",
+  },
+  mainichiViewerPagerCount: {
+    minWidth: "42px",
+    color: COLLECTION_MUTED,
     fontFamily: "var(--font-ui)",
-    fontSize: "30px",
-    fontWeight: 300,
+    fontSize: "12px",
+    fontWeight: 500,
     lineHeight: 1,
-    transform: "translateY(-50%)",
-    cursor: "pointer",
-    WebkitTapHighlightColor: "transparent",
-  },
-  mainichiViewerNavButtonPrevious: {
-    left: "max(8px, calc(50% - min(50vw, 300px) - 10px))",
-  },
-  mainichiViewerNavButtonNext: {
-    right: "max(8px, calc(50% - min(50vw, 300px) - 10px))",
+    textAlign: "center",
+    fontVariantNumeric: "tabular-nums",
   },
   mainichiViewerActions: {
     width: "min(100%, 420px)",
@@ -5702,6 +5806,49 @@ const styles = {
     gridTemplateColumns: "minmax(0, 1fr) auto",
     gap: "10px",
     alignItems: "center",
+  },
+  mainichiViewerConfirmBackdrop: {
+    position: "fixed",
+    inset: 0,
+    zIndex: 1,
+    display: "grid",
+    placeItems: "center",
+    padding: "24px",
+    background: "color-mix(in srgb, var(--ink) 18%, transparent)",
+    backdropFilter: "blur(4px)",
+    WebkitBackdropFilter: "blur(4px)",
+  },
+  mainichiViewerConfirm: {
+    width: "min(100%, 360px)",
+    display: "grid",
+    gap: "13px",
+    padding: "20px",
+    border: "1px solid color-mix(in srgb, var(--line) 72%, transparent)",
+    borderRadius: "var(--radius-xl)",
+    background: "color-mix(in srgb, var(--paper-card) 94%, transparent)",
+    boxShadow: "var(--shadow-e2)",
+  },
+  mainichiViewerConfirmTitle: {
+    margin: 0,
+    color: COLLECTION_TEXT_STRONG,
+    fontFamily: "var(--font-ui)",
+    fontSize: "17px",
+    fontWeight: 500,
+    lineHeight: 1.45,
+  },
+  mainichiViewerConfirmText: {
+    margin: 0,
+    color: COLLECTION_MUTED,
+    fontFamily: "var(--font-ui)",
+    fontSize: "13px",
+    fontWeight: 400,
+    lineHeight: 1.6,
+  },
+  mainichiViewerConfirmActions: {
+    display: "grid",
+    gridTemplateColumns: "1fr 1fr",
+    gap: "10px",
+    marginTop: "3px",
   },
   todayAlbumCard: {
     display: "grid",
