@@ -15,15 +15,74 @@ import {
 import { AppButton } from "../../components/ui/AppButton";
 import { color, radius, spacing } from "../../components/ui/designTokens";
 
-const dreams = [
+const openingParagraphs = [
+  "ねてるねこは、猫の写真がたくさん流れていく場所ではなく、猫をもっと大切に見られる場所でありたいと思っています。",
+  "毎日見ている猫を、もう一度かわいいと思えたり。",
+  "知らなかったその子らしさに、少しずつ気づけたり。",
+  "まだ出会っていない猫にも、自然に目が向いたり。",
+  "そんな場所を、静かに長く育てていきたいです。",
+] as const;
+
+const valuesParagraphs = [
+  "ねてるねこが大事にしたいのは、猫をたくさん見せることよりも、猫を大切に見る時間を増やすことです。",
+  "かわいさを競わせるより、その子らしさに気づけること。",
+  "流れて消えていくより、あとからそっと見返せること。",
+  "誰かに見せるためだけではなく、自分の猫をもっと好きになれること。",
+  "そんな場所でありたいと思っています。",
+] as const;
+
+const futureItems = [
   {
-    text: "家族を探している保護猫の寝顔が、特別な封筒で届く",
-    done: false,
+    title: "自分の猫を、もっと好きになれること",
+    body: [
+      "毎日そばにいる猫でも、見慣れてしまうことがあります。",
+      "でも、ふと見返したときに、「この子らしいな」「やっぱりかわいいな」と思える瞬間があります。",
+      "ねてるねこは、自分の猫の好きなところに何度でも気づける場所にしていきたいです。",
+    ],
   },
-  { text: "寝相の図鑑（香箱、アンモニャイト、へそ天など）", done: false },
-  { text: "月の終わりに届く「◯月の寝顔」", done: false },
-  { text: "年の終わりに、1冊の「寝顔の本」", done: false },
-  { text: "寝顔に添える、3秒の寝息", done: false },
+  {
+    title: "猫のことを、少しずつわかること",
+    body: [
+      "猫は、言葉でたくさん説明してくれるわけではありません。",
+      "しぐさ、距離感、年齢、暮らし方。少しずつ見ているうちに、その子にとって心地いいことが前よりわかるようになる。",
+      "かわいいと思うだけではなく、猫に少しやさしくなれる場所にしていきたいです。",
+    ],
+  },
+  {
+    title: "まだ出会っていない猫にも、自然に目が向くこと",
+    body: [
+      "猫との出会いは、最初から大きな決心ではなくてもいいと思っています。",
+      "「この子、かわいいな」「どんな性格なんだろう」「どんな場所が好きなんだろう」",
+      "そんな小さな興味から、家族を探している猫のことを知るきっかけが生まれるかもしれません。",
+      "ねてるねこの中にも、そんな自然な出会いの余白を少しずつ作っていきたいです。",
+    ],
+  },
+  {
+    title: "猫との時間が、ちゃんと残っていくこと",
+    body: [
+      "猫との毎日は、特別な日ばかりではありません。",
+      "いつもの場所にいること。同じような表情をしていること。なんでもない写真が増えていくこと。",
+      "でも、あとから見返すと、そういう時間ほど大切だったりします。",
+      "ねてるねこは、猫との日々が流れて消えず、あとから静かに見返せる場所でありたいです。",
+    ],
+  },
+  {
+    title: "猫を大切にする人が、静かにつながれること",
+    body: [
+      "にぎやかに広がるよりも、そっと見守れるくらいの距離感がねてるねこには合っていると思っています。",
+      "誰かの猫を見て、自分の猫も大切にしたくなる。",
+      "自分の猫を置いておくことで、誰かの気持ちも少しやわらぐ。",
+      "そんな静かなつながりを育てていきたいです。",
+    ],
+  },
+] as const;
+
+const supportUses = [
+  "写真や記録を安心して預かるための仕組み",
+  "静かで見やすい体験を守ること",
+  "猫のことを少し知れる機能や読みもの",
+  "家族を探している猫にも自然に目が向く仕組みの準備",
+  "アプリを続けていくための開発と運営",
 ] as const;
 
 export default function BetaSupporterPage() {
@@ -117,51 +176,113 @@ export default function BetaSupporterPage() {
           ‹ 設定
         </AppButton>
 
-        <h1 style={styles.title}>これからのねてるねこ</h1>
+        <header style={styles.header}>
+          <p style={styles.kicker}>これからのねてるねこ</p>
+          <h1 style={styles.title}>猫をもっと大切に見られる場所へ。</h1>
+        </header>
 
-        <section style={styles.hero}>
-          <h2 style={styles.heading}>βサポーター</h2>
-          <p style={styles.lead}>
-            サポーターの応援は、サーバー費用、写真のお預かり、この場所を静かに保つために使います。
+        <section style={styles.hero} aria-label="これからのねてるねこ">
+          {openingParagraphs.map((paragraph) => (
+            <p key={paragraph} style={styles.lead}>
+              {paragraph}
+            </p>
+          ))}
+        </section>
+
+        <section style={styles.section}>
+          <h2 style={styles.heading}>小さなきっかけ</h2>
+          <p style={styles.body}>
+            保護猫と暮らすようになってから、猫を見る目が少し変わりました。
           </p>
-          <p style={styles.lead}>
-            そのうえで、少しずつ形にしたいことがあります。
+          <p style={styles.body}>好きな場所。安心する距離感。ちょっとしたクセや、表情。</p>
+          <p style={styles.body}>
+            知っていくほど、その子の好きなところが増えていく。
+          </p>
+          <p style={styles.body}>
+            ねてるねこも、そんな小さな発見が増えていく場所にしたいです。
           </p>
         </section>
 
         <section style={styles.section}>
-          <h2 style={styles.heading}>形にしたいこと</h2>
-          <ul style={styles.dreamList}>
-            {dreams.map((dream) => (
-              <li key={dream.text} style={styles.dreamItem}>
-                <span style={styles.dreamDot} aria-hidden="true" />
-                <span>
-                  {dream.text}
-                  {dream.done ? <span style={styles.doneMark}>できました</span> : null}
-                </span>
+          <h2 style={styles.heading}>大事にしたいこと</h2>
+          {valuesParagraphs.map((paragraph) => (
+            <p key={paragraph} style={styles.body}>
+              {paragraph}
+            </p>
+          ))}
+        </section>
+
+        <section style={styles.section}>
+          <h2 style={styles.heading}>少しずつ育てたいこと</h2>
+          <p style={styles.body}>まだ、全部の形は決まっていません。</p>
+          <p style={styles.body}>でも、ねてるねこで増やしていきたい時間があります。</p>
+          <div style={styles.futureList}>
+            {futureItems.map((item) => (
+              <article key={item.title} style={styles.futureItem}>
+                <h3 style={styles.futureTitle}>{item.title}</h3>
+                {item.body.map((paragraph) => (
+                  <p key={paragraph} style={styles.futureBody}>
+                    {paragraph}
+                  </p>
+                ))}
+              </article>
+            ))}
+          </div>
+        </section>
+
+        <section style={styles.section}>
+          <h2 style={styles.heading}>まだ形にしすぎないこと</h2>
+          <p style={styles.body}>ここに書いていることは、決まった機能の一覧ではありません。</p>
+          <p style={styles.body}>作りながら、変わることもあります。順番が入れ替わることもあります。</p>
+          <p style={styles.body}>
+            でも、猫をもっと好きになれる場所にしたい、猫のことを少し知れる場所にしたい、まだ出会っていない猫にも目が向く場所にしたい。
+          </p>
+          <p style={styles.body}>その気持ちは変わりません。</p>
+          <p style={styles.closing}>できたものから、少しずつ届けます。</p>
+        </section>
+
+        <section style={styles.section}>
+          <h2 style={styles.heading}>この場所を続けるために</h2>
+          <p style={styles.body}>
+            ねてるねこを、広告や数字に寄りすぎない場所として静かに続けていくには、少しずつ支えが必要です。
+          </p>
+          <p style={styles.body}>
+            いただいた応援は、ねてるねこを長く育てるために使います。
+          </p>
+          <ul style={styles.supportList}>
+            {supportUses.map((use) => (
+              <li key={use} style={styles.supportItem}>
+                <span style={styles.supportDot} aria-hidden="true" />
+                <span>{use}</span>
               </li>
             ))}
           </ul>
         </section>
 
         <section style={styles.section}>
-          <h2 style={styles.heading}>小さなメモ</h2>
-          <p style={styles.note}>
-            これは約束ではなく、アイデアのメモです。
-            <br />
-            内容や順番は変わることがあります。
+          <h2 style={styles.heading}>応援しても、しなくても</h2>
+          <p style={styles.body}>
+            応援してもしなくても、ねてるねこの基本的な体験は変わりません。
           </p>
-          <p style={styles.closing}>できたものから、みんなに届きます。</p>
+          <p style={styles.body}>
+            投稿が有利になったり、見える猫が増えたりするものではありません。
+          </p>
+          <p style={styles.body}>
+            これは機能を買うための支払いというより、この場所を一緒に育てるための応援です。
+          </p>
         </section>
 
         <section style={styles.actionSection}>
-          <h2 style={styles.heading}>支払い</h2>
+          <p style={styles.supporterLabel}>βサポーター</p>
+          <h2 style={styles.actionTitle}>この場所を支える</h2>
           <p style={styles.price}>月 1,480円</p>
           <p style={styles.note}>
-            機能は何も制限しません。
-            <br />
-            応援してもしなくても、ねてるねこは同じように使えます。
+            ねてるねこを、静かに長く続く場所にするための応援です。
           </p>
+          <p style={styles.note}>
+            自分の猫をもっと好きになれる場所を。猫のことを少し知れる場所を。まだ出会っていない猫にも、自然に目が向く場所を。
+          </p>
+          <p style={styles.closing}>少しずつ育てていきます。</p>
           {billingStatus.isBetaSupporter ? (
             <AppButton
               type="button"
@@ -180,7 +301,7 @@ export default function BetaSupporterPage() {
               onClick={handleStartSupporter}
               disabled={isLoading}
             >
-              {isLoading ? "Stripeへ移動しています" : "応援する"}
+              {isLoading ? "Stripeへ移動しています" : "そっと応援する"}
             </AppButton>
           ) : (
             <p style={styles.note}>
@@ -193,11 +314,21 @@ export default function BetaSupporterPage() {
         </section>
 
         <nav style={styles.legalLinks} aria-label="法務リンク">
-          <AppButton href="/terms" variant="quiet" size="sm">利用規約</AppButton>
-          <AppButton href="/privacy" variant="quiet" size="sm">プライバシーポリシー</AppButton>
-          <AppButton href="/contact" variant="quiet" size="sm">問い合わせ</AppButton>
-          <AppButton href="/cancellation" variant="quiet" size="sm">解約方法</AppButton>
-          <AppButton href="/commercial-transactions" variant="quiet" size="sm">特商法表記</AppButton>
+          <AppButton href="/terms" variant="quiet" size="sm">
+            利用規約
+          </AppButton>
+          <AppButton href="/privacy" variant="quiet" size="sm">
+            プライバシーポリシー
+          </AppButton>
+          <AppButton href="/contact" variant="quiet" size="sm">
+            問い合わせ
+          </AppButton>
+          <AppButton href="/cancellation" variant="quiet" size="sm">
+            解約方法
+          </AppButton>
+          <AppButton href="/commercial-transactions" variant="quiet" size="sm">
+            特商法表記
+          </AppButton>
         </nav>
       </div>
     </main>
@@ -234,69 +365,113 @@ const styles = {
   },
   backLink: {
     justifySelf: "start",
-    marginBottom: "18px",
+    marginBottom: 18,
+  },
+  header: {
+    display: "grid",
+    gap: 8,
+    marginBottom: 28,
+  },
+  kicker: {
+    margin: 0,
+    color: color.textMuted,
+    fontSize: 12,
+    fontWeight: 500,
+    lineHeight: 1.5,
+  },
+  title: {
+    margin: 0,
+    color: color.textStrong,
+    fontSize: 25,
+    fontWeight: 500,
+    lineHeight: 1.48,
   },
   hero: {
     display: "grid",
-    gap: "10px",
-    padding: "18px 0",
+    gap: 12,
+    padding: "20px 0 22px",
     borderTop: "1px solid rgba(120,108,94,0.14)",
   },
   section: {
     display: "grid",
-    gap: "12px",
-    padding: "18px 0",
+    gap: 12,
+    padding: "22px 0",
     borderTop: "1px solid rgba(120,108,94,0.14)",
   },
   actionSection: {
     display: "grid",
-    gap: "12px",
-    margin: "18px 0 0",
-    padding: "16px",
-    borderRadius: "var(--radius-lg)",
+    gap: 12,
+    margin: "20px 0 0",
+    padding: "18px 16px",
+    borderRadius: radius.lg,
     border: "1px solid rgba(120,108,94,0.16)",
-    background: "rgba(255,253,248,0.54)",
+    background: "rgba(255,253,248,0.58)",
   },
   heading: {
     margin: 0,
     color: color.textStrong,
-    fontSize: 15,
+    fontSize: 16,
     fontWeight: 500,
     lineHeight: 1.6,
-    letterSpacing: "0.03em",
-  },
-  title: {
-    margin: "0 0 26px",
-    color: color.textStrong,
-    fontSize: 24,
-    fontWeight: 500,
-    lineHeight: 1.42,
-    letterSpacing: "0.04em",
   },
   lead: {
+    margin: 0,
+    color: color.text,
+    fontSize: 14,
+    fontWeight: 500,
+    lineHeight: 1.95,
+  },
+  body: {
+    margin: 0,
+    color: color.textMuted,
+    fontSize: 13,
+    fontWeight: 500,
+    lineHeight: 1.92,
+  },
+  futureList: {
+    display: "grid",
+    gap: 0,
+    marginTop: 4,
+    borderTop: "1px solid rgba(120,108,94,0.12)",
+  },
+  futureItem: {
+    display: "grid",
+    gap: 8,
+    padding: "16px 0",
+    borderBottom: "1px solid rgba(120,108,94,0.12)",
+  },
+  futureTitle: {
+    margin: 0,
+    color: color.textStrong,
+    fontSize: 14,
+    fontWeight: 500,
+    lineHeight: 1.65,
+  },
+  futureBody: {
     margin: 0,
     color: color.textMuted,
     fontSize: 13,
     fontWeight: 500,
     lineHeight: 1.9,
   },
-  dreamList: {
+  supportList: {
     display: "grid",
-    gap: spacing.md,
+    gap: 10,
     listStyle: "none",
-    margin: 0,
+    margin: "2px 0 0",
     padding: 0,
   },
-  dreamItem: {
+  supportItem: {
     display: "grid",
     gridTemplateColumns: "12px 1fr",
     alignItems: "start",
     gap: spacing.sm,
-    color: color.text,
+    color: color.textMuted,
     fontSize: 13,
-    lineHeight: 1.85,
+    fontWeight: 500,
+    lineHeight: 1.75,
   },
-  dreamDot: {
+  supportDot: {
     width: 5,
     height: 5,
     marginTop: 9,
@@ -304,17 +479,19 @@ const styles = {
     background: color.accentWarm,
     opacity: 0.62,
   },
-  doneMark: {
-    display: "inline-flex",
-    marginLeft: spacing.sm,
-    padding: "2px 7px",
-    borderRadius: radius.pill,
-    border: `1px solid ${color.border}`,
-    color: color.accent,
+  supporterLabel: {
+    margin: 0,
+    color: color.textMuted,
     fontSize: 12,
     fontWeight: 500,
-    lineHeight: 1.35,
-    verticalAlign: "middle",
+    lineHeight: 1.5,
+  },
+  actionTitle: {
+    margin: 0,
+    color: color.textStrong,
+    fontSize: 18,
+    fontWeight: 500,
+    lineHeight: 1.5,
   },
   note: {
     margin: 0,
@@ -349,6 +526,6 @@ const styles = {
     flexWrap: "wrap",
     justifyContent: "center",
     gap: `${spacing.sm}px ${spacing.md}px`,
-    padding: `18px 0 0`,
+    padding: "18px 0 0",
   },
 } satisfies Record<string, CSSProperties>;

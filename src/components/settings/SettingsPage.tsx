@@ -1102,7 +1102,7 @@ function BetaSupporterPanel({
         {billingStatus.isBetaSupporter ? "βサポーターです" : "βサポーター"}
       </p>
       <p style={styles.betaNoteText}>
-        これからの ねてるねこと、応援の使いみちを見られます。
+        ねてるねこのこれからと、この場所を静かに続けるための応援について見られます。
       </p>
       <AppButton
         href="/beta-supporter"
