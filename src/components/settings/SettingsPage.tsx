@@ -712,43 +712,39 @@ export function SettingsPage() {
               <p style={styles.loadingText}>確認中...</p>
             ) : isLoggedIn ? (
               <>
-                <div style={styles.row}>
+                <div style={styles.accountRow}>
                   <div style={styles.rowLeft}>
                     <span style={styles.statusDot} />
                     <span style={styles.rowLabel}>接続済み</span>
                   </div>
-                  <span style={styles.rowValue}>{email ?? ""}</span>
-                </div>
-                <div style={styles.divider} />
-                <div style={styles.secondaryActionRow}>
-                  <AppButton
-                    type="button"
-                    variant="quiet"
-                    size="sm"
-                    style={styles.logoutButton}
-                    onClick={handleLogout}
-                  >
-                    ログアウト
-                  </AppButton>
+                  <div style={styles.accountActionSide}>
+                    <span style={styles.accountEmail}>{email ?? ""}</span>
+                    <button
+                      type="button"
+                      style={styles.accountTextButton}
+                      onClick={handleLogout}
+                    >
+                      ログアウト
+                    </button>
+                  </div>
                 </div>
               </>
             ) : (
               <>
-                <div style={styles.row}>
+                <div style={styles.accountRow}>
                   <div style={styles.rowLeft}>
                     <span style={{ ...styles.statusDot, ...styles.statusDotOff }} />
                     <span style={styles.rowLabel}>未接続</span>
                   </div>
+                  <AppButton
+                    href="/account/create"
+                    variant="quiet"
+                    size="sm"
+                    style={styles.accountInlineButton}
+                  >
+                    作成する
+                  </AppButton>
                 </div>
-                <div style={styles.divider} />
-                <AppButton
-                  href="/account/create"
-                  variant="ghost"
-                  fullWidth
-                  style={styles.settingsActionButton}
-                >
-                  アカウントを作成する
-                </AppButton>
               </>
             )}
           </AppCard>
@@ -2339,16 +2335,51 @@ const styles = {
     fontSize: "13px",
     fontWeight: 500,
   },
-  secondaryActionRow: {
-    display: "flex",
-    justifyContent: "flex-end",
-    padding: "4px 0",
+  accountRow: {
+    display: "grid",
+    gridTemplateColumns: "minmax(0, 1fr) auto",
+    alignItems: "center",
+    gap: "12px",
+    minHeight: "54px",
+    padding: "8px 0",
   },
-  logoutButton: {
-    minHeight: "38px",
-    padding: "0 4px",
+  accountActionSide: {
+    minWidth: 0,
+    display: "grid",
+    justifyItems: "end",
+    gap: "2px",
+  },
+  accountEmail: {
+    maxWidth: "178px",
+    overflow: "hidden",
+    textOverflow: "ellipsis",
+    whiteSpace: "nowrap" as const,
+    fontSize: "12px",
+    lineHeight: 1.35,
+    color: "var(--ink-soft)",
+  },
+  accountTextButton: {
+    minHeight: "30px",
+    padding: "0 2px",
+    border: "none",
+    borderRadius: "999px",
+    background: "transparent",
     color: "var(--ink-soft)",
     boxShadow: "none",
+    font: "inherit",
+    fontSize: "12px",
+    fontWeight: 500,
+    cursor: "pointer",
+  },
+  accountInlineButton: {
+    minHeight: "36px",
+    padding: "0 12px",
+    border: "1px solid rgba(120, 108, 94, 0.12)",
+    background: "rgba(255, 253, 248, 0.3)",
+    color: "var(--ink-soft)",
+    boxShadow: "none",
+    fontSize: "12px",
+    fontWeight: 500,
   },
   betaNote: {
     padding: "12px 0",
