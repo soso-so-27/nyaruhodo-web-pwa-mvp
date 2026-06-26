@@ -664,8 +664,9 @@ export function SettingsPage() {
                 <div style={styles.actionStack}>
                   <AppButton
                     type="button"
-                    variant="secondary"
+                    variant="ghost"
                     fullWidth
+                    style={styles.settingsActionButton}
                     loading={isSyncing}
                     onClick={() => {
                       void handleSyncNow();
@@ -676,8 +677,9 @@ export function SettingsPage() {
                   </AppButton>
                   <AppButton
                     type="button"
-                    variant="ghost"
+                    variant="quiet"
                     fullWidth
+                    style={styles.settingsQuietActionButton}
                     loading={isSyncing}
                     onClick={() => {
                       void handleRestoreFromAccount();
@@ -739,7 +741,12 @@ export function SettingsPage() {
                   </div>
                 </div>
                 <div style={styles.divider} />
-                <AppButton href="/account/create" variant="secondary" fullWidth>
+                <AppButton
+                  href="/account/create"
+                  variant="ghost"
+                  fullWidth
+                  style={styles.settingsActionButton}
+                >
                   アカウントを作成する
                 </AppButton>
               </>
@@ -772,8 +779,9 @@ export function SettingsPage() {
               <div style={styles.referralActions}>
                 <AppButton
                   type="button"
-                  variant="secondary"
+                  variant="ghost"
                   fullWidth
+                  style={styles.settingsActionButton}
                   onClick={() => {
                     void handleShareReferralLink();
                   }}
@@ -784,6 +792,7 @@ export function SettingsPage() {
                   type="button"
                   variant="quiet"
                   fullWidth
+                  style={styles.settingsQuietActionButton}
                   onClick={() => {
                     void handleCopyReferralLink();
                   }}
@@ -814,8 +823,9 @@ export function SettingsPage() {
                 </div>
                 <AppButton
                   type="button"
-                  variant="secondary"
+                  variant="ghost"
                   fullWidth
+                  style={styles.settingsActionButton}
                   onClick={() => {
                     setFeedbackKind("beta_feedback");
                     setIsFeedbackOpen((open) => !open);
@@ -846,7 +856,12 @@ export function SettingsPage() {
                   </p>
                 </div>
                 {!isLoggedIn ? (
-                  <AppButton href="/account/create" variant="secondary" fullWidth>
+                  <AppButton
+                    href="/account/create"
+                    variant="ghost"
+                    fullWidth
+                    style={styles.settingsActionButton}
+                  >
                     ログインして参加する
                   </AppButton>
                 ) : null}
@@ -1093,7 +1108,12 @@ function BetaSupporterPanel({
       <p style={styles.betaNoteText}>
         これからの ねてるねこと、応援の使いみちを見られます。
       </p>
-      <AppButton href="/beta-supporter" variant="secondary" fullWidth>
+      <AppButton
+        href="/beta-supporter"
+        variant="ghost"
+        fullWidth
+        style={styles.settingsActionButton}
+      >
         これからの ねてるねこ
       </AppButton>
       {billingMessage ? (
@@ -1150,8 +1170,9 @@ function BetaFeedbackForm({
       />
       <AppButton
         type="submit"
-        variant="secondary"
+        variant="ghost"
         fullWidth
+        style={styles.settingsActionButton}
         loading={isSending}
         disabled={isSending}
       >
@@ -2297,8 +2318,26 @@ const styles = {
   },
   actionStack: {
     display: "grid",
-    gap: "10px",
+    gap: "8px",
     padding: "0 0 12px",
+  },
+  settingsActionButton: {
+    minHeight: "42px",
+    border: "1px solid rgba(120,108,94,0.14)",
+    background: "rgba(255,253,248,0.38)",
+    color: "var(--ink)",
+    boxShadow: "none",
+    fontSize: "13px",
+    fontWeight: 500,
+  },
+  settingsQuietActionButton: {
+    minHeight: "40px",
+    border: "1px solid transparent",
+    background: "transparent",
+    color: "var(--ink-soft)",
+    boxShadow: "none",
+    fontSize: "13px",
+    fontWeight: 500,
   },
   secondaryActionRow: {
     display: "flex",
