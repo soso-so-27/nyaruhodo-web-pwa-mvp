@@ -92,6 +92,7 @@ import { AppLoadingScreen } from "../loading/AppLoadingScreen";
 import { HomeDeskModel } from "./HomeDeskModel";
 import {
   getActiveCatProfile,
+  getCatAvatarSrcForCoat,
   getCatName,
   readActiveCatId,
   readCatProfiles,
@@ -3310,6 +3311,10 @@ function ExchangeSharePermissionSheet({
   const shouldShowCatPicker = catProfiles.length > 1;
   const [mode, setMode] = useState<"shared" | "private">("shared");
   const isPrivate = mode === "private" || !isExchangeTargetAvailable;
+  const selectedCatProfile =
+    catProfiles.find((profile) => profile.id === selectedCatId) ??
+    catProfiles[0] ??
+    null;
 
   function selectMode(nextMode: "shared" | "private") {
     setMode(nextMode);
@@ -3319,60 +3324,132 @@ function ExchangeSharePermissionSheet({
   return (
     <AppSheet
       placement="bottom"
-      title={"このねがおで よければ"}
+      title={"このねがおを とっておく"}
       variant="dim"
       closeOnOverlay={false}
       onClose={onClose}
       style={styles.exchangeSheetFrame}
     >
-        <div style={styles.exchangeSharePreview}>
+        <div style={styles.exchangeShareLayout}>
+          <div style={styles.exchangeSharePreview}>
           <StoredPhotoImage src={photo.src} alt="" style={styles.exchangePhoto} />
+          </div>
+          <div style={styles.exchangeShareSummary}>
+            <span style={styles.exchangeShareSummaryIcon} aria-hidden="true">
+              <AppIcon name={isPrivate ? "lock" : "mail"} size={17} />
+            </span>
+            <p style={styles.exchangeLead}>
+              {isPrivate ? "自分だけの記録にします。" : deliveryCopy}
+            </p>
+          </div>
         </div>
-        <p style={styles.exchangeLead}>
-          {isPrivate
-            ? "とっておくと、アルバムにだけ入ります。"
-            : `とっておくと、${deliveryCopy}`}
-        </p>
-        {shouldShowCatPicker ? (
-          <div style={styles.exchangeCatPicker} aria-label="入れる猫">
-            {catProfiles.map((profile) => {
-              const isSelected = profile.id === selectedCatId;
 
-              return (
-                <button
-                  key={profile.id}
-                  type="button"
-                  style={{
-                    ...styles.exchangeCatOption,
-                    ...(isSelected ? styles.exchangeCatOptionActive : {}),
-                  }}
-                  onClick={() => onCatSelect(profile.id)}
-                  aria-pressed={isSelected}
-                >
-                  <span style={styles.exchangeCatName}>{getCatName(profile)}</span>
-                  {isSelected ? (
-                    <span style={styles.exchangeCatSelectedMark} aria-hidden="true">
-                      ✓
+        <div style={styles.exchangeDecisionStack}>
+        {shouldShowCatPicker ? (
+          <div style={styles.exchangeDecisionBlock}>
+            <p style={styles.exchangeDecisionLabel}>この子の記録に入れる</p>
+            <div style={styles.exchangeCatPicker} aria-label="入れる猫">
+              {catProfiles.map((profile) => {
+                const isSelected = profile.id === selectedCatId;
+                const avatarSrc =
+                  profile.avatarDataUrl ??
+                  getCatAvatarSrcForCoat(profile.appearance?.coat);
+
+                return (
+                  <button
+                    key={profile.id}
+                    type="button"
+                    style={{
+                      ...styles.exchangeCatOption,
+                      ...(isSelected ? styles.exchangeCatOptionActive : {}),
+                    }}
+                    onClick={() => onCatSelect(profile.id)}
+                    aria-pressed={isSelected}
+                  >
+                    <span style={styles.exchangeCatAvatar}>
+                      <StoredPhotoImage
+                        src={avatarSrc}
+                        alt=""
+                        style={{
+                          ...styles.exchangeCatAvatarImage,
+                          objectFit: profile.avatarDataUrl ? "cover" : "contain",
+                        }}
+                      />
                     </span>
-                  ) : null}
-                </button>
-              );
-            })}
+                    <span style={styles.exchangeCatName}>{getCatName(profile)}</span>
+                    {isSelected ? (
+                      <span style={styles.exchangeCatSelectedMark} aria-hidden="true">
+                        ✓
+                      </span>
+                    ) : null}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        ) : selectedCatProfile ? (
+          <div style={styles.exchangeSelectedCatCard}>
+            <span style={styles.exchangeShareSummaryIcon} aria-hidden="true">
+              <AppIcon name="cat" size={17} />
+            </span>
+            <span style={styles.exchangeSelectedCatText}>
+              {getCatName(selectedCatProfile)}の記録に入ります
+            </span>
           </div>
         ) : null}
+
         {isExchangeTargetAvailable ? (
-          <button
-            type="button"
-            style={{
-              ...styles.exchangePrivateToggleButton,
-              ...(isPrivate ? styles.exchangePrivateToggleButtonActive : {}),
-            }}
-            onClick={() => selectMode(isPrivate ? "shared" : "private")}
-            aria-pressed={isPrivate}
-          >
-            {isPrivate ? "この1まいは、とどけません" : "この1まいは、とどけない"}
-          </button>
-        ) : null}
+          <div style={styles.exchangeDecisionBlock}>
+            <p style={styles.exchangeDecisionLabel}>ねこだより</p>
+            <div style={styles.exchangeModeGroup} role="group" aria-label="ねこだより">
+              <button
+                type="button"
+                style={{
+                  ...styles.exchangeModeButton,
+                  ...(!isPrivate ? styles.exchangeModeButtonActive : {}),
+                }}
+                onClick={() => selectMode("shared")}
+                aria-pressed={!isPrivate}
+              >
+                <span style={styles.exchangeModeIcon} aria-hidden="true">
+                  <AppIcon name="mail" size={18} />
+                </span>
+                <span style={styles.exchangeModeText}>
+                  <span style={styles.exchangeModeLabel}>届ける</span>
+                  <span style={styles.exchangeModeSub}>よる8じの便りに使う</span>
+                </span>
+              </button>
+              <button
+                type="button"
+                style={{
+                  ...styles.exchangeModeButton,
+                  ...(isPrivate ? styles.exchangeModeButtonActive : {}),
+                }}
+                onClick={() => selectMode("private")}
+                aria-pressed={isPrivate}
+              >
+                <span style={styles.exchangeModeIcon} aria-hidden="true">
+                  <AppIcon name="lock" size={18} />
+                </span>
+                <span style={styles.exchangeModeText}>
+                  <span style={styles.exchangeModeLabel}>自分だけ</span>
+                  <span style={styles.exchangeModeSub}>ねこだよりに使わない</span>
+                </span>
+              </button>
+            </div>
+          </div>
+        ) : (
+          <div style={styles.exchangeSelectedCatCard}>
+            <span style={styles.exchangeShareSummaryIcon} aria-hidden="true">
+              <AppIcon name="lock" size={17} />
+            </span>
+            <span style={styles.exchangeSelectedCatText}>
+              きょうの便りは届いたので、自分だけの記録にします
+            </span>
+          </div>
+        )}
+        </div>
+
         <div style={styles.exchangeActions}>
           <button
             type="button"
@@ -7058,12 +7135,18 @@ const styles = {
     maxWidth: "410px",
     margin: "0 auto",
   },
+  exchangeShareLayout: {
+    display: "grid",
+    gap: "10px",
+    minWidth: 0,
+  },
   exchangeLead: {
-    margin: "0 2px 10px",
-    color: "#716b60",
-    fontSize: "12px",
+    margin: 0,
+    color: "#5f584f",
+    fontSize: "13px",
     fontWeight: 500,
-    lineHeight: 1.45,
+    lineHeight: 1.5,
+    letterSpacing: "0.02em",
   },
   exchangePhotoFrame: {
     width: "100%",
@@ -7087,48 +7170,110 @@ const styles = {
   },
   exchangeSharePreview: {
     width: "100%",
-    height: "clamp(230px, 46vh, 340px)",
-    borderRadius: "var(--radius-xl)",
+    height: "clamp(230px, 43vh, 330px)",
+    borderRadius: "24px",
     overflow: "hidden",
-    background: "rgba(47,42,35,0.06)",
-    border: "0.5px solid rgba(86,78,64,0.1)",
+    background:
+      "linear-gradient(180deg, rgba(255,253,248,0.92), rgba(248,242,232,0.88))",
+    border: "1px solid rgba(144,126,102,0.12)",
     display: "flex",
     alignItems: "center",
     justifyContent: "center",
     boxSizing: "border-box",
-    marginBottom: "10px",
+    boxShadow:
+      "inset 0 1px 0 rgba(255,255,255,0.62), 0 12px 28px rgba(90,76,60,0.06)",
+  },
+  exchangeShareSummary: {
+    display: "grid",
+    gridTemplateColumns: "30px minmax(0, 1fr)",
+    alignItems: "center",
+    gap: "9px",
+    minHeight: "42px",
+    padding: "8px 10px",
+    borderRadius: "18px",
+    border: "1px solid rgba(144,126,102,0.1)",
+    background: "rgba(255,253,248,0.54)",
+    boxSizing: "border-box",
+  },
+  exchangeShareSummaryIcon: {
+    width: "30px",
+    height: "30px",
+    borderRadius: "999px",
+    display: "inline-flex",
+    alignItems: "center",
+    justifyContent: "center",
+    color: "#a8493f",
+    background: "rgba(168,73,63,0.08)",
+  },
+  exchangeDecisionStack: {
+    display: "grid",
+    gap: "10px",
+    margin: "12px 0 14px",
+    minWidth: 0,
+  },
+  exchangeDecisionBlock: {
+    display: "grid",
+    gap: "7px",
+    minWidth: 0,
+  },
+  exchangeDecisionLabel: {
+    margin: "0 2px",
+    color: "#8a8174",
+    fontSize: "12px",
+    fontWeight: 500,
+    lineHeight: 1.35,
+    letterSpacing: "0.04em",
   },
   exchangeCatPicker: {
     display: "flex",
-    gap: "8px",
+    gap: "7px",
     overflowX: "auto",
     scrollbarWidth: "none",
-    padding: "8px 1px 4px",
+    padding: "1px",
   },
   exchangeCatOption: {
     display: "inline-flex",
     alignItems: "center",
     justifyContent: "center",
-    gap: "7px",
-    minWidth: "74px",
-    minHeight: "36px",
-    border: "0.5px solid rgba(86,78,64,0.12)",
-    borderRadius: "var(--radius-full)",
-    background: "rgba(255,255,255,0.38)",
+    gap: "8px",
+    minWidth: "92px",
+    minHeight: "44px",
+    border: "1px solid rgba(144,126,102,0.12)",
+    borderRadius: "999px",
+    background: "rgba(255,253,248,0.52)",
     color: "#716b60",
-    padding: "0 14px",
+    padding: "4px 12px 4px 5px",
     cursor: "pointer",
     flexShrink: 0,
+    boxShadow: "inset 0 1px 0 rgba(255,255,255,0.48)",
   },
   exchangeCatOptionActive: {
-    border: "1px solid rgba(61,54,44,0.34)",
-    background: "rgba(86,78,64,0.12)",
-    color: "#292721",
-    boxShadow: "inset 0 1px 0 rgba(255,255,255,0.46)",
+    border: "1px solid rgba(168,73,63,0.36)",
+    background: "rgba(255,248,240,0.88)",
+    color: "#3b332c",
+    boxShadow:
+      "inset 0 1px 0 rgba(255,255,255,0.56), 0 7px 16px rgba(120,82,58,0.06)",
+  },
+  exchangeCatAvatar: {
+    width: "34px",
+    height: "34px",
+    borderRadius: "999px",
+    overflow: "hidden",
+    display: "inline-flex",
+    alignItems: "center",
+    justifyContent: "center",
+    background: "rgba(255,253,248,0.82)",
+    border: "1px solid rgba(144,126,102,0.12)",
+    flexShrink: 0,
+  },
+  exchangeCatAvatarImage: {
+    width: "100%",
+    height: "100%",
+    display: "block",
   },
   exchangeCatName: {
     minWidth: 0,
-    maxWidth: "116px",
+    maxWidth: "88px",
     overflow: "hidden",
     textOverflow: "ellipsis",
     whiteSpace: "nowrap",
@@ -7136,10 +7281,31 @@ const styles = {
     fontWeight: 500,
   },
   exchangeCatSelectedMark: {
-    color: "#5b4d40",
+    color: "#a8493f",
     fontSize: "12px",
     fontWeight: 720,
     lineHeight: 1,
+  },
+  exchangeSelectedCatCard: {
+    display: "grid",
+    gridTemplateColumns: "34px minmax(0, 1fr)",
+    alignItems: "center",
+    gap: "10px",
+    minHeight: "50px",
+    padding: "8px 10px",
+    borderRadius: "18px",
+    border: "1px solid rgba(144,126,102,0.1)",
+    background: "rgba(255,253,248,0.52)",
+    color: "#5f584f",
+    boxSizing: "border-box",
+  },
+  exchangeSelectedCatText: {
+    minWidth: 0,
+    color: "#5f584f",
+    fontSize: "13px",
+    fontWeight: 500,
+    lineHeight: 1.45,
+    letterSpacing: "0.02em",
   },
   exchangePrivateToggleButton: {
     justifySelf: "start",
@@ -7216,27 +7382,40 @@ const styles = {
     display: "grid",
     gridTemplateColumns: "repeat(2, minmax(0, 1fr))",
     gap: "8px",
-    margin: "10px 0 8px",
+    margin: 0,
   },
   exchangeModeButton: {
     minWidth: 0,
-    minHeight: "54px",
-    border: "0.5px solid rgba(86,78,64,0.12)",
-    borderRadius: "var(--radius-lg)",
-    background: "rgba(255,255,255,0.46)",
+    minHeight: "66px",
+    border: "1px solid rgba(144,126,102,0.12)",
+    borderRadius: "20px",
+    background: "rgba(255,253,248,0.5)",
     color: "#716b60",
     display: "inline-flex",
     alignItems: "center",
-    justifyContent: "center",
-    gap: "8px",
-    padding: "8px 9px",
+    justifyContent: "flex-start",
+    gap: "9px",
+    padding: "10px",
     cursor: "pointer",
+    boxShadow: "inset 0 1px 0 rgba(255,255,255,0.48)",
   },
   exchangeModeButtonActive: {
-    border: "0.5px solid rgba(61,54,44,0.22)",
-    background: "rgba(255,255,255,0.9)",
-    color: "#292721",
-    boxShadow: "0 8px 18px rgba(90,76,60,0.06)",
+    border: "1px solid rgba(168,73,63,0.34)",
+    background: "rgba(255,248,240,0.92)",
+    color: "#3b332c",
+    boxShadow:
+      "inset 0 1px 0 rgba(255,255,255,0.58), 0 8px 18px rgba(120,82,58,0.07)",
+  },
+  exchangeModeIcon: {
+    width: "32px",
+    height: "32px",
+    borderRadius: "999px",
+    display: "inline-flex",
+    alignItems: "center",
+    justifyContent: "center",
+    flexShrink: 0,
+    color: "#a8493f",
+    background: "rgba(168,73,63,0.08)",
   },
   exchangeModeText: {
     minWidth: 0,
@@ -7246,16 +7425,15 @@ const styles = {
   },
   exchangeModeLabel: {
     fontSize: "13px",
-    fontWeight: 500,
-    lineHeight: 1.1,
+    fontWeight: 520,
+    lineHeight: 1.25,
     whiteSpace: "nowrap",
   },
   exchangeModeSub: {
     color: "#8a8174",
-    fontSize: "12px",
+    fontSize: "11px",
     fontWeight: 500,
-    lineHeight: 1.1,
-    whiteSpace: "nowrap",
+    lineHeight: 1.25,
   },
   exchangeAssurance: {
     margin: "0 2px 12px",
@@ -7271,15 +7449,18 @@ const styles = {
     gap: "10px",
   },
   exchangeKeepButton: {
-    minHeight: "50px",
-    border: "0.5px solid rgba(86,78,64,0.14)",
+    minHeight: "54px",
+    border: "1px solid rgba(144,126,102,0.14)",
     borderRadius: "var(--radius-full)",
-    background: "rgba(255,253,248,0.94)",
+    background:
+      "linear-gradient(180deg, rgba(255,253,248,0.98), rgba(248,242,232,0.94))",
     color: "#292721",
     fontSize: "15px",
-    fontWeight: 500,
+    fontWeight: 520,
+    letterSpacing: "0.04em",
     cursor: "pointer",
-    boxShadow: "0 8px 20px rgba(90,76,60,0.07)",
+    boxShadow:
+      "inset 0 1px 0 rgba(255,255,255,0.72), 0 12px 26px rgba(90,76,60,0.08)",
   },
   exchangePlainButton: {
     minHeight: "28px",
