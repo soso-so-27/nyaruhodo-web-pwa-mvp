@@ -20,11 +20,12 @@ import { getStoragePhotoPath, isUsablePhotoSrc } from "../../lib/photoStorage";
 import {
   BOX_PHOTO_STORAGE_EVENT,
   deleteOwnSleepingPhoto,
+  dismissExchangePhoto,
   hideKeptExchangePhoto,
   isExchangePhotoLocallyBlocked,
-  keepExchangePhoto,
   readKeptExchangePhotos,
   readAllOwnSleepingPhotos,
+  reportExchangePhoto,
   updateKeptExchangePhotoDataUrl,
   updateOwnSleepingPhotoDelivery,
   type ExchangePhoto,
@@ -294,6 +295,7 @@ type MainichiDayPhoto = {
   kind: BoxDetailKind;
   sideLabel: string;
   catName?: string;
+  shared?: boolean;
   storageWriteback?: (dataUrl: string) => void;
   deliveredAt?: number;
 };
@@ -757,29 +759,147 @@ export function CollectionPage() {
     });
   }
 
-  function handleKeepMainichiPhoto(photo: MainichiDayPhoto) {
-    if (photo.kind !== "other") {
-      return false;
+  function handleToggleMainichiSleepingDelivery(photo: MainichiDayPhoto) {
+    if (photo.kind !== "sleeping") {
+      return;
     }
 
-    const saved = keepExchangePhoto(createExchangePhotoFromDayPhoto(photo));
+    const nextShared = !photo.shared;
+    const updatedPhoto = updateOwnSleepingPhotoDelivery(photo.id, nextShared);
 
-    if (saved) {
-      setBoxRefreshTick((value) => value + 1);
-      showToast("とっておきました");
+    if (updatedPhoto) {
+      void backupOwnSleepingPhotoMoment(updatedPhoto);
     }
 
+    setBoxRefreshTick((value) => value + 1);
+    setSelectedMainichiViewer((current) =>
+      current
+        ? {
+            ...current,
+            photos: current.photos.map((candidate) =>
+              candidate.kind === "sleeping" && candidate.id === photo.id
+                ? { ...candidate, shared: nextShared }
+                : candidate,
+            ),
+          }
+        : current,
+    );
+    showToast(nextShared ? "ねこだよりに使うようにしました" : "自分だけにしました");
     trackProductEvent(
-      "collection_mainichi_photo_keep_tapped",
+      "collection_mainichi_sleeping_delivery_toggled",
       {
         photo_id: photo.id,
-        source_photo_id: photo.sourcePhotoId ?? null,
-        saved,
+        shared: nextShared,
       },
       { localCatId: activeCatId },
     );
+  }
 
-    return saved;
+  function handleDeleteMainichiSleepingPhoto(photo: MainichiDayPhoto) {
+    if (photo.kind !== "sleeping") {
+      return;
+    }
+
+    deleteOwnSleepingPhoto(photo.id);
+    void deleteAccountSleepingPhoto(photo.id).catch(() => {
+      // Local delete should still feel immediate; restore checks expose remote issues.
+    });
+    setBoxRefreshTick((value) => value + 1);
+    setSelectedMainichiViewer((current) => {
+      if (!current) {
+        return current;
+      }
+
+      const photos = current.photos.filter(
+        (candidate) => !(candidate.kind === "sleeping" && candidate.id === photo.id),
+      );
+
+      if (photos.length === 0) {
+        return null;
+      }
+
+      return {
+        ...current,
+        photos,
+        index: Math.min(current.index, photos.length - 1),
+      };
+    });
+    showToast("ねこだよりから外しました");
+    trackProductEvent(
+      "collection_mainichi_sleeping_photo_deleted",
+      { photo_id: photo.id },
+      { localCatId: activeCatId },
+    );
+  }
+
+  function handleHideMainichiDeliveredPhoto(
+    photo: MainichiDayPhoto,
+    reason: "hide" | "report",
+  ) {
+    if (photo.kind !== "other") {
+      return;
+    }
+
+    const exchangePhoto = createExchangePhotoFromDayPhoto(photo);
+    const isKeptPhoto = readKeptExchangePhotos().some(
+      (savedPhoto) =>
+        savedPhoto.id === photo.id ||
+        Boolean(
+          photo.sourcePhotoId && savedPhoto.sourcePhotoId === photo.sourcePhotoId,
+        ),
+    );
+
+    if (isKeptPhoto) {
+      hideKeptExchangePhoto(photo.id, reason);
+    } else {
+      if (reason === "report") {
+        reportExchangePhoto(exchangePhoto);
+      } else {
+        dismissExchangePhoto(exchangePhoto);
+      }
+    }
+
+    void hideAccountKeptExchangePhoto(photo.id, reason).catch(() => {
+      // Local hide/report should stay instant even if the account sync retries later.
+    });
+    setBoxRefreshTick((value) => value + 1);
+    setSelectedMainichiViewer((current) => {
+      if (!current) {
+        return current;
+      }
+
+      const photos = current.photos.filter(
+        (candidate) =>
+          !(
+            candidate.kind === "other" &&
+            (candidate.id === photo.id ||
+              Boolean(
+                photo.sourcePhotoId &&
+                  candidate.sourcePhotoId === photo.sourcePhotoId,
+              ))
+          ),
+      );
+
+      if (photos.length === 0) {
+        return null;
+      }
+
+      return {
+        ...current,
+        photos,
+        index: Math.min(current.index, photos.length - 1),
+      };
+    });
+    showToast(reason === "report" ? "通報して非表示にしました" : "非表示にしました");
+    trackProductEvent(
+      "collection_mainichi_delivered_photo_hidden",
+      {
+        photo_id: photo.id,
+        source_photo_id: photo.sourcePhotoId ?? null,
+        reason,
+      },
+      { localCatId: activeCatId },
+    );
   }
 
   function handleBoxPhotoScroll(event: UIEvent<HTMLDivElement>) {
@@ -1150,7 +1270,14 @@ export function CollectionPage() {
           onClose={closeMainichiFullscreenPhoto}
           onPrevious={() => moveMainichiFullscreenPhoto(-1)}
           onNext={() => moveMainichiFullscreenPhoto(1)}
-          onKeep={handleKeepMainichiPhoto}
+          onToggleSleepingDelivery={handleToggleMainichiSleepingDelivery}
+          onDeleteSleepingPhoto={handleDeleteMainichiSleepingPhoto}
+          onHideDeliveredPhoto={(photo) =>
+            handleHideMainichiDeliveredPhoto(photo, "hide")
+          }
+          onReportDeliveredPhoto={(photo) =>
+            handleHideMainichiDeliveredPhoto(photo, "report")
+          }
         />
       ) : null}
       {selectedBoxKind ? (
@@ -2136,7 +2263,10 @@ function MainichiFullscreenPhoto({
   onClose,
   onPrevious,
   onNext,
-  onKeep,
+  onToggleSleepingDelivery,
+  onDeleteSleepingPhoto,
+  onHideDeliveredPhoto,
+  onReportDeliveredPhoto,
 }: {
   photo: MainichiDayPhoto;
   photoCount: number;
@@ -2145,33 +2275,21 @@ function MainichiFullscreenPhoto({
   onClose: () => void;
   onPrevious: () => void;
   onNext: () => void;
-  onKeep: (photo: MainichiDayPhoto) => boolean;
+  onToggleSleepingDelivery: (photo: MainichiDayPhoto) => void;
+  onDeleteSleepingPhoto: (photo: MainichiDayPhoto) => void;
+  onHideDeliveredPhoto: (photo: MainichiDayPhoto) => void;
+  onReportDeliveredPhoto: (photo: MainichiDayPhoto) => void;
 }) {
-  const [saveState, setSaveState] = useState<"idle" | "saved">(() =>
-    photo.kind === "other" && isMainichiPhotoKept(photo) ? "saved" : "idle",
-  );
   const [photoAspectRatio, setPhotoAspectRatio] = useState("1 / 1");
   const touchStartXRef = useRef<number | null>(null);
   const canNavigate = photoCount > 1;
+  const deliveryActionLabel = photo.shared
+    ? "自分だけにする"
+    : "ねこだよりに使う";
 
   useEffect(() => {
-    setSaveState(photo.kind === "other" && isMainichiPhotoKept(photo) ? "saved" : "idle");
     setPhotoAspectRatio("1 / 1");
   }, [photo.id, photo.kind, photo.sourcePhotoId]);
-
-  function handleKeep() {
-    if (photo.kind !== "other") {
-      return;
-    }
-
-    if (saveState === "saved") {
-      return;
-    }
-
-    if (onKeep(photo)) {
-      setSaveState("saved");
-    }
-  }
 
   function handleTouchStart(event: TouchEvent<HTMLDivElement>) {
     touchStartXRef.current = event.touches[0]?.clientX ?? null;
@@ -2273,18 +2391,53 @@ function MainichiFullscreenPhoto({
           </button>
         ) : null}
       </div>
-      {photo.kind === "other" ? (
-        <AppButton
-          type="button"
-          variant="secondary"
-          size="lg"
-          fullWidth
-          style={styles.mainichiViewerKeepButton}
-          onClick={handleKeep}
-        >
-          {saveState === "saved" ? "とっておいた" : "とっておく"}
-        </AppButton>
-      ) : null}
+      <div style={styles.mainichiViewerActions} aria-label="写真の操作">
+        {photo.kind === "sleeping" ? (
+          <>
+            <AppButton
+              type="button"
+              variant={photo.shared ? "ghost" : "secondary"}
+              size="sm"
+              iconStart={
+                <AppIcon name={photo.shared ? "eyeOff" : "send"} size={17} />
+              }
+              onClick={() => onToggleSleepingDelivery(photo)}
+            >
+              {deliveryActionLabel}
+            </AppButton>
+            <AppButton
+              type="button"
+              variant="danger"
+              size="sm"
+              iconStart={<AppIcon name="trash" size={17} />}
+              onClick={() => onDeleteSleepingPhoto(photo)}
+            >
+              削除
+            </AppButton>
+          </>
+        ) : (
+          <>
+            <AppButton
+              type="button"
+              variant="ghost"
+              size="sm"
+              iconStart={<AppIcon name="eyeOff" size={17} />}
+              onClick={() => onHideDeliveredPhoto(photo)}
+            >
+              非表示
+            </AppButton>
+            <AppButton
+              type="button"
+              variant="danger"
+              size="sm"
+              iconStart={<AppIcon name="flag" size={17} />}
+              onClick={() => onReportDeliveredPhoto(photo)}
+            >
+              通報
+            </AppButton>
+          </>
+        )}
+      </div>
     </div>
   );
 }
@@ -3261,6 +3414,7 @@ function buildMainichiDayPhotos(
         kind: "sleeping" as const,
         sideLabel: "おくった",
         catName: catId ? catNameById.get(catId) : undefined,
+        shared: photo.shared,
       };
     });
   const deliveredPhotos = group.sections
@@ -3301,18 +3455,6 @@ function createExchangePhotoFromDayPhoto(photo: MainichiDayPhoto): ExchangePhoto
     theme: "mainichi",
     deliveredAt: photo.deliveredAt ?? photo.timestamp,
   };
-}
-
-function isMainichiPhotoKept(photo: MainichiDayPhoto) {
-  if (photo.kind !== "other") {
-    return false;
-  }
-
-  return readKeptExchangePhotos().some(
-    (savedPhoto) =>
-      savedPhoto.id === photo.id ||
-      Boolean(photo.sourcePhotoId && savedPhoto.sourcePhotoId === photo.sourcePhotoId),
-  );
 }
 
 function getMainichiPhotoSide(photo: MainichiDayPhoto): MainichiBoardSide {
@@ -5553,9 +5695,13 @@ const styles = {
   mainichiViewerNavButtonNext: {
     right: "max(8px, calc(50% - min(50vw, 300px) - 10px))",
   },
-  mainichiViewerKeepButton: {
+  mainichiViewerActions: {
     width: "min(100%, 420px)",
     justifySelf: "center",
+    display: "grid",
+    gridTemplateColumns: "minmax(0, 1fr) auto",
+    gap: "10px",
+    alignItems: "center",
   },
   todayAlbumCard: {
     display: "grid",

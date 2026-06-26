@@ -735,7 +735,7 @@ test.describe("collection album flow", () => {
     );
   });
 
-  test("opens a mainichi day view and keeps a delivered photo from fullscreen", async ({
+  test("opens a delivered mainichi photo directly and hides it from fullscreen", async ({
     page,
   }) => {
     const now = Date.parse("2026-06-13T11:05:00.000Z");
@@ -811,13 +811,15 @@ test.describe("collection album flow", () => {
     await page.getByRole("tab", { name: "とどいた" }).click();
     await page.getByTestId("mainichi-board-photo-delivered").click();
     await expect(page.getByTestId("mainichi-photo-viewer")).toBeVisible();
-    await page.getByRole("button", { name: "とっておく" }).click();
+    await page.getByRole("button", { name: "非表示" }).click();
+    await expect(page.getByTestId("mainichi-photo-viewer")).toHaveCount(0);
+    await expect(page.getByTestId("mainichi-board-photo-delivered")).toHaveCount(0);
 
     await expect
       .poll(() =>
         page.evaluate(() => {
           const photos = JSON.parse(
-            window.localStorage.getItem("nyaruhodo_exchange_kept_photos") ?? "[]",
+            window.localStorage.getItem("nyaruhodo_exchange_dismissed_photos") ?? "[]",
           ) as { id?: string; sourcePhotoId?: string }[];
 
           return photos.some(
@@ -828,6 +830,78 @@ test.describe("collection album flow", () => {
         }),
       )
       .toBe(true);
+  });
+
+  test("opens an own mainichi photo directly and updates its delivery actions", async ({
+    page,
+  }) => {
+    const now = Date.parse("2026-06-14T11:05:00.000Z");
+
+    await page.addInitScript(
+      ({ currentCatId, src, createdAt }) => {
+        window.localStorage.setItem("active_cat_id", currentCatId);
+        window.localStorage.setItem(
+          "cat_profiles",
+          JSON.stringify([
+            {
+              id: currentCatId,
+              name: "current cat",
+              createdAt: new Date(createdAt).toISOString(),
+              updatedAt: new Date(createdAt).toISOString(),
+            },
+          ]),
+        );
+        window.localStorage.setItem(
+          "nyaruhodo_exchange_own_sleeping_photos",
+          JSON.stringify([
+            {
+              id: "own-mainichi-action",
+              ownerCatId: currentCatId,
+              catId: currentCatId,
+              src,
+              state: "sleeping",
+              visibility: "shared",
+              deliveryStatus: "available",
+              triggerLabel: "sleeping",
+              theme: "sleeping",
+              shared: true,
+              createdAt,
+            },
+          ]),
+        );
+      },
+      {
+        currentCatId: "current-cat",
+        src: photoDataUrl,
+        createdAt: now,
+      },
+    );
+
+    await page.goto("/collection");
+    await page.waitForLoadState("networkidle");
+
+    await page.getByTestId("mainichi-board-photo-sent").click();
+    await expect(page.getByTestId("mainichi-photo-viewer")).toBeVisible();
+
+    await page.getByRole("button", { name: "自分だけにする" }).click();
+    await expect(page.getByRole("button", { name: "ねこだよりに使う" })).toBeVisible();
+    await expect
+      .poll(() =>
+        page.evaluate(() => {
+          const photos = JSON.parse(
+            window.localStorage.getItem("nyaruhodo_exchange_own_sleeping_photos") ??
+              "[]",
+          ) as { id?: string; shared?: boolean; visibility?: string }[];
+          const photo = photos.find((candidate) => candidate.id === "own-mainichi-action");
+
+          return photo?.shared === false && photo.visibility === "private";
+        }),
+      )
+      .toBe(true);
+
+    await page.getByRole("button", { name: "削除" }).click();
+    await expect(page.getByTestId("mainichi-photo-viewer")).toHaveCount(0);
+    await expect(page.getByTestId("mainichi-board-photo-sent")).toHaveCount(0);
   });
 });
 
