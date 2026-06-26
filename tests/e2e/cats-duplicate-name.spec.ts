@@ -22,7 +22,8 @@ test("asks for confirmation before saving a duplicate cat name", async ({
   await page.goto("/cats");
   await page.waitForLoadState("networkidle");
 
-  await page.getByRole("button", { name: "うちのこを管理" }).click();
+  await page.getByTestId("cats-section-tab-basic").click();
+  await page.getByRole("button", { name: "猫を追加・管理" }).click();
   await page.getByRole("button", { name: "ねこをふやす" }).click();
   await page.getByLabel(/\u3053\u306e\u5b50\u306e\u540d\u524d/).fill("\u30e0\u30ae");
   await page.getByRole("button", { name: /^\u4fdd\u5b58$/ }).click();
@@ -66,7 +67,9 @@ test("shows birthday countdown on the cat page", async ({
   await page.goto("/cats");
   await page.waitForLoadState("networkidle");
 
-  await expect(page.getByText("誕生日まで あと3日")).toBeVisible();
+  const celebrations = page.getByRole("region", { name: "記念" });
+  await expect(celebrations).toContainText("誕生日");
+  await expect(celebrations).toContainText("あと3日");
   await expect(page.getByText("むぎの日まで あと3日")).toHaveCount(0);
   await expect(page.getByText("ずかんで つかわれます")).toHaveCount(0);
 });
@@ -130,7 +133,8 @@ test("deletes a cat after confirmation and moves the active cat", async ({
   await page.goto("/cats");
   await page.waitForLoadState("networkidle");
 
-  await page.getByRole("button", { name: "うちのこを管理" }).click();
+  await page.getByTestId("cats-section-tab-basic").click();
+  await page.getByRole("button", { name: "猫を追加・管理" }).click();
   await page.getByRole("button", { name: "この子を消す" }).click();
   await expect(page.getByText("ムギ・写真1枚 を消しますか？")).toBeVisible();
   await page.getByRole("button", { name: /^消す$/ }).click();
@@ -157,7 +161,7 @@ test("deletes a cat after confirmation and moves the active cat", async ({
       names: ["むぎ"],
       photoCount: 1,
     });
-  await page.getByRole("button", { name: "うちのこを管理" }).click();
+  await page.getByRole("button", { name: "猫を追加・管理" }).click();
   await expect(page.getByRole("button", { name: "この子を消す" })).toHaveCount(0);
 });
 

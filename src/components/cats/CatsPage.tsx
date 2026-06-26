@@ -135,7 +135,6 @@ export function CatsPage() {
   const [isEditingCatName, setIsEditingCatName] = useState(false);
   const [isEditingProfile, setIsEditingProfile] = useState(false);
   const [isAddingCat, setIsAddingCat] = useState(false);
-  const [isCatSwitcherOpen, setIsCatSwitcherOpen] = useState(false);
   const [isCatManageOpen, setIsCatManageOpen] = useState(false);
   const [isCatManageEditing, setIsCatManageEditing] = useState(false);
   const [isThumbnailPickerOpen, setIsThumbnailPickerOpen] = useState(false);
@@ -385,7 +384,6 @@ export function CatsPage() {
     setActiveCatId(nextActiveProfile.id);
     setCatNameInput(getCatName(nextActiveProfile));
     setIsAddingCat(false);
-    setIsCatSwitcherOpen(false);
     setIsEditingCatName(false);
     setIsEditingProfile(false);
     setIsOnboardingAlbumCreated(false);
@@ -414,7 +412,6 @@ export function CatsPage() {
     setIsAddingCat(true);
     setIsCatManageOpen(true);
     setIsCatManageEditing(false);
-    setIsCatSwitcherOpen(false);
     setIsEditingCatName(false);
     setIsEditingProfile(false);
   }
@@ -682,7 +679,6 @@ export function CatsPage() {
     setCatNameInput(getCatName(nextActiveProfile));
     setDeleteCatTarget(null);
     setIsDeletingCat(false);
-    setIsCatSwitcherOpen(false);
     setIsAddingCat(false);
     setIsEditingCatName(false);
     setIsEditingProfile(false);
@@ -1216,20 +1212,6 @@ export function CatsPage() {
               </div>
             ) : (
               <>
-            {shouldShowCatSwitchButton ? (
-              <AppButton
-                type="button"
-                variant="secondary"
-                fullWidth
-                iconStart={<CatSwitchIcon />}
-                onClick={() => {
-                  setIsCatManageOpen(false);
-                  setIsCatSwitcherOpen(true);
-                }}
-              >
-                ねこを切り替える
-              </AppButton>
-            ) : null}
             <AppButton
               type="button"
               variant="secondary"
@@ -1240,28 +1222,6 @@ export function CatsPage() {
               }}
             >
               ねこをふやす
-            </AppButton>
-            <AppButton
-              type="button"
-              variant="secondary"
-              fullWidth
-                iconStart={<PencilSmallIcon />}
-                onClick={() => {
-                  openCatManageEditor();
-                }}
-              >
-                名前や記録を編集
-              </AppButton>
-            <AppButton
-              type="button"
-              variant="quiet"
-              fullWidth
-              onClick={() => {
-                setIsCatManageOpen(false);
-                setIsThumbnailPickerOpen(true);
-              }}
-            >
-              サムネイル写真を変える
             </AppButton>
             {canManageCats && catProfiles.length > 1 ? (
               <AppButton
@@ -1280,59 +1240,6 @@ export function CatsPage() {
             )}
           </div>
         </AppBottomSheet>
-      ) : null}
-      {isCatSwitcherOpen ? (
-        <AppBottomSheet
-          title="ねこを選ぶ"
-          onClose={() => setIsCatSwitcherOpen(false)}
-        >
-          <div style={styles.catSheetList}>
-            {catProfiles.map((profile) => {
-              const isActive = profile.id === activeCatId;
-              const avatarSrc =
-                profile.avatarDataUrl ?? getCatAvatarSrc(profile.appearance?.coat);
-
-              return (
-                <button
-                  key={profile.id}
-                  type="button"
-                  style={
-                    isActive
-                      ? { ...styles.catSheetOption, ...styles.catSheetOptionActive }
-                      : styles.catSheetOption
-                  }
-                  onClick={() => handleCatSelect(profile.id)}
-                  aria-pressed={isActive}
-                >
-                  <PhotoTile
-                    src={avatarSrc}
-                    alt=""
-                    variant="avatar"
-                    fit={profile.avatarDataUrl ? "cover" : "contain"}
-                    style={styles.catSheetPhotoTileRoot}
-                    imageStyle={
-                      profile.avatarDataUrl
-                        ? styles.catSheetPhotoTile
-                        : styles.catSheetAvatarTile
-                    }
-                  />
-                  <span style={styles.catSheetName}>{profile.name}</span>
-                  {isActive ? (
-                    <span style={styles.catSheetCurrent}>いま</span>
-                  ) : null}
-                </button>
-              );
-            })}
-                <AppButton
-                  type="button"
-                  variant="secondary"
-                  fullWidth
-                  onClick={startAddingCat}
-                >
-                  ねこを ふやす
-                </AppButton>
-              </div>
-            </AppBottomSheet>
       ) : null}
       {deleteCatTarget ? (
         <AppBottomSheet
@@ -2929,10 +2836,6 @@ function CheckSmallIcon() {
   );
 }
 
-function CatSwitchIcon() {
-  return <span style={styles.catSwitchMaskIcon} aria-hidden="true" />;
-}
-
 function PencilSmallIcon() {
   return (
     <svg
@@ -3711,20 +3614,6 @@ const styles = {
     width: "32px",
     height: "32px",
     minWidth: "32px",
-  },
-  catSwitchMaskIcon: {
-    width: "20px",
-    height: "20px",
-    display: "block",
-    backgroundColor: "currentColor",
-    maskImage: "url('/icons/cat-tab-mask.png')",
-    maskPosition: "center",
-    maskRepeat: "no-repeat",
-    maskSize: "contain",
-    WebkitMaskImage: "url('/icons/cat-tab-mask.png')",
-    WebkitMaskPosition: "center",
-    WebkitMaskRepeat: "no-repeat",
-    WebkitMaskSize: "contain",
   },
   familyHero: {
     display: "grid",
@@ -5023,58 +4912,6 @@ const styles = {
     fontWeight: 400,
     lineHeight: 1.4,
     letterSpacing: "var(--tracking-body)",
-  },
-  catSheetList: {
-    display: "grid",
-    gap: "8px",
-  },
-  catSheetOption: {
-    minHeight: "54px",
-    border: "1px solid var(--line)",
-    borderRadius: "var(--radius-lg)",
-    background: "color-mix(in srgb, var(--paper) 44%, transparent)",
-    color: CATS_TEXT,
-    display: "grid",
-    gridTemplateColumns: "42px 1fr auto",
-    alignItems: "center",
-    gap: "10px",
-    padding: "7px 11px 7px 7px",
-    cursor: "pointer",
-    textAlign: "left",
-  },
-  catSheetOptionActive: {
-    background: "color-mix(in srgb, var(--paper-warm) 78%, transparent)",
-    border: "1px solid var(--line)",
-  },
-  catSheetPhotoTileRoot: {
-    width: "42px",
-    height: "42px",
-  },
-  catSheetPhotoTile: {
-    width: "42px",
-    height: "42px",
-    border: "3px solid var(--paper)",
-  },
-  catSheetAvatarTile: {
-    width: "42px",
-    height: "42px",
-    padding: "6px",
-    boxSizing: "border-box",
-    border: "3px solid var(--paper)",
-  },
-  catSheetName: {
-    fontFamily: CATS_SERIF,
-    fontSize: "15px",
-    fontWeight: 400,
-    color: CATS_TEXT_STRONG,
-    letterSpacing: CATS_BODY_TRACKING,
-  },
-  catSheetCurrent: {
-    color: CATS_FAINT,
-    fontFamily: CATS_SERIF,
-    fontSize: CATS_META_SIZE,
-    fontWeight: 400,
-    letterSpacing: CATS_META_TRACKING,
   },
   homePhotoSection: {
     display: "flex",
