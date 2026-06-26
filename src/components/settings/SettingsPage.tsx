@@ -46,7 +46,6 @@ import {
 import { AppButton } from "../ui/AppButton";
 import { AppCard } from "../ui/AppCard";
 import { AppTextField } from "../ui/AppTextField";
-import { AppToggle } from "../ui/AppToggle";
 import { PhotoTile } from "../ui/PhotoTile";
 import {
   readKeptExchangePhotoStorageDebug,
@@ -61,14 +60,6 @@ import {
   readEveningDeliveryTrace,
   type EveningDeliveryTraceEntry,
 } from "../../lib/home/eveningDeliveryTrace";
-import {
-  readOpenSoundEnabled,
-  readSelectedOpenSoundCandidate,
-  saveOpenSoundEnabled,
-  saveSelectedOpenSoundCandidate,
-  type OpenSoundCandidateId,
-} from "../../lib/openSound";
-
 type SettingsTab = "general" | "admin";
 type PhotoReportSummary = {
   id: string;
@@ -158,9 +149,6 @@ export function SettingsPage() {
   const [referralSummary, setReferralSummary] =
     useState<ClientReferralSummary | null>(null);
   const [referralMessage, setReferralMessage] = useState("");
-  const [openSoundEnabled, setOpenSoundEnabled] = useState(true);
-  const [openSoundCandidate, setOpenSoundCandidate] =
-    useState<OpenSoundCandidateId>("1");
   const showsAdminSection =
     adminCapabilities.testToolsEnabled || adminCapabilities.stockAdminEnabled;
   const [activeSettingsTab, setActiveSettingsTab] =
@@ -168,8 +156,6 @@ export function SettingsPage() {
 
   useEffect(() => {
     setDisplayEnvironment(getDisplayEnvironment());
-    setOpenSoundEnabled(readOpenSoundEnabled());
-    setOpenSoundCandidate(readSelectedOpenSoundCandidate());
     refreshKeptExchangeDebug();
     refreshEveningDeliveryTrace();
     void checkAuthState();
@@ -183,16 +169,6 @@ export function SettingsPage() {
       setActiveSettingsTab("general");
     }
   }, [activeSettingsTab, showsAdminSection]);
-
-  function updateOpenSoundEnabled(enabled: boolean) {
-    saveOpenSoundEnabled(enabled);
-    setOpenSoundEnabled(enabled);
-  }
-
-  function updateOpenSoundCandidate(candidate: OpenSoundCandidateId) {
-    saveSelectedOpenSoundCandidate(candidate);
-    setOpenSoundCandidate(candidate);
-  }
 
   async function checkAuthState() {
     const supabase = createBrowserSupabaseClient();
@@ -577,7 +553,7 @@ export function SettingsPage() {
 
   async function handleStartBetaSupporter() {
     setIsBillingLoading(true);
-    setBillingMessage("Stripeへ移動しています");
+    setBillingMessage("支払いページへ移動しています。");
 
     const url = await startBetaSupporterCheckout();
 
@@ -592,7 +568,7 @@ export function SettingsPage() {
 
   async function handleOpenBillingPortal() {
     setIsBillingLoading(true);
-    setBillingMessage("Stripeへ移動しています");
+    setBillingMessage("支払い管理へ移動しています。");
 
     const url = await openBillingPortal();
 
@@ -659,7 +635,7 @@ export function SettingsPage() {
         {activeSettingsTab === "general" ? (
           <>
         <section style={{ ...styles.section, order: 2 }}>
-          <p style={styles.sectionLabel}>写真の保存</p>
+          <p style={styles.sectionLabel}>保存と復元</p>
           <AppCard variant="outlined" padding="sm" style={styles.card}>
             <div style={styles.row}>
               <span style={styles.rowLabel}>
@@ -667,9 +643,9 @@ export function SettingsPage() {
               </span>
               <span style={styles.rowValue}>
                 {displayEnvironment === "standalone"
-                  ? "アプリ側"
+                  ? "ホーム画面アプリ"
                   : displayEnvironment === "browser"
-                    ? "Web側"
+                    ? "Safari / Web"
                     : ""}
               </span>
             </div>
@@ -688,7 +664,7 @@ export function SettingsPage() {
                 <div style={styles.actionStack}>
                   <AppButton
                     type="button"
-                    variant="primary"
+                    variant="secondary"
                     fullWidth
                     loading={isSyncing}
                     onClick={() => {
@@ -700,7 +676,7 @@ export function SettingsPage() {
                   </AppButton>
                   <AppButton
                     type="button"
-                    variant="secondary"
+                    variant="ghost"
                     fullWidth
                     loading={isSyncing}
                     onClick={() => {
@@ -763,7 +739,7 @@ export function SettingsPage() {
                   </div>
                 </div>
                 <div style={styles.divider} />
-                <AppButton href="/account/create" variant="primary" fullWidth>
+                <AppButton href="/account/create" variant="secondary" fullWidth>
                   アカウントを作成する
                 </AppButton>
               </>
@@ -824,23 +800,6 @@ export function SettingsPage() {
           </section>
         ) : null}
 
-        <section style={{ ...styles.section, order: 3 }}>
-          <p style={styles.sectionLabel}>音</p>
-          <AppCard variant="outlined" padding="sm" style={styles.card}>
-            <div style={styles.row}>
-              <div style={styles.rowLeft}>
-                <span style={styles.rowLabel}>ひらく音</span>
-                <span style={styles.rowValue}>ねこだよりをひらいたときだけ</span>
-              </div>
-              <AppToggle
-                checked={openSoundEnabled}
-                onChange={updateOpenSoundEnabled}
-                label="ひらく音"
-              />
-            </div>
-          </AppCard>
-        </section>
-
         <section style={{ ...styles.section, order: 5 }}>
           <p style={styles.sectionLabel}>参加と応援</p>
           <AppCard variant="outlined" padding="sm" style={{ ...styles.card, ...styles.betaCard }}>
@@ -855,7 +814,7 @@ export function SettingsPage() {
                 </div>
                 <AppButton
                   type="button"
-                  variant="primary"
+                  variant="secondary"
                   fullWidth
                   onClick={() => {
                     setFeedbackKind("beta_feedback");
@@ -935,28 +894,6 @@ export function SettingsPage() {
               <BuildInfoPanel
                 buildSha={APP_BUILD_SHA}
               />
-              <div style={styles.divider} />
-              <div style={styles.row}>
-                <div style={styles.rowLeft}>
-                  <span style={styles.rowLabel}>ひらく音 候補</span>
-                  <span style={styles.rowValue}>実機A/B用</span>
-                </div>
-                <AppTextField
-                  as="select"
-                  value={openSoundCandidate}
-                  onChange={(event) =>
-                    updateOpenSoundCandidate(
-                      event.currentTarget.value as OpenSoundCandidateId,
-                    )
-                  }
-                  aria-label="ひらく音の候補"
-                  rootStyle={styles.soundCandidateField}
-                >
-                  <option value="1">候補1</option>
-                  <option value="2">候補2</option>
-                  <option value="3">候補3</option>
-                </AppTextField>
-              </div>
               <div style={styles.divider} />
               <AppButton
                 type="button"
@@ -1099,10 +1036,10 @@ export function SettingsPage() {
             </div>
             <div style={styles.divider} />
             <div style={styles.betaNote}>
-              <p style={styles.betaNoteTitle}>現在ベータ版として無料公開中</p>
+              <p style={styles.betaNoteTitle}>現在ベータ版として公開中</p>
               <p style={styles.betaNoteText}>
                 写真を長く置けるように、保存容量の拡張や家族共有の準備をしています。
-                正式版リリース時に、有料プランを導入する場合があります。
+                料金や提供範囲が変わる場合は、事前にお知らせします。
                 現在の写真と猫データは、引き続き大切に扱います。
               </p>
             </div>
@@ -1213,7 +1150,7 @@ function BetaFeedbackForm({
       />
       <AppButton
         type="submit"
-        variant="primary"
+        variant="secondary"
         fullWidth
         loading={isSending}
         disabled={isSending}
@@ -2340,9 +2277,6 @@ const styles = {
     display: "grid",
     gridTemplateColumns: "1fr 1fr",
     gap: "8px",
-  },
-  soundCandidateField: {
-    minWidth: "112px",
   },
   authDebugRow: {
     display: "grid",
