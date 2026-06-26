@@ -17,6 +17,11 @@ import {
   type CatYearSummary,
 } from "../../lib/cats/yearSummary";
 import {
+  readCatGalleryPhotos,
+  saveCatGalleryPhoto,
+  type CatGalleryPhoto,
+} from "../../lib/cats/catGalleryPhotos";
+import {
   readCatSleepingMilestones,
   readOwnSleepingPhotos,
   readOwnSleepingPhotoCount,
@@ -74,6 +79,7 @@ type LensPhoto = {
   createdAt: number;
   catIds: string[];
   catNames: string[];
+  kind: "sleeping" | "photo";
   deliveryCount?: number;
 };
 type DeleteCatTarget = {
@@ -151,6 +157,7 @@ export function CatsPage() {
   const [message, setMessage] = useState("");
   const [saveMessage, setSaveMessage] = useState("");
   const [omoideRefreshTick, setOmoideRefreshTick] = useState(0);
+  const [galleryRefreshTick, setGalleryRefreshTick] = useState(0);
   const [activeLens, setActiveLens] = useState<UchinokoLens>("cat");
   const [activeSection, setActiveSection] =
     useState<UchinokoSection>("record");
@@ -204,7 +211,7 @@ export function CatsPage() {
     !isEditingProfile;
   const localLensPhotos = useMemo(
     () => createLocalLensPhotos(catProfiles),
-    [catProfiles],
+    [catProfiles, galleryRefreshTick],
   );
   const lensPhotosByCat = mergeLensPhotoSources(
     localLensPhotos.byCat,
@@ -233,7 +240,7 @@ export function CatsPage() {
   const photoSheetPhotos =
     photoSheetLens === "all" ? allLensPhotos : activeCatLensPhotos;
   const photoSheetTitle =
-    photoSheetLens === "all" ? "ぜんぶのねがお" : "すべてのすがた";
+    photoSheetLens === "all" ? "ぜんぶの写真" : "この子の写真";
 
   useEffect(() => {
     document.documentElement.classList.add("cats-scrollbar-quiet");
@@ -622,6 +629,55 @@ export function CatsPage() {
     input.click();
   }
 
+  async function handleAddCatPhoto() {
+    if (!activeCatId) {
+      return;
+    }
+
+    const targetCatId = activeCatId;
+    const input = document.createElement("input");
+
+    input.type = "file";
+    input.accept = "image/*";
+    input.onchange = async () => {
+      const file = input.files?.[0];
+
+      if (!file) {
+        return;
+      }
+
+      try {
+        const dataUrl = await resizeAndEncode(file, 1400);
+        const photoSrc = await storeAccountPhotoDataUrl({
+          dataUrl,
+          pathSegments: [targetCatId, "photos"],
+          fileName: `photo-${Date.now()}`,
+        });
+        const savedPhoto = saveCatGalleryPhoto({
+          catId: targetCatId,
+          src: photoSrc,
+        });
+
+        if (!savedPhoto) {
+          setSaveMessage("写真を追加できませんでした。");
+          setTimeout(() => setSaveMessage(""), 2400);
+          return;
+        }
+
+        setGalleryRefreshTick((value) => value + 1);
+        setActiveSection("photos");
+        setActiveLens("cat");
+        setSaveMessage("写真を追加しました。");
+        setTimeout(() => setSaveMessage(""), 2000);
+      } catch {
+        setSaveMessage("写真を追加できませんでした。");
+        setTimeout(() => setSaveMessage(""), 2400);
+      }
+    };
+
+    input.click();
+  }
+
   function startDeleteCat(profile: CatProfile) {
     if (catProfiles.length <= 1) {
       setMessage("最後の1匹は消せません");
@@ -928,9 +984,13 @@ export function CatsPage() {
         activeSection === "photos" &&
         activeLens === "cat" ? (
           <LensPhotoSection
-            title="最近のすがた"
+            title="この子の写真"
             photos={activeCatLensPhotos}
-            emptyCopy="このこに紐づく ねがおは、まだありません。"
+            emptyCopy="この子の写真は、まだありません。"
+            onAddPhoto={() => {
+              void handleAddCatPhoto();
+            }}
+            onOpenPhoto={(photo) => setSelectedRecordPhoto(toRecordPhotoPreview(photo))}
           />
         ) : null}
 
@@ -941,6 +1001,7 @@ export function CatsPage() {
           <AllCatsLensView
             photos={allLensPhotos}
             catCount={catProfiles.length}
+            onOpenPhoto={(photo) => setSelectedRecordPhoto(toRecordPhotoPreview(photo))}
           />
         ) : null}
 
@@ -1295,7 +1356,7 @@ export function CatsPage() {
         />
       ) : null}
       {selectedRecordPhoto ? (
-        <RecordPhotoSheet
+        <PhotoFullscreenViewer
           photo={selectedRecordPhoto}
           onClose={() => setSelectedRecordPhoto(null)}
         />
@@ -1305,6 +1366,7 @@ export function CatsPage() {
           title={photoSheetTitle}
           photos={photoSheetPhotos}
           showCatNames={photoSheetLens === "all"}
+          onOpenPhoto={(photo) => setSelectedRecordPhoto(toRecordPhotoPreview(photo))}
           onClose={() => setPhotoSheetLens(null)}
         />
       ) : null}
@@ -1386,7 +1448,7 @@ function RecordOverview({
     photos,
     milestones,
     memories,
-    max: 4,
+    max: 3,
   });
   const yearSummaries = createCatYearSummaries({
     photos,
@@ -1812,20 +1874,37 @@ function LensPhotoSection({
   title,
   photos,
   emptyCopy,
+  onAddPhoto,
+  onOpenPhoto,
 }: {
   title: string;
   photos: LensPhoto[];
   emptyCopy: string;
+  onAddPhoto: () => void;
+  onOpenPhoto: (photo: LensPhoto) => void;
 }) {
   return (
     <section style={styles.lensPhotoSection}>
       <div style={styles.lensSectionHeader}>
-        <p style={styles.lensSectionTitle}>{title}</p>
+        <div style={styles.lensSectionTitleRow}>
+          <p style={styles.lensSectionTitle}>{title}</p>
+          <button
+            type="button"
+            style={styles.lensAddPhotoButton}
+            onClick={onAddPhoto}
+          >
+            写真を追加
+          </button>
+        </div>
+        <p style={styles.lensSectionSub}>
+          ねがおも、なんでもない写真も、この子の記録として残せます。
+        </p>
       </div>
       <LensPhotoGrid
         photos={photos}
         emptyCopy={emptyCopy}
         showCatNames={false}
+        onOpenPhoto={onOpenPhoto}
       />
     </section>
   );
@@ -1834,22 +1913,25 @@ function LensPhotoSection({
 function AllCatsLensView({
   photos,
   catCount,
+  onOpenPhoto,
 }: {
   photos: LensPhoto[];
   catCount: number;
+  onOpenPhoto: (photo: LensPhoto) => void;
 }) {
   return (
     <section style={styles.allLensCard}>
       <div style={styles.lensSectionHeader}>
-        <p style={styles.lensSectionTitle}>ぜんぶの ねがお</p>
+        <p style={styles.lensSectionTitle}>ぜんぶの写真</p>
         <p style={styles.lensSectionSub}>
-          {catCount}ひきの ねがおを、日付順に。
+          {catCount}ひきの写真を、日付順に。
         </p>
       </div>
       <LensPhotoGrid
         photos={photos}
-        emptyCopy="まだ ねがおはありません。"
+        emptyCopy="まだ写真はありません。"
         showCatNames
+        onOpenPhoto={onOpenPhoto}
       />
     </section>
   );
@@ -1941,10 +2023,12 @@ function LensPhotoGrid({
   photos,
   emptyCopy,
   showCatNames,
+  onOpenPhoto,
 }: {
   photos: LensPhoto[];
   emptyCopy: string;
   showCatNames: boolean;
+  onOpenPhoto: (photo: LensPhoto) => void;
 }) {
   if (photos.length === 0) {
     return <p style={styles.lensPhotoEmpty}>{emptyCopy}</p>;
@@ -1959,6 +2043,7 @@ function LensPhotoGrid({
             alt=""
             variant="tile"
             aspect="1 / 1"
+            onClick={() => onOpenPhoto(photo)}
             style={styles.lensPhotoTileRoot}
             imageStyle={styles.lensPhotoTile}
           />
@@ -1980,11 +2065,13 @@ function PhotoListSheet({
   title,
   photos,
   showCatNames,
+  onOpenPhoto,
   onClose,
 }: {
   title: string;
   photos: LensPhoto[];
   showCatNames: boolean;
+  onOpenPhoto: (photo: LensPhoto) => void;
   onClose: () => void;
 }) {
   return (
@@ -1996,7 +2083,12 @@ function PhotoListSheet({
         ) : (
           <div style={styles.photoListGrid}>
             {photos.map((photo) => (
-              <div key={photo.id} style={styles.photoListItem}>
+              <button
+                key={photo.id}
+                type="button"
+                style={styles.photoListItem}
+                onClick={() => onOpenPhoto(photo)}
+              >
                 <PhotoTile
                   src={photo.src}
                   alt=""
@@ -2010,7 +2102,7 @@ function PhotoListSheet({
                     {photo.catNames.join("・")}
                   </span>
                 ) : null}
-              </div>
+              </button>
             ))}
           </div>
         )}
@@ -2292,7 +2384,7 @@ function OmoideMemorySheet({
   );
 }
 
-function RecordPhotoSheet({
+function PhotoFullscreenViewer({
   photo,
   onClose,
 }: {
@@ -2300,18 +2392,35 @@ function RecordPhotoSheet({
   onClose: () => void;
 }) {
   return (
-    <AppBottomSheet title={photo.title} onClose={onClose}>
-      <div style={styles.recordPhotoSheet}>
-        <div style={styles.recordPhotoFrame}>
+    <div
+      role="dialog"
+      aria-modal="true"
+      aria-label={photo.title}
+      style={styles.photoViewerOverlay}
+      onClick={onClose}
+    >
+      <div style={styles.photoViewerChrome} onClick={(event) => event.stopPropagation()}>
+        <button
+          type="button"
+          style={styles.photoViewerCloseButton}
+          onClick={onClose}
+          aria-label="写真を閉じる"
+        >
+          ×
+        </button>
+        <div style={styles.photoViewerImageFrame}>
           <StoredPhotoImage
             src={photo.src}
             alt=""
-            style={styles.recordPhotoImage}
+            style={styles.photoViewerImage}
           />
         </div>
-        <p style={styles.recordPhotoDate}>{formatFootprintDate(photo.timestamp)}</p>
+        <div style={styles.photoViewerMeta}>
+          <p style={styles.photoViewerTitle}>{photo.title}</p>
+          <p style={styles.photoViewerDate}>{formatFootprintDate(photo.timestamp)}</p>
+        </div>
       </div>
-    </AppBottomSheet>
+    </div>
   );
 }
 
@@ -2379,6 +2488,18 @@ function createLocalLensPhotos(catProfiles: CatProfile[]): {
     allPhotos.push(lensPhoto);
   }
 
+  for (const photo of readCatGalleryPhotos(null)) {
+    const profile = profilesById.get(photo.catId);
+
+    if (!profile) {
+      continue;
+    }
+
+    const lensPhoto = createLocalGalleryLensPhoto(photo, profile);
+    byCat[profile.id].push(lensPhoto);
+    allPhotos.push(lensPhoto);
+  }
+
   for (const catId of Object.keys(byCat)) {
     byCat[catId] = dedupeLensPhotos(byCat[catId]);
   }
@@ -2399,6 +2520,7 @@ function createLocalLensPhoto(
     createdAt: photo.createdAt,
     catIds: [profile.id],
     catNames: [getCatName(profile)],
+    kind: "sleeping",
     deliveryCount: photo.shared ? 1 : 0,
   };
 }
@@ -2410,6 +2532,21 @@ function createLocalOrphanLensPhoto(photo: OwnSleepingPhoto): LensPhoto {
     createdAt: photo.createdAt,
     catIds: [],
     catNames: [],
+    kind: "sleeping",
+  };
+}
+
+function createLocalGalleryLensPhoto(
+  photo: CatGalleryPhoto,
+  profile: CatProfile,
+): LensPhoto {
+  return {
+    id: photo.id,
+    src: photo.src,
+    createdAt: photo.createdAt,
+    catIds: [profile.id],
+    catNames: [getCatName(profile)],
+    kind: "photo",
   };
 }
 
@@ -2423,6 +2560,7 @@ function createRemoteLensPhoto(
     createdAt: parseRemoteLensPhotoDate(row.capturedAt ?? row.createdAt),
     catIds: [profile.id],
     catNames: [getCatName(profile)],
+    kind: "sleeping",
     deliveryCount: row.deliveryCount,
   };
 }
@@ -2444,16 +2582,17 @@ function mergeLensPhotoSources(
 
   for (const catId of catIds) {
     const remotePhotos = remoteByCat[catId] ?? [];
-    merged[catId] = dedupeLensPhotos(
-      remotePhotos.length > 0 ? remotePhotos : localByCat[catId] ?? [],
-    );
+    merged[catId] = dedupeLensPhotos([
+      ...remotePhotos,
+      ...(localByCat[catId] ?? []),
+    ]);
   }
 
   return merged;
 }
 
 function mergeAllLensPhotos(remotePhotos: LensPhoto[], localPhotos: LensPhoto[]) {
-  return dedupeLensPhotos(remotePhotos.length > 0 ? remotePhotos : localPhotos);
+  return dedupeLensPhotos([...remotePhotos, ...localPhotos]);
 }
 
 function dedupeLensPhotos(photos: LensPhoto[]) {
@@ -2507,6 +2646,14 @@ function formatLensPhotoDate(timestamp: number) {
   }
 
   return formatFootprintDate(timestamp);
+}
+
+function toRecordPhotoPreview(photo: LensPhoto): RecordPhotoPreview {
+  return {
+    src: photo.src,
+    title: photo.kind === "sleeping" ? "ねがお" : "写真",
+    timestamp: photo.createdAt,
+  };
 }
 
 function getLensPhotoCountForCat(
@@ -4048,6 +4195,80 @@ const styles = {
     color: CATS_TEXT_STRONG,
     boxShadow: "0 0 0 1px color-mix(in srgb, var(--line) 72%, transparent)",
   },
+  photoViewerOverlay: {
+    position: "fixed",
+    inset: 0,
+    zIndex: 80,
+    display: "grid",
+    alignItems: "center",
+    justifyItems: "center",
+    padding:
+      "calc(18px + env(safe-area-inset-top)) 18px calc(22px + env(safe-area-inset-bottom))",
+    background:
+      "color-mix(in srgb, var(--app-night-ink, #1d1a18) 78%, transparent)",
+    backdropFilter: "blur(10px)",
+  },
+  photoViewerChrome: {
+    width: "min(100%, 540px)",
+    maxHeight: "100%",
+    display: "grid",
+    gap: "12px",
+    alignContent: "center",
+  },
+  photoViewerCloseButton: {
+    justifySelf: "end",
+    width: "44px",
+    height: "44px",
+    border: "1px solid color-mix(in srgb, var(--paper) 72%, transparent)",
+    borderRadius: "50%",
+    background: "color-mix(in srgb, var(--paper) 86%, transparent)",
+    color: CATS_TEXT,
+    fontFamily: CATS_UI,
+    fontSize: "24px",
+    fontWeight: 300,
+    lineHeight: 1,
+    cursor: "pointer",
+    boxShadow: "var(--shadow-e1)",
+    WebkitTapHighlightColor: "transparent",
+  },
+  photoViewerImageFrame: {
+    width: "100%",
+    maxHeight: "min(72dvh, 720px)",
+    display: "grid",
+    alignItems: "center",
+    justifyItems: "center",
+    overflow: "hidden",
+    borderRadius: "18px",
+    background: "color-mix(in srgb, var(--paper-card) 18%, transparent)",
+    boxShadow: "0 18px 52px rgba(0,0,0,0.24)",
+  },
+  photoViewerImage: {
+    width: "100%",
+    maxHeight: "min(72dvh, 720px)",
+    objectFit: "contain",
+    borderRadius: "18px",
+  },
+  photoViewerMeta: {
+    display: "grid",
+    gap: "2px",
+    padding: "0 4px",
+  },
+  photoViewerTitle: {
+    margin: 0,
+    color: "var(--paper)",
+    fontFamily: CATS_SERIF,
+    fontSize: "14px",
+    fontWeight: 400,
+    lineHeight: 1.5,
+  },
+  photoViewerDate: {
+    margin: 0,
+    color: "color-mix(in srgb, var(--paper) 72%, transparent)",
+    fontFamily: CATS_UI,
+    fontSize: "12px",
+    fontWeight: 400,
+    lineHeight: 1.5,
+  },
   recordPhotoSheet: {
     display: "grid",
     gap: "12px",
@@ -4599,6 +4820,12 @@ const styles = {
     gap: "4px",
     margin: "0 8px 12px",
   },
+  lensSectionTitleRow: {
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: "12px",
+  },
   lensSectionTitle: {
     margin: 0,
     color: CATS_TEXT,
@@ -4607,6 +4834,22 @@ const styles = {
     fontWeight: 400,
     lineHeight: 1.45,
     letterSpacing: CATS_TITLE_TRACKING,
+  },
+  lensAddPhotoButton: {
+    flex: "0 0 auto",
+    minHeight: "34px",
+    padding: "0 12px",
+    border: "1px solid color-mix(in srgb, var(--control-border) 76%, transparent)",
+    borderRadius: "999px",
+    background: "color-mix(in srgb, var(--paper) 72%, transparent)",
+    color: CATS_TEXT,
+    fontFamily: CATS_UI,
+    fontSize: "12px",
+    fontWeight: 500,
+    lineHeight: 1,
+    cursor: "pointer",
+    boxShadow: "var(--shadow-e0)",
+    WebkitTapHighlightColor: "transparent",
   },
   lensSectionSub: {
     margin: 0,
@@ -4718,7 +4961,12 @@ const styles = {
     minWidth: 0,
     aspectRatio: "1 / 1",
     overflow: "hidden",
+    padding: 0,
+    border: "none",
     background: "color-mix(in srgb, var(--paper-warm) 34%, transparent)",
+    color: "inherit",
+    cursor: "pointer",
+    WebkitTapHighlightColor: "transparent",
   },
   photoListTileRoot: {
     width: "100%",
