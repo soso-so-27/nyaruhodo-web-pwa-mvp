@@ -120,6 +120,33 @@ test("switches to the next cat from the cover in one tap", async ({ page }) => {
     .toBe("cat-komugi");
 });
 
+test("lets the owner choose a cat thumbnail from existing photos", async ({
+  page,
+}) => {
+  await seedCatsProfile(page, Date.parse("2026-06-10T12:30:00+09:00"), 3);
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto("/cats");
+  await page.waitForLoadState("networkidle");
+
+  await page.getByTestId("cats-thumbnail-picker-button").click();
+
+  await expect(page.getByRole("dialog", { name: "サムネイル写真" })).toBeVisible();
+  await page
+    .getByRole("button", { name: /の写真をサムネイルにする/ })
+    .first()
+    .click();
+
+  await expect
+    .poll(() =>
+      page.evaluate(() => {
+        const raw = window.localStorage.getItem("cat_profiles");
+        const [profile] = raw ? JSON.parse(raw) : [];
+        return profile?.avatarDataUrl ?? "";
+      }),
+    )
+    .toBe(photoDataUrl);
+});
+
 async function seedCatsProfile(page: Page, now: number, photoCount: number) {
   await page.addInitScript(
     ({ nowValue, src, count }) => {

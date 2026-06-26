@@ -126,6 +126,7 @@ export function CatsPage() {
   const [isCatSwitcherOpen, setIsCatSwitcherOpen] = useState(false);
   const [isCatManageOpen, setIsCatManageOpen] = useState(false);
   const [isCatManageEditing, setIsCatManageEditing] = useState(false);
+  const [isThumbnailPickerOpen, setIsThumbnailPickerOpen] = useState(false);
   const [isOnboardingMode, setIsOnboardingMode] = useState(false);
   const [isOnboardingCompletionReady, setIsOnboardingCompletionReady] =
     useState(false);
@@ -200,10 +201,12 @@ export function CatsPage() {
   const activeCatLensPhotos = activeCatId
     ? lensPhotosByCat[activeCatId] ?? []
     : [];
+  const hasCustomThumbnail = Boolean(activeCatProfile?.avatarDataUrl);
   const activeCoverPhoto = activeCatLensPhotos[0] ?? null;
-  const activeCoverSrc = activeCoverPhoto?.src ?? activeAvatarSrc;
+  const activeCoverSrc =
+    activeCatProfile?.avatarDataUrl ?? activeCoverPhoto?.src ?? activeAvatarSrc;
   const activeCoverFit =
-    activeCoverPhoto || activeCatProfile?.avatarDataUrl ? "cover" : "contain";
+    hasCustomThumbnail || activeCoverPhoto ? "cover" : "contain";
   const allLensPhotos = useMemo(
     () =>
       mergeAllLensPhotos(
@@ -540,6 +543,40 @@ export function CatsPage() {
     }
   }
 
+  function updateActiveCatThumbnail(photoSrc: string | undefined) {
+    if (!activeCatId) {
+      return;
+    }
+
+    const targetCatId = activeCatId;
+    const raw = window.localStorage.getItem(STORAGE_KEYS.catProfiles);
+
+    if (!raw) {
+      return;
+    }
+
+    const profiles = JSON.parse(raw) as CatProfile[];
+    const index = profiles.findIndex((profile) => profile.id === targetCatId);
+
+    if (index === -1) {
+      return;
+    }
+
+    const nextProfile = {
+      ...profiles[index],
+      avatarDataUrl: photoSrc,
+      updatedAt: new Date().toISOString(),
+    } satisfies CatProfile;
+    const nextProfiles = profiles.map((profile, profileIndex) =>
+      profileIndex === index ? nextProfile : profile,
+    );
+
+    saveCatProfiles(nextProfiles);
+    setCatProfiles(nextProfiles);
+    setSaveMessage(photoSrc ? "サムネイルを変えました。" : "自動表示に戻しました。");
+    setTimeout(() => setSaveMessage(""), 2000);
+  }
+
   async function handleAvatarUpload() {
     if (!activeCatId) {
       return;
@@ -564,34 +601,8 @@ export function CatsPage() {
           pathSegments: [targetCatId, "avatar"],
           fileName: "avatar",
         });
-        const raw = window.localStorage.getItem(STORAGE_KEYS.catProfiles);
-
-        if (!raw) {
-          return;
-        }
-
-        const profiles = JSON.parse(raw) as CatProfile[];
-        const index = profiles.findIndex((profile) => profile.id === targetCatId);
-
-        if (index === -1) {
-          return;
-        }
-
-        const nextProfiles = profiles.map((profile, profileIndex) =>
-          profileIndex === index
-            ? {
-                ...profile,
-                avatarDataUrl: photoSrc,
-                updatedAt: new Date().toISOString(),
-              }
-            : profile,
-        );
-
-        window.localStorage.setItem(
-          STORAGE_KEYS.catProfiles,
-          JSON.stringify(nextProfiles),
-        );
-        setCatProfiles(nextProfiles);
+        updateActiveCatThumbnail(photoSrc);
+        setIsThumbnailPickerOpen(false);
       } catch {
         return;
       }
@@ -760,6 +771,17 @@ export function CatsPage() {
                         aria-label={`${activeCatProfile.name}を編集・管理`}
                       >
                         <PencilSmallIcon />
+                      </button>
+                    ) : null}
+                    {canManageCats ? (
+                      <button
+                        type="button"
+                        data-testid="cats-thumbnail-picker-button"
+                        style={styles.profileCoverPhotoButton}
+                        onClick={() => setIsThumbnailPickerOpen(true)}
+                        aria-label={`${activeCatProfile.name}のサムネイル写真を選ぶ`}
+                      >
+                        <CameraSmallIcon />
                       </button>
                     ) : null}
                     {shouldShowCatSwitchButton ? (
@@ -1232,10 +1254,10 @@ export function CatsPage() {
               fullWidth
               onClick={() => {
                 setIsCatManageOpen(false);
-                void handleAvatarUpload();
+                setIsThumbnailPickerOpen(true);
               }}
             >
-              アイコン写真を変える
+              サムネイル写真を変える
             </AppButton>
             {canManageCats && catProfiles.length > 1 ? (
               <AppButton
@@ -1373,6 +1395,25 @@ export function CatsPage() {
           photos={photoSheetPhotos}
           showCatNames={photoSheetLens === "all"}
           onClose={() => setPhotoSheetLens(null)}
+        />
+      ) : null}
+      {isThumbnailPickerOpen && activeCatProfile ? (
+        <ThumbnailPickerSheet
+          catName={getCatName(activeCatProfile)}
+          photos={activeCatLensPhotos}
+          hasCustomThumbnail={hasCustomThumbnail}
+          onPickPhoto={(photo) => {
+            updateActiveCatThumbnail(photo.src);
+            setIsThumbnailPickerOpen(false);
+          }}
+          onUpload={() => {
+            void handleAvatarUpload();
+          }}
+          onReset={() => {
+            updateActiveCatThumbnail(undefined);
+            setIsThumbnailPickerOpen(false);
+          }}
+          onClose={() => setIsThumbnailPickerOpen(false)}
         />
       ) : null}
     </main>
@@ -1926,6 +1967,82 @@ function PhotoListSheet({
             ))}
           </div>
         )}
+      </div>
+    </AppBottomSheet>
+  );
+}
+
+function ThumbnailPickerSheet({
+  catName,
+  photos,
+  hasCustomThumbnail,
+  onPickPhoto,
+  onUpload,
+  onReset,
+  onClose,
+}: {
+  catName: string;
+  photos: LensPhoto[];
+  hasCustomThumbnail: boolean;
+  onPickPhoto: (photo: LensPhoto) => void;
+  onUpload: () => void;
+  onReset: () => void;
+  onClose: () => void;
+}) {
+  return (
+    <AppBottomSheet title="サムネイル写真" onClose={onClose}>
+      <div style={styles.thumbnailPicker}>
+        <div style={styles.thumbnailPickerActions}>
+          <AppButton
+            type="button"
+            variant="secondary"
+            fullWidth
+            iconStart={<PhotoSmallIcon />}
+            onClick={onUpload}
+          >
+            端末の写真を選ぶ
+          </AppButton>
+          {hasCustomThumbnail ? (
+            <AppButton
+              type="button"
+              variant="quiet"
+              fullWidth
+              onClick={onReset}
+            >
+              自動表示に戻す
+            </AppButton>
+          ) : null}
+        </div>
+
+        <div style={styles.thumbnailPickerSection}>
+          <p style={styles.thumbnailPickerTitle}>{catName}のねがおから選ぶ</p>
+          {photos.length > 0 ? (
+            <div style={styles.thumbnailPickerGrid}>
+              {photos.map((photo) => (
+                <button
+                  key={photo.id}
+                  type="button"
+                  style={styles.thumbnailPickerPhoto}
+                  onClick={() => onPickPhoto(photo)}
+                  aria-label={`${formatLensPhotoDate(photo.createdAt)}の写真をサムネイルにする`}
+                >
+                  <PhotoTile
+                    src={photo.src}
+                    alt=""
+                    variant="tile"
+                    aspect="1 / 1"
+                    style={styles.thumbnailPickerPhotoTileRoot}
+                    imageStyle={styles.thumbnailPickerPhotoTile}
+                  />
+                </button>
+              ))}
+            </div>
+          ) : (
+            <p style={styles.thumbnailPickerEmpty}>
+              ねがおを撮ると、ここからも選べます。
+            </p>
+          )}
+        </div>
       </div>
     </AppBottomSheet>
   );
@@ -2745,6 +2862,65 @@ function PencilSmallIcon() {
   );
 }
 
+function CameraSmallIcon() {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      width="19"
+      height="19"
+      fill="none"
+      aria-hidden="true"
+      style={{ display: "block" }}
+    >
+      <path
+        d="M7.5 8.4 8.8 6.6h6.4l1.3 1.8h1.7c1 0 1.8.8 1.8 1.8v6.1c0 1-.8 1.8-1.8 1.8H5.8c-1 0-1.8-.8-1.8-1.8v-6.1c0-1 .8-1.8 1.8-1.8h1.7Z"
+        stroke="currentColor"
+        strokeWidth="1.65"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+      <circle
+        cx="12"
+        cy="13.2"
+        r="2.65"
+        stroke="currentColor"
+        strokeWidth="1.65"
+      />
+    </svg>
+  );
+}
+
+function PhotoSmallIcon() {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      width="19"
+      height="19"
+      fill="none"
+      aria-hidden="true"
+      style={{ display: "block" }}
+    >
+      <rect
+        x="4.4"
+        y="5.4"
+        width="15.2"
+        height="13.2"
+        rx="2.2"
+        stroke="currentColor"
+        strokeWidth="1.65"
+      />
+      <path
+        d="m6.7 16.1 3.4-3.5 2.5 2.4 1.4-1.4 3.3 3.5"
+        stroke="currentColor"
+        strokeWidth="1.65"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+      <circle cx="15.8" cy="9.3" r="1.15" fill="currentColor" />
+    </svg>
+  );
+}
+
 function MoreDotsIcon() {
   return (
     <svg
@@ -3275,6 +3451,30 @@ const styles = {
     color: "color-mix(in srgb, var(--ink) 78%, transparent)",
     boxShadow:
       "0 1px 0 color-mix(in srgb, var(--paper) 64%, transparent), 0 10px 20px -18px color-mix(in srgb, var(--ink) 30%, transparent)",
+    cursor: "pointer",
+    WebkitTapHighlightColor: "transparent",
+    backdropFilter: "blur(10px)",
+    WebkitBackdropFilter: "blur(10px)",
+  },
+  profileCoverPhotoButton: {
+    position: "absolute" as const,
+    right: "10px",
+    bottom: "10px",
+    zIndex: 2,
+    width: "44px",
+    height: "44px",
+    minWidth: "44px",
+    display: "inline-flex",
+    alignItems: "center",
+    justifyContent: "center",
+    padding: 0,
+    borderRadius: "999px",
+    border: "1px solid color-mix(in srgb, var(--seal) 42%, var(--paper) 58%)",
+    background:
+      "linear-gradient(180deg, color-mix(in srgb, var(--paper-card) 92%, transparent), color-mix(in srgb, var(--paper-warm) 88%, transparent))",
+    color: "var(--seal)",
+    boxShadow:
+      "0 1px 0 color-mix(in srgb, var(--paper) 80%, transparent), 0 12px 24px -16px color-mix(in srgb, var(--seal) 38%, transparent)",
     cursor: "pointer",
     WebkitTapHighlightColor: "transparent",
     backdropFilter: "blur(10px)",
@@ -4353,6 +4553,70 @@ const styles = {
     overflow: "hidden",
     textOverflow: "ellipsis",
     whiteSpace: "nowrap",
+  },
+  thumbnailPicker: {
+    display: "grid",
+    gap: "18px",
+    minWidth: 0,
+  },
+  thumbnailPickerActions: {
+    display: "grid",
+    gap: "8px",
+  },
+  thumbnailPickerSection: {
+    display: "grid",
+    gap: "9px",
+    minWidth: 0,
+  },
+  thumbnailPickerTitle: {
+    margin: "0 2px",
+    color: CATS_MUTED,
+    fontFamily: CATS_SERIF,
+    fontSize: CATS_META_SIZE,
+    fontWeight: 400,
+    lineHeight: 1.45,
+    letterSpacing: CATS_META_TRACKING,
+  },
+  thumbnailPickerGrid: {
+    display: "grid",
+    gridTemplateColumns: "repeat(4, minmax(0, 1fr))",
+    gap: "6px",
+    minWidth: 0,
+  },
+  thumbnailPickerPhoto: {
+    position: "relative",
+    minWidth: 0,
+    aspectRatio: "1 / 1",
+    padding: 0,
+    border: "1px solid color-mix(in srgb, var(--paper-card) 82%, transparent)",
+    borderRadius: "14px",
+    overflow: "hidden",
+    background: "color-mix(in srgb, var(--paper-warm) 34%, transparent)",
+    boxShadow:
+      "0 1px 0 color-mix(in srgb, var(--paper) 80%, transparent), 0 10px 20px -18px color-mix(in srgb, var(--ink) 28%, transparent)",
+    cursor: "pointer",
+    WebkitTapHighlightColor: "transparent",
+  },
+  thumbnailPickerPhotoTileRoot: {
+    display: "block",
+    width: "100%",
+    height: "100%",
+  },
+  thumbnailPickerPhotoTile: {
+    width: "100%",
+    height: "100%",
+    border: "none",
+    borderRadius: 0,
+    boxShadow: "none",
+  },
+  thumbnailPickerEmpty: {
+    margin: 0,
+    color: CATS_FAINT,
+    fontFamily: CATS_SERIF,
+    fontSize: CATS_BODY_SIZE,
+    fontWeight: 400,
+    lineHeight: 1.7,
+    letterSpacing: CATS_BODY_TRACKING,
   },
   zukanHint: {
     margin: "8px 0 0",
