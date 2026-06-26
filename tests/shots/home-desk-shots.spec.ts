@@ -23,6 +23,7 @@ const expectedShotNames = [
   "album_today.png",
   "mainichi_board_2.png",
   "mainichi_board_12.png",
+  "mainichi_board_24.png",
   "mainichi_board_31.png",
   "mainichi_board_31_bundle_sheet.png",
   "mainichi_board_62.png",
@@ -224,7 +225,7 @@ test.describe("home desk model shots", () => {
     });
   });
 
-  for (const count of [2, 12, 31, 62] as const) {
+  for (const count of [2, 12, 24, 31, 62] as const) {
     test(`mainichi_board_${count}`, async ({ page }) => {
       await seedMainichiBoardPhotoCount(page, count);
       await page.goto("/collection");
@@ -233,16 +234,16 @@ test.describe("home desk model shots", () => {
       const board = page.getByTestId("mainichi-photo-board");
       await expect(board).toBeVisible();
       await expect(page.getByTestId("mainichi-board-photo-sent")).toHaveCount(
-        count > 12 ? 8 : count,
+        count > 24 ? 18 : count,
       );
-      if (count > 12) {
+      if (count > 24) {
         await expect(page.getByTestId("mainichi-month-bundle-open")).toBeVisible();
       }
       await page.waitForTimeout(500);
       await board.screenshot({
         path: path.join(shotsDir, `mainichi_board_${count}.png`),
       });
-      if (count > 12) {
+      if (count > 24) {
         await page.getByTestId("mainichi-month-bundle-open").click();
         const bundleDayCount = await page.getByTestId("mainichi-month-bundle-day").count();
         expect(bundleDayCount).toBeGreaterThan(8);

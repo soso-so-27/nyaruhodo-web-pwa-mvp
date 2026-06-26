@@ -1562,14 +1562,7 @@ function MainichiMonthBoard({
           ...styles.mainichiBundleLayerFront,
         }}
       />
-      {isCondensedBundle ? <span style={styles.mainichiBundleLiftTab} /> : null}
       <span style={styles.mainichiBundlePocket} />
-      <span
-        style={{
-          ...styles.mainichiBundleSeal,
-          ...(isCondensedBundle ? styles.mainichiBundleSealOpenable : {}),
-        }}
-      />
     </>
   );
   const [isBundleSheetOpen, setIsBundleSheetOpen] = useState(false);
@@ -1599,7 +1592,7 @@ function MainichiMonthBoard({
                 ...styles.mainichiBundleOpenButton,
               }}
               onClick={() => setIsBundleSheetOpen(true)}
-              aria-label={`${month.label}の束をひらく`}
+              aria-label={`${month.label}の写真を見る`}
             >
               {bundleLayers}
             </button>
@@ -3250,12 +3243,15 @@ function getMainichiBoardPhotoKey(photo: MainichiBoardPhoto) {
   return `${photo.side}:${photo.sourcePhotoId ?? photo.id}:${photo.dateKey}`;
 }
 
+const MAINICHI_BOARD_DIRECT_PHOTO_LIMIT = 24;
+const MAINICHI_BOARD_DENSE_PREVIEW_LIMIT = 18;
+
 function getMainichiBoardVisiblePhotos(photos: MainichiBoardPhoto[]) {
-  if (photos.length <= 12) {
+  if (photos.length <= MAINICHI_BOARD_DIRECT_PHOTO_LIMIT) {
     return photos;
   }
 
-  return photos.slice(0, 8);
+  return photos.slice(0, MAINICHI_BOARD_DENSE_PREVIEW_LIMIT);
 }
 
 function groupMainichiBoardPhotosByDay(
@@ -3342,15 +3338,25 @@ function getMainichiBundleBaseStyle(
   isCondensedBundle = false,
 ): CSSProperties {
   const depth =
-    isCondensedBundle
+    isCondensedBundle && total >= 48
       ? {
-          width: "88%",
-          height: "146px",
-          bottom: "18px",
-          opacity: 0.84,
-          edge: "18px",
-          pocket: 0.44,
-          shadow: 0.18,
+          width: "90%",
+          height: "112px",
+          bottom: "44px",
+          opacity: 0.36,
+          edge: "15px",
+          pocket: 0.18,
+          shadow: 0.11,
+        }
+      : isCondensedBundle
+      ? {
+          width: "86%",
+          height: "86px",
+          bottom: "52px",
+          opacity: 0.3,
+          edge: "11px",
+          pocket: 0.16,
+          shadow: 0.09,
         }
       : total <= 1
       ? {
@@ -4878,41 +4884,6 @@ const styles = {
     background:
       "linear-gradient(180deg, color-mix(in srgb, var(--paper-card) 4%, transparent), color-mix(in srgb, var(--paper-warm) 34%, transparent))",
     opacity: "var(--mainichi-bundle-pocket-opacity, 0.46)",
-  },
-  mainichiBundleLiftTab: {
-    position: "absolute",
-    left: "50%",
-    bottom: "calc(var(--mainichi-bundle-edge, 8px) * 3.05 + 6px)",
-    width: "42px",
-    height: "13px",
-    borderRadius: "999px 999px 8px 8px",
-    transform: "translateX(-50%) rotate(-0.25deg)",
-    background:
-      "linear-gradient(180deg, color-mix(in srgb, var(--paper-card) 66%, white 34%), color-mix(in srgb, var(--paper-warm) 54%, transparent))",
-    border: "1px solid color-mix(in srgb, var(--line) 42%, transparent)",
-    boxShadow:
-      "0 1px 0 color-mix(in srgb, white 40%, transparent) inset, 0 8px 14px -13px rgba(73,55,36,0.48)",
-    opacity: 0.72,
-  },
-  mainichiBundleSeal: {
-    position: "absolute",
-    left: "var(--mainichi-bundle-seal-x, 62%)",
-    bottom: "10px",
-    width: "18px",
-    height: "18px",
-    borderRadius: "999px",
-    transform: "translateX(-50%) rotate(5deg)",
-    background:
-      "radial-gradient(circle at 34% 30%, color-mix(in srgb, var(--seal) 58%, white 28%), color-mix(in srgb, var(--seal) 82%, var(--ink) 18%) 72%)",
-    boxShadow:
-      "0 1px 0 color-mix(in srgb, white 32%, transparent) inset, 0 4px 8px -5px rgba(68,42,28,0.48)",
-  },
-  mainichiBundleSealOpenable: {
-    bottom: "8px",
-    width: "24px",
-    height: "24px",
-    boxShadow:
-      "0 1px 0 color-mix(in srgb, white 32%, transparent) inset, 0 0 0 4px color-mix(in srgb, var(--seal) 10%, transparent), 0 10px 16px -12px rgba(78,40,28,0.78)",
   },
   mainichiBoardPhotoButton: {
     position: "absolute",
