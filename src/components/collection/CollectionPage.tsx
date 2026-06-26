@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
-import type { CSSProperties, MouseEvent, UIEvent } from "react";
+import type { CSSProperties, MouseEvent, TouchEvent, UIEvent } from "react";
 import {
   getCollectionSlotPhotoSlug,
   getDailyCollectionTarget,
@@ -284,6 +284,8 @@ type MainichiMorphSource = {
 type MainichiDayPhoto = {
   id: string;
   sourcePhotoId?: string;
+  dateKey: string;
+  dateLabel: string;
   src: string;
   thumbnailSrc?: string;
   displaySrc?: string;
@@ -294,6 +296,12 @@ type MainichiDayPhoto = {
   catName?: string;
   storageWriteback?: (dataUrl: string) => void;
   deliveredAt?: number;
+};
+
+type MainichiViewerState = {
+  photos: MainichiDayPhoto[];
+  index: number;
+  monthLabel: string | null;
 };
 
 export function CollectionPage() {
@@ -321,8 +329,8 @@ export function CollectionPage() {
   >(null);
   const [selectedMainichiSource, setSelectedMainichiSource] =
     useState<MainichiMorphSource | null>(null);
-  const [selectedMainichiPhoto, setSelectedMainichiPhoto] =
-    useState<MainichiDayPhoto | null>(null);
+  const [selectedMainichiViewer, setSelectedMainichiViewer] =
+    useState<MainichiViewerState | null>(null);
   const [currentBoxPhotoIndex, setCurrentBoxPhotoIndex] = useState(0);
   const toastTimerRef = useRef<number | null>(null);
   const trackedViewCatIdRef = useRef<string | null>(null);
@@ -493,6 +501,8 @@ export function CollectionPage() {
         : [],
     [catNameById, selectedMainichiDayGroup],
   );
+  const selectedMainichiPhoto =
+    selectedMainichiViewer?.photos[selectedMainichiViewer.index] ?? null;
 
   useEffect(() => {
     if (!hasLoaded || !activeCatId || trackedViewCatIdRef.current === activeCatId) {
@@ -638,21 +648,113 @@ export function CollectionPage() {
   }
 
   function openMainichiFullscreenPhoto(photo: MainichiDayPhoto) {
-    setSelectedMainichiPhoto(photo);
+    const photoIndex = selectedMainichiDayPhotos.findIndex(
+      (candidate) =>
+        candidate.kind === photo.kind &&
+        candidate.id === photo.id &&
+        candidate.dateKey === photo.dateKey,
+    );
+
+    setSelectedMainichiViewer({
+      photos: selectedMainichiDayPhotos.length > 0 ? selectedMainichiDayPhotos : [photo],
+      index: Math.max(photoIndex, 0),
+      monthLabel: null,
+    });
     trackProductEvent(
       "collection_mainichi_photo_opened",
       {
-        date_key: selectedMainichiDayKey,
+        date_key: photo.dateKey,
         kind: photo.kind,
         photo_id: photo.id,
         source_photo_id: photo.sourcePhotoId ?? null,
+        entry: "day_sheet",
+      },
+      { localCatId: activeCatId },
+    );
+  }
+
+  function openMainichiBoardPhoto(
+    photo: MainichiBoardPhoto,
+    month: MainichiBoardMonth,
+    source: MainichiMorphSource | null = null,
+  ) {
+    const monthPhotos = buildMainichiViewerPhotosForMonth(
+      month,
+      albumDayGroups,
+      catNameById,
+    );
+    const photoKey = getMainichiBoardPhotoKey(photo);
+    const photoIndex = monthPhotos.findIndex(
+      (candidate) => getMainichiDayPhotoBoardKey(candidate) === photoKey,
+    );
+    const fallbackGroup = albumDayGroups.find((group) => group.key === photo.dateKey);
+    const fallbackPhotos = fallbackGroup
+      ? buildMainichiDayPhotos(fallbackGroup, catNameById).filter(
+          (candidate) => getMainichiPhotoSide(candidate) === photo.side,
+        )
+      : [];
+    const photos = monthPhotos.length > 0 ? monthPhotos : fallbackPhotos;
+    const index = Math.max(photoIndex, 0);
+    const selectedPhoto = photos[index] ?? null;
+
+    if (!selectedPhoto) {
+      openMainichiDay(photo.dateKey, source);
+      return;
+    }
+
+    setSelectedMainichiViewer({
+      photos,
+      index,
+      monthLabel: month.label,
+    });
+    trackProductEvent(
+      "collection_mainichi_photo_opened",
+      {
+        date_key: selectedPhoto.dateKey,
+        kind: selectedPhoto.kind,
+        photo_id: selectedPhoto.id,
+        source_photo_id: selectedPhoto.sourcePhotoId ?? null,
+        source_photo_key: source?.photoKey ?? null,
+        month_key: month.key,
+        entry: "month_board",
       },
       { localCatId: activeCatId },
     );
   }
 
   function closeMainichiFullscreenPhoto() {
-    setSelectedMainichiPhoto(null);
+    setSelectedMainichiViewer(null);
+  }
+
+  function moveMainichiFullscreenPhoto(direction: -1 | 1) {
+    setSelectedMainichiViewer((current) => {
+      if (!current || current.photos.length <= 1) {
+        return current;
+      }
+
+      const nextIndex =
+        (current.index + direction + current.photos.length) % current.photos.length;
+      const nextPhoto = current.photos[nextIndex];
+
+      trackProductEvent(
+        "collection_mainichi_photo_navigated",
+        {
+          date_key: nextPhoto.dateKey,
+          kind: nextPhoto.kind,
+          photo_id: nextPhoto.id,
+          source_photo_id: nextPhoto.sourcePhotoId ?? null,
+          direction,
+          index: nextIndex,
+          photo_count: current.photos.length,
+        },
+        { localCatId: activeCatId },
+      );
+
+      return {
+        ...current,
+        index: nextIndex,
+      };
+    });
   }
 
   function handleKeepMainichiPhoto(photo: MainichiDayPhoto) {
@@ -1027,6 +1129,7 @@ export function CollectionPage() {
           firstEveningDeliveryTargetDateKey={firstEveningDeliveryTargetDateKey}
           catProfiles={catProfiles}
           onOpenMainichiDay={openMainichiDay}
+          onOpenMainichiPhoto={openMainichiBoardPhoto}
         />
       </div>
       {selectedMainichiDayGroup ? (
@@ -1041,7 +1144,12 @@ export function CollectionPage() {
       {selectedMainichiPhoto ? (
         <MainichiFullscreenPhoto
           photo={selectedMainichiPhoto}
+          photoCount={selectedMainichiViewer?.photos.length ?? 1}
+          currentIndex={selectedMainichiViewer?.index ?? 0}
+          monthLabel={selectedMainichiViewer?.monthLabel ?? null}
           onClose={closeMainichiFullscreenPhoto}
+          onPrevious={() => moveMainichiFullscreenPhoto(-1)}
+          onNext={() => moveMainichiFullscreenPhoto(1)}
           onKeep={handleKeepMainichiPhoto}
         />
       ) : null}
@@ -1114,12 +1222,18 @@ function BoxOverview({
   firstEveningDeliveryTargetDateKey,
   catProfiles,
   onOpenMainichiDay,
+  onOpenMainichiPhoto,
 }: {
   dayGroups: AlbumDayGroup[];
   firstEveningDeliveryTargetDateKey: string | null;
   catProfiles: CatProfile[];
   onOpenMainichiDay: (
     dateKey: string,
+    source?: MainichiMorphSource | null,
+  ) => void;
+  onOpenMainichiPhoto: (
+    photo: MainichiBoardPhoto,
+    month: MainichiBoardMonth,
     source?: MainichiMorphSource | null,
   ) => void;
 }) {
@@ -1135,6 +1249,7 @@ function BoxOverview({
         firstEveningDeliveryTargetDateKey={firstEveningDeliveryTargetDateKey}
         catProfiles={catProfiles}
         onOpenDay={onOpenMainichiDay}
+        onOpenPhoto={onOpenMainichiPhoto}
       />
     </section>
   );
@@ -1147,6 +1262,7 @@ function MainichiPhotoBoard({
   firstEveningDeliveryTargetDateKey,
   catProfiles,
   onOpenDay,
+  onOpenPhoto,
 }: {
   dayGroups: AlbumDayGroup[];
   activeSide: MainichiBoardSide;
@@ -1154,6 +1270,11 @@ function MainichiPhotoBoard({
   firstEveningDeliveryTargetDateKey: string | null;
   catProfiles: CatProfile[];
   onOpenDay: (dateKey: string, source?: MainichiMorphSource | null) => void;
+  onOpenPhoto: (
+    photo: MainichiBoardPhoto,
+    month: MainichiBoardMonth,
+    source?: MainichiMorphSource | null,
+  ) => void;
 }) {
   const months = useMemo(
     () =>
@@ -1271,6 +1392,7 @@ function MainichiPhotoBoard({
             showCatNames={false}
             pastingPhotoKey={pastingPhotoKey}
             onOpenDay={onOpenDay}
+            onOpenPhoto={onOpenPhoto}
           />
         </div>
       ) : (
@@ -1543,11 +1665,17 @@ function MainichiMonthBoard({
   showCatNames,
   pastingPhotoKey,
   onOpenDay,
+  onOpenPhoto,
 }: {
   month: MainichiBoardMonth;
   showCatNames: boolean;
   pastingPhotoKey: string | null;
   onOpenDay: (dateKey: string, source?: MainichiMorphSource | null) => void;
+  onOpenPhoto: (
+    photo: MainichiBoardPhoto,
+    month: MainichiBoardMonth,
+    source?: MainichiMorphSource | null,
+  ) => void;
 }) {
   const bundleSide = month.photos[0]?.side ?? "sent";
   const visiblePhotos = getMainichiBoardVisiblePhotos(month.photos);
@@ -1623,7 +1751,7 @@ function MainichiMonthBoard({
               total={month.photos.length}
               showCatName={showCatNames && month.photos.length <= 3}
               shouldPaste={getMainichiBoardPhotoKey(photo) === pastingPhotoKey}
-              onOpenDay={onOpenDay}
+              onOpenPhoto={(source) => onOpenPhoto(photo, month, source)}
             />
           ))}
         </div>
@@ -1740,14 +1868,14 @@ function MainichiBoardPhotoCard({
   total,
   showCatName,
   shouldPaste,
-  onOpenDay,
+  onOpenPhoto,
 }: {
   photo: MainichiBoardPhoto;
   index: number;
   total: number;
   showCatName: boolean;
   shouldPaste: boolean;
-  onOpenDay: (dateKey: string, source?: MainichiMorphSource | null) => void;
+  onOpenPhoto: (source?: MainichiMorphSource | null) => void;
 }) {
   const layout = getMainichiBoardPhotoLayout(index, total);
   const showTape = shouldPaste || shouldShowMainichiBoardTape(index, total);
@@ -1759,7 +1887,7 @@ function MainichiBoardPhotoCard({
   function handleClick(event: MouseEvent<HTMLButtonElement>) {
     const rect = event.currentTarget.getBoundingClientRect();
 
-    onOpenDay(photo.dateKey, {
+    onOpenPhoto({
       rect: {
         left: rect.left,
         top: rect.top,
@@ -2002,17 +2130,34 @@ function MainichiDaySheet({
 
 function MainichiFullscreenPhoto({
   photo,
+  photoCount,
+  currentIndex,
+  monthLabel,
   onClose,
+  onPrevious,
+  onNext,
   onKeep,
 }: {
   photo: MainichiDayPhoto;
+  photoCount: number;
+  currentIndex: number;
+  monthLabel: string | null;
   onClose: () => void;
+  onPrevious: () => void;
+  onNext: () => void;
   onKeep: (photo: MainichiDayPhoto) => boolean;
 }) {
   const [saveState, setSaveState] = useState<"idle" | "saved">(() =>
     photo.kind === "other" && isMainichiPhotoKept(photo) ? "saved" : "idle",
   );
   const [photoAspectRatio, setPhotoAspectRatio] = useState("1 / 1");
+  const touchStartXRef = useRef<number | null>(null);
+  const canNavigate = photoCount > 1;
+
+  useEffect(() => {
+    setSaveState(photo.kind === "other" && isMainichiPhotoKept(photo) ? "saved" : "idle");
+    setPhotoAspectRatio("1 / 1");
+  }, [photo.id, photo.kind, photo.sourcePhotoId]);
 
   function handleKeep() {
     if (photo.kind !== "other") {
@@ -2028,9 +2173,50 @@ function MainichiFullscreenPhoto({
     }
   }
 
+  function handleTouchStart(event: TouchEvent<HTMLDivElement>) {
+    touchStartXRef.current = event.touches[0]?.clientX ?? null;
+  }
+
+  function handleTouchEnd(event: TouchEvent<HTMLDivElement>) {
+    const startX = touchStartXRef.current;
+    const endX = event.changedTouches[0]?.clientX ?? null;
+
+    touchStartXRef.current = null;
+
+    if (!canNavigate || startX === null || endX === null) {
+      return;
+    }
+
+    const deltaX = endX - startX;
+
+    if (Math.abs(deltaX) < 48) {
+      return;
+    }
+
+    if (deltaX > 0) {
+      onPrevious();
+    } else {
+      onNext();
+    }
+  }
+
   return (
-    <div style={styles.mainichiViewerOverlay} data-testid="mainichi-photo-viewer">
+    <div
+      style={styles.mainichiViewerOverlay}
+      data-testid="mainichi-photo-viewer"
+      onTouchStart={handleTouchStart}
+      onTouchEnd={handleTouchEnd}
+    >
       <div style={styles.mainichiViewerChrome}>
+        <div style={styles.mainichiViewerMeta}>
+          <span style={styles.mainichiViewerDate}>{photo.dateLabel}</span>
+          <span style={styles.mainichiViewerSide}>{photo.sideLabel}</span>
+          {monthLabel && canNavigate ? (
+            <span style={styles.mainichiViewerCount}>
+              {monthLabel} {currentIndex + 1}/{photoCount}
+            </span>
+          ) : null}
+        </div>
         <AppButton
           type="button"
           variant="ghost"
@@ -2042,23 +2228,51 @@ function MainichiFullscreenPhoto({
           ×
         </AppButton>
       </div>
-      <PhotoViewerFrame
-        src={getPhotoDetailSrc(photo)}
-        alt=""
-        fit="contain"
-        aspect="auto"
-        style={{
-          ...styles.mainichiViewerFrame,
-          aspectRatio: photoAspectRatio,
-        }}
-        imageStyle={styles.mainichiViewerImage}
-        onStorageDataUrl={photo.storageWriteback}
-        onNaturalSize={({ width, height }) => {
-          if (width > 0 && height > 0) {
-            setPhotoAspectRatio(`${width} / ${height}`);
-          }
-        }}
-      />
+      <div style={styles.mainichiViewerStage}>
+        {canNavigate ? (
+          <button
+            type="button"
+            style={{
+              ...styles.mainichiViewerNavButton,
+              ...styles.mainichiViewerNavButtonPrevious,
+            }}
+            onClick={onPrevious}
+            aria-label="前のねこだより"
+          >
+            ‹
+          </button>
+        ) : null}
+        <PhotoViewerFrame
+          src={getPhotoDetailSrc(photo)}
+          alt=""
+          fit="contain"
+          aspect="auto"
+          style={{
+            ...styles.mainichiViewerFrame,
+            aspectRatio: photoAspectRatio,
+          }}
+          imageStyle={styles.mainichiViewerImage}
+          onStorageDataUrl={photo.storageWriteback}
+          onNaturalSize={({ width, height }) => {
+            if (width > 0 && height > 0) {
+              setPhotoAspectRatio(`${width} / ${height}`);
+            }
+          }}
+        />
+        {canNavigate ? (
+          <button
+            type="button"
+            style={{
+              ...styles.mainichiViewerNavButton,
+              ...styles.mainichiViewerNavButtonNext,
+            }}
+            onClick={onNext}
+            aria-label="次のねこだより"
+          >
+            ›
+          </button>
+        ) : null}
+      </div>
       {photo.kind === "other" ? (
         <AppButton
           type="button"
@@ -3037,6 +3251,8 @@ function buildMainichiDayPhotos(
       return {
         id: photo.id,
         sourcePhotoId: photo.sourcePhotoId,
+        dateKey: group.key,
+        dateLabel: group.label,
         src: photo.src,
         thumbnailSrc: photo.thumbnailSrc,
         displaySrc: photo.displaySrc,
@@ -3054,6 +3270,8 @@ function buildMainichiDayPhotos(
     .map((photo) => ({
       id: photo.id,
       sourcePhotoId: photo.sourcePhotoId,
+      dateKey: group.key,
+      dateLabel: group.label,
       src: photo.src,
       thumbnailSrc: photo.thumbnailSrc,
       displaySrc: photo.displaySrc,
@@ -3095,6 +3313,39 @@ function isMainichiPhotoKept(photo: MainichiDayPhoto) {
       savedPhoto.id === photo.id ||
       Boolean(photo.sourcePhotoId && savedPhoto.sourcePhotoId === photo.sourcePhotoId),
   );
+}
+
+function getMainichiPhotoSide(photo: MainichiDayPhoto): MainichiBoardSide {
+  return photo.kind === "sleeping" ? "sent" : "delivered";
+}
+
+function getMainichiDayPhotoBoardKey(photo: MainichiDayPhoto) {
+  return `${getMainichiPhotoSide(photo)}:${photo.sourcePhotoId ?? photo.id}:${photo.dateKey}`;
+}
+
+function buildMainichiViewerPhotosForMonth(
+  month: MainichiBoardMonth,
+  dayGroups: AlbumDayGroup[],
+  catNameById: Map<string, string>,
+) {
+  const dayGroupByKey = new Map(dayGroups.map((group) => [group.key, group]));
+  const dayPhotoByBoardKey = new Map<string, MainichiDayPhoto>();
+
+  for (const dateKey of new Set(month.photos.map((photo) => photo.dateKey))) {
+    const group = dayGroupByKey.get(dateKey);
+
+    if (!group) {
+      continue;
+    }
+
+    for (const photo of buildMainichiDayPhotos(group, catNameById)) {
+      dayPhotoByBoardKey.set(getMainichiDayPhotoBoardKey(photo), photo);
+    }
+  }
+
+  return month.photos
+    .map((photo) => dayPhotoByBoardKey.get(getMainichiBoardPhotoKey(photo)))
+    .filter((photo): photo is MainichiDayPhoto => Boolean(photo));
 }
 
 function buildMainichiBoardMonths(
@@ -5218,6 +5469,49 @@ const styles = {
   },
   mainichiViewerChrome: {
     display: "flex",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: "16px",
+  },
+  mainichiViewerMeta: {
+    display: "flex",
+    minWidth: 0,
+    alignItems: "baseline",
+    gap: "10px",
+    color: COLLECTION_TEXT,
+  },
+  mainichiViewerDate: {
+    fontFamily: "var(--font-ui)",
+    fontSize: "16px",
+    fontWeight: 500,
+    lineHeight: 1.3,
+    fontVariantNumeric: "tabular-nums",
+    whiteSpace: "nowrap",
+  },
+  mainichiViewerSide: {
+    color: COLLECTION_MUTED,
+    fontFamily: "var(--font-display)",
+    fontSize: "13px",
+    fontWeight: 400,
+    lineHeight: 1.3,
+    letterSpacing: "0.08em",
+    whiteSpace: "nowrap",
+  },
+  mainichiViewerCount: {
+    minWidth: 0,
+    overflow: "hidden",
+    color: COLLECTION_MUTED,
+    fontFamily: "var(--font-ui)",
+    fontSize: "12px",
+    fontWeight: 400,
+    lineHeight: 1.3,
+    textOverflow: "ellipsis",
+    whiteSpace: "nowrap",
+  },
+  mainichiViewerStage: {
+    position: "relative",
+    display: "grid",
+    alignItems: "center",
     justifyContent: "flex-end",
   },
   mainichiViewerFrame: {
@@ -5231,6 +5525,33 @@ const styles = {
   mainichiViewerImage: {
     width: "100%",
     height: "100%",
+  },
+  mainichiViewerNavButton: {
+    position: "absolute",
+    top: "50%",
+    zIndex: 2,
+    width: "44px",
+    height: "44px",
+    display: "grid",
+    placeItems: "center",
+    border: "1px solid color-mix(in srgb, var(--line) 72%, transparent)",
+    borderRadius: "999px",
+    background: "color-mix(in srgb, var(--paper-card) 84%, transparent)",
+    boxShadow: "0 10px 24px -18px rgba(72,58,38,0.46)",
+    color: COLLECTION_TEXT,
+    fontFamily: "var(--font-ui)",
+    fontSize: "30px",
+    fontWeight: 300,
+    lineHeight: 1,
+    transform: "translateY(-50%)",
+    cursor: "pointer",
+    WebkitTapHighlightColor: "transparent",
+  },
+  mainichiViewerNavButtonPrevious: {
+    left: "max(8px, calc(50% - min(50vw, 300px) - 10px))",
+  },
+  mainichiViewerNavButtonNext: {
+    right: "max(8px, calc(50% - min(50vw, 300px) - 10px))",
   },
   mainichiViewerKeepButton: {
     width: "min(100%, 420px)",

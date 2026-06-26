@@ -75,8 +75,6 @@ test.describe("collection album flow", () => {
     const firstSentPhoto = page.getByTestId("mainichi-board-photo-sent").first();
     await expect(page.getByTestId("mainichi-board-photo-sent")).toHaveCount(2);
     await expect(firstSentPhoto).not.toHaveAttribute("data-mainichi-paste", "true");
-    await expect(page.getByText("current cat")).toBeVisible();
-    await expect(page.getByText("previous cat")).toBeVisible();
 
     await expect(page.getByTestId("mainichi-board-photo-sent")).toHaveCount(2);
   });
@@ -282,7 +280,7 @@ test.describe("collection album flow", () => {
 
     await page.goto("/collection");
     await page.waitForLoadState("networkidle");
-    await page.getByRole("radio").nth(1).click();
+    await page.getByRole("tab", { name: "とどいた" }).click();
     await expect(page.getByTestId("mainichi-board-photo-delivered")).toBeVisible();
 
     await expect
@@ -299,7 +297,7 @@ test.describe("collection album flow", () => {
     allowSignedUrl = false;
     await page.reload();
     await page.waitForLoadState("networkidle");
-    await page.getByRole("radio").nth(1).click();
+    await page.getByRole("tab", { name: "とどいた" }).click();
 
     await expect(page.locator('main img[src^="data:image/"]')).toHaveCount(1);
   });
@@ -404,7 +402,7 @@ test.describe("collection album flow", () => {
 
     await page.goto("/collection");
     await page.waitForLoadState("networkidle");
-    await page.getByRole("radio").nth(1).click();
+    await page.getByRole("tab", { name: "とどいた" }).click();
 
     await expect(page.getByTestId("mainichi-board-photo-delivered")).toBeVisible();
     await expect(page.locator('main img[src^="data:image/"]')).toHaveCount(1);
@@ -442,7 +440,7 @@ test.describe("collection album flow", () => {
     await page.waitForLoadState("networkidle");
 
     await expect(page.getByTestId("album-sealed-delivery")).toHaveCount(0);
-    await page.getByRole("radio").nth(1).click();
+    await page.getByRole("tab", { name: "とどいた" }).click();
     await expect(page.getByTestId("mainichi-board-photo-delivered")).toBeVisible();
     await expect(page.getByTestId("mainichi-board-photo-delivered")).toHaveCount(1);
   });
@@ -461,7 +459,7 @@ test.describe("collection album flow", () => {
     await page.waitForLoadState("networkidle");
 
     await expect(page.getByTestId("album-sealed-delivery")).toHaveCount(0);
-    await page.getByRole("radio").nth(1).click();
+    await page.getByRole("tab", { name: "とどいた" }).click();
     await expect(page.getByTestId("mainichi-board-photo-delivered")).toBeVisible();
     await expect(page.getByTestId("mainichi-board-photo-delivered")).toHaveCount(1);
     await expect
@@ -810,12 +808,8 @@ test.describe("collection album flow", () => {
     await page.goto("/collection");
     await page.waitForLoadState("networkidle");
 
-    await page.getByTestId("mainichi-board-photo-sent").click();
-    await expect(page.getByTestId("mainichi-day-sheet")).toBeVisible();
-    await expect(page.getByTestId("mainichi-day-photo-sent")).toBeVisible();
-    await expect(page.getByTestId("mainichi-day-photo-delivered")).toBeVisible();
-
-    await page.getByTestId("mainichi-day-photo-delivered").click();
+    await page.getByRole("tab", { name: "とどいた" }).click();
+    await page.getByTestId("mainichi-board-photo-delivered").click();
     await expect(page.getByTestId("mainichi-photo-viewer")).toBeVisible();
     await page.getByRole("button", { name: "とっておく" }).click();
 
