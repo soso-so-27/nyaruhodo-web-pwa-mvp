@@ -147,6 +147,82 @@ test("lets the owner choose a cat thumbnail from existing photos", async ({
     .toBe(photoDataUrl);
 });
 
+test("shows a meaningful pickup only when there is a strong cat record reason", async ({
+  page,
+}) => {
+  await seedCatsProfile(page, Date.parse("2026-06-10T12:30:00+09:00"), 10);
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto("/cats");
+  await page.waitForLoadState("networkidle");
+
+  const pickup = page.getByTestId("cats-pickup-section");
+  await expect(pickup).toBeVisible();
+  await expect(pickup).toContainText("ピックアップ");
+  await expect(pickup).toContainText("10枚目のねがお");
+  await expect(page.getByText("思い出が")).toHaveCount(0);
+
+  await pickup.getByRole("button").click();
+
+  await expect
+    .poll(() =>
+      page.evaluate(() =>
+        window.localStorage.getItem("neteruneko_cat_pickup_history") ?? "",
+      ),
+    )
+    .toContain("milestone-10");
+});
+
+test("renders footprints as recent cat events instead of a photo-only list", async ({
+  page,
+}) => {
+  await seedCatsProfile(page, Date.parse("2026-06-10T12:30:00+09:00"), 12);
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto("/cats");
+  await page.waitForLoadState("networkidle");
+
+  await expect(page.getByRole("heading", { name: "足あと" })).toBeVisible();
+  await expect(page.getByText("2026年6月")).toBeVisible();
+  await expect(page.getByText("ねがおを撮った").first()).toBeVisible();
+  await expect(page.getByText("届いた")).toHaveCount(0);
+});
+
+test("shows celebrations as current milestones instead of a fixed 50-photo card", async ({
+  page,
+}) => {
+  await seedCatsProfile(page, Date.parse("2026-06-10T12:30:00+09:00"), 10);
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto("/cats");
+  await page.waitForLoadState("networkidle");
+
+  const celebration = page
+    .getByRole("heading", { name: "記念" })
+    .locator("xpath=ancestor::section");
+
+  await expect(celebration).toContainText("家族になって");
+  await expect(celebration).toContainText("ねがお");
+  await expect(celebration).toContainText("10枚 → 50枚");
+  await expect(celebration).toContainText("誕生日");
+});
+
+test("opens a year summary dashboard from the yearly archive", async ({
+  page,
+}) => {
+  await seedCatsProfile(page, Date.parse("2026-06-10T12:30:00+09:00"), 10);
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto("/cats");
+  await page.waitForLoadState("networkidle");
+
+  await page.getByRole("button", { name: /2026年/ }).click();
+
+  const dialog = page.getByRole("dialog", { name: "2026年" });
+  await expect(dialog).toBeVisible();
+  await expect(dialog).toContainText("ねがお");
+  await expect(dialog).toContainText("ピックアップ");
+  await expect(dialog).toContainText("記念");
+  await expect(dialog).toContainText("6月によく撮りました");
+  await expect(dialog).toContainText("10枚目");
+});
+
 async function seedCatsProfile(page: Page, now: number, photoCount: number) {
   await page.addInitScript(
     ({ nowValue, src, count }) => {

@@ -5,6 +5,18 @@ import type { CSSProperties } from "react";
 import { storeAccountPhotoDataUrl } from "../../lib/photoStorageClient";
 import { STORAGE_KEYS } from "../../lib/storage";
 import {
+  markCatPickupSeen,
+  readCatPickupHistory,
+  selectCatPickup,
+  type CatPickup,
+} from "../../lib/cats/pickup";
+import { createCatFootprintEntries } from "../../lib/cats/footprints";
+import { createCatCelebrationItems } from "../../lib/cats/celebrations";
+import {
+  createCatYearSummaries,
+  type CatYearSummary,
+} from "../../lib/cats/yearSummary";
+import {
   readCatSleepingMilestones,
   readOwnSleepingPhotos,
   readOwnSleepingPhotoCount,
@@ -159,6 +171,8 @@ export function CatsPage() {
     useState<OmoideMemory | null>(null);
   const [selectedRecordPhoto, setSelectedRecordPhoto] =
     useState<RecordPhotoPreview | null>(null);
+  const [selectedYearSummary, setSelectedYearSummary] =
+    useState<CatYearSummary | null>(null);
 
   const activeCatProfile =
     catProfiles.length > 0
@@ -950,6 +964,7 @@ export function CatsPage() {
         !isOnboardingCompletionView &&
         activeSection === "record" ? (
           <RecordOverview
+            activeCatId={activeCatId}
             photos={activeCatLensPhotos}
             milestones={sleepingMilestones}
             memories={omoideMemories}
@@ -959,6 +974,7 @@ export function CatsPage() {
             onOpenMemory={(memory) => setSelectedOmoideMemory(memory)}
             onOpenPhoto={(photo) => setSelectedRecordPhoto(photo)}
             onOpenPhotos={() => setPhotoSheetLens("cat")}
+            onOpenYear={(summary) => setSelectedYearSummary(summary)}
           />
         ) : null}
 
@@ -1397,6 +1413,12 @@ export function CatsPage() {
           onClose={() => setPhotoSheetLens(null)}
         />
       ) : null}
+      {selectedYearSummary ? (
+        <YearSummarySheet
+          summary={selectedYearSummary}
+          onClose={() => setSelectedYearSummary(null)}
+        />
+      ) : null}
       {isThumbnailPickerOpen && activeCatProfile ? (
         <ThumbnailPickerSheet
           catName={getCatName(activeCatProfile)}
@@ -1431,6 +1453,7 @@ function PageBackdrop() {
 }
 
 function RecordOverview({
+  activeCatId,
   photos,
   milestones,
   memories,
@@ -1440,7 +1463,9 @@ function RecordOverview({
   onOpenMemory,
   onOpenPhoto,
   onOpenPhotos,
+  onOpenYear,
 }: {
+  activeCatId: string | null;
   photos: LensPhoto[];
   milestones: CatSleepingMilestone[];
   memories: OmoideMemory[];
@@ -1450,63 +1475,100 @@ function RecordOverview({
   onOpenMemory: (memory: OmoideMemory) => void;
   onOpenPhoto: (photo: RecordPhotoPreview) => void;
   onOpenPhotos: () => void;
+  onOpenYear: (summary: CatYearSummary) => void;
 }) {
-  const latestMemory = memories[0] ?? null;
-  const recentEntries = createRecordTimelineEntries(milestones, memories).slice(
-    0,
-    3,
-  );
-  const archiveRows = createYearArchiveRows(photos, memories).slice(0, 3);
-  const milestoneItems = createRecordMilestones({
+  const [pickupRefreshTick, setPickupRefreshTick] = useState(0);
+  const now = getClientNow();
+  const pickup = selectCatPickup({
+    now,
+    photos,
     milestones,
+    memories,
+    birthdayStatus,
+    history: readCatPickupHistory(activeCatId),
+  });
+  const recentEntries = createCatFootprintEntries({
+    photos,
+    milestones,
+    memories,
+    max: 4,
+  });
+  const yearSummaries = createCatYearSummaries({
+    photos,
+    memories,
+    milestones,
+    now,
+  }).slice(0, 3);
+  const celebrationItems = createCatCelebrationItems({
     familyDuration,
     birthdayStatus,
     takenSleepingPhotoCount,
   });
+  void pickupRefreshTick;
+
+  function scrollToMilestones() {
+    document
+      .getElementById("cats-milestones-heading")
+      ?.scrollIntoView({ behavior: "smooth", block: "start" });
+  }
 
   return (
     <div style={styles.recordOverview}>
-      <section style={styles.recordBlock} aria-labelledby="cats-now-heading">
-        <h2 id="cats-now-heading" style={styles.recordBlockTitle}>
-          <span style={styles.recordBlockTitleMark} aria-hidden="true" />
-          いま
-        </h2>
-        <button
-          type="button"
-          style={
-            latestMemory
-              ? styles.nowMemoryRow
-              : { ...styles.nowMemoryRow, ...styles.nowMemoryRowDisabled }
-          }
-          onClick={() => {
-            if (latestMemory) {
-              onOpenMemory(latestMemory);
-            }
-          }}
-          disabled={!latestMemory}
+      {pickup ? (
+        <section
+          style={styles.recordBlock}
+          aria-labelledby="cats-pickup-heading"
+          data-testid="cats-pickup-section"
         >
-          <EnvelopeSmallIcon />
-          <span style={styles.nowMemoryText}>
-            {latestMemory
-              ? `思い出が${memories.length}通届いています`
-              : "届いている思い出はありません"}
-          </span>
-          <span style={styles.nowMemoryAction}>
-            {latestMemory ? "読む" : "待つ"}
-          </span>
-          {latestMemory ? <ChevronRightSmallIcon /> : null}
-        </button>
-      </section>
+          <h2 id="cats-pickup-heading" style={styles.recordBlockTitle}>
+            <span style={styles.recordBlockTitleMark} aria-hidden="true" />
+            ピックアップ
+          </h2>
+          <button
+            type="button"
+            style={styles.pickupRow}
+            onClick={() => {
+              markCatPickupSeen(activeCatId, pickup);
+              setPickupRefreshTick((value) => value + 1);
+              openPickupTarget(pickup, {
+                onOpenMemory,
+                onOpenPhoto,
+                onOpenMilestones: scrollToMilestones,
+              });
+            }}
+          >
+            {pickup.src ? (
+              <span style={styles.pickupThumb}>
+                <StoredPhotoImage
+                  src={pickup.src}
+                  alt=""
+                  style={styles.pickupThumbImage}
+                />
+              </span>
+            ) : (
+              <span style={styles.pickupIcon} aria-hidden="true">
+                <EnvelopeSmallIcon />
+              </span>
+            )}
+            <span style={styles.pickupText}>
+              <span style={styles.pickupTitle}>{pickup.title}</span>
+              <span style={styles.pickupBody}>{pickup.body}</span>
+            </span>
+            <span style={styles.pickupAction}>{pickup.actionLabel}</span>
+            <ChevronRightSmallIcon />
+          </button>
+        </section>
+      ) : null}
 
       <section style={styles.recordBlock} aria-labelledby="cats-recent-heading">
         <h2 id="cats-recent-heading" style={styles.recordBlockTitle}>
           <span style={styles.recordBlockTitleMark} aria-hidden="true" />
-          最近
+          足あと
         </h2>
         <p style={styles.recordMonthLabel}>
           {recentEntries[0]
             ? formatRecordMonth(recentEntries[0].timestamp)
-            : formatRecordMonth(Date.now())}
+            : formatRecordMonth(now)}
         </p>
         {recentEntries.length > 0 ? (
           <div style={styles.recentTimeline}>
@@ -1520,12 +1582,8 @@ function RecordOverview({
                     onOpenMemory(entry.memory);
                     return;
                   }
-                  if (entry.src) {
-                    onOpenPhoto({
-                      src: entry.src,
-                      title: entry.title,
-                      timestamp: entry.timestamp,
-                    });
+                  if (entry.photo) {
+                    onOpenPhoto(entry.photo);
                     return;
                   }
                   onOpenPhotos();
@@ -1559,7 +1617,7 @@ function RecordOverview({
           記念
         </h2>
         <div style={styles.milestoneRail}>
-          {milestoneItems.map((item) => (
+          {celebrationItems.map((item) => (
             <div key={item.key} style={styles.milestoneItem}>
               <span
                 style={
@@ -1581,30 +1639,51 @@ function RecordOverview({
       <section style={styles.recordBlock} aria-labelledby="cats-archive-heading">
         <h2 id="cats-archive-heading" style={styles.recordBlockTitle}>
           <span style={styles.recordBlockTitleMark} aria-hidden="true" />
-          これまで
+          年ごと
         </h2>
         <div style={styles.archiveTable}>
-          {archiveRows.map((row) => (
+          {yearSummaries.map((row) => (
             <button
               key={row.year}
               type="button"
               style={styles.archiveRow}
-              onClick={onOpenPhotos}
+              onClick={() => onOpenYear(row)}
             >
               <span style={styles.archiveYear}>{row.year}年</span>
               <span style={styles.archiveSummary}>
-                写真 {row.photoCount}枚・思い出 {row.memoryCount}通
+                写真 {row.photoCount}枚・記念 {row.milestoneCount}件
               </span>
               <ChevronRightSmallIcon />
             </button>
           ))}
-          {archiveRows.length === 0 ? (
+          {yearSummaries.length === 0 ? (
             <p style={styles.recordEmptyText}>これから少しずつたまります。</p>
           ) : null}
         </div>
       </section>
     </div>
   );
+}
+
+function openPickupTarget(
+  pickup: CatPickup,
+  actions: {
+    onOpenMemory: (memory: OmoideMemory) => void;
+    onOpenPhoto: (photo: RecordPhotoPreview) => void;
+    onOpenMilestones: () => void;
+  },
+) {
+  if (pickup.target.kind === "memory") {
+    actions.onOpenMemory(pickup.target.memory);
+    return;
+  }
+
+  if (pickup.target.kind === "photo") {
+    actions.onOpenPhoto(pickup.target.photo);
+    return;
+  }
+
+  actions.onOpenMilestones();
 }
 
 function FootprintCard({ milestone }: { milestone: CatSleepingMilestone }) {
@@ -1967,6 +2046,62 @@ function PhotoListSheet({
             ))}
           </div>
         )}
+      </div>
+    </AppBottomSheet>
+  );
+}
+
+function YearSummarySheet({
+  summary,
+  onClose,
+}: {
+  summary: CatYearSummary;
+  onClose: () => void;
+}) {
+  return (
+    <AppBottomSheet title={`${summary.year}年`} onClose={onClose}>
+      <div style={styles.yearSummarySheet}>
+        {summary.coverSrc ? (
+          <div style={styles.yearSummaryCover}>
+            <StoredPhotoImage
+              src={summary.coverSrc}
+              alt=""
+              style={styles.yearSummaryCoverImage}
+            />
+          </div>
+        ) : null}
+        <div style={styles.yearSummaryStats}>
+          <div style={styles.yearSummaryStat}>
+            <span style={styles.yearSummaryStatValue}>{summary.photoCount}</span>
+            <span style={styles.yearSummaryStatLabel}>ねがお</span>
+          </div>
+          <div style={styles.yearSummaryStat}>
+            <span style={styles.yearSummaryStatValue}>{summary.pickupCount}</span>
+            <span style={styles.yearSummaryStatLabel}>ピックアップ</span>
+          </div>
+          <div style={styles.yearSummaryStat}>
+            <span style={styles.yearSummaryStatValue}>{summary.milestoneCount}</span>
+            <span style={styles.yearSummaryStatLabel}>記念</span>
+          </div>
+        </div>
+        <div style={styles.yearSummaryBlock}>
+          <p style={styles.yearSummaryBlockLabel}>よく撮った月</p>
+          <p style={styles.yearSummaryBlockText}>{summary.activeMonthLabel}</p>
+        </div>
+        <div style={styles.yearSummaryBlock}>
+          <p style={styles.yearSummaryBlockLabel}>この年の記念</p>
+          {summary.highlights.length > 0 ? (
+            <div style={styles.yearSummaryHighlights}>
+              {summary.highlights.map((highlight) => (
+                <span key={highlight} style={styles.yearSummaryHighlight}>
+                  {highlight}
+                </span>
+              ))}
+            </div>
+          ) : (
+            <p style={styles.yearSummaryBlockText}>これから</p>
+          )}
+        </div>
       </div>
     </AppBottomSheet>
   );
@@ -2456,115 +2591,6 @@ function countStoredSleepingPhotosForCat(catId: string) {
   }
 }
 
-type RecordTimelineEntry = {
-  id: string;
-  title: string;
-  timestamp: number;
-  src?: string;
-  memory?: OmoideMemory;
-};
-
-function createRecordTimelineEntries(
-  milestones: CatSleepingMilestone[],
-  memories: OmoideMemory[],
-): RecordTimelineEntry[] {
-  const milestoneEntries = milestones
-    .filter((milestone) => milestone.reachedAt)
-    .map((milestone) => ({
-      id: `milestone-${milestone.target}`,
-      title: getFootprintMilestoneTitle(milestone.target),
-      timestamp: milestone.reachedAt,
-      src: milestone.src,
-    }));
-  const memoryEntries = memories.map((memory) => ({
-    id: `memory-${memory.id}`,
-    title: "思い出が届いた",
-    timestamp: memory.deliveredAt,
-    src: memory.photo.thumbnailSrc ?? memory.photo.displaySrc ?? memory.photo.src,
-    memory,
-  }));
-
-  return [...milestoneEntries, ...memoryEntries]
-    .filter((entry) => entry.timestamp)
-    .sort((left, right) => right.timestamp - left.timestamp);
-}
-
-function createYearArchiveRows(photos: LensPhoto[], memories: OmoideMemory[]) {
-  const rows = new Map<number, { year: number; photoCount: number; memoryCount: number }>();
-
-  for (const photo of photos) {
-    const year = getYearFromTimestamp(photo.createdAt);
-    const row = rows.get(year) ?? { year, photoCount: 0, memoryCount: 0 };
-    row.photoCount += 1;
-    rows.set(year, row);
-  }
-
-  for (const memory of memories) {
-    const year = getYearFromTimestamp(memory.deliveredAt);
-    const row = rows.get(year) ?? { year, photoCount: 0, memoryCount: 0 };
-    row.memoryCount += 1;
-    rows.set(year, row);
-  }
-
-  if (rows.size === 0) {
-    const year = new Date().getFullYear();
-    rows.set(year, { year, photoCount: 0, memoryCount: 0 });
-  }
-
-  return [...rows.values()].sort((left, right) => right.year - left.year);
-}
-
-function createRecordMilestones({
-  milestones,
-  familyDuration,
-  birthdayStatus,
-  takenSleepingPhotoCount,
-}: {
-  milestones: CatSleepingMilestone[];
-  familyDuration: { primary: string; secondary: string };
-  birthdayStatus: { copy: string; isToday: boolean } | null;
-  takenSleepingPhotoCount: number;
-}) {
-  const fiftyMilestone = milestones.find((milestone) => milestone.target === 50);
-  const hasReachedFifty = Boolean(fiftyMilestone?.reachedAt);
-  const remainingFifty = Math.max(0, 50 - takenSleepingPhotoCount);
-  const familyCopy =
-    familyDuration.secondary ||
-    (familyDuration.primary === "未設定" ? "未登録" : familyDuration.primary);
-
-  return [
-    {
-      key: "family-days",
-      label: "家族になって",
-      status: familyCopy,
-      reached: familyCopy !== "未登録",
-    },
-    {
-      key: "photos-50",
-      label: "50枚",
-      status: hasReachedFifty
-        ? "達成しました"
-        : remainingFifty > 0
-          ? `あと${remainingFifty}枚`
-          : "もうすぐ",
-      reached: hasReachedFifty,
-    },
-    {
-      key: "birthday",
-      label: "誕生日",
-      status: birthdayStatus
-        ? birthdayStatus.copy.replace("誕生日まで ", "")
-        : "未登録",
-      reached: Boolean(birthdayStatus?.isToday),
-    },
-  ];
-}
-
-function getYearFromTimestamp(timestamp: number) {
-  const date = new Date(timestamp || Date.now());
-  return Number.isNaN(date.getTime()) ? new Date().getFullYear() : date.getFullYear();
-}
-
 function formatRecordMonth(timestamp: number) {
   const date = new Date(timestamp);
   if (Number.isNaN(date.getTime())) {
@@ -2572,6 +2598,17 @@ function formatRecordMonth(timestamp: number) {
   }
 
   return `${date.getFullYear()}年${date.getMonth() + 1}月`;
+}
+
+function getClientNow() {
+  if (typeof window === "undefined") {
+    return Date.now();
+  }
+
+  const testNow = (window as typeof window & { __testNow?: number }).__testNow;
+  return typeof testNow === "number" && Number.isFinite(testNow)
+    ? testNow
+    : Date.now();
 }
 
 function formatRecordShortDate(timestamp: number) {
@@ -3794,6 +3831,84 @@ const styles = {
     letterSpacing: "0.02em",
     whiteSpace: "nowrap",
   },
+  pickupRow: {
+    width: "100%",
+    minHeight: "76px",
+    display: "grid",
+    gridTemplateColumns: "52px minmax(0, 1fr) auto 18px",
+    alignItems: "center",
+    gap: "12px",
+    padding: "10px 14px 10px 10px",
+    borderRadius: "14px",
+    border: "1px solid color-mix(in srgb, var(--line-strong) 78%, transparent)",
+    background:
+      "linear-gradient(135deg, color-mix(in srgb, var(--paper-card) 50%, transparent), color-mix(in srgb, var(--seal) 7%, var(--paper-card)))",
+    color: "var(--seal)",
+    boxShadow: "0 10px 22px color-mix(in srgb, var(--shadow) 28%, transparent)",
+    cursor: "pointer",
+    textAlign: "left",
+    WebkitTapHighlightColor: "transparent",
+  },
+  pickupThumb: {
+    width: "52px",
+    height: "52px",
+    overflow: "hidden",
+    borderRadius: "12px",
+    background: CATS_PANEL_BACKGROUND_SOFT,
+    boxShadow: "0 0 0 1px color-mix(in srgb, var(--paper) 65%, transparent)",
+  },
+  pickupThumbImage: {
+    width: "100%",
+    height: "100%",
+    objectFit: "cover",
+    borderRadius: "12px",
+  },
+  pickupIcon: {
+    width: "52px",
+    height: "52px",
+    display: "inline-flex",
+    alignItems: "center",
+    justifyContent: "center",
+    borderRadius: "12px",
+    background: "color-mix(in srgb, var(--paper-card) 74%, transparent)",
+    color: "var(--seal)",
+  },
+  pickupText: {
+    minWidth: 0,
+    display: "grid",
+    gap: "3px",
+  },
+  pickupTitle: {
+    color: CATS_TEXT_STRONG,
+    fontFamily: CATS_UI,
+    fontSize: "14px",
+    fontWeight: 600,
+    lineHeight: 1.35,
+    letterSpacing: "0",
+    overflow: "hidden",
+    textOverflow: "ellipsis",
+    whiteSpace: "nowrap",
+  },
+  pickupBody: {
+    color: CATS_MUTED,
+    fontFamily: CATS_UI,
+    fontSize: "12px",
+    fontWeight: 500,
+    lineHeight: 1.35,
+    letterSpacing: "0",
+    overflow: "hidden",
+    textOverflow: "ellipsis",
+    whiteSpace: "nowrap",
+  },
+  pickupAction: {
+    color: "var(--seal)",
+    fontFamily: CATS_UI,
+    fontSize: "12px",
+    fontWeight: 600,
+    lineHeight: 1.3,
+    letterSpacing: "0",
+    whiteSpace: "nowrap",
+  },
   recentTimeline: {
     position: "relative" as const,
     display: "grid",
@@ -4553,6 +4668,97 @@ const styles = {
     overflow: "hidden",
     textOverflow: "ellipsis",
     whiteSpace: "nowrap",
+  },
+  yearSummarySheet: {
+    display: "grid",
+    gap: "14px",
+  },
+  yearSummaryCover: {
+    width: "100%",
+    aspectRatio: "16 / 9",
+    overflow: "hidden",
+    borderRadius: "14px",
+    background: CATS_PANEL_BACKGROUND_SOFT,
+  },
+  yearSummaryCoverImage: {
+    width: "100%",
+    height: "100%",
+    objectFit: "cover",
+    borderRadius: "14px",
+  },
+  yearSummaryStats: {
+    display: "grid",
+    gridTemplateColumns: "repeat(3, minmax(0, 1fr))",
+    gap: "8px",
+  },
+  yearSummaryStat: {
+    display: "grid",
+    gap: "3px",
+    minHeight: "68px",
+    alignContent: "center",
+    padding: "10px",
+    borderRadius: "10px",
+    border: "1px solid color-mix(in srgb, var(--line) 78%, transparent)",
+    background: "color-mix(in srgb, var(--paper-card) 32%, transparent)",
+  },
+  yearSummaryStatValue: {
+    color: CATS_TEXT_STRONG,
+    fontFamily: CATS_UI,
+    fontSize: "20px",
+    fontWeight: 500,
+    lineHeight: 1.2,
+    letterSpacing: "0",
+  },
+  yearSummaryStatLabel: {
+    color: CATS_MUTED,
+    fontFamily: CATS_UI,
+    fontSize: "11px",
+    fontWeight: 500,
+    lineHeight: 1.3,
+    letterSpacing: "0",
+  },
+  yearSummaryBlock: {
+    display: "grid",
+    gap: "5px",
+    padding: "12px 0",
+    borderTop: "1px solid color-mix(in srgb, var(--line) 84%, transparent)",
+  },
+  yearSummaryBlockLabel: {
+    margin: 0,
+    color: CATS_MUTED,
+    fontFamily: CATS_UI,
+    fontSize: "12px",
+    fontWeight: 500,
+    lineHeight: 1.35,
+    letterSpacing: "0",
+  },
+  yearSummaryBlockText: {
+    margin: 0,
+    color: CATS_TEXT_STRONG,
+    fontFamily: CATS_UI,
+    fontSize: "14px",
+    fontWeight: 500,
+    lineHeight: 1.45,
+    letterSpacing: "0",
+  },
+  yearSummaryHighlights: {
+    display: "flex",
+    flexWrap: "wrap" as const,
+    gap: "6px",
+  },
+  yearSummaryHighlight: {
+    display: "inline-flex",
+    alignItems: "center",
+    minHeight: "28px",
+    padding: "0 10px",
+    borderRadius: "999px",
+    background: "color-mix(in srgb, var(--seal) 10%, transparent)",
+    color: "var(--seal)",
+    fontFamily: CATS_UI,
+    fontSize: "12px",
+    fontWeight: 600,
+    lineHeight: 1.2,
+    letterSpacing: "0",
   },
   thumbnailPicker: {
     display: "grid",
