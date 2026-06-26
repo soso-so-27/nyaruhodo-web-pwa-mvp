@@ -118,7 +118,7 @@ function HomeLoading() {
 
 function CollectionLoading() {
   return (
-    <section style={styles.pageStage} aria-label="まいにちを読み込み中">
+    <section style={styles.pageStage} aria-label="ねこだよりを読み込み中">
       <div style={styles.segmentGhost} aria-hidden="true">
         <span style={styles.segmentPill} />
         <span style={styles.segmentPillSoft} />

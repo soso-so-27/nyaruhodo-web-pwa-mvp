@@ -1188,7 +1188,7 @@ function DeskPhotoViewer({
             </AppButton>
             <div style={deskStyles.viewerOwnHeader}>
               <p style={deskStyles.viewerOwnKicker}>きょうの ねがお</p>
-              <p style={deskStyles.viewerOwnNote}>写真は、まいにち と うちのこ に残ります</p>
+              <p style={deskStyles.viewerOwnNote}>写真は、ねこだより と うちのこ に残ります</p>
             </div>
             <span style={deskStyles.viewerOwnHeaderSpacer} aria-hidden="true" />
           </div>

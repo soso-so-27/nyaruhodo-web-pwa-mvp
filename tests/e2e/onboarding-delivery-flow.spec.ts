@@ -184,21 +184,14 @@ test.describe("onboarding delivery flow", () => {
       sourcePhotoId: stockResponses[0].sourceOwnPhotoId,
       error: null,
     });
-    await expect(page.getByText("ねがおが")).toBeVisible();
-    await expect(page.getByText("とどいています")).toBeVisible();
-    await page.getByRole("button", { name: "おさえて ひらく" }).click();
-    await expect(page.getByText("どこかの ねがお")).toBeVisible();
+    await expect(page.getByText("ねこだよりが")).toBeVisible();
+    await expect(page.getByText("届きました")).toBeVisible();
+    await page.getByRole("button", { name: "ねこだよりを開く" }).click();
     await page.waitForTimeout(1600);
     await expectVisibleNonBlackImage(page.locator("main img").last());
-    await expect(page.getByText("とっておくと、アルバムに入ります。")).toBeVisible();
+    await expect(page.getByText("届いた写真は、ねこだよりに入りました。今日のねがおは、よる8時の便りになります。")).toBeVisible();
     await expect(
-      page.getByRole("button", { name: "この2枚をとっておく" }),
-    ).toBeVisible();
-    await expect.poll(() => readKeptExchangePhotoCount(page)).toBe(0);
-    await page.getByRole("button", { name: "この2枚をとっておく" }).click();
-    await expect(page.getByText("アルバムに入りました。")).toBeVisible();
-    await expect(
-      page.getByRole("button", { name: "アルバムで見る" }),
+      page.getByRole("button", { name: "ねこだよりを見る" }),
     ).toBeVisible();
     await expect.poll(() => readKeptExchangePhotoCount(page)).toBe(1);
     const eveningDeliveryDays = await page.evaluate(() => {
@@ -211,7 +204,7 @@ test.describe("onboarding delivery flow", () => {
       ).length;
     });
     expect(eveningDeliveryDays).toBeGreaterThan(0);
-    await page.getByRole("button", { name: "アルバムで見る" }).click();
+    await page.getByRole("button", { name: "ねこだよりを見る" }).click();
     await expect(page).toHaveURL(/\/collection/);
 
     const storage = await page.evaluate(() => {
@@ -239,7 +232,7 @@ test.describe("onboarding delivery flow", () => {
     await expectVisibleNonBlackImage(page.locator("main img").first());
   });
 
-  test("does not keep a delivered photo before the explicit keep action", async ({
+  test("automatically keeps a delivered photo after opening it", async ({
     page,
   }) => {
     await routeImmediateDelivery(page);
@@ -247,25 +240,26 @@ test.describe("onboarding delivery flow", () => {
     await page.goto("/onboarding");
     await page.waitForLoadState("networkidle");
     await page.waitForTimeout(1000);
-    await page.getByRole("button", { name: "ねてるねこを入れる" }).click();
+    await page.getByRole("button", { name: "ねがおを入れて受け取る" }).click();
     await page.locator('input[type="file"]').last().setInputFiles({
       name: "own-sleeping.png",
       mimeType: "image/png",
       buffer: testPng,
     });
 
-    await expect(page.getByRole("button", { name: "おさえて ひらく" })).toBeVisible();
-    await page.getByRole("button", { name: "おさえて ひらく" }).click();
+    await expect(page.getByRole("button", { name: "ねこだよりを開く" })).toBeVisible();
+    await expect.poll(() => readKeptExchangePhotoCount(page)).toBe(0);
+    await page.getByRole("button", { name: "ねこだよりを開く" }).click();
     await page.waitForTimeout(1600);
     await expect(
-      page.getByRole("button", { name: "この2枚をとっておく" }),
+      page.getByRole("button", { name: "ねこだよりを見る" }),
     ).toBeVisible();
-    await expect(page.getByText("とっておくと、アルバムに入ります。")).toBeVisible();
-    await expect.poll(() => readKeptExchangePhotoCount(page)).toBe(0);
+    await expect(page.getByText("届いた写真は、ねこだよりに入りました。今日のねがおは、よる8時の便りになります。")).toBeVisible();
+    await expect.poll(() => readKeptExchangePhotoCount(page)).toBe(1);
 
     await page.getByRole("button", { name: "閉じる" }).click();
     await expect(page).toHaveURL(/\/home/);
-    await expect.poll(() => readKeptExchangePhotoCount(page)).toBe(0);
+    await expect.poll(() => readKeptExchangePhotoCount(page)).toBe(1);
   });
 
   test("skips the name entry for an existing named cat", async ({ page }) => {

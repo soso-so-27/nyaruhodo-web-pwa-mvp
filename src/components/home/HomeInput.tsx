@@ -3060,7 +3060,7 @@ function EveningDeliveryOpening({
           />
         </div>
         <p style={styles.eveningOpeningSavedNote}>
-          まいにちに保存しました
+          ねこだよりに入りました
         </p>
         <AppButton type="button" fullWidth onClick={onClose}>
           閉じる

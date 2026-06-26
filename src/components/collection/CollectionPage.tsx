@@ -991,7 +991,7 @@ export function CollectionPage() {
         <PageBackdrop />
         <div style={styles.container}>
           <AppCard variant="section" padding="lg" style={styles.emptyCard}>
-            <h1 style={styles.emptyTitle}>まいにち</h1>
+            <h1 style={styles.emptyTitle}>ねこだより</h1>
             <p style={styles.emptyText}>準備しています</p>
           </AppCard>
         </div>
@@ -1006,7 +1006,7 @@ export function CollectionPage() {
         <PageBackdrop />
         <div style={styles.container}>
           <AppCard variant="section" padding="lg" style={styles.emptyCard}>
-            <h1 style={styles.emptyTitle}>まいにち</h1>
+            <h1 style={styles.emptyTitle}>ねこだより</h1>
             <p style={styles.emptyText}>一緒に暮らしている猫を登録しましょう</p>
             <AppButton href="/cats" variant="primary" fullWidth>
               猫を登録する
@@ -1127,7 +1127,7 @@ function BoxOverview({
     useState<MainichiBoardSide>("sent");
 
   return (
-    <section style={styles.boxOverview} aria-label="まいにち">
+    <section style={styles.boxOverview} aria-label="ねこだより">
       <MainichiPhotoBoard
         dayGroups={dayGroups}
         activeSide={activeBoardSide}
@@ -1338,7 +1338,7 @@ function MainichiSideTabs({
   ];
 
   return (
-    <div style={styles.mainichiBoardTabs} role="tablist" aria-label="まいにちの面">
+    <div style={styles.mainichiBoardTabs} role="tablist" aria-label="ねこだよりの面">
       {tabs.map((tab) => {
         const selected = activeSide === tab.value;
 
@@ -1366,7 +1366,7 @@ function MainichiBoardEmptyState({ activeSide }: { activeSide: MainichiBoardSide
   const isSent = activeSide === "sent";
 
   return (
-    <section style={styles.mainichiBoardEmpty} aria-label="まいにちの空の状態">
+    <section style={styles.mainichiBoardEmpty} aria-label="ねこだよりの空の状態">
       <span style={styles.mainichiBoardEmptyStack} aria-hidden="true">
         <span
           style={{
@@ -2096,7 +2096,7 @@ function BoxPhotoDetailSheet({
   onDeleteSleepingPhoto: (photo: BoxPreviewPhoto) => void;
   onHideOtherPhoto: (photo: BoxPreviewPhoto) => void;
 }) {
-  const title = dayLabel ?? "まいにち";
+  const title = dayLabel ?? "ねこだより";
   const currentPhoto =
     photos[Math.max(0, Math.min(currentPhotoIndex, photos.length - 1))] ?? null;
   const deliveryActionLabel = currentPhoto?.shared

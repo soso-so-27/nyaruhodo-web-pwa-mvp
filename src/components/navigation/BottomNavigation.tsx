@@ -42,7 +42,7 @@ export function BottomNavigation({
     {
       key: "collection",
       href: "/collection",
-      label: "まいにち",
+      label: "ねこだより",
       icon: <GeneratedNavIcon src="/icons/bottom-nav-mainichi.png" />,
     },
     {

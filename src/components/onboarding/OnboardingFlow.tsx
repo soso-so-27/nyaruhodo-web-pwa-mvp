@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { CSSProperties } from "react";
 import { readClientAdminCapabilities } from "../../lib/adminCapabilitiesClient";
 import { STORAGE_KEYS } from "../../lib/storage";
@@ -30,7 +30,6 @@ import {
 import { AppButton } from "../ui/AppButton";
 import { PhotoTile } from "../ui/PhotoTile";
 import { WordmarkHeader } from "../ui/AppHeader";
-import { AppIcon } from "../ui/AppIcons";
 
 type OnboardingState =
   | "intro"
@@ -55,6 +54,7 @@ export function OnboardingFlow() {
   const [isCandidateAdding, setIsCandidateAdding] = useState(false);
   const [isTestMode, setIsTestMode] = useState(false);
   const [completionCopy, setCompletionCopy] = useState("");
+  const autoKeptDeliveredPhotoIdRef = useRef("");
 
   function markOnboardingAlbumCompletionReady() {
     window.sessionStorage.setItem(ONBOARDING_ALBUM_COMPLETION_READY_KEY, "true");
@@ -83,6 +83,19 @@ export function OnboardingFlow() {
       isMounted = false;
     };
   }, []);
+
+  useEffect(() => {
+    if (state !== "delivered" || !deliveredPhoto || isDeliveredPhotoKept) {
+      return;
+    }
+
+    if (autoKeptDeliveredPhotoIdRef.current === deliveredPhoto.id) {
+      return;
+    }
+
+    autoKeptDeliveredPhotoIdRef.current = deliveredPhoto.id;
+    void keepDeliveredPhotoForOnboarding();
+  }, [state, deliveredPhoto, isDeliveredPhotoKept]);
 
   async function handleSelectSleepingPhoto() {
     if (state === "saving") {
@@ -137,6 +150,7 @@ export function OnboardingFlow() {
         setSelectedPhotoSrc(dataUrl);
         setPendingOwnPhoto(ownPhoto);
         setIsDeliveredPhotoKept(false);
+        autoKeptDeliveredPhotoIdRef.current = "";
         const eveningTarget = recordEveningDeliveryTarget(ownPhoto);
         trackProductEvent("take_photo", {
           catId,
@@ -180,7 +194,7 @@ export function OnboardingFlow() {
     }, 60000);
   }
 
-  async function handleContinueAfterDelivery() {
+  async function keepDeliveredPhotoForOnboarding() {
     if (!deliveredPhoto) {
       return;
     }
@@ -198,14 +212,12 @@ export function OnboardingFlow() {
       return;
     }
 
-    if (isTestMode) {
-      setIsDeliveredPhotoKept(true);
-      return;
-    }
+    setIsDeliveredPhotoKept(true);
 
-    window.localStorage.setItem(STORAGE_KEYS.onboardingCompleted, "true");
-    setCompletionCopy(getEveningDeliveryCompletionCopy());
-    setState("kept");
+    if (!isTestMode) {
+      window.localStorage.setItem(STORAGE_KEYS.onboardingCompleted, "true");
+      setCompletionCopy(getEveningDeliveryCompletionCopy());
+    }
   }
 
   function handleOpenEnvelope() {
@@ -384,6 +396,10 @@ export function OnboardingFlow() {
           0% { transform: translateX(0) scale(1); opacity: 0.74; }
           100% { transform: translateX(4px) scale(1); opacity: 0.64; }
         }
+        @keyframes onboardingEnvelopeFloat {
+          0%, 100% { transform: translateY(0) rotate(-0.8deg); }
+          50% { transform: translateY(-5px) rotate(0.5deg); }
+        }
       `}</style>
       <div style={styles.paperBackground} aria-hidden="true" />
       <div style={styles.container}>
@@ -391,28 +407,25 @@ export function OnboardingFlow() {
 
         {state === "intro" || state === "saving" ? (
           <section style={styles.hero} aria-label="ねてるねこのはじめかた">
-            <div style={styles.flow} aria-hidden="true">
-              <span style={styles.flowIcon}>
-                <AppIcon name="camera" size={20} />
-              </span>
-              <span style={styles.flowDots} />
-              <span style={styles.flowIconAccent}>
-                <AppIcon name="mail" size={20} />
-              </span>
+            <div style={styles.introArtifact} aria-hidden="true">
+              <img
+                src="/illustrations/sleeping-cat-empty.png"
+                alt=""
+                style={styles.introCat}
+              />
+              <OnboardingEnvelopeArt compact />
             </div>
             <h1 style={styles.title}>
-              ねてるねこを入れると
+              ねがおを入れると
               <br />
-              どこかのねこの
-              <br />
-              ねがおが
-              <br />
-              1枚とどきます
+              ねこだよりが届きます
             </h1>
             <p style={styles.lead}>
-              いいねもコメントもなく、
+              自分のねこの写真を1枚入れると、
               <br />
-              ただ1枚だけ。
+              どこかのねこの寝顔が1枚届きます。
+              <br />
+              写真は公開されません。
             </p>
             {state === "saving" ? (
               <DeliveryWaiting />
@@ -426,7 +439,7 @@ export function OnboardingFlow() {
               style={styles.onboardingCta}
               disabled={state === "saving"}
             >
-              {state === "saving" ? "おあずかりしています..." : "ねてるねこを入れる"}
+              {state === "saving" ? "ねこだよりを準備しています..." : "ねがおを入れて受け取る"}
             </AppButton>
             <AppButton type="button" variant="quiet" size="md" onClick={handleGoHome}>
               あとで
@@ -437,18 +450,18 @@ export function OnboardingFlow() {
 
         {state === "envelope" && deliveredPhoto ? (
           <section style={styles.result} aria-label="ねがおがとどいています">
+            <OnboardingEnvelopeArt />
             <h2 style={styles.subTitle}>
-              ねがおが
+              ねこだよりが
               <br />
-              とどいています
+              届きました
             </h2>
             <button
               type="button"
               onClick={handleOpenEnvelope}
               style={styles.deliveryEnvelopeButton}
             >
-              <AppIcon name="mail" size={34} />
-              おさえて ひらく
+              ねこだよりを開く
             </button>
           </section>
         ) : null}
@@ -458,7 +471,6 @@ export function OnboardingFlow() {
             <div style={styles.revealingPhotoFrame}>
               <PhotoTile
                 src={deliveredPhoto.src}
-                label="どこかの ねがお"
                 imageStyle={styles.revealingPhoto}
               />
             </div>
@@ -467,45 +479,45 @@ export function OnboardingFlow() {
 
         {state === "delivered" && deliveredPhoto ? (
           <section style={styles.result} aria-label="とどいたねがお">
-            <p style={styles.kicker}>きょうの2まい</p>
+            <p style={styles.kicker}>ねこだよりが届きました</p>
             {selectedPhotoSrc ? (
-              <div style={styles.photoPair}>
-                <PhotoTile
-                  src={selectedPhotoSrc}
-                  label="入れた1枚"
-                  muted
-                  imageStyle={styles.ownPhoto}
-                />
-                <span style={styles.pairDots} />
+              <div style={styles.deliveredMoment}>
                 <PhotoTile
                   src={deliveredPhoto.src}
-                  label="とどいた1枚"
+                  style={styles.deliveredPhotoTile}
                   imageStyle={styles.deliveredPhoto}
+                />
+                <PhotoTile
+                  src={selectedPhotoSrc}
+                  muted
+                  style={styles.ownPhotoTile}
+                  imageStyle={styles.ownPhoto}
                 />
               </div>
             ) : (
               <PhotoTile
                 src={deliveredPhoto.src}
-                label="とどいた1枚"
+                style={styles.deliveredPhotoTile}
                 imageStyle={styles.deliveredPhoto}
               />
             )}
             <p style={styles.resultText}>
               {isDeliveredPhotoKept
-                ? "アルバムに入りました。"
-                : "とっておくと、アルバムに入ります。"}
+                ? "届いた写真は、ねこだよりに入りました。今日のねがおは、よる8時の便りになります。"
+                : "届いた写真を、ねこだよりに入れています。"}
             </p>
             <AppButton
               type="button"
               onClick={
                 isDeliveredPhotoKept
                   ? () => router.push("/collection")
-                  : handleContinueAfterDelivery
+                  : undefined
               }
+              disabled={!isDeliveredPhotoKept}
               fullWidth
               style={styles.onboardingCta}
             >
-              {isDeliveredPhotoKept ? "アルバムで見る" : "この2枚をとっておく"}
+              {isDeliveredPhotoKept ? "ねこだよりを見る" : "ねこだよりに入れています..."}
             </AppButton>
             <AppButton type="button" variant="quiet" size="md" onClick={handleGoHome}>
               閉じる
@@ -523,7 +535,7 @@ export function OnboardingFlow() {
             <p style={styles.resultText}>
               {isTestMode
                 ? "とどく候補がまだありません。テスト用に、ここで候補を追加できます。"
-                : "今日はまだ\nとどくねがおを準備中です。"}
+                : "今日はまだ、届くねこだよりを準備中です。"}
             </p>
             {isTestMode ? (
               <AppButton
@@ -554,23 +566,47 @@ export function OnboardingFlow() {
             <h2 style={styles.subTitle}>
               また寝ていたら、
               <br />
-              ここへ。
+              ホームから送れます
             </h2>
             <AppButton
-              href="/account/create?from=onboarding"
-              onClick={markOnboardingAlbumCompletionReady}
+              type="button"
+              onClick={handleGoHome}
               fullWidth
-              style={styles.onboardingCtaLink}
+              style={styles.onboardingCta}
             >
-              このねこのアルバムをつくる
+              ホームへ戻る
             </AppButton>
-            <AppButton type="button" variant="quiet" size="md" onClick={handleGoHome}>
-              ねてるねこへ
+            <AppButton
+              href="/account/create?from=onboarding"
+              variant="quiet"
+              size="md"
+              onClick={markOnboardingAlbumCompletionReady}
+            >
+              うちのこを登録する
             </AppButton>
           </section>
         ) : null}
       </div>
     </main>
+  );
+}
+
+function OnboardingEnvelopeArt({ compact = false }: { compact?: boolean }) {
+  return (
+    <span
+      style={{
+        ...styles.onboardingEnvelopeArt,
+        ...(compact ? styles.onboardingEnvelopeArtCompact : {}),
+      }}
+      aria-hidden="true"
+    >
+      <span style={styles.onboardingEnvelopeShadow} />
+      <img
+        src="/illustrations/onboarding-envelope.png"
+        alt=""
+        style={styles.onboardingEnvelopeImage}
+      />
+    </span>
   );
 }
 
@@ -766,8 +802,7 @@ function resizeDataUrl(
   });
 }
 
-const SERIF =
-  'var(--font-display)';
+const UI_FONT = "var(--font-ui)";
 
 const styles = {
   page: {
@@ -814,62 +849,79 @@ const styles = {
     display: "grid",
     justifyItems: "center",
     textAlign: "center",
-    gap: "14px",
+    gap: "13px",
   },
-  flow: {
-    display: "inline-flex",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: "12px",
-    color: "#8b8173",
-    marginBottom: "2px",
+  introArtifact: {
+    position: "relative",
+    width: "min(74vw, 260px)",
+    height: "154px",
+    display: "grid",
+    placeItems: "center",
+    margin: "-4px 0 10px",
   },
-  flowIcon: {
-    width: "46px",
-    height: "46px",
-    borderRadius: "var(--radius-full)",
-    display: "inline-flex",
-    alignItems: "center",
-    justifyContent: "center",
-    background: "rgba(239,229,214,0.8)",
-    color: "#746b5f",
-    border: "1px solid rgba(120,108,94,0.12)",
+  introCat: {
+    position: "absolute",
+    zIndex: 2,
+    top: "0",
+    left: "50%",
+    width: "94px",
+    height: "94px",
+    objectFit: "contain",
+    transform: "translateX(-50%)",
+    filter:
+      "drop-shadow(0 10px 14px rgba(92,70,46,0.08)) saturate(0.94)",
   },
-  flowIconAccent: {
-    width: "46px",
-    height: "46px",
-    borderRadius: "var(--radius-full)",
-    display: "inline-flex",
-    alignItems: "center",
-    justifyContent: "center",
-    background: "var(--paper-card)",
-    color: "var(--ink-soft)",
-    border: "1px solid var(--line)",
+  onboardingEnvelopeArt: {
+    position: "relative",
+    display: "block",
+    width: "min(82vw, 304px)",
+    aspectRatio: "1375 / 664",
+    margin: "0 auto",
+    animation: "onboardingEnvelopeFloat 4.8s ease-in-out infinite",
   },
-  flowDots: {
-    width: "60px",
-    height: "2px",
-    borderRadius: "var(--radius-full)",
+  onboardingEnvelopeArtCompact: {
+    position: "absolute",
+    zIndex: 1,
+    bottom: "0",
+    width: "200px",
+    opacity: 0.94,
+  },
+  onboardingEnvelopeShadow: {
+    position: "absolute",
+    left: "12%",
+    right: "12%",
+    bottom: "1px",
+    height: "18px",
+    borderRadius: "999px",
     background:
-      "repeating-linear-gradient(90deg, rgba(142,128,110,0.42) 0 4px, transparent 4px 10px)",
+      "radial-gradient(ellipse at center, rgba(92,70,46,0.14), transparent 70%)",
+    filter: "blur(2px)",
+  },
+  onboardingEnvelopeImage: {
+    position: "absolute",
+    inset: 0,
+    width: "100%",
+    height: "100%",
+    objectFit: "contain",
+    filter: "drop-shadow(0 14px 22px rgba(68,50,32,0.08))",
   },
   title: {
-    margin: "6px 0 0",
-    color: "#202020",
-    fontFamily: SERIF,
-    fontSize: "24px",
-    fontWeight: 500,
-    lineHeight: 1.46,
-    letterSpacing: "0.08em",
+    margin: "8px 0 0",
+    color: "#3f382e",
+    fontFamily: UI_FONT,
+    fontSize: "22px",
+    fontWeight: 400,
+    lineHeight: 1.56,
+    letterSpacing: "0.04em",
   },
   lead: {
     margin: 0,
-    color: "#6a6258",
-    fontFamily: SERIF,
+    color: "#6f6757",
+    fontFamily: UI_FONT,
     fontSize: "13px",
     fontWeight: 400,
-    lineHeight: 1.72,
-    letterSpacing: "0.06em",
+    lineHeight: 1.9,
+    letterSpacing: 0,
   },
   deliveryWaiting: {
     display: "grid",
@@ -903,11 +955,11 @@ const styles = {
   },
   deliveryWaitingText: {
     color: "#746a5f",
-    fontFamily: SERIF,
+    fontFamily: UI_FONT,
     fontSize: "13px",
     fontWeight: 400,
     lineHeight: 1.45,
-    letterSpacing: "0.08em",
+    letterSpacing: 0,
   },
   onboardingCta: {
     width: "min(100%, 280px)",
@@ -916,51 +968,6 @@ const styles = {
   onboardingCtaLink: {
     width: "min(100%, 280px)",
     marginTop: "20px",
-  },
-  primaryButton: {
-    width: "min(100%, 280px)",
-    minHeight: "54px",
-    marginTop: "16px",
-    border: "1px solid rgba(120,108,94,0.12)",
-    borderRadius: "var(--radius-full)",
-    background: "rgba(255,253,248,0.86)",
-    color: "#403a33",
-    boxShadow: "0 8px 20px rgba(90,76,60,0.07)",
-    fontSize: "15px",
-    fontWeight: 500,
-    cursor: "pointer",
-  },
-  primaryLink: {
-    width: "min(100%, 280px)",
-    minHeight: "54px",
-    marginTop: "20px",
-    border: "1px solid rgba(120,108,94,0.12)",
-    borderRadius: "var(--radius-full)",
-    background: "rgba(255,253,248,0.86)",
-    color: "#403a33",
-    boxShadow: "0 8px 20px rgba(90,76,60,0.07)",
-    fontSize: "15px",
-    fontWeight: 500,
-    textDecoration: "none",
-    display: "inline-flex",
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  secondaryLink: {
-    color: "#6a6258",
-    fontSize: "13px",
-    fontWeight: 500,
-    textDecoration: "none",
-    padding: "4px 12px",
-  },
-  textButton: {
-    border: "none",
-    background: "transparent",
-    color: "#9c9388",
-    fontSize: "12px",
-    fontWeight: 500,
-    cursor: "pointer",
-    padding: "8px 12px",
   },
   message: {
     margin: "2px 0 0",
@@ -979,57 +986,44 @@ const styles = {
     display: "grid",
     justifyItems: "center",
     textAlign: "center",
-    gap: "15px",
+    gap: "17px",
   },
   kicker: {
     margin: 0,
-    color: "#6a6258",
-    fontFamily: SERIF,
-    fontSize: "15px",
+    color: "#6f6757",
+    fontFamily: UI_FONT,
+    fontSize: "13px",
     fontWeight: 400,
     lineHeight: 1.5,
-    letterSpacing: "0.12em",
+    letterSpacing: "0.03em",
   },
   subTitle: {
     margin: "6px 0 0",
-    color: "#202020",
-    fontFamily: SERIF,
-    fontSize: "24px",
-    fontWeight: 500,
-    lineHeight: 1.45,
-    letterSpacing: "0.08em",
-  },
-  deliveryEnvelope: {
-    width: "54px",
-    height: "54px",
-    margin: "-2px 0 -2px",
-    borderRadius: "var(--radius-full)",
-    display: "inline-flex",
-    alignItems: "center",
-    justifyContent: "center",
-    background: "var(--paper-card)",
-    color: "var(--seal)",
-    border: "1px solid var(--line)",
-    boxShadow: "0 10px 24px rgba(90,76,60,0.08)",
-    animation: "deliveredEnvelope 460ms cubic-bezier(0.22, 1, 0.36, 1) both",
+    color: "#3f382e",
+    fontFamily: UI_FONT,
+    fontSize: "22px",
+    fontWeight: 400,
+    lineHeight: 1.56,
+    letterSpacing: "0.04em",
   },
   deliveryEnvelopeButton: {
-    width: "min(46vw, 164px)",
-    height: "min(46vw, 164px)",
-    border: "1px solid var(--line)",
+    width: "min(100%, 260px)",
+    minHeight: "54px",
+    border: "1px solid color-mix(in srgb, var(--seal) 28%, var(--line) 72%)",
     borderRadius: "var(--radius-full)",
-    background: "var(--paper-card)",
+    background:
+      "linear-gradient(180deg, rgba(255,253,248,0.94), rgba(250,244,235,0.88))",
     color: "var(--seal)",
     display: "inline-flex",
-    flexDirection: "column",
     alignItems: "center",
     justifyContent: "center",
-    gap: "16px",
-    boxShadow: "0 16px 38px rgba(90,76,60,0.09)",
-    fontFamily: "-apple-system, BlinkMacSystemFont, \"Segoe UI\", sans-serif",
-    fontSize: "13px",
-    fontWeight: 500,
+    boxShadow:
+      "0 1px 0 rgba(255,255,255,0.5) inset, 0 16px 30px -24px rgba(90,76,60,0.42)",
+    fontFamily: UI_FONT,
+    fontSize: "15px",
+    fontWeight: 400,
     lineHeight: 1,
+    letterSpacing: "0.03em",
     cursor: "pointer",
     animation: "deliveredEnvelope 460ms cubic-bezier(0.22, 1, 0.36, 1) both",
   },
@@ -1046,13 +1040,14 @@ const styles = {
     borderRadius: "var(--radius-2xl)",
     boxShadow: "0 18px 44px rgba(90,76,60,0.12)",
   },
-  photoPair: {
+  deliveredMoment: {
+    position: "relative",
+    width: "min(100%, 292px)",
+    minHeight: "318px",
     display: "grid",
-    gridTemplateColumns: "118px 28px 118px",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: "7px",
-    width: "100%",
+    justifyItems: "center",
+    alignItems: "start",
+    margin: "2px 0 0",
   },
   photoItem: {
     display: "grid",
@@ -1064,23 +1059,34 @@ const styles = {
     justifyItems: "center",
     gap: "8px",
   },
+  deliveredPhotoTile: {
+    position: "relative",
+    zIndex: 2,
+  },
+  ownPhotoTile: {
+    position: "absolute",
+    zIndex: 3,
+    right: "2px",
+    bottom: "4px",
+    transform: "rotate(3.2deg)",
+  },
   ownPhoto: {
-    width: "112px",
-    height: "112px",
+    width: "92px",
+    height: "92px",
     objectFit: "cover",
-    borderRadius: "var(--radius-2xl)",
-    opacity: 0.72,
-    border: "6px solid rgba(255,253,248,0.76)",
-    boxShadow: "0 10px 24px rgba(90,76,60,0.09)",
+    borderRadius: "20px",
+    opacity: 0.78,
+    border: "6px solid rgba(255,253,248,0.82)",
+    boxShadow: "0 12px 24px -14px rgba(72,54,35,0.42)",
     animation: "ownPhotoSend 560ms ease-out both",
   },
   deliveredPhoto: {
-    width: "112px",
-    height: "112px",
+    width: "min(74vw, 268px)",
+    height: "min(74vw, 268px)",
     objectFit: "cover",
-    borderRadius: "var(--radius-2xl)",
-    border: "6px solid rgba(255,253,248,0.82)",
-    boxShadow: "0 10px 24px rgba(90,76,60,0.09)",
+    borderRadius: "28px",
+    border: "8px solid rgba(255,253,248,0.86)",
+    boxShadow: "0 22px 46px -24px rgba(66,48,31,0.5)",
     animation: "deliveredPhotoIn 620ms 120ms cubic-bezier(0.22, 1, 0.36, 1) both",
   },
   photoLabel: {
@@ -1098,21 +1104,14 @@ const styles = {
     border: "7px solid rgba(255,253,248,0.82)",
     boxShadow: "0 14px 34px rgba(90,76,60,0.12)",
   },
-  pairDots: {
-    width: "30px",
-    height: "2px",
-    borderRadius: "var(--radius-full)",
-    background:
-      "repeating-linear-gradient(90deg, rgba(142,128,110,0.42) 0 4px, transparent 4px 10px)",
-  },
   resultText: {
     width: "min(100%, 286px)",
     margin: 0,
-    color: "#6a6258",
-    fontFamily: SERIF,
+    color: "#6f6757",
+    fontFamily: UI_FONT,
     fontSize: "13px",
     fontWeight: 400,
-    lineHeight: 1.75,
-    letterSpacing: "0.06em",
+    lineHeight: 1.9,
+    letterSpacing: 0,
   },
 } satisfies Record<string, CSSProperties>;

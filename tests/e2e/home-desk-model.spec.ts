@@ -87,10 +87,10 @@ test.describe("home desk model", () => {
       "page",
     );
     await expect(nav.getByText("きょう", { exact: true })).toBeVisible();
-    await expect(nav.getByText("まいにち", { exact: true })).toBeHidden();
+    await expect(nav.getByText("ねこだより", { exact: true })).toBeHidden();
     await expect(nav.getByText("うちのこ", { exact: true })).toBeHidden();
 
-    await nav.getByRole("link", { name: "まいにち" }).click();
+    await nav.getByRole("link", { name: "ねこだより" }).click();
     await expect(page).toHaveURL(/\/collection$/);
     const collectionNav = page.getByRole("navigation", {
       name: "下部ナビゲーション",
@@ -99,9 +99,9 @@ test.describe("home desk model", () => {
       collectionNav.getByRole("link", { name: "きょう" }),
     ).not.toHaveAttribute("aria-current", "page");
     await expect(
-      collectionNav.getByRole("link", { name: "まいにち" }),
+      collectionNav.getByRole("link", { name: "ねこだより" }),
     ).toHaveAttribute("aria-current", "page");
-    await expect(collectionNav.getByText("まいにち", { exact: true })).toBeVisible();
+    await expect(collectionNav.getByText("ねこだより", { exact: true })).toBeVisible();
     await expect(collectionNav.getByText("きょう", { exact: true })).toBeHidden();
   });
 
