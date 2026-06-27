@@ -173,10 +173,6 @@ export function CatsPage() {
   >({});
   const [hasRemoteLensPhotosLoaded, setHasRemoteLensPhotosLoaded] =
     useState(false);
-  const [isInitialCatStateReady, setIsInitialCatStateReady] = useState(false);
-  const [isInitialCoverReady, setIsInitialCoverReady] = useState(false);
-  const [hasReleasedInitialCoverGate, setHasReleasedInitialCoverGate] =
-    useState(false);
   const [selectedOmoideMemory, setSelectedOmoideMemory] =
     useState<OmoideMemory | null>(null);
   const [selectedRecordPhoto, setSelectedRecordPhoto] =
@@ -246,40 +242,6 @@ export function CatsPage() {
   const photoSheetTitle =
     photoSheetLens === "all" ? "ぜんぶの写真" : "この子の写真";
 
-  const shouldWaitForInitialCover =
-    isInitialCatStateReady &&
-    Boolean(activeCatProfile) &&
-    !isOnboardingProfileSetup &&
-    !isOnboardingCompletionView &&
-    !hasReleasedInitialCoverGate &&
-    !isInitialCoverReady;
-  const shouldConcealInitialPage =
-    !isInitialCatStateReady || shouldWaitForInitialCover;
-
-  useEffect(() => {
-    if (
-      !isInitialCatStateReady ||
-      isOnboardingProfileSetup ||
-      hasReleasedInitialCoverGate ||
-      !activeCoverSrc
-    ) {
-      return;
-    }
-
-    setIsInitialCoverReady(false);
-    const timer = window.setTimeout(() => {
-      setIsInitialCoverReady(true);
-      setHasReleasedInitialCoverGate(true);
-    }, 1800);
-
-    return () => window.clearTimeout(timer);
-  }, [
-    activeCoverSrc,
-    hasReleasedInitialCoverGate,
-    isInitialCatStateReady,
-    isOnboardingProfileSetup,
-  ]);
-
   useEffect(() => {
     document.documentElement.classList.add("cats-scrollbar-quiet");
     document.body.classList.add("cats-scrollbar-quiet");
@@ -322,7 +284,6 @@ export function CatsPage() {
       setIsEditingProfile(true);
     }
     saveActiveCatId(activeProfile.id);
-    setIsInitialCatStateReady(true);
   }, []);
 
   useEffect(() => {
@@ -807,17 +768,7 @@ export function CatsPage() {
         }
       `}</style>
       <PageBackdrop />
-      {shouldConcealInitialPage ? (
-        <div style={styles.initialCoverGate} aria-hidden="true">
-          <span style={styles.initialCoverGateMark} />
-        </div>
-      ) : null}
-      <div
-        style={{
-          ...styles.container,
-          ...(shouldConcealInitialPage ? styles.initialContentConcealed : {}),
-        }}
-      >
+      <div style={styles.container}>
         {isOnboardingMode ? (
           <AppCard
             variant="section"
@@ -876,14 +827,6 @@ export function CatsPage() {
                       fit={activeCoverFit}
                       aspect="auto"
                       loading="eager"
-                      onLoad={() => {
-                        setIsInitialCoverReady(true);
-                        setHasReleasedInitialCoverGate(true);
-                      }}
-                      onError={() => {
-                        setIsInitialCoverReady(true);
-                        setHasReleasedInitialCoverGate(true);
-                      }}
                       style={styles.profileCoverTileRoot}
                       imageStyle={styles.profileCoverImage}
                     />
@@ -1153,9 +1096,7 @@ export function CatsPage() {
         {message ? <p style={styles.message}>{message}</p> : null}
         {saveMessage ? <p style={styles.message}>{saveMessage}</p> : null}
       </div>
-      {!isOnboardingProfileSetup &&
-      !isOnboardingCompletionView &&
-      !shouldConcealInitialPage ? (
+      {!isOnboardingProfileSetup && !isOnboardingCompletionView ? (
         <BottomNavigation active="cats" />
       ) : null}
       {isCatManageOpen && activeCatProfile ? (
@@ -3480,28 +3421,6 @@ const styles = {
     fontSynthesis: "none",
     padding:
       "calc(20px + env(safe-area-inset-top)) 24px calc(var(--bottom-nav-height) + var(--bottom-nav-safe-offset) + 24px + env(safe-area-inset-bottom))",
-  },
-  initialContentConcealed: {
-    opacity: 0,
-    pointerEvents: "none",
-  },
-  initialCoverGate: {
-    position: "fixed",
-    inset: 0,
-    zIndex: 3,
-    display: "grid",
-    placeItems: "center",
-    pointerEvents: "none",
-  },
-  initialCoverGateMark: {
-    width: "42px",
-    height: "42px",
-    borderRadius: "999px",
-    background:
-      "linear-gradient(145deg, color-mix(in srgb, var(--paper-card) 70%, transparent), color-mix(in srgb, var(--paper-warm) 38%, transparent))",
-    boxShadow:
-      "0 1px 0 color-mix(in srgb, white 48%, transparent) inset, 0 14px 24px -20px rgba(68,52,34,0.42)",
-    opacity: 0.72,
   },
   pageKicker: {
     margin: "0 0 5px",

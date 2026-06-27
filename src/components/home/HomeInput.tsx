@@ -5208,7 +5208,7 @@ function isAccountRestoreDismissed() {
   }
 }
 
-const startupBridgeBackground =
+const homeBaseBackground =
   "radial-gradient(78% 48% at 12% 5%, rgba(225, 158, 134, 0.28), transparent 64%), radial-gradient(72% 44% at 92% 100%, rgba(145, 165, 194, 0.24), transparent 66%), linear-gradient(180deg, #efe3d3 0%, #e9ddce 52%, #ded5c8 100%)";
 
 const styles = {
@@ -5222,7 +5222,7 @@ const styles = {
     height: "100vh",
     minHeight: "100vh",
     overflow: "hidden",
-    background: startupBridgeBackground,
+    background: homeBaseBackground,
     backgroundColor: "#eadfce",
     color: "#202020",
     fontFamily:

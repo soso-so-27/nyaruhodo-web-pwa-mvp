@@ -2,24 +2,17 @@ import type { CSSProperties } from "react";
 import { BottomNavigation } from "../navigation/BottomNavigation";
 
 type AppLoadingScreenProps = {
-  variant: "home" | "collection" | "cats" | "account" | "startup";
+  variant: "collection" | "account";
 };
 
 export function AppLoadingScreen({ variant }: AppLoadingScreenProps) {
-  const isHome = variant === "home";
   const isCollection = variant === "collection";
-  const isCats = variant === "cats";
   const isAccount = variant === "account";
-  const isStartup = variant === "startup";
-  const isBarePaper = isStartup || isCats;
-  const activeNav = isHome ? "today" : isCollection ? "collection" : "cats";
 
   return (
     <main style={styles.page} aria-busy="true">
       <div style={styles.paperBackground} aria-hidden="true" />
       <div style={styles.container}>
-        {isStartup ? <StartupLoading /> : null}
-        {isHome ? <HomeLoading /> : null}
         {isCollection ? <CollectionLoading /> : null}
         {isAccount ? <AccountLoading /> : null}
       </div>
@@ -52,55 +45,15 @@ export function AppLoadingScreen({ variant }: AppLoadingScreenProps) {
           100% { transform: translateX(140%); opacity: 0; }
         }
 
-        @keyframes loadingEnvelopePulse {
-          0%, 100% { box-shadow: 0 10px 22px -18px rgba(120, 70, 52, .2); }
-          50% { box-shadow: 0 13px 26px -16px rgba(194, 116, 90, .28); }
-        }
-
         @media (prefers-reduced-motion: reduce) {
-          .loading-sheen::after,
-          .loading-envelope-pulse {
+          .loading-sheen::after {
             animation: none !important;
           }
         }
       `}</style>
 
-      {isAccount || isBarePaper ? null : <BottomNavigation active={activeNav} />}
+      {isAccount ? null : <BottomNavigation active="collection" />}
     </main>
-  );
-}
-
-function StartupLoading() {
-  return (
-    <section
-      style={styles.startupStage}
-      aria-label="ねてるねこを起動中"
-    >
-    </section>
-  );
-}
-
-function HomeLoading() {
-  return (
-    <section style={styles.homeStage} aria-label="きょうを読み込み中">
-      <div style={styles.homeFrame} className="loading-sheen">
-        <img
-          src="/illustrations/sleeping-cat-empty.png"
-          alt=""
-          aria-hidden="true"
-          style={styles.homeCat}
-        />
-      </div>
-      <div style={styles.homeTray}>
-        <div style={styles.compactLetter} className="loading-envelope-pulse" aria-hidden="true">
-          <span style={styles.letterSeal} />
-        </div>
-        <div style={styles.trayLines} aria-hidden="true">
-          <span style={styles.trayLineLong} className="loading-sheen" />
-          <span style={styles.trayLineShort} className="loading-sheen" />
-        </div>
-      </div>
-    </section>
   );
 }
 
@@ -115,7 +68,11 @@ function CollectionLoading() {
         <span style={styles.monthLine} className="loading-sheen" />
         <div style={styles.boardCluster}>
           {boardPhotoLayouts.map((layout, index) => (
-            <span key={index} style={{ ...styles.boardPhoto, ...layout }} className="loading-sheen" />
+            <span
+              key={index}
+              style={{ ...styles.boardPhoto, ...layout }}
+              className="loading-sheen"
+            />
           ))}
         </div>
       </div>
@@ -149,7 +106,7 @@ const shimmerSurface: CSSProperties = {
   border: "1px solid color-mix(in srgb, var(--ink) 7%, transparent)",
 };
 
-const startupBridgeBackground =
+const pageBackground =
   "radial-gradient(78% 48% at 12% 5%, rgba(225, 158, 134, 0.28), transparent 64%), radial-gradient(72% 44% at 92% 100%, rgba(145, 165, 194, 0.24), transparent 66%), linear-gradient(180deg, #efe3d3 0%, #e9ddce 52%, #ded5c8 100%)";
 
 const boardPhotoLayouts: CSSProperties[] = [
@@ -170,7 +127,7 @@ const styles = {
     overflow: "hidden",
     color: "var(--ink)",
     fontFamily: "var(--font-ui)",
-    background: startupBridgeBackground,
+    background: pageBackground,
     backgroundColor: "#eadfce",
     backgroundSize: "var(--app-paper-background-size)",
     backgroundPosition: "var(--app-paper-background-position)",
@@ -180,7 +137,7 @@ const styles = {
     position: "fixed",
     inset: 0,
     pointerEvents: "none",
-    background: startupBridgeBackground,
+    background: pageBackground,
     backgroundColor: "#eadfce",
     backgroundSize: "var(--app-paper-background-size)",
     backgroundPosition: "var(--app-paper-background-position)",
@@ -192,86 +149,6 @@ const styles = {
     width: "min(calc(100% - 28px), 410px)",
     minHeight: "100%",
     margin: "0 auto",
-  },
-  startupStage: {
-    minHeight: "100dvh",
-    position: "relative",
-    margin: "0 calc(50% - 50vw)",
-    width: "100vw",
-    overflow: "hidden",
-    background: startupBridgeBackground,
-    backgroundColor: "#eadfce",
-    backgroundSize: "var(--app-paper-background-size)",
-    backgroundPosition: "var(--app-paper-background-position)",
-    backgroundRepeat: "var(--app-paper-background-repeat)",
-  },
-  homeStage: {
-    minHeight: "100dvh",
-    display: "flex",
-    flexDirection: "column",
-    justifyContent: "center",
-    gap: "18px",
-    padding: "calc(26px + env(safe-area-inset-top)) 4px calc(116px + env(safe-area-inset-bottom))",
-  },
-  homeFrame: {
-    ...paperSurface,
-    position: "relative",
-    width: "100%",
-    minHeight: "clamp(500px, 62dvh, 606px)",
-    borderRadius: "30px",
-    display: "grid",
-    placeItems: "center",
-  },
-  homeCat: {
-    width: "118px",
-    opacity: 0.7,
-    filter: "drop-shadow(0 10px 18px rgba(70,50,30,.1))",
-  },
-  homeTray: {
-    ...paperSurface,
-    width: "100%",
-    minHeight: "86px",
-    borderRadius: "22px",
-    display: "grid",
-    gridTemplateColumns: "96px 1fr",
-    alignItems: "center",
-    gap: "18px",
-    padding: "14px 18px",
-  },
-  compactLetter: {
-    width: "96px",
-    height: "48px",
-    borderRadius: "14px",
-    display: "grid",
-    placeItems: "center",
-    background:
-      "linear-gradient(145deg, rgba(255,253,248,.88), rgba(245,237,222,.7)), linear-gradient(32deg, transparent 49%, rgba(160,130,90,.12) 50%, transparent 51%)",
-    border: "1px solid color-mix(in srgb, var(--seal) 10%, transparent)",
-  },
-  letterSeal: {
-    width: "14px",
-    height: "14px",
-    borderRadius: "999px",
-    background: "var(--seal)",
-    opacity: 0.84,
-  },
-  trayLines: {
-    display: "grid",
-    gap: "10px",
-    justifyItems: "start",
-  },
-  trayLineLong: {
-    ...shimmerSurface,
-    width: "min(100%, 172px)",
-    height: "11px",
-    borderRadius: "999px",
-  },
-  trayLineShort: {
-    ...shimmerSurface,
-    width: "112px",
-    height: "10px",
-    borderRadius: "999px",
-    opacity: 0.8,
   },
   pageStage: {
     minHeight: "100dvh",
