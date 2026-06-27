@@ -5377,6 +5377,9 @@ function isAccountRestoreDismissed() {
   }
 }
 
+const startupBridgeBackground =
+  "radial-gradient(78% 48% at 12% 5%, rgba(225, 158, 134, 0.28), transparent 64%), radial-gradient(72% 44% at 92% 100%, rgba(145, 165, 194, 0.24), transparent 66%), linear-gradient(180deg, #efe3d3 0%, #e9ddce 52%, #ded5c8 100%)";
+
 const styles = {
   page: {
     position: "fixed",
@@ -5388,7 +5391,8 @@ const styles = {
     height: "100vh",
     minHeight: "100vh",
     overflow: "hidden",
-    backgroundColor: "#f7f3ea",
+    background: startupBridgeBackground,
+    backgroundColor: "#eadfce",
     color: "#202020",
     fontFamily:
       'Outfit, "Zen Kaku Gothic New", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
@@ -5401,14 +5405,16 @@ const styles = {
     inset: 0,
     zIndex: 1000,
     overflow: "hidden",
-    backgroundColor: "#f7f0e2",
+    background: startupBridgeBackground,
+    backgroundColor: "#eadfce",
     transition: "opacity 240ms ease",
     willChange: "opacity",
   },
   initialLoadingBackdrop: {
     position: "absolute",
     inset: 0,
-    background: "var(--app-paper-background)",
+    background: startupBridgeBackground,
+    backgroundColor: "#eadfce",
     backgroundSize: "var(--app-paper-background-size)",
     backgroundPosition: "var(--app-paper-background-position)",
     backgroundRepeat: "var(--app-paper-background-repeat)",

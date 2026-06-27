@@ -185,6 +185,9 @@ const shimmerSurface: CSSProperties = {
   border: "1px solid color-mix(in srgb, var(--ink) 7%, transparent)",
 };
 
+const startupBridgeBackground =
+  "radial-gradient(78% 48% at 12% 5%, rgba(225, 158, 134, 0.28), transparent 64%), radial-gradient(72% 44% at 92% 100%, rgba(145, 165, 194, 0.24), transparent 66%), linear-gradient(180deg, #efe3d3 0%, #e9ddce 52%, #ded5c8 100%)";
+
 const boardPhotoLayouts: CSSProperties[] = [
   { left: "11%", top: "24%", width: "116px", height: "112px", transform: "rotate(-5deg)" },
   { left: "46%", top: "19%", width: "96px", height: "92px", transform: "rotate(3deg)" },
@@ -203,7 +206,8 @@ const styles = {
     overflow: "hidden",
     color: "var(--ink)",
     fontFamily: "var(--font-ui)",
-    background: "var(--app-paper-background)",
+    background: startupBridgeBackground,
+    backgroundColor: "#eadfce",
     backgroundSize: "var(--app-paper-background-size)",
     backgroundPosition: "var(--app-paper-background-position)",
     backgroundRepeat: "var(--app-paper-background-repeat)",
@@ -212,7 +216,8 @@ const styles = {
     position: "fixed",
     inset: 0,
     pointerEvents: "none",
-    background: "var(--app-paper-background)",
+    background: startupBridgeBackground,
+    backgroundColor: "#eadfce",
     backgroundSize: "var(--app-paper-background-size)",
     backgroundPosition: "var(--app-paper-background-position)",
     backgroundRepeat: "var(--app-paper-background-repeat)",
@@ -239,7 +244,8 @@ const styles = {
     margin: "0 calc(50% - 50vw)",
     width: "100vw",
     overflow: "hidden",
-    background: "var(--app-paper-background)",
+    background: startupBridgeBackground,
+    backgroundColor: "#eadfce",
     backgroundSize: "var(--app-paper-background-size)",
     backgroundPosition: "var(--app-paper-background-position)",
     backgroundRepeat: "var(--app-paper-background-repeat)",

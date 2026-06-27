@@ -69,12 +69,15 @@ export const viewport: Viewport = {
   width: "device-width",
   initialScale: 1,
   viewportFit: "cover",
-  themeColor: "#f7f0e2",
+  themeColor: "#eadfce",
 };
 
-const criticalPageBackground = "#f7f0e2";
+const criticalPageBackground = "#eadfce";
+const criticalPaperBackground =
+  "radial-gradient(78% 48% at 12% 5%, rgba(225, 158, 134, 0.28), transparent 64%), radial-gradient(72% 44% at 92% 100%, rgba(145, 165, 194, 0.24), transparent 66%), linear-gradient(180deg, #efe3d3 0%, #e9ddce 52%, #ded5c8 100%)";
 
 const criticalHtmlStyle: CSSProperties = {
+  background: criticalPaperBackground,
   backgroundColor: criticalPageBackground,
   colorScheme: "light",
 };
@@ -82,6 +85,7 @@ const criticalHtmlStyle: CSSProperties = {
 const criticalBodyStyle: CSSProperties = {
   margin: 0,
   minHeight: "100vh",
+  background: criticalPaperBackground,
   backgroundColor: criticalPageBackground,
 };
 
