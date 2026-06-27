@@ -1,8 +1,4 @@
-"use client";
-
-import { useRouter } from "next/navigation";
-import { useEffect } from "react";
-import { AppLoadingScreen } from "../components/loading/AppLoadingScreen";
+import { redirect } from "next/navigation";
 
 const ATTRIBUTION_PARAMS = [
   "source",
@@ -16,22 +12,22 @@ const ATTRIBUTION_PARAMS = [
   "invite",
 ] as const;
 
-export default function Page() {
-  const router = useRouter();
+type RootPageProps = {
+  searchParams?: Promise<Record<string, string | string[] | undefined>>;
+};
 
-  useEffect(() => {
-    router.replace(buildRedirectTarget("/home"));
-  }, [router]);
-
-  return <AppLoadingScreen variant="startup" />;
+export default async function Page({ searchParams }: RootPageProps) {
+  redirect(buildRedirectTarget("/home", (await searchParams) ?? {}));
 }
 
-function buildRedirectTarget(pathname: "/home") {
-  const currentParams = new URLSearchParams(window.location.search);
+function buildRedirectTarget(
+  pathname: "/home",
+  currentParams: Record<string, string | string[] | undefined>,
+) {
   const nextParams = new URLSearchParams();
 
   for (const key of ATTRIBUTION_PARAMS) {
-    const value = currentParams.get(key);
+    const value = getFirstParamValue(currentParams[key]);
     if (value) {
       nextParams.set(key, value.slice(0, 120));
     }
@@ -39,4 +35,12 @@ function buildRedirectTarget(pathname: "/home") {
 
   const query = nextParams.toString();
   return query ? `${pathname}?${query}` : pathname;
+}
+
+function getFirstParamValue(value: string | string[] | undefined) {
+  if (Array.isArray(value)) {
+    return value[0] ?? "";
+  }
+
+  return value ?? "";
 }

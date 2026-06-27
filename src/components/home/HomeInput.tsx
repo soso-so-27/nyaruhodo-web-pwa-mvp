@@ -2172,7 +2172,11 @@ export function HomeInput({ recentEvents: _recentEvents }: HomeInputProps) {
             pointerEvents: isInitialHomeVisualReady ? "none" : "auto",
           }}
         >
-          <div style={styles.initialLoadingBackdrop} aria-hidden="true" />
+          <div
+            className="app-startup-splash-backdrop"
+            style={styles.initialLoadingBackdrop}
+            aria-hidden="true"
+          />
           <div style={styles.initialLoadingSoftLight} aria-hidden="true" />
         </div>
       ) : null}
@@ -5405,7 +5409,6 @@ const styles = {
   initialLoadingBackdrop: {
     position: "absolute",
     inset: 0,
-    backgroundImage: "url('/splash/v5/apple-splash-1170-2532.png')",
     backgroundSize: "cover",
     backgroundPosition: "center",
     backgroundRepeat: "no-repeat",

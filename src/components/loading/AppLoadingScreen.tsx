@@ -86,7 +86,11 @@ export function AppLoadingScreen({ variant }: AppLoadingScreenProps) {
 
 function StartupLoading() {
   return (
-    <section style={styles.startupStage} aria-label="ねてるねこを起動中">
+    <section
+      className="app-startup-splash-backdrop"
+      style={styles.startupStage}
+      aria-label="ねてるねこを起動中"
+    >
       <div style={styles.splashEnvelope} className="loading-splash-breath" aria-hidden="true" />
     </section>
   );
@@ -242,7 +246,6 @@ const styles = {
     margin: "0 calc(50% - 50vw)",
     width: "100vw",
     overflow: "hidden",
-    backgroundImage: "url('/splash/v5/apple-splash-1170-2532.png')",
     backgroundSize: "cover",
     backgroundPosition: "center",
     backgroundRepeat: "no-repeat",
