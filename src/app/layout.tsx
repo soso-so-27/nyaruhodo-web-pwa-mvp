@@ -69,7 +69,7 @@ export const viewport: Viewport = {
   width: "device-width",
   initialScale: 1,
   viewportFit: "cover",
-  themeColor: "#f7f3ea",
+  themeColor: "#f7f0e2",
 };
 
 const criticalPageBackground = "#f7f0e2";
