@@ -11,6 +11,7 @@ export function AppLoadingScreen({ variant }: AppLoadingScreenProps) {
   const isCats = variant === "cats";
   const isAccount = variant === "account";
   const isStartup = variant === "startup";
+  const isBarePaper = isStartup || isCats;
   const activeNav = isHome ? "today" : isCollection ? "collection" : "cats";
 
   return (
@@ -20,7 +21,6 @@ export function AppLoadingScreen({ variant }: AppLoadingScreenProps) {
         {isStartup ? <StartupLoading /> : null}
         {isHome ? <HomeLoading /> : null}
         {isCollection ? <CollectionLoading /> : null}
-        {isCats ? <CatsLoading /> : null}
         {isAccount ? <AccountLoading /> : null}
       </div>
 
@@ -65,7 +65,7 @@ export function AppLoadingScreen({ variant }: AppLoadingScreenProps) {
         }
       `}</style>
 
-      {isAccount || isStartup ? null : <BottomNavigation active={activeNav} />}
+      {isAccount || isBarePaper ? null : <BottomNavigation active={activeNav} />}
     </main>
   );
 }
@@ -118,33 +118,6 @@ function CollectionLoading() {
             <span key={index} style={{ ...styles.boardPhoto, ...layout }} className="loading-sheen" />
           ))}
         </div>
-      </div>
-    </section>
-  );
-}
-
-function CatsLoading() {
-  return (
-    <section style={styles.pageStage} aria-label="うちのこを読み込み中">
-      <div style={styles.catHeader}>
-        <span style={styles.avatarGhost} className="loading-sheen" />
-        <span style={styles.nameGhost} className="loading-sheen" />
-        <span style={styles.smallCircleGhost} />
-      </div>
-      <div style={styles.recordPaper}>
-        <span style={styles.kickerLine} className="loading-sheen" />
-        <span style={styles.titleLine} className="loading-sheen" />
-        <div style={styles.metricGrid}>
-          <span style={styles.metricGhost} />
-          <span style={styles.metricGhost} />
-          <span style={styles.metricGhost} />
-          <span style={styles.metricGhost} />
-        </div>
-      </div>
-      <div style={styles.photoGridGhost}>
-        {Array.from({ length: 6 }, (_, index) => (
-          <span key={index} style={styles.squareGhost} className="loading-sheen" />
-        ))}
       </div>
     </section>
   );
@@ -353,75 +326,6 @@ const styles = {
     position: "absolute",
     borderRadius: "14px",
     boxShadow: "0 12px 22px -18px rgba(70,50,30,.35)",
-  },
-  catHeader: {
-    ...paperSurface,
-    borderRadius: "28px",
-    minHeight: "104px",
-    display: "grid",
-    gridTemplateColumns: "58px 1fr 48px",
-    alignItems: "center",
-    gap: "14px",
-    padding: "18px 20px",
-  },
-  avatarGhost: {
-    ...shimmerSurface,
-    width: "58px",
-    height: "58px",
-    borderRadius: "999px",
-  },
-  nameGhost: {
-    ...shimmerSurface,
-    width: "92px",
-    height: "22px",
-    borderRadius: "999px",
-  },
-  smallCircleGhost: {
-    width: "48px",
-    height: "48px",
-    borderRadius: "999px",
-    border: "1px solid color-mix(in srgb, var(--ink) 9%, transparent)",
-    background: "rgba(255,253,248,.4)",
-  },
-  recordPaper: {
-    ...paperSurface,
-    borderRadius: "28px",
-    padding: "24px",
-    display: "grid",
-    gap: "16px",
-  },
-  kickerLine: {
-    ...shimmerSurface,
-    width: "120px",
-    height: "13px",
-    borderRadius: "999px",
-  },
-  titleLine: {
-    ...shimmerSurface,
-    width: "190px",
-    height: "28px",
-    borderRadius: "999px",
-  },
-  metricGrid: {
-    display: "grid",
-    gridTemplateColumns: "1fr 1fr",
-    gap: "12px",
-  },
-  metricGhost: {
-    height: "74px",
-    borderRadius: "18px",
-    border: "1px solid color-mix(in srgb, var(--ink) 7%, transparent)",
-    background: "rgba(255,253,248,.34)",
-  },
-  photoGridGhost: {
-    display: "grid",
-    gridTemplateColumns: "repeat(3, 1fr)",
-    gap: "3px",
-  },
-  squareGhost: {
-    ...shimmerSurface,
-    aspectRatio: "1 / 1",
-    borderRadius: "8px",
   },
   accountStage: {
     minHeight: "100dvh",
