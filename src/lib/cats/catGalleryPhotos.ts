@@ -1,4 +1,5 @@
 import { isUsablePhotoSrc, normalizePersistentPhotoSrc } from "../photoStorage";
+import { STORAGE_KEYS } from "../storage";
 
 export type CatGalleryPhoto = {
   id: string;
@@ -7,11 +8,10 @@ export type CatGalleryPhoto = {
   createdAt: number;
 };
 
-const CAT_GALLERY_PHOTOS_STORAGE_KEY = "neteruneko_cat_gallery_photos";
 const CAT_GALLERY_PHOTOS_UPDATED_EVENT = "neteruneko_cat_gallery_photos_updated";
 
 export function readCatGalleryPhotos(activeCatId: string | null = null) {
-  const photos = readStorageArray<CatGalleryPhoto>(CAT_GALLERY_PHOTOS_STORAGE_KEY)
+  const photos = readStorageArray<CatGalleryPhoto>(STORAGE_KEYS.catGalleryPhotos)
     .filter(isValidCatGalleryPhoto)
     .map(normalizeCatGalleryPhoto)
     .sort((left, right) => right.createdAt - left.createdAt);
@@ -44,7 +44,7 @@ export function saveCatGalleryPhoto({
 
   try {
     const saved = readCatGalleryPhotos(null);
-    writeStorageArray(CAT_GALLERY_PHOTOS_STORAGE_KEY, [photo, ...saved].slice(0, 120));
+    writeStorageArray(STORAGE_KEYS.catGalleryPhotos, [photo, ...saved].slice(0, 120));
     dispatchCatGalleryPhotosUpdated();
     return photo;
   } catch {

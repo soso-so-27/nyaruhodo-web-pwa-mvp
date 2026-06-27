@@ -2,6 +2,7 @@
 
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import type { CSSProperties, MouseEvent, TouchEvent, UIEvent } from "react";
+import { AnimatePresence, MotionConfig, motion } from "motion/react";
 import {
   getCollectionSlotPhotoSlug,
   getDailyCollectionTarget,
@@ -119,7 +120,7 @@ const MAINICHI_PASTE_MOTION_CSS = `
   }
 }
 
-[data-mainichi-paste="true"] {
+[data-mainichi-css-paste="true"] {
   animation: mainichiPasteSettle 720ms cubic-bezier(0.22, 1, 0.36, 1) both;
   will-change: transform, filter, opacity;
 }
@@ -133,12 +134,11 @@ const MAINICHI_PASTE_MOTION_CSS = `
 }
 
 [data-mainichi-photo-card="true"]:active {
-  transform: translate(var(--mainichi-shift-x), calc(var(--mainichi-shift-y) + 2px)) rotate(var(--mainichi-rotation)) scale(0.982) !important;
   filter: brightness(0.985) drop-shadow(0 8px 12px rgba(94,76,52,0.12));
 }
 
 @media (prefers-reduced-motion: reduce) {
-  [data-mainichi-paste="true"],
+  [data-mainichi-css-paste="true"],
   [data-mainichi-paste-tape="true"] {
     animation: none !important;
   }
@@ -1265,25 +1265,28 @@ export function CollectionPage() {
           onOpenPhoto={openMainichiFullscreenPhoto}
         />
       ) : null}
-      {selectedMainichiPhoto ? (
-        <MainichiFullscreenPhoto
-          photo={selectedMainichiPhoto}
-          photoCount={selectedMainichiViewer?.photos.length ?? 1}
-          currentIndex={selectedMainichiViewer?.index ?? 0}
-          monthLabel={selectedMainichiViewer?.monthLabel ?? null}
-          onClose={closeMainichiFullscreenPhoto}
-          onPrevious={() => moveMainichiFullscreenPhoto(-1)}
-          onNext={() => moveMainichiFullscreenPhoto(1)}
-          onToggleSleepingDelivery={handleToggleMainichiSleepingDelivery}
-          onDeleteSleepingPhoto={handleDeleteMainichiSleepingPhoto}
-          onHideDeliveredPhoto={(photo) =>
-            handleHideMainichiDeliveredPhoto(photo, "hide")
-          }
-          onReportDeliveredPhoto={(photo) =>
-            handleHideMainichiDeliveredPhoto(photo, "report")
-          }
-        />
-      ) : null}
+      <AnimatePresence>
+        {selectedMainichiPhoto ? (
+          <MainichiFullscreenPhoto
+            key={`${selectedMainichiPhoto.kind}-${selectedMainichiPhoto.id}-${selectedMainichiPhoto.dateKey}`}
+            photo={selectedMainichiPhoto}
+            photoCount={selectedMainichiViewer?.photos.length ?? 1}
+            currentIndex={selectedMainichiViewer?.index ?? 0}
+            monthLabel={selectedMainichiViewer?.monthLabel ?? null}
+            onClose={closeMainichiFullscreenPhoto}
+            onPrevious={() => moveMainichiFullscreenPhoto(-1)}
+            onNext={() => moveMainichiFullscreenPhoto(1)}
+            onToggleSleepingDelivery={handleToggleMainichiSleepingDelivery}
+            onDeleteSleepingPhoto={handleDeleteMainichiSleepingPhoto}
+            onHideDeliveredPhoto={(photo) =>
+              handleHideMainichiDeliveredPhoto(photo, "hide")
+            }
+            onReportDeliveredPhoto={(photo) =>
+              handleHideMainichiDeliveredPhoto(photo, "report")
+            }
+          />
+        ) : null}
+      </AnimatePresence>
       {selectedBoxKind ? (
         <BoxPhotoDetailSheet
           kind={selectedBoxKind}
@@ -1515,22 +1518,39 @@ function MainichiPhotoBoard({
           onOpenMonthPicker={() => setIsMonthPickerOpen(true)}
         />
       ) : null}
-      {selectedMonth ? (
-        <div style={styles.mainichiMonthList}>
-          <MainichiMonthBoard
-            key={`${activeSide}-${selectedMonth.key}`}
-            month={selectedMonth}
-            showCatNames={false}
-            pastingPhotoKey={pastingPhotoKey}
-            onOpenDay={onOpenDay}
-            onOpenPhoto={onOpenPhoto}
-          />
-        </div>
-      ) : (
-        <div data-testid="mainichi-board-empty">
-          <MainichiBoardEmptyState activeSide={activeSide} />
-        </div>
-      )}
+      <MotionConfig reducedMotion="user">
+        <AnimatePresence mode="wait" initial={false}>
+          {selectedMonth ? (
+            <motion.div
+              key={`${activeSide}-${selectedMonth.key}`}
+              style={styles.mainichiMonthList}
+              initial={{ opacity: 0, y: 12, scale: 0.992 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              exit={{ opacity: 0, y: -8, scale: 0.996 }}
+              transition={{ duration: 0.28, ease: [0.22, 1, 0.36, 1] }}
+            >
+              <MainichiMonthBoard
+                month={selectedMonth}
+                showCatNames={false}
+                pastingPhotoKey={pastingPhotoKey}
+                onOpenDay={onOpenDay}
+                onOpenPhoto={onOpenPhoto}
+              />
+            </motion.div>
+          ) : (
+            <motion.div
+              key={`empty-${activeSide}`}
+              data-testid="mainichi-board-empty"
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -6 }}
+              transition={{ duration: 0.24, ease: [0.22, 1, 0.36, 1] }}
+            >
+              <MainichiBoardEmptyState activeSide={activeSide} />
+            </motion.div>
+          )}
+        </AnimatePresence>
+      </MotionConfig>
       {isMonthPickerOpen ? (
         <MainichiMonthPickerSheet
           months={months}
@@ -1596,7 +1616,7 @@ function MainichiSideTabs({
         const selected = activeSide === tab.value;
 
         return (
-          <button
+          <motion.button
             key={tab.value}
             type="button"
             role="tab"
@@ -1606,9 +1626,11 @@ function MainichiSideTabs({
               ...(selected ? styles.mainichiBoardTabActive : {}),
             }}
             onClick={() => onSideChange(tab.value)}
+            whileTap={{ scale: 0.96 }}
+            transition={{ duration: 0.14, ease: "easeOut" }}
           >
             {tab.label}
-          </button>
+          </motion.button>
         );
       })}
     </div>
@@ -1856,15 +1878,34 @@ function MainichiMonthBoard({
             ...getMainichiBoardCanvasStyle(month.photos.length, isCondensedBundle),
           }}
         >
-          <span style={bundleBaseStyle} aria-hidden="true">
+          <motion.span
+            style={bundleBaseStyle}
+            aria-hidden="true"
+            initial={{ y: 18, scaleX: 0.94, scaleY: 0.88 }}
+            animate={{ y: 0, scaleX: 1, scaleY: 1 }}
+            transition={{
+              delay: 0.08,
+              duration: 0.46,
+              ease: [0.22, 1, 0.36, 1],
+            }}
+          >
             {bundleLayers}
-          </span>
+          </motion.span>
           {isCondensedBundle ? (
-            <button
+            <motion.button
               type="button"
               data-testid="mainichi-month-bundle-open"
               style={styles.mainichiMonthOpenButton}
               onClick={() => setIsBundleSheetOpen(true)}
+              initial={{ opacity: 0, y: 10, scale: 0.92 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              whileTap={{ scale: 0.94, y: 2 }}
+              transition={{
+                delay: 0.34,
+                type: "spring",
+                stiffness: 260,
+                damping: 22,
+              }}
               aria-label={`${month.label}の写真を見る`}
             >
               <span style={styles.mainichiMonthOpenGlyph} aria-hidden="true">
@@ -1872,7 +1913,7 @@ function MainichiMonthBoard({
                 <span style={styles.mainichiMonthOpenGlyphDot} />
                 <span style={styles.mainichiMonthOpenGlyphDot} />
               </span>
-            </button>
+            </motion.button>
           ) : null}
           {visiblePhotos.map((photo, index) => (
             <MainichiBoardPhotoCard
@@ -1925,7 +1966,7 @@ function MainichiMonthBundleSheet({
       <style>{MAINICHI_MONTH_PICKER_CSS}</style>
       <div style={styles.mainichiMonthBundleDays}>
         {dayBundles.map((bundle, index) => (
-          <button
+          <motion.button
             key={bundle.key}
             type="button"
             style={{
@@ -1933,6 +1974,15 @@ function MainichiMonthBundleSheet({
               ...getMainichiMonthBundleDayStyle(index, bundle.photos.length),
             }}
             onClick={() => onOpenDay(bundle.key)}
+            initial={{ opacity: 0, y: 18, rotate: index % 2 === 0 ? -1.2 : 1.2 }}
+            animate={{ opacity: 1, y: 0, rotate: 0 }}
+            whileTap={{ scale: 0.972, y: 2 }}
+            transition={{
+              delay: Math.min(index * 0.045, 0.28),
+              type: "spring",
+              stiffness: 240,
+              damping: 25,
+            }}
             data-testid="mainichi-month-bundle-day"
             aria-label={`${bundle.label} ${bundle.photos.length}枚`}
           >
@@ -1986,7 +2036,7 @@ function MainichiMonthBundleSheet({
               ) : null}
             </span>
             <span style={styles.mainichiMonthBundleDaySeal} aria-hidden="true" />
-          </button>
+          </motion.button>
         ))}
       </div>
     </AppBottomSheet>
@@ -2010,6 +2060,7 @@ function MainichiBoardPhotoCard({
 }) {
   const layout = getMainichiBoardPhotoLayout(index, total);
   const showTape = shouldPaste || shouldShowMainichiBoardTape(index, total);
+  const cardMotion = getMainichiBoardPhotoMotion(index, total, layout);
   const testId =
     photo.side === "sent"
       ? "mainichi-board-photo-sent"
@@ -2030,7 +2081,7 @@ function MainichiBoardPhotoCard({
   }
 
   return (
-    <button
+    <motion.button
       type="button"
       data-testid={testId}
       data-mainichi-photo-card="true"
@@ -2046,16 +2097,25 @@ function MainichiBoardPhotoCard({
         "--mainichi-photo-border": showTape ? layout.tapedBorderWidth : layout.borderWidth,
         "--mainichi-photo-radius": showTape ? layout.tapedBorderRadius : layout.borderRadius,
         zIndex: layout.zIndex,
-        transform:
-          "translate(var(--mainichi-shift-x), var(--mainichi-shift-y)) rotate(var(--mainichi-rotation))",
       } as CSSProperties}
+      initial={cardMotion.initial}
+      animate={cardMotion.animate}
+      exit={cardMotion.exit}
+      whileTap={cardMotion.whileTap}
+      transition={cardMotion.transition}
       onClick={handleClick}
       aria-label={photo.side === "sent" ? "おくった ねがおをひらく" : "とどいた ねがおをひらく"}
     >
       {showTape ? (
-        <span
-          data-mainichi-paste-tape={shouldPaste ? "true" : undefined}
+        <motion.span
           style={styles.mainichiBoardTape}
+          initial={shouldPaste ? { opacity: 0, y: -8, scaleX: 0.88 } : false}
+          animate={{ opacity: 0.82, y: 0, scaleX: 1 }}
+          transition={{
+            delay: cardMotion.tapeDelay,
+            duration: shouldPaste ? 0.38 : 0.24,
+            ease: [0.22, 1, 0.36, 1],
+          }}
           aria-hidden="true"
         />
       ) : null}
@@ -2079,7 +2139,7 @@ function MainichiBoardPhotoCard({
       {showCatName && photo.catName ? (
         <span style={styles.mainichiBoardPhotoCatBadge}>{photo.catName}</span>
       ) : null}
-    </button>
+    </motion.button>
   );
 }
 
@@ -2215,21 +2275,30 @@ function MainichiDaySheet({
         </div>
         {photos.length > 0 ? (
           <div style={styles.mainichiDayTimeline}>
-            {photos.map((photo, index) => (
-              <button
-                key={`${photo.kind}-${photo.id}`}
-                type="button"
-                style={{
-                  ...styles.mainichiDayPhotoRow,
-                  transform: `rotate(${getMainichiDayPhotoRotation(index)})`,
-                }}
-                onClick={() => onOpenPhoto(photo)}
-                data-testid={
-                  photo.kind === "sleeping"
-                    ? "mainichi-day-photo-sent"
-                    : "mainichi-day-photo-delivered"
-                }
-              >
+            {photos.map((photo, index) => {
+              const rotation = getMainichiDayPhotoRotation(index);
+
+              return (
+                <motion.button
+                  key={`${photo.kind}-${photo.id}`}
+                  type="button"
+                  style={styles.mainichiDayPhotoRow}
+                  initial={{ opacity: 0, y: 14, rotate: 0, scale: 0.96 }}
+                  animate={{ opacity: 1, y: 0, rotate: rotation, scale: 1 }}
+                  whileTap={{ scale: 0.972, y: 2, rotate: rotation }}
+                  transition={{
+                    delay: Math.min(index * 0.045, 0.22),
+                    type: "spring",
+                    stiffness: 230,
+                    damping: 24,
+                  }}
+                  onClick={() => onOpenPhoto(photo)}
+                  data-testid={
+                    photo.kind === "sleeping"
+                      ? "mainichi-day-photo-sent"
+                      : "mainichi-day-photo-delivered"
+                  }
+                >
                 <PhotoTile
                   src={getPhotoThumbnailSrc(photo)}
                   alt=""
@@ -2245,8 +2314,9 @@ function MainichiDaySheet({
                     <span style={styles.mainichiDayPhotoCat}>{photo.catName}</span>
                   ) : null}
                 </span>
-              </button>
-            ))}
+                </motion.button>
+              );
+            })}
           </div>
         ) : (
           <EmptyState
@@ -2362,11 +2432,15 @@ function MainichiFullscreenPhoto({
   }
 
   return (
-    <div
+    <motion.div
       style={styles.mainichiViewerOverlay}
       data-testid="mainichi-photo-viewer"
       onTouchStart={handleTouchStart}
       onTouchEnd={handleTouchEnd}
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+      transition={{ duration: 0.18, ease: "easeOut" }}
     >
       <div style={styles.mainichiViewerChrome}>
         <div style={styles.mainichiViewerMeta}>
@@ -2389,7 +2463,16 @@ function MainichiFullscreenPhoto({
           ×
         </AppButton>
       </div>
-      <div style={styles.mainichiViewerStage}>
+      <motion.div
+        style={styles.mainichiViewerStage}
+        initial={{ opacity: 0, y: 16, scale: 0.985 }}
+        animate={{ opacity: 1, y: 0, scale: 1 }}
+        exit={{ opacity: 0, y: 8, scale: 0.99 }}
+        transition={{
+          duration: 0.28,
+          ease: [0.22, 1, 0.36, 1],
+        }}
+      >
         <PhotoViewerFrame
           src={getPhotoDetailSrc(photo)}
           alt=""
@@ -2440,7 +2523,7 @@ function MainichiFullscreenPhoto({
             </AppButton>
           </div>
         ) : null}
-      </div>
+      </motion.div>
       <div style={styles.mainichiViewerActions} aria-label="写真の操作">
         {photo.kind === "sleeping" ? (
           <>
@@ -2536,7 +2619,7 @@ function MainichiFullscreenPhoto({
           </section>
         </div>
       ) : null}
-    </div>
+    </motion.div>
   );
 }
 
@@ -4087,6 +4170,71 @@ function getMainichiBoardPhotoLayout(index: number, total: number) {
       width: `${width}%`,
     } satisfies CSSProperties,
   };
+}
+
+function getMainichiBoardPhotoMotion(
+  index: number,
+  total: number,
+  layout: ReturnType<typeof getMainichiBoardPhotoLayout>,
+) {
+  const x = parseMainichiPixelValue(layout.shiftX);
+  const y = parseMainichiPixelValue(layout.shiftY);
+  const isSparse = total <= 3;
+  const isMedium = total > 3 && total <= 12;
+  const delayStep = total > MAINICHI_BOARD_DIRECT_PHOTO_LIMIT ? 0.018 : 0.034;
+  const delayCap = total > MAINICHI_BOARD_DIRECT_PHOTO_LIMIT ? 0.26 : 0.42;
+  const delay = Math.min(index * delayStep, delayCap);
+  const lift = isSparse ? 18 : isMedium ? 34 : 48;
+  const initialScale = isSparse ? 0.94 : isMedium ? 0.84 : 0.76;
+  const initialRotate =
+    total <= 1 ? layout.rotation : index % 2 === 0 ? "-0.8deg" : "0.8deg";
+
+  return {
+    initial: {
+      opacity: 0,
+      scale: initialScale,
+      x: x * 0.28,
+      y: y + lift,
+      rotate: initialRotate,
+      filter: "brightness(1.02) saturate(0.96)",
+    },
+    animate: {
+      opacity: 1,
+      scale: 1,
+      x,
+      y,
+      rotate: layout.rotation,
+      filter: "brightness(1) saturate(1)",
+    },
+    exit: {
+      opacity: 0,
+      scale: 0.97,
+      x: x * 0.5,
+      y: y - 10,
+      rotate: layout.rotation,
+      filter: "brightness(0.98) saturate(0.98)",
+    },
+    whileTap: {
+      scale: 0.968,
+      x,
+      y: y + 2,
+      rotate: layout.rotation,
+      filter: "brightness(0.985) saturate(0.98)",
+    },
+    transition: {
+      delay,
+      type: "spring" as const,
+      stiffness: isSparse ? 210 : 250,
+      damping: isSparse ? 24 : 28,
+      mass: isSparse ? 0.78 : 0.68,
+    },
+    tapeDelay: delay + (isSparse ? 0.08 : 0.14),
+  };
+}
+
+function parseMainichiPixelValue(value: string) {
+  const parsed = Number.parseFloat(value);
+  return Number.isFinite(parsed) ? parsed : 0;
 }
 
 function getMainichiBoardPhotoAspect(index: number, total: number) {

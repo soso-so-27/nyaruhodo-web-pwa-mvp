@@ -8,7 +8,8 @@
     "e2e:prod": "playwright test -c playwright.prod.config.ts",
     "e2e:headed": "playwright test --headed",
     "shots": "node scripts/run-shots.mjs",
-    "check:release": "node scripts/check-release-readiness.mjs"
+    "check:release": "node scripts/check-release-readiness.mjs",
+    "check:release:local": "node scripts/check-release-readiness.mjs --local"
   },
   "dependencies": {
     "@supabase/ssr": "0.10.3",
