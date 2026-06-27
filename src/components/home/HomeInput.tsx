@@ -260,7 +260,7 @@ const HOME_VISUAL_ASSET_URLS = [
   "/images/home-backgrounds/generated-morning-paper.png",
   "/images/home-backgrounds/generated-noon-paper.png",
   "/images/home-backgrounds/generated-evening-paper.png",
-  "/images/home-backgrounds/generated-night-paper.png",
+  "/images/home-backgrounds/generated-night-paper-v2.png",
 ] as const;
 
 type BeforeInstallPromptEvent = Event & {

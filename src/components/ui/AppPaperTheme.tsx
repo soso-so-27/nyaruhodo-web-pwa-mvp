@@ -7,7 +7,7 @@ const PAPER_IMAGES = {
   morning: "url('/images/home-backgrounds/generated-morning-paper.png')",
   noon: "url('/images/home-backgrounds/generated-noon-paper.png')",
   evening: "url('/images/home-backgrounds/generated-evening-paper.png')",
-  night: "url('/images/home-backgrounds/generated-night-paper.png')",
+  night: "url('/images/home-backgrounds/generated-night-paper-v2.png')",
 } as const;
 
 const PAPER_DAYLIGHT_ANCHORS = [
