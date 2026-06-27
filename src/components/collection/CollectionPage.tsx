@@ -1831,11 +1831,11 @@ function MainichiMonthBoard({
   ) => void;
 }) {
   const bundleSide = month.photos[0]?.side ?? "sent";
-  const visiblePhotos = getMainichiBoardVisiblePhotos(month.photos);
-  const isCondensedBundle = visiblePhotos.length < month.photos.length;
+  const visiblePhotos = month.photos;
+  const isCondensedBundle = false;
   const bundleBaseStyle = {
     ...styles.mainichiBundleBase,
-    ...getMainichiBundleBaseStyle(month.photos.length, bundleSide, isCondensedBundle),
+    ...getMainichiBundleBaseStyle(month.photos.length, bundleSide),
   };
   const bundleLayers = (
     <>
@@ -1878,19 +1878,6 @@ function MainichiMonthBoard({
             ...getMainichiBoardCanvasStyle(month.photos.length, isCondensedBundle),
           }}
         >
-          <motion.span
-            style={bundleBaseStyle}
-            aria-hidden="true"
-            initial={{ y: 18, scaleX: 0.94, scaleY: 0.88 }}
-            animate={{ y: 0, scaleX: 1, scaleY: 1 }}
-            transition={{
-              delay: 0.08,
-              duration: 0.46,
-              ease: [0.22, 1, 0.36, 1],
-            }}
-          >
-            {bundleLayers}
-          </motion.span>
           {isCondensedBundle ? (
             <motion.button
               type="button"

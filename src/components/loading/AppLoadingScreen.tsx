@@ -16,7 +16,9 @@ export function AppLoadingScreen({ variant }: AppLoadingScreenProps) {
   return (
     <main style={styles.page} aria-busy="true">
       <div style={styles.paperBackground} aria-hidden="true" />
-      <div style={styles.paperBreath} className="loading-paper-breath" aria-hidden="true" />
+      {isStartup ? null : (
+        <div style={styles.paperBreath} className="loading-paper-breath" aria-hidden="true" />
+      )}
 
       <div style={styles.container}>
         {isStartup ? <StartupLoading /> : null}
@@ -84,7 +86,6 @@ function StartupLoading() {
       style={styles.startupStage}
       aria-label="ねてるねこを起動中"
     >
-      <div style={styles.startupPaperGlow} aria-hidden="true" />
     </section>
   );
 }
@@ -249,13 +250,6 @@ const styles = {
     backgroundSize: "var(--app-paper-background-size)",
     backgroundPosition: "var(--app-paper-background-position)",
     backgroundRepeat: "var(--app-paper-background-repeat)",
-  },
-  startupPaperGlow: {
-    position: "absolute",
-    inset: 0,
-    background:
-      "radial-gradient(54% 34% at 50% 44%, rgba(255,255,255,.16), transparent 68%)",
-    mixBlendMode: "soft-light",
   },
   homeStage: {
     minHeight: "100dvh",
