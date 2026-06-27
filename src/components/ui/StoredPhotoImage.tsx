@@ -10,6 +10,7 @@ import {
 } from "react";
 
 import {
+  DISPLAY_SIGNED_URL_SECONDS,
   getStoragePhotoPath,
 } from "../../lib/photoStorage";
 import { trackProductEvent } from "../../lib/analytics/productAnalytics";
@@ -17,8 +18,9 @@ import { STORAGE_KEYS } from "../../lib/storage";
 import { createBrowserSupabaseClient } from "../../lib/supabase/browser";
 import { color, radius, shadow, typography } from "./designTokens";
 
-const signedUrlCache = new Map<string, string>();
+const signedUrlCache = new Map<string, { expiresAt: number; url: string }>();
 const signedUrlPromiseCache = new Map<string, Promise<string | null>>();
+const SIGNED_URL_CACHE_SAFETY_MS = 5 * 60 * 1000;
 
 const fallbackFrameStyle: CSSProperties = {
   display: "grid",
@@ -137,7 +139,7 @@ export function StoredPhotoImage({
       return;
     }
 
-    const cachedUrl = signedUrlCache.get(storagePath);
+    const cachedUrl = readCachedSignedUrl(storagePath);
     if (cachedUrl) {
       setDisplaySrc(cachedUrl);
       return;
@@ -150,7 +152,7 @@ export function StoredPhotoImage({
 
     void signedUrlPromise.then((signedUrl) => {
       if (signedUrl) {
-        signedUrlCache.set(storagePath, signedUrl);
+        writeCachedSignedUrl(storagePath, signedUrl);
       } else {
         signedUrlPromiseCache.delete(storagePath);
       }
@@ -378,7 +380,31 @@ function getInitialDisplaySrc(src: string) {
     return src;
   }
 
-  return signedUrlCache.get(storagePath) ?? "";
+  return readCachedSignedUrl(storagePath) ?? "";
+}
+
+function readCachedSignedUrl(storagePath: string) {
+  const cached = signedUrlCache.get(storagePath);
+
+  if (!cached) {
+    return null;
+  }
+
+  if (cached.expiresAt <= Date.now()) {
+    signedUrlCache.delete(storagePath);
+    return null;
+  }
+
+  return cached.url;
+}
+
+function writeCachedSignedUrl(storagePath: string, url: string) {
+  signedUrlCache.set(storagePath, {
+    expiresAt:
+      Date.now() +
+      Math.max(0, DISPLAY_SIGNED_URL_SECONDS * 1000 - SIGNED_URL_CACHE_SAFETY_MS),
+    url,
+  });
 }
 
 async function resolveStoragePhotoForDisplay(src: string, storagePath: string) {

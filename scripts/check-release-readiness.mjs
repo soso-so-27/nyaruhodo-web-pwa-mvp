@@ -162,7 +162,7 @@ if (bucketResponse.status === 200) {
 console.log("Release readiness checks passed.");
 
 function readEnv(name) {
-  return (env[name] ?? "").trim();
+  return normalizeEnvValue(env[name]);
 }
 
 function requireEnv(name) {
@@ -202,11 +202,24 @@ function readEnvFile(path) {
         .split(/\r?\n/)
         .map((line) => line.match(/^\s*([^#=]+)=(.*)$/))
         .filter(Boolean)
-        .map((match) => [match[1].trim(), match[2].trim()]),
+        .map((match) => [match[1].trim(), normalizeEnvValue(match[2])]),
     );
   } catch {
     return {};
   }
+}
+
+function normalizeEnvValue(value) {
+  const trimmed = (value ?? "").trim();
+
+  if (
+    (trimmed.startsWith('"') && trimmed.endsWith('"')) ||
+    (trimmed.startsWith("'") && trimmed.endsWith("'"))
+  ) {
+    return trimmed.slice(1, -1).trim();
+  }
+
+  return trimmed;
 }
 
 function warn(message) {

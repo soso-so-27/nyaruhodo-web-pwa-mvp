@@ -8,3 +8,5 @@ playwright-report/
 test-results/
 scripts/fonts/src/
 scripts/fonts/.build/
+.vercel
+.env*.local

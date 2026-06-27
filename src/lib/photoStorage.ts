@@ -3,7 +3,7 @@ import { createBrowserSupabaseClient } from "./supabase/browser";
 export const CAT_PHOTOS_BUCKET = "cat-photos";
 const STORAGE_PHOTO_PREFIX = "storage:";
 const LEGACY_STORAGE_PHOTO_PREFIX = "storage://";
-const DISPLAY_SIGNED_URL_SECONDS = 60 * 60 * 24;
+export const DISPLAY_SIGNED_URL_SECONDS = 60 * 60;
 
 type BrowserSupabaseClient = NonNullable<
   ReturnType<typeof createBrowserSupabaseClient>

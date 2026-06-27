@@ -8,10 +8,18 @@
 - [ ] `git branch --show-current` が `codex/hitotoki-exchange`
 - [ ] `npm run typecheck` が通る
 - [ ] `npm run build` が通る
+- [ ] `npm audit --omit=dev` が High 0 である
 - [ ] `npm run check:release` が通る
 - [ ] `supabase migration list` で Local / Remote が一致している
 - [ ] Vercel の本番デプロイが成功している
 - [ ] 本番URLで `/home` `/collection` `/cats` `/settings` が開ける
+
+### ベータ公開前のセキュリティ/PWAメモ
+
+- `npm audit --omit=dev` の Moderate 2 は `postcss` 経由。`npm audit fix` が Next 9 系への破壊的downgradeを提案するため、ベータでは未対応として記録する。
+- client-visible signed URL は短命化する。`exchange` 経路は10分、`photo-storage/signed-url` 経路は1時間を上限にする。
+- Service Worker は `/api/*`、Supabase signed URL、`token` 付きURL、authorization付きrequestをキャッシュしない。ユーザー写真/API JSON/認証済みレスポンスをCache Storageへ保存しない。
+- `sleeping-delivery-pool-guards.spec.ts` の配信日検証は Supabase public env が必要。env未設定時はrelease gateでは明示skip、env設定済み環境では通す。
 
 ## 2. iPhone PWAの起動
 

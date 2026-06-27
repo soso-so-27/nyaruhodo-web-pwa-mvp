@@ -3,6 +3,7 @@ import { NextResponse } from "next/server";
 
 import {
   CAT_PHOTOS_BUCKET,
+  DISPLAY_SIGNED_URL_SECONDS,
   createSignedStorageUrl,
   getStoragePhotoPath,
 } from "../../../../lib/photoStorage";
@@ -105,5 +106,9 @@ async function createStorageSignedUrlResponse(
     return NextResponse.json({ signedUrl: null, error: "photo_unavailable" }, { status: 404 });
   }
 
-  return NextResponse.json({ bucket: CAT_PHOTOS_BUCKET, signedUrl });
+  return NextResponse.json({
+    bucket: CAT_PHOTOS_BUCKET,
+    expiresIn: DISPLAY_SIGNED_URL_SECONDS,
+    signedUrl,
+  });
 }

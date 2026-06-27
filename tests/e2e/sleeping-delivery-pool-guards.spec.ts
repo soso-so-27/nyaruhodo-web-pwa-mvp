@@ -9,6 +9,7 @@ import {
   isStorageDeliveryPhotoUrl,
 } from "../../src/lib/home/deliveryPoolGuards";
 import {
+  DISPLAY_SIGNED_URL_SECONDS,
   normalizePersistentPhotoSrc,
   toStoragePhotoUrl,
 } from "../../src/lib/photoStorage";
@@ -62,6 +63,11 @@ test.describe("sleeping delivery pool guards", () => {
     expect(normalizePersistentPhotoSrc("https://example.com/photo.jpg")).toBe(
       "https://example.com/photo.jpg",
     );
+  });
+
+  test("keeps display signed urls within the beta release lifetime budget", () => {
+    expect(DISPLAY_SIGNED_URL_SECONDS).toBeGreaterThan(0);
+    expect(DISPLAY_SIGNED_URL_SECONDS).toBeLessThanOrEqual(60 * 60);
   });
 
   test("blocks known red-blue test photo ids and matching data urls only", () => {
@@ -259,6 +265,11 @@ test.describe("sleeping delivery pool guards", () => {
   test("rejects normal exchange before the server delivery date", async ({
     request,
   }) => {
+    test.skip(
+      !hasSupabasePublicConfigFromEnv(),
+      "NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY are required for server delivery date validation.",
+    );
+
     const response = await request.post("/api/sleeping-delivery/exchange", {
       data: {
         ...buildExchangeRequest(normalCatLikePhotoUrl, `future-${Date.now()}`),
@@ -489,6 +500,166 @@ test.describe("sleeping delivery pool guards", () => {
     }
   });
 
+  test("accepts only delivered photo reports and counts distinct reporters", async ({
+    request,
+  }) => {
+    const adminSupabase = createAdminSupabaseClientFromEnv();
+
+    test.skip(
+      !adminSupabase,
+      "SUPABASE_SERVICE_ROLE_KEY is required for the report abuse guard test.",
+    );
+
+    if (!adminSupabase) {
+      return;
+    }
+
+    const createdAt = Date.now();
+    const sourcePhotoId = `report-source-${createdAt}`;
+    const firstAnonymousId = `report-anon-a-${createdAt}`;
+    const secondAnonymousId = `report-anon-b-${createdAt}`;
+    const firstDeliveryId = `report-delivery-a-${createdAt}`;
+    const secondDeliveryId = `report-delivery-b-${createdAt}`;
+    let sourceMomentUuid: string | null = null;
+
+    try {
+      const { data: sourceMoment, error: sourceError } = await adminSupabase
+        .from("cat_moments")
+        .insert({
+          anonymous_id: `report-source-owner-${createdAt}`,
+          local_moment_id: sourcePhotoId,
+          local_cat_id: `report-source-cat-${createdAt}`,
+          owner_cat_id: `report-source-owner-cat-${createdAt}`,
+          photo_url: normalCatLikePhotoUrl,
+          state: "sleeping",
+          visibility: "shared",
+          delivery_status: "available",
+          moderation_status: "approved",
+          source_moment_id: null,
+          metadata: { source: "report-test" },
+          captured_at: new Date(createdAt).toISOString(),
+          created_at: new Date(createdAt).toISOString(),
+        })
+        .select("id")
+        .single();
+
+      expect(sourceError).toBeFalsy();
+      sourceMomentUuid = sourceMoment?.id ?? null;
+      expect(sourceMomentUuid).toBeTruthy();
+
+      const { error: deliveryError } = await adminSupabase
+        .from("cat_moment_deliveries")
+        .insert([
+          {
+            anonymous_id: firstAnonymousId,
+            local_delivery_id: firstDeliveryId,
+            source_moment_id: sourceMomentUuid,
+            source_photo_id: sourcePhotoId,
+            recipient_local_cat_id: `report-cat-a-${createdAt}`,
+            photo_url: normalCatLikePhotoUrl,
+            status: "delivered",
+            metadata: { source: "report-test" },
+            delivered_at: new Date(createdAt + 1).toISOString(),
+          },
+          {
+            anonymous_id: secondAnonymousId,
+            local_delivery_id: secondDeliveryId,
+            source_moment_id: sourceMomentUuid,
+            source_photo_id: sourcePhotoId,
+            recipient_local_cat_id: `report-cat-b-${createdAt}`,
+            photo_url: normalCatLikePhotoUrl,
+            status: "delivered",
+            metadata: { source: "report-test" },
+            delivered_at: new Date(createdAt + 2).toISOString(),
+          },
+        ]);
+
+      expect(deliveryError).toBeFalsy();
+
+      const rejectedResponse = await request.post("/api/reports", {
+        data: {
+          photoId: `missing-delivery-${createdAt}`,
+          sourcePhotoId,
+          anonymousId: `not-delivered-${createdAt}`,
+          reason: "not_cat",
+        },
+      });
+
+      expect(rejectedResponse.status()).toBe(403);
+
+      const firstReportResponse = await request.post("/api/reports", {
+        data: {
+          photoId: firstDeliveryId,
+          sourcePhotoId,
+          anonymousId: firstAnonymousId,
+          reason: "not_cat",
+        },
+      });
+
+      expect(firstReportResponse.status()).toBe(200);
+      expect(await firstReportResponse.json()).toMatchObject({ ok: true });
+
+      const duplicateReportResponse = await request.post("/api/reports", {
+        data: {
+          photoId: firstDeliveryId,
+          sourcePhotoId,
+          anonymousId: firstAnonymousId,
+          reason: "uncomfortable",
+        },
+      });
+
+      expect(duplicateReportResponse.status()).toBe(200);
+      expect(await duplicateReportResponse.json()).toMatchObject({
+        ok: true,
+        duplicate: true,
+      });
+
+      const { count: duplicateCount, error: duplicateCountError } =
+        await adminSupabase
+          .from("photo_reports")
+          .select("id", { count: "exact", head: true })
+          .eq("source_photo_id", sourcePhotoId)
+          .eq("reporter_anonymous_id", firstAnonymousId);
+
+      expect(duplicateCountError).toBeFalsy();
+      expect(duplicateCount).toBe(1);
+
+      const secondReportResponse = await request.post("/api/reports", {
+        data: {
+          photoId: secondDeliveryId,
+          sourcePhotoId,
+          anonymousId: secondAnonymousId,
+          reason: "other",
+        },
+      });
+
+      expect(secondReportResponse.status()).toBe(200);
+
+      const { data: reportedMoment, error: reportedMomentError } =
+        await adminSupabase
+          .from("cat_moments")
+          .select("delivery_status")
+          .eq("local_moment_id", sourcePhotoId)
+          .single();
+
+      expect(reportedMomentError).toBeFalsy();
+      expect(reportedMoment?.delivery_status).toBe("reported");
+    } finally {
+      await adminSupabase
+        .from("photo_reports")
+        .delete()
+        .eq("source_photo_id", sourcePhotoId);
+      await adminSupabase
+        .from("cat_moment_deliveries")
+        .delete()
+        .in("anonymous_id", [firstAnonymousId, secondAnonymousId]);
+      await adminSupabase
+        .from("cat_moments")
+        .delete()
+        .eq("local_moment_id", sourcePhotoId);
+    }
+  });
+
   test("rejects oversized exchange payload fields", async ({ request }) => {
     const oversizedDataUrl = `data:image/png;base64,${"A".repeat(2 * 1024 * 1024)}`;
     const oversizedPhotoResponse = await request.post(
@@ -658,6 +829,15 @@ function createAdminSupabaseClientFromEnv() {
       persistSession: false,
     },
   });
+}
+
+function hasSupabasePublicConfigFromEnv() {
+  const env = readLocalEnv();
+  return Boolean(
+    (process.env.NEXT_PUBLIC_SUPABASE_URL ?? env.NEXT_PUBLIC_SUPABASE_URL) &&
+      (process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ??
+        env.NEXT_PUBLIC_SUPABASE_ANON_KEY),
+  );
 }
 
 function readLocalEnv(): LocalEnv {

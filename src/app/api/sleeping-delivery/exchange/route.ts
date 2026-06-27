@@ -1264,7 +1264,7 @@ async function resolvePhotoUrl(photoUrl: string, supabase: SupabaseClient) {
   if (storagePath) {
     const { data, error } = await supabase.storage
       .from(CAT_PHOTOS_BUCKET)
-      .createSignedUrl(storagePath, 60 * 60 * 24 * 365);
+      .createSignedUrl(storagePath, TRANSIENT_DELIVERY_SIGNED_URL_SECONDS);
 
     if (error || !data?.signedUrl) {
       return null;

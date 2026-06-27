@@ -97,4 +97,31 @@ test.describe("beta release smoke", () => {
       expect(iconResponse.headers()["content-type"]).toContain("image/png");
     }
   });
+
+  test("PWA service worker and offline fallback are reachable", async ({
+    request,
+  }) => {
+    const serviceWorkerResponse = await request.get("/sw.js");
+    expect(serviceWorkerResponse.ok()).toBe(true);
+    expect(serviceWorkerResponse.headers()["content-type"]).toContain(
+      "javascript",
+    );
+
+    const offlineResponse = await request.get("/offline");
+    expect(offlineResponse.ok()).toBe(true);
+    expect(await offlineResponse.text()).toContain("いまは通信できません");
+  });
+
+  test("baseline security headers are present", async ({ request }) => {
+    const response = await request.get("/home");
+    const headers = response.headers();
+
+    expect(headers["x-content-type-options"]).toBe("nosniff");
+    expect(headers["referrer-policy"]).toBe("strict-origin-when-cross-origin");
+    expect(headers["x-frame-options"]).toBe("DENY");
+    expect(headers["permissions-policy"]).toContain("camera=(self)");
+    expect(headers["content-security-policy-report-only"]).toContain(
+      "default-src 'self'",
+    );
+  });
 });
