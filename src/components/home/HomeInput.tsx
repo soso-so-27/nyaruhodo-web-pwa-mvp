@@ -2173,7 +2173,6 @@ export function HomeInput({ recentEvents: _recentEvents }: HomeInputProps) {
           }}
         >
           <div
-            className="app-startup-splash-backdrop"
             style={styles.initialLoadingBackdrop}
             aria-hidden="true"
           />
@@ -5409,9 +5408,10 @@ const styles = {
   initialLoadingBackdrop: {
     position: "absolute",
     inset: 0,
-    backgroundSize: "cover",
-    backgroundPosition: "center",
-    backgroundRepeat: "no-repeat",
+    background: "var(--app-paper-background)",
+    backgroundSize: "var(--app-paper-background-size)",
+    backgroundPosition: "var(--app-paper-background-position)",
+    backgroundRepeat: "var(--app-paper-background-repeat)",
   },
   initialLoadingSoftLight: {
     position: "absolute",

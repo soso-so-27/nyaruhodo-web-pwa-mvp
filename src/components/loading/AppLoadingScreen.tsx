@@ -64,16 +64,10 @@ export function AppLoadingScreen({ variant }: AppLoadingScreenProps) {
           50% { box-shadow: 0 13px 26px -16px rgba(194, 116, 90, .28); }
         }
 
-        @keyframes loadingSplashBreath {
-          0%, 100% { opacity: .98; transform: scale(1); }
-          50% { opacity: 1; transform: scale(1.006); }
-        }
-
         @media (prefers-reduced-motion: reduce) {
           .loading-sheen::after,
           .loading-paper-breath,
-          .loading-envelope-pulse,
-          .loading-splash-breath {
+          .loading-envelope-pulse {
             animation: none !important;
           }
         }
@@ -87,11 +81,10 @@ export function AppLoadingScreen({ variant }: AppLoadingScreenProps) {
 function StartupLoading() {
   return (
     <section
-      className="app-startup-splash-backdrop"
       style={styles.startupStage}
       aria-label="ねてるねこを起動中"
     >
-      <div style={styles.splashEnvelope} aria-hidden="true" />
+      <div style={styles.startupPaperGlow} aria-hidden="true" />
     </section>
   );
 }
@@ -246,15 +239,16 @@ const styles = {
     margin: "0 calc(50% - 50vw)",
     width: "100vw",
     overflow: "hidden",
-    backgroundSize: "cover",
-    backgroundPosition: "center",
-    backgroundRepeat: "no-repeat",
+    background: "var(--app-paper-background)",
+    backgroundSize: "var(--app-paper-background-size)",
+    backgroundPosition: "var(--app-paper-background-position)",
+    backgroundRepeat: "var(--app-paper-background-repeat)",
   },
-  splashEnvelope: {
+  startupPaperGlow: {
     position: "absolute",
     inset: 0,
     background:
-      "radial-gradient(56% 36% at 50% 44%, rgba(255,255,255,.08), transparent 68%)",
+      "radial-gradient(54% 34% at 50% 44%, rgba(255,255,255,.16), transparent 68%)",
     mixBlendMode: "soft-light",
   },
   homeStage: {
