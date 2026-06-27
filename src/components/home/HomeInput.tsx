@@ -2176,7 +2176,6 @@ export function HomeInput({ recentEvents: _recentEvents }: HomeInputProps) {
             style={styles.initialLoadingBackdrop}
             aria-hidden="true"
           />
-          <div style={styles.initialLoadingSoftLight} aria-hidden="true" />
         </div>
       ) : null}
 
@@ -5418,13 +5417,6 @@ const styles = {
     backgroundSize: "var(--app-paper-background-size)",
     backgroundPosition: "var(--app-paper-background-position)",
     backgroundRepeat: "var(--app-paper-background-repeat)",
-  },
-  initialLoadingSoftLight: {
-    position: "absolute",
-    inset: 0,
-    background:
-      "radial-gradient(56% 36% at 50% 44%, rgba(255,255,255,.08), transparent 68%)",
-    mixBlendMode: "soft-light",
   },
   paperBackground: {
     position: "fixed",
