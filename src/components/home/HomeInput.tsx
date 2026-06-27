@@ -251,17 +251,6 @@ const HOME_INSTALL_HINT_DISMISSED_STORAGE_KEY =
   "neteruneko_home_install_hint_dismissed";
 const HOME_TODAY_CAT_SELECTION_STORAGE_KEY =
   "neteruneko_home_today_cat_selection";
-const HOME_INITIAL_READY_MIN_MS = 780;
-const HOME_INITIAL_READY_TIMEOUT_MS = 2600;
-const HOME_VISUAL_ASSET_URLS = [
-  "/illustrations/sleeping-cat-empty.png",
-  "/illustrations/home-envelope-flap-lines.png",
-  "/images/home-backgrounds/generated-dawn-paper.png",
-  "/images/home-backgrounds/generated-morning-paper.png",
-  "/images/home-backgrounds/generated-noon-paper.png",
-  "/images/home-backgrounds/generated-evening-paper.png",
-  "/images/home-backgrounds/generated-night-paper-v2.png",
-] as const;
 
 type BeforeInstallPromptEvent = Event & {
   prompt: () => Promise<void>;
@@ -269,79 +258,6 @@ type BeforeInstallPromptEvent = Event & {
 };
 
 type HomeInstallPlatform = "ios" | "android";
-
-function wait(ms: number) {
-  return new Promise<void>((resolve) => {
-    window.setTimeout(resolve, Math.max(0, ms));
-  });
-}
-
-function waitForAnimationFrames(count: number) {
-  return new Promise<void>((resolve) => {
-    let remaining = count;
-    const tickFrame = () => {
-      remaining -= 1;
-      if (remaining <= 0) {
-        resolve();
-        return;
-      }
-      window.requestAnimationFrame(tickFrame);
-    };
-
-    window.requestAnimationFrame(tickFrame);
-  });
-}
-
-function preloadHomeVisualAssets() {
-  return Promise.all(
-    HOME_VISUAL_ASSET_URLS.map(
-      (src) =>
-        new Promise<void>((resolve) => {
-          const image = new Image();
-          image.onload = () => resolve();
-          image.onerror = () => resolve();
-          image.src = src;
-        }),
-    ),
-  ).then(() => undefined);
-}
-
-async function waitForFontsReady() {
-  try {
-    await document.fonts?.ready;
-  } catch {
-    // Font readiness should not block the home screen forever.
-  }
-}
-
-function waitForHomeMountedImages() {
-  const desk = document.querySelector<HTMLElement>("[data-testid='home-desk-model']");
-  if (!desk) {
-    return Promise.resolve();
-  }
-
-  const images = Array.from(desk.querySelectorAll("img"));
-  if (images.length === 0) {
-    return Promise.resolve();
-  }
-
-  return Promise.all(
-    images.map(async (image) => {
-      if (!image.complete) {
-        await new Promise<void>((resolve) => {
-          image.addEventListener("load", () => resolve(), { once: true });
-          image.addEventListener("error", () => resolve(), { once: true });
-        });
-      }
-
-      try {
-        await image.decode?.();
-      } catch {
-        // Some decoded/cached images can reject; the element is still usable.
-      }
-    }),
-  ).then(() => undefined);
-}
 
 export function HomeInput({ recentEvents: _recentEvents }: HomeInputProps) {
   const [catProfiles, setCatProfiles] = useState<CatProfile[]>([]);
@@ -409,16 +325,9 @@ export function HomeInput({ recentEvents: _recentEvents }: HomeInputProps) {
   const [discoveryDismissedToday, setDiscoveryDismissedToday] = useState(false);
   const hasTrackedHomeView = useRef(false);
   const hasTrackedGoogleAuthSuccess = useRef(false);
-  const hasCompletedInitialHomeVisualReady = useRef(false);
   const toastTimerRef = useRef<number | null>(null);
   const completedBoardTimerRef = useRef<number | null>(null);
   const boardSheetReturnTimerRef = useRef<number | null>(null);
-  const [isInitialHomeVisualReady, setIsInitialHomeVisualReady] =
-    useState(false);
-  const [
-    isInitialHomeVisualOverlayMounted,
-    setIsInitialHomeVisualOverlayMounted,
-  ] = useState(true);
 
   useEffect(() => {
     const profiles = readCatProfiles();
@@ -455,67 +364,6 @@ export function HomeInput({ recentEvents: _recentEvents }: HomeInputProps) {
       document.removeEventListener("visibilitychange", handleVisibilityChange);
     };
   }, []);
-
-  useEffect(() => {
-    if (
-      hasCompletedInitialHomeVisualReady.current ||
-      !isHomeClockReady ||
-      !activeCatId ||
-      !activeCat
-    ) {
-      return;
-    }
-
-    let cancelled = false;
-    const startedAt = window.performance.now();
-    const timeoutId = window.setTimeout(() => {
-      if (cancelled || hasCompletedInitialHomeVisualReady.current) {
-        return;
-      }
-      hasCompletedInitialHomeVisualReady.current = true;
-      setIsInitialHomeVisualReady(true);
-    }, HOME_INITIAL_READY_TIMEOUT_MS);
-
-    async function settleHomeVisuals() {
-      await preloadHomeVisualAssets();
-      await waitForFontsReady();
-      await waitForAnimationFrames(3);
-      await waitForHomeMountedImages();
-      await waitForAnimationFrames(2);
-
-      const elapsed = window.performance.now() - startedAt;
-      if (elapsed < HOME_INITIAL_READY_MIN_MS) {
-        await wait(HOME_INITIAL_READY_MIN_MS - elapsed);
-      }
-
-      if (cancelled || hasCompletedInitialHomeVisualReady.current) {
-        return;
-      }
-
-      window.clearTimeout(timeoutId);
-      hasCompletedInitialHomeVisualReady.current = true;
-      setIsInitialHomeVisualReady(true);
-    }
-
-    void settleHomeVisuals();
-
-    return () => {
-      cancelled = true;
-      window.clearTimeout(timeoutId);
-    };
-  }, [activeCat, activeCatId, isHomeClockReady]);
-
-  useEffect(() => {
-    if (!isInitialHomeVisualReady) {
-      return;
-    }
-
-    const timeoutId = window.setTimeout(() => {
-      setIsInitialHomeVisualOverlayMounted(false);
-    }, 260);
-
-    return () => window.clearTimeout(timeoutId);
-  }, [isInitialHomeVisualReady]);
 
   useEffect(() => {
     function refreshEveningDeliveryState() {
@@ -2162,22 +2010,6 @@ export function HomeInput({ recentEvents: _recentEvents }: HomeInputProps) {
           />
         ) : null}
       </div>
-
-      {isInitialHomeVisualOverlayMounted ? (
-        <div
-          data-startup-overlay="home-visual-ready"
-          style={{
-            ...styles.initialLoadingOverlay,
-            opacity: isInitialHomeVisualReady ? 0 : 1,
-            pointerEvents: isInitialHomeVisualReady ? "none" : "auto",
-          }}
-        >
-          <div
-            style={styles.initialLoadingBackdrop}
-            aria-hidden="true"
-          />
-        </div>
-      ) : null}
 
       {openingEveningDelivery ? (
         <EveningDeliveryOpening
@@ -5398,25 +5230,6 @@ const styles = {
   },
   homeContentLayer: {
     display: "contents",
-  },
-  initialLoadingOverlay: {
-    position: "fixed",
-    inset: 0,
-    zIndex: 1000,
-    overflow: "hidden",
-    background: startupBridgeBackground,
-    backgroundColor: "#eadfce",
-    transition: "opacity 240ms ease",
-    willChange: "opacity",
-  },
-  initialLoadingBackdrop: {
-    position: "absolute",
-    inset: 0,
-    background: startupBridgeBackground,
-    backgroundColor: "#eadfce",
-    backgroundSize: "var(--app-paper-background-size)",
-    backgroundPosition: "var(--app-paper-background-position)",
-    backgroundRepeat: "var(--app-paper-background-repeat)",
   },
   paperBackground: {
     position: "fixed",
