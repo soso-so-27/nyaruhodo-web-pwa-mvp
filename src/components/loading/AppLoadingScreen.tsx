@@ -16,10 +16,6 @@ export function AppLoadingScreen({ variant }: AppLoadingScreenProps) {
   return (
     <main style={styles.page} aria-busy="true">
       <div style={styles.paperBackground} aria-hidden="true" />
-      {isStartup ? null : (
-        <div style={styles.paperBreath} className="loading-paper-breath" aria-hidden="true" />
-      )}
-
       <div style={styles.container}>
         {isStartup ? <StartupLoading /> : null}
         {isHome ? <HomeLoading /> : null}
@@ -56,11 +52,6 @@ export function AppLoadingScreen({ variant }: AppLoadingScreenProps) {
           100% { transform: translateX(140%); opacity: 0; }
         }
 
-        @keyframes loadingBreath {
-          0%, 100% { opacity: .5; transform: translate3d(-1.2%, -.7%, 0) scale(1); }
-          50% { opacity: .82; transform: translate3d(1.4%, .9%, 0) scale(1.03); }
-        }
-
         @keyframes loadingEnvelopePulse {
           0%, 100% { box-shadow: 0 10px 22px -18px rgba(120, 70, 52, .2); }
           50% { box-shadow: 0 13px 26px -16px rgba(194, 116, 90, .28); }
@@ -68,7 +59,6 @@ export function AppLoadingScreen({ variant }: AppLoadingScreenProps) {
 
         @media (prefers-reduced-motion: reduce) {
           .loading-sheen::after,
-          .loading-paper-breath,
           .loading-envelope-pulse {
             animation: none !important;
           }
@@ -222,15 +212,6 @@ const styles = {
     backgroundSize: "var(--app-paper-background-size)",
     backgroundPosition: "var(--app-paper-background-position)",
     backgroundRepeat: "var(--app-paper-background-repeat)",
-  },
-  paperBreath: {
-    position: "fixed",
-    inset: "-8%",
-    pointerEvents: "none",
-    background:
-      "radial-gradient(60% 48% at 58% 18%, rgba(255,255,255,.22), transparent 62%), radial-gradient(52% 42% at 18% 78%, color-mix(in srgb, var(--app-paper-wash-bottom) 18%, transparent), transparent 68%)",
-    mixBlendMode: "soft-light",
-    animation: "loadingBreath 18s ease-in-out infinite",
   },
   container: {
     position: "relative",
