@@ -91,7 +91,7 @@ function StartupLoading() {
       style={styles.startupStage}
       aria-label="ねてるねこを起動中"
     >
-      <div style={styles.splashEnvelope} className="loading-splash-breath" aria-hidden="true" />
+      <div style={styles.splashEnvelope} aria-hidden="true" />
     </section>
   );
 }
@@ -256,7 +256,6 @@ const styles = {
     background:
       "radial-gradient(56% 36% at 50% 44%, rgba(255,255,255,.08), transparent 68%)",
     mixBlendMode: "soft-light",
-    animation: "loadingSplashBreath 4.8s ease-in-out infinite",
   },
   homeStage: {
     minHeight: "100dvh",
