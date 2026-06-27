@@ -88,7 +88,6 @@ import {
 import type { RecentEvent } from "../../lib/supabase/queries";
 import { createBrowserSupabaseClient } from "../../lib/supabase/browser";
 import { BottomNavigation } from "../navigation/BottomNavigation";
-import { AppLoadingScreen } from "../loading/AppLoadingScreen";
 import { HomeDeskModel } from "./HomeDeskModel";
 import {
   getActiveCatProfile,
@@ -416,6 +415,10 @@ export function HomeInput({ recentEvents: _recentEvents }: HomeInputProps) {
   const boardSheetReturnTimerRef = useRef<number | null>(null);
   const [isInitialHomeVisualReady, setIsInitialHomeVisualReady] =
     useState(false);
+  const [
+    isInitialHomeVisualOverlayMounted,
+    setIsInitialHomeVisualOverlayMounted,
+  ] = useState(true);
 
   useEffect(() => {
     const profiles = readCatProfiles();
@@ -501,6 +504,18 @@ export function HomeInput({ recentEvents: _recentEvents }: HomeInputProps) {
       window.clearTimeout(timeoutId);
     };
   }, [activeCat, activeCatId, isHomeClockReady]);
+
+  useEffect(() => {
+    if (!isInitialHomeVisualReady) {
+      return;
+    }
+
+    const timeoutId = window.setTimeout(() => {
+      setIsInitialHomeVisualOverlayMounted(false);
+    }, 260);
+
+    return () => window.clearTimeout(timeoutId);
+  }, [isInitialHomeVisualReady]);
 
   useEffect(() => {
     function refreshEveningDeliveryState() {
@@ -2148,9 +2163,17 @@ export function HomeInput({ recentEvents: _recentEvents }: HomeInputProps) {
         ) : null}
       </div>
 
-      {!isInitialHomeVisualReady ? (
-        <div style={styles.initialLoadingOverlay}>
-          <AppLoadingScreen variant="startup" />
+      {isInitialHomeVisualOverlayMounted ? (
+        <div
+          data-startup-overlay="home-visual-ready"
+          style={{
+            ...styles.initialLoadingOverlay,
+            opacity: isInitialHomeVisualReady ? 0 : 1,
+            pointerEvents: isInitialHomeVisualReady ? "none" : "auto",
+          }}
+        >
+          <div style={styles.initialLoadingBackdrop} aria-hidden="true" />
+          <div style={styles.initialLoadingSoftLight} aria-hidden="true" />
         </div>
       ) : null}
 
@@ -5374,8 +5397,25 @@ const styles = {
     position: "fixed",
     inset: 0,
     zIndex: 1000,
-    background: "var(--app-paper-background)",
-    pointerEvents: "auto",
+    overflow: "hidden",
+    backgroundColor: "#f7f0e2",
+    transition: "opacity 240ms ease",
+    willChange: "opacity",
+  },
+  initialLoadingBackdrop: {
+    position: "absolute",
+    inset: 0,
+    backgroundImage: "url('/splash/v5/apple-splash-1170-2532.png')",
+    backgroundSize: "cover",
+    backgroundPosition: "center",
+    backgroundRepeat: "no-repeat",
+  },
+  initialLoadingSoftLight: {
+    position: "absolute",
+    inset: 0,
+    background:
+      "radial-gradient(56% 36% at 50% 44%, rgba(255,255,255,.08), transparent 68%)",
+    mixBlendMode: "soft-light",
   },
   paperBackground: {
     position: "fixed",

@@ -23,7 +23,10 @@ type PhotoTileProps = {
   interactive?: boolean;
   onClick?: () => void;
   fallbackLabel?: string;
+  loading?: "eager" | "lazy";
   onStorageDataUrl?: (dataUrl: string) => void;
+  onLoad?: () => void;
+  onError?: () => void;
   children?: ReactNode;
   style?: CSSProperties;
   imageStyle?: CSSProperties;
@@ -42,7 +45,10 @@ export function PhotoTile({
   interactive = false,
   onClick,
   fallbackLabel,
+  loading,
   onStorageDataUrl,
+  onLoad,
+  onError,
   children,
   style,
   imageStyle,
@@ -71,7 +77,10 @@ export function PhotoTile({
           src={src}
           alt={alt}
           style={{ ...frameStyle, objectFit: fit }}
+          loading={loading}
           onStorageDataUrl={onStorageDataUrl}
+          onLoad={onLoad}
+          onError={onError}
         />
       ) : (
         <span style={frameStyle}>{children ?? fallbackLabel}</span>
