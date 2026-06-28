@@ -310,11 +310,55 @@ test.describe("onboarding delivery flow", () => {
 
     await expectVisibleNonBlackImage(page.locator("main img").last());
     await expect.poll(() => readKeptExchangePhotoCount(page)).toBe(1);
+    const openedSnapshot = await readOnboardingDeliverySnapshot(page);
+
+    expect(openedSnapshot.ownPhoto?.id).toBeTruthy();
+    expect(openedSnapshot.deliveredPhoto?.id).toBeTruthy();
+    expect(openedSnapshot.deliveredPhoto?.sourcePhotoId).toBe("stock-storage-e2e-fake");
+    expect(openedSnapshot.keptPhoto?.sourcePhotoId).toBe("stock-storage-e2e-fake");
+    expect(openedSnapshot.openedAt).toBeTruthy();
+    expect(openedSnapshot.keptAt).toBeTruthy();
+    expect(openedSnapshot.deliveredPhoto?.id).not.toBe(openedSnapshot.ownPhoto?.id);
+    expect(openedSnapshot.keptPhoto?.id).toBe(openedSnapshot.deliveredPhoto?.id);
 
     await page.locator("main button").first().click();
     await expect(page).toHaveURL(/\/collection/);
+    await page.locator('[role="tab"]').nth(0).click();
+    const sentCard = page.getByTestId("mainichi-board-photo-sent").first();
+    await expect(sentCard).toBeVisible();
+    await expect(sentCard).not.toHaveAttribute(
+      "data-source-photo-id",
+      "stock-storage-e2e-fake",
+    );
+
     await page.locator('[role="tab"]').nth(1).click();
-    await expectVisibleNonBlackImage(page.locator("main img").first());
+    const deliveredCard = page.getByTestId("mainichi-board-photo-delivered").first();
+    await expect(deliveredCard).toBeVisible();
+    await expect(deliveredCard).toHaveAttribute(
+      "data-photo-id",
+      openedSnapshot.deliveredPhoto?.id ?? "",
+    );
+    await expect(deliveredCard).toHaveAttribute(
+      "data-source-photo-id",
+      "stock-storage-e2e-fake",
+    );
+    await expectVisibleNonBlackImage(deliveredCard.locator("img").first());
+
+    await markOnboardingAlbumCreatedInBrowser(page);
+    await page.goto("/collection");
+    await page.locator('[role="tab"]').nth(1).click();
+    const deliveredCardAfterAlbum = page
+      .getByTestId("mainichi-board-photo-delivered")
+      .first();
+    await expect(deliveredCardAfterAlbum).toBeVisible();
+    await expect(deliveredCardAfterAlbum).toHaveAttribute(
+      "data-photo-id",
+      openedSnapshot.deliveredPhoto?.id ?? "",
+    );
+    await expect(deliveredCardAfterAlbum).toHaveAttribute(
+      "data-source-photo-id",
+      "stock-storage-e2e-fake",
+    );
   });
 
   test("does not show the PWA home install guide inside Instagram browser", async ({
@@ -724,6 +768,76 @@ async function readKeptExchangePhotoCount(page: Page) {
     } catch {
       return 0;
     }
+  });
+}
+
+async function readOnboardingDeliverySnapshot(page: Page) {
+  return page.evaluate(() => {
+    const readArray = (key: string) => {
+      try {
+        const parsed = JSON.parse(window.localStorage.getItem(key) ?? "[]");
+
+        return Array.isArray(parsed) ? parsed : [];
+      } catch {
+        return [];
+      }
+    };
+    const readObject = (key: string) => {
+      try {
+        const parsed = JSON.parse(window.localStorage.getItem(key) ?? "{}");
+
+        return parsed && typeof parsed === "object" ? parsed : {};
+      } catch {
+        return {};
+      }
+    };
+    const ownSleepingPhotos = readArray("nyaruhodo_exchange_own_sleeping_photos");
+    const keptExchangePhotos = readArray("nyaruhodo_exchange_kept_photos");
+    const eveningDeliveryDays = Object.values(
+      readObject("neteruneko_evening_delivery_days"),
+    ) as Array<{
+      deliveredPhoto?: {
+        id?: string;
+        sourcePhotoId?: string;
+        src?: string;
+      };
+      deliveredAt?: number;
+      openedAt?: string;
+      keptAt?: string;
+    }>;
+    const openedDays = eveningDeliveryDays
+      .filter((day) => Boolean(day.deliveredPhoto && day.openedAt))
+      .sort((a, b) => (b.deliveredAt ?? 0) - (a.deliveredAt ?? 0));
+    const openedDay = openedDays[0] ?? null;
+
+    return {
+      ownPhoto: ownSleepingPhotos[0] ?? null,
+      keptPhoto: keptExchangePhotos[0] ?? null,
+      deliveredPhoto: openedDay?.deliveredPhoto ?? null,
+      openedAt: openedDay?.openedAt ?? null,
+      keptAt: openedDay?.keptAt ?? null,
+    };
+  });
+}
+
+async function markOnboardingAlbumCreatedInBrowser(page: Page) {
+  await page.evaluate(() => {
+    const raw = window.localStorage.getItem("neteruneko_onboarding_progress");
+    const progress = raw ? JSON.parse(raw) : {};
+
+    window.localStorage.setItem(
+      "neteruneko_onboarding_progress",
+      JSON.stringify({
+        ...progress,
+        stage: "album_created",
+        albumCreatedAt: new Date().toISOString(),
+      }),
+    );
+    window.localStorage.setItem("onboarding_completed", "true");
+    window.sessionStorage.setItem(
+      "neteruneko_onboarding_album_completion_ready",
+      "true",
+    );
   });
 }
 

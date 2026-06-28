@@ -2125,6 +2125,8 @@ function MainichiBoardPhotoCard({
       type="button"
       data-testid={testId}
       data-mainichi-photo-card="true"
+      data-photo-id={photo.id}
+      data-source-photo-id={photo.sourcePhotoId ?? undefined}
       data-mainichi-paste={shouldPaste ? "true" : undefined}
       style={{
         ...styles.mainichiBoardPhotoButton,
@@ -3728,9 +3730,17 @@ function buildMainichiBoardMonths(
   );
   const photos = dayGroups.flatMap((group) => {
     const sectionKind: AlbumPhotoKind = side === "sent" ? "sleeping" : "other";
+    const sectionPhotos = group.sections
+      .filter((section) => section.kind === sectionKind)
+      .flatMap((section) =>
+        section.photos.map((photo) =>
+          createMainichiBoardPhoto(photo, group.key, side, catNameById),
+        ),
+      );
 
     if (
       side === "delivered" &&
+      sectionPhotos.length === 0 &&
       !shouldResolveOtherDeliverySlot(
         group.key,
         firstEveningDeliveryTargetDateKey,
@@ -3739,13 +3749,7 @@ function buildMainichiBoardMonths(
       return [];
     }
 
-    return group.sections
-      .filter((section) => section.kind === sectionKind)
-      .flatMap((section) =>
-        section.photos.map((photo) =>
-          createMainichiBoardPhoto(photo, group.key, side, catNameById),
-        ),
-      );
+    return sectionPhotos;
   });
   const monthMap = new Map<string, MainichiBoardPhoto[]>();
 
