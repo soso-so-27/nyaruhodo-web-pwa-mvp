@@ -156,7 +156,6 @@ test.describe("onboarding delivery flow", () => {
       mimeType: "image/png",
       buffer: testPng,
     });
-    await continuePastOptionalOnboardingNamePrompt(page);
 
     await expect.poll(() => exchangeCalls).toBe(1);
     const addCandidateButton = page.getByRole("button", {
@@ -218,7 +217,7 @@ test.describe("onboarding delivery flow", () => {
       page.getByText(/届いたねこだよりを[\s\S]*しまいました。[\s\S]*夜8時の便りになります。/),
     ).toBeVisible();
     await expect(
-      page.getByRole("button", { name: "ねこだよりを見る" }),
+      page.getByRole("button", { name: "つづける" }),
     ).toBeVisible();
     await expect.poll(() => readKeptExchangePhotoCount(page)).toBe(1);
     const eveningDeliveryDays = await page.evaluate(() => {
@@ -231,8 +230,9 @@ test.describe("onboarding delivery flow", () => {
       ).length;
     });
     expect(eveningDeliveryDays).toBeGreaterThan(0);
-    await page.getByRole("button", { name: "ねこだよりを見る" }).click();
-    await expect(page).toHaveURL(/\/collection/);
+    await page.getByRole("button", { name: "つづける" }).click();
+    await continuePastOptionalOnboardingNamePrompt(page);
+    await expect(page).toHaveURL(/\/account\/create\?from=onboarding/);
 
     const storage = await page.evaluate(() => {
       const readArray = (key: string) => {
@@ -255,8 +255,6 @@ test.describe("onboarding delivery flow", () => {
     expect(storage.keptExchangePhotos.length).toBeGreaterThan(0);
     expect(storage.ownSleepingPhotos[0]?.src).toMatch(/^data:image\//);
     expect(storage.keptExchangePhotos[0]?.src).toBeTruthy();
-
-    await expectVisibleNonBlackImage(page.locator("main img").first());
   });
 
   test("automatically keeps a delivered photo after opening it", async ({
@@ -273,14 +271,13 @@ test.describe("onboarding delivery flow", () => {
       mimeType: "image/png",
       buffer: testPng,
     });
-    await continuePastOptionalOnboardingNamePrompt(page);
 
     await expect(page.getByRole("button", { name: "ねこだよりを開く" })).toBeVisible();
     await expect.poll(() => readKeptExchangePhotoCount(page)).toBe(0);
     await page.getByRole("button", { name: "ねこだよりを開く" }).click();
     await page.waitForTimeout(1600);
     await expect(
-      page.getByRole("button", { name: "ねこだよりを見る" }),
+      page.getByRole("button", { name: "つづける" }),
     ).toBeVisible();
     await expect(
       page.getByText(/届いたねこだよりを[\s\S]*しまいました。[\s\S]*夜8時の便りになります。/),
@@ -305,7 +302,6 @@ test.describe("onboarding delivery flow", () => {
       mimeType: "image/png",
       buffer: testPng,
     });
-    await continuePastOptionalOnboardingNamePrompt(page);
 
     await expect(page.locator("main button").first()).toBeVisible();
     await page.locator("main button").first().click();
@@ -324,8 +320,7 @@ test.describe("onboarding delivery flow", () => {
     expect(openedSnapshot.deliveredPhoto?.id).not.toBe(openedSnapshot.ownPhoto?.id);
     expect(openedSnapshot.keptPhoto?.id).toBe(openedSnapshot.deliveredPhoto?.id);
 
-    await page.locator("main button").first().click();
-    await expect(page).toHaveURL(/\/collection/);
+    await page.goto("/collection");
     await page.locator('[role="tab"]').nth(0).click();
     const sentCard = page.getByTestId("mainichi-board-photo-sent").first();
     await expect(sentCard).toBeVisible();
@@ -424,7 +419,6 @@ test.describe("onboarding delivery flow", () => {
       mimeType: "image/png",
       buffer: testPng,
     });
-    await continuePastOptionalOnboardingNamePrompt(page);
 
     await expect(page.getByRole("button", { name: "ねこだよりを開く" })).toBeVisible();
     await expect.poll(() => exchangeCalls).toBe(1);
@@ -509,7 +503,6 @@ test.describe("onboarding delivery flow", () => {
       mimeType: "image/png",
       buffer: testPng,
     });
-    await continuePastOptionalOnboardingNamePrompt(page);
 
     await expect(page.getByRole("button", { name: "ねこだよりを開く" })).toBeVisible();
     const progress = await readOnboardingProgress(page);
@@ -546,7 +539,6 @@ test.describe("onboarding delivery flow", () => {
       mimeType: "image/png",
       buffer: testPng,
     });
-    await continuePastOptionalOnboardingNamePrompt(page);
 
     await expect(page.getByRole("button", { name: "ねこだよりを開く" })).toBeVisible();
     expect(await readOnboardingProgress(page)).toMatchObject({

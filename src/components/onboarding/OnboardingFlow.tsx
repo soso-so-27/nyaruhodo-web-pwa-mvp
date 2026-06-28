@@ -222,9 +222,20 @@ export function OnboardingFlow() {
       setSelectedPhotoSrc(progress.selectedPhotoSrc ?? "");
       setPendingOwnPhoto(progress.ownPhoto ?? null);
       setDeliveredPhoto(progress.deliveredPhoto);
-      setIsDeliveredPhotoKept(false);
+      setIsDeliveredPhotoKept(progress.isDeliveredPhotoKept ?? true);
       setCompletionCopy(progress.completionCopy ?? "");
       setState("envelope");
+      return true;
+    }
+
+    if (progress.stage === "name_pending" && progress.ownPhoto && progress.deliveredPhoto) {
+      setSelectedPhotoSrc(progress.selectedPhotoSrc ?? "");
+      setPendingOwnPhoto(progress.ownPhoto);
+      setDeliveredPhoto(progress.deliveredPhoto);
+      setIsDeliveredPhotoKept(false);
+      setCatNameDraft("");
+      setState("naming");
+      trackCatNamePromptView(progress.ownPhoto.id);
       return true;
     }
 
@@ -232,9 +243,8 @@ export function OnboardingFlow() {
       setSelectedPhotoSrc(progress.selectedPhotoSrc ?? "");
       setPendingOwnPhoto(progress.ownPhoto);
       setIsDeliveredPhotoKept(false);
-      setCatNameDraft("");
-      setState("naming");
-      trackCatNamePromptView(progress.ownPhoto.id);
+      setState("saving");
+      void resumeSubmittedProgress({ ...progress, stage: "submitted" });
       return true;
     }
 
@@ -367,12 +377,11 @@ export function OnboardingFlow() {
           anonymousId,
           onboardingDateKey,
         );
-        const shouldAskCatName = isCatProfileNameUnset(activeProfile);
         writeOnboardingProgress({
           version: 1,
           anonymousId,
           dateKey: onboardingDateKey,
-          stage: shouldAskCatName ? "name_pending" : "submitted",
+          stage: "submitted",
           source: entrySourceRef.current,
           submissionId,
           ownPhoto,
@@ -399,13 +408,6 @@ export function OnboardingFlow() {
           submission_id: submissionId,
           delivery_date_key: eveningTarget.dateKey,
         });
-
-        if (shouldAskCatName) {
-          setCatNameDraft("");
-          setState("naming");
-          trackCatNamePromptView(ownPhoto.id);
-          return;
-        }
 
         const delivered = await deliverOwnSleepingPhoto({
           ownPhoto,
@@ -489,6 +491,8 @@ export function OnboardingFlow() {
       selectedPhotoSrc || progress?.selectedPhotoSrc || ownPhoto.src;
     const nextName = skip ? "" : catNameDraft.trim();
 
+    isSubmittingRef.current = true;
+
     if (nextName) {
       updateCatProfileName(readCatProfiles(), ownPhoto.ownerCatId, nextName);
       trackProductEvent("cat_name_entered", {
@@ -502,39 +506,51 @@ export function OnboardingFlow() {
       });
     }
 
-    isSubmittingRef.current = true;
-    setMessage("");
-    setState("saving");
-    writeOnboardingProgress({
-      version: 1,
-      anonymousId,
-      dateKey: deliveryDateKey,
-      stage: "submitted",
+    patchOnboardingProgress({
+      stage: "opened",
       source: entrySourceRef.current,
-      submissionId,
       ownPhoto,
       selectedPhotoSrc: selectedPhotoSrcForProgress,
-      updatedAt: Date.now(),
+      deliveredPhoto: deliveredPhoto ?? progress?.deliveredPhoto,
+      isDeliveredPhotoKept: true,
     });
+    markOnboardingAlbumCompletionReady();
+    router.push(
+      `/account/create?from=onboarding&source=${encodeURIComponent(entrySourceRef.current)}`,
+    );
+  }
 
-    try {
-      const delivered = await deliverOwnSleepingPhoto({
-        ownPhoto,
-        recipientCatId: ownPhoto.ownerCatId,
-        deliveryDateKey,
-        submissionId,
-        selectedPhotoSrc: selectedPhotoSrcForProgress,
-        emptyMessage: canShowTestTools
-          ? "とどく候補がまだありません。テスト用に候補を追加できます。"
-          : "ねこだよりを準備しています。もう一度ひらいてみてください。",
-      });
-
-      if (!delivered) {
-        setState("empty");
-      }
-    } finally {
-      isSubmittingRef.current = false;
+  function handleContinueAfterDeliveredPhoto() {
+    if (!isDeliveredPhotoKept) {
+      return;
     }
+
+    const progress = readCurrentOnboardingProgress();
+    const ownPhoto = pendingOwnPhoto ?? progress?.ownPhoto ?? null;
+    const activeProfile = getActiveCatProfile(
+      readCatProfiles(),
+      ownPhoto?.ownerCatId ?? readActiveCatId(),
+    );
+
+    if (ownPhoto && isCatProfileNameUnset(activeProfile)) {
+      patchOnboardingProgress({
+        stage: "name_pending",
+        source: entrySourceRef.current,
+        ownPhoto,
+        selectedPhotoSrc: selectedPhotoSrc || progress?.selectedPhotoSrc,
+        deliveredPhoto: deliveredPhoto ?? progress?.deliveredPhoto,
+        isDeliveredPhotoKept: true,
+      });
+      setCatNameDraft("");
+      trackCatNamePromptView(ownPhoto.id);
+      setState("naming");
+      return;
+    }
+
+    markOnboardingAlbumCompletionReady();
+    router.push(
+      `/account/create?from=onboarding&source=${encodeURIComponent(entrySourceRef.current)}`,
+    );
   }
 
   async function keepDeliveredPhotoForOnboarding() {
@@ -1001,13 +1017,19 @@ export function OnboardingFlow() {
 
         {state === "naming" ? (
           <section style={styles.result} aria-label="この子の名前">
-            <p style={styles.kicker}>ねがおをおあずかりしました</p>
+            <p style={styles.kicker}>
+              {deliveredPhoto
+                ? "届いたねこだよりをしまいました"
+                : "ねがおをおあずかりしました"}
+            </p>
             {selectedPhotoSrc ? (
               <img src={selectedPhotoSrc} alt="" style={styles.namePreviewPhoto} />
             ) : null}
             <h2 style={styles.subTitle}>この子の名前は？</h2>
             <p style={styles.resultText}>
-              名前だけで大丈夫です。
+              名前を入れると、あとから見返しやすくなります。
+              <br />
+              外には出ません。
               <br />
               あとから変えられます。
             </p>
@@ -1034,7 +1056,7 @@ export function OnboardingFlow() {
                 style={styles.onboardingCta}
                 disabled={isSubmittingRef.current}
               >
-                つづける
+                名前を入れて進む
               </AppButton>
             </form>
             <AppButton
@@ -1150,14 +1172,14 @@ export function OnboardingFlow() {
               type="button"
               onClick={
                 isDeliveredPhotoKept
-                  ? () => router.push("/collection")
+                  ? handleContinueAfterDeliveredPhoto
                   : undefined
               }
               disabled={!isDeliveredPhotoKept}
               fullWidth
               style={styles.onboardingCta}
             >
-              {isDeliveredPhotoKept ? "ねこだよりを見る" : "ねこだよりに入れています..."}
+              {isDeliveredPhotoKept ? "つづける" : "ねこだよりに入れています..."}
             </AppButton>
             <AppButton type="button" variant="quiet" size="md" onClick={handleGoHome}>
               閉じる
