@@ -68,6 +68,16 @@ const fallbackHelpStyle: CSSProperties = {
   fontWeight: 500,
 };
 
+const quietFallbackMarkStyle: CSSProperties = {
+  width: "34%",
+  maxWidth: 34,
+  aspectRatio: "1 / 1",
+  borderRadius: "999px",
+  background:
+    "radial-gradient(circle at 35% 32%, rgba(255,255,255,0.66), transparent 34%), color-mix(in srgb, var(--paper-card, #fffaf2) 72%, rgba(190, 164, 134, 0.26))",
+  opacity: 0.58,
+};
+
 const imageSelectionLockStyle = {
   userSelect: "none",
   WebkitUserSelect: "none",
@@ -85,6 +95,7 @@ export function StoredPhotoImage({
   onLoad,
   onError,
   fallbackSrcs = EMPTY_FALLBACK_SRCS,
+  fallbackVariant = "message",
 }: {
   src: string;
   alt: string;
@@ -96,6 +107,7 @@ export function StoredPhotoImage({
   onLoad?: () => void;
   onError?: () => void;
   fallbackSrcs?: string[];
+  fallbackVariant?: "message" | "quiet";
 }) {
   const {
     objectFit,
@@ -116,10 +128,12 @@ export function StoredPhotoImage({
   const [storageDataUrl, setStorageDataUrl] = useState<string | null>(null);
   const [isLoaded, setIsLoaded] = useState(false);
   const [hasError, setHasError] = useState(false);
+  const [signedUrlRetryNonce, setSignedUrlRetryNonce] = useState(0);
   const imageRef = useRef<HTMLImageElement | null>(null);
   const loadStartedAtRef = useRef<number>(performance.now());
   const trackedDisplaySrcRef = useRef("");
   const persistedDataUrlRef = useRef("");
+  const signedUrlRetryCountsRef = useRef(new Map<string, number>());
   const isInlineImage = displaySrc.startsWith("data:image/");
   const hasNextSource = sourceIndex < sourceQueue.length - 1;
   const frameStyle = useMemo<CSSProperties>(
@@ -137,6 +151,7 @@ export function StoredPhotoImage({
 
   useEffect(() => {
     setSourceIndex(0);
+    signedUrlRetryCountsRef.current.clear();
   }, [fallbackSrcKey, src]);
 
   useEffect(() => {
@@ -187,7 +202,7 @@ export function StoredPhotoImage({
     return () => {
       isActive = false;
     };
-  }, [currentSource, hasNextSource, sourceQueue.length]);
+  }, [currentSource, hasNextSource, signedUrlRetryNonce, sourceQueue.length]);
 
   useEffect(() => {
     loadStartedAtRef.current = performance.now();
@@ -268,7 +283,7 @@ export function StoredPhotoImage({
 
   if (!displaySrc) {
     return hasError ? (
-      <PhotoFallback style={frameStyle} />
+      <PhotoFallback style={frameStyle} variant={fallbackVariant} />
     ) : (
       <span aria-hidden="true" style={frameStyle} />
     );
@@ -301,6 +316,17 @@ export function StoredPhotoImage({
         }}
         onError={() => {
           setIsLoaded(false);
+          const storagePath = getStoragePhotoPath(currentSource);
+
+          if (storagePath && shouldRetrySignedUrl(storagePath, signedUrlRetryCountsRef)) {
+            signedUrlCache.delete(storagePath);
+            signedUrlPromiseCache.delete(storagePath);
+            setHasError(false);
+            setDisplaySrc("");
+            setSignedUrlRetryNonce((value) => value + 1);
+            return;
+          }
+
           if (hasNextSource) {
             setHasError(false);
             setSourceIndex((index) => Math.min(index + 1, sourceQueue.length - 1));
@@ -334,7 +360,9 @@ export function StoredPhotoImage({
           }}
         />
       ) : null}
-      {hasError ? <PhotoFallback style={fallbackOverlayStyle} /> : null}
+      {hasError ? (
+        <PhotoFallback style={fallbackOverlayStyle} variant={fallbackVariant} />
+      ) : null}
     </span>
   );
 }
@@ -401,7 +429,35 @@ function getImageSourceKind(displaySrc: string) {
   return "other";
 }
 
-function PhotoFallback({ style }: { style: CSSProperties }) {
+function shouldRetrySignedUrl(
+  storagePath: string,
+  retryCountsRef: MutableRefObject<Map<string, number>>,
+) {
+  const currentCount = retryCountsRef.current.get(storagePath) ?? 0;
+
+  if (currentCount >= 2) {
+    return false;
+  }
+
+  retryCountsRef.current.set(storagePath, currentCount + 1);
+  return true;
+}
+
+function PhotoFallback({
+  style,
+  variant,
+}: {
+  style: CSSProperties;
+  variant: "message" | "quiet";
+}) {
+  if (variant === "quiet") {
+    return (
+      <span style={{ ...fallbackFrameStyle, ...style }} aria-hidden="true">
+        <span style={quietFallbackMarkStyle} />
+      </span>
+    );
+  }
+
   return (
     <span style={{ ...fallbackFrameStyle, ...style }}>
       <span style={fallbackTextStyle}>

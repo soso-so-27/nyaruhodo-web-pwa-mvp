@@ -81,6 +81,7 @@ export function PhotoTile({
           style={{ ...frameStyle, objectFit: fit }}
           loading={loading}
           fallbackSrcs={fallbackSrcs}
+          fallbackVariant="quiet"
           onStorageDataUrl={onStorageDataUrl}
           onLoad={onLoad}
           onError={onError}
