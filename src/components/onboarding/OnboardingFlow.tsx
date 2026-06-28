@@ -42,6 +42,9 @@ type OnboardingState =
 
 const ONBOARDING_ALBUM_COMPLETION_READY_KEY =
   "neteruneko_onboarding_album_completion_ready";
+const ONBOARDING_FALLBACK_DELIVERY_SRC =
+  "/illustrations/sleeping-cat-empty.png";
+const IS_PRODUCTION = process.env.NODE_ENV === "production";
 
 export function OnboardingFlow() {
   const router = useRouter();
@@ -54,7 +57,10 @@ export function OnboardingFlow() {
   const [isCandidateAdding, setIsCandidateAdding] = useState(false);
   const [isTestMode, setIsTestMode] = useState(false);
   const [completionCopy, setCompletionCopy] = useState("");
+  const [entrySource, setEntrySource] = useState("direct");
   const autoKeptDeliveredPhotoIdRef = useRef("");
+  const hasTrackedIntroViewRef = useRef(false);
+  const canShowTestTools = isTestMode && !IS_PRODUCTION;
 
   function markOnboardingAlbumCompletionReady() {
     window.sessionStorage.setItem(ONBOARDING_ALBUM_COMPLETION_READY_KEY, "true");
@@ -85,6 +91,19 @@ export function OnboardingFlow() {
   }, []);
 
   useEffect(() => {
+    if (hasTrackedIntroViewRef.current) {
+      return;
+    }
+
+    const source = readOnboardingSourceFromLocation();
+    setEntrySource(source);
+    hasTrackedIntroViewRef.current = true;
+    trackProductEvent("onboarding_intro_view", {
+      source,
+    });
+  }, []);
+
+  useEffect(() => {
     if (state !== "delivered" || !deliveredPhoto || isDeliveredPhotoKept) {
       return;
     }
@@ -101,6 +120,10 @@ export function OnboardingFlow() {
     if (state === "saving") {
       return;
     }
+
+    trackProductEvent("onboarding_submit_photo_click", {
+      source: entrySource,
+    });
 
     const input = document.createElement("input");
     input.type = "file";
@@ -159,18 +182,23 @@ export function OnboardingFlow() {
           source: "onboarding",
           delivery_date_key: eveningTarget.dateKey,
         });
+        trackProductEvent("onboarding_photo_submitted", {
+          catId,
+          source: entrySource,
+          delivery_date_key: eveningTarget.dateKey,
+        });
 
         const delivered = await deliverOwnSleepingPhoto({
           ownPhoto,
           recipientCatId: catId,
-          emptyMessage: isTestMode
+          emptyMessage: canShowTestTools
             ? "ねがおは入りました。とどく候補がまだありません。テスト用に候補を追加できます。"
             : "ねがおは入りました。今日はまだ、とどくねがおを準備中です。",
         });
 
         if (!delivered) {
           setMessage(
-            isTestMode
+            canShowTestTools
               ? "ねがおは入りました。とどく候補がまだありません。テスト用に候補を追加できます。"
               : "ねがおは入りました。今日はまだ、とどくねがおを準備中です。",
           );
@@ -202,9 +230,10 @@ export function OnboardingFlow() {
     const keepResult = await keepExchangePhotoForAlbum(deliveredPhoto);
     setDeliveredPhoto(keepResult.photo);
     trackProductEvent("onboarding_delivered_photo_confirmed", {
+      source: entrySource,
       source_photo_id: keepResult.photo.sourcePhotoId ?? null,
       saved_to_album: keepResult.saved,
-      test_mode: isTestMode,
+      test_mode: canShowTestTools,
     });
 
     if (!keepResult.saved) {
@@ -227,6 +256,10 @@ export function OnboardingFlow() {
 
     trackProductEvent("envelope_opened", {
       source: "onboarding",
+      photo_id: deliveredPhoto.id,
+    });
+    trackProductEvent("onboarding_delivery_opened", {
+      source: entrySource,
       photo_id: deliveredPhoto.id,
     });
     setState("revealing");
@@ -257,30 +290,57 @@ export function OnboardingFlow() {
       mode: "onboarding",
     });
 
+    let nextPhoto = exchangeResult?.photo ?? null;
+    let deliverySource = exchangeResult?.photo ? "exchange" : "illustration_fallback";
+
+    if (!nextPhoto && canShowTestTools) {
+      trackProductEvent("onboarding_sleeping_photo_delivered", {
+        source: entrySource,
+        has_delivered_photo: false,
+        candidate_count: exchangeResult?.diagnostics?.candidateCount ?? null,
+        available_count: exchangeResult?.diagnostics?.availableCount ?? null,
+        excluded_count: exchangeResult?.diagnostics?.excludedCount ?? null,
+      });
+      setMessage(emptyMessage);
+      return false;
+    }
+
+    if (!nextPhoto || !isUsablePhotoSrc(nextPhoto.src)) {
+      nextPhoto = await createOnboardingFallbackDeliveryPhoto(ownPhoto, nextPhoto);
+      deliverySource = "illustration_fallback";
+    }
+
     trackProductEvent("onboarding_sleeping_photo_delivered", {
-      has_delivered_photo: Boolean(exchangeResult?.photo),
+      source: entrySource,
+      has_delivered_photo: Boolean(nextPhoto),
+      delivery_source: deliverySource,
       candidate_count: exchangeResult?.diagnostics?.candidateCount ?? null,
       available_count: exchangeResult?.diagnostics?.availableCount ?? null,
       excluded_count: exchangeResult?.diagnostics?.excludedCount ?? null,
     });
 
-    if (!exchangeResult?.photo) {
+    if (!nextPhoto) {
       setMessage(emptyMessage);
       return false;
     }
 
-    setDeliveredPhoto(exchangeResult.photo);
+    setDeliveredPhoto(nextPhoto);
     setIsDeliveredPhotoKept(false);
+    trackProductEvent("onboarding_delivery_ready", {
+      source: entrySource,
+      delivery_source: deliverySource,
+      photo_id: nextPhoto.id,
+    });
     trackProductEvent("envelope_shown", {
       source: "onboarding",
-      photo_id: exchangeResult.photo.id,
+      photo_id: nextPhoto.id,
     });
     setState("envelope");
     return true;
   }
 
   async function handleAddCandidatePhoto() {
-    if (!isTestMode) {
+    if (!canShowTestTools) {
       return;
     }
 
@@ -365,7 +425,13 @@ export function OnboardingFlow() {
   }
 
   function handleGoHome() {
-    if (isTestMode) {
+    trackProductEvent("onboarding_skip", {
+      source: entrySource,
+      state,
+      test_mode: canShowTestTools,
+    });
+
+    if (canShowTestTools) {
       router.push("/settings");
       return;
     }
@@ -425,7 +491,14 @@ export function OnboardingFlow() {
               <br />
               どこかのねこの寝顔が1枚届きます。
               <br />
-              写真は公開されません。
+              <br />
+              入れた写真は、ねてるねこの中で
+              <br />
+              匿名のねこだよりになることがあります。
+              <br />
+              SNSなど外には公開されません。
+              <br />
+              名前や場所も出ません。
             </p>
             {state === "saving" ? (
               <DeliveryWaiting />
@@ -439,7 +512,7 @@ export function OnboardingFlow() {
               style={styles.onboardingCta}
               disabled={state === "saving"}
             >
-              {state === "saving" ? "ねこだよりを準備しています..." : "ねがおを入れて受け取る"}
+              {state === "saving" ? "ねこだよりを準備しています…" : "ねがおを1枚入れる"}
             </AppButton>
             <AppButton type="button" variant="quiet" size="md" onClick={handleGoHome}>
               あとで
@@ -503,7 +576,16 @@ export function OnboardingFlow() {
             )}
             <p style={styles.resultText}>
               {isDeliveredPhotoKept
-                ? "届いた写真は、ねこだよりに入りました。今日のねがおは、よる8時の便りになります。"
+                ? (
+                    <>
+                      ねこだよりをしまいました。
+                      <br />
+                      <br />
+                      あなたのねがおは、
+                      <br />
+                      夜8時の便りになります。
+                    </>
+                  )
                 : "届いた写真を、ねこだよりに入れています。"}
             </p>
             <AppButton
@@ -533,11 +615,11 @@ export function OnboardingFlow() {
               <img src={selectedPhotoSrc} alt="" style={styles.savedPhoto} />
             ) : null}
             <p style={styles.resultText}>
-              {isTestMode
+              {canShowTestTools
                 ? "とどく候補がまだありません。テスト用に、ここで候補を追加できます。"
                 : "今日はまだ、届くねこだよりを準備中です。"}
             </p>
-            {isTestMode ? (
+            {canShowTestTools ? (
               <AppButton
                 type="button"
                 onClick={() => {
@@ -577,7 +659,7 @@ export function OnboardingFlow() {
               ホームへ戻る
             </AppButton>
             <AppButton
-              href="/account/create?from=onboarding"
+              href={`/account/create?from=onboarding&source=${encodeURIComponent(entrySource)}`}
               variant="quiet"
               size="md"
               onClick={markOnboardingAlbumCompletionReady}
@@ -623,6 +705,72 @@ function DeliveryWaiting() {
       </span>
     </div>
   );
+}
+
+function readOnboardingSourceFromLocation() {
+  const source = new URLSearchParams(window.location.search).get("source");
+
+  if (!source) {
+    return "direct";
+  }
+
+  const normalized = source.trim().toLowerCase();
+
+  return /^[a-z0-9_-]{1,40}$/.test(normalized) ? normalized : "direct";
+}
+
+async function createOnboardingFallbackDeliveryPhoto(
+  ownPhoto: OwnSleepingPhoto,
+  basePhoto?: ExchangePhoto | null,
+): Promise<ExchangePhoto | null> {
+  const fallbackSrc = await loadImageAssetAsDataUrl(ONBOARDING_FALLBACK_DELIVERY_SRC);
+  const src = fallbackSrc && isUsablePhotoSrc(fallbackSrc)
+    ? fallbackSrc
+    : basePhoto?.src ?? "";
+
+  if (!isUsablePhotoSrc(src)) {
+    return null;
+  }
+
+  return {
+    id: basePhoto?.id ?? `onboarding-fallback-${ownPhoto.id}`,
+    sourcePhotoId: basePhoto?.sourcePhotoId ?? `onboarding-fallback-${ownPhoto.id}`,
+    src,
+    thumbnailSrc: basePhoto?.thumbnailSrc,
+    displaySrc: basePhoto?.displaySrc,
+    originalSrc: basePhoto?.originalSrc,
+    title: basePhoto?.title ?? "ねこだより",
+    subtitle: basePhoto?.subtitle ?? "どこかのねがお",
+    triggerLabel: basePhoto?.triggerLabel ?? "ねがお",
+    theme: basePhoto?.theme ?? "sleeping",
+    deliveredAt: basePhoto?.deliveredAt ?? Date.now(),
+  };
+}
+
+async function loadImageAssetAsDataUrl(src: string) {
+  try {
+    const response = await fetch(src, { cache: "force-cache" });
+
+    if (!response.ok) {
+      return null;
+    }
+
+    const blob = await response.blob();
+
+    return await new Promise<string | null>((resolve) => {
+      const reader = new FileReader();
+
+      reader.onload = () => {
+        resolve(typeof reader.result === "string" ? reader.result : null);
+      };
+      reader.onerror = () => {
+        resolve(null);
+      };
+      reader.readAsDataURL(blob);
+    });
+  } catch {
+    return null;
+  }
 }
 
 function resizeAndEncode(

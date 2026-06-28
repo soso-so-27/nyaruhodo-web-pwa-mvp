@@ -158,9 +158,33 @@ test.describe("onboarding delivery flow", () => {
     });
 
     await expect.poll(() => exchangeCalls).toBe(1);
-    await expect(page.locator("button").first()).toBeEnabled();
+    const addCandidateButton = page.getByRole("button", {
+      name: "とどく候補を追加する",
+    });
+    const openEnvelopeButton = page.getByRole("button", {
+      name: "ねこだよりを開く",
+    });
 
-    await page.locator("button").first().click();
+    await expect
+      .poll(async () => {
+        if (await addCandidateButton.isVisible()) {
+          return "test-tools";
+        }
+
+        if (await openEnvelopeButton.isVisible()) {
+          return "production-fallback";
+        }
+
+        return "waiting";
+      })
+      .not.toBe("waiting");
+
+    if (await openEnvelopeButton.isVisible()) {
+      await expect(addCandidateButton).toHaveCount(0);
+      return;
+    }
+
+    await addCandidateButton.click();
     await page.locator('input[type="file"]').last().setInputFiles({
       name: "stock-sleeping.png",
       mimeType: "image/png",
@@ -189,7 +213,9 @@ test.describe("onboarding delivery flow", () => {
     await page.getByRole("button", { name: "ねこだよりを開く" }).click();
     await page.waitForTimeout(1600);
     await expectVisibleNonBlackImage(page.locator("main img").last());
-    await expect(page.getByText("届いた写真は、ねこだよりに入りました。今日のねがおは、よる8時の便りになります。")).toBeVisible();
+    await expect(
+      page.getByText(/ねこだよりをしまいました。[\s\S]*夜8時の便りになります。/),
+    ).toBeVisible();
     await expect(
       page.getByRole("button", { name: "ねこだよりを見る" }),
     ).toBeVisible();
@@ -240,7 +266,7 @@ test.describe("onboarding delivery flow", () => {
     await page.goto("/onboarding");
     await page.waitForLoadState("networkidle");
     await page.waitForTimeout(1000);
-    await page.getByRole("button", { name: "ねがおを入れて受け取る" }).click();
+    await page.getByRole("button", { name: "ねがおを1枚入れる" }).click();
     await page.locator('input[type="file"]').last().setInputFiles({
       name: "own-sleeping.png",
       mimeType: "image/png",
@@ -254,7 +280,9 @@ test.describe("onboarding delivery flow", () => {
     await expect(
       page.getByRole("button", { name: "ねこだよりを見る" }),
     ).toBeVisible();
-    await expect(page.getByText("届いた写真は、ねこだよりに入りました。今日のねがおは、よる8時の便りになります。")).toBeVisible();
+    await expect(
+      page.getByText(/ねこだよりをしまいました。[\s\S]*夜8時の便りになります。/),
+    ).toBeVisible();
     await expect.poll(() => readKeptExchangePhotoCount(page)).toBe(1);
 
     await page.getByRole("button", { name: "閉じる" }).click();

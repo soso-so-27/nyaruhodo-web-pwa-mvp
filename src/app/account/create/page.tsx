@@ -75,8 +75,10 @@ export default function AccountCreatePage() {
   const [displayEnvironment, setDisplayEnvironment] =
     useState<DisplayEnvironment>("unknown");
   const [isFromOnboarding, setIsFromOnboarding] = useState(false);
+  const [onboardingSource, setOnboardingSource] = useState("direct");
   const googleButtonRef = useRef<HTMLDivElement | null>(null);
   const hasTrackedCtaView = useRef(false);
+  const hasTrackedOnboardingPromptView = useRef(false);
   const hasTrackedCallbackError = useRef(false);
 
   function markOnboardingAlbumCompletionReady() {
@@ -88,8 +90,17 @@ export default function AccountCreatePage() {
     setDisplayEnvironment(getDisplayEnvironment());
     const fromOnboarding =
       new URLSearchParams(window.location.search).get("from") === "onboarding";
+    const source = readOnboardingSourceFromLocation();
 
     setIsFromOnboarding(fromOnboarding);
+    setOnboardingSource(source);
+
+    if (fromOnboarding && !hasTrackedOnboardingPromptView.current) {
+      hasTrackedOnboardingPromptView.current = true;
+      trackProductEvent("onboarding_album_create_prompt_view", {
+        source,
+      });
+    }
 
     let isMounted = true;
 
@@ -326,6 +337,10 @@ export default function AccountCreatePage() {
     );
     if (isFromOnboarding) {
       markOnboardingAlbumCompletionReady();
+      trackProductEvent("onboarding_album_created", {
+        source: onboardingSource,
+        method: "google",
+      });
     }
     await claimPendingReferral();
     router.replace(
@@ -334,6 +349,13 @@ export default function AccountCreatePage() {
   }
 
   function handleLater() {
+    if (isFromOnboarding) {
+      trackProductEvent("onboarding_skip", {
+        source: onboardingSource,
+        state: "account_create",
+      });
+    }
+
     window.localStorage.setItem(
       ACCOUNT_CREATE_PROMPT_DISMISSED_KEY,
       JSON.stringify({
@@ -365,7 +387,7 @@ export default function AccountCreatePage() {
               </h1>
               <p style={styles.body}>
                 {isFromOnboarding
-                  ? "今日の2枚を\nあとから見返せるようにします。"
+                  ? "今日のねがおを\nあとから見返せるようにします。\n\n届いたねこだよりも、あとから見返せます。"
                   : "この端末のねがおを、アカウントに保存できます。別の端末でも復元できます。"}
               </p>
               {connectedEmail ? (
@@ -381,6 +403,10 @@ export default function AccountCreatePage() {
                     type="button"
                     onClick={() => {
                       markOnboardingAlbumCompletionReady();
+                      trackProductEvent("onboarding_album_created", {
+                        source: onboardingSource,
+                        method: "already_connected",
+                      });
                       router.push("/cats?onboarding=1");
                     }}
                     fullWidth
@@ -413,7 +439,7 @@ export default function AccountCreatePage() {
               </h1>
               <p style={styles.body}>
                 {isFromOnboarding
-                  ? "今日の2枚を\nあとから見返せるようにします。"
+                  ? "今日のねがおを\nあとから見返せるようにします。\n\n届いたねこだよりも、あとから見返せます。"
                   : "Googleアカウントで接続すると、この端末のねがおを保存できます。別の端末でも、とったねがおやとどいたねがおを復元できます。"}
               </p>
               {!isFromOnboarding ? (
@@ -538,6 +564,18 @@ function loadGoogleIdentityScript() {
     script.onerror = () => reject(new Error("Google Identity script failed"));
     document.head.appendChild(script);
   });
+}
+
+function readOnboardingSourceFromLocation() {
+  const source = new URLSearchParams(window.location.search).get("source");
+
+  if (!source) {
+    return "direct";
+  }
+
+  const normalized = source.trim().toLowerCase();
+
+  return /^[a-z0-9_-]{1,40}$/.test(normalized) ? normalized : "direct";
 }
 
 function EnvironmentNotice({
