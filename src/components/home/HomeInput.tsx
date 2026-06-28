@@ -110,6 +110,7 @@ import { StoredPhotoImage } from "../ui/StoredPhotoImage";
 
 type HomeInputProps = {
   recentEvents: RecentEvent[];
+  initialNow: number;
 };
 
 type LockData = {
@@ -259,12 +260,15 @@ type BeforeInstallPromptEvent = Event & {
 
 type HomeInstallPlatform = "ios" | "android";
 
-export function HomeInput({ recentEvents: _recentEvents }: HomeInputProps) {
+export function HomeInput({
+  recentEvents: _recentEvents,
+  initialNow,
+}: HomeInputProps) {
   const [catProfiles, setCatProfiles] = useState<CatProfile[]>([]);
   const [activeCatId, setActiveCatId] = useState<string | null>(null);
   const [activeCat, setActiveCat] = useState<CatProfile | null>(null);
   const [lockData, setLockData] = useState<LockData>({});
-  const [tick, setTick] = useState(0);
+  const [tick, setTick] = useState(initialNow);
   const isHomeClockReady = tick > 0;
   const homeNow = isHomeClockReady ? tick : 0;
   const [isYousuOpen, setIsYousuOpen] = useState(false);
