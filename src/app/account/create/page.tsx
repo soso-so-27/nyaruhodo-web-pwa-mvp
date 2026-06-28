@@ -106,6 +106,9 @@ export default function AccountCreatePage() {
       trackProductEvent("onboarding_album_create_prompt_view", {
         source,
       });
+      trackProductEvent("onboarding_album_prompt_view", {
+        source,
+      });
     }
 
     let isMounted = true;
@@ -235,6 +238,13 @@ export default function AccountCreatePage() {
   }, [isAccountConnected, isCheckingAccount]);
 
   async function handleGoogleSignIn() {
+    if (isFromOnboarding) {
+      trackProductEvent("onboarding_google_continue_click", {
+        source: onboardingSource,
+        method: "google_prompt",
+      });
+    }
+
     if (!GOOGLE_CLIENT_ID) {
       if (!isFromOnboarding) {
         setMessage("Googleログインを準備できませんでした。少し時間をおいてもう一度お試しください。");
@@ -276,6 +286,12 @@ export default function AccountCreatePage() {
       route: "/account/create",
       trigger: "google_identity_button",
     });
+    if (isFromOnboarding) {
+      trackProductEvent("onboarding_google_continue_click", {
+        source: onboardingSource,
+        method: "google_identity_button",
+      });
+    }
 
     const supabase = createBrowserSupabaseClient();
 
@@ -348,6 +364,14 @@ export default function AccountCreatePage() {
         source: onboardingSource,
         method: "google",
       });
+      trackProductEvent("cat_album_created", {
+        source: onboardingSource,
+        method: "google",
+      });
+      trackProductEvent("onboarding_completed", {
+        source: onboardingSource,
+        method: "google",
+      });
     }
     await claimPendingReferral();
     router.replace(
@@ -358,6 +382,10 @@ export default function AccountCreatePage() {
   function handleLater() {
     if (isFromOnboarding) {
       trackProductEvent("onboarding_skip", {
+        source: onboardingSource,
+        state: "account_create",
+      });
+      trackProductEvent("onboarding_skip_click", {
         source: onboardingSource,
         state: "account_create",
       });
@@ -412,6 +440,14 @@ export default function AccountCreatePage() {
                       markOnboardingAlbumCompletionReady();
                       markOnboardingAlbumCreated(onboardingSource);
                       trackProductEvent("onboarding_album_created", {
+                        source: onboardingSource,
+                        method: "already_connected",
+                      });
+                      trackProductEvent("cat_album_created", {
+                        source: onboardingSource,
+                        method: "already_connected",
+                      });
+                      trackProductEvent("onboarding_completed", {
                         source: onboardingSource,
                         method: "already_connected",
                       });

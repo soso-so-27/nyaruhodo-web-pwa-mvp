@@ -2,6 +2,7 @@
 
 import { useEffect, useLayoutEffect, useMemo, useState } from "react";
 import type { CSSProperties } from "react";
+import { trackProductEvent } from "../../lib/analytics/productAnalytics";
 import { storeAccountPhotoDataUrl } from "../../lib/photoStorageClient";
 import { STORAGE_KEYS } from "../../lib/storage";
 import {
@@ -471,6 +472,22 @@ export function CatsPage() {
     setDuplicateCatNameToConfirm(null);
     setIsAddingCat(false);
     setIsCatManageOpen(false);
+    trackProductEvent(
+      "cat_album_created",
+      {
+        source: "cat_manage",
+        method: "add_cat",
+      },
+      { localCatId: result.activeCatId },
+    );
+    trackProductEvent(
+      "cat_name_saved",
+      {
+        source: "cat_manage",
+        method: "add_cat",
+      },
+      { localCatId: result.activeCatId },
+    );
     setMessage("保存しました。");
   }
 
@@ -541,6 +558,7 @@ export function CatsPage() {
       const nextProfiles = profiles.map((profile, profileIndex) =>
         profileIndex === index ? nextProfile : profile,
       );
+      const didSaveName = nextProfile.name !== profiles[index].name;
 
       window.localStorage.setItem(
         STORAGE_KEYS.catProfiles,
@@ -550,10 +568,36 @@ export function CatsPage() {
       setActiveCatId(nextProfile.id);
       setCatNameInput(nextProfile.name);
       const remoteSaveResult = await saveRemoteCatProfile(nextProfile);
+      if (didSaveName) {
+        trackProductEvent(
+          "cat_name_saved",
+          {
+            source: isOnboardingMode ? "onboarding" : "cat_profile",
+            method: "profile_save",
+          },
+          { localCatId: nextProfile.id },
+        );
+      }
       setIsEditingCatName(false);
       setIsEditingProfile(false);
       setIsCatManageEditing(false);
       if (isOnboardingMode) {
+        trackProductEvent(
+          "cat_album_created",
+          {
+            source: "onboarding",
+            method: "profile_save",
+          },
+          { localCatId: nextProfile.id },
+        );
+        trackProductEvent(
+          "onboarding_completed",
+          {
+            source: "onboarding",
+            method: "cat_profile_save",
+          },
+          { localCatId: nextProfile.id },
+        );
         setIsOnboardingAlbumCreated(true);
         setSaveMessage("");
         return;

@@ -72,6 +72,34 @@ export async function requireStockAdminAccess(
   return { allowed: true, capabilities, user };
 }
 
+export async function requireAdminAccess(
+  request: Request,
+): Promise<AdminAccessResult> {
+  const capabilities = await getAdminCapabilitiesForRequest(request);
+
+  if (!hasAdminEmailConfig()) {
+    return {
+      allowed: false,
+      capabilities,
+      status: 503,
+      error: "admin_config_missing",
+    };
+  }
+
+  const user = await getAuthenticatedUserForRequest(request);
+
+  if (!user || !capabilities.isAdmin) {
+    return {
+      allowed: false,
+      capabilities,
+      status: 403,
+      error: "admin_required",
+    };
+  }
+
+  return { allowed: true, capabilities, user };
+}
+
 export async function getAuthenticatedUserForRequest(request: Request) {
   const bearerToken = getBearerToken(request);
 

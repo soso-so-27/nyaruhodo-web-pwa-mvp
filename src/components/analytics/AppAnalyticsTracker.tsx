@@ -20,6 +20,8 @@ export function AppAnalyticsTracker() {
     trackProductEvent("app_opened", {
       display_mode: appState.displayMode,
       route: window.location.pathname,
+      is_in_app_browser: isInAppBrowser(),
+      is_standalone_pwa: appState.displayMode === "standalone",
       has_completed_onboarding: appState.hasCompletedOnboarding,
       cat_count: appState.catCount,
     });
@@ -85,6 +87,18 @@ function getDisplayMode(): "browser" | "standalone" | "unknown" {
   } catch {
     return "unknown";
   }
+}
+
+function isInAppBrowser() {
+  const userAgent = window.navigator.userAgent.toLowerCase();
+
+  return (
+    userAgent.includes("instagram") ||
+    userAgent.includes("fbav") ||
+    userAgent.includes("fban") ||
+    userAgent.includes("line/") ||
+    userAgent.includes("micromessenger")
+  );
 }
 
 function getActiveTab(pathname: string) {

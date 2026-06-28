@@ -695,6 +695,20 @@ export function CollectionPage() {
       },
       { localCatId: activeCatId },
     );
+    trackProductEvent(
+      "collection_view",
+      {
+        photo_count: storedCollectionPhotos.length,
+        collected_slot_count: photosBySlot.size,
+        total_slot_count: COLLECTION_GROUPS.reduce(
+          (total, group) => total + group.slots.length,
+          0,
+        ),
+        active_group_id: activeGroupId,
+        daily_target_slot_id: dailyTargetSlot?.id ?? null,
+      },
+      { localCatId: activeCatId },
+    );
   }
 
   function openMainichiBoardPhoto(
@@ -1471,6 +1485,24 @@ function MainichiPhotoBoard({
   const hasAutoSelectedBoardSideRef = useRef(false);
   const hasUserSelectedBoardSideRef = useRef(false);
   const hasPlayedNavEntryMotionRef = useRef(false);
+  const trackedBoardSideRef = useRef<MainichiBoardSide | null>(null);
+
+  useEffect(() => {
+    if (trackedBoardSideRef.current === activeSide) {
+      return;
+    }
+
+    trackedBoardSideRef.current = activeSide;
+    trackProductEvent(
+      activeSide === "sent"
+        ? "collection_sent_tab_view"
+        : "collection_received_tab_view",
+      {
+        surface: "mainichi_board",
+        month_count: months.length,
+      },
+    );
+  }, [activeSide, months.length]);
 
   useEffect(() => {
     if (

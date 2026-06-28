@@ -7,6 +7,9 @@ const FLUSH_BATCH_SIZE = 25;
 const SOCIAL_SOURCE_VALUES = new Set([
   "sns",
   "instagram",
+  "instagram_story",
+  "instagram_bio",
+  "instagram_dm",
   "ig",
   "threads",
   "x",
@@ -42,6 +45,14 @@ export type ProductAnalyticsEvent = {
   source?: "sns" | "direct" | "pwa" | "unknown";
   properties?: Record<string, unknown>;
 };
+
+type AppEventSource =
+  | "instagram"
+  | "instagram_story"
+  | "instagram_bio"
+  | "instagram_dm"
+  | "direct"
+  | "unknown";
 
 export function trackProductEvent(
   name: string,
@@ -115,6 +126,8 @@ export async function flushProductAnalyticsEvents() {
     if (error) {
       return;
     }
+
+    await supabase.from("app_events").insert(batch.map(toAppEventRow));
 
     const currentQueue = readAnalyticsEventQueue();
     window.localStorage.setItem(
@@ -206,6 +219,42 @@ function getTrafficSource(): ProductAnalyticsEvent["source"] {
   return document.referrer ? "unknown" : "direct";
 }
 
+function getAppEventSource(): AppEventSource {
+  const params = new URLSearchParams(window.location.search);
+  return normalizeAppEventSource(params.get("source") || params.get("utm_source"));
+}
+
+function normalizeAppEventSource(source: string | null | undefined): AppEventSource {
+  const normalized = source?.trim().toLowerCase();
+
+  if (
+    normalized === "instagram" ||
+    normalized === "instagram_story" ||
+    normalized === "instagram_bio" ||
+    normalized === "instagram_dm"
+  ) {
+    return normalized;
+  }
+
+  if (normalized === "ig") {
+    return "instagram";
+  }
+
+  if (normalized === "direct") {
+    return "direct";
+  }
+
+  if (normalized === "unknown") {
+    return "unknown";
+  }
+
+  if (!normalized) {
+    return "direct";
+  }
+
+  return "unknown";
+}
+
 function getAttributionProperties() {
   const params = new URLSearchParams(window.location.search);
   const properties: Record<string, string> = {};
@@ -249,10 +298,72 @@ function toAnalyticsRow(event: ProductAnalyticsEvent) {
   };
 }
 
+function toAppEventRow(event: ProductAnalyticsEvent) {
+  const metadata = sanitizeProperties(event.properties ?? {});
+  const source = getAnalyticsSource(metadata);
+
+  return {
+    id: event.id ?? createId(),
+    event_name: event.name,
+    source,
+    anonymous_id: event.anonymous_id,
+    user_id: event.user_id ?? null,
+    session_id: event.session_id,
+    submission_id: getString(metadata.submission_id),
+    cat_id:
+      getString(metadata.cat_id) ??
+      getString(metadata.catId) ??
+      event.local_cat_id ??
+      null,
+    photo_id: getString(metadata.photo_id),
+    delivery_photo_id:
+      getString(metadata.delivery_photo_id) ?? getString(metadata.source_photo_id),
+    route: event.route ?? null,
+    surface: getString(metadata.surface),
+    is_in_app_browser: isInAppBrowser(),
+    is_standalone_pwa: isStandalonePwa(),
+    error_code: getString(metadata.error_code) ?? getString(metadata.error_type),
+    error_message: sanitizeErrorMessage(getString(metadata.error_message)),
+    metadata,
+    created_at: event.occurred_at,
+  };
+}
+
+function getAnalyticsSource(metadata: Record<string, unknown>): AppEventSource {
+  const sourceFromUrl = getAppEventSource();
+  const metadataSource = getString(metadata.source);
+
+  if (!metadataSource) {
+    return sourceFromUrl;
+  }
+
+  const normalized = normalizeAppEventSource(metadataSource);
+  const raw = metadataSource.trim().toLowerCase();
+
+  if (
+    normalized !== "unknown" ||
+    raw === "unknown" ||
+    raw === "instagram" ||
+    raw === "instagram_story" ||
+    raw === "instagram_bio" ||
+    raw === "instagram_dm" ||
+    raw === "ig" ||
+    raw === "direct"
+  ) {
+    return normalized;
+  }
+
+  return sourceFromUrl;
+}
+
 function sanitizeProperties(properties: Record<string, unknown>) {
   const sanitized: Record<string, unknown> = {};
 
   for (const [key, value] of Object.entries(properties)) {
+    if (isUnsafeMetadataKey(key)) {
+      continue;
+    }
+
     if (typeof value === "string" && value.length > 160) {
       sanitized[key] = value.slice(0, 160);
       continue;
@@ -262,4 +373,54 @@ function sanitizeProperties(properties: Record<string, unknown>) {
   }
 
   return sanitized;
+}
+
+function isUnsafeMetadataKey(key: string) {
+  const normalized = key.toLowerCase();
+  return (
+    normalized.includes("email") ||
+    normalized.includes("name") ||
+    normalized.includes("url") ||
+    normalized.includes("signed") ||
+    normalized.includes("storage_path") ||
+    normalized.includes("path")
+  );
+}
+
+function getString(value: unknown) {
+  return typeof value === "string" && value.trim() ? value.trim().slice(0, 160) : null;
+}
+
+function sanitizeErrorMessage(message: string | null) {
+  if (!message) {
+    return null;
+  }
+
+  return message.replace(/https?:\/\/\S+/g, "[url]").slice(0, 160);
+}
+
+function isStandalonePwa() {
+  try {
+    const navigatorWithStandalone = window.navigator as Navigator & {
+      standalone?: boolean;
+    };
+
+    return Boolean(
+      window.matchMedia?.("(display-mode: standalone)").matches ||
+        navigatorWithStandalone.standalone,
+    );
+  } catch {
+    return false;
+  }
+}
+
+function isInAppBrowser() {
+  const userAgent = window.navigator.userAgent.toLowerCase();
+  return (
+    userAgent.includes("instagram") ||
+    userAgent.includes("fbav") ||
+    userAgent.includes("fban") ||
+    userAgent.includes("line/") ||
+    userAgent.includes("micromessenger")
+  );
 }

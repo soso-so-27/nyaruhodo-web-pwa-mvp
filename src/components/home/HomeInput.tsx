@@ -907,6 +907,19 @@ export function HomeInput({
       },
       { localCatId: activeCatId },
     );
+    trackProductEvent(
+      "home_view",
+      {
+        cat_count: catProfiles.length,
+        has_active_cat: true,
+        has_home_photo: Boolean(activeCat.homePhotoDataUrl),
+        record_count: recordLog.length,
+        own_sleeping_photo_count: readOwnSleepingPhotoCount(activeCatId),
+        kept_exchange_photo_count: readKeptExchangePhotoCount(),
+        delivery_remaining: sleepingCounterRemaining ?? null,
+      },
+      { localCatId: activeCatId },
+    );
   }, [
     activeCat,
     activeCatId,
@@ -1557,7 +1570,38 @@ export function HomeInput({
           },
           { localCatId: activeCatId },
         );
-      } catch {
+        trackProductEvent(
+          "home_photo_submitted",
+          {
+            source,
+            surface: "home",
+            theme: "sleeping",
+            file_size_bucket: fileSizeBucket,
+          },
+          { localCatId: activeCatId },
+        );
+        trackProductEvent(
+          "photo_submitted",
+          {
+            source,
+            surface: "home",
+            theme: "sleeping",
+            file_size_bucket: fileSizeBucket,
+          },
+          { localCatId: activeCatId },
+        );
+      } catch (error) {
+        trackProductEvent(
+          "photo_upload_error",
+          {
+            source,
+            surface: "home",
+            error_code: "home_sleeping_photo_save_failed",
+            error_message:
+              error instanceof Error ? error.message : "home sleeping photo save failed",
+          },
+          { localCatId: activeCatId },
+        );
         showToast(PHOTO_INPUT_FAILURE_MESSAGE);
       } finally {
         setIsExchangePhotoAdding(false);
@@ -1664,6 +1708,16 @@ export function HomeInput({
       },
       { localCatId: activeCatId },
     );
+    trackProductEvent(
+      "home_photo_submit_click",
+      {
+        source,
+        has_accepted_safety: hasAcceptedSleepingSafety,
+        delivery_available: !sleepingCounterRemaining,
+        delivery_remaining: sleepingCounterRemaining ?? null,
+      },
+      { localCatId: activeCatId },
+    );
 
     if (!hasAcceptedSleepingSafety) {
       setPendingSleepingPhotoSource(source);
@@ -1745,6 +1799,19 @@ export function HomeInput({
         delivery_date_key: deliveryState.dateKey,
         auto_saved: wasSaved,
         photo_id: deliveryState.deliveredPhoto.id,
+      },
+      {
+        localCatId: activeCatId,
+      },
+    );
+    trackProductEvent(
+      "delivery_opened",
+      {
+        delivery_date_key: deliveryState.dateKey,
+        auto_saved: wasSaved,
+        photo_id: deliveryState.deliveredPhoto.id,
+        delivery_photo_id: deliveryState.deliveredPhoto.id,
+        surface: "home",
       },
       {
         localCatId: activeCatId,

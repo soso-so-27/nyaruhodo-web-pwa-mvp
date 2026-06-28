@@ -259,6 +259,9 @@ export function OnboardingFlow() {
     trackProductEvent("onboarding_submit_photo_click", {
       source: entrySourceRef.current,
     });
+    trackProductEvent("onboarding_photo_select_click", {
+      source: entrySourceRef.current,
+    });
 
     const input = document.createElement("input");
     input.type = "file";
@@ -340,6 +343,13 @@ export function OnboardingFlow() {
           submission_id: submissionId,
           delivery_date_key: eveningTarget.dateKey,
         });
+        trackProductEvent("photo_submitted", {
+          catId,
+          source: entrySourceRef.current,
+          surface: "onboarding",
+          submission_id: submissionId,
+          delivery_date_key: eveningTarget.dateKey,
+        });
 
         const delivered = await deliverOwnSleepingPhoto({
           ownPhoto,
@@ -361,7 +371,14 @@ export function OnboardingFlow() {
           setState("empty");
           return;
         }
-      } catch {
+      } catch (error) {
+        trackProductEvent("photo_upload_error", {
+          source: entrySourceRef.current,
+          surface: "onboarding",
+          error_code: "onboarding_photo_save_failed",
+          error_message:
+            error instanceof Error ? error.message : "onboarding photo save failed",
+        });
         setMessage("写真を保存できませんでした。JPEGやPNGの写真で、もう一度試してください。");
         setState("intro");
       } finally {
@@ -414,6 +431,12 @@ export function OnboardingFlow() {
     if (!isTestMode) {
       window.localStorage.setItem(STORAGE_KEYS.onboardingCompleted, "true");
       setCompletionCopy(getEveningDeliveryCompletionCopy());
+      trackProductEvent("onboarding_completed", {
+        source: entrySourceRef.current,
+        method: "delivery_kept",
+        photo_id: keepResult.photo.id,
+        delivery_photo_id: keepResult.photo.id,
+      });
     }
   }
 
@@ -457,6 +480,7 @@ export function OnboardingFlow() {
     trackProductEvent("onboarding_delivery_opened", {
       source: entrySourceRef.current,
       photo_id: deliveredPhoto.id,
+      delivery_photo_id: deliveredPhoto.id,
     });
     patchOnboardingProgress({
       stage: "opened",
@@ -557,6 +581,14 @@ export function OnboardingFlow() {
       delivery_source: deliverySource,
       photo_id: nextPhoto.id,
     });
+    trackProductEvent("onboarding_delivery_arrived", {
+      source: entrySourceRef.current,
+      delivery_source: deliverySource,
+      photo_id: nextPhoto.id,
+      delivery_photo_id: nextPhoto.id,
+      submission_id: submissionId ?? null,
+      delivery_date_key: deliveryDateKey ?? null,
+    });
     trackProductEvent("envelope_shown", {
       source: "onboarding",
       photo_id: nextPhoto.id,
@@ -655,6 +687,11 @@ export function OnboardingFlow() {
 
   function handleGoHome() {
     trackProductEvent("onboarding_skip", {
+      source: entrySourceRef.current,
+      state,
+      test_mode: canShowTestTools,
+    });
+    trackProductEvent("onboarding_skip_click", {
       source: entrySourceRef.current,
       state,
       test_mode: canShowTestTools,
