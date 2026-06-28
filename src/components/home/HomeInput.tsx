@@ -91,7 +91,6 @@ import { BottomNavigation } from "../navigation/BottomNavigation";
 import { HomeDeskModel } from "./HomeDeskModel";
 import {
   getActiveCatProfile,
-  getCatAvatarSrcForCoat,
   getCatName,
   readActiveCatId,
   readCatProfiles,
@@ -3212,9 +3211,6 @@ function ExchangeSharePermissionSheet({
             <div style={styles.exchangeCatPicker} aria-label="入れる猫">
               {catProfiles.map((profile) => {
                 const isSelected = profile.id === selectedCatId;
-                const avatarSrc =
-                  profile.avatarDataUrl ??
-                  getCatAvatarSrcForCoat(profile.appearance?.coat);
 
                 return (
                   <button
@@ -3227,16 +3223,6 @@ function ExchangeSharePermissionSheet({
                     onClick={() => onCatSelect(profile.id)}
                     aria-pressed={isSelected}
                   >
-                    <span style={styles.exchangeCatAvatar}>
-                      <StoredPhotoImage
-                        src={avatarSrc}
-                        alt=""
-                        style={{
-                          ...styles.exchangeCatAvatarImage,
-                          objectFit: profile.avatarDataUrl ? "cover" : "contain",
-                        }}
-                      />
-                    </span>
                     <span style={styles.exchangeCatName}>{getCatName(profile)}</span>
                     {isSelected ? (
                       <span style={styles.exchangeCatSelectedMark} aria-hidden="true">
@@ -3249,10 +3235,12 @@ function ExchangeSharePermissionSheet({
             </div>
           </div>
         ) : selectedCatProfile ? (
-          <div style={styles.exchangeSelectedCatCard}>
-            <span style={styles.exchangeShareSummaryIcon} aria-hidden="true">
-              <AppIcon name="cat" size={17} />
-            </span>
+          <div
+            style={{
+              ...styles.exchangeSelectedCatCard,
+              ...styles.exchangeSelectedCatCardPlain,
+            }}
+          >
             <span style={styles.exchangeSelectedCatText}>
               {getCatName(selectedCatProfile)}の記録に入ります
             </span>
@@ -7093,14 +7081,14 @@ const styles = {
     display: "inline-flex",
     alignItems: "center",
     justifyContent: "center",
-    gap: "8px",
-    minWidth: "92px",
+    gap: "6px",
+    minWidth: "78px",
     minHeight: "44px",
     border: "1px solid rgba(144,126,102,0.12)",
     borderRadius: "999px",
     background: "rgba(255,253,248,0.52)",
     color: "#716b60",
-    padding: "4px 12px 4px 5px",
+    padding: "8px 13px",
     cursor: "pointer",
     flexShrink: 0,
     boxShadow: "inset 0 1px 0 rgba(255,255,255,0.48)",
@@ -7112,26 +7100,9 @@ const styles = {
     boxShadow:
       "inset 0 1px 0 rgba(255,255,255,0.56), 0 7px 16px rgba(120,82,58,0.06)",
   },
-  exchangeCatAvatar: {
-    width: "34px",
-    height: "34px",
-    borderRadius: "999px",
-    overflow: "hidden",
-    display: "inline-flex",
-    alignItems: "center",
-    justifyContent: "center",
-    background: "rgba(255,253,248,0.82)",
-    border: "1px solid rgba(144,126,102,0.12)",
-    flexShrink: 0,
-  },
-  exchangeCatAvatarImage: {
-    width: "100%",
-    height: "100%",
-    display: "block",
-  },
   exchangeCatName: {
     minWidth: 0,
-    maxWidth: "88px",
+    maxWidth: "96px",
     overflow: "hidden",
     textOverflow: "ellipsis",
     whiteSpace: "nowrap",
@@ -7156,6 +7127,10 @@ const styles = {
     background: "rgba(255,253,248,0.52)",
     color: "#5f584f",
     boxSizing: "border-box",
+  },
+  exchangeSelectedCatCardPlain: {
+    gridTemplateColumns: "minmax(0, 1fr)",
+    padding: "9px 13px",
   },
   exchangeSelectedCatText: {
     minWidth: 0,

@@ -1561,7 +1561,7 @@ function MainichiPhotoBoard({
         />
       ) : null}
       <MotionConfig reducedMotion="user">
-        <AnimatePresence mode="wait" initial={false}>
+        <AnimatePresence mode="wait" initial={shouldUseNavEntryMotion}>
           {selectedMonth ? (
             <motion.div
               key={`${activeSide}-${selectedMonth.key}`}
@@ -1575,7 +1575,6 @@ function MainichiPhotoBoard({
                 month={selectedMonth}
                 showCatNames={false}
                 pastingPhotoKey={pastingPhotoKey}
-                entranceMotion={shouldUseNavEntryMotion ? "nav" : "default"}
                 onOpenDay={onOpenDay}
                 onOpenPhoto={onOpenPhoto}
               />
@@ -1860,14 +1859,12 @@ function MainichiMonthBoard({
   month,
   showCatNames,
   pastingPhotoKey,
-  entranceMotion,
   onOpenDay,
   onOpenPhoto,
 }: {
   month: MainichiBoardMonth;
   showCatNames: boolean;
   pastingPhotoKey: string | null;
-  entranceMotion: "default" | "nav";
   onOpenDay: (dateKey: string, source?: MainichiMorphSource | null) => void;
   onOpenPhoto: (
     photo: MainichiBoardPhoto,
@@ -1955,7 +1952,6 @@ function MainichiMonthBoard({
               total={month.photos.length}
               showCatName={showCatNames && month.photos.length <= 3}
               shouldPaste={getMainichiBoardPhotoKey(photo) === pastingPhotoKey}
-              entranceMotion={entranceMotion}
               onOpenPhoto={(source) => onOpenPhoto(photo, month, source)}
             />
           ))}
@@ -2082,7 +2078,6 @@ function MainichiBoardPhotoCard({
   total,
   showCatName,
   shouldPaste,
-  entranceMotion,
   onOpenPhoto,
 }: {
   photo: MainichiBoardPhoto;
@@ -2090,17 +2085,11 @@ function MainichiBoardPhotoCard({
   total: number;
   showCatName: boolean;
   shouldPaste: boolean;
-  entranceMotion: "default" | "nav";
   onOpenPhoto: (source?: MainichiMorphSource | null) => void;
 }) {
   const layout = getMainichiBoardPhotoLayout(index, total);
   const showTape = shouldPaste || shouldShowMainichiBoardTape(index, total);
-  const cardMotion = getMainichiBoardPhotoMotion(
-    index,
-    total,
-    layout,
-    entranceMotion,
-  );
+  const cardMotion = getMainichiBoardPhotoMotion(index, total, layout);
   const testId =
     photo.side === "sent"
       ? "mainichi-board-photo-sent"
@@ -4216,71 +4205,27 @@ function getMainichiBoardPhotoMotion(
   index: number,
   total: number,
   layout: ReturnType<typeof getMainichiBoardPhotoLayout>,
-  entranceMotion: "default" | "nav" = "default",
 ) {
   const x = parseMainichiPixelValue(layout.shiftX);
   const y = parseMainichiPixelValue(layout.shiftY);
   const isSparse = total <= 3;
   const isMedium = total > 3 && total <= 12;
-  const isNavEntry = entranceMotion === "nav";
-  const delayStep = isNavEntry
-    ? total > MAINICHI_BOARD_DIRECT_PHOTO_LIMIT
-      ? 0.014
-      : 0.026
-    : total > MAINICHI_BOARD_DIRECT_PHOTO_LIMIT
-      ? 0.018
-      : 0.034;
-  const delayCap = isNavEntry
-    ? total > MAINICHI_BOARD_DIRECT_PHOTO_LIMIT
-      ? 0.2
-      : 0.34
-    : total > MAINICHI_BOARD_DIRECT_PHOTO_LIMIT
-      ? 0.26
-      : 0.42;
+  const delayStep = total > MAINICHI_BOARD_DIRECT_PHOTO_LIMIT ? 0.018 : 0.034;
+  const delayCap = total > MAINICHI_BOARD_DIRECT_PHOTO_LIMIT ? 0.26 : 0.42;
   const delay = Math.min(index * delayStep, delayCap);
-  const lift = isNavEntry
-    ? isSparse
-      ? 28
-      : isMedium
-        ? 54
-        : 72
-    : isSparse
-      ? 18
-      : isMedium
-        ? 34
-        : 48;
-  const initialScale = isNavEntry
-    ? isSparse
-      ? 0.9
-      : isMedium
-        ? 0.78
-        : 0.7
-    : isSparse
-      ? 0.94
-      : isMedium
-        ? 0.84
-        : 0.76;
+  const lift = isSparse ? 18 : isMedium ? 34 : 48;
+  const initialScale = isSparse ? 0.94 : isMedium ? 0.84 : 0.76;
   const initialRotate =
-    total <= 1
-      ? layout.rotation
-      : isNavEntry
-        ? index % 2 === 0
-          ? "-2.2deg"
-          : "2deg"
-        : index % 2 === 0
-          ? "-0.8deg"
-          : "0.8deg";
+    total <= 1 ? layout.rotation : index % 2 === 0 ? "-0.8deg" : "0.8deg";
 
   return {
     initial: {
       opacity: 0,
       scale: initialScale,
-      x: isNavEntry ? x * 0.18 : x * 0.28,
+      x: x * 0.28,
       y: y + lift,
       rotate: initialRotate,
-      filter: isNavEntry
-        ? "brightness(1.04) saturate(0.94) blur(0.2px)"
-        : "brightness(1.02) saturate(0.96)",
+      filter: "brightness(1.02) saturate(0.96)",
     },
     animate: {
       opacity: 1,
@@ -4308,11 +4253,11 @@ function getMainichiBoardPhotoMotion(
     transition: {
       delay,
       type: "spring" as const,
-      stiffness: isNavEntry ? (isSparse ? 190 : 225) : isSparse ? 210 : 250,
-      damping: isNavEntry ? (isSparse ? 22 : 24) : isSparse ? 24 : 28,
-      mass: isNavEntry ? (isSparse ? 0.92 : 0.82) : isSparse ? 0.78 : 0.68,
+      stiffness: isSparse ? 210 : 250,
+      damping: isSparse ? 24 : 28,
+      mass: isSparse ? 0.78 : 0.68,
     },
-    tapeDelay: delay + (isNavEntry ? 0.18 : isSparse ? 0.08 : 0.14),
+    tapeDelay: delay + (isSparse ? 0.08 : 0.14),
   };
 }
 

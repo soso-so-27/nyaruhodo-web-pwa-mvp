@@ -1446,9 +1446,17 @@ async function restoreRemoteSnapshot(
     const existingIndex = profiles.findIndex((profile) => profile.id === localCatId);
 
     if (existingIndex >= 0) {
+      const existingProfile = profiles[existingIndex];
+
       profiles[existingIndex] = {
-        ...profiles[existingIndex],
+        ...existingProfile,
         ...restoredProfile,
+        avatarDataUrl:
+          restoredProfile.avatarDataUrl ?? existingProfile.avatarDataUrl,
+        homePhotoDataUrl:
+          restoredProfile.homePhotoDataUrl ?? existingProfile.homePhotoDataUrl,
+        homePhotoPosition:
+          restoredProfile.homePhotoPosition ?? existingProfile.homePhotoPosition,
       };
     } else {
       profiles.push(restoredProfile);
