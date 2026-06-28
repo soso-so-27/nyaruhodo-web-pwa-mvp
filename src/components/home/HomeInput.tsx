@@ -731,7 +731,6 @@ export function HomeInput({
   const eveningDelivery = useEveningDelivery({
     activeCatId,
     ownSleepingPhotos: ownSleepingPhotosForDelivery,
-    tick,
   });
   const eveningDeliveryRefreshTick =
     eveningRefreshTick + eveningDelivery.refreshToken;
@@ -2067,6 +2066,8 @@ export function HomeInput({
             onKeepOpenedDelivery={handleKeepEveningDelivery}
             onReportOpenedDelivery={handleReportEveningDelivery}
             onDeliveredStorageDataUrl={handleDeskDeliveredPhotoDataUrl}
+            eveningDeliveryCheckStatus={eveningDelivery.checkStatus}
+            onRetryEveningDeliveryCheck={eveningDelivery.retryEveningDeliveryCheck}
             omoideMemory={arrivedOmoideMemory}
             onOpenOmoideMemory={(memory) => {
               markOmoideMemoryOpened(memory.id, homeNow);

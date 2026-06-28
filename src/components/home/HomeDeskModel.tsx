@@ -33,6 +33,10 @@ type HomeTodayPhase =
   | "opened"
   | "empty-after"
   | "late-sent";
+type EveningDeliveryCheckStatus = {
+  state: "idle" | "checking" | "slow" | "failed";
+  dateKey: string | null;
+};
 
 type DeskViewerPhoto =
   | {
@@ -67,6 +71,8 @@ type HomeDeskModelProps = {
     photo: ExchangePhoto,
     dataUrl: string,
   ) => void;
+  eveningDeliveryCheckStatus?: EveningDeliveryCheckStatus;
+  onRetryEveningDeliveryCheck?: () => void;
   omoideMemory?: OmoideMemory | null;
   onOpenOmoideMemory?: (memory: OmoideMemory) => void;
   onDismissOmoideMemory?: (memory: OmoideMemory) => void;
@@ -240,6 +246,8 @@ export function HomeDeskModel({
   onKeepOpenedDelivery,
   onReportOpenedDelivery,
   onDeliveredStorageDataUrl,
+  eveningDeliveryCheckStatus,
+  onRetryEveningDeliveryCheck,
   omoideMemory,
   onOpenOmoideMemory,
   onDismissOmoideMemory,
@@ -281,6 +289,12 @@ export function HomeDeskModel({
     targetPhoto: displayPhoto,
     now,
   });
+  const deliveryCheckState =
+    eveningState.kind === "waiting" &&
+    eveningDeliveryCheckStatus?.dateKey === eveningState.dateKey &&
+    eveningDeliveryCheckStatus.state !== "idle"
+      ? eveningDeliveryCheckStatus.state
+      : "idle";
   const homePhoto = homeDay.photo;
   const frameLayoutStyle = useHomeFrameLayout(
     deskState,
@@ -658,7 +672,11 @@ export function HomeDeskModel({
                     ...(usesTextRibbonTray ? deskStyles.notificationRowTextRibbon : {}),
                   }}
                 >
-                  <HomeLetterTrayText phase={homeDay.phase} />
+                  <HomeLetterTrayText
+                    phase={homeDay.phase}
+                    deliveryCheckState={deliveryCheckState}
+                    onRetry={onRetryEveningDeliveryCheck}
+                  />
                 </a>
               ) : (
                 <div
@@ -668,7 +686,11 @@ export function HomeDeskModel({
                     ...(usesTextRibbonTray ? deskStyles.notificationRowTextRibbon : {}),
                   }}
                 >
-                  <HomeLetterTrayText phase={homeDay.phase} />
+                  <HomeLetterTrayText
+                    phase={homeDay.phase}
+                    deliveryCheckState={deliveryCheckState}
+                    onRetry={onRetryEveningDeliveryCheck}
+                  />
                 </div>
               )}
               {subNotifications.slice(0, 2).map((memory) => (
@@ -1715,10 +1737,46 @@ function getHomeDayPresentation({
   };
 }
 
-function HomeLetterTrayText({ phase }: { phase: HomeTodayPhase }) {
+function HomeLetterTrayText({
+  phase,
+  deliveryCheckState = "idle",
+  onRetry,
+}: {
+  phase: HomeTodayPhase;
+  deliveryCheckState?: EveningDeliveryCheckStatus["state"];
+  onRetry?: () => void;
+}) {
   const keyword = (children: ReactNode) => (
     <span style={deskStyles.letterTrayKeyword}>{children}</span>
   );
+
+  if (deliveryCheckState === "checking") {
+    return (
+      <>
+        <strong style={deskStyles.letterTrayTitle}>
+          ねこだよりを確認しています…
+        </strong>
+        <span style={deskStyles.letterTraySub}>もうすぐ届きます</span>
+      </>
+    );
+  }
+
+  if (deliveryCheckState === "slow" || deliveryCheckState === "failed") {
+    return (
+      <>
+        <strong style={deskStyles.letterTrayTitle}>
+          少し時間がかかっています
+        </strong>
+        <button
+          type="button"
+          style={deskStyles.letterTrayRetryButton}
+          onClick={onRetry}
+        >
+          もう一度確認する
+        </button>
+      </>
+    );
+  }
 
   if (phase === "opened") {
     return (
@@ -2631,6 +2689,20 @@ const deskStyles = {
   letterTrayKeyword: {
     color: "var(--ink)",
     fontWeight: 500,
+  },
+  letterTrayRetryButton: {
+    minHeight: "30px",
+    padding: "4px 14px",
+    border: "1px solid color-mix(in srgb, var(--seal) 30%, var(--line))",
+    borderRadius: "999px",
+    background: "color-mix(in srgb, var(--paper-card) 78%, transparent)",
+    color: "var(--seal)",
+    fontFamily: "var(--font-display)",
+    fontSize: "12px",
+    fontWeight: 400,
+    letterSpacing: "var(--tracking-body)",
+    cursor: "pointer",
+    WebkitTapHighlightColor: "transparent",
   },
   trayLetterButton: {
     width: "76px",

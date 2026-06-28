@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 import { trackProductEvent } from "../analytics/productAnalytics";
 import { resolveStoredPhotoUrl } from "../photoStorage";
@@ -20,216 +20,424 @@ import { recordEveningDeliveryTrace } from "./eveningDeliveryTrace";
 import type { OwnSleepingPhoto } from "./sleepingPhotos";
 
 const EXCHANGE_UPLOAD_MAX_DATA_URL_LENGTH = 500_000;
+const EVENING_DELIVERY_SLOW_MS = 4_000;
+
+type EveningDeliveryCheckSource =
+  | "app_open"
+  | "state_change"
+  | "focus"
+  | "visibilitychange"
+  | "pageshow"
+  | "delivery_time_reached"
+  | "retry";
+
+type EveningDeliveryCheckStatus = {
+  state: "idle" | "checking" | "slow" | "failed";
+  dateKey: string | null;
+};
 
 export function useEveningDelivery({
   activeCatId,
   ownSleepingPhotos,
-  tick,
 }: {
   activeCatId: string | null;
   ownSleepingPhotos: OwnSleepingPhoto[];
-  tick: number;
 }) {
   const pendingEveningDeliveryKeysRef = useRef(new Set<string>());
+  const mountedRef = useRef(true);
   const [refreshToken, setRefreshToken] = useState(0);
+  const [checkRequest, setCheckRequest] = useState<{
+    source: EveningDeliveryCheckSource;
+    token: number;
+  }>({ source: "app_open", token: 0 });
+  const [checkStatus, setCheckStatus] = useState<EveningDeliveryCheckStatus>({
+    state: "idle",
+    dateKey: null,
+  });
 
-  useEffect(() => {
-    if (!tick) {
-      return;
-    }
+  const requestDeliveryCheck = useCallback((source: EveningDeliveryCheckSource) => {
+    setCheckRequest((current) => ({
+      source,
+      token: current.token + 1,
+    }));
+  }, []);
 
-    const now = tick;
-    const todayKey = getJstDateKey(now);
-    const store = readEveningDeliveryStore();
-    const todayDay = store[todayKey];
-    const pendingDay = getPendingEveningDeliveryDay(now);
-    const traceBase = buildEveningDeliveryTraceBase({
-      activeCatId,
-      now,
-      pendingDay,
-      todayDay,
-      todayKey,
-    });
-
-    if (!pendingDay?.targetOwnPhotoId || !activeCatId) {
-      if (todayDay && now >= getJstDeliveryTime(todayKey)) {
-        recordEveningDeliveryTrace({
-          ...traceBase,
-          gate: pendingDay ? "missing_target_or_cat" : "no_pending_day",
-        });
-      }
-      return;
-    }
-
-    if (pendingEveningDeliveryKeysRef.current.has(pendingDay.dateKey)) {
-      recordEveningDeliveryTrace({
-        ...traceBase,
-        gate: "already_pending",
+  const ensureEveningDelivery = useCallback(
+    async (source: EveningDeliveryCheckSource) => {
+      const now = Date.now();
+      const todayKey = getJstDateKey(now);
+      const store = readEveningDeliveryStore();
+      const todayDay = store[todayKey];
+      const pendingDay = getPendingEveningDeliveryDay(now);
+      const traceBase = buildEveningDeliveryTraceBase({
+        activeCatId,
+        now,
+        pendingDay,
+        todayDay,
+        todayKey,
       });
-      return;
-    }
 
-    const directOwnPhoto = ownSleepingPhotos.find(
-      (photo) => photo.id === pendingDay.targetOwnPhotoId,
-    );
-    const targetPhoto = directOwnPhoto ? null : pendingDay.targetPhoto;
-    const legacyPhoto =
-      directOwnPhoto || targetPhoto
-        ? null
-        : findLegacyEveningDeliveryPhoto(
-            pendingDay,
-            ownSleepingPhotos,
-            activeCatId,
-          );
-    const ownPhoto = directOwnPhoto ?? targetPhoto ?? legacyPhoto;
-    const selectedPhotoSource = directOwnPhoto
-      ? "direct"
-      : targetPhoto
-        ? "targetPhoto"
-        : legacyPhoto
-          ? "legacy"
-          : "none";
-
-    if (!ownPhoto) {
-      recordEveningDeliveryTrace({
-        ...traceBase,
-        gate: "missing_photo",
-        directOwnPhotoFound: Boolean(directOwnPhoto),
-        targetPhotoFallbackUsed: Boolean(targetPhoto),
-        legacyFallbackUsed: Boolean(legacyPhoto),
-        selectedPhotoSource,
-      });
-      return;
-    }
-
-    pendingEveningDeliveryKeysRef.current.add(pendingDay.dateKey);
-    void (async () => {
-      const uploadSrc = await resolveExchangePhotoUploadSrc(ownPhoto);
-
-      if (!uploadSrc.src) {
-        recordEveningDeliveryTrace({
-          ...traceBase,
-          gate:
-            selectedPhotoSource === "legacy"
-              ? "legacy_photo_not_data"
-              : "photo_not_data",
-          directOwnPhotoFound: Boolean(directOwnPhoto),
-          targetPhotoFallbackUsed: Boolean(targetPhoto),
-          legacyFallbackUsed: selectedPhotoSource === "legacy",
-          legacyFallbackReason: "non_data_src",
-          selectedPhotoSource,
-          selectedPhotoSrcKind: uploadSrc.srcKind,
-          exchangePayloadLength: null,
-        });
-        pendingEveningDeliveryKeysRef.current.delete(pendingDay.dateKey);
+      if (!pendingDay?.targetOwnPhotoId || !activeCatId) {
+        if (todayDay && now >= getJstDeliveryTime(todayKey)) {
+          recordEveningDeliveryTrace({
+            ...traceBase,
+            gate: pendingDay ? "missing_target_or_cat" : "no_pending_day",
+          });
+        }
+        setCheckStatus((current) =>
+          current.state === "checking" || current.state === "slow"
+            ? { state: "idle", dateKey: null }
+            : current,
+        );
         return;
       }
 
-      recordEveningDeliveryTrace({
-        ...traceBase,
-        gate: "exchange_started",
-        directOwnPhotoFound: Boolean(directOwnPhoto),
-        targetPhotoFallbackUsed: Boolean(targetPhoto),
-        legacyFallbackUsed: Boolean(legacyPhoto),
-        selectedPhotoSource,
-        selectedPhotoSrcKind: uploadSrc.srcKind,
-        exchangePayloadLength: uploadSrc.src.length,
-        exchangeCalled: true,
+      if (pendingEveningDeliveryKeysRef.current.has(pendingDay.dateKey)) {
+        recordEveningDeliveryTrace({
+          ...traceBase,
+          gate: "already_pending",
+        });
+        return;
+      }
+
+      const directOwnPhoto = ownSleepingPhotos.find(
+        (photo) => photo.id === pendingDay.targetOwnPhotoId,
+      );
+      const targetPhoto = directOwnPhoto ? null : pendingDay.targetPhoto;
+      const legacyPhoto =
+        directOwnPhoto || targetPhoto
+          ? null
+          : findLegacyEveningDeliveryPhoto(
+              pendingDay,
+              ownSleepingPhotos,
+              activeCatId,
+            );
+      const ownPhoto = directOwnPhoto ?? targetPhoto ?? legacyPhoto;
+      const selectedPhotoSource = directOwnPhoto
+        ? "direct"
+        : targetPhoto
+          ? "targetPhoto"
+          : legacyPhoto
+            ? "legacy"
+            : "none";
+
+      if (!ownPhoto) {
+        recordEveningDeliveryTrace({
+          ...traceBase,
+          gate: "missing_photo",
+          directOwnPhotoFound: Boolean(directOwnPhoto),
+          targetPhotoFallbackUsed: Boolean(targetPhoto),
+          legacyFallbackUsed: Boolean(legacyPhoto),
+          selectedPhotoSource,
+        });
+        setCheckStatus({ state: "failed", dateKey: pendingDay.dateKey });
+        trackEveningDeliveryCheckEvent("evening_delivery_check_failed", {
+          startedAt: now,
+          source,
+          route: getCurrentRoute(),
+        });
+        return;
+      }
+
+      pendingEveningDeliveryKeysRef.current.add(pendingDay.dateKey);
+      const checkStartedAt = Date.now();
+      const route = getCurrentRoute();
+      let slowTimer: number | null = null;
+
+      setCheckStatus({ state: "checking", dateKey: pendingDay.dateKey });
+      trackEveningDeliveryCheckEvent("evening_delivery_check_started", {
+        startedAt: checkStartedAt,
+        source,
+        route,
       });
 
-      const exchangeStartedAt = Date.now();
-      const result = await createEveningExchangePhoto({
-        ownPhoto: {
-          ...ownPhoto,
-          src: uploadSrc.src,
-        },
-        seed: `${pendingDay.dateKey}:${ownPhoto.id}`,
-        deliveryDateKey: pendingDay.dateKey,
-        recipientCatId: pendingDay.targetCatId ?? activeCatId,
-      });
+      slowTimer = window.setTimeout(() => {
+        if (!mountedRef.current) {
+          return;
+        }
+        setCheckStatus((current) =>
+          current.dateKey === pendingDay.dateKey && current.state === "checking"
+            ? { state: "slow", dateKey: pendingDay.dateKey }
+            : current,
+        );
+        trackEveningDeliveryCheckEvent("evening_delivery_check_timeout", {
+          startedAt: checkStartedAt,
+          source,
+          route,
+        });
+      }, EVENING_DELIVERY_SLOW_MS);
 
-      recordEveningDeliveryTrace({
-        ...traceBase,
-        gate: "exchange_completed",
-        directOwnPhotoFound: Boolean(directOwnPhoto),
-        targetPhotoFallbackUsed: Boolean(targetPhoto),
-        legacyFallbackUsed: Boolean(legacyPhoto),
-        selectedPhotoSource,
-        selectedPhotoSrcKind: uploadSrc.srcKind,
-        exchangePayloadLength: uploadSrc.src.length,
-        exchangeElapsedMs: Date.now() - exchangeStartedAt,
-        exchangeCalled: true,
-        exchangeStatus: result.httpStatus,
-        exchangeError: result.error,
-        exchangePhotoReceived: Boolean(result.photo),
-      });
+      try {
+        const uploadSrc = await resolveExchangePhotoUploadSrc(ownPhoto);
 
-      if (!result.photo) {
-        pendingEveningDeliveryKeysRef.current.delete(pendingDay.dateKey);
-        if (result.error === "delivery_not_yet") {
+        if (!uploadSrc.src) {
+          recordEveningDeliveryTrace({
+            ...traceBase,
+            gate:
+              selectedPhotoSource === "legacy"
+                ? "legacy_photo_not_data"
+                : "photo_not_data",
+            directOwnPhotoFound: Boolean(directOwnPhoto),
+            targetPhotoFallbackUsed: Boolean(targetPhoto),
+            legacyFallbackUsed: selectedPhotoSource === "legacy",
+            legacyFallbackReason: "non_data_src",
+            selectedPhotoSource,
+            selectedPhotoSrcKind: uploadSrc.srcKind,
+            exchangePayloadLength: null,
+          });
+          pendingEveningDeliveryKeysRef.current.delete(pendingDay.dateKey);
+          setCheckStatus({ state: "failed", dateKey: pendingDay.dateKey });
+          trackEveningDeliveryCheckEvent("evening_delivery_check_failed", {
+            startedAt: checkStartedAt,
+            source,
+            route,
+          });
+          return;
+        }
+
+        recordEveningDeliveryTrace({
+          ...traceBase,
+          gate: "exchange_started",
+          directOwnPhotoFound: Boolean(directOwnPhoto),
+          targetPhotoFallbackUsed: Boolean(targetPhoto),
+          legacyFallbackUsed: Boolean(legacyPhoto),
+          selectedPhotoSource,
+          selectedPhotoSrcKind: uploadSrc.srcKind,
+          exchangePayloadLength: uploadSrc.src.length,
+          exchangeCalled: true,
+        });
+
+        const exchangeStartedAt = Date.now();
+        const result = await createEveningExchangePhoto({
+          ownPhoto: {
+            ...ownPhoto,
+            src: uploadSrc.src,
+          },
+          seed: `${pendingDay.dateKey}:${ownPhoto.id}`,
+          deliveryDateKey: pendingDay.dateKey,
+          recipientCatId: pendingDay.targetCatId ?? activeCatId,
+        });
+
+        recordEveningDeliveryTrace({
+          ...traceBase,
+          gate: "exchange_completed",
+          directOwnPhotoFound: Boolean(directOwnPhoto),
+          targetPhotoFallbackUsed: Boolean(targetPhoto),
+          legacyFallbackUsed: Boolean(legacyPhoto),
+          selectedPhotoSource,
+          selectedPhotoSrcKind: uploadSrc.srcKind,
+          exchangePayloadLength: uploadSrc.src.length,
+          exchangeElapsedMs: Date.now() - exchangeStartedAt,
+          exchangeCalled: true,
+          exchangeStatus: result.httpStatus,
+          exchangeError: result.error,
+          exchangePhotoReceived: Boolean(result.photo),
+        });
+
+        if (!result.photo) {
+          pendingEveningDeliveryKeysRef.current.delete(pendingDay.dateKey);
+          if (result.error === "delivery_not_yet") {
+            setCheckStatus({ state: "idle", dateKey: null });
+            trackProductEvent(
+              "exchange_rejected_not_yet",
+              {
+                delivery_date_key: pendingDay.dateKey,
+                http_status: result.httpStatus,
+              },
+              { localCatId: pendingDay.targetCatId ?? activeCatId },
+            );
+            return;
+          }
+          if (result.error === "delivery_window_expired") {
+            markEveningDeliverySkipped(pendingDay.dateKey);
+            setCheckStatus({ state: "failed", dateKey: pendingDay.dateKey });
+            trackProductEvent(
+              "exchange_rejected_expired",
+              {
+                delivery_date_key: pendingDay.dateKey,
+                http_status: result.httpStatus,
+              },
+              { localCatId: pendingDay.targetCatId ?? activeCatId },
+            );
+            trackEveningDeliveryCheckEvent("evening_delivery_check_failed", {
+              startedAt: checkStartedAt,
+              source,
+              route,
+            });
+            return;
+          }
+          setCheckStatus({ state: "failed", dateKey: pendingDay.dateKey });
           trackProductEvent(
-            "exchange_rejected_not_yet",
+            "delivery_sent",
             {
               delivery_date_key: pendingDay.dateKey,
-              http_status: result.httpStatus,
+              poolSource: "none",
+              isOnboardingInstant: false,
+              isDay1Evening: false,
             },
             { localCatId: pendingDay.targetCatId ?? activeCatId },
           );
+          trackEveningDeliveryCheckEvent("evening_delivery_check_failed", {
+            startedAt: checkStartedAt,
+            source,
+            route,
+          });
           return;
         }
-        if (result.error === "delivery_window_expired") {
-          markEveningDeliverySkipped(pendingDay.dateKey);
-          trackProductEvent(
-            "exchange_rejected_expired",
-            {
-              delivery_date_key: pendingDay.dateKey,
-              http_status: result.httpStatus,
-            },
-            { localCatId: pendingDay.targetCatId ?? activeCatId },
-          );
-          return;
-        }
+
+        setEveningDeliveredPhoto(pendingDay.dateKey, result.photo, Date.now());
+        void setAppBadge(1);
+        setRefreshToken((value) => value + 1);
+        setCheckStatus({ state: "idle", dateKey: null });
+        trackEveningDeliveryCheckEvent("evening_delivery_check_succeeded", {
+          startedAt: checkStartedAt,
+          source,
+          route,
+        });
         trackProductEvent(
           "delivery_sent",
           {
             delivery_date_key: pendingDay.dateKey,
-            poolSource: "none",
+            poolSource: "normal",
             isOnboardingInstant: false,
             isDay1Evening: false,
+            tier: result.tier ?? null,
           },
           { localCatId: pendingDay.targetCatId ?? activeCatId },
         );
-        return;
+        if (result.tier) {
+          trackProductEvent(
+            "delivery_tier_served",
+            {
+              delivery_date_key: pendingDay.dateKey,
+              tier: result.tier,
+            },
+            { localCatId: pendingDay.targetCatId ?? activeCatId },
+          );
+        }
+      } catch {
+        pendingEveningDeliveryKeysRef.current.delete(pendingDay.dateKey);
+        setCheckStatus({ state: "failed", dateKey: pendingDay.dateKey });
+        trackEveningDeliveryCheckEvent("evening_delivery_check_failed", {
+          startedAt: checkStartedAt,
+          source,
+          route,
+        });
+      } finally {
+        if (slowTimer !== null) {
+          window.clearTimeout(slowTimer);
+        }
       }
+    },
+    [activeCatId, ownSleepingPhotos],
+  );
 
-      setEveningDeliveredPhoto(pendingDay.dateKey, result.photo, Date.now());
-      void setAppBadge(1);
-      setRefreshToken((value) => value + 1);
-      trackProductEvent(
-        "delivery_sent",
-        {
-          delivery_date_key: pendingDay.dateKey,
-          poolSource: "normal",
-          isOnboardingInstant: false,
-          isDay1Evening: false,
-          tier: result.tier ?? null,
-        },
-        { localCatId: pendingDay.targetCatId ?? activeCatId },
-      );
-      if (result.tier) {
-        trackProductEvent(
-          "delivery_tier_served",
-          {
-            delivery_date_key: pendingDay.dateKey,
-            tier: result.tier,
-          },
-          { localCatId: pendingDay.targetCatId ?? activeCatId },
-        );
+  useEffect(() => {
+    mountedRef.current = true;
+    requestDeliveryCheck("app_open");
+
+    const handleFocus = () => requestDeliveryCheck("focus");
+    const handlePageShow = () => requestDeliveryCheck("pageshow");
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === "visible") {
+        requestDeliveryCheck("visibilitychange");
       }
-    })();
-  }, [activeCatId, ownSleepingPhotos, tick]);
+    };
 
-  return { refreshToken };
+    window.addEventListener("focus", handleFocus);
+    window.addEventListener("pageshow", handlePageShow);
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+
+    return () => {
+      mountedRef.current = false;
+      window.removeEventListener("focus", handleFocus);
+      window.removeEventListener("pageshow", handlePageShow);
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+    };
+  }, [requestDeliveryCheck]);
+
+  useEffect(() => {
+    void ensureEveningDelivery("state_change");
+  }, [ensureEveningDelivery]);
+
+  useEffect(() => {
+    if (checkRequest.token === 0) {
+      return;
+    }
+
+    void ensureEveningDelivery(checkRequest.source);
+  }, [checkRequest, ensureEveningDelivery]);
+
+  useEffect(() => {
+    const delay = getNextEveningDeliveryCheckDelay();
+
+    if (delay === null) {
+      return;
+    }
+
+    const timerId = window.setTimeout(() => {
+      requestDeliveryCheck("delivery_time_reached");
+    }, delay);
+
+    return () => window.clearTimeout(timerId);
+  }, [requestDeliveryCheck, activeCatId, ownSleepingPhotos, refreshToken, checkRequest.token]);
+
+  return {
+    refreshToken,
+    checkStatus,
+    retryEveningDeliveryCheck: () => requestDeliveryCheck("retry"),
+  };
+}
+
+function getNextEveningDeliveryCheckDelay() {
+  const now = Date.now();
+  const nextDeliveryTime = Object.values(readEveningDeliveryStore())
+    .filter(
+      (day) =>
+        day.targetOwnPhotoId &&
+        !day.deliveredPhoto &&
+        !day.skippedAt &&
+        getJstDeliveryTime(day.dateKey) > now,
+    )
+    .map((day) => getJstDeliveryTime(day.dateKey))
+    .sort((a, b) => a - b)[0];
+
+  if (!nextDeliveryTime) {
+    return null;
+  }
+
+  return Math.max(0, nextDeliveryTime - now + 60);
+}
+
+function trackEveningDeliveryCheckEvent(
+  eventName:
+    | "evening_delivery_check_started"
+    | "evening_delivery_check_succeeded"
+    | "evening_delivery_check_failed"
+    | "evening_delivery_check_timeout",
+  {
+    startedAt,
+    source,
+    route,
+  }: {
+    startedAt: number;
+    source: EveningDeliveryCheckSource;
+    route: string;
+  },
+) {
+  trackProductEvent(eventName, {
+    latency_ms: Math.max(0, Date.now() - startedAt),
+    source,
+    route,
+  });
+}
+
+function getCurrentRoute() {
+  if (typeof window === "undefined") {
+    return "unknown";
+  }
+
+  return window.location.pathname || "unknown";
 }
 
 function buildEveningDeliveryTraceBase({
