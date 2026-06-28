@@ -17,8 +17,21 @@ import {
 } from "../../lib/home/sleepingPhotos";
 import {
   getEveningDeliveryCompletionCopy,
+  markEveningDeliveryKept,
+  markEveningDeliveryOpened,
   recordEveningDeliveryTarget,
+  setEveningDeliveredPhoto,
 } from "../../lib/home/eveningDelivery";
+import {
+  createOnboardingSubmissionId,
+  getOrCreateOnboardingAnonymousId,
+  normalizeOnboardingSource,
+  patchOnboardingProgress,
+  readTodayOnboardingProgress,
+  writeOnboardingProgress,
+  type OnboardingProgress,
+  type OnboardingSource,
+} from "../../lib/onboarding/progress";
 import { trackProductEvent } from "../../lib/analytics/productAnalytics";
 import { isUsablePhotoSrc } from "../../lib/photoStorage";
 import {
@@ -57,9 +70,12 @@ export function OnboardingFlow() {
   const [isCandidateAdding, setIsCandidateAdding] = useState(false);
   const [isTestMode, setIsTestMode] = useState(false);
   const [completionCopy, setCompletionCopy] = useState("");
-  const [entrySource, setEntrySource] = useState("direct");
+  const [entrySource, setEntrySource] = useState<OnboardingSource>("direct");
   const autoKeptDeliveredPhotoIdRef = useRef("");
   const hasTrackedIntroViewRef = useRef(false);
+  const hasResolvedProgressRef = useRef(false);
+  const isSubmittingRef = useRef(false);
+  const entrySourceRef = useRef<OnboardingSource>("direct");
   const canShowTestTools = isTestMode && !IS_PRODUCTION;
 
   function markOnboardingAlbumCompletionReady() {
@@ -91,16 +107,15 @@ export function OnboardingFlow() {
   }, []);
 
   useEffect(() => {
-    if (hasTrackedIntroViewRef.current) {
+    if (hasResolvedProgressRef.current) {
       return;
     }
 
     const source = readOnboardingSourceFromLocation();
     setEntrySource(source);
-    hasTrackedIntroViewRef.current = true;
-    trackProductEvent("onboarding_intro_view", {
-      source,
-    });
+    entrySourceRef.current = source;
+    hasResolvedProgressRef.current = true;
+    resolveOnboardingProgress(source);
   }, []);
 
   useEffect(() => {
@@ -116,13 +131,121 @@ export function OnboardingFlow() {
     void keepDeliveredPhotoForOnboarding();
   }, [state, deliveredPhoto, isDeliveredPhotoKept]);
 
+  function resolveOnboardingProgress(source: OnboardingSource) {
+    const progress = readTodayOnboardingProgress();
+
+    if (restoreExistingProgress(progress, source)) {
+      return;
+    }
+
+    if (
+      source === "direct" &&
+      window.localStorage.getItem(STORAGE_KEYS.onboardingCompleted) === "true"
+    ) {
+      router.replace("/home");
+      return;
+    }
+
+    trackOnboardingIntroView(source);
+  }
+
+  function restoreExistingProgress(
+    progress: OnboardingProgress | null,
+    source: OnboardingSource,
+  ) {
+    if (!progress) {
+      return false;
+    }
+
+    if (progress.stage === "album_created") {
+      router.replace("/home");
+      return true;
+    }
+
+    if (progress.stage === "opened") {
+      router.replace(
+        `/account/create?from=onboarding&source=${encodeURIComponent(source)}`,
+      );
+      return true;
+    }
+
+    if (progress.stage === "arrived" && progress.deliveredPhoto) {
+      setSelectedPhotoSrc(progress.selectedPhotoSrc ?? "");
+      setPendingOwnPhoto(progress.ownPhoto ?? null);
+      setDeliveredPhoto(progress.deliveredPhoto);
+      setIsDeliveredPhotoKept(false);
+      setCompletionCopy(progress.completionCopy ?? "");
+      setState("envelope");
+      return true;
+    }
+
+    if (progress.stage === "submitted" && progress.ownPhoto) {
+      setSelectedPhotoSrc(progress.selectedPhotoSrc ?? "");
+      setPendingOwnPhoto(progress.ownPhoto);
+      setIsDeliveredPhotoKept(false);
+      setState("saving");
+      void resumeSubmittedProgress(progress);
+      return true;
+    }
+
+    return false;
+  }
+
+  async function resumeSubmittedProgress(progress: OnboardingProgress) {
+    if (isSubmittingRef.current) {
+      return;
+    }
+
+    isSubmittingRef.current = true;
+    setMessage("");
+
+    try {
+      const delivered = await deliverOwnSleepingPhoto({
+        ownPhoto: progress.ownPhoto!,
+        recipientCatId: progress.ownPhoto!.catId,
+        deliveryDateKey: progress.dateKey,
+        submissionId: progress.submissionId,
+        selectedPhotoSrc: progress.selectedPhotoSrc,
+        emptyMessage: canShowTestTools
+          ? "ねがおは入りました。とどく候補がまだありません。テスト用に候補を追加できます。"
+          : "ねがおは入りました。今日はまだ、とどくねがおを準備中です。",
+      });
+
+      if (!delivered) {
+        setState("empty");
+      }
+    } finally {
+      isSubmittingRef.current = false;
+    }
+  }
+
+  function trackOnboardingIntroView(source: OnboardingSource) {
+    if (hasTrackedIntroViewRef.current) {
+      return;
+    }
+
+    hasTrackedIntroViewRef.current = true;
+    trackProductEvent("onboarding_intro_view", {
+      source,
+    });
+  }
+
   async function handleSelectSleepingPhoto() {
-    if (state === "saving") {
+    if (state === "saving" || isSubmittingRef.current) {
+      return;
+    }
+
+    const restored = restoreExistingProgress(
+      readTodayOnboardingProgress(),
+      entrySourceRef.current,
+    );
+
+    if (restored) {
       return;
     }
 
     trackProductEvent("onboarding_submit_photo_click", {
-      source: entrySource,
+      source: entrySourceRef.current,
     });
 
     const input = document.createElement("input");
@@ -153,6 +276,7 @@ export function OnboardingFlow() {
       }
 
       setState("saving");
+      isSubmittingRef.current = true;
       setMessage("");
 
       try {
@@ -175,6 +299,22 @@ export function OnboardingFlow() {
         setIsDeliveredPhotoKept(false);
         autoKeptDeliveredPhotoIdRef.current = "";
         const eveningTarget = recordEveningDeliveryTarget(ownPhoto);
+        const anonymousId = getOrCreateOnboardingAnonymousId();
+        const submissionId = createOnboardingSubmissionId(
+          anonymousId,
+          eveningTarget.dateKey,
+        );
+        writeOnboardingProgress({
+          version: 1,
+          anonymousId,
+          dateKey: eveningTarget.dateKey,
+          stage: "submitted",
+          source: entrySourceRef.current,
+          submissionId,
+          ownPhoto,
+          selectedPhotoSrc: dataUrl,
+          updatedAt: Date.now(),
+        });
         trackProductEvent("take_photo", {
           catId,
           hour: new Date().getHours(),
@@ -184,13 +324,17 @@ export function OnboardingFlow() {
         });
         trackProductEvent("onboarding_photo_submitted", {
           catId,
-          source: entrySource,
+          source: entrySourceRef.current,
+          submission_id: submissionId,
           delivery_date_key: eveningTarget.dateKey,
         });
 
         const delivered = await deliverOwnSleepingPhoto({
           ownPhoto,
           recipientCatId: catId,
+          deliveryDateKey: eveningTarget.dateKey,
+          submissionId,
+          selectedPhotoSrc: dataUrl,
           emptyMessage: canShowTestTools
             ? "ねがおは入りました。とどく候補がまだありません。テスト用に候補を追加できます。"
             : "ねがおは入りました。今日はまだ、とどくねがおを準備中です。",
@@ -209,6 +353,7 @@ export function OnboardingFlow() {
         setMessage("写真を保存できませんでした。JPEGやPNGの写真で、もう一度試してください。");
         setState("intro");
       } finally {
+        isSubmittingRef.current = false;
         cleanupInput();
       }
     };
@@ -230,7 +375,7 @@ export function OnboardingFlow() {
     const keepResult = await keepExchangePhotoForAlbum(deliveredPhoto);
     setDeliveredPhoto(keepResult.photo);
     trackProductEvent("onboarding_delivered_photo_confirmed", {
-      source: entrySource,
+      source: entrySourceRef.current,
       source_photo_id: keepResult.photo.sourcePhotoId ?? null,
       saved_to_album: keepResult.saved,
       test_mode: canShowTestTools,
@@ -242,6 +387,17 @@ export function OnboardingFlow() {
     }
 
     setIsDeliveredPhotoKept(true);
+    patchOnboardingProgress({
+      stage: "opened",
+      source: entrySourceRef.current,
+      deliveredPhoto: keepResult.photo,
+      isDeliveredPhotoKept: keepResult.saved,
+      completionCopy: getEveningDeliveryCompletionCopy(),
+    });
+    const progress = readTodayOnboardingProgress();
+    if (progress?.dateKey) {
+      markEveningDeliveryKept(progress.dateKey);
+    }
 
     if (!isTestMode) {
       window.localStorage.setItem(STORAGE_KEYS.onboardingCompleted, "true");
@@ -259,9 +415,19 @@ export function OnboardingFlow() {
       photo_id: deliveredPhoto.id,
     });
     trackProductEvent("onboarding_delivery_opened", {
-      source: entrySource,
+      source: entrySourceRef.current,
       photo_id: deliveredPhoto.id,
     });
+    patchOnboardingProgress({
+      stage: "opened",
+      source: entrySourceRef.current,
+      deliveredPhoto,
+      isDeliveredPhotoKept,
+    });
+    const progress = readTodayOnboardingProgress();
+    if (progress?.dateKey) {
+      markEveningDeliveryOpened(progress.dateKey);
+    }
     setState("revealing");
     window.setTimeout(() => {
       setState("delivered");
@@ -273,18 +439,25 @@ export function OnboardingFlow() {
     recipientCatId,
     emptyMessage,
     preferredSourcePhotoId,
+    deliveryDateKey,
+    submissionId,
+    selectedPhotoSrc: selectedPhotoSrcForProgress,
   }: {
     ownPhoto: OwnSleepingPhoto;
     recipientCatId: string;
     emptyMessage: string;
     preferredSourcePhotoId?: string | null;
+    deliveryDateKey?: string | null;
+    submissionId?: string | null;
+    selectedPhotoSrc?: string;
   }) {
     const exchangeResult = await createSleepingExchange({
       ownPhoto,
       triggerLabel: "ねがお",
       theme: "sleeping",
       category: "sleeping",
-      seed: `${ownPhoto.id}:${Date.now()}`,
+      seed: submissionId ?? `${ownPhoto.id}:${deliveryDateKey ?? Date.now()}`,
+      deliveryDateKey: deliveryDateKey ?? undefined,
       recipientCatId,
       preferredSourcePhotoId,
       mode: "onboarding",
@@ -326,8 +499,21 @@ export function OnboardingFlow() {
 
     setDeliveredPhoto(nextPhoto);
     setIsDeliveredPhotoKept(false);
+    if (deliveryDateKey) {
+      setEveningDeliveredPhoto(deliveryDateKey, nextPhoto);
+    }
+    patchOnboardingProgress({
+      stage: "arrived",
+      source: entrySourceRef.current,
+      dateKey: deliveryDateKey ?? undefined,
+      submissionId: submissionId ?? undefined,
+      ownPhoto,
+      selectedPhotoSrc: selectedPhotoSrcForProgress,
+      deliveredPhoto: nextPhoto,
+      isDeliveredPhotoKept: false,
+    });
     trackProductEvent("onboarding_delivery_ready", {
-      source: entrySource,
+      source: entrySourceRef.current,
       delivery_source: deliverySource,
       photo_id: nextPhoto.id,
     });
@@ -400,6 +586,9 @@ export function OnboardingFlow() {
           ownPhoto: pendingOwnPhoto,
           recipientCatId: pendingOwnPhoto.catId,
           preferredSourcePhotoId: saved.sourceOwnPhotoId ?? saved.id,
+          deliveryDateKey: readTodayOnboardingProgress()?.dateKey,
+          submissionId: readTodayOnboardingProgress()?.submissionId,
+          selectedPhotoSrc,
           emptyMessage:
             "とどく候補を追加しましたが、まだ受け取れませんでした。設定のとどく状態を確認してください。",
         });
@@ -426,7 +615,7 @@ export function OnboardingFlow() {
 
   function handleGoHome() {
     trackProductEvent("onboarding_skip", {
-      source: entrySource,
+      source: entrySourceRef.current,
       state,
       test_mode: canShowTestTools,
     });
@@ -711,15 +900,9 @@ function DeliveryWaiting() {
 }
 
 function readOnboardingSourceFromLocation() {
-  const source = new URLSearchParams(window.location.search).get("source");
-
-  if (!source) {
-    return "direct";
-  }
-
-  const normalized = source.trim().toLowerCase();
-
-  return /^[a-z0-9_-]{1,40}$/.test(normalized) ? normalized : "direct";
+  return normalizeOnboardingSource(
+    new URLSearchParams(window.location.search).get("source"),
+  );
 }
 
 async function createOnboardingFallbackDeliveryPhoto(

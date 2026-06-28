@@ -14,6 +14,11 @@ import {
 import { STORAGE_KEYS } from "../../../lib/storage";
 import { trackProductEvent } from "../../../lib/analytics/productAnalytics";
 import { writeAuthDebugEvent } from "../../../lib/authDebug";
+import {
+  markOnboardingAlbumCreated,
+  normalizeOnboardingSource,
+  type OnboardingSource,
+} from "../../../lib/onboarding/progress";
 import { claimPendingReferral } from "../../../lib/referrals/client";
 import {
   getDisplayEnvironment,
@@ -75,7 +80,8 @@ export default function AccountCreatePage() {
   const [displayEnvironment, setDisplayEnvironment] =
     useState<DisplayEnvironment>("unknown");
   const [isFromOnboarding, setIsFromOnboarding] = useState(false);
-  const [onboardingSource, setOnboardingSource] = useState("direct");
+  const [onboardingSource, setOnboardingSource] =
+    useState<OnboardingSource>("direct");
   const googleButtonRef = useRef<HTMLDivElement | null>(null);
   const hasTrackedCtaView = useRef(false);
   const hasTrackedOnboardingPromptView = useRef(false);
@@ -337,6 +343,7 @@ export default function AccountCreatePage() {
     );
     if (isFromOnboarding) {
       markOnboardingAlbumCompletionReady();
+      markOnboardingAlbumCreated(onboardingSource);
       trackProductEvent("onboarding_album_created", {
         source: onboardingSource,
         method: "google",
@@ -403,6 +410,7 @@ export default function AccountCreatePage() {
                     type="button"
                     onClick={() => {
                       markOnboardingAlbumCompletionReady();
+                      markOnboardingAlbumCreated(onboardingSource);
                       trackProductEvent("onboarding_album_created", {
                         source: onboardingSource,
                         method: "already_connected",
@@ -567,15 +575,9 @@ function loadGoogleIdentityScript() {
 }
 
 function readOnboardingSourceFromLocation() {
-  const source = new URLSearchParams(window.location.search).get("source");
-
-  if (!source) {
-    return "direct";
-  }
-
-  const normalized = source.trim().toLowerCase();
-
-  return /^[a-z0-9_-]{1,40}$/.test(normalized) ? normalized : "direct";
+  return normalizeOnboardingSource(
+    new URLSearchParams(window.location.search).get("source"),
+  );
 }
 
 function EnvironmentNotice({

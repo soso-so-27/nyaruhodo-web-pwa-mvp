@@ -290,6 +290,178 @@ test.describe("onboarding delivery flow", () => {
     await expect.poll(() => readKeptExchangePhotoCount(page)).toBe(1);
   });
 
+  test("restores the current onboarding state across repeated social URL visits", async ({
+    page,
+  }) => {
+    let exchangeCalls = 0;
+
+    await page.route("**/api/sleeping-delivery/exchange", async (route) => {
+      exchangeCalls += 1;
+      await route.fulfill({
+        contentType: "application/json",
+        body: JSON.stringify({
+          photo: {
+            id: "delivered-social-revisit",
+            sourcePhotoId: "stock-social-revisit",
+            src: `data:image/png;base64,${testPng.toString("base64")}`,
+            title: "",
+            subtitle: "",
+            triggerLabel: "sleeping",
+            theme: "sleeping",
+            deliveredAt: Date.now(),
+          },
+          source: "remote",
+          diagnostics: {
+            source: "remote",
+            availableCount: 1,
+            candidateCount: 1,
+            normalCandidateCount: 1,
+            fallbackCandidateCount: 0,
+            fallbackActive: false,
+          },
+        }),
+      });
+    });
+
+    await page.goto("/onboarding?source=instagram_story");
+    await expect(
+      page.getByRole("button", { name: "ねがおを1枚入れる" }),
+    ).toBeVisible();
+
+    await page.getByRole("button", { name: "ねがおを1枚入れる" }).click();
+    await page.locator('input[type="file"]').last().setInputFiles({
+      name: "own-sleeping.png",
+      mimeType: "image/png",
+      buffer: testPng,
+    });
+
+    await expect(page.getByRole("button", { name: "ねこだよりを開く" })).toBeVisible();
+    await expect.poll(() => exchangeCalls).toBe(1);
+    const submittedProgress = await readOnboardingProgress(page);
+    expect(submittedProgress).toMatchObject({
+      stage: "arrived",
+      source: "instagram_story",
+    });
+    expect(submittedProgress.submissionId).toContain(submittedProgress.dateKey);
+
+    await page.goto("/onboarding?source=instagram_dm");
+    await expect(page.getByRole("button", { name: "ねこだよりを開く" })).toBeVisible();
+    await expect.poll(() => exchangeCalls).toBe(1);
+    expect(await readOnboardingProgress(page)).toMatchObject({
+      stage: "arrived",
+      source: "instagram_story",
+      submissionId: submittedProgress.submissionId,
+    });
+
+    await page.getByRole("button", { name: "ねこだよりを開く" }).click();
+    await page.waitForTimeout(1600);
+    await expect(
+      page.getByText(/届いたねこだよりを[\s\S]*しまいました。/),
+    ).toBeVisible();
+
+    await page.goto("/onboarding?source=instagram_bio");
+    await expect(page).toHaveURL(/\/account\/create\?from=onboarding&source=instagram_bio/);
+    await expect(
+      page.getByRole("heading", { name: "うちのこのアルバムをつくる" }),
+    ).toBeVisible();
+
+    await page.evaluate(() => {
+      const raw = window.localStorage.getItem("neteruneko_onboarding_progress");
+      const progress = raw ? JSON.parse(raw) : {};
+      window.localStorage.setItem(
+        "neteruneko_onboarding_progress",
+        JSON.stringify({ ...progress, stage: "album_created" }),
+      );
+    });
+    await page.goto("/onboarding?source=unknown_source");
+    await expect(page).toHaveURL(/\/home/);
+  });
+
+  test("does not let yesterday album completion block a new social onboarding day", async ({
+    page,
+  }) => {
+    await routeImmediateDelivery(page);
+    await page.addInitScript(() => {
+      const now = new Date();
+      const yesterday = new Date(now.getTime() - 24 * 60 * 60 * 1000);
+      const dateKey = new Intl.DateTimeFormat("en-CA", {
+        timeZone: "Asia/Tokyo",
+        year: "numeric",
+        month: "2-digit",
+        day: "2-digit",
+      }).format(yesterday);
+
+      window.localStorage.setItem("onboarding_completed", "true");
+      window.localStorage.setItem(
+        "neteruneko_onboarding_progress",
+        JSON.stringify({
+          version: 1,
+          anonymousId: "anonymous-yesterday",
+          dateKey,
+          stage: "album_created",
+          source: "instagram_story",
+          submissionId: `onboarding:anonymous-yesterday:${dateKey}`,
+          updatedAt: yesterday.getTime(),
+        }),
+      );
+    });
+
+    await page.goto("/onboarding?source=instagram_story");
+    await expect(page).not.toHaveURL(/\/home/);
+    await expect(
+      page.getByRole("button", { name: "ねがおを1枚入れる" }),
+    ).toBeVisible();
+
+    await page.getByRole("button", { name: "ねがおを1枚入れる" }).click();
+    await page.locator('input[type="file"]').last().setInputFiles({
+      name: "today-own-sleeping.png",
+      mimeType: "image/png",
+      buffer: testPng,
+    });
+
+    await expect(page.getByRole("button", { name: "ねこだよりを開く" })).toBeVisible();
+    const progress = await readOnboardingProgress(page);
+    const todayKey = await page.evaluate(() =>
+      new Intl.DateTimeFormat("en-CA", {
+        timeZone: "Asia/Tokyo",
+        year: "numeric",
+        month: "2-digit",
+        day: "2-digit",
+      }).format(new Date()),
+    );
+
+    expect(progress).toMatchObject({
+      dateKey: todayKey,
+      stage: "arrived",
+      source: "instagram_story",
+    });
+    expect(progress.submissionId).toContain(todayKey);
+  });
+
+  test("normalizes unknown social source without blocking onboarding", async ({
+    page,
+  }) => {
+    await routeImmediateDelivery(page);
+
+    await page.goto("/onboarding?source=instagram_reels");
+    await expect(
+      page.getByRole("button", { name: "ねがおを1枚入れる" }),
+    ).toBeVisible();
+
+    await page.getByRole("button", { name: "ねがおを1枚入れる" }).click();
+    await page.locator('input[type="file"]').last().setInputFiles({
+      name: "unknown-source-sleeping.png",
+      mimeType: "image/png",
+      buffer: testPng,
+    });
+
+    await expect(page.getByRole("button", { name: "ねこだよりを開く" })).toBeVisible();
+    expect(await readOnboardingProgress(page)).toMatchObject({
+      stage: "arrived",
+      source: "unknown",
+    });
+  });
+
   test("skips the name entry for an existing named cat", async ({ page }) => {
     await seedOnboardingAlbumCompletionReady(page);
     await seedCatProfileBeforeLoad(page, {
@@ -468,6 +640,13 @@ async function readKeptExchangePhotoCount(page: Page) {
     } catch {
       return 0;
     }
+  });
+}
+
+async function readOnboardingProgress(page: Page) {
+  return page.evaluate(() => {
+    const raw = window.localStorage.getItem("neteruneko_onboarding_progress");
+    return raw ? JSON.parse(raw) : null;
   });
 }
 
