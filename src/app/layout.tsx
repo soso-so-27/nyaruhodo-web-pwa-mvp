@@ -41,10 +41,12 @@ const zenKakuGothicNew = localFont({
   display: "swap",
 });
 
+const siteUrl =
+  process.env.NEXT_PUBLIC_SITE_URL?.trim() ||
+  "https://nyaruhodo-web-pwa-mvp.vercel.app";
+
 export const metadata: Metadata = {
-  metadataBase: new URL(
-    process.env.NEXT_PUBLIC_SITE_URL ?? "https://nyaruhodo-web-pwa-mvp.vercel.app",
-  ),
+  metadataBase: new URL(siteUrl),
   title: "ねてるねこ",
   description: "ねがおを撮ると、よる8時にねこだよりが届く猫の写真記録アプリ",
   applicationName: "ねてるねこ",

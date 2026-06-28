@@ -18,6 +18,7 @@ import {
 } from "../../lib/home/sleepingPhotos";
 import {
   getEveningDeliveryCompletionCopy,
+  getJstDateKey,
   markEveningDeliveryKept,
   markEveningDeliveryOpened,
   recordEveningDeliveryTarget,
@@ -29,7 +30,7 @@ import {
   getOrCreateOnboardingAnonymousId,
   normalizeOnboardingSource,
   patchOnboardingProgress,
-  readTodayOnboardingProgress,
+  readCurrentOnboardingProgress,
   writeOnboardingProgress,
   type OnboardingProgress,
   type OnboardingSource,
@@ -144,7 +145,7 @@ export function OnboardingFlow() {
   }, [state, deliveredPhoto, isDeliveredPhotoKept]);
 
   function resolveOnboardingProgress(source: OnboardingSource) {
-    const progress = readTodayOnboardingProgress();
+    const progress = readCurrentOnboardingProgress();
 
     if (restoreExistingProgress(progress, source)) {
       return;
@@ -248,7 +249,7 @@ export function OnboardingFlow() {
     }
 
     const restored = restoreExistingProgress(
-      readTodayOnboardingProgress(),
+      readCurrentOnboardingProgress(),
       entrySourceRef.current,
     );
 
@@ -314,15 +315,16 @@ export function OnboardingFlow() {
         setIsDeliveredPhotoKept(false);
         autoKeptDeliveredPhotoIdRef.current = "";
         const eveningTarget = recordEveningDeliveryTarget(ownPhoto);
+        const onboardingDateKey = getJstDateKey();
         const anonymousId = getOrCreateOnboardingAnonymousId();
         const submissionId = createOnboardingSubmissionId(
           anonymousId,
-          eveningTarget.dateKey,
+          onboardingDateKey,
         );
         writeOnboardingProgress({
           version: 1,
           anonymousId,
-          dateKey: eveningTarget.dateKey,
+          dateKey: onboardingDateKey,
           stage: "submitted",
           source: entrySourceRef.current,
           submissionId,
@@ -354,7 +356,7 @@ export function OnboardingFlow() {
         const delivered = await deliverOwnSleepingPhoto({
           ownPhoto,
           recipientCatId: catId,
-          deliveryDateKey: eveningTarget.dateKey,
+          deliveryDateKey: onboardingDateKey,
           submissionId,
           selectedPhotoSrc: dataUrl,
           emptyMessage: canShowTestTools
@@ -423,7 +425,7 @@ export function OnboardingFlow() {
       isDeliveredPhotoKept: keepResult.saved,
       completionCopy: getEveningDeliveryCompletionCopy(),
     });
-    const progress = readTodayOnboardingProgress();
+    const progress = readCurrentOnboardingProgress();
     if (progress?.dateKey) {
       markEveningDeliveryKept(progress.dateKey);
     }
@@ -445,7 +447,7 @@ export function OnboardingFlow() {
       return;
     }
 
-    const progress = readTodayOnboardingProgress();
+    const progress = readCurrentOnboardingProgress();
     const nextPhoto =
       progress?.dateKey
         ? updateEveningDeliveredPhotoDataUrl(progress.dateKey, dataUrl)
@@ -488,7 +490,7 @@ export function OnboardingFlow() {
       deliveredPhoto,
       isDeliveredPhotoKept,
     });
-    const progress = readTodayOnboardingProgress();
+    const progress = readCurrentOnboardingProgress();
     if (progress?.dateKey) {
       markEveningDeliveryOpened(progress.dateKey);
     }
@@ -658,8 +660,8 @@ export function OnboardingFlow() {
           ownPhoto: pendingOwnPhoto,
           recipientCatId: pendingOwnPhoto.catId,
           preferredSourcePhotoId: saved.sourceOwnPhotoId ?? saved.id,
-          deliveryDateKey: readTodayOnboardingProgress()?.dateKey,
-          submissionId: readTodayOnboardingProgress()?.submissionId,
+          deliveryDateKey: readCurrentOnboardingProgress()?.dateKey,
+          submissionId: readCurrentOnboardingProgress()?.submissionId,
           selectedPhotoSrc,
           emptyMessage:
             "とどく候補を追加しましたが、まだ受け取れませんでした。設定のとどく状態を確認してください。",

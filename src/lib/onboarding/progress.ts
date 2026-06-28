@@ -1,5 +1,8 @@
 import { STORAGE_KEYS } from "../storage";
-import { getJstDateKey } from "../home/eveningDelivery";
+import {
+  getEveningDeliveryTargetDateKey,
+  getJstDateKey,
+} from "../home/eveningDelivery";
 import type { ExchangePhoto, OwnSleepingPhoto } from "../home/sleepingPhotos";
 
 export type OnboardingSource =
@@ -74,6 +77,23 @@ export function readTodayOnboardingProgress(now = Date.now()) {
   const progress = readOnboardingProgress();
 
   if (!progress || progress.dateKey !== getJstDateKey(now)) {
+    return null;
+  }
+
+  return progress;
+}
+
+export function readCurrentOnboardingProgress(now = Date.now()) {
+  const progress = readOnboardingProgress();
+
+  if (!progress) {
+    return null;
+  }
+
+  const todayKey = getJstDateKey(now);
+  const targetKey = getEveningDeliveryTargetDateKey(now);
+
+  if (progress.dateKey !== todayKey && progress.dateKey !== targetKey) {
     return null;
   }
 

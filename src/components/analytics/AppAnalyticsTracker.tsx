@@ -48,6 +48,61 @@ export function AppAnalyticsTracker() {
     });
   }, [pathname]);
 
+  useEffect(() => {
+    if (process.env.NODE_ENV !== "production") {
+      return;
+    }
+
+    function handleWindowError(event: ErrorEvent) {
+      if (!event.error) {
+        return;
+      }
+
+      trackProductEvent("app_error", {
+        surface: "window_error",
+        error_code: event.error?.name ?? "window_error",
+        error_message: sanitizeAnalyticsErrorMessage(
+          event.message || "window error",
+        ),
+        route: window.location.pathname,
+      });
+    }
+
+    function handleUnhandledRejection(event: PromiseRejectionEvent) {
+      if (event.reason instanceof DOMException && event.reason.name === "AbortError") {
+        return;
+      }
+
+      const reason =
+        event.reason instanceof Error
+          ? event.reason.message
+          : typeof event.reason === "string"
+            ? event.reason
+            : "unhandled rejection";
+
+      trackProductEvent("app_error", {
+        surface: "unhandled_rejection",
+        error_code:
+          event.reason instanceof Error
+            ? event.reason.name
+            : "unhandled_rejection",
+        error_message: sanitizeAnalyticsErrorMessage(reason),
+        route: window.location.pathname,
+      });
+    }
+
+    window.addEventListener("error", handleWindowError);
+    window.addEventListener("unhandledrejection", handleUnhandledRejection);
+
+    return () => {
+      window.removeEventListener("error", handleWindowError);
+      window.removeEventListener(
+        "unhandledrejection",
+        handleUnhandledRejection,
+      );
+    };
+  }, []);
+
   return null;
 }
 
@@ -87,6 +142,13 @@ function getDisplayMode(): "browser" | "standalone" | "unknown" {
   } catch {
     return "unknown";
   }
+}
+
+function sanitizeAnalyticsErrorMessage(message: string) {
+  return message
+    .replace(/https?:\/\/\S+/gi, "[url]")
+    .replace(/\b(?:data|blob):\S+/gi, "[url]")
+    .slice(0, 240);
 }
 
 function isInAppBrowser() {
