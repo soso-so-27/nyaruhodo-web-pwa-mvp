@@ -290,6 +290,49 @@ test.describe("onboarding delivery flow", () => {
     await expect.poll(() => readKeptExchangePhotoCount(page)).toBe(1);
   });
 
+  test("falls back to thumbnail for storage-backed onboarding deliveries and keeps them visible", async ({
+    page,
+  }) => {
+    await routeStorageDeliveryWithBrokenDisplay(page);
+
+    await page.goto("/onboarding?source=instagram_story");
+    await page.waitForLoadState("networkidle");
+    await page.locator("main button").first().click();
+    await page.locator('input[type="file"]').last().setInputFiles({
+      name: "own-sleeping.png",
+      mimeType: "image/png",
+      buffer: testPng,
+    });
+
+    await expect(page.locator("main button").first()).toBeVisible();
+    await page.locator("main button").first().click();
+    await page.waitForTimeout(1800);
+
+    await expectVisibleNonBlackImage(page.locator("main img").last());
+    await expect.poll(() => readKeptExchangePhotoCount(page)).toBe(1);
+
+    await page.locator("main button").first().click();
+    await expect(page).toHaveURL(/\/collection/);
+    await page.locator('[role="tab"]').nth(1).click();
+    await expectVisibleNonBlackImage(page.locator("main img").first());
+  });
+
+  test("does not show the PWA home install guide inside Instagram browser", async ({
+    page,
+  }) => {
+    await page.addInitScript(() => {
+      window.localStorage.setItem("onboarding_completed", "true");
+      Object.defineProperty(window.navigator, "userAgent", {
+        get: () =>
+          "Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 Instagram 350.0.0.0 Mobile/15E148",
+      });
+    });
+
+    await page.goto("/home");
+    await page.waitForLoadState("networkidle");
+    await expect(page.getByText("iPhoneでホームに置く")).toHaveCount(0);
+  });
+
   test("restores the current onboarding state across repeated social URL visits", async ({
     page,
   }) => {
@@ -609,6 +652,47 @@ async function routeImmediateDelivery(page: Page) {
           id: `delivered-test-${Date.now()}`,
           sourcePhotoId: "stock-e2e-fake",
           src: `data:image/png;base64,${testPng.toString("base64")}`,
+          title: "",
+          subtitle: "",
+          triggerLabel: "sleeping",
+          theme: "sleeping",
+          deliveredAt: Date.now(),
+        },
+        source: "remote",
+        diagnostics: {
+          source: "remote",
+          availableCount: 1,
+          candidateCount: 1,
+          normalCandidateCount: 1,
+          fallbackCandidateCount: 0,
+          fallbackActive: false,
+        },
+      }),
+    });
+  });
+}
+
+async function routeStorageDeliveryWithBrokenDisplay(page: Page) {
+  await page.route("https://example.com/missing-delivery-display.jpg", async (route) => {
+    await route.fulfill({ status: 404, body: "" });
+  });
+  await page.route("**/api/photo-storage/signed-url", async (route) => {
+    await route.fulfill({
+      status: 403,
+      contentType: "application/json",
+      body: JSON.stringify({ signedUrl: null, error: "forbidden_photo" }),
+    });
+  });
+  await page.route("**/api/sleeping-delivery/exchange", async (route) => {
+    await route.fulfill({
+      contentType: "application/json",
+      body: JSON.stringify({
+        photo: {
+          id: `delivered-storage-${Date.now()}`,
+          sourcePhotoId: "stock-storage-e2e-fake",
+          src: "storage:admin-stock/sleeping/onboarding-delivered.jpg",
+          displaySrc: "https://example.com/missing-delivery-display.jpg",
+          thumbnailSrc: `data:image/png;base64,${testPng.toString("base64")}`,
           title: "",
           subtitle: "",
           triggerLabel: "sleeping",

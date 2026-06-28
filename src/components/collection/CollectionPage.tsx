@@ -16,7 +16,7 @@ import {
 import {
   storeAccountPhotoDataUrl,
 } from "../../lib/photoStorageClient";
-import { getStoragePhotoPath, isUsablePhotoSrc } from "../../lib/photoStorage";
+import { isUsablePhotoSrc } from "../../lib/photoStorage";
 import {
   BOX_PHOTO_STORAGE_EVENT,
   deleteOwnSleepingPhoto,
@@ -252,6 +252,7 @@ type MainichiBoardPhoto = {
   dateKey: string;
   dateLabel: string;
   src: string;
+  fallbackSrcs?: string[];
   timestamp: number;
   side: MainichiBoardSide;
   catName?: string;
@@ -2029,6 +2030,7 @@ function MainichiMonthBundleSheet({
                 <PhotoTile
                   key={photo.id}
                   src={photo.src}
+                  fallbackSrcs={photo.fallbackSrcs}
                   alt=""
                   variant="tile"
                   aspect="1 / 1"
@@ -2159,6 +2161,7 @@ function MainichiBoardPhotoCard({
       ) : null}
       <PhotoTile
         src={photo.src}
+        fallbackSrcs={photo.fallbackSrcs}
         alt=""
         variant="tile"
         aspect={layout.aspect}
@@ -2339,6 +2342,7 @@ function MainichiDaySheet({
                 >
                 <PhotoTile
                   src={getPhotoThumbnailSrc(photo)}
+                  fallbackSrcs={getPhotoFallbackSrcs(photo)}
                   alt=""
                   variant="tile"
                   aspect="1 / 1"
@@ -2513,6 +2517,7 @@ function MainichiFullscreenPhoto({
       >
         <PhotoViewerFrame
           src={getPhotoDetailSrc(photo)}
+          fallbackSrcs={getPhotoFallbackSrcs(photo)}
           alt=""
           fit="contain"
           aspect="auto"
@@ -2698,6 +2703,7 @@ function BoxPhotoDetailSheet({
               <div key={photo.id} style={styles.photoSlide}>
                 <StoredPhotoImage
                   src={getPhotoDetailSrc(photo)}
+                  fallbackSrcs={getPhotoFallbackSrcs(photo)}
                   alt=""
                   style={styles.photoImg}
                   onStorageDataUrl={
@@ -3151,6 +3157,7 @@ function CollectionCard({
       >
         <StoredPhotoImage
           src={getPhotoThumbnailSrc(firstPhoto)}
+          fallbackSrcs={getPhotoFallbackSrcs(firstPhoto)}
           alt=""
           style={styles.cardPhoto}
         />
@@ -3215,6 +3222,7 @@ function CollectionPhotoSheet({
               <div key={photo.id} style={styles.photoSlide}>
                 <StoredPhotoImage
                   src={getPhotoDetailSrc(photo)}
+                  fallbackSrcs={getPhotoFallbackSrcs(photo)}
                   alt=""
                   style={styles.photoImg}
                 />
@@ -3769,6 +3777,7 @@ function createMainichiBoardPhoto(
     dateKey,
     dateLabel: getAlbumDateLabelFromKey(dateKey),
     src: getPhotoThumbnailSrc(photo),
+    fallbackSrcs: getPhotoFallbackSrcs(photo),
     timestamp: photo.timestamp,
     side,
     catName: side === "sent" && catId ? catNameById.get(catId) : undefined,
@@ -4444,20 +4453,6 @@ function readOpenedEveningDeliveryBoxPhotos(): BoxPreviewPhoto[] {
         };
       }
 
-      if (getStoragePhotoPath(deliveredPhoto.src)) {
-        const {
-          thumbnailSrc: _thumbnailSrc,
-          displaySrc: _displaySrc,
-          originalSrc: _originalSrc,
-          ...persistentDeliveredPhoto
-        } = deliveredPhoto;
-
-        return {
-          ...persistentDeliveredPhoto,
-          deliveredAt,
-        };
-      }
-
       return {
         ...deliveredPhoto,
         deliveredAt,
@@ -4589,10 +4584,6 @@ function getPhotoThumbnailSrc(photo: {
   thumbnailSrc?: string;
   displaySrc?: string;
 }) {
-  if (getStoragePhotoPath(photo.src)) {
-    return photo.src;
-  }
-
   if (isUsableStoredPhotoSrc(photo.thumbnailSrc)) {
     return photo.thumbnailSrc;
   }
@@ -4602,18 +4593,30 @@ function getPhotoThumbnailSrc(photo: {
 
 function getPhotoDetailSrc(photo: {
   src: string;
+  thumbnailSrc?: string;
   displaySrc?: string;
   originalSrc?: string;
 }) {
-  if (getStoragePhotoPath(photo.src)) {
-    return photo.src;
-  }
-
   if (isUsableStoredPhotoSrc(photo.displaySrc)) {
     return photo.displaySrc;
   }
 
-  return photo.src;
+  if (isUsableStoredPhotoSrc(photo.originalSrc)) {
+    return photo.originalSrc;
+  }
+
+  return isUsableStoredPhotoSrc(photo.thumbnailSrc) ? photo.thumbnailSrc : photo.src;
+}
+
+function getPhotoFallbackSrcs(photo: {
+  src: string;
+  thumbnailSrc?: string;
+  displaySrc?: string;
+  originalSrc?: string;
+}) {
+  return [photo.displaySrc, photo.thumbnailSrc, photo.originalSrc, photo.src].filter(
+    (src): src is string => isUsableStoredPhotoSrc(src),
+  );
 }
 
 function writeBackDeliveredPhotoDataUrl(photo: BoxPreviewPhoto, dataUrl: string) {

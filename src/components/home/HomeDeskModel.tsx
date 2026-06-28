@@ -587,6 +587,7 @@ export function HomeDeskModel({
                       >
                         <StoredPhotoImage
                           src={getPhotoDetailSrc(deliveredPhoto)}
+                          fallbackSrcs={getPhotoFallbackSrcs(deliveredPhoto)}
                           alt=""
                           loading="eager"
                           onStorageDataUrl={(dataUrl) => {
@@ -1085,6 +1086,7 @@ function OmoideMemoryViewer({
         <div style={deskStyles.omoideViewerImageFrame}>
           <StoredPhotoImage
             src={getPhotoDetailSrc(memory.photo)}
+            fallbackSrcs={getPhotoFallbackSrcs(memory.photo)}
             alt=""
             style={deskStyles.omoideViewerImage}
           />
@@ -1247,6 +1249,7 @@ function DeskPhotoViewer({
         ) : null}
         <PhotoViewerFrame
           src={getPhotoDetailSrc(viewerPhoto.photo)}
+          fallbackSrcs={getPhotoFallbackSrcs(viewerPhoto.photo)}
           alt=""
           aspect={isOwnPhoto ? "auto" : undefined}
           fit={isOwnPhoto ? "cover" : "contain"}
@@ -1903,10 +1906,21 @@ function getPhotoDisplaySrc(
 function getPhotoDetailSrc(
   photo: Pick<
     OwnSleepingPhoto | ExchangePhoto,
-    "src" | "displaySrc" | "originalSrc"
+    "src" | "thumbnailSrc" | "displaySrc" | "originalSrc"
   >,
 ) {
-  return photo.originalSrc ?? photo.displaySrc ?? photo.src;
+  return photo.displaySrc ?? photo.originalSrc ?? photo.thumbnailSrc ?? photo.src;
+}
+
+function getPhotoFallbackSrcs(
+  photo: Pick<
+    OwnSleepingPhoto | ExchangePhoto,
+    "src" | "thumbnailSrc" | "displaySrc" | "originalSrc"
+  >,
+) {
+  return [photo.displaySrc, photo.thumbnailSrc, photo.originalSrc, photo.src].filter(
+    (src): src is string => typeof src === "string" && src.trim().length > 0,
+  );
 }
 
 async function savePhotoToDevice(

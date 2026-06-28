@@ -419,6 +419,11 @@ export function HomeInput({
       return;
     }
 
+    if (isInAppBrowser()) {
+      dismissHomeInstallHint();
+      return;
+    }
+
     if (
       window.localStorage.getItem(HOME_INSTALL_HINT_DISMISSED_STORAGE_KEY) ===
         "true" ||
@@ -2925,6 +2930,7 @@ function EveningDeliveryOpening({
         <div style={styles.eveningOpeningPhotoFrame}>
           <StoredPhotoImage
             src={getPhotoDetailSrc(state.deliveredPhoto)}
+            fallbackSrcs={getPhotoFallbackSrcs(state.deliveredPhoto)}
             alt=""
             style={styles.eveningOpeningPhoto}
             onStorageDataUrl={onStorageDataUrl}
@@ -3137,6 +3143,7 @@ function ExchangePhotoSheet({
         <div style={styles.exchangePhotoFrame}>
           <StoredPhotoImage
             src={getPhotoDetailSrc(photo)}
+            fallbackSrcs={getPhotoFallbackSrcs(photo)}
             alt=""
             style={styles.exchangePhoto}
             onStorageDataUrl={onStorageDataUrl}
@@ -4541,10 +4548,21 @@ function getPhotoThumbnailSrc(
 function getPhotoDetailSrc(
   photo: Pick<
     OwnSleepingPhoto | ExchangePhoto,
-    "src" | "displaySrc" | "originalSrc"
+    "src" | "thumbnailSrc" | "displaySrc" | "originalSrc"
   >,
 ) {
-  return photo.originalSrc ?? photo.displaySrc ?? photo.src;
+  return photo.displaySrc ?? photo.originalSrc ?? photo.thumbnailSrc ?? photo.src;
+}
+
+function getPhotoFallbackSrcs(
+  photo: Pick<
+    OwnSleepingPhoto | ExchangePhoto,
+    "src" | "thumbnailSrc" | "displaySrc" | "originalSrc"
+  >,
+) {
+  return [photo.displaySrc, photo.thumbnailSrc, photo.originalSrc, photo.src].filter(
+    (src): src is string => typeof src === "string" && src.trim().length > 0,
+  );
 }
 
 function hasAcceptedSleepingSafetyNotice() {
@@ -4572,6 +4590,10 @@ function getHomeInstallPlatform(): HomeInstallPlatform | null {
     return null;
   }
 
+  if (isInAppBrowser()) {
+    return null;
+  }
+
   const userAgent = window.navigator.userAgent.toLowerCase();
   const isIos =
     /iphone|ipad|ipod/.test(userAgent) ||
@@ -4587,6 +4609,18 @@ function getHomeInstallPlatform(): HomeInstallPlatform | null {
   }
 
   return null;
+}
+
+function isInAppBrowser() {
+  if (typeof window === "undefined") {
+    return false;
+  }
+
+  const userAgent = window.navigator.userAgent.toLowerCase();
+
+  return /instagram|fban|fbav|fb_iab|line\/|micromessenger|twitter|tiktok|bytedance|snapchat|pinterest/.test(
+    userAgent,
+  );
 }
 
 function isStandaloneDisplay() {

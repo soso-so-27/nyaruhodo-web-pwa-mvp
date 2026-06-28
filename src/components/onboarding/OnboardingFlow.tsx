@@ -12,6 +12,7 @@ import {
 import {
   keepExchangePhoto,
   saveOwnSleepingPhoto,
+  updateKeptExchangePhotoDataUrl,
   type ExchangePhoto,
   type OwnSleepingPhoto,
 } from "../../lib/home/sleepingPhotos";
@@ -21,6 +22,7 @@ import {
   markEveningDeliveryOpened,
   recordEveningDeliveryTarget,
   setEveningDeliveredPhoto,
+  updateEveningDeliveredPhotoDataUrl,
 } from "../../lib/home/eveningDelivery";
 import {
   createOnboardingSubmissionId,
@@ -415,6 +417,34 @@ export function OnboardingFlow() {
     }
   }
 
+  function handleDeliveredPhotoDataUrl(dataUrl: string) {
+    if (!deliveredPhoto || !dataUrl.startsWith("data:image/")) {
+      return;
+    }
+
+    const progress = readTodayOnboardingProgress();
+    const nextPhoto =
+      progress?.dateKey
+        ? updateEveningDeliveredPhotoDataUrl(progress.dateKey, dataUrl)
+        : null;
+    const photoWithDataUrl =
+      nextPhoto ?? {
+        ...deliveredPhoto,
+        src: dataUrl,
+        thumbnailSrc: dataUrl,
+        displaySrc: dataUrl,
+        originalSrc: dataUrl,
+      };
+
+    setDeliveredPhoto(photoWithDataUrl);
+    updateKeptExchangePhotoDataUrl(photoWithDataUrl, dataUrl);
+    patchOnboardingProgress({
+      stage: progress?.stage ?? "opened",
+      deliveredPhoto: photoWithDataUrl,
+      isDeliveredPhotoKept,
+    });
+  }
+
   function handleOpenEnvelope() {
     if (!deliveredPhoto) {
       return;
@@ -743,8 +773,10 @@ export function OnboardingFlow() {
           <section style={styles.result} aria-label="どこかのねがお">
             <div style={styles.revealingPhotoFrame}>
               <PhotoTile
-                src={deliveredPhoto.src}
+                src={getExchangePhotoDisplaySrc(deliveredPhoto)}
+                fallbackSrcs={getExchangePhotoFallbackSrcs(deliveredPhoto)}
                 imageStyle={styles.revealingPhoto}
+                onStorageDataUrl={handleDeliveredPhotoDataUrl}
               />
             </div>
           </section>
@@ -756,9 +788,11 @@ export function OnboardingFlow() {
             {selectedPhotoSrc ? (
               <div style={styles.deliveredMoment}>
                 <PhotoTile
-                  src={deliveredPhoto.src}
+                  src={getExchangePhotoDisplaySrc(deliveredPhoto)}
+                  fallbackSrcs={getExchangePhotoFallbackSrcs(deliveredPhoto)}
                   style={styles.deliveredPhotoTile}
                   imageStyle={styles.deliveredPhoto}
+                  onStorageDataUrl={handleDeliveredPhotoDataUrl}
                 />
                 <PhotoTile
                   src={selectedPhotoSrc}
@@ -769,9 +803,11 @@ export function OnboardingFlow() {
               </div>
             ) : (
               <PhotoTile
-                src={deliveredPhoto.src}
+                src={getExchangePhotoDisplaySrc(deliveredPhoto)}
+                fallbackSrcs={getExchangePhotoFallbackSrcs(deliveredPhoto)}
                 style={styles.deliveredPhotoTile}
                 imageStyle={styles.deliveredPhoto}
+                onStorageDataUrl={handleDeliveredPhotoDataUrl}
               />
             )}
             <p style={styles.resultText}>
@@ -1078,6 +1114,20 @@ async function keepExchangePhotoForAlbum(photo: ExchangePhoto) {
   }
 
   return { photo: candidates[0] ?? photo, saved: false };
+}
+
+function getExchangePhotoDisplaySrc(photo: ExchangePhoto) {
+  return (
+    [photo.displaySrc, photo.thumbnailSrc, photo.originalSrc, photo.src].find(
+      (src) => typeof src === "string" && isUsablePhotoSrc(src),
+    ) ?? photo.src
+  );
+}
+
+function getExchangePhotoFallbackSrcs(photo: ExchangePhoto) {
+  return [photo.thumbnailSrc, photo.originalSrc, photo.src].filter(
+    (src): src is string => typeof src === "string" && isUsablePhotoSrc(src),
+  );
 }
 
 async function createAlbumPhotoCandidates(photo: ExchangePhoto) {

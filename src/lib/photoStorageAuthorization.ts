@@ -77,6 +77,7 @@ export async function hasDeliveredStoragePhoto({
   anonymousId: string | null;
 }) {
   if (
+    userId &&
     await hasDeliveredStoragePhotoForUser({
       supabase,
       photoUrlVariants,

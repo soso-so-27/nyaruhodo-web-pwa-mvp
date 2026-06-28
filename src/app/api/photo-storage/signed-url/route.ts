@@ -8,6 +8,7 @@ import {
   getStoragePhotoPath,
 } from "../../../../lib/photoStorage";
 import {
+  getStoragePhotoUrlVariants,
   hasDeliveredStoragePhoto,
   isAuthorizedStoragePhotoPath,
   isSafeStoragePath,
@@ -32,9 +33,31 @@ export async function POST(request: Request) {
   }
 
   const bearerToken = getBearerToken(request);
+  const anonymousId = normalizeAnonymousId(body?.anonymousId);
 
   if (!bearerToken) {
-    return NextResponse.json({ signedUrl: null, error: "auth_required" }, { status: 401 });
+    if (!anonymousId) {
+      return NextResponse.json({ signedUrl: null, error: "auth_required" }, { status: 401 });
+    }
+
+    const signingSupabase = createSupabaseAdminClient();
+
+    if (!signingSupabase) {
+      return NextResponse.json({ signedUrl: null, error: "server_unavailable" }, { status: 503 });
+    }
+
+    const isDeliveredToAnonymousSession = await hasDeliveredStoragePhoto({
+      supabase: signingSupabase,
+      photoUrlVariants: getStoragePhotoUrlVariants(storagePath),
+      userId: "",
+      anonymousId,
+    });
+
+    if (!isDeliveredToAnonymousSession) {
+      return NextResponse.json({ signedUrl: null, error: "forbidden_photo" }, { status: 403 });
+    }
+
+    return createStorageSignedUrlResponse(storagePath, signingSupabase);
   }
 
   const config = getSupabasePublicConfig();
@@ -72,7 +95,7 @@ export async function POST(request: Request) {
   const isAuthorized = await isAuthorizedStoragePhotoPath({
     storagePath,
     userId,
-    anonymousId: normalizeAnonymousId(body?.anonymousId),
+    anonymousId,
     hasDeliveredPhoto: (photoUrlVariants, checkedUserId, anonymousId) =>
       hasDeliveredStoragePhoto({
         supabase: signingSupabase,

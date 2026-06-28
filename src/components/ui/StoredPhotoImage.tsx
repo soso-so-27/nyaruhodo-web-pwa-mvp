@@ -21,6 +21,7 @@ import { color, radius, shadow, typography } from "./designTokens";
 const signedUrlCache = new Map<string, { expiresAt: number; url: string }>();
 const signedUrlPromiseCache = new Map<string, Promise<string | null>>();
 const SIGNED_URL_CACHE_SAFETY_MS = 5 * 60 * 1000;
+const EMPTY_FALLBACK_SRCS: string[] = [];
 
 const fallbackFrameStyle: CSSProperties = {
   display: "grid",
@@ -83,6 +84,7 @@ export function StoredPhotoImage({
   onNaturalSize,
   onLoad,
   onError,
+  fallbackSrcs = EMPTY_FALLBACK_SRCS,
 }: {
   src: string;
   alt: string;
@@ -93,6 +95,7 @@ export function StoredPhotoImage({
   onNaturalSize?: (size: { width: number; height: number }) => void;
   onLoad?: () => void;
   onError?: () => void;
+  fallbackSrcs?: string[];
 }) {
   const {
     objectFit,
@@ -101,7 +104,14 @@ export function StoredPhotoImage({
     mixBlendMode,
     ...containerStyle
   } = style ?? {};
-  const initialSrc = getInitialDisplaySrc(src);
+  const fallbackSrcKey = fallbackSrcs.join("\u0000");
+  const sourceQueue = useMemo(
+    () => getUniquePhotoSources([src, ...fallbackSrcs]),
+    [fallbackSrcKey, src],
+  );
+  const [sourceIndex, setSourceIndex] = useState(0);
+  const currentSource = sourceQueue[sourceIndex] ?? src;
+  const initialSrc = getInitialDisplaySrc(currentSource);
   const [displaySrc, setDisplaySrc] = useState(initialSrc);
   const [storageDataUrl, setStorageDataUrl] = useState<string | null>(null);
   const [isLoaded, setIsLoaded] = useState(false);
@@ -111,6 +121,7 @@ export function StoredPhotoImage({
   const trackedDisplaySrcRef = useRef("");
   const persistedDataUrlRef = useRef("");
   const isInlineImage = displaySrc.startsWith("data:image/");
+  const hasNextSource = sourceIndex < sourceQueue.length - 1;
   const frameStyle = useMemo<CSSProperties>(
     () => ({
       ...containerStyle,
@@ -125,8 +136,12 @@ export function StoredPhotoImage({
   );
 
   useEffect(() => {
+    setSourceIndex(0);
+  }, [fallbackSrcKey, src]);
+
+  useEffect(() => {
     let isActive = true;
-    const storagePath = getStoragePhotoPath(src);
+    const storagePath = getStoragePhotoPath(currentSource);
 
     loadStartedAtRef.current = performance.now();
     trackedDisplaySrcRef.current = "";
@@ -135,7 +150,7 @@ export function StoredPhotoImage({
     setStorageDataUrl(null);
 
     if (!storagePath) {
-      setDisplaySrc(src);
+      setDisplaySrc(currentSource);
       return;
     }
 
@@ -147,7 +162,7 @@ export function StoredPhotoImage({
 
     const signedUrlPromise =
       signedUrlPromiseCache.get(storagePath) ??
-      resolveStoragePhotoForDisplay(src, storagePath);
+      resolveStoragePhotoForDisplay(currentSource);
     signedUrlPromiseCache.set(storagePath, signedUrlPromise);
 
     void signedUrlPromise.then((signedUrl) => {
@@ -160,6 +175,8 @@ export function StoredPhotoImage({
       if (isActive) {
         if (signedUrl) {
           setDisplaySrc(signedUrl);
+        } else if (hasNextSource) {
+          setSourceIndex((index) => Math.min(index + 1, sourceQueue.length - 1));
         } else {
           setDisplaySrc("");
           setHasError(true);
@@ -170,7 +187,7 @@ export function StoredPhotoImage({
     return () => {
       isActive = false;
     };
-  }, [src]);
+  }, [currentSource, hasNextSource, sourceQueue.length]);
 
   useEffect(() => {
     loadStartedAtRef.current = performance.now();
@@ -284,8 +301,13 @@ export function StoredPhotoImage({
         }}
         onError={() => {
           setIsLoaded(false);
-          setHasError(true);
-          onError?.();
+          if (hasNextSource) {
+            setHasError(false);
+            setSourceIndex((index) => Math.min(index + 1, sourceQueue.length - 1));
+          } else {
+            setHasError(true);
+            onError?.();
+          }
         }}
         style={{
           width: "100%",
@@ -315,6 +337,22 @@ export function StoredPhotoImage({
       {hasError ? <PhotoFallback style={fallbackOverlayStyle} /> : null}
     </span>
   );
+}
+
+function getUniquePhotoSources(sources: Array<string | null | undefined>) {
+  const seen = new Set<string>();
+  const values: string[] = [];
+
+  for (const source of sources) {
+    const value = typeof source === "string" ? source.trim() : "";
+    if (!value || seen.has(value)) {
+      continue;
+    }
+    seen.add(value);
+    values.push(value);
+  }
+
+  return values;
 }
 
 function buildDevelopFilter(
@@ -407,7 +445,7 @@ function writeCachedSignedUrl(storagePath: string, url: string) {
   });
 }
 
-async function resolveStoragePhotoForDisplay(src: string, storagePath: string) {
+async function resolveStoragePhotoForDisplay(src: string) {
   const supabase = createBrowserSupabaseClient();
 
   return readSignedUrlFromApi(src, supabase);

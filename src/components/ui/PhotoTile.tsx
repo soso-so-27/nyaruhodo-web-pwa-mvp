@@ -24,6 +24,7 @@ type PhotoTileProps = {
   onClick?: () => void;
   fallbackLabel?: string;
   loading?: "eager" | "lazy";
+  fallbackSrcs?: string[];
   onStorageDataUrl?: (dataUrl: string) => void;
   onLoad?: () => void;
   onError?: () => void;
@@ -46,6 +47,7 @@ export function PhotoTile({
   onClick,
   fallbackLabel,
   loading,
+  fallbackSrcs,
   onStorageDataUrl,
   onLoad,
   onError,
@@ -78,6 +80,7 @@ export function PhotoTile({
           alt={alt}
           style={{ ...frameStyle, objectFit: fit }}
           loading={loading}
+          fallbackSrcs={fallbackSrcs}
           onStorageDataUrl={onStorageDataUrl}
           onLoad={onLoad}
           onError={onError}
@@ -107,6 +110,7 @@ type PhotoViewerFrameProps = {
   alt?: string;
   aspect?: PhotoTileAspect;
   fit?: PhotoTileFit;
+  fallbackSrcs?: string[];
   onStorageDataUrl?: (dataUrl: string) => void;
   onNaturalSize?: (size: { width: number; height: number }) => void;
   style?: CSSProperties;
@@ -119,6 +123,7 @@ export function PhotoViewerFrame({
   alt = "",
   aspect = "1 / 1",
   fit = "cover",
+  fallbackSrcs,
   onStorageDataUrl,
   onNaturalSize,
   style,
@@ -137,6 +142,7 @@ export function PhotoViewerFrame({
         src={src}
         alt={alt}
         style={{ ...styles.viewerImage, objectFit: fit, ...imageStyle }}
+        fallbackSrcs={fallbackSrcs}
         onStorageDataUrl={onStorageDataUrl}
         onNaturalSize={onNaturalSize}
       />
