@@ -160,7 +160,9 @@ export function SettingsPage() {
     useState<ClientReferralSummary | null>(null);
   const [referralMessage, setReferralMessage] = useState("");
   const showsAdminSection =
-    adminCapabilities.testToolsEnabled || adminCapabilities.stockAdminEnabled;
+    adminCapabilities.isAdmin ||
+    adminCapabilities.testToolsEnabled ||
+    adminCapabilities.stockAdminEnabled;
   const [activeSettingsTab, setActiveSettingsTab] =
     useState<SettingsTab>("general");
 
@@ -915,6 +917,11 @@ export function SettingsPage() {
               <BuildInfoPanel
                 buildSha={APP_BUILD_SHA}
               />
+              <div style={styles.divider} />
+              <a href="/admin/analytics" style={styles.linkRow}>
+                <span style={styles.rowLabel}>Analytics</span>
+                <span style={styles.rowChevron}>›</span>
+              </a>
               <div style={styles.divider} />
               <AppButton
                 type="button"
