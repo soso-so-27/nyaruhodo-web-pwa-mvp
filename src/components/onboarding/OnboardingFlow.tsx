@@ -494,9 +494,10 @@ export function OnboardingFlow() {
               <br />
               入れた写真は、ねてるねこの中で
               <br />
-              匿名のねこだよりになることがあります。
+              名前を出さずに届くことがあります。
               <br />
-              SNSなど外には公開されません。
+              <br />
+              SNSなど外には出ません。
               <br />
               名前や場所も出ません。
             </p>
@@ -578,7 +579,9 @@ export function OnboardingFlow() {
               {isDeliveredPhotoKept
                 ? (
                     <>
-                      ねこだよりをしまいました。
+                      届いたねこだよりを
+                      <br />
+                      しまいました。
                       <br />
                       <br />
                       あなたのねがおは、

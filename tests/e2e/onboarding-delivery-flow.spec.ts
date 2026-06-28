@@ -214,7 +214,7 @@ test.describe("onboarding delivery flow", () => {
     await page.waitForTimeout(1600);
     await expectVisibleNonBlackImage(page.locator("main img").last());
     await expect(
-      page.getByText(/ねこだよりをしまいました。[\s\S]*夜8時の便りになります。/),
+      page.getByText(/届いたねこだよりを[\s\S]*しまいました。[\s\S]*夜8時の便りになります。/),
     ).toBeVisible();
     await expect(
       page.getByRole("button", { name: "ねこだよりを見る" }),
@@ -281,7 +281,7 @@ test.describe("onboarding delivery flow", () => {
       page.getByRole("button", { name: "ねこだよりを見る" }),
     ).toBeVisible();
     await expect(
-      page.getByText(/ねこだよりをしまいました。[\s\S]*夜8時の便りになります。/),
+      page.getByText(/届いたねこだよりを[\s\S]*しまいました。[\s\S]*夜8時の便りになります。/),
     ).toBeVisible();
     await expect.poll(() => readKeptExchangePhotoCount(page)).toBe(1);
 

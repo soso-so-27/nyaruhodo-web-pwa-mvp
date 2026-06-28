@@ -382,7 +382,7 @@ export default function AccountCreatePage() {
               <p style={styles.eyebrow}>アカウント</p>
               <h1 style={styles.title}>
                 {isFromOnboarding
-                  ? "このねこのアルバムをつくる"
+                  ? "うちのこのアルバムをつくる"
                   : "Googleアカウントに接続済みです"}
               </h1>
               <p style={styles.body}>
@@ -434,7 +434,7 @@ export default function AccountCreatePage() {
               </p>
               <h1 style={styles.title}>
                 {isFromOnboarding
-                  ? "このねこのアルバムをつくる"
+                  ? "うちのこのアルバムをつくる"
                   : "ねがおを、あとから見返せるように"}
               </h1>
               <p style={styles.body}>
