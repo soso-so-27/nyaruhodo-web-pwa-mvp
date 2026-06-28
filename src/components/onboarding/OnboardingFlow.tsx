@@ -58,6 +58,16 @@ const ONBOARDING_ALBUM_COMPLETION_READY_KEY =
 const ONBOARDING_FALLBACK_DELIVERY_SRC =
   "/illustrations/sleeping-cat-empty.png";
 const IS_PRODUCTION = process.env.NODE_ENV === "production";
+const MAX_UPLOAD_SOURCE_FILE_BYTES = 20 * 1024 * 1024;
+const SUPPORTED_SOURCE_IMAGE_MIME_TYPES = new Set([
+  "image/avif",
+  "image/gif",
+  "image/heic",
+  "image/heif",
+  "image/jpeg",
+  "image/png",
+  "image/webp",
+]);
 
 export function OnboardingFlow() {
   const router = useRouter();
@@ -1047,8 +1057,12 @@ async function saveStockCandidateWithFallback(file: File) {
 }
 
 function isLikelyImageFile(file: File) {
+  if (file.size > MAX_UPLOAD_SOURCE_FILE_BYTES) {
+    return false;
+  }
+
   if (file.type) {
-    return file.type.startsWith("image/");
+    return SUPPORTED_SOURCE_IMAGE_MIME_TYPES.has(file.type.toLowerCase());
   }
 
   return /\.(avif|gif|heic|heif|jpe?g|png|webp)$/i.test(file.name);

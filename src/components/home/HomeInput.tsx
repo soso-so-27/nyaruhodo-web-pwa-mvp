@@ -10,7 +10,6 @@ import { trackProductEvent } from "../../lib/analytics/productAnalytics";
 import { writeAuthDebugEvent } from "../../lib/authDebug";
 import {
   storeAccountPhotoDataUrl,
-  storeAccountPhotoFile,
 } from "../../lib/photoStorageClient";
 import {
   getCollectionSlotPhotoSlug,
@@ -129,6 +128,17 @@ const PHOTO_SAVE_FAILURE_MESSAGE =
   "写真を保存できませんでした。少し時間をおいて、もう一度試してください";
 const PHOTO_INPUT_FAILURE_MESSAGE =
   "写真を読み込めませんでした。JPEGやPNGの写真で、もう一度試してください";
+
+const MAX_UPLOAD_SOURCE_FILE_BYTES = 20 * 1024 * 1024;
+const SUPPORTED_SOURCE_IMAGE_MIME_TYPES = new Set([
+  "image/avif",
+  "image/gif",
+  "image/heic",
+  "image/heif",
+  "image/jpeg",
+  "image/png",
+  "image/webp",
+]);
 
 type RecordLogItem = {
   id: string;
@@ -4843,18 +4853,11 @@ async function createStoredPhotoVariantSet({
     displayDataUrl.length <= 1_900_000
       ? displayDataUrl
       : await resizeAndEncode(file, 900, 0.76, "image/webp");
-  const [originalSrc, storedDisplaySrc] = await Promise.all([
-    storeAccountPhotoFile({
-      file,
-      pathSegments: [...pathSegments, "original"],
-      fileName,
-    }),
-    storeAccountPhotoDataUrl({
-      dataUrl: displayDataUrl,
-      pathSegments: [...pathSegments, "display"],
-      fileName,
-    }),
-  ]);
+  const storedDisplaySrc = await storeAccountPhotoDataUrl({
+    dataUrl: displayDataUrl,
+    pathSegments: [...pathSegments, "display"],
+    fileName,
+  });
   const canStoreVariants = isStoragePhotoReference(storedDisplaySrc);
   const thumbnailSrc = canStoreVariants
     ? await storeAccountPhotoDataUrl({
@@ -4875,7 +4878,6 @@ async function createStoredPhotoVariantSet({
     ...(thumbnailSrc && isStoragePhotoReference(thumbnailSrc)
       ? { thumbnailSrc }
       : {}),
-    ...(originalSrc ? { originalSrc } : {}),
   };
 }
 
@@ -4889,6 +4891,8 @@ function resizeAndEncode(
   quality = 0.86,
   mimeType = "image/jpeg",
 ): Promise<string> {
+  assertSupportedSourceImage(file);
+
   return new Promise((resolve, reject) => {
     const img = new Image();
     const url = URL.createObjectURL(file);
@@ -4923,6 +4927,24 @@ function resizeAndEncode(
 
     img.src = url;
   });
+}
+
+function assertSupportedSourceImage(file: File) {
+  if (file.size > MAX_UPLOAD_SOURCE_FILE_BYTES) {
+    throw new Error("Image file is too large");
+  }
+
+  if (file.type) {
+    if (!SUPPORTED_SOURCE_IMAGE_MIME_TYPES.has(file.type.toLowerCase())) {
+      throw new Error("Unsupported image file type");
+    }
+
+    return;
+  }
+
+  if (!/\.(avif|gif|heic|heif|jpe?g|png|webp)$/i.test(file.name)) {
+    throw new Error("Unsupported image file type");
+  }
 }
 
 function setLock(catId: string, type: LockType): LockData {

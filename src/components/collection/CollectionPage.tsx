@@ -15,7 +15,6 @@ import {
 } from "../../lib/accountSync";
 import {
   storeAccountPhotoDataUrl,
-  storeAccountPhotoFile,
 } from "../../lib/photoStorageClient";
 import { getStoragePhotoPath, isUsablePhotoSrc } from "../../lib/photoStorage";
 import {
@@ -82,6 +81,16 @@ const COLLECTION_SURFACE_SOFT: CSSProperties = {
 };
 const COLLECTION_NAV_ENTRY_STORAGE_KEY = "neteruneko_collection_nav_entry";
 const MAINICHI_SEEN_PHOTO_KEYS_STORAGE_KEY = "neteruneko_mainichi_seen_photo_keys";
+const MAX_UPLOAD_SOURCE_FILE_BYTES = 20 * 1024 * 1024;
+const SUPPORTED_SOURCE_IMAGE_MIME_TYPES = new Set([
+  "image/avif",
+  "image/gif",
+  "image/heic",
+  "image/heif",
+  "image/jpeg",
+  "image/png",
+  "image/webp",
+]);
 const MAINICHI_PASTE_MOTION_CSS = `
 @keyframes mainichiPasteSettle {
   0% {
@@ -4921,18 +4930,11 @@ async function createStoredCollectionPhotoVariantSet({
     displayDataUrl.length <= 1_900_000
       ? displayDataUrl
       : await resizeAndEncode(file, 900, 0.76, "image/webp");
-  const [originalSrc, storedDisplaySrc] = await Promise.all([
-    storeAccountPhotoFile({
-      file,
-      pathSegments: [...pathSegments, "original"],
-      fileName,
-    }),
-    storeAccountPhotoDataUrl({
-      dataUrl: displayDataUrl,
-      pathSegments: [...pathSegments, "display"],
-      fileName,
-    }),
-  ]);
+  const storedDisplaySrc = await storeAccountPhotoDataUrl({
+    dataUrl: displayDataUrl,
+    pathSegments: [...pathSegments, "display"],
+    fileName,
+  });
   const canStoreVariants = isStoragePhotoReference(storedDisplaySrc);
   const thumbnailSrc = canStoreVariants
     ? await storeAccountPhotoDataUrl({
@@ -4948,7 +4950,6 @@ async function createStoredCollectionPhotoVariantSet({
     ...(thumbnailSrc && isStoragePhotoReference(thumbnailSrc)
       ? { thumbnailSrc }
       : {}),
-    ...(originalSrc ? { originalSrc } : {}),
   };
 }
 
@@ -4962,6 +4963,8 @@ function resizeAndEncode(
   quality = 0.85,
   mimeType = "image/jpeg",
 ): Promise<string> {
+  assertSupportedSourceImage(file);
+
   return new Promise((resolve) => {
     const img = new Image();
     const url = URL.createObjectURL(file);
@@ -4993,6 +4996,24 @@ function resizeAndEncode(
 
     img.src = url;
   });
+}
+
+function assertSupportedSourceImage(file: File) {
+  if (file.size > MAX_UPLOAD_SOURCE_FILE_BYTES) {
+    throw new Error("Image file is too large");
+  }
+
+  if (file.type) {
+    if (!SUPPORTED_SOURCE_IMAGE_MIME_TYPES.has(file.type.toLowerCase())) {
+      throw new Error("Unsupported image file type");
+    }
+
+    return;
+  }
+
+  if (!/\.(avif|gif|heic|heif|jpe?g|png|webp)$/i.test(file.name)) {
+    throw new Error("Unsupported image file type");
+  }
 }
 
 function getCollectionGroupLabel(groupId: CollectionGroupId) {

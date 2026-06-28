@@ -73,6 +73,17 @@ type EditableGender = "male" | "female" | "unknown" | "";
 type EditableCoat = CatCoat | "";
 type UchinokoLens = "cat" | "all";
 type UchinokoSection = "record" | "photos" | "basic";
+const MAX_UPLOAD_SOURCE_FILE_BYTES = 20 * 1024 * 1024;
+const SUPPORTED_SOURCE_IMAGE_MIME_TYPES = new Set([
+  "image/avif",
+  "image/gif",
+  "image/heic",
+  "image/heif",
+  "image/jpeg",
+  "image/png",
+  "image/webp",
+]);
+
 type LensPhoto = {
   id: string;
   src: string;
@@ -613,6 +624,7 @@ export function CatsPage() {
       }
 
       try {
+        assertSupportedSourceImage(file);
         const dataUrl = await resizeAndEncode(file, 800);
         const photoSrc = await storeAccountPhotoDataUrl({
           dataUrl,
@@ -647,6 +659,7 @@ export function CatsPage() {
       }
 
       try {
+        assertSupportedSourceImage(file);
         const dataUrl = await resizeAndEncode(file, 1400);
         const photoSrc = await storeAccountPhotoDataUrl({
           dataUrl,
@@ -3372,6 +3385,24 @@ function resizeAndEncode(file: File, maxSize = 800): Promise<string> {
 
     img.src = url;
   });
+}
+
+function assertSupportedSourceImage(file: File) {
+  if (file.size > MAX_UPLOAD_SOURCE_FILE_BYTES) {
+    throw new Error("Image file is too large");
+  }
+
+  if (file.type) {
+    if (!SUPPORTED_SOURCE_IMAGE_MIME_TYPES.has(file.type.toLowerCase())) {
+      throw new Error("Unsupported image file type");
+    }
+
+    return;
+  }
+
+  if (!/\.(avif|gif|heic|heif|jpe?g|png|webp)$/i.test(file.name)) {
+    throw new Error("Unsupported image file type");
+  }
 }
 
 const styles = {
