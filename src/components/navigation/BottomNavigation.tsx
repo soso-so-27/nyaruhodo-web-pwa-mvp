@@ -24,6 +24,8 @@ type ViewTransitionDocument = Document & {
   };
 };
 
+const COLLECTION_NAV_ENTRY_STORAGE_KEY = "neteruneko_collection_nav_entry";
+
 export function BottomNavigation({
   active,
   homeState = "1",
@@ -72,6 +74,13 @@ export function BottomNavigation({
     if (event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
 
     setPendingKey(item.key);
+    if (item.key === "collection") {
+      try {
+        window.sessionStorage.setItem(COLLECTION_NAV_ENTRY_STORAGE_KEY, "1");
+      } catch {
+        // Navigation should still work if sessionStorage is unavailable.
+      }
+    }
 
     const prefersReducedMotion = window.matchMedia(
       "(prefers-reduced-motion: reduce)",
