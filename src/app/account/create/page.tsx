@@ -430,7 +430,7 @@ export default function AccountCreatePage() {
           ) : (
             <>
               <p style={styles.eyebrow}>
-                {isFromOnboarding ? "とっておいた2枚" : "ねてるねこの保存"}
+                {isFromOnboarding ? "今日のねがお" : "ねてるねこの保存"}
               </p>
               <h1 style={styles.title}>
                 {isFromOnboarding
