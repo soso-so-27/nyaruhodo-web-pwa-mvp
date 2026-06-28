@@ -1,1 +1,1 @@
-export const HOME_ENVELOPE_OPEN_MS = 2200;
+export const HOME_ENVELOPE_OPEN_MS = 1150;

@@ -14,6 +14,7 @@ export type OnboardingSource =
   | "unknown";
 
 export type OnboardingProgressStage =
+  | "name_pending"
   | "submitted"
   | "arrived"
   | "opened"
@@ -201,6 +202,7 @@ function isOnboardingProgressStage(
   value: unknown,
 ): value is OnboardingProgressStage {
   return (
+    value === "name_pending" ||
     value === "submitted" ||
     value === "arrived" ||
     value === "opened" ||

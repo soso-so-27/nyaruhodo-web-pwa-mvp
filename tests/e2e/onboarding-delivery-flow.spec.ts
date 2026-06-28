@@ -156,6 +156,7 @@ test.describe("onboarding delivery flow", () => {
       mimeType: "image/png",
       buffer: testPng,
     });
+    await continuePastOptionalOnboardingNamePrompt(page);
 
     await expect.poll(() => exchangeCalls).toBe(1);
     const addCandidateButton = page.getByRole("button", {
@@ -272,6 +273,7 @@ test.describe("onboarding delivery flow", () => {
       mimeType: "image/png",
       buffer: testPng,
     });
+    await continuePastOptionalOnboardingNamePrompt(page);
 
     await expect(page.getByRole("button", { name: "ねこだよりを開く" })).toBeVisible();
     await expect.poll(() => readKeptExchangePhotoCount(page)).toBe(0);
@@ -303,6 +305,7 @@ test.describe("onboarding delivery flow", () => {
       mimeType: "image/png",
       buffer: testPng,
     });
+    await continuePastOptionalOnboardingNamePrompt(page);
 
     await expect(page.locator("main button").first()).toBeVisible();
     await page.locator("main button").first().click();
@@ -421,6 +424,7 @@ test.describe("onboarding delivery flow", () => {
       mimeType: "image/png",
       buffer: testPng,
     });
+    await continuePastOptionalOnboardingNamePrompt(page);
 
     await expect(page.getByRole("button", { name: "ねこだよりを開く" })).toBeVisible();
     await expect.poll(() => exchangeCalls).toBe(1);
@@ -505,6 +509,7 @@ test.describe("onboarding delivery flow", () => {
       mimeType: "image/png",
       buffer: testPng,
     });
+    await continuePastOptionalOnboardingNamePrompt(page);
 
     await expect(page.getByRole("button", { name: "ねこだよりを開く" })).toBeVisible();
     const progress = await readOnboardingProgress(page);
@@ -541,6 +546,7 @@ test.describe("onboarding delivery flow", () => {
       mimeType: "image/png",
       buffer: testPng,
     });
+    await continuePastOptionalOnboardingNamePrompt(page);
 
     await expect(page.getByRole("button", { name: "ねこだよりを開く" })).toBeVisible();
     expect(await readOnboardingProgress(page)).toMatchObject({
@@ -685,6 +691,20 @@ async function seedCatProfileBeforeLoad(page: Page, input: {
     );
     window.localStorage.setItem("active_cat_id", profileInput.id);
   }, input);
+}
+
+async function continuePastOptionalOnboardingNamePrompt(page: Page) {
+  const nameInput = page.locator("main section input").first();
+  const didShowNamePrompt = await nameInput
+    .waitFor({ state: "visible", timeout: 5000 })
+    .then(() => true)
+    .catch(() => false);
+
+  if (!didShowNamePrompt) {
+    return;
+  }
+
+  await page.locator("main section button").last().click();
 }
 
 async function routeImmediateDelivery(page: Page) {

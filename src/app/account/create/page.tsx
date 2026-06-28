@@ -8,6 +8,12 @@ import { AppButton } from "../../../components/ui/AppButton";
 import { AppCard } from "../../../components/ui/AppCard";
 import { WordmarkHeader } from "../../../components/ui/AppHeader";
 import {
+  getActiveCatProfile,
+  isCatProfileNameUnset,
+  readActiveCatId,
+  readCatProfiles,
+} from "../../../components/home/homeInputHelpers";
+import {
   APP_ACCENT,
   APP_PAGE_BACKGROUND,
 } from "../../../components/ui/appTheme";
@@ -82,14 +88,37 @@ export default function AccountCreatePage() {
   const [isFromOnboarding, setIsFromOnboarding] = useState(false);
   const [onboardingSource, setOnboardingSource] =
     useState<OnboardingSource>("direct");
+  const [onboardingCatName, setOnboardingCatName] = useState("");
   const googleButtonRef = useRef<HTMLDivElement | null>(null);
   const hasTrackedCtaView = useRef(false);
   const hasTrackedOnboardingPromptView = useRef(false);
   const hasTrackedCallbackError = useRef(false);
 
+  const hasOnboardingCatName = onboardingCatName.trim().length > 0;
+  const onboardingAlbumTitle = hasOnboardingCatName
+    ? `${onboardingCatName.trim()}のアルバムをつくる`
+    : "うちのこのアルバムをつくる";
+  const onboardingAlbumBody = hasOnboardingCatName
+    ? `${onboardingCatName.trim()}のねがおを\nあとから見返せるようにします。\n\n届いたねこだよりも、あとから見返せます。`
+    : "今日のねがおを\nあとから見返せるようにします。\n\n届いたねこだよりも、あとから見返せます。";
+
   function markOnboardingAlbumCompletionReady() {
     window.sessionStorage.setItem(ONBOARDING_ALBUM_COMPLETION_READY_KEY, "true");
   }
+
+  function trackOnboardingAlbumCreatedVariant(method: string) {
+    trackProductEvent(
+      hasOnboardingCatName
+        ? "album_created_with_name"
+        : "album_created_without_name",
+      {
+        source: onboardingSource,
+        method,
+        surface: "onboarding",
+      },
+    );
+  }
+
   const hasInitializedGoogleButton = useRef(false);
 
   useEffect(() => {
@@ -97,6 +126,19 @@ export default function AccountCreatePage() {
     const fromOnboarding =
       new URLSearchParams(window.location.search).get("from") === "onboarding";
     const source = readOnboardingSourceFromLocation();
+    let catName = "";
+
+    if (fromOnboarding) {
+      const activeProfile = getActiveCatProfile(
+        readCatProfiles(),
+        readActiveCatId(),
+      );
+
+      if (!isCatProfileNameUnset(activeProfile)) {
+        catName = activeProfile.name.trim();
+        setOnboardingCatName(catName);
+      }
+    }
 
     setIsFromOnboarding(fromOnboarding);
     setOnboardingSource(source);
@@ -109,6 +151,13 @@ export default function AccountCreatePage() {
       trackProductEvent("onboarding_album_prompt_view", {
         source,
       });
+      trackProductEvent(
+        catName ? "album_prompt_view_with_name" : "album_prompt_view_without_name",
+        {
+          source,
+          surface: "onboarding",
+        },
+      );
     }
 
     let isMounted = true;
@@ -372,6 +421,7 @@ export default function AccountCreatePage() {
         source: onboardingSource,
         method: "google",
       });
+      trackOnboardingAlbumCreatedVariant("google");
     }
     await claimPendingReferral();
     router.replace(
@@ -417,12 +467,12 @@ export default function AccountCreatePage() {
               <p style={styles.eyebrow}>アカウント</p>
               <h1 style={styles.title}>
                 {isFromOnboarding
-                  ? "うちのこのアルバムをつくる"
+                  ? onboardingAlbumTitle
                   : "Googleアカウントに接続済みです"}
               </h1>
               <p style={styles.body}>
                 {isFromOnboarding
-                  ? "今日のねがおを\nあとから見返せるようにします。\n\n届いたねこだよりも、あとから見返せます。"
+                  ? onboardingAlbumBody
                   : "この端末のねがおを、アカウントに保存できます。別の端末でも復元できます。"}
               </p>
               {connectedEmail ? (
@@ -451,6 +501,7 @@ export default function AccountCreatePage() {
                         source: onboardingSource,
                         method: "already_connected",
                       });
+                      trackOnboardingAlbumCreatedVariant("already_connected");
                       router.push("/cats?onboarding=1");
                     }}
                     fullWidth
@@ -478,12 +529,12 @@ export default function AccountCreatePage() {
               </p>
               <h1 style={styles.title}>
                 {isFromOnboarding
-                  ? "うちのこのアルバムをつくる"
+                  ? onboardingAlbumTitle
                   : "ねがおを、あとから見返せるように"}
               </h1>
               <p style={styles.body}>
                 {isFromOnboarding
-                  ? "今日のねがおを\nあとから見返せるようにします。\n\n届いたねこだよりも、あとから見返せます。"
+                  ? onboardingAlbumBody
                   : "Googleアカウントで接続すると、この端末のねがおを保存できます。別の端末でも、とったねがおやとどいたねがおを復元できます。"}
               </p>
               {!isFromOnboarding ? (

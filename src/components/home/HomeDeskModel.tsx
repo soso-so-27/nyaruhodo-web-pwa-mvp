@@ -79,7 +79,7 @@ type HomeDeskModelProps = {
 };
 
 const ENVELOPE_OPEN_MS = HOME_ENVELOPE_OPEN_MS;
-const ENVELOPE_SEAL_OPEN_MS = 1320;
+const ENVELOPE_SEAL_OPEN_MS = Math.min(760, HOME_ENVELOPE_OPEN_MS);
 const HOME_FRAME_TUNING = {
   pagePaddingX: "12px",
   pagePaddingTop: "64px",
@@ -265,6 +265,9 @@ export function HomeDeskModel({
   );
   const envelopeOpenTimerRef = useRef<number | null>(null);
   const isOpeningEnvelopeRef = useRef(false);
+  const revealStartedAtRef = useRef<number | null>(null);
+  const revealPhotoLoadedTrackedRef = useRef(false);
+  const revealPhotoErrorTrackedRef = useRef(false);
   const daylightStyle = useDaylight(now);
   const hasSupplementalNotification = Boolean(omoideMemory);
   const [homePhotoAspect, setHomePhotoAspect] = useState<number | null>(null);
@@ -349,6 +352,12 @@ export function HomeDeskModel({
     }
   }, [eveningState.kind]);
 
+  useEffect(() => {
+    revealStartedAtRef.current = null;
+    revealPhotoLoadedTrackedRef.current = false;
+    revealPhotoErrorTrackedRef.current = false;
+  }, [eveningState.dateKey, eveningState.kind]);
+
   function openDeliveredLetter() {
     if (eveningState.kind !== "delivered") {
       return;
@@ -359,8 +368,12 @@ export function HomeDeskModel({
     }
 
     isOpeningEnvelopeRef.current = true;
+    const startedAt = performance.now();
+    revealStartedAtRef.current = startedAt;
+    trackHomeRevealEvent("delivery_reveal_started", 0);
 
     if (prefersReducedMotion) {
+      trackHomeRevealEvent("delivery_reveal_skipped", 0);
       void playOpenSound();
       onOpenDelivery(eveningState);
       return;
@@ -376,9 +389,46 @@ export function HomeDeskModel({
       envelopeOpenTimerRef.current = null;
       isOpeningEnvelopeRef.current = false;
       setIsEnvelopeOpening(false);
+      trackHomeRevealEvent(
+        "delivery_reveal_completed",
+        performance.now() - startedAt,
+      );
       void playOpenSound();
       onOpenDelivery(eveningState);
     }, ENVELOPE_OPEN_MS);
+  }
+
+  function getRevealLatencyMs() {
+    const startedAt = revealStartedAtRef.current;
+    return startedAt ? performance.now() - startedAt : 0;
+  }
+
+  function trackHomeRevealEvent(name: string, latencyMs = getRevealLatencyMs()) {
+    trackProductEvent(name, {
+      latency_ms: Math.max(0, Math.round(latencyMs)),
+      route: "/home",
+      source: "evening_delivery",
+      surface: "home",
+      reduced_motion: prefersReducedMotion,
+    });
+  }
+
+  function handleRevealPhotoLoaded() {
+    if (revealPhotoLoadedTrackedRef.current) {
+      return;
+    }
+
+    revealPhotoLoadedTrackedRef.current = true;
+    trackHomeRevealEvent("delivery_reveal_photo_loaded");
+  }
+
+  function handleRevealPhotoError() {
+    if (revealPhotoErrorTrackedRef.current) {
+      return;
+    }
+
+    revealPhotoErrorTrackedRef.current = true;
+    trackHomeRevealEvent("delivery_reveal_photo_error");
   }
 
 
@@ -604,6 +654,8 @@ export function HomeDeskModel({
                           fallbackSrcs={getPhotoFallbackSrcs(deliveredPhoto)}
                           alt=""
                           loading="eager"
+                          onLoad={handleRevealPhotoLoaded}
+                          onError={handleRevealPhotoError}
                           onStorageDataUrl={(dataUrl) => {
                             onDeliveredStorageDataUrl(
                               eveningState.dateKey,

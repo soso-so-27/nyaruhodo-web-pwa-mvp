@@ -39,9 +39,11 @@ import { trackProductEvent } from "../../lib/analytics/productAnalytics";
 import { isUsablePhotoSrc } from "../../lib/photoStorage";
 import {
   getActiveCatProfile,
+  isCatProfileNameUnset,
   readActiveCatId,
   readCatProfiles,
   saveActiveCatId,
+  updateCatProfileName,
 } from "../home/homeInputHelpers";
 import { AppButton } from "../ui/AppButton";
 import { PhotoTile } from "../ui/PhotoTile";
@@ -50,6 +52,7 @@ import { WordmarkHeader } from "../ui/AppHeader";
 type OnboardingState =
   | "intro"
   | "saving"
+  | "naming"
   | "envelope"
   | "revealing"
   | "delivered"
@@ -62,6 +65,7 @@ const ONBOARDING_FALLBACK_DELIVERY_SRC =
   "/illustrations/sleeping-cat-empty.png";
 const IS_PRODUCTION = process.env.NODE_ENV === "production";
 const MAX_UPLOAD_SOURCE_FILE_BYTES = 20 * 1024 * 1024;
+const ONBOARDING_REVEAL_MS = 1150;
 const SUPPORTED_SOURCE_IMAGE_MIME_TYPES = new Set([
   "image/avif",
   "image/gif",
@@ -84,10 +88,19 @@ export function OnboardingFlow() {
   const [isTestMode, setIsTestMode] = useState(false);
   const [completionCopy, setCompletionCopy] = useState("");
   const [entrySource, setEntrySource] = useState<OnboardingSource>("direct");
+  const [isOpeningEnvelope, setIsOpeningEnvelope] = useState(false);
+  const [catNameDraft, setCatNameDraft] = useState("");
+  const prefersReducedMotion = usePrefersReducedMotion();
   const autoKeptDeliveredPhotoIdRef = useRef("");
   const hasTrackedIntroViewRef = useRef(false);
   const hasResolvedProgressRef = useRef(false);
   const isSubmittingRef = useRef(false);
+  const isOpeningEnvelopeRef = useRef(false);
+  const revealTimerRef = useRef<number | null>(null);
+  const revealStartedAtRef = useRef<number | null>(null);
+  const revealPhotoLoadedTrackedRef = useRef("");
+  const revealPhotoErrorTrackedRef = useRef("");
+  const catNamePromptTrackedPhotoRef = useRef("");
   const entrySourceRef = useRef<OnboardingSource>("direct");
   const canShowTestTools = isTestMode && !IS_PRODUCTION;
 
@@ -144,6 +157,29 @@ export function OnboardingFlow() {
     void keepDeliveredPhotoForOnboarding();
   }, [state, deliveredPhoto, isDeliveredPhotoKept]);
 
+  useEffect(() => {
+    return () => {
+      if (revealTimerRef.current) {
+        window.clearTimeout(revealTimerRef.current);
+      }
+    };
+  }, []);
+
+  useEffect(() => {
+    if (state === "envelope" || state === "revealing") {
+      return;
+    }
+
+    setIsOpeningEnvelope(false);
+    isOpeningEnvelopeRef.current = false;
+  }, [state]);
+
+  useEffect(() => {
+    revealStartedAtRef.current = null;
+    revealPhotoLoadedTrackedRef.current = "";
+    revealPhotoErrorTrackedRef.current = "";
+  }, [deliveredPhoto?.id]);
+
   function resolveOnboardingProgress(source: OnboardingSource) {
     const progress = readCurrentOnboardingProgress();
 
@@ -189,6 +225,16 @@ export function OnboardingFlow() {
       setIsDeliveredPhotoKept(false);
       setCompletionCopy(progress.completionCopy ?? "");
       setState("envelope");
+      return true;
+    }
+
+    if (progress.stage === "name_pending" && progress.ownPhoto) {
+      setSelectedPhotoSrc(progress.selectedPhotoSrc ?? "");
+      setPendingOwnPhoto(progress.ownPhoto);
+      setIsDeliveredPhotoKept(false);
+      setCatNameDraft("");
+      setState("naming");
+      trackCatNamePromptView(progress.ownPhoto.id);
       return true;
     }
 
@@ -321,11 +367,12 @@ export function OnboardingFlow() {
           anonymousId,
           onboardingDateKey,
         );
+        const shouldAskCatName = isCatProfileNameUnset(activeProfile);
         writeOnboardingProgress({
           version: 1,
           anonymousId,
           dateKey: onboardingDateKey,
-          stage: "submitted",
+          stage: shouldAskCatName ? "name_pending" : "submitted",
           source: entrySourceRef.current,
           submissionId,
           ownPhoto,
@@ -352,6 +399,13 @@ export function OnboardingFlow() {
           submission_id: submissionId,
           delivery_date_key: eveningTarget.dateKey,
         });
+
+        if (shouldAskCatName) {
+          setCatNameDraft("");
+          setState("naming");
+          trackCatNamePromptView(ownPhoto.id);
+          return;
+        }
 
         const delivered = await deliverOwnSleepingPhoto({
           ownPhoto,
@@ -396,6 +450,91 @@ export function OnboardingFlow() {
         input.remove();
       }
     }, 60000);
+  }
+
+  function trackCatNamePromptView(photoId?: string | null) {
+    const key = photoId ?? pendingOwnPhoto?.id ?? "unknown";
+
+    if (catNamePromptTrackedPhotoRef.current === key) {
+      return;
+    }
+
+    catNamePromptTrackedPhotoRef.current = key;
+    trackProductEvent("cat_name_prompt_view", {
+      source: entrySourceRef.current,
+      surface: "onboarding",
+    });
+  }
+
+  async function handleContinueAfterCatName(skip = false) {
+    if (isSubmittingRef.current) {
+      return;
+    }
+
+    const progress = readCurrentOnboardingProgress();
+    const ownPhoto = pendingOwnPhoto ?? progress?.ownPhoto ?? null;
+
+    if (!ownPhoto) {
+      setState("intro");
+      return;
+    }
+
+    const deliveryDateKey = progress?.dateKey ?? getJstDateKey();
+    const anonymousId =
+      progress?.anonymousId ?? getOrCreateOnboardingAnonymousId();
+    const submissionId =
+      progress?.submissionId ??
+      createOnboardingSubmissionId(anonymousId, deliveryDateKey);
+    const selectedPhotoSrcForProgress =
+      selectedPhotoSrc || progress?.selectedPhotoSrc || ownPhoto.src;
+    const nextName = skip ? "" : catNameDraft.trim();
+
+    if (nextName) {
+      updateCatProfileName(readCatProfiles(), ownPhoto.ownerCatId, nextName);
+      trackProductEvent("cat_name_entered", {
+        source: entrySourceRef.current,
+        surface: "onboarding",
+      });
+    } else {
+      trackProductEvent("cat_name_skipped", {
+        source: entrySourceRef.current,
+        surface: "onboarding",
+      });
+    }
+
+    isSubmittingRef.current = true;
+    setMessage("");
+    setState("saving");
+    writeOnboardingProgress({
+      version: 1,
+      anonymousId,
+      dateKey: deliveryDateKey,
+      stage: "submitted",
+      source: entrySourceRef.current,
+      submissionId,
+      ownPhoto,
+      selectedPhotoSrc: selectedPhotoSrcForProgress,
+      updatedAt: Date.now(),
+    });
+
+    try {
+      const delivered = await deliverOwnSleepingPhoto({
+        ownPhoto,
+        recipientCatId: ownPhoto.ownerCatId,
+        deliveryDateKey,
+        submissionId,
+        selectedPhotoSrc: selectedPhotoSrcForProgress,
+        emptyMessage: canShowTestTools
+          ? "とどく候補がまだありません。テスト用に候補を追加できます。"
+          : "ねこだよりを準備しています。もう一度ひらいてみてください。",
+      });
+
+      if (!delivered) {
+        setState("empty");
+      }
+    } finally {
+      isSubmittingRef.current = false;
+    }
   }
 
   async function keepDeliveredPhotoForOnboarding() {
@@ -475,6 +614,15 @@ export function OnboardingFlow() {
       return;
     }
 
+    if (isOpeningEnvelopeRef.current) {
+      return;
+    }
+
+    isOpeningEnvelopeRef.current = true;
+    setIsOpeningEnvelope(true);
+    const startedAt = performance.now();
+    revealStartedAtRef.current = startedAt;
+    trackOnboardingRevealEvent("delivery_reveal_started", 0);
     trackProductEvent("envelope_opened", {
       source: "onboarding",
       photo_id: deliveredPhoto.id,
@@ -494,10 +642,71 @@ export function OnboardingFlow() {
     if (progress?.dateKey) {
       markEveningDeliveryOpened(progress.dateKey);
     }
-    setState("revealing");
-    window.setTimeout(() => {
+
+    if (revealTimerRef.current) {
+      window.clearTimeout(revealTimerRef.current);
+      revealTimerRef.current = null;
+    }
+
+    if (prefersReducedMotion) {
+      trackOnboardingRevealEvent("delivery_reveal_skipped", 0);
       setState("delivered");
-    }, 1400);
+      return;
+    }
+
+    setState("revealing");
+    revealTimerRef.current = window.setTimeout(() => {
+      revealTimerRef.current = null;
+      trackOnboardingRevealEvent(
+        "delivery_reveal_completed",
+        performance.now() - startedAt,
+      );
+      setState("delivered");
+    }, ONBOARDING_REVEAL_MS);
+  }
+
+  function getOnboardingRevealLatencyMs() {
+    const startedAt = revealStartedAtRef.current;
+    return startedAt ? performance.now() - startedAt : 0;
+  }
+
+  function trackOnboardingRevealEvent(
+    name: string,
+    latencyMs = getOnboardingRevealLatencyMs(),
+  ) {
+    trackProductEvent(name, {
+      latency_ms: Math.max(0, Math.round(latencyMs)),
+      route: "/onboarding",
+      source: entrySourceRef.current,
+      surface: "onboarding",
+      reduced_motion: prefersReducedMotion,
+    });
+  }
+
+  function handleRevealPhotoLoaded() {
+    if (!deliveredPhoto) {
+      return;
+    }
+
+    if (revealPhotoLoadedTrackedRef.current === deliveredPhoto.id) {
+      return;
+    }
+
+    revealPhotoLoadedTrackedRef.current = deliveredPhoto.id;
+    trackOnboardingRevealEvent("delivery_reveal_photo_loaded");
+  }
+
+  function handleRevealPhotoError() {
+    if (!deliveredPhoto) {
+      return;
+    }
+
+    if (revealPhotoErrorTrackedRef.current === deliveredPhoto.id) {
+      return;
+    }
+
+    revealPhotoErrorTrackedRef.current = deliveredPhoto.id;
+    trackOnboardingRevealEvent("delivery_reveal_photo_error");
   }
 
   async function deliverOwnSleepingPhoto({
@@ -790,9 +999,70 @@ export function OnboardingFlow() {
           </section>
         ) : null}
 
+        {state === "naming" ? (
+          <section style={styles.result} aria-label="この子の名前">
+            <p style={styles.kicker}>ねがおをおあずかりしました</p>
+            {selectedPhotoSrc ? (
+              <img src={selectedPhotoSrc} alt="" style={styles.namePreviewPhoto} />
+            ) : null}
+            <h2 style={styles.subTitle}>この子の名前は？</h2>
+            <p style={styles.resultText}>
+              名前だけで大丈夫です。
+              <br />
+              あとから変えられます。
+            </p>
+            <form
+              style={styles.nameForm}
+              onSubmit={(event) => {
+                event.preventDefault();
+                void handleContinueAfterCatName(false);
+              }}
+            >
+              <input
+                value={catNameDraft}
+                onChange={(event) => setCatNameDraft(event.currentTarget.value)}
+                placeholder="例：むぎ"
+                maxLength={24}
+                autoComplete="off"
+                inputMode="text"
+                style={styles.nameInput}
+                aria-label="この子の名前"
+              />
+              <AppButton
+                type="submit"
+                fullWidth
+                style={styles.onboardingCta}
+                disabled={isSubmittingRef.current}
+              >
+                つづける
+              </AppButton>
+            </form>
+            <AppButton
+              type="button"
+              variant="quiet"
+              size="md"
+              onClick={() => {
+                void handleContinueAfterCatName(true);
+              }}
+            >
+              あとで
+            </AppButton>
+          </section>
+        ) : null}
+
         {state === "envelope" && deliveredPhoto ? (
           <section style={styles.result} aria-label="ねがおがとどいています">
             <OnboardingEnvelopeArt />
+            <span style={styles.deliveryPhotoPreload} aria-hidden="true">
+              <PhotoTile
+                src={getExchangePhotoDisplaySrc(deliveredPhoto)}
+                fallbackSrcs={getExchangePhotoFallbackSrcs(deliveredPhoto)}
+                loading="eager"
+                onStorageDataUrl={handleDeliveredPhotoDataUrl}
+                onLoad={handleRevealPhotoLoaded}
+                onError={handleRevealPhotoError}
+              />
+            </span>
             <h2 style={styles.subTitle}>
               ねこだよりが
               <br />
@@ -801,7 +1071,12 @@ export function OnboardingFlow() {
             <button
               type="button"
               onClick={handleOpenEnvelope}
-              style={styles.deliveryEnvelopeButton}
+              disabled={isOpeningEnvelope}
+              aria-busy={isOpeningEnvelope}
+              style={{
+                ...styles.deliveryEnvelopeButton,
+                ...(isOpeningEnvelope ? styles.deliveryEnvelopeButtonBusy : {}),
+              }}
             >
               ねこだよりを開く
             </button>
@@ -816,6 +1091,8 @@ export function OnboardingFlow() {
                 fallbackSrcs={getExchangePhotoFallbackSrcs(deliveredPhoto)}
                 imageStyle={styles.revealingPhoto}
                 onStorageDataUrl={handleDeliveredPhotoDataUrl}
+                onLoad={handleRevealPhotoLoaded}
+                onError={handleRevealPhotoError}
               />
             </div>
           </section>
@@ -832,6 +1109,8 @@ export function OnboardingFlow() {
                   style={styles.deliveredPhotoTile}
                   imageStyle={styles.deliveredPhoto}
                   onStorageDataUrl={handleDeliveredPhotoDataUrl}
+                  onLoad={handleRevealPhotoLoaded}
+                  onError={handleRevealPhotoError}
                 />
                 <PhotoTile
                   src={selectedPhotoSrc}
@@ -847,6 +1126,8 @@ export function OnboardingFlow() {
                 style={styles.deliveredPhotoTile}
                 imageStyle={styles.deliveredPhoto}
                 onStorageDataUrl={handleDeliveredPhotoDataUrl}
+                onLoad={handleRevealPhotoLoaded}
+                onError={handleRevealPhotoError}
               />
             )}
             <p style={styles.resultText}>
@@ -982,6 +1263,26 @@ function DeliveryWaiting() {
       </span>
     </div>
   );
+}
+
+function usePrefersReducedMotion() {
+  const [prefersReducedMotion, setPrefersReducedMotion] = useState(false);
+
+  useEffect(() => {
+    const media = window.matchMedia?.("(prefers-reduced-motion: reduce)");
+
+    if (!media) {
+      return;
+    }
+
+    const updatePreference = () => setPrefersReducedMotion(media.matches);
+    updatePreference();
+    media.addEventListener?.("change", updatePreference);
+
+    return () => media.removeEventListener?.("change", updatePreference);
+  }, []);
+
+  return prefersReducedMotion;
 }
 
 function readOnboardingSourceFromLocation() {
@@ -1398,6 +1699,40 @@ const styles = {
     lineHeight: 1.45,
     letterSpacing: 0,
   },
+  namePreviewPhoto: {
+    width: "min(48vw, 168px)",
+    aspectRatio: "1 / 1",
+    objectFit: "cover",
+    borderRadius: "26px",
+    border: "7px solid rgba(255,253,248,0.82)",
+    boxShadow: "0 16px 36px -24px rgba(66,48,31,0.46)",
+  },
+  nameForm: {
+    width: "min(100%, 292px)",
+    display: "grid",
+    justifyItems: "center",
+    gap: "12px",
+  },
+  nameInput: {
+    width: "100%",
+    minHeight: "54px",
+    boxSizing: "border-box",
+    border: "1px solid rgba(120,108,94,0.18)",
+    borderRadius: "var(--radius-full)",
+    background:
+      "linear-gradient(180deg, rgba(255,253,248,0.94), rgba(250,244,235,0.86))",
+    color: "#3f382e",
+    fontFamily: UI_FONT,
+    fontSize: "17px",
+    fontWeight: 400,
+    lineHeight: 1.4,
+    letterSpacing: "0.03em",
+    textAlign: "center",
+    padding: "0 20px",
+    outline: "none",
+    boxShadow:
+      "0 1px 0 rgba(255,255,255,0.55) inset, 0 14px 30px -26px rgba(90,76,60,0.36)",
+  },
   onboardingCta: {
     width: "min(100%, 280px)",
     marginTop: "16px",
@@ -1463,6 +1798,19 @@ const styles = {
     letterSpacing: "0.03em",
     cursor: "pointer",
     animation: "deliveredEnvelope 460ms cubic-bezier(0.22, 1, 0.36, 1) both",
+  },
+  deliveryEnvelopeButtonBusy: {
+    cursor: "default",
+    opacity: 0.72,
+    transform: "translateY(1px) scale(0.992)",
+  },
+  deliveryPhotoPreload: {
+    position: "absolute",
+    width: 1,
+    height: 1,
+    overflow: "hidden",
+    opacity: 0,
+    pointerEvents: "none",
   },
   revealingPhotoFrame: {
     width: "min(100%, 292px)",
