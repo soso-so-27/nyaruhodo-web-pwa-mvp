@@ -1583,7 +1583,7 @@ function useHomeFrameLayout(
 }
 
 function useHomeViewportBackground(daylightStyle: HomeDaylightStyle) {
-  useEffect(() => {
+  useLayoutEffect(() => {
     const root = document.documentElement;
     const body = document.body;
     const themeMeta = document.querySelector<HTMLMetaElement>(

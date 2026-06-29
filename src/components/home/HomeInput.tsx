@@ -2039,50 +2039,55 @@ export function HomeInput({
     keptExchangePhotoCount,
     now: homeNow,
   });
+  const isHomeReady = isHomeClockReady && hasHydratedHomeState;
 
   return (
-    <main style={styles.page}>
+    <main
+      style={isHomeReady ? styles.page : styles.startupPage}
+      aria-busy={isHomeReady ? undefined : true}
+    >
       <div
         aria-hidden={openingEveningDelivery ? true : undefined}
         style={styles.homeContentLayer}
       >
-        <div style={styles.paperBackground} aria-hidden="true" />
-        <div style={styles.paperNoise} aria-hidden="true" />
-
-        {!isHomeClockReady || !hasHydratedHomeState ? (
+        {!isHomeReady ? (
           <HomeStartupHold />
         ) : (
-          <HomeDeskModel
-            catName={homeCatName}
-            eveningState={eveningHomeState}
-            ownSleepingPhotos={ownSleepingPhotosForHome}
-            sleepingCounter={sleepingCounterCount}
-            showGuidanceCopy={shouldShowDeskGuidanceCopy}
-            showSleepingCounter={
-              typeof sleepingPresenceCount === "number" &&
-              isTodaySleepingCounterVisible(sleepingCounterCount)
-            }
-            now={homeNow}
-            onTakePhoto={() => handleSleepingPhotoStart("camera")}
-            onOpenDelivery={handleOpenEveningDelivery}
-            onKeepOpenedDelivery={handleKeepEveningDelivery}
-            onReportOpenedDelivery={handleReportEveningDelivery}
-            onDeliveredStorageDataUrl={handleDeskDeliveredPhotoDataUrl}
-            eveningDeliveryCheckStatus={eveningDelivery.checkStatus}
-            onRetryEveningDeliveryCheck={eveningDelivery.retryEveningDeliveryCheck}
-            omoideMemory={arrivedOmoideMemory}
-            onOpenOmoideMemory={(memory) => {
-              markOmoideMemoryOpened(memory.id, homeNow);
-              setOmoideRefreshTick((value) => value + 1);
-            }}
-            onDismissOmoideMemory={(memory) => {
-              markOmoideMemoryDismissed(memory.id, homeNow);
-              setOmoideRefreshTick((value) => value + 1);
-            }}
-          />
+          <>
+            <div style={styles.paperBackground} aria-hidden="true" />
+            <div style={styles.paperNoise} aria-hidden="true" />
+            <HomeDeskModel
+              catName={homeCatName}
+              eveningState={eveningHomeState}
+              ownSleepingPhotos={ownSleepingPhotosForHome}
+              sleepingCounter={sleepingCounterCount}
+              showGuidanceCopy={shouldShowDeskGuidanceCopy}
+              showSleepingCounter={
+                typeof sleepingPresenceCount === "number" &&
+                isTodaySleepingCounterVisible(sleepingCounterCount)
+              }
+              now={homeNow}
+              onTakePhoto={() => handleSleepingPhotoStart("camera")}
+              onOpenDelivery={handleOpenEveningDelivery}
+              onKeepOpenedDelivery={handleKeepEveningDelivery}
+              onReportOpenedDelivery={handleReportEveningDelivery}
+              onDeliveredStorageDataUrl={handleDeskDeliveredPhotoDataUrl}
+              eveningDeliveryCheckStatus={eveningDelivery.checkStatus}
+              onRetryEveningDeliveryCheck={eveningDelivery.retryEveningDeliveryCheck}
+              omoideMemory={arrivedOmoideMemory}
+              onOpenOmoideMemory={(memory) => {
+                markOmoideMemoryOpened(memory.id, homeNow);
+                setOmoideRefreshTick((value) => value + 1);
+              }}
+              onDismissOmoideMemory={(memory) => {
+                markOmoideMemoryDismissed(memory.id, homeNow);
+                setOmoideRefreshTick((value) => value + 1);
+              }}
+            />
+          </>
         )}
 
-        {shouldShowHomeInstallHint && homeInstallPlatform ? (
+        {isHomeReady && shouldShowHomeInstallHint && homeInstallPlatform ? (
           <HomeInstallHintCard
             platform={homeInstallPlatform}
             canPrompt={Boolean(homeInstallPrompt)}
@@ -2091,7 +2096,7 @@ export function HomeInput({
           />
         ) : null}
 
-        {isHomeInstallGuideOpen && homeInstallPlatform ? (
+        {isHomeReady && isHomeInstallGuideOpen && homeInstallPlatform ? (
           <HomeInstallGuideSheet
             platform={homeInstallPlatform}
             onClose={dismissHomeInstallHint}
@@ -5339,6 +5344,18 @@ const styles = {
     fontFamily:
       'Outfit, "Zen Kaku Gothic New", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
   },
+  startupPage: {
+    position: "fixed",
+    inset: 0,
+    width: "100%",
+    height: "100vh",
+    minHeight: "100vh",
+    overflow: "hidden",
+    background: "#f4f1ea",
+    color: "var(--ink-soft)",
+    fontFamily:
+      'Outfit, "Zen Kaku Gothic New", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
+  },
   homeContentLayer: {
     display: "contents",
   },
@@ -5372,6 +5389,10 @@ const styles = {
     boxSizing: "border-box",
     color: "var(--ink-soft)",
     pointerEvents: "none",
+    backgroundImage: "url('/splash/v6/apple-splash-1179-2556.png')",
+    backgroundSize: "cover",
+    backgroundPosition: "50% 50%",
+    backgroundRepeat: "no-repeat",
   },
   homeInstallHintCard: {
     position: "fixed",
