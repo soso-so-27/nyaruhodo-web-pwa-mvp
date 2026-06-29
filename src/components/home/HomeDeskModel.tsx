@@ -112,7 +112,6 @@ const HOME_FRAME_TUNING = {
   frameAspectWidthPerHeight: 9 / 14,
   emptyIllustrationWidth: "min(42vw, 152px)",
   emptyIllustrationMinWidth: "128px",
-  emptyTitleSize: "21px",
   emptyActionSize: "14px",
 } as const;
 const HOME_SKY_BACKGROUND =
@@ -525,9 +524,6 @@ export function HomeDeskModel({
               >
                 <span style={deskStyles.homeEmptyEnvelopeHint} aria-hidden="true" />
                 <SleepingCatPlaceholder />
-                <span style={deskStyles.homeEmptyTitle}>
-                  きょうの ねがお、まだ
-                </span>
                 <button
                   type="button"
                   data-testid="home-empty-action"
@@ -1455,7 +1451,6 @@ function useDaylight(now: number) {
       "--home-empty-illustration-width": HOME_FRAME_TUNING.emptyIllustrationWidth,
       "--home-empty-illustration-min-width":
         HOME_FRAME_TUNING.emptyIllustrationMinWidth,
-      "--home-empty-title-size": HOME_FRAME_TUNING.emptyTitleSize,
       "--home-empty-action-size": HOME_FRAME_TUNING.emptyActionSize,
       "--home-sky-glow-x": "50%",
       "--home-sky-glow-y": "12%",
@@ -1616,7 +1611,6 @@ function useHomeViewportBackground(daylightStyle: HomeDaylightStyle) {
       "--home-empty-frame-max-height",
       "--home-empty-illustration-width",
       "--home-empty-illustration-min-width",
-      "--home-empty-title-size",
       "--home-empty-action-size",
       "--home-sky-glow-x",
       "--home-sky-glow-y",
@@ -2303,7 +2297,7 @@ const deskStyles = {
     display: "grid",
     placeItems: "center",
     alignContent: "center",
-    gap: "18px",
+    gap: "20px",
     padding: "36px 18px",
     border: "none",
     outline: "none",
@@ -2334,14 +2328,6 @@ const deskStyles = {
     mixBlendMode: "multiply",
     overflow: "hidden",
     pointerEvents: "none",
-  },
-  homeEmptyTitle: {
-    position: "relative",
-    zIndex: 1,
-    color: "var(--ink)",
-    fontFamily: "var(--font-display)",
-    fontSize: "var(--home-empty-title-size, 20px)",
-    letterSpacing: "var(--tracking-label)",
   },
   homeEmptyAction: {
     position: "relative",
