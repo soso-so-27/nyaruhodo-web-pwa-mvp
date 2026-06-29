@@ -2886,14 +2886,7 @@ function HomeStartupHold() {
       aria-label="きょうを読み込み中"
       aria-busy="true"
       style={styles.startupHold}
-    >
-      <img
-        src="/images/home/generated-envelope-wide-v2.png"
-        alt=""
-        aria-hidden="true"
-        style={styles.startupEnvelope}
-      />
-    </section>
+    />
   );
 }
 
@@ -5372,19 +5365,10 @@ const styles = {
     position: "fixed",
     inset: 0,
     zIndex: 18,
-    display: "grid",
-    placeItems: "center",
+    display: "block",
     padding: "calc(env(safe-area-inset-top) + 24px) 24px calc(env(safe-area-inset-bottom) + 24px)",
     boxSizing: "border-box",
     color: "var(--ink-soft)",
-  },
-  startupEnvelope: {
-    width: "min(70vw, 330px)",
-    height: "auto",
-    transform: "translateY(-2vh)",
-    filter: "drop-shadow(0 16px 28px rgba(70, 50, 30, 0.18))",
-    userSelect: "none",
-    WebkitUserSelect: "none",
     pointerEvents: "none",
   },
   homeInstallHintCard: {
