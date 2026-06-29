@@ -276,6 +276,7 @@ export function HomeInput({
   const [catProfiles, setCatProfiles] = useState<CatProfile[]>([]);
   const [activeCatId, setActiveCatId] = useState<string | null>(null);
   const [activeCat, setActiveCat] = useState<CatProfile | null>(null);
+  const [hasHydratedHomeState, setHasHydratedHomeState] = useState(false);
   const [lockData, setLockData] = useState<LockData>({});
   const [tick, setTick] = useState(initialNow);
   const isHomeClockReady = tick > 0;
@@ -342,7 +343,7 @@ export function HomeInput({
   const completedBoardTimerRef = useRef<number | null>(null);
   const boardSheetReturnTimerRef = useRef<number | null>(null);
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     const profiles = readCatProfiles();
     const activeId = readActiveCatId();
     const active = getActiveCatProfile(profiles, activeId);
@@ -353,6 +354,7 @@ export function HomeInput({
     saveActiveCatId(active.id);
     hydrateCatState(active.id);
     setHasAcceptedSleepingSafety(hasAcceptedSleepingSafetyNotice());
+    setHasHydratedHomeState(true);
   }, []);
 
   useEffect(() => {
@@ -2047,8 +2049,8 @@ export function HomeInput({
         <div style={styles.paperBackground} aria-hidden="true" />
         <div style={styles.paperNoise} aria-hidden="true" />
 
-        {!isHomeClockReady ? (
-          <HomeClockHydrationPlaceholder />
+        {!isHomeClockReady || !hasHydratedHomeState ? (
+          <HomeStartupHold />
         ) : (
           <HomeDeskModel
             catName={homeCatName}
@@ -2877,22 +2879,20 @@ function InfoSheet({
   );
 }
 
-function HomeClockHydrationPlaceholder() {
+function HomeStartupHold() {
   return (
     <section
-      data-testid="home-clock-placeholder"
-      aria-label="きょう"
-      style={styles.clockDeskPlaceholder}
+      data-testid="home-startup-hold"
+      aria-label="きょうを読み込み中"
+      aria-busy="true"
+      style={styles.startupHold}
     >
-      <div style={styles.clockDeskPlaceholderStage}>
-        <div style={styles.clockDeskPlaceholderSlot}>
-          <div style={styles.clockDeskPlaceholderFrame} />
-        </div>
-        <div style={styles.clockDeskPlaceholderSlot}>
-          <div style={styles.clockDeskPlaceholderLetter} />
-        </div>
-      </div>
-      <BottomNavigation active="today" homeVariant="desk" homeState="1" />
+      <img
+        src="/images/home/generated-envelope-wide-v2.png"
+        alt=""
+        aria-hidden="true"
+        style={styles.startupEnvelope}
+      />
     </section>
   );
 }
@@ -5368,49 +5368,24 @@ const styles = {
       "linear-gradient(90deg, rgba(88,73,50,0.035) 1px, transparent 1px), linear-gradient(0deg, rgba(88,73,50,0.03) 1px, transparent 1px)",
     backgroundSize: "28px 28px",
   },
-  clockDeskPlaceholder: {
+  startupHold: {
     position: "fixed",
     inset: 0,
     zIndex: 18,
     display: "grid",
-    gridTemplateRows: "minmax(0, 1fr) auto",
-    alignItems: "center",
-    justifyItems: "center",
-    padding: "calc(env(safe-area-inset-top) + 34px) 24px calc(env(safe-area-inset-bottom) + 116px)",
+    placeItems: "center",
+    padding: "calc(env(safe-area-inset-top) + 24px) 24px calc(env(safe-area-inset-bottom) + 24px)",
     boxSizing: "border-box",
     color: "var(--ink-soft)",
   },
-  clockDeskPlaceholderStage: {
-    width: "min(76vw, 330px)",
-    display: "grid",
-    gridTemplateColumns: "minmax(0, 1fr) minmax(0, 0.75fr)",
-    alignItems: "center",
-    justifyItems: "center",
-    gap: "32px",
+  startupEnvelope: {
+    width: "min(70vw, 330px)",
+    height: "auto",
     transform: "translateY(-2vh)",
-  },
-  clockDeskPlaceholderSlot: {
-    width: "100%",
-    aspectRatio: "1 / 1",
-    display: "grid",
-    placeItems: "center",
-  },
-  clockDeskPlaceholderFrame: {
-    width: "100%",
-    aspectRatio: "1 / 1",
-    borderRadius: "var(--radius-xl)",
-    border: "1px solid var(--line)",
-    background: "var(--paper)",
-    boxShadow: "var(--shadow-e1)",
-  },
-  clockDeskPlaceholderLetter: {
-    width: "100%",
-    aspectRatio: "1.48 / 1",
-    borderRadius: "var(--radius-md)",
-    border: "1px solid var(--line)",
-    background: "var(--paper-card)",
-    boxShadow: "var(--shadow-e1)",
-    transform: "rotate(-2.5deg)",
+    filter: "drop-shadow(0 16px 28px rgba(70, 50, 30, 0.18))",
+    userSelect: "none",
+    WebkitUserSelect: "none",
+    pointerEvents: "none",
   },
   homeInstallHintCard: {
     position: "fixed",
