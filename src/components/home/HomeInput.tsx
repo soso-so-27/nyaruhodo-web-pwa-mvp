@@ -5317,8 +5317,7 @@ function isAccountRestoreDismissed() {
   }
 }
 
-const homeBaseBackground =
-  "radial-gradient(78% 48% at 12% 5%, rgba(225, 158, 134, 0.28), transparent 64%), radial-gradient(72% 44% at 92% 100%, rgba(145, 165, 194, 0.24), transparent 66%), linear-gradient(180deg, #efe3d3 0%, #e9ddce 52%, #ded5c8 100%)";
+const homeBaseBackground = "var(--app-paper-background)";
 
 const styles = {
   page: {
@@ -5332,7 +5331,10 @@ const styles = {
     minHeight: "100vh",
     overflow: "hidden",
     background: homeBaseBackground,
-    backgroundColor: "#eadfce",
+    backgroundColor: "var(--paper-warm)",
+    backgroundSize: "var(--app-paper-background-size)",
+    backgroundPosition: "var(--app-paper-background-position)",
+    backgroundRepeat: "var(--app-paper-background-repeat)",
     color: "#202020",
     fontFamily:
       'Outfit, "Zen Kaku Gothic New", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
@@ -5345,11 +5347,11 @@ const styles = {
     inset: 0,
     zIndex: 0,
     pointerEvents: "none",
-    background: [
-      "radial-gradient(circle at 18% 14%, rgba(255,255,255,0.84) 0%, rgba(255,255,255,0.28) 28%, rgba(255,255,255,0) 54%)",
-      "radial-gradient(circle at 86% 82%, rgba(226,211,185,0.34) 0%, rgba(226,211,185,0.12) 30%, rgba(226,211,185,0) 58%)",
-      "linear-gradient(180deg, #fbf8f0 0%, #f4efe4 52%, #eee6d8 100%)",
-    ].join(", "),
+    background: "var(--app-paper-background)",
+    backgroundColor: "var(--paper-warm)",
+    backgroundSize: "var(--app-paper-background-size)",
+    backgroundPosition: "var(--app-paper-background-position)",
+    backgroundRepeat: "var(--app-paper-background-repeat)",
   },
   paperNoise: {
     position: "fixed",

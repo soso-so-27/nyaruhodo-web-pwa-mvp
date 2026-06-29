@@ -72,16 +72,22 @@ export const viewport: Viewport = {
   width: "device-width",
   initialScale: 1,
   viewportFit: "cover",
-  themeColor: "#eadfce",
+  themeColor: "#f4f1ea",
 };
 
-const criticalPageBackground = "#eadfce";
+const criticalPageBackground = "#f4f1ea";
 const criticalPaperBackground =
-  "radial-gradient(78% 48% at 12% 5%, rgba(225, 158, 134, 0.28), transparent 64%), radial-gradient(72% 44% at 92% 100%, rgba(145, 165, 194, 0.24), transparent 66%), linear-gradient(180deg, #efe3d3 0%, #e9ddce 52%, #ded5c8 100%)";
+  "linear-gradient(180deg, rgba(241, 234, 223, 0.24) 0%, rgba(245, 236, 220, 0.14) 48%, rgba(231, 219, 200, 0.18) 100%), url('/images/home-backgrounds/generated-noon-paper.png'), linear-gradient(180deg, #fbfaf7 0%, #f4f1ea 100%)";
+const criticalPaperBackgroundSize = "100% 100%, cover, 100% 100%";
+const criticalPaperBackgroundPosition = "50% 50%, 50% 50%, 50% 50%";
+const criticalPaperBackgroundRepeat = "no-repeat, no-repeat, no-repeat";
 
 const criticalHtmlStyle: CSSProperties = {
   background: criticalPaperBackground,
   backgroundColor: criticalPageBackground,
+  backgroundSize: criticalPaperBackgroundSize,
+  backgroundPosition: criticalPaperBackgroundPosition,
+  backgroundRepeat: criticalPaperBackgroundRepeat,
   colorScheme: "light",
 };
 
@@ -90,6 +96,9 @@ const criticalBodyStyle: CSSProperties = {
   minHeight: "100vh",
   background: criticalPaperBackground,
   backgroundColor: criticalPageBackground,
+  backgroundSize: criticalPaperBackgroundSize,
+  backgroundPosition: criticalPaperBackgroundPosition,
+  backgroundRepeat: criticalPaperBackgroundRepeat,
 };
 
 export default function RootLayout({
