@@ -1,4 +1,4 @@
-import { expect, test, type Locator, type Page } from "@playwright/test";
+import { devices, expect, test, type Locator, type Page } from "@playwright/test";
 
 const testPng = Buffer.from(
   "iVBORw0KGgoAAAANSUhEUgAAAGQAAABkCAYAAABw4pVUAAAAAXNSR0IArs4c6QAAAARnQU1BAACxjwv8YQUAAAAJcEhZcwAADsMAAA7DAcdvqGQAAAEJSURBVHhe7dExEcAgAMBAJKKuTpnpjoLA/fACchlrzv2C+a0njDPsVmfYrQyJMSTGkBhDYgyJMSTGkBhDYgyJMSTGkBhDYgyJMSTGkBhDYgyJMSTGkBhDYgyJMSTGkBhDYgyJMSTGkBhDYgyJMSTGkBhDYgyJMSTGkBhDYgyJMSTGkBhDYgyJMSTGkBhDYgyJMSTGkBhDYgyJMSTGkBhDYgyJMSTGkBhDYgyJMSTGkBhDYgyJMSTGkBhDYgyJMSTGkBhDYgyJMSTGkBhDYgyJMSTGkBhDYgyJMSTGkBhDYgyJMSTGkBhDYgyJMSTmB4RCEqdGtA/tAAAAAElFTkSuQmCC",
@@ -6,6 +6,14 @@ const testPng = Buffer.from(
 );
 
 test.describe("onboarding delivery flow", () => {
+  test.use({
+    viewport: devices["iPhone 12 Pro"].viewport,
+    userAgent: devices["iPhone 12 Pro"].userAgent,
+    deviceScaleFactor: devices["iPhone 12 Pro"].deviceScaleFactor,
+    isMobile: devices["iPhone 12 Pro"].isMobile,
+    hasTouch: devices["iPhone 12 Pro"].hasTouch,
+  });
+
   test("reaches the album after adding a real test candidate", async ({ page }) => {
     let exchangeCalls = 0;
     let stockCalls = 0;
