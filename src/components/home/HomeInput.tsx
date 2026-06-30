@@ -3013,7 +3013,10 @@ function EveningDeliveryOpening({
         style={styles.eveningOpeningPairStage}
         data-testid="evening-opening-pair"
       >
-        <p style={styles.eveningOpeningTitle}>ねこだより、とどいた</p>
+        <p style={styles.eveningOpeningTitle}>ねこだより</p>
+        <p style={styles.eveningOpeningSubtitle}>
+          どこかのねがおが届きました
+        </p>
         <div style={styles.eveningOpeningPhotoFrame}>
           <StoredPhotoImage
             src={getPhotoDetailSrc(state.deliveredPhoto)}
@@ -3024,9 +3027,15 @@ function EveningDeliveryOpening({
           />
         </div>
         <p style={styles.eveningOpeningSavedNote}>
-          ねこだよりに入りました
+          とどいたで見返せます
         </p>
-        <AppButton type="button" fullWidth onClick={onClose}>
+        <AppButton
+          type="button"
+          variant="quiet"
+          size="md"
+          onClick={onClose}
+          style={styles.eveningOpeningCloseButton}
+        >
           閉じる
         </AppButton>
         <p style={styles.eveningOpeningAfterword}>また、あした</p>
@@ -7040,13 +7049,13 @@ const styles = {
     justifyItems: "center",
   },
   eveningOpeningPhotoFrame: {
-    width: "min(calc(100vw - 64px), 360px)",
+    width: "min(calc(100vw - 32px), 390px)",
     aspectRatio: "1 / 1",
-    padding: "8px",
-    borderRadius: "24px",
-    background: "color-mix(in srgb, var(--paper-card) 84%, transparent)",
+    padding: "6px",
+    borderRadius: "22px",
+    background: "color-mix(in srgb, var(--paper-card) 68%, transparent)",
     boxShadow:
-      "0 1px 0 rgba(255,255,255,.58) inset, 0 18px 46px rgba(96,78,54,0.14)",
+      "0 1px 0 rgba(255,255,255,.52) inset, 0 16px 38px rgba(96,78,54,0.12)",
     boxSizing: "border-box",
     overflow: "hidden",
   },
@@ -7054,7 +7063,7 @@ const styles = {
     width: "100%",
     height: "100%",
     objectFit: "cover",
-    borderRadius: "18px",
+    borderRadius: "17px",
     background: "rgba(255,253,248,0.72)",
     animation: "exchangePhotoIn 440ms cubic-bezier(0, 0, 0.2, 1) both",
   },
@@ -7067,9 +7076,9 @@ const styles = {
     letterSpacing: "0.08em",
   },
   eveningOpeningPairStage: {
-    width: "min(calc(100vw - 32px), 480px)",
+    width: "min(calc(100vw - 24px), 460px)",
     display: "grid",
-    gap: "18px",
+    gap: "12px",
     justifyItems: "center",
     animation: "eveningOpeningStageIn 440ms cubic-bezier(0, 0, 0.2, 1) both",
   },
@@ -7089,8 +7098,17 @@ const styles = {
     lineHeight: 1.42,
     letterSpacing: "0.08em",
   },
+  eveningOpeningSubtitle: {
+    margin: "-4px 0 4px",
+    color: "#746a5f",
+    fontFamily: "var(--font-display)",
+    fontSize: "14px",
+    fontWeight: 400,
+    lineHeight: 1.5,
+    letterSpacing: "0.04em",
+  },
   eveningOpeningSavedNote: {
-    margin: "-4px 0 0",
+    margin: "2px 0 0",
     color: "#746a5f",
     fontFamily: "var(--font-display)",
     fontSize: "13px",
@@ -7098,8 +7116,13 @@ const styles = {
     lineHeight: 1.5,
     letterSpacing: "0.04em",
   },
+  eveningOpeningCloseButton: {
+    minWidth: 120,
+    marginTop: 2,
+    color: "#746a5f",
+  },
   eveningOpeningAfterword: {
-    margin: "-4px 0 0",
+    margin: "-2px 0 0",
     color: "#a65045",
     fontFamily: "var(--font-display)",
     fontSize: "13px",
