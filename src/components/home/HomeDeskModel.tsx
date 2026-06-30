@@ -991,7 +991,7 @@ export function HomeDeskModel({
           animation: deskEnvelopeActionFade 110ms ease-out both;
         }
         .desk-letter-simple-opening [data-envelope-art="simple"] {
-          animation: deskEnvelopeSimpleFadeOut 240ms 60ms cubic-bezier(0.22, 1, 0.36, 1) both;
+          animation: deskEnvelopeSimpleFadeOut 360ms 100ms cubic-bezier(0.4, 0, 1, 1) both;
         }
         .desk-letter-opening [data-envelope-body="true"] {
           animation: deskEnvelopeBodyOpen ${ENVELOPE_OPEN_MS}ms cubic-bezier(0.18, 0.92, 0.2, 1) both;
@@ -1049,8 +1049,8 @@ export function HomeDeskModel({
           }
           to {
             opacity: 0;
-            transform: translate(-50%, -50%) translateY(7px) scale(0.98);
-            filter: drop-shadow(0 10px 20px color-mix(in srgb, var(--ink) 10%, transparent)) blur(1px);
+            transform: translate(-50%, -50%) translateY(4px) scale(0.985);
+            filter: drop-shadow(0 10px 20px color-mix(in srgb, var(--ink) 10%, transparent)) blur(0.6px);
           }
         }
         @keyframes deskEnvelopeBodyOpen {

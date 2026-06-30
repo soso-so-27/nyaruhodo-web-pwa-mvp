@@ -7024,7 +7024,7 @@ const styles = {
     backgroundPosition: "var(--app-paper-background-position)",
     backgroundRepeat: "var(--app-paper-background-repeat)",
     color: "#292721",
-    animation: "eveningOpeningOverlayIn 240ms ease-out both",
+    animation: "eveningOpeningOverlayIn 440ms cubic-bezier(0, 0, 0.2, 1) both",
   },
   eveningOpeningPhotoStage: {
     width: "min(calc(100vw - 54px), 420px)",
@@ -7049,7 +7049,7 @@ const styles = {
     objectFit: "cover",
     borderRadius: "18px",
     background: "rgba(255,253,248,0.72)",
-    animation: "exchangePhotoIn 1.1s cubic-bezier(0.22, 1, 0.36, 1) both",
+    animation: "exchangePhotoIn 440ms cubic-bezier(0, 0, 0.2, 1) both",
   },
   eveningOpeningCaption: {
     margin: "8px 0 0",
@@ -7064,7 +7064,7 @@ const styles = {
     display: "grid",
     gap: "18px",
     justifyItems: "center",
-    animation: "eveningOpeningStageIn 280ms cubic-bezier(0.22, 1, 0.36, 1) both",
+    animation: "eveningOpeningStageIn 440ms cubic-bezier(0, 0, 0.2, 1) both",
   },
   eveningOpeningPairCard: {
     width: "100%",

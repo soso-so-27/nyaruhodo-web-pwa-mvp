@@ -8,16 +8,55 @@ import { HOME_ENVELOPE_OPEN_MS } from "../../../components/home/homeEnvelopeMoti
 
 type PreviewPhase = "idle" | "opening" | "result";
 type PreviewMode = "current" | "simple";
+type SimpleRevealSpeed = "fast" | "recommended" | "slow";
 
 const PREVIEW_PHOTO_SRC = "/sample-cats/mugi-hero.png";
-const SIMPLE_REVEAL_MS = 620;
+const SIMPLE_REVEAL_PRESETS: Array<{
+  key: SimpleRevealSpeed;
+  label: string;
+  durationMs: number;
+  envelopeDurationMs: number;
+  envelopeDelayMs: number;
+}> = [
+  {
+    key: "fast",
+    label: "速い: 300ms",
+    durationMs: 300,
+    envelopeDurationMs: 180,
+    envelopeDelayMs: 40,
+  },
+  {
+    key: "recommended",
+    label: "推奨: 760ms",
+    durationMs: 760,
+    envelopeDurationMs: 360,
+    envelopeDelayMs: 100,
+  },
+  {
+    key: "slow",
+    label: "ゆっくり: 950ms",
+    durationMs: 950,
+    envelopeDurationMs: 460,
+    envelopeDelayMs: 120,
+  },
+];
 
 export default function AdminAnimationPreviewClient() {
   const [phase, setPhase] = useState<PreviewPhase>("idle");
   const [mode, setMode] = useState<PreviewMode>("simple");
+  const [simpleSpeed, setSimpleSpeed] =
+    useState<SimpleRevealSpeed>("recommended");
   const [playKey, setPlayKey] = useState(0);
   const [prefersReducedMotion, setPrefersReducedMotion] = useState(false);
   const resultTimerRef = useRef<number | null>(null);
+  const simplePreset =
+    SIMPLE_REVEAL_PRESETS.find((preset) => preset.key === simpleSpeed) ??
+    SIMPLE_REVEAL_PRESETS[1];
+  const simpleRevealVars = {
+    "--admin-simple-reveal-duration": `${simplePreset.durationMs}ms`,
+    "--admin-simple-envelope-duration": `${simplePreset.envelopeDurationMs}ms`,
+    "--admin-simple-envelope-delay": `${simplePreset.envelopeDelayMs}ms`,
+  } as CSSProperties;
 
   useEffect(() => {
     const media = window.matchMedia("(prefers-reduced-motion: reduce)");
@@ -57,7 +96,8 @@ export default function AdminAnimationPreviewClient() {
     setPlayKey((current) => current + 1);
     setPhase("opening");
 
-    const duration = mode === "simple" ? SIMPLE_REVEAL_MS : HOME_ENVELOPE_OPEN_MS;
+    const duration =
+      mode === "simple" ? simplePreset.durationMs : HOME_ENVELOPE_OPEN_MS;
     const delay = prefersReducedMotion ? 120 : duration;
     resultTimerRef.current = window.setTimeout(() => {
       resultTimerRef.current = null;
@@ -102,9 +142,38 @@ export default function AdminAnimationPreviewClient() {
       {mode === "current" ? (
         <p style={styles.compareNote}>現行は比較用です。本番ホームでは採用していません。</p>
       ) : null}
+      {mode === "simple" ? (
+        <section style={styles.speedTabs} aria-label="シンプル速度">
+          {SIMPLE_REVEAL_PRESETS.map((preset) => (
+            <button
+              key={preset.key}
+              type="button"
+              onClick={() => {
+                if (!isOpening) {
+                  setSimpleSpeed(preset.key);
+                  setPhase("idle");
+                  setPlayKey((current) => current + 1);
+                }
+              }}
+              disabled={isOpening}
+              style={{
+                ...styles.speedButton,
+                ...(simpleSpeed === preset.key ? styles.speedButtonActive : {}),
+              }}
+            >
+              {preset.label}
+            </button>
+          ))}
+        </section>
+      ) : null}
 
       <section style={styles.previewShell} aria-label="開封アニメーション確認">
-        <div style={styles.phoneFrame}>
+        <div
+          style={{
+            ...styles.phoneFrame,
+            ...(isSimple ? simpleRevealVars : {}),
+          }}
+        >
           <div style={styles.paperBackdrop} aria-hidden="true" />
           <a
             href="/settings"
@@ -228,7 +297,7 @@ export default function AdminAnimationPreviewClient() {
           {phase === "idle" ? "ホーム夜8時便を再生" : "もう一度再生"}
         </button>
         <p style={styles.metaText}>
-          {mode === "simple" ? `シンプル: ${SIMPLE_REVEAL_MS}ms` : `現行: ${HOME_ENVELOPE_OPEN_MS}ms`} / reduced motion:{" "}
+          {mode === "simple" ? `シンプル: ${simplePreset.durationMs}ms` : `現行: ${HOME_ENVELOPE_OPEN_MS}ms`} / reduced motion:{" "}
           {prefersReducedMotion ? "有効" : "無効"}
         </p>
       </section>
@@ -255,7 +324,7 @@ export default function AdminAnimationPreviewClient() {
         }
 
         .admin-envelope-preview-button.simple-reveal.is-opening .simple-envelope-image {
-          animation: adminSimpleEnvelopeOut 240ms 60ms cubic-bezier(0.22, 1, 0.36, 1) both;
+          animation: adminSimpleEnvelopeOut var(--admin-simple-envelope-duration, 360ms) var(--admin-simple-envelope-delay, 100ms) cubic-bezier(0.4, 0, 1, 1) both;
         }
 
         @keyframes adminEnvelopeActionFade {
@@ -289,8 +358,8 @@ export default function AdminAnimationPreviewClient() {
           }
           to {
             opacity: 0;
-            transform: translateY(7px) scale(0.98);
-            filter: blur(1px);
+            transform: translateY(4px) scale(0.985);
+            filter: blur(0.6px);
           }
         }
 
@@ -381,6 +450,28 @@ const styles = {
     display: "flex",
     justifyContent: "center",
     gap: 8,
+  },
+  speedTabs: {
+    width: "min(100%, 560px)",
+    margin: "-2px auto 14px",
+    display: "flex",
+    justifyContent: "center",
+    gap: 8,
+    flexWrap: "wrap" as const,
+  },
+  speedButton: {
+    border: "1px solid rgba(122, 95, 78, 0.2)",
+    borderRadius: 999,
+    padding: "8px 12px",
+    background: "rgba(255, 252, 247, 0.58)",
+    color: "#756157",
+    fontSize: 12,
+    cursor: "pointer",
+  },
+  speedButtonActive: {
+    borderColor: "rgba(166, 84, 72, 0.36)",
+    background: "rgba(255, 249, 243, 0.92)",
+    color: "#9b4c42",
   },
   modeButton: {
     minHeight: 38,
@@ -535,7 +626,8 @@ const styles = {
   },
   simpleResultOverlay: {
     background: "rgba(247, 240, 228, 0.18)",
-    animation: "simpleRevealResultIn 520ms cubic-bezier(0.22, 1, 0.36, 1) both",
+    animation:
+      "simpleRevealResultIn var(--admin-simple-reveal-duration, 760ms) cubic-bezier(0, 0, 0.2, 1) both",
   },
   resultStage: {
     width: "100%",
