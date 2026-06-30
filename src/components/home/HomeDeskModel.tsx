@@ -991,7 +991,7 @@ export function HomeDeskModel({
           animation: deskEnvelopeActionFade 110ms ease-out both;
         }
         .desk-letter-simple-opening [data-envelope-art="simple"] {
-          animation: deskEnvelopeSimpleFadeOut 320ms 80ms cubic-bezier(0.22, 1, 0.36, 1) both;
+          animation: deskEnvelopeSimpleFadeOut 240ms 60ms cubic-bezier(0.22, 1, 0.36, 1) both;
         }
         .desk-letter-opening [data-envelope-body="true"] {
           animation: deskEnvelopeBodyOpen ${ENVELOPE_OPEN_MS}ms cubic-bezier(0.18, 0.92, 0.2, 1) both;

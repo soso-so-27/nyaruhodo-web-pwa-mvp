@@ -14,7 +14,7 @@ const SIMPLE_REVEAL_MS = 620;
 
 export default function AdminAnimationPreviewClient() {
   const [phase, setPhase] = useState<PreviewPhase>("idle");
-  const [mode, setMode] = useState<PreviewMode>("current");
+  const [mode, setMode] = useState<PreviewMode>("simple");
   const [playKey, setPlayKey] = useState(0);
   const [prefersReducedMotion, setPrefersReducedMotion] = useState(false);
   const resultTimerRef = useRef<number | null>(null);
@@ -99,6 +99,9 @@ export default function AdminAnimationPreviewClient() {
           </button>
         ))}
       </section>
+      {mode === "current" ? (
+        <p style={styles.compareNote}>現行は比較用です。本番ホームでは採用していません。</p>
+      ) : null}
 
       <section style={styles.previewShell} aria-label="開封アニメーション確認">
         <div style={styles.phoneFrame}>
@@ -252,7 +255,7 @@ export default function AdminAnimationPreviewClient() {
         }
 
         .admin-envelope-preview-button.simple-reveal.is-opening .simple-envelope-image {
-          animation: adminSimpleEnvelopeOut 320ms 80ms cubic-bezier(0.22, 1, 0.36, 1) both;
+          animation: adminSimpleEnvelopeOut 240ms 60ms cubic-bezier(0.22, 1, 0.36, 1) both;
         }
 
         @keyframes adminEnvelopeActionFade {
@@ -393,6 +396,13 @@ const styles = {
     borderColor: "rgba(166, 80, 69, 0.44)",
     background: "rgba(255, 249, 243, 0.92)",
     color: "#9b4c42",
+  },
+  compareNote: {
+    width: "min(100%, 560px)",
+    margin: "-4px auto 12px",
+    color: "#8a6258",
+    fontSize: 12,
+    textAlign: "center",
   },
   previewShell: {
     width: "100%",
