@@ -67,6 +67,10 @@ export function trackProductEvent(
   }
 
   try {
+    const propertiesForStorage = sanitizeProperties({
+      ...getAttributionProperties(),
+      ...properties,
+    });
     const event: ProductAnalyticsEvent = {
       id: createId(),
       name,
@@ -76,12 +80,9 @@ export function trackProductEvent(
       user_id: options.userId ?? null,
       local_cat_id: options.localCatId ?? null,
       route: window.location.pathname,
-      referrer: document.referrer || null,
+      referrer: sanitizeReferrer(document.referrer),
       source: getTrafficSource(),
-      properties: {
-        ...getAttributionProperties(),
-        ...properties,
-      },
+      properties: propertiesForStorage,
     };
 
     const queue = readAnalyticsEventQueue();
@@ -152,10 +153,62 @@ export function readAnalyticsEventQueue(): ProductAnalyticsEvent[] {
       return [];
     }
     const parsed = JSON.parse(raw);
-    return Array.isArray(parsed) ? parsed : [];
+    return Array.isArray(parsed)
+      ? parsed
+          .map(sanitizeQueuedAnalyticsEvent)
+          .filter((event): event is ProductAnalyticsEvent => Boolean(event))
+      : [];
   } catch {
     return [];
   }
+}
+
+function sanitizeQueuedAnalyticsEvent(
+  value: unknown,
+): ProductAnalyticsEvent | null {
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    return null;
+  }
+
+  const event = value as Partial<ProductAnalyticsEvent>;
+
+  if (
+    typeof event.name !== "string" ||
+    typeof event.occurred_at !== "string" ||
+    typeof event.anonymous_id !== "string" ||
+    typeof event.session_id !== "string"
+  ) {
+    return null;
+  }
+
+  return {
+    id: typeof event.id === "string" ? event.id : undefined,
+    name: event.name,
+    occurred_at: event.occurred_at,
+    anonymous_id: event.anonymous_id,
+    session_id: event.session_id,
+    user_id: typeof event.user_id === "string" ? event.user_id : null,
+    local_cat_id:
+      typeof event.local_cat_id === "string" ? event.local_cat_id : null,
+    route: typeof event.route === "string" ? event.route.slice(0, 160) : undefined,
+    referrer:
+      typeof event.referrer === "string"
+        ? sanitizeReferrer(event.referrer)
+        : null,
+    source: isProductAnalyticsSource(event.source) ? event.source : "unknown",
+    properties: sanitizeProperties(event.properties ?? {}),
+  };
+}
+
+function isProductAnalyticsSource(
+  value: unknown,
+): value is ProductAnalyticsEvent["source"] {
+  return (
+    value === "sns" ||
+    value === "direct" ||
+    value === "pwa" ||
+    value === "unknown"
+  );
 }
 
 function getOrCreateAnonymousId() {
@@ -364,12 +417,12 @@ function sanitizeProperties(properties: Record<string, unknown>) {
       continue;
     }
 
-    if (typeof value === "string" && value.length > 160) {
-      sanitized[key] = value.slice(0, 160);
+    const sanitizedValue = sanitizeMetadataValue(key, value);
+    if (sanitizedValue === undefined) {
       continue;
     }
 
-    sanitized[key] = value;
+    sanitized[key] = sanitizedValue;
   }
 
   return sanitized;
@@ -382,9 +435,60 @@ function isUnsafeMetadataKey(key: string) {
     normalized.includes("name") ||
     normalized.includes("url") ||
     normalized.includes("signed") ||
+    normalized.includes("token") ||
+    normalized.includes("secret") ||
     normalized.includes("storage_path") ||
     normalized.includes("path")
   );
+}
+
+function sanitizeMetadataValue(key: string, value: unknown) {
+  if (value === null || value === undefined) {
+    return value;
+  }
+
+  if (typeof value === "string") {
+    const normalizedKey = key.trim().toLowerCase();
+    if (normalizedKey === "error_message") {
+      return sanitizeErrorMessage(value);
+    }
+
+    if (isUnsafeMetadataString(value)) {
+      return undefined;
+    }
+
+    return value.slice(0, 160);
+  }
+
+  if (typeof value === "number" || typeof value === "boolean") {
+    return value;
+  }
+
+  return undefined;
+}
+
+function isUnsafeMetadataString(value: string) {
+  const normalized = value.trim().toLowerCase();
+
+  return (
+    normalized.startsWith("http://") ||
+    normalized.startsWith("https://") ||
+    normalized.startsWith("storage:") ||
+    normalized.startsWith("storage://") ||
+    normalized.includes("/storage/v1/object/") ||
+    normalized.includes("token=") ||
+    normalized.includes("expires=") ||
+    normalized.includes("signature=") ||
+    normalized.includes("x-amz-signature=")
+  );
+}
+
+function sanitizeReferrer(referrer: string) {
+  if (!referrer || isUnsafeMetadataString(referrer)) {
+    return null;
+  }
+
+  return referrer.slice(0, 160);
 }
 
 function getString(value: unknown) {
@@ -396,7 +500,12 @@ function sanitizeErrorMessage(message: string | null) {
     return null;
   }
 
-  return message.replace(/https?:\/\/\S+/g, "[url]").slice(0, 160);
+  return message
+    .replace(/https?:\/\/\S+/g, "[url]")
+    .replace(/storage:\/\/\S+/g, "[storage]")
+    .replace(/storage:[^\s)]+/g, "[storage]")
+    .replace(/([?&](?:token|signature|expires|expires_at|expiresAt)=)[^&\s]+/gi, "$1[redacted]")
+    .slice(0, 160);
 }
 
 function isStandalonePwa() {

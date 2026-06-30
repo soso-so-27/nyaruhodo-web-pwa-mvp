@@ -3,7 +3,11 @@ import {
   getEveningDeliveryTargetDateKey,
   getJstDateKey,
 } from "../home/eveningDelivery";
-import type { ExchangePhoto, OwnSleepingPhoto } from "../home/sleepingPhotos";
+import {
+  sanitizeExchangePhotoForPersistence,
+  type ExchangePhoto,
+  type OwnSleepingPhoto,
+} from "../home/sleepingPhotos";
 
 export type OnboardingSource =
   | "direct"
@@ -107,9 +111,16 @@ export function writeOnboardingProgress(progress: OnboardingProgress) {
   }
 
   try {
+    const deliveredPhoto = sanitizeOptionalDeliveredPhoto(
+      progress.deliveredPhoto,
+    );
     window.localStorage.setItem(
       STORAGE_KEYS.onboardingProgress,
-      JSON.stringify({ ...progress, updatedAt: Date.now() }),
+      JSON.stringify({
+        ...progress,
+        ...(deliveredPhoto ? { deliveredPhoto } : { deliveredPhoto: undefined }),
+        updatedAt: Date.now(),
+      }),
     );
   } catch {
     // Onboarding persistence should never block the first experience.
@@ -123,6 +134,9 @@ export function patchOnboardingProgress(
   const dateKey = patch.dateKey ?? current?.dateKey ?? getJstDateKey();
   const anonymousId =
     patch.anonymousId ?? current?.anonymousId ?? getOrCreateOnboardingAnonymousId();
+  const deliveredPhoto = sanitizeOptionalDeliveredPhoto(
+    patch.deliveredPhoto ?? current?.deliveredPhoto,
+  );
 
   writeOnboardingProgress({
     version: 1,
@@ -135,13 +149,17 @@ export function patchOnboardingProgress(
       createOnboardingSubmissionId(anonymousId, dateKey),
     ownPhoto: patch.ownPhoto ?? current?.ownPhoto,
     selectedPhotoSrc: patch.selectedPhotoSrc ?? current?.selectedPhotoSrc,
-    deliveredPhoto: patch.deliveredPhoto ?? current?.deliveredPhoto,
+    ...(deliveredPhoto ? { deliveredPhoto } : {}),
     isDeliveredPhotoKept:
       patch.isDeliveredPhotoKept ?? current?.isDeliveredPhotoKept,
     completionCopy: patch.completionCopy ?? current?.completionCopy,
     stage: patch.stage,
     updatedAt: Date.now(),
   });
+}
+
+function sanitizeOptionalDeliveredPhoto(photo: ExchangePhoto | undefined) {
+  return sanitizeExchangePhotoForPersistence(photo) ?? undefined;
 }
 
 export function markOnboardingAlbumCreated(source: OnboardingSource) {

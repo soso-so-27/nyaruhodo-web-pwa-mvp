@@ -2310,6 +2310,24 @@ export function HomeInput({
             filter: blur(0);
           }
         }
+        @keyframes eveningOpeningOverlayIn {
+          from {
+            opacity: 0;
+          }
+          to {
+            opacity: 1;
+          }
+        }
+        @keyframes eveningOpeningStageIn {
+          from {
+            opacity: 0;
+            transform: translate3d(0, 8px, 0) scale(0.98);
+          }
+          to {
+            opacity: 1;
+            transform: translate3d(0, 0, 0) scale(1);
+          }
+        }
         .mikke-all-body {
           scrollbar-width: none;
         }
@@ -7006,6 +7024,7 @@ const styles = {
     backgroundPosition: "var(--app-paper-background-position)",
     backgroundRepeat: "var(--app-paper-background-repeat)",
     color: "#292721",
+    animation: "eveningOpeningOverlayIn 240ms ease-out both",
   },
   eveningOpeningPhotoStage: {
     width: "min(calc(100vw - 54px), 420px)",
@@ -7045,6 +7064,7 @@ const styles = {
     display: "grid",
     gap: "18px",
     justifyItems: "center",
+    animation: "eveningOpeningStageIn 280ms cubic-bezier(0.22, 1, 0.36, 1) both",
   },
   eveningOpeningPairCard: {
     width: "100%",

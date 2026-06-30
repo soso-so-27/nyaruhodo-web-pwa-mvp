@@ -1,6 +1,5 @@
 import {
   getStoragePhotoPath,
-  isLikelySignedPhotoUrl,
   isUsablePhotoSrc,
   normalizePersistentPhotoSrc,
 } from "../photoStorage";
@@ -89,6 +88,13 @@ export type CatSleepingMilestone = {
 
 export type HiddenExchangePhotoReason = "hide" | "report";
 export type ExchangePhotoReportReason = "not_cat" | "uncomfortable" | "other";
+
+type ExchangePhotoHistoryEntry = {
+  photoId: string;
+  sourcePhotoId?: string;
+  reason?: HiddenExchangePhotoReason | ExchangePhotoReportReason;
+  createdAt: number;
+};
 
 export type DeliverableSleepingPhotoInput = {
   triggerLabel: string;
@@ -545,7 +551,8 @@ export function deleteOwnSleepingPhoto(photoId: string) {
 
 export function readKeptExchangePhotos() {
   return readStorageArray<ExchangePhoto>(KEPT_EXCHANGE_PHOTO_STORAGE_KEY)
-    .filter(isValidExchangePhoto)
+    .map(sanitizeExchangePhotoForPersistence)
+    .filter((photo): photo is ExchangePhoto => Boolean(photo))
     .slice(0, 50);
 }
 
@@ -594,23 +601,11 @@ export function readKeptExchangePhotoStorageDebug(): KeptExchangePhotoStorageDeb
 }
 
 export function keepExchangePhoto(photo: ExchangePhoto) {
-  if (!isValidExchangePhoto(photo)) {
+  const persistentPhoto = sanitizeExchangePhotoForPersistence(photo);
+
+  if (!persistentPhoto) {
     return false;
   }
-
-  const persistentSrc = normalizePersistentPhotoSrc(photo.src);
-
-  if (!persistentSrc || !isUsablePhotoSrc(persistentSrc)) {
-    return false;
-  }
-
-  const persistentPhoto = {
-    ...photo,
-    src: persistentSrc,
-    thumbnailSrc: normalizePersistentExchangePhotoSrc(photo.thumbnailSrc),
-    displaySrc: normalizePersistentExchangePhotoSrc(photo.displaySrc),
-    originalSrc: normalizePersistentExchangePhotoSrc(photo.originalSrc),
-  };
 
   try {
     const saved = readKeptExchangePhotos().filter(
@@ -715,11 +710,46 @@ export function updateKeptExchangePhotoDataUrl(
 }
 
 function normalizePersistentExchangePhotoSrc(src: string | undefined) {
-  if (!src || isLikelySignedPhotoUrl(src)) {
+  if (!src) {
     return undefined;
   }
 
-  return normalizeOptionalPhotoSrc(src) ?? undefined;
+  const normalized = normalizePersistentPhotoSrc(src);
+  if (!normalized || isHttpPhotoSrc(normalized)) {
+    return undefined;
+  }
+
+  return isUsablePhotoSrc(normalized) ? normalized : undefined;
+}
+
+export function sanitizeExchangePhotoForPersistence(
+  photo: ExchangePhoto | null | undefined,
+): ExchangePhoto | null {
+  if (!photo || typeof photo.id !== "string" || typeof photo.src !== "string") {
+    return null;
+  }
+
+  const persistentSrc = normalizePersistentPhotoSrc(photo.src);
+
+  if (
+    !persistentSrc ||
+    isHttpPhotoSrc(persistentSrc) ||
+    !isUsablePhotoSrc(persistentSrc)
+  ) {
+    return null;
+  }
+
+  return {
+    ...photo,
+    src: persistentSrc,
+    thumbnailSrc: normalizePersistentExchangePhotoSrc(photo.thumbnailSrc),
+    displaySrc: normalizePersistentExchangePhotoSrc(photo.displaySrc),
+    originalSrc: normalizePersistentExchangePhotoSrc(photo.originalSrc),
+  };
+}
+
+function isHttpPhotoSrc(src: string) {
+  return src.startsWith("http://") || src.startsWith("https://");
 }
 
 function createEmptyKeptExchangeDebug(
@@ -759,14 +789,13 @@ function getPhotoSrcKind(src: string): KeptExchangePhotoStorageDebug["latestSrcK
 
 export function dismissExchangePhoto(photo: ExchangePhoto) {
   try {
-    const saved = readStorageArray<Partial<ExchangePhoto>>(
+    const saved = readStorageArray<ExchangePhotoHistoryEntry>(
       DISMISSED_EXCHANGE_PHOTO_STORAGE_KEY,
     );
-    const dismissed = {
-      id: photo.id,
+    const dismissed: ExchangePhotoHistoryEntry = {
+      photoId: photo.id,
       sourcePhotoId: photo.sourcePhotoId,
-      src: photo.src,
-      dismissedAt: Date.now(),
+      createdAt: Date.now(),
     };
 
     writeStorageArray(
@@ -783,22 +812,24 @@ export function reportExchangePhoto(
   reason: ExchangePhotoReportReason = "other",
 ) {
   try {
-    const reported = readStorageArray<Partial<ExchangePhoto>>(
+    const reported = readStorageArray<ExchangePhotoHistoryEntry>(
       REPORTED_EXCHANGE_PHOTO_STORAGE_KEY,
     );
-    const dismissed = readStorageArray<Partial<ExchangePhoto>>(
+    const dismissed = readStorageArray<ExchangePhotoHistoryEntry>(
       DISMISSED_EXCHANGE_PHOTO_STORAGE_KEY,
     );
-    const reportedPhoto = {
-      ...photo,
-      reportedAt: Date.now(),
-      reportReason: reason,
-    };
-    const dismissedPhoto = {
-      id: photo.id,
+    const createdAt = Date.now();
+    const reportedPhoto: ExchangePhotoHistoryEntry = {
+      photoId: photo.id,
       sourcePhotoId: photo.sourcePhotoId,
-      src: photo.src,
-      dismissedAt: Date.now(),
+      reason,
+      createdAt,
+    };
+    const dismissedPhoto: ExchangePhotoHistoryEntry = {
+      photoId: photo.id,
+      sourcePhotoId: photo.sourcePhotoId,
+      reason: "report",
+      createdAt,
     };
 
     writeStorageArray(
@@ -830,11 +861,13 @@ export function hideKeptExchangePhoto(
         reason === "report"
           ? REPORTED_EXCHANGE_PHOTO_STORAGE_KEY
           : DISMISSED_EXCHANGE_PHOTO_STORAGE_KEY;
-      const history = readStorageArray<Partial<ExchangePhoto>>(historyKey);
-      const historyPhoto =
-        reason === "report"
-          ? { ...targetPhoto, reportedAt: Date.now() }
-          : { ...targetPhoto, dismissedAt: Date.now() };
+      const history = readStorageArray<ExchangePhotoHistoryEntry>(historyKey);
+      const historyPhoto: ExchangePhotoHistoryEntry = {
+        photoId: targetPhoto.id,
+        sourcePhotoId: targetPhoto.sourcePhotoId,
+        reason,
+        createdAt: Date.now(),
+      };
 
       writeStorageArray(historyKey, [historyPhoto, ...history].slice(0, 50));
     }
@@ -932,22 +965,28 @@ function mergeExchangePhotos(
   const byId = new Map<string, ExchangePhoto>();
 
   for (const photo of [...existingPhotos, ...restoredPhotos]) {
-    if (!isValidExchangePhoto(photo)) {
+    const normalizedPhoto = sanitizeExchangePhotoForPersistence(photo);
+    if (!normalizedPhoto) {
       continue;
     }
 
-    byId.set(photo.id, photo);
+    byId.set(normalizedPhoto.id, normalizedPhoto);
   }
 
   return [...byId.values()].sort((a, b) => b.deliveredAt - a.deliveredAt);
 }
 
 function addExchangePhotoIdsFromStorage(blockedIds: Set<string>, key: string) {
-  const photos = readStorageArray<Partial<ExchangePhoto>>(key);
+  const photos = readStorageArray<
+    Partial<ExchangePhoto> & Partial<ExchangePhotoHistoryEntry>
+  >(key);
 
   for (const photo of photos) {
     if (typeof photo.sourcePhotoId === "string") {
       blockedIds.add(photo.sourcePhotoId);
+    }
+    if (typeof photo.photoId === "string") {
+      blockedIds.add(photo.photoId);
     }
     if (typeof photo.id === "string") {
       blockedIds.add(photo.id);

@@ -1,5 +1,9 @@
 import { STORAGE_KEYS } from "../storage";
-import type { ExchangePhoto, OwnSleepingPhoto } from "./sleepingPhotos";
+import {
+  sanitizeExchangePhotoForPersistence,
+  type ExchangePhoto,
+  type OwnSleepingPhoto,
+} from "./sleepingPhotos";
 
 export const EVENING_DELIVERY_HOUR = 20;
 export const EVENING_REVIEW_CUTOFF_HOUR = 19;
@@ -138,13 +142,20 @@ export function setEveningDeliveredPhoto(
   deliveredPhoto: ExchangePhoto,
   deliveredAt = Date.now(),
 ) {
+  const persistentDeliveredPhoto =
+    sanitizeExchangePhotoForPersistence(deliveredPhoto);
+
+  if (!persistentDeliveredPhoto) {
+    return;
+  }
+
   const store = readEveningDeliveryStore();
   const day = store[dateKey] ?? { dateKey };
 
   store[dateKey] = {
     ...day,
     dateKey,
-    deliveredPhoto,
+    deliveredPhoto: persistentDeliveredPhoto,
     deliveredAt,
   };
   for (const [otherDateKey, otherDay] of Object.entries(store)) {

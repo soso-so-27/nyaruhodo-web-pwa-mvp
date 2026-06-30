@@ -94,20 +94,25 @@ export default function AdminAnalyticsClient() {
       <section style={styles.header}>
         <p style={styles.kicker}>Admin</p>
         <h1 style={styles.title}>Analytics</h1>
-        <div style={styles.periodTabs}>
-          {PERIODS.map((item) => (
-            <button
-              key={item.key}
-              type="button"
-              onClick={() => setPeriod(item.key)}
-              style={{
-                ...styles.periodButton,
-                ...(period === item.key ? styles.periodButtonActive : {}),
-              }}
-            >
-              {item.label}
-            </button>
-          ))}
+        <div style={styles.headerTools}>
+          <div style={styles.periodTabs}>
+            {PERIODS.map((item) => (
+              <button
+                key={item.key}
+                type="button"
+                onClick={() => setPeriod(item.key)}
+                style={{
+                  ...styles.periodButton,
+                  ...(period === item.key ? styles.periodButtonActive : {}),
+                }}
+              >
+                {item.label}
+              </button>
+            ))}
+          </div>
+          <a href="/admin/animation-preview" style={styles.adminToolLink}>
+            開封アニメーション確認
+          </a>
         </div>
       </section>
 
@@ -302,10 +307,26 @@ const styles = {
     fontWeight: 500,
     letterSpacing: 0,
   },
+  headerTools: {
+    display: "flex",
+    flexWrap: "wrap",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: 10,
+  },
   periodTabs: {
     display: "flex",
     flexWrap: "wrap",
     gap: 8,
+  },
+  adminToolLink: {
+    border: "1px solid rgba(91, 74, 62, 0.18)",
+    borderRadius: 999,
+    background: "rgba(255, 252, 246, 0.62)",
+    padding: "9px 16px",
+    color: "#7f4d44",
+    fontSize: 13,
+    textDecoration: "none",
   },
   periodButton: {
     border: "1px solid rgba(91, 74, 62, 0.24)",

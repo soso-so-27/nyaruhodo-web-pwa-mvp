@@ -430,6 +430,9 @@ export function HomeDeskModel({
     trackHomeRevealEvent("delivery_reveal_photo_error");
   }
 
+  const openingChromeStyle = isEnvelopeOpening
+    ? deskStyles.envelopeOpeningChromeHidden
+    : undefined;
 
   return (
     <section
@@ -452,7 +455,10 @@ export function HomeDeskModel({
         iconOnly
         data-testid="home-settings-shortcut"
         aria-label="設定"
-        style={deskStyles.settingsShortcut}
+        style={{
+          ...deskStyles.settingsShortcut,
+          ...openingChromeStyle,
+        }}
       >
         <AppIcon name="settings" size={16} />
       </AppButton>
@@ -801,12 +807,22 @@ export function HomeDeskModel({
       </div>
 
       {!shouldHidePresence ? (
-        <p style={deskStyles.presence}>
+        <p
+          style={{
+            ...deskStyles.presence,
+            ...openingChromeStyle,
+          }}
+        >
           きょうも、{sleepingCounter}ひきの ねこが ねています
         </p>
       ) : null}
 
-      <BottomNavigation active="today" homeVariant="desk" homeState={deskState} />
+      <div
+        aria-hidden={isEnvelopeOpening ? true : undefined}
+        style={openingChromeStyle}
+      >
+        <BottomNavigation active="today" homeVariant="desk" homeState={deskState} />
+      </div>
 
       {viewerPhoto ? (
         <DeskPhotoViewer
@@ -945,6 +961,9 @@ export function HomeDeskModel({
           line-height: 1.45;
           letter-spacing: var(--tracking-body);
         }
+        .desk-letter-opening [data-envelope-action="true"]::before {
+          animation: deskEnvelopeActionFade 110ms ease-out both;
+        }
         .desk-letter-opening [data-envelope-body="true"] {
           animation: deskEnvelopeBodyOpen ${ENVELOPE_OPEN_MS}ms cubic-bezier(0.18, 0.92, 0.2, 1) both;
         }
@@ -981,6 +1000,16 @@ export function HomeDeskModel({
             opacity: 1;
             transform: translateY(0) scale(1);
             filter: blur(0);
+          }
+        }
+        @keyframes deskEnvelopeActionFade {
+          from {
+            opacity: 1;
+            transform: translateY(0);
+          }
+          to {
+            opacity: 0;
+            transform: translateY(-2px);
           }
         }
         @keyframes deskEnvelopeBodyOpen {
@@ -1103,6 +1132,7 @@ export function HomeDeskModel({
           .desk-evening-soon-copy,
           .home-letter-tray-glow,
           .desk-envelope-home,
+          .desk-letter-opening [data-envelope-action="true"]::before,
           .desk-letter-opening [data-envelope-body="true"],
           .desk-letter-opening [data-envelope-art="closed"],
           .desk-letter-opening [data-envelope-art="open"],
@@ -2199,6 +2229,11 @@ const deskStyles = {
   },
   homeHeroDelivered: {
     gap: "18px",
+  },
+  envelopeOpeningChromeHidden: {
+    opacity: 0,
+    pointerEvents: "none",
+    transition: "opacity 140ms ease",
   },
   homeHeroOpened: {
     gap: "18px",
