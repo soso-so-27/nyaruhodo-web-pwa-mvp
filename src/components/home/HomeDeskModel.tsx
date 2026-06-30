@@ -20,7 +20,11 @@ import { AppIcon } from "../ui/AppIcons";
 import { PhotoViewerFrame } from "../ui/PhotoTile";
 import { StoredPhotoImage } from "../ui/StoredPhotoImage";
 import { HomeEnvelopeMotionArt } from "./HomeEnvelopeMotionArt";
-import { HOME_ENVELOPE_OPEN_MS } from "./homeEnvelopeMotionConfig";
+import {
+  HOME_ENVELOPE_OPEN_MS,
+  HOME_REVEAL_MODE,
+  HOME_SIMPLE_REVEAL_COMMIT_MS,
+} from "./homeEnvelopeMotionConfig";
 
 type DeskState = "1" | "1b" | "2" | "3" | "4";
 type HomeDaylightStyle = CSSProperties & Record<`--${string}`, string>;
@@ -78,7 +82,10 @@ type HomeDeskModelProps = {
   onDismissOmoideMemory?: (memory: OmoideMemory) => void;
 };
 
-const ENVELOPE_OPEN_MS = HOME_ENVELOPE_OPEN_MS;
+const USE_SIMPLE_HOME_REVEAL = HOME_REVEAL_MODE === "simple";
+const ENVELOPE_OPEN_MS = USE_SIMPLE_HOME_REVEAL
+  ? HOME_SIMPLE_REVEAL_COMMIT_MS
+  : HOME_ENVELOPE_OPEN_MS;
 const ENVELOPE_SEAL_OPEN_MS = Math.min(760, HOME_ENVELOPE_OPEN_MS);
 const HOME_FRAME_TUNING = {
   pagePaddingX: "12px",
@@ -378,7 +385,9 @@ export function HomeDeskModel({
       return;
     }
 
-    setDevelopPhotoMounted(true);
+    if (!USE_SIMPLE_HOME_REVEAL || !usesEnvelopeHome) {
+      setDevelopPhotoMounted(true);
+    }
     setEnvelopeOpenPlayKey((value) => value + 1);
     setIsEnvelopeOpening(true);
     if (envelopeOpenTimerRef.current) {
@@ -593,7 +602,11 @@ export function HomeDeskModel({
                   }}
                   className={[
                     usesEnvelopeHome ? "desk-envelope-home" : null,
-                    isEnvelopeOpening ? "desk-letter-opening" : null,
+                    isEnvelopeOpening
+                      ? usesEnvelopeHome && USE_SIMPLE_HOME_REVEAL
+                        ? "desk-letter-simple-opening"
+                        : "desk-letter-opening"
+                      : null,
                   ]
                     .filter(Boolean)
                     .join(" ")}
@@ -615,10 +628,20 @@ export function HomeDeskModel({
                     }}
                   >
                     {usesEnvelopeHome ? (
-                      <HomeEnvelopeMotionArt
-                        isOpening={isEnvelopeOpening}
-                        playKey={envelopeOpenPlayKey}
-                      />
+                      USE_SIMPLE_HOME_REVEAL ? (
+                        <img
+                          data-envelope-art="simple"
+                          src="/images/home/generated-envelope-wide-v2.png"
+                          alt=""
+                          draggable={false}
+                          style={deskStyles.envelopeHomeSimpleImage}
+                        />
+                      ) : (
+                        <HomeEnvelopeMotionArt
+                          isOpening={isEnvelopeOpening}
+                          playKey={envelopeOpenPlayKey}
+                        />
+                      )
                     ) : null}
                     <span
                       data-envelope-flap="true"
@@ -638,7 +661,9 @@ export function HomeDeskModel({
                       }
                       aria-hidden="true"
                     />
-                    {deliveredPhoto && (developPhotoMounted || usesEnvelopeHome) ? (
+                    {deliveredPhoto &&
+                    !(usesEnvelopeHome && USE_SIMPLE_HOME_REVEAL) &&
+                    (developPhotoMounted || usesEnvelopeHome) ? (
                       <span
                         data-develop-photo={
                           developPhotoMounted ? "true" : "preload"
@@ -961,8 +986,12 @@ export function HomeDeskModel({
           line-height: 1.45;
           letter-spacing: var(--tracking-body);
         }
-        .desk-letter-opening [data-envelope-action="true"]::before {
+        .desk-letter-opening [data-envelope-action="true"]::before,
+        .desk-letter-simple-opening [data-envelope-action="true"]::before {
           animation: deskEnvelopeActionFade 110ms ease-out both;
+        }
+        .desk-letter-simple-opening [data-envelope-art="simple"] {
+          animation: deskEnvelopeSimpleFadeOut 320ms 80ms cubic-bezier(0.22, 1, 0.36, 1) both;
         }
         .desk-letter-opening [data-envelope-body="true"] {
           animation: deskEnvelopeBodyOpen ${ENVELOPE_OPEN_MS}ms cubic-bezier(0.18, 0.92, 0.2, 1) both;
@@ -1010,6 +1039,18 @@ export function HomeDeskModel({
           to {
             opacity: 0;
             transform: translateY(-2px);
+          }
+        }
+        @keyframes deskEnvelopeSimpleFadeOut {
+          from {
+            opacity: 1;
+            transform: translate(-50%, -50%) translateY(0) scale(1);
+            filter: drop-shadow(0 16px 28px color-mix(in srgb, var(--ink) 16%, transparent)) blur(0);
+          }
+          to {
+            opacity: 0;
+            transform: translate(-50%, -50%) translateY(7px) scale(0.98);
+            filter: drop-shadow(0 10px 20px color-mix(in srgb, var(--ink) 10%, transparent)) blur(1px);
           }
         }
         @keyframes deskEnvelopeBodyOpen {
@@ -1132,6 +1173,8 @@ export function HomeDeskModel({
           .desk-evening-soon-copy,
           .home-letter-tray-glow,
           .desk-envelope-home,
+          .desk-letter-simple-opening [data-envelope-action="true"]::before,
+          .desk-letter-simple-opening [data-envelope-art="simple"],
           .desk-letter-opening [data-envelope-action="true"]::before,
           .desk-letter-opening [data-envelope-body="true"],
           .desk-letter-opening [data-envelope-art="closed"],
@@ -2687,6 +2730,19 @@ const deskStyles = {
     filter:
       "drop-shadow(0 18px 30px color-mix(in srgb, var(--ink) 20%, transparent)) drop-shadow(0 6px 18px color-mix(in srgb, var(--seal) 10%, transparent))",
     transformOrigin: "50% 58%",
+    pointerEvents: "none",
+  },
+  envelopeHomeSimpleImage: {
+    position: "absolute",
+    left: "50%",
+    top: "54%",
+    width: "96%",
+    height: "auto",
+    display: "block",
+    transform: "translate(-50%, -50%)",
+    filter:
+      "drop-shadow(0 16px 28px color-mix(in srgb, var(--ink) 16%, transparent))",
+    transformOrigin: "50% 62%",
     pointerEvents: "none",
   },
   envelopeHomeArtOpen: {

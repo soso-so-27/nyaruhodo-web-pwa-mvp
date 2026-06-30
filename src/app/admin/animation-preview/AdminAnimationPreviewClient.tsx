@@ -7,11 +7,14 @@ import { HomeEnvelopeMotionArt } from "../../../components/home/HomeEnvelopeMoti
 import { HOME_ENVELOPE_OPEN_MS } from "../../../components/home/homeEnvelopeMotionConfig";
 
 type PreviewPhase = "idle" | "opening" | "result";
+type PreviewMode = "current" | "simple";
 
 const PREVIEW_PHOTO_SRC = "/sample-cats/mugi-hero.png";
+const SIMPLE_REVEAL_MS = 620;
 
 export default function AdminAnimationPreviewClient() {
   const [phase, setPhase] = useState<PreviewPhase>("idle");
+  const [mode, setMode] = useState<PreviewMode>("current");
   const [playKey, setPlayKey] = useState(0);
   const [prefersReducedMotion, setPrefersReducedMotion] = useState(false);
   const resultTimerRef = useRef<number | null>(null);
@@ -32,16 +35,30 @@ export default function AdminAnimationPreviewClient() {
     };
   }, []);
 
-  function replay() {
+  function resetTimer() {
     if (resultTimerRef.current !== null) {
       window.clearTimeout(resultTimerRef.current);
       resultTimerRef.current = null;
     }
+  }
 
+  function changeMode(nextMode: PreviewMode) {
+    if (nextMode === mode || phase === "opening") {
+      return;
+    }
+    resetTimer();
+    setMode(nextMode);
+    setPhase("idle");
+    setPlayKey((current) => current + 1);
+  }
+
+  function replay() {
+    resetTimer();
     setPlayKey((current) => current + 1);
     setPhase("opening");
 
-    const delay = prefersReducedMotion ? 120 : HOME_ENVELOPE_OPEN_MS;
+    const duration = mode === "simple" ? SIMPLE_REVEAL_MS : HOME_ENVELOPE_OPEN_MS;
+    const delay = prefersReducedMotion ? 120 : duration;
     resultTimerRef.current = window.setTimeout(() => {
       resultTimerRef.current = null;
       setPhase("result");
@@ -49,6 +66,8 @@ export default function AdminAnimationPreviewClient() {
   }
 
   const isOpening = phase === "opening";
+  const isSimple = mode === "simple";
+  const shouldShowResult = isSimple ? phase !== "idle" : phase === "result";
   const chromeStyle = isOpening ? styles.hiddenChrome : undefined;
 
   return (
@@ -62,6 +81,23 @@ export default function AdminAnimationPreviewClient() {
         <p style={styles.description}>
           実機でねこだより開封の見え方を確認できます。通常ユーザーには表示されません。
         </p>
+      </section>
+
+      <section style={styles.modeTabs} aria-label="確認モード">
+        {(["current", "simple"] as const).map((item) => (
+          <button
+            key={item}
+            type="button"
+            onClick={() => changeMode(item)}
+            disabled={isOpening}
+            style={{
+              ...styles.modeButton,
+              ...(mode === item ? styles.modeButtonActive : {}),
+            }}
+          >
+            {item === "current" ? "現行" : "シンプル"}
+          </button>
+        ))}
       </section>
 
       <section style={styles.previewShell} aria-label="開封アニメーション確認">
@@ -83,7 +119,8 @@ export default function AdminAnimationPreviewClient() {
               type="button"
               className={[
                 "admin-envelope-preview-button",
-                isOpening ? "desk-letter-opening" : "",
+                isSimple ? "simple-reveal" : "current-reveal",
+                isOpening ? "is-opening" : "",
               ]
                 .filter(Boolean)
                 .join(" ")}
@@ -98,24 +135,36 @@ export default function AdminAnimationPreviewClient() {
                 style={styles.envelopeBody}
                 aria-hidden="true"
               >
-                <HomeEnvelopeMotionArt
-                  isOpening={isOpening}
-                  playKey={playKey}
-                />
-                {phase !== "idle" ? (
-                  <span
-                    data-develop-photo="true"
-                    style={styles.developPhoto}
-                    aria-hidden="true"
-                  >
-                    <img
-                      src={PREVIEW_PHOTO_SRC}
-                      alt=""
-                      draggable={false}
-                      style={styles.developImage}
+                {isSimple ? (
+                  <img
+                    src="/images/home/generated-envelope-wide-v2.png"
+                    alt=""
+                    className="simple-envelope-image"
+                    draggable={false}
+                    style={styles.simpleEnvelopeImage}
+                  />
+                ) : (
+                  <>
+                    <HomeEnvelopeMotionArt
+                      isOpening={isOpening}
+                      playKey={playKey}
                     />
-                  </span>
-                ) : null}
+                    {phase !== "idle" ? (
+                      <span
+                        data-develop-photo="true"
+                        style={styles.developPhoto}
+                        aria-hidden="true"
+                      >
+                        <img
+                          src={PREVIEW_PHOTO_SRC}
+                          alt=""
+                          draggable={false}
+                          style={styles.developImage}
+                        />
+                      </span>
+                    ) : null}
+                  </>
+                )}
               </span>
               <span
                 data-envelope-action="true"
@@ -124,9 +173,20 @@ export default function AdminAnimationPreviewClient() {
               />
             </button>
 
-            {phase === "result" ? (
-              <div style={styles.resultOverlay} aria-live="polite">
-                <div style={styles.resultStage}>
+            {shouldShowResult ? (
+              <div
+                style={{
+                  ...styles.resultOverlay,
+                  ...(isSimple ? styles.simpleResultOverlay : {}),
+                }}
+                aria-live="polite"
+              >
+                <div
+                  style={{
+                    ...styles.resultStage,
+                    ...(isSimple ? styles.simpleResultStage : {}),
+                  }}
+                >
                   <p style={styles.resultTitle}>ねこだより、とどいた</p>
                   <div style={styles.resultPhotoFrame}>
                     <img
@@ -137,9 +197,11 @@ export default function AdminAnimationPreviewClient() {
                     />
                   </div>
                   <p style={styles.resultNote}>ねこだよりに入りました</p>
-                  <button type="button" onClick={replay} style={styles.replayButton}>
-                    もう一度再生
-                  </button>
+                  {phase === "result" ? (
+                    <button type="button" onClick={replay} style={styles.replayButton}>
+                      もう一度再生
+                    </button>
+                  ) : null}
                 </div>
               </div>
             ) : null}
@@ -163,7 +225,7 @@ export default function AdminAnimationPreviewClient() {
           {phase === "idle" ? "ホーム夜8時便を再生" : "もう一度再生"}
         </button>
         <p style={styles.metaText}>
-          通常速度: {HOME_ENVELOPE_OPEN_MS}ms / reduced motion:{" "}
+          {mode === "simple" ? `シンプル: ${SIMPLE_REVEAL_MS}ms` : `現行: ${HOME_ENVELOPE_OPEN_MS}ms`} / reduced motion:{" "}
           {prefersReducedMotion ? "有効" : "無効"}
         </p>
       </section>
@@ -181,17 +243,21 @@ export default function AdminAnimationPreviewClient() {
           white-space: nowrap;
         }
 
-        .admin-envelope-preview-button.desk-letter-opening [data-envelope-action="true"]::before {
-          animation: adminEnvelopeActionFade 110ms ease-out both;
+        .admin-envelope-preview-button.is-opening [data-envelope-action="true"]::before {
+          animation: adminEnvelopeActionFade 120ms ease-out both;
         }
 
-        .admin-envelope-preview-button.desk-letter-opening [data-develop-photo="true"] {
+        .admin-envelope-preview-button.current-reveal.is-opening [data-develop-photo="true"] {
           animation: adminEnvelopePhotoReveal ${HOME_ENVELOPE_OPEN_MS}ms cubic-bezier(0.2, 0.82, 0.2, 1) both;
+        }
+
+        .admin-envelope-preview-button.simple-reveal.is-opening .simple-envelope-image {
+          animation: adminSimpleEnvelopeOut 320ms 80ms cubic-bezier(0.22, 1, 0.36, 1) both;
         }
 
         @keyframes adminEnvelopeActionFade {
           from { opacity: 1; transform: translate(-50%, -50%) scale(1); }
-          to { opacity: 0; transform: translate(-50%, -50%) scale(0.98); }
+          to { opacity: 0; transform: translate(-50%, -52%) scale(0.98); }
         }
 
         @keyframes adminEnvelopePhotoReveal {
@@ -209,6 +275,19 @@ export default function AdminAnimationPreviewClient() {
             opacity: 1;
             transform: translate(-50%, -92px) scale(1);
             filter: blur(0);
+          }
+        }
+
+        @keyframes adminSimpleEnvelopeOut {
+          from {
+            opacity: 1;
+            transform: translateY(0) scale(1);
+            filter: blur(0);
+          }
+          to {
+            opacity: 0;
+            transform: translateY(7px) scale(0.98);
+            filter: blur(1px);
           }
         }
 
@@ -232,10 +311,23 @@ export default function AdminAnimationPreviewClient() {
           }
         }
 
+        @keyframes simpleRevealResultIn {
+          0%, 34% {
+            opacity: 0;
+            transform: scale(0.98);
+          }
+          100% {
+            opacity: 1;
+            transform: scale(1);
+          }
+        }
+
         @media (prefers-reduced-motion: reduce) {
-          .admin-envelope-preview-button.desk-letter-opening [data-envelope-action="true"]::before,
-          .admin-envelope-preview-button.desk-letter-opening [data-develop-photo="true"] {
+          .admin-envelope-preview-button.is-opening [data-envelope-action="true"]::before,
+          .admin-envelope-preview-button.current-reveal.is-opening [data-develop-photo="true"],
+          .admin-envelope-preview-button.simple-reveal.is-opening .simple-envelope-image {
             animation-duration: 1ms;
+            animation-delay: 0ms;
           }
         }
       `}</style>
@@ -254,7 +346,7 @@ const styles = {
   },
   header: {
     width: "min(100%, 560px)",
-    margin: "0 auto 16px",
+    margin: "0 auto 14px",
   },
   backLink: {
     display: "inline-flex",
@@ -280,6 +372,28 @@ const styles = {
     fontSize: 14,
     lineHeight: 1.7,
   },
+  modeTabs: {
+    width: "min(100%, 560px)",
+    margin: "0 auto 14px",
+    display: "flex",
+    justifyContent: "center",
+    gap: 8,
+  },
+  modeButton: {
+    minHeight: 38,
+    minWidth: 92,
+    borderRadius: 999,
+    border: "1px solid rgba(91, 74, 62, 0.18)",
+    background: "rgba(255, 252, 247, 0.58)",
+    color: "#6a5b51",
+    font: "inherit",
+    cursor: "pointer",
+  },
+  modeButtonActive: {
+    borderColor: "rgba(166, 80, 69, 0.44)",
+    background: "rgba(255, 249, 243, 0.92)",
+    color: "#9b4c42",
+  },
   previewShell: {
     width: "100%",
     display: "flex",
@@ -288,7 +402,7 @@ const styles = {
   phoneFrame: {
     position: "relative",
     width: "min(100%, 390px)",
-    minHeight: "min(720px, calc(100dvh - 190px))",
+    minHeight: "min(720px, calc(100dvh - 230px))",
     overflow: "hidden",
     borderRadius: 28,
     border: "1px solid rgba(91, 74, 62, 0.14)",
@@ -353,6 +467,17 @@ const styles = {
     inset: 0,
     display: "block",
   },
+  simpleEnvelopeImage: {
+    position: "absolute",
+    left: "50%",
+    top: "54%",
+    width: "96%",
+    height: "auto",
+    display: "block",
+    transform: "translate(-50%, -50%)",
+    filter: "drop-shadow(0 16px 26px rgba(73, 52, 38, 0.16))",
+    pointerEvents: "none",
+  },
   envelopeAction: {
     position: "absolute",
     left: "50%",
@@ -398,12 +523,19 @@ const styles = {
     zIndex: 10,
     animation: "eveningOpeningOverlayIn 240ms ease-out both",
   },
+  simpleResultOverlay: {
+    background: "rgba(247, 240, 228, 0.18)",
+    animation: "simpleRevealResultIn 520ms cubic-bezier(0.22, 1, 0.36, 1) both",
+  },
   resultStage: {
     width: "100%",
     display: "grid",
     justifyItems: "center",
     gap: 14,
     animation: "eveningOpeningStageIn 280ms cubic-bezier(0.22, 1, 0.36, 1) both",
+  },
+  simpleResultStage: {
+    animation: "none",
   },
   resultTitle: {
     margin: 0,
