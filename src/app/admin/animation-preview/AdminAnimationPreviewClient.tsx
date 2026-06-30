@@ -625,9 +625,8 @@ const styles = {
     animation: "eveningOpeningOverlayIn 240ms ease-out both",
   },
   simpleResultOverlay: {
-    background: "rgba(247, 240, 228, 0.18)",
-    animation:
-      "simpleRevealResultIn var(--admin-simple-reveal-duration, 760ms) cubic-bezier(0, 0, 0.2, 1) both",
+    background: "rgba(247, 240, 228, 0.98)",
+    animation: "none",
   },
   resultStage: {
     width: "100%",
@@ -637,7 +636,8 @@ const styles = {
     animation: "eveningOpeningStageIn 280ms cubic-bezier(0.22, 1, 0.36, 1) both",
   },
   simpleResultStage: {
-    animation: "none",
+    animation:
+      "simpleRevealResultIn var(--admin-simple-reveal-duration, 760ms) cubic-bezier(0, 0, 0.2, 1) both",
   },
   resultTitle: {
     margin: 0,

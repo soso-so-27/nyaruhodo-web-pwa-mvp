@@ -2048,7 +2048,10 @@ export function HomeInput({
     >
       <div
         aria-hidden={openingEveningDelivery ? true : undefined}
-        style={styles.homeContentLayer}
+        style={{
+          ...styles.homeContentLayer,
+          ...(openingEveningDelivery ? styles.homeContentLayerObscured : {}),
+        }}
       >
         {!isHomeReady ? (
           <HomeStartupHold />
@@ -5377,6 +5380,10 @@ const styles = {
   homeContentLayer: {
     display: "contents",
   },
+  homeContentLayerObscured: {
+    visibility: "hidden",
+    pointerEvents: "none",
+  },
   paperBackground: {
     position: "fixed",
     inset: 0,
@@ -7020,11 +7027,11 @@ const styles = {
       "calc(44px + env(safe-area-inset-top)) 16px calc(28px + env(safe-area-inset-bottom))",
     boxSizing: "border-box",
     background: "var(--app-paper-background)",
+    backgroundColor: "var(--paper-warm)",
     backgroundSize: "var(--app-paper-background-size)",
     backgroundPosition: "var(--app-paper-background-position)",
     backgroundRepeat: "var(--app-paper-background-repeat)",
     color: "#292721",
-    animation: "eveningOpeningOverlayIn 440ms cubic-bezier(0, 0, 0.2, 1) both",
   },
   eveningOpeningPhotoStage: {
     width: "min(calc(100vw - 54px), 420px)",
