@@ -7065,7 +7065,7 @@ const styles = {
     objectFit: "cover",
     borderRadius: "17px",
     background: "rgba(255,253,248,0.72)",
-    animation: "exchangePhotoIn 440ms cubic-bezier(0, 0, 0.2, 1) both",
+    animation: "exchangePhotoIn 360ms cubic-bezier(0, 0, 0.2, 1) both",
   },
   eveningOpeningCaption: {
     margin: "8px 0 0",
@@ -7080,7 +7080,7 @@ const styles = {
     display: "grid",
     gap: "12px",
     justifyItems: "center",
-    animation: "eveningOpeningStageIn 440ms cubic-bezier(0, 0, 0.2, 1) both",
+    animation: "eveningOpeningStageIn 360ms cubic-bezier(0, 0, 0.2, 1) both",
   },
   eveningOpeningPairCard: {
     width: "100%",

@@ -316,6 +316,8 @@ export function HomeDeskModel({
   const hasTrayActions = homeDay.phase === "delivered" || subNotifications.length > 0;
   const usesTextRibbonTray = !hasTrayActions;
   const usesEnvelopeHome = homeDay.phase === "delivered" && !hasSplitTrayActions;
+  const shouldShowHomeFrameTakeButton =
+    homeDay.phase === "empty-before" || homeDay.phase === "empty-after";
   const shouldHidePresence = true;
   useEffect(() => {
     trackDeskStateShown(deskState, eveningState.dateKey);
@@ -522,15 +524,17 @@ export function HomeDeskModel({
                     />
                   </span>
                 </button>
-                <button
-                  type="button"
-                  style={deskStyles.homeAddPhotoButton}
-                  onClick={onTakePhoto}
-                  aria-label="ねがおを とる"
-                >
-                  <AppIcon name="camera" size={15} />
-                  <span>ねがおを とる</span>
-                </button>
+                {shouldShowHomeFrameTakeButton ? (
+                  <button
+                    type="button"
+                    style={deskStyles.homeAddPhotoButton}
+                    onClick={onTakePhoto}
+                    aria-label="ねがおを とる"
+                  >
+                    <AppIcon name="camera" size={15} />
+                    <span>ねがおを とる</span>
+                  </button>
+                ) : null}
               </div>
             ) : (
               <div
@@ -991,7 +995,7 @@ export function HomeDeskModel({
           animation: deskEnvelopeActionFade 110ms ease-out both;
         }
         .desk-letter-simple-opening [data-envelope-art="simple"] {
-          animation: deskEnvelopeSimpleFadeOut 360ms 100ms cubic-bezier(0.4, 0, 1, 1) both;
+          animation: deskEnvelopeSimpleFadeOut 260ms 70ms cubic-bezier(0.4, 0, 1, 1) both;
         }
         .desk-letter-opening [data-envelope-body="true"] {
           animation: deskEnvelopeBodyOpen ${ENVELOPE_OPEN_MS}ms cubic-bezier(0.18, 0.92, 0.2, 1) both;

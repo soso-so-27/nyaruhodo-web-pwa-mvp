@@ -10,7 +10,7 @@ type PreviewPhase = "idle" | "opening" | "result";
 type PreviewMode = "current" | "simple";
 type SimpleRevealSpeed = "fast" | "recommended" | "slow";
 
-const PREVIEW_PHOTO_SRC = "/sample-cats/mugi-hero.png";
+const PREVIEW_PHOTO_SRC = "/sample-cats/pose-belly.png";
 const SIMPLE_REVEAL_PRESETS: Array<{
   key: SimpleRevealSpeed;
   label: string;
