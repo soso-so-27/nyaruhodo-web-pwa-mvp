@@ -1078,7 +1078,7 @@ export function CatsPage() {
                       <>
                         <AppTextField
                           type="date"
-                          label="家に来た日"
+                          label="家族になった日"
                           value={editFamilySinceDate}
                           onChange={(event) =>
                             setEditFamilySinceDate(event.target.value)
@@ -1088,7 +1088,7 @@ export function CatsPage() {
 
                         <AppTextField
                           type="date"
-                          label="生年月日"
+                          label="誕生日"
                           value={editBirthDate}
                           onChange={(event) => setEditBirthDate(event.target.value)}
                           max={new Date().toISOString().split("T")[0]}
@@ -1108,7 +1108,7 @@ export function CatsPage() {
 
                         <AppTextField
                           type="text"
-                          label="猫種"
+                          label="猫種・タイプ"
                           value={editBreed}
                           onChange={(event) => setEditBreed(event.target.value)}
                           placeholder="例：サバトラ、雑種・ミックス"
@@ -1275,7 +1275,7 @@ export function CatsPage() {
                 <div style={{ ...styles.recordRow, ...styles.recordRowLast }}>
                   <span style={styles.recordLabel}>関係の記録</span>
                   <span style={styles.recordMetricValue}>
-                    迎えた日から
+                    家族になった日から
                   </span>
                 </div>
               </AppCard>
@@ -1419,7 +1419,7 @@ export function CatsPage() {
                   <div style={styles.catManageDateGrid}>
                     <AppTextField
                       type="date"
-                      label="迎えた日"
+                      label="家族になった日"
                       value={editFamilySinceDate}
                       onChange={(event) =>
                         setEditFamilySinceDate(event.target.value)
@@ -1451,7 +1451,7 @@ export function CatsPage() {
                   />
                   <AppTextField
                     type="text"
-                    label="猫種"
+                    label="猫種・タイプ"
                     value={editBreed}
                     onChange={(event) => setEditBreed(event.target.value)}
                     placeholder="例：サバトラ、雑種・ミックス"
@@ -2029,7 +2029,7 @@ function CatBasicProfilePanel({
         />
         <div style={styles.basicPhotoInfo}>
           <div style={styles.basicPhotoHeader}>
-            <p style={styles.basicPhotoTitle}>この子の写真</p>
+            <p style={styles.basicPhotoTitle}>代表写真</p>
             <span style={styles.basicPhotoStatus}>
               {hasCustomThumbnail ? "設定済み" : "自動表示"}
             </span>
@@ -2067,7 +2067,7 @@ function BasicInfoTable({
 }) {
   const rows = [
     {
-      label: "迎えた日",
+      label: "家族になった日",
       value: formatBasicInfoDate(profile.basicInfo?.familySinceDate),
     },
     {
@@ -2079,7 +2079,7 @@ function BasicInfoTable({
       value: formatGender(profile.basicInfo?.gender),
     },
     {
-      label: "猫種",
+      label: "猫種・タイプ",
       value: profile.basicInfo?.breed,
     },
     {
@@ -2097,7 +2097,7 @@ function BasicInfoTable({
         <p style={styles.basicInfoTitle}>基本情報</p>
         <div style={styles.basicInfoHeaderActions}>
           <span style={styles.basicInfoProgress}>
-            登録済み {registeredCount}/{rows.length}
+            この子のこと {registeredCount}つ
           </span>
           {onEdit ? (
             <button
