@@ -320,6 +320,8 @@ export function HomeDeskModel({
   const usesEnvelopeHome = homeDay.phase === "delivered" && !hasSplitTrayActions;
   const shouldShowHomeFrameTakeButton =
     homeDay.phase === "empty-before" || homeDay.phase === "empty-after";
+  const shouldShowCatGalleryPhotoLink =
+    Boolean(onAddCatPhoto) && homeDay.phase !== "delivered";
   const shouldHidePresence = true;
   useEffect(() => {
     trackDeskStateShown(deskState, eveningState.dateKey);
@@ -526,21 +528,26 @@ export function HomeDeskModel({
                     />
                   </span>
                 </button>
-                {shouldShowHomeFrameTakeButton ? (
+                {shouldShowHomeFrameTakeButton || shouldShowCatGalleryPhotoLink ? (
                   <div style={deskStyles.homePhotoActions}>
-                    <button
-                      type="button"
-                      style={deskStyles.homeAddPhotoButton}
-                      onClick={onTakePhoto}
-                      aria-label="ねがおを とる"
-                    >
-                      <AppIcon name="camera" size={15} />
-                      <span>ねがおを とる</span>
-                    </button>
-                    {onAddCatPhoto ? (
+                    {shouldShowHomeFrameTakeButton ? (
                       <button
                         type="button"
-                        style={deskStyles.homeAddCatPhotoLink}
+                        style={deskStyles.homeAddPhotoButton}
+                        onClick={onTakePhoto}
+                        aria-label="ねがおを とる"
+                      >
+                        <AppIcon name="camera" size={15} />
+                        <span>ねがおを とる</span>
+                      </button>
+                    ) : null}
+                    {shouldShowCatGalleryPhotoLink && onAddCatPhoto ? (
+                      <button
+                        type="button"
+                        style={{
+                          ...deskStyles.homeAddCatPhotoLink,
+                          ...deskStyles.homeAddCatPhotoLinkFloating,
+                        }}
                         onClick={onAddCatPhoto}
                       >
                         この子の写真を追加
@@ -567,7 +574,7 @@ export function HomeDeskModel({
                   <AppIcon name="camera" size={16} />
                   ねがおを とる
                 </button>
-                {onAddCatPhoto ? (
+                {shouldShowCatGalleryPhotoLink && onAddCatPhoto ? (
                   <div style={deskStyles.homeAddCatPhotoBlock}>
                     <button
                       type="button"
@@ -2498,6 +2505,16 @@ const deskStyles = {
     textUnderlineOffset: "4px",
     cursor: "pointer",
     WebkitTapHighlightColor: "transparent",
+  },
+  homeAddCatPhotoLinkFloating: {
+    padding: "4px 8px",
+    borderRadius: "var(--radius-full)",
+    background: "color-mix(in srgb, var(--paper-card) 74%, transparent)",
+    boxShadow:
+      "0 1px 0 color-mix(in srgb, var(--paper-card) 62%, transparent) inset, 0 8px 18px -16px rgba(70, 50, 30, 0.24)",
+    backdropFilter: "blur(10px)",
+    WebkitBackdropFilter: "blur(10px)",
+    textDecorationColor: "transparent",
   },
   homeAddCatPhotoNote: {
     color: "color-mix(in srgb, var(--ink-soft) 68%, transparent)",
