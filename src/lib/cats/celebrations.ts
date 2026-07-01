@@ -80,16 +80,11 @@ function createSleepingCountCelebration(
     };
   }
 
-  const reachedTarget = [...SLEEPING_COUNT_TARGETS]
-    .reverse()
-    .find((target) => target <= count);
-  const primary = reachedTarget ?? count;
-
   return {
     key: "sleeping-count",
     label: "ねがお",
-    status: `${primary} / ${nextTarget}枚`,
-    reached: Boolean(reachedTarget),
+    status: `${count} / ${nextTarget}枚`,
+    reached: count >= SLEEPING_COUNT_TARGETS[0],
     tone: "progress",
   };
 }
