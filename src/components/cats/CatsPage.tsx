@@ -1105,6 +1105,14 @@ export function CatsPage() {
                         />
                       </button>
                     ) : null}
+                    <button
+                      type="button"
+                      data-testid="cats-thumbnail-picker-button"
+                      style={styles.profileCoverThumbnailButton}
+                      onClick={() => setIsThumbnailPickerOpen(true)}
+                    >
+                      写真を変える
+                    </button>
                   </div>
                 </div>
               </>
@@ -1217,10 +1225,6 @@ export function CatsPage() {
           >
             <CatBasicProfilePanel
               profile={activeCatProfile}
-              coverSrc={activeCoverSrc}
-              coverFit={activeCoverFit}
-              hasCustomThumbnail={hasCustomThumbnail}
-              onOpenThumbnailPicker={() => setIsThumbnailPickerOpen(true)}
               onEdit={openCatManageEditor}
               onManage={() => {
                 setIsCatManageEditing(false);
@@ -1436,23 +1440,23 @@ export function CatsPage() {
               </div>
             ) : isCatManageEditing ? (
               <div style={styles.catManageEditor}>
-                <div style={styles.catManageEditorHero}>
-                  <img
-                    src={activeAvatarSrc}
-                    alt=""
-                    aria-hidden="true"
-                    style={styles.catManageEditorAvatar}
-                  />
-                  <div style={styles.catManageEditorHeroText}>
-                    <p style={styles.catManageEditorKicker}>編集中</p>
-                    <p style={styles.catManageEditorName}>
-                      {catNameInput.trim() || activeCatProfile.name}
-                    </p>
-                  </div>
+                <div style={styles.catManageEditorIntro}>
+                  <p style={styles.catManageEditorKicker}>基本情報</p>
+                  <p style={styles.catManageEditorIntroTitle}>
+                    {catNameInput.trim() || activeCatProfile.name}のこと
+                  </p>
+                  <p style={styles.catManageEditorIntroText}>
+                    あとから見返したいことだけ、少しずつ残せます。
+                  </p>
                 </div>
 
                 <section style={styles.catManageFormSection}>
-                  <p style={styles.catManageFormTitle}>この子のこと</p>
+                  <div style={styles.catManageFormHeading}>
+                    <p style={styles.catManageFormTitle}>名前と日付</p>
+                    <p style={styles.catManageFormNote}>
+                      名前と、家族になった日・誕生日を残します。
+                    </p>
+                  </div>
                   <AppTextField
                     id="cat-manage-name"
                     type="text"
@@ -1482,7 +1486,12 @@ export function CatsPage() {
                 </section>
 
                 <section style={styles.catManageFormSection}>
-                  <p style={styles.catManageFormTitle}>見た目・からだ</p>
+                  <div style={styles.catManageFormHeading}>
+                    <p style={styles.catManageFormTitle}>見た目</p>
+                    <p style={styles.catManageFormNote}>
+                      わかるところだけで大丈夫です。
+                    </p>
+                  </div>
                   <AppSegmented<EditableGender>
                     value={editGender}
                     ariaLabel="性別"
@@ -1508,7 +1517,12 @@ export function CatsPage() {
                 </section>
 
                 <section style={styles.catManageFormSection}>
-                  <p style={styles.catManageFormTitle}>この子らしさ</p>
+                  <div style={styles.catManageFormHeading}>
+                    <p style={styles.catManageFormTitle}>この子らしさ</p>
+                    <p style={styles.catManageFormNote}>
+                      好きな場所や苦手なことを、短くメモできます。
+                    </p>
+                  </div>
                   <AppTextField
                     type="text"
                     label="よく呼ぶ名前"
@@ -1552,7 +1566,12 @@ export function CatsPage() {
                 </section>
 
                 <section style={styles.catManageFormSection}>
-                  <p style={styles.catManageFormTitle}>ケアのメモ</p>
+                  <div style={styles.catManageFormHeading}>
+                    <p style={styles.catManageFormTitle}>ケアのメモ</p>
+                    <p style={styles.catManageFormNote}>
+                      体重や病院のことを、必要な分だけ残せます。
+                    </p>
+                  </div>
                   <div style={styles.catManageDateGrid}>
                     <AppTextField
                       type="number"
@@ -2132,56 +2151,15 @@ function CatSummaryPanel({
 
 function CatBasicProfilePanel({
   profile,
-  coverSrc,
-  coverFit,
-  hasCustomThumbnail,
-  onOpenThumbnailPicker,
   onEdit,
   onManage,
 }: {
   profile: CatProfile;
-  coverSrc: string;
-  coverFit: "cover" | "contain";
-  hasCustomThumbnail: boolean;
-  onOpenThumbnailPicker: () => void;
   onEdit?: () => void;
   onManage?: () => void;
 }) {
   return (
     <div style={styles.basicProfilePanel}>
-      <section style={styles.basicPhotoSection}>
-        <PhotoTile
-          src={coverSrc}
-          alt=""
-          variant="tile"
-          fit={coverFit}
-          aspect="1 / 1"
-          style={styles.basicPhotoPreviewRoot}
-          imageStyle={styles.basicPhotoPreviewImage}
-        />
-        <div style={styles.basicPhotoInfo}>
-          <div style={styles.basicPhotoHeader}>
-            <p style={styles.basicPhotoTitle}>代表写真</p>
-            <span style={styles.basicPhotoStatus}>
-              {hasCustomThumbnail ? "設定済み" : "自動表示"}
-            </span>
-          </div>
-          <p style={styles.basicPhotoCopy}>
-            うちのこページの上に出る写真です。
-          </p>
-          <div style={styles.basicPhotoActions}>
-            <button
-              type="button"
-              data-testid="cats-thumbnail-picker-button"
-              style={styles.basicPhotoButton}
-              onClick={onOpenThumbnailPicker}
-            >
-              <span>写真を選ぶ</span>
-            </button>
-          </div>
-        </div>
-      </section>
-
       <BasicInfoTable profile={profile} onEdit={onEdit} onManage={onManage} />
     </div>
   );
@@ -4454,23 +4432,26 @@ const styles = {
     backdropFilter: "blur(10px)",
     WebkitBackdropFilter: "blur(10px)",
   },
-  profileCoverPhotoButton: {
+  profileCoverThumbnailButton: {
     position: "absolute" as const,
     right: "10px",
     bottom: "10px",
     zIndex: 2,
-    width: "44px",
-    height: "44px",
-    minWidth: "44px",
+    minHeight: "34px",
     display: "inline-flex",
     alignItems: "center",
     justifyContent: "center",
-    padding: 0,
+    padding: "0 12px",
     borderRadius: "999px",
     border: "1px solid color-mix(in srgb, var(--seal) 42%, var(--paper) 58%)",
     background:
       "linear-gradient(180deg, color-mix(in srgb, var(--paper-card) 92%, transparent), color-mix(in srgb, var(--paper-warm) 88%, transparent))",
     color: "var(--seal)",
+    fontFamily: CATS_UI,
+    fontSize: CATS_META_SIZE,
+    fontWeight: 600,
+    lineHeight: 1,
+    letterSpacing: "0",
     boxShadow:
       "0 1px 0 color-mix(in srgb, var(--paper) 80%, transparent), 0 12px 24px -16px color-mix(in srgb, var(--seal) 38%, transparent)",
     cursor: "pointer",
@@ -5379,94 +5360,7 @@ const styles = {
   },
   basicProfilePanel: {
     display: "grid",
-    gap: "18px",
-  },
-  basicPhotoSection: {
-    display: "grid",
-    gridTemplateColumns: "86px minmax(0, 1fr)",
-    alignItems: "center",
-    gap: "13px",
-    padding: "12px",
-    borderRadius: "16px",
-    border: "1px solid color-mix(in srgb, var(--line-strong) 58%, transparent)",
-    background: "color-mix(in srgb, var(--paper) 30%, transparent)",
-  },
-  basicPhotoPreviewRoot: {
-    width: "86px",
-    height: "86px",
-    borderRadius: "14px",
-    overflow: "hidden",
-    background: "color-mix(in srgb, var(--paper-card) 78%, transparent)",
-    border: "1px solid color-mix(in srgb, var(--paper-card) 90%, transparent)",
-    boxShadow:
-      "0 1px 0 color-mix(in srgb, var(--paper) 80%, transparent), 0 12px 24px -20px color-mix(in srgb, var(--ink) 30%, transparent)",
-  },
-  basicPhotoPreviewImage: {
-    width: "100%",
-    height: "100%",
-    borderRadius: "14px",
-  },
-  basicPhotoInfo: {
-    display: "grid",
-    gap: "7px",
-    minWidth: 0,
-  },
-  basicPhotoHeader: {
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "space-between",
-    gap: "10px",
-    minWidth: 0,
-  },
-  basicPhotoTitle: {
-    margin: 0,
-    color: CATS_TEXT,
-    fontFamily: CATS_SERIF,
-    fontSize: CATS_BODY_SIZE,
-    fontWeight: 400,
-    lineHeight: 1.35,
-    letterSpacing: CATS_BODY_TRACKING,
-  },
-  basicPhotoStatus: {
-    flex: "0 0 auto",
-    color: CATS_FAINT,
-    fontFamily: CATS_UI,
-    fontSize: CATS_TINY_SIZE,
-    fontWeight: 500,
-    lineHeight: 1,
-    letterSpacing: "0",
-  },
-  basicPhotoCopy: {
-    margin: 0,
-    color: CATS_MUTED,
-    fontFamily: CATS_SERIF,
-    fontSize: CATS_META_SIZE,
-    fontWeight: 400,
-    lineHeight: 1.55,
-    letterSpacing: CATS_META_TRACKING,
-  },
-  basicPhotoActions: {
-    display: "flex",
-    alignItems: "center",
-    minWidth: 0,
-  },
-  basicPhotoButton: {
-    minHeight: "34px",
-    display: "inline-flex",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: "7px",
-    padding: "0 12px",
-    borderRadius: "999px",
-    border: "1px solid color-mix(in srgb, var(--seal) 32%, var(--line) 68%)",
-    background: "color-mix(in srgb, var(--paper-card) 62%, transparent)",
-    color: "var(--seal)",
-    fontFamily: CATS_UI,
-    fontSize: CATS_META_SIZE,
-    fontWeight: 600,
-    lineHeight: 1,
-    letterSpacing: "0",
-    cursor: "pointer",
+    gap: "0",
   },
   basicInfoPanel: {
     marginBottom: "22px",
@@ -5624,8 +5518,14 @@ const styles = {
   },
   catManageEditor: {
     display: "grid",
-    gap: "14px",
+    gap: "18px",
     minWidth: 0,
+  },
+  catManageEditorIntro: {
+    display: "grid",
+    gap: "5px",
+    minWidth: 0,
+    padding: "2px 2px 6px",
   },
   catManageEditorHero: {
     display: "grid",
@@ -5685,23 +5585,52 @@ const styles = {
     textOverflow: "ellipsis",
     whiteSpace: "nowrap",
   },
+  catManageEditorIntroTitle: {
+    margin: 0,
+    color: CATS_TEXT_STRONG,
+    fontFamily: CATS_SERIF,
+    fontSize: "21px",
+    fontWeight: 400,
+    lineHeight: 1.38,
+    letterSpacing: CATS_TITLE_TRACKING,
+  },
+  catManageEditorIntroText: {
+    margin: 0,
+    color: CATS_MUTED,
+    fontFamily: CATS_SERIF,
+    fontSize: CATS_BODY_SIZE,
+    fontWeight: 400,
+    lineHeight: 1.65,
+    letterSpacing: CATS_BODY_TRACKING,
+  },
   catManageFormSection: {
     display: "grid",
-    gap: "10px",
+    gap: "12px",
     minWidth: 0,
-    padding: "12px",
-    borderRadius: "var(--radius-xl)",
-    background:
-      "linear-gradient(180deg, color-mix(in srgb, var(--paper-card) 86%, transparent), color-mix(in srgb, var(--paper) 74%, transparent))",
-    boxShadow: "inset 0 0 0 1px color-mix(in srgb, var(--line) 52%, transparent)",
+    padding: "18px 2px 0",
+    borderTop: "1px solid color-mix(in srgb, var(--line) 62%, transparent)",
+  },
+  catManageFormHeading: {
+    display: "grid",
+    gap: "4px",
+    minWidth: 0,
   },
   catManageFormTitle: {
     margin: 0,
+    color: CATS_TEXT_STRONG,
+    fontFamily: CATS_SERIF,
+    fontSize: "16px",
+    fontWeight: 400,
+    lineHeight: 1.45,
+    letterSpacing: CATS_TITLE_TRACKING,
+  },
+  catManageFormNote: {
+    margin: 0,
     color: CATS_MUTED,
-    fontFamily: CATS_UI,
+    fontFamily: CATS_SERIF,
     fontSize: CATS_META_SIZE,
     fontWeight: 400,
-    lineHeight: 1.2,
+    lineHeight: 1.55,
     letterSpacing: CATS_META_TRACKING,
   },
   catManageDateGrid: {
