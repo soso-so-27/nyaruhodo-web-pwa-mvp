@@ -247,8 +247,17 @@ export function CatsPage() {
   const activeCatLensPhotos = activeCatId
     ? lensPhotosByCat[activeCatId] ?? []
     : [];
+  const activeCatGalleryLensPhotos = useMemo(
+    () => activeCatLensPhotos.filter(isCatGalleryLensPhoto),
+    [activeCatLensPhotos],
+  );
+  const stableSleepingCoverPhoto = useMemo(
+    () => getStableSleepingCoverPhoto(activeCatLensPhotos),
+    [activeCatLensPhotos],
+  );
   const hasCustomThumbnail = Boolean(activeCatProfile?.avatarDataUrl);
-  const activeCoverPhoto = activeCatLensPhotos[0] ?? null;
+  const activeCoverPhoto =
+    activeCatGalleryLensPhotos[0] ?? stableSleepingCoverPhoto;
   const activeCoverSrc =
     activeCatProfile?.avatarDataUrl ?? activeCoverPhoto?.src ?? activeAvatarSrc;
   const activeCoverFit =
@@ -263,8 +272,12 @@ export function CatsPage() {
       ),
     [hasRemoteLensPhotosLoaded, localLensPhotos.all, remoteLensPhotosByCat],
   );
+  const allGalleryLensPhotos = useMemo(
+    () => allLensPhotos.filter(isCatGalleryLensPhoto),
+    [allLensPhotos],
+  );
   const photoSheetPhotos =
-    photoSheetLens === "all" ? allLensPhotos : activeCatLensPhotos;
+    photoSheetLens === "all" ? allGalleryLensPhotos : activeCatGalleryLensPhotos;
   const photoSheetTitle =
     photoSheetLens === "all" ? "ぜんぶの写真" : "この子の写真";
 
@@ -1185,7 +1198,7 @@ export function CatsPage() {
         activeLens === "cat" ? (
           <LensPhotoSection
             title="この子の写真"
-            photos={activeCatLensPhotos}
+            photos={activeCatGalleryLensPhotos}
             emptyCopy="この子の写真は、まだありません。"
             onAddPhoto={() => {
               void handleAddCatPhoto();
@@ -1199,7 +1212,7 @@ export function CatsPage() {
         activeSection === "photos" &&
         activeLens === "all" ? (
           <AllCatsLensView
-            photos={allLensPhotos}
+            photos={allGalleryLensPhotos}
             catCount={catProfiles.length}
             onOpenPhoto={(photo) => setSelectedRecordPhoto(toRecordPhotoPreview(photo))}
           />
@@ -2151,7 +2164,7 @@ function LensPhotoSection({
           </button>
         </div>
         <p style={styles.lensSectionSub}>
-          あとから見返したい写真を選んで残せます。ねこだよりには使われません。100枚まで。
+          毎日のねがおとは別に、あとから見返したい写真を選んで残せます。ねこだよりには使われません。100枚まで。
         </p>
       </div>
       <LensPhotoGrid
@@ -2667,7 +2680,9 @@ function ThumbnailPickerSheet({
         </div>
 
         <div style={styles.thumbnailPickerSection}>
-          <p style={styles.thumbnailPickerTitle}>{catName}の写真から選ぶ</p>
+          <p style={styles.thumbnailPickerTitle}>
+            この子の写真・ねがおから選ぶ
+          </p>
           {photos.length > 0 ? (
             <div style={styles.thumbnailPickerGrid}>
               {photos.map((photo) => (
@@ -2691,7 +2706,7 @@ function ThumbnailPickerSheet({
             </div>
           ) : (
             <p style={styles.thumbnailPickerEmpty}>
-              この子の写真を残すと、ここからも選べます。
+              この子の写真やねがおがあると、ここから選べます。
             </p>
           )}
         </div>
@@ -3137,6 +3152,18 @@ function toRecordPhotoPreview(photo: LensPhoto): RecordPhotoPreview {
     kind: photo.kind,
     catIds: photo.catIds,
   };
+}
+
+function isCatGalleryLensPhoto(photo: LensPhoto) {
+  return photo.kind === "photo";
+}
+
+function getStableSleepingCoverPhoto(photos: LensPhoto[]) {
+  return (
+    photos
+      .filter((photo) => photo.kind === "sleeping")
+      .sort((left, right) => left.createdAt - right.createdAt)[0] ?? null
+  );
 }
 
 function isStoragePhotoReference(src: string | null | undefined) {
