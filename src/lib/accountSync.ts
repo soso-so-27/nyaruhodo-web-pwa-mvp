@@ -1,4 +1,9 @@
 import { STORAGE_KEYS, getRecordLogKey } from "./storage";
+import {
+  readCatGalleryPhotos,
+  restoreSyncedCatGalleryPhotos,
+  type CatGalleryPhoto,
+} from "./cats/catGalleryPhotos";
 import { createBrowserSupabaseClient } from "./supabase/browser";
 import {
   dispatchBoxPhotoStorageEvent,
@@ -57,6 +62,7 @@ type LocalSnapshot = {
   activeCatId: string | null;
   profiles: LocalCatProfile[];
   recordLogsByCatId: Map<string, LocalRecordLogItem[]>;
+  catGalleryPhotos: CatGalleryPhoto[];
   collectionPhotos: LocalCollectionStore;
   ownSleepingPhotos: OwnSleepingPhoto[];
   keptExchangePhotos: ExchangePhoto[];
@@ -153,12 +159,14 @@ export type AccountSyncResult = {
   status: SyncStatus;
   pushedCats: number;
   pushedRecords: number;
+  pushedCatGalleryPhotos: number;
   pushedCollectionPhotos: number;
   pushedOwnSleepingPhotos: number;
   pushedKeptExchangePhotos: number;
   pushedLocalState: number;
   restoredCats: number;
   restoredRecords: number;
+  restoredCatGalleryPhotos: number;
   restoredCollectionPhotos: number;
   restoredOwnSleepingPhotos: number;
   restoredKeptExchangePhotos: number;
@@ -171,12 +179,14 @@ export type AccountSyncOverview = {
   hasLocalData: boolean;
   localCats: number;
   localRecords: number;
+  localCatGalleryPhotos: number;
   localCollectionPhotos: number;
   localOwnSleepingPhotos: number;
   localKeptExchangePhotos: number;
   localStateItems: number;
   remoteCats: number;
   remoteRecords: number;
+  remoteCatGalleryPhotos: number;
   remoteCollectionPhotos: number;
   remoteOwnSleepingPhotos: number;
   remoteKeptExchangePhotos: number;
@@ -193,6 +203,11 @@ export type AccountDeleteResult = {
 };
 
 const SYNC_METADATA = { source: "localStorage-v1" };
+const CAT_GALLERY_COLLECTION_SLOT = "__cat_gallery";
+const CAT_GALLERY_COLLECTION_METADATA = {
+  ...SYNC_METADATA,
+  domain: "cat_gallery",
+};
 const LOCAL_STATE_SOURCE = "account-local-state-v1";
 const SYNCABLE_LOCAL_STATE_KEYS = new Set([
   STORAGE_KEYS.activeCatId,
@@ -241,12 +256,14 @@ export async function getAccountSyncOverview(): Promise<AccountSyncOverview> {
     hasLocalData: false,
     localCats: 0,
     localRecords: 0,
+    localCatGalleryPhotos: 0,
     localCollectionPhotos: 0,
     localOwnSleepingPhotos: 0,
     localKeptExchangePhotos: 0,
     localStateItems: 0,
     remoteCats: 0,
     remoteRecords: 0,
+    remoteCatGalleryPhotos: 0,
     remoteCollectionPhotos: 0,
     remoteOwnSleepingPhotos: 0,
     remoteKeptExchangePhotos: 0,
@@ -264,6 +281,7 @@ export async function getAccountSyncOverview(): Promise<AccountSyncOverview> {
   const snapshot = readLocalSnapshot();
   const localCats = snapshot.profiles.length;
   const localRecords = countLocalRecords(snapshot.recordLogsByCatId);
+  const localCatGalleryPhotos = snapshot.catGalleryPhotos.length;
   const localCollectionPhotos = countLocalCollectionPhotos(snapshot.collectionPhotos);
   const localOwnSleepingPhotos = snapshot.ownSleepingPhotos.length;
   const localKeptExchangePhotos = snapshot.keptExchangePhotos.length;
@@ -277,6 +295,7 @@ export async function getAccountSyncOverview(): Promise<AccountSyncOverview> {
       hasLocalData,
       localCats,
       localRecords,
+      localCatGalleryPhotos,
       localCollectionPhotos,
       localOwnSleepingPhotos,
       localKeptExchangePhotos,
@@ -292,6 +311,7 @@ export async function getAccountSyncOverview(): Promise<AccountSyncOverview> {
       hasLocalData,
       localCats,
       localRecords,
+      localCatGalleryPhotos,
       localCollectionPhotos,
       localOwnSleepingPhotos,
       localKeptExchangePhotos,
@@ -304,6 +324,7 @@ export async function getAccountSyncOverview(): Promise<AccountSyncOverview> {
   const [
     catsResult,
     recordsResult,
+    catGalleryResult,
     collectionResult,
     ownSleepingResult,
     keptExchangeResult,
@@ -322,7 +343,13 @@ export async function getAccountSyncOverview(): Promise<AccountSyncOverview> {
       supabase
         .from("collection_photos")
         .select("id", { count: "exact", head: true })
-        .eq("user_id", userId),
+        .eq("user_id", userId)
+        .eq("slot_slug", CAT_GALLERY_COLLECTION_SLOT),
+      supabase
+        .from("collection_photos")
+        .select("id", { count: "exact", head: true })
+        .eq("user_id", userId)
+        .neq("slot_slug", CAT_GALLERY_COLLECTION_SLOT),
       supabase
         .from("cat_moments")
         .select("id", { count: "exact", head: true })
@@ -347,6 +374,7 @@ export async function getAccountSyncOverview(): Promise<AccountSyncOverview> {
     ((catsResult.data ?? []) as RemoteCatRow[]).filter(Boolean),
   ).length;
   const remoteRecords = recordsResult.count ?? 0;
+  const remoteCatGalleryPhotos = catGalleryResult.count ?? 0;
   const remoteCollectionPhotos = collectionResult.count ?? 0;
   const remoteOwnSleepingPhotos = ownSleepingResult.count ?? 0;
   const remoteKeptExchangePhotos = keptExchangeResult.count ?? 0;
@@ -354,6 +382,9 @@ export async function getAccountSyncOverview(): Promise<AccountSyncOverview> {
   const errors = [
     catsResult.error ? `cats: ${catsResult.error.message}` : null,
     recordsResult.error ? `records: ${recordsResult.error.message}` : null,
+    catGalleryResult.error
+      ? `cat_gallery_photos: ${catGalleryResult.error.message}`
+      : null,
     collectionResult.error ? `collection_photos: ${collectionResult.error.message}` : null,
     ownSleepingResult.error ? `cat_moments: ${ownSleepingResult.error.message}` : null,
     keptExchangeResult.error
@@ -370,6 +401,7 @@ export async function getAccountSyncOverview(): Promise<AccountSyncOverview> {
   const hasRemoteData =
     remoteCats > 0 ||
     remoteRecords > 0 ||
+    remoteCatGalleryPhotos > 0 ||
     remoteCollectionPhotos > 0 ||
     remoteOwnSleepingPhotos > 0 ||
     remoteKeptExchangePhotos > 0 ||
@@ -380,12 +412,14 @@ export async function getAccountSyncOverview(): Promise<AccountSyncOverview> {
     hasLocalData,
     localCats,
     localRecords,
+    localCatGalleryPhotos,
     localCollectionPhotos,
     localOwnSleepingPhotos,
     localKeptExchangePhotos,
     localStateItems,
     remoteCats,
     remoteRecords,
+    remoteCatGalleryPhotos,
     remoteCollectionPhotos,
     remoteOwnSleepingPhotos,
     remoteKeptExchangePhotos,
@@ -397,6 +431,7 @@ export async function getAccountSyncOverview(): Promise<AccountSyncOverview> {
       (!hasLocalData ||
         remoteCats > localCats ||
         remoteRecords > localRecords ||
+        remoteCatGalleryPhotos > localCatGalleryPhotos ||
         remoteCollectionPhotos > localCollectionPhotos ||
         remoteOwnSleepingPhotos > localOwnSleepingPhotos ||
         remoteKeptExchangePhotos > localKeptExchangePhotos ||
@@ -634,6 +669,7 @@ function hasRestoredAccountData(result: AccountSyncResult) {
   return (
     result.restoredCats > 0 ||
     result.restoredRecords > 0 ||
+    result.restoredCatGalleryPhotos > 0 ||
     result.restoredCollectionPhotos > 0 ||
     result.restoredOwnSleepingPhotos > 0 ||
     result.restoredKeptExchangePhotos > 0 ||
@@ -646,12 +682,14 @@ function createEmptyResult(): AccountSyncResult {
     status: "skipped",
     pushedCats: 0,
     pushedRecords: 0,
+    pushedCatGalleryPhotos: 0,
     pushedCollectionPhotos: 0,
     pushedOwnSleepingPhotos: 0,
     pushedKeptExchangePhotos: 0,
     pushedLocalState: 0,
     restoredCats: 0,
     restoredRecords: 0,
+    restoredCatGalleryPhotos: 0,
     restoredCollectionPhotos: 0,
     restoredOwnSleepingPhotos: 0,
     restoredKeptExchangePhotos: 0,
@@ -668,6 +706,7 @@ function readLocalSnapshot(): LocalSnapshot {
   );
   const collectionPhotos =
     readJson<LocalCollectionStore>(STORAGE_KEYS.collectionPhotos) ?? {};
+  const catGalleryPhotos = readCatGalleryPhotos(null);
   const ownSleepingPhotos = readAllOwnSleepingPhotos();
   const keptExchangePhotos = readKeptExchangePhotos();
   const localState = readSyncableLocalState();
@@ -684,6 +723,7 @@ function readLocalSnapshot(): LocalSnapshot {
     activeCatId: window.localStorage.getItem(STORAGE_KEYS.activeCatId),
     profiles,
     recordLogsByCatId,
+    catGalleryPhotos,
     collectionPhotos,
     ownSleepingPhotos,
     keptExchangePhotos,
@@ -716,6 +756,7 @@ function hasMeaningfulLocalData(snapshot: LocalSnapshot) {
 
   if (meaningfulProfiles.length === 0) {
     return (
+      snapshot.catGalleryPhotos.length > 0 ||
       hasLocalCollectionPhotos(snapshot.collectionPhotos) ||
       snapshot.ownSleepingPhotos.length > 0 ||
       snapshot.keptExchangePhotos.length > 0 ||
@@ -744,6 +785,7 @@ function hasMeaningfulLocalData(snapshot: LocalSnapshot) {
   }
 
   return (
+    snapshot.catGalleryPhotos.length > 0 ||
     hasLocalCollectionPhotos(snapshot.collectionPhotos) ||
     snapshot.ownSleepingPhotos.length > 0 ||
     snapshot.keptExchangePhotos.length > 0
@@ -829,6 +871,13 @@ async function pushLocalSnapshot(
   }
 
   await syncRecordLogs(supabase, userId, snapshot.recordLogsByCatId, remoteCatIds, result);
+  await syncCatGalleryPhotos(
+    supabase,
+    userId,
+    snapshot.catGalleryPhotos,
+    remoteCatIds,
+    result,
+  );
   await syncCollectionPhotos(
     supabase,
     userId,
@@ -986,6 +1035,72 @@ async function syncRecordLogs(
   }
 
   result.pushedRecords += missingRows.length;
+}
+
+async function syncCatGalleryPhotos(
+  supabase: NonNullable<ReturnType<typeof createBrowserSupabaseClient>>,
+  userId: string,
+  catGalleryPhotos: CatGalleryPhoto[],
+  remoteCatIds: Map<string, string>,
+  result: AccountSyncResult,
+) {
+  const rows = [];
+
+  for (const photo of catGalleryPhotos) {
+    const remoteCatId = remoteCatIds.get(photo.catId);
+
+    if (!remoteCatId) {
+      continue;
+    }
+
+    const src = photo.src;
+    const existingStoragePath = getStoragePhotoPath(src);
+
+    if (!src.startsWith("data:") && !existingStoragePath) {
+      continue;
+    }
+
+    const storagePath =
+      existingStoragePath ??
+      (await uploadDataUrl(
+        supabase,
+        `${userId}/${remoteCatId}/cat-gallery/${sanitizePathSegment(
+          photo.id,
+        )}.${getDataUrlExtension(src)}`,
+        src,
+      ));
+
+    rows.push({
+      user_id: userId,
+      cat_id: remoteCatId,
+      local_cat_id: photo.catId,
+      local_photo_id: photo.id,
+      slot_slug: CAT_GALLERY_COLLECTION_SLOT,
+      storage_path: storagePath,
+      captured_at: new Date(photo.createdAt).toISOString(),
+      metadata: CAT_GALLERY_COLLECTION_METADATA,
+    });
+  }
+
+  const missingRows = await filterRowsMissingByLocalId(
+    supabase,
+    "collection_photos",
+    userId,
+    rows,
+    "local_photo_id",
+  );
+
+  if (missingRows.length === 0) {
+    return;
+  }
+
+  const { error } = await supabase.from("collection_photos").insert(missingRows);
+
+  if (error) {
+    throw new Error(`Cat gallery photo sync failed: ${error.message}`);
+  }
+
+  result.pushedCatGalleryPhotos += missingRows.length;
 }
 
 async function syncCollectionPhotos(
@@ -1477,6 +1592,7 @@ async function restoreRemoteSnapshot(
   result.restoredCats = profiles.length;
 
   await restoreRecordLogs(supabase, userId, remoteIdToLocalId, result, options);
+  await restoreCatGalleryPhotos(supabase, userId, remoteIdToLocalId, result, options);
   await restoreCollectionPhotos(supabase, userId, remoteIdToLocalId, result, options);
   await restoreSleepingPhotos(supabase, userId, remoteIdToLocalId, result, options);
   await restoreLocalState(supabase, userId, result, options);
@@ -1542,6 +1658,64 @@ async function restoreRecordLogs(
   }
 }
 
+async function restoreCatGalleryPhotos(
+  supabase: NonNullable<ReturnType<typeof createBrowserSupabaseClient>>,
+  userId: string,
+  remoteIdToLocalId: Map<string, string>,
+  result: AccountSyncResult,
+  options: { mergeLocal: boolean },
+) {
+  const { data, error } = await supabase
+    .from("collection_photos")
+    .select("id, cat_id, local_cat_id, local_photo_id, slot_slug, storage_path, captured_at, created_at")
+    .eq("user_id", userId)
+    .eq("slot_slug", CAT_GALLERY_COLLECTION_SLOT)
+    .order("created_at", { ascending: true });
+
+  if (error) {
+    throw new Error(`Cat gallery restore failed: ${error.message}`);
+  }
+
+  const photos: CatGalleryPhoto[] = [];
+
+  for (const photo of (data ?? []) as RemoteCollectionPhotoRow[]) {
+    const localCatId =
+      photo.local_cat_id ?? remoteIdToLocalId.get(photo.cat_id) ?? null;
+
+    if (!localCatId) {
+      continue;
+    }
+
+    const photoSrc = toStoragePhotoUrl(photo.storage_path);
+
+    if (!photoSrc) {
+      continue;
+    }
+
+    const createdAt = new Date(photo.captured_at ?? photo.created_at).getTime();
+
+    if (Number.isNaN(createdAt)) {
+      continue;
+    }
+
+    photos.push({
+      id: photo.local_photo_id ?? photo.id,
+      catId: localCatId,
+      src: photoSrc,
+      createdAt,
+    });
+  }
+
+  if (photos.length === 0) {
+    return;
+  }
+
+  result.restoredCatGalleryPhotos += restoreSyncedCatGalleryPhotos({
+    photos,
+    mergeLocal: options.mergeLocal,
+  });
+}
+
 async function restoreCollectionPhotos(
   supabase: NonNullable<ReturnType<typeof createBrowserSupabaseClient>>,
   userId: string,
@@ -1553,6 +1727,7 @@ async function restoreCollectionPhotos(
     .from("collection_photos")
     .select("id, cat_id, local_cat_id, local_photo_id, slot_slug, storage_path, captured_at, created_at")
     .eq("user_id", userId)
+    .neq("slot_slug", CAT_GALLERY_COLLECTION_SLOT)
     .order("created_at", { ascending: true });
 
   if (error) {

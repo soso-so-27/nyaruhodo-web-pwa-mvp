@@ -2483,7 +2483,7 @@ function ThumbnailPickerSheet({
         </div>
 
         <div style={styles.thumbnailPickerSection}>
-          <p style={styles.thumbnailPickerTitle}>{catName}のねがおから選ぶ</p>
+          <p style={styles.thumbnailPickerTitle}>{catName}の写真から選ぶ</p>
           {photos.length > 0 ? (
             <div style={styles.thumbnailPickerGrid}>
               {photos.map((photo) => (

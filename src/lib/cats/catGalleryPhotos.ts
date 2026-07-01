@@ -8,7 +8,8 @@ export type CatGalleryPhoto = {
   createdAt: number;
 };
 
-const CAT_GALLERY_PHOTOS_UPDATED_EVENT = "neteruneko_cat_gallery_photos_updated";
+export const CAT_GALLERY_PHOTOS_UPDATED_EVENT =
+  "neteruneko_cat_gallery_photos_updated";
 
 export function readCatGalleryPhotos(activeCatId: string | null = null) {
   const photos = readStorageArray<CatGalleryPhoto>(STORAGE_KEYS.catGalleryPhotos)
@@ -50,6 +51,40 @@ export function saveCatGalleryPhoto({
   } catch {
     return null;
   }
+}
+
+export function restoreSyncedCatGalleryPhotos({
+  photos,
+  mergeLocal,
+}: {
+  photos: CatGalleryPhoto[];
+  mergeLocal: boolean;
+}) {
+  const existing = mergeLocal ? readCatGalleryPhotos(null) : [];
+  const photoMap = new Map<string, CatGalleryPhoto>();
+  const existingIds = new Set(existing.map((photo) => photo.id));
+  let restoredCount = 0;
+
+  for (const photo of [...existing, ...photos]) {
+    if (!isValidCatGalleryPhoto(photo)) {
+      continue;
+    }
+
+    const normalized = normalizeCatGalleryPhoto(photo);
+    if (!existingIds.has(normalized.id)) {
+      restoredCount += 1;
+    }
+    photoMap.set(normalized.id, normalized);
+  }
+
+  const nextPhotos = [...photoMap.values()]
+    .sort((left, right) => right.createdAt - left.createdAt)
+    .slice(0, 120);
+
+  writeStorageArray(STORAGE_KEYS.catGalleryPhotos, nextPhotos);
+  dispatchCatGalleryPhotosUpdated();
+
+  return restoredCount;
 }
 
 function normalizeCatGalleryPhoto(photo: CatGalleryPhoto): CatGalleryPhoto {

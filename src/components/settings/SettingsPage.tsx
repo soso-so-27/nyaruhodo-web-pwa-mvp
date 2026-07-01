@@ -309,6 +309,7 @@ export function SettingsPage() {
     trackProductEvent("settings_account_sync_clicked", {
       remote_cats: syncOverview?.remoteCats ?? null,
       remote_records: syncOverview?.remoteRecords ?? null,
+      remote_cat_gallery_photos: syncOverview?.remoteCatGalleryPhotos ?? null,
       remote_collection_photos: syncOverview?.remoteCollectionPhotos ?? null,
       remote_own_sleeping_photos: syncOverview?.remoteOwnSleepingPhotos ?? null,
       remote_kept_exchange_photos: syncOverview?.remoteKeptExchangePhotos ?? null,
@@ -324,11 +325,13 @@ export function SettingsPage() {
       status: result.status,
       pushed_cats: result.pushedCats,
       pushed_records: result.pushedRecords,
+      pushed_cat_gallery_photos: result.pushedCatGalleryPhotos,
       pushed_collection_photos: result.pushedCollectionPhotos,
       pushed_own_sleeping_photos: result.pushedOwnSleepingPhotos,
       pushed_kept_exchange_photos: result.pushedKeptExchangePhotos,
       restored_cats: result.restoredCats,
       restored_records: result.restoredRecords,
+      restored_cat_gallery_photos: result.restoredCatGalleryPhotos,
       restored_collection_photos: result.restoredCollectionPhotos,
       restored_own_sleeping_photos: result.restoredOwnSleepingPhotos,
       restored_kept_exchange_photos: result.restoredKeptExchangePhotos,
@@ -341,6 +344,7 @@ export function SettingsPage() {
     trackProductEvent("settings_account_restore_clicked", {
       remote_cats: syncOverview?.remoteCats ?? null,
       remote_records: syncOverview?.remoteRecords ?? null,
+      remote_cat_gallery_photos: syncOverview?.remoteCatGalleryPhotos ?? null,
       remote_collection_photos: syncOverview?.remoteCollectionPhotos ?? null,
       remote_own_sleeping_photos: syncOverview?.remoteOwnSleepingPhotos ?? null,
       remote_kept_exchange_photos: syncOverview?.remoteKeptExchangePhotos ?? null,
@@ -353,6 +357,7 @@ export function SettingsPage() {
       trackProductEvent("settings_account_restore_cancelled", {
         remote_cats: syncOverview?.remoteCats ?? null,
         remote_records: syncOverview?.remoteRecords ?? null,
+        remote_cat_gallery_photos: syncOverview?.remoteCatGalleryPhotos ?? null,
         remote_collection_photos: syncOverview?.remoteCollectionPhotos ?? null,
         remote_own_sleeping_photos: syncOverview?.remoteOwnSleepingPhotos ?? null,
         remote_kept_exchange_photos: syncOverview?.remoteKeptExchangePhotos ?? null,
@@ -376,6 +381,7 @@ export function SettingsPage() {
       status: result.status,
       restored_cats: result.restoredCats,
       restored_records: result.restoredRecords,
+      restored_cat_gallery_photos: result.restoredCatGalleryPhotos,
       restored_collection_photos: result.restoredCollectionPhotos,
       restored_own_sleeping_photos: result.restoredOwnSleepingPhotos,
       restored_kept_exchange_photos: result.restoredKeptExchangePhotos,
@@ -1748,10 +1754,12 @@ function formatReportDate(value: string) {
 
 function SyncStatusPanel({ overview }: { overview: AccountSyncOverview }) {
   const localPhotoTotal =
+    overview.localCatGalleryPhotos +
     overview.localCollectionPhotos +
     overview.localOwnSleepingPhotos +
     overview.localKeptExchangePhotos;
   const remotePhotoTotal =
+    overview.remoteCatGalleryPhotos +
     overview.remoteCollectionPhotos +
     overview.remoteOwnSleepingPhotos +
     overview.remoteKeptExchangePhotos;
@@ -1795,6 +1803,7 @@ function SyncResultDetails({
   const rows =
     action === "sync"
       ? [
+          ["この子の写真", result.pushedCatGalleryPhotos, "枚"],
           ["アルバム写真", result.pushedCollectionPhotos, "枚"],
           ["とったねがお", result.pushedOwnSleepingPhotos, "枚"],
           ["とどいたねがお", result.pushedKeptExchangePhotos, "枚"],
@@ -1802,6 +1811,7 @@ function SyncResultDetails({
           ["記録", result.pushedRecords, "件"],
         ]
       : [
+          ["この子の写真", result.restoredCatGalleryPhotos, "枚"],
           ["アルバム写真", result.restoredCollectionPhotos, "枚"],
           ["とったねがお", result.restoredOwnSleepingPhotos, "枚"],
           ["とどいたねがお", result.restoredKeptExchangePhotos, "枚"],
@@ -1812,10 +1822,12 @@ function SyncResultDetails({
   const title = action === "sync" ? "保存結果" : "復元結果";
   const photoTotal =
     action === "sync"
-      ? result.pushedCollectionPhotos +
+      ? result.pushedCatGalleryPhotos +
+        result.pushedCollectionPhotos +
         result.pushedOwnSleepingPhotos +
         result.pushedKeptExchangePhotos
-      : result.restoredCollectionPhotos +
+      : result.restoredCatGalleryPhotos +
+        result.restoredCollectionPhotos +
         result.restoredOwnSleepingPhotos +
         result.restoredKeptExchangePhotos;
 
