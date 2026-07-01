@@ -198,7 +198,7 @@ const commercialTransactionsSections = [
   },
   {
     title: "販売価格",
-    body: ["月額 1,480円（税込）"],
+    body: ["月額 1,480円（税別）"],
   },
   {
     title: "商品代金以外の必要料金",

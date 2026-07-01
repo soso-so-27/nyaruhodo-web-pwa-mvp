@@ -275,7 +275,7 @@ export default function BetaSupporterPage() {
         <section style={styles.actionSection}>
           <p style={styles.supporterLabel}>βサポーター</p>
           <h2 style={styles.actionTitle}>この場所を支える</h2>
-          <p style={styles.price}>月 1,480円</p>
+          <p style={styles.price}>月 1,480円 + 税</p>
           <p style={styles.note}>
             ねてるねこを、静かに長く続く場所にするための応援です。
           </p>
