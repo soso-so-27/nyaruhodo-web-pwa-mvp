@@ -13,6 +13,7 @@ import {
 } from "../../lib/cats/pickup";
 import { createCatFootprintEntries } from "../../lib/cats/footprints";
 import { createCatCelebrationItems } from "../../lib/cats/celebrations";
+import type { CatCelebrationTone } from "../../lib/cats/celebrations";
 import {
   createCatYearSummaries,
   type CatYearSummary,
@@ -1642,14 +1643,18 @@ function RecordOverview({
           {celebrationItems.map((item) => (
             <div key={item.key} style={styles.milestoneItem}>
               <span
-                style={
-                  item.reached
-                    ? { ...styles.milestoneDot, ...styles.milestoneDotReached }
-                    : styles.milestoneDot
-                }
+                style={{
+                  ...styles.milestoneDot,
+                  ...getCelebrationToneStyle(item.tone),
+                }}
                 aria-hidden="true"
               >
-                {item.reached ? <CheckSmallIcon /> : null}
+                <span
+                  style={{
+                    ...styles.milestoneDotInner,
+                    ...getCelebrationToneInnerStyle(item.tone),
+                  }}
+                />
               </span>
               <span style={styles.milestoneLabel}>{item.label}</span>
               <span style={styles.milestoneStatus}>{item.status}</span>
@@ -3239,28 +3244,6 @@ function ChevronRightSmallIcon() {
   );
 }
 
-function CheckSmallIcon() {
-  return (
-    <svg
-      viewBox="0 0 24 24"
-      width="14"
-      height="14"
-      fill="none"
-      aria-hidden="true"
-      focusable="false"
-      style={{ display: "block" }}
-    >
-      <path
-        d="m7.2 12.1 3 3 6.6-7"
-        stroke="currentColor"
-        strokeWidth="2"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
-    </svg>
-  );
-}
-
 function PencilSmallIcon() {
   return (
     <svg
@@ -3499,7 +3482,11 @@ function getDaysThreadIntro(catName: string, familySinceDate?: string) {
 
 function getBirthdayStatus(
   birthDate: string | undefined,
-): { copy: string; isToday: boolean } | null {
+): {
+  copy: string;
+  isToday: boolean;
+  phase: "normal" | "upcoming" | "today" | "recent";
+} | null {
   const birth = parseLocalDate(birthDate);
 
   if (!birth) {
@@ -3513,6 +3500,18 @@ function getBirthdayStatus(
     birth.getMonth(),
     birth.getDate(),
   );
+  const daysSinceThisYearBirthday = Math.floor(
+    (today.getTime() - thisYearBirthday.getTime()) / 86_400_000,
+  );
+
+  if (daysSinceThisYearBirthday > 0 && daysSinceThisYearBirthday <= 7) {
+    return {
+      copy: "今年も迎えました",
+      isToday: false,
+      phase: "recent",
+    };
+  }
+
   const nextBirthday =
     thisYearBirthday < today
       ? new Date(today.getFullYear() + 1, birth.getMonth(), birth.getDate())
@@ -3526,13 +3525,33 @@ function getBirthdayStatus(
     return {
       copy: "きょうは 誕生日",
       isToday: true,
+      phase: "today",
     };
   }
 
   return {
     copy: `誕生日まで あと${daysUntil}日`,
     isToday: false,
+    phase: daysUntil <= 30 ? "upcoming" : "normal",
   };
+}
+
+function getCelebrationToneStyle(tone: CatCelebrationTone) {
+  if (tone === "unset") return styles.milestoneDotUnset;
+  if (tone === "progress") return styles.milestoneDotProgress;
+  if (tone === "upcoming") return styles.milestoneDotUpcoming;
+  if (tone === "today") return styles.milestoneDotToday;
+  if (tone === "recent") return styles.milestoneDotRecent;
+  return styles.milestoneDotActive;
+}
+
+function getCelebrationToneInnerStyle(tone: CatCelebrationTone) {
+  if (tone === "unset") return styles.milestoneDotInnerUnset;
+  if (tone === "progress") return styles.milestoneDotInnerProgress;
+  if (tone === "upcoming") return styles.milestoneDotInnerUpcoming;
+  if (tone === "today") return styles.milestoneDotInnerToday;
+  if (tone === "recent") return styles.milestoneDotInnerRecent;
+  return styles.milestoneDotInnerActive;
 }
 
 function addYearsSafe(date: Date, years: number) {
@@ -4387,11 +4406,66 @@ const styles = {
     alignItems: "center",
     justifyContent: "center",
     borderRadius: "999px",
-    background: "color-mix(in srgb, var(--ink-soft) 42%, var(--paper))",
-    color: "var(--paper)",
+    border: "1px solid color-mix(in srgb, var(--line-strong) 76%, transparent)",
+    background: "color-mix(in srgb, var(--paper-card) 78%, transparent)",
+    boxShadow: "0 1px 2px color-mix(in srgb, var(--ink) 8%, transparent)",
   },
-  milestoneDotReached: {
+  milestoneDotInner: {
+    width: "7px",
+    height: "7px",
+    borderRadius: "999px",
+    background: "color-mix(in srgb, var(--ink-soft) 46%, transparent)",
+  },
+  milestoneDotActive: {
+    borderColor: "color-mix(in srgb, var(--seal) 34%, var(--line-strong))",
+  },
+  milestoneDotProgress: {
+    borderColor: "color-mix(in srgb, var(--seal) 42%, var(--line-strong))",
+    background:
+      "linear-gradient(180deg, color-mix(in srgb, var(--paper-card) 82%, transparent), color-mix(in srgb, var(--seal) 10%, var(--paper-card)))",
+  },
+  milestoneDotUpcoming: {
+    borderColor: "color-mix(in srgb, var(--seal) 46%, var(--line-strong))",
+    background:
+      "color-mix(in srgb, var(--seal) 8%, var(--paper-card))",
+  },
+  milestoneDotToday: {
+    borderColor: "var(--seal)",
     background: "var(--seal)",
+    boxShadow:
+      "0 0 0 3px color-mix(in srgb, var(--seal) 13%, transparent), 0 8px 18px -16px var(--seal)",
+  },
+  milestoneDotRecent: {
+    borderColor: "color-mix(in srgb, var(--seal) 38%, var(--line-strong))",
+    background:
+      "color-mix(in srgb, var(--paper-warm) 64%, var(--paper-card))",
+  },
+  milestoneDotUnset: {
+    borderStyle: "dashed",
+    opacity: 0.72,
+  },
+  milestoneDotInnerActive: {
+    background: "color-mix(in srgb, var(--seal) 64%, var(--ink-soft))",
+  },
+  milestoneDotInnerProgress: {
+    width: "10px",
+    height: "4px",
+    borderRadius: "999px",
+    background: "color-mix(in srgb, var(--seal) 72%, var(--ink-soft))",
+  },
+  milestoneDotInnerUpcoming: {
+    background: "var(--seal)",
+  },
+  milestoneDotInnerToday: {
+    width: "8px",
+    height: "8px",
+    background: "var(--paper)",
+  },
+  milestoneDotInnerRecent: {
+    background: "color-mix(in srgb, var(--seal) 58%, var(--paper-warm))",
+  },
+  milestoneDotInnerUnset: {
+    background: "transparent",
   },
   milestoneLabel: {
     marginTop: "2px",

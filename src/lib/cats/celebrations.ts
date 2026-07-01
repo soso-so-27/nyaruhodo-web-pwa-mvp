@@ -1,13 +1,26 @@
+export type CatCelebrationTone =
+  | "unset"
+  | "active"
+  | "progress"
+  | "upcoming"
+  | "today"
+  | "recent";
+
 export type CatCelebrationItem = {
   key: "family-days" | "sleeping-count" | "birthday";
   label: string;
   status: string;
   reached: boolean;
+  tone: CatCelebrationTone;
 };
 
 export type CatCelebrationInput = {
   familyDuration: { primary: string; secondary: string };
-  birthdayStatus: { copy: string; isToday: boolean } | null;
+  birthdayStatus: {
+    copy: string;
+    isToday: boolean;
+    phase?: "normal" | "upcoming" | "today" | "recent";
+  } | null;
   takenSleepingPhotoCount: number;
 };
 
@@ -37,6 +50,7 @@ function createFamilyCelebration(
     label: "家族になって",
     status: familyCopy,
     reached: familyCopy !== "未登録",
+    tone: familyCopy === "未登録" ? "unset" : "active",
   };
 }
 
@@ -52,6 +66,7 @@ function createSleepingCountCelebration(
       label: "ねがお",
       status: "これから",
       reached: false,
+      tone: "unset",
     };
   }
 
@@ -61,19 +76,21 @@ function createSleepingCountCelebration(
       label: "ねがお",
       status: `${count}枚`,
       reached: true,
+      tone: "progress",
     };
   }
 
   const reachedTarget = [...SLEEPING_COUNT_TARGETS]
     .reverse()
     .find((target) => target <= count);
-  const primary = reachedTarget ? `${reachedTarget}枚` : `${count}枚`;
+  const primary = reachedTarget ?? count;
 
   return {
     key: "sleeping-count",
     label: "ねがお",
-    status: `${primary} → ${nextTarget}枚`,
+    status: `${primary} / ${nextTarget}枚`,
     reached: Boolean(reachedTarget),
+    tone: "progress",
   };
 }
 
@@ -86,13 +103,24 @@ function createBirthdayCelebration(
       label: "誕生日",
       status: "未登録",
       reached: false,
+      tone: "unset",
     };
   }
+
+  const tone: CatCelebrationTone =
+    birthdayStatus.phase === "today"
+      ? "today"
+      : birthdayStatus.phase === "recent"
+        ? "recent"
+        : birthdayStatus.phase === "upcoming"
+          ? "upcoming"
+          : "active";
 
   return {
     key: "birthday",
     label: "誕生日",
     status: birthdayStatus.copy.replace("誕生日まで ", ""),
     reached: birthdayStatus.isToday,
+    tone,
   };
 }
