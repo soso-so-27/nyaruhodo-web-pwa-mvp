@@ -105,6 +105,7 @@ type RemoteCatSaveResult =
   | { status: "saved" | "skipped" }
   | { status: "error"; message: string };
 type PhotoSheetLens = "cat" | "all";
+type YearSummaryDetailKind = "photos" | "pickups" | "milestones";
 type RecordPhotoPreview = {
   src: string;
   title: string;
@@ -1431,6 +1432,17 @@ export function CatsPage() {
       {selectedYearSummary ? (
         <YearSummarySheet
           summary={selectedYearSummary}
+          photos={activeCatLensPhotos}
+          memories={omoideMemories}
+          milestones={sleepingMilestones}
+          onOpenPhoto={(photo) => {
+            setSelectedYearSummary(null);
+            setSelectedRecordPhoto(photo);
+          }}
+          onOpenMemory={(memory) => {
+            setSelectedYearSummary(null);
+            setSelectedOmoideMemory(memory);
+          }}
           onClose={() => setSelectedYearSummary(null)}
         />
       ) : null}
@@ -2171,11 +2183,34 @@ function PhotoListSheet({
 
 function YearSummarySheet({
   summary,
+  photos,
+  memories,
+  milestones,
+  onOpenPhoto,
+  onOpenMemory,
   onClose,
 }: {
   summary: CatYearSummary;
+  photos: LensPhoto[];
+  memories: OmoideMemory[];
+  milestones: CatSleepingMilestone[];
+  onOpenPhoto: (photo: RecordPhotoPreview) => void;
+  onOpenMemory: (memory: OmoideMemory) => void;
   onClose: () => void;
 }) {
+  const [activeDetail, setActiveDetail] =
+    useState<YearSummaryDetailKind | null>(null);
+  const yearPhotos = photos.filter((photo) =>
+    isTimestampInYear(photo.createdAt, summary.year),
+  );
+  const yearMemories = memories.filter((memory) =>
+    isTimestampInYear(memory.openedAt ?? memory.deliveredAt, summary.year),
+  );
+  const yearMilestones = milestones.filter(
+    (milestone) =>
+      milestone.reachedAt && isTimestampInYear(milestone.reachedAt, summary.year),
+  );
+
   return (
     <AppBottomSheet title={`${summary.year}年`} onClose={onClose}>
       <div style={styles.yearSummarySheet}>
@@ -2189,19 +2224,38 @@ function YearSummarySheet({
           </div>
         ) : null}
         <div style={styles.yearSummaryStats}>
-          <div style={styles.yearSummaryStat}>
-            <span style={styles.yearSummaryStatValue}>{summary.photoCount}</span>
-            <span style={styles.yearSummaryStatLabel}>ねがお</span>
-          </div>
-          <div style={styles.yearSummaryStat}>
-            <span style={styles.yearSummaryStatValue}>{summary.pickupCount}</span>
-            <span style={styles.yearSummaryStatLabel}>ピックアップ</span>
-          </div>
-          <div style={styles.yearSummaryStat}>
-            <span style={styles.yearSummaryStatValue}>{summary.milestoneCount}</span>
-            <span style={styles.yearSummaryStatLabel}>記念</span>
-          </div>
+          <YearSummaryStatButton
+            value={summary.photoCount}
+            label="ねがお"
+            active={activeDetail === "photos"}
+            disabled={yearPhotos.length === 0}
+            onClick={() => setActiveDetail("photos")}
+          />
+          <YearSummaryStatButton
+            value={summary.pickupCount}
+            label="ピックアップ"
+            active={activeDetail === "pickups"}
+            disabled={yearMemories.length === 0}
+            onClick={() => setActiveDetail("pickups")}
+          />
+          <YearSummaryStatButton
+            value={summary.milestoneCount}
+            label="記念"
+            active={activeDetail === "milestones"}
+            disabled={yearMilestones.length === 0}
+            onClick={() => setActiveDetail("milestones")}
+          />
         </div>
+        {activeDetail ? (
+          <YearSummaryDetailList
+            kind={activeDetail}
+            photos={yearPhotos}
+            memories={yearMemories}
+            milestones={yearMilestones}
+            onOpenPhoto={onOpenPhoto}
+            onOpenMemory={onOpenMemory}
+          />
+        ) : null}
         <div style={styles.yearSummaryBlock}>
           <p style={styles.yearSummaryBlockLabel}>よく撮った月</p>
           <p style={styles.yearSummaryBlockText}>{summary.activeMonthLabel}</p>
@@ -2222,6 +2276,163 @@ function YearSummarySheet({
         </div>
       </div>
     </AppBottomSheet>
+  );
+}
+
+function YearSummaryStatButton({
+  value,
+  label,
+  active,
+  disabled,
+  onClick,
+}: {
+  value: number;
+  label: string;
+  active: boolean;
+  disabled: boolean;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      style={{
+        ...styles.yearSummaryStat,
+        ...styles.yearSummaryStatButton,
+        ...(active ? styles.yearSummaryStatButtonActive : {}),
+        ...(disabled ? styles.yearSummaryStatButtonDisabled : {}),
+      }}
+      onClick={onClick}
+      disabled={disabled}
+      aria-pressed={active}
+    >
+      <span style={styles.yearSummaryStatValue}>{value}</span>
+      <span style={styles.yearSummaryStatLabel}>{label}</span>
+    </button>
+  );
+}
+
+function YearSummaryDetailList({
+  kind,
+  photos,
+  memories,
+  milestones,
+  onOpenPhoto,
+  onOpenMemory,
+}: {
+  kind: YearSummaryDetailKind;
+  photos: LensPhoto[];
+  memories: OmoideMemory[];
+  milestones: CatSleepingMilestone[];
+  onOpenPhoto: (photo: RecordPhotoPreview) => void;
+  onOpenMemory: (memory: OmoideMemory) => void;
+}) {
+  if (kind === "photos") {
+    return (
+      <section style={styles.yearSummaryDetail} aria-label="この年のねがお">
+        <p style={styles.yearSummaryDetailTitle}>この年のねがお</p>
+        <div style={styles.yearSummaryPhotoGrid}>
+          {photos.map((photo) => (
+            <button
+              key={photo.id}
+              type="button"
+              style={styles.yearSummaryPhotoButton}
+              onClick={() => onOpenPhoto(toRecordPhotoPreview(photo))}
+              aria-label={`${formatLensPhotoDate(photo.createdAt)}のねがおを開く`}
+            >
+              <StoredPhotoImage
+                src={photo.src}
+                alt=""
+                style={styles.yearSummaryPhotoImage}
+              />
+            </button>
+          ))}
+        </div>
+      </section>
+    );
+  }
+
+  if (kind === "pickups") {
+    return (
+      <section style={styles.yearSummaryDetail} aria-label="この年のピックアップ">
+        <p style={styles.yearSummaryDetailTitle}>この年のピックアップ</p>
+        <div style={styles.yearSummaryRows}>
+          {memories.map((memory) => (
+            <button
+              key={memory.id}
+              type="button"
+              style={styles.yearSummaryRow}
+              onClick={() => onOpenMemory(memory)}
+            >
+              <span style={styles.yearSummaryRowThumb}>
+                <StoredPhotoImage
+                  src={memory.photo.thumbnailSrc ?? memory.photo.displaySrc ?? memory.photo.src}
+                  alt=""
+                  style={styles.yearSummaryRowImage}
+                />
+              </span>
+              <span style={styles.yearSummaryRowText}>
+                <span style={styles.yearSummaryRowTitle}>{memory.title}</span>
+                <span style={styles.yearSummaryRowMeta}>
+                  {formatFootprintDate(memory.openedAt ?? memory.deliveredAt)}
+                </span>
+              </span>
+              <ChevronRightSmallIcon />
+            </button>
+          ))}
+        </div>
+      </section>
+    );
+  }
+
+  return (
+    <section style={styles.yearSummaryDetail} aria-label="この年の記念">
+      <p style={styles.yearSummaryDetailTitle}>この年の記念</p>
+      <div style={styles.yearSummaryRows}>
+        {milestones.map((milestone) => {
+          const title = getFootprintMilestoneTitle(milestone.target);
+          const hasPhoto = Boolean(milestone.src && milestone.reachedAt);
+
+          return (
+            <button
+              key={`${milestone.target}-${milestone.reachedAt ?? 0}`}
+              type="button"
+              style={styles.yearSummaryRow}
+              onClick={() => {
+                if (!hasPhoto) {
+                  return;
+                }
+
+                onOpenPhoto({
+                  src: milestone.src,
+                  title,
+                  timestamp: milestone.reachedAt!,
+                });
+              }}
+              disabled={!hasPhoto}
+            >
+              <span style={styles.yearSummaryRowThumb}>
+                {milestone.src ? (
+                  <StoredPhotoImage
+                    src={milestone.src}
+                    alt=""
+                    style={styles.yearSummaryRowImage}
+                  />
+                ) : (
+                  <span style={styles.yearSummaryRowFallback} aria-hidden="true" />
+                )}
+              </span>
+              <span style={styles.yearSummaryRowText}>
+                <span style={styles.yearSummaryRowTitle}>{title}</span>
+                <span style={styles.yearSummaryRowMeta}>
+                  {milestone.reachedAt ? formatFootprintDate(milestone.reachedAt) : ""}
+                </span>
+              </span>
+              {hasPhoto ? <ChevronRightSmallIcon /> : null}
+            </button>
+          );
+        })}
+      </div>
+    </section>
   );
 }
 
@@ -2505,6 +2716,16 @@ function formatFootprintDate(timestamp: number) {
     2,
     "0",
   )}/${String(date.getDate()).padStart(2, "0")}`;
+}
+
+function isTimestampInYear(timestamp: number, year: number) {
+  if (!timestamp) {
+    return false;
+  }
+
+  const date = new Date(timestamp);
+
+  return !Number.isNaN(date.getTime()) && date.getFullYear() === year;
 }
 
 function formatBasicInfoDate(value?: string) {
@@ -5105,6 +5326,21 @@ const styles = {
     border: "1px solid color-mix(in srgb, var(--line) 78%, transparent)",
     background: "color-mix(in srgb, var(--paper-card) 32%, transparent)",
   },
+  yearSummaryStatButton: {
+    width: "100%",
+    textAlign: "left" as const,
+    color: "inherit",
+    cursor: "pointer",
+    WebkitTapHighlightColor: "transparent",
+  },
+  yearSummaryStatButtonActive: {
+    borderColor: "color-mix(in srgb, var(--seal) 38%, var(--line))",
+    background: "color-mix(in srgb, var(--seal) 8%, var(--paper-card) 34%)",
+  },
+  yearSummaryStatButtonDisabled: {
+    cursor: "default",
+    opacity: 0.56,
+  },
   yearSummaryStatValue: {
     color: CATS_TEXT_STRONG,
     fontFamily: CATS_UI,
@@ -5118,6 +5354,108 @@ const styles = {
     fontFamily: CATS_UI,
     fontSize: "11px",
     fontWeight: 500,
+    lineHeight: 1.3,
+    letterSpacing: "0",
+  },
+  yearSummaryDetail: {
+    display: "grid",
+    gap: "9px",
+    padding: "12px",
+    borderRadius: "14px",
+    border: "1px solid color-mix(in srgb, var(--line) 78%, transparent)",
+    background: "color-mix(in srgb, var(--paper-card) 28%, transparent)",
+  },
+  yearSummaryDetailTitle: {
+    margin: 0,
+    color: CATS_TEXT_STRONG,
+    fontFamily: CATS_UI,
+    fontSize: "13px",
+    fontWeight: 600,
+    lineHeight: 1.35,
+    letterSpacing: "0",
+  },
+  yearSummaryPhotoGrid: {
+    display: "grid",
+    gridTemplateColumns: "repeat(3, minmax(0, 1fr))",
+    gap: "6px",
+  },
+  yearSummaryPhotoButton: {
+    width: "100%",
+    aspectRatio: "1 / 1",
+    overflow: "hidden",
+    padding: 0,
+    border: "1px solid color-mix(in srgb, var(--line) 74%, transparent)",
+    borderRadius: "12px",
+    background: CATS_PANEL_BACKGROUND_SOFT,
+    cursor: "pointer",
+    WebkitTapHighlightColor: "transparent",
+  },
+  yearSummaryPhotoImage: {
+    width: "100%",
+    height: "100%",
+    objectFit: "cover",
+    borderRadius: "11px",
+  },
+  yearSummaryRows: {
+    display: "grid",
+    gap: "7px",
+  },
+  yearSummaryRow: {
+    display: "grid",
+    gridTemplateColumns: "44px minmax(0, 1fr) auto",
+    alignItems: "center",
+    gap: "10px",
+    minHeight: "56px",
+    width: "100%",
+    padding: "6px",
+    border: "1px solid color-mix(in srgb, var(--line) 72%, transparent)",
+    borderRadius: "12px",
+    background: "color-mix(in srgb, var(--paper-card) 42%, transparent)",
+    color: "inherit",
+    textAlign: "left" as const,
+    cursor: "pointer",
+    WebkitTapHighlightColor: "transparent",
+  },
+  yearSummaryRowThumb: {
+    width: "44px",
+    height: "44px",
+    overflow: "hidden",
+    borderRadius: "10px",
+    background: CATS_PANEL_BACKGROUND_SOFT,
+  },
+  yearSummaryRowImage: {
+    width: "100%",
+    height: "100%",
+    objectFit: "cover",
+    borderRadius: "10px",
+  },
+  yearSummaryRowFallback: {
+    display: "block",
+    width: "100%",
+    height: "100%",
+    background: "color-mix(in srgb, var(--seal) 10%, transparent)",
+  },
+  yearSummaryRowText: {
+    display: "grid",
+    gap: "2px",
+    minWidth: 0,
+  },
+  yearSummaryRowTitle: {
+    color: CATS_TEXT_STRONG,
+    fontFamily: CATS_UI,
+    fontSize: "13px",
+    fontWeight: 600,
+    lineHeight: 1.35,
+    letterSpacing: "0",
+    overflow: "hidden",
+    textOverflow: "ellipsis",
+    whiteSpace: "nowrap" as const,
+  },
+  yearSummaryRowMeta: {
+    color: CATS_MUTED,
+    fontFamily: CATS_UI,
+    fontSize: "11px",
+    fontWeight: 400,
     lineHeight: 1.3,
     letterSpacing: "0",
   },
