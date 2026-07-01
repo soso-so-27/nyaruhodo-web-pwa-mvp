@@ -6,6 +6,7 @@ import { AnimatePresence, MotionConfig, motion } from "motion/react";
 import {
   getCollectionSlotPhotoSlug,
   getDailyCollectionTarget,
+  isReservedCollectionSlotSlug,
 } from "../../lib/collection/dailyTarget";
 import { trackProductEvent } from "../../lib/analytics/productAnalytics";
 import {
@@ -1065,6 +1066,10 @@ export function CollectionPage() {
       }
 
       const addedPhoto = addCollectionPhoto(activeCatId, slug, photoVariants);
+      if (!addedPhoto) {
+        return;
+      }
+
       setCollectionPhotos((current) => ({
         ...current,
         [slug]: [...(current[slug] ?? []), addedPhoto],
@@ -4873,10 +4878,12 @@ function readCollectionPhotos(catId: string): Record<string, StoredCollectionPho
       countStoredPhotos(catPhotos) > 0 ? catPhotos : mergeAllCollectionPhotos(all);
 
     return Object.fromEntries(
-      Object.entries(photosForDisplay).map(([slug, value]) => [
-        slug,
-        normalizeStoredPhotoList(value, catId, slug),
-      ]),
+      Object.entries(photosForDisplay)
+        .filter(([slug]) => !isReservedCollectionSlotSlug(slug))
+        .map(([slug, value]) => [
+          slug,
+          normalizeStoredPhotoList(value, catId, slug),
+        ]),
     );
   } catch {
     return {};
@@ -4891,6 +4898,10 @@ function addCollectionPhoto(
     "src" | "thumbnailSrc" | "displaySrc" | "originalSrc"
   >,
 ) {
+  if (isReservedCollectionSlotSlug(slug)) {
+    return null;
+  }
+
   const photo: StoredCollectionPhotoEntry = {
     id: createCollectionPhotoId(catId, slug),
     ...photoInput,
@@ -4972,7 +4983,10 @@ function countStoredPhotos(
   >,
 ) {
   return Object.entries(photosBySlug).reduce(
-    (count, [slug, value]) => count + normalizeStoredPhotoList(value, "cat", slug).length,
+    (count, [slug, value]) =>
+      isReservedCollectionSlotSlug(slug)
+        ? count
+        : count + normalizeStoredPhotoList(value, "cat", slug).length,
     0,
   );
 }
@@ -4987,6 +5001,10 @@ function mergeAllCollectionPhotos(
 
   for (const [catId, photosBySlug] of Object.entries(allPhotos)) {
     for (const [slug, value] of Object.entries(photosBySlug)) {
+      if (isReservedCollectionSlotSlug(slug)) {
+        continue;
+      }
+
       merged[slug] = [
         ...(merged[slug] ?? []),
         ...normalizeStoredPhotoList(value, catId, slug),

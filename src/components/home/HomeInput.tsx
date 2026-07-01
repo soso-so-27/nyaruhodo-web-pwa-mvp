@@ -14,6 +14,7 @@ import {
 import {
   getCollectionSlotPhotoSlug,
   getDailyCollectionTarget,
+  isReservedCollectionSlotSlug,
   readStoredCollectionPhotos,
 } from "../../lib/collection/dailyTarget";
 import {
@@ -4610,6 +4611,10 @@ function saveRecord(
 }
 
 function saveCollectionPhoto(catId: string, slug: string, dataUrl: string) {
+  if (isReservedCollectionSlotSlug(slug)) {
+    return;
+  }
+
   try {
     const raw = window.localStorage.getItem(STORAGE_KEYS.collectionPhotos);
     const all = raw

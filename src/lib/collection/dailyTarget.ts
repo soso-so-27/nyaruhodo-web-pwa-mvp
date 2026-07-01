@@ -1,6 +1,12 @@
 import { COLLECTION_GROUPS, type CollectionSlot } from "./poses";
 import { STORAGE_KEYS } from "../storage";
 
+export const CAT_GALLERY_COLLECTION_SLOT = "__cat_gallery";
+
+export function isReservedCollectionSlotSlug(slug: string) {
+  return slug === CAT_GALLERY_COLLECTION_SLOT;
+}
+
 export function getCollectionSlotPhotoSlug(slot: CollectionSlot) {
   return `${slot.group}_${slot.id.replace(/-/g, "_")}`;
 }
@@ -46,10 +52,12 @@ export function readStoredCollectionPhotos(catId: string) {
       countStoredPhotos(catPhotos) > 0 ? catPhotos : mergeAllCollectionPhotos(all);
 
     return Object.fromEntries(
-      Object.entries(photosForDisplay).map(([slug, value]) => [
-        slug,
-        normalizeStoredPhotoList(value),
-      ]),
+      Object.entries(photosForDisplay)
+        .filter(([slug]) => !isReservedCollectionSlotSlug(slug))
+        .map(([slug, value]) => [
+          slug,
+          normalizeStoredPhotoList(value),
+        ]),
     );
   } catch {
     return {};
@@ -87,8 +95,11 @@ function countStoredPhotos(
     StoredCollectionPhoto[] | StoredCollectionPhoto | string[] | string
   >,
 ) {
-  return Object.values(photosBySlug).reduce(
-    (count, value) => count + normalizeStoredPhotoList(value).length,
+  return Object.entries(photosBySlug).reduce(
+    (count, [slug, value]) =>
+      isReservedCollectionSlotSlug(slug)
+        ? count
+        : count + normalizeStoredPhotoList(value).length,
     0,
   );
 }
@@ -103,6 +114,10 @@ function mergeAllCollectionPhotos(
 
   for (const photosBySlug of Object.values(allPhotos)) {
     for (const [slug, value] of Object.entries(photosBySlug)) {
+      if (isReservedCollectionSlotSlug(slug)) {
+        continue;
+      }
+
       merged[slug] = [
         ...(merged[slug] ?? []),
         ...normalizeStoredPhotoList(value),

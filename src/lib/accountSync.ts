@@ -22,6 +22,10 @@ import {
   toStoragePhotoUrl,
   uploadDataUrl,
 } from "./photoStorage";
+import {
+  CAT_GALLERY_COLLECTION_SLOT,
+  isReservedCollectionSlotSlug,
+} from "./collection/dailyTarget";
 
 type LocalCatProfile = {
   id: string;
@@ -203,7 +207,6 @@ export type AccountDeleteResult = {
 };
 
 const SYNC_METADATA = { source: "localStorage-v1" };
-const CAT_GALLERY_COLLECTION_SLOT = "__cat_gallery";
 const CAT_GALLERY_COLLECTION_METADATA = {
   ...SYNC_METADATA,
   domain: "cat_gallery",
@@ -610,7 +613,8 @@ export async function deleteAccountCollectionPhoto(localPhotoId: string) {
     .from("collection_photos")
     .delete()
     .eq("user_id", data.user.id)
-    .eq("local_photo_id", localPhotoId);
+    .eq("local_photo_id", localPhotoId)
+    .neq("slot_slug", CAT_GALLERY_COLLECTION_SLOT);
 
   if (error) {
     throw new Error(`Collection photo delete failed: ${error.message}`);
@@ -807,8 +811,10 @@ function hasMeaningfulCatProfileDetails(profile: LocalCatProfile) {
 
 function hasLocalCollectionPhotos(collectionPhotos: LocalCollectionStore) {
   return Object.values(collectionPhotos).some((catPhotos) =>
-    Object.values(catPhotos).some(
-      (photos) => normalizeCollectionPhotoEntries(photos).length > 0,
+    Object.entries(catPhotos).some(
+      ([slug, photos]) =>
+        !isReservedCollectionSlotSlug(slug) &&
+        normalizeCollectionPhotoEntries(photos).length > 0,
     ),
   );
 }
@@ -827,7 +833,11 @@ function countLocalCollectionPhotos(collectionPhotos: LocalCollectionStore) {
   let count = 0;
 
   for (const catPhotos of Object.values(collectionPhotos)) {
-    for (const photos of Object.values(catPhotos)) {
+    for (const [slug, photos] of Object.entries(catPhotos)) {
+      if (isReservedCollectionSlotSlug(slug)) {
+        continue;
+      }
+
       count += normalizeCollectionPhotoEntries(photos).length;
     }
   }
@@ -1088,6 +1098,7 @@ async function syncCatGalleryPhotos(
     userId,
     rows,
     "local_photo_id",
+    { slotSlug: CAT_GALLERY_COLLECTION_SLOT },
   );
 
   if (missingRows.length === 0) {
@@ -1120,6 +1131,10 @@ async function syncCollectionPhotos(
     }
 
     for (const [slotSlug, rawPhotos] of Object.entries(photosBySlot)) {
+      if (isReservedCollectionSlotSlug(slotSlug)) {
+        continue;
+      }
+
       const photos = normalizeCollectionPhotoEntries(rawPhotos);
 
       for (const [index, photo] of photos.entries()) {
@@ -1162,6 +1177,7 @@ async function syncCollectionPhotos(
     userId,
     rows,
     "local_photo_id",
+    { excludeReservedCollectionSlots: true },
   );
 
   if (missingRows.length === 0) {
@@ -2023,6 +2039,10 @@ async function filterRowsMissingByLocalId<T extends Record<string, unknown>>(
   userId: string,
   rows: T[],
   idField: "local_record_id" | "local_photo_id",
+  options: {
+    slotSlug?: string;
+    excludeReservedCollectionSlots?: boolean;
+  } = {},
 ) {
   const localIds = rows
     .map((row) => row[idField])
@@ -2032,11 +2052,22 @@ async function filterRowsMissingByLocalId<T extends Record<string, unknown>>(
     return rows;
   }
 
-  const { data, error } = await supabase
+  let query = supabase
     .from(table)
     .select(idField)
     .eq("user_id", userId)
     .in(idField, localIds);
+
+  if (table === "collection_photos" && options.slotSlug) {
+    query = query.eq("slot_slug", options.slotSlug);
+  } else if (
+    table === "collection_photos" &&
+    options.excludeReservedCollectionSlots
+  ) {
+    query = query.neq("slot_slug", CAT_GALLERY_COLLECTION_SLOT);
+  }
+
+  const { data, error } = await query;
 
   if (error) {
     throw new Error(`Existing ${table} lookup failed: ${error.message}`);
