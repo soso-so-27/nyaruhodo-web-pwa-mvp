@@ -4,7 +4,7 @@ import { getAuthenticatedUserForRequest } from "../../../../lib/adminAccess";
 import { getBetaCapabilitiesForRequest } from "../../../../lib/betaAccess";
 import {
   getBillingBaseUrl,
-  isActiveBetaSupporterStatus,
+  isCurrentBetaSupporterSubscription,
   readLatestSubscriptionForUser,
   upsertCheckoutStartedSubscription,
 } from "../../../../lib/billing/subscriptions";
@@ -45,11 +45,12 @@ export async function POST(request: Request) {
 
   const existing = await readLatestSubscriptionForUser(supabase, user.id);
 
-  if (isActiveBetaSupporterStatus(existing?.status)) {
+  if (isCurrentBetaSupporterSubscription(existing)) {
     return billingError("already_active", 409);
   }
 
-  let customerId = existing?.stripeCustomerId ?? null;
+  const canReuseCustomer = existing?.priceId === priceId;
+  let customerId = canReuseCustomer ? (existing?.stripeCustomerId ?? null) : null;
 
   if (!customerId) {
     try {

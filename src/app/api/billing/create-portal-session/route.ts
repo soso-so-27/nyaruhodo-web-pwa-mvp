@@ -3,6 +3,7 @@ import { NextResponse } from "next/server";
 import { getAuthenticatedUserForRequest } from "../../../../lib/adminAccess";
 import {
   getBillingBaseUrl,
+  isCurrentBetaSupporterSubscription,
   readLatestSubscriptionForUser,
 } from "../../../../lib/billing/subscriptions";
 import {
@@ -32,7 +33,10 @@ export async function POST(request: Request) {
 
   const subscription = await readLatestSubscriptionForUser(supabase, user.id);
 
-  if (!subscription?.stripeCustomerId) {
+  if (
+    !isCurrentBetaSupporterSubscription(subscription) ||
+    !subscription?.stripeCustomerId
+  ) {
     return billingError("customer_not_found", 404);
   }
 

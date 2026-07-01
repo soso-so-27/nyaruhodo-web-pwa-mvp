@@ -3,7 +3,7 @@ import { NextResponse } from "next/server";
 import { getAuthenticatedUserForRequest } from "../../../../lib/adminAccess";
 import {
   getLatestSubscriptionForUser,
-  isActiveBetaSupporterStatus,
+  isCurrentBetaSupporterSubscription,
 } from "../../../../lib/billing/subscriptions";
 import { isStripeBillingConfigured } from "../../../../lib/billing/stripe";
 
@@ -24,14 +24,15 @@ export async function GET(request: Request) {
 
   const subscription = await getLatestSubscriptionForUser(user.id);
   const status = subscription?.status ?? "none";
+  const isCurrentSupporter = isCurrentBetaSupporterSubscription(subscription);
 
   return NextResponse.json({
     isLoggedIn: true,
     billingConfigured: isStripeBillingConfigured(),
-    isBetaSupporter: isActiveBetaSupporterStatus(status),
+    isBetaSupporter: isCurrentSupporter,
     status,
     currentPeriodEnd: subscription?.currentPeriodEnd ?? null,
     cancelAtPeriodEnd: subscription?.cancelAtPeriodEnd ?? false,
-    canManageBilling: Boolean(subscription?.stripeCustomerId),
+    canManageBilling: Boolean(isCurrentSupporter && subscription?.stripeCustomerId),
   });
 }

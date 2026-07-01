@@ -35,6 +35,18 @@ export function isActiveBetaSupporterStatus(status: string | null | undefined) {
   return status === "active" || status === "trialing";
 }
 
+export function isCurrentBetaSupporterSubscription(
+  subscription: Pick<BetaSupporterSubscription, "status" | "priceId"> | null | undefined,
+) {
+  const currentPriceId = getStripePriceId();
+
+  return Boolean(
+    currentPriceId &&
+      isActiveBetaSupporterStatus(subscription?.status) &&
+      subscription?.priceId === currentPriceId,
+  );
+}
+
 export async function getLatestSubscriptionForUser(userId: string) {
   const supabase = createSupabaseAdminClient();
 
@@ -48,7 +60,7 @@ export async function getLatestSubscriptionForUser(userId: string) {
 export async function isUserBetaSupporter(userId: string) {
   const subscription = await getLatestSubscriptionForUser(userId);
 
-  return isActiveBetaSupporterStatus(subscription?.status);
+  return isCurrentBetaSupporterSubscription(subscription);
 }
 
 export async function readLatestSubscriptionForUser(
