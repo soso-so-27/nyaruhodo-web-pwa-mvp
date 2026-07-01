@@ -4,6 +4,7 @@ import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import type { CSSProperties, MouseEvent, ReactNode, TouchEvent } from "react";
 import {
   getAccountSyncOverview,
+  restoreCatGalleryPhotosFromAccount,
   syncLocalDataWithAccount,
 } from "../../lib/accountSync";
 import { trackProductEvent } from "../../lib/analytics/productAnalytics";
@@ -297,6 +298,7 @@ export function HomeInput({
   const [accountRestoreSummary, setAccountRestoreSummary] = useState<{
     remoteCats: number;
     remoteRecords: number;
+    remoteCatGalleryPhotos: number;
     remoteCollectionPhotos: number;
     remoteOwnSleepingPhotos: number;
     remoteKeptExchangePhotos: number;
@@ -647,6 +649,50 @@ export function HomeInput({
     const syncResult = await syncLocalDataWithAccount({
       restoreIfLocalEmpty: false,
     });
+    const catGalleryLocalBefore = readCatGalleryPhotos(null).length;
+
+    trackProductEvent(
+      "cat_gallery_restore_started",
+      {
+        route: "/home",
+        local_count: catGalleryLocalBefore,
+        has_session: true,
+      },
+      {
+        localCatId,
+        userId,
+      },
+    );
+
+    const catGalleryRestoreResult = await restoreCatGalleryPhotosFromAccount();
+    const catGalleryRestoreEvent =
+      catGalleryRestoreResult.status === "restored"
+        ? "cat_gallery_restore_completed"
+        : catGalleryRestoreResult.status === "empty"
+          ? "cat_gallery_remote_empty"
+          : catGalleryRestoreResult.status === "error"
+            ? "cat_gallery_restore_failed"
+            : "cat_gallery_local_merged";
+
+    trackProductEvent(
+      catGalleryRestoreEvent,
+      {
+        route: "/home",
+        local_count: catGalleryRestoreResult.localBefore,
+        remote_count: catGalleryRestoreResult.remoteCount,
+        restored_count: catGalleryRestoreResult.restoredCount,
+        merged_count: Math.max(
+          0,
+          catGalleryRestoreResult.localAfter - catGalleryRestoreResult.localBefore,
+        ),
+        has_session: catGalleryRestoreResult.hasSession,
+        error_count: catGalleryRestoreResult.errors.length,
+      },
+      {
+        localCatId,
+        userId,
+      },
+    );
 
     trackProductEvent(
       "account_data_sync_completed",
@@ -654,15 +700,20 @@ export function HomeInput({
         status: syncResult.status,
         pushed_cats: syncResult.pushedCats,
         pushed_records: syncResult.pushedRecords,
+        pushed_cat_gallery_photos: syncResult.pushedCatGalleryPhotos,
         pushed_collection_photos: syncResult.pushedCollectionPhotos,
         pushed_own_sleeping_photos: syncResult.pushedOwnSleepingPhotos,
         pushed_kept_exchange_photos: syncResult.pushedKeptExchangePhotos,
         restored_cats: syncResult.restoredCats,
         restored_records: syncResult.restoredRecords,
+        restored_cat_gallery_photos:
+          syncResult.restoredCatGalleryPhotos +
+          catGalleryRestoreResult.restoredCount,
         restored_collection_photos: syncResult.restoredCollectionPhotos,
         restored_own_sleeping_photos: syncResult.restoredOwnSleepingPhotos,
         restored_kept_exchange_photos: syncResult.restoredKeptExchangePhotos,
-        error_count: syncResult.errors.length,
+        error_count:
+          syncResult.errors.length + catGalleryRestoreResult.errors.length,
       },
       {
         localCatId,
@@ -674,9 +725,11 @@ export function HomeInput({
       syncResult.status === "synced" ||
       (syncResult.status === "restored" &&
         (syncResult.restoredCats > 0 ||
+          syncResult.restoredCatGalleryPhotos > 0 ||
           syncResult.restoredCollectionPhotos > 0 ||
           syncResult.restoredOwnSleepingPhotos > 0 ||
-          syncResult.restoredKeptExchangePhotos > 0))
+          syncResult.restoredKeptExchangePhotos > 0)) ||
+      catGalleryRestoreResult.restoredCount > 0
     ) {
       refreshHomeFromLocalStorage();
     }
@@ -969,6 +1022,7 @@ export function HomeInput({
       setAccountRestoreSummary({
         remoteCats: overview.remoteCats,
         remoteRecords: overview.remoteRecords,
+        remoteCatGalleryPhotos: overview.remoteCatGalleryPhotos,
         remoteCollectionPhotos: overview.remoteCollectionPhotos,
         remoteOwnSleepingPhotos: overview.remoteOwnSleepingPhotos,
         remoteKeptExchangePhotos: overview.remoteKeptExchangePhotos,
@@ -980,6 +1034,7 @@ export function HomeInput({
           local_cats: overview.localCats,
           remote_cats: overview.remoteCats,
           remote_records: overview.remoteRecords,
+          remote_cat_gallery_photos: overview.remoteCatGalleryPhotos,
           remote_collection_photos: overview.remoteCollectionPhotos,
           remote_own_sleeping_photos: overview.remoteOwnSleepingPhotos,
           remote_kept_exchange_photos: overview.remoteKeptExchangePhotos,
@@ -1110,6 +1165,8 @@ export function HomeInput({
       {
         remote_cats: accountRestoreSummary?.remoteCats ?? null,
         remote_records: accountRestoreSummary?.remoteRecords ?? null,
+        remote_cat_gallery_photos:
+          accountRestoreSummary?.remoteCatGalleryPhotos ?? null,
         remote_collection_photos:
           accountRestoreSummary?.remoteCollectionPhotos ?? null,
         remote_own_sleeping_photos:
@@ -1132,6 +1189,8 @@ export function HomeInput({
       {
         remote_cats: accountRestoreSummary?.remoteCats ?? null,
         remote_records: accountRestoreSummary?.remoteRecords ?? null,
+        remote_cat_gallery_photos:
+          accountRestoreSummary?.remoteCatGalleryPhotos ?? null,
         remote_collection_photos:
           accountRestoreSummary?.remoteCollectionPhotos ?? null,
         remote_own_sleeping_photos:
@@ -1155,6 +1214,7 @@ export function HomeInput({
         status: result.status,
         restored_cats: result.restoredCats,
         restored_records: result.restoredRecords,
+        restored_cat_gallery_photos: result.restoredCatGalleryPhotos,
         restored_collection_photos: result.restoredCollectionPhotos,
         restored_own_sleeping_photos: result.restoredOwnSleepingPhotos,
         restored_kept_exchange_photos: result.restoredKeptExchangePhotos,
@@ -1166,6 +1226,7 @@ export function HomeInput({
     if (
       result.status === "restored" &&
       (result.restoredCats > 0 ||
+        result.restoredCatGalleryPhotos > 0 ||
         result.restoredCollectionPhotos > 0 ||
         result.restoredOwnSleepingPhotos > 0 ||
         result.restoredKeptExchangePhotos > 0)
@@ -3569,6 +3630,7 @@ function AccountRestoreSheet({
   summary: {
     remoteCats: number;
     remoteRecords: number;
+    remoteCatGalleryPhotos: number;
     remoteCollectionPhotos: number;
     remoteOwnSleepingPhotos: number;
     remoteKeptExchangePhotos: number;
@@ -3587,6 +3649,7 @@ function AccountRestoreSheet({
           <div style={styles.accountRestoreStats}>
             <span>猫 {summary.remoteCats}</span>
             <span>記録 {summary.remoteRecords}</span>
+            <span>この子の写真 {summary.remoteCatGalleryPhotos}</span>
             <span>写真 {summary.remoteCollectionPhotos}</span>
             <span>とったねがお {summary.remoteOwnSleepingPhotos}</span>
             <span>とどいたねがお {summary.remoteKeptExchangePhotos}</span>

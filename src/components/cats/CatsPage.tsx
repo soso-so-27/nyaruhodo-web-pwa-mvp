@@ -1,11 +1,12 @@
 "use client";
 
-import { useEffect, useLayoutEffect, useMemo, useState } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import type { CSSProperties } from "react";
 import { trackProductEvent } from "../../lib/analytics/productAnalytics";
 import {
   clearAccountCatAvatar,
   deleteAccountCatGalleryPhoto,
+  restoreCatGalleryPhotosFromAccount,
 } from "../../lib/accountSync";
 import { storeAccountPhotoDataUrl } from "../../lib/photoStorageClient";
 import { STORAGE_KEYS } from "../../lib/storage";
@@ -152,6 +153,8 @@ const CATS_SURFACE_SOFT: CSSProperties = {
 };
 const ONBOARDING_ALBUM_COMPLETION_READY_KEY =
   "neteruneko_onboarding_album_completion_ready";
+const CAT_GALLERY_RESTORE_SESSION_KEY =
+  "neteruneko_cat_gallery_restore_checked";
 const SHOW_LEGACY_DETAIL_SECTIONS = false;
 
 export function CatsPage() {
@@ -190,6 +193,7 @@ export function CatsPage() {
   const [saveMessage, setSaveMessage] = useState("");
   const [omoideRefreshTick, setOmoideRefreshTick] = useState(0);
   const [galleryRefreshTick, setGalleryRefreshTick] = useState(0);
+  const isCatGalleryRestoreCheckRunningRef = useRef(false);
   const [activeLens, setActiveLens] = useState<UchinokoLens>("cat");
   const [activeSection, setActiveSection] =
     useState<UchinokoSection>("record");
@@ -419,6 +423,85 @@ export function CatsPage() {
       isCancelled = true;
     };
   }, [catProfiles]);
+
+  useEffect(() => {
+    if (catProfiles.length === 0 || isCatGalleryRestoreCheckRunningRef.current) {
+      return;
+    }
+
+    try {
+      if (window.sessionStorage.getItem(CAT_GALLERY_RESTORE_SESSION_KEY)) {
+        return;
+      }
+    } catch {
+      // Session storage can be unavailable in some embedded browsers.
+    }
+
+    let isCancelled = false;
+
+    async function restoreRemoteCatGalleryIfNeeded() {
+      isCatGalleryRestoreCheckRunningRef.current = true;
+      const localBefore = readCatGalleryPhotos(null).length;
+
+      trackProductEvent(
+        "cat_gallery_restore_started",
+        {
+          route: "/cats",
+          local_count: localBefore,
+          has_session: null,
+        },
+        { localCatId: activeCatId },
+      );
+
+      const result = await restoreCatGalleryPhotosFromAccount();
+
+      if (result.hasSession && result.status !== "error") {
+        try {
+          window.sessionStorage.setItem(
+            CAT_GALLERY_RESTORE_SESSION_KEY,
+            String(Date.now()),
+          );
+        } catch {
+          // Restore should still work even when session storage is unavailable.
+        }
+      }
+
+      const eventName =
+        result.status === "restored"
+          ? "cat_gallery_restore_completed"
+          : result.status === "empty"
+            ? "cat_gallery_remote_empty"
+            : result.status === "error"
+              ? "cat_gallery_restore_failed"
+              : "cat_gallery_local_merged";
+
+      trackProductEvent(
+        eventName,
+        {
+          route: "/cats",
+          local_count: result.localBefore,
+          remote_count: result.remoteCount,
+          restored_count: result.restoredCount,
+          merged_count: Math.max(0, result.localAfter - result.localBefore),
+          has_session: result.hasSession,
+          error_count: result.errors.length,
+        },
+        { localCatId: activeCatId },
+      );
+
+      if (!isCancelled && result.restoredCount > 0) {
+        setGalleryRefreshTick((value) => value + 1);
+      }
+
+      isCatGalleryRestoreCheckRunningRef.current = false;
+    }
+
+    void restoreRemoteCatGalleryIfNeeded();
+
+    return () => {
+      isCancelled = true;
+    };
+  }, [activeCatId, catProfiles.length]);
 
   useEffect(() => {
     if (!isOnboardingCompletionView) {
@@ -1252,7 +1335,7 @@ export function CatsPage() {
           <LensPhotoSection
             title="この子の写真"
             photos={activeCatGalleryLensPhotos}
-            emptyCopy="この子の写真は、まだありません。"
+            emptyCopy="毎日のねがおは別にたまります。ここには「この子の写真を残す」で選んだ写真だけが入ります。"
             onAddPhoto={() => {
               void handleAddCatPhoto();
             }}

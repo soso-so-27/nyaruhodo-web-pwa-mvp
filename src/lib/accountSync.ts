@@ -201,6 +201,16 @@ export type AccountSyncOverview = {
   errors: string[];
 };
 
+export type CatGalleryAccountRestoreResult = {
+  status: "skipped" | "empty" | "restored" | "error";
+  hasSession: boolean;
+  localBefore: number;
+  localAfter: number;
+  remoteCount: number;
+  restoredCount: number;
+  errors: string[];
+};
+
 export type AccountDeleteResult = {
   status: "deleted" | "skipped" | "error";
   errors: string[];
@@ -528,6 +538,107 @@ export async function syncLocalDataWithAccount(options?: {
       status: "error",
       errors: [
         syncError instanceof Error ? syncError.message : "Unknown account sync error",
+      ],
+    };
+  }
+}
+
+export async function restoreCatGalleryPhotosFromAccount(): Promise<CatGalleryAccountRestoreResult> {
+  const localBefore = readCatGalleryPhotos(null).length;
+  const emptyResult: CatGalleryAccountRestoreResult = {
+    status: "skipped",
+    hasSession: false,
+    localBefore,
+    localAfter: localBefore,
+    remoteCount: 0,
+    restoredCount: 0,
+    errors: [],
+  };
+
+  if (typeof window === "undefined") {
+    return emptyResult;
+  }
+
+  const supabase = createBrowserSupabaseClient();
+
+  if (!supabase) {
+    return emptyResult;
+  }
+
+  const { data, error } = await supabase.auth.getUser();
+
+  if (error || !data.user) {
+    return {
+      ...emptyResult,
+      status: error ? "error" : "skipped",
+      hasSession: false,
+      errors: error ? [error.message] : [],
+    };
+  }
+
+  const result = createEmptyResult();
+
+  try {
+    const { data: cats, error: catsError } = await supabase
+      .from("cats")
+      .select("id, local_cat_id")
+      .eq("owner_user_id", data.user.id);
+
+    if (catsError) {
+      throw new Error(`Cat lookup failed: ${catsError.message}`);
+    }
+
+    const remoteIdToLocalId = new Map<string, string>();
+
+    for (const cat of (cats ?? []) as { id: string; local_cat_id: string | null }[]) {
+      if (!cat.id) {
+        continue;
+      }
+
+      remoteIdToLocalId.set(cat.id, cat.local_cat_id ?? `remote-cat-${cat.id}`);
+    }
+
+    const stats = await restoreCatGalleryPhotos(
+      supabase,
+      data.user.id,
+      remoteIdToLocalId,
+      result,
+      { mergeLocal: true },
+    );
+    const localAfter = readCatGalleryPhotos(null).length;
+
+    if (stats.restoredCount > 0) {
+      await saveSyncState(supabase, data.user.id, {
+        last_pull_at: new Date().toISOString(),
+      });
+    }
+
+    return {
+      status:
+        stats.remoteCount === 0
+          ? "empty"
+          : stats.restoredCount > 0
+            ? "restored"
+            : "skipped",
+      hasSession: true,
+      localBefore,
+      localAfter,
+      remoteCount: stats.remoteCount,
+      restoredCount: stats.restoredCount,
+      errors: result.errors,
+    };
+  } catch (restoreError) {
+    return {
+      status: "error",
+      hasSession: true,
+      localBefore,
+      localAfter: readCatGalleryPhotos(null).length,
+      remoteCount: 0,
+      restoredCount: 0,
+      errors: [
+        restoreError instanceof Error
+          ? restoreError.message
+          : "Unknown cat gallery restore error",
       ],
     };
   }
@@ -1737,7 +1848,7 @@ async function restoreCatGalleryPhotos(
   remoteIdToLocalId: Map<string, string>,
   result: AccountSyncResult,
   options: { mergeLocal: boolean },
-) {
+): Promise<{ remoteCount: number; restoredCount: number }> {
   const { data, error } = await supabase
     .from("collection_photos")
     .select("id, cat_id, local_cat_id, local_photo_id, slot_slug, storage_path, captured_at, created_at")
@@ -1749,6 +1860,7 @@ async function restoreCatGalleryPhotos(
     throw new Error(`Cat gallery restore failed: ${error.message}`);
   }
 
+  const remoteCount = data?.length ?? 0;
   const photos: CatGalleryPhoto[] = [];
 
   for (const photo of (data ?? []) as RemoteCollectionPhotoRow[]) {
@@ -1780,13 +1892,17 @@ async function restoreCatGalleryPhotos(
   }
 
   if (photos.length === 0) {
-    return;
+    return { remoteCount, restoredCount: 0 };
   }
 
-  result.restoredCatGalleryPhotos += restoreSyncedCatGalleryPhotos({
+  const restoredCount = restoreSyncedCatGalleryPhotos({
     photos,
     mergeLocal: options.mergeLocal,
   });
+
+  result.restoredCatGalleryPhotos += restoredCount;
+
+  return { remoteCount, restoredCount };
 }
 
 async function restoreCollectionPhotos(

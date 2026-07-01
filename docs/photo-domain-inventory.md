@@ -53,6 +53,18 @@
 - Regular collection display, counts, push, and restore must exclude `__cat_gallery`.
 - Cat gallery restore should read only `__cat_gallery` and write back to `neteruneko_cat_gallery_photos`.
 
+## Account reconnect / restore rule
+
+- `この子の写真` is `catGalleryPhotos`; `ねがお` is `ownSleepingPhotos`.
+- `ねがお` is not automatically copied into `この子の写真`, and it does not consume the 100-photo cat gallery limit.
+- `この子の写真` syncs through `collection_photos.slot_slug="__cat_gallery"`.
+- After Google reconnect, remote `__cat_gallery` rows should be merged back into local `neteruneko_cat_gallery_photos`.
+- If remote `__cat_gallery` is empty, local `catGalleryPhotos` must not be cleared.
+- `/cats` displays local restored `catGalleryPhotos`; remote `__cat_gallery` should be restored first rather than mixed into regular collection display.
+- Empty states should explain that daily `ねがお` is stored separately and that only photos explicitly saved via `この子の写真を残す` appear here.
+- Known account reconnect risk: Safari, PWA, and Instagram in-app browser can have separate browser storage. If `nyaruhodo_supabase_auth` is missing in the current context, the app may look disconnected even if another browser context is still connected.
+- No silent sign-out path should clear account data during cat gallery restore. Explicit logout remains the settings `signOut()` action.
+
 ## 今回のP0対応
 
 - `catGalleryPhotos` を account sync snapshot に追加。
