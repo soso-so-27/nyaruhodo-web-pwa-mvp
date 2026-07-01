@@ -720,7 +720,9 @@ export function CatsPage() {
 
     const targetCatId = activeCatId;
     if (readCatGalleryPhotos(targetCatId).length >= CAT_GALLERY_PHOTO_LIMIT) {
-      setSaveMessage(`この子の写真は${CAT_GALLERY_PHOTO_LIMIT}枚まで保存できます。`);
+      setSaveMessage(
+        `この子の写真は${CAT_GALLERY_PHOTO_LIMIT}枚までです。残したい写真を整理してから追加してください。`,
+      );
       setTimeout(() => setSaveMessage(""), 2400);
       return;
     }
@@ -2145,11 +2147,11 @@ function LensPhotoSection({
             style={styles.lensAddPhotoButton}
             onClick={onAddPhoto}
           >
-            写真を追加
+            写真を残す
           </button>
         </div>
         <p style={styles.lensSectionSub}>
-          ねがおも、なんでもない写真も、この子の記録として残せます。
+          あとから見返したい写真を選んで残せます。ねこだよりには使われません。100枚まで。
         </p>
       </div>
       <LensPhotoGrid
@@ -2689,7 +2691,7 @@ function ThumbnailPickerSheet({
             </div>
           ) : (
             <p style={styles.thumbnailPickerEmpty}>
-              この子の写真を追加すると、ここからも選べます。
+              この子の写真を残すと、ここからも選べます。
             </p>
           )}
         </div>

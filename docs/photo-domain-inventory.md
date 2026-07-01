@@ -8,7 +8,7 @@
 | --- | --- | --- | --- | --- | --- | --- |
 | ねがお | ホームの「ねがおをとる」、オンボーディングの「ねがおを1枚入れる」 | `nyaruhodo_exchange_own_sleeping_photos` / remote `cat_moments` | ホーム、ねこだよりの「おくった」、うちのこ写真、記念、足あと、年まとめ | 対象。`syncSleepingPhotos()` / `restoreSleepingPhotos()` | 寝顔ビューア側に削除/外す導線あり | 対象。明示的に入れた寝顔だけ |
 | とどいた | 夜8時便、オンボーディング即時ねこだより | `nyaruhodo_exchange_kept_photos` / remote `cat_moment_deliveries` | ねこだよりの「とどいた」、うちのこ記録/思い出 | 対象。`syncSleepingPhotos()` / `restoreSleepingPhotos()` | 非表示/通報系の導線あり | 対象外。届いた写真であり、再配布候補ではない |
-| この子の写真 | うちのこ > 写真 > 写真を追加、ホームの「この子の写真を追加」 | `neteruneko_cat_gallery_photos` / remote `collection_photos` with `slot_slug="__cat_gallery"` | うちのこ > 写真、この子/ぜんぶ、代表写真選択 | 対象。`syncCatGalleryPhotos()` / `restoreCatGalleryPhotos()` | 写真ビューアから「この写真を削除」。local/remote `__cat_gallery` row から消す | 対象外。寝顔以外も含むため交換候補にしない |
+| この子の写真 | うちのこ > 写真 > 写真を残す、ホームの「この子の写真を残す」 | `neteruneko_cat_gallery_photos` / remote `collection_photos` with `slot_slug="__cat_gallery"` | うちのこ > 写真、この子/ぜんぶ、代表写真選択 | 対象。`syncCatGalleryPhotos()` / `restoreCatGalleryPhotos()` | 写真ビューアから「この写真を削除」。local/remote `__cat_gallery` row から消す | 対象外。寝顔以外も含むため交換候補にしない |
 | 代表写真 | うちのこ > 基本 > 写真を選ぶ | `catProfiles[].avatarDataUrl` / remote `cats.avatar_storage_path` | うちのこページ上部、猫切り替え、プロフィール表示 | 対象。`syncCatProfile()` / `restoreCatProfiles()` | 「自動表示に戻す」あり。代表写真に使う `catGalleryPhoto` 削除時は自動表示へ戻す | 対象外 |
 | テーマ別アルバム | `/collection` の各テーマ/カテゴリから写真追加 | `collection_photos` / remote `collection_photos` | `/collection` 側のテーマ別写真 | 対象。`syncCollectionPhotos()` / `restoreCollectionPhotos()` | 対象。写真詳細/スロット側から削除 | 対象外 |
 
@@ -26,9 +26,20 @@
 - `この子の写真` は canvas 再エンコード後、Storage用 display を長辺2560px / JPEG quality 0.88 で作る。
 - `この子の写真` は localStorage にbase64を残さないため、Storage参照を作れた場合だけ保存する。
 - `catGalleryPhotos` のlocalStorageには `photoId`, `catId`, `createdAt`, `storage:` 参照だけを残す。
-- `catGalleryPhotos` は公開初期の肥大化を避けるため、1匹あたり50枚まで保存する。
+- `catGalleryPhotos` は公開初期の肥大化を避けるため、1匹あたり100枚まで保存する。
 - `ownSleepingPhotos` はStorage参照を優先する。ただし匿名/未同期の既存フローでは、交換体験維持のため圧縮済みdata URL fallbackが残る可能性がある。
 - `avatarDataUrl` はStorage参照を優先し、代表写真の直接アップロードではStorage参照を作れた場合だけ反映する。
+
+## この子の写真の運用方針
+
+- `この子の写真` は写真の原本保管アプリではなく、あとから見返したい猫の写真を選んで残す場所。
+- 一括追加、自動バックアップ、無制限保存はしない。1枚ずつ選んで残す。
+- 現時点では、猫ごとに100枚まで保存できる。
+- 原本ではなく、スマホで見返しやすい表示サイズに整えてStorageへ保存する。
+- `この子の写真` は `ねこだより` には使わない。
+- 通常collectionとは分離し、`slot_slug="__cat_gallery"` を内部予約slotとして扱う。
+- 将来的なプラン案: 無料/ベータは100枚/猫、有料では300枚以上/猫を検討する。
+- 将来的な価値案: とっておき写真、年まとめ、グッズ作成、カレンダー/カード/小さな本などの物販導線を検討する。
 
 ## Internal reserved collection slot
 

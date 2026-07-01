@@ -550,7 +550,7 @@ export function HomeDeskModel({
                         }}
                         onClick={onAddCatPhoto}
                       >
-                        この子の写真を追加
+                        この子の写真を残す
                       </button>
                     ) : null}
                   </div>
@@ -581,10 +581,10 @@ export function HomeDeskModel({
                       style={deskStyles.homeAddCatPhotoLink}
                       onClick={onAddCatPhoto}
                     >
-                      この子の写真を追加
+                      この子の写真を残す
                     </button>
                     <span style={deskStyles.homeAddCatPhotoNote}>
-                      この写真は、この子の記録にだけ残ります。ねこだよりには使われません。
+                      この子を見返すための写真を残せます。ねこだよりには使われません。100枚まで。
                     </span>
                   </div>
                 ) : null}

@@ -10,7 +10,7 @@ export type CatGalleryPhoto = {
 
 export const CAT_GALLERY_PHOTOS_UPDATED_EVENT =
   "neteruneko_cat_gallery_photos_updated";
-export const CAT_GALLERY_PHOTO_LIMIT = 50;
+export const CAT_GALLERY_PHOTO_LIMIT = 100;
 
 export function readCatGalleryPhotos(activeCatId: string | null = null) {
   const photos = readStorageArray<CatGalleryPhoto>(STORAGE_KEYS.catGalleryPhotos)
