@@ -23,6 +23,7 @@ import {
   type CatYearSummary,
 } from "../../lib/cats/yearSummary";
 import {
+  CAT_GALLERY_PHOTO_LIMIT,
   deleteCatGalleryPhoto,
   readCatGalleryPhotos,
   saveCatGalleryPhoto,
@@ -695,9 +696,16 @@ export function CatsPage() {
           pathSegments: [targetCatId, "avatar"],
           fileName: "avatar",
         });
+        if (!isStoragePhotoReference(photoSrc)) {
+          setSaveMessage("代表写真を保存できませんでした。");
+          setTimeout(() => setSaveMessage(""), 2400);
+          return;
+        }
         updateActiveCatThumbnail(photoSrc);
         setIsThumbnailPickerOpen(false);
       } catch {
+        setSaveMessage("代表写真を保存できませんでした。");
+        setTimeout(() => setSaveMessage(""), 2400);
         return;
       }
     };
@@ -711,6 +719,12 @@ export function CatsPage() {
     }
 
     const targetCatId = activeCatId;
+    if (readCatGalleryPhotos(targetCatId).length >= CAT_GALLERY_PHOTO_LIMIT) {
+      setSaveMessage(`この子の写真は${CAT_GALLERY_PHOTO_LIMIT}枚まで保存できます。`);
+      setTimeout(() => setSaveMessage(""), 2400);
+      return;
+    }
+
     const input = document.createElement("input");
 
     input.type = "file";
@@ -724,12 +738,17 @@ export function CatsPage() {
 
       try {
         assertSupportedSourceImage(file);
-        const dataUrl = await resizeAndEncode(file, 1400);
+        const dataUrl = await resizeAndEncode(file, 2560, 0.88);
         const photoSrc = await storeAccountPhotoDataUrl({
           dataUrl,
           pathSegments: [targetCatId, "photos"],
           fileName: `photo-${Date.now()}`,
         });
+        if (!isStoragePhotoReference(photoSrc)) {
+          setSaveMessage("写真を追加できませんでした。");
+          setTimeout(() => setSaveMessage(""), 2400);
+          return;
+        }
         const savedPhoto = saveCatGalleryPhoto({
           catId: targetCatId,
           src: photoSrc,
@@ -3118,6 +3137,10 @@ function toRecordPhotoPreview(photo: LensPhoto): RecordPhotoPreview {
   };
 }
 
+function isStoragePhotoReference(src: string | null | undefined) {
+  return Boolean(src?.startsWith("storage:") || src?.startsWith("storage://"));
+}
+
 function getLensPhotoCountForCat(
   catId: string,
   photosByCat: Record<string, LensPhoto[]>,
@@ -3820,7 +3843,7 @@ function getCoatLabel(coat: string): string {
   return labels[coat] ?? coat;
 }
 
-function resizeAndEncode(file: File, maxSize = 800): Promise<string> {
+function resizeAndEncode(file: File, maxSize = 800, quality = 0.85): Promise<string> {
   return new Promise((resolve) => {
     const img = new Image();
     const url = URL.createObjectURL(file);
@@ -3842,7 +3865,7 @@ function resizeAndEncode(file: File, maxSize = 800): Promise<string> {
 
       context.drawImage(img, 0, 0, canvas.width, canvas.height);
       URL.revokeObjectURL(url);
-      resolve(canvas.toDataURL("image/jpeg", 0.85));
+      resolve(canvas.toDataURL("image/jpeg", quality));
     };
 
     img.src = url;

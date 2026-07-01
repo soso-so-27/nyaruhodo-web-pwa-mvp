@@ -7,7 +7,11 @@ import {
   syncLocalDataWithAccount,
 } from "../../lib/accountSync";
 import { trackProductEvent } from "../../lib/analytics/productAnalytics";
-import { saveCatGalleryPhoto } from "../../lib/cats/catGalleryPhotos";
+import {
+  CAT_GALLERY_PHOTO_LIMIT,
+  readCatGalleryPhotos,
+  saveCatGalleryPhoto,
+} from "../../lib/cats/catGalleryPhotos";
 import { writeAuthDebugEvent } from "../../lib/authDebug";
 import {
   storeAccountPhotoDataUrl,
@@ -1350,6 +1354,10 @@ export function HomeInput({
     if (!activeCatId) return;
 
     const targetCatId = activeCatId;
+    if (readCatGalleryPhotos(targetCatId).length >= CAT_GALLERY_PHOTO_LIMIT) {
+      showToast(`この子の写真は${CAT_GALLERY_PHOTO_LIMIT}枚まで保存できます。`);
+      return;
+    }
 
     trackProductEvent(
       "cat_gallery_add_entry_click",
@@ -1370,12 +1378,18 @@ export function HomeInput({
       if (!file) return;
 
       try {
-        const dataUrl = await resizeAndEncode(file, 1400);
+        const dataUrl = await resizeAndEncode(file, 2560, 0.88);
         const photoSrc = await storeAccountPhotoDataUrl({
           dataUrl,
           pathSegments: [targetCatId, "photos"],
           fileName: `photo-${Date.now()}`,
         });
+
+        if (!isStoragePhotoReference(photoSrc)) {
+          showToast(PHOTO_SAVE_FAILURE_MESSAGE);
+          return;
+        }
+
         const savedPhoto = saveCatGalleryPhoto({
           catId: targetCatId,
           src: photoSrc,
@@ -5047,13 +5061,13 @@ async function createStoredPhotoVariantSet({
   fileName: string;
 }) {
   const [thumbnailDataUrl, displayDataUrl] = await Promise.all([
-    resizeAndEncode(file, 400, 0.7, "image/webp"),
-    resizeAndEncode(file, 1200, 0.8, "image/webp"),
+    resizeAndEncode(file, 512, 0.72, "image/webp"),
+    resizeAndEncode(file, 2048, 0.84, "image/webp"),
   ]);
   const exchangeDataUrl =
     displayDataUrl.length <= 1_900_000
       ? displayDataUrl
-      : await resizeAndEncode(file, 900, 0.76, "image/webp");
+      : await resizeAndEncode(file, 1200, 0.8, "image/webp");
   const storedDisplaySrc = await storeAccountPhotoDataUrl({
     dataUrl: displayDataUrl,
     pathSegments: [...pathSegments, "display"],

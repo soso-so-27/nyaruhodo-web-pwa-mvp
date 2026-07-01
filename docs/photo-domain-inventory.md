@@ -19,6 +19,17 @@
 - `代表写真` は見出し用の写真。写真そのものの置き場ではなく、プロフィール表示の設定。
 - `テーマ別アルバム` は `/collection` のカテゴリ別写真。`この子の写真` とは今は統合しない。
 
+## 画質 / localStorage 方針
+
+- ねてるねこは原本保管アプリではない。元File/BlobやEXIFつき原本は保存しない。
+- `ねがお` は canvas 再エンコード後、Storage用 display を長辺2048px / WebP quality 0.84、thumbnail を長辺512px / WebP quality 0.72 で作る。
+- `この子の写真` は canvas 再エンコード後、Storage用 display を長辺2560px / JPEG quality 0.88 で作る。
+- `この子の写真` は localStorage にbase64を残さないため、Storage参照を作れた場合だけ保存する。
+- `catGalleryPhotos` のlocalStorageには `photoId`, `catId`, `createdAt`, `storage:` 参照だけを残す。
+- `catGalleryPhotos` は公開初期の肥大化を避けるため、1匹あたり50枚まで保存する。
+- `ownSleepingPhotos` はStorage参照を優先する。ただし匿名/未同期の既存フローでは、交換体験維持のため圧縮済みdata URL fallbackが残る可能性がある。
+- `avatarDataUrl` はStorage参照を優先し、代表写真の直接アップロードではStorage参照を作れた場合だけ反映する。
+
 ## Internal reserved collection slot
 
 - `slot_slug="__cat_gallery"` is reserved for syncing `catGalleryPhotos`.
@@ -40,5 +51,7 @@
 - Done: `うちのこ > 写真` の詳細ビューから「この写真を削除」を追加。
 - Done: 代表写真に使われている `catGalleryPhoto` を削除した場合、自動表示へ戻す。
 - P1: storage上の実ファイル削除方針を決める。公開前はlocal/remote rowの削除優先でよい。
+- P1: 匿名/未同期の `ownSleepingPhotos` data URL fallback を完全にStorage参照へ寄せるか検討する。
+- P1: 既存端末に残るlegacy `avatarDataUrl` / accountSync snapshot内のdata URLをStorage参照へ移行する方針を決める。
 - P1: `/collection` は「テーマ別アルバム」、`うちのこ > 写真` は「この子の写真」としてUI文言を継続的に分ける。
 - P2: 将来的に `cat_gallery_photos` 専用テーブルを作るか検討する。現時点ではDB再設計しない。

@@ -10,6 +10,7 @@ export type CatGalleryPhoto = {
 
 export const CAT_GALLERY_PHOTOS_UPDATED_EVENT =
   "neteruneko_cat_gallery_photos_updated";
+export const CAT_GALLERY_PHOTO_LIMIT = 50;
 
 export function readCatGalleryPhotos(activeCatId: string | null = null) {
   const photos = readStorageArray<CatGalleryPhoto>(STORAGE_KEYS.catGalleryPhotos)
@@ -45,7 +46,15 @@ export function saveCatGalleryPhoto({
 
   try {
     const saved = readCatGalleryPhotos(null);
-    writeStorageArray(STORAGE_KEYS.catGalleryPhotos, [photo, ...saved].slice(0, 120));
+    const savedForCat = saved.filter((savedPhoto) => savedPhoto.catId === catId);
+    if (savedForCat.length >= CAT_GALLERY_PHOTO_LIMIT) {
+      return null;
+    }
+
+    writeStorageArray(
+      STORAGE_KEYS.catGalleryPhotos,
+      limitCatGalleryPhotosPerCat([photo, ...saved]),
+    );
     dispatchCatGalleryPhotosUpdated();
     return photo;
   } catch {
@@ -98,9 +107,7 @@ export function restoreSyncedCatGalleryPhotos({
     photoMap.set(normalized.id, normalized);
   }
 
-  const nextPhotos = [...photoMap.values()]
-    .sort((left, right) => right.createdAt - left.createdAt)
-    .slice(0, 120);
+  const nextPhotos = limitCatGalleryPhotosPerCat([...photoMap.values()]);
 
   writeStorageArray(STORAGE_KEYS.catGalleryPhotos, nextPhotos);
   dispatchCatGalleryPhotosUpdated();
@@ -128,6 +135,22 @@ function isValidCatGalleryPhoto(
       typeof photo.createdAt === "number" &&
       Number.isFinite(photo.createdAt),
   );
+}
+
+function limitCatGalleryPhotosPerCat(photos: CatGalleryPhoto[]) {
+  const countByCatId = new Map<string, number>();
+
+  return photos
+    .sort((left, right) => right.createdAt - left.createdAt)
+    .filter((photo) => {
+      const count = countByCatId.get(photo.catId) ?? 0;
+      if (count >= CAT_GALLERY_PHOTO_LIMIT) {
+        return false;
+      }
+
+      countByCatId.set(photo.catId, count + 1);
+      return true;
+    });
 }
 
 function createCatGalleryPhotoId(createdAt: number) {
