@@ -1452,7 +1452,7 @@ export function CatsPage() {
                 </div>
 
                 <section style={styles.catManageFormSection}>
-                  <p style={styles.catManageFormTitle}>名前</p>
+                  <p style={styles.catManageFormTitle}>この子のこと</p>
                   <AppTextField
                     id="cat-manage-name"
                     type="text"
@@ -1461,10 +1461,6 @@ export function CatsPage() {
                     onChange={(event) => setCatNameInput(event.target.value)}
                     placeholder="例：むぎ"
                   />
-                </section>
-
-                <section style={styles.catManageFormSection}>
-                  <p style={styles.catManageFormTitle}>日付</p>
                   <div style={styles.catManageDateGrid}>
                     <AppTextField
                       type="date"
@@ -1486,7 +1482,7 @@ export function CatsPage() {
                 </section>
 
                 <section style={styles.catManageFormSection}>
-                  <p style={styles.catManageFormTitle}>からだの情報</p>
+                  <p style={styles.catManageFormTitle}>見た目・からだ</p>
                   <AppSegmented<EditableGender>
                     value={editGender}
                     ariaLabel="性別"
@@ -1512,7 +1508,7 @@ export function CatsPage() {
                 </section>
 
                 <section style={styles.catManageFormSection}>
-                  <p style={styles.catManageFormTitle}>呼び名・この子らしさ</p>
+                  <p style={styles.catManageFormTitle}>この子らしさ</p>
                   <AppTextField
                     type="text"
                     label="よく呼ぶ名前"
@@ -2180,7 +2176,6 @@ function CatBasicProfilePanel({
               style={styles.basicPhotoButton}
               onClick={onOpenThumbnailPicker}
             >
-              <CameraSmallIcon />
               <span>写真を選ぶ</span>
             </button>
           </div>
@@ -3834,34 +3829,6 @@ function PencilSmallIcon() {
         stroke="currentColor"
         strokeWidth="1.75"
         strokeLinecap="round"
-      />
-    </svg>
-  );
-}
-
-function CameraSmallIcon() {
-  return (
-    <svg
-      viewBox="0 0 24 24"
-      width="19"
-      height="19"
-      fill="none"
-      aria-hidden="true"
-      style={{ display: "block" }}
-    >
-      <path
-        d="M7.5 8.4 8.8 6.6h6.4l1.3 1.8h1.7c1 0 1.8.8 1.8 1.8v6.1c0 1-.8 1.8-1.8 1.8H5.8c-1 0-1.8-.8-1.8-1.8v-6.1c0-1 .8-1.8 1.8-1.8h1.7Z"
-        stroke="currentColor"
-        strokeWidth="1.65"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
-      <circle
-        cx="12"
-        cy="13.2"
-        r="2.65"
-        stroke="currentColor"
-        strokeWidth="1.65"
       />
     </svg>
   );
