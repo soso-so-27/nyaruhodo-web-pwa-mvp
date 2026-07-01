@@ -1583,6 +1583,35 @@ function RecordOverview({
         </section>
       ) : null}
 
+      <section style={styles.recordBlock} aria-labelledby="cats-milestones-heading">
+        <h2 id="cats-milestones-heading" style={styles.recordBlockTitle}>
+          <span style={styles.recordBlockTitleMark} aria-hidden="true" />
+          記念
+        </h2>
+        <div style={styles.milestoneRail}>
+          {celebrationItems.map((item) => (
+            <div key={item.key} style={styles.milestoneItem}>
+              <span
+                style={{
+                  ...styles.milestoneDot,
+                  ...getCelebrationToneStyle(item.tone),
+                }}
+                aria-hidden="true"
+              >
+                <span
+                  style={{
+                    ...styles.milestoneDotInner,
+                    ...getCelebrationToneInnerStyle(item.tone),
+                  }}
+                />
+              </span>
+              <span style={styles.milestoneLabel}>{item.label}</span>
+              <span style={styles.milestoneStatus}>{item.status}</span>
+            </div>
+          ))}
+        </div>
+      </section>
+
       <section style={styles.recordBlock} aria-labelledby="cats-recent-heading">
         <h2 id="cats-recent-heading" style={styles.recordBlockTitle}>
           <span style={styles.recordBlockTitleMark} aria-hidden="true" />
@@ -1632,35 +1661,6 @@ function RecordOverview({
         ) : (
           <p style={styles.recordEmptyText}>最近の記録はまだありません。</p>
         )}
-      </section>
-
-      <section style={styles.recordBlock} aria-labelledby="cats-milestones-heading">
-        <h2 id="cats-milestones-heading" style={styles.recordBlockTitle}>
-          <span style={styles.recordBlockTitleMark} aria-hidden="true" />
-          記念
-        </h2>
-        <div style={styles.milestoneRail}>
-          {celebrationItems.map((item) => (
-            <div key={item.key} style={styles.milestoneItem}>
-              <span
-                style={{
-                  ...styles.milestoneDot,
-                  ...getCelebrationToneStyle(item.tone),
-                }}
-                aria-hidden="true"
-              >
-                <span
-                  style={{
-                    ...styles.milestoneDotInner,
-                    ...getCelebrationToneInnerStyle(item.tone),
-                  }}
-                />
-              </span>
-              <span style={styles.milestoneLabel}>{item.label}</span>
-              <span style={styles.milestoneStatus}>{item.status}</span>
-            </div>
-          ))}
-        </div>
       </section>
 
       <section style={styles.recordBlock} aria-labelledby="cats-archive-heading">
