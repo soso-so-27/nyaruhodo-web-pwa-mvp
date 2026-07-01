@@ -53,6 +53,27 @@ export function saveCatGalleryPhoto({
   }
 }
 
+export function deleteCatGalleryPhoto(photoId: string) {
+  if (!photoId) {
+    return null;
+  }
+
+  const saved = readCatGalleryPhotos(null);
+  const target = saved.find((photo) => photo.id === photoId) ?? null;
+
+  if (!target) {
+    return null;
+  }
+
+  writeStorageArray(
+    STORAGE_KEYS.catGalleryPhotos,
+    saved.filter((photo) => photo.id !== photoId),
+  );
+  dispatchCatGalleryPhotosUpdated();
+
+  return target;
+}
+
 export function restoreSyncedCatGalleryPhotos({
   photos,
   mergeLocal,

@@ -621,6 +621,63 @@ export async function deleteAccountCollectionPhoto(localPhotoId: string) {
   }
 }
 
+export async function deleteAccountCatGalleryPhoto(localPhotoId: string) {
+  if (typeof window === "undefined") {
+    return;
+  }
+
+  const supabase = createBrowserSupabaseClient();
+
+  if (!supabase) {
+    return;
+  }
+
+  const { data, error: authError } = await supabase.auth.getUser();
+
+  if (authError || !data.user) {
+    return;
+  }
+
+  const { error } = await supabase
+    .from("collection_photos")
+    .delete()
+    .eq("user_id", data.user.id)
+    .eq("local_photo_id", localPhotoId)
+    .eq("slot_slug", CAT_GALLERY_COLLECTION_SLOT);
+
+  if (error) {
+    throw new Error(`Cat gallery photo delete failed: ${error.message}`);
+  }
+}
+
+export async function clearAccountCatAvatar(localCatId: string) {
+  if (typeof window === "undefined") {
+    return;
+  }
+
+  const supabase = createBrowserSupabaseClient();
+
+  if (!supabase) {
+    return;
+  }
+
+  const { data, error: authError } = await supabase.auth.getUser();
+
+  if (authError || !data.user) {
+    return;
+  }
+
+  const { error } = await supabase
+    .from("cats")
+    .update({ avatar_storage_path: null })
+    .eq("owner_user_id", data.user.id)
+    .eq("local_cat_id", localCatId);
+
+  if (error) {
+    throw new Error(`Cat avatar clear failed: ${error.message}`);
+  }
+}
+
 export async function deleteAccountStoredData(): Promise<AccountDeleteResult> {
   if (typeof window === "undefined") {
     return { status: "skipped", errors: [] };

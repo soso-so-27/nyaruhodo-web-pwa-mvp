@@ -3,6 +3,10 @@
 import { useEffect, useLayoutEffect, useMemo, useState } from "react";
 import type { CSSProperties } from "react";
 import { trackProductEvent } from "../../lib/analytics/productAnalytics";
+import {
+  clearAccountCatAvatar,
+  deleteAccountCatGalleryPhoto,
+} from "../../lib/accountSync";
 import { storeAccountPhotoDataUrl } from "../../lib/photoStorageClient";
 import { STORAGE_KEYS } from "../../lib/storage";
 import {
@@ -19,6 +23,7 @@ import {
   type CatYearSummary,
 } from "../../lib/cats/yearSummary";
 import {
+  deleteCatGalleryPhoto,
   readCatGalleryPhotos,
   saveCatGalleryPhoto,
   type CatGalleryPhoto,
@@ -108,9 +113,12 @@ type RemoteCatSaveResult =
 type PhotoSheetLens = "cat" | "all";
 type YearSummaryDetailKind = "photos" | "pickups" | "milestones";
 type RecordPhotoPreview = {
+  id?: string;
   src: string;
   title: string;
   timestamp: number;
+  kind?: LensPhoto["kind"];
+  catIds?: string[];
 };
 
 const CATS_TEXT = "var(--ink)";
@@ -191,6 +199,9 @@ export function CatsPage() {
     useState<OmoideMemory | null>(null);
   const [selectedRecordPhoto, setSelectedRecordPhoto] =
     useState<RecordPhotoPreview | null>(null);
+  const [deleteGalleryPhotoTarget, setDeleteGalleryPhotoTarget] =
+    useState<RecordPhotoPreview | null>(null);
+  const [isDeletingGalleryPhoto, setIsDeletingGalleryPhoto] = useState(false);
   const [selectedYearSummary, setSelectedYearSummary] =
     useState<CatYearSummary | null>(null);
 
@@ -652,6 +663,13 @@ export function CatsPage() {
     setTimeout(() => setSaveMessage(""), 2000);
   }
 
+  function isGalleryPhotoAvatar(photo: RecordPhotoPreview) {
+    return catProfiles.some(
+      (profile) =>
+        photo.catIds?.includes(profile.id) && profile.avatarDataUrl === photo.src,
+    );
+  }
+
   async function handleAvatarUpload() {
     if (!activeCatId) {
       return;
@@ -726,6 +744,15 @@ export function CatsPage() {
         setGalleryRefreshTick((value) => value + 1);
         setActiveSection("photos");
         setActiveLens("cat");
+        trackProductEvent(
+          "cat_gallery_photo_added",
+          {
+            route: "/cats",
+            source: "cats_photos_tab",
+            cat_id: targetCatId,
+          },
+          { localCatId: targetCatId },
+        );
         setSaveMessage("写真を追加しました。");
         setTimeout(() => setSaveMessage(""), 2000);
       } catch {
@@ -735,6 +762,98 @@ export function CatsPage() {
     };
 
     input.click();
+  }
+
+  function requestDeleteGalleryPhoto(photo: RecordPhotoPreview) {
+    if (photo.kind !== "photo" || !photo.id) {
+      return;
+    }
+
+    setDeleteGalleryPhotoTarget(photo);
+  }
+
+  function cancelDeleteGalleryPhoto() {
+    if (isDeletingGalleryPhoto) {
+      return;
+    }
+
+    if (deleteGalleryPhotoTarget) {
+      trackProductEvent(
+        "cat_gallery_photo_delete_cancelled",
+        {
+          route: "/cats",
+          source: "photo_viewer",
+          cat_id: deleteGalleryPhotoTarget.catIds?.[0] ?? null,
+          is_avatar_photo: isGalleryPhotoAvatar(deleteGalleryPhotoTarget),
+        },
+        { localCatId: deleteGalleryPhotoTarget.catIds?.[0] ?? activeCatId },
+      );
+    }
+    setDeleteGalleryPhotoTarget(null);
+  }
+
+  async function confirmDeleteGalleryPhoto() {
+    const target = deleteGalleryPhotoTarget;
+
+    if (!target?.id || isDeletingGalleryPhoto) {
+      return;
+    }
+
+    const targetCatId = target.catIds?.[0] ?? activeCatId;
+    const wasAvatarPhoto = isGalleryPhotoAvatar(target);
+
+    setIsDeletingGalleryPhoto(true);
+
+    try {
+      if (wasAvatarPhoto && targetCatId) {
+        await clearAccountCatAvatar(targetCatId);
+      }
+
+      await deleteAccountCatGalleryPhoto(target.id);
+
+      if (wasAvatarPhoto) {
+        const nextProfiles = catProfiles.map((profile) =>
+          profile.avatarDataUrl === target.src
+            ? {
+                ...profile,
+                avatarDataUrl: undefined,
+                updatedAt: new Date().toISOString(),
+              }
+            : profile,
+        );
+
+        saveCatProfiles(nextProfiles);
+        setCatProfiles(nextProfiles);
+      }
+
+      const deletedPhoto = deleteCatGalleryPhoto(target.id);
+
+      if (!deletedPhoto) {
+        setDeleteGalleryPhotoTarget(null);
+        return;
+      }
+
+      setGalleryRefreshTick((value) => value + 1);
+      setSelectedRecordPhoto(null);
+      setDeleteGalleryPhotoTarget(null);
+      trackProductEvent(
+        "cat_gallery_photo_deleted",
+        {
+          route: "/cats",
+          source: "photo_viewer",
+          cat_id: targetCatId ?? null,
+          is_avatar_photo: wasAvatarPhoto,
+        },
+        { localCatId: targetCatId ?? activeCatId },
+      );
+      setSaveMessage("この子の写真から削除しました。");
+      setTimeout(() => setSaveMessage(""), 2200);
+    } catch {
+      setSaveMessage("写真を削除できませんでした。もう一度お試しください。");
+      setTimeout(() => setSaveMessage(""), 2600);
+    } finally {
+      setIsDeletingGalleryPhoto(false);
+    }
   }
 
   function startDeleteCat(profile: CatProfile) {
@@ -1095,7 +1214,7 @@ export function CatsPage() {
               style={styles.recordPanel}
             >
               <p style={styles.bunbakoSectionTitle}>記録</p>
-              <p style={styles.sectionLead}>ねがおと思い出から、自動でたまります。</p>
+              <p style={styles.sectionLead}>写真と思い出から、自動でたまります。</p>
               <AppCard as="div" variant="inset" padding="sm" style={styles.recordList}>
                 <div style={styles.recordRow}>
                   <span style={styles.recordLabel}>
@@ -1439,8 +1558,52 @@ export function CatsPage() {
       {selectedRecordPhoto ? (
         <PhotoFullscreenViewer
           photo={selectedRecordPhoto}
+          canDelete={selectedRecordPhoto.kind === "photo"}
+          onRequestDelete={() => requestDeleteGalleryPhoto(selectedRecordPhoto)}
           onClose={() => setSelectedRecordPhoto(null)}
         />
+      ) : null}
+      {deleteGalleryPhotoTarget ? (
+        <AppBottomSheet
+          title="この写真を削除"
+          onClose={cancelDeleteGalleryPhoto}
+        >
+          <div style={styles.deleteCatConfirm}>
+            <p style={styles.deleteCatConfirmTitle}>
+              この子の写真から削除します。
+            </p>
+            <p style={styles.deleteCatConfirmText}>
+              ねこだよりや、ほかの人に届いた写真には影響しません。
+            </p>
+            {isGalleryPhotoAvatar(deleteGalleryPhotoTarget) ? (
+              <p style={styles.deleteCatConfirmText}>
+                この写真は代表写真にも使われています。削除すると、代表写真は自動表示に戻ります。
+              </p>
+            ) : null}
+            <div style={styles.deleteCatConfirmActions}>
+              <AppButton
+                type="button"
+                variant="danger"
+                fullWidth
+                onClick={() => {
+                  void confirmDeleteGalleryPhoto();
+                }}
+                disabled={isDeletingGalleryPhoto}
+              >
+                {isDeletingGalleryPhoto ? "削除しています..." : "この写真を削除"}
+              </AppButton>
+              <AppButton
+                type="button"
+                variant="quiet"
+                fullWidth
+                onClick={cancelDeleteGalleryPhoto}
+                disabled={isDeletingGalleryPhoto}
+              >
+                やめる
+              </AppButton>
+            </div>
+          </div>
+        </AppBottomSheet>
       ) : null}
       {isThumbnailPickerOpen && activeCatProfile ? (
         <ThumbnailPickerSheet
@@ -2149,7 +2312,7 @@ function PhotoListSheet({
       <div style={styles.photoListSheet}>
         <p style={styles.photoListCount}>{photos.length}枚</p>
         {photos.length === 0 ? (
-          <p style={styles.lensPhotoEmpty}>まだ ねがおはありません。</p>
+          <p style={styles.lensPhotoEmpty}>まだ写真はありません。</p>
         ) : (
           <div style={styles.photoListGrid}>
             {photos.map((photo) => (
@@ -2224,7 +2387,7 @@ function YearSummarySheet({
         <div style={styles.yearSummaryStats}>
           <YearSummaryStatButton
             value={summary.photoCount}
-            label="ねがお"
+            label="写真"
             active={activeDetail === "photos"}
             disabled={yearPhotos.length === 0}
             onClick={() => setActiveDetail("photos")}
@@ -2323,8 +2486,8 @@ function YearSummaryDetailList({
 }) {
   if (kind === "photos") {
     return (
-      <section style={styles.yearSummaryDetail} aria-label="この年のねがお">
-        <p style={styles.yearSummaryDetailTitle}>この年のねがお</p>
+      <section style={styles.yearSummaryDetail} aria-label="この年の写真">
+        <p style={styles.yearSummaryDetailTitle}>この年の写真</p>
         <div style={styles.yearSummaryPhotoGrid}>
           {photos.map((photo) => (
             <button
@@ -2332,7 +2495,7 @@ function YearSummaryDetailList({
               type="button"
               style={styles.yearSummaryPhotoButton}
               onClick={() => onOpenPhoto(toRecordPhotoPreview(photo))}
-              aria-label={`${formatLensPhotoDate(photo.createdAt)}のねがおを開く`}
+              aria-label={`${formatLensPhotoDate(photo.createdAt)}の写真を開く`}
             >
               <StoredPhotoImage
                 src={photo.src}
@@ -2507,7 +2670,7 @@ function ThumbnailPickerSheet({
             </div>
           ) : (
             <p style={styles.thumbnailPickerEmpty}>
-              ねがおを撮ると、ここからも選べます。
+              この子の写真を追加すると、ここからも選べます。
             </p>
           )}
         </div>
@@ -2659,9 +2822,13 @@ function OmoideMemorySheet({
 
 function PhotoFullscreenViewer({
   photo,
+  canDelete = false,
+  onRequestDelete,
   onClose,
 }: {
   photo: RecordPhotoPreview;
+  canDelete?: boolean;
+  onRequestDelete?: () => void;
   onClose: () => void;
 }) {
   return (
@@ -2692,6 +2859,15 @@ function PhotoFullscreenViewer({
           <p style={styles.photoViewerTitle}>{photo.title}</p>
           <p style={styles.photoViewerDate}>{formatFootprintDate(photo.timestamp)}</p>
         </div>
+        {canDelete && onRequestDelete ? (
+          <button
+            type="button"
+            style={styles.photoViewerDeleteButton}
+            onClick={onRequestDelete}
+          >
+            この写真を削除
+          </button>
+        ) : null}
       </div>
     </div>
   );
@@ -2933,9 +3109,12 @@ function formatLensPhotoDate(timestamp: number) {
 
 function toRecordPhotoPreview(photo: LensPhoto): RecordPhotoPreview {
   return {
+    id: photo.id,
     src: photo.src,
     title: photo.kind === "sleeping" ? "ねがお" : "写真",
     timestamp: photo.createdAt,
+    kind: photo.kind,
+    catIds: photo.catIds,
   };
 }
 
@@ -4638,6 +4817,19 @@ const styles = {
     fontSize: "12px",
     fontWeight: 400,
     lineHeight: 1.5,
+  },
+  photoViewerDeleteButton: {
+    justifySelf: "start",
+    border: "none",
+    background: "transparent",
+    color: "color-mix(in srgb, var(--danger) 72%, var(--paper))",
+    fontFamily: CATS_UI,
+    fontSize: "12px",
+    fontWeight: 500,
+    lineHeight: 1.5,
+    padding: "4px",
+    cursor: "pointer",
+    WebkitTapHighlightColor: "transparent",
   },
   recordPhotoSheet: {
     display: "grid",

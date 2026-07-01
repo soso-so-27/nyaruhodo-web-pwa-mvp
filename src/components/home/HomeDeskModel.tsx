@@ -63,6 +63,7 @@ type HomeDeskModelProps = {
   showSleepingCounter: boolean;
   now: number;
   onTakePhoto: () => void;
+  onAddCatPhoto?: () => void;
   onOpenDelivery: (state: Extract<EveningHomeState, { kind: "delivered" }>) => void;
   onKeepOpenedDelivery: (dateKey: string, photo: ExchangePhoto) => void;
   onReportOpenedDelivery: (
@@ -248,6 +249,7 @@ export function HomeDeskModel({
   sleepingCounter,
   now,
   onTakePhoto,
+  onAddCatPhoto,
   onOpenDelivery,
   onKeepOpenedDelivery,
   onReportOpenedDelivery,
@@ -525,15 +527,26 @@ export function HomeDeskModel({
                   </span>
                 </button>
                 {shouldShowHomeFrameTakeButton ? (
-                  <button
-                    type="button"
-                    style={deskStyles.homeAddPhotoButton}
-                    onClick={onTakePhoto}
-                    aria-label="ねがおを とる"
-                  >
-                    <AppIcon name="camera" size={15} />
-                    <span>ねがおを とる</span>
-                  </button>
+                  <div style={deskStyles.homePhotoActions}>
+                    <button
+                      type="button"
+                      style={deskStyles.homeAddPhotoButton}
+                      onClick={onTakePhoto}
+                      aria-label="ねがおを とる"
+                    >
+                      <AppIcon name="camera" size={15} />
+                      <span>ねがおを とる</span>
+                    </button>
+                    {onAddCatPhoto ? (
+                      <button
+                        type="button"
+                        style={deskStyles.homeAddCatPhotoLink}
+                        onClick={onAddCatPhoto}
+                      >
+                        この子の写真を追加
+                      </button>
+                    ) : null}
+                  </div>
                 ) : null}
               </div>
             ) : (
@@ -554,6 +567,20 @@ export function HomeDeskModel({
                   <AppIcon name="camera" size={16} />
                   ねがおを とる
                 </button>
+                {onAddCatPhoto ? (
+                  <div style={deskStyles.homeAddCatPhotoBlock}>
+                    <button
+                      type="button"
+                      style={deskStyles.homeAddCatPhotoLink}
+                      onClick={onAddCatPhoto}
+                    >
+                      この子の写真を追加
+                    </button>
+                    <span style={deskStyles.homeAddCatPhotoNote}>
+                      この写真は、この子の記録にだけ残ります。ねこだよりには使われません。
+                    </span>
+                  </div>
+                ) : null}
               </div>
             )}
           </div>
@@ -2301,6 +2328,16 @@ const deskStyles = {
     cursor: "pointer",
     WebkitTapHighlightColor: "transparent",
   },
+  homePhotoActions: {
+    position: "absolute",
+    right: "clamp(8px, 3%, 12px)",
+    bottom: "clamp(8px, 3%, 12px)",
+    zIndex: 2,
+    display: "grid",
+    justifyItems: "end",
+    gap: "6px",
+    maxWidth: "calc(100% - 16px)",
+  },
   homeFrameShell: {
     position: "relative",
     display: "grid",
@@ -2340,12 +2377,8 @@ const deskStyles = {
     boxShadow: "var(--home-frame-hairline)",
   },
   homeAddPhotoButton: {
-    position: "absolute",
-    right: "clamp(8px, 3%, 12px)",
-    bottom: "clamp(8px, 3%, 12px)",
-    zIndex: 2,
     minHeight: "36px",
-    maxWidth: "calc(100% - 16px)",
+    maxWidth: "100%",
     display: "inline-flex",
     alignItems: "center",
     justifyContent: "center",
@@ -2438,6 +2471,42 @@ const deskStyles = {
     WebkitTapHighlightColor: "transparent",
     transition:
       "transform 140ms var(--ease-gentle), box-shadow 140ms var(--ease-gentle), background var(--home-daylight-transition, 1800ms) var(--ease-gentle)",
+  },
+  homeAddCatPhotoBlock: {
+    position: "relative",
+    zIndex: 1,
+    display: "grid",
+    justifyItems: "center",
+    gap: "6px",
+    maxWidth: "260px",
+    marginTop: "-8px",
+  },
+  homeAddCatPhotoLink: {
+    appearance: "none",
+    WebkitAppearance: "none",
+    border: "none",
+    background: "transparent",
+    color: "color-mix(in srgb, var(--ink-soft) 78%, var(--home-wax, #c2745a))",
+    fontFamily: "var(--font-ui)",
+    fontSize: "12px",
+    fontWeight: 500,
+    lineHeight: 1.6,
+    letterSpacing: "var(--tracking-body)",
+    padding: "2px 4px",
+    textDecoration: "underline",
+    textDecorationColor: "color-mix(in srgb, var(--ink-soft) 24%, transparent)",
+    textUnderlineOffset: "4px",
+    cursor: "pointer",
+    WebkitTapHighlightColor: "transparent",
+  },
+  homeAddCatPhotoNote: {
+    color: "color-mix(in srgb, var(--ink-soft) 68%, transparent)",
+    fontFamily: "var(--font-ui)",
+    fontSize: "11px",
+    fontWeight: 400,
+    lineHeight: 1.7,
+    letterSpacing: "var(--tracking-body)",
+    textAlign: "center",
   },
   sleepingCatPlaceholder: {
     position: "relative",

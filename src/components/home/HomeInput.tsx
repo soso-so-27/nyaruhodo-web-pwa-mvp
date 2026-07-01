@@ -7,6 +7,7 @@ import {
   syncLocalDataWithAccount,
 } from "../../lib/accountSync";
 import { trackProductEvent } from "../../lib/analytics/productAnalytics";
+import { saveCatGalleryPhoto } from "../../lib/cats/catGalleryPhotos";
 import { writeAuthDebugEvent } from "../../lib/authDebug";
 import {
   storeAccountPhotoDataUrl,
@@ -1345,6 +1346,64 @@ export function HomeInput({
     input.click();
   }
 
+  async function handleCatGalleryPhotoAdd() {
+    if (!activeCatId) return;
+
+    const targetCatId = activeCatId;
+
+    trackProductEvent(
+      "cat_gallery_add_entry_click",
+      {
+        route: "/home",
+        source: "home_sub_cta",
+        cat_id: targetCatId,
+      },
+      { localCatId: targetCatId },
+    );
+
+    const input = document.createElement("input");
+    input.type = "file";
+    input.accept = "image/*";
+
+    input.onchange = async () => {
+      const file = input.files?.[0];
+      if (!file) return;
+
+      try {
+        const dataUrl = await resizeAndEncode(file, 1400);
+        const photoSrc = await storeAccountPhotoDataUrl({
+          dataUrl,
+          pathSegments: [targetCatId, "photos"],
+          fileName: `photo-${Date.now()}`,
+        });
+        const savedPhoto = saveCatGalleryPhoto({
+          catId: targetCatId,
+          src: photoSrc,
+        });
+
+        if (!savedPhoto) {
+          showToast(PHOTO_SAVE_FAILURE_MESSAGE);
+          return;
+        }
+
+        trackProductEvent(
+          "cat_gallery_photo_added",
+          {
+            route: "/home",
+            source: "home_sub_cta",
+            cat_id: targetCatId,
+          },
+          { localCatId: targetCatId },
+        );
+        showToast("この子の写真に追加しました");
+      } catch {
+        showToast(PHOTO_SAVE_FAILURE_MESSAGE);
+      }
+    };
+
+    input.click();
+  }
+
   async function handleCollectionPhotoAdd(slot: CollectionSlot) {
     if (!activeCatId || isCollectionPhotoAdding) return;
 
@@ -2072,6 +2131,13 @@ export function HomeInput({
               }
               now={homeNow}
               onTakePhoto={() => handleSleepingPhotoStart("camera")}
+              onAddCatPhoto={
+                activeCatId
+                  ? () => {
+                      void handleCatGalleryPhotoAdd();
+                    }
+                  : undefined
+              }
               onOpenDelivery={handleOpenEveningDelivery}
               onKeepOpenedDelivery={handleKeepEveningDelivery}
               onReportOpenedDelivery={handleReportEveningDelivery}
