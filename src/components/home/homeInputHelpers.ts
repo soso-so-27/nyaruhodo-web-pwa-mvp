@@ -63,6 +63,23 @@ export type CatBasicInfo = {
   birthDate?: string;
   gender?: "male" | "female" | "unknown";
   breed?: string;
+  personality?: CatPersonalityInfo;
+  care?: CatCareInfo;
+};
+
+export type CatPersonalityInfo = {
+  callName?: string;
+  favoritePlace?: string;
+  favoritePlay?: string;
+  favoriteTouch?: string;
+  dislikes?: string;
+};
+
+export type CatCareInfo = {
+  weightKg?: number;
+  weightMeasuredDate?: string;
+  vetClinic?: string;
+  careNote?: string;
 };
 
 export type CatTraitMemo = {
@@ -992,13 +1009,67 @@ function normalizeCatBasicInfo(
     birthDate: basicInfo.birthDate || undefined,
     gender,
     breed: basicInfo.breed || undefined,
+    personality: normalizeCatPersonalityInfo(basicInfo.personality),
+    care: normalizeCatCareInfo(basicInfo.care),
   };
 
   return nextBasicInfo.familySinceDate ||
     nextBasicInfo.birthDate ||
     nextBasicInfo.gender ||
-    nextBasicInfo.breed
+    nextBasicInfo.breed ||
+    nextBasicInfo.personality ||
+    nextBasicInfo.care
     ? nextBasicInfo
+    : undefined;
+}
+
+function normalizeCatPersonalityInfo(
+  personality: Partial<CatPersonalityInfo> | undefined,
+): CatPersonalityInfo | undefined {
+  if (!personality) {
+    return undefined;
+  }
+
+  const nextPersonality: CatPersonalityInfo = {
+    callName: personality.callName || undefined,
+    favoritePlace: personality.favoritePlace || undefined,
+    favoritePlay: personality.favoritePlay || undefined,
+    favoriteTouch: personality.favoriteTouch || undefined,
+    dislikes: personality.dislikes || undefined,
+  };
+
+  return nextPersonality.callName ||
+    nextPersonality.favoritePlace ||
+    nextPersonality.favoritePlay ||
+    nextPersonality.favoriteTouch ||
+    nextPersonality.dislikes
+    ? nextPersonality
+    : undefined;
+}
+
+function normalizeCatCareInfo(
+  care: Partial<CatCareInfo> | undefined,
+): CatCareInfo | undefined {
+  if (!care) {
+    return undefined;
+  }
+
+  const weightKg =
+    typeof care.weightKg === "number" && Number.isFinite(care.weightKg)
+      ? care.weightKg
+      : undefined;
+  const nextCare: CatCareInfo = {
+    weightKg,
+    weightMeasuredDate: care.weightMeasuredDate || undefined,
+    vetClinic: care.vetClinic || undefined,
+    careNote: care.careNote || undefined,
+  };
+
+  return nextCare.weightKg ||
+    nextCare.weightMeasuredDate ||
+    nextCare.vetClinic ||
+    nextCare.careNote
+    ? nextCare
     : undefined;
 }
 

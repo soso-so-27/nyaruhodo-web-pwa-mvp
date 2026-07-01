@@ -83,6 +83,12 @@
 
 目的: この子を見るときの基本的な文脈を作る。
 
+保存先:
+
+- `catProfiles[].basicInfo`
+- remote syncでは `cats.basic_info` JSON に含める
+- DBカラムは追加しない
+
 将来の返し方:
 
 - `今日は家族になって3年と278日`
@@ -97,7 +103,7 @@
 
 ## C. 呼び名・この子らしさ
 
-粘着性を高める本命ブロック。今回は実装しない。
+粘着性を高める本命ブロック。P1として最小項目を実装済み。
 
 候補:
 
@@ -118,6 +124,14 @@
 - 飼い主が「この子はこういう子」と思っていることを残す
 - アプリが後からこの子らしい文脈として返せる材料にする
 
+保存先:
+
+- `basicInfo.personality.callName`
+- `basicInfo.personality.favoritePlace`
+- `basicInfo.personality.favoritePlay`
+- `basicInfo.personality.favoriteTouch`
+- `basicInfo.personality.dislikes`
+
 将来の返し方:
 
 - `むぎって呼ぶと、耳だけ動く日があります`
@@ -133,13 +147,20 @@ UIでは研究名や専門用語を出しすぎず、猫あるあるとして自
 
 目的: 健康管理アプリにするためではなく、飼い主がこの子を見返すための最低限のケアメモ。
 
+保存先:
+
+- `basicInfo.care.weightKg`
+- `basicInfo.care.weightMeasuredDate`
+- `basicInfo.care.vetClinic`
+- `basicInfo.care.careNote`
+
 見せ方:
 
 - `健康管理` ではなく `ケア情報` または `ケアのメモ`
 - アプリが医学的な判断をしない
 - 獣医師に相談する前提の控えにする
 
-P1候補:
+P1として実装済み:
 
 - 体重
 - 最後に測った日
@@ -191,9 +212,9 @@ P2候補:
 
 ### P1
 
-基本タブ内に `呼び名・この子らしさ` を追加検討。
+基本タブ内に `呼び名・この子らしさ` を最小追加済み。
 
-候補:
+実装済み:
 
 - よく呼ぶ名前
 - 好きな場所
@@ -201,9 +222,9 @@ P2候補:
 - なでられると好きなところ
 - 苦手なこと
 
-ケア情報の最小追加検討。
+ケア情報の最小追加済み。
 
-候補:
+実装済み:
 
 - 体重
 - 最後に測った日

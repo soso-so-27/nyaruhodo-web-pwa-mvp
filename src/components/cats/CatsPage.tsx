@@ -177,6 +177,15 @@ export function CatsPage() {
   const [editGender, setEditGender] = useState<EditableGender>("");
   const [editBreed, setEditBreed] = useState("");
   const [editCoat, setEditCoat] = useState<EditableCoat>("");
+  const [editCallName, setEditCallName] = useState("");
+  const [editFavoritePlace, setEditFavoritePlace] = useState("");
+  const [editFavoritePlay, setEditFavoritePlay] = useState("");
+  const [editFavoriteTouch, setEditFavoriteTouch] = useState("");
+  const [editDislikes, setEditDislikes] = useState("");
+  const [editWeightKg, setEditWeightKg] = useState("");
+  const [editWeightMeasuredDate, setEditWeightMeasuredDate] = useState("");
+  const [editVetClinic, setEditVetClinic] = useState("");
+  const [editCareNote, setEditCareNote] = useState("");
   const [message, setMessage] = useState("");
   const [saveMessage, setSaveMessage] = useState("");
   const [omoideRefreshTick, setOmoideRefreshTick] = useState(0);
@@ -525,6 +534,25 @@ export function CatsPage() {
     setEditGender(activeCatProfile?.basicInfo?.gender ?? "");
     setEditBreed(activeCatProfile?.basicInfo?.breed ?? "");
     setEditCoat(activeCatProfile?.appearance?.coat ?? "");
+    setEditCallName(activeCatProfile?.basicInfo?.personality?.callName ?? "");
+    setEditFavoritePlace(
+      activeCatProfile?.basicInfo?.personality?.favoritePlace ?? "",
+    );
+    setEditFavoritePlay(
+      activeCatProfile?.basicInfo?.personality?.favoritePlay ?? "",
+    );
+    setEditFavoriteTouch(
+      activeCatProfile?.basicInfo?.personality?.favoriteTouch ?? "",
+    );
+    setEditDislikes(activeCatProfile?.basicInfo?.personality?.dislikes ?? "");
+    setEditWeightKg(
+      formatEditableWeight(activeCatProfile?.basicInfo?.care?.weightKg),
+    );
+    setEditWeightMeasuredDate(
+      activeCatProfile?.basicInfo?.care?.weightMeasuredDate ?? "",
+    );
+    setEditVetClinic(activeCatProfile?.basicInfo?.care?.vetClinic ?? "");
+    setEditCareNote(activeCatProfile?.basicInfo?.care?.careNote ?? "");
     setMessage("");
     setSaveMessage("");
     setIsAddingCat(false);
@@ -567,6 +595,25 @@ export function CatsPage() {
         return;
       }
 
+      const parsedWeightKg = parseEditableWeightKg(editWeightKg);
+      if (parsedWeightKg === "invalid") {
+        setSaveMessage("体重は0.5〜20kgの範囲で入力してください。");
+        return;
+      }
+
+      const nextPersonality = buildCatPersonalityInfo({
+        callName: editCallName,
+        favoritePlace: editFavoritePlace,
+        favoritePlay: editFavoritePlay,
+        favoriteTouch: editFavoriteTouch,
+        dislikes: editDislikes,
+      });
+      const nextCare = buildCatCareInfo({
+        weightKg: parsedWeightKg,
+        weightMeasuredDate: editWeightMeasuredDate,
+        vetClinic: editVetClinic,
+        careNote: editCareNote,
+      });
       const nextProfile = {
         ...profiles[index],
         name: catNameInput.trim() || profiles[index].name,
@@ -575,6 +622,8 @@ export function CatsPage() {
           birthDate: editBirthDate || undefined,
           gender: editGender || undefined,
           breed: editBreed.trim() || undefined,
+          personality: nextPersonality,
+          care: nextCare,
         },
         appearance: {
           ...(profiles[index].appearance ?? {}),
@@ -1462,6 +1511,93 @@ export function CatsPage() {
                   />
                 </section>
 
+                <section style={styles.catManageFormSection}>
+                  <p style={styles.catManageFormTitle}>呼び名・この子らしさ</p>
+                  <AppTextField
+                    type="text"
+                    label="よく呼ぶ名前"
+                    value={editCallName}
+                    maxLength={50}
+                    onChange={(event) => setEditCallName(event.target.value)}
+                    placeholder="例：むぎちゃん"
+                  />
+                  <AppTextField
+                    as="textarea"
+                    label="好きな場所"
+                    value={editFavoritePlace}
+                    maxLength={120}
+                    onChange={(event) => setEditFavoritePlace(event.target.value)}
+                    placeholder="例：ソファの右端"
+                  />
+                  <AppTextField
+                    as="textarea"
+                    label="好きな遊び"
+                    value={editFavoritePlay}
+                    maxLength={120}
+                    onChange={(event) => setEditFavoritePlay(event.target.value)}
+                    placeholder="例：ひも、追いかけっこ"
+                  />
+                  <AppTextField
+                    as="textarea"
+                    label="なでられると好きなところ"
+                    value={editFavoriteTouch}
+                    maxLength={120}
+                    onChange={(event) => setEditFavoriteTouch(event.target.value)}
+                    placeholder="例：あごの下"
+                  />
+                  <AppTextField
+                    as="textarea"
+                    label="苦手なこと"
+                    value={editDislikes}
+                    maxLength={120}
+                    onChange={(event) => setEditDislikes(event.target.value)}
+                    placeholder="例：掃除機、大きな音"
+                  />
+                </section>
+
+                <section style={styles.catManageFormSection}>
+                  <p style={styles.catManageFormTitle}>ケアのメモ</p>
+                  <div style={styles.catManageDateGrid}>
+                    <AppTextField
+                      type="number"
+                      label="体重"
+                      value={editWeightKg}
+                      min="0.5"
+                      max="20"
+                      step="0.1"
+                      inputMode="decimal"
+                      onChange={(event) => setEditWeightKg(event.target.value)}
+                      placeholder="例：4.8"
+                      hint="kg"
+                    />
+                    <AppTextField
+                      type="date"
+                      label="最後に測った日"
+                      value={editWeightMeasuredDate}
+                      onChange={(event) =>
+                        setEditWeightMeasuredDate(event.target.value)
+                      }
+                      max={new Date().toISOString().split("T")[0]}
+                    />
+                  </div>
+                  <AppTextField
+                    type="text"
+                    label="かかりつけ"
+                    value={editVetClinic}
+                    maxLength={80}
+                    onChange={(event) => setEditVetClinic(event.target.value)}
+                    placeholder="例：○○動物病院"
+                  />
+                  <AppTextField
+                    as="textarea"
+                    label="気をつけること"
+                    value={editCareNote}
+                    maxLength={180}
+                    onChange={(event) => setEditCareNote(event.target.value)}
+                    placeholder="例：爪切りが苦手"
+                  />
+                </section>
+
                 <div style={styles.catManageEditorActions}>
                   <AppButton
                     type="button"
@@ -2089,7 +2225,57 @@ function BasicInfoTable({
         : "",
     },
   ];
-  const registeredCount = rows.filter((row) => row.value).length;
+  const personalityRows = [
+    {
+      label: "よく呼ぶ名前",
+      value: profile.basicInfo?.personality?.callName,
+    },
+    {
+      label: "好きな場所",
+      value: profile.basicInfo?.personality?.favoritePlace,
+    },
+    {
+      label: "好きな遊び",
+      value: profile.basicInfo?.personality?.favoritePlay,
+    },
+    {
+      label: "なでられると好きなところ",
+      value: profile.basicInfo?.personality?.favoriteTouch,
+    },
+    {
+      label: "苦手なこと",
+      value: profile.basicInfo?.personality?.dislikes,
+    },
+  ];
+  const careRows = [
+    {
+      label: "体重",
+      value: formatCareWeight(
+        profile.basicInfo?.care?.weightKg,
+        profile.basicInfo?.care?.weightMeasuredDate,
+      ),
+    },
+    {
+      label: "最後に測った日",
+      value: profile.basicInfo?.care?.weightKg
+        ? ""
+        : formatBasicInfoDate(profile.basicInfo?.care?.weightMeasuredDate),
+      countable: false,
+    },
+    {
+      label: "かかりつけ",
+      value: profile.basicInfo?.care?.vetClinic,
+    },
+    {
+      label: "気をつけること",
+      value: profile.basicInfo?.care?.careNote,
+    },
+  ];
+  const registeredCount = countKnownCatInfo({
+    basicRows: rows,
+    personalityRows,
+    careRows,
+  });
 
   return (
     <div style={styles.basicInfoBlock}>
@@ -2128,12 +2314,60 @@ function BasicInfoTable({
           </div>
         ))}
       </div>
+      <BasicInfoSubsection
+        title="呼び名・この子らしさ"
+        rows={personalityRows}
+        emptyCopy="まだありません"
+      />
+      <BasicInfoSubsection
+        title="ケアのメモ"
+        rows={careRows}
+        emptyCopy="まだありません"
+      />
       {onManage ? (
         <button type="button" style={styles.basicInfoManageButton} onClick={onManage}>
           猫を追加・管理
         </button>
       ) : null}
     </div>
+  );
+}
+
+function BasicInfoSubsection({
+  title,
+  rows,
+  emptyCopy,
+}: {
+  title: string;
+  rows: Array<{ label: string; value?: string }>;
+  emptyCopy: string;
+}) {
+  const hasAnyValue = rows.some((row) => row.value);
+
+  return (
+    <section style={styles.basicInfoSubsection}>
+      <p style={styles.basicInfoSubsectionTitle}>{title}</p>
+      {hasAnyValue ? (
+        <div style={styles.basicInfoTable}>
+          {rows.map((row) => (
+            <div key={row.label} style={styles.basicInfoRow}>
+              <span style={styles.basicInfoLabel}>{row.label}</span>
+              <span
+                style={
+                  row.value
+                    ? { ...styles.basicInfoValue, ...styles.basicInfoLongValue }
+                    : { ...styles.basicInfoValue, ...styles.basicInfoMissing }
+                }
+              >
+                {row.value || "未登録"}
+              </span>
+            </div>
+          ))}
+        </div>
+      ) : (
+        <p style={styles.basicInfoSubsectionEmpty}>{emptyCopy}</p>
+      )}
+    </section>
   );
 }
 
@@ -2955,6 +3189,109 @@ function formatBasicInfoDate(value?: string) {
     2,
     "0",
   )}/${String(date.getDate()).padStart(2, "0")}`;
+}
+
+function formatCareWeight(weightKg?: number, measuredDate?: string) {
+  if (!weightKg) {
+    return "";
+  }
+
+  const weightCopy = `${formatEditableWeight(weightKg)}kg`;
+  const measuredDateCopy = formatBasicInfoDate(measuredDate);
+
+  return measuredDateCopy ? `${weightCopy} / ${measuredDateCopy}` : weightCopy;
+}
+
+function formatEditableWeight(weightKg?: number) {
+  if (!weightKg || !Number.isFinite(weightKg)) {
+    return "";
+  }
+
+  return Number.isInteger(weightKg) ? String(weightKg) : weightKg.toFixed(1);
+}
+
+function parseEditableWeightKg(value: string): number | "invalid" | undefined {
+  const trimmed = value.trim();
+
+  if (!trimmed) {
+    return undefined;
+  }
+
+  const parsed = Number(trimmed.replace(",", "."));
+
+  if (!Number.isFinite(parsed) || parsed < 0.5 || parsed > 20) {
+    return "invalid";
+  }
+
+  return Math.round(parsed * 10) / 10;
+}
+
+function buildCatPersonalityInfo(input: {
+  callName: string;
+  favoritePlace: string;
+  favoritePlay: string;
+  favoriteTouch: string;
+  dislikes: string;
+}) {
+  const personality = {
+    callName: trimToMax(input.callName, 50),
+    favoritePlace: trimToMax(input.favoritePlace, 120),
+    favoritePlay: trimToMax(input.favoritePlay, 120),
+    favoriteTouch: trimToMax(input.favoriteTouch, 120),
+    dislikes: trimToMax(input.dislikes, 120),
+  };
+
+  return personality.callName ||
+    personality.favoritePlace ||
+    personality.favoritePlay ||
+    personality.favoriteTouch ||
+    personality.dislikes
+    ? personality
+    : undefined;
+}
+
+function buildCatCareInfo(input: {
+  weightKg: number | undefined;
+  weightMeasuredDate: string;
+  vetClinic: string;
+  careNote: string;
+}) {
+  const care = {
+    weightKg: input.weightKg,
+    weightMeasuredDate: input.weightMeasuredDate || undefined,
+    vetClinic: trimToMax(input.vetClinic, 80),
+    careNote: trimToMax(input.careNote, 180),
+  };
+
+  return care.weightKg ||
+    care.weightMeasuredDate ||
+    care.vetClinic ||
+    care.careNote
+    ? care
+    : undefined;
+}
+
+function trimToMax(value: string, maxLength: number) {
+  const trimmed = value.trim();
+  return trimmed ? trimmed.slice(0, maxLength) : undefined;
+}
+
+function countKnownCatInfo({
+  basicRows,
+  personalityRows,
+  careRows,
+}: {
+  basicRows: Array<{ value?: string }>;
+  personalityRows: Array<{ value?: string }>;
+  careRows: Array<{ value?: string; countable?: boolean }>;
+}) {
+  return [...basicRows, ...personalityRows, ...careRows].filter((row) => {
+    if ("countable" in row && row.countable === false) {
+      return false;
+    }
+
+    return row.value;
+  }).length;
 }
 
 function createLocalLensPhotos(catProfiles: CatProfile[]): {
@@ -5225,6 +5562,33 @@ const styles = {
     overflow: "hidden",
     background: "color-mix(in srgb, var(--paper) 34%, transparent)",
   },
+  basicInfoSubsection: {
+    display: "grid",
+    gap: "8px",
+    paddingTop: "4px",
+  },
+  basicInfoSubsectionTitle: {
+    margin: 0,
+    color: CATS_MUTED,
+    fontFamily: CATS_SERIF,
+    fontSize: CATS_BODY_SIZE,
+    fontWeight: 400,
+    lineHeight: 1.4,
+    letterSpacing: CATS_BODY_TRACKING,
+  },
+  basicInfoSubsectionEmpty: {
+    margin: 0,
+    padding: "11px 12px",
+    borderRadius: "var(--radius-lg)",
+    border: "1px solid color-mix(in srgb, var(--line-strong) 52%, transparent)",
+    background: "color-mix(in srgb, var(--paper) 25%, transparent)",
+    color: CATS_FAINT,
+    fontFamily: CATS_SERIF,
+    fontSize: CATS_META_SIZE,
+    fontWeight: 400,
+    lineHeight: 1.45,
+    letterSpacing: CATS_META_TRACKING,
+  },
   basicInfoRow: {
     display: "grid",
     gridTemplateColumns: "92px minmax(0, 1fr)",
@@ -5610,6 +5974,12 @@ const styles = {
     overflow: "hidden",
     textOverflow: "ellipsis",
     whiteSpace: "nowrap",
+  },
+  basicInfoLongValue: {
+    overflow: "visible",
+    textOverflow: "clip",
+    whiteSpace: "normal",
+    padding: "9px 0",
   },
   yearSummarySheet: {
     display: "grid",
