@@ -79,7 +79,7 @@ export function createCatFootprintEntries({
     .map((memory) => ({
       id: `pickup-${memory.id}`,
       type: "pickup" as const,
-      title: "ピックアップを見た",
+      title: "思い出を見た",
       timestamp: memory.openedAt ?? memory.deliveredAt,
       src: memory.photo.thumbnailSrc ?? memory.photo.displaySrc ?? memory.photo.src,
       memory,

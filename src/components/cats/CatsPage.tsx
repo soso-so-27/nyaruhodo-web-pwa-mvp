@@ -1544,7 +1544,7 @@ function RecordOverview({
         >
           <h2 id="cats-pickup-heading" style={styles.recordBlockTitle}>
             <span style={styles.recordBlockTitleMark} aria-hidden="true" />
-            ピックアップ
+            今日の1件
           </h2>
           <button
             type="button"
@@ -2226,7 +2226,7 @@ function YearSummarySheet({
           />
           <YearSummaryStatButton
             value={summary.pickupCount}
-            label="ピックアップ"
+            label="思い出"
             active={activeDetail === "pickups"}
             disabled={yearMemories.length === 0}
             onClick={() => setActiveDetail("pickups")}
@@ -2343,8 +2343,8 @@ function YearSummaryDetailList({
 
   if (kind === "pickups") {
     return (
-      <section style={styles.yearSummaryDetail} aria-label="この年のピックアップ">
-        <p style={styles.yearSummaryDetailTitle}>この年のピックアップ</p>
+      <section style={styles.yearSummaryDetail} aria-label="この年の思い出">
+        <p style={styles.yearSummaryDetailTitle}>この年の思い出</p>
         <div style={styles.yearSummaryRows}>
           {memories.map((memory) => (
             <button
@@ -2357,7 +2357,7 @@ function YearSummaryDetailList({
                     memory.photo.displaySrc ??
                     memory.photo.thumbnailSrc ??
                     memory.photo.src,
-                  title: memory.title || "ピックアップ",
+                  title: memory.title || "思い出",
                   timestamp: memory.openedAt ?? memory.deliveredAt,
                 })
               }

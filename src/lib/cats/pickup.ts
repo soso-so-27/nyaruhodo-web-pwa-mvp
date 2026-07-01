@@ -187,7 +187,7 @@ function createMemoryCandidate({
     id: `memory-${memory.id}`,
     type: "memory",
     sourceId: memory.sourcePhotoId,
-    title: "ピックアップ",
+    title: "思い出",
     body: getMemoryPickupBody(memory),
     actionLabel: "見る",
     score: 82 + getLookbackBonus(memory.lookback),
