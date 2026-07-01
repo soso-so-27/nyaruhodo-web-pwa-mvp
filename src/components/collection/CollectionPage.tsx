@@ -1458,7 +1458,7 @@ function MainichiPhotoBoard({
     source?: MainichiMorphSource | null,
   ) => void;
 }) {
-  const months = useMemo(
+  const contentMonths = useMemo(
     () =>
       buildMainichiBoardMonths(
         dayGroups,
@@ -1468,7 +1468,11 @@ function MainichiPhotoBoard({
       ),
     [activeSide, catProfiles, dayGroups, firstEveningDeliveryTargetDateKey],
   );
-  const alternateMonths = useMemo(
+  const months = useMemo(
+    () => includeCurrentMainichiMonth(contentMonths),
+    [contentMonths],
+  );
+  const alternateContentMonths = useMemo(
     () =>
       buildMainichiBoardMonths(
         dayGroups,
@@ -1508,15 +1512,15 @@ function MainichiPhotoBoard({
     if (
       hasAutoSelectedBoardSideRef.current ||
       hasUserSelectedBoardSideRef.current ||
-      months.length > 0 ||
-      alternateMonths.length === 0
+      contentMonths.length > 0 ||
+      alternateContentMonths.length === 0
     ) {
       return;
     }
 
     hasAutoSelectedBoardSideRef.current = true;
     onSideChange(activeSide === "sent" ? "delivered" : "sent");
-  }, [activeSide, alternateMonths.length, months.length, onSideChange]);
+  }, [activeSide, alternateContentMonths.length, contentMonths.length, onSideChange]);
 
   useEffect(() => {
     if (months.length === 0) {
@@ -1533,7 +1537,7 @@ function MainichiPhotoBoard({
 
   const selectedMonth =
     months.find((month) => month.key === selectedMonthKey) ?? months[0] ?? null;
-  const hasAnyBoardMonths = months.length > 0 || alternateMonths.length > 0;
+  const hasAnyBoardMonths = months.length > 0;
   const shouldUseNavEntryMotion =
     playNavEntryMotion &&
     Boolean(selectedMonth) &&
@@ -1604,7 +1608,7 @@ function MainichiPhotoBoard({
       ) : null}
       <MotionConfig reducedMotion="user">
         <AnimatePresence mode="wait" initial={shouldUseNavEntryMotion}>
-          {selectedMonth ? (
+          {selectedMonth && selectedMonth.photos.length > 0 ? (
             <motion.div
               key={`${activeSide}-${selectedMonth.key}`}
               style={styles.mainichiMonthList}
@@ -3797,6 +3801,23 @@ function buildMainichiBoardMonths(
       photos: [...monthPhotos].sort((a, b) => b.timestamp - a.timestamp),
     }))
     .sort((a, b) => b.key.localeCompare(a.key));
+}
+
+function includeCurrentMainichiMonth(months: MainichiBoardMonth[]) {
+  const currentMonthKey = getMainichiMonthKey(getJstDateKey());
+
+  if (months.some((month) => month.key === currentMonthKey)) {
+    return months;
+  }
+
+  return [
+    {
+      key: currentMonthKey,
+      label: formatMainichiMonthLabel(currentMonthKey),
+      photos: [],
+    },
+    ...months,
+  ].sort((a, b) => b.key.localeCompare(a.key));
 }
 
 function createMainichiBoardPhoto(
