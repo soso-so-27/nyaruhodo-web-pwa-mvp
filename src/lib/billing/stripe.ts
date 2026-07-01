@@ -125,6 +125,9 @@ export async function createStripeCheckoutSession({
   body.set("client_reference_id", userId);
   body.set("metadata[user_id]", userId);
   body.set("subscription_data[metadata][user_id]", userId);
+  body.set("automatic_tax[enabled]", "true");
+  body.set("billing_address_collection", "required");
+  body.set("customer_update[address]", "auto");
   body.set("success_url", successUrl);
   body.set("cancel_url", cancelUrl);
 
