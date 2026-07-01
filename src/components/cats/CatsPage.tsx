@@ -1403,23 +1403,6 @@ export function CatsPage() {
           </div>
         </AppBottomSheet>
       ) : null}
-      {selectedOmoideMemory ? (
-        <OmoideMemorySheet
-          memory={selectedOmoideMemory}
-          onClose={() => setSelectedOmoideMemory(null)}
-          onHideDate={() => {
-            hideOmoideDate(selectedOmoideMemory.sourceDateKey);
-            setOmoideRefreshTick((value) => value + 1);
-            setSelectedOmoideMemory(null);
-          }}
-        />
-      ) : null}
-      {selectedRecordPhoto ? (
-        <PhotoFullscreenViewer
-          photo={selectedRecordPhoto}
-          onClose={() => setSelectedRecordPhoto(null)}
-        />
-      ) : null}
       {photoSheetLens ? (
         <PhotoListSheet
           title={photoSheetTitle}
@@ -1436,14 +1419,26 @@ export function CatsPage() {
           memories={omoideMemories}
           milestones={sleepingMilestones}
           onOpenPhoto={(photo) => {
-            setSelectedYearSummary(null);
             setSelectedRecordPhoto(photo);
           }}
-          onOpenMemory={(memory) => {
-            setSelectedYearSummary(null);
-            setSelectedOmoideMemory(memory);
-          }}
           onClose={() => setSelectedYearSummary(null)}
+        />
+      ) : null}
+      {selectedOmoideMemory ? (
+        <OmoideMemorySheet
+          memory={selectedOmoideMemory}
+          onClose={() => setSelectedOmoideMemory(null)}
+          onHideDate={() => {
+            hideOmoideDate(selectedOmoideMemory.sourceDateKey);
+            setOmoideRefreshTick((value) => value + 1);
+            setSelectedOmoideMemory(null);
+          }}
+        />
+      ) : null}
+      {selectedRecordPhoto ? (
+        <PhotoFullscreenViewer
+          photo={selectedRecordPhoto}
+          onClose={() => setSelectedRecordPhoto(null)}
         />
       ) : null}
       {isThumbnailPickerOpen && activeCatProfile ? (
@@ -2187,7 +2182,6 @@ function YearSummarySheet({
   memories,
   milestones,
   onOpenPhoto,
-  onOpenMemory,
   onClose,
 }: {
   summary: CatYearSummary;
@@ -2195,7 +2189,6 @@ function YearSummarySheet({
   memories: OmoideMemory[];
   milestones: CatSleepingMilestone[];
   onOpenPhoto: (photo: RecordPhotoPreview) => void;
-  onOpenMemory: (memory: OmoideMemory) => void;
   onClose: () => void;
 }) {
   const [activeDetail, setActiveDetail] =
@@ -2253,7 +2246,6 @@ function YearSummarySheet({
             memories={yearMemories}
             milestones={yearMilestones}
             onOpenPhoto={onOpenPhoto}
-            onOpenMemory={onOpenMemory}
           />
         ) : null}
         <div style={styles.yearSummaryBlock}>
@@ -2317,14 +2309,12 @@ function YearSummaryDetailList({
   memories,
   milestones,
   onOpenPhoto,
-  onOpenMemory,
 }: {
   kind: YearSummaryDetailKind;
   photos: LensPhoto[];
   memories: OmoideMemory[];
   milestones: CatSleepingMilestone[];
   onOpenPhoto: (photo: RecordPhotoPreview) => void;
-  onOpenMemory: (memory: OmoideMemory) => void;
 }) {
   if (kind === "photos") {
     return (
@@ -2361,7 +2351,16 @@ function YearSummaryDetailList({
               key={memory.id}
               type="button"
               style={styles.yearSummaryRow}
-              onClick={() => onOpenMemory(memory)}
+              onClick={() =>
+                onOpenPhoto({
+                  src:
+                    memory.photo.displaySrc ??
+                    memory.photo.thumbnailSrc ??
+                    memory.photo.src,
+                  title: memory.title || "ピックアップ",
+                  timestamp: memory.openedAt ?? memory.deliveredAt,
+                })
+              }
             >
               <span style={styles.yearSummaryRowThumb}>
                 <StoredPhotoImage
