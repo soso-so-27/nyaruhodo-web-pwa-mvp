@@ -17,6 +17,7 @@ type AppSegmentedProps<T extends string> = {
   ariaLabel: string;
   columns?: number;
   style?: CSSProperties;
+  selectedStyle?: CSSProperties;
 };
 
 export function AppSegmented<T extends string>({
@@ -26,6 +27,7 @@ export function AppSegmented<T extends string>({
   ariaLabel,
   columns,
   style,
+  selectedStyle,
 }: AppSegmentedProps<T>) {
   return (
     <div
@@ -53,6 +55,7 @@ export function AppSegmented<T extends string>({
             style={{
               ...styles.option,
               ...(selected ? styles.optionSelected : {}),
+              ...(selected ? selectedStyle : {}),
               ...(option.disabled ? styles.optionDisabled : {}),
             }}
           >

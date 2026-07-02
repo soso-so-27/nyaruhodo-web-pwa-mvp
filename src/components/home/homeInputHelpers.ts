@@ -80,6 +80,8 @@ export type CatCareInfo = {
   weightMeasuredDate?: string;
   vetClinic?: string;
   careNote?: string;
+  vaccineDate?: string;
+  vaccineNote?: string;
 };
 
 export type CatTraitMemo = {
@@ -101,7 +103,8 @@ export type CatCoat =
   | "black"
   | "white"
   | "hachiware"
-  | "calico";
+  | "calico"
+  | "tortoiseshell";
 
 export function getCatAvatarSrcForCoat(coat?: CatCoat) {
   const avatars: Record<CatCoat, string> = {
@@ -114,6 +117,7 @@ export function getCatAvatarSrcForCoat(coat?: CatCoat) {
     white: "white",
     hachiware: "black",
     calico: "calico",
+    tortoiseshell: "black",
   };
 
   return `/icons/cat-avatars/${coat ? avatars[coat] : "neutral"}.png`;
@@ -1067,12 +1071,16 @@ function normalizeCatCareInfo(
     weightMeasuredDate: care.weightMeasuredDate || undefined,
     vetClinic: care.vetClinic || undefined,
     careNote: care.careNote || undefined,
+    vaccineDate: care.vaccineDate || undefined,
+    vaccineNote: care.vaccineNote || undefined,
   };
 
   return nextCare.weightKg ||
     nextCare.weightMeasuredDate ||
     nextCare.vetClinic ||
-    nextCare.careNote
+    nextCare.careNote ||
+    nextCare.vaccineDate ||
+    nextCare.vaccineNote
     ? nextCare
     : undefined;
 }
@@ -1096,6 +1104,7 @@ function isValidCatAppearance(
       "white",
       "hachiware",
       "calico",
+      "tortoiseshell",
     ].includes(appearance.coat)
   );
 }

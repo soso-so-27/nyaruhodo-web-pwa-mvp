@@ -73,12 +73,13 @@ import type { CatCoat, CatProfile } from "../home/homeInputHelpers";
 const COAT_OPTIONS: { value: CatCoat; label: string; color: string }[] = [
   { value: "orange_tabby", label: "茶トラ", color: "#d8bd9a" },
   { value: "kiji_tabby", label: "キジトラ", color: "#8f7a61" },
-  { value: "saba", label: "サバ", color: "#d8d2c4" },
+  { value: "saba", label: "サバトラ", color: "#d8d2c4" },
   { value: "gray", label: "グレー", color: "#d6d3d1" },
   { value: "black", label: "黒", color: "#625f59" },
   { value: "white", label: "白", color: "#fafafa" },
   { value: "hachiware", label: "ハチワレ", color: "#625f59" },
   { value: "calico", label: "三毛", color: "#f0c28b" },
+  { value: "tortoiseshell", label: "サビ", color: "#4a3327" },
 ];
 type EditableGender = "male" | "female" | "unknown" | "";
 type EditableCoat = CatCoat | "";
@@ -192,6 +193,8 @@ export function CatsPage() {
   const [editWeightMeasuredDate, setEditWeightMeasuredDate] = useState("");
   const [editVetClinic, setEditVetClinic] = useState("");
   const [editCareNote, setEditCareNote] = useState("");
+  const [editVaccineDate, setEditVaccineDate] = useState("");
+  const [editVaccineNote, setEditVaccineNote] = useState("");
   const [message, setMessage] = useState("");
   const [saveMessage, setSaveMessage] = useState("");
   const [omoideRefreshTick, setOmoideRefreshTick] = useState(0);
@@ -635,6 +638,8 @@ export function CatsPage() {
     );
     setEditVetClinic(activeCatProfile?.basicInfo?.care?.vetClinic ?? "");
     setEditCareNote(activeCatProfile?.basicInfo?.care?.careNote ?? "");
+    setEditVaccineDate(activeCatProfile?.basicInfo?.care?.vaccineDate ?? "");
+    setEditVaccineNote(activeCatProfile?.basicInfo?.care?.vaccineNote ?? "");
     setMessage("");
     setSaveMessage("");
     setIsAddingCat(false);
@@ -706,6 +711,8 @@ export function CatsPage() {
         weightMeasuredDate: nextWeightMeasuredDate,
         vetClinic: editVetClinic,
         careNote: editCareNote,
+        vaccineDate: editVaccineDate,
+        vaccineNote: editVaccineNote,
       });
       const nextProfile = {
         ...profiles[index],
@@ -1552,13 +1559,7 @@ export function CatsPage() {
                   </p>
                 </div>
 
-                <section style={styles.catManageFormSection}>
-                  <div style={styles.catManageFormHeading}>
-                    <p style={styles.catManageFormTitle}>たいせつな日</p>
-                    <p style={styles.catManageFormNote}>
-                      この日から、いっしょの日々をかぞえます。
-                    </p>
-                  </div>
+                <section style={styles.catManageNameBlock}>
                   <AppTextField
                     id="cat-manage-name"
                     type="text"
@@ -1567,6 +1568,12 @@ export function CatsPage() {
                     onChange={(event) => setCatNameInput(event.target.value)}
                     placeholder="例：むぎ"
                   />
+                </section>
+
+                <section style={styles.catManageFormSection}>
+                  <div style={styles.catManageFormHeading}>
+                    <p style={styles.catManageFormTitle}>たいせつな日</p>
+                  </div>
                   <div style={styles.catManageDateGrid}>
                     <AppTextField
                       type="date"
@@ -1576,6 +1583,7 @@ export function CatsPage() {
                         setEditFamilySinceDate(event.target.value)
                       }
                       max={new Date().toISOString().split("T")[0]}
+                      hint="この日から、いっしょの日々をかぞえます。"
                     />
                     <AppTextField
                       type="date"
@@ -1599,6 +1607,7 @@ export function CatsPage() {
                     value={editGender}
                     ariaLabel="性別"
                     columns={3}
+                    selectedStyle={styles.catManageSelectedOption}
                     onChange={setEditGender}
                     options={[
                       { value: "male", label: "男の子" },
@@ -1674,10 +1683,10 @@ export function CatsPage() {
                       体重や病院のことを、必要な分だけ残せます。
                     </p>
                   </div>
-                  <div style={styles.catManageWeightRow}>
+                  <div style={styles.catManageCareGrid}>
                     <AppTextField
                       type="number"
-                      label="体重"
+                      label="体重（kg）"
                       value={editWeightKg}
                       min="0.5"
                       max="20"
@@ -1685,18 +1694,15 @@ export function CatsPage() {
                       inputMode="decimal"
                       onChange={(event) => setEditWeightKg(event.target.value)}
                       placeholder="例：4.8"
-                      rootStyle={styles.catManageWeightInput}
                     />
-                    <span style={styles.catManageWeightUnit}>kg</span>
                     <AppTextField
                       type="date"
-                      label="測定日"
+                      label="はかった日"
                       value={editWeightMeasuredDate}
                       onChange={(event) =>
                         setEditWeightMeasuredDate(event.target.value)
                       }
                       max={new Date().toISOString().split("T")[0]}
-                      rootStyle={styles.catManageWeightDate}
                     />
                   </div>
                   <AppTextField
@@ -1706,6 +1712,21 @@ export function CatsPage() {
                     maxLength={80}
                     onChange={(event) => setEditVetClinic(event.target.value)}
                     placeholder="例：○○動物病院"
+                  />
+                  <AppTextField
+                    type="date"
+                    label="ワクチンを打った日"
+                    value={editVaccineDate}
+                    onChange={(event) => setEditVaccineDate(event.target.value)}
+                    max={new Date().toISOString().split("T")[0]}
+                  />
+                  <AppTextField
+                    type="text"
+                    label="ワクチンのメモ"
+                    value={editVaccineNote}
+                    maxLength={80}
+                    onChange={(event) => setEditVaccineNote(event.target.value)}
+                    placeholder="例：3種混合"
                   />
                   <AppTextField
                     as="textarea"
@@ -2309,11 +2330,13 @@ function BasicInfoTable({
       label: "家族になった日",
       value: formatBasicInfoDate(profile.basicInfo?.familySinceDate),
       accent: true,
+      valueTone: "numeric",
     }),
     createBasicInfoRow({
       label: "誕生日",
       value: birthdayDate,
       note: birthdayNote,
+      valueTone: "numeric",
     }),
   ];
   const appearanceRows = [
@@ -2322,7 +2345,7 @@ function BasicInfoTable({
       value: formatGender(profile.basicInfo?.gender),
     }),
     createBasicInfoRow({
-      label: "毛色",
+      label: "毛がら",
       value: formatCoatAndBreed(
         profile.appearance?.coat,
         profile.basicInfo?.breed,
@@ -2333,27 +2356,22 @@ function BasicInfoTable({
     createBasicInfoRow({
       label: "よく呼ぶ名前",
       value: profile.basicInfo?.personality?.callName,
-      variant: "note",
     }),
     createBasicInfoRow({
       label: "好きな場所",
       value: profile.basicInfo?.personality?.favoritePlace,
-      variant: "note",
     }),
     createBasicInfoRow({
       label: "好きな遊び",
       value: profile.basicInfo?.personality?.favoritePlay,
-      variant: "note",
     }),
     createBasicInfoRow({
       label: "なでられると好きなところ",
       value: profile.basicInfo?.personality?.favoriteTouch,
-      variant: "note",
     }),
     createBasicInfoRow({
       label: "苦手なこと",
       value: profile.basicInfo?.personality?.dislikes,
-      variant: "note",
     }),
   ];
   const careRows = [
@@ -2363,6 +2381,7 @@ function BasicInfoTable({
       note: formatCareWeightMeasuredNote(
         profile.basicInfo?.care?.weightMeasuredDate,
       ),
+      valueTone: "numeric",
     }),
     createBasicInfoRow({
       label: "かかりつけ",
@@ -2371,7 +2390,12 @@ function BasicInfoTable({
     createBasicInfoRow({
       label: "気をつけること",
       value: profile.basicInfo?.care?.careNote,
-      variant: "note",
+    }),
+    createBasicInfoRow({
+      label: "ワクチンを打った日",
+      value: formatBasicInfoDate(profile.basicInfo?.care?.vaccineDate),
+      note: profile.basicInfo?.care?.vaccineNote,
+      valueTone: "numeric",
     }),
   ];
   const groups = [
@@ -2437,7 +2461,7 @@ type BasicInfoDisplayRow = {
   value: string;
   note?: string;
   accent?: boolean;
-  variant?: "table" | "note";
+  valueTone?: "text" | "numeric";
 };
 
 function createBasicInfoRow({
@@ -2445,20 +2469,20 @@ function createBasicInfoRow({
   value,
   note,
   accent,
-  variant = "table",
+  valueTone = "text",
 }: {
   label: string;
   value?: string;
   note?: string;
   accent?: boolean;
-  variant?: "table" | "note";
+  valueTone?: "text" | "numeric";
 }): BasicInfoDisplayRow {
   return {
     label,
     value: value?.trim() ?? "",
     note,
     accent,
-    variant,
+    valueTone,
   };
 }
 
@@ -2479,29 +2503,30 @@ function BasicInfoSubsection({
     <section style={styles.basicInfoSubsection}>
       <p style={styles.basicInfoSubsectionTitle}>{title}</p>
       <div style={styles.basicInfoTable}>
-        {visibleRows.map((row) =>
-          row.variant === "note" ? (
-            <div key={row.label} style={styles.basicInfoNoteRow}>
-              <span style={styles.basicInfoNoteLabel}>{row.label}</span>
-              <span style={styles.basicInfoNoteValue}>{row.value}</span>
-            </div>
-          ) : (
-            <div key={row.label} style={styles.basicInfoRow}>
-              <span style={styles.basicInfoLabel}>
-                {row.accent ? (
-                  <span style={styles.basicInfoAccentDot} aria-hidden="true" />
-                ) : null}
-                {row.label}
+        {visibleRows.map((row) => (
+          <div key={row.label} style={styles.basicInfoRow}>
+            <span style={styles.basicInfoLabel}>
+              {row.accent ? (
+                <span style={styles.basicInfoAccentDot} aria-hidden="true" />
+              ) : null}
+              {row.label}
+            </span>
+            <span style={styles.basicInfoValueStack}>
+              <span
+                style={
+                  row.valueTone === "numeric"
+                    ? { ...styles.basicInfoValue, ...styles.basicInfoValueNumeric }
+                    : styles.basicInfoValue
+                }
+              >
+                {row.value}
               </span>
-              <span style={styles.basicInfoValueStack}>
-                <span style={styles.basicInfoValue}>{row.value}</span>
-                {row.note ? (
-                  <span style={styles.basicInfoValueNote}>{row.note}</span>
-                ) : null}
-              </span>
-            </div>
-          ),
-        )}
+              {row.note ? (
+                <span style={styles.basicInfoValueNote}>{row.note}</span>
+              ) : null}
+            </span>
+          </div>
+        ))}
       </div>
     </section>
   );
@@ -3412,18 +3437,24 @@ function buildCatCareInfo(input: {
   weightMeasuredDate: string;
   vetClinic: string;
   careNote: string;
+  vaccineDate: string;
+  vaccineNote: string;
 }) {
   const care = {
     weightKg: input.weightKg,
     weightMeasuredDate: input.weightMeasuredDate || undefined,
     vetClinic: trimToMax(input.vetClinic, 80),
     careNote: trimToMax(input.careNote, 180),
+    vaccineDate: input.vaccineDate || undefined,
+    vaccineNote: trimToMax(input.vaccineNote, 80),
   };
 
   return care.weightKg ||
     care.weightMeasuredDate ||
     care.vetClinic ||
-    care.careNote
+    care.careNote ||
+    care.vaccineDate ||
+    care.vaccineNote
     ? care
     : undefined;
 }
@@ -4091,8 +4122,8 @@ function CoatSelector({
 }) {
   return (
     <div style={styles.coatSection}>
-      <p style={styles.sectionLabel}>毛色</p>
-      <div role="radiogroup" aria-label="毛色" style={styles.coatChipGrid}>
+      <p style={styles.sectionLabel}>毛がら</p>
+      <div role="radiogroup" aria-label="毛がら" style={styles.coatChipGrid}>
         {COAT_OPTIONS.map((option) => {
           const selected = currentCoat === option.value;
 
@@ -4339,6 +4370,7 @@ function getCatAvatarSrc(coat?: string): string {
     white: "/sample-cats/white.png",
     hachiware: "/sample-cats/black.png",
     calico: "/sample-cats/calico.png",
+    tortoiseshell: "/sample-cats/black.png",
     cream: "/sample-cats/saba.png",
   };
 
@@ -4363,7 +4395,7 @@ function getCoatColor(coat: string): string {
 
 function getCoatLabel(coat: string): string {
   const labels: Record<string, string> = {
-    saba: "サバ",
+    saba: "サバトラ",
     kiji_tabby: "キジトラ",
     gray: "グレー",
     orange_tabby: "茶トラ",
@@ -4371,7 +4403,8 @@ function getCoatLabel(coat: string): string {
     white: "白",
     hachiware: "ハチワレ",
     calico: "三毛",
-    cream: "サバ",
+    tortoiseshell: "サビ",
+    cream: "サバトラ",
   };
 
   return labels[coat] ?? coat;
@@ -4384,6 +4417,10 @@ function getCoatChipBackground(coat: CatCoat, fallback: string) {
 
   if (coat === "hachiware") {
     return "linear-gradient(90deg, #4b4742 0 48%, #faf7f0 48% 100%)";
+  }
+
+  if (coat === "tortoiseshell") {
+    return "linear-gradient(135deg, #3b2b24 0 48%, #11100f 48% 100%)";
   }
 
   return fallback;
@@ -5618,7 +5655,7 @@ const styles = {
   basicInfoTitle: {
     margin: 0,
     color: CATS_TEXT,
-    fontFamily: CATS_SERIF,
+    fontFamily: CATS_BASIC_VALUE_SERIF,
     fontSize: CATS_TITLE_SIZE,
     fontWeight: 400,
     lineHeight: 1.45,
@@ -5666,11 +5703,11 @@ const styles = {
   basicInfoSubsectionTitle: {
     margin: 0,
     color: CATS_MUTED,
-    fontFamily: CATS_SERIF,
-    fontSize: CATS_BODY_SIZE,
-    fontWeight: 400,
+    fontFamily: CATS_UI,
+    fontSize: CATS_META_SIZE,
+    fontWeight: 600,
     lineHeight: 1.4,
-    letterSpacing: CATS_BODY_TRACKING,
+    letterSpacing: "0.08em",
   },
   basicInfoSubsectionEmpty: {
     margin: 0,
@@ -5687,11 +5724,9 @@ const styles = {
   },
   basicInfoRow: {
     display: "grid",
-    gridTemplateColumns: "104px minmax(0, 1fr)",
-    alignItems: "center",
-    gap: "12px",
-    minHeight: "42px",
-    padding: "8px 12px",
+    gap: "6px",
+    minHeight: "auto",
+    padding: "12px",
     borderBottom: "1px solid color-mix(in srgb, var(--line-strong) 46%, transparent)",
   },
   basicInfoLabel: {
@@ -5700,10 +5735,10 @@ const styles = {
     gap: "7px",
     color: CATS_MUTED,
     fontFamily: CATS_UI,
-    fontSize: CATS_META_SIZE,
-    fontWeight: 400,
+    fontSize: CATS_TINY_SIZE,
+    fontWeight: 500,
     lineHeight: 1.35,
-    letterSpacing: "0.03em",
+    letterSpacing: "0.08em",
   },
   basicInfoAccentDot: {
     width: "7px",
@@ -5714,22 +5749,27 @@ const styles = {
   },
   basicInfoValueStack: {
     display: "grid",
-    justifyItems: "end",
+    justifyItems: "start",
     gap: "2px",
     minWidth: 0,
-    textAlign: "right",
+    textAlign: "left",
   },
   basicInfoValue: {
     minWidth: 0,
     color: CATS_TEXT,
+    fontFamily: CATS_UI,
+    fontSize: "16px",
+    fontWeight: 500,
+    lineHeight: 1.65,
+    letterSpacing: CATS_BODY_TRACKING,
+    whiteSpace: "pre-wrap",
+    overflowWrap: "anywhere",
+  },
+  basicInfoValueNumeric: {
     fontFamily: CATS_BASIC_VALUE_SERIF,
-    fontSize: "15px",
     fontWeight: 400,
     lineHeight: 1.45,
     letterSpacing: "0.01em",
-    overflow: "hidden",
-    textOverflow: "ellipsis",
-    whiteSpace: "nowrap",
   },
   basicInfoValueNote: {
     color: CATS_FAINT,
@@ -5804,6 +5844,7 @@ const styles = {
     display: "grid",
     gap: "18px",
     minWidth: 0,
+    overflowX: "hidden",
   },
   catManageEditorIntro: {
     display: "grid",
@@ -5881,11 +5922,19 @@ const styles = {
   catManageEditorIntroText: {
     margin: 0,
     color: CATS_MUTED,
-    fontFamily: CATS_SERIF,
+    fontFamily: CATS_UI,
     fontSize: CATS_BODY_SIZE,
-    fontWeight: 400,
+    fontWeight: 500,
     lineHeight: 1.65,
     letterSpacing: CATS_BODY_TRACKING,
+  },
+  catManageNameBlock: {
+    display: "grid",
+    minWidth: 0,
+    padding: "12px",
+    borderRadius: "var(--radius-lg)",
+    border: "1px solid color-mix(in srgb, var(--line-strong) 58%, transparent)",
+    background: "color-mix(in srgb, var(--paper) 42%, transparent)",
   },
   catManageFormSection: {
     display: "grid",
@@ -5902,18 +5951,18 @@ const styles = {
   catManageFormTitle: {
     margin: 0,
     color: CATS_TEXT_STRONG,
-    fontFamily: CATS_SERIF,
-    fontSize: "16px",
-    fontWeight: 400,
+    fontFamily: CATS_UI,
+    fontSize: CATS_META_SIZE,
+    fontWeight: 600,
     lineHeight: 1.45,
-    letterSpacing: CATS_TITLE_TRACKING,
+    letterSpacing: "0.08em",
   },
   catManageFormNote: {
     margin: 0,
     color: CATS_MUTED,
-    fontFamily: CATS_SERIF,
+    fontFamily: CATS_UI,
     fontSize: CATS_META_SIZE,
-    fontWeight: 400,
+    fontWeight: 500,
     lineHeight: 1.55,
     letterSpacing: CATS_META_TRACKING,
   },
@@ -5923,32 +5972,20 @@ const styles = {
     gap: "10px",
     minWidth: 0,
   },
-  catManageWeightRow: {
+  catManageCareGrid: {
     display: "grid",
-    gridTemplateColumns: "minmax(0, 0.9fr) auto minmax(0, 1.1fr)",
-    alignItems: "end",
-    gap: "8px",
+    gridTemplateColumns: "minmax(0, 1fr)",
+    gap: "10px",
     minWidth: 0,
-  },
-  catManageWeightInput: {
-    minWidth: 0,
-  },
-  catManageWeightDate: {
-    minWidth: 0,
-  },
-  catManageWeightUnit: {
-    minHeight: "44px",
-    display: "inline-flex",
-    alignItems: "center",
-    color: CATS_MUTED,
-    fontFamily: CATS_UI,
-    fontSize: CATS_META_SIZE,
-    fontWeight: 500,
-    lineHeight: 1,
-    paddingBottom: "1px",
   },
   catManageCareNoteField: {
     minHeight: "82px",
+  },
+  catManageSelectedOption: {
+    borderColor: "color-mix(in srgb, var(--seal) 42%, var(--control-border))",
+    background: "color-mix(in srgb, var(--seal) 13%, var(--paper-card))",
+    color: "var(--seal)",
+    boxShadow: "inset 0 0 0 1px color-mix(in srgb, var(--seal) 10%, transparent)",
   },
   catManageEditorActions: {
     position: "sticky",
