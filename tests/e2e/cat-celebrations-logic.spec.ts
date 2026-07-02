@@ -16,18 +16,21 @@ test.describe("cat celebrations", () => {
         label: "家族になって",
         status: "未登録",
         reached: false,
+        tone: "unset",
       },
       {
         key: "sleeping-count",
         label: "ねがお",
         status: "これから",
         reached: false,
+        tone: "unset",
       },
       {
         key: "birthday",
         label: "誕生日",
         status: "未登録",
         reached: false,
+        tone: "unset",
       },
     ]);
   });
@@ -41,7 +44,7 @@ test.describe("cat celebrations", () => {
       })[1],
     ).toMatchObject({
       label: "ねがお",
-      status: "10枚 → 50枚",
+      status: "10 / 50枚",
       reached: true,
     });
 
@@ -52,7 +55,7 @@ test.describe("cat celebrations", () => {
         takenSleepingPhotoCount: 80,
       })[1],
     ).toMatchObject({
-      status: "50枚 → 100枚",
+      status: "80 / 100枚",
       reached: true,
     });
   });
@@ -65,7 +68,7 @@ test.describe("cat celebrations", () => {
         takenSleepingPhotoCount: 420,
       })[1],
     ).toMatchObject({
-      status: "365枚 → 500枚",
+      status: "420 / 500枚",
       reached: true,
     });
   });
