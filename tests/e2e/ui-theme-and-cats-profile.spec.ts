@@ -230,7 +230,7 @@ test("edits weight and mixed coat without showing the old breed field", async ({
 
   await expect(page.getByText("茶トラ（ミックス）")).toBeVisible();
   await expect(page.getByText("5.5 kg")).toBeVisible();
-  await expect(page.getByText("2026年7月2日に はかりました")).toBeVisible();
+  await expect(page.getByText("（2026年7月2日）")).toBeVisible();
   await expect(page.getByText("ワクチンを打った日")).toBeVisible();
   await expect(page.getByText("2026年6月1日")).toBeVisible();
   await expect(page.getByText("3種混合")).toBeVisible();

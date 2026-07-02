@@ -1127,6 +1127,25 @@ export function CatsPage() {
           height: 0;
           display: none;
         }
+
+        .cat-basic-date-field {
+          width: 100%;
+          max-width: 100%;
+          min-width: 0;
+          min-inline-size: 0;
+          -webkit-appearance: none;
+          appearance: none;
+        }
+
+        .cat-basic-date-field::-webkit-date-and-time-value {
+          min-width: 0;
+          text-align: left;
+        }
+
+        .cat-basic-date-field::-webkit-calendar-picker-indicator {
+          flex: 0 0 auto;
+          margin-left: 4px;
+        }
       `}</style>
       <PageBackdrop />
       <div style={styles.container}>
@@ -1594,6 +1613,7 @@ export function CatsPage() {
                   <div style={styles.catManageDateGrid}>
                     <AppTextField
                       type="date"
+                      className="cat-basic-date-field"
                       label="家族になった日"
                       value={editFamilySinceDate}
                       onChange={(event) =>
@@ -1604,6 +1624,7 @@ export function CatsPage() {
                     />
                     <AppTextField
                       type="date"
+                      className="cat-basic-date-field"
                       label="誕生日"
                       value={editBirthDate}
                       onChange={(event) => setEditBirthDate(event.target.value)}
@@ -1714,6 +1735,7 @@ export function CatsPage() {
                     />
                     <AppTextField
                       type="date"
+                      className="cat-basic-date-field"
                       label="はかった日"
                       value={editWeightMeasuredDate}
                       onChange={(event) =>
@@ -1732,6 +1754,7 @@ export function CatsPage() {
                   />
                   <AppTextField
                     type="date"
+                    className="cat-basic-date-field"
                     label="ワクチンを打った日"
                     value={editVaccineDate}
                     onChange={(event) => setEditVaccineDate(event.target.value)}
@@ -1757,25 +1780,22 @@ export function CatsPage() {
                 </section>
 
                 <div style={styles.catManageEditorActions}>
-                  <AppButton
+                  <button
                     type="button"
-                    variant="quiet"
-                    fullWidth
+                    style={styles.catManageBackButton}
                     onClick={cancelEditingCatName}
                     disabled={isSavingProfile}
                   >
                     もどる
-                  </AppButton>
-                  <AppButton
+                  </button>
+                  <button
                     type="button"
-                    variant="primary"
-                    fullWidth
+                    style={styles.catManageSaveButton}
                     onClick={handleSaveProfile}
-                    loading={isSavingProfile}
-                    loadingLabel="保存中"
+                    disabled={isSavingProfile}
                   >
-                    保存する
-                  </AppButton>
+                    {isSavingProfile ? "保存中" : "保存する"}
+                  </button>
                 </div>
               </div>
             ) : (
@@ -2507,8 +2527,15 @@ function BasicInfoSubsection({
     <section style={styles.basicInfoSubsection}>
       <p style={styles.basicInfoSubsectionTitle}>{title}</p>
       <div style={styles.basicInfoTable}>
-        {visibleRows.map((row) => (
-          <div key={row.label} style={styles.basicInfoRow}>
+        {visibleRows.map((row, index) => (
+          <div
+            key={row.label}
+            style={
+              index === 0
+                ? { ...styles.basicInfoRow, ...styles.basicInfoRowFirst }
+                : styles.basicInfoRow
+            }
+          >
             <span style={styles.basicInfoLabel}>
               {row.accent ? (
                 <span style={styles.basicInfoAccentDot} aria-hidden="true" />
@@ -3364,7 +3391,7 @@ function formatCareWeight(weightKg?: number) {
 function formatCareWeightMeasuredNote(measuredDate?: string) {
   const measuredDateCopy = formatBasicInfoDate(measuredDate);
 
-  return measuredDateCopy ? `${measuredDateCopy}に はかりました` : "";
+  return measuredDateCopy ? `（${measuredDateCopy}）` : "";
 }
 
 function formatCoatAndBreed(coat?: string, breed?: string) {
@@ -5650,7 +5677,7 @@ const styles = {
   },
   basicInfoBlock: {
     display: "grid",
-    gap: "15px",
+    gap: "18px",
   },
   basicProfilePanel: {
     display: "grid",
@@ -5694,15 +5721,15 @@ const styles = {
     letterSpacing: CATS_META_TRACKING,
   },
   basicInfoEditButton: {
-    minHeight: "32px",
+    minHeight: "34px",
     display: "inline-flex",
     alignItems: "center",
     justifyContent: "center",
     gap: "6px",
     padding: "0 10px",
     borderRadius: "999px",
-    border: "1px solid color-mix(in srgb, var(--line) 56%, transparent)",
-    background: "color-mix(in srgb, var(--paper) 36%, transparent)",
+    border: "1px solid color-mix(in srgb, var(--line) 50%, transparent)",
+    background: "color-mix(in srgb, var(--paper-card) 32%, transparent)",
     color: CATS_MUTED,
     fontFamily: CATS_UI,
     fontSize: CATS_META_SIZE,
@@ -5713,7 +5740,7 @@ const styles = {
   },
   basicInfoTable: {
     display: "grid",
-    gap: "12px",
+    gap: 0,
     borderRadius: 0,
     border: "none",
     overflow: "visible",
@@ -5721,13 +5748,13 @@ const styles = {
   },
   basicInfoSubsection: {
     display: "grid",
-    gap: "9px",
-    paddingTop: "14px",
+    gap: "4px",
+    paddingTop: "16px",
     borderTop: "1px solid color-mix(in srgb, var(--line) 58%, transparent)",
   },
   basicInfoSubsectionTitle: {
     margin: 0,
-    color: CATS_MUTED,
+    color: CATS_FAINT,
     fontFamily: CATS_UI,
     fontSize: CATS_META_SIZE,
     fontWeight: 500,
@@ -5749,21 +5776,29 @@ const styles = {
   },
   basicInfoRow: {
     display: "grid",
-    gap: "5px",
+    gridTemplateColumns: "minmax(92px, 34%) minmax(0, 1fr)",
+    alignItems: "baseline",
+    columnGap: "14px",
+    rowGap: "5px",
     minHeight: "auto",
-    padding: "0",
-    borderBottom: "none",
+    padding: "11px 0 0",
+    borderTop: "1px solid color-mix(in srgb, var(--line) 42%, transparent)",
+  },
+  basicInfoRowFirst: {
+    paddingTop: "4px",
+    borderTop: "none",
   },
   basicInfoLabel: {
     display: "inline-flex",
-    alignItems: "center",
+    alignItems: "baseline",
     gap: "7px",
-    color: CATS_MUTED,
+    color: CATS_FAINT,
     fontFamily: CATS_UI,
     fontSize: CATS_TINY_SIZE,
     fontWeight: 500,
-    lineHeight: 1.35,
-    letterSpacing: "0.08em",
+    lineHeight: 1.55,
+    letterSpacing: "0.04em",
+    overflowWrap: "anywhere",
   },
   basicInfoAccentDot: {
     width: "7px",
@@ -5775,7 +5810,7 @@ const styles = {
   basicInfoValueStack: {
     display: "grid",
     justifyItems: "start",
-    gap: "2px",
+    gap: "3px",
     minWidth: 0,
     textAlign: "left",
   },
@@ -5783,25 +5818,25 @@ const styles = {
     minWidth: 0,
     color: CATS_TEXT,
     fontFamily: CATS_UI,
-    fontSize: "16px",
+    fontSize: "15px",
     fontWeight: 400,
-    lineHeight: 1.65,
+    lineHeight: 1.7,
     letterSpacing: CATS_BODY_TRACKING,
     whiteSpace: "pre-wrap",
     overflowWrap: "anywhere",
   },
   basicInfoValueNumeric: {
-    fontFamily: CATS_BASIC_VALUE_SERIF,
+    fontFamily: CATS_UI,
     fontWeight: 400,
-    lineHeight: 1.45,
-    letterSpacing: "0.01em",
+    lineHeight: 1.55,
+    letterSpacing: CATS_BODY_TRACKING,
   },
   basicInfoValueNote: {
     color: CATS_FAINT,
     fontFamily: CATS_UI,
     fontSize: CATS_TINY_SIZE,
     fontWeight: 400,
-    lineHeight: 1.35,
+    lineHeight: 1.45,
     letterSpacing: CATS_META_TRACKING,
   },
   basicInfoNoteRow: {
@@ -6015,13 +6050,47 @@ const styles = {
   catManageEditorActions: {
     position: "sticky",
     bottom: "-1px",
-    display: "grid",
-    gridTemplateColumns: "1fr 1fr",
-    gap: "10px",
-    margin: "2px -2px 0",
-    padding: "10px 2px 2px",
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: "12px",
+    margin: "4px -2px 0",
+    padding: "14px 2px 4px",
     background:
-      "linear-gradient(180deg, transparent, color-mix(in srgb, var(--paper-card) 92%, transparent) 42%)",
+      "linear-gradient(180deg, transparent, color-mix(in srgb, var(--paper-card) 96%, transparent) 42%)",
+  },
+  catManageBackButton: {
+    minWidth: "82px",
+    minHeight: "42px",
+    padding: "0 12px",
+    border: "none",
+    borderRadius: "999px",
+    background: "transparent",
+    color: CATS_MUTED,
+    fontFamily: CATS_UI,
+    fontSize: "14px",
+    fontWeight: 500,
+    lineHeight: 1,
+    letterSpacing: CATS_BODY_TRACKING,
+    cursor: "pointer",
+    WebkitTapHighlightColor: "transparent",
+  },
+  catManageSaveButton: {
+    minWidth: "132px",
+    minHeight: "42px",
+    padding: "0 20px",
+    border: "1px solid color-mix(in srgb, var(--ink) 82%, transparent)",
+    borderRadius: "999px",
+    background: "color-mix(in srgb, var(--ink) 92%, transparent)",
+    color: "var(--paper)",
+    fontFamily: CATS_UI,
+    fontSize: "14px",
+    fontWeight: 500,
+    lineHeight: 1,
+    letterSpacing: CATS_BODY_TRACKING,
+    boxShadow: "0 10px 20px -18px color-mix(in srgb, var(--ink) 44%, transparent)",
+    cursor: "pointer",
+    WebkitTapHighlightColor: "transparent",
   },
   deleteCatConfirm: {
     display: "grid",
