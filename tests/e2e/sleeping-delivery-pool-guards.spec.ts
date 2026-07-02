@@ -208,6 +208,8 @@ test.describe("sleeping delivery pool guards", () => {
   });
 
   test("accepts supported exchange data urls", async ({ request }) => {
+    await skipIfLocalSupabaseUnavailable();
+
     for (const [index, src] of [
       redBlueTestPhotoUrl,
       normalCatLikePhotoUrl,
@@ -269,6 +271,7 @@ test.describe("sleeping delivery pool guards", () => {
       !hasSupabasePublicConfigFromEnv(),
       "NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY are required for server delivery date validation.",
     );
+    await skipIfLocalSupabaseUnavailable();
 
     const response = await request.post("/api/sleeping-delivery/exchange", {
       data: {
@@ -287,6 +290,8 @@ test.describe("sleeping delivery pool guards", () => {
   test("allows first onboarding exchange without a delivery date key", async ({
     request,
   }) => {
+    await skipIfLocalSupabaseUnavailable();
+
     const adminSupabase = createAdminSupabaseClientFromEnv();
 
     test.skip(
@@ -330,6 +335,8 @@ test.describe("sleeping delivery pool guards", () => {
   test("keeps exchange response under the delivery latency budget", async ({
     request,
   }) => {
+    await skipIfLocalSupabaseUnavailable();
+
     const startedAt = performance.now();
     const response = await request.post("/api/sleeping-delivery/exchange", {
       data: buildExchangeRequest(
@@ -344,6 +351,8 @@ test.describe("sleeping delivery pool guards", () => {
   });
 
   test("does not deliver pending moderation rows", async ({ request }) => {
+    await skipIfLocalSupabaseUnavailable();
+
     const adminSupabase = createAdminSupabaseClientFromEnv();
 
     test.skip(
@@ -411,6 +420,8 @@ test.describe("sleeping delivery pool guards", () => {
   test("keeps exchange idempotent for the same anonymous id and delivery date", async ({
     request,
   }) => {
+    await skipIfLocalSupabaseUnavailable();
+
     const adminSupabase = createAdminSupabaseClientFromEnv();
 
     test.skip(
@@ -503,6 +514,8 @@ test.describe("sleeping delivery pool guards", () => {
   test("accepts only delivered photo reports and counts distinct reporters", async ({
     request,
   }) => {
+    await skipIfLocalSupabaseUnavailable();
+
     const adminSupabase = createAdminSupabaseClientFromEnv();
 
     test.skip(
@@ -688,6 +701,8 @@ test.describe("sleeping delivery pool guards", () => {
   });
 
   test("rate limits repeated exchange calls", async ({ request }) => {
+    await skipIfLocalSupabaseUnavailable();
+
     const anonymousId = `rate-limit-${Date.now()}`;
     const responses = await Promise.all(
       Array.from({ length: 11 }, (_, index) =>
@@ -705,6 +720,8 @@ test.describe("sleeping delivery pool guards", () => {
   });
 
   test("does not return known test or debug pool rows", async ({ request }) => {
+    await skipIfLocalSupabaseUnavailable();
+
     const adminSupabase = createAdminSupabaseClientFromEnv();
 
     test.skip(
@@ -838,6 +855,56 @@ function hasSupabasePublicConfigFromEnv() {
       (process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ??
         env.NEXT_PUBLIC_SUPABASE_ANON_KEY),
   );
+}
+
+let localSupabaseReachability: Promise<boolean> | null = null;
+
+async function skipIfLocalSupabaseUnavailable() {
+  test.skip(
+    !(await isLocalSupabaseReachable()),
+    "Local Supabase at 127.0.0.1:54321 is required for this delivery-pool integration test.",
+  );
+}
+
+async function isLocalSupabaseReachable() {
+  if (process.env.PLAYWRIGHT_REQUIRE_LOCAL_SUPABASE === "1") {
+    return true;
+  }
+
+  const env = readLocalEnv();
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL ?? env.NEXT_PUBLIC_SUPABASE_URL;
+  if (!url || !isLocalSupabaseUrl(url)) {
+    return true;
+  }
+
+  localSupabaseReachability ??= probeLocalSupabase(url);
+  return localSupabaseReachability;
+}
+
+function isLocalSupabaseUrl(value: string) {
+  try {
+    const url = new URL(value);
+    return url.hostname === "127.0.0.1" || url.hostname === "localhost";
+  } catch {
+    return false;
+  }
+}
+
+async function probeLocalSupabase(value: string) {
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 1_000);
+
+  try {
+    const response = await fetch(new URL("/rest/v1/", value), {
+      method: "HEAD",
+      signal: controller.signal,
+    });
+    return response.status < 500;
+  } catch {
+    return false;
+  } finally {
+    clearTimeout(timeout);
+  }
 }
 
 function readLocalEnv(): LocalEnv {
