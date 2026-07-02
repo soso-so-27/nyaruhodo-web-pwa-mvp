@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 
 import {
   getDataUrlExtension,
+  getStoragePhotoPath,
   isUsablePhotoSrc,
   sanitizePathSegment,
   toStoragePhotoUrl,
@@ -14,6 +15,12 @@ import {
   toCatMomentRecord,
   type OwnSleepingPhoto,
 } from "../../../../lib/home/sleepingPhotos";
+import {
+  buildSleepingDeliveryRateLimitKey,
+  checkExchangeRateLimit,
+  validateOwnPhotoSrc,
+  validateOwnStoragePhotoPathAccess,
+} from "../../../../lib/home/sleepingDeliveryRequestGuards";
 
 export const dynamic = "force-dynamic";
 
@@ -56,6 +63,42 @@ export async function POST(request: Request) {
     );
   }
 
+  const rateLimit = checkExchangeRateLimit(
+    buildSleepingDeliveryRateLimitKey(request, anonymousId),
+  );
+
+  if (!rateLimit.allowed) {
+    return NextResponse.json(
+      { ok: false, error: "too_many_requests" },
+      { status: 429 },
+    );
+  }
+
+  const srcValidation = validateOwnPhotoSrc(photo.src);
+
+  if (!srcValidation.ok) {
+    return NextResponse.json(
+      { ok: false, error: srcValidation.error },
+      { status: srcValidation.status },
+    );
+  }
+
+  const storagePath = getStoragePhotoPath(photo.src);
+
+  if (storagePath) {
+    const storageValidation = validateOwnStoragePhotoPathAccess(
+      storagePath,
+      userId,
+    );
+
+    if (!storageValidation.ok) {
+      return NextResponse.json(
+        { ok: false, error: storageValidation.error },
+        { status: storageValidation.status },
+      );
+    }
+  }
+
   const moment = ownSleepingPhotoToCatMoment(photo);
   const record = toCatMomentRecord(moment);
   const photoUrl =
@@ -94,12 +137,16 @@ export async function POST(request: Request) {
     owner_cat_id: record.owner_cat_id,
     photo_url: photoUrl,
     state: record.state,
-    visibility: record.visibility,
-    delivery_status: record.delivery_status,
+    visibility: "shared",
+    delivery_status: "available",
+    moderation_status: "pending",
     source_moment_id: record.source_moment_id,
     metadata: {
+      source: "user_backup",
+      pool_kind: "user_shared",
       trigger_label: photo.triggerLabel,
       theme: photo.theme,
+      shared: true,
     },
     captured_at: record.created_at,
     created_at: record.created_at,
@@ -151,18 +198,12 @@ function normalizeBackupPhoto(
       ? { originalSrc: photo.originalSrc }
       : {}),
     state: photo.state === "sleeping" ? photo.state : "sleeping",
-    visibility: photo.visibility === "private" ? "private" : "shared",
-    deliveryStatus:
-      photo.deliveryStatus === "hidden" || photo.deliveryStatus === "reported"
-        ? photo.deliveryStatus
-        : "available",
+    visibility: "shared",
+    deliveryStatus: "available",
     triggerLabel:
       typeof photo.triggerLabel === "string" ? photo.triggerLabel : "ねがお",
     theme: typeof photo.theme === "string" ? photo.theme : "sleeping",
-    shared:
-      typeof photo.shared === "boolean"
-        ? photo.shared
-        : photo.visibility === "shared",
+    shared: true,
     createdAt:
       typeof photo.createdAt === "number" && Number.isFinite(photo.createdAt)
         ? photo.createdAt
