@@ -158,7 +158,7 @@ test("shows a meaningful pickup only when there is a strong cat record reason", 
 
   const pickup = page.getByTestId("cats-pickup-section");
   await expect(pickup).toBeVisible();
-  await expect(pickup).toContainText("ピックアップ");
+  await expect(pickup).toContainText("今日の1件");
   await expect(pickup).toContainText("10枚目のねがお");
   await expect(page.getByText("思い出が")).toHaveCount(0);
 
@@ -218,7 +218,7 @@ test("opens a year summary dashboard from the yearly archive", async ({
   const dialog = page.getByRole("dialog", { name: "2026年" });
   await expect(dialog).toBeVisible();
   await expect(dialog).toContainText("ねがお");
-  await expect(dialog).toContainText("ピックアップ");
+  await expect(dialog).toContainText("思い出");
   await expect(dialog).toContainText("記念");
   await expect(dialog).toContainText("6月によく撮りました");
   await expect(dialog).toContainText("10枚目");
@@ -266,6 +266,17 @@ async function seedCatsProfile(page: Page, now: number, photoCount: number) {
             triggerLabel: "sleeping",
             theme: "sleeping",
             shared: index % 2 === 0,
+            createdAt: nowValue - index * 86_400_000,
+          })),
+        ),
+      );
+      window.localStorage.setItem(
+        "neteruneko_cat_gallery_photos",
+        JSON.stringify(
+          Array.from({ length: count }, (_, index) => ({
+            id: `cat-gallery-${index}`,
+            catId: "cat-mugi",
+            src,
             createdAt: nowValue - index * 86_400_000,
           })),
         ),

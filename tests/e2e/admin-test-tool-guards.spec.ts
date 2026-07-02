@@ -338,7 +338,7 @@ test.describe("admin test tool guards", () => {
     await expect(page.getByText("これからのねてるねこ").first()).toBeVisible();
     await expect(page.getByRole("button", { name: "支払いを管理" })).toBeVisible();
     await expect(
-      page.getByText("機能は何も制限しません。"),
+      page.getByText("応援してもしなくても、ねてるねこの基本的な体験は変わりません。"),
     ).toBeVisible();
   });
 

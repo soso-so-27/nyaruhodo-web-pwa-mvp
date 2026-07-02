@@ -4,7 +4,7 @@ const photoDataUrl =
   "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAGQAAABkCAYAAABw4pVUAAAAAXNSR0IArs4c6QAAAARnQU1BAACxjwv8YQUAAAAJcEhZcwAADsMAAA7DAcdvqGQAAAEJSURBVHhe7dExEcAgAMBAJKKuTpnpjoLA/fACchlrzv2C+a0njDPsVmfYrQyJMSTGkBhDYgyJMSTGkBhDYgyJMSTGkBhDYgyJMSTGkBhDYgyJMSTGkBhDYgyJMSTGkBhDYgyJMSTGkBhDYgyJMSTGkBhDYgyJMSTGkBhDYgyJMSTGkBhDYgyJMSTGkBhDYgyJMSTGkBhDYgyJMSTGkBhDYgyJMSTGkBhDYgyJMSTGkBhDYgyJMSTGkBhDYgyJMSTmB4RCEqdGtA/tAAAAAElFTkSuQmCC";
 
 test.describe("collection album flow", () => {
-  test("shows taken sleeping photos even when older photos belong to a previous cat id", async ({
+  test("shows only the active cat's taken sleeping photos when older photos belong to a previous cat id", async ({
     page,
   }) => {
     const now = Date.now();
@@ -73,10 +73,10 @@ test.describe("collection album flow", () => {
     await page.goto("/collection");
     await page.waitForLoadState("networkidle");
     const firstSentPhoto = page.getByTestId("mainichi-board-photo-sent").first();
-    await expect(page.getByTestId("mainichi-board-photo-sent")).toHaveCount(2);
+    await expect(page.getByTestId("mainichi-board-photo-sent")).toHaveCount(1);
     await expect(firstSentPhoto).not.toHaveAttribute("data-mainichi-paste", "true");
 
-    await expect(page.getByTestId("mainichi-board-photo-sent")).toHaveCount(2);
+    await expect(page.getByTestId("mainichi-board-photo-sent")).toHaveCount(1);
   });
 
   test("shows restored storage sleeping photos alongside latest local photos", async ({
@@ -166,6 +166,7 @@ test.describe("collection album flow", () => {
   }) => {
     const now = Date.parse("2026-06-10T12:10:00.000Z");
     let allowSignedUrl = true;
+    await page.clock.setFixedTime(new Date(now));
 
     await page.route("**/api/photo-storage/signed-url", async (route) => {
       const body = route.request().postDataJSON() as { src?: string };
@@ -311,6 +312,7 @@ test.describe("collection album flow", () => {
     const staleSignedSrc =
       "https://example.invalid/storage/v1/object/sign/cat-photos/admin-stock/sleeping/delivered-2026-06-15.jpg?token=expired";
     const signedUrlRequests: string[] = [];
+    await page.clock.setFixedTime(new Date(now));
 
     await page.route("**/api/photo-storage/signed-url", async (route) => {
       const body = route.request().postDataJSON() as { src?: string };
@@ -448,8 +450,9 @@ test.describe("collection album flow", () => {
   test("auto-opens yesterday's unopened evening delivery after 5am", async ({
     page,
   }) => {
+    const now = Date.parse("2026-06-10T20:01:00.000Z");
     await seedCollectionEveningDelivery(page, {
-      now: Date.parse("2026-06-10T20:01:00.000Z"),
+      now,
       deliveredAt: Date.parse("2026-06-10T11:05:00.000Z"),
       dateKey: "2026-06-10",
       opened: false,
@@ -567,6 +570,7 @@ test.describe("collection album flow", () => {
     const now = Date.parse("2026-06-10T10:00:00.000Z");
     const todayKey = "2026-06-10";
     const yesterdayAt = now - 24 * 60 * 60 * 1000;
+    await page.clock.setFixedTime(new Date(now));
 
     await page.addInitScript(
       ({ currentCatId, src, createdAt, olderCreatedAt, targetDateKey }) => {
@@ -653,6 +657,7 @@ test.describe("collection album flow", () => {
   }) => {
     const now = Date.parse("2026-06-10T12:00:00.000Z");
     const todayKey = "2026-06-10";
+    await page.clock.setFixedTime(new Date(now));
 
     await page.addInitScript(
       ({ currentCatId, src, createdAt, targetDateKey }) => {
@@ -740,6 +745,7 @@ test.describe("collection album flow", () => {
   }) => {
     const now = Date.parse("2026-06-13T11:05:00.000Z");
     const dateKey = "2026-06-13";
+    await page.clock.setFixedTime(new Date(now));
 
     await page.addInitScript(
       ({ currentCatId, src, createdAt, targetDateKey }) => {
@@ -811,6 +817,7 @@ test.describe("collection album flow", () => {
     await page.getByRole("tab", { name: "とどいた" }).click();
     await page.getByTestId("mainichi-board-photo-delivered").click();
     await expect(page.getByTestId("mainichi-photo-viewer")).toBeVisible();
+    await disableNextDevToolsPointerEvents(page);
     await page.getByRole("button", { name: "ねこだよりから外す" }).click();
     await page
       .getByRole("alertdialog")
@@ -840,6 +847,7 @@ test.describe("collection album flow", () => {
     page,
   }) => {
     const now = Date.parse("2026-06-14T11:05:00.000Z");
+    await page.clock.setFixedTime(new Date(now));
 
     await page.addInitScript(
       ({ currentCatId, src, createdAt }) => {
@@ -924,6 +932,7 @@ async function seedCollectionEveningDelivery(
     opened: boolean;
   },
 ) {
+  await page.clock.setFixedTime(new Date(now));
   await page.addInitScript(
     ({ currentCatId, src, currentNow, deliveredAt, targetDateKey, opened }) => {
       const originalDateNow = Date.now.bind(Date);
@@ -996,4 +1005,10 @@ async function seedCollectionEveningDelivery(
       opened,
     },
   );
+}
+
+async function disableNextDevToolsPointerEvents(page: Page) {
+  await page.addStyleTag({
+    content: "nextjs-portal { pointer-events: none !important; }",
+  });
 }

@@ -3,9 +3,10 @@ import { expect, test, type Page } from "@playwright/test";
 const photoDataUrl =
   "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAGQAAABkCAYAAABw4pVUAAAAAXNSR0IArs4c6QAAAARnQU1BAACxjwv8YQUAAAAJcEhZcwAADsMAAA7DAcdvqGQAAAEJSURBVHhe7dExEcAgAMBAJKKuTpnpjoLA/fACchlrzv2C+a0njDPsVmfYrQyJMSTGkBhDYgyJMSTGkBhDYgyJMSTGkBhDYgyJMSTGkBhDYgyJMSTGkBhDYgyJMSTGkBhDYgyJMSTGkBhDYgyJMSTGkBhDYgyJMSTGkBhDYgyJMSTGkBhDYgyJMSTGkBhDYgyJMSTGkBhDYgyJMSTGkBhDYgyJMSTGkBhDYgyJMSTGkBhDYgyJMSTGkBhDYgyJMSTmB4RCEqdGtA/tAAAAAElFTkSuQmCC";
 
-const beforeEight = Date.parse("2026-06-10T10:30:00.000Z");
-const wellBeforeEight = Date.parse("2026-06-10T09:00:00.000Z");
-const afterEight = Date.parse("2026-06-10T11:10:00.000Z");
+const currentJstDateKey = getCurrentJstDateKey();
+const beforeEight = getCurrentJstTime(19, 30);
+const wellBeforeEight = getCurrentJstTime(18, 0);
+const afterEight = getCurrentJstTime(20, 10);
 
 test.describe("home desk state cycle", () => {
   test("maps home states to day-cycle indicator classes", async ({ page }) => {
@@ -20,7 +21,7 @@ test.describe("home desk state cycle", () => {
     await seedHomeState(page, {
       now: wellBeforeEight,
       eveningDay: {
-        dateKey: "2026-06-10",
+        dateKey: currentJstDateKey,
         targetOwnPhotoId: "own-today",
         targetCatId: "cat-home",
         targetCapturedAt: beforeEight,
@@ -36,7 +37,7 @@ test.describe("home desk state cycle", () => {
     await seedHomeState(page, {
       now: afterEight,
       eveningDay: {
-        dateKey: "2026-06-10",
+        dateKey: currentJstDateKey,
         targetOwnPhotoId: "own-today",
         targetCatId: "cat-home",
         targetCapturedAt: beforeEight,
@@ -54,7 +55,7 @@ test.describe("home desk state cycle", () => {
     await seedHomeState(page, {
       now: afterEight,
       eveningDay: {
-        dateKey: "2026-06-10",
+        dateKey: currentJstDateKey,
         targetOwnPhotoId: "own-today",
         targetCatId: "cat-home",
         targetCapturedAt: beforeEight,
@@ -75,7 +76,7 @@ test.describe("home desk state cycle", () => {
     await seedHomeState(page, {
       now: afterEight,
       eveningDay: {
-        dateKey: "2026-06-10",
+        dateKey: currentJstDateKey,
         targetOwnPhotoId: "own-today",
         targetCatId: "cat-home",
         targetCapturedAt: beforeEight,
@@ -99,7 +100,7 @@ test.describe("home desk state cycle", () => {
     await seedHomeState(page, {
       now: wellBeforeEight,
       eveningDay: {
-        dateKey: "2026-06-10",
+        dateKey: currentJstDateKey,
         targetOwnPhotoId: "own-today",
         targetCatId: "cat-home",
         targetCapturedAt: beforeEight,
@@ -159,7 +160,8 @@ test.describe("home desk state cycle", () => {
 
     await page.goto("/cats");
     await page.waitForLoadState("networkidle");
-    await expect(page.getByRole("button", { name: "うちのこを管理" })).toBeVisible();
+    await expect(page.getByRole("link", { name: "うちのこ" })).toBeVisible();
+    await expect(page.getByRole("radio", { name: "記録" })).toBeVisible();
   });
 
   test("hides the presence line even when the presence api returns a count", async ({
@@ -225,7 +227,7 @@ test.describe("home desk state cycle", () => {
       await seedHomeState(page, {
         now: wellBeforeEight,
         eveningDay: {
-          dateKey: "2026-06-10",
+          dateKey: currentJstDateKey,
           targetOwnPhotoId: "own-today",
           targetCatId: "cat-home",
           targetCapturedAt: beforeEight,
@@ -339,4 +341,17 @@ function buildDeliveredPhoto() {
     theme: "sleeping",
     deliveredAt: beforeEight,
   };
+}
+
+function getCurrentJstDateKey() {
+  const date = new Date(Date.now() + 9 * 60 * 60 * 1000);
+  const year = date.getUTCFullYear();
+  const month = String(date.getUTCMonth() + 1).padStart(2, "0");
+  const day = String(date.getUTCDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+}
+
+function getCurrentJstTime(hour: number, minute: number) {
+  const [year, month, day] = currentJstDateKey.split("-").map(Number);
+  return Date.UTC(year, month - 1, day, hour - 9, minute);
 }

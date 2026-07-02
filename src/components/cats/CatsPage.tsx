@@ -1365,10 +1365,19 @@ export function CatsPage() {
             familyDuration={familyDuration}
             birthdayStatus={birthdayStatus}
             takenSleepingPhotoCount={takenSleepingPhotoCount}
+            omoideControls={omoideControls}
             onOpenMemory={(memory) => setSelectedOmoideMemory(memory)}
             onOpenPhoto={(photo) => setSelectedRecordPhoto(photo)}
             onOpenPhotos={() => setPhotoSheetLens("cat")}
             onOpenYear={(summary) => setSelectedYearSummary(summary)}
+            onPauseOmoide={() => {
+              pauseOmoideMemories();
+              setOmoideRefreshTick((value) => value + 1);
+            }}
+            onDisableOmoide={() => {
+              disableOmoideMemories(!omoideControls.disabled);
+              setOmoideRefreshTick((value) => value + 1);
+            }}
           />
         ) : null}
 
@@ -1914,10 +1923,13 @@ function RecordOverview({
   familyDuration,
   birthdayStatus,
   takenSleepingPhotoCount,
+  omoideControls,
   onOpenMemory,
   onOpenPhoto,
   onOpenPhotos,
   onOpenYear,
+  onPauseOmoide,
+  onDisableOmoide,
 }: {
   activeCatId: string | null;
   photos: LensPhoto[];
@@ -1926,13 +1938,17 @@ function RecordOverview({
   familyDuration: { primary: string; secondary: string };
   birthdayStatus: { copy: string; isToday: boolean } | null;
   takenSleepingPhotoCount: number;
+  omoideControls: ReturnType<typeof readOmoideMemoryControls>;
   onOpenMemory: (memory: OmoideMemory) => void;
   onOpenPhoto: (photo: RecordPhotoPreview) => void;
   onOpenPhotos: () => void;
   onOpenYear: (summary: CatYearSummary) => void;
+  onPauseOmoide: () => void;
+  onDisableOmoide: () => void;
 }) {
   const [pickupRefreshTick, setPickupRefreshTick] = useState(0);
   const now = getClientNow();
+  const openedMemories = memories.filter((memory) => Boolean(memory.openedAt));
   const pickup = selectCatPickup({
     now,
     photos,
@@ -2093,6 +2109,16 @@ function RecordOverview({
           <p style={styles.recordEmptyText}>最近の記録はまだありません。</p>
         )}
       </section>
+
+      {openedMemories.length > 0 ? (
+        <OmoideBunbako
+          memories={openedMemories}
+          controls={omoideControls}
+          onOpen={onOpenMemory}
+          onPause={onPauseOmoide}
+          onDisable={onDisableOmoide}
+        />
+      ) : null}
 
       <section style={styles.recordBlock} aria-labelledby="cats-archive-heading">
         <h2 id="cats-archive-heading" style={styles.recordBlockTitle}>

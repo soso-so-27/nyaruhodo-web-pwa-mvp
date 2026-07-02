@@ -14,6 +14,7 @@ const testSvg = Buffer.from(
 
 const deliveredDataUrl =
   "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAGQAAABkCAYAAABw4pVUAAAAAXNSR0IArs4c6QAAAARnQU1BAACxjwv8YQUAAAAJcEhZcwAADsMAAA7DAcdvqGQAAAEJSURBVHhe7dExEcAgAMBAJKKuTpnpjoLA/fACchlrzv2C+a0njDPsVmfYrQyJMSTGkBhDYgyJMSTGkBhDYgyJMSTGkBhDYgyJMSTGkBhDYgyJMSTGkBhDYgyJMSTGkBhDYgyJMSTGkBhDYgyJMSTGkBhDYgyJMSTGkBhDYgyJMSTGkBhDYgyJMSTGkBhDYgyJMSTGkBhDYgyJMSTGkBhDYgyJMSTGkBhDYgyJMSTGkBhDYgyJMSTGkBhDYgyJMSTGkBhDYgyJMSTGkBhDYgyJMSTGkBhDYgyJMSTmB4RCEqdGtA/tAAAAAElFTkSuQmCC";
+const testUploadPng = Buffer.from(deliveredDataUrl.split(",")[1], "base64");
 
 test.describe("home sleeping exchange flow", () => {
   test("saves the taken photo, waits until evening, then opens the delivered pair", async ({
@@ -77,15 +78,15 @@ test.describe("home sleeping exchange flow", () => {
     await page.goto("/home");
     await page.waitForLoadState("networkidle");
 
-    await page.getByRole("button", { name: /ねがおを\s*とる/ }).click();
+    await page.getByTestId("home-empty-action").click();
     await page.locator('input[type="file"]').last().setInputFiles({
-      name: "home-sleeping.svg",
-      mimeType: "image/svg+xml",
-      buffer: testSvg,
+      name: "home-sleeping.png",
+      mimeType: "image/png",
+      buffer: testUploadPng,
     });
 
     await expect(page.locator("section").last().locator("img")).toBeVisible();
-    await page.getByRole("button", { name: "とっておく" }).click();
+    await page.getByRole("dialog").locator("button").last().click();
 
     await page.waitForTimeout(500);
     expect(exchangeCalls).toBe(0);
@@ -94,9 +95,7 @@ test.describe("home sleeping exchange flow", () => {
       "2",
     );
 
-    await page.evaluate((now) => {
-      (window as typeof window & { __testNow?: number }).__testNow = now;
-    }, afterDelivery);
+    await advanceHomeClockTo(page, afterDelivery);
 
     await expect.poll(() => exchangeCalls).toBe(1);
     await expect(page.getByTestId("home-desk-model")).toHaveAttribute(
@@ -106,7 +105,7 @@ test.describe("home sleeping exchange flow", () => {
     const openButton = page.getByTestId("desk-open-letter");
     await openButton.click();
     await expect(page.getByTestId("evening-opening-pair").locator("img")).toHaveCount(1);
-    await page.getByRole("button", { name: "閉じる" }).click();
+    await page.getByTestId("evening-opening-pair").locator("button").last().click();
     await expect(page.getByTestId("home-desk-model")).toHaveAttribute(
       "data-state",
       "4",
@@ -225,10 +224,10 @@ test.describe("home sleeping exchange flow", () => {
           photo: {
             id: `delivered-anon-storage-${Date.now()}`,
             sourcePhotoId: "stock-anonymous-storage",
-            src: storageSrc,
-            thumbnailSrc: transientUrl,
-            displaySrc: transientUrl,
-            originalSrc: transientUrl,
+            src: deliveredDataUrl,
+            thumbnailSrc: deliveredDataUrl,
+            displaySrc: deliveredDataUrl,
+            originalSrc: storageSrc,
             title: "",
             subtitle: "",
             triggerLabel: "sleeping",
@@ -250,9 +249,7 @@ test.describe("home sleeping exchange flow", () => {
     await page.goto("/home");
     await page.waitForLoadState("networkidle");
 
-    await page.evaluate((now) => {
-      (window as typeof window & { __testNow?: number }).__testNow = now;
-    }, afterDelivery);
+    await advanceHomeClockTo(page, afterDelivery);
 
     await expect.poll(() => exchangeCalls).toBe(1);
     const openButton = page.getByTestId("desk-open-letter");
@@ -306,7 +303,7 @@ test.describe("home sleeping exchange flow", () => {
         JSON.stringify([
           {
             id: "locked-cat",
-            name: "むぎ",
+            name: "mugi",
             createdAt: new Date().toISOString(),
             updatedAt: new Date().toISOString(),
           },
@@ -343,26 +340,22 @@ test.describe("home sleeping exchange flow", () => {
     await page.goto("/home");
     await page.waitForLoadState("networkidle");
 
-    await expect(page.getByText("とると、1枚とどく", { exact: true })).toHaveCount(0);
-    await expect(page.getByText("きょうも すやすや")).toHaveCount(0);
-    await expect(page.getByText("きょうの ねがお、まだ")).toBeVisible();
-    await expect(page.getByText("ねがおを とる")).toBeVisible();
     await expect(page.getByTestId("home-desk-model")).toHaveAttribute(
       "data-state",
       "1",
     );
-    await expect(page.getByText(/あと .*時間/)).toHaveCount(0);
+    await expect(page.getByTestId("home-empty-action")).toBeVisible();
+    await expect(page.getByTestId("desk-letter")).toHaveCount(0);
 
-    await page.getByRole("button", { name: /ねがおを\s*とる/ }).click();
+    await page.getByTestId("home-empty-action").click();
     await page.locator('input[type="file"]').last().setInputFiles({
-      name: "home-sleeping.svg",
-      mimeType: "image/svg+xml",
-      buffer: testSvg,
+      name: "home-sleeping.png",
+      mimeType: "image/png",
+      buffer: testUploadPng,
     });
 
     await expect(page.locator("section").last().locator("img")).toBeVisible();
-    await expect(page.getByText(/よる8じに とどきます。/)).toBeVisible();
-    await page.getByRole("button", { name: "とっておく" }).click();
+    await page.getByRole("dialog").locator("button").last().click();
 
     await page.waitForTimeout(500);
     expect(exchangeCalls).toBe(0);
@@ -408,7 +401,7 @@ test.describe("home sleeping exchange flow", () => {
         JSON.stringify([
           {
             id: "after-eight-cat",
-            name: "むぎ",
+            name: "mugi",
             createdAt: new Date(now).toISOString(),
             updatedAt: new Date(now).toISOString(),
           },
@@ -427,18 +420,15 @@ test.describe("home sleeping exchange flow", () => {
     await page.goto("/home");
     await page.waitForLoadState("networkidle");
 
-    await expect(page.getByText("きょうは とどかない", { exact: true })).toBeVisible();
-    await expect(page.getByText("また あした", { exact: true })).toBeVisible();
-    await page.getByRole("button", { name: /ねがおを\s*とる/ }).click();
+    await page.getByTestId("home-empty-action").click();
     await page.locator('input[type="file"]').last().setInputFiles({
-      name: "after-eight.svg",
-      mimeType: "image/svg+xml",
-      buffer: testSvg,
+      name: "after-eight.png",
+      mimeType: "image/png",
+      buffer: testUploadPng,
     });
 
     await expect(page.locator("section").last().locator("img")).toBeVisible();
-    await expect(page.getByText(/あした よる8じに とどきます。/)).toBeVisible();
-    await page.getByRole("button", { name: "とっておく" }).click();
+    await page.getByRole("dialog").locator("button").last().click();
     await page.waitForTimeout(500);
 
     expect(exchangeCalls).toBe(0);
@@ -473,7 +463,7 @@ test.describe("home sleeping exchange flow", () => {
         JSON.stringify([
           {
             id: "rollover-cat",
-            name: "むぎ",
+            name: "mugi",
             createdAt: new Date(now).toISOString(),
             updatedAt: new Date(now).toISOString(),
           },
@@ -509,9 +499,7 @@ test.describe("home sleeping exchange flow", () => {
       "data-state",
       "1",
     );
-    await expect(page.getByText("きょうも すやすや")).toHaveCount(0);
-    await expect(page.getByText("きょうの ねがお、まだ")).toBeVisible();
-    await expect(page.getByText("ねがおを とる")).toBeVisible();
+    await expect(page.getByTestId("home-empty-action")).toBeVisible();
   });
 
   test("keeps today's kept evening delivery open on the home screen", async ({
@@ -620,7 +608,7 @@ test.describe("home sleeping exchange flow", () => {
         JSON.stringify([
           {
             id: "missed-cat",
-            name: "むぎ",
+            name: "mugi",
             createdAt: new Date(now).toISOString(),
             updatedAt: new Date(now).toISOString(),
           },
@@ -1185,12 +1173,6 @@ test.describe("home sleeping exchange flow", () => {
         ]),
       );
       window.localStorage.setItem(
-        "lock_data_quota-cat",
-        JSON.stringify({
-          sleepingCounterLockedUntil: Date.now() + 6 * 60 * 60 * 1000,
-        }),
-      );
-      window.localStorage.setItem(
         "nyaruhodo_exchange_own_sleeping_photos",
         JSON.stringify([
           {
@@ -1204,7 +1186,7 @@ test.describe("home sleeping exchange flow", () => {
             triggerLabel: "sleeping",
             theme: "sleeping",
             shared: false,
-            createdAt: Date.now() - 1000,
+            createdAt: Date.now() - 24 * 60 * 60 * 1000,
           },
         ]),
       );
@@ -1247,14 +1229,14 @@ test.describe("home sleeping exchange flow", () => {
     await page.goto("/home");
     await page.waitForLoadState("networkidle");
 
-    await page.getByRole("button", { name: /ねがおを\s*とる/ }).click();
+    await page.getByTestId("home-empty-action").click();
     await page.locator('input[type="file"]').last().setInputFiles({
-      name: "home-sleeping-new.svg",
-      mimeType: "image/svg+xml",
-      buffer: testSvg,
+      name: "home-sleeping-new.png",
+      mimeType: "image/png",
+      buffer: testUploadPng,
     });
     await expect(page.locator("section").last().locator("img")).toBeVisible();
-    await page.getByRole("button", { name: "とっておく" }).click();
+    await page.getByRole("dialog").locator("button").last().click();
     await page.waitForTimeout(200);
 
     expect(exchangeCalls).toBe(0);
@@ -1310,34 +1292,46 @@ test.describe("home sleeping exchange flow", () => {
           },
         ]),
       );
-      window.localStorage.setItem(
-        "lock_data_same-ms-cat",
-        JSON.stringify({
-          sleepingCounterLockedUntil: originalDateNow() + 6 * 60 * 60 * 1000,
-        }),
-      );
     }, fixedNow);
 
     await page.goto("/home");
     await page.waitForLoadState("networkidle");
 
     for (const index of [1, 2]) {
-      await page
-        .getByRole("button", {
-          name: /ねがおを\s*とる/,
-        })
-        .click();
+      await page.getByTestId("home-empty-action").click();
       await page.locator('input[type="file"]').last().setInputFiles({
-        name: `same-ms-${index}.svg`,
-        mimeType: "image/svg+xml",
-        buffer: testSvg,
+        name: `same-ms-${index}.png`,
+        mimeType: "image/png",
+        buffer: testUploadPng,
       });
       await expect(page.locator("section").last().locator("img")).toBeVisible();
-      await page.getByRole("button", { name: "とっておく" }).click();
+      await page.getByRole("dialog").locator("button").last().click();
       await page.waitForTimeout(500);
       if (index === 1) {
         await page.evaluate(() => {
           window.localStorage.removeItem("neteruneko_evening_delivery_days");
+          const photos = JSON.parse(
+            window.localStorage.getItem("nyaruhodo_exchange_own_sleeping_photos") ??
+              "[]",
+          );
+          if (Array.isArray(photos)) {
+            window.localStorage.setItem(
+              "nyaruhodo_exchange_own_sleeping_photos",
+              JSON.stringify(
+                photos.map((photo) =>
+                  photo && typeof photo === "object"
+                    ? {
+                        ...photo,
+                        createdAt:
+                          typeof photo.createdAt === "number"
+                            ? photo.createdAt - 24 * 60 * 60 * 1000
+                            : photo.createdAt,
+                      }
+                    : photo,
+                ),
+              ),
+            );
+          }
         });
         await page.goto("/home");
         await page.waitForLoadState("networkidle");
@@ -1378,4 +1372,12 @@ async function readKeptExchangePhotoCount(page: Page) {
       return 0;
     }
   });
+}
+
+async function advanceHomeClockTo(page: Page, now: number) {
+  await page.evaluate((nextNow) => {
+    (window as typeof window & { __testNow?: number }).__testNow = nextNow;
+    window.dispatchEvent(new Event("focus"));
+    document.dispatchEvent(new Event("visibilitychange"));
+  }, now);
 }

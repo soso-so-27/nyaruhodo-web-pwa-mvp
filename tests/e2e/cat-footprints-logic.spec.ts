@@ -54,7 +54,7 @@ test.describe("cat footprints", () => {
     });
 
     expect(entries).toHaveLength(1);
-    expect(entries[0].title).toBe("ピックアップを見た");
+    expect(entries[0].title).toBe("思い出を見た");
     expect(entries[0].type).toBe("pickup");
   });
 

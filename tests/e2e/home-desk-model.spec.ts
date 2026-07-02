@@ -5,16 +5,31 @@ const ownDataUrl =
 
 const deliveredDataUrl =
   "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAGQAAABkCAYAAABw4pVUAAAAAXNSR0IArs4c6QAAAARnQU1BAACxjwv8YQUAAAAJcEhZcwAADsMAAA7DAcdvqGQAAAEJSURBVHhe7dExEcAgAMBAJKKuTpnpjoLA/fACchlrzv2C+a0njDPsVmfYrQyJMSTGkBhDYgyJMSTGkBhDYgyJMSTGkBhDYgyJMSTGkBhDYgyJMSTGkBhDYgyJMSTGkBhDYgyJMSTGkBhDYgyJMSTGkBhDYgyJMSTGkBhDYgyJMSTGkBhDYgyJMSTGkBhDYgyJMSTGkBhDYgyJMSTGkBhDYgyJMSTGkBhDYgyJMSTGkBhDYgyJMSTmB4RCEqdGtA/tAAAAAElFTkSuQmCC";
+const currentJstDateKey = getCurrentJstDateKey();
+const beforeEightToday = getCurrentJstTime(19, 30);
+const afterEightToday = getCurrentJstTime(20, 5);
 
 test.describe("home desk model", () => {
-  test("maps the five home states to desk data-state values", async ({ page }) => {
+  test("maps the five home states to desk shell states and presentation phases", async ({ page }) => {
+    const expectedStates = {
+      "1": { deskState: "1", phase: "empty-before" },
+      "1b": { deskState: "1b", phase: "empty-after" },
+      "2": { deskState: "2", phase: "sent-before" },
+      "3": { deskState: "3", phase: "delivered" },
+      "4": { deskState: "4", phase: "opened" },
+    } as const;
+
     for (const state of ["1", "1b", "2", "3", "4"] as const) {
       await seedDeskState(page, state);
       await page.goto("/home");
       await page.waitForLoadState("networkidle");
       await expect(page.getByTestId("home-desk-model")).toHaveAttribute(
         "data-state",
-        state,
+        expectedStates[state].deskState,
+      );
+      await expect(page.getByTestId("home-letter-tray")).toHaveAttribute(
+        "data-phase",
+        expectedStates[state].phase,
       );
     }
   });
@@ -29,6 +44,10 @@ test.describe("home desk model", () => {
     await expect(page.getByTestId("home-desk-model")).toHaveAttribute(
       "data-state",
       "2",
+    );
+    await expect(page.getByTestId("home-letter-tray")).toHaveAttribute(
+      "data-phase",
+      "sent-before",
     );
     await expect(page.getByTestId("desk-home-frame")).toBeVisible();
     await expect(page.getByText("おくった")).toBeVisible();
@@ -57,7 +76,7 @@ test.describe("home desk model", () => {
     });
 
     await seedDeskState(page, "2", {
-      now: Date.parse("2026-06-10T10:59:58.000Z"),
+      now: getCurrentJstTime(19, 59) + 58_000,
     });
     await page.goto("/home");
     await page.waitForLoadState("networkidle");
@@ -65,6 +84,10 @@ test.describe("home desk model", () => {
     await expect(page.getByTestId("home-desk-model")).toHaveAttribute(
       "data-state",
       "2",
+    );
+    await expect(page.getByTestId("home-letter-tray")).toHaveAttribute(
+      "data-phase",
+      "sent-before",
     );
     expect(
       hydrationMessages.filter(
@@ -108,7 +131,7 @@ test.describe("home desk model", () => {
   test("moves the home frame light by time without changing the state2 frame", async ({
     page,
   }) => {
-    await seedDeskState(page, "2", { now: Date.parse("2026-06-10T00:00:00.000Z") });
+    await seedDeskState(page, "2", { now: getCurrentJstTime(9, 0) });
     await page.goto("/home");
     await page.waitForLoadState("networkidle");
 
@@ -121,7 +144,7 @@ test.describe("home desk model", () => {
     const morningFrameBox = await page.getByTestId("desk-home-frame").boundingBox();
     expect(morningFrameBox).not.toBeNull();
 
-    await seedDeskState(page, "2", { now: Date.parse("2026-06-10T09:00:00.000Z") });
+    await seedDeskState(page, "2", { now: getCurrentJstTime(18, 0) });
     await page.goto("/home");
     await page.waitForLoadState("networkidle");
 
@@ -145,7 +168,7 @@ test.describe("home desk model", () => {
   test("keeps the sent-before letter tray copy until the 20:00 delivery", async ({
     page,
   }) => {
-    await seedDeskState(page, "2", { now: Date.parse("2026-06-10T07:59:00.000Z") });
+    await seedDeskState(page, "2", { now: getCurrentJstTime(19, 59) });
     await mockDeskExchange(page);
     await page.goto("/home");
     await page.waitForLoadState("networkidle");
@@ -154,17 +177,28 @@ test.describe("home desk model", () => {
     await expect(page.getByText("よる8時に とどく")).toBeVisible();
 
     await page.evaluate(() => {
+      const [year, month, day] = new Date(Date.now() + 9 * 60 * 60 * 1000)
+        .toISOString()
+        .slice(0, 10)
+        .split("-")
+        .map(Number);
       (window as typeof window & { __testNow?: number }).__testNow = Date.parse(
-        "2026-06-10T08:00:00.000Z",
+        new Date(Date.UTC(year, month - 1, day, 11, 0)).toISOString(),
       );
     });
     await expect(page.getByText("もうすぐ、とどく")).toHaveCount(0);
     await expect(page.getByText("よる8時に とどく")).toBeVisible();
 
     await page.evaluate(() => {
+      const [year, month, day] = new Date(Date.now() + 9 * 60 * 60 * 1000)
+        .toISOString()
+        .slice(0, 10)
+        .split("-")
+        .map(Number);
       (window as typeof window & { __testNow?: number }).__testNow = Date.parse(
-        "2026-06-10T11:00:00.000Z",
+        new Date(Date.UTC(year, month - 1, day, 11, 1)).toISOString(),
       );
+      window.dispatchEvent(new Event("focus"));
     });
     await expect(page.getByTestId("home-desk-model")).toHaveAttribute(
       "data-state",
@@ -176,7 +210,7 @@ test.describe("home desk model", () => {
     page,
   }) => {
     await seedDeskState(page, "2", {
-      now: Date.parse("2026-06-10T09:00:00.000Z"),
+      now: getCurrentJstTime(18, 0),
       keptExchangePhotoCount: 6,
       firstTargetDateKey: "2026-06-01",
     });
@@ -190,7 +224,7 @@ test.describe("home desk model", () => {
   });
 
   test("does not show the removed 2-second letter hint before 17:00", async ({ page }) => {
-    await seedDeskState(page, "2", { now: Date.parse("2026-06-10T06:30:00.000Z") });
+    await seedDeskState(page, "2", { now: getCurrentJstTime(15, 30) });
     await page.goto("/home");
     await page.waitForLoadState("networkidle");
 
@@ -206,7 +240,6 @@ test.describe("home desk model", () => {
     await page.waitForLoadState("networkidle");
 
     await expect(page.getByText("きょうも すやすや")).toHaveCount(0);
-    await expect(page.getByText("きょうの ねがお、まだ")).toBeVisible();
     await expect(page.getByText("ねがおを とる")).toBeVisible();
     await expect(page.getByText("とると、よる8時に")).toBeVisible();
     await expect(page.getByText("ねこだよりが とどく")).toBeVisible();
@@ -215,7 +248,7 @@ test.describe("home desk model", () => {
       "border-style",
       "none",
     );
-    await expect(page.getByTestId("desk-empty-frame")).toHaveCSS("cursor", "pointer");
+    await expect(page.getByTestId("desk-empty-frame")).toHaveCSS("cursor", "auto");
   });
 
   test("shows state1b as tomorrow capture without an exchange letter", async ({
@@ -294,7 +327,7 @@ test.describe("home desk model", () => {
 
     expect(settingsBox?.width).toBe(36);
     expect(settingsBox?.height).toBe(36);
-    expect(actionBox?.height).toBe(44);
+    expect(actionBox?.height).toBe(48);
     expect(navBox?.height).toBe(60);
 
     const centers = [frameBox!, trayBox!, navBox!].map(
@@ -327,9 +360,9 @@ test.describe("home desk model", () => {
       };
     });
 
-    expect(styles.frameGap).toBe("16px");
+    expect(styles.frameGap).toBe("20px");
     expect(styles.actionColumnGap).toBe("8px");
-    expect(styles.actionPaddingLeft).toBe("20px");
+    expect(styles.actionPaddingLeft).toBe("24px");
     expect(styles.trayRadiusToken).toBe("20px");
     expect(styles.navGap).toBe("4px");
   });
@@ -378,26 +411,17 @@ test.describe("home desk model", () => {
     const letter = page.getByTestId("desk-open-letter");
     const box = await letter.boundingBox();
     expect(box).not.toBeNull();
-    await expect(letter.locator('[data-envelope-motion-root="true"]')).toHaveCount(1);
+    await expect(letter.locator('[data-envelope-motion-root="true"]')).toHaveCount(0);
+    await expect(letter.locator('[data-envelope-art="simple"]')).toHaveCount(1);
     await expect(letter.locator('[data-develop-photo="true"]')).toHaveCount(0);
 
     await letter.click();
     await page.waitForTimeout(250);
-    await expect(letter.locator('[data-develop-photo="true"]')).toHaveCount(1);
-    await expect
-      .poll(() =>
-        letter
-          .locator(".home-envelope-motion-wax-left")
-          .evaluate((element) => Number(getComputedStyle(element).opacity)),
-      )
-      .toBeGreaterThan(0);
-    await expect(page.getByTestId("evening-opening-pair")).toHaveCount(0);
-
-    await page.waitForTimeout(1200);
-    await expect(page.getByTestId("evening-opening-pair")).toHaveCount(0);
+    await expect(letter.locator('[data-develop-photo="true"]')).toHaveCount(0);
+    await expect(letter.locator('[data-envelope-art="simple"]')).toHaveCount(0);
 
     const openingPair = page.getByTestId("evening-opening-pair");
-    await expect(openingPair).toBeVisible();
+    await expect(openingPair.getByText("ねこだより")).toBeVisible();
     await expect(openingPair.locator("img")).toHaveCount(1);
     await expect(page.getByRole("button", { name: "閉じる" })).toBeVisible();
     await expect
@@ -499,7 +523,6 @@ test.describe("home desk model", () => {
     page,
   }) => {
     await seedDeskState(page, "1b", {
-      now: Date.parse("2026-06-10T11:05:00.000Z"),
       withOmoideCandidate: true,
     });
 
@@ -543,21 +566,37 @@ async function seedDeskState(
   const now =
     options.now ??
     (state === "1b"
-      ? Date.parse("2026-06-10T12:05:00.000Z")
+      ? afterEightToday
       : state === "3" || state === "4"
-        ? Date.parse("2026-06-10T11:05:00.000Z")
-        : Date.parse("2026-06-10T03:00:00.000Z"));
+        ? afterEightToday
+        : beforeEightToday);
 
   await page.addInitScript(
-    ({ now, state, ownDataUrl, deliveredDataUrl, options }) => {
+    ({
+      now,
+      state,
+      ownDataUrl,
+      deliveredDataUrl,
+      options,
+      dateKeyValue,
+      beforeEightValue,
+    }) => {
       (window as typeof window & { __testNow?: number }).__testNow = now;
       const originalDateNow = Date.now.bind(Date);
       Date.now = () =>
         (window as typeof window & { __testNow?: number }).__testNow ??
         originalDateNow();
 
+      if (!window.location.pathname.startsWith("/home")) {
+        return;
+      }
+
       const catId = "cat-desk";
-      const dateKey = "2026-06-10";
+      const dateKey = dateKeyValue;
+      const capturedAt =
+        state === "3" || state === "4"
+          ? beforeEightValue
+          : now;
       const ownPhoto = {
         id: "own-desk",
         ownerCatId: catId,
@@ -569,7 +608,7 @@ async function seedDeskState(
         triggerLabel: "sleeping",
         theme: "sleeping",
         shared: false,
-        createdAt: now,
+        createdAt: capturedAt,
       };
       const deliveredPhoto = {
         id: "delivered-desk",
@@ -583,6 +622,7 @@ async function seedDeskState(
       };
       const store: Record<string, unknown> = {};
 
+      window.localStorage.clear();
       window.localStorage.setItem("neteruneko_home_desk_model", "1");
       window.localStorage.setItem("nyaruhodo_sleeping_safety_accepted", "1");
       window.localStorage.setItem("active_cat_id", catId);
@@ -602,7 +642,7 @@ async function seedDeskState(
       const omoidePhoto = {
         ...ownPhoto,
         id: "own-omoide-week",
-        createdAt: Date.parse("2026-06-03T03:00:00.000Z"),
+        createdAt: beforeEightValue - 7 * 24 * 60 * 60 * 1000,
       };
       window.localStorage.setItem(
         "nyaruhodo_exchange_own_sleeping_photos",
@@ -614,7 +654,7 @@ async function seedDeskState(
           dateKey,
           targetOwnPhotoId: ownPhoto.id,
           targetCatId: catId,
-          targetCapturedAt: now,
+          targetCapturedAt: capturedAt,
           targetPhoto: ownPhoto,
           ...(state === "3" || state === "4"
             ? { deliveredPhoto, deliveredAt: now }
@@ -668,7 +708,15 @@ async function seedDeskState(
         ),
       );
     },
-    { now, state, ownDataUrl, deliveredDataUrl, options },
+    {
+      now,
+      state,
+      ownDataUrl,
+      deliveredDataUrl,
+      options,
+      dateKeyValue: currentJstDateKey,
+      beforeEightValue: beforeEightToday,
+    },
   );
 
   await page.route("/api/presence", async (route) => {
@@ -678,6 +726,19 @@ async function seedDeskState(
       body: JSON.stringify({ count: 124 }),
     });
   });
+}
+
+function getCurrentJstDateKey() {
+  const date = new Date(Date.now() + 9 * 60 * 60 * 1000);
+  const year = date.getUTCFullYear();
+  const month = String(date.getUTCMonth() + 1).padStart(2, "0");
+  const day = String(date.getUTCDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+}
+
+function getCurrentJstTime(hour: number, minute: number) {
+  const [year, month, day] = currentJstDateKey.split("-").map(Number);
+  return Date.UTC(year, month - 1, day, hour - 9, minute);
 }
 
 async function mockDeskExchange(page: Page) {

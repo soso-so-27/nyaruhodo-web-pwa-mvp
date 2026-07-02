@@ -89,7 +89,7 @@ test.describe("cat pickup selection", () => {
     });
 
     expect(pickup?.type).toBe("memory");
-    expect(pickup?.title).toBe("ピックアップ");
+    expect(pickup?.title).toBe("思い出");
     expect(pickup?.body).toBe("1年前のねがおです");
     expect(pickup?.score).toBeGreaterThanOrEqual(90);
   });
