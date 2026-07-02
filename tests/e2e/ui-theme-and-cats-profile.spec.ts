@@ -178,7 +178,7 @@ test("shows only filled basic profile fields", async ({ page }) => {
   await expect(page.getByText("未登録")).toHaveCount(0);
   await expect(page.getByText("なでられると好きなところ")).toBeVisible();
   await expect(page.getByText("あごの下")).toBeVisible();
-  await expect(page.getByText("7月10日は「むぎの日」")).toBeVisible();
+  await expect(page.getByText("7月10日は「むぎの日」")).toHaveCount(0);
 });
 
 test("edits weight and mixed coat without showing the old breed field", async ({

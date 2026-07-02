@@ -201,6 +201,8 @@ const styles = {
   root: {
     display: "grid",
     gap: spacing.sm,
+    minWidth: 0,
+    maxWidth: "100%",
   },
   label: {
     color: color.textMuted,
@@ -211,6 +213,8 @@ const styles = {
   },
   field: {
     width: "100%",
+    maxWidth: "100%",
+    minWidth: 0,
     boxSizing: "border-box",
     minHeight: 44,
     borderWidth: 1,
@@ -220,7 +224,7 @@ const styles = {
     background: "color-mix(in srgb, var(--paper) 72%, transparent)",
     color: color.text,
     fontFamily: typography.fontUi,
-    fontSize: typography.caption.fontSize,
+    fontSize: 16,
     fontWeight: 500,
     lineHeight: 1.4,
     padding: `0 ${spacing.md}px`,

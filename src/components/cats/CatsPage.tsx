@@ -1205,14 +1205,36 @@ export function CatsPage() {
                         />
                       </button>
                     ) : null}
-                    <button
-                      type="button"
-                      data-testid="cats-thumbnail-picker-button"
-                      style={styles.profileCoverThumbnailButton}
-                      onClick={() => setIsThumbnailPickerOpen(true)}
-                    >
-                      写真を変える
-                    </button>
+                    {activeSection === "basic" ? (
+                      <button
+                        type="button"
+                        style={{
+                          ...styles.profileCoverManageButton,
+                          ...(shouldShowCatSwitchButton
+                            ? styles.profileCoverManageButtonWithSwitch
+                            : {}),
+                        }}
+                        onClick={() => {
+                          setIsCatManageEditing(false);
+                          setIsAddingCat(false);
+                          setIsCatManageOpen(true);
+                        }}
+                        aria-label="猫を追加・管理"
+                      >
+                        <MoreDotsIcon />
+                      </button>
+                    ) : null}
+                    {activeSection === "basic" ? (
+                      <button
+                        type="button"
+                        data-testid="cats-thumbnail-picker-button"
+                        style={styles.profileCoverThumbnailButton}
+                        onClick={() => setIsThumbnailPickerOpen(true)}
+                        aria-label="代表写真を変える"
+                      >
+                        <PhotoSmallIcon />
+                      </button>
+                    ) : null}
                   </div>
                 </div>
               </>
@@ -1325,11 +1347,6 @@ export function CatsPage() {
             <CatBasicProfilePanel
               profile={activeCatProfile}
               onEdit={openCatManageEditor}
-              onManage={() => {
-                setIsCatManageEditing(false);
-                setIsAddingCat(false);
-                setIsCatManageOpen(true);
-              }}
             />
           </AppCard>
         ) : null}
@@ -2295,15 +2312,13 @@ function CatSummaryPanel({
 function CatBasicProfilePanel({
   profile,
   onEdit,
-  onManage,
 }: {
   profile: CatProfile;
   onEdit?: () => void;
-  onManage?: () => void;
 }) {
   return (
     <div style={styles.basicProfilePanel}>
-      <BasicInfoTable profile={profile} onEdit={onEdit} onManage={onManage} />
+      <BasicInfoTable profile={profile} onEdit={onEdit} />
     </div>
   );
 }
@@ -2311,20 +2326,15 @@ function CatBasicProfilePanel({
 function BasicInfoTable({
   profile,
   onEdit,
-  onManage,
 }: {
   profile: CatProfile;
   onEdit?: () => void;
-  onManage?: () => void;
 }) {
   const catDisplayName = getCatName(profile);
   const catNameForTitle = isCatProfileNameUnset(profile)
     ? "この子"
     : catDisplayName;
   const birthdayDate = formatBasicInfoDate(profile.basicInfo?.birthDate);
-  const birthdayNote = birthdayDate
-    ? `${formatBirthdayMonthDay(profile.basicInfo?.birthDate)}は「${catNameForTitle}の日」`
-    : "";
   const importantDateRows = [
     createBasicInfoRow({
       label: "家族になった日",
@@ -2335,7 +2345,6 @@ function BasicInfoTable({
     createBasicInfoRow({
       label: "誕生日",
       value: birthdayDate,
-      note: birthdayNote,
       valueTone: "numeric",
     }),
   ];
@@ -2447,11 +2456,6 @@ function BasicInfoTable({
         ) : null}
       </div>
       {hasAnyGroup ? groups.map(renderGroup) : null}
-      {onManage ? (
-        <button type="button" style={styles.basicInfoManageButton} onClick={onManage}>
-          猫を追加・管理
-        </button>
-      ) : null}
     </div>
   );
 }
@@ -3347,16 +3351,6 @@ function formatBasicInfoDate(value?: string) {
   }
 
   return `${date.getFullYear()}年${date.getMonth() + 1}月${date.getDate()}日`;
-}
-
-function formatBirthdayMonthDay(value?: string) {
-  const date = parseLocalDate(value);
-
-  if (!date) {
-    return "";
-  }
-
-  return `${date.getMonth() + 1}月${date.getDate()}日`;
 }
 
 function formatCareWeight(weightKg?: number) {
@@ -4709,23 +4703,25 @@ const styles = {
     right: "10px",
     bottom: "10px",
     zIndex: 2,
-    minHeight: "34px",
+    width: "40px",
+    height: "40px",
+    minWidth: "40px",
+    minHeight: "40px",
     display: "inline-flex",
     alignItems: "center",
     justifyContent: "center",
-    padding: "0 12px",
+    padding: 0,
     borderRadius: "999px",
-    border: "1px solid color-mix(in srgb, var(--seal) 42%, var(--paper) 58%)",
-    background:
-      "linear-gradient(180deg, color-mix(in srgb, var(--paper-card) 92%, transparent), color-mix(in srgb, var(--paper-warm) 88%, transparent))",
-    color: "var(--seal)",
+    border: "1px solid color-mix(in srgb, var(--paper) 70%, transparent)",
+    background: "color-mix(in srgb, var(--paper-card) 78%, transparent)",
+    color: "color-mix(in srgb, var(--ink) 78%, transparent)",
     fontFamily: CATS_UI,
     fontSize: CATS_META_SIZE,
-    fontWeight: 600,
+    fontWeight: 500,
     lineHeight: 1,
     letterSpacing: "0",
     boxShadow:
-      "0 1px 0 color-mix(in srgb, var(--paper) 80%, transparent), 0 12px 24px -16px color-mix(in srgb, var(--seal) 38%, transparent)",
+      "0 1px 0 color-mix(in srgb, var(--paper) 64%, transparent), 0 10px 20px -18px color-mix(in srgb, var(--ink) 30%, transparent)",
     cursor: "pointer",
     WebkitTapHighlightColor: "transparent",
     backdropFilter: "blur(10px)",
@@ -4760,6 +4756,32 @@ const styles = {
     display: "block",
     objectFit: "contain",
     opacity: 0.82,
+  },
+  profileCoverManageButton: {
+    position: "absolute" as const,
+    left: "10px",
+    top: "10px",
+    zIndex: 2,
+    width: "40px",
+    height: "40px",
+    minWidth: "40px",
+    display: "inline-flex",
+    alignItems: "center",
+    justifyContent: "center",
+    padding: 0,
+    borderRadius: "999px",
+    border: "1px solid color-mix(in srgb, var(--paper) 70%, transparent)",
+    background: "color-mix(in srgb, var(--paper-card) 78%, transparent)",
+    color: "color-mix(in srgb, var(--ink) 78%, transparent)",
+    boxShadow:
+      "0 1px 0 color-mix(in srgb, var(--paper) 64%, transparent), 0 10px 20px -18px color-mix(in srgb, var(--ink) 30%, transparent)",
+    cursor: "pointer",
+    WebkitTapHighlightColor: "transparent",
+    backdropFilter: "blur(10px)",
+    WebkitBackdropFilter: "blur(10px)",
+  },
+  profileCoverManageButtonWithSwitch: {
+    left: "58px",
   },
   profileHero: {
     display: "grid",
@@ -5628,7 +5650,7 @@ const styles = {
   },
   basicInfoBlock: {
     display: "grid",
-    gap: "9px",
+    gap: "15px",
   },
   basicProfilePanel: {
     display: "grid",
@@ -5636,7 +5658,8 @@ const styles = {
   },
   basicInfoPanel: {
     marginBottom: "22px",
-    background: CATS_PANEL_BACKGROUND,
+    background: "transparent",
+    boxShadow: "none",
     backdropFilter: "none",
   },
   basicInfoHeader: {
@@ -5678,34 +5701,36 @@ const styles = {
     gap: "6px",
     padding: "0 10px",
     borderRadius: "999px",
-    border: "1px solid color-mix(in srgb, var(--line-strong) 60%, transparent)",
-    background: "color-mix(in srgb, var(--paper-card) 50%, transparent)",
+    border: "1px solid color-mix(in srgb, var(--line) 56%, transparent)",
+    background: "color-mix(in srgb, var(--paper) 36%, transparent)",
     color: CATS_MUTED,
     fontFamily: CATS_UI,
     fontSize: CATS_META_SIZE,
-    fontWeight: 600,
+    fontWeight: 500,
     lineHeight: 1,
     letterSpacing: "0",
     cursor: "pointer",
   },
   basicInfoTable: {
     display: "grid",
-    borderRadius: "var(--radius-lg)",
-    border: "1px solid color-mix(in srgb, var(--line-strong) 62%, transparent)",
-    overflow: "hidden",
-    background: "color-mix(in srgb, var(--paper) 34%, transparent)",
+    gap: "12px",
+    borderRadius: 0,
+    border: "none",
+    overflow: "visible",
+    background: "transparent",
   },
   basicInfoSubsection: {
     display: "grid",
-    gap: "8px",
-    paddingTop: "7px",
+    gap: "9px",
+    paddingTop: "14px",
+    borderTop: "1px solid color-mix(in srgb, var(--line) 58%, transparent)",
   },
   basicInfoSubsectionTitle: {
     margin: 0,
     color: CATS_MUTED,
     fontFamily: CATS_UI,
     fontSize: CATS_META_SIZE,
-    fontWeight: 600,
+    fontWeight: 500,
     lineHeight: 1.4,
     letterSpacing: "0.08em",
   },
@@ -5724,10 +5749,10 @@ const styles = {
   },
   basicInfoRow: {
     display: "grid",
-    gap: "6px",
+    gap: "5px",
     minHeight: "auto",
-    padding: "12px",
-    borderBottom: "1px solid color-mix(in srgb, var(--line-strong) 46%, transparent)",
+    padding: "0",
+    borderBottom: "none",
   },
   basicInfoLabel: {
     display: "inline-flex",
@@ -5759,7 +5784,7 @@ const styles = {
     color: CATS_TEXT,
     fontFamily: CATS_UI,
     fontSize: "16px",
-    fontWeight: 500,
+    fontWeight: 400,
     lineHeight: 1.65,
     letterSpacing: CATS_BODY_TRACKING,
     whiteSpace: "pre-wrap",
@@ -6658,7 +6683,9 @@ const styles = {
     gap: "7px",
     padding: "0 11px",
     borderRadius: "var(--radius-full)",
-    border: "1px solid color-mix(in srgb, var(--line-strong) 64%, transparent)",
+    borderWidth: "1px",
+    borderStyle: "solid",
+    borderColor: "color-mix(in srgb, var(--line-strong) 64%, transparent)",
     background: "color-mix(in srgb, var(--paper) 62%, transparent)",
     color: CATS_MUTED,
     fontFamily: CATS_UI,
