@@ -285,12 +285,8 @@ export function CatsPage() {
       ),
     [hasRemoteLensPhotosLoaded, localLensPhotos.all, remoteLensPhotosByCat],
   );
-  const allGalleryLensPhotos = useMemo(
-    () => allLensPhotos.filter(isCatGalleryLensPhoto),
-    [allLensPhotos],
-  );
   const photoSheetPhotos =
-    photoSheetLens === "all" ? allGalleryLensPhotos : activeCatGalleryLensPhotos;
+    photoSheetLens === "all" ? allLensPhotos : activeCatLensPhotos;
   const photoSheetTitle =
     photoSheetLens === "all" ? "ぜんぶの写真" : "この子の写真";
 
@@ -1334,8 +1330,8 @@ export function CatsPage() {
         activeLens === "cat" ? (
           <LensPhotoSection
             title="この子の写真"
-            photos={activeCatGalleryLensPhotos}
-            emptyCopy="毎日のねがおは別にたまります。ここには「この子の写真を残す」で選んだ写真だけが入ります。"
+            photos={activeCatLensPhotos}
+            emptyCopy="まだ写真はありません。ねがおを撮るか、あとから見返したい写真を残すと、ここに並びます。"
             onAddPhoto={() => {
               void handleAddCatPhoto();
             }}
@@ -1348,7 +1344,7 @@ export function CatsPage() {
         activeSection === "photos" &&
         activeLens === "all" ? (
           <AllCatsLensView
-            photos={allGalleryLensPhotos}
+            photos={allLensPhotos}
             catCount={catProfiles.length}
             onOpenPhoto={(photo) => setSelectedRecordPhoto(toRecordPhotoPreview(photo))}
           />
@@ -2480,7 +2476,7 @@ function LensPhotoSection({
           </button>
         </div>
         <p style={styles.lensSectionSub}>
-          毎日のねがおとは別に、あとから見返したい写真を選んで残せます。ねこだよりには使われません。100枚まで。
+          毎日のねがおと、選んで残した写真が並びます。「写真を残す」で選んだ写真は、ねこだよりには使われません。100枚まで。
         </p>
       </div>
       <LensPhotoGrid

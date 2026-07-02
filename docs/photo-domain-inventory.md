@@ -32,8 +32,9 @@
 
 ## この子の写真の運用方針
 
-- `この子の写真` は写真の原本保管アプリではなく、あとから見返したい猫の写真を選んで残す場所。
-- `ねがお` は自動では `この子の写真` に入れない。`この子の写真` に出るのは、ユーザーが明示的に残した `catGalleryPhotos` だけ。
+- `この子の写真` は写真の原本保管アプリではなく、その子の写真をあとから見返す場所。
+- `この子の写真` の画面には、毎日の `ねがお` (`ownSleepingPhotos`) と、ユーザーが明示的に残した写真 (`catGalleryPhotos`) の両方を並べる。
+- `ねがお` は `catGalleryPhotos` へ自動コピーしない。`この子の写真を残す` で選んだ写真だけが `catGalleryPhotos` になる。
 - `この子の写真` 100枚枠を消費するのは `catGalleryPhotos` だけ。`ねがお` は別の記録として `ownSleepingPhotos` にたまり、100日撮ってもこの枠は消費しない。
 - 一括追加、自動バックアップ、無制限保存はしない。1枚ずつ選んで残す。
 - 現時点では、猫ごとに100枚まで保存できる。
@@ -55,13 +56,14 @@
 
 ## Account reconnect / restore rule
 
-- `この子の写真` is `catGalleryPhotos`; `ねがお` is `ownSleepingPhotos`.
-- `ねがお` is not automatically copied into `この子の写真`, and it does not consume the 100-photo cat gallery limit.
+- `この子の写真` UI displays both `ownSleepingPhotos` and `catGalleryPhotos`.
+- `catGalleryPhotos` remains the manually saved photo domain, synced through `collection_photos.slot_slug="__cat_gallery"`.
+- `ねがお` is not automatically copied into `catGalleryPhotos`, and it does not consume the 100-photo cat gallery limit.
 - `この子の写真` syncs through `collection_photos.slot_slug="__cat_gallery"`.
 - After Google reconnect, remote `__cat_gallery` rows should be merged back into local `neteruneko_cat_gallery_photos`.
 - If remote `__cat_gallery` is empty, local `catGalleryPhotos` must not be cleared.
-- `/cats` displays local restored `catGalleryPhotos`; remote `__cat_gallery` should be restored first rather than mixed into regular collection display.
-- Empty states should explain that daily `ねがお` is stored separately and that only photos explicitly saved via `この子の写真を残す` appear here.
+- `/cats` displays the merged photo lens (`ownSleepingPhotos` + restored `catGalleryPhotos`); remote `__cat_gallery` should be restored first rather than mixed into regular collection display.
+- Empty states should explain that daily `ねがお` and photos saved via `この子の写真を残す` both appear in the photo lens, while only manually saved photos count toward the 100-photo gallery limit.
 - Known account reconnect risk: Safari, PWA, and Instagram in-app browser can have separate browser storage. If `nyaruhodo_supabase_auth` is missing in the current context, the app may look disconnected even if another browser context is still connected.
 - No silent sign-out path should clear account data during cat gallery restore. Explicit logout remains the settings `signOut()` action.
 
