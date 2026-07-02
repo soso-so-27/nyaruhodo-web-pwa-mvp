@@ -95,20 +95,24 @@ export type CatAppearance = {
 export type CatCoat =
   | "saba"
   | "cream"
+  | "kiji_tabby"
   | "gray"
   | "orange_tabby"
   | "black"
   | "white"
+  | "hachiware"
   | "calico";
 
 export function getCatAvatarSrcForCoat(coat?: CatCoat) {
   const avatars: Record<CatCoat, string> = {
     saba: "saba",
     cream: "saba",
+    kiji_tabby: "saba",
     gray: "gray",
     orange_tabby: "orange_tabby",
     black: "black",
     white: "white",
+    hachiware: "black",
     calico: "calico",
   };
 
@@ -1085,10 +1089,12 @@ function isValidCatAppearance(
     [
       "cream",
       "saba",
+      "kiji_tabby",
       "gray",
       "orange_tabby",
       "black",
       "white",
+      "hachiware",
       "calico",
     ].includes(appearance.coat)
   );

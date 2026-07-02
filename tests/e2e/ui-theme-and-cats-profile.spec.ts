@@ -148,6 +148,97 @@ test("lets the owner choose a cat thumbnail from existing photos", async ({
     .toBe(photoDataUrl);
 });
 
+test("shows only filled basic profile fields", async ({ page }) => {
+  await seedCatsBasicProfile(page, {
+    basicInfo: {
+      familySinceDate: "2022-09-22",
+      birthDate: "2022-07-10",
+      gender: "male",
+      personality: {
+        favoriteTouch: "あごの下",
+      },
+    },
+    appearance: {
+      coat: "orange_tabby",
+    },
+  });
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto("/cats");
+  await page.waitForLoadState("networkidle");
+  await page.getByTestId("cats-section-tab-basic").click();
+
+  await expect(page.getByText("むぎのこと")).toBeVisible();
+  await expect(page.getByText("たいせつな日")).toBeVisible();
+  await expect(page.getByText("見た目")).toBeVisible();
+  await expect(page.getByText("この子らしさ")).toBeVisible();
+  await expect(page.getByText("ケアのメモ")).toHaveCount(0);
+  await expect(page.getByText("かかりつけ")).toHaveCount(0);
+  await expect(page.getByText("未登録")).toHaveCount(0);
+  await expect(page.getByText("なでられると好きなところ")).toBeVisible();
+  await expect(page.getByText("あごの下")).toBeVisible();
+  await expect(page.getByText("7月10日は「むぎの日」")).toBeVisible();
+});
+
+test("edits weight and mixed coat without showing the old breed field", async ({
+  page,
+}) => {
+  await page.clock.setFixedTime(new Date("2026-07-02T12:00:00+09:00"));
+  await seedCatsBasicProfile(page, {
+    basicInfo: {
+      familySinceDate: "2022-09-22",
+      birthDate: "2022-07-10",
+      breed: "ミックス",
+    },
+    appearance: {},
+  });
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto("/cats");
+  await page.waitForLoadState("networkidle");
+  await page.getByTestId("cats-section-tab-basic").click();
+
+  await page.getByRole("button", { name: "基本情報を編集" }).click();
+  const dialog = page.getByRole("dialog", { name: "むぎのことを 書く" });
+  await expect(dialog).toBeVisible();
+  await expect(dialog.getByText("あとから見返したいことだけ、少しずつ。")).toBeVisible();
+  await expect(dialog.getByText("猫種・タイプ")).toHaveCount(0);
+  await expect(dialog.getByRole("radio", { name: "男の子" })).toBeVisible();
+  await expect(dialog.getByRole("radio", { name: "女の子" })).toBeVisible();
+  await expect(dialog.getByRole("radio", { name: "わからない" })).toBeVisible();
+  await expect(dialog.getByRole("button", { name: "ミックス" })).toHaveAttribute(
+    "aria-pressed",
+    "true",
+  );
+
+  await dialog.getByRole("radio", { name: "茶トラ" }).click();
+  await dialog.getByLabel("体重").fill("5.5");
+  await dialog.getByRole("button", { name: "保存する" }).click();
+
+  await expect(page.getByText("茶トラ（ミックス）")).toBeVisible();
+  await expect(page.getByText("5.5 kg")).toBeVisible();
+  await expect(page.getByText("2026年7月2日に はかりました")).toBeVisible();
+  await expect(page.getByText("最後に測った日")).toHaveCount(0);
+
+  await expect
+    .poll(() =>
+      page.evaluate(() => {
+        const raw = window.localStorage.getItem("cat_profiles");
+        const [profile] = raw ? JSON.parse(raw) : [];
+        return {
+          coat: profile?.appearance?.coat ?? "",
+          breed: profile?.basicInfo?.breed ?? "",
+          measuredDate: profile?.basicInfo?.care?.weightMeasuredDate ?? "",
+          weightKg: profile?.basicInfo?.care?.weightKg ?? 0,
+        };
+      }),
+    )
+    .toEqual({
+      coat: "orange_tabby",
+      breed: "ミックス",
+      measuredDate: "2026-07-02",
+      weightKg: 5.5,
+    });
+});
+
 test("shows a meaningful pickup only when there is a strong cat record reason", async ({
   page,
 }) => {
@@ -283,6 +374,55 @@ async function seedCatsProfile(page: Page, now: number, photoCount: number) {
       );
     },
     { nowValue: now, src: photoDataUrl, count: photoCount },
+  );
+}
+
+async function seedCatsBasicProfile(
+  page: Page,
+  profilePatch: {
+    basicInfo?: Record<string, unknown>;
+    appearance?: Record<string, unknown>;
+  },
+) {
+  await page.addInitScript(
+    ({ patch, src }) => {
+      const nowIso = new Date("2026-07-02T12:00:00+09:00").toISOString();
+      window.localStorage.setItem("active_cat_id", "cat-mugi");
+      window.localStorage.setItem(
+        "cat_profiles",
+        JSON.stringify([
+          {
+            id: "cat-mugi",
+            name: "\u3080\u304e",
+            createdAt: nowIso,
+            updatedAt: nowIso,
+            basicInfo: patch.basicInfo ?? {},
+            appearance: patch.appearance ?? {},
+          },
+        ]),
+      );
+      window.localStorage.setItem(
+        "nyaruhodo_exchange_own_sleeping_photos",
+        JSON.stringify([
+          {
+            id: "own-sleeping-basic",
+            ownerCatId: "cat-mugi",
+            catId: "cat-mugi",
+            src,
+            thumbnailSrc: src,
+            displaySrc: src,
+            state: "sleeping",
+            visibility: "private",
+            deliveryStatus: "available",
+            triggerLabel: "sleeping",
+            theme: "sleeping",
+            shared: false,
+            createdAt: Date.parse("2026-07-01T20:00:00+09:00"),
+          },
+        ]),
+      );
+    },
+    { patch: profilePatch, src: photoDataUrl },
   );
 }
 

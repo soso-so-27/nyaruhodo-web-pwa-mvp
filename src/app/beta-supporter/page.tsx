@@ -301,7 +301,7 @@ export default function BetaSupporterPage() {
               onClick={handleStartSupporter}
               disabled={isLoading}
             >
-              {isLoading ? "Stripeへ移動しています" : "そっと応援する"}
+              {isLoading ? "Stripeへ移動しています" : "応援する"}
             </AppButton>
           ) : (
             <p style={styles.note}>
