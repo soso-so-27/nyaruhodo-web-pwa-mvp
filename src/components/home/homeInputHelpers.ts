@@ -91,7 +91,7 @@ export type CatTraitMemo = {
 };
 
 export type CatAppearance = {
-  coat?: CatCoat;
+  coat?: string;
 };
 
 export type CatCoat =
@@ -106,7 +106,7 @@ export type CatCoat =
   | "calico"
   | "tortoiseshell";
 
-export function getCatAvatarSrcForCoat(coat?: CatCoat) {
+export function getCatAvatarSrcForCoat(coat?: string) {
   const avatars: Record<CatCoat, string> = {
     saba: "saba",
     cream: "saba",
@@ -120,7 +120,12 @@ export function getCatAvatarSrcForCoat(coat?: CatCoat) {
     tortoiseshell: "black",
   };
 
-  return `/icons/cat-avatars/${coat ? avatars[coat] : "neutral"}.png`;
+  const avatarKey =
+    coat && Object.prototype.hasOwnProperty.call(avatars, coat)
+      ? avatars[coat as CatCoat]
+      : "neutral";
+
+  return `/icons/cat-avatars/${avatarKey}.png`;
 }
 
 type ConcernSignal =
@@ -742,7 +747,7 @@ export function updateCatProfileName(
 export function updateCatProfileCoat(
   profiles: CatProfile[],
   activeCatId: string | null,
-  coat: CatCoat,
+  coat: string,
 ) {
   const activeProfile = getActiveCatProfile(profiles, activeCatId);
   const now = new Date().toISOString();
@@ -1092,21 +1097,7 @@ function isValidCatAppearance(
     return false;
   }
 
-  return (
-    !appearance.coat ||
-    [
-      "cream",
-      "saba",
-      "kiji_tabby",
-      "gray",
-      "orange_tabby",
-      "black",
-      "white",
-      "hachiware",
-      "calico",
-      "tortoiseshell",
-    ].includes(appearance.coat)
-  );
+  return !appearance.coat || typeof appearance.coat === "string";
 }
 
 function normalizeCatAppearance(appearance: CatAppearance): CatAppearance {

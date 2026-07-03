@@ -68,21 +68,9 @@ import {
   saveActiveCatId,
   saveCatProfiles,
 } from "../home/homeInputHelpers";
-import type { CatCoat, CatProfile } from "../home/homeInputHelpers";
-
-const COAT_OPTIONS: { value: CatCoat; label: string; color: string }[] = [
-  { value: "orange_tabby", label: "茶トラ", color: "#d8bd9a" },
-  { value: "kiji_tabby", label: "キジトラ", color: "#8f7a61" },
-  { value: "saba", label: "サバトラ", color: "#d8d2c4" },
-  { value: "gray", label: "グレー", color: "#d6d3d1" },
-  { value: "black", label: "黒", color: "#625f59" },
-  { value: "white", label: "白", color: "#fafafa" },
-  { value: "hachiware", label: "ハチワレ", color: "#625f59" },
-  { value: "calico", label: "三毛", color: "#f0c28b" },
-  { value: "tortoiseshell", label: "サビ", color: "#4a3327" },
-];
+import type { CatProfile } from "../home/homeInputHelpers";
 type EditableGender = "male" | "female" | "unknown" | "";
-type EditableCoat = CatCoat | "";
+type EditableCoat = string;
 type UchinokoLens = "cat" | "all";
 type UchinokoSection = "record" | "photos" | "basic";
 const MAX_UPLOAD_SOURCE_FILE_BYTES = 20 * 1024 * 1024;
@@ -727,7 +715,7 @@ export function CatsPage() {
         },
         appearance: {
           ...(profiles[index].appearance ?? {}),
-          coat: editCoat || undefined,
+          coat: editCoat.trim() || undefined,
         },
         updatedAt: new Date().toISOString(),
       } satisfies CatProfile;
@@ -1210,7 +1198,45 @@ export function CatsPage() {
                       style={styles.profileCoverTileRoot}
                       imageStyle={styles.profileCoverImage}
                     />
-                    {shouldShowCatSwitchButton ? (
+                    {activeSection === "basic" ? (
+                      <div style={styles.profileCoverActionStack}>
+                        {shouldShowCatSwitchButton ? (
+                          <button
+                            type="button"
+                            style={styles.profileCoverActionButton}
+                            onClick={handleCycleCat}
+                            aria-label="次のねこに切り替える"
+                          >
+                            <img
+                              src="/icons/cat-switch-generated.png"
+                              alt=""
+                              style={styles.profileCoverSwitchIcon}
+                            />
+                          </button>
+                        ) : null}
+                        <button
+                          type="button"
+                          data-testid="cats-thumbnail-picker-button"
+                          style={styles.profileCoverActionButton}
+                          onClick={() => setIsThumbnailPickerOpen(true)}
+                          aria-label="代表写真を変える"
+                        >
+                          <PhotoSmallIcon />
+                        </button>
+                        <button
+                          type="button"
+                          style={styles.profileCoverActionButton}
+                          onClick={() => {
+                            setIsCatManageEditing(false);
+                            setIsAddingCat(false);
+                            setIsCatManageOpen(true);
+                          }}
+                          aria-label="猫を追加・管理"
+                        >
+                          <AddSmallIcon />
+                        </button>
+                      </div>
+                    ) : shouldShowCatSwitchButton ? (
                       <button
                         type="button"
                         style={styles.profileCoverSwitchButton}
@@ -1222,36 +1248,6 @@ export function CatsPage() {
                           alt=""
                           style={styles.profileCoverSwitchIcon}
                         />
-                      </button>
-                    ) : null}
-                    {activeSection === "basic" ? (
-                      <button
-                        type="button"
-                        style={{
-                          ...styles.profileCoverManageButton,
-                          ...(shouldShowCatSwitchButton
-                            ? styles.profileCoverManageButtonWithSwitch
-                            : {}),
-                        }}
-                        onClick={() => {
-                          setIsCatManageEditing(false);
-                          setIsAddingCat(false);
-                          setIsCatManageOpen(true);
-                        }}
-                        aria-label="猫を追加・管理"
-                      >
-                        <MoreDotsIcon />
-                      </button>
-                    ) : null}
-                    {activeSection === "basic" ? (
-                      <button
-                        type="button"
-                        data-testid="cats-thumbnail-picker-button"
-                        style={styles.profileCoverThumbnailButton}
-                        onClick={() => setIsThumbnailPickerOpen(true)}
-                        aria-label="代表写真を変える"
-                      >
-                        <PhotoSmallIcon />
                       </button>
                     ) : null}
                   </div>
@@ -1326,16 +1322,24 @@ export function CatsPage() {
                 ) : null}
 
                 {!isOnboardingProfileSetup ? (
-                  <CoatSelector
-                    currentCoat={editCoat || selectedCoat}
-                    isMixed={isMixedBreedValue(editBreed)}
-                    onSelect={setEditCoat}
-                    onToggleMixed={() => {
-                      setEditBreed((current) =>
-                        isMixedBreedValue(current) ? "" : "ミックス",
-                      );
-                    }}
-                  />
+                  <>
+                    <AppTextField
+                      type="text"
+                      label="毛柄"
+                      value={editCoat || selectedCoat || ""}
+                      maxLength={40}
+                      onChange={(event) => setEditCoat(event.target.value)}
+                      placeholder="例：茶トラ"
+                    />
+                    <AppTextField
+                      type="text"
+                      label="猫種"
+                      value={editBreed}
+                      maxLength={40}
+                      onChange={(event) => setEditBreed(event.target.value)}
+                      placeholder="例：ミックス"
+                    />
+                  </>
                 ) : null}
               </>
             ) : null}
@@ -1589,12 +1593,6 @@ export function CatsPage() {
               </div>
             ) : isCatManageEditing ? (
               <div style={styles.catManageEditor}>
-                <div style={styles.catManageEditorIntro}>
-                  <p style={styles.catManageEditorIntroText}>
-                    あとから見返したいことだけ、少しずつ。ぜんぶ書かなくて だいじょうぶ。
-                  </p>
-                </div>
-
                 <section style={styles.catManageNameBlock}>
                   <AppTextField
                     id="cat-manage-name"
@@ -1620,7 +1618,6 @@ export function CatsPage() {
                         setEditFamilySinceDate(event.target.value)
                       }
                       max={new Date().toISOString().split("T")[0]}
-                      hint="この日から、いっしょの日々をかぞえます。"
                     />
                     <AppTextField
                       type="date"
@@ -1629,7 +1626,6 @@ export function CatsPage() {
                       value={editBirthDate}
                       onChange={(event) => setEditBirthDate(event.target.value)}
                       max={new Date().toISOString().split("T")[0]}
-                      hint="わからないときは、そのままで だいじょうぶ。"
                     />
                   </div>
                 </section>
@@ -1637,9 +1633,6 @@ export function CatsPage() {
                 <section style={styles.catManageFormSection}>
                   <div style={styles.catManageFormHeading}>
                     <p style={styles.catManageFormTitle}>見た目</p>
-                    <p style={styles.catManageFormNote}>
-                      わかるところだけで大丈夫です。
-                    </p>
                   </div>
                   <AppSegmented<EditableGender>
                     value={editGender}
@@ -1653,24 +1646,27 @@ export function CatsPage() {
                       { value: "unknown", label: "わからない" },
                     ]}
                   />
-                  <CoatSelector
-                    currentCoat={editCoat || selectedCoat}
-                    isMixed={isMixedBreedValue(editBreed)}
-                    onSelect={setEditCoat}
-                    onToggleMixed={() => {
-                      setEditBreed((current) =>
-                        isMixedBreedValue(current) ? "" : "ミックス",
-                      );
-                    }}
+                  <AppTextField
+                    type="text"
+                    label="毛柄"
+                    value={editCoat || selectedCoat || ""}
+                    maxLength={40}
+                    onChange={(event) => setEditCoat(event.target.value)}
+                    placeholder="例：茶トラ"
+                  />
+                  <AppTextField
+                    type="text"
+                    label="猫種"
+                    value={editBreed}
+                    maxLength={40}
+                    onChange={(event) => setEditBreed(event.target.value)}
+                    placeholder="例：ミックス"
                   />
                 </section>
 
                 <section style={styles.catManageFormSection}>
                   <div style={styles.catManageFormHeading}>
                     <p style={styles.catManageFormTitle}>この子らしさ</p>
-                    <p style={styles.catManageFormNote}>
-                      好きな場所や苦手なことを、短くメモできます。
-                    </p>
                   </div>
                   <AppTextField
                     type="text"
@@ -1717,9 +1713,6 @@ export function CatsPage() {
                 <section style={styles.catManageFormSection}>
                   <div style={styles.catManageFormHeading}>
                     <p style={styles.catManageFormTitle}>ケアのメモ</p>
-                    <p style={styles.catManageFormNote}>
-                      体重や病院のことを、必要な分だけ残せます。
-                    </p>
                   </div>
                   <div style={styles.catManageCareGrid}>
                     <AppTextField
@@ -2359,7 +2352,6 @@ function BasicInfoTable({
     createBasicInfoRow({
       label: "家族になった日",
       value: formatBasicInfoDate(profile.basicInfo?.familySinceDate),
-      accent: true,
       valueTone: "numeric",
     }),
     createBasicInfoRow({
@@ -2374,11 +2366,14 @@ function BasicInfoTable({
       value: formatGender(profile.basicInfo?.gender),
     }),
     createBasicInfoRow({
-      label: "毛がら",
-      value: formatCoatAndBreed(
-        profile.appearance?.coat,
-        profile.basicInfo?.breed,
-      ),
+      label: "毛柄",
+      value: profile.appearance?.coat
+        ? getCoatLabel(profile.appearance.coat)
+        : "",
+    }),
+    createBasicInfoRow({
+      label: "猫種",
+      value: profile.basicInfo?.breed,
     }),
   ];
   const personalityRows = [
@@ -2484,7 +2479,6 @@ type BasicInfoDisplayRow = {
   label: string;
   value: string;
   note?: string;
-  accent?: boolean;
   valueTone?: "text" | "numeric";
 };
 
@@ -2492,20 +2486,17 @@ function createBasicInfoRow({
   label,
   value,
   note,
-  accent,
   valueTone = "text",
 }: {
   label: string;
   value?: string;
   note?: string;
-  accent?: boolean;
   valueTone?: "text" | "numeric";
 }): BasicInfoDisplayRow {
   return {
     label,
     value: value?.trim() ?? "",
     note,
-    accent,
     valueTone,
   };
 }
@@ -2536,12 +2527,7 @@ function BasicInfoSubsection({
                 : styles.basicInfoRow
             }
           >
-            <span style={styles.basicInfoLabel}>
-              {row.accent ? (
-                <span style={styles.basicInfoAccentDot} aria-hidden="true" />
-              ) : null}
-              {row.label}
-            </span>
+            <span style={styles.basicInfoLabel}>{row.label}</span>
             <span style={styles.basicInfoValueStack}>
               <span
                 style={
@@ -3391,18 +3377,7 @@ function formatCareWeight(weightKg?: number) {
 function formatCareWeightMeasuredNote(measuredDate?: string) {
   const measuredDateCopy = formatBasicInfoDate(measuredDate);
 
-  return measuredDateCopy ? `（${measuredDateCopy}）` : "";
-}
-
-function formatCoatAndBreed(coat?: string, breed?: string) {
-  const coatLabel = coat ? getCoatLabel(coat) : "";
-  const breedLabel = breed?.trim() ?? "";
-
-  if (coatLabel && breedLabel) {
-    return `${coatLabel}（${breedLabel}）`;
-  }
-
-  return coatLabel || breedLabel;
+  return measuredDateCopy;
 }
 
 function formatEditableWeight(weightKg?: number) {
@@ -3483,10 +3458,6 @@ function buildCatCareInfo(input: {
 function trimToMax(value: string, maxLength: number) {
   const trimmed = value.trim();
   return trimmed ? trimmed.slice(0, maxLength) : undefined;
-}
-
-function isMixedBreedValue(value?: string) {
-  return value?.trim() === "ミックス";
 }
 
 function getTodayDateInputValue() {
@@ -4130,66 +4101,6 @@ function AddSmallIcon() {
   );
 }
 
-function CoatSelector({
-  currentCoat,
-  isMixed,
-  onSelect,
-  onToggleMixed,
-}: {
-  currentCoat?: EditableCoat;
-  isMixed: boolean;
-  onSelect: (coat: CatCoat) => void;
-  onToggleMixed: () => void;
-}) {
-  return (
-    <div style={styles.coatSection}>
-      <p style={styles.sectionLabel}>毛がら</p>
-      <div role="radiogroup" aria-label="毛がら" style={styles.coatChipGrid}>
-        {COAT_OPTIONS.map((option) => {
-          const selected = currentCoat === option.value;
-
-          return (
-            <button
-              key={option.value}
-              type="button"
-              role="radio"
-              aria-checked={selected}
-              style={
-                selected
-                  ? { ...styles.coatChip, ...styles.coatChipSelected }
-                  : styles.coatChip
-              }
-              onClick={() => onSelect(option.value)}
-            >
-              <span
-                style={{
-                  ...styles.coatSwatch,
-                  background: getCoatChipBackground(option.value, option.color),
-                }}
-                aria-hidden="true"
-              />
-              <span>{option.label}</span>
-            </button>
-          );
-        })}
-      </div>
-      <button
-        type="button"
-        aria-pressed={isMixed}
-        style={
-          isMixed
-            ? { ...styles.coatChip, ...styles.coatChipSelected, ...styles.coatMixChip }
-            : { ...styles.coatChip, ...styles.coatMixChip }
-        }
-        onClick={onToggleMixed}
-      >
-        <span style={styles.coatMixDot} aria-hidden="true" />
-        <span>ミックス</span>
-      </button>
-    </div>
-  );
-}
-
 function formatFamilyDuration(familySinceDate?: string): {
   primary: string;
   secondary: string;
@@ -4398,22 +4309,6 @@ function getCatAvatarSrc(coat?: string): string {
   return coatMap[coat ?? ""] ?? "/sample-cats/saba.png";
 }
 
-function getCoatColor(coat: string): string {
-  const colors: Record<string, string> = {
-    saba: "#d8d2c4",
-    kiji_tabby: "#8f7a61",
-    gray: "#c8c6c2",
-    orange_tabby: "#dfc7a8",
-    black: "#625f59",
-    white: "#f0eeea",
-    hachiware: "#625f59",
-    calico: "#ded6ca",
-    cream: "#d8d2c4",
-  };
-
-  return colors[coat] ?? "#d8d2c4";
-}
-
 function getCoatLabel(coat: string): string {
   const labels: Record<string, string> = {
     saba: "サバトラ",
@@ -4429,22 +4324,6 @@ function getCoatLabel(coat: string): string {
   };
 
   return labels[coat] ?? coat;
-}
-
-function getCoatChipBackground(coat: CatCoat, fallback: string) {
-  if (coat === "calico") {
-    return "conic-gradient(from 30deg, #faf6ee 0 34%, #d7a166 34% 64%, #5d554c 64% 82%, #faf6ee 82% 100%)";
-  }
-
-  if (coat === "hachiware") {
-    return "linear-gradient(90deg, #4b4742 0 48%, #faf7f0 48% 100%)";
-  }
-
-  if (coat === "tortoiseshell") {
-    return "linear-gradient(135deg, #3b2b24 0 48%, #11100f 48% 100%)";
-  }
-
-  return fallback;
 }
 
 function resizeAndEncode(file: File, maxSize = 800, quality = 0.85): Promise<string> {
@@ -4717,6 +4596,34 @@ const styles = {
     borderRadius: "999px",
     border: "1px solid color-mix(in srgb, var(--paper) 70%, transparent)",
     background: "color-mix(in srgb, var(--paper-card) 78%, transparent)",
+    color: "color-mix(in srgb, var(--ink) 78%, transparent)",
+    boxShadow:
+      "0 1px 0 color-mix(in srgb, var(--paper) 64%, transparent), 0 10px 20px -18px color-mix(in srgb, var(--ink) 30%, transparent)",
+    cursor: "pointer",
+    WebkitTapHighlightColor: "transparent",
+    backdropFilter: "blur(10px)",
+    WebkitBackdropFilter: "blur(10px)",
+  },
+  profileCoverActionStack: {
+    position: "absolute" as const,
+    right: "10px",
+    top: "10px",
+    zIndex: 2,
+    display: "grid",
+    gap: "8px",
+  },
+  profileCoverActionButton: {
+    width: "40px",
+    height: "40px",
+    minWidth: "40px",
+    minHeight: "40px",
+    display: "inline-flex",
+    alignItems: "center",
+    justifyContent: "center",
+    padding: "7px",
+    borderRadius: "999px",
+    border: "1px solid color-mix(in srgb, var(--paper) 70%, transparent)",
+    background: "color-mix(in srgb, var(--paper-card) 80%, transparent)",
     color: "color-mix(in srgb, var(--ink) 78%, transparent)",
     boxShadow:
       "0 1px 0 color-mix(in srgb, var(--paper) 64%, transparent), 0 10px 20px -18px color-mix(in srgb, var(--ink) 30%, transparent)",
@@ -5776,12 +5683,15 @@ const styles = {
   },
   basicInfoRow: {
     display: "grid",
-    gridTemplateColumns: "minmax(92px, 34%) minmax(0, 1fr)",
+    gridTemplateColumns: "minmax(78px, 29%) minmax(0, 1fr)",
     alignItems: "baseline",
-    columnGap: "14px",
+    columnGap: "16px",
     rowGap: "5px",
     minHeight: "auto",
-    padding: "11px 0 0",
+    paddingTop: "12px",
+    paddingRight: 0,
+    paddingBottom: 0,
+    paddingLeft: 0,
     borderTop: "1px solid color-mix(in srgb, var(--line) 42%, transparent)",
   },
   basicInfoRowFirst: {
@@ -5800,17 +5710,11 @@ const styles = {
     letterSpacing: "0.04em",
     overflowWrap: "anywhere",
   },
-  basicInfoAccentDot: {
-    width: "7px",
-    height: "7px",
-    flex: "0 0 auto",
-    borderRadius: "50%",
-    background: "var(--seal)",
-  },
   basicInfoValueStack: {
-    display: "grid",
-    justifyItems: "start",
-    gap: "3px",
+    display: "flex",
+    alignItems: "baseline",
+    flexWrap: "wrap" as const,
+    gap: "4px 9px",
     minWidth: 0,
     textAlign: "left",
   },
@@ -5834,9 +5738,9 @@ const styles = {
   basicInfoValueNote: {
     color: CATS_FAINT,
     fontFamily: CATS_UI,
-    fontSize: CATS_TINY_SIZE,
+    fontSize: CATS_META_SIZE,
     fontWeight: 400,
-    lineHeight: 1.45,
+    lineHeight: 1.55,
     letterSpacing: CATS_META_TRACKING,
   },
   basicInfoNoteRow: {

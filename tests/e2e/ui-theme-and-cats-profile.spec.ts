@@ -171,7 +171,7 @@ test("shows only filled basic profile fields", async ({ page }) => {
   await expect(page.getByText("たいせつな日")).toBeVisible();
   await expect(page.getByText("見た目")).toBeVisible();
   await expect(page.getByText("この子らしさ")).toBeVisible();
-  await expect(page.getByText("毛がら")).toBeVisible();
+  await expect(page.getByText("毛柄")).toBeVisible();
   await expect(page.getByText("ケアのメモ")).toHaveCount(0);
   await expect(page.getByText("かかりつけ")).toHaveCount(0);
   await expect(page.getByText("ワクチンを打った日")).toHaveCount(0);
@@ -201,14 +201,15 @@ test("edits weight and mixed coat without showing the old breed field", async ({
   await page.getByRole("button", { name: "基本情報を編集" }).click();
   const dialog = page.getByRole("dialog", { name: "むぎのことを 書く" });
   await expect(dialog).toBeVisible();
-  await expect(dialog.getByText("あとから見返したいことだけ、少しずつ。")).toBeVisible();
+  await expect(dialog.getByText("あとから見返したいことだけ、少しずつ。")).toHaveCount(0);
   await expect(dialog.getByLabel("この子の名前")).toBeVisible();
   await expect(
     dialog.getByText("この日から、いっしょの日々をかぞえます。"),
-  ).toBeVisible();
+  ).toHaveCount(0);
   await expect(dialog.getByText("猫種・タイプ")).toHaveCount(0);
   await expect(dialog.getByText("毛色")).toHaveCount(0);
-  await expect(dialog.getByText("毛がら")).toBeVisible();
+  await expect(dialog.getByLabel("毛柄")).toBeVisible();
+  await expect(dialog.getByLabel("猫種")).toBeVisible();
   await expect
     .poll(() =>
       dialog.evaluate((element) => element.scrollWidth <= element.clientWidth + 1),
@@ -217,20 +218,19 @@ test("edits weight and mixed coat without showing the old breed field", async ({
   await expect(dialog.getByRole("radio", { name: "男の子" })).toBeVisible();
   await expect(dialog.getByRole("radio", { name: "女の子" })).toBeVisible();
   await expect(dialog.getByRole("radio", { name: "わからない" })).toBeVisible();
-  await expect(dialog.getByRole("button", { name: "ミックス" })).toHaveAttribute(
-    "aria-pressed",
-    "true",
-  );
+  await expect(dialog.getByLabel("猫種")).toHaveValue("ミックス");
 
-  await dialog.getByRole("radio", { name: "茶トラ" }).click();
+  await dialog.getByLabel("毛柄").fill("茶トラ");
   await dialog.getByLabel("体重（kg）").fill("5.5");
   await dialog.getByLabel("ワクチンを打った日").fill("2026-06-01");
   await dialog.getByLabel("ワクチンのメモ").fill("3種混合");
   await dialog.getByRole("button", { name: "保存する" }).click();
 
-  await expect(page.getByText("茶トラ（ミックス）")).toBeVisible();
+  await expect(page.getByText("茶トラ")).toBeVisible();
+  await expect(page.getByText("猫種")).toBeVisible();
+  await expect(page.getByText("ミックス")).toBeVisible();
   await expect(page.getByText("5.5 kg")).toBeVisible();
-  await expect(page.getByText("（2026年7月2日）")).toBeVisible();
+  await expect(page.getByText("2026年7月2日")).toBeVisible();
   await expect(page.getByText("ワクチンを打った日")).toBeVisible();
   await expect(page.getByText("2026年6月1日")).toBeVisible();
   await expect(page.getByText("3種混合")).toBeVisible();
@@ -253,7 +253,7 @@ test("edits weight and mixed coat without showing the old breed field", async ({
       }),
     )
     .toEqual({
-      coat: "orange_tabby",
+      coat: "茶トラ",
       breed: "ミックス",
       measuredDate: "2026-07-02",
       weightKg: 5.5,
