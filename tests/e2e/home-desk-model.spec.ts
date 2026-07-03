@@ -52,6 +52,7 @@ test.describe("home desk model", () => {
     await expect(page.getByTestId("desk-home-frame")).toBeVisible();
     await expect(page.getByText("おくった")).toBeVisible();
     await expect(page.getByText("よる8時に とどく").first()).toBeVisible();
+    await expect(page.getByText("とっておきに のこす")).toBeVisible();
     await expect(page.getByTestId("desk-letter")).toHaveCount(0);
     await expect(page.getByTestId("today-pair-nav-icon")).toBeVisible();
     await expect(page.getByTestId("today-pair-nav-slot")).toHaveCount(2);
@@ -243,6 +244,8 @@ test.describe("home desk model", () => {
     await expect(page.getByText("ねがおを とる")).toBeVisible();
     await expect(page.getByText("とると、よる8時に")).toBeVisible();
     await expect(page.getByText("ねこだよりが とどく")).toBeVisible();
+    await expect(page.getByText("ねてない子は、アルバムへ")).toHaveCount(0);
+    await expect(page.getByText("とっておきに のこす")).toHaveCount(0);
     await expect(page.getByTestId("desk-letter")).toHaveCount(0);
     await expect(page.getByTestId("desk-empty-frame")).toHaveCSS(
       "border-style",

@@ -1405,7 +1405,7 @@ export function CatsPage() {
           <LensPhotoSection
             title="この子の写真"
             photos={activeCatLensPhotos}
-            emptyCopy="まだ写真はありません。ねがおを撮るか、アルバムにのこすと、ここに並びます。"
+            emptyCopy="まだ写真はありません。ねがおを撮るか、とっておきにのこすと、ここに並びます。"
             onAddPhoto={() => {
               requestAddCatPhoto();
             }}
@@ -1989,13 +1989,13 @@ function CatGalleryIntroSheet({
   onClose: () => void;
 }) {
   return (
-    <AppBottomSheet title="アルバムに のこす" onClose={onClose}>
+    <AppBottomSheet title="とっておきに のこす" onClose={onClose}>
       <div style={styles.deleteCatConfirm}>
         <p style={styles.deleteCatConfirmTitle}>
-          ここに のこした写真は、ねこだよりには つかわれません。
+          ここは、とっておきの 100枚だけ。
         </p>
         <p style={styles.deleteCatConfirmText}>
-          この子のアルバムに、100枚まで残せます。
+          ねこだよりには つかわれません。
         </p>
         <div style={styles.deleteCatConfirmActions}>
           <AppButton type="button" variant="primary" fullWidth onClick={onContinue}>
@@ -2594,7 +2594,7 @@ function LensPhotoSection({
             style={styles.lensAddPhotoButton}
             onClick={onAddPhoto}
           >
-            ＋ のこす
+            ＋ とっておき
           </button>
         </div>
         <p style={styles.lensSectionSub}>

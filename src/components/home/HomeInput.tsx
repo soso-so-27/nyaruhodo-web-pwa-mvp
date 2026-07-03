@@ -3085,12 +3085,12 @@ function CatGalleryIntroSheet({
   onClose: () => void;
 }) {
   return (
-    <AppBottomSheet title="アルバムに のこす" onClose={onClose}>
+    <AppBottomSheet title="とっておきに のこす" onClose={onClose}>
       <div style={styles.infoSheetBody}>
         <p style={styles.infoSheetLead}>
-          ここに のこした写真は、ねこだよりには つかわれません。
+          ここは、とっておきの 100枚だけ。
         </p>
-        <p style={styles.infoSheetText}>この子のアルバムに、100枚まで残せます。</p>
+        <p style={styles.infoSheetText}>ねこだよりには つかわれません。</p>
         <AppButton type="button" variant="primary" fullWidth onClick={onContinue}>
           写真を選ぶ
         </AppButton>

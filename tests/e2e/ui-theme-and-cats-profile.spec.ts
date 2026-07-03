@@ -62,6 +62,7 @@ test("keeps the cats photo tab clear of the fixed bottom navigation", async ({
   const nav = page.getByRole("navigation");
 
   await expect(grid).toBeVisible();
+  await expect(page.getByRole("button", { name: "＋ とっておき" })).toBeVisible();
   await expect(photoItems).toHaveCount(16);
   await expect
     .poll(() =>

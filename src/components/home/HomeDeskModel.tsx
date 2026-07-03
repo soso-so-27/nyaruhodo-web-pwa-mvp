@@ -321,7 +321,7 @@ export function HomeDeskModel({
   const shouldShowHomeFrameTakeButton =
     homeDay.phase === "empty-before" || homeDay.phase === "empty-after";
   const shouldShowCatGalleryPhotoLink =
-    Boolean(onAddCatPhoto) && homeDay.phase !== "delivered";
+    Boolean(onAddCatPhoto) && Boolean(homePhoto) && homeDay.phase !== "delivered";
   const shouldHidePresence = true;
   useEffect(() => {
     trackDeskStateShown(deskState, eveningState.dateKey);
@@ -550,7 +550,7 @@ export function HomeDeskModel({
                         }}
                         onClick={onAddCatPhoto}
                       >
-                        アルバムに のこす
+                        とっておきに のこす
                       </button>
                     ) : null}
                   </div>
@@ -574,17 +574,6 @@ export function HomeDeskModel({
                   <AppIcon name="camera" size={16} />
                   ねがおを とる
                 </button>
-                {shouldShowCatGalleryPhotoLink && onAddCatPhoto ? (
-                  <div style={deskStyles.homeAddCatPhotoBlock}>
-                    <button
-                      type="button"
-                      style={deskStyles.homeAddCatPhotoLink}
-                      onClick={onAddCatPhoto}
-                    >
-                      ねてない子は、アルバムへ
-                    </button>
-                  </div>
-                ) : null}
               </div>
             )}
           </div>
@@ -2475,14 +2464,6 @@ const deskStyles = {
     WebkitTapHighlightColor: "transparent",
     transition:
       "transform 140ms var(--ease-gentle), box-shadow 140ms var(--ease-gentle), background var(--home-daylight-transition, 1800ms) var(--ease-gentle)",
-  },
-  homeAddCatPhotoBlock: {
-    position: "relative",
-    zIndex: 1,
-    display: "grid",
-    justifyItems: "center",
-    maxWidth: "260px",
-    marginTop: "24px",
   },
   homeAddCatPhotoLink: {
     appearance: "none",
