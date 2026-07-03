@@ -35,7 +35,6 @@ import {
 } from "../../lib/referrals/client";
 import {
   getDisplayEnvironment,
-  getDisplayEnvironmentLabel,
   type DisplayEnvironment,
 } from "../../lib/displayEnvironment";
 import { createBrowserSupabaseClient } from "../../lib/supabase/browser";
@@ -670,14 +669,7 @@ export function SettingsPage() {
           <AppCard variant="outlined" padding="sm" style={styles.card}>
             <div style={styles.row}>
               <span style={styles.rowLabel}>
-                {getDisplayEnvironmentLabel(displayEnvironment)}
-              </span>
-              <span style={styles.rowValue}>
-                {displayEnvironment === "standalone"
-                  ? "ホーム画面アプリ"
-                  : displayEnvironment === "browser"
-                    ? "Safari / Web"
-                    : ""}
+                いまの入口: {formatDisplayEnvironmentValue(displayEnvironment)}
               </span>
             </div>
             <div style={styles.divider} />
@@ -831,11 +823,15 @@ export function SettingsPage() {
                 <span style={styles.rowLabel}>紹介コード</span>
                 <span style={styles.referralCode}>{referralSummary.code}</span>
               </div>
-              <div style={styles.divider} />
-              <div style={styles.row}>
-                <span style={styles.rowLabel}>紹介された人</span>
-                <span style={styles.rowValue}>{referralSummary.acceptedCount}人</span>
-              </div>
+              {referralSummary.acceptedCount > 0 ? (
+                <>
+                  <div style={styles.divider} />
+                  <div style={styles.row}>
+                    <span style={styles.rowLabel}>紹介された人</span>
+                    <span style={styles.rowValue}>{referralSummary.acceptedCount}人</span>
+                  </div>
+                </>
+              ) : null}
               <div style={styles.divider} />
               <div style={styles.referralActions}>
                 <AppButton
@@ -1191,6 +1187,18 @@ function BetaSupporterPanel({
   );
 }
 
+function formatDisplayEnvironmentValue(environment: DisplayEnvironment) {
+  if (environment === "standalone") {
+    return "ホーム画面アプリ";
+  }
+
+  if (environment === "browser") {
+    return "Safari / Web";
+  }
+
+  return "確認中";
+}
+
 function NotificationSettingsPanel({
   environment,
   permission,
@@ -1214,9 +1222,9 @@ function NotificationSettingsPanel({
   if (permission === "granted") {
     return (
       <div style={styles.betaNote}>
-        <p style={styles.betaNoteTitle}>よる8時のおしらせを うけとれます</p>
+        <p style={styles.betaNoteTitle}>おしらせは ゆるされています</p>
         <p style={styles.betaNoteText}>
-          端末や通信の状態によって、届くタイミングが前後することがあります。
+          おしらせの しくみは じゅんび中です。
         </p>
       </div>
     );
