@@ -277,7 +277,7 @@ export function CatsPage() {
   const photoSheetPhotos =
     photoSheetLens === "all" ? allLensPhotos : activeCatLensPhotos;
   const photoSheetTitle =
-    photoSheetLens === "all" ? "ぜんぶの写真" : "この子の写真";
+    photoSheetLens === "all" ? "ぜんぶの写真" : "この子のとっておき";
 
   useEffect(() => {
     document.documentElement.classList.add("cats-scrollbar-quiet");
@@ -880,7 +880,7 @@ export function CatsPage() {
     const targetCatId = activeCatId;
     if (readCatGalleryPhotos(targetCatId).length >= CAT_GALLERY_PHOTO_LIMIT) {
       setSaveMessage(
-        `この子の写真は${CAT_GALLERY_PHOTO_LIMIT}枚までです。残したい写真を整理してから追加してください。`,
+        `とっておきは${CAT_GALLERY_PHOTO_LIMIT}枚までです。残したい写真を整理してから追加してください。`,
       );
       setTimeout(() => setSaveMessage(""), 2400);
       return;
@@ -1032,7 +1032,7 @@ export function CatsPage() {
         },
         { localCatId: targetCatId ?? activeCatId },
       );
-      setSaveMessage("この子の写真から削除しました。");
+      setSaveMessage("この子のとっておきから削除しました。");
       setTimeout(() => setSaveMessage(""), 2200);
     } catch {
       setSaveMessage("写真を削除できませんでした。もう一度お試しください。");
@@ -1391,21 +1391,13 @@ export function CatsPage() {
         {activeCatProfile &&
         !isOnboardingCompletionView &&
         activeSection === "photos" &&
-        shouldShowPhotoLensSwitch ? (
-          <PhotoLensFilter
-            value={activeLens}
-            onChange={setActiveLens}
-          />
-        ) : null}
-
-        {activeCatProfile &&
-        !isOnboardingCompletionView &&
-        activeSection === "photos" &&
         activeLens === "cat" ? (
           <LensPhotoSection
-            title="この子の写真"
+            title="この子のとっておき"
             photos={activeCatLensPhotos}
             emptyCopy="まだ写真はありません。ねがおを撮るか、とっておきにのこすと、ここに並びます。"
+            lensValue={activeLens}
+            onLensChange={shouldShowPhotoLensSwitch ? setActiveLens : undefined}
             onAddPhoto={() => {
               requestAddCatPhoto();
             }}
@@ -1420,6 +1412,8 @@ export function CatsPage() {
           <AllCatsLensView
             photos={allLensPhotos}
             catCount={catProfiles.length}
+            lensValue={activeLens}
+            onLensChange={shouldShowPhotoLensSwitch ? setActiveLens : undefined}
             onOpenPhoto={(photo) => setSelectedRecordPhoto(toRecordPhotoPreview(photo))}
           />
         ) : null}
@@ -1907,7 +1901,7 @@ export function CatsPage() {
         >
           <div style={styles.deleteCatConfirm}>
             <p style={styles.deleteCatConfirmTitle}>
-              この子の写真から削除します。
+              この子のとっておきから削除します。
             </p>
             <p style={styles.deleteCatConfirmText}>
               ねこだよりや、ほかの人に届いた写真には影響しません。
@@ -2486,9 +2480,9 @@ function BasicInfoTable({
             style={styles.basicInfoEditButton}
             onClick={onEdit}
             aria-label="基本情報を編集"
+            title="基本情報を編集"
           >
             <PencilSmallIcon />
-            <span>編集</span>
           </button>
         ) : null}
       </div>
@@ -2575,12 +2569,16 @@ function LensPhotoSection({
   title,
   photos,
   emptyCopy,
+  lensValue,
+  onLensChange,
   onAddPhoto,
   onOpenPhoto,
 }: {
   title: string;
   photos: LensPhoto[];
   emptyCopy: string;
+  lensValue: UchinokoLens;
+  onLensChange?: (value: UchinokoLens) => void;
   onAddPhoto: () => void;
   onOpenPhoto: (photo: LensPhoto) => void;
 }) {
@@ -2589,13 +2587,20 @@ function LensPhotoSection({
       <div style={styles.lensSectionHeader}>
         <div style={styles.lensSectionTitleRow}>
           <p style={styles.lensSectionTitle}>{title}</p>
-          <button
-            type="button"
-            style={styles.lensAddPhotoButton}
-            onClick={onAddPhoto}
-          >
-            ＋ とっておき
-          </button>
+          <div style={styles.lensSectionTitleActions}>
+            {onLensChange ? (
+              <PhotoLensFilter value={lensValue} onChange={onLensChange} />
+            ) : null}
+            <button
+              type="button"
+              style={styles.lensAddPhotoButton}
+              onClick={onAddPhoto}
+              aria-label="とっておきを追加"
+              title="とっておきを追加"
+            >
+              ＋
+            </button>
+          </div>
         </div>
         <p style={styles.lensSectionSub}>
           毎日のねがおと、選んで残した写真が並びます。
@@ -2614,16 +2619,25 @@ function LensPhotoSection({
 function AllCatsLensView({
   photos,
   catCount,
+  lensValue,
+  onLensChange,
   onOpenPhoto,
 }: {
   photos: LensPhoto[];
   catCount: number;
+  lensValue: UchinokoLens;
+  onLensChange?: (value: UchinokoLens) => void;
   onOpenPhoto: (photo: LensPhoto) => void;
 }) {
   return (
     <section style={styles.allLensCard}>
       <div style={styles.lensSectionHeader}>
-        <p style={styles.lensSectionTitle}>ぜんぶの写真</p>
+        <div style={styles.lensSectionTitleRow}>
+          <p style={styles.lensSectionTitle}>ぜんぶの写真</p>
+          {onLensChange ? (
+            <PhotoLensFilter value={lensValue} onChange={onLensChange} />
+          ) : null}
+        </div>
         <p style={styles.lensSectionSub}>
           {catCount}ひきの写真を、日付順に。
         </p>
@@ -3115,7 +3129,7 @@ function ThumbnailPickerSheet({
 
         <div style={styles.thumbnailPickerSection}>
           <p style={styles.thumbnailPickerTitle}>
-            この子の写真・ねがおから選ぶ
+            とっておき・ねがおから選ぶ
           </p>
           {photos.length > 0 ? (
             <div style={styles.thumbnailPickerGrid}>
@@ -3140,7 +3154,7 @@ function ThumbnailPickerSheet({
             </div>
           ) : (
             <p style={styles.thumbnailPickerEmpty}>
-              この子の写真やねがおがあると、ここから選べます。
+              とっておきやねがおがあると、ここから選べます。
             </p>
           )}
         </div>
@@ -5239,23 +5253,23 @@ const styles = {
   photoLensFilter: {
     display: "inline-flex",
     alignItems: "center",
-    justifySelf: "start",
-    gap: "6px",
-    minHeight: "36px",
-    margin: "-2px 0 10px",
+    flex: "0 0 auto",
+    gap: "3px",
+    minHeight: "32px",
+    margin: 0,
     padding: "2px",
     borderRadius: "999px",
     background: "color-mix(in srgb, var(--paper-card) 34%, transparent)",
   },
   photoLensFilterButton: {
-    minHeight: "32px",
-    padding: "0 12px",
+    minHeight: "28px",
+    padding: "0 9px",
     border: "none",
     borderRadius: "999px",
     background: "transparent",
     color: CATS_MUTED,
     fontFamily: CATS_UI,
-    fontSize: "12px",
+    fontSize: "11px",
     fontWeight: 500,
     letterSpacing: "0.02em",
     cursor: "pointer",
@@ -5585,12 +5599,12 @@ const styles = {
     letterSpacing: CATS_META_TRACKING,
   },
   basicInfoEditButton: {
+    width: "34px",
     minHeight: "34px",
     display: "inline-flex",
     alignItems: "center",
     justifyContent: "center",
-    gap: "6px",
-    padding: "0 10px",
+    padding: 0,
     borderRadius: "999px",
     border: "1px solid color-mix(in srgb, var(--line) 50%, transparent)",
     background: "color-mix(in srgb, var(--paper-card) 32%, transparent)",
@@ -5998,10 +6012,17 @@ const styles = {
     display: "flex",
     alignItems: "center",
     justifyContent: "space-between",
-    gap: "12px",
+    gap: "10px",
+  },
+  lensSectionTitleActions: {
+    flex: "0 0 auto",
+    display: "inline-flex",
+    alignItems: "center",
+    gap: "6px",
   },
   lensSectionTitle: {
     margin: 0,
+    minWidth: 0,
     color: CATS_TEXT,
     fontFamily: CATS_SERIF,
     fontSize: CATS_TITLE_SIZE,
@@ -6011,15 +6032,17 @@ const styles = {
   },
   lensAddPhotoButton: {
     flex: "0 0 auto",
+    width: "34px",
+    height: "34px",
     minHeight: "34px",
-    padding: "0 12px",
+    padding: 0,
     border: "1px solid color-mix(in srgb, var(--control-border) 76%, transparent)",
     borderRadius: "999px",
     background: "color-mix(in srgb, var(--paper) 72%, transparent)",
     color: CATS_TEXT,
     fontFamily: CATS_UI,
-    fontSize: "12px",
-    fontWeight: 500,
+    fontSize: "18px",
+    fontWeight: 400,
     lineHeight: 1,
     cursor: "pointer",
     boxShadow: "var(--shadow-e0)",
