@@ -13,6 +13,7 @@ const legalRoutes = [
   "/terms",
   "/privacy",
   "/contact",
+  "/account-deletion",
   "/cancellation",
   "/commercial-transactions",
 ];

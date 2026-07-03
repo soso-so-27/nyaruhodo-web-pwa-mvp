@@ -1,10 +1,10 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { CSSProperties, FormEvent } from "react";
 import {
   getAccountSyncOverview,
-  syncLocalDataWithAccount,
+  mergeAccountDataWithAccount,
 } from "../../lib/accountSync";
 import type { AccountSyncOverview, AccountSyncResult } from "../../lib/accountSync";
 import {
@@ -104,7 +104,6 @@ export function SettingsPage() {
   const [email, setEmail] = useState<string | null>(null);
   const [syncMessage, setSyncMessage] = useState("");
   const [lastSyncResult, setLastSyncResult] = useState<{
-    action: "sync" | "restore";
     result: AccountSyncResult;
   } | null>(null);
   const [syncOverview, setSyncOverview] = useState<AccountSyncOverview | null>(null);
@@ -164,6 +163,10 @@ export function SettingsPage() {
     useState<ClientReferralSummary | null>(null);
   const [referralMessage, setReferralMessage] = useState("");
   const [omoideDisabled, setOmoideDisabled] = useState(false);
+  const [notificationPermission, setNotificationPermission] = useState<
+    NotificationPermission | "unsupported"
+  >("default");
+  const hasRunAccountAutoSync = useRef(false);
   const showsAdminSection =
     adminCapabilities.isAdmin ||
     adminCapabilities.testToolsEnabled ||
@@ -204,9 +207,23 @@ export function SettingsPage() {
       await claimPendingReferral();
       await refreshSyncOverview();
       await refreshReferralSummary();
+      if (!hasRunAccountAutoSync.current) {
+        hasRunAccountAutoSync.current = true;
+        void runAccountSync("auto");
+      }
     }
     setIsLoading(false);
   }
+
+  useEffect(() => {
+    if (typeof window === "undefined") {
+      return;
+    }
+
+    setNotificationPermission(
+      "Notification" in window ? Notification.permission : "unsupported",
+    );
+  }, []);
 
   async function refreshReferralSummary() {
     const summary = await readClientReferralSummary();
@@ -310,9 +327,20 @@ export function SettingsPage() {
   }
 
   async function handleSyncNow() {
-    setIsSyncing(true);
-    setSyncMessage("");
+    await runAccountSync("manual");
+  }
+
+  async function runAccountSync(trigger: "auto" | "manual") {
+    if (isSyncing && trigger === "manual") {
+      return;
+    }
+
+    if (trigger === "manual") {
+      setIsSyncing(true);
+      setSyncMessage("");
+    }
     trackProductEvent("settings_account_sync_clicked", {
+      trigger,
       remote_cats: syncOverview?.remoteCats ?? null,
       remote_records: syncOverview?.remoteRecords ?? null,
       remote_cat_gallery_photos: syncOverview?.remoteCatGalleryPhotos ?? null,
@@ -321,13 +349,16 @@ export function SettingsPage() {
       remote_kept_exchange_photos: syncOverview?.remoteKeptExchangePhotos ?? null,
     });
 
-    const result = await syncLocalDataWithAccount({ restoreIfLocalEmpty: false });
+    const result = await mergeAccountDataWithAccount();
 
-    setSyncMessage(getSyncResultMessage(result, "sync"));
-    setLastSyncResult({ action: "sync", result });
+    if (trigger === "manual" || result.status === "error") {
+      setSyncMessage(getSyncResultMessage(result));
+      setLastSyncResult({ result });
+    }
 
     await refreshSyncOverview();
     trackProductEvent("settings_account_sync_completed", {
+      trigger,
       status: result.status,
       pushed_cats: result.pushedCats,
       pushed_records: result.pushedRecords,
@@ -343,57 +374,27 @@ export function SettingsPage() {
       restored_kept_exchange_photos: result.restoredKeptExchangePhotos,
       error_count: result.errors.length,
     });
-    setIsSyncing(false);
+
+    if (trigger === "manual") {
+      setIsSyncing(false);
+    }
   }
 
-  async function handleRestoreFromAccount() {
-    trackProductEvent("settings_account_restore_clicked", {
-      remote_cats: syncOverview?.remoteCats ?? null,
-      remote_records: syncOverview?.remoteRecords ?? null,
-      remote_cat_gallery_photos: syncOverview?.remoteCatGalleryPhotos ?? null,
-      remote_collection_photos: syncOverview?.remoteCollectionPhotos ?? null,
-      remote_own_sleeping_photos: syncOverview?.remoteOwnSleepingPhotos ?? null,
-      remote_kept_exchange_photos: syncOverview?.remoteKeptExchangePhotos ?? null,
-    });
-    if (
-      !window.confirm(
-        "アカウントに保存されているデータを、この端末に追加で復元しますか？",
-      )
-    ) {
-      trackProductEvent("settings_account_restore_cancelled", {
-        remote_cats: syncOverview?.remoteCats ?? null,
-        remote_records: syncOverview?.remoteRecords ?? null,
-        remote_cat_gallery_photos: syncOverview?.remoteCatGalleryPhotos ?? null,
-        remote_collection_photos: syncOverview?.remoteCollectionPhotos ?? null,
-        remote_own_sleeping_photos: syncOverview?.remoteOwnSleepingPhotos ?? null,
-        remote_kept_exchange_photos: syncOverview?.remoteKeptExchangePhotos ?? null,
-      });
+  async function handleNotificationPermissionRequest() {
+    if (typeof window === "undefined" || !("Notification" in window)) {
+      setNotificationPermission("unsupported");
       return;
     }
 
-    setIsSyncing(true);
-    setSyncMessage("");
-
-    const result = await syncLocalDataWithAccount({
-      forceRestore: true,
-      restoreIfLocalEmpty: true,
+    const permission = await Notification.requestPermission().catch(
+      () => Notification.permission,
+    );
+    setNotificationPermission(permission);
+    trackProductEvent("notification_permission_requested", {
+      route: "/settings",
+      permission,
+      surface: "settings",
     });
-
-    setSyncMessage(getSyncResultMessage(result, "restore"));
-    setLastSyncResult({ action: "restore", result });
-
-    await refreshSyncOverview();
-    trackProductEvent("settings_account_restore_completed", {
-      status: result.status,
-      restored_cats: result.restoredCats,
-      restored_records: result.restoredRecords,
-      restored_cat_gallery_photos: result.restoredCatGalleryPhotos,
-      restored_collection_photos: result.restoredCollectionPhotos,
-      restored_own_sleeping_photos: result.restoredOwnSleepingPhotos,
-      restored_kept_exchange_photos: result.restoredKeptExchangePhotos,
-      error_count: result.errors.length,
-    });
-    setIsSyncing(false);
   }
 
   async function handleStockPhotoImport() {
@@ -703,20 +704,7 @@ export function SettingsPage() {
                     }}
                     disabled={isSyncing}
                   >
-                    {isSyncing ? "保存中..." : "この端末をアカウントに保存"}
-                  </AppButton>
-                  <AppButton
-                    type="button"
-                    variant="quiet"
-                    fullWidth
-                    style={styles.settingsQuietActionButton}
-                    loading={isSyncing}
-                    onClick={() => {
-                      void handleRestoreFromAccount();
-                    }}
-                    disabled={isSyncing}
-                  >
-                    アカウントからこの端末に復元
+                    {isSyncing ? "同期中…" : "いますぐ同期する"}
                   </AppButton>
                 </div>
                 {syncMessage ? (
@@ -725,10 +713,7 @@ export function SettingsPage() {
                   </p>
                 ) : null}
                 {lastSyncResult ? (
-                  <SyncResultDetails
-                    action={lastSyncResult.action}
-                    result={lastSyncResult.result}
-                  />
+                  <SyncResultDetails result={lastSyncResult.result} />
                 ) : null}
               </>
             ) : null}
@@ -739,13 +724,13 @@ export function SettingsPage() {
           <p style={styles.sectionLabel}>アカウント</p>
           <AppCard variant="outlined" padding="sm" style={styles.card}>
             {isLoading ? (
-              <p style={styles.loadingText}>確認中...</p>
+              <p style={styles.loadingText}>確認中…</p>
             ) : isLoggedIn ? (
               <>
                 <div style={styles.accountRow}>
                   <div style={styles.rowLeft}>
                     <span style={styles.statusDot} />
-                    <span style={styles.rowLabel}>接続済み</span>
+                    <span style={styles.rowLabel}>ログイン中</span>
                   </div>
                   <div style={styles.accountActionSide}>
                     <span style={styles.accountEmail}>{email ?? ""}</span>
@@ -764,7 +749,7 @@ export function SettingsPage() {
                 <div style={styles.accountRow}>
                   <div style={styles.rowLeft}>
                     <span style={{ ...styles.statusDot, ...styles.statusDotOff }} />
-                    <span style={styles.rowLabel}>未接続</span>
+                    <span style={styles.rowLabel}>ログアウト中</span>
                   </div>
                   <AppButton
                     href="/account/create"
@@ -777,10 +762,28 @@ export function SettingsPage() {
                 </div>
               </>
             )}
+            <div style={styles.divider} />
+            <a href="/account-deletion" style={styles.linkRow}>
+              <span style={styles.rowLabel}>アカウントとデータの削除について</span>
+              <span style={styles.rowChevron}>›</span>
+            </a>
           </AppCard>
         </section>
 
         <section style={{ ...styles.section, order: 3 }}>
+          <p style={styles.sectionLabel}>おしらせ</p>
+          <AppCard variant="outlined" padding="sm" style={styles.card}>
+            <NotificationSettingsPanel
+              environment={displayEnvironment}
+              permission={notificationPermission}
+              onRequestPermission={() => {
+                void handleNotificationPermissionRequest();
+              }}
+            />
+          </AppCard>
+        </section>
+
+        <section style={{ ...styles.section, order: 4 }}>
           <p style={styles.sectionLabel}>思い出便</p>
           <AppCard variant="outlined" padding="sm" style={styles.card}>
             <div style={styles.row}>
@@ -813,11 +816,11 @@ export function SettingsPage() {
         </section>
 
         {isLoggedIn && referralSummary?.referralEnabled ? (
-          <section style={{ ...styles.section, order: 4 }}>
+          <section style={{ ...styles.section, order: 5 }}>
             <p style={styles.sectionLabel}>紹介</p>
             <AppCard variant="outlined" padding="sm" style={styles.card}>
               <div style={styles.betaNote}>
-                <p style={styles.betaNoteTitle}>ねこだよりを紹介する</p>
+                <p style={styles.betaNoteTitle}>ねてるねこを 紹介する</p>
                 <p style={styles.betaNoteText}>
                   ねてるねこを試してほしい人に、あなた専用のリンクを渡せます。
                   登録されると、ここに紹介数が残ります。
@@ -867,7 +870,7 @@ export function SettingsPage() {
           </section>
         ) : null}
 
-        <section style={{ ...styles.section, order: 5 }}>
+        <section style={{ ...styles.section, order: 6 }}>
           <p style={styles.sectionLabel}>参加と応援</p>
           <AppCard variant="outlined" padding="sm" style={{ ...styles.card, ...styles.betaCard }}>
             {betaCapabilities.feedbackEnabled ? (
@@ -1029,7 +1032,7 @@ export function SettingsPage() {
                 }}
                 disabled={isDeliveryDiagnosticsLoading}
               >
-                {isDeliveryDiagnosticsLoading ? "確認中..." : "とどく状態を確認する"}
+                {isDeliveryDiagnosticsLoading ? "確認中…" : "とどく状態を確認する"}
               </AppButton>
               {adminCapabilities.stockAdminEnabled ? (
                 <>
@@ -1044,7 +1047,7 @@ export function SettingsPage() {
                     }}
                     disabled={isStockAdding}
                   >
-                    {isStockAdding ? "追加中..." : "とどくねがおを追加する"}
+                    {isStockAdding ? "追加中…" : "とどくねがおを追加する"}
                   </AppButton>
                   <div style={styles.divider} />
                   <p style={styles.storageNote}>
@@ -1063,7 +1066,7 @@ export function SettingsPage() {
 
         {activeSettingsTab === "general" ? (
           <>
-        <section style={{ ...styles.section, order: 6 }}>
+        <section style={{ ...styles.section, order: 7 }}>
           <p style={styles.sectionLabel}>ヘルプと規約</p>
           <AppCard variant="outlined" padding="sm" style={styles.card}>
             <a href="/how-to-use" style={styles.linkRow}>
@@ -1098,7 +1101,7 @@ export function SettingsPage() {
           </AppCard>
         </section>
 
-        <section style={{ ...styles.section, order: 7 }}>
+        <section style={{ ...styles.section, order: 8 }}>
           <p style={styles.sectionLabel}>アプリについて</p>
           <AppCard variant="outlined" padding="sm" style={styles.card}>
             <div style={styles.row}>
@@ -1188,6 +1191,78 @@ function BetaSupporterPanel({
   );
 }
 
+function NotificationSettingsPanel({
+  environment,
+  permission,
+  onRequestPermission,
+}: {
+  environment: DisplayEnvironment;
+  permission: NotificationPermission | "unsupported";
+  onRequestPermission: () => void;
+}) {
+  if (environment !== "standalone") {
+    return (
+      <div style={styles.betaNote}>
+        <p style={styles.betaNoteTitle}>ホーム画面アプリでのみ使えます</p>
+        <p style={styles.betaNoteText}>
+          よる8時のおしらせは、ホーム画面に追加したねてるねこで使えます。
+        </p>
+      </div>
+    );
+  }
+
+  if (permission === "granted") {
+    return (
+      <div style={styles.betaNote}>
+        <p style={styles.betaNoteTitle}>よる8時のおしらせを うけとれます</p>
+        <p style={styles.betaNoteText}>
+          端末や通信の状態によって、届くタイミングが前後することがあります。
+        </p>
+      </div>
+    );
+  }
+
+  if (permission === "denied") {
+    return (
+      <div style={styles.betaNote}>
+        <p style={styles.betaNoteTitle}>おしらせはオフです</p>
+        <p style={styles.betaNoteText}>
+          iPhoneの設定 &gt; ねてるねこ &gt; 通知 から変えられます。
+        </p>
+      </div>
+    );
+  }
+
+  if (permission === "unsupported") {
+    return (
+      <div style={styles.betaNote}>
+        <p style={styles.betaNoteTitle}>この端末ではおしらせを使えません</p>
+        <p style={styles.betaNoteText}>
+          ホーム画面アプリで開いているか、端末の通知設定を確認してください。
+        </p>
+      </div>
+    );
+  }
+
+  return (
+    <div style={styles.betaNote}>
+      <p style={styles.betaNoteTitle}>よる8時のおしらせ</p>
+      <p style={styles.betaNoteText}>
+        よる8時ごろに、ねこだよりの時間を思い出せます。
+      </p>
+      <AppButton
+        type="button"
+        variant="ghost"
+        fullWidth
+        style={styles.settingsActionButton}
+        onClick={onRequestPermission}
+      >
+        おしらせを ゆるす
+      </AppButton>
+    </div>
+  );
+}
+
 function BetaFeedbackForm({
   category,
   message,
@@ -1239,7 +1314,7 @@ function BetaFeedbackForm({
         loading={isSending}
         disabled={isSending}
       >
-        {isSending ? "送っています..." : "送る"}
+        {isSending ? "送っています…" : "送る"}
       </AppButton>
       {status ? (
         <p style={styles.feedbackStatus} role="status">
@@ -1321,7 +1396,7 @@ function isLikelyImageFile(file: File) {
 
 function AuthDebugPanel({ snapshot }: { snapshot: AuthDebugSnapshot | null }) {
   if (!snapshot) {
-    return <p style={styles.loadingText}>ログイン状態を読み込み中...</p>;
+    return <p style={styles.loadingText}>ログイン状態を読み込み中…</p>;
   }
 
   const latestDetails = snapshot.latestEvent?.details
@@ -1807,27 +1882,16 @@ function SyncStatusPanel({ overview }: { overview: AccountSyncOverview }) {
     overview.remoteCollectionPhotos +
     overview.remoteOwnSleepingPhotos +
     overview.remoteKeptExchangePhotos;
-  const statusText = overview.shouldSuggestRestore
-    ? "アカウントに、この端末へ戻せるデータがあります。"
-    : "この端末の写真と記録をアカウントに保存できます。";
+  const latestSyncAt = getLatestSyncDate(overview.lastPushAt, overview.lastPullAt);
 
   return (
     <div style={styles.syncStatusPanel}>
-      <div style={styles.syncStatusHeader}>
-        <div>
-          <p style={styles.syncOverviewLabel}>アカウント保存</p>
-          <p style={styles.syncOverviewText}>{statusText}</p>
-        </div>
-        {overview.shouldSuggestRestore ? (
-          <span style={styles.syncOverviewBadge}>復元できます</span>
-        ) : null}
-      </div>
-
       <div style={styles.syncMetaGrid}>
-        <span>この端末: 写真 {localPhotoTotal}枚 / 猫 {overview.localCats}匹</span>
-        <span>アカウント: 写真 {remotePhotoTotal}枚 / 猫 {overview.remoteCats}匹</span>
-        <span>最終保存: {formatSyncDate(overview.lastPushAt)}</span>
-        <span>最終復元: {formatSyncDate(overview.lastPullAt)}</span>
+        <span>最終同期: {formatSyncDate(latestSyncAt)}</span>
+        <span>
+          この端末: 写真{localPhotoTotal}・猫{overview.localCats} ／ アカウント:
+          写真{remotePhotoTotal}・猫{overview.remoteCats}
+        </span>
       </div>
 
       {overview.errors.length > 0 ? (
@@ -1838,48 +1902,34 @@ function SyncStatusPanel({ overview }: { overview: AccountSyncOverview }) {
 }
 
 function SyncResultDetails({
-  action,
   result,
 }: {
-  action: "sync" | "restore";
   result: AccountSyncResult;
 }) {
-  const rows =
-    action === "sync"
-      ? [
-          ["この子の写真", result.pushedCatGalleryPhotos, "枚"],
-          ["アルバム写真", result.pushedCollectionPhotos, "枚"],
-          ["とったねがお", result.pushedOwnSleepingPhotos, "枚"],
-          ["とどいたねがお", result.pushedKeptExchangePhotos, "枚"],
-          ["猫", result.pushedCats, "匹"],
-          ["記録", result.pushedRecords, "件"],
-        ]
-      : [
-          ["この子の写真", result.restoredCatGalleryPhotos, "枚"],
-          ["アルバム写真", result.restoredCollectionPhotos, "枚"],
-          ["とったねがお", result.restoredOwnSleepingPhotos, "枚"],
-          ["とどいたねがお", result.restoredKeptExchangePhotos, "枚"],
-          ["猫", result.restoredCats, "匹"],
-          ["記録", result.restoredRecords, "件"],
-        ];
+  const rows = [
+    ["この子の写真", result.restoredCatGalleryPhotos + result.pushedCatGalleryPhotos, "枚"],
+    ["アルバム写真", result.restoredCollectionPhotos + result.pushedCollectionPhotos, "枚"],
+    ["とったねがお", result.restoredOwnSleepingPhotos + result.pushedOwnSleepingPhotos, "枚"],
+    ["とどいたねがお", result.restoredKeptExchangePhotos + result.pushedKeptExchangePhotos, "枚"],
+    ["猫", result.restoredCats + result.pushedCats, "匹"],
+    ["記録", result.restoredRecords + result.pushedRecords, "件"],
+  ];
   const visibleRows = rows.filter(([, value]) => Number(value) > 0);
-  const title = action === "sync" ? "保存結果" : "復元結果";
   const photoTotal =
-    action === "sync"
-      ? result.pushedCatGalleryPhotos +
-        result.pushedCollectionPhotos +
-        result.pushedOwnSleepingPhotos +
-        result.pushedKeptExchangePhotos
-      : result.restoredCatGalleryPhotos +
-        result.restoredCollectionPhotos +
-        result.restoredOwnSleepingPhotos +
-        result.restoredKeptExchangePhotos;
+    result.pushedCatGalleryPhotos +
+    result.pushedCollectionPhotos +
+    result.pushedOwnSleepingPhotos +
+    result.pushedKeptExchangePhotos +
+    result.restoredCatGalleryPhotos +
+    result.restoredCollectionPhotos +
+    result.restoredOwnSleepingPhotos +
+    result.restoredKeptExchangePhotos;
 
   return (
     <div style={styles.syncResultDetails} role="status">
-      <p style={styles.syncResultTitle}>{title}</p>
+      <p style={styles.syncResultTitle}>同期結果</p>
       <p style={styles.syncResultSummary}>
-        {getSyncPhotoSummary(action, photoTotal, result.status)}
+        {getSyncPhotoSummary(photoTotal, result.status)}
       </p>
       {visibleRows.length > 0 ? (
         <div style={styles.syncResultRows}>
@@ -1892,9 +1942,7 @@ function SyncResultDetails({
         </div>
       ) : (
         <p style={styles.syncResultEmpty}>
-          {action === "sync"
-            ? "アカウントへ新しく保存されたデータはありません。"
-            : "この端末へ新しく復元されたデータはありません。"}
+          新しく揃えたデータはありません。
         </p>
       )}
       {result.errors.length > 0 ? (
@@ -1912,54 +1960,38 @@ function SyncResultDetails({
 }
 
 function getSyncPhotoSummary(
-  action: "sync" | "restore",
   photoTotal: number,
   status: AccountSyncResult["status"],
 ) {
+  if (status === "error") {
+    return "同期できませんでした。あとで もう一度。";
+  }
+
   if (photoTotal > 0) {
-    return action === "sync"
-      ? `写真 ${photoTotal}枚をアカウントに保存しました。`
-      : `写真 ${photoTotal}枚をこの端末に戻しました。`;
+    return `同期しました（写真${photoTotal}枚が新しく揃いました）。`;
   }
 
-  if (status === "synced" || status === "restored") {
-    return action === "sync"
-      ? "猫や記録は保存しました。写真は新しく保存されていません。"
-      : "猫や記録は戻りました。写真は新しく戻っていません。";
-  }
-
-  return action === "sync"
-    ? "新しく保存された写真はありません。"
-    : "新しく戻った写真はありません。";
+  return "同期しました。";
 }
 
 function getSyncResultMessage(
   result: AccountSyncResult,
-  action: "sync" | "restore",
 ) {
-  const hasPartialErrors = result.errors.length > 0;
-
-  if (result.status === "synced") {
-    return hasPartialErrors
-      ? "保存しました。一部のねがお写真はあとで再同期されます。"
-      : "この端末のデータをアカウントに保存しました。";
-  }
-
-  if (result.status === "restored") {
-    return hasPartialErrors
-      ? "復元しました。一部のねがお写真はあとで再同期されます。"
-      : "アカウントのデータをこの端末に復元しました。";
-  }
-
   if (result.status === "error") {
-    return action === "restore"
-      ? "復元できませんでした。ログイン状態を確認してください。"
-      : "保存できませんでした。ログイン状態を確認してください。";
+    return "同期できませんでした。あとで もう一度。";
   }
 
-  return action === "restore"
-    ? "アカウント側に復元できるデータはまだありません。"
-    : "この端末に保存できるデータはまだありません。";
+  const photoTotal =
+    result.pushedCatGalleryPhotos +
+    result.pushedCollectionPhotos +
+    result.pushedOwnSleepingPhotos +
+    result.pushedKeptExchangePhotos +
+    result.restoredCatGalleryPhotos +
+    result.restoredCollectionPhotos +
+    result.restoredOwnSleepingPhotos +
+    result.restoredKeptExchangePhotos;
+
+  return getSyncPhotoSummary(photoTotal, result.status);
 }
 
 function formatSyncError(error: string) {
@@ -2003,6 +2035,20 @@ function formatSyncDate(value: string | null) {
     hour: "2-digit",
     minute: "2-digit",
   }).format(date);
+}
+
+function getLatestSyncDate(lastPushAt: string | null, lastPullAt: string | null) {
+  const candidates = [lastPushAt, lastPullAt]
+    .map((value) => {
+      const timestamp = value ? Date.parse(value) : NaN;
+      return Number.isFinite(timestamp) ? { value, timestamp } : null;
+    })
+    .filter((candidate): candidate is { value: string; timestamp: number } =>
+      Boolean(candidate),
+    )
+    .sort((a, b) => b.timestamp - a.timestamp);
+
+  return candidates[0]?.value ?? null;
 }
 
 function formatTraceBool(value: boolean) {

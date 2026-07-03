@@ -468,7 +468,7 @@ export default function AccountCreatePage() {
               <h1 style={styles.title}>
                 {isFromOnboarding
                   ? onboardingAlbumTitle
-                  : "Googleアカウントに接続済みです"}
+                  : "Googleアカウントにログイン中です"}
               </h1>
               <p style={styles.body}>
                 {isFromOnboarding

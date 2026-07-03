@@ -90,6 +90,15 @@ test.describe("admin test tool guards", () => {
     await expect(
       page.getByRole("button", { name: "とどくねがおを追加する" }),
     ).toHaveCount(0);
+    await expect(page.getByText("アカウントとデータの削除について")).toBeVisible();
+    await expect(page.getByText("おしらせ", { exact: true })).toBeVisible();
+    await expect(page.getByText("ホーム画面アプリでのみ使えます")).toBeVisible();
+    await expect(
+      page.getByRole("button", { name: "この端末をアカウントに保存" }),
+    ).toHaveCount(0);
+    await expect(
+      page.getByRole("button", { name: "アカウントからこの端末に復元" }),
+    ).toHaveCount(0);
   });
 
   test("does not enable onboarding test mode for non-admin query access", async ({

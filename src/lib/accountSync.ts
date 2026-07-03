@@ -543,6 +543,73 @@ export async function syncLocalDataWithAccount(options?: {
   }
 }
 
+export async function mergeAccountDataWithAccount(): Promise<AccountSyncResult> {
+  const result = createEmptyResult();
+
+  if (typeof window === "undefined") {
+    return { ...result, status: "skipped" };
+  }
+
+  const supabase = createBrowserSupabaseClient();
+
+  if (!supabase) {
+    return { ...result, status: "skipped" };
+  }
+
+  const { data, error } = await supabase.auth.getUser();
+
+  if (error || !data.user) {
+    return {
+      ...result,
+      status: error ? "error" : "skipped",
+      errors: error ? [error.message] : [],
+    };
+  }
+
+  try {
+    await ensureRemoteProfile(supabase, data.user.id, data.user.user_metadata);
+
+    // Settings sync is intentionally additive: remote rows are merged into
+    // localStorage first, then the merged local snapshot is pushed back.
+    // This path does not propagate deletions or treat remote-empty as a command
+    // to clear local data.
+    await restoreRemoteSnapshot(supabase, data.user.id, result, {
+      mergeLocal: true,
+    });
+    if (result.errors.length > 0) {
+      return { ...result, status: "error" };
+    }
+
+    const snapshot = readLocalSnapshot();
+
+    if (hasMeaningfulLocalData(snapshot)) {
+      await pushLocalSnapshot(supabase, data.user.id, snapshot, result);
+      if (result.errors.length > 0) {
+        return { ...result, status: "error" };
+      }
+    }
+
+    const now = new Date().toISOString();
+    await saveSyncState(supabase, data.user.id, {
+      last_pull_at: now,
+      last_push_at: now,
+    });
+
+    return {
+      ...result,
+      status: hasRestoredAccountData(result) ? "restored" : "synced",
+    };
+  } catch (syncError) {
+    return {
+      ...result,
+      status: "error",
+      errors: [
+        syncError instanceof Error ? syncError.message : "Unknown account sync error",
+      ],
+    };
+  }
+}
+
 export async function restoreCatGalleryPhotosFromAccount(): Promise<CatGalleryAccountRestoreResult> {
   const localBefore = readCatGalleryPhotos(null).length;
   const emptyResult: CatGalleryAccountRestoreResult = {
