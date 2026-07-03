@@ -134,6 +134,7 @@ const PHOTO_SAVE_FAILURE_MESSAGE =
   "写真を保存できませんでした。少し時間をおいて、もう一度試してください";
 const PHOTO_INPUT_FAILURE_MESSAGE =
   "写真を読み込めませんでした。JPEGやPNGの写真で、もう一度試してください";
+const CAMERA_INPUT_STALE_CLEANUP_MS = 10 * 60 * 1000;
 
 const MAX_UPLOAD_SOURCE_FILE_BYTES = 20 * 1024 * 1024;
 const SUPPORTED_SOURCE_IMAGE_MIME_TYPES = new Set([
@@ -1746,7 +1747,7 @@ export function HomeInput({
       if (!input.files?.length) {
         input.remove();
       }
-    }, 60000);
+    }, CAMERA_INPUT_STALE_CLEANUP_MS);
   }
 
   async function handleSleepingStockPhotoImport() {
