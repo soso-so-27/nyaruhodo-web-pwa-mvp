@@ -198,8 +198,6 @@ export function CatsPage() {
   >({});
   const [hasRemoteLensPhotosLoaded, setHasRemoteLensPhotosLoaded] =
     useState(false);
-  const [selectedOmoideMemory, setSelectedOmoideMemory] =
-    useState<OmoideMemory | null>(null);
   const [selectedRecordPhoto, setSelectedRecordPhoto] =
     useState<RecordPhotoPreview | null>(null);
   const [deleteGalleryPhotoTarget, setDeleteGalleryPhotoTarget] =
@@ -1081,7 +1079,6 @@ export function CatsPage() {
     setIsAddingCat(false);
     setIsEditingCatName(false);
     setIsEditingProfile(false);
-    setSelectedOmoideMemory(null);
     setRemoteLensPhotosByCat((current) => {
       const next = { ...current };
       delete next[target.id];
@@ -1415,7 +1412,9 @@ export function CatsPage() {
             familyDuration={familyDuration}
             birthdayStatus={birthdayStatus}
             takenSleepingPhotoCount={takenSleepingPhotoCount}
-            onOpenMemory={(memory) => setSelectedOmoideMemory(memory)}
+            onOpenMemory={(memory) =>
+              setSelectedRecordPhoto(toRecordPhotoPreviewFromMemory(memory))
+            }
             onOpenPhoto={(photo) => setSelectedRecordPhoto(photo)}
             onOpenPhotos={() => setPhotoSheetLens("cat")}
             onOpenYear={(summary) => setSelectedYearSummary(summary)}
@@ -1868,12 +1867,6 @@ export function CatsPage() {
             setSelectedRecordPhoto(photo);
           }}
           onClose={() => setSelectedYearSummary(null)}
-        />
-      ) : null}
-      {selectedOmoideMemory ? (
-        <OmoideMemorySheet
-          memory={selectedOmoideMemory}
-          onClose={() => setSelectedOmoideMemory(null)}
         />
       ) : null}
       {selectedRecordPhoto ? (
@@ -3157,53 +3150,6 @@ function OmoideBunbako({
   );
 }
 
-function OmoideMemorySheet({
-  memory,
-  onClose,
-}: {
-  memory: OmoideMemory;
-  onClose: () => void;
-}) {
-  return (
-    <div
-      data-testid="omoide-memory-viewer"
-      style={styles.omoideViewerBackdrop}
-      onClick={onClose}
-    >
-      <section
-        style={styles.omoideViewerPanel}
-        aria-label="思い出が、とどきました"
-        onClick={(event) => event.stopPropagation()}
-      >
-        <p style={styles.omoideViewerKicker}>思い出が、とどきました</p>
-        <h2 style={styles.omoideViewerTitle}>{memory.title}</h2>
-        <p style={styles.omoideViewerDate}>{formatOmoideMemoryDate(memory)}</p>
-        <div style={styles.omoideViewerImageFrame}>
-          <StoredPhotoImage
-            src={memory.photo.displaySrc ?? memory.photo.src}
-            fallbackSrcs={[
-              memory.photo.thumbnailSrc,
-              memory.photo.originalSrc,
-              memory.photo.src,
-            ].filter(Boolean) as string[]}
-            alt=""
-            style={styles.omoideViewerImage}
-          />
-        </div>
-        <p style={styles.omoideViewerVoice}>{memory.voice}</p>
-        <p style={styles.omoideViewerBridge}>{memory.bridge}</p>
-        <AppButton
-          type="button"
-          variant="quiet"
-          onClick={onClose}
-        >
-          そっと しまう
-        </AppButton>
-      </section>
-    </div>
-  );
-}
-
 function PhotoFullscreenViewer({
   photo,
   canDelete = false,
@@ -3621,6 +3567,19 @@ function toRecordPhotoPreview(photo: LensPhoto): RecordPhotoPreview {
     timestamp: photo.createdAt,
     kind: photo.kind,
     catIds: photo.catIds,
+  };
+}
+
+function toRecordPhotoPreviewFromMemory(memory: OmoideMemory): RecordPhotoPreview {
+  return {
+    id: memory.id,
+    src:
+      memory.photo.displaySrc ??
+      memory.photo.thumbnailSrc ??
+      memory.photo.originalSrc ??
+      memory.photo.src,
+    title: memory.title || "思い出",
+    timestamp: memory.openedAt ?? memory.deliveredAt,
   };
 }
 
@@ -6763,84 +6722,6 @@ const styles = {
     fontSize: CATS_META_SIZE,
     lineHeight: 1.7,
     letterSpacing: "0.02em",
-  },
-  omoideViewerBackdrop: {
-    position: "fixed" as const,
-    inset: 0,
-    zIndex: 60,
-    display: "grid",
-    placeItems: "center",
-    padding:
-      "calc(24px + env(safe-area-inset-top)) 20px calc(24px + env(safe-area-inset-bottom))",
-    background: "var(--bg-gradient)",
-  },
-  omoideViewerPanel: {
-    width: "min(100%, 430px)",
-    minHeight: "100%",
-    display: "flex",
-    flexDirection: "column" as const,
-    alignItems: "center",
-    justifyContent: "center",
-    gap: "12px",
-    color: CATS_TEXT,
-  },
-  omoideViewerKicker: {
-    margin: "0 0 4px",
-    color: CATS_MUTED,
-    fontFamily: CATS_SERIF,
-    fontSize: "12px",
-    fontWeight: 400,
-    letterSpacing: CATS_META_TRACKING,
-  },
-  omoideViewerTitle: {
-    margin: 0,
-    color: CATS_TEXT,
-    fontFamily: CATS_SERIF,
-    fontSize: "24px",
-    fontWeight: 400,
-    letterSpacing: CATS_TITLE_TRACKING,
-    lineHeight: 1.4,
-    textAlign: "center" as const,
-  },
-  omoideViewerDate: {
-    margin: "0 0 8px",
-    color: CATS_MUTED,
-    fontFamily: CATS_SERIF,
-    fontSize: "12px",
-    fontWeight: 400,
-    letterSpacing: CATS_BODY_TRACKING,
-  },
-  omoideViewerImageFrame: {
-    width: "min(72vw, 280px)",
-    aspectRatio: "1 / 1",
-    padding: "8px",
-    borderRadius: "var(--radius-xl)",
-    background: "var(--paper)",
-    boxShadow: "var(--shadow-e2)",
-    transform: "rotate(-1deg)",
-  },
-  omoideViewerImage: {
-    width: "100%",
-    height: "100%",
-    borderRadius: "var(--radius-lg)",
-  },
-  omoideViewerVoice: {
-    margin: "16px 0 0",
-    color: CATS_TEXT,
-    fontFamily: CATS_SERIF,
-    fontSize: "15px",
-    fontWeight: 400,
-    letterSpacing: CATS_TITLE_TRACKING,
-    textAlign: "center" as const,
-  },
-  omoideViewerBridge: {
-    margin: 0,
-    color: CATS_MUTED,
-    fontFamily: CATS_SERIF,
-    fontSize: "12px",
-    fontWeight: 400,
-    letterSpacing: CATS_BODY_TRACKING,
-    textAlign: "center" as const,
   },
   message: {
     margin: "10px 0 0",
