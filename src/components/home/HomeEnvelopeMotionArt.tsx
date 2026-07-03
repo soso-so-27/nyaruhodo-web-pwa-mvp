@@ -79,7 +79,7 @@ export function HomeEnvelopeMotionArt({
       >
         <EnvelopeLayer
           className="home-envelope-motion-shadow"
-          src="/animations/reference/home-envelope-rive-layers-v2/transparent/11-11-envelope-shadow.png"
+          src="/animations/reference/home-envelope-rive-layers-v2/transparent/11-11-envelope-shadow.webp"
           width="56%"
           top="86%"
           zIndex={0}
@@ -96,7 +96,7 @@ export function HomeEnvelopeMotionArt({
         />
         <EnvelopeLayer
           className="home-envelope-motion-inner"
-          src="/animations/reference/home-envelope-rive-layers-v2/transparent/04-04-back-inner-panel.png"
+          src="/animations/reference/home-envelope-rive-layers-v2/transparent/04-04-back-inner-panel.webp"
           width="64%"
           top="45%"
           zIndex={1}
@@ -113,7 +113,7 @@ export function HomeEnvelopeMotionArt({
         />
         <EnvelopeLayer
           className="home-envelope-motion-card"
-          src="/animations/reference/home-envelope-rive-layers-v2/transparent/10-10-photo-card-placeholder.png"
+          src="/animations/reference/home-envelope-rive-layers-v2/transparent/10-10-photo-card-placeholder.webp"
           width="54%"
           top="68%"
           zIndex={2}
@@ -139,7 +139,7 @@ export function HomeEnvelopeMotionArt({
         />
         <EnvelopeLayer
           className="home-envelope-motion-pocket"
-          src="/animations/reference/home-envelope-rive-layers-v2/transparent/02-02-open-front-pocket.png"
+          src="/animations/reference/home-envelope-rive-layers-v2/transparent/02-02-open-front-pocket.webp"
           width="70%"
           top="61%"
           zIndex={3}
@@ -156,7 +156,7 @@ export function HomeEnvelopeMotionArt({
         />
         <EnvelopeLayer
           className="home-envelope-motion-flap"
-          src="/animations/reference/home-envelope-rive-layers-v2/transparent/03-03-top-flap.png"
+          src="/animations/reference/home-envelope-rive-layers-v2/transparent/03-03-top-flap.webp"
           width="68%"
           top="33%"
           zIndex={4}
@@ -175,7 +175,7 @@ export function HomeEnvelopeMotionArt({
         />
         <EnvelopeLayer
           className="home-envelope-motion-closed"
-          src="/animations/reference/home-envelope-rive-layers-v2/transparent/01-01-closed-envelope-body.png"
+          src="/animations/reference/home-envelope-rive-layers-v2/transparent/01-01-closed-envelope-body.webp"
           width="88%"
           top="58%"
           zIndex={5}
@@ -191,7 +191,7 @@ export function HomeEnvelopeMotionArt({
         />
         <EnvelopeLayer
           className="home-envelope-motion-glow"
-          src="/animations/reference/home-envelope-rive-layers-v2/transparent/09-09-inner-glow.png"
+          src="/animations/reference/home-envelope-rive-layers-v2/transparent/09-09-inner-glow.webp"
           width="62%"
           top="50%"
           zIndex={6}
@@ -208,7 +208,7 @@ export function HomeEnvelopeMotionArt({
         />
         <EnvelopeLayer
           className="home-envelope-motion-wax"
-          src="/animations/reference/home-envelope-rive-layers-v2/transparent/05-05-wax-seal-intact.png"
+          src="/animations/reference/home-envelope-rive-layers-v2/transparent/05-05-wax-seal-intact.webp"
           width="18%"
           top="59%"
           zIndex={7}
@@ -225,7 +225,7 @@ export function HomeEnvelopeMotionArt({
         />
         <EnvelopeLayer
           className="home-envelope-motion-wax-left"
-          src="/animations/reference/home-envelope-rive-layers-v2/transparent/06-06-wax-seal-left.png"
+          src="/animations/reference/home-envelope-rive-layers-v2/transparent/06-06-wax-seal-left.webp"
           width="12%"
           top="59%"
           zIndex={8}
@@ -243,7 +243,7 @@ export function HomeEnvelopeMotionArt({
         />
         <EnvelopeLayer
           className="home-envelope-motion-wax-right"
-          src="/animations/reference/home-envelope-rive-layers-v2/transparent/07-07-wax-seal-right.png"
+          src="/animations/reference/home-envelope-rive-layers-v2/transparent/07-07-wax-seal-right.webp"
           width="12%"
           top="59%"
           zIndex={8}
@@ -261,7 +261,7 @@ export function HomeEnvelopeMotionArt({
         />
         <EnvelopeLayer
           className="home-envelope-motion-crumbs"
-          src="/animations/reference/home-envelope-rive-layers-v2/transparent/08-08-wax-crumbs.png"
+          src="/animations/reference/home-envelope-rive-layers-v2/transparent/08-08-wax-crumbs.webp"
           width="24%"
           top="65%"
           zIndex={9}
@@ -278,7 +278,7 @@ export function HomeEnvelopeMotionArt({
         />
         <EnvelopeLayer
           className="home-envelope-motion-motes"
-          src="/animations/reference/home-envelope-rive-layers-v2/transparent/12-12-paper-motes.png"
+          src="/animations/reference/home-envelope-rive-layers-v2/transparent/12-12-paper-motes.webp"
           width="76%"
           top="39%"
           zIndex={10}

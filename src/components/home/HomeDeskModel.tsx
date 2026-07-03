@@ -127,11 +127,11 @@ const HOME_SKY_BACKGROUND_POSITION =
 const HOME_SKY_BACKGROUND_REPEAT =
   "no-repeat, no-repeat, no-repeat, no-repeat, no-repeat, no-repeat";
 const HOME_BACKGROUND_IMAGES = {
-  dawn: "url('/images/home-backgrounds/generated-dawn-paper.png')",
-  morning: "url('/images/home-backgrounds/generated-morning-paper.png')",
-  noon: "url('/images/home-backgrounds/generated-noon-paper.png')",
-  evening: "url('/images/home-backgrounds/generated-evening-paper.png')",
-  night: "url('/images/home-backgrounds/generated-night-paper-v2.png')",
+  dawn: "url('/images/home-backgrounds/dawn.webp')",
+  morning: "url('/images/home-backgrounds/morning.webp')",
+  noon: "url('/images/home-backgrounds/noon.webp')",
+  evening: "url('/images/home-backgrounds/evening.webp')",
+  night: "url('/images/home-backgrounds/night.webp')",
 } as const;
 const HOME_DAYLIGHT_ANCHORS = [
   {
@@ -644,7 +644,7 @@ export function HomeDeskModel({
                       USE_SIMPLE_HOME_REVEAL ? (
                         <img
                           data-envelope-art="simple"
-                          src="/images/home/generated-envelope-wide-v2.png"
+                          src="/images/home/generated-envelope-wide-v2.webp"
                           alt=""
                           draggable={false}
                           style={deskStyles.envelopeHomeSimpleImage}
@@ -1832,7 +1832,7 @@ function HomeLetterTrayText({
 function SleepingCatPlaceholder() {
   return (
     <img
-      src="/illustrations/sleeping-cat-empty.png"
+      src="/illustrations/sleeping-cat-empty.webp"
       alt=""
       aria-hidden="true"
       style={deskStyles.sleepingCatPlaceholder}
@@ -2295,7 +2295,7 @@ const deskStyles = {
     transform: "translate(-50%, -50%)",
     borderRadius: "0",
     border: "none",
-    backgroundImage: "url('/illustrations/home-envelope-flap-lines.png')",
+    backgroundImage: "url('/illustrations/home-envelope-flap-lines.webp')",
     backgroundRepeat: "no-repeat",
     backgroundPosition: "50% 50%",
     backgroundSize: "contain",

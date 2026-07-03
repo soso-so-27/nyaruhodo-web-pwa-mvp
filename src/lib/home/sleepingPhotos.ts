@@ -3,6 +3,7 @@ import {
   isUsablePhotoSrc,
   normalizePersistentPhotoSrc,
 } from "../photoStorage";
+import { readCachedJson, writeCachedJson } from "../storage";
 import { recordDeliveryStorageWritebackTrace } from "./eveningDeliveryTrace";
 
 export type CatMomentState = "sleeping";
@@ -1000,8 +1001,7 @@ function readStorageArray<T>(key: string) {
   }
 
   try {
-    const raw = window.localStorage.getItem(key);
-    const parsed = raw ? (JSON.parse(raw) as unknown) : [];
+    const parsed = readCachedJson<unknown>(key) ?? [];
 
     return Array.isArray(parsed) ? (parsed as T[]) : [];
   } catch {
@@ -1026,8 +1026,7 @@ function readStorageObject<T extends Record<string, unknown>>(key: string): T {
   }
 
   try {
-    const raw = window.localStorage.getItem(key);
-    const parsed = raw ? (JSON.parse(raw) as unknown) : {};
+    const parsed = readCachedJson<unknown>(key) ?? {};
 
     return parsed && typeof parsed === "object" && !Array.isArray(parsed)
       ? (parsed as T)
@@ -1038,11 +1037,11 @@ function readStorageObject<T extends Record<string, unknown>>(key: string): T {
 }
 
 function writeStorageArray<T>(key: string, value: T[]) {
-  window.localStorage.setItem(key, JSON.stringify(value));
+  writeCachedJson(key, value);
 }
 
 function writeStorageValue<T>(key: string, value: T) {
-  window.localStorage.setItem(key, JSON.stringify(value));
+  writeCachedJson(key, value);
 }
 
 function writeStorageArrayWithFallback<T>(

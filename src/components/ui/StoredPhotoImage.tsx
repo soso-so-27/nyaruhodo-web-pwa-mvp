@@ -38,8 +38,8 @@ const developOverlayStyle: CSSProperties = {
   inset: 0,
   pointerEvents: "none",
   background:
-    "linear-gradient(180deg, rgba(251,250,247,0.28), rgba(244,241,234,0.18))",
-  transition: "opacity 420ms var(--ease-gentle)",
+    "linear-gradient(180deg, rgba(251,250,247,0.72), rgba(244,241,234,0.52))",
+  transition: "opacity 220ms var(--ease-gentle)",
 };
 
 const fallbackOverlayStyle: CSSProperties = {
@@ -90,6 +90,10 @@ export function StoredPhotoImage({
   style,
   imageStyle,
   loading,
+  decoding,
+  fetchPriority,
+  width,
+  height,
   onStorageDataUrl,
   onNaturalSize,
   onLoad,
@@ -102,6 +106,10 @@ export function StoredPhotoImage({
   style?: CSSProperties;
   imageStyle?: CSSProperties;
   loading?: "eager" | "lazy";
+  decoding?: "async" | "sync" | "auto";
+  fetchPriority?: "high" | "low" | "auto";
+  width?: number;
+  height?: number;
   onStorageDataUrl?: (dataUrl: string) => void;
   onNaturalSize?: (size: { width: number; height: number }) => void;
   onLoad?: () => void;
@@ -175,18 +183,7 @@ export function StoredPhotoImage({
       return;
     }
 
-    const signedUrlPromise =
-      signedUrlPromiseCache.get(storagePath) ??
-      resolveStoragePhotoForDisplay(currentSource);
-    signedUrlPromiseCache.set(storagePath, signedUrlPromise);
-
-    void signedUrlPromise.then((signedUrl) => {
-      if (signedUrl) {
-        writeCachedSignedUrl(storagePath, signedUrl);
-      } else {
-        signedUrlPromiseCache.delete(storagePath);
-      }
-
+    void getStoragePhotoSignedUrl(currentSource).then((signedUrl) => {
       if (isActive) {
         if (signedUrl) {
           setDisplaySrc(signedUrl);
@@ -216,39 +213,36 @@ export function StoredPhotoImage({
       return;
     }
 
+    let isActive = true;
     const updateImageState = () => {
-      if (!image.complete) {
-        return false;
-      }
-
       if (image.naturalWidth > 0) {
-        setIsLoaded(true);
+        if (isActive) {
+          setIsLoaded(true);
+        }
       } else {
-        setIsLoaded(false);
-        setHasError(true);
-      }
-
-      return true;
-    };
-
-    if (updateImageState()) {
-      return;
-    }
-
-    let checkCount = 0;
-    const checkTimer = window.setInterval(() => {
-      checkCount += 1;
-
-      if (updateImageState() || checkCount >= 25) {
-        if (!image.complete || image.naturalWidth === 0) {
+        if (isActive) {
           setIsLoaded(false);
           setHasError(true);
         }
-        window.clearInterval(checkTimer);
       }
-    }, 400);
+    };
 
-    return () => window.clearInterval(checkTimer);
+    if (image.complete) {
+      updateImageState();
+      return;
+    }
+
+    if (typeof image.decode === "function") {
+      void image.decode().then(updateImageState).catch(() => {
+        if (image.complete) {
+          updateImageState();
+        }
+      });
+    }
+
+    return () => {
+      isActive = false;
+    };
   }, [displaySrc]);
 
   useEffect(() => {
@@ -297,7 +291,10 @@ export function StoredPhotoImage({
         alt={alt}
         draggable={false}
         loading={loading ?? (isInlineImage ? "eager" : "lazy")}
-        decoding={isInlineImage ? "sync" : "async"}
+        decoding={decoding ?? "async"}
+        fetchPriority={fetchPriority}
+        width={width}
+        height={height}
         onLoad={() => {
           setIsLoaded(true);
           onLoad?.();
@@ -340,13 +337,11 @@ export function StoredPhotoImage({
           height: "100%",
           objectFit: objectFit ?? "cover",
           objectPosition,
-          filter: buildDevelopFilter(filter, isLoaded, hasError),
+          filter,
           mixBlendMode,
           display: "block",
-          opacity: hasError ? 0 : 1,
-          transform: isLoaded ? "scale(1)" : "scale(1.018)",
-          transition:
-            "filter 420ms var(--ease-gentle), opacity 180ms var(--ease-gentle), transform 420ms var(--ease-gentle)",
+          opacity: hasError || !isLoaded ? 0 : 1,
+          transition: "opacity 220ms var(--ease-gentle)",
           ...imageStyle,
           ...imageSelectionLockStyle,
         }}
@@ -381,19 +376,6 @@ function getUniquePhotoSources(sources: Array<string | null | undefined>) {
   }
 
   return values;
-}
-
-function buildDevelopFilter(
-  baseFilter: CSSProperties["filter"],
-  isLoaded: boolean,
-  hasError: boolean,
-) {
-  const filters = [
-    baseFilter,
-    !hasError && !isLoaded ? "blur(14px) saturate(0.9)" : null,
-  ].filter(Boolean);
-
-  return filters.length > 0 ? filters.join(" ") : undefined;
 }
 
 function trackImageLoadCompleted({
@@ -505,6 +487,88 @@ async function resolveStoragePhotoForDisplay(src: string) {
   const supabase = createBrowserSupabaseClient();
 
   return readSignedUrlFromApi(src, supabase);
+}
+
+export function getCachedStoragePhotoSignedUrl(src: string) {
+  const storagePath = getStoragePhotoPath(src);
+  return storagePath ? readCachedSignedUrl(storagePath) : null;
+}
+
+export async function getStoragePhotoSignedUrl(src: string) {
+  const storagePath = getStoragePhotoPath(src);
+
+  if (!storagePath) {
+    return src || null;
+  }
+
+  const cachedUrl = readCachedSignedUrl(storagePath);
+  if (cachedUrl) {
+    return cachedUrl;
+  }
+
+  const signedUrlPromise =
+    signedUrlPromiseCache.get(storagePath) ??
+    resolveStoragePhotoForDisplay(src);
+  signedUrlPromiseCache.set(storagePath, signedUrlPromise);
+
+  const signedUrl = await signedUrlPromise;
+  if (signedUrl) {
+    writeCachedSignedUrl(storagePath, signedUrl);
+  } else {
+    signedUrlPromiseCache.delete(storagePath);
+  }
+
+  return signedUrl;
+}
+
+export async function preloadStoragePhotoSignedUrls(sources: string[]) {
+  const paths = Array.from(
+    new Set(
+      sources
+        .map((source) => getStoragePhotoPath(source))
+        .filter((path): path is string => Boolean(path && !readCachedSignedUrl(path))),
+    ),
+  );
+
+  if (paths.length === 0) {
+    return;
+  }
+
+  const supabase = createBrowserSupabaseClient();
+  const accessToken = supabase
+    ? (await supabase.auth.getSession()).data.session?.access_token
+    : null;
+
+  const response = await fetch("/api/photo-storage/signed-urls", {
+    method: "POST",
+    headers: {
+      "content-type": "application/json",
+      ...(accessToken ? { authorization: `Bearer ${accessToken}` } : {}),
+    },
+    body: JSON.stringify({
+      anonymousId: readAnalyticsAnonymousId(),
+      paths,
+    }),
+  }).catch(() => null);
+
+  if (!response?.ok) {
+    return;
+  }
+
+  const body = (await response.json().catch(() => null)) as {
+    signedUrls?: unknown;
+  } | null;
+  const signedUrls =
+    body?.signedUrls && typeof body.signedUrls === "object"
+      ? (body.signedUrls as Record<string, unknown>)
+      : {};
+
+  for (const path of paths) {
+    const signedUrl = signedUrls[path];
+    if (typeof signedUrl === "string" && signedUrl) {
+      writeCachedSignedUrl(path, signedUrl);
+    }
+  }
 }
 
 async function readSignedUrlFromApi(

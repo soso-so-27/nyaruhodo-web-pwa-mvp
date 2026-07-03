@@ -39,7 +39,7 @@ import {
   readEveningDeliveryStore,
 } from "../../lib/home/eveningDelivery";
 import { backupOwnSleepingPhotoMoment } from "../../lib/home/sleepingPhotoBackup";
-import { STORAGE_KEYS } from "../../lib/storage";
+import { STORAGE_KEYS, readCachedJson, writeCachedJson } from "../../lib/storage";
 import {
   COLLECTION_GROUPS,
   type CollectionGroup,
@@ -61,7 +61,10 @@ import { AppCard } from "../ui/AppCard";
 import { AppIcon } from "../ui/AppIcons";
 import { EmptyState } from "../ui/EmptyState";
 import { PhotoTile, PhotoViewerFrame } from "../ui/PhotoTile";
-import { StoredPhotoImage } from "../ui/StoredPhotoImage";
+import {
+  StoredPhotoImage,
+  preloadStoragePhotoSignedUrls,
+} from "../ui/StoredPhotoImage";
 import { color, radius, shadow } from "../ui/designTokens";
 
 const COLLECTION_TEXT = "var(--ink)";
@@ -478,7 +481,10 @@ export function CollectionPage() {
     () =>
       storedCollectionPhotos.map((photo) => ({
         id: photo.id,
-        src: photo.src,
+        src: getPhotoThumbnailSrc(photo),
+        thumbnailSrc: photo.thumbnailSrc,
+        displaySrc: photo.displaySrc ?? photo.src,
+        originalSrc: photo.originalSrc ?? photo.src,
         createdAt: getCollectionPhotoTimestamp(photo),
         sourcePhotoId: photo.slotId,
       })),
@@ -528,6 +534,15 @@ export function CollectionPage() {
   );
   const selectedMainichiPhoto =
     selectedMainichiViewer?.photos[selectedMainichiViewer.index] ?? null;
+  useEffect(() => {
+    void preloadStoragePhotoSignedUrls(
+      [
+        ...storedCollectionPhotos.slice(0, 36).map(getPhotoThumbnailSrc),
+        ...sleepingBoxPhotos.slice(0, 18).map(getPhotoThumbnailSrc),
+        ...otherBoxPhotos.slice(0, 18).map(getPhotoThumbnailSrc),
+      ],
+    );
+  }, [otherBoxPhotos, sleepingBoxPhotos, storedCollectionPhotos]);
 
   useEffect(() => {
     if (!hasLoaded || !activeCatId || trackedViewCatIdRef.current === activeCatId) {
@@ -1169,16 +1184,14 @@ export function CollectionPage() {
     }
 
     try {
-      const raw = window.localStorage.getItem(STORAGE_KEYS.collectionPhotos);
-
-      if (!raw) {
-        return;
-      }
-
-      const all = JSON.parse(raw) as Record<
+      const all = readCachedJson<Record<
         string,
         Record<string, StoredCollectionPhotoEntry[] | StoredCollectionPhotoEntry | string[] | string>
-      >;
+      >>(STORAGE_KEYS.collectionPhotos);
+
+      if (!all) {
+        return;
+      }
       const catPhotos = normalizeStoredPhotoList(all[activeCatId]?.[slug]);
 
       if (!catPhotos.length) {
@@ -1196,7 +1209,7 @@ export function CollectionPage() {
         all[activeCatId][slug] = catPhotos;
       }
 
-      window.localStorage.setItem(STORAGE_KEYS.collectionPhotos, JSON.stringify(all));
+      writeCachedJson(STORAGE_KEYS.collectionPhotos, all);
       if (photoToDelete?.id) {
         void deleteAccountCollectionPhoto(photoToDelete.id).catch(() => {
           // The local album should update immediately; account checks surface sync issues.
@@ -3652,8 +3665,8 @@ function readMainichiSeenPhotoKeys() {
   }
 
   try {
-    const raw = window.localStorage.getItem(MAINICHI_SEEN_PHOTO_KEYS_STORAGE_KEY);
-    const values = raw ? JSON.parse(raw) : [];
+    const values =
+      readCachedJson<unknown[]>(MAINICHI_SEEN_PHOTO_KEYS_STORAGE_KEY) ?? [];
 
     return new Set(
       Array.isArray(values)
@@ -3671,10 +3684,7 @@ function writeMainichiSeenPhotoKeys(keys: Set<string>) {
   }
 
   try {
-    window.localStorage.setItem(
-      MAINICHI_SEEN_PHOTO_KEYS_STORAGE_KEY,
-      JSON.stringify([...keys].slice(-500)),
-    );
+    writeCachedJson(MAINICHI_SEEN_PHOTO_KEYS_STORAGE_KEY, [...keys].slice(-500));
   } catch {
     // Local-only motion bookkeeping should never block the album.
   }
@@ -4863,16 +4873,14 @@ function buildNextCollectionTargets(
 
 function readCollectionPhotos(catId: string): Record<string, StoredCollectionPhotoEntry[]> {
   try {
-    const raw = window.localStorage.getItem(STORAGE_KEYS.collectionPhotos);
-
-    if (!raw) {
-      return {};
-    }
-
-    const all = JSON.parse(raw) as Record<
+    const all = readCachedJson<Record<
       string,
       Record<string, StoredCollectionPhotoEntry[] | StoredCollectionPhotoEntry | string[] | string>
-    >;
+    >>(STORAGE_KEYS.collectionPhotos);
+
+    if (!all) {
+      return {};
+    }
     const catPhotos = all[catId] ?? {};
     const photosForDisplay =
       countStoredPhotos(catPhotos) > 0 ? catPhotos : mergeAllCollectionPhotos(all);
@@ -4909,20 +4917,18 @@ function addCollectionPhoto(
   };
 
   try {
-    const raw = window.localStorage.getItem(STORAGE_KEYS.collectionPhotos);
-    const all = raw
-      ? (JSON.parse(raw) as Record<
-          string,
-          Record<string, StoredCollectionPhotoEntry[] | StoredCollectionPhotoEntry | string[] | string>
-        >)
-      : {};
+    const all =
+      readCachedJson<Record<
+        string,
+        Record<string, StoredCollectionPhotoEntry[] | StoredCollectionPhotoEntry | string[] | string>
+      >>(STORAGE_KEYS.collectionPhotos) ?? {};
 
     if (!all[catId]) {
       all[catId] = {};
     }
 
     all[catId][slug] = [...normalizeStoredPhotoList(all[catId][slug], catId, slug), photo];
-    window.localStorage.setItem(STORAGE_KEYS.collectionPhotos, JSON.stringify(all));
+    writeCachedJson(STORAGE_KEYS.collectionPhotos, all);
   } catch {
     // Ignore localStorage quota or parse failures for this MVP fallback.
   }
@@ -5433,7 +5439,9 @@ const styles = {
     rowGap: "10px",
     padding: "4px 2px 28px",
     alignItems: "start",
-  },
+      contentVisibility: "auto",
+    containIntrinsicSize: "720px",
+},
   mainichiMonthBundleDay: {
     display: "grid",
     justifyItems: "center",
@@ -5678,7 +5686,9 @@ const styles = {
     margin: "0 auto",
     width: "100%",
     maxWidth: "430px",
-  },
+      contentVisibility: "auto",
+    containIntrinsicSize: "840px",
+},
   mainichiBundleBase: {
     position: "absolute",
     zIndex: 0,
@@ -5793,7 +5803,7 @@ const styles = {
     top: "0",
     width: "76px",
     height: "22px",
-    backgroundImage: "url('/images/ui/washi-tape-cream.png')",
+    backgroundImage: "url('/images/ui/washi-tape-cream.webp')",
     backgroundSize: "100% 100%",
     backgroundPosition: "center",
     backgroundRepeat: "no-repeat",
@@ -6713,7 +6723,9 @@ const styles = {
     display: "grid",
     gridTemplateColumns: "repeat(2, minmax(0, 1fr))",
     gap: "12px",
-  },
+      contentVisibility: "auto",
+    containIntrinsicSize: "720px",
+},
   shareView: {
     display: "grid",
     gap: "12px",

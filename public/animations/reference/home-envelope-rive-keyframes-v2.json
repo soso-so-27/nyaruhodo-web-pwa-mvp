@@ -1,0 +1,150 @@
+{
+  "version": 1,
+  "asset": "home-envelope-open-v2",
+  "targetRuntimeFile": "/animations/home-envelope-open.riv",
+  "artboard": {
+    "name": "HomeEnvelopeOpen",
+    "width": 1200,
+    "height": 760,
+    "safeArea": {
+      "x": 40,
+      "y": 72,
+      "width": 1120,
+      "height": 632
+    }
+  },
+  "stateMachine": {
+    "name": "EnvelopeOpenMachine",
+    "triggerInput": "open",
+    "states": ["Idle", "Opening", "Done"]
+  },
+  "coordinateModel": {
+    "notes": "Positions mirror the DOM motion preview. Convert percentages to Rive artboard coordinates after importing the v2 transparent PNGs.",
+    "stageWidth": 1200,
+    "stageHeight": 760,
+    "origin": "center"
+  },
+  "layers": [
+    {
+      "name": "envelope_shadow",
+      "file": "/animations/reference/home-envelope-rive-layers-v2/transparent/11-11-envelope-shadow.png",
+      "initial": { "x": 600, "y": 654, "scale": 1, "opacity": 0.72 }
+    },
+    {
+      "name": "back_inner_panel",
+      "file": "/animations/reference/home-envelope-rive-layers-v2/transparent/04-04-back-inner-panel.png",
+      "initial": { "x": 600, "y": 342, "scale": 1, "opacity": 0 }
+    },
+    {
+      "name": "photo_card_placeholder",
+      "file": "/animations/reference/home-envelope-rive-layers-v2/transparent/10-10-photo-card-placeholder.png",
+      "initial": { "x": 600, "y": 517, "scale": 0.94, "opacity": 0 }
+    },
+    {
+      "name": "open_front_pocket",
+      "file": "/animations/reference/home-envelope-rive-layers-v2/transparent/02-02-open-front-pocket.png",
+      "initial": { "x": 600, "y": 464, "scale": 0.996, "opacity": 0 }
+    },
+    {
+      "name": "top_flap",
+      "file": "/animations/reference/home-envelope-rive-layers-v2/transparent/03-03-top-flap.png",
+      "initial": { "x": 600, "y": 251, "scaleY": 0.22, "rotationX": 0, "opacity": 0 },
+      "transformOrigin": "50% 100%"
+    },
+    {
+      "name": "closed_envelope_body",
+      "file": "/animations/reference/home-envelope-rive-layers-v2/transparent/01-01-closed-envelope-body.png",
+      "initial": { "x": 600, "y": 441, "scale": 1, "opacity": 1 }
+    },
+    {
+      "name": "inner_glow",
+      "file": "/animations/reference/home-envelope-rive-layers-v2/transparent/09-09-inner-glow.png",
+      "initial": { "x": 600, "y": 380, "scale": 0.6, "opacity": 0 }
+    },
+    {
+      "name": "wax_seal_intact",
+      "file": "/animations/reference/home-envelope-rive-layers-v2/transparent/05-05-wax-seal-intact.png",
+      "initial": { "x": 600, "y": 448, "scale": 1, "opacity": 1 }
+    },
+    {
+      "name": "wax_seal_left",
+      "file": "/animations/reference/home-envelope-rive-layers-v2/transparent/06-06-wax-seal-left.png",
+      "initial": { "x": 600, "y": 448, "rotation": 0, "opacity": 0 }
+    },
+    {
+      "name": "wax_seal_right",
+      "file": "/animations/reference/home-envelope-rive-layers-v2/transparent/07-07-wax-seal-right.png",
+      "initial": { "x": 600, "y": 448, "rotation": 0, "opacity": 0 }
+    },
+    {
+      "name": "wax_crumbs",
+      "file": "/animations/reference/home-envelope-rive-layers-v2/transparent/08-08-wax-crumbs.png",
+      "initial": { "x": 600, "y": 494, "scale": 0.7, "opacity": 0 }
+    },
+    {
+      "name": "paper_motes",
+      "file": "/animations/reference/home-envelope-rive-layers-v2/transparent/12-12-paper-motes.png",
+      "initial": { "x": 600, "y": 296, "scale": 0.72, "opacity": 0 }
+    }
+  ],
+  "timelineMs": [
+    {
+      "time": 0,
+      "label": "idle",
+      "notes": "Closed envelope, intact wax seal, no glow."
+    },
+    {
+      "time": 110,
+      "label": "tap_squash",
+      "group": { "scaleX": 1.008, "scaleY": 0.982, "y": 2 },
+      "wax_seal_intact": { "scaleX": 1.04, "scaleY": 0.94 }
+    },
+    {
+      "time": 430,
+      "label": "seal_break",
+      "closed_envelope_body": { "opacity": 0 },
+      "open_front_pocket": { "opacity": 1, "scale": 1 },
+      "back_inner_panel": { "opacity": 0.8, "scale": 1.03 },
+      "inner_glow": { "opacity": 0.38, "scale": 0.72 },
+      "wax_seal_intact": { "opacity": 0 },
+      "wax_seal_left": { "x": 582, "rotation": -7, "opacity": 1 },
+      "wax_seal_right": { "x": 618, "rotation": 7, "opacity": 1 },
+      "wax_crumbs": { "opacity": 1, "scale": 1 }
+    },
+    {
+      "time": 780,
+      "label": "flap_open",
+      "top_flap": { "y": 144, "scaleY": 1, "rotationX": -112, "opacity": 1 },
+      "inner_glow": { "opacity": 0.82, "scale": 1.12 },
+      "paper_motes": { "opacity": 0.82, "scale": 0.9 }
+    },
+    {
+      "time": 1040,
+      "label": "pocket_breath",
+      "open_front_pocket": { "y": 459 },
+      "top_flap": { "y": 160, "rotationX": -104 },
+      "inner_glow": { "opacity": 0.82, "scale": 1.12 }
+    },
+    {
+      "time": 1580,
+      "label": "photo_peek",
+      "photo_card_placeholder": { "y": 255, "scale": 1, "opacity": 1 },
+      "paper_motes": { "y": 262, "scale": 1.04, "opacity": 0.7 }
+    },
+    {
+      "time": 2200,
+      "label": "settled",
+      "top_flap": { "rotationX": -104 },
+      "inner_glow": { "opacity": 0.46, "scale": 1 },
+      "paper_motes": { "opacity": 0 },
+      "envelope_shadow": { "opacity": 0.72, "scale": 1 }
+    }
+  ],
+  "curves": {
+    "tap": [0.24, 0.88, 0.32, 1],
+    "sealBreak": [0.18, 0.82, 0.22, 1],
+    "flapOpen": [0.16, 0.96, 0.24, 1],
+    "photoRise": [0.2, 0.82, 0.18, 1],
+    "settle": [0.32, 0, 0.2, 1]
+  }
+}

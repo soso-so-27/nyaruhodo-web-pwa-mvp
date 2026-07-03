@@ -1,10 +1,11 @@
 import { isUsablePhotoSrc, normalizePersistentPhotoSrc } from "../photoStorage";
-import { STORAGE_KEYS } from "../storage";
+import { STORAGE_KEYS, readCachedJson, writeCachedJson } from "../storage";
 
 export type CatGalleryPhoto = {
   id: string;
   catId: string;
   src: string;
+  thumbnailSrc?: string;
   createdAt: number;
 };
 
@@ -28,11 +29,15 @@ export function readCatGalleryPhotos(activeCatId: string | null = null) {
 export function saveCatGalleryPhoto({
   catId,
   src,
+  thumbnailSrc,
 }: {
   catId: string;
   src: string;
+  thumbnailSrc?: string | null;
 }) {
   const normalizedSrc = normalizePersistentPhotoSrc(src) || src;
+  const normalizedThumbnailSrc =
+    thumbnailSrc ? normalizePersistentPhotoSrc(thumbnailSrc) || thumbnailSrc : null;
 
   if (!catId || !isUsablePhotoSrc(normalizedSrc)) {
     return null;
@@ -43,6 +48,9 @@ export function saveCatGalleryPhoto({
     id: createCatGalleryPhotoId(createdAt),
     catId,
     src: normalizedSrc,
+    ...(normalizedThumbnailSrc && isUsablePhotoSrc(normalizedThumbnailSrc)
+      ? { thumbnailSrc: normalizedThumbnailSrc }
+      : {}),
     createdAt,
   };
 
@@ -83,6 +91,37 @@ export function deleteCatGalleryPhoto(photoId: string) {
   dispatchCatGalleryPhotosUpdated();
 
   return target;
+}
+
+export function updateCatGalleryPhotoThumbnail(photoId: string, thumbnailSrc: string) {
+  const normalizedThumbnailSrc =
+    normalizePersistentPhotoSrc(thumbnailSrc) || thumbnailSrc;
+
+  if (!photoId || !isUsablePhotoSrc(normalizedThumbnailSrc)) {
+    return null;
+  }
+
+  const saved = readCatGalleryPhotos(null);
+  let updatedPhoto: CatGalleryPhoto | null = null;
+  const nextPhotos = saved.map((photo) => {
+    if (photo.id !== photoId) {
+      return photo;
+    }
+
+    updatedPhoto = {
+      ...photo,
+      thumbnailSrc: normalizedThumbnailSrc,
+    };
+    return updatedPhoto;
+  });
+
+  if (!updatedPhoto) {
+    return null;
+  }
+
+  writeStorageArray(STORAGE_KEYS.catGalleryPhotos, nextPhotos);
+  dispatchCatGalleryPhotosUpdated();
+  return updatedPhoto;
 }
 
 export function hasAcknowledgedCatGalleryIntro() {
@@ -141,6 +180,12 @@ function normalizeCatGalleryPhoto(photo: CatGalleryPhoto): CatGalleryPhoto {
     id: photo.id,
     catId: photo.catId,
     src: normalizePersistentPhotoSrc(photo.src) || photo.src,
+    ...(photo.thumbnailSrc && isUsablePhotoSrc(photo.thumbnailSrc)
+      ? {
+          thumbnailSrc:
+            normalizePersistentPhotoSrc(photo.thumbnailSrc) || photo.thumbnailSrc,
+        }
+      : {}),
     createdAt: photo.createdAt,
   };
 }
@@ -195,8 +240,7 @@ function readStorageArray<T>(key: string) {
   }
 
   try {
-    const raw = window.localStorage.getItem(key);
-    const parsed = raw ? (JSON.parse(raw) as unknown) : [];
+    const parsed = readCachedJson<unknown>(key) ?? [];
 
     return Array.isArray(parsed) ? (parsed as T[]) : [];
   } catch {
@@ -205,5 +249,5 @@ function readStorageArray<T>(key: string) {
 }
 
 function writeStorageArray<T>(key: string, value: T[]) {
-  window.localStorage.setItem(key, JSON.stringify(value));
+  writeCachedJson(key, value);
 }

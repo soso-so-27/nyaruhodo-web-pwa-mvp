@@ -48,13 +48,13 @@ export function BottomNavigation({
       key: "collection",
       href: "/collection",
       label: "ねこだより",
-      icon: <GeneratedNavIcon src="/icons/bottom-nav-mainichi.png" />,
+      icon: <GeneratedNavIcon src="/icons/bottom-nav-mainichi.webp" />,
     },
     {
       key: "cats",
       href: "/cats",
       label: "うちのこ",
-      icon: <GeneratedNavIcon src="/icons/bottom-nav-uchinoko.png" />,
+      icon: <GeneratedNavIcon src="/icons/bottom-nav-uchinoko.webp" />,
     },
   ];
   const displayActiveKey = pendingKey ?? activeKey;
@@ -181,7 +181,7 @@ function TodayPairIcon({ state }: { state: "1" | "1b" | "2" | "3" | "4" }) {
 
   return (
     <GeneratedNavIcon
-      src="/icons/bottom-nav-today.png"
+      src="/icons/bottom-nav-today.webp"
       todayTestSlots
       style={isAfterCapture ? styles.generatedNavIconActive : undefined}
     />
@@ -207,6 +207,10 @@ function GeneratedNavIcon({
         alt=""
         aria-hidden="true"
         draggable={false}
+        width={44}
+        height={44}
+        loading="eager"
+        decoding="async"
         style={{ ...styles.generatedNavIcon, ...style }}
       />
       {todayTestSlots ? (

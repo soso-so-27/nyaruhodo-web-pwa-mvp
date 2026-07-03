@@ -1,0 +1,203 @@
+{
+  "source": "public/animations/reference/home-envelope-rive-layers-v2/source-layer-sheet.png",
+  "artReference": "/animations/reference/home-envelope-rive-storyboard-v2.png",
+  "note": "Generated raster PNG layers for Rive Editor import. Use v2 storyboard for final art polish; these layers are construction-ready but can be refined in Rive.",
+  "canvasSize": {
+    "width": 1536,
+    "height": 1024
+  },
+  "layers": [
+    {
+      "file": "/animations/reference/home-envelope-rive-layers-v2/transparent/01-01-closed-envelope-body.png",
+      "name": "01_closed_envelope_body",
+      "transformOrigin": "center 58%",
+      "sourceBox": [
+        24,
+        138,
+        434,
+        426
+      ],
+      "size": {
+        "width": 390,
+        "height": 267
+      },
+      "note": "closed idle envelope"
+    },
+    {
+      "file": "/animations/reference/home-envelope-rive-layers-v2/transparent/02-02-open-front-pocket.png",
+      "name": "02_open_front_pocket",
+      "transformOrigin": "center 72%",
+      "sourceBox": [
+        436,
+        62,
+        812,
+        446
+      ],
+      "size": {
+        "width": 343,
+        "height": 354
+      },
+      "note": "open pocket and visible inner fold"
+    },
+    {
+      "file": "/animations/reference/home-envelope-rive-layers-v2/transparent/03-03-top-flap.png",
+      "name": "03_top_flap",
+      "transformOrigin": "center 94%",
+      "sourceBox": [
+        812,
+        124,
+        1166,
+        296
+      ],
+      "size": {
+        "width": 329,
+        "height": 147
+      },
+      "note": "top flap/back flap piece"
+    },
+    {
+      "file": "/animations/reference/home-envelope-rive-layers-v2/transparent/04-04-back-inner-panel.png",
+      "name": "04_back_inner_panel",
+      "transformOrigin": "center 56%",
+      "sourceBox": [
+        1160,
+        154,
+        1516,
+        436
+      ],
+      "size": {
+        "width": 328,
+        "height": 259
+      },
+      "note": "back/inner panel construction reference"
+    },
+    {
+      "file": "/animations/reference/home-envelope-rive-layers-v2/transparent/05-05-wax-seal-intact.png",
+      "name": "05_wax_seal_intact",
+      "transformOrigin": "center center",
+      "sourceBox": [
+        78,
+        462,
+        296,
+        674
+      ],
+      "size": {
+        "width": 195,
+        "height": 189
+      },
+      "note": "intact wax seal with sleeping cat impression"
+    },
+    {
+      "file": "/animations/reference/home-envelope-rive-layers-v2/transparent/06-06-wax-seal-left.png",
+      "name": "06_wax_seal_left",
+      "transformOrigin": "70% center",
+      "sourceBox": [
+        406,
+        462,
+        568,
+        672
+      ],
+      "size": {
+        "width": 132,
+        "height": 186
+      },
+      "note": "left broken wax half"
+    },
+    {
+      "file": "/animations/reference/home-envelope-rive-layers-v2/transparent/07-07-wax-seal-right.png",
+      "name": "07_wax_seal_right",
+      "transformOrigin": "30% center",
+      "sourceBox": [
+        644,
+        464,
+        800,
+        672
+      ],
+      "size": {
+        "width": 129,
+        "height": 188
+      },
+      "note": "right broken wax half"
+    },
+    {
+      "file": "/animations/reference/home-envelope-rive-layers-v2/transparent/08-08-wax-crumbs.png",
+      "name": "08_wax_crumbs",
+      "transformOrigin": "center center",
+      "sourceBox": [
+        912,
+        488,
+        1074,
+        652
+      ],
+      "size": {
+        "width": 161,
+        "height": 158
+      },
+      "note": "small broken wax crumbs grouped"
+    },
+    {
+      "file": "/animations/reference/home-envelope-rive-layers-v2/transparent/09-09-inner-glow.png",
+      "name": "09_inner_glow",
+      "transformOrigin": "center center",
+      "sourceBox": [
+        1190,
+        468,
+        1458,
+        696
+      ],
+      "size": {
+        "width": 360,
+        "height": 260
+      },
+      "note": "warm inner glow layer"
+    },
+    {
+      "file": "/animations/reference/home-envelope-rive-layers-v2/transparent/10-10-photo-card-placeholder.png",
+      "name": "10_photo_card_placeholder",
+      "transformOrigin": "center 100%",
+      "sourceBox": [
+        78,
+        690,
+        448,
+        946
+      ],
+      "size": {
+        "width": 345,
+        "height": 234
+      },
+      "note": "blank replaceable photo card placeholder"
+    },
+    {
+      "file": "/animations/reference/home-envelope-rive-layers-v2/transparent/11-11-envelope-shadow.png",
+      "name": "11_envelope_shadow",
+      "transformOrigin": "center center",
+      "sourceBox": [
+        604,
+        820,
+        862,
+        904
+      ],
+      "size": {
+        "width": 205,
+        "height": 54
+      },
+      "note": "soft envelope ground shadow"
+    },
+    {
+      "file": "/animations/reference/home-envelope-rive-layers-v2/transparent/12-12-paper-motes.png",
+      "name": "12_paper_motes",
+      "transformOrigin": "center center",
+      "sourceBox": [
+        990,
+        730,
+        1398,
+        968
+      ],
+      "size": {
+        "width": 420,
+        "height": 250
+      },
+      "note": "sparse paper motes grouped"
+    }
+  ]
+}

@@ -30,6 +30,7 @@ import {
   hasAcknowledgedCatGalleryIntro,
   readCatGalleryPhotos,
   saveCatGalleryPhoto,
+  updateCatGalleryPhotoThumbnail,
   type CatGalleryPhoto,
 } from "../../lib/cats/catGalleryPhotos";
 import {
@@ -58,7 +59,11 @@ import { AppCard } from "../ui/AppCard";
 import { AppSegmented } from "../ui/AppSegmented";
 import { AppTextField } from "../ui/AppTextField";
 import { PhotoTile } from "../ui/PhotoTile";
-import { StoredPhotoImage } from "../ui/StoredPhotoImage";
+import {
+  StoredPhotoImage,
+  getStoragePhotoSignedUrl,
+  preloadStoragePhotoSignedUrls,
+} from "../ui/StoredPhotoImage";
 import { OmoideMemoryViewer } from "../home/OmoideMemoryViewer";
 import {
   addCatProfile,
@@ -89,6 +94,9 @@ const SUPPORTED_SOURCE_IMAGE_MIME_TYPES = new Set([
 type LensPhoto = {
   id: string;
   src: string;
+  thumbnailSrc?: string;
+  displaySrc?: string;
+  originalSrc?: string;
   createdAt: number;
   catIds: string[];
   catNames: string[];
@@ -189,6 +197,7 @@ export function CatsPage() {
   const [saveMessage, setSaveMessage] = useState("");
   const [galleryRefreshTick, setGalleryRefreshTick] = useState(0);
   const isCatGalleryRestoreCheckRunningRef = useRef(false);
+  const catGalleryThumbnailBackfillAttemptedRef = useRef(new Set<string>());
   const [activeLens, setActiveLens] = useState<UchinokoLens>("cat");
   const [activeSection, setActiveSection] =
     useState<UchinokoSection>("record");
@@ -263,6 +272,40 @@ export function CatsPage() {
     () => activeCatLensPhotos.filter(isCatGalleryLensPhoto),
     [activeCatLensPhotos],
   );
+  useEffect(() => {
+    let isCancelled = false;
+    const missingThumbnailPhotos = activeCatGalleryLensPhotos
+      .filter(
+        (photo) =>
+          !photo.thumbnailSrc &&
+          !catGalleryThumbnailBackfillAttemptedRef.current.has(photo.id),
+      )
+      .slice(0, 3);
+
+    if (missingThumbnailPhotos.length === 0) {
+      return;
+    }
+
+    for (const photo of missingThumbnailPhotos) {
+      catGalleryThumbnailBackfillAttemptedRef.current.add(photo.id);
+    }
+
+    void backfillCatGalleryThumbnails(missingThumbnailPhotos, () => isCancelled)
+      .then((updatedCount) => {
+        if (!isCancelled && updatedCount > 0) {
+          setGalleryRefreshTick((value) => value + 1);
+        }
+      });
+
+    return () => {
+      isCancelled = true;
+    };
+  }, [activeCatGalleryLensPhotos]);
+  useEffect(() => {
+    void preloadStoragePhotoSignedUrls(
+      activeCatLensPhotos.slice(0, 48).map(getLensPhotoThumbnailSrc),
+    );
+  }, [activeCatLensPhotos]);
   const stableSleepingCoverPhoto = useMemo(
     () => getStableSleepingCoverPhoto(activeCatLensPhotos),
     [activeCatLensPhotos],
@@ -919,11 +962,19 @@ export function CatsPage() {
 
       try {
         assertSupportedSourceImage(file);
-        const dataUrl = await resizeAndEncode(file, 2560, 0.88);
+        const [dataUrl, thumbnailDataUrl] = await Promise.all([
+          resizeAndEncode(file, 2560, 0.88),
+          resizeAndEncode(file, 512, 0.72, "image/webp"),
+        ]);
         const photoSrc = await storeAccountPhotoDataUrl({
           dataUrl,
           pathSegments: [targetCatId, "photos"],
           fileName: `photo-${Date.now()}`,
+        });
+        const thumbnailSrc = await storeAccountPhotoDataUrl({
+          dataUrl: thumbnailDataUrl,
+          pathSegments: [targetCatId, "photos"],
+          fileName: `photo-${Date.now()}-thumb`,
         });
         if (!isStoragePhotoReference(photoSrc)) {
           setSaveMessage("写真を追加できませんでした。");
@@ -933,6 +984,7 @@ export function CatsPage() {
         const savedPhoto = saveCatGalleryPhoto({
           catId: targetCatId,
           src: photoSrc,
+          thumbnailSrc: isStoragePhotoReference(thumbnailSrc) ? thumbnailSrc : null,
         });
 
         if (!savedPhoto) {
@@ -1242,7 +1294,7 @@ export function CatsPage() {
                             aria-label="次のねこに切り替える"
                           >
                             <img
-                              src="/icons/cat-switch-generated.png"
+                              src="/icons/cat-switch-generated.webp"
                               alt=""
                               style={styles.profileCoverSwitchIcon}
                             />
@@ -1278,7 +1330,7 @@ export function CatsPage() {
                         aria-label="次のねこに切り替える"
                       >
                         <img
-                          src="/icons/cat-switch-generated.png"
+                          src="/icons/cat-switch-generated.webp"
                           alt=""
                           style={styles.profileCoverSwitchIcon}
                         />
@@ -2800,7 +2852,7 @@ function LensPhotoGrid({
       {photos.map((photo) => (
         <div key={photo.id} style={styles.lensPhotoItem}>
           <PhotoTile
-            src={photo.src}
+            src={getLensPhotoThumbnailSrc(photo)}
             alt=""
             variant="tile"
             aspect="1 / 1"
@@ -2851,7 +2903,7 @@ function PhotoListSheet({
                 onClick={() => onOpenPhoto(photo)}
               >
                 <PhotoTile
-                  src={photo.src}
+                  src={getLensPhotoThumbnailSrc(photo)}
                   alt=""
                   variant="tile"
                   aspect="1 / 1"
@@ -3031,7 +3083,7 @@ function YearSummaryDetailList({
               aria-label={`${formatLensPhotoDate(photo.createdAt)}の写真を開く`}
             >
               <StoredPhotoImage
-                src={photo.src}
+                src={getLensPhotoThumbnailSrc(photo)}
                 alt=""
                 style={styles.yearSummaryPhotoImage}
               />
@@ -3184,7 +3236,7 @@ function ThumbnailPickerSheet({
                   aria-label={`${formatLensPhotoDate(photo.createdAt)}の写真をサムネイルにする`}
                 >
                   <PhotoTile
-                    src={photo.src}
+                    src={getLensPhotoThumbnailSrc(photo)}
                     alt=""
                     variant="tile"
                     aspect="1 / 1"
@@ -3297,6 +3349,10 @@ function PhotoFullscreenViewer({
             src={photo.src}
             alt=""
             style={styles.photoViewerImage}
+            loading="eager"
+            fetchPriority="high"
+            width={390}
+            height={390}
           />
         </div>
         <div style={styles.photoViewerMeta}>
@@ -3545,7 +3601,10 @@ function createLocalLensPhoto(
 ): LensPhoto {
   return {
     id: photo.id,
-    src: photo.thumbnailSrc ?? photo.displaySrc ?? photo.src,
+    src: getLensPhotoThumbnailSrc(photo),
+    thumbnailSrc: photo.thumbnailSrc,
+    displaySrc: photo.displaySrc,
+    originalSrc: photo.src,
     createdAt: photo.createdAt,
     catIds: [profile.id],
     catNames: [getCatName(profile)],
@@ -3557,7 +3616,10 @@ function createLocalLensPhoto(
 function createLocalOrphanLensPhoto(photo: OwnSleepingPhoto): LensPhoto {
   return {
     id: photo.id,
-    src: photo.thumbnailSrc ?? photo.displaySrc ?? photo.src,
+    src: getLensPhotoThumbnailSrc(photo),
+    thumbnailSrc: photo.thumbnailSrc,
+    displaySrc: photo.displaySrc,
+    originalSrc: photo.src,
     createdAt: photo.createdAt,
     catIds: [],
     catNames: [],
@@ -3571,7 +3633,10 @@ function createLocalGalleryLensPhoto(
 ): LensPhoto {
   return {
     id: photo.id,
-    src: photo.src,
+    src: photo.thumbnailSrc ?? photo.src,
+    thumbnailSrc: photo.thumbnailSrc,
+    displaySrc: photo.src,
+    originalSrc: photo.src,
     createdAt: photo.createdAt,
     catIds: [profile.id],
     catNames: [getCatName(profile)],
@@ -3586,6 +3651,8 @@ function createRemoteLensPhoto(
   return {
     id: row.localMomentId || row.catMomentId,
     src: row.photoUrl,
+    displaySrc: row.photoUrl,
+    originalSrc: row.photoUrl,
     createdAt: parseRemoteLensPhotoDate(row.capturedAt ?? row.createdAt),
     catIds: [profile.id],
     catNames: [getCatName(profile)],
@@ -3644,6 +3711,9 @@ function dedupeLensPhotos(photos: LensPhoto[]) {
       createdAt: Math.max(existing.createdAt, photo.createdAt),
       catIds: uniqueStrings([...existing.catIds, ...photo.catIds]),
       catNames: uniqueStrings([...existing.catNames, ...photo.catNames]),
+      thumbnailSrc: existing.thumbnailSrc ?? photo.thumbnailSrc,
+      displaySrc: existing.displaySrc ?? photo.displaySrc,
+      originalSrc: existing.originalSrc ?? photo.originalSrc,
       deliveryCount: Math.max(
         existing.deliveryCount ?? 0,
         photo.deliveryCount ?? 0,
@@ -3680,12 +3750,29 @@ function formatLensPhotoDate(timestamp: number) {
 function toRecordPhotoPreview(photo: LensPhoto): RecordPhotoPreview {
   return {
     id: photo.id,
-    src: photo.src,
+    src: getLensPhotoDetailSrc(photo),
     title: photo.kind === "sleeping" ? "ねがお" : "写真",
     timestamp: photo.createdAt,
     kind: photo.kind,
     catIds: photo.catIds,
   };
+}
+
+function getLensPhotoThumbnailSrc(photo: {
+  src: string;
+  thumbnailSrc?: string;
+  displaySrc?: string;
+}) {
+  return photo.thumbnailSrc ?? photo.displaySrc ?? photo.src;
+}
+
+function getLensPhotoDetailSrc(photo: {
+  src: string;
+  displaySrc?: string;
+  originalSrc?: string;
+  thumbnailSrc?: string;
+}) {
+  return photo.displaySrc ?? photo.originalSrc ?? photo.thumbnailSrc ?? photo.src;
 }
 
 function toRecordPhotoPreviewFromMemory(memory: OmoideMemory): RecordPhotoPreview {
@@ -3715,6 +3802,87 @@ function getStableSleepingCoverPhoto(photos: LensPhoto[]) {
 
 function isStoragePhotoReference(src: string | null | undefined) {
   return Boolean(src?.startsWith("storage:") || src?.startsWith("storage://"));
+}
+
+async function backfillCatGalleryThumbnails(
+  photos: LensPhoto[],
+  isCancelled: () => boolean,
+) {
+  let updatedCount = 0;
+
+  for (const photo of photos) {
+    if (isCancelled()) {
+      break;
+    }
+
+    const source = photo.displaySrc ?? photo.originalSrc ?? photo.src;
+    const displaySrc = isStoragePhotoReference(source)
+      ? await getStoragePhotoSignedUrl(source)
+      : source;
+
+    if (isCancelled() || !displaySrc) {
+      continue;
+    }
+
+    const thumbnailDataUrl = await resizeImageSource(
+      displaySrc,
+      512,
+      0.72,
+      "image/webp",
+    );
+
+    if (isCancelled() || !thumbnailDataUrl) {
+      continue;
+    }
+
+    const thumbnailSrc = await storeAccountPhotoDataUrl({
+      dataUrl: thumbnailDataUrl,
+      pathSegments: [photo.catIds[0] ?? "cat", "photos"],
+      fileName: `${photo.id}-thumb`,
+    });
+
+    if (!isCancelled() && isStoragePhotoReference(thumbnailSrc)) {
+      updateCatGalleryPhotoThumbnail(photo.id, thumbnailSrc);
+      updatedCount += 1;
+    }
+  }
+
+  return updatedCount;
+}
+
+function resizeImageSource(
+  src: string,
+  maxSize: number,
+  quality: number,
+  mimeType: string,
+) {
+  return new Promise<string | null>((resolve) => {
+    const img = new Image();
+    img.crossOrigin = "anonymous";
+
+    img.onload = () => {
+      try {
+        const scale = Math.min(1, maxSize / Math.max(img.width, img.height));
+        const canvas = document.createElement("canvas");
+        canvas.width = Math.round(img.width * scale);
+        canvas.height = Math.round(img.height * scale);
+        const context = canvas.getContext("2d");
+
+        if (!context) {
+          resolve(null);
+          return;
+        }
+
+        context.drawImage(img, 0, 0, canvas.width, canvas.height);
+        const encoded = canvas.toDataURL(mimeType, quality);
+        resolve(encoded.startsWith(`data:${mimeType};`) ? encoded : null);
+      } catch {
+        resolve(null);
+      }
+    };
+    img.onerror = () => resolve(null);
+    img.src = src;
+  });
 }
 
 function getLensPhotoCountForCat(
@@ -4311,19 +4479,19 @@ function formatGender(gender?: string): string {
 
 function getCatAvatarSrc(coat?: string): string {
   const coatMap: Record<string, string> = {
-    saba: "/sample-cats/saba.png",
-    kiji_tabby: "/sample-cats/saba.png",
-    gray: "/sample-cats/gray.png",
-    orange_tabby: "/sample-cats/orange_tabby.png",
-    black: "/sample-cats/black.png",
-    white: "/sample-cats/white.png",
-    hachiware: "/sample-cats/black.png",
-    calico: "/sample-cats/calico.png",
-    tortoiseshell: "/sample-cats/black.png",
-    cream: "/sample-cats/saba.png",
+    saba: "/sample-cats/saba.webp",
+    kiji_tabby: "/sample-cats/saba.webp",
+    gray: "/sample-cats/gray.webp",
+    orange_tabby: "/sample-cats/orange_tabby.webp",
+    black: "/sample-cats/black.webp",
+    white: "/sample-cats/white.webp",
+    hachiware: "/sample-cats/black.webp",
+    calico: "/sample-cats/calico.webp",
+    tortoiseshell: "/sample-cats/black.webp",
+    cream: "/sample-cats/saba.webp",
   };
 
-  return coatMap[coat ?? ""] ?? "/sample-cats/saba.png";
+  return coatMap[coat ?? ""] ?? "/sample-cats/saba.webp";
 }
 
 function getCoatLabel(coat: string): string {
@@ -4343,7 +4511,12 @@ function getCoatLabel(coat: string): string {
   return labels[coat] ?? coat;
 }
 
-function resizeAndEncode(file: File, maxSize = 800, quality = 0.85): Promise<string> {
+function resizeAndEncode(
+  file: File,
+  maxSize = 800,
+  quality = 0.85,
+  mimeType = "image/jpeg",
+): Promise<string> {
   return new Promise((resolve) => {
     const img = new Image();
     const url = URL.createObjectURL(file);
@@ -4365,7 +4538,12 @@ function resizeAndEncode(file: File, maxSize = 800, quality = 0.85): Promise<str
 
       context.drawImage(img, 0, 0, canvas.width, canvas.height);
       URL.revokeObjectURL(url);
-      resolve(canvas.toDataURL("image/jpeg", quality));
+      const encoded = canvas.toDataURL(mimeType, quality);
+      resolve(
+        encoded.startsWith(`data:${mimeType};`)
+          ? encoded
+          : canvas.toDataURL("image/jpeg", quality),
+      );
     };
 
     img.src = url;
@@ -5559,7 +5737,9 @@ const styles = {
     padding: "0 2px 2px 0",
     scrollSnapType: "x proximity",
     scrollbarWidth: "none",
-  },
+      contentVisibility: "auto",
+    containIntrinsicSize: "180px",
+},
   footprintCard: {
     width: "132px",
     minHeight: "128px",
@@ -6213,7 +6393,9 @@ const styles = {
     gridTemplateColumns: "repeat(3, minmax(0, 1fr))",
     gap: "2px",
     minWidth: 0,
-  },
+      contentVisibility: "auto",
+    containIntrinsicSize: "720px",
+},
   photoListItem: {
     position: "relative",
     minWidth: 0,
@@ -6345,7 +6527,9 @@ const styles = {
     display: "grid",
     gridTemplateColumns: "repeat(3, minmax(0, 1fr))",
     gap: "6px",
-  },
+      contentVisibility: "auto",
+    containIntrinsicSize: "420px",
+},
   yearSummaryPhotoButton: {
     width: "100%",
     aspectRatio: "1 / 1",
@@ -6366,7 +6550,9 @@ const styles = {
   yearSummaryRows: {
     display: "grid",
     gap: "7px",
-  },
+      contentVisibility: "auto",
+    containIntrinsicSize: "480px",
+},
   yearSummaryRow: {
     display: "grid",
     gridTemplateColumns: "44px minmax(0, 1fr) auto",
@@ -6767,7 +6953,9 @@ const styles = {
   },
   bunbakoList: {
     display: "grid",
-  },
+      contentVisibility: "auto",
+    containIntrinsicSize: "360px",
+},
   bunbakoRow: {
     width: "100%",
     minHeight: "60px",

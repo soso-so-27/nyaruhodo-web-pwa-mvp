@@ -3,7 +3,7 @@
 import { usePathname } from "next/navigation";
 import { useEffect, useRef } from "react";
 import { trackProductEvent } from "../../lib/analytics/productAnalytics";
-import { STORAGE_KEYS } from "../../lib/storage";
+import { STORAGE_KEYS, readCachedJson } from "../../lib/storage";
 
 export function AppAnalyticsTracker() {
   const pathname = usePathname();
@@ -117,8 +117,7 @@ function getAppState() {
 
 function getCatCount() {
   try {
-    const raw = window.localStorage.getItem(STORAGE_KEYS.catProfiles);
-    const parsed = raw ? JSON.parse(raw) : [];
+    const parsed = readCachedJson<unknown>(STORAGE_KEYS.catProfiles) ?? [];
     return Array.isArray(parsed) ? parsed.length : 0;
   } catch {
     return 0;

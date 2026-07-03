@@ -1,4 +1,4 @@
-import { STORAGE_KEYS } from "../storage";
+import { STORAGE_KEYS, readCachedJson, writeCachedJson } from "../storage";
 import { createBrowserSupabaseClient } from "../supabase/browser";
 
 const SESSION_TIMEOUT_MS = 30 * 60 * 1000;
@@ -87,10 +87,7 @@ export function trackProductEvent(
 
     const queue = readAnalyticsEventQueue();
     const nextQueue = [...queue, event].slice(-MAX_QUEUE_SIZE);
-    window.localStorage.setItem(
-      STORAGE_KEYS.analyticsEventQueue,
-      JSON.stringify(nextQueue),
-    );
+    writeCachedJson(STORAGE_KEYS.analyticsEventQueue, nextQueue);
 
     void flushProductAnalyticsEvents();
   } catch {
@@ -131,9 +128,9 @@ export async function flushProductAnalyticsEvents() {
     await supabase.from("app_events").insert(batch.map(toAppEventRow));
 
     const currentQueue = readAnalyticsEventQueue();
-    window.localStorage.setItem(
+    writeCachedJson(
       STORAGE_KEYS.analyticsEventQueue,
-      JSON.stringify(currentQueue.slice(batch.length)),
+      currentQueue.slice(batch.length),
     );
   } catch {
     // Keep the local queue and retry later.
@@ -148,11 +145,7 @@ export function readAnalyticsEventQueue(): ProductAnalyticsEvent[] {
   }
 
   try {
-    const raw = window.localStorage.getItem(STORAGE_KEYS.analyticsEventQueue);
-    if (!raw) {
-      return [];
-    }
-    const parsed = JSON.parse(raw);
+    const parsed = readCachedJson<unknown>(STORAGE_KEYS.analyticsEventQueue);
     return Array.isArray(parsed)
       ? parsed
           .map(sanitizeQueuedAnalyticsEvent)
@@ -226,8 +219,8 @@ function getOrCreateSessionId() {
   const now = Date.now();
 
   try {
-    const raw = window.localStorage.getItem(STORAGE_KEYS.analyticsSession);
-    const session = raw ? (JSON.parse(raw) as Partial<AnalyticsSession>) : null;
+    const session =
+      readCachedJson<Partial<AnalyticsSession>>(STORAGE_KEYS.analyticsSession);
     if (
       session?.id &&
       typeof session.lastSeenAt === "number" &&
@@ -237,10 +230,7 @@ function getOrCreateSessionId() {
         id: session.id,
         lastSeenAt: now,
       };
-      window.localStorage.setItem(
-        STORAGE_KEYS.analyticsSession,
-        JSON.stringify(nextSession),
-      );
+      writeCachedJson(STORAGE_KEYS.analyticsSession, nextSession);
       return nextSession.id;
     }
   } catch {
@@ -251,10 +241,7 @@ function getOrCreateSessionId() {
     id: createId(),
     lastSeenAt: now,
   };
-  window.localStorage.setItem(
-    STORAGE_KEYS.analyticsSession,
-    JSON.stringify(nextSession),
-  );
+  writeCachedJson(STORAGE_KEYS.analyticsSession, nextSession);
   return nextSession.id;
 }
 

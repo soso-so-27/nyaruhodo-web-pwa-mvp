@@ -1,6 +1,11 @@
 import type { RecentEvent } from "../../lib/supabase/queries";
 import { getCatTypeInfo } from "../../lib/diagnosisOnboarding/catTypes";
-import { STORAGE_KEYS } from "../../lib/storage";
+import {
+  STORAGE_KEYS,
+  readCachedJson,
+  removeCachedJson,
+  writeCachedJson,
+} from "../../lib/storage";
 import type {
   ActivityPattern,
   AxisScores,
@@ -125,7 +130,7 @@ export function getCatAvatarSrcForCoat(coat?: string) {
       ? avatars[coat as CatCoat]
       : "neutral";
 
-  return `/icons/cat-avatars/${avatarKey}.png`;
+  return `/icons/cat-avatars/${avatarKey}.webp`;
 }
 
 type ConcernSignal =
@@ -547,7 +552,7 @@ export function readCatProfiles() {
 }
 
 export function saveCatProfiles(profiles: CatProfile[]) {
-  window.localStorage.setItem(CAT_PROFILES_KEY, JSON.stringify(profiles));
+  writeCachedJson(CAT_PROFILES_KEY, profiles);
 }
 
 export function readActiveCatId() {
@@ -559,22 +564,23 @@ export function saveActiveCatId(catId: string) {
 }
 
 export function readActiveCatTraitMemo(activeCatId: string | null) {
-  const value = window.localStorage.getItem(CAT_PROFILES_KEY);
+  const parsed = readCachedJson<unknown>(CAT_PROFILES_KEY);
 
-  if (!value) {
+  if (!parsed) {
     return null;
   }
 
   try {
-    const parsed = JSON.parse(value) as
-      | Partial<CatProfile>[]
-      | Record<string, Partial<CatProfile>>;
     const candidates = Array.isArray(parsed)
       ? parsed
-      : Object.entries(parsed).map(([id, profile]) => ({
-          ...profile,
-          id: profile.id ?? id,
-        }));
+      : parsed && typeof parsed === "object"
+        ? Object.entries(parsed as Record<string, Partial<CatProfile>>).map(
+            ([id, profile]) => ({
+              ...profile,
+              id: profile.id ?? id,
+            }),
+          )
+        : [];
     const profile =
       candidates.find((candidate) => candidate.id === activeCatId) ??
       candidates.find((candidate) => candidate.typeLabel);
@@ -873,16 +879,16 @@ export function isCurrentCatHintSuppressed({
 }
 
 function readStoredCatProfiles() {
-  const value = window.localStorage.getItem(CAT_PROFILES_KEY);
-
-  if (!value) {
-    return [];
-  }
-
   try {
-    const parsed = JSON.parse(value) as
+    const parsed = readCachedJson<
       | Partial<CatProfile>[]
-      | Record<string, Partial<CatProfile>>;
+      | Record<string, Partial<CatProfile>>
+    >(CAT_PROFILES_KEY);
+
+    if (!parsed) {
+      return [];
+    }
+
     const profiles = Array.isArray(parsed)
       ? parsed
       : Object.entries(parsed).map(([id, profile]) => ({
@@ -1108,14 +1114,8 @@ function normalizeCatAppearance(appearance: CatAppearance): CatAppearance {
 }
 
 function readStoredCurrentCatHintSuppressions() {
-  const value = window.localStorage.getItem(CURRENT_CAT_HINT_SUPPRESSION_KEY);
-
-  if (!value) {
-    return [];
-  }
-
   try {
-    const parsed = JSON.parse(value) as Partial<CurrentCatHintSuppression>[];
+    const parsed = readCachedJson<unknown>(CURRENT_CAT_HINT_SUPPRESSION_KEY) ?? [];
 
     if (!Array.isArray(parsed)) {
       return [];
@@ -1130,10 +1130,7 @@ function readStoredCurrentCatHintSuppressions() {
 function saveCurrentCatHintSuppressions(
   suppressions: CurrentCatHintSuppression[],
 ) {
-  window.localStorage.setItem(
-    CURRENT_CAT_HINT_SUPPRESSION_KEY,
-    JSON.stringify(suppressions),
-  );
+  writeCachedJson(CURRENT_CAT_HINT_SUPPRESSION_KEY, suppressions);
 }
 
 function isValidCurrentCatHintSuppression(
@@ -1184,14 +1181,8 @@ function migrateLegacyCatProfile() {
 }
 
 export function readLatestHypothesis() {
-  const value = window.localStorage.getItem(STORAGE_KEYS.latestHypothesis);
-
-  if (!value) {
-    return null;
-  }
-
   try {
-    const parsed = JSON.parse(value) as {
+    const parsed = readCachedJson<{
       source?: string;
       text?: string;
       category?: string;
@@ -1199,14 +1190,14 @@ export function readLatestHypothesis() {
       localCatId?: string | null;
       createdAt?: string;
       expiresAt?: string;
-    };
+    }>(STORAGE_KEYS.latestHypothesis);
 
-    if (!parsed.text) {
+    if (!parsed?.text) {
       return null;
     }
 
     if (isExpiredLatestHypothesis(parsed)) {
-      window.localStorage.removeItem(STORAGE_KEYS.latestHypothesis);
+      removeCachedJson(STORAGE_KEYS.latestHypothesis);
       return null;
     }
 
@@ -1217,10 +1208,10 @@ export function readLatestHypothesis() {
 }
 
 export function clearLatestHypothesis() {
-  window.localStorage.removeItem(STORAGE_KEYS.latestHypothesis);
-  window.localStorage.removeItem(STORAGE_KEYS.lastInputSignal);
-  window.localStorage.removeItem(STORAGE_KEYS.lastContext);
-  window.localStorage.removeItem(STORAGE_KEYS.lastPrimaryCategory);
+  removeCachedJson(STORAGE_KEYS.latestHypothesis);
+  removeCachedJson(STORAGE_KEYS.lastInputSignal);
+  removeCachedJson(STORAGE_KEYS.lastContext);
+  removeCachedJson(STORAGE_KEYS.lastPrimaryCategory);
 }
 
 export function parseStoredContext(value: string) {

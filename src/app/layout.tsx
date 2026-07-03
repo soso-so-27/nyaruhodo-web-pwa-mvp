@@ -45,6 +45,7 @@ const zenKakuGothicNew = localFont({
 const siteUrl =
   process.env.NEXT_PUBLIC_SITE_URL?.trim() ||
   "https://nyaruhodo-web-pwa-mvp.vercel.app";
+const supabaseOrigin = getOrigin(process.env.NEXT_PUBLIC_SUPABASE_URL);
 
 export const metadata: Metadata = {
   metadataBase: new URL(siteUrl),
@@ -61,10 +62,7 @@ export const metadata: Metadata = {
     "apple-mobile-web-app-capable": "yes",
   },
   icons: {
-    icon: [
-      { url: "/favicon.ico", sizes: "any" },
-      { url: "/icon-envelope-v2-192.png", type: "image/png" },
-    ],
+    icon: [{ url: "/favicon.ico", sizes: "any" }],
     apple: "/icon-envelope-v2-180.png",
   },
 };
@@ -78,10 +76,10 @@ export const viewport: Viewport = {
 
 const criticalPageBackground = "#f4f1ea";
 const criticalPaperBackground =
-  "linear-gradient(180deg, rgba(241, 234, 223, 0.24) 0%, rgba(245, 236, 220, 0.14) 48%, rgba(231, 219, 200, 0.18) 100%), url('/images/home-backgrounds/generated-noon-paper.png'), linear-gradient(180deg, #fbfaf7 0%, #f4f1ea 100%)";
-const criticalPaperBackgroundSize = "100% 100%, cover, 100% 100%";
+  "linear-gradient(180deg, rgba(241, 234, 223, 0.24) 0%, rgba(245, 236, 220, 0.14) 48%, rgba(231, 219, 200, 0.18) 100%), url('/images/home-backgrounds/paper-grain-tile.webp'), linear-gradient(180deg, #fbfaf7 0%, #f4f1ea 100%)";
+const criticalPaperBackgroundSize = "100% 100%, 512px 512px, 100% 100%";
 const criticalPaperBackgroundPosition = "50% 50%, 50% 50%, 50% 50%";
-const criticalPaperBackgroundRepeat = "no-repeat, no-repeat, no-repeat";
+const criticalPaperBackgroundRepeat = "no-repeat, repeat, no-repeat";
 
 const criticalHtmlStyle: CSSProperties = {
   background: criticalPaperBackground,
@@ -114,9 +112,11 @@ export default function RootLayout({
       style={criticalHtmlStyle}
     >
       <head>
+        {supabaseOrigin ? (
+          <link rel="preconnect" href={supabaseOrigin} crossOrigin="" />
+        ) : null}
         <link rel="apple-touch-icon" href="/icon-envelope-v2-180.png" />
         <link rel="icon" href="/favicon.ico" sizes="any" />
-        <link rel="icon" href="/icon-envelope-v2-192.png" type="image/png" />
       </head>
       <body style={criticalBodyStyle}>
         <AppPaperTheme />
@@ -127,4 +127,16 @@ export default function RootLayout({
       </body>
     </html>
   );
+}
+
+function getOrigin(value: string | undefined) {
+  if (!value) {
+    return null;
+  }
+
+  try {
+    return new URL(value).origin;
+  } catch {
+    return null;
+  }
 }

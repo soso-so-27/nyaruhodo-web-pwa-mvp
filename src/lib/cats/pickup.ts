@@ -3,6 +3,7 @@ import type {
   CatSleepingMilestoneTarget,
 } from "../home/sleepingPhotos";
 import type { OmoideMemory } from "../home/omoideDelivery";
+import { readCachedJson, writeCachedJson } from "../storage";
 
 export type CatPickupPhoto = {
   id: string;
@@ -94,8 +95,7 @@ export function readCatPickupHistory(catId: string | null): CatPickupHistory {
   }
 
   try {
-    const raw = window.localStorage.getItem(CAT_PICKUP_HISTORY_KEY);
-    const parsed = raw ? JSON.parse(raw) : {};
+    const parsed = readCachedJson<Record<string, unknown>>(CAT_PICKUP_HISTORY_KEY) ?? {};
     const byCat = parsed?.[catId];
 
     if (!byCat || typeof byCat !== "object") {
@@ -120,15 +120,14 @@ export function markCatPickupSeen(
   }
 
   try {
-    const raw = window.localStorage.getItem(CAT_PICKUP_HISTORY_KEY);
-    const parsed = raw ? JSON.parse(raw) : {};
+    const parsed = readCachedJson<Record<string, unknown>>(CAT_PICKUP_HISTORY_KEY) ?? {};
     const store = parsed && typeof parsed === "object" ? parsed : {};
     const current =
       store[catId] && typeof store[catId] === "object" ? store[catId] : {};
 
-    window.localStorage.setItem(
+    writeCachedJson(
       CAT_PICKUP_HISTORY_KEY,
-      JSON.stringify({
+      {
         ...store,
         [catId]: prunePickupHistory({
           ...current,
@@ -139,7 +138,7 @@ export function markCatPickupSeen(
             seenAt,
           },
         }),
-      }),
+      },
     );
   } catch {
     // Pickup history is a quality-of-life guard. Failing silently keeps the page usable.

@@ -21,15 +21,15 @@
 
   /* ===== 背景: 紙に当たる光(フラット禁止・全画面共通) ===== */
   --bg-gradient: linear-gradient(180deg, var(--paper) 0%, var(--paper-warm) 100%);
-  --app-paper-image: url("/images/home-backgrounds/generated-noon-paper.png");
-  --app-paper-wash-top: #f1eadf;
-  --app-paper-wash-mid: #f5ecdc;
-  --app-paper-wash-bottom: #e7dbc8;
-  --app-paper-wash-top-strength: 24%;
-  --app-paper-wash-mid-strength: 14%;
-  --app-paper-wash-bottom-strength: 18%;
+  --app-paper-image: none;
+  --app-paper-wash-top: #efd9ce;
+  --app-paper-wash-mid: #f5ead6;
+  --app-paper-wash-bottom: #e4d2bd;
+  --app-paper-wash-top-strength: 36%;
+  --app-paper-wash-mid-strength: 22%;
+  --app-paper-wash-bottom-strength: 26%;
   --app-theme-color: var(--paper-card);
-  --app-paper-grain: url("/images/home-backgrounds/paper-grain.png");
+  --app-paper-grain: url("/images/home-backgrounds/paper-grain-tile.webp");
   --app-paper-background:
     linear-gradient(
       180deg,
@@ -37,15 +37,16 @@
       color-mix(in srgb, var(--app-paper-wash-mid) var(--app-paper-wash-mid-strength), transparent) 48%,
       color-mix(in srgb, var(--app-paper-wash-bottom) var(--app-paper-wash-bottom-strength), transparent) 100%
     ),
+    var(--app-paper-grain),
     var(--app-paper-image),
     linear-gradient(
       180deg,
       color-mix(in srgb, var(--paper) 78%, var(--paper-warm)) 0%,
       color-mix(in srgb, var(--paper-warm) 82%, var(--paper-card)) 100%
     );
-  --app-paper-background-size: 100% 100%, cover, 100% 100%;
-  --app-paper-background-position: 50% 50%, 50% 50%, 50% 50%;
-  --app-paper-background-repeat: no-repeat, no-repeat, no-repeat;
+  --app-paper-background-size: 100% 100%, 512px 512px, cover, 100% 100%;
+  --app-paper-background-position: 50% 50%, 50% 50%, 50% 50%, 50% 50%;
+  --app-paper-background-repeat: no-repeat, repeat, no-repeat, no-repeat;
   --app-page-surface: color-mix(in srgb, var(--paper-card) 44%, transparent);
   --app-page-surface-strong: color-mix(in srgb, var(--paper-card) 58%, transparent);
   --app-page-surface-soft: color-mix(in srgb, var(--paper) 24%, transparent);

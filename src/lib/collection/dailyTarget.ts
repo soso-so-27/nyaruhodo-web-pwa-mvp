@@ -1,5 +1,5 @@
 import { COLLECTION_GROUPS, type CollectionSlot } from "./poses";
-import { STORAGE_KEYS } from "../storage";
+import { STORAGE_KEYS, readCachedJson } from "../storage";
 
 export const CAT_GALLERY_COLLECTION_SLOT = "__cat_gallery";
 
@@ -37,16 +37,14 @@ export function readStoredCollectionPhotos(catId: string) {
   }
 
   try {
-    const raw = window.localStorage.getItem(STORAGE_KEYS.collectionPhotos);
-
-    if (!raw) {
-      return {};
-    }
-
-    const all = JSON.parse(raw) as Record<
+    const all = readCachedJson<Record<
       string,
       Record<string, StoredCollectionPhoto[] | StoredCollectionPhoto | string[] | string>
-    >;
+    >>(STORAGE_KEYS.collectionPhotos);
+
+    if (!all) {
+      return {};
+    }
     const catPhotos = all[catId] ?? {};
     const photosForDisplay =
       countStoredPhotos(catPhotos) > 0 ? catPhotos : mergeAllCollectionPhotos(all);

@@ -1,3 +1,5 @@
+import { readCachedJson, writeCachedJson } from "../storage";
+
 export const EVENING_DELIVERY_TRACE_STORAGE_KEY =
   "neteruneko_admin_evening_delivery_trace";
 
@@ -49,9 +51,9 @@ export function recordEveningDeliveryTrace(
       id: `trace-${Date.now()}-${Math.random().toString(16).slice(2)}`,
       checkedAt: new Date().toISOString(),
     });
-    window.localStorage.setItem(
+    writeCachedJson(
       EVENING_DELIVERY_TRACE_STORAGE_KEY,
-      JSON.stringify(entries.slice(0, 20)),
+      entries.slice(0, 20),
     );
   } catch {
     // Delivery must never depend on debug trace persistence.
@@ -94,8 +96,8 @@ export function readEveningDeliveryTrace(): EveningDeliveryTraceEntry[] {
   }
 
   try {
-    const raw = window.localStorage.getItem(EVENING_DELIVERY_TRACE_STORAGE_KEY);
-    const parsed = raw ? JSON.parse(raw) : [];
+    const parsed =
+      readCachedJson<unknown[]>(EVENING_DELIVERY_TRACE_STORAGE_KEY) ?? [];
 
     return Array.isArray(parsed)
       ? parsed.filter(isEveningDeliveryTraceEntry).slice(0, 20)

@@ -10,7 +10,7 @@ type PreviewPhase = "idle" | "opening" | "result";
 type PreviewMode = "current" | "simple";
 type SimpleRevealSpeed = "fast" | "recommended" | "slow";
 
-const PREVIEW_PHOTO_SRC = "/sample-cats/pose-belly.png";
+const PREVIEW_PHOTO_SRC = "/sample-cats/pose-belly.webp";
 const SIMPLE_REVEAL_PRESETS: Array<{
   key: SimpleRevealSpeed;
   label: string;
@@ -209,7 +209,7 @@ export default function AdminAnimationPreviewClient() {
               >
                 {isSimple ? (
                   <img
-                    src="/images/home/generated-envelope-wide-v2.png"
+                    src="/images/home/generated-envelope-wide-v2.webp"
                     alt=""
                     className="simple-envelope-image"
                     draggable={false}
@@ -515,7 +515,7 @@ const styles = {
     position: "absolute",
     inset: 0,
     backgroundImage:
-      "linear-gradient(rgba(255,255,255,0.08), rgba(255,255,255,0.08)), url('/images/home-backgrounds/paper-grain.png')",
+      "linear-gradient(rgba(255,255,255,0.08), rgba(255,255,255,0.08)), url('/images/home-backgrounds/paper-grain-tile.webp')",
     backgroundSize: "auto, 420px 420px",
     opacity: 0.75,
     pointerEvents: "none",

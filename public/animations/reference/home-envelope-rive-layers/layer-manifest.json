@@ -1,0 +1,86 @@
+{
+  "version": 1,
+  "name": "home-envelope-rive-layer-kit",
+  "sourceSheet": "/animations/reference/home-envelope-rive-layers/source-layer-sheet.png",
+  "preview": "/animations/reference/home-envelope-rive-layers/layer-preview.png",
+  "artboard": {
+    "width": 1200,
+    "height": 760
+  },
+  "layers": [
+    {
+      "name": "closed-envelope-body",
+      "file": "/animations/reference/home-envelope-rive-layers/transparent/01-closed-envelope-body.png",
+      "suggestedRole": "Idle reference or fallback closed envelope composite",
+      "suggestedPosition": { "x": 600, "y": 440 },
+      "notes": "Use as visual reference, not necessarily as one animated piece."
+    },
+    {
+      "name": "open-front-pocket",
+      "file": "/animations/reference/home-envelope-rive-layers/transparent/02-open-front-pocket.png",
+      "suggestedRole": "Front pocket over photo card",
+      "suggestedPosition": { "x": 600, "y": 470 }
+    },
+    {
+      "name": "top-flap",
+      "file": "/animations/reference/home-envelope-rive-layers/transparent/03-top-flap.png",
+      "suggestedRole": "Top flap, rotate around bottom center",
+      "suggestedPosition": { "x": 600, "y": 276 },
+      "transformOrigin": "50% 100%"
+    },
+    {
+      "name": "back-inner-panel",
+      "file": "/animations/reference/home-envelope-rive-layers/transparent/04-back-inner-panel.png",
+      "suggestedRole": "Back panel and inner warm paper glow",
+      "suggestedPosition": { "x": 600, "y": 388 }
+    },
+    {
+      "name": "wax-seal-intact",
+      "file": "/animations/reference/home-envelope-rive-layers/transparent/05-wax-seal-intact.png",
+      "suggestedRole": "Idle wax seal",
+      "suggestedPosition": { "x": 600, "y": 478 }
+    },
+    {
+      "name": "wax-seal-left",
+      "file": "/animations/reference/home-envelope-rive-layers/transparent/06-wax-seal-left.png",
+      "suggestedRole": "Broken wax seal left half",
+      "suggestedPosition": { "x": 582, "y": 478 }
+    },
+    {
+      "name": "wax-seal-right",
+      "file": "/animations/reference/home-envelope-rive-layers/transparent/07-wax-seal-right.png",
+      "suggestedRole": "Broken wax seal right half",
+      "suggestedPosition": { "x": 618, "y": 478 }
+    },
+    {
+      "name": "wax-crumbs",
+      "file": "/animations/reference/home-envelope-rive-layers/transparent/08-wax-crumbs.png",
+      "suggestedRole": "Small crumbs during seal break",
+      "suggestedPosition": { "x": 600, "y": 520 }
+    },
+    {
+      "name": "inner-glow",
+      "file": "/animations/reference/home-envelope-rive-layers/transparent/09-inner-glow.png",
+      "suggestedRole": "Warm glow expanding after flap opens",
+      "suggestedPosition": { "x": 600, "y": 380 }
+    },
+    {
+      "name": "photo-card-placeholder",
+      "file": "/animations/reference/home-envelope-rive-layers/transparent/10-photo-card-placeholder.png",
+      "suggestedRole": "Placeholder card that aligns with DOM photo reveal",
+      "suggestedPosition": { "x": 600, "y": 520 }
+    },
+    {
+      "name": "envelope-shadow",
+      "file": "/animations/reference/home-envelope-rive-layers/transparent/11-envelope-shadow.png",
+      "suggestedRole": "Soft contact shadow under envelope",
+      "suggestedPosition": { "x": 600, "y": 622 }
+    },
+    {
+      "name": "paper-motes",
+      "file": "/animations/reference/home-envelope-rive-layers/transparent/12-paper-motes.png",
+      "suggestedRole": "Quiet reward motes, opacity fade",
+      "suggestedPosition": { "x": 600, "y": 328 }
+    }
+  ]
+}

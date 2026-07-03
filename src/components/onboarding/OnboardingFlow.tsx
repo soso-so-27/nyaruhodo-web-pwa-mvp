@@ -62,7 +62,7 @@ type OnboardingState =
 const ONBOARDING_ALBUM_COMPLETION_READY_KEY =
   "neteruneko_onboarding_album_completion_ready";
 const ONBOARDING_FALLBACK_DELIVERY_SRC =
-  "/illustrations/sleeping-cat-empty.png";
+  "/illustrations/sleeping-cat-empty.webp";
 const IS_PRODUCTION = process.env.NODE_ENV === "production";
 const MAX_UPLOAD_SOURCE_FILE_BYTES = 20 * 1024 * 1024;
 const ONBOARDING_REVEAL_MS = 1150;
@@ -968,7 +968,7 @@ export function OnboardingFlow() {
           <section style={styles.hero} aria-label="ねてるねこのはじめかた">
             <div style={styles.introArtifact} aria-hidden="true">
               <img
-                src="/illustrations/sleeping-cat-empty.png"
+                src="/illustrations/sleeping-cat-empty.webp"
                 alt=""
                 style={styles.introCat}
               />
@@ -1264,7 +1264,7 @@ function OnboardingEnvelopeArt({ compact = false }: { compact?: boolean }) {
     >
       <span style={styles.onboardingEnvelopeShadow} />
       <img
-        src="/illustrations/onboarding-envelope.png"
+        src="/illustrations/onboarding-envelope.webp"
         alt=""
         style={styles.onboardingEnvelopeImage}
       />

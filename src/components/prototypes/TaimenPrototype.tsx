@@ -16,36 +16,36 @@ type PrototypePhoto = {
 const defaultPhotos: Record<PhotoPattern, { own: PrototypePhoto; delivered: PrototypePhoto }> = {
   mixed: {
     own: {
-      src: "/sample-cats/mugi-portrait.png",
+      src: "/sample-cats/mugi-portrait.webp",
       label: "むぎ",
       tone: "縦長寄り",
     },
     delivered: {
-      src: "/sample-cats/pose-stretch.png",
+      src: "/sample-cats/pose-stretch.webp",
       label: "どこかのこ",
       tone: "横長寄り",
     },
   },
   portrait: {
     own: {
-      src: "/sample-cats/mugi-hero.png",
+      src: "/sample-cats/mugi-hero.webp",
       label: "むぎ",
       tone: "縦長",
     },
     delivered: {
-      src: "/sample-cats/orange_tabby.png",
+      src: "/sample-cats/orange_tabby.webp",
       label: "どこかのこ",
       tone: "縦長",
     },
   },
   landscape: {
     own: {
-      src: "/sample-cats/pose-loaf.png",
+      src: "/sample-cats/pose-loaf.webp",
       label: "むぎ",
       tone: "横長",
     },
     delivered: {
-      src: "/sample-cats/pose-box.png",
+      src: "/sample-cats/pose-box.webp",
       label: "どこかのこ",
       tone: "横長",
     },

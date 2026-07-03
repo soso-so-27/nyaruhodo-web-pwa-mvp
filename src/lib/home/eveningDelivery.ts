@@ -1,4 +1,4 @@
-import { STORAGE_KEYS } from "../storage";
+import { STORAGE_KEYS, readCachedJson, writeCachedJson } from "../storage";
 import {
   sanitizeExchangePhotoForPersistence,
   type ExchangePhoto,
@@ -59,12 +59,7 @@ export function readEveningDeliveryStore(): EveningDeliveryStore {
   }
 
   try {
-    const raw = window.localStorage.getItem(STORAGE_KEYS.eveningDeliveryDays);
-    if (!raw) {
-      return {};
-    }
-
-    const parsed = JSON.parse(raw);
+    const parsed = readCachedJson<unknown>(STORAGE_KEYS.eveningDeliveryDays);
     if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
       return {};
     }
@@ -99,9 +94,9 @@ export function writeEveningDeliveryStore(store: EveningDeliveryStore) {
   }
 
   try {
-    window.localStorage.setItem(
+    writeCachedJson(
       STORAGE_KEYS.eveningDeliveryDays,
-      JSON.stringify(pruneEveningDeliveryStore(store)),
+      pruneEveningDeliveryStore(store),
     );
     window.dispatchEvent(new Event("neteruneko_evening_delivery_updated"));
   } catch {

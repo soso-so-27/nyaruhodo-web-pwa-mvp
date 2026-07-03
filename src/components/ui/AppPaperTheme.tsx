@@ -3,11 +3,11 @@
 import { useEffect } from "react";
 
 const PAPER_IMAGES = {
-  dawn: "url('/images/home-backgrounds/generated-dawn-paper.png')",
-  morning: "url('/images/home-backgrounds/generated-morning-paper.png')",
-  noon: "url('/images/home-backgrounds/generated-noon-paper.png')",
-  evening: "url('/images/home-backgrounds/generated-evening-paper.png')",
-  night: "url('/images/home-backgrounds/generated-night-paper-v2.png')",
+  dawn: "url('/images/home-backgrounds/dawn.webp')",
+  morning: "url('/images/home-backgrounds/morning.webp')",
+  noon: "url('/images/home-backgrounds/noon.webp')",
+  evening: "url('/images/home-backgrounds/evening.webp')",
+  night: "url('/images/home-backgrounds/night.webp')",
 } as const;
 
 const PAPER_DAYLIGHT_ANCHORS = [
@@ -43,12 +43,12 @@ const PAPER_DAYLIGHT_ANCHORS = [
   },
   {
     minute: 12 * 60,
-    washTop: "#f1eadf",
-    washMid: "#f5ecdc",
-    washBottom: "#e7dbc8",
-    washTopStrength: 24,
-    washMidStrength: 14,
-    washBottomStrength: 18,
+    washTop: "#efd9ce",
+    washMid: "#f5ead6",
+    washBottom: "#e4d2bd",
+    washTopStrength: 36,
+    washMidStrength: 22,
+    washBottomStrength: 26,
     paperCard: "#f1efe9",
     ink: "#3f3a33",
     inkSoft: "#665d53",

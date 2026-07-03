@@ -89,6 +89,8 @@ import {
   getDiscoveryLogKey,
   getLockDataKey,
   getRecordLogKey,
+  readCachedJson,
+  writeCachedJson,
 } from "../../lib/storage";
 import type { RecentEvent } from "../../lib/supabase/queries";
 import { createBrowserSupabaseClient } from "../../lib/supabase/browser";
@@ -367,13 +369,25 @@ export function HomeInput({
   }, []);
 
   useEffect(() => {
+    let timeoutId: number | null = null;
+
     function refreshTick() {
       setTick(Date.now());
     }
 
-    refreshTick();
+    function scheduleNextTick() {
+      const now = Date.now();
+      const intervalMs = shouldUseHighResolutionHomeClock(now) ? 1000 : 30000;
+      const delay = intervalMs - (now % intervalMs);
+      timeoutId = window.setTimeout(() => {
+        refreshTick();
+        scheduleNextTick();
+      }, delay || intervalMs);
+    }
 
-    const intervalId = window.setInterval(refreshTick, 1000);
+    refreshTick();
+    scheduleNextTick();
+
     window.addEventListener("focus", refreshTick);
     const handleVisibilityChange = () => {
       if (document.visibilityState === "visible") {
@@ -383,7 +397,9 @@ export function HomeInput({
     document.addEventListener("visibilitychange", handleVisibilityChange);
 
     return () => {
-      window.clearInterval(intervalId);
+      if (timeoutId !== null) {
+        window.clearTimeout(timeoutId);
+      }
       window.removeEventListener("focus", refreshTick);
       document.removeEventListener("visibilitychange", handleVisibilityChange);
     };
@@ -1429,11 +1445,19 @@ export function HomeInput({
       if (!file) return;
 
       try {
-        const dataUrl = await resizeAndEncode(file, 2560, 0.88);
+        const [dataUrl, thumbnailDataUrl] = await Promise.all([
+          resizeAndEncode(file, 2560, 0.88),
+          resizeAndEncode(file, 512, 0.72, "image/webp"),
+        ]);
         const photoSrc = await storeAccountPhotoDataUrl({
           dataUrl,
           pathSegments: [targetCatId, "photos"],
           fileName: `photo-${Date.now()}`,
+        });
+        const thumbnailSrc = await storeAccountPhotoDataUrl({
+          dataUrl: thumbnailDataUrl,
+          pathSegments: [targetCatId, "photos"],
+          fileName: `photo-${Date.now()}-thumb`,
         });
 
         if (!isStoragePhotoReference(photoSrc)) {
@@ -1444,6 +1468,9 @@ export function HomeInput({
         const savedPhoto = saveCatGalleryPhoto({
           catId: targetCatId,
           src: photoSrc,
+          thumbnailSrc: isStoragePhotoReference(thumbnailSrc)
+            ? thumbnailSrc
+            : null,
         });
 
         if (!savedPhoto) {
@@ -4473,17 +4500,12 @@ function selectLeastRecentlyPhotographedCat(
 
 function readStoredTodayHomeCatSelection() {
   try {
-    const raw = window.localStorage.getItem(HOME_TODAY_CAT_SELECTION_STORAGE_KEY);
-    if (!raw) {
-      return null;
-    }
-
-    const parsed = JSON.parse(raw) as Partial<{
+    const parsed = readCachedJson<Partial<{
       dateKey: string;
       catId: string;
-    }>;
+    }>>(HOME_TODAY_CAT_SELECTION_STORAGE_KEY);
 
-    if (typeof parsed.dateKey !== "string" || typeof parsed.catId !== "string") {
+    if (typeof parsed?.dateKey !== "string" || typeof parsed.catId !== "string") {
       return null;
     }
 
@@ -4713,22 +4735,20 @@ function getCollectionSlotById(slotId?: string) {
 
 function getCoatAvatarSrc(coat?: string) {
   const coatMap: Record<string, string> = {
-    saba: "/sample-cats/saba.png",
-    gray: "/sample-cats/gray.png",
-    orange_tabby: "/sample-cats/orange_tabby.png",
-    black: "/sample-cats/black.png",
-    white: "/sample-cats/white.png",
-    calico: "/sample-cats/calico.png",
-    cream: "/sample-cats/saba.png",
+    saba: "/sample-cats/saba.webp",
+    gray: "/sample-cats/gray.webp",
+    orange_tabby: "/sample-cats/orange_tabby.webp",
+    black: "/sample-cats/black.webp",
+    white: "/sample-cats/white.webp",
+    calico: "/sample-cats/calico.webp",
+    cream: "/sample-cats/saba.webp",
   };
-  return coatMap[coat ?? ""] ?? "/sample-cats/saba.png";
+  return coatMap[coat ?? ""] ?? "/sample-cats/saba.webp";
 }
 
 function readLockData(catId: string): LockData {
   try {
-    const raw = window.localStorage.getItem(getLockDataKey(catId));
-    if (!raw) return {};
-    return JSON.parse(raw) as LockData;
+    return readCachedJson<LockData>(getLockDataKey(catId)) ?? {};
   } catch {
     return {};
   }
@@ -4736,14 +4756,12 @@ function readLockData(catId: string): LockData {
 
 function saveLockData(catId: string, data: LockData) {
   // TODO: Supabase移行時はここを書き換え
-  window.localStorage.setItem(getLockDataKey(catId), JSON.stringify(data));
+  writeCachedJson(getLockDataKey(catId), data);
 }
 
 function readRecordLog(catId: string): RecordLogItem[] {
   try {
-    const raw = window.localStorage.getItem(getRecordLogKey(catId));
-    if (!raw) return [];
-    return (JSON.parse(raw) as RecordLogItem[]).sort(
+    return (readCachedJson<RecordLogItem[]>(getRecordLogKey(catId)) ?? []).sort(
       (a, b) => b.timestamp - a.timestamp,
     );
   } catch {
@@ -4763,9 +4781,9 @@ function saveRecord(
     timestamp: Date.now(),
   };
 
-  window.localStorage.setItem(
+  writeCachedJson(
     getRecordLogKey(catId),
-    JSON.stringify([nextRecord, ...records].slice(0, 200)),
+    [nextRecord, ...records].slice(0, 200),
   );
 }
 
@@ -4775,13 +4793,11 @@ function saveCollectionPhoto(catId: string, slug: string, dataUrl: string) {
   }
 
   try {
-    const raw = window.localStorage.getItem(STORAGE_KEYS.collectionPhotos);
-    const all = raw
-      ? (JSON.parse(raw) as Record<
-          string,
-          Record<string, StoredCollectionPhoto[] | StoredCollectionPhoto | string[] | string>
-        >)
-      : {};
+    const all =
+      readCachedJson<Record<
+        string,
+        Record<string, StoredCollectionPhoto[] | StoredCollectionPhoto | string[] | string>
+      >>(STORAGE_KEYS.collectionPhotos) ?? {};
     const photo: StoredCollectionPhoto = {
       id: createCollectionPhotoId(catId, slug),
       src: dataUrl,
@@ -4793,7 +4809,7 @@ function saveCollectionPhoto(catId: string, slug: string, dataUrl: string) {
       ...normalizeStoredPhotoList(all[catId][slug], catId, slug),
       photo,
     ];
-    window.localStorage.setItem(STORAGE_KEYS.collectionPhotos, JSON.stringify(all));
+    writeCachedJson(STORAGE_KEYS.collectionPhotos, all);
   } catch {
     // Keep the home flow usable even if local photo storage fails.
   }
@@ -5352,6 +5368,18 @@ function getAllMikkeCategoriesCooldownProgress(
   return Math.min(1, Math.min(...remainingMs) / MIKKE_LOCK_MS);
 }
 
+function shouldUseHighResolutionHomeClock(timestamp: number) {
+  const hour = getJSTHour(timestamp);
+  const minute = Number(
+    new Intl.DateTimeFormat("ja-JP", {
+      minute: "numeric",
+      timeZone: "Asia/Tokyo",
+    }).format(new Date(timestamp)),
+  );
+
+  return hour === 19 ? minute >= 58 : hour === 20 && minute <= 1;
+}
+
 function isLocked(lockData: LockData, type: LockType, now = Date.now()) {
   const field = type === "yousu" ? "yousuLockedUntil" : "mugiLockedUntil";
   return now < (lockData[field] || 0);
@@ -5474,8 +5502,7 @@ function getDiscoveryState(catId: string) {
 
 function hasSeenDiscoveryToday(catId: string) {
   try {
-    const raw = window.localStorage.getItem(getDiscoveryLogKey(catId));
-    const log = raw ? (JSON.parse(raw) as string[]) : [];
+    const log = readCachedJson<string[]>(getDiscoveryLogKey(catId)) ?? [];
     return log.includes(getTodayJST());
   } catch {
     return false;
@@ -5484,17 +5511,13 @@ function hasSeenDiscoveryToday(catId: string) {
 
 function markDiscoverySeen(catId: string) {
   try {
-    const raw = window.localStorage.getItem(getDiscoveryLogKey(catId));
-    const log = raw ? (JSON.parse(raw) as string[]) : [];
+    const log = readCachedJson<string[]>(getDiscoveryLogKey(catId)) ?? [];
     const today = getTodayJST();
     const nextLog = log.includes(today) ? log : [today, ...log];
 
-    window.localStorage.setItem(
-      getDiscoveryLogKey(catId),
-      JSON.stringify(nextLog.slice(0, 30)),
-    );
+    writeCachedJson(getDiscoveryLogKey(catId), nextLog.slice(0, 30));
   } catch {
-    window.localStorage.setItem(getDiscoveryLogKey(catId), JSON.stringify([]));
+    writeCachedJson(getDiscoveryLogKey(catId), []);
   }
 }
 
@@ -5587,7 +5610,7 @@ const styles = {
     boxSizing: "border-box",
     color: "var(--ink-soft)",
     pointerEvents: "none",
-    backgroundImage: "url('/splash/v6/apple-splash-1179-2556.png')",
+    backgroundImage: "url('/splash/v6/apple-splash-1179-2556.webp')",
     backgroundSize: "cover",
     backgroundPosition: "50% 50%",
     backgroundRepeat: "no-repeat",

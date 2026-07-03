@@ -24,6 +24,9 @@ type PhotoTileProps = {
   onClick?: () => void;
   fallbackLabel?: string;
   loading?: "eager" | "lazy";
+  fetchPriority?: "high" | "low" | "auto";
+  imageWidth?: number;
+  imageHeight?: number;
   fallbackSrcs?: string[];
   onStorageDataUrl?: (dataUrl: string) => void;
   onLoad?: () => void;
@@ -47,6 +50,9 @@ export function PhotoTile({
   onClick,
   fallbackLabel,
   loading,
+  fetchPriority,
+  imageWidth,
+  imageHeight,
   fallbackSrcs,
   onStorageDataUrl,
   onLoad,
@@ -80,6 +86,9 @@ export function PhotoTile({
           alt={alt}
           style={{ ...frameStyle, objectFit: fit }}
           loading={loading}
+          fetchPriority={fetchPriority}
+          width={imageWidth ?? getPhotoTileIntrinsicSize(size)}
+          height={imageHeight ?? getPhotoTileIntrinsicSize(size)}
           fallbackSrcs={fallbackSrcs}
           fallbackVariant="quiet"
           onStorageDataUrl={onStorageDataUrl}
@@ -116,6 +125,8 @@ type PhotoViewerFrameProps = {
   onNaturalSize?: (size: { width: number; height: number }) => void;
   style?: CSSProperties;
   imageStyle?: CSSProperties;
+  loading?: "eager" | "lazy";
+  fetchPriority?: "high" | "low" | "auto";
   children?: ReactNode;
 };
 
@@ -129,6 +140,8 @@ export function PhotoViewerFrame({
   onNaturalSize,
   style,
   imageStyle,
+  loading,
+  fetchPriority,
   children,
 }: PhotoViewerFrameProps) {
   return (
@@ -143,6 +156,8 @@ export function PhotoViewerFrame({
         src={src}
         alt={alt}
         style={{ ...styles.viewerImage, objectFit: fit, ...imageStyle }}
+        loading={loading}
+        fetchPriority={fetchPriority}
         fallbackSrcs={fallbackSrcs}
         onStorageDataUrl={onStorageDataUrl}
         onNaturalSize={onNaturalSize}
@@ -231,3 +246,7 @@ const sizeStyles = {
     height: 148,
   },
 } satisfies Record<string, CSSProperties>;
+
+function getPhotoTileIntrinsicSize(size: PhotoTileSize) {
+  return size === "sm" ? 72 : size === "lg" ? 148 : 112;
+}

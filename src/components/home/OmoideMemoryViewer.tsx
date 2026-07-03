@@ -14,8 +14,6 @@ export function OmoideMemoryViewer({
   isRevisit?: boolean;
   onStow: () => void;
 }) {
-  const duration = isRevisit ? "600ms" : "1350ms";
-
   return (
     <div
       data-testid="omoide-memory-viewer"
@@ -23,12 +21,7 @@ export function OmoideMemoryViewer({
       onClick={onStow}
     >
       <section
-        style={
-          {
-            ...viewerStyles.card,
-            "--omoide-develop-duration": duration,
-          } as CSSProperties
-        }
+        style={viewerStyles.card}
         aria-label={memory.title}
         onClick={(event) => event.stopPropagation()}
       >
@@ -42,6 +35,8 @@ export function OmoideMemoryViewer({
             fallbackSrcs={getOmoidePhotoFallbackSrcs(memory)}
             alt=""
             style={viewerStyles.photo}
+            loading={isRevisit ? "lazy" : "eager"}
+            fetchPriority={isRevisit ? "auto" : "high"}
           />
         </div>
         <button
@@ -53,20 +48,6 @@ export function OmoideMemoryViewer({
           文箱に しまう
         </button>
       </section>
-      <style>{`
-        [data-testid="omoide-memory-viewer"] img {
-          animation: omoideDevelop var(--omoide-develop-duration) cubic-bezier(0, 0, 0.2, 1) both;
-        }
-        @keyframes omoideDevelop {
-          from { opacity: 0; filter: blur(14px); transform: scale(0.985); }
-          to { opacity: 1; filter: blur(0); transform: scale(1); }
-        }
-        @media (prefers-reduced-motion: reduce) {
-          [data-testid="omoide-memory-viewer"] img {
-            animation: none;
-          }
-        }
-      `}</style>
     </div>
   );
 }

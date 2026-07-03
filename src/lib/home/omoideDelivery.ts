@@ -1,5 +1,5 @@
 import { trackProductEvent } from "../analytics/productAnalytics";
-import { STORAGE_KEYS } from "../storage";
+import { STORAGE_KEYS, readCachedJson, writeCachedJson } from "../storage";
 import {
   addJstDays,
   getJstDateKey,
@@ -249,8 +249,7 @@ export function readOmoideMemoryControls(): OmoideMemoryControls {
   }
 
   try {
-    const raw = window.localStorage.getItem(STORAGE_KEYS.omoideMemoryControls);
-    const parsed = raw ? (JSON.parse(raw) as unknown) : {};
+    const parsed = readCachedJson<unknown>(STORAGE_KEYS.omoideMemoryControls) ?? {};
     if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
       return {};
     }
@@ -513,8 +512,7 @@ function readOmoideMemoryStore(): OmoideMemoryStore {
   }
 
   try {
-    const raw = window.localStorage.getItem(STORAGE_KEYS.omoideMemories);
-    const parsed = raw ? (JSON.parse(raw) as unknown) : {};
+    const parsed = readCachedJson<unknown>(STORAGE_KEYS.omoideMemories) ?? {};
     if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
       return {};
     }
@@ -537,9 +535,9 @@ function writeOmoideMemoryStore(store: OmoideMemoryStore) {
     .sort(([, a], [, b]) => b.deliveredAt - a.deliveredAt)
     .slice(0, 120);
 
-  window.localStorage.setItem(
+  writeCachedJson(
     STORAGE_KEYS.omoideMemories,
-    JSON.stringify(Object.fromEntries(entries)),
+    Object.fromEntries(entries),
   );
   window.dispatchEvent(new Event("neteruneko_omoide_memories_updated"));
 }
@@ -549,9 +547,9 @@ function writeOmoideMemoryControls(controls: OmoideMemoryControls) {
     return;
   }
 
-  window.localStorage.setItem(
+  writeCachedJson(
     STORAGE_KEYS.omoideMemoryControls,
-    JSON.stringify(controls),
+    controls,
   );
   window.dispatchEvent(new Event("neteruneko_omoide_memories_updated"));
 }

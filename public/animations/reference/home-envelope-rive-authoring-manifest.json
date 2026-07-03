@@ -1,0 +1,92 @@
+{
+  "version": 1,
+  "purpose": "Authoring handoff for the production home envelope opening Rive file.",
+  "output": {
+    "file": "public/animations/home-envelope-open.riv",
+    "mustBeRealRiveRuntimeExport": true
+  },
+  "runtimeContract": {
+    "artboard": "HomeEnvelopeOpen",
+    "artboardSize": {
+      "width": 1200,
+      "height": 760
+    },
+    "stateMachine": "EnvelopeOpenMachine",
+    "openInput": "open",
+    "openInputType": "Trigger",
+    "durationMs": 2200
+  },
+  "primaryReferences": {
+    "storyboard": "public/animations/reference/home-envelope-rive-storyboard-v2.png",
+    "keyframes": "public/animations/reference/home-envelope-rive-keyframes-v2.json",
+    "layerManifest": "public/animations/reference/home-envelope-rive-layers-v2/layer-manifest.json",
+    "editorPrompt": "docs/design/home-envelope-rive-editor-agent-prompt.md",
+    "productionBrief": "docs/design/home-envelope-rive-production-brief.md",
+    "authoringOptions": "docs/design/home-envelope-rive-authoring-options.md"
+  },
+  "allowedProductionLayerSource": {
+    "directory": "public/animations/reference/home-envelope-rive-layers-v2/transparent",
+    "files": [
+      "01-01-closed-envelope-body.png",
+      "02-02-open-front-pocket.png",
+      "03-03-top-flap.png",
+      "04-04-back-inner-panel.png",
+      "05-05-wax-seal-intact.png",
+      "06-06-wax-seal-left.png",
+      "07-07-wax-seal-right.png",
+      "08-08-wax-crumbs.png",
+      "09-09-inner-glow.png",
+      "10-10-photo-card-placeholder.png",
+      "11-11-envelope-shadow.png",
+      "12-12-paper-motes.png"
+    ],
+    "mayRedrawInRive": true,
+    "doNotUseCodexSvg": true,
+    "doNotUseOlderV1LayerSetAsFinalArt": true
+  },
+  "motionBeats": [
+    {
+      "timeMs": 0,
+      "name": "idle",
+      "description": "Closed horizontal washi envelope, intact terracotta wax seal."
+    },
+    {
+      "timeMs": 110,
+      "name": "tap_squash",
+      "description": "Immediate tactile press response within 100ms."
+    },
+    {
+      "timeMs": 430,
+      "name": "seal_break",
+      "description": "Wax seal cracks, halves separate, first warm glow appears."
+    },
+    {
+      "timeMs": 780,
+      "name": "flap_open",
+      "description": "Top flap visibly opens with overshoot; never a single-frame swap."
+    },
+    {
+      "timeMs": 1040,
+      "name": "pocket_breath",
+      "description": "Front pocket lifts subtly and settles."
+    },
+    {
+      "timeMs": 1580,
+      "name": "photo_peek",
+      "description": "Blank photo placeholder rises from inside the envelope."
+    },
+    {
+      "timeMs": 2200,
+      "name": "settled",
+      "description": "Open pose remains stable for React handoff to the delivered photo."
+    }
+  ],
+  "acceptanceCommands": [
+    "npm run check:rive-envelope-handoff",
+    "npm run check:rive-envelope-assets",
+    "npm run check:rive-envelope",
+    "npm run typecheck",
+    "npm run build",
+    "npx playwright test tests/e2e/home-desk-model.spec.ts -g \"opens the delivered envelope after a tap animation\""
+  ]
+}
