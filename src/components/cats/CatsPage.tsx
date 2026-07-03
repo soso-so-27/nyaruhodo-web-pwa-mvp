@@ -24,8 +24,10 @@ import {
   type CatYearSummary,
 } from "../../lib/cats/yearSummary";
 import {
+  acknowledgeCatGalleryIntro,
   CAT_GALLERY_PHOTO_LIMIT,
   deleteCatGalleryPhoto,
+  hasAcknowledgedCatGalleryIntro,
   readCatGalleryPhotos,
   saveCatGalleryPhoto,
   type CatGalleryPhoto,
@@ -190,6 +192,8 @@ export function CatsPage() {
     useState<DeleteCatTarget | null>(null);
   const [isDeletingCat, setIsDeletingCat] = useState(false);
   const [isSavingProfile, setIsSavingProfile] = useState(false);
+  const [isCatGalleryIntroSheetOpen, setIsCatGalleryIntroSheetOpen] =
+    useState(false);
   const [photoSheetLens, setPhotoSheetLens] = useState<PhotoSheetLens | null>(
     null,
   );
@@ -855,7 +859,20 @@ export function CatsPage() {
     input.click();
   }
 
-  async function handleAddCatPhoto() {
+  function requestAddCatPhoto() {
+    if (!activeCatId) {
+      return;
+    }
+
+    if (!hasAcknowledgedCatGalleryIntro()) {
+      setIsCatGalleryIntroSheetOpen(true);
+      return;
+    }
+
+    void startAddCatPhoto();
+  }
+
+  async function startAddCatPhoto() {
     if (!activeCatId) {
       return;
     }
@@ -925,6 +942,12 @@ export function CatsPage() {
     };
 
     input.click();
+  }
+
+  function handleCatGalleryIntroContinue() {
+    acknowledgeCatGalleryIntro();
+    setIsCatGalleryIntroSheetOpen(false);
+    void startAddCatPhoto();
   }
 
   function requestDeleteGalleryPhoto(photo: RecordPhotoPreview) {
@@ -1382,9 +1405,9 @@ export function CatsPage() {
           <LensPhotoSection
             title="この子の写真"
             photos={activeCatLensPhotos}
-            emptyCopy="まだ写真はありません。ねがおを撮るか、あとから見返したい写真を残すと、ここに並びます。"
+            emptyCopy="まだ写真はありません。ねがおを撮るか、アルバムにのこすと、ここに並びます。"
             onAddPhoto={() => {
-              void handleAddCatPhoto();
+              requestAddCatPhoto();
             }}
             onOpenPhoto={(photo) => setSelectedRecordPhoto(toRecordPhotoPreview(photo))}
           />
@@ -1919,6 +1942,12 @@ export function CatsPage() {
           </div>
         </AppBottomSheet>
       ) : null}
+      {isCatGalleryIntroSheetOpen ? (
+        <CatGalleryIntroSheet
+          onContinue={handleCatGalleryIntroContinue}
+          onClose={() => setIsCatGalleryIntroSheetOpen(false)}
+        />
+      ) : null}
       {isThumbnailPickerOpen && activeCatProfile ? (
         <ThumbnailPickerSheet
           catName={getCatName(activeCatProfile)}
@@ -1949,6 +1978,35 @@ function PageBackdrop() {
       <div style={styles.ambientHighlight} aria-hidden="true" />
       <div style={styles.backgroundVeil} aria-hidden="true" />
     </>
+  );
+}
+
+function CatGalleryIntroSheet({
+  onContinue,
+  onClose,
+}: {
+  onContinue: () => void;
+  onClose: () => void;
+}) {
+  return (
+    <AppBottomSheet title="アルバムに のこす" onClose={onClose}>
+      <div style={styles.deleteCatConfirm}>
+        <p style={styles.deleteCatConfirmTitle}>
+          ここに のこした写真は、ねこだよりには つかわれません。
+        </p>
+        <p style={styles.deleteCatConfirmText}>
+          この子のアルバムに、100枚まで残せます。
+        </p>
+        <div style={styles.deleteCatConfirmActions}>
+          <AppButton type="button" variant="primary" fullWidth onClick={onContinue}>
+            写真を選ぶ
+          </AppButton>
+          <AppButton type="button" variant="quiet" fullWidth onClick={onClose}>
+            やめる
+          </AppButton>
+        </div>
+      </div>
+    </AppBottomSheet>
   );
 }
 
@@ -2536,11 +2594,11 @@ function LensPhotoSection({
             style={styles.lensAddPhotoButton}
             onClick={onAddPhoto}
           >
-            写真を残す
+            ＋ のこす
           </button>
         </div>
         <p style={styles.lensSectionSub}>
-          毎日のねがおと、選んで残した写真が並びます。「写真を残す」で選んだ写真は、ねこだよりには使われません。100枚まで。
+          毎日のねがおと、選んで残した写真が並びます。
         </p>
       </div>
       <LensPhotoGrid

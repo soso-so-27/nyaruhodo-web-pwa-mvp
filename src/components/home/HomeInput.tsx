@@ -9,7 +9,9 @@ import {
 } from "../../lib/accountSync";
 import { trackProductEvent } from "../../lib/analytics/productAnalytics";
 import {
+  acknowledgeCatGalleryIntro,
   CAT_GALLERY_PHOTO_LIMIT,
+  hasAcknowledgedCatGalleryIntro,
   readCatGalleryPhotos,
   saveCatGalleryPhoto,
 } from "../../lib/cats/catGalleryPhotos";
@@ -305,6 +307,8 @@ export function HomeInput({
   } | null>(null);
   const [isDiscoverySheetOpen, setIsDiscoverySheetOpen] = useState(false);
   const [isRecentChangeSheetOpen, setIsRecentChangeSheetOpen] = useState(false);
+  const [isCatGalleryIntroSheetOpen, setIsCatGalleryIntroSheetOpen] =
+    useState(false);
   const [selectedYousu, setSelectedYousu] = useState<string | null>(null);
   const [recordLog, setRecordLog] = useState<RecordLogItem[]>([]);
   const [mikkeRefreshTick, setMikkeRefreshTick] = useState(0);
@@ -1411,7 +1415,18 @@ export function HomeInput({
     input.click();
   }
 
-  async function handleCatGalleryPhotoAdd() {
+  function requestCatGalleryPhotoAdd() {
+    if (!activeCatId) return;
+
+    if (!hasAcknowledgedCatGalleryIntro()) {
+      setIsCatGalleryIntroSheetOpen(true);
+      return;
+    }
+
+    void startCatGalleryPhotoAdd();
+  }
+
+  async function startCatGalleryPhotoAdd() {
     if (!activeCatId) return;
 
     const targetCatId = activeCatId;
@@ -1479,6 +1494,12 @@ export function HomeInput({
     };
 
     input.click();
+  }
+
+  function handleCatGalleryIntroContinue() {
+    acknowledgeCatGalleryIntro();
+    setIsCatGalleryIntroSheetOpen(false);
+    void startCatGalleryPhotoAdd();
   }
 
   async function handleCollectionPhotoAdd(slot: CollectionSlot) {
@@ -2211,7 +2232,7 @@ export function HomeInput({
               onAddCatPhoto={
                 activeCatId
                   ? () => {
-                      void handleCatGalleryPhotoAdd();
+                      requestCatGalleryPhotoAdd();
                     }
                   : undefined
               }
@@ -2359,6 +2380,13 @@ export function HomeInput({
           lead={personalityInsight.body}
           body={personalityInsight.sheetBody}
           onClose={() => setIsRecentChangeSheetOpen(false)}
+        />
+      ) : null}
+
+      {isCatGalleryIntroSheetOpen ? (
+        <CatGalleryIntroSheet
+          onContinue={handleCatGalleryIntroContinue}
+          onClose={() => setIsCatGalleryIntroSheetOpen(false)}
         />
       ) : null}
 
@@ -3044,6 +3072,28 @@ function InfoSheet({
       <div style={styles.infoSheetBody}>
         <p style={styles.infoSheetLead}>{lead}</p>
         <p style={styles.infoSheetText}>{body}</p>
+      </div>
+    </AppBottomSheet>
+  );
+}
+
+function CatGalleryIntroSheet({
+  onContinue,
+  onClose,
+}: {
+  onContinue: () => void;
+  onClose: () => void;
+}) {
+  return (
+    <AppBottomSheet title="アルバムに のこす" onClose={onClose}>
+      <div style={styles.infoSheetBody}>
+        <p style={styles.infoSheetLead}>
+          ここに のこした写真は、ねこだよりには つかわれません。
+        </p>
+        <p style={styles.infoSheetText}>この子のアルバムに、100枚まで残せます。</p>
+        <AppButton type="button" variant="primary" fullWidth onClick={onContinue}>
+          写真を選ぶ
+        </AppButton>
       </div>
     </AppBottomSheet>
   );

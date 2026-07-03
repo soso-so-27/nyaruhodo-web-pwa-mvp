@@ -11,6 +11,8 @@ export type CatGalleryPhoto = {
 export const CAT_GALLERY_PHOTOS_UPDATED_EVENT =
   "neteruneko_cat_gallery_photos_updated";
 export const CAT_GALLERY_PHOTO_LIMIT = 100;
+const CAT_GALLERY_INTRO_ACKNOWLEDGED_STORAGE_KEY =
+  "neteruneko_cat_gallery_intro_acknowledged";
 
 export function readCatGalleryPhotos(activeCatId: string | null = null) {
   const photos = readStorageArray<CatGalleryPhoto>(STORAGE_KEYS.catGalleryPhotos)
@@ -81,6 +83,25 @@ export function deleteCatGalleryPhoto(photoId: string) {
   dispatchCatGalleryPhotosUpdated();
 
   return target;
+}
+
+export function hasAcknowledgedCatGalleryIntro() {
+  if (typeof window === "undefined") {
+    return true;
+  }
+
+  return (
+    window.localStorage.getItem(CAT_GALLERY_INTRO_ACKNOWLEDGED_STORAGE_KEY) ===
+    "true"
+  );
+}
+
+export function acknowledgeCatGalleryIntro() {
+  if (typeof window === "undefined") {
+    return;
+  }
+
+  window.localStorage.setItem(CAT_GALLERY_INTRO_ACKNOWLEDGED_STORAGE_KEY, "true");
 }
 
 export function restoreSyncedCatGalleryPhotos({

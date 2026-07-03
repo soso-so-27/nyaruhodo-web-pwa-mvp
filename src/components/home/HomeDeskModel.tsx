@@ -550,7 +550,7 @@ export function HomeDeskModel({
                         }}
                         onClick={onAddCatPhoto}
                       >
-                        この子の写真を残す
+                        アルバムに のこす
                       </button>
                     ) : null}
                   </div>
@@ -581,11 +581,8 @@ export function HomeDeskModel({
                       style={deskStyles.homeAddCatPhotoLink}
                       onClick={onAddCatPhoto}
                     >
-                      この子の写真を残す
+                      ねてない子は、アルバムへ
                     </button>
-                    <span style={deskStyles.homeAddCatPhotoNote}>
-                      この子を見返すための写真を残せます。ねこだよりには使われません。100枚まで。
-                    </span>
                   </div>
                 ) : null}
               </div>
@@ -2484,9 +2481,8 @@ const deskStyles = {
     zIndex: 1,
     display: "grid",
     justifyItems: "center",
-    gap: "6px",
     maxWidth: "260px",
-    marginTop: "-8px",
+    marginTop: "24px",
   },
   homeAddCatPhotoLink: {
     appearance: "none",
@@ -2515,15 +2511,6 @@ const deskStyles = {
     backdropFilter: "blur(10px)",
     WebkitBackdropFilter: "blur(10px)",
     textDecorationColor: "transparent",
-  },
-  homeAddCatPhotoNote: {
-    color: "color-mix(in srgb, var(--ink-soft) 68%, transparent)",
-    fontFamily: "var(--font-ui)",
-    fontSize: "11px",
-    fontWeight: 400,
-    lineHeight: 1.7,
-    letterSpacing: "var(--tracking-body)",
-    textAlign: "center",
   },
   sleepingCatPlaceholder: {
     position: "relative",
