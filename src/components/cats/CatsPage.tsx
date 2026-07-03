@@ -3144,18 +3144,17 @@ function OmoideBunbako({
   const [isControlsOpen, setIsControlsOpen] = useState(false);
 
   return (
-    <AppCard
+    <section
       id="omoide"
-      as="section"
-      variant="section"
-      padding="md"
       style={styles.bunbakoSection}
       data-testid="omoide-bunbako"
+      aria-labelledby="cats-omoide-heading"
     >
       <div style={styles.bunbakoHeader}>
-        <div>
-          <p style={styles.bunbakoSectionTitle}>とどいた思い出</p>
-        </div>
+        <h2 id="cats-omoide-heading" style={styles.recordBlockTitle}>
+          <span style={styles.recordBlockTitleMark} aria-hidden="true" />
+          とどいた思い出
+        </h2>
         <AppButton
           type="button"
           variant="ghost"
@@ -3168,16 +3167,15 @@ function OmoideBunbako({
         </AppButton>
       </div>
       {memories.length > 0 ? (
-        <div style={styles.bunbakoScroller}>
+        <div style={styles.bunbakoList}>
           {memories.map((memory) => (
             <button
               key={memory.id}
               type="button"
-              style={styles.bunbakoLetter}
+              style={styles.bunbakoRow}
               onClick={() => onOpen(memory)}
             >
-              <span style={styles.bunbakoPostmark}>{memory.title}</span>
-              <span style={styles.bunbakoWindow}>
+              <span style={styles.bunbakoThumb}>
                 <StoredPhotoImage
                   src={
                     memory.photo.thumbnailSrc ??
@@ -3188,7 +3186,13 @@ function OmoideBunbako({
                   style={styles.bunbakoPhoto}
                 />
               </span>
-              <span style={styles.bunbakoSeal} aria-hidden="true" />
+              <span style={styles.bunbakoText}>
+                <span style={styles.bunbakoTitle}>{memory.title}</span>
+                <span style={styles.bunbakoMeta}>
+                  {formatOmoideMemoryDate(memory)}
+                </span>
+              </span>
+              <ChevronRightSmallIcon />
             </button>
           ))}
         </div>
@@ -3230,7 +3234,7 @@ function OmoideBunbako({
           </div>
         </AppBottomSheet>
       ) : null}
-    </AppCard>
+    </section>
   );
 }
 
@@ -3365,6 +3369,10 @@ function formatBasicInfoDate(value?: string) {
   }
 
   return `${date.getFullYear()}年${date.getMonth() + 1}月${date.getDate()}日`;
+}
+
+function formatOmoideMemoryDate(memory: OmoideMemory) {
+  return formatBasicInfoDate(memory.sourceDateKey) || memory.subtitle || "";
 }
 
 function formatCareWeight(weightKg?: number) {
@@ -6698,17 +6706,15 @@ const styles = {
     marginTop: "2px",
   },
   bunbakoSection: {
-    marginTop: "22px",
-    marginBottom: "28px",
-    background: CATS_PANEL_BACKGROUND,
-    backdropFilter: "none",
+    display: "grid",
+    gap: "9px",
   },
   bunbakoHeader: {
     display: "flex",
-    alignItems: "flex-start",
+    alignItems: "center",
     justifyContent: "space-between",
     gap: "12px",
-    marginBottom: "12px",
+    minWidth: 0,
   },
   bunbakoSectionTitle: {
     margin: 0,
@@ -6727,58 +6733,67 @@ const styles = {
     letterSpacing: "0.02em",
     lineHeight: 1.6,
   },
-  bunbakoScroller: {
-    display: "flex",
-    gap: "12px",
-    overflowX: "auto",
-    padding: "4px 2px 8px",
-    WebkitOverflowScrolling: "touch",
-  },
-  bunbakoLetter: {
-    position: "relative",
-    flex: "0 0 152px",
-    minHeight: "118px",
+  bunbakoList: {
     display: "grid",
-    gridTemplateRows: "auto 1fr",
-    gap: "8px",
-    padding: "12px",
-    border: "1px solid var(--line)",
-    borderRadius: "var(--radius-md)",
-    background: "var(--paper-card)",
+  },
+  bunbakoRow: {
+    width: "100%",
+    minHeight: "60px",
+    display: "grid",
+    gridTemplateColumns: "56px minmax(0, 1fr) 18px",
+    alignItems: "center",
+    gap: "12px",
+    padding: "8px 0",
+    border: "none",
+    borderBottom: "1px solid color-mix(in srgb, var(--line) 84%, transparent)",
+    background: "transparent",
     color: CATS_TEXT,
-    boxShadow: "var(--shadow-e1)",
+    font: "inherit",
     textAlign: "left",
-    transform: "rotate(-1deg)",
+    cursor: "pointer",
+    WebkitTapHighlightColor: "transparent",
   },
-  bunbakoPostmark: {
-    color: CATS_MUTED,
-    fontFamily: CATS_SERIF,
-    fontSize: CATS_META_SIZE,
-    letterSpacing: CATS_META_TRACKING,
-    lineHeight: 1.45,
-  },
-  bunbakoWindow: {
-    width: "72px",
-    height: "54px",
-    alignSelf: "end",
+  bunbakoThumb: {
+    width: "56px",
+    height: "40px",
     overflow: "hidden",
-    border: "1px solid var(--line)",
-    borderRadius: "var(--radius-md)",
-    background: CATS_PAPER,
+    borderRadius: "8px",
+    background: CATS_PANEL_BACKGROUND_SOFT,
   },
   bunbakoPhoto: {
     width: "100%",
     height: "100%",
-    borderRadius: "var(--radius-md)",
+    objectFit: "cover",
+    borderRadius: "8px",
   },
-  bunbakoSeal: {
-    position: "absolute",
-    right: "14px",
-    bottom: "18px",
-    width: "12px",
-    height: "12px",
-    borderRadius: "50%",
-    background: "var(--seal)",
+  bunbakoText: {
+    minWidth: 0,
+    display: "grid",
+    gap: "3px",
+  },
+  bunbakoTitle: {
+    minWidth: 0,
+    color: CATS_TEXT_STRONG,
+    fontFamily: CATS_UI,
+    fontSize: "14px",
+    fontWeight: 500,
+    lineHeight: 1.35,
+    letterSpacing: "0",
+    overflow: "hidden",
+    textOverflow: "ellipsis",
+    whiteSpace: "nowrap",
+  },
+  bunbakoMeta: {
+    minWidth: 0,
+    color: CATS_MUTED,
+    fontFamily: CATS_UI,
+    fontSize: "12px",
+    fontWeight: 500,
+    lineHeight: 1.35,
+    letterSpacing: "0",
+    overflow: "hidden",
+    textOverflow: "ellipsis",
+    whiteSpace: "nowrap",
   },
   bunbakoEmpty: {
     margin: "4px 0 12px",
