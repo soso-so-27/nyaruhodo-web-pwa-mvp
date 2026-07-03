@@ -236,6 +236,7 @@ const YOUSU_OPTIONS = [
 
 const HOME_NAV_FRAME_WIDTH = "min(calc(100% - 28px), 410px)";
 const HOME_NAV_EDGE_INSET = "max(14px, calc((100vw - 410px) / 2))";
+const HOME_STARTUP_HOLD_MIN_MS = 280;
 
 type BoardShelfStat = {
   icon: AppIconName;
@@ -286,6 +287,7 @@ export function HomeInput({
   const [activeCatId, setActiveCatId] = useState<string | null>(null);
   const [activeCat, setActiveCat] = useState<CatProfile | null>(null);
   const [hasHydratedHomeState, setHasHydratedHomeState] = useState(false);
+  const [isStartupHoldReleased, setIsStartupHoldReleased] = useState(false);
   const [lockData, setLockData] = useState<LockData>({});
   const [tick, setTick] = useState(initialNow);
   const isHomeClockReady = tick > 0;
@@ -354,7 +356,8 @@ export function HomeInput({
   const completedBoardTimerRef = useRef<number | null>(null);
   const boardSheetReturnTimerRef = useRef<number | null>(null);
 
-  useLayoutEffect(() => {
+  useEffect(() => {
+    let releaseTimerId: number | null = null;
     const profiles = readCatProfiles();
     const activeId = readActiveCatId();
     const active = getActiveCatProfile(profiles, activeId);
@@ -366,6 +369,16 @@ export function HomeInput({
     hydrateCatState(active.id);
     setHasAcceptedSleepingSafety(hasAcceptedSleepingSafetyNotice());
     setHasHydratedHomeState(true);
+
+    releaseTimerId = window.setTimeout(() => {
+      setIsStartupHoldReleased(true);
+    }, HOME_STARTUP_HOLD_MIN_MS);
+
+    return () => {
+      if (releaseTimerId !== null) {
+        window.clearTimeout(releaseTimerId);
+      }
+    };
   }, []);
 
   useEffect(() => {
@@ -2197,7 +2210,8 @@ export function HomeInput({
     keptExchangePhotoCount,
     now: homeNow,
   });
-  const isHomeReady = isHomeClockReady && hasHydratedHomeState;
+  const isHomeReady =
+    isHomeClockReady && hasHydratedHomeState && isStartupHoldReleased;
 
   return (
     <main
@@ -5610,10 +5624,10 @@ const styles = {
     boxSizing: "border-box",
     color: "var(--ink-soft)",
     pointerEvents: "none",
-    background: "var(--app-paper-background)",
-    backgroundSize: "var(--app-paper-background-size)",
-    backgroundPosition: "var(--app-paper-background-position)",
-    backgroundRepeat: "var(--app-paper-background-repeat)",
+    backgroundImage: "url('/splash/web/apple-splash-1179-2556.webp')",
+    backgroundSize: "cover",
+    backgroundPosition: "50% 50%",
+    backgroundRepeat: "no-repeat",
   },
   homeInstallHintCard: {
     position: "fixed",
