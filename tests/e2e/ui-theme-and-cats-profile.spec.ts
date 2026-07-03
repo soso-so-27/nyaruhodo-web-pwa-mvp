@@ -226,6 +226,7 @@ test("edits weight and mixed coat without showing the old breed field", async ({
   await dialog.getByLabel("ワクチンのメモ").fill("3種混合");
   await dialog.getByRole("button", { name: "保存する" }).click();
 
+  await expect(dialog).toBeHidden();
   await expect(page.getByText("茶トラ")).toBeVisible();
   await expect(page.getByText("猫種")).toBeVisible();
   await expect(page.getByText("ミックス")).toBeVisible();

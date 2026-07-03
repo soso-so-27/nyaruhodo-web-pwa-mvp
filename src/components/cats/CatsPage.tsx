@@ -772,6 +772,7 @@ export function CatsPage() {
           ? "この端末には保存しました。Google連携への反映はあとでやり直します。"
           : "保存しました。",
       );
+      setIsCatManageOpen(false);
       setTimeout(() => setSaveMessage(""), 2000);
     } catch {
       return;
@@ -4663,7 +4664,7 @@ const styles = {
   },
   profileCoverSwitchButton: {
     position: "absolute" as const,
-    left: "10px",
+    right: "10px",
     top: "10px",
     zIndex: 2,
     width: "40px",
@@ -5952,21 +5953,18 @@ const styles = {
     boxShadow: "inset 0 0 0 1px color-mix(in srgb, var(--seal) 10%, transparent)",
   },
   catManageEditorActions: {
-    position: "sticky",
-    bottom: "-1px",
     display: "flex",
     alignItems: "center",
     justifyContent: "space-between",
     gap: "12px",
-    margin: "4px -2px 0",
-    padding: "14px 2px 4px",
-    background:
-      "linear-gradient(180deg, transparent, color-mix(in srgb, var(--paper-card) 96%, transparent) 42%)",
+    margin: "8px 0 0",
+    padding: "14px 0 0",
+    borderTop: "1px solid color-mix(in srgb, var(--line) 48%, transparent)",
   },
   catManageBackButton: {
-    minWidth: "82px",
-    minHeight: "42px",
-    padding: "0 12px",
+    minWidth: "72px",
+    minHeight: "40px",
+    padding: "0 8px",
     border: "none",
     borderRadius: "999px",
     background: "transparent",
@@ -5980,19 +5978,19 @@ const styles = {
     WebkitTapHighlightColor: "transparent",
   },
   catManageSaveButton: {
-    minWidth: "132px",
-    minHeight: "42px",
-    padding: "0 20px",
-    border: "1px solid color-mix(in srgb, var(--ink) 82%, transparent)",
+    minWidth: "112px",
+    minHeight: "40px",
+    padding: "0 18px",
+    border: "1px solid color-mix(in srgb, var(--seal) 48%, transparent)",
     borderRadius: "999px",
-    background: "color-mix(in srgb, var(--ink) 92%, transparent)",
+    background: "color-mix(in srgb, var(--seal) 88%, var(--paper-card))",
     color: "var(--paper)",
     fontFamily: CATS_UI,
     fontSize: "14px",
     fontWeight: 500,
     lineHeight: 1,
     letterSpacing: CATS_BODY_TRACKING,
-    boxShadow: "0 10px 20px -18px color-mix(in srgb, var(--ink) 44%, transparent)",
+    boxShadow: "0 8px 18px -16px color-mix(in srgb, var(--seal) 44%, transparent)",
     cursor: "pointer",
     WebkitTapHighlightColor: "transparent",
   },
