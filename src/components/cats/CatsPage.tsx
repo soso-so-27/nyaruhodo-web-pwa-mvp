@@ -43,11 +43,7 @@ import {
 } from "../../lib/supabase/catMomentCats";
 import { createBrowserSupabaseClient } from "../../lib/supabase/browser";
 import {
-  disableOmoideMemories,
-  hideOmoideDate,
-  pauseOmoideMemories,
   readOmoideMemoriesForCat,
-  readOmoideMemoryControls,
   type OmoideMemory,
 } from "../../lib/home/omoideDelivery";
 import { BottomNavigation } from "../navigation/BottomNavigation";
@@ -185,7 +181,6 @@ export function CatsPage() {
   const [editVaccineNote, setEditVaccineNote] = useState("");
   const [message, setMessage] = useState("");
   const [saveMessage, setSaveMessage] = useState("");
-  const [omoideRefreshTick, setOmoideRefreshTick] = useState(0);
   const [galleryRefreshTick, setGalleryRefreshTick] = useState(0);
   const isCatGalleryRestoreCheckRunningRef = useRef(false);
   const [activeLens, setActiveLens] = useState<UchinokoLens>("cat");
@@ -226,8 +221,6 @@ export function CatsPage() {
     ? readOwnSleepingPhotoCount(activeCatId)
     : 0;
   const omoideMemories = readOmoideMemoriesForCat(activeCatId);
-  const omoideControls = readOmoideMemoryControls();
-  void omoideRefreshTick;
   const sleepingMilestones = readCatSleepingMilestones(activeCatId);
   const activeAvatarSrc =
     activeCatProfile?.avatarDataUrl ??
@@ -1422,19 +1415,10 @@ export function CatsPage() {
             familyDuration={familyDuration}
             birthdayStatus={birthdayStatus}
             takenSleepingPhotoCount={takenSleepingPhotoCount}
-            omoideControls={omoideControls}
             onOpenMemory={(memory) => setSelectedOmoideMemory(memory)}
             onOpenPhoto={(photo) => setSelectedRecordPhoto(photo)}
             onOpenPhotos={() => setPhotoSheetLens("cat")}
             onOpenYear={(summary) => setSelectedYearSummary(summary)}
-            onPauseOmoide={() => {
-              pauseOmoideMemories();
-              setOmoideRefreshTick((value) => value + 1);
-            }}
-            onDisableOmoide={() => {
-              disableOmoideMemories(!omoideControls.disabled);
-              setOmoideRefreshTick((value) => value + 1);
-            }}
           />
         ) : null}
 
@@ -1890,11 +1874,6 @@ export function CatsPage() {
         <OmoideMemorySheet
           memory={selectedOmoideMemory}
           onClose={() => setSelectedOmoideMemory(null)}
-          onHideDate={() => {
-            hideOmoideDate(selectedOmoideMemory.sourceDateKey);
-            setOmoideRefreshTick((value) => value + 1);
-            setSelectedOmoideMemory(null);
-          }}
         />
       ) : null}
       {selectedRecordPhoto ? (
@@ -1988,13 +1967,10 @@ function RecordOverview({
   familyDuration,
   birthdayStatus,
   takenSleepingPhotoCount,
-  omoideControls,
   onOpenMemory,
   onOpenPhoto,
   onOpenPhotos,
   onOpenYear,
-  onPauseOmoide,
-  onDisableOmoide,
 }: {
   activeCatId: string | null;
   photos: LensPhoto[];
@@ -2003,13 +1979,10 @@ function RecordOverview({
   familyDuration: { primary: string; secondary: string };
   birthdayStatus: { copy: string; isToday: boolean } | null;
   takenSleepingPhotoCount: number;
-  omoideControls: ReturnType<typeof readOmoideMemoryControls>;
   onOpenMemory: (memory: OmoideMemory) => void;
   onOpenPhoto: (photo: RecordPhotoPreview) => void;
   onOpenPhotos: () => void;
   onOpenYear: (summary: CatYearSummary) => void;
-  onPauseOmoide: () => void;
-  onDisableOmoide: () => void;
 }) {
   const [pickupRefreshTick, setPickupRefreshTick] = useState(0);
   const now = getClientNow();
@@ -2178,10 +2151,7 @@ function RecordOverview({
       {openedMemories.length > 0 ? (
         <OmoideBunbako
           memories={openedMemories}
-          controls={omoideControls}
           onOpen={onOpenMemory}
-          onPause={onPauseOmoide}
-          onDisable={onDisableOmoide}
         />
       ) : null}
 
@@ -3130,19 +3100,11 @@ function ThumbnailPickerSheet({
 
 function OmoideBunbako({
   memories,
-  controls,
   onOpen,
-  onPause,
-  onDisable,
 }: {
   memories: OmoideMemory[];
-  controls: ReturnType<typeof readOmoideMemoryControls>;
   onOpen: (memory: OmoideMemory) => void;
-  onPause: () => void;
-  onDisable: () => void;
 }) {
-  const [isControlsOpen, setIsControlsOpen] = useState(false);
-
   return (
     <section
       id="omoide"
@@ -3155,16 +3117,6 @@ function OmoideBunbako({
           <span style={styles.recordBlockTitleMark} aria-hidden="true" />
           とどいた思い出
         </h2>
-        <AppButton
-          type="button"
-          variant="ghost"
-          size="icon"
-          iconOnly
-          onClick={() => setIsControlsOpen(true)}
-          aria-label="思い出の設定"
-        >
-          <MoreDotsIcon />
-        </AppButton>
       </div>
       {memories.length > 0 ? (
         <div style={styles.bunbakoList}>
@@ -3201,39 +3153,6 @@ function OmoideBunbako({
           はじめての思い出は、これから届きます。
         </p>
       )}
-      {isControlsOpen ? (
-        <AppBottomSheet
-          title="思い出の設定"
-          onClose={() => setIsControlsOpen(false)}
-        >
-          <div style={styles.omoideControls}>
-            <AppButton
-              type="button"
-              variant="secondary"
-              fullWidth
-              onClick={() => {
-                onPause();
-                setIsControlsOpen(false);
-              }}
-            >
-              思い出を しばらく お休みする
-            </AppButton>
-            <AppButton
-              type="button"
-              variant="secondary"
-              fullWidth
-              onClick={() => {
-                onDisable();
-                setIsControlsOpen(false);
-              }}
-            >
-              {controls.disabled
-                ? "思い出を 受け取る"
-                : "思い出を 受け取らない"}
-            </AppButton>
-          </div>
-        </AppBottomSheet>
-      ) : null}
     </section>
   );
 }
@@ -3241,35 +3160,47 @@ function OmoideBunbako({
 function OmoideMemorySheet({
   memory,
   onClose,
-  onHideDate,
 }: {
   memory: OmoideMemory;
   onClose: () => void;
-  onHideDate: () => void;
 }) {
   return (
-    <AppBottomSheet title="思い出が、とどきました" onClose={onClose}>
-      <div style={styles.omoideSheet}>
-        <p style={styles.omoideSheetTitle}>{memory.title}</p>
-        <div style={styles.omoideSheetImageFrame}>
+    <div
+      data-testid="omoide-memory-viewer"
+      style={styles.omoideViewerBackdrop}
+      onClick={onClose}
+    >
+      <section
+        style={styles.omoideViewerPanel}
+        aria-label="思い出が、とどきました"
+        onClick={(event) => event.stopPropagation()}
+      >
+        <p style={styles.omoideViewerKicker}>思い出が、とどきました</p>
+        <h2 style={styles.omoideViewerTitle}>{memory.title}</h2>
+        <p style={styles.omoideViewerDate}>{formatOmoideMemoryDate(memory)}</p>
+        <div style={styles.omoideViewerImageFrame}>
           <StoredPhotoImage
             src={memory.photo.displaySrc ?? memory.photo.src}
+            fallbackSrcs={[
+              memory.photo.thumbnailSrc,
+              memory.photo.originalSrc,
+              memory.photo.src,
+            ].filter(Boolean) as string[]}
             alt=""
-            style={styles.omoideSheetImage}
+            style={styles.omoideViewerImage}
           />
         </div>
-        <p style={styles.omoideSheetVoice}>{memory.voice}</p>
-        <p style={styles.omoideSheetBridge}>{memory.bridge}</p>
+        <p style={styles.omoideViewerVoice}>{memory.voice}</p>
+        <p style={styles.omoideViewerBridge}>{memory.bridge}</p>
         <AppButton
           type="button"
-          variant="secondary"
-          fullWidth
-          onClick={onHideDate}
+          variant="quiet"
+          onClick={onClose}
         >
-          この日を 見せない
+          そっと しまう
         </AppButton>
-      </div>
-    </AppBottomSheet>
+      </section>
+    </div>
   );
 }
 
@@ -6803,12 +6734,6 @@ const styles = {
     letterSpacing: CATS_BODY_TRACKING,
     lineHeight: 1.7,
   },
-  omoideControls: {
-    display: "flex",
-    flexDirection: "column",
-    gap: "8px",
-    marginTop: "12px",
-  },
   daysThread: {
     marginTop: "24px",
     marginBottom: "12px",
@@ -6839,42 +6764,83 @@ const styles = {
     lineHeight: 1.7,
     letterSpacing: "0.02em",
   },
-  omoideSheet: {
+  omoideViewerBackdrop: {
+    position: "fixed" as const,
+    inset: 0,
+    zIndex: 60,
     display: "grid",
-    gap: "12px",
-    justifyItems: "center",
+    placeItems: "center",
+    padding:
+      "calc(24px + env(safe-area-inset-top)) 20px calc(24px + env(safe-area-inset-bottom))",
+    background: "var(--bg-gradient)",
   },
-  omoideSheetTitle: {
+  omoideViewerPanel: {
+    width: "min(100%, 430px)",
+    minHeight: "100%",
+    display: "flex",
+    flexDirection: "column" as const,
+    alignItems: "center",
+    justifyContent: "center",
+    gap: "12px",
+    color: CATS_TEXT,
+  },
+  omoideViewerKicker: {
+    margin: "0 0 4px",
+    color: CATS_MUTED,
+    fontFamily: CATS_SERIF,
+    fontSize: "12px",
+    fontWeight: 400,
+    letterSpacing: CATS_META_TRACKING,
+  },
+  omoideViewerTitle: {
     margin: 0,
     color: CATS_TEXT,
     fontFamily: CATS_SERIF,
-    fontSize: CATS_TITLE_SIZE,
+    fontSize: "24px",
+    fontWeight: 400,
     letterSpacing: CATS_TITLE_TRACKING,
+    lineHeight: 1.4,
+    textAlign: "center" as const,
   },
-  omoideSheetImageFrame: {
-    width: "min(70vw, 260px)",
+  omoideViewerDate: {
+    margin: "0 0 8px",
+    color: CATS_MUTED,
+    fontFamily: CATS_SERIF,
+    fontSize: "12px",
+    fontWeight: 400,
+    letterSpacing: CATS_BODY_TRACKING,
+  },
+  omoideViewerImageFrame: {
+    width: "min(72vw, 280px)",
     aspectRatio: "1 / 1",
     padding: "8px",
     borderRadius: "var(--radius-xl)",
-    background: CATS_PAPER,
-    boxShadow: "var(--shadow-e1)",
+    background: "var(--paper)",
+    boxShadow: "var(--shadow-e2)",
+    transform: "rotate(-1deg)",
   },
-  omoideSheetImage: {
+  omoideViewerImage: {
     width: "100%",
     height: "100%",
     borderRadius: "var(--radius-lg)",
   },
-  omoideSheetVoice: {
-    margin: 0,
+  omoideViewerVoice: {
+    margin: "16px 0 0",
     color: CATS_TEXT,
     fontFamily: CATS_SERIF,
-    fontSize: "13px",
-    letterSpacing: "var(--tracking-body)",
+    fontSize: "15px",
+    fontWeight: 400,
+    letterSpacing: CATS_TITLE_TRACKING,
+    textAlign: "center" as const,
   },
-  omoideSheetBridge: {
+  omoideViewerBridge: {
     margin: 0,
     color: CATS_MUTED,
+    fontFamily: CATS_SERIF,
     fontSize: "12px",
+    fontWeight: 400,
+    letterSpacing: CATS_BODY_TRACKING,
+    textAlign: "center" as const,
   },
   message: {
     margin: "10px 0 0",
