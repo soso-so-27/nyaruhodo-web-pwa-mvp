@@ -7,16 +7,12 @@ import { StoredPhotoImage } from "../ui/StoredPhotoImage";
 
 export function OmoideMemoryViewer({
   memory,
-  alreadyRecordedToday,
   isRevisit = false,
   onStow,
-  onCue,
 }: {
   memory: OmoideMemory;
-  alreadyRecordedToday: boolean;
   isRevisit?: boolean;
   onStow: () => void;
-  onCue: () => void;
 }) {
   const duration = isRevisit ? "600ms" : "1350ms";
 
@@ -33,14 +29,9 @@ export function OmoideMemoryViewer({
             "--omoide-develop-duration": duration,
           } as CSSProperties
         }
-        aria-label="思い出が、とどきました"
+        aria-label={memory.title}
         onClick={(event) => event.stopPropagation()}
       >
-        <p style={viewerStyles.kicker}>
-          <span style={viewerStyles.kickerLine} aria-hidden="true" />
-          <span>思い出が、とどきました</span>
-          <span style={viewerStyles.kickerLine} aria-hidden="true" />
-        </p>
         <h2 style={viewerStyles.title}>{memory.title}</h2>
         <p data-testid="omoide-memory-date" style={viewerStyles.date}>
           {formatOmoideSourceDate(memory.sourceDateKey)}
@@ -53,21 +44,6 @@ export function OmoideMemoryViewer({
             style={viewerStyles.photo}
           />
         </div>
-        <p style={viewerStyles.voice}>{memory.voice}</p>
-        <p style={viewerStyles.bridge}>{memory.bridge}</p>
-        <p style={viewerStyles.question}>
-          きょうの {memory.catName}は、どんな ねがお？
-        </p>
-        <button
-          type="button"
-          data-testid="omoide-memory-cue"
-          style={viewerStyles.primaryButton}
-          onClick={onCue}
-        >
-          {alreadyRecordedToday
-            ? `きょうの ${memory.catName}を みる`
-            : `いまの ${memory.catName}を のこす`}
-        </button>
         <button
           type="button"
           data-testid="omoide-memory-stow"
@@ -130,7 +106,7 @@ const viewerStyles = {
   backdrop: {
     position: "fixed",
     inset: 0,
-    zIndex: 60,
+    zIndex: 90,
     display: "grid",
     placeItems: "center",
     padding:
@@ -145,8 +121,8 @@ const viewerStyles = {
     display: "flex",
     flexDirection: "column",
     alignItems: "center",
-    gap: "10px",
-    padding: "24px 18px 18px",
+    gap: "12px",
+    padding: "26px 18px 18px",
     borderRadius: "16px",
     border: "1px solid color-mix(in srgb, var(--line) 68%, transparent)",
     background:
@@ -156,50 +132,33 @@ const viewerStyles = {
     color: "var(--ink)",
     transform: "rotate(-1.2deg)",
   },
-  kicker: {
-    width: "100%",
-    margin: "0 0 2px",
-    display: "grid",
-    gridTemplateColumns: "1fr auto 1fr",
-    alignItems: "center",
-    gap: "10px",
-    color: "var(--ink-soft)",
-    fontFamily: "var(--font-display)",
-    fontSize: "11px",
-    fontWeight: 500,
-    letterSpacing: "var(--tracking-label)",
-    textAlign: "center",
-  },
-  kickerLine: {
-    height: "1px",
-    background: "color-mix(in srgb, var(--line) 72%, transparent)",
-  },
   title: {
     margin: 0,
     color: "var(--ink)",
     fontFamily: "var(--font-serif)",
-    fontSize: "23px",
+    fontSize: "24px",
     fontWeight: 400,
     lineHeight: 1.38,
     letterSpacing: "0",
     textAlign: "center",
   },
   date: {
-    margin: "0 0 6px",
+    margin: "-4px 0 8px",
     color: "var(--ink-soft)",
-    fontFamily: "var(--font-serif)",
+    fontFamily: "var(--font-display)",
     fontSize: "12px",
-    fontWeight: 400,
+    fontWeight: 500,
     letterSpacing: "0",
   },
   photoFrame: {
-    width: "min(72vw, 282px)",
+    width: "min(76vw, 302px)",
     aspectRatio: "1 / 1",
     padding: "8px",
     borderRadius: "14px",
     background: "color-mix(in srgb, white 88%, var(--paper-card) 12%)",
     boxShadow:
       "0 10px 24px -18px color-mix(in srgb, var(--ink) 40%, transparent), 0 0 0 1px color-mix(in srgb, var(--line) 34%, transparent)",
+    transform: "rotate(0.7deg)",
   },
   photo: {
     width: "100%",
@@ -208,53 +167,9 @@ const viewerStyles = {
     objectFit: "cover",
     background: "var(--paper-card)",
   },
-  voice: {
-    margin: "12px 0 0",
-    color: "var(--ink)",
-    fontFamily: "var(--font-serif)",
-    fontSize: "15px",
-    fontWeight: 400,
-    lineHeight: 1.7,
-    letterSpacing: "0",
-    textAlign: "center",
-  },
-  bridge: {
-    margin: 0,
-    color: "var(--ink-soft)",
-    fontFamily: "var(--font-serif)",
-    fontSize: "13px",
-    fontWeight: 400,
-    lineHeight: 1.6,
-    letterSpacing: "0",
-    textAlign: "center",
-  },
-  question: {
-    margin: "2px 0 0",
-    color: "var(--ink-soft)",
-    fontFamily: "var(--font-display)",
-    fontSize: "13px",
-    lineHeight: 1.6,
-    letterSpacing: "var(--tracking-body)",
-    textAlign: "center",
-  },
-  primaryButton: {
-    width: "min(100%, 300px)",
-    minHeight: "46px",
-    marginTop: "6px",
-    padding: "0 18px",
-    border: "1px solid color-mix(in srgb, var(--seal) 82%, transparent)",
-    borderRadius: "999px",
-    background: "var(--seal)",
-    color: "white",
-    fontFamily: "var(--font-display)",
-    fontSize: "14px",
-    fontWeight: 500,
-    letterSpacing: "var(--tracking-label)",
-    cursor: "pointer",
-    boxShadow: "0 10px 22px -18px color-mix(in srgb, var(--seal) 78%, transparent)",
-  },
   textButton: {
-    minHeight: "34px",
+    minHeight: "36px",
+    marginTop: "4px",
     padding: "0 4px",
     border: "none",
     background: "transparent",

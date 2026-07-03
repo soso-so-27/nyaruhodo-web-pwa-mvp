@@ -537,7 +537,9 @@ test.describe("home desk model", () => {
     await expect(page).toHaveURL(/\/home$/);
     await expect(page.getByTestId("omoide-memory-viewer")).toBeVisible();
     await expect(page.getByTestId("omoide-memory-date")).toBeVisible();
-    await page.getByTestId("omoide-memory-stow").click();
+    await expect(page.getByTestId("omoide-memory-stow")).toBeVisible();
+    await expect(page.getByTestId("omoide-memory-cue")).toHaveCount(0);
+    await page.mouse.click(12, 12);
     await expect(page.getByTestId("omoide-memory-viewer")).toHaveCount(0);
 
     await page.goto("/cats#omoide");

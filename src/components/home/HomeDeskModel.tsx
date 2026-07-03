@@ -914,21 +914,9 @@ export function HomeDeskModel({
         <OmoideMemoryViewer
           memory={openingOmoideMemory.memory}
           isRevisit={openingOmoideMemory.isRevisit}
-          alreadyRecordedToday={Boolean(targetPhoto)}
           onStow={() => {
             onStowOmoideMemory?.(openingOmoideMemory.memory, "home");
             setOpeningOmoideMemory(null);
-          }}
-          onCue={() => {
-            trackProductEvent(
-              "omoide_cue_tapped",
-              { led_to_capture: !targetPhoto },
-              { localCatId: openingOmoideMemory.memory.catId },
-            );
-            setOpeningOmoideMemory(null);
-            if (!targetPhoto) {
-              onTakePhoto();
-            }
           }}
         />
       ) : null}

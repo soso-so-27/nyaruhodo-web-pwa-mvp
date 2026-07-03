@@ -267,15 +267,6 @@ export function CatsPage() {
     () => getStableSleepingCoverPhoto(activeCatLensPhotos),
     [activeCatLensPhotos],
   );
-  const hasTodaySleepingPhoto = useMemo(
-    () =>
-      activeCatLensPhotos.some(
-        (photo) =>
-          photo.kind === "sleeping" &&
-          getLocalDateKey(photo.createdAt) === getLocalDateKey(getClientNow()),
-      ),
-    [activeCatLensPhotos],
-  );
   const hasCustomThumbnail = Boolean(activeCatProfile?.avatarDataUrl);
   const activeCoverPhoto =
     activeCatGalleryLensPhotos[0] ?? stableSleepingCoverPhoto;
@@ -1918,24 +1909,12 @@ export function CatsPage() {
         <OmoideMemoryViewer
           memory={selectedOmoideMemory.memory}
           isRevisit={selectedOmoideMemory.isRevisit}
-          alreadyRecordedToday={hasTodaySleepingPhoto}
           onStow={() => {
             trackOmoideMemoryDismissed(
               selectedOmoideMemory.memory,
               selectedOmoideMemory.source,
             );
             setSelectedOmoideMemory(null);
-          }}
-          onCue={() => {
-            trackProductEvent(
-              "omoide_cue_tapped",
-              { led_to_capture: !hasTodaySleepingPhoto },
-              { localCatId: selectedOmoideMemory.memory.catId },
-            );
-            setSelectedOmoideMemory(null);
-            if (!hasTodaySleepingPhoto) {
-              window.location.assign("/home");
-            }
           }}
         />
       ) : null}
@@ -3361,18 +3340,6 @@ function isTimestampInYear(timestamp: number, year: number) {
 
 function isDateKeyInYear(dateKey: string, year: number) {
   return Number(dateKey.slice(0, 4)) === year;
-}
-
-function getLocalDateKey(timestamp: number) {
-  const date = new Date(timestamp);
-  if (Number.isNaN(date.getTime())) {
-    return "";
-  }
-
-  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(
-    2,
-    "0",
-  )}-${String(date.getDate()).padStart(2, "0")}`;
 }
 
 function formatBasicInfoDate(value?: string) {
