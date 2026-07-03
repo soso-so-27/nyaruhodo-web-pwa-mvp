@@ -60,6 +60,10 @@ import {
   readEveningDeliveryTrace,
   type EveningDeliveryTraceEntry,
 } from "../../lib/home/eveningDeliveryTrace";
+import {
+  disableOmoideMemories,
+  readOmoideMemoryControls,
+} from "../../lib/home/omoideDelivery";
 type SettingsTab = "general" | "admin";
 type PhotoReportSummary = {
   id: string;
@@ -159,6 +163,7 @@ export function SettingsPage() {
   const [referralSummary, setReferralSummary] =
     useState<ClientReferralSummary | null>(null);
   const [referralMessage, setReferralMessage] = useState("");
+  const [omoideDisabled, setOmoideDisabled] = useState(false);
   const showsAdminSection =
     adminCapabilities.isAdmin ||
     adminCapabilities.testToolsEnabled ||
@@ -168,6 +173,7 @@ export function SettingsPage() {
 
   useEffect(() => {
     setDisplayEnvironment(getDisplayEnvironment());
+    setOmoideDisabled(readOmoideMemoryControls().disabled === true);
     refreshKeptExchangeDebug();
     refreshEveningDeliveryTrace();
     void checkAuthState();
@@ -603,6 +609,12 @@ export function SettingsPage() {
     setKeptExchangeDebug(readKeptExchangePhotoStorageDebug());
   }
 
+  function handleOmoideDisabledToggle() {
+    const next = !omoideDisabled;
+    disableOmoideMemories(next);
+    setOmoideDisabled(next);
+  }
+
   return (
     <main style={styles.page}>
       <div style={styles.container}>
@@ -765,6 +777,38 @@ export function SettingsPage() {
                 </div>
               </>
             )}
+          </AppCard>
+        </section>
+
+        <section style={{ ...styles.section, order: 3 }}>
+          <p style={styles.sectionLabel}>思い出便</p>
+          <AppCard variant="outlined" padding="sm" style={styles.card}>
+            <div style={styles.row}>
+              <span style={styles.rowTextStack}>
+                <span style={styles.rowLabel}>思い出を 受け取らない</span>
+                <span style={styles.rowDescription}>
+                  オンにすると、過去のねがおの思い出便は届きません。
+                </span>
+              </span>
+              <button
+                type="button"
+                role="switch"
+                aria-checked={omoideDisabled}
+                style={{
+                  ...styles.switchButton,
+                  ...(omoideDisabled ? styles.switchButtonOn : {}),
+                }}
+                onClick={handleOmoideDisabledToggle}
+              >
+                <span
+                  style={{
+                    ...styles.switchKnob,
+                    ...(omoideDisabled ? styles.switchKnobOn : {}),
+                  }}
+                  aria-hidden="true"
+                />
+              </button>
+            </div>
           </AppCard>
         </section>
 
@@ -2096,10 +2140,21 @@ const styles = {
     alignItems: "center",
     gap: "8px",
   },
+  rowTextStack: {
+    minWidth: 0,
+    display: "grid",
+    gap: "4px",
+  },
   rowLabel: {
     fontSize: "13px",
     color: "var(--ink)",
     fontWeight: 500,
+  },
+  rowDescription: {
+    maxWidth: "230px",
+    color: "var(--ink-soft)",
+    fontSize: "12px",
+    lineHeight: 1.55,
   },
   rowValue: {
     fontSize: "13px",
@@ -2120,6 +2175,34 @@ const styles = {
     letterSpacing: "0.12em",
     lineHeight: 1,
     padding: "7px 10px",
+  },
+  switchButton: {
+    flex: "0 0 auto",
+    width: "46px",
+    height: "28px",
+    padding: "3px",
+    border: "1px solid rgba(120,108,94,0.18)",
+    borderRadius: "999px",
+    background: "rgba(120,108,94,0.12)",
+    cursor: "pointer",
+    transition: "background 160ms ease, border-color 160ms ease",
+  },
+  switchButtonOn: {
+    borderColor: "color-mix(in srgb, var(--seal) 62%, transparent)",
+    background: "color-mix(in srgb, var(--seal) 42%, var(--paper) 58%)",
+  },
+  switchKnob: {
+    display: "block",
+    width: "20px",
+    height: "20px",
+    borderRadius: "999px",
+    background: "var(--paper-card)",
+    boxShadow: "0 2px 8px rgba(70, 50, 30, 0.16)",
+    transform: "translateX(0)",
+    transition: "transform 160ms ease",
+  },
+  switchKnobOn: {
+    transform: "translateX(18px)",
   },
   referralActions: {
     display: "grid",

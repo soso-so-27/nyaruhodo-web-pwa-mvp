@@ -45,8 +45,11 @@ import {
 } from "../../lib/supabase/catMomentCats";
 import { createBrowserSupabaseClient } from "../../lib/supabase/browser";
 import {
+  markOmoideMemoryOpened,
   readOmoideMemoriesForCat,
+  trackOmoideMemoryDismissed,
   type OmoideMemory,
+  type OmoideOpenSource,
 } from "../../lib/home/omoideDelivery";
 import { BottomNavigation } from "../navigation/BottomNavigation";
 import { AppButton } from "../ui/AppButton";
@@ -56,6 +59,7 @@ import { AppSegmented } from "../ui/AppSegmented";
 import { AppTextField } from "../ui/AppTextField";
 import { PhotoTile } from "../ui/PhotoTile";
 import { StoredPhotoImage } from "../ui/StoredPhotoImage";
+import { OmoideMemoryViewer } from "../home/OmoideMemoryViewer";
 import {
   addCatProfile,
   getActiveCatProfile,
@@ -204,6 +208,12 @@ export function CatsPage() {
     useState(false);
   const [selectedRecordPhoto, setSelectedRecordPhoto] =
     useState<RecordPhotoPreview | null>(null);
+  const [selectedOmoideMemory, setSelectedOmoideMemory] =
+    useState<{
+      memory: OmoideMemory;
+      source: OmoideOpenSource;
+      isRevisit: boolean;
+    } | null>(null);
   const [deleteGalleryPhotoTarget, setDeleteGalleryPhotoTarget] =
     useState<RecordPhotoPreview | null>(null);
   const [isDeletingGalleryPhoto, setIsDeletingGalleryPhoto] = useState(false);
@@ -257,6 +267,15 @@ export function CatsPage() {
     () => getStableSleepingCoverPhoto(activeCatLensPhotos),
     [activeCatLensPhotos],
   );
+  const hasTodaySleepingPhoto = useMemo(
+    () =>
+      activeCatLensPhotos.some(
+        (photo) =>
+          photo.kind === "sleeping" &&
+          getLocalDateKey(photo.createdAt) === getLocalDateKey(getClientNow()),
+      ),
+    [activeCatLensPhotos],
+  );
   const hasCustomThumbnail = Boolean(activeCatProfile?.avatarDataUrl);
   const activeCoverPhoto =
     activeCatGalleryLensPhotos[0] ?? stableSleepingCoverPhoto;
@@ -278,6 +297,16 @@ export function CatsPage() {
     photoSheetLens === "all" ? allLensPhotos : activeCatLensPhotos;
   const photoSheetTitle =
     photoSheetLens === "all" ? "ぜんぶの写真" : "この子のとっておき";
+
+  function openOmoideMemory(memory: OmoideMemory, source: OmoideOpenSource) {
+    const wasAlreadyOpened = Boolean(memory.openedAt);
+    const opened = markOmoideMemoryOpened(memory.id, getClientNow(), source);
+    setSelectedOmoideMemory({
+      memory: opened ?? memory,
+      source,
+      isRevisit: wasAlreadyOpened,
+    });
+  }
 
   useEffect(() => {
     document.documentElement.classList.add("cats-scrollbar-quiet");
@@ -1429,9 +1458,7 @@ export function CatsPage() {
             familyDuration={familyDuration}
             birthdayStatus={birthdayStatus}
             takenSleepingPhotoCount={takenSleepingPhotoCount}
-            onOpenMemory={(memory) =>
-              setSelectedRecordPhoto(toRecordPhotoPreviewFromMemory(memory))
-            }
+            onOpenMemory={openOmoideMemory}
             onOpenPhoto={(photo) => setSelectedRecordPhoto(photo)}
             onOpenPhotos={() => setPhotoSheetLens("cat")}
             onOpenYear={(summary) => setSelectedYearSummary(summary)}
@@ -1883,7 +1910,33 @@ export function CatsPage() {
           onOpenPhoto={(photo) => {
             setSelectedRecordPhoto(photo);
           }}
+          onOpenMemory={(memory) => openOmoideMemory(memory, "year")}
           onClose={() => setSelectedYearSummary(null)}
+        />
+      ) : null}
+      {selectedOmoideMemory ? (
+        <OmoideMemoryViewer
+          memory={selectedOmoideMemory.memory}
+          isRevisit={selectedOmoideMemory.isRevisit}
+          alreadyRecordedToday={hasTodaySleepingPhoto}
+          onStow={() => {
+            trackOmoideMemoryDismissed(
+              selectedOmoideMemory.memory,
+              selectedOmoideMemory.source,
+            );
+            setSelectedOmoideMemory(null);
+          }}
+          onCue={() => {
+            trackProductEvent(
+              "omoide_cue_tapped",
+              { led_to_capture: !hasTodaySleepingPhoto },
+              { localCatId: selectedOmoideMemory.memory.catId },
+            );
+            setSelectedOmoideMemory(null);
+            if (!hasTodaySleepingPhoto) {
+              window.location.assign("/home");
+            }
+          }}
         />
       ) : null}
       {selectedRecordPhoto ? (
@@ -2024,7 +2077,7 @@ function RecordOverview({
   familyDuration: { primary: string; secondary: string };
   birthdayStatus: { copy: string; isToday: boolean } | null;
   takenSleepingPhotoCount: number;
-  onOpenMemory: (memory: OmoideMemory) => void;
+  onOpenMemory: (memory: OmoideMemory, source: OmoideOpenSource) => void;
   onOpenPhoto: (photo: RecordPhotoPreview) => void;
   onOpenPhotos: () => void;
   onOpenYear: (summary: CatYearSummary) => void;
@@ -2084,7 +2137,7 @@ function RecordOverview({
               markCatPickupSeen(activeCatId, pickup);
               setPickupRefreshTick((value) => value + 1);
               openPickupTarget(pickup, {
-                onOpenMemory,
+                onOpenMemory: (memory) => onOpenMemory(memory, "pickup"),
                 onOpenPhoto,
                 onOpenMilestones: scrollToMilestones,
               });
@@ -2161,7 +2214,7 @@ function RecordOverview({
                 style={styles.recentTimelineRow}
                 onClick={() => {
                   if (entry.memory) {
-                    onOpenMemory(entry.memory);
+                    onOpenMemory(entry.memory, "bunbako");
                     return;
                   }
                   if (entry.photo) {
@@ -2196,7 +2249,7 @@ function RecordOverview({
       {openedMemories.length > 0 ? (
         <OmoideBunbako
           memories={openedMemories}
-          onOpen={onOpenMemory}
+          onOpen={(memory) => onOpenMemory(memory, "bunbako")}
         />
       ) : null}
 
@@ -2832,6 +2885,7 @@ function YearSummarySheet({
   memories,
   milestones,
   onOpenPhoto,
+  onOpenMemory,
   onClose,
 }: {
   summary: CatYearSummary;
@@ -2839,6 +2893,7 @@ function YearSummarySheet({
   memories: OmoideMemory[];
   milestones: CatSleepingMilestone[];
   onOpenPhoto: (photo: RecordPhotoPreview) => void;
+  onOpenMemory: (memory: OmoideMemory) => void;
   onClose: () => void;
 }) {
   const [activeDetail, setActiveDetail] =
@@ -2847,7 +2902,7 @@ function YearSummarySheet({
     isTimestampInYear(photo.createdAt, summary.year),
   );
   const yearMemories = memories.filter((memory) =>
-    isTimestampInYear(memory.openedAt ?? memory.deliveredAt, summary.year),
+    isDateKeyInYear(memory.deliveryDateKey, summary.year),
   );
   const yearMilestones = milestones.filter(
     (milestone) =>
@@ -2896,6 +2951,7 @@ function YearSummarySheet({
             memories={yearMemories}
             milestones={yearMilestones}
             onOpenPhoto={onOpenPhoto}
+            onOpenMemory={onOpenMemory}
           />
         ) : null}
         <div style={styles.yearSummaryBlock}>
@@ -2959,12 +3015,14 @@ function YearSummaryDetailList({
   memories,
   milestones,
   onOpenPhoto,
+  onOpenMemory,
 }: {
   kind: YearSummaryDetailKind;
   photos: LensPhoto[];
   memories: OmoideMemory[];
   milestones: CatSleepingMilestone[];
   onOpenPhoto: (photo: RecordPhotoPreview) => void;
+  onOpenMemory: (memory: OmoideMemory) => void;
 }) {
   if (kind === "photos") {
     return (
@@ -3001,16 +3059,7 @@ function YearSummaryDetailList({
               key={memory.id}
               type="button"
               style={styles.yearSummaryRow}
-              onClick={() =>
-                onOpenPhoto({
-                  src:
-                    memory.photo.displaySrc ??
-                    memory.photo.thumbnailSrc ??
-                    memory.photo.src,
-                  title: memory.title || "思い出",
-                  timestamp: memory.openedAt ?? memory.deliveredAt,
-                })
-              }
+              onClick={() => onOpenMemory(memory)}
             >
               <span style={styles.yearSummaryRowThumb}>
                 <StoredPhotoImage
@@ -3022,7 +3071,7 @@ function YearSummaryDetailList({
               <span style={styles.yearSummaryRowText}>
                 <span style={styles.yearSummaryRowTitle}>{memory.title}</span>
                 <span style={styles.yearSummaryRowMeta}>
-                  {formatFootprintDate(memory.openedAt ?? memory.deliveredAt)}
+                  {formatOmoideMemoryDate(memory)}
                 </span>
               </span>
               <ChevronRightSmallIcon />
@@ -3308,6 +3357,22 @@ function isTimestampInYear(timestamp: number, year: number) {
   const date = new Date(timestamp);
 
   return !Number.isNaN(date.getTime()) && date.getFullYear() === year;
+}
+
+function isDateKeyInYear(dateKey: string, year: number) {
+  return Number(dateKey.slice(0, 4)) === year;
+}
+
+function getLocalDateKey(timestamp: number) {
+  const date = new Date(timestamp);
+  if (Number.isNaN(date.getTime())) {
+    return "";
+  }
+
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(
+    2,
+    "0",
+  )}-${String(date.getDate()).padStart(2, "0")}`;
 }
 
 function formatBasicInfoDate(value?: string) {

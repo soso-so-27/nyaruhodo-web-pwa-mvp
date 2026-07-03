@@ -65,9 +65,9 @@ import {
 } from "../../lib/home/eveningDelivery";
 import {
   ensureOmoideMemoryArrival,
-  markOmoideMemoryDismissed,
   markOmoideMemoryOpened,
   readLatestArrivedOmoideMemory,
+  trackOmoideMemoryDismissed,
 } from "../../lib/home/omoideDelivery";
 import { useEveningDelivery } from "../../lib/home/useEveningDelivery";
 import {
@@ -2243,13 +2243,13 @@ export function HomeInput({
               eveningDeliveryCheckStatus={eveningDelivery.checkStatus}
               onRetryEveningDeliveryCheck={eveningDelivery.retryEveningDeliveryCheck}
               omoideMemory={arrivedOmoideMemory}
-              onOpenOmoideMemory={(memory) => {
-                markOmoideMemoryOpened(memory.id, homeNow);
+              onOpenOmoideMemory={(memory, source) => {
+                const opened = markOmoideMemoryOpened(memory.id, homeNow, source);
                 setOmoideRefreshTick((value) => value + 1);
+                return opened ?? memory;
               }}
-              onDismissOmoideMemory={(memory) => {
-                markOmoideMemoryDismissed(memory.id, homeNow);
-                setOmoideRefreshTick((value) => value + 1);
+              onStowOmoideMemory={(memory, source) => {
+                trackOmoideMemoryDismissed(memory, source);
               }}
             />
           </>

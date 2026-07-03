@@ -44,8 +44,7 @@ export function createCatYearSummaries({
   }
 
   for (const memory of memories) {
-    const timestamp = memory.openedAt ?? memory.deliveredAt;
-    const year = toValidDate(timestamp).getFullYear();
+    const year = getYearFromDateKey(memory.deliveryDateKey);
     const row = getOrCreateRow(rows, year);
     row.pickupCount += 1;
   }
@@ -135,6 +134,11 @@ function getYearMilestoneLabel(target: CatSleepingMilestone["target"]) {
 function toValidDate(timestamp: number) {
   const date = new Date(timestamp || Date.now());
   return Number.isNaN(date.getTime()) ? new Date() : date;
+}
+
+function getYearFromDateKey(dateKey: string) {
+  const year = Number(dateKey.slice(0, 4));
+  return year || new Date().getFullYear();
 }
 
 function unique(values: string[]) {

@@ -9,7 +9,10 @@ import type {
   ExchangePhoto,
   OwnSleepingPhoto,
 } from "../../lib/home/sleepingPhotos";
-import type { OmoideMemory } from "../../lib/home/omoideDelivery";
+import type {
+  OmoideMemory,
+  OmoideOpenSource,
+} from "../../lib/home/omoideDelivery";
 import { trackProductEvent } from "../../lib/analytics/productAnalytics";
 import { playOpenSound } from "../../lib/openSound";
 import { BottomNavigation } from "../navigation/BottomNavigation";
@@ -25,6 +28,7 @@ import {
   HOME_REVEAL_MODE,
   HOME_SIMPLE_REVEAL_COMMIT_MS,
 } from "./homeEnvelopeMotionConfig";
+import { OmoideMemoryViewer } from "./OmoideMemoryViewer";
 
 type DeskState = "1" | "1b" | "2" | "3" | "4";
 type HomeDaylightStyle = CSSProperties & Record<`--${string}`, string>;
@@ -79,8 +83,11 @@ type HomeDeskModelProps = {
   eveningDeliveryCheckStatus?: EveningDeliveryCheckStatus;
   onRetryEveningDeliveryCheck?: () => void;
   omoideMemory?: OmoideMemory | null;
-  onOpenOmoideMemory?: (memory: OmoideMemory) => void;
-  onDismissOmoideMemory?: (memory: OmoideMemory) => void;
+  onOpenOmoideMemory?: (
+    memory: OmoideMemory,
+    source: OmoideOpenSource,
+  ) => OmoideMemory | null;
+  onStowOmoideMemory?: (memory: OmoideMemory, source: OmoideOpenSource) => void;
 };
 
 const USE_SIMPLE_HOME_REVEAL = HOME_REVEAL_MODE === "simple";
@@ -258,7 +265,7 @@ export function HomeDeskModel({
   onRetryEveningDeliveryCheck,
   omoideMemory,
   onOpenOmoideMemory,
-  onDismissOmoideMemory,
+  onStowOmoideMemory,
 }: HomeDeskModelProps) {
   const deskState = getDeskState(eveningState);
   const prefersReducedMotion = usePrefersReducedMotion();
@@ -267,7 +274,7 @@ export function HomeDeskModel({
   const [developPhotoMounted, setDevelopPhotoMounted] = useState(false);
   const [viewerPhoto, setViewerPhoto] = useState<DeskViewerPhoto | null>(null);
   const [openingOmoideMemory, setOpeningOmoideMemory] =
-    useState<OmoideMemory | null>(null);
+    useState<{ memory: OmoideMemory; isRevisit: boolean } | null>(null);
   const [, setReportedDeliveredIds] = useState<Set<string>>(
     () => new Set(),
   );
@@ -318,6 +325,9 @@ export function HomeDeskModel({
   const hasTrayActions = homeDay.phase === "delivered" || subNotifications.length > 0;
   const usesTextRibbonTray = !hasTrayActions;
   const usesEnvelopeHome = homeDay.phase === "delivered" && !hasSplitTrayActions;
+  const shouldHideBaseNoticeForOmoideOnly =
+    subNotifications.length > 0 &&
+    (homeDay.phase === "late-sent" || homeDay.phase === "empty-after");
   const shouldShowHomeFrameTakeButton =
     homeDay.phase === "empty-before" || homeDay.phase === "empty-after";
   const shouldShowCatGalleryPhotoLink =
@@ -781,7 +791,7 @@ export function HomeDeskModel({
                     onRetry={onRetryEveningDeliveryCheck}
                   />
                 </a>
-              ) : (
+              ) : shouldHideBaseNoticeForOmoideOnly ? null : (
                 <div
                   style={{
                     ...deskStyles.notificationRow,
@@ -807,8 +817,11 @@ export function HomeDeskModel({
                     ...(hasSplitTrayActions ? deskStyles.notificationRowSplitCard : {}),
                   }}
                   onClick={() => {
-                    onOpenOmoideMemory?.(memory);
-                    window.location.assign("/cats#omoide");
+                    const opened = onOpenOmoideMemory?.(memory, "home") ?? memory;
+                    setOpeningOmoideMemory({
+                      memory: opened,
+                      isRevisit: Boolean(memory.openedAt),
+                    });
                   }}
                   aria-label="思い出が、とどきました。うちのこで見る"
                 >
@@ -899,18 +912,18 @@ export function HomeDeskModel({
 
       {openingOmoideMemory ? (
         <OmoideMemoryViewer
-          memory={openingOmoideMemory}
+          memory={openingOmoideMemory.memory}
+          isRevisit={openingOmoideMemory.isRevisit}
           alreadyRecordedToday={Boolean(targetPhoto)}
-          onClose={() => setOpeningOmoideMemory(null)}
-          onDismiss={() => {
-            onDismissOmoideMemory?.(openingOmoideMemory);
+          onStow={() => {
+            onStowOmoideMemory?.(openingOmoideMemory.memory, "home");
             setOpeningOmoideMemory(null);
           }}
           onCue={() => {
             trackProductEvent(
               "omoide_cue_tapped",
               { led_to_capture: !targetPhoto },
-              { localCatId: openingOmoideMemory.catId },
+              { localCatId: openingOmoideMemory.memory.catId },
             );
             setOpeningOmoideMemory(null);
             if (!targetPhoto) {
@@ -1218,85 +1231,6 @@ export function HomeDeskModel({
         }
       `}</style>
     </section>
-  );
-}
-
-function OmoideMemoryViewer({
-  memory,
-  alreadyRecordedToday,
-  onClose,
-  onDismiss,
-  onCue,
-}: {
-  memory: OmoideMemory;
-  alreadyRecordedToday: boolean;
-  onClose: () => void;
-  onDismiss: () => void;
-  onCue: () => void;
-}) {
-  return (
-    <div
-      data-testid="omoide-memory-viewer"
-      style={deskStyles.omoideViewerBackdrop}
-      onClick={onClose}
-    >
-      <section
-        style={deskStyles.omoideViewerPanel}
-        aria-label="思い出が、とどきました"
-        onClick={(event) => event.stopPropagation()}
-      >
-        <p style={deskStyles.omoideViewerKicker}>思い出が、とどきました</p>
-        <h2 style={deskStyles.omoideViewerTitle}>{memory.title}</h2>
-        <p style={deskStyles.omoideViewerDate}>
-          {formatOmoideDate(memory.sourceDateKey)}
-        </p>
-        <div style={deskStyles.omoideViewerImageFrame}>
-          <StoredPhotoImage
-            src={getPhotoDetailSrc(memory.photo)}
-            fallbackSrcs={getPhotoFallbackSrcs(memory.photo)}
-            alt=""
-            style={deskStyles.omoideViewerImage}
-          />
-        </div>
-        <p style={deskStyles.omoideViewerVoice}>{memory.voice}</p>
-        <p style={deskStyles.omoideViewerBridge}>{memory.bridge}</p>
-        <p style={deskStyles.omoideViewerQuestion}>
-          きょうの {memory.catName}は、どんな ねがお？
-        </p>
-        <AppButton
-          type="button"
-          variant="primary"
-          fullWidth
-          style={deskStyles.omoideViewerButton}
-          onClick={onCue}
-        >
-          {alreadyRecordedToday
-            ? `きょうの ${memory.catName}を みる`
-            : `いまの ${memory.catName}を のこす`}
-        </AppButton>
-        <AppButton
-          type="button"
-          variant="quiet"
-          onClick={onDismiss}
-        >
-          そっと しまう
-        </AppButton>
-      </section>
-      <style>{`
-        [data-testid="omoide-memory-viewer"] img {
-          animation: omoideDevelop var(--dur-develop) var(--ease-settle) both;
-        }
-        @keyframes omoideDevelop {
-          from { opacity: 0; filter: blur(14px); transform: scale(0.985) rotate(-1deg); }
-          to { opacity: 1; filter: blur(0); transform: scale(1) rotate(-1deg); }
-        }
-        @media (prefers-reduced-motion: reduce) {
-          [data-testid="omoide-memory-viewer"] img {
-            animation: none;
-          }
-        }
-      `}</style>
-    </div>
   );
 }
 
@@ -3400,98 +3334,6 @@ const deskStyles = {
     display: "flex",
     flexDirection: "column",
     gap: "8px",
-  },
-  omoideViewerBackdrop: {
-    position: "fixed",
-    inset: 0,
-    zIndex: 60,
-    display: "grid",
-    placeItems: "center",
-    padding:
-      "calc(24px + env(safe-area-inset-top)) 20px calc(24px + env(safe-area-inset-bottom))",
-    background: "var(--bg-gradient)",
-  },
-  omoideViewerPanel: {
-    width: "min(100%, 430px)",
-    minHeight: "100%",
-    display: "flex",
-    flexDirection: "column",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: "12px",
-    color: "var(--ink)",
-  },
-  omoideViewerKicker: {
-    margin: "0 0 4px",
-    color: "var(--ink-soft)",
-    fontFamily: "var(--font-display)",
-    fontSize: "12px",
-    letterSpacing: "var(--tracking-label)",
-  },
-  omoideViewerTitle: {
-    margin: 0,
-    color: "var(--ink)",
-    fontFamily: "var(--font-display)",
-    fontSize: "24px",
-    fontWeight: 400,
-    letterSpacing: "var(--tracking-label)",
-    lineHeight: 1.4,
-    textAlign: "center",
-  },
-  omoideViewerDate: {
-    margin: "0 0 8px",
-    color: "var(--ink-soft)",
-    fontFamily: "var(--font-display)",
-    fontSize: "12px",
-    letterSpacing: "var(--tracking-body)",
-  },
-  omoideViewerImageFrame: {
-    width: "min(72vw, 280px)",
-    aspectRatio: "1 / 1",
-    padding: "8px",
-    borderRadius: "var(--radius-xl)",
-    background: "var(--paper)",
-    boxShadow: "var(--shadow-e2)",
-    transform: "rotate(-1deg)",
-  },
-  omoideViewerImage: {
-    width: "100%",
-    height: "100%",
-    borderRadius: "var(--radius-lg)",
-  },
-  omoideViewerVoice: {
-    margin: "16px 0 0",
-    color: "var(--ink)",
-    fontFamily: "var(--font-display)",
-    fontSize: "15px",
-    letterSpacing: "var(--tracking-label)",
-    textAlign: "center",
-  },
-  omoideViewerBridge: {
-    margin: 0,
-    color: "var(--ink-soft)",
-    fontFamily: "var(--font-display)",
-    fontSize: "12px",
-    letterSpacing: "var(--tracking-body)",
-  },
-  omoideViewerQuestion: {
-    margin: "4px 0 0",
-    color: "var(--ink-soft)",
-    fontFamily: "var(--font-display)",
-    fontSize: "13px",
-    letterSpacing: "var(--tracking-body)",
-    textAlign: "center",
-  },
-  omoideViewerButton: {
-    width: "min(100%, 320px)",
-    marginTop: "8px",
-  },
-  omoideViewerGuard: {
-    margin: "8px 0 0",
-    color: "var(--ink-faint)",
-    fontSize: "12px",
-    letterSpacing: "var(--tracking-body)",
-    textAlign: "center",
   },
   yesterday: {
     display: "flex",

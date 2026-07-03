@@ -20,6 +20,8 @@ export type OmoideReason =
   | "season"
   | "first_seed";
 
+export type OmoideOpenSource = "home" | "pickup" | "bunbako" | "year";
+
 export type OmoideMemory = {
   id: string;
   catId: string;
@@ -155,18 +157,28 @@ export function ensureOmoideMemoryArrival({
   return memory;
 }
 
-export function markOmoideMemoryOpened(id: string, openedAt = Date.now()) {
+export function markOmoideMemoryOpened(
+  id: string,
+  openedAt = Date.now(),
+  source: OmoideOpenSource = "home",
+) {
   const store = readOmoideMemoryStore();
   const memory = store[id];
   if (!memory) {
     return null;
   }
 
-  const nextMemory = { ...memory, openedAt };
-  writeOmoideMemoryStore({ ...store, [id]: nextMemory });
+  const nextMemory = memory.openedAt ? memory : { ...memory, openedAt };
+  if (!memory.openedAt) {
+    writeOmoideMemoryStore({ ...store, [id]: nextMemory });
+  }
   trackProductEvent(
     "omoide_opened",
-    { source: "home", memory_age: openedAt - memory.photo.createdAt },
+    {
+      source,
+      memory_age: openedAt - memory.photo.createdAt,
+      already_opened: Boolean(memory.openedAt),
+    },
     { localCatId: memory.catId },
   );
   return nextMemory;
@@ -183,6 +195,13 @@ export function markOmoideMemoryDismissed(id: string, dismissedAt = Date.now()) 
   writeOmoideMemoryStore({ ...store, [id]: nextMemory });
   trackProductEvent("omoide_dismissed", {}, { localCatId: memory.catId });
   return nextMemory;
+}
+
+export function trackOmoideMemoryDismissed(
+  memory: OmoideMemory,
+  source: OmoideOpenSource,
+) {
+  trackProductEvent("omoide_dismissed", { source }, { localCatId: memory.catId });
 }
 
 export function pauseOmoideMemories(days = 30) {
