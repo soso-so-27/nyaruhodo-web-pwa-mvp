@@ -36,6 +36,7 @@ Operational reading:
 - The app should feel like paper and ink before it feels like an app surface.
 - Color is carried by photos, not by UI chrome.
 - UI may use one deep color only: `--seal`, for the wax-seal point and destructive/action warning text. Do not use it as a filled surface.
+- Unopened items are indicated only by a 6-7px `--seal` dot. Do not use numbers, badges, or `NEW` text for this meaning.
 - Use serif + tracking for labels, dates, and button text. Use sans-serif for practical body copy such as settings explanations.
 - Buttons are mostly words or thin-line paper pills. Filled buttons are exceptional and limited to one per screen.
 

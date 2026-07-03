@@ -5,6 +5,8 @@ import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import type { CSSProperties, MouseEvent, ReactNode } from "react";
 
+import { hasUnopenedArrivedOmoideMemory } from "../../lib/home/omoideDelivery";
+
 type BottomNavigationProps = {
   active: "home" | "today" | "collection" | "cats";
   homeVariant?: "default" | "desk";
@@ -33,6 +35,7 @@ export function BottomNavigation({
   const router = useRouter();
   const pathname = usePathname();
   const [pendingKey, setPendingKey] = useState<NavItem["key"] | null>(null);
+  const [hasUnopenedOmoide, setHasUnopenedOmoide] = useState(false);
   const activeKey = active === "today" ? "home" : active;
   const items: readonly NavItem[] = [
     {
@@ -63,6 +66,31 @@ export function BottomNavigation({
   useEffect(() => {
     setPendingKey(null);
   }, [activeKey, pathname]);
+
+  useEffect(() => {
+    function refreshUnopenedOmoide() {
+      setHasUnopenedOmoide(hasUnopenedArrivedOmoideMemory());
+    }
+
+    refreshUnopenedOmoide();
+    window.addEventListener(
+      "neteruneko_omoide_memories_updated",
+      refreshUnopenedOmoide,
+    );
+    window.addEventListener("storage", refreshUnopenedOmoide);
+    window.addEventListener("focus", refreshUnopenedOmoide);
+    const intervalId = window.setInterval(refreshUnopenedOmoide, 60_000);
+
+    return () => {
+      window.removeEventListener(
+        "neteruneko_omoide_memories_updated",
+        refreshUnopenedOmoide,
+      );
+      window.removeEventListener("storage", refreshUnopenedOmoide);
+      window.removeEventListener("focus", refreshUnopenedOmoide);
+      window.clearInterval(intervalId);
+    };
+  }, []);
 
   function handleNavClick(
     event: MouseEvent<HTMLAnchorElement>,
@@ -131,6 +159,12 @@ export function BottomNavigation({
               aria-hidden="true"
             >
               {item.icon}
+              {item.key === "cats" && hasUnopenedOmoide ? (
+                <span
+                  data-testid="cats-nav-unopened-omoide-dot"
+                  style={styles.unopenedSealDot}
+                />
+              ) : null}
             </span>
             <span style={isActive ? styles.activeNavLabel : styles.navLabel}>
               {displayLabel}
@@ -257,6 +291,7 @@ const styles = {
       "color var(--dur-instant) var(--ease-gentle), transform var(--dur-instant) var(--ease-settle)",
   },
   navIcon: {
+    position: "relative",
     display: "inline-flex",
     alignItems: "center",
     justifyContent: "center",
@@ -267,6 +302,7 @@ const styles = {
     transition: "color var(--dur-instant) var(--ease-gentle), transform var(--dur-instant) var(--ease-settle)",
   },
   activeNavIcon: {
+    position: "relative",
     display: "inline-flex",
     alignItems: "center",
     justifyContent: "center",
@@ -312,6 +348,17 @@ const styles = {
     width: "9px",
     height: "12px",
     opacity: 0,
+    pointerEvents: "none",
+  },
+  unopenedSealDot: {
+    position: "absolute",
+    top: "0px",
+    right: "0px",
+    width: "7px",
+    height: "7px",
+    borderRadius: "999px",
+    background: "var(--seal)",
+    boxShadow: "0 0 0 2px color-mix(in srgb, var(--paper) 86%, transparent)",
     pointerEvents: "none",
   },
   navLabel: {

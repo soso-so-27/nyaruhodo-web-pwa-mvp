@@ -16,7 +16,7 @@ test.describe("home desk model", () => {
       "1b": { deskState: "1b", phase: "empty-after" },
       "2": { deskState: "2", phase: "sent-before" },
       "3": { deskState: "3", phase: "delivered" },
-      "4": { deskState: "4", phase: "opened" },
+      "4": { deskState: "4", phase: null },
     } as const;
 
     for (const state of ["1", "1b", "2", "3", "4"] as const) {
@@ -27,10 +27,74 @@ test.describe("home desk model", () => {
         "data-state",
         expectedStates[state].deskState,
       );
-      await expect(page.getByTestId("home-letter-tray")).toHaveAttribute(
-        "data-phase",
-        expectedStates[state].phase,
-      );
+      if (expectedStates[state].phase) {
+        await expect(page.getByTestId("home-letter-tray")).toHaveAttribute(
+          "data-phase",
+          expectedStates[state].phase,
+        );
+      } else {
+        await expect(page.getByTestId("home-letter-tray")).toHaveCount(0);
+      }
+    }
+  });
+
+  test("keeps the notification tray limited to unopened items across night states", async ({
+    page,
+  }) => {
+    const states = [
+      {
+        state: "1b" as const,
+        name: "empty-after",
+        expectedDeliveryLetters: 0,
+        expectedTrayWithoutOmoide: true,
+      },
+      {
+        state: "2" as const,
+        name: "waiting-after-eight",
+        expectedDeliveryLetters: 0,
+        expectedTrayWithoutOmoide: true,
+      },
+      {
+        state: "3" as const,
+        name: "delivery-unopened",
+        expectedDeliveryLetters: 1,
+        expectedTrayWithoutOmoide: true,
+      },
+      {
+        state: "4" as const,
+        name: "delivery-opened",
+        expectedDeliveryLetters: 0,
+        expectedTrayWithoutOmoide: false,
+      },
+    ];
+
+    for (const withOmoide of [false, true]) {
+      for (const scenario of states) {
+        if (scenario.state === "2") {
+          await mockDeskExchangeEmpty(page);
+        }
+        await seedDeskState(page, scenario.state, {
+          now: afterEightToday,
+          withStoredOmoide: withOmoide,
+        });
+        await page.goto(`/home?matrix=${scenario.name}-${withOmoide ? "omoide" : "plain"}`);
+        await page.waitForLoadState("networkidle");
+
+        const tray = page.getByTestId("home-letter-tray");
+        const shouldShowTray = scenario.expectedTrayWithoutOmoide;
+        await expect(tray).toHaveCount(shouldShowTray ? 1 : 0);
+        await expect(page.getByTestId("desk-open-letter")).toHaveCount(
+          scenario.expectedDeliveryLetters,
+        );
+        await expect(page.getByTestId("omoide-arrival-letter")).toHaveCount(0);
+        await expect(page.getByTestId("cats-nav-unopened-omoide-dot")).toHaveCount(
+          withOmoide ? 1 : 0,
+        );
+
+        if (shouldShowTray) {
+          await expect(tray.locator('a[href="/collection"]')).toHaveCount(0);
+        }
+      }
     }
   });
 
@@ -277,7 +341,6 @@ test.describe("home desk model", () => {
     const states = [
       { state: "1" as const, frameTestId: "desk-empty-frame" },
       { state: "2" as const, frameTestId: "desk-home-frame" },
-      { state: "4" as const, frameTestId: "desk-home-frame" },
     ];
 
     for (const { state, frameTestId } of states) {
@@ -301,6 +364,21 @@ test.describe("home desk model", () => {
         Math.round(navBox!.y - 16),
       );
     }
+
+    await seedDeskState(page, "4");
+    await page.goto("/home");
+    await page.waitForLoadState("networkidle");
+    const openedFrameBox = await page.getByTestId("desk-home-frame").boundingBox();
+    const openedNavBox = await page
+      .getByRole("navigation", { name: "下部ナビゲーション" })
+      .boundingBox();
+
+    await expect(page.getByTestId("home-letter-tray")).toHaveCount(0);
+    expect(openedFrameBox).not.toBeNull();
+    expect(openedNavBox).not.toBeNull();
+    expect(Math.round(openedFrameBox!.y + openedFrameBox!.height)).toBeLessThanOrEqual(
+      Math.round(openedNavBox!.y - 16),
+    );
   });
 
   test("keeps the home skeleton aligned on the 4px grid", async ({ page }) => {
@@ -482,7 +560,7 @@ test.describe("home desk model", () => {
     await expect(page.getByTestId("evening-opening-pair")).toHaveCount(0);
   });
 
-  test("keeps state4 focused on the latest own cat photo", async ({
+  test("opens the delivered photo from the state4 home frame without a notification row", async ({
     page,
   }) => {
     await seedDeskState(page, "4");
@@ -494,11 +572,13 @@ test.describe("home desk model", () => {
       "4",
     );
     await expect(page.getByTestId("desk-home-frame")).toBeVisible();
-    await expect(page.getByText("きょうの ねこだより")).toBeVisible();
+    await expect(page.getByTestId("home-letter-tray")).toHaveCount(0);
     await expect(page.getByRole("button", { name: "とっておく" })).toHaveCount(0);
     await expect(
       page.getByRole("button", { name: "どこかのこの写真を大きく見る" }),
     ).toHaveCount(0);
+    await page.getByTestId("desk-home-frame").click();
+    await expect(page.getByTestId("desk-photo-viewer")).toBeVisible();
   });
 
   test("does not show the removed yesterday mini on home", async ({
@@ -522,7 +602,7 @@ test.describe("home desk model", () => {
     await expect(page.locator(".desk-frame-breathe")).toHaveCount(0);
   });
 
-  test("delivers a past sleeping photo as an omoide letter and keeps it in the cat tab", async ({
+  test("marks unopened omoide on the cats tab and opens it from today's pickup", async ({
     page,
   }) => {
     await seedDeskState(page, "1b", {
@@ -532,13 +612,21 @@ test.describe("home desk model", () => {
     await page.goto("/home");
     await page.waitForLoadState("networkidle");
 
-    await expect(page.getByTestId("omoide-arrival-letter")).toBeVisible();
-    await page.getByTestId("omoide-arrival-letter").click();
-    await expect(page).toHaveURL(/\/home$/);
+    await expect(page.getByTestId("omoide-arrival-letter")).toHaveCount(0);
+    await expect(page.getByTestId("cats-nav-unopened-omoide-dot")).toBeVisible();
+
+    await page.goto("/cats");
+    await page.waitForLoadState("networkidle");
+    await expect(page.getByTestId("cats-nav-unopened-omoide-dot")).toBeVisible();
+    await expect(page.getByTestId("cats-pickup-unopened-omoide-dot")).toBeVisible();
+
+    await page.getByTestId("cats-pickup-section").locator("button").click();
     await expect(page.getByTestId("omoide-memory-viewer")).toBeVisible();
     await expect(page.getByTestId("omoide-memory-date")).toBeVisible();
     await expect(page.getByTestId("omoide-memory-stow")).toBeVisible();
     await expect(page.getByTestId("omoide-memory-cue")).toHaveCount(0);
+    await expect(page.getByTestId("cats-nav-unopened-omoide-dot")).toHaveCount(0);
+    await expect(page.getByTestId("cats-pickup-unopened-omoide-dot")).toHaveCount(0);
     await page.mouse.click(12, 12);
     await expect(page.getByTestId("omoide-memory-viewer")).toHaveCount(0);
 
@@ -572,6 +660,7 @@ async function seedDeskState(
     firstTargetDateKey?: string;
     withYesterday?: boolean;
     withOmoideCandidate?: boolean;
+    withStoredOmoide?: boolean;
   } = {},
 ) {
   const now =
@@ -704,6 +793,38 @@ async function seedDeskState(
         };
       }
 
+      if (options.withStoredOmoide) {
+        const memoryPhoto = {
+          ...omoidePhoto,
+          src: deliveredDataUrl,
+          displaySrc: deliveredDataUrl,
+          thumbnailSrc: deliveredDataUrl,
+        };
+        window.localStorage.setItem(
+          "neteruneko_omoide_memories",
+          JSON.stringify({
+            "omoide-desk-stored": {
+              id: "omoide-desk-stored",
+              catId,
+              catName: "むぎ",
+              sourcePhotoId: memoryPhoto.id,
+              sourceDateKey: "2026-06-03",
+              deliveryDateKey: dateKey,
+              photo: memoryPhoto,
+              lookback: "week",
+              reason: "same_day",
+              title: "1週間前の、きょう",
+              subtitle: "1週間前の むぎから 届きました。",
+              voice: "1回目の 夏の、ある日。",
+              bridge: "あれから、7日。",
+              deliveredAt: now,
+            },
+          }),
+        );
+      } else {
+        window.localStorage.removeItem("neteruneko_omoide_memories");
+      }
+
       window.localStorage.setItem(
         "neteruneko_evening_delivery_days",
         JSON.stringify(store),
@@ -777,6 +898,15 @@ async function mockDeskExchange(page: Page) {
           fallbackActive: false,
         },
       }),
+    });
+  });
+}
+
+async function mockDeskExchangeEmpty(page: Page) {
+  await page.route("**/api/sleeping-delivery/exchange", async (route) => {
+    await route.fulfill({
+      status: 204,
+      body: "",
     });
   });
 }

@@ -9,10 +9,6 @@ import type {
   ExchangePhoto,
   OwnSleepingPhoto,
 } from "../../lib/home/sleepingPhotos";
-import type {
-  OmoideMemory,
-  OmoideOpenSource,
-} from "../../lib/home/omoideDelivery";
 import { trackProductEvent } from "../../lib/analytics/productAnalytics";
 import { playOpenSound } from "../../lib/openSound";
 import { BottomNavigation } from "../navigation/BottomNavigation";
@@ -28,7 +24,6 @@ import {
   HOME_REVEAL_MODE,
   HOME_SIMPLE_REVEAL_COMMIT_MS,
 } from "./homeEnvelopeMotionConfig";
-import { OmoideMemoryViewer } from "./OmoideMemoryViewer";
 
 type DeskState = "1" | "1b" | "2" | "3" | "4";
 type HomeDaylightStyle = CSSProperties & Record<`--${string}`, string>;
@@ -82,12 +77,6 @@ type HomeDeskModelProps = {
   ) => void;
   eveningDeliveryCheckStatus?: EveningDeliveryCheckStatus;
   onRetryEveningDeliveryCheck?: () => void;
-  omoideMemory?: OmoideMemory | null;
-  onOpenOmoideMemory?: (
-    memory: OmoideMemory,
-    source: OmoideOpenSource,
-  ) => OmoideMemory | null;
-  onStowOmoideMemory?: (memory: OmoideMemory, source: OmoideOpenSource) => void;
 };
 
 const USE_SIMPLE_HOME_REVEAL = HOME_REVEAL_MODE === "simple";
@@ -263,9 +252,6 @@ export function HomeDeskModel({
   onDeliveredStorageDataUrl,
   eveningDeliveryCheckStatus,
   onRetryEveningDeliveryCheck,
-  omoideMemory,
-  onOpenOmoideMemory,
-  onStowOmoideMemory,
 }: HomeDeskModelProps) {
   const deskState = getDeskState(eveningState);
   const prefersReducedMotion = usePrefersReducedMotion();
@@ -273,8 +259,6 @@ export function HomeDeskModel({
   const [envelopeOpenPlayKey, setEnvelopeOpenPlayKey] = useState(0);
   const [developPhotoMounted, setDevelopPhotoMounted] = useState(false);
   const [viewerPhoto, setViewerPhoto] = useState<DeskViewerPhoto | null>(null);
-  const [openingOmoideMemory, setOpeningOmoideMemory] =
-    useState<{ memory: OmoideMemory; isRevisit: boolean } | null>(null);
   const [, setReportedDeliveredIds] = useState<Set<string>>(
     () => new Set(),
   );
@@ -284,7 +268,6 @@ export function HomeDeskModel({
   const revealPhotoLoadedTrackedRef = useRef(false);
   const revealPhotoErrorTrackedRef = useRef(false);
   const daylightStyle = useDaylight(now);
-  const hasSupplementalNotification = Boolean(omoideMemory);
   const [homePhotoAspect, setHomePhotoAspect] = useState<number | null>(null);
   useHomeViewportBackground(daylightStyle);
   const targetPhoto =
@@ -316,18 +299,22 @@ export function HomeDeskModel({
   const homePhoto = homeDay.photo;
   const frameLayoutStyle = useHomeFrameLayout(
     deskState,
-    hasSupplementalNotification,
+    false,
     homePhoto ? homePhotoAspect : null,
   );
-  const subNotifications = omoideMemory ? [omoideMemory] : [];
-  const hasSplitTrayActions =
-    homeDay.phase === "delivered" && subNotifications.length > 0;
-  const hasTrayActions = homeDay.phase === "delivered" || subNotifications.length > 0;
+  const subNotifications = [] as Array<{
+    id: string;
+    openedAt?: number;
+    photo: OwnSleepingPhoto;
+  }>;
+  const hasUnopenedDeliveryNotification = homeDay.phase === "delivered";
+  const hasSplitTrayActions = false;
+  const hasTrayActions = hasUnopenedDeliveryNotification;
   const usesTextRibbonTray = !hasTrayActions;
-  const usesEnvelopeHome = homeDay.phase === "delivered" && !hasSplitTrayActions;
-  const shouldHideBaseNoticeForOmoideOnly =
-    subNotifications.length > 0 &&
-    (homeDay.phase === "late-sent" || homeDay.phase === "empty-after");
+  const usesEnvelopeHome = hasUnopenedDeliveryNotification;
+  const shouldShowBaseNotice =
+    hasUnopenedDeliveryNotification || homeDay.phase !== "opened";
+  const shouldShowNotificationTray = shouldShowBaseNotice;
   const shouldShowHomeFrameTakeButton =
     homeDay.phase === "empty-before" || homeDay.phase === "empty-after";
   const shouldShowCatGalleryPhotoLink =
@@ -340,17 +327,6 @@ export function HomeDeskModel({
   useEffect(() => {
     setHomePhotoAspect(null);
   }, [homePhoto?.id, homePhoto?.src]);
-
-  useEffect(() => {
-    if (!omoideMemory) {
-      return;
-    }
-
-    trackProductEvent("omoide_arrival_shown", {
-      memory_id: omoideMemory.id,
-      lookback: omoideMemory.lookback,
-    });
-  }, [omoideMemory]);
 
   useEffect(() => {
     return () => {
@@ -507,13 +483,22 @@ export function HomeDeskModel({
                   type="button"
                   data-testid="desk-home-frame"
                   style={deskStyles.homeFrameButton}
-                  onClick={() =>
+                  onClick={() => {
+                    if (homeDay.phase === "opened" && deliveredPhoto) {
+                      setViewerPhoto({
+                        kind: "other",
+                        photo: deliveredPhoto,
+                        dateKey: eveningState.dateKey,
+                      });
+                      return;
+                    }
+
                     setViewerPhoto({
                       kind: "own",
                       photo: homePhoto,
                       dateKey: eveningState.dateKey,
-                    })
-                  }
+                    });
+                  }}
                   aria-label={`${catName}のきょうのねがおを大きく見る`}
                 >
                   <span
@@ -588,38 +573,32 @@ export function HomeDeskModel({
             )}
           </div>
 
+          {shouldShowNotificationTray ? (
           <section
             data-testid="home-letter-tray"
             data-phase={homeDay.phase}
             style={{
               ...deskStyles.notificationTray,
               ...(usesTextRibbonTray ? deskStyles.notificationTrayRibbon : {}),
-              ...(subNotifications.length > 0 && homeDay.phase !== "delivered"
-                ? deskStyles.notificationTrayList
-                : {}),
-              ...(homeDay.phase === "delivered" ? deskStyles.notificationTrayDelivered : {}),
+              ...(hasUnopenedDeliveryNotification ? deskStyles.notificationTrayDelivered : {}),
               ...(usesEnvelopeHome ? deskStyles.notificationTrayEnvelopeHome : {}),
             }}
             className={
-              homeDay.phase === "delivered" && !prefersReducedMotion
+              hasUnopenedDeliveryNotification && !prefersReducedMotion
                 ? "home-letter-tray-glow"
                 : undefined
             }
             aria-label="ホームのお知らせ"
           >
             <div
-              className={hasSplitTrayActions ? "home-tray-action-carousel" : undefined}
               style={{
                 ...deskStyles.notificationRows,
                 ...(usesTextRibbonTray ? deskStyles.notificationRowsRibbon : {}),
-                ...(hasSplitTrayActions ? deskStyles.notificationRowsSplit : {}),
-                ...(subNotifications.length === 0
-                  ? deskStyles.notificationRowsSingle
-                  : {}),
+                ...deskStyles.notificationRowsSingle,
                 ...(usesEnvelopeHome ? deskStyles.notificationRowsEnvelopeHome : {}),
               }}
             >
-              {homeDay.phase === "delivered" ? (
+              {hasUnopenedDeliveryNotification ? (
                 <button
                   type="button"
                   role="button"
@@ -775,23 +754,7 @@ export function HomeDeskModel({
                     </span>
                   </div>
                 </button>
-              ) : homeDay.phase === "opened" ? (
-                <a
-                  href="/collection"
-                  style={{
-                    ...deskStyles.notificationRow,
-                    ...deskStyles.notificationRowText,
-                    ...deskStyles.notificationRowLink,
-                    ...(usesTextRibbonTray ? deskStyles.notificationRowTextRibbon : {}),
-                  }}
-                >
-                  <HomeLetterTrayText
-                    phase={homeDay.phase}
-                    deliveryCheckState={deliveryCheckState}
-                    onRetry={onRetryEveningDeliveryCheck}
-                  />
-                </a>
-              ) : shouldHideBaseNoticeForOmoideOnly ? null : (
+              ) : shouldShowBaseNotice ? (
                 <div
                   style={{
                     ...deskStyles.notificationRow,
@@ -805,24 +768,18 @@ export function HomeDeskModel({
                     onRetry={onRetryEveningDeliveryCheck}
                   />
                 </div>
-              )}
+              ) : null}
               {subNotifications.slice(0, 2).map((memory) => (
                 <button
                   key={memory.id}
                   type="button"
-                  data-testid="omoide-arrival-letter"
+                  data-testid="unused-omoide-arrival-card"
                   style={{
                     ...deskStyles.notificationRow,
                     ...deskStyles.notificationRowInteractive,
                     ...(hasSplitTrayActions ? deskStyles.notificationRowSplitCard : {}),
                   }}
-                  onClick={() => {
-                    const opened = onOpenOmoideMemory?.(memory, "home") ?? memory;
-                    setOpeningOmoideMemory({
-                      memory: opened,
-                      isRevisit: Boolean(memory.openedAt),
-                    });
-                  }}
+                  onClick={() => undefined}
                   aria-label="思い出が、とどきました。うちのこで見る"
                 >
                   <span style={deskStyles.notificationThumb} aria-hidden="true">
@@ -864,6 +821,7 @@ export function HomeDeskModel({
               ) : null}
             </div>
           </section>
+          ) : null}
         </div>
 
       </div>
@@ -906,17 +864,6 @@ export function HomeDeskModel({
               return next;
             });
             setViewerPhoto(null);
-          }}
-        />
-      ) : null}
-
-      {openingOmoideMemory ? (
-        <OmoideMemoryViewer
-          memory={openingOmoideMemory.memory}
-          isRevisit={openingOmoideMemory.isRevisit}
-          onStow={() => {
-            onStowOmoideMemory?.(openingOmoideMemory.memory, "home");
-            setOpeningOmoideMemory(null);
           }}
         />
       ) : null}
@@ -1521,7 +1468,7 @@ function useHomeFrameLayout(
         "[data-testid='home-letter-tray']",
       );
       const navElement = document.querySelector<HTMLElement>("nav");
-      if (!pageElement || !trayElement || !navElement) {
+      if (!pageElement || !navElement) {
         return;
       }
 
@@ -1538,9 +1485,10 @@ function useHomeFrameLayout(
         0,
         Math.min(viewportWidth - paddingX, stageMaxWidth),
       );
-      const trayHeight =
-        trayElement.getBoundingClientRect().height ||
-        readPixels(pageStyle.getPropertyValue("--home-tray-min-height"), 104);
+      const trayHeight = trayElement
+        ? trayElement.getBoundingClientRect().height ||
+          readPixels(pageStyle.getPropertyValue("--home-tray-min-height"), 104)
+        : 0;
       const trayToNavGap = readPixels(
         pageStyle.getPropertyValue("--home-tray-to-nav-gap"),
         32,

@@ -2072,6 +2072,8 @@ function RecordOverview({
     birthdayStatus,
     history: readCatPickupHistory(activeCatId),
   });
+  const pickupHasUnopenedMemory =
+    pickup?.target.kind === "memory" && !pickup.target.memory.openedAt;
   const recentEntries = createCatFootprintEntries({
     photos,
     milestones,
@@ -2129,10 +2131,22 @@ function RecordOverview({
                   alt=""
                   style={styles.pickupThumbImage}
                 />
+                {pickupHasUnopenedMemory ? (
+                  <span
+                    data-testid="cats-pickup-unopened-omoide-dot"
+                    style={styles.pickupUnopenedSealDot}
+                  />
+                ) : null}
               </span>
             ) : (
               <span style={styles.pickupIcon} aria-hidden="true">
                 <EnvelopeSmallIcon />
+                {pickupHasUnopenedMemory ? (
+                  <span
+                    data-testid="cats-pickup-unopened-omoide-dot"
+                    style={styles.pickupUnopenedSealDot}
+                  />
+                ) : null}
               </span>
             )}
             <span style={styles.pickupText}>
@@ -5009,6 +5023,7 @@ const styles = {
     WebkitTapHighlightColor: "transparent",
   },
   pickupThumb: {
+    position: "relative",
     width: "52px",
     height: "52px",
     overflow: "hidden",
@@ -5023,6 +5038,7 @@ const styles = {
     borderRadius: "12px",
   },
   pickupIcon: {
+    position: "relative",
     width: "52px",
     height: "52px",
     display: "inline-flex",
@@ -5031,6 +5047,18 @@ const styles = {
     borderRadius: "12px",
     background: "color-mix(in srgb, var(--paper-card) 74%, transparent)",
     color: "var(--seal)",
+  },
+  pickupUnopenedSealDot: {
+    position: "absolute",
+    top: "5px",
+    right: "5px",
+    width: "7px",
+    height: "7px",
+    borderRadius: "999px",
+    background: "var(--seal)",
+    boxShadow:
+      "0 0 0 2px color-mix(in srgb, var(--paper-card) 84%, transparent)",
+    pointerEvents: "none",
   },
   pickupText: {
     minWidth: 0,

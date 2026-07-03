@@ -80,6 +80,15 @@ export function readLatestArrivedOmoideMemory(
   );
 }
 
+export function hasUnopenedArrivedOmoideMemory(now = Date.now()) {
+  return readOmoideMemories().some(
+    (memory) =>
+      !memory.openedAt &&
+      !memory.dismissedAt &&
+      now >= getJstDeliveryTime(memory.deliveryDateKey),
+  );
+}
+
 export function ensureOmoideMemoryArrival({
   catId,
   catName,
