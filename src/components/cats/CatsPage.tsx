@@ -6025,10 +6025,11 @@ const styles = {
     minWidth: 0,
     color: CATS_TEXT,
     fontFamily: CATS_SERIF,
-    fontSize: CATS_TITLE_SIZE,
+    fontSize: "18px",
     fontWeight: 400,
-    lineHeight: 1.45,
+    lineHeight: 1.35,
     letterSpacing: CATS_TITLE_TRACKING,
+    whiteSpace: "nowrap",
   },
   lensAddPhotoButton: {
     flex: "0 0 auto",
