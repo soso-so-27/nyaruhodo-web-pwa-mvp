@@ -31,6 +31,7 @@ import {
   type OnboardingProgress,
   type OnboardingSource,
 } from "../../lib/onboarding/progress";
+import { consumeOnboardingTestResetRequest } from "../../lib/onboarding/testReset";
 import { trackProductEvent } from "../../lib/analytics/productAnalytics";
 import { resizeImageFileToDataUrl } from "../../lib/imageResize";
 import { isUsablePhotoSrc } from "../../lib/photoStorage";
@@ -209,10 +210,20 @@ export function OnboardingFlow() {
       return;
     }
 
+    const didReset = consumeOnboardingTestResetRequest();
     const source = readOnboardingSourceFromLocation();
     setEntrySource(source);
     entrySourceRef.current = source;
     hasResolvedProgressRef.current = true;
+    if (didReset) {
+      setSelectedPhotoSrc("");
+      setDeliveredPhoto(null);
+      setPendingOwnPhoto(null);
+      setIsDeliveredPhotoKept(false);
+      setCompletionCopy("");
+      setState("intro");
+      setMessage("テスト用に、この端末のオンボーディング状態をリセットしました。");
+    }
     resolveOnboardingProgress(source);
   }, []);
 

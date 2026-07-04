@@ -604,6 +604,77 @@ test.describe("onboarding delivery flow", () => {
     await expect(page.getByText("アプリでつづける")).toHaveCount(0);
   });
 
+  test("resets local onboarding test data from an explicit reset link", async ({
+    page,
+  }) => {
+    await page.goto("/onboarding");
+    await page.evaluate(() => {
+      window.localStorage.setItem("onboarding_completed", "true");
+      window.localStorage.setItem(
+        "neteruneko_onboarding_progress",
+        JSON.stringify({
+          version: 1,
+          anonymousId: "anonymous-reset-e2e",
+          dateKey: "2026-07-04",
+          stage: "opened",
+          source: "referral",
+          submissionId: "onboarding:anonymous-reset-e2e:2026-07-04",
+          updatedAt: Date.now(),
+        }),
+      );
+      window.localStorage.setItem(
+        "nyaruhodo_exchange_own_sleeping_photos",
+        JSON.stringify([
+          { id: "onboarding-old", catId: "cat-old", src: "data:image/png;base64,AA==" },
+        ]),
+      );
+      window.localStorage.setItem(
+        "nyaruhodo_exchange_kept_photos",
+        JSON.stringify([{ id: "kept-old", src: "data:image/png;base64,AA==" }]),
+      );
+      window.localStorage.setItem("cat_profiles", JSON.stringify([{ id: "cat-old" }]));
+      window.localStorage.setItem("active_cat_id", "cat-old");
+      window.localStorage.setItem(
+        "record_log_cat-old",
+        JSON.stringify([{ id: "log-old" }]),
+      );
+      window.sessionStorage.setItem(
+        "neteruneko_onboarding_album_completion_ready",
+        "true",
+      );
+    });
+
+    await page.goto("/onboarding?ref=ABC234&reset_onboarding=1");
+    await expect(
+      page.getByText("テスト用に、この端末のオンボーディング状態をリセットしました。"),
+    ).toBeVisible();
+    await expect(page).toHaveURL(/\/onboarding\?ref=ABC234$/);
+
+    const storage = await page.evaluate(() => ({
+      completed: window.localStorage.getItem("onboarding_completed"),
+      progress: window.localStorage.getItem("neteruneko_onboarding_progress"),
+      ownPhotos: window.localStorage.getItem("nyaruhodo_exchange_own_sleeping_photos"),
+      keptPhotos: window.localStorage.getItem("nyaruhodo_exchange_kept_photos"),
+      profiles: window.localStorage.getItem("cat_profiles"),
+      activeCatId: window.localStorage.getItem("active_cat_id"),
+      recordLog: window.localStorage.getItem("record_log_cat-old"),
+      pendingReferral: window.localStorage.getItem("neteruneko_pending_referral_code"),
+      sessionReady: window.sessionStorage.getItem(
+        "neteruneko_onboarding_album_completion_ready",
+      ),
+    }));
+
+    expect(storage.completed).toBeNull();
+    expect(storage.progress).toBeNull();
+    expect(storage.ownPhotos).toBeNull();
+    expect(storage.keptPhotos).toBeNull();
+    expect(storage.profiles).toBeNull();
+    expect(storage.activeCatId).toBeNull();
+    expect(storage.recordLog).toBeNull();
+    expect(storage.sessionReady).toBeNull();
+    expect(storage.pendingReferral).toContain("ABC234");
+  });
+
   test("does not keep referral links for users who already completed onboarding", async ({
     page,
   }) => {
