@@ -45,6 +45,7 @@ import {
   type CatMomentForCat,
 } from "../../lib/supabase/catMomentCats";
 import { createBrowserSupabaseClient } from "../../lib/supabase/browser";
+import { getStoragePhotoPath } from "../../lib/photoStorage";
 import {
   markOmoideMemoryOpened,
   readOmoideMemoriesForCat,
@@ -839,7 +840,7 @@ export function CatsPage() {
     }
   }
 
-  function updateActiveCatThumbnail(photoSrc: string | undefined) {
+  async function updateActiveCatThumbnail(photoSrc: string | undefined) {
     if (!activeCatId) {
       return;
     }
@@ -869,7 +870,13 @@ export function CatsPage() {
 
     saveCatProfiles(nextProfiles);
     setCatProfiles(nextProfiles);
+    const remoteSaveResult = await saveRemoteCatProfile(nextProfile);
     setSaveMessage(photoSrc ? "サムネイルを変えました。" : "自動表示に戻しました。");
+    if (remoteSaveResult.status === "error") {
+      setSaveMessage(
+        "この端末には保存しました。Google連携への反映はあとでやり直します。",
+      );
+    }
     setTimeout(() => setSaveMessage(""), 2000);
   }
 
@@ -910,7 +917,7 @@ export function CatsPage() {
           setTimeout(() => setSaveMessage(""), 2400);
           return;
         }
-        updateActiveCatThumbnail(photoSrc);
+        void updateActiveCatThumbnail(photoSrc);
         setIsThumbnailPickerOpen(false);
       } catch {
         setSaveMessage("代表写真を保存できませんでした。");
@@ -2032,14 +2039,14 @@ export function CatsPage() {
           photos={activeCatLensPhotos}
           hasCustomThumbnail={hasCustomThumbnail}
           onPickPhoto={(photo) => {
-            updateActiveCatThumbnail(photo.src);
+            void updateActiveCatThumbnail(getLensPhotoDetailSrc(photo));
             setIsThumbnailPickerOpen(false);
           }}
           onUpload={() => {
             void handleAvatarUpload();
           }}
           onReset={() => {
-            updateActiveCatThumbnail(undefined);
+            void updateActiveCatThumbnail(undefined);
             setIsThumbnailPickerOpen(false);
           }}
           onClose={() => setIsThumbnailPickerOpen(false)}
@@ -4068,6 +4075,9 @@ async function saveRemoteCatProfile(
     name: profile.name,
     basic_info: toJsonObject(profile.basicInfo),
     appearance: toJsonObject(profile.appearance),
+    avatar_storage_path: profile.avatarDataUrl
+      ? getStoragePhotoPath(profile.avatarDataUrl)
+      : null,
     local_created_at: profile.createdAt,
     local_updated_at: profile.updatedAt,
   };
