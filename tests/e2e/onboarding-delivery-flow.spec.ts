@@ -555,6 +555,52 @@ test.describe("onboarding delivery flow", () => {
     });
   });
 
+  test("starts onboarding from referral links for new users", async ({
+    page,
+  }) => {
+    await page.addInitScript(() => {
+      window.localStorage.removeItem("onboarding_completed");
+      window.localStorage.removeItem("neteruneko_onboarding_progress");
+      window.localStorage.removeItem("neteruneko_pending_referral_code");
+    });
+
+    await page.goto("/onboarding?source=referral&ref=ABC234");
+    await expect(
+      page.getByRole("button", { name: "ねがおを1枚入れる" }),
+    ).toBeVisible();
+    await expect
+      .poll(() =>
+        page.evaluate(() => {
+          const raw = window.localStorage.getItem("neteruneko_pending_referral_code");
+          const parsed = raw ? JSON.parse(raw) : null;
+          return parsed?.code ?? "";
+        }),
+      )
+      .toBe("ABC234");
+  });
+
+  test("does not keep referral links for users who already completed onboarding", async ({
+    page,
+  }) => {
+    await page.addInitScript(() => {
+      window.localStorage.setItem("onboarding_completed", "true");
+      window.localStorage.setItem(
+        "neteruneko_pending_referral_code",
+        JSON.stringify({ code: "OLD234", capturedAt: new Date().toISOString() }),
+      );
+    });
+
+    await page.goto("/onboarding?source=referral&ref=ABC234");
+    await expect(page).toHaveURL(/\/home/);
+    await expect
+      .poll(() =>
+        page.evaluate(() =>
+          window.localStorage.getItem("neteruneko_pending_referral_code"),
+        ),
+      )
+      .toBeNull();
+  });
+
   test("skips the name entry for an existing named cat", async ({ page }) => {
     await seedOnboardingAlbumCompletionReady(page);
     await seedCatProfileBeforeLoad(page, {

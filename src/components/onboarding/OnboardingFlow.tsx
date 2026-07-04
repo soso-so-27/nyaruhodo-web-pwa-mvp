@@ -87,7 +87,9 @@ export function OnboardingFlow() {
   const [isCandidateAdding, setIsCandidateAdding] = useState(false);
   const [isTestMode, setIsTestMode] = useState(false);
   const [completionCopy, setCompletionCopy] = useState("");
-  const [entrySource, setEntrySource] = useState<OnboardingSource>("direct");
+  const [entrySource, setEntrySource] = useState<OnboardingSource>(
+    readOnboardingSourceFromLocation,
+  );
   const [isOpeningEnvelope, setIsOpeningEnvelope] = useState(false);
   const [catNameDraft, setCatNameDraft] = useState("");
   const prefersReducedMotion = usePrefersReducedMotion();
@@ -101,11 +103,43 @@ export function OnboardingFlow() {
   const revealPhotoLoadedTrackedRef = useRef("");
   const revealPhotoErrorTrackedRef = useRef("");
   const catNamePromptTrackedPhotoRef = useRef("");
-  const entrySourceRef = useRef<OnboardingSource>("direct");
+  const entrySourceRef = useRef<OnboardingSource>(entrySource);
   const canShowTestTools = isTestMode && !IS_PRODUCTION;
 
   function markOnboardingAlbumCompletionReady() {
     window.sessionStorage.setItem(ONBOARDING_ALBUM_COMPLETION_READY_KEY, "true");
+  }
+
+  function getEffectiveEntrySource() {
+    const currentSource = entrySourceRef.current;
+
+    if (hasReferralQueryInLocation()) {
+      entrySourceRef.current = "referral";
+      setEntrySource("referral");
+      return "referral";
+    }
+
+    if (currentSource !== "direct") {
+      return currentSource;
+    }
+
+    if (readOnboardingSourceFromLocation() === "referral") {
+      entrySourceRef.current = "referral";
+      setEntrySource("referral");
+      return "referral";
+    }
+
+    try {
+      if (window.localStorage.getItem(STORAGE_KEYS.pendingReferralCode)) {
+        entrySourceRef.current = "referral";
+        setEntrySource("referral");
+        return "referral";
+      }
+    } catch {
+      // Source correction is best-effort only.
+    }
+
+    return currentSource;
   }
 
   useEffect(() => {
@@ -188,7 +222,7 @@ export function OnboardingFlow() {
     }
 
     if (
-      source === "direct" &&
+      (source === "direct" || source === "referral") &&
       window.localStorage.getItem(STORAGE_KEYS.onboardingCompleted) === "true"
     ) {
       router.replace("/home");
@@ -306,7 +340,7 @@ export function OnboardingFlow() {
 
     const restored = restoreExistingProgress(
       readCurrentOnboardingProgress(),
-      entrySourceRef.current,
+      getEffectiveEntrySource(),
     );
 
     if (restored) {
@@ -314,10 +348,10 @@ export function OnboardingFlow() {
     }
 
     trackProductEvent("onboarding_submit_photo_click", {
-      source: entrySourceRef.current,
+      source: getEffectiveEntrySource(),
     });
     trackProductEvent("onboarding_photo_select_click", {
-      source: entrySourceRef.current,
+      source: getEffectiveEntrySource(),
     });
 
     const input = document.createElement("input");
@@ -382,7 +416,7 @@ export function OnboardingFlow() {
           anonymousId,
           dateKey: onboardingDateKey,
           stage: "submitted",
-          source: entrySourceRef.current,
+          source: getEffectiveEntrySource(),
           submissionId,
           ownPhoto,
           selectedPhotoSrc: dataUrl,
@@ -397,13 +431,13 @@ export function OnboardingFlow() {
         });
         trackProductEvent("onboarding_photo_submitted", {
           catId,
-          source: entrySourceRef.current,
+          source: getEffectiveEntrySource(),
           submission_id: submissionId,
           delivery_date_key: eveningTarget.dateKey,
         });
         trackProductEvent("photo_submitted", {
           catId,
-          source: entrySourceRef.current,
+          source: getEffectiveEntrySource(),
           surface: "onboarding",
           submission_id: submissionId,
           delivery_date_key: eveningTarget.dateKey,
@@ -431,7 +465,7 @@ export function OnboardingFlow() {
         }
       } catch (error) {
         trackProductEvent("photo_upload_error", {
-          source: entrySourceRef.current,
+          source: getEffectiveEntrySource(),
           surface: "onboarding",
           error_code: "onboarding_photo_save_failed",
           error_message:
@@ -463,7 +497,7 @@ export function OnboardingFlow() {
 
     catNamePromptTrackedPhotoRef.current = key;
     trackProductEvent("cat_name_prompt_view", {
-      source: entrySourceRef.current,
+      source: getEffectiveEntrySource(),
       surface: "onboarding",
     });
   }
@@ -496,19 +530,19 @@ export function OnboardingFlow() {
     if (nextName) {
       updateCatProfileName(readCatProfiles(), ownPhoto.ownerCatId, nextName);
       trackProductEvent("cat_name_entered", {
-        source: entrySourceRef.current,
+        source: getEffectiveEntrySource(),
         surface: "onboarding",
       });
     } else {
       trackProductEvent("cat_name_skipped", {
-        source: entrySourceRef.current,
+        source: getEffectiveEntrySource(),
         surface: "onboarding",
       });
     }
 
     patchOnboardingProgress({
       stage: "opened",
-      source: entrySourceRef.current,
+      source: getEffectiveEntrySource(),
       ownPhoto,
       selectedPhotoSrc: selectedPhotoSrcForProgress,
       deliveredPhoto: deliveredPhoto ?? progress?.deliveredPhoto,
@@ -516,7 +550,7 @@ export function OnboardingFlow() {
     });
     markOnboardingAlbumCompletionReady();
     router.push(
-      `/account/create?from=onboarding&source=${encodeURIComponent(entrySourceRef.current)}`,
+      `/account/create?from=onboarding&source=${encodeURIComponent(getEffectiveEntrySource())}`,
     );
   }
 
@@ -535,7 +569,7 @@ export function OnboardingFlow() {
     if (ownPhoto && isCatProfileNameUnset(activeProfile)) {
       patchOnboardingProgress({
         stage: "name_pending",
-        source: entrySourceRef.current,
+        source: getEffectiveEntrySource(),
         ownPhoto,
         selectedPhotoSrc: selectedPhotoSrc || progress?.selectedPhotoSrc,
         deliveredPhoto: deliveredPhoto ?? progress?.deliveredPhoto,
@@ -549,7 +583,7 @@ export function OnboardingFlow() {
 
     markOnboardingAlbumCompletionReady();
     router.push(
-      `/account/create?from=onboarding&source=${encodeURIComponent(entrySourceRef.current)}`,
+      `/account/create?from=onboarding&source=${encodeURIComponent(getEffectiveEntrySource())}`,
     );
   }
 
@@ -561,7 +595,7 @@ export function OnboardingFlow() {
     const keepResult = await keepExchangePhotoForAlbum(deliveredPhoto);
     setDeliveredPhoto(keepResult.photo);
     trackProductEvent("onboarding_delivered_photo_confirmed", {
-      source: entrySourceRef.current,
+      source: getEffectiveEntrySource(),
       source_photo_id: keepResult.photo.sourcePhotoId ?? null,
       saved_to_album: keepResult.saved,
       test_mode: canShowTestTools,
@@ -575,7 +609,7 @@ export function OnboardingFlow() {
     setIsDeliveredPhotoKept(true);
     patchOnboardingProgress({
       stage: "opened",
-      source: entrySourceRef.current,
+      source: getEffectiveEntrySource(),
       deliveredPhoto: keepResult.photo,
       isDeliveredPhotoKept: keepResult.saved,
       completionCopy: getEveningDeliveryCompletionCopy(),
@@ -589,7 +623,7 @@ export function OnboardingFlow() {
       window.localStorage.setItem(STORAGE_KEYS.onboardingCompleted, "true");
       setCompletionCopy(getEveningDeliveryCompletionCopy());
       trackProductEvent("onboarding_completed", {
-        source: entrySourceRef.current,
+        source: getEffectiveEntrySource(),
         method: "delivery_kept",
         photo_id: keepResult.photo.id,
         delivery_photo_id: keepResult.photo.id,
@@ -644,13 +678,13 @@ export function OnboardingFlow() {
       photo_id: deliveredPhoto.id,
     });
     trackProductEvent("onboarding_delivery_opened", {
-      source: entrySourceRef.current,
+      source: getEffectiveEntrySource(),
       photo_id: deliveredPhoto.id,
       delivery_photo_id: deliveredPhoto.id,
     });
     patchOnboardingProgress({
       stage: "opened",
-      source: entrySourceRef.current,
+      source: getEffectiveEntrySource(),
       deliveredPhoto,
       isDeliveredPhotoKept,
     });
@@ -693,7 +727,7 @@ export function OnboardingFlow() {
     trackProductEvent(name, {
       latency_ms: Math.max(0, Math.round(latencyMs)),
       route: "/onboarding",
-      source: entrySourceRef.current,
+      source: getEffectiveEntrySource(),
       surface: "onboarding",
       reduced_motion: prefersReducedMotion,
     });
@@ -795,7 +829,7 @@ export function OnboardingFlow() {
     }
     patchOnboardingProgress({
       stage: "arrived",
-      source: entrySourceRef.current,
+      source: getEffectiveEntrySource(),
       dateKey: deliveryDateKey ?? undefined,
       submissionId: submissionId ?? undefined,
       ownPhoto,
@@ -804,12 +838,12 @@ export function OnboardingFlow() {
       isDeliveredPhotoKept: false,
     });
     trackProductEvent("onboarding_delivery_ready", {
-      source: entrySourceRef.current,
+      source: getEffectiveEntrySource(),
       delivery_source: deliverySource,
       photo_id: nextPhoto.id,
     });
     trackProductEvent("onboarding_delivery_arrived", {
-      source: entrySourceRef.current,
+      source: getEffectiveEntrySource(),
       delivery_source: deliverySource,
       photo_id: nextPhoto.id,
       delivery_photo_id: nextPhoto.id,
@@ -914,12 +948,12 @@ export function OnboardingFlow() {
 
   function handleGoHome() {
     trackProductEvent("onboarding_skip", {
-      source: entrySourceRef.current,
+      source: getEffectiveEntrySource(),
       state,
       test_mode: canShowTestTools,
     });
     trackProductEvent("onboarding_skip_click", {
-      source: entrySourceRef.current,
+      source: getEffectiveEntrySource(),
       state,
       test_mode: canShowTestTools,
     });
@@ -1308,9 +1342,26 @@ function usePrefersReducedMotion() {
 }
 
 function readOnboardingSourceFromLocation() {
+  if (typeof window === "undefined") {
+    return "direct" satisfies OnboardingSource;
+  }
+
+  if (hasReferralQueryInLocation()) {
+    return "referral" satisfies OnboardingSource;
+  }
+
   return normalizeOnboardingSource(
     new URLSearchParams(window.location.search).get("source"),
   );
+}
+
+function hasReferralQueryInLocation() {
+  if (typeof window === "undefined") {
+    return false;
+  }
+
+  const params = new URLSearchParams(window.location.search);
+  return params.has("ref") || params.has("referral") || params.has("invite");
 }
 
 async function createOnboardingFallbackDeliveryPhoto(

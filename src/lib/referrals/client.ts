@@ -28,6 +28,15 @@ export function capturePendingReferralFromLocation() {
     return null;
   }
 
+  if (window.localStorage.getItem(STORAGE_KEYS.onboardingCompleted) === "true") {
+    window.localStorage.removeItem(STORAGE_KEYS.pendingReferralCode);
+    trackProductEvent("referral_link_ignored", {
+      code,
+      reason: "onboarding_completed",
+    });
+    return null;
+  }
+
   window.localStorage.setItem(
     STORAGE_KEYS.pendingReferralCode,
     JSON.stringify({

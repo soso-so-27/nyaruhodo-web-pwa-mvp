@@ -59,7 +59,7 @@ export async function GET(request: Request) {
     isLoggedIn: true,
     referralEnabled: true,
     code: summary.code,
-    shareUrl: `${baseUrl}/?ref=${encodeURIComponent(summary.code)}`,
+    shareUrl: `${baseUrl}/onboarding?source=referral&ref=${encodeURIComponent(summary.code)}`,
     acceptedCount: summary.acceptedCount,
   });
 }

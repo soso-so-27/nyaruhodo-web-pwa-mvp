@@ -15,6 +15,7 @@ export type OnboardingSource =
   | "instagram_story"
   | "instagram_bio"
   | "instagram_dm"
+  | "referral"
   | "unknown";
 
 export type OnboardingProgressStage =
@@ -45,6 +46,7 @@ const ALLOWED_SOURCES = new Set<OnboardingSource>([
   "instagram_story",
   "instagram_bio",
   "instagram_dm",
+  "referral",
 ]);
 
 export function normalizeOnboardingSource(value: string | null) {
