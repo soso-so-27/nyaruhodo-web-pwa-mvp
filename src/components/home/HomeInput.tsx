@@ -8,6 +8,7 @@ import {
   syncLocalDataWithAccount,
 } from "../../lib/accountSync";
 import { trackProductEvent } from "../../lib/analytics/productAnalytics";
+import { resizeImageFileToDataUrl } from "../../lib/imageResize";
 import {
   acknowledgeCatGalleryIntro,
   CAT_GALLERY_PHOTO_LIMIT,
@@ -5226,40 +5227,7 @@ function resizeAndEncode(
 ): Promise<string> {
   assertSupportedSourceImage(file);
 
-  return new Promise((resolve, reject) => {
-    const img = new Image();
-    const url = URL.createObjectURL(file);
-
-    img.onload = () => {
-      const scale = Math.min(1, maxSize / Math.max(img.width, img.height));
-      const canvas = document.createElement("canvas");
-      canvas.width = Math.round(img.width * scale);
-      canvas.height = Math.round(img.height * scale);
-      const ctx = canvas.getContext("2d");
-
-      if (!ctx) {
-        URL.revokeObjectURL(url);
-        reject(new Error("Canvas is not available"));
-        return;
-      }
-
-      ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-      URL.revokeObjectURL(url);
-      const encoded = canvas.toDataURL(mimeType, quality);
-      resolve(
-        encoded.startsWith(`data:${mimeType};`)
-          ? encoded
-          : canvas.toDataURL("image/jpeg", quality),
-      );
-    };
-
-    img.onerror = () => {
-      URL.revokeObjectURL(url);
-      reject(new Error("Image load failed"));
-    };
-
-    img.src = url;
-  });
+  return resizeImageFileToDataUrl(file, maxSize, quality, mimeType);
 }
 
 function assertSupportedSourceImage(file: File) {

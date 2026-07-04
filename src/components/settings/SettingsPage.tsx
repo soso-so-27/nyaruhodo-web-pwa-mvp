@@ -12,6 +12,7 @@ import {
   type ClientAdminCapabilities,
 } from "../../lib/adminCapabilitiesClient";
 import { trackProductEvent } from "../../lib/analytics/productAnalytics";
+import { resizeImageFileToDataUrl } from "../../lib/imageResize";
 import {
   readClientBetaCapabilities,
   sendBetaFeedback,
@@ -1341,36 +1342,7 @@ function resizeAndEncode(
   maxSize = 800,
   quality = 0.82,
 ): Promise<string> {
-  return new Promise((resolve, reject) => {
-    const image = new Image();
-    const url = URL.createObjectURL(file);
-
-    image.onload = () => {
-      const scale = Math.min(1, maxSize / Math.max(image.width, image.height));
-      const canvas = document.createElement("canvas");
-
-      canvas.width = Math.max(1, Math.round(image.width * scale));
-      canvas.height = Math.max(1, Math.round(image.height * scale));
-
-      const context = canvas.getContext("2d");
-      if (!context) {
-        URL.revokeObjectURL(url);
-        reject(new Error("Canvas context unavailable"));
-        return;
-      }
-
-      context.drawImage(image, 0, 0, canvas.width, canvas.height);
-      URL.revokeObjectURL(url);
-      resolve(canvas.toDataURL("image/jpeg", quality));
-    };
-
-    image.onerror = () => {
-      URL.revokeObjectURL(url);
-      reject(new Error("Image load failed"));
-    };
-
-    image.src = url;
-  });
+  return resizeImageFileToDataUrl(file, maxSize, quality);
 }
 
 async function saveStockPhotoWithFallback(file: File) {

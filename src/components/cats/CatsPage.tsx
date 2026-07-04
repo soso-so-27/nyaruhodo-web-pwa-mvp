@@ -3,6 +3,7 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import type { CSSProperties } from "react";
 import { trackProductEvent } from "../../lib/analytics/productAnalytics";
+import { resizeImageFileToDataUrl } from "../../lib/imageResize";
 import {
   clearAccountCatAvatar,
   deleteAccountCatGalleryPhoto,
@@ -4570,37 +4571,9 @@ function resizeAndEncode(
   quality = 0.85,
   mimeType = "image/jpeg",
 ): Promise<string> {
-  return new Promise((resolve) => {
-    const img = new Image();
-    const url = URL.createObjectURL(file);
-
-    img.onload = () => {
-      const scale = Math.min(1, maxSize / Math.max(img.width, img.height));
-      const canvas = document.createElement("canvas");
-
-      canvas.width = Math.round(img.width * scale);
-      canvas.height = Math.round(img.height * scale);
-
-      const context = canvas.getContext("2d");
-
-      if (!context) {
-        URL.revokeObjectURL(url);
-        resolve("");
-        return;
-      }
-
-      context.drawImage(img, 0, 0, canvas.width, canvas.height);
-      URL.revokeObjectURL(url);
-      const encoded = canvas.toDataURL(mimeType, quality);
-      resolve(
-        encoded.startsWith(`data:${mimeType};`)
-          ? encoded
-          : canvas.toDataURL("image/jpeg", quality),
-      );
-    };
-
-    img.src = url;
-  });
+  return resizeImageFileToDataUrl(file, maxSize, quality, mimeType).catch(
+    () => "",
+  );
 }
 
 function assertSupportedSourceImage(file: File) {
