@@ -225,109 +225,66 @@ export default function AccountCreatePage() {
     );
   }, []);
 
-  useEffect(() => {
-    if (isCheckingAccount || isAccountConnected) {
-      return;
-    }
-
-    const fromOnboarding =
-      new URLSearchParams(window.location.search).get("from") === "onboarding";
-
-    if (!GOOGLE_CLIENT_ID) {
-      if (!fromOnboarding) {
-        setMessage("Googleログインを準備できませんでした。少し時間をおいてもう一度お試しください。");
-      }
-      return;
-    }
-
-    let isCancelled = false;
-
-    async function setupGoogleButton() {
-      try {
-        await loadGoogleIdentityScript();
-
-        if (
-          isCancelled ||
-          hasInitializedGoogleButton.current ||
-          !googleButtonRef.current ||
-          !window.google?.accounts?.id
-        ) {
-          return;
-        }
-
-        hasInitializedGoogleButton.current = true;
-        window.google.accounts.id.initialize({
-          client_id: GOOGLE_CLIENT_ID,
-          callback: (response) => {
-            void handleGoogleCredential(response);
-          },
-          use_fedcm_for_prompt: true,
-        });
-        window.google.accounts.id.renderButton(googleButtonRef.current, {
-          theme: "outline",
-          size: "large",
-          shape: "pill",
-          text: "continue_with",
-          width: 320,
-          locale: "ja",
-        });
-      } catch (error) {
-        const message =
-          error instanceof Error ? error.message : "Google script load failed";
-
-        writeAuthDebugEvent("gis_script_failed", { message });
-        setMessage("Googleログインの読み込みに失敗しました。もう一度お試しください。");
-      }
-    }
-
-    void setupGoogleButton();
-
-    return () => {
-      isCancelled = true;
-    };
-  }, [isAccountConnected, isCheckingAccount]);
-
   async function handleGoogleSignIn() {
     if (isFromOnboarding) {
       trackProductEvent("onboarding_google_continue_click", {
         source: onboardingSource,
-        method: "google_prompt",
+        method: "oauth_redirect",
       });
     }
 
-    if (!GOOGLE_CLIENT_ID) {
-      if (!isFromOnboarding) {
-        setMessage("Googleログインを準備できませんでした。少し時間をおいてもう一度お試しください。");
-      }
+    const supabase = createBrowserSupabaseClient();
+
+    if (!supabase) {
+      setMessage("アカウント接続の準備がまだできていません。");
       return;
     }
 
-    try {
-      await loadGoogleIdentityScript();
+    setIsStartingAuth(true);
+    setMessage("");
+    window.localStorage.setItem(
+      STORAGE_KEYS.authGooglePending,
+      JSON.stringify({
+        provider: "google",
+        route: "/account/create",
+        method: "oauth_redirect",
+        startedAt: new Date().toISOString(),
+      }),
+    );
+    trackProductEvent("auth_google_started", {
+      route: "/account/create",
+      method: "oauth_redirect",
+    });
 
-      if (!window.google?.accounts?.id) {
-        setMessage("Googleログインを読み込めませんでした。もう一度お試しください。");
-        return;
-      }
+    const redirectTo = createAuthCallbackUrl({
+      nextPath: isFromOnboarding
+        ? `/account/create?from=onboarding&source=${encodeURIComponent(
+            onboardingSource,
+          )}`
+        : "/home",
+    });
 
-      if (!hasInitializedGoogleButton.current) {
-        hasInitializedGoogleButton.current = true;
-        window.google.accounts.id.initialize({
-          client_id: GOOGLE_CLIENT_ID,
-          callback: (response) => {
-            void handleGoogleCredential(response);
-          },
-          use_fedcm_for_prompt: true,
-        });
-      }
+    const { error } = await supabase.auth.signInWithOAuth({
+      provider: "google",
+      options: {
+        redirectTo,
+        queryParams: {
+          prompt: "select_account",
+        },
+      },
+    });
 
-      window.google.accounts.id.prompt();
-    } catch (error) {
-      const message =
-        error instanceof Error ? error.message : "Google script load failed";
-
-      writeAuthDebugEvent("gis_prompt_failed", { message });
-      setMessage("Googleログインの読み込みに失敗しました。もう一度お試しください。");
+    if (error) {
+      writeAuthDebugEvent("oauth_redirect_failed", {
+        message: error.message,
+      });
+      trackProductEvent("auth_google_failed", {
+        error_type: "oauth_redirect_failed",
+        error_message: error.message,
+      });
+      window.localStorage.removeItem(STORAGE_KEYS.authGooglePending);
+      setIsStartingAuth(false);
+      setMessage("Googleログインを開始できませんでした。少し時間をおいてもう一度お試しください。");
     }
   }
 
@@ -700,6 +657,15 @@ function readOnboardingSourceFromLocation() {
   return normalizeOnboardingSource(
     new URLSearchParams(window.location.search).get("source"),
   );
+}
+
+function createAuthCallbackUrl({ nextPath }: { nextPath: string }) {
+  const origin =
+    typeof window === "undefined" ? "" : window.location.origin;
+  const callbackUrl = new URL("/auth/callback", origin);
+
+  callbackUrl.searchParams.set("next", nextPath);
+  return callbackUrl.toString();
 }
 
 function EnvironmentNotice({

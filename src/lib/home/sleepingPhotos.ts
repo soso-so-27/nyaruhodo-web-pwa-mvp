@@ -73,6 +73,7 @@ export type OwnSleepingPhoto = CatMoment & {
   theme: string;
   shared: boolean;
   createdAt: number;
+  captureContext?: "daily" | "onboarding";
 };
 
 export const CAT_SLEEPING_MILESTONE_TARGETS = [1, 10, 50, 100] as const;
@@ -139,7 +140,7 @@ const CAT_SLEEPING_MILESTONES_STORAGE_KEY =
   "neteruneko_cat_sleeping_milestones";
 
 export function readOwnSleepingPhotos(activeCatId: string | null = null) {
-  const photos = readAllOwnSleepingPhotos();
+  const photos = readAllOwnSleepingPhotos().filter(isRegularOwnSleepingPhoto);
 
   const activeCatPhotos = activeCatId
     ? photos.filter((photo) => photo.ownerCatId === activeCatId)
@@ -154,6 +155,17 @@ export function readAllOwnSleepingPhotos() {
     .map(normalizeOwnSleepingPhoto);
 }
 
+export function isOnboardingOwnSleepingPhoto(
+  photo: Pick<OwnSleepingPhoto, "id"> &
+    Partial<Pick<OwnSleepingPhoto, "captureContext">>,
+) {
+  return photo.captureContext === "onboarding" || isOnboardingOwnSleepingPhotoId(photo.id);
+}
+
+function isRegularOwnSleepingPhoto(photo: OwnSleepingPhoto) {
+  return !isOnboardingOwnSleepingPhoto(photo);
+}
+
 export function readOwnSleepingPhotoCount(activeCatId: string | null) {
   const photos = readAllOwnSleepingPhotos();
 
@@ -162,12 +174,29 @@ export function readOwnSleepingPhotoCount(activeCatId: string | null) {
   }
 
   const stats = readCatSleepingStats();
+  const onboardingCountByCat = photos.reduce<Record<string, number>>(
+    (counts, photo) => {
+      if (isOnboardingOwnSleepingPhoto(photo)) {
+        const catId = photo.ownerCatId ?? photo.catId;
+        counts[catId] = (counts[catId] ?? 0) + 1;
+      }
+      return counts;
+    },
+    {},
+  );
   const statTotal = Object.values(stats).reduce(
     (total, stat) => total + Math.max(0, stat.takenCount ?? 0),
     0,
   );
+  const onboardingTotal = Object.values(onboardingCountByCat).reduce(
+    (total, count) => total + count,
+    0,
+  );
 
-  return Math.max(statTotal, photos.length);
+  return Math.max(
+    Math.max(0, statTotal - onboardingTotal),
+    photos.filter(isRegularOwnSleepingPhoto).length,
+  );
 }
 
 export function readCatSleepingMilestones(
@@ -180,17 +209,23 @@ export function readCatSleepingMilestones(
   const stored = readCatSleepingMilestoneStore()[activeCatId] ?? [];
   const byTarget = new Map<CatSleepingMilestoneTarget, CatSleepingMilestone>();
 
-  for (const milestone of stored) {
-    if (isValidCatSleepingMilestone(milestone)) {
-      byTarget.set(milestone.target, milestone);
-    }
-  }
-
   const photos = readStorageArray<OwnSleepingPhoto>(OWN_SLEEPING_PHOTO_STORAGE_KEY)
     .filter(isValidOwnSleepingPhoto)
     .map(normalizeOwnSleepingPhoto)
+    .filter(isRegularOwnSleepingPhoto)
     .filter((photo) => photo.ownerCatId === activeCatId)
     .sort((a, b) => a.createdAt - b.createdAt);
+  const regularPhotoIds = new Set(photos.map((photo) => photo.id));
+
+  for (const milestone of stored) {
+    if (
+      isValidCatSleepingMilestone(milestone) &&
+      !isOnboardingOwnSleepingPhotoId(milestone.photoId) &&
+      (regularPhotoIds.size === 0 || regularPhotoIds.has(milestone.photoId))
+    ) {
+      byTarget.set(milestone.target, milestone);
+    }
+  }
 
   for (const target of CAT_SLEEPING_MILESTONE_TARGETS) {
     if (byTarget.has(target)) {
@@ -258,7 +293,10 @@ export function restoreSyncedSleepingPhotos({
 }
 
 function getValidOwnSleepingPhotoCount(photos: OwnSleepingPhoto[]) {
-  return photos.filter(isValidOwnSleepingPhoto).length;
+  return photos
+    .filter(isValidOwnSleepingPhoto)
+    .map(normalizeOwnSleepingPhoto)
+    .filter(isRegularOwnSleepingPhoto).length;
 }
 
 type CatSleepingStatsStore = Record<string, { takenCount: number }>;
@@ -270,11 +308,21 @@ function getOwnSleepingPhotoCountForCat(
 ) {
   const storedCount =
     readCatSleepingStats()[activeCatId]?.takenCount ?? 0;
-  const visibleCount = photos.filter(
-    (photo) => photo.ownerCatId === activeCatId,
+  const normalizedPhotos = photos
+    .filter(isValidOwnSleepingPhoto)
+    .map(normalizeOwnSleepingPhoto);
+  const onboardingCount = normalizedPhotos.filter(
+    (photo) =>
+      (photo.ownerCatId ?? photo.catId) === activeCatId &&
+      isOnboardingOwnSleepingPhoto(photo),
+  ).length;
+  const visibleCount = normalizedPhotos.filter(
+    (photo) =>
+      (photo.ownerCatId ?? photo.catId) === activeCatId &&
+      isRegularOwnSleepingPhoto(photo),
   ).length;
 
-  return Math.max(storedCount, visibleCount);
+  return Math.max(Math.max(0, storedCount - onboardingCount), visibleCount);
 }
 
 function recordOwnSleepingPhotoTaken(
@@ -448,6 +496,7 @@ export function saveOwnSleepingPhoto({
   triggerLabel,
   theme,
   shared,
+  captureContext = "daily",
   minRetainedCount = 1,
 }: {
   catId: string;
@@ -458,6 +507,7 @@ export function saveOwnSleepingPhoto({
   triggerLabel: string;
   theme: string;
   shared: boolean;
+  captureContext?: OwnSleepingPhoto["captureContext"];
   minRetainedCount?: number;
 }) {
   if (!isUsablePhotoSrc(src)) {
@@ -488,6 +538,7 @@ export function saveOwnSleepingPhoto({
       theme,
       shared,
       createdAt,
+      captureContext,
     };
     const normalizedOwnPhoto = normalizeOwnSleepingPhoto(ownPhoto);
     const nextPhotos = [normalizedOwnPhoto, ...saved];
@@ -499,7 +550,9 @@ export function saveOwnSleepingPhoto({
     );
 
     if (savedPhotos.some((photo) => photo.id === normalizedOwnPhoto.id)) {
-      recordOwnSleepingPhotoTaken(normalizedOwnPhoto, previousTakenCount + 1);
+      if (isRegularOwnSleepingPhoto(normalizedOwnPhoto)) {
+        recordOwnSleepingPhotoTaken(normalizedOwnPhoto, previousTakenCount + 1);
+      }
       dispatchBoxPhotoStorageEvent();
         return normalizedOwnPhoto;
     }
@@ -1106,7 +1159,12 @@ function normalizeOwnSleepingPhoto(photo: OwnSleepingPhoto): OwnSleepingPhoto {
     shared,
     createdAt: photo.createdAt ?? Date.now(),
     sourceMomentId: photo.sourceMomentId,
+    captureContext: photo.captureContext === "onboarding" ? "onboarding" : "daily",
   };
+}
+
+function isOnboardingOwnSleepingPhotoId(id: string | undefined) {
+  return typeof id === "string" && id.startsWith("onboarding-");
 }
 
 function isValidExchangePhoto(photo: Partial<ExchangePhoto>) {

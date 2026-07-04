@@ -72,7 +72,6 @@ import {
   BOX_PHOTO_STORAGE_EVENT,
   dismissExchangePhoto,
   keepExchangePhoto,
-  readAllOwnSleepingPhotos,
   readKeptExchangePhotoCount,
   readOwnSleepingPhotos,
   readOwnSleepingPhotoCount,
@@ -761,7 +760,7 @@ export function HomeInput({
   const activeCatName = activeCat ? getCatName(activeCat) : "ねこ";
   const homeDateKey = isHomeClockReady ? getJstDateKey(homeNow) : "";
   const allOwnSleepingPhotos = useMemo(
-    () => readAllOwnSleepingPhotos(),
+    () => readOwnSleepingPhotos(null),
     [collectionRefreshTick, eveningRefreshTick],
   );
   const homeDisplayCat = useMemo(

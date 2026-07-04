@@ -20,11 +20,6 @@ import {
 import {
   getEveningDeliveryCompletionCopy,
   getJstDateKey,
-  markEveningDeliveryKept,
-  markEveningDeliveryOpened,
-  recordEveningDeliveryTarget,
-  setEveningDeliveredPhoto,
-  updateEveningDeliveredPhotoDataUrl,
 } from "../../lib/home/eveningDelivery";
 import {
   createOnboardingSubmissionId,
@@ -505,7 +500,6 @@ export function OnboardingFlow() {
         setPendingOwnPhoto(ownPhoto);
         setIsDeliveredPhotoKept(false);
         autoKeptDeliveredPhotoIdRef.current = "";
-        const eveningTarget = recordEveningDeliveryTarget(ownPhoto);
         const onboardingDateKey = getJstDateKey();
         const anonymousId = getOrCreateOnboardingAnonymousId();
         const submissionId = createOnboardingSubmissionId(
@@ -526,22 +520,22 @@ export function OnboardingFlow() {
         trackProductEvent("take_photo", {
           catId,
           hour: new Date().getHours(),
-          isExchangeTarget: eveningTarget.isExchangeTarget,
+          isExchangeTarget: true,
           source: "onboarding",
-          delivery_date_key: eveningTarget.dateKey,
+          delivery_date_key: onboardingDateKey,
         });
         trackProductEvent("onboarding_photo_submitted", {
           catId,
           source: getEffectiveEntrySource(),
           submission_id: submissionId,
-          delivery_date_key: eveningTarget.dateKey,
+          delivery_date_key: onboardingDateKey,
         });
         trackProductEvent("photo_submitted", {
           catId,
           source: getEffectiveEntrySource(),
           surface: "onboarding",
           submission_id: submissionId,
-          delivery_date_key: eveningTarget.dateKey,
+          delivery_date_key: onboardingDateKey,
         });
 
         const delivered = await deliverOwnSleepingPhoto({
@@ -725,10 +719,6 @@ export function OnboardingFlow() {
       isDeliveredPhotoKept: keepResult.saved,
       completionCopy: getEveningDeliveryCompletionCopy(),
     });
-    const progress = readCurrentOnboardingProgress();
-    if (progress?.dateKey) {
-      markEveningDeliveryKept(progress.dateKey);
-    }
 
     if (!isTestMode) {
       window.localStorage.setItem(STORAGE_KEYS.onboardingCompleted, "true");
@@ -748,18 +738,13 @@ export function OnboardingFlow() {
     }
 
     const progress = readCurrentOnboardingProgress();
-    const nextPhoto =
-      progress?.dateKey
-        ? updateEveningDeliveredPhotoDataUrl(progress.dateKey, dataUrl)
-        : null;
-    const photoWithDataUrl =
-      nextPhoto ?? {
-        ...deliveredPhoto,
-        src: dataUrl,
-        thumbnailSrc: dataUrl,
-        displaySrc: dataUrl,
-        originalSrc: dataUrl,
-      };
+    const photoWithDataUrl = {
+      ...deliveredPhoto,
+      src: dataUrl,
+      thumbnailSrc: dataUrl,
+      displaySrc: dataUrl,
+      originalSrc: dataUrl,
+    };
 
     setDeliveredPhoto(photoWithDataUrl);
     updateKeptExchangePhotoDataUrl(photoWithDataUrl, dataUrl);
@@ -799,10 +784,6 @@ export function OnboardingFlow() {
       deliveredPhoto,
       isDeliveredPhotoKept,
     });
-    const progress = readCurrentOnboardingProgress();
-    if (progress?.dateKey) {
-      markEveningDeliveryOpened(progress.dateKey);
-    }
 
     if (revealTimerRef.current) {
       window.clearTimeout(revealTimerRef.current);
@@ -935,9 +916,6 @@ export function OnboardingFlow() {
 
     setDeliveredPhoto(nextPhoto);
     setIsDeliveredPhotoKept(false);
-    if (deliveryDateKey) {
-      setEveningDeliveredPhoto(deliveryDateKey, nextPhoto);
-    }
     patchOnboardingProgress({
       stage: "arrived",
       source: getEffectiveEntrySource(),
@@ -1321,9 +1299,9 @@ export function OnboardingFlow() {
                       しまいました。
                       <br />
                       <br />
-                      あなたのねがおは、
+                      ホームでねがおをとると、
                       <br />
-                      夜8時の便りになります。
+                      よる8時にまた届きます。
                     </>
                   )
                 : "届いた写真を、ねこだよりに入れています。"}
@@ -1764,6 +1742,7 @@ async function saveSleepingPhotoWithFallback(file: File, catId: string) {
       triggerLabel: "ねがお",
       theme: "sleeping",
       shared: true,
+      captureContext: "onboarding",
       minRetainedCount: 1,
     });
 
@@ -1894,6 +1873,7 @@ function createOnboardingOwnPhotoFallback({
     theme: "sleeping",
     shared: true,
     createdAt,
+    captureContext: "onboarding",
   };
 }
 

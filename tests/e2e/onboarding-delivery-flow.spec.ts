@@ -222,7 +222,7 @@ test.describe("onboarding delivery flow", () => {
     await page.waitForTimeout(1600);
     await expectVisibleNonBlackImage(page.locator("main img").last());
     await expect(
-      page.getByText(/届いたねこだよりを[\s\S]*しまいました。[\s\S]*夜8時の便りになります。/),
+      page.getByText(/届いたねこだよりを[\s\S]*しまいました。[\s\S]*よる8時にまた届きます。/),
     ).toBeVisible();
     await expect(
       page.getByRole("button", { name: "つづける" }),
@@ -237,7 +237,7 @@ test.describe("onboarding delivery flow", () => {
         Boolean((day as { targetOwnPhotoId?: string }).targetOwnPhotoId),
       ).length;
     });
-    expect(eveningDeliveryDays).toBeGreaterThan(0);
+    expect(eveningDeliveryDays).toBe(0);
     await page.getByRole("button", { name: "つづける" }).click();
     await continuePastOptionalOnboardingNamePrompt(page);
     await expect(page).toHaveURL(/\/account\/create\?from=onboarding/);
@@ -261,6 +261,7 @@ test.describe("onboarding delivery flow", () => {
 
     expect(storage.ownSleepingPhotos.length).toBeGreaterThan(0);
     expect(storage.keptExchangePhotos.length).toBeGreaterThan(0);
+    expect(storage.ownSleepingPhotos[0]?.captureContext).toBe("onboarding");
     expect(storage.ownSleepingPhotos[0]?.src).toMatch(/^data:image\//);
     expect(storage.keptExchangePhotos[0]?.src).toBeTruthy();
   });
@@ -288,7 +289,7 @@ test.describe("onboarding delivery flow", () => {
       page.getByRole("button", { name: "つづける" }),
     ).toBeVisible();
     await expect(
-      page.getByText(/届いたねこだよりを[\s\S]*しまいました。[\s\S]*夜8時の便りになります。/),
+      page.getByText(/届いたねこだよりを[\s\S]*しまいました。[\s\S]*よる8時にまた届きます。/),
     ).toBeVisible();
     await expect.poll(() => readKeptExchangePhotoCount(page)).toBe(1);
 
@@ -330,12 +331,7 @@ test.describe("onboarding delivery flow", () => {
 
     await page.goto("/collection");
     await page.locator('[role="tab"]').nth(0).click();
-    const sentCard = page.getByTestId("mainichi-board-photo-sent").first();
-    await expect(sentCard).toBeVisible();
-    await expect(sentCard).not.toHaveAttribute(
-      "data-source-photo-id",
-      "stock-storage-e2e-fake",
-    );
+    await expect(page.getByTestId("mainichi-board-photo-sent")).toHaveCount(0);
 
     await page.locator('[role="tab"]').nth(1).click();
     const deliveredCard = page.getByTestId("mainichi-board-photo-delivered").first();
@@ -926,29 +922,22 @@ async function readOnboardingDeliverySnapshot(page: Page) {
     };
     const ownSleepingPhotos = readArray("nyaruhodo_exchange_own_sleeping_photos");
     const keptExchangePhotos = readArray("nyaruhodo_exchange_kept_photos");
-    const eveningDeliveryDays = Object.values(
-      readObject("neteruneko_evening_delivery_days"),
-    ) as Array<{
+    const progress = readObject("neteruneko_onboarding_progress") as {
       deliveredPhoto?: {
         id?: string;
         sourcePhotoId?: string;
         src?: string;
       };
-      deliveredAt?: number;
-      openedAt?: string;
-      keptAt?: string;
-    }>;
-    const openedDays = eveningDeliveryDays
-      .filter((day) => Boolean(day.deliveredPhoto && day.openedAt))
-      .sort((a, b) => (b.deliveredAt ?? 0) - (a.deliveredAt ?? 0));
-    const openedDay = openedDays[0] ?? null;
+      stage?: string;
+      isDeliveredPhotoKept?: boolean;
+    };
 
     return {
       ownPhoto: ownSleepingPhotos[0] ?? null,
       keptPhoto: keptExchangePhotos[0] ?? null,
-      deliveredPhoto: openedDay?.deliveredPhoto ?? null,
-      openedAt: openedDay?.openedAt ?? null,
-      keptAt: openedDay?.keptAt ?? null,
+      deliveredPhoto: progress.deliveredPhoto ?? null,
+      openedAt: progress.stage === "opened" ? "opened" : null,
+      keptAt: progress.isDeliveredPhotoKept ? "kept" : null,
     };
   });
 }

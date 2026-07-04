@@ -22,7 +22,7 @@ export default function AuthCallbackPage() {
     const params = new URLSearchParams(window.location.search);
     const code = params.get("code");
     const next = getSafeNextPath(params.get("next"));
-    const errorPath = "/account/create?error=auth";
+    const errorPath = getAuthErrorPath(next);
 
     if (!code) {
       trackProductEvent("auth_google_failed", {
@@ -68,4 +68,15 @@ function getSafeNextPath(next: string | null) {
   }
 
   return next;
+}
+
+function getAuthErrorPath(next: string) {
+  if (next.startsWith("/account/create")) {
+    const url = new URL(next, window.location.origin);
+
+    url.searchParams.set("error", "auth");
+    return `${url.pathname}${url.search}`;
+  }
+
+  return "/account/create?error=auth";
 }
