@@ -597,7 +597,7 @@ export default function AccountCreatePage() {
               ) : null}
               <p style={styles.authNote}>
                 {isFromOnboarding
-                  ? "名前や場所は公開されません。"
+                  ? "Googleなしでも、一時URLを作ってホーム画面アプリに引き継げます。"
                   : "Googleの画面が開きます。接続後、このアプリに戻ります。"}
               </p>
 

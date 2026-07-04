@@ -108,6 +108,11 @@ export function OnboardingFlow() {
   const [entrySource, setEntrySource] = useState<OnboardingSource>(
     readOnboardingSourceFromLocation,
   );
+  const [isExternalBrowserGuideDismissed, setIsExternalBrowserGuideDismissed] =
+    useState(false);
+  const [hasCopiedExternalBrowserUrl, setHasCopiedExternalBrowserUrl] =
+    useState(false);
+  const [isEmbeddedBrowser, setIsEmbeddedBrowser] = useState(false);
   const [isOpeningEnvelope, setIsOpeningEnvelope] = useState(false);
   const [catNameDraft, setCatNameDraft] = useState("");
   const prefersReducedMotion = usePrefersReducedMotion();
@@ -188,6 +193,7 @@ export function OnboardingFlow() {
     const enabled = readOnboardingPhotoDebugEnabled();
 
     setIsPhotoDebugMode(enabled);
+    setIsEmbeddedBrowser(isEmbeddedInAppBrowser());
   }, []);
 
   useEffect(() => {
@@ -364,6 +370,29 @@ export function OnboardingFlow() {
     hasTrackedIntroViewRef.current = true;
     trackProductEvent("onboarding_intro_view", {
       source,
+    });
+  }
+
+  async function handleCopyOnboardingUrl() {
+    if (typeof window === "undefined") {
+      return;
+    }
+
+    try {
+      await navigator.clipboard.writeText(window.location.href);
+      setHasCopiedExternalBrowserUrl(true);
+      trackProductEvent("onboarding_external_browser_url_copied", {
+        source: getEffectiveEntrySource(),
+      });
+    } catch {
+      setHasCopiedExternalBrowserUrl(false);
+    }
+  }
+
+  function handleContinueInEmbeddedBrowser() {
+    setIsExternalBrowserGuideDismissed(true);
+    trackProductEvent("onboarding_embedded_browser_continue", {
+      source: getEffectiveEntrySource(),
     });
   }
 
@@ -1035,6 +1064,17 @@ export function OnboardingFlow() {
     router.push("/home");
   }
 
+  const shouldShowExternalBrowserGuide =
+    state === "intro" &&
+    entrySource === "referral" &&
+    isEmbeddedBrowser &&
+    !isExternalBrowserGuideDismissed;
+  const shouldShowEmbeddedPhotoNotice =
+    !shouldShowExternalBrowserGuide &&
+    state === "intro" &&
+    entrySource !== "direct" &&
+    isEmbeddedBrowser;
+
   return (
     <main style={styles.page}>
       <style>{`
@@ -1066,7 +1106,17 @@ export function OnboardingFlow() {
       <div style={styles.container}>
         <WordmarkHeader style={styles.brandHeader} />
 
-        {state === "intro" || state === "saving" ? (
+        {shouldShowExternalBrowserGuide ? (
+          <ExternalBrowserGuide
+            copied={hasCopiedExternalBrowserUrl}
+            onCopy={() => {
+              void handleCopyOnboardingUrl();
+            }}
+            onContinue={handleContinueInEmbeddedBrowser}
+          />
+        ) : null}
+
+        {!shouldShowExternalBrowserGuide && (state === "intro" || state === "saving") ? (
           <section style={styles.hero} aria-label="ねてるねこのはじめかた">
             <div style={styles.introArtifact} aria-hidden="true">
               <img
@@ -1098,6 +1148,12 @@ export function OnboardingFlow() {
             </p>
             {state === "saving" ? (
               <DeliveryWaiting />
+            ) : null}
+            {shouldShowEmbeddedPhotoNotice ? (
+              <p style={styles.embeddedBrowserNotice}>
+                LINEやInstagramの中で進めると、ホーム画面アプリに入れる前に
+                「アプリでつづける」が必要です。
+              </p>
             ) : null}
             <AppButton
               type="button"
@@ -1389,6 +1445,48 @@ function DeliveryWaiting() {
   );
 }
 
+function ExternalBrowserGuide({
+  copied,
+  onCopy,
+  onContinue,
+}: {
+  copied: boolean;
+  onCopy: () => void;
+  onContinue: () => void;
+}) {
+  return (
+    <section style={styles.externalBrowserGuide} aria-label="ブラウザで開く案内">
+      <p style={styles.kicker}>招待リンク</p>
+      <h1 style={styles.title}>
+        SafariやChromeで
+        <br />
+        開くと安心です
+      </h1>
+      <p style={styles.externalBrowserText}>
+        LINEやInstagramの中で始めると、ホーム画面アプリにしたあと、
+        写真を引き継ぐ手順が必要になります。
+      </p>
+      <p style={styles.externalBrowserText}>
+        先にSafariやChromeで開くと、そのままホーム画面アプリへ残せます。
+      </p>
+      <div style={styles.externalBrowserActions}>
+        <AppButton
+          type="button"
+          variant="accent"
+          fullWidth
+          onClick={onCopy}
+          style={styles.onboardingCta}
+        >
+          {copied ? "URLをコピーしました" : "URLをコピー"}
+        </AppButton>
+        <AppButton type="button" variant="quiet" size="md" onClick={onContinue}>
+          このまま進む
+        </AppButton>
+      </div>
+    </section>
+  );
+}
+
 function OnboardingPhotoDebugPanel({
   info,
 }: {
@@ -1471,6 +1569,23 @@ function hasReferralQueryInLocation() {
 
   const params = new URLSearchParams(window.location.search);
   return params.has("ref") || params.has("referral") || params.has("invite");
+}
+
+function isEmbeddedInAppBrowser() {
+  if (typeof window === "undefined") {
+    return false;
+  }
+
+  const ua = window.navigator.userAgent.toLowerCase();
+
+  return (
+    ua.includes(" line/") ||
+    ua.includes("instagram") ||
+    ua.includes("fbav") ||
+    ua.includes("fban") ||
+    ua.includes("twitter") ||
+    ua.includes("micromessenger")
+  );
 }
 
 function readOnboardingPhotoDebugEnabled() {
@@ -2066,6 +2181,35 @@ const styles = {
     textAlign: "center",
     gap: "13px",
   },
+  externalBrowserGuide: {
+    display: "grid",
+    justifyItems: "center",
+    textAlign: "center",
+    gap: "14px",
+    width: "100%",
+    padding: "24px 18px",
+    boxSizing: "border-box",
+    border: "1px solid rgba(120,108,94,0.12)",
+    borderRadius: "24px",
+    background:
+      "linear-gradient(180deg, rgba(255,253,248,0.86), rgba(250,244,235,0.72))",
+    boxShadow: "0 18px 42px -34px rgba(82, 61, 43, 0.48)",
+  },
+  externalBrowserText: {
+    margin: 0,
+    color: "#6f6757",
+    fontFamily: UI_FONT,
+    fontSize: "13px",
+    fontWeight: 400,
+    lineHeight: 1.9,
+    letterSpacing: 0,
+  },
+  externalBrowserActions: {
+    display: "grid",
+    justifyItems: "center",
+    gap: "8px",
+    width: "100%",
+  },
   introArtifact: {
     position: "relative",
     width: "min(74vw, 260px)",
@@ -2175,6 +2319,20 @@ const styles = {
     fontWeight: 400,
     lineHeight: 1.45,
     letterSpacing: 0,
+  },
+  embeddedBrowserNotice: {
+    margin: "2px 0 -2px",
+    width: "min(100%, 286px)",
+    boxSizing: "border-box",
+    border: "1px solid rgba(120,108,94,0.1)",
+    borderRadius: "16px",
+    background: "rgba(255,253,248,0.54)",
+    color: "#7a7065",
+    fontFamily: UI_FONT,
+    fontSize: "11px",
+    fontWeight: 400,
+    lineHeight: 1.7,
+    padding: "9px 11px",
   },
   namePreviewPhoto: {
     width: "min(48vw, 168px)",

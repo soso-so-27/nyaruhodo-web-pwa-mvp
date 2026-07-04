@@ -579,6 +579,34 @@ test.describe("onboarding delivery flow", () => {
       .toBe("ABC234");
   });
 
+  test("shows an external browser guide for referral links opened in LINE", async ({
+    page,
+  }) => {
+    await page.addInitScript(() => {
+      Object.defineProperty(window.navigator, "userAgent", {
+        get: () =>
+          "Mozilla/5.0 (Linux; Android 14; Pixel 7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Mobile Safari/537.36 Line/14.0.0",
+      });
+      window.localStorage.removeItem("onboarding_completed");
+      window.localStorage.removeItem("neteruneko_onboarding_progress");
+      window.localStorage.removeItem("neteruneko_pending_referral_code");
+    });
+
+    await page.goto("/onboarding?source=referral&ref=LINE234");
+    await expect(
+      page.getByRole("heading", { name: "SafariやChromeで 開くと安心です" }),
+    ).toBeVisible();
+    await expect(
+      page.getByRole("button", { name: "ねがおを1枚入れる" }),
+    ).toHaveCount(0);
+
+    await page.getByRole("button", { name: "このまま進む" }).click();
+    await expect(
+      page.getByRole("button", { name: "ねがおを1枚入れる" }),
+    ).toBeVisible();
+    await expect(page.getByText("アプリでつづける")).toBeVisible();
+  });
+
   test("does not keep referral links for users who already completed onboarding", async ({
     page,
   }) => {
