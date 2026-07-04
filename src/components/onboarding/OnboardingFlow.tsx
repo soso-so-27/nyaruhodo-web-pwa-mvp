@@ -476,14 +476,23 @@ export function OnboardingFlow() {
           return;
         }
       } catch (error) {
+        const errorMessage =
+          error instanceof Error ? error.message : "onboarding photo save failed";
         trackProductEvent("photo_upload_error", {
           source: getEffectiveEntrySource(),
           surface: "onboarding",
           error_code: "onboarding_photo_save_failed",
-          error_message:
-            error instanceof Error ? error.message : "onboarding photo save failed",
+          error_message: errorMessage,
+          error_stage: getOnboardingPhotoErrorStage(errorMessage),
+          file_size_bucket: getFileSizeBucket(file.size),
+          file_type: sanitizeFileType(file.type),
+          file_extension: getSafeFileExtension(file.name),
         });
-        setMessage("写真を保存できませんでした。少し時間をおいて、もう一度試してください。");
+        setMessage(
+          getOnboardingPhotoErrorStage(errorMessage) === "decode"
+            ? "写真を読み込めませんでした。JPEGやPNGの写真で、もう一度試してください。"
+            : "写真を保存できませんでした。少し時間をおいて、もう一度試してください。",
+        );
         setState("intro");
       } finally {
         isSubmittingRef.current = false;
@@ -1471,13 +1480,15 @@ function resizeAndEncode(
 async function saveSleepingPhotoWithFallback(file: File, catId: string) {
   const createdAt = Date.now();
   const fileName = `onboarding-${createdAt}`;
-  const [thumbnailDataUrl, displayDataUrl] = await Promise.all([
-    resizeAndEncode(file, 512, 0.72, "image/webp"),
-    resizeAndEncode(file, 2048, 0.84, "image/webp"),
-  ]);
-  const exchangeDataUrl = await createOnboardingExchangeDataUrl(
+  const exchangeDataUrl = await createOnboardingExchangeDataUrl(file);
+  const displayDataUrl =
+    (await tryResizeAndEncode(file, 2048, 0.84, "image/webp")) ??
+    exchangeDataUrl;
+  const thumbnailDataUrl = await tryResizeAndEncode(
     file,
-    displayDataUrl,
+    512,
+    0.72,
+    "image/webp",
   );
   const storedDisplaySrc = await storeAccountPhotoDataUrl({
     dataUrl: displayDataUrl,
@@ -1485,37 +1496,47 @@ async function saveSleepingPhotoWithFallback(file: File, catId: string) {
     fileName,
   });
   const canUseStorage = isStoragePhotoReference(storedDisplaySrc);
-  const storedThumbnailSrc = canUseStorage
+  const storedThumbnailSrc = canUseStorage && thumbnailDataUrl
     ? await storeAccountPhotoDataUrl({
         dataUrl: thumbnailDataUrl,
         pathSegments: ["onboarding", catId, "thumbnail"],
         fileName,
       })
     : null;
+  const compactAttempts = await createCompactOwnPhotoAttempts(file);
   const attempts: Array<{
     src: string;
     displaySrc?: string;
     thumbnailSrc?: string;
-  }> = [
-    {
-      src: canUseStorage ? storedDisplaySrc : exchangeDataUrl,
-      displaySrc: canUseStorage ? storedDisplaySrc : undefined,
-      thumbnailSrc: isStoragePhotoReference(storedThumbnailSrc)
-        ? storedThumbnailSrc
-        : undefined,
-    },
-    {
-      src: exchangeDataUrl,
-      displaySrc: canUseStorage ? storedDisplaySrc : undefined,
-      thumbnailSrc: isStoragePhotoReference(storedThumbnailSrc)
-        ? storedThumbnailSrc
-        : undefined,
-    },
-    { src: await resizeAndEncode(file, 560, 0.66) },
-    { src: await resizeAndEncode(file, 420, 0.58) },
-    { src: await resizeAndEncode(file, 320, 0.5) },
-    { src: await resizeAndEncode(file, 240, 0.42) },
-  ];
+  }> = (
+    [
+      canUseStorage
+        ? {
+            src: storedDisplaySrc,
+            displaySrc: storedDisplaySrc,
+            thumbnailSrc: isStoragePhotoReference(storedThumbnailSrc)
+              ? storedThumbnailSrc
+              : undefined,
+          }
+        : null,
+      {
+        src: exchangeDataUrl,
+        displaySrc: canUseStorage ? storedDisplaySrc : undefined,
+        thumbnailSrc: isStoragePhotoReference(storedThumbnailSrc)
+          ? storedThumbnailSrc
+          : undefined,
+      },
+      ...compactAttempts.map((src) => ({ src })),
+    ] satisfies Array<{
+      src: string;
+      displaySrc?: string;
+      thumbnailSrc?: string;
+    } | null>
+  ).filter((attempt): attempt is {
+    src: string;
+    displaySrc?: string;
+    thumbnailSrc?: string;
+  } => Boolean(attempt));
   const triedSrcs = new Set<string>();
 
   for (const attempt of attempts) {
@@ -1560,11 +1581,13 @@ function isStoragePhotoReference(src: string | null | undefined): src is string 
 
 async function createOnboardingExchangeDataUrl(
   file: File,
-  preferredDataUrl: string,
+  preferredDataUrl?: string,
 ) {
-  if (preferredDataUrl.length <= 1_900_000) {
+  if (preferredDataUrl && preferredDataUrl.length <= 1_900_000) {
     return preferredDataUrl;
   }
+
+  let lastUsableDataUrl: string | null = null;
 
   for (const attempt of [
     { maxSize: 1200, quality: 0.8 },
@@ -1572,19 +1595,65 @@ async function createOnboardingExchangeDataUrl(
     { maxSize: 720, quality: 0.72 },
     { maxSize: 560, quality: 0.68 },
   ]) {
-    const dataUrl = await resizeAndEncode(
+    const dataUrl = await tryResizeAndEncode(
       file,
       attempt.maxSize,
       attempt.quality,
       "image/webp",
     );
 
+    if (!dataUrl) {
+      continue;
+    }
+
+    lastUsableDataUrl = dataUrl;
+
     if (dataUrl.length <= 1_900_000) {
       return dataUrl;
     }
   }
 
-  return resizeAndEncode(file, 420, 0.62, "image/webp");
+  return (
+    (await tryResizeAndEncode(file, 420, 0.62, "image/webp")) ??
+    lastUsableDataUrl ??
+    Promise.reject(new Error("onboarding_photo_decode_failed"))
+  );
+}
+
+async function createCompactOwnPhotoAttempts(file: File) {
+  const attempts: string[] = [];
+
+  for (const attempt of [
+    { maxSize: 560, quality: 0.66 },
+    { maxSize: 420, quality: 0.58 },
+    { maxSize: 320, quality: 0.5 },
+    { maxSize: 240, quality: 0.42 },
+  ]) {
+    const dataUrl = await tryResizeAndEncode(
+      file,
+      attempt.maxSize,
+      attempt.quality,
+    );
+
+    if (dataUrl) {
+      attempts.push(dataUrl);
+    }
+  }
+
+  return attempts;
+}
+
+async function tryResizeAndEncode(
+  file: File,
+  maxSize = 1100,
+  quality = 0.78,
+  mimeType = "image/jpeg",
+) {
+  try {
+    return await resizeAndEncode(file, maxSize, quality, mimeType);
+  } catch {
+    return null;
+  }
 }
 
 function createOnboardingOwnPhotoFallback({
@@ -1658,6 +1727,47 @@ function isLikelyImageFile(file: File) {
   }
 
   return /\.(avif|gif|heic|heif|jpe?g|png|webp)$/i.test(file.name);
+}
+
+function getOnboardingPhotoErrorStage(message: string) {
+  if (
+    message.includes("onboarding_photo_decode_failed") ||
+    message.includes("Image load failed")
+  ) {
+    return "decode";
+  }
+
+  if (message.includes("Canvas")) {
+    return "canvas";
+  }
+
+  if (message.includes("Photo upload failed")) {
+    return "storage";
+  }
+
+  return "unknown";
+}
+
+function sanitizeFileType(type: string) {
+  const normalized = type.trim().toLowerCase();
+
+  return /^image\/[a-z0-9.+-]+$/.test(normalized) ? normalized : "unknown";
+}
+
+function getSafeFileExtension(name: string) {
+  const extension = name.split(".").pop()?.trim().toLowerCase();
+
+  return extension && /^[a-z0-9]{2,8}$/.test(extension) ? extension : "unknown";
+}
+
+function getFileSizeBucket(size: number) {
+  if (size < 1_000_000) {
+    return "small";
+  }
+  if (size < 5_000_000) {
+    return "medium";
+  }
+  return "large";
 }
 
 async function keepExchangePhotoForAlbum(photo: ExchangePhoto) {
