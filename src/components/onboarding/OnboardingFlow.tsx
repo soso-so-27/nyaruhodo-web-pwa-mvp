@@ -37,6 +37,7 @@ import {
 } from "../../lib/onboarding/progress";
 import { trackProductEvent } from "../../lib/analytics/productAnalytics";
 import { isUsablePhotoSrc } from "../../lib/photoStorage";
+import { storeAccountPhotoDataUrl } from "../../lib/photoStorageClient";
 import {
   getActiveCatProfile,
   isCatProfileNameUnset,
@@ -394,7 +395,7 @@ export function OnboardingFlow() {
         const savedResult = await saveSleepingPhotoWithFallback(file, catId);
 
         if (!savedResult) {
-          setMessage("写真を保存できませんでした。JPEGやPNGの写真で、もう一度試してください。");
+          setMessage("写真を保存できませんでした。少し時間をおいて、もう一度試してください。");
           setState("intro");
           return;
         }
@@ -471,7 +472,7 @@ export function OnboardingFlow() {
           error_message:
             error instanceof Error ? error.message : "onboarding photo save failed",
         });
-        setMessage("写真を保存できませんでした。JPEGやPNGの写真で、もう一度試してください。");
+        setMessage("写真を保存できませんでした。少し時間をおいて、もう一度試してください。");
         setState("intro");
       } finally {
         isSubmittingRef.current = false;
@@ -1422,6 +1423,7 @@ function resizeAndEncode(
   file: File,
   maxSize = 1100,
   quality = 0.78,
+  mimeType = "image/jpeg",
 ): Promise<string> {
   return new Promise((resolve, reject) => {
     const image = new Image();
@@ -1444,7 +1446,12 @@ function resizeAndEncode(
       context.drawImage(image, 0, 0, canvas.width, canvas.height);
       URL.revokeObjectURL(url);
       try {
-        resolve(canvas.toDataURL("image/jpeg", quality));
+        const encoded = canvas.toDataURL(mimeType, quality);
+        resolve(
+          encoded.startsWith(`data:${mimeType};`)
+            ? encoded
+            : canvas.toDataURL("image/jpeg", quality),
+        );
       } catch (error) {
         reject(error);
       }
@@ -1460,29 +1467,83 @@ function resizeAndEncode(
 }
 
 async function saveSleepingPhotoWithFallback(file: File, catId: string) {
-  const attempts = [
-    { maxSize: 560, quality: 0.66 },
-    { maxSize: 420, quality: 0.58 },
-    { maxSize: 320, quality: 0.5 },
-    { maxSize: 240, quality: 0.42 },
+  const createdAt = Date.now();
+  const fileName = `onboarding-${createdAt}`;
+  const [thumbnailDataUrl, displayDataUrl] = await Promise.all([
+    resizeAndEncode(file, 512, 0.72, "image/webp"),
+    resizeAndEncode(file, 2048, 0.84, "image/webp"),
+  ]);
+  const exchangeDataUrl =
+    displayDataUrl.length <= 1_900_000
+      ? displayDataUrl
+      : await resizeAndEncode(file, 1200, 0.8, "image/webp");
+  const storedDisplaySrc = await storeAccountPhotoDataUrl({
+    dataUrl: displayDataUrl,
+    pathSegments: ["onboarding", catId, "display"],
+    fileName,
+  });
+  const canUseStorage = isStoragePhotoReference(storedDisplaySrc);
+  const storedThumbnailSrc = canUseStorage
+    ? await storeAccountPhotoDataUrl({
+        dataUrl: thumbnailDataUrl,
+        pathSegments: ["onboarding", catId, "thumbnail"],
+        fileName,
+      })
+    : null;
+  const attempts: Array<{
+    src: string;
+    displaySrc?: string;
+    thumbnailSrc?: string;
+  }> = [
+    {
+      src: canUseStorage ? storedDisplaySrc : exchangeDataUrl,
+      displaySrc: canUseStorage ? storedDisplaySrc : undefined,
+      thumbnailSrc: isStoragePhotoReference(storedThumbnailSrc)
+        ? storedThumbnailSrc
+        : undefined,
+    },
+    {
+      src: exchangeDataUrl,
+      displaySrc: canUseStorage ? storedDisplaySrc : undefined,
+      thumbnailSrc: isStoragePhotoReference(storedThumbnailSrc)
+        ? storedThumbnailSrc
+        : undefined,
+    },
+    { src: await resizeAndEncode(file, 560, 0.66) },
+    { src: await resizeAndEncode(file, 420, 0.58) },
+    { src: await resizeAndEncode(file, 320, 0.5) },
+    { src: await resizeAndEncode(file, 240, 0.42) },
   ];
+  const triedSrcs = new Set<string>();
 
   for (const attempt of attempts) {
-    const dataUrl = await resizeAndEncode(file, attempt.maxSize, attempt.quality);
+    if (!attempt.src || triedSrcs.has(attempt.src)) {
+      continue;
+    }
+
+    triedSrcs.add(attempt.src);
     const ownPhoto = saveOwnSleepingPhoto({
       catId,
-      src: dataUrl,
+      src: attempt.src,
+      thumbnailSrc: attempt.thumbnailSrc,
+      displaySrc: attempt.displaySrc,
+      originalSrc: canUseStorage ? storedDisplaySrc : undefined,
       triggerLabel: "ねがお",
       theme: "sleeping",
       shared: true,
+      minRetainedCount: 1,
     });
 
     if (ownPhoto) {
-      return { dataUrl, ownPhoto };
+      return { dataUrl: exchangeDataUrl, ownPhoto };
     }
   }
 
   return null;
+}
+
+function isStoragePhotoReference(src: string | null | undefined): src is string {
+  return Boolean(src?.startsWith("storage:") || src?.startsWith("storage://"));
 }
 
 async function saveStockCandidateWithFallback(file: File) {
