@@ -140,3 +140,13 @@
 - 削除案内に、写真1枚単位の削除方法と、配達済み写真の相手側扱いがない。
 - 特商法表記の価格が、アプリ/Stripe側の実請求額と一致しているか確認が必要。
 - 問い合わせページは「正式な連絡先を追記予定」となっており、先行ユーザー受け入れ時の実連絡先として十分か確認が必要。
+## 2026-07-05 追記: 匿名IDから個人情報への逆引き調査
+
+アカウント削除後に受け取り側へ残す `cat_moment_deliveries` について、`anonymous_id` からメールアドレスや `auth.users.id` へ戻れる対応表がないかを確認した。
+
+- `cat_moments` / `cat_moment_deliveries` / `photo_reports` / `app_events` / `referral_codes` / `referral_claims` は `anonymous_id` を保持し得るが、これらは匿名IDそのものを持つだけで、メールアドレスへ結び付けるカラムは確認できない。
+- `onboarding_handoffs` は `handoff_token` と `payload` を持つ一時引き継ぎテーブルで、RLSはservice_role限定、期限は24時間、redeemは単回。テーブル定義上は `anonymous_id` 専用カラムやメールアドレスカラムを持たない。
+- Googleログイン後のアカウント同期は `user_id` ベースで、現時点のschema/route検索では `anonymous_id -> user_id/email` の恒久対応表は確認できない。
+- `app_events` は `anonymous_id` と `user_id` のどちらかをイベント単位で保持し得る。今回の削除APIでは `user_id` が削除対象ユーザーと一致する行を削除対象に含めた。
+
+結論: 現時点では、配達済みdeliveryに残る `anonymous_id` から削除済みユーザーのメールアドレスまたはauth user idへ直接戻る経路は見つからない。将来 `anonymous_id` と `user_id` / メールを結ぶテーブルを追加した場合、そのテーブルはアカウント削除対象に含める必要がある。

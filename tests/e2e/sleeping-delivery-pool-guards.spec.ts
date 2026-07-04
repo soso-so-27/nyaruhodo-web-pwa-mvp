@@ -13,7 +13,9 @@ import {
   getArchivedDeliveryStoragePath,
 } from "../../src/lib/accountDeletionStorage";
 import {
+  CAT_PHOTOS_BUCKET,
   DISPLAY_SIGNED_URL_SECONDS,
+  getStoragePhotoPath,
   normalizePersistentPhotoSrc,
   toStoragePhotoUrl,
 } from "../../src/lib/photoStorage";
@@ -162,6 +164,285 @@ test.describe("sleeping delivery pool guards", () => {
       "user-a/cat-1/sleeping/hidden.webp",
       "user-a/cat-1/sleeping/pending.webp",
     ]);
+  });
+
+  test("account deletion guide explains delivered photos remain", async ({
+    page,
+  }) => {
+    await page.goto("/account-deletion");
+
+    await expect(
+      page.getByText("すでにお届けしたねがおは、受け取った方の記録に残ります。"),
+    ).toHaveCount(1);
+    await expect(
+      page.getByText("保存されている写真ファイル（すでにお届けしたねがおを除く）"),
+    ).toHaveCount(1);
+  });
+
+  test("account deletion keeps delivered photos viewable for recipients", async ({
+    request,
+  }) => {
+    await skipIfLocalSupabaseUnavailable();
+
+    const adminSupabase = createAdminSupabaseClientFromEnv();
+    const publicSupabase = createPublicSupabaseClientFromEnv();
+
+    test.skip(
+      !adminSupabase || !publicSupabase,
+      "Local Supabase public and service role keys are required for account deletion integration tests.",
+    );
+
+    if (!adminSupabase || !publicSupabase) {
+      return;
+    }
+
+    const createdAt = Date.now();
+    const source = await createConfirmedTestUser(
+      adminSupabase,
+      publicSupabase,
+      `delete-source-${createdAt}@example.test`,
+    );
+    const recipient = await createConfirmedTestUser(
+      adminSupabase,
+      publicSupabase,
+      `delete-recipient-${createdAt}@example.test`,
+    );
+    const localMomentId = `delete-delivered-moment-${createdAt}`;
+    const localDeliveryId = `delete-delivered-delivery-${createdAt}`;
+    const sourcePath = `${source.userId}/e2e/account-delete/${localMomentId}.jpg`;
+    let archivePath: string | null = null;
+
+    try {
+      await uploadTestPhoto(adminSupabase, sourcePath);
+      await insertTestMoment(adminSupabase, {
+        localMomentId,
+        photoUrl: toStoragePhotoUrl(sourcePath),
+        userId: source.userId,
+      });
+      await insertTestDelivery(adminSupabase, {
+        localDeliveryId,
+        photoUrl: toStoragePhotoUrl(sourcePath),
+        recipientUserId: recipient.userId,
+        sourcePhotoId: localMomentId,
+      });
+      await insertTestAppEvent(adminSupabase, source.userId, createdAt);
+
+      const response = await request.post("/api/account/delete-stored-data", {
+        data: { userId: recipient.userId },
+        headers: {
+          authorization: `Bearer ${source.accessToken}`,
+        },
+      });
+
+      expect(response.status()).toBe(200);
+      await expectAccountUserDeleted(adminSupabase, source.userId);
+
+      const { data: delivery, error: deliveryError } = await adminSupabase
+        .from("cat_moment_deliveries")
+        .select("photo_url, user_id")
+        .eq("local_delivery_id", localDeliveryId)
+        .single();
+
+      expect(deliveryError).toBeFalsy();
+      expect(delivery?.user_id).toBe(recipient.userId);
+      expect(delivery?.photo_url).toMatch(/^storage:delivery-archive\//);
+      expect(delivery?.photo_url ?? "").not.toContain(source.userId);
+
+      archivePath = getStoragePhotoPath(delivery?.photo_url ?? "");
+      expect(archivePath).toBeTruthy();
+
+      const { data: archivedPhoto, error: archiveDownloadError } =
+        await adminSupabase.storage
+          .from(CAT_PHOTOS_BUCKET)
+          .download(archivePath ?? "");
+      expect(archiveDownloadError).toBeFalsy();
+      expect(archivedPhoto).toBeTruthy();
+
+      const { data: originalPhoto } = await adminSupabase.storage
+        .from(CAT_PHOTOS_BUCKET)
+        .download(sourcePath);
+      expect(originalPhoto).toBeNull();
+
+      const signedUrlResponse = await request.post(
+        "/api/photo-storage/signed-url",
+        {
+          data: { src: delivery?.photo_url },
+          headers: {
+            authorization: `Bearer ${recipient.accessToken}`,
+          },
+        },
+      );
+
+      expect(signedUrlResponse.status()).toBe(200);
+      const signedUrlBody = await signedUrlResponse.json();
+      expect(signedUrlBody?.signedUrl).toContain("/storage/v1/");
+
+      const { count: appEventCount, error: appEventCountError } =
+        await adminSupabase
+          .from("app_events")
+          .select("id", { count: "exact", head: true })
+          .eq("user_id", source.userId);
+      expect(appEventCountError).toBeFalsy();
+      expect(appEventCount).toBe(0);
+    } finally {
+      await adminSupabase
+        .from("cat_moment_deliveries")
+        .delete()
+        .eq("local_delivery_id", localDeliveryId);
+      await adminSupabase
+        .from("cat_moments")
+        .delete()
+        .eq("local_moment_id", localMomentId);
+      await adminSupabase.storage
+        .from(CAT_PHOTOS_BUCKET)
+        .remove([sourcePath, ...(archivePath ? [archivePath] : [])]);
+      await adminSupabase.auth.admin.deleteUser(source.userId);
+      await adminSupabase.auth.admin.deleteUser(recipient.userId);
+    }
+  });
+
+  test("account deletion removes undelivered account storage", async ({
+    request,
+  }) => {
+    await skipIfLocalSupabaseUnavailable();
+
+    const adminSupabase = createAdminSupabaseClientFromEnv();
+    const publicSupabase = createPublicSupabaseClientFromEnv();
+
+    test.skip(
+      !adminSupabase || !publicSupabase,
+      "Local Supabase public and service role keys are required for account deletion integration tests.",
+    );
+
+    if (!adminSupabase || !publicSupabase) {
+      return;
+    }
+
+    const createdAt = Date.now();
+    const source = await createConfirmedTestUser(
+      adminSupabase,
+      publicSupabase,
+      `delete-undelivered-${createdAt}@example.test`,
+    );
+    const localMomentId = `delete-undelivered-moment-${createdAt}`;
+    const sourcePath = `${source.userId}/e2e/account-delete/${localMomentId}.jpg`;
+
+    try {
+      await uploadTestPhoto(adminSupabase, sourcePath);
+      await insertTestMoment(adminSupabase, {
+        localMomentId,
+        photoUrl: toStoragePhotoUrl(sourcePath),
+        userId: source.userId,
+      });
+
+      const response = await request.post("/api/account/delete-stored-data", {
+        headers: {
+          authorization: `Bearer ${source.accessToken}`,
+        },
+      });
+
+      expect(response.status()).toBe(200);
+      await expectAccountUserDeleted(adminSupabase, source.userId);
+
+      const { data: originalPhoto } = await adminSupabase.storage
+        .from(CAT_PHOTOS_BUCKET)
+        .download(sourcePath);
+      expect(originalPhoto).toBeNull();
+    } finally {
+      await adminSupabase
+        .from("cat_moments")
+        .delete()
+        .eq("local_moment_id", localMomentId);
+      await adminSupabase.storage.from(CAT_PHOTOS_BUCKET).remove([sourcePath]);
+      await adminSupabase.auth.admin.deleteUser(source.userId);
+    }
+  });
+
+  test("account deletion derives the target user from the bearer token", async ({
+    request,
+  }) => {
+    await skipIfLocalSupabaseUnavailable();
+
+    const adminSupabase = createAdminSupabaseClientFromEnv();
+    const publicSupabase = createPublicSupabaseClientFromEnv();
+
+    test.skip(
+      !adminSupabase || !publicSupabase,
+      "Local Supabase public and service role keys are required for account deletion integration tests.",
+    );
+
+    if (!adminSupabase || !publicSupabase) {
+      return;
+    }
+
+    const createdAt = Date.now();
+    const source = await createConfirmedTestUser(
+      adminSupabase,
+      publicSupabase,
+      `delete-body-source-${createdAt}@example.test`,
+    );
+    const other = await createConfirmedTestUser(
+      adminSupabase,
+      publicSupabase,
+      `delete-body-other-${createdAt}@example.test`,
+    );
+    const otherMomentId = `delete-body-other-moment-${createdAt}`;
+    const otherPath = `${other.userId}/e2e/account-delete/${otherMomentId}.jpg`;
+
+    try {
+      await uploadTestPhoto(adminSupabase, otherPath);
+      await insertTestMoment(adminSupabase, {
+        localMomentId: otherMomentId,
+        photoUrl: toStoragePhotoUrl(otherPath),
+        userId: other.userId,
+      });
+
+      const response = await request.post("/api/account/delete-stored-data", {
+        data: { userId: other.userId },
+        headers: {
+          authorization: `Bearer ${source.accessToken}`,
+        },
+      });
+
+      expect(response.status()).toBe(200);
+      await expectAccountUserDeleted(adminSupabase, source.userId);
+
+      const { data: otherAuthUser, error: otherAuthError } =
+        await adminSupabase.auth.admin.getUserById(other.userId);
+      expect(otherAuthError).toBeFalsy();
+      expect(otherAuthUser.user?.id).toBe(other.userId);
+
+      const { data: otherMoment, error: otherMomentError } = await adminSupabase
+        .from("cat_moments")
+        .select("id")
+        .eq("local_moment_id", otherMomentId)
+        .single();
+      expect(otherMomentError).toBeFalsy();
+      expect(otherMoment?.id).toBeTruthy();
+
+      const { data: otherPhoto, error: otherDownloadError } =
+        await adminSupabase.storage.from(CAT_PHOTOS_BUCKET).download(otherPath);
+      expect(otherDownloadError).toBeFalsy();
+      expect(otherPhoto).toBeTruthy();
+    } finally {
+      await adminSupabase
+        .from("cat_moments")
+        .delete()
+        .eq("local_moment_id", otherMomentId);
+      await adminSupabase.storage.from(CAT_PHOTOS_BUCKET).remove([otherPath]);
+      await adminSupabase.auth.admin.deleteUser(source.userId);
+      await adminSupabase.auth.admin.deleteUser(other.userId);
+    }
+  });
+
+  test("account deletion api rejects unauthenticated requests", async ({
+    request,
+  }) => {
+    const response = await request.post("/api/account/delete-stored-data", {
+      data: { userId: "00000000-0000-4000-8000-000000000000" },
+    });
+
+    expect(response.status()).toBe(401);
   });
 
   test("requires admin access for delivery diagnostics", async ({ request }) => {
@@ -885,6 +1166,147 @@ function buildExchangeRequest(
   };
 }
 
+async function createConfirmedTestUser(
+  adminSupabase: any,
+  publicSupabase: any,
+  email: string,
+) {
+  const password = `Password-${Date.now()}-${Math.random().toString(16).slice(2)}!`;
+  const { data: created, error: createError } =
+    await adminSupabase.auth.admin.createUser({
+      email,
+      email_confirm: true,
+      password,
+    });
+
+  expect(createError).toBeFalsy();
+  expect(created.user?.id).toBeTruthy();
+
+  const { data: signedIn, error: signInError } =
+    await publicSupabase.auth.signInWithPassword({
+      email,
+      password,
+    });
+
+  expect(signInError).toBeFalsy();
+  expect(signedIn.session?.access_token).toBeTruthy();
+
+  return {
+    accessToken: signedIn.session?.access_token ?? "",
+    email,
+    userId: created.user?.id ?? "",
+  };
+}
+
+async function uploadTestPhoto(
+  adminSupabase: any,
+  storagePath: string,
+) {
+  const { buffer, contentType } = dataUrlToBuffer(normalCatLikePhotoUrl);
+  const { error } = await adminSupabase.storage
+    .from(CAT_PHOTOS_BUCKET)
+    .upload(storagePath, buffer, {
+      contentType,
+      upsert: true,
+    });
+
+  expect(error).toBeFalsy();
+}
+
+async function insertTestMoment(
+  adminSupabase: any,
+  {
+    localMomentId,
+    photoUrl,
+    userId,
+  }: {
+    localMomentId: string;
+    photoUrl: string;
+    userId: string;
+  },
+) {
+  const { error } = await adminSupabase.from("cat_moments").insert({
+    anonymous_id: null,
+    captured_at: new Date().toISOString(),
+    delivery_status: "available",
+    local_cat_id: "account-delete-cat",
+    local_moment_id: localMomentId,
+    metadata: { source: "e2e-account-deletion" },
+    moderation_status: "approved",
+    owner_cat_id: "account-delete-cat",
+    photo_url: photoUrl,
+    state: "sleeping",
+    user_id: userId,
+    visibility: "shared",
+  });
+
+  expect(error).toBeFalsy();
+}
+
+async function insertTestDelivery(
+  adminSupabase: any,
+  {
+    localDeliveryId,
+    photoUrl,
+    recipientUserId,
+    sourcePhotoId,
+  }: {
+    localDeliveryId: string;
+    photoUrl: string;
+    recipientUserId: string;
+    sourcePhotoId: string;
+  },
+) {
+  const { error } = await adminSupabase.from("cat_moment_deliveries").insert({
+    anonymous_id: null,
+    local_delivery_id: localDeliveryId,
+    metadata: { source: "e2e-account-deletion" },
+    photo_url: photoUrl,
+    recipient_local_cat_id: "account-delete-recipient-cat",
+    source_photo_id: sourcePhotoId,
+    status: "delivered",
+    user_id: recipientUserId,
+  });
+
+  expect(error).toBeFalsy();
+}
+
+async function insertTestAppEvent(
+  adminSupabase: any,
+  userId: string,
+  id: number,
+) {
+  const { error } = await adminSupabase.from("app_events").insert({
+    event_name: `account_delete_e2e_${id}`,
+    source: "direct",
+    user_id: userId,
+  });
+
+  expect(error).toBeFalsy();
+}
+
+async function expectAccountUserDeleted(
+  adminSupabase: any,
+  userId: string,
+) {
+  const { data, error } = await adminSupabase.auth.admin.getUserById(userId);
+
+  expect(error || !data.user).toBeTruthy();
+}
+
+function dataUrlToBuffer(dataUrl: string) {
+  const match = dataUrl.match(/^data:([^;]+);base64,(.+)$/);
+
+  if (!match) {
+    throw new Error("Invalid test data URL");
+  }
+
+  return {
+    buffer: Buffer.from(match[2], "base64"),
+    contentType: match[1],
+  };
+}
+
 function getYesterdayJstDateKey() {
   const jstNow = Date.now() + 9 * 60 * 60 * 1000;
   const date = new Date(jstNow - 24 * 60 * 60 * 1000);
@@ -905,6 +1327,24 @@ function createAdminSupabaseClientFromEnv() {
   }
 
   return createClient(url, serviceRoleKey, {
+    auth: {
+      autoRefreshToken: false,
+      persistSession: false,
+    },
+  });
+}
+
+function createPublicSupabaseClientFromEnv() {
+  const env = readLocalEnv();
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL ?? env.NEXT_PUBLIC_SUPABASE_URL;
+  const anonKey =
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ?? env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+
+  if (!url || !anonKey) {
+    return null;
+  }
+
+  return createClient(url, anonKey, {
     auth: {
       autoRefreshToken: false,
       persistSession: false,

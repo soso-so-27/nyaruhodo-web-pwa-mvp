@@ -16,6 +16,9 @@ import { getSupabasePublicConfig } from "../../../../lib/supabase/config";
 const STORAGE_LIST_LIMIT = 1000;
 const DELETE_CHUNK_SIZE = 100;
 const DELIVERY_QUERY_LIMIT = 1000;
+const DELETE_RATE_LIMIT_WINDOW_MS = 10 * 60 * 1000;
+const DELETE_RATE_LIMIT_MAX_BUCKETS = 1000;
+const deleteRateLimitBuckets = new Map<string, number>();
 
 type AccountDeleteResult = {
   deletedStoragePaths: number;
@@ -42,6 +45,13 @@ export async function POST(request: Request) {
     return NextResponse.json(
       { ok: false, error: "server_unavailable" },
       { status: 503 },
+    );
+  }
+
+  if (!checkDeleteRateLimit(userId)) {
+    return NextResponse.json(
+      { ok: false, error: "rate_limited" },
+      { status: 429 },
     );
   }
 
@@ -114,20 +124,34 @@ async function deleteStoredDataForUser(
   await deleteStoragePaths(supabase, deletablePaths, errors);
 
   const deleteSteps = [
+    supabase.from("cat_moment_cats").delete().eq("user_id", userId),
     supabase.from("cat_moment_deliveries").delete().eq("user_id", userId),
     supabase.from("cat_moments").delete().eq("user_id", userId),
     supabase.from("collection_photos").delete().eq("user_id", userId),
+    supabase.from("photo_reports").delete().eq("reporter_user_id", userId),
     supabase.from("record_logs").delete().eq("user_id", userId),
+    supabase.from("subscriptions").delete().eq("user_id", userId),
+    supabase.from("app_events").delete().eq("user_id", userId),
+    supabase.from("referral_claims").delete().or(
+      `referrer_user_id.eq.${userId},referred_user_id.eq.${userId}`,
+    ),
+    supabase.from("referral_codes").delete().eq("user_id", userId),
+    supabase.from("beta_feedback").delete().eq("user_id", userId),
     supabase.from("account_sync_state").delete().eq("user_id", userId),
     supabase.from("cats").delete().eq("owner_user_id", userId),
   ];
   const results = await Promise.all(deleteSteps);
+  const { error: authDeleteError } = await supabase.auth.admin.deleteUser(userId);
 
   results.forEach((result, index) => {
     if (result.error) {
       errors.push(`delete step ${index + 1}: ${result.error.message}`);
     }
   });
+
+  if (authDeleteError) {
+    errors.push(`auth delete: ${authDeleteError.message}`);
+  }
 
   return {
     deletedStoragePaths: deletablePaths.length,
@@ -259,4 +283,30 @@ function getBearerToken(request: Request) {
   const [scheme, token] = authorization.split(/\s+/);
 
   return scheme?.toLowerCase() === "bearer" ? token : null;
+}
+
+function checkDeleteRateLimit(userId: string) {
+  const now = Date.now();
+
+  for (const [bucketUserId, resetAt] of deleteRateLimitBuckets) {
+    if (resetAt <= now) {
+      deleteRateLimitBuckets.delete(bucketUserId);
+    }
+  }
+
+  if (deleteRateLimitBuckets.size > DELETE_RATE_LIMIT_MAX_BUCKETS) {
+    const oldestKey = deleteRateLimitBuckets.keys().next().value;
+    if (oldestKey) {
+      deleteRateLimitBuckets.delete(oldestKey);
+    }
+  }
+
+  const resetAt = deleteRateLimitBuckets.get(userId);
+
+  if (resetAt && resetAt > now) {
+    return false;
+  }
+
+  deleteRateLimitBuckets.set(userId, now + DELETE_RATE_LIMIT_WINDOW_MS);
+  return true;
 }
