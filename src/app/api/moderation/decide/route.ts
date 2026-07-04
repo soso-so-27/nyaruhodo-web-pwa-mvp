@@ -38,6 +38,16 @@ export async function POST(request: Request) {
 
   const user = await getAuthenticatedUserForRequest(request);
   const moderatedBy = user?.email ?? user?.id ?? "admin";
+  const { data: target, error: targetError } = await supabase
+    .from("cat_moments")
+    .select("id, local_moment_id")
+    .eq("id", momentId)
+    .maybeSingle();
+
+  if (targetError || !target) {
+    return NextResponse.json({ ok: false }, { status: 200 });
+  }
+
   const patch =
     decision === "approved"
       ? {
@@ -56,6 +66,19 @@ export async function POST(request: Request) {
 
   if (error) {
     return NextResponse.json({ ok: false }, { status: 200 });
+  }
+
+  if (target.local_moment_id) {
+    const { error: duplicateError } = await supabase
+      .from("cat_moments")
+      .update(patch)
+      .eq("local_moment_id", target.local_moment_id)
+      .eq("moderation_status", "pending")
+      .eq("visibility", "shared");
+
+    if (duplicateError) {
+      return NextResponse.json({ ok: false }, { status: 200 });
+    }
   }
 
   return NextResponse.json({ ok: true });
