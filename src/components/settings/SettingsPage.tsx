@@ -522,8 +522,11 @@ export function SettingsPage() {
   async function handleModerationDecision(momentId: string, decision: "approved" | "rejected") {
     setModerationMessage("");
     const ok = await decideModerationMoment(momentId, decision);
-    setModerationMessage(ok ? "moderation updated" : "moderation failed");
+    setModerationMessage(
+      ok ? (decision === "approved" ? "承認しました" : "除外しました") : "更新できませんでした",
+    );
     if (ok) {
+      setModerationQueue((items) => items.filter((item) => item.id !== momentId));
       trackProductEvent("moderation_decided", {
         decision,
         moment_id: momentId,
@@ -1651,9 +1654,10 @@ function ModerationQueuePanel({
       </p>
       <div style={styles.authDebugRows}>
         <AuthDebugRow label="未審査" value={`${pendingCount}件`} />
+        <AuthDebugRow label="表示中" value={`${moments.length}件`} />
         {message ? <AuthDebugRow label="結果" value={message} /> : null}
       </div>
-      {moments.slice(0, 6).map((moment) => (
+      {moments.map((moment) => (
         <div key={moment.id} style={styles.moderationItem}>
           {moment.photoSrc ? (
             <PhotoTile
