@@ -1473,10 +1473,10 @@ async function saveSleepingPhotoWithFallback(file: File, catId: string) {
     resizeAndEncode(file, 512, 0.72, "image/webp"),
     resizeAndEncode(file, 2048, 0.84, "image/webp"),
   ]);
-  const exchangeDataUrl =
-    displayDataUrl.length <= 1_900_000
-      ? displayDataUrl
-      : await resizeAndEncode(file, 1200, 0.8, "image/webp");
+  const exchangeDataUrl = await createOnboardingExchangeDataUrl(
+    file,
+    displayDataUrl,
+  );
   const storedDisplaySrc = await storeAccountPhotoDataUrl({
     dataUrl: displayDataUrl,
     pathSegments: ["onboarding", catId, "display"],
@@ -1539,11 +1539,81 @@ async function saveSleepingPhotoWithFallback(file: File, catId: string) {
     }
   }
 
-  return null;
+  const fallbackOwnPhoto = createOnboardingOwnPhotoFallback({
+    catId,
+    src: exchangeDataUrl,
+    displaySrc: canUseStorage ? storedDisplaySrc : undefined,
+    thumbnailSrc: isStoragePhotoReference(storedThumbnailSrc)
+      ? storedThumbnailSrc
+      : undefined,
+    createdAt,
+  });
+
+  return { dataUrl: exchangeDataUrl, ownPhoto: fallbackOwnPhoto };
 }
 
 function isStoragePhotoReference(src: string | null | undefined): src is string {
   return Boolean(src?.startsWith("storage:") || src?.startsWith("storage://"));
+}
+
+async function createOnboardingExchangeDataUrl(
+  file: File,
+  preferredDataUrl: string,
+) {
+  if (preferredDataUrl.length <= 1_900_000) {
+    return preferredDataUrl;
+  }
+
+  for (const attempt of [
+    { maxSize: 1200, quality: 0.8 },
+    { maxSize: 900, quality: 0.76 },
+    { maxSize: 720, quality: 0.72 },
+    { maxSize: 560, quality: 0.68 },
+  ]) {
+    const dataUrl = await resizeAndEncode(
+      file,
+      attempt.maxSize,
+      attempt.quality,
+      "image/webp",
+    );
+
+    if (dataUrl.length <= 1_900_000) {
+      return dataUrl;
+    }
+  }
+
+  return resizeAndEncode(file, 420, 0.62, "image/webp");
+}
+
+function createOnboardingOwnPhotoFallback({
+  catId,
+  src,
+  displaySrc,
+  thumbnailSrc,
+  createdAt,
+}: {
+  catId: string;
+  src: string;
+  displaySrc?: string;
+  thumbnailSrc?: string;
+  createdAt: number;
+}): OwnSleepingPhoto {
+  return {
+    id: `onboarding-${createdAt}-${Math.random().toString(16).slice(2)}`,
+    ownerCatId: catId,
+    catId,
+    src,
+    ...(thumbnailSrc ? { thumbnailSrc } : {}),
+    ...(displaySrc ? { displaySrc } : {}),
+    ...(displaySrc ? { originalSrc: displaySrc } : {}),
+    state: "sleeping",
+    visibility: "shared",
+    deliveryStatus: "available",
+    triggerLabel: "ねがお",
+    theme: "sleeping",
+    shared: true,
+    createdAt,
+  };
 }
 
 async function saveStockCandidateWithFallback(file: File) {
