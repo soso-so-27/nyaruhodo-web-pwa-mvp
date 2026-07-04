@@ -9,6 +9,10 @@ import {
   isStorageDeliveryPhotoUrl,
 } from "../../src/lib/home/deliveryPoolGuards";
 import {
+  buildAccountStorageDeletionPlan,
+  getArchivedDeliveryStoragePath,
+} from "../../src/lib/accountDeletionStorage";
+import {
   DISPLAY_SIGNED_URL_SECONDS,
   normalizePersistentPhotoSrc,
   toStoragePhotoUrl,
@@ -98,6 +102,66 @@ test.describe("sleeping delivery pool guards", () => {
     );
     expect(isStorageDeliveryPhotoUrl(normalCatLikePhotoUrl)).toBe(false);
     expect(isStorageDeliveryPhotoUrl("https://example.com/photo.jpg")).toBe(false);
+  });
+
+  test("plans delivered account photos for archive before deleting user storage", () => {
+    const plan = buildAccountStorageDeletionPlan({
+      archivePathForSource: (sourcePath) =>
+        getArchivedDeliveryStoragePath(sourcePath, "archive-id"),
+      deliveryRows: [
+        {
+          photo_url: "storage:user-a/cat-1/sleeping/delivered.webp",
+          status: "delivered",
+        },
+      ],
+      ownerPrefix: "user-a",
+      storagePaths: [
+        "user-a/cat-1/sleeping/delivered.webp",
+        "user-a/cat-1/sleeping/unshared.webp",
+      ],
+    });
+
+    expect(plan.copies).toEqual([
+      {
+        archivePath: "delivery-archive/archive-id.webp",
+        sourcePath: "user-a/cat-1/sleeping/delivered.webp",
+        sourceUrlVariants: [
+          "storage:user-a/cat-1/sleeping/delivered.webp",
+          "storage://user-a/cat-1/sleeping/delivered.webp",
+        ],
+        targetPhotoUrl: "storage:delivery-archive/archive-id.webp",
+      },
+    ]);
+    expect(plan.deletablePaths).toEqual(["user-a/cat-1/sleeping/unshared.webp"]);
+    expect(plan.copies[0].archivePath).not.toContain("user-a");
+  });
+
+  test("does not preserve hidden or pending account photos", () => {
+    const plan = buildAccountStorageDeletionPlan({
+      archivePathForSource: (sourcePath) =>
+        getArchivedDeliveryStoragePath(sourcePath, "archive-id"),
+      deliveryRows: [
+        {
+          photo_url: "storage:user-a/cat-1/sleeping/hidden.webp",
+          status: "hidden",
+        },
+        {
+          photo_url: "storage:user-a/cat-1/sleeping/pending.webp",
+          status: "pending",
+        },
+      ],
+      ownerPrefix: "user-a",
+      storagePaths: [
+        "user-a/cat-1/sleeping/hidden.webp",
+        "user-a/cat-1/sleeping/pending.webp",
+      ],
+    });
+
+    expect(plan.copies).toEqual([]);
+    expect(plan.deletablePaths).toEqual([
+      "user-a/cat-1/sleeping/hidden.webp",
+      "user-a/cat-1/sleeping/pending.webp",
+    ]);
   });
 
   test("requires admin access for delivery diagnostics", async ({ request }) => {

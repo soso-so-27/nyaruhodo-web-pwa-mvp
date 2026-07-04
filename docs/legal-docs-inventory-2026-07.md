@@ -19,7 +19,7 @@
   - 現在は東京地方裁判所。運営者所在地や法務判断に合わせて確認が必要。
 - 写真削除時の配達済み相手側の扱い
   - 2026-07-05 コード確認済み。自分のねがお削除は `ownSleepingPhotos` と `cat_moments` を削除するが、受け取り側の `cat_moment_deliveries` は削除しないため、「受け取った方の記録に残ることがある」前提と整合する。
-  - ただし、アカウントとデータ全体の削除では `deleteAccountStoredData()` / 手動削除runbookがStorageオブジェクト削除を含むため、届いた先で写真を表示できなくなる可能性がある。削除案内はこの差分を区別する文言に更新済み。
+  - 2026-07-05 追補。アカウントとデータ全体の削除でも、配達済みのねがおは `delivery-archive/` へ退避して `cat_moment_deliveries.photo_url` を差し替える仕様に変更済み。削除済みユーザーのStorageパスは残さず、受け取り側の記録は画像ごと保全する。
 - reject時の本人アルバム側の扱い
   - 2026-07-05 コード確認済み。moderation reject は `cat_moments` を `rejected` / `hidden` に更新するのみで、投稿者側の local album data は削除しないため、「ユーザー自身の記録には残る」前提と整合する。
 - 価格表記

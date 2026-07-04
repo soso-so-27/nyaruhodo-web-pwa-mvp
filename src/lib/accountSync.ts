@@ -876,30 +876,42 @@ export async function deleteAccountStoredData(): Promise<AccountDeleteResult> {
     };
   }
 
-  const userId = data.user.id;
-  const errors: string[] = [];
+  const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
+  const accessToken = sessionData.session?.access_token;
 
-  await deleteStorageFolder(supabase, userId, errors);
+  if (sessionError || !accessToken) {
+    return {
+      status: "error",
+      errors: [sessionError?.message ?? "Account delete auth token missing"],
+    };
+  }
 
-  const deleteSteps = [
-    supabase.from("cat_moment_deliveries").delete().eq("user_id", userId),
-    supabase.from("cat_moments").delete().eq("user_id", userId),
-    supabase.from("collection_photos").delete().eq("user_id", userId),
-    supabase.from("record_logs").delete().eq("user_id", userId),
-    supabase.from("account_sync_state").delete().eq("user_id", userId),
-    supabase.from("cats").delete().eq("owner_user_id", userId),
-  ];
-
-  const results = await Promise.all(deleteSteps);
-
-  results.forEach((result, index) => {
-    if (result.error) {
-      errors.push(`delete step ${index + 1}: ${result.error.message}`);
-    }
+  const response = await fetch("/api/account/delete-stored-data", {
+    method: "POST",
+    headers: {
+      authorization: `Bearer ${accessToken}`,
+    },
+  }).catch((error) => {
+    throw new Error(
+      error instanceof Error ? error.message : "Account delete request failed",
+    );
   });
+  const result = await response.json().catch(() => null) as
+    | { errors?: unknown; status?: unknown }
+    | null;
+  const errors = Array.isArray(result?.errors)
+    ? result.errors.filter((error): error is string => typeof error === "string")
+    : [];
+
+  if (!response.ok || result?.status === "error") {
+    return {
+      status: "error",
+      errors: errors.length > 0 ? errors : [`Account delete failed: ${response.status}`],
+    };
+  }
 
   return {
-    status: errors.length > 0 ? "error" : "deleted",
+    status: result?.status === "deleted" ? "deleted" : "skipped",
     errors,
   };
 }

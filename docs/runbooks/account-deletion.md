@@ -1,8 +1,8 @@
 # Account Deletion Runbook
 
-Last updated: 2026-07-03
+Last updated: 2026-07-05
 
-This runbook covers manual deletion requests during the beta period. There is no self-service deletion API yet.
+This runbook covers manual deletion requests during the beta period. There is no exposed self-service deletion UI yet; the stored-data deletion API follows the same preservation rule below.
 
 ## Request Intake
 
@@ -24,31 +24,38 @@ Delete data tied to the requester from:
 - `record_logs`
 - `photo_reports`
 - `subscriptions`
-- Storage objects referenced by the deleted rows
+- Storage objects under the requester's user id prefix, except delivered photos that must be preserved for recipients
 
 If the user used the app anonymously and cannot be linked to an account, delete only data that can be confidently matched to the requester.
+
+Delivered `ねがお` is recipient data after delivery. Preserve the image for recipients before removing the requester's account data.
 
 ## Recommended Order
 
 1. Export a temporary operator-only list of row ids and storage paths needed for deletion. Do not keep this longer than the support task requires.
-2. List Storage paths from:
-   - `cat_moments.storage_path`, `display_storage_path`, `thumbnail_storage_path`
-   - `cat_moment_deliveries.storage_path`, `display_storage_path`, `thumbnail_storage_path`
-   - `collection_photos.storage_path`, `display_storage_path`, `thumbnail_storage_path`
-   - `cats.avatar_storage_path`
-3. Delete dependent rows first:
+2. List all Storage objects under the requester's user id prefix in `cat-photos`.
+3. Find delivered recipient records that reference requester-owned Storage paths:
+   - table: `cat_moment_deliveries`
+   - statuses to preserve: `delivered`, `kept`, `dismissed`
+   - compare normalized `photo_url` paths, not signed URLs
+4. For each preserved delivered photo:
+   - copy the Storage object to a neutral path under `delivery-archive/`
+   - update all matching `cat_moment_deliveries.photo_url` values to the new `storage:delivery-archive/...` path
+   - only after the copy and row update succeed, include the original requester-owned Storage path in the deletion list
+5. Delete dependent rows tied to the requester:
    - `photo_reports`
    - `record_logs`
    - `cat_moment_cats`
-   - `cat_moment_deliveries`
+   - `cat_moment_deliveries` where the requester is the recipient (`user_id`)
    - `cat_moments`
    - `collection_photos`
    - `subscriptions`
-4. Delete `cats` rows owned by the user.
-5. Delete Storage objects collected in step 2. Ignore not-found responses and continue.
-6. Delete the `auth.users` row last.
-7. Confirm the app no longer shows the account data after logout/login.
-8. Reply to the user that deletion is complete.
+6. Delete `cats` rows owned by the user.
+7. Delete requester-owned Storage objects after the preservation step. Ignore not-found responses and continue.
+8. Delete the `auth.users` row last.
+9. Confirm the app no longer shows the account data after logout/login.
+10. Confirm preserved delivered photos still render from recipient accounts and no preserved `photo_url` contains the deleted user id.
+11. Reply to the user that deletion is complete.
 
 ## Notes
 
@@ -56,4 +63,5 @@ If the user used the app anonymously and cannot be linked to an account, delete 
 - Do not delete by broad predicates such as only `slot_slug = "__cat_gallery"`. Always include the user id and, where available, cat/photo ids.
 - `collection_photos.slot_slug = "__cat_gallery"` is the internal sync slot for `この子のとっておき`; treat it as user photo data.
 - Current account sync is additive. It does not propagate deletions. Manual deletion must remove remote rows directly.
+- `cat_moment_deliveries` can display delivered photos without the original `cat_moments` row because the delivery row stores `photo_url`. It is acceptable to delete the requester's `cat_moments` after preserving delivered Storage paths.
 - If any deletion fails, keep the request open and record the exact table/path that needs follow-up.

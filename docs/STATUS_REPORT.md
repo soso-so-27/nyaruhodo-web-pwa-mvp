@@ -23,6 +23,17 @@
 - 既存default grantとして `TRUNCATE` 等の広い権限が残っている。直接insertはRLS/grantで塞がったが、grant全面整理は `docs/specs/grant-hardening-spec.md` の別タスク。
 - GitHub Actions `.github/workflows/supabase-migrations.yml` を追加し、main push時にmigration適用とdry-run差分検知を行う。
 
+## 0.1 2026-07-05 アカウント削除時の配達済みねがお保全
+
+アカウントとデータ全体の削除時も、配達済みのねがおは受け取った側の記録として画像ごと残す方針に更新済み。
+
+- `cat_moment_deliveries` は `photo_url` を持ち、表示/署名URL認可がdelivery行だけで成立するため、削除対象ユーザーの `cat_moments` は削除する方針。
+- 削除対象ユーザー配下のStorage pathを参照する配達済みdeliveryは、削除前に `delivery-archive/` の中立pathへコピーし、`cat_moment_deliveries.photo_url` を差し替える。
+- 差し替え完了後に、削除対象ユーザー配下のStorage objectを削除する。これにより、残る写真pathから削除済みユーザーidを逆引きできない。
+- 手動削除runbookと削除案内文もこの方針に更新済み。
+
+根拠: `src/app/api/account/delete-stored-data/route.ts`, `src/lib/accountDeletionStorage.ts`, `docs/runbooks/account-deletion.md`
+
 ## 1. 技術スタック・構成
 
 ### Next.js / ルーティング
