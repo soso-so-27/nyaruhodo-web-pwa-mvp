@@ -4,6 +4,25 @@
 対象リポジトリ: `web-pwa-mvp-agents-md-docs`  
 注意: このレポートはコード読解に基づく現状整理です。リポジトリ内に `spec v1.2` という単一の仕様ファイルは見当たらないため、仕様差分はユーザー指定項目および現行の `AGENTS.md` / `docs/design/DESIGN-CANON.md` / 関連実装との突き合わせとして記録します。
 
+## 0. 2026-07-04 本番Supabase security migration確認
+
+2026-07-04に本番Supabase `nyaruhodo-mvp-test` / ref `fwqhpjumerbqufqgmibu` のmigration未適用を確認し、`20260702093000` 以降7本を `supabase db push --linked` で適用済み。
+
+根拠: `docs/prod-migration-gap-2026-07-04.md`
+
+| 項目 | 本番状態 | 根拠 |
+| --- | --- | --- |
+| S1: `cat_moments` anon direct insert封鎖 | 本番込みで検証済み | `20260702093000` 適用済み。anon direct insertはHTTP 401 / `42501 permission denied` |
+| S2: admin guard | 本番コード上はfail closed。env `ADMIN_EMAILS` 未設定時は503、非adminは403 | `src/lib/adminAccess.ts` |
+| S3: `cat_moment_deliveries` anon direct insert封鎖 | 本番込みで検証済み | `20260702113000` 適用済み。backup policy 0行。anon direct insertはHTTP 401 / RLS拒否 |
+| S4: `moderation_status` filter | 本番DBにmigration適用済み。コード上は候補queryとdeliverability helperで `approved` 限定 | `docs/security-s4-extract-2026-07-02.md`, `src/app/api/sleeping-delivery/exchange/route.ts` |
+
+注意:
+
+- 過去配達履歴に、`pending` の `cat_moments` から配達された `cat_moment_deliveries` が16件ある。これは2026-06-05〜2026-06-11ごろの既存履歴であり、本タスクでは削除・更新していない。
+- 既存default grantとして `TRUNCATE` 等の広い権限が残っている。直接insertはRLS/grantで塞がったが、grant全面整理は `docs/specs/grant-hardening-spec.md` の別タスク。
+- GitHub Actions `.github/workflows/supabase-migrations.yml` を追加し、main push時にmigration適用とdry-run差分検知を行う。
+
 ## 1. 技術スタック・構成
 
 ### Next.js / ルーティング
