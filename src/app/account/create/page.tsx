@@ -25,6 +25,7 @@ import {
   normalizeOnboardingSource,
   type OnboardingSource,
 } from "../../../lib/onboarding/progress";
+import { createOnboardingHandoff } from "../../../lib/onboarding/handoff";
 import { claimPendingReferral } from "../../../lib/referrals/client";
 import {
   getDisplayEnvironment,
@@ -429,7 +430,7 @@ export default function AccountCreatePage() {
     );
   }
 
-  function handleLater() {
+  async function handleLater() {
     if (isFromOnboarding) {
       trackProductEvent("onboarding_skip", {
         source: onboardingSource,
@@ -439,6 +440,39 @@ export default function AccountCreatePage() {
         source: onboardingSource,
         state: "account_create",
       });
+
+      setIsStartingAuth(true);
+      setMessage("");
+
+      try {
+        const handoff = await createOnboardingHandoff({
+          source: onboardingSource,
+          markCompleted: true,
+        });
+
+        markOnboardingAlbumCompletionReady();
+        trackProductEvent("onboarding_album_created", {
+          source: onboardingSource,
+          method: "handoff",
+        });
+        trackProductEvent("cat_album_created", {
+          source: onboardingSource,
+          method: "handoff",
+        });
+        trackProductEvent("onboarding_completed", {
+          source: onboardingSource,
+          method: "handoff",
+        });
+        trackOnboardingAlbumCreatedVariant("handoff");
+        router.push(`${handoff.continueUrl}&handoff_from=account`);
+      } catch {
+        setIsStartingAuth(false);
+        setMessage(
+          "つづきの準備ができませんでした。少し時間をおいて、もう一度お試しください。",
+        );
+      }
+
+      return;
     }
 
     window.localStorage.setItem(
@@ -587,8 +621,9 @@ export default function AccountCreatePage() {
                       size="md"
                       onClick={handleLater}
                       fullWidth
+                      disabled={isStartingAuth || isCheckingAccount}
                     >
-                      あとで
+                      {isStartingAuth ? "準備しています..." : "アプリでつづける"}
                     </AppButton>
                   </>
                 ) : (
