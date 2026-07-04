@@ -5624,7 +5624,7 @@ const styles = {
     boxSizing: "border-box",
     color: "var(--ink-soft)",
     pointerEvents: "none",
-    backgroundImage: "url('/splash/web/apple-splash-1179-2556.webp')",
+    backgroundImage: "url('/splash/v6/apple-splash-1179-2556.png')",
     backgroundSize: "cover",
     backgroundPosition: "50% 50%",
     backgroundRepeat: "no-repeat",
