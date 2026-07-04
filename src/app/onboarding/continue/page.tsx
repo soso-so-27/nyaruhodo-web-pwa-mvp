@@ -70,6 +70,11 @@ function OnboardingContinueContent() {
         kept_exchange_photo_count: result.keptExchangePhotoCount,
         cat_count: result.catCount,
       });
+      trackProductEvent("onboarding_resumed", {
+        source: "handoff",
+        method,
+        environment: getDisplayEnvironment(),
+      });
       setStatus("restored");
       setMessage("ねがおを復元しました。ホームへ移動します。");
       window.setTimeout(() => {
@@ -85,9 +90,7 @@ function OnboardingContinueContent() {
         environment: getDisplayEnvironment(),
       });
       setStatus("error");
-      setMessage(
-        "つづきの復元ができませんでした。もう一度、招待リンクからお試しください。",
-      );
+      setMessage(getRestoreErrorMessage(errorMessage));
     }
   }
 
@@ -99,6 +102,10 @@ function OnboardingContinueContent() {
     try {
       await navigator.clipboard.writeText(continueUrl);
       setCopied(true);
+      trackProductEvent("handoff_url_copied", {
+        route: "/onboarding/continue",
+        environment: getDisplayEnvironment(),
+      });
     } catch {
       setCopied(false);
     }
@@ -192,6 +199,18 @@ function OnboardingContinueShell() {
       </div>
     </main>
   );
+}
+
+function getRestoreErrorMessage(errorMessage: string) {
+  if (errorMessage === "handoff_expired") {
+    return "このつづきのリンクは期限が切れました。もう一度、招待リンクからお試しください。";
+  }
+
+  if (errorMessage === "handoff_already_used") {
+    return "このつづきのリンクは使用済みです。すでに復元したホーム画面アプリから開いてください。";
+  }
+
+  return "つづきの復元ができませんでした。もう一度、招待リンクからお試しください。";
 }
 
 function detectEmbeddedBrowser() {

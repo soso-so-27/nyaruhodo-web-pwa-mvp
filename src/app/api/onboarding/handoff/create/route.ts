@@ -16,7 +16,7 @@ const MAX_DATA_URL_BYTES = 3 * 1024 * 1024;
 const MAX_DEPTH = 8;
 const MAX_ARRAY_ITEMS = 80;
 const MAX_OBJECT_KEYS = 80;
-const HANDOFF_EXPIRES_MS = 7 * 24 * 60 * 60 * 1000;
+const HANDOFF_EXPIRES_MS = 24 * 60 * 60 * 1000;
 
 type CreateHandoffBody = {
   payload?: unknown;

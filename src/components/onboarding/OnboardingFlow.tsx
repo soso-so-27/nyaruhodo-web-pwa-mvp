@@ -118,6 +118,7 @@ export function OnboardingFlow() {
   const prefersReducedMotion = usePrefersReducedMotion();
   const autoKeptDeliveredPhotoIdRef = useRef("");
   const hasTrackedIntroViewRef = useRef(false);
+  const hasTrackedEmbeddedBrowserRef = useRef(false);
   const hasResolvedProgressRef = useRef(false);
   const isSubmittingRef = useRef(false);
   const isOpeningEnvelopeRef = useRef(false);
@@ -195,6 +196,18 @@ export function OnboardingFlow() {
     setIsPhotoDebugMode(enabled);
     setIsEmbeddedBrowser(isEmbeddedInAppBrowser());
   }, []);
+
+  useEffect(() => {
+    if (!isEmbeddedBrowser || hasTrackedEmbeddedBrowserRef.current) {
+      return;
+    }
+
+    hasTrackedEmbeddedBrowserRef.current = true;
+    trackProductEvent("inapp_browser_detected", {
+      source: entrySource,
+      surface: "onboarding",
+    });
+  }, [entrySource, isEmbeddedBrowser]);
 
   useEffect(() => {
     if (hasResolvedProgressRef.current) {
@@ -1069,11 +1082,6 @@ export function OnboardingFlow() {
     entrySource === "referral" &&
     isEmbeddedBrowser &&
     !isExternalBrowserGuideDismissed;
-  const shouldShowEmbeddedPhotoNotice =
-    !shouldShowExternalBrowserGuide &&
-    state === "intro" &&
-    entrySource !== "direct" &&
-    isEmbeddedBrowser;
 
   return (
     <main style={styles.page}>
@@ -1148,12 +1156,6 @@ export function OnboardingFlow() {
             </p>
             {state === "saving" ? (
               <DeliveryWaiting />
-            ) : null}
-            {shouldShowEmbeddedPhotoNotice ? (
-              <p style={styles.embeddedBrowserNotice}>
-                LINEやInstagramの中で進めると、ホーム画面アプリに入れる前に
-                「アプリでつづける」が必要です。
-              </p>
             ) : null}
             <AppButton
               type="button"
@@ -1456,7 +1458,15 @@ function ExternalBrowserGuide({
 }) {
   return (
     <section style={styles.externalBrowserGuide} aria-label="ブラウザで開く案内">
-      <p style={styles.kicker}>招待リンク</p>
+      <div style={styles.externalBrowserArt} aria-hidden="true">
+        <img
+          src="/illustrations/sleeping-cat-empty.webp"
+          alt=""
+          style={styles.externalBrowserCat}
+        />
+        <OnboardingEnvelopeArt compact />
+      </div>
+      <p style={styles.kicker}>紹介リンク</p>
       <h1 style={styles.title}>
         SafariやChromeで
         <br />
@@ -2185,15 +2195,34 @@ const styles = {
     display: "grid",
     justifyItems: "center",
     textAlign: "center",
-    gap: "14px",
+    gap: "12px",
     width: "100%",
-    padding: "24px 18px",
+    padding: "22px 18px 24px",
     boxSizing: "border-box",
     border: "1px solid rgba(120,108,94,0.12)",
     borderRadius: "24px",
     background:
       "linear-gradient(180deg, rgba(255,253,248,0.86), rgba(250,244,235,0.72))",
     boxShadow: "0 18px 42px -34px rgba(82, 61, 43, 0.48)",
+  },
+  externalBrowserArt: {
+    position: "relative",
+    width: "min(62vw, 214px)",
+    height: "122px",
+    display: "grid",
+    placeItems: "center",
+    margin: "-2px 0 4px",
+  },
+  externalBrowserCat: {
+    position: "absolute",
+    zIndex: 2,
+    top: "-4px",
+    left: "50%",
+    width: "72px",
+    height: "72px",
+    objectFit: "contain",
+    transform: "translateX(-50%)",
+    filter: "drop-shadow(0 8px 12px rgba(92,70,46,0.08)) saturate(0.94)",
   },
   externalBrowserText: {
     margin: 0,

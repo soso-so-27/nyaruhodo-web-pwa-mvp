@@ -559,7 +559,7 @@ export default function AccountCreatePage() {
           ) : (
             <>
               <p style={styles.eyebrow}>
-                {isFromOnboarding ? "今日のねがお" : "ねてるねこの保存"}
+                {isFromOnboarding ? "つづき" : "ねてるねこの保存"}
               </p>
               <h1 style={styles.title}>
                 {isFromOnboarding
@@ -597,7 +597,7 @@ export default function AccountCreatePage() {
               ) : null}
               <p style={styles.authNote}>
                 {isFromOnboarding
-                  ? "Googleなしでも、一時URLを作ってホーム画面アプリに引き継げます。"
+                  ? "Googleなしでも、つづきのリンクでホーム画面アプリに引き継げます。"
                   : "Googleの画面が開きます。接続後、このアプリに戻ります。"}
               </p>
 

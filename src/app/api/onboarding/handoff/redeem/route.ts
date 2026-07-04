@@ -63,18 +63,43 @@ export async function POST(request: Request) {
     );
   }
 
+  if (data.redeemed_at || Number(data.redeem_count) > 0) {
+    return NextResponse.json(
+      { ok: false, error: "handoff_already_used" },
+      { status: 409 },
+    );
+  }
+
   const now = new Date().toISOString();
-  await supabase
+  const { data: redeemed, error: redeemError } = await supabase
     .from("onboarding_handoffs")
     .update({
-      redeemed_at: data.redeemed_at ?? now,
+      redeemed_at: now,
       last_redeemed_at: now,
-      redeem_count: Math.max(0, Number(data.redeem_count) || 0) + 1,
+      redeem_count: 1,
     })
-    .eq("handoff_token", token);
+    .eq("handoff_token", token)
+    .eq("redeem_count", 0)
+    .is("redeemed_at", null)
+    .select("payload")
+    .maybeSingle();
+
+  if (redeemError) {
+    return NextResponse.json(
+      { ok: false, error: "handoff_redeem_failed" },
+      { status: 500 },
+    );
+  }
+
+  if (!redeemed) {
+    return NextResponse.json(
+      { ok: false, error: "handoff_already_used" },
+      { status: 409 },
+    );
+  }
 
   return NextResponse.json({
     ok: true,
-    payload: data.payload,
+    payload: redeemed.payload,
   });
 }

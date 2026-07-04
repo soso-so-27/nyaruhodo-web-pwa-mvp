@@ -596,6 +596,7 @@ test.describe("onboarding delivery flow", () => {
     await expect(
       page.getByRole("heading", { name: "SafariやChromeで 開くと安心です" }),
     ).toBeVisible();
+    await expect(page.getByText("紹介リンク")).toBeVisible();
     await expect(
       page.getByRole("button", { name: "ねがおを1枚入れる" }),
     ).toHaveCount(0);
@@ -604,7 +605,7 @@ test.describe("onboarding delivery flow", () => {
     await expect(
       page.getByRole("button", { name: "ねがおを1枚入れる" }),
     ).toBeVisible();
-    await expect(page.getByText("アプリでつづける")).toBeVisible();
+    await expect(page.getByText("アプリでつづける")).toHaveCount(0);
   });
 
   test("does not keep referral links for users who already completed onboarding", async ({
