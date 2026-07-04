@@ -11,6 +11,7 @@ import {
 } from "../../lib/home/deliveryCandidates";
 import {
   keepExchangePhoto,
+  readOwnSleepingPhotos,
   saveOwnSleepingPhoto,
   updateKeptExchangePhotoDataUrl,
   type ExchangePhoto,
@@ -226,6 +227,16 @@ export function OnboardingFlow() {
       (source === "direct" || source === "referral") &&
       window.localStorage.getItem(STORAGE_KEYS.onboardingCompleted) === "true"
     ) {
+      if (!hasCompletedOnboardingEvidence()) {
+        window.localStorage.removeItem(STORAGE_KEYS.onboardingCompleted);
+        trackProductEvent("onboarding_stale_completion_cleared", {
+          source,
+          surface: "onboarding",
+        });
+        trackOnboardingIntroView(source);
+        return;
+      }
+
       router.replace("/home");
       return;
     }
@@ -482,11 +493,6 @@ export function OnboardingFlow() {
 
     document.body.appendChild(input);
     input.click();
-    window.setTimeout(() => {
-      if (!input.files?.length) {
-        input.remove();
-      }
-    }, 60000);
   }
 
   function trackCatNamePromptView(photoId?: string | null) {
@@ -964,7 +970,6 @@ export function OnboardingFlow() {
       return;
     }
 
-    window.localStorage.setItem(STORAGE_KEYS.onboardingCompleted, "true");
     router.push("/home");
   }
 
@@ -1043,9 +1048,6 @@ export function OnboardingFlow() {
             >
               {state === "saving" ? "ねこだよりを準備しています…" : "ねがおを1枚入れる"}
             </AppButton>
-            <AppButton type="button" variant="quiet" size="md" onClick={handleGoHome}>
-              あとで
-            </AppButton>
             {message ? <p style={styles.message}>{message}</p> : null}
           </section>
         ) : null}
@@ -1102,7 +1104,7 @@ export function OnboardingFlow() {
                 void handleContinueAfterCatName(true);
               }}
             >
-              あとで
+              名前なしで進む
             </AppButton>
           </section>
         ) : null}
@@ -1614,6 +1616,16 @@ function createOnboardingOwnPhotoFallback({
     shared: true,
     createdAt,
   };
+}
+
+function hasCompletedOnboardingEvidence() {
+  const progress = readCurrentOnboardingProgress();
+
+  if (progress?.stage === "album_created" || progress?.stage === "opened") {
+    return true;
+  }
+
+  return readOwnSleepingPhotos().length > 0;
 }
 
 async function saveStockCandidateWithFallback(file: File) {

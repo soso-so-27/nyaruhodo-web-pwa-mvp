@@ -1,6 +1,8 @@
 "use client";
 
 import { trackProductEvent } from "../analytics/productAnalytics";
+import { readOwnSleepingPhotos } from "../home/sleepingPhotos";
+import { readOnboardingProgress } from "../onboarding/progress";
 import { STORAGE_KEYS } from "../storage";
 import { createBrowserSupabaseClient } from "../supabase/browser";
 
@@ -29,12 +31,20 @@ export function capturePendingReferralFromLocation() {
   }
 
   if (window.localStorage.getItem(STORAGE_KEYS.onboardingCompleted) === "true") {
-    window.localStorage.removeItem(STORAGE_KEYS.pendingReferralCode);
-    trackProductEvent("referral_link_ignored", {
+    if (hasCompletedOnboardingEvidence()) {
+      window.localStorage.removeItem(STORAGE_KEYS.pendingReferralCode);
+      trackProductEvent("referral_link_ignored", {
+        code,
+        reason: "onboarding_completed",
+      });
+      return null;
+    }
+
+    window.localStorage.removeItem(STORAGE_KEYS.onboardingCompleted);
+    trackProductEvent("referral_stale_completion_cleared", {
       code,
-      reason: "onboarding_completed",
+      reason: "missing_completion_evidence",
     });
-    return null;
   }
 
   window.localStorage.setItem(
@@ -50,6 +60,16 @@ export function capturePendingReferralFromLocation() {
   });
 
   return code;
+}
+
+function hasCompletedOnboardingEvidence() {
+  const progress = readOnboardingProgress();
+
+  if (progress?.stage === "album_created" || progress?.stage === "opened") {
+    return true;
+  }
+
+  return readOwnSleepingPhotos().length > 0;
 }
 
 export async function readClientReferralSummary(): Promise<ClientReferralSummary> {

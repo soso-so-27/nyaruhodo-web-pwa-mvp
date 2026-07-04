@@ -585,6 +585,24 @@ test.describe("onboarding delivery flow", () => {
     await page.addInitScript(() => {
       window.localStorage.setItem("onboarding_completed", "true");
       window.localStorage.setItem(
+        "nyaruhodo_exchange_own_sleeping_photos",
+        JSON.stringify([
+          {
+            id: "completed-own-photo",
+            ownerCatId: "completed-cat",
+            catId: "completed-cat",
+            src: "storage:completed-cat/sleeping/completed-own-photo.webp",
+            state: "sleeping",
+            visibility: "shared",
+            deliveryStatus: "available",
+            triggerLabel: "ねがお",
+            theme: "sleeping",
+            shared: true,
+            createdAt: Date.now(),
+          },
+        ]),
+      );
+      window.localStorage.setItem(
         "neteruneko_pending_referral_code",
         JSON.stringify({ code: "OLD234", capturedAt: new Date().toISOString() }),
       );
@@ -597,6 +615,26 @@ test.describe("onboarding delivery flow", () => {
         page.evaluate(() =>
           window.localStorage.getItem("neteruneko_pending_referral_code"),
         ),
+      )
+      .toBeNull();
+  });
+
+  test("clears stale onboarding completion flags without evidence", async ({
+    page,
+  }) => {
+    await page.addInitScript(() => {
+      window.localStorage.setItem("onboarding_completed", "true");
+      window.localStorage.removeItem("neteruneko_onboarding_progress");
+      window.localStorage.removeItem("nyaruhodo_exchange_own_sleeping_photos");
+      window.localStorage.removeItem("neteruneko_pending_referral_code");
+    });
+
+    await page.goto("/onboarding?source=referral&ref=STALE1");
+    await expect(page.locator("main button")).toHaveCount(1);
+    await expect(page.locator("main button").first()).toBeVisible();
+    await expect
+      .poll(() =>
+        page.evaluate(() => window.localStorage.getItem("onboarding_completed")),
       )
       .toBeNull();
   });
