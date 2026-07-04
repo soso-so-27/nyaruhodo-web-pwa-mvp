@@ -61,8 +61,20 @@ type OnboardingState =
   | "empty"
   | "kept";
 
+type OnboardingPhotoDebugInfo = {
+  stage: string;
+  fileName: string;
+  fileType: string;
+  fileExtension: string;
+  fileSize: string;
+  lastModified: string;
+  browser: string;
+  errorMessage?: string;
+};
+
 const ONBOARDING_ALBUM_COMPLETION_READY_KEY =
   "neteruneko_onboarding_album_completion_ready";
+const ONBOARDING_PHOTO_DEBUG_STORAGE_KEY = "neteruneko_onboarding_photo_debug";
 const ONBOARDING_FALLBACK_DELIVERY_SRC =
   "/illustrations/sleeping-cat-empty.webp";
 const IS_PRODUCTION = process.env.NODE_ENV === "production";
@@ -86,6 +98,9 @@ export function OnboardingFlow() {
   const [isDeliveredPhotoKept, setIsDeliveredPhotoKept] = useState(false);
   const [pendingOwnPhoto, setPendingOwnPhoto] = useState<OwnSleepingPhoto | null>(null);
   const [message, setMessage] = useState("");
+  const [isPhotoDebugMode, setIsPhotoDebugMode] = useState(false);
+  const [photoDebugInfo, setPhotoDebugInfo] =
+    useState<OnboardingPhotoDebugInfo | null>(null);
   const [isCandidateAdding, setIsCandidateAdding] = useState(false);
   const [isTestMode, setIsTestMode] = useState(false);
   const [completionCopy, setCompletionCopy] = useState("");
@@ -166,6 +181,12 @@ export function OnboardingFlow() {
     return () => {
       isMounted = false;
     };
+  }, []);
+
+  useEffect(() => {
+    const enabled = readOnboardingPhotoDebugEnabled();
+
+    setIsPhotoDebugMode(enabled);
   }, []);
 
   useEffect(() => {
@@ -388,6 +409,17 @@ export function OnboardingFlow() {
       const file = input.files?.[0];
 
       if (!file || !isLikelyImageFile(file)) {
+        if (isPhotoDebugMode) {
+          setPhotoDebugInfo(
+            createOnboardingPhotoDebugInfo(
+              "rejected",
+              file,
+              file
+                ? "unsupported_type_or_size"
+                : "missing_file_from_browser_input",
+            ),
+          );
+        }
         setMessage("写真を読み込めませんでした。JPEGやPNGの写真で、もう一度試してください。");
         cleanupInput();
         return;
@@ -396,6 +428,11 @@ export function OnboardingFlow() {
       setState("saving");
       isSubmittingRef.current = true;
       setMessage("");
+      if (isPhotoDebugMode) {
+        setPhotoDebugInfo(createOnboardingPhotoDebugInfo("selected", file));
+      } else {
+        setPhotoDebugInfo(null);
+      }
 
       try {
         const profiles = readCatProfiles();
@@ -406,6 +443,15 @@ export function OnboardingFlow() {
         const savedResult = await saveSleepingPhotoWithFallback(file, catId);
 
         if (!savedResult) {
+          if (isPhotoDebugMode) {
+            setPhotoDebugInfo(
+              createOnboardingPhotoDebugInfo(
+                "save-returned-null",
+                file,
+                "saveSleepingPhotoWithFallback returned null",
+              ),
+            );
+          }
           setMessage("写真を保存できませんでした。少し時間をおいて、もう一度試してください。");
           setState("intro");
           return;
@@ -478,18 +524,24 @@ export function OnboardingFlow() {
       } catch (error) {
         const errorMessage =
           error instanceof Error ? error.message : "onboarding photo save failed";
+        const errorStage = getOnboardingPhotoErrorStage(errorMessage);
+        if (isPhotoDebugMode) {
+          setPhotoDebugInfo(
+            createOnboardingPhotoDebugInfo(errorStage, file, errorMessage),
+          );
+        }
         trackProductEvent("photo_upload_error", {
           source: getEffectiveEntrySource(),
           surface: "onboarding",
           error_code: "onboarding_photo_save_failed",
           error_message: errorMessage,
-          error_stage: getOnboardingPhotoErrorStage(errorMessage),
+          error_stage: errorStage,
           file_size_bucket: getFileSizeBucket(file.size),
           file_type: sanitizeFileType(file.type),
           file_extension: getSafeFileExtension(file.name),
         });
         setMessage(
-          getOnboardingPhotoErrorStage(errorMessage) === "decode"
+          errorStage === "decode"
             ? "写真を読み込めませんでした。JPEGやPNGの写真で、もう一度試してください。"
             : "写真を保存できませんでした。少し時間をおいて、もう一度試してください。",
         );
@@ -1058,6 +1110,9 @@ export function OnboardingFlow() {
               {state === "saving" ? "ねこだよりを準備しています…" : "ねがおを1枚入れる"}
             </AppButton>
             {message ? <p style={styles.message}>{message}</p> : null}
+            {isPhotoDebugMode ? (
+              <OnboardingPhotoDebugPanel info={photoDebugInfo} />
+            ) : null}
           </section>
         ) : null}
 
@@ -1333,6 +1388,47 @@ function DeliveryWaiting() {
   );
 }
 
+function OnboardingPhotoDebugPanel({
+  info,
+}: {
+  info: OnboardingPhotoDebugInfo | null;
+}) {
+  if (!info) {
+    return (
+      <details style={styles.photoDebugPanel}>
+        <summary style={styles.photoDebugSummary}>写真デバッグ</summary>
+        <p style={styles.photoDebugText}>
+          写真を選ぶと、ここに読み込み情報が出ます。
+        </p>
+      </details>
+    );
+  }
+
+  const rows = [
+    ["stage", info.stage],
+    ["type", info.fileType],
+    ["ext", info.fileExtension],
+    ["size", info.fileSize],
+    ["modified", info.lastModified],
+    ["browser", info.browser],
+    ...(info.errorMessage ? [["error", info.errorMessage]] : []),
+  ];
+
+  return (
+    <details style={styles.photoDebugPanel} open>
+      <summary style={styles.photoDebugSummary}>写真デバッグ</summary>
+      <dl style={styles.photoDebugList}>
+        {rows.map(([label, value]) => (
+          <div key={label} style={styles.photoDebugRow}>
+            <dt style={styles.photoDebugLabel}>{label}</dt>
+            <dd style={styles.photoDebugValue}>{value}</dd>
+          </div>
+        ))}
+      </dl>
+    </details>
+  );
+}
+
 function usePrefersReducedMotion() {
   const [prefersReducedMotion, setPrefersReducedMotion] = useState(false);
 
@@ -1374,6 +1470,32 @@ function hasReferralQueryInLocation() {
 
   const params = new URLSearchParams(window.location.search);
   return params.has("ref") || params.has("referral") || params.has("invite");
+}
+
+function readOnboardingPhotoDebugEnabled() {
+  if (typeof window === "undefined") {
+    return false;
+  }
+
+  const params = new URLSearchParams(window.location.search);
+  const requested =
+    params.get("photoDebug") === "1" || params.get("debug") === "photo";
+
+  if (requested) {
+    try {
+      window.localStorage.setItem(ONBOARDING_PHOTO_DEBUG_STORAGE_KEY, "true");
+    } catch {
+      // Debug mode should not block onboarding.
+    }
+
+    return true;
+  }
+
+  try {
+    return window.localStorage.getItem(ONBOARDING_PHOTO_DEBUG_STORAGE_KEY) === "true";
+  } catch {
+    return false;
+  }
 }
 
 async function createOnboardingFallbackDeliveryPhoto(
@@ -1770,6 +1892,71 @@ function getFileSizeBucket(size: number) {
   return "large";
 }
 
+function createOnboardingPhotoDebugInfo(
+  stage: string,
+  file: File | null | undefined,
+  errorMessage?: string,
+): OnboardingPhotoDebugInfo {
+  return {
+    stage,
+    fileName: getSafeDebugFileName(file?.name),
+    fileType: sanitizeFileType(file?.type ?? ""),
+    fileExtension: getSafeFileExtension(file?.name ?? ""),
+    fileSize: formatFileSize(file?.size ?? 0),
+    lastModified: formatFileTimestamp(file?.lastModified ?? 0),
+    browser: getDebugBrowserLabel(),
+    ...(errorMessage ? { errorMessage: truncateDebugText(errorMessage, 160) } : {}),
+  };
+}
+
+function getSafeDebugFileName(name: string | undefined) {
+  if (!name) {
+    return "unknown";
+  }
+
+  const extension = getSafeFileExtension(name);
+  return extension === "unknown" ? "selected-file" : `selected.${extension}`;
+}
+
+function formatFileSize(size: number) {
+  if (!Number.isFinite(size) || size <= 0) {
+    return "unknown";
+  }
+
+  return `${(size / 1_000_000).toFixed(2)} MB (${getFileSizeBucket(size)})`;
+}
+
+function formatFileTimestamp(timestamp: number) {
+  if (!Number.isFinite(timestamp) || timestamp <= 0) {
+    return "unknown";
+  }
+
+  return new Date(timestamp).toISOString();
+}
+
+function getDebugBrowserLabel() {
+  if (typeof navigator === "undefined") {
+    return "unknown";
+  }
+
+  const userAgent = navigator.userAgent;
+  const isAndroid = /Android/i.test(userAgent);
+  const isLine = /Line/i.test(userAgent);
+  const isInstagram = /Instagram/i.test(userAgent);
+  const isWebView = /wv|Version\/[\d.]+ Chrome\/[\d.]+ Mobile Safari/i.test(
+    userAgent,
+  );
+
+  return [
+    isAndroid ? "Android" : /iPhone|iPad|iPod/i.test(userAgent) ? "iOS" : "other",
+    isLine ? "LINE" : isInstagram ? "Instagram" : isWebView ? "WebView" : "browser",
+  ].join(" / ");
+}
+
+function truncateDebugText(value: string, maxLength: number) {
+  return value.length > maxLength ? `${value.slice(0, maxLength)}…` : value;
+}
+
 async function keepExchangePhotoForAlbum(photo: ExchangePhoto) {
   const candidates = await createAlbumPhotoCandidates(photo);
 
@@ -2079,6 +2266,49 @@ const styles = {
     lineHeight: 1.55,
     padding: "10px 12px",
     boxShadow: "0 4px 12px rgba(90,76,60,0.025)",
+  },
+  photoDebugPanel: {
+    width: "min(100%, 280px)",
+    margin: "0",
+    border: "1px dashed rgba(142, 80, 70, 0.34)",
+    borderRadius: "var(--radius-md)",
+    background: "rgba(255,253,248,0.72)",
+    color: "#5f554b",
+    fontFamily: UI_FONT,
+    fontSize: "11px",
+    lineHeight: 1.45,
+    padding: "9px 10px",
+    textAlign: "left",
+    boxSizing: "border-box",
+  },
+  photoDebugSummary: {
+    cursor: "pointer",
+    color: "var(--seal)",
+    fontWeight: 600,
+    letterSpacing: "0.03em",
+  },
+  photoDebugText: {
+    margin: "8px 0 0",
+  },
+  photoDebugList: {
+    display: "grid",
+    gap: "5px",
+    margin: "8px 0 0",
+  },
+  photoDebugRow: {
+    display: "grid",
+    gridTemplateColumns: "68px minmax(0, 1fr)",
+    gap: "7px",
+    alignItems: "start",
+  },
+  photoDebugLabel: {
+    color: "#8a7d70",
+    fontWeight: 600,
+  },
+  photoDebugValue: {
+    minWidth: 0,
+    margin: 0,
+    overflowWrap: "anywhere",
   },
   result: {
     display: "grid",
