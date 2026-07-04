@@ -675,6 +675,26 @@ test.describe("onboarding delivery flow", () => {
     expect(storage.pendingReferral).toContain("ABC234");
   });
 
+  test("does not consume handoff links inside embedded browsers", async ({
+    page,
+  }) => {
+    await page.addInitScript(() => {
+      Object.defineProperty(window.navigator, "userAgent", {
+        get: () =>
+          "Mozilla/5.0 (Linux; Android 14; Pixel 7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Mobile Safari/537.36 Line/14.0.0",
+      });
+    });
+
+    await page.goto(
+      "/onboarding/continue?handoff=onb_00000000-0000-4000-8000-000000000000_0123456789abcdef0123456789abcdef0123",
+    );
+    await expect(
+      page.getByRole("heading", { name: "ホーム画面アプリで つづけます" }),
+    ).toBeVisible();
+    await expect(page.getByRole("button", { name: "URLをコピー" })).toBeVisible();
+    await expect(page.getByRole("button", { name: "このまま復元する" })).toHaveCount(0);
+  });
+
   test("does not keep referral links for users who already completed onboarding", async ({
     page,
   }) => {

@@ -2,7 +2,7 @@
 
 import { useRouter, useSearchParams } from "next/navigation";
 import type { CSSProperties } from "react";
-import { Suspense, useEffect, useMemo, useRef, useState } from "react";
+import { Suspense, useEffect, useRef, useState } from "react";
 
 import { AppButton } from "../../../components/ui/AppButton";
 import { AppCard } from "../../../components/ui/AppCard";
@@ -29,8 +29,10 @@ function OnboardingContinueContent() {
   const [status, setStatus] = useState<RestoreStatus>("ready");
   const [message, setMessage] = useState("");
   const [copied, setCopied] = useState(false);
+  const [hasCheckedEnvironment, setHasCheckedEnvironment] = useState(false);
+  const [isEmbeddedBrowser, setIsEmbeddedBrowser] = useState(false);
   const didAutoRestore = useRef(false);
-  const isEmbeddedBrowser = useMemo(() => detectEmbeddedBrowser(), []);
+  const shouldShowEmbeddedGuide = hasCheckedEnvironment && isEmbeddedBrowser;
   const continueUrl =
     typeof window === "undefined"
       ? ""
@@ -39,9 +41,18 @@ function OnboardingContinueContent() {
         )}`;
 
   useEffect(() => {
+    setIsEmbeddedBrowser(detectEmbeddedBrowser());
+    setHasCheckedEnvironment(true);
+  }, []);
+
+  useEffect(() => {
     if (!token) {
       setStatus("error");
       setMessage("つづきの情報が見つかりませんでした。");
+      return;
+    }
+
+    if (!hasCheckedEnvironment) {
       return;
     }
 
@@ -52,7 +63,7 @@ function OnboardingContinueContent() {
     didAutoRestore.current = true;
     void restoreAndGoHome("auto");
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isEmbeddedBrowser, token]);
+  }, [hasCheckedEnvironment, isEmbeddedBrowser, token]);
 
   async function restoreAndGoHome(method: "auto" | "manual") {
     if (!token || status === "restoring") {
@@ -118,17 +129,21 @@ function OnboardingContinueContent() {
         <AppCard variant="section" padding="lg" style={styles.card}>
           <p style={styles.eyebrow}>つづき</p>
           <h1 style={styles.title}>
-            {isEmbeddedBrowser
-              ? "ホーム画面アプリで つづけます"
-              : "ねがおを 復元しています"}
+            {!hasCheckedEnvironment
+              ? "ねがおを 確認しています"
+              : shouldShowEmbeddedGuide
+                ? "ホーム画面アプリで つづけます"
+                : "ねがおを 復元しています"}
           </h1>
           <p style={styles.body}>
-            {isEmbeddedBrowser
-              ? "LINEやInstagramの中で入れた写真は、ホーム画面アプリへ自動では渡りません。このページをChromeやSafari、またはホーム画面アプリで開くと、さっきのねがおを復元できます。"
-              : "さっき入れたねがおを、このブラウザに戻しています。"}
+            {!hasCheckedEnvironment
+              ? "少しだけお待ちください。"
+              : shouldShowEmbeddedGuide
+                ? "LINEやInstagramの中で入れた写真は、ホーム画面アプリへ自動では渡りません。URLをコピーして、ChromeやSafari、またはホーム画面アプリで開いてください。"
+                : "さっき入れたねがおを、このブラウザに戻しています。"}
           </p>
 
-          {isEmbeddedBrowser ? (
+          {shouldShowEmbeddedGuide ? (
             <div style={styles.urlBox}>
               <span style={styles.urlText}>{continueUrl}</span>
             </div>
@@ -141,7 +156,7 @@ function OnboardingContinueContent() {
           ) : null}
 
           <div style={styles.actions}>
-            {isEmbeddedBrowser ? (
+            {!hasCheckedEnvironment ? null : shouldShowEmbeddedGuide ? (
               <>
                 <AppButton
                   type="button"
@@ -152,18 +167,6 @@ function OnboardingContinueContent() {
                   }}
                 >
                   {copied ? "コピーしました" : "URLをコピー"}
-                </AppButton>
-                <AppButton
-                  type="button"
-                  variant="quiet"
-                  size="md"
-                  fullWidth
-                  disabled={status === "restoring"}
-                  onClick={() => {
-                    void restoreAndGoHome("manual");
-                  }}
-                >
-                  このまま復元する
                 </AppButton>
               </>
             ) : (

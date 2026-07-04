@@ -80,7 +80,7 @@ declare global {
 export default function AccountCreatePage() {
   const router = useRouter();
   const [message, setMessage] = useState("");
-  const [isStartingAuth, setIsStartingAuth] = useState(false);
+  const [pendingAction, setPendingAction] = useState<"google" | "handoff" | null>(null);
   const [isCheckingAccount, setIsCheckingAccount] = useState(true);
   const [isAccountConnected, setIsAccountConnected] = useState(false);
   const [connectedEmail, setConnectedEmail] = useState("");
@@ -96,6 +96,9 @@ export default function AccountCreatePage() {
   const hasTrackedCallbackError = useRef(false);
 
   const hasOnboardingCatName = onboardingCatName.trim().length > 0;
+  const isStartingAuth = pendingAction !== null;
+  const isStartingGoogle = pendingAction === "google";
+  const isPreparingHandoff = pendingAction === "handoff";
   const onboardingAlbumTitle = hasOnboardingCatName
     ? `${onboardingCatName.trim()}のアルバムをつくる`
     : "うちのこのアルバムをつくる";
@@ -240,7 +243,7 @@ export default function AccountCreatePage() {
       return;
     }
 
-    setIsStartingAuth(true);
+    setPendingAction("google");
     setMessage("");
     window.localStorage.setItem(
       STORAGE_KEYS.authGooglePending,
@@ -283,7 +286,7 @@ export default function AccountCreatePage() {
         error_message: error.message,
       });
       window.localStorage.removeItem(STORAGE_KEYS.authGooglePending);
-      setIsStartingAuth(false);
+      setPendingAction(null);
       setMessage("Googleログインを開始できませんでした。少し時間をおいてもう一度お試しください。");
     }
   }
@@ -307,7 +310,7 @@ export default function AccountCreatePage() {
       return;
     }
 
-    setIsStartingAuth(true);
+    setPendingAction("google");
     setMessage("");
     trackProductEvent("auth_google_started", {
       route: "/account/create",
@@ -321,7 +324,7 @@ export default function AccountCreatePage() {
       trackProductEvent("auth_google_failed", {
         error_type: "missing_google_credential",
       });
-      setIsStartingAuth(false);
+      setPendingAction(null);
       setMessage("Googleログイン情報を受け取れませんでした。もう一度お試しください。");
       return;
     }
@@ -343,7 +346,7 @@ export default function AccountCreatePage() {
         error_type: "id_token_sign_in_failed",
         error_message: error.message,
       });
-      setIsStartingAuth(false);
+      setPendingAction(null);
       setMessage(
         "Googleログインを開始できませんでした。少し時間をおいてもう一度お試しください。",
       );
@@ -398,7 +401,7 @@ export default function AccountCreatePage() {
         state: "account_create",
       });
 
-      setIsStartingAuth(true);
+      setPendingAction("handoff");
       setMessage("");
 
       try {
@@ -423,7 +426,7 @@ export default function AccountCreatePage() {
         trackOnboardingAlbumCreatedVariant("handoff");
         router.push(`${handoff.continueUrl}&handoff_from=account`);
       } catch {
-        setIsStartingAuth(false);
+        setPendingAction(null);
         setMessage(
           "つづきの準備ができませんでした。少し時間をおいて、もう一度お試しください。",
         );
@@ -570,7 +573,7 @@ export default function AccountCreatePage() {
                       fullWidth
                       disabled={isStartingAuth || isCheckingAccount}
                     >
-                      {isStartingAuth ? "Googleを開いています..." : "Googleでつづける"}
+                      {isStartingGoogle ? "Googleを開いています..." : "Googleでつづける"}
                     </AppButton>
                     <AppButton
                       type="button"
@@ -580,7 +583,7 @@ export default function AccountCreatePage() {
                       fullWidth
                       disabled={isStartingAuth || isCheckingAccount}
                     >
-                      {isStartingAuth ? "準備しています..." : "アプリでつづける"}
+                      {isPreparingHandoff ? "リンクを作っています..." : "つづきのリンクを作る"}
                     </AppButton>
                   </>
                 ) : (
@@ -594,7 +597,7 @@ export default function AccountCreatePage() {
                       fullWidth
                       disabled={isStartingAuth || isCheckingAccount}
                     >
-                      {isStartingAuth ? "Googleを開いています..." : "Googleで続ける"}
+                      {isStartingGoogle ? "Googleを開いています..." : "Googleで続ける"}
                     </AppButton>
                     <AppButton
                       type="button"

@@ -483,13 +483,16 @@ export function OnboardingFlow() {
         setPhotoDebugInfo(null);
       }
 
+      let savedResult: Awaited<ReturnType<typeof saveSleepingPhotoWithFallback>> | null = null;
+      let catId = "";
+
       try {
         const profiles = readCatProfiles();
         const activeProfile = getActiveCatProfile(profiles, readActiveCatId());
-        const catId = activeProfile.id;
+        catId = activeProfile.id;
 
         saveActiveCatId(catId);
-        const savedResult = await saveSleepingPhotoWithFallback(file, catId);
+        savedResult = await saveSleepingPhotoWithFallback(file, catId);
 
         if (!savedResult) {
           if (isPhotoDebugMode) {
@@ -505,7 +508,39 @@ export function OnboardingFlow() {
           setState("intro");
           return;
         }
+      } catch (error) {
+        const errorMessage =
+          error instanceof Error ? error.message : "onboarding photo save failed";
+        const errorStage = getOnboardingPhotoErrorStage(errorMessage);
+        if (isPhotoDebugMode) {
+          setPhotoDebugInfo(
+            createOnboardingPhotoDebugInfo(errorStage, file, errorMessage),
+          );
+        }
+        trackProductEvent("photo_upload_error", {
+          source: getEffectiveEntrySource(),
+          surface: "onboarding",
+          error_code: "onboarding_photo_save_failed",
+          error_message: errorMessage,
+          error_stage: errorStage,
+          file_size_bucket: getFileSizeBucket(file.size),
+          file_type: sanitizeFileType(file.type),
+          file_extension: getSafeFileExtension(file.name),
+        });
+        setMessage(
+          errorStage === "decode"
+            ? "写真を読み込めませんでした。JPEGやPNGの写真で、もう一度試してください。"
+            : "写真を保存できませんでした。少し時間をおいて、もう一度試してください。",
+        );
+        setState("intro");
+        return;
+      }
 
+      if (!savedResult) {
+        return;
+      }
+
+      try {
         const { dataUrl, ownPhoto } = savedResult;
         setSelectedPhotoSrc(dataUrl);
         setPendingOwnPhoto(ownPhoto);
@@ -571,29 +606,35 @@ export function OnboardingFlow() {
         }
       } catch (error) {
         const errorMessage =
-          error instanceof Error ? error.message : "onboarding photo save failed";
-        const errorStage = getOnboardingPhotoErrorStage(errorMessage);
+          error instanceof Error ? error.message : "onboarding delivery failed";
         if (isPhotoDebugMode) {
           setPhotoDebugInfo(
-            createOnboardingPhotoDebugInfo(errorStage, file, errorMessage),
+            createOnboardingPhotoDebugInfo("delivery", file, errorMessage),
           );
         }
+        trackProductEvent("onboarding_delivery_error", {
+          source: getEffectiveEntrySource(),
+          error_code: "onboarding_delivery_failed_after_photo_save",
+          error_message: errorMessage,
+          file_size_bucket: getFileSizeBucket(file.size),
+          file_type: sanitizeFileType(file.type),
+          file_extension: getSafeFileExtension(file.name),
+        });
         trackProductEvent("photo_upload_error", {
           source: getEffectiveEntrySource(),
           surface: "onboarding",
-          error_code: "onboarding_photo_save_failed",
-          error_message: errorMessage,
-          error_stage: errorStage,
+          error_code: "onboarding_delivery_failed_after_photo_save",
+          error_stage: "delivery",
           file_size_bucket: getFileSizeBucket(file.size),
           file_type: sanitizeFileType(file.type),
           file_extension: getSafeFileExtension(file.name),
         });
         setMessage(
-          errorStage === "decode"
-            ? "写真を読み込めませんでした。JPEGやPNGの写真で、もう一度試してください。"
-            : "写真を保存できませんでした。少し時間をおいて、もう一度試してください。",
+          canShowTestTools
+            ? "ねがおは入りました。とどく候補の準備で止まりました。テスト用に候補を追加できます。"
+            : "ねがおは入りました。とどくねがおの準備に時間がかかっています。少し時間をおいて、もう一度お試しください。",
         );
-        setState("intro");
+        setState("empty");
       } finally {
         isSubmittingRef.current = false;
         cleanupInput();
