@@ -237,6 +237,7 @@ const YOUSU_OPTIONS = [
 const HOME_NAV_FRAME_WIDTH = "min(calc(100% - 28px), 410px)";
 const HOME_NAV_EDGE_INSET = "max(14px, calc((100vw - 410px) / 2))";
 const HOME_STARTUP_HOLD_MIN_MS = 280;
+let hasShownHomeStartupHold = false;
 
 type BoardShelfStat = {
   icon: AppIconName;
@@ -287,7 +288,9 @@ export function HomeInput({
   const [activeCatId, setActiveCatId] = useState<string | null>(null);
   const [activeCat, setActiveCat] = useState<CatProfile | null>(null);
   const [hasHydratedHomeState, setHasHydratedHomeState] = useState(false);
-  const [isStartupHoldReleased, setIsStartupHoldReleased] = useState(false);
+  const [isStartupHoldReleased, setIsStartupHoldReleased] = useState(
+    () => hasShownHomeStartupHold,
+  );
   const [lockData, setLockData] = useState<LockData>({});
   const [tick, setTick] = useState(initialNow);
   const isHomeClockReady = tick > 0;
@@ -370,7 +373,13 @@ export function HomeInput({
     setHasAcceptedSleepingSafety(hasAcceptedSleepingSafetyNotice());
     setHasHydratedHomeState(true);
 
+    if (hasShownHomeStartupHold) {
+      setIsStartupHoldReleased(true);
+      return undefined;
+    }
+
     releaseTimerId = window.setTimeout(() => {
+      hasShownHomeStartupHold = true;
       setIsStartupHoldReleased(true);
     }, HOME_STARTUP_HOLD_MIN_MS);
 
