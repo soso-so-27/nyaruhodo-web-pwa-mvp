@@ -12,6 +12,7 @@ import {
   buildAccountStorageDeletionPlan,
   getArchivedDeliveryStoragePath,
 } from "../../src/lib/accountDeletionStorage";
+import { isAccountDeletionStripeCancellationRequired } from "../../src/lib/accountDeletionBilling";
 import {
   CAT_PHOTOS_BUCKET,
   DISPLAY_SIGNED_URL_SECONDS,
@@ -164,6 +165,42 @@ test.describe("sleeping delivery pool guards", () => {
       "user-a/cat-1/sleeping/hidden.webp",
       "user-a/cat-1/sleeping/pending.webp",
     ]);
+  });
+
+  test("requires Stripe cancellation before deleting payable account data", () => {
+    expect(
+      isAccountDeletionStripeCancellationRequired({
+        cancelAtPeriodEnd: false,
+        currentPeriodEnd: null,
+        priceId: "price_live",
+        status: "active",
+        stripeCustomerId: "cus_live",
+        stripeSubscriptionId: "sub_live",
+        userId: "user-a",
+      }),
+    ).toBe(true);
+    expect(
+      isAccountDeletionStripeCancellationRequired({
+        cancelAtPeriodEnd: false,
+        currentPeriodEnd: null,
+        priceId: "price_live",
+        status: "canceled",
+        stripeCustomerId: "cus_live",
+        stripeSubscriptionId: "sub_live",
+        userId: "user-a",
+      }),
+    ).toBe(false);
+    expect(
+      isAccountDeletionStripeCancellationRequired({
+        cancelAtPeriodEnd: false,
+        currentPeriodEnd: null,
+        priceId: "price_live",
+        status: "active",
+        stripeCustomerId: "cus_live",
+        stripeSubscriptionId: null,
+        userId: "user-a",
+      }),
+    ).toBe(false);
   });
 
   test("account deletion guide explains delivered photos remain", async ({

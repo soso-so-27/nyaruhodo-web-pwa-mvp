@@ -167,6 +167,15 @@ export async function retrieveStripeSubscription(subscriptionId: string) {
   );
 }
 
+export async function cancelStripeSubscription(subscriptionId: string) {
+  return stripeRequest<StripeSubscriptionPayload>(
+    `/subscriptions/${encodeURIComponent(subscriptionId)}`,
+    {
+      method: "DELETE",
+    },
+  );
+}
+
 export function verifyStripeWebhookEvent(rawBody: string, signature: string | null) {
   const webhookSecret = getStripeWebhookSecret();
 
@@ -208,7 +217,7 @@ export function readStripeObjectId(value: unknown) {
 async function stripeRequest<T>(
   path: string,
   init: {
-    method: "GET" | "POST";
+    method: "DELETE" | "GET" | "POST";
     body?: URLSearchParams;
   },
 ) {

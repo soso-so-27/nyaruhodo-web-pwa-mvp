@@ -9,6 +9,7 @@ import {
   PRESERVED_DELIVERY_STATUSES,
   type DeliveryStorageReference,
 } from "../../../../lib/accountDeletionStorage";
+import { cancelAccountDeletionStripeSubscriptions } from "../../../../lib/accountDeletionBilling";
 import { CAT_PHOTOS_BUCKET } from "../../../../lib/photoStorage";
 import { createSupabaseAdminClient } from "../../../../lib/supabase/admin";
 import { getSupabasePublicConfig } from "../../../../lib/supabase/config";
@@ -21,6 +22,7 @@ const DELETE_RATE_LIMIT_MAX_BUCKETS = 1000;
 const deleteRateLimitBuckets = new Map<string, number>();
 
 type AccountDeleteResult = {
+  cancelledStripeSubscriptions: number;
   deletedStoragePaths: number;
   errors: string[];
   preservedDeliveryPhotos: number;
@@ -98,6 +100,21 @@ async function deleteStoredDataForUser(
   userId: string,
 ): Promise<AccountDeleteResult> {
   const errors: string[] = [];
+  const billingResult = await cancelAccountDeletionStripeSubscriptions({
+    supabase,
+    userId,
+  });
+
+  if (billingResult.errors.length > 0) {
+    return {
+      cancelledStripeSubscriptions: billingResult.cancelledStripeSubscriptions,
+      deletedStoragePaths: 0,
+      errors: billingResult.errors,
+      preservedDeliveryPhotos: 0,
+      status: "error",
+    };
+  }
+
   const storagePaths = await listStoragePaths(supabase, userId, errors);
   const deliveryRows = await readPreservedDeliveryRowsForPrefix(
     supabase,
@@ -154,6 +171,7 @@ async function deleteStoredDataForUser(
   }
 
   return {
+    cancelledStripeSubscriptions: billingResult.cancelledStripeSubscriptions,
     deletedStoragePaths: deletablePaths.length,
     errors,
     preservedDeliveryPhotos: copiedSourcePaths.length,
