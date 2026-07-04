@@ -665,7 +665,7 @@ export function SettingsPage() {
         {activeSettingsTab === "general" ? (
           <>
         <section style={{ ...styles.section, order: 2 }}>
-          <p style={styles.sectionLabel}>保存と復元</p>
+          <p style={styles.sectionLabel}>アカウント同期</p>
           <AppCard variant="outlined" padding="sm" style={styles.card}>
             <div style={styles.row}>
               <span style={styles.rowLabel}>
@@ -673,6 +673,9 @@ export function SettingsPage() {
               </span>
             </div>
             <div style={styles.divider} />
+            <p style={styles.storageNote}>
+              この端末とアカウントの写真をそろえます。
+            </p>
             <p style={styles.storageNote}>
               iPhoneでは、ホーム画面アプリとSafari/Webで写真の保存場所が分かれることがあります。写真が見えないときは、撮ったときと同じ入口から開いてください。
             </p>

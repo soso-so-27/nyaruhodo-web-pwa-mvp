@@ -2485,21 +2485,21 @@ function MainichiFullscreenPhoto({
     pendingAction === "delete"
       ? {
           title: "このねがおを削除しますか",
-          text: "ねこだよりとうちのこから外れます。",
+          text: "この写真は、とったねがおから削除され、ねこだよりの候補からも外れます。",
           confirm: "削除",
           variant: "danger" as const,
         }
       : pendingAction === "report"
         ? {
             title: "この写真を通報しますか",
-            text: "この写真をねこだよりから外し、確認対象として送ります。",
+            text: "この写真はあなたのねこだよりに表示されなくなり、確認対象として送られます。",
             confirm: "通報",
             variant: "danger" as const,
           }
         : pendingAction === "hide"
           ? {
               title: "ねこだよりから外しますか",
-              text: "この写真はあなたのねこだよりに表示されなくなります。",
+              text: "この写真はあなたのねこだよりに表示されなくなります。写真そのものや相手側の記録は削除されません。",
               confirm: "外す",
               variant: "secondary" as const,
             }
@@ -2763,12 +2763,49 @@ function BoxPhotoDetailSheet({
   onDeleteSleepingPhoto: (photo: BoxPreviewPhoto) => void;
   onHideOtherPhoto: (photo: BoxPreviewPhoto) => void;
 }) {
+  const [pendingAction, setPendingAction] = useState<
+    "delete" | "hide" | null
+  >(null);
   const title = dayLabel ?? "ねこだより";
   const currentPhoto =
     photos[Math.max(0, Math.min(currentPhotoIndex, photos.length - 1))] ?? null;
   const deliveryActionLabel = currentPhoto?.shared
     ? "自分だけにする"
     : "とどくようにする";
+  const pendingActionCopy =
+    pendingAction === "delete"
+      ? {
+          title: "とったねがおから削除しますか",
+          text: "この写真は、とったねがおから削除され、ねこだよりの候補からも外れます。",
+          confirm: "削除",
+          variant: "danger" as const,
+        }
+      : pendingAction === "hide"
+        ? {
+            title: "アルバムから外しますか",
+            text: "この写真は、この端末のアルバムに表示されなくなります。写真そのものや相手側の記録は削除されません。",
+            confirm: "外す",
+            variant: "secondary" as const,
+          }
+        : null;
+
+  useEffect(() => {
+    setPendingAction(null);
+  }, [currentPhoto?.id, kind]);
+
+  function handleConfirmPendingAction() {
+    if (!currentPhoto) {
+      return;
+    }
+
+    if (pendingAction === "delete") {
+      onDeleteSleepingPhoto(currentPhoto);
+    } else if (pendingAction === "hide") {
+      onHideOtherPhoto(currentPhoto);
+    }
+
+    setPendingAction(null);
+  }
 
   return (
     <AppBottomSheet title={title} onClose={onClose} variant="paper">
@@ -2839,7 +2876,7 @@ function BoxPhotoDetailSheet({
                 variant="danger"
                 size="icon"
                 iconOnly
-                onClick={() => onDeleteSleepingPhoto(currentPhoto)}
+                onClick={() => setPendingAction("delete")}
               >
                 <AppIcon name="trash" size={20} />
               </AppButton>
@@ -2855,13 +2892,55 @@ function BoxPhotoDetailSheet({
                 variant="danger"
                 size="icon"
                 iconOnly
-                onClick={() => onHideOtherPhoto(currentPhoto)}
+                onClick={() => setPendingAction("hide")}
               >
                 <AppIcon name="trash" size={20} />
               </AppButton>
             </div>
           </div>
         )
+      ) : null}
+      {pendingActionCopy ? (
+        <div style={styles.mainichiViewerConfirmBackdrop} role="presentation">
+          <section
+            role="alertdialog"
+            aria-modal="true"
+            aria-labelledby="box-photo-detail-confirm-title"
+            aria-describedby="box-photo-detail-confirm-text"
+            style={styles.mainichiViewerConfirm}
+          >
+            <h2
+              id="box-photo-detail-confirm-title"
+              style={styles.mainichiViewerConfirmTitle}
+            >
+              {pendingActionCopy.title}
+            </h2>
+            <p
+              id="box-photo-detail-confirm-text"
+              style={styles.mainichiViewerConfirmText}
+            >
+              {pendingActionCopy.text}
+            </p>
+            <div style={styles.mainichiViewerConfirmActions}>
+              <AppButton
+                type="button"
+                variant="ghost"
+                size="sm"
+                onClick={() => setPendingAction(null)}
+              >
+                キャンセル
+              </AppButton>
+              <AppButton
+                type="button"
+                variant={pendingActionCopy.variant}
+                size="sm"
+                onClick={handleConfirmPendingAction}
+              >
+                {pendingActionCopy.confirm}
+              </AppButton>
+            </div>
+          </section>
+        </div>
       ) : null}
     </AppBottomSheet>
   );

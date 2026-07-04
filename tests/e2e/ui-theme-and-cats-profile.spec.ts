@@ -62,6 +62,10 @@ test("keeps the cats photo tab clear of the fixed bottom navigation", async ({
   const nav = page.getByRole("navigation");
 
   await expect(grid).toBeVisible();
+  await expect(page.getByText("この子の写真")).toBeVisible();
+  await expect(
+    page.getByText("毎日のねがおと、とっておきが並びます。"),
+  ).toBeVisible();
   await expect(page.getByRole("button", { name: "とっておきを追加" })).toBeVisible();
   await expect(photoItems).toHaveCount(16);
   await expect
@@ -163,7 +167,7 @@ test("shows only filled basic profile fields", async ({ page }) => {
       coat: "orange_tabby",
     },
   });
-  await page.setViewportSize({ width: 390, height: 844 });
+  await page.setViewportSize({ width: 375, height: 667 });
   await page.goto("/cats");
   await page.waitForLoadState("networkidle");
   await page.getByTestId("cats-section-tab-basic").click();

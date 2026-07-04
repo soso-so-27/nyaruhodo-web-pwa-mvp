@@ -1443,7 +1443,7 @@ export function HomeInput({
     const targetCatId = activeCatId;
     if (readCatGalleryPhotos(targetCatId).length >= CAT_GALLERY_PHOTO_LIMIT) {
       showToast(
-        `この子の写真は${CAT_GALLERY_PHOTO_LIMIT}枚までです。残したい写真を整理してから追加してください。`,
+        "保存できる枚数に達しています。残したい写真を整理してから追加してください。",
       );
       return;
     }

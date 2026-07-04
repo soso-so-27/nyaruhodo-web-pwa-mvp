@@ -158,6 +158,8 @@ const ONBOARDING_ALBUM_COMPLETION_READY_KEY =
   "neteruneko_onboarding_album_completion_ready";
 const CAT_GALLERY_RESTORE_SESSION_KEY =
   "neteruneko_cat_gallery_restore_checked";
+const UNOPENED_OMOIDE_DOT_HINT_STORAGE_KEY =
+  "neteruneko_unopened_omoide_dot_hint_seen";
 const SHOW_LEGACY_DETAIL_SECTIONS = false;
 
 export function CatsPage() {
@@ -331,7 +333,7 @@ export function CatsPage() {
   const photoSheetPhotos =
     photoSheetLens === "all" ? allLensPhotos : activeCatLensPhotos;
   const photoSheetTitle =
-    photoSheetLens === "all" ? "ぜんぶの写真" : "この子のとっておき";
+    photoSheetLens === "all" ? "ぜんぶの写真" : "この子の写真";
 
   function openOmoideMemory(memory: OmoideMemory, source: OmoideOpenSource) {
     const wasAlreadyOpened = Boolean(memory.openedAt);
@@ -950,7 +952,7 @@ export function CatsPage() {
     const targetCatId = activeCatId;
     if (readCatGalleryPhotos(targetCatId).length >= CAT_GALLERY_PHOTO_LIMIT) {
       setSaveMessage(
-        `とっておきは${CAT_GALLERY_PHOTO_LIMIT}枚までです。残したい写真を整理してから追加してください。`,
+        "保存できる枚数に達しています。残したい写真を整理してから追加してください。",
       );
       setTimeout(() => setSaveMessage(""), 2400);
       return;
@@ -1111,7 +1113,7 @@ export function CatsPage() {
         },
         { localCatId: targetCatId ?? activeCatId },
       );
-      setSaveMessage("この子のとっておきから削除しました。");
+      setSaveMessage("この子の写真から削除しました。");
       setTimeout(() => setSaveMessage(""), 2200);
     } catch {
       setSaveMessage("写真を削除できませんでした。もう一度お試しください。");
@@ -1214,8 +1216,18 @@ export function CatsPage() {
           max-width: 100%;
           min-width: 0;
           min-inline-size: 0;
+          box-sizing: border-box;
+          font-size: 16px;
           -webkit-appearance: none;
           appearance: none;
+        }
+
+        .cats-page [role="dialog"] input,
+        .cats-page [role="dialog"] select,
+        .cats-page [role="dialog"] textarea {
+          max-width: 100%;
+          box-sizing: border-box;
+          font-size: 16px;
         }
 
         .cat-basic-date-field::-webkit-date-and-time-value {
@@ -1472,7 +1484,7 @@ export function CatsPage() {
         activeSection === "photos" &&
         activeLens === "cat" ? (
           <LensPhotoSection
-            title="この子のとっておき"
+            title="この子の写真"
             photos={activeCatLensPhotos}
             emptyCopy="まだ写真はありません。ねがおを撮るか、とっておきにのこすと、ここに並びます。"
             lensValue={activeLens}
@@ -1992,7 +2004,7 @@ export function CatsPage() {
         >
           <div style={styles.deleteCatConfirm}>
             <p style={styles.deleteCatConfirmTitle}>
-              この子のとっておきから削除します。
+              この子の写真から削除します。
             </p>
             <p style={styles.deleteCatConfirmText}>
               ねこだよりや、ほかの人に届いた写真には影響しません。
@@ -2121,6 +2133,7 @@ function RecordOverview({
   onOpenYear: (summary: CatYearSummary) => void;
 }) {
   const [pickupRefreshTick, setPickupRefreshTick] = useState(0);
+  const [hasSeenUnopenedOmoideHint] = useState(hasSeenUnopenedOmoideDotHint);
   const now = getClientNow();
   const openedMemories = memories.filter((memory) => Boolean(memory.openedAt));
   const pickup = selectCatPickup({
@@ -2133,6 +2146,8 @@ function RecordOverview({
   });
   const pickupHasUnopenedMemory =
     pickup?.target.kind === "memory" && !pickup.target.memory.openedAt;
+  const shouldShowUnopenedOmoideHint =
+    pickupHasUnopenedMemory && !hasSeenUnopenedOmoideHint;
   const recentEntries = createCatFootprintEntries({
     photos,
     milestones,
@@ -2151,6 +2166,13 @@ function RecordOverview({
     takenSleepingPhotoCount,
   });
   void pickupRefreshTick;
+
+  useEffect(() => {
+    if (!shouldShowUnopenedOmoideHint) {
+      return;
+    }
+    acknowledgeUnopenedOmoideDotHint();
+  }, [shouldShowUnopenedOmoideHint]);
 
   function scrollToMilestones() {
     document
@@ -2215,6 +2237,11 @@ function RecordOverview({
             <span style={styles.pickupAction}>{pickup.actionLabel}</span>
             <ChevronRightSmallIcon />
           </button>
+          {shouldShowUnopenedOmoideHint ? (
+            <p style={styles.pickupHint}>
+              まだ ひらいていない思い出に、点が つきます。
+            </p>
+          ) : null}
         </section>
       ) : null}
 
@@ -2708,7 +2735,7 @@ function LensPhotoSection({
           </div>
         </div>
         <p style={styles.lensSectionSub}>
-          毎日のねがおと、選んで残した写真が並びます。
+          毎日のねがおと、とっておきが並びます。
         </p>
       </div>
       <LensPhotoGrid
@@ -3969,6 +3996,22 @@ function formatRecordShortDate(timestamp: number) {
   }
 
   return `${date.getMonth() + 1}/${date.getDate()}`;
+}
+
+function hasSeenUnopenedOmoideDotHint() {
+  try {
+    return window.localStorage.getItem(UNOPENED_OMOIDE_DOT_HINT_STORAGE_KEY) === "1";
+  } catch {
+    return true;
+  }
+}
+
+function acknowledgeUnopenedOmoideDotHint() {
+  try {
+    window.localStorage.setItem(UNOPENED_OMOIDE_DOT_HINT_STORAGE_KEY, "1");
+  } catch {
+    // The hint is non-essential; ignore private-mode storage failures.
+  }
 }
 
 async function deleteRemoteCatProfile(
@@ -5283,6 +5326,15 @@ const styles = {
     lineHeight: 1.3,
     letterSpacing: "0",
     whiteSpace: "nowrap",
+  },
+  pickupHint: {
+    margin: "6px 2px 0",
+    color: CATS_MUTED,
+    fontFamily: CATS_UI,
+    fontSize: CATS_TINY_SIZE,
+    fontWeight: 400,
+    lineHeight: 1.55,
+    letterSpacing: CATS_META_TRACKING,
   },
   recentTimeline: {
     position: "relative" as const,
