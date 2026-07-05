@@ -1174,19 +1174,14 @@ export function OnboardingFlow() {
               ねこだよりが届きます
             </h1>
             <p style={styles.lead}>
-              自分のねこの写真を1枚入れると、
+              自分のねこの寝顔を1枚入れると、
               <br />
-              どこかのねこの寝顔が1枚届きます。
-              <br />
-              <br />
-              入れた写真は、ねてるねこの中で
-              <br />
-              名前を出さずに届くことがあります。
+              どこかのねこの寝顔が1通届きます。
               <br />
               <br />
-              SNSなど外には出ません。
+              外には出ません。
               <br />
-              名前や場所も出ません。
+              届く前に、すべて確認しています。
             </p>
             {state === "saving" ? (
               <DeliveryWaiting />
@@ -1202,6 +1197,7 @@ export function OnboardingFlow() {
             >
               {state === "saving" ? "ねこだよりを準備しています…" : "ねがおを1枚入れる"}
             </AppButton>
+            <p style={styles.ctaFootnote}>無料・ひとりで作っています</p>
             {message ? <p style={styles.message}>{message}</p> : null}
             {isPhotoDebugMode ? (
               <OnboardingPhotoDebugPanel info={photoDebugInfo} />
@@ -2351,6 +2347,15 @@ const styles = {
   onboardingCta: {
     width: "min(100%, 280px)",
     marginTop: "16px",
+  },
+  ctaFootnote: {
+    margin: "-6px 0 0",
+    color: "#8a8175",
+    fontFamily: UI_FONT,
+    fontSize: "11px",
+    fontWeight: 400,
+    lineHeight: 1.5,
+    letterSpacing: 0,
   },
   onboardingCtaLink: {
     width: "min(100%, 280px)",
