@@ -719,6 +719,59 @@ test.describe("onboarding delivery flow", () => {
     await expect.poll(() => redeemCalls).toBe(1);
   });
 
+  test("restores handoff data and goes home after a manual click", async ({
+    page,
+  }) => {
+    let redeemCalls = 0;
+    await page.route("**/api/onboarding/handoff/redeem", async (route) => {
+      redeemCalls += 1;
+      await route.fulfill({
+        contentType: "application/json",
+        body: JSON.stringify({
+          ok: true,
+          payload: {
+            version: 1,
+            createdAt: new Date().toISOString(),
+            source: "referral",
+            onboardingProgress: null,
+            onboardingCompleted: true,
+            catProfiles: [
+              {
+                id: "handoff-cat",
+                name: "むぎ",
+                createdAt: new Date().toISOString(),
+              },
+            ],
+            activeCatId: "handoff-cat",
+            ownSleepingPhotos: [],
+            keptExchangePhotos: [],
+            pendingReferralCode: "LINE234",
+          },
+        }),
+      });
+    });
+
+    await page.goto(
+      "/onboarding/continue?handoff=onb_00000000-0000-4000-8000-000000000000_0123456789abcdef0123",
+    );
+    await page.locator("main button").first().click();
+
+    await expect.poll(() => redeemCalls).toBe(1);
+    await expect(page).toHaveURL(/\/home\?handoff=restored/);
+    await expect
+      .poll(() =>
+        page.evaluate(() => ({
+          activeCatId: window.localStorage.getItem("active_cat_id"),
+          completed: window.localStorage.getItem("onboarding_completed"),
+          profiles: window.localStorage.getItem("cat_profiles"),
+        })),
+      )
+      .toMatchObject({
+        activeCatId: "handoff-cat",
+        completed: "true",
+      });
+  });
+
   test("lets locally restored users go home when a handoff token is already used", async ({
     page,
   }) => {
