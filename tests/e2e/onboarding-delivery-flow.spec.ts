@@ -781,7 +781,25 @@ test.describe("onboarding delivery flow", () => {
               },
             ],
             activeCatId: "handoff-cat",
-            ownSleepingPhotos: [],
+            ownSleepingPhotos: [
+              {
+                id: "handoff-own-photo",
+                catId: "handoff-cat",
+                ownerCatId: "handoff-cat",
+                src: `data:image/png;base64,${testPng.toString("base64")}`,
+                thumbnailSrc: `data:image/png;base64,${testPng.toString("base64")}`,
+                displaySrc: `data:image/png;base64,${testPng.toString("base64")}`,
+                originalSrc: `data:image/png;base64,${testPng.toString("base64")}`,
+                state: "sleeping",
+                visibility: "shared",
+                deliveryStatus: "available",
+                triggerLabel: "sleeping",
+                theme: "sleeping",
+                shared: true,
+                createdAt: Date.now(),
+                captureContext: "onboarding",
+              },
+            ],
             keptExchangePhotos: [],
             pendingReferralCode: "LINE234",
           },
@@ -802,12 +820,17 @@ test.describe("onboarding delivery flow", () => {
           activeCatId: window.localStorage.getItem("active_cat_id"),
           completed: window.localStorage.getItem("onboarding_completed"),
           profiles: window.localStorage.getItem("cat_profiles"),
+          ownPhotos: window.localStorage.getItem("nyaruhodo_exchange_own_sleeping_photos"),
         })),
       )
       .toMatchObject({
         activeCatId: "handoff-cat",
         completed: "true",
       });
+    const ownPhotos = await page.evaluate(() =>
+      JSON.parse(window.localStorage.getItem("nyaruhodo_exchange_own_sleeping_photos") ?? "[]"),
+    );
+    expect(ownPhotos[0]?.src).toMatch(/^data:image\//);
   });
 
   test("lets locally restored users go home when a handoff token is already used", async ({

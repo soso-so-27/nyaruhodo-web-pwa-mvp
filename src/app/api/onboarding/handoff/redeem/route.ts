@@ -1,5 +1,9 @@
 import { NextResponse } from "next/server";
 
+import {
+  CAT_PHOTOS_BUCKET,
+  getStoragePhotoPath,
+} from "../../../../../lib/photoStorage";
 import { createSupabaseAdminClient } from "../../../../../lib/supabase/admin";
 
 export const dynamic = "force-dynamic";
@@ -70,6 +74,16 @@ export async function POST(request: Request) {
     );
   }
 
+  let payload: unknown;
+  try {
+    payload = await hydrateHandoffStorageRefs(data.payload, token, supabase);
+  } catch {
+    return NextResponse.json(
+      { ok: false, error: "handoff_payload_unavailable" },
+      { status: 500 },
+    );
+  }
+
   const now = new Date().toISOString();
   const { data: redeemed, error: redeemError } = await supabase
     .from("onboarding_handoffs")
@@ -100,6 +114,92 @@ export async function POST(request: Request) {
 
   return NextResponse.json({
     ok: true,
-    payload: redeemed.payload,
+    payload,
   });
+}
+
+async function hydrateHandoffStorageRefs(
+  value: unknown,
+  token: string,
+  supabase: NonNullable<ReturnType<typeof createSupabaseAdminClient>>,
+  depth = 0,
+  cache = new Map<string, string>(),
+): Promise<unknown> {
+  if (depth > 8) {
+    return null;
+  }
+
+  if (typeof value === "string") {
+    const storagePath = getStoragePhotoPath(value);
+    const prefix = `handoffs/${token}/`;
+
+    if (!storagePath || !storagePath.startsWith(prefix)) {
+      return value;
+    }
+
+    if (cache.has(storagePath)) {
+      return cache.get(storagePath) ?? value;
+    }
+
+    const dataUrl = await downloadStorageObjectAsDataUrl(storagePath, supabase);
+    cache.set(storagePath, dataUrl);
+    return dataUrl;
+  }
+
+  if (Array.isArray(value)) {
+    return Promise.all(
+      value.map((item) =>
+        hydrateHandoffStorageRefs(item, token, supabase, depth + 1, cache),
+      ),
+    );
+  }
+
+  if (value && typeof value === "object") {
+    const next: Record<string, unknown> = {};
+
+    for (const [key, item] of Object.entries(value as Record<string, unknown>)) {
+      next[key] = await hydrateHandoffStorageRefs(
+        item,
+        token,
+        supabase,
+        depth + 1,
+        cache,
+      );
+    }
+
+    return next;
+  }
+
+  return value;
+}
+
+async function downloadStorageObjectAsDataUrl(
+  path: string,
+  supabase: NonNullable<ReturnType<typeof createSupabaseAdminClient>>,
+) {
+  const { data, error } = await supabase.storage
+    .from(CAT_PHOTOS_BUCKET)
+    .download(path);
+
+  if (error || !data) {
+    throw new Error("handoff_storage_download_failed");
+  }
+
+  const arrayBuffer = await data.arrayBuffer();
+  const base64 = Buffer.from(arrayBuffer).toString("base64");
+  const contentType = data.type || getContentTypeFromPath(path);
+
+  return `data:${contentType};base64,${base64}`;
+}
+
+function getContentTypeFromPath(path: string) {
+  if (path.endsWith(".webp")) {
+    return "image/webp";
+  }
+
+  if (path.endsWith(".png")) {
+    return "image/png";
+  }
+
+  return "image/jpeg";
 }
