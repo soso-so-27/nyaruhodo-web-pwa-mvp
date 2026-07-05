@@ -718,8 +718,12 @@ test.describe("onboarding delivery flow", () => {
     const capturedCreateBodies: Array<{
       payload?: {
         onboardingProgress?: { ownPhoto?: { id?: string }; deliveredPhoto?: { id?: string } };
+        source?: string;
+        catProfiles?: Array<{ id?: string }>;
+        activeCatId?: string | null;
         ownSleepingPhotos?: Array<{ id?: string }>;
         keptExchangePhotos?: Array<{ id?: string; sourcePhotoId?: string }>;
+        pendingReferralCode?: string | null;
       };
     }> = [];
 
@@ -779,9 +783,16 @@ test.describe("onboarding delivery flow", () => {
       );
       window.localStorage.setItem(
         "cat_profiles",
-        JSON.stringify([{ id: "cat-current", name: "current" }]),
+        JSON.stringify([
+          { id: "cat-current", name: "current" },
+          { id: "cat-old", name: "old" },
+        ]),
       );
       window.localStorage.setItem("active_cat_id", "cat-current");
+      window.localStorage.setItem(
+        "neteruneko_pending_referral_code",
+        JSON.stringify({ code: "LINE234", capturedAt: new Date().toISOString() }),
+      );
       window.localStorage.setItem(
         "nyaruhodo_exchange_own_sleeping_photos",
         JSON.stringify([
@@ -835,6 +846,10 @@ test.describe("onboarding delivery flow", () => {
 
     expect(capturedPayload?.ownSleepingPhotos).toHaveLength(1);
     expect(capturedPayload?.keptExchangePhotos).toHaveLength(1);
+    expect(capturedPayload?.catProfiles).toHaveLength(1);
+    expect(capturedPayload?.catProfiles?.[0]?.id).toBe("cat-current");
+    expect(capturedPayload?.activeCatId).toBe("cat-current");
+    expect(capturedPayload?.pendingReferralCode).toContain("LINE234");
     expect(capturedPayload?.ownSleepingPhotos?.[0]?.id).toBe("onboarding-current-own");
     expect(capturedPayload?.keptExchangePhotos?.[0]?.sourcePhotoId).toBe(
       "source-current-delivered",
@@ -849,6 +864,99 @@ test.describe("onboarding delivery flow", () => {
         (photo) => photo.id === "old-kept-photo",
       ),
     ).toBe(false);
+    expect(
+      capturedPayload?.catProfiles?.some((profile) => profile.id === "cat-old"),
+    ).toBe(false);
+  });
+
+  test("does not hand off stale referral codes outside referral onboarding", async ({
+    page,
+  }) => {
+    const imageDataUrl = `data:image/png;base64,${testPng.toString("base64")}`;
+    const capturedCreateBodies: Array<{
+      payload?: {
+        pendingReferralCode?: string | null;
+      };
+    }> = [];
+
+    await page.addInitScript(({ imageDataUrl }) => {
+      const dateKey = new Intl.DateTimeFormat("en-CA", {
+        timeZone: "Asia/Tokyo",
+        year: "numeric",
+        month: "2-digit",
+        day: "2-digit",
+      }).format(new Date());
+      const currentOwnPhoto = {
+        id: "direct-current-own",
+        catId: "cat-current",
+        ownerCatId: "cat-current",
+        src: imageDataUrl,
+        thumbnailSrc: imageDataUrl,
+        displaySrc: imageDataUrl,
+        originalSrc: imageDataUrl,
+        state: "sleeping",
+        visibility: "shared",
+        deliveryStatus: "available",
+        triggerLabel: "sleeping",
+        theme: "sleeping",
+        shared: true,
+        createdAt: Date.now(),
+        captureContext: "onboarding",
+      };
+
+      window.localStorage.setItem(
+        "neteruneko_onboarding_progress",
+        JSON.stringify({
+          version: 1,
+          anonymousId: "anonymous-direct-handoff",
+          dateKey,
+          stage: "opened",
+          source: "direct",
+          submissionId: `onboarding:anonymous-direct-handoff:${dateKey}`,
+          ownPhoto: currentOwnPhoto,
+          selectedPhotoSrc: imageDataUrl,
+          deliveredPhoto: null,
+          isDeliveredPhotoKept: false,
+          updatedAt: Date.now(),
+        }),
+      );
+      window.localStorage.setItem(
+        "cat_profiles",
+        JSON.stringify([{ id: "cat-current", name: "current" }]),
+      );
+      window.localStorage.setItem("active_cat_id", "cat-current");
+      window.localStorage.setItem(
+        "nyaruhodo_exchange_own_sleeping_photos",
+        JSON.stringify([currentOwnPhoto]),
+      );
+      window.localStorage.setItem(
+        "neteruneko_pending_referral_code",
+        JSON.stringify({ code: "STALE234", capturedAt: new Date().toISOString() }),
+      );
+    }, { imageDataUrl });
+
+    await page.route("**/api/onboarding/handoff/create", async (route) => {
+      capturedCreateBodies.push(route.request().postDataJSON());
+      await route.fulfill({
+        contentType: "application/json",
+        body: JSON.stringify({
+          ok: true,
+          token: "onb_00000000-0000-4000-8000-000000000000_bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          expiresAt: new Date(Date.now() + 60_000).toISOString(),
+          continueUrl:
+            "/onboarding/continue?handoff=onb_00000000-0000-4000-8000-000000000000_bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        }),
+      });
+    });
+
+    await page.goto("/account/create?from=onboarding&source=direct");
+    const handoffButton = page.locator("main button").nth(1);
+    await expect(handoffButton).toBeVisible();
+    await expect(handoffButton).toBeEnabled();
+    await handoffButton.click();
+
+    await expect.poll(() => capturedCreateBodies.length).toBe(1);
+    expect(capturedCreateBodies[0]?.payload?.pendingReferralCode).toBeNull();
   });
 
   test("does not consume handoff links inside embedded browsers", async ({

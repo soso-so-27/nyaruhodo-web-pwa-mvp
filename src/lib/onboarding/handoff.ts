@@ -1,6 +1,7 @@
 import {
   readActiveCatId,
   readCatProfiles,
+  type CatProfile,
 } from "../../components/home/homeInputHelpers";
 import {
   readAllOwnSleepingPhotos,
@@ -118,6 +119,7 @@ export function createOnboardingHandoffPayload(
           updatedAt: Date.now(),
         }
       : onboardingProgress;
+  const currentCatId = getCurrentOnboardingCatId(nextOnboardingProgress);
 
   return {
     version: 1,
@@ -127,14 +129,33 @@ export function createOnboardingHandoffPayload(
     onboardingCompleted:
       markCompleted ||
       window.localStorage.getItem(STORAGE_KEYS.onboardingCompleted) === "true",
-    catProfiles: readCatProfiles(),
-    activeCatId: readActiveCatId(),
+    catProfiles: getCurrentOnboardingCatProfiles(currentCatId),
+    activeCatId: currentCatId,
     ownSleepingPhotos: getCurrentOnboardingOwnPhotos(nextOnboardingProgress),
     keptExchangePhotos: getCurrentOnboardingKeptPhotos(nextOnboardingProgress),
-    pendingReferralCode: window.localStorage.getItem(
-      STORAGE_KEYS.pendingReferralCode,
+    pendingReferralCode: getCurrentPendingReferralCode(
+      nextOnboardingProgress,
+      source,
     ),
   };
+}
+
+function getCurrentOnboardingCatId(
+  progress: OnboardingProgress | null,
+): string | null {
+  return (
+    progress?.ownPhoto?.ownerCatId ??
+    progress?.ownPhoto?.catId ??
+    readActiveCatId()
+  );
+}
+
+function getCurrentOnboardingCatProfiles(catId: string | null): CatProfile[] {
+  if (!catId) {
+    return [];
+  }
+
+  return readCatProfiles().filter((profile) => profile.id === catId);
 }
 
 function getCurrentOnboardingOwnPhotos(
@@ -181,6 +202,17 @@ function isSameExchangePhoto(
         photo.sourcePhotoId === target.sourcePhotoId,
     )
   );
+}
+
+function getCurrentPendingReferralCode(
+  progress: OnboardingProgress | null,
+  source: OnboardingSource,
+) {
+  if (source !== "referral" && progress?.source !== "referral") {
+    return null;
+  }
+
+  return window.localStorage.getItem(STORAGE_KEYS.pendingReferralCode);
 }
 
 export function restoreOnboardingHandoffPayload(payload: unknown) {
