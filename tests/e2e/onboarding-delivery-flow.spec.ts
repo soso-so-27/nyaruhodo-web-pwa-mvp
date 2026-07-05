@@ -634,6 +634,7 @@ test.describe("onboarding delivery flow", () => {
       );
       window.localStorage.setItem("cat_profiles", JSON.stringify([{ id: "cat-old" }]));
       window.localStorage.setItem("active_cat_id", "cat-old");
+      window.localStorage.setItem("analytics_anonymous_id", "anonymous-reset-e2e");
       window.localStorage.setItem(
         "record_log_cat-old",
         JSON.stringify([{ id: "log-old" }]),
@@ -657,6 +658,7 @@ test.describe("onboarding delivery flow", () => {
       keptPhotos: window.localStorage.getItem("nyaruhodo_exchange_kept_photos"),
       profiles: window.localStorage.getItem("cat_profiles"),
       activeCatId: window.localStorage.getItem("active_cat_id"),
+      anonymousId: window.localStorage.getItem("analytics_anonymous_id"),
       recordLog: window.localStorage.getItem("record_log_cat-old"),
       pendingReferral: window.localStorage.getItem("neteruneko_pending_referral_code"),
       sessionReady: window.sessionStorage.getItem(
@@ -670,6 +672,8 @@ test.describe("onboarding delivery flow", () => {
     expect(storage.keptPhotos).toBeNull();
     expect(storage.profiles).toBeNull();
     expect(storage.activeCatId).toBeNull();
+    expect(storage.anonymousId).toBeTruthy();
+    expect(storage.anonymousId).not.toBe("anonymous-reset-e2e");
     expect(storage.recordLog).toBeNull();
     expect(storage.sessionReady).toBeNull();
     expect(storage.pendingReferral).toContain("ABC234");

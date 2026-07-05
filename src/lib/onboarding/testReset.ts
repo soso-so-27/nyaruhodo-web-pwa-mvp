@@ -7,6 +7,7 @@ const ONBOARDING_TEST_RESET_KEYS = [
   STORAGE_KEYS.accountCreatePromptDismissed,
   STORAGE_KEYS.accountRestorePromptDismissed,
   STORAGE_KEYS.activeCatId,
+  STORAGE_KEYS.analyticsAnonymousId,
   STORAGE_KEYS.authGooglePending,
   STORAGE_KEYS.catGalleryPhotos,
   STORAGE_KEYS.catProfiles,
