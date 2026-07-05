@@ -40,6 +40,7 @@ import {
   readEveningDeliveryStore,
 } from "../../lib/home/eveningDelivery";
 import { backupOwnSleepingPhotoMoment } from "../../lib/home/sleepingPhotoBackup";
+import { readCurrentOnboardingProgress } from "../../lib/onboarding/progress";
 import { STORAGE_KEYS, readCachedJson, writeCachedJson } from "../../lib/storage";
 import {
   COLLECTION_GROUPS,
@@ -473,7 +474,10 @@ export function CollectionPage() {
   const otherBoxPhotos = useMemo(
     () =>
       mergeBoxPreviewPhotos(
-        openedEveningDeliveryPhotos,
+        mergeBoxPreviewPhotos(
+          openedEveningDeliveryPhotos,
+          readOnboardingDeliveredBoxPhotos(),
+        ),
         readKeptExchangePhotos(),
       ),
     [boxRefreshTick, hasLoaded, openedEveningDeliveryPhotos],
@@ -4648,6 +4652,40 @@ function readOpenedEveningDeliveryBoxPhotos(): BoxPreviewPhoto[] {
       };
     })
     .filter((photo) => isUsableStoredPhotoSrc(photo.src));
+}
+
+function readOnboardingDeliveredBoxPhotos(): BoxPreviewPhoto[] {
+  const progress = readCurrentOnboardingProgress();
+  const deliveredPhoto = progress?.deliveredPhoto;
+
+  if (
+    !deliveredPhoto ||
+    !progress.isDeliveredPhotoKept ||
+    isExchangePhotoLocallyBlocked(deliveredPhoto)
+  ) {
+    return [];
+  }
+
+  const deliveredAt = deliveredPhoto.deliveredAt ?? progress.updatedAt;
+
+  if (deliveredPhoto.src.startsWith("data:image/")) {
+    return [
+      {
+        ...deliveredPhoto,
+        thumbnailSrc: deliveredPhoto.src,
+        displaySrc: deliveredPhoto.src,
+        originalSrc: deliveredPhoto.src,
+        deliveredAt,
+      },
+    ].filter((photo) => isUsableStoredPhotoSrc(photo.src));
+  }
+
+  return [
+    {
+      ...deliveredPhoto,
+      deliveredAt,
+    },
+  ].filter((photo) => isUsableStoredPhotoSrc(photo.src));
 }
 
 function readUndeliverableEveningDeliveryDateKeys() {

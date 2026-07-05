@@ -1089,6 +1089,65 @@ test.describe("onboarding delivery flow", () => {
     expect(keptPhotos).toHaveLength(0);
   });
 
+  test("shows the onboarding delivered photo without adding kept album photos", async ({
+    page,
+  }) => {
+    const imageDataUrl = `data:image/png;base64,${testPng.toString("base64")}`;
+
+    await page.addInitScript(({ imageDataUrl }) => {
+      const now = Date.now();
+      const dateKey = new Intl.DateTimeFormat("en-CA", {
+        timeZone: "Asia/Tokyo",
+        year: "numeric",
+        month: "2-digit",
+        day: "2-digit",
+      }).format(new Date(now));
+
+      window.localStorage.setItem("onboarding_completed", "true");
+      window.localStorage.setItem("active_cat_id", "onboarding-visible-cat");
+      window.localStorage.setItem(
+        "cat_profiles",
+        JSON.stringify([{ id: "onboarding-visible-cat", name: "visible" }]),
+      );
+      window.localStorage.setItem(
+        "neteruneko_onboarding_progress",
+        JSON.stringify({
+          version: 1,
+          anonymousId: "onboarding-visible-anon",
+          dateKey,
+          stage: "album_created",
+          source: "referral",
+          submissionId: `onboarding:onboarding-visible-anon:${dateKey}`,
+          deliveredPhoto: {
+            id: "onboarding-visible-delivered",
+            sourcePhotoId: "onboarding-visible-source",
+            src: imageDataUrl,
+            thumbnailSrc: imageDataUrl,
+            displaySrc: imageDataUrl,
+            originalSrc: imageDataUrl,
+            title: "",
+            subtitle: "",
+            triggerLabel: "sleeping",
+            theme: "sleeping",
+            deliveredAt: now,
+          },
+          isDeliveredPhotoKept: true,
+          updatedAt: now,
+        }),
+      );
+      window.localStorage.setItem("nyaruhodo_exchange_kept_photos", "[]");
+    }, { imageDataUrl });
+
+    await page.goto("/collection");
+    await page.getByRole("tab", { name: "とどいた" }).click();
+
+    await expect(page.getByTestId("mainichi-board-photo-delivered")).toHaveCount(1);
+    const keptPhotos = await page.evaluate(() =>
+      JSON.parse(window.localStorage.getItem("nyaruhodo_exchange_kept_photos") ?? "[]"),
+    );
+    expect(keptPhotos).toHaveLength(0);
+  });
+
   test("lets locally restored users go home when a handoff token is already used", async ({
     page,
   }) => {
