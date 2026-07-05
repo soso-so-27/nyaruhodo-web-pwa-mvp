@@ -9,10 +9,20 @@ import {
   isStorageDeliveryPhotoUrl,
 } from "../../src/lib/home/deliveryPoolGuards";
 import {
+  copyPreservedDeliveryPhotos,
+  deleteStoredDataForUser,
+} from "../../src/app/api/account/delete-stored-data/route";
+import {
   buildAccountStorageDeletionPlan,
   getArchivedDeliveryStoragePath,
 } from "../../src/lib/accountDeletionStorage";
 import { isAccountDeletionStripeCancellationRequired } from "../../src/lib/accountDeletionBilling";
+import {
+  isFastStockCandidateDeliverable,
+  isRowDeliverable,
+  resetOnboardingExchangeExceptionLimitForTests,
+  validateExchangeDeliveryDateKey,
+} from "../../src/app/api/sleeping-delivery/exchange/route";
 import {
   CAT_PHOTOS_BUCKET,
   DISPLAY_SIGNED_URL_SECONDS,
@@ -201,6 +211,117 @@ test.describe("sleeping delivery pool guards", () => {
         userId: "user-a",
       }),
     ).toBe(false);
+  });
+
+  test("account deletion keeps auth when a table delete step fails", async () => {
+    const fakeSupabase = createFakeAccountDeletionSupabase({
+      deleteErrors: { cat_moments: "simulated delete failure" },
+    });
+
+    const result = await deleteStoredDataForUser(
+      fakeSupabase.client,
+      "user-delete-failure",
+    );
+
+    expect(result.status).toBe("error");
+    expect(result.errors).toContain("delete step 3: simulated delete failure");
+    expect(fakeSupabase.authDeleteCalls).toBe(0);
+  });
+
+  test("account deletion does not delete preserved source storage when no delivery rows update", async () => {
+    const fakeSupabase = createFakeAccountDeletionSupabase({
+      updateRowsBySourcePath: {
+        "user-a/cat-1/sleeping/delivered.webp": [],
+      },
+    });
+    const errors: string[] = [];
+
+    const copied = await copyPreservedDeliveryPhotos(
+      fakeSupabase.client,
+      [
+        {
+          archivePath: "delivery-archive/archive.webp",
+          sourcePath: "user-a/cat-1/sleeping/delivered.webp",
+          sourceUrlVariants: [
+            "storage:user-a/cat-1/sleeping/delivered.webp",
+            "storage://user-a/cat-1/sleeping/delivered.webp",
+          ],
+          targetPhotoUrl: "storage:delivery-archive/archive.webp",
+        },
+      ],
+      errors,
+    );
+
+    expect(copied).toEqual([]);
+    expect(errors).toContain(
+      "delivery preserve user-a/cat-1/sleeping/delivered.webp: no rows updated",
+    );
+    expect(fakeSupabase.storageRemovedPaths).toEqual([]);
+  });
+
+  test("excludes anonymous-era own rows after login when sender anonymous id is present", () => {
+    const row = createDeliverableRow({
+      anonymous_id: "anon-before-login",
+      user_id: null,
+    });
+    const context = {
+      userId: "user-after-login",
+      anonymousId: null,
+      senderAnonymousId: "anon-before-login",
+      recipientCatId: "cat-current",
+      excludePhotoId: "current-own-photo",
+      blockedPhotoIds: new Set<string>(),
+      deliveredSourceMomentIds: new Set<string>(),
+    };
+
+    expect(isRowDeliverable(row, context)).toBe(false);
+    const fastRow =
+      row as unknown as Parameters<typeof isFastStockCandidateDeliverable>[0];
+    expect(isFastStockCandidateDeliverable(fastRow, context)).toBe(false);
+  });
+
+  test("limits onboarding instant exchange exceptions per ip key", async () => {
+    resetOnboardingExchangeExceptionLimitForTests();
+    const fakeSupabase = createFakeOnboardingValidationSupabase();
+    const baseArgs = {
+      supabase: fakeSupabase.client,
+      userId: null,
+      anonymousId: "anon-onboarding",
+      deliveryDateKey: null,
+      mode: "onboarding" as const,
+      debugDryRun: false,
+      onboardingExceptionIpKey: "ip:203.0.113.10",
+    };
+
+    expect(
+      await validateExchangeDeliveryDateKey(baseArgs),
+    ).toEqual({ ok: true });
+    expect(
+      await validateExchangeDeliveryDateKey({
+        ...baseArgs,
+        anonymousId: "anon-onboarding-2",
+      }),
+    ).toEqual({ ok: true });
+    expect(
+      await validateExchangeDeliveryDateKey({
+        ...baseArgs,
+        anonymousId: "anon-onboarding-3",
+      }),
+    ).toEqual({ ok: true });
+
+    const fourth = await validateExchangeDeliveryDateKey({
+      ...baseArgs,
+      anonymousId: "anon-onboarding-4",
+    });
+
+    expect(fourth).toMatchObject({
+      ok: false,
+      error: "delivery_not_yet",
+    });
+    expect(fakeSupabase.insertedAppEvents).toHaveLength(1);
+    expect(fakeSupabase.insertedAppEvents[0].event_name).toBe(
+      "onboarding_exchange_exception_limited",
+    );
   });
 
   test("account deletion guide explains delivered photos remain", async ({
@@ -1433,6 +1554,176 @@ async function expectAccountUserDeleted(
   const { data, error } = await adminSupabase.auth.admin.getUserById(userId);
 
   expect(error || !data.user).toBeTruthy();
+}
+
+function createFakeAccountDeletionSupabase({
+  deleteErrors = {},
+  updateRowsBySourcePath = {},
+}: {
+  deleteErrors?: Record<string, string>;
+  updateRowsBySourcePath?: Record<string, Array<{ id: string }>>;
+}) {
+  const state = {
+    authDeleteCalls: 0,
+    storageRemovedPaths: [] as string[],
+  };
+  const client = {
+    auth: {
+      admin: {
+        deleteUser: async () => {
+          state.authDeleteCalls += 1;
+          return { error: null };
+        },
+      },
+    },
+    storage: {
+      from: () => ({
+        copy: async () => ({ error: null }),
+        list: async () => ({ data: [], error: null }),
+        remove: async (paths: string[]) => {
+          state.storageRemovedPaths.push(...paths);
+          return { error: null };
+        },
+      }),
+    },
+    from: (table: string) =>
+      createFakeAccountDeletionQuery({
+        deleteError: deleteErrors[table] ?? null,
+        table,
+        updateRowsBySourcePath,
+      }),
+  } as any;
+
+  return {
+    client,
+    get authDeleteCalls() {
+      return state.authDeleteCalls;
+    },
+    get storageRemovedPaths() {
+      return state.storageRemovedPaths;
+    },
+  };
+}
+
+function createFakeAccountDeletionQuery({
+  deleteError,
+  table,
+  updateRowsBySourcePath,
+}: {
+  deleteError: string | null;
+  table: string;
+  updateRowsBySourcePath: Record<string, Array<{ id: string }>>;
+}) {
+  let operation: "delete" | "select" | "update" | null = null;
+  let sourcePath: string | null = null;
+
+  const query = {
+    delete() {
+      operation = "delete";
+      return query;
+    },
+    eq() {
+      return query;
+    },
+    in(column: string, values: string[]) {
+      if (column === "photo_url") {
+        sourcePath =
+          values
+            .map((value) => value.replace(/^storage:\/\//, "").replace(/^storage:/, ""))
+            .find((value) => updateRowsBySourcePath[value] !== undefined) ?? null;
+      }
+      return query;
+    },
+    maybeSingle: async () => ({ data: null, error: null }),
+    or() {
+      return query;
+    },
+    range() {
+      return Promise.resolve({ data: [], error: null });
+    },
+    select() {
+      if (operation === "update") {
+        return Promise.resolve({
+          data: sourcePath ? updateRowsBySourcePath[sourcePath] ?? [] : [],
+          error: null,
+        });
+      }
+      operation = "select";
+      return query;
+    },
+    then(resolve: (value: { data?: unknown[]; error: { message: string } | null }) => void) {
+      if (operation === "delete") {
+        resolve({
+          error: deleteError ? { message: deleteError } : null,
+        });
+        return;
+      }
+      resolve({ data: [], error: null });
+    },
+    update() {
+      operation = "update";
+      return query;
+    },
+  };
+
+  void table;
+  return query;
+}
+
+function createFakeOnboardingValidationSupabase() {
+  const insertedAppEvents: Array<Record<string, unknown>> = [];
+  const client = {
+    from: (table: string) => {
+      if (table === "app_events") {
+        return {
+          insert: async (row: Record<string, unknown>) => {
+            insertedAppEvents.push(row);
+            return { error: null };
+          },
+        };
+      }
+
+      return {
+        eq() {
+          return this;
+        },
+        is() {
+          return this;
+        },
+        select() {
+          return this;
+        },
+        then(resolve: (value: { count: number; error: null }) => void) {
+          resolve({ count: 0, error: null });
+        },
+      };
+    },
+  } as any;
+
+  return { client, insertedAppEvents };
+}
+
+function createDeliverableRow(
+  overrides: Partial<{
+    anonymous_id: string | null;
+    user_id: string | null;
+  }> = {},
+) {
+  return {
+    anonymous_id: overrides.anonymous_id ?? "anon-other",
+    created_at: new Date().toISOString(),
+    delivery_count: 0,
+    delivery_status: "available" as const,
+    id: "row-id",
+    local_cat_id: "cat-source",
+    local_moment_id: "source-moment",
+    metadata: { pool_kind: "user_shared" },
+    moderation_status: "approved" as const,
+    owner_cat_id: "cat-source",
+    photo_url: normalCatLikePhotoUrl,
+    pool_date: "2026-07-05",
+    user_id: overrides.user_id ?? "user-other",
+  };
 }
 
 function dataUrlToBuffer(dataUrl: string) {

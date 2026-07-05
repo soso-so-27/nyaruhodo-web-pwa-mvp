@@ -95,7 +95,7 @@ async function authenticateUser(request: Request) {
   return data.user.id;
 }
 
-async function deleteStoredDataForUser(
+export async function deleteStoredDataForUser(
   supabase: SupabaseClient,
   userId: string,
 ): Promise<AccountDeleteResult> {
@@ -158,13 +158,24 @@ async function deleteStoredDataForUser(
     supabase.from("cats").delete().eq("owner_user_id", userId),
   ];
   const results = await Promise.all(deleteSteps);
-  const { error: authDeleteError } = await supabase.auth.admin.deleteUser(userId);
 
   results.forEach((result, index) => {
     if (result.error) {
       errors.push(`delete step ${index + 1}: ${result.error.message}`);
     }
   });
+
+  if (errors.length > 0) {
+    return {
+      cancelledStripeSubscriptions: billingResult.cancelledStripeSubscriptions,
+      deletedStoragePaths: deletablePaths.length,
+      errors,
+      preservedDeliveryPhotos: copiedSourcePaths.length,
+      status: "error",
+    };
+  }
+
+  const { error: authDeleteError } = await supabase.auth.admin.deleteUser(userId);
 
   if (authDeleteError) {
     errors.push(`auth delete: ${authDeleteError.message}`);
@@ -179,7 +190,7 @@ async function deleteStoredDataForUser(
   };
 }
 
-async function copyPreservedDeliveryPhotos(
+export async function copyPreservedDeliveryPhotos(
   supabase: SupabaseClient,
   copies: ReturnType<typeof buildAccountStorageDeletionPlan>["copies"],
   errors: string[],
@@ -196,14 +207,20 @@ async function copyPreservedDeliveryPhotos(
       continue;
     }
 
-    const { error: updateError } = await supabase
+    const { data: updateData, error: updateError } = await supabase
       .from("cat_moment_deliveries")
       .update({ photo_url: copy.targetPhotoUrl })
       .in("photo_url", copy.sourceUrlVariants)
-      .in("status", [...PRESERVED_DELIVERY_STATUSES]);
+      .in("status", [...PRESERVED_DELIVERY_STATUSES])
+      .select("id");
 
     if (updateError) {
       errors.push(`delivery preserve ${copy.sourcePath}: ${updateError.message}`);
+      continue;
+    }
+
+    if ((updateData?.length ?? 0) === 0) {
+      errors.push(`delivery preserve ${copy.sourcePath}: no rows updated`);
       continue;
     }
 

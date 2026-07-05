@@ -107,7 +107,11 @@ export function buildSleepingDeliveryRateLimitKey(
     return `anon:${anonymousId}`;
   }
 
-  return `ip:${readClientIp(request)}`;
+  return `ip:${readSleepingDeliveryClientIp(request)}`;
+}
+
+export function buildSleepingDeliveryIpRateLimitKey(request: Request) {
+  return `ip:${readSleepingDeliveryClientIp(request)}`;
 }
 
 export function checkExchangeRateLimit(key: string) {
@@ -187,7 +191,7 @@ function hasExpectedImageMagicNumber(mime: string, header: Buffer) {
   return false;
 }
 
-function readClientIp(request: Request) {
+export function readSleepingDeliveryClientIp(request: Request) {
   const forwardedFor = request.headers.get("x-forwarded-for");
 
   if (forwardedFor) {

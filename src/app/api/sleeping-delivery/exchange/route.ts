@@ -11,6 +11,7 @@ import {
   uploadDataUrl,
 } from "../../../../lib/photoStorage";
 import {
+  buildSleepingDeliveryIpRateLimitKey,
   buildSleepingDeliveryRateLimitKey,
   checkExchangeRateLimit,
   type SleepingDeliveryValidationResult,
@@ -115,6 +116,17 @@ const TIERED_CANDIDATE_LIMIT = 240;
 const TRANSIENT_DELIVERY_SIGNED_URL_SECONDS = 10 * 60;
 type FastCandidateMode = "admin_storage" | "tiered";
 
+type OnboardingExceptionBucket = {
+  startedAt: number;
+  count: number;
+  updatedAt: number;
+};
+
+const ONBOARDING_EXCEPTION_LIMIT_PER_IP = 3;
+const ONBOARDING_EXCEPTION_WINDOW_MS = 24 * 60 * 60 * 1000;
+const ONBOARDING_EXCEPTION_MAX_BUCKETS = 1000;
+const onboardingExceptionBuckets = new Map<string, OnboardingExceptionBucket>();
+
 export async function POST(request: Request) {
   try {
     return await handleExchangePost(request);
@@ -185,6 +197,7 @@ async function handleExchangePost(request: Request) {
   }
 
   const userId = user?.id ?? null;
+  const senderAnonymousId = input.anonymousId;
   const anonymousId = userId ? null : input.anonymousId;
   const adminSupabase = createSupabaseAdminClient();
   const serverSupabase = adminSupabase ? null : await createServerSupabaseClient();
@@ -211,6 +224,7 @@ async function handleExchangePost(request: Request) {
     deliveryDateKey: input.deliveryDateKey,
     mode: input.mode,
     debugDryRun,
+    onboardingExceptionIpKey: buildSleepingDeliveryIpRateLimitKey(request),
   });
 
   if (!deliveryDateValidation.ok) {
@@ -335,6 +349,7 @@ async function handleExchangePost(request: Request) {
   const deliverableContext = {
     userId,
     anonymousId,
+    senderAnonymousId,
     recipientCatId: input.recipientCatId,
     excludePhotoId: ownPhoto.id,
     blockedPhotoIds,
@@ -676,13 +691,14 @@ function exchangeError(error: string, status: 400 | 401 | 403 | 413 | 415 | 429)
   return NextResponse.json({ photo: null, source: "none", error }, { status });
 }
 
-async function validateExchangeDeliveryDateKey({
+export async function validateExchangeDeliveryDateKey({
   supabase,
   userId,
   anonymousId,
   deliveryDateKey,
   mode,
   debugDryRun,
+  onboardingExceptionIpKey,
 }: {
   supabase: SupabaseClient;
   userId: string | null;
@@ -690,6 +706,7 @@ async function validateExchangeDeliveryDateKey({
   deliveryDateKey: string | null;
   mode: "onboarding" | null;
   debugDryRun: boolean;
+  onboardingExceptionIpKey: string;
 }) {
   const serverDateKey = getServerJstDateKey();
 
@@ -702,7 +719,21 @@ async function validateExchangeDeliveryDateKey({
     (await hasNoPriorDeliveries({ supabase, userId, anonymousId }));
 
   if (canUseOnboardingException) {
-    return { ok: true as const };
+    const onboardingExceptionLimit = checkOnboardingExchangeExceptionLimit(
+      onboardingExceptionIpKey,
+    );
+
+    if (onboardingExceptionLimit.allowed) {
+      return { ok: true as const };
+    }
+
+    await recordOnboardingExceptionLimitEvent({
+      supabase,
+      userId,
+      anonymousId,
+      ipKey: onboardingExceptionIpKey,
+      count: onboardingExceptionLimit.count,
+    });
   }
 
   if (!deliveryDateKey) {
@@ -714,6 +745,89 @@ async function validateExchangeDeliveryDateKey({
   }
 
   return validateServerDeliveryDateKey({ deliveryDateKey });
+}
+
+export function checkOnboardingExchangeExceptionLimit(key: string) {
+  const now = Date.now();
+  const existing = onboardingExceptionBuckets.get(key);
+  const bucket: OnboardingExceptionBucket = existing
+    ? {
+        startedAt:
+          now - existing.startedAt > ONBOARDING_EXCEPTION_WINDOW_MS
+            ? now
+            : existing.startedAt,
+        count:
+          now - existing.startedAt > ONBOARDING_EXCEPTION_WINDOW_MS
+            ? 0
+            : existing.count,
+        updatedAt: now,
+      }
+    : {
+        startedAt: now,
+        count: 0,
+        updatedAt: now,
+      };
+
+  bucket.count += 1;
+  onboardingExceptionBuckets.set(key, bucket);
+  pruneOnboardingExceptionBuckets(now);
+
+  return {
+    allowed: bucket.count <= ONBOARDING_EXCEPTION_LIMIT_PER_IP,
+    count: bucket.count,
+  };
+}
+
+export function resetOnboardingExchangeExceptionLimitForTests() {
+  onboardingExceptionBuckets.clear();
+}
+
+async function recordOnboardingExceptionLimitEvent({
+  supabase,
+  userId,
+  anonymousId,
+  ipKey,
+  count,
+}: {
+  supabase: SupabaseClient;
+  userId: string | null;
+  anonymousId: string | null;
+  ipKey: string;
+  count: number;
+}) {
+  const eventRow = {
+    event_name: "onboarding_exchange_exception_limited",
+    source: "unknown",
+    user_id: userId,
+    anonymous_id: userId ? null : anonymousId,
+    route: "/api/sleeping-delivery/exchange",
+    metadata: {
+      ip_key_hash: hashText(ipKey).toString(36),
+      count,
+      limit: ONBOARDING_EXCEPTION_LIMIT_PER_IP,
+      window_hours: 24,
+    },
+  };
+
+  const { error } = await supabase.from("app_events").insert(eventRow);
+
+  if (error) {
+    console.warn("[sleeping-delivery/exchange] onboarding limit event failed", {
+      code: error.code,
+    });
+  }
+}
+
+function pruneOnboardingExceptionBuckets(now: number) {
+  if (onboardingExceptionBuckets.size <= ONBOARDING_EXCEPTION_MAX_BUCKETS) {
+    return;
+  }
+
+  for (const [key, bucket] of onboardingExceptionBuckets) {
+    if (now - bucket.updatedAt > ONBOARDING_EXCEPTION_WINDOW_MS * 2) {
+      onboardingExceptionBuckets.delete(key);
+    }
+  }
 }
 
 async function hasNoPriorDeliveries({
@@ -978,11 +1092,12 @@ function readFastCandidateMode(): FastCandidateMode {
   return "tiered";
 }
 
-function isFastStockCandidateDeliverable(
+export function isFastStockCandidateDeliverable(
   row: FastStockCandidateRow,
   {
     userId,
     anonymousId,
+    senderAnonymousId,
     recipientCatId,
     excludePhotoId,
     blockedPhotoIds,
@@ -990,6 +1105,7 @@ function isFastStockCandidateDeliverable(
   }: {
     userId: string | null;
     anonymousId: string | null;
+    senderAnonymousId: string | null;
     recipientCatId: string | null;
     excludePhotoId: string;
     blockedPhotoIds: Set<string>;
@@ -1000,6 +1116,9 @@ function isFastStockCandidateDeliverable(
     return false;
   }
   if (!userId && anonymousId && row.anonymous_id === anonymousId) {
+    return false;
+  }
+  if (senderAnonymousId && row.anonymous_id === senderAnonymousId) {
     return false;
   }
   if (
@@ -1021,11 +1140,12 @@ function isFastStockCandidateDeliverable(
   return !blockedPhotoIds.has(row.id) && !blockedPhotoIds.has(row.local_moment_id);
 }
 
-function isRowDeliverable(
+export function isRowDeliverable(
   row: RemoteCatMomentRow,
   {
     userId,
     anonymousId,
+    senderAnonymousId,
     recipientCatId,
     excludePhotoId,
     blockedPhotoIds,
@@ -1033,6 +1153,7 @@ function isRowDeliverable(
   }: {
     userId: string | null;
     anonymousId: string | null;
+    senderAnonymousId: string | null;
     recipientCatId: string | null;
     excludePhotoId: string;
     blockedPhotoIds: Set<string>;
@@ -1052,6 +1173,9 @@ function isRowDeliverable(
     return false;
   }
   if (!userId && anonymousId && row.anonymous_id === anonymousId) {
+    return false;
+  }
+  if (senderAnonymousId && row.anonymous_id === senderAnonymousId) {
     return false;
   }
   if (
