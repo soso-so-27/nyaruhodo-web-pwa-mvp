@@ -28,6 +28,7 @@ import {
 import { createOnboardingHandoff } from "../../../lib/onboarding/handoff";
 import { claimPendingReferral } from "../../../lib/referrals/client";
 import {
+  getEmbeddedBrowserInfo,
   getDisplayEnvironment,
   getDisplayEnvironmentLabel,
   type DisplayEnvironment,
@@ -86,6 +87,7 @@ export default function AccountCreatePage() {
   const [connectedEmail, setConnectedEmail] = useState("");
   const [displayEnvironment, setDisplayEnvironment] =
     useState<DisplayEnvironment>("unknown");
+  const [embeddedBrowserLabel, setEmbeddedBrowserLabel] = useState("");
   const [isFromOnboarding, setIsFromOnboarding] = useState(false);
   const [onboardingSource, setOnboardingSource] =
     useState<OnboardingSource>("direct");
@@ -99,6 +101,7 @@ export default function AccountCreatePage() {
   const isStartingAuth = pendingAction !== null;
   const isStartingGoogle = pendingAction === "google";
   const isPreparingHandoff = pendingAction === "handoff";
+  const isEmbeddedBrowser = embeddedBrowserLabel.length > 0;
   const onboardingAlbumTitle = hasOnboardingCatName
     ? `${onboardingCatName.trim()}のアルバムをつくる`
     : "うちのこのアルバムをつくる";
@@ -127,6 +130,8 @@ export default function AccountCreatePage() {
 
   useEffect(() => {
     setDisplayEnvironment(getDisplayEnvironment());
+    const embeddedBrowser = getEmbeddedBrowserInfo();
+    setEmbeddedBrowserLabel(embeddedBrowser.label);
     const fromOnboarding =
       new URLSearchParams(window.location.search).get("from") === "onboarding";
     const source = readOnboardingSourceFromLocation();
@@ -146,6 +151,15 @@ export default function AccountCreatePage() {
 
     setIsFromOnboarding(fromOnboarding);
     setOnboardingSource(source);
+
+    if (embeddedBrowser.isEmbedded) {
+      trackProductEvent("inapp_browser_detected", {
+        route: "/account/create",
+        source,
+        surface: "account_create",
+        browser: embeddedBrowser.label,
+      });
+    }
 
     if (fromOnboarding && !hasTrackedOnboardingPromptView.current) {
       hasTrackedOnboardingPromptView.current = true;
@@ -229,6 +243,26 @@ export default function AccountCreatePage() {
   }, []);
 
   async function handleGoogleSignIn() {
+    if (isEmbeddedBrowser) {
+      const browserLabel = embeddedBrowserLabel || "このアプリ";
+      trackProductEvent("auth_google_blocked_embedded_browser", {
+        route: "/account/create",
+        source: onboardingSource,
+        surface: isFromOnboarding ? "onboarding" : "account_create",
+        browser: browserLabel,
+      });
+      if (isFromOnboarding) {
+        setMessage(
+          `${browserLabel}の中からは、Googleのログインがひらけない決まりになっています。「つづきのリンクを作る」から、Safari/Chromeまたはホーム画面アプリでつづけられます。`,
+        );
+      } else {
+        setMessage(
+          `${browserLabel}の中からは、Googleのログインがひらけない決まりになっています。Safari/Chromeで開き直してからお試しください。`,
+        );
+      }
+      return;
+    }
+
     if (isFromOnboarding) {
       trackProductEvent("onboarding_google_continue_click", {
         source: onboardingSource,
@@ -556,28 +590,34 @@ export default function AccountCreatePage() {
                 </p>
               ) : null}
               <p style={styles.authNote}>
-                {isFromOnboarding
-                  ? "Googleなしでも、つづきのリンクでホーム画面アプリに引き継げます。"
-                  : "Googleの画面が開きます。接続後、このアプリに戻ります。"}
+                {isEmbeddedBrowser
+                  ? isFromOnboarding
+                    ? `${embeddedBrowserLabel}の中からは、Googleのログインがひらけない決まりになっています。「つづきのリンクを作る」から、Safari/Chromeまたはホーム画面アプリでつづけられます。`
+                    : `${embeddedBrowserLabel}の中からは、Googleのログインがひらけない決まりになっています。Safari/Chromeで開き直してください。`
+                  : isFromOnboarding
+                  ? "Googleなしでも、つづきのリンクでホーム画面アプリに引き継げます。Googleがひらけないときは、つづきのリンクを作ってSafari/Chromeで開いてください。"
+                  : "Googleの画面が開きます。うまくいかない場合は、Safari/Chromeで開き直してください。"}
               </p>
 
               <div style={styles.actions}>
                 {isFromOnboarding ? (
                   <>
+                    {!isEmbeddedBrowser ? (
+                      <AppButton
+                        type="button"
+                        onClick={() => {
+                          void handleGoogleSignIn();
+                        }}
+                        variant="accent"
+                        fullWidth
+                        disabled={isStartingAuth || isCheckingAccount}
+                      >
+                        {isStartingGoogle ? "Googleを開いています..." : "Googleでつづける"}
+                      </AppButton>
+                    ) : null}
                     <AppButton
                       type="button"
-                      onClick={() => {
-                        void handleGoogleSignIn();
-                      }}
-                      variant="accent"
-                      fullWidth
-                      disabled={isStartingAuth || isCheckingAccount}
-                    >
-                      {isStartingGoogle ? "Googleを開いています..." : "Googleでつづける"}
-                    </AppButton>
-                    <AppButton
-                      type="button"
-                      variant="quiet"
+                      variant={isEmbeddedBrowser ? "accent" : "quiet"}
                       size="md"
                       onClick={handleLater}
                       fullWidth

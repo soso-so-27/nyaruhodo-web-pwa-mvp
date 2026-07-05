@@ -10,6 +10,7 @@ https://nyaruhodo.jp/onboarding?source=instagram_story
 
 - Confirm Vercel Production is Ready and `nyaruhodo.jp` points to the latest Production deployment.
 - Confirm Supabase migrations are applied with `supabase migration list`.
+- Confirm Google login succeeds in Safari/Chrome/PWA. If it fails there too, fix Google Cloud OAuth redirect URI / Supabase callback settings before testing Instagram handoff.
 - Confirm `npm run check:release`, `npm run typecheck`, and `npm run build` pass locally or in CI.
 - Local `npm run check:release` needs a valid `.env.local`. Pull Preview/Production env from Vercel or fill the required values first; empty values stop with `Missing NEXT_PUBLIC_SUPABASE_URL.` and no secret values are printed.
 - Confirm Vercel plan, spend limit, and alert emails with the project owner before posting broadly.
@@ -22,7 +23,7 @@ https://nyaruhodo.jp/onboarding?source=instagram_story
 - Select one cat photo and confirm upload does not freeze.
 - Confirm one `ねこだより` arrives and can be opened.
 - Confirm `うちのこのアルバムをつくる` appears after opening.
-- Confirm Google login either works or the `あとで` path lets the user leave safely.
+- Confirm Google login is not the main path inside Instagram; the handoff link path appears and continues in Safari/Chrome/PWA.
 - Reopen the same URL and confirm the flow resumes instead of restarting.
 - Open `?source=instagram_bio` after submitting and confirm state is not reset.
 
