@@ -37,6 +37,7 @@ import {
 import {
   readCatSleepingMilestones,
   readOwnSleepingPhotos,
+  readOwnSleepingPhotosForAlbum,
   readOwnSleepingPhotoCount,
   type CatSleepingMilestone,
   type OwnSleepingPhoto,
@@ -247,9 +248,7 @@ export function CatsPage() {
     : 0;
   const omoideMemories = readOmoideMemoriesForCat(activeCatId);
   const sleepingMilestones = readCatSleepingMilestones(activeCatId);
-  const activeAvatarSrc =
-    activeCatProfile?.avatarDataUrl ??
-    getCatAvatarSrc(activeCatProfile?.appearance?.coat);
+  const activeAvatarSrc = activeCatProfile?.avatarDataUrl;
   const isOnboardingProfileSetup = isOnboardingMode && isEditingProfile;
   const isOnboardingCompletionView =
     isOnboardingMode && isOnboardingCompletionReady && !isEditingProfile;
@@ -3594,7 +3593,7 @@ function createLocalLensPhotos(catProfiles: CatProfile[]): {
   );
   const allPhotos: LensPhoto[] = [];
 
-  for (const photo of readOwnSleepingPhotos(null)) {
+  for (const photo of readOwnSleepingPhotosForAlbum(null)) {
     const catId = photo.ownerCatId ?? photo.catId;
     const profile = profilesById.get(catId);
 
@@ -4529,23 +4528,6 @@ function formatGender(gender?: string): string {
   }
 
   return "";
-}
-
-function getCatAvatarSrc(coat?: string): string {
-  const coatMap: Record<string, string> = {
-    saba: "/sample-cats/saba.webp",
-    kiji_tabby: "/sample-cats/saba.webp",
-    gray: "/sample-cats/gray.webp",
-    orange_tabby: "/sample-cats/orange_tabby.webp",
-    black: "/sample-cats/black.webp",
-    white: "/sample-cats/white.webp",
-    hachiware: "/sample-cats/black.webp",
-    calico: "/sample-cats/calico.webp",
-    tortoiseshell: "/sample-cats/black.webp",
-    cream: "/sample-cats/saba.webp",
-  };
-
-  return coatMap[coat ?? ""] ?? "/sample-cats/saba.webp";
 }
 
 function getCoatLabel(coat: string): string {

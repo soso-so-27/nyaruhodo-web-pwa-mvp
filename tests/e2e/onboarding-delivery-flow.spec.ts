@@ -292,9 +292,7 @@ test.describe("onboarding delivery flow", () => {
       page.getByText(/届いたねこだよりを[\s\S]*しまいました。[\s\S]*よる8時にまた届きます。/),
     ).toBeVisible();
     await expect.poll(() => readKeptExchangePhotoCount(page)).toBe(1);
-
-    await page.getByRole("button", { name: "閉じる" }).click();
-    await expect(page).toHaveURL(/\/home/);
+    await expect(page.getByRole("button", { name: "閉じる" })).toHaveCount(0);
     await expect.poll(() => readKeptExchangePhotoCount(page)).toBe(1);
   });
 
@@ -331,7 +329,7 @@ test.describe("onboarding delivery flow", () => {
 
     await page.goto("/collection");
     await page.locator('[role="tab"]').nth(0).click();
-    await expect(page.getByTestId("mainichi-board-photo-sent")).toHaveCount(0);
+    await expect(page.getByTestId("mainichi-board-photo-sent").first()).toBeVisible();
 
     await page.locator('[role="tab"]').nth(1).click();
     const deliveredCard = page.getByTestId("mainichi-board-photo-delivered").first();
@@ -361,6 +359,42 @@ test.describe("onboarding delivery flow", () => {
       "data-source-photo-id",
       "stock-storage-e2e-fake",
     );
+  });
+
+  test("persists signed onboarding deliveries as local image fallbacks", async ({
+    page,
+  }) => {
+    await routeStorageDeliveryWithSignedDisplay(page);
+
+    await page.goto("/onboarding?source=line");
+    await page.waitForLoadState("networkidle");
+    await page.locator("main button").first().click();
+    await page.locator('input[type="file"]').last().setInputFiles({
+      name: "sleeping-cat.png",
+      mimeType: "image/png",
+      buffer: testPng,
+    });
+
+    await page.getByRole("button", { name: "ねこだよりを開く" }).click();
+    await expect(page.getByRole("button", { name: "つづける" })).toBeEnabled();
+
+    const openedSnapshot = await readOnboardingDeliverySnapshot(page);
+    expect(openedSnapshot.keptPhoto?.sourcePhotoId).toBe("stock-signed-e2e-fake");
+    expect(openedSnapshot.keptPhoto?.src).toMatch(/^data:image\//);
+
+    await page.evaluate(() => {
+      window.localStorage.setItem("analytics_anonymous_id", "anonymous-other-context");
+    });
+    await page.goto("/collection");
+    await page.locator('[role="tab"]').nth(1).click();
+
+    const deliveredCard = page.getByTestId("mainichi-board-photo-delivered").first();
+    await expect(deliveredCard).toBeVisible();
+    await expect(deliveredCard).toHaveAttribute(
+      "data-source-photo-id",
+      "stock-signed-e2e-fake",
+    );
+    await expectVisibleNonBlackImage(deliveredCard.locator("img").first());
   });
 
   test("does not show the PWA home install guide inside Instagram browser", async ({
@@ -1063,6 +1097,53 @@ async function routeStorageDeliveryWithBrokenDisplay(page: Page) {
           src: "storage:admin-stock/sleeping/onboarding-delivered.jpg",
           displaySrc: "https://example.com/missing-delivery-display.jpg",
           thumbnailSrc: `data:image/png;base64,${testPng.toString("base64")}`,
+          title: "",
+          subtitle: "",
+          triggerLabel: "sleeping",
+          theme: "sleeping",
+          deliveredAt: Date.now(),
+        },
+        source: "remote",
+        diagnostics: {
+          source: "remote",
+          availableCount: 1,
+          candidateCount: 1,
+          normalCandidateCount: 1,
+          fallbackCandidateCount: 0,
+          fallbackActive: false,
+        },
+      }),
+    });
+  });
+}
+
+async function routeStorageDeliveryWithSignedDisplay(page: Page) {
+  await page.route("https://example.com/signed-delivery-display.jpg", async (route) => {
+    await route.fulfill({
+      status: 200,
+      headers: {
+        "access-control-allow-origin": "*",
+        "content-type": "image/png",
+      },
+      body: testPng,
+    });
+  });
+  await page.route("**/api/photo-storage/signed-url", async (route) => {
+    await route.fulfill({
+      status: 403,
+      contentType: "application/json",
+      body: JSON.stringify({ signedUrl: null, error: "forbidden_photo" }),
+    });
+  });
+  await page.route("**/api/sleeping-delivery/exchange", async (route) => {
+    await route.fulfill({
+      contentType: "application/json",
+      body: JSON.stringify({
+        photo: {
+          id: `delivered-signed-${Date.now()}`,
+          sourcePhotoId: "stock-signed-e2e-fake",
+          src: "storage:admin-stock/sleeping/onboarding-delivered-signed.jpg",
+          displaySrc: "https://example.com/signed-delivery-display.jpg",
           title: "",
           subtitle: "",
           triggerLabel: "sleeping",

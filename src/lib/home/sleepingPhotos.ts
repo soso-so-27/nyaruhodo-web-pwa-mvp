@@ -149,6 +149,16 @@ export function readOwnSleepingPhotos(activeCatId: string | null = null) {
   return (activeCatPhotos.length > 0 ? activeCatPhotos : photos).slice(0, 24);
 }
 
+export function readOwnSleepingPhotosForAlbum(activeCatId: string | null = null) {
+  const photos = readAllOwnSleepingPhotos();
+
+  const activeCatPhotos = activeCatId
+    ? photos.filter((photo) => photo.ownerCatId === activeCatId)
+    : photos;
+
+  return (activeCatPhotos.length > 0 ? activeCatPhotos : photos).slice(0, 24);
+}
+
 export function readAllOwnSleepingPhotos() {
   return readStorageArray<OwnSleepingPhoto>(OWN_SLEEPING_PHOTO_STORAGE_KEY)
     .filter(isValidOwnSleepingPhoto)

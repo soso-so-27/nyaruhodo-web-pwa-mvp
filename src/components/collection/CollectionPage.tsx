@@ -26,7 +26,7 @@ import {
   hideKeptExchangePhoto,
   isExchangePhotoLocallyBlocked,
   readKeptExchangePhotos,
-  readOwnSleepingPhotos,
+  readOwnSleepingPhotosForAlbum,
   reportExchangePhoto,
   updateKeptExchangePhotoDataUrl,
   updateOwnSleepingPhotoDelivery,
@@ -455,7 +455,7 @@ export function CollectionPage() {
     [catName, shareSuggestionSlot, storedCollectionPhotos],
   );
   const sleepingBoxPhotos = useMemo(
-    () => readOwnSleepingPhotos(null),
+    () => readOwnSleepingPhotosForAlbum(null),
     [boxRefreshTick, hasLoaded],
   );
   const openedEveningDeliveryPhotos = useMemo(

@@ -1385,9 +1385,6 @@ export function OnboardingFlow() {
             >
               {isDeliveredPhotoKept ? "つづける" : "ねこだよりに入れています..."}
             </AppButton>
-            <AppButton type="button" variant="quiet" size="md" onClick={handleGoHome}>
-              閉じる
-            </AppButton>
             {message ? <p style={styles.message}>{message}</p> : null}
           </section>
         ) : null}
@@ -2119,12 +2116,53 @@ function getExchangePhotoFallbackSrcs(photo: ExchangePhoto) {
 }
 
 async function createAlbumPhotoCandidates(photo: ExchangePhoto) {
-  if (!photo.src.startsWith("data:image/")) {
-    return [photo];
-  }
-
   const candidates: ExchangePhoto[] = [];
   const seenSrcs = new Set<string>();
+
+  for (const sourceSrc of getAlbumCandidateSourceSrcs(photo)) {
+    const dataUrl = sourceSrc.startsWith("data:image/")
+      ? sourceSrc
+      : await loadImageAssetAsDataUrl(sourceSrc);
+
+    if (!dataUrl?.startsWith("data:image/")) {
+      continue;
+    }
+
+    for (const attempt of [
+      { maxSize: 420, quality: 0.62 },
+      { maxSize: 320, quality: 0.56 },
+      { maxSize: 240, quality: 0.5 },
+      { maxSize: 180, quality: 0.44 },
+    ]) {
+      const compressedSrc = await resizeDataUrl(
+        dataUrl,
+        attempt.maxSize,
+        attempt.quality,
+      );
+
+      if (
+        compressedSrc &&
+        isUsablePhotoSrc(compressedSrc) &&
+        !seenSrcs.has(compressedSrc)
+      ) {
+        seenSrcs.add(compressedSrc);
+        candidates.push(createDataBackedExchangePhoto(photo, compressedSrc));
+      }
+    }
+
+    if (isUsablePhotoSrc(dataUrl) && !seenSrcs.has(dataUrl)) {
+      seenSrcs.add(dataUrl);
+      candidates.push(createDataBackedExchangePhoto(photo, dataUrl));
+    }
+
+    if (candidates.length > 0) {
+      break;
+    }
+  }
+
+  if (!photo.src.startsWith("data:image/")) {
+    return [...candidates, photo];
+  }
 
   for (const attempt of [
     { maxSize: 420, quality: 0.62 },
@@ -2140,7 +2178,7 @@ async function createAlbumPhotoCandidates(photo: ExchangePhoto) {
 
     if (compressedSrc && isUsablePhotoSrc(compressedSrc) && !seenSrcs.has(compressedSrc)) {
       seenSrcs.add(compressedSrc);
-      candidates.push({ ...photo, src: compressedSrc });
+      candidates.push(createDataBackedExchangePhoto(photo, compressedSrc));
     }
   }
 
@@ -2149,6 +2187,27 @@ async function createAlbumPhotoCandidates(photo: ExchangePhoto) {
   }
 
   return candidates;
+}
+
+function getAlbumCandidateSourceSrcs(photo: ExchangePhoto) {
+  return [photo.thumbnailSrc, photo.displaySrc, photo.originalSrc, photo.src].filter(
+    (src): src is string =>
+      typeof src === "string" &&
+      (src.startsWith("data:image/") || /^https?:\/\//i.test(src)),
+  );
+}
+
+function createDataBackedExchangePhoto(
+  photo: ExchangePhoto,
+  dataUrl: string,
+): ExchangePhoto {
+  return {
+    ...photo,
+    src: dataUrl,
+    thumbnailSrc: dataUrl,
+    displaySrc: dataUrl,
+    originalSrc: dataUrl,
+  };
 }
 
 function resizeDataUrl(
