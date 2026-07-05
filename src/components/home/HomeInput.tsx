@@ -827,10 +827,7 @@ export function HomeInput({
         : readOwnSleepingPhotos(null),
     [allOwnSleepingPhotos, homeDisplayCatId],
   );
-  const ownSleepingPhotosForDelivery = useMemo(
-    () => readOwnSleepingPhotos(activeCatId),
-    [activeCatId, collectionRefreshTick, eveningRefreshTick],
-  );
+  const ownSleepingPhotosForDelivery = allOwnSleepingPhotos;
   const eveningDelivery = useEveningDelivery({
     activeCatId,
     ownSleepingPhotos: ownSleepingPhotosForDelivery,
@@ -840,11 +837,11 @@ export function HomeInput({
   const eveningHomeState = useMemo(
     () =>
       buildEveningHomeState({
-        activeCatId: homeDisplayCatId,
-        ownPhotos: ownSleepingPhotosForHome,
+        activeCatId: null,
+        ownPhotos: allOwnSleepingPhotos,
         now: homeNow,
       }),
-    [homeDisplayCatId, eveningDeliveryRefreshTick, homeNow, ownSleepingPhotosForHome],
+    [allOwnSleepingPhotos, eveningDeliveryRefreshTick, homeNow],
   );
   const deliveredHomePhoto =
     eveningHomeState.kind === "delivered"

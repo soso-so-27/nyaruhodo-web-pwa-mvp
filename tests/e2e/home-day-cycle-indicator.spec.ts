@@ -93,6 +93,89 @@ test.describe("home desk state cycle", () => {
     await expect(page.getByTestId("evening-opening-pair")).toBeVisible();
   });
 
+  test("keeps the evening delivery state independent of the selected cat", async ({
+    page,
+  }) => {
+    await page.addInitScript(
+      ({ nowValue, dateKey, src }) => {
+        const originalDateNow = Date.now.bind(Date);
+        (window as typeof window & { __testNow?: number }).__testNow = nowValue;
+        Date.now = () =>
+          (window as typeof window & { __testNow?: number }).__testNow ??
+          originalDateNow();
+        window.localStorage.clear();
+        window.localStorage.setItem("nyaruhodo_sleeping_safety_accepted", "1");
+        window.localStorage.setItem("neteruneko_onboarding_completed", "true");
+        window.localStorage.setItem("active_cat_id", "cat-other");
+        window.localStorage.setItem(
+          "cat_profiles",
+          JSON.stringify([
+            {
+              id: "cat-home",
+              name: "むぎ",
+              createdAt: new Date(nowValue).toISOString(),
+              updatedAt: new Date(nowValue).toISOString(),
+            },
+            {
+              id: "cat-other",
+              name: "そら",
+              createdAt: new Date(nowValue).toISOString(),
+              updatedAt: new Date(nowValue).toISOString(),
+            },
+          ]),
+        );
+        window.localStorage.setItem(
+          "nyaruhodo_exchange_own_sleeping_photos",
+          JSON.stringify([
+            {
+              id: "own-today",
+              ownerCatId: "cat-home",
+              catId: "cat-home",
+              src,
+              state: "sleeping",
+              visibility: "private",
+              deliveryStatus: "available",
+              triggerLabel: "sleeping",
+              theme: "sleeping",
+              shared: true,
+              createdAt: nowValue,
+            },
+          ]),
+        );
+        window.localStorage.setItem(
+          "neteruneko_evening_delivery_days",
+          JSON.stringify({
+            [dateKey]: {
+              dateKey,
+              targetOwnPhotoId: "own-today",
+              targetCatId: "cat-home",
+              targetCapturedAt: nowValue,
+              deliveredPhoto: {
+                id: "delivered-today",
+                sourcePhotoId: "source-today",
+                src,
+                triggerLabel: "sleeping",
+                theme: "sleeping",
+                deliveredAt: nowValue,
+              },
+              deliveredAt: nowValue,
+            },
+          }),
+        );
+      },
+      { nowValue: afterEight, dateKey: currentJstDateKey, src: photoDataUrl },
+    );
+
+    await page.goto("/home");
+    await page.waitForLoadState("networkidle");
+
+    await expect(page.getByTestId("home-desk-model")).toHaveAttribute(
+      "data-state",
+      "3",
+    );
+    await expect(page.getByTestId("desk-open-letter")).toHaveCount(1);
+  });
+
   test("omits motif animation classes when reduced motion is enabled", async ({
     page,
   }) => {

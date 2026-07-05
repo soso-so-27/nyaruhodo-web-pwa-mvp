@@ -478,9 +478,11 @@ function findTargetPhoto(
     return day.targetPhoto;
   }
 
+  const targetCatId = day.targetCatId ?? activeCatId;
+
   return (
     ownPhotos.find((photo) =>
-      activeCatId ? photo.ownerCatId === activeCatId : true,
+      targetCatId ? (photo.ownerCatId ?? photo.catId) === targetCatId : true,
     ) ?? null
   );
 }

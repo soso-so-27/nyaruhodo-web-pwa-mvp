@@ -138,6 +138,114 @@ test.describe("home sleeping exchange flow", () => {
     expect(storage.eveningDeliveryDays["2026-06-10"]?.keptAt).toBeTruthy();
   });
 
+  test("uses the stored delivery target cat instead of the selected cat", async ({
+    page,
+  }) => {
+    let exchangeCalls = 0;
+    let recipientCatId: string | null = null;
+    const beforeDelivery = Date.parse("2026-06-10T10:59:00.000Z");
+    const afterDelivery = Date.parse("2026-06-10T11:01:00.000Z");
+
+    await page.addInitScript(
+      ({ now, capturedAt, ownDataUrl }) => {
+        (window as typeof window & { __testNow?: number }).__testNow = now;
+        const originalDateNow = Date.now.bind(Date);
+        Date.now = () =>
+          (window as typeof window & { __testNow?: number }).__testNow ??
+          originalDateNow();
+        window.localStorage.setItem("nyaruhodo_sleeping_safety_accepted", "1");
+        window.localStorage.setItem("neteruneko_onboarding_completed", "true");
+        window.localStorage.setItem("active_cat_id", "cat-other");
+        window.localStorage.setItem(
+          "cat_profiles",
+          JSON.stringify([
+            {
+              id: "cat-target",
+              name: "むぎ",
+              createdAt: new Date(now).toISOString(),
+              updatedAt: new Date(now).toISOString(),
+            },
+            {
+              id: "cat-other",
+              name: "そら",
+              createdAt: new Date(now).toISOString(),
+              updatedAt: new Date(now).toISOString(),
+            },
+          ]),
+        );
+        const ownPhoto = {
+          id: "target-cat-own-photo",
+          ownerCatId: "cat-target",
+          catId: "cat-target",
+          src: ownDataUrl,
+          state: "sleeping",
+          visibility: "private",
+          deliveryStatus: "available",
+          triggerLabel: "sleeping",
+          theme: "sleeping",
+          shared: true,
+          createdAt: capturedAt,
+        };
+        window.localStorage.setItem(
+          "nyaruhodo_exchange_own_sleeping_photos",
+          JSON.stringify([ownPhoto]),
+        );
+        window.localStorage.setItem(
+          "neteruneko_evening_delivery_days",
+          JSON.stringify({
+            "2026-06-10": {
+              dateKey: "2026-06-10",
+              targetOwnPhotoId: ownPhoto.id,
+              targetCatId: "cat-target",
+              targetCapturedAt: capturedAt,
+              targetPhoto: ownPhoto,
+            },
+          }),
+        );
+      },
+      { now: afterDelivery, capturedAt: beforeDelivery, ownDataUrl: deliveredDataUrl },
+    );
+
+    await page.route("**/api/sleeping-delivery/exchange", async (route) => {
+      exchangeCalls += 1;
+      const body = route.request().postDataJSON() as { recipientCatId?: string };
+      recipientCatId = body.recipientCatId ?? null;
+      await route.fulfill({
+        contentType: "application/json",
+        body: JSON.stringify({
+          photo: {
+            id: `delivered-target-cat-${Date.now()}`,
+            sourcePhotoId: "source-target-cat",
+            src: deliveredDataUrl,
+            title: "",
+            subtitle: "",
+            triggerLabel: "sleeping",
+            theme: "sleeping",
+            deliveredAt: afterDelivery,
+          },
+          source: "remote",
+          diagnostics: {
+            source: "remote",
+            candidateCount: 1,
+            normalCandidateCount: 1,
+            fallbackCandidateCount: 0,
+            fallbackActive: false,
+          },
+        }),
+      });
+    });
+
+    await page.goto("/home");
+    await page.waitForLoadState("networkidle");
+
+    await expect.poll(() => exchangeCalls).toBe(1);
+    expect(recipientCatId).toBe("cat-target");
+    await expect(page.getByTestId("home-desk-model")).toHaveAttribute(
+      "data-state",
+      "3",
+    );
+  });
+
   test("lets anonymous users open storage deliveries without signed-url API auth", async ({
     page,
   }) => {

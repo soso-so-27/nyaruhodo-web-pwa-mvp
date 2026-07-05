@@ -69,6 +69,7 @@ export function useEveningDelivery({
       const store = readEveningDeliveryStore();
       const todayDay = store[todayKey];
       const pendingDay = getPendingEveningDeliveryDay(now);
+      const recipientCatId = pendingDay?.targetCatId ?? activeCatId;
       const traceBase = buildEveningDeliveryTraceBase({
         activeCatId,
         now,
@@ -77,7 +78,7 @@ export function useEveningDelivery({
         todayKey,
       });
 
-      if (!pendingDay?.targetOwnPhotoId || !activeCatId) {
+      if (!pendingDay?.targetOwnPhotoId || !recipientCatId) {
         if (todayDay && now >= getJstDeliveryTime(todayKey)) {
           recordEveningDeliveryTrace({
             ...traceBase,
@@ -110,7 +111,7 @@ export function useEveningDelivery({
           : findLegacyEveningDeliveryPhoto(
               pendingDay,
               ownSleepingPhotos,
-              activeCatId,
+              recipientCatId,
             );
       const ownPhoto = directOwnPhoto ?? targetPhoto ?? legacyPhoto;
       const selectedPhotoSource = directOwnPhoto
@@ -215,7 +216,7 @@ export function useEveningDelivery({
           },
           seed: `${pendingDay.dateKey}:${ownPhoto.id}`,
           deliveryDateKey: pendingDay.dateKey,
-          recipientCatId: pendingDay.targetCatId ?? activeCatId,
+          recipientCatId,
         });
 
         recordEveningDeliveryTrace({
@@ -244,7 +245,7 @@ export function useEveningDelivery({
                 delivery_date_key: pendingDay.dateKey,
                 http_status: result.httpStatus,
               },
-              { localCatId: pendingDay.targetCatId ?? activeCatId },
+              { localCatId: recipientCatId },
             );
             return;
           }
@@ -257,7 +258,7 @@ export function useEveningDelivery({
                 delivery_date_key: pendingDay.dateKey,
                 http_status: result.httpStatus,
               },
-              { localCatId: pendingDay.targetCatId ?? activeCatId },
+              { localCatId: recipientCatId },
             );
             trackEveningDeliveryCheckEvent("evening_delivery_check_failed", {
               startedAt: checkStartedAt,
@@ -275,7 +276,7 @@ export function useEveningDelivery({
               isOnboardingInstant: false,
               isDay1Evening: false,
             },
-            { localCatId: pendingDay.targetCatId ?? activeCatId },
+            { localCatId: recipientCatId },
           );
           trackEveningDeliveryCheckEvent("evening_delivery_check_failed", {
             startedAt: checkStartedAt,
@@ -303,7 +304,7 @@ export function useEveningDelivery({
             isDay1Evening: false,
             tier: result.tier ?? null,
           },
-          { localCatId: pendingDay.targetCatId ?? activeCatId },
+          { localCatId: recipientCatId },
         );
         if (result.tier) {
           trackProductEvent(
@@ -312,7 +313,7 @@ export function useEveningDelivery({
               delivery_date_key: pendingDay.dateKey,
               tier: result.tier,
             },
-            { localCatId: pendingDay.targetCatId ?? activeCatId },
+            { localCatId: recipientCatId },
           );
         }
       } catch {
