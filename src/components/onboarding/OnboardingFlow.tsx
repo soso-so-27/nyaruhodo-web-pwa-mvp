@@ -10,10 +10,8 @@ import {
   saveRemoteDeliveryStockPhoto,
 } from "../../lib/home/deliveryCandidates";
 import {
-  keepExchangePhoto,
   readOwnSleepingPhotos,
   saveOwnSleepingPhoto,
-  updateKeptExchangePhotoDataUrl,
   type ExchangePhoto,
   type OwnSleepingPhoto,
 } from "../../lib/home/sleepingPhotos";
@@ -237,7 +235,7 @@ export function OnboardingFlow() {
     }
 
     autoKeptDeliveredPhotoIdRef.current = deliveredPhoto.id;
-    void keepDeliveredPhotoForOnboarding();
+    markDeliveredPhotoReadyForOnboarding();
   }, [state, deliveredPhoto, isDeliveredPhotoKept]);
 
   useEffect(() => {
@@ -744,31 +742,24 @@ export function OnboardingFlow() {
     );
   }
 
-  async function keepDeliveredPhotoForOnboarding() {
+  function markDeliveredPhotoReadyForOnboarding() {
     if (!deliveredPhoto) {
       return;
     }
 
-    const keepResult = await keepExchangePhotoForAlbum(deliveredPhoto);
-    setDeliveredPhoto(keepResult.photo);
     trackProductEvent("onboarding_delivered_photo_confirmed", {
       source: getEffectiveEntrySource(),
-      source_photo_id: keepResult.photo.sourcePhotoId ?? null,
-      saved_to_album: keepResult.saved,
+      source_photo_id: deliveredPhoto.sourcePhotoId ?? null,
+      saved_to_album: false,
       test_mode: canShowTestTools,
     });
-
-    if (!keepResult.saved) {
-      setMessage("ねがおはとどきましたが、アルバムに保存できませんでした。設定の保存状態を確認してください。");
-      return;
-    }
 
     setIsDeliveredPhotoKept(true);
     patchOnboardingProgress({
       stage: "opened",
       source: getEffectiveEntrySource(),
-      deliveredPhoto: keepResult.photo,
-      isDeliveredPhotoKept: keepResult.saved,
+      deliveredPhoto,
+      isDeliveredPhotoKept: true,
       completionCopy: getEveningDeliveryCompletionCopy(),
     });
 
@@ -777,9 +768,9 @@ export function OnboardingFlow() {
       setCompletionCopy(getEveningDeliveryCompletionCopy());
       trackProductEvent("onboarding_completed", {
         source: getEffectiveEntrySource(),
-        method: "delivery_kept",
-        photo_id: keepResult.photo.id,
-        delivery_photo_id: keepResult.photo.id,
+        method: "delivery_confirmed",
+        photo_id: deliveredPhoto.id,
+        delivery_photo_id: deliveredPhoto.id,
       });
     }
   }
@@ -799,7 +790,6 @@ export function OnboardingFlow() {
     };
 
     setDeliveredPhoto(photoWithDataUrl);
-    updateKeptExchangePhotoDataUrl(photoWithDataUrl, dataUrl);
     patchOnboardingProgress({
       stage: progress?.stage ?? "opened",
       deliveredPhoto: photoWithDataUrl,
@@ -2089,18 +2079,6 @@ function truncateDebugText(value: string, maxLength: number) {
   return value.length > maxLength ? `${value.slice(0, maxLength)}…` : value;
 }
 
-async function keepExchangePhotoForAlbum(photo: ExchangePhoto) {
-  const candidates = await createAlbumPhotoCandidates(photo);
-
-  for (const candidate of candidates) {
-    if (keepExchangePhoto(candidate)) {
-      return { photo: candidate, saved: true };
-    }
-  }
-
-  return { photo: candidates[0] ?? photo, saved: false };
-}
-
 function getExchangePhotoDisplaySrc(photo: ExchangePhoto) {
   return (
     [photo.displaySrc, photo.thumbnailSrc, photo.originalSrc, photo.src].find(
@@ -2113,138 +2091,6 @@ function getExchangePhotoFallbackSrcs(photo: ExchangePhoto) {
   return [photo.thumbnailSrc, photo.originalSrc, photo.src].filter(
     (src): src is string => typeof src === "string" && isUsablePhotoSrc(src),
   );
-}
-
-async function createAlbumPhotoCandidates(photo: ExchangePhoto) {
-  const candidates: ExchangePhoto[] = [];
-  const seenSrcs = new Set<string>();
-
-  for (const sourceSrc of getAlbumCandidateSourceSrcs(photo)) {
-    const dataUrl = sourceSrc.startsWith("data:image/")
-      ? sourceSrc
-      : await loadImageAssetAsDataUrl(sourceSrc);
-
-    if (!dataUrl?.startsWith("data:image/")) {
-      continue;
-    }
-
-    for (const attempt of [
-      { maxSize: 420, quality: 0.62 },
-      { maxSize: 320, quality: 0.56 },
-      { maxSize: 240, quality: 0.5 },
-      { maxSize: 180, quality: 0.44 },
-    ]) {
-      const compressedSrc = await resizeDataUrl(
-        dataUrl,
-        attempt.maxSize,
-        attempt.quality,
-      );
-
-      if (
-        compressedSrc &&
-        isUsablePhotoSrc(compressedSrc) &&
-        !seenSrcs.has(compressedSrc)
-      ) {
-        seenSrcs.add(compressedSrc);
-        candidates.push(createDataBackedExchangePhoto(photo, compressedSrc));
-      }
-    }
-
-    if (isUsablePhotoSrc(dataUrl) && !seenSrcs.has(dataUrl)) {
-      seenSrcs.add(dataUrl);
-      candidates.push(createDataBackedExchangePhoto(photo, dataUrl));
-    }
-
-    if (candidates.length > 0) {
-      break;
-    }
-  }
-
-  if (!photo.src.startsWith("data:image/")) {
-    return [...candidates, photo];
-  }
-
-  for (const attempt of [
-    { maxSize: 420, quality: 0.62 },
-    { maxSize: 320, quality: 0.56 },
-    { maxSize: 240, quality: 0.5 },
-    { maxSize: 180, quality: 0.44 },
-  ]) {
-    const compressedSrc = await resizeDataUrl(
-      photo.src,
-      attempt.maxSize,
-      attempt.quality,
-    );
-
-    if (compressedSrc && isUsablePhotoSrc(compressedSrc) && !seenSrcs.has(compressedSrc)) {
-      seenSrcs.add(compressedSrc);
-      candidates.push(createDataBackedExchangePhoto(photo, compressedSrc));
-    }
-  }
-
-  if (isUsablePhotoSrc(photo.src) && !seenSrcs.has(photo.src)) {
-    candidates.push(photo);
-  }
-
-  return candidates;
-}
-
-function getAlbumCandidateSourceSrcs(photo: ExchangePhoto) {
-  return [photo.thumbnailSrc, photo.displaySrc, photo.originalSrc, photo.src].filter(
-    (src): src is string =>
-      typeof src === "string" &&
-      (src.startsWith("data:image/") || /^https?:\/\//i.test(src)),
-  );
-}
-
-function createDataBackedExchangePhoto(
-  photo: ExchangePhoto,
-  dataUrl: string,
-): ExchangePhoto {
-  return {
-    ...photo,
-    src: dataUrl,
-    thumbnailSrc: dataUrl,
-    displaySrc: dataUrl,
-    originalSrc: dataUrl,
-  };
-}
-
-function resizeDataUrl(
-  src: string,
-  maxSize = 420,
-  quality = 0.62,
-): Promise<string | null> {
-  return new Promise((resolve) => {
-    const image = new Image();
-
-    image.onload = () => {
-      const scale = Math.min(1, maxSize / Math.max(image.width, image.height));
-      const canvas = document.createElement("canvas");
-
-      canvas.width = Math.max(1, Math.round(image.width * scale));
-      canvas.height = Math.max(1, Math.round(image.height * scale));
-
-      const context = canvas.getContext("2d");
-      if (!context) {
-        resolve(null);
-        return;
-      }
-
-      context.drawImage(image, 0, 0, canvas.width, canvas.height);
-      try {
-        resolve(canvas.toDataURL("image/jpeg", quality));
-      } catch {
-        resolve(null);
-      }
-    };
-
-    image.onerror = () => {
-      resolve(null);
-    };
-
-    image.src = src;
-  });
 }
 
 const UI_FONT = "var(--font-ui)";

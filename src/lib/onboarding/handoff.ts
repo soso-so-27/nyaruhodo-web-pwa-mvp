@@ -5,7 +5,6 @@ import {
 } from "../../components/home/homeInputHelpers";
 import {
   readAllOwnSleepingPhotos,
-  readKeptExchangePhotos,
   restoreSyncedSleepingPhotos,
   type ExchangePhoto,
   type OwnSleepingPhoto,
@@ -132,7 +131,7 @@ export function createOnboardingHandoffPayload(
     catProfiles: getCurrentOnboardingCatProfiles(currentCatId),
     activeCatId: currentCatId,
     ownSleepingPhotos: getCurrentOnboardingOwnPhotos(nextOnboardingProgress),
-    keptExchangePhotos: getCurrentOnboardingKeptPhotos(nextOnboardingProgress),
+    keptExchangePhotos: [],
     pendingReferralCode: getCurrentPendingReferralCode(
       nextOnboardingProgress,
       source,
@@ -172,38 +171,6 @@ function getCurrentOnboardingOwnPhotos(
   return [storedPhoto ?? progress.ownPhoto];
 }
 
-function getCurrentOnboardingKeptPhotos(
-  progress: OnboardingProgress | null,
-): ExchangePhoto[] {
-  if (!progress?.deliveredPhoto) {
-    return [];
-  }
-
-  const storedPhoto = readKeptExchangePhotos().find((photo) =>
-    isSameExchangePhoto(photo, progress.deliveredPhoto),
-  );
-
-  return [storedPhoto ?? progress.deliveredPhoto];
-}
-
-function isSameExchangePhoto(
-  photo: ExchangePhoto,
-  target: ExchangePhoto | undefined,
-) {
-  if (!target) {
-    return false;
-  }
-
-  return (
-    photo.id === target.id ||
-    Boolean(
-      photo.sourcePhotoId &&
-        target.sourcePhotoId &&
-        photo.sourcePhotoId === target.sourcePhotoId,
-    )
-  );
-}
-
 function getCurrentPendingReferralCode(
   progress: OnboardingProgress | null,
   source: OnboardingSource,
@@ -234,7 +201,7 @@ export function restoreOnboardingHandoffPayload(payload: unknown) {
 
   restoreSyncedSleepingPhotos({
     ownPhotos: payload.ownSleepingPhotos,
-    keptPhotos: payload.keptExchangePhotos,
+    keptPhotos: [],
     mergeLocal: true,
   });
 
