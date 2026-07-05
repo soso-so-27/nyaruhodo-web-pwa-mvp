@@ -713,6 +713,144 @@ test.describe("onboarding delivery flow", () => {
     expect(storage.pendingReferral).toContain("ABC234");
   });
 
+  test("hands off only the current onboarding photos", async ({ page }) => {
+    const imageDataUrl = `data:image/png;base64,${testPng.toString("base64")}`;
+    const capturedCreateBodies: Array<{
+      payload?: {
+        onboardingProgress?: { ownPhoto?: { id?: string }; deliveredPhoto?: { id?: string } };
+        ownSleepingPhotos?: Array<{ id?: string }>;
+        keptExchangePhotos?: Array<{ id?: string; sourcePhotoId?: string }>;
+      };
+    }> = [];
+
+    await page.addInitScript(({ imageDataUrl }) => {
+      const dateKey = new Intl.DateTimeFormat("en-CA", {
+        timeZone: "Asia/Tokyo",
+        year: "numeric",
+        month: "2-digit",
+        day: "2-digit",
+      }).format(new Date());
+      const currentOwnPhoto = {
+        id: "onboarding-current-own",
+        catId: "cat-current",
+        ownerCatId: "cat-current",
+        src: imageDataUrl,
+        thumbnailSrc: imageDataUrl,
+        displaySrc: imageDataUrl,
+        originalSrc: imageDataUrl,
+        state: "sleeping",
+        visibility: "shared",
+        deliveryStatus: "available",
+        triggerLabel: "sleeping",
+        theme: "sleeping",
+        shared: true,
+        createdAt: Date.now(),
+        captureContext: "onboarding",
+      };
+      const currentDeliveredPhoto = {
+        id: "onboarding-current-delivered",
+        sourcePhotoId: "source-current-delivered",
+        src: imageDataUrl,
+        thumbnailSrc: imageDataUrl,
+        displaySrc: imageDataUrl,
+        originalSrc: imageDataUrl,
+        title: "",
+        subtitle: "",
+        triggerLabel: "sleeping",
+        theme: "sleeping",
+        deliveredAt: Date.now(),
+      };
+
+      window.localStorage.setItem(
+        "neteruneko_onboarding_progress",
+        JSON.stringify({
+          version: 1,
+          anonymousId: "anonymous-handoff-current",
+          dateKey,
+          stage: "opened",
+          source: "referral",
+          submissionId: `onboarding:anonymous-handoff-current:${dateKey}`,
+          ownPhoto: currentOwnPhoto,
+          selectedPhotoSrc: imageDataUrl,
+          deliveredPhoto: currentDeliveredPhoto,
+          isDeliveredPhotoKept: true,
+          updatedAt: Date.now(),
+        }),
+      );
+      window.localStorage.setItem(
+        "cat_profiles",
+        JSON.stringify([{ id: "cat-current", name: "current" }]),
+      );
+      window.localStorage.setItem("active_cat_id", "cat-current");
+      window.localStorage.setItem(
+        "nyaruhodo_exchange_own_sleeping_photos",
+        JSON.stringify([
+          currentOwnPhoto,
+          {
+            ...currentOwnPhoto,
+            id: "old-own-photo",
+            catId: "cat-old",
+            ownerCatId: "cat-old",
+            captureContext: "daily",
+          },
+        ]),
+      );
+      window.localStorage.setItem(
+        "nyaruhodo_exchange_kept_photos",
+        JSON.stringify([
+          {
+            ...currentDeliveredPhoto,
+            id: "kept-current-copy",
+          },
+          {
+            ...currentDeliveredPhoto,
+            id: "old-kept-photo",
+            sourcePhotoId: "old-source-photo",
+          },
+        ]),
+      );
+    }, { imageDataUrl });
+    await page.route("**/api/onboarding/handoff/create", async (route) => {
+      capturedCreateBodies.push(route.request().postDataJSON());
+      await route.fulfill({
+        contentType: "application/json",
+        body: JSON.stringify({
+          ok: true,
+          token: "onb_00000000-0000-4000-8000-000000000000_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          expiresAt: new Date(Date.now() + 60_000).toISOString(),
+          continueUrl:
+            "/onboarding/continue?handoff=onb_00000000-0000-4000-8000-000000000000_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        }),
+      });
+    });
+
+    await page.goto("/account/create?from=onboarding&source=referral");
+    const handoffButton = page.locator("main button").nth(1);
+    await expect(handoffButton).toBeVisible();
+    await expect(handoffButton).toBeEnabled();
+    await handoffButton.click();
+
+    await expect.poll(() => capturedCreateBodies.length).toBe(1);
+    const capturedPayload = capturedCreateBodies[0]?.payload;
+
+    expect(capturedPayload?.ownSleepingPhotos).toHaveLength(1);
+    expect(capturedPayload?.keptExchangePhotos).toHaveLength(1);
+    expect(capturedPayload?.ownSleepingPhotos?.[0]?.id).toBe("onboarding-current-own");
+    expect(capturedPayload?.keptExchangePhotos?.[0]?.sourcePhotoId).toBe(
+      "source-current-delivered",
+    );
+    expect(
+      capturedPayload?.ownSleepingPhotos?.some(
+        (photo) => photo.id === "old-own-photo",
+      ),
+    ).toBe(false);
+    expect(
+      capturedPayload?.keptExchangePhotos?.some(
+        (photo) => photo.id === "old-kept-photo",
+      ),
+    ).toBe(false);
+  });
+
   test("does not consume handoff links inside embedded browsers", async ({
     page,
   }) => {

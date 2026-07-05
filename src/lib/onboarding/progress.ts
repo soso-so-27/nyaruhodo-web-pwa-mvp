@@ -237,6 +237,7 @@ function isOnboardingSource(value: unknown): value is OnboardingSource {
     value === "instagram_story" ||
     value === "instagram_bio" ||
     value === "instagram_dm" ||
+    value === "referral" ||
     value === "unknown"
   );
 }

@@ -110,26 +110,77 @@ export function createOnboardingHandoffPayload(
   markCompleted = false,
 ): OnboardingHandoffPayload {
   const onboardingProgress = readOnboardingProgress();
+  const nextOnboardingProgress =
+    markCompleted && onboardingProgress
+      ? {
+          ...onboardingProgress,
+          stage: "album_created" as const,
+          updatedAt: Date.now(),
+        }
+      : onboardingProgress;
 
   return {
     version: 1,
     createdAt: new Date().toISOString(),
     source,
-    onboardingProgress:
-      markCompleted && onboardingProgress
-        ? { ...onboardingProgress, stage: "album_created", updatedAt: Date.now() }
-        : onboardingProgress,
+    onboardingProgress: nextOnboardingProgress,
     onboardingCompleted:
       markCompleted ||
       window.localStorage.getItem(STORAGE_KEYS.onboardingCompleted) === "true",
     catProfiles: readCatProfiles(),
     activeCatId: readActiveCatId(),
-    ownSleepingPhotos: readAllOwnSleepingPhotos(),
-    keptExchangePhotos: readKeptExchangePhotos(),
+    ownSleepingPhotos: getCurrentOnboardingOwnPhotos(nextOnboardingProgress),
+    keptExchangePhotos: getCurrentOnboardingKeptPhotos(nextOnboardingProgress),
     pendingReferralCode: window.localStorage.getItem(
       STORAGE_KEYS.pendingReferralCode,
     ),
   };
+}
+
+function getCurrentOnboardingOwnPhotos(
+  progress: OnboardingProgress | null,
+): OwnSleepingPhoto[] {
+  if (!progress?.ownPhoto) {
+    return [];
+  }
+
+  const storedPhoto = readAllOwnSleepingPhotos().find(
+    (photo) => photo.id === progress.ownPhoto?.id,
+  );
+
+  return [storedPhoto ?? progress.ownPhoto];
+}
+
+function getCurrentOnboardingKeptPhotos(
+  progress: OnboardingProgress | null,
+): ExchangePhoto[] {
+  if (!progress?.deliveredPhoto) {
+    return [];
+  }
+
+  const storedPhoto = readKeptExchangePhotos().find((photo) =>
+    isSameExchangePhoto(photo, progress.deliveredPhoto),
+  );
+
+  return [storedPhoto ?? progress.deliveredPhoto];
+}
+
+function isSameExchangePhoto(
+  photo: ExchangePhoto,
+  target: ExchangePhoto | undefined,
+) {
+  if (!target) {
+    return false;
+  }
+
+  return (
+    photo.id === target.id ||
+    Boolean(
+      photo.sourcePhotoId &&
+        target.sourcePhotoId &&
+        photo.sourcePhotoId === target.sourcePhotoId,
+    )
+  );
 }
 
 export function restoreOnboardingHandoffPayload(payload: unknown) {
