@@ -1636,6 +1636,8 @@ export function CatsPage() {
               setIsCatManageEditing(false);
             }
           }}
+          closeOnOverlay={!isCatManageEditing}
+          showCloseButton={!isCatManageEditing}
         >
           <div style={styles.catManageSheet}>
             {isAddingCat ? (
@@ -2619,6 +2621,7 @@ function BasicInfoTable({
         {onEdit ? (
           <button
             type="button"
+            data-testid="cats-basic-info-edit-button"
             style={styles.basicInfoEditButton}
             onClick={onEdit}
             aria-label="基本情報を編集"

@@ -23,6 +23,7 @@ export type AppSheetProps = {
   children: ReactNode;
   onClose: () => void;
   closeLabel?: string;
+  showCloseButton?: boolean;
   placement?: AppSheetPlacement;
   size?: AppSheetSize;
   variant?: AppSheetVariant;
@@ -54,6 +55,7 @@ export function AppSheet({
   children,
   onClose,
   closeLabel = "閉じる",
+  showCloseButton = true,
   placement = "bottom",
   size = "content",
   variant = "paper",
@@ -188,16 +190,18 @@ export function AppSheet({
           )}
           <div style={styles.headerActions}>
             {headerAction}
-            <AppButton
-              type="button"
-              onClick={onClose}
-              variant="ghost"
-              size="icon"
-              iconOnly
-              aria-label={closeLabel}
-            >
-              <CloseIcon size={18} />
-            </AppButton>
+            {showCloseButton ? (
+              <AppButton
+                type="button"
+                onClick={onClose}
+                variant="ghost"
+                size="icon"
+                iconOnly
+                aria-label={closeLabel}
+              >
+                <CloseIcon size={18} />
+              </AppButton>
+            ) : null}
           </div>
         </div>
         <div style={styles.body}>{children}</div>
