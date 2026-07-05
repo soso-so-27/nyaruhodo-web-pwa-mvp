@@ -302,6 +302,7 @@ async function handleExchangePost(request: Request) {
       state: "sleeping",
       visibility: "shared",
       delivery_status: "available",
+      moderation_status: "pending",
       source_moment_id: null,
       metadata: {
         source: "user",

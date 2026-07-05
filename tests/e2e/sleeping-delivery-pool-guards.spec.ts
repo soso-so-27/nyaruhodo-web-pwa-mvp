@@ -714,6 +714,110 @@ test.describe("sleeping delivery pool guards", () => {
     }
   });
 
+  test("puts approved onboarding photos into the normal delivery pool", async ({
+    request,
+  }) => {
+    await skipIfLocalSupabaseUnavailable();
+
+    const adminSupabase = createAdminSupabaseClientFromEnv();
+
+    test.skip(
+      !adminSupabase,
+      "SUPABASE_SERVICE_ROLE_KEY is required for the onboarding pool smoke test.",
+    );
+
+    if (!adminSupabase) {
+      return;
+    }
+
+    const createdAt = Date.now();
+    const sourceRequestId = `onboarding-pool-source-${createdAt}`;
+    const recipientRequestId = `onboarding-pool-recipient-${createdAt}`;
+    const sourceAnonymousId = `onboarding-pool-source-anon-${createdAt}`;
+    const recipientAnonymousId = `onboarding-pool-recipient-anon-${createdAt}`;
+    const onboardingMomentId = `guard-own-${sourceRequestId}`;
+    const recipientMomentId = `guard-own-${recipientRequestId}`;
+
+    try {
+      const onboardingResponse = await request.post(
+        "/api/sleeping-delivery/exchange",
+        {
+          data: {
+            ...buildExchangeRequest(
+              normalCatLikePhotoUrl,
+              sourceRequestId,
+              sourceAnonymousId,
+            ),
+            debugDryRun: false,
+            mode: "onboarding",
+          },
+        },
+      );
+
+      expect(onboardingResponse.status()).not.toBe(422);
+
+      const { data: pendingMoment, error: pendingError } = await adminSupabase
+        .from("cat_moments")
+        .select(
+          "id, local_moment_id, visibility, delivery_status, moderation_status, metadata",
+        )
+        .eq("anonymous_id", sourceAnonymousId)
+        .eq("local_moment_id", onboardingMomentId)
+        .maybeSingle();
+
+      expect(pendingError).toBeNull();
+      expect(pendingMoment).toBeTruthy();
+      if (!pendingMoment) {
+        throw new Error("Expected onboarding photo to be inserted into cat_moments");
+      }
+      expect(pendingMoment.visibility).toBe("shared");
+      expect(pendingMoment.delivery_status).toBe("available");
+      expect(pendingMoment.moderation_status).toBe("pending");
+      expect(pendingMoment.metadata?.pool_kind).toBe("user_shared");
+
+      const { error: approveError } = await adminSupabase
+        .from("cat_moments")
+        .update({
+          moderated_at: new Date().toISOString(),
+          moderated_by: "e2e",
+          moderation_status: "approved",
+        })
+        .eq("id", pendingMoment.id);
+
+      expect(approveError).toBeNull();
+
+      const deliveryResponse = await request.post(
+        "/api/sleeping-delivery/exchange",
+        {
+          data: {
+            ...buildExchangeRequest(
+              normalCatLikePhotoUrl,
+              recipientRequestId,
+              recipientAnonymousId,
+            ),
+            debugDryRun: false,
+            deliveryDateKey: getYesterdayJstDateKey(),
+            preferredSourcePhotoId: onboardingMomentId,
+            recipientCatId: `onboarding-pool-recipient-cat-${createdAt}`,
+          },
+        },
+      );
+
+      expect(deliveryResponse.status()).toBe(200);
+      const deliveryBody = (await deliveryResponse.json()) as ExchangeResponse;
+      expect(deliveryBody.photo?.sourcePhotoId).toBe(onboardingMomentId);
+    } finally {
+      await adminSupabase
+        .from("cat_moment_deliveries")
+        .delete()
+        .in("anonymous_id", [sourceAnonymousId, recipientAnonymousId]);
+      await adminSupabase
+        .from("cat_moments")
+        .delete()
+        .in("local_moment_id", [onboardingMomentId, recipientMomentId]);
+    }
+  });
+
   test("keeps exchange response under the delivery latency budget", async ({
     request,
   }) => {
