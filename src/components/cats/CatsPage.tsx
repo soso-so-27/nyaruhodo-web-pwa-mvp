@@ -233,6 +233,8 @@ export function CatsPage() {
   const [isDeletingGalleryPhoto, setIsDeletingGalleryPhoto] = useState(false);
   const [selectedYearSummary, setSelectedYearSummary] =
     useState<CatYearSummary | null>(null);
+  const stickyProfileSummaryRef = useRef<HTMLDivElement | null>(null);
+  const [isProfileSummaryPinned, setIsProfileSummaryPinned] = useState(false);
 
   const activeCatProfile =
     catProfiles.length > 0
@@ -320,6 +322,43 @@ export function CatsPage() {
     activeCatProfile?.avatarDataUrl ?? activeCoverPhoto?.src ?? activeAvatarSrc;
   const activeCoverFit =
     hasCustomThumbnail || activeCoverPhoto ? "cover" : "contain";
+  useEffect(() => {
+    const shouldTrack =
+      Boolean(activeCatProfile) &&
+      !isOnboardingCompletionView &&
+      !isOnboardingProfileSetup;
+
+    if (!shouldTrack) {
+      setIsProfileSummaryPinned(false);
+      return;
+    }
+
+    const updatePinnedState = () => {
+      const node = stickyProfileSummaryRef.current;
+      if (!node) {
+        setIsProfileSummaryPinned(false);
+        return;
+      }
+
+      const shouldPin = node.getBoundingClientRect().top <= 8;
+      setIsProfileSummaryPinned((current) =>
+        current === shouldPin ? current : shouldPin,
+      );
+    };
+
+    updatePinnedState();
+    window.addEventListener("scroll", updatePinnedState, { passive: true });
+    window.addEventListener("resize", updatePinnedState);
+
+    return () => {
+      window.removeEventListener("scroll", updatePinnedState);
+      window.removeEventListener("resize", updatePinnedState);
+    };
+  }, [
+    activeCatProfile,
+    isOnboardingCompletionView,
+    isOnboardingProfileSetup,
+  ]);
   const allLensPhotos = useMemo(
     () =>
       mergeAllLensPhotos(
@@ -1449,6 +1488,47 @@ export function CatsPage() {
               </>
             ) : null}
           </div>
+        ) : null}
+
+        {activeCatProfile &&
+        !isOnboardingCompletionView &&
+        !isOnboardingProfileSetup ? (
+          <>
+            <div
+              ref={stickyProfileSummaryRef}
+              style={
+                isProfileSummaryPinned
+                  ? styles.stickyProfileSummaryAnchorPinned
+                  : undefined
+              }
+            >
+              <UchinokoStickySummary
+                catName={catName}
+                coverSrc={activeCoverSrc}
+                coverFit={activeCoverFit}
+              />
+            </div>
+            {isProfileSummaryPinned ? (
+              <>
+                <UchinokoStickySummary
+                  catName={catName}
+                  coverSrc={activeCoverSrc}
+                  coverFit={activeCoverFit}
+                  fixed
+                />
+                <UchinokoSectionTabs
+                  value={activeSection}
+                  onChange={setActiveSection}
+                  options={[
+                    { value: "record", label: "記録" },
+                    { value: "photos", label: "写真" },
+                    { value: "basic", label: "基本" },
+                  ]}
+                  fixed
+                />
+              </>
+            ) : null}
+          </>
         ) : null}
 
         {activeCatProfile && !isOnboardingCompletionView ? (
@@ -2788,17 +2868,23 @@ function UchinokoSectionTabs({
   value,
   onChange,
   options,
+  fixed = false,
 }: {
   value: UchinokoSection;
   onChange: (value: UchinokoSection) => void;
   options: { value: UchinokoSection; label: string }[];
+  fixed?: boolean;
 }) {
   return (
     <div
       role="radiogroup"
-      data-testid="cats-section-tabs"
+      data-testid={fixed ? "cats-section-tabs-pinned" : "cats-section-tabs"}
       aria-label="うちのこの中身"
-      style={styles.sectionTabs}
+      style={
+        fixed
+          ? { ...styles.sectionTabs, ...styles.sectionTabsFixed }
+          : styles.sectionTabs
+      }
     >
       {options.map((option) => {
         const selected = option.value === value;
@@ -2821,6 +2907,49 @@ function UchinokoSectionTabs({
           </button>
         );
       })}
+    </div>
+  );
+}
+
+function UchinokoStickySummary({
+  catName,
+  coverSrc,
+  coverFit,
+  fixed = false,
+}: {
+  catName: string;
+  coverSrc?: string;
+  coverFit: "cover" | "contain";
+  fixed?: boolean;
+}) {
+  return (
+    <div
+      data-testid={
+        fixed
+          ? "cats-sticky-profile-summary-pinned"
+          : "cats-sticky-profile-summary"
+      }
+      style={
+        fixed
+          ? { ...styles.stickyProfileSummary, ...styles.stickyProfileSummaryFixed }
+          : styles.stickyProfileSummary
+      }
+      aria-label="表示中のうちのこ"
+    >
+      <PhotoTile
+        src={coverSrc}
+        alt=""
+        variant="bare"
+        fit={coverFit}
+        aspect="auto"
+        loading="eager"
+        style={styles.stickyProfileThumbRoot}
+        imageStyle={styles.stickyProfileThumbImage}
+      />
+      <div style={styles.stickyProfileText}>
+        <span style={styles.stickyProfileKicker}>うちのこ</span>
+        <span style={styles.stickyProfileName}>{catName}</span>
+      </div>
     </div>
   );
 }
@@ -4716,6 +4845,78 @@ const styles = {
   sectionSwitch: {
     margin: "0 0 12px",
   },
+  stickyProfileSummaryAnchorPinned: {
+    visibility: "hidden" as const,
+  },
+  stickyProfileSummary: {
+    display: "grid",
+    gridTemplateColumns: "44px minmax(0, 1fr)",
+    alignItems: "center",
+    gap: "10px",
+    boxSizing: "border-box" as const,
+    minHeight: "58px",
+    margin: "0 -6px 8px",
+    padding: "7px 10px",
+    borderRadius: "18px",
+    border: "1px solid color-mix(in srgb, var(--paper) 62%, transparent)",
+    background:
+      "color-mix(in srgb, var(--paper-card) 82%, transparent)",
+    boxShadow:
+      "0 1px 0 color-mix(in srgb, var(--paper) 70%, transparent), 0 12px 24px -22px color-mix(in srgb, var(--ink) 34%, transparent)",
+    backdropFilter: "blur(14px)",
+    WebkitBackdropFilter: "blur(14px)",
+  },
+  stickyProfileSummaryFixed: {
+    position: "fixed" as const,
+    top: "calc(env(safe-area-inset-top) + 8px)",
+    left: "50%",
+    zIndex: 40,
+    width: "min(calc(100% - 36px), 382px)",
+    margin: 0,
+    transform: "translateX(-50%)",
+  },
+  stickyProfileThumbRoot: {
+    display: "block",
+    width: "44px",
+    height: "44px",
+    overflow: "hidden",
+    borderRadius: "14px",
+    background: "color-mix(in srgb, var(--paper-card) 80%, transparent)",
+  },
+  stickyProfileThumbImage: {
+    display: "block",
+    width: "44px",
+    height: "44px",
+    border: "none",
+    borderRadius: "14px",
+    boxShadow: "none",
+    background: "transparent",
+  },
+  stickyProfileText: {
+    display: "grid",
+    minWidth: 0,
+    gap: "2px",
+  },
+  stickyProfileKicker: {
+    color: CATS_FAINT,
+    fontFamily: CATS_UI,
+    fontSize: CATS_TINY_SIZE,
+    fontWeight: 500,
+    lineHeight: 1.2,
+    letterSpacing: "0.08em",
+  },
+  stickyProfileName: {
+    minWidth: 0,
+    overflow: "hidden",
+    textOverflow: "ellipsis",
+    whiteSpace: "nowrap",
+    color: CATS_TEXT_STRONG,
+    fontFamily: CATS_SERIF,
+    fontSize: "18px",
+    fontWeight: 400,
+    lineHeight: 1.25,
+    letterSpacing: CATS_TITLE_TRACKING,
+  },
   sectionTabs: {
     display: "grid",
     gridTemplateColumns: "repeat(3, minmax(0, 1fr))",
@@ -4730,6 +4931,23 @@ const styles = {
     borderBottom: "1px solid color-mix(in srgb, var(--line) 72%, transparent)",
     background: "transparent",
     boxShadow: "none",
+  },
+  sectionTabsFixed: {
+    position: "fixed" as const,
+    top: "calc(env(safe-area-inset-top) + 70px)",
+    left: "50%",
+    zIndex: 39,
+    width: "min(calc(100% - 36px), 382px)",
+    minHeight: "44px",
+    margin: 0,
+    transform: "translateX(-50%)",
+    borderRadius: "0 0 16px 16px",
+    borderBottom: "1px solid color-mix(in srgb, var(--line) 70%, transparent)",
+    background: "color-mix(in srgb, var(--paper-card) 82%, transparent)",
+    boxShadow:
+      "0 12px 24px -24px color-mix(in srgb, var(--ink) 34%, transparent)",
+    backdropFilter: "blur(14px)",
+    WebkitBackdropFilter: "blur(14px)",
   },
   sectionTabButton: {
     minWidth: 0,
