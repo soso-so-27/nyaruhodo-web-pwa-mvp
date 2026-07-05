@@ -28,6 +28,8 @@ type StampPairProps = {
   onDeliveredStorageDataUrl?: (dataUrl: string) => void;
   showOwnLabel?: boolean;
   showDeliveredLabel?: boolean;
+  deliveredStampHidden?: boolean;
+  deliveredStampTestId?: string;
   "data-testid"?: string;
 };
 
@@ -49,6 +51,8 @@ export function StampPair({
   onDeliveredStorageDataUrl,
   showOwnLabel = false,
   showDeliveredLabel = false,
+  deliveredStampHidden = false,
+  deliveredStampTestId,
   "data-testid": testId,
 }: StampPairProps) {
   const isHome = size === "home";
@@ -104,7 +108,12 @@ export function StampPair({
               deliveredAriaLabel ??
               (deliveredLabel ? `${deliveredLabel}の写真を大きく見る` : undefined)
             }
-            style={{ ...styles.stamp, ...stampStyle }}
+            style={{
+              ...styles.stamp,
+              ...stampStyle,
+              ...(deliveredStampHidden ? styles.hiddenStamp : {}),
+            }}
+            testId={deliveredStampTestId}
           >
             <span style={styles.stampPerforation} aria-hidden="true" />
             <StoredPhotoImage
@@ -117,10 +126,16 @@ export function StampPair({
         ) : shouldShowStampFallback ? (
           <button
             type="button"
-            style={{ ...styles.stampMissing, ...stampStyle, ...styles.buttonReset }}
+            style={{
+              ...styles.stampMissing,
+              ...stampStyle,
+              ...styles.buttonReset,
+              ...(deliveredStampHidden ? styles.hiddenStamp : {}),
+            }}
             onClick={onDeliveredClick}
             disabled={!onDeliveredClick}
             aria-label={deliveredAriaLabel}
+            data-testid={deliveredStampTestId}
           >
             {deliveredFallback}
           </button>
@@ -155,12 +170,14 @@ function PhotoButton({
   onClick,
   ariaLabel,
   style,
+  testId,
 }: {
   children: ReactNode;
   disabled?: boolean;
   onClick?: (event: MouseEvent<HTMLButtonElement>) => void;
   ariaLabel?: string;
   style: CSSProperties;
+  testId?: string;
 }) {
   if (onClick && !disabled) {
     return (
@@ -169,13 +186,18 @@ function PhotoButton({
         style={{ ...style, ...styles.buttonReset }}
         onClick={onClick}
         aria-label={ariaLabel}
+        data-testid={testId}
       >
         {children}
       </button>
     );
   }
 
-  return <span style={style}>{children}</span>;
+  return (
+    <span style={style} data-testid={testId}>
+      {children}
+    </span>
+  );
 }
 
 const styles = {
@@ -303,6 +325,10 @@ const styles = {
     letterSpacing: "var(--tracking-body)",
     textAlign: "center",
     boxShadow: shadow.e1,
+  },
+  hiddenStamp: {
+    opacity: 0,
+    pointerEvents: "none",
   },
   belowNotice: {
     maxWidth: "100%",

@@ -540,8 +540,96 @@ test.describe("home desk model", () => {
       "data-state",
       "4",
     );
+    await expect(page.getByTestId("home-stamp-pair")).toBeVisible();
+    await expect(page.getByTestId("home-stamp-pair-stamp")).toBeVisible();
+    await expect
+      .poll(() =>
+        page
+          .getByTestId("home-stamp-pair-stamp")
+          .evaluate((element) => (element as HTMLElement).style.transform),
+      )
+      .toBe("rotate(4deg)");
     await expect(page.getByText(/\u3069\u3053\u304b\u306e\u3053/)).toHaveCount(0);
     await expect(page.getByTestId("evening-opening-pair")).toHaveCount(0);
+  });
+
+  test("renders the opened StampPair even when today's own photo is missing", async ({
+    page,
+  }) => {
+    await seedDeskState(page, "4", { withoutOwnPhoto: true });
+    await page.goto("/home");
+    await page.waitForLoadState("networkidle");
+
+    await expect(page.getByTestId("home-desk-model")).toHaveAttribute(
+      "data-state",
+      "4",
+    );
+    await expect(page.getByTestId("home-stamp-pair")).toBeVisible();
+    await expect(page.getByTestId("home-stamp-pair-stamp")).toBeVisible();
+  });
+
+  test("starts decoding the delivered photo while the unopened letter is visible", async ({
+    page,
+  }) => {
+    await seedDeskState(page, "3");
+    await page.goto("/home");
+    await page.waitForLoadState("networkidle");
+
+    const letter = page.getByTestId("desk-open-letter");
+    await expect(letter).toHaveAttribute("data-photo-decode", /loading|ready/);
+    await expect
+      .poll(() => letter.getAttribute("data-photo-decode"))
+      .toBe("ready");
+  });
+
+  test("closes the opening overlay immediately without a flyer when motion is reduced", async ({
+    page,
+  }) => {
+    await page.emulateMedia({ reducedMotion: "reduce" });
+    await seedDeskState(page, "3");
+    await page.goto("/home");
+    await page.waitForLoadState("networkidle");
+
+    await page.getByTestId("desk-open-letter").click();
+    await expect(page.getByTestId("evening-opening-pair")).toBeVisible();
+    await page.getByRole("button", { name: "閉じる" }).click();
+
+    await expect(page.getByTestId("evening-opening-flyer")).toHaveCount(0);
+    await expect(page.getByTestId("evening-opening-pair")).toHaveCount(0);
+    await expect(page.getByTestId("home-stamp-pair-stamp")).toBeVisible();
+  });
+
+  test("stows the opened photo into the StampPair stamp slot", async ({ page }) => {
+    await seedDeskState(page, "3");
+    await page.goto("/home");
+    await page.waitForLoadState("networkidle");
+
+    await page.getByTestId("desk-open-letter").click();
+    await expect(page.getByTestId("evening-opening-pair")).toBeVisible();
+    await page.getByRole("button", { name: "閉じる" }).click();
+
+    const flyer = page.getByTestId("evening-opening-flyer");
+    await expect(flyer).toBeVisible();
+    expect(
+      await flyer.evaluate((element) => getComputedStyle(element).willChange),
+    ).toContain("transform");
+    await expect(page.getByTestId("evening-opening-pair")).toHaveCount(0);
+    await expect(page.getByTestId("home-stamp-pair-stamp")).toBeVisible();
+  });
+
+  test("shows system-opened deliveries directly as the opened StampPair", async ({
+    page,
+  }) => {
+    await seedDeskState(page, "4", { openedBySystem: true });
+    await page.goto("/home");
+    await page.waitForLoadState("networkidle");
+
+    await expect(page.getByTestId("home-desk-model")).toHaveAttribute(
+      "data-state",
+      "4",
+    );
+    await expect(page.getByTestId("evening-opening-pair")).toHaveCount(0);
+    await expect(page.getByTestId("home-stamp-pair-stamp")).toBeVisible();
   });
 
   test("hides desk labels after the habit threshold", async ({ page }) => {
@@ -577,7 +665,8 @@ test.describe("home desk model", () => {
     await expect(
       page.getByRole("button", { name: "どこかのこの写真を大きく見る" }),
     ).toHaveCount(0);
-    await page.getByTestId("desk-home-frame").click();
+    await expect(page.getByTestId("home-stamp-pair-stamp")).toBeVisible();
+    await page.getByTestId("home-stamp-pair-stamp").click();
     await expect(page.getByTestId("desk-photo-viewer")).toBeVisible();
   });
 
@@ -661,6 +750,8 @@ async function seedDeskState(
     withYesterday?: boolean;
     withOmoideCandidate?: boolean;
     withStoredOmoide?: boolean;
+    withoutOwnPhoto?: boolean;
+    openedBySystem?: boolean;
   } = {},
 ) {
   const now =
@@ -738,7 +829,10 @@ async function seedDeskState(
         ]),
       );
 
-      const ownPhotos = state === "1" || state === "1b" ? [] : [ownPhoto];
+      const ownPhotos =
+        state === "1" || state === "1b" || options.withoutOwnPhoto
+          ? []
+          : [ownPhoto];
       const omoidePhoto = {
         ...ownPhoto,
         id: "own-omoide-week",
@@ -755,11 +849,16 @@ async function seedDeskState(
           targetOwnPhotoId: ownPhoto.id,
           targetCatId: catId,
           targetCapturedAt: capturedAt,
-          targetPhoto: ownPhoto,
+          ...(options.withoutOwnPhoto ? {} : { targetPhoto: ownPhoto }),
           ...(state === "3" || state === "4"
             ? { deliveredPhoto, deliveredAt: now }
             : {}),
-          ...(state === "4" ? { openedAt: now + 1000 } : {}),
+          ...(state === "4"
+            ? {
+                openedAt: now + 1000,
+                openedBy: options.openedBySystem ? "system" : "user",
+              }
+            : {}),
         };
       }
 

@@ -112,12 +112,26 @@ import {
 } from "../ui/AppIcons";
 import { AppButton } from "../ui/AppButton";
 import { AppCard } from "../ui/AppCard";
-import { StoredPhotoImage } from "../ui/StoredPhotoImage";
+import {
+  getStoragePhotoSignedUrl,
+  StoredPhotoImage,
+} from "../ui/StoredPhotoImage";
 
 type HomeInputProps = {
   recentEvents: RecentEvent[];
   initialNow: number;
 };
+
+type DeliveredPhotoDecodeStatus = "idle" | "loading" | "ready" | "failed";
+type DeliveredPhotoDecodeEntry = {
+  status: DeliveredPhotoDecodeStatus;
+  promise: Promise<DeliveredPhotoDecodeStatus>;
+};
+
+const DELIVERED_PHOTO_DECODE_WAIT_MS = 1500;
+const EVENING_OPENING_STOW_MS = 520;
+const EVENING_OPENING_STOW_EASING = "cubic-bezier(0.22, 1, 0.36, 1)";
+const EVENING_STAMP_TARGET_TEST_ID = "home-stamp-pair-stamp";
 
 type LockData = {
   yousuLockedUntil?: number;
@@ -331,6 +345,8 @@ export function HomeInput({
     useState<ExchangePhoto | null>(null);
   const [openingEveningDelivery, setOpeningEveningDelivery] =
     useState<Extract<EveningHomeState, { kind: "delivered" }> | null>(null);
+  const [deliveredPhotoDecodeStatus, setDeliveredPhotoDecodeStatus] =
+    useState<DeliveredPhotoDecodeStatus>("idle");
   const [pendingExchangeSharePhoto, setPendingExchangeSharePhoto] =
     useState<PendingExchangeSharePhoto | null>(null);
   const [pendingExchangeCatId, setPendingExchangeCatId] = useState<string | null>(
@@ -358,6 +374,10 @@ export function HomeInput({
   const toastTimerRef = useRef<number | null>(null);
   const completedBoardTimerRef = useRef<number | null>(null);
   const boardSheetReturnTimerRef = useRef<number | null>(null);
+  const deliveredPhotoDecodeCacheRef = useRef(
+    new Map<string, DeliveredPhotoDecodeEntry>(),
+  );
+  const openingEveningDeliveryRequestRef = useRef<string | null>(null);
 
   useEffect(() => {
     let releaseTimerId: number | null = null;
@@ -826,6 +846,35 @@ export function HomeInput({
       }),
     [homeDisplayCatId, eveningDeliveryRefreshTick, homeNow, ownSleepingPhotosForHome],
   );
+  const deliveredHomePhoto =
+    eveningHomeState.kind === "delivered"
+      ? eveningHomeState.deliveredPhoto
+      : null;
+  const deliveredHomePhotoDecodeKey = deliveredHomePhoto
+    ? getDeliveredPhotoDecodeKey(deliveredHomePhoto)
+    : null;
+  useEffect(() => {
+    if (!deliveredHomePhoto || !deliveredHomePhotoDecodeKey) {
+      setDeliveredPhotoDecodeStatus("idle");
+      return;
+    }
+
+    let isActive = true;
+    const entry = getOrStartDeliveredPhotoDecode(
+      deliveredPhotoDecodeCacheRef.current,
+      deliveredHomePhoto,
+    );
+    setDeliveredPhotoDecodeStatus(entry.status);
+    entry.promise.then((status) => {
+      if (isActive) {
+        setDeliveredPhotoDecodeStatus(status);
+      }
+    });
+
+    return () => {
+      isActive = false;
+    };
+  }, [deliveredHomePhoto, deliveredHomePhotoDecodeKey]);
   useEffect(() => {
     if (!isHomeClockReady || !activeCatId || !activeCat) {
       return;
@@ -1966,12 +2015,24 @@ export function HomeInput({
     );
   }
 
-  function handleOpenEveningDelivery(
+  async function handleOpenEveningDelivery(
     deliveryState: Extract<EveningHomeState, { kind: "delivered" }>,
   ) {
+    if (openingEveningDeliveryRequestRef.current === deliveryState.dateKey) {
+      return;
+    }
+
+    openingEveningDeliveryRequestRef.current = deliveryState.dateKey;
+    const decodeStatus = await waitForDeliveredPhotoDecode(
+      deliveredPhotoDecodeCacheRef.current,
+      deliveryState.deliveredPhoto,
+      DELIVERED_PHOTO_DECODE_WAIT_MS,
+    );
+    setDeliveredPhotoDecodeStatus(decodeStatus);
     setOpeningEveningDelivery(deliveryState);
     const wasSaved = keepExchangePhoto(deliveryState.deliveredPhoto);
     markEveningDeliveryKept(deliveryState.dateKey);
+    openingEveningDeliveryRequestRef.current = null;
     setCollectionRefreshTick((value) => value + 1);
     setEveningRefreshTick((value) => value + 1);
     trackProductEvent(
@@ -2265,6 +2326,8 @@ export function HomeInput({
               onDeliveredStorageDataUrl={handleDeskDeliveredPhotoDataUrl}
               eveningDeliveryCheckStatus={eveningDelivery.checkStatus}
               onRetryEveningDeliveryCheck={eveningDelivery.retryEveningDeliveryCheck}
+              deliveredPhotoDecodeStatus={deliveredPhotoDecodeStatus}
+              hideOpenedDeliveryStamp={Boolean(openingEveningDelivery)}
             />
           </>
         )}
@@ -3198,6 +3261,33 @@ function useSleepingPresenceCount() {
   return count;
 }
 
+function usePrefersReducedMotion() {
+  const [prefersReducedMotion, setPrefersReducedMotion] = useState(false);
+
+  useEffect(() => {
+    const query = window.matchMedia("(prefers-reduced-motion: reduce)");
+    setPrefersReducedMotion(query.matches);
+    const handleChange = () => setPrefersReducedMotion(query.matches);
+    query.addEventListener("change", handleChange);
+    return () => query.removeEventListener("change", handleChange);
+  }, []);
+
+  return prefersReducedMotion;
+}
+
+function isUsableRect(rect: DOMRect | undefined): rect is DOMRect {
+  return Boolean(rect && rect.width > 0 && rect.height > 0);
+}
+
+type EveningOpeningFlyerState = {
+  left: number;
+  top: number;
+  width: number;
+  height: number;
+  transform: string;
+  isAnimating: boolean;
+};
+
 function EveningDeliveryOpening({
   state,
   catName,
@@ -3209,23 +3299,151 @@ function EveningDeliveryOpening({
   onStorageDataUrl: (dataUrl: string) => void;
   onClose: () => void;
 }) {
+  const prefersReducedMotion = usePrefersReducedMotion();
+  const photoFrameRef = useRef<HTMLDivElement | null>(null);
+  const closeTimerRef = useRef<number | null>(null);
+  const isClosingRef = useRef(false);
+  const pushedHistoryRef = useRef(false);
+  const ignoreNextPopRef = useRef(false);
+  const requestCloseRef = useRef<(syncHistory?: boolean) => void>(() => undefined);
+  const [isClosing, setIsClosing] = useState(false);
+  const [flyer, setFlyer] = useState<EveningOpeningFlyerState | null>(null);
+
+  function finishClose() {
+    if (closeTimerRef.current) {
+      window.clearTimeout(closeTimerRef.current);
+      closeTimerRef.current = null;
+    }
+    onClose();
+  }
+
+  function requestClose(syncHistory = true) {
+    if (isClosingRef.current) {
+      return;
+    }
+
+    if (syncHistory && pushedHistoryRef.current) {
+      ignoreNextPopRef.current = true;
+      pushedHistoryRef.current = false;
+      window.history.back();
+    }
+
+    if (prefersReducedMotion) {
+      finishClose();
+      return;
+    }
+
+    const sourceRect = photoFrameRef.current?.getBoundingClientRect();
+    const targetRect = document
+      .querySelector<HTMLElement>(`[data-testid="${EVENING_STAMP_TARGET_TEST_ID}"]`)
+      ?.getBoundingClientRect();
+
+    if (!isUsableRect(sourceRect) || !isUsableRect(targetRect)) {
+      finishClose();
+      return;
+    }
+
+    isClosingRef.current = true;
+    setIsClosing(true);
+    setFlyer({
+      left: sourceRect.left,
+      top: sourceRect.top,
+      width: sourceRect.width,
+      height: sourceRect.height,
+      transform: "translate3d(0, 0, 0) scale(1) rotate(0deg)",
+      isAnimating: false,
+    });
+
+    window.requestAnimationFrame(() => {
+      window.requestAnimationFrame(() => {
+        setFlyer((current) =>
+          current
+            ? {
+                ...current,
+                transform: `translate3d(${targetRect.left - sourceRect.left}px, ${
+                  targetRect.top - sourceRect.top
+                }px, 0) scale(${targetRect.width / sourceRect.width}, ${
+                  targetRect.height / sourceRect.height
+                }) rotate(4deg)`,
+                isAnimating: true,
+              }
+            : current,
+        );
+      });
+    });
+
+    closeTimerRef.current = window.setTimeout(
+      finishClose,
+      EVENING_OPENING_STOW_MS,
+    );
+  }
+  requestCloseRef.current = requestClose;
+
   useEffect(() => {
     trackProductEvent("envelope_shown", {
       delivery_date_key: state.dateKey,
     });
   }, [state.dateKey]);
 
+  useEffect(() => {
+    window.history.pushState(
+      { neterunekoEveningOpening: true },
+      "",
+      window.location.href,
+    );
+    pushedHistoryRef.current = true;
+
+    function handlePopState() {
+      if (ignoreNextPopRef.current) {
+        ignoreNextPopRef.current = false;
+        return;
+      }
+
+      pushedHistoryRef.current = false;
+      requestCloseRef.current(false);
+    }
+
+    window.addEventListener("popstate", handlePopState);
+    return () => {
+      window.removeEventListener("popstate", handlePopState);
+      if (closeTimerRef.current) {
+        window.clearTimeout(closeTimerRef.current);
+      }
+    };
+  }, []);
+
   return (
-    <div style={styles.eveningOpeningOverlay} aria-live="polite">
+    <div
+      style={styles.eveningOpeningOverlay}
+      aria-live="polite"
+      onClick={() => requestClose()}
+    >
       <div
-        style={styles.eveningOpeningPairStage}
+        style={{
+          ...styles.eveningOpeningBackdrop,
+          ...(isClosing ? styles.eveningOpeningBackdropClosing : {}),
+        }}
+        aria-hidden="true"
+      />
+      <div
+        style={{
+          ...styles.eveningOpeningPairStage,
+          ...(isClosing ? styles.eveningOpeningPairStageClosing : {}),
+        }}
         data-testid="evening-opening-pair"
+        onClick={(event) => event.stopPropagation()}
       >
         <p style={styles.eveningOpeningTitle}>ねこだより</p>
         <p style={styles.eveningOpeningSubtitle}>
           どこかのねがおが届きました
         </p>
-        <div style={styles.eveningOpeningPhotoFrame}>
+        <div
+          ref={photoFrameRef}
+          style={{
+            ...styles.eveningOpeningPhotoFrame,
+            ...(isClosing ? styles.eveningOpeningPhotoFrameClosing : {}),
+          }}
+        >
           <StoredPhotoImage
             src={getPhotoDetailSrc(state.deliveredPhoto)}
             fallbackSrcs={getPhotoFallbackSrcs(state.deliveredPhoto)}
@@ -3241,13 +3459,36 @@ function EveningDeliveryOpening({
           type="button"
           variant="quiet"
           size="md"
-          onClick={onClose}
+          onClick={() => requestClose()}
           style={styles.eveningOpeningCloseButton}
         >
           閉じる
         </AppButton>
         <p style={styles.eveningOpeningAfterword}>また、あした</p>
       </div>
+      {flyer ? (
+        <div
+          data-testid="evening-opening-flyer"
+          style={{
+            ...styles.eveningOpeningFlyer,
+            left: flyer.left,
+            top: flyer.top,
+            width: flyer.width,
+            height: flyer.height,
+            transform: flyer.transform,
+            transition: flyer.isAnimating
+              ? `transform ${EVENING_OPENING_STOW_MS}ms ${EVENING_OPENING_STOW_EASING}`
+              : "none",
+          }}
+        >
+          <StoredPhotoImage
+            src={getPhotoDetailSrc(state.deliveredPhoto)}
+            fallbackSrcs={getPhotoFallbackSrcs(state.deliveredPhoto)}
+            alt=""
+            style={styles.eveningOpeningFlyerPhoto}
+          />
+        </div>
+      ) : null}
     </div>
   );
 }
@@ -4851,6 +5092,116 @@ function getPhotoDetailSrc(
   >,
 ) {
   return photo.displaySrc ?? photo.originalSrc ?? photo.thumbnailSrc ?? photo.src;
+}
+
+function getDeliveredPhotoDecodeKey(
+  photo: Pick<
+    OwnSleepingPhoto | ExchangePhoto,
+    "id" | "src" | "thumbnailSrc" | "displaySrc" | "originalSrc"
+  >,
+) {
+  return [photo.id, ...getPhotoFallbackSrcs(photo)].join("|");
+}
+
+function getOrStartDeliveredPhotoDecode(
+  cache: Map<string, DeliveredPhotoDecodeEntry>,
+  photo: Pick<
+    OwnSleepingPhoto | ExchangePhoto,
+    "id" | "src" | "thumbnailSrc" | "displaySrc" | "originalSrc"
+  >,
+) {
+  const key = getDeliveredPhotoDecodeKey(photo);
+  const cached = cache.get(key);
+  if (cached) {
+    return cached;
+  }
+
+  let entry: DeliveredPhotoDecodeEntry;
+  const promise = preloadDeliveredPhoto(photo).then((status) => {
+    entry.status = status;
+    return status;
+  });
+  entry = {
+    status: "loading",
+    promise,
+  };
+  cache.set(key, entry);
+  return entry;
+}
+
+async function waitForDeliveredPhotoDecode(
+  cache: Map<string, DeliveredPhotoDecodeEntry>,
+  photo: Pick<
+    OwnSleepingPhoto | ExchangePhoto,
+    "id" | "src" | "thumbnailSrc" | "displaySrc" | "originalSrc"
+  >,
+  timeoutMs: number,
+) {
+  const entry = getOrStartDeliveredPhotoDecode(cache, photo);
+  if (entry.status === "ready" || entry.status === "failed") {
+    return entry.status;
+  }
+
+  return Promise.race([
+    entry.promise,
+    new Promise<DeliveredPhotoDecodeStatus>((resolve) => {
+      window.setTimeout(() => resolve(entry.status), timeoutMs);
+    }),
+  ]);
+}
+
+async function preloadDeliveredPhoto(
+  photo: Pick<
+    OwnSleepingPhoto | ExchangePhoto,
+    "src" | "thumbnailSrc" | "displaySrc" | "originalSrc"
+  >,
+): Promise<DeliveredPhotoDecodeStatus> {
+  const sources = getUniquePhotoSources([
+    getPhotoDetailSrc(photo),
+    ...getPhotoFallbackSrcs(photo),
+  ]);
+
+  for (const source of sources) {
+    try {
+      const resolvedSource = await getStoragePhotoSignedUrl(source);
+      if (typeof resolvedSource !== "string" || !resolvedSource) {
+        continue;
+      }
+      await decodeImageSource(resolvedSource);
+      return "ready";
+    } catch {
+      // Try the next fallback source; the visible image path does the same.
+    }
+  }
+
+  return "failed";
+}
+
+function getUniquePhotoSources(sources: Array<string | null | undefined>) {
+  return Array.from(
+    new Set(
+      sources.filter(
+        (src): src is string => typeof src === "string" && src.trim().length > 0,
+      ),
+    ),
+  );
+}
+
+async function decodeImageSource(src: string) {
+  const image = new Image();
+  image.decoding = "async";
+  image.loading = "eager";
+  image.src = src;
+
+  if (typeof image.decode === "function") {
+    await image.decode();
+    return;
+  }
+
+  await new Promise<void>((resolve, reject) => {
+    image.onload = () => resolve();
+    image.onerror = () => reject(new Error("image decode failed"));
+  });
 }
 
 function getPhotoFallbackSrcs(
@@ -7212,12 +7563,21 @@ const styles = {
     padding:
       "calc(44px + env(safe-area-inset-top)) 16px calc(28px + env(safe-area-inset-bottom))",
     boxSizing: "border-box",
+    overflow: "hidden",
+    color: "#292721",
+  },
+  eveningOpeningBackdrop: {
+    position: "absolute",
+    inset: 0,
     background: "var(--app-paper-background)",
     backgroundColor: "var(--paper-warm)",
     backgroundSize: "var(--app-paper-background-size)",
     backgroundPosition: "var(--app-paper-background-position)",
     backgroundRepeat: "var(--app-paper-background-repeat)",
-    color: "#292721",
+    transition: "opacity 180ms ease",
+  },
+  eveningOpeningBackdropClosing: {
+    opacity: 0,
   },
   eveningOpeningPhotoStage: {
     width: "min(calc(100vw - 54px), 420px)",
@@ -7236,6 +7596,9 @@ const styles = {
     boxSizing: "border-box",
     overflow: "hidden",
   },
+  eveningOpeningPhotoFrameClosing: {
+    opacity: 0,
+  },
   eveningOpeningPhoto: {
     width: "100%",
     height: "100%",
@@ -7253,11 +7616,39 @@ const styles = {
     letterSpacing: "0.08em",
   },
   eveningOpeningPairStage: {
+    position: "relative",
+    zIndex: 1,
     width: "min(calc(100vw - 24px), 460px)",
     display: "grid",
     gap: "12px",
     justifyItems: "center",
     animation: "eveningOpeningStageIn 360ms cubic-bezier(0, 0, 0.2, 1) both",
+    transition: "opacity 180ms ease",
+  },
+  eveningOpeningPairStageClosing: {
+    opacity: 0,
+    pointerEvents: "none",
+  },
+  eveningOpeningFlyer: {
+    position: "fixed",
+    zIndex: 3,
+    padding: "6px",
+    borderRadius: "22px",
+    background: "color-mix(in srgb, var(--paper-card) 68%, transparent)",
+    boxShadow:
+      "0 1px 0 rgba(255,255,255,.52) inset, 0 16px 38px rgba(96,78,54,0.12)",
+    boxSizing: "border-box",
+    overflow: "hidden",
+    transformOrigin: "top left",
+    willChange: "transform",
+    pointerEvents: "none",
+  },
+  eveningOpeningFlyerPhoto: {
+    width: "100%",
+    height: "100%",
+    objectFit: "cover",
+    borderRadius: "17px",
+    background: "rgba(255,253,248,0.72)",
   },
   eveningOpeningPairCard: {
     width: "100%",
