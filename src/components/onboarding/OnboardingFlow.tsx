@@ -947,6 +947,20 @@ export function OnboardingFlow() {
       return false;
     }
 
+    if (IS_PRODUCTION && (!nextPhoto || !isUsablePhotoSrc(nextPhoto.src))) {
+      trackProductEvent("onboarding_delivery_blocked", {
+        source: getEffectiveEntrySource(),
+        reason: nextPhoto ? "unusable_photo_src" : "no_delivery_photo",
+        http_status: exchangeResult?.httpStatus ?? null,
+        exchange_error: exchangeResult?.error ?? null,
+        candidate_count: exchangeResult?.diagnostics?.candidateCount ?? null,
+        available_count: exchangeResult?.diagnostics?.availableCount ?? null,
+        excluded_count: exchangeResult?.diagnostics?.excludedCount ?? null,
+      });
+      setMessage(emptyMessage);
+      return false;
+    }
+
     if (!nextPhoto || !isUsablePhotoSrc(nextPhoto.src)) {
       nextPhoto = await createOnboardingFallbackDeliveryPhoto(ownPhoto, nextPhoto);
       deliverySource = "illustration_fallback";
@@ -1671,9 +1685,9 @@ async function createOnboardingFallbackDeliveryPhoto(
     id: basePhoto?.id ?? `onboarding-fallback-${ownPhoto.id}`,
     sourcePhotoId: basePhoto?.sourcePhotoId ?? `onboarding-fallback-${ownPhoto.id}`,
     src,
-    thumbnailSrc: basePhoto?.thumbnailSrc,
-    displaySrc: basePhoto?.displaySrc,
-    originalSrc: basePhoto?.originalSrc,
+    thumbnailSrc: src,
+    displaySrc: src,
+    originalSrc: src,
     title: basePhoto?.title ?? "ねこだより",
     subtitle: basePhoto?.subtitle ?? "どこかのねがお",
     triggerLabel: basePhoto?.triggerLabel ?? "ねがお",
