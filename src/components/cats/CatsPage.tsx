@@ -203,6 +203,7 @@ export function CatsPage() {
   const [galleryRefreshTick, setGalleryRefreshTick] = useState(0);
   const isCatGalleryRestoreCheckRunningRef = useRef(false);
   const catGalleryThumbnailBackfillAttemptedRef = useRef(new Set<string>());
+  const tabContentScrollerRef = useRef<HTMLDivElement | null>(null);
   const [activeLens, setActiveLens] = useState<UchinokoLens>("cat");
   const [activeSection, setActiveSection] =
     useState<UchinokoSection>("record");
@@ -320,6 +321,9 @@ export function CatsPage() {
     activeCatProfile?.avatarDataUrl ?? activeCoverPhoto?.src ?? activeAvatarSrc;
   const activeCoverFit =
     hasCustomThumbnail || activeCoverPhoto ? "cover" : "contain";
+  useEffect(() => {
+    tabContentScrollerRef.current?.scrollTo({ top: 0, left: 0 });
+  }, [activeCatId, activeLens, activeSection]);
   const allLensPhotos = useMemo(
     () =>
       mergeAllLensPhotos(
@@ -1463,7 +1467,11 @@ export function CatsPage() {
           />
         ) : null}
 
-        <div data-testid="cats-tab-scroll" style={styles.tabContentScroller}>
+        <div
+          ref={tabContentScrollerRef}
+          data-testid="cats-tab-scroll"
+          style={styles.tabContentScroller}
+        >
         {activeCatProfile &&
         !isOnboardingCompletionView &&
         activeSection === "basic" ? (
