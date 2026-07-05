@@ -4640,7 +4640,7 @@ const styles = {
     margin: "0 auto",
     fontSynthesis: "none",
     padding:
-      "calc(20px + env(safe-area-inset-top)) 24px calc(var(--bottom-nav-height) + var(--bottom-nav-safe-offset) + 24px + env(safe-area-inset-bottom))",
+      "calc(20px + env(safe-area-inset-top)) 24px 0",
   },
   pageKicker: {
     margin: "0 0 5px",
@@ -4741,7 +4741,8 @@ const styles = {
     overflowX: "hidden" as const,
     WebkitOverflowScrolling: "touch",
     paddingTop: "2px",
-    paddingBottom: "8px",
+    paddingBottom:
+      "calc(var(--bottom-nav-height) + var(--bottom-nav-safe-offset) + 24px + env(safe-area-inset-bottom))",
   },
   sectionTabs: {
     flex: "0 0 auto",
