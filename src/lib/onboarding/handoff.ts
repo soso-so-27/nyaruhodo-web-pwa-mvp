@@ -9,7 +9,7 @@ import {
   type ExchangePhoto,
   type OwnSleepingPhoto,
 } from "../home/sleepingPhotos";
-import { STORAGE_KEYS, writeCachedJson } from "../storage";
+import { STORAGE_KEYS, removeCachedJson, writeCachedJson } from "../storage";
 import {
   markOnboardingAlbumCreated,
   normalizeOnboardingSource,
@@ -18,6 +18,9 @@ import {
   type OnboardingProgress,
   type OnboardingSource,
 } from "./progress";
+
+const ONBOARDING_HANDOFF_OWN_PHOTOS_KEY = "nyaruhodo_exchange_own_sleeping_photos";
+const ONBOARDING_HANDOFF_KEPT_PHOTOS_KEY = "nyaruhodo_exchange_kept_photos";
 
 export type OnboardingHandoffPayload = {
   version: 1;
@@ -199,10 +202,12 @@ export function restoreOnboardingHandoffPayload(payload: unknown) {
     writeOnboardingProgress(payload.onboardingProgress);
   }
 
+  removeCachedJson(ONBOARDING_HANDOFF_OWN_PHOTOS_KEY);
+  removeCachedJson(ONBOARDING_HANDOFF_KEPT_PHOTOS_KEY);
   restoreSyncedSleepingPhotos({
     ownPhotos: payload.ownSleepingPhotos,
     keptPhotos: [],
-    mergeLocal: true,
+    mergeLocal: false,
   });
 
   if (payload.pendingReferralCode) {

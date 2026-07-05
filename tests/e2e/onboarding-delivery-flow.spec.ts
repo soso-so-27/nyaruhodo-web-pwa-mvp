@@ -975,6 +975,7 @@ test.describe("onboarding delivery flow", () => {
     page,
   }) => {
     let redeemCalls = 0;
+    const imageDataUrl = `data:image/png;base64,${testPng.toString("base64")}`;
     await page.route("**/api/onboarding/handoff/redeem", async (route) => {
       redeemCalls += 1;
       await route.fulfill({
@@ -1000,10 +1001,10 @@ test.describe("onboarding delivery flow", () => {
                 id: "handoff-own-photo",
                 catId: "handoff-cat",
                 ownerCatId: "handoff-cat",
-                src: `data:image/png;base64,${testPng.toString("base64")}`,
-                thumbnailSrc: `data:image/png;base64,${testPng.toString("base64")}`,
-                displaySrc: `data:image/png;base64,${testPng.toString("base64")}`,
-                originalSrc: `data:image/png;base64,${testPng.toString("base64")}`,
+                src: imageDataUrl,
+                thumbnailSrc: imageDataUrl,
+                displaySrc: imageDataUrl,
+                originalSrc: imageDataUrl,
                 state: "sleeping",
                 visibility: "shared",
                 deliveryStatus: "available",
@@ -1024,6 +1025,38 @@ test.describe("onboarding delivery flow", () => {
     await page.goto(
       "/onboarding/continue?handoff=onb_00000000-0000-4000-8000-000000000000_0123456789abcdef0123",
     );
+    await page.evaluate(({ imageDataUrl }) => {
+      window.localStorage.setItem(
+        "nyaruhodo_exchange_own_sleeping_photos",
+        JSON.stringify([
+          {
+            id: "stale-target-own",
+            catId: "stale-target-cat",
+            ownerCatId: "stale-target-cat",
+            src: imageDataUrl,
+            state: "sleeping",
+            visibility: "shared",
+            deliveryStatus: "available",
+            createdAt: Date.now() - 10_000,
+          },
+        ]),
+      );
+      window.localStorage.setItem(
+        "nyaruhodo_exchange_kept_photos",
+        JSON.stringify([
+          {
+            id: "stale-target-kept",
+            sourcePhotoId: "stale-target-source",
+            src: imageDataUrl,
+            title: "stale",
+            subtitle: "",
+            triggerLabel: "sleeping",
+            theme: "sleeping",
+            deliveredAt: Date.now() - 10_000,
+          },
+        ]),
+      );
+    }, { imageDataUrl });
     await page.locator("main button").first().click();
 
     await expect.poll(() => redeemCalls).toBe(1);
@@ -1035,6 +1068,7 @@ test.describe("onboarding delivery flow", () => {
           completed: window.localStorage.getItem("onboarding_completed"),
           profiles: window.localStorage.getItem("cat_profiles"),
           ownPhotos: window.localStorage.getItem("nyaruhodo_exchange_own_sleeping_photos"),
+          keptPhotos: window.localStorage.getItem("nyaruhodo_exchange_kept_photos"),
         })),
       )
       .toMatchObject({
@@ -1044,7 +1078,15 @@ test.describe("onboarding delivery flow", () => {
     const ownPhotos = await page.evaluate(() =>
       JSON.parse(window.localStorage.getItem("nyaruhodo_exchange_own_sleeping_photos") ?? "[]"),
     );
+    const keptPhotos = await page.evaluate(() =>
+      JSON.parse(window.localStorage.getItem("nyaruhodo_exchange_kept_photos") ?? "[]"),
+    );
+    expect(ownPhotos).toHaveLength(1);
     expect(ownPhotos[0]?.src).toMatch(/^data:image\//);
+    expect(ownPhotos.some((photo: { id?: string }) => photo.id === "stale-target-own")).toBe(
+      false,
+    );
+    expect(keptPhotos).toHaveLength(0);
   });
 
   test("lets locally restored users go home when a handoff token is already used", async ({
