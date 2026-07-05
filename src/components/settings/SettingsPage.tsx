@@ -20,9 +20,7 @@ import {
   type ClientBetaCapabilities,
 } from "../../lib/betaClient";
 import {
-  openBillingPortal,
   readClientBillingStatus,
-  startBetaSupporterCheckout,
   type ClientBillingStatus,
 } from "../../lib/billingClient";
 import {
@@ -141,8 +139,6 @@ export function SettingsPage() {
       isBetaSupporter: false,
     });
   const [isFeedbackOpen, setIsFeedbackOpen] = useState(false);
-  const [feedbackKind, setFeedbackKind] =
-    useState<"beta_feedback" | "supporter_voice">("beta_feedback");
   const [feedbackCategory, setFeedbackCategory] =
     useState<BetaFeedbackCategory>("good");
   const [feedbackMessage, setFeedbackMessage] = useState("");
@@ -157,8 +153,6 @@ export function SettingsPage() {
     cancelAtPeriodEnd: false,
     canManageBilling: false,
   });
-  const [billingMessage, setBillingMessage] = useState("");
-  const [isBillingLoading, setIsBillingLoading] = useState(false);
   const [referralSummary, setReferralSummary] =
     useState<ClientReferralSummary | null>(null);
   const [referralMessage, setReferralMessage] = useState("");
@@ -551,7 +545,7 @@ export function SettingsPage() {
     const message = feedbackMessage.trim();
 
     if (!message) {
-      setFeedbackStatus("感じたことを入力してください。");
+      setFeedbackStatus("改善メモを入力してください。");
       return;
     }
 
@@ -566,7 +560,9 @@ export function SettingsPage() {
     const ok = await sendBetaFeedback({
       category: feedbackCategory,
       message,
-      kind: feedbackKind,
+      kind: betaCapabilities.supporterVoiceEnabled
+        ? "supporter_voice"
+        : "beta_feedback",
     });
 
     if (ok) {
@@ -577,36 +573,6 @@ export function SettingsPage() {
     }
 
     setIsFeedbackSending(false);
-  }
-
-  async function handleStartBetaSupporter() {
-    setIsBillingLoading(true);
-    setBillingMessage("支払いページへ移動しています。");
-
-    const url = await startBetaSupporterCheckout();
-
-    if (url) {
-      window.location.href = url;
-      return;
-    }
-
-    setBillingMessage("支払いページを開けませんでした。ログイン状態を確認してください。");
-    setIsBillingLoading(false);
-  }
-
-  async function handleOpenBillingPortal() {
-    setIsBillingLoading(true);
-    setBillingMessage("支払い管理へ移動しています。");
-
-    const url = await openBillingPortal();
-
-    if (url) {
-      window.location.href = url;
-      return;
-    }
-
-    setBillingMessage("支払い管理を開けませんでした。");
-    setIsBillingLoading(false);
   }
 
   function refreshKeptExchangeDebug() {
@@ -770,7 +736,7 @@ export function SettingsPage() {
         </section>
 
         <section style={{ ...styles.section, order: 3 }}>
-          <p style={styles.sectionLabel}>おしらせ</p>
+          <p style={styles.sectionLabel}>通知</p>
           <AppCard variant="outlined" padding="sm" style={styles.card}>
             <NotificationSettingsPanel
               environment={displayEnvironment}
@@ -879,10 +845,12 @@ export function SettingsPage() {
             {betaCapabilities.feedbackEnabled ? (
               <>
                 <div style={styles.betaNote}>
-                  <p style={styles.betaNoteTitle}>感じたことを送る</p>
+                  <p style={styles.betaNoteTitle}>改善メモを送る</p>
                   <p style={styles.betaNoteText}>
-                    よかったこと、分かりにくかったこと、
-                    バグっぽいことを送れます。
+                    {betaCapabilities.supporterVoiceEnabled
+                      ? "βサポーターの声も、ここにまとめて送れます。"
+                      : "返信がいらない感想や気づきを送れます。"}
+                    削除・ログイン・支払いなどの連絡は問い合わせへ。
                   </p>
                 </div>
                 <AppButton
@@ -891,12 +859,11 @@ export function SettingsPage() {
                   fullWidth
                   style={styles.settingsActionButton}
                   onClick={() => {
-                    setFeedbackKind("beta_feedback");
                     setIsFeedbackOpen((open) => !open);
                     setFeedbackStatus("");
                   }}
                 >
-                  意見を送る
+                  改善メモを書く
                 </AppButton>
                 {isFeedbackOpen ? (
                   <BetaFeedbackForm
@@ -914,9 +881,10 @@ export function SettingsPage() {
             ) : (
               <>
                 <div style={styles.betaNote}>
-                  <p style={styles.betaNoteTitle}>感じたことを送る</p>
+                  <p style={styles.betaNoteTitle}>改善メモを送る</p>
                   <p style={styles.betaNoteText}>
-                    β参加者は、よかったことや分かりにくかったことを送れます。
+                    β参加者は、返信不要の感想や気づきを送れます。
+                    返事が必要な連絡は問い合わせを使ってください。
                   </p>
                 </div>
                 {!isLoggedIn ? (
@@ -934,26 +902,6 @@ export function SettingsPage() {
             )}
             <BetaSupporterPanel
               billingStatus={billingStatus}
-              betaCapabilities={betaCapabilities}
-              isBillingLoading={isBillingLoading}
-              billingMessage={billingMessage}
-              isFeedbackOpen={isFeedbackOpen && feedbackKind === "supporter_voice"}
-              feedbackCategory={feedbackCategory}
-              feedbackMessage={feedbackMessage}
-              feedbackStatus={feedbackStatus}
-              isFeedbackSending={isFeedbackSending}
-              onStartSupporter={handleStartBetaSupporter}
-              onOpenPortal={handleOpenBillingPortal}
-              onOpenSupporterVoice={() => {
-                setFeedbackKind("supporter_voice");
-                setIsFeedbackOpen((open) =>
-                  feedbackKind === "supporter_voice" ? !open : true,
-                );
-                setFeedbackStatus("");
-              }}
-              onCategoryChange={setFeedbackCategory}
-              onMessageChange={setFeedbackMessage}
-              onSubmit={handleFeedbackSubmit}
             />
           </AppCard>
         </section>
@@ -1138,36 +1086,8 @@ export function SettingsPage() {
 
 function BetaSupporterPanel({
   billingStatus,
-  betaCapabilities,
-  isBillingLoading,
-  billingMessage,
-  isFeedbackOpen,
-  feedbackCategory,
-  feedbackMessage,
-  feedbackStatus,
-  isFeedbackSending,
-  onStartSupporter,
-  onOpenPortal,
-  onOpenSupporterVoice,
-  onCategoryChange,
-  onMessageChange,
-  onSubmit,
 }: {
   billingStatus: ClientBillingStatus;
-  betaCapabilities: ClientBetaCapabilities;
-  isBillingLoading: boolean;
-  billingMessage: string;
-  isFeedbackOpen: boolean;
-  feedbackCategory: BetaFeedbackCategory;
-  feedbackMessage: string;
-  feedbackStatus: string;
-  isFeedbackSending: boolean;
-  onStartSupporter: () => void;
-  onOpenPortal: () => void;
-  onOpenSupporterVoice: () => void;
-  onCategoryChange: (category: BetaFeedbackCategory) => void;
-  onMessageChange: (message: string) => void;
-  onSubmit: (event: FormEvent<HTMLFormElement>) => void;
 }) {
   return (
     <div style={styles.betaNote}>
@@ -1185,11 +1105,6 @@ function BetaSupporterPanel({
       >
         これからの ねてるねこ
       </AppButton>
-      {billingMessage ? (
-        <p style={styles.syncMessage} role="status">
-          {billingMessage}
-        </p>
-      ) : null}
     </div>
   );
 }
@@ -1218,9 +1133,9 @@ function NotificationSettingsPanel({
   if (environment !== "standalone") {
     return (
       <div style={styles.betaNote}>
-        <p style={styles.betaNoteTitle}>ホーム画面アプリでのみ使えます</p>
+        <p style={styles.betaNoteTitle}>Push通知はホーム画面アプリで使えます</p>
         <p style={styles.betaNoteText}>
-          よる8時のおしらせは、ホーム画面に追加したねてるねこで使えます。
+          夜8時のねこだより通知は準備中です。通知を使うときは、ホーム画面に追加したねてるねこから設定します。
         </p>
       </div>
     );
@@ -1229,9 +1144,9 @@ function NotificationSettingsPanel({
   if (permission === "granted") {
     return (
       <div style={styles.betaNote}>
-        <p style={styles.betaNoteTitle}>おしらせは ゆるされています</p>
+        <p style={styles.betaNoteTitle}>通知は許可されています</p>
         <p style={styles.betaNoteText}>
-          おしらせの しくみは じゅんび中です。
+          夜8時のPush通知は準備中です。配信が始まるまでは通知は届きません。
         </p>
       </div>
     );
@@ -1240,7 +1155,7 @@ function NotificationSettingsPanel({
   if (permission === "denied") {
     return (
       <div style={styles.betaNote}>
-        <p style={styles.betaNoteTitle}>おしらせはオフです</p>
+        <p style={styles.betaNoteTitle}>通知はオフです</p>
         <p style={styles.betaNoteText}>
           iPhoneの設定 &gt; ねてるねこ &gt; 通知 から変えられます。
         </p>
@@ -1251,7 +1166,7 @@ function NotificationSettingsPanel({
   if (permission === "unsupported") {
     return (
       <div style={styles.betaNote}>
-        <p style={styles.betaNoteTitle}>この端末ではおしらせを使えません</p>
+        <p style={styles.betaNoteTitle}>この端末では通知を使えません</p>
         <p style={styles.betaNoteText}>
           ホーム画面アプリで開いているか、端末の通知設定を確認してください。
         </p>
@@ -1261,9 +1176,9 @@ function NotificationSettingsPanel({
 
   return (
     <div style={styles.betaNote}>
-      <p style={styles.betaNoteTitle}>よる8時のおしらせ</p>
+      <p style={styles.betaNoteTitle}>夜8時のPush通知（準備中）</p>
       <p style={styles.betaNoteText}>
-        よる8時ごろに、ねこだよりの時間を思い出せます。
+        ねこだよりの時間を思い出すための通知です。今は許可設定だけ準備しています。
       </p>
       <AppButton
         type="button"
@@ -1272,7 +1187,7 @@ function NotificationSettingsPanel({
         style={styles.settingsActionButton}
         onClick={onRequestPermission}
       >
-        おしらせを ゆるす
+        通知を許可する
       </AppButton>
     </div>
   );
@@ -1319,7 +1234,7 @@ function BetaFeedbackForm({
         maxLength={2000}
         required
         rows={5}
-        placeholder="感じたことを書いてください"
+        placeholder="返信がいらない感想や気づきを書いてください"
       />
       <AppButton
         type="submit"
