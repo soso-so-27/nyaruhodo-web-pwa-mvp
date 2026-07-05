@@ -1,16 +1,58 @@
+import fs from "node:fs";
+import path from "node:path";
 import { defineConfig, devices } from "@playwright/test";
 
+function readEnvFile(filePath: string): Record<string, string> {
+  if (!fs.existsSync(filePath)) {
+    return {};
+  }
+
+  return fs
+    .readFileSync(filePath, "utf8")
+    .split(/\r?\n/)
+    .reduce<Record<string, string>>((acc, line) => {
+      const trimmed = line.trim();
+      if (!trimmed || trimmed.startsWith("#")) {
+        return acc;
+      }
+
+      const separatorIndex = trimmed.indexOf("=");
+      if (separatorIndex === -1) {
+        return acc;
+      }
+
+      const key = trimmed.slice(0, separatorIndex).trim();
+      let value = trimmed.slice(separatorIndex + 1).trim();
+      if (
+        (value.startsWith('"') && value.endsWith('"')) ||
+        (value.startsWith("'") && value.endsWith("'"))
+      ) {
+        value = value.slice(1, -1);
+      }
+      acc[key] = value;
+      return acc;
+    }, {});
+}
+
+const localEnv = readEnvFile(path.resolve(process.cwd(), ".env.local"));
+
+function resolveEnv(name: string, fallback = ""): string {
+  return process.env[name] ?? localEnv[name] ?? fallback;
+}
+
 const testSupabaseEnv = {
-  NEXT_PUBLIC_SUPABASE_URL:
-    process.env.NEXT_PUBLIC_SUPABASE_URL ?? "http://127.0.0.1:54321",
-  NEXT_PUBLIC_SUPABASE_ANON_KEY:
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ?? "test-anon-key",
-  SUPABASE_SERVICE_ROLE_KEY:
-    process.env.SUPABASE_SERVICE_ROLE_KEY ?? "test-service-role-key",
+  NEXT_PUBLIC_SUPABASE_URL: resolveEnv(
+    "NEXT_PUBLIC_SUPABASE_URL",
+    "http://127.0.0.1:54321",
+  ),
+  NEXT_PUBLIC_SUPABASE_ANON_KEY: resolveEnv("NEXT_PUBLIC_SUPABASE_ANON_KEY"),
+  SUPABASE_SERVICE_ROLE_KEY: resolveEnv("SUPABASE_SERVICE_ROLE_KEY"),
 };
 
 for (const [key, value] of Object.entries(testSupabaseEnv)) {
-  process.env[key] ??= value;
+  if (value) {
+    process.env[key] ??= value;
+  }
 }
 
 const baseURL = process.env.PLAYWRIGHT_BASE_URL ?? "http://localhost:3000";
@@ -41,6 +83,7 @@ const mobileSpecs = [
 
 export default defineConfig({
   testDir: "./tests/e2e",
+  globalSetup: "./tests/e2e/global-setup.ts",
   timeout: 30_000,
   expect: {
     timeout: 10_000,

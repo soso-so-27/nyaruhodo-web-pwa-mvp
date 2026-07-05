@@ -36,6 +36,16 @@
   「確認の関所が無い場所でDBが動いた」型であり、pushスタイルの問題ではない
 - 新しい種類の破壊的操作を行う前は、必ず既存ルール（PROD-OPERATIONS）に立ち返る
 
+## ローカル統合E2Eの復旧手順
+
+- `supabase stop && supabase start` でローカルSupabaseを再起動する。
+- `supabase status` の URL / anon key / service role key を `.env.local` に再同期する。
+- Playwrightプリフライトがkey不一致を検出したら、E2Eは走らせず上記手順で直す。
+
+## 統合E2Eの判定規則（P3準備）
+
+- Supabase local起動込みのDB統合E2EをCIへ移した後は、「ローカルの赤=環境、CIの赤=本物」として扱う。
+
 最終更新: 2026-07-04
 
 ## 原則
