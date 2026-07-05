@@ -19,6 +19,10 @@ type LegalPageProps = {
 
 const privacySections = [
   {
+    title: "事業者",
+    body: ["中西 壮野"],
+  },
+  {
     title: "取得する情報",
     body: [
       "ねてるねこは、猫のプロフィール、写真、写真に紐づく時間や状態、アカウント連携に必要な情報を扱います。",
@@ -176,7 +180,7 @@ const termsSections = [
     title: "準拠法および管轄裁判所",
     body: [
       "本規約は、日本法に準拠し、日本法に従って解釈されます。",
-      "本サービスに関して運営者とユーザーとの間で紛争が生じた場合、東京地方裁判所を第一審の専属的合意管轄裁判所とします。",
+      "本サービスに関して運営者とユーザーとの間で紛争が生じた場合、中西 壮野の所在地を管轄する地方裁判所を第一審の専属的合意管轄裁判所とします。",
     ],
   },
 ] as const satisfies readonly LegalSection[];
@@ -203,7 +207,7 @@ const contactSections = [
   {
     title: "正式な連絡先について",
     body: [
-      "公開前に、問い合わせ先メールアドレスまたは問い合わせフォームをこのページへ追記する予定です。メールアドレスを掲載する場合はスパム対策を行います。",
+      "正式な連絡先メールアドレス: nakanishisoya@gmail.com",
     ],
   },
 ] as const satisfies readonly LegalSection[];
@@ -286,7 +290,7 @@ const commercialTransactionsSections = [
   },
   {
     title: "販売事業者",
-    body: ["【要決定: Octagon Consulting（法人名義）か中西壮野（個人名義）か】"],
+    body: ["中西 壮野"],
   },
   {
     title: "運営責任者",
@@ -294,11 +298,14 @@ const commercialTransactionsSections = [
   },
   {
     title: "所在地",
-    body: ["【住所。個人の場合「請求があった場合、遅滞なく開示します」の記載方式も可】"],
+    body: ["請求があった場合、遅滞なく開示します。"],
   },
   {
     title: "連絡先",
-    body: ["【メールアドレス】（電話番号: 請求があった場合、遅滞なく開示します）"],
+    body: [
+      "メールアドレス: nakanishisoya@gmail.com",
+      "電話番号: 請求があった場合、遅滞なく開示します。",
+    ],
   },
   {
     title: "販売価格",
@@ -328,7 +335,7 @@ const commercialTransactionsSections = [
   },
   {
     title: "動作環境",
-    body: ["【対応ブラウザ/OSを記載】"],
+    body: ["iOS Safari / Android Chrome の最新版。ホーム画面への追加（PWA）に対応。"],
   },
 ] as const satisfies readonly LegalSection[];
 
@@ -337,7 +344,7 @@ export function PrivacyPage() {
     <LegalPage
       title="プライバシーポリシー"
       lead="ねてるねこで扱う猫の写真、Googleログイン、アカウント保存、分析イベントについての基本方針です。"
-      updatedAt="2026年6月3日"
+      updatedAt="2026年7月5日"
       sections={privacySections}
     />
   );
@@ -348,7 +355,7 @@ export function TermsPage() {
     <LegalPage
       title="利用規約"
       lead="ねてるねこベータ版を安心して使うための、最小限のルールです。"
-      updatedAt="2026年6月3日"
+      updatedAt="2026年7月5日"
       sections={termsSections}
     />
   );
@@ -359,7 +366,7 @@ export function ContactPage() {
     <LegalPage
       title="問い合わせ"
       lead="ベータ期間中の連絡方法についてまとめています。"
-      updatedAt="2026年6月7日"
+      updatedAt="2026年7月5日"
       sections={contactSections}
     />
   );
@@ -392,7 +399,7 @@ export function CommercialTransactionsPage() {
     <LegalPage
       title="特定商取引法に基づく表記"
       lead="βサポーターの支払いに関する表示です。"
-      updatedAt="2026年6月7日"
+      updatedAt="2026年7月5日"
       sections={commercialTransactionsSections}
     />
   );

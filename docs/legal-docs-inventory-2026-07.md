@@ -1,22 +1,23 @@
 # Legal docs inventory 2026-07
 
 作成日: 2026-07-05  
-調査範囲: 所在・網羅性・導線の棚卸のみ。文面の書き換えは行っていない。
+調査範囲: 所在・網羅性・導線の棚卸。2026-07-05追補で確定した法務文書の名義・連絡先・管轄・動作環境を反映済み。
 
-## 2026-07-05 追補反映後の未決事項
+## 2026-07-05 追補反映後の確定事項
 
 2026-07-05 に、利用規約・プライバシーポリシー・削除案内・特定商取引法に基づく表記へ追補ドラフトを反映した。
+同日追補で、以下を確定した:
 
-反映後も中西さん側で判断が必要なもの:
+- 特定商取引法に基づく表記の販売事業者名義: 中西 壮野（個人）
+- 特定商取引法に基づく表記の運営責任者: 中西 壮野
+- 特定商取引法に基づく表記の所在地・電話番号: 請求があった場合、遅滞なく開示
+- 特定商取引法に基づく表記の連絡先メールアドレス: nakanishisoya@gmail.com
+- 特定商取引法に基づく表記の動作環境: iOS Safari / Android Chrome の最新版。ホーム画面への追加（PWA）に対応
+- 利用規約の準拠法・管轄: 中西 壮野の所在地を管轄する地方裁判所
+- プライバシーポリシーの事業者名: 中西 壮野
 
-- 特定商取引法に基づく表記の販売事業者名義
-  - `Octagon Consulting` など法人名義にするか、個人名義にするか。
-- 特定商取引法に基づく表記の所在地・連絡先の記載方式
-  - 現在はドラフトの未決定文言を残している。
-- 特定商取引法に基づく表記の動作環境
-  - 現在は `【対応ブラウザ/OSを記載】` の未決定文言。
-- 準拠法・管轄
-  - 現在は東京地方裁判所。運営者所在地や法務判断に合わせて確認が必要。
+既存追補で確認済みの事項:
+
 - 写真削除時の配達済み相手側の扱い
   - 2026-07-05 コード確認済み。自分のねがお削除は `ownSleepingPhotos` と `cat_moments` を削除するが、受け取り側の `cat_moment_deliveries` は削除しないため、「受け取った方の記録に残ることがある」前提と整合する。
   - 2026-07-05 追補。アカウントとデータ全体の削除でも、配達済みのねがおは `delivery-archive/` へ退避して `cat_moment_deliveries.photo_url` を差し替える仕様に変更済み。削除済みユーザーのStorageパスは残さず、受け取り側の記録は画像ごと保全する。
@@ -58,11 +59,11 @@
 
 | 文書 | URL | ルートファイル | 本文ファイル | 最終更新 |
 | --- | --- | --- | --- | --- |
-| 利用規約 | `/terms` | `src/app/terms/page.tsx` | `src/components/legal/LegalPage.tsx` `TermsPage` | 2026年6月3日 |
-| プライバシーポリシー | `/privacy` | `src/app/privacy/page.tsx` | `src/components/legal/LegalPage.tsx` `PrivacyPage` | 2026年6月3日 |
+| 利用規約 | `/terms` | `src/app/terms/page.tsx` | `src/components/legal/LegalPage.tsx` `TermsPage` | 2026年7月5日 |
+| プライバシーポリシー | `/privacy` | `src/app/privacy/page.tsx` | `src/components/legal/LegalPage.tsx` `PrivacyPage` | 2026年7月5日 |
 | 削除案内 | `/account-deletion` | `src/app/account-deletion/page.tsx` | `src/components/legal/LegalPage.tsx` `AccountDeletionPage` | 2026年7月3日 |
-| 特定商取引法に基づく表記 | `/commercial-transactions` | `src/app/commercial-transactions/page.tsx` | `src/components/legal/LegalPage.tsx` `CommercialTransactionsPage` | 2026年6月7日 |
-| 問い合わせ | `/contact` | `src/app/contact/page.tsx` | `src/components/legal/LegalPage.tsx` `ContactPage` | 2026年6月7日 |
+| 特定商取引法に基づく表記 | `/commercial-transactions` | `src/app/commercial-transactions/page.tsx` | `src/components/legal/LegalPage.tsx` `CommercialTransactionsPage` | 2026年7月5日 |
+| 問い合わせ | `/contact` | `src/app/contact/page.tsx` | `src/components/legal/LegalPage.tsx` `ContactPage` | 2026年7月5日 |
 | 解約方法 | `/cancellation` | `src/app/cancellation/page.tsx` | `src/components/legal/LegalPage.tsx` `CancellationPage` | 2026年6月7日 |
 
 ## 網羅性チェック
@@ -77,7 +78,7 @@
 | 事前審査（モデレーション）の存在と、reject時の扱い | ない | 通報後の確認はあるが、投稿前/配達前審査とreject時の扱いは明示されていない。 |
 | 課金: 月額・自動更新・解約方法・返金方針 | ない | `将来の有料プラン` はあるが、現行月額や自動更新・解約・返金は利用規約内にはない。 |
 | サービスの変更・終了時の扱い | ない | ベータ版の機能/保存仕様/料金体系の変更可能性はあるが、サービス終了時の扱いはない。 |
-| 準拠法・管轄 | ない | 該当記述なし。 |
+| 準拠法・管轄 | ある | 中西 壮野の所在地を管轄する地方裁判所を第一審の専属的合意管轄裁判所とする記載あり。 |
 
 ### プライバシーポリシー
 
@@ -102,12 +103,13 @@
 
 | 項目 | ある/ない | 根拠 |
 | --- | --- | --- |
-| 事業者名 | ある | 「請求があった場合、遅滞なく開示します。」 |
+| 事業者名 | ある | 中西 壮野。 |
 | 所在地 | ある | 「請求があった場合、遅滞なく開示します。」 |
-| 連絡先 | ある | `/contact` と請求時開示。 |
+| 連絡先 | ある | メールアドレス `nakanishisoya@gmail.com` と、電話番号の請求時開示。 |
 | 販売価格 | ある | 反映前は税別表記。2026-07-05追補で総額表示へ更新。 |
 | 支払時期/方法 | ある | クレジットカード決済（Stripe）、申込み時初回決済、毎月自動更新。 |
 | 解約条件 | ある | 設定画面の「支払いを管理」から解約、請求期間終了まで利用可能。 |
+| 動作環境 | ある | iOS Safari / Android Chrome の最新版。ホーム画面への追加（PWA）に対応。 |
 
 ## 導線チェック
 
@@ -139,7 +141,6 @@
 - プライバシーポリシーに一般的な保存期間の考え方がない。
 - 削除案内に、写真1枚単位の削除方法と、配達済み写真の相手側扱いがない。
 - 特商法表記の価格が、アプリ/Stripe側の実請求額と一致しているか確認が必要。
-- 問い合わせページは「正式な連絡先を追記予定」となっており、先行ユーザー受け入れ時の実連絡先として十分か確認が必要。
 ## 2026-07-05 追記: 匿名IDから個人情報への逆引き調査
 
 アカウント削除後に受け取り側へ残す `cat_moment_deliveries` について、`anonymous_id` からメールアドレスや `auth.users.id` へ戻れる対応表がないかを確認した。
