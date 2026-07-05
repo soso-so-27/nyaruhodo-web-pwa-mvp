@@ -233,8 +233,8 @@ export function CatsPage() {
   const [isDeletingGalleryPhoto, setIsDeletingGalleryPhoto] = useState(false);
   const [selectedYearSummary, setSelectedYearSummary] =
     useState<CatYearSummary | null>(null);
-  const sectionTabsRef = useRef<HTMLDivElement | null>(null);
-  const [isSectionTabsPinned, setIsSectionTabsPinned] = useState(false);
+  const profileCoverRef = useRef<HTMLDivElement | null>(null);
+  const [isProfileCoverPinned, setIsProfileCoverPinned] = useState(false);
 
   const activeCatProfile =
     catProfiles.length > 0
@@ -325,22 +325,23 @@ export function CatsPage() {
   useEffect(() => {
     const shouldTrack =
       Boolean(activeCatProfile) &&
-      !isOnboardingCompletionView;
+      !isOnboardingCompletionView &&
+      !isOnboardingProfileSetup;
 
     if (!shouldTrack) {
-      setIsSectionTabsPinned(false);
+      setIsProfileCoverPinned(false);
       return;
     }
 
     const updatePinnedState = () => {
-      const node = sectionTabsRef.current;
+      const node = profileCoverRef.current;
       if (!node) {
-        setIsSectionTabsPinned(false);
+        setIsProfileCoverPinned(false);
         return;
       }
 
       const shouldPin = node.getBoundingClientRect().top <= 8;
-      setIsSectionTabsPinned((current) =>
+      setIsProfileCoverPinned((current) =>
         current === shouldPin ? current : shouldPin,
       );
     };
@@ -356,6 +357,7 @@ export function CatsPage() {
   }, [
     activeCatProfile,
     isOnboardingCompletionView,
+    isOnboardingProfileSetup,
   ]);
   const allLensPhotos = useMemo(
     () =>
@@ -1327,8 +1329,13 @@ export function CatsPage() {
               <>
                 <div style={styles.profileCoverHero}>
                   <div
+                    ref={profileCoverRef}
                     data-testid="cats-profile-cover"
-                    style={styles.profileCoverFrame}
+                    style={
+                      isProfileCoverPinned
+                        ? { ...styles.profileCoverFrame, ...styles.profileCoverFramePinnedAnchor }
+                        : styles.profileCoverFrame
+                    }
                   >
                     <PhotoTile
                       src={activeCoverSrc}
@@ -1393,6 +1400,26 @@ export function CatsPage() {
                       </button>
                     ) : null}
                   </div>
+                  {isProfileCoverPinned ? (
+                    <div
+                      data-testid="cats-profile-cover-pinned"
+                      style={{
+                        ...styles.profileCoverFrame,
+                        ...styles.profileCoverFrameFixed,
+                      }}
+                    >
+                      <PhotoTile
+                        src={activeCoverSrc}
+                        alt=""
+                        variant="bare"
+                        fit={activeCoverFit}
+                        aspect="auto"
+                        loading="eager"
+                        style={styles.profileCoverTileRoot}
+                        imageStyle={styles.profileCoverImage}
+                      />
+                    </div>
+                  ) : null}
                 </div>
               </>
             ) : null}
@@ -1491,9 +1518,8 @@ export function CatsPage() {
         {activeCatProfile && !isOnboardingCompletionView ? (
           <>
             <div
-              ref={sectionTabsRef}
               style={
-                isSectionTabsPinned ? styles.sectionTabsAnchorPinned : undefined
+                isProfileCoverPinned ? styles.sectionTabsAnchorPinned : undefined
               }
             >
               <UchinokoSectionTabs
@@ -1506,7 +1532,7 @@ export function CatsPage() {
                 ]}
               />
             </div>
-            {isSectionTabsPinned ? (
+            {isProfileCoverPinned ? (
               <UchinokoSectionTabs
                 value={activeSection}
                 onChange={setActiveSection}
@@ -4800,10 +4826,10 @@ const styles = {
   },
   sectionTabsFixed: {
     position: "fixed" as const,
-    top: "calc(env(safe-area-inset-top) + 8px)",
+    top: "calc(env(safe-area-inset-top) + 204px)",
     left: "50%",
-    zIndex: 40,
-    width: "min(calc(100% - 36px), 382px)",
+    zIndex: 39,
+    width: "min(calc(100% - 48px), 382px)",
     minHeight: "44px",
     margin: 0,
     transform: "translateX(-50%)",
@@ -4835,6 +4861,18 @@ const styles = {
     borderBottom: "2px solid var(--seal)",
     background: "transparent",
     boxShadow: "none",
+  },
+  profileCoverFramePinnedAnchor: {
+    visibility: "hidden" as const,
+  },
+  profileCoverFrameFixed: {
+    position: "fixed" as const,
+    top: "calc(env(safe-area-inset-top) + 8px)",
+    left: "50%",
+    zIndex: 40,
+    width: "min(calc(100% - 16px), 414px)",
+    marginLeft: 0,
+    transform: "translateX(-50%)",
   },
   profileCoverHero: {
     position: "relative" as const,
