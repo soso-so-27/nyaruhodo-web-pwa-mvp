@@ -29,6 +29,15 @@ export type EveningDeliveryTraceEntry = {
   legacyFallbackReason?: string;
   selectedPhotoSource: "direct" | "targetPhoto" | "legacy" | "none";
   selectedPhotoSrcKind?: "data" | "storage" | "http" | "other" | "empty";
+  exchangeUploadResizeStep?:
+    | "storage_direct"
+    | "data_resize_420_0.58"
+    | "data_resize_320_0.52"
+    | "data_resize_240_0.46"
+    | "data_resize_180_0.4"
+    | "data_original"
+    | "data_unusable"
+    | "none";
   exchangePayloadLength?: number | null;
   exchangeElapsedMs?: number | null;
   exchangeCalled: boolean;

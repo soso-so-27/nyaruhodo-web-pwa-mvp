@@ -20,9 +20,13 @@ import { isAccountDeletionStripeCancellationRequired } from "../../src/lib/accou
 import {
   isFastStockCandidateDeliverable,
   isRowDeliverable,
+  buildIdempotentDeliveryId,
+  buildIdempotentDeliveryIds,
+  readExistingDelivery,
   resetOnboardingExchangeExceptionLimitForTests,
   validateExchangeDeliveryDateKey,
 } from "../../src/app/api/sleeping-delivery/exchange/route";
+import { resolveExchangePhotoUploadSrc } from "../../src/lib/home/useEveningDelivery";
 import {
   CAT_PHOTOS_BUCKET,
   DISPLAY_SIGNED_URL_SECONDS,
@@ -115,6 +119,29 @@ test.describe("sleeping delivery pool guards", () => {
     );
     expect(isStorageDeliveryPhotoUrl(normalCatLikePhotoUrl)).toBe(false);
     expect(isStorageDeliveryPhotoUrl("https://example.com/photo.jpg")).toBe(false);
+  });
+
+  test("uses storage reference directly for synced account exchange photos", async () => {
+    const upload = await resolveExchangePhotoUploadSrc({
+      catId: "cat-storage",
+      createdAt: Date.now(),
+      deliveryStatus: "available",
+      displaySrc: normalCatLikePhotoUrl,
+      id: "own-storage-photo",
+      ownerCatId: "cat-storage",
+      shared: true,
+      src: "storage:user/cat-storage/sleeping/own-storage-photo.webp",
+      state: "sleeping",
+      theme: "ねがお",
+      triggerLabel: "20時",
+      visibility: "shared",
+    });
+
+    expect(upload).toEqual({
+      src: "storage:user/cat-storage/sleeping/own-storage-photo.webp",
+      srcKind: "storage",
+      resizeStep: "storage_direct",
+    });
   });
 
   test("plans delivered account photos for archive before deleting user storage", () => {
@@ -322,6 +349,70 @@ test.describe("sleeping delivery pool guards", () => {
     expect(fakeSupabase.insertedAppEvents[0].event_name).toBe(
       "onboarding_exchange_exception_limited",
     );
+  });
+
+  test("replays idempotent exchange deliveries from new or legacy ids", async () => {
+    const ids = buildIdempotentDeliveryIds({
+      anonymousId: "anon-idempotent",
+      deliveryDateKey: "2026-07-05",
+      userId: null,
+    });
+
+    const legacyDelivery = {
+      anonymous_id: "anon-idempotent",
+      delivered_at: new Date().toISOString(),
+      id: "delivery-row-legacy",
+      local_delivery_id: ids.legacy,
+      metadata: {},
+      photo_url: normalCatLikePhotoUrl,
+      recipient_local_cat_id: "cat-recipient",
+      source_moment_id: "source-row",
+      source_photo_id: "source-photo",
+      status: "delivered",
+      user_id: null,
+    };
+    const legacyReplay = await readExistingDelivery({
+      anonymousId: "anon-idempotent",
+      legacyLocalDeliveryId: ids.legacy,
+      localDeliveryId: ids.primary,
+      supabase: createFakeDeliveryLookupSupabase([legacyDelivery]).client,
+      userId: null,
+    });
+
+    expect(legacyReplay?.local_delivery_id).toBe(ids.legacy);
+
+    const newDelivery = {
+      ...legacyDelivery,
+      id: "delivery-row-new",
+      local_delivery_id: ids.primary,
+    };
+    const newReplay = await readExistingDelivery({
+      anonymousId: "anon-idempotent",
+      legacyLocalDeliveryId: ids.legacy,
+      localDeliveryId: ids.primary,
+      supabase: createFakeDeliveryLookupSupabase([newDelivery, legacyDelivery])
+        .client,
+      userId: null,
+    });
+
+    expect(newReplay?.local_delivery_id).toBe(ids.primary);
+  });
+
+  test("uses sha256 idempotent ids with distinct 96-bit digests", () => {
+    const first = buildIdempotentDeliveryId({
+      anonymousId: "anon-a",
+      deliveryDateKey: "2026-07-05",
+      userId: null,
+    });
+    const second = buildIdempotentDeliveryId({
+      anonymousId: "anon-b",
+      deliveryDateKey: "2026-07-05",
+      userId: null,
+    });
+
+    expect(first).toMatch(/^delivered-sleeping-2026-07-05-[0-9a-f]{24}$/);
+    expect(second).toMatch(/^delivered-sleeping-2026-07-05-[0-9a-f]{24}$/);
+    expect(first).not.toBe(second);
   });
 
   test("account deletion guide explains delivered photos remain", async ({
@@ -1701,6 +1792,53 @@ function createFakeOnboardingValidationSupabase() {
   } as any;
 
   return { client, insertedAppEvents };
+}
+
+function createFakeDeliveryLookupSupabase(deliveries: Array<Record<string, unknown>>) {
+  const client = {
+    from: (table: string) => {
+      expect(table).toBe("cat_moment_deliveries");
+      return createFakeDeliveryLookupQuery(deliveries);
+    },
+  } as any;
+
+  return { client };
+}
+
+function createFakeDeliveryLookupQuery(deliveries: Array<Record<string, unknown>>) {
+  const filters: Record<string, unknown> = {};
+
+  const query = {
+    eq(column: string, value: unknown) {
+      filters[column] = value;
+      return query;
+    },
+    is(column: string, value: unknown) {
+      filters[column] = value;
+      return query;
+    },
+    limit() {
+      return query;
+    },
+    maybeSingle: async () => {
+      const data =
+        deliveries.find((delivery) =>
+          Object.entries(filters).every(([column, value]) => {
+            if (value === null) {
+              return delivery[column] === null || delivery[column] === undefined;
+            }
+            return delivery[column] === value;
+          }),
+        ) ?? null;
+
+      return { data, error: null };
+    },
+    select() {
+      return query;
+    },
+  };
+
+  return query;
 }
 
 function createDeliverableRow(

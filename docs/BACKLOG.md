@@ -14,3 +14,4 @@
 - rejected写真の同一localMomentId再送でpendingへ戻る審査ループ防止（再送時に既存rejectedを引き継ぐ案） — 出典: 2026-07-05コード監査 F1〜F4付帯
 - 退会後Stripe webhookがsubscriptions行を復活させ得る件の確認（FK有無確認、auth user不在ならskip案） — 出典: 2026-07-05コード監査 F1〜F4付帯
 - `toExchangePhotoFromDelivery` のtitle文字化け確認（実害なら修正、抽出時症状なら記録のみ） — 出典: 2026-07-05コード監査 F1〜F4付帯
+- exchange冪等IDの旧32bit ID読み取りを削除（2026-07-13以降。実デプロイ日が遅れた場合はデプロイ日+8日以降） — 出典: 2026-07-05監査フォローアップ #4

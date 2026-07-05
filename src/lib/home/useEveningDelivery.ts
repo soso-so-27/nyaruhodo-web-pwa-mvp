@@ -3,8 +3,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 
 import { trackProductEvent } from "../analytics/productAnalytics";
-import { resolveStoredPhotoUrl } from "../photoStorage";
-import { createBrowserSupabaseClient } from "../supabase/browser";
 import { createSleepingExchange } from "./deliveryCandidates";
 import {
   getJstDateKey,
@@ -21,6 +19,16 @@ import type { OwnSleepingPhoto } from "./sleepingPhotos";
 
 const EXCHANGE_UPLOAD_MAX_DATA_URL_LENGTH = 500_000;
 const EVENING_DELIVERY_SLOW_MS = 4_000;
+
+export type ExchangeUploadResizeStep =
+  | "storage_direct"
+  | "data_resize_420_0.58"
+  | "data_resize_320_0.52"
+  | "data_resize_240_0.46"
+  | "data_resize_180_0.4"
+  | "data_original"
+  | "data_unusable"
+  | "none";
 
 type EveningDeliveryCheckSource =
   | "app_open"
@@ -184,6 +192,7 @@ export function useEveningDelivery({
             legacyFallbackReason: "non_data_src",
             selectedPhotoSource,
             selectedPhotoSrcKind: uploadSrc.srcKind,
+            exchangeUploadResizeStep: uploadSrc.resizeStep,
             exchangePayloadLength: null,
           });
           pendingEveningDeliveryKeysRef.current.delete(pendingDay.dateKey);
@@ -204,6 +213,7 @@ export function useEveningDelivery({
           legacyFallbackUsed: Boolean(legacyPhoto),
           selectedPhotoSource,
           selectedPhotoSrcKind: uploadSrc.srcKind,
+          exchangeUploadResizeStep: uploadSrc.resizeStep,
           exchangePayloadLength: uploadSrc.src.length,
           exchangeCalled: true,
         });
@@ -227,6 +237,7 @@ export function useEveningDelivery({
           legacyFallbackUsed: Boolean(legacyPhoto),
           selectedPhotoSource,
           selectedPhotoSrcKind: uploadSrc.srcKind,
+          exchangeUploadResizeStep: uploadSrc.resizeStep,
           exchangePayloadLength: uploadSrc.src.length,
           exchangeElapsedMs: Date.now() - exchangeStartedAt,
           exchangeCalled: true,
@@ -569,53 +580,29 @@ function getExchangePhotoUploadSrc(photo: OwnSleepingPhoto) {
   );
 }
 
-async function resolveExchangePhotoUploadSrc(photo: OwnSleepingPhoto): Promise<{
+export async function resolveExchangePhotoUploadSrc(photo: OwnSleepingPhoto): Promise<{
   src: string | null;
   srcKind: ReturnType<typeof getTracePhotoSrcKind>;
+  resizeStep: ExchangeUploadResizeStep;
 }> {
   const storageSrc = getExchangePhotoStorageSrc(photo);
 
   if (storageSrc) {
-    return { src: storageSrc, srcKind: "storage" };
+    return { src: storageSrc, srcKind: "storage", resizeStep: "storage_direct" };
   }
 
   const dataSrc = getExchangePhotoUploadSrc(photo);
 
   if (dataSrc) {
-    return { src: await prepareExchangeUploadDataUrl(dataSrc), srcKind: "data" };
+    const prepared = await prepareExchangeUploadDataUrl(dataSrc);
+    return { src: prepared.src, srcKind: "data", resizeStep: prepared.resizeStep };
   }
 
-  const candidates = [
-    photo.src,
-    photo.displaySrc,
-    photo.thumbnailSrc,
-    photo.originalSrc,
-  ].filter((src): src is string => Boolean(src));
-  const firstKind = getTracePhotoSrcKind(candidates[0]);
-  const supabase = createBrowserSupabaseClient();
-
-  if (!supabase) {
-    return { src: null, srcKind: firstKind };
-  }
-
-  for (const candidate of candidates) {
-    if (!isStoragePhotoReference(candidate)) {
-      continue;
-    }
-
-    const resolved = await resolveStoredPhotoUrl(supabase, candidate).catch(
-      () => undefined,
-    );
-
-    if (resolved && resolved.startsWith("data:image/")) {
-      return {
-        src: await prepareExchangeUploadDataUrl(resolved),
-        srcKind: "storage",
-      };
-    }
-  }
-
-  return { src: null, srcKind: firstKind };
+  return {
+    src: null,
+    srcKind: getTracePhotoSrcKind(photo.src),
+    resizeStep: "none",
+  };
 }
 
 function getExchangePhotoStorageSrc(photo: OwnSleepingPhoto) {
@@ -630,29 +617,44 @@ function getExchangePhotoStorageSrc(photo: OwnSleepingPhoto) {
   );
 }
 
-async function prepareExchangeUploadDataUrl(dataUrl: string) {
+async function prepareExchangeUploadDataUrl(dataUrl: string): Promise<{
+  src: string | null;
+  resizeStep: ExchangeUploadResizeStep;
+}> {
   if (!dataUrl.startsWith("data:image/")) {
-    return null;
+    return { src: null, resizeStep: "data_unusable" };
   }
 
-  const attempts = [
-    await resizeDataUrl(dataUrl, 420, 0.58),
-    await resizeDataUrl(dataUrl, 320, 0.52),
-    await resizeDataUrl(dataUrl, 240, 0.46),
-    await resizeDataUrl(dataUrl, 180, 0.4),
-    dataUrl,
+  const attempts: {
+    maxSize: number;
+    quality: number;
+    resizeStep: ExchangeUploadResizeStep;
+  }[] = [
+    { maxSize: 420, quality: 0.58, resizeStep: "data_resize_420_0.58" },
+    { maxSize: 320, quality: 0.52, resizeStep: "data_resize_320_0.52" },
+    { maxSize: 240, quality: 0.46, resizeStep: "data_resize_240_0.46" },
+    { maxSize: 180, quality: 0.4, resizeStep: "data_resize_180_0.4" },
   ];
 
-  return (
-    attempts.find(
-      (candidate): candidate is string =>
-        Boolean(
-          candidate &&
-            isDeliverableDataPhotoSrc(candidate) &&
-            candidate.length <= EXCHANGE_UPLOAD_MAX_DATA_URL_LENGTH,
-        ),
-    ) ?? null
-  );
+  for (const attempt of attempts) {
+    const candidate = await resizeDataUrl(dataUrl, attempt.maxSize, attempt.quality);
+    if (
+      candidate &&
+      isDeliverableDataPhotoSrc(candidate) &&
+      candidate.length <= EXCHANGE_UPLOAD_MAX_DATA_URL_LENGTH
+    ) {
+      return { src: candidate, resizeStep: attempt.resizeStep };
+    }
+  }
+
+  if (
+    isDeliverableDataPhotoSrc(dataUrl) &&
+    dataUrl.length <= EXCHANGE_UPLOAD_MAX_DATA_URL_LENGTH
+  ) {
+    return { src: dataUrl, resizeStep: "data_original" };
+  }
+
+  return { src: null, resizeStep: "data_unusable" };
 }
 
 function getTracePhotoSrcKind(src: string | null | undefined) {

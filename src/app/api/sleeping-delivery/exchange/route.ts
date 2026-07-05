@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import { NextResponse } from "next/server";
 import type { SupabaseClient } from "@supabase/supabase-js";
 
@@ -239,21 +240,23 @@ async function handleExchangePost(request: Request) {
     );
   }
 
-  const idempotentDeliveryId =
+  const idempotentDeliveryIds =
     input.deliveryDateKey && !debugDryRun
-      ? buildIdempotentDeliveryId({
+      ? buildIdempotentDeliveryIds({
           userId,
           anonymousId,
           deliveryDateKey: input.deliveryDateKey,
         })
       : null;
+  const idempotentDeliveryId = idempotentDeliveryIds?.primary ?? null;
 
-  if (idempotentDeliveryId) {
+  if (idempotentDeliveryIds) {
     const existingDelivery = await readExistingDelivery({
       supabase,
       userId,
       anonymousId,
-      localDeliveryId: idempotentDeliveryId,
+      localDeliveryId: idempotentDeliveryIds.primary,
+      legacyLocalDeliveryId: idempotentDeliveryIds.legacy,
     });
 
     if (existingDelivery) {
@@ -482,6 +485,7 @@ async function handleExchangePost(request: Request) {
           userId,
           anonymousId,
           localDeliveryId: idempotentDeliveryId,
+          legacyLocalDeliveryId: idempotentDeliveryIds?.legacy ?? null,
         });
 
         if (existingDelivery) {
@@ -859,7 +863,25 @@ async function hasNoPriorDeliveries({
   return (count ?? 0) === 0;
 }
 
-function buildIdempotentDeliveryId({
+export function buildIdempotentDeliveryId({
+  userId,
+  anonymousId,
+  deliveryDateKey,
+}: {
+  userId: string | null;
+  anonymousId: string | null;
+  deliveryDateKey: string;
+}) {
+  const recipientIdentity = userId ? `user:${userId}` : `anon:${anonymousId ?? ""}`;
+  const digest = createHash("sha256")
+    .update(`${recipientIdentity}:${deliveryDateKey}`)
+    .digest("hex")
+    .slice(0, 24);
+
+  return `delivered-sleeping-${deliveryDateKey}-${digest}`;
+}
+
+export function buildLegacyIdempotentDeliveryId({
   userId,
   anonymousId,
   deliveryDateKey,
@@ -874,7 +896,54 @@ function buildIdempotentDeliveryId({
   return `delivered-sleeping-${deliveryDateKey}-${digest}`;
 }
 
-async function readExistingDelivery({
+export function buildIdempotentDeliveryIds(args: {
+  userId: string | null;
+  anonymousId: string | null;
+  deliveryDateKey: string;
+}) {
+  const primary = buildIdempotentDeliveryId(args);
+  const legacy = buildLegacyIdempotentDeliveryId(args);
+
+  return {
+    primary,
+    legacy,
+    all: primary === legacy ? [primary] : [primary, legacy],
+  };
+}
+
+export async function readExistingDelivery({
+  supabase,
+  userId,
+  anonymousId,
+  localDeliveryId,
+  legacyLocalDeliveryId = null,
+}: {
+  supabase: SupabaseClient;
+  userId: string | null;
+  anonymousId: string | null;
+  localDeliveryId: string;
+  legacyLocalDeliveryId?: string | null;
+}) {
+  const primary = await readExistingDeliveryByLocalId({
+    supabase,
+    userId,
+    anonymousId,
+    localDeliveryId,
+  });
+
+  if (primary || !legacyLocalDeliveryId || legacyLocalDeliveryId === localDeliveryId) {
+    return primary;
+  }
+
+  return readExistingDeliveryByLocalId({
+    supabase,
+    userId,
+    anonymousId,
+    localDeliveryId: legacyLocalDeliveryId,
+  });
+}
+
+async function readExistingDeliveryByLocalId({
   supabase,
   userId,
   anonymousId,
@@ -1037,7 +1106,13 @@ async function deleteExistingMoment({
     query = query.is("user_id", null).eq("anonymous_id", anonymousId);
   }
 
-  await query;
+  const { error } = await query;
+
+  if (error) {
+    console.warn("[sleeping-delivery/exchange] existing moment delete failed", {
+      code: error.code,
+    });
+  }
 }
 
 async function readRemoteCandidateRows(
