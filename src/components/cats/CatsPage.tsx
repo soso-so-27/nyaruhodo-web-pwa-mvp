@@ -233,8 +233,6 @@ export function CatsPage() {
   const [isDeletingGalleryPhoto, setIsDeletingGalleryPhoto] = useState(false);
   const [selectedYearSummary, setSelectedYearSummary] =
     useState<CatYearSummary | null>(null);
-  const profileCoverRef = useRef<HTMLDivElement | null>(null);
-  const [isProfileCoverPinned, setIsProfileCoverPinned] = useState(false);
 
   const activeCatProfile =
     catProfiles.length > 0
@@ -322,43 +320,6 @@ export function CatsPage() {
     activeCatProfile?.avatarDataUrl ?? activeCoverPhoto?.src ?? activeAvatarSrc;
   const activeCoverFit =
     hasCustomThumbnail || activeCoverPhoto ? "cover" : "contain";
-  useEffect(() => {
-    const shouldTrack =
-      Boolean(activeCatProfile) &&
-      !isOnboardingCompletionView &&
-      !isOnboardingProfileSetup;
-
-    if (!shouldTrack) {
-      setIsProfileCoverPinned(false);
-      return;
-    }
-
-    const updatePinnedState = () => {
-      const node = profileCoverRef.current;
-      if (!node) {
-        setIsProfileCoverPinned(false);
-        return;
-      }
-
-      const shouldPin = node.getBoundingClientRect().top <= 8;
-      setIsProfileCoverPinned((current) =>
-        current === shouldPin ? current : shouldPin,
-      );
-    };
-
-    updatePinnedState();
-    window.addEventListener("scroll", updatePinnedState, { passive: true });
-    window.addEventListener("resize", updatePinnedState);
-
-    return () => {
-      window.removeEventListener("scroll", updatePinnedState);
-      window.removeEventListener("resize", updatePinnedState);
-    };
-  }, [
-    activeCatProfile,
-    isOnboardingCompletionView,
-    isOnboardingProfileSetup,
-  ]);
   const allLensPhotos = useMemo(
     () =>
       mergeAllLensPhotos(
@@ -1329,13 +1290,8 @@ export function CatsPage() {
               <>
                 <div style={styles.profileCoverHero}>
                   <div
-                    ref={profileCoverRef}
                     data-testid="cats-profile-cover"
-                    style={
-                      isProfileCoverPinned
-                        ? { ...styles.profileCoverFrame, ...styles.profileCoverFramePinnedAnchor }
-                        : styles.profileCoverFrame
-                    }
+                    style={styles.profileCoverFrame}
                   >
                     <PhotoTile
                       src={activeCoverSrc}
@@ -1400,26 +1356,6 @@ export function CatsPage() {
                       </button>
                     ) : null}
                   </div>
-                  {isProfileCoverPinned ? (
-                    <div
-                      data-testid="cats-profile-cover-pinned"
-                      style={{
-                        ...styles.profileCoverFrame,
-                        ...styles.profileCoverFrameFixed,
-                      }}
-                    >
-                      <PhotoTile
-                        src={activeCoverSrc}
-                        alt=""
-                        variant="bare"
-                        fit={activeCoverFit}
-                        aspect="auto"
-                        loading="eager"
-                        style={styles.profileCoverTileRoot}
-                        imageStyle={styles.profileCoverImage}
-                      />
-                    </div>
-                  ) : null}
                 </div>
               </>
             ) : null}
@@ -1516,37 +1452,18 @@ export function CatsPage() {
         ) : null}
 
         {activeCatProfile && !isOnboardingCompletionView ? (
-          <>
-            <div
-              style={
-                isProfileCoverPinned ? styles.sectionTabsAnchorPinned : undefined
-              }
-            >
-              <UchinokoSectionTabs
-                value={activeSection}
-                onChange={setActiveSection}
-                options={[
-                  { value: "record", label: "記録" },
-                  { value: "photos", label: "写真" },
-                  { value: "basic", label: "基本" },
-                ]}
-              />
-            </div>
-            {isProfileCoverPinned ? (
-              <UchinokoSectionTabs
-                value={activeSection}
-                onChange={setActiveSection}
-                options={[
-                  { value: "record", label: "記録" },
-                  { value: "photos", label: "写真" },
-                  { value: "basic", label: "基本" },
-                ]}
-                fixed
-              />
-            ) : null}
-          </>
+          <UchinokoSectionTabs
+            value={activeSection}
+            onChange={setActiveSection}
+            options={[
+              { value: "record", label: "記録" },
+              { value: "photos", label: "写真" },
+              { value: "basic", label: "基本" },
+            ]}
+          />
         ) : null}
 
+        <div data-testid="cats-tab-scroll" style={styles.tabContentScroller}>
         {activeCatProfile &&
         !isOnboardingCompletionView &&
         activeSection === "basic" ? (
@@ -1682,6 +1599,7 @@ export function CatsPage() {
 
         {message ? <p style={styles.message}>{message}</p> : null}
         {saveMessage ? <p style={styles.message}>{saveMessage}</p> : null}
+        </div>
       </div>
       {!isOnboardingProfileSetup && !isOnboardingCompletionView ? (
         <BottomNavigation active="cats" />
@@ -2872,23 +2790,17 @@ function UchinokoSectionTabs({
   value,
   onChange,
   options,
-  fixed = false,
 }: {
   value: UchinokoSection;
   onChange: (value: UchinokoSection) => void;
   options: { value: UchinokoSection; label: string }[];
-  fixed?: boolean;
 }) {
   return (
     <div
       role="radiogroup"
-      data-testid={fixed ? "cats-section-tabs-pinned" : "cats-section-tabs"}
+      data-testid="cats-section-tabs"
       aria-label="うちのこの中身"
-      style={
-        fixed
-          ? { ...styles.sectionTabs, ...styles.sectionTabsFixed }
-          : styles.sectionTabs
-      }
+      style={styles.sectionTabs}
     >
       {options.map((option) => {
         const selected = option.value === value;
@@ -4669,6 +4581,7 @@ function assertSupportedSourceImage(file: File) {
 const styles = {
   page: {
     position: "relative",
+    height: "100dvh",
     minHeight: "100vh",
     background: "var(--app-paper-background)",
     backgroundSize: "var(--app-paper-background-size)",
@@ -4676,6 +4589,7 @@ const styles = {
     backgroundRepeat: "var(--app-paper-background-repeat)",
     color: CATS_TEXT,
     overflowX: "hidden",
+    overflowY: "hidden",
     scrollPaddingBottom:
       "calc(var(--bottom-nav-height) + var(--bottom-nav-safe-offset) + 48px)",
     fontFamily: "var(--font-ui)",
@@ -4709,6 +4623,12 @@ const styles = {
     position: "relative",
     zIndex: 2,
     width: "min(100%, 430px)",
+    height: "100dvh",
+    maxHeight: "100dvh",
+    display: "flex",
+    flexDirection: "column" as const,
+    overflow: "hidden",
+    boxSizing: "border-box" as const,
     margin: "0 auto",
     fontSynthesis: "none",
     padding:
@@ -4806,10 +4726,17 @@ const styles = {
   sectionSwitch: {
     margin: "0 0 12px",
   },
-  sectionTabsAnchorPinned: {
-    visibility: "hidden" as const,
+  tabContentScroller: {
+    minHeight: 0,
+    flex: "1 1 auto",
+    overflowY: "auto" as const,
+    overflowX: "hidden" as const,
+    WebkitOverflowScrolling: "touch",
+    paddingTop: "2px",
+    paddingBottom: "8px",
   },
   sectionTabs: {
+    flex: "0 0 auto",
     display: "grid",
     gridTemplateColumns: "repeat(3, minmax(0, 1fr))",
     alignItems: "center",
@@ -4823,23 +4750,6 @@ const styles = {
     borderBottom: "1px solid color-mix(in srgb, var(--line) 72%, transparent)",
     background: "transparent",
     boxShadow: "none",
-  },
-  sectionTabsFixed: {
-    position: "fixed" as const,
-    top: "calc(env(safe-area-inset-top) + 204px)",
-    left: "50%",
-    zIndex: 39,
-    width: "min(calc(100% - 48px), 382px)",
-    minHeight: "44px",
-    margin: 0,
-    transform: "translateX(-50%)",
-    borderRadius: "16px",
-    borderBottom: "1px solid color-mix(in srgb, var(--line) 70%, transparent)",
-    background: "color-mix(in srgb, var(--paper-card) 82%, transparent)",
-    boxShadow:
-      "0 12px 24px -24px color-mix(in srgb, var(--ink) 34%, transparent)",
-    backdropFilter: "blur(14px)",
-    WebkitBackdropFilter: "blur(14px)",
   },
   sectionTabButton: {
     minWidth: 0,
@@ -4861,18 +4771,6 @@ const styles = {
     borderBottom: "2px solid var(--seal)",
     background: "transparent",
     boxShadow: "none",
-  },
-  profileCoverFramePinnedAnchor: {
-    visibility: "hidden" as const,
-  },
-  profileCoverFrameFixed: {
-    position: "fixed" as const,
-    top: "calc(env(safe-area-inset-top) + 8px)",
-    left: "50%",
-    zIndex: 40,
-    width: "min(calc(100% - 16px), 414px)",
-    marginLeft: 0,
-    transform: "translateX(-50%)",
   },
   profileCoverHero: {
     position: "relative" as const,
