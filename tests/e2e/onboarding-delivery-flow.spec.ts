@@ -695,6 +695,55 @@ test.describe("onboarding delivery flow", () => {
     await expect(page.getByRole("button", { name: "このまま復元する" })).toHaveCount(0);
   });
 
+  test("does not auto consume handoff links in normal browsers", async ({
+    page,
+  }) => {
+    let redeemCalls = 0;
+    await page.route("**/api/onboarding/handoff/redeem", async (route) => {
+      redeemCalls += 1;
+      await route.fulfill({
+        contentType: "application/json",
+        status: 409,
+        body: JSON.stringify({ ok: false, error: "handoff_already_used" }),
+      });
+    });
+
+    await page.goto(
+      "/onboarding/continue?handoff=onb_00000000-0000-4000-8000-000000000000_0123456789abcdef0123",
+    );
+    await page.waitForTimeout(500);
+
+    expect(redeemCalls).toBe(0);
+
+    await page.locator("main button").first().click();
+    await expect.poll(() => redeemCalls).toBe(1);
+  });
+
+  test("lets locally restored users go home when a handoff token is already used", async ({
+    page,
+  }) => {
+    await page.addInitScript(() => {
+      window.localStorage.setItem("onboarding_completed", "true");
+    });
+    await page.route("**/api/onboarding/handoff/redeem", async (route) => {
+      await route.fulfill({
+        contentType: "application/json",
+        status: 409,
+        body: JSON.stringify({ ok: false, error: "handoff_already_used" }),
+      });
+    });
+
+    await page.goto(
+      "/onboarding/continue?handoff=onb_00000000-0000-4000-8000-000000000000_0123456789abcdef0123",
+    );
+    await page.locator("main button").first().click();
+
+    await expect(
+      page.getByText("この端末には、つづきが復元されています。ホームへ進めます。"),
+    ).toBeVisible();
+    await expect(page.getByRole("button", { name: "ホームへ" })).toBeVisible();
+  });
+
   test("does not keep referral links for users who already completed onboarding", async ({
     page,
   }) => {

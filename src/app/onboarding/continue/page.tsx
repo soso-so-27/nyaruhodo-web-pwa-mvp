@@ -1,8 +1,8 @@
 "use client";
 
-import { useRouter, useSearchParams } from "next/navigation";
+import { useSearchParams } from "next/navigation";
 import type { CSSProperties } from "react";
-import { Suspense, useEffect, useRef, useState } from "react";
+import { Suspense, useEffect, useState } from "react";
 
 import { AppButton } from "../../../components/ui/AppButton";
 import { AppCard } from "../../../components/ui/AppCard";
@@ -11,6 +11,7 @@ import { APP_PAGE_BACKGROUND } from "../../../components/ui/appTheme";
 import { trackProductEvent } from "../../../lib/analytics/productAnalytics";
 import { getDisplayEnvironment } from "../../../lib/displayEnvironment";
 import { redeemOnboardingHandoff } from "../../../lib/onboarding/handoff";
+import { STORAGE_KEYS } from "../../../lib/storage";
 
 type RestoreStatus = "ready" | "restoring" | "restored" | "error";
 
@@ -23,7 +24,6 @@ export default function OnboardingContinuePage() {
 }
 
 function OnboardingContinueContent() {
-  const router = useRouter();
   const searchParams = useSearchParams();
   const token = searchParams.get("handoff") ?? "";
   const [status, setStatus] = useState<RestoreStatus>("ready");
@@ -31,7 +31,6 @@ function OnboardingContinueContent() {
   const [copied, setCopied] = useState(false);
   const [hasCheckedEnvironment, setHasCheckedEnvironment] = useState(false);
   const [isEmbeddedBrowser, setIsEmbeddedBrowser] = useState(false);
-  const didAutoRestore = useRef(false);
   const shouldShowEmbeddedGuide = hasCheckedEnvironment && isEmbeddedBrowser;
   const continueUrl =
     typeof window === "undefined"
@@ -49,21 +48,8 @@ function OnboardingContinueContent() {
     if (!token) {
       setStatus("error");
       setMessage("つづきの情報が見つかりませんでした。");
-      return;
     }
-
-    if (!hasCheckedEnvironment) {
-      return;
-    }
-
-    if (isEmbeddedBrowser || didAutoRestore.current) {
-      return;
-    }
-
-    didAutoRestore.current = true;
-    void restoreAndGoHome("auto");
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [hasCheckedEnvironment, isEmbeddedBrowser, token]);
+  }, [token]);
 
   async function restoreAndGoHome(method: "auto" | "manual") {
     if (!token || status === "restoring") {
@@ -89,7 +75,7 @@ function OnboardingContinueContent() {
       setStatus("restored");
       setMessage("ねがおを復元しました。ホームへ移動します。");
       window.setTimeout(() => {
-        router.replace("/home?handoff=restored");
+        goHome();
       }, 350);
     } catch (error) {
       const errorMessage =
@@ -100,9 +86,22 @@ function OnboardingContinueContent() {
         error: errorMessage,
         environment: getDisplayEnvironment(),
       });
+      if (
+        errorMessage === "handoff_already_used" &&
+        hasRestoredOnboardingState()
+      ) {
+        setStatus("restored");
+        setMessage("この端末には、つづきが復元されています。ホームへ進めます。");
+        return;
+      }
+
       setStatus("error");
       setMessage(getRestoreErrorMessage(errorMessage));
     }
+  }
+
+  function goHome() {
+    window.location.assign("/home?handoff=restored");
   }
 
   async function copyContinueUrl() {
@@ -174,12 +173,21 @@ function OnboardingContinueContent() {
                 type="button"
                 variant="accent"
                 fullWidth
-                disabled={status === "restoring" || status === "restored"}
+                disabled={status === "restoring"}
                 onClick={() => {
+                  if (status === "restored") {
+                    goHome();
+                    return;
+                  }
+
                   void restoreAndGoHome("manual");
                 }}
               >
-                {status === "restoring" ? "復元しています..." : "復元してホームへ"}
+                {status === "restoring"
+                  ? "復元しています..."
+                  : status === "restored"
+                    ? "ホームへ"
+                    : "復元してホームへ"}
               </AppButton>
             )}
           </div>
@@ -230,6 +238,18 @@ function detectEmbeddedBrowser() {
     ua.includes("fban") ||
     ua.includes("twitter") ||
     ua.includes("micromessenger")
+  );
+}
+
+function hasRestoredOnboardingState() {
+  if (typeof window === "undefined") {
+    return false;
+  }
+
+  return Boolean(
+    window.localStorage.getItem(STORAGE_KEYS.onboardingCompleted) === "true" ||
+      window.localStorage.getItem(STORAGE_KEYS.onboardingProgress) ||
+      window.localStorage.getItem(STORAGE_KEYS.catProfiles),
   );
 }
 
