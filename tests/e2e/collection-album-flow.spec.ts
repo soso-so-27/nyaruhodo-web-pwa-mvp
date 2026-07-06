@@ -213,7 +213,9 @@ test.describe("collection album flow", () => {
           signedUrls: Object.fromEntries(
             (body.paths ?? []).map((path) => [
               path,
-              path === displayPath ? photoDataUrl : null,
+              path === displayPath
+                ? `/__signed-photo/${encodeURIComponent(path)}?variant=${body.variant ?? ""}`
+                : null,
             ]),
           ),
         }),
@@ -234,8 +236,17 @@ test.describe("collection album flow", () => {
       await route.fulfill({
         contentType: "application/json",
         body: JSON.stringify({
-          signedUrl: path === displayPath ? photoDataUrl : null,
+          signedUrl:
+            path === displayPath || path === thumbnailPath
+              ? `/__signed-photo/${encodeURIComponent(path)}?variant=${body.variant ?? ""}`
+              : null,
         }),
+      });
+    });
+    await page.route("**/__signed-photo/**", async (route) => {
+      await route.fulfill({
+        contentType: "image/svg+xml",
+        body: `<svg xmlns="http://www.w3.org/2000/svg" width="800" height="600"><rect width="800" height="600" fill="#886"/></svg>`,
       });
     });
 
@@ -286,15 +297,163 @@ test.describe("collection album flow", () => {
     await page.goto("/collection");
     await page.waitForLoadState("networkidle");
     await expect(page.getByTestId("mainichi-board-photo-sent")).toHaveCount(1);
+    await expect(page.getByTestId("mainichi-board-photo-sent").locator("img").last()).toHaveJSProperty(
+      "complete",
+      true,
+    );
+    const finalSrc = await page
+      .getByTestId("mainichi-board-photo-sent")
+      .locator("img")
+      .last()
+      .evaluate((image) => (image as HTMLImageElement).currentSrc);
 
     expect(
       signedUrlRequests.some(
         (request) =>
-          request.endpoint === "single" &&
           request.paths.includes(displayPath) &&
           request.variant === "thumbnail",
       ),
     ).toBe(true);
+    expect(decodeURIComponent(finalSrc)).toContain(displayPath);
+    expect(finalSrc).toContain("variant=thumbnail");
+  });
+
+  test("prefetches startup photo URLs and image bodies while idle", async ({ page }) => {
+    const now = Date.now();
+    const currentCatId = "current-cat";
+    const sentPath = "user-1/current-cat/sleeping/startup-sent-display.jpg";
+    const deliveredPath = "delivery-archive/startup-delivered-display.jpg";
+    const galleryPath = "cat-gallery/current-cat/startup-gallery-thumbnail.webp";
+    const signedUrlRequests: Array<{ paths: string[]; variant?: string }> = [];
+    const fetchedPhotoPaths: string[] = [];
+
+    await page.addInitScript(
+      ({ currentCatId, sentSrc, deliveredSrc, gallerySrc, createdAt }) => {
+        window.requestIdleCallback = (callback: IdleRequestCallback) => {
+          window.setTimeout(
+            () =>
+              callback({
+                didTimeout: false,
+                timeRemaining: () => 50,
+              } as IdleDeadline),
+            0,
+          );
+          return 1;
+        };
+        window.cancelIdleCallback = () => undefined;
+        window.localStorage.setItem("active_cat_id", currentCatId);
+        window.localStorage.setItem(
+          "cat_profiles",
+          JSON.stringify([
+            {
+              id: currentCatId,
+              name: "current cat",
+              createdAt: new Date(createdAt).toISOString(),
+              updatedAt: new Date(createdAt).toISOString(),
+            },
+          ]),
+        );
+        window.localStorage.setItem(
+          "nyaruhodo_exchange_own_sleeping_photos",
+          JSON.stringify([
+            {
+              id: `own-sleeping-${createdAt}`,
+              ownerCatId: currentCatId,
+              catId: currentCatId,
+              src: sentSrc,
+              displaySrc: sentSrc,
+              originalSrc: sentSrc,
+              state: "sleeping",
+              visibility: "private",
+              deliveryStatus: "available",
+              triggerLabel: "sleeping",
+              theme: "sleeping",
+              shared: false,
+              createdAt,
+            },
+          ]),
+        );
+        window.localStorage.setItem(
+          "nyaruhodo_exchange_kept_photos",
+          JSON.stringify([
+            {
+              id: "kept-startup",
+              sourcePhotoId: "source-startup",
+              src: deliveredSrc,
+              displaySrc: deliveredSrc,
+              originalSrc: deliveredSrc,
+              title: "delivered",
+              subtitle: "",
+              triggerLabel: "mainichi",
+              theme: "mainichi",
+              deliveredAt: createdAt,
+            },
+          ]),
+        );
+        window.localStorage.setItem(
+          "neteruneko_cat_gallery_photos",
+          JSON.stringify([
+            {
+              id: "gallery-startup",
+              catId: currentCatId,
+              src: gallerySrc,
+              thumbnailSrc: gallerySrc,
+              createdAt,
+            },
+          ]),
+        );
+      },
+      {
+        currentCatId,
+        sentSrc: `storage:${sentPath}`,
+        deliveredSrc: `storage:${deliveredPath}`,
+        gallerySrc: `storage:${galleryPath}`,
+        createdAt: now,
+      },
+    );
+    await page.route("**/api/photo-storage/signed-urls", async (route) => {
+      const body = route.request().postDataJSON() as {
+        paths?: string[];
+        variant?: string;
+      };
+      signedUrlRequests.push({
+        paths: body.paths ?? [],
+        variant: body.variant,
+      });
+
+      await route.fulfill({
+        contentType: "application/json",
+        body: JSON.stringify({
+          signedUrls: Object.fromEntries(
+            (body.paths ?? []).map((path) => [
+              path,
+              `/__prefetched-photo/${encodeURIComponent(path)}?variant=${body.variant ?? ""}`,
+            ]),
+          ),
+        }),
+      });
+    });
+    await page.route("**/__prefetched-photo/**", async (route) => {
+      const url = new URL(route.request().url());
+      fetchedPhotoPaths.push(decodeURIComponent(url.pathname));
+      await route.fulfill({
+        contentType: "image/svg+xml",
+        body: `<svg xmlns="http://www.w3.org/2000/svg" width="800" height="600"><rect width="800" height="600" fill="#668"/></svg>`,
+      });
+    });
+
+    await page.goto("/home");
+
+    await expect
+      .poll(() => signedUrlRequests.flatMap((request) => request.paths), {
+        timeout: 5000,
+      })
+      .toEqual(expect.arrayContaining([sentPath, deliveredPath, galleryPath]));
+    await expect
+      .poll(() => fetchedPhotoPaths.join("\n"), { timeout: 5000 })
+      .toContain(sentPath);
+    expect(fetchedPhotoPaths.join("\n")).toContain(deliveredPath);
+    expect(fetchedPhotoPaths.join("\n")).toContain(galleryPath);
   });
 
   test("does not request a new signed url for the same storage photo in one session", async ({

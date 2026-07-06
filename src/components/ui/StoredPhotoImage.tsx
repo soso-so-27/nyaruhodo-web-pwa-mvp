@@ -87,6 +87,7 @@ const imageSelectionLockStyle = {
 
 export function StoredPhotoImage({
   src,
+  previewSrc,
   alt,
   style,
   imageStyle,
@@ -104,6 +105,7 @@ export function StoredPhotoImage({
   storageVariant = "display",
 }: {
   src: string;
+  previewSrc?: string;
   alt: string;
   style?: CSSProperties;
   imageStyle?: CSSProperties;
@@ -137,12 +139,15 @@ export function StoredPhotoImage({
   const [displaySrc, setDisplaySrc] = useState(() =>
     getInitialDisplaySrc(currentSource, storageVariant),
   );
+  const [previewDisplaySrc, setPreviewDisplaySrc] = useState("");
+  const [isPreviewLoaded, setIsPreviewLoaded] = useState(false);
   const [storageDataUrl, setStorageDataUrl] = useState<string | null>(null);
   const [isLoaded, setIsLoaded] = useState(false);
   const [hasError, setHasError] = useState(false);
   const [signedUrlRetryNonce, setSignedUrlRetryNonce] = useState(0);
   const [activeStorageVariant, setActiveStorageVariant] =
     useState<StorageSignedUrlVariant>(storageVariant);
+  const prefersReducedMotion = usePrefersReducedMotion();
   const imageRef = useRef<HTMLImageElement | null>(null);
   const loadStartedAtRef = useRef<number>(performance.now());
   const trackedDisplaySrcRef = useRef("");
@@ -168,6 +173,45 @@ export function StoredPhotoImage({
     setActiveStorageVariant(storageVariant);
     signedUrlRetryCountsRef.current.clear();
   }, [fallbackSrcKey, src, storageVariant]);
+
+  useEffect(() => {
+    let isActive = true;
+    const previewSource = typeof previewSrc === "string" ? previewSrc.trim() : "";
+    const finalStoragePath = getStoragePhotoPath(currentSource);
+    const previewStoragePath = previewSource ? getStoragePhotoPath(previewSource) : null;
+
+    setPreviewDisplaySrc("");
+    setIsPreviewLoaded(false);
+
+    if (
+      !previewSource ||
+      previewSource === currentSource ||
+      (finalStoragePath && previewStoragePath === finalStoragePath)
+    ) {
+      return;
+    }
+
+    if (!previewStoragePath) {
+      setPreviewDisplaySrc(previewSource);
+      return;
+    }
+
+    const cachedPreview = readCachedSignedUrl(previewStoragePath, "thumbnail");
+    if (cachedPreview) {
+      setPreviewDisplaySrc(cachedPreview);
+      return;
+    }
+
+    void getStoragePhotoSignedUrl(previewSource, "thumbnail").then((signedUrl) => {
+      if (isActive && signedUrl) {
+        setPreviewDisplaySrc(signedUrl);
+      }
+    });
+
+    return () => {
+      isActive = false;
+    };
+  }, [currentSource, previewSrc]);
 
   useEffect(() => {
     let isActive = true;
@@ -289,6 +333,50 @@ export function StoredPhotoImage({
   }, [onStorageDataUrl, storageDataUrl]);
 
   if (!displaySrc) {
+    if (previewDisplaySrc) {
+      return (
+        <span style={frameStyle}>
+          <img
+            src={previewDisplaySrc}
+            alt=""
+            aria-hidden="true"
+            draggable={false}
+            loading={loading ?? "lazy"}
+            decoding="async"
+            width={width}
+            height={height}
+            onLoad={() => setIsPreviewLoaded(true)}
+            onError={() => {
+              setIsPreviewLoaded(false);
+              setPreviewDisplaySrc("");
+            }}
+            style={{
+              width: "100%",
+              height: "100%",
+              objectFit: objectFit ?? "cover",
+              objectPosition,
+              display: "block",
+              opacity: isPreviewLoaded ? 1 : 0,
+              transition: prefersReducedMotion
+                ? "none"
+                : "opacity 150ms var(--ease-gentle)",
+              ...imageStyle,
+              ...imageSelectionLockStyle,
+            }}
+          />
+          {!hasError ? (
+            <span
+              aria-hidden="true"
+              style={{
+                ...developOverlayStyle,
+                opacity: isPreviewLoaded ? 0 : 1,
+              }}
+            />
+          ) : null}
+        </span>
+      );
+    }
+
     return hasError ? (
       <PhotoFallback style={frameStyle} variant={fallbackVariant} />
     ) : (
@@ -298,6 +386,38 @@ export function StoredPhotoImage({
 
   return (
     <span style={frameStyle}>
+      {previewDisplaySrc ? (
+        <img
+          src={previewDisplaySrc}
+          alt=""
+          aria-hidden="true"
+          draggable={false}
+          loading={loading ?? "lazy"}
+          decoding="async"
+          width={width}
+          height={height}
+          onLoad={() => setIsPreviewLoaded(true)}
+          onError={() => {
+            setIsPreviewLoaded(false);
+            setPreviewDisplaySrc("");
+          }}
+          style={{
+            position: "absolute",
+            inset: 0,
+            width: "100%",
+            height: "100%",
+            objectFit: objectFit ?? "cover",
+            objectPosition,
+            display: "block",
+            opacity: !isLoaded && isPreviewLoaded ? 1 : 0,
+            transition: prefersReducedMotion
+              ? "none"
+              : "opacity 150ms var(--ease-gentle)",
+            ...imageStyle,
+            ...imageSelectionLockStyle,
+          }}
+        />
+      ) : null}
       <img
         ref={imageRef}
         src={displaySrc}
@@ -362,7 +482,11 @@ export function StoredPhotoImage({
           mixBlendMode,
           display: "block",
           opacity: hasError || !isLoaded ? 0 : 1,
-          transition: "opacity 220ms var(--ease-gentle)",
+          transition: prefersReducedMotion
+            ? "none"
+            : previewDisplaySrc
+              ? "opacity 150ms var(--ease-gentle)"
+              : "opacity 220ms var(--ease-gentle)",
           ...imageStyle,
           ...imageSelectionLockStyle,
         }}
@@ -381,6 +505,27 @@ export function StoredPhotoImage({
       ) : null}
     </span>
   );
+}
+
+function usePrefersReducedMotion() {
+  const [prefersReducedMotion, setPrefersReducedMotion] = useState(false);
+
+  useEffect(() => {
+    const mediaQuery = window.matchMedia?.("(prefers-reduced-motion: reduce)");
+    if (!mediaQuery) {
+      return;
+    }
+
+    setPrefersReducedMotion(mediaQuery.matches);
+    const handleChange = () => setPrefersReducedMotion(mediaQuery.matches);
+    mediaQuery.addEventListener?.("change", handleChange);
+
+    return () => {
+      mediaQuery.removeEventListener?.("change", handleChange);
+    };
+  }, []);
+
+  return prefersReducedMotion;
 }
 
 function getUniquePhotoSources(sources: Array<string | null | undefined>) {
@@ -635,6 +780,49 @@ export async function preloadStoragePhotoSignedUrls(
   }
 }
 
+export async function prefetchStoragePhotoImages(
+  sources: string[],
+  variant: StorageSignedUrlVariant = "thumbnail",
+) {
+  if (typeof window === "undefined" || shouldSkipPhotoPrefetch()) {
+    return { attemptedCount: 0, fetchedCount: 0 };
+  }
+
+  await preloadStoragePhotoSignedUrls(sources, variant);
+
+  const signedUrls = Array.from(
+    new Set(
+      sources
+        .map((source) => getStoragePhotoPath(source))
+        .filter((path): path is string => Boolean(path))
+        .map((path) => readCachedSignedUrl(path, variant))
+        .filter((url): url is string => Boolean(url)),
+    ),
+  );
+
+  let fetchedCount = 0;
+  await Promise.all(
+    signedUrls.map(async (signedUrl) => {
+      const response = await fetch(signedUrl, {
+        cache: "force-cache",
+        mode: "no-cors",
+        priority: "low",
+      } as RequestInit & { priority?: "high" | "low" | "auto" }).catch(
+        () => null,
+      );
+
+      if (response && (response.ok || response.type === "opaque")) {
+        fetchedCount += 1;
+      }
+    }),
+  );
+
+  return {
+    attemptedCount: signedUrls.length,
+    fetchedCount,
+  };
+}
+
 async function readSignedUrlFromApi(
   src: string,
   supabase: ReturnType<typeof createBrowserSupabaseClient>,
@@ -674,6 +862,16 @@ function trackTransformFallback() {
   trackProductEvent("photo_transform_fallback", {
     variant: "thumbnail",
   });
+}
+
+function shouldSkipPhotoPrefetch() {
+  const connection = (
+    navigator as Navigator & {
+      connection?: { saveData?: boolean };
+    }
+  ).connection;
+
+  return Boolean(connection?.saveData);
 }
 
 async function readDisplayDataUrl(displaySrc: string) {

@@ -2243,6 +2243,7 @@ function MainichiBoardPhotoCard({
       ) : null}
       <PhotoTile
         src={photo.boardSrc}
+        previewSrc={photo.src}
         fallbackSrcs={photo.fallbackSrcs}
         alt=""
         variant="tile"
@@ -2600,6 +2601,7 @@ function MainichiFullscreenPhoto({
       >
         <PhotoViewerFrame
           src={getPhotoDetailSrc(photo)}
+          previewSrc={getPhotoThumbnailSrc(photo)}
           fallbackSrcs={getPhotoFallbackSrcs(photo)}
           alt=""
           fit="contain"

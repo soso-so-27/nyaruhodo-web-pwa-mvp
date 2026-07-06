@@ -13,6 +13,7 @@ type PhotoTileAspect = "1 / 1" | "4 / 3" | "3 / 4" | "auto" | (string & {});
 
 type PhotoTileProps = {
   src?: string;
+  previewSrc?: string;
   alt?: string;
   label?: string;
   size?: PhotoTileSize;
@@ -40,6 +41,7 @@ type PhotoTileProps = {
 
 export function PhotoTile({
   src,
+  previewSrc,
   alt = "",
   label,
   size = "md",
@@ -86,6 +88,7 @@ export function PhotoTile({
       {src ? (
         <StoredPhotoImage
           src={src}
+          previewSrc={previewSrc}
           alt={alt}
           style={{ ...frameStyle, objectFit: fit }}
           storageVariant={storageVariant}
@@ -121,6 +124,7 @@ export function PhotoTile({
 
 type PhotoViewerFrameProps = {
   src: string;
+  previewSrc?: string;
   alt?: string;
   aspect?: PhotoTileAspect;
   fit?: PhotoTileFit;
@@ -136,6 +140,7 @@ type PhotoViewerFrameProps = {
 
 export function PhotoViewerFrame({
   src,
+  previewSrc,
   alt = "",
   aspect = "1 / 1",
   fit = "cover",
@@ -158,6 +163,7 @@ export function PhotoViewerFrame({
     >
       <StoredPhotoImage
         src={src}
+        previewSrc={previewSrc}
         alt={alt}
         style={{ ...styles.viewerImage, objectFit: fit, ...imageStyle }}
         loading={loading}

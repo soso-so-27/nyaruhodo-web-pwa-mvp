@@ -321,6 +321,9 @@ export function CatsPage() {
     activeCatProfile?.avatarDataUrl ??
     (activeCoverPhoto ? getLensPhotoDetailSrc(activeCoverPhoto) : undefined) ??
     activeAvatarSrc;
+  const activeCoverPreviewSrc = activeCoverPhoto
+    ? getLensPhotoThumbnailSrc(activeCoverPhoto)
+    : undefined;
   const activeCoverFit =
     hasCustomThumbnail || activeCoverPhoto ? "cover" : "contain";
   useEffect(() => {
@@ -1301,6 +1304,7 @@ export function CatsPage() {
                   >
                     <PhotoTile
                       src={activeCoverSrc}
+                      previewSrc={activeCoverPreviewSrc}
                       alt=""
                       variant="bare"
                       fit={activeCoverFit}
