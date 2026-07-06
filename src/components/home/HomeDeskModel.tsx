@@ -17,7 +17,6 @@ import { AppCard } from "../ui/AppCard";
 import { AppSheet } from "../ui/AppBottomSheet";
 import { AppIcon } from "../ui/AppIcons";
 import { PhotoViewerFrame } from "../ui/PhotoTile";
-import { StampPair } from "../ui/StampPair";
 import { StoredPhotoImage } from "../ui/StoredPhotoImage";
 import { HomeEnvelopeMotionArt } from "./HomeEnvelopeMotionArt";
 import {
@@ -79,7 +78,6 @@ type HomeDeskModelProps = {
   eveningDeliveryCheckStatus?: EveningDeliveryCheckStatus;
   onRetryEveningDeliveryCheck?: () => void;
   deliveredPhotoDecodeStatus?: "idle" | "loading" | "ready" | "failed";
-  hideOpenedDeliveryStamp?: boolean;
 };
 
 const USE_SIMPLE_HOME_REVEAL = HOME_REVEAL_MODE === "simple";
@@ -256,7 +254,6 @@ export function HomeDeskModel({
   eveningDeliveryCheckStatus,
   onRetryEveningDeliveryCheck,
   deliveredPhotoDecodeStatus = "idle",
-  hideOpenedDeliveryStamp = false,
 }: HomeDeskModelProps) {
   const deskState = getDeskState(eveningState);
   const prefersReducedMotion = usePrefersReducedMotion();
@@ -479,51 +476,7 @@ export function HomeDeskModel({
           }}
         >
           <div style={deskStyles.todayPhotoZone}>
-            {usesEnvelopeHome ? null : homeDay.phase === "opened" && deliveredPhoto ? (
-              <div
-                data-testid="desk-home-frame"
-                style={deskStyles.homeStampPairShell}
-              >
-                <StampPair
-                  data-testid="home-stamp-pair"
-                  size="home"
-                  ownPhoto={homePhoto ? { src: getPhotoDisplaySrc(homePhoto) } : null}
-                  deliveredPhoto={{ src: getPhotoDetailSrc(deliveredPhoto) }}
-                  ownAlt=""
-                  deliveredAlt=""
-                  ownAriaLabel={`${catName}のきょうのねがおを大きく見る`}
-                  deliveredAriaLabel="どこかのこの写真を大きく見る"
-                  ownFallback={null}
-                  onOwnClick={
-                    homePhoto
-                      ? () => {
-                          setViewerPhoto({
-                            kind: "own",
-                            photo: homePhoto,
-                            dateKey: eveningState.dateKey,
-                          });
-                        }
-                      : undefined
-                  }
-                  onDeliveredClick={() => {
-                    setViewerPhoto({
-                      kind: "other",
-                      photo: deliveredPhoto,
-                      dateKey: eveningState.dateKey,
-                    });
-                  }}
-                  onDeliveredStorageDataUrl={(dataUrl) =>
-                    onDeliveredStorageDataUrl(
-                      eveningState.dateKey,
-                      deliveredPhoto,
-                      dataUrl,
-                    )
-                  }
-                  deliveredStampHidden={hideOpenedDeliveryStamp}
-                  deliveredStampTestId="home-stamp-pair-stamp"
-                />
-              </div>
-            ) : homePhoto ? (
+            {usesEnvelopeHome ? null : homePhoto ? (
               <div
                 style={{
                   ...deskStyles.homeFrameShell,
@@ -2255,13 +2208,6 @@ const deskStyles = {
     maxWidth: "calc(100% - 16px)",
   },
   homeFrameShell: {
-    position: "relative",
-    display: "grid",
-    justifyItems: "center",
-    width: "min(100%, var(--home-frame-layout-width, 100%))",
-    margin: "0 auto",
-  },
-  homeStampPairShell: {
     position: "relative",
     display: "grid",
     justifyItems: "center",

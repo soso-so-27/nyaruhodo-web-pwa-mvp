@@ -531,7 +531,7 @@ test.describe("home desk model", () => {
     await expect(page.getByText("むぎ、ねてる?")).toHaveCount(0);
   });
 
-  test("omits visible photo labels in the opened pair", async ({ page }) => {
+  test("shows the opened home as the normal photo frame without the old stamp pair", async ({ page }) => {
     await seedDeskState(page, "4");
     await page.goto("/home");
     await page.waitForLoadState("networkidle");
@@ -540,20 +540,14 @@ test.describe("home desk model", () => {
       "data-state",
       "4",
     );
-    await expect(page.getByTestId("home-stamp-pair")).toBeVisible();
-    await expect(page.getByTestId("home-stamp-pair-stamp")).toBeVisible();
-    await expect
-      .poll(() =>
-        page
-          .getByTestId("home-stamp-pair-stamp")
-          .evaluate((element) => (element as HTMLElement).style.transform),
-      )
-      .toBe("rotate(4deg)");
+    await expect(page.getByTestId("desk-home-frame")).toBeVisible();
+    await expect(page.getByTestId("home-stamp-pair")).toHaveCount(0);
+    await expect(page.getByTestId("home-stamp-pair-stamp")).toHaveCount(0);
     await expect(page.getByText(/\u3069\u3053\u304b\u306e\u3053/)).toHaveCount(0);
     await expect(page.getByTestId("evening-opening-pair")).toHaveCount(0);
   });
 
-  test("renders the opened StampPair even when today's own photo is missing", async ({
+  test("does not revive the old opened stamp pair when today's own photo is missing", async ({
     page,
   }) => {
     await seedDeskState(page, "4", { withoutOwnPhoto: true });
@@ -564,8 +558,8 @@ test.describe("home desk model", () => {
       "data-state",
       "4",
     );
-    await expect(page.getByTestId("home-stamp-pair")).toBeVisible();
-    await expect(page.getByTestId("home-stamp-pair-stamp")).toBeVisible();
+    await expect(page.getByTestId("home-stamp-pair")).toHaveCount(0);
+    await expect(page.getByTestId("home-stamp-pair-stamp")).toHaveCount(0);
   });
 
   test("starts decoding the delivered photo while the unopened letter is visible", async ({
@@ -596,10 +590,11 @@ test.describe("home desk model", () => {
 
     await expect(page.getByTestId("evening-opening-flyer")).toHaveCount(0);
     await expect(page.getByTestId("evening-opening-pair")).toHaveCount(0);
-    await expect(page.getByTestId("home-stamp-pair-stamp")).toBeVisible();
+    await expect(page.getByTestId("desk-home-frame")).toBeVisible();
+    await expect(page.getByTestId("home-stamp-pair-stamp")).toHaveCount(0);
   });
 
-  test("stows the opened photo into the StampPair stamp slot", async ({ page }) => {
+  test("closes the opening overlay back to the normal home frame", async ({ page }) => {
     await seedDeskState(page, "3");
     await page.goto("/home");
     await page.waitForLoadState("networkidle");
@@ -609,15 +604,13 @@ test.describe("home desk model", () => {
     await page.getByRole("button", { name: "閉じる" }).click();
 
     const flyer = page.getByTestId("evening-opening-flyer");
-    await expect(flyer).toBeVisible();
-    expect(
-      await flyer.evaluate((element) => getComputedStyle(element).willChange),
-    ).toContain("transform");
+    await expect(flyer).toHaveCount(0);
     await expect(page.getByTestId("evening-opening-pair")).toHaveCount(0);
-    await expect(page.getByTestId("home-stamp-pair-stamp")).toBeVisible();
+    await expect(page.getByTestId("desk-home-frame")).toBeVisible();
+    await expect(page.getByTestId("home-stamp-pair-stamp")).toHaveCount(0);
   });
 
-  test("shows system-opened deliveries directly as the opened StampPair", async ({
+  test("shows system-opened deliveries directly as the normal opened home frame", async ({
     page,
   }) => {
     await seedDeskState(page, "4", { openedBySystem: true });
@@ -629,7 +622,8 @@ test.describe("home desk model", () => {
       "4",
     );
     await expect(page.getByTestId("evening-opening-pair")).toHaveCount(0);
-    await expect(page.getByTestId("home-stamp-pair-stamp")).toBeVisible();
+    await expect(page.getByTestId("desk-home-frame")).toBeVisible();
+    await expect(page.getByTestId("home-stamp-pair-stamp")).toHaveCount(0);
   });
 
   test("hides desk labels after the habit threshold", async ({ page }) => {
@@ -666,11 +660,8 @@ test.describe("home desk model", () => {
     await expect(
       letterTray.getByRole("button", { name: "どこかのこの写真を大きく見る" }),
     ).toHaveCount(0);
-    await expect(
-      page.getByRole("button", { name: "どこかのこの写真を大きく見る" }),
-    ).toHaveCount(1);
-    await expect(page.getByTestId("home-stamp-pair-stamp")).toBeVisible();
-    await page.getByTestId("home-stamp-pair-stamp").click();
+    await expect(page.getByTestId("home-stamp-pair-stamp")).toHaveCount(0);
+    await page.getByTestId("desk-home-frame").click();
     await expect(page.getByTestId("desk-photo-viewer")).toBeVisible();
   });
 

@@ -2383,7 +2383,6 @@ export function HomeInput({
               eveningDeliveryCheckStatus={eveningDelivery.checkStatus}
               onRetryEveningDeliveryCheck={eveningDelivery.retryEveningDeliveryCheck}
               deliveredPhotoDecodeStatus={deliveredPhotoDecodeStatus}
-              hideOpenedDeliveryStamp={Boolean(openingEveningDelivery)}
             />
           </>
         )}
