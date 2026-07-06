@@ -2,7 +2,9 @@ import { NextResponse } from "next/server";
 import type { SupabaseClient } from "@supabase/supabase-js";
 
 import {
+  CAT_PHOTOS_BUCKET,
   getDataUrlExtension,
+  getStoragePhotoPath,
   isUsablePhotoSrc,
   sanitizePathSegment,
   toStoragePhotoUrl,
@@ -18,6 +20,76 @@ export const dynamic = "force-dynamic";
 type StockRequest = {
   src?: string;
 };
+
+type StockMomentRow = {
+  id: string;
+  local_moment_id: string;
+  local_cat_id: string;
+  owner_cat_id: string;
+  photo_url: string;
+  moderation_status: string;
+  delivery_status: string;
+  metadata: Record<string, unknown> | null;
+  created_at: string;
+};
+
+export async function GET(request: Request) {
+  const adminAccess = await requireStockAdminAccess(request);
+
+  if (!adminAccess.allowed) {
+    return NextResponse.json(
+      { moments: [], count: 0, error: adminAccess.error },
+      { status: adminAccess.status },
+    );
+  }
+
+  const supabase = createSupabaseAdminClient();
+
+  if (!supabase) {
+    return NextResponse.json(
+      { moments: [], count: 0, error: "server_stock_unavailable" },
+      { status: 503 },
+    );
+  }
+
+  const { data, error, count } = await supabase
+    .from("cat_moments")
+    .select(
+      "id, local_moment_id, local_cat_id, owner_cat_id, photo_url, moderation_status, delivery_status, metadata, created_at",
+      { count: "exact" },
+    )
+    .eq("visibility", "shared")
+    .eq("delivery_status", "available")
+    .eq("moderation_status", "approved")
+    .or(
+      "metadata->>source.eq.admin-stock,metadata->>pool_kind.eq.admin_stock,metadata->>pool_kind.eq.admin-stock,anonymous_id.eq.admin-stock,local_cat_id.eq.admin-stock,owner_cat_id.eq.admin-stock",
+    )
+    .order("created_at", { ascending: false })
+    .limit(100);
+
+  if (error) {
+    return NextResponse.json(
+      { moments: [], count: 0, error: error.message },
+      { status: 200 },
+    );
+  }
+
+  const moments = await Promise.all(
+    ((data ?? []) as StockMomentRow[]).map(async (row) => ({
+      id: row.id,
+      localMomentId: row.local_moment_id,
+      localCatId: row.local_cat_id,
+      ownerCatId: row.owner_cat_id,
+      photoSrc: await resolveStockPhotoSrc(row.photo_url),
+      moderationStatus: row.moderation_status,
+      deliveryStatus: row.delivery_status,
+      metadata: row.metadata ?? {},
+      createdAt: row.created_at,
+    })),
+  );
+
+  return NextResponse.json({ moments, count: count ?? moments.length });
+}
 
 export async function POST(request: Request) {
   const adminAccess = await requireStockAdminAccess(request);
@@ -104,6 +176,29 @@ export async function POST(request: Request) {
 
 function isSupportedPhotoSrc(src: string) {
   return isUsablePhotoSrc(src);
+}
+
+async function resolveStockPhotoSrc(photoUrl: string) {
+  const storagePath = getStoragePhotoPath(photoUrl);
+
+  if (!storagePath) {
+    return photoUrl.startsWith("data:image/") ? photoUrl : null;
+  }
+
+  const supabase = createSupabaseAdminClient();
+  if (!supabase) {
+    return null;
+  }
+
+  const { data, error } = await supabase.storage
+    .from(CAT_PHOTOS_BUCKET)
+    .createSignedUrl(storagePath, 60 * 10);
+
+  if (error || !data?.signedUrl) {
+    return null;
+  }
+
+  return data.signedUrl;
 }
 
 async function prepareStockPhotoUrl({

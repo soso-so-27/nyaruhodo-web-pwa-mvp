@@ -78,6 +78,7 @@ type ModerationQueueItem = {
   photoSrc: string | null;
   moderationStatus: string;
   deliveryStatus: string;
+  metadata?: Record<string, unknown>;
   createdAt: string;
 };
 const APP_BUILD_SHA =
@@ -124,6 +125,9 @@ export function SettingsPage() {
   const [moderationQueue, setModerationQueue] = useState<ModerationQueueItem[]>([]);
   const [moderationPendingCount, setModerationPendingCount] = useState(0);
   const [moderationMessage, setModerationMessage] = useState("");
+  const [adminStockMoments, setAdminStockMoments] = useState<ModerationQueueItem[]>([]);
+  const [adminStockReviewCount, setAdminStockReviewCount] = useState(0);
+  const [adminStockReviewMessage, setAdminStockReviewMessage] = useState("");
   const [adminCapabilities, setAdminCapabilities] =
     useState<ClientAdminCapabilities>({
       isAdmin: false,
@@ -499,6 +503,7 @@ export function SettingsPage() {
       void refreshDeliveryDiagnostics();
       void refreshPhotoReports();
       void refreshModerationQueue();
+      void refreshAdminStockMoments();
     }
   }
 
@@ -511,6 +516,12 @@ export function SettingsPage() {
     const queue = await readModerationQueue();
     setModerationQueue(queue.moments);
     setModerationPendingCount(queue.pendingCount);
+  }
+
+  async function refreshAdminStockMoments() {
+    const stock = await readAdminStockMoments();
+    setAdminStockMoments(stock.moments);
+    setAdminStockReviewCount(stock.count);
   }
 
   async function handleModerationDecision(momentId: string, decision: "approved" | "rejected") {
@@ -527,6 +538,25 @@ export function SettingsPage() {
       });
     }
     await refreshModerationQueue();
+  }
+
+  async function handleAdminStockReject(momentId: string) {
+    setAdminStockReviewMessage("");
+    const ok = await decideModerationMoment(momentId, "rejected");
+    setAdminStockReviewMessage(
+      ok ? "運営ストックから外しました" : "更新できませんでした",
+    );
+    if (ok) {
+      setAdminStockMoments((items) => items.filter((item) => item.id !== momentId));
+      setAdminStockReviewCount((count) => Math.max(0, count - 1));
+      trackProductEvent("moderation_decided", {
+        decision: "rejected",
+        moment_id: momentId,
+        source: "admin_stock_review",
+      });
+    }
+    await refreshAdminStockMoments();
+    await refreshDeliveryDiagnostics();
   }
 
   async function refreshBetaCapabilities() {
@@ -954,6 +984,19 @@ export function SettingsPage() {
               <div style={styles.divider} />
               <DeliveryDiagnosticsPanel diagnostics={deliveryDiagnostics} />
               <div style={styles.divider} />
+              {adminCapabilities.stockAdminEnabled ? (
+                <>
+                  <AdminStockReviewPanel
+                    moments={adminStockMoments}
+                    count={adminStockReviewCount}
+                    message={adminStockReviewMessage}
+                    onReject={(momentId) => {
+                      void handleAdminStockReject(momentId);
+                    }}
+                  />
+                  <div style={styles.divider} />
+                </>
+              ) : null}
               <ModerationQueuePanel
                 moments={moderationQueue}
                 pendingCount={moderationPendingCount}
@@ -978,6 +1021,7 @@ export function SettingsPage() {
                   void refreshDeliveryDiagnostics();
                   void refreshPhotoReports();
                   void refreshModerationQueue();
+                  void refreshAdminStockMoments();
                   refreshKeptExchangeDebug();
                   refreshEveningDeliveryTrace();
                 }}
@@ -1551,6 +1595,66 @@ function PhotoReportsPanel({ reports }: { reports: PhotoReportSummary[] }) {
   );
 }
 
+function AdminStockReviewPanel({
+  moments,
+  count,
+  message,
+  onReject,
+}: {
+  moments: ModerationQueueItem[];
+  count: number;
+  message: string;
+  onReject: (momentId: string) => void;
+}) {
+  return (
+    <AppCard as="div" variant="inset" padding="sm" style={styles.authDebugPanel}>
+      <p style={styles.syncOverviewText}>
+        運営ストックの確認です。新しく来た人の最初の一通にふさわしくない写真だけ
+        rejectしてください。
+      </p>
+      <div style={styles.authDebugRows}>
+        <AuthDebugRow label="approved stock" value={`${count}件`} />
+        <AuthDebugRow label="表示中" value={`${moments.length}件`} />
+        {message ? <AuthDebugRow label="結果" value={message} /> : null}
+      </div>
+      {moments.map((moment) => (
+        <div key={moment.id} style={styles.moderationItem}>
+          {moment.photoSrc ? (
+            <PhotoTile
+              src={moment.photoSrc}
+              alt=""
+              variant="tile"
+              aspect="1 / 1"
+              style={styles.moderationImageRoot}
+              imageStyle={styles.moderationImage}
+            />
+          ) : (
+            <div style={styles.moderationImageFallback}>no image</div>
+          )}
+          <div style={styles.moderationBody}>
+            <span style={styles.rowValue}>{moment.localMomentId}</span>
+            <span style={styles.rowValue}>{formatReportDate(moment.createdAt)}</span>
+            <span style={styles.rowValue}>
+              {readAdminStockSourceLabel(moment.metadata)}
+            </span>
+            <div style={styles.moderationActions}>
+              <AppButton
+                type="button"
+                variant="danger"
+                size="sm"
+                fullWidth
+                onClick={() => onReject(moment.id)}
+              >
+                reject
+              </AppButton>
+            </div>
+          </div>
+        </div>
+      ))}
+    </AppCard>
+  );
+}
+
 function ModerationQueuePanel({
   moments,
   pendingCount,
@@ -1712,6 +1816,31 @@ async function readModerationQueue() {
   }
 }
 
+async function readAdminStockMoments() {
+  const headers = await buildAuthorizedHeaders();
+  const fallback = { moments: [] as ModerationQueueItem[], count: 0 };
+
+  try {
+    const response = await fetch("/api/sleeping-delivery/stock", { headers });
+    if (!response.ok) {
+      return fallback;
+    }
+
+    const body = (await response.json().catch(() => null)) as {
+      moments?: ModerationQueueItem[];
+      count?: number;
+    } | null;
+
+    const moments = Array.isArray(body?.moments) ? body.moments : [];
+    return {
+      moments,
+      count: typeof body?.count === "number" ? body.count : moments.length,
+    };
+  } catch {
+    return fallback;
+  }
+}
+
 async function decideModerationMoment(
   momentId: string,
   decision: "approved" | "rejected",
@@ -1771,6 +1900,14 @@ function formatReportDate(value: string) {
     hour: "2-digit",
     minute: "2-digit",
   }).format(timestamp);
+}
+
+function readAdminStockSourceLabel(metadata: Record<string, unknown> | undefined) {
+  const source = typeof metadata?.source === "string" ? metadata.source : "";
+  const poolKind =
+    typeof metadata?.pool_kind === "string" ? metadata.pool_kind : "";
+
+  return [source, poolKind].filter(Boolean).join(" / ") || "admin-stock";
 }
 
 function SyncStatusPanel({ overview }: { overview: AccountSyncOverview }) {
