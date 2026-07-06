@@ -3543,16 +3543,19 @@ function ThumbnailCropSheet({
     cropRef.current = crop;
   }, [crop]);
 
-  function updateCrop(patch: Partial<CatAvatarCrop>) {
-    onChange(normalizeAvatarCrop({ ...crop, ...patch }));
-  }
+  useLayoutEffect(() => {
+    const previousBodyOverflow = document.body.style.overflow;
+    const previousHtmlOverscroll =
+      document.documentElement.style.overscrollBehavior;
 
-  function nudgeCrop(deltaX: number, deltaY: number) {
-    updateCrop({
-      offsetX: crop.offsetX + deltaX,
-      offsetY: crop.offsetY + deltaY,
-    });
-  }
+    document.body.style.overflow = "hidden";
+    document.documentElement.style.overscrollBehavior = "none";
+
+    return () => {
+      document.body.style.overflow = previousBodyOverflow;
+      document.documentElement.style.overscrollBehavior = previousHtmlOverscroll;
+    };
+  }, []);
 
   function beginPan(pointer: { x: number; y: number }) {
     gestureStartRef.current = {
@@ -3580,129 +3583,164 @@ function ThumbnailCropSheet({
     };
   }
 
+  function handlePointerDown(event: React.PointerEvent<HTMLDivElement>) {
+    event.preventDefault();
+    try {
+      event.currentTarget.setPointerCapture(event.pointerId);
+    } catch {
+      // Synthetic/test events and some embedded browsers may not expose an
+      // active pointer capture target; tracked pointer positions still work.
+    }
+
+    activePointersRef.current.set(event.pointerId, {
+      x: event.clientX,
+      y: event.clientY,
+    });
+
+    const pointers = [...activePointersRef.current.values()];
+
+    if (pointers.length >= 2) {
+      beginPinch(pointers.slice(0, 2));
+    } else if (pointers[0]) {
+      beginPan(pointers[0]);
+    }
+  }
+
+  function handlePointerMove(event: React.PointerEvent<HTMLDivElement>) {
+    const pointers = activePointersRef.current;
+
+    if (!pointers.has(event.pointerId)) {
+      return;
+    }
+
+    event.preventDefault();
+    pointers.set(event.pointerId, {
+      x: event.clientX,
+      y: event.clientY,
+    });
+
+    const activePointers = [...pointers.values()];
+    const start = gestureStartRef.current;
+
+    if (!start) {
+      if (activePointers.length >= 2) {
+        beginPinch(activePointers.slice(0, 2));
+      } else if (activePointers[0]) {
+        beginPan(activePointers[0]);
+      }
+      return;
+    }
+
+    const rect = event.currentTarget.getBoundingClientRect();
+
+    if (activePointers.length >= 2) {
+      const [first, second] = activePointers.slice(0, 2);
+
+      if (!first || !second) {
+        return;
+      }
+
+      const centerX = (first.x + second.x) / 2;
+      const centerY = (first.y + second.y) / 2;
+      const deltaX = ((centerX - start.centerX) / rect.width) * 100;
+      const deltaY = ((centerY - start.centerY) / rect.height) * 100;
+      const nextDistance = getPointDistance(first, second);
+      const distanceRatio = start.distance > 0 ? nextDistance / start.distance : 1;
+
+      onChange(
+        normalizeAvatarCrop({
+          ...start.crop,
+          scale: start.crop.scale * distanceRatio,
+          offsetX: start.crop.offsetX + deltaX,
+          offsetY: start.crop.offsetY + deltaY,
+        }),
+      );
+      return;
+    }
+
+    const [pointer] = activePointers;
+
+    if (!pointer) {
+      return;
+    }
+
+    if (start.mode !== "pan") {
+      beginPan(pointer);
+      return;
+    }
+
+    const deltaX = ((pointer.x - start.centerX) / rect.width) * 100;
+    const deltaY = ((pointer.y - start.centerY) / rect.height) * 100;
+
+    onChange(
+      normalizeAvatarCrop({
+        ...start.crop,
+        offsetX: start.crop.offsetX + deltaX,
+        offsetY: start.crop.offsetY + deltaY,
+      }),
+    );
+  }
+
+  function handlePointerEnd(event: React.PointerEvent<HTMLDivElement>) {
+    if (event.currentTarget.hasPointerCapture(event.pointerId)) {
+      event.currentTarget.releasePointerCapture(event.pointerId);
+    }
+
+    activePointersRef.current.delete(event.pointerId);
+    const pointers = [...activePointersRef.current.values()];
+
+    if (pointers.length >= 2) {
+      beginPinch(pointers.slice(0, 2));
+    } else if (pointers[0]) {
+      beginPan(pointers[0]);
+    } else {
+      gestureStartRef.current = null;
+    }
+  }
+
+  function handlePointerCancel(event: React.PointerEvent<HTMLDivElement>) {
+    activePointersRef.current.delete(event.pointerId);
+    gestureStartRef.current = null;
+  }
+
   return (
-    <AppBottomSheet title="サムネイルを合わせる" onClose={onBack}>
-      <div data-testid="thumbnail-crop-sheet" style={styles.thumbnailCrop}>
+    <div
+      role="dialog"
+      aria-modal="true"
+      aria-label={"\u30b5\u30e0\u30cd\u30a4\u30eb\u3092\u5408\u308f\u305b\u308b"}
+      data-testid="thumbnail-crop-sheet"
+      style={styles.thumbnailCropOverlay}
+    >
+      <div style={styles.thumbnailCropHeader}>
+        <button
+          type="button"
+          data-testid="thumbnail-crop-back"
+          style={styles.thumbnailCropHeaderButton}
+          onClick={onBack}
+        >
+          {"\u3082\u3069\u308b"}
+        </button>
+        <p style={styles.thumbnailCropTitle}>
+          {"\u30b5\u30e0\u30cd\u30a4\u30eb\u3092\u5408\u308f\u305b\u308b"}
+        </p>
+        <button
+          type="button"
+          data-testid="thumbnail-crop-save"
+          style={styles.thumbnailCropSaveButton}
+          onClick={onSave}
+        >
+          {"\u4fdd\u5b58"}
+        </button>
+      </div>
+
+      <div style={styles.thumbnailCropStage}>
         <div
           data-testid="thumbnail-crop-preview"
           style={styles.thumbnailCropPreview}
-          onPointerDown={(event) => {
-            event.preventDefault();
-            try {
-              event.currentTarget.setPointerCapture(event.pointerId);
-            } catch {
-              // Synthetic/test events and some embedded browsers may not expose
-              // an active pointer capture target, but the crop gesture can still
-              // continue from the tracked pointer positions.
-            }
-            activePointersRef.current.set(event.pointerId, {
-              x: event.clientX,
-              y: event.clientY,
-            });
-
-            const pointers = [...activePointersRef.current.values()];
-
-            if (pointers.length >= 2) {
-              beginPinch(pointers.slice(0, 2));
-            } else if (pointers[0]) {
-              beginPan(pointers[0]);
-            }
-          }}
-          onPointerMove={(event) => {
-            const pointers = activePointersRef.current;
-
-            if (!pointers.has(event.pointerId)) {
-              return;
-            }
-
-            event.preventDefault();
-            pointers.set(event.pointerId, {
-              x: event.clientX,
-              y: event.clientY,
-            });
-
-            const activePointers = [...pointers.values()];
-            const start = gestureStartRef.current;
-
-            if (!start) {
-              if (activePointers.length >= 2) {
-                beginPinch(activePointers.slice(0, 2));
-              } else if (activePointers[0]) {
-                beginPan(activePointers[0]);
-              }
-              return;
-            }
-
-            const rect = event.currentTarget.getBoundingClientRect();
-
-            if (activePointers.length >= 2) {
-              const [first, second] = activePointers.slice(0, 2);
-
-              if (!first || !second) {
-                return;
-              }
-
-              const centerX = (first.x + second.x) / 2;
-              const centerY = (first.y + second.y) / 2;
-              const deltaX = ((centerX - start.centerX) / rect.width) * 100;
-              const deltaY = ((centerY - start.centerY) / rect.height) * 100;
-              const nextDistance = getPointDistance(first, second);
-              const distanceRatio =
-                start.distance > 0 ? nextDistance / start.distance : 1;
-
-              onChange(
-                normalizeAvatarCrop({
-                  ...start.crop,
-                  scale: start.crop.scale * distanceRatio,
-                  offsetX: start.crop.offsetX + deltaX,
-                  offsetY: start.crop.offsetY + deltaY,
-                }),
-              );
-              return;
-            }
-
-            const [pointer] = activePointers;
-
-            if (!pointer) {
-              return;
-            }
-
-            if (start.mode !== "pan") {
-              beginPan(pointer);
-              return;
-            }
-
-            const deltaX = ((pointer.x - start.centerX) / rect.width) * 100;
-            const deltaY = ((pointer.y - start.centerY) / rect.height) * 100;
-
-            onChange(
-              normalizeAvatarCrop({
-                ...start.crop,
-                offsetX: start.crop.offsetX + deltaX,
-                offsetY: start.crop.offsetY + deltaY,
-              }),
-            );
-          }}
-          onPointerUp={(event) => {
-            if (event.currentTarget.hasPointerCapture(event.pointerId)) {
-              event.currentTarget.releasePointerCapture(event.pointerId);
-            }
-
-            activePointersRef.current.delete(event.pointerId);
-            const pointers = [...activePointersRef.current.values()];
-
-            if (pointers.length >= 2) {
-              beginPinch(pointers.slice(0, 2));
-            } else if (pointers[0]) {
-              beginPan(pointers[0]);
-            } else {
-              gestureStartRef.current = null;
-            }
-          }}
-          onPointerCancel={(event) => {
-            activePointersRef.current.delete(event.pointerId);
-            gestureStartRef.current = null;
-          }}
+          onPointerDown={handlePointerDown}
+          onPointerMove={handlePointerMove}
+          onPointerUp={handlePointerEnd}
+          onPointerCancel={handlePointerCancel}
         >
           <StoredPhotoImage
             src={src}
@@ -3715,86 +3753,10 @@ function ThumbnailCropSheet({
             height={232}
           />
         </div>
-
-        <div style={styles.thumbnailCropControls}>
-          <label style={styles.thumbnailCropLabel} htmlFor="thumbnail-crop-scale">
-            拡大
-          </label>
-          <input
-            id="thumbnail-crop-scale"
-            data-testid="thumbnail-crop-scale"
-            type="range"
-            min="1"
-            max="2.8"
-            step="0.05"
-            value={crop.scale}
-            onChange={(event) =>
-              updateCrop({ scale: Number(event.currentTarget.value) })
-            }
-            style={styles.thumbnailCropRange}
-          />
-        </div>
-
-        <div style={styles.thumbnailCropNudgeGrid} aria-label="位置を調整">
-          <button
-            type="button"
-            style={styles.thumbnailCropNudgeButton}
-            onClick={() => nudgeCrop(0, -4)}
-            aria-label="上へ"
-          >
-            ↑
-          </button>
-          <button
-            type="button"
-            style={styles.thumbnailCropNudgeButton}
-            onClick={() => nudgeCrop(-4, 0)}
-            aria-label="左へ"
-          >
-            ←
-          </button>
-          <button
-            type="button"
-            style={styles.thumbnailCropNudgeButton}
-            onClick={() => nudgeCrop(4, 0)}
-            aria-label="右へ"
-          >
-            →
-          </button>
-          <button
-            type="button"
-            style={styles.thumbnailCropNudgeButton}
-            onClick={() => nudgeCrop(0, 4)}
-            aria-label="下へ"
-          >
-            ↓
-          </button>
-        </div>
-
-        <div style={styles.thumbnailCropActions}>
-          <AppButton
-            type="button"
-            variant="quiet"
-            fullWidth
-            onClick={onBack}
-            data-testid="thumbnail-crop-back"
-          >
-            もどる
-          </AppButton>
-          <AppButton
-            type="button"
-            variant="primary"
-            fullWidth
-            onClick={onSave}
-            data-testid="thumbnail-crop-save"
-          >
-            保存する
-          </AppButton>
-        </div>
       </div>
-    </AppBottomSheet>
+    </div>
   );
 }
-
 function OmoideBunbako({
   memories,
   onOpen,
@@ -7358,10 +7320,80 @@ const styles = {
     gap: "16px",
     minWidth: 0,
   },
+  thumbnailCropOverlay: {
+    position: "fixed" as const,
+    inset: 0,
+    zIndex: 1200,
+    display: "grid",
+    gridTemplateRows: "auto minmax(0, 1fr)",
+    minWidth: 0,
+    minHeight: "100dvh",
+    padding:
+      "calc(env(safe-area-inset-top, 0px) + 12px) 16px calc(env(safe-area-inset-bottom, 0px) + 18px)",
+    background:
+      "linear-gradient(180deg, color-mix(in srgb, var(--paper) 92%, white), color-mix(in srgb, var(--paper-card) 88%, white))",
+    overscrollBehavior: "none",
+    touchAction: "none",
+  },
+  thumbnailCropHeader: {
+    display: "grid",
+    gridTemplateColumns: "76px minmax(0, 1fr) 76px",
+    alignItems: "center",
+    gap: "8px",
+    minWidth: 0,
+  },
+  thumbnailCropTitle: {
+    margin: 0,
+    color: CATS_TEXT_STRONG,
+    fontFamily: CATS_UI,
+    fontSize: "16px",
+    fontWeight: 600,
+    lineHeight: 1.3,
+    letterSpacing: "0",
+    textAlign: "center" as const,
+    whiteSpace: "nowrap" as const,
+    overflow: "hidden",
+    textOverflow: "ellipsis",
+  },
+  thumbnailCropHeaderButton: {
+    minWidth: 0,
+    height: "44px",
+    border: "none",
+    borderRadius: "999px",
+    background: "transparent",
+    color: CATS_MUTED,
+    fontFamily: CATS_UI,
+    fontSize: "15px",
+    fontWeight: 500,
+    cursor: "pointer",
+    WebkitTapHighlightColor: "transparent",
+  },
+  thumbnailCropSaveButton: {
+    minWidth: 0,
+    height: "44px",
+    border: "none",
+    borderRadius: "999px",
+    background: "var(--ink)",
+    color: "var(--paper)",
+    fontFamily: CATS_UI,
+    fontSize: "15px",
+    fontWeight: 600,
+    cursor: "pointer",
+    WebkitTapHighlightColor: "transparent",
+  },
+  thumbnailCropStage: {
+    display: "grid",
+    alignItems: "center",
+    justifyItems: "center",
+    minWidth: 0,
+    minHeight: 0,
+    padding: "18px 0 28px",
+  },
   thumbnailCropPreview: {
     position: "relative" as const,
     width: "100%",
-    height: "232px",
+    maxWidth: "520px",
+    aspectRatio: "390 / 232",
     overflow: "hidden",
     borderRadius: "18px",
     border: "1px solid color-mix(in srgb, var(--line) 78%, transparent)",
