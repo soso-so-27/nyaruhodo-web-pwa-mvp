@@ -3529,12 +3529,19 @@ function ThumbnailCropSheet({
   onSave: () => void;
   onBack: () => void;
 }) {
-  const dragStartRef = useRef<{
-    pointerId: number;
-    x: number;
-    y: number;
+  const cropRef = useRef(crop);
+  const activePointersRef = useRef(new Map<number, { x: number; y: number }>());
+  const gestureStartRef = useRef<{
+    mode: "pan" | "pinch";
+    centerX: number;
+    centerY: number;
+    distance: number;
     crop: CatAvatarCrop;
   } | null>(null);
+
+  useEffect(() => {
+    cropRef.current = crop;
+  }, [crop]);
 
   function updateCrop(patch: Partial<CatAvatarCrop>) {
     onChange(normalizeAvatarCrop({ ...crop, ...patch }));
@@ -3547,6 +3554,32 @@ function ThumbnailCropSheet({
     });
   }
 
+  function beginPan(pointer: { x: number; y: number }) {
+    gestureStartRef.current = {
+      mode: "pan",
+      centerX: pointer.x,
+      centerY: pointer.y,
+      distance: 1,
+      crop: cropRef.current,
+    };
+  }
+
+  function beginPinch(points: Array<{ x: number; y: number }>) {
+    const [first, second] = points;
+
+    if (!first || !second) {
+      return;
+    }
+
+    gestureStartRef.current = {
+      mode: "pinch",
+      centerX: (first.x + second.x) / 2,
+      centerY: (first.y + second.y) / 2,
+      distance: getPointDistance(first, second),
+      crop: cropRef.current,
+    };
+  }
+
   return (
     <AppBottomSheet title="サムネイルを合わせる" onClose={onBack}>
       <div data-testid="thumbnail-crop-sheet" style={styles.thumbnailCrop}>
@@ -3554,24 +3587,93 @@ function ThumbnailCropSheet({
           data-testid="thumbnail-crop-preview"
           style={styles.thumbnailCropPreview}
           onPointerDown={(event) => {
-            event.currentTarget.setPointerCapture(event.pointerId);
-            dragStartRef.current = {
-              pointerId: event.pointerId,
+            event.preventDefault();
+            try {
+              event.currentTarget.setPointerCapture(event.pointerId);
+            } catch {
+              // Synthetic/test events and some embedded browsers may not expose
+              // an active pointer capture target, but the crop gesture can still
+              // continue from the tracked pointer positions.
+            }
+            activePointersRef.current.set(event.pointerId, {
               x: event.clientX,
               y: event.clientY,
-              crop,
-            };
+            });
+
+            const pointers = [...activePointersRef.current.values()];
+
+            if (pointers.length >= 2) {
+              beginPinch(pointers.slice(0, 2));
+            } else if (pointers[0]) {
+              beginPan(pointers[0]);
+            }
           }}
           onPointerMove={(event) => {
-            const start = dragStartRef.current;
+            const pointers = activePointersRef.current;
 
-            if (!start || start.pointerId !== event.pointerId) {
+            if (!pointers.has(event.pointerId)) {
+              return;
+            }
+
+            event.preventDefault();
+            pointers.set(event.pointerId, {
+              x: event.clientX,
+              y: event.clientY,
+            });
+
+            const activePointers = [...pointers.values()];
+            const start = gestureStartRef.current;
+
+            if (!start) {
+              if (activePointers.length >= 2) {
+                beginPinch(activePointers.slice(0, 2));
+              } else if (activePointers[0]) {
+                beginPan(activePointers[0]);
+              }
               return;
             }
 
             const rect = event.currentTarget.getBoundingClientRect();
-            const deltaX = ((event.clientX - start.x) / rect.width) * 100;
-            const deltaY = ((event.clientY - start.y) / rect.height) * 100;
+
+            if (activePointers.length >= 2) {
+              const [first, second] = activePointers.slice(0, 2);
+
+              if (!first || !second) {
+                return;
+              }
+
+              const centerX = (first.x + second.x) / 2;
+              const centerY = (first.y + second.y) / 2;
+              const deltaX = ((centerX - start.centerX) / rect.width) * 100;
+              const deltaY = ((centerY - start.centerY) / rect.height) * 100;
+              const nextDistance = getPointDistance(first, second);
+              const distanceRatio =
+                start.distance > 0 ? nextDistance / start.distance : 1;
+
+              onChange(
+                normalizeAvatarCrop({
+                  ...start.crop,
+                  scale: start.crop.scale * distanceRatio,
+                  offsetX: start.crop.offsetX + deltaX,
+                  offsetY: start.crop.offsetY + deltaY,
+                }),
+              );
+              return;
+            }
+
+            const [pointer] = activePointers;
+
+            if (!pointer) {
+              return;
+            }
+
+            if (start.mode !== "pan") {
+              beginPan(pointer);
+              return;
+            }
+
+            const deltaX = ((pointer.x - start.centerX) / rect.width) * 100;
+            const deltaY = ((pointer.y - start.centerY) / rect.height) * 100;
 
             onChange(
               normalizeAvatarCrop({
@@ -3582,11 +3684,24 @@ function ThumbnailCropSheet({
             );
           }}
           onPointerUp={(event) => {
-            event.currentTarget.releasePointerCapture(event.pointerId);
-            dragStartRef.current = null;
+            if (event.currentTarget.hasPointerCapture(event.pointerId)) {
+              event.currentTarget.releasePointerCapture(event.pointerId);
+            }
+
+            activePointersRef.current.delete(event.pointerId);
+            const pointers = [...activePointersRef.current.values()];
+
+            if (pointers.length >= 2) {
+              beginPinch(pointers.slice(0, 2));
+            } else if (pointers[0]) {
+              beginPan(pointers[0]);
+            } else {
+              gestureStartRef.current = null;
+            }
           }}
-          onPointerCancel={() => {
-            dragStartRef.current = null;
+          onPointerCancel={(event) => {
+            activePointersRef.current.delete(event.pointerId);
+            gestureStartRef.current = null;
           }}
         >
           <StoredPhotoImage
@@ -4223,6 +4338,13 @@ function getAvatarCropImageStyle(crop: CatAvatarCrop): CSSProperties {
     transition: "transform 120ms var(--ease-gentle)",
     willChange: "transform",
   };
+}
+
+function getPointDistance(
+  first: { x: number; y: number },
+  second: { x: number; y: number },
+) {
+  return Math.hypot(first.x - second.x, first.y - second.y);
 }
 
 function clampNumber(value: number, min: number, max: number) {

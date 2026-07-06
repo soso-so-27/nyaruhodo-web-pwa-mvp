@@ -260,6 +260,60 @@ test("lets the owner adjust and save the cat thumbnail crop", async ({ page }) =
     .toEqual({ scale: 1.5, offsetX: 4, offsetY: -4 });
 });
 
+test("lets the owner pinch to zoom the cat thumbnail crop", async ({ page }) => {
+  await seedCatsProfile(page, Date.parse("2026-06-10T12:30:00+09:00"), 3);
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto("/cats");
+  await page.waitForLoadState("networkidle");
+
+  await page.getByTestId("cats-section-tab-basic").click();
+  await page.getByTestId("cats-thumbnail-picker-button").click();
+  await page.getByTestId("thumbnail-picker-photo").first().click();
+
+  await expect(page.getByTestId("thumbnail-crop-sheet")).toBeVisible();
+  await page.getByTestId("thumbnail-crop-preview").evaluate((element) => {
+    const rect = element.getBoundingClientRect();
+    const centerX = rect.left + rect.width / 2;
+    const centerY = rect.top + rect.height / 2;
+    const firePointer = (
+      type: string,
+      pointerId: number,
+      clientX: number,
+      clientY: number,
+    ) => {
+      element.dispatchEvent(
+        new PointerEvent(type, {
+          bubbles: true,
+          cancelable: true,
+          clientX,
+          clientY,
+          isPrimary: pointerId === 1,
+          pointerId,
+          pointerType: "touch",
+        }),
+      );
+    };
+
+    firePointer("pointerdown", 1, centerX - 30, centerY);
+    firePointer("pointerdown", 2, centerX + 30, centerY);
+    firePointer("pointermove", 1, centerX - 60, centerY);
+    firePointer("pointermove", 2, centerX + 60, centerY);
+    firePointer("pointerup", 1, centerX - 60, centerY);
+    firePointer("pointerup", 2, centerX + 60, centerY);
+  });
+  await page.getByTestId("thumbnail-crop-save").click();
+
+  await expect
+    .poll(() =>
+      page.evaluate(() => {
+        const raw = window.localStorage.getItem("cat_profiles");
+        const [profile] = raw ? JSON.parse(raw) : [];
+        return profile?.avatarCrop?.scale ?? 0;
+      }),
+    )
+    .toBe(2);
+});
+
 test("shows the custom top cover without over-cropping", async ({
   page,
 }) => {
