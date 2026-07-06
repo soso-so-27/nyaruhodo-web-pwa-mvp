@@ -5,6 +5,7 @@ import localFont from "next/font/local";
 import { AppAnalyticsTracker } from "../components/analytics/AppAnalyticsTracker";
 import { AppReferralTracker } from "../components/analytics/AppReferralTracker";
 import { UserDeviceGate } from "../components/device/UserDeviceGate";
+import { PhotoSwCacheController } from "../components/performance/PhotoSwCacheController";
 import { PhotoStartupPrefetcher } from "../components/performance/PhotoStartupPrefetcher";
 import { ServiceWorkerRegistrar } from "../components/pwa/ServiceWorkerRegistrar";
 import { AppPaperTheme } from "../components/ui/AppPaperTheme";
@@ -123,6 +124,7 @@ export default function RootLayout({
         <AppPaperTheme />
         <AppAnalyticsTracker />
         <AppReferralTracker />
+        <PhotoSwCacheController />
         <PhotoStartupPrefetcher />
         <ServiceWorkerRegistrar />
         <UserDeviceGate>{children}</UserDeviceGate>
