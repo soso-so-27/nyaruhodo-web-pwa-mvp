@@ -297,6 +297,10 @@ test.describe("collection album flow", () => {
     await page.goto("/collection");
     await page.waitForLoadState("networkidle");
     await expect(page.getByTestId("mainichi-board-photo-sent")).toHaveCount(1);
+    await expect(page.getByTestId("mainichi-board-photo-sent")).toHaveAttribute(
+      "data-photo-decode-ready",
+      "true",
+    );
     await expect(page.getByTestId("mainichi-board-photo-sent").locator("img").last()).toHaveJSProperty(
       "complete",
       true,

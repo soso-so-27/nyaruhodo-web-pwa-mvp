@@ -62,6 +62,17 @@ test("keeps the cats photo tab clear of the fixed bottom navigation", async ({
   const nav = page.getByRole("navigation");
 
   await expect(grid).toBeVisible();
+  await expect(grid).toHaveAttribute("data-photo-decode-gate", "ready");
+  await expect
+    .poll(() =>
+      grid.locator("img").evaluateAll((images) =>
+        images.slice(0, 12).every((image) => {
+          const element = image as HTMLImageElement;
+          return element.complete && element.naturalWidth > 0;
+        }),
+      ),
+    )
+    .toBe(true);
   await expect(page.getByText("この子の写真")).toBeVisible();
   await expect(
     page.getByText("毎日のねがおと、とっておきが並びます。"),

@@ -734,6 +734,50 @@ export async function getStoragePhotoSignedUrl(
   return signedUrl;
 }
 
+export async function decodePhotoSourcesForDisplay(
+  sources: string[],
+  variant: StorageSignedUrlVariant = "thumbnail",
+  timeoutMs = 800,
+) {
+  const startedAt = typeof performance !== "undefined" ? performance.now() : Date.now();
+  const uniqueSources = getUniquePhotoSources(sources);
+
+  if (typeof window === "undefined" || uniqueSources.length === 0) {
+    return { ok: false, timedOut: false, waitMs: 0 };
+  }
+
+  const decodePromise = (async () => {
+    for (const source of uniqueSources) {
+      const displayUrl = await getStoragePhotoSignedUrl(source, variant);
+      if (!displayUrl) {
+        continue;
+      }
+
+      if (await decodeImageUrl(displayUrl)) {
+        return true;
+      }
+    }
+
+    return false;
+  })();
+  const timeoutPromise = new Promise<"timeout">((resolve) => {
+    window.setTimeout(() => resolve("timeout"), timeoutMs);
+  });
+  const result = await Promise.race([decodePromise, timeoutPromise]);
+
+  return {
+    ok: result === true,
+    timedOut: result === "timeout",
+    waitMs: Math.max(
+      0,
+      Math.round(
+        (typeof performance !== "undefined" ? performance.now() : Date.now()) -
+          startedAt,
+      ),
+    ),
+  };
+}
+
 export async function preloadStoragePhotoSignedUrls(
   sources: string[],
   variant: StorageSignedUrlVariant = "thumbnail",
@@ -846,6 +890,40 @@ function prefetchPhotoImageBody(signedUrl: string) {
 
   photoImagePrefetchPromiseCache.set(signedUrl, promise);
   return promise;
+}
+
+function decodeImageUrl(src: string) {
+  return new Promise<boolean>((resolve) => {
+    const image = new Image();
+    let settled = false;
+    const finish = (ok: boolean) => {
+      if (settled) {
+        return;
+      }
+      settled = true;
+      resolve(ok);
+    };
+
+    image.decoding = "async";
+    image.onload = () => finish(image.naturalWidth > 0);
+    image.onerror = () => finish(false);
+    image.src = src;
+
+    if (image.complete) {
+      finish(image.naturalWidth > 0);
+      return;
+    }
+
+    if (typeof image.decode === "function") {
+      void image.decode().then(() => finish(image.naturalWidth > 0)).catch(() => {
+        if (image.complete) {
+          finish(image.naturalWidth > 0);
+        } else {
+          finish(false);
+        }
+      });
+    }
+  });
 }
 
 async function waitForPhotoImagePrefetch(signedUrl: string, timeoutMs: number) {

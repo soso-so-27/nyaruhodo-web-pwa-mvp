@@ -63,6 +63,7 @@ import { AppSegmented } from "../ui/AppSegmented";
 import { AppTextField } from "../ui/AppTextField";
 import { PhotoTile } from "../ui/PhotoTile";
 import {
+  decodePhotoSourcesForDisplay,
   StoredPhotoImage,
   getStoragePhotoSignedUrl,
   preloadStoragePhotoSignedUrls,
@@ -84,6 +85,8 @@ type EditableCoat = string;
 type UchinokoLens = "cat" | "all";
 type UchinokoSection = "record" | "photos" | "basic";
 const MAX_UPLOAD_SOURCE_FILE_BYTES = 20 * 1024 * 1024;
+const LENS_PHOTO_FIRST_VIEW_COUNT = 12;
+const LENS_PHOTO_REVEAL_TIMEOUT_MS = 400;
 const SUPPORTED_SOURCE_IMAGE_MIME_TYPES = new Set([
   "image/avif",
   "image/gif",
@@ -2897,12 +2900,77 @@ function LensPhotoGrid({
   showCatNames: boolean;
   onOpenPhoto: (photo: LensPhoto) => void;
 }) {
+  const [isFirstViewReady, setIsFirstViewReady] = useState(false);
+  const firstViewSignature = photos
+    .slice(0, LENS_PHOTO_FIRST_VIEW_COUNT)
+    .map((photo) => `${photo.id}:${getLensPhotoThumbnailSrc(photo)}`)
+    .join("|");
+
+  useEffect(() => {
+    let isCancelled = false;
+    const firstViewPhotos = photos.slice(0, LENS_PHOTO_FIRST_VIEW_COUNT);
+
+    if (firstViewPhotos.length === 0) {
+      setIsFirstViewReady(true);
+      return () => {
+        isCancelled = true;
+      };
+    }
+
+    const startedAt = performance.now();
+    setIsFirstViewReady(false);
+
+    void Promise.allSettled(
+      firstViewPhotos.map((photo) =>
+        decodePhotoSourcesForDisplay(
+          [
+            getLensPhotoThumbnailSrc(photo),
+            photo.displaySrc ?? "",
+            photo.originalSrc ?? "",
+            photo.src,
+          ],
+          "thumbnail",
+          LENS_PHOTO_REVEAL_TIMEOUT_MS,
+        ),
+      ),
+    ).then(() => {
+      if (isCancelled) {
+        return;
+      }
+
+      setIsFirstViewReady(true);
+      trackProductEvent("tab_reveal_wait_ms", {
+        surface: "cats_lens_photo_grid",
+        wait_ms: Math.max(0, Math.round(performance.now() - startedAt)),
+        photo_count: firstViewPhotos.length,
+      });
+    });
+
+    return () => {
+      isCancelled = true;
+    };
+  }, [firstViewSignature]);
+
   if (photos.length === 0) {
     return <p style={styles.lensPhotoEmpty}>{emptyCopy}</p>;
   }
 
+  if (!isFirstViewReady) {
+    return (
+      <div
+        data-testid="cats-lens-photo-grid"
+        data-photo-decode-gate="waiting"
+        style={styles.lensPhotoGridPending}
+      />
+    );
+  }
+
   return (
-    <div data-testid="cats-lens-photo-grid" style={styles.lensPhotoGrid}>
+    <div
+      data-testid="cats-lens-photo-grid"
+      data-photo-decode-gate="ready"
+      style={styles.lensPhotoGrid}
+    >
       {photos.map((photo) => (
         <div key={photo.id} style={styles.lensPhotoItem}>
           <PhotoTile
@@ -6360,6 +6428,9 @@ const styles = {
     gap: "4px",
     overflow: "hidden",
     borderRadius: "8px",
+  },
+  lensPhotoGridPending: {
+    minHeight: 260,
   },
   lensPhotoItem: {
     display: "grid",

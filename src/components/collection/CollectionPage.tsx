@@ -64,6 +64,7 @@ import { AppIcon } from "../ui/AppIcons";
 import { EmptyState } from "../ui/EmptyState";
 import { PhotoTile, PhotoViewerFrame } from "../ui/PhotoTile";
 import {
+  decodePhotoSourcesForDisplay,
   StoredPhotoImage,
   preloadStoragePhotoSignedUrls,
 } from "../ui/StoredPhotoImage";
@@ -88,6 +89,7 @@ const COLLECTION_SURFACE_SOFT: CSSProperties = {
 const COLLECTION_NAV_ENTRY_STORAGE_KEY = "neteruneko_collection_nav_entry";
 const MAINICHI_SEEN_PHOTO_KEYS_STORAGE_KEY = "neteruneko_mainichi_seen_photo_keys";
 const MAX_UPLOAD_SOURCE_FILE_BYTES = 20 * 1024 * 1024;
+const MAINICHI_CARD_DECODE_TIMEOUT_MS = 800;
 const SUPPORTED_SOURCE_IMAGE_MIME_TYPES = new Set([
   "image/avif",
   "image/gif",
@@ -1993,6 +1995,56 @@ function MainichiMonthBoard({
     </>
   );
   const [isBundleSheetOpen, setIsBundleSheetOpen] = useState(false);
+  const [decodedPhotoKeys, setDecodedPhotoKeys] = useState<Set<string>>(
+    () => new Set(),
+  );
+
+  useEffect(() => {
+    let isCancelled = false;
+    setDecodedPhotoKeys(new Set());
+
+    if (month.photos.length === 0) {
+      return () => {
+        isCancelled = true;
+      };
+    }
+
+    for (const photo of month.photos) {
+      const photoKey = getMainichiBoardPhotoKey(photo);
+      void decodePhotoSourcesForDisplay(
+        [photo.boardSrc, photo.src, ...(photo.fallbackSrcs ?? [])],
+        "thumbnail",
+        MAINICHI_CARD_DECODE_TIMEOUT_MS,
+      ).then((result) => {
+        if (isCancelled) {
+          return;
+        }
+
+        setDecodedPhotoKeys((currentKeys) => {
+          if (currentKeys.has(photoKey)) {
+            return currentKeys;
+          }
+          const nextKeys = new Set(currentKeys);
+          nextKeys.add(photoKey);
+          return nextKeys;
+        });
+        trackProductEvent("card_decode_wait_ms", {
+          surface: "mainichi_board",
+          side: photo.side,
+          wait_ms: result.waitMs,
+          timed_out: result.timedOut,
+          ok: result.ok,
+        });
+      });
+    }
+
+    return () => {
+      isCancelled = true;
+    };
+  }, [month.key, month.photos]);
+  const revealPhotos = visiblePhotos.filter((photo) =>
+    decodedPhotoKeys.has(getMainichiBoardPhotoKey(photo)),
+  );
 
   return (
     <>
@@ -2034,17 +2086,24 @@ function MainichiMonthBoard({
               </span>
             </motion.button>
           ) : null}
-          {visiblePhotos.map((photo, index) => (
-            <MainichiBoardPhotoCard
-              key={photo.id}
-              photo={photo}
-              index={index}
-              total={month.photos.length}
-              showCatName={showCatNames && month.photos.length <= 3}
-              shouldPaste={getMainichiBoardPhotoKey(photo) === pastingPhotoKey}
-              onOpenPhoto={(source) => onOpenPhoto(photo, month, source)}
-            />
-          ))}
+          {revealPhotos.map((photo) => {
+            const originalIndex = visiblePhotos.findIndex(
+              (candidate) => candidate.id === photo.id,
+            );
+            const index = originalIndex >= 0 ? originalIndex : 0;
+
+            return (
+              <MainichiBoardPhotoCard
+                key={photo.id}
+                photo={photo}
+                index={index}
+                total={month.photos.length}
+                showCatName={showCatNames && month.photos.length <= 3}
+                shouldPaste={getMainichiBoardPhotoKey(photo) === pastingPhotoKey}
+                onOpenPhoto={(source) => onOpenPhoto(photo, month, source)}
+              />
+            );
+          })}
         </div>
       </AppCard>
       {isBundleSheetOpen ? (
@@ -2205,6 +2264,7 @@ function MainichiBoardPhotoCard({
       type="button"
       data-testid={testId}
       data-mainichi-photo-card="true"
+      data-photo-decode-ready="true"
       data-photo-id={photo.id}
       data-source-photo-id={photo.sourcePhotoId ?? undefined}
       data-mainichi-paste={shouldPaste ? "true" : undefined}
