@@ -186,6 +186,117 @@ test.describe("collection album flow", () => {
     await expect(page.getByTestId("mainichi-board-photo-sent")).toHaveCount(2);
   });
 
+  test("uses transformed display asset for sent board photos", async ({ page }) => {
+    const now = Date.now();
+    const displayPath = "user-1/current-cat/sleeping/display.jpg";
+    const thumbnailPath = "user-1/current-cat/sleeping/thumbnail.webp";
+    const signedUrlRequests: Array<{
+      endpoint: "batch" | "single";
+      paths: string[];
+      variant?: string;
+    }> = [];
+
+    await page.route("**/api/photo-storage/signed-urls", async (route) => {
+      const body = route.request().postDataJSON() as {
+        paths?: string[];
+        variant?: string;
+      };
+      signedUrlRequests.push({
+        endpoint: "batch",
+        paths: body.paths ?? [],
+        variant: body.variant,
+      });
+
+      await route.fulfill({
+        contentType: "application/json",
+        body: JSON.stringify({
+          signedUrls: Object.fromEntries(
+            (body.paths ?? []).map((path) => [
+              path,
+              path === displayPath ? photoDataUrl : null,
+            ]),
+          ),
+        }),
+      });
+    });
+    await page.route("**/api/photo-storage/signed-url", async (route) => {
+      const body = route.request().postDataJSON() as {
+        src?: string;
+        variant?: string;
+      };
+      const path = body.src?.replace(/^storage:/, "") ?? "";
+      signedUrlRequests.push({
+        endpoint: "single",
+        paths: path ? [path] : [],
+        variant: body.variant,
+      });
+
+      await route.fulfill({
+        contentType: "application/json",
+        body: JSON.stringify({
+          signedUrl: path === displayPath ? photoDataUrl : null,
+        }),
+      });
+    });
+
+    await page.addInitScript(
+      ({ currentCatId, displaySrc, thumbnailSrc, createdAt }) => {
+        window.localStorage.setItem("active_cat_id", currentCatId);
+        window.localStorage.setItem(
+          "cat_profiles",
+          JSON.stringify([
+            {
+              id: currentCatId,
+              name: "current cat",
+              createdAt: new Date(createdAt).toISOString(),
+              updatedAt: new Date(createdAt).toISOString(),
+            },
+          ]),
+        );
+        window.localStorage.setItem(
+          "nyaruhodo_exchange_own_sleeping_photos",
+          JSON.stringify([
+            {
+              id: `own-sleeping-${createdAt}`,
+              ownerCatId: currentCatId,
+              catId: currentCatId,
+              src: displaySrc,
+              displaySrc,
+              thumbnailSrc,
+              originalSrc: displaySrc,
+              state: "sleeping",
+              visibility: "private",
+              deliveryStatus: "available",
+              triggerLabel: "sleeping",
+              theme: "sleeping",
+              shared: false,
+              createdAt,
+            },
+          ]),
+        );
+      },
+      {
+        currentCatId: "current-cat",
+        displaySrc: `storage:${displayPath}`,
+        thumbnailSrc: `storage:${thumbnailPath}`,
+        createdAt: now,
+      },
+    );
+
+    await page.goto("/collection");
+    await page.waitForLoadState("networkidle");
+    await expect(page.getByTestId("mainichi-board-photo-sent")).toHaveCount(1);
+
+    expect(
+      signedUrlRequests.some(
+        (request) =>
+          request.endpoint === "single" &&
+          request.paths.includes(displayPath) &&
+          request.variant === "thumbnail",
+      ),
+    ).toBe(true);
+  });
+
   test("does not request a new signed url for the same storage photo in one session", async ({
     page,
   }) => {

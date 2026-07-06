@@ -258,6 +258,7 @@ type MainichiBoardPhoto = {
   dateKey: string;
   dateLabel: string;
   src: string;
+  boardSrc: string;
   fallbackSrcs?: string[];
   timestamp: number;
   side: MainichiBoardSide;
@@ -2241,11 +2242,12 @@ function MainichiBoardPhotoCard({
         />
       ) : null}
       <PhotoTile
-        src={photo.src}
+        src={photo.boardSrc}
         fallbackSrcs={photo.fallbackSrcs}
         alt=""
         variant="tile"
         aspect={layout.aspect}
+        storageVariant="thumbnail"
         style={styles.mainichiBoardPhotoTileRoot}
         imageStyle={styles.mainichiBoardPhotoTile}
         onStorageDataUrl={
@@ -3970,6 +3972,7 @@ function createMainichiBoardPhoto(
     dateKey,
     dateLabel: getAlbumDateLabelFromKey(dateKey),
     src: getPhotoThumbnailSrc(photo),
+    boardSrc: getPhotoTransformBaseSrc(photo),
     fallbackSrcs: getPhotoFallbackSrcs(photo),
     timestamp: photo.timestamp,
     side,
@@ -4816,6 +4819,25 @@ function getPhotoThumbnailSrc(photo: {
   }
 
   return isUsableStoredPhotoSrc(photo.displaySrc) ? photo.displaySrc : photo.src;
+}
+
+function getPhotoTransformBaseSrc(photo: {
+  src: string;
+  displaySrc?: string;
+  originalSrc?: string;
+  thumbnailSrc?: string;
+}) {
+  // Transformed signed URLs should shrink a larger display/original asset, not
+  // upscale the saved 512px thumbnail asset.
+  if (isUsableStoredPhotoSrc(photo.displaySrc)) {
+    return photo.displaySrc;
+  }
+
+  if (isUsableStoredPhotoSrc(photo.originalSrc)) {
+    return photo.originalSrc;
+  }
+
+  return isUsableStoredPhotoSrc(photo.thumbnailSrc) ? photo.thumbnailSrc : photo.src;
 }
 
 function getPhotoDetailSrc(photo: {
