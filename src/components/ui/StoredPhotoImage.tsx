@@ -12,6 +12,7 @@ import {
 import {
   DISPLAY_SIGNED_URL_SECONDS,
   getStoragePhotoPath,
+  type StorageSignedUrlVariant,
 } from "../../lib/photoStorage";
 import { trackProductEvent } from "../../lib/analytics/productAnalytics";
 import { STORAGE_KEYS } from "../../lib/storage";
@@ -101,6 +102,7 @@ export function StoredPhotoImage({
   onError,
   fallbackSrcs = EMPTY_FALLBACK_SRCS,
   fallbackVariant = "message",
+  storageVariant = "display",
 }: {
   src: string;
   alt: string;
@@ -117,6 +119,7 @@ export function StoredPhotoImage({
   onError?: () => void;
   fallbackSrcs?: string[];
   fallbackVariant?: "message" | "quiet";
+  storageVariant?: StorageSignedUrlVariant;
 }) {
   const {
     objectFit,
@@ -132,12 +135,15 @@ export function StoredPhotoImage({
   );
   const [sourceIndex, setSourceIndex] = useState(0);
   const currentSource = sourceQueue[sourceIndex] ?? src;
-  const initialSrc = getInitialDisplaySrc(currentSource);
-  const [displaySrc, setDisplaySrc] = useState(initialSrc);
+  const [displaySrc, setDisplaySrc] = useState(() =>
+    getInitialDisplaySrc(currentSource, storageVariant),
+  );
   const [storageDataUrl, setStorageDataUrl] = useState<string | null>(null);
   const [isLoaded, setIsLoaded] = useState(false);
   const [hasError, setHasError] = useState(false);
   const [signedUrlRetryNonce, setSignedUrlRetryNonce] = useState(0);
+  const [activeStorageVariant, setActiveStorageVariant] =
+    useState<StorageSignedUrlVariant>(storageVariant);
   const imageRef = useRef<HTMLImageElement | null>(null);
   const loadStartedAtRef = useRef<number>(performance.now());
   const trackedDisplaySrcRef = useRef("");
@@ -160,8 +166,9 @@ export function StoredPhotoImage({
 
   useEffect(() => {
     setSourceIndex(0);
+    setActiveStorageVariant(storageVariant);
     signedUrlRetryCountsRef.current.clear();
-  }, [fallbackSrcKey, src]);
+  }, [fallbackSrcKey, src, storageVariant]);
 
   useEffect(() => {
     let isActive = true;
@@ -178,13 +185,13 @@ export function StoredPhotoImage({
       return;
     }
 
-    const cachedUrl = readCachedSignedUrl(storagePath);
+    const cachedUrl = readCachedSignedUrl(storagePath, activeStorageVariant);
     if (cachedUrl) {
       setDisplaySrc(cachedUrl);
       return;
     }
 
-    void getStoragePhotoSignedUrl(currentSource).then((signedUrl) => {
+    void getStoragePhotoSignedUrl(currentSource, activeStorageVariant).then((signedUrl) => {
       if (isActive) {
         if (signedUrl) {
           setDisplaySrc(signedUrl);
@@ -200,7 +207,13 @@ export function StoredPhotoImage({
     return () => {
       isActive = false;
     };
-  }, [currentSource, hasNextSource, signedUrlRetryNonce, sourceQueue.length]);
+  }, [
+    activeStorageVariant,
+    currentSource,
+    hasNextSource,
+    signedUrlRetryNonce,
+    sourceQueue.length,
+  ]);
 
   useEffect(() => {
     loadStartedAtRef.current = performance.now();
@@ -316,9 +329,17 @@ export function StoredPhotoImage({
           setIsLoaded(false);
           const storagePath = getStoragePhotoPath(currentSource);
 
+          if (storagePath && activeStorageVariant === "thumbnail") {
+            trackTransformFallback();
+            deleteCachedSignedUrl(storagePath, "thumbnail");
+            setHasError(false);
+            setDisplaySrc("");
+            setActiveStorageVariant("display");
+            return;
+          }
+
           if (storagePath && shouldRetrySignedUrl(storagePath, signedUrlRetryCountsRef)) {
-            signedUrlCache.delete(storagePath);
-            signedUrlPromiseCache.delete(storagePath);
+            deleteCachedSignedUrl(storagePath, activeStorageVariant);
             setHasError(false);
             setDisplaySrc("");
             setSignedUrlRetryNonce((value) => value + 1);
@@ -451,32 +472,50 @@ function PhotoFallback({
   );
 }
 
-function getInitialDisplaySrc(src: string) {
+function getInitialDisplaySrc(
+  src: string,
+  variant: StorageSignedUrlVariant = "display",
+) {
   const storagePath = getStoragePhotoPath(src);
   if (!storagePath) {
     return src;
   }
 
-  return readCachedSignedUrl(storagePath) ?? "";
+  return readCachedSignedUrl(storagePath, variant) ?? "";
 }
 
-function readCachedSignedUrl(storagePath: string) {
-  const cached = signedUrlCache.get(storagePath);
+function getSignedUrlCacheKey(
+  storagePath: string,
+  variant: StorageSignedUrlVariant,
+) {
+  return `${variant}\u0000${storagePath}`;
+}
+
+function readCachedSignedUrl(
+  storagePath: string,
+  variant: StorageSignedUrlVariant,
+) {
+  const cacheKey = getSignedUrlCacheKey(storagePath, variant);
+  const cached = signedUrlCache.get(cacheKey);
 
   if (!cached) {
     return null;
   }
 
   if (cached.expiresAt <= Date.now()) {
-    signedUrlCache.delete(storagePath);
+    signedUrlCache.delete(cacheKey);
     return null;
   }
 
   return cached.url;
 }
 
-function writeCachedSignedUrl(storagePath: string, url: string) {
-  signedUrlCache.set(storagePath, {
+function writeCachedSignedUrl(
+  storagePath: string,
+  url: string,
+  variant: StorageSignedUrlVariant,
+) {
+  signedUrlCache.set(getSignedUrlCacheKey(storagePath, variant), {
     expiresAt:
       Date.now() +
       Math.max(0, DISPLAY_SIGNED_URL_SECONDS * 1000 * SIGNED_URL_CACHE_REFRESH_RATIO),
@@ -484,50 +523,74 @@ function writeCachedSignedUrl(storagePath: string, url: string) {
   });
 }
 
-async function resolveStoragePhotoForDisplay(src: string) {
+function deleteCachedSignedUrl(
+  storagePath: string,
+  variant: StorageSignedUrlVariant,
+) {
+  const cacheKey = getSignedUrlCacheKey(storagePath, variant);
+  signedUrlCache.delete(cacheKey);
+  signedUrlPromiseCache.delete(cacheKey);
+}
+
+async function resolveStoragePhotoForDisplay(
+  src: string,
+  variant: StorageSignedUrlVariant,
+) {
   const supabase = createBrowserSupabaseClient();
 
-  return readSignedUrlFromApi(src, supabase);
+  return readSignedUrlFromApi(src, supabase, variant);
 }
 
-export function getCachedStoragePhotoSignedUrl(src: string) {
+export function getCachedStoragePhotoSignedUrl(
+  src: string,
+  variant: StorageSignedUrlVariant = "display",
+) {
   const storagePath = getStoragePhotoPath(src);
-  return storagePath ? readCachedSignedUrl(storagePath) : null;
+  return storagePath ? readCachedSignedUrl(storagePath, variant) : null;
 }
 
-export async function getStoragePhotoSignedUrl(src: string) {
+export async function getStoragePhotoSignedUrl(
+  src: string,
+  variant: StorageSignedUrlVariant = "display",
+) {
   const storagePath = getStoragePhotoPath(src);
 
   if (!storagePath) {
     return src || null;
   }
 
-  const cachedUrl = readCachedSignedUrl(storagePath);
+  const cachedUrl = readCachedSignedUrl(storagePath, variant);
   if (cachedUrl) {
     return cachedUrl;
   }
 
+  const cacheKey = getSignedUrlCacheKey(storagePath, variant);
   const signedUrlPromise =
-    signedUrlPromiseCache.get(storagePath) ??
-    resolveStoragePhotoForDisplay(src);
-  signedUrlPromiseCache.set(storagePath, signedUrlPromise);
+    signedUrlPromiseCache.get(cacheKey) ??
+    resolveStoragePhotoForDisplay(src, variant);
+  signedUrlPromiseCache.set(cacheKey, signedUrlPromise);
 
   const signedUrl = await signedUrlPromise;
   if (signedUrl) {
-    writeCachedSignedUrl(storagePath, signedUrl);
+    writeCachedSignedUrl(storagePath, signedUrl, variant);
   } else {
-    signedUrlPromiseCache.delete(storagePath);
+    signedUrlPromiseCache.delete(cacheKey);
   }
 
   return signedUrl;
 }
 
-export async function preloadStoragePhotoSignedUrls(sources: string[]) {
+export async function preloadStoragePhotoSignedUrls(
+  sources: string[],
+  variant: StorageSignedUrlVariant = "thumbnail",
+) {
   const paths = Array.from(
     new Set(
       sources
         .map((source) => getStoragePhotoPath(source))
-        .filter((path): path is string => Boolean(path && !readCachedSignedUrl(path))),
+        .filter((path): path is string =>
+          Boolean(path && !readCachedSignedUrl(path, variant)),
+        ),
     ),
   );
 
@@ -549,6 +612,7 @@ export async function preloadStoragePhotoSignedUrls(sources: string[]) {
     body: JSON.stringify({
       anonymousId: readAnalyticsAnonymousId(),
       paths,
+      variant,
     }),
   }).catch(() => null);
 
@@ -567,7 +631,7 @@ export async function preloadStoragePhotoSignedUrls(sources: string[]) {
   for (const path of paths) {
     const signedUrl = signedUrls[path];
     if (typeof signedUrl === "string" && signedUrl) {
-      writeCachedSignedUrl(path, signedUrl);
+      writeCachedSignedUrl(path, signedUrl, variant);
     }
   }
 }
@@ -575,6 +639,7 @@ export async function preloadStoragePhotoSignedUrls(sources: string[]) {
 async function readSignedUrlFromApi(
   src: string,
   supabase: ReturnType<typeof createBrowserSupabaseClient>,
+  variant: StorageSignedUrlVariant,
 ) {
   const accessToken = supabase
     ? (await supabase.auth.getSession()).data.session?.access_token
@@ -589,6 +654,7 @@ async function readSignedUrlFromApi(
     body: JSON.stringify({
       anonymousId: readAnalyticsAnonymousId(),
       src,
+      variant,
     }),
   }).catch(() => null);
 
@@ -603,6 +669,12 @@ async function readSignedUrlFromApi(
   return typeof body?.signedUrl === "string" && body.signedUrl
     ? body.signedUrl
     : null;
+}
+
+function trackTransformFallback() {
+  trackProductEvent("photo_transform_fallback", {
+    variant: "thumbnail",
+  });
 }
 
 async function readDisplayDataUrl(displaySrc: string) {

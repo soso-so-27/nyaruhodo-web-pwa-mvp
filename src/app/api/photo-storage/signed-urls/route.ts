@@ -6,6 +6,7 @@ import {
   DISPLAY_SIGNED_URL_SECONDS,
   createSignedStorageUrls,
   getStoragePhotoPath,
+  type StorageSignedUrlVariant,
 } from "../../../../lib/photoStorage";
 import {
   getStoragePhotoUrlVariants,
@@ -24,11 +25,13 @@ const MAX_BATCH_SIGNED_URL_PATHS = 80;
 type SignedUrlsRequest = {
   anonymousId?: unknown;
   paths?: unknown;
+  variant?: unknown;
 };
 
 export async function POST(request: Request) {
   const body = (await request.json().catch(() => null)) as SignedUrlsRequest | null;
   const storagePaths = normalizeStoragePaths(body?.paths);
+  const variant = normalizeSignedUrlVariant(body?.variant);
 
   if (storagePaths.length === 0) {
     return NextResponse.json({ signedUrls: {}, error: "invalid_photo" }, { status: 400 });
@@ -71,6 +74,7 @@ export async function POST(request: Request) {
     const batchSignedUrls = await createSignedStorageUrls(
       signingSupabase,
       authorizedPaths,
+      variant,
     );
 
     for (const storagePath of authorizedPaths) {
@@ -125,6 +129,7 @@ export async function POST(request: Request) {
   const batchSignedUrls = await createSignedStorageUrls(
     signingSupabase,
     authorizedPaths,
+    variant,
   );
 
   for (const storagePath of authorizedPaths) {
@@ -156,6 +161,10 @@ function getBearerToken(request: Request) {
   const match = authorization.match(/^Bearer\s+(.+)$/i);
 
   return match?.[1]?.trim() || null;
+}
+
+function normalizeSignedUrlVariant(value: unknown): StorageSignedUrlVariant {
+  return value === "thumbnail" ? "thumbnail" : "display";
 }
 
 function createStorageSignedUrlsResponse(signedUrls: Record<string, string | null>) {

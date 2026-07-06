@@ -4,6 +4,13 @@ export const CAT_PHOTOS_BUCKET = "cat-photos";
 const STORAGE_PHOTO_PREFIX = "storage:";
 const LEGACY_STORAGE_PHOTO_PREFIX = "storage://";
 export const DISPLAY_SIGNED_URL_SECONDS = 60 * 60 * 24;
+export const STORAGE_SIGNED_URL_VARIANTS = ["display", "thumbnail"] as const;
+export type StorageSignedUrlVariant = (typeof STORAGE_SIGNED_URL_VARIANTS)[number];
+
+const THUMBNAIL_TRANSFORM = {
+  quality: 75,
+  width: 400,
+} as const;
 
 type BrowserSupabaseClient = NonNullable<
   ReturnType<typeof createBrowserSupabaseClient>
@@ -138,10 +145,15 @@ export async function resolveStoredPhotoUrl(
 export async function createSignedStorageUrl(
   supabase: BrowserSupabaseClient,
   path: string,
+  variant: StorageSignedUrlVariant = "display",
 ) {
+  const options =
+    variant === "thumbnail"
+      ? { transform: THUMBNAIL_TRANSFORM }
+      : undefined;
   const { data, error } = await supabase.storage
     .from(CAT_PHOTOS_BUCKET)
-    .createSignedUrl(path, DISPLAY_SIGNED_URL_SECONDS);
+    .createSignedUrl(path, DISPLAY_SIGNED_URL_SECONDS, options);
 
   if (error || !data?.signedUrl) {
     return undefined;
@@ -153,11 +165,27 @@ export async function createSignedStorageUrl(
 export async function createSignedStorageUrls(
   supabase: BrowserSupabaseClient,
   paths: string[],
+  variant: StorageSignedUrlVariant = "display",
 ) {
   const uniquePaths = Array.from(new Set(paths.filter(Boolean)));
 
   if (uniquePaths.length === 0) {
     return {};
+  }
+
+  if (variant === "thumbnail") {
+    const entries = await Promise.all(
+      uniquePaths.map(async (path) => [
+        path,
+        await createSignedStorageUrl(supabase, path, variant),
+      ] as const),
+    );
+
+    return Object.fromEntries(
+      entries.filter(
+        (entry): entry is readonly [string, string] => typeof entry[1] === "string" && entry[1].length > 0,
+      ),
+    );
   }
 
   const { data, error } = await supabase.storage

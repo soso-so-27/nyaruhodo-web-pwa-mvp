@@ -85,6 +85,7 @@ export function PhotoTile({
           src={src}
           alt={alt}
           style={{ ...frameStyle, objectFit: fit }}
+          storageVariant="thumbnail"
           loading={loading}
           fetchPriority={fetchPriority}
           width={imageWidth ?? getPhotoTileIntrinsicSize(size)}

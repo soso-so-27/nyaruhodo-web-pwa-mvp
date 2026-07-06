@@ -84,10 +84,35 @@ test.describe("collection album flow", () => {
   }) => {
     const now = Date.now();
 
-    await page.route("**/api/photo-storage/signed-url", async (route) => {
-      const body = route.request().postDataJSON() as { src?: string };
+    await page.route("**/api/photo-storage/signed-urls", async (route) => {
+      const body = route.request().postDataJSON() as {
+        paths?: string[];
+        variant?: string;
+      };
 
-      if (body.src === "storage:user-1/current-cat/sleeping/restored.jpg") {
+      await route.fulfill({
+        contentType: "application/json",
+        body: JSON.stringify({
+          signedUrls: Object.fromEntries(
+            (body.paths ?? []).map((path) => [
+              path,
+              path === "user-1/current-cat/sleeping/restored.jpg" &&
+              body.variant === "thumbnail"
+                ? photoDataUrl
+                : null,
+            ]),
+          ),
+        }),
+      });
+    });
+
+    await page.route("**/api/photo-storage/signed-url", async (route) => {
+      const body = route.request().postDataJSON() as { src?: string; variant?: string };
+
+      if (
+        body.src === "storage:user-1/current-cat/sleeping/restored.jpg" &&
+        body.variant === "display"
+      ) {
         await route.fulfill({
           contentType: "application/json",
           body: JSON.stringify({ signedUrl: photoDataUrl }),
@@ -172,7 +197,11 @@ test.describe("collection album flow", () => {
 
     await page.route("**/api/photo-storage/signed-urls", async (route) => {
       batchSignedUrlCalls += 1;
-      const body = route.request().postDataJSON() as { paths?: string[] };
+      const body = route.request().postDataJSON() as {
+        paths?: string[];
+        variant?: string;
+      };
+      expect(body.variant).toBe("thumbnail");
       const signedUrls = Object.fromEntries(
         (body.paths ?? []).map((path) => [path, path === storagePath ? photoDataUrl : null]),
       );
@@ -185,12 +214,12 @@ test.describe("collection album flow", () => {
 
     await page.route("**/api/photo-storage/signed-url", async (route) => {
       singleSignedUrlCalls += 1;
-      const body = route.request().postDataJSON() as { src?: string };
+      const body = route.request().postDataJSON() as { src?: string; variant?: string };
 
       await route.fulfill({
         contentType: "application/json",
         body: JSON.stringify({
-          signedUrl: body.src === storageSrc ? photoDataUrl : null,
+          signedUrl: body.src === storageSrc && body.variant === "display" ? photoDataUrl : null,
         }),
       });
     });
@@ -240,6 +269,7 @@ test.describe("collection album flow", () => {
     await page.waitForLoadState("networkidle");
     await expect(page.getByTestId("mainichi-board-photo-sent")).toHaveCount(1);
     const callsAfterFirstView = batchSignedUrlCalls + singleSignedUrlCalls;
+    const thumbnailBatchCallsAfterFirstView = batchSignedUrlCalls;
     expect(callsAfterFirstView).toBeGreaterThan(0);
 
     await page.locator('a[href="/cats"]').click();
@@ -249,7 +279,110 @@ test.describe("collection album flow", () => {
     await page.waitForLoadState("networkidle");
     await expect(page.getByTestId("mainichi-board-photo-sent")).toHaveCount(1);
 
-    expect(batchSignedUrlCalls + singleSignedUrlCalls).toBe(callsAfterFirstView);
+    expect(batchSignedUrlCalls).toBe(thumbnailBatchCallsAfterFirstView);
+  });
+
+  test("falls back to plain signed url when thumbnail transform is unavailable", async ({
+    page,
+  }) => {
+    const now = Date.now();
+    const storagePath = "user-1/current-cat/sleeping/transform-fallback.jpg";
+    const storageSrc = `storage:${storagePath}`;
+    let batchSignedUrlCalls = 0;
+    let plainSignedUrlCalls = 0;
+
+    await page.route("**/api/photo-storage/signed-urls", async (route) => {
+      batchSignedUrlCalls += 1;
+      const body = route.request().postDataJSON() as {
+        paths?: string[];
+        variant?: string;
+      };
+
+      expect(body.variant).toBe("thumbnail");
+
+      await route.fulfill({
+        contentType: "application/json",
+        body: JSON.stringify({
+          signedUrls: Object.fromEntries(
+            (body.paths ?? []).map((path) => [
+              path,
+              path === storagePath ? "data:image/png;base64,not-a-valid-image" : null,
+            ]),
+          ),
+        }),
+      });
+    });
+
+    await page.route("**/api/photo-storage/signed-url", async (route) => {
+      const body = route.request().postDataJSON() as { src?: string; variant?: string };
+      if (body.src === storageSrc && body.variant === "display") {
+        plainSignedUrlCalls += 1;
+        await route.fulfill({
+          contentType: "application/json",
+          body: JSON.stringify({ signedUrl: photoDataUrl }),
+        });
+        return;
+      }
+
+      await route.fulfill({
+        status: 404,
+        contentType: "application/json",
+        body: JSON.stringify({ signedUrl: null }),
+      });
+    });
+
+    await page.addInitScript(
+      ({ currentCatId, src, createdAt }) => {
+        window.localStorage.setItem("active_cat_id", currentCatId);
+        window.localStorage.setItem(
+          "cat_profiles",
+          JSON.stringify([
+            {
+              id: currentCatId,
+              name: "current cat",
+              createdAt: new Date(createdAt).toISOString(),
+              updatedAt: new Date(createdAt).toISOString(),
+            },
+          ]),
+        );
+        window.localStorage.setItem(
+          "nyaruhodo_exchange_own_sleeping_photos",
+          JSON.stringify([
+            {
+              id: `own-sleeping-${createdAt}`,
+              ownerCatId: currentCatId,
+              catId: currentCatId,
+              src,
+              thumbnailSrc: src,
+              state: "sleeping",
+              visibility: "private",
+              deliveryStatus: "available",
+              triggerLabel: "sleeping",
+              theme: "sleeping",
+              shared: false,
+              createdAt,
+            },
+          ]),
+        );
+      },
+      {
+        currentCatId: "current-cat",
+        src: storageSrc,
+        createdAt: now,
+      },
+    );
+
+    await page.goto("/collection");
+    await page.waitForLoadState("networkidle");
+    await expect(page.getByTestId("mainichi-board-photo-sent")).toHaveCount(1);
+    await page.getByTestId("mainichi-board-photo-sent").first().scrollIntoViewIfNeeded();
+
+    await expect
+      .poll(async () => plainSignedUrlCalls)
+      .toBeGreaterThan(0);
+    expect(batchSignedUrlCalls).toBeGreaterThan(0);
+
+    expect(plainSignedUrlCalls).toBe(1);
   });
 
   test("writes delivered storage photos back as data urls for offline album display", async ({

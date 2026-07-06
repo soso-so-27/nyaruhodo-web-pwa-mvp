@@ -6,6 +6,7 @@ import {
   DISPLAY_SIGNED_URL_SECONDS,
   createSignedStorageUrl,
   getStoragePhotoPath,
+  type StorageSignedUrlVariant,
 } from "../../../../lib/photoStorage";
 import {
   getStoragePhotoUrlVariants,
@@ -22,11 +23,13 @@ export const dynamic = "force-dynamic";
 type SignedUrlRequest = {
   anonymousId?: unknown;
   src?: string;
+  variant?: unknown;
 };
 
 export async function POST(request: Request) {
   const body = (await request.json().catch(() => null)) as SignedUrlRequest | null;
   const storagePath = getStoragePhotoPath(typeof body?.src === "string" ? body.src : "");
+  const variant = normalizeSignedUrlVariant(body?.variant);
 
   if (!storagePath || !isSafeStoragePath(storagePath)) {
     return NextResponse.json({ signedUrl: null, error: "invalid_photo" }, { status: 400 });
@@ -57,7 +60,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ signedUrl: null, error: "forbidden_photo" }, { status: 403 });
     }
 
-    return createStorageSignedUrlResponse(storagePath, signingSupabase);
+    return createStorageSignedUrlResponse(storagePath, signingSupabase, variant);
   }
 
   const config = getSupabasePublicConfig();
@@ -109,7 +112,7 @@ export async function POST(request: Request) {
     return NextResponse.json({ signedUrl: null, error: "forbidden_photo" }, { status: 403 });
   }
 
-  return createStorageSignedUrlResponse(storagePath, signingSupabase);
+  return createStorageSignedUrlResponse(storagePath, signingSupabase, variant);
 }
 
 function getBearerToken(request: Request) {
@@ -122,8 +125,9 @@ function getBearerToken(request: Request) {
 async function createStorageSignedUrlResponse(
   storagePath: string,
   signingSupabase: SupabaseClient,
+  variant: StorageSignedUrlVariant,
 ) {
-  const signedUrl = await createSignedStorageUrl(signingSupabase, storagePath);
+  const signedUrl = await createSignedStorageUrl(signingSupabase, storagePath, variant);
 
   if (!signedUrl) {
     return NextResponse.json({ signedUrl: null, error: "photo_unavailable" }, { status: 404 });
@@ -133,5 +137,10 @@ async function createStorageSignedUrlResponse(
     bucket: CAT_PHOTOS_BUCKET,
     expiresIn: DISPLAY_SIGNED_URL_SECONDS,
     signedUrl,
+    variant,
   });
+}
+
+function normalizeSignedUrlVariant(value: unknown): StorageSignedUrlVariant {
+  return value === "thumbnail" ? "thumbnail" : "display";
 }
