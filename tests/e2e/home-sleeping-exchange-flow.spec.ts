@@ -16,6 +16,21 @@ const deliveredDataUrl =
   "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAGQAAABkCAYAAABw4pVUAAAAAXNSR0IArs4c6QAAAARnQU1BAACxjwv8YQUAAAAJcEhZcwAADsMAAA7DAcdvqGQAAAEJSURBVHhe7dExEcAgAMBAJKKuTpnpjoLA/fACchlrzv2C+a0njDPsVmfYrQyJMSTGkBhDYgyJMSTGkBhDYgyJMSTGkBhDYgyJMSTGkBhDYgyJMSTGkBhDYgyJMSTGkBhDYgyJMSTGkBhDYgyJMSTGkBhDYgyJMSTGkBhDYgyJMSTGkBhDYgyJMSTGkBhDYgyJMSTGkBhDYgyJMSTGkBhDYgyJMSTGkBhDYgyJMSTGkBhDYgyJMSTGkBhDYgyJMSTGkBhDYgyJMSTGkBhDYgyJMSTGkBhDYgyJMSTmB4RCEqdGtA/tAAAAAElFTkSuQmCC";
 const testUploadPng = Buffer.from(deliveredDataUrl.split(",")[1], "base64");
 
+async function waitForOwnSleepingPhotoCount(page: Page, minCount: number) {
+  await expect
+    .poll(() =>
+      page.evaluate(() => {
+        const parsed = JSON.parse(
+          window.localStorage.getItem("nyaruhodo_exchange_own_sleeping_photos") ??
+            "[]",
+        );
+        return Array.isArray(parsed) ? parsed.length : 0;
+      }),
+    )
+    .toBeGreaterThanOrEqual(minCount);
+  await expect(page.getByRole("dialog")).toHaveCount(0);
+}
+
 test.describe("home sleeping exchange flow", () => {
   test("saves the taken photo, waits until evening, then opens the delivered pair", async ({
     page,
@@ -85,15 +100,20 @@ test.describe("home sleeping exchange flow", () => {
       buffer: testUploadPng,
     });
 
-    await expect(page.locator("section").last().locator("img")).toBeVisible();
-    await page.getByRole("dialog").locator("button").last().click();
+    await waitForOwnSleepingPhotoCount(page, 1);
 
-    await page.waitForTimeout(500);
     expect(exchangeCalls).toBe(0);
     await expect(page.getByTestId("home-desk-model")).toHaveAttribute(
       "data-state",
       "2",
     );
+    const deliveryTargetBeforeEvening = await page.evaluate(() => {
+      const parsed = JSON.parse(
+        window.localStorage.getItem("neteruneko_evening_delivery_days") ?? "{}",
+      );
+      return parsed["2026-06-10"]?.targetOwnPhotoId ?? null;
+    });
+    expect(deliveryTargetBeforeEvening).toBeTruthy();
 
     await advanceHomeClockTo(page, afterDelivery);
 
@@ -462,10 +482,7 @@ test.describe("home sleeping exchange flow", () => {
       buffer: testUploadPng,
     });
 
-    await expect(page.locator("section").last().locator("img")).toBeVisible();
-    await page.getByRole("dialog").locator("button").last().click();
-
-    await page.waitForTimeout(500);
+    await waitForOwnSleepingPhotoCount(page, 1);
     expect(exchangeCalls).toBe(0);
     await expect(page.getByTestId("home-desk-model")).toHaveAttribute(
       "data-state",
@@ -535,9 +552,7 @@ test.describe("home sleeping exchange flow", () => {
       buffer: testUploadPng,
     });
 
-    await expect(page.locator("section").last().locator("img")).toBeVisible();
-    await page.getByRole("dialog").locator("button").last().click();
-    await page.waitForTimeout(500);
+    await waitForOwnSleepingPhotoCount(page, 1);
 
     expect(exchangeCalls).toBe(0);
 
@@ -1343,9 +1358,7 @@ test.describe("home sleeping exchange flow", () => {
       mimeType: "image/png",
       buffer: testUploadPng,
     });
-    await expect(page.locator("section").last().locator("img")).toBeVisible();
-    await page.getByRole("dialog").locator("button").last().click();
-    await page.waitForTimeout(200);
+    await waitForOwnSleepingPhotoCount(page, 2);
 
     expect(exchangeCalls).toBe(0);
 
@@ -1412,9 +1425,7 @@ test.describe("home sleeping exchange flow", () => {
         mimeType: "image/png",
         buffer: testUploadPng,
       });
-      await expect(page.locator("section").last().locator("img")).toBeVisible();
-      await page.getByRole("dialog").locator("button").last().click();
-      await page.waitForTimeout(500);
+      await waitForOwnSleepingPhotoCount(page, index);
       if (index === 1) {
         await page.evaluate(() => {
           window.localStorage.removeItem("neteruneko_evening_delivery_days");

@@ -1782,20 +1782,29 @@ export function HomeInput({
           fileName: `sleeping-${Date.now()}`,
         });
         const fileSizeBucket = getFileSizeBucket(file.size);
-
-        setPendingExchangeSharePhoto({
-          ...photoVariants,
-          triggerLabel: "ねてる",
-          theme: "sleeping",
-          fileSizeBucket,
+        const saveResult = await saveHomeSleepingPhoto({
+          catId: activeCatId,
+          photo: {
+            ...photoVariants,
+            triggerLabel: "sleeping",
+            theme: "sleeping",
+            fileSizeBucket,
+          },
+          shared: true,
         });
-        setPendingExchangeCatId(activeCatId);
+
+        if (!saveResult) {
+          showToast(PHOTO_SAVE_FAILURE_MESSAGE);
+          return;
+        }
+
         trackProductEvent(
           "home_exchange_sleeping_photo_selected",
           {
             theme: "sleeping",
             source,
             file_size_bucket: fileSizeBucket,
+            saved_immediately: true,
           },
           { localCatId: activeCatId },
         );
@@ -2178,6 +2187,54 @@ export function HomeInput({
     }
 
     setIsHomeInstallGuideOpen(true);
+  }
+
+  async function saveHomeSleepingPhoto({
+    catId,
+    photo,
+    shared,
+  }: {
+    catId: string;
+    photo: PendingExchangeSharePhoto;
+    shared: boolean;
+  }) {
+    const ownPhoto = await saveOwnSleepingPhotoWithCompressedFallback({
+      catId,
+      src: photo.src,
+      thumbnailSrc: photo.thumbnailSrc,
+      displaySrc: photo.displaySrc,
+      originalSrc: photo.originalSrc,
+      triggerLabel: photo.triggerLabel,
+      theme: photo.theme,
+      shared,
+    });
+
+    if (!ownPhoto) {
+      return null;
+    }
+
+    void backupOwnSleepingPhotoMoment(ownPhoto);
+    const deliveryTarget = shared
+      ? recordEveningDeliveryTarget(ownPhoto)
+      : null;
+    setCollectionRefreshTick((value) => value + 1);
+    if (deliveryTarget) {
+      setEveningRefreshTick((value) => value + 1);
+    }
+
+    if (shared) {
+      trackProductEvent(
+        "take_photo",
+        {
+          catId,
+          hour: new Date().getHours(),
+          isExchangeTarget: deliveryTarget?.isExchangeTarget ?? false,
+        },
+        { localCatId: catId },
+      );
+    }
+
+    return { ownPhoto, deliveryTarget };
   }
 
   async function handleConfirmExchangeSharePhoto(photo: PendingExchangeSharePhoto) {
