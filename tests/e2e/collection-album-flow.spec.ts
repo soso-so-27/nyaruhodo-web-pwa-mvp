@@ -318,7 +318,7 @@ test.describe("collection album flow", () => {
     expect(finalSrc).toContain("variant=thumbnail");
   });
 
-  test("prefetches startup photo URLs and image bodies while idle", async ({ page }) => {
+  test("prefetches startup photo URLs and image bodies soon after startup", async ({ page }) => {
     const now = Date.now();
     const currentCatId = "current-cat";
     const sentPath = "user-1/current-cat/sleeping/startup-sent-display.jpg";
@@ -454,6 +454,14 @@ test.describe("collection album flow", () => {
       .toContain(sentPath);
     expect(fetchedPhotoPaths.join("\n")).toContain(deliveredPath);
     expect(fetchedPhotoPaths.join("\n")).toContain(galleryPath);
+    const prefetchEvent = await page.evaluate(() => {
+      const events = JSON.parse(
+        window.localStorage.getItem("analytics_event_queue") ?? "[]",
+      ) as Array<{ name?: string; properties?: Record<string, unknown> }>;
+      return events.find((event) => event.name === "photo_prefetch_done");
+    });
+
+    expect(prefetchEvent?.properties?.duration_ms).toEqual(expect.any(Number));
   });
 
   test("does not request a new signed url for the same storage photo in one session", async ({

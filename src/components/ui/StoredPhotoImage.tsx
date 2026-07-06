@@ -21,7 +21,9 @@ import { color, radius, shadow, typography } from "./designTokens";
 
 const signedUrlCache = new Map<string, { expiresAt: number; url: string }>();
 const signedUrlPromiseCache = new Map<string, Promise<string | null>>();
+const photoImagePrefetchPromiseCache = new Map<string, Promise<boolean>>();
 const SIGNED_URL_CACHE_REFRESH_RATIO = 0.8;
+const PREFETCH_DISPLAY_WAIT_MS = 250;
 const EMPTY_FALLBACK_SRCS: string[] = [];
 
 const fallbackFrameStyle: CSSProperties = {
@@ -230,13 +232,21 @@ export function StoredPhotoImage({
 
     const cachedUrl = readCachedSignedUrl(storagePath, activeStorageVariant);
     if (cachedUrl) {
-      setDisplaySrc(cachedUrl);
+      void waitForPhotoImagePrefetch(cachedUrl, PREFETCH_DISPLAY_WAIT_MS).then(() => {
+        if (isActive) {
+          setDisplaySrc(cachedUrl);
+        }
+      });
       return;
     }
 
-    void getStoragePhotoSignedUrl(currentSource, activeStorageVariant).then((signedUrl) => {
+    void getStoragePhotoSignedUrl(currentSource, activeStorageVariant).then(async (signedUrl) => {
       if (isActive) {
         if (signedUrl) {
+          await waitForPhotoImagePrefetch(signedUrl, PREFETCH_DISPLAY_WAIT_MS);
+          if (!isActive) {
+            return;
+          }
           setDisplaySrc(signedUrl);
         } else if (hasNextSource) {
           setSourceIndex((index) => Math.min(index + 1, sourceQueue.length - 1));
@@ -803,15 +813,9 @@ export async function prefetchStoragePhotoImages(
   let fetchedCount = 0;
   await Promise.all(
     signedUrls.map(async (signedUrl) => {
-      const response = await fetch(signedUrl, {
-        cache: "force-cache",
-        mode: "no-cors",
-        priority: "low",
-      } as RequestInit & { priority?: "high" | "low" | "auto" }).catch(
-        () => null,
-      );
+      const didFetch = await prefetchPhotoImageBody(signedUrl);
 
-      if (response && (response.ok || response.type === "opaque")) {
+      if (didFetch) {
         fetchedCount += 1;
       }
     }),
@@ -821,6 +825,40 @@ export async function prefetchStoragePhotoImages(
     attemptedCount: signedUrls.length,
     fetchedCount,
   };
+}
+
+function prefetchPhotoImageBody(signedUrl: string) {
+  const existing = photoImagePrefetchPromiseCache.get(signedUrl);
+  if (existing) {
+    return existing;
+  }
+
+  const promise = fetch(signedUrl, {
+    cache: "force-cache",
+    mode: "no-cors",
+    priority: "low",
+  } as RequestInit & { priority?: "high" | "low" | "auto" })
+    .then((response) => response.ok || response.type === "opaque")
+    .catch(() => false)
+    .finally(() => {
+      photoImagePrefetchPromiseCache.delete(signedUrl);
+    });
+
+  photoImagePrefetchPromiseCache.set(signedUrl, promise);
+  return promise;
+}
+
+async function waitForPhotoImagePrefetch(signedUrl: string, timeoutMs: number) {
+  const promise = photoImagePrefetchPromiseCache.get(signedUrl);
+
+  if (!promise) {
+    return;
+  }
+
+  await Promise.race([
+    promise,
+    new Promise((resolve) => window.setTimeout(resolve, timeoutMs)),
+  ]);
 }
 
 async function readSignedUrlFromApi(

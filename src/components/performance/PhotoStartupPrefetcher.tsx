@@ -15,7 +15,7 @@ import { STORAGE_KEYS } from "../../lib/storage";
 import { prefetchStoragePhotoImages } from "../ui/StoredPhotoImage";
 
 const PREFETCH_LIMIT_PER_BUCKET = 6;
-const STARTUP_PREFETCH_DELAY_MS = 1400;
+const STARTUP_PREFETCH_DELAY_MS = 200;
 
 export function PhotoStartupPrefetcher() {
   useEffect(() => {
@@ -24,17 +24,17 @@ export function PhotoStartupPrefetcher() {
     }
 
     let isCancelled = false;
-    const cancelIdleTask = scheduleIdleTask(() => {
+    const timeoutId = window.setTimeout(() => {
       if (isCancelled) {
         return;
       }
 
       void prefetchStartupPhotos();
-    });
+    }, STARTUP_PREFETCH_DELAY_MS);
 
     return () => {
       isCancelled = true;
-      cancelIdleTask();
+      window.clearTimeout(timeoutId);
     };
   }, []);
 
@@ -42,6 +42,7 @@ export function PhotoStartupPrefetcher() {
 }
 
 async function prefetchStartupPhotos() {
+  const startedAt = performance.now();
   const activeCatId = readActiveCatId();
   const sentSources = readOwnSleepingPhotosForAlbum(activeCatId)
     .slice(0, PREFETCH_LIMIT_PER_BUCKET)
@@ -67,6 +68,7 @@ async function prefetchStartupPhotos() {
       route: window.location.pathname,
       attempted_count: result.attemptedCount,
       fetched_count: result.fetchedCount,
+      duration_ms: Math.round(performance.now() - startedAt),
       sent_count: sentSources.length,
       delivered_count: deliveredSources.length,
       cat_gallery_count: catGallerySources.length,
@@ -75,6 +77,7 @@ async function prefetchStartupPhotos() {
     trackProductEvent("photo_prefetch_failed", {
       route: window.location.pathname,
       attempted_count: thumbnailSources.length,
+      duration_ms: Math.round(performance.now() - startedAt),
     });
   }
 }
@@ -99,21 +102,4 @@ function shouldSkipStartupPrefetch() {
   ).connection;
 
   return Boolean(connection?.saveData);
-}
-
-function scheduleIdleTask(task: () => void) {
-  const requestIdleCallback = window.requestIdleCallback;
-  const cancelIdleCallback = window.cancelIdleCallback;
-
-  if (typeof requestIdleCallback === "function") {
-    const idleId = requestIdleCallback(task, { timeout: STARTUP_PREFETCH_DELAY_MS * 2 });
-    return () => {
-      if (typeof cancelIdleCallback === "function") {
-        cancelIdleCallback(idleId);
-      }
-    };
-  }
-
-  const timeoutId = window.setTimeout(task, STARTUP_PREFETCH_DELAY_MS);
-  return () => window.clearTimeout(timeoutId);
 }
