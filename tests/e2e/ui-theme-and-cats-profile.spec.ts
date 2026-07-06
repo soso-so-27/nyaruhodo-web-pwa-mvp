@@ -224,7 +224,7 @@ test("lets the owner choose a cat thumbnail from existing photos", async ({
     .toBe(photoDataUrl);
 });
 
-test("shows the custom top cover as a top-biased cover image", async ({
+test("shows the custom top cover without over-cropping", async ({
   page,
 }) => {
   const signedUrlRequests: Array<{ src?: string; variant?: string }> = [];
@@ -272,7 +272,7 @@ test("shows the custom top cover as a top-biased cover image", async ({
         .first()
         .evaluate((image) => window.getComputedStyle(image).objectFit),
     )
-    .toBe("cover");
+    .toBe("contain");
   await expect
     .poll(() =>
       coverImages

@@ -330,7 +330,7 @@ export function CatsPage() {
       ? getLensPhotoThumbnailSrc(activeCoverPhoto)
       : undefined;
   const activeCoverFit =
-    activeCoverSrc ? "cover" : "contain";
+    activeCoverSrc && !hasCustomThumbnail ? "cover" : "contain";
   const activeCoverRecordPhoto =
     activeCoverPhoto && !hasCustomThumbnail
       ? toRecordPhotoPreview(activeCoverPhoto)
