@@ -330,7 +330,20 @@ export function CatsPage() {
       ? getLensPhotoThumbnailSrc(activeCoverPhoto)
       : undefined;
   const activeCoverFit =
-    hasCustomThumbnail ? "contain" : activeCoverPhoto ? "cover" : "contain";
+    activeCoverSrc ? "cover" : "contain";
+  const activeCoverRecordPhoto =
+    activeCoverPhoto && !hasCustomThumbnail
+      ? toRecordPhotoPreview(activeCoverPhoto)
+      : activeCoverSrc
+        ? {
+            src: activeCoverSrc,
+            title: "代表写真",
+            timestamp:
+              Date.parse(
+                activeCatProfile?.updatedAt ?? activeCatProfile?.createdAt ?? "",
+              ) || Date.now(),
+          }
+        : null;
   useEffect(() => {
     tabContentScrollerRef.current?.scrollTo({ top: 0, left: 0 });
   }, [activeCatId, activeLens, activeSection]);
@@ -1320,6 +1333,11 @@ export function CatsPage() {
                       loading="eager"
                       style={styles.profileCoverTileRoot}
                       imageStyle={styles.profileCoverImage}
+                      onClick={
+                        activeCoverRecordPhoto
+                          ? () => setSelectedRecordPhoto(activeCoverRecordPhoto)
+                          : undefined
+                      }
                     />
                     {activeSection === "basic" ? (
                       <div style={styles.profileCoverActionStack}>
@@ -4923,13 +4941,13 @@ const styles = {
   profileCoverHero: {
     position: "relative" as const,
     display: "block",
-    minHeight: "196px",
+    minHeight: "240px",
   },
   profileCoverFrame: {
     position: "relative" as const,
     display: "block",
     width: "calc(100% + 32px)",
-    height: "188px",
+    height: "232px",
     marginLeft: "-16px",
     overflow: "hidden",
     borderRadius: "18px",
@@ -4947,6 +4965,8 @@ const styles = {
     display: "block",
     width: "100%",
     height: "100%",
+    // Temporary framing until face-aware cover positioning is introduced.
+    objectPosition: "50% 30%",
     border: "none",
     borderRadius: 0,
     boxShadow: "none",
