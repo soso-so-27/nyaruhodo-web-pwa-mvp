@@ -224,6 +224,42 @@ test("lets the owner choose a cat thumbnail from existing photos", async ({
     .toBe(photoDataUrl);
 });
 
+test("lets the owner adjust and save the cat thumbnail crop", async ({ page }) => {
+  await seedCatsProfile(page, Date.parse("2026-06-10T12:30:00+09:00"), 3);
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto("/cats");
+  await page.waitForLoadState("networkidle");
+
+  await page.getByTestId("cats-section-tab-basic").click();
+  await page.getByTestId("cats-thumbnail-picker-button").click();
+  await page.getByTestId("thumbnail-picker-photo").first().click();
+
+  await expect(page.getByTestId("thumbnail-crop-sheet")).toBeVisible();
+  await page.getByTestId("thumbnail-crop-scale").evaluate((input) => {
+    const range = input as HTMLInputElement;
+    const valueSetter = Object.getOwnPropertyDescriptor(
+      HTMLInputElement.prototype,
+      "value",
+    )?.set;
+    valueSetter?.call(range, "1.5");
+    range.dispatchEvent(new Event("input", { bubbles: true }));
+    range.dispatchEvent(new Event("change", { bubbles: true }));
+  });
+  await page.getByRole("button", { name: "右へ" }).click();
+  await page.getByRole("button", { name: "上へ" }).click();
+  await page.getByTestId("thumbnail-crop-save").click();
+
+  await expect
+    .poll(() =>
+      page.evaluate(() => {
+        const raw = window.localStorage.getItem("cat_profiles");
+        const [profile] = raw ? JSON.parse(raw) : [];
+        return profile?.avatarCrop ?? null;
+      }),
+    )
+    .toEqual({ scale: 1.5, offsetX: 4, offsetY: -4 });
+});
+
 test("shows the custom top cover without over-cropping", async ({
   page,
 }) => {

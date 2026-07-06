@@ -40,6 +40,7 @@ export type CatProfile = {
   homePhotoDataUrl?: string;
   homePhotoPosition?: string;
   avatarDataUrl?: string;
+  avatarCrop?: CatAvatarCrop;
   basicInfo?: CatBasicInfo;
   appearance?: CatAppearance;
   typeKey?: CatTypeKey;
@@ -61,6 +62,12 @@ export type CatProfile = {
     percent: number;
     sourceBreakdown: UnderstandingSourceBreakdown;
   };
+};
+
+export type CatAvatarCrop = {
+  scale: number;
+  offsetX: number;
+  offsetY: number;
 };
 
 export type CatBasicInfo = {
@@ -919,6 +926,7 @@ function normalizeStoredCatProfile(profile: Partial<CatProfile>): CatProfile {
     homePhotoDataUrl: profile.homePhotoDataUrl,
     homePhotoPosition: profile.homePhotoPosition,
     avatarDataUrl: profile.avatarDataUrl,
+    avatarCrop: normalizeCatAvatarCrop(profile.avatarCrop),
     typeKey,
     typeLabel: typeInfo?.label ?? normalizeCatTypeLabel(profile.typeLabel),
     typeTagline: profile.typeTagline ?? typeInfo?.tagline,
@@ -932,6 +940,32 @@ function normalizeStoredCatProfile(profile: Partial<CatProfile>): CatProfile {
     modifiers: Array.isArray(profile.modifiers) ? profile.modifiers : undefined,
     onboarding: profile.onboarding,
     understanding: profile.understanding,
+  };
+}
+
+function normalizeCatAvatarCrop(
+  crop: CatProfile["avatarCrop"],
+): CatAvatarCrop | undefined {
+  if (!crop || typeof crop !== "object") {
+    return undefined;
+  }
+
+  const scale = Number(crop.scale);
+  const offsetX = Number(crop.offsetX);
+  const offsetY = Number(crop.offsetY);
+
+  if (
+    !Number.isFinite(scale) ||
+    !Number.isFinite(offsetX) ||
+    !Number.isFinite(offsetY)
+  ) {
+    return undefined;
+  }
+
+  return {
+    scale: Math.min(2.8, Math.max(1, scale)),
+    offsetX: Math.min(48, Math.max(-48, offsetX)),
+    offsetY: Math.min(48, Math.max(-48, offsetY)),
   };
 }
 

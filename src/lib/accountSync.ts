@@ -36,6 +36,11 @@ type LocalCatProfile = {
   homePhotoDataUrl?: string;
   homePhotoPosition?: string;
   avatarDataUrl?: string;
+  avatarCrop?: {
+    scale?: number;
+    offsetX?: number;
+    offsetY?: number;
+  };
   basicInfo?: Record<string, unknown>;
   appearance?: Record<string, unknown>;
   typeKey?: string;
@@ -1840,6 +1845,7 @@ async function restoreRemoteSnapshot(
           restoredProfile.homePhotoDataUrl ?? existingProfile.homePhotoDataUrl,
         homePhotoPosition:
           restoredProfile.homePhotoPosition ?? existingProfile.homePhotoPosition,
+        avatarCrop: existingProfile.avatarCrop,
       };
     } else {
       profiles.push(restoredProfile);
