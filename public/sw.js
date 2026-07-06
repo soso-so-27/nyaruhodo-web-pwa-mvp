@@ -15,6 +15,11 @@ const PHOTO_CACHE_VARIANT_PARAMS = [
 const CAT_PHOTOS_BUCKET = "cat-photos";
 const STORAGE_SIGNED_OBJECT_MARKER = `/storage/v1/object/sign/${CAT_PHOTOS_BUCKET}/`;
 const STORAGE_SIGNED_RENDER_MARKER = `/storage/v1/render/image/sign/${CAT_PHOTOS_BUCKET}/`;
+const PHOTO_CACHE_IMAGE_PREFIX = "/__sw-photo-cache/image/";
+const PHOTO_CACHE_META_PREFIX = "/__sw-photo-cache/meta/";
+const PHOTO_CACHE_TTL_MS = 7 * 24 * 60 * 60 * 1000;
+const PHOTO_CACHE_MAX_ENTRIES = 200;
+const PHOTO_CACHE_MAX_BYTES = 50 * 1024 * 1024;
 
 let photoImageCacheEnabled = null;
 let photoImageCacheEnabledPromise = null;
@@ -71,6 +76,12 @@ self.addEventListener("fetch", (event) => {
   }
 
   const url = new URL(request.url);
+  const photoCacheInfo = createPhotoImageCacheInfo(request, url);
+
+  if (photoCacheInfo) {
+    event.respondWith(handlePhotoImageRequest(request, photoCacheInfo));
+    return;
+  }
 
   if (shouldNeverCache(request, url)) {
     return;
@@ -104,6 +115,194 @@ function shouldNeverCache(request, url) {
   }
 
   return false;
+}
+
+async function handlePhotoImageRequest(request, info) {
+  let networkResponse = null;
+
+  try {
+    const enabled = await readPhotoCacheEnabled();
+
+    if (!enabled) {
+      return fetch(request);
+    }
+
+    const cached = await readFreshPhotoImageCache(info);
+
+    if (cached) {
+      return cached;
+    }
+
+    networkResponse = await fetch(request);
+    await storePhotoImageCache(info, networkResponse.clone());
+
+    return networkResponse;
+  } catch {
+    return networkResponse ?? fetch(request);
+  }
+}
+
+async function readFreshPhotoImageCache(info) {
+  const metadata = await readPhotoImageMetadata(info.logicalKey);
+
+  if (!metadata) {
+    return null;
+  }
+
+  const now = Date.now();
+
+  if (now - metadata.createdAt > PHOTO_CACHE_TTL_MS) {
+    await deletePhotoImageCacheEntry(info.logicalKey);
+    return null;
+  }
+
+  const cache = await caches.open(PHOTO_IMAGE_CACHE);
+  const cached = await cache.match(createPhotoImageRequest(info.logicalKey));
+
+  if (!cached) {
+    await deletePhotoImageMetadata(info.logicalKey);
+    return null;
+  }
+
+  await writePhotoImageMetadata({
+    ...metadata,
+    lastUsedAt: now,
+  });
+
+  return cached;
+}
+
+async function storePhotoImageCache(info, response) {
+  if (response.status !== 200) {
+    return;
+  }
+
+  const contentType = response.headers.get("content-type") ?? "";
+
+  if (!contentType.toLowerCase().startsWith("image/")) {
+    return;
+  }
+
+  const estimatedBytes = readContentLength(response);
+  const now = Date.now();
+  const metadata = {
+    key: info.logicalKey,
+    objectPath: info.objectPath,
+    variantKey: info.variantKey,
+    createdAt: now,
+    lastUsedAt: now,
+    estimatedBytes,
+  };
+
+  try {
+    const cache = await caches.open(PHOTO_IMAGE_CACHE);
+    await cache.put(createPhotoImageRequest(info.logicalKey), response);
+    await writePhotoImageMetadata(metadata);
+    await enforcePhotoImageCacheLimits();
+  } catch {
+    // Quota/cache failures must never block private photo display.
+  }
+}
+
+async function readPhotoImageMetadata(logicalKey) {
+  const cache = await caches.open(PHOTO_IMAGE_META_CACHE);
+  const response = await cache.match(createPhotoMetaRequest(logicalKey));
+
+  if (!response) {
+    return null;
+  }
+
+  return response.json().catch(() => null);
+}
+
+async function writePhotoImageMetadata(metadata) {
+  const cache = await caches.open(PHOTO_IMAGE_META_CACHE);
+  await cache.put(createPhotoMetaRequest(metadata.key), jsonResponse(metadata));
+}
+
+async function deletePhotoImageCacheEntry(logicalKey) {
+  const [imageCache, metaCache] = await Promise.all([
+    caches.open(PHOTO_IMAGE_CACHE),
+    caches.open(PHOTO_IMAGE_META_CACHE),
+  ]);
+
+  await Promise.all([
+    imageCache.delete(createPhotoImageRequest(logicalKey)),
+    metaCache.delete(createPhotoMetaRequest(logicalKey)),
+  ]);
+}
+
+async function deletePhotoImageMetadata(logicalKey) {
+  const cache = await caches.open(PHOTO_IMAGE_META_CACHE);
+  await cache.delete(createPhotoMetaRequest(logicalKey));
+}
+
+async function readAllPhotoImageMetadata() {
+  const cache = await caches.open(PHOTO_IMAGE_META_CACHE);
+  const requests = await cache.keys();
+  const entries = await Promise.all(
+    requests
+      .filter((request) => new URL(request.url).pathname.startsWith(PHOTO_CACHE_META_PREFIX))
+      .map(async (request) => {
+        const response = await cache.match(request);
+        const metadata = await response?.json().catch(() => null);
+        return isPhotoImageMetadata(metadata) ? metadata : null;
+      }),
+  );
+
+  return entries.filter(Boolean);
+}
+
+async function enforcePhotoImageCacheLimits() {
+  const metadataEntries = await readAllPhotoImageMetadata();
+  const now = Date.now();
+  const expiredEntries = metadataEntries.filter(
+    (metadata) => now - metadata.createdAt > PHOTO_CACHE_TTL_MS,
+  );
+
+  await Promise.all(
+    expiredEntries.map((metadata) => deletePhotoImageCacheEntry(metadata.key)),
+  );
+
+  const liveEntries = metadataEntries
+    .filter((metadata) => now - metadata.createdAt <= PHOTO_CACHE_TTL_MS)
+    .sort((left, right) => left.lastUsedAt - right.lastUsedAt);
+  let totalBytes = liveEntries.reduce(
+    (total, metadata) => total + metadata.estimatedBytes,
+    0,
+  );
+  let totalEntries = liveEntries.length;
+
+  for (const metadata of liveEntries) {
+    if (
+      totalEntries <= PHOTO_CACHE_MAX_ENTRIES &&
+      totalBytes <= PHOTO_CACHE_MAX_BYTES
+    ) {
+      break;
+    }
+
+    await deletePhotoImageCacheEntry(metadata.key);
+    totalEntries -= 1;
+    totalBytes = Math.max(0, totalBytes - metadata.estimatedBytes);
+  }
+}
+
+function isPhotoImageMetadata(value) {
+  return (
+    value &&
+    typeof value === "object" &&
+    typeof value.key === "string" &&
+    typeof value.objectPath === "string" &&
+    typeof value.variantKey === "string" &&
+    typeof value.createdAt === "number" &&
+    typeof value.lastUsedAt === "number" &&
+    typeof value.estimatedBytes === "number"
+  );
+}
+
+function readContentLength(response) {
+  const value = Number(response.headers.get("content-length") ?? "0");
+  return Number.isFinite(value) && value > 0 ? value : 0;
 }
 
 async function readPhotoCacheEnabled() {
@@ -212,6 +411,18 @@ function sanitizePhotoVariantValue(value) {
 
 function createPhotoCacheRequest(path) {
   return new Request(`${self.location.origin}${path}`);
+}
+
+function createPhotoImageRequest(logicalKey) {
+  return createPhotoCacheRequest(
+    `${PHOTO_CACHE_IMAGE_PREFIX}${encodeURIComponent(logicalKey)}`,
+  );
+}
+
+function createPhotoMetaRequest(logicalKey) {
+  return createPhotoCacheRequest(
+    `${PHOTO_CACHE_META_PREFIX}${encodeURIComponent(logicalKey)}`,
+  );
 }
 
 function jsonResponse(value) {
