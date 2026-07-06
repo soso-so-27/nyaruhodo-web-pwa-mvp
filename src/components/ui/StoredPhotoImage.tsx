@@ -22,7 +22,6 @@ import { color, radius, shadow, typography } from "./designTokens";
 const signedUrlCache = new Map<string, { expiresAt: number; url: string }>();
 const signedUrlPromiseCache = new Map<string, Promise<string | null>>();
 const SIGNED_URL_CACHE_REFRESH_RATIO = 0.8;
-const DEFAULT_INTRINSIC_IMAGE_SIZE = 512;
 const EMPTY_FALLBACK_SRCS: string[] = [];
 
 const fallbackFrameStyle: CSSProperties = {
@@ -307,8 +306,8 @@ export function StoredPhotoImage({
         loading={loading ?? (isInlineImage ? "eager" : "lazy")}
         decoding={decoding ?? "async"}
         fetchPriority={fetchPriority}
-        width={width ?? DEFAULT_INTRINSIC_IMAGE_SIZE}
-        height={height ?? DEFAULT_INTRINSIC_IMAGE_SIZE}
+        width={width}
+        height={height}
         onLoad={() => {
           setIsLoaded(true);
           onLoad?.();
