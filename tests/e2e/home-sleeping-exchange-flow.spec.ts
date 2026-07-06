@@ -31,6 +31,15 @@ async function waitForOwnSleepingPhotoCount(page: Page, minCount: number) {
   await expect(page.getByRole("dialog")).toHaveCount(0);
 }
 
+function readEveningTargetOwnPhotoId(page: Page, dateKey: string) {
+  return page.evaluate((targetDateKey) => {
+    const parsed = JSON.parse(
+      window.localStorage.getItem("neteruneko_evening_delivery_days") ?? "{}",
+    );
+    return parsed[targetDateKey]?.targetOwnPhotoId ?? null;
+  }, dateKey);
+}
+
 test.describe("home sleeping exchange flow", () => {
   test("saves the taken photo, waits until evening, then opens the delivered pair", async ({
     page,
@@ -156,6 +165,79 @@ test.describe("home sleeping exchange flow", () => {
     expect(storage.keptExchangePhotos[0]?.src).toBeTruthy();
     expect(storage.eveningDeliveryDays["2026-06-10"]?.openedAt).toBeTruthy();
     expect(storage.eveningDeliveryDays["2026-06-10"]?.keptAt).toBeTruthy();
+  });
+
+  test("uses the latest same-day retake as today's delivery photo", async ({
+    page,
+  }) => {
+    const beforeDelivery = Date.parse("2026-06-10T10:30:00.000Z");
+
+    await page.addInitScript((now) => {
+      (window as typeof window & { __testNow?: number }).__testNow = now;
+      const originalDateNow = Date.now.bind(Date);
+      Date.now = () =>
+        (window as typeof window & { __testNow?: number }).__testNow ??
+        originalDateNow();
+      window.localStorage.setItem("nyaruhodo_sleeping_safety_accepted", "1");
+      window.localStorage.setItem("active_cat_id", "retake-cat");
+      window.localStorage.setItem(
+        "cat_profiles",
+        JSON.stringify([
+          {
+            id: "retake-cat",
+            name: "retake cat",
+            createdAt: new Date(now).toISOString(),
+            updatedAt: new Date(now).toISOString(),
+          },
+        ]),
+      );
+    }, beforeDelivery);
+
+    await page.goto("/home");
+    await page.waitForLoadState("networkidle");
+
+    await page.getByTestId("home-empty-action").click();
+    await page.locator('input[type="file"]').last().setInputFiles({
+      name: "first-sleeping.png",
+      mimeType: "image/png",
+      buffer: testUploadPng,
+    });
+    await waitForOwnSleepingPhotoCount(page, 1);
+    await expect(page.getByTestId("home-retake-action")).toBeVisible();
+    const firstTargetId = await readEveningTargetOwnPhotoId(page, "2026-06-10");
+    expect(firstTargetId).toBeTruthy();
+
+    await page.evaluate(
+      (nextNow) => {
+        (window as typeof window & { __testNow?: number }).__testNow = nextNow;
+      },
+      beforeDelivery + 60_000,
+    );
+    await page.getByTestId("home-retake-action").click();
+    await page.locator('input[type="file"]').last().setInputFiles({
+      name: "second-sleeping.png",
+      mimeType: "image/png",
+      buffer: testUploadPng,
+    });
+    await waitForOwnSleepingPhotoCount(page, 2);
+
+    const storage = await page.evaluate(() => {
+      const photos = JSON.parse(
+        window.localStorage.getItem("nyaruhodo_exchange_own_sleeping_photos") ??
+          "[]",
+      );
+      const days = JSON.parse(
+        window.localStorage.getItem("neteruneko_evening_delivery_days") ?? "{}",
+      );
+      return {
+        latestOwnPhotoId: Array.isArray(photos) ? photos[0]?.id : null,
+        targetOwnPhotoId: days["2026-06-10"]?.targetOwnPhotoId ?? null,
+      };
+    });
+
+    expect(storage.latestOwnPhotoId).toBeTruthy();
+    expect(storage.latestOwnPhotoId).not.toBe(firstTargetId);
+    expect(storage.targetOwnPhotoId).toBe(storage.latestOwnPhotoId);
   });
 
   test("uses the stored delivery target cat instead of the selected cat", async ({

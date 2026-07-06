@@ -321,7 +321,9 @@ export function HomeDeskModel({
     hasUnopenedDeliveryNotification || homeDay.phase !== "opened";
   const shouldShowNotificationTray = shouldShowBaseNotice;
   const shouldShowHomeFrameTakeButton =
-    homeDay.phase === "empty-before" || homeDay.phase === "empty-after";
+    homeDay.phase === "empty-before" ||
+    homeDay.phase === "empty-after" ||
+    homeDay.phase === "sent-before";
   const shouldShowCatGalleryPhotoLink =
     Boolean(onAddCatPhoto) && Boolean(homePhoto) && homeDay.phase !== "delivered";
   const shouldHidePresence = true;
@@ -577,6 +579,7 @@ export function HomeDeskModel({
                     {shouldShowHomeFrameTakeButton ? (
                       <button
                         type="button"
+                        data-testid="home-retake-action"
                         style={deskStyles.homeAddPhotoButton}
                         onClick={onTakePhoto}
                         aria-label="ねがおを とる"

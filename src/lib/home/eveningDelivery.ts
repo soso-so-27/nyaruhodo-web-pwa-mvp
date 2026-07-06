@@ -111,9 +111,10 @@ export function recordEveningDeliveryTarget(
   const store = readEveningDeliveryStore();
   const targetDateKey = getEveningDeliveryTargetDateKey(now);
   const day = store[targetDateKey] ?? { dateKey: targetDateKey };
-  const isExchangeTarget = !day.targetOwnPhotoId;
+  const canReplaceTarget = !day.deliveredPhoto && !day.openedAt;
+  const isExchangeTarget = canReplaceTarget;
 
-  if (isExchangeTarget) {
+  if (canReplaceTarget) {
     store[targetDateKey] = {
       ...day,
       dateKey: targetDateKey,
