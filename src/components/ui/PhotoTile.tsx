@@ -1,6 +1,7 @@
 "use client";
 
 import type { CSSProperties, ReactNode } from "react";
+import type { StorageSignedUrlVariant } from "../../lib/photoStorage";
 import { color, radius, shadow, spacing, typography } from "./designTokens";
 import { StoredPhotoImage } from "./StoredPhotoImage";
 
@@ -27,6 +28,7 @@ type PhotoTileProps = {
   fetchPriority?: "high" | "low" | "auto";
   imageWidth?: number;
   imageHeight?: number;
+  storageVariant?: StorageSignedUrlVariant;
   fallbackSrcs?: string[];
   onStorageDataUrl?: (dataUrl: string) => void;
   onLoad?: () => void;
@@ -53,6 +55,7 @@ export function PhotoTile({
   fetchPriority,
   imageWidth,
   imageHeight,
+  storageVariant = "thumbnail",
   fallbackSrcs,
   onStorageDataUrl,
   onLoad,
@@ -85,7 +88,7 @@ export function PhotoTile({
           src={src}
           alt={alt}
           style={{ ...frameStyle, objectFit: fit }}
-          storageVariant="thumbnail"
+          storageVariant={storageVariant}
           loading={loading}
           fetchPriority={fetchPriority}
           width={imageWidth ?? getPhotoTileIntrinsicSize(size)}

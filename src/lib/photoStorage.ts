@@ -9,7 +9,7 @@ export type StorageSignedUrlVariant = (typeof STORAGE_SIGNED_URL_VARIANTS)[numbe
 
 const THUMBNAIL_TRANSFORM = {
   quality: 75,
-  width: 400,
+  width: 800,
 } as const;
 
 type BrowserSupabaseClient = NonNullable<

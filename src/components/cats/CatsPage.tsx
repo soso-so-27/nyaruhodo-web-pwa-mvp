@@ -318,7 +318,9 @@ export function CatsPage() {
   const activeCoverPhoto =
     activeCatGalleryLensPhotos[0] ?? stableSleepingCoverPhoto;
   const activeCoverSrc =
-    activeCatProfile?.avatarDataUrl ?? activeCoverPhoto?.src ?? activeAvatarSrc;
+    activeCatProfile?.avatarDataUrl ??
+    (activeCoverPhoto ? getLensPhotoDetailSrc(activeCoverPhoto) : undefined) ??
+    activeAvatarSrc;
   const activeCoverFit =
     hasCustomThumbnail || activeCoverPhoto ? "cover" : "contain";
   useEffect(() => {
@@ -1303,6 +1305,7 @@ export function CatsPage() {
                       variant="bare"
                       fit={activeCoverFit}
                       aspect="auto"
+                      storageVariant="display"
                       loading="eager"
                       style={styles.profileCoverTileRoot}
                       imageStyle={styles.profileCoverImage}
