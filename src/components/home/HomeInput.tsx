@@ -130,9 +130,6 @@ type DeliveredPhotoDecodeEntry = {
 };
 
 const DELIVERED_PHOTO_DECODE_WAIT_MS = 1500;
-const EVENING_OPENING_STOW_MS = 520;
-const EVENING_OPENING_STOW_EASING = "cubic-bezier(0.22, 1, 0.36, 1)";
-const EVENING_STAMP_TARGET_TEST_ID = "home-stamp-pair-stamp";
 
 type LockData = {
   yousuLockedUntil?: number;
@@ -3330,19 +3327,6 @@ function usePrefersReducedMotion() {
   return prefersReducedMotion;
 }
 
-function isUsableRect(rect: DOMRect | undefined): rect is DOMRect {
-  return Boolean(rect && rect.width > 0 && rect.height > 0);
-}
-
-type EveningOpeningFlyerState = {
-  left: number;
-  top: number;
-  width: number;
-  height: number;
-  transform: string;
-  isAnimating: boolean;
-};
-
 function EveningDeliveryOpening({
   state,
   catName,
@@ -3355,14 +3339,12 @@ function EveningDeliveryOpening({
   onClose: () => void;
 }) {
   const prefersReducedMotion = usePrefersReducedMotion();
-  const photoFrameRef = useRef<HTMLDivElement | null>(null);
   const closeTimerRef = useRef<number | null>(null);
   const isClosingRef = useRef(false);
   const pushedHistoryRef = useRef(false);
   const ignoreNextPopRef = useRef(false);
   const requestCloseRef = useRef<(syncHistory?: boolean) => void>(() => undefined);
   const [isClosing, setIsClosing] = useState(false);
-  const [flyer, setFlyer] = useState<EveningOpeningFlyerState | null>(null);
 
   function finishClose() {
     if (closeTimerRef.current) {
@@ -3388,48 +3370,12 @@ function EveningDeliveryOpening({
       return;
     }
 
-    const sourceRect = photoFrameRef.current?.getBoundingClientRect();
-    const targetRect = document
-      .querySelector<HTMLElement>(`[data-testid="${EVENING_STAMP_TARGET_TEST_ID}"]`)
-      ?.getBoundingClientRect();
-
-    if (!isUsableRect(sourceRect) || !isUsableRect(targetRect)) {
-      finishClose();
-      return;
-    }
-
     isClosingRef.current = true;
     setIsClosing(true);
-    setFlyer({
-      left: sourceRect.left,
-      top: sourceRect.top,
-      width: sourceRect.width,
-      height: sourceRect.height,
-      transform: "translate3d(0, 0, 0) scale(1) rotate(0deg)",
-      isAnimating: false,
-    });
-
-    window.requestAnimationFrame(() => {
-      window.requestAnimationFrame(() => {
-        setFlyer((current) =>
-          current
-            ? {
-                ...current,
-                transform: `translate3d(${targetRect.left - sourceRect.left}px, ${
-                  targetRect.top - sourceRect.top
-                }px, 0) scale(${targetRect.width / sourceRect.width}, ${
-                  targetRect.height / sourceRect.height
-                }) rotate(4deg)`,
-                isAnimating: true,
-              }
-            : current,
-        );
-      });
-    });
 
     closeTimerRef.current = window.setTimeout(
       finishClose,
-      EVENING_OPENING_STOW_MS,
+      160,
     );
   }
   requestCloseRef.current = requestClose;
@@ -3493,7 +3439,6 @@ function EveningDeliveryOpening({
           どこかのねがおが届きました
         </p>
         <div
-          ref={photoFrameRef}
           style={{
             ...styles.eveningOpeningPhotoFrame,
             ...(isClosing ? styles.eveningOpeningPhotoFrameClosing : {}),
@@ -3521,29 +3466,6 @@ function EveningDeliveryOpening({
         </AppButton>
         <p style={styles.eveningOpeningAfterword}>また、あした</p>
       </div>
-      {flyer ? (
-        <div
-          data-testid="evening-opening-flyer"
-          style={{
-            ...styles.eveningOpeningFlyer,
-            left: flyer.left,
-            top: flyer.top,
-            width: flyer.width,
-            height: flyer.height,
-            transform: flyer.transform,
-            transition: flyer.isAnimating
-              ? `transform ${EVENING_OPENING_STOW_MS}ms ${EVENING_OPENING_STOW_EASING}`
-              : "none",
-          }}
-        >
-          <StoredPhotoImage
-            src={getPhotoDetailSrc(state.deliveredPhoto)}
-            fallbackSrcs={getPhotoFallbackSrcs(state.deliveredPhoto)}
-            alt=""
-            style={styles.eveningOpeningFlyerPhoto}
-          />
-        </div>
-      ) : null}
     </div>
   );
 }
@@ -7683,27 +7605,6 @@ const styles = {
   eveningOpeningPairStageClosing: {
     opacity: 0,
     pointerEvents: "none",
-  },
-  eveningOpeningFlyer: {
-    position: "fixed",
-    zIndex: 3,
-    padding: "6px",
-    borderRadius: "22px",
-    background: "color-mix(in srgb, var(--paper-card) 68%, transparent)",
-    boxShadow:
-      "0 1px 0 rgba(255,255,255,.52) inset, 0 16px 38px rgba(96,78,54,0.12)",
-    boxSizing: "border-box",
-    overflow: "hidden",
-    transformOrigin: "top left",
-    willChange: "transform",
-    pointerEvents: "none",
-  },
-  eveningOpeningFlyerPhoto: {
-    width: "100%",
-    height: "100%",
-    objectFit: "cover",
-    borderRadius: "17px",
-    background: "rgba(255,253,248,0.72)",
   },
   eveningOpeningPairCard: {
     width: "100%",

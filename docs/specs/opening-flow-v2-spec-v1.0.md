@@ -1,118 +1,28 @@
-# 仕様: 開封フロー v2 — 「ひらくは静止、しまうが動く」
+# Opening Flow v2 Spec v1.0 - Deprecated
 
-> 対象: Codex実装用。自己完結。前提資料: docs/opening-flow-inventory-2026-07.md
-> 方針確定事項: 長押しは復活しない（タップ維持）。開封演出は現状の簡略型を維持。
-> モーションは「しまう」（オーバーレイを閉じる瞬間）にのみ置く。
-> 優先度: P1（投稿3ブロッカーではない。ただしP3までに入れたい）
+Date: 2026-07-06
 
----
+This file used to describe a home state4 `StampPair` direction. That direction
+caused the opened home to regress to the old stamp-pair look and is no longer
+valid.
 
-## 0. 体験の全体像（実装前にこれだけ読めば分かる要約)
+Use `docs/specs/opening-flow-v2.md` as the canonical spec.
 
-1. 20時、封筒がとどく（現状のまま）
-2. タップでひらく → 180msで封筒が消え、**届いた写真が一枚、全画面で静かに出る**（現状のまま。
-   ただし写真は事前decode済みで、遅れて出ることがなくなる）
-3. 閉じる操作をすると、**全画面の写真が縮みながら移動し、ホームの自分のねがお（絵葉書）の
-   右上に切手として貼られ、4度傾いて止まる**（新規・本仕様の中心）
-4. 以後、ホームは一日中この StampPair 状態（自分のねがお大＋受信切手）＝ state4（新規接続）
+## Deprecated Direction
 
-## 1. StampPair のホーム state4 接続【乖離#6/#7の解消】
+The following ideas from the original v1.0 spec are rejected:
 
-- `src/components/ui/StampPair.tsx`（実装済み・未接続）をホームの開封済み状態の表示に接続する
-- 表示内容: 自分のきょうのねがお（大・絵葉書）＋ 受信写真（切手サイズ・右上・`rotate(4deg)`）
-- 自分のねがおが無い日（とっていない日に過去分を見る場合等）は StampPair の既存仕様
-  （切手位置が空く）に従う
-- 翌朝5時の自動開封（`openedBy: "system"`）は**モーションなしで直接この state4 を表示**
-- アルバム「まいにち」側で同レイアウトを使っている場合は共通コンポーネントに寄せる
-  （実装調査の上、無理な統合はしない。見た目の一致が目的）
+- The opened home mounts the old paired/stamp layout.
+- The delivered photo is permanently shown as a stamp on the home screen.
+- The close animation targets a stamp slot.
+- System-opened deliveries render the opened `StampPair` directly.
 
-## 2. 受信写真の事前decode【「写真が遅れて出る」の根治】
+## Current Rule
 
-- `EveningHomeState.kind` が `delivered` になった時点（＝封筒が出た時点）で、
-  受信写真のプリロードを開始する:
-  1. signed URL を解決（既存の `StoredPhotoImage` の解決経路を関数として再利用）
-  2. `new Image()` に読み込み、`img.decode()` の完了を待つ
-  3. 完了フラグを state/ref に保持
-- タップ時: decode完了済みなら即オーバーレイ表示。未完了なら**最大1500ms待ってから**
-  現状のフォールバック挙動（既存のスケルトン/checking表示）に落ちる
-- signed URL の期限切れに注意: プリロードから開封まで時間が空く可能性がある（最長: 20時→翌朝5時)。
-  URL失効時はタップ時に再解決してリトライする経路を残す
-- 追加のネットワーク負荷は1枚分のみ。20時の交換API成功直後が自然な開始点
+Opened home returns to the normal home photo frame. The old stamp pair must not
+be mounted on `/home`.
 
-## 3. 「しまう」モーション【本仕様の中心・新規】
+See:
 
-### 3.1 トリガー
-- オーバーレイの閉じる操作すべて: 閉じるボタン / 背景（scrim）タップ / ブラウザバック
-- どの経路でも同じモーションで閉じる
-
-### 3.2 動き（FLIP・1要素・transformのみ）
-1. 閉じる操作の瞬間、ホーム側 StampPair の**切手スロットの boundingClientRect を取得**
-   （state4 はオーバーレイの背面に既にレンダリングされていること——閉じる前に
-   ホームの状態を opened に確定させ、背面を StampPair にしておく）
-2. オーバーレイの写真要素（またはその複製を `position: fixed` で重ねたもの）を、
-   現在の全画面位置から切手スロットの位置へ `transform: translate(...) scale(...) rotate(4deg)`
-   でアニメーション
-3. 同時にオーバーレイの紙背景・見出し・ボタンは opacity フェードアウト（transformしない）
-4. アニメーション完了後、複製を破棄し、背面の StampPair の実切手を表示（opacity 0→1 を
-   複製破棄と同フレームで。二重表示・空白フレームを作らない）
-
-### 3.3 パラメータ
-- 所要: **520ms**。イージング: `cubic-bezier(0.22, 1, 0.36, 1)`（減速して静かに着地）
-- 使用プロパティ: `transform` と `opacity` のみ。**blur / filter / box-shadowのアニメーション禁止**
-  （棚卸で確認された前回失敗要因を踏まない）
-- `will-change: transform` を複製要素にのみ付与し、完了後に外す
-- 回転は 0deg → 4deg をtransformに含める（着地の瞬間に傾くのではなく、移動中に自然に傾く）
-
-### 3.4 フォールバック
-- `prefers-reduced-motion: reduce`: モーションなし。オーバーレイは現状どおりフェードで閉じ、
-  state4 が即時表示される
-- rect取得失敗・背面未レンダリング等の異常時: reduced-motion と同じ即時経路に落ちる
-  （モーションの失敗で閉じられなくなる事故を構造的に排除）
-
-## 4. 仕様書側の改訂（コードと同時にdocsを直す）
-
-- `docs/design/neteruneko-design-brief.md`: 長押し開封（「おさえて ひらく」・現像・離すと閉じる）の
-  記述を削除し、タップ開封＋しまうモーションの記述に置換
-- `docs/envelope-reveal-audit.md` の旧数値（2200ms）を現行値に更新
-- 本仕様を `docs/specs/opening-flow-v2.md` としてコミット
-
-## 5. スコープ外
-
-- 残骸コードの削除（棚卸§7のリスト。admin preview / design handoff の利用継続確認が先。別タスク）
-- `HomeEnvelopeMotionArt`・Rive資産の扱い（同上）
-- 開封音・触覚フィードバックの追加
-- state2（待ち状態）側の変更
-
-## 6. テスト
-
-### 6.1 E2E（自動）
-1. 開封後、ホームが StampPair 表示（自分大＋切手・rotate属性）になる
-2. 自分のねがおが無い日は切手位置が空の StampPair になる
-3. delivered 状態で受信写真のプリロードが開始される（decode完了フラグの検証）
-4. reduced-motion 環境で閉じた場合、即時に state4 になる（モーション要素が出ない）
-5. 翌朝5時自動開封経路で、モーションなしに state4 になる
-
-### 6.2 実機（必須・Playwrightで代替不可）
-- iPhone Safari/PWA 実機で「しまう」モーションの**動画を撮る**（確立済みルール:
-  ジェスチャ・モーションは実機動画で検証）
-- 確認観点: 60fpsで滑らかか / 着地時の二重表示・空白フレームがないか /
-  scrimタップ・戻る操作でも同じ動きか / 写真が遅れて出る現象が消えているか
-
-## 7. 完了条件
-
-- [ ] StampPair がホーム state4 に接続され、アルバム側と見た目が一致
-- [ ] decode同期により、タップ→写真表示が即時（実機で体感確認）
-- [ ] しまうモーションが実機動画で確認済み
-- [ ] E2E 5本グリーン
-- [ ] design brief / audit doc の改訂
-- [ ] `npm run typecheck` / `npm run build` / 既存E2E回帰なし
-
-## 8. 報告フォーマット
-
-- コミットハッシュ
-- 実機動画のパス（artifacts/ 可）
-- E2E結果
-- StampPair共通化の判断（したか・しなかったか・理由一行）
-
----
-改訂履歴: v1.0 (2026-07-05) 初版
+- `docs/specs/opening-flow-v2.md`
+- `tests/e2e/home-desk-model.spec.ts`
