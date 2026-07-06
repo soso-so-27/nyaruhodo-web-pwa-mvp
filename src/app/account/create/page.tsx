@@ -22,7 +22,7 @@ import { trackProductEvent } from "../../../lib/analytics/productAnalytics";
 import { writeAuthDebugEvent } from "../../../lib/authDebug";
 import {
   markOnboardingAlbumCreated,
-  normalizeOnboardingSource,
+  readOnboardingSourceFromLocation,
   type OnboardingSource,
 } from "../../../lib/onboarding/progress";
 import { createOnboardingHandoff } from "../../../lib/onboarding/handoff";
@@ -694,12 +694,6 @@ function loadGoogleIdentityScript() {
     script.onerror = () => reject(new Error("Google Identity script failed"));
     document.head.appendChild(script);
   });
-}
-
-function readOnboardingSourceFromLocation() {
-  return normalizeOnboardingSource(
-    new URLSearchParams(window.location.search).get("source"),
-  );
 }
 
 function createAuthCallbackUrl({ nextPath }: { nextPath: string }) {

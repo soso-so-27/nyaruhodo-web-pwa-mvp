@@ -359,7 +359,8 @@ async function handleExchangePost(request: Request) {
     deliveredSourceMomentIds,
   };
 
-  const fastCandidateMode = readFastCandidateMode();
+  const isOnboardingExchange = input.mode === "onboarding";
+  const fastCandidateMode = isOnboardingExchange ? "tiered" : readFastCandidateMode();
   const fastRows =
     fastCandidateMode === "admin_storage"
       ? await readFastStockCandidateRows(supabase)
@@ -392,11 +393,19 @@ async function handleExchangePost(request: Request) {
       remoteRows.filter((row) => isRowDeliverable(row, deliverableContext)),
       input,
     );
-    candidates = tieredRows.filter((row) => getDeliveryTier(row, input) < 3);
-    fallbackCandidates = tieredRows.filter(
-      (row) => getDeliveryTier(row, input) === 3,
-    );
-    candidatePool = tieredRows;
+    if (isOnboardingExchange) {
+      candidates = [];
+      fallbackCandidates = tieredRows.filter(
+        (row) => readPoolKind(row.metadata) === "admin_stock",
+      );
+      candidatePool = fallbackCandidates;
+    } else {
+      candidates = tieredRows.filter((row) => getDeliveryTier(row, input) < 3);
+      fallbackCandidates = tieredRows.filter(
+        (row) => getDeliveryTier(row, input) === 3,
+      );
+      candidatePool = tieredRows;
+    }
     selected = await selectCandidate(candidatePool, input, supabase);
     fastPathActive = false;
     markExchangeTiming(timing, "select_full_pool");

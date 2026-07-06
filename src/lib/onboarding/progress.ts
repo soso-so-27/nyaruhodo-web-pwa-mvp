@@ -49,6 +49,8 @@ const ALLOWED_SOURCES = new Set<OnboardingSource>([
   "referral",
 ]);
 
+const ONBOARDING_SOURCE_QUERY_KEYS = ["src", "source", "utm_source"] as const;
+
 export function normalizeOnboardingSource(value: string | null) {
   if (!value) {
     return "direct" satisfies OnboardingSource;
@@ -59,6 +61,51 @@ export function normalizeOnboardingSource(value: string | null) {
   return ALLOWED_SOURCES.has(normalized as OnboardingSource)
     ? (normalized as OnboardingSource)
     : ("unknown" satisfies OnboardingSource);
+}
+
+export function readOnboardingSourceFromLocation() {
+  if (typeof window === "undefined") {
+    return "direct" satisfies OnboardingSource;
+  }
+
+  const params = new URLSearchParams(window.location.search);
+  if (params.has("ref") || params.has("referral") || params.has("invite")) {
+    writeOnboardingSourceToSession("referral");
+    return "referral" satisfies OnboardingSource;
+  }
+
+  for (const key of ONBOARDING_SOURCE_QUERY_KEYS) {
+    const raw = params.get(key);
+    if (raw) {
+      const source = normalizeOnboardingSource(raw);
+      writeOnboardingSourceToSession(source);
+      return source;
+    }
+  }
+
+  const stored = readOnboardingSourceFromSession();
+  return stored ?? ("direct" satisfies OnboardingSource);
+}
+
+export function readOnboardingSourceFromSession() {
+  if (typeof window === "undefined") {
+    return null;
+  }
+
+  try {
+    const stored = window.sessionStorage.getItem(STORAGE_KEYS.onboardingSource);
+    return isOnboardingSource(stored) ? stored : null;
+  } catch {
+    return null;
+  }
+}
+
+function writeOnboardingSourceToSession(source: OnboardingSource) {
+  try {
+    window.sessionStorage.setItem(STORAGE_KEYS.onboardingSource, source);
+  } catch {
+    // Attribution should never block onboarding.
+  }
 }
 
 export function readOnboardingProgress() {

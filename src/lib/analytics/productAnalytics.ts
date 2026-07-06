@@ -16,8 +16,10 @@ const SOCIAL_SOURCE_VALUES = new Set([
   "twitter",
   "tiktok",
   "line",
+  "referral",
 ]);
 const ATTRIBUTION_PROPERTY_KEYS = [
+  "src",
   "utm_source",
   "utm_medium",
   "utm_campaign",
@@ -51,6 +53,7 @@ type AppEventSource =
   | "instagram_story"
   | "instagram_bio"
   | "instagram_dm"
+  | "referral"
   | "direct"
   | "unknown";
 
@@ -246,10 +249,9 @@ function getOrCreateSessionId() {
 }
 
 function getTrafficSource(): ProductAnalyticsEvent["source"] {
-  const params = new URLSearchParams(window.location.search);
-  const source = params.get("source") || params.get("utm_source");
+  const source = readAttributionSource().raw;
   if (source) {
-    return SOCIAL_SOURCE_VALUES.has(source.toLowerCase()) ? "sns" : "unknown";
+    return SOCIAL_SOURCE_VALUES.has(source.trim().toLowerCase()) ? "sns" : "unknown";
   }
 
   if (window.matchMedia?.("(display-mode: standalone)").matches) {
@@ -260,8 +262,7 @@ function getTrafficSource(): ProductAnalyticsEvent["source"] {
 }
 
 function getAppEventSource(): AppEventSource {
-  const params = new URLSearchParams(window.location.search);
-  return normalizeAppEventSource(params.get("source") || params.get("utm_source"));
+  return readAttributionSource().normalized;
 }
 
 function normalizeAppEventSource(source: string | null | undefined): AppEventSource {
@@ -271,7 +272,8 @@ function normalizeAppEventSource(source: string | null | undefined): AppEventSou
     normalized === "instagram" ||
     normalized === "instagram_story" ||
     normalized === "instagram_bio" ||
-    normalized === "instagram_dm"
+    normalized === "instagram_dm" ||
+    normalized === "referral"
   ) {
     return normalized;
   }
@@ -298,10 +300,12 @@ function normalizeAppEventSource(source: string | null | undefined): AppEventSou
 function getAttributionProperties() {
   const params = new URLSearchParams(window.location.search);
   const properties: Record<string, string> = {};
+  const attribution = readAttributionSource();
 
-  const sourceParam = params.get("source");
-  if (sourceParam) {
-    properties.source_param = sourceParam.slice(0, 160);
+  properties.source = attribution.normalized;
+
+  if (attribution.raw) {
+    properties.source_param = attribution.raw.slice(0, 160);
   }
 
   for (const key of ATTRIBUTION_PROPERTY_KEYS) {
@@ -312,6 +316,45 @@ function getAttributionProperties() {
   }
 
   return properties;
+}
+
+function readAttributionSource(): {
+  raw: string | null;
+  normalized: AppEventSource;
+} {
+  const params = new URLSearchParams(window.location.search);
+  if (params.has("ref") || params.has("referral") || params.has("invite")) {
+    try {
+      window.sessionStorage.setItem(STORAGE_KEYS.onboardingSource, "referral");
+    } catch {
+      // Attribution persistence is best-effort.
+    }
+    return { raw: "referral", normalized: "referral" };
+  }
+
+  const raw =
+    params.get("src") ?? params.get("source") ?? params.get("utm_source");
+
+  if (raw) {
+    const normalized = normalizeAppEventSource(raw);
+    try {
+      window.sessionStorage.setItem(STORAGE_KEYS.onboardingSource, normalized);
+    } catch {
+      // Attribution persistence is best-effort.
+    }
+    return { raw, normalized };
+  }
+
+  try {
+    const stored = window.sessionStorage.getItem(STORAGE_KEYS.onboardingSource);
+    if (stored) {
+      return { raw: null, normalized: normalizeAppEventSource(stored) };
+    }
+  } catch {
+    // Fall through.
+  }
+
+  return { raw: null, normalized: "direct" };
 }
 
 function createId() {
@@ -387,6 +430,7 @@ function getAnalyticsSource(metadata: Record<string, unknown>): AppEventSource {
     raw === "instagram_story" ||
     raw === "instagram_bio" ||
     raw === "instagram_dm" ||
+    raw === "referral" ||
     raw === "ig" ||
     raw === "direct"
   ) {

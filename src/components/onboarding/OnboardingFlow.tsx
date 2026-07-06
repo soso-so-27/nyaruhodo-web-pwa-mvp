@@ -22,9 +22,9 @@ import {
 import {
   createOnboardingSubmissionId,
   getOrCreateOnboardingAnonymousId,
-  normalizeOnboardingSource,
   patchOnboardingProgress,
   readCurrentOnboardingProgress,
+  readOnboardingSourceFromLocation,
   writeOnboardingProgress,
   type OnboardingProgress,
   type OnboardingSource,
@@ -67,8 +67,19 @@ type OnboardingPhotoDebugInfo = {
   errorMessage?: string;
 };
 
+type OnboardingInstallPlatform = "ios" | "android";
+
+type BeforeInstallPromptEvent = Event & {
+  prompt: () => Promise<void>;
+  userChoice?: Promise<{ outcome: "accepted" | "dismissed"; platform: string }>;
+};
+
 const ONBOARDING_ALBUM_COMPLETION_READY_KEY =
   "neteruneko_onboarding_album_completion_ready";
+const ONBOARDING_SECOND_PHOTO_INTENT_KEY =
+  "neteruneko_onboarding_second_photo_intent";
+const ONBOARDING_INSTALL_GUIDE_DISMISSED_KEY =
+  "neteruneko_onboarding_install_guide_dismissed";
 const ONBOARDING_PHOTO_DEBUG_STORAGE_KEY = "neteruneko_onboarding_photo_debug";
 const ONBOARDING_FALLBACK_DELIVERY_SRC =
   "/illustrations/sleeping-cat-empty.webp";
@@ -107,6 +118,11 @@ export function OnboardingFlow() {
   const [hasCopiedExternalBrowserUrl, setHasCopiedExternalBrowserUrl] =
     useState(false);
   const [isEmbeddedBrowser, setIsEmbeddedBrowser] = useState(false);
+  const [installPlatform, setInstallPlatform] =
+    useState<OnboardingInstallPlatform | null>(null);
+  const [installPrompt, setInstallPrompt] =
+    useState<BeforeInstallPromptEvent | null>(null);
+  const [isInstallGuideDismissed, setIsInstallGuideDismissed] = useState(false);
   const [isOpeningEnvelope, setIsOpeningEnvelope] = useState(false);
   const [catNameDraft, setCatNameDraft] = useState("");
   const prefersReducedMotion = usePrefersReducedMotion();
@@ -122,7 +138,21 @@ export function OnboardingFlow() {
   const revealPhotoErrorTrackedRef = useRef("");
   const catNamePromptTrackedPhotoRef = useRef("");
   const entrySourceRef = useRef<OnboardingSource>(entrySource);
+  const secondPhotoPromptTrackedRef = useRef(false);
+  const installGuideTrackedRef = useRef(false);
   const canShowTestTools = isTestMode && !IS_PRODUCTION;
+  const shouldShowSecondPhotoPrompt =
+    state === "delivered" &&
+    Boolean(deliveredPhoto) &&
+    isDeliveredPhotoKept &&
+    isBeforeJstHour(20);
+  const shouldShowInstallGuide =
+    state === "delivered" &&
+    Boolean(deliveredPhoto) &&
+    isDeliveredPhotoKept &&
+    Boolean(installPlatform) &&
+    !isEmbeddedBrowser &&
+    !isInstallGuideDismissed;
 
   function markOnboardingAlbumCompletionReady() {
     window.sessionStorage.setItem(ONBOARDING_ALBUM_COMPLETION_READY_KEY, "true");
@@ -189,6 +219,36 @@ export function OnboardingFlow() {
 
     setIsPhotoDebugMode(enabled);
     setIsEmbeddedBrowser(isEmbeddedInAppBrowser());
+    setIsInstallGuideDismissed(readOnboardingInstallGuideDismissed());
+    if (!isStandaloneDisplay() && !isEmbeddedInAppBrowser()) {
+      setInstallPlatform(getOnboardingInstallPlatform());
+    }
+  }, []);
+
+  useEffect(() => {
+    const handleBeforeInstallPrompt = (event: Event) => {
+      event.preventDefault();
+      setInstallPrompt(event as BeforeInstallPromptEvent);
+      if (!isStandaloneDisplay() && !isEmbeddedInAppBrowser()) {
+        setInstallPlatform("android");
+      }
+    };
+    const handleAppInstalled = () => {
+      trackProductEvent("pwa_install_guide_completed", {
+        source: getEffectiveEntrySource(),
+        surface: "onboarding",
+        method: "installed",
+      });
+      dismissOnboardingInstallGuide();
+    };
+
+    window.addEventListener("beforeinstallprompt", handleBeforeInstallPrompt);
+    window.addEventListener("appinstalled", handleAppInstalled);
+
+    return () => {
+      window.removeEventListener("beforeinstallprompt", handleBeforeInstallPrompt);
+      window.removeEventListener("appinstalled", handleAppInstalled);
+    };
   }, []);
 
   useEffect(() => {
@@ -237,6 +297,31 @@ export function OnboardingFlow() {
     autoKeptDeliveredPhotoIdRef.current = deliveredPhoto.id;
     markDeliveredPhotoReadyForOnboarding();
   }, [state, deliveredPhoto, isDeliveredPhotoKept]);
+
+  useEffect(() => {
+    if (!shouldShowSecondPhotoPrompt || secondPhotoPromptTrackedRef.current) {
+      return;
+    }
+
+    secondPhotoPromptTrackedRef.current = true;
+    trackProductEvent("onboarding_second_photo_prompt_view", {
+      source: getEffectiveEntrySource(),
+    });
+  }, [shouldShowSecondPhotoPrompt]);
+
+  useEffect(() => {
+    if (!shouldShowInstallGuide || installGuideTrackedRef.current) {
+      return;
+    }
+
+    installGuideTrackedRef.current = true;
+    trackProductEvent("pwa_install_prompt_view", {
+      source: getEffectiveEntrySource(),
+      surface: "onboarding",
+      platform: installPlatform,
+      can_prompt: Boolean(installPrompt),
+    });
+  }, [installPlatform, installPrompt, shouldShowInstallGuide]);
 
   useEffect(() => {
     return () => {
@@ -740,6 +825,60 @@ export function OnboardingFlow() {
     router.push(
       `/account/create?from=onboarding&source=${encodeURIComponent(getEffectiveEntrySource())}`,
     );
+  }
+
+  function handleStartSecondPhoto() {
+    if (!isDeliveredPhotoKept) {
+      return;
+    }
+
+    markOnboardingAlbumCompletionReady();
+    try {
+      window.sessionStorage.setItem(ONBOARDING_SECOND_PHOTO_INTENT_KEY, "true");
+    } catch {
+      // Intent tracking should never block the next step.
+    }
+    trackProductEvent("onboarding_second_photo_submitted", {
+      source: getEffectiveEntrySource(),
+      surface: "onboarding_delivered",
+    });
+    router.push("/home?from=onboarding_second_photo");
+  }
+
+  async function handleOnboardingInstallPrimary() {
+    if (installPlatform === "android" && installPrompt) {
+      const prompt = installPrompt;
+      setInstallPrompt(null);
+      await prompt.prompt();
+      const choice = await prompt.userChoice?.catch(() => null);
+      trackProductEvent("pwa_install_guide_completed", {
+        source: getEffectiveEntrySource(),
+        surface: "onboarding",
+        method: choice?.outcome === "accepted" ? "accepted" : "dismissed",
+      });
+      if (choice?.outcome === "accepted") {
+        dismissOnboardingInstallGuide();
+      }
+      return;
+    }
+
+    trackProductEvent("pwa_install_guide_completed", {
+      source: getEffectiveEntrySource(),
+      surface: "onboarding",
+      method: "guide_read",
+      platform: installPlatform,
+    });
+    dismissOnboardingInstallGuide();
+  }
+
+  function dismissOnboardingInstallGuide() {
+    setIsInstallGuideDismissed(true);
+    setInstallPrompt(null);
+    try {
+      window.localStorage.setItem(ONBOARDING_INSTALL_GUIDE_DISMISSED_KEY, "true");
+    } catch {
+      // Install guide should never block onboarding completion.
+    }
   }
 
   function markDeliveredPhotoReadyForOnboarding() {
@@ -1358,6 +1497,38 @@ export function OnboardingFlow() {
                   )
                 : "届いた写真を、ねこだよりに入れています。"}
             </p>
+            {shouldShowSecondPhotoPrompt ? (
+              <>
+                <p style={styles.resultText}>
+                  きょうの よる8時にも、もう一通とどきます。
+                  <br />
+                  もう一枚、いれておきますか。
+                </p>
+                <AppButton
+                  type="button"
+                  onClick={handleStartSecondPhoto}
+                  disabled={!isDeliveredPhotoKept}
+                  fullWidth
+                  style={styles.onboardingCta}
+                >
+                  もう一枚いれておく
+                </AppButton>
+              </>
+            ) : isDeliveredPhotoKept ? (
+              <p style={styles.resultText}>
+                あしたの よる8時に、つぎの一通がとどきます。
+              </p>
+            ) : null}
+            {shouldShowInstallGuide && installPlatform ? (
+              <OnboardingInstallGuide
+                platform={installPlatform}
+                canPrompt={Boolean(installPrompt)}
+                onPrimary={() => {
+                  void handleOnboardingInstallPrimary();
+                }}
+                onDismiss={dismissOnboardingInstallGuide}
+              />
+            ) : null}
             <AppButton
               type="button"
               onClick={
@@ -1474,6 +1645,61 @@ function DeliveryWaiting() {
   );
 }
 
+function OnboardingInstallGuide({
+  platform,
+  canPrompt,
+  onPrimary,
+  onDismiss,
+}: {
+  platform: OnboardingInstallPlatform;
+  canPrompt: boolean;
+  onPrimary: () => void;
+  onDismiss: () => void;
+}) {
+  const steps =
+    platform === "ios"
+      ? ["共有ボタンをひらく", "ホーム画面に追加をえらぶ", "追加をおす"]
+      : canPrompt
+        ? ["このボタンから、ホーム画面に追加できます。"]
+        : ["Chromeのメニューをひらく", "アプリをインストール、またはホーム画面に追加をえらぶ"];
+  const primaryLabel = platform === "android" && canPrompt ? "ホーム画面に追加する" : "わかった";
+
+  return (
+    <section
+      style={styles.installGuide}
+      aria-label="ホーム画面に追加する案内"
+      data-testid="onboarding-install-guide"
+    >
+      <p style={styles.installGuideTitle}>
+        とどく場所を、さきに作っておきましょう
+      </p>
+      <p style={styles.installGuideText}>
+        ホーム画面に置いておくと、あしたからの一通をすぐ見られます。
+      </p>
+      <ol style={styles.installGuideList}>
+        {steps.map((step) => (
+          <li key={step} style={styles.installGuideItem}>
+            {step}
+          </li>
+        ))}
+      </ol>
+      <div style={styles.installGuideActions}>
+        <AppButton
+          type="button"
+          variant="secondary"
+          size="sm"
+          onClick={onPrimary}
+        >
+          {primaryLabel}
+        </AppButton>
+        <AppButton type="button" variant="quiet" size="sm" onClick={onDismiss}>
+          あとで
+        </AppButton>
+      </div>
+    </section>
+  );
+}
+
 function ExternalBrowserGuide({
   copied,
   onCopy,
@@ -1585,20 +1811,6 @@ function usePrefersReducedMotion() {
   return prefersReducedMotion;
 }
 
-function readOnboardingSourceFromLocation() {
-  if (typeof window === "undefined") {
-    return "direct" satisfies OnboardingSource;
-  }
-
-  if (hasReferralQueryInLocation()) {
-    return "referral" satisfies OnboardingSource;
-  }
-
-  return normalizeOnboardingSource(
-    new URLSearchParams(window.location.search).get("source"),
-  );
-}
-
 function hasReferralQueryInLocation() {
   if (typeof window === "undefined") {
     return false;
@@ -1606,6 +1818,20 @@ function hasReferralQueryInLocation() {
 
   const params = new URLSearchParams(window.location.search);
   return params.has("ref") || params.has("referral") || params.has("invite");
+}
+
+function isBeforeJstHour(hour: number) {
+  const currentHour = Number(
+    new Intl.DateTimeFormat("ja-JP", {
+      hour: "2-digit",
+      hour12: false,
+      timeZone: "Asia/Tokyo",
+    })
+      .formatToParts(new Date())
+      .find((part) => part.type === "hour")?.value,
+  );
+
+  return Number.isFinite(currentHour) && currentHour < hour;
 }
 
 function isEmbeddedInAppBrowser() {
@@ -1623,6 +1849,55 @@ function isEmbeddedInAppBrowser() {
     ua.includes("twitter") ||
     ua.includes("micromessenger")
   );
+}
+
+function isStandaloneDisplay() {
+  if (typeof window === "undefined") {
+    return false;
+  }
+
+  const navigatorWithStandalone = window.navigator as Navigator & {
+    standalone?: boolean;
+  };
+
+  return (
+    window.matchMedia?.("(display-mode: standalone)").matches === true ||
+    window.matchMedia?.("(display-mode: fullscreen)").matches === true ||
+    navigatorWithStandalone.standalone === true
+  );
+}
+
+function getOnboardingInstallPlatform(): OnboardingInstallPlatform | null {
+  if (typeof window === "undefined") {
+    return null;
+  }
+
+  const ua = window.navigator.userAgent;
+
+  if (/iPad|iPhone|iPod/i.test(ua)) {
+    return "ios";
+  }
+
+  if (/Android/i.test(ua)) {
+    return "android";
+  }
+
+  return null;
+}
+
+function readOnboardingInstallGuideDismissed() {
+  if (typeof window === "undefined") {
+    return false;
+  }
+
+  try {
+    return (
+      window.localStorage.getItem(ONBOARDING_INSTALL_GUIDE_DISMISSED_KEY) ===
+      "true"
+    );
+  } catch {
+    return false;
+  }
 }
 
 function readOnboardingPhotoDebugEnabled() {
@@ -2309,6 +2584,60 @@ const styles = {
     fontWeight: 400,
     lineHeight: 1.7,
     padding: "9px 11px",
+  },
+  installGuide: {
+    width: "min(100%, 286px)",
+    display: "grid",
+    gap: "8px",
+    margin: "4px 0 0",
+    padding: "13px 14px",
+    boxSizing: "border-box",
+    border: "1px solid rgba(120,108,94,0.12)",
+    borderRadius: "18px",
+    background:
+      "linear-gradient(180deg, rgba(255,253,248,0.72), rgba(250,244,235,0.56))",
+    boxShadow: "0 12px 28px -26px rgba(82,61,43,0.32)",
+    textAlign: "left",
+  },
+  installGuideTitle: {
+    margin: 0,
+    color: "#4c4238",
+    fontFamily: UI_FONT,
+    fontSize: "13px",
+    fontWeight: 500,
+    lineHeight: 1.55,
+    letterSpacing: 0,
+  },
+  installGuideText: {
+    margin: 0,
+    color: "#746a5f",
+    fontFamily: UI_FONT,
+    fontSize: "12px",
+    fontWeight: 400,
+    lineHeight: 1.75,
+    letterSpacing: 0,
+  },
+  installGuideList: {
+    display: "grid",
+    gap: "4px",
+    margin: "0 0 2px",
+    padding: "0 0 0 18px",
+    color: "#746a5f",
+    fontFamily: UI_FONT,
+    fontSize: "12px",
+    fontWeight: 400,
+    lineHeight: 1.65,
+    letterSpacing: 0,
+  },
+  installGuideItem: {
+    paddingLeft: "2px",
+  },
+  installGuideActions: {
+    display: "flex",
+    justifyContent: "flex-start",
+    alignItems: "center",
+    gap: "8px",
+    flexWrap: "wrap",
   },
   namePreviewPhoto: {
     width: "min(48vw, 168px)",

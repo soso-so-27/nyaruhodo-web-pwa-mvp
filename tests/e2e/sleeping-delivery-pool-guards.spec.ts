@@ -59,6 +59,10 @@ type ExchangeResponse = {
     src: string;
   } | null;
   source?: "remote" | "none";
+  diagnostics?: {
+    normalCandidateCount?: number;
+  };
+  tier?: number | null;
 };
 
 type LocalEnv = Record<string, string>;
@@ -1027,6 +1031,136 @@ test.describe("sleeping delivery pool guards", () => {
         .from("cat_moments")
         .delete()
         .in("local_moment_id", [onboardingMomentId, recipientMomentId]);
+    }
+  });
+
+  test("uses admin stock only for immediate onboarding exchange", async ({
+    request,
+  }) => {
+    await skipIfLocalSupabaseUnavailable();
+
+    const adminSupabase = createAdminSupabaseClientFromEnv();
+
+    test.skip(
+      !adminSupabase,
+      "SUPABASE_SERVICE_ROLE_KEY is required for the onboarding admin stock test.",
+    );
+
+    if (!adminSupabase) {
+      return;
+    }
+
+    const createdAt = Date.now();
+    const normalCandidateId = `onboarding-normal-candidate-${createdAt}`;
+    const adminCandidateId = `onboarding-admin-stock-${createdAt}`;
+    const onboardingAnonymousId = `onboarding-admin-stock-anon-${createdAt}`;
+    const normalAnonymousId = `onboarding-normal-anon-${createdAt}`;
+    const normalRequestId = `onboarding-normal-recipient-${createdAt}`;
+
+    try {
+      const { error: insertError } = await adminSupabase.from("cat_moments").insert([
+        {
+          anonymous_id: `onboarding-normal-source-${createdAt}`,
+          local_moment_id: normalCandidateId,
+          local_cat_id: `onboarding-normal-source-cat-${createdAt}`,
+          owner_cat_id: `onboarding-normal-source-cat-${createdAt}`,
+          photo_url: normalCatLikePhotoUrl,
+          state: "sleeping",
+          visibility: "shared",
+          delivery_status: "available",
+          moderation_status: "approved",
+          moderated_at: new Date(createdAt - 120_000).toISOString(),
+          moderated_by: "e2e",
+          source_moment_id: null,
+          metadata: {
+            source: "e2e-onboarding-admin-stock",
+            pool_kind: "user_shared",
+            theme: "sleeping",
+            trigger_label: "sleeping",
+          },
+          captured_at: new Date(createdAt - 120_000).toISOString(),
+          created_at: new Date(createdAt - 120_000).toISOString(),
+        },
+        {
+          anonymous_id: `onboarding-admin-source-${createdAt}`,
+          local_moment_id: adminCandidateId,
+          local_cat_id: `onboarding-admin-source-cat-${createdAt}`,
+          owner_cat_id: `onboarding-admin-source-cat-${createdAt}`,
+          photo_url: normalCatLikePhotoUrl,
+          state: "sleeping",
+          visibility: "shared",
+          delivery_status: "available",
+          moderation_status: "approved",
+          moderated_at: new Date(createdAt - 60_000).toISOString(),
+          moderated_by: "e2e",
+          source_moment_id: null,
+          metadata: {
+            source: "e2e-onboarding-admin-stock",
+            pool_kind: "admin_stock",
+            theme: "sleeping",
+            trigger_label: "sleeping",
+          },
+          captured_at: new Date(createdAt - 60_000).toISOString(),
+          created_at: new Date(createdAt - 60_000).toISOString(),
+        },
+      ]);
+
+      expect(insertError).toBeNull();
+
+      const onboardingResponse = await request.post(
+        "/api/sleeping-delivery/exchange",
+        {
+          data: {
+            ...buildExchangeRequest(
+              normalCatLikePhotoUrl,
+              `onboarding-admin-stock-own-${createdAt}`,
+              onboardingAnonymousId,
+            ),
+            debugDryRun: false,
+            mode: "onboarding",
+            preferredSourcePhotoId: normalCandidateId,
+            recipientCatId: `onboarding-admin-recipient-cat-${createdAt}`,
+          },
+        },
+      );
+
+      expect(onboardingResponse.status()).toBe(200);
+      const onboardingBody = (await onboardingResponse.json()) as ExchangeResponse;
+      expect(onboardingBody.photo?.sourcePhotoId).not.toBe(normalCandidateId);
+      expect(onboardingBody.tier).toBe(3);
+      expect(onboardingBody.diagnostics?.normalCandidateCount).toBe(0);
+
+      const normalResponse = await request.post("/api/sleeping-delivery/exchange", {
+        data: {
+          ...buildExchangeRequest(
+            normalCatLikePhotoUrl,
+            normalRequestId,
+            normalAnonymousId,
+          ),
+          debugDryRun: false,
+          deliveryDateKey: getYesterdayJstDateKey(),
+          preferredSourcePhotoId: normalCandidateId,
+          recipientCatId: `onboarding-normal-recipient-cat-${createdAt}`,
+        },
+      });
+
+      expect(normalResponse.status()).toBe(200);
+      const normalBody = (await normalResponse.json()) as ExchangeResponse;
+      expect(normalBody.photo?.sourcePhotoId).toBe(normalCandidateId);
+    } finally {
+      await adminSupabase
+        .from("cat_moment_deliveries")
+        .delete()
+        .in("anonymous_id", [onboardingAnonymousId, normalAnonymousId]);
+      await adminSupabase
+        .from("cat_moments")
+        .delete()
+        .in("local_moment_id", [
+          normalCandidateId,
+          adminCandidateId,
+          `guard-own-onboarding-admin-stock-own-${createdAt}`,
+          `guard-own-${normalRequestId}`,
+        ]);
     }
   });
 

@@ -295,6 +295,57 @@ test.describe("onboarding delivery flow", () => {
     await expect.poll(() => readKeptExchangePhotoCount(page)).toBe(0);
   });
 
+  test("shows a second photo bridge before 8pm after onboarding delivery", async ({
+    page,
+  }) => {
+    await mockBrowserDate(page, "2026-07-06T10:00:00+09:00");
+    await routeImmediateDelivery(page);
+
+    await page.goto("/onboarding");
+    await page.waitForLoadState("networkidle");
+    await page.locator("main button").first().click();
+    await page.locator('input[type="file"]').last().setInputFiles({
+      name: "own-sleeping.png",
+      mimeType: "image/png",
+      buffer: testPng,
+    });
+
+    await page.locator("main button").first().click();
+    await page.waitForTimeout(1600);
+
+    await expect(
+      page.getByRole("button", { name: "もう一枚いれておく" }),
+    ).toBeVisible();
+    await expect(page.getByTestId("onboarding-install-guide")).toBeVisible();
+  });
+
+  test("shows the next day bridge after 8pm after onboarding delivery", async ({
+    page,
+  }) => {
+    await mockBrowserDate(page, "2026-07-06T21:00:00+09:00");
+    await routeImmediateDelivery(page);
+
+    await page.goto("/onboarding");
+    await page.waitForLoadState("networkidle");
+    await page.locator("main button").first().click();
+    await page.locator('input[type="file"]').last().setInputFiles({
+      name: "own-sleeping.png",
+      mimeType: "image/png",
+      buffer: testPng,
+    });
+
+    await page.locator("main button").first().click();
+    await page.waitForTimeout(1600);
+
+    await expect(
+      page.getByText("あしたの よる8時に、つぎの一通がとどきます。"),
+    ).toBeVisible();
+    await expect(
+      page.getByRole("button", { name: "もう一枚いれておく" }),
+    ).toHaveCount(0);
+    await expect(page.getByTestId("onboarding-install-guide")).toBeVisible();
+  });
+
   test("falls back to thumbnail for storage-backed onboarding deliveries without adding to the received album", async ({
     page,
   }) => {
@@ -382,6 +433,37 @@ test.describe("onboarding delivery flow", () => {
     await page.goto("/home");
     await page.waitForLoadState("networkidle");
     await expect(page.getByText("iPhoneでホームに置く")).toHaveCount(0);
+  });
+
+  test("records src attribution on app open and onboarding intro", async ({
+    page,
+  }) => {
+    await page.route("**/rest/v1/**", async (route) => {
+      await route.fulfill({
+        contentType: "application/json",
+        status: 500,
+        body: JSON.stringify({ error: "keep local analytics queue for assertions" }),
+      });
+    });
+
+    await page.goto("/onboarding?src=instagram_bio");
+    await expect(page.locator("main button").first()).toBeVisible();
+
+    const events = await waitForAnalyticsEvents(page, [
+      "app_opened",
+      "onboarding_intro_view",
+    ]);
+
+    expect(events.app_opened?.properties).toMatchObject({
+      source: "instagram_bio",
+      source_param: "instagram_bio",
+      src: "instagram_bio",
+    });
+    expect(events.onboarding_intro_view?.properties).toMatchObject({
+      source: "instagram_bio",
+      source_param: "instagram_bio",
+      src: "instagram_bio",
+    });
   });
 
   test("restores the current onboarding state across repeated social URL visits", async ({
@@ -1414,6 +1496,37 @@ async function routeImmediateDelivery(page: Page) {
   });
 }
 
+async function mockBrowserDate(page: Page, isoDate: string) {
+  await page.addInitScript((fixedIso) => {
+    const fixedTime = new Date(fixedIso).valueOf();
+    const RealDate = Date;
+
+    class MockDate extends RealDate {
+      constructor(...args: unknown[]) {
+        if (args.length === 0) {
+          super(fixedTime);
+          return;
+        }
+
+        if (args.length === 1) {
+          super(args[0] as string | number | Date);
+          return;
+        }
+
+        super(...(args as [number, number, number, number?, number?, number?, number?]));
+      }
+
+      static now() {
+        return fixedTime;
+      }
+    }
+
+    Object.setPrototypeOf(MockDate, RealDate);
+    // @ts-expect-error Test-only Date replacement in the browser context.
+    window.Date = MockDate;
+  }, isoDate);
+}
+
 async function routeStorageDeliveryWithBrokenDisplay(page: Page) {
   await page.route("https://example.com/missing-delivery-display.jpg", async (route) => {
     await route.fulfill({ status: 404, body: "" });
@@ -1514,6 +1627,32 @@ async function readKeptExchangePhotoCount(page: Page) {
       return 0;
     }
   });
+}
+
+async function waitForAnalyticsEvents(page: Page, names: string[]) {
+  const readEvents = () =>
+    page.evaluate((eventNames) => {
+      const raw = window.localStorage.getItem("analytics_event_queue");
+      const queue = raw ? JSON.parse(raw) : [];
+      const result: Record<string, { properties?: Record<string, unknown> }> = {};
+
+      for (const name of eventNames) {
+        const match = [...queue]
+          .reverse()
+          .find((event) => event?.name === name);
+        if (match) {
+          result[name] = { properties: match.properties ?? {} };
+        }
+      }
+
+      return result;
+    }, names);
+
+  await expect
+    .poll(async () => Object.keys(await readEvents()).length)
+    .toBe(names.length);
+
+  return readEvents();
 }
 
 async function readOnboardingDeliverySnapshot(page: Page) {
