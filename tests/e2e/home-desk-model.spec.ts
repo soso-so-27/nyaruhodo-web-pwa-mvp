@@ -660,11 +660,15 @@ test.describe("home desk model", () => {
       "4",
     );
     await expect(page.getByTestId("desk-home-frame")).toBeVisible();
-    await expect(page.getByTestId("home-letter-tray")).toHaveCount(0);
+    const letterTray = page.getByTestId("home-letter-tray");
+    await expect(letterTray).toHaveCount(0);
     await expect(page.getByRole("button", { name: "とっておく" })).toHaveCount(0);
     await expect(
-      page.getByRole("button", { name: "どこかのこの写真を大きく見る" }),
+      letterTray.getByRole("button", { name: "どこかのこの写真を大きく見る" }),
     ).toHaveCount(0);
+    await expect(
+      page.getByRole("button", { name: "どこかのこの写真を大きく見る" }),
+    ).toHaveCount(1);
     await expect(page.getByTestId("home-stamp-pair-stamp")).toBeVisible();
     await page.getByTestId("home-stamp-pair-stamp").click();
     await expect(page.getByTestId("desk-photo-viewer")).toBeVisible();

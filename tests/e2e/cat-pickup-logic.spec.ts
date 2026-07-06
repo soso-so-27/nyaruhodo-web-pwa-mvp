@@ -115,10 +115,12 @@ test("marks a cat pickup as seen in local storage", () => {
   Object.defineProperty(globalThis, "window", {
     configurable: true,
     value: {
+      addEventListener: () => undefined,
       localStorage: {
         getItem: (key: string) => storage.get(key) ?? null,
         setItem: (key: string, value: string) => storage.set(key, value),
       },
+      removeEventListener: () => undefined,
     },
   });
 

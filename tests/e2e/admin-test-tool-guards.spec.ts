@@ -91,8 +91,10 @@ test.describe("admin test tool guards", () => {
       page.getByRole("button", { name: "とどくねがおを追加する" }),
     ).toHaveCount(0);
     await expect(page.getByText("アカウントとデータの削除について")).toBeVisible();
-    await expect(page.getByText("おしらせ", { exact: true })).toBeVisible();
-    await expect(page.getByText("ホーム画面アプリでのみ使えます")).toBeVisible();
+    await expect(page.getByText("通知", { exact: true })).toBeVisible();
+    await expect(
+      page.getByText("Push通知はホーム画面アプリで使えます"),
+    ).toBeVisible();
     await expect(
       page.getByRole("button", { name: "この端末をアカウントに保存" }),
     ).toHaveCount(0);
@@ -287,7 +289,9 @@ test.describe("admin test tool guards", () => {
     await page.goto("/settings");
     await page.waitForLoadState("networkidle");
 
-    await expect(page.getByRole("button", { name: "意見を送る" })).toBeVisible();
+    await expect(
+      page.getByRole("button", { name: "改善メモを書く" }),
+    ).toBeVisible();
     await expect(page.getByText("βサポーター", { exact: true })).toBeVisible();
     await expect(
       page.getByRole("link", { name: "これからの ねてるねこ" }),

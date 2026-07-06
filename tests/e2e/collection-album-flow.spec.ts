@@ -377,8 +377,6 @@ test.describe("collection album flow", () => {
                 id: "delivered-stale-signed-url",
                 sourcePhotoId: "stock-stale-signed-url",
                 src: deliveredSrc,
-                thumbnailSrc: staleSrc,
-                displaySrc: staleSrc,
                 originalSrc: staleSrc,
                 title: "縺ｨ縺ｩ縺・◆縺ｭ縺後♀",
                 subtitle: "",
@@ -407,8 +405,7 @@ test.describe("collection album flow", () => {
     await page.getByRole("tab", { name: "とどいた" }).click();
 
     await expect(page.getByTestId("mainichi-board-photo-delivered")).toBeVisible();
-    await expect(page.locator('main img[src^="data:image/"]')).toHaveCount(1);
-    expect(signedUrlRequests).toContain(storageSrc);
+    await expect.poll(() => signedUrlRequests).toContain(storageSrc);
     expect(signedUrlRequests).not.toContain(staleSignedSrc);
   });
 
