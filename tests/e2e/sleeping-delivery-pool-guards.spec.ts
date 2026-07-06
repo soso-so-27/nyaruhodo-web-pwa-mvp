@@ -1095,8 +1095,7 @@ test.describe("sleeping delivery pool guards", () => {
           moderated_by: "e2e",
           source_moment_id: null,
           metadata: {
-            source: "e2e-onboarding-admin-stock",
-            pool_kind: "admin_stock",
+            source: "admin-stock",
             theme: "sleeping",
             trigger_label: "sleeping",
           },

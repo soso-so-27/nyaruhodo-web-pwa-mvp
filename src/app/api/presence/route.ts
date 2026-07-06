@@ -132,6 +132,14 @@ function readPoolKind(metadata: Record<string, unknown> | null) {
     return poolKind;
   }
 
+  if (poolKind === "admin-stock") {
+    return "admin_stock";
+  }
+
+  if (metadata?.source === "admin-stock") {
+    return "admin_stock";
+  }
+
   return "unknown";
 }
 

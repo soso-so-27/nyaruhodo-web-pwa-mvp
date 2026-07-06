@@ -57,3 +57,24 @@ Remote database is up to date.
 - 事後確認
 - 復元可能性
 - 再発防止
+
+## Weekly pool health check
+
+Run this read-only query before public campaigns and at least weekly during beta:
+
+```sql
+select
+  metadata->>'source' as src,
+  moderation_status,
+  state,
+  count(*)
+from cat_moments
+group by 1, 2, 3
+order by 4 desc;
+```
+
+Check three things:
+
+1. `src = 'admin-stock'` with `moderation_status = 'approved'` has at least 1 row. This is the onboarding first-letter supply canary.
+2. `moderation_status = 'pending'` is not piling up. Clear the moderation queue before campaigns so real user photos are not buried under test leftovers.
+3. Code must treat admin stock consistently. Runtime selection uses `metadata.pool_kind = 'admin_stock'`; legacy/prod rows with `metadata.source = 'admin-stock'` are also treated as admin stock as a compatibility fallback.
