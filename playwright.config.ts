@@ -67,6 +67,7 @@ const desktopSpecs = [
   "**/desktop-device-gate.spec.ts",
   "**/sleeping-delivery-request-guards.spec.ts",
   "**/sleeping-delivery-pool-guards.spec.ts",
+  "**/sw-image-cache.spec.ts",
 ];
 
 const mobileSpecs = [

@@ -159,12 +159,28 @@ async function handlePhotoImageRequest(request, info) {
     emitPhotoCacheTrace("photo_sw_cache_miss", {
       variant: info.variantKey,
     });
-    networkResponse = await fetch(request);
+    networkResponse = await fetchPhotoImageResponse(request);
     await storePhotoImageCache(info, networkResponse.clone());
 
     return networkResponse;
   } catch {
     return networkResponse ?? fetch(request);
+  }
+}
+
+async function fetchPhotoImageResponse(request) {
+  try {
+    return await fetch(
+      new Request(request.url, {
+        cache: request.cache,
+        credentials: "omit",
+        headers: request.headers,
+        mode: "cors",
+        redirect: request.redirect,
+      }),
+    );
+  } catch {
+    return fetch(request);
   }
 }
 
