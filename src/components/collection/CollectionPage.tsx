@@ -2032,6 +2032,8 @@ function MainichiMonthBoard({
           surface: "mainichi_board",
           side: photo.side,
           wait_ms: result.waitMs,
+          url_resolve_ms: result.urlResolveMs,
+          image_ready_ms: result.imageReadyMs,
           timed_out: result.timedOut,
           ok: result.ok,
         });
@@ -2309,6 +2311,7 @@ function MainichiBoardPhotoCard({
         variant="tile"
         aspect={layout.aspect}
         storageVariant="thumbnail"
+        initiallyLoaded
         style={styles.mainichiBoardPhotoTileRoot}
         imageStyle={styles.mainichiBoardPhotoTile}
         onStorageDataUrl={

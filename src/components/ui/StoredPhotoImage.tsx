@@ -105,6 +105,7 @@ export function StoredPhotoImage({
   fallbackSrcs = EMPTY_FALLBACK_SRCS,
   fallbackVariant = "message",
   storageVariant = "display",
+  initiallyLoaded = false,
 }: {
   src: string;
   previewSrc?: string;
@@ -123,6 +124,7 @@ export function StoredPhotoImage({
   fallbackSrcs?: string[];
   fallbackVariant?: "message" | "quiet";
   storageVariant?: StorageSignedUrlVariant;
+  initiallyLoaded?: boolean;
 }) {
   const {
     objectFit,
@@ -144,7 +146,7 @@ export function StoredPhotoImage({
   const [previewDisplaySrc, setPreviewDisplaySrc] = useState("");
   const [isPreviewLoaded, setIsPreviewLoaded] = useState(false);
   const [storageDataUrl, setStorageDataUrl] = useState<string | null>(null);
-  const [isLoaded, setIsLoaded] = useState(false);
+  const [isLoaded, setIsLoaded] = useState(initiallyLoaded);
   const [hasError, setHasError] = useState(false);
   const [signedUrlRetryNonce, setSignedUrlRetryNonce] = useState(0);
   const [activeStorageVariant, setActiveStorageVariant] =
@@ -221,7 +223,7 @@ export function StoredPhotoImage({
 
     loadStartedAtRef.current = performance.now();
     trackedDisplaySrcRef.current = "";
-    setIsLoaded(false);
+    setIsLoaded(initiallyLoaded);
     setHasError(false);
     setStorageDataUrl(null);
 
@@ -264,6 +266,7 @@ export function StoredPhotoImage({
     activeStorageVariant,
     currentSource,
     hasNextSource,
+    initiallyLoaded,
     signedUrlRetryNonce,
     sourceQueue.length,
   ]);
@@ -741,19 +744,39 @@ export async function decodePhotoSourcesForDisplay(
 ) {
   const startedAt = typeof performance !== "undefined" ? performance.now() : Date.now();
   const uniqueSources = getUniquePhotoSources(sources);
+  let urlResolveMs: number | null = null;
+  let imageReadyMs: number | null = null;
 
   if (typeof window === "undefined" || uniqueSources.length === 0) {
-    return { ok: false, timedOut: false, waitMs: 0 };
+    return { ok: false, timedOut: false, waitMs: 0, urlResolveMs, imageReadyMs };
   }
 
   const decodePromise = (async () => {
     for (const source of uniqueSources) {
+      const urlStartedAt =
+        typeof performance !== "undefined" ? performance.now() : Date.now();
       const displayUrl = await getStoragePhotoSignedUrl(source, variant);
+      urlResolveMs = Math.max(
+        0,
+        Math.round(
+          (typeof performance !== "undefined" ? performance.now() : Date.now()) -
+            urlStartedAt,
+        ),
+      );
       if (!displayUrl) {
         continue;
       }
 
+      const imageStartedAt =
+        typeof performance !== "undefined" ? performance.now() : Date.now();
       if (await decodeImageUrl(displayUrl)) {
+        imageReadyMs = Math.max(
+          0,
+          Math.round(
+            (typeof performance !== "undefined" ? performance.now() : Date.now()) -
+              imageStartedAt,
+          ),
+        );
         return true;
       }
     }
@@ -768,6 +791,8 @@ export async function decodePhotoSourcesForDisplay(
   return {
     ok: result === true,
     timedOut: result === "timeout",
+    urlResolveMs,
+    imageReadyMs,
     waitMs: Math.max(
       0,
       Math.round(

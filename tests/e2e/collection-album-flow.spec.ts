@@ -195,6 +195,11 @@ test.describe("collection album flow", () => {
       paths: string[];
       variant?: string;
     }> = [];
+    let releaseSingleSignedUrl: () => void = () => {};
+    const singleSignedUrlGate = new Promise<void>((resolve) => {
+      releaseSingleSignedUrl = resolve;
+    });
+    let shouldDelayDisplaySignedUrl = true;
 
     await page.route("**/api/photo-storage/signed-urls", async (route) => {
       const body = route.request().postDataJSON() as {
@@ -213,7 +218,7 @@ test.describe("collection album flow", () => {
           signedUrls: Object.fromEntries(
             (body.paths ?? []).map((path) => [
               path,
-              path === displayPath
+              path === displayPath && body.variant !== "thumbnail"
                 ? `/__signed-photo/${encodeURIComponent(path)}?variant=${body.variant ?? ""}`
                 : null,
             ]),
@@ -232,6 +237,14 @@ test.describe("collection album flow", () => {
         paths: path ? [path] : [],
         variant: body.variant,
       });
+      if (
+        shouldDelayDisplaySignedUrl &&
+        path === displayPath &&
+        body.variant === "thumbnail"
+      ) {
+        shouldDelayDisplaySignedUrl = false;
+        await singleSignedUrlGate;
+      }
 
       await route.fulfill({
         contentType: "application/json",
@@ -294,7 +307,11 @@ test.describe("collection album flow", () => {
       },
     );
 
-    await page.goto("/collection");
+    await page.goto("/collection", { waitUntil: "domcontentloaded" });
+    await expect(page.getByTestId("mainichi-board-photo-sent")).toHaveCount(0, {
+      timeout: 250,
+    });
+    releaseSingleSignedUrl();
     await page.waitForLoadState("networkidle");
     await expect(page.getByTestId("mainichi-board-photo-sent")).toHaveCount(1);
     await expect(page.getByTestId("mainichi-board-photo-sent")).toHaveAttribute(
@@ -305,6 +322,15 @@ test.describe("collection album flow", () => {
       "complete",
       true,
     );
+    await expect
+      .poll(() =>
+        page
+          .getByTestId("mainichi-board-photo-sent")
+          .locator("img")
+          .last()
+          .evaluate((image) => window.getComputedStyle(image).opacity),
+      )
+      .toBe("1");
     const finalSrc = await page
       .getByTestId("mainichi-board-photo-sent")
       .locator("img")
