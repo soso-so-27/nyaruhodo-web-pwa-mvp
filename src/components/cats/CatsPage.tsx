@@ -324,11 +324,13 @@ export function CatsPage() {
     activeCatProfile?.avatarDataUrl ??
     (activeCoverPhoto ? getLensPhotoDetailSrc(activeCoverPhoto) : undefined) ??
     activeAvatarSrc;
-  const activeCoverPreviewSrc = activeCoverPhoto
-    ? getLensPhotoThumbnailSrc(activeCoverPhoto)
-    : undefined;
+  const activeCoverPreviewSrc = hasCustomThumbnail
+    ? undefined
+    : activeCoverPhoto
+      ? getLensPhotoThumbnailSrc(activeCoverPhoto)
+      : undefined;
   const activeCoverFit =
-    hasCustomThumbnail || activeCoverPhoto ? "cover" : "contain";
+    hasCustomThumbnail ? "contain" : activeCoverPhoto ? "cover" : "contain";
   useEffect(() => {
     tabContentScrollerRef.current?.scrollTo({ top: 0, left: 0 });
   }, [activeCatId, activeLens, activeSection]);

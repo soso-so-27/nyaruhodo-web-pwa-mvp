@@ -224,6 +224,60 @@ test("lets the owner choose a cat thumbnail from existing photos", async ({
     .toBe(photoDataUrl);
 });
 
+test("shows the custom top cover without an automatic preview or crop", async ({
+  page,
+}) => {
+  const signedUrlRequests: Array<{ src?: string; variant?: string }> = [];
+
+  await page.route("**/api/photo-storage/signed-url", async (route) => {
+    const body = route.request().postDataJSON() as {
+      src?: string;
+      variant?: string;
+    };
+    signedUrlRequests.push(body);
+
+    await route.fulfill({
+      contentType: "application/json",
+      body: JSON.stringify({
+        bucket: "cat-photos",
+        expiresIn: 86_400,
+        signedUrl: photoDataUrl,
+        variant: body.variant ?? "display",
+      }),
+    });
+  });
+
+  await seedCatsProfileWithCustomStorageAvatar(
+    page,
+    Date.parse("2026-06-10T12:30:00+09:00"),
+  );
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto("/cats");
+  await page.waitForLoadState("networkidle");
+
+  const coverImages = page.getByTestId("cats-profile-cover").locator("img");
+
+  await expect(coverImages).toHaveCount(1);
+  await expect
+    .poll(() =>
+      coverImages.first().evaluate((image) => {
+        const element = image as HTMLImageElement;
+        return element.complete && element.naturalWidth > 0;
+      }),
+    )
+    .toBe(true);
+  await expect
+    .poll(() =>
+      coverImages
+        .first()
+        .evaluate((image) => window.getComputedStyle(image).objectFit),
+    )
+    .toBe("contain");
+  expect(signedUrlRequests.some((request) => request.src?.includes("/avatar/"))).toBe(
+    true,
+  );
+});
+
 test("shows only filled basic profile fields", async ({ page }) => {
   await seedCatsBasicProfile(page, {
     basicInfo: {
@@ -521,6 +575,46 @@ async function seedCatsProfileWithStoragePhotos(
     },
     { nowValue: now, count: photoCount },
   );
+}
+
+async function seedCatsProfileWithCustomStorageAvatar(page: Page, now: number) {
+  await page.addInitScript(({ nowValue }) => {
+    (window as typeof window & { __testNow?: number }).__testNow = nowValue;
+    const nowIso = new Date(nowValue).toISOString();
+    window.localStorage.setItem("active_cat_id", "cat-mugi");
+    window.localStorage.setItem(
+      "cat_profiles",
+      JSON.stringify([
+        {
+          id: "cat-mugi",
+          name: "\u3080\u304e",
+          createdAt: nowIso,
+          updatedAt: nowIso,
+          avatarDataUrl: "storage:cat-mugi/avatar/avatar.webp",
+        },
+      ]),
+    );
+    window.localStorage.setItem(
+      "nyaruhodo_exchange_own_sleeping_photos",
+      JSON.stringify([
+        {
+          id: "own-auto-cover",
+          ownerCatId: "cat-mugi",
+          catId: "cat-mugi",
+          src: "storage:cat-mugi/sleeping/auto/display.webp",
+          thumbnailSrc: "storage:cat-mugi/sleeping/auto/thumbnail.webp",
+          displaySrc: "storage:cat-mugi/sleeping/auto/display.webp",
+          state: "sleeping",
+          visibility: "private",
+          deliveryStatus: "available",
+          triggerLabel: "sleeping",
+          theme: "sleeping",
+          shared: false,
+          createdAt: nowValue,
+        },
+      ]),
+    );
+  }, { nowValue: now });
 }
 
 async function seedCatsBasicProfile(
