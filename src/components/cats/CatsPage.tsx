@@ -86,7 +86,7 @@ type UchinokoLens = "cat" | "all";
 type UchinokoSection = "record" | "photos" | "basic";
 const MAX_UPLOAD_SOURCE_FILE_BYTES = 20 * 1024 * 1024;
 const LENS_PHOTO_FIRST_VIEW_COUNT = 12;
-const LENS_PHOTO_REVEAL_TIMEOUT_MS = 400;
+const LENS_PHOTO_REVEAL_TIMEOUT_MS = 800;
 const SUPPORTED_SOURCE_IMAGE_MIME_TYPES = new Set([
   "image/avif",
   "image/gif",
@@ -420,8 +420,10 @@ export function CatsPage() {
       const supabase = createBrowserSupabaseClient();
 
       if (!supabase) {
-        setRemoteLensPhotosByCat({});
-        setHasRemoteLensPhotosLoaded(false);
+        if (!isCancelled) {
+          setRemoteLensPhotosByCat({});
+          setHasRemoteLensPhotosLoaded(true);
+        }
         return;
       }
 
@@ -430,7 +432,7 @@ export function CatsPage() {
       if (!userResult.user) {
         if (!isCancelled) {
           setRemoteLensPhotosByCat({});
-          setHasRemoteLensPhotosLoaded(false);
+          setHasRemoteLensPhotosLoaded(true);
         }
         return;
       }
@@ -444,7 +446,7 @@ export function CatsPage() {
       if (error || !Array.isArray(remoteCats)) {
         if (!isCancelled) {
           setRemoteLensPhotosByCat({});
-          setHasRemoteLensPhotosLoaded(false);
+          setHasRemoteLensPhotosLoaded(true);
         }
         return;
       }
@@ -1512,6 +1514,7 @@ export function CatsPage() {
               requestAddCatPhoto();
             }}
             onOpenPhoto={(photo) => setSelectedRecordPhoto(toRecordPhotoPreview(photo))}
+            isListSettled={hasRemoteLensPhotosLoaded || activeCatLensPhotos.length > 0}
           />
         ) : null}
 
@@ -1525,6 +1528,7 @@ export function CatsPage() {
             lensValue={activeLens}
             onLensChange={shouldShowPhotoLensSwitch ? setActiveLens : undefined}
             onOpenPhoto={(photo) => setSelectedRecordPhoto(toRecordPhotoPreview(photo))}
+            isListSettled={hasRemoteLensPhotosLoaded || allLensPhotos.length > 0}
           />
         ) : null}
 
@@ -2728,6 +2732,7 @@ function LensPhotoSection({
   onLensChange,
   onAddPhoto,
   onOpenPhoto,
+  isListSettled,
 }: {
   title: string;
   photos: LensPhoto[];
@@ -2736,6 +2741,7 @@ function LensPhotoSection({
   onLensChange?: (value: UchinokoLens) => void;
   onAddPhoto: () => void;
   onOpenPhoto: (photo: LensPhoto) => void;
+  isListSettled: boolean;
 }) {
   return (
     <section style={styles.lensPhotoSection}>
@@ -2766,6 +2772,7 @@ function LensPhotoSection({
         emptyCopy={emptyCopy}
         showCatNames={false}
         onOpenPhoto={onOpenPhoto}
+        isListSettled={isListSettled}
       />
     </section>
   );
@@ -2777,12 +2784,14 @@ function AllCatsLensView({
   lensValue,
   onLensChange,
   onOpenPhoto,
+  isListSettled,
 }: {
   photos: LensPhoto[];
   catCount: number;
   lensValue: UchinokoLens;
   onLensChange?: (value: UchinokoLens) => void;
   onOpenPhoto: (photo: LensPhoto) => void;
+  isListSettled: boolean;
 }) {
   return (
     <section style={styles.allLensCard}>
@@ -2802,6 +2811,7 @@ function AllCatsLensView({
         emptyCopy="まだ写真はありません。"
         showCatNames
         onOpenPhoto={onOpenPhoto}
+        isListSettled={isListSettled}
       />
     </section>
   );
@@ -2894,13 +2904,16 @@ function LensPhotoGrid({
   emptyCopy,
   showCatNames,
   onOpenPhoto,
+  isListSettled,
 }: {
   photos: LensPhoto[];
   emptyCopy: string;
   showCatNames: boolean;
   onOpenPhoto: (photo: LensPhoto) => void;
+  isListSettled: boolean;
 }) {
   const [isFirstViewReady, setIsFirstViewReady] = useState(false);
+  const mountedAtRef = useRef(performance.now());
   const firstViewSignature = photos
     .slice(0, LENS_PHOTO_FIRST_VIEW_COUNT)
     .map((photo) => `${photo.id}:${getLensPhotoThumbnailSrc(photo)}`)
@@ -2908,10 +2921,29 @@ function LensPhotoGrid({
 
   useEffect(() => {
     let isCancelled = false;
+
+    if (!isListSettled) {
+      setIsFirstViewReady(false);
+      return () => {
+        isCancelled = true;
+      };
+    }
+
     const firstViewPhotos = photos.slice(0, LENS_PHOTO_FIRST_VIEW_COUNT);
 
     if (firstViewPhotos.length === 0) {
       setIsFirstViewReady(true);
+      trackProductEvent("tab_reveal_wait_ms", {
+        surface: "cats_lens_photo_grid",
+        wait_ms: 0,
+        list_resolved_ms: Math.max(
+          0,
+          Math.round(performance.now() - mountedAtRef.current),
+        ),
+        photo_count: 0,
+        ready_count: 0,
+        timeout_count: 0,
+      });
       return () => {
         isCancelled = true;
       };
@@ -2933,36 +2965,48 @@ function LensPhotoGrid({
           LENS_PHOTO_REVEAL_TIMEOUT_MS,
         ),
       ),
-    ).then(() => {
+    ).then((results) => {
       if (isCancelled) {
         return;
       }
 
+      const decodeResults = results.flatMap((result) =>
+        result.status === "fulfilled" ? [result.value] : [],
+      );
       setIsFirstViewReady(true);
       trackProductEvent("tab_reveal_wait_ms", {
         surface: "cats_lens_photo_grid",
         wait_ms: Math.max(0, Math.round(performance.now() - startedAt)),
+        list_resolved_ms: Math.max(0, Math.round(startedAt - mountedAtRef.current)),
         photo_count: firstViewPhotos.length,
+        ready_count: decodeResults.filter((result) => result.ok).length,
+        timeout_count: decodeResults.filter((result) => result.timedOut).length,
+        url_resolve_ms_max: Math.max(
+          0,
+          ...decodeResults.map((result) => result.urlResolveMs ?? 0),
+        ),
+        image_ready_ms_max: Math.max(
+          0,
+          ...decodeResults.map((result) => result.imageReadyMs ?? 0),
+        ),
       });
     });
 
     return () => {
       isCancelled = true;
     };
-  }, [firstViewSignature]);
+  }, [firstViewSignature, isListSettled]);
+
+  if (!isListSettled) {
+    return <LensPhotoGridSkeleton />;
+  }
 
   if (photos.length === 0) {
     return <p style={styles.lensPhotoEmpty}>{emptyCopy}</p>;
   }
 
   if (!isFirstViewReady) {
-    return (
-      <div
-        data-testid="cats-lens-photo-grid"
-        data-photo-decode-gate="waiting"
-        style={styles.lensPhotoGridPending}
-      />
-    );
+    return <LensPhotoGridSkeleton />;
   }
 
   return (
@@ -4643,6 +4687,21 @@ function resizeAndEncode(
 ): Promise<string> {
   return resizeImageFileToDataUrl(file, maxSize, quality, mimeType).catch(
     () => "",
+  );
+}
+
+function LensPhotoGridSkeleton() {
+  return (
+    <div
+      data-testid="cats-lens-photo-grid"
+      data-photo-decode-gate="waiting"
+      style={styles.lensPhotoGrid}
+      aria-hidden="true"
+    >
+      {Array.from({ length: LENS_PHOTO_FIRST_VIEW_COUNT }, (_, index) => (
+        <span key={index} style={styles.lensPhotoSkeletonItem} />
+      ))}
+    </div>
   );
 }
 
@@ -6431,6 +6490,13 @@ const styles = {
   },
   lensPhotoGridPending: {
     minHeight: 260,
+  },
+  lensPhotoSkeletonItem: {
+    aspectRatio: "1 / 1",
+    borderRadius: "8px",
+    background:
+      "linear-gradient(180deg, color-mix(in srgb, var(--paper-card) 84%, transparent), color-mix(in srgb, var(--paper-warm) 42%, transparent))",
+    boxShadow: "0 0 0 1px color-mix(in srgb, var(--control-border) 28%, transparent) inset",
   },
   lensPhotoItem: {
     display: "grid",

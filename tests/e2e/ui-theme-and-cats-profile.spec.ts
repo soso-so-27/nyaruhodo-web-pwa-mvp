@@ -121,6 +121,66 @@ test("keeps the cats photo tab clear of the fixed bottom navigation", async ({
   );
 });
 
+test("shows a quiet photo grid skeleton while cats photo thumbnails resolve", async ({
+  page,
+}) => {
+  let releaseSignedUrl: () => void = () => {};
+  const signedUrlGate = new Promise<void>((resolve) => {
+    releaseSignedUrl = resolve;
+  });
+  let shouldDelayFirstThumbnail = true;
+
+  await page.route("**/api/photo-storage/signed-url", async (route) => {
+    const body = route.request().postDataJSON() as {
+      src?: string;
+      variant?: string;
+    };
+
+    if (shouldDelayFirstThumbnail && body.variant === "thumbnail") {
+      shouldDelayFirstThumbnail = false;
+      await signedUrlGate;
+    }
+
+    await route.fulfill({
+      contentType: "application/json",
+      body: JSON.stringify({
+        bucket: "cat-photos",
+        expiresIn: 86_400,
+        signedUrl: photoDataUrl,
+        variant: body.variant ?? "thumbnail",
+      }),
+    });
+  });
+
+  await seedCatsProfileWithStoragePhotos(
+    page,
+    Date.parse("2026-06-10T12:30:00+09:00"),
+    4,
+  );
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto("/cats");
+  await page.waitForLoadState("domcontentloaded");
+  await page.getByTestId("cats-section-tab-photos").click();
+
+  const grid = page.getByTestId("cats-lens-photo-grid");
+  await expect(grid).toHaveAttribute("data-photo-decode-gate", "waiting");
+  await expect(grid.locator("span")).toHaveCount(12);
+  await expect(grid.locator("img")).toHaveCount(0);
+
+  releaseSignedUrl();
+  await expect(grid).toHaveAttribute("data-photo-decode-gate", "ready");
+  await expect
+    .poll(() =>
+      grid.locator("img").evaluateAll((images) =>
+        images.slice(0, 4).every((image) => {
+          const element = image as HTMLImageElement;
+          return element.complete && element.naturalWidth > 0;
+        }),
+      ),
+    )
+    .toBe(true);
+});
+
 test("switches to the next cat from the cover in one tap", async ({ page }) => {
   await seedMultipleCatsProfile(page, Date.parse("2026-06-10T12:30:00+09:00"));
   await page.setViewportSize({ width: 390, height: 844 });
@@ -414,6 +474,52 @@ async function seedCatsProfile(page: Page, now: number, photoCount: number) {
       );
     },
     { nowValue: now, src: photoDataUrl, count: photoCount },
+  );
+}
+
+async function seedCatsProfileWithStoragePhotos(
+  page: Page,
+  now: number,
+  photoCount: number,
+) {
+  await page.addInitScript(
+    ({ nowValue, count }) => {
+      (window as typeof window & { __testNow?: number }).__testNow = nowValue;
+      const nowIso = new Date(nowValue).toISOString();
+      window.localStorage.setItem("active_cat_id", "cat-mugi");
+      window.localStorage.setItem(
+        "cat_profiles",
+        JSON.stringify([
+          {
+            id: "cat-mugi",
+            name: "\u3080\u304e",
+            createdAt: nowIso,
+            updatedAt: nowIso,
+          },
+        ]),
+      );
+      window.localStorage.setItem(
+        "nyaruhodo_exchange_own_sleeping_photos",
+        JSON.stringify(
+          Array.from({ length: count }, (_, index) => ({
+            id: `own-storage-${index}`,
+            ownerCatId: "cat-mugi",
+            catId: "cat-mugi",
+            src: `storage:cat-mugi/sleeping/${index}/display.webp`,
+            thumbnailSrc: `storage:cat-mugi/sleeping/${index}/thumbnail.webp`,
+            displaySrc: `storage:cat-mugi/sleeping/${index}/display.webp`,
+            state: "sleeping",
+            visibility: "private",
+            deliveryStatus: "available",
+            triggerLabel: "sleeping",
+            theme: "sleeping",
+            shared: false,
+            createdAt: nowValue - index * 86_400_000,
+          })),
+        ),
+      );
+    },
+    { nowValue: now, count: photoCount },
   );
 }
 
