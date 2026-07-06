@@ -2,8 +2,122 @@ import { expect, test, type Page } from "@playwright/test";
 
 const photoDataUrl =
   "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAGQAAABkCAYAAABw4pVUAAAAAXNSR0IArs4c6QAAAARnQU1BAACxjwv8YQUAAAAJcEhZcwAADsMAAA7DAcdvqGQAAAEJSURBVHhe7dExEcAgAMBAJKKuTpnpjoLA/fACchlrzv2C+a0njDPsVmfYrQyJMSTGkBhDYgyJMSTGkBhDYgyJMSTGkBhDYgyJMSTGkBhDYgyJMSTGkBhDYgyJMSTGkBhDYgyJMSTGkBhDYgyJMSTGkBhDYgyJMSTGkBhDYgyJMSTGkBhDYgyJMSTGkBhDYgyJMSTGkBhDYgyJMSTGkBhDYgyJMSTGkBhDYgyJMSTGkBhDYgyJMSTGkBhDYgyJMSTmB4RCEqdGtA/tAAAAAElFTkSuQmCC";
+const photoUploadBuffer = Buffer.from(photoDataUrl.split(",")[1], "base64");
 
 test.describe("collection album flow", () => {
+  test("shows a home sleeping photo in sent after capture", async ({ page }) => {
+    const now = Date.parse("2026-07-07T09:30:00+09:00");
+
+    await page.addInitScript(({ currentCatId, createdAt }) => {
+      (window as typeof window & { __testNow?: number }).__testNow = createdAt;
+      const originalDateNow = Date.now.bind(Date);
+      Date.now = () =>
+        (window as typeof window & { __testNow?: number }).__testNow ??
+        originalDateNow();
+      window.localStorage.setItem("nyaruhodo_sleeping_safety_accepted", "1");
+      window.localStorage.setItem("active_cat_id", currentCatId);
+      window.localStorage.setItem(
+        "cat_profiles",
+        JSON.stringify([
+          {
+            id: currentCatId,
+            name: "current cat",
+            createdAt: new Date(createdAt).toISOString(),
+            updatedAt: new Date(createdAt).toISOString(),
+          },
+        ]),
+      );
+    }, {
+      currentCatId: "current-cat",
+      createdAt: now,
+    });
+
+    await page.goto("/home");
+    await page.waitForLoadState("networkidle");
+    await page.getByTestId("home-empty-action").click();
+    await page.locator('input[type="file"]').last().setInputFiles({
+      name: "sleeping.png",
+      mimeType: "image/png",
+      buffer: photoUploadBuffer,
+    });
+
+    await expect
+      .poll(() =>
+        page.evaluate(() => {
+          const parsed = JSON.parse(
+            window.localStorage.getItem("nyaruhodo_exchange_own_sleeping_photos") ??
+              "[]",
+          );
+          return Array.isArray(parsed) ? parsed.length : 0;
+        }),
+      )
+      .toBeGreaterThanOrEqual(1);
+
+    await page.goto("/collection");
+    await expect(page.getByTestId("mainichi-board-photo-sent")).toHaveCount(1);
+  });
+
+  test("refreshes sent photos when the PWA returns to the collection", async ({
+    page,
+  }) => {
+    const now = Date.parse("2026-07-07T09:30:00+09:00");
+
+    await page.addInitScript(({ currentCatId, createdAt }) => {
+      window.localStorage.setItem("active_cat_id", currentCatId);
+      window.localStorage.setItem(
+        "cat_profiles",
+        JSON.stringify([
+          {
+            id: currentCatId,
+            name: "current cat",
+            createdAt: new Date(createdAt).toISOString(),
+            updatedAt: new Date(createdAt).toISOString(),
+          },
+        ]),
+      );
+      window.localStorage.setItem(
+        "nyaruhodo_exchange_own_sleeping_photos",
+        JSON.stringify([]),
+      );
+    }, {
+      currentCatId: "current-cat",
+      createdAt: now,
+    });
+
+    await page.emulateMedia({ reducedMotion: "reduce" });
+    await page.goto("/collection");
+    await page.waitForLoadState("networkidle");
+    await expect(page.getByTestId("mainichi-board-photo-sent")).toHaveCount(0);
+
+    await page.evaluate(({ currentCatId, src, createdAt }) => {
+      window.localStorage.setItem(
+        "nyaruhodo_exchange_own_sleeping_photos",
+        JSON.stringify([
+          {
+            id: `own-sleeping-${createdAt}`,
+            ownerCatId: currentCatId,
+            catId: currentCatId,
+            src,
+            state: "sleeping",
+            visibility: "private",
+            deliveryStatus: "available",
+            triggerLabel: "sleeping",
+            theme: "sleeping",
+            shared: false,
+            createdAt,
+          },
+        ]),
+      );
+      window.dispatchEvent(new Event("focus"));
+    }, {
+      currentCatId: "current-cat",
+      src: photoDataUrl,
+      createdAt: now,
+    });
+
+    await expect(page.getByTestId("mainichi-board-photo-sent")).toHaveCount(1);
+  });
+
   test("shows only the active cat's taken sleeping photos when older photos belong to a previous cat id", async ({
     page,
   }) => {

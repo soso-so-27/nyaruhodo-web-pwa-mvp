@@ -402,12 +402,22 @@ export function CollectionPage() {
       setBoxRefreshTick((value) => value + 1);
     }
 
+    function refreshBoxesOnVisible() {
+      if (document.visibilityState === "visible") {
+        refreshBoxes();
+      }
+    }
+
     window.addEventListener(BOX_PHOTO_STORAGE_EVENT, refreshBoxes);
     window.addEventListener("storage", refreshBoxes);
+    window.addEventListener("focus", refreshBoxes);
+    document.addEventListener("visibilitychange", refreshBoxesOnVisible);
 
     return () => {
       window.removeEventListener(BOX_PHOTO_STORAGE_EVENT, refreshBoxes);
       window.removeEventListener("storage", refreshBoxes);
+      window.removeEventListener("focus", refreshBoxes);
+      document.removeEventListener("visibilitychange", refreshBoxesOnVisible);
     };
   }, []);
 
