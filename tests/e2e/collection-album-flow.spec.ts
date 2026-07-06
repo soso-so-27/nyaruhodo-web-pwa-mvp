@@ -161,6 +161,97 @@ test.describe("collection album flow", () => {
     await expect(page.getByTestId("mainichi-board-photo-sent")).toHaveCount(2);
   });
 
+  test("does not request a new signed url for the same storage photo in one session", async ({
+    page,
+  }) => {
+    const now = Date.now();
+    const storagePath = "user-1/current-cat/sleeping/cached.jpg";
+    const storageSrc = `storage:${storagePath}`;
+    let batchSignedUrlCalls = 0;
+    let singleSignedUrlCalls = 0;
+
+    await page.route("**/api/photo-storage/signed-urls", async (route) => {
+      batchSignedUrlCalls += 1;
+      const body = route.request().postDataJSON() as { paths?: string[] };
+      const signedUrls = Object.fromEntries(
+        (body.paths ?? []).map((path) => [path, path === storagePath ? photoDataUrl : null]),
+      );
+
+      await route.fulfill({
+        contentType: "application/json",
+        body: JSON.stringify({ signedUrls }),
+      });
+    });
+
+    await page.route("**/api/photo-storage/signed-url", async (route) => {
+      singleSignedUrlCalls += 1;
+      const body = route.request().postDataJSON() as { src?: string };
+
+      await route.fulfill({
+        contentType: "application/json",
+        body: JSON.stringify({
+          signedUrl: body.src === storageSrc ? photoDataUrl : null,
+        }),
+      });
+    });
+
+    await page.addInitScript(
+      ({ currentCatId, src, createdAt }) => {
+        window.localStorage.setItem("active_cat_id", currentCatId);
+        window.localStorage.setItem(
+          "cat_profiles",
+          JSON.stringify([
+            {
+              id: currentCatId,
+              name: "current cat",
+              createdAt: new Date(createdAt).toISOString(),
+              updatedAt: new Date(createdAt).toISOString(),
+            },
+          ]),
+        );
+        window.localStorage.setItem(
+          "nyaruhodo_exchange_own_sleeping_photos",
+          JSON.stringify([
+            {
+              id: `own-sleeping-${createdAt}`,
+              ownerCatId: currentCatId,
+              catId: currentCatId,
+              src,
+              thumbnailSrc: src,
+              state: "sleeping",
+              visibility: "private",
+              deliveryStatus: "available",
+              triggerLabel: "sleeping",
+              theme: "sleeping",
+              shared: false,
+              createdAt,
+            },
+          ]),
+        );
+      },
+      {
+        currentCatId: "current-cat",
+        src: storageSrc,
+        createdAt: now,
+      },
+    );
+
+    await page.goto("/collection");
+    await page.waitForLoadState("networkidle");
+    await expect(page.getByTestId("mainichi-board-photo-sent")).toHaveCount(1);
+    const callsAfterFirstView = batchSignedUrlCalls + singleSignedUrlCalls;
+    expect(callsAfterFirstView).toBeGreaterThan(0);
+
+    await page.locator('a[href="/cats"]').click();
+    await page.waitForURL("**/cats");
+    await page.locator('a[href="/collection"]').click();
+    await page.waitForURL("**/collection");
+    await page.waitForLoadState("networkidle");
+    await expect(page.getByTestId("mainichi-board-photo-sent")).toHaveCount(1);
+
+    expect(batchSignedUrlCalls + singleSignedUrlCalls).toBe(callsAfterFirstView);
+  });
+
   test("writes delivered storage photos back as data urls for offline album display", async ({
     page,
   }) => {

@@ -4,7 +4,7 @@ import { NextResponse } from "next/server";
 import {
   CAT_PHOTOS_BUCKET,
   DISPLAY_SIGNED_URL_SECONDS,
-  createSignedStorageUrl,
+  createSignedStorageUrls,
   getStoragePhotoPath,
 } from "../../../../lib/photoStorage";
 import {
@@ -52,6 +52,8 @@ export async function POST(request: Request) {
     }
 
     const signedUrls: Record<string, string | null> = {};
+    const authorizedPaths: string[] = [];
+
     for (const storagePath of storagePaths) {
       const isDeliveredToAnonymousSession = await hasDeliveredStoragePhoto({
         supabase: signingSupabase,
@@ -60,9 +62,19 @@ export async function POST(request: Request) {
         anonymousId,
       });
 
-      signedUrls[storagePath] = isDeliveredToAnonymousSession
-        ? await createSignedStorageUrl(signingSupabase, storagePath) ?? null
-        : null;
+      signedUrls[storagePath] = null;
+      if (isDeliveredToAnonymousSession) {
+        authorizedPaths.push(storagePath);
+      }
+    }
+
+    const batchSignedUrls = await createSignedStorageUrls(
+      signingSupabase,
+      authorizedPaths,
+    );
+
+    for (const storagePath of authorizedPaths) {
+      signedUrls[storagePath] = batchSignedUrls[storagePath] ?? null;
     }
 
     return createStorageSignedUrlsResponse(signedUrls);
@@ -88,6 +100,8 @@ export async function POST(request: Request) {
   }
 
   const signedUrls: Record<string, string | null> = {};
+  const authorizedPaths: string[] = [];
+
   for (const storagePath of storagePaths) {
     const isAuthorized = await isAuthorizedStoragePhotoPath({
       storagePath,
@@ -102,9 +116,19 @@ export async function POST(request: Request) {
         }),
     });
 
-    signedUrls[storagePath] = isAuthorized
-      ? await createSignedStorageUrl(signingSupabase, storagePath) ?? null
-      : null;
+    signedUrls[storagePath] = null;
+    if (isAuthorized) {
+      authorizedPaths.push(storagePath);
+    }
+  }
+
+  const batchSignedUrls = await createSignedStorageUrls(
+    signingSupabase,
+    authorizedPaths,
+  );
+
+  for (const storagePath of authorizedPaths) {
+    signedUrls[storagePath] = batchSignedUrls[storagePath] ?? null;
   }
 
   return createStorageSignedUrlsResponse(signedUrls);

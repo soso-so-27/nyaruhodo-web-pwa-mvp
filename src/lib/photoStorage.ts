@@ -3,7 +3,7 @@ import { createBrowserSupabaseClient } from "./supabase/browser";
 export const CAT_PHOTOS_BUCKET = "cat-photos";
 const STORAGE_PHOTO_PREFIX = "storage:";
 const LEGACY_STORAGE_PHOTO_PREFIX = "storage://";
-export const DISPLAY_SIGNED_URL_SECONDS = 60 * 10;
+export const DISPLAY_SIGNED_URL_SECONDS = 60 * 60 * 24;
 
 type BrowserSupabaseClient = NonNullable<
   ReturnType<typeof createBrowserSupabaseClient>
@@ -148,6 +148,35 @@ export async function createSignedStorageUrl(
   }
 
   return data.signedUrl;
+}
+
+export async function createSignedStorageUrls(
+  supabase: BrowserSupabaseClient,
+  paths: string[],
+) {
+  const uniquePaths = Array.from(new Set(paths.filter(Boolean)));
+
+  if (uniquePaths.length === 0) {
+    return {};
+  }
+
+  const { data, error } = await supabase.storage
+    .from(CAT_PHOTOS_BUCKET)
+    .createSignedUrls(uniquePaths, DISPLAY_SIGNED_URL_SECONDS);
+
+  if (error || !data) {
+    return {};
+  }
+
+  const signedUrls: Record<string, string> = {};
+
+  for (const item of data) {
+    if (item?.path && item.signedUrl) {
+      signedUrls[item.path] = item.signedUrl;
+    }
+  }
+
+  return signedUrls;
 }
 
 export async function uploadDataUrl(

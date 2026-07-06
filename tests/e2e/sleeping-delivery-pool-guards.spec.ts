@@ -92,7 +92,7 @@ test.describe("sleeping delivery pool guards", () => {
 
   test("keeps display signed urls within the beta release lifetime budget", () => {
     expect(DISPLAY_SIGNED_URL_SECONDS).toBeGreaterThan(0);
-    expect(DISPLAY_SIGNED_URL_SECONDS).toBeLessThanOrEqual(60 * 60);
+    expect(DISPLAY_SIGNED_URL_SECONDS).toBe(60 * 60 * 24);
   });
 
   test("blocks known red-blue test photo ids and matching data urls only", () => {

@@ -20,7 +20,8 @@ import { color, radius, shadow, typography } from "./designTokens";
 
 const signedUrlCache = new Map<string, { expiresAt: number; url: string }>();
 const signedUrlPromiseCache = new Map<string, Promise<string | null>>();
-const SIGNED_URL_CACHE_SAFETY_MS = 5 * 60 * 1000;
+const SIGNED_URL_CACHE_REFRESH_RATIO = 0.8;
+const DEFAULT_INTRINSIC_IMAGE_SIZE = 512;
 const EMPTY_FALLBACK_SRCS: string[] = [];
 
 const fallbackFrameStyle: CSSProperties = {
@@ -293,8 +294,8 @@ export function StoredPhotoImage({
         loading={loading ?? (isInlineImage ? "eager" : "lazy")}
         decoding={decoding ?? "async"}
         fetchPriority={fetchPriority}
-        width={width}
-        height={height}
+        width={width ?? DEFAULT_INTRINSIC_IMAGE_SIZE}
+        height={height ?? DEFAULT_INTRINSIC_IMAGE_SIZE}
         onLoad={() => {
           setIsLoaded(true);
           onLoad?.();
@@ -478,7 +479,7 @@ function writeCachedSignedUrl(storagePath: string, url: string) {
   signedUrlCache.set(storagePath, {
     expiresAt:
       Date.now() +
-      Math.max(0, DISPLAY_SIGNED_URL_SECONDS * 1000 - SIGNED_URL_CACHE_SAFETY_MS),
+      Math.max(0, DISPLAY_SIGNED_URL_SECONDS * 1000 * SIGNED_URL_CACHE_REFRESH_RATIO),
     url,
   });
 }
