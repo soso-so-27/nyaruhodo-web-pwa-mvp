@@ -8,6 +8,7 @@ import {
   syncLocalDataWithAccount,
 } from "../../lib/accountSync";
 import { trackProductEvent } from "../../lib/analytics/productAnalytics";
+import { purgeAllPhotoSwCache } from "../../lib/photoSwCache";
 import { resizeImageFileToDataUrl } from "../../lib/imageResize";
 import {
   acknowledgeCatGalleryIntro,
@@ -581,6 +582,7 @@ export function HomeInput({
           origin: window.location.origin,
           path: window.location.pathname,
         });
+        purgeAllPhotoSwCache("account_switch");
         const { error } = await supabase.auth.exchangeCodeForSession(authCode);
 
         params.delete("code");

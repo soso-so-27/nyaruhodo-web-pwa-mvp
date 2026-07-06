@@ -3,6 +3,7 @@
 import { useEffect, useRef } from "react";
 import { AppLoadingScreen } from "../../../components/loading/AppLoadingScreen";
 import { trackProductEvent } from "../../../lib/analytics/productAnalytics";
+import { purgeAllPhotoSwCache } from "../../../lib/photoSwCache";
 import { STORAGE_KEYS } from "../../../lib/storage";
 import { createBrowserSupabaseClient } from "../../../lib/supabase/browser";
 
@@ -42,6 +43,7 @@ export default function AuthCallbackPage() {
       return;
     }
 
+    purgeAllPhotoSwCache("account_switch");
     const { error } = await supabase.auth.exchangeCodeForSession(code);
 
     if (error) {

@@ -3,6 +3,7 @@ import {
   isUsablePhotoSrc,
   normalizePersistentPhotoSrc,
 } from "../photoStorage";
+import { purgePhotoSwCacheForSources } from "../photoSwCache";
 import { readCachedJson, writeCachedJson } from "../storage";
 import { recordDeliveryStorageWritebackTrace } from "./eveningDeliveryTrace";
 
@@ -607,6 +608,18 @@ export function deleteOwnSleepingPhoto(photoId: string) {
 
     writeStorageArray(OWN_SLEEPING_PHOTO_STORAGE_KEY, nextPhotos);
 
+    if (targetPhoto) {
+      purgePhotoSwCacheForSources(
+        [
+          targetPhoto.src,
+          targetPhoto.thumbnailSrc,
+          targetPhoto.displaySrc,
+          targetPhoto.originalSrc,
+        ],
+        "own_photo_deleted",
+      );
+    }
+
     dispatchBoxPhotoStorageEvent();
   } catch {
     // Local MVP storage should not block album use.
@@ -921,6 +934,15 @@ export function hideKeptExchangePhoto(
     writeStorageArray(KEPT_EXCHANGE_PHOTO_STORAGE_KEY, nextPhotos);
 
     if (targetPhoto) {
+      purgePhotoSwCacheForSources(
+        [
+          targetPhoto.src,
+          targetPhoto.thumbnailSrc,
+          targetPhoto.displaySrc,
+          targetPhoto.originalSrc,
+        ],
+        "reported_hidden",
+      );
       const historyKey =
         reason === "report"
           ? REPORTED_EXCHANGE_PHOTO_STORAGE_KEY

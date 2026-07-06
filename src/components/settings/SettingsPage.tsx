@@ -12,6 +12,7 @@ import {
   type ClientAdminCapabilities,
 } from "../../lib/adminCapabilitiesClient";
 import { trackProductEvent } from "../../lib/analytics/productAnalytics";
+import { purgeAllPhotoSwCache } from "../../lib/photoSwCache";
 import { resizeImageFileToDataUrl } from "../../lib/imageResize";
 import {
   readClientBetaCapabilities,
@@ -251,6 +252,7 @@ export function SettingsPage() {
     const supabase = createBrowserSupabaseClient();
     if (!supabase) return;
 
+    purgeAllPhotoSwCache("logout");
     await supabase.auth.signOut();
     setIsLoggedIn(false);
     setEmail(null);

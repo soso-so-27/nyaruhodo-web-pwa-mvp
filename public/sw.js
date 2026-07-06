@@ -65,6 +65,26 @@ self.addEventListener("message", (event) => {
   if (data.type === "NN_PHOTO_CACHE_CONFIG") {
     const enabled = data.enabled === true;
     event.waitUntil(writePhotoCacheConfig(enabled));
+    return;
+  }
+
+  if (data.type === "NN_PHOTO_CACHE_PURGE") {
+    event.waitUntil(
+      purgePhotoImageCache({
+        paths: Array.isArray(data.paths) ? data.paths : [],
+        variants: Array.isArray(data.variants) ? data.variants : null,
+        reason: typeof data.reason === "string" ? data.reason : "unknown",
+      }),
+    );
+    return;
+  }
+
+  if (data.type === "NN_PHOTO_CACHE_PURGE_ALL") {
+    event.waitUntil(
+      purgeAllPhotoImageCache(
+        typeof data.reason === "string" ? data.reason : "unknown",
+      ),
+    );
   }
 });
 
@@ -130,9 +150,15 @@ async function handlePhotoImageRequest(request, info) {
     const cached = await readFreshPhotoImageCache(info);
 
     if (cached) {
+      emitPhotoCacheTrace("photo_sw_cache_hit", {
+        variant: info.variantKey,
+      });
       return cached;
     }
 
+    emitPhotoCacheTrace("photo_sw_cache_miss", {
+      variant: info.variantKey,
+    });
     networkResponse = await fetch(request);
     await storePhotoImageCache(info, networkResponse.clone());
 
@@ -199,9 +225,53 @@ async function storePhotoImageCache(info, response) {
     await cache.put(createPhotoImageRequest(info.logicalKey), response);
     await writePhotoImageMetadata(metadata);
     await enforcePhotoImageCacheLimits();
-  } catch {
+  } catch (error) {
+    emitPhotoCacheTrace("photo_sw_cache_error", {
+      surface: "store",
+      error_code: getErrorName(error),
+    });
     // Quota/cache failures must never block private photo display.
   }
+}
+
+async function purgePhotoImageCache({ paths, variants, reason }) {
+  const pathSet = new Set(paths.filter((path) => typeof path === "string" && path));
+  const variantSet = variants
+    ? new Set(variants.filter((variant) => typeof variant === "string" && variant))
+    : null;
+
+  if (pathSet.size === 0) {
+    return;
+  }
+
+  const metadataEntries = await readAllPhotoImageMetadata();
+  const targets = metadataEntries.filter(
+    (metadata) =>
+      pathSet.has(metadata.objectPath) &&
+      (!variantSet || variantSet.has(metadata.variantKey)),
+  );
+
+  await Promise.all(
+    targets.map((metadata) => deletePhotoImageCacheEntry(metadata.key)),
+  );
+  emitPhotoCacheTrace("photo_sw_cache_purge", {
+    reason,
+    purged_count: targets.length,
+  });
+}
+
+async function purgeAllPhotoImageCache(reason) {
+  await Promise.all([
+    caches.delete(PHOTO_IMAGE_CACHE),
+    caches.delete(PHOTO_IMAGE_META_CACHE),
+  ]);
+  photoImageCacheEnabled = false;
+  photoImageCacheEnabledPromise = null;
+  await writePhotoCacheConfig(false);
+  emitPhotoCacheTrace("photo_sw_cache_purge", {
+    reason,
+    purged_count: -1,
+  });
 }
 
 async function readPhotoImageMetadata(logicalKey) {
@@ -345,6 +415,9 @@ async function writePhotoCacheConfig(enabled) {
       updatedAt: Date.now(),
     }),
   );
+  emitPhotoCacheTrace("photo_sw_cache_configured", {
+    enabled,
+  });
 }
 
 function createPhotoImageCacheInfo(request, url) {
@@ -431,6 +504,55 @@ function jsonResponse(value) {
       "content-type": "application/json; charset=utf-8",
     },
   });
+}
+
+function emitPhotoCacheTrace(eventName, metadata = {}) {
+  const safeMetadata = sanitizePhotoCacheTraceMetadata(metadata);
+
+  void self.clients
+    .matchAll({ type: "window", includeUncontrolled: true })
+    .then((clients) => {
+      for (const client of clients) {
+        client.postMessage({
+          type: "NN_PHOTO_CACHE_TRACE",
+          eventName,
+          metadata: safeMetadata,
+        });
+      }
+    })
+    .catch(() => null);
+}
+
+function sanitizePhotoCacheTraceMetadata(metadata) {
+  const safe = {};
+  const allowedKeys = [
+    "variant",
+    "age_ms",
+    "estimated_bytes",
+    "entry_count",
+    "reason",
+    "purged_count",
+    "enabled",
+    "surface",
+    "error_code",
+  ];
+
+  for (const key of allowedKeys) {
+    const value = metadata[key];
+    if (
+      typeof value === "string" ||
+      typeof value === "number" ||
+      typeof value === "boolean"
+    ) {
+      safe[key] = value;
+    }
+  }
+
+  return safe;
+}
+
+function getErrorName(error) {
+  return error instanceof Error ? error.name : "unknown";
 }
 
 function isStaticAsset(request, url) {

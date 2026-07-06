@@ -22,6 +22,7 @@ import {
   toStoragePhotoUrl,
   uploadDataUrl,
 } from "./photoStorage";
+import { purgeAllPhotoSwCache } from "./photoSwCache";
 import {
   CAT_GALLERY_COLLECTION_SLOT,
   isReservedCollectionSlotSlug,
@@ -908,6 +909,10 @@ export async function deleteAccountStoredData(): Promise<AccountDeleteResult> {
       status: "error",
       errors: errors.length > 0 ? errors : [`Account delete failed: ${response.status}`],
     };
+  }
+
+  if (result?.status === "deleted") {
+    purgeAllPhotoSwCache("account_deleted");
   }
 
   return {

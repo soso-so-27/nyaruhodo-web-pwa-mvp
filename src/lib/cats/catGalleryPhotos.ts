@@ -1,4 +1,5 @@
 import { isUsablePhotoSrc, normalizePersistentPhotoSrc } from "../photoStorage";
+import { purgePhotoSwCacheForSources } from "../photoSwCache";
 import { STORAGE_KEYS, readCachedJson, writeCachedJson } from "../storage";
 
 export type CatGalleryPhoto = {
@@ -87,6 +88,10 @@ export function deleteCatGalleryPhoto(photoId: string) {
   writeStorageArray(
     STORAGE_KEYS.catGalleryPhotos,
     saved.filter((photo) => photo.id !== photoId),
+  );
+  purgePhotoSwCacheForSources(
+    [target.src, target.thumbnailSrc],
+    "cat_gallery_photo_deleted",
   );
   dispatchCatGalleryPhotosUpdated();
 
