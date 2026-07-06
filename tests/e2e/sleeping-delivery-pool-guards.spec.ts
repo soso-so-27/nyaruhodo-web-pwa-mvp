@@ -1163,6 +1163,119 @@ test.describe("sleeping delivery pool guards", () => {
     }
   });
 
+  test("distributes immediate onboarding exchange across admin stock photos", async ({
+    request,
+  }) => {
+    await skipIfLocalSupabaseUnavailable();
+
+    const adminSupabase = createAdminSupabaseClientFromEnv();
+
+    test.skip(
+      !adminSupabase,
+      "SUPABASE_SERVICE_ROLE_KEY is required for the onboarding admin stock distribution test.",
+    );
+
+    if (!adminSupabase) {
+      return;
+    }
+
+    const createdAt = Date.now();
+    const adminCandidateIds = Array.from(
+      { length: 5 },
+      (_, index) => `onboarding-admin-stock-distribution-${createdAt}-${index}`,
+    );
+    const candidateIdSet = new Set(adminCandidateIds);
+
+    const { data: existingRows, error: existingRowsError } = await adminSupabase
+      .from("cat_moments")
+      .select("id, local_moment_id, metadata")
+      .eq("visibility", "shared")
+      .eq("delivery_status", "available")
+      .eq("moderation_status", "approved");
+
+    expect(existingRowsError).toBeNull();
+
+    const blockedExistingAdminStockIds = ((existingRows ?? []) as Array<{
+      id?: string | null;
+      local_moment_id?: string | null;
+      metadata?: Record<string, unknown> | null;
+    }>)
+      .filter((row) => {
+        const poolKind = row.metadata?.pool_kind;
+        return (
+          poolKind === "admin_stock" ||
+          poolKind === "admin-stock" ||
+          row.metadata?.source === "admin-stock"
+        );
+      })
+      .flatMap((row) => [row.id, row.local_moment_id])
+      .filter((id): id is string => typeof id === "string" && id.length > 0);
+
+    try {
+      const { error: insertError } = await adminSupabase.from("cat_moments").insert(
+        adminCandidateIds.map((candidateId, index) => ({
+          anonymous_id: `onboarding-admin-distribution-source-${createdAt}-${index}`,
+          local_moment_id: candidateId,
+          local_cat_id: `onboarding-admin-distribution-cat-${createdAt}-${index}`,
+          owner_cat_id: `onboarding-admin-distribution-cat-${createdAt}-${index}`,
+          photo_url: normalCatLikePhotoUrl,
+          state: "sleeping",
+          visibility: "shared",
+          delivery_status: "available",
+          moderation_status: "approved",
+          moderated_at: new Date(createdAt - 60_000 - index).toISOString(),
+          moderated_by: "e2e",
+          source_moment_id: null,
+          metadata: {
+            source: "admin-stock",
+            theme: "sleeping",
+            trigger_label: "sleeping",
+          },
+          captured_at: new Date(createdAt - 60_000 - index).toISOString(),
+          created_at: new Date(createdAt - 60_000 - index).toISOString(),
+        })),
+      );
+
+      expect(insertError).toBeNull();
+
+      const selectedSourcePhotoIds = new Set<string>();
+
+      for (let index = 0; index < 12; index += 1) {
+        const exchangeResponse = await request.post(
+          "/api/sleeping-delivery/exchange",
+          {
+            data: {
+              ...buildExchangeRequest(
+                normalCatLikePhotoUrl,
+                `onboarding-admin-distribution-own-${createdAt}-${index}`,
+                `onboarding-admin-distribution-anon-${createdAt}-${index}`,
+              ),
+              blockedPhotoIds: blockedExistingAdminStockIds,
+              debugDryRun: true,
+              mode: "onboarding",
+              recipientCatId: `onboarding-admin-distribution-recipient-cat-${createdAt}-${index}`,
+              seed: `onboarding-admin-distribution-seed-${createdAt}-${index}`,
+            },
+          },
+        );
+
+        expect(exchangeResponse.status()).toBe(200);
+        const exchangeBody = (await exchangeResponse.json()) as ExchangeResponse;
+        const sourcePhotoId = exchangeBody.photo?.sourcePhotoId ?? "";
+
+        expect(candidateIdSet.has(sourcePhotoId)).toBe(true);
+        selectedSourcePhotoIds.add(sourcePhotoId);
+      }
+
+      expect(selectedSourcePhotoIds.size).toBeGreaterThan(1);
+    } finally {
+      await adminSupabase
+        .from("cat_moments")
+        .delete()
+        .in("local_moment_id", adminCandidateIds);
+    }
+  });
+
   test("keeps exchange response under the delivery latency budget", async ({
     request,
   }) => {
