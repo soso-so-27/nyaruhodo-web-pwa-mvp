@@ -462,15 +462,24 @@ test.describe("sleeping delivery pool guards", () => {
     );
     const localMomentId = `delete-delivered-moment-${createdAt}`;
     const localDeliveryId = `delete-delivered-delivery-${createdAt}`;
+    const anonymousId = `delete-anonymous-${createdAt}`;
+    const anonymousMomentId = `delete-anonymous-moment-${createdAt}`;
     const sourcePath = `${source.userId}/e2e/account-delete/${localMomentId}.jpg`;
+    const anonymousPath = `anonymous/${anonymousId}/e2e/account-delete/${anonymousMomentId}.jpg`;
     let archivePath: string | null = null;
 
     try {
       await uploadTestPhoto(adminSupabase, sourcePath);
+      await uploadTestPhoto(adminSupabase, anonymousPath);
       await insertTestMoment(adminSupabase, {
         localMomentId,
         photoUrl: toStoragePhotoUrl(sourcePath),
         userId: source.userId,
+      });
+      await insertAnonymousTestMoment(adminSupabase, {
+        anonymousId,
+        localMomentId: anonymousMomentId,
+        photoUrl: toStoragePhotoUrl(anonymousPath),
       });
       await insertTestDelivery(adminSupabase, {
         localDeliveryId,
@@ -478,10 +487,15 @@ test.describe("sleeping delivery pool guards", () => {
         recipientUserId: recipient.userId,
         sourcePhotoId: localMomentId,
       });
-      await insertTestAppEvent(adminSupabase, source.userId, createdAt);
+      await insertTestAccountOwnedRows(adminSupabase, {
+        accessToken: source.accessToken,
+        anonymousId,
+        eventId: createdAt,
+        userId: source.userId,
+      });
 
       const response = await request.post("/api/account/delete-stored-data", {
-        data: { userId: recipient.userId },
+        data: { anonymousId, userId: recipient.userId },
         headers: {
           authorization: `Bearer ${source.accessToken}`,
         },
@@ -537,6 +551,36 @@ test.describe("sleeping delivery pool guards", () => {
           .eq("user_id", source.userId);
       expect(appEventCountError).toBeFalsy();
       expect(appEventCount).toBe(0);
+
+      await expectTableCount(adminSupabase, "account_local_state", {
+        user_id: source.userId,
+      }, 0);
+      await expectTableCount(adminSupabase, "product_analytics_events", {
+        user_id: source.userId,
+      }, 0);
+      await expectTableCount(adminSupabase, "mikke_window_answers", {
+        user_id: source.userId,
+      }, 0);
+      await expectTableCount(adminSupabase, "profiles", {
+        id: source.userId,
+      }, 0);
+      await expectTableCount(adminSupabase, "cat_moments", {
+        anonymous_id: anonymousId,
+      }, 0);
+      await expectTableCount(adminSupabase, "app_events", {
+        anonymous_id: anonymousId,
+      }, 0);
+      await expectTableCount(adminSupabase, "product_analytics_events", {
+        anonymous_id: anonymousId,
+      }, 0);
+      await expectTableCount(adminSupabase, "mikke_window_answers", {
+        anonymous_id: anonymousId,
+      }, 0);
+
+      const { data: anonymousPhoto } = await adminSupabase.storage
+        .from(CAT_PHOTOS_BUCKET)
+        .download(anonymousPath);
+      expect(anonymousPhoto).toBeNull();
     } finally {
       await adminSupabase
         .from("cat_moment_deliveries")
@@ -545,10 +589,14 @@ test.describe("sleeping delivery pool guards", () => {
       await adminSupabase
         .from("cat_moments")
         .delete()
-        .eq("local_moment_id", localMomentId);
+        .in("local_moment_id", [localMomentId, anonymousMomentId]);
       await adminSupabase.storage
         .from(CAT_PHOTOS_BUCKET)
-        .remove([sourcePath, ...(archivePath ? [archivePath] : [])]);
+        .remove([
+          sourcePath,
+          anonymousPath,
+          ...(archivePath ? [archivePath] : []),
+        ]);
       await adminSupabase.auth.admin.deleteUser(source.userId);
       await adminSupabase.auth.admin.deleteUser(recipient.userId);
     }
@@ -1845,6 +1893,36 @@ async function insertTestMoment(
   expect(error).toBeFalsy();
 }
 
+async function insertAnonymousTestMoment(
+  adminSupabase: any,
+  {
+    anonymousId,
+    localMomentId,
+    photoUrl,
+  }: {
+    anonymousId: string;
+    localMomentId: string;
+    photoUrl: string;
+  },
+) {
+  const { error } = await adminSupabase.from("cat_moments").insert({
+    anonymous_id: anonymousId,
+    captured_at: new Date().toISOString(),
+    delivery_status: "available",
+    local_cat_id: "account-delete-anonymous-cat",
+    local_moment_id: localMomentId,
+    metadata: { source: "e2e-account-deletion-anonymous" },
+    moderation_status: "approved",
+    owner_cat_id: "account-delete-anonymous-cat",
+    photo_url: photoUrl,
+    state: "sleeping",
+    user_id: null,
+    visibility: "shared",
+  });
+
+  expect(error).toBeFalsy();
+}
+
 async function insertTestDelivery(
   adminSupabase: any,
   {
@@ -1877,14 +1955,101 @@ async function insertTestAppEvent(
   adminSupabase: any,
   userId: string,
   id: number,
+  anonymousId?: string,
 ) {
   const { error } = await adminSupabase.from("app_events").insert({
+    anonymous_id: anonymousId ?? null,
     event_name: `account_delete_e2e_${id}`,
     source: "direct",
     user_id: userId,
   });
 
   expect(error).toBeFalsy();
+}
+
+async function insertTestAccountOwnedRows(
+  adminSupabase: any,
+  {
+    accessToken,
+    anonymousId,
+    eventId,
+    userId,
+  }: {
+    accessToken: string;
+    anonymousId: string;
+    eventId: number;
+    userId: string;
+  },
+) {
+  const userSupabase = createAuthenticatedSupabaseClientFromEnv(accessToken);
+  if (!userSupabase) {
+    throw new Error("Authenticated Supabase test client unavailable");
+  }
+
+  await insertTestAppEvent(userSupabase, userId, eventId, anonymousId);
+
+  const { error: localStateError } = await userSupabase
+    .from("account_local_state")
+    .upsert({
+      state_key: `account-delete-e2e-${eventId}`,
+      user_id: userId,
+      value: { source: "e2e-account-deletion" },
+    });
+  expect(localStateError).toBeFalsy();
+
+  const { error: productAnalyticsError } = await userSupabase
+    .from("product_analytics_events")
+    .insert({
+      anonymous_id: anonymousId,
+      local_cat_id: "account-delete-cat",
+      name: `account_delete_e2e_${eventId}`,
+      properties: { source: "e2e-account-deletion" },
+      route: "/e2e-account-delete",
+      session_id: `account-delete-session-${eventId}`,
+      source: "direct",
+      user_id: userId,
+    });
+  expect(productAnalyticsError).toBeFalsy();
+
+  const { error: mikkeError } = await userSupabase
+    .from("mikke_window_answers")
+    .insert({
+      anonymous_id: anonymousId,
+      answer_id: "floor",
+      answer_label: "floor",
+      category: "place",
+      local_cat_id: "account-delete-cat",
+      metadata: { source: "e2e-account-deletion" },
+      question_id: `account-delete-question-${eventId}`,
+      user_id: userId,
+      window_id: `account-delete-window-${eventId}`,
+    });
+  expect(mikkeError).toBeFalsy();
+
+  const { error: profileError } = await userSupabase.from("profiles").upsert({
+    display_name: "Account Delete E2E",
+    id: userId,
+  });
+  expect(profileError).toBeFalsy();
+}
+
+async function expectTableCount(
+  adminSupabase: any,
+  table: string,
+  filters: Record<string, string>,
+  expected: number,
+) {
+  let query = adminSupabase
+    .from(table)
+    .select("*", { count: "exact", head: true });
+
+  for (const [column, value] of Object.entries(filters)) {
+    query = query.eq(column, value);
+  }
+
+  const { count, error } = await query;
+  expect(error).toBeFalsy();
+  expect(count).toBe(expected);
 }
 
 async function expectAccountUserDeleted(
@@ -2167,6 +2332,29 @@ function createPublicSupabaseClientFromEnv() {
     auth: {
       autoRefreshToken: false,
       persistSession: false,
+    },
+  });
+}
+
+function createAuthenticatedSupabaseClientFromEnv(accessToken: string) {
+  const env = readLocalEnv();
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL ?? env.NEXT_PUBLIC_SUPABASE_URL;
+  const anonKey =
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ?? env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+
+  if (!url || !anonKey) {
+    return null;
+  }
+
+  return createClient(url, anonKey, {
+    auth: {
+      autoRefreshToken: false,
+      persistSession: false,
+    },
+    global: {
+      headers: {
+        authorization: `Bearer ${accessToken}`,
+      },
     },
   });
 }

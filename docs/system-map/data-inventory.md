@@ -98,3 +98,28 @@ PII観点で重要なものを中心に。全キーは `STORAGE_KEYS`（`keys.ts
 - localStorageキー: **約28**（静的24＋動的4系）。
 - **退会完全性の穴（削除経路なしでuser紐づきうる）**: `product_analytics_events`・`account_local_state`・
   `profiles`・`mikke_window_answers`（→ issues P0-1 / P2-4）。
+
+---
+
+## 2026-07-07 update: account deletion coverage
+
+`src/app/api/account/delete-stored-data/route.ts` now explicitly deletes these
+additional account-owned tables through the service-role account deletion API:
+
+- `account_local_state` by `user_id`
+- `product_analytics_events` by `user_id`
+- `mikke_window_answers` by `user_id`
+- `profiles` by `id`
+
+The same route accepts the client-held `anonymousId` during account deletion.
+Anonymous-era rows are deleted only when that anonymous id has a recorded contact
+with the current user (`app_events`, `product_analytics_events`,
+`mikke_window_answers`, or `referral_claims`). If no contact is found, the
+anonymous cleanup is skipped and recorded in the API result. This prevents a
+logged-in user from naming another user's anonymous id and deleting unrelated
+anonymous data.
+
+Storage cleanup also includes `anonymous/{anonymousId}/` when the anonymous id is
+authorized by the same contact check. Admin stock, aggregate/reporting views,
+handoff audit rows, and transfer-intent audit rows remain intentionally outside
+the account-deletion route.

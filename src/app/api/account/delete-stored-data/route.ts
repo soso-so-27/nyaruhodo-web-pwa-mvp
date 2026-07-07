@@ -10,7 +10,7 @@ import {
   type DeliveryStorageReference,
 } from "../../../../lib/accountDeletionStorage";
 import { cancelAccountDeletionStripeSubscriptions } from "../../../../lib/accountDeletionBilling";
-import { CAT_PHOTOS_BUCKET } from "../../../../lib/photoStorage";
+import { CAT_PHOTOS_BUCKET, sanitizePathSegment } from "../../../../lib/photoStorage";
 import { createSupabaseAdminClient } from "../../../../lib/supabase/admin";
 import { getSupabasePublicConfig } from "../../../../lib/supabase/config";
 
@@ -23,13 +23,18 @@ const deleteRateLimitBuckets = new Map<string, number>();
 
 type AccountDeleteResult = {
   cancelledStripeSubscriptions: number;
+  deletedAnonymousIds: string[];
   deletedStoragePaths: number;
   errors: string[];
   preservedDeliveryPhotos: number;
+  skippedAnonymousIds: string[];
   status: "deleted" | "error" | "skipped";
 };
 
 type CatMomentDeliveryRow = DeliveryStorageReference;
+type DeleteStoredDataBody = {
+  anonymousId?: unknown;
+};
 
 export async function POST(request: Request) {
   const userId = await authenticateUser(request);
@@ -57,7 +62,12 @@ export async function POST(request: Request) {
     );
   }
 
-  const result = await deleteStoredDataForUser(supabase, userId);
+  const body = (await request.json().catch(() => null)) as
+    | DeleteStoredDataBody
+    | null;
+  const result = await deleteStoredDataForUser(supabase, userId, {
+    anonymousId: normalizeAnonymousId(body?.anonymousId),
+  });
 
   return NextResponse.json({
     ok: result.status !== "error",
@@ -98,8 +108,11 @@ async function authenticateUser(request: Request) {
 export async function deleteStoredDataForUser(
   supabase: SupabaseClient,
   userId: string,
+  options: { anonymousId?: string | null } = {},
 ): Promise<AccountDeleteResult> {
   const errors: string[] = [];
+  const skippedAnonymousIds: string[] = [];
+  const deletedAnonymousIds: string[] = [];
   const billingResult = await cancelAccountDeletionStripeSubscriptions({
     supabase,
     userId,
@@ -108,38 +121,61 @@ export async function deleteStoredDataForUser(
   if (billingResult.errors.length > 0) {
     return {
       cancelledStripeSubscriptions: billingResult.cancelledStripeSubscriptions,
+      deletedAnonymousIds,
       deletedStoragePaths: 0,
       errors: billingResult.errors,
       preservedDeliveryPhotos: 0,
+      skippedAnonymousIds,
       status: "error",
     };
   }
 
-  const storagePaths = await listStoragePaths(supabase, userId, errors);
-  const deliveryRows = await readPreservedDeliveryRowsForPrefix(
+  const authorizedAnonymousIds = await resolveAuthorizedAnonymousIds({
+    anonymousId: options.anonymousId,
     supabase,
     userId,
     errors,
-  );
-  const deletionPlan = buildAccountStorageDeletionPlan({
-    archivePathForSource: (sourcePath) =>
-      getArchivedDeliveryStoragePath(sourcePath, randomUUID()),
-    deliveryRows,
-    ownerPrefix: userId,
-    storagePaths,
+    skippedAnonymousIds,
   });
+  const storagePrefixes = [
+    userId,
+    ...authorizedAnonymousIds.map(
+      (anonymousId) => `anonymous/${sanitizePathSegment(anonymousId)}`,
+    ),
+  ];
+  const storagePlans = await Promise.all(
+    storagePrefixes.map(async (prefix) => {
+      const storagePaths = await listStoragePaths(supabase, prefix, errors);
+      const deliveryRows = await readPreservedDeliveryRowsForPrefix(
+        supabase,
+        prefix,
+        errors,
+      );
+
+      return buildAccountStorageDeletionPlan({
+        archivePathForSource: (sourcePath) =>
+          getArchivedDeliveryStoragePath(sourcePath, randomUUID()),
+        deliveryRows,
+        ownerPrefix: prefix,
+        storagePaths,
+      });
+    }),
+  );
   const copiedSourcePaths = await copyPreservedDeliveryPhotos(
     supabase,
-    deletionPlan.copies,
+    storagePlans.flatMap((plan) => plan.copies),
     errors,
   );
   const deletablePaths = [
-    ...deletionPlan.deletablePaths,
+    ...storagePlans.flatMap((plan) => plan.deletablePaths),
     ...copiedSourcePaths,
   ];
 
   await deleteStoragePaths(supabase, deletablePaths, errors);
 
+  // Intentionally out of scope: admin-only seed/stock rows, aggregate views, and
+  // handoff/transfer audit rows. Handoffs are cleaned by their cron GC; admin
+  // stock is operational content, not account-owned user data.
   const deleteSteps = [
     supabase.from("cat_moment_cats").delete().eq("user_id", userId),
     supabase.from("cat_moment_deliveries").delete().eq("user_id", userId),
@@ -155,7 +191,12 @@ export async function deleteStoredDataForUser(
     supabase.from("referral_codes").delete().eq("user_id", userId),
     supabase.from("beta_feedback").delete().eq("user_id", userId),
     supabase.from("account_sync_state").delete().eq("user_id", userId),
+    supabase.from("account_local_state").delete().eq("user_id", userId),
+    supabase.from("product_analytics_events").delete().eq("user_id", userId),
+    supabase.from("mikke_window_answers").delete().eq("user_id", userId),
+    supabase.from("profiles").delete().eq("id", userId),
     supabase.from("cats").delete().eq("owner_user_id", userId),
+    ...buildAnonymousDeleteSteps(supabase, authorizedAnonymousIds),
   ];
   const results = await Promise.all(deleteSteps);
 
@@ -168,12 +209,16 @@ export async function deleteStoredDataForUser(
   if (errors.length > 0) {
     return {
       cancelledStripeSubscriptions: billingResult.cancelledStripeSubscriptions,
+      deletedAnonymousIds,
       deletedStoragePaths: deletablePaths.length,
       errors,
       preservedDeliveryPhotos: copiedSourcePaths.length,
+      skippedAnonymousIds,
       status: "error",
     };
   }
+
+  deletedAnonymousIds.push(...authorizedAnonymousIds);
 
   const { error: authDeleteError } = await supabase.auth.admin.deleteUser(userId);
 
@@ -183,11 +228,132 @@ export async function deleteStoredDataForUser(
 
   return {
     cancelledStripeSubscriptions: billingResult.cancelledStripeSubscriptions,
+    deletedAnonymousIds,
     deletedStoragePaths: deletablePaths.length,
     errors,
     preservedDeliveryPhotos: copiedSourcePaths.length,
+    skippedAnonymousIds,
     status: errors.length > 0 ? "error" : "deleted",
   };
+}
+
+function buildAnonymousDeleteSteps(
+  supabase: SupabaseClient,
+  anonymousIds: string[],
+) {
+  return anonymousIds.flatMap((anonymousId) => [
+    supabase.from("cat_moment_deliveries").delete().eq("anonymous_id", anonymousId),
+    supabase.from("cat_moments").delete().eq("anonymous_id", anonymousId),
+    supabase.from("photo_reports").delete().eq("reporter_anonymous_id", anonymousId),
+    supabase.from("app_events").delete().eq("anonymous_id", anonymousId),
+    supabase.from("product_analytics_events").delete().eq("anonymous_id", anonymousId),
+    supabase.from("mikke_window_answers").delete().eq("anonymous_id", anonymousId),
+    supabase.from("referral_claims").delete().eq("anonymous_id", anonymousId),
+  ]);
+}
+
+async function resolveAuthorizedAnonymousIds({
+  anonymousId,
+  errors,
+  skippedAnonymousIds,
+  supabase,
+  userId,
+}: {
+  anonymousId?: string | null;
+  errors: string[];
+  skippedAnonymousIds: string[];
+  supabase: SupabaseClient;
+  userId: string;
+}) {
+  if (!anonymousId) {
+    return [];
+  }
+
+  const hasContact = await hasAnonymousUserContact({
+    anonymousId,
+    errors,
+    supabase,
+    userId,
+  });
+
+  if (!hasContact) {
+    skippedAnonymousIds.push(anonymousId);
+    console.info("[account/delete-stored-data] skipped anonymous id cleanup", {
+      reason: "no_user_contact",
+      userId,
+    });
+    return [];
+  }
+
+  return [anonymousId];
+}
+
+async function hasAnonymousUserContact({
+  anonymousId,
+  errors,
+  supabase,
+  userId,
+}: {
+  anonymousId: string;
+  errors: string[];
+  supabase: SupabaseClient;
+  userId: string;
+}) {
+  const checks = [
+    countRows(
+      supabase
+        .from("app_events")
+        .select("id", { count: "exact", head: true })
+        .eq("user_id", userId)
+        .eq("anonymous_id", anonymousId),
+      "anonymous contact app_events",
+      errors,
+    ),
+    countRows(
+      supabase
+        .from("product_analytics_events")
+        .select("id", { count: "exact", head: true })
+        .eq("user_id", userId)
+        .eq("anonymous_id", anonymousId),
+      "anonymous contact product_analytics_events",
+      errors,
+    ),
+    countRows(
+      supabase
+        .from("mikke_window_answers")
+        .select("id", { count: "exact", head: true })
+        .eq("user_id", userId)
+        .eq("anonymous_id", anonymousId),
+      "anonymous contact mikke_window_answers",
+      errors,
+    ),
+    countRows(
+      supabase
+        .from("referral_claims")
+        .select("id", { count: "exact", head: true })
+        .eq("referred_user_id", userId)
+        .eq("anonymous_id", anonymousId),
+      "anonymous contact referral_claims",
+      errors,
+    ),
+  ];
+
+  return (await Promise.all(checks)).some((count) => count > 0);
+}
+
+async function countRows(
+  query: PromiseLike<{ count: number | null; error: { message: string } | null }>,
+  label: string,
+  errors: string[],
+) {
+  const { count, error } = await query;
+
+  if (error) {
+    errors.push(`${label}: ${error.message}`);
+    return 0;
+  }
+
+  return count ?? 0;
 }
 
 export async function copyPreservedDeliveryPhotos(
@@ -318,6 +484,20 @@ function getBearerToken(request: Request) {
   const [scheme, token] = authorization.split(/\s+/);
 
   return scheme?.toLowerCase() === "bearer" ? token : null;
+}
+
+function normalizeAnonymousId(value: unknown) {
+  if (typeof value !== "string") {
+    return null;
+  }
+
+  const trimmed = value.trim();
+
+  if (trimmed.length === 0 || trimmed.length > 120) {
+    return null;
+  }
+
+  return /^[a-zA-Z0-9._:-]+$/.test(trimmed) ? trimmed : null;
 }
 
 function checkDeleteRateLimit(userId: string) {

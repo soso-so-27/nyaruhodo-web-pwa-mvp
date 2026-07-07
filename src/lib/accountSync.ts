@@ -23,6 +23,7 @@ import {
   uploadDataUrl,
 } from "./photoStorage";
 import { purgeAllPhotoSwCache } from "./photoSwCache";
+import { readAnonymousId } from "./identity/anonymousId";
 import {
   CAT_GALLERY_COLLECTION_SLOT,
   isReservedCollectionSlotSlug,
@@ -896,7 +897,9 @@ export async function deleteAccountStoredData(): Promise<AccountDeleteResult> {
     method: "POST",
     headers: {
       authorization: `Bearer ${accessToken}`,
+      "content-type": "application/json",
     },
+    body: JSON.stringify({ anonymousId: readAnonymousId() }),
   }).catch((error) => {
     throw new Error(
       error instanceof Error ? error.message : "Account delete request failed",
