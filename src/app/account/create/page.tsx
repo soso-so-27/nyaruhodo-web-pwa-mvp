@@ -380,9 +380,6 @@ export default function AccountCreatePage() {
       had_error: Boolean(prepared.error),
       pending_storage_refs: prepared.pendingPaths,
     });
-    if (prepared.error && prepared.pendingPaths > 0) {
-      return { error: new Error(prepared.error) };
-    }
     window.localStorage.setItem(
       STORAGE_KEYS.authGooglePending,
       JSON.stringify({

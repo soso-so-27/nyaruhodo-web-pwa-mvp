@@ -58,6 +58,13 @@ same target account: if the browser crashes after the copy succeeds but before
 local references are rewritten, a retry by the same signed-in account returns
 the saved mappings. A different account cannot reuse the nonce.
 
+If the transfer intent cannot be created because the anonymous session has
+already expired or the network is unavailable, account login is allowed to
+continue and the transfer is skipped. The app records the failure in product
+events (`auth_google_link_fallback_started` with `had_error`) and leaves the
+original local `storage:` references untouched for later support recovery rather
+than showing a dead error screen during onboarding.
+
 The copied path shape is
 `{targetUserId}/anonymous-transfer/{anonymousUid}/...`. Signed URL
 authorization treats any path under the signed-in user's first path segment as

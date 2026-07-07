@@ -784,6 +784,9 @@ test.describe("sleeping delivery pool guards", () => {
 
     await expect(authorize("user-1/cat/photo.jpg", null)).resolves.toBe(true);
     await expect(
+      authorize("user-1/anonymous-transfer/anon-a/cat-1/sleeping/photo-webp", null),
+    ).resolves.toBe(true);
+    await expect(
       authorize("admin-stock/sleeping/delivered.jpg", "anon-1"),
     ).resolves.toBe(true);
     await expect(
