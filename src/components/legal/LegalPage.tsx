@@ -1,6 +1,13 @@
 "use client";
 
-import type { CSSProperties } from "react";
+import { useEffect, useState } from "react";
+import type { CSSProperties, ReactNode } from "react";
+import { deleteAccountStoredData } from "../../lib/accountSync";
+import {
+  openBillingPortal,
+  readClientBillingStatus,
+  type ClientBillingStatus,
+} from "../../lib/billingClient";
 import { APP_PAGE_BACKGROUND } from "../ui/appTheme";
 import { AppButton } from "../ui/AppButton";
 
@@ -15,6 +22,23 @@ type LegalPageProps = {
   lead: string;
   updatedAt: string;
   sections: readonly LegalSection[];
+};
+
+type LegalFrameProps = {
+  children: ReactNode;
+  title: string;
+  lead: string;
+  updatedAt: string;
+};
+
+const defaultBillingStatus: ClientBillingStatus = {
+  isLoggedIn: false,
+  billingConfigured: false,
+  isBetaSupporter: false,
+  status: "none",
+  currentPeriodEnd: null,
+  cancelAtPeriodEnd: false,
+  canManageBilling: false,
 };
 
 const privacySections = [
@@ -233,7 +257,7 @@ const accountDeletionSections = [
   {
     title: "依頼方法",
     body: [
-      "設定画面の問い合わせ導線、または運営者が案内している連絡先から「削除希望」と送ってください。",
+      "ログインできない場合は、設定画面の問い合わせ導線、または運営者が案内している連絡先から「削除希望」と送ってください。",
       "本人確認と対象確認のため、ログインに使ったメールアドレス、利用している猫の名前、分かる範囲の利用状況を確認することがあります。パスワード、署名付きURL、写真URLを送る必要はありません。",
     ],
   },
@@ -257,7 +281,7 @@ const accountDeletionSections = [
     title: "対応の目安",
     body: [
       "削除対象を確認できたものから7日以内に削除し、完了をお知らせします。",
-      "ベータ期間中はセルフサービスの削除ボタンはまだありません。削除が必要な場合は、問い合わせから依頼してください。",
+      "ログインして退会操作ができる場合は、このページの退会ボタンから手続きできます。ログインできない場合は、問い合わせから依頼してください。",
     ],
   },
 ] as const satisfies readonly LegalSection[];
@@ -375,13 +399,226 @@ export function ContactPage() {
 }
 
 export function AccountDeletionPage() {
+  const [billingStatus, setBillingStatus] =
+    useState<ClientBillingStatus>(defaultBillingStatus);
+  const [isLoadingBilling, setIsLoadingBilling] = useState(true);
+  const [isOpeningPortal, setIsOpeningPortal] = useState(false);
+  const [confirmText, setConfirmText] = useState("");
+  const [deleteState, setDeleteState] = useState<
+    "idle" | "deleting" | "completed" | "error"
+  >("idle");
+
+  useEffect(() => {
+    let isMounted = true;
+
+    async function loadBillingStatus() {
+      const status = await readClientBillingStatus();
+
+      if (!isMounted) {
+        return;
+      }
+
+      setBillingStatus(status);
+      setIsLoadingBilling(false);
+    }
+
+    void loadBillingStatus();
+
+    return () => {
+      isMounted = false;
+    };
+  }, []);
+
+  useEffect(() => {
+    if (deleteState !== "completed") {
+      return;
+    }
+
+    const timer = window.setTimeout(() => {
+      window.location.href = "/";
+    }, 3200);
+
+    return () => window.clearTimeout(timer);
+  }, [deleteState]);
+
+  async function handleOpenPortal() {
+    if (isOpeningPortal) {
+      return;
+    }
+
+    setIsOpeningPortal(true);
+    const url = await openBillingPortal();
+
+    if (url) {
+      window.location.href = url;
+      return;
+    }
+
+    setIsOpeningPortal(false);
+  }
+
+  async function handleDeleteAccount() {
+    if (deleteState === "deleting" || confirmText.trim() !== "たいかい") {
+      return;
+    }
+
+    setDeleteState("deleting");
+    const result = await deleteAccountStoredData().catch((error) => ({
+      status: "error" as const,
+      errors: [error instanceof Error ? error.message : "delete failed"],
+    }));
+
+    setDeleteState(result.status === "deleted" ? "completed" : "error");
+  }
+
+  const showPaymentManagement =
+    billingStatus.isLoggedIn &&
+    billingStatus.isBetaSupporter &&
+    billingStatus.canManageBilling;
+  const isConfirmValid = confirmText.trim() === "たいかい";
+
+  if (deleteState === "completed") {
+    return (
+      <LegalFrame
+        title="退会を受け付けました"
+        lead="アカウントと保存データの削除が完了しました。"
+        updatedAt="2026年7月7日"
+      >
+        <section style={styles.section}>
+          <p style={styles.paragraph}>これまで使ってくださって、ありがとうございました。</p>
+        </section>
+      </LegalFrame>
+    );
+  }
+
   return (
-    <LegalPage
+    <LegalFrame
       title="アカウントとデータの削除について"
-      lead="ねてるねこに保存したアカウント、写真、猫の記録、思い出の削除依頼についてまとめています。"
+      lead="支払いだけを止める、写真だけを消す、退会する。必要な操作を分けて選べます。"
       updatedAt="2026年7月7日"
-      sections={accountDeletionSections}
-    />
+    >
+      {showPaymentManagement ? (
+        <section data-testid="account-delete-payment-block" style={styles.section}>
+          <h2 style={styles.sectionTitle}>お支払いだけをやめたい方へ</h2>
+          <p style={styles.paragraph}>
+            退会は不要です。毎日の交換も、写真も、そのまま使いつづけられます。
+          </p>
+          <AppButton
+            type="button"
+            variant="secondary"
+            size="md"
+            fullWidth
+            onClick={handleOpenPortal}
+            loading={isOpeningPortal}
+            loadingLabel="支払い管理を開いています"
+          >
+            支払いの管理
+          </AppButton>
+        </section>
+      ) : null}
+
+      <section style={styles.section}>
+        <h2 style={styles.sectionTitle}>特定の写真だけを消したい方へ</h2>
+        <p style={styles.paragraph}>
+          写真をひらき、写真の操作から削除を選んでください。ねがおはアルバム「まいにち」、この子の写真はうちのこ「写真」から操作できます。
+        </p>
+        <div style={styles.actionRow}>
+          <AppButton href="/collection" variant="quiet" size="sm">
+            アルバムへ
+          </AppButton>
+          <AppButton href="/cats" variant="quiet" size="sm">
+            うちのこへ
+          </AppButton>
+        </div>
+      </section>
+
+      {billingStatus.isLoggedIn ? (
+        <section data-testid="account-delete-request-block" style={styles.section}>
+          <h2 style={styles.sectionTitle}>退会（すべてのデータの削除）</h2>
+          <p style={styles.paragraph}>
+            退会すると、あなたのアカウント、自分の写真、猫のプロフィール、記録、思い出のデータを削除します。
+          </p>
+          <p style={styles.paragraph}>
+            すでに届いた相手のねこだよりは、受け取った方の記録として残ります。
+          </p>
+          <p style={styles.importantParagraph}>
+            退会すると、お支払いは同時に停止します。日割りの返金はなく、サポーター特典もその時点で終了します。
+          </p>
+          <label style={styles.confirmLabel} htmlFor="account-delete-confirm">
+            続ける場合は「たいかい」と入力してください
+          </label>
+          <input
+            id="account-delete-confirm"
+            data-testid="account-delete-confirm-input"
+            value={confirmText}
+            onChange={(event) => setConfirmText(event.target.value)}
+            style={styles.confirmInput}
+            inputMode="text"
+            autoComplete="off"
+          />
+          <AppButton
+            type="button"
+            variant="danger"
+            size="md"
+            fullWidth
+            disabled={!isConfirmValid || deleteState === "deleting"}
+            loading={deleteState === "deleting"}
+            loadingLabel="削除しています"
+            onClick={handleDeleteAccount}
+            data-testid="account-delete-submit"
+          >
+            退会してデータを削除する
+          </AppButton>
+          {deleteState === "error" ? (
+            <p role="status" style={styles.errorText}>
+              時間をおいてもう一度お試しください。解決しない場合は
+              <a href="/contact" style={styles.inlineLink}>
+                お問い合わせ
+              </a>
+              へ。
+            </p>
+          ) : null}
+        </section>
+      ) : isLoadingBilling ? (
+        <section style={styles.section}>
+          <p style={styles.paragraph}>ログイン状態を確認しています。</p>
+        </section>
+      ) : (
+        <section style={styles.section}>
+          <h2 style={styles.sectionTitle}>
+            ログインできない場合のデータ削除依頼
+          </h2>
+          <p style={styles.paragraph}>
+            ログインできない場合や、匿名で使っていた端末のデータについては、問い合わせから「削除希望」と送ってください。
+          </p>
+          <AppButton href="/contact" variant="secondary" size="md" fullWidth>
+            問い合わせる
+          </AppButton>
+        </section>
+      )}
+
+      {!billingStatus.isLoggedIn && !isLoadingBilling
+        ? (accountDeletionSections as readonly LegalSection[]).map((section) => (
+            <section key={section.title} style={styles.section}>
+              <h2 style={styles.sectionTitle}>{section.title}</h2>
+              {section.body?.map((paragraph) => (
+                <p key={paragraph} style={styles.paragraph}>
+                  {paragraph}
+                </p>
+              ))}
+              {section.bullets ? (
+                <ul style={styles.list}>
+                  {section.bullets.map((item) => (
+                    <li key={item} style={styles.listItem}>
+                      {item}
+                    </li>
+                  ))}
+                </ul>
+              ) : null}
+            </section>
+          ))
+        : null}
+    </LegalFrame>
   );
 }
 
@@ -409,6 +646,36 @@ export function CommercialTransactionsPage() {
 
 function LegalPage({ title, lead, updatedAt, sections }: LegalPageProps) {
   return (
+    <LegalFrame title={title} lead={lead} updatedAt={updatedAt}>
+      {sections.map((section) => (
+        <section key={section.title} style={styles.section}>
+          <h2 style={styles.sectionTitle}>{section.title}</h2>
+          {section.body?.map((paragraph) => (
+            <p key={paragraph} style={styles.paragraph}>
+              {paragraph}
+            </p>
+          ))}
+          {section.bullets ? (
+            <ul style={styles.list}>
+              {section.bullets.map((item) => (
+                <li key={item} style={styles.listItem}>
+                  {item}
+                </li>
+              ))}
+            </ul>
+          ) : null}
+        </section>
+      ))}
+
+      <p style={styles.note}>
+        このページはベータ版公開に向けた暫定版です。正式公開前に内容を更新することがあります。
+      </p>
+    </LegalFrame>
+  );
+}
+
+function LegalFrame({ title, lead, updatedAt, children }: LegalFrameProps) {
+  return (
     <main style={styles.page}>
       <div style={styles.container}>
         <div style={styles.header}>
@@ -423,29 +690,7 @@ function LegalPage({ title, lead, updatedAt, sections }: LegalPageProps) {
 
         <p style={styles.lead}>{lead}</p>
 
-        {sections.map((section) => (
-            <section key={section.title} style={styles.section}>
-              <h2 style={styles.sectionTitle}>{section.title}</h2>
-              {section.body?.map((paragraph) => (
-                <p key={paragraph} style={styles.paragraph}>
-                  {paragraph}
-                </p>
-              ))}
-              {section.bullets ? (
-                <ul style={styles.list}>
-                  {section.bullets.map((item) => (
-                    <li key={item} style={styles.listItem}>
-                      {item}
-                    </li>
-                  ))}
-                </ul>
-              ) : null}
-            </section>
-        ))}
-
-        <p style={styles.note}>
-          このページはベータ版公開に向けた暫定版です。正式公開前に内容を更新することがあります。
-        </p>
+        {children}
       </div>
     </main>
   );
@@ -515,6 +760,60 @@ const styles = {
     fontWeight: 500,
     lineHeight: 1.9,
     letterSpacing: 0,
+  },
+  importantParagraph: {
+    margin: "12px 0",
+    padding: "12px 14px",
+    borderRadius: "12px",
+    background: "rgba(145, 76, 69, 0.08)",
+    color: "#4f473a",
+    fontSize: "14px",
+    fontWeight: 600,
+    lineHeight: 1.8,
+  },
+  actionRow: {
+    display: "flex",
+    flexWrap: "wrap",
+    gap: "8px",
+    marginTop: "12px",
+  },
+  confirmLabel: {
+    display: "block",
+    margin: "18px 0 8px",
+    color: "#6f6658",
+    fontSize: "12px",
+    fontWeight: 600,
+    letterSpacing: "0.04em",
+    lineHeight: 1.6,
+  },
+  confirmInput: {
+    boxSizing: "border-box",
+    width: "100%",
+    maxWidth: "100%",
+    minHeight: "48px",
+    margin: "0 0 14px",
+    border: "1px solid rgba(117, 103, 83, 0.24)",
+    borderRadius: "14px",
+    background: "rgba(255, 255, 250, 0.84)",
+    color: "#332f28",
+    fontFamily:
+      '"Zen Kaku Gothic New", "Hiragino Sans", "Yu Gothic", sans-serif',
+    fontSize: "16px",
+    fontWeight: 500,
+    padding: "10px 12px",
+    outline: "none",
+  },
+  errorText: {
+    margin: "12px 0 0",
+    color: "#7b3c35",
+    fontSize: "13px",
+    fontWeight: 500,
+    lineHeight: 1.7,
+  },
+  inlineLink: {
+    color: "#7b3c35",
+    textDecoration: "underline",
+    textUnderlineOffset: "3px",
   },
   list: {
     display: "flex",

@@ -73,6 +73,7 @@ const desktopSpecs = [
 
 const mobileSpecs = [
   "**/admin-test-tool-guards.spec.ts",
+  "**/account-deletion-ui.spec.ts",
   "**/app-sheet-behavior.spec.ts",
   "**/cats-duplicate-name.spec.ts",
   "**/collection-album-flow.spec.ts",

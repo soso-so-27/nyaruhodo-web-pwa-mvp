@@ -8,6 +8,7 @@
 - 旧 `docs/marketing/MARKETING-CANON.md` v0.1 の扱いをアーカイブ/削除/参照停止のどれかに決める — 出典: `docs/BRAND-GUIDELINE.md` v1.0 §11（2026-07-07: 参照は全てv0.2へ付け替え済み。残るのはファイル自体の移動判断）
 - ~~`FEATURE-IDEAS` 相当の「作らないものリスト」を一本化する~~ — **済 2026-07-07**（`docs/FEATURE-IDEAS.md` v2.0 コミット・アンチロードマップ節を含む）
 - 実装内の未定義 `var(--font-serif)` 参照を現行書体トークンへ寄せる — 出典: `docs/BRAND-GUIDELINE.md` v1.0 §6
+- 年額プラン検討（フェーズ2後半。一年の現像の予約として。返金は月単位比例で規約に明記。グリーフ時は個別対応） — 出典: `FEATURE-IDEAS` / 事業方針D5 / 2026-07-07退会UI分岐設計
 
 - grant hardening 本体 — 出典: `docs/specs/grant-hardening-spec.md`
 - 未参照Storageオブジェクトの定期GC（105件棚卸済み） — 出典: `docs/incident-20260704-bulk-delete.md`
