@@ -69,7 +69,8 @@ These rules are permanent. Specs do not restate them. If a spec or doc conflicts
 - Browser localStorage as the primary MVP client store
 - Optional account sync for persistence across installs/devices
 
-There is currently no Service Worker. The PWA is manifest-only, so do not assume offline support or push notification handling exists.
+`public/sw.js` is an active Service Worker. It provides the offline fallback and, when `NEXT_PUBLIC_ENABLE_SW_IMAGE_CACHE=true`, caches signed photo responses through the photo cache controller.
+Photo SW cache purges are wired for own-photo deletion, cat-gallery photo deletion, reported/hidden photos, logout, account deletion, account switch, and feature-disabled transitions. Do not assume push notification handling exists.
 
 ## Product Principles
 

@@ -1,3 +1,5 @@
+import { createHash, timingSafeEqual } from "node:crypto";
+
 import { NextResponse } from "next/server";
 
 export function authorizeAdminTaskRequest(request: Request) {
@@ -21,7 +23,10 @@ export function authorizeAdminTaskRequest(request: Request) {
     request.headers.get("x-cron-secret") ??
     "";
 
-  if (bearer !== expectedSecret && headerSecret !== expectedSecret) {
+  if (
+    !isAdminTaskSecretMatch(bearer, expectedSecret) &&
+    !isAdminTaskSecretMatch(headerSecret, expectedSecret)
+  ) {
     return NextResponse.json(
       { ok: false, error: "forbidden" },
       { status: 403 },
@@ -29,4 +34,11 @@ export function authorizeAdminTaskRequest(request: Request) {
   }
 
   return null;
+}
+
+function isAdminTaskSecretMatch(candidate: string, expected: string) {
+  const candidateDigest = createHash("sha256").update(candidate).digest();
+  const expectedDigest = createHash("sha256").update(expected).digest();
+
+  return timingSafeEqual(candidateDigest, expectedDigest);
 }

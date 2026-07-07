@@ -336,6 +336,10 @@ test.describe("onboarding delivery flow", () => {
 
     await page.goto("/onboarding");
     await page.waitForLoadState("networkidle");
+    await expect(
+      page.getByRole("heading", { name: "SafariやChromeで 開くと安心です" }),
+    ).toBeVisible();
+    await page.getByRole("button", { name: "このまま進む" }).click();
     await page.locator("main button").first().click();
     await page.locator('input[type="file"]').last().setInputFiles({
       name: "own-sleeping.png",
@@ -724,6 +728,29 @@ test.describe("onboarding delivery flow", () => {
       page.getByRole("button", { name: "ねがおを1枚入れる" }),
     ).toBeVisible();
     await expect(page.getByText("アプリでつづける")).toHaveCount(0);
+  });
+
+  test("shows an external browser guide for Instagram bio links opened in an embedded browser", async ({
+    page,
+  }) => {
+    await page.addInitScript(() => {
+      Object.defineProperty(window.navigator, "userAgent", {
+        get: () =>
+          "Mozilla/5.0 (iPhone; CPU iPhone OS 18_5 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Mobile/15E148 Instagram 385.0.0.25.75",
+      });
+      window.localStorage.removeItem("onboarding_completed");
+      window.localStorage.removeItem("neteruneko_onboarding_progress");
+      window.localStorage.removeItem("neteruneko_pending_referral_code");
+    });
+
+    await page.goto("/onboarding?source=instagram_bio");
+    await expect(
+      page.getByRole("heading", { name: "SafariやChromeで 開くと安心です" }),
+    ).toBeVisible();
+    await expect(page.getByText("アプリ内ブラウザ")).toBeVisible();
+    await expect(
+      page.getByRole("button", { name: "ねがおを1枚入れる" }),
+    ).toHaveCount(0);
   });
 
   test("resets local onboarding test data from an explicit reset link", async ({

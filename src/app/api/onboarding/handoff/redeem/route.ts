@@ -62,6 +62,7 @@ export async function POST(request: Request) {
   }
 
   if (new Date(data.expires_at).getTime() < Date.now()) {
+    await cleanupExpiredHandoff(supabase, token);
     return NextResponse.json(
       { ok: false, error: "handoff_expired" },
       { status: 410 },
@@ -125,6 +126,30 @@ export async function POST(request: Request) {
     ok: true,
     payload,
   });
+}
+
+async function cleanupExpiredHandoff(
+  supabase: NonNullable<ReturnType<typeof createSupabaseAdminClient>>,
+  token: string,
+) {
+  try {
+    await removeHandoffStorageObjects(supabase, token);
+  } catch (error) {
+    console.warn("[onboarding/handoff/redeem] expired handoff storage cleanup failed", {
+      error: error instanceof Error ? error.message : "unknown",
+    });
+  }
+
+  const { error } = await supabase
+    .from("onboarding_handoffs")
+    .update({ payload: null })
+    .eq("handoff_token", token);
+
+  if (error) {
+    console.warn("[onboarding/handoff/redeem] expired handoff payload cleanup failed", {
+      error: error.message,
+    });
+  }
 }
 
 async function hydrateHandoffStorageRefs(

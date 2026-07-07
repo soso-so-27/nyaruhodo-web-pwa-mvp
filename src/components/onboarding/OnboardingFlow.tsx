@@ -1274,7 +1274,6 @@ export function OnboardingFlow() {
 
   const shouldShowExternalBrowserGuide =
     state === "intro" &&
-    entrySource === "referral" &&
     isEmbeddedBrowser &&
     !isExternalBrowserGuideDismissed;
 
@@ -1311,6 +1310,7 @@ export function OnboardingFlow() {
 
         {shouldShowExternalBrowserGuide ? (
           <ExternalBrowserGuide
+            source={entrySource}
             copied={hasCopiedExternalBrowserUrl}
             onCopy={() => {
               void handleCopyOnboardingUrl();
@@ -1742,14 +1742,18 @@ function OnboardingInstallGuide({
 }
 
 function ExternalBrowserGuide({
+  source,
   copied,
   onCopy,
   onContinue,
 }: {
+  source: OnboardingSource;
   copied: boolean;
   onCopy: () => void;
   onContinue: () => void;
 }) {
+  const kicker = source === "referral" ? "紹介リンク" : "アプリ内ブラウザ";
+
   return (
     <section style={styles.externalBrowserGuide} aria-label="ブラウザで開く案内">
       <div style={styles.externalBrowserArt} aria-hidden="true">
@@ -1760,7 +1764,7 @@ function ExternalBrowserGuide({
         />
         <OnboardingEnvelopeArt compact />
       </div>
-      <p style={styles.kicker}>紹介リンク</p>
+      <p style={styles.kicker}>{kicker}</p>
       <h1 style={styles.title}>
         SafariやChromeで
         <br />

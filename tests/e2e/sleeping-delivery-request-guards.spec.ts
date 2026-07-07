@@ -10,6 +10,7 @@ import {
   isTransferIntentExpired,
   normalizeAnonymousTransferPaths,
 } from "../../src/lib/auth/anonymousStorageTransfer";
+import { authorizeAdminTaskRequest } from "../../src/lib/server/adminTaskAuth";
 
 const validPngDataUrl =
   "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADElEQVR42mP8z8BQDwAFgwJ/lm6v9wAAAABJRU5ErkJggg==";
@@ -138,4 +139,53 @@ test.describe("sleeping delivery request guards", () => {
       isTransferIntentExpired("2026-07-07T00:15:00.000Z", Date.parse("2026-07-07T00:14:00.000Z")),
     ).toBe(false);
   });
+
+  test("accepts admin task secrets without direct string comparison", () => {
+    const originalSecret = process.env.ADMIN_TASK_SECRET;
+    const originalCronSecret = process.env.CRON_SECRET;
+    const originalStorageSecret = process.env.STORAGE_HARDENING_SECRET;
+
+    try {
+      process.env.ADMIN_TASK_SECRET = "review-secret";
+      delete process.env.CRON_SECRET;
+      delete process.env.STORAGE_HARDENING_SECRET;
+
+      expect(
+        authorizeAdminTaskRequest(
+          new Request("https://example.test/admin", {
+            headers: { authorization: "Bearer review-secret" },
+          }),
+        ),
+      ).toBeNull();
+
+      expect(
+        authorizeAdminTaskRequest(
+          new Request("https://example.test/admin", {
+            headers: { "x-cron-secret": "review-secret" },
+          }),
+        ),
+      ).toBeNull();
+
+      const rejected = authorizeAdminTaskRequest(
+        new Request("https://example.test/admin", {
+          headers: { authorization: "Bearer wrong" },
+        }),
+      );
+
+      expect(rejected?.status).toBe(403);
+    } finally {
+      restoreEnv("ADMIN_TASK_SECRET", originalSecret);
+      restoreEnv("CRON_SECRET", originalCronSecret);
+      restoreEnv("STORAGE_HARDENING_SECRET", originalStorageSecret);
+    }
+  });
 });
+
+function restoreEnv(key: string, value: string | undefined) {
+  if (value === undefined) {
+    delete process.env[key];
+    return;
+  }
+
+  process.env[key] = value;
+}

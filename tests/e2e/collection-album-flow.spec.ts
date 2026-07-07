@@ -40,6 +40,7 @@ test.describe("collection album flow", () => {
       mimeType: "image/png",
       buffer: photoUploadBuffer,
     });
+    await confirmSleepingPhotoShare(page);
 
     await expect
       .poll(() =>
@@ -555,6 +556,13 @@ test.describe("collection album flow", () => {
         createdAt: now,
       },
     );
+    await page.route("**/rest/v1/product_analytics_events*", async (route) => {
+      await route.fulfill({
+        contentType: "application/json",
+        status: 500,
+        body: JSON.stringify({ error: "keep local analytics queue for assertions" }),
+      });
+    });
     await page.route("**/api/photo-storage/signed-urls", async (route) => {
       const body = route.request().postDataJSON() as {
         paths?: string[];
@@ -598,14 +606,22 @@ test.describe("collection album flow", () => {
       .toContain(sentPath);
     expect(fetchedPhotoPaths.join("\n")).toContain(deliveredPath);
     expect(fetchedPhotoPaths.join("\n")).toContain(galleryPath);
-    const prefetchEvent = await page.evaluate(() => {
-      const events = JSON.parse(
-        window.localStorage.getItem("analytics_event_queue") ?? "[]",
-      ) as Array<{ name?: string; properties?: Record<string, unknown> }>;
-      return events.find((event) => event.name === "photo_prefetch_done");
-    });
-
-    expect(prefetchEvent?.properties?.duration_ms).toEqual(expect.any(Number));
+    await expect
+      .poll(
+        () =>
+          page.evaluate(() => {
+            const events = JSON.parse(
+              window.localStorage.getItem("analytics_event_queue") ?? "[]",
+            ) as Array<{ name?: string; properties?: Record<string, unknown> }>;
+            return events.some(
+              (event) =>
+                event.name === "photo_prefetch_done" &&
+                typeof event.properties?.duration_ms === "number",
+            );
+          }),
+        { timeout: 5000 },
+      )
+      .toBe(true);
   });
 
   test("does not request a new signed url for the same storage photo in one session", async ({
@@ -1560,6 +1576,12 @@ test.describe("collection album flow", () => {
     await expect(page.getByTestId("mainichi-board-photo-sent")).toHaveCount(0);
   });
 });
+
+async function confirmSleepingPhotoShare(page: Page) {
+  const dialog = page.getByRole("dialog");
+  await expect(dialog).toBeVisible();
+  await dialog.locator("button").last().click();
+}
 
 async function seedCollectionEveningDelivery(
   page: Page,
