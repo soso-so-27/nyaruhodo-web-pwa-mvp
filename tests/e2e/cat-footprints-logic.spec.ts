@@ -76,13 +76,31 @@ test.describe("cat footprints", () => {
       "photo-photo-3",
     ]);
   });
+
+  test("does not treat cat gallery photos as sleeping-photo footprints", () => {
+    const entries = createCatFootprintEntries({
+      photos: [
+        photo("gallery-photo", now - 30_000, "photo"),
+        photo("sleeping-photo", now - 60_000, "sleeping"),
+      ],
+      milestones: emptyMilestones(),
+      memories: [],
+    });
+
+    expect(entries.map((entry) => entry.id)).toEqual(["photo-sleeping-photo"]);
+  });
 });
 
-function photo(id: string, createdAt: number): CatFootprintPhoto {
+function photo(
+  id: string,
+  createdAt: number,
+  kind: CatFootprintPhoto["kind"] = "sleeping",
+): CatFootprintPhoto {
   return {
     id,
     src: photoSrc,
     createdAt,
+    kind,
   };
 }
 

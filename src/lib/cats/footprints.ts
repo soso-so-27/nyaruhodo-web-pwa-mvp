@@ -8,6 +8,7 @@ export type CatFootprintPhoto = {
   id: string;
   src: string;
   createdAt: number;
+  kind?: "sleeping" | "photo";
 };
 
 export type CatFootprintEntry = {
@@ -42,7 +43,12 @@ export function createCatFootprintEntries({
   );
 
   const photoEntries = photos
-    .filter((photo) => photo.createdAt && !milestonePhotoIds.has(photo.id))
+    .filter(
+      (photo) =>
+        (photo.kind ?? "sleeping") === "sleeping" &&
+        photo.createdAt &&
+        !milestonePhotoIds.has(photo.id),
+    )
     .slice(0, 8)
     .map((photo) => ({
       id: `photo-${photo.id}`,
