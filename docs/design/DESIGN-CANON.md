@@ -1,6 +1,6 @@
 # ねてるねこ Design Canon
 
-Last updated: 2026-06-12
+Last updated: 2026-07-07
 
 This file is the design source of truth for future UI work. Before changing UI, copy, motion, navigation, product surface hierarchy, or design tokens, compare the change against this file and record any intentional deviation in the PR or task report.
 
@@ -31,13 +31,20 @@ Owner decision:
 > エネルギー(賑やかさ)は借りない。
 > 決定: 中西壮野 2026-06-12
 
+2026-07-07 update:
+
+- The "明朝+字間" typeface decision above is an old decision.
+- The current official brand body type is the settings-page body type: `--font-ui` = `Zen Kaku Gothic New`.
+- The current display type is `--font-display` = `Klee One`.
+- Do not change implementation fonts to chase the old Mincho wording; current implementation is the source of truth.
+
 Operational reading:
 
 - The app should feel like paper and ink before it feels like an app surface.
 - Color is carried by photos, not by UI chrome.
 - UI may use one deep color only: `--seal`, for the wax-seal point and destructive/action warning text. Do not use it as a filled surface.
 - Unopened items are indicated only by a 6-7px `--seal` dot. Do not use numbers, badges, or `NEW` text for this meaning.
-- Use serif + tracking for labels, dates, and button text. Use sans-serif for practical body copy such as settings explanations.
+- Use the current font tokens: `--font-display` for short display labels, dates, and envelope-adjacent words; `--font-ui` for body copy, settings, legal, and admin surfaces.
 - Buttons are mostly words or thin-line paper pills. Filled buttons are exceptional and limited to one per screen.
 
 Attached token canon:
@@ -172,8 +179,8 @@ These are the current design principles for `ねてるねこ`.
 1. 色のない静けさ。
    UI chrome is paper and ink only. No rose surfaces, no colored cards, no colorful buttons. Photos carry color.
 
-2. 明朝+字間で特別感を作る。
-   Labels, dates, and button text use serif type with tracking. Avoid heavy weights; emphasis comes from spacing, position, and silence.
+2. 書体と間で特別感を作る。
+   The old Mincho decision was replaced on 2026-07-07 by the settings-page type direction. Use `--font-ui` (`Zen Kaku Gothic New`) for body copy and `--font-display` (`Klee One`) for short display moments. Avoid heavy weights; emphasis comes from spacing, position, and silence.
 
 3. ボタンは文字。
    Most actions should read as words or thin-line paper pills. A filled action is rare and limited to one per screen.
@@ -196,7 +203,7 @@ Every future UI PR or task report should answer:
 - Does it use `src/app/tokens.css` instead of raw component-local color, shadow, radius, and easing values?
 - Does it avoid colored surfaces outside photos?
 - Is `--seal` limited to wax-seal points and destructive/action warning text?
-- Are labels/dates/button text serif + tracked, with no unnecessary bold?
+- Are labels/dates/button text using the current font tokens, with no unnecessary bold?
 - Does it respect `prefers-reduced-motion`?
 - Does it keep user-facing copy quiet and hiragana-forward where appropriate, while keeping settings/legal/admin clear?
 - If it changes delivery-adjacent UI, did it avoid coupling presentation changes to delivery detection logic?

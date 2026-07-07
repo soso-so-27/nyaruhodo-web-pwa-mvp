@@ -10,7 +10,8 @@
 - `--seal` は封蝋の点、押下中の「おさえて ひらく」、破壊的操作の文字にのみ使う。
 - 背景は全画面 `--bg-gradient`。
 - 塗りつぶしボタンは1画面に最大1つ。
-- ラベル・日付・ボタン文字は明朝+字間。
+- ラベル・日付・ボタン文字は現行表示書体+字間。
+- 旧「明朝+字間」決定は、2026-07-07に設定ページ本文書体（`--font-ui` = `Zen Kaku Gothic New`）を公式本文書体とする方針へ差し替え済み。
 
 ## CSS Tokens
 
@@ -41,8 +42,9 @@
   --radius-s: 13px;
 
   /* ===== 文字 ===== */
-  --font-serif: "Hiragino Mincho ProN", "Yu Mincho", serif;
-  --font-sans:  -apple-system, "Hiragino Sans", sans-serif;
+  --font-display: var(--font-klee-one), "Klee One", sans-serif;
+  --font-ui: var(--font-zen-kaku), "Zen Kaku Gothic New", -apple-system, "Hiragino Sans", sans-serif;
+  --font-sans: -apple-system, "Hiragino Sans", sans-serif;
   --tracking-label: 0.18em;
   --tracking-body:  0.06em;
 
@@ -61,7 +63,7 @@
 1. 有彩色の面は禁止。UIの面は `--paper`, `--paper-warm`, `--paper-card` のみ。
 2. `--seal` は点と文字だけ。面に塗らない。
 3. 背景は `--bg-gradient`。
-4. ラベル・日付・ボタン文字は `--font-serif` + `--tracking-label`。
-5. 本文・設定説明・管理表示は `--font-sans` 可。
+4. ラベル・日付・ボタン文字は `--font-display` + `--tracking-label`。
+5. 本文・設定説明・管理表示は `--font-ui`。
 6. 物に説明を印字しない。「おさえて ひらく」は封筒下の独立行。
 7. 写真タイルの白フチ・角丸は維持。写真だけが色の主役。

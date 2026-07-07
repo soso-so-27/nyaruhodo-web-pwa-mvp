@@ -3,6 +3,11 @@
 - Tier2内の鮮度重み付け（撮影経過の弱い減衰・冬が来る前に） — 出典: 2026-07-07棚卸残 #10
 - 投稿時の軽い猫検出「ねこが見つかりませんでした。このまま入れますか」（フェーズ2・AIパイプライン副産物） — 出典: 2026-07-07棚卸残 #10
 - ブロック機能（この送り主から受け取らない・ストア配信要件） — 出典: 2026-07-07棚卸残 #10
+- `--seal` の面利用を棚卸し、CANON例外にするか紙系へ戻すか決める — 出典: `docs/BRAND-GUIDELINE.md` v1.0 §11
+- `手紙` / `一通` / `ねこだより` の外向き語彙ゆれを整理する — 出典: `docs/BRAND-GUIDELINE.md` v1.0 §11
+- 旧 `docs/marketing/MARKETING-CANON.md` v0.1 の扱いをアーカイブ/削除/参照停止のどれかに決める — 出典: `docs/BRAND-GUIDELINE.md` v1.0 §11
+- `FEATURE-IDEAS` 相当の「作らないものリスト」を一本化する — 出典: `docs/BRAND-GUIDELINE.md` v1.0 §11
+- 実装内の未定義 `var(--font-serif)` 参照を現行書体トークンへ寄せる — 出典: `docs/BRAND-GUIDELINE.md` v1.0 §6
 
 - grant hardening 本体 — 出典: `docs/specs/grant-hardening-spec.md`
 - 未参照Storageオブジェクトの定期GC（105件棚卸済み） — 出典: `docs/incident-20260704-bulk-delete.md`
