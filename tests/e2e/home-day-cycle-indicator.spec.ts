@@ -445,6 +445,163 @@ test.describe("home desk state cycle", () => {
       });
   });
 
+  test("restores all remote sleeping history without applying local display limits", async ({
+    page,
+  }) => {
+    const userId = "user-restore-full-history";
+    const remoteCatId = "remote-cat-full-history";
+    const localCatId = "local-cat-full-history";
+    const now = Date.parse("2026-07-08T09:00:00+09:00");
+    const remoteMoments = Array.from({ length: 30 }, (_, index) => ({
+      id: `remote-moment-${index + 1}`,
+      local_moment_id: `local-moment-${index + 1}`,
+      local_cat_id: localCatId,
+      owner_cat_id: remoteCatId,
+      photo_url: `storage:${userId}/${remoteCatId}/sleeping/local-moment-${index + 1}.jpg`,
+      state: "sleeping",
+      visibility: "shared",
+      delivery_status: "available",
+      source_moment_id: null,
+      metadata: {},
+      captured_at: new Date(now - index * 60_000).toISOString(),
+      created_at: new Date(now - index * 60_000).toISOString(),
+    }));
+    const remoteDeliveries = Array.from({ length: 55 }, (_, index) => ({
+      id: `remote-delivery-${index + 1}`,
+      local_delivery_id: `local-delivery-${index + 1}`,
+      source_moment_id: `source-moment-${index + 1}`,
+      source_photo_id: `source-photo-${index + 1}`,
+      recipient_local_cat_id: null,
+      photo_url: `storage:${userId}/kept/deliveries/local-delivery-${index + 1}.jpg`,
+      status: "kept",
+      metadata: {},
+      delivered_at: new Date(now - index * 60_000).toISOString(),
+    }));
+
+    await page.addInitScript(
+      ({ accessToken, createdAt, userIdValue }) => {
+        window.localStorage.clear();
+        window.localStorage.setItem(
+          "auth_google_pending",
+          JSON.stringify({
+            provider: "google",
+            route: "/account/create",
+            method: "oauth_redirect",
+            startedAt: new Date(createdAt).toISOString(),
+          }),
+        );
+        window.localStorage.setItem(
+          "nyaruhodo_supabase_auth",
+          JSON.stringify({
+            access_token: accessToken,
+            refresh_token: "test-refresh-token",
+            expires_at: Math.floor(Date.now() / 1000) + 3600,
+            expires_in: 3600,
+            token_type: "bearer",
+            user: {
+              id: userIdValue,
+              aud: "authenticated",
+              role: "authenticated",
+              email: "restore-full@example.test",
+              app_metadata: {},
+              user_metadata: {},
+            },
+          }),
+        );
+      },
+      {
+        accessToken: "test-restore-full-access-token",
+        createdAt: now,
+        userIdValue: userId,
+      },
+    );
+
+    await page.route("**/auth/v1/user", async (route) => {
+      await route.fulfill({
+        contentType: "application/json",
+        body: JSON.stringify({
+          id: userId,
+          aud: "authenticated",
+          role: "authenticated",
+          email: "restore-full@example.test",
+          app_metadata: {},
+          user_metadata: {},
+        }),
+      });
+    });
+    await page.route("**/rest/v1/**", async (route) => {
+      const url = new URL(route.request().url());
+      const table = url.pathname.split("/").pop() ?? "";
+      const rowsByTable: Record<string, unknown[]> = {
+        profiles: [],
+        cats: [
+          {
+            id: remoteCatId,
+            local_cat_id: localCatId,
+            name: "restored",
+            type_key: null,
+            type_label: null,
+            type_tagline: null,
+            basic_info: {},
+            appearance: {},
+            axis_scores: {},
+            activity_pattern: {},
+            type_scores: {},
+            modifiers: [],
+            onboarding: {},
+            understanding: {},
+            avatar_storage_path: null,
+            home_photo_storage_path: null,
+            home_photo_position: null,
+            local_created_at: new Date(now).toISOString(),
+            local_updated_at: new Date(now).toISOString(),
+            created_at: new Date(now).toISOString(),
+            updated_at: new Date(now).toISOString(),
+          },
+        ],
+        record_logs: [],
+        collection_photos: [],
+        cat_moments: remoteMoments,
+        cat_moment_deliveries: remoteDeliveries,
+        account_local_state: [],
+        account_sync_state: [],
+        product_analytics_events: [],
+        app_events: [],
+      };
+
+      await route.fulfill({
+        contentType: "application/json",
+        body: JSON.stringify(rowsByTable[table] ?? []),
+      });
+    });
+
+    await page.goto("/home?auth=google_success");
+
+    await expect
+      .poll(() =>
+        page.evaluate(() => {
+          const readArray = (key: string) => {
+            try {
+              const parsed = JSON.parse(window.localStorage.getItem(key) ?? "[]");
+
+              return Array.isArray(parsed) ? parsed : [];
+            } catch {
+              return [];
+            }
+          };
+
+          return {
+            keptCount: readArray("nyaruhodo_exchange_kept_photos").length,
+            ownCount: readArray("nyaruhodo_exchange_own_sleeping_photos").length,
+          };
+        }),
+      )
+      .toEqual({
+        keptCount: 55,
+        ownCount: 30,
+      });
+  });
+
   test("omits motif animation classes when reduced motion is enabled", async ({
     page,
   }) => {

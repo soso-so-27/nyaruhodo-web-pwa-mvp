@@ -25,6 +25,7 @@ import {
   dismissExchangePhoto,
   hideKeptExchangePhoto,
   isExchangePhotoLocallyBlocked,
+  readKeptExchangePhotosForAlbum,
   readKeptExchangePhotos,
   readOwnSleepingPhotosForAlbum,
   reportExchangePhoto,
@@ -491,7 +492,7 @@ export function CollectionPage() {
           openedEveningDeliveryPhotos,
           readOnboardingDeliveredBoxPhotos(),
         ),
-        readKeptExchangePhotos(),
+        readKeptExchangePhotosForAlbum(),
       ),
     [boxRefreshTick, hasLoaded, openedEveningDeliveryPhotos],
   );
@@ -911,7 +912,7 @@ export function CollectionPage() {
     }
 
     const exchangePhoto = createExchangePhotoFromDayPhoto(photo);
-    const isKeptPhoto = readKeptExchangePhotos().some(
+    const isKeptPhoto = readKeptExchangePhotosForAlbum().some(
       (savedPhoto) =>
         savedPhoto.id === photo.id ||
         Boolean(

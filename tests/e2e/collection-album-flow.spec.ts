@@ -1399,6 +1399,57 @@ test.describe("collection album flow", () => {
     );
   });
 
+  test("shows delivered mainichi history beyond the home cache limit", async ({
+    page,
+  }) => {
+    const now = Date.parse("2026-07-08T12:00:00.000Z");
+    await page.clock.setFixedTime(new Date(now));
+
+    await page.addInitScript(
+      ({ currentCatId, deliveredPhotos, nowValue }) => {
+        window.localStorage.setItem("active_cat_id", currentCatId);
+        window.localStorage.setItem(
+          "cat_profiles",
+          JSON.stringify([
+            {
+              id: currentCatId,
+              name: "current cat",
+              createdAt: new Date(nowValue).toISOString(),
+              updatedAt: new Date(nowValue).toISOString(),
+            },
+          ]),
+        );
+        window.localStorage.setItem(
+          "nyaruhodo_exchange_kept_photos",
+          JSON.stringify(deliveredPhotos),
+        );
+      },
+      {
+        currentCatId: "current-cat",
+        deliveredPhotos: Array.from({ length: 55 }, (_, index) => ({
+          id: `delivered-history-${index + 1}`,
+          sourcePhotoId: `source-history-${index + 1}`,
+          src: photoDataUrl,
+          title: "とどいたねがお",
+          subtitle: "",
+          triggerLabel: "sleeping",
+          theme: "sleeping",
+          deliveredAt: now - index * 60_000,
+        })),
+        nowValue: now,
+      },
+    );
+
+    await page.goto("/collection");
+    await page.waitForLoadState("networkidle");
+    await page.getByRole("tab", { name: "とどいた" }).click();
+
+    await expect(page.getByTestId("mainichi-board-photo-delivered")).toHaveCount(
+      55,
+      { timeout: 10_000 },
+    );
+  });
+
   test("opens a delivered mainichi photo directly and hides it from fullscreen", async ({
     page,
   }) => {
