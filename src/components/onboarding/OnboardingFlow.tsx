@@ -53,6 +53,7 @@ type OnboardingState =
   | "envelope"
   | "revealing"
   | "delivered"
+  | "second_photo_prompt"
   | "empty"
   | "kept";
 
@@ -142,7 +143,7 @@ export function OnboardingFlow() {
   const installGuideTrackedRef = useRef(false);
   const canShowTestTools = isTestMode && !IS_PRODUCTION;
   const shouldShowSecondPhotoPrompt =
-    state === "delivered" &&
+    state === "second_photo_prompt" &&
     Boolean(deliveredPhoto) &&
     isDeliveredPhotoKept &&
     isBeforeJstHour(20);
@@ -788,6 +789,19 @@ export function OnboardingFlow() {
       deliveredPhoto: deliveredPhoto ?? progress?.deliveredPhoto,
       isDeliveredPhotoKept: true,
     });
+    continueAfterOnboardingLetter();
+  }
+
+  function continueAfterOnboardingLetter() {
+    if (isBeforeJstHour(20) && deliveredPhoto && isDeliveredPhotoKept) {
+      setState("second_photo_prompt");
+      return;
+    }
+
+    continueToAccountCreate();
+  }
+
+  function continueToAccountCreate() {
     markOnboardingAlbumCompletionReady();
     router.push(
       `/account/create?from=onboarding&source=${encodeURIComponent(getEffectiveEntrySource())}`,
@@ -821,10 +835,7 @@ export function OnboardingFlow() {
       return;
     }
 
-    markOnboardingAlbumCompletionReady();
-    router.push(
-      `/account/create?from=onboarding&source=${encodeURIComponent(getEffectiveEntrySource())}`,
-    );
+    continueAfterOnboardingLetter();
   }
 
   function handleStartSecondPhoto() {
@@ -1508,24 +1519,7 @@ export function OnboardingFlow() {
                   )
                 : "届いた写真を、ねこだよりに入れています。"}
             </p>
-            {shouldShowSecondPhotoPrompt ? (
-              <>
-                <p style={styles.resultText}>
-                  きょうの よる8時にも、もう一通とどきます。
-                  <br />
-                  もう一枚、いれておきますか。
-                </p>
-                <AppButton
-                  type="button"
-                  onClick={handleStartSecondPhoto}
-                  disabled={!isDeliveredPhotoKept}
-                  fullWidth
-                  style={styles.onboardingCta}
-                >
-                  もう一枚いれておく
-                </AppButton>
-              </>
-            ) : isDeliveredPhotoKept ? (
+            {!isBeforeJstHour(20) && isDeliveredPhotoKept ? (
               <p style={styles.resultText}>
                 あしたの よる8時に、つぎの一通がとどきます。
               </p>
@@ -1550,6 +1544,7 @@ export function OnboardingFlow() {
               disabled={!isDeliveredPhotoKept}
               fullWidth
               style={styles.onboardingCta}
+              data-testid="onboarding-delivered-continue"
             >
               {isDeliveredPhotoKept ? "つづける" : "ねこだよりに入れています..."}
             </AppButton>
@@ -1557,6 +1552,41 @@ export function OnboardingFlow() {
           </section>
         ) : null}
 
+        {state === "second_photo_prompt" ? (
+          <section style={styles.result} aria-label="きょうのもう一通">
+            <p style={styles.kicker}>きょうのつづき</p>
+            <h2 style={styles.subTitle}>
+              よる8時に、
+              <br />
+              もう一通とどきます
+            </h2>
+            <p style={styles.resultText}>
+              もう一枚だけ、ねがおをいれておくと
+              <br />
+              きょうのねこだよりになります。
+            </p>
+            <AppButton
+              type="button"
+              onClick={handleStartSecondPhoto}
+              disabled={!isDeliveredPhotoKept}
+              fullWidth
+              style={styles.onboardingCta}
+              data-testid="onboarding-second-photo-primary"
+            >
+              もう一枚いれておく
+            </AppButton>
+            <AppButton
+              type="button"
+              variant="quiet"
+              size="md"
+              onClick={continueToAccountCreate}
+              data-testid="onboarding-second-photo-skip"
+            >
+              今日はここまで
+            </AppButton>
+            {message ? <p style={styles.message}>{message}</p> : null}
+          </section>
+        ) : null}
         {state === "empty" ? (
           <section style={styles.result} aria-label="ねがおを保存しました">
             <p style={styles.kicker}>ねがおが入りました</p>

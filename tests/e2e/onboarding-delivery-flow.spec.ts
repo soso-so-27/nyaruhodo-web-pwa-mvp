@@ -313,10 +313,11 @@ test.describe("onboarding delivery flow", () => {
     await page.locator("main button").first().click();
     await page.waitForTimeout(1600);
 
-    await expect(
-      page.getByRole("button", { name: "もう一枚いれておく" }),
-    ).toBeVisible();
+    await expect(page.getByTestId("onboarding-second-photo-primary")).toHaveCount(0);
     await expect(page.getByTestId("onboarding-install-guide")).toBeVisible();
+    await page.getByTestId("onboarding-delivered-continue").click();
+    await continuePastOptionalOnboardingNamePrompt(page);
+    await expect(page.getByTestId("onboarding-second-photo-primary")).toBeVisible();
   });
 
 
@@ -344,7 +345,10 @@ test.describe("onboarding delivery flow", () => {
 
     await page.locator("main button").first().click();
     await page.waitForTimeout(1600);
-    await page.locator("main button").first().click();
+    await page.getByTestId("onboarding-delivered-continue").click();
+    await continuePastOptionalOnboardingNamePrompt(page);
+    await expect(page.getByTestId("onboarding-second-photo-primary")).toBeVisible();
+    await page.getByTestId("onboarding-second-photo-primary").click();
 
     await expect(page).toHaveURL(/\/account\/create\?from=onboarding/);
     await expect(page).toHaveURL(/next=second_photo/);
