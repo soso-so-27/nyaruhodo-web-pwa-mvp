@@ -1,0 +1,8 @@
+{
+  "crons": [
+    {
+      "path": "/api/admin/onboarding-handoffs/cleanup",
+      "schedule": "30 18 * * *"
+    }
+  ]
+}

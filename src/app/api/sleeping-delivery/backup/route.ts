@@ -101,18 +101,14 @@ export async function POST(request: Request) {
 
   const moment = ownSleepingPhotoToCatMoment(photo);
   const record = toCatMomentRecord(moment);
-  const photoUrl =
-    userId && record.photo_url.startsWith("data:")
-      ? toStoragePhotoUrl(
-          await uploadDataUrl(
-            adminSupabase,
-            `${userId}/${sanitizePathSegment(photo.ownerCatId)}/sleeping/${sanitizePathSegment(
-              record.id,
-            )}.${getDataUrlExtension(record.photo_url)}`,
-            record.photo_url,
-          ),
-        )
-      : record.photo_url;
+  const photoUrl = await persistBackupPhotoUrl({
+    adminSupabase,
+    userId,
+    anonymousId,
+    photo,
+    recordId: record.id,
+    photoUrl: record.photo_url,
+  });
 
   if (userId) {
     const { error: deleteError } = await adminSupabase
@@ -225,4 +221,81 @@ function normalizeAnonymousId(value: unknown) {
   }
 
   return normalized;
+}
+
+async function persistBackupPhotoUrl({
+  adminSupabase,
+  userId,
+  anonymousId,
+  photo,
+  recordId,
+  photoUrl,
+}: {
+  adminSupabase: NonNullable<ReturnType<typeof createSupabaseAdminClient>>;
+  userId: string | null;
+  anonymousId: string | null;
+  photo: OwnSleepingPhoto;
+  recordId: string;
+  photoUrl: string;
+}) {
+  if (!photoUrl.startsWith("data:")) {
+    return photoUrl;
+  }
+
+  const path = userId
+    ? `${userId}/${sanitizePathSegment(photo.ownerCatId)}/sleeping/${sanitizePathSegment(
+        recordId,
+      )}.${getDataUrlExtension(photoUrl)}`
+    : `anonymous/${sanitizePathSegment(
+        anonymousId ?? "unattributed",
+      )}/sleeping/${sanitizePathSegment(recordId)}.${getDataUrlExtension(photoUrl)}`;
+
+  try {
+    return toStoragePhotoUrl(await uploadDataUrl(adminSupabase, path, photoUrl));
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "unknown";
+    console.warn("[sleeping-delivery/backup] storage upload failed", {
+      hasUser: Boolean(userId),
+      hasAnonymousId: Boolean(anonymousId),
+      error: message,
+    });
+    await recordBackupStorageUploadFailure({
+      adminSupabase,
+      userId,
+      anonymousId,
+      error: message,
+    });
+    return photoUrl;
+  }
+}
+
+async function recordBackupStorageUploadFailure({
+  adminSupabase,
+  userId,
+  anonymousId,
+  error,
+}: {
+  adminSupabase: NonNullable<ReturnType<typeof createSupabaseAdminClient>>;
+  userId: string | null;
+  anonymousId: string | null;
+  error: string;
+}) {
+  const { error: eventError } = await adminSupabase.from("app_events").insert({
+    event_name: "sleeping_backup_storage_upload_failed",
+    source: "unknown",
+    user_id: userId,
+    anonymous_id: userId ? null : anonymousId,
+    route: "/api/sleeping-delivery/backup",
+    metadata: {
+      has_user: Boolean(userId),
+      has_anonymous_id: Boolean(anonymousId),
+      error: error.slice(0, 160),
+    },
+  });
+
+  if (eventError) {
+    console.warn("[sleeping-delivery/backup] upload failure trace failed", {
+      code: eventError.code,
+    });
+  }
 }

@@ -4,6 +4,7 @@ import {
   CAT_PHOTOS_BUCKET,
   getStoragePhotoPath,
 } from "../../../../../lib/photoStorage";
+import { removeHandoffStorageObjects } from "../../../../../lib/server/handoffStorageCleanup";
 import { createSupabaseAdminClient } from "../../../../../lib/supabase/admin";
 
 export const dynamic = "force-dynamic";
@@ -110,6 +111,14 @@ export async function POST(request: Request) {
       { ok: false, error: "handoff_already_used" },
       { status: 409 },
     );
+  }
+
+  try {
+    await removeHandoffStorageObjects(supabase, token);
+  } catch (error) {
+    console.warn("[onboarding/handoff/redeem] handoff storage cleanup failed", {
+      error: error instanceof Error ? error.message : "unknown",
+    });
   }
 
   return NextResponse.json({

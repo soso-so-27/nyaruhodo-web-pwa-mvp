@@ -202,11 +202,13 @@ export function restoreOnboardingHandoffPayload(payload: unknown) {
     writeOnboardingProgress(payload.onboardingProgress);
   }
 
+  const keptPhotos = getRestoredKeptExchangePhotos(payload);
+
   removeCachedJson(ONBOARDING_HANDOFF_OWN_PHOTOS_KEY);
   removeCachedJson(ONBOARDING_HANDOFF_KEPT_PHOTOS_KEY);
   restoreSyncedSleepingPhotos({
     ownPhotos: payload.ownSleepingPhotos,
-    keptPhotos: [],
+    keptPhotos,
     mergeLocal: false,
   });
 
@@ -223,9 +225,47 @@ export function restoreOnboardingHandoffPayload(payload: unknown) {
 
   return {
     ownSleepingPhotoCount: payload.ownSleepingPhotos.length,
-    keptExchangePhotoCount: payload.keptExchangePhotos.length,
+    keptExchangePhotoCount: keptPhotos.length,
     catCount: payload.catProfiles.length,
   };
+}
+
+function getRestoredKeptExchangePhotos(
+  payload: OnboardingHandoffPayload,
+): ExchangePhoto[] {
+  const photos = [...payload.keptExchangePhotos];
+  const deliveredPhoto = payload.onboardingProgress?.deliveredPhoto;
+
+  if (payload.onboardingProgress?.isDeliveredPhotoKept && deliveredPhoto) {
+    photos.push(deliveredPhoto);
+  }
+
+  const seen = new Set<string>();
+  const restored: ExchangePhoto[] = [];
+
+  for (const photo of photos) {
+    const keys = getExchangePhotoDedupeKeys(photo);
+    if (keys.some((key) => seen.has(key))) {
+      continue;
+    }
+
+    for (const key of keys) {
+      seen.add(key);
+    }
+    restored.push(photo);
+  }
+
+  return restored;
+}
+
+function getExchangePhotoDedupeKeys(photo: ExchangePhoto) {
+  return [
+    `id:${photo.id}`,
+    photo.sourcePhotoId ? `source:${photo.sourcePhotoId}` : "",
+    photo.src ? `src:${photo.src}` : "",
+    photo.displaySrc ? `display:${photo.displaySrc}` : "",
+    photo.originalSrc ? `original:${photo.originalSrc}` : "",
+  ].filter(Boolean);
 }
 
 function isOnboardingHandoffPayload(
