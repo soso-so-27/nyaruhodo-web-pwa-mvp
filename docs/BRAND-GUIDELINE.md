@@ -188,7 +188,7 @@
 
 ### 切手
 
-切手は有料/コスメティックや過去specに残る語彙だが、現行ホームの主導線では使わない。`StampPair` 復帰禁止は `docs/design/neteruneko-design-brief.md` のHard Noに従う。
+切手は**全面禁止**の語彙である（2026-07-06決定、原典: `docs/FEATURE-IDEAS.md` §語彙の改定）。ユーザー向けコピー・内部仕様語・aria-label・コンポーネント名の由来を含む、いかなる層でも使わない。届くのは受け取る側の一通であり、切手は送る側が貼るもの——受信の喜びとメタファーがずれるため。コスメティック課金の器は封蝋・便箋（・封筒）へ移設する。`StampPair` 復帰禁止は `docs/design/neteruneko-design-brief.md` のHard Noに従う。既存コード内のUI名（`StampPair` 等）の一括改名は、受信語彙（たば等）の中西確定後にCodex便で行う。
 
 ## 8. 写真の思想
 
