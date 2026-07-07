@@ -49,6 +49,7 @@ These rules are permanent. Specs do not restate them. If a spec or doc conflicts
 - Migration always precedes code deploy (procedure canon: `docs/DEPLOY-CHECKLIST.md`).
 - No deploys between 19:00 and 21:00 JST (review window + 20:00 delivery + opening time).
 - Production data DELETE / bulk UPDATE / TRUNCATE / DDL / data moves require prior report and approval (procedure canon: `docs/PROD-OPERATIONS.md`). Only read-only SQL is allowed before approval.
+- History rewrite (reset/rebase/amend) is allowed only for unpushed commits. Never rewrite pushed history.
 
 ### Document priority
 
