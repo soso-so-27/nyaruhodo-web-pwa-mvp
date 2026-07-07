@@ -1779,21 +1779,13 @@ export function HomeInput({
           fileName: `sleeping-${Date.now()}`,
         });
         const fileSizeBucket = getFileSizeBucket(file.size);
-        const saveResult = await saveHomeSleepingPhoto({
-          catId: activeCatId,
-          photo: {
-            ...photoVariants,
-            triggerLabel: "sleeping",
-            theme: "sleeping",
-            fileSizeBucket,
-          },
-          shared: true,
+        setPendingExchangeSharePhoto({
+          ...photoVariants,
+          triggerLabel: "sleeping",
+          theme: "sleeping",
+          fileSizeBucket,
         });
-
-        if (!saveResult) {
-          showToast(PHOTO_SAVE_FAILURE_MESSAGE);
-          return;
-        }
+        setPendingExchangeCatId(activeCatId);
 
         trackProductEvent(
           "home_exchange_sleeping_photo_selected",
@@ -1801,27 +1793,7 @@ export function HomeInput({
             theme: "sleeping",
             source,
             file_size_bucket: fileSizeBucket,
-            saved_immediately: true,
-          },
-          { localCatId: activeCatId },
-        );
-        trackProductEvent(
-          "home_photo_submitted",
-          {
-            source,
-            surface: "home",
-            theme: "sleeping",
-            file_size_bucket: fileSizeBucket,
-          },
-          { localCatId: activeCatId },
-        );
-        trackProductEvent(
-          "photo_submitted",
-          {
-            source,
-            surface: "home",
-            theme: "sleeping",
-            file_size_bucket: fileSizeBucket,
+            saved_immediately: false,
           },
           { localCatId: activeCatId },
         );
@@ -2333,6 +2305,8 @@ export function HomeInput({
     keptExchangePhotoCount,
     now: homeNow,
   });
+  const canUsePendingPhotoAsDeliveryTarget =
+    eveningHomeState.kind === "before" || eveningHomeState.kind === "waiting";
   const isHomeReady =
     isHomeClockReady && hasHydratedHomeState && isStartupHoldReleased;
 
@@ -2445,9 +2419,9 @@ export function HomeInput({
           photo={pendingExchangeSharePhoto}
           catProfiles={catProfiles}
           selectedCatId={pendingExchangeCatId ?? activeCatId}
-          isExchangeTargetAvailable={eveningHomeState.kind === "before"}
+          isExchangeTargetAvailable={canUsePendingPhotoAsDeliveryTarget}
           deliveryCopy={
-            eveningHomeState.kind === "before" && eveningHomeState.isTodayDelivery
+            canUsePendingPhotoAsDeliveryTarget && eveningHomeState.isTodayDelivery
               ? "よる8時に とどきます。"
               : "あした よる8時に とどきます。"
           }
@@ -2457,7 +2431,7 @@ export function HomeInput({
               "home_exchange_share_mode_selected",
               {
                 mode,
-                delivery_available: eveningHomeState.kind === "before",
+                delivery_available: canUsePendingPhotoAsDeliveryTarget,
                 delivery_date_key: eveningHomeState.dateKey,
               },
               { localCatId: pendingExchangeCatId ?? activeCatId },

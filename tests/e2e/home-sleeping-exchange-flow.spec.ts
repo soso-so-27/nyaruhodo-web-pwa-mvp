@@ -31,6 +31,12 @@ async function waitForOwnSleepingPhotoCount(page: Page, minCount: number) {
   await expect(page.getByRole("dialog")).toHaveCount(0);
 }
 
+async function confirmSleepingPhotoShare(page: Page) {
+  const dialog = page.getByRole("dialog");
+  await expect(dialog).toBeVisible();
+  await dialog.locator("button").last().click();
+}
+
 function readEveningTargetOwnPhotoId(page: Page, dateKey: string) {
   return page.evaluate((targetDateKey) => {
     const parsed = JSON.parse(
@@ -108,6 +114,7 @@ test.describe("home sleeping exchange flow", () => {
       mimeType: "image/png",
       buffer: testUploadPng,
     });
+    await confirmSleepingPhotoShare(page);
 
     await waitForOwnSleepingPhotoCount(page, 1);
 
@@ -167,6 +174,65 @@ test.describe("home sleeping exchange flow", () => {
     expect(storage.eveningDeliveryDays["2026-06-10"]?.keptAt).toBeTruthy();
   });
 
+  test("does not save the taken photo before the share confirmation sheet", async ({
+    page,
+  }) => {
+    const beforeDelivery = Date.parse("2026-06-10T10:30:00.000Z");
+
+    await page.addInitScript((now) => {
+      (window as typeof window & { __testNow?: number }).__testNow = now;
+      const originalDateNow = Date.now.bind(Date);
+      Date.now = () =>
+        (window as typeof window & { __testNow?: number }).__testNow ??
+        originalDateNow();
+      window.localStorage.setItem("nyaruhodo_sleeping_safety_accepted", "1");
+      window.localStorage.setItem("active_cat_id", "confirm-cat");
+      window.localStorage.setItem(
+        "cat_profiles",
+        JSON.stringify([
+          {
+            id: "confirm-cat",
+            name: "confirm cat",
+            createdAt: new Date(now).toISOString(),
+            updatedAt: new Date(now).toISOString(),
+          },
+        ]),
+      );
+    }, beforeDelivery);
+
+    await page.goto("/home");
+    await page.waitForLoadState("networkidle");
+
+    await page.getByTestId("home-empty-action").click();
+    await page.locator('input[type="file"]').last().setInputFiles({
+      name: "needs-confirmation.png",
+      mimeType: "image/png",
+      buffer: testUploadPng,
+    });
+
+    await expect(page.getByRole("dialog")).toBeVisible();
+    const beforeConfirm = await page.evaluate(() => ({
+      ownPhotos: JSON.parse(
+        window.localStorage.getItem("nyaruhodo_exchange_own_sleeping_photos") ??
+          "[]",
+      ),
+      eveningDays: JSON.parse(
+        window.localStorage.getItem("neteruneko_evening_delivery_days") ?? "{}",
+      ),
+    }));
+    expect(beforeConfirm.ownPhotos).toHaveLength(0);
+    expect(beforeConfirm.eveningDays["2026-06-10"]?.targetOwnPhotoId).toBeFalsy();
+
+    await confirmSleepingPhotoShare(page);
+    await waitForOwnSleepingPhotoCount(page, 1);
+
+    const afterConfirmTargetId = await readEveningTargetOwnPhotoId(
+      page,
+      "2026-06-10",
+    );
+    expect(afterConfirmTargetId).toBeTruthy();
+  });
+
   test("uses the latest same-day retake as today's delivery photo", async ({
     page,
   }) => {
@@ -202,6 +268,7 @@ test.describe("home sleeping exchange flow", () => {
       mimeType: "image/png",
       buffer: testUploadPng,
     });
+    await confirmSleepingPhotoShare(page);
     await waitForOwnSleepingPhotoCount(page, 1);
     await expect(page.getByTestId("home-retake-action")).toBeVisible();
     const firstTargetId = await readEveningTargetOwnPhotoId(page, "2026-06-10");
@@ -219,6 +286,7 @@ test.describe("home sleeping exchange flow", () => {
       mimeType: "image/png",
       buffer: testUploadPng,
     });
+    await confirmSleepingPhotoShare(page);
     await waitForOwnSleepingPhotoCount(page, 2);
 
     const storage = await page.evaluate(() => {
@@ -563,6 +631,7 @@ test.describe("home sleeping exchange flow", () => {
       mimeType: "image/png",
       buffer: testUploadPng,
     });
+    await confirmSleepingPhotoShare(page);
 
     await waitForOwnSleepingPhotoCount(page, 1);
     expect(exchangeCalls).toBe(0);
@@ -633,6 +702,7 @@ test.describe("home sleeping exchange flow", () => {
       mimeType: "image/png",
       buffer: testUploadPng,
     });
+    await confirmSleepingPhotoShare(page);
 
     await waitForOwnSleepingPhotoCount(page, 1);
 
@@ -1440,6 +1510,7 @@ test.describe("home sleeping exchange flow", () => {
       mimeType: "image/png",
       buffer: testUploadPng,
     });
+    await confirmSleepingPhotoShare(page);
     await waitForOwnSleepingPhotoCount(page, 2);
 
     expect(exchangeCalls).toBe(0);
@@ -1507,6 +1578,7 @@ test.describe("home sleeping exchange flow", () => {
         mimeType: "image/png",
         buffer: testUploadPng,
       });
+      await confirmSleepingPhotoShare(page);
       await waitForOwnSleepingPhotoCount(page, index);
       if (index === 1) {
         await page.evaluate(() => {
