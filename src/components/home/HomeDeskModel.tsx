@@ -1775,7 +1775,7 @@ function HomeLetterTrayText({
         <strong style={deskStyles.letterTrayTitle}>
           ねこだよりを確認しています…
         </strong>
-        <span style={deskStyles.letterTraySub}>もうすぐ届きます</span>
+        <span style={deskStyles.letterTraySub}>もうすぐ、とどく</span>
       </>
     );
   }

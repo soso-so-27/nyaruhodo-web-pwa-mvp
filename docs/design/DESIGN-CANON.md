@@ -65,6 +65,13 @@ Owner decision, 2026-06-12:
 
 This section supersedes older desk-model prototype and brief text that described state2 letter filling, growing, waterline shimmer, or plump-envelope behavior.
 
+2026-07-07 update (implementation is the source of truth for state2 copy):
+
+- The 17:00-19:59 one-line hint and the pre-17:00 tap hint were later removed from the product. E2E (`tests/e2e/home-desk-model.spec.ts`) now guards that `もうすぐ、とどく` stays absent in state2 and that the sent-before tray copy `おくった` / `よる8時に とどく` is kept until 20:00.
+- The phrase `もうすぐ、とどく` survives only as the delivery-check loading subline at 20:00 (`HomeDeskModel.tsx`).
+- Home copy and tab-name canon: `docs/specs/neteruneko-home-mainichi-v1.md` §1 plus `docs/BRAND-GUIDELINE.md` §4. Current tab labels in implementation: きょう / ねこだより / うちのこ (`src/components/navigation/BottomNavigation.tsx`).
+- Time-of-day expression in implementation is the whole-home ambient wash plus time-banded paper background images (`HOME_DAYLIGHT_ANCHORS`, `getHomeBackgroundImage`). This matches the "whole-home ambient" intent above; the frame-border-only variant in older specs is invalid.
+
 ## 2. Canon Priority
 
 When documents conflict, use this order:
