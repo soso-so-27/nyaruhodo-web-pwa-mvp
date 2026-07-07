@@ -377,8 +377,12 @@ export default function AccountCreatePage() {
     trackProductEvent("auth_google_link_fallback_started", {
       route: "/account/create",
       reason,
+      had_error: Boolean(prepared.error),
       pending_storage_refs: prepared.pendingPaths,
     });
+    if (prepared.error && prepared.pendingPaths > 0) {
+      return { error: new Error(prepared.error) };
+    }
     window.localStorage.setItem(
       STORAGE_KEYS.authGooglePending,
       JSON.stringify({

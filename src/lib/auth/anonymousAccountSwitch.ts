@@ -14,12 +14,19 @@ type PendingAnonymousStorageTransfer = {
   createdAt: string;
   fromUserId: string;
   paths: string[];
+  transferToken: string;
 };
 
 type CopyAnonymousStorageResponse = {
   ok?: boolean;
   copied?: number;
   mappings?: Array<{ from: string; to: string }>;
+  error?: string;
+};
+
+type TransferIntentResponse = {
+  ok?: boolean;
+  transferToken?: string;
   error?: string;
 };
 
@@ -40,16 +47,41 @@ export async function prepareAnonymousStorageRefsForAccountSwitch() {
     return { converted: 0, pendingPaths: 0 };
   }
 
+  const { data: sessionData } = await supabase.auth.getSession();
+  const accessToken = sessionData.session?.access_token;
   const paths = collectLocalStoragePathsForUser(fromUserId);
   if (paths.length === 0) {
     window.localStorage.removeItem(ANONYMOUS_STORAGE_TRANSFER_KEY);
     return { converted: 0, pendingPaths: 0 };
   }
 
+  if (!accessToken) {
+    return {
+      converted: 0,
+      error: "anonymous_session_required",
+      pendingPaths: paths.length,
+    };
+  }
+
+  const pendingPaths = paths.slice(0, MAX_TRANSFER_PATHS);
+  const transferIntent = await createAnonymousStorageTransferIntent({
+    accessToken,
+    paths: pendingPaths,
+  });
+
+  if (!transferIntent.transferToken) {
+    return {
+      converted: 0,
+      error: transferIntent.error ?? "transfer_intent_failed",
+      pendingPaths: pendingPaths.length,
+    };
+  }
+
   const pending: PendingAnonymousStorageTransfer = {
     createdAt: new Date().toISOString(),
     fromUserId,
-    paths: paths.slice(0, MAX_TRANSFER_PATHS),
+    paths: pendingPaths,
+    transferToken: transferIntent.transferToken,
   };
 
   window.localStorage.setItem(
@@ -80,6 +112,7 @@ export async function finalizeAnonymousStorageTransfer() {
     accessToken,
     fromUserId: pending.fromUserId,
     paths: pending.paths,
+    transferToken: pending.transferToken,
   });
 
   if (!response) {
@@ -107,10 +140,12 @@ async function fetchAnonymousStorageCopy({
   accessToken,
   fromUserId,
   paths,
+  transferToken,
 }: {
   accessToken: string;
   fromUserId: string;
   paths: string[];
+  transferToken: string;
 }) {
   try {
     return await fetch("/api/account/copy-anonymous-storage", {
@@ -122,10 +157,41 @@ async function fetchAnonymousStorageCopy({
       body: JSON.stringify({
         fromUserId,
         paths,
+        transferToken,
       }),
     });
   } catch {
     return null;
+  }
+}
+
+async function createAnonymousStorageTransferIntent({
+  accessToken,
+  paths,
+}: {
+  accessToken: string;
+  paths: string[];
+}) {
+  try {
+    const response = await fetch("/api/account/transfer-intent", {
+      method: "POST",
+      headers: {
+        authorization: `Bearer ${accessToken}`,
+        "content-type": "application/json",
+      },
+      body: JSON.stringify({ paths }),
+    });
+    const result = (await response.json().catch(() => null)) as
+      | TransferIntentResponse
+      | null;
+
+    if (!response.ok || !result?.ok || !result.transferToken) {
+      return { error: result?.error ?? "transfer_intent_failed" };
+    }
+
+    return { transferToken: result.transferToken };
+  } catch {
+    return { error: "transfer_intent_request_failed" };
   }
 }
 
@@ -283,6 +349,8 @@ function readPendingTransfer() {
           : new Date().toISOString(),
       fromUserId: parsed.fromUserId,
       paths: parsed.paths.filter((path): path is string => typeof path === "string"),
+      transferToken:
+        typeof parsed.transferToken === "string" ? parsed.transferToken : "",
     } satisfies PendingAnonymousStorageTransfer;
   } catch {
     return null;

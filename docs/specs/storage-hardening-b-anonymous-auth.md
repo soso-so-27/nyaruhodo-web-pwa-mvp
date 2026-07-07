@@ -38,14 +38,37 @@ browser `localStorage` quota and lose data during the fallback.
 The implemented fallback keeps photo bytes out of `localStorage`:
 
 1. Record only the anonymous Storage paths before signing out of the anonymous
-   session.
+   session. At this moment the anonymous session is still alive, so the client
+   first creates a short-lived transfer intent with
+   `/api/account/transfer-intent`.
 2. Sign in to the existing Google account.
 3. Call `/api/account/copy-anonymous-storage` with the new account's access
-   token. The route derives the target user from the token; the client cannot
-   choose another target uid.
-4. The route copies only objects whose first path segment matches the recorded
-   anonymous uid. It does not delete the anonymous originals.
-5. The client rewrites local `storage:` references to the copied paths.
+   token and the transfer nonce. The route derives the target user from the
+   token; the client cannot choose another target uid.
+4. The route verifies that the nonce is valid, unused, not expired, and belongs
+   to the same anonymous uid. This proves the user controlled the anonymous
+   session, not merely that they saw a `storage:` path from a delivered photo.
+5. The route copies only objects included in the intent's path list and whose
+   first path segment matches the anonymous uid. It does not delete the
+   anonymous originals.
+6. The client rewrites local `storage:` references to the copied paths.
+
+Completed transfer intents are one-time across users, but idempotent for the
+same target account: if the browser crashes after the copy succeeds but before
+local references are rewritten, a retry by the same signed-in account returns
+the saved mappings. A different account cannot reuse the nonce.
+
+The copied path shape is
+`{targetUserId}/anonymous-transfer/{anonymousUid}/...`. Signed URL
+authorization treats any path under the signed-in user's first path segment as
+owned by that user, so this path remains compatible with display and account
+sync code that uses storage refs as opaque strings. Code that assumes
+`{userId}/{catId}/sleeping/...` must not parse these copied fallback paths.
+
+When the future 90-day anonymous cleanup runs, anonymous-era `cat_moments` rows
+that still point at `{anonymousUid}/...` are expected to be cleaned together
+with the old anonymous Storage objects. The copied existing-account paths are
+separate user-owned objects and must not be removed by anonymous cleanup.
 
 This is the accepted beta implementation. GA can revisit whether the copied
 objects should also be deduped or garbage-collected after a longer retention
@@ -66,6 +89,8 @@ Production must not enable the flag until all of the following are true:
   existing-account login without showing a dead error page.
 - Anonymous Storage references are server-copied and rewritten before the
   anonymous uid is considered safely merged into an existing Google uid.
+- Server copy requires a short-lived transfer nonce created while the anonymous
+  session is still active.
 - Supabase Anonymous sign-ins are enabled.
 - Turnstile/CAPTCHA settings are in place or an explicit decision is recorded
   to launch the flag without CAPTCHA.

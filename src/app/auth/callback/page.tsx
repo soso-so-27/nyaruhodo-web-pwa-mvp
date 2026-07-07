@@ -107,8 +107,17 @@ async function startExistingGoogleFallback({
   trackProductEvent("auth_google_link_fallback_started", {
     route: "/auth/callback",
     reason,
+    had_error: Boolean(prepared.error),
     pending_storage_refs: prepared.pendingPaths,
   });
+  if (prepared.error && prepared.pendingPaths > 0) {
+    trackProductEvent("auth_google_failed", {
+      error_type: "anonymous_storage_transfer_intent_failed",
+      error_message: prepared.error,
+    });
+    window.location.replace(getAuthErrorPath(next));
+    return;
+  }
   window.localStorage.setItem(
     STORAGE_KEYS.authGooglePending,
     JSON.stringify({
