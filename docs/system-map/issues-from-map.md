@@ -121,12 +121,52 @@
 
 ---
 
-## サマリ（問題件数）
+## 追補（2026-07-07・screen-flows.md 作成時に判明）
 
-- P0: **2**（退会削除の取りこぼし / cron TZ）
-- P1: **4**（匿名ID重複実装 / handoff無認証+セッション移送 / 管理API認可の不揃い / admin-secretタスクのrate limit欠落）
-- P2: **5**（退避モード常在 / presence全件走査 / cat_moments書込3経路 / mikke残存 / 旧診断ルート）
-- 合計: **11**
+### 解消: P0-2（cron TZ）
+`docs/PROD-OPERATIONS.md`「Cron time zone note」（2026-07-07追記）により、`30 18 * * *` = UTC
+（JST 03:30）が**意図された深夜GC窓**であることが文書化された。運用理解とコードの乖離は解消。
+→ P0-2 はクローズ（コード変更不要）。
+
+### 追加 P1
+
+**P1-5. 退会APIがUIから未配線（呼ばれない機能）**
+- 出典: `src/lib/accountSync.ts:865`（`deleteAccountStoredData`）の呼び出しが
+  `src/components` に**0件**（grep確認）。API `POST /api/account/delete-stored-data` と
+  クライアント関数まで実装済みだが、どの画面からも遷移が存在しない。
+- 事故: 「退会機能はある」と誤認したまま公開し、実際はユーザーが自力で退会できない。
+  実装済みコードが未検証のまま腐る（Stripe解約→全削除→auth削除の重い経路が本番未通電）。
+- 対処案: セルフサービス退会UIの配線（設定→確認→`deleteAccountStoredData`）。配線までは
+  `/account-deletion` の案内が「問い合わせベース」であることを明示し続ける。
+
+### 追加 P2
+
+**P2-6. `/offline` が行き止まり（復帰導線ゼロ）**
+- 出典: `src/app/offline/page.tsx`（href/router 0件）、到達は `public/sw.js:4` のfallbackのみ
+- 事故: オフライン復帰後もユーザーが自力で戻れない（再読み込み頼み）。
+- 対処案: 「ホームへもどる」1リンク（オンライン復帰検知でも可）。
+
+**P2-7. `/onboarding` への内部導線がテスト用のみ（新規ユーザーの取りこぼし分岐）**
+- 出典: 内部リンクは `SettingsPage.tsx:975`（`?test=1`）のみ。`/home` 側に未完了ユーザーを
+  onboardingへ誘導する分岐が無い（`src/app/home/*.tsx` に onboarding 参照0件）。
+- 事故: 外部リンクを経ずに `/home` を直接開いた新規ユーザー（検索・共有URL等）は、
+  オンボーディングに一度も出会わずに空のホームから始まる。「どの分岐にも該当しない場合」の
+  フォールバック先が未定義の典型。
+- 対処案: home側で「初回状態（onboardingCompleted無し＋写真0）→ onboardingへの静かな案内」を検討。
+
+**P2-8. 2枚目プロンプトの無反応分岐（サイレントno-op）**
+- 出典: `OnboardingFlow.tsx:841-843`（`handleStartSecondPhoto` は `!isDeliveredPhotoKept` で
+  無言のreturn）
+- 事故: 条件が崩れた状態でボタンが表示されると、押しても何も起きないUIになる
+  （現状は表示条件 `:145-149` が守っているが、フォールバック未定義のまま表示条件だけに依存）。
+- 対処案: no-op分岐にトラッキングかdisabled表示を入れ、表示条件と実行条件の二重化を明示。
+
+### 更新後サマリ
+
+- P0: **1**（P0-1 退会削除の取りこぼし。P0-2はクローズ）
+- P1: **5**（+P1-5 退会UI未配線）
+- P2: **8**（+P2-6〜P2-8）
+- 合計: **14（うちクローズ1）**
 
 補足: これらは「地図を描いて初めて見えた構造」に限定。個別APIのバリデーション等の細部は
 `feature-inventory.md` / `data-flows.md` の出典に委ね、ここには挙げていない。
