@@ -2448,8 +2448,8 @@ export function HomeInput({
           isExchangeTargetAvailable={eveningHomeState.kind === "before"}
           deliveryCopy={
             eveningHomeState.kind === "before" && eveningHomeState.isTodayDelivery
-              ? "よる8じに とどきます。"
-              : "あした よる8じに とどきます。"
+              ? "よる8時に とどきます。"
+              : "あした よる8時に とどきます。"
           }
           onCatSelect={setPendingExchangeCatId}
           onModeChange={(mode) => {
@@ -3804,7 +3804,7 @@ function ExchangeSharePermissionSheet({
                 </span>
                 <span style={styles.exchangeModeText}>
                   <span style={styles.exchangeModeLabel}>届ける</span>
-                  <span style={styles.exchangeModeSub}>よる8じの便りに使う</span>
+                  <span style={styles.exchangeModeSub}>よる8時の便りに使う</span>
                 </span>
               </button>
               <button

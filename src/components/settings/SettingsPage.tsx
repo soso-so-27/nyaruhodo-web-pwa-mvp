@@ -1181,7 +1181,7 @@ function NotificationSettingsPanel({
       <div style={styles.betaNote}>
         <p style={styles.betaNoteTitle}>Push通知はホーム画面アプリで使えます</p>
         <p style={styles.betaNoteText}>
-          夜8時のねこだより通知は準備中です。通知を使うときは、ホーム画面に追加したねてるねこから設定します。
+          よる8時のねこだより通知は準備中です。通知を使うときは、ホーム画面に追加したねてるねこから設定します。
         </p>
       </div>
     );
@@ -1192,7 +1192,7 @@ function NotificationSettingsPanel({
       <div style={styles.betaNote}>
         <p style={styles.betaNoteTitle}>通知は許可されています</p>
         <p style={styles.betaNoteText}>
-          夜8時のPush通知は準備中です。配信が始まるまでは通知は届きません。
+          よる8時のPush通知は準備中です。配信が始まるまでは通知は届きません。
         </p>
       </div>
     );
@@ -1222,7 +1222,7 @@ function NotificationSettingsPanel({
 
   return (
     <div style={styles.betaNote}>
-      <p style={styles.betaNoteTitle}>夜8時のPush通知（準備中）</p>
+      <p style={styles.betaNoteTitle}>よる8時のPush通知（準備中）</p>
       <p style={styles.betaNoteText}>
         ねこだよりの時間を思い出すための通知です。今は許可設定だけ準備しています。
       </p>

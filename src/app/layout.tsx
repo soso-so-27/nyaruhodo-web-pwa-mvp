@@ -52,7 +52,7 @@ const supabaseOrigin = getOrigin(process.env.NEXT_PUBLIC_SUPABASE_URL);
 export const metadata: Metadata = {
   metadataBase: new URL(siteUrl),
   title: "ねてるねこ",
-  description: "ねがおを撮ると、よる8時にねこだよりが届く猫の写真記録アプリ",
+  description: "ねがおを一枚とると、よる8時にねこだよりがとどく、静かなアプリ",
   applicationName: "ねてるねこ",
   manifest: "/manifest.webmanifest",
   appleWebApp: {

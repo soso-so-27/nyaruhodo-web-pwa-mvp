@@ -199,7 +199,7 @@ export default function AdminAnimationPreviewClient() {
               onClick={replay}
               disabled={isOpening}
               aria-busy={isOpening}
-              aria-label="ホーム夜8時便を再生"
+              aria-label="ホームよる8時便を再生"
               style={styles.envelopeButton}
             >
               <span
@@ -294,7 +294,7 @@ export default function AdminAnimationPreviewClient() {
           disabled={isOpening}
           style={styles.primaryButton}
         >
-          {phase === "idle" ? "ホーム夜8時便を再生" : "もう一度再生"}
+          {phase === "idle" ? "ホームよる8時便を再生" : "もう一度再生"}
         </button>
         <p style={styles.metaText}>
           {mode === "simple" ? `シンプル: ${simplePreset.durationMs}ms` : `現行: ${HOME_ENVELOPE_OPEN_MS}ms`} / reduced motion:{" "}
