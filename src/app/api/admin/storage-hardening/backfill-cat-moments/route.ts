@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 
 import {
+  CAT_PHOTOS_BUCKET,
   getDataUrlExtension,
   sanitizePathSegment,
   toStoragePhotoUrl,
@@ -100,8 +101,12 @@ export async function POST(request: Request) {
       .eq("photo_url", row.photo_url);
 
     if (updateError) {
+      await supabase.storage.from(CAT_PHOTOS_BUCKET).remove([storagePath]);
       skipped += 1;
-      failures.push({ id: row.id, reason: "update_failed" });
+      failures.push({
+        id: row.id,
+        reason: `update_failed: ${updateError.message}`.slice(0, 160),
+      });
       continue;
     }
 
