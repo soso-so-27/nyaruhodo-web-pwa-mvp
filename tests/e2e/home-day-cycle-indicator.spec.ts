@@ -315,6 +315,136 @@ test.describe("home desk state cycle", () => {
       });
   });
 
+  test("syncs all local sleeping history without applying home display limits", async ({
+    page,
+  }) => {
+    const userId = "user-sync-full-history";
+    const now = Date.parse("2026-07-08T09:00:00+09:00");
+    const ownPhotos = Array.from({ length: 30 }, (_, index) => ({
+      id: `own-history-${String(index + 1).padStart(2, "0")}`,
+      ownerCatId: "cat-history",
+      catId: "cat-history",
+      src: `storage:${userId}/cat-history/sleeping/own-history-${index + 1}.jpg`,
+      state: "sleeping",
+      visibility: "shared",
+      deliveryStatus: "available",
+      triggerLabel: "sleeping",
+      theme: "sleeping",
+      shared: true,
+      createdAt: now - index * 60_000,
+      captureContext: "daily",
+    }));
+    const keptPhotos = Array.from({ length: 55 }, (_, index) => ({
+      id: `kept-history-${String(index + 1).padStart(2, "0")}`,
+      sourcePhotoId: `source-history-${index + 1}`,
+      src: `storage:${userId}/kept/deliveries/kept-history-${index + 1}.jpg`,
+      title: "delivered",
+      subtitle: "",
+      triggerLabel: "sleeping",
+      theme: "sleeping",
+      deliveredAt: now - index * 60_000,
+    }));
+    let insertedMoments: unknown[] = [];
+    let insertedDeliveries: unknown[] = [];
+
+    await page.addInitScript(
+      ({ accessToken, keptPhotosValue, nowValue, ownPhotosValue, userIdValue }) => {
+        window.localStorage.clear();
+        window.localStorage.setItem("nyaruhodo_sleeping_safety_accepted", "1");
+        window.localStorage.setItem("neteruneko_onboarding_completed", "true");
+        window.localStorage.setItem("active_cat_id", "cat-history");
+        window.localStorage.setItem(
+          "auth_google_pending",
+          JSON.stringify({
+            provider: "google",
+            route: "/account/create",
+            method: "oauth_redirect",
+            startedAt: new Date(nowValue).toISOString(),
+          }),
+        );
+        window.localStorage.setItem(
+          "nyaruhodo_supabase_auth",
+          JSON.stringify({
+            access_token: accessToken,
+            refresh_token: "test-refresh-token",
+            expires_at: Math.floor(Date.now() / 1000) + 3600,
+            expires_in: 3600,
+            token_type: "bearer",
+            user: {
+              id: userIdValue,
+              aud: "authenticated",
+              role: "authenticated",
+              email: "history@example.test",
+              app_metadata: {},
+              user_metadata: {},
+            },
+          }),
+        );
+        window.localStorage.setItem(
+          "nyaruhodo_exchange_own_sleeping_photos",
+          JSON.stringify(ownPhotosValue),
+        );
+        window.localStorage.setItem(
+          "nyaruhodo_exchange_kept_photos",
+          JSON.stringify(keptPhotosValue),
+        );
+      },
+      {
+        accessToken: "test-history-access-token",
+        keptPhotosValue: keptPhotos,
+        nowValue: now,
+        ownPhotosValue: ownPhotos,
+        userIdValue: userId,
+      },
+    );
+
+    await page.route("**/auth/v1/user", async (route) => {
+      await route.fulfill({
+        contentType: "application/json",
+        body: JSON.stringify({
+          id: userId,
+          aud: "authenticated",
+          role: "authenticated",
+          email: "history@example.test",
+          app_metadata: {},
+          user_metadata: {},
+        }),
+      });
+    });
+    await page.route("**/rest/v1/**", async (route) => {
+      const request = route.request();
+      const url = new URL(request.url());
+      const table = url.pathname.split("/").pop() ?? "";
+      const method = request.method();
+
+      if (method === "POST" && table === "cat_moments") {
+        insertedMoments = JSON.parse(request.postData() ?? "[]") as unknown[];
+      }
+
+      if (method === "POST" && table === "cat_moment_deliveries") {
+        insertedDeliveries = JSON.parse(request.postData() ?? "[]") as unknown[];
+      }
+
+      await route.fulfill({
+        status: method === "GET" ? 200 : 201,
+        contentType: "application/json",
+        body: "[]",
+      });
+    });
+
+    await page.goto("/home?auth=google_success");
+
+    await expect
+      .poll(() => ({
+        deliveries: insertedDeliveries.length,
+        moments: insertedMoments.length,
+      }))
+      .toEqual({
+        deliveries: 55,
+        moments: 30,
+      });
+  });
+
   test("omits motif animation classes when reduced motion is enabled", async ({
     page,
   }) => {

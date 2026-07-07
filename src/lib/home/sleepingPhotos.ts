@@ -150,6 +150,10 @@ export function readOwnSleepingPhotos(activeCatId: string | null = null) {
   return (activeCatPhotos.length > 0 ? activeCatPhotos : photos).slice(0, 24);
 }
 
+export function readOwnSleepingPhotosForSync() {
+  return readAllOwnSleepingPhotos().filter(isRegularOwnSleepingPhoto);
+}
+
 export function readOwnSleepingPhotosForAlbum(activeCatId: string | null = null) {
   const photos = readAllOwnSleepingPhotos();
 
@@ -631,6 +635,12 @@ export function readKeptExchangePhotos() {
     .map(sanitizeExchangePhotoForPersistence)
     .filter((photo): photo is ExchangePhoto => Boolean(photo))
     .slice(0, 50);
+}
+
+export function readKeptExchangePhotosForSync() {
+  return readStorageArray<ExchangePhoto>(KEPT_EXCHANGE_PHOTO_STORAGE_KEY)
+    .map(sanitizeExchangePhotoForPersistence)
+    .filter((photo): photo is ExchangePhoto => Boolean(photo));
 }
 
 export function readKeptExchangePhotoCount() {

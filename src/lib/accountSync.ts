@@ -8,7 +8,9 @@ import { createBrowserSupabaseClient } from "./supabase/browser";
 import {
   dispatchBoxPhotoStorageEvent,
   readOwnSleepingPhotos,
+  readOwnSleepingPhotosForSync,
   readKeptExchangePhotos,
+  readKeptExchangePhotosForSync,
   restoreSyncedSleepingPhotos,
   type ExchangePhoto,
   type OwnSleepingPhoto,
@@ -971,8 +973,8 @@ function readLocalSnapshot(): LocalSnapshot {
   const collectionPhotos =
     readJson<LocalCollectionStore>(STORAGE_KEYS.collectionPhotos) ?? {};
   const catGalleryPhotos = readCatGalleryPhotos(null);
-  const ownSleepingPhotos = readOwnSleepingPhotos(null);
-  const keptExchangePhotos = readKeptExchangePhotos();
+  const ownSleepingPhotos = readOwnSleepingPhotosForSync();
+  const keptExchangePhotos = readKeptExchangePhotosForSync();
   const localState = readSyncableLocalState();
   const recordLogsByCatId = new Map<string, LocalRecordLogItem[]>();
 
