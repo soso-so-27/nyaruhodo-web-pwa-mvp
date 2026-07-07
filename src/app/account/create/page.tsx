@@ -30,6 +30,7 @@ import {
   isAnonymousAuthEnabled,
   isAnonymousSupabaseUser,
 } from "../../../lib/auth/anonymousAuth";
+import { prepareAnonymousStorageRefsForAccountSwitch } from "../../../lib/auth/anonymousAccountSwitch";
 import { claimPendingReferral } from "../../../lib/referrals/client";
 import {
   getEmbeddedBrowserInfo,
@@ -283,20 +284,6 @@ export default function AccountCreatePage() {
 
     setPendingAction("google");
     setMessage("");
-    window.localStorage.setItem(
-      STORAGE_KEYS.authGooglePending,
-      JSON.stringify({
-        provider: "google",
-        route: "/account/create",
-        method: "oauth_redirect",
-        startedAt: new Date().toISOString(),
-      }),
-    );
-    trackProductEvent("auth_google_started", {
-      route: "/account/create",
-      method: "oauth_redirect",
-    });
-
     const redirectTo = createAuthCallbackUrl({
       nextPath: isFromOnboarding
         ? `/account/create?from=onboarding&source=${encodeURIComponent(
@@ -309,6 +296,21 @@ export default function AccountCreatePage() {
     const shouldLinkIdentity =
       isAnonymousAuthEnabled() &&
       isAnonymousSupabaseUser(sessionData.session?.user);
+    const method = shouldLinkIdentity ? "link_identity" : "oauth_redirect";
+    window.localStorage.setItem(
+      STORAGE_KEYS.authGooglePending,
+      JSON.stringify({
+        provider: "google",
+        route: "/account/create",
+        method,
+        startedAt: new Date().toISOString(),
+      }),
+    );
+    trackProductEvent("auth_google_started", {
+      route: "/account/create",
+      method,
+    });
+
     const authWithLinkIdentity = supabase.auth as typeof supabase.auth & {
       linkIdentity?: typeof supabase.auth.signInWithOAuth;
     };
@@ -334,6 +336,18 @@ export default function AccountCreatePage() {
           });
 
     if (error) {
+      if (shouldLinkIdentity) {
+        const fallback = await startExistingGoogleFallback({
+          supabase,
+          redirectTo,
+          reason: "link_identity_start_failed",
+        });
+
+        if (!fallback.error) {
+          return;
+        }
+      }
+
       writeAuthDebugEvent("oauth_redirect_failed", {
         message: error.message,
       });
@@ -345,6 +359,43 @@ export default function AccountCreatePage() {
       setPendingAction(null);
       setMessage("Googleログインを開始できませんでした。少し時間をおいてもう一度お試しください。");
     }
+  }
+
+  async function startExistingGoogleFallback({
+    supabase,
+    redirectTo,
+    reason,
+  }: {
+    supabase: NonNullable<ReturnType<typeof createBrowserSupabaseClient>>;
+    redirectTo: string;
+    reason: string;
+  }) {
+    const prepared = await prepareAnonymousStorageRefsForAccountSwitch();
+    trackProductEvent("auth_google_link_fallback_started", {
+      route: "/account/create",
+      reason,
+      converted_storage_refs: prepared.converted,
+    });
+    window.localStorage.setItem(
+      STORAGE_KEYS.authGooglePending,
+      JSON.stringify({
+        provider: "google",
+        route: "/account/create",
+        method: "oauth_redirect_existing_fallback",
+        reason,
+        startedAt: new Date().toISOString(),
+      }),
+    );
+    await supabase.auth.signOut({ scope: "local" });
+    return supabase.auth.signInWithOAuth({
+      provider: "google",
+      options: {
+        redirectTo,
+        queryParams: {
+          prompt: "select_account",
+        },
+      },
+    });
   }
 
   async function handleGoogleCredential(response: GoogleCredentialResponse) {

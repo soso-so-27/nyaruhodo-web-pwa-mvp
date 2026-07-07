@@ -18,6 +18,10 @@ The feature remains gated by `NEXT_PUBLIC_ANON_AUTH_ENABLED`.
   Redeem restores the session before restoring local onboarding data.
 - Google continuation uses `linkIdentity()` when the current session is anonymous.
   Without an anonymous session, it keeps the existing `signInWithOAuth()` behavior.
+- If Google linking fails because the identity already belongs to another account,
+  the app falls back to the existing-account OAuth path. Before switching sessions,
+  local photos pointing at the anonymous uid's Storage folder are converted to
+  data URLs so account sync can re-upload them under the existing uid.
 - Anonymous users are not treated as a completed Google/account connection on
   `/account/create`.
 
@@ -26,12 +30,27 @@ The feature remains gated by `NEXT_PUBLIC_ANON_AUTH_ENABLED`.
 `NEXT_PUBLIC_ANON_AUTH_ENABLED=true` is required before this path activates.
 Supabase Anonymous sign-ins must also be enabled in the Supabase dashboard.
 
+Production must not enable the flag until all of the following are true:
+
+- Q6 has been manually verified with two real browsers: browser A creates the
+  anonymous session, browser B redeems the handoff, and both A-then-B and B-then-A
+  refresh/orderings keep the redeemed browser usable.
+- Supabase refresh-token reuse interval/settings have been recorded.
+- Q9 has been answered and the Google identity conflict path falls back to an
+  existing-account login without showing a dead error page.
+- Anonymous Storage references are converted before switching from the anonymous
+  uid to an existing Google uid.
+- Supabase Anonymous sign-ins are enabled.
+- Turnstile/CAPTCHA settings are in place or an explicit decision is recorded
+  to launch the flag without CAPTCHA.
+
 ## Not implemented in this slice
 
 - Turnstile CAPTCHA plumbing for anonymous sign-in.
 - A 90-day cleanup job for inactive anonymous auth users.
 - A dedicated conflict UI for `linkIdentity()` when the Google identity already
-  belongs to another account.
+  belongs to another account. The technical fallback exists, but no separate
+  explanatory UI exists yet.
 - RLS policy rewrites. Existing authenticated uid-scoped storage policies already
   cover anonymous users because they are authenticated users with an auth uid.
 
@@ -40,5 +59,6 @@ Supabase Anonymous sign-ins must also be enabled in the Supabase dashboard.
 - Confirm Supabase Anonymous sign-ins are enabled.
 - Confirm Storage policy uses `auth.uid()` folder ownership.
 - Confirm handoff restore succeeds across two real browsers with the same uid.
+- Confirm Q6 refresh-token handoff behavior manually before enabling production.
 - Confirm Google link works for a new Google identity.
 - Confirm existing Google identity conflict falls back to the current account-sync path.

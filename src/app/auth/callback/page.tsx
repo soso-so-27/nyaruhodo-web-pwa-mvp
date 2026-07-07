@@ -3,6 +3,7 @@
 import { useEffect, useRef } from "react";
 import { AppLoadingScreen } from "../../../components/loading/AppLoadingScreen";
 import { trackProductEvent } from "../../../lib/analytics/productAnalytics";
+import { prepareAnonymousStorageRefsForAccountSwitch } from "../../../lib/auth/anonymousAccountSwitch";
 import { purgeAllPhotoSwCache } from "../../../lib/photoSwCache";
 import { STORAGE_KEYS } from "../../../lib/storage";
 import { createBrowserSupabaseClient } from "../../../lib/supabase/browser";
@@ -24,16 +25,24 @@ export default function AuthCallbackPage() {
     const code = params.get("code");
     const next = getSafeNextPath(params.get("next"));
     const errorPath = getAuthErrorPath(next);
+    const supabase = createBrowserSupabaseClient();
 
     if (!code) {
+      if (supabase && shouldFallbackFromLinkIdentity()) {
+        await startExistingGoogleFallback({
+          supabase,
+          next,
+          reason: "link_identity_callback_missing_code",
+        });
+        return;
+      }
+
       trackProductEvent("auth_google_failed", {
         error_type: "missing_callback_code",
       });
       window.location.replace(errorPath);
       return;
     }
-
-    const supabase = createBrowserSupabaseClient();
 
     if (!supabase) {
       trackProductEvent("auth_google_failed", {
@@ -47,6 +56,15 @@ export default function AuthCallbackPage() {
     const { error } = await supabase.auth.exchangeCodeForSession(code);
 
     if (error) {
+      if (shouldFallbackFromLinkIdentity()) {
+        await startExistingGoogleFallback({
+          supabase,
+          next,
+          reason: "link_identity_code_exchange_failed",
+        });
+        return;
+      }
+
       window.localStorage.removeItem(STORAGE_KEYS.authGooglePending);
       trackProductEvent("auth_google_failed", {
         error_type: "code_exchange_failed",
@@ -62,6 +80,70 @@ export default function AuthCallbackPage() {
   }
 
   return <AppLoadingScreen variant="account" />;
+}
+
+async function startExistingGoogleFallback({
+  supabase,
+  next,
+  reason,
+}: {
+  supabase: NonNullable<ReturnType<typeof createBrowserSupabaseClient>>;
+  next: string;
+  reason: string;
+}) {
+  const prepared = await prepareAnonymousStorageRefsForAccountSwitch();
+  trackProductEvent("auth_google_link_fallback_started", {
+    route: "/auth/callback",
+    reason,
+    converted_storage_refs: prepared.converted,
+  });
+  window.localStorage.setItem(
+    STORAGE_KEYS.authGooglePending,
+    JSON.stringify({
+      provider: "google",
+      route: "/auth/callback",
+      method: "oauth_redirect_existing_fallback",
+      reason,
+      startedAt: new Date().toISOString(),
+    }),
+  );
+  await supabase.auth.signOut({ scope: "local" });
+  const redirectTo = createAuthCallbackUrl({ nextPath: next });
+  const { error } = await supabase.auth.signInWithOAuth({
+    provider: "google",
+    options: {
+      redirectTo,
+      queryParams: {
+        prompt: "select_account",
+      },
+    },
+  });
+
+  if (error) {
+    window.localStorage.removeItem(STORAGE_KEYS.authGooglePending);
+    trackProductEvent("auth_google_failed", {
+      error_type: "link_fallback_start_failed",
+      error_message: error.message,
+    });
+    window.location.replace(getAuthErrorPath(next));
+  }
+}
+
+function shouldFallbackFromLinkIdentity() {
+  try {
+    const raw = window.localStorage.getItem(STORAGE_KEYS.authGooglePending);
+    const pending = raw ? (JSON.parse(raw) as { method?: string }) : null;
+    return pending?.method === "link_identity";
+  } catch {
+    return false;
+  }
+}
+
+function createAuthCallbackUrl({ nextPath }: { nextPath: string }) {
+  const callbackUrl = new URL("/auth/callback", window.location.origin);
+
+  callbackUrl.searchParams.set("next", nextPath);
+  return callbackUrl.toString();
 }
 
 function getSafeNextPath(next: string | null) {
