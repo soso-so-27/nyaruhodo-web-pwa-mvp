@@ -18,13 +18,15 @@ rejected for the current product.
 
 ## Explicit Non-Goals
 
-- Do not render `src/components/ui/StampPair.tsx` on the home opened state.
-- Do not add `home-stamp-pair` or `home-stamp-pair-stamp` back to `/home`.
-- Do not use a stamp slot as the close-animation target.
+- Do not render `src/components/ui/TayoriPair.tsx` (renamed from
+  `StampPair.tsx` on 2026-07-07, behavior unchanged) on the home opened state.
+- Do not add `home-stamp-pair` or `home-stamp-pair-stamp` back to `/home`
+  (legacy test ids, kept in the E2E absence guards).
+- Do not use the corner slot as the close-animation target.
 - Do not show opened delivery copy inside the notification tray.
 
-`StampPair` may still exist for historical prototypes or album-side experiments,
-but it is not the canonical home opened-state UI.
+`TayoriPair` may still exist for historical prototypes or album-side
+experiments, but it is not the canonical home opened-state UI.
 
 ## Current Opened State
 

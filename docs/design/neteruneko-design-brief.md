@@ -26,15 +26,17 @@ cat.
 
 ## Hard No
 
-Do not restore the old home stamp-pair layout.
+Do not restore the old home paired-corner layout.
 
-- Do not mount `StampPair` on `/home` state4.
-- Do not show a permanent delivered-photo stamp on the home frame.
-- Do not use a stamp slot as the close-animation target.
+- Do not mount `TayoriPair` (renamed from `StampPair` on 2026-07-07) on `/home` state4.
+- Do not show a permanent delivered-photo corner card on the home frame.
+- Do not use the corner slot as the close-animation target.
 - Do not add opened delivery rows back into the notification card.
 
-`StampPair` can remain for prototypes or album experiments, but it is not the
-home opened-state design.
+`TayoriPair` can remain for prototypes or album experiments, but it is not the
+home opened-state design. The legacy `home-stamp-pair` /
+`home-stamp-pair-stamp` test ids stay in the E2E absence guards as historical
+regression markers; do not reuse them.
 
 ## Visual Tone
 

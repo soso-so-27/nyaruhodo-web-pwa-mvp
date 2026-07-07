@@ -20,7 +20,8 @@ These rules are permanent. Specs do not restate them. If a spec or doc conflicts
 
 ### Vocabulary lock (user-facing copy)
 
-- Use: `ねがお` / `ねがおを とる` / `ねこだより` / `とどく` / `ひらく` (hiragana forms).
+- Use: `ねがお` / `ねがおを とる` / `ねこだより` / `とどく` / `ひらく` / `たば` (hiragana forms).
+- `ねこだより` names both the arriving letter and the small received photo that remains after opening. `たば` names the collection of received ねこだより (owner decision 2026-07-07, successor wording to the banned 切手). Do not invent new nouns for these.
 - Never use `切手` at any layer — user copy, spec wording, aria-labels, or metaphors behind component names. The receiving-world motifs are 封蝋 (wax seal) and 便箋 (stationery).
 - Never use `手紙` / `おてがみ` in user-facing copy. The name is `ねこだより`. Envelope, wax seal, and stationery exist only as visuals of the opening gesture and are not named in copy.
 - Never use SNS vocabulary: いいね, フォロワー, ランキング, ストリーク, 連続記録, ポイント, ランク, 達成.

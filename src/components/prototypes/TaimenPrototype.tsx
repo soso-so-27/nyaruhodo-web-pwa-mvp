@@ -61,7 +61,7 @@ const modes: Array<{ id: PrototypeMode; label: string; caption: string }> = [
   {
     id: "b2",
     label: "改2",
-    caption: "切手として隅に貼る",
+    caption: "ねこだよりとして隅にそえる",
   },
 ];
 
@@ -107,7 +107,7 @@ export function TaimenPrototype() {
         <span style={styles.kicker}>taimen b refine</span>
         <h1 style={styles.title}>対面表示 Bリファイン</h1>
         <p style={styles.lead}>
-          むぎを主役にしたまま、届いた寝顔を「便箋」か「切手」として添える静止比較です。実機では下の入力から、むぎの実写真に差し替えられます。
+          むぎを主役にしたまま、届いたねこだよりを「便箋に敷く」か「隅にそえる」かで比べる静止比較です。実機では下の入力から、むぎの実写真に差し替えられます。
         </p>
       </section>
 
@@ -182,7 +182,7 @@ export function TaimenPrototype() {
           </span>
         </div>
         {mode === "b1" ? <LetterBelow photos={photos} /> : null}
-        {mode === "b2" ? <StampCorner photos={photos} /> : null}
+        {mode === "b2" ? <TayoriCorner photos={photos} /> : null}
       </section>
 
       <section style={styles.notes}>
@@ -192,7 +192,7 @@ export function TaimenPrototype() {
         />
         <PrototypeNote
           title="改2"
-          body="むぎ写真を絵葉書の主役にし、届いた寝顔は切手のしるしとして隅に置きます。"
+          body="むぎ写真を絵葉書の主役にし、届いた寝顔は小さなねこだよりとして隅にそえます。"
         />
       </section>
     </main>
@@ -220,32 +220,32 @@ function LetterBelow({
         </div>
       </div>
       <p style={styles.variantCaption}>
-        むぎの下に、届いた手紙をそっと置きます。
+        むぎの下に、とどいた ねこだよりをそっと置きます。
       </p>
     </div>
   );
 }
 
-function StampCorner({
+function TayoriCorner({
   photos,
 }: {
   photos: { own: PrototypePhoto; delivered: PrototypePhoto };
 }) {
   return (
-    <div style={styles.stampWrap} data-testid="taimen-mode-b2">
+    <div style={styles.tayoriWrap} data-testid="taimen-mode-b2">
       <div style={styles.postcardPhoto}>
         <img src={photos.own.src} alt={photos.own.label} style={styles.postcardImage} />
-        <div style={styles.stampCard} aria-label="届いた切手">
-          <span style={styles.stampPerforation} aria-hidden="true" />
+        <div style={styles.tayoriCard} aria-label="とどいた ねこだより">
+          <span style={styles.tayoriPerforation} aria-hidden="true" />
           <img
             src={photos.delivered.src}
             alt={photos.delivered.label}
-            style={styles.stampImage}
+            style={styles.tayoriImage}
           />
         </div>
       </div>
       <p style={styles.variantCaption}>
-        むぎの絵葉書に、届いた寝顔の切手を貼ります。
+        むぎの絵葉書に、とどいた ねこだよりをそえます。
       </p>
     </div>
   );
@@ -464,7 +464,7 @@ const styles = {
     letterSpacing: "0.08em",
     textAlign: "center",
   },
-  stampWrap: {
+  tayoriWrap: {
     display: "grid",
     justifyItems: "center",
     gap: spacing.xl,
@@ -483,7 +483,7 @@ const styles = {
     objectFit: "cover",
     display: "block",
   },
-  stampCard: {
+  tayoriCard: {
     position: "absolute",
     top: -8,
     right: -8,
@@ -495,14 +495,14 @@ const styles = {
     background: color.surfaceSoft,
     boxShadow: shadow.e1,
   },
-  stampPerforation: {
+  tayoriPerforation: {
     position: "absolute",
     inset: 5,
     border: `1px dashed ${color.border}`,
     borderRadius: radius.sm,
     pointerEvents: "none",
   },
-  stampImage: {
+  tayoriImage: {
     width: "100%",
     height: "100%",
     objectFit: "cover",

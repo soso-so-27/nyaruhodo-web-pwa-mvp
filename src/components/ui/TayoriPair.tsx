@@ -4,36 +4,36 @@ import type { CSSProperties, MouseEvent, ReactNode } from "react";
 import { color, radius, shadow, spacing, typography } from "./designTokens";
 import { StoredPhotoImage } from "./StoredPhotoImage";
 
-type StampPairSize = "home" | "album" | "albumCompact";
+type TayoriPairSize = "home" | "album" | "albumCompact";
 
-type StampPairPhoto = {
+type TayoriPairPhoto = {
   src: string;
 };
 
-type StampPairProps = {
-  ownPhoto?: StampPairPhoto | null;
-  deliveredPhoto?: StampPairPhoto | null;
+type TayoriPairProps = {
+  ownPhoto?: TayoriPairPhoto | null;
+  deliveredPhoto?: TayoriPairPhoto | null;
   ownLabel?: string;
   deliveredLabel?: string;
-  size?: StampPairSize;
+  size?: TayoriPairSize;
   ownAlt?: string;
   deliveredAlt?: string;
   ownAriaLabel?: string;
   deliveredAriaLabel?: string;
   ownFallback?: ReactNode;
   deliveredFallback?: ReactNode;
-  deliveredFallbackPlacement?: "stamp" | "below";
+  deliveredFallbackPlacement?: "tayori" | "below";
   onOwnClick?: () => void;
   onDeliveredClick?: () => void;
   onDeliveredStorageDataUrl?: (dataUrl: string) => void;
   showOwnLabel?: boolean;
   showDeliveredLabel?: boolean;
-  deliveredStampHidden?: boolean;
-  deliveredStampTestId?: string;
+  deliveredTayoriHidden?: boolean;
+  deliveredTayoriTestId?: string;
   "data-testid"?: string;
 };
 
-export function StampPair({
+export function TayoriPair({
   ownPhoto,
   deliveredPhoto,
   ownLabel,
@@ -45,16 +45,16 @@ export function StampPair({
   deliveredAriaLabel,
   ownFallback,
   deliveredFallback,
-  deliveredFallbackPlacement = "stamp",
+  deliveredFallbackPlacement = "tayori",
   onOwnClick,
   onDeliveredClick,
   onDeliveredStorageDataUrl,
   showOwnLabel = false,
   showDeliveredLabel = false,
-  deliveredStampHidden = false,
-  deliveredStampTestId,
+  deliveredTayoriHidden = false,
+  deliveredTayoriTestId,
   "data-testid": testId,
-}: StampPairProps) {
+}: TayoriPairProps) {
   const isHome = size === "home";
   const isAlbumCompact = size === "albumCompact";
   const frameStyle = isHome
@@ -62,11 +62,11 @@ export function StampPair({
     : isAlbumCompact
       ? styles.albumCompactFrame
       : styles.albumFrame;
-  const stampStyle = isHome ? styles.homeStamp : styles.albumStamp;
-  const shouldShowStampFallback =
+  const tayoriStyle = isHome ? styles.homeTayori : styles.albumTayori;
+  const shouldShowTayoriFallback =
     !deliveredPhoto &&
     Boolean(deliveredFallback) &&
-    deliveredFallbackPlacement === "stamp";
+    deliveredFallbackPlacement === "tayori";
   const shouldShowBelowFallback =
     !deliveredPhoto &&
     Boolean(deliveredFallback) &&
@@ -109,33 +109,33 @@ export function StampPair({
               (deliveredLabel ? `${deliveredLabel}の写真を大きく見る` : undefined)
             }
             style={{
-              ...styles.stamp,
-              ...stampStyle,
-              ...(deliveredStampHidden ? styles.hiddenStamp : {}),
+              ...styles.tayori,
+              ...tayoriStyle,
+              ...(deliveredTayoriHidden ? styles.hiddenTayori : {}),
             }}
-            testId={deliveredStampTestId}
+            testId={deliveredTayoriTestId}
           >
-            <span style={styles.stampPerforation} aria-hidden="true" />
+            <span style={styles.tayoriPerforation} aria-hidden="true" />
             <StoredPhotoImage
               src={deliveredPhoto.src}
               alt={deliveredAlt}
-              style={styles.stampImage}
+              style={styles.tayoriImage}
               onStorageDataUrl={onDeliveredStorageDataUrl}
             />
           </PhotoButton>
-        ) : shouldShowStampFallback ? (
+        ) : shouldShowTayoriFallback ? (
           <button
             type="button"
             style={{
-              ...styles.stampMissing,
-              ...stampStyle,
+              ...styles.tayoriMissing,
+              ...tayoriStyle,
               ...styles.buttonReset,
-              ...(deliveredStampHidden ? styles.hiddenStamp : {}),
+              ...(deliveredTayoriHidden ? styles.hiddenTayori : {}),
             }}
             onClick={onDeliveredClick}
             disabled={!onDeliveredClick}
             aria-label={deliveredAriaLabel}
-            data-testid={deliveredStampTestId}
+            data-testid={deliveredTayoriTestId}
           >
             {deliveredFallback}
           </button>
@@ -271,7 +271,7 @@ const styles = {
     background: "color-mix(in srgb, var(--paper) 76%, transparent)",
     borderRadius: radius.lg,
   },
-  stamp: {
+  tayori: {
     position: "absolute",
     right: -8,
     top: -8,
@@ -284,29 +284,29 @@ const styles = {
     boxShadow: shadow.e1,
     overflow: "hidden",
   },
-  homeStamp: {
+  homeTayori: {
     width: 88,
     aspectRatio: "1 / 1",
   },
-  albumStamp: {
+  albumTayori: {
     width: "38%",
     aspectRatio: "1 / 1",
   },
-  stampPerforation: {
+  tayoriPerforation: {
     position: "absolute",
     inset: 5,
     border: `1px dashed ${color.border}`,
     borderRadius: radius.sm,
     pointerEvents: "none",
   },
-  stampImage: {
+  tayoriImage: {
     width: "100%",
     height: "100%",
     objectFit: "cover",
     display: "block",
     borderRadius: radius.sm,
   },
-  stampMissing: {
+  tayoriMissing: {
     position: "absolute",
     right: -8,
     top: -8,
@@ -326,7 +326,7 @@ const styles = {
     textAlign: "center",
     boxShadow: shadow.e1,
   },
-  hiddenStamp: {
+  hiddenTayori: {
     opacity: 0,
     pointerEvents: "none",
   },
