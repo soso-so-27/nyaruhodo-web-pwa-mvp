@@ -97,8 +97,7 @@ export async function POST(request: Request) {
     const { error: updateError } = await supabase
       .from("cat_moments")
       .update({ photo_url: toStoragePhotoUrl(storagePath) })
-      .eq("id", row.id)
-      .eq("photo_url", row.photo_url);
+      .eq("id", row.id);
 
     if (updateError) {
       await supabase.storage.from(CAT_PHOTOS_BUCKET).remove([storagePath]);
