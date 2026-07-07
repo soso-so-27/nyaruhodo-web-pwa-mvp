@@ -49,6 +49,8 @@ Do not implement everything at once.
 
 ## Supabase
 
+（本節の恒久ルールの正は `AGENTS.md` と `docs/PROD-OPERATIONS.md`。本節は参照）
+
 - Access Supabase only from `/lib/supabase`.
 - Ask before creating or running migrations.
 - Ask before creating RLS policies.

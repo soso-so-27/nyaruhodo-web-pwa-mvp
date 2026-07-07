@@ -22,7 +22,8 @@
 | 二面の記録タブ | まいにち | 送った＋届いたを等価に持つ中立な器 |
 | 自分の猫専用アルバム | うちのこ | 自分の猫を時間で眺める宝物 |
 
-2026-07-07注: 本表とBRAND-GUIDELINE §4を、ホームのコピー・タブ名の正典とする。
+2026-07-07注: 本表とBRAND-GUIDELINE §4を、ホームのコピー・タブ名の正典とする
+（語彙ロックそのものの正は `AGENTS.md`）。
 下部ナビの現行実装ラベルは **きょう／ねこだより／うちのこ**（`src/components/navigation/BottomNavigation.tsx`。
 受信蓄積の面はFEATURE-IDEAS §語彙の改定により「ねこだより」で統一）。「まいにち」はアルバム面の名称として存続。
 
@@ -163,7 +164,7 @@
 
 ## 6. 実装メモ
 
-- マイグレーション先行。
+- migration precedes code deploy（正: AGENTS.md／手順: `docs/DEPLOY-CHECKLIST.md`）。
 - `SLEEPING_DELIVERY_FAST_CANDIDATES=admin_storage` は保持。
 - 20:00 JST 配信が「とどいた」を発火し、ホームの開封、会う、まいにち着地へつながる。
 

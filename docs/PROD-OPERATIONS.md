@@ -4,6 +4,8 @@
 
 ## 本番データ削除・大量更新の原則
 
+**本節が削除・大量更新の承認手順の正**（恒久原則の一行はAGENTS.md「Operational discipline」、そこから本節が参照される）。
+
 本番データに対する `DELETE` / 大量 `UPDATE` / `TRUNCATE` / DDL は、事前報告と承認なしに実行しない。
 
 実行前に必ず以下を共有する。
@@ -29,20 +31,9 @@
 
 ## Migration / deploy
 
-コードデプロイ前に本番migrationが適用済みであることを確認する。
-
-```bash
-npx supabase migration list --linked
-npx supabase db push --linked --dry-run
-```
-
-期待値:
-
-```txt
-Remote database is up to date.
-```
-
-未適用migrationがある場合は、内容に破壊的操作がないことを確認してから適用する。破壊的操作が含まれる場合は停止してレビューする。
+**正: `docs/DEPLOY-CHECKLIST.md`**（migration always precedes code deploy。恒久原則はAGENTS.md）。
+確認コマンド・期待値・破壊的操作時の停止手順は DEPLOY-CHECKLIST「手動デプロイ時の確認」を参照し、
+本書では重複させない（2026-07-07 一本化）。
 
 ## Incident record
 
@@ -62,6 +53,8 @@ Remote database is up to date.
 
 旧「事業方針v2.0 §9 配達保証／§17 安全設計」はリポジトリ外の文書で原本が失われている。
 spec-v1.3が依拠する原則を、ここに正式に収載する（docs監査 B10対応）。
+内容の出典: `docs/specs/spec-v1.3.md` §1.2・§2.1・§3.1・§3.5 の記述と
+`docs/MODERATION-CANON.md` §4.5 からの逆算復元（新規の発明は含まない）。
 
 - **配達保証**: 候補は Tier1（当日の一般投稿）→ Tier2（過去在庫）→ Tier3（運営シード）の順で
   選び、フォールバックで一日一通を絶やさない。再配達・シードであることは
