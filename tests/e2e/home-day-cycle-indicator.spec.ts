@@ -183,6 +183,7 @@ test.describe("home desk state cycle", () => {
     const remoteCatId = "remote-cat-restore";
     const localCatId = "local-cat-restored";
     const restoredPhotoUrl = `storage:${userId}/${remoteCatId}/sleeping/restored.jpg`;
+    const restoredCoverPath = `${userId}/${remoteCatId}/cover/cover.webp`;
     const now = Date.parse("2026-07-07T09:00:00+09:00");
 
     await page.addInitScript(
@@ -258,6 +259,8 @@ test.describe("home desk state cycle", () => {
             onboarding: {},
             understanding: {},
             avatar_storage_path: null,
+            cover_storage_path: restoredCoverPath,
+            cover_crop: { scale: 1.7, offsetX: 12, offsetY: -8 },
             home_photo_storage_path: null,
             home_photo_position: null,
             local_created_at: new Date(now).toISOString(),
@@ -303,6 +306,12 @@ test.describe("home desk state cycle", () => {
       .poll(() =>
         page.evaluate(() => ({
           activeCatId: window.localStorage.getItem("active_cat_id"),
+          profiles: JSON.parse(
+            window.localStorage.getItem("cat_profiles") ?? "[]",
+          ) as Array<{
+            coverPhotoDataUrl?: string;
+            coverCrop?: { scale?: number; offsetX?: number; offsetY?: number };
+          }>,
           ownPhotos: JSON.parse(
             window.localStorage.getItem("nyaruhodo_exchange_own_sleeping_photos") ??
               "[]",
@@ -311,6 +320,12 @@ test.describe("home desk state cycle", () => {
       )
       .toMatchObject({
         activeCatId: localCatId,
+        profiles: [
+          {
+            coverPhotoDataUrl: `storage:${restoredCoverPath}`,
+            coverCrop: { scale: 1.7, offsetX: 12, offsetY: -8 },
+          },
+        ],
         ownPhotos: [{ src: restoredPhotoUrl }],
       });
   });
@@ -551,6 +566,8 @@ test.describe("home desk state cycle", () => {
             onboarding: {},
             understanding: {},
             avatar_storage_path: null,
+            cover_storage_path: null,
+            cover_crop: null,
             home_photo_storage_path: null,
             home_photo_position: null,
             local_created_at: new Date(now).toISOString(),

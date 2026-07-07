@@ -39,8 +39,8 @@ export type CatProfile = {
   updatedAt: string;
   homePhotoDataUrl?: string;
   homePhotoPosition?: string;
-  avatarDataUrl?: string;
-  avatarCrop?: CatAvatarCrop;
+  coverPhotoDataUrl?: string;
+  coverCrop?: CatCoverCrop;
   basicInfo?: CatBasicInfo;
   appearance?: CatAppearance;
   typeKey?: CatTypeKey;
@@ -64,10 +64,15 @@ export type CatProfile = {
   };
 };
 
-export type CatAvatarCrop = {
+export type CatCoverCrop = {
   scale: number;
   offsetX: number;
   offsetY: number;
+};
+
+type LegacyCatProfile = Partial<CatProfile> & {
+  avatarDataUrl?: string;
+  avatarCrop?: Partial<CatCoverCrop>;
 };
 
 export type CatBasicInfo = {
@@ -696,7 +701,7 @@ export function isCatProfileNameUnset(profile: CatProfile | null | undefined) {
 
 function hasUserProfileDetails(profile: CatProfile) {
   return Boolean(
-    profile.avatarDataUrl ||
+    profile.coverPhotoDataUrl ||
       profile.homePhotoDataUrl ||
       profile.basicInfo?.familySinceDate ||
       profile.basicInfo?.birthDate ||
@@ -888,8 +893,8 @@ export function isCurrentCatHintSuppressed({
 function readStoredCatProfiles() {
   try {
     const parsed = readCachedJson<
-      | Partial<CatProfile>[]
-      | Record<string, Partial<CatProfile>>
+      | LegacyCatProfile[]
+      | Record<string, LegacyCatProfile>
     >(CAT_PROFILES_KEY);
 
     if (!parsed) {
@@ -911,11 +916,13 @@ function readStoredCatProfiles() {
   }
 }
 
-function normalizeStoredCatProfile(profile: Partial<CatProfile>): CatProfile {
+function normalizeStoredCatProfile(profile: LegacyCatProfile): CatProfile {
   const typeKey = profile.typeKey
     ? migrateTypeKey(String(profile.typeKey))
     : undefined;
   const typeInfo = typeKey ? getCatTypeInfo(typeKey) : undefined;
+  const coverPhotoDataUrl = profile.coverPhotoDataUrl ?? profile.avatarDataUrl;
+  const coverCrop = normalizeCatCoverCrop(profile.coverCrop ?? profile.avatarCrop);
 
   return {
     id: profile.id as string,
@@ -925,8 +932,8 @@ function normalizeStoredCatProfile(profile: Partial<CatProfile>): CatProfile {
       profile.updatedAt ?? profile.createdAt ?? new Date().toISOString(),
     homePhotoDataUrl: profile.homePhotoDataUrl,
     homePhotoPosition: profile.homePhotoPosition,
-    avatarDataUrl: profile.avatarDataUrl,
-    avatarCrop: normalizeCatAvatarCrop(profile.avatarCrop),
+    coverPhotoDataUrl,
+    coverCrop,
     typeKey,
     typeLabel: typeInfo?.label ?? normalizeCatTypeLabel(profile.typeLabel),
     typeTagline: profile.typeTagline ?? typeInfo?.tagline,
@@ -943,9 +950,9 @@ function normalizeStoredCatProfile(profile: Partial<CatProfile>): CatProfile {
   };
 }
 
-function normalizeCatAvatarCrop(
-  crop: CatProfile["avatarCrop"],
-): CatAvatarCrop | undefined {
+function normalizeCatCoverCrop(
+  crop: Partial<CatCoverCrop> | undefined,
+): CatCoverCrop | undefined {
   if (!crop || typeof crop !== "object") {
     return undefined;
   }

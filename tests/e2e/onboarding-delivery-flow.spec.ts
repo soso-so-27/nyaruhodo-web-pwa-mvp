@@ -1417,7 +1417,7 @@ test.describe("onboarding delivery flow", () => {
     await seedCatProfileBeforeLoad(page, {
       id: "local-cat-default-with-details",
       name: "ミケ",
-      avatarDataUrl: `data:image/png;base64,${testPng.toString("base64")}`,
+      coverPhotoDataUrl: `data:image/png;base64,${testPng.toString("base64")}`,
     });
 
     await page.goto("/cats?onboarding=1");
@@ -1492,7 +1492,7 @@ async function seedOnboardingAlbumCompletionReady(page: Page) {
 async function seedCatProfileBeforeLoad(page: Page, input: {
   id: string;
   name: string;
-  avatarDataUrl?: string;
+  coverPhotoDataUrl?: string;
 }) {
   await page.addInitScript((profileInput) => {
     const now = new Date().toISOString();
@@ -1505,8 +1505,8 @@ async function seedCatProfileBeforeLoad(page: Page, input: {
           name: profileInput.name,
           createdAt: now,
           updatedAt: now,
-          ...(profileInput.avatarDataUrl
-            ? { avatarDataUrl: profileInput.avatarDataUrl }
+          ...(profileInput.coverPhotoDataUrl
+            ? { coverPhotoDataUrl: profileInput.coverPhotoDataUrl }
             : {}),
         },
       ]),

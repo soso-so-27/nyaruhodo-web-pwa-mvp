@@ -5,7 +5,7 @@ import type { CSSProperties } from "react";
 import { trackProductEvent } from "../../lib/analytics/productAnalytics";
 import { resizeImageFileToDataUrl } from "../../lib/imageResize";
 import {
-  clearAccountCatAvatar,
+  clearAccountCatCoverPhoto,
   deleteAccountCatGalleryPhoto,
   restoreCatGalleryPhotosFromAccount,
 } from "../../lib/accountSync";
@@ -71,7 +71,7 @@ import {
 import { OmoideMemoryViewer } from "../home/OmoideMemoryViewer";
 import {
   addCatProfile,
-  type CatAvatarCrop,
+  type CatCoverCrop,
   getActiveCatProfile,
   getCatName,
   isCatProfileNameUnset,
@@ -167,7 +167,7 @@ const CAT_GALLERY_RESTORE_SESSION_KEY =
 const UNOPENED_OMOIDE_DOT_HINT_STORAGE_KEY =
   "neteruneko_unopened_omoide_dot_hint_seen";
 const SHOW_LEGACY_DETAIL_SECTIONS = false;
-const DEFAULT_AVATAR_CROP: CatAvatarCrop = {
+const DEFAULT_COVER_CROP: CatCoverCrop = {
   scale: 1,
   offsetX: 0,
   offsetY: 0,
@@ -185,10 +185,10 @@ export function CatsPage() {
   const [isAddingCat, setIsAddingCat] = useState(false);
   const [isCatManageOpen, setIsCatManageOpen] = useState(false);
   const [isCatManageEditing, setIsCatManageEditing] = useState(false);
-  const [isThumbnailPickerOpen, setIsThumbnailPickerOpen] = useState(false);
-  const [thumbnailCropDraft, setThumbnailCropDraft] = useState<{
+  const [isCoverPhotoSheetOpen, setIsCoverPhotoSheetOpen] = useState(false);
+  const [coverCropDraft, setCoverCropDraft] = useState<{
     src: string;
-    crop: CatAvatarCrop;
+    crop: CatCoverCrop;
   } | null>(null);
   const [isOnboardingMode, setIsOnboardingMode] = useState(false);
   const [isOnboardingCompletionReady, setIsOnboardingCompletionReady] =
@@ -262,7 +262,6 @@ export function CatsPage() {
     : 0;
   const omoideMemories = readOmoideMemoriesForCat(activeCatId);
   const sleepingMilestones = readCatSleepingMilestones(activeCatId);
-  const activeAvatarSrc = activeCatProfile?.avatarDataUrl;
   const isOnboardingProfileSetup = isOnboardingMode && isEditingProfile;
   const isOnboardingCompletionView =
     isOnboardingMode && isOnboardingCompletionReady && !isEditingProfile;
@@ -327,28 +326,27 @@ export function CatsPage() {
     () => getStableSleepingCoverPhoto(activeCatLensPhotos),
     [activeCatLensPhotos],
   );
-  const hasCustomThumbnail = Boolean(activeCatProfile?.avatarDataUrl);
+  const hasCustomCoverPhoto = Boolean(activeCatProfile?.coverPhotoDataUrl);
   const activeCoverPhoto =
     activeCatGalleryLensPhotos[0] ?? stableSleepingCoverPhoto;
   const activeCoverSrc =
-    activeCatProfile?.avatarDataUrl ??
-    (activeCoverPhoto ? getLensPhotoDetailSrc(activeCoverPhoto) : undefined) ??
-    activeAvatarSrc;
-  const activeCoverPreviewSrc = hasCustomThumbnail
+    activeCatProfile?.coverPhotoDataUrl ??
+    (activeCoverPhoto ? getLensPhotoDetailSrc(activeCoverPhoto) : undefined);
+  const activeCoverPreviewSrc = hasCustomCoverPhoto
     ? undefined
     : activeCoverPhoto
       ? getLensPhotoThumbnailSrc(activeCoverPhoto)
       : undefined;
-  const activeAvatarCrop = normalizeAvatarCrop(activeCatProfile?.avatarCrop);
+  const activeCoverCrop = normalizeCoverCrop(activeCatProfile?.coverCrop);
   const activeCoverFit =
     activeCoverSrc ? "cover" : "contain";
   const activeCoverRecordPhoto =
-    activeCoverPhoto && !hasCustomThumbnail
+    activeCoverPhoto && !hasCustomCoverPhoto
       ? toRecordPhotoPreview(activeCoverPhoto)
       : activeCoverSrc
         ? {
             src: activeCoverSrc,
-            title: "代表写真",
+            title: "カバー写真",
             timestamp:
               Date.parse(
                 activeCatProfile?.updatedAt ?? activeCatProfile?.createdAt ?? "",
@@ -882,9 +880,9 @@ export function CatsPage() {
     }
   }
 
-  async function updateActiveCatThumbnail(
+  async function saveActiveCatCoverPhoto(
     photoSrc: string | undefined,
-    crop?: CatAvatarCrop,
+    crop?: CatCoverCrop,
   ) {
     if (!activeCatId) {
       return;
@@ -906,8 +904,8 @@ export function CatsPage() {
 
     const nextProfile = {
       ...profiles[index],
-      avatarDataUrl: photoSrc,
-      avatarCrop: photoSrc ? normalizeAvatarCrop(crop) : undefined,
+      coverPhotoDataUrl: photoSrc,
+      coverCrop: photoSrc ? normalizeCoverCrop(crop) : undefined,
       updatedAt: new Date().toISOString(),
     } satisfies CatProfile;
     const nextProfiles = profiles.map((profile, profileIndex) =>
@@ -917,7 +915,7 @@ export function CatsPage() {
     saveCatProfiles(nextProfiles);
     setCatProfiles(nextProfiles);
     const remoteSaveResult = await saveRemoteCatProfile(nextProfile);
-    setSaveMessage(photoSrc ? "サムネイルを変えました。" : "自動表示に戻しました。");
+    setSaveMessage(photoSrc ? "カバー写真を変えました。" : "自動表示にもどしました。");
     if (remoteSaveResult.status === "error") {
       setSaveMessage(
         "この端末には保存しました。Google連携への反映はあとでやり直します。",
@@ -926,14 +924,15 @@ export function CatsPage() {
     setTimeout(() => setSaveMessage(""), 2000);
   }
 
-  function isGalleryPhotoAvatar(photo: RecordPhotoPreview) {
+  function isGalleryPhotoCover(photo: RecordPhotoPreview) {
     return catProfiles.some(
       (profile) =>
-        photo.catIds?.includes(profile.id) && profile.avatarDataUrl === photo.src,
+        photo.catIds?.includes(profile.id) &&
+        profile.coverPhotoDataUrl === photo.src,
     );
   }
 
-  async function handleAvatarUpload() {
+  async function handleCoverPhotoUpload() {
     if (!activeCatId) {
       return;
     }
@@ -955,22 +954,21 @@ export function CatsPage() {
         const dataUrl = await resizeAndEncode(file, 800);
         const photoSrc = await storeAccountPhotoDataUrl({
           dataUrl,
-          pathSegments: [targetCatId, "avatar"],
-          fileName: "avatar",
+          pathSegments: [targetCatId, "cover"],
+          fileName: "cover",
         });
         if (!isStoragePhotoReference(photoSrc)) {
-          setSaveMessage("代表写真を保存できませんでした。");
+          setSaveMessage("カバー写真を保存できませんでした。");
           setTimeout(() => setSaveMessage(""), 2400);
           return;
         }
-        void updateActiveCatThumbnail(photoSrc, DEFAULT_AVATAR_CROP);
-        setThumbnailCropDraft({
+        setCoverCropDraft({
           src: photoSrc,
-          crop: DEFAULT_AVATAR_CROP,
+          crop: DEFAULT_COVER_CROP,
         });
-        setIsThumbnailPickerOpen(false);
+        setIsCoverPhotoSheetOpen(false);
       } catch {
-        setSaveMessage("代表写真を保存できませんでした。");
+        setSaveMessage("カバー写真を保存できませんでした。");
         setTimeout(() => setSaveMessage(""), 2400);
         return;
       }
@@ -1099,7 +1097,7 @@ export function CatsPage() {
           route: "/cats",
           source: "photo_viewer",
           cat_id: deleteGalleryPhotoTarget.catIds?.[0] ?? null,
-          is_avatar_photo: isGalleryPhotoAvatar(deleteGalleryPhotoTarget),
+          is_cover_photo: isGalleryPhotoCover(deleteGalleryPhotoTarget),
         },
         { localCatId: deleteGalleryPhotoTarget.catIds?.[0] ?? activeCatId },
       );
@@ -1115,23 +1113,24 @@ export function CatsPage() {
     }
 
     const targetCatId = target.catIds?.[0] ?? activeCatId;
-    const wasAvatarPhoto = isGalleryPhotoAvatar(target);
+    const wasCoverPhoto = isGalleryPhotoCover(target);
 
     setIsDeletingGalleryPhoto(true);
 
     try {
-      if (wasAvatarPhoto && targetCatId) {
-        await clearAccountCatAvatar(targetCatId);
+      if (wasCoverPhoto && targetCatId) {
+        await clearAccountCatCoverPhoto(targetCatId);
       }
 
       await deleteAccountCatGalleryPhoto(target.id);
 
-      if (wasAvatarPhoto) {
+      if (wasCoverPhoto) {
         const nextProfiles = catProfiles.map((profile) =>
-          profile.avatarDataUrl === target.src
+          profile.coverPhotoDataUrl === target.src
             ? {
                 ...profile,
-                avatarDataUrl: undefined,
+                coverPhotoDataUrl: undefined,
+                coverCrop: undefined,
                 updatedAt: new Date().toISOString(),
               }
             : profile,
@@ -1157,7 +1156,7 @@ export function CatsPage() {
           route: "/cats",
           source: "photo_viewer",
           cat_id: targetCatId ?? null,
-          is_avatar_photo: wasAvatarPhoto,
+          is_cover_photo: wasCoverPhoto,
         },
         { localCatId: targetCatId ?? activeCatId },
       );
@@ -1341,7 +1340,7 @@ export function CatsPage() {
                     data-testid="cats-profile-cover"
                     style={styles.profileCoverFrame}
                   >
-                    {activeCoverSrc && hasCustomThumbnail ? (
+                    {activeCoverSrc && hasCustomCoverPhoto ? (
                       <button
                         type="button"
                         aria-label={activeCoverRecordPhoto?.title}
@@ -1358,7 +1357,7 @@ export function CatsPage() {
                           storageVariant="display"
                           loading="eager"
                           style={styles.profileCoverCustomImage}
-                          imageStyle={getAvatarCropImageStyle(activeAvatarCrop)}
+                          imageStyle={getCoverCropImageStyle(activeCoverCrop)}
                           width={420}
                           height={232}
                         />
@@ -1400,10 +1399,10 @@ export function CatsPage() {
                         ) : null}
                         <button
                           type="button"
-                          data-testid="cats-thumbnail-picker-button"
+                          data-testid="cats-cover-photo-button"
                           style={styles.profileCoverActionButton}
-                          onClick={() => setIsThumbnailPickerOpen(true)}
-                          aria-label="代表写真を変える"
+                          onClick={() => setIsCoverPhotoSheetOpen(true)}
+                          aria-label={"\u30ab\u30d0\u30fc\u5199\u771f\u3092\u5909\u3048\u308b"}
                         >
                           <PhotoSmallIcon />
                         </button>
@@ -1720,7 +1719,7 @@ export function CatsPage() {
             {isAddingCat ? (
               <div style={styles.catManageEditor}>
                 <div style={styles.catManageEditorHero}>
-                  <span style={styles.catManageAddAvatar} aria-hidden="true">
+                  <span style={styles.catManageAddIcon} aria-hidden="true">
                     <AddSmallIcon />
                   </span>
                   <div style={styles.catManageEditorHeroText}>
@@ -2098,9 +2097,9 @@ export function CatsPage() {
             <p style={styles.deleteCatConfirmText}>
               ねこだよりや、ほかの人に届いた写真には影響しません。
             </p>
-            {isGalleryPhotoAvatar(deleteGalleryPhotoTarget) ? (
+            {isGalleryPhotoCover(deleteGalleryPhotoTarget) ? (
               <p style={styles.deleteCatConfirmText}>
-                この写真は代表写真にも使われています。削除すると、代表写真は自動表示に戻ります。
+                この写真はカバー写真にも使われています。削除すると、カバー写真は自動表示に戻ります。
               </p>
             ) : null}
             <div style={styles.deleteCatConfirmActions}>
@@ -2134,51 +2133,53 @@ export function CatsPage() {
           onClose={() => setIsCatGalleryIntroSheetOpen(false)}
         />
       ) : null}
-      {isThumbnailPickerOpen && activeCatProfile ? (
-        <ThumbnailPickerSheet
+      {isCoverPhotoSheetOpen && activeCatProfile ? (
+        <CoverPhotoSheet
           catName={getCatName(activeCatProfile)}
           photos={activeCatLensPhotos}
-          hasCustomThumbnail={hasCustomThumbnail}
+          hasCustomCoverPhoto={hasCustomCoverPhoto}
+          currentCoverSrc={activeCoverSrc}
+          currentCoverCrop={activeCoverCrop}
+          onAdjustCurrent={(src, crop) => {
+            setCoverCropDraft({ src, crop });
+            setIsCoverPhotoSheetOpen(false);
+          }}
           onPickPhoto={(photo) => {
-            void updateActiveCatThumbnail(
-              getLensPhotoDetailSrc(photo),
-              activeCatProfile.avatarCrop ?? DEFAULT_AVATAR_CROP,
-            );
-            setThumbnailCropDraft({
+            setCoverCropDraft({
               src: getLensPhotoDetailSrc(photo),
-              crop: activeCatProfile.avatarCrop ?? DEFAULT_AVATAR_CROP,
+              crop: DEFAULT_COVER_CROP,
             });
-            setIsThumbnailPickerOpen(false);
+            setIsCoverPhotoSheetOpen(false);
           }}
           onUpload={() => {
-            void handleAvatarUpload();
+            void handleCoverPhotoUpload();
           }}
           onReset={() => {
-            void updateActiveCatThumbnail(undefined);
-            setIsThumbnailPickerOpen(false);
+            void saveActiveCatCoverPhoto(undefined);
+            setIsCoverPhotoSheetOpen(false);
           }}
-          onClose={() => setIsThumbnailPickerOpen(false)}
+          onClose={() => setIsCoverPhotoSheetOpen(false)}
         />
       ) : null}
-      {thumbnailCropDraft ? (
-        <ThumbnailCropSheet
-          src={thumbnailCropDraft.src}
-          crop={thumbnailCropDraft.crop}
+      {coverCropDraft ? (
+        <CoverCropSheet
+          src={coverCropDraft.src}
+          crop={coverCropDraft.crop}
           onChange={(crop) =>
-            setThumbnailCropDraft((current) =>
+            setCoverCropDraft((current) =>
               current ? { ...current, crop } : current,
             )
           }
           onSave={() => {
-            void updateActiveCatThumbnail(
-              thumbnailCropDraft.src,
-              thumbnailCropDraft.crop,
+            void saveActiveCatCoverPhoto(
+              coverCropDraft.src,
+              coverCropDraft.crop,
             );
-            setThumbnailCropDraft(null);
+            setCoverCropDraft(null);
           }}
           onBack={() => {
-            setThumbnailCropDraft(null);
-            setIsThumbnailPickerOpen(true);
+            setCoverCropDraft(null);
+            setIsCoverPhotoSheetOpen(true);
           }}
         />
       ) : null}
@@ -3437,10 +3438,13 @@ function YearSummaryDetailList({
   );
 }
 
-function ThumbnailPickerSheet({
+function CoverPhotoSheet({
   catName,
   photos,
-  hasCustomThumbnail,
+  hasCustomCoverPhoto,
+  currentCoverSrc,
+  currentCoverCrop,
+  onAdjustCurrent,
   onPickPhoto,
   onUpload,
   onReset,
@@ -3448,40 +3452,56 @@ function ThumbnailPickerSheet({
 }: {
   catName: string;
   photos: LensPhoto[];
-  hasCustomThumbnail: boolean;
+  hasCustomCoverPhoto: boolean;
+  currentCoverSrc?: string;
+  currentCoverCrop: CatCoverCrop;
+  onAdjustCurrent: (src: string, crop: CatCoverCrop) => void;
   onPickPhoto: (photo: LensPhoto) => void;
   onUpload: () => void;
   onReset: () => void;
   onClose: () => void;
 }) {
   return (
-    <AppBottomSheet title="サムネイル写真" onClose={onClose}>
+    <AppBottomSheet title={"\u30ab\u30d0\u30fc\u5199\u771f\u3092\u5909\u3048\u308b"} onClose={onClose}>
       <div style={styles.thumbnailPicker}>
         <div style={styles.thumbnailPickerActions}>
+          {currentCoverSrc ? (
+            <AppButton
+              type="button"
+              variant="secondary"
+              fullWidth
+              data-testid="cover-photo-adjust-current"
+              onClick={() => onAdjustCurrent(currentCoverSrc, currentCoverCrop)}
+            >
+              {"\u3044\u307e\u306e\u5199\u771f\u306e\u4f4d\u7f6e\u3092\u8abf\u6574"}
+            </AppButton>
+          ) : null}
           <AppButton
             type="button"
             variant="secondary"
             fullWidth
             iconStart={<PhotoSmallIcon />}
+            data-testid="cover-photo-upload"
             onClick={onUpload}
           >
-            端末の写真を選ぶ
+            {"\u7aef\u672b\u304b\u3089\u3048\u3089\u3076"}
           </AppButton>
-          {hasCustomThumbnail ? (
+          {hasCustomCoverPhoto ? (
             <AppButton
               type="button"
               variant="quiet"
               fullWidth
+              data-testid="cover-photo-reset"
               onClick={onReset}
             >
-              自動表示に戻す
+              {"\u81ea\u52d5\u306b\u3082\u3069\u3059"}
             </AppButton>
           ) : null}
         </div>
 
         <div style={styles.thumbnailPickerSection}>
           <p style={styles.thumbnailPickerTitle}>
-            とっておき・ねがおから選ぶ
+            {"\u3053\u306e\u5b50\u306e\u5199\u771f\u304b\u3089\u3048\u3089\u3076"}
           </p>
           {photos.length > 0 ? (
             <div style={styles.thumbnailPickerGrid}>
@@ -3489,10 +3509,10 @@ function ThumbnailPickerSheet({
                 <button
                   key={photo.id}
                   type="button"
-                  data-testid="thumbnail-picker-photo"
+                  data-testid="cover-photo-picker-photo"
                   style={styles.thumbnailPickerPhoto}
                   onClick={() => onPickPhoto(photo)}
-                  aria-label={`${formatLensPhotoDate(photo.createdAt)}の写真をサムネイルにする`}
+                  aria-label={`${formatLensPhotoDate(photo.createdAt)}\u306e\u5199\u771f\u3092\u30ab\u30d0\u30fc\u5199\u771f\u306b\u3059\u308b`}
                 >
                   <PhotoTile
                     src={getLensPhotoThumbnailSrc(photo)}
@@ -3507,7 +3527,7 @@ function ThumbnailPickerSheet({
             </div>
           ) : (
             <p style={styles.thumbnailPickerEmpty}>
-              とっておきやねがおがあると、ここから選べます。
+              {"\u3068\u3063\u3066\u304a\u304d\u3084\u5bdd\u9854\u304c\u3042\u308b\u3068\u3001\u3053\u3053\u304b\u3089\u9078\u3079\u307e\u3059\u3002"}
             </p>
           )}
         </div>
@@ -3516,7 +3536,7 @@ function ThumbnailPickerSheet({
   );
 }
 
-function ThumbnailCropSheet({
+function CoverCropSheet({
   src,
   crop,
   onChange,
@@ -3524,8 +3544,8 @@ function ThumbnailCropSheet({
   onBack,
 }: {
   src: string;
-  crop: CatAvatarCrop;
-  onChange: (crop: CatAvatarCrop) => void;
+  crop: CatCoverCrop;
+  onChange: (crop: CatCoverCrop) => void;
   onSave: () => void;
   onBack: () => void;
 }) {
@@ -3536,7 +3556,7 @@ function ThumbnailCropSheet({
     centerX: number;
     centerY: number;
     distance: number;
-    crop: CatAvatarCrop;
+    crop: CatCoverCrop;
   } | null>(null);
 
   useEffect(() => {
@@ -3648,7 +3668,7 @@ function ThumbnailCropSheet({
       const distanceRatio = start.distance > 0 ? nextDistance / start.distance : 1;
 
       onChange(
-        normalizeAvatarCrop({
+        normalizeCoverCrop({
           ...start.crop,
           scale: start.crop.scale * distanceRatio,
           offsetX: start.crop.offsetX + deltaX,
@@ -3673,7 +3693,7 @@ function ThumbnailCropSheet({
     const deltaY = ((pointer.y - start.centerY) / rect.height) * 100;
 
     onChange(
-      normalizeAvatarCrop({
+      normalizeCoverCrop({
         ...start.crop,
         offsetX: start.crop.offsetX + deltaX,
         offsetY: start.crop.offsetY + deltaY,
@@ -3707,25 +3727,25 @@ function ThumbnailCropSheet({
     <div
       role="dialog"
       aria-modal="true"
-      aria-label={"\u30b5\u30e0\u30cd\u30a4\u30eb\u3092\u5408\u308f\u305b\u308b"}
-      data-testid="thumbnail-crop-sheet"
+      aria-label={"\u30ab\u30d0\u30fc\u5199\u771f\u3092\u5408\u308f\u305b\u308b"}
+      data-testid="cover-crop-sheet"
       style={styles.thumbnailCropOverlay}
     >
       <div style={styles.thumbnailCropHeader}>
         <button
           type="button"
-          data-testid="thumbnail-crop-back"
+          data-testid="cover-crop-back"
           style={styles.thumbnailCropHeaderButton}
           onClick={onBack}
         >
           {"\u3082\u3069\u308b"}
         </button>
         <p style={styles.thumbnailCropTitle}>
-          {"\u30b5\u30e0\u30cd\u30a4\u30eb\u3092\u5408\u308f\u305b\u308b"}
+          {"\u30ab\u30d0\u30fc\u5199\u771f\u3092\u5408\u308f\u305b\u308b"}
         </p>
         <button
           type="button"
-          data-testid="thumbnail-crop-save"
+          data-testid="cover-crop-save"
           style={styles.thumbnailCropSaveButton}
           onClick={onSave}
         >
@@ -3735,7 +3755,7 @@ function ThumbnailCropSheet({
 
       <div style={styles.thumbnailCropStage}>
         <div
-          data-testid="thumbnail-crop-preview"
+          data-testid="cover-crop-preview"
           style={styles.thumbnailCropPreview}
           onPointerDown={handlePointerDown}
           onPointerMove={handlePointerMove}
@@ -3748,7 +3768,7 @@ function ThumbnailCropSheet({
             storageVariant="display"
             loading="eager"
             style={styles.thumbnailCropImageFrame}
-            imageStyle={getAvatarCropImageStyle(crop)}
+            imageStyle={getCoverCropImageStyle(crop)}
             width={420}
             height={232}
           />
@@ -4275,24 +4295,24 @@ function getLensPhotoDetailSrc(photo: {
   return photo.displaySrc ?? photo.originalSrc ?? photo.thumbnailSrc ?? photo.src;
 }
 
-function normalizeAvatarCrop(crop?: Partial<CatAvatarCrop>): CatAvatarCrop {
+function normalizeCoverCrop(crop?: Partial<CatCoverCrop>): CatCoverCrop {
   return {
-    scale: clampNumber(crop?.scale ?? DEFAULT_AVATAR_CROP.scale, 1, 2.8),
+    scale: clampNumber(crop?.scale ?? DEFAULT_COVER_CROP.scale, 1, 2.8),
     offsetX: clampNumber(
-      crop?.offsetX ?? DEFAULT_AVATAR_CROP.offsetX,
+      crop?.offsetX ?? DEFAULT_COVER_CROP.offsetX,
       -48,
       48,
     ),
     offsetY: clampNumber(
-      crop?.offsetY ?? DEFAULT_AVATAR_CROP.offsetY,
+      crop?.offsetY ?? DEFAULT_COVER_CROP.offsetY,
       -48,
       48,
     ),
   };
 }
 
-function getAvatarCropImageStyle(crop: CatAvatarCrop): CSSProperties {
-  const normalized = normalizeAvatarCrop(crop);
+function getCoverCropImageStyle(crop: CatCoverCrop): CSSProperties {
+  const normalized = normalizeCoverCrop(crop);
 
   return {
     transform: `translate(${normalized.offsetX}%, ${normalized.offsetY}%) scale(${normalized.scale})`,
@@ -4626,9 +4646,10 @@ async function saveRemoteCatProfile(
     name: profile.name,
     basic_info: toJsonObject(profile.basicInfo),
     appearance: toJsonObject(profile.appearance),
-    avatar_storage_path: profile.avatarDataUrl
-      ? getStoragePhotoPath(profile.avatarDataUrl)
+    cover_storage_path: profile.coverPhotoDataUrl
+      ? getStoragePhotoPath(profile.coverPhotoDataUrl)
       : null,
+    cover_crop: profile.coverCrop ? toJsonObject(profile.coverCrop) : null,
     local_created_at: profile.createdAt,
     local_updated_at: profile.updatedAt,
   };
@@ -6633,7 +6654,7 @@ const styles = {
     boxShadow:
       "0 0 0 3px color-mix(in srgb, var(--paper-card) 82%, transparent), var(--shadow-e1)",
   },
-  catManageAddAvatar: {
+  catManageAddIcon: {
     width: "44px",
     height: "44px",
     display: "inline-flex",

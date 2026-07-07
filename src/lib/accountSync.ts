@@ -38,8 +38,8 @@ type LocalCatProfile = {
   updatedAt?: string;
   homePhotoDataUrl?: string;
   homePhotoPosition?: string;
-  avatarDataUrl?: string;
-  avatarCrop?: {
+  coverPhotoDataUrl?: string;
+  coverCrop?: {
     scale?: number;
     offsetX?: number;
     offsetY?: number;
@@ -55,6 +55,11 @@ type LocalCatProfile = {
   modifiers?: unknown[];
   onboarding?: Record<string, unknown>;
   understanding?: Record<string, unknown>;
+};
+
+type LegacyLocalCatProfile = LocalCatProfile & {
+  avatarDataUrl?: string;
+  avatarCrop?: LocalCatProfile["coverCrop"];
 };
 
 type LocalRecordLogItem = {
@@ -104,6 +109,8 @@ type RemoteCatRow = {
   onboarding: Record<string, unknown> | null;
   understanding: Record<string, unknown> | null;
   avatar_storage_path: string | null;
+  cover_storage_path: string | null;
+  cover_crop: Record<string, unknown> | null;
   home_photo_storage_path: string | null;
   home_photo_position: string | null;
   local_created_at: string | null;
@@ -837,7 +844,7 @@ export async function deleteAccountCatGalleryPhoto(localPhotoId: string) {
   }
 }
 
-export async function clearAccountCatAvatar(localCatId: string) {
+export async function clearAccountCatCoverPhoto(localCatId: string) {
   if (typeof window === "undefined") {
     return;
   }
@@ -856,12 +863,12 @@ export async function clearAccountCatAvatar(localCatId: string) {
 
   const { error } = await supabase
     .from("cats")
-    .update({ avatar_storage_path: null })
+    .update({ cover_storage_path: null, cover_crop: null, avatar_storage_path: null })
     .eq("owner_user_id", data.user.id)
     .eq("local_cat_id", localCatId);
 
   if (error) {
-    throw new Error(`Cat avatar clear failed: ${error.message}`);
+    throw new Error(`Cat cover clear failed: ${error.message}`);
   }
 }
 
@@ -1000,7 +1007,7 @@ function readLocalSnapshot(): LocalSnapshot {
 }
 
 function normalizeProfiles(
-  value: LocalCatProfile[] | Record<string, LocalCatProfile> | null,
+  value: LegacyLocalCatProfile[] | Record<string, LegacyLocalCatProfile> | null,
 ): LocalCatProfile[] {
   if (!value) {
     return [];
@@ -1010,9 +1017,19 @@ function normalizeProfiles(
     ? value
     : Object.entries(value).map(([id, profile]) => ({ ...profile, id: profile.id ?? id }));
 
-  return profiles.filter((profile): profile is LocalCatProfile =>
-    Boolean(profile && typeof profile.id === "string" && profile.id),
-  );
+  return profiles
+    .filter((profile): profile is LegacyLocalCatProfile =>
+      Boolean(profile && typeof profile.id === "string" && profile.id),
+    )
+    .map((profile) => {
+      const { avatarDataUrl, avatarCrop, ...rest } = profile;
+
+      return {
+        ...rest,
+        coverPhotoDataUrl: profile.coverPhotoDataUrl ?? avatarDataUrl,
+        coverCrop: normalizeCoverCrop(profile.coverCrop ?? avatarCrop),
+      };
+    });
 }
 
 function hasMeaningfulLocalData(snapshot: LocalSnapshot) {
@@ -1062,7 +1079,7 @@ function hasMeaningfulCatProfileDetails(profile: LocalCatProfile) {
   return Boolean(
     profile.typeKey ||
       profile.typeLabel ||
-      profile.avatarDataUrl ||
+      profile.coverPhotoDataUrl ||
       profile.homePhotoDataUrl ||
       !isEmptyObject(profile.basicInfo) ||
       !isEmptyObject(profile.appearance) ||
@@ -1182,6 +1199,7 @@ async function syncCatProfile(
     onboarding: toJsonObject(profile.onboarding),
     understanding: toJsonObject(profile.understanding),
     home_photo_position: profile.homePhotoPosition ?? null,
+    cover_crop: profile.coverCrop ? toJsonObject(profile.coverCrop) : null,
     metadata: SYNC_METADATA,
     local_created_at: toIsoStringOrNull(profile.createdAt),
     local_updated_at: toIsoStringOrNull(profile.updatedAt),
@@ -1221,16 +1239,16 @@ async function syncCatProfile(
 
   const photoUpdates: Record<string, string | null> = {};
 
-  if (profile.avatarDataUrl?.startsWith("data:")) {
-    photoUpdates.avatar_storage_path = await uploadDataUrl(
+  if (profile.coverPhotoDataUrl?.startsWith("data:")) {
+    photoUpdates.cover_storage_path = await uploadDataUrl(
       supabase,
-      `${userId}/${remoteCatId}/avatar/avatar.${getDataUrlExtension(profile.avatarDataUrl)}`,
-      profile.avatarDataUrl,
+      `${userId}/${remoteCatId}/cover/cover.${getDataUrlExtension(profile.coverPhotoDataUrl)}`,
+      profile.coverPhotoDataUrl,
     );
-  } else if (profile.avatarDataUrl) {
-    const storagePath = getStoragePhotoPath(profile.avatarDataUrl);
+  } else if (profile.coverPhotoDataUrl) {
+    const storagePath = getStoragePhotoPath(profile.coverPhotoDataUrl);
     if (storagePath) {
-      photoUpdates.avatar_storage_path = storagePath;
+      photoUpdates.cover_storage_path = storagePath;
     }
   }
 
@@ -1821,9 +1839,10 @@ async function restoreRemoteSnapshot(
         ? toStoragePhotoUrl(cat.home_photo_storage_path)
         : undefined,
       homePhotoPosition: cat.home_photo_position ?? undefined,
-      avatarDataUrl: cat.avatar_storage_path
-        ? toStoragePhotoUrl(cat.avatar_storage_path)
+      coverPhotoDataUrl: (cat.cover_storage_path ?? cat.avatar_storage_path)
+        ? toStoragePhotoUrl(cat.cover_storage_path ?? cat.avatar_storage_path ?? "")
         : undefined,
+      coverCrop: normalizeCoverCrop(cat.cover_crop),
       basicInfo: cat.basic_info ?? undefined,
       appearance: cat.appearance ?? undefined,
       typeKey: cat.type_key ?? undefined,
@@ -1844,13 +1863,13 @@ async function restoreRemoteSnapshot(
       profiles[existingIndex] = {
         ...existingProfile,
         ...restoredProfile,
-        avatarDataUrl:
-          restoredProfile.avatarDataUrl ?? existingProfile.avatarDataUrl,
+        coverPhotoDataUrl:
+          restoredProfile.coverPhotoDataUrl ?? existingProfile.coverPhotoDataUrl,
         homePhotoDataUrl:
           restoredProfile.homePhotoDataUrl ?? existingProfile.homePhotoDataUrl,
         homePhotoPosition:
           restoredProfile.homePhotoPosition ?? existingProfile.homePhotoPosition,
-        avatarCrop: existingProfile.avatarCrop,
+        coverCrop: restoredProfile.coverCrop ?? existingProfile.coverCrop,
       };
     } else {
       profiles.push(restoredProfile);
@@ -2453,7 +2472,7 @@ function isLocalDefaultCatProfile(profile: LocalCatProfile) {
     profile.id.startsWith("local-cat-") &&
     (profile.name === "ミケ" || !profile.name) &&
     !profile.homePhotoDataUrl &&
-    !profile.avatarDataUrl &&
+    !profile.coverPhotoDataUrl &&
     !profile.basicInfo &&
     !profile.appearance &&
     !profile.typeKey &&
@@ -2499,6 +2518,7 @@ function isAccidentalDefaultRemoteCat(cat: RemoteCatRow) {
     typeof cat.local_cat_id === "string" &&
     cat.local_cat_id.startsWith("local-cat-") &&
     !cat.avatar_storage_path &&
+    !cat.cover_storage_path &&
     !cat.home_photo_storage_path &&
     !cat.type_key &&
     !cat.type_label &&
@@ -2709,6 +2729,32 @@ function normalizeCollectionPhotoEntries(
 
 function toJsonObject(value: Record<string, unknown> | null | undefined) {
   return value && typeof value === "object" && !Array.isArray(value) ? value : {};
+}
+
+function normalizeCoverCrop(
+  crop: Record<string, unknown> | LocalCatProfile["coverCrop"] | null | undefined,
+): LocalCatProfile["coverCrop"] | undefined {
+  if (!crop || typeof crop !== "object" || Array.isArray(crop)) {
+    return undefined;
+  }
+
+  const scale = Number(crop.scale);
+  const offsetX = Number(crop.offsetX);
+  const offsetY = Number(crop.offsetY);
+
+  if (
+    !Number.isFinite(scale) ||
+    !Number.isFinite(offsetX) ||
+    !Number.isFinite(offsetY)
+  ) {
+    return undefined;
+  }
+
+  return {
+    scale: Math.min(2.8, Math.max(1, scale)),
+    offsetX: Math.min(48, Math.max(-48, offsetX)),
+    offsetY: Math.min(48, Math.max(-48, offsetY)),
+  };
 }
 
 function toIsoStringOrNull(value: string | null | undefined) {

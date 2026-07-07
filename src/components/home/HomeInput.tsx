@@ -4920,7 +4920,7 @@ function buildHomeBoardItems({
 
 function getHomeCatThumbSrc(profile: CatProfile) {
   return (
-    profile.avatarDataUrl ??
+    profile.coverPhotoDataUrl ??
     profile.homePhotoDataUrl ??
     getCoatAvatarSrc(profile.appearance?.coat)
   );
