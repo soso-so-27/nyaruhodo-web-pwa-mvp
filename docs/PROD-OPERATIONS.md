@@ -87,3 +87,10 @@ Check three things:
 1. `src = 'admin-stock'` with `moderation_status = 'approved'` has at least 1 row. This is the onboarding first-letter supply canary.
 2. `moderation_status = 'pending'` is not piling up. Clear the moderation queue before campaigns so real user photos are not buried under test leftovers.
 3. Code must treat admin stock consistently. Runtime selection uses `metadata.pool_kind = 'admin_stock'`; legacy/prod rows with `metadata.source = 'admin-stock'` are also treated as admin stock as a compatibility fallback.
+
+## Cron time zone note
+
+Vercel cron schedules are written in UTC. The handoff cleanup schedule in
+`vercel.json` is intentionally kept as `30 18 * * *`, which runs at JST 03:30.
+This is the intended late-night garbage-collection window for expired or
+redeemed onboarding handoffs.
