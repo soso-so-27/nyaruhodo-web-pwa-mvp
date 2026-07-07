@@ -14,6 +14,50 @@ The core product model is:
 
 The app should feel calm, private, and small. Avoid adding loud engagement loops, feed-like browsing, public galleries, or growth mechanics.
 
+## Permanent Rules (owner-approved 2026-07-07)
+
+These rules are permanent. Specs do not restate them. If a spec or doc conflicts with this section, this section wins; report the conflict instead of silently resolving it.
+
+### Vocabulary lock (user-facing copy)
+
+- Use: `ねがお` / `ねがおを とる` / `ねこだより` / `とどく` / `ひらく` (hiragana forms).
+- Never use `切手` at any layer — user copy, spec wording, aria-labels, or metaphors behind component names. The receiving-world motifs are 封蝋 (wax seal) and 便箋 (stationery).
+- Never use `手紙` / `おてがみ` in user-facing copy. The name is `ねこだより`. Envelope, wax seal, and stationery exist only as visuals of the opening gesture and are not named in copy.
+- Never use SNS vocabulary: いいね, フォロワー, ランキング, ストリーク, 連続記録, ポイント, ランク, 達成.
+- Never use `一生` or words evoking a cat's death (最期, 見送る, 虹の橋, 天国, etc.) anywhere in the product or its communications.
+- Time notation in user-facing copy is `よる8時` (not `よる8じ`, not `夜8時`).
+
+### Product principles (immutable)
+
+- Give-to-receive: taking today's ねがお is what brings tonight's ねこだより. A day without taking simply has no letter tonight — never stage punishment, streak loss, or guilt, and never empty the home screen to pressure the user.
+- Originals are never hostages: viewing one's own photos and received ねこだより stays free after cancellation. Never build a reduced storage plan.
+- The daily exchange (receiving ねこだより) stays free forever.
+- No loss-aversion copy ("消えてしまいます" etc.) and no retention dialogs.
+
+### Billing rules (owner decision 2026-07-06)
+
+- During beta, payment is support (応援) with no feature differences; the beta-supporter page copy is canonical.
+- Post-launch paid-plan contents are UNDECIDED. Do not present paid perks as settled in copy, specs, terms, or UI. Business-strategy price-table items are candidates, not promises. Only the owner decides paid contents.
+
+### Fixed values
+
+- Delivery: daily 20:00 JST. Exchange opens at server time 19:55:00 (5-minute tolerance). Moderation cutoff is 19:55; the review-schedule canon is `docs/MODERATION-CANON.md` §4.
+- Price: ¥1,480 (tax excluded) = ¥1,628 (tax included) per month.
+
+### Operational discipline
+
+- Migration always precedes code deploy (procedure canon: `docs/DEPLOY-CHECKLIST.md`).
+- No deploys between 19:00 and 21:00 JST (review window + 20:00 delivery + opening time).
+- Production data DELETE / bulk UPDATE / TRUNCATE / DDL / data moves require prior report and approval (procedure canon: `docs/PROD-OPERATIONS.md`). Only read-only SQL is allowed before approval.
+
+### Document priority
+
+- Canon priority follows `docs/BRAND-GUIDELINE.md` §10, which includes this file.
+
+### Reporting rule
+
+- Every completion report must attach evidence per change: a grep of the changed lines, or the name of the test that verifies the behavior.
+
 ## Tech Stack
 
 - Next.js App Router

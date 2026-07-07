@@ -246,14 +246,15 @@
 本書は入口であり、最終正典ではない。詳細判断は以下を優先する。
 
 1. 中西の明示判断
-2. `docs/design/DESIGN-CANON.md`
-3. `docs/MARKETING-CANON.md`
-4. `docs/MODERATION-CANON.md`
-5. `docs/OPERATIONS-PLAYBOOK.md`
-6. `docs/neteruneko-business-strategy-v1.2.md`
-7. `src/app/tokens.css`（実装上の色・書体・背景の現値）
-8. focused spec / STATUS / ROADMAP
-9. 旧 `にゃるほど` 系文書（参考のみ。現行ブランドを上書きしない）
+2. `AGENTS.md`（エージェント向け恒久ルール。語彙ロック・禁止語彙・確定数値・運用規律・報告規律の正）
+3. `docs/design/DESIGN-CANON.md`
+4. `docs/MARKETING-CANON.md`
+5. `docs/MODERATION-CANON.md`
+6. `docs/OPERATIONS-PLAYBOOK.md`
+7. `docs/neteruneko-business-strategy-v1.2.md`
+8. `src/app/tokens.css`（実装上の色・書体・背景の現値）
+9. focused spec / STATUS / ROADMAP
+10. 旧 `にゃるほど` 系文書（参考のみ。現行ブランドを上書きしない）
 
 改訂権限は中西のみ。制作物を作る人は、本書にない判断を新しく発明せず、必要なら矛盾・未決として記録する。
 
