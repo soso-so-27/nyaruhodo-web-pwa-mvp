@@ -581,4 +581,10 @@ historical sections below is not canonical.
 - The phantom 事業方針v2.0 §9/§17 principles are formally recorded in
   `docs/PROD-OPERATIONS.md`「配達保証・安全設計の原則」.
 - 「切手」 is banned at every layer (FEATURE-IDEAS §語彙の改定); `/prototypes`
-  routes are gated out of production builds.
+  routes are gated out of production builds. Successor wording confirmed
+  2026-07-07: ねこだより (single letter and the small received photo) / たば
+  (the collection). `StampPair` was renamed to `TayoriPair` (behavior
+  unchanged).
+- The state3 "long-press opening" wording in historical sections below
+  (e.g. §state3 tables) is not canonical either; opening is tap-based
+  (`docs/specs/opening-flow-v2.md`).
