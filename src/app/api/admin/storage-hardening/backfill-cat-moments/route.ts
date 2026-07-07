@@ -9,6 +9,7 @@ import {
 } from "../../../../../lib/photoStorage";
 import { validateOwnPhotoSrc } from "../../../../../lib/home/sleepingDeliveryRequestGuards";
 import { authorizeAdminTaskRequest } from "../../../../../lib/server/adminTaskAuth";
+import { checkAdminTaskRateLimit } from "../../../../../lib/server/adminTaskRateLimit";
 import { createSupabaseAdminClient } from "../../../../../lib/supabase/admin";
 
 export const dynamic = "force-dynamic";
@@ -32,6 +33,14 @@ export async function POST(request: Request) {
   const unauthorized = authorizeAdminTaskRequest(request);
   if (unauthorized) {
     return unauthorized;
+  }
+
+  const rateLimited = checkAdminTaskRateLimit(
+    request,
+    "storage-hardening-backfill-cat-moments",
+  );
+  if (rateLimited) {
+    return rateLimited;
   }
 
   const supabase = createSupabaseAdminClient();

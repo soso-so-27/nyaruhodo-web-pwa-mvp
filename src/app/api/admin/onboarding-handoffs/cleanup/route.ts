@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 
 import { authorizeAdminTaskRequest } from "../../../../../lib/server/adminTaskAuth";
+import { checkAdminTaskRateLimit } from "../../../../../lib/server/adminTaskRateLimit";
 import { removeHandoffStorageObjects } from "../../../../../lib/server/handoffStorageCleanup";
 import { createSupabaseAdminClient } from "../../../../../lib/supabase/admin";
 
@@ -28,6 +29,11 @@ async function runCleanup(request: Request) {
   const unauthorized = authorizeAdminTaskRequest(request);
   if (unauthorized) {
     return unauthorized;
+  }
+
+  const rateLimited = checkAdminTaskRateLimit(request, "handoff-cleanup");
+  if (rateLimited) {
+    return rateLimited;
   }
 
   const supabase = createSupabaseAdminClient();
