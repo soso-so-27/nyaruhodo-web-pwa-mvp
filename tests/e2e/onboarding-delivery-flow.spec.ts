@@ -319,6 +319,37 @@ test.describe("onboarding delivery flow", () => {
     await expect(page.getByTestId("onboarding-install-guide")).toBeVisible();
   });
 
+
+  test("routes embedded second photo bridge through account handoff", async ({
+    page,
+  }) => {
+    await page.addInitScript(() => {
+      Object.defineProperty(window.navigator, "userAgent", {
+        configurable: true,
+        get: () =>
+          "Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 Mobile/15E148 Line/14.0.0",
+      });
+    });
+    await mockBrowserDate(page, "2026-07-06T10:00:00+09:00");
+    await routeImmediateDelivery(page);
+
+    await page.goto("/onboarding");
+    await page.waitForLoadState("networkidle");
+    await page.locator("main button").first().click();
+    await page.locator('input[type="file"]').last().setInputFiles({
+      name: "own-sleeping.png",
+      mimeType: "image/png",
+      buffer: testPng,
+    });
+
+    await page.locator("main button").first().click();
+    await page.waitForTimeout(1600);
+    await page.locator("main button").first().click();
+
+    await expect(page).toHaveURL(/\/account\/create\?from=onboarding/);
+    await expect(page).toHaveURL(/next=second_photo/);
+  });
+
   test("shows the next day bridge after 8pm after onboarding delivery", async ({
     page,
   }) => {

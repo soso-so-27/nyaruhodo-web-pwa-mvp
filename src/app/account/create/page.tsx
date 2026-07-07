@@ -135,6 +135,7 @@ export default function AccountCreatePage() {
   }
 
   const hasInitializedGoogleButton = useRef(false);
+  const [handoffNext, setHandoffNext] = useState("");
 
   useEffect(() => {
     setDisplayEnvironment(getDisplayEnvironment());
@@ -142,6 +143,7 @@ export default function AccountCreatePage() {
     setEmbeddedBrowserLabel(embeddedBrowser.label);
     const fromOnboarding =
       new URLSearchParams(window.location.search).get("from") === "onboarding";
+    const next = new URLSearchParams(window.location.search).get("next");
     const source = readOnboardingSourceFromLocation();
     let catName = "";
 
@@ -159,6 +161,7 @@ export default function AccountCreatePage() {
 
     setIsFromOnboarding(fromOnboarding);
     setOnboardingSource(source);
+    setHandoffNext(next === "second_photo" ? "second_photo" : "");
 
     if (embeddedBrowser.isEmbedded) {
       trackProductEvent("inapp_browser_detected", {
@@ -543,7 +546,11 @@ export default function AccountCreatePage() {
           method: "handoff",
         });
         trackOnboardingAlbumCreatedVariant("handoff");
-        router.push(`${handoff.continueUrl}&handoff_from=account`);
+        const nextParam =
+          handoffNext === "second_photo" ? "&next=second_photo" : "";
+        router.push(
+          `${handoff.continueUrl}${nextParam}&handoff_from=account`,
+        );
       } catch {
         setPendingAction(null);
         setMessage(

@@ -26,6 +26,7 @@ export default function OnboardingContinuePage() {
 function OnboardingContinueContent() {
   const searchParams = useSearchParams();
   const token = searchParams.get("handoff") ?? "";
+  const next = searchParams.get("next") === "second_photo" ? "second_photo" : "";
   const [status, setStatus] = useState<RestoreStatus>("ready");
   const [message, setMessage] = useState("");
   const [copied, setCopied] = useState(false);
@@ -37,7 +38,7 @@ function OnboardingContinueContent() {
       ? ""
       : `${window.location.origin}/onboarding/continue?handoff=${encodeURIComponent(
           token,
-        )}`;
+        )}${next ? `&next=${encodeURIComponent(next)}` : ""}`;
 
   useEffect(() => {
     setIsEmbeddedBrowser(detectEmbeddedBrowser());
@@ -101,7 +102,9 @@ function OnboardingContinueContent() {
   }
 
   function goHome() {
-    window.location.assign("/home?handoff=restored");
+    const suffix =
+      next === "second_photo" ? "&from=onboarding_second_photo" : "";
+    window.location.assign(`/home?handoff=restored${suffix}`);
   }
 
   async function copyContinueUrl() {

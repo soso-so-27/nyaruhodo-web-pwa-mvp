@@ -841,7 +841,18 @@ export function OnboardingFlow() {
     trackProductEvent("onboarding_second_photo_submitted", {
       source: getEffectiveEntrySource(),
       surface: "onboarding_delivered",
+      requires_handoff: isEmbeddedBrowser,
     });
+
+    if (isEmbeddedBrowser) {
+      router.push(
+        `/account/create?from=onboarding&source=${encodeURIComponent(
+          getEffectiveEntrySource(),
+        )}&next=second_photo`,
+      );
+      return;
+    }
+
     router.push("/home?from=onboarding_second_photo");
   }
 
