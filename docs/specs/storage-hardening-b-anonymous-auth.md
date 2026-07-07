@@ -20,10 +20,36 @@ The feature remains gated by `NEXT_PUBLIC_ANON_AUTH_ENABLED`.
   Without an anonymous session, it keeps the existing `signInWithOAuth()` behavior.
 - If Google linking fails because the identity already belongs to another account,
   the app falls back to the existing-account OAuth path. Before switching sessions,
-  local photos pointing at the anonymous uid's Storage folder are converted to
-  data URLs so account sync can re-upload them under the existing uid.
+  local Storage references pointing at the anonymous uid are recorded as a small
+  path manifest. After the existing account login completes, the server copies
+  those objects from `{anonymousUid}/...` to
+  `{existingUserId}/anonymous-transfer/{anonymousUid}/...` with the service role,
+  then the client rewrites local references to the copied paths.
 - Anonymous users are not treated as a completed Google/account connection on
   `/account/create`.
+
+## Q9 conflict fallback decision
+
+The first Q9 fallback briefly considered converting anonymous Storage references
+back into `data:` URLs before switching sessions. That was rejected because it
+does not scale: a user who stays anonymous for many photos can exceed the
+browser `localStorage` quota and lose data during the fallback.
+
+The implemented fallback keeps photo bytes out of `localStorage`:
+
+1. Record only the anonymous Storage paths before signing out of the anonymous
+   session.
+2. Sign in to the existing Google account.
+3. Call `/api/account/copy-anonymous-storage` with the new account's access
+   token. The route derives the target user from the token; the client cannot
+   choose another target uid.
+4. The route copies only objects whose first path segment matches the recorded
+   anonymous uid. It does not delete the anonymous originals.
+5. The client rewrites local `storage:` references to the copied paths.
+
+This is the accepted beta implementation. GA can revisit whether the copied
+objects should also be deduped or garbage-collected after a longer retention
+period.
 
 ## Rollout guard
 
@@ -38,8 +64,8 @@ Production must not enable the flag until all of the following are true:
 - Supabase refresh-token reuse interval/settings have been recorded.
 - Q9 has been answered and the Google identity conflict path falls back to an
   existing-account login without showing a dead error page.
-- Anonymous Storage references are converted before switching from the anonymous
-  uid to an existing Google uid.
+- Anonymous Storage references are server-copied and rewritten before the
+  anonymous uid is considered safely merged into an existing Google uid.
 - Supabase Anonymous sign-ins are enabled.
 - Turnstile/CAPTCHA settings are in place or an explicit decision is recorded
   to launch the flag without CAPTCHA.
@@ -61,4 +87,5 @@ Production must not enable the flag until all of the following are true:
 - Confirm handoff restore succeeds across two real browsers with the same uid.
 - Confirm Q6 refresh-token handoff behavior manually before enabling production.
 - Confirm Google link works for a new Google identity.
-- Confirm existing Google identity conflict falls back to the current account-sync path.
+- Confirm existing Google identity conflict falls back to the current account
+  and copies anonymous Storage references without expanding them to `data:` URLs.

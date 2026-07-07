@@ -30,7 +30,10 @@ import {
   isAnonymousAuthEnabled,
   isAnonymousSupabaseUser,
 } from "../../../lib/auth/anonymousAuth";
-import { prepareAnonymousStorageRefsForAccountSwitch } from "../../../lib/auth/anonymousAccountSwitch";
+import {
+  finalizeAnonymousStorageTransfer,
+  prepareAnonymousStorageRefsForAccountSwitch,
+} from "../../../lib/auth/anonymousAccountSwitch";
 import { claimPendingReferral } from "../../../lib/referrals/client";
 import {
   getEmbeddedBrowserInfo,
@@ -374,7 +377,7 @@ export default function AccountCreatePage() {
     trackProductEvent("auth_google_link_fallback_started", {
       route: "/account/create",
       reason,
-      converted_storage_refs: prepared.converted,
+      pending_storage_refs: prepared.pendingPaths,
     });
     window.localStorage.setItem(
       STORAGE_KEYS.authGooglePending,
@@ -474,6 +477,14 @@ export default function AccountCreatePage() {
         startedAt: new Date().toISOString(),
       }),
     );
+    const transfer = await finalizeAnonymousStorageTransfer();
+    if (transfer.copied > 0 || transfer.error) {
+      trackProductEvent("auth_google_anonymous_storage_transfer_completed", {
+        route: "/account/create",
+        copied_storage_refs: transfer.copied,
+        had_error: Boolean(transfer.error),
+      });
+    }
     if (isFromOnboarding) {
       markOnboardingAlbumCompletionReady();
       markOnboardingAlbumCreated(onboardingSource);

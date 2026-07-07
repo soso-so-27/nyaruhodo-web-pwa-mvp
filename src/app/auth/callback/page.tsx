@@ -3,7 +3,10 @@
 import { useEffect, useRef } from "react";
 import { AppLoadingScreen } from "../../../components/loading/AppLoadingScreen";
 import { trackProductEvent } from "../../../lib/analytics/productAnalytics";
-import { prepareAnonymousStorageRefsForAccountSwitch } from "../../../lib/auth/anonymousAccountSwitch";
+import {
+  finalizeAnonymousStorageTransfer,
+  prepareAnonymousStorageRefsForAccountSwitch,
+} from "../../../lib/auth/anonymousAccountSwitch";
 import { purgeAllPhotoSwCache } from "../../../lib/photoSwCache";
 import { STORAGE_KEYS } from "../../../lib/storage";
 import { createBrowserSupabaseClient } from "../../../lib/supabase/browser";
@@ -74,6 +77,15 @@ export default function AuthCallbackPage() {
       return;
     }
 
+    const transfer = await finalizeAnonymousStorageTransfer();
+    if (transfer.copied > 0 || transfer.error) {
+      trackProductEvent("auth_google_anonymous_storage_transfer_completed", {
+        route: "/auth/callback",
+        copied_storage_refs: transfer.copied,
+        had_error: Boolean(transfer.error),
+      });
+    }
+
     const successUrl = new URL(next, window.location.origin);
     successUrl.searchParams.set("auth", "google_success");
     window.location.replace(successUrl.toString());
@@ -95,7 +107,7 @@ async function startExistingGoogleFallback({
   trackProductEvent("auth_google_link_fallback_started", {
     route: "/auth/callback",
     reason,
-    converted_storage_refs: prepared.converted,
+    pending_storage_refs: prepared.pendingPaths,
   });
   window.localStorage.setItem(
     STORAGE_KEYS.authGooglePending,
