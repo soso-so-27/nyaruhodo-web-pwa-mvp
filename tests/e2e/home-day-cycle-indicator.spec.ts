@@ -176,6 +176,145 @@ test.describe("home desk state cycle", () => {
     await expect(page.getByTestId("desk-open-letter")).toHaveCount(1);
   });
 
+  test("restores remote account photos after Google login on an empty PWA install", async ({
+    page,
+  }) => {
+    const userId = "user-restore-empty-pwa";
+    const remoteCatId = "remote-cat-restore";
+    const localCatId = "local-cat-restored";
+    const restoredPhotoUrl = `storage:${userId}/${remoteCatId}/sleeping/restored.jpg`;
+    const now = Date.parse("2026-07-07T09:00:00+09:00");
+
+    await page.addInitScript(
+      ({ accessToken, createdAt, userId }) => {
+        window.localStorage.clear();
+        window.localStorage.setItem(
+          "auth_google_pending",
+          JSON.stringify({
+            provider: "google",
+            route: "/account/create",
+            method: "oauth_redirect",
+            startedAt: new Date(createdAt).toISOString(),
+          }),
+        );
+        window.localStorage.setItem(
+          "nyaruhodo_supabase_auth",
+          JSON.stringify({
+            access_token: accessToken,
+            refresh_token: "test-refresh-token",
+            expires_at: Math.floor(Date.now() / 1000) + 3600,
+            expires_in: 3600,
+            token_type: "bearer",
+            user: {
+              id: userId,
+              aud: "authenticated",
+              role: "authenticated",
+              email: "restore@example.test",
+              app_metadata: {},
+              user_metadata: {},
+            },
+          }),
+        );
+      },
+      {
+        accessToken: "test-access-token",
+        createdAt: now,
+        userId,
+      },
+    );
+
+    await page.route("**/auth/v1/user", async (route) => {
+      await route.fulfill({
+        contentType: "application/json",
+        body: JSON.stringify({
+          id: userId,
+          aud: "authenticated",
+          role: "authenticated",
+          email: "restore@example.test",
+          app_metadata: {},
+          user_metadata: {},
+        }),
+      });
+    });
+    await page.route("**/rest/v1/**", async (route) => {
+      const url = new URL(route.request().url());
+      const table = url.pathname.split("/").pop() ?? "";
+      const rowsByTable: Record<string, unknown[]> = {
+        profiles: [],
+        cats: [
+          {
+            id: remoteCatId,
+            local_cat_id: localCatId,
+            name: "復元ねこ",
+            type_key: null,
+            type_label: null,
+            type_tagline: null,
+            basic_info: {},
+            appearance: {},
+            axis_scores: {},
+            activity_pattern: {},
+            type_scores: {},
+            modifiers: [],
+            onboarding: {},
+            understanding: {},
+            avatar_storage_path: null,
+            home_photo_storage_path: null,
+            home_photo_position: null,
+            local_created_at: new Date(now).toISOString(),
+            local_updated_at: new Date(now).toISOString(),
+            created_at: new Date(now).toISOString(),
+            updated_at: new Date(now).toISOString(),
+          },
+        ],
+        record_logs: [],
+        collection_photos: [],
+        cat_moments: [
+          {
+            id: "remote-moment-restored",
+            local_moment_id: "local-moment-restored",
+            local_cat_id: localCatId,
+            owner_cat_id: remoteCatId,
+            photo_url: restoredPhotoUrl,
+            state: "sleeping",
+            visibility: "shared",
+            delivery_status: "available",
+            source_moment_id: null,
+            metadata: {},
+            captured_at: new Date(now).toISOString(),
+            created_at: new Date(now).toISOString(),
+          },
+        ],
+        cat_moment_deliveries: [],
+        account_local_state: [],
+        account_sync_state: [],
+        product_analytics_events: [],
+        app_events: [],
+      };
+
+      await route.fulfill({
+        contentType: "application/json",
+        body: JSON.stringify(rowsByTable[table] ?? []),
+      });
+    });
+
+    await page.goto("/home?auth=google_success");
+
+    await expect
+      .poll(() =>
+        page.evaluate(() => ({
+          activeCatId: window.localStorage.getItem("active_cat_id"),
+          ownPhotos: JSON.parse(
+            window.localStorage.getItem("nyaruhodo_exchange_own_sleeping_photos") ??
+              "[]",
+          ) as Array<{ src?: string }>,
+        })),
+      )
+      .toMatchObject({
+        activeCatId: localCatId,
+        ownPhotos: [{ src: restoredPhotoUrl }],
+      });
+  });
+
   test("omits motif animation classes when reduced motion is enabled", async ({
     page,
   }) => {

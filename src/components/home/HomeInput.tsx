@@ -689,7 +689,7 @@ export function HomeInput({
     );
 
     const syncResult = await syncLocalDataWithAccount({
-      restoreIfLocalEmpty: false,
+      restoreIfLocalEmpty: true,
     });
     const catGalleryLocalBefore = readCatGalleryPhotos(null).length;
 
