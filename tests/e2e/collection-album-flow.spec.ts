@@ -118,7 +118,7 @@ test.describe("collection album flow", () => {
     await expect(page.getByTestId("mainichi-board-photo-sent")).toHaveCount(1);
   });
 
-  test("shows only the active cat's taken sleeping photos when older photos belong to a previous cat id", async ({
+  test("shows all cats' taken sleeping photos in the shared nekodayori board", async ({
     page,
   }) => {
     const now = Date.now();
@@ -187,10 +187,10 @@ test.describe("collection album flow", () => {
     await page.goto("/collection");
     await page.waitForLoadState("networkidle");
     const firstSentPhoto = page.getByTestId("mainichi-board-photo-sent").first();
-    await expect(page.getByTestId("mainichi-board-photo-sent")).toHaveCount(1);
+    await expect(page.getByTestId("mainichi-board-photo-sent")).toHaveCount(2);
     await expect(firstSentPhoto).not.toHaveAttribute("data-mainichi-paste", "true");
 
-    await expect(page.getByTestId("mainichi-board-photo-sent")).toHaveCount(1);
+    await expect(page.getByTestId("mainichi-board-photo-sent")).toHaveCount(2);
   });
 
   test("shows restored storage sleeping photos alongside latest local photos", async ({

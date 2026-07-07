@@ -1321,7 +1321,6 @@ export function CollectionPage() {
       <PageBackdrop />
       <div style={styles.container}>
         <BoxOverview
-          activeCatId={activeCatId}
           dayGroups={albumDayGroups}
           firstEveningDeliveryTargetDateKey={firstEveningDeliveryTargetDateKey}
           catProfiles={catProfiles}
@@ -1427,7 +1426,6 @@ function PageBackdrop() {
 }
 
 function BoxOverview({
-  activeCatId,
   dayGroups,
   firstEveningDeliveryTargetDateKey,
   catProfiles,
@@ -1436,7 +1434,6 @@ function BoxOverview({
   onOpenMainichiDay,
   onOpenMainichiPhoto,
 }: {
-  activeCatId: string | null;
   dayGroups: AlbumDayGroup[];
   firstEveningDeliveryTargetDateKey: string | null;
   catProfiles: CatProfile[];
@@ -1458,7 +1455,6 @@ function BoxOverview({
   return (
     <section style={styles.boxOverview} aria-label="ねこだより">
       <MainichiPhotoBoard
-        activeCatId={activeCatId}
         dayGroups={dayGroups}
         activeSide={activeBoardSide}
         onSideChange={setActiveBoardSide}
@@ -1474,7 +1470,6 @@ function BoxOverview({
 }
 
 function MainichiPhotoBoard({
-  activeCatId,
   dayGroups,
   activeSide,
   onSideChange,
@@ -1485,7 +1480,6 @@ function MainichiPhotoBoard({
   onOpenDay,
   onOpenPhoto,
 }: {
-  activeCatId: string | null;
   dayGroups: AlbumDayGroup[];
   activeSide: MainichiBoardSide;
   onSideChange: (side: MainichiBoardSide) => void;
@@ -1507,10 +1501,8 @@ function MainichiPhotoBoard({
         activeSide,
         firstEveningDeliveryTargetDateKey,
         catProfiles,
-        activeCatId,
       ),
     [
-      activeCatId,
       activeSide,
       catProfiles,
       dayGroups,
@@ -1528,10 +1520,8 @@ function MainichiPhotoBoard({
         activeSide === "sent" ? "delivered" : "sent",
         firstEveningDeliveryTargetDateKey,
         catProfiles,
-        activeCatId,
       ),
     [
-      activeCatId,
       activeSide,
       catProfiles,
       dayGroups,
@@ -3956,7 +3946,6 @@ function buildMainichiBoardMonths(
   side: MainichiBoardSide,
   firstEveningDeliveryTargetDateKey: string | null,
   catProfiles: CatProfile[],
-  activeCatId: string | null,
 ): MainichiBoardMonth[] {
   const catNameById = new Map(
     catProfiles.map((profile) => [profile.id, getCatName(profile)]),
@@ -3966,13 +3955,9 @@ function buildMainichiBoardMonths(
     const sectionPhotos = group.sections
       .filter((section) => section.kind === sectionKind)
       .flatMap((section) =>
-        section.photos
-          .filter((photo) =>
-            shouldIncludeMainichiBoardPhoto(photo, side, activeCatId),
-          )
-          .map((photo) =>
-            createMainichiBoardPhoto(photo, group.key, side, catNameById),
-          ),
+        section.photos.map((photo) =>
+          createMainichiBoardPhoto(photo, group.key, side, catNameById),
+        ),
       );
 
     if (
@@ -4002,18 +3987,6 @@ function buildMainichiBoardMonths(
       photos: [...monthPhotos].sort((a, b) => b.timestamp - a.timestamp),
     }))
     .sort((a, b) => b.key.localeCompare(a.key));
-}
-
-function shouldIncludeMainichiBoardPhoto(
-  photo: AlbumMomentPhoto,
-  side: MainichiBoardSide,
-  activeCatId: string | null,
-) {
-  if (side !== "sent" || !activeCatId) {
-    return true;
-  }
-
-  return (photo.ownerCatId ?? photo.catId) === activeCatId;
 }
 
 function includeCurrentMainichiMonth(months: MainichiBoardMonth[]) {
