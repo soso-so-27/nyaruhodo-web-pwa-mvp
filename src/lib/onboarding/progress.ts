@@ -1,4 +1,5 @@
 import { STORAGE_KEYS } from "../storage";
+import { getOrCreateAnonymousId } from "../identity/anonymousId";
 import {
   getEveningDeliveryTargetDateKey,
   getJstDateKey,
@@ -228,17 +229,7 @@ export function getOrCreateOnboardingAnonymousId() {
     return "anonymous-unavailable";
   }
 
-  const existing = window.localStorage.getItem(STORAGE_KEYS.analyticsAnonymousId);
-  if (existing) {
-    return existing;
-  }
-
-  const nextId =
-    globalThis.crypto?.randomUUID?.() ??
-    `anonymous-${Date.now()}-${Math.random().toString(16).slice(2)}`;
-
-  window.localStorage.setItem(STORAGE_KEYS.analyticsAnonymousId, nextId);
-  return nextId;
+  return getOrCreateAnonymousId();
 }
 
 export function createOnboardingSubmissionId(

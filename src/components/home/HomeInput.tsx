@@ -8,6 +8,7 @@ import {
   syncLocalDataWithAccount,
 } from "../../lib/accountSync";
 import { trackProductEvent } from "../../lib/analytics/productAnalytics";
+import { getOrCreateAnonymousId } from "../../lib/identity/anonymousId";
 import { purgeAllPhotoSwCache } from "../../lib/photoSwCache";
 import { resizeImageFileToDataUrl } from "../../lib/imageResize";
 import {
@@ -4460,17 +4461,7 @@ async function sendPhotoReport(
 
 function getOrCreateReportAnonymousId() {
   try {
-    const existing = window.localStorage.getItem(STORAGE_KEYS.analyticsAnonymousId);
-    if (existing) {
-      return existing;
-    }
-
-    const nextId =
-      typeof crypto !== "undefined" && "randomUUID" in crypto
-        ? crypto.randomUUID()
-        : `anon-${Date.now()}-${Math.random().toString(16).slice(2)}`;
-    window.localStorage.setItem(STORAGE_KEYS.analyticsAnonymousId, nextId);
-    return nextId;
+    return getOrCreateAnonymousId();
   } catch {
     return `anon-${Date.now()}-${Math.random().toString(16).slice(2)}`;
   }

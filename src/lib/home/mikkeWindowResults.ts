@@ -1,4 +1,4 @@
-import { STORAGE_KEYS } from "../storage";
+import { getOrCreateAnonymousId } from "../identity/anonymousId";
 import { createBrowserSupabaseClient } from "../supabase/browser";
 import type {
   MikkeWindow,
@@ -74,17 +74,4 @@ export async function fetchMikkeWindowCounts(
     answerLabel: row.answer_label,
     count: row.answer_count,
   }));
-}
-
-function getOrCreateAnonymousId() {
-  const existing = window.localStorage.getItem(STORAGE_KEYS.analyticsAnonymousId);
-  if (existing) {
-    return existing;
-  }
-
-  const nextId =
-    window.crypto?.randomUUID?.() ??
-    `anon-${Date.now()}-${Math.random().toString(16).slice(2)}`;
-  window.localStorage.setItem(STORAGE_KEYS.analyticsAnonymousId, nextId);
-  return nextId;
 }

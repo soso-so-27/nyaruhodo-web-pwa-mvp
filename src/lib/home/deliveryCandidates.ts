@@ -7,7 +7,7 @@ import {
 } from "./sleepingPhotos";
 import { getStoragePhotoPath } from "../photoStorage";
 import { createBrowserSupabaseClient } from "../supabase/browser";
-import { STORAGE_KEYS } from "../storage";
+import { getOrCreateAnonymousId } from "../identity/anonymousId";
 
 type RemoteStockResponse = {
   photo?: ExchangePhotoPoolItem | null;
@@ -227,21 +227,6 @@ export async function readSleepingDeliveryDiagnostics() {
   } catch {
     return null;
   }
-}
-
-function getOrCreateAnonymousId() {
-  const existing = window.localStorage.getItem(STORAGE_KEYS.analyticsAnonymousId);
-
-  if (existing) {
-    return existing;
-  }
-
-  const nextId =
-    globalThis.crypto?.randomUUID?.() ??
-    `anonymous-${Date.now()}-${Math.random().toString(16).slice(2)}`;
-
-  window.localStorage.setItem(STORAGE_KEYS.analyticsAnonymousId, nextId);
-  return nextId;
 }
 
 function readBlockedExchangePhotoIdList() {

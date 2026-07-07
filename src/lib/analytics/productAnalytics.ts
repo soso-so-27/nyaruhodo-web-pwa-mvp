@@ -1,4 +1,5 @@
 import { STORAGE_KEYS, readCachedJson, writeCachedJson } from "../storage";
+import { getOrCreateAnonymousId } from "../identity/anonymousId";
 import { createBrowserSupabaseClient } from "../supabase/browser";
 
 const SESSION_TIMEOUT_MS = 30 * 60 * 1000;
@@ -205,17 +206,6 @@ function isProductAnalyticsSource(
     value === "pwa" ||
     value === "unknown"
   );
-}
-
-function getOrCreateAnonymousId() {
-  const existing = window.localStorage.getItem(STORAGE_KEYS.analyticsAnonymousId);
-  if (existing) {
-    return existing;
-  }
-
-  const nextId = createId();
-  window.localStorage.setItem(STORAGE_KEYS.analyticsAnonymousId, nextId);
-  return nextId;
 }
 
 function getOrCreateSessionId() {
