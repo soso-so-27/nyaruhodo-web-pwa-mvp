@@ -123,6 +123,10 @@
 
 ## 追補（2026-07-07・screen-flows.md 作成時に判明）
 
+### 解消: P1-4（admin-secretタスクのrate limit）
+`ed61dd5 Rate limit admin secret maintenance tasks` により `src/lib/server/adminTaskRateLimit.ts` が
+新設され、cleanup / backfill の両routeに適用された（同コミットのdiff参照）。→ P1-4 はクローズ。
+
 ### 解消: P0-2（cron TZ）
 `docs/PROD-OPERATIONS.md`「Cron time zone note」（2026-07-07追記）により、`30 18 * * *` = UTC
 （JST 03:30）が**意図された深夜GC窓**であることが文書化された。運用理解とコードの乖離は解消。
@@ -164,9 +168,9 @@
 ### 更新後サマリ
 
 - P0: **1**（P0-1 退会削除の取りこぼし。P0-2はクローズ）
-- P1: **5**（+P1-5 退会UI未配線）
+- P1: **4**（+P1-5 退会UI未配線 / P1-4は `ed61dd5` でクローズ）
 - P2: **8**（+P2-6〜P2-8）
-- 合計: **14（うちクローズ1）**
+- 合計: **14（うちクローズ2・オープン12）**
 
 補足: これらは「地図を描いて初めて見えた構造」に限定。個別APIのバリデーション等の細部は
 `feature-inventory.md` / `data-flows.md` の出典に委ね、ここには挙げていない。
