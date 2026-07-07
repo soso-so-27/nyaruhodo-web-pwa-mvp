@@ -58,6 +58,22 @@ Remote database is up to date.
 - 復元可能性
 - 再発防止
 
+## 配達保証・安全設計の原則（2026-07-07 正式収載）
+
+旧「事業方針v2.0 §9 配達保証／§17 安全設計」はリポジトリ外の文書で原本が失われている。
+spec-v1.3が依拠する原則を、ここに正式に収載する（docs監査 B10対応）。
+
+- **配達保証**: 候補は Tier1（当日の一般投稿）→ Tier2（過去在庫）→ Tier3（運営シード）の順で
+  選び、フォールバックで一日一通を絶やさない。再配達・シードであることは
+  レスポンス・UI・通知のいずれにも表出させない。
+- **安全設計**: 新規投稿は `pending` デフォルトで、approveされるまで配達プールに乗らない。
+  rejectは投稿者に通知せず、本人のアルバムからも奪わない。
+- **運用指標**: 日次供給/需要比は `/api/sleeping-delivery/diagnostics` と下記の
+  週次プールヘルスチェックで観測する。
+- **人質回避**（損失煽り・引き止めの禁止）は `AGENTS.md`「Product principles」が正。
+- 審査者向けの要約は `docs/MODERATION-CANON.md` §4.5。配達順序の実装詳細の正は
+  `docs/specs/spec-v1.3.md` §3。
+
 ## Weekly pool health check
 
 Run this read-only query before public campaigns and at least weekly during beta:
