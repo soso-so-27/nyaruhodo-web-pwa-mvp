@@ -154,6 +154,8 @@ export async function createOnboardingHandoffPayload(
 }
 
 async function getHandoffSessionPayload() {
+  // Session handoff is only allowed while the anonymous-auth experiment is
+  // explicitly enabled. Legacy handoff carries local data, never auth tokens.
   if (!isAnonymousAuthEnabled()) {
     return null;
   }

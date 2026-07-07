@@ -16,7 +16,11 @@ const MAX_DATA_URL_BYTES = 3 * 1024 * 1024;
 const MAX_DEPTH = 8;
 const MAX_ARRAY_ITEMS = 80;
 const MAX_OBJECT_KEYS = 80;
-const HANDOFF_EXPIRES_MS = 24 * 60 * 60 * 1000;
+const HANDOFF_EXPIRES_MS = 2 * 60 * 60 * 1000;
+const RATE_LIMIT_WINDOW_MS = 60 * 60 * 1000;
+const RATE_LIMIT_MAX_REQUESTS = 10;
+const RATE_LIMIT_MAX_BUCKETS = 500;
+const rateLimitBuckets = new Map<string, { count: number; resetAt: number }>();
 
 type CreateHandoffBody = {
   payload?: unknown;
@@ -24,6 +28,13 @@ type CreateHandoffBody = {
 };
 
 export async function POST(request: Request) {
+  if (!checkHandoffCreateRateLimit(request)) {
+    return NextResponse.json(
+      { ok: false, error: "rate_limited" },
+      { status: 429 },
+    );
+  }
+
   const supabase = createSupabaseAdminClient();
 
   if (!supabase) {
@@ -197,6 +208,7 @@ async function persistDataUrls({
 }
 
 function createHandoffToken() {
+  // randomUUID plus 18 crypto-random bytes keeps handoff URLs unguessable.
   const random = crypto.getRandomValues(new Uint8Array(18));
   const suffix = Array.from(random, (byte) =>
     byte.toString(16).padStart(2, "0"),
@@ -221,4 +233,48 @@ function getJsonByteLength(value: unknown) {
 
 function getUtf8ByteLength(value: string) {
   return new TextEncoder().encode(value).byteLength;
+}
+
+function checkHandoffCreateRateLimit(request: Request) {
+  const key = readClientIp(request);
+  const now = Date.now();
+  pruneRateLimitBuckets(now);
+
+  const existing = rateLimitBuckets.get(key);
+  const bucket =
+    existing && existing.resetAt > now
+      ? existing
+      : { count: 0, resetAt: now + RATE_LIMIT_WINDOW_MS };
+
+  bucket.count += 1;
+  rateLimitBuckets.set(key, bucket);
+
+  return bucket.count <= RATE_LIMIT_MAX_REQUESTS;
+}
+
+function readClientIp(request: Request) {
+  return (
+    request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ||
+    request.headers.get("x-real-ip") ||
+    "unknown"
+  );
+}
+
+function pruneRateLimitBuckets(now: number) {
+  for (const [key, bucket] of rateLimitBuckets) {
+    if (bucket.resetAt <= now) {
+      rateLimitBuckets.delete(key);
+    }
+  }
+
+  if (rateLimitBuckets.size <= RATE_LIMIT_MAX_BUCKETS) {
+    return;
+  }
+
+  for (const key of rateLimitBuckets.keys()) {
+    rateLimitBuckets.delete(key);
+    if (rateLimitBuckets.size <= RATE_LIMIT_MAX_BUCKETS) {
+      break;
+    }
+  }
 }
