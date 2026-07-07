@@ -6,6 +6,7 @@ import {
   toStoragePhotoUrl,
   uploadDataUrl,
 } from "./photoStorage";
+import { ensureAnonymousSession } from "./auth/anonymousAuth";
 import { createBrowserSupabaseClient } from "./supabase/browser";
 
 export async function storeAccountPhotoDataUrl({
@@ -29,7 +30,11 @@ export async function storeAccountPhotoDataUrl({
 
   try {
     const { data } = await supabase.auth.getUser();
-    const userId = data.user?.id;
+    let userId = data.user?.id;
+
+    if (!userId) {
+      userId = (await ensureAnonymousSession("photo_store"))?.userId;
+    }
 
     if (!userId) {
       return dataUrl;

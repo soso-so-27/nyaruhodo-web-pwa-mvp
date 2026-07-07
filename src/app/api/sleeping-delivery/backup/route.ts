@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { createClient } from "@supabase/supabase-js";
 
 import {
   getDataUrlExtension,
@@ -9,6 +10,7 @@ import {
   uploadDataUrl,
 } from "../../../../lib/photoStorage";
 import { createSupabaseAdminClient } from "../../../../lib/supabase/admin";
+import { getSupabasePublicConfig } from "../../../../lib/supabase/config";
 import { createServerSupabaseClient } from "../../../../lib/supabase/server";
 import {
   ownSleepingPhotoToCatMoment,
@@ -49,10 +51,7 @@ export async function POST(request: Request) {
     );
   }
 
-  const serverSupabase = await createServerSupabaseClient();
-  const { data } = serverSupabase
-    ? await serverSupabase.auth.getUser().catch(() => ({ data: { user: null } }))
-    : { data: { user: null } };
+  const data = await getRequestUser(request);
   const userId = data.user?.id ?? null;
   const anonymousId = userId ? null : normalizeAnonymousId(body?.anonymousId);
 
@@ -156,6 +155,38 @@ export async function POST(request: Request) {
   }
 
   return NextResponse.json({ ok: true });
+}
+
+async function getRequestUser(request: Request) {
+  const bearerToken = getBearerToken(request);
+  const config = getSupabasePublicConfig();
+
+  if (bearerToken && config) {
+    const authSupabase = createClient(config.url, config.anonKey, {
+      auth: {
+        autoRefreshToken: false,
+        persistSession: false,
+      },
+    });
+    const { data } = await authSupabase.auth
+      .getUser(bearerToken)
+      .catch(() => ({ data: { user: null } }));
+    return data;
+  }
+
+  const serverSupabase = await createServerSupabaseClient();
+  const { data } = serverSupabase
+    ? await serverSupabase.auth.getUser().catch(() => ({ data: { user: null } }))
+    : { data: { user: null } };
+
+  return data;
+}
+
+function getBearerToken(request: Request) {
+  const authorization = request.headers.get("authorization") ?? "";
+  const match = authorization.match(/^Bearer\s+(.+)$/i);
+
+  return match?.[1]?.trim() || null;
 }
 
 function normalizeBackupPhoto(

@@ -26,6 +26,10 @@ import {
   type OnboardingSource,
 } from "../../../lib/onboarding/progress";
 import { createOnboardingHandoff } from "../../../lib/onboarding/handoff";
+import {
+  isAnonymousAuthEnabled,
+  isAnonymousSupabaseUser,
+} from "../../../lib/auth/anonymousAuth";
 import { claimPendingReferral } from "../../../lib/referrals/client";
 import {
   getEmbeddedBrowserInfo,
@@ -196,7 +200,7 @@ export default function AccountCreatePage() {
         return;
       }
 
-      if (!error && data.user) {
+      if (!error && data.user && !isAnonymousSupabaseUser(data.user)) {
         setIsAccountConnected(true);
         setConnectedEmail(data.user.email ?? "");
       }
@@ -301,15 +305,33 @@ export default function AccountCreatePage() {
         : "/home",
     });
 
-    const { error } = await supabase.auth.signInWithOAuth({
-      provider: "google",
-      options: {
-        redirectTo,
-        queryParams: {
-          prompt: "select_account",
-        },
-      },
-    });
+    const { data: sessionData } = await supabase.auth.getSession();
+    const shouldLinkIdentity =
+      isAnonymousAuthEnabled() &&
+      isAnonymousSupabaseUser(sessionData.session?.user);
+    const authWithLinkIdentity = supabase.auth as typeof supabase.auth & {
+      linkIdentity?: typeof supabase.auth.signInWithOAuth;
+    };
+    const { error } =
+      shouldLinkIdentity && typeof authWithLinkIdentity.linkIdentity === "function"
+        ? await authWithLinkIdentity.linkIdentity({
+            provider: "google",
+            options: {
+              redirectTo,
+              queryParams: {
+                prompt: "select_account",
+              },
+            },
+          })
+        : await supabase.auth.signInWithOAuth({
+            provider: "google",
+            options: {
+              redirectTo,
+              queryParams: {
+                prompt: "select_account",
+              },
+            },
+          });
 
     if (error) {
       writeAuthDebugEvent("oauth_redirect_failed", {

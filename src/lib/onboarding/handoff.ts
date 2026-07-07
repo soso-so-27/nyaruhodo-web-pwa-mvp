@@ -4,12 +4,17 @@ import {
   type CatProfile,
 } from "../../components/home/homeInputHelpers";
 import {
+  ensureAnonymousSession,
+  isAnonymousAuthEnabled,
+} from "../auth/anonymousAuth";
+import {
   readAllOwnSleepingPhotos,
   restoreSyncedSleepingPhotos,
   type ExchangePhoto,
   type OwnSleepingPhoto,
 } from "../home/sleepingPhotos";
 import { STORAGE_KEYS, removeCachedJson, writeCachedJson } from "../storage";
+import { createBrowserSupabaseClient } from "../supabase/browser";
 import {
   markOnboardingAlbumCreated,
   normalizeOnboardingSource,
@@ -33,6 +38,10 @@ export type OnboardingHandoffPayload = {
   ownSleepingPhotos: OwnSleepingPhoto[];
   keptExchangePhotos: ExchangePhoto[];
   pendingReferralCode: string | null;
+  session?: {
+    accessToken: string;
+    refreshToken: string;
+  } | null;
 };
 
 export type CreateOnboardingHandoffResult = {
@@ -48,7 +57,8 @@ export async function createOnboardingHandoff({
   source: OnboardingSource;
   markCompleted?: boolean;
 }): Promise<CreateOnboardingHandoffResult> {
-  const payload = createOnboardingHandoffPayload(source, markCompleted);
+  await ensureAnonymousSession("handoff_create");
+  const payload = await createOnboardingHandoffPayload(source, markCompleted);
   const response = await fetch("/api/onboarding/handoff/create", {
     method: "POST",
     headers: {
@@ -105,13 +115,13 @@ export async function redeemOnboardingHandoff(token: string) {
     throw new Error(result?.error ?? "handoff_redeem_failed");
   }
 
-  return restoreOnboardingHandoffPayload(result.payload);
+  return restoreOnboardingHandoffPayloadWithSession(result.payload);
 }
 
-export function createOnboardingHandoffPayload(
+export async function createOnboardingHandoffPayload(
   source: OnboardingSource,
   markCompleted = false,
-): OnboardingHandoffPayload {
+): Promise<OnboardingHandoffPayload> {
   const onboardingProgress = readOnboardingProgress();
   const nextOnboardingProgress =
     markCompleted && onboardingProgress
@@ -139,6 +149,29 @@ export function createOnboardingHandoffPayload(
       nextOnboardingProgress,
       source,
     ),
+    session: await getHandoffSessionPayload(),
+  };
+}
+
+async function getHandoffSessionPayload() {
+  if (!isAnonymousAuthEnabled()) {
+    return null;
+  }
+
+  const supabase = createBrowserSupabaseClient();
+  if (!supabase) {
+    return null;
+  }
+
+  const { data } = await supabase.auth.getSession();
+  const session = data.session;
+  if (!session?.access_token || !session.refresh_token) {
+    return null;
+  }
+
+  return {
+    accessToken: session.access_token,
+    refreshToken: session.refresh_token,
   };
 }
 
@@ -230,6 +263,27 @@ export function restoreOnboardingHandoffPayload(payload: unknown) {
   };
 }
 
+export async function restoreOnboardingHandoffPayloadWithSession(payload: unknown) {
+  if (!isOnboardingHandoffPayload(payload)) {
+    throw new Error("invalid_handoff_payload");
+  }
+
+  if (payload.session?.accessToken && payload.session.refreshToken) {
+    const supabase = createBrowserSupabaseClient();
+    const { error } =
+      (await supabase?.auth.setSession({
+        access_token: payload.session.accessToken,
+        refresh_token: payload.session.refreshToken,
+      })) ?? { error: null };
+
+    if (error) {
+      throw new Error("handoff_session_restore_failed");
+    }
+  }
+
+  return restoreOnboardingHandoffPayload(payload);
+}
+
 function getRestoredKeptExchangePhotos(
   payload: OnboardingHandoffPayload,
 ): ExchangePhoto[] {
@@ -287,6 +341,11 @@ function isOnboardingHandoffPayload(
     Array.isArray(payload.keptExchangePhotos) &&
     typeof payload.onboardingCompleted === "boolean" &&
     (typeof payload.pendingReferralCode === "string" ||
-      payload.pendingReferralCode === null)
+      payload.pendingReferralCode === null) &&
+    (payload.session === undefined ||
+      payload.session === null ||
+      (typeof payload.session === "object" &&
+        typeof payload.session.accessToken === "string" &&
+        typeof payload.session.refreshToken === "string"))
   );
 }
