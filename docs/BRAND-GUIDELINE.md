@@ -1,7 +1,7 @@
-# BRAND-GUIDELINE.md — ねてるねこ ブランドガイドライン v0.9
+# BRAND-GUIDELINE.md — ねてるねこ ブランドガイドライン v1.0
 
 作成日: 2026-07-07
-状態: ドラフト。最終確定は中西レビュー後に v1.0 とする。
+状態: v1.0。中西レビュー反映済み。
 
 この文書は、新しい制作物（投稿、LP、資料、グッズ、プレス、外部向け説明）を作る人が最初に読む入口である。詳細な正典は各CANONに置き、本書は索引と、制作時に迷いやすい判断だけを持つ。
 
@@ -37,22 +37,31 @@
 
 ## 2. 名前
 
+### 三層構造
+
+| 層 | 表記 | 扱い |
+|---|---|---|
+| 事業主体の屋号 | `にゃるほど` / `nyaruhodo` | ユーザー向け画面では原則出さない。法務ページ、団体向け資料、ドメイン、リポジトリ名、Vercel URL、Supabase project など、主体・技術識別子として必要な場所に限る。 |
+| サービス名 | `ねてるねこ` / `neteruneko` | ユーザーが見る全表記の主体。公開ブランド名はひらがな `ねてるねこ` 固定。英字表記 `neteruneko` は公式の公開ブランド表記。 |
+| 機能名 | `ねこだより`, `ねがお`, `うちのこ`, `まいにち` など | §4の語彙ロック表と同じ層。サービス名の代替にせず、体験内の具体的な機能・場所を指す。 |
+
 ### 基本表記
 
 - 公開ブランド名は `ねてるねこ`。ひらがな固定。
 - 文章の中では、原則としてカギ括弧を付けずに `ねてるねこ` と書く。
-- アプリ名を英字にする必要がある場合の暫定表記は `neteruneko`。これは現行のファイル名、storage key、設計文書で使われている実態に合わせたもの。
+- 英字表記は `neteruneko`。公開ブランドとして正式に使ってよい。
 
 ### 旧名・技術名
 
-- `にゃるほど` は旧プロダクト/旧設計文脈。現行ブランドのコピーには使わない。
-- `nyaruhodo` は現在もリポジトリ名、Vercel URL、Supabase project、`nyaruhodo.jp` ドメインに残る技術・URL上の識別子。ブランド表記としては使わない。
+- `にゃるほど` / `nyaruhodo` は事業主体の屋号・技術識別子。ユーザー向け画面では原則出さず、法務ページとドメインなど必要な場所に限る。
+- `nyaruhodo` は現在もリポジトリ名、Vercel URL、Supabase project、`nyaruhodo.jp` ドメインに残る技術・URL上の識別子。サービス名の代替としては使わない。
 - ドメインを示すときは `nyaruhodo.jp` のようにURLとして扱い、ブランド名の代替にしない。
 
-### 未確定
+### 外部説明の書式
 
-- 英字ロゴや海外向け表記として `neteruneko` を正式採用するかは未確定。現時点では内部slugとして扱う。
-- `ニャるほど` 表記は今回の棚卸では現行原典に見当たらず、旧名としても `にゃるほど` 表記が多い。
+- 通常の投稿、LP、アプリ画面、プレス見出しでは `ねてるねこ` 単独で書く。
+- 法務ページ・団体向け資料など、運営主体を明記する必要がある場所だけ `にゃるほど（屋号）が運営する「ねてるねこ」` と書く。
+- `ニャるほど` 表記は今回の棚卸では現行原典に見当たらず、ブランド表記として使わない。
 
 ## 3. 声（Voice）
 
@@ -127,23 +136,25 @@
 
 原典: `docs/design/DESIGN-CANON.md`, `docs/design/neteruneko-design-tokens-v2.md`, `src/app/layout.tsx`, `src/app/tokens.css`。
 
-現行実装:
+2026-07-07確定:
 
-- 表示用: `--font-display: var(--font-klee-one), "Klee One", sans-serif`
-- UI本文: `--font-ui: var(--font-zen-kaku), "Zen Kaku Gothic New", -apple-system, "Hiragino Sans", sans-serif`
-- 汎用sans: `--font-sans: -apple-system, "Hiragino Sans", sans-serif`
+- ブランドの公式本文書体は、設定ページ本文が継承している `--font-ui` とする。
+- 実値: `--font-ui: var(--font-zen-kaku), "Zen Kaku Gothic New", -apple-system, "Hiragino Sans", sans-serif`
+- 表示・見出し用: `--font-display: var(--font-klee-one), "Klee One", sans-serif`
 - local font: `klee-one-400/600-subset.woff2`, `zen-kaku-gothic-new-400/500-subset.woff2`
+- 根拠: `src/app/globals.css` の `body { font-family: var(--font-ui) }` と `src/app/tokens.css` の `--font-ui`。`SettingsPage.tsx` は本文書体を個別指定せず、bodyから継承している。
 
 使い分け:
 
-- 見出し、日付、短いラベル、封筒まわりの言葉は `--font-display` を使う。
-- 設定、法務、説明文、管理画面は `--font-ui` を使う。
+- 設定、法務、説明文、管理画面、長めの本文は `--font-ui` を使う。
+- 見出し、日付、短いラベル、封筒まわりの短い言葉は `--font-display` を使ってよい。
 - 数字は誇示しない。必要な数値は情報として静かに置く。
 - 太字で押さない。間、余白、字間、紙面の位置で強弱を作る。
 
 注意:
 
-- `docs/design/DESIGN-CANON.md` と `docs/design/neteruneko-design-tokens-v2.md` は「明朝+字間」を原則としているが、現行実装は `Klee One` と `Zen Kaku Gothic New` に寄っている。これは矛盾リストに残す。
+- `docs/design/DESIGN-CANON.md` 側の旧「明朝+字間」決定は、2026-07-07に設定ページ書体（`Zen Kaku Gothic New`）へ差し替え確定。
+- 実装の書体は変更しない。現状を正とする。
 
 ## 7. 意匠モチーフ
 
@@ -246,28 +257,27 @@
 
 改訂権限は中西のみ。制作物を作る人は、本書にない判断を新しく発明せず、必要なら矛盾・未決として記録する。
 
-## 11. 矛盾・表記ゆれ（未修正）
+## 11. 残る矛盾・表記ゆれ（未修正）
 
-今回の棚卸で見つけたもの。ここでは直さない。
+今回の棚卸で見つけたもののうち、v1.0で未解消のもの。ここでは直さない。
 
-1. `Shippori Mincho` という要求・会話上の前提に対し、現行実装は `Klee One` と `Zen Kaku Gothic New`。一方、`docs/design/DESIGN-CANON.md` と `docs/design/neteruneko-design-tokens-v2.md` は「明朝+字間」を原則としている。
-2. `docs/design/neteruneko-design-tokens-v2.md` は `--font-serif` を定義しているが、現行 `src/app/tokens.css` には `--font-serif` がなく、実装側に一部 `var(--font-serif)` 参照が残る。
-3. `--seal` は「点と文字だけ。面に塗らない」とされるが、実装内には `background: var(--seal)` や `color-mix(... var(--seal) ...)` の面利用が複数残る。
-4. `docs/specs/neteruneko-home-mainichi-v1.md` は「手紙」という語を使わないとする一方、`docs/lp-copy-v1.0.md` では「一通」「封筒」文脈で手紙メタファーに近い説明を使う。現行の外向き語彙としては `ねこだより` と `一通` を優先する。
-5. `docs/marketing/MARKETING-CANON.md` v0.1 と `docs/MARKETING-CANON.md` v0.2 が併存している。v0.2を優先するが、旧版が検索に引っかかる。
-6. `にゃるほど` 系文書、`nyaruhodo` 系技術識別子、`ねてるねこ` ブランドが併存している。外向きブランドは `ねてるねこ` に固定する。
-7. `FEATURE-IDEAS` というファイル名は今回の棚卸では見つからなかった。近い役割は `docs/ROADMAP.md`, `docs/decisions.md`, `docs/specs/neteruneko-home-mainichi-v1.md`, `docs/neteruneko-business-strategy-v1.2.md` に分散している。
+1. `--seal` は「点と文字だけ。面に塗らない」とされるが、実装内には `background: var(--seal)` や `color-mix(... var(--seal) ...)` の面利用が複数残る。
+2. `docs/specs/neteruneko-home-mainichi-v1.md` は「手紙」という語を使わないとする一方、`docs/lp-copy-v1.0.md` では「一通」「封筒」文脈で手紙メタファーに近い説明を使う。現行の外向き語彙としては `ねこだより` と `一通` を優先する。
+3. `docs/marketing/MARKETING-CANON.md` v0.1 と `docs/MARKETING-CANON.md` v0.2 が併存している。v0.2を優先するが、旧版が検索に引っかかる。
+4. `にゃるほど` 系文書、`nyaruhodo` 系技術識別子、`ねてるねこ` ブランドが併存している。外向きブランドは `ねてるねこ` に固定する。
+5. `FEATURE-IDEAS` というファイル名は今回の棚卸では見つからなかった。近い役割は `docs/ROADMAP.md`, `docs/decisions.md`, `docs/specs/neteruneko-home-mainichi-v1.md`, `docs/neteruneko-business-strategy-v1.2.md` に分散している。
 
-## 12. 中西判断が必要な未決
+## 12. v1.0で確定したこと
 
-1. 英字表記 `neteruneko` を公開ブランドとして正式採用するか、内部slugに留めるか。
-2. `nyaruhodo.jp` とブランド名 `ねてるねこ` の関係を、外部資料でどう説明するか。
-3. 明朝原則を復活させるのか、現行の `Klee One` をブランド書体として確定するのか。
-4. `--seal` の面利用を全面禁止に戻すのか、CTAなどの例外をCANON化するのか。
-5. `FEATURE-IDEAS` 相当の「作らないものリスト」をどのファイルに一本化するか。
+1. 英字表記 `neteruneko` は公式の公開ブランド表記とする。
+2. `nyaruhodo` は屋号・ドメイン・技術slugに限定する。
+3. 外部説明は、法務ページ・団体向け資料のみ `にゃるほど（屋号）が運営する「ねてるねこ」` とし、その他は `ねてるねこ` 単独とする。
+4. ブランドの公式本文書体は、設定ページ本文が使う `--font-ui` = `Zen Kaku Gothic New` とする。
+5. 実装の書体は変更せず、現状を正とする。
 
 ---
 
 改訂履歴:
 
+- v1.0 (2026-07-07): 英字表記 `neteruneko`、`nyaruhodo` の扱い、公式本文書体 `Zen Kaku Gothic New` を中西レビューで確定。
 - v0.9 (2026-07-07): 既存CANON、design docs、LP、運用、事業方針、実装トークンの棚卸から初版ドラフトを作成。

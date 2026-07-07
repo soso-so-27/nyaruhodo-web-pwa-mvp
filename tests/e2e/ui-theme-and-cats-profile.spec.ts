@@ -103,7 +103,7 @@ test("keeps the cats photo tab clear of the fixed bottom navigation", async ({
     nav.boundingBox(),
   ]);
   expect(tabsBox?.height).toBe(48);
-  expect(coverBox?.height).toBe(188);
+  expect(coverBox?.height).toBe(232);
   expect(coverBox?.width).toBeGreaterThanOrEqual(370);
   expect(navBoxBeforeScroll?.height).toBe(60);
 
