@@ -14,9 +14,12 @@ export const dynamic = "force-dynamic";
 
 const DEFAULT_LIMIT = 50;
 const MAX_LIMIT = 50;
+const DEFAULT_SCAN_LIMIT = 250;
+const MAX_SCAN_LIMIT = 250;
 
 type BackfillRequest = {
   limit?: unknown;
+  scanLimit?: unknown;
 };
 
 type CatMomentDataUrlRow = {
@@ -40,12 +43,13 @@ export async function POST(request: Request) {
 
   const body = (await request.json().catch(() => null)) as BackfillRequest | null;
   const limit = normalizeLimit(body?.limit);
+  const scanLimit = normalizeScanLimit(body?.scanLimit);
   const { data, error } = await supabase
     .from("cat_moments")
     .select("id, photo_url")
     .like("photo_url", "data:%")
     .order("created_at", { ascending: true })
-    .limit(limit);
+    .limit(scanLimit);
 
   if (error) {
     return NextResponse.json(
@@ -60,6 +64,10 @@ export async function POST(request: Request) {
   const failures: Array<{ id: string; reason: string }> = [];
 
   for (const row of rows) {
+    if (updated >= limit) {
+      break;
+    }
+
     const validation = validateOwnPhotoSrc(row.photo_url);
     if (!validation.ok) {
       skipped += 1;
@@ -111,6 +119,8 @@ export async function POST(request: Request) {
 
   console.info("[admin/storage-hardening/backfill-cat-moments] completed", {
     scanned: rows.length,
+    updateLimit: limit,
+    scanLimit,
     updated,
     skipped,
     remainingCatMomentDataUrlCount,
@@ -120,6 +130,8 @@ export async function POST(request: Request) {
   return NextResponse.json({
     ok: true,
     scanned: rows.length,
+    updateLimit: limit,
+    scanLimit,
     updated,
     skipped,
     remainingCatMomentDataUrlCount: remainingCatMomentDataUrlCount ?? null,
@@ -135,4 +147,13 @@ function normalizeLimit(value: unknown) {
   }
 
   return DEFAULT_LIMIT;
+}
+
+function normalizeScanLimit(value: unknown) {
+  const limit = Number(value);
+  if (Number.isFinite(limit) && limit > 0) {
+    return Math.min(MAX_SCAN_LIMIT, Math.floor(limit));
+  }
+
+  return DEFAULT_SCAN_LIMIT;
 }
