@@ -566,3 +566,19 @@ The canonical home opened-state spec is `docs/specs/opening-flow-v2.md`.
 Opened home must render the normal `desk-home-frame`; `home-stamp-pair` and
 `home-stamp-pair-stamp` must remain absent. Older StampPair/state4 wording in
 historical sections below is not canonical.
+
+# Canon Supersession Note (2026-07-07, docs-audit bin 2)
+
+- `docs/specs/ig-post-draft-skill-v1.0.md` is a deprecated duplicate stub; the
+  canonical skill spec is `docs/specs/ig-post-draft-skill-spec-v1.0.md` (v1.1,
+  now referencing MARKETING-CANON v0.2 and phases P2.5/P2.9/P3).
+- Home copy / tab-name canon: `docs/specs/neteruneko-home-mainichi-v1.md` §1 +
+  `docs/BRAND-GUIDELINE.md` §4. Current tab labels: きょう / ねこだより / うちのこ.
+  The state2 17:00 waiting line is removed (E2E-guarded); older wording in
+  `docs/specs/ux-ui-design-v1.1.md` §0/§2 is deprecated by its header note.
+- Token names/values: `src/app/tokens.css` is the single source;
+  `docs/design/neteruneko-design-tokens-v2.md` no longer restates values.
+- The phantom 事業方針v2.0 §9/§17 principles are formally recorded in
+  `docs/PROD-OPERATIONS.md`「配達保証・安全設計の原則」.
+- 「切手」 is banned at every layer (FEATURE-IDEAS §語彙の改定); `/prototypes`
+  routes are gated out of production builds.
