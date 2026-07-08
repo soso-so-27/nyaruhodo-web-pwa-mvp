@@ -816,7 +816,7 @@ export function HomeDeskModel({
                         ...(hasSplitTrayActions ? deskStyles.notificationTitleSplit : {}),
                       }}
                     >
-                      とどいた思い出
+                      思い出が、とどきました
                     </span>
                     <span
                       style={{

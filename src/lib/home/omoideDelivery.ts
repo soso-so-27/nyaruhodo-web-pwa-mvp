@@ -210,6 +210,7 @@ export function trackOmoideMemoryDismissed(
   memory: OmoideMemory,
   source: OmoideOpenSource,
 ) {
+  // Means closing the viewer / returning to the omoide box; event name is kept for analytics continuity.
   trackProductEvent("omoide_dismissed", { source }, { localCatId: memory.catId });
 }
 

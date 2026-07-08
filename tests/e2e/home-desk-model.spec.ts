@@ -746,7 +746,7 @@ test.describe("home desk model", () => {
     await page.waitForLoadState("networkidle");
     const bunbako = page.getByTestId("omoide-bunbako");
     await expect(bunbako).toBeVisible();
-    await expect(bunbako.getByText("とどいた思い出")).toBeVisible();
+    await expect(bunbako.getByText("思い出箱")).toBeVisible();
     await expect(bunbako.getByText("1週間前の、きょう。")).toBeVisible();
   });
 });

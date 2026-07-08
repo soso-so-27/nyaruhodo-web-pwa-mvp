@@ -709,7 +709,7 @@ test("keeps the record tab sections in the intended order", async ({ page }) => 
 
   const celebrationIndex = sectionOrder.indexOf("記念");
   const footprintIndex = sectionOrder.indexOf("足あと");
-  const memoryIndex = sectionOrder.indexOf("とどいた思い出");
+  const memoryIndex = sectionOrder.indexOf("思い出箱");
   const yearIndex = sectionOrder.indexOf("年ごと");
 
   expect(celebrationIndex).toBeGreaterThanOrEqual(0);

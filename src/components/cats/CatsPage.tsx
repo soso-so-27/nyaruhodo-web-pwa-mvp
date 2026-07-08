@@ -1654,7 +1654,7 @@ export function CatsPage() {
                   </span>
                 </div>
                 <div style={styles.recordRow}>
-                  <span style={styles.recordLabel}>とどいた思い出</span>
+                  <span style={styles.recordLabel}>思い出箱</span>
                   <span style={styles.recordMetricValue}>
                     {omoideMemories.length}通
                   </span>
@@ -3814,7 +3814,7 @@ function OmoideBunbako({
       <div style={styles.bunbakoHeader}>
         <h2 id="cats-omoide-heading" style={styles.recordBlockTitle}>
           <span style={styles.recordBlockTitleMark} aria-hidden="true" />
-          とどいた思い出
+          思い出箱
         </h2>
       </div>
       {memories.length > 0 ? (

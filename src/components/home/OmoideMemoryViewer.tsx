@@ -45,7 +45,7 @@ export function OmoideMemoryViewer({
           style={viewerStyles.textButton}
           onClick={onStow}
         >
-          文箱に しまう
+          思い出箱に もどす
         </button>
       </section>
     </div>
