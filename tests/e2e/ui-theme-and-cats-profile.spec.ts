@@ -642,8 +642,7 @@ test("shows celebrations as current milestones instead of a fixed 50-photo card"
 
   await expect(celebration).toContainText("家族になって");
   await expect(celebration).toContainText("ねがお");
-  await expect(celebration).toContainText("10枚");
-  await expect(celebration).not.toContainText("/ 50枚");
+  await expect(celebration).toContainText("10 / 50枚");
   await expect(celebration).toContainText("誕生日");
 });
 

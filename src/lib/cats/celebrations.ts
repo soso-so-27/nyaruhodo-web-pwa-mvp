@@ -58,6 +58,8 @@ function createSleepingCountCelebration(
   takenSleepingPhotoCount: number,
 ): CatCelebrationItem {
   const count = Math.max(0, Math.floor(takenSleepingPhotoCount));
+  const nextTarget = SLEEPING_COUNT_TARGETS.find((target) => target > count);
+
   if (count <= 0) {
     return {
       key: "sleeping-count",
@@ -68,10 +70,20 @@ function createSleepingCountCelebration(
     };
   }
 
+  if (!nextTarget) {
+    return {
+      key: "sleeping-count",
+      label: "ねがお",
+      status: `${count}枚`,
+      reached: true,
+      tone: "progress",
+    };
+  }
+
   return {
     key: "sleeping-count",
     label: "ねがお",
-    status: `${count}枚`,
+    status: `${count} / ${nextTarget}枚`,
     reached: count >= SLEEPING_COUNT_TARGETS[0],
     tone: "progress",
   };

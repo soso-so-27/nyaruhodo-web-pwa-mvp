@@ -28,9 +28,9 @@ test.describe("cat footprints", () => {
     });
 
     expect(entries.map((entry) => entry.title)).toEqual([
-      "ねがおを撮った",
+      "ねがおを とった",
       "10枚目",
-      "ねがおを撮った",
+      "ねがおを とった",
     ]);
     expect(entries.filter((entry) => entry.id.includes("photo-10"))).toHaveLength(0);
     expect(entries.some((entry) => entry.id === "milestone-10")).toBe(true);

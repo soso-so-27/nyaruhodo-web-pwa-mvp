@@ -35,7 +35,7 @@ test.describe("cat celebrations", () => {
     ]);
   });
 
-  test("shows the sleeping photo count without a target denominator", () => {
+  test("shows the next sleeping photo target from the current count", () => {
     expect(
       createCatCelebrationItems({
         familyDuration: { primary: "100日", secondary: "" },
@@ -44,7 +44,7 @@ test.describe("cat celebrations", () => {
       })[1],
     ).toMatchObject({
       label: "ねがお",
-      status: "10枚",
+      status: "10 / 50枚",
       reached: true,
     });
 
@@ -55,7 +55,7 @@ test.describe("cat celebrations", () => {
         takenSleepingPhotoCount: 80,
       })[1],
     ).toMatchObject({
-      status: "80枚",
+      status: "80 / 100枚",
       reached: true,
     });
   });
@@ -68,7 +68,7 @@ test.describe("cat celebrations", () => {
         takenSleepingPhotoCount: 420,
       })[1],
     ).toMatchObject({
-      status: "420枚",
+      status: "420 / 500枚",
       reached: true,
     });
   });
