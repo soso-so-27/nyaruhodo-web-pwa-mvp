@@ -12,7 +12,7 @@ const afterEightToday = getCurrentJstTime(20, 5);
 test.describe("home desk model", () => {
   test("maps the five home states to desk shell states and presentation phases", async ({ page }) => {
     const expectedStates = {
-      "1": { deskState: "1", phase: "empty-before" },
+      "1": { deskState: "1", phase: null },
       "1b": { deskState: "1b", phase: "empty-after" },
       "2": { deskState: "2", phase: "sent-before" },
       "3": { deskState: "3", phase: "delivered" },
@@ -337,32 +337,41 @@ test.describe("home desk model", () => {
   test("keeps the home frame, tray, and bottom navigation separated", async ({
     page,
   }) => {
-    const states = [
-      { state: "1" as const, frameTestId: "desk-empty-frame" },
-      { state: "2" as const, frameTestId: "desk-home-frame" },
-    ];
+    await seedDeskState(page, "1");
+    await page.goto("/home");
+    await page.waitForLoadState("networkidle");
 
-    for (const { state, frameTestId } of states) {
-      await seedDeskState(page, state);
-      await page.goto("/home");
-      await page.waitForLoadState("networkidle");
+    const emptyFrameBox = await page.getByTestId("desk-empty-frame").boundingBox();
+    const emptyNavBox = await page
+      .getByRole("navigation", { name: "下部ナビゲーション" })
+      .boundingBox();
 
-      const frameBox = await page.getByTestId(frameTestId).boundingBox();
-      const trayBox = await page.getByTestId("home-letter-tray").boundingBox();
-      const navBox = await page
-        .getByRole("navigation", { name: "下部ナビゲーション" })
-        .boundingBox();
+    await expect(page.getByTestId("home-letter-tray")).toHaveCount(0);
+    expect(emptyFrameBox).not.toBeNull();
+    expect(emptyNavBox).not.toBeNull();
+    expect(Math.round(emptyFrameBox!.y + emptyFrameBox!.height)).toBeLessThanOrEqual(
+      Math.round(emptyNavBox!.y - 16),
+    );
 
-      expect(frameBox).not.toBeNull();
-      expect(trayBox).not.toBeNull();
-      expect(navBox).not.toBeNull();
-      expect(Math.round(frameBox!.y + frameBox!.height)).toBeLessThanOrEqual(
-        Math.round(trayBox!.y - 8),
-      );
-      expect(Math.round(trayBox!.y + trayBox!.height)).toBeLessThanOrEqual(
-        Math.round(navBox!.y - 16),
-      );
-    }
+    await seedDeskState(page, "2");
+    await page.goto("/home");
+    await page.waitForLoadState("networkidle");
+
+    const frameBox = await page.getByTestId("desk-home-frame").boundingBox();
+    const trayBox = await page.getByTestId("home-letter-tray").boundingBox();
+    const navBox = await page
+      .getByRole("navigation", { name: "下部ナビゲーション" })
+      .boundingBox();
+
+    expect(frameBox).not.toBeNull();
+    expect(trayBox).not.toBeNull();
+    expect(navBox).not.toBeNull();
+    expect(Math.round(frameBox!.y + frameBox!.height)).toBeLessThanOrEqual(
+      Math.round(trayBox!.y - 8),
+    );
+    expect(Math.round(trayBox!.y + trayBox!.height)).toBeLessThanOrEqual(
+      Math.round(navBox!.y - 16),
+    );
 
     await seedDeskState(page, "4");
     await page.goto("/home");
@@ -388,21 +397,19 @@ test.describe("home desk model", () => {
     const emptyFrame = page.getByTestId("desk-empty-frame");
     const emptyAction = page.getByTestId("home-empty-action");
     const settings = page.getByTestId("home-settings-shortcut");
-    const tray = page.getByTestId("home-letter-tray");
     const nav = page.getByRole("navigation", { name: "下部ナビゲーション" });
 
-    const [frameBox, actionBox, settingsBox, trayBox, navBox] = await Promise.all([
+    await expect(page.getByTestId("home-letter-tray")).toHaveCount(0);
+    const [frameBox, actionBox, settingsBox, navBox] = await Promise.all([
       emptyFrame.boundingBox(),
       emptyAction.boundingBox(),
       settings.boundingBox(),
-      tray.boundingBox(),
       nav.boundingBox(),
     ]);
 
     expect(frameBox).not.toBeNull();
     expect(actionBox).not.toBeNull();
     expect(settingsBox).not.toBeNull();
-    expect(trayBox).not.toBeNull();
     expect(navBox).not.toBeNull();
 
     expect(settingsBox?.width).toBe(36);
@@ -410,7 +417,7 @@ test.describe("home desk model", () => {
     expect(actionBox?.height).toBe(48);
     expect(navBox?.height).toBe(60);
 
-    const centers = [frameBox!, trayBox!, navBox!].map(
+    const centers = [frameBox!, navBox!].map(
       (box) => Math.round(box.x + box.width / 2),
     );
     expect(new Set(centers).size).toBe(1);

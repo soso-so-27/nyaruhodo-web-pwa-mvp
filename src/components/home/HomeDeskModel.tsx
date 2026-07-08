@@ -312,8 +312,11 @@ export function HomeDeskModel({
   const hasTrayActions = hasUnopenedDeliveryNotification;
   const usesTextRibbonTray = !hasTrayActions;
   const usesEnvelopeHome = hasUnopenedDeliveryNotification;
+  const shouldSuppressEmptyBeforeNotice =
+    homeDay.phase === "empty-before" && deliveryCheckState === "idle";
   const shouldShowBaseNotice =
-    hasUnopenedDeliveryNotification || homeDay.phase !== "opened";
+    hasUnopenedDeliveryNotification ||
+    (homeDay.phase !== "opened" && !shouldSuppressEmptyBeforeNotice);
   const shouldShowNotificationTray = shouldShowBaseNotice;
   const shouldShowHomeFrameTakeButton =
     homeDay.phase === "empty-before" ||
@@ -1815,14 +1818,7 @@ function HomeLetterTrayText({
     );
   }
 
-  return (
-    <strong style={deskStyles.letterTrayTitle}>
-      <span style={deskStyles.letterTrayLine}>とると、よる8時に</span>
-      <span style={deskStyles.letterTrayLine}>
-        {keyword("ねこだより")}が {keyword("とどく")}
-      </span>
-    </strong>
-  );
+  return null;
 }
 
 function SleepingCatPlaceholder() {
