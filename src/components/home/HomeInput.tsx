@@ -3275,9 +3275,6 @@ function EveningDeliveryOpening({
         onClick={(event) => event.stopPropagation()}
       >
         <p style={styles.eveningOpeningTitle}>ねこだより</p>
-        <p style={styles.eveningOpeningSubtitle}>
-          どこかのねがおが届きました
-        </p>
         <div
           style={{
             ...styles.eveningOpeningPhotoFrame,
@@ -3293,18 +3290,16 @@ function EveningDeliveryOpening({
           />
         </div>
         <p style={styles.eveningOpeningSavedNote}>
-          とどいたで見返せます
+          この一通は、『とどいた』にしまわれました
         </p>
-        <AppButton
+        <button
           type="button"
-          variant="quiet"
-          size="md"
+          data-testid="evening-opening-tomorrow"
           onClick={() => requestClose()}
-          style={styles.eveningOpeningCloseButton}
+          style={styles.eveningOpeningTomorrowButton}
         >
-          閉じる
-        </AppButton>
-        <p style={styles.eveningOpeningAfterword}>また、あした</p>
+          また、あした
+        </button>
       </div>
     </div>
   );
@@ -7473,7 +7468,7 @@ const styles = {
     zIndex: 1,
     width: "min(calc(100vw - 24px), 460px)",
     display: "grid",
-    gap: "12px",
+    gap: "10px",
     justifyItems: "center",
     animation: "eveningOpeningStageIn 360ms cubic-bezier(0, 0, 0.2, 1) both",
     transition: "opacity 180ms ease",
@@ -7490,7 +7485,7 @@ const styles = {
     gap: "12px",
   },
   eveningOpeningTitle: {
-    margin: 0,
+    margin: "0 0 2px",
     color: "#292721",
     fontFamily: "var(--font-display)",
     fontSize: "24px",
@@ -7498,37 +7493,33 @@ const styles = {
     lineHeight: 1.42,
     letterSpacing: "0.08em",
   },
-  eveningOpeningSubtitle: {
-    margin: "-4px 0 4px",
-    color: "#746a5f",
-    fontFamily: "var(--font-display)",
-    fontSize: "14px",
-    fontWeight: 400,
-    lineHeight: 1.5,
-    letterSpacing: "0.04em",
-  },
   eveningOpeningSavedNote: {
     margin: "2px 0 0",
     color: "#746a5f",
     fontFamily: "var(--font-display)",
-    fontSize: "13px",
+    fontSize: "12px",
     fontWeight: 400,
     lineHeight: 1.5,
     letterSpacing: "0.04em",
   },
-  eveningOpeningCloseButton: {
-    minWidth: 120,
-    marginTop: 2,
-    color: "#746a5f",
-  },
-  eveningOpeningAfterword: {
-    margin: "-2px 0 0",
-    color: "#a65045",
-    fontFamily: "var(--font-display)",
-    fontSize: "13px",
-    fontWeight: 400,
-    lineHeight: 1.5,
-    letterSpacing: "0.08em",
+  eveningOpeningTomorrowButton: {
+    width: "min(260px, 100%)",
+    minHeight: "54px",
+    marginTop: "4px",
+    border: "1px solid rgba(144,126,102,0.14)",
+    borderRadius: "var(--radius-full)",
+    background:
+      "linear-gradient(180deg, rgba(255,253,248,0.98), rgba(248,242,232,0.94))",
+    color: "#292721",
+    fontFamily: "var(--font-ui)",
+    fontSize: "15px",
+    fontWeight: 520,
+    lineHeight: 1.35,
+    letterSpacing: "0.04em",
+    cursor: "pointer",
+    boxShadow:
+      "inset 0 1px 0 rgba(255,255,255,0.72), 0 12px 26px rgba(90,76,60,0.08)",
+    WebkitTapHighlightColor: "transparent",
   },
   exchangeSheetFrame: {
     left: "14px",

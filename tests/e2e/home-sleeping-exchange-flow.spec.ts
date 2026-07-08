@@ -140,8 +140,12 @@ test.describe("home sleeping exchange flow", () => {
     );
     const openButton = page.getByTestId("desk-open-letter");
     await openButton.click();
-    await expect(page.getByTestId("evening-opening-pair").locator("img")).toHaveCount(1);
-    await page.getByTestId("evening-opening-pair").locator("button").last().click();
+    const openingPanel = page.getByTestId("evening-opening-pair");
+    await expect(openingPanel.locator("img")).toHaveCount(1);
+    await expect(openingPanel).toContainText("この一通は、『とどいた』にしまわれました");
+    await expect(openingPanel.getByRole("button", { name: "閉じる" })).toHaveCount(0);
+    await expect(openingPanel.locator("button")).toHaveCount(1);
+    await openingPanel.getByRole("button", { name: "また、あした" }).click();
     await expect(page.getByTestId("home-desk-model")).toHaveAttribute(
       "data-state",
       "4",
@@ -643,8 +647,11 @@ test.describe("home sleeping exchange flow", () => {
     await expect.poll(() => exchangeCalls).toBe(1);
     const openButton = page.getByTestId("desk-open-letter");
     await openButton.click();
-    await expect(page.getByTestId("evening-opening-pair")).toBeVisible();
-    await expect(page.getByTestId("evening-opening-pair").locator("img")).toHaveCount(1);
+    const openingPanel = page.getByTestId("evening-opening-pair");
+    await expect(openingPanel).toBeVisible();
+    await expect(openingPanel.locator("img")).toHaveCount(1);
+    await expect(openingPanel.getByRole("button", { name: "閉じる" })).toHaveCount(0);
+    await expect(openingPanel.getByRole("button", { name: "また、あした" })).toBeVisible();
 
     await expect
       .poll(() =>
@@ -669,7 +676,7 @@ test.describe("home sleeping exchange flow", () => {
     expect(openedDelivery?.openedAt).toBeTruthy();
     expect(openedDelivery?.keptAt).toBeTruthy();
 
-    await page.getByTestId("evening-opening-pair").locator("button").last().click();
+    await openingPanel.getByRole("button", { name: "また、あした" }).click();
     expect(signedUrlCalls).toBe(0);
   });
 

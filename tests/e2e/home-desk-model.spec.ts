@@ -515,7 +515,16 @@ test.describe("home desk model", () => {
     const openingPair = page.getByTestId("evening-opening-pair");
     await expect(openingPair.getByText("ねこだより")).toBeVisible();
     await expect(openingPair.locator("img")).toHaveCount(1);
-    await expect(page.getByRole("button", { name: "閉じる" })).toBeVisible();
+    await expect(openingPair).toContainText(
+      "この一通は、『とどいた』にしまわれました",
+    );
+    await expect(openingPair.getByRole("button", { name: "閉じる" })).toHaveCount(
+      0,
+    );
+    await expect(openingPair.locator("button")).toHaveCount(1);
+    await expect(
+      openingPair.getByRole("button", { name: "また、あした" }),
+    ).toBeVisible();
     await expect
       .poll(() =>
         page.evaluate(
@@ -596,8 +605,12 @@ test.describe("home desk model", () => {
     await page.waitForLoadState("networkidle");
 
     await page.getByTestId("desk-open-letter").click();
-    await expect(page.getByTestId("evening-opening-pair")).toBeVisible();
-    await page.getByRole("button", { name: "閉じる" }).click();
+    const openingPair = page.getByTestId("evening-opening-pair");
+    await expect(openingPair).toBeVisible();
+    await expect(openingPair.getByRole("button", { name: "閉じる" })).toHaveCount(
+      0,
+    );
+    await openingPair.getByRole("button", { name: "また、あした" }).click();
 
     await expect(page.getByTestId("evening-opening-flyer")).toHaveCount(0);
     await expect(page.getByTestId("evening-opening-pair")).toHaveCount(0);
@@ -611,8 +624,12 @@ test.describe("home desk model", () => {
     await page.waitForLoadState("networkidle");
 
     await page.getByTestId("desk-open-letter").click();
-    await expect(page.getByTestId("evening-opening-pair")).toBeVisible();
-    await page.getByRole("button", { name: "閉じる" }).click();
+    const openingPair = page.getByTestId("evening-opening-pair");
+    await expect(openingPair).toBeVisible();
+    await expect(openingPair.getByRole("button", { name: "閉じる" })).toHaveCount(
+      0,
+    );
+    await openingPair.getByRole("button", { name: "また、あした" }).click();
 
     const flyer = page.getByTestId("evening-opening-flyer");
     await expect(flyer).toHaveCount(0);
