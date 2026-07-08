@@ -1569,7 +1569,7 @@ export function CatsPage() {
           <LensPhotoSection
             title="この子の写真"
             photos={activeCatLensPhotos}
-            emptyCopy="まだ写真はありません。ねがおを撮るか、写真をしまうと、ここに並びます。"
+            emptyCopy="まだ写真はありません。ねがおを とるか、写真をしまうと、ここに並びます。"
             lensValue={activeLens}
             onLensChange={shouldShowPhotoLensSwitch ? setActiveLens : undefined}
             onAddPhoto={() => {
@@ -3261,7 +3261,7 @@ function YearSummarySheet({
           />
         ) : null}
         <div style={styles.yearSummaryBlock}>
-          <p style={styles.yearSummaryBlockLabel}>よく撮った月</p>
+          <p style={styles.yearSummaryBlockLabel}>よく とった月</p>
           <p style={styles.yearSummaryBlockText}>{summary.activeMonthLabel}</p>
         </div>
         <div style={styles.yearSummaryBlock}>

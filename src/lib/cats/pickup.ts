@@ -306,7 +306,7 @@ function getMemoryPickupBody(memory: OmoideMemory) {
   if (memory.lookback === "month") return "1か月前のねがおです";
   if (memory.lookback === "half_year") return "半年前のねがおです";
   if (memory.lookback === "year") return "1年前のねがおです";
-  return "前に撮ったねがおです";
+  return "前に とったねがおです";
 }
 
 function getLookbackBonus(lookback: OmoideMemory["lookback"]) {

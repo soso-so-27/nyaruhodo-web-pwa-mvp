@@ -623,7 +623,8 @@ test("renders footprints as recent cat events instead of a photo-only list", asy
 
   await expect(page.getByRole("heading", { name: "足あと" })).toBeVisible();
   await expect(page.getByText("2026年6月")).toBeVisible();
-  await expect(page.getByText("ねがおを撮った").first()).toBeVisible();
+  await expect(page.getByText("ねがおを とった").first()).toBeVisible();
+  await expect(page.getByText("撮った")).toHaveCount(0);
   await expect(page.getByText("届いた")).toHaveCount(0);
 });
 
@@ -641,8 +642,36 @@ test("shows celebrations as current milestones instead of a fixed 50-photo card"
 
   await expect(celebration).toContainText("家族になって");
   await expect(celebration).toContainText("ねがお");
-  await expect(celebration).toContainText("10 / 50枚");
+  await expect(celebration).toContainText("10枚");
+  await expect(celebration).not.toContainText("/ 50枚");
   await expect(celebration).toContainText("誕生日");
+});
+
+test("keeps the record tab sections in the intended order", async ({ page }) => {
+  await seedCatsProfileWithOpenedMemory(
+    page,
+    Date.parse("2026-06-10T12:30:00+09:00"),
+    12,
+  );
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto("/cats");
+  await page.waitForLoadState("networkidle");
+
+  const sectionOrder = await page.evaluate(() =>
+    Array.from(document.querySelectorAll("main h2")).map(
+      (heading) => heading.textContent?.trim() ?? "",
+    ),
+  );
+
+  const celebrationIndex = sectionOrder.indexOf("記念");
+  const footprintIndex = sectionOrder.indexOf("足あと");
+  const memoryIndex = sectionOrder.indexOf("とどいた思い出");
+  const yearIndex = sectionOrder.indexOf("年ごと");
+
+  expect(celebrationIndex).toBeGreaterThanOrEqual(0);
+  expect(footprintIndex).toBeGreaterThan(celebrationIndex);
+  expect(memoryIndex).toBeGreaterThan(footprintIndex);
+  expect(yearIndex).toBeGreaterThan(memoryIndex);
 });
 
 test("opens a year summary dashboard from the yearly archive", async ({
@@ -660,7 +689,7 @@ test("opens a year summary dashboard from the yearly archive", async ({
   await expect(dialog).toContainText("ねがお");
   await expect(dialog).toContainText("思い出");
   await expect(dialog).toContainText("記念");
-  await expect(dialog).toContainText("6月によく撮りました");
+  await expect(dialog).toContainText("6月によく とりました");
   await expect(dialog).toContainText("10枚目");
 });
 
@@ -723,6 +752,57 @@ async function seedCatsProfile(page: Page, now: number, photoCount: number) {
       );
     },
     { nowValue: now, src: photoDataUrl, count: photoCount },
+  );
+}
+
+async function seedCatsProfileWithOpenedMemory(
+  page: Page,
+  now: number,
+  photoCount: number,
+) {
+  await seedCatsProfile(page, now, photoCount);
+  await page.addInitScript(
+    ({ nowValue, src }) => {
+      const memoryPhoto = {
+        id: "own-sleeping-memory",
+        ownerCatId: "cat-mugi",
+        catId: "cat-mugi",
+        src,
+        thumbnailSrc: src,
+        displaySrc: src,
+        state: "sleeping",
+        visibility: "private",
+        deliveryStatus: "available",
+        triggerLabel: "sleeping",
+        theme: "sleeping",
+        shared: false,
+        createdAt: nowValue - 7 * 86_400_000,
+      };
+
+      window.localStorage.setItem(
+        "neteruneko_omoide_memories",
+        JSON.stringify({
+          "omoide-record-opened": {
+            id: "omoide-record-opened",
+            catId: "cat-mugi",
+            catName: "\u3080\u304e",
+            sourcePhotoId: memoryPhoto.id,
+            sourceDateKey: "2026-06-03",
+            deliveryDateKey: "2026-06-10",
+            photo: memoryPhoto,
+            lookback: "week",
+            reason: "same_day",
+            title: "\u5148\u9031\u306e\u306d\u304c\u304a",
+            subtitle: "\u524d\u306b\u3068\u3063\u305f\u306d\u304c\u304a\u304c\u5c4a\u304d\u307e\u3057\u305f\u3002",
+            voice: "\u3042\u306e\u65e5\u306e\u3080\u304e",
+            bridge: "\u305d\u3063\u3068\u601d\u3044\u51fa\u3057\u307e\u3059\u3002",
+            deliveredAt: nowValue,
+            openedAt: nowValue,
+          },
+        }),
+      );
+    },
+    { nowValue: now, src: photoDataUrl },
   );
 }
 

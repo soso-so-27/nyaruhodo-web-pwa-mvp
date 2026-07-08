@@ -123,7 +123,7 @@ function getActiveMonthLabel(monthCounts: Map<number, number>) {
         rightCount - leftCount || rightMonth - leftMonth,
     )[0] ?? [];
 
-  return typeof month === "number" ? `${month + 1}月によく撮りました` : "これから";
+  return typeof month === "number" ? `${month + 1}月によく とりました` : "これから";
 }
 
 function getYearMilestoneLabel(target: CatSleepingMilestone["target"]) {

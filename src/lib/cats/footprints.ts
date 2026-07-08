@@ -53,12 +53,12 @@ export function createCatFootprintEntries({
     .map((photo) => ({
       id: `photo-${photo.id}`,
       type: "photo" as const,
-      title: "ねがおを撮った",
+      title: "ねがおを とった",
       timestamp: photo.createdAt,
       src: photo.src,
       photo: {
         src: photo.src,
-        title: "ねがおを撮った",
+        title: "ねがおを とった",
         timestamp: photo.createdAt,
       },
     }));
