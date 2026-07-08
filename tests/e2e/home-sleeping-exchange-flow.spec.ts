@@ -773,6 +773,7 @@ test.describe("home sleeping exchange flow", () => {
 
   test("treats photos after 8pm as tomorrow delivery", async ({ page }) => {
     let exchangeCalls = 0;
+    const beforeDelivery = Date.parse("2026-06-10T10:30:00.000Z");
     const afterDelivery = Date.parse("2026-06-10T11:10:00.000Z");
 
     await page.addInitScript((now) => {
@@ -794,7 +795,7 @@ test.describe("home sleeping exchange flow", () => {
           },
         ]),
       );
-    }, afterDelivery);
+    }, beforeDelivery);
 
     await page.route("**/api/sleeping-delivery/exchange", async (route) => {
       exchangeCalls += 1;
@@ -813,6 +814,9 @@ test.describe("home sleeping exchange flow", () => {
       mimeType: "image/png",
       buffer: testUploadPng,
     });
+    await page.evaluate((nextNow) => {
+      (window as typeof window & { __testNow?: number }).__testNow = nextNow;
+    }, afterDelivery);
     await confirmSleepingPhotoShare(page);
 
     await waitForOwnSleepingPhotoCount(page, 1);
@@ -1543,8 +1547,14 @@ test.describe("home sleeping exchange flow", () => {
   }) => {
     let exchangeCalls = 0;
     const existingLargePhotoSrc = deliveredDataUrl;
+    const beforeDelivery = Date.parse("2026-06-10T10:30:00.000Z");
 
-    await page.addInitScript((largePhotoSrc) => {
+    await page.addInitScript(({ largePhotoSrc, now }) => {
+      (window as typeof window & { __testNow?: number }).__testNow = now;
+      const originalDateNow = Date.now.bind(Date);
+      Date.now = () =>
+        (window as typeof window & { __testNow?: number }).__testNow ??
+        originalDateNow();
       window.localStorage.setItem("nyaruhodo_sleeping_safety_accepted", "1");
       window.localStorage.setItem("active_cat_id", "quota-cat");
       window.localStorage.setItem(
@@ -1572,7 +1582,7 @@ test.describe("home sleeping exchange flow", () => {
             triggerLabel: "sleeping",
             theme: "sleeping",
             shared: false,
-            createdAt: Date.now() - 24 * 60 * 60 * 1000,
+            createdAt: now - 24 * 60 * 60 * 1000,
           },
         ]),
       );
@@ -1602,7 +1612,7 @@ test.describe("home sleeping exchange flow", () => {
 
         return originalSetItem.call(this, key, value);
       };
-    }, existingLargePhotoSrc);
+    }, { largePhotoSrc: existingLargePhotoSrc, now: beforeDelivery });
 
     await page.route("**/api/sleeping-delivery/exchange", async (route) => {
       exchangeCalls += 1;
@@ -1658,7 +1668,7 @@ test.describe("home sleeping exchange flow", () => {
   test("keeps separate taken photos even when saved in the same millisecond", async ({
     page,
   }) => {
-    const fixedNow = Date.now();
+    const fixedNow = Date.parse("2026-06-10T10:30:00.000Z");
 
     await page.addInitScript((now) => {
       const originalDateNow = Date.now.bind(Date);

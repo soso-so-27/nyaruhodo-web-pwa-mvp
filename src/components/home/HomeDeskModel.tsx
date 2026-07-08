@@ -320,6 +320,8 @@ export function HomeDeskModel({
   const shouldShowNotificationTray = shouldShowBaseNotice;
   const shouldShowHomeFrameTakeButton =
     deskState === "1" && homeDay.phase === "empty-before";
+  const shouldShowHomeFrameRetakeLink =
+    deskState === "2" && homeDay.phase === "sent-before";
   const shouldHidePresence = true;
   useEffect(() => {
     trackDeskStateShown(deskState, eveningState.dateKey);
@@ -540,6 +542,18 @@ export function HomeDeskModel({
                       <AppIcon name="mail" size={13} />
                       きょうの一枚。よる8時のねこだよりに
                     </span>
+                  </div>
+                ) : null}
+                {shouldShowHomeFrameRetakeLink ? (
+                  <div style={deskStyles.homeRetakeRow}>
+                    <button
+                      type="button"
+                      data-testid="home-retake-action"
+                      style={deskStyles.homeRetakeLink}
+                      onClick={onTakePhoto}
+                    >
+                      とりなおす
+                    </button>
                   </div>
                 ) : null}
               </div>
@@ -2194,6 +2208,27 @@ const deskStyles = {
     justifyItems: "end",
     gap: "6px",
     maxWidth: "calc(100% - 16px)",
+  },
+  homeRetakeRow: {
+    display: "flex",
+    justifyContent: "center",
+    marginTop: "10px",
+  },
+  homeRetakeLink: {
+    appearance: "none",
+    WebkitAppearance: "none",
+    border: "none",
+    background: "transparent",
+    color: "color-mix(in srgb, var(--ink-soft) 68%, var(--home-wax, var(--seal)))",
+    fontFamily: "var(--font-ui)",
+    fontSize: "12px",
+    fontWeight: 500,
+    lineHeight: 1.4,
+    letterSpacing: "var(--tracking-body)",
+    textDecoration: "underline",
+    textUnderlineOffset: "3px",
+    cursor: "pointer",
+    WebkitTapHighlightColor: "transparent",
   },
   homeFrameShell: {
     position: "relative",

@@ -27,14 +27,14 @@ test.describe("cat year summaries", () => {
       photoCount: 2,
       pickupCount: 1,
       milestoneCount: 1,
-      activeMonthLabel: "6月によく撮りました",
+      activeMonthLabel: "6月によく とりました",
       highlights: ["10枚目"],
     });
     expect(summaries[1]).toMatchObject({
       photoCount: 1,
       pickupCount: 0,
       milestoneCount: 0,
-      activeMonthLabel: "5月によく撮りました",
+      activeMonthLabel: "5月によく とりました",
     });
   });
 
