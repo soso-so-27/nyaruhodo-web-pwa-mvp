@@ -1008,10 +1008,19 @@ export function CatsPage() {
 
     input.type = "file";
     input.accept = "image/*";
+    input.style.position = "fixed";
+    input.style.left = "-9999px";
+    input.style.opacity = "0";
+    const cleanupInput = () => {
+      window.setTimeout(() => {
+        input.remove();
+      }, 0);
+    };
     input.onchange = async () => {
       const file = input.files?.[0];
 
       if (!file) {
+        cleanupInput();
         return;
       }
 
@@ -1031,7 +1040,7 @@ export function CatsPage() {
           pathSegments: [targetCatId, "photos"],
           fileName: `photo-${Date.now()}-thumb`,
         });
-        if (!isStoragePhotoReference(photoSrc)) {
+        if (!isStoragePhotoReference(photoSrc) && !photoSrc.startsWith("data:image/")) {
           setSaveMessage("写真を追加できませんでした。");
           setTimeout(() => setSaveMessage(""), 2400);
           return;
@@ -1065,10 +1074,18 @@ export function CatsPage() {
       } catch {
         setSaveMessage("写真を追加できませんでした。");
         setTimeout(() => setSaveMessage(""), 2400);
+      } finally {
+        cleanupInput();
       }
     };
 
+    document.body.appendChild(input);
     input.click();
+    window.setTimeout(() => {
+      if (!input.files?.length) {
+        input.remove();
+      }
+    }, 60000);
   }
 
   function handleCatGalleryIntroContinue() {
@@ -2847,6 +2864,7 @@ function LensPhotoSection({
             ) : null}
             <button
               type="button"
+              data-testid="cats-add-photo-button"
               style={styles.lensAddPhotoButton}
               onClick={onAddPhoto}
               aria-label="写真をしまう"

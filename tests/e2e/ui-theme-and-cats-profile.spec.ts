@@ -2,6 +2,7 @@ import { expect, test, type Page } from "@playwright/test";
 
 const photoDataUrl =
   "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAGQAAABkCAYAAABw4pVUAAAAAXNSR0IArs4c6QAAAARnQU1BAACxjwv8YQUAAAAJcEhZcwAADsMAAA7DAcdvqGQAAAEJSURBVHhe7dExEcAgAMBAJKKuTpnpjoLA/fACchlrzv2C+a0njDPsVmfYrQyJMSTGkBhDYgyJMSTGkBhDYgyJMSTGkBhDYgyJMSTGkBhDYgyJMSTGkBhDYgyJMSTGkBhDYgyJMSTGkBhDYgyJMSTGkBhDYgyJMSTGkBhDYgyJMSTGkBhDYgyJMSTGkBhDYgyJMSTGkBhDYgyJMSTGkBhDYgyJMSTGkBhDYgyJMSTGkBhDYgyJMSTmB4RCEqdGtA/tAAAAAElFTkSuQmCC";
+const photoUploadBuffer = Buffer.from(photoDataUrl.split(",")[1], "base64");
 
 const timeSamples = [
   { key: "dawn", now: "2026-06-10T06:30:00+09:00" },
@@ -125,6 +126,50 @@ test("keeps the cats photo tab clear of the fixed bottom navigation", async ({
   await expect(
     page.getByText("ここにしまった写真は、ねこだよりには使われません。"),
   ).toBeVisible();
+});
+
+test("reflects an added cat gallery photo immediately", async ({ page }) => {
+  await seedCatsProfile(page, Date.parse("2026-06-10T12:30:00+09:00"), 0);
+  await page.addInitScript(() => {
+    window.localStorage.setItem(
+      "neteruneko_cat_gallery_intro_acknowledged",
+      "true",
+    );
+  });
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto("/cats");
+  await page.waitForLoadState("networkidle");
+  await page.getByTestId("cats-section-tab-photos").click();
+
+  const fileChooserPromise = page.waitForEvent("filechooser");
+  await page.getByTestId("cats-add-photo-button").click();
+  const fileChooser = await fileChooserPromise;
+  await fileChooser.setFiles({
+    name: "cat-gallery-upload.png",
+    mimeType: "image/png",
+    buffer: photoUploadBuffer,
+  });
+
+  await expect
+    .poll(() =>
+      page.evaluate(() => {
+        const raw = window.localStorage.getItem("neteruneko_cat_gallery_photos");
+        const photos = raw ? JSON.parse(raw) : [];
+        return {
+          count: Array.isArray(photos) ? photos.length : 0,
+          src: Array.isArray(photos) ? photos[0]?.src ?? "" : "",
+        };
+      }),
+    )
+    .toMatchObject({
+      count: 1,
+      src: expect.stringMatching(/^(data:image\/|storage:|storage:\/\/)/),
+    });
+
+  const grid = page.getByTestId("cats-lens-photo-grid");
+  await expect(grid).toHaveAttribute("data-photo-decode-gate", "ready");
+  await expect(grid.locator(":scope > div")).toHaveCount(1);
+  await expect(grid.locator("img")).toHaveCount(1);
 });
 
 test("shows the photo lens switch only when multiple cats are registered", async ({
