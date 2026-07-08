@@ -100,6 +100,7 @@ export async function POST(request: Request) {
 
   const moment = ownSleepingPhotoToCatMoment(photo);
   const record = toCatMomentRecord(moment);
+  const visibility = photo.shared ? "shared" : "private";
   const photoUrl = await persistBackupPhotoUrl({
     adminSupabase,
     userId,
@@ -132,7 +133,7 @@ export async function POST(request: Request) {
     owner_cat_id: record.owner_cat_id,
     photo_url: photoUrl,
     state: record.state,
-    visibility: "shared",
+    visibility,
     delivery_status: "available",
     moderation_status: "pending",
     source_moment_id: record.source_moment_id,
@@ -141,7 +142,7 @@ export async function POST(request: Request) {
       pool_kind: "user_shared",
       trigger_label: photo.triggerLabel,
       theme: photo.theme,
-      shared: true,
+      shared: photo.shared,
     },
     captured_at: record.created_at,
     created_at: record.created_at,
@@ -225,12 +226,13 @@ function normalizeBackupPhoto(
       ? { originalSrc: photo.originalSrc }
       : {}),
     state: photo.state === "sleeping" ? photo.state : "sleeping",
-    visibility: "shared",
+    visibility:
+      photo.shared === false || photo.visibility === "private" ? "private" : "shared",
     deliveryStatus: "available",
     triggerLabel:
       typeof photo.triggerLabel === "string" ? photo.triggerLabel : "ねがお",
     theme: typeof photo.theme === "string" ? photo.theme : "sleeping",
-    shared: true,
+    shared: !(photo.shared === false || photo.visibility === "private"),
     createdAt:
       typeof photo.createdAt === "number" && Number.isFinite(photo.createdAt)
         ? photo.createdAt

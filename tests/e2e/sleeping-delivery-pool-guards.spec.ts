@@ -311,6 +311,26 @@ test.describe("sleeping delivery pool guards", () => {
     expect(isFastStockCandidateDeliverable(fastRow, context)).toBe(false);
   });
 
+  test("excludes private rows from delivery candidates as a defense in depth", () => {
+    const row = createDeliverableRow({
+      visibility: "private",
+    });
+    const context = {
+      userId: "user-recipient",
+      anonymousId: null,
+      senderAnonymousId: "anon-recipient",
+      recipientCatId: "cat-current",
+      excludePhotoId: "current-own-photo",
+      blockedPhotoIds: new Set<string>(),
+      deliveredSourceMomentIds: new Set<string>(),
+    };
+
+    expect(isRowDeliverable(row, context)).toBe(false);
+    const fastRow =
+      row as unknown as Parameters<typeof isFastStockCandidateDeliverable>[0];
+    expect(isFastStockCandidateDeliverable(fastRow, context)).toBe(false);
+  });
+
   test("limits onboarding instant exchange exceptions per ip key", async () => {
     resetOnboardingExchangeExceptionLimitForTests();
     const fakeSupabase = createFakeOnboardingValidationSupabase();
@@ -1506,6 +1526,96 @@ test.describe("sleeping delivery pool guards", () => {
     }
   });
 
+  test("backs up private own sleeping photos without exposing them to queue or delivery", async ({
+    request,
+  }) => {
+    await skipIfLocalSupabaseUnavailable();
+
+    const adminSupabase = createAdminSupabaseClientFromEnv();
+
+    test.skip(
+      !adminSupabase,
+      "SUPABASE_SERVICE_ROLE_KEY is required for the private backup smoke test.",
+    );
+
+    if (!adminSupabase) {
+      return;
+    }
+
+    const createdAt = Date.now();
+    const anonymousId = `private-backup-anonymous-${createdAt}`;
+    const localMomentId = `private-backup-moment-${createdAt}`;
+
+    try {
+      const response = await request.post("/api/sleeping-delivery/backup", {
+        data: {
+          anonymousId,
+          photo: {
+            id: localMomentId,
+            catId: `private-backup-cat-${createdAt}`,
+            ownerCatId: `private-backup-cat-${createdAt}`,
+            src: normalCatLikePhotoUrl,
+            state: "sleeping",
+            visibility: "private",
+            deliveryStatus: "available",
+            triggerLabel: "sleeping",
+            theme: "sleeping",
+            shared: false,
+            createdAt,
+          },
+        },
+      });
+
+      expect(response.status()).toBe(200);
+
+      const { data: backedUpRows, error: readError } = await adminSupabase
+        .from("cat_moments")
+        .select("local_moment_id, visibility, moderation_status, delivery_status, metadata")
+        .eq("anonymous_id", anonymousId)
+        .eq("local_moment_id", localMomentId);
+
+      expect(readError).toBeFalsy();
+      expect(backedUpRows).toHaveLength(1);
+      expect(backedUpRows?.[0]).toMatchObject({
+        local_moment_id: localMomentId,
+        visibility: "private",
+        moderation_status: "pending",
+        delivery_status: "available",
+      });
+      expect(backedUpRows?.[0]?.metadata).toMatchObject({
+        source: "user_backup",
+        shared: false,
+      });
+
+      const { count: queueCount, error: queueError } = await adminSupabase
+        .from("cat_moments")
+        .select("id", { count: "exact", head: true })
+        .eq("local_moment_id", localMomentId)
+        .eq("moderation_status", "pending")
+        .eq("visibility", "shared")
+        .eq("delivery_status", "available");
+
+      expect(queueError).toBeFalsy();
+      expect(queueCount).toBe(0);
+
+      const { count: candidateCount, error: candidateError } = await adminSupabase
+        .from("cat_moments")
+        .select("id", { count: "exact", head: true })
+        .eq("local_moment_id", localMomentId)
+        .eq("visibility", "shared")
+        .eq("delivery_status", "available")
+        .eq("moderation_status", "approved");
+
+      expect(candidateError).toBeFalsy();
+      expect(candidateCount).toBe(0);
+    } finally {
+      await adminSupabase
+        .from("cat_moments")
+        .delete()
+        .eq("anonymous_id", anonymousId);
+    }
+  });
+
   test("accepts only delivered photo reports and counts distinct reporters", async ({
     request,
   }) => {
@@ -2259,6 +2369,7 @@ function createDeliverableRow(
   overrides: Partial<{
     anonymous_id: string | null;
     user_id: string | null;
+    visibility: "private" | "shared";
   }> = {},
 ) {
   return {
@@ -2275,6 +2386,7 @@ function createDeliverableRow(
     photo_url: normalCatLikePhotoUrl,
     pool_date: "2026-07-05",
     user_id: overrides.user_id ?? "user-other",
+    visibility: overrides.visibility ?? "shared",
   };
 }
 

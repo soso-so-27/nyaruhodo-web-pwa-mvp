@@ -66,6 +66,7 @@ type RemoteCatMomentRow = {
   local_cat_id: string;
   owner_cat_id: string;
   photo_url: string;
+  visibility?: "private" | "shared";
   delivery_status: "available" | "hidden" | "reported";
   moderation_status?: "pending" | "approved" | "rejected";
   pool_date?: string | null;
@@ -1130,7 +1131,7 @@ async function readRemoteCandidateRows(
   const { data } = await supabase
     .from("cat_moments")
     .select(
-      "id, user_id, anonymous_id, local_moment_id, local_cat_id, owner_cat_id, photo_url, delivery_status, moderation_status, pool_date, delivery_count, metadata, created_at",
+      "id, user_id, anonymous_id, local_moment_id, local_cat_id, owner_cat_id, photo_url, visibility, delivery_status, moderation_status, pool_date, delivery_count, metadata, created_at",
     )
     .eq("visibility", "shared")
     .eq("delivery_status", "available")
@@ -1154,7 +1155,7 @@ async function readFastStockCandidateRows(
   const { data } = await supabase
     .from("cat_moments")
     .select(
-      "id, user_id, anonymous_id, local_moment_id, local_cat_id, owner_cat_id, delivery_status, moderation_status, pool_date, delivery_count, metadata, created_at",
+      "id, user_id, anonymous_id, local_moment_id, local_cat_id, owner_cat_id, visibility, delivery_status, moderation_status, pool_date, delivery_count, metadata, created_at",
     )
     .eq("visibility", "shared")
     .eq("delivery_status", "available")
@@ -1196,6 +1197,9 @@ export function isFastStockCandidateDeliverable(
     deliveredSourceMomentIds: Set<string>;
   },
 ) {
+  if (row.visibility && row.visibility !== "shared") {
+    return false;
+  }
   if (userId && row.user_id === userId) {
     return false;
   }
@@ -1244,6 +1248,9 @@ export function isRowDeliverable(
     deliveredSourceMomentIds: Set<string>;
   },
 ) {
+  if (row.visibility && row.visibility !== "shared") {
+    return false;
+  }
   if (isBlockedDeliveryPoolRow(row)) {
     return false;
   }
@@ -1520,7 +1527,7 @@ async function fetchFastStorageCandidate(
   const { data } = await supabase
     .from("cat_moments")
     .select(
-      "id, user_id, anonymous_id, local_moment_id, local_cat_id, owner_cat_id, photo_url, delivery_status, moderation_status, pool_date, delivery_count, metadata, created_at",
+      "id, user_id, anonymous_id, local_moment_id, local_cat_id, owner_cat_id, photo_url, visibility, delivery_status, moderation_status, pool_date, delivery_count, metadata, created_at",
     )
     .eq("id", row.id)
     .maybeSingle();
