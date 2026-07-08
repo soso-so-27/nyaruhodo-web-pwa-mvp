@@ -319,9 +319,7 @@ export function HomeDeskModel({
     (homeDay.phase !== "opened" && !shouldSuppressEmptyBeforeNotice);
   const shouldShowNotificationTray = shouldShowBaseNotice;
   const shouldShowHomeFrameTakeButton =
-    homeDay.phase === "empty-before" ||
-    homeDay.phase === "empty-after" ||
-    homeDay.phase === "sent-before";
+    deskState === "1" && homeDay.phase === "empty-before";
   const shouldHidePresence = true;
   useEffect(() => {
     trackDeskStateShown(deskState, eveningState.dateKey);
@@ -552,21 +550,25 @@ export function HomeDeskModel({
               >
                 <span style={deskStyles.homeEmptyEnvelopeHint} aria-hidden="true" />
                 <SleepingCatPlaceholder />
-                <button
-                  type="button"
-                  data-testid="home-empty-action"
-                  className="home-empty-cta-action"
-                  style={deskStyles.homeEmptyAction}
-                  onClick={onTakePhoto}
-                  aria-label={`${catName}の ねがおを とる`}
-                >
-                  <AppIcon name="camera" size={16} />
-                  ねがおを とる
-                </button>
-                <span style={deskStyles.homeCaptureHint}>
-                  <AppIcon name="mail" size={13} />
-                  きょうの一枚。よる8時のねこだよりに
-                </span>
+                {shouldShowHomeFrameTakeButton ? (
+                  <>
+                    <button
+                      type="button"
+                      data-testid="home-empty-action"
+                      className="home-empty-cta-action"
+                      style={deskStyles.homeEmptyAction}
+                      onClick={onTakePhoto}
+                      aria-label={`${catName}の ねがおを とる`}
+                    >
+                      <AppIcon name="camera" size={16} />
+                      ねがおを とる
+                    </button>
+                    <span style={deskStyles.homeCaptureHint}>
+                      <AppIcon name="mail" size={13} />
+                      きょうの一枚。よる8時のねこだよりに
+                    </span>
+                  </>
+                ) : null}
               </div>
             )}
           </div>

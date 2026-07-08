@@ -116,6 +116,10 @@ test.describe("home desk model", () => {
     await expect(page.getByTestId("desk-home-frame")).toBeVisible();
     await expect(page.getByText("おくった")).toBeVisible();
     await expect(page.getByText("よる8時に とどく").first()).toBeVisible();
+    await expect(page.getByTestId("home-retake-action")).toHaveCount(0);
+    await expect(
+      page.getByText("きょうの一枚。よる8時のねこだよりに"),
+    ).toHaveCount(0);
     await expect(page.getByText("この子の写真をしまう")).toHaveCount(0);
     await expect(page.getByTestId("desk-letter")).toHaveCount(0);
     await expect(page.getByTestId("today-pair-nav-icon")).toBeVisible();
