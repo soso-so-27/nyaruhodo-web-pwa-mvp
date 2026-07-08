@@ -2393,6 +2393,13 @@ function RecordOverview({
         </div>
       </section>
 
+      {openedMemories.length > 0 ? (
+        <OmoideBunbako
+          memories={openedMemories}
+          onOpen={(memory) => onOpenMemory(memory, "bunbako")}
+        />
+      ) : null}
+
       <section style={styles.recordBlock} aria-labelledby="cats-recent-heading">
         <h2 id="cats-recent-heading" style={styles.recordBlockTitle}>
           <span style={styles.recordBlockTitleMark} aria-hidden="true" />
@@ -2443,13 +2450,6 @@ function RecordOverview({
           <p style={styles.recordEmptyText}>最近の記録はまだありません。</p>
         )}
       </section>
-
-      {openedMemories.length > 0 ? (
-        <OmoideBunbako
-          memories={openedMemories}
-          onOpen={(memory) => onOpenMemory(memory, "bunbako")}
-        />
-      ) : null}
 
       <section style={styles.recordBlock} aria-labelledby="cats-archive-heading">
         <h2 id="cats-archive-heading" style={styles.recordBlockTitle}>

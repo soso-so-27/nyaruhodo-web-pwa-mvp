@@ -669,9 +669,9 @@ test("keeps the record tab sections in the intended order", async ({ page }) => 
   const yearIndex = sectionOrder.indexOf("年ごと");
 
   expect(celebrationIndex).toBeGreaterThanOrEqual(0);
-  expect(footprintIndex).toBeGreaterThan(celebrationIndex);
-  expect(memoryIndex).toBeGreaterThan(footprintIndex);
-  expect(yearIndex).toBeGreaterThan(memoryIndex);
+  expect(memoryIndex).toBeGreaterThan(celebrationIndex);
+  expect(footprintIndex).toBeGreaterThan(memoryIndex);
+  expect(yearIndex).toBeGreaterThan(footprintIndex);
 });
 
 test("opens a year summary dashboard from the yearly archive", async ({
