@@ -233,6 +233,117 @@ test.describe("home sleeping exchange flow", () => {
     expect(afterConfirmTargetId).toBeTruthy();
   });
 
+  test("updates the save sheet status when switching delivery mode", async ({
+    page,
+  }) => {
+    const beforeDelivery = Date.parse("2026-06-10T10:30:00.000Z");
+
+    await page.addInitScript((now) => {
+      (window as typeof window & { __testNow?: number }).__testNow = now;
+      const originalDateNow = Date.now.bind(Date);
+      Date.now = () =>
+        (window as typeof window & { __testNow?: number }).__testNow ??
+        originalDateNow();
+      window.localStorage.setItem("nyaruhodo_sleeping_safety_accepted", "1");
+      window.localStorage.setItem("active_cat_id", "status-cat");
+      window.localStorage.setItem(
+        "cat_profiles",
+        JSON.stringify([
+          {
+            id: "status-cat",
+            name: "status cat",
+            createdAt: new Date(now).toISOString(),
+            updatedAt: new Date(now).toISOString(),
+          },
+        ]),
+      );
+    }, beforeDelivery);
+
+    await page.goto("/home");
+    await page.waitForLoadState("networkidle");
+
+    await page.getByTestId("home-empty-action").click();
+    await page.locator('input[type="file"]').last().setInputFiles({
+      name: "status-sheet.png",
+      mimeType: "image/png",
+      buffer: testUploadPng,
+    });
+
+    const dialog = page.getByRole("dialog");
+    await expect(dialog).toBeVisible();
+    await expect(page.getByTestId("exchange-share-status")).toHaveText(
+      "よる8時に とどきます。",
+    );
+    await expect(page.getByTestId("exchange-share-submit")).toHaveText("のこす");
+
+    await page.getByTestId("exchange-share-mode-private").click();
+    await expect(page.getByTestId("exchange-share-status")).toHaveText(
+      "じぶんの記録にのこします。そとには出ません。",
+    );
+
+    await page.getByTestId("exchange-share-mode-shared").click();
+    await expect(page.getByTestId("exchange-share-status")).toHaveText(
+      "よる8時に とどきます。",
+    );
+  });
+
+  test("defaults the save sheet to the previously selected cat", async ({
+    page,
+  }) => {
+    const beforeDelivery = Date.parse("2026-06-10T10:30:00.000Z");
+
+    await page.addInitScript((now) => {
+      (window as typeof window & { __testNow?: number }).__testNow = now;
+      const originalDateNow = Date.now.bind(Date);
+      Date.now = () =>
+        (window as typeof window & { __testNow?: number }).__testNow ??
+        originalDateNow();
+      window.localStorage.setItem("nyaruhodo_sleeping_safety_accepted", "1");
+      window.localStorage.setItem("active_cat_id", "cat-mugi");
+      window.localStorage.setItem(
+        "neteruneko_exchange_share_cat_selection",
+        JSON.stringify({ catId: "cat-ame" }),
+      );
+      window.localStorage.setItem(
+        "cat_profiles",
+        JSON.stringify([
+          {
+            id: "cat-mugi",
+            name: "むぎ",
+            createdAt: new Date(now).toISOString(),
+            updatedAt: new Date(now).toISOString(),
+          },
+          {
+            id: "cat-ame",
+            name: "あめ",
+            createdAt: new Date(now).toISOString(),
+            updatedAt: new Date(now).toISOString(),
+          },
+        ]),
+      );
+    }, beforeDelivery);
+
+    await page.goto("/home");
+    await page.waitForLoadState("networkidle");
+
+    await page.getByTestId("home-empty-action").click();
+    await page.locator('input[type="file"]').last().setInputFiles({
+      name: "remember-cat.png",
+      mimeType: "image/png",
+      buffer: testUploadPng,
+    });
+
+    await expect(page.getByRole("dialog")).toBeVisible();
+    await expect(page.getByTestId("exchange-share-cat-cat-ame")).toHaveAttribute(
+      "aria-checked",
+      "true",
+    );
+    await expect(page.getByTestId("exchange-share-cat-cat-mugi")).toHaveAttribute(
+      "aria-checked",
+      "false",
+    );
+  });
+
   test("uses the latest same-day retake as today's delivery photo", async ({
     page,
   }) => {

@@ -281,6 +281,8 @@ const HOME_INSTALL_HINT_DISMISSED_STORAGE_KEY =
   "neteruneko_home_install_hint_dismissed";
 const HOME_TODAY_CAT_SELECTION_STORAGE_KEY =
   "neteruneko_home_today_cat_selection";
+const EXCHANGE_SHARE_CAT_SELECTION_STORAGE_KEY =
+  "neteruneko_exchange_share_cat_selection";
 
 type BeforeInstallPromptEvent = Event & {
   prompt: () => Promise<void>;
@@ -1680,7 +1682,9 @@ export function HomeInput({
           theme: "sleeping",
           fileSizeBucket,
         });
-        setPendingExchangeCatId(activeCatId);
+        setPendingExchangeCatId(
+          readStoredExchangeShareCatSelection(catProfiles, activeCatId),
+        );
 
         trackProductEvent(
           "home_exchange_sleeping_photo_selected",
@@ -1718,6 +1722,11 @@ export function HomeInput({
         input.remove();
       }
     }, CAMERA_INPUT_STALE_CLEANUP_MS);
+  }
+
+  function handlePendingExchangeCatSelect(catId: string) {
+    setPendingExchangeCatId(catId);
+    saveStoredExchangeShareCatSelection(catId);
   }
 
   async function handleSleepingStockPhotoImport() {
@@ -2105,6 +2114,7 @@ export function HomeInput({
     const targetCatId = pendingExchangeCatId ?? activeCatId;
     if (!targetCatId) return;
 
+    saveStoredExchangeShareCatSelection(targetCatId);
     const ownPhoto = await saveOwnSleepingPhotoWithCompressedFallback({
       catId: targetCatId,
       src: photo.src,
@@ -2156,6 +2166,7 @@ export function HomeInput({
     const targetCatId = pendingExchangeCatId ?? activeCatId;
     if (!targetCatId) return;
 
+    saveStoredExchangeShareCatSelection(targetCatId);
     const ownPhoto = await saveOwnSleepingPhotoWithCompressedFallback({
       catId: targetCatId,
       src: photo.src,
@@ -2308,12 +2319,8 @@ export function HomeInput({
           catProfiles={catProfiles}
           selectedCatId={pendingExchangeCatId ?? activeCatId}
           isExchangeTargetAvailable={canUsePendingPhotoAsDeliveryTarget}
-          deliveryCopy={
-            canUsePendingPhotoAsDeliveryTarget && eveningHomeState.isTodayDelivery
-              ? "よる8時に とどきます。"
-              : "あした よる8時に とどきます。"
-          }
-          onCatSelect={setPendingExchangeCatId}
+          deliveryCopy="よる8時に とどきます。"
+          onCatSelect={handlePendingExchangeCatSelect}
           onModeChange={(mode) => {
             trackProductEvent(
               "home_exchange_share_mode_selected",
@@ -3547,6 +3554,9 @@ function ExchangeSharePermissionSheet({
     catProfiles.find((profile) => profile.id === selectedCatId) ??
     catProfiles[0] ??
     null;
+  const statusCopy = isPrivate
+    ? "じぶんの記録にのこします。そとには出ません。"
+    : deliveryCopy;
 
   function selectMode(nextMode: "shared" | "private") {
     setMode(nextMode);
@@ -3570,8 +3580,8 @@ function ExchangeSharePermissionSheet({
             <span style={styles.exchangeShareSummaryIcon} aria-hidden="true">
               <AppIcon name={isPrivate ? "lock" : "mail"} size={17} />
             </span>
-            <p style={styles.exchangeLead}>
-              {isPrivate ? "じぶんの記録に のこします。" : deliveryCopy}
+            <p style={styles.exchangeLead} data-testid="exchange-share-status">
+              {statusCopy}
             </p>
           </div>
         </div>
@@ -3580,7 +3590,11 @@ function ExchangeSharePermissionSheet({
         {shouldShowCatPicker ? (
           <div style={styles.exchangeDecisionBlock}>
             <p style={styles.exchangeDecisionLabel}>この子の記録に入れる</p>
-            <div style={styles.exchangeCatPicker} aria-label="入れる猫">
+            <div
+              style={styles.exchangeCatPicker}
+              role="radiogroup"
+              aria-label="入れる猫"
+            >
               {catProfiles.map((profile) => {
                 const isSelected = profile.id === selectedCatId;
 
@@ -3588,12 +3602,14 @@ function ExchangeSharePermissionSheet({
                   <button
                     key={profile.id}
                     type="button"
+                    data-testid={`exchange-share-cat-${profile.id}`}
+                    role="radio"
                     style={{
                       ...styles.exchangeCatOption,
                       ...(isSelected ? styles.exchangeCatOptionActive : {}),
                     }}
                     onClick={() => onCatSelect(profile.id)}
-                    aria-pressed={isSelected}
+                    aria-checked={isSelected}
                   >
                     <span style={styles.exchangeCatName}>{getCatName(profile)}</span>
                     {isSelected ? (
@@ -3631,6 +3647,7 @@ function ExchangeSharePermissionSheet({
                 }}
                 onClick={() => selectMode("shared")}
                 aria-pressed={!isPrivate}
+                data-testid="exchange-share-mode-shared"
               >
                 <span style={styles.exchangeModeIcon} aria-hidden="true">
                   <AppIcon name="mail" size={18} />
@@ -3648,6 +3665,7 @@ function ExchangeSharePermissionSheet({
                 }}
                 onClick={() => selectMode("private")}
                 aria-pressed={isPrivate}
+                data-testid="exchange-share-mode-private"
               >
                 <span style={styles.exchangeModeIcon} aria-hidden="true">
                   <AppIcon name="lock" size={18} />
@@ -3676,8 +3694,9 @@ function ExchangeSharePermissionSheet({
             type="button"
             style={styles.exchangeKeepButton}
             onClick={isPrivate ? onPrivate : onConfirm}
+            data-testid="exchange-share-submit"
           >
-            {isPrivate ? "記録にのこす" : "届ける"}
+            のこす
           </button>
         </div>
     </AppSheet>
@@ -4593,6 +4612,40 @@ function saveStoredTodayHomeCatSelection(selection: {
     );
   } catch {
     // The home can still fall back to an in-memory selection when storage is full.
+  }
+}
+
+function readStoredExchangeShareCatSelection(
+  profiles: CatProfile[],
+  fallbackCatId: string,
+) {
+  try {
+    const parsed = readCachedJson<Partial<{ catId: string }>>(
+      EXCHANGE_SHARE_CAT_SELECTION_STORAGE_KEY,
+    );
+    if (
+      typeof parsed?.catId === "string" &&
+      profiles.some((profile) => profile.id === parsed.catId)
+    ) {
+      return parsed.catId;
+    }
+  } catch {
+    // Fall back to the currently active cat when the cached preference is invalid.
+  }
+
+  return profiles.some((profile) => profile.id === fallbackCatId)
+    ? fallbackCatId
+    : profiles[0]?.id ?? fallbackCatId;
+}
+
+function saveStoredExchangeShareCatSelection(catId: string) {
+  try {
+    window.localStorage.setItem(
+      EXCHANGE_SHARE_CAT_SELECTION_STORAGE_KEY,
+      JSON.stringify({ catId }),
+    );
+  } catch {
+    // Choosing the cat should still work even when storage is full.
   }
 }
 
