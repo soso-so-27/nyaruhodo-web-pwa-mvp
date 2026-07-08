@@ -116,7 +116,7 @@ test.describe("home desk model", () => {
     await expect(page.getByTestId("desk-home-frame")).toBeVisible();
     await expect(page.getByText("おくった")).toBeVisible();
     await expect(page.getByText("よる8時に とどく").first()).toBeVisible();
-    await expect(page.getByText("とっておきに のこす")).toBeVisible();
+    await expect(page.getByText("この子の写真をしまう")).toHaveCount(0);
     await expect(page.getByTestId("desk-letter")).toHaveCount(0);
     await expect(page.getByTestId("today-pair-nav-icon")).toBeVisible();
     await expect(page.getByTestId("today-pair-nav-slot")).toHaveCount(2);
@@ -306,10 +306,9 @@ test.describe("home desk model", () => {
 
     await expect(page.getByText("きょうも すやすや")).toHaveCount(0);
     await expect(page.getByText("ねがおを とる")).toBeVisible();
-    await expect(page.getByText("とると、よる8時に")).toBeVisible();
-    await expect(page.getByText("ねこだよりが とどく")).toBeVisible();
+    await expect(page.getByText("きょうの一枚。よる8時のねこだよりに")).toBeVisible();
     await expect(page.getByText("ねてない子は、アルバムへ")).toHaveCount(0);
-    await expect(page.getByText("とっておきに のこす")).toHaveCount(0);
+    await expect(page.getByText("この子の写真をしまう")).toHaveCount(0);
     await expect(page.getByTestId("desk-letter")).toHaveCount(0);
     await expect(page.getByTestId("desk-empty-frame")).toHaveCSS(
       "border-style",
@@ -656,7 +655,7 @@ test.describe("home desk model", () => {
     await expect(page.getByTestId("desk-home-frame")).toBeVisible();
     const letterTray = page.getByTestId("home-letter-tray");
     await expect(letterTray).toHaveCount(0);
-    await expect(page.getByRole("button", { name: "とっておく" })).toHaveCount(0);
+    await expect(page.getByRole("button", { name: "しまう" })).toHaveCount(0);
     await expect(
       letterTray.getByRole("button", { name: "どこかのこの写真を大きく見る" }),
     ).toHaveCount(0);

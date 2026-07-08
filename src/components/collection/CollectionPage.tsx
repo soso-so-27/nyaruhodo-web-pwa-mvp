@@ -1079,7 +1079,6 @@ export function CollectionPage() {
     const input = document.createElement("input");
     input.type = "file";
     input.accept = "image/*";
-    input.setAttribute("capture", "environment");
 
     input.onchange = async () => {
       const file = input.files?.[0];
@@ -2919,7 +2918,7 @@ function BoxPhotoDetailSheet({
       ) : (
         <div style={styles.photoEmpty}>
           <span style={styles.photoEmptyText}>
-            {kind === "sleeping" ? "ねがおをとると、ここに並びます" : "とっておくと、ここに並びます"}
+            {kind === "sleeping" ? "ねがおをとると、ここに並びます" : "しまうと、ここに並びます"}
           </span>
         </div>
       )}

@@ -62,7 +62,6 @@ type HomeDeskModelProps = {
   showSleepingCounter: boolean;
   now: number;
   onTakePhoto: () => void;
-  onAddCatPhoto?: () => void;
   onOpenDelivery: (state: Extract<EveningHomeState, { kind: "delivered" }>) => void;
   onKeepOpenedDelivery: (dateKey: string, photo: ExchangePhoto) => void;
   onReportOpenedDelivery: (
@@ -246,7 +245,6 @@ export function HomeDeskModel({
   sleepingCounter,
   now,
   onTakePhoto,
-  onAddCatPhoto,
   onOpenDelivery,
   onKeepOpenedDelivery,
   onReportOpenedDelivery,
@@ -321,8 +319,6 @@ export function HomeDeskModel({
     homeDay.phase === "empty-before" ||
     homeDay.phase === "empty-after" ||
     homeDay.phase === "sent-before";
-  const shouldShowCatGalleryPhotoLink =
-    Boolean(onAddCatPhoto) && Boolean(homePhoto) && homeDay.phase !== "delivered";
   const shouldHidePresence = true;
   useEffect(() => {
     trackDeskStateShown(deskState, eveningState.dateKey);
@@ -527,32 +523,22 @@ export function HomeDeskModel({
                     />
                   </span>
                 </button>
-                {shouldShowHomeFrameTakeButton || shouldShowCatGalleryPhotoLink ? (
+                {shouldShowHomeFrameTakeButton ? (
                   <div style={deskStyles.homePhotoActions}>
-                    {shouldShowHomeFrameTakeButton ? (
-                      <button
-                        type="button"
-                        data-testid="home-retake-action"
-                        style={deskStyles.homeAddPhotoButton}
-                        onClick={onTakePhoto}
-                        aria-label="ねがおを とる"
-                      >
-                        <AppIcon name="camera" size={15} />
-                        <span>ねがおを とる</span>
-                      </button>
-                    ) : null}
-                    {shouldShowCatGalleryPhotoLink && onAddCatPhoto ? (
-                      <button
-                        type="button"
-                        style={{
-                          ...deskStyles.homeAddCatPhotoLink,
-                          ...deskStyles.homeAddCatPhotoLinkFloating,
-                        }}
-                        onClick={onAddCatPhoto}
-                      >
-                        とっておきに のこす
-                      </button>
-                    ) : null}
+                    <button
+                      type="button"
+                      data-testid="home-retake-action"
+                      style={deskStyles.homeAddPhotoButton}
+                      onClick={onTakePhoto}
+                      aria-label="ねがおを とる"
+                    >
+                      <AppIcon name="camera" size={15} />
+                      <span>ねがおを とる</span>
+                    </button>
+                    <span style={deskStyles.homeCaptureHint}>
+                      <AppIcon name="mail" size={13} />
+                      きょうの一枚。よる8時のねこだよりに
+                    </span>
                   </div>
                 ) : null}
               </div>
@@ -574,6 +560,10 @@ export function HomeDeskModel({
                   <AppIcon name="camera" size={16} />
                   ねがおを とる
                 </button>
+                <span style={deskStyles.homeCaptureHint}>
+                  <AppIcon name="mail" size={13} />
+                  きょうの一枚。よる8時のねこだよりに
+                </span>
               </div>
             )}
           </div>
@@ -1316,7 +1306,7 @@ function DeskPhotoViewer({
           }}
           onClick={handleSave}
         >
-          {saveState === "saved" ? "とっておいた" : "とっておく"}
+          {saveState === "saved" ? "しまった" : "しまう"}
         </AppButton>
       </section>
       {isReportSheetOpen && viewerPhoto.kind === "other" ? (
@@ -2341,33 +2331,19 @@ const deskStyles = {
     transition:
       "transform 140ms var(--ease-gentle), box-shadow 140ms var(--ease-gentle), background var(--home-daylight-transition, 1800ms) var(--ease-gentle)",
   },
-  homeAddCatPhotoLink: {
-    appearance: "none",
-    WebkitAppearance: "none",
-    border: "none",
-    background: "transparent",
-    color: "color-mix(in srgb, var(--ink-soft) 78%, var(--home-wax, #c2745a))",
+  homeCaptureHint: {
+    display: "inline-flex",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: "5px",
+    maxWidth: "min(260px, 78vw)",
+    color: "color-mix(in srgb, var(--ink-soft) 76%, var(--home-wax, #c2745a))",
     fontFamily: "var(--font-ui)",
     fontSize: "12px",
     fontWeight: 500,
-    lineHeight: 1.6,
+    lineHeight: 1.45,
     letterSpacing: "var(--tracking-body)",
-    padding: "2px 4px",
-    textDecoration: "underline",
-    textDecorationColor: "color-mix(in srgb, var(--ink-soft) 24%, transparent)",
-    textUnderlineOffset: "4px",
-    cursor: "pointer",
-    WebkitTapHighlightColor: "transparent",
-  },
-  homeAddCatPhotoLinkFloating: {
-    padding: "4px 8px",
-    borderRadius: "var(--radius-full)",
-    background: "color-mix(in srgb, var(--paper-card) 74%, transparent)",
-    boxShadow:
-      "0 1px 0 color-mix(in srgb, var(--paper-card) 62%, transparent) inset, 0 8px 18px -16px rgba(70, 50, 30, 0.24)",
-    backdropFilter: "blur(10px)",
-    WebkitBackdropFilter: "blur(10px)",
-    textDecorationColor: "transparent",
+    textAlign: "center",
   },
   sleepingCatPlaceholder: {
     position: "relative",

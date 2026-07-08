@@ -1569,7 +1569,7 @@ export function CatsPage() {
           <LensPhotoSection
             title="この子の写真"
             photos={activeCatLensPhotos}
-            emptyCopy="まだ写真はありません。ねがおを撮るか、とっておきにのこすと、ここに並びます。"
+            emptyCopy="まだ写真はありません。ねがおを撮るか、写真をしまうと、ここに並びます。"
             lensValue={activeLens}
             onLensChange={shouldShowPhotoLensSwitch ? setActiveLens : undefined}
             onAddPhoto={() => {
@@ -2205,13 +2205,13 @@ function CatGalleryIntroSheet({
   onClose: () => void;
 }) {
   return (
-    <AppBottomSheet title="とっておきに のこす" onClose={onClose}>
+    <AppBottomSheet title="この子の写真をしまう" onClose={onClose}>
       <div style={styles.deleteCatConfirm}>
         <p style={styles.deleteCatConfirmTitle}>
-          ここは、とっておきの 100枚だけ。
+          ここは、この子の写真を100枚まで。
         </p>
         <p style={styles.deleteCatConfirmText}>
-          ねこだよりには つかわれません。
+          写真はこの子の記録にしまいます。そとには出ません。
         </p>
         <div style={styles.deleteCatConfirmActions}>
           <AppButton type="button" variant="primary" fullWidth onClick={onContinue}>
@@ -2849,15 +2849,16 @@ function LensPhotoSection({
               type="button"
               style={styles.lensAddPhotoButton}
               onClick={onAddPhoto}
-              aria-label="とっておきを追加"
-              title="とっておきを追加"
+              aria-label="写真をしまう"
+              title="写真をしまう"
             >
               ＋
             </button>
           </div>
         </div>
         <p style={styles.lensSectionSub}>
-          毎日のねがおと、とっておきが並びます。
+          毎日のねがおと、しまった写真が並びます。写真はこの子の記録にしまいます。
+          そとには出ません。
         </p>
       </div>
       <LensPhotoGrid

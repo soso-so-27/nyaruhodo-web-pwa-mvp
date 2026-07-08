@@ -75,9 +75,10 @@ test("keeps the cats photo tab clear of the fixed bottom navigation", async ({
     .toBe(true);
   await expect(page.getByText("この子の写真")).toBeVisible();
   await expect(
-    page.getByText("毎日のねがおと、とっておきが並びます。"),
+    page.getByText("毎日のねがおと、しまった写真が並びます。", { exact: false }),
   ).toBeVisible();
-  await expect(page.getByRole("button", { name: "とっておきを追加" })).toBeVisible();
+  await expect(page.getByText("そとには出ません。", { exact: false })).toBeVisible();
+  await expect(page.getByRole("button", { name: "写真をしまう" })).toBeVisible();
   await expect(photoItems).toHaveCount(16);
   await expect
     .poll(() =>

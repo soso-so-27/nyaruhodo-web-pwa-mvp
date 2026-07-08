@@ -12,11 +12,7 @@ import { getOrCreateAnonymousId } from "../../lib/identity/anonymousId";
 import { purgeAllPhotoSwCache } from "../../lib/photoSwCache";
 import { resizeImageFileToDataUrl } from "../../lib/imageResize";
 import {
-  acknowledgeCatGalleryIntro,
-  CAT_GALLERY_PHOTO_LIMIT,
-  hasAcknowledgedCatGalleryIntro,
   readCatGalleryPhotos,
-  saveCatGalleryPhoto,
 } from "../../lib/cats/catGalleryPhotos";
 import { writeAuthDebugEvent } from "../../lib/authDebug";
 import {
@@ -325,8 +321,6 @@ export function HomeInput({
   } | null>(null);
   const [isDiscoverySheetOpen, setIsDiscoverySheetOpen] = useState(false);
   const [isRecentChangeSheetOpen, setIsRecentChangeSheetOpen] = useState(false);
-  const [isCatGalleryIntroSheetOpen, setIsCatGalleryIntroSheetOpen] =
-    useState(false);
   const [selectedYousu, setSelectedYousu] = useState<string | null>(null);
   const [recordLog, setRecordLog] = useState<RecordLogItem[]>([]);
   const [mikkeRefreshTick, setMikkeRefreshTick] = useState(0);
@@ -1472,104 +1466,6 @@ export function HomeInput({
     input.click();
   }
 
-  function requestCatGalleryPhotoAdd() {
-    if (!activeCatId) return;
-
-    if (!hasAcknowledgedCatGalleryIntro()) {
-      setIsCatGalleryIntroSheetOpen(true);
-      return;
-    }
-
-    void startCatGalleryPhotoAdd();
-  }
-
-  async function startCatGalleryPhotoAdd() {
-    if (!activeCatId) return;
-
-    const targetCatId = activeCatId;
-    if (readCatGalleryPhotos(targetCatId).length >= CAT_GALLERY_PHOTO_LIMIT) {
-      showToast(
-        "保存できる枚数に達しています。残したい写真を整理してから追加してください。",
-      );
-      return;
-    }
-
-    trackProductEvent(
-      "cat_gallery_add_entry_click",
-      {
-        route: "/home",
-        source: "home_sub_cta",
-        cat_id: targetCatId,
-      },
-      { localCatId: targetCatId },
-    );
-
-    const input = document.createElement("input");
-    input.type = "file";
-    input.accept = "image/*";
-
-    input.onchange = async () => {
-      const file = input.files?.[0];
-      if (!file) return;
-
-      try {
-        const [dataUrl, thumbnailDataUrl] = await Promise.all([
-          resizeAndEncode(file, 2560, 0.88),
-          resizeAndEncode(file, 512, 0.72, "image/webp"),
-        ]);
-        const photoSrc = await storeAccountPhotoDataUrl({
-          dataUrl,
-          pathSegments: [targetCatId, "photos"],
-          fileName: `photo-${Date.now()}`,
-        });
-        const thumbnailSrc = await storeAccountPhotoDataUrl({
-          dataUrl: thumbnailDataUrl,
-          pathSegments: [targetCatId, "photos"],
-          fileName: `photo-${Date.now()}-thumb`,
-        });
-
-        if (!isStoragePhotoReference(photoSrc)) {
-          showToast(PHOTO_SAVE_FAILURE_MESSAGE);
-          return;
-        }
-
-        const savedPhoto = saveCatGalleryPhoto({
-          catId: targetCatId,
-          src: photoSrc,
-          thumbnailSrc: isStoragePhotoReference(thumbnailSrc)
-            ? thumbnailSrc
-            : null,
-        });
-
-        if (!savedPhoto) {
-          showToast(PHOTO_SAVE_FAILURE_MESSAGE);
-          return;
-        }
-
-        trackProductEvent(
-          "cat_gallery_photo_added",
-          {
-            route: "/home",
-            source: "home_sub_cta",
-            cat_id: targetCatId,
-          },
-          { localCatId: targetCatId },
-        );
-        showToast("この子の写真に追加しました");
-      } catch {
-        showToast(PHOTO_SAVE_FAILURE_MESSAGE);
-      }
-    };
-
-    input.click();
-  }
-
-  function handleCatGalleryIntroContinue() {
-    acknowledgeCatGalleryIntro();
-    setIsCatGalleryIntroSheetOpen(false);
-    void startCatGalleryPhotoAdd();
-  }
-
   async function handleCollectionPhotoAdd(slot: CollectionSlot) {
     if (!activeCatId || isCollectionPhotoAdding) return;
 
@@ -1587,7 +1483,6 @@ export function HomeInput({
     const input = document.createElement("input");
     input.type = "file";
     input.accept = "image/*";
-    input.setAttribute("capture", "environment");
 
     input.onchange = async () => {
       const file = input.files?.[0];
@@ -1649,7 +1544,6 @@ export function HomeInput({
     const input = document.createElement("input");
     input.type = "file";
     input.accept = "image/*";
-    input.setAttribute("capture", "environment");
 
     input.onchange = async () => {
       const file = input.files?.[0];
@@ -2341,13 +2235,6 @@ export function HomeInput({
               }
               now={homeNow}
               onTakePhoto={() => handleSleepingPhotoStart("camera")}
-              onAddCatPhoto={
-                activeCatId
-                  ? () => {
-                      requestCatGalleryPhotoAdd();
-                    }
-                  : undefined
-              }
               onOpenDelivery={handleOpenEveningDelivery}
               onKeepOpenedDelivery={handleKeepEveningDelivery}
               onReportOpenedDelivery={handleReportEveningDelivery}
@@ -2484,13 +2371,6 @@ export function HomeInput({
           lead={personalityInsight.body}
           body={personalityInsight.sheetBody}
           onClose={() => setIsRecentChangeSheetOpen(false)}
-        />
-      ) : null}
-
-      {isCatGalleryIntroSheetOpen ? (
-        <CatGalleryIntroSheet
-          onContinue={handleCatGalleryIntroContinue}
-          onClose={() => setIsCatGalleryIntroSheetOpen(false)}
         />
       ) : null}
 
@@ -3181,28 +3061,6 @@ function InfoSheet({
   );
 }
 
-function CatGalleryIntroSheet({
-  onContinue,
-  onClose,
-}: {
-  onContinue: () => void;
-  onClose: () => void;
-}) {
-  return (
-    <AppBottomSheet title="とっておきに のこす" onClose={onClose}>
-      <div style={styles.infoSheetBody}>
-        <p style={styles.infoSheetLead}>
-          ここは、とっておきの 100枚だけ。
-        </p>
-        <p style={styles.infoSheetText}>ねこだよりには つかわれません。</p>
-        <AppButton type="button" variant="primary" fullWidth onClick={onContinue}>
-          写真を選ぶ
-        </AppButton>
-      </div>
-    </AppBottomSheet>
-  );
-}
-
 function HomeStartupHold() {
   return (
     <section
@@ -3646,10 +3504,10 @@ function ExchangePhotoSheet({
             onStorageDataUrl={onStorageDataUrl}
           />
         </div>
-        <p style={styles.exchangeAssurance}>とっておくと、アルバムに入ります。</p>
+        <p style={styles.exchangeAssurance}>しまうと、アルバムに入ります。</p>
         <div style={styles.exchangeActions}>
           <button type="button" style={styles.exchangeKeepButton} onClick={onKeep}>
-            とっておく
+            しまう
           </button>
           <button type="button" style={styles.exchangePlainButton} onClick={onClose}>
             閉じる
@@ -3698,7 +3556,7 @@ function ExchangeSharePermissionSheet({
   return (
     <AppSheet
       placement="bottom"
-      title={"このねがおを とっておく"}
+      title={"このねがおを のこす"}
       variant="dim"
       closeOnOverlay={false}
       onClose={onClose}
@@ -3713,7 +3571,7 @@ function ExchangeSharePermissionSheet({
               <AppIcon name={isPrivate ? "lock" : "mail"} size={17} />
             </span>
             <p style={styles.exchangeLead}>
-              {isPrivate ? "自分だけの記録にします。" : deliveryCopy}
+              {isPrivate ? "じぶんの記録に のこします。" : deliveryCopy}
             </p>
           </div>
         </div>
@@ -3819,7 +3677,7 @@ function ExchangeSharePermissionSheet({
             style={styles.exchangeKeepButton}
             onClick={isPrivate ? onPrivate : onConfirm}
           >
-            とっておく
+            {isPrivate ? "記録にのこす" : "届ける"}
           </button>
         </div>
     </AppSheet>

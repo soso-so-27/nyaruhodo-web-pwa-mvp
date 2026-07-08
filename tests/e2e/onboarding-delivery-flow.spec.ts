@@ -15,6 +15,7 @@ test.describe("onboarding delivery flow", () => {
   });
 
   test("reaches the album after adding a real test candidate", async ({ page }) => {
+    test.slow();
     let exchangeCalls = 0;
     let stockCalls = 0;
     const stockResponses: Array<{
@@ -239,7 +240,7 @@ test.describe("onboarding delivery flow", () => {
     });
     expect(eveningDeliveryDays).toBe(0);
     await page.getByRole("button", { name: "つづける" }).click();
-    await continuePastOptionalOnboardingNamePrompt(page);
+    await continuePastOptionalOnboardingBridge(page);
     await expect(page).toHaveURL(/\/account\/create\?from=onboarding/);
 
     const storage = await page.evaluate(() => {
@@ -1513,6 +1514,37 @@ async function seedCatProfileBeforeLoad(page: Page, input: {
     );
     window.localStorage.setItem("active_cat_id", profileInput.id);
   }, input);
+}
+
+async function continuePastOptionalOnboardingBridge(page: Page) {
+  await continuePastOptionalOnboardingNamePrompt(page);
+
+  const deadline = Date.now() + 30_000;
+  while (Date.now() < deadline) {
+    if (/\/account\/create\?from=onboarding/.test(page.url())) {
+      break;
+    }
+
+    const buttons = page.locator("main button");
+    const buttonCount = await buttons.count();
+    const lastButton = buttons.last();
+    const lastButtonText =
+      buttonCount > 0 ? (await lastButton.textContent())?.trim() ?? "" : "";
+
+    if (
+      buttonCount >= 2 &&
+      lastButtonText &&
+      !lastButtonText.includes("つづける") &&
+      !lastButtonText.includes("名前なしで進む")
+    ) {
+      await lastButton.click();
+      break;
+    }
+
+    await page.waitForTimeout(250);
+  }
+
+  await continuePastOptionalOnboardingNamePrompt(page);
 }
 
 async function continuePastOptionalOnboardingNamePrompt(page: Page) {

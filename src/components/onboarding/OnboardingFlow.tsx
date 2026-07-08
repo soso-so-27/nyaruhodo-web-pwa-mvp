@@ -1619,8 +1619,8 @@ export function OnboardingFlow() {
         ) : null}
 
         {state === "kept" ? (
-          <section style={styles.result} aria-label="とっておきました">
-            <p style={styles.kicker}>とっておきました</p>
+          <section style={styles.result} aria-label="しまいました">
+            <p style={styles.kicker}>しまいました</p>
             {completionCopy ? (
               <p style={styles.resultText}>{completionCopy}</p>
             ) : null}
