@@ -75,9 +75,9 @@ test("keeps the cats photo tab clear of the fixed bottom navigation", async ({
     .toBe(true);
   await expect(page.getByText("この子の写真")).toBeVisible();
   await expect(
-    page.getByText("毎日のねがおと、しまった写真が並びます。", { exact: false }),
+    page.getByText("とっておきたい一枚を、ここにしまっておけます。"),
   ).toBeVisible();
-  await expect(page.getByText("そとには出ません。", { exact: false })).toBeVisible();
+  await expect(page.getByTestId("cats-photo-lens-filter")).toHaveCount(0);
   await expect(page.getByRole("button", { name: "写真をしまう" })).toBeVisible();
   await expect(photoItems).toHaveCount(16);
   await expect
@@ -120,6 +120,25 @@ test("keeps the cats photo tab clear of the fixed bottom navigation", async ({
   expect((lastPhotoBox?.y ?? 0) + (lastPhotoBox?.height ?? 0)).toBeLessThan(
     navBox?.y ?? 0,
   );
+
+  await page.getByRole("button", { name: "写真をしまう" }).click();
+  await expect(
+    page.getByText("ここにしまった写真は、ねこだよりには使われません。"),
+  ).toBeVisible();
+});
+
+test("shows the photo lens switch only when multiple cats are registered", async ({
+  page,
+}) => {
+  await seedMultipleCatsProfile(page, Date.parse("2026-06-10T12:30:00+09:00"));
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto("/cats");
+  await page.waitForLoadState("networkidle");
+  await page.getByTestId("cats-section-tab-photos").click();
+
+  await expect(page.getByTestId("cats-photo-lens-filter")).toBeVisible();
+  await expect(page.getByTestId("cats-photo-lens-cat")).toHaveText("この子");
+  await expect(page.getByTestId("cats-photo-lens-all")).toHaveText("ぜんぶ");
 });
 
 test("shows a quiet photo grid skeleton while cats photo thumbnails resolve", async ({

@@ -2211,7 +2211,7 @@ function CatGalleryIntroSheet({
           ここは、この子の写真を100枚まで。
         </p>
         <p style={styles.deleteCatConfirmText}>
-          写真はこの子の記録にしまいます。そとには出ません。
+          ここにしまった写真は、ねこだよりには使われません。
         </p>
         <div style={styles.deleteCatConfirmActions}>
           <AppButton type="button" variant="primary" fullWidth onClick={onContinue}>
@@ -2857,8 +2857,7 @@ function LensPhotoSection({
           </div>
         </div>
         <p style={styles.lensSectionSub}>
-          毎日のねがおと、しまった写真が並びます。写真はこの子の記録にしまいます。
-          そとには出ません。
+          とっておきたい一枚を、ここにしまっておけます。
         </p>
       </div>
       <LensPhotoGrid
@@ -2967,6 +2966,7 @@ function PhotoLensFilter({
   return (
     <div
       role="radiogroup"
+      data-testid="cats-photo-lens-filter"
       aria-label="写真の見かた"
       style={styles.photoLensFilter}
     >
@@ -2977,6 +2977,7 @@ function PhotoLensFilter({
             key={option.value}
             type="button"
             role="radio"
+            data-testid={`cats-photo-lens-${option.value}`}
             aria-checked={selected}
             style={
               selected
