@@ -84,7 +84,7 @@ async function prefetchStartupPhotos() {
 }
 
 function getLargePhotoSource(photo: PhotoSourceSet) {
-  return resolvePhotoSrc(photo, "large");
+  return resolvePhotoSrc(photo, "board");
 }
 
 function readActiveCatId() {

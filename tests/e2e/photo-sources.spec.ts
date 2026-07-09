@@ -35,8 +35,8 @@ test.describe("photo source resolution", () => {
 
     expect(resolvePhotoSrc(photo, "list")).toBe(photo.thumbnailSrc);
     expect(resolvePhotoStorageVariant(photo, "list")).toBe("display");
-    expect(resolvePhotoSrc(photo, "large")).toBe(photo.displaySrc);
-    expect(resolvePhotoStorageVariant(photo, "large")).toBe("thumbnail");
+    expect(resolvePhotoSrc(photo, "board")).toBe(photo.displaySrc);
+    expect(resolvePhotoStorageVariant(photo, "board")).toBe("thumbnail");
   });
 
   test("returns stable unique fallbacks for every visible screen", () => {

@@ -4,7 +4,34 @@ import {
   type StorageSignedUrlVariant,
 } from "./photoStorage";
 
-export type PhotoSourceContext = "list" | "large" | "cover" | "detail";
+export type PhotoSourceContext = "list" | "board" | "cover" | "detail";
+
+export const PHOTO_DISPLAY_CONTRACT = {
+  list: {
+    fit: "cover",
+    source: "thumbnail",
+    storageVariant: "thumbnail",
+    usage: "square tiles",
+  },
+  board: {
+    fit: "cover",
+    source: "display",
+    storageVariant: "thumbnail",
+    usage: "nekodayori board cards",
+  },
+  cover: {
+    fit: "cover",
+    source: "display",
+    storageVariant: "display",
+    usage: "cat profile cover",
+  },
+  detail: {
+    fit: "contain",
+    source: "display",
+    storageVariant: "display",
+    usage: "full/detail viewer",
+  },
+} as const;
 
 export type PhotoSourceSet = {
   src: string;
@@ -35,7 +62,10 @@ export function resolvePhotoStorageVariant(
     return "display";
   }
 
-  if (context === "large") {
+  if (context === "board") {
+    // Board cards should sign the larger display/original asset with the
+    // thumbnail transform. This shrinks a large source to width=800 instead of
+    // upscaling a saved 512px thumbnail asset.
     return "thumbnail";
   }
 

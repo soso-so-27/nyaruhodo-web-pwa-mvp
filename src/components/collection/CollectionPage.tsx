@@ -2318,7 +2318,7 @@ function MainichiBoardPhotoCard({
         alt=""
         variant="tile"
         aspect={layout.aspect}
-        storageVariant={getPhotoStorageVariant(photo, "large")}
+        storageVariant={getPhotoStorageVariant(photo, "board")}
         initiallyLoaded
         style={styles.mainichiBoardPhotoTileRoot}
         imageStyle={styles.mainichiBoardPhotoTile}
@@ -4877,7 +4877,7 @@ function getPhotoThumbnailSrc(photo: PhotoSourceSet) {
 function getPhotoTransformBaseSrc(photo: PhotoSourceSet) {
   // Transformed signed URLs should shrink a larger display/original asset, not
   // upscale the saved 512px thumbnail asset.
-  return resolvePhotoSrc(photo, "large");
+  return resolvePhotoSrc(photo, "board");
 }
 
 function getPhotoDetailSrc(photo: PhotoSourceSet) {
