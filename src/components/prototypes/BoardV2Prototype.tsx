@@ -40,7 +40,11 @@ type PrototypePhoto = {
 const PHOTO_STORAGE_EVENT = "nyaruhodo_box_photos_updated";
 const ACCOUNT_RESTORE_TIMEOUT_MS = 8000;
 
-export function BoardV2Prototype() {
+export function BoardV2Prototype({
+  returnToPath = "/prototypes/board-v2",
+}: {
+  returnToPath?: string;
+}) {
   const [side, setSide] = useState<BoardSide>("sent");
   const [mode, setMode] = useState<BoardMode>("v2");
   const [allPhotos, setAllPhotos] = useState<PrototypePhoto[]>([]);
@@ -175,7 +179,11 @@ export function BoardV2Prototype() {
           </span>
         </div>
         {!hasAnyRealPhoto ? (
-          <AccountRestoreNotice status={restoreStatus} onRestore={restoreRemotePhotos} />
+          <AccountRestoreNotice
+            status={restoreStatus}
+            returnToPath={returnToPath}
+            onRestore={restoreRemotePhotos}
+          />
         ) : displayedPhotos.length === 0 ? (
           <div style={styles.empty} data-testid="board-v2-empty">
             この月の写真はまだありません。
@@ -247,9 +255,11 @@ async function syncAccountDataForPrototype() {
 
 function AccountRestoreNotice({
   status,
+  returnToPath,
   onRestore,
 }: {
   status: "idle" | "checking" | "restored" | "skipped" | "error";
+  returnToPath: string;
   onRestore: () => void;
 }) {
   const text =
@@ -267,7 +277,7 @@ function AccountRestoreNotice({
       <p style={styles.restoreText}>{text}</p>
       <div style={styles.restoreActions}>
         <a
-          href="/account/create?returnTo=/prototypes/board-v2"
+          href={`/account/create?returnTo=${encodeURIComponent(returnToPath)}`}
           data-testid="board-v2-login-link"
           style={styles.restoreLoginLink}
         >

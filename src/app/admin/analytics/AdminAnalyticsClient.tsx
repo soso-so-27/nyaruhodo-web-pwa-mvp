@@ -113,6 +113,9 @@ export default function AdminAnalyticsClient() {
           <a href="/admin/animation-preview" style={styles.adminToolLink}>
             開封アニメーション確認
           </a>
+          <a href="/admin/board-v2" style={styles.adminToolLink}>
+            ねこだよりボードv2確認
+          </a>
         </div>
       </section>
 

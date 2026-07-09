@@ -120,7 +120,7 @@ test.describe("board v2 prototype", () => {
     await expect(page.getByTestId("board-v2-restore-notice")).toBeVisible();
     await expect(page.getByTestId("board-v2-login-link")).toHaveAttribute(
       "href",
-      "/account/create?returnTo=/prototypes/board-v2",
+      "/account/create?returnTo=%2Fprototypes%2Fboard-v2",
     );
     await expect(page.getByTestId("board-v2-restore-account")).toBeEnabled();
 
@@ -145,5 +145,23 @@ test.describe("board v2 prototype", () => {
 
     expect(layout).toContain('process.env.VERCEL_ENV === "production"');
     expect(layout).toContain("notFound()");
+  });
+
+  test("exposes board v2 through an admin-only production route", async () => {
+    const pageSource = fs.readFileSync(
+      path.resolve(process.cwd(), "src/app/admin/board-v2/page.tsx"),
+      "utf8",
+    );
+    const analyticsSource = fs.readFileSync(
+      path.resolve(
+        process.cwd(),
+        "src/app/admin/analytics/AdminAnalyticsClient.tsx",
+      ),
+      "utf8",
+    );
+
+    expect(pageSource).toContain("requireAdminAccess");
+    expect(pageSource).toContain('returnToPath="/admin/board-v2"');
+    expect(analyticsSource).toContain("/admin/board-v2");
   });
 });
