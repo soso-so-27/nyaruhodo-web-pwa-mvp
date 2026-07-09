@@ -49,6 +49,13 @@ import {
 import { createBrowserSupabaseClient } from "../../lib/supabase/browser";
 import { getStoragePhotoPath } from "../../lib/photoStorage";
 import {
+  resolvePhotoFallbackSrcs,
+  resolvePhotoSrc,
+  resolvePhotoStorageVariant,
+  type PhotoSourceContext,
+  type PhotoSourceSet,
+} from "../../lib/photoSources";
+import {
   markOmoideMemoryOpened,
   readOmoideMemoriesForCat,
   trackOmoideMemoryDismissed,
@@ -334,7 +341,7 @@ export function CatsPage() {
     activeCatGalleryLensPhotos[0] ?? stableSleepingCoverPhoto;
   const activeCoverSrc =
     activeCatProfile?.coverPhotoDataUrl ??
-    (activeCoverPhoto ? getLensPhotoDetailSrc(activeCoverPhoto) : undefined);
+    (activeCoverPhoto ? resolvePhotoSrc(activeCoverPhoto, "cover") : undefined);
   const activeCoverPreviewSrc = hasCustomCoverPhoto
     ? undefined
     : activeCoverPhoto
@@ -1399,7 +1406,16 @@ export function CatsPage() {
                         variant="bare"
                         fit={activeCoverFit}
                         aspect="auto"
-                        storageVariant="display"
+                        storageVariant={
+                          activeCoverPhoto
+                            ? getLensPhotoStorageVariant(activeCoverPhoto, "cover")
+                            : "display"
+                        }
+                        fallbackSrcs={
+                          activeCoverPhoto
+                            ? getLensPhotoFallbackSrcs(activeCoverPhoto)
+                            : undefined
+                        }
                         loading="eager"
                         style={styles.profileCoverTileRoot}
                         imageStyle={styles.profileCoverImage}
@@ -3082,12 +3098,7 @@ function LensPhotoGrid({
     void Promise.allSettled(
       firstViewPhotos.map((photo) =>
         decodePhotoSourcesForDisplay(
-          [
-            getLensPhotoThumbnailSrc(photo),
-            photo.displaySrc ?? "",
-            photo.originalSrc ?? "",
-            photo.src,
-          ],
+          [getLensPhotoThumbnailSrc(photo), ...getLensPhotoFallbackSrcs(photo)],
           "thumbnail",
           LENS_PHOTO_REVEAL_TIMEOUT_MS,
         ),
@@ -3200,6 +3211,8 @@ function PhotoListSheet({
                   alt=""
                   variant="tile"
                   aspect="1 / 1"
+                  storageVariant={getLensPhotoStorageVariant(photo, "list")}
+                  fallbackSrcs={getLensPhotoFallbackSrcs(photo)}
                   style={styles.photoListTileRoot}
                   imageStyle={styles.photoListTile}
                 />
@@ -3401,9 +3414,11 @@ function YearSummaryDetailList({
             >
               <span style={styles.yearSummaryRowThumb}>
                 <StoredPhotoImage
-                  src={memory.photo.thumbnailSrc ?? memory.photo.displaySrc ?? memory.photo.src}
+                  src={resolvePhotoSrc(memory.photo, "list")}
                   alt=""
                   style={styles.yearSummaryRowImage}
+                  storageVariant={resolvePhotoStorageVariant(memory.photo, "list")}
+                  fallbackSrcs={resolvePhotoFallbackSrcs(memory.photo)}
                 />
               </span>
               <span style={styles.yearSummaryRowText}>
@@ -3842,13 +3857,11 @@ function OmoideBunbako({
             >
               <span style={styles.bunbakoThumb}>
                 <StoredPhotoImage
-                  src={
-                    memory.photo.thumbnailSrc ??
-                    memory.photo.displaySrc ??
-                    memory.photo.src
-                  }
+                  src={resolvePhotoSrc(memory.photo, "list")}
                   alt=""
                   style={styles.bunbakoPhoto}
+                  storageVariant={resolvePhotoStorageVariant(memory.photo, "list")}
+                  fallbackSrcs={resolvePhotoFallbackSrcs(memory.photo)}
                 />
               </span>
               <span style={styles.bunbakoText}>
@@ -4187,10 +4200,10 @@ function createLocalGalleryLensPhoto(
 ): LensPhoto {
   return {
     id: photo.id,
-    src: photo.thumbnailSrc ?? photo.src,
+    src: resolvePhotoSrc(photo, "list"),
     thumbnailSrc: photo.thumbnailSrc,
-    displaySrc: photo.src,
-    originalSrc: photo.src,
+    displaySrc: resolvePhotoSrc(photo, "detail"),
+    originalSrc: resolvePhotoSrc(photo, "detail"),
     createdAt: photo.createdAt,
     catIds: [profile.id],
     catNames: [getCatName(profile)],
@@ -4265,9 +4278,9 @@ function dedupeLensPhotos(photos: LensPhoto[]) {
       createdAt: Math.max(existing.createdAt, photo.createdAt),
       catIds: uniqueStrings([...existing.catIds, ...photo.catIds]),
       catNames: uniqueStrings([...existing.catNames, ...photo.catNames]),
-      thumbnailSrc: existing.thumbnailSrc ?? photo.thumbnailSrc,
-      displaySrc: existing.displaySrc ?? photo.displaySrc,
-      originalSrc: existing.originalSrc ?? photo.originalSrc,
+      thumbnailSrc: preferPhotoVariant(existing.thumbnailSrc, photo.thumbnailSrc),
+      displaySrc: preferPhotoVariant(existing.displaySrc, photo.displaySrc),
+      originalSrc: preferPhotoVariant(existing.originalSrc, photo.originalSrc),
       deliveryCount: Math.max(
         existing.deliveryCount ?? 0,
         photo.deliveryCount ?? 0,
@@ -4282,6 +4295,13 @@ function dedupeLensPhotos(photos: LensPhoto[]) {
 
 function uniqueStrings(values: string[]) {
   return [...new Set(values.filter(Boolean))];
+}
+
+function preferPhotoVariant(
+  existing: string | undefined,
+  incoming: string | undefined,
+) {
+  return existing || incoming;
 }
 
 function parseRemoteLensPhotoDate(dateValue: string | null) {
@@ -4312,21 +4332,23 @@ function toRecordPhotoPreview(photo: LensPhoto): RecordPhotoPreview {
   };
 }
 
-function getLensPhotoThumbnailSrc(photo: {
-  src: string;
-  thumbnailSrc?: string;
-  displaySrc?: string;
-}) {
-  return photo.thumbnailSrc ?? photo.displaySrc ?? photo.src;
+function getLensPhotoThumbnailSrc(photo: PhotoSourceSet) {
+  return resolvePhotoSrc(photo, "list");
 }
 
-function getLensPhotoDetailSrc(photo: {
-  src: string;
-  displaySrc?: string;
-  originalSrc?: string;
-  thumbnailSrc?: string;
-}) {
-  return photo.displaySrc ?? photo.originalSrc ?? photo.thumbnailSrc ?? photo.src;
+function getLensPhotoDetailSrc(photo: PhotoSourceSet) {
+  return resolvePhotoSrc(photo, "detail");
+}
+
+function getLensPhotoStorageVariant(
+  photo: PhotoSourceSet,
+  context: PhotoSourceContext,
+) {
+  return resolvePhotoStorageVariant(photo, context);
+}
+
+function getLensPhotoFallbackSrcs(photo: PhotoSourceSet) {
+  return resolvePhotoFallbackSrcs(photo);
 }
 
 function normalizeCoverCrop(crop?: Partial<CatCoverCrop>): CatCoverCrop {
@@ -4374,11 +4396,7 @@ function clampNumber(value: number, min: number, max: number) {
 function toRecordPhotoPreviewFromMemory(memory: OmoideMemory): RecordPhotoPreview {
   return {
     id: memory.id,
-    src:
-      memory.photo.displaySrc ??
-      memory.photo.thumbnailSrc ??
-      memory.photo.originalSrc ??
-      memory.photo.src,
+    src: resolvePhotoSrc(memory.photo, "detail"),
     title: memory.title || "思い出",
     timestamp: memory.openedAt ?? memory.deliveredAt,
   };
@@ -4411,7 +4429,7 @@ async function backfillCatGalleryThumbnails(
       break;
     }
 
-    const source = photo.displaySrc ?? photo.originalSrc ?? photo.src;
+    const source = resolvePhotoSrc(photo, "detail");
     const displaySrc = isStoragePhotoReference(source)
       ? await getStoragePhotoSignedUrl(source)
       : source;

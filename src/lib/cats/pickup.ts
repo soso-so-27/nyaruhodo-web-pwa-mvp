@@ -3,6 +3,7 @@ import type {
   CatSleepingMilestoneTarget,
 } from "../home/sleepingPhotos";
 import type { OmoideMemory } from "../home/omoideDelivery";
+import { resolvePhotoSrc } from "../photoSources";
 import { readCachedJson, writeCachedJson } from "../storage";
 
 export type CatPickupPhoto = {
@@ -191,7 +192,7 @@ function createMemoryCandidate({
     actionLabel: "見る",
     score: 82 + getLookbackBonus(memory.lookback),
     scoredAt: memory.deliveredAt,
-    src: memory.photo.thumbnailSrc ?? memory.photo.displaySrc ?? memory.photo.src,
+    src: resolvePhotoSrc(memory.photo, "list"),
     target: { kind: "memory", memory },
   };
 }

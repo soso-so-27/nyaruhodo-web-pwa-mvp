@@ -20,6 +20,13 @@ import {
 } from "../../lib/photoStorageClient";
 import { isUsablePhotoSrc } from "../../lib/photoStorage";
 import {
+  resolvePhotoFallbackSrcs,
+  resolvePhotoSrc,
+  resolvePhotoStorageVariant,
+  type PhotoSourceContext,
+  type PhotoSourceSet,
+} from "../../lib/photoSources";
+import {
   BOX_PHOTO_STORAGE_EVENT,
   deleteOwnSleepingPhoto,
   dismissExchangePhoto,
@@ -502,8 +509,8 @@ export function CollectionPage() {
         id: photo.id,
         src: getPhotoThumbnailSrc(photo),
         thumbnailSrc: photo.thumbnailSrc,
-        displaySrc: photo.displaySrc ?? photo.src,
-        originalSrc: photo.originalSrc ?? photo.src,
+        displaySrc: resolvePhotoSrc(photo, "detail"),
+        originalSrc: resolvePhotoSrc(photo, "detail"),
         createdAt: getCollectionPhotoTimestamp(photo),
         sourcePhotoId: photo.slotId,
       })),
@@ -2310,7 +2317,7 @@ function MainichiBoardPhotoCard({
         alt=""
         variant="tile"
         aspect={layout.aspect}
-        storageVariant="thumbnail"
+        storageVariant={getPhotoStorageVariant(photo, "large")}
         initiallyLoaded
         style={styles.mainichiBoardPhotoTileRoot}
         imageStyle={styles.mainichiBoardPhotoTile}
@@ -2493,6 +2500,7 @@ function MainichiDaySheet({
                   alt=""
                   variant="tile"
                   aspect="1 / 1"
+                  storageVariant={getPhotoStorageVariant(photo, "list")}
                   style={styles.mainichiDayPhotoTileRoot}
                   imageStyle={styles.mainichiDayPhotoTile}
                   onStorageDataUrl={photo.storageWriteback}
@@ -2669,6 +2677,7 @@ function MainichiFullscreenPhoto({
           alt=""
           fit="contain"
           aspect="auto"
+          storageVariant={getPhotoStorageVariant(photo, "detail")}
           style={{
             ...styles.mainichiViewerFrame,
             aspectRatio: photoAspectRatio,
@@ -2891,6 +2900,7 @@ function BoxPhotoDetailSheet({
                   fallbackSrcs={getPhotoFallbackSrcs(photo)}
                   alt=""
                   style={styles.photoImg}
+                  storageVariant={getPhotoStorageVariant(photo, "detail")}
                   onStorageDataUrl={
                     kind === "other"
                       ? (dataUrl) => writeBackDeliveredPhotoDataUrl(photo, dataUrl)
@@ -3387,6 +3397,7 @@ function CollectionCard({
           fallbackSrcs={getPhotoFallbackSrcs(firstPhoto)}
           alt=""
           style={styles.cardPhoto}
+          storageVariant={getPhotoStorageVariant(firstPhoto, "list")}
         />
         <span style={styles.cardPhotoFade} aria-hidden="true" />
         {photos.length > 1 ? (
@@ -3452,6 +3463,7 @@ function CollectionPhotoSheet({
                   fallbackSrcs={getPhotoFallbackSrcs(photo)}
                   alt=""
                   style={styles.photoImg}
+                  storageVariant={getPhotoStorageVariant(photo, "detail")}
                 />
                 {photo.localIndex !== undefined ? (
                   <AppButton
@@ -4857,63 +4869,29 @@ function getBoxPhotoTimestamp(photo: BoxPreviewPhoto) {
   return photo.deliveredAt ?? photo.createdAt ?? parseTimestampFromId(photo.id) ?? Date.now();
 }
 
-function getPhotoThumbnailSrc(photo: {
-  src: string;
-  thumbnailSrc?: string;
-  displaySrc?: string;
-}) {
-  if (isUsableStoredPhotoSrc(photo.thumbnailSrc)) {
-    return photo.thumbnailSrc;
-  }
-
-  return isUsableStoredPhotoSrc(photo.displaySrc) ? photo.displaySrc : photo.src;
+function getPhotoThumbnailSrc(photo: PhotoSourceSet) {
+  return resolvePhotoSrc(photo, "list");
 }
 
-function getPhotoTransformBaseSrc(photo: {
-  src: string;
-  displaySrc?: string;
-  originalSrc?: string;
-  thumbnailSrc?: string;
-}) {
+function getPhotoTransformBaseSrc(photo: PhotoSourceSet) {
   // Transformed signed URLs should shrink a larger display/original asset, not
   // upscale the saved 512px thumbnail asset.
-  if (isUsableStoredPhotoSrc(photo.displaySrc)) {
-    return photo.displaySrc;
-  }
-
-  if (isUsableStoredPhotoSrc(photo.originalSrc)) {
-    return photo.originalSrc;
-  }
-
-  return isUsableStoredPhotoSrc(photo.thumbnailSrc) ? photo.thumbnailSrc : photo.src;
+  return resolvePhotoSrc(photo, "large");
 }
 
-function getPhotoDetailSrc(photo: {
-  src: string;
-  thumbnailSrc?: string;
-  displaySrc?: string;
-  originalSrc?: string;
-}) {
-  if (isUsableStoredPhotoSrc(photo.displaySrc)) {
-    return photo.displaySrc;
-  }
-
-  if (isUsableStoredPhotoSrc(photo.originalSrc)) {
-    return photo.originalSrc;
-  }
-
-  return isUsableStoredPhotoSrc(photo.thumbnailSrc) ? photo.thumbnailSrc : photo.src;
+function getPhotoDetailSrc(photo: PhotoSourceSet) {
+  return resolvePhotoSrc(photo, "detail");
 }
 
-function getPhotoFallbackSrcs(photo: {
-  src: string;
-  thumbnailSrc?: string;
-  displaySrc?: string;
-  originalSrc?: string;
-}) {
-  return [photo.displaySrc, photo.thumbnailSrc, photo.originalSrc, photo.src].filter(
-    (src): src is string => isUsableStoredPhotoSrc(src),
-  );
+function getPhotoStorageVariant(
+  photo: PhotoSourceSet,
+  context: PhotoSourceContext,
+) {
+  return resolvePhotoStorageVariant(photo, context);
+}
+
+function getPhotoFallbackSrcs(photo: PhotoSourceSet) {
+  return resolvePhotoFallbackSrcs(photo);
 }
 
 function writeBackDeliveredPhotoDataUrl(photo: BoxPreviewPhoto, dataUrl: string) {

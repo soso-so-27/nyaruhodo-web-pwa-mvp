@@ -11,6 +11,13 @@ import type {
 } from "../../lib/home/sleepingPhotos";
 import { trackProductEvent } from "../../lib/analytics/productAnalytics";
 import { playOpenSound } from "../../lib/openSound";
+import {
+  resolvePhotoFallbackSrcs,
+  resolvePhotoSrc,
+  resolvePhotoStorageVariant,
+  type PhotoSourceContext,
+  type PhotoSourceSet,
+} from "../../lib/photoSources";
 import { BottomNavigation } from "../navigation/BottomNavigation";
 import { AppButton } from "../ui/AppButton";
 import { AppCard } from "../ui/AppCard";
@@ -514,6 +521,8 @@ export function HomeDeskModel({
                       src={getPhotoDisplaySrc(homePhoto)}
                       alt=""
                       style={deskStyles.homeFrameImage}
+                      storageVariant={getPhotoStorageVariant(homePhoto, "list")}
+                      fallbackSrcs={getPhotoFallbackSrcs(homePhoto)}
                       onNaturalSize={({ width, height }) => {
                         if (width <= 0 || height <= 0) return;
                         const nextAspect = clampHomePhotoAspect(width / height);
@@ -708,6 +717,7 @@ export function HomeDeskModel({
                           src={getPhotoDetailSrc(deliveredPhoto)}
                           fallbackSrcs={getPhotoFallbackSrcs(deliveredPhoto)}
                           alt=""
+                          storageVariant={getPhotoStorageVariant(deliveredPhoto, "detail")}
                           loading="eager"
                           onLoad={handleRevealPhotoLoaded}
                           onError={handleRevealPhotoError}
@@ -802,6 +812,8 @@ export function HomeDeskModel({
                       src={getPhotoDisplaySrc(memory.photo)}
                       alt=""
                       style={deskStyles.notificationThumbImage}
+                      storageVariant={getPhotoStorageVariant(memory.photo, "list")}
+                      fallbackSrcs={getPhotoFallbackSrcs(memory.photo)}
                     />
                   </span>
                   <span
@@ -1302,6 +1314,7 @@ function DeskPhotoViewer({
           src={getPhotoDetailSrc(viewerPhoto.photo)}
           fallbackSrcs={getPhotoFallbackSrcs(viewerPhoto.photo)}
           alt=""
+          storageVariant={getPhotoStorageVariant(viewerPhoto.photo, "detail")}
           aspect={isOwnPhoto ? "auto" : undefined}
           fit={isOwnPhoto ? "cover" : "contain"}
           style={
@@ -1973,33 +1986,23 @@ function parseHexColor(hex: string) {
   return [1, 3, 5].map((start) => Number.parseInt(hex.slice(start, start + 2), 16));
 }
 
-function getPhotoDisplaySrc(
-  photo: Pick<
-    OwnSleepingPhoto | ExchangePhoto,
-    "src" | "thumbnailSrc" | "displaySrc" | "originalSrc"
-  >,
-) {
-  return photo.displaySrc ?? photo.thumbnailSrc ?? photo.src;
+function getPhotoDisplaySrc(photo: PhotoSourceSet) {
+  return resolvePhotoSrc(photo, "list");
 }
 
-function getPhotoDetailSrc(
-  photo: Pick<
-    OwnSleepingPhoto | ExchangePhoto,
-    "src" | "thumbnailSrc" | "displaySrc" | "originalSrc"
-  >,
-) {
-  return photo.displaySrc ?? photo.originalSrc ?? photo.thumbnailSrc ?? photo.src;
+function getPhotoDetailSrc(photo: PhotoSourceSet) {
+  return resolvePhotoSrc(photo, "detail");
 }
 
-function getPhotoFallbackSrcs(
-  photo: Pick<
-    OwnSleepingPhoto | ExchangePhoto,
-    "src" | "thumbnailSrc" | "displaySrc" | "originalSrc"
-  >,
+function getPhotoStorageVariant(
+  photo: PhotoSourceSet,
+  context: PhotoSourceContext,
 ) {
-  return [photo.displaySrc, photo.thumbnailSrc, photo.originalSrc, photo.src].filter(
-    (src): src is string => typeof src === "string" && src.trim().length > 0,
-  );
+  return resolvePhotoStorageVariant(photo, context);
+}
+
+function getPhotoFallbackSrcs(photo: PhotoSourceSet) {
+  return resolvePhotoFallbackSrcs(photo);
 }
 
 async function savePhotoToDevice(

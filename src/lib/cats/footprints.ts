@@ -3,6 +3,7 @@ import type {
   CatSleepingMilestoneTarget,
 } from "../home/sleepingPhotos";
 import type { OmoideMemory } from "../home/omoideDelivery";
+import { resolvePhotoSrc } from "../photoSources";
 
 export type CatFootprintPhoto = {
   id: string;
@@ -87,7 +88,7 @@ export function createCatFootprintEntries({
       type: "pickup" as const,
       title: "思い出を見た",
       timestamp: memory.openedAt ?? memory.deliveredAt,
-      src: memory.photo.thumbnailSrc ?? memory.photo.displaySrc ?? memory.photo.src,
+      src: resolvePhotoSrc(memory.photo, "list"),
       memory,
     }));
 

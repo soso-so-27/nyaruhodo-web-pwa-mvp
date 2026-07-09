@@ -10,6 +10,13 @@ import {
 import { trackProductEvent } from "../../lib/analytics/productAnalytics";
 import { getOrCreateAnonymousId } from "../../lib/identity/anonymousId";
 import { purgeAllPhotoSwCache } from "../../lib/photoSwCache";
+import {
+  resolvePhotoFallbackSrcs,
+  resolvePhotoSrc,
+  resolvePhotoStorageVariant,
+  type PhotoSourceContext,
+  type PhotoSourceSet,
+} from "../../lib/photoSources";
 import { resizeImageFileToDataUrl } from "../../lib/imageResize";
 import {
   readCatGalleryPhotos,
@@ -3303,6 +3310,7 @@ function EveningDeliveryOpening({
             fallbackSrcs={getPhotoFallbackSrcs(state.deliveredPhoto)}
             alt=""
             style={styles.eveningOpeningPhoto}
+            storageVariant={getPhotoStorageVariant(state.deliveredPhoto, "detail")}
             onStorageDataUrl={onStorageDataUrl}
           />
         </div>
@@ -3520,6 +3528,7 @@ function ExchangePhotoSheet({
             fallbackSrcs={getPhotoFallbackSrcs(photo)}
             alt=""
             style={styles.exchangePhoto}
+            storageVariant={getPhotoStorageVariant(photo, "detail")}
             onStorageDataUrl={onStorageDataUrl}
           />
         </div>
@@ -4945,18 +4954,20 @@ function saveCollectionPhoto(catId: string, slug: string, dataUrl: string) {
 }
 
 function getPhotoThumbnailSrc(
-  photo: Pick<OwnSleepingPhoto | ExchangePhoto, "src" | "thumbnailSrc" | "displaySrc">,
+  photo: PhotoSourceSet,
 ) {
-  return photo.thumbnailSrc ?? photo.displaySrc ?? photo.src;
+  return resolvePhotoSrc(photo, "list");
 }
 
-function getPhotoDetailSrc(
-  photo: Pick<
-    OwnSleepingPhoto | ExchangePhoto,
-    "src" | "thumbnailSrc" | "displaySrc" | "originalSrc"
-  >,
+function getPhotoDetailSrc(photo: PhotoSourceSet) {
+  return resolvePhotoSrc(photo, "detail");
+}
+
+function getPhotoStorageVariant(
+  photo: PhotoSourceSet,
+  context: PhotoSourceContext,
 ) {
-  return photo.displaySrc ?? photo.originalSrc ?? photo.thumbnailSrc ?? photo.src;
+  return resolvePhotoStorageVariant(photo, context);
 }
 
 function getDeliveredPhotoDecodeKey(
@@ -5070,14 +5081,9 @@ async function decodeImageSource(src: string) {
 }
 
 function getPhotoFallbackSrcs(
-  photo: Pick<
-    OwnSleepingPhoto | ExchangePhoto,
-    "src" | "thumbnailSrc" | "displaySrc" | "originalSrc"
-  >,
+  photo: PhotoSourceSet,
 ) {
-  return [photo.displaySrc, photo.thumbnailSrc, photo.originalSrc, photo.src].filter(
-    (src): src is string => typeof src === "string" && src.trim().length > 0,
-  );
+  return resolvePhotoFallbackSrcs(photo);
 }
 
 function hasAcceptedSleepingSafetyNotice() {

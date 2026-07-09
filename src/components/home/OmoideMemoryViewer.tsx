@@ -3,6 +3,11 @@
 import type { CSSProperties } from "react";
 
 import type { OmoideMemory } from "../../lib/home/omoideDelivery";
+import {
+  resolvePhotoFallbackSrcs,
+  resolvePhotoSrc,
+  resolvePhotoStorageVariant,
+} from "../../lib/photoSources";
 import { StoredPhotoImage } from "../ui/StoredPhotoImage";
 
 export function OmoideMemoryViewer({
@@ -35,6 +40,7 @@ export function OmoideMemoryViewer({
             fallbackSrcs={getOmoidePhotoFallbackSrcs(memory)}
             alt=""
             style={viewerStyles.photo}
+            storageVariant={resolvePhotoStorageVariant(memory.photo, "detail")}
             loading={isRevisit ? "lazy" : "eager"}
             fetchPriority={isRevisit ? "auto" : "high"}
           />
@@ -65,22 +71,11 @@ export function formatOmoideSourceDate(dateKey: string) {
 }
 
 function getOmoidePhotoDetailSrc(memory: OmoideMemory) {
-  return (
-    memory.photo.displaySrc ??
-    memory.photo.originalSrc ??
-    memory.photo.thumbnailSrc ??
-    memory.photo.src
-  );
+  return resolvePhotoSrc(memory.photo, "detail");
 }
 
 function getOmoidePhotoFallbackSrcs(memory: OmoideMemory) {
-  const src = getOmoidePhotoDetailSrc(memory);
-  return [
-    memory.photo.displaySrc,
-    memory.photo.thumbnailSrc,
-    memory.photo.originalSrc,
-    memory.photo.src,
-  ].filter((value): value is string => Boolean(value && value !== src));
+  return resolvePhotoFallbackSrcs(memory.photo);
 }
 
 const viewerStyles = {

@@ -10,6 +10,7 @@ import {
   type ExchangePhoto,
   type OwnSleepingPhoto,
 } from "../../lib/home/sleepingPhotos";
+import { resolvePhotoSrc, type PhotoSourceSet } from "../../lib/photoSources";
 import { isUsablePhotoSrc } from "../../lib/photoStorage";
 import { STORAGE_KEYS } from "../../lib/storage";
 import { prefetchStoragePhotoImages } from "../ui/StoredPhotoImage";
@@ -54,7 +55,7 @@ async function prefetchStartupPhotos() {
     .filter(isUsablePhotoSrc);
   const catGallerySources = readCatGalleryPhotos(activeCatId)
     .slice(0, PREFETCH_LIMIT_PER_BUCKET)
-    .map((photo) => photo.thumbnailSrc ?? photo.src)
+    .map(getLargePhotoSource)
     .filter(isUsablePhotoSrc);
 
   const thumbnailSources = [...sentSources, ...deliveredSources, ...catGallerySources];
@@ -82,8 +83,8 @@ async function prefetchStartupPhotos() {
   }
 }
 
-function getLargePhotoSource(photo: OwnSleepingPhoto | ExchangePhoto) {
-  return photo.displaySrc ?? photo.originalSrc ?? photo.thumbnailSrc ?? photo.src;
+function getLargePhotoSource(photo: PhotoSourceSet) {
+  return resolvePhotoSrc(photo, "large");
 }
 
 function readActiveCatId() {
