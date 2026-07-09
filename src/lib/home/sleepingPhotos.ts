@@ -3,6 +3,7 @@ import {
   isUsablePhotoSrc,
   normalizePersistentPhotoSrc,
 } from "../photoStorage";
+import { completePhotoSourceSet } from "../photoSources";
 import { purgePhotoSwCacheForSources } from "../photoSwCache";
 import { readCachedJson, writeCachedJson } from "../storage";
 import { recordDeliveryStorageWritebackTrace } from "./eveningDeliveryTrace";
@@ -831,13 +832,13 @@ export function sanitizeExchangePhotoForPersistence(
     return null;
   }
 
-  return {
+  return completePhotoSourceSet({
     ...photo,
     src: persistentSrc,
     thumbnailSrc: normalizePersistentExchangePhotoSrc(photo.thumbnailSrc),
     displaySrc: normalizePersistentExchangePhotoSrc(photo.displaySrc),
     originalSrc: normalizePersistentExchangePhotoSrc(photo.originalSrc),
-  };
+  });
 }
 
 function isHttpPhotoSrc(src: string) {
@@ -1190,7 +1191,7 @@ function normalizeOwnSleepingPhoto(photo: OwnSleepingPhoto): OwnSleepingPhoto {
   const displaySrc = normalizeOptionalPhotoSrc(photo.displaySrc);
   const originalSrc = normalizeOptionalPhotoSrc(photo.originalSrc);
 
-  return {
+  return completePhotoSourceSet({
     id: photo.id,
     ownerCatId,
     catId: photo.catId ?? ownerCatId,
@@ -1207,7 +1208,7 @@ function normalizeOwnSleepingPhoto(photo: OwnSleepingPhoto): OwnSleepingPhoto {
     createdAt: photo.createdAt ?? Date.now(),
     sourceMomentId: photo.sourceMomentId,
     captureContext: photo.captureContext === "onboarding" ? "onboarding" : "daily",
-  };
+  });
 }
 
 function isOnboardingOwnSleepingPhotoId(id: string | undefined) {

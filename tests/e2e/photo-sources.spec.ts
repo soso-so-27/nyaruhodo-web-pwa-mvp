@@ -1,6 +1,7 @@
 import { expect, test } from "@playwright/test";
 
 import {
+  completePhotoSourceSet,
   resolvePhotoFallbackSrcs,
   resolvePhotoSrc,
   resolvePhotoStorageVariant,
@@ -51,5 +52,17 @@ test.describe("photo source resolution", () => {
       "storage:user-1/cat-1/sleeping/photo-1-thumb.webp",
       "storage:user-1/cat-1/sleeping/photo-1-original.jpg",
     ]);
+  });
+
+  test("repairs already restored local photos that only have src", () => {
+    const repaired = completePhotoSourceSet({
+      src: "storage:user-1/cat-1/collection/photo-1.jpg",
+    });
+
+    expect(repaired.thumbnailSrc).toBe(repaired.src);
+    expect(repaired.displaySrc).toBe(repaired.src);
+    expect(repaired.originalSrc).toBe(repaired.src);
+    expect(resolvePhotoStorageVariant(repaired, "list")).toBe("thumbnail");
+    expect(resolvePhotoStorageVariant(repaired, "detail")).toBe("display");
   });
 });

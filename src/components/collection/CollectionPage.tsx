@@ -20,6 +20,7 @@ import {
 } from "../../lib/photoStorageClient";
 import { isUsablePhotoSrc } from "../../lib/photoStorage";
 import {
+  completePhotoSourceSet,
   resolvePhotoFallbackSrcs,
   resolvePhotoSrc,
   resolvePhotoStorageVariant,
@@ -5127,7 +5128,7 @@ function normalizeStoredPhotoList(
       if (photo && typeof photo.src === "string" && photo.src) {
         const parsedCreatedAt = getStoredCollectionPhotoCreatedAt(photo);
 
-        return {
+        return completePhotoSourceSet({
           id: photo.id || `${catId}:${slug}:${index}`,
           src: photo.src,
           ...(isUsableStoredPhotoSrc(photo.thumbnailSrc)
@@ -5140,7 +5141,7 @@ function normalizeStoredPhotoList(
             ? { originalSrc: photo.originalSrc }
             : {}),
           ...(parsedCreatedAt ? { createdAt: parsedCreatedAt } : {}),
-        };
+        });
       }
 
       return null;

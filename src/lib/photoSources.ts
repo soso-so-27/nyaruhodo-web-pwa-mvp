@@ -60,6 +60,19 @@ export function resolvePhotoFallbackSrcs(photo: PhotoSourceSet) {
   ]);
 }
 
+export function completePhotoSourceSet<T extends PhotoSourceSet>(
+  photo: T,
+): T & Required<Pick<PhotoSourceSet, "thumbnailSrc" | "displaySrc" | "originalSrc">> {
+  const fallbackSrc = resolvePhotoSrc(photo, "detail");
+
+  return {
+    ...photo,
+    thumbnailSrc: photo.thumbnailSrc ?? fallbackSrc,
+    displaySrc: photo.displaySrc ?? fallbackSrc,
+    originalSrc: photo.originalSrc ?? fallbackSrc,
+  };
+}
+
 function firstUsablePhotoSrc(sources: Array<string | undefined>) {
   return sources.find((source) => source && isUsablePhotoSrc(source));
 }

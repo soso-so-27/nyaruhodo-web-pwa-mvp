@@ -1,4 +1,5 @@
 import { isUsablePhotoSrc, normalizePersistentPhotoSrc } from "../photoStorage";
+import { completePhotoSourceSet } from "../photoSources";
 import { purgePhotoSwCacheForSources } from "../photoSwCache";
 import { STORAGE_KEYS, readCachedJson, writeCachedJson } from "../storage";
 
@@ -197,7 +198,7 @@ export function restoreSyncedCatGalleryPhotos({
 }
 
 function normalizeCatGalleryPhoto(photo: CatGalleryPhoto): CatGalleryPhoto {
-  return {
+  return completePhotoSourceSet({
     id: photo.id,
     catId: photo.catId,
     src: normalizePersistentPhotoSrc(photo.src) || photo.src,
@@ -220,7 +221,7 @@ function normalizeCatGalleryPhoto(photo: CatGalleryPhoto): CatGalleryPhoto {
         }
       : {}),
     createdAt: photo.createdAt,
-  };
+  });
 }
 
 function isValidCatGalleryPhoto(
