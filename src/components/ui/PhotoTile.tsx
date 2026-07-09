@@ -77,7 +77,6 @@ export function PhotoTile({
     ...(isBare ? styles.bareFrame : null),
     ...(isAvatar ? styles.avatarFrame : styles.rounded),
     ...(muted ? styles.mutedFrame : null),
-    ...imageStyle,
   };
   const isInteractive = interactive || Boolean(onClick);
   const rootStyle = {
@@ -93,6 +92,7 @@ export function PhotoTile({
           previewSrc={previewSrc}
           alt={alt}
           style={{ ...frameStyle, objectFit: fit }}
+          imageStyle={imageStyle}
           storageVariant={storageVariant}
           loading={loading}
           fetchPriority={fetchPriority}
@@ -134,6 +134,7 @@ type PhotoViewerFrameProps = {
   fallbackSrcs?: string[];
   onStorageDataUrl?: (dataUrl: string) => void;
   onNaturalSize?: (size: { width: number; height: number }) => void;
+  storageVariant?: StorageSignedUrlVariant;
   style?: CSSProperties;
   imageStyle?: CSSProperties;
   loading?: "eager" | "lazy";
@@ -150,6 +151,7 @@ export function PhotoViewerFrame({
   fallbackSrcs,
   onStorageDataUrl,
   onNaturalSize,
+  storageVariant = "display",
   style,
   imageStyle,
   loading,
@@ -168,7 +170,9 @@ export function PhotoViewerFrame({
         src={src}
         previewSrc={previewSrc}
         alt={alt}
-        style={{ ...styles.viewerImage, objectFit: fit, ...imageStyle }}
+        style={{ ...styles.viewerImage, objectFit: fit }}
+        imageStyle={imageStyle}
+        storageVariant={storageVariant}
         loading={loading}
         fetchPriority={fetchPriority}
         fallbackSrcs={fallbackSrcs}
