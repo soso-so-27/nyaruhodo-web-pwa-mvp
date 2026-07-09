@@ -81,6 +81,7 @@ const mobileSpecs = [
   "**/home-desk-model.spec.ts",
   "**/home-sleeping-exchange-flow.spec.ts",
   "**/onboarding-delivery-flow.spec.ts",
+  "**/settings-page-organization.spec.ts",
   "**/ui-theme-and-cats-profile.spec.ts",
 ];
 

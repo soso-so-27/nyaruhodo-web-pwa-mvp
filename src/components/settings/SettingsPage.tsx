@@ -669,21 +669,8 @@ export function SettingsPage() {
         <section style={{ ...styles.section, order: 2 }}>
           <p style={styles.sectionLabel}>アカウント同期</p>
           <AppCard variant="outlined" padding="sm" style={styles.card}>
-            <div style={styles.row}>
-              <span style={styles.rowLabel}>
-                いまの入口: {formatDisplayEnvironmentValue(displayEnvironment)}
-              </span>
-            </div>
-            <div style={styles.divider} />
-            <p style={styles.storageNote}>
-              この端末とアカウントの写真をそろえます。
-            </p>
-            <p style={styles.storageNote}>
-              iPhoneでは、ホーム画面アプリとSafari/Webで写真の保存場所が分かれることがあります。写真が見えないときは、撮ったときと同じ入口から開いてください。
-            </p>
             {isLoggedIn ? (
               <>
-                <div style={styles.divider} />
                 {syncOverview ? (
                   <SyncStatusPanel overview={syncOverview} />
                 ) : (
@@ -712,8 +699,21 @@ export function SettingsPage() {
                 {lastSyncResult ? (
                   <SyncResultDetails result={lastSyncResult.result} />
                 ) : null}
+                <div style={styles.divider} />
               </>
             ) : null}
+            <div style={styles.row}>
+              <span style={styles.rowLabel}>
+                いまの入口: {formatDisplayEnvironmentValue(displayEnvironment)}
+              </span>
+            </div>
+            <div style={styles.divider} />
+            <details style={styles.disclosure}>
+              <summary style={styles.disclosureSummary}>写真が見えないとき</summary>
+              <p style={styles.storageNote}>
+                iPhoneでは、ホーム画面アプリとSafari/Webで写真の保存場所が分かれることがあります。写真が見えないときは、撮ったときと同じ入口から開いてください。
+              </p>
+            </details>
           </AppCard>
         </section>
 
@@ -785,25 +785,26 @@ export function SettingsPage() {
           <AppCard variant="outlined" padding="sm" style={styles.card}>
             <div style={styles.row}>
               <span style={styles.rowTextStack}>
-                <span style={styles.rowLabel}>思い出を 受け取らない</span>
+                <span style={styles.rowLabel}>思い出便を 受け取る</span>
                 <span style={styles.rowDescription}>
-                  オンにすると、過去のねがおの思い出便は届きません。
+                  オフにすると、過去のねがおの思い出便は届きません。
                 </span>
               </span>
               <button
                 type="button"
                 role="switch"
-                aria-checked={omoideDisabled}
+                aria-label="思い出便を 受け取る"
+                aria-checked={!omoideDisabled}
                 style={{
                   ...styles.switchButton,
-                  ...(omoideDisabled ? styles.switchButtonOn : {}),
+                  ...(!omoideDisabled ? styles.switchButtonOn : {}),
                 }}
                 onClick={handleOmoideDisabledToggle}
               >
                 <span
                   style={{
                     ...styles.switchKnob,
-                    ...(omoideDisabled ? styles.switchKnobOn : {}),
+                    ...(!omoideDisabled ? styles.switchKnobOn : {}),
                   }}
                   aria-hidden="true"
                 />
@@ -820,14 +821,9 @@ export function SettingsPage() {
                 <p style={styles.betaNoteTitle}>ねてるねこを 紹介する</p>
                 <p style={styles.betaNoteText}>
                   ねてるねこを試してほしい人に、あなた専用のリンクを渡せます。
-                  登録されると、ここに紹介数が残ります。
                 </p>
               </div>
-              <div style={styles.divider} />
-              <div style={styles.row}>
-                <span style={styles.rowLabel}>紹介コード</span>
-                <span style={styles.referralCode}>{referralSummary.code}</span>
-              </div>
+              {/* Store builds or offline surfaces may need a visible code again. */}
               {referralSummary.acceptedCount > 0 ? (
                 <>
                   <div style={styles.divider} />
@@ -935,6 +931,11 @@ export function SettingsPage() {
             <BetaSupporterPanel
               billingStatus={billingStatus}
             />
+            <div style={styles.divider} />
+            <a href="/cancellation" style={styles.linkRow}>
+              <span style={styles.rowLabel}>解約方法</span>
+              <span style={styles.rowChevron}>›</span>
+            </a>
           </AppCard>
         </section>
           </>
@@ -1116,7 +1117,6 @@ export function SettingsPage() {
             <div style={styles.betaNote}>
               <p style={styles.betaNoteTitle}>現在ベータ版として公開中</p>
               <p style={styles.betaNoteText}>
-                写真を長く置けるように、保存容量の拡張や家族共有の準備をしています。
                 料金や提供範囲が変わる場合は、事前にお知らせします。
                 現在の写真と猫データは、引き続き大切に扱います。
               </p>
@@ -1141,7 +1141,7 @@ function BetaSupporterPanel({
         {billingStatus.isBetaSupporter ? "βサポーターです" : "βサポーター"}
       </p>
       <p style={styles.betaNoteText}>
-        ねてるねこのこれからと、この場所を静かに続けるための応援について見られます。
+        ねてるねこを、静かに続けていくための応援ページです。
       </p>
       <AppButton
         href="/beta-supporter"
@@ -1181,7 +1181,7 @@ function NotificationSettingsPanel({
       <div style={styles.betaNote}>
         <p style={styles.betaNoteTitle}>Push通知はホーム画面アプリで使えます</p>
         <p style={styles.betaNoteText}>
-          よる8時のねこだより通知は準備中です。通知を使うときは、ホーム画面に追加したねてるねこから設定します。
+          よる8時のPush配信は、アプリ側で準備中です。通知を使うときは、ホーム画面に追加したねてるねこから設定します。
         </p>
       </div>
     );
@@ -1190,9 +1190,9 @@ function NotificationSettingsPanel({
   if (permission === "granted") {
     return (
       <div style={styles.betaNote}>
-        <p style={styles.betaNoteTitle}>通知は許可されています</p>
+        <p style={styles.betaNoteTitle}>通知は許可されています（この端末の設定）</p>
         <p style={styles.betaNoteText}>
-          よる8時のPush通知は準備中です。配信が始まるまでは通知は届きません。
+          よる8時のPush配信は、アプリ側で準備中です。配信がはじまるまで通知は届きません。
         </p>
       </div>
     );
@@ -2268,7 +2268,9 @@ const styles = {
     width: "46px",
     height: "28px",
     padding: "3px",
-    border: "1px solid rgba(120,108,94,0.18)",
+    borderWidth: "1px",
+    borderStyle: "solid",
+    borderColor: "rgba(120,108,94,0.18)",
     borderRadius: "999px",
     background: "rgba(120,108,94,0.12)",
     cursor: "pointer",
@@ -2330,6 +2332,18 @@ const styles = {
     fontSize: "12px",
     fontWeight: 500,
     lineHeight: 1.7,
+  },
+  disclosure: {
+    padding: "8px 0",
+  },
+  disclosureSummary: {
+    minHeight: "34px",
+    display: "flex",
+    alignItems: "center",
+    color: "var(--ink)",
+    fontSize: "13px",
+    fontWeight: 500,
+    cursor: "pointer",
   },
   syncMessage: {
     fontSize: "12px",
