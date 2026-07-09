@@ -280,6 +280,21 @@ test.describe("home sleeping exchange flow", () => {
     );
     await expect(page.getByTestId("exchange-share-submit")).toHaveText("のこす");
 
+    await expect
+      .poll(async () => {
+        const submitBox = await page
+          .getByTestId("exchange-share-submit")
+          .boundingBox();
+        const navBox = await page.locator("[data-app-bottom-nav]").boundingBox();
+
+        if (!submitBox || !navBox) {
+          return false;
+        }
+
+        return submitBox.y + submitBox.height < navBox.y;
+      })
+      .toBe(true);
+
     await page.getByTestId("exchange-share-mode-private").click();
     await expect(page.getByTestId("exchange-share-status")).toHaveText(
       "じぶんの記録にのこします。そとには出ません。",

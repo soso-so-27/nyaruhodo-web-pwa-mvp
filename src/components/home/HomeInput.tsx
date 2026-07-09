@@ -7524,9 +7524,14 @@ const styles = {
   exchangeSheetFrame: {
     left: "14px",
     right: "14px",
+    bottom:
+      "calc(var(--bottom-nav-height) + var(--bottom-nav-safe-offset) + 12px)",
     width: "auto",
     maxWidth: "410px",
+    maxHeight:
+      "calc(100dvh - var(--bottom-nav-height) - var(--bottom-nav-safe-offset) - 36px - env(safe-area-inset-top))",
     margin: "0 auto",
+    borderRadius: "24px",
   },
   exchangeShareLayout: {
     display: "grid",
@@ -7823,10 +7828,16 @@ const styles = {
     lineHeight: 1.35,
   },
   exchangeActions: {
+    position: "sticky",
+    bottom: 0,
+    zIndex: 1,
     display: "grid",
     gridTemplateColumns: "1fr",
     alignItems: "center",
     gap: "10px",
+    padding: "10px 0 2px",
+    background:
+      "linear-gradient(180deg, color-mix(in srgb, var(--paper) 0%, transparent), color-mix(in srgb, var(--paper) 96%, transparent) 28%)",
   },
   exchangeKeepButton: {
     minHeight: "54px",
