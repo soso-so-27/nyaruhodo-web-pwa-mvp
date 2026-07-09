@@ -245,7 +245,9 @@ const YOUSU_OPTIONS = [
 
 const HOME_NAV_FRAME_WIDTH = "min(calc(100% - 28px), 410px)";
 const HOME_NAV_EDGE_INSET = "max(14px, calc((100vw - 410px) / 2))";
-const HOME_STARTUP_HOLD_MIN_MS = 280;
+const HOME_STARTUP_IMAGE_SRC = "/splash/startup-envelope-hold-1206-2622-v1.webp";
+const HOME_STARTUP_HOLD_MIN_MS = 650;
+const HOME_STARTUP_HOLD_FADE_MS = 240;
 let hasShownHomeStartupHold = false;
 
 type BoardShelfStat = {
@@ -301,6 +303,9 @@ export function HomeInput({
   const [hasHydratedHomeState, setHasHydratedHomeState] = useState(false);
   const [isStartupHoldReleased, setIsStartupHoldReleased] = useState(
     () => hasShownHomeStartupHold,
+  );
+  const [isStartupHoldMounted, setIsStartupHoldMounted] = useState(
+    () => !hasShownHomeStartupHold,
   );
   const [lockData, setLockData] = useState<LockData>({});
   const [tick, setTick] = useState(initialNow);
@@ -376,6 +381,7 @@ export function HomeInput({
 
   useEffect(() => {
     let releaseTimerId: number | null = null;
+    let unmountTimerId: number | null = null;
     const profiles = readCatProfiles();
     const activeId = readActiveCatId();
     const active = getActiveCatProfile(profiles, activeId);
@@ -390,17 +396,24 @@ export function HomeInput({
 
     if (hasShownHomeStartupHold) {
       setIsStartupHoldReleased(true);
+      setIsStartupHoldMounted(false);
       return undefined;
     }
 
     releaseTimerId = window.setTimeout(() => {
-      hasShownHomeStartupHold = true;
       setIsStartupHoldReleased(true);
+      unmountTimerId = window.setTimeout(() => {
+        hasShownHomeStartupHold = true;
+        setIsStartupHoldMounted(false);
+      }, HOME_STARTUP_HOLD_FADE_MS);
     }, HOME_STARTUP_HOLD_MIN_MS);
 
     return () => {
       if (releaseTimerId !== null) {
         window.clearTimeout(releaseTimerId);
+      }
+      if (unmountTimerId !== null) {
+        window.clearTimeout(unmountTimerId);
       }
     };
   }, []);
@@ -2213,13 +2226,12 @@ export function HomeInput({
   });
   const canUsePendingPhotoAsDeliveryTarget =
     eveningHomeState.kind === "before" || eveningHomeState.kind === "waiting";
-  const isHomeReady =
-    isHomeClockReady && hasHydratedHomeState && isStartupHoldReleased;
+  const isHomeReady = isHomeClockReady && hasHydratedHomeState;
 
   return (
     <main
       style={isHomeReady ? styles.page : styles.startupPage}
-      aria-busy={isHomeReady ? undefined : true}
+      aria-busy={isHomeReady && !isStartupHoldMounted ? undefined : true}
     >
       <div
         aria-hidden={openingEveningDelivery ? true : undefined}
@@ -2228,9 +2240,7 @@ export function HomeInput({
           ...(openingEveningDelivery ? styles.homeContentLayerObscured : {}),
         }}
       >
-        {!isHomeReady ? (
-          <HomeStartupHold />
-        ) : (
+        {isHomeReady ? (
           <>
             <div style={styles.paperBackground} aria-hidden="true" />
             <div style={styles.paperNoise} aria-hidden="true" />
@@ -2255,7 +2265,7 @@ export function HomeInput({
               deliveredPhotoDecodeStatus={deliveredPhotoDecodeStatus}
             />
           </>
-        )}
+        ) : null}
 
         {isHomeReady && shouldShowHomeInstallHint && homeInstallPlatform ? (
           <HomeInstallHintCard
@@ -2273,6 +2283,10 @@ export function HomeInput({
           />
         ) : null}
       </div>
+
+      {isStartupHoldMounted ? (
+        <HomeStartupHold isReleased={isStartupHoldReleased} />
+      ) : null}
 
       {openingEveningDelivery ? (
         <EveningDeliveryOpening
@@ -3068,13 +3082,16 @@ function InfoSheet({
   );
 }
 
-function HomeStartupHold() {
+function HomeStartupHold({ isReleased }: { isReleased: boolean }) {
   return (
     <section
       data-testid="home-startup-hold"
       aria-label="きょうを読み込み中"
       aria-busy="true"
-      style={styles.startupHold}
+      style={{
+        ...styles.startupHold,
+        ...(isReleased ? styles.startupHoldReleased : {}),
+      }}
     />
   );
 }
@@ -5799,10 +5816,16 @@ const styles = {
     boxSizing: "border-box",
     color: "var(--ink-soft)",
     pointerEvents: "none",
-    backgroundImage: "url('/splash/startup-envelope-1206-2622-v3.png')",
+    opacity: 1,
+    transition: `opacity ${HOME_STARTUP_HOLD_FADE_MS}ms ease`,
+    willChange: "opacity",
+    backgroundImage: `url('${HOME_STARTUP_IMAGE_SRC}')`,
     backgroundSize: "cover",
     backgroundPosition: "50% 50%",
     backgroundRepeat: "no-repeat",
+  },
+  startupHoldReleased: {
+    opacity: 0,
   },
   homeInstallHintCard: {
     position: "fixed",
