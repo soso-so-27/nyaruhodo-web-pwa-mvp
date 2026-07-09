@@ -70,7 +70,24 @@ type LocalRecordLogItem = {
   metadata?: Record<string, unknown>;
 };
 
-type LocalCollectionPhoto = string | { id?: string; src?: string; createdAt?: string };
+type LocalCollectionPhoto =
+  | string
+  | {
+      id?: string;
+      src?: string;
+      thumbnailSrc?: string;
+      displaySrc?: string;
+      originalSrc?: string;
+      createdAt?: string;
+    };
+type NormalizedLocalCollectionPhoto = {
+  id?: string;
+  src: string;
+  thumbnailSrc?: string;
+  displaySrc?: string;
+  originalSrc?: string;
+  createdAt?: string;
+};
 type LocalCollectionStore = Record<
   string,
   Record<string, LocalCollectionPhoto[] | LocalCollectionPhoto>
@@ -2001,6 +2018,7 @@ async function restoreCatGalleryPhotos(
       id: photo.local_photo_id ?? photo.id,
       catId: localCatId,
       src: photoSrc,
+      ...buildRestoredPhotoVariants(photoSrc),
       createdAt,
     });
   }
@@ -2061,6 +2079,7 @@ async function restoreCollectionPhotos(
     const restoredPhoto = {
       id: photo.local_photo_id ?? photo.id,
       src: photoSrc,
+      ...buildRestoredPhotoVariants(photoSrc),
       createdAt: photo.captured_at ?? photo.created_at,
     };
 
@@ -2118,6 +2137,7 @@ async function restoreSleepingPhotos(
         ownerCatId: localCatId,
         catId: localCatId,
         src: photoSrc,
+        ...buildRestoredPhotoVariants(photoSrc),
         state: "sleeping",
         visibility: moment.visibility,
         deliveryStatus: moment.delivery_status,
@@ -2150,6 +2170,7 @@ async function restoreSleepingPhotos(
         sourcePhotoId:
           delivery.source_photo_id ?? delivery.source_moment_id ?? undefined,
         src: photoSrc,
+        ...buildRestoredPhotoVariants(photoSrc),
         title: typeof metadata.title === "string" ? metadata.title : "とどいたねがお",
         subtitle: typeof metadata.subtitle === "string" ? metadata.subtitle : "",
         triggerLabel:
@@ -2713,18 +2734,33 @@ function normalizeCollectionPhotoEntries(
   const list = Array.isArray(value) ? value : value ? [value] : [];
 
   return list
-    .map((photo): { id?: string; src: string; createdAt?: string } | null => {
+    .map((photo): NormalizedLocalCollectionPhoto | null => {
       if (typeof photo === "string") {
         return photo ? { src: photo } : null;
       }
 
       if (photo && typeof photo.src === "string" && photo.src) {
-        return { id: photo.id, src: photo.src, createdAt: photo.createdAt };
+        return {
+          id: photo.id,
+          src: photo.src,
+          ...(photo.thumbnailSrc ? { thumbnailSrc: photo.thumbnailSrc } : {}),
+          ...(photo.displaySrc ? { displaySrc: photo.displaySrc } : {}),
+          ...(photo.originalSrc ? { originalSrc: photo.originalSrc } : {}),
+          createdAt: photo.createdAt,
+        };
       }
 
       return null;
     })
-    .filter((photo): photo is { id?: string; src: string; createdAt?: string } => Boolean(photo));
+    .filter((photo): photo is NormalizedLocalCollectionPhoto => Boolean(photo));
+}
+
+function buildRestoredPhotoVariants(src: string) {
+  return {
+    thumbnailSrc: src,
+    displaySrc: src,
+    originalSrc: src,
+  };
 }
 
 function toJsonObject(value: Record<string, unknown> | null | undefined) {

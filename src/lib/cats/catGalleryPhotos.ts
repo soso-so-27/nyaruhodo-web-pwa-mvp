@@ -7,6 +7,8 @@ export type CatGalleryPhoto = {
   catId: string;
   src: string;
   thumbnailSrc?: string;
+  displaySrc?: string;
+  originalSrc?: string;
   createdAt: number;
 };
 
@@ -31,14 +33,22 @@ export function saveCatGalleryPhoto({
   catId,
   src,
   thumbnailSrc,
+  displaySrc,
+  originalSrc,
 }: {
   catId: string;
   src: string;
   thumbnailSrc?: string | null;
+  displaySrc?: string | null;
+  originalSrc?: string | null;
 }) {
   const normalizedSrc = normalizePersistentPhotoSrc(src) || src;
   const normalizedThumbnailSrc =
     thumbnailSrc ? normalizePersistentPhotoSrc(thumbnailSrc) || thumbnailSrc : null;
+  const normalizedDisplaySrc =
+    displaySrc ? normalizePersistentPhotoSrc(displaySrc) || displaySrc : null;
+  const normalizedOriginalSrc =
+    originalSrc ? normalizePersistentPhotoSrc(originalSrc) || originalSrc : null;
 
   if (!catId || !isUsablePhotoSrc(normalizedSrc)) {
     return null;
@@ -51,6 +61,12 @@ export function saveCatGalleryPhoto({
     src: normalizedSrc,
     ...(normalizedThumbnailSrc && isUsablePhotoSrc(normalizedThumbnailSrc)
       ? { thumbnailSrc: normalizedThumbnailSrc }
+      : {}),
+    ...(normalizedDisplaySrc && isUsablePhotoSrc(normalizedDisplaySrc)
+      ? { displaySrc: normalizedDisplaySrc }
+      : {}),
+    ...(normalizedOriginalSrc && isUsablePhotoSrc(normalizedOriginalSrc)
+      ? { originalSrc: normalizedOriginalSrc }
       : {}),
     createdAt,
   };
@@ -90,7 +106,7 @@ export function deleteCatGalleryPhoto(photoId: string) {
     saved.filter((photo) => photo.id !== photoId),
   );
   purgePhotoSwCacheForSources(
-    [target.src, target.thumbnailSrc],
+    [target.src, target.thumbnailSrc, target.displaySrc, target.originalSrc],
     "cat_gallery_photo_deleted",
   );
   dispatchCatGalleryPhotosUpdated();
@@ -189,6 +205,18 @@ function normalizeCatGalleryPhoto(photo: CatGalleryPhoto): CatGalleryPhoto {
       ? {
           thumbnailSrc:
             normalizePersistentPhotoSrc(photo.thumbnailSrc) || photo.thumbnailSrc,
+        }
+      : {}),
+    ...(photo.displaySrc && isUsablePhotoSrc(photo.displaySrc)
+      ? {
+          displaySrc:
+            normalizePersistentPhotoSrc(photo.displaySrc) || photo.displaySrc,
+        }
+      : {}),
+    ...(photo.originalSrc && isUsablePhotoSrc(photo.originalSrc)
+      ? {
+          originalSrc:
+            normalizePersistentPhotoSrc(photo.originalSrc) || photo.originalSrc,
         }
       : {}),
     createdAt: photo.createdAt,
