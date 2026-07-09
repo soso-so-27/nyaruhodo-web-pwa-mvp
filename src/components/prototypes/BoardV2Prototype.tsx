@@ -265,15 +265,24 @@ function AccountRestoreNotice({
     <div style={styles.restoreNotice} data-testid="board-v2-restore-notice">
       <p style={styles.restoreTitle}>実データがまだありません</p>
       <p style={styles.restoreText}>{text}</p>
-      <button
-        type="button"
-        data-testid="board-v2-restore-account"
-        style={styles.restoreButton}
-        onClick={onRestore}
-        disabled={status === "checking"}
-      >
-        {status === "checking" ? "読み込み中" : "アカウントから読み込む"}
-      </button>
+      <div style={styles.restoreActions}>
+        <a
+          href="/account/create?returnTo=/prototypes/board-v2"
+          data-testid="board-v2-login-link"
+          style={styles.restoreLoginLink}
+        >
+          ログインして読み込む
+        </a>
+        <button
+          type="button"
+          data-testid="board-v2-restore-account"
+          style={styles.restoreButton}
+          onClick={onRestore}
+          disabled={status === "checking"}
+        >
+          {status === "checking" ? "読み込み中" : "アカウントから読み込む"}
+        </button>
+      </div>
     </div>
   );
 }
@@ -818,14 +827,33 @@ const styles: Record<string, CSSProperties> = {
     fontSize: 13,
     lineHeight: 1.8,
   },
-  restoreButton: {
+  restoreActions: {
+    display: "flex",
+    flexWrap: "wrap",
+    justifyContent: "center",
+    gap: 10,
     marginTop: 4,
+  },
+  restoreLoginLink: {
+    display: "inline-flex",
+    alignItems: "center",
+    justifyContent: "center",
     border: "1px solid color-mix(in srgb, var(--seal) 30%, var(--line))",
     borderRadius: 999,
     padding: "10px 18px",
     color: "var(--seal)",
-    background: "color-mix(in srgb, var(--paper-card) 86%, white 14%)",
+    background: "color-mix(in srgb, var(--seal) 8%, var(--paper-card) 92%)",
     boxShadow: "var(--shadow-e0)",
+    fontSize: 13,
+    fontWeight: 700,
+    textDecoration: "none",
+  },
+  restoreButton: {
+    border: "1px solid var(--line)",
+    borderRadius: 999,
+    padding: "10px 18px",
+    color: "var(--ink-soft)",
+    background: "color-mix(in srgb, var(--paper-card) 86%, white 14%)",
     font: "inherit",
     fontSize: 13,
     fontWeight: 700,

@@ -100,6 +100,7 @@ export default function AccountCreatePage() {
   const [onboardingSource, setOnboardingSource] =
     useState<OnboardingSource>("direct");
   const [onboardingCatName, setOnboardingCatName] = useState("");
+  const [returnToPath, setReturnToPath] = useState("");
   const googleButtonRef = useRef<HTMLDivElement | null>(null);
   const hasTrackedCtaView = useRef(false);
   const hasTrackedOnboardingPromptView = useRef(false);
@@ -143,7 +144,9 @@ export default function AccountCreatePage() {
     setEmbeddedBrowserLabel(embeddedBrowser.label);
     const fromOnboarding =
       new URLSearchParams(window.location.search).get("from") === "onboarding";
-    const next = new URLSearchParams(window.location.search).get("next");
+    const searchParams = new URLSearchParams(window.location.search);
+    const next = searchParams.get("next");
+    const returnTo = normalizeInternalReturnPath(searchParams.get("returnTo"));
     const source = readOnboardingSourceFromLocation();
     let catName = "";
 
@@ -162,6 +165,7 @@ export default function AccountCreatePage() {
     setIsFromOnboarding(fromOnboarding);
     setOnboardingSource(source);
     setHandoffNext(next === "second_photo" ? "second_photo" : "");
+    setReturnToPath(returnTo);
 
     if (embeddedBrowser.isEmbedded) {
       trackProductEvent("inapp_browser_detected", {
@@ -295,7 +299,7 @@ export default function AccountCreatePage() {
         ? `/account/create?from=onboarding&source=${encodeURIComponent(
             onboardingSource,
           )}`
-        : "/home",
+        : returnToPath || "/home",
     });
 
     const { data: sessionData } = await supabase.auth.getSession();
@@ -508,7 +512,9 @@ export default function AccountCreatePage() {
     }
     await claimPendingReferral();
     router.replace(
-      isFromOnboarding ? "/cats?onboarding=1" : "/home?auth=google_success",
+      isFromOnboarding
+        ? "/cats?onboarding=1"
+        : returnToPath || "/home?auth=google_success",
     );
   }
 
@@ -570,7 +576,7 @@ export default function AccountCreatePage() {
         ).toISOString(),
       }),
     );
-    router.push("/home");
+    router.push(returnToPath || "/home");
   }
 
   if (isCheckingAccount) {
@@ -632,7 +638,7 @@ export default function AccountCreatePage() {
                   <AppButton
                     type="button"
                     onClick={() => {
-                      router.push("/home");
+                      router.push(returnToPath || "/home");
                     }}
                     variant="primary"
                     fullWidth
@@ -795,6 +801,19 @@ function createAuthCallbackUrl({ nextPath }: { nextPath: string }) {
 
   callbackUrl.searchParams.set("next", nextPath);
   return callbackUrl.toString();
+}
+
+function normalizeInternalReturnPath(value: string | null) {
+  if (!value || !value.startsWith("/") || value.startsWith("//")) {
+    return "";
+  }
+
+  try {
+    const parsed = new URL(value, "https://neteruneko.local");
+    return `${parsed.pathname}${parsed.search}${parsed.hash}`;
+  } catch {
+    return "";
+  }
 }
 
 function EnvironmentNotice({

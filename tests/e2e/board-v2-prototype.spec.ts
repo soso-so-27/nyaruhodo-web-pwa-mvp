@@ -118,6 +118,10 @@ test.describe("board v2 prototype", () => {
     await page.goto("/prototypes/board-v2?empty=1");
 
     await expect(page.getByTestId("board-v2-restore-notice")).toBeVisible();
+    await expect(page.getByTestId("board-v2-login-link")).toHaveAttribute(
+      "href",
+      "/account/create?returnTo=/prototypes/board-v2",
+    );
     await expect(page.getByTestId("board-v2-restore-account")).toBeEnabled();
 
     await page.getByTestId("board-v2-current").click();
