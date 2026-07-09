@@ -48,6 +48,20 @@ const siteUrl =
   process.env.NEXT_PUBLIC_SITE_URL?.trim() ||
   "https://nyaruhodo-web-pwa-mvp.vercel.app";
 const supabaseOrigin = getOrigin(process.env.NEXT_PUBLIC_SUPABASE_URL);
+const startupImages = [
+  { width: 320, height: 568, ratio: 2, file: "640-1136" },
+  { width: 375, height: 667, ratio: 2, file: "750-1334" },
+  { width: 414, height: 896, ratio: 2, file: "828-1792" },
+  { width: 375, height: 812, ratio: 3, file: "1125-2436" },
+  { width: 390, height: 844, ratio: 3, file: "1170-2532" },
+  { width: 393, height: 852, ratio: 3, file: "1179-2556" },
+  { width: 402, height: 874, ratio: 3, file: "1206-2622" },
+  { width: 414, height: 736, ratio: 3, file: "1242-2208" },
+  { width: 414, height: 896, ratio: 3, file: "1242-2688" },
+  { width: 428, height: 926, ratio: 3, file: "1284-2778" },
+  { width: 430, height: 932, ratio: 3, file: "1290-2796" },
+  { width: 440, height: 956, ratio: 3, file: "1320-2868" },
+] as const;
 
 export const metadata: Metadata = {
   metadataBase: new URL(siteUrl),
@@ -58,10 +72,11 @@ export const metadata: Metadata = {
   appleWebApp: {
     capable: true,
     title: "ねてるねこ",
-    statusBarStyle: "black-translucent",
+    statusBarStyle: "default",
   },
   other: {
     "apple-mobile-web-app-capable": "yes",
+    "apple-mobile-web-app-status-bar-style": "default",
   },
   icons: {
     icon: [{ url: "/favicon.ico", sizes: "any" }],
@@ -117,8 +132,17 @@ export default function RootLayout({
         {supabaseOrigin ? (
           <link rel="preconnect" href={supabaseOrigin} crossOrigin="" />
         ) : null}
+        <meta name="color-scheme" content="light" />
         <link rel="apple-touch-icon" href="/icon-envelope-v2-180.png" />
         <link rel="icon" href="/favicon.ico" sizes="any" />
+        {startupImages.map((image) => (
+          <link
+            key={image.file}
+            rel="apple-touch-startup-image"
+            href={`/splash/apple-splash-${image.file}.png`}
+            media={`(device-width: ${image.width}px) and (device-height: ${image.height}px) and (-webkit-device-pixel-ratio: ${image.ratio}) and (orientation: portrait)`}
+          />
+        ))}
       </head>
       <body style={criticalBodyStyle}>
         <AppPaperTheme />
