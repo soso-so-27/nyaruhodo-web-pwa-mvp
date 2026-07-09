@@ -140,7 +140,7 @@ export default function RootLayout({
           <link
             key={image.file}
             rel="apple-touch-startup-image"
-            href={`/splash/startup-paper-${image.file}-v2.png`}
+            href={`/splash/startup-envelope-${image.file}-v3.png`}
             media={`screen and (device-width: ${image.width}px) and (device-height: ${image.height}px) and (-webkit-device-pixel-ratio: ${image.ratio}) and (orientation: portrait)`}
           />
         ))}
