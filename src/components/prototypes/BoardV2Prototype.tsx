@@ -5,6 +5,10 @@ import { useEffect, useMemo, useState, type CSSProperties } from "react";
 import { syncLocalDataWithAccount } from "../../lib/accountSync";
 import { isUsablePhotoSrc } from "../../lib/photoStorage";
 import {
+  resolvePhotoFallbackSrcs,
+  resolvePhotoSrc,
+} from "../../lib/photoSources";
+import {
   autoOpenExpiredEveningDeliveries,
   readEveningDeliveryStore,
 } from "../../lib/home/eveningDelivery";
@@ -610,23 +614,11 @@ function getPhotoTransformBaseSrc(photo: {
   originalSrc?: string;
   thumbnailSrc?: string;
 }) {
-  if (isUsableOptionalPhotoSrc(photo.displaySrc)) {
-    return photo.displaySrc;
-  }
-  if (isUsableOptionalPhotoSrc(photo.originalSrc)) {
-    return photo.originalSrc;
-  }
-  return isUsableOptionalPhotoSrc(photo.thumbnailSrc) ? photo.thumbnailSrc : photo.src;
+  return resolvePhotoSrc(photo, "board");
 }
 
 function getPhotoDetailSrc(photo: PrototypePhoto) {
-  if (isUsableOptionalPhotoSrc(photo.displaySrc)) {
-    return photo.displaySrc;
-  }
-  if (isUsableOptionalPhotoSrc(photo.originalSrc)) {
-    return photo.originalSrc;
-  }
-  return isUsableOptionalPhotoSrc(photo.thumbnailSrc) ? photo.thumbnailSrc : photo.src;
+  return resolvePhotoSrc(photo, "detail");
 }
 
 function getPhotoFallbackSrcs(photo: {
@@ -635,14 +627,7 @@ function getPhotoFallbackSrcs(photo: {
   originalSrc?: string;
   thumbnailSrc?: string;
 }) {
-  const sources = [photo.displaySrc, photo.thumbnailSrc, photo.originalSrc, photo.src].filter(
-    (src): src is string => isUsableOptionalPhotoSrc(src),
-  );
-  return [...new Set(sources)];
-}
-
-function isUsableOptionalPhotoSrc(src: string | null | undefined): src is string {
-  return typeof src === "string" && isUsablePhotoSrc(src);
+  return resolvePhotoFallbackSrcs(photo);
 }
 
 function getOwnTimestamp(photo: OwnSleepingPhoto) {

@@ -11,6 +11,7 @@ import { trackProductEvent } from "../../lib/analytics/productAnalytics";
 import { getOrCreateAnonymousId } from "../../lib/identity/anonymousId";
 import { purgeAllPhotoSwCache } from "../../lib/photoSwCache";
 import {
+  completePhotoSourceSet,
   resolvePhotoFallbackSrcs,
   resolvePhotoSrc,
   resolvePhotoStorageVariant,
@@ -5163,6 +5164,9 @@ function isStandaloneDisplay() {
 type StoredCollectionPhoto = {
   id?: string;
   src?: string;
+  thumbnailSrc?: string;
+  displaySrc?: string;
+  originalSrc?: string;
   createdAt?: string;
 };
 
@@ -5172,7 +5176,7 @@ function normalizeStoredPhotoList(
   slug = "photo",
 ) {
   if (typeof value === "string") {
-    return [{ id: `${catId}:${slug}:0`, src: value }];
+    return [completePhotoSourceSet({ id: `${catId}:${slug}:0`, src: value })];
   }
 
   const values = Array.isArray(value) ? value : value ? [value] : [];
@@ -5180,15 +5184,20 @@ function normalizeStoredPhotoList(
   return values
     .map((photo, index): StoredCollectionPhoto | null => {
       if (typeof photo === "string") {
-        return photo ? { id: `${catId}:${slug}:${index}`, src: photo } : null;
+        return photo
+          ? completePhotoSourceSet({ id: `${catId}:${slug}:${index}`, src: photo })
+          : null;
       }
 
       if (photo && typeof photo.src === "string" && photo.src) {
-        return {
+        return completePhotoSourceSet({
           id: photo.id || `${catId}:${slug}:${index}`,
           src: photo.src,
+          ...(photo.thumbnailSrc ? { thumbnailSrc: photo.thumbnailSrc } : {}),
+          ...(photo.displaySrc ? { displaySrc: photo.displaySrc } : {}),
+          ...(photo.originalSrc ? { originalSrc: photo.originalSrc } : {}),
           createdAt: photo.createdAt,
-        };
+        });
       }
 
       return null;

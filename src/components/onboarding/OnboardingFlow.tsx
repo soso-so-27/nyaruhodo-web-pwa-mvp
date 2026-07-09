@@ -33,6 +33,10 @@ import { consumeOnboardingTestResetRequest } from "../../lib/onboarding/testRese
 import { trackProductEvent } from "../../lib/analytics/productAnalytics";
 import { resizeImageFileToDataUrl } from "../../lib/imageResize";
 import { isUsablePhotoSrc } from "../../lib/photoStorage";
+import {
+  resolvePhotoFallbackSrcs,
+  resolvePhotoSrc,
+} from "../../lib/photoSources";
 import { storeAccountPhotoDataUrl } from "../../lib/photoStorageClient";
 import {
   getActiveCatProfile,
@@ -2396,17 +2400,11 @@ function truncateDebugText(value: string, maxLength: number) {
 }
 
 function getExchangePhotoDisplaySrc(photo: ExchangePhoto) {
-  return (
-    [photo.displaySrc, photo.thumbnailSrc, photo.originalSrc, photo.src].find(
-      (src) => typeof src === "string" && isUsablePhotoSrc(src),
-    ) ?? photo.src
-  );
+  return resolvePhotoSrc(photo, "detail");
 }
 
 function getExchangePhotoFallbackSrcs(photo: ExchangePhoto) {
-  return [photo.thumbnailSrc, photo.originalSrc, photo.src].filter(
-    (src): src is string => typeof src === "string" && isUsablePhotoSrc(src),
-  );
+  return resolvePhotoFallbackSrcs(photo);
 }
 
 const UI_FONT = "var(--font-ui)";
