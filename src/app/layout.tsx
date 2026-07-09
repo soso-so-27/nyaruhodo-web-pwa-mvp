@@ -52,6 +52,7 @@ const startupImages = [
   { width: 320, height: 568, ratio: 2, file: "640-1136" },
   { width: 375, height: 667, ratio: 2, file: "750-1334" },
   { width: 414, height: 896, ratio: 2, file: "828-1792" },
+  { width: 360, height: 780, ratio: 3, file: "1080-2340" },
   { width: 375, height: 812, ratio: 3, file: "1125-2436" },
   { width: 390, height: 844, ratio: 3, file: "1170-2532" },
   { width: 393, height: 852, ratio: 3, file: "1179-2556" },
@@ -140,7 +141,7 @@ export default function RootLayout({
             key={image.file}
             rel="apple-touch-startup-image"
             href={`/splash/apple-splash-${image.file}.png`}
-            media={`(device-width: ${image.width}px) and (device-height: ${image.height}px) and (-webkit-device-pixel-ratio: ${image.ratio}) and (orientation: portrait)`}
+            media={`screen and (device-width: ${image.width}px) and (device-height: ${image.height}px) and (-webkit-device-pixel-ratio: ${image.ratio}) and (orientation: portrait)`}
           />
         ))}
       </head>
