@@ -15,6 +15,7 @@ const FINE_POINTER_QUERY = "(hover: hover) and (pointer: fine)";
 export function UserDeviceGate({ children }: UserDeviceGateProps) {
   const pathname = usePathname() ?? "/";
   const isAdminRoute = pathname === "/admin" || pathname.startsWith("/admin/");
+  const isPrototypeRoute = pathname.startsWith("/prototypes/");
   const [isRuntimeDesktop, setIsRuntimeDesktop] = useState(false);
   const [currentUrl, setCurrentUrl] = useState("");
   const [copyState, setCopyState] = useState<"idle" | "copied" | "failed">(
@@ -23,7 +24,7 @@ export function UserDeviceGate({ children }: UserDeviceGateProps) {
   const trackedRoutesRef = useRef<Set<string>>(new Set());
 
   useEffect(() => {
-    if (isAdminRoute) {
+    if (isAdminRoute || isPrototypeRoute) {
       return;
     }
 
@@ -45,10 +46,10 @@ export function UserDeviceGate({ children }: UserDeviceGateProps) {
       desktopMedia.removeEventListener("change", update);
       finePointerMedia.removeEventListener("change", update);
     };
-  }, [isAdminRoute, pathname]);
+  }, [isAdminRoute, isPrototypeRoute, pathname]);
 
   useEffect(() => {
-    if (isAdminRoute || !isRuntimeDesktop) {
+    if (isAdminRoute || isPrototypeRoute || !isRuntimeDesktop) {
       return;
     }
 
@@ -65,9 +66,9 @@ export function UserDeviceGate({ children }: UserDeviceGateProps) {
       is_in_app_browser: isInAppBrowser(),
       is_standalone_pwa: isStandalonePwa(),
     });
-  }, [isAdminRoute, isRuntimeDesktop, pathname]);
+  }, [isAdminRoute, isPrototypeRoute, isRuntimeDesktop, pathname]);
 
-  if (isAdminRoute) {
+  if (isAdminRoute || isPrototypeRoute) {
     return <>{children}</>;
   }
 
