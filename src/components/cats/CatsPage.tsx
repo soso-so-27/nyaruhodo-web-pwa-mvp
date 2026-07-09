@@ -172,6 +172,7 @@ const DEFAULT_COVER_CROP: CatCoverCrop = {
   offsetX: 0,
   offsetY: 0,
 };
+type CatManageEditSource = "basic" | "manage";
 
 export function CatsPage() {
   const [catProfiles, setCatProfiles] = useState<CatProfile[]>([]);
@@ -185,6 +186,8 @@ export function CatsPage() {
   const [isAddingCat, setIsAddingCat] = useState(false);
   const [isCatManageOpen, setIsCatManageOpen] = useState(false);
   const [isCatManageEditing, setIsCatManageEditing] = useState(false);
+  const [catManageEditSource, setCatManageEditSource] =
+    useState<CatManageEditSource | null>(null);
   const [isCoverPhotoSheetOpen, setIsCoverPhotoSheetOpen] = useState(false);
   const [coverCropDraft, setCoverCropDraft] = useState<{
     src: string;
@@ -639,6 +642,7 @@ export function CatsPage() {
     setIsAddingCat(true);
     setIsCatManageOpen(true);
     setIsCatManageEditing(false);
+    setCatManageEditSource(null);
     setIsEditingCatName(false);
     setIsEditingProfile(false);
   }
@@ -680,6 +684,7 @@ export function CatsPage() {
     setDuplicateCatNameToConfirm(null);
     setIsAddingCat(false);
     setIsCatManageOpen(false);
+    setCatManageEditSource(null);
     trackProductEvent(
       "cat_album_created",
       {
@@ -734,8 +739,9 @@ export function CatsPage() {
     setIsEditingProfile(true);
   }
 
-  function openCatManageEditor() {
+  function openCatManageEditor(source: CatManageEditSource) {
     handleStartEdit();
+    setCatManageEditSource(source);
     setIsCatManageEditing(true);
     setIsCatManageOpen(true);
   }
@@ -747,6 +753,10 @@ export function CatsPage() {
     setIsEditingCatName(false);
     setIsEditingProfile(false);
     setIsCatManageEditing(false);
+    if (catManageEditSource === "basic") {
+      setIsCatManageOpen(false);
+    }
+    setCatManageEditSource(null);
   }
 
   async function handleSaveProfile() {
@@ -844,6 +854,8 @@ export function CatsPage() {
       setIsEditingCatName(false);
       setIsEditingProfile(false);
       setIsCatManageEditing(false);
+      const shouldCloseCatManageAfterSave = catManageEditSource !== "manage";
+      setCatManageEditSource(null);
       if (isOnboardingMode) {
         trackProductEvent(
           "cat_album_created",
@@ -871,7 +883,7 @@ export function CatsPage() {
           ? "この端末には保存しました。Google連携への反映はあとでやり直します。"
           : "保存しました。",
       );
-      setIsCatManageOpen(false);
+      setIsCatManageOpen(!shouldCloseCatManageAfterSave);
       setTimeout(() => setSaveMessage(""), 2000);
     } catch {
       return;
@@ -1428,6 +1440,7 @@ export function CatsPage() {
                           style={styles.profileCoverActionButton}
                           onClick={() => {
                             setIsCatManageEditing(false);
+                            setCatManageEditSource(null);
                             setIsAddingCat(false);
                             setIsCatManageOpen(true);
                           }}
@@ -1574,7 +1587,7 @@ export function CatsPage() {
           >
             <CatBasicProfilePanel
               profile={activeCatProfile}
-              onEdit={openCatManageEditor}
+              onEdit={() => openCatManageEditor("basic")}
             />
           </AppCard>
         ) : null}
@@ -1727,6 +1740,7 @@ export function CatsPage() {
               cancelAddingCat();
             } else {
               setIsCatManageEditing(false);
+              setCatManageEditSource(null);
             }
           }}
           closeOnOverlay={!isCatManageEditing}

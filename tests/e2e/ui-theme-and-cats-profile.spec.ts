@@ -633,6 +633,29 @@ test("edits weight and mixed coat without showing the old breed field", async ({
     });
 });
 
+test("closes the basic profile editor instead of returning to cat management", async ({
+  page,
+}) => {
+  await seedCatsBasicProfile(page, {
+    basicInfo: {
+      familySinceDate: "2022-09-22",
+    },
+  });
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto("/cats");
+  await page.waitForLoadState("networkidle");
+  await page.getByTestId("cats-section-tab-basic").click();
+
+  await page.getByTestId("cats-basic-info-edit-button").click();
+  const dialog = page.getByRole("dialog").first();
+  await expect(dialog).toBeVisible();
+
+  await dialog.getByRole("button", { name: "もどる" }).click();
+
+  await expect(page.getByRole("dialog")).toHaveCount(0);
+  await expect(page.getByText("うちのこを管理")).toHaveCount(0);
+});
+
 test("shows a meaningful pickup only when there is a strong cat record reason", async ({
   page,
 }) => {
