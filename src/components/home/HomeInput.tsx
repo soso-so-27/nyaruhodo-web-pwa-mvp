@@ -7828,16 +7828,11 @@ const styles = {
     lineHeight: 1.35,
   },
   exchangeActions: {
-    position: "sticky",
-    bottom: 0,
-    zIndex: 1,
     display: "grid",
     gridTemplateColumns: "1fr",
     alignItems: "center",
     gap: "10px",
-    padding: "10px 0 2px",
-    background:
-      "linear-gradient(180deg, color-mix(in srgb, var(--paper) 0%, transparent), color-mix(in srgb, var(--paper) 96%, transparent) 28%)",
+    padding: "4px 0 2px",
   },
   exchangeKeepButton: {
     minHeight: "54px",
