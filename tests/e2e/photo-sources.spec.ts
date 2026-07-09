@@ -1,6 +1,7 @@
 import { expect, test } from "@playwright/test";
 
 import {
+  PHOTO_DISPLAY_CONTRACT,
   completePhotoSourceSet,
   resolvePhotoFallbackSrcs,
   resolvePhotoSrc,
@@ -9,6 +10,19 @@ import {
 } from "../../src/lib/photoSources";
 
 test.describe("photo source resolution", () => {
+  test("declares the supported display contexts", () => {
+    expect(Object.keys(PHOTO_DISPLAY_CONTRACT)).toEqual([
+      "list",
+      "board",
+      "cover",
+      "detail",
+    ]);
+    expect(PHOTO_DISPLAY_CONTRACT.list.fit).toBe("cover");
+    expect(PHOTO_DISPLAY_CONTRACT.board.source).toBe("display");
+    expect(PHOTO_DISPLAY_CONTRACT.cover.fit).toBe("cover");
+    expect(PHOTO_DISPLAY_CONTRACT.detail.fit).toBe("contain");
+  });
+
   test("keeps reconnected storage photos on the right display variants", () => {
     const restoredPhoto: PhotoSourceSet = {
       src: "storage:user-1/cat-1/sleeping/photo-1.jpg",
@@ -23,6 +37,8 @@ test.describe("photo source resolution", () => {
     expect(resolvePhotoStorageVariant(restoredPhoto, "detail")).toBe("display");
     expect(resolvePhotoSrc(restoredPhoto, "cover")).toBe(restoredPhoto.src);
     expect(resolvePhotoStorageVariant(restoredPhoto, "cover")).toBe("display");
+    expect(resolvePhotoSrc(restoredPhoto, "board")).toBe(restoredPhoto.src);
+    expect(resolvePhotoStorageVariant(restoredPhoto, "board")).toBe("thumbnail");
   });
 
   test("does not upscale a separately stored thumbnail asset", () => {

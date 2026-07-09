@@ -518,6 +518,57 @@ test("shows the custom top cover without over-cropping", async ({
   );
 });
 
+test("falls back to automatic cover framing when a custom cover has no crop", async ({
+  page,
+}) => {
+  await page.route("**/api/photo-storage/signed-url", async (route) => {
+    const body = route.request().postDataJSON() as {
+      src?: string;
+      variant?: string;
+    };
+
+    await route.fulfill({
+      contentType: "application/json",
+      body: JSON.stringify({
+        bucket: "cat-photos",
+        expiresIn: 86_400,
+        signedUrl: photoDataUrl,
+        variant: body.variant ?? "display",
+      }),
+    });
+  });
+
+  await seedCatsProfileWithCustomStorageCover(
+    page,
+    Date.parse("2026-06-10T12:30:00+09:00"),
+    { includeCrop: false },
+  );
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto("/cats");
+  await page.waitForLoadState("networkidle");
+
+  const coverImage = page.getByTestId("cats-profile-cover").locator("img").first();
+
+  await expect
+    .poll(() =>
+      coverImage.evaluate((image) => {
+        const element = image as HTMLImageElement;
+        return element.complete && element.naturalWidth > 0;
+      }),
+    )
+    .toBe(true);
+  await expect
+    .poll(() =>
+      coverImage.evaluate((image) => window.getComputedStyle(image).objectFit),
+    )
+    .toBe("cover");
+  await expect
+    .poll(() =>
+      coverImage.evaluate((image) => window.getComputedStyle(image).objectPosition),
+    )
+    .toBe("50% 30%");
+});
+
 test("shows only filled basic profile fields", async ({ page }) => {
   await seedCatsBasicProfile(page, {
     basicInfo: {
@@ -919,8 +970,12 @@ async function seedCatsProfileWithStoragePhotos(
   );
 }
 
-async function seedCatsProfileWithCustomStorageCover(page: Page, now: number) {
-  await page.addInitScript(({ nowValue }) => {
+async function seedCatsProfileWithCustomStorageCover(
+  page: Page,
+  now: number,
+  options: { includeCrop?: boolean } = {},
+) {
+  await page.addInitScript(({ nowValue, includeCrop }) => {
     (window as typeof window & { __testNow?: number }).__testNow = nowValue;
     const nowIso = new Date(nowValue).toISOString();
     window.localStorage.setItem("active_cat_id", "cat-mugi");
@@ -933,7 +988,9 @@ async function seedCatsProfileWithCustomStorageCover(page: Page, now: number) {
           createdAt: nowIso,
           updatedAt: nowIso,
           coverPhotoDataUrl: "storage:cat-mugi/cover/cover.webp",
-          coverCrop: { scale: 1, offsetX: 0, offsetY: 0 },
+          ...(includeCrop
+            ? { coverCrop: { scale: 1, offsetX: 0, offsetY: 0 } }
+            : {}),
         },
       ]),
     );
@@ -957,7 +1014,7 @@ async function seedCatsProfileWithCustomStorageCover(page: Page, now: number) {
         },
       ]),
     );
-  }, { nowValue: now });
+  }, { nowValue: now, includeCrop: options.includeCrop ?? true });
 }
 
 async function seedCatsBasicProfile(
