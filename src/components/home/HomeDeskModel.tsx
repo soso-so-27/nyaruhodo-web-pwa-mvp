@@ -518,10 +518,10 @@ export function HomeDeskModel({
                     }}
                   >
                     <StoredPhotoImage
-                      src={getPhotoDisplaySrc(homePhoto)}
+                      src={getPhotoBoardSrc(homePhoto)}
                       alt=""
                       style={deskStyles.homeFrameImage}
-                      storageVariant={getPhotoStorageVariant(homePhoto, "list")}
+                      storageVariant={getPhotoStorageVariant(homePhoto, "board")}
                       fallbackSrcs={getPhotoFallbackSrcs(homePhoto)}
                       onNaturalSize={({ width, height }) => {
                         if (width <= 0 || height <= 0) return;
@@ -809,7 +809,7 @@ export function HomeDeskModel({
                 >
                   <span style={deskStyles.notificationThumb} aria-hidden="true">
                     <StoredPhotoImage
-                      src={getPhotoDisplaySrc(memory.photo)}
+                      src={getPhotoListSrc(memory.photo)}
                       alt=""
                       style={deskStyles.notificationThumbImage}
                       storageVariant={getPhotoStorageVariant(memory.photo, "list")}
@@ -1986,8 +1986,12 @@ function parseHexColor(hex: string) {
   return [1, 3, 5].map((start) => Number.parseInt(hex.slice(start, start + 2), 16));
 }
 
-function getPhotoDisplaySrc(photo: PhotoSourceSet) {
+function getPhotoListSrc(photo: PhotoSourceSet) {
   return resolvePhotoSrc(photo, "list");
+}
+
+function getPhotoBoardSrc(photo: PhotoSourceSet) {
+  return resolvePhotoSrc(photo, "board");
 }
 
 function getPhotoDetailSrc(photo: PhotoSourceSet) {
