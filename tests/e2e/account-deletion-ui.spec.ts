@@ -56,4 +56,31 @@ test.describe("account deletion UI", () => {
     await expect(page.getByTestId("account-delete-request-block")).toBeVisible();
     await expect(page.getByTestId("account-delete-payment-block")).toHaveCount(0);
   });
+
+  test("shows payment management block for a signed-in user with an active subscription", async ({
+    page,
+  }) => {
+    await mockBillingStatus(page, {
+      isLoggedIn: true,
+      isBetaSupporter: true,
+      status: "active",
+      canManageBilling: true,
+    });
+
+    await page.route("**/api/billing/create-portal-session", async (route) => {
+      await route.fulfill({
+        contentType: "application/json",
+        body: JSON.stringify({ url: "https://billing.example.test/session" }),
+      });
+    });
+
+    await page.goto("/account-deletion");
+
+    const paymentBlock = page.getByTestId("account-delete-payment-block");
+    await expect(paymentBlock).toBeVisible();
+    await expect(paymentBlock.getByText("退会は不要です。")).toBeVisible();
+    await expect(
+      paymentBlock.getByRole("button", { name: "支払いの管理" }),
+    ).toBeVisible();
+  });
 });

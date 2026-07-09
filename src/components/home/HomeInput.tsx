@@ -7532,6 +7532,7 @@ const styles = {
       "calc(100dvh - var(--bottom-nav-height) - var(--bottom-nav-safe-offset) - 36px - env(safe-area-inset-top))",
     margin: "0 auto",
     borderRadius: "24px",
+    padding: "8px 16px 16px",
   },
   exchangeShareLayout: {
     display: "grid",

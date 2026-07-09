@@ -761,7 +761,7 @@ export function SettingsPage() {
             )}
             <div style={styles.divider} />
             <a href="/account-deletion" style={styles.linkRow}>
-              <span style={styles.rowLabel}>アカウントとデータの削除について</span>
+              <span style={styles.rowLabel}>解約・データ削除・退会について</span>
               <span style={styles.rowChevron}>›</span>
             </a>
           </AppCard>
