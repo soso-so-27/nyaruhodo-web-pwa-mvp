@@ -347,6 +347,7 @@ export function CatsPage() {
     : activeCoverPhoto
       ? getLensPhotoThumbnailSrc(activeCoverPhoto)
       : undefined;
+  const hasCustomCoverCrop = Boolean(activeCatProfile?.coverCrop);
   const activeCoverCrop = normalizeCoverCrop(activeCatProfile?.coverCrop);
   const activeCoverFit =
     activeCoverSrc ? "cover" : "contain";
@@ -924,7 +925,7 @@ export function CatsPage() {
     const nextProfile = {
       ...profiles[index],
       coverPhotoDataUrl: photoSrc,
-      coverCrop: photoSrc ? normalizeCoverCrop(crop) : undefined,
+      coverCrop: photoSrc && crop ? normalizeCoverCrop(crop) : undefined,
       updatedAt: new Date().toISOString(),
     } satisfies CatProfile;
     const nextProfiles = profiles.map((profile, profileIndex) =>
@@ -1392,8 +1393,16 @@ export function CatsPage() {
                           alt=""
                           storageVariant="display"
                           loading="eager"
-                          style={styles.profileCoverCustomImage}
-                          imageStyle={getCoverCropImageStyle(activeCoverCrop)}
+                          style={
+                            hasCustomCoverCrop
+                              ? styles.profileCoverCustomCroppedImage
+                              : styles.profileCoverCustomImage
+                          }
+                          imageStyle={
+                            hasCustomCoverCrop
+                              ? getCoverCropImageStyle(activeCoverCrop)
+                              : undefined
+                          }
                           width={420}
                           height={232}
                         />
@@ -5415,6 +5424,18 @@ const styles = {
     WebkitTapHighlightColor: "transparent",
   },
   profileCoverCustomImage: {
+    display: "block",
+    width: "100%",
+    height: "100%",
+    objectFit: "cover",
+    objectPosition: "50% 30%",
+    background:
+      "linear-gradient(180deg, color-mix(in srgb, var(--paper-card) 88%, white), color-mix(in srgb, var(--paper) 86%, white))",
+    border: "none",
+    borderRadius: 0,
+    boxShadow: "none",
+  },
+  profileCoverCustomCroppedImage: {
     display: "block",
     width: "100%",
     height: "100%",
