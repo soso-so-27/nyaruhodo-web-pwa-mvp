@@ -66,6 +66,7 @@ const desktopSpecs = [
   "**/cat-year-summary-logic.spec.ts",
   "**/desktop-device-gate.spec.ts",
   "**/onboarding-handoff-restore.spec.ts",
+  "**/photo-sources.spec.ts",
   "**/sleeping-delivery-request-guards.spec.ts",
   "**/sleeping-delivery-pool-guards.spec.ts",
   "**/sw-image-cache.spec.ts",
