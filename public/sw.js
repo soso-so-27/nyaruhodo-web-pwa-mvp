@@ -1,4 +1,6 @@
-const CACHE_VERSION = "2026-06-28-01";
+// Deliberately bump when a photo delivery semantic changes so an installed PWA
+// claims the new worker and drops stale signed-image responses on next launch.
+const CACHE_VERSION = "2026-07-10-01";
 const STATIC_CACHE = `neteruneko-static-${CACHE_VERSION}`;
 const RUNTIME_CACHE = `neteruneko-runtime-${CACHE_VERSION}`;
 const OFFLINE_URL = "/offline";
