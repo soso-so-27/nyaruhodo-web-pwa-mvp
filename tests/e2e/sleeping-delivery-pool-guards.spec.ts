@@ -1584,6 +1584,7 @@ test.describe("sleeping delivery pool guards", () => {
       });
       expect(backedUpRows?.[0]?.metadata).toMatchObject({
         source: "user_backup",
+        pool_kind: "user_private",
         shared: false,
       });
 

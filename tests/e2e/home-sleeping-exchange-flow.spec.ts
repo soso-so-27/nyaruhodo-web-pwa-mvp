@@ -306,6 +306,71 @@ test.describe("home sleeping exchange flow", () => {
     );
   });
 
+  test("keeps a home photo private when the user chooses 自分だけ", async ({
+    page,
+  }) => {
+    const beforeDelivery = Date.parse("2026-06-10T10:30:00.000Z");
+
+    await page.addInitScript((now) => {
+      (window as typeof window & { __testNow?: number }).__testNow = now;
+      const originalDateNow = Date.now.bind(Date);
+      Date.now = () =>
+        (window as typeof window & { __testNow?: number }).__testNow ??
+        originalDateNow();
+      window.localStorage.setItem("nyaruhodo_sleeping_safety_accepted", "1");
+      window.localStorage.setItem("active_cat_id", "private-cat");
+      window.localStorage.setItem(
+        "cat_profiles",
+        JSON.stringify([
+          {
+            id: "private-cat",
+            name: "private cat",
+            createdAt: new Date(now).toISOString(),
+            updatedAt: new Date(now).toISOString(),
+          },
+        ]),
+      );
+    }, beforeDelivery);
+
+    await page.goto("/home");
+    await page.waitForLoadState("networkidle");
+
+    await page.getByTestId("home-empty-action").click();
+    await page.locator('input[type="file"]').last().setInputFiles({
+      name: "private-home-photo.png",
+      mimeType: "image/png",
+      buffer: testUploadPng,
+    });
+
+    await expect(page.getByRole("dialog")).toBeVisible();
+    await page.getByTestId("exchange-share-mode-private").click();
+    await page.getByTestId("exchange-share-submit").click();
+    await waitForOwnSleepingPhotoCount(page, 1);
+
+    const privatePhotoState = await page.evaluate(() => {
+      const photos = JSON.parse(
+        window.localStorage.getItem("nyaruhodo_exchange_own_sleeping_photos") ??
+          "[]",
+      ) as { shared?: boolean; visibility?: string; ownerCatId?: string }[];
+      const eveningDays = JSON.parse(
+        window.localStorage.getItem("neteruneko_evening_delivery_days") ?? "{}",
+      ) as Record<string, { targetOwnPhotoId?: string } | undefined>;
+      const photo = photos.find((candidate) => candidate.ownerCatId === "private-cat");
+
+      return {
+        shared: photo?.shared,
+        visibility: photo?.visibility,
+        deliveryTargetId: eveningDays["2026-06-10"]?.targetOwnPhotoId ?? null,
+      };
+    });
+
+    expect(privatePhotoState).toEqual({
+      shared: false,
+      visibility: "private",
+      deliveryTargetId: null,
+    });
+  });
+
   test("defaults the save sheet to the previously selected cat", async ({
     page,
   }) => {

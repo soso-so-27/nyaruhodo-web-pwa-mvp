@@ -139,7 +139,7 @@ export async function POST(request: Request) {
     source_moment_id: record.source_moment_id,
     metadata: {
       source: "user_backup",
-      pool_kind: "user_shared",
+      pool_kind: visibility === "private" ? "user_private" : "user_shared",
       trigger_label: photo.triggerLabel,
       theme: photo.theme,
       shared: photo.shared,
