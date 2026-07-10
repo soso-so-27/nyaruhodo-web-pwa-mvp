@@ -96,11 +96,30 @@ test.describe("board v2 prototype", () => {
   });
 
   test("uses the unchanged production board for the current comparison query", async ({ page }) => {
-    await page.goto("/prototypes/board-v2?mode=current&layout=natural&frame=f3");
+    await page.goto("/prototypes/board-v2?mode=current&layout=crop&frame=f1&order=newest");
 
     await expect(page.getByTestId("mainichi-month-board")).toBeVisible();
     await expect(page.getByTestId("mainichi-board-photo-sent")).toHaveCount(3);
     await expect(page.getByTestId("mainichi-prototype-month-board")).toHaveCount(0);
+  });
+
+  test("shows current-algorithm comparison variants beyond the exact baseline", async ({ page }) => {
+    await page.goto("/prototypes/board-v2?mode=current&layout=natural&frame=f3&order=brightest");
+
+    await expect(page.getByTestId("mainichi-prototype-month-board")).toBeVisible();
+    await expect(page.getByTestId("mainichi-prototype-board")).toHaveAttribute(
+      "data-board-algorithm",
+      "current",
+    );
+    await expect
+      .poll(() =>
+        page
+          .locator('[data-testid="mainichi-prototype-photo"] img')
+          .evaluateAll((images) =>
+            images.length === 3 && images.every((image) => image.naturalWidth > 0),
+          ),
+      )
+      .toBe(true);
   });
 
   test("offers the comparison controls in a mobile-friendly settings sheet", async ({ page }) => {
@@ -117,7 +136,11 @@ test.describe("board v2 prototype", () => {
     await expect(page).toHaveURL(/layout=natural/);
     await expect(page).toHaveURL(/frame=f3/);
     await expect(page).toHaveURL(/order=brightest/);
-    await expect(page.getByTestId("mainichi-month-board")).toBeVisible();
+    await expect(page.getByTestId("mainichi-prototype-month-board")).toBeVisible();
+    await expect(page.getByTestId("mainichi-prototype-board")).toHaveAttribute(
+      "data-board-algorithm",
+      "current",
+    );
 
     await expect
       .poll(() =>

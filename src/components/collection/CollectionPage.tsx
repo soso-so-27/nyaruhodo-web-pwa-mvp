@@ -1658,6 +1658,11 @@ function MainichiPhotoBoard({
     });
   }, [prefersReducedMotion, selectedMonth]);
 
+  const comparisonOptions =
+    boardV2Prototype && shouldUsePrototypeComparisonBoard(boardV2Prototype)
+      ? boardV2Prototype
+      : null;
+
   return (
     <section style={styles.mainichiBoard} data-testid="mainichi-photo-board">
       <style>{MAINICHI_PASTE_MOTION_CSS}</style>
@@ -1683,10 +1688,11 @@ function MainichiPhotoBoard({
               exit={{ opacity: 0, y: -8, scale: 0.996 }}
               transition={{ duration: 0.28, ease: [0.22, 1, 0.36, 1] }}
             >
-              {boardV2Prototype?.mode === "v2" ? (
+              {comparisonOptions ? (
                 <MainichiPrototypeMonthBoard
                   month={selectedMonth}
-                  options={boardV2Prototype}
+                  options={comparisonOptions}
+                  algorithm={comparisonOptions.mode}
                   onOpenPhoto={onOpenPhoto}
                 />
               ) : (
@@ -1978,10 +1984,12 @@ function MainichiMonthPickerSheet({
 function MainichiPrototypeMonthBoard({
   month,
   options,
+  algorithm,
   onOpenPhoto,
 }: {
   month: MainichiBoardMonth;
   options: BoardV2PrototypeOptions;
+  algorithm: BoardV2PrototypeOptions["mode"];
   onOpenPhoto: (
     photo: MainichiBoardPhoto,
     month: MainichiBoardMonth,
@@ -1990,6 +1998,9 @@ function MainichiPrototypeMonthBoard({
 }) {
   const [ratios, setRatios] = useState<Record<string, number>>({});
   const [brightness, setBrightness] = useState<Record<string, number>>({});
+  const [decodedPhotoKeys, setDecodedPhotoKeys] = useState<Set<string>>(
+    () => new Set(),
+  );
 
   useEffect(() => {
     let active = true;
@@ -2017,6 +2028,10 @@ function MainichiPrototypeMonthBoard({
     };
   }, [month.photos]);
 
+  useEffect(() => {
+    setDecodedPhotoKeys(new Set());
+  }, [month.key]);
+
   const photos = useMemo(
     () =>
       [...month.photos].sort((a, b) => {
@@ -2033,8 +2048,40 @@ function MainichiPrototypeMonthBoard({
     [brightness, month.photos, options.order],
   );
   const placements = useMemo(
-    () => buildMainichiPrototypePlacements(photos, options.layout, ratios),
-    [options.layout, photos, ratios],
+    () => buildMainichiPrototypePlacements(photos, options.layout, ratios, algorithm),
+    [algorithm, options.layout, photos, ratios],
+  );
+  useEffect(() => {
+    let active = true;
+
+    for (const photo of photos) {
+      const key = getMainichiBoardPhotoKey(photo);
+      void decodePhotoSourcesForDisplay(
+        [photo.boardSrc, photo.src, ...(photo.fallbackSrcs ?? [])],
+        getPhotoStorageVariant(photo, "board"),
+        MAINICHI_CARD_DECODE_TIMEOUT_MS,
+      ).then(() => {
+        if (!active) {
+          return;
+        }
+        setDecodedPhotoKeys((current) => {
+          if (current.has(key)) {
+            return current;
+          }
+          const next = new Set(current);
+          next.add(key);
+          return next;
+        });
+      });
+    }
+
+    return () => {
+      active = false;
+    };
+  }, [photos]);
+
+  const revealedPlacements = placements.items.filter(({ photo }) =>
+    decodedPhotoKeys.has(getMainichiBoardPhotoKey(photo)),
   );
   const dated = new Set<string>();
 
@@ -2053,8 +2100,9 @@ function MainichiPrototypeMonthBoard({
           height: placements.height,
         }}
         data-testid="mainichi-prototype-board"
+        data-board-algorithm={algorithm}
       >
-        {placements.items.map(({ photo, style, height }, index) => {
+        {revealedPlacements.map(({ photo, style, height }, index) => {
           const firstForDate = !dated.has(photo.dateKey);
           dated.add(photo.dateKey);
           const key = getMainichiBoardPhotoKey(photo);
@@ -2100,6 +2148,7 @@ function MainichiPrototypeMonthBoard({
                 }}
                 width={180}
                 height={Math.round(height)}
+                initiallyLoaded
                 onNaturalSize={({ width, height }) => {
                   if (width <= 0 || height <= 0) {
                     return;
@@ -4345,7 +4394,12 @@ function buildMainichiPrototypePlacements(
   photos: MainichiBoardPhoto[],
   layout: BoardV2PrototypeOptions["layout"],
   ratios: Record<string, number>,
+  algorithm: BoardV2PrototypeOptions["mode"],
 ) {
+  if (algorithm === "current") {
+    return buildMainichiCurrentComparisonPlacements(photos, layout, ratios);
+  }
+
   const sparse = photos.length <= 3;
   const width = sparse ? 196 : photos.length > 18 ? 150 : 168;
   const topPadding = sparse ? 38 : 24;
@@ -4381,6 +4435,79 @@ function buildMainichiPrototypePlacements(
     height: `${Math.ceil(cursorY + topPadding)}px`,
     items,
   };
+}
+
+function buildMainichiCurrentComparisonPlacements(
+  photos: MainichiBoardPhoto[],
+  layout: BoardV2PrototypeOptions["layout"],
+  ratios: Record<string, number>,
+) {
+  const baseHeight = getMainichiCurrentCanvasHeight(photos.length);
+  let requiredHeight = baseHeight;
+  const items = photos.map((photo, index) => {
+    const boardLayout = getMainichiBoardPhotoLayout(index, photos.length);
+    const widthPercent = Number.parseFloat(boardLayout.width) || 30;
+    const width = Math.round((430 * widthPercent) / 100);
+    const cropRatio = parseMainichiAspectRatio(boardLayout.aspect);
+    const naturalRatio = ratios[getMainichiBoardPhotoKey(photo)] ?? cropRatio;
+    const aspectRatio = layout === "natural" ? naturalRatio : cropRatio;
+    const height = Math.max(1, Math.round(width / aspectRatio));
+    const top = Number.parseFloat(boardLayout.top) || 0;
+    requiredHeight = Math.max(requiredHeight, Math.ceil(top + height + 28));
+
+    return {
+      photo,
+      height,
+      style: {
+        ...boardLayout.style,
+        aspectRatio: String(aspectRatio),
+        transform: `translate(${boardLayout.shiftX}, ${boardLayout.shiftY}) rotate(${boardLayout.rotation})`,
+        zIndex: boardLayout.zIndex,
+      } satisfies CSSProperties,
+    };
+  });
+
+  return {
+    height: `${requiredHeight}px`,
+    items,
+  };
+}
+
+function shouldUsePrototypeComparisonBoard(
+  options: BoardV2PrototypeOptions | undefined,
+) {
+  if (!options) {
+    return false;
+  }
+
+  // This one combination is the pixel-comparison baseline: the live board.
+  return !(
+    options.mode === "current" &&
+    options.layout === "crop" &&
+    options.frame === "f1" &&
+    options.order === "newest"
+  );
+}
+
+function getMainichiCurrentCanvasHeight(total: number) {
+  if (total <= 1) {
+    return 280;
+  }
+  if (total <= 3) {
+    return 320;
+  }
+  if (total <= 8) {
+    return 460;
+  }
+  if (total <= 16) {
+    return 520;
+  }
+  return 560;
+}
+
+function parseMainichiAspectRatio(aspect: string) {
+  const [width, height] = aspect.split("/").map((value) => Number(value.trim()));
+  return width > 0 && height > 0 ? width / height : 1;
 }
 
 function getMainichiPrototypeFrameStyle(frame: BoardV2PrototypeOptions["frame"]) {
