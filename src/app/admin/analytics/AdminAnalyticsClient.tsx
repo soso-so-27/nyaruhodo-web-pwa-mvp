@@ -3,6 +3,8 @@
 import type { CSSProperties } from "react";
 import { useEffect, useState } from "react";
 
+import { createBrowserSupabaseClient } from "../../../lib/supabase/browser";
+
 type PeriodKey = "today" | "yesterday" | "7d" | "28d";
 
 type AnalyticsResponse = {
@@ -56,8 +58,20 @@ export default function AdminAnalyticsClient() {
       setError("");
 
       try {
+        const headers = new Headers();
+        const supabase = createBrowserSupabaseClient();
+        const { data: sessionData } = supabase
+          ? await supabase.auth.getSession()
+          : { data: { session: null } };
+        const accessToken = sessionData.session?.access_token;
+
+        if (accessToken) {
+          headers.set("Authorization", `Bearer ${accessToken}`);
+        }
+
         const response = await fetch(`/api/admin/analytics?period=${period}`, {
           cache: "no-store",
+          headers,
         });
 
         if (!response.ok) {
