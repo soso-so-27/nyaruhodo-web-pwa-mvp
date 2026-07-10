@@ -9,14 +9,16 @@
 コマンド:
 
 ```bash
-npm run smoke:load:prepost3 -- --base-url=http://localhost:3000 --levels=30,60,120
+node scripts/prepost3-load-smoke.mjs --base-url=http://localhost:3000 --levels=30,60,120
 ```
 
 Previewを叩く場合:
 
 ```bash
-npm run smoke:load:prepost3 -- --base-url=https://<preview-host> --levels=30,60,120
+node scripts/prepost3-load-smoke.mjs --base-url=https://<preview-host> --levels=30,60,120
 ```
+
+`npm run smoke:load:prepost3` はローカル既定値で走らせるショートカット。対象URLを指定する検証では、引数落ちを避けるため `node scripts/prepost3-load-smoke.mjs ...` を使う。
 
 出力: `artifacts/prepost3-load-smoke/*.json`
 
@@ -30,7 +32,7 @@ npm run smoke:load:prepost3 -- --base-url=https://<preview-host> --levels=30,60,
 backupの実書き込みまで見る場合は、ローカル/Previewの捨て環境だけで以下を使う:
 
 ```bash
-LOAD_SMOKE_ALLOW_BACKUP_WRITES=1 npm run smoke:load:prepost3 -- --base-url=http://localhost:3000 --levels=30
+LOAD_SMOKE_ALLOW_BACKUP_WRITES=1 node scripts/prepost3-load-smoke.mjs --base-url=http://localhost:3000 --levels=30
 ```
 
 判定:
