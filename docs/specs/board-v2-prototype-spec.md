@@ -1,7 +1,10 @@
 # ねこだよりボード v2 プロトタイプ
 
-ステータス: v1.1 / 判定用。`/prototypes/board-v2` と管理画面内の
-`/admin/board-v2` に限る。本番のねこだより画面には移植しない。
+> Final selection correction (2026-07-11): production uses the `current` placement algorithm with natural ratios, f3 frames, no date badges, and newest-first order. The v2 stacked placement was not selected.
+
+ステータス: Deprecated（2026-07-10）。判定結果「原寸型 × f3 × 日付なし × 新しい順」を
+本番のねこだよりへ移植済み。`/prototypes/board-v2` と `/admin/board-v2` は案内スタブのみ。
+表示仕様の正は `CollectionPage` とする。
 画面の器は `CollectionPage` をそのまま使い、プロトタイプでは写真ボードだけを
 差し替える。月選択、面のタブ、紙背景、余白、下部ナビ、写真ビューアは本番と同一である。
 

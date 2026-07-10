@@ -1,117 +1,71 @@
 import fs from "node:fs";
 import path from "node:path";
-import { expect, test } from "@playwright/test";
+import { expect, test, type Page } from "@playwright/test";
+
 import { THUMBNAIL_TRANSFORM } from "../../src/lib/photoStorage";
 
-test.describe("board v2 prototype", () => {
+test.describe("production nekodayori natural board", () => {
   test.beforeEach(async ({ page }) => {
-    await page.addInitScript(() => {
-      function makeDataUrl(color: string, width = 32, height = 32) {
-        const canvas = document.createElement("canvas");
-        canvas.width = width;
-        canvas.height = height;
-        const context = canvas.getContext("2d");
-        if (!context) {
-          return "";
-        }
-        context.fillStyle = color;
-        context.fillRect(0, 0, width, height);
-        context.fillStyle = "rgba(255,255,255,0.7)";
-        context.beginPath();
-        context.arc(width * 0.35, height * 0.42, Math.min(width, height) * 0.18, 0, Math.PI * 2);
-        context.arc(width * 0.65, height * 0.42, Math.min(width, height) * 0.18, 0, Math.PI * 2);
-        context.fill();
-        return canvas.toDataURL("image/png");
-      }
+    await seedBoard(page, 3, true);
+  });
 
-      const catId = "board-prototype-cat";
-      const first = new Date("2026-07-08T12:00:00+09:00").getTime();
-      window.localStorage.setItem("active_cat_id", catId);
-      window.localStorage.setItem(
-        "cat_profiles",
-        JSON.stringify([
-          {
-            id: catId,
-            name: "むぎ",
-            createdAt: new Date(first).toISOString(),
-            updatedAt: new Date(first).toISOString(),
-          },
-        ]),
-      );
-      window.localStorage.setItem(
-        "nyaruhodo_exchange_own_sleeping_photos",
-        JSON.stringify([
-          {
-            id: `own-${first}`,
-            catId,
-            ownerCatId: catId,
-            src: makeDataUrl("#c77c63", 24, 48),
-            createdAt: first,
-            state: "sleeping",
-            visibility: "shared",
-            deliveryStatus: "available",
-            triggerLabel: "daily",
-            theme: "sleeping",
-            shared: true,
-          },
-          {
-            id: `own-${first - 3600000}`,
-            catId,
-            ownerCatId: catId,
-            src: makeDataUrl("#7898b2", 48, 24),
-            createdAt: first - 3600000,
-            state: "sleeping",
-            visibility: "shared",
-            deliveryStatus: "available",
-            triggerLabel: "daily",
-            theme: "sleeping",
-            shared: true,
-          },
-          {
-            id: `own-${first - 86400000}`,
-            catId,
-            ownerCatId: catId,
-            src: makeDataUrl("#9a8062"),
-            createdAt: first - 86400000,
-            state: "sleeping",
-            visibility: "shared",
-            deliveryStatus: "available",
-            triggerLabel: "daily",
-            theme: "sleeping",
-            shared: true,
-          },
-        ]),
-      );
-      window.localStorage.setItem("nyaruhodo_exchange_kept_photos", "[]");
+  test("uses natural ratios, f3 frames, no date badges, and newest-first order", async ({
+    page,
+  }) => {
+    await page.goto("/collection");
+
+    const photos = page.getByTestId("mainichi-board-photo-sent");
+    const board = page.getByTestId("mainichi-natural-board");
+    await expect(board).toBeVisible();
+    await expect(board).toHaveAttribute("data-board-algorithm", "current");
+    await expect(photos).toHaveCount(3);
+
+    const timestamps = await photos.evaluateAll((items) =>
+      items.map((item) => Number(item.getAttribute("data-photo-timestamp"))),
+    );
+    expect(timestamps).toEqual([...timestamps].sort((left, right) => right - left));
+
+    const firstRatio = await photos.first().evaluate((item) => {
+      const width = (item as HTMLElement).offsetWidth;
+      const height = (item as HTMLElement).offsetHeight;
+      return width / height;
     });
+    expect(firstRatio).toBeCloseTo(0.5, 1);
+
+    const frame = photos.first().locator("span").first();
+    await expect(frame).toHaveCSS("border-top-width", "1px");
+    await expect(frame).toHaveCSS("border-radius", "0px");
+    await expect(page.locator('[data-mainichi-paste-tape="true"]')).toHaveCount(0);
+    await expect(page.locator('[data-testid="mainichi-date-badge"]')).toHaveCount(0);
+
+    await page.getByRole("tab", { name: "とどいた" }).click();
+    await expect(page.getByTestId("mainichi-board-photo-delivered")).toHaveCount(1);
   });
 
-  test("uses the production collection shell and swaps only the v2 board", async ({ page }) => {
-    await page.goto("/prototypes/board-v2?mode=v2&layout=natural&frame=f3&order=brightest");
+  test("keeps the selected current placement for a dense 31-photo month", async ({
+    page,
+  }) => {
+    await seedBoard(page, 31, false);
+    await page.goto("/collection");
 
-    await expect(page.getByTestId("mainichi-photo-board")).toBeVisible();
-    await expect(page.getByTestId("mainichi-month-select")).toBeVisible();
-    await expect(page.getByTestId("mainichi-prototype-month-board")).toBeVisible();
-    await expect(page.getByTestId("mainichi-prototype-photo")).toHaveCount(3);
-    await expect(page.getByTestId("board-v2-settings-button")).toBeVisible();
+    const photos = page.getByTestId("mainichi-board-photo-sent");
+    await expect(photos).toHaveCount(31);
+    await expect(page.getByTestId("mainichi-natural-board")).toHaveAttribute(
+      "data-board-algorithm",
+      "current",
+    );
+    await photos.last().scrollIntoViewIfNeeded();
+    await expect(photos.last()).toBeVisible();
   });
 
-  test("requests a contain transform for thumbnail delivery", () => {
-    expect(THUMBNAIL_TRANSFORM).toEqual({
-      quality: 75,
-      resize: "contain",
-      width: 800,
-    });
-  });
-
-  test("uses plain display dimensions for the natural board layout", async ({ page }) => {
+  test("uses plain display dimensions as the card ratio source", async ({ page }) => {
     const displaySrc = "storage:user-1/cat-1/sleeping/display/landscape.jpg";
-    const transformedSrc = "data:image/svg+xml," + encodeURIComponent(
-      '<svg xmlns="http://www.w3.org/2000/svg" width="200" height="600"></svg>',
-    );
-    const plainDisplaySrc = "data:image/svg+xml," + encodeURIComponent(
-      '<svg xmlns="http://www.w3.org/2000/svg" width="600" height="300"></svg>',
-    );
+    const transformedSrc =
+      "data:image/svg+xml," +
+      encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="200" height="600"></svg>');
+    const plainDisplaySrc =
+      "data:image/svg+xml," +
+      encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="600" height="300"></svg>');
     const requests: Array<{ src?: string; variant?: string }> = [];
 
     await page.route("**/api/photo-storage/signed-url", async (route) => {
@@ -125,35 +79,35 @@ test.describe("board v2 prototype", () => {
       });
     });
     await page.addInitScript(({ src }) => {
-      const catId = "board-prototype-cat";
       const createdAt = new Date("2026-07-08T12:00:00+09:00").getTime();
-      window.localStorage.setItem("active_cat_id", catId);
-      window.localStorage.setItem("cat_profiles", JSON.stringify([{ id: catId, name: "むぎ" }]));
+      window.localStorage.setItem("active_cat_id", "board-cat");
+      window.localStorage.setItem("cat_profiles", JSON.stringify([{ id: "board-cat", name: "むぎ" }]));
       window.localStorage.setItem(
         "nyaruhodo_exchange_own_sleeping_photos",
-        JSON.stringify([{
-          id: `own-${createdAt}`,
-          catId,
-          ownerCatId: catId,
-          src,
-          thumbnailSrc: src,
-          displaySrc: src,
-          originalSrc: src,
-          createdAt,
-          state: "sleeping",
-          visibility: "shared",
-          deliveryStatus: "available",
-          triggerLabel: "daily",
-          theme: "sleeping",
-          shared: true,
-        }]),
+        JSON.stringify([
+          {
+            id: `own-${createdAt}`,
+            catId: "board-cat",
+            ownerCatId: "board-cat",
+            src,
+            thumbnailSrc: src,
+            displaySrc: src,
+            originalSrc: src,
+            createdAt,
+            state: "sleeping",
+            visibility: "shared",
+            deliveryStatus: "available",
+            triggerLabel: "daily",
+            theme: "sleeping",
+            shared: true,
+          },
+        ]),
       );
       window.localStorage.setItem("nyaruhodo_exchange_kept_photos", "[]");
     }, { src: displaySrc });
 
-    await page.goto("/prototypes/board-v2?mode=v2&layout=natural&frame=f3&order=newest");
-    const photo = page.getByTestId("mainichi-prototype-photo");
-    await expect(photo).toHaveCount(1);
+    await page.goto("/collection");
+    const photo = page.getByTestId("mainichi-board-photo-sent");
     await expect(photo).toHaveAttribute("data-display-natural-ratio", "2.000000");
     expect(requests).toEqual(
       expect.arrayContaining([
@@ -163,61 +117,22 @@ test.describe("board v2 prototype", () => {
     );
   });
 
-  test("uses the unchanged production board for the current comparison query", async ({ page }) => {
-    await page.goto("/prototypes/board-v2?mode=current&layout=crop&frame=f1&order=newest");
-
-    await expect(page.getByTestId("mainichi-month-board")).toBeVisible();
-    await expect(page.getByTestId("mainichi-board-photo-sent")).toHaveCount(3);
-    await expect(page.getByTestId("mainichi-prototype-month-board")).toHaveCount(0);
+  test("requests a contain transform for thumbnail delivery", () => {
+    expect(THUMBNAIL_TRANSFORM).toEqual({
+      quality: 75,
+      resize: "contain",
+      width: 800,
+    });
   });
 
-  test("shows current-algorithm comparison variants beyond the exact baseline", async ({ page }) => {
-    await page.goto("/prototypes/board-v2?mode=current&layout=natural&frame=f3&order=brightest");
-
-    await expect(page.getByTestId("mainichi-prototype-month-board")).toBeVisible();
-    await expect(page.getByTestId("mainichi-prototype-board")).toHaveAttribute(
-      "data-board-algorithm",
-      "current",
+  test("replaces the prototype with a deprecated stub", async ({ page }) => {
+    await page.goto("/prototypes/board-v2");
+    await expect(page.getByRole("heading", { name: "本番へ 移植しました" })).toBeVisible();
+    await expect(page.getByRole("link", { name: "ねこだよりを ひらく" })).toHaveAttribute(
+      "href",
+      "/collection",
     );
-    await expect
-      .poll(() =>
-        page
-          .locator('[data-testid="mainichi-prototype-photo"] img')
-          .evaluateAll((images) =>
-            images.length === 3 &&
-            images.every(
-              (image) => image instanceof HTMLImageElement && image.naturalWidth > 0,
-            ),
-          ),
-      )
-      .toBe(true);
-  });
-
-  test("offers the comparison controls in a mobile-friendly settings sheet", async ({ page }) => {
-    await page.goto("/prototypes/board-v2?mode=v2&layout=crop&frame=f1&order=newest");
-
-    await page.getByTestId("board-v2-settings-button").click();
-    await expect(page.getByText("ボードの比較")).toBeVisible();
-    await page.getByTestId("board-v2-option-layout-natural").click();
-    await page.getByTestId("board-v2-option-frame-f3").click();
-    await page.getByTestId("board-v2-option-order-brightest").click();
-    await page.getByTestId("board-v2-option-mode-current").click();
-
-    await expect(page).toHaveURL(/mode=current/);
-    await expect(page).toHaveURL(/layout=natural/);
-    await expect(page).toHaveURL(/frame=f3/);
-    await expect(page).toHaveURL(/order=brightest/);
-    await expect(page.getByTestId("mainichi-prototype-month-board")).toBeVisible();
-    await expect(page.getByTestId("mainichi-prototype-board")).toHaveAttribute(
-      "data-board-algorithm",
-      "current",
-    );
-
-    await expect
-      .poll(() =>
-        page.evaluate(() => window.localStorage.getItem("neteruneko_board_v2_prototype_options")),
-      )
-      .toContain('"layout":"natural"');
+    await expect(page.getByTestId("board-v2-settings-button")).toHaveCount(0);
   });
 
   test("keeps prototype routes covered by the production 404 gate", async () => {
@@ -225,26 +140,72 @@ test.describe("board v2 prototype", () => {
       path.resolve(process.cwd(), "src/app/prototypes/layout.tsx"),
       "utf8",
     );
-
     expect(layout).toContain('process.env.VERCEL_ENV === "production"');
     expect(layout).toContain("notFound()");
   });
-
-  test("exposes the same collection renderer through an admin-only production route", async () => {
-    const pageSource = fs.readFileSync(
-      path.resolve(process.cwd(), "src/app/admin/board-v2/page.tsx"),
-      "utf8",
-    );
-    const analyticsSource = fs.readFileSync(
-      path.resolve(
-        process.cwd(),
-        "src/app/admin/analytics/AdminAnalyticsClient.tsx",
-      ),
-      "utf8",
-    );
-
-    expect(pageSource).toContain("AdminAccessGate");
-    expect(pageSource).toContain("readBoardV2PrototypeOptions");
-    expect(analyticsSource).toContain("/admin/board-v2");
-  });
 });
+
+async function seedBoard(page: Page, sentCount: number, includeDelivered: boolean) {
+  await page.addInitScript(
+    ({ count, delivered }) => {
+      function makeDataUrl(color: string, width: number, height: number) {
+        const canvas = document.createElement("canvas");
+        canvas.width = width;
+        canvas.height = height;
+        const context = canvas.getContext("2d");
+        if (!context) return "";
+        context.fillStyle = color;
+        context.fillRect(0, 0, width, height);
+        context.fillStyle = "rgba(255,255,255,0.66)";
+        context.beginPath();
+        context.arc(width * 0.5, height * 0.45, Math.min(width, height) * 0.22, 0, Math.PI * 2);
+        context.fill();
+        return canvas.toDataURL("image/png");
+      }
+
+      const catId = "board-cat";
+      const newest = new Date("2026-07-08T12:00:00+09:00").getTime();
+      const shapes = [
+        { width: 24, height: 48 },
+        { width: 48, height: 24 },
+        { width: 32, height: 32 },
+      ];
+      const sent = Array.from({ length: count }, (_, index) => {
+        const shape = shapes[index % shapes.length];
+        return {
+          id: `own-${newest - index * 3_600_000}`,
+          catId,
+          ownerCatId: catId,
+          src: makeDataUrl(`hsl(${(index * 37) % 360} 36% 58%)`, shape.width, shape.height),
+          createdAt: newest - index * 3_600_000,
+          state: "sleeping",
+          visibility: "shared",
+          deliveryStatus: "available",
+          triggerLabel: "daily",
+          theme: "sleeping",
+          shared: true,
+        };
+      });
+      const kept = delivered
+        ? [
+            {
+              id: "delivered-board",
+              sourcePhotoId: "stock-board",
+              src: makeDataUrl("#8b6f62", 48, 32),
+              title: "とどいたねがお",
+              subtitle: "",
+              triggerLabel: "sleeping",
+              theme: "sleeping",
+              deliveredAt: newest - 90_000,
+            },
+          ]
+        : [];
+
+      window.localStorage.setItem("active_cat_id", catId);
+      window.localStorage.setItem("cat_profiles", JSON.stringify([{ id: catId, name: "むぎ" }]));
+      window.localStorage.setItem("nyaruhodo_exchange_own_sleeping_photos", JSON.stringify(sent));
+      window.localStorage.setItem("nyaruhodo_exchange_kept_photos", JSON.stringify(kept));
+    },
+    { count: sentCount, delivered: includeDelivered },
+  );
+}
