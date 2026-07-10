@@ -93,11 +93,26 @@ test("keeps the cats photo tab clear of the fixed bottom navigation", async ({
     const photoGrid = document.querySelector<HTMLElement>(
       '[data-testid="cats-lens-photo-grid"]',
     );
+    const firstTile = photoGrid?.querySelector<HTMLButtonElement>(":scope > div button");
+    const firstFrame = firstTile?.querySelector<HTMLElement>("span");
+    const firstImage = firstTile?.querySelector<HTMLImageElement>("img");
     return {
       columnGap: photoGrid ? getComputedStyle(photoGrid).columnGap : "",
+      rowGap: photoGrid ? getComputedStyle(photoGrid).rowGap : "",
+      frameBorderWidth: firstFrame ? getComputedStyle(firstFrame).borderWidth : "",
+      frameBorderRadius: firstFrame
+        ? getComputedStyle(firstFrame).borderRadius
+        : "",
+      frameBoxShadow: firstFrame ? getComputedStyle(firstFrame).boxShadow : "",
+      imageObjectFit: firstImage ? getComputedStyle(firstImage).objectFit : "",
     };
   });
-  expect(gridMetrics.columnGap).toBe("4px");
+  expect(gridMetrics.columnGap).toBe("2px");
+  expect(gridMetrics.rowGap).toBe("2px");
+  expect(gridMetrics.frameBorderWidth).toBe("0px");
+  expect(gridMetrics.frameBorderRadius).toBe("0px");
+  expect(gridMetrics.frameBoxShadow).toBe("none");
+  expect(gridMetrics.imageObjectFit).toBe("cover");
 
   const [tabsBox, coverBox, navBoxBeforeScroll] = await Promise.all([
     tabs.boundingBox(),

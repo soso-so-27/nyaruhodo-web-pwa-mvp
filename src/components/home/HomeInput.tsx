@@ -3297,6 +3297,7 @@ function EveningDeliveryOpening({
           ...(isClosing ? styles.eveningOpeningPairStageClosing : {}),
         }}
         data-testid="evening-opening-pair"
+        data-photo-id={state.deliveredPhoto.id}
         onClick={(event) => event.stopPropagation()}
       >
         <p style={styles.eveningOpeningTitle}>ねこだより</p>
@@ -3321,10 +3322,11 @@ function EveningDeliveryOpening({
         <button
           type="button"
           data-testid="evening-opening-tomorrow"
+          data-stow-state="stowed"
           onClick={() => requestClose()}
           style={styles.eveningOpeningTomorrowButton}
         >
-          また、あした
+          とじる
         </button>
       </div>
     </div>

@@ -74,8 +74,11 @@ export function PhotoTile({
     ...styles.frame,
     ...sizeStyles[size],
     ...(aspect !== "auto" ? { aspectRatio: aspect } : null),
-    ...(isBare ? styles.bareFrame : null),
-    ...(isAvatar ? styles.avatarFrame : styles.rounded),
+    ...(isBare
+      ? styles.bareFrame
+      : isAvatar
+        ? styles.avatarFrame
+        : styles.rounded),
     ...(muted ? styles.mutedFrame : null),
   };
   const isInteractive = interactive || Boolean(onClick);
@@ -217,6 +220,7 @@ const styles = {
   },
   bareFrame: {
     border: "none",
+    borderRadius: 0,
     background: "transparent",
     boxShadow: shadow.none,
   },

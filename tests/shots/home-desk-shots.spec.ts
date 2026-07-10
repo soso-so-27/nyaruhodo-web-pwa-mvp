@@ -316,7 +316,7 @@ test.describe("home desk model shots", () => {
     await page.goto("/home");
     await page.waitForLoadState("networkidle");
     await page.getByTestId("desk-home-frame").click();
-    await expect(page.getByRole("button", { name: "閉じる" })).toBeVisible();
+    await expect(page.getByRole("button", { name: "とじる" })).toBeVisible();
     await page.waitForTimeout(500);
     await page.screenshot({
       path: path.join(shotsDir, "state4_home_frame_viewer_close.png"),

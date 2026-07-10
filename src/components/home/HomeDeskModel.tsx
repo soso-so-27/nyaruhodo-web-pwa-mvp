@@ -492,17 +492,9 @@ export function HomeDeskModel({
                 <button
                   type="button"
                   data-testid="desk-home-frame"
+                  data-photo-id={homePhoto.id}
                   style={deskStyles.homeFrameButton}
                   onClick={() => {
-                    if (homeDay.phase === "opened" && deliveredPhoto) {
-                      setViewerPhoto({
-                        kind: "other",
-                        photo: deliveredPhoto,
-                        dateKey: eveningState.dateKey,
-                      });
-                      return;
-                    }
-
                     setViewerPhoto({
                       kind: "own",
                       photo: homePhoto,
@@ -1209,21 +1201,18 @@ function DeskPhotoViewer({
 }) {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [isReportSheetOpen, setIsReportSheetOpen] = useState(false);
-  const [saveState, setSaveState] = useState<"idle" | "saved">("idle");
   const isOwnPhoto = viewerPhoto.kind === "own";
 
-  async function handleSave() {
+  function handleStow() {
     onSave();
-    await savePhotoToDevice(viewerPhoto.photo);
-    setSaveState("saved");
-    window.setTimeout(() => {
-      setSaveState("idle");
-    }, 2000);
+    onClose();
   }
 
   return (
     <div
       data-testid="desk-photo-viewer"
+      data-photo-kind={viewerPhoto.kind}
+      data-photo-id={viewerPhoto.photo.id}
       style={deskStyles.viewerBackdrop}
       onClick={onClose}
     >
@@ -1247,9 +1236,9 @@ function DeskPhotoViewer({
               size="sm"
               style={deskStyles.viewerOwnCloseButton}
               onClick={onClose}
-              aria-label="閉じる"
+              aria-label="とじる"
             >
-              閉じる
+              とじる
             </AppButton>
             <div style={deskStyles.viewerOwnHeader}>
               <p style={deskStyles.viewerOwnKicker}>きょうの ねがお</p>
@@ -1264,9 +1253,9 @@ function DeskPhotoViewer({
             size="sm"
             style={deskStyles.viewerCloseButton}
             onClick={onClose}
-            aria-label="閉じる"
+            aria-label="とじる"
           >
-            閉じる
+            とじる
           </AppButton>
         )}
         {viewerPhoto.kind === "other" ? (
@@ -1326,20 +1315,19 @@ function DeskPhotoViewer({
             isOwnPhoto ? deskStyles.viewerOwnImage : deskStyles.viewerImage
           }
         />
-        <AppButton
-          type="button"
-          variant="secondary"
-          size="lg"
-          fullWidth
-          style={{
-            ...deskStyles.viewerSaveButtonLayout,
-            ...(isOwnPhoto ? deskStyles.viewerSaveButtonHidden : {}),
-            ...(saveState === "saved" ? deskStyles.viewerSaveButtonSaved : {}),
-          }}
-          onClick={handleSave}
-        >
-          {saveState === "saved" ? "しまった" : "しまう"}
-        </AppButton>
+        {viewerPhoto.kind === "other" ? (
+          <AppButton
+            type="button"
+            variant="secondary"
+            size="lg"
+            fullWidth
+            data-testid="desk-photo-viewer-stow"
+            style={deskStyles.viewerSaveButtonLayout}
+            onClick={handleStow}
+          >
+            しまう
+          </AppButton>
+        ) : null}
       </section>
       {isReportSheetOpen && viewerPhoto.kind === "other" ? (
         <AppSheet
@@ -2007,69 +1995,6 @@ function getPhotoStorageVariant(
 
 function getPhotoFallbackSrcs(photo: PhotoSourceSet) {
   return resolvePhotoFallbackSrcs(photo);
-}
-
-async function savePhotoToDevice(
-  photo: Pick<OwnSleepingPhoto | ExchangePhoto, "id" | "src" | "displaySrc" | "originalSrc">,
-) {
-  const src = getPhotoDetailSrc(photo);
-  const blob = await readPhotoBlob(src);
-
-  if (blob) {
-    const file = new File([blob], `${photo.id || "neteruneko"}.jpg`, {
-      type: blob.type || "image/jpeg",
-    });
-    const shareNavigator = navigator as Navigator & {
-      canShare?: (data: ShareData) => boolean;
-      share?: (data: ShareData) => Promise<void>;
-    };
-
-    if (
-      shareNavigator.share &&
-      (!shareNavigator.canShare || shareNavigator.canShare({ files: [file] }))
-    ) {
-      await shareNavigator.share({ files: [file], title: "ねてるねこ" });
-      return "share" as const;
-    }
-
-    triggerDownload(URL.createObjectURL(blob), `${photo.id || "neteruneko"}.jpg`, true);
-    return "download" as const;
-  }
-
-  triggerDownload(src, `${photo.id || "neteruneko"}.jpg`);
-  return "download" as const;
-}
-
-async function readPhotoBlob(src: string) {
-  try {
-    if (src.startsWith("data:image/")) {
-      const response = await fetch(src);
-      return await response.blob();
-    }
-
-    if (src.startsWith("http://") || src.startsWith("https://")) {
-      const response = await fetch(src);
-      return response.ok ? await response.blob() : null;
-    }
-  } catch {
-    return null;
-  }
-
-  return null;
-}
-
-function triggerDownload(src: string, fileName: string, revoke = false) {
-  const anchor = document.createElement("a");
-  anchor.href = src;
-  anchor.download = fileName;
-  anchor.rel = "noopener";
-  document.body.appendChild(anchor);
-  anchor.click();
-  anchor.remove();
-
-  if (revoke) {
-    window.setTimeout(() => URL.revokeObjectURL(src), 5000);
-  }
 }
 
 function getExchangePhotoIdentity(photo: Pick<ExchangePhoto, "id" | "sourcePhotoId">) {

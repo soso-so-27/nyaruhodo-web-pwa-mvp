@@ -2061,7 +2061,7 @@ function MainichiNaturalMonthBoard({
         data-testid="mainichi-natural-board"
         data-board-algorithm="current"
       >
-        {revealedPlacements.map(({ photo, style, height }, index) => {
+        {revealedPlacements.map(({ photo, style, height, motion: cardMotion }, index) => {
           const key = getMainichiBoardPhotoKey(photo);
           const testId =
             photo.side === "sent"
@@ -2069,10 +2069,15 @@ function MainichiNaturalMonthBoard({
               : "mainichi-board-photo-delivered";
 
           return (
-            <button
+            <motion.button
               key={key}
               type="button"
               data-testid={testId}
+              data-mainichi-photo-card="true"
+              data-mainichi-motion="paste"
+              data-mainichi-motion-delay={cardMotion.transition.delay}
+              data-mainichi-motion-from-opacity={cardMotion.initial.opacity}
+              data-mainichi-motion-from-scale={cardMotion.initial.scale}
               data-photo-id={photo.id}
               data-source-photo-id={photo.sourcePhotoId ?? undefined}
               data-photo-timestamp={photo.timestamp}
@@ -2081,6 +2086,11 @@ function MainichiNaturalMonthBoard({
               data-mainichi-paste={key === pastingPhotoKey ? "true" : undefined}
               data-display-natural-ratio={ratios[key]?.toFixed(6) ?? ""}
               style={{ ...styles.mainichiNaturalPhotoButton, ...style }}
+              initial={cardMotion.initial}
+              animate={cardMotion.animate}
+              exit={cardMotion.exit}
+              whileTap={cardMotion.whileTap}
+              transition={cardMotion.transition}
               onClick={(event) => {
                 const rect = event.currentTarget.getBoundingClientRect();
                 onOpenPhoto(photo, month, {
@@ -2125,7 +2135,7 @@ function MainichiNaturalMonthBoard({
                     : undefined
                 }
               />
-            </button>
+            </motion.button>
           );
         })}
       </div>
@@ -4372,10 +4382,10 @@ function buildMainichiCurrentNaturalPlacements(
     return {
       photo,
       height,
+      motion: getMainichiBoardPhotoMotion(index, photos.length, boardLayout),
       style: {
         ...boardLayout.style,
         aspectRatio: String(ratio),
-        transform: `translate(${boardLayout.shiftX}, ${boardLayout.shiftY}) rotate(${boardLayout.rotation})`,
         zIndex: boardLayout.zIndex,
       } satisfies CSSProperties,
     };

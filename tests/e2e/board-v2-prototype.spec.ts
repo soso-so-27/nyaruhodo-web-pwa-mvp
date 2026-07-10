@@ -42,6 +42,31 @@ test.describe("production nekodayori natural board", () => {
     await expect(page.getByTestId("mainichi-board-photo-delivered")).toHaveCount(1);
   });
 
+  test("pastes every decoded photo onto the board with the staggered motion", async ({
+    page,
+  }) => {
+    await page.addInitScript(() => {
+      sessionStorage.setItem("neteruneko_collection_nav_entry", "1");
+    });
+    await page.goto("/collection");
+    const photos = page.getByTestId("mainichi-board-photo-sent");
+    await expect(photos).toHaveCount(3);
+    const motion = await photos.evaluateAll((items) =>
+      items.map((item) => ({
+        delay: Number(item.getAttribute("data-mainichi-motion-delay")),
+        fromOpacity: Number(
+          item.getAttribute("data-mainichi-motion-from-opacity"),
+        ),
+        fromScale: Number(item.getAttribute("data-mainichi-motion-from-scale")),
+      })),
+    );
+    const delays = motion.map((entry) => entry.delay);
+    expect(delays).toEqual([...delays].sort((left, right) => left - right));
+    expect(new Set(delays).size).toBe(3);
+    expect(motion.every((entry) => entry.fromOpacity === 0)).toBe(true);
+    expect(motion.every((entry) => entry.fromScale < 1)).toBe(true);
+  });
+
   test("keeps the selected current placement for a dense 31-photo month", async ({
     page,
   }) => {

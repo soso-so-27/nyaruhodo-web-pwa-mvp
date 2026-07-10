@@ -145,7 +145,7 @@ test.describe("home sleeping exchange flow", () => {
     await expect(openingPanel).toContainText("この一通は、『とどいた』にしまわれました");
     await expect(openingPanel.getByRole("button", { name: "閉じる" })).toHaveCount(0);
     await expect(openingPanel.locator("button")).toHaveCount(1);
-    await openingPanel.getByRole("button", { name: "また、あした" }).click();
+    await openingPanel.getByRole("button", { name: "とじる" }).click();
     await expect(page.getByTestId("home-desk-model")).toHaveAttribute(
       "data-state",
       "4",
@@ -731,7 +731,7 @@ test.describe("home sleeping exchange flow", () => {
     await expect(openingPanel).toBeVisible();
     await expect(openingPanel.locator("img")).toHaveCount(1);
     await expect(openingPanel.getByRole("button", { name: "閉じる" })).toHaveCount(0);
-    await expect(openingPanel.getByRole("button", { name: "また、あした" })).toBeVisible();
+    await expect(openingPanel.getByRole("button", { name: "とじる" })).toBeVisible();
 
     await expect
       .poll(() =>
@@ -756,7 +756,7 @@ test.describe("home sleeping exchange flow", () => {
     expect(openedDelivery?.openedAt).toBeTruthy();
     expect(openedDelivery?.keptAt).toBeTruthy();
 
-    await openingPanel.getByRole("button", { name: "また、あした" }).click();
+    await openingPanel.getByRole("button", { name: "とじる" }).click();
     expect(signedUrlCalls).toBe(0);
   });
 

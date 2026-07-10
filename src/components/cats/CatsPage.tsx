@@ -3195,8 +3195,9 @@ function LensPhotoGrid({
           <PhotoTile
             src={getLensPhotoThumbnailSrc(photo)}
             alt=""
-            variant="tile"
+            variant="bare"
             aspect="1 / 1"
+            fit="cover"
             onClick={() => onOpenPhoto(photo)}
             style={styles.lensPhotoTileRoot}
             imageStyle={styles.lensPhotoTile}
@@ -7028,16 +7029,16 @@ const styles = {
   lensPhotoGrid: {
     display: "grid",
     gridTemplateColumns: "repeat(3, minmax(0, 1fr))",
-    gap: "4px",
+    gap: "2px",
     overflow: "hidden",
-    borderRadius: "8px",
+    borderRadius: "1px",
   },
   lensPhotoGridPending: {
     minHeight: 260,
   },
   lensPhotoSkeletonItem: {
     aspectRatio: "1 / 1",
-    borderRadius: "8px",
+    borderRadius: "1px",
     background:
       "linear-gradient(180deg, color-mix(in srgb, var(--paper-card) 84%, transparent), color-mix(in srgb, var(--paper-warm) 42%, transparent))",
     boxShadow: "0 0 0 1px color-mix(in srgb, var(--control-border) 28%, transparent) inset",
@@ -7055,7 +7056,7 @@ const styles = {
     height: "auto",
     aspectRatio: "1 / 1",
     border: "0",
-    borderRadius: "8px",
+    borderRadius: "1px",
     boxShadow: "none",
   },
   lensPhotoDate: {

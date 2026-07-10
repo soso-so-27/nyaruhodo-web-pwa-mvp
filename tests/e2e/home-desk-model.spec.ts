@@ -523,7 +523,7 @@ test.describe("home desk model", () => {
     );
     await expect(openingPair.locator("button")).toHaveCount(1);
     await expect(
-      openingPair.getByRole("button", { name: "また、あした" }),
+      openingPair.getByRole("button", { name: "とじる" }),
     ).toBeVisible();
     await expect
       .poll(() =>
@@ -610,7 +610,7 @@ test.describe("home desk model", () => {
     await expect(openingPair.getByRole("button", { name: "閉じる" })).toHaveCount(
       0,
     );
-    await openingPair.getByRole("button", { name: "また、あした" }).click();
+    await openingPair.getByRole("button", { name: "とじる" }).click();
 
     await expect(page.getByTestId("evening-opening-flyer")).toHaveCount(0);
     await expect(page.getByTestId("evening-opening-pair")).toHaveCount(0);
@@ -629,7 +629,7 @@ test.describe("home desk model", () => {
     await expect(openingPair.getByRole("button", { name: "閉じる" })).toHaveCount(
       0,
     );
-    await openingPair.getByRole("button", { name: "また、あした" }).click();
+    await openingPair.getByRole("button", { name: "とじる" }).click();
 
     const flyer = page.getByTestId("evening-opening-flyer");
     await expect(flyer).toHaveCount(0);
@@ -670,7 +670,7 @@ test.describe("home desk model", () => {
     await expect(page.getByTestId("evening-opening-pair")).toHaveCount(0);
   });
 
-  test("opens the delivered photo from the state4 home frame without a notification row", async ({
+  test("opens the same own photo that is visible in the state4 home frame", async ({
     page,
   }) => {
     await seedDeskState(page, "4");
@@ -689,8 +689,50 @@ test.describe("home desk model", () => {
       letterTray.getByRole("button", { name: "どこかのこの写真を大きく見る" }),
     ).toHaveCount(0);
     await expect(page.getByTestId("home-stamp-pair-stamp")).toHaveCount(0);
-    await page.getByTestId("desk-home-frame").click();
-    await expect(page.getByTestId("desk-photo-viewer")).toBeVisible();
+    const frame = page.getByTestId("desk-home-frame");
+    await expect(frame).toHaveAttribute("data-photo-id", "own-desk");
+    await frame.click();
+    const viewer = page.getByTestId("desk-photo-viewer");
+    await expect(viewer).toBeVisible();
+    await expect(viewer).toHaveAttribute("data-photo-kind", "own");
+    await expect(viewer).toHaveAttribute("data-photo-id", "own-desk");
+    await expect(viewer.getByRole("button", { name: "とじる" })).toBeVisible();
+    await expect(viewer.getByTestId("desk-photo-viewer-stow")).toHaveCount(0);
+  });
+
+  test("stows a tapped delivered photo and only shows close after it is stored", async ({
+    page,
+  }) => {
+    await seedDeskState(page, "3");
+    await page.goto("/home");
+    await page.waitForLoadState("networkidle");
+
+    await page.getByTestId("desk-open-letter").click();
+    const openingPair = page.getByTestId("evening-opening-pair");
+    await expect(openingPair).toBeVisible();
+    await expect(openingPair).toHaveAttribute("data-photo-id", "delivered-desk");
+    const closeButton = openingPair.getByTestId("evening-opening-tomorrow");
+    await expect(closeButton).toHaveAttribute("data-stow-state", "stowed");
+    await expect(closeButton).toHaveText("とじる");
+    await expect
+      .poll(() =>
+        page.evaluate(() => {
+          const kept = JSON.parse(
+            localStorage.getItem("nyaruhodo_exchange_kept_photos") ?? "[]",
+          ) as Array<{ id?: string }>;
+          const days = JSON.parse(
+            localStorage.getItem("neteruneko_evening_delivery_days") ?? "{}",
+          ) as Record<string, { keptAt?: number }>;
+          return {
+            kept: kept.some((photo) => photo.id === "delivered-desk"),
+            marked: Object.values(days).some((day) => typeof day.keptAt === "number"),
+          };
+        }),
+      )
+      .toEqual({ kept: true, marked: true });
+
+    await closeButton.click();
+    await expect(openingPair).toHaveCount(0);
   });
 
   test("does not show the removed yesterday mini on home", async ({
