@@ -2,10 +2,15 @@ import { headers } from "next/headers";
 
 import { BoardV2Prototype } from "../../../components/prototypes/BoardV2Prototype";
 import { requireAdminAccess } from "../../../lib/adminAccess";
+import { readBoardV2PrototypeOptions } from "../../../lib/collection/boardV2Prototype";
 
 export const dynamic = "force-dynamic";
 
-export default async function AdminBoardV2Page() {
+export default async function AdminBoardV2Page({
+  searchParams,
+}: {
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
+}) {
   const requestHeaders = await headers();
   const access = await requireAdminAccess(
     new Request("https://nyaruhodo.local/admin/board-v2", {
@@ -36,5 +41,5 @@ export default async function AdminBoardV2Page() {
     );
   }
 
-  return <BoardV2Prototype returnToPath="/admin/board-v2" />;
+  return <BoardV2Prototype options={readBoardV2PrototypeOptions(await searchParams)} />;
 }

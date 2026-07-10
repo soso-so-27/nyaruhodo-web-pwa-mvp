@@ -9,6 +9,7 @@ import {
   getDailyCollectionTarget,
   isReservedCollectionSlotSlug,
 } from "../../lib/collection/dailyTarget";
+import type { BoardV2PrototypeOptions } from "../../lib/collection/boardV2Prototype";
 import { trackProductEvent } from "../../lib/analytics/productAnalytics";
 import {
   deleteAccountCollectionPhoto,
@@ -74,6 +75,7 @@ import { EmptyState } from "../ui/EmptyState";
 import { PhotoTile, PhotoViewerFrame } from "../ui/PhotoTile";
 import {
   decodePhotoSourcesForDisplay,
+  getStoragePhotoSignedUrl,
   StoredPhotoImage,
   preloadStoragePhotoSignedUrls,
 } from "../ui/StoredPhotoImage";
@@ -335,7 +337,11 @@ type MainichiViewerState = {
   monthLabel: string | null;
 };
 
-export function CollectionPage() {
+export function CollectionPage({
+  boardV2Prototype,
+}: {
+  boardV2Prototype?: BoardV2PrototypeOptions;
+} = {}) {
   const [catProfiles, setCatProfiles] = useState<CatProfile[]>([]);
   const [activeCatId, setActiveCatId] = useState<string | null>(null);
   const [activeGroupId, setActiveGroupId] = useState<CollectionGroupId>("pose");
@@ -1336,6 +1342,7 @@ export function CollectionPage() {
           onNavEntryMotionPlayed={() => setShouldPlayMainichiNavEntry(false)}
           onOpenMainichiDay={openMainichiDay}
           onOpenMainichiPhoto={openMainichiBoardPhoto}
+          boardV2Prototype={boardV2Prototype}
         />
       </div>
       {selectedMainichiDayGroup ? (
@@ -1441,6 +1448,7 @@ function BoxOverview({
   onNavEntryMotionPlayed,
   onOpenMainichiDay,
   onOpenMainichiPhoto,
+  boardV2Prototype,
 }: {
   dayGroups: AlbumDayGroup[];
   firstEveningDeliveryTargetDateKey: string | null;
@@ -1456,6 +1464,7 @@ function BoxOverview({
     month: MainichiBoardMonth,
     source?: MainichiMorphSource | null,
   ) => void;
+  boardV2Prototype?: BoardV2PrototypeOptions;
 }) {
   const [activeBoardSide, setActiveBoardSide] =
     useState<MainichiBoardSide>("sent");
@@ -1472,6 +1481,7 @@ function BoxOverview({
         onNavEntryMotionPlayed={onNavEntryMotionPlayed}
         onOpenDay={onOpenMainichiDay}
         onOpenPhoto={onOpenMainichiPhoto}
+        boardV2Prototype={boardV2Prototype}
       />
     </section>
   );
@@ -1487,6 +1497,7 @@ function MainichiPhotoBoard({
   onNavEntryMotionPlayed,
   onOpenDay,
   onOpenPhoto,
+  boardV2Prototype,
 }: {
   dayGroups: AlbumDayGroup[];
   activeSide: MainichiBoardSide;
@@ -1501,6 +1512,7 @@ function MainichiPhotoBoard({
     month: MainichiBoardMonth,
     source?: MainichiMorphSource | null,
   ) => void;
+  boardV2Prototype?: BoardV2PrototypeOptions;
 }) {
   const contentMonths = useMemo(
     () =>
@@ -1671,13 +1683,21 @@ function MainichiPhotoBoard({
               exit={{ opacity: 0, y: -8, scale: 0.996 }}
               transition={{ duration: 0.28, ease: [0.22, 1, 0.36, 1] }}
             >
-              <MainichiMonthBoard
-                month={selectedMonth}
-                showCatNames={false}
-                pastingPhotoKey={pastingPhotoKey}
-                onOpenDay={onOpenDay}
-                onOpenPhoto={onOpenPhoto}
-              />
+              {boardV2Prototype?.mode === "v2" ? (
+                <MainichiPrototypeMonthBoard
+                  month={selectedMonth}
+                  options={boardV2Prototype}
+                  onOpenPhoto={onOpenPhoto}
+                />
+              ) : (
+                <MainichiMonthBoard
+                  month={selectedMonth}
+                  showCatNames={false}
+                  pastingPhotoKey={pastingPhotoKey}
+                  onOpenDay={onOpenDay}
+                  onOpenPhoto={onOpenPhoto}
+                />
+              )}
             </motion.div>
           ) : (
             <motion.div
@@ -1952,6 +1972,151 @@ function MainichiMonthPickerSheet({
         ))}
       </div>
     </AppBottomSheet>
+  );
+}
+
+function MainichiPrototypeMonthBoard({
+  month,
+  options,
+  onOpenPhoto,
+}: {
+  month: MainichiBoardMonth;
+  options: BoardV2PrototypeOptions;
+  onOpenPhoto: (
+    photo: MainichiBoardPhoto,
+    month: MainichiBoardMonth,
+    source?: MainichiMorphSource | null,
+  ) => void;
+}) {
+  const [ratios, setRatios] = useState<Record<string, number>>({});
+  const [brightness, setBrightness] = useState<Record<string, number>>({});
+
+  useEffect(() => {
+    let active = true;
+    void Promise.all(
+      month.photos.map(async (photo) => [
+        getMainichiBoardPhotoKey(photo),
+        await readMainichiPrototypeBrightness(photo.boardSrc),
+      ] as const),
+    ).then((values) => {
+      if (!active) {
+        return;
+      }
+      setBrightness((current) => {
+        const next = { ...current };
+        for (const [key, value] of values) {
+          if (value !== null) {
+            next[key] = value;
+          }
+        }
+        return next;
+      });
+    });
+    return () => {
+      active = false;
+    };
+  }, [month.photos]);
+
+  const photos = useMemo(
+    () =>
+      [...month.photos].sort((a, b) => {
+        if (options.order === "brightest") {
+          const difference =
+            (brightness[getMainichiBoardPhotoKey(b)] ?? -1) -
+            (brightness[getMainichiBoardPhotoKey(a)] ?? -1);
+          if (difference !== 0) {
+            return difference;
+          }
+        }
+        return b.timestamp - a.timestamp;
+      }),
+    [brightness, month.photos, options.order],
+  );
+  const placements = useMemo(
+    () => buildMainichiPrototypePlacements(photos, options.layout, ratios),
+    [options.layout, photos, ratios],
+  );
+  const dated = new Set<string>();
+
+  return (
+    <AppCard
+      as="section"
+      variant="section"
+      padding="md"
+      style={styles.mainichiMonthBoard}
+      data-testid="mainichi-prototype-month-board"
+      aria-label={month.label}
+    >
+      <div
+        style={{
+          ...styles.mainichiBoardPhotos,
+          height: placements.height,
+        }}
+        data-testid="mainichi-prototype-board"
+      >
+        {placements.items.map(({ photo, style, height }, index) => {
+          const firstForDate = !dated.has(photo.dateKey);
+          dated.add(photo.dateKey);
+          const key = getMainichiBoardPhotoKey(photo);
+
+          return (
+            <button
+              key={key}
+              type="button"
+              data-testid="mainichi-prototype-photo"
+              data-photo-id={photo.id}
+              style={{ ...styles.mainichiPrototypePhotoButton, ...style }}
+              onClick={(event) => {
+                const rect = event.currentTarget.getBoundingClientRect();
+                onOpenPhoto(photo, month, {
+                  rect: {
+                    left: rect.left,
+                    top: rect.top,
+                    width: rect.width,
+                    height: rect.height,
+                  },
+                  photoKey: key,
+                });
+              }}
+              aria-label={photo.side === "sent" ? "おくった ねがおをひらく" : "とどいた ねがおをひらく"}
+            >
+              {options.frame === "f1" && firstForDate ? (
+                <span style={styles.mainichiPrototypeTape} aria-hidden="true">
+                  {formatMainichiPrototypeDate(photo.dateKey)}
+                </span>
+              ) : null}
+              <StoredPhotoImage
+                src={photo.boardSrc}
+                previewSrc={photo.src}
+                fallbackSrcs={photo.fallbackSrcs}
+                alt=""
+                loading={index < 8 ? "eager" : "lazy"}
+                decoding="async"
+                storageVariant={getPhotoStorageVariant(photo, "board")}
+                style={getMainichiPrototypeFrameStyle(options.frame)}
+                imageStyle={{
+                  ...styles.mainichiPrototypePhotoImage,
+                  objectFit: options.layout === "natural" ? "contain" : "cover",
+                }}
+                width={180}
+                height={Math.round(height)}
+                onNaturalSize={({ width, height }) => {
+                  if (width <= 0 || height <= 0) {
+                    return;
+                  }
+                  const ratio = width / height;
+                  setRatios((current) =>
+                    Math.abs((current[key] ?? 0) - ratio) < 0.001
+                      ? current
+                      : { ...current, [key]: ratio },
+                  );
+                }}
+              />
+            </button>
+          );
+        })}
+      </div>
+    </AppCard>
   );
 }
 
@@ -4176,6 +4341,111 @@ function groupMainichiBoardPhotosByDay(
     .sort((a, b) => b.timestamp - a.timestamp);
 }
 
+function buildMainichiPrototypePlacements(
+  photos: MainichiBoardPhoto[],
+  layout: BoardV2PrototypeOptions["layout"],
+  ratios: Record<string, number>,
+) {
+  const sparse = photos.length <= 3;
+  const width = sparse ? 196 : photos.length > 18 ? 150 : 168;
+  const topPadding = sparse ? 38 : 24;
+  let cursorY = topPadding;
+  const items = photos.map((photo, index) => {
+    const ratio = ratios[getMainichiBoardPhotoKey(photo)] ?? 1;
+    const height =
+      layout === "natural"
+        ? clampMainichiPrototypeValue(width / ratio, width * 0.58, width * 1.72)
+        : width;
+    const seed = getMainichiPrototypeSeed(`${getMainichiBoardPhotoKey(photo)}:${photo.dateKey}`);
+    const x = (getMainichiPrototypeSeed(`x:${getMainichiBoardPhotoKey(photo)}`) - 0.5) *
+      (sparse ? 42 : 146);
+    const overlap = sparse ? 0.12 : 0.22;
+    const top = cursorY;
+    cursorY += Math.round(height * (1 - overlap));
+
+    return {
+      photo,
+      height,
+      style: {
+        width: `${width}px`,
+        height: `${Math.round(height)}px`,
+        top: `${top}px`,
+        left: `calc(50% + ${Math.round(x)}px)`,
+        transform: `translateX(-50%) rotate(${(-3 + seed * 6).toFixed(2)}deg)`,
+        zIndex: photos.length - index,
+      } satisfies CSSProperties,
+    };
+  });
+
+  return {
+    height: `${Math.ceil(cursorY + topPadding)}px`,
+    items,
+  };
+}
+
+function getMainichiPrototypeFrameStyle(frame: BoardV2PrototypeOptions["frame"]) {
+  if (frame === "f2") {
+    return styles.mainichiPrototypeFrameF2;
+  }
+  if (frame === "f3") {
+    return styles.mainichiPrototypeFrameF3;
+  }
+  return styles.mainichiPrototypeFrameF1;
+}
+
+function formatMainichiPrototypeDate(dateKey: string) {
+  const [, month, day] = dateKey.split("-");
+  return `${Number(month)}/${Number(day)}`;
+}
+
+function clampMainichiPrototypeValue(value: number, min: number, max: number) {
+  return Math.min(max, Math.max(min, value));
+}
+
+function getMainichiPrototypeSeed(input: string) {
+  let hash = 2166136261;
+  for (let index = 0; index < input.length; index += 1) {
+    hash ^= input.charCodeAt(index);
+    hash = Math.imul(hash, 16777619);
+  }
+  return (hash >>> 0) / 4294967295;
+}
+
+async function readMainichiPrototypeBrightness(source: string) {
+  const displaySource = await getStoragePhotoSignedUrl(source, "thumbnail");
+  if (!displaySource) {
+    return null;
+  }
+
+  return new Promise<number | null>((resolve) => {
+    const image = new Image();
+    image.crossOrigin = "anonymous";
+    image.onload = () => {
+      try {
+        const canvas = document.createElement("canvas");
+        canvas.width = 16;
+        canvas.height = 16;
+        const context = canvas.getContext("2d", { willReadFrequently: true });
+        if (!context) {
+          resolve(null);
+          return;
+        }
+        context.drawImage(image, 0, 0, canvas.width, canvas.height);
+        const pixels = context.getImageData(0, 0, canvas.width, canvas.height).data;
+        let total = 0;
+        for (let index = 0; index < pixels.length; index += 4) {
+          total += pixels[index] * 0.2126 + pixels[index + 1] * 0.7152 + pixels[index + 2] * 0.0722;
+        }
+        resolve(total / (pixels.length / 4));
+      } catch {
+        resolve(null);
+      }
+    };
+    image.onerror = () => resolve(null);
+    image.src = displaySource;
+  });
+}
+
 function getMainichiBoardCanvasStyle(
   total: number,
   isCondensedBundle = false,
@@ -5934,6 +6204,62 @@ const styles = {
     transformOrigin: "50% 22%",
     transition:
       "transform var(--dur-instant) var(--ease-settle), filter var(--dur-instant) var(--ease-gentle)",
+  },
+  mainichiPrototypePhotoButton: {
+    position: "absolute",
+    border: "none",
+    padding: 0,
+    background: "transparent",
+    cursor: "pointer",
+    transformOrigin: "50% 50%",
+    WebkitTapHighlightColor: "transparent",
+  },
+  mainichiPrototypeFrameF1: {
+    width: "100%",
+    height: "100%",
+    border: "12px solid color-mix(in srgb, var(--paper-card) 78%, white 22%)",
+    borderRadius: "16px",
+    background: "var(--paper-card)",
+    boxShadow:
+      "0 14px 26px rgba(72, 58, 39, 0.14), inset 0 0 0 1px rgba(117, 90, 64, 0.08)",
+  },
+  mainichiPrototypeFrameF2: {
+    width: "100%",
+    height: "100%",
+    border: "4px solid color-mix(in srgb, var(--paper-card) 72%, white 28%)",
+    borderRadius: "2px",
+    background: "var(--paper-card)",
+    boxShadow: "0 7px 10px rgba(72, 58, 39, 0.14)",
+  },
+  mainichiPrototypeFrameF3: {
+    width: "100%",
+    height: "100%",
+    border: "1px solid rgba(255, 255, 255, 0.84)",
+    borderRadius: 0,
+    background: "var(--paper-card)",
+    boxShadow: "0 5px 8px rgba(72, 58, 39, 0.16)",
+  },
+  mainichiPrototypePhotoImage: {
+    width: "100%",
+    height: "100%",
+    display: "block",
+  },
+  mainichiPrototypeTape: {
+    position: "absolute",
+    zIndex: 3,
+    top: "-10px",
+    left: "50%",
+    transform: "translateX(-50%) rotate(-2deg)",
+    minWidth: "46px",
+    borderRadius: "5px",
+    padding: "4px 10px",
+    color: COLLECTION_TEXT,
+    background: "linear-gradient(90deg, rgba(248,230,198,0.88), rgba(255,244,214,0.94))",
+    boxShadow: "0 4px 10px rgba(105, 79, 50, 0.12)",
+    fontFamily: "var(--font-ui)",
+    fontSize: "12px",
+    fontWeight: 700,
+    textAlign: "center",
   },
   mainichiBoardTape: {
     position: "absolute",

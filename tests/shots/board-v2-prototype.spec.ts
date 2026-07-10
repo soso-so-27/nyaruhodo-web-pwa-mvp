@@ -10,16 +10,11 @@ test.beforeAll(() => {
 });
 
 for (const count of [31, 3]) {
-  test(`captures board-v2 comparison set with ${count} photos`, async ({ page }) => {
+  test(`captures collection-shell comparison set with ${count} photos`, async ({ page }) => {
     await page.addInitScript((photoCount) => {
       const colors = ["#bd745d", "#839bb3", "#ad9272", "#7b9b83", "#c38a78"];
-      const ratios = [
-        [4, 3],
-        [3, 4],
-        [16, 9],
-        [1, 1],
-        [5, 4],
-      ];
+      const ratios = [[4, 3], [3, 4], [16, 9], [1, 1], [5, 4]];
+      const catId = "board-shot-cat";
       const first = new Date("2026-07-10T12:00:00+09:00").getTime();
       const photos = Array.from({ length: photoCount }, (_, index) => {
         const [ratioWidth, ratioHeight] = ratios[index % ratios.length];
@@ -37,11 +32,10 @@ for (const count of [31, 3]) {
         context.arc(canvas.width * 0.36, canvas.height * 0.44, Math.min(canvas.width, canvas.height) * 0.18, 0, Math.PI * 2);
         context.arc(canvas.width * 0.64, canvas.height * 0.44, Math.min(canvas.width, canvas.height) * 0.18, 0, Math.PI * 2);
         context.fill();
-
         return {
           id: `board-shot-${first - index * 600000}`,
-          catId: "board-shot-cat",
-          ownerCatId: "board-shot-cat",
+          catId,
+          ownerCatId: catId,
           src: canvas.toDataURL("image/png"),
           createdAt: first - index * 600000,
           state: "sleeping",
@@ -53,13 +47,13 @@ for (const count of [31, 3]) {
         };
       });
 
+      localStorage.setItem("active_cat_id", catId);
+      localStorage.setItem("cat_profiles", JSON.stringify([
+        { id: catId, name: "むぎ", createdAt: new Date(first).toISOString(), updatedAt: new Date(first).toISOString() },
+      ]));
       localStorage.setItem("nyaruhodo_exchange_own_sleeping_photos", JSON.stringify(photos));
       localStorage.setItem("nyaruhodo_exchange_kept_photos", "[]");
-      localStorage.removeItem("nyaruhodo_board_v2_preferences");
     }, count);
-
-    await page.goto("/prototypes/board-v2");
-    await expect(page.getByTestId("board-v2-layout")).toBeVisible();
 
     for (const [layout, frame] of [
       ["crop", "f1"],
@@ -67,13 +61,20 @@ for (const count of [31, 3]) {
       ["natural", "f2"],
       ["natural", "f3"],
     ]) {
-      await page.getByTestId(`board-v2-layout-${layout}`).click();
-      await page.getByTestId(`board-v2-frame-${frame}`).click();
+      await page.goto(`/prototypes/board-v2?mode=v2&layout=${layout}&frame=${frame}`);
+      await expect(page.getByTestId("mainichi-prototype-month-board")).toBeVisible();
       await page.waitForTimeout(450);
       await page.screenshot({
         path: path.join(shotsDir, `board-v2-${count}-${layout}-${frame}.png`),
         fullPage: true,
       });
     }
+
+    await page.goto("/prototypes/board-v2?mode=current");
+    await expect(page.getByTestId("mainichi-month-board")).toBeVisible();
+    await page.screenshot({
+      path: path.join(shotsDir, `board-v2-${count}-current.png`),
+      fullPage: true,
+    });
   });
 }
