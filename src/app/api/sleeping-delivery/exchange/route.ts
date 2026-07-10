@@ -129,6 +129,14 @@ const ONBOARDING_EXCEPTION_WINDOW_MS = 24 * 60 * 60 * 1000;
 const ONBOARDING_EXCEPTION_MAX_BUCKETS = 1000;
 const onboardingExceptionBuckets = new Map<string, OnboardingExceptionBucket>();
 
+function isExchangeDebugDryRunAllowed() {
+  return (
+    process.env.NODE_ENV !== "production" ||
+    process.env.VERCEL_ENV === "preview" ||
+    process.env.EXCHANGE_DEBUG_DRY_RUN_ENABLED === "1"
+  );
+}
+
 export async function POST(request: Request) {
   try {
     return await handleExchangePost(request);
@@ -178,8 +186,13 @@ async function handleExchangePost(request: Request) {
   const ownPhotoStoragePath = getStoragePhotoPath(ownPhoto.src);
   const shouldAddOwnPhotoToPool =
     !ownPhotoStoragePath && !isBlockedDeliveryPhotoUrl(ownPhoto.src);
-  const debugDryRun =
-    input.debugDryRun === true && process.env.NODE_ENV !== "production";
+  const debugDryRunRequested = input.debugDryRun === true;
+  const debugDryRun = debugDryRunRequested && isExchangeDebugDryRunAllowed();
+
+  if (debugDryRunRequested && !debugDryRun) {
+    return exchangeError("debug_dry_run_disabled", 403);
+  }
+
   const user = shouldAddOwnPhotoToPool || ownPhotoStoragePath
     ? await getAuthenticatedUserForRequest(request)
     : null;
