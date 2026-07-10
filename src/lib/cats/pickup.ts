@@ -23,6 +23,7 @@ export type CatPickupHistory = Record<string, CatPickupHistoryItem>;
 
 export type CatPickupType =
   | "birthday"
+  | "family_anniversary"
   | "first_photo"
   | "memory"
   | "milestone";
@@ -58,6 +59,7 @@ export type CatPickupInput = {
   milestones: CatSleepingMilestone[];
   memories: OmoideMemory[];
   birthdayStatus: { copy: string; isToday: boolean } | null;
+  familyAnniversaryStatus?: { copy: string; isToday: boolean } | null;
   history?: CatPickupHistory;
 };
 
@@ -68,26 +70,70 @@ const RECENT_TYPE_PENALTY_MS = 2 * 24 * 60 * 60 * 1000;
 const MILESTONE_FRESH_MS = 14 * 24 * 60 * 60 * 1000;
 
 export function selectCatPickup({
+  ...input
+}: CatPickupInput): CatPickup | null {
+  return selectCatPickups(input)[0] ?? null;
+}
+
+export function selectCatPickups({
   now,
   photos,
   milestones,
   memories,
   birthdayStatus,
+  familyAnniversaryStatus = null,
   history = {},
-}: CatPickupInput): CatPickup | null {
+}: CatPickupInput): CatPickup[] {
   const candidates = [
     createBirthdayCandidate({ now, birthdayStatus }),
+    createFamilyAnniversaryCandidate({ now, familyAnniversaryStatus }),
     createMemoryCandidate({ now, memories }),
     createMilestoneCandidate({ now, milestones }),
     createFirstPhotoCandidate({ now, photos }),
   ].filter((candidate): candidate is CatPickup => Boolean(candidate));
 
-  const ranked = candidates
+  const eligible = candidates
     .map((candidate) => applyHistoryScore(candidate, history, now))
-    .filter((candidate) => candidate.score >= MIN_PICKUP_SCORE)
+    .filter((candidate) => candidate.score >= MIN_PICKUP_SCORE);
+
+  const alreadyShownToday = eligible.filter((candidate) =>
+    isPickupShownToday(history, candidate, now),
+  );
+
+  if (alreadyShownToday.length > 0) {
+    const shownAnniversaries = alreadyShownToday.filter(isAnniversaryPickup);
+    return shownAnniversaries.length > 0
+      ? shownAnniversaries.slice(0, 2)
+      : [alreadyShownToday[0]];
+  }
+
+  const anniversaries = eligible
+    .filter(isAnniversaryPickup)
     .sort((left, right) => right.score - left.score || right.scoredAt - left.scoredAt);
 
-  return ranked[0] ?? null;
+  // 今日の1件は、記念日 > 節目 > 思い出便。誕生日と家族になった日が重なる日だけ、
+  // 二つの記念日を並べる。負けた節目は履歴に書かれないので翌日に繰り越される。
+  if (anniversaries.length > 0) {
+    return anniversaries.slice(0, 2);
+  }
+
+  if (hasPickupSeenToday(history, now)) {
+    return [];
+  }
+
+  const milestoneCandidates = eligible
+    .filter((candidate) => candidate.type === "milestone" || candidate.type === "first_photo")
+    .sort((left, right) => right.score - left.score || right.scoredAt - left.scoredAt);
+
+  if (milestoneCandidates[0]) {
+    return [milestoneCandidates[0]];
+  }
+
+  const memoryCandidates = eligible
+    .filter((candidate) => candidate.type === "memory")
+    .sort((left, right) => right.score - left.score || right.scoredAt - left.scoredAt);
+
+  return memoryCandidates[0] ? [memoryCandidates[0]] : [];
 }
 
 export function readCatPickupHistory(catId: string | null): CatPickupHistory {
@@ -125,6 +171,13 @@ export function markCatPickupSeen(
     const store = parsed && typeof parsed === "object" ? parsed : {};
     const current =
       store[catId] && typeof store[catId] === "object" ? store[catId] : {};
+    const existing = (current as Record<string, unknown>)[
+      pickup.id
+    ] as CatPickupHistoryItem | undefined;
+
+    if (existing && isSameLocalDay(existing.seenAt, seenAt)) {
+      return;
+    }
 
     writeCachedJson(
       CAT_PICKUP_HISTORY_KEY,
@@ -162,6 +215,29 @@ function createBirthdayCandidate({
     sourceId: `birthday-${year}`,
     title: "誕生日",
     body: "今日は大事な日です",
+    actionLabel: "記念を見る",
+    score: 96,
+    scoredAt: now,
+    target: { kind: "milestones" },
+  };
+}
+
+function createFamilyAnniversaryCandidate({
+  now,
+  familyAnniversaryStatus,
+}: Pick<CatPickupInput, "now" | "familyAnniversaryStatus">): CatPickup | null {
+  if (!familyAnniversaryStatus?.isToday) {
+    return null;
+  }
+
+  const year = new Date(now).getFullYear();
+
+  return {
+    id: `family-anniversary-${year}`,
+    type: "family_anniversary",
+    sourceId: `family-anniversary-${year}`,
+    title: "家族になった日",
+    body: familyAnniversaryStatus.copy,
     actionLabel: "記念を見る",
     score: 96,
     scoredAt: now,
@@ -278,8 +354,14 @@ function applyHistoryScore(
     (item) => item.sourceId === pickup.sourceId || item.id === pickup.id,
   );
 
-  if (latestSameSource && now - latestSameSource.seenAt < RECENT_SEEN_COOLDOWN_MS) {
-    return { ...pickup, score: 0 };
+  if (latestSameSource) {
+    if (isSameLocalDay(latestSameSource.seenAt, now)) {
+      return pickup;
+    }
+
+    if (now - latestSameSource.seenAt < RECENT_SEEN_COOLDOWN_MS) {
+      return { ...pickup, score: 0 };
+    }
   }
 
   const latestSeen = seenItems[0];
@@ -291,6 +373,37 @@ function applyHistoryScore(
   }
 
   return pickup;
+}
+
+function isAnniversaryPickup(pickup: CatPickup) {
+  return pickup.type === "birthday" || pickup.type === "family_anniversary";
+}
+
+function hasPickupSeenToday(history: CatPickupHistory, now: number) {
+  return Object.values(history).some((item) => isSameLocalDay(item.seenAt, now));
+}
+
+function isPickupShownToday(
+  history: CatPickupHistory,
+  pickup: CatPickup,
+  now: number,
+) {
+  return Object.values(history).some(
+    (item) =>
+      (item.id === pickup.id || item.sourceId === pickup.sourceId) &&
+      isSameLocalDay(item.seenAt, now),
+  );
+}
+
+function isSameLocalDay(left: number, right: number) {
+  const leftDate = new Date(left);
+  const rightDate = new Date(right);
+
+  return (
+    leftDate.getFullYear() === rightDate.getFullYear() &&
+    leftDate.getMonth() === rightDate.getMonth() &&
+    leftDate.getDate() === rightDate.getDate()
+  );
 }
 
 function prunePickupHistory(history: CatPickupHistory) {
@@ -340,6 +453,7 @@ function isCatPickupHistoryItem(value: unknown): value is CatPickupHistoryItem {
 function isCatPickupType(value: unknown): value is CatPickupType {
   return (
     value === "birthday" ||
+    value === "family_anniversary" ||
     value === "first_photo" ||
     value === "memory" ||
     value === "milestone"

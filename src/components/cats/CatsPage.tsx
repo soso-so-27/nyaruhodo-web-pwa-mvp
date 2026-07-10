@@ -14,7 +14,7 @@ import { STORAGE_KEYS } from "../../lib/storage";
 import {
   markCatPickupSeen,
   readCatPickupHistory,
-  selectCatPickup,
+  selectCatPickups,
   type CatPickup,
 } from "../../lib/cats/pickup";
 import { createCatFootprintEntries } from "../../lib/cats/footprints";
@@ -266,7 +266,15 @@ export function CatsPage() {
   const familyDuration = formatFamilyDuration(
     activeCatProfile?.basicInfo?.familySinceDate,
   );
-  const birthdayStatus = getBirthdayStatus(activeCatProfile?.basicInfo?.birthDate);
+  const clientNow = getClientNow();
+  const birthdayStatus = getBirthdayStatus(
+    activeCatProfile?.basicInfo?.birthDate,
+    clientNow,
+  );
+  const familyAnniversaryStatus = getFamilyAnniversaryStatus(
+    activeCatProfile?.basicInfo?.familySinceDate,
+    clientNow,
+  );
   const takenSleepingPhotoCount = activeCatId
     ? readOwnSleepingPhotoCount(activeCatId)
     : 0;
@@ -1659,6 +1667,7 @@ export function CatsPage() {
             memories={omoideMemories}
             familyDuration={familyDuration}
             birthdayStatus={birthdayStatus}
+            familyAnniversaryStatus={familyAnniversaryStatus}
             takenSleepingPhotoCount={takenSleepingPhotoCount}
             onOpenMemory={openOmoideMemory}
             onOpenPhoto={(photo) => setSelectedRecordPhoto(photo)}
@@ -2289,6 +2298,7 @@ function RecordOverview({
   memories,
   familyDuration,
   birthdayStatus,
+  familyAnniversaryStatus,
   takenSleepingPhotoCount,
   onOpenMemory,
   onOpenPhoto,
@@ -2301,6 +2311,7 @@ function RecordOverview({
   memories: OmoideMemory[];
   familyDuration: { primary: string; secondary: string };
   birthdayStatus: { copy: string; isToday: boolean } | null;
+  familyAnniversaryStatus: { copy: string; isToday: boolean } | null;
   takenSleepingPhotoCount: number;
   onOpenMemory: (memory: OmoideMemory, source: OmoideOpenSource) => void;
   onOpenPhoto: (photo: RecordPhotoPreview) => void;
@@ -2311,16 +2322,20 @@ function RecordOverview({
   const [hasSeenUnopenedOmoideHint] = useState(hasSeenUnopenedOmoideDotHint);
   const now = getClientNow();
   const openedMemories = memories.filter((memory) => Boolean(memory.openedAt));
-  const pickup = selectCatPickup({
+  const pickupHistory = readCatPickupHistory(activeCatId);
+  const pickups = selectCatPickups({
     now,
     photos,
     milestones,
     memories,
     birthdayStatus,
-    history: readCatPickupHistory(activeCatId),
+    familyAnniversaryStatus,
+    history: pickupHistory,
   });
-  const pickupHasUnopenedMemory =
-    pickup?.target.kind === "memory" && !pickup.target.memory.openedAt;
+  const pickupIds = pickups.map((pickup) => pickup.id).join(",");
+  const pickupHasUnopenedMemory = pickups.some(
+    (pickup) => pickup.target.kind === "memory" && !pickup.target.memory.openedAt,
+  );
   const shouldShowUnopenedOmoideHint =
     pickupHasUnopenedMemory && !hasSeenUnopenedOmoideHint;
   const recentEntries = createCatFootprintEntries({
@@ -2349,6 +2364,11 @@ function RecordOverview({
     acknowledgeUnopenedOmoideDotHint();
   }, [shouldShowUnopenedOmoideHint]);
 
+  useEffect(() => {
+    // Record only the cards that actually reached the record tab. Suppressed milestones stay queued.
+    pickups.forEach((pickup) => markCatPickupSeen(activeCatId, pickup, now));
+  }, [activeCatId, pickupIds]);
+
   function scrollToMilestones() {
     document
       .getElementById("cats-milestones-heading")
@@ -2357,7 +2377,7 @@ function RecordOverview({
 
   return (
     <div style={styles.recordOverview}>
-      {pickup ? (
+      {pickups.length > 0 ? (
         <section
           style={styles.recordBlock}
           aria-labelledby="cats-pickup-heading"
@@ -2367,51 +2387,59 @@ function RecordOverview({
             <span style={styles.recordBlockTitleMark} aria-hidden="true" />
             今日の1件
           </h2>
-          <button
-            type="button"
-            style={styles.pickupRow}
-            onClick={() => {
-              markCatPickupSeen(activeCatId, pickup);
-              setPickupRefreshTick((value) => value + 1);
-              openPickupTarget(pickup, {
-                onOpenMemory: (memory) => onOpenMemory(memory, "pickup"),
-                onOpenPhoto,
-                onOpenMilestones: scrollToMilestones,
-              });
-            }}
-          >
-            {pickup.src ? (
-              <span style={styles.pickupThumb}>
-                <StoredPhotoImage
-                  src={pickup.src}
-                  alt=""
-                  style={styles.pickupThumbImage}
-                />
-                {pickupHasUnopenedMemory ? (
-                  <span
-                    data-testid="cats-pickup-unopened-omoide-dot"
-                    style={styles.pickupUnopenedSealDot}
-                  />
-                ) : null}
-              </span>
-            ) : (
-              <span style={styles.pickupIcon} aria-hidden="true">
-                <EnvelopeSmallIcon />
-                {pickupHasUnopenedMemory ? (
-                  <span
-                    data-testid="cats-pickup-unopened-omoide-dot"
-                    style={styles.pickupUnopenedSealDot}
-                  />
-                ) : null}
-              </span>
-            )}
-            <span style={styles.pickupText}>
-              <span style={styles.pickupTitle}>{pickup.title}</span>
-              <span style={styles.pickupBody}>{pickup.body}</span>
-            </span>
-            <span style={styles.pickupAction}>{pickup.actionLabel}</span>
-            <ChevronRightSmallIcon />
-          </button>
+          {pickups.map((pickup) => {
+            const hasUnopenedMemory =
+              pickup.target.kind === "memory" && !pickup.target.memory.openedAt;
+
+            return (
+              <button
+                key={pickup.id}
+                type="button"
+                style={styles.pickupRow}
+                onClick={() => {
+                  markCatPickupSeen(activeCatId, pickup, now);
+                  setPickupRefreshTick((value) => value + 1);
+                  openPickupTarget(pickup, {
+                    onOpenMemory: (memory) => onOpenMemory(memory, "pickup"),
+                    onOpenPhoto,
+                    onOpenMilestones: scrollToMilestones,
+                  });
+                }}
+              >
+                {pickup.src ? (
+                  <span style={styles.pickupThumb}>
+                    <StoredPhotoImage
+                      src={pickup.src}
+                      alt=""
+                      style={styles.pickupThumbImage}
+                    />
+                    {hasUnopenedMemory ? (
+                      <span
+                        data-testid="cats-pickup-unopened-omoide-dot"
+                        style={styles.pickupUnopenedSealDot}
+                      />
+                    ) : null}
+                  </span>
+                ) : (
+                  <span style={styles.pickupIcon} aria-hidden="true">
+                    <EnvelopeSmallIcon />
+                    {hasUnopenedMemory ? (
+                      <span
+                        data-testid="cats-pickup-unopened-omoide-dot"
+                        style={styles.pickupUnopenedSealDot}
+                      />
+                    ) : null}
+                  </span>
+                )}
+                <span style={styles.pickupText}>
+                  <span style={styles.pickupTitle}>{pickup.title}</span>
+                  <span style={styles.pickupBody}>{pickup.body}</span>
+                </span>
+                <span style={styles.pickupAction}>{pickup.actionLabel}</span>
+                <ChevronRightSmallIcon />
+              </button>
+            );
+          })}
           {shouldShowUnopenedOmoideHint ? (
             <p style={styles.pickupHint}>
               まだ ひらいていない思い出に、点が つきます。
@@ -5003,6 +5031,7 @@ function getDaysThreadIntro(catName: string, familySinceDate?: string) {
 
 function getBirthdayStatus(
   birthDate: string | undefined,
+  nowValue = Date.now(),
 ): {
   copy: string;
   isToday: boolean;
@@ -5014,7 +5043,7 @@ function getBirthdayStatus(
     return null;
   }
 
-  const now = new Date(Date.now());
+  const now = new Date(nowValue);
   const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
   const thisYearBirthday = new Date(
     today.getFullYear(),
@@ -5055,6 +5084,24 @@ function getBirthdayStatus(
     isToday: false,
     phase: daysUntil <= 30 ? "upcoming" : "normal",
   };
+}
+
+function getFamilyAnniversaryStatus(
+  familySinceDate: string | undefined,
+  nowValue = Date.now(),
+): { copy: string; isToday: boolean } | null {
+  const familySince = parseLocalDate(familySinceDate);
+  if (!familySince) {
+    return null;
+  }
+
+  const now = new Date(nowValue);
+  const isToday =
+    familySince.getMonth() === now.getMonth() && familySince.getDate() === now.getDate();
+
+  return isToday
+    ? { copy: "きょうは 家族になった日", isToday: true }
+    : null;
 }
 
 function getCelebrationToneStyle(tone: CatCelebrationTone) {

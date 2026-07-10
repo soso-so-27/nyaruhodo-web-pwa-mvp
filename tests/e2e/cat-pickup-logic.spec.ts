@@ -3,6 +3,7 @@ import { expect, test } from "@playwright/test";
 import {
   markCatPickupSeen,
   selectCatPickup,
+  selectCatPickups,
   type CatPickupHistory,
   type CatPickupPhoto,
 } from "../../src/lib/cats/pickup";
@@ -46,7 +47,7 @@ test.describe("cat pickup selection", () => {
         id: "first-photo-first",
         type: "first_photo",
         sourceId: "first",
-        seenAt: now - 60_000,
+        seenAt: now - 86_400_000,
       },
     };
 
@@ -105,6 +106,69 @@ test.describe("cat pickup selection", () => {
 
     expect(pickup?.type).toBe("birthday");
     expect(pickup?.actionLabel).toBe("記念を見る");
+  });
+
+  test("uses the fixed priority of anniversary, milestone, then memory", () => {
+    const pickup = selectCatPickup({
+      now,
+      photos: manyPhotos(12),
+      milestones: [
+        ...emptyMilestones().filter((item) => item.target !== 10),
+        milestone(10, "milestone-10", now - 30_000),
+      ],
+      memories: [memory("memory-week", "source-week", now - 30_000, "week")],
+      birthdayStatus: { copy: "きょうは 誕生日", isToday: true },
+    });
+
+    expect(pickup?.type).toBe("birthday");
+  });
+
+  test("allows two pickups only when birthday and family anniversary overlap", () => {
+    const pickups = selectCatPickups({
+      now,
+      photos: manyPhotos(12),
+      milestones: emptyMilestones(),
+      memories: [memory("memory-week", "source-week", now - 30_000, "week")],
+      birthdayStatus: { copy: "きょうは 誕生日", isToday: true },
+      familyAnniversaryStatus: { copy: "きょうは 家族になった日", isToday: true },
+    });
+
+    expect(pickups.map((pickup) => pickup.type)).toEqual([
+      "birthday",
+      "family_anniversary",
+    ]);
+  });
+
+  test("keeps a milestone for the next day when today is won by an anniversary", () => {
+    const milestonePickup = milestone(10, "milestone-10", now - 30_000);
+    const today = selectCatPickup({
+      now,
+      photos: manyPhotos(12),
+      milestones: [...emptyMilestones().filter((item) => item.target !== 10), milestonePickup],
+      memories: [memory("memory-week", "source-week", now - 30_000, "week")],
+      birthdayStatus: { copy: "きょうは 誕生日", isToday: true },
+    });
+
+    expect(today?.type).toBe("birthday");
+
+    const tomorrow = selectCatPickup({
+      now: now + 86_400_000,
+      photos: manyPhotos(12),
+      milestones: [...emptyMilestones().filter((item) => item.target !== 10), milestonePickup],
+      memories: [memory("memory-week", "source-week", now - 30_000, "week")],
+      birthdayStatus: null,
+      history: {
+        [today!.id]: {
+          id: today!.id,
+          type: today!.type,
+          sourceId: today!.sourceId,
+          seenAt: now,
+        },
+      },
+    });
+
+    expect(tomorrow?.type).toBe("milestone");
+    expect(tomorrow?.id).toBe("milestone-10");
   });
 });
 

@@ -707,10 +707,12 @@ test("closes the basic profile editor instead of returning to cat management", a
   await expect(page.getByText("うちのこを管理")).toHaveCount(0);
 });
 
-test("shows a meaningful pickup only when there is a strong cat record reason", async ({
+test("prioritizes a birthday and carries its losing milestone into the next day", async ({
   page,
 }) => {
-  await seedCatsProfile(page, Date.parse("2026-06-10T12:30:00+09:00"), 10);
+  const birthday = Date.parse("2026-07-10T12:30:00+09:00");
+  const tomorrow = Date.parse("2026-07-11T12:30:00+09:00");
+  await seedCatsProfile(page, birthday, 10);
   await page.setViewportSize({ width: 390, height: 844 });
   await page.goto("/cats");
   await page.waitForLoadState("networkidle");
@@ -718,11 +720,32 @@ test("shows a meaningful pickup only when there is a strong cat record reason", 
   const pickup = page.getByTestId("cats-pickup-section");
   await expect(pickup).toBeVisible();
   await expect(pickup).toContainText("今日の1件");
-  await expect(pickup).toContainText("10枚目のねがお");
+  await expect(pickup).toContainText("誕生日");
   await expect(page.getByText("思い出が")).toHaveCount(0);
 
-  await pickup.getByRole("button").click();
+  await expect
+    .poll(() =>
+      page.evaluate(() =>
+        window.localStorage.getItem("neteruneko_cat_pickup_history") ?? "",
+      ),
+    )
+    .toContain("birthday-2026");
+  await expect
+    .poll(() =>
+      page.evaluate(() =>
+        window.localStorage.getItem("neteruneko_cat_pickup_history") ?? "",
+      ),
+    )
+    .not.toContain("milestone-10");
 
+  await page.addInitScript((nextNow) => {
+    (window as typeof window & { __testNow?: number }).__testNow = nextNow;
+  }, tomorrow);
+  await page.reload();
+  await page.waitForLoadState("networkidle");
+
+  await expect(pickup).toContainText("10枚目のねがお");
+  await pickup.getByRole("button").click();
   await expect
     .poll(() =>
       page.evaluate(() =>
