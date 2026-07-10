@@ -703,6 +703,7 @@ export default function AccountCreatePage() {
                     {!isEmbeddedBrowser ? (
                       <AppButton
                         type="button"
+                        data-testid="account-create-google"
                         onClick={() => {
                           void handleGoogleSignIn();
                         }}
@@ -715,6 +716,7 @@ export default function AccountCreatePage() {
                     ) : null}
                     <AppButton
                       type="button"
+                      data-testid="account-create-handoff"
                       variant={isEmbeddedBrowser ? "accent" : "quiet"}
                       size="md"
                       onClick={handleLater}
@@ -728,6 +730,7 @@ export default function AccountCreatePage() {
                   <>
                     <AppButton
                       type="button"
+                      data-testid="account-create-google"
                       onClick={() => {
                         void handleGoogleSignIn();
                       }}
@@ -739,6 +742,7 @@ export default function AccountCreatePage() {
                     </AppButton>
                     <AppButton
                       type="button"
+                      data-testid="account-create-handoff"
                       onClick={handleLater}
                       variant="quiet"
                       size="md"

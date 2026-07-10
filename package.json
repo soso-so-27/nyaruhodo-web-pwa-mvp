@@ -6,6 +6,8 @@
     "typecheck": "tsc --noEmit",
     "e2e": "playwright test",
     "e2e:full": "node scripts/run-e2e-full.mjs",
+    "smoke:load:prepost3": "node scripts/prepost3-load-smoke.mjs",
+    "audit:mobile:prepost3": "node scripts/prepost3-mobile-audit.mjs",
     "e2e:prod": "playwright test -c playwright.prod.config.ts",
     "e2e:headed": "playwright test --headed",
     "shots": "node scripts/run-shots.mjs",
