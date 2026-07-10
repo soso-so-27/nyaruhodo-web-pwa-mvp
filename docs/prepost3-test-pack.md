@@ -18,6 +18,18 @@ Previewを叩く場合:
 node scripts/prepost3-load-smoke.mjs --base-url=https://<preview-host> --levels=30,60,120
 ```
 
+Vercel Deployment Protection が有効なPreviewを叩く場合は、bypass secretを環境変数で渡す:
+
+```bash
+VERCEL_PROTECTION_BYPASS=<secret> node scripts/prepost3-load-smoke.mjs --base-url=https://<preview-host> --levels=30,60,120
+```
+
+Windows PowerShell:
+
+```powershell
+$env:VERCEL_PROTECTION_BYPASS="<secret>"; node scripts/prepost3-load-smoke.mjs --base-url=https://<preview-host> --levels=30,60,120; Remove-Item Env:VERCEL_PROTECTION_BYPASS
+```
+
 `npm run smoke:load:prepost3` はローカル既定値で走らせるショートカット。対象URLを指定する検証では、引数落ちを避けるため `node scripts/prepost3-load-smoke.mjs ...` を使う。
 
 出力: `artifacts/prepost3-load-smoke/*.json`

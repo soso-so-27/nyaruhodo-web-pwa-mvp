@@ -6,6 +6,12 @@ const DEFAULT_LEVELS = [30, 60, 120];
 const DEFAULT_BASE_URL =
   process.env.PLAYWRIGHT_BASE_URL || process.env.APP_URL || "http://localhost:3000";
 const WRITE_BACKUP = process.env.LOAD_SMOKE_ALLOW_BACKUP_WRITES === "1";
+const VERCEL_PROTECTION_BYPASS =
+  process.env.VERCEL_PROTECTION_BYPASS ||
+  process.env.VERCEL_AUTOMATION_BYPASS_SECRET ||
+  process.env.VERCEL_BYPASS_SECRET ||
+  process.env.PREVIEW_BYPASS_SECRET ||
+  "";
 
 const tinyPng =
   "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAFgwJ/lQn2swAAAABJRU5ErkJggg==";
@@ -24,7 +30,12 @@ if (levels.length === 0) {
 }
 
 console.log(
-  `[prepost3-load-smoke] base=${baseUrl} levels=${levels.join(",")} backupWrites=${WRITE_BACKUP}`,
+  [
+    `[prepost3-load-smoke] base=${baseUrl}`,
+    `levels=${levels.join(",")}`,
+    `backupWrites=${WRITE_BACKUP}`,
+    `vercelBypass=${Boolean(VERCEL_PROTECTION_BYPASS)}`,
+  ].join(" "),
 );
 
 const results = [];
@@ -49,7 +60,9 @@ await writeFile(
       notes: [
         "exchange uses debugDryRun=true by default to avoid writes.",
         "backup uses invalid_photo by default. Set LOAD_SMOKE_ALLOW_BACKUP_WRITES=1 only in local/preview test environments.",
+        "Set VERCEL_PROTECTION_BYPASS or VERCEL_AUTOMATION_BYPASS_SECRET to send x-vercel-protection-bypass for protected preview deployments.",
       ],
+      vercelProtectionBypassHeader: Boolean(VERCEL_PROTECTION_BYPASS),
       results,
     },
     null,
@@ -170,17 +183,10 @@ async function runTargetLevel(target, level) {
 async function timeRequest(target, index) {
   const startedAt = performance.now();
   try {
+    const headers = buildHeaders(target, index);
     const response = await fetch(`${baseUrl}${target.path}`, {
       method: target.method,
-      headers:
-        target.method === "POST"
-          ? {
-              "content-type": "application/json",
-              "x-forwarded-for": `198.51.100.${(index % 200) + 1}`,
-            }
-          : {
-              "x-forwarded-for": `198.51.100.${(index % 200) + 1}`,
-            },
+      headers,
       body:
         target.method === "POST"
           ? JSON.stringify(typeof target.body === "function" ? target.body(index) : target.body)
@@ -205,6 +211,22 @@ async function timeRequest(target, index) {
       error: error instanceof Error ? error.message : String(error),
     };
   }
+}
+
+function buildHeaders(target, index) {
+  const headers = {
+    "x-forwarded-for": `198.51.100.${(index % 200) + 1}`,
+  };
+
+  if (target.method === "POST") {
+    headers["content-type"] = "application/json";
+  }
+
+  if (VERCEL_PROTECTION_BYPASS) {
+    headers["x-vercel-protection-bypass"] = VERCEL_PROTECTION_BYPASS;
+  }
+
+  return headers;
 }
 
 function percentile(sortedValues, fraction) {
