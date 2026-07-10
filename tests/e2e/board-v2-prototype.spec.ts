@@ -92,7 +92,7 @@ test.describe("board v2 prototype", () => {
     await expect(page.getByTestId("mainichi-month-select")).toBeVisible();
     await expect(page.getByTestId("mainichi-prototype-month-board")).toBeVisible();
     await expect(page.getByTestId("mainichi-prototype-photo")).toHaveCount(3);
-    await expect(page.locator('[data-testid^="board-v2-"]')).toHaveCount(0);
+    await expect(page.getByTestId("board-v2-settings-button")).toBeVisible();
   });
 
   test("uses the unchanged production board for the current comparison query", async ({ page }) => {
@@ -101,6 +101,29 @@ test.describe("board v2 prototype", () => {
     await expect(page.getByTestId("mainichi-month-board")).toBeVisible();
     await expect(page.getByTestId("mainichi-board-photo-sent")).toHaveCount(3);
     await expect(page.getByTestId("mainichi-prototype-month-board")).toHaveCount(0);
+  });
+
+  test("offers the comparison controls in a mobile-friendly settings sheet", async ({ page }) => {
+    await page.goto("/prototypes/board-v2?mode=v2&layout=crop&frame=f1&order=newest");
+
+    await page.getByTestId("board-v2-settings-button").click();
+    await expect(page.getByText("ボードの比較")).toBeVisible();
+    await page.getByTestId("board-v2-option-layout-natural").click();
+    await page.getByTestId("board-v2-option-frame-f3").click();
+    await page.getByTestId("board-v2-option-order-brightest").click();
+    await page.getByTestId("board-v2-option-mode-current").click();
+
+    await expect(page).toHaveURL(/mode=current/);
+    await expect(page).toHaveURL(/layout=natural/);
+    await expect(page).toHaveURL(/frame=f3/);
+    await expect(page).toHaveURL(/order=brightest/);
+    await expect(page.getByTestId("mainichi-month-board")).toBeVisible();
+
+    await expect
+      .poll(() =>
+        page.evaluate(() => window.localStorage.getItem("neteruneko_board_v2_prototype_options")),
+      )
+      .toContain('"layout":"natural"');
   });
 
   test("keeps prototype routes covered by the production 404 gate", async () => {
@@ -126,7 +149,7 @@ test.describe("board v2 prototype", () => {
       "utf8",
     );
 
-    expect(pageSource).toContain("requireAdminAccess");
+    expect(pageSource).toContain("AdminAccessGate");
     expect(pageSource).toContain("readBoardV2PrototypeOptions");
     expect(analyticsSource).toContain("/admin/board-v2");
   });
