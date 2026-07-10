@@ -20,10 +20,16 @@ import {
   type OwnSleepingPhoto,
 } from "../../lib/home/sleepingPhotos";
 import { readCurrentOnboardingProgress } from "../../lib/onboarding/progress";
-import { StoredPhotoImage } from "../ui/StoredPhotoImage";
+import {
+  getStoragePhotoSignedUrl,
+  StoredPhotoImage,
+} from "../ui/StoredPhotoImage";
 
 type BoardSide = "sent" | "delivered";
 type BoardMode = "v2" | "current";
+type BoardLayout = "crop" | "natural";
+type BoardFrame = "f1" | "f2" | "f3";
+type BoardOrder = "newest" | "brightest";
 
 type PrototypePhoto = {
   id: string;
@@ -43,6 +49,13 @@ type PrototypePhoto = {
 
 const PHOTO_STORAGE_EVENT = "nyaruhodo_box_photos_updated";
 const ACCOUNT_RESTORE_TIMEOUT_MS = 8000;
+const BOARD_V2_PREFERENCES_KEY = "nyaruhodo_board_v2_preferences";
+const DEFAULT_BOARD_PREFERENCES = {
+  mode: "v2" as BoardMode,
+  layout: "crop" as BoardLayout,
+  frame: "f1" as BoardFrame,
+  order: "newest" as BoardOrder,
+};
 
 export function BoardV2Prototype({
   returnToPath = "/prototypes/board-v2",
@@ -50,8 +63,12 @@ export function BoardV2Prototype({
   returnToPath?: string;
 }) {
   const [side, setSide] = useState<BoardSide>("sent");
-  const [mode, setMode] = useState<BoardMode>("v2");
+  const [preferences, setPreferences] = useState(DEFAULT_BOARD_PREFERENCES);
+  const [hasLoadedPreferences, setHasLoadedPreferences] = useState(false);
+  const { mode, layout, frame, order } = preferences;
   const [allPhotos, setAllPhotos] = useState<PrototypePhoto[]>([]);
+  const [photoRatios, setPhotoRatios] = useState<Record<string, number>>({});
+  const [photoBrightness, setPhotoBrightness] = useState<Record<string, number>>({});
   const [selectedMonthKey, setSelectedMonthKey] = useState<string | null>(null);
   const [viewerPhoto, setViewerPhoto] = useState<PrototypePhoto | null>(null);
   const [restoreStatus, setRestoreStatus] = useState<
@@ -75,6 +92,50 @@ export function BoardV2Prototype({
     };
   }, []);
 
+  useEffect(() => {
+    setPreferences(readBoardPreferences());
+    setHasLoadedPreferences(true);
+  }, []);
+
+  useEffect(() => {
+    if (!hasLoadedPreferences) {
+      return;
+    }
+    try {
+      window.localStorage.setItem(BOARD_V2_PREFERENCES_KEY, JSON.stringify(preferences));
+    } catch {
+      // The prototype still works when the browser does not expose local storage.
+    }
+  }, [hasLoadedPreferences, preferences]);
+
+  useEffect(() => {
+    let active = true;
+
+    void Promise.all(
+      allPhotos.map(async (photo) => {
+        const brightness = await readPhotoBrightness(photo.boardSrc);
+        return [getPhotoKey(photo), brightness] as const;
+      }),
+    ).then((values) => {
+      if (!active) {
+        return;
+      }
+      setPhotoBrightness((current) => {
+        const next = { ...current };
+        for (const [key, brightness] of values) {
+          if (brightness !== null) {
+            next[key] = brightness;
+          }
+        }
+        return next;
+      });
+    });
+
+    return () => {
+      active = false;
+    };
+  }, [allPhotos]);
+
   async function restoreRemotePhotos() {
     setRestoreStatus("checking");
     const result = await syncAccountDataForPrototype();
@@ -94,8 +155,18 @@ export function BoardV2Prototype({
     () =>
       allPhotos
         .filter((photo) => photo.side === side)
-        .sort((a, b) => b.timestamp - a.timestamp),
-    [allPhotos, side],
+        .sort((a, b) => {
+          if (order === "brightest") {
+            const brightnessDelta =
+              (photoBrightness[getPhotoKey(b)] ?? -1) -
+              (photoBrightness[getPhotoKey(a)] ?? -1);
+            if (brightnessDelta !== 0) {
+              return brightnessDelta;
+            }
+          }
+          return b.timestamp - a.timestamp;
+        }),
+    [allPhotos, order, photoBrightness, side],
   );
   const months = useMemo(() => buildMonths(photosForSide), [photosForSide]);
   const monthKey = selectedMonthKey ?? months[0]?.key ?? getCurrentMonthKey();
@@ -117,6 +188,8 @@ export function BoardV2Prototype({
 
   const displayedPhotos = monthPhotos;
   const hasAnyRealPhoto = allPhotos.length > 0;
+  const updatePreferences = (next: Partial<typeof preferences>) =>
+    setPreferences((current) => ({ ...current, ...next }));
 
   return (
     <main style={styles.page} data-testid="board-v2-prototype">
@@ -126,15 +199,49 @@ export function BoardV2Prototype({
           <h1 style={styles.title}>ねこだよりボード v2</h1>
           <p style={styles.lead}>実データで、散らばり具合を見比べます。</p>
         </div>
-        <SegmentedControl
-          label="表示"
-          value={mode}
-          options={[
-            { value: "v2", label: "v2" },
-            { value: "current", label: "現行" },
-          ]}
-          onChange={(value) => setMode(value as BoardMode)}
-        />
+        <div style={styles.compareControls} aria-label="表示の比較">
+          <SegmentedControl
+            label="配置"
+            idPrefix="board-v2"
+            value={mode}
+            options={[
+              { value: "v2", label: "v2" },
+              { value: "current", label: "現行" },
+            ]}
+            onChange={(value) => updatePreferences({ mode: value as BoardMode })}
+          />
+          <SegmentedControl
+            label="写真の形"
+            idPrefix="board-v2-layout"
+            value={layout}
+            options={[
+              { value: "crop", label: "crop" },
+              { value: "natural", label: "原寸" },
+            ]}
+            onChange={(value) => updatePreferences({ layout: value as BoardLayout })}
+          />
+          <SegmentedControl
+            label="枠"
+            idPrefix="board-v2-frame"
+            value={frame}
+            options={[
+              { value: "f1", label: "f1" },
+              { value: "f2", label: "f2" },
+              { value: "f3", label: "f3" },
+            ]}
+            onChange={(value) => updatePreferences({ frame: value as BoardFrame })}
+          />
+          <SegmentedControl
+            label="席順"
+            idPrefix="board-v2-order"
+            value={order}
+            options={[
+              { value: "newest", label: "新しい順" },
+              { value: "brightest", label: "明るい順" },
+            ]}
+            onChange={(value) => updatePreferences({ order: value as BoardOrder })}
+          />
+        </div>
       </header>
 
       <section style={styles.controls} aria-label="ねこだよりボードの切り替え">
@@ -193,9 +300,39 @@ export function BoardV2Prototype({
             この月の写真はまだありません。
           </div>
         ) : mode === "v2" ? (
-          <V2Board photos={displayedPhotos} onOpen={setViewerPhoto} />
+          <V2Board
+            photos={displayedPhotos}
+            layout={layout}
+            frame={frame}
+            ratios={photoRatios}
+            onNaturalSize={(photo, size) =>
+              setPhotoRatios((current) => {
+                const key = getPhotoKey(photo);
+                const ratio = size.width / size.height;
+                return Math.abs((current[key] ?? 0) - ratio) < 0.001
+                  ? current
+                  : { ...current, [key]: ratio };
+              })
+            }
+            onOpen={setViewerPhoto}
+          />
         ) : (
-          <CurrentBoard photos={displayedPhotos} onOpen={setViewerPhoto} />
+          <CurrentBoard
+            photos={displayedPhotos}
+            layout={layout}
+            frame={frame}
+            ratios={photoRatios}
+            onNaturalSize={(photo, size) =>
+              setPhotoRatios((current) => {
+                const key = getPhotoKey(photo);
+                const ratio = size.width / size.height;
+                return Math.abs((current[key] ?? 0) - ratio) < 0.001
+                  ? current
+                  : { ...current, [key]: ratio };
+              })
+            }
+            onOpen={setViewerPhoto}
+          />
         )}
       </section>
 
@@ -303,12 +440,23 @@ function AccountRestoreNotice({
 
 function V2Board({
   photos,
+  layout,
+  frame,
+  ratios,
+  onNaturalSize,
   onOpen,
 }: {
   photos: PrototypePhoto[];
+  layout: BoardLayout;
+  frame: BoardFrame;
+  ratios: Record<string, number>;
+  onNaturalSize: (photo: PrototypePhoto, size: { width: number; height: number }) => void;
   onOpen: (photo: PrototypePhoto) => void;
 }) {
-  const placements = useMemo(() => buildV2Placements(photos), [photos]);
+  const placements = useMemo(
+    () => buildV2Placements(photos, layout, ratios),
+    [layout, photos, ratios],
+  );
   const dated = new Set<string>();
   const sparse = photos.length <= 3;
 
@@ -320,7 +468,7 @@ function V2Board({
       }}
       data-testid="board-v2-layout"
     >
-      {placements.items.map(({ photo, style }, index) => {
+      {placements.items.map(({ photo, style, height }, index) => {
         const showDate = !dated.has(photo.dateKey);
         dated.add(photo.dateKey);
 
@@ -338,7 +486,7 @@ function V2Board({
             }}
             onClick={() => onOpen(photo)}
           >
-            {showDate ? (
+            {showDate && frame === "f1" ? (
               <span data-testid="board-v2-date-tape" style={styles.dateTape}>
                 {formatDateTape(photo.dateKey)}
               </span>
@@ -351,10 +499,11 @@ function V2Board({
               alt={photo.side === "sent" ? "おくったねがお" : "とどいたねがお"}
               loading={index < 8 ? "eager" : "lazy"}
               decoding="async"
-              style={styles.photoFrame}
-              imageStyle={styles.photoImage}
+              style={getFrameStyle(frame)}
+              imageStyle={getBoardImageStyle(layout)}
               width={180}
-              height={180}
+              height={Math.round(height)}
+              onNaturalSize={(size) => onNaturalSize(photo, size)}
             />
             {photo.catName ? <span style={styles.catBadge}>{photo.catName}</span> : null}
           </button>
@@ -366,9 +515,17 @@ function V2Board({
 
 function CurrentBoard({
   photos,
+  layout,
+  frame,
+  ratios,
+  onNaturalSize,
   onOpen,
 }: {
   photos: PrototypePhoto[];
+  layout: BoardLayout;
+  frame: BoardFrame;
+  ratios: Record<string, number>;
+  onNaturalSize: (photo: PrototypePhoto, size: { width: number; height: number }) => void;
   onOpen: (photo: PrototypePhoto) => void;
 }) {
   return (
@@ -380,7 +537,12 @@ function CurrentBoard({
           data-testid="board-v2-current-photo"
           data-date-key={photo.dateKey}
           data-timestamp={photo.timestamp}
-          style={styles.currentPhotoButton}
+          style={{
+            ...styles.currentPhotoButton,
+            ...(layout === "natural"
+              ? { aspectRatio: `${ratios[getPhotoKey(photo)] ?? 1} / 1` }
+              : null),
+          }}
           onClick={() => onOpen(photo)}
         >
           <StoredPhotoImage
@@ -391,10 +553,11 @@ function CurrentBoard({
             alt={photo.side === "sent" ? "おくったねがお" : "とどいたねがお"}
             loading={index < 8 ? "eager" : "lazy"}
             decoding="async"
-            style={styles.currentPhotoFrame}
-            imageStyle={styles.photoImage}
+            style={getCurrentFrameStyle(frame, layout)}
+            imageStyle={getBoardImageStyle(layout)}
             width={148}
-            height={148}
+            height={layout === "natural" ? undefined : 148}
+            onNaturalSize={(size) => onNaturalSize(photo, size)}
           />
           <span style={styles.currentDate}>{formatDateTape(photo.dateKey)}</span>
         </button>
@@ -438,11 +601,13 @@ function PhotoViewer({
 
 function SegmentedControl({
   label,
+  idPrefix = "board-v2",
   value,
   options,
   onChange,
 }: {
   label: string;
+  idPrefix?: string;
   value: string;
   options: Array<{ value: string; label: string }>;
   onChange: (value: string) => void;
@@ -457,7 +622,7 @@ function SegmentedControl({
             type="button"
             role="tab"
             aria-selected={selected}
-            data-testid={`board-v2-${option.value}`}
+            data-testid={`${idPrefix}-${option.value}`}
             style={{
               ...styles.segmentButton,
               ...(selected ? styles.segmentButtonActive : null),
@@ -575,37 +740,83 @@ function buildMonths(photos: PrototypePhoto[]) {
     .sort((a, b) => b.key.localeCompare(a.key));
 }
 
-function buildV2Placements(photos: PrototypePhoto[]) {
+function buildV2Placements(
+  photos: PrototypePhoto[],
+  layout: BoardLayout,
+  ratios: Record<string, number>,
+) {
   const total = photos.length;
   const sparse = total <= 3;
   const cardWidth = sparse ? 190 : total > 18 ? 150 : 166;
-  const cardHeight = cardWidth;
-  const verticalStep = sparse ? 236 : Math.round(cardHeight * 0.88);
   const topPad = sparse ? 34 : 28;
-  const boardHeight = `${topPad * 2 + cardHeight + Math.max(0, total - 1) * verticalStep}px`;
+  let cursorY = topPad;
+  const items = photos.map((photo, index) => {
+    const ratio = ratios[getPhotoKey(photo)] ?? 1;
+    // A square reserve avoids a jump before natural dimensions are available.
+    const height =
+      layout === "natural"
+        ? clamp(cardWidth / ratio, cardWidth * 0.58, cardWidth * 1.72)
+        : cardWidth;
+    const seed = seededUnit(`${photo.sourcePhotoId ?? photo.id}:${photo.dateKey}`);
+    const rotate = -3 + seed * 6;
+    const xUnit = seededUnit(`x:${photo.sourcePhotoId ?? photo.id}`);
+    const maxShift = sparse ? 22 : 74;
+    const x = (xUnit - 0.5) * maxShift * 2;
+    const y = cursorY;
+    // The visible centre remains above 70%; taller originals overlap less.
+    const overlap = sparse ? 0.12 : 0.22;
+    cursorY += Math.round(height * (1 - overlap));
+
+    return {
+      photo,
+      height,
+      style: {
+        width: `${cardWidth}px`,
+        height: `${Math.round(height)}px`,
+        top: `${y}px`,
+        left: `calc(50% + ${Math.round(x)}px)`,
+        transform: `translateX(-50%) rotate(${rotate.toFixed(2)}deg)`,
+        zIndex: total - index,
+      } satisfies CSSProperties,
+    };
+  });
 
   return {
-    boardHeight,
-    items: photos.map((photo, index) => {
-      const seed = seededUnit(`${photo.sourcePhotoId ?? photo.id}:${photo.dateKey}`);
-      const rotate = -3 + seed * 6;
-      const xUnit = seededUnit(`x:${photo.sourcePhotoId ?? photo.id}`);
-      const maxShift = sparse ? 22 : 74;
-      const x = (xUnit - 0.5) * maxShift * 2;
-      const y = topPad + index * verticalStep;
-
-      return {
-        photo,
-        style: {
-          width: `${cardWidth}px`,
-          top: `${y}px`,
-          left: `calc(50% + ${Math.round(x)}px)`,
-          transform: `translateX(-50%) rotate(${rotate.toFixed(2)}deg)`,
-          zIndex: total - index,
-        } satisfies CSSProperties,
-      };
-    }),
+    boardHeight: `${Math.ceil(cursorY + topPad)}px`,
+    items,
   };
+}
+
+function getFrameStyle(frame: BoardFrame): CSSProperties {
+  if (frame === "f2") {
+    return styles.photoFrameFine;
+  }
+  if (frame === "f3") {
+    return styles.photoFrameBare;
+  }
+  return styles.photoFrame;
+}
+
+function getCurrentFrameStyle(frame: BoardFrame, layout: BoardLayout): CSSProperties {
+  const base = frame === "f1" ? styles.currentPhotoFrame : getFrameStyle(frame);
+  return layout === "natural"
+    ? { ...base, width: "100%", height: "100%", aspectRatio: undefined }
+    : base;
+}
+
+function getBoardImageStyle(layout: BoardLayout): CSSProperties {
+  return {
+    ...styles.photoImage,
+    objectFit: layout === "natural" ? "contain" : "cover",
+  };
+}
+
+function getPhotoKey(photo: PrototypePhoto) {
+  return `${photo.side}:${photo.sourcePhotoId ?? photo.id}`;
+}
+
+function clamp(value: number, min: number, max: number) {
+  return Math.min(max, Math.max(min, value));
 }
 
 function getPhotoTransformBaseSrc(photo: {
@@ -684,6 +895,68 @@ function seededUnit(input: string) {
   return (hash >>> 0) / 4294967295;
 }
 
+function readBoardPreferences(): {
+  mode: BoardMode;
+  layout: BoardLayout;
+  frame: BoardFrame;
+  order: BoardOrder;
+} {
+  const fallback = DEFAULT_BOARD_PREFERENCES;
+
+  if (typeof window === "undefined") {
+    return fallback;
+  }
+
+  try {
+    const raw = window.localStorage.getItem(BOARD_V2_PREFERENCES_KEY);
+    const value = raw ? (JSON.parse(raw) as Partial<typeof fallback>) : null;
+    return {
+      mode: value?.mode === "current" ? "current" : "v2",
+      layout: value?.layout === "natural" ? "natural" : "crop",
+      frame: value?.frame === "f2" || value?.frame === "f3" ? value.frame : "f1",
+      order: value?.order === "brightest" ? "brightest" : "newest",
+    };
+  } catch {
+    return fallback;
+  }
+}
+
+async function readPhotoBrightness(source: string) {
+  const displaySource = await getStoragePhotoSignedUrl(source, "thumbnail");
+  if (!displaySource) {
+    return null;
+  }
+
+  return new Promise<number | null>((resolve) => {
+    const image = new Image();
+    image.crossOrigin = "anonymous";
+    image.onload = () => {
+      try {
+        const canvas = document.createElement("canvas");
+        canvas.width = 16;
+        canvas.height = 16;
+        const context = canvas.getContext("2d", { willReadFrequently: true });
+        if (!context) {
+          resolve(null);
+          return;
+        }
+        context.drawImage(image, 0, 0, canvas.width, canvas.height);
+        const pixels = context.getImageData(0, 0, canvas.width, canvas.height).data;
+        let total = 0;
+        for (let index = 0; index < pixels.length; index += 4) {
+          total += pixels[index] * 0.2126 + pixels[index + 1] * 0.7152 + pixels[index + 2] * 0.0722;
+        }
+        resolve(total / (pixels.length / 4));
+      } catch {
+        // A CDN response without CORS stays in the normal chronological order.
+        resolve(null);
+      }
+    };
+    image.onerror = () => resolve(null);
+    image.src = displaySource;
+  });
+}
+
 const styles: Record<string, CSSProperties> = {
   page: {
     minHeight: "100dvh",
@@ -695,11 +968,18 @@ const styles: Record<string, CSSProperties> = {
   },
   header: {
     display: "flex",
+    flexWrap: "wrap",
     justifyContent: "space-between",
     gap: 16,
     alignItems: "flex-start",
     maxWidth: 760,
     margin: "0 auto 18px",
+  },
+  compareControls: {
+    display: "grid",
+    justifyItems: "end",
+    gap: 6,
+    maxWidth: "100%",
   },
   kicker: {
     margin: "0 0 6px",
@@ -877,9 +1157,25 @@ const styles: Record<string, CSSProperties> = {
     width: "100%",
     height: "100%",
     borderRadius: 16,
-    border: "7px solid color-mix(in srgb, var(--paper-card) 78%, white 22%)",
+    border: "12px solid color-mix(in srgb, var(--paper-card) 78%, white 22%)",
     boxShadow:
       "0 14px 26px rgba(72, 58, 39, 0.14), inset 0 0 0 1px rgba(117, 90, 64, 0.08)",
+    background: "var(--paper-card)",
+  },
+  photoFrameFine: {
+    width: "100%",
+    height: "100%",
+    borderRadius: 2,
+    border: "4px solid color-mix(in srgb, var(--paper-card) 72%, white 28%)",
+    boxShadow: "0 7px 10px rgba(72, 58, 39, 0.14)",
+    background: "var(--paper-card)",
+  },
+  photoFrameBare: {
+    width: "100%",
+    height: "100%",
+    borderRadius: 0,
+    border: "1px solid rgba(255, 255, 255, 0.84)",
+    boxShadow: "0 5px 8px rgba(72, 58, 39, 0.16)",
     background: "var(--paper-card)",
   },
   photoImage: {

@@ -11,10 +11,10 @@ test.describe("board v2 prototype", () => {
         return;
       }
 
-      function makeDataUrl(color: string) {
+      function makeDataUrl(color: string, width = 32, height = 32) {
         const canvas = document.createElement("canvas");
-        canvas.width = 32;
-        canvas.height = 32;
+        canvas.width = width;
+        canvas.height = height;
         const context = canvas.getContext("2d");
         if (!context) {
           return "";
@@ -39,7 +39,7 @@ test.describe("board v2 prototype", () => {
           id: `own-${first}`,
           catId: "cat-1",
           ownerCatId: "cat-1",
-          src: makeDataUrl("#c77c63"),
+          src: makeDataUrl("#c77c63", 24, 48),
           createdAt: first,
           state: "sleeping",
           visibility: "shared",
@@ -110,6 +110,42 @@ test.describe("board v2 prototype", () => {
 
     await page.getByTestId("board-v2-v2").click();
     await expect(page.getByTestId("board-v2-layout")).toBeVisible();
+  });
+
+  test("keeps the raw-aspect and frame comparisons available after reload", async ({
+    page,
+  }) => {
+    await page.goto("/prototypes/board-v2");
+
+    await page.getByTestId("board-v2-layout-natural").click();
+    await page.getByTestId("board-v2-frame-f3").click();
+    await page.getByTestId("board-v2-order-brightest").click();
+
+    await expect(page.getByTestId("board-v2-layout-natural")).toHaveAttribute(
+      "aria-selected",
+      "true",
+    );
+    await expect(page.getByTestId("board-v2-frame-f3")).toHaveAttribute(
+      "aria-selected",
+      "true",
+    );
+    await expect(page.getByTestId("board-v2-date-tape")).toHaveCount(0);
+
+    await expect
+      .poll(() =>
+        page.evaluate(() => window.localStorage.getItem("nyaruhodo_board_v2_preferences")),
+      )
+      .toContain('"layout":"natural"');
+
+    await page.reload();
+    await expect(page.getByTestId("board-v2-layout-natural")).toHaveAttribute(
+      "aria-selected",
+      "true",
+    );
+    await expect(page.getByTestId("board-v2-frame-f3")).toHaveAttribute(
+      "aria-selected",
+      "true",
+    );
   });
 
   test("keeps empty real-data controls clickable instead of auto-locking on restore", async ({
