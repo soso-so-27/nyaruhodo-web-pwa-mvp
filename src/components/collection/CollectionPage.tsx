@@ -2029,6 +2029,40 @@ function MainichiPrototypeMonthBoard({
   }, [month.photos]);
 
   useEffect(() => {
+    let active = true;
+
+    if (options.layout !== "natural") {
+      return () => {
+        active = false;
+      };
+    }
+
+    void Promise.all(
+      month.photos.map(async (photo) => [
+        getMainichiBoardPhotoKey(photo),
+        await readMainichiPrototypeDisplayRatio(photo.boardSrc),
+      ] as const),
+    ).then((values) => {
+      if (!active) {
+        return;
+      }
+      setRatios((current) => {
+        const next = { ...current };
+        for (const [key, value] of values) {
+          if (value !== null) {
+            next[key] = value;
+          }
+        }
+        return next;
+      });
+    });
+
+    return () => {
+      active = false;
+    };
+  }, [month.photos, options.layout]);
+
+  useEffect(() => {
     setDecodedPhotoKeys(new Set());
   }, [month.key]);
 
@@ -2113,6 +2147,7 @@ function MainichiPrototypeMonthBoard({
               type="button"
               data-testid="mainichi-prototype-photo"
               data-photo-id={photo.id}
+              data-display-natural-ratio={ratios[key]?.toFixed(6) ?? ""}
               style={{ ...styles.mainichiPrototypePhotoButton, ...style }}
               onClick={(event) => {
                 const rect = event.currentTarget.getBoundingClientRect();
@@ -2149,17 +2184,6 @@ function MainichiPrototypeMonthBoard({
                 width={180}
                 height={Math.round(height)}
                 initiallyLoaded
-                onNaturalSize={({ width, height }) => {
-                  if (width <= 0 || height <= 0) {
-                    return;
-                  }
-                  const ratio = width / height;
-                  setRatios((current) =>
-                    Math.abs((current[key] ?? 0) - ratio) < 0.001
-                      ? current
-                      : { ...current, [key]: ratio },
-                  );
-                }}
               />
             </button>
           );
@@ -4567,6 +4591,26 @@ async function readMainichiPrototypeBrightness(source: string) {
       } catch {
         resolve(null);
       }
+    };
+    image.onerror = () => resolve(null);
+    image.src = displaySource;
+  });
+}
+
+async function readMainichiPrototypeDisplayRatio(source: string) {
+  const displaySource = await getStoragePhotoSignedUrl(source, "display");
+  if (!displaySource) {
+    return null;
+  }
+
+  return new Promise<number | null>((resolve) => {
+    const image = new Image();
+    image.onload = () => {
+      if (image.naturalWidth <= 0 || image.naturalHeight <= 0) {
+        resolve(null);
+        return;
+      }
+      resolve(image.naturalWidth / image.naturalHeight);
     };
     image.onerror = () => resolve(null);
     image.src = displaySource;

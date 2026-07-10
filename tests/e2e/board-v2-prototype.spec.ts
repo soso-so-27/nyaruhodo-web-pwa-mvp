@@ -1,6 +1,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import { expect, test } from "@playwright/test";
+import { THUMBNAIL_TRANSFORM } from "../../src/lib/photoStorage";
 
 test.describe("board v2 prototype", () => {
   test.beforeEach(async ({ page }) => {
@@ -95,6 +96,73 @@ test.describe("board v2 prototype", () => {
     await expect(page.getByTestId("board-v2-settings-button")).toBeVisible();
   });
 
+  test("requests a contain transform for thumbnail delivery", () => {
+    expect(THUMBNAIL_TRANSFORM).toEqual({
+      quality: 75,
+      resize: "contain",
+      width: 800,
+    });
+  });
+
+  test("uses plain display dimensions for the natural board layout", async ({ page }) => {
+    const displaySrc = "storage:user-1/cat-1/sleeping/display/landscape.jpg";
+    const transformedSrc = "data:image/svg+xml," + encodeURIComponent(
+      '<svg xmlns="http://www.w3.org/2000/svg" width="200" height="600"></svg>',
+    );
+    const plainDisplaySrc = "data:image/svg+xml," + encodeURIComponent(
+      '<svg xmlns="http://www.w3.org/2000/svg" width="600" height="300"></svg>',
+    );
+    const requests: Array<{ src?: string; variant?: string }> = [];
+
+    await page.route("**/api/photo-storage/signed-url", async (route) => {
+      const body = route.request().postDataJSON() as { src?: string; variant?: string };
+      requests.push(body);
+      await route.fulfill({
+        contentType: "application/json",
+        body: JSON.stringify({
+          signedUrl: body.variant === "display" ? plainDisplaySrc : transformedSrc,
+        }),
+      });
+    });
+    await page.addInitScript(({ src }) => {
+      const catId = "board-prototype-cat";
+      const createdAt = new Date("2026-07-08T12:00:00+09:00").getTime();
+      window.localStorage.setItem("active_cat_id", catId);
+      window.localStorage.setItem("cat_profiles", JSON.stringify([{ id: catId, name: "むぎ" }]));
+      window.localStorage.setItem(
+        "nyaruhodo_exchange_own_sleeping_photos",
+        JSON.stringify([{
+          id: `own-${createdAt}`,
+          catId,
+          ownerCatId: catId,
+          src,
+          thumbnailSrc: src,
+          displaySrc: src,
+          originalSrc: src,
+          createdAt,
+          state: "sleeping",
+          visibility: "shared",
+          deliveryStatus: "available",
+          triggerLabel: "daily",
+          theme: "sleeping",
+          shared: true,
+        }]),
+      );
+      window.localStorage.setItem("nyaruhodo_exchange_kept_photos", "[]");
+    }, { src: displaySrc });
+
+    await page.goto("/prototypes/board-v2?mode=v2&layout=natural&frame=f3&order=newest");
+    const photo = page.getByTestId("mainichi-prototype-photo");
+    await expect(photo).toHaveCount(1);
+    await expect(photo).toHaveAttribute("data-display-natural-ratio", "2.000000");
+    expect(requests).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ src: displaySrc, variant: "thumbnail" }),
+        expect.objectContaining({ src: displaySrc, variant: "display" }),
+      ]),
+    );
+  });
+
   test("uses the unchanged production board for the current comparison query", async ({ page }) => {
     await page.goto("/prototypes/board-v2?mode=current&layout=crop&frame=f1&order=newest");
 
@@ -116,7 +184,10 @@ test.describe("board v2 prototype", () => {
         page
           .locator('[data-testid="mainichi-prototype-photo"] img')
           .evaluateAll((images) =>
-            images.length === 3 && images.every((image) => image.naturalWidth > 0),
+            images.length === 3 &&
+            images.every(
+              (image) => image instanceof HTMLImageElement && image.naturalWidth > 0,
+            ),
           ),
       )
       .toBe(true);

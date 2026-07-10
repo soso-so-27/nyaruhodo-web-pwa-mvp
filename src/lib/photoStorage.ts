@@ -7,8 +7,11 @@ export const DISPLAY_SIGNED_URL_SECONDS = 60 * 60 * 24;
 export const STORAGE_SIGNED_URL_VARIANTS = ["display", "thumbnail"] as const;
 export type StorageSignedUrlVariant = (typeof STORAGE_SIGNED_URL_VARIANTS)[number];
 
-const THUMBNAIL_TRANSFORM = {
+export const THUMBNAIL_TRANSFORM = {
   quality: 75,
+  // Supabase otherwise preserves the original height while changing only the
+  // width for some JPEGs, which changes the image's natural aspect ratio.
+  resize: "contain",
   width: 800,
 } as const;
 
