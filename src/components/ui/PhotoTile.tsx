@@ -37,6 +37,7 @@ type PhotoTileProps = {
   initiallyLoaded?: boolean;
   children?: ReactNode;
   style?: CSSProperties;
+  frameStyle?: CSSProperties;
   imageStyle?: CSSProperties;
 };
 
@@ -66,6 +67,7 @@ export function PhotoTile({
   initiallyLoaded,
   children,
   style,
+  frameStyle: frameStyleOverride,
   imageStyle,
 }: PhotoTileProps) {
   const isAvatar = variant === "avatar" || shape === "circle";
@@ -80,6 +82,7 @@ export function PhotoTile({
         ? styles.avatarFrame
         : styles.rounded),
     ...(muted ? styles.mutedFrame : null),
+    ...frameStyleOverride,
   };
   const isInteractive = interactive || Boolean(onClick);
   const rootStyle = {

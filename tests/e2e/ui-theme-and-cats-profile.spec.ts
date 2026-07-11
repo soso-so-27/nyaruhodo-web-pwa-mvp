@@ -96,6 +96,13 @@ test("keeps the cats photo tab clear of the fixed bottom navigation", async ({
     const firstTile = photoGrid?.querySelector<HTMLButtonElement>(":scope > div button");
     const firstFrame = firstTile?.querySelector<HTMLElement>("span");
     const firstImage = firstTile?.querySelector<HTMLImageElement>("img");
+    const items = photoGrid
+      ? Array.from(photoGrid.querySelectorAll<HTMLElement>(":scope > div"))
+      : [];
+    const firstRect = items[0]?.getBoundingClientRect();
+    const secondRect = items[1]?.getBoundingClientRect();
+    const fourthRect = items[3]?.getBoundingClientRect();
+    const frameRect = firstFrame?.getBoundingClientRect();
     return {
       columnGap: photoGrid ? getComputedStyle(photoGrid).columnGap : "",
       rowGap: photoGrid ? getComputedStyle(photoGrid).rowGap : "",
@@ -105,14 +112,22 @@ test("keeps the cats photo tab clear of the fixed bottom navigation", async ({
         : "",
       frameBoxShadow: firstFrame ? getComputedStyle(firstFrame).boxShadow : "",
       imageObjectFit: firstImage ? getComputedStyle(firstImage).objectFit : "",
+      itemWidth: firstRect?.width ?? 0,
+      frameWidth: frameRect?.width ?? 0,
+      horizontalGap:
+        firstRect && secondRect ? secondRect.left - firstRect.right : 0,
+      verticalGap: firstRect && fourthRect ? fourthRect.top - firstRect.bottom : 0,
     };
   });
   expect(gridMetrics.columnGap).toBe("2px");
   expect(gridMetrics.rowGap).toBe("2px");
   expect(gridMetrics.frameBorderWidth).toBe("0px");
-  expect(gridMetrics.frameBorderRadius).toBe("0px");
+  expect(gridMetrics.frameBorderRadius).toBe("1px");
   expect(gridMetrics.frameBoxShadow).toBe("none");
   expect(gridMetrics.imageObjectFit).toBe("cover");
+  expect(gridMetrics.frameWidth).toBeCloseTo(gridMetrics.itemWidth, 5);
+  expect(gridMetrics.horizontalGap).toBeCloseTo(2, 5);
+  expect(gridMetrics.verticalGap).toBeCloseTo(2, 5);
 
   const [tabsBox, coverBox, navBoxBeforeScroll] = await Promise.all([
     tabs.boundingBox(),

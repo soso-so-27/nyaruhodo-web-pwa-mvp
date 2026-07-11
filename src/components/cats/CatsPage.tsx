@@ -3200,6 +3200,7 @@ function LensPhotoGrid({
             fit="cover"
             onClick={() => onOpenPhoto(photo)}
             style={styles.lensPhotoTileRoot}
+            frameStyle={styles.lensPhotoTileFrame}
             imageStyle={styles.lensPhotoTile}
           />
           <span style={styles.lensPhotoDate}>
@@ -7050,6 +7051,12 @@ const styles = {
   },
   lensPhotoTileRoot: {
     width: "100%",
+  },
+  lensPhotoTileFrame: {
+    width: "100%",
+    height: "auto",
+    aspectRatio: "1 / 1",
+    borderRadius: "1px",
   },
   lensPhotoTile: {
     width: "100%",
