@@ -47,6 +47,7 @@ export type OmoideMemoryControls = {
   disabled?: boolean;
   pausedUntil?: number;
   hiddenDateKeys?: string[];
+  usedSourcePhotoIds?: string[];
 };
 
 const MIN_DELIVERY_INTERVAL_MS = 7 * 24 * 60 * 60 * 1000;
@@ -61,7 +62,12 @@ export function readOmoideMemories(): OmoideMemory[] {
 
 export function readOmoideMemoriesForCat(catId: string | null) {
   const memories = readOmoideMemories();
-  return catId ? memories.filter((memory) => memory.catId === catId) : memories;
+  const catMemories = catId
+    ? memories.filter((memory) => memory.catId === catId)
+    : memories;
+  return readOmoideMemoryControls().disabled
+    ? catMemories.filter((memory) => Boolean(memory.openedAt))
+    : catMemories;
 }
 
 export function readLatestArrivedOmoideMemory(
@@ -81,6 +87,9 @@ export function readLatestArrivedOmoideMemory(
 }
 
 export function hasUnopenedArrivedOmoideMemory(now = Date.now()) {
+  if (readOmoideMemoryControls().disabled) {
+    return false;
+  }
   return readOmoideMemories().some(
     (memory) =>
       !memory.openedAt &&
@@ -114,6 +123,10 @@ export function ensureOmoideMemoryArrival({
   // arrivals here or switch them to the quiet memorial tone before delivery.
 
   const store = readOmoideMemoryStore();
+  const usedSourcePhotoIds = new Set([
+    ...(controls.usedSourcePhotoIds ?? []),
+    ...Object.values(store).map((memory) => memory.sourcePhotoId),
+  ]);
   const todayKey = getJstDateKey(now);
   const existing = Object.values(store).find(
     (memory) => memory.catId === catId && memory.deliveryDateKey === todayKey,
@@ -133,6 +146,7 @@ export function ensureOmoideMemoryArrival({
     familySinceDate,
     ownPhotos,
     controls,
+    usedSourcePhotoIds,
     now,
   });
   if (!candidate) {
@@ -151,6 +165,12 @@ export function ensureOmoideMemoryArrival({
   writeOmoideMemoryStore({
     ...store,
     [memory.id]: memory,
+  });
+  writeOmoideMemoryControls({
+    ...controls,
+    usedSourcePhotoIds: [
+      ...new Set([...usedSourcePhotoIds, memory.sourcePhotoId]),
+    ],
   });
 
   trackProductEvent(
@@ -268,6 +288,16 @@ export function readOmoideMemoryControls(): OmoideMemoryControls {
             (dateKey): dateKey is string => typeof dateKey === "string",
           )
         : [],
+      usedSourcePhotoIds: Array.isArray(controls.usedSourcePhotoIds)
+        ? [
+            ...new Set(
+              controls.usedSourcePhotoIds.filter(
+                (photoId): photoId is string =>
+                  typeof photoId === "string" && photoId.length > 0,
+              ),
+            ),
+          ]
+        : [],
     };
   } catch {
     return {};
@@ -280,6 +310,7 @@ function selectOmoideCandidate({
   familySinceDate,
   ownPhotos,
   controls,
+  usedSourcePhotoIds,
   now,
 }: {
   catId: string;
@@ -287,10 +318,15 @@ function selectOmoideCandidate({
   familySinceDate?: string;
   ownPhotos: OwnSleepingPhoto[];
   controls: OmoideMemoryControls;
+  usedSourcePhotoIds: Set<string>;
   now: number;
 }) {
   const photos = ownPhotos
-    .filter((photo) => photo.ownerCatId === catId || photo.catId === catId)
+    .filter(
+      (photo) =>
+        (photo.ownerCatId === catId || photo.catId === catId) &&
+        !usedSourcePhotoIds.has(photo.id),
+    )
     .sort((a, b) => a.createdAt - b.createdAt);
   if (photos.length === 0) {
     return null;

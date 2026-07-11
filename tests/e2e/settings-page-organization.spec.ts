@@ -73,7 +73,11 @@ test.describe("settings page organization", () => {
           return raw ? JSON.parse(raw) : null;
         }),
       )
-      .toEqual({ disabled: false, hiddenDateKeys: [] });
+      .toEqual({
+        disabled: false,
+        hiddenDateKeys: [],
+        usedSourcePhotoIds: [],
+      });
   });
 });
 

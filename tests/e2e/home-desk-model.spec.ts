@@ -926,6 +926,52 @@ test.describe("home desk model", () => {
     await expect(bunbako.getByText("思い出箱")).toBeVisible();
     await expect(bunbako.getByText("1週間前の、きょう。")).toBeVisible();
   });
+
+  test("keeps an already used source photo out of a new omoide delivery", async ({
+    page,
+  }) => {
+    await seedDeskState(page, "1b", {
+      withOmoideCandidate: true,
+      usedOmoideSourcePhotoIds: ["own-omoide-week"],
+    });
+
+    await page.goto("/home");
+    await page.waitForLoadState("networkidle");
+
+    await expect
+      .poll(() =>
+        page.evaluate(() =>
+          window.localStorage.getItem("neteruneko_omoide_memories"),
+        ),
+      )
+      .toBeNull();
+  });
+
+  test("hides unopened omoide while receiving is disabled without deleting it", async ({
+    page,
+  }) => {
+    await seedDeskState(page, "1b", {
+      withStoredOmoide: true,
+      omoideDisabled: true,
+    });
+
+    await page.goto("/home");
+    await page.waitForLoadState("networkidle");
+    await expect(page.getByTestId("cats-nav-unopened-omoide-dot")).toHaveCount(0);
+
+    await page.goto("/cats");
+    await page.waitForLoadState("networkidle");
+    await expect(page.getByTestId("cats-pickup-unopened-omoide-dot")).toHaveCount(0);
+    await expect(page.getByTestId("omoide-bunbako")).toHaveCount(0);
+    await expect
+      .poll(() =>
+        page.evaluate(() => {
+          const raw = window.localStorage.getItem("neteruneko_omoide_memories");
+          return raw ? Object.keys(JSON.parse(raw)).length : 0;
+        }),
+      )
+      .toBe(1);
+  });
 });
 
 function rectsOverlap(
@@ -950,6 +996,8 @@ async function seedDeskState(
     withYesterday?: boolean;
     withOmoideCandidate?: boolean;
     withStoredOmoide?: boolean;
+    usedOmoideSourcePhotoIds?: string[];
+    omoideDisabled?: boolean;
     withoutOwnPhoto?: boolean;
     openedBySystem?: boolean;
   } = {},
@@ -1042,6 +1090,17 @@ async function seedDeskState(
         "nyaruhodo_exchange_own_sleeping_photos",
         JSON.stringify(options.withOmoideCandidate ? [omoidePhoto, ...ownPhotos] : ownPhotos),
       );
+      if (options.omoideDisabled || options.usedOmoideSourcePhotoIds) {
+        window.localStorage.setItem(
+          "neteruneko_omoide_memory_controls",
+          JSON.stringify({
+            disabled: options.omoideDisabled === true,
+            usedSourcePhotoIds: options.usedOmoideSourcePhotoIds ?? [],
+          }),
+        );
+      } else {
+        window.localStorage.removeItem("neteruneko_omoide_memory_controls");
+      }
 
       if (state === "2" || state === "3" || state === "4") {
         store[dateKey] = {
