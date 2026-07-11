@@ -397,6 +397,66 @@ test.describe("home desk model", () => {
     await expect(page.getByTestId("desk-empty-frame")).toHaveCSS("cursor", "auto");
   });
 
+  test("adapts the b3 ink trace across the four ambient periods", async ({
+    context,
+  }) => {
+    const periods = [
+      { name: "morning", now: getCurrentJstTime(7, 0) },
+      { name: "noon", now: getCurrentJstTime(12, 0) },
+      { name: "evening", now: getCurrentJstTime(17, 0) },
+      { name: "night", now: getCurrentJstTime(22, 0) },
+    ];
+    const inkColors: string[] = [];
+
+    for (const period of periods) {
+      const periodPage = await context.newPage();
+      await seedDeskState(periodPage, "1", { now: period.now });
+      await periodPage.goto("/home?illust=b3-ink");
+      await periodPage.waitForLoadState("networkidle");
+
+      const inkCat = periodPage.getByTestId("home-b3-ink-cat");
+      await expect(inkCat).toBeVisible();
+      inkColors.push(await inkCat.evaluate((element) => getComputedStyle(element).backgroundColor));
+      await periodPage.screenshot({
+        path: `artifacts/cat-illustration-b-variants/b3-ink-${period.name}.png`,
+        fullPage: true,
+      });
+      await periodPage.close();
+    }
+
+    expect(new Set(inkColors).size).toBe(4);
+  });
+
+  test("adapts the d1 silhouette across the four ambient periods", async ({
+    context,
+  }) => {
+    const periods = [
+      { name: "morning", now: getCurrentJstTime(7, 0) },
+      { name: "noon", now: getCurrentJstTime(12, 0) },
+      { name: "evening", now: getCurrentJstTime(17, 0) },
+      { name: "night", now: getCurrentJstTime(22, 0) },
+    ];
+    const inkColors: string[] = [];
+
+    for (const period of periods) {
+      const periodPage = await context.newPage();
+      await seedDeskState(periodPage, "1", { now: period.now });
+      await periodPage.goto("/home?illust=d1-ink");
+      await periodPage.waitForLoadState("networkidle");
+
+      const inkCat = periodPage.getByTestId("home-d1-ink-cat");
+      await expect(inkCat).toBeVisible();
+      inkColors.push(await inkCat.evaluate((element) => getComputedStyle(element).backgroundColor));
+      await periodPage.screenshot({
+        path: `artifacts/cat-illustration-d-silhouette/d1-ink-${period.name}.png`,
+        fullPage: true,
+      });
+      await periodPage.close();
+    }
+
+    expect(new Set(inkColors).size).toBe(4);
+  });
+
   test("shows state1b as tomorrow capture without an exchange letter", async ({
     page,
   }) => {

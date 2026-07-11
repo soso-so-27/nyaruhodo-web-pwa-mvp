@@ -6,7 +6,35 @@ export type CatIllustrationVariant =
   | "current"
   | "theme-a"
   | "theme-b"
-  | "theme-c";
+  | "theme-c"
+  | BDetailVariant
+  | DSilhouetteVariant;
+
+export type BDetailVariant =
+  | "b1"
+  | "b2"
+  | "b3"
+  | "b4"
+  | "b5"
+  | "b6"
+  | "b7"
+  | "b8"
+  | "b9"
+  | "b10"
+  | "b3-ink";
+
+export type DSilhouetteVariant =
+  | "d1"
+  | "d2"
+  | "d3"
+  | "d4"
+  | "d5"
+  | "d6"
+  | "d7"
+  | "d8"
+  | "d9"
+  | "d10"
+  | "d1-ink";
 
 export type CatIllustrationAssetKey =
   | "homeEmptyCat"
@@ -24,7 +52,64 @@ export const CAT_ILLUSTRATION_VARIANTS: readonly CatIllustrationVariant[] = [
   "theme-a",
   "theme-b",
   "theme-c",
+  "b1",
+  "b2",
+  "b3",
+  "b4",
+  "b5",
+  "b6",
+  "b7",
+  "b8",
+  "b9",
+  "b10",
+  "b3-ink",
+  "d1",
+  "d2",
+  "d3",
+  "d4",
+  "d5",
+  "d6",
+  "d7",
+  "d8",
+  "d9",
+  "d10",
+  "d1-ink",
 ];
+
+export const CAT_ILLUSTRATION_PRIMARY_VARIANTS = [
+  "current",
+  "theme-a",
+  "theme-b",
+  "theme-c",
+] as const;
+
+export const CAT_ILLUSTRATION_B_DETAIL_VARIANTS = [
+  "b1",
+  "b2",
+  "b3",
+  "b4",
+  "b5",
+  "b6",
+  "b7",
+  "b8",
+  "b9",
+  "b10",
+  "b3-ink",
+] as const satisfies readonly BDetailVariant[];
+
+export const CAT_ILLUSTRATION_D_SILHOUETTE_VARIANTS = [
+  "d1",
+  "d2",
+  "d3",
+  "d4",
+  "d5",
+  "d6",
+  "d7",
+  "d8",
+  "d9",
+  "d10",
+  "d1-ink",
+] as const satisfies readonly DSilhouetteVariant[];
 
 const VARIANT_CHANGE_EVENT = "neteruneko_cat_illustration_variant_changed";
 
@@ -56,6 +141,28 @@ export function getCatIllustrationAssets(
 ): CatIllustrationAssets {
   if (variant === "current") {
     return CURRENT_CAT_ILLUSTRATION_ASSETS;
+  }
+
+  if (variant.startsWith("b")) {
+    const homeFilename = variant === "b3-ink" ? "b3-ink.svg" : `${variant}.webp`;
+    return {
+      homeEmptyCat: `/illustrations/candidates/theme-b-variants/${homeFilename}`,
+      todayNavIcon: "/illustrations/candidates/theme-b/nav-today.webp",
+      uchinokoNavIcon: "/illustrations/candidates/theme-b/nav-uchinoko.webp",
+      catSwitcherIcon: "/illustrations/candidates/theme-b/cat-switcher.webp",
+      deliveryFallback: CURRENT_CAT_ILLUSTRATION_ASSETS.deliveryFallback,
+    };
+  }
+
+  if (variant.startsWith("d")) {
+    const homeFilename = variant === "d1-ink" ? "d1-ink.svg" : `${variant}.webp`;
+    return {
+      homeEmptyCat: `/illustrations/candidates/theme-d-silhouette/${homeFilename}`,
+      todayNavIcon: "/illustrations/candidates/theme-b/nav-today.webp",
+      uchinokoNavIcon: "/illustrations/candidates/theme-b/nav-uchinoko.webp",
+      catSwitcherIcon: "/illustrations/candidates/theme-b/cat-switcher.webp",
+      deliveryFallback: CURRENT_CAT_ILLUSTRATION_ASSETS.deliveryFallback,
+    };
   }
 
   const base = `/illustrations/candidates/${variant}`;

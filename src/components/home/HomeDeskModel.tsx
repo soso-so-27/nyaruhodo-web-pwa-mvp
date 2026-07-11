@@ -7,6 +7,7 @@ import { type EveningHomeState } from "../../lib/home/eveningDelivery";
 import {
   fallBackCatIllustrationImage,
   useCatIllustrationAssets,
+  useCatIllustrationVariant,
 } from "../../lib/assets/catIllustrationAssets";
 import type {
   ExchangePhotoReportReason,
@@ -161,6 +162,7 @@ const HOME_DAYLIGHT_ANCHORS = [
     ambientWarmStrength: "30%",
     ambientCoolStrength: "12%",
     envelopeLineOpacity: "0.33",
+    illustrationInk: "#6b594b",
   },
   {
     minute: 7 * 60,
@@ -178,6 +180,7 @@ const HOME_DAYLIGHT_ANCHORS = [
     ambientWarmStrength: "24%",
     ambientCoolStrength: "10%",
     envelopeLineOpacity: "0.34",
+    illustrationInk: "#665548",
   },
   {
     minute: 12 * 60,
@@ -195,6 +198,7 @@ const HOME_DAYLIGHT_ANCHORS = [
     ambientWarmStrength: "14%",
     ambientCoolStrength: "8%",
     envelopeLineOpacity: "0.36",
+    illustrationInk: "#594b40",
   },
   {
     minute: 17 * 60,
@@ -212,6 +216,7 @@ const HOME_DAYLIGHT_ANCHORS = [
     ambientWarmStrength: "28%",
     ambientCoolStrength: "12%",
     envelopeLineOpacity: "0.32",
+    illustrationInk: "#493d38",
   },
   {
     minute: 19 * 60 + 40,
@@ -229,6 +234,7 @@ const HOME_DAYLIGHT_ANCHORS = [
     ambientWarmStrength: "22%",
     ambientCoolStrength: "20%",
     envelopeLineOpacity: "0.26",
+    illustrationInk: "#342e31",
   },
   {
     minute: 22 * 60,
@@ -246,6 +252,7 @@ const HOME_DAYLIGHT_ANCHORS = [
     ambientWarmStrength: "10%",
     ambientCoolStrength: "28%",
     envelopeLineOpacity: "0.18",
+    illustrationInk: "#24242a",
   },
 ] as const;
 
@@ -1447,6 +1454,7 @@ function useDaylight(now: number) {
       "--home-ambient-warm-strength": colors.ambientWarmStrength,
       "--home-ambient-cool-strength": colors.ambientCoolStrength,
       "--home-envelope-line-opacity": colors.envelopeLineOpacity,
+      "--home-illustration-ink": colors.illustrationInk,
       "--home-daylight-transition": HOME_FRAME_TUNING.daylightTransition,
     } as HomeDaylightStyle;
   }, [minuteKey]);
@@ -1844,6 +1852,25 @@ function HomeLetterTrayText({
 
 function SleepingCatPlaceholder() {
   const catIllustrations = useCatIllustrationAssets();
+  const illustrationVariant = useCatIllustrationVariant();
+
+  if (illustrationVariant === "b3-ink" || illustrationVariant === "d1-ink") {
+    const maskSrc =
+      illustrationVariant === "b3-ink"
+        ? "/illustrations/candidates/theme-b-variants/b3-ink.svg"
+        : "/illustrations/candidates/theme-d-silhouette/d1-ink.svg";
+    return (
+      <span
+        data-testid={`home-${illustrationVariant}-cat`}
+        aria-hidden="true"
+        style={{
+          ...deskStyles.sleepingCatInkMask,
+          maskImage: `url('${maskSrc}')`,
+          WebkitMaskImage: `url('${maskSrc}')`,
+        }}
+      />
+    );
+  }
 
   return (
     <img
@@ -1913,6 +1940,11 @@ function interpolateDaylightAnchor(
     glow: interpolateHexColor(from.glow, to.glow, progress),
     ambientWarm: interpolateHexColor(from.ambientWarm, to.ambientWarm, progress),
     ambientCool: interpolateHexColor(from.ambientCool, to.ambientCool, progress),
+    illustrationInk: interpolateHexColor(
+      from.illustrationInk,
+      to.illustrationInk,
+      progress,
+    ),
     ambientWarmX: staticAnchor.ambientWarmX,
     ambientWarmY: staticAnchor.ambientWarmY,
     ambientCoolX: staticAnchor.ambientCoolX,
@@ -2329,6 +2361,21 @@ const deskStyles = {
     display: "block",
     opacity: 0.96,
     userSelect: "none",
+  },
+  sleepingCatInkMask: {
+    display: "block",
+    width: "var(--home-empty-illustration-width, min(40vw, 136px))",
+    minWidth: "var(--home-empty-illustration-min-width, 112px)",
+    aspectRatio: "1 / 1",
+    backgroundColor: "var(--home-illustration-ink, var(--ink))",
+    maskPosition: "center",
+    maskRepeat: "no-repeat",
+    maskSize: "contain",
+    WebkitMaskPosition: "center",
+    WebkitMaskRepeat: "no-repeat",
+    WebkitMaskSize: "contain",
+    transition:
+      "background-color var(--home-daylight-transition, 1800ms) var(--ease-gentle)",
   },
   notificationTray: {
     width: "100%",

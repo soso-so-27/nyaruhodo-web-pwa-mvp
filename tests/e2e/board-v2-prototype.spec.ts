@@ -161,6 +161,12 @@ test.describe("production nekodayori natural board", () => {
     await expect(page.getByTestId("cat-illustration-variant-theme-a")).toBeVisible();
     await expect(page.getByTestId("cat-illustration-variant-theme-b")).toBeVisible();
     await expect(page.getByTestId("cat-illustration-variant-theme-c")).toBeVisible();
+    await expect(page.getByTestId("cat-illustration-variant-b1")).toBeVisible();
+    await expect(page.getByTestId("cat-illustration-variant-b10")).toBeVisible();
+    await expect(page.getByTestId("cat-illustration-variant-b3-ink")).toBeVisible();
+    await expect(page.getByTestId("cat-illustration-variant-d1")).toBeVisible();
+    await expect(page.getByTestId("cat-illustration-variant-d10")).toBeVisible();
+    await expect(page.getByTestId("cat-illustration-variant-d1-ink")).toBeVisible();
   });
 
   test("keeps prototype routes covered by the production 404 gate", async () => {

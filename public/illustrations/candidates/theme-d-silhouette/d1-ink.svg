@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 640">
+  <mask id="cat">
+    <rect width="640" height="640" fill="#000"/>
+    <path fill="#fff" d="M164 335c-19-84 39-170 125-187 98-20 190 41 207 135 18 98-47 191-146 204-86 11-174-42-193-116-4-15-2-25 7-36Z"/>
+    <path fill="#fff" d="M151 309c-24-27-28-65-3-88l42 35c31-36 91-23 105 24 18 57-36 105-88 82-18-8-35-26-56-53Z"/>
+    <path fill="#fff" d="M151 351c34 17 77 16 112-3 41-23 83-22 126 4-30 47-82 79-139 77-48-2-88-31-99-78Z"/>
+    <path fill="none" stroke="#000" stroke-width="18" stroke-linecap="round" d="M205 281c14-23 30-35 48-37M274 267c21 15 32 38 31 69M208 344c29 14 57 12 83-7M306 344c28 12 56 8 83-12"/>
+    <path fill="none" stroke="#000" stroke-width="13" stroke-linecap="round" d="M171 310c12 10 24 11 36 1"/>
+  </mask>
+  <rect width="640" height="640" fill="#000" mask="url(#cat)"/>
+</svg>
