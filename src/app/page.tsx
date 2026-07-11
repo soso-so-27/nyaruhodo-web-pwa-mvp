@@ -1,7 +1,5 @@
 import { HomePageContent } from "./home/HomePageContent";
 
-export const dynamic = "force-dynamic";
-
-export default async function Page() {
+export default function Page() {
   return <HomePageContent />;
 }

@@ -98,9 +98,7 @@ import {
   readCachedJson,
   writeCachedJson,
 } from "../../lib/storage";
-import type { RecentEvent } from "../../lib/supabase/queries";
 import { createBrowserSupabaseClient } from "../../lib/supabase/browser";
-import { BottomNavigation } from "../navigation/BottomNavigation";
 import { HomeDeskModel } from "./HomeDeskModel";
 import {
   getActiveCatProfile,
@@ -124,7 +122,6 @@ import {
 } from "../ui/StoredPhotoImage";
 
 type HomeInputProps = {
-  recentEvents: RecentEvent[];
   initialNow: number;
 };
 
@@ -253,11 +250,6 @@ const YOUSU_OPTIONS = [
 
 const HOME_NAV_FRAME_WIDTH = "min(calc(100% - 28px), 410px)";
 const HOME_NAV_EDGE_INSET = "max(14px, calc((100vw - 410px) / 2))";
-const HOME_STARTUP_IMAGE_SRC = "/splash/startup-envelope-hold-1206-2622-v1.webp";
-const HOME_STARTUP_HOLD_MIN_MS = 650;
-const HOME_STARTUP_HOLD_FADE_MS = 240;
-let hasShownHomeStartupHold = false;
-
 type BoardShelfStat = {
   icon: AppIconName;
   label: string;
@@ -302,19 +294,12 @@ type BeforeInstallPromptEvent = Event & {
 type HomeInstallPlatform = "ios" | "android";
 
 export function HomeInput({
-  recentEvents: _recentEvents,
   initialNow,
 }: HomeInputProps) {
   const [catProfiles, setCatProfiles] = useState<CatProfile[]>([]);
   const [activeCatId, setActiveCatId] = useState<string | null>(null);
   const [activeCat, setActiveCat] = useState<CatProfile | null>(null);
   const [hasHydratedHomeState, setHasHydratedHomeState] = useState(false);
-  const [isStartupHoldReleased, setIsStartupHoldReleased] = useState(
-    () => hasShownHomeStartupHold,
-  );
-  const [isStartupHoldMounted, setIsStartupHoldMounted] = useState(
-    () => !hasShownHomeStartupHold,
-  );
   const [lockData, setLockData] = useState<LockData>({});
   const [tick, setTick] = useState(initialNow);
   const isHomeClockReady = tick > 0;
@@ -388,8 +373,6 @@ export function HomeInput({
   const openingEveningDeliveryRequestRef = useRef<string | null>(null);
 
   useEffect(() => {
-    let releaseTimerId: number | null = null;
-    let unmountTimerId: number | null = null;
     const profiles = readCatProfiles();
     const activeId = readActiveCatId();
     const active = getActiveCatProfile(profiles, activeId);
@@ -401,29 +384,6 @@ export function HomeInput({
     hydrateCatState(active.id);
     setHasAcceptedSleepingSafety(hasAcceptedSleepingSafetyNotice());
     setHasHydratedHomeState(true);
-
-    if (hasShownHomeStartupHold) {
-      setIsStartupHoldReleased(true);
-      setIsStartupHoldMounted(false);
-      return undefined;
-    }
-
-    releaseTimerId = window.setTimeout(() => {
-      setIsStartupHoldReleased(true);
-      unmountTimerId = window.setTimeout(() => {
-        hasShownHomeStartupHold = true;
-        setIsStartupHoldMounted(false);
-      }, HOME_STARTUP_HOLD_FADE_MS);
-    }, HOME_STARTUP_HOLD_MIN_MS);
-
-    return () => {
-      if (releaseTimerId !== null) {
-        window.clearTimeout(releaseTimerId);
-      }
-      if (unmountTimerId !== null) {
-        window.clearTimeout(unmountTimerId);
-      }
-    };
   }, []);
 
   useEffect(() => {
@@ -2239,7 +2199,7 @@ export function HomeInput({
   return (
     <main
       style={isHomeReady ? styles.page : styles.startupPage}
-      aria-busy={isHomeReady && !isStartupHoldMounted ? undefined : true}
+      aria-busy={isHomeReady ? undefined : true}
     >
       <div
         aria-hidden={openingEveningDelivery ? true : undefined}
@@ -2273,7 +2233,9 @@ export function HomeInput({
               deliveredPhotoDecodeStatus={deliveredPhotoDecodeStatus}
             />
           </>
-        ) : null}
+        ) : (
+          <HomeStartupSkeleton />
+        )}
 
         {isHomeReady && shouldShowHomeInstallHint && homeInstallPlatform ? (
           <HomeInstallHintCard
@@ -2291,10 +2253,6 @@ export function HomeInput({
           />
         ) : null}
       </div>
-
-      {isStartupHoldMounted ? (
-        <HomeStartupHold isReleased={isStartupHoldReleased} />
-      ) : null}
 
       {openingEveningDelivery ? (
         <EveningDeliveryOpening
@@ -3090,17 +3048,24 @@ function InfoSheet({
   );
 }
 
-function HomeStartupHold({ isReleased }: { isReleased: boolean }) {
+function HomeStartupSkeleton() {
   return (
     <section
-      data-testid="home-startup-hold"
+      data-testid="home-startup-skeleton"
       aria-label="きょうを読み込み中"
       aria-busy="true"
-      style={{
-        ...styles.startupHold,
-        ...(isReleased ? styles.startupHoldReleased : {}),
-      }}
-    />
+      style={styles.startupSkeleton}
+    >
+      <span style={styles.startupSkeletonSettings} aria-hidden="true" />
+      <span style={styles.startupSkeletonFrame} aria-hidden="true" />
+      <span style={styles.startupSkeletonAction} aria-hidden="true" />
+      <span style={styles.startupSkeletonCopy} aria-hidden="true" />
+      <span style={styles.startupSkeletonNav} aria-hidden="true">
+        <span style={styles.startupSkeletonNavActive} />
+        <span style={styles.startupSkeletonNavSlot} />
+        <span style={styles.startupSkeletonNavSlot} />
+      </span>
+    </section>
   );
 }
 
@@ -5824,25 +5789,74 @@ const styles = {
       "linear-gradient(90deg, rgba(88,73,50,0.035) 1px, transparent 1px), linear-gradient(0deg, rgba(88,73,50,0.03) 1px, transparent 1px)",
     backgroundSize: "28px 28px",
   },
-  startupHold: {
+  startupSkeleton: {
     position: "fixed",
     inset: 0,
-    zIndex: 18,
-    display: "block",
-    padding: "calc(env(safe-area-inset-top) + 24px) 24px calc(env(safe-area-inset-bottom) + 24px)",
+    zIndex: 2,
+    display: "grid",
+    justifyItems: "center",
+    alignContent: "start",
+    padding: "calc(env(safe-area-inset-top) + 28px) 24px calc(env(safe-area-inset-bottom) + 16px)",
     boxSizing: "border-box",
-    color: "var(--ink-soft)",
     pointerEvents: "none",
-    opacity: 1,
-    transition: `opacity ${HOME_STARTUP_HOLD_FADE_MS}ms ease`,
-    willChange: "opacity",
-    backgroundImage: `url('${HOME_STARTUP_IMAGE_SRC}')`,
-    backgroundSize: "cover",
-    backgroundPosition: "50% 50%",
-    backgroundRepeat: "no-repeat",
+    background: "#f4f1ea",
   },
-  startupHoldReleased: {
-    opacity: 0,
+  startupSkeletonSettings: {
+    position: "absolute",
+    top: "calc(env(safe-area-inset-top) + 20px)",
+    right: "22px",
+    width: "42px",
+    height: "42px",
+    border: "1px solid rgba(163, 151, 135, 0.34)",
+    borderRadius: "999px",
+    background: "rgba(251, 250, 247, 0.44)",
+  },
+  startupSkeletonFrame: {
+    width: "min(72vw, 292px)",
+    aspectRatio: "4 / 3",
+    marginTop: "24vh",
+    border: "1px solid rgba(163, 151, 135, 0.3)",
+    borderRadius: "18px",
+    background: "rgba(251, 250, 247, 0.24)",
+  },
+  startupSkeletonAction: {
+    width: "190px",
+    height: "48px",
+    marginTop: "22px",
+    border: "1px solid rgba(168, 88, 78, 0.24)",
+    borderRadius: "999px",
+    background: "rgba(251, 250, 247, 0.34)",
+  },
+  startupSkeletonCopy: {
+    width: "238px",
+    height: "12px",
+    marginTop: "22px",
+    borderRadius: "999px",
+    background: "rgba(138, 132, 122, 0.12)",
+  },
+  startupSkeletonNav: {
+    position: "absolute",
+    left: "50%",
+    bottom: "max(16px, env(safe-area-inset-bottom))",
+    display: "grid",
+    gridTemplateColumns: "repeat(3, 1fr)",
+    gap: "4px",
+    width: "min(calc(100% - 48px), 410px)",
+    height: "60px",
+    padding: "4px",
+    transform: "translateX(-50%)",
+    border: "1px solid rgba(163, 151, 135, 0.38)",
+    borderRadius: "999px",
+    background: "rgba(251, 250, 247, 0.62)",
+  },
+  startupSkeletonNavActive: {
+    border: "1px solid rgba(138, 132, 122, 0.2)",
+    borderRadius: "999px",
+    background: "rgba(251, 250, 247, 0.66)",
+  },
+  startupSkeletonNavSlot: {
+    borderRadius: "999px",
+    background: "transparent",
   },
   homeInstallHintCard: {
     position: "fixed",

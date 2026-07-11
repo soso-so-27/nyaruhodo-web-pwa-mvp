@@ -10,6 +10,81 @@ const beforeEightToday = getCurrentJstTime(19, 30);
 const afterEightToday = getCurrentJstTime(20, 5);
 
 test.describe("home desk model", () => {
+  test("serves a stable home skeleton before client state hydrates", async ({
+    request,
+  }) => {
+    for (const route of ["/", "/home"]) {
+      const response = await request.get(route);
+      expect(response.ok()).toBe(true);
+      const html = await response.text();
+
+      expect(html).toContain('data-testid="home-startup-skeleton"');
+      expect(html).not.toContain("startup-envelope-hold-1206-2622-v1.webp");
+      expect(html).not.toContain("Googleでつづける");
+      expect(html).not.toContain("ログイン");
+    }
+  });
+
+  test("keeps src attribution on the statically served root route", async ({
+    page,
+  }) => {
+    await page.route("**/rest/v1/**", async (route) => {
+      await route.fulfill({
+        contentType: "application/json",
+        status: 500,
+        body: JSON.stringify({ error: "keep analytics queued locally" }),
+      });
+    });
+
+    await page.goto("/?src=instagram_bio");
+    await expect(page.getByTestId("home-desk-model")).toBeVisible();
+
+    await expect
+      .poll(async () =>
+        page.evaluate(() => {
+          const events = JSON.parse(
+            window.localStorage.getItem("analytics_event_queue") ?? "[]",
+          ) as Array<{ name?: string; properties?: Record<string, unknown> }>;
+          return events.find((event) => event.name === "app_opened")?.properties;
+        }),
+      )
+      .toMatchObject({
+        source: "instagram_bio",
+        source_param: "instagram_bio",
+        src: "instagram_bio",
+      });
+  });
+
+  test("uses a neutral skeleton before restoring a completed handoff home", async ({
+    page,
+  }) => {
+    await page.addInitScript(() => {
+      window.localStorage.setItem("onboarding_completed", "true");
+      window.localStorage.setItem(
+        "neteruneko_onboarding_progress",
+        JSON.stringify({
+          version: 1,
+          anonymousId: "static-handoff-user",
+          dateKey: "2026-07-11",
+          stage: "album_created",
+          source: "handoff",
+          updatedAt: Date.now(),
+        }),
+      );
+    });
+
+    const response = await page.request.get("/home?handoff=restored");
+    const html = await response.text();
+    expect(html).toContain('data-testid="home-startup-skeleton"');
+    expect(html).not.toContain("Googleでつづける");
+    expect(html).not.toContain("ログイン");
+
+    await page.goto("/home?handoff=restored");
+    await expect(page.getByTestId("home-desk-model")).toBeVisible();
+    await expect(page.getByTestId("home-startup-skeleton")).toHaveCount(0);
+    await expect(page.getByText("Googleでつづける")).toHaveCount(0);
+  });
+
   test("maps the five home states to desk shell states and presentation phases", async ({ page }) => {
     const expectedStates = {
       "1": { deskState: "1", phase: null },

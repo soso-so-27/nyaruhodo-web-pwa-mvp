@@ -63,7 +63,6 @@ const startupImages = [
   { width: 430, height: 932, ratio: 3, file: "1290-2796" },
   { width: 440, height: 956, ratio: 3, file: "1320-2868" },
 ] as const;
-const startupHoldImage = "/splash/startup-envelope-hold-1206-2622-v1.webp";
 
 export const metadata: Metadata = {
   metadataBase: new URL(siteUrl),
@@ -155,12 +154,6 @@ export default function RootLayout({
             fetchPriority="high"
           />
         ))}
-        <link
-          rel="preload"
-          as="image"
-          href={startupHoldImage}
-          fetchPriority="high"
-        />
       </head>
       <body style={criticalBodyStyle}>
         <AppPaperTheme />
