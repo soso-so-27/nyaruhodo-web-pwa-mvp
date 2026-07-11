@@ -5,6 +5,7 @@ import { useState } from "react";
 import {
   CAT_ILLUSTRATION_B_DETAIL_VARIANTS,
   CAT_ILLUSTRATION_D_SILHOUETTE_VARIANTS,
+  CAT_ILLUSTRATION_E_SPLASH_PALETTE_VARIANTS,
   CAT_ILLUSTRATION_PRIMARY_VARIANTS,
   getCatIllustrationAssets,
   setCatIllustrationVariant,
@@ -42,6 +43,14 @@ const variantLabels: Record<CatIllustrationVariant, string> = {
   d9: "d9",
   d10: "d10",
   "d1-ink": "d1 墨色連動",
+  e1: "e1",
+  e2: "e2",
+  e3: "e3",
+  e4: "e4",
+  e5: "e5",
+  e6: "e6",
+  e7: "e7",
+  e8: "e8",
 };
 
 export function BoardV2Prototype() {
@@ -137,6 +146,36 @@ export function BoardV2Prototype() {
                     type="button"
                     data-testid={`cat-illustration-variant-${variant}`}
                     aria-label={`Dシルエット ${variantLabels[variant]}`}
+                    aria-pressed={isSelected}
+                    onClick={() => setCatIllustrationVariant(variant)}
+                    style={{
+                      ...styles.detailButton,
+                      ...(isSelected ? styles.optionButtonSelected : {}),
+                    }}
+                  >
+                    <img
+                      src={assets.homeEmptyCat}
+                      alt=""
+                      width={54}
+                      height={54}
+                      style={styles.detailPreview}
+                    />
+                    <span>{variantLabels[variant]}</span>
+                  </button>
+                );
+              })}
+            </div>
+            <p style={styles.optionLabel}>E 起動画面パレット</p>
+            <div style={styles.detailChoices}>
+              {CAT_ILLUSTRATION_E_SPLASH_PALETTE_VARIANTS.map((variant) => {
+                const isSelected = selectedVariant === variant;
+                const assets = getCatIllustrationAssets(variant);
+                return (
+                  <button
+                    key={variant}
+                    type="button"
+                    data-testid={`cat-illustration-variant-${variant}`}
+                    aria-label={`E 起動画面パレット ${variantLabels[variant]}`}
                     aria-pressed={isSelected}
                     onClick={() => setCatIllustrationVariant(variant)}
                     style={{

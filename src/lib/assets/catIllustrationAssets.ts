@@ -8,7 +8,8 @@ export type CatIllustrationVariant =
   | "theme-b"
   | "theme-c"
   | BDetailVariant
-  | DSilhouetteVariant;
+  | DSilhouetteVariant
+  | ESplashPaletteVariant;
 
 export type BDetailVariant =
   | "b1"
@@ -35,6 +36,16 @@ export type DSilhouetteVariant =
   | "d9"
   | "d10"
   | "d1-ink";
+
+export type ESplashPaletteVariant =
+  | "e1"
+  | "e2"
+  | "e3"
+  | "e4"
+  | "e5"
+  | "e6"
+  | "e7"
+  | "e8";
 
 export type CatIllustrationAssetKey =
   | "homeEmptyCat"
@@ -74,6 +85,14 @@ export const CAT_ILLUSTRATION_VARIANTS: readonly CatIllustrationVariant[] = [
   "d9",
   "d10",
   "d1-ink",
+  "e1",
+  "e2",
+  "e3",
+  "e4",
+  "e5",
+  "e6",
+  "e7",
+  "e8",
 ];
 
 export const CAT_ILLUSTRATION_PRIMARY_VARIANTS = [
@@ -110,6 +129,17 @@ export const CAT_ILLUSTRATION_D_SILHOUETTE_VARIANTS = [
   "d10",
   "d1-ink",
 ] as const satisfies readonly DSilhouetteVariant[];
+
+export const CAT_ILLUSTRATION_E_SPLASH_PALETTE_VARIANTS = [
+  "e1",
+  "e2",
+  "e3",
+  "e4",
+  "e5",
+  "e6",
+  "e7",
+  "e8",
+] as const satisfies readonly ESplashPaletteVariant[];
 
 const VARIANT_CHANGE_EVENT = "neteruneko_cat_illustration_variant_changed";
 
@@ -158,6 +188,16 @@ export function getCatIllustrationAssets(
     const homeFilename = variant === "d1-ink" ? "d1-ink.svg" : `${variant}.webp`;
     return {
       homeEmptyCat: `/illustrations/candidates/theme-d-silhouette/${homeFilename}`,
+      todayNavIcon: "/illustrations/candidates/theme-b/nav-today.webp",
+      uchinokoNavIcon: "/illustrations/candidates/theme-b/nav-uchinoko.webp",
+      catSwitcherIcon: "/illustrations/candidates/theme-b/cat-switcher.webp",
+      deliveryFallback: CURRENT_CAT_ILLUSTRATION_ASSETS.deliveryFallback,
+    };
+  }
+
+  if (variant.startsWith("e")) {
+    return {
+      homeEmptyCat: `/illustrations/candidates/theme-e-splash-palette/${variant}.webp`,
       todayNavIcon: "/illustrations/candidates/theme-b/nav-today.webp",
       uchinokoNavIcon: "/illustrations/candidates/theme-b/nav-uchinoko.webp",
       catSwitcherIcon: "/illustrations/candidates/theme-b/cat-switcher.webp",
