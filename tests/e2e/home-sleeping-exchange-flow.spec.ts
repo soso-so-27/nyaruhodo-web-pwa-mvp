@@ -240,6 +240,7 @@ test.describe("home sleeping exchange flow", () => {
   test("updates the save sheet status when switching delivery mode", async ({
     page,
   }) => {
+    await page.setViewportSize({ width: 390, height: 667 });
     const beforeDelivery = Date.parse("2026-06-10T10:30:00.000Z");
 
     await page.addInitScript((now) => {
@@ -256,6 +257,12 @@ test.describe("home sleeping exchange flow", () => {
           {
             id: "status-cat",
             name: "status cat",
+            createdAt: new Date(now).toISOString(),
+            updatedAt: new Date(now).toISOString(),
+          },
+          {
+            id: "status-cat-second",
+            name: "second cat",
             createdAt: new Date(now).toISOString(),
             updatedAt: new Date(now).toISOString(),
           },
@@ -279,6 +286,18 @@ test.describe("home sleeping exchange flow", () => {
       "よる8時に とどきます。",
     );
     await expect(page.getByTestId("exchange-share-submit")).toHaveText("のこす");
+    await expect(page.getByTestId("exchange-share-submit")).toBeVisible();
+    await expect(page.getByTestId("exchange-share-cat-status-cat-second")).toBeVisible();
+    await expect(page.getByTestId("exchange-share-mode-shared")).toBeVisible();
+    await expect(page.getByTestId("exchange-share-mode-private")).toBeVisible();
+    await expect
+      .poll(() =>
+        page.getByTestId("exchange-share-submit").evaluate((button) => {
+          const rect = button.getBoundingClientRect();
+          return rect.top >= 0 && rect.bottom <= window.innerHeight;
+        }),
+      )
+      .toBe(true);
 
     await expect
       .poll(async () => {

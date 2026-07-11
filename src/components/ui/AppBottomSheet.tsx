@@ -32,6 +32,7 @@ export type AppSheetProps = {
   lockScroll?: boolean;
   initialFocusRef?: RefObject<HTMLElement>;
   headerAction?: ReactNode;
+  footer?: ReactNode;
   style?: CSSProperties;
 };
 
@@ -64,6 +65,7 @@ export function AppSheet({
   lockScroll = true,
   initialFocusRef,
   headerAction,
+  footer,
   style,
 }: AppSheetProps) {
   const titleId = useId();
@@ -205,6 +207,7 @@ export function AppSheet({
           </div>
         </div>
         <div style={styles.body}>{children}</div>
+        {footer ? <div style={styles.footer}>{footer}</div> : null}
       </section>
     </>
   );
@@ -371,5 +374,10 @@ const styles = {
     minHeight: 0,
     overflowY: "auto",
     overscrollBehavior: "contain",
+  },
+  footer: {
+    flex: "0 0 auto",
+    paddingTop: "8px",
+    background: "inherit",
   },
 } satisfies Record<string, CSSProperties>;

@@ -3565,10 +3565,26 @@ function ExchangeSharePermissionSheet({
       closeOnOverlay={false}
       onClose={onClose}
       style={styles.exchangeSheetFrame}
+      footer={
+        <div style={styles.exchangeActions}>
+          <button
+            type="button"
+            style={styles.exchangeKeepButton}
+            onClick={isPrivate ? onPrivate : onConfirm}
+            data-testid="exchange-share-submit"
+          >
+            のこす
+          </button>
+        </div>
+      }
     >
         <div style={styles.exchangeShareLayout}>
           <div style={styles.exchangeSharePreview}>
-          <StoredPhotoImage src={photo.src} alt="" style={styles.exchangePhoto} />
+          <StoredPhotoImage
+            src={photo.src}
+            alt=""
+            style={styles.exchangeSharePhoto}
+          />
           </div>
           <div style={styles.exchangeShareSummary}>
             <span style={styles.exchangeShareSummaryIcon} aria-hidden="true">
@@ -3683,16 +3699,6 @@ function ExchangeSharePermissionSheet({
         )}
         </div>
 
-        <div style={styles.exchangeActions}>
-          <button
-            type="button"
-            style={styles.exchangeKeepButton}
-            onClick={isPrivate ? onPrivate : onConfirm}
-            data-testid="exchange-share-submit"
-          >
-            のこす
-          </button>
-        </div>
     </AppSheet>
   );
 }
@@ -7595,7 +7601,7 @@ const styles = {
   },
   exchangeShareLayout: {
     display: "grid",
-    gap: "10px",
+    gap: "8px",
     minWidth: 0,
   },
   exchangeLead: {
@@ -7628,11 +7634,11 @@ const styles = {
   },
   exchangeSharePreview: {
     width: "100%",
-    height: "clamp(230px, 43vh, 330px)",
-    borderRadius: "24px",
+    height: "clamp(156px, 25vh, 190px)",
+    borderRadius: "18px",
     overflow: "hidden",
-    background:
-      "linear-gradient(180deg, rgba(255,253,248,0.92), rgba(248,242,232,0.88))",
+    padding: "8px",
+    background: "rgba(74,63,53,0.075)",
     border: "1px solid rgba(144,126,102,0.12)",
     display: "flex",
     alignItems: "center",
@@ -7646,16 +7652,16 @@ const styles = {
     gridTemplateColumns: "30px minmax(0, 1fr)",
     alignItems: "center",
     gap: "9px",
-    minHeight: "42px",
-    padding: "8px 10px",
-    borderRadius: "18px",
+    minHeight: "38px",
+    padding: "5px 9px",
+    borderRadius: "14px",
     border: "1px solid rgba(144,126,102,0.1)",
     background: "rgba(255,253,248,0.54)",
     boxSizing: "border-box",
   },
   exchangeShareSummaryIcon: {
-    width: "30px",
-    height: "30px",
+    width: "28px",
+    height: "28px",
     borderRadius: "999px",
     display: "inline-flex",
     alignItems: "center",
@@ -7665,13 +7671,13 @@ const styles = {
   },
   exchangeDecisionStack: {
     display: "grid",
-    gap: "10px",
-    margin: "12px 0 14px",
+    gap: "8px",
+    margin: "8px 0 4px",
     minWidth: 0,
   },
   exchangeDecisionBlock: {
     display: "grid",
-    gap: "7px",
+    gap: "5px",
     minWidth: 0,
   },
   exchangeDecisionLabel: {
@@ -7695,12 +7701,12 @@ const styles = {
     justifyContent: "center",
     gap: "6px",
     minWidth: "78px",
-    minHeight: "44px",
+    minHeight: "38px",
     border: "1px solid rgba(144,126,102,0.12)",
     borderRadius: "999px",
     background: "rgba(255,253,248,0.52)",
     color: "#716b60",
-    padding: "8px 13px",
+    padding: "6px 12px",
     cursor: "pointer",
     flexShrink: 0,
     boxShadow: "inset 0 1px 0 rgba(255,255,255,0.48)",
@@ -7732,9 +7738,9 @@ const styles = {
     gridTemplateColumns: "34px minmax(0, 1fr)",
     alignItems: "center",
     gap: "10px",
-    minHeight: "50px",
-    padding: "8px 10px",
-    borderRadius: "18px",
+    minHeight: "38px",
+    padding: "6px 10px",
+    borderRadius: "14px",
     border: "1px solid rgba(144,126,102,0.1)",
     background: "rgba(255,253,248,0.52)",
     color: "#5f584f",
@@ -7742,7 +7748,7 @@ const styles = {
   },
   exchangeSelectedCatCardPlain: {
     gridTemplateColumns: "minmax(0, 1fr)",
-    padding: "9px 13px",
+    padding: "7px 11px",
   },
   exchangeSelectedCatText: {
     minWidth: 0,
@@ -7831,16 +7837,16 @@ const styles = {
   },
   exchangeModeButton: {
     minWidth: 0,
-    minHeight: "66px",
+    minHeight: "56px",
     border: "1px solid rgba(144,126,102,0.12)",
-    borderRadius: "20px",
+    borderRadius: "16px",
     background: "rgba(255,253,248,0.5)",
     color: "#716b60",
     display: "inline-flex",
     alignItems: "center",
     justifyContent: "flex-start",
-    gap: "9px",
-    padding: "10px",
+    gap: "7px",
+    padding: "8px",
     cursor: "pointer",
     boxShadow: "inset 0 1px 0 rgba(255,255,255,0.48)",
   },
@@ -7852,8 +7858,8 @@ const styles = {
       "inset 0 1px 0 rgba(255,255,255,0.58), 0 8px 18px rgba(120,82,58,0.07)",
   },
   exchangeModeIcon: {
-    width: "32px",
-    height: "32px",
+    width: "28px",
+    height: "28px",
     borderRadius: "999px",
     display: "inline-flex",
     alignItems: "center",
@@ -7892,7 +7898,17 @@ const styles = {
     gridTemplateColumns: "1fr",
     alignItems: "center",
     gap: "10px",
-    padding: "4px 0 2px",
+    padding: 0,
+  },
+  exchangeSharePhoto: {
+    width: "100%",
+    height: "100%",
+    maxWidth: "100%",
+    maxHeight: "100%",
+    objectFit: "contain",
+    display: "block",
+    borderRadius: "12px",
+    background: "transparent",
   },
   exchangeKeepButton: {
     minHeight: "54px",
