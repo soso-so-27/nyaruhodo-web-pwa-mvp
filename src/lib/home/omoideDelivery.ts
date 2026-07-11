@@ -52,7 +52,6 @@ export type OmoideMemoryControls = {
 
 const MIN_DELIVERY_INTERVAL_MS = 7 * 24 * 60 * 60 * 1000;
 const FIRST_SEED_START_DAY = 7;
-const FIRST_SEED_END_DAY = 10;
 
 export function readOmoideMemories(): OmoideMemory[] {
   return Object.values(readOmoideMemoryStore())
@@ -178,7 +177,7 @@ export function ensureOmoideMemoryArrival({
     {
       lookback: memory.lookback,
       reason: memory.reason,
-      days_since_join: getDaysSinceJoin(familySinceDate, now),
+      days_since_first_photo: getDaysSinceFirstPhoto(ownPhotos, catId, now),
     },
     { localCatId: catId },
   );
@@ -321,30 +320,32 @@ function selectOmoideCandidate({
   usedSourcePhotoIds: Set<string>;
   now: number;
 }) {
-  const photos = ownPhotos
-    .filter(
-      (photo) =>
-        (photo.ownerCatId === catId || photo.catId === catId) &&
-        !usedSourcePhotoIds.has(photo.id),
-    )
+  const allCatPhotos = ownPhotos
+    .filter((photo) => photo.ownerCatId === catId || photo.catId === catId)
     .sort((a, b) => a.createdAt - b.createdAt);
+  const photos = allCatPhotos.filter((photo) => !usedSourcePhotoIds.has(photo.id));
   if (photos.length === 0) {
     return null;
   }
 
   const hiddenDateKeys = new Set(controls.hiddenDateKeys ?? []);
-  const daysSinceJoin = getDaysSinceJoin(familySinceDate, now);
+  const firstRecordedPhoto = allCatPhotos[0] ?? null;
+  const daysSinceFirstPhoto = firstRecordedPhoto
+    ? getDaysSinceTimestamp(firstRecordedPhoto.createdAt, now)
+    : 0;
   const todayKey = getJstDateKey(now);
   const priorMemories = readOmoideMemoriesForCat(catId);
 
   if (
-    daysSinceJoin >= FIRST_SEED_START_DAY &&
-    daysSinceJoin <= FIRST_SEED_END_DAY &&
-    !priorMemories.some((memory) => memory.reason === "first_seed")
+    daysSinceFirstPhoto >= FIRST_SEED_START_DAY &&
+    priorMemories.length === 0
   ) {
-    const firstPhoto = photos.find(
-      (photo) => !hiddenDateKeys.has(getJstDateKey(photo.createdAt)),
-    );
+    const firstPhoto =
+      firstRecordedPhoto &&
+      !usedSourcePhotoIds.has(firstRecordedPhoto.id) &&
+      !hiddenDateKeys.has(getJstDateKey(firstRecordedPhoto.createdAt))
+        ? firstRecordedPhoto
+        : null;
     if (firstPhoto) {
       return createOmoideCandidate({
         catName,
@@ -488,13 +489,19 @@ function getOmoideTitle(lookback: {
   return `${lookback.amount ?? 2}年前の、きょう。`;
 }
 
-function getDaysSinceJoin(familySinceDate: string | undefined, now: number) {
-  const joinedAt = parseLocalDateStart(familySinceDate);
-  if (!joinedAt) {
-    return 0;
-  }
+function getDaysSinceFirstPhoto(
+  photos: OwnSleepingPhoto[],
+  catId: string,
+  now: number,
+) {
+  const firstPhoto = photos
+    .filter((photo) => photo.ownerCatId === catId || photo.catId === catId)
+    .sort((a, b) => a.createdAt - b.createdAt)[0];
+  return firstPhoto ? getDaysSinceTimestamp(firstPhoto.createdAt, now) : 0;
+}
 
-  return Math.max(1, Math.floor((now - joinedAt) / 86_400_000) + 1);
+function getDaysSinceTimestamp(timestamp: number, now: number) {
+  return Math.max(1, Math.floor((now - timestamp) / 86_400_000) + 1);
 }
 
 function getSeasonName(dateKey: string) {

@@ -80,6 +80,7 @@ import {
   keepExchangePhoto,
   readKeptExchangePhotoCount,
   readOwnSleepingPhotos,
+  readOwnSleepingPhotosForSync,
   readOwnSleepingPhotoCount,
   reportExchangePhoto,
   saveOwnSleepingPhoto,
@@ -760,6 +761,10 @@ export function HomeInput({
     () => readOwnSleepingPhotos(null),
     [collectionRefreshTick, eveningRefreshTick],
   );
+  const allOwnSleepingPhotoHistory = useMemo(
+    () => readOwnSleepingPhotosForSync(),
+    [collectionRefreshTick, eveningRefreshTick],
+  );
   const homeDisplayCat = useMemo(
     () =>
       selectTodayHomeCat({
@@ -850,24 +855,24 @@ export function HomeInput({
     };
   }, [deliveredHomePhoto, deliveredHomePhotoDecodeKey]);
   useEffect(() => {
-    if (!isHomeClockReady || !activeCatId || !activeCat) {
+    if (!isHomeClockReady || catProfiles.length === 0) {
       return;
     }
 
-    ensureOmoideMemoryArrival({
-      catId: activeCatId,
-      catName,
-      familySinceDate: activeCat.basicInfo?.familySinceDate,
-      ownPhotos: ownSleepingPhotosForHome,
-      now: homeNow,
-    });
+    for (const profile of catProfiles) {
+      ensureOmoideMemoryArrival({
+        catId: profile.id,
+        catName: getCatName(profile),
+        familySinceDate: profile.basicInfo?.familySinceDate,
+        ownPhotos: allOwnSleepingPhotoHistory,
+        now: homeNow,
+      });
+    }
   }, [
-    activeCat,
-    activeCatId,
-    catName,
+    allOwnSleepingPhotoHistory,
+    catProfiles,
     homeNow,
     isHomeClockReady,
-    ownSleepingPhotosForHome,
   ]);
   const keptExchangePhotoCount = useMemo(
     () => readKeptExchangePhotoCount(),

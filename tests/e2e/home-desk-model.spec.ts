@@ -972,6 +972,31 @@ test.describe("home desk model", () => {
       )
       .toBe(1);
   });
+
+  test("evaluates every registered cat and seeds from each cat's first app photo", async ({
+    page,
+  }) => {
+    await seedDeskState(page, "1b", {
+      withAllCatOmoideCandidates: true,
+    });
+
+    await page.goto("/home");
+    await page.waitForLoadState("networkidle");
+
+    await expect
+      .poll(() =>
+        page.evaluate(() => {
+          const raw = window.localStorage.getItem("neteruneko_omoide_memories");
+          if (!raw) return [];
+          return Object.values(
+            JSON.parse(raw) as Record<string, { catId: string; reason: string }>,
+          )
+            .map((memory) => `${memory.catId}:${memory.reason}`)
+            .sort();
+        }),
+      )
+      .toEqual(["cat-desk-second:first_seed", "cat-desk:first_seed"]);
+  });
 });
 
 function rectsOverlap(
@@ -998,6 +1023,7 @@ async function seedDeskState(
     withStoredOmoide?: boolean;
     usedOmoideSourcePhotoIds?: string[];
     omoideDisabled?: boolean;
+    withAllCatOmoideCandidates?: boolean;
     withoutOwnPhoto?: boolean;
     openedBySystem?: boolean;
   } = {},
@@ -1065,17 +1091,23 @@ async function seedDeskState(
       window.localStorage.setItem("neteruneko_home_desk_model", "1");
       window.localStorage.setItem("nyaruhodo_sleeping_safety_accepted", "1");
       window.localStorage.setItem("active_cat_id", catId);
-      window.localStorage.setItem(
-        "cat_profiles",
-        JSON.stringify([
-          {
-            id: catId,
-            name: "むぎ",
-            createdAt: new Date(now).toISOString(),
-            updatedAt: new Date(now).toISOString(),
-          },
-        ]),
-      );
+      const profiles = [
+        {
+          id: catId,
+          name: "むぎ",
+          createdAt: new Date(now).toISOString(),
+          updatedAt: new Date(now).toISOString(),
+        },
+      ];
+      if (options.withAllCatOmoideCandidates) {
+        profiles.push({
+          id: "cat-desk-second",
+          name: "あめ",
+          createdAt: new Date(now).toISOString(),
+          updatedAt: new Date(now).toISOString(),
+        });
+      }
+      window.localStorage.setItem("cat_profiles", JSON.stringify(profiles));
 
       const ownPhotos =
         state === "1" || state === "1b" || options.withoutOwnPhoto
@@ -1086,9 +1118,21 @@ async function seedDeskState(
         id: "own-omoide-week",
         createdAt: beforeEightValue - 7 * 24 * 60 * 60 * 1000,
       };
+      const secondCatOmoidePhoto = {
+        ...omoidePhoto,
+        id: "own-omoide-week-second",
+        ownerCatId: "cat-desk-second",
+        catId: "cat-desk-second",
+        createdAt: beforeEightValue - 30 * 24 * 60 * 60 * 1000,
+      };
+      const omoideCandidates = options.withAllCatOmoideCandidates
+        ? [omoidePhoto, secondCatOmoidePhoto]
+        : options.withOmoideCandidate
+          ? [omoidePhoto]
+          : [];
       window.localStorage.setItem(
         "nyaruhodo_exchange_own_sleeping_photos",
-        JSON.stringify(options.withOmoideCandidate ? [omoidePhoto, ...ownPhotos] : ownPhotos),
+        JSON.stringify([...omoideCandidates, ...ownPhotos]),
       );
       if (options.omoideDisabled || options.usedOmoideSourcePhotoIds) {
         window.localStorage.setItem(
