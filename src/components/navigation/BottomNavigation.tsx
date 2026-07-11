@@ -6,6 +6,10 @@ import { useEffect, useState } from "react";
 import type { CSSProperties, MouseEvent, ReactNode } from "react";
 
 import { hasUnopenedArrivedOmoideMemory } from "../../lib/home/omoideDelivery";
+import {
+  fallBackCatIllustrationImage,
+  useCatIllustrationAssets,
+} from "../../lib/assets/catIllustrationAssets";
 
 type BottomNavigationProps = {
   active: "home" | "today" | "collection" | "cats";
@@ -32,6 +36,7 @@ export function BottomNavigation({
   active,
   homeState = "1",
 }: BottomNavigationProps) {
+  const catIllustrations = useCatIllustrationAssets();
   const router = useRouter();
   const pathname = usePathname();
   const [pendingKey, setPendingKey] = useState<NavItem["key"] | null>(null);
@@ -42,7 +47,9 @@ export function BottomNavigation({
       key: "home",
       href: "/home",
       label: "きょう",
-      icon: <TodayPairIcon state={homeState} />,
+      icon: (
+        <TodayPairIcon state={homeState} src={catIllustrations.todayNavIcon} />
+      ),
     },
     {
       key: "collection",
@@ -54,7 +61,12 @@ export function BottomNavigation({
       key: "cats",
       href: "/cats",
       label: "うちのこ",
-      icon: <GeneratedNavIcon src="/icons/bottom-nav-uchinoko.webp" />,
+      icon: (
+        <GeneratedNavIcon
+          src={catIllustrations.uchinokoNavIcon}
+          fallbackKey="uchinokoNavIcon"
+        />
+      ),
     },
   ];
   const displayActiveKey = pendingKey ?? activeKey;
@@ -176,13 +188,20 @@ export function BottomNavigation({
   );
 }
 
-function TodayPairIcon({ state }: { state: "1" | "1b" | "2" | "3" | "4" }) {
+function TodayPairIcon({
+  state,
+  src,
+}: {
+  state: "1" | "1b" | "2" | "3" | "4";
+  src: string;
+}) {
   const isAfterCapture = state === "2" || state === "3" || state === "4";
 
   return (
     <GeneratedNavIcon
-      src="/icons/bottom-nav-today.webp"
+      src={src}
       todayTestSlots
+      fallbackKey="todayNavIcon"
       style={isAfterCapture ? styles.generatedNavIconActive : undefined}
     />
   );
@@ -192,10 +211,12 @@ function GeneratedNavIcon({
   src,
   todayTestSlots = false,
   style,
+  fallbackKey,
 }: {
   src: string;
   todayTestSlots?: boolean;
   style?: CSSProperties;
+  fallbackKey?: "todayNavIcon" | "uchinokoNavIcon";
 }) {
   return (
     <span
@@ -212,6 +233,11 @@ function GeneratedNavIcon({
         loading="eager"
         decoding="async"
         style={{ ...styles.generatedNavIcon, ...style }}
+        onError={(event) => {
+          if (fallbackKey) {
+            fallBackCatIllustrationImage(event.currentTarget, fallbackKey);
+          }
+        }}
       />
       {todayTestSlots ? (
         <>

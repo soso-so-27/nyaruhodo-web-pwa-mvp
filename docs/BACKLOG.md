@@ -1,5 +1,7 @@
 # Backlog
 
+- 猫イラスト旧未使用資産（`cat-avatars` / `CatIcon` / `catAvatarSettle`）の参照確認と掃除 — 出典: `artifacts/cat-illust-inventory.md`（当選テーマ決定後）
+
 - 写真の intrinsic width/height 永続化（表示契約は `docs/photo-display-contract.md` を正とし、保存形式変更は別specで扱う） — 出典: 2026-07-09 写真表示契約棚卸 Drift 6
 
 - Tier2内の鮮度重み付け（撮影経過の弱い減衰・冬が来る前に） — 出典: 2026-07-07棚卸残 #10

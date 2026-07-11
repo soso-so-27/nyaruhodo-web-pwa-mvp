@@ -4,6 +4,10 @@ import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import type { CSSProperties } from "react";
 import { readClientAdminCapabilities } from "../../lib/adminCapabilitiesClient";
+import {
+  fallBackCatIllustrationImage,
+  useCatIllustrationAssets,
+} from "../../lib/assets/catIllustrationAssets";
 import { STORAGE_KEYS } from "../../lib/storage";
 import {
   createSleepingExchange,
@@ -86,8 +90,6 @@ const ONBOARDING_SECOND_PHOTO_INTENT_KEY =
 const ONBOARDING_INSTALL_GUIDE_DISMISSED_KEY =
   "neteruneko_onboarding_install_guide_dismissed";
 const ONBOARDING_PHOTO_DEBUG_STORAGE_KEY = "neteruneko_onboarding_photo_debug";
-const ONBOARDING_FALLBACK_DELIVERY_SRC =
-  "/illustrations/sleeping-cat-empty.webp";
 const IS_PRODUCTION = process.env.NODE_ENV === "production";
 const MAX_UPLOAD_SOURCE_FILE_BYTES = 20 * 1024 * 1024;
 const ONBOARDING_REVEAL_MS = 1150;
@@ -102,6 +104,7 @@ const SUPPORTED_SOURCE_IMAGE_MIME_TYPES = new Set([
 ]);
 
 export function OnboardingFlow() {
+  const catIllustrations = useCatIllustrationAssets();
   const router = useRouter();
   const [state, setState] = useState<OnboardingState>("intro");
   const [selectedPhotoSrc, setSelectedPhotoSrc] = useState("");
@@ -1117,7 +1120,11 @@ export function OnboardingFlow() {
     }
 
     if (!nextPhoto || !isUsablePhotoSrc(nextPhoto.src)) {
-      nextPhoto = await createOnboardingFallbackDeliveryPhoto(ownPhoto, nextPhoto);
+      nextPhoto = await createOnboardingFallbackDeliveryPhoto(
+        ownPhoto,
+        catIllustrations.deliveryFallback,
+        nextPhoto,
+      );
       deliverySource = "illustration_fallback";
     }
 
@@ -1327,9 +1334,12 @@ export function OnboardingFlow() {
           <section style={styles.hero} aria-label="ねてるねこのはじめかた">
             <div style={styles.introArtifact} aria-hidden="true">
               <img
-                src="/illustrations/sleeping-cat-empty.webp"
+                src={catIllustrations.homeEmptyCat}
                 alt=""
                 style={styles.introCat}
+                onError={(event) =>
+                  fallBackCatIllustrationImage(event.currentTarget, "homeEmptyCat")
+                }
               />
               <OnboardingEnvelopeArt compact />
             </div>
@@ -1756,15 +1766,19 @@ function ExternalBrowserGuide({
   onCopy: () => void;
   onContinue: () => void;
 }) {
+  const catIllustrations = useCatIllustrationAssets();
   const kicker = source === "referral" ? "紹介リンク" : "アプリ内ブラウザ";
 
   return (
     <section style={styles.externalBrowserGuide} aria-label="ブラウザで開く案内">
       <div style={styles.externalBrowserArt} aria-hidden="true">
         <img
-          src="/illustrations/sleeping-cat-empty.webp"
+          src={catIllustrations.homeEmptyCat}
           alt=""
           style={styles.externalBrowserCat}
+          onError={(event) =>
+            fallBackCatIllustrationImage(event.currentTarget, "homeEmptyCat")
+          }
         />
         <OnboardingEnvelopeArt compact />
       </div>
@@ -1977,9 +1991,10 @@ function readOnboardingPhotoDebugEnabled() {
 
 async function createOnboardingFallbackDeliveryPhoto(
   ownPhoto: OwnSleepingPhoto,
+  fallbackAssetSrc: string,
   basePhoto?: ExchangePhoto | null,
 ): Promise<ExchangePhoto | null> {
-  const fallbackSrc = await loadImageAssetAsDataUrl(ONBOARDING_FALLBACK_DELIVERY_SRC);
+  const fallbackSrc = await loadImageAssetAsDataUrl(fallbackAssetSrc);
   const src = fallbackSrc && isUsablePhotoSrc(fallbackSrc)
     ? fallbackSrc
     : basePhoto?.src ?? "";

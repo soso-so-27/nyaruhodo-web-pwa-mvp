@@ -4,6 +4,10 @@ import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import type { CSSProperties, ReactNode } from "react";
 
 import { type EveningHomeState } from "../../lib/home/eveningDelivery";
+import {
+  fallBackCatIllustrationImage,
+  useCatIllustrationAssets,
+} from "../../lib/assets/catIllustrationAssets";
 import type {
   ExchangePhotoReportReason,
   ExchangePhoto,
@@ -1839,13 +1843,18 @@ function HomeLetterTrayText({
 }
 
 function SleepingCatPlaceholder() {
+  const catIllustrations = useCatIllustrationAssets();
+
   return (
     <img
-      src="/illustrations/sleeping-cat-empty.webp"
+      src={catIllustrations.homeEmptyCat}
       alt=""
       aria-hidden="true"
       style={deskStyles.sleepingCatPlaceholder}
       draggable={false}
+      onError={(event) =>
+        fallBackCatIllustrationImage(event.currentTarget, "homeEmptyCat")
+      }
     />
   );
 }

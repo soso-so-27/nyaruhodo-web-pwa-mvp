@@ -3,6 +3,10 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import type { CSSProperties } from "react";
 import { trackProductEvent } from "../../lib/analytics/productAnalytics";
+import {
+  fallBackCatIllustrationImage,
+  useCatIllustrationAssets,
+} from "../../lib/assets/catIllustrationAssets";
 import { resizeImageFileToDataUrl } from "../../lib/imageResize";
 import {
   clearAccountCatCoverPhoto,
@@ -182,6 +186,7 @@ const DEFAULT_COVER_CROP: CatCoverCrop = {
 type CatManageEditSource = "basic" | "manage";
 
 export function CatsPage() {
+  const catIllustrations = useCatIllustrationAssets();
   const [catProfiles, setCatProfiles] = useState<CatProfile[]>([]);
   const [activeCatId, setActiveCatId] = useState<string | null>(null);
   const [catNameInput, setCatNameInput] = useState("");
@@ -1453,9 +1458,15 @@ export function CatsPage() {
                             aria-label="次のねこに切り替える"
                           >
                             <img
-                              src="/icons/cat-switch-generated.webp"
+                              src={catIllustrations.catSwitcherIcon}
                               alt=""
                               style={styles.profileCoverSwitchIcon}
+                              onError={(event) =>
+                                fallBackCatIllustrationImage(
+                                  event.currentTarget,
+                                  "catSwitcherIcon",
+                                )
+                              }
                             />
                           </button>
                         ) : null}
@@ -1490,9 +1501,15 @@ export function CatsPage() {
                         aria-label="次のねこに切り替える"
                       >
                         <img
-                          src="/icons/cat-switch-generated.webp"
+                          src={catIllustrations.catSwitcherIcon}
                           alt=""
                           style={styles.profileCoverSwitchIcon}
+                          onError={(event) =>
+                            fallBackCatIllustrationImage(
+                              event.currentTarget,
+                              "catSwitcherIcon",
+                            )
+                          }
                         />
                       </button>
                     ) : null}

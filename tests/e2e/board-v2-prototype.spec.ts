@@ -150,14 +150,17 @@ test.describe("production nekodayori natural board", () => {
     });
   });
 
-  test("replaces the prototype with a deprecated stub", async ({ page }) => {
+  test("keeps the review-only illustration comparison sheet available", async ({
+    page,
+  }) => {
     await page.goto("/prototypes/board-v2");
-    await expect(page.getByRole("heading", { name: "本番へ 移植しました" })).toBeVisible();
-    await expect(page.getByRole("link", { name: "ねこだよりを ひらく" })).toHaveAttribute(
-      "href",
-      "/collection",
-    );
-    await expect(page.getByTestId("board-v2-settings-button")).toHaveCount(0);
+    await page.getByTestId("board-v2-settings-button").click();
+
+    await expect(page.getByText("イラスト", { exact: true })).toBeVisible();
+    await expect(page.getByTestId("cat-illustration-variant-current")).toBeVisible();
+    await expect(page.getByTestId("cat-illustration-variant-theme-a")).toBeVisible();
+    await expect(page.getByTestId("cat-illustration-variant-theme-b")).toBeVisible();
+    await expect(page.getByTestId("cat-illustration-variant-theme-c")).toBeVisible();
   });
 
   test("keeps prototype routes covered by the production 404 gate", async () => {
