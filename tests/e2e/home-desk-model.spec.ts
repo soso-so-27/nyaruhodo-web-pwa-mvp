@@ -457,6 +457,38 @@ test.describe("home desk model", () => {
     expect(new Set(inkColors).size).toBe(4);
   });
 
+  test("captures the three e5 directions across all ambient periods", async ({
+    context,
+  }) => {
+    test.setTimeout(90_000);
+    const variants = ["e5-original", "e5-muted", "e5-mono"] as const;
+    const periods = [
+      { name: "morning", now: getCurrentJstTime(7, 0) },
+      { name: "noon", now: getCurrentJstTime(12, 0) },
+      { name: "evening", now: getCurrentJstTime(17, 0) },
+      { name: "night", now: getCurrentJstTime(22, 0) },
+    ];
+
+    for (const variant of variants) {
+      for (const period of periods) {
+        const periodPage = await context.newPage();
+        await seedDeskState(periodPage, "1", { now: period.now });
+        await periodPage.goto(`/home?illust=${variant}`);
+        await periodPage.waitForLoadState("networkidle");
+
+        const candidate = periodPage.locator(
+          `img[src*="/illustrations/candidates/theme-e5-direction/"]`,
+        );
+        await expect(candidate).toBeVisible();
+        await periodPage.screenshot({
+          path: `artifacts/cat-illustration-e5-direction/${variant}-${period.name}.png`,
+          fullPage: true,
+        });
+        await periodPage.close();
+      }
+    }
+  });
+
   test("shows state1b as tomorrow capture without an exchange letter", async ({
     page,
   }) => {

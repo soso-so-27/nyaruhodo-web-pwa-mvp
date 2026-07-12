@@ -6,6 +6,7 @@ import {
   CAT_ILLUSTRATION_B_DETAIL_VARIANTS,
   CAT_ILLUSTRATION_D_SILHOUETTE_VARIANTS,
   CAT_ILLUSTRATION_E_SPLASH_PALETTE_VARIANTS,
+  CAT_ILLUSTRATION_E5_DIRECTION_VARIANTS,
   CAT_ILLUSTRATION_PRIMARY_VARIANTS,
   getCatIllustrationAssets,
   setCatIllustrationVariant,
@@ -51,6 +52,9 @@ const variantLabels: Record<CatIllustrationVariant, string> = {
   e6: "e6",
   e7: "e7",
   e8: "e8",
+  "e5-original": "原案",
+  "e5-muted": "彩度控えめ",
+  "e5-mono": "単色（ナビ用）",
 };
 
 export function BoardV2Prototype() {
@@ -176,6 +180,36 @@ export function BoardV2Prototype() {
                     type="button"
                     data-testid={`cat-illustration-variant-${variant}`}
                     aria-label={`E 起動画面パレット ${variantLabels[variant]}`}
+                    aria-pressed={isSelected}
+                    onClick={() => setCatIllustrationVariant(variant)}
+                    style={{
+                      ...styles.detailButton,
+                      ...(isSelected ? styles.optionButtonSelected : {}),
+                    }}
+                  >
+                    <img
+                      src={assets.homeEmptyCat}
+                      alt=""
+                      width={54}
+                      height={54}
+                      style={styles.detailPreview}
+                    />
+                    <span>{variantLabels[variant]}</span>
+                  </button>
+                );
+              })}
+            </div>
+            <p style={styles.optionLabel}>E5 方針比較</p>
+            <div style={styles.detailChoices}>
+              {CAT_ILLUSTRATION_E5_DIRECTION_VARIANTS.map((variant) => {
+                const isSelected = selectedVariant === variant;
+                const assets = getCatIllustrationAssets(variant);
+                return (
+                  <button
+                    key={variant}
+                    type="button"
+                    data-testid={`cat-illustration-variant-${variant}`}
+                    aria-label={`E5 方針比較 ${variantLabels[variant]}`}
                     aria-pressed={isSelected}
                     onClick={() => setCatIllustrationVariant(variant)}
                     style={{

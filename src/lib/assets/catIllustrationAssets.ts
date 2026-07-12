@@ -9,7 +9,8 @@ export type CatIllustrationVariant =
   | "theme-c"
   | BDetailVariant
   | DSilhouetteVariant
-  | ESplashPaletteVariant;
+  | ESplashPaletteVariant
+  | E5DirectionVariant;
 
 export type BDetailVariant =
   | "b1"
@@ -46,6 +47,11 @@ export type ESplashPaletteVariant =
   | "e6"
   | "e7"
   | "e8";
+
+export type E5DirectionVariant =
+  | "e5-original"
+  | "e5-muted"
+  | "e5-mono";
 
 export type CatIllustrationAssetKey =
   | "homeEmptyCat"
@@ -93,6 +99,9 @@ export const CAT_ILLUSTRATION_VARIANTS: readonly CatIllustrationVariant[] = [
   "e6",
   "e7",
   "e8",
+  "e5-original",
+  "e5-muted",
+  "e5-mono",
 ];
 
 export const CAT_ILLUSTRATION_PRIMARY_VARIANTS = [
@@ -140,6 +149,12 @@ export const CAT_ILLUSTRATION_E_SPLASH_PALETTE_VARIANTS = [
   "e7",
   "e8",
 ] as const satisfies readonly ESplashPaletteVariant[];
+
+export const CAT_ILLUSTRATION_E5_DIRECTION_VARIANTS = [
+  "e5-original",
+  "e5-muted",
+  "e5-mono",
+] as const satisfies readonly E5DirectionVariant[];
 
 const VARIANT_CHANGE_EVENT = "neteruneko_cat_illustration_variant_changed";
 
@@ -196,6 +211,15 @@ export function getCatIllustrationAssets(
   }
 
   if (variant.startsWith("e")) {
+    if (variant.startsWith("e5-")) {
+      return {
+        homeEmptyCat: `/illustrations/candidates/theme-e5-direction/${variant.slice(3)}.webp`,
+        todayNavIcon: "/illustrations/candidates/theme-b/nav-today.webp",
+        uchinokoNavIcon: "/illustrations/candidates/theme-b/nav-uchinoko.webp",
+        catSwitcherIcon: "/illustrations/candidates/theme-b/cat-switcher.webp",
+        deliveryFallback: CURRENT_CAT_ILLUSTRATION_ASSETS.deliveryFallback,
+      };
+    }
     return {
       homeEmptyCat: `/illustrations/candidates/theme-e-splash-palette/${variant}.webp`,
       todayNavIcon: "/illustrations/candidates/theme-b/nav-today.webp",
