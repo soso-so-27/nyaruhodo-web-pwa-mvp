@@ -223,7 +223,7 @@ test.describe("onboarding delivery flow", () => {
     await page.waitForTimeout(1600);
     await expectVisibleNonBlackImage(page.locator("main img").last());
     await expect(
-      page.getByText(/届いたねこだよりを[\s\S]*しまいました。[\s\S]*よる8時にまた届きます。/),
+      page.getByText("この一通は、『とどいた』にしまわれました"),
     ).toBeVisible();
     await expect(
       page.getByRole("button", { name: "つづける" }),
@@ -289,8 +289,49 @@ test.describe("onboarding delivery flow", () => {
       page.getByRole("button", { name: "つづける" }),
     ).toBeVisible();
     await expect(
-      page.getByText(/届いたねこだよりを[\s\S]*しまいました。[\s\S]*よる8時にまた届きます。/),
+      page.getByText("この一通は、『とどいた』にしまわれました"),
     ).toBeVisible();
+    await expect(page.getByTestId("onboarding-install-guide")).toHaveCount(0);
+    await expect(page.getByTestId("onboarding-delivered-photos").locator("img")).toHaveCount(1);
+    const deliveredLayout = await page.evaluate(() => {
+      const frame = document.querySelector<HTMLElement>(
+        '[data-testid="onboarding-delivered-photos"]',
+      );
+      const title = document.querySelector<HTMLElement>(
+        '[data-testid="onboarding-delivered-title"]',
+      );
+      const button = document.querySelector<HTMLElement>(
+        '[data-testid="onboarding-delivered-continue"]',
+      );
+      const frameRect = frame?.getBoundingClientRect();
+      const titleRect = title?.getBoundingClientRect();
+      const buttonRect = button?.getBoundingClientRect();
+      const frameStyle = frame ? window.getComputedStyle(frame) : null;
+
+      return {
+        frameWidth: frameRect?.width ?? 0,
+        frameHeight: frameRect?.height ?? 0,
+        frameRight: frameRect?.right ?? Number.POSITIVE_INFINITY,
+        titleBottom: titleRect?.bottom ?? Number.POSITIVE_INFINITY,
+        frameTop: frameRect?.top ?? Number.NEGATIVE_INFINITY,
+        buttonBottom: buttonRect?.bottom ?? Number.POSITIVE_INFINITY,
+        viewportWidth: window.innerWidth,
+        viewportHeight: window.innerHeight,
+        paddingTop: frameStyle?.paddingTop ?? "",
+        borderRadius: frameStyle?.borderRadius ?? "",
+      };
+    });
+    expect(deliveredLayout.frameWidth).toBeGreaterThanOrEqual(240);
+    expect(deliveredLayout.frameHeight).toBe(deliveredLayout.frameWidth);
+    expect(deliveredLayout.frameRight).toBeLessThanOrEqual(deliveredLayout.viewportWidth);
+    expect(deliveredLayout.titleBottom).toBeLessThanOrEqual(
+      deliveredLayout.frameTop,
+    );
+    expect(deliveredLayout.buttonBottom).toBeLessThanOrEqual(
+      deliveredLayout.viewportHeight,
+    );
+    expect(deliveredLayout.paddingTop).toBe("6px");
+    expect(deliveredLayout.borderRadius).toBe("22px");
     await expect.poll(() => readKeptExchangePhotoCount(page)).toBe(0);
     await expect(page.getByRole("button", { name: "閉じる" })).toHaveCount(0);
     await expect.poll(() => readKeptExchangePhotoCount(page)).toBe(0);
@@ -315,7 +356,7 @@ test.describe("onboarding delivery flow", () => {
     await page.waitForTimeout(1600);
 
     await expect(page.getByTestId("onboarding-second-photo-primary")).toHaveCount(0);
-    await expect(page.getByTestId("onboarding-install-guide")).toBeVisible();
+    await expect(page.getByTestId("onboarding-install-guide")).toHaveCount(0);
     await page.getByTestId("onboarding-delivered-continue").click();
     await continuePastOptionalOnboardingNamePrompt(page);
     await expect(page.getByTestId("onboarding-second-photo-primary")).toBeVisible();
@@ -359,7 +400,7 @@ test.describe("onboarding delivery flow", () => {
     await expect(page).toHaveURL(/next=second_photo/);
   });
 
-  test("shows the next day bridge after 8pm after onboarding delivery", async ({
+  test("keeps the delivered letter focused after 8pm", async ({
     page,
   }) => {
     await mockBrowserDate(page, "2026-07-06T21:00:00+09:00");
@@ -378,12 +419,13 @@ test.describe("onboarding delivery flow", () => {
     await page.waitForTimeout(1600);
 
     await expect(
-      page.getByText("あしたの よる8時に、つぎの一通がとどきます。"),
+      page.getByText("この一通は、『とどいた』にしまわれました"),
     ).toBeVisible();
+    await expect(page.getByRole("button", { name: "つづける" })).toBeVisible();
     await expect(
       page.getByRole("button", { name: "もう一枚いれておく" }),
     ).toHaveCount(0);
-    await expect(page.getByTestId("onboarding-install-guide")).toBeVisible();
+    await expect(page.getByTestId("onboarding-install-guide")).toHaveCount(0);
   });
 
   test("falls back to thumbnail for storage-backed onboarding deliveries without adding to the received album", async ({
@@ -572,7 +614,7 @@ test.describe("onboarding delivery flow", () => {
     await page.getByRole("button", { name: "ねこだよりを開く" }).click();
     await page.waitForTimeout(1600);
     await expect(
-      page.getByText(/届いたねこだよりを[\s\S]*しまいました。/),
+      page.getByText("この一通は、『とどいた』にしまわれました"),
     ).toBeVisible();
 
     await page.goto("/onboarding?source=instagram_bio");

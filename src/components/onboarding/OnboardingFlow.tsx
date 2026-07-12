@@ -52,6 +52,7 @@ import {
 } from "../home/homeInputHelpers";
 import { AppButton } from "../ui/AppButton";
 import { PhotoTile } from "../ui/PhotoTile";
+import { StoredPhotoImage } from "../ui/StoredPhotoImage";
 import { WordmarkHeader } from "../ui/AppHeader";
 
 type OnboardingState =
@@ -76,19 +77,10 @@ type OnboardingPhotoDebugInfo = {
   errorMessage?: string;
 };
 
-type OnboardingInstallPlatform = "ios" | "android";
-
-type BeforeInstallPromptEvent = Event & {
-  prompt: () => Promise<void>;
-  userChoice?: Promise<{ outcome: "accepted" | "dismissed"; platform: string }>;
-};
-
 const ONBOARDING_ALBUM_COMPLETION_READY_KEY =
   "neteruneko_onboarding_album_completion_ready";
 const ONBOARDING_SECOND_PHOTO_INTENT_KEY =
   "neteruneko_onboarding_second_photo_intent";
-const ONBOARDING_INSTALL_GUIDE_DISMISSED_KEY =
-  "neteruneko_onboarding_install_guide_dismissed";
 const ONBOARDING_PHOTO_DEBUG_STORAGE_KEY = "neteruneko_onboarding_photo_debug";
 const IS_PRODUCTION = process.env.NODE_ENV === "production";
 const MAX_UPLOAD_SOURCE_FILE_BYTES = 20 * 1024 * 1024;
@@ -126,11 +118,6 @@ export function OnboardingFlow() {
   const [hasCopiedExternalBrowserUrl, setHasCopiedExternalBrowserUrl] =
     useState(false);
   const [isEmbeddedBrowser, setIsEmbeddedBrowser] = useState(false);
-  const [installPlatform, setInstallPlatform] =
-    useState<OnboardingInstallPlatform | null>(null);
-  const [installPrompt, setInstallPrompt] =
-    useState<BeforeInstallPromptEvent | null>(null);
-  const [isInstallGuideDismissed, setIsInstallGuideDismissed] = useState(false);
   const [isOpeningEnvelope, setIsOpeningEnvelope] = useState(false);
   const [isRetryingDelivery, setIsRetryingDelivery] = useState(false);
   const [hasRevealPhotoError, setHasRevealPhotoError] = useState(false);
@@ -150,20 +137,12 @@ export function OnboardingFlow() {
   const catNamePromptTrackedPhotoRef = useRef("");
   const entrySourceRef = useRef<OnboardingSource>(entrySource);
   const secondPhotoPromptTrackedRef = useRef(false);
-  const installGuideTrackedRef = useRef(false);
   const canShowTestTools = isTestMode && !IS_PRODUCTION;
   const shouldShowSecondPhotoPrompt =
     state === "second_photo_prompt" &&
     Boolean(deliveredPhoto) &&
     isDeliveredPhotoKept &&
     isBeforeJstHour(20);
-  const shouldShowInstallGuide =
-    state === "delivered" &&
-    Boolean(deliveredPhoto) &&
-    isDeliveredPhotoKept &&
-    Boolean(installPlatform) &&
-    !isEmbeddedBrowser &&
-    !isInstallGuideDismissed;
 
   function markOnboardingAlbumCompletionReady() {
     window.sessionStorage.setItem(ONBOARDING_ALBUM_COMPLETION_READY_KEY, "true");
@@ -230,36 +209,6 @@ export function OnboardingFlow() {
 
     setIsPhotoDebugMode(enabled);
     setIsEmbeddedBrowser(isEmbeddedInAppBrowser());
-    setIsInstallGuideDismissed(readOnboardingInstallGuideDismissed());
-    if (!isStandaloneDisplay() && !isEmbeddedInAppBrowser()) {
-      setInstallPlatform(getOnboardingInstallPlatform());
-    }
-  }, []);
-
-  useEffect(() => {
-    const handleBeforeInstallPrompt = (event: Event) => {
-      event.preventDefault();
-      setInstallPrompt(event as BeforeInstallPromptEvent);
-      if (!isStandaloneDisplay() && !isEmbeddedInAppBrowser()) {
-        setInstallPlatform("android");
-      }
-    };
-    const handleAppInstalled = () => {
-      trackProductEvent("pwa_install_guide_completed", {
-        source: getEffectiveEntrySource(),
-        surface: "onboarding",
-        method: "installed",
-      });
-      dismissOnboardingInstallGuide();
-    };
-
-    window.addEventListener("beforeinstallprompt", handleBeforeInstallPrompt);
-    window.addEventListener("appinstalled", handleAppInstalled);
-
-    return () => {
-      window.removeEventListener("beforeinstallprompt", handleBeforeInstallPrompt);
-      window.removeEventListener("appinstalled", handleAppInstalled);
-    };
   }, []);
 
   useEffect(() => {
@@ -319,20 +268,6 @@ export function OnboardingFlow() {
       source: getEffectiveEntrySource(),
     });
   }, [shouldShowSecondPhotoPrompt]);
-
-  useEffect(() => {
-    if (!shouldShowInstallGuide || installGuideTrackedRef.current) {
-      return;
-    }
-
-    installGuideTrackedRef.current = true;
-    trackProductEvent("pwa_install_prompt_view", {
-      source: getEffectiveEntrySource(),
-      surface: "onboarding",
-      platform: installPlatform,
-      can_prompt: Boolean(installPrompt),
-    });
-  }, [installPlatform, installPrompt, shouldShowInstallGuide]);
 
   useEffect(() => {
     return () => {
@@ -879,42 +814,6 @@ export function OnboardingFlow() {
     router.push("/home?from=onboarding_second_photo");
   }
 
-  async function handleOnboardingInstallPrimary() {
-    if (installPlatform === "android" && installPrompt) {
-      const prompt = installPrompt;
-      setInstallPrompt(null);
-      await prompt.prompt();
-      const choice = await prompt.userChoice?.catch(() => null);
-      trackProductEvent("pwa_install_guide_completed", {
-        source: getEffectiveEntrySource(),
-        surface: "onboarding",
-        method: choice?.outcome === "accepted" ? "accepted" : "dismissed",
-      });
-      if (choice?.outcome === "accepted") {
-        dismissOnboardingInstallGuide();
-      }
-      return;
-    }
-
-    trackProductEvent("pwa_install_guide_completed", {
-      source: getEffectiveEntrySource(),
-      surface: "onboarding",
-      method: "guide_read",
-      platform: installPlatform,
-    });
-    dismissOnboardingInstallGuide();
-  }
-
-  function dismissOnboardingInstallGuide() {
-    setIsInstallGuideDismissed(true);
-    setInstallPrompt(null);
-    try {
-      window.localStorage.setItem(ONBOARDING_INSTALL_GUIDE_DISMISSED_KEY, "true");
-    } catch {
-      // Install guide should never block onboarding completion.
-    }
-  }
-
   function markDeliveredPhotoReadyForOnboarding() {
     if (!deliveredPhoto) {
       return;
@@ -1345,6 +1244,11 @@ export function OnboardingFlow() {
     state === "intro" &&
     isEmbeddedBrowser &&
     !isExternalBrowserGuideDismissed;
+  const shouldShowBrandHeader = ![
+    "envelope",
+    "revealing",
+    "delivered",
+  ].includes(state);
 
   return (
     <main style={styles.page}>
@@ -1364,10 +1268,6 @@ export function OnboardingFlow() {
           65% { transform: translateY(-2px) scale(1.015); opacity: 1; filter: blur(0); }
           100% { transform: translateY(0) scale(1); opacity: 1; filter: blur(0); }
         }
-        @keyframes ownPhotoSend {
-          0% { transform: translateX(0) scale(1); opacity: 0.74; }
-          100% { transform: translateX(4px) scale(1); opacity: 0.64; }
-        }
         @keyframes onboardingEnvelopeFloat {
           0%, 100% { transform: translateY(0) rotate(-0.8deg); }
           50% { transform: translateY(-5px) rotate(0.5deg); }
@@ -1375,7 +1275,9 @@ export function OnboardingFlow() {
       `}</style>
       <div style={styles.paperBackground} aria-hidden="true" />
       <div style={styles.container}>
-        <WordmarkHeader style={styles.brandHeader} />
+        {shouldShowBrandHeader ? (
+          <WordmarkHeader style={styles.brandHeader} />
+        ) : null}
 
         {shouldShowExternalBrowserGuide ? (
           <ExternalBrowserGuide
@@ -1532,12 +1434,19 @@ export function OnboardingFlow() {
 
         {state === "revealing" && deliveredPhoto ? (
           <section style={styles.result} aria-label="どこかのねがお">
-            <div style={styles.revealingPhotoFrame}>
-              <PhotoTile
+            <div
+              style={{
+                ...styles.onboardingDeliveredPhotoFrame,
+                ...styles.revealingPhotoFrame,
+              }}
+            >
+              <StoredPhotoImage
                 key={`onboarding-delivery-reveal-${revealPhotoRetryKey}`}
                 src={getExchangePhotoDisplaySrc(deliveredPhoto)}
                 fallbackSrcs={getExchangePhotoFallbackSrcs(deliveredPhoto)}
-                imageStyle={styles.revealingPhoto}
+                alt=""
+                style={styles.onboardingDeliveredPhoto}
+                storageVariant="display"
                 onStorageDataUrl={handleDeliveredPhotoDataUrl}
                 onLoad={handleRevealPhotoLoaded}
                 onError={handleRevealPhotoError}
@@ -1547,42 +1456,32 @@ export function OnboardingFlow() {
         ) : null}
 
         {state === "delivered" && deliveredPhoto ? (
-          <section style={styles.result} aria-label="とどいたねがお">
-            <p style={styles.kicker}>ねこだよりが届きました</p>
-            {selectedPhotoSrc ? (
-              <div
-                style={styles.deliveredMoment}
-                data-testid="onboarding-delivered-photos"
-              >
-                <PhotoTile
-                  key={`onboarding-delivery-opened-${revealPhotoRetryKey}`}
-                  src={getExchangePhotoDisplaySrc(deliveredPhoto)}
-                  fallbackSrcs={getExchangePhotoFallbackSrcs(deliveredPhoto)}
-                  style={styles.deliveredPhotoTile}
-                  imageStyle={styles.deliveredPhoto}
-                  onStorageDataUrl={handleDeliveredPhotoDataUrl}
-                  onLoad={handleRevealPhotoLoaded}
-                  onError={handleRevealPhotoError}
-                />
-                <PhotoTile
-                  src={selectedPhotoSrc}
-                  muted
-                  style={styles.ownPhotoTile}
-                  imageStyle={styles.ownPhoto}
-                />
-              </div>
-            ) : (
-              <PhotoTile
+          <section
+            style={{ ...styles.result, ...styles.deliveredResult }}
+            aria-label="とどいたねがお"
+          >
+            <p
+              style={styles.onboardingDeliveredTitle}
+              data-testid="onboarding-delivered-title"
+            >
+              ねこだより
+            </p>
+            <div
+              style={styles.onboardingDeliveredPhotoFrame}
+              data-testid="onboarding-delivered-photos"
+            >
+              <StoredPhotoImage
                 key={`onboarding-delivery-opened-${revealPhotoRetryKey}`}
                 src={getExchangePhotoDisplaySrc(deliveredPhoto)}
                 fallbackSrcs={getExchangePhotoFallbackSrcs(deliveredPhoto)}
-                style={styles.deliveredPhotoTile}
-                imageStyle={styles.deliveredPhoto}
+                alt=""
+                style={styles.onboardingDeliveredPhoto}
+                storageVariant="display"
                 onStorageDataUrl={handleDeliveredPhotoDataUrl}
                 onLoad={handleRevealPhotoLoaded}
                 onError={handleRevealPhotoError}
               />
-            )}
+            </div>
             {hasRevealPhotoError ? (
               <div
                 data-testid="onboarding-delivery-photo-error"
@@ -1605,35 +1504,9 @@ export function OnboardingFlow() {
             ) : null}
             <p style={styles.resultText}>
               {isDeliveredPhotoKept
-                ? (
-                    <>
-                      届いたねこだよりを
-                      <br />
-                      しまいました。
-                      <br />
-                      <br />
-                      ホームでねがおをとると、
-                      <br />
-                      よる8時にまた届きます。
-                    </>
-                  )
-                : "届いた写真を、ねこだよりに入れています。"}
+                ? "この一通は、『とどいた』にしまわれました"
+                : "この一通を、しまっています。"}
             </p>
-            {!isBeforeJstHour(20) && isDeliveredPhotoKept ? (
-              <p style={styles.resultText}>
-                あしたの よる8時に、つぎの一通がとどきます。
-              </p>
-            ) : null}
-            {shouldShowInstallGuide && installPlatform ? (
-              <OnboardingInstallGuide
-                platform={installPlatform}
-                canPrompt={Boolean(installPrompt)}
-                onPrimary={() => {
-                  void handleOnboardingInstallPrimary();
-                }}
-                onDismiss={dismissOnboardingInstallGuide}
-              />
-            ) : null}
             <AppButton
               type="button"
               onClick={
@@ -1643,7 +1516,7 @@ export function OnboardingFlow() {
               }
               disabled={!isDeliveredPhotoKept}
               fullWidth
-              style={styles.onboardingCta}
+              style={styles.onboardingDeliveredContinue}
               data-testid="onboarding-delivered-continue"
             >
               {isDeliveredPhotoKept ? "つづける" : "ねこだよりに入れています..."}
@@ -1795,61 +1668,6 @@ function DeliveryWaiting() {
         おあずかりしました
       </span>
     </div>
-  );
-}
-
-function OnboardingInstallGuide({
-  platform,
-  canPrompt,
-  onPrimary,
-  onDismiss,
-}: {
-  platform: OnboardingInstallPlatform;
-  canPrompt: boolean;
-  onPrimary: () => void;
-  onDismiss: () => void;
-}) {
-  const steps =
-    platform === "ios"
-      ? ["共有ボタンをひらく", "ホーム画面に追加をえらぶ", "追加をおす"]
-      : canPrompt
-        ? ["このボタンから、ホーム画面に追加できます。"]
-        : ["Chromeのメニューをひらく", "アプリをインストール、またはホーム画面に追加をえらぶ"];
-  const primaryLabel = platform === "android" && canPrompt ? "ホーム画面に追加する" : "わかった";
-
-  return (
-    <section
-      style={styles.installGuide}
-      aria-label="ホーム画面に追加する案内"
-      data-testid="onboarding-install-guide"
-    >
-      <p style={styles.installGuideTitle}>
-        とどく場所を、さきに作っておきましょう
-      </p>
-      <p style={styles.installGuideText}>
-        ホーム画面に置いておくと、あしたからの一通をすぐ見られます。
-      </p>
-      <ol style={styles.installGuideList}>
-        {steps.map((step) => (
-          <li key={step} style={styles.installGuideItem}>
-            {step}
-          </li>
-        ))}
-      </ol>
-      <div style={styles.installGuideActions}>
-        <AppButton
-          type="button"
-          variant="secondary"
-          size="sm"
-          onClick={onPrimary}
-        >
-          {primaryLabel}
-        </AppButton>
-        <AppButton type="button" variant="quiet" size="sm" onClick={onDismiss}>
-          あとで
-        </AppButton>
-      </div>
-    </section>
   );
 }
 
@@ -2010,55 +1828,6 @@ function isEmbeddedInAppBrowser() {
     ua.includes("twitter") ||
     ua.includes("micromessenger")
   );
-}
-
-function isStandaloneDisplay() {
-  if (typeof window === "undefined") {
-    return false;
-  }
-
-  const navigatorWithStandalone = window.navigator as Navigator & {
-    standalone?: boolean;
-  };
-
-  return (
-    window.matchMedia?.("(display-mode: standalone)").matches === true ||
-    window.matchMedia?.("(display-mode: fullscreen)").matches === true ||
-    navigatorWithStandalone.standalone === true
-  );
-}
-
-function getOnboardingInstallPlatform(): OnboardingInstallPlatform | null {
-  if (typeof window === "undefined") {
-    return null;
-  }
-
-  const ua = window.navigator.userAgent;
-
-  if (/iPad|iPhone|iPod/i.test(ua)) {
-    return "ios";
-  }
-
-  if (/Android/i.test(ua)) {
-    return "android";
-  }
-
-  return null;
-}
-
-function readOnboardingInstallGuideDismissed() {
-  if (typeof window === "undefined") {
-    return false;
-  }
-
-  try {
-    return (
-      window.localStorage.getItem(ONBOARDING_INSTALL_GUIDE_DISMISSED_KEY) ===
-      "true"
-    );
-  } catch {
-    return false;
-  }
 }
 
 function readOnboardingPhotoDebugEnabled() {
@@ -2741,60 +2510,6 @@ const styles = {
     lineHeight: 1.7,
     padding: "9px 11px",
   },
-  installGuide: {
-    width: "min(100%, 286px)",
-    display: "grid",
-    gap: "8px",
-    margin: "4px 0 0",
-    padding: "13px 14px",
-    boxSizing: "border-box",
-    border: "1px solid rgba(120,108,94,0.12)",
-    borderRadius: "18px",
-    background:
-      "linear-gradient(180deg, rgba(255,253,248,0.72), rgba(250,244,235,0.56))",
-    boxShadow: "0 12px 28px -26px rgba(82,61,43,0.32)",
-    textAlign: "left",
-  },
-  installGuideTitle: {
-    margin: 0,
-    color: "#4c4238",
-    fontFamily: UI_FONT,
-    fontSize: "13px",
-    fontWeight: 500,
-    lineHeight: 1.55,
-    letterSpacing: 0,
-  },
-  installGuideText: {
-    margin: 0,
-    color: "#746a5f",
-    fontFamily: UI_FONT,
-    fontSize: "12px",
-    fontWeight: 400,
-    lineHeight: 1.75,
-    letterSpacing: 0,
-  },
-  installGuideList: {
-    display: "grid",
-    gap: "4px",
-    margin: "0 0 2px",
-    padding: "0 0 0 18px",
-    color: "#746a5f",
-    fontFamily: UI_FONT,
-    fontSize: "12px",
-    fontWeight: 400,
-    lineHeight: 1.65,
-    letterSpacing: 0,
-  },
-  installGuideItem: {
-    paddingLeft: "2px",
-  },
-  installGuideActions: {
-    display: "flex",
-    justifyContent: "flex-start",
-    alignItems: "center",
-    gap: "8px",
-    flexWrap: "wrap",
-  },
   namePreviewPhoto: {
     width: "min(48vw, 168px)",
     aspectRatio: "1 / 1",
@@ -2960,74 +2675,57 @@ const styles = {
     opacity: 0,
     pointerEvents: "none",
   },
+  deliveredResult: {
+    gap: "10px",
+  },
+  onboardingDeliveredTitle: {
+    margin: "0 0 2px",
+    color: "#292721",
+    fontFamily: "var(--font-display)",
+    fontSize: "24px",
+    fontWeight: 500,
+    lineHeight: 1.42,
+    letterSpacing: "0.08em",
+  },
+  onboardingDeliveredPhotoFrame: {
+    width:
+      "min(calc(100vw - 56px), 300px, calc(100dvh - 250px))",
+    aspectRatio: "1 / 1",
+    padding: "6px",
+    borderRadius: "22px",
+    background: "color-mix(in srgb, var(--paper-card) 68%, transparent)",
+    boxShadow:
+      "0 1px 0 rgba(255,255,255,.52) inset, 0 16px 38px rgba(96,78,54,0.12)",
+    boxSizing: "border-box",
+    overflow: "hidden",
+  },
   revealingPhotoFrame: {
-    width: "min(100%, 292px)",
-    display: "grid",
-    justifyItems: "center",
     animation: "deliveredPhotoIn 780ms cubic-bezier(0.22, 1, 0.36, 1) both",
   },
-  revealingPhoto: {
-    width: "min(72vw, 268px)",
-    height: "min(72vw, 268px)",
+  onboardingDeliveredPhoto: {
+    width: "100%",
+    height: "100%",
     objectFit: "cover",
-    borderRadius: "var(--radius-2xl)",
-    boxShadow: "0 18px 44px rgba(90,76,60,0.12)",
+    borderRadius: "17px",
+    background: "rgba(255,253,248,0.72)",
+    animation: "deliveredPhotoIn 360ms cubic-bezier(0, 0, 0.2, 1) both",
   },
-  deliveredMoment: {
-    position: "relative",
-    width: "min(100%, 292px)",
-    minHeight: "318px",
-    display: "grid",
-    justifyItems: "center",
-    alignItems: "start",
-    margin: "2px 0 0",
-  },
-  photoItem: {
-    display: "grid",
-    justifyItems: "center",
-    gap: "8px",
-  },
-  singleDeliveredPhoto: {
-    display: "grid",
-    justifyItems: "center",
-    gap: "8px",
-  },
-  deliveredPhotoTile: {
-    position: "relative",
-    zIndex: 2,
-  },
-  ownPhotoTile: {
-    position: "absolute",
-    zIndex: 3,
-    right: "2px",
-    bottom: "4px",
-    transform: "rotate(3.2deg)",
-  },
-  ownPhoto: {
-    width: "92px",
-    height: "92px",
-    objectFit: "cover",
-    borderRadius: "20px",
-    opacity: 0.78,
-    border: "6px solid rgba(255,253,248,0.82)",
-    boxShadow: "0 12px 24px -14px rgba(72,54,35,0.42)",
-    animation: "ownPhotoSend 560ms ease-out both",
-  },
-  deliveredPhoto: {
-    width: "min(74vw, 268px)",
-    height: "min(74vw, 268px)",
-    objectFit: "cover",
-    borderRadius: "28px",
-    border: "8px solid rgba(255,253,248,0.86)",
-    boxShadow: "0 22px 46px -24px rgba(66,48,31,0.5)",
-    animation: "deliveredPhotoIn 620ms 120ms cubic-bezier(0.22, 1, 0.36, 1) both",
-  },
-  photoLabel: {
-    color: "#8a8174",
-    fontSize: "13px",
-    fontWeight: 500,
-    lineHeight: 1.3,
+  onboardingDeliveredContinue: {
+    width: "min(260px, 100%)",
+    minHeight: "54px",
+    marginTop: "4px",
+    border: "1px solid rgba(144,126,102,0.14)",
+    borderRadius: "var(--radius-full)",
+    background:
+      "linear-gradient(180deg, rgba(255,253,248,0.98), rgba(248,242,232,0.94))",
+    color: "#292721",
+    fontFamily: "var(--font-ui)",
+    fontSize: "15px",
+    fontWeight: 520,
+    lineHeight: 1.35,
     letterSpacing: "0.04em",
+    boxShadow:
+      "inset 0 1px 0 rgba(255,255,255,0.72), 0 12px 26px rgba(90,76,60,0.08)",
   },
   savedPhoto: {
     width: "min(100%, 260px)",

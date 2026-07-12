@@ -28,7 +28,7 @@
 - `admin_stock` はオンボ専用ではなく、通常20時便でも Tier3 fallback として届く対象に残る。
 - オンボの `admin_stock` 選定は seed による分散が効く。全員が同じ1枚を受け取る設計ではない。
 - オンボで投入した1枚は、通常の `cat_moments` として保存され、承認後は通常のねこだより配達候補に入る。
-- オンボ末尾にはPWA設置案内が出る。ホーム側の install hint も、スキップした人への再機会として残る。
+- PWA設置案内は一通目の開封直後には出さず、オンボ完了後のホーム側 install hint に一本化する。
 - resetリンクはテスト用。実ユーザーのmainリンクとは観察上分ける。
 
 ## 1. 全体フロー
@@ -56,9 +56,8 @@ flowchart TD
   L --> L1{"20時前?"}
   L1 -- yes --> L2["2枚目予告<br/>今夜8時にも届く"]
   L1 -- no --> L3["翌日予告<br/>明日20時に届く"]
-  L2 --> L4["PWA設置案内<br/>郵便受けを置く"]
-  L3 --> L4
-  L4 --> M{"猫名設定済み?"}
+  L2 --> M{"猫名設定済み?"}
+  L3 --> M
 
   M -- no --> N["naming<br/>名前入力/スキップ"]
   M -- yes --> O["/account/create<br/>保存方法選択"]
@@ -91,9 +90,8 @@ flowchart TD
 | 候補不足 | `empty` | 今日は準備中 | ホームへ | `/home` | 届かないと感じて離脱 | `onboarding_delivery_error` または配達未成立系 |
 | 到着 | `envelope` | ねこだよりが届く | 開く | revealing | 封筒が押せると分からない | `onboarding_delivery_ready`, `onboarding_delivery_arrived`, `envelope_shown` |
 | 開封中 | `revealing` | 届いた写真の表示演出 | なし | delivered | 写真ロード失敗、枠だけ表示 | `delivery_reveal_started`, `delivery_reveal_completed`, `delivery_reveal_photo_loaded`, `delivery_reveal_photo_error` |
-| 届いた写真 | `delivered` | 届いたねこだより + 自分の写真 | 続ける / 2枚目導線 | PWA案内、naming、account/create | 写真が消える、次の意味が分からない | `envelope_opened`, `onboarding_delivery_opened`, `onboarding_delivered_photo_confirmed`, `onboarding_completed` |
+| 届いた写真 | `delivered` | 届いたねこだより1枚 | 続ける | 2枚目予告、naming、account/create | 写真が消える、次の意味が分からない | `envelope_opened`, `onboarding_delivery_opened`, `onboarding_delivered_photo_confirmed`, `onboarding_completed` |
 | 2枚目予告 | delivered内 | 20時前なら「今夜8時にも届く」 | もう1枚入れる | `/home?from=onboarding_second_photo` | 本便との違いが分からない | `onboarding_second_photo_prompt_view`, `onboarding_second_photo_submitted` |
-| PWA設置案内 | delivered内 | ホーム画面に追加案内 | 追加する / わかった | naming/account/create | 手順が分からない、設置せず離脱 | `pwa_install_prompt_view`, `pwa_install_guide_completed` |
 | 名前入力 | `naming` | この子の名前入力 | 名前を入れて進む / スキップ | account/create | 名前で詰まる | `cat_name_prompt_view`, `cat_name_entered`, `cat_name_skipped` |
 | 保存方法 | `/account/create?from=onboarding` | Google / つづきのリンク | Googleで続ける / つづきのリンク | cats / continue | Google拒否、handoff作成失敗 | `onboarding_album_prompt_view`, `account_create_cta_viewed`, `onboarding_google_continue_click`, `auth_google_started`, `auth_google_failed`, `auth_google_blocked_embedded_browser`, `onboarding_skip_click` |
 | Google成功 | `/auth/callback` | Google認証 | 承認 | `/cats?onboarding=1` | Google Cloud/Supabase設定不備、アプリ内ブラウザ拒否 | `auth_google_started`, `auth_google_failed`, `onboarding_album_created`, `cat_album_created`, `onboarding_completed` |
@@ -210,22 +208,18 @@ Safari / ChromeでもGoogleが失敗する場合は、アプリ側ではなく G
 
 現在の実装:
 
-- オンボ末尾の届いた写真表示後に、PWA設置案内が出る。
-- standalone表示時、設置済み検知時、またはdismiss済みでは出さない。
-- Android Chromeでは `beforeinstallprompt` があればボタンからネイティブpromptを出す。
-- iOS Safariでは共有ボタンから「ホーム画面に追加」の手順案内を出す。
-- LINE/Instagram内では設置そのものより、まずSafari/Chromeで続ける導線を優先する。
-- ホーム側の既存install hintも残る。オンボでスキップした人への再機会。
+- 一通目を開いた直後は届いた写真と「つづける」だけを表示し、設置案内を挟まない。
+- オンボ完了後、ホーム側の既存install hintで案内する。
+- LINE/Instagram内では設置そのものより、Safari/Chromeで続ける導線を優先する。
 
 見るイベント:
 
-- `pwa_install_prompt_view`
-- `pwa_install_guide_completed`
+- ホーム側install hintのイベントを参照する。
 
 観察したいこと:
 
-- 設置案内が感情の山、つまり一通目を開いた直後に見えているか。
-- スキップしてもオンボが止まらないか。
+- 開封直後の写真体験を設置案内が遮っていないか。
+- オンボ完了後のホームで設置の再機会が届くか。
 - PWA起動後、handoff復元済みデータが見えるか。
 
 ## 10. 計測クエリ観点
@@ -279,7 +273,6 @@ onboarding_completed
 | 未審査滞留 | `pending/shared/available` の件数 |
 | 写真枠だけ表示 | `delivery_reveal_photo_error` / signed URL系error |
 | 2枚目導線 | `onboarding_second_photo_prompt_view` → `onboarding_second_photo_submitted` |
-| PWA設置案内 | `pwa_install_prompt_view` → `pwa_install_guide_completed` |
 
 ## 12. 実機検証シナリオ
 
