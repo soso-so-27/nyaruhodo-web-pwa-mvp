@@ -132,6 +132,9 @@ export function OnboardingFlow() {
     useState<BeforeInstallPromptEvent | null>(null);
   const [isInstallGuideDismissed, setIsInstallGuideDismissed] = useState(false);
   const [isOpeningEnvelope, setIsOpeningEnvelope] = useState(false);
+  const [isRetryingDelivery, setIsRetryingDelivery] = useState(false);
+  const [hasRevealPhotoError, setHasRevealPhotoError] = useState(false);
+  const [revealPhotoRetryKey, setRevealPhotoRetryKey] = useState(0);
   const [catNameDraft, setCatNameDraft] = useState("");
   const prefersReducedMotion = usePrefersReducedMotion();
   const autoKeptDeliveredPhotoIdRef = useRef("");
@@ -352,6 +355,8 @@ export function OnboardingFlow() {
     revealStartedAtRef.current = null;
     revealPhotoLoadedTrackedRef.current = "";
     revealPhotoErrorTrackedRef.current = "";
+    setHasRevealPhotoError(false);
+    setRevealPhotoRetryKey(0);
   }, [deliveredPhoto?.id]);
 
   function resolveOnboardingProgress(source: OnboardingSource) {
@@ -1045,6 +1050,7 @@ export function OnboardingFlow() {
     }
 
     revealPhotoLoadedTrackedRef.current = deliveredPhoto.id;
+    setHasRevealPhotoError(false);
     trackOnboardingRevealEvent("delivery_reveal_photo_loaded");
   }
 
@@ -1058,7 +1064,59 @@ export function OnboardingFlow() {
     }
 
     revealPhotoErrorTrackedRef.current = deliveredPhoto.id;
+    setHasRevealPhotoError(true);
     trackOnboardingRevealEvent("delivery_reveal_photo_error");
+  }
+
+  function handleRetryRevealPhoto() {
+    revealPhotoErrorTrackedRef.current = "";
+    setHasRevealPhotoError(false);
+    setRevealPhotoRetryKey((value) => value + 1);
+    trackProductEvent("onboarding_delivery_photo_retry", {
+      source: getEffectiveEntrySource(),
+      photo_id: deliveredPhoto?.id ?? null,
+    });
+  }
+
+  async function handleRetryOnboardingDelivery() {
+    if (isSubmittingRef.current || isRetryingDelivery) {
+      return;
+    }
+
+    const progress = readCurrentOnboardingProgress();
+    const ownPhoto = pendingOwnPhoto ?? progress?.ownPhoto ?? null;
+    if (!ownPhoto) {
+      setState("intro");
+      setMessage("写真をもう一度選んでください。");
+      return;
+    }
+
+    isSubmittingRef.current = true;
+    setIsRetryingDelivery(true);
+    setMessage("");
+    trackProductEvent("onboarding_delivery_retry", {
+      source: getEffectiveEntrySource(),
+      submission_id: progress?.submissionId ?? null,
+    });
+
+    try {
+      const delivered = await deliverOwnSleepingPhoto({
+        ownPhoto,
+        recipientCatId: ownPhoto.catId,
+        deliveryDateKey: progress?.dateKey,
+        submissionId: progress?.submissionId,
+        selectedPhotoSrc: selectedPhotoSrc || progress?.selectedPhotoSrc,
+        emptyMessage:
+          "ねがおは入りました。通信を確認して、もう一度お試しください。",
+      });
+
+      if (!delivered) {
+        setState("empty");
+      }
+    } finally {
+      isSubmittingRef.current = false;
+      setIsRetryingDelivery(false);
+    }
   }
 
   async function deliverOwnSleepingPhoto({
@@ -1363,6 +1421,7 @@ export function OnboardingFlow() {
             ) : null}
             <AppButton
               type="button"
+              data-testid="onboarding-photo-select"
               onClick={() => {
                 void handleSelectSleepingPhoto();
               }}
@@ -1442,6 +1501,7 @@ export function OnboardingFlow() {
             <OnboardingEnvelopeArt />
             <span style={styles.deliveryPhotoPreload} aria-hidden="true">
               <PhotoTile
+                key={`onboarding-delivery-preload-${revealPhotoRetryKey}`}
                 src={getExchangePhotoDisplaySrc(deliveredPhoto)}
                 fallbackSrcs={getExchangePhotoFallbackSrcs(deliveredPhoto)}
                 loading="eager"
@@ -1474,6 +1534,7 @@ export function OnboardingFlow() {
           <section style={styles.result} aria-label="どこかのねがお">
             <div style={styles.revealingPhotoFrame}>
               <PhotoTile
+                key={`onboarding-delivery-reveal-${revealPhotoRetryKey}`}
                 src={getExchangePhotoDisplaySrc(deliveredPhoto)}
                 fallbackSrcs={getExchangePhotoFallbackSrcs(deliveredPhoto)}
                 imageStyle={styles.revealingPhoto}
@@ -1489,8 +1550,12 @@ export function OnboardingFlow() {
           <section style={styles.result} aria-label="とどいたねがお">
             <p style={styles.kicker}>ねこだよりが届きました</p>
             {selectedPhotoSrc ? (
-              <div style={styles.deliveredMoment}>
+              <div
+                style={styles.deliveredMoment}
+                data-testid="onboarding-delivered-photos"
+              >
                 <PhotoTile
+                  key={`onboarding-delivery-opened-${revealPhotoRetryKey}`}
                   src={getExchangePhotoDisplaySrc(deliveredPhoto)}
                   fallbackSrcs={getExchangePhotoFallbackSrcs(deliveredPhoto)}
                   style={styles.deliveredPhotoTile}
@@ -1508,6 +1573,7 @@ export function OnboardingFlow() {
               </div>
             ) : (
               <PhotoTile
+                key={`onboarding-delivery-opened-${revealPhotoRetryKey}`}
                 src={getExchangePhotoDisplaySrc(deliveredPhoto)}
                 fallbackSrcs={getExchangePhotoFallbackSrcs(deliveredPhoto)}
                 style={styles.deliveredPhotoTile}
@@ -1517,6 +1583,26 @@ export function OnboardingFlow() {
                 onError={handleRevealPhotoError}
               />
             )}
+            {hasRevealPhotoError ? (
+              <div
+                data-testid="onboarding-delivery-photo-error"
+                role="alert"
+                style={styles.recoveryPanel}
+              >
+                <p style={styles.recoveryText}>
+                  届いた写真を表示できませんでした。通信を確認して、もう一度お試しください。
+                </p>
+                <AppButton
+                  type="button"
+                  variant="quiet"
+                  size="md"
+                  onClick={handleRetryRevealPhoto}
+                  data-testid="onboarding-delivery-photo-retry"
+                >
+                  写真をもう一度読み込む
+                </AppButton>
+              </div>
+            ) : null}
             <p style={styles.resultText}>
               {isDeliveredPhotoKept
                 ? (
@@ -1625,6 +1711,18 @@ export function OnboardingFlow() {
                 {isCandidateAdding ? "追加しています..." : "とどく候補を追加する"}
               </AppButton>
             ) : null}
+            <AppButton
+              type="button"
+              variant="accent"
+              fullWidth
+              onClick={() => {
+                void handleRetryOnboardingDelivery();
+              }}
+              disabled={isRetryingDelivery}
+              data-testid="onboarding-delivery-retry"
+            >
+              {isRetryingDelivery ? "もう一度ためしています..." : "もう一度 とどける"}
+            </AppButton>
             <AppButton type="button" variant="quiet" size="md" onClick={handleGoHome}>
               ねてるねこへ
             </AppButton>
@@ -2938,6 +3036,26 @@ const styles = {
     borderRadius: "var(--radius-2xl)",
     border: "7px solid rgba(255,253,248,0.82)",
     boxShadow: "0 14px 34px rgba(90,76,60,0.12)",
+  },
+  recoveryPanel: {
+    width: "min(100%, 286px)",
+    display: "grid",
+    justifyItems: "center",
+    gap: "8px",
+    padding: "12px 14px",
+    boxSizing: "border-box",
+    border: "1px solid rgba(168,88,78,0.18)",
+    borderRadius: "var(--radius-lg)",
+    background: "rgba(255,253,248,0.72)",
+  },
+  recoveryText: {
+    margin: 0,
+    color: "#6f6757",
+    fontFamily: UI_FONT,
+    fontSize: "12px",
+    fontWeight: 400,
+    lineHeight: 1.7,
+    letterSpacing: 0,
   },
   resultText: {
     width: "min(100%, 286px)",

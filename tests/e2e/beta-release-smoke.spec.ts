@@ -110,7 +110,9 @@ test.describe("beta release smoke", () => {
 
     const offlineResponse = await request.get("/offline");
     expect(offlineResponse.ok()).toBe(true);
-    expect(await offlineResponse.text()).toContain("いまは通信できません");
+    const offlineHtml = await offlineResponse.text();
+    expect(offlineHtml).toContain("いまは通信できません");
+    expect(offlineHtml).toContain("もう一度読み込む");
   });
 
   test("baseline security headers are present", async ({ request }) => {

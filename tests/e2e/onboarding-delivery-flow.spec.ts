@@ -731,6 +731,185 @@ test.describe("onboarding delivery flow", () => {
     await expect(page.getByText("アプリでつづける")).toHaveCount(0);
   });
 
+  test("retries delivery with the already saved onboarding photo", async ({
+    page,
+  }) => {
+    let exchangeCalls = 0;
+    let capabilityCalls = 0;
+    await page.route("**/api/admin/capabilities", async (route) => {
+      capabilityCalls += 1;
+      await route.fulfill({
+        contentType: "application/json",
+        body: JSON.stringify({
+          isAdmin: true,
+          testToolsEnabled: true,
+          stockAdminEnabled: false,
+        }),
+      });
+    });
+    await page.route("**/api/sleeping-delivery/exchange", async (route) => {
+      exchangeCalls += 1;
+      if (exchangeCalls === 1) {
+        await route.fulfill({
+          status: 503,
+          contentType: "application/json",
+          body: JSON.stringify({ error: "temporarily_unavailable" }),
+        });
+        return;
+      }
+
+      await route.fulfill({
+        contentType: "application/json",
+        body: JSON.stringify({
+          photo: {
+            id: "delivered-after-retry",
+            sourcePhotoId: "stock-after-retry",
+            src: `data:image/png;base64,${testPng.toString("base64")}`,
+            title: "",
+            subtitle: "",
+            triggerLabel: "sleeping",
+            theme: "sleeping",
+            deliveredAt: Date.now(),
+          },
+          source: "remote",
+        }),
+      });
+    });
+
+    await page.goto("/onboarding?test");
+    await expect.poll(() => capabilityCalls).toBeGreaterThan(0);
+    await page.getByTestId("onboarding-photo-select").click();
+    await page.locator('input[type="file"]').last().setInputFiles({
+      name: "own-sleeping.png",
+      mimeType: "image/png",
+      buffer: testPng,
+    });
+
+    await expect(page.getByTestId("onboarding-delivery-retry")).toBeVisible();
+    await expect.poll(() => readOwnSleepingPhotoCount(page)).toBe(1);
+    await page.getByTestId("onboarding-delivery-retry").click();
+
+    await expect.poll(() => exchangeCalls).toBe(2);
+    await expect(
+      page.getByRole("button", { name: "ねこだよりを開く" }),
+    ).toBeVisible();
+    await expect.poll(() => readOwnSleepingPhotoCount(page)).toBe(1);
+  });
+
+  test("returns to photo selection after an unsupported onboarding file", async ({
+    page,
+  }) => {
+    await page.goto("/onboarding");
+    await page.getByTestId("onboarding-photo-select").click();
+    await page.locator('input[type="file"]').last().setInputFiles({
+      name: "not-a-photo.txt",
+      mimeType: "text/plain",
+      buffer: Buffer.from("not a photo", "utf8"),
+    });
+
+    await expect(
+      page.getByText(
+        "写真を読み込めませんでした。JPEGやPNGの写真で、もう一度試してください。",
+      ),
+    ).toBeVisible();
+    await expect(page.getByTestId("onboarding-photo-select")).toBeVisible();
+  });
+
+  test("offers a retry when the delivered onboarding photo cannot load", async ({
+    page,
+  }) => {
+    let imageAvailable = false;
+    let imageRequests = 0;
+    await page.route("https://example.com/onboarding-delivery.jpg", async (route) => {
+      imageRequests += 1;
+      if (!imageAvailable) {
+        await route.fulfill({ status: 404, body: "" });
+        return;
+      }
+
+      await route.fulfill({
+        status: 200,
+        headers: { "content-type": "image/png" },
+        body: testPng,
+      });
+    });
+    await page.route("**/api/sleeping-delivery/exchange", async (route) => {
+      await route.fulfill({
+        contentType: "application/json",
+        body: JSON.stringify({
+          photo: {
+            id: "delivered-broken-image",
+            sourcePhotoId: "stock-broken-image",
+            src: "https://example.com/onboarding-delivery.jpg",
+            title: "",
+            subtitle: "",
+            triggerLabel: "sleeping",
+            theme: "sleeping",
+            deliveredAt: Date.now(),
+          },
+          source: "remote",
+        }),
+      });
+    });
+
+    await page.goto("/onboarding");
+    await page.getByTestId("onboarding-photo-select").click();
+    await page.locator('input[type="file"]').last().setInputFiles({
+      name: "own-sleeping.png",
+      mimeType: "image/png",
+      buffer: testPng,
+    });
+    await page.getByRole("button", { name: "ねこだよりを開く" }).click();
+
+    await expect(page.getByTestId("onboarding-delivery-photo-error")).toBeVisible();
+    imageAvailable = true;
+    await page.getByTestId("onboarding-delivery-photo-retry").click();
+    await expect(page.getByTestId("onboarding-delivery-photo-error")).toHaveCount(0);
+    await expect.poll(() => imageRequests).toBeGreaterThan(1);
+    await expect
+      .poll(() =>
+        page.getByTestId("onboarding-delivered-photos").evaluate((container) =>
+          Array.from(container.querySelectorAll("img")).some(
+            (image) => image.complete && image.naturalWidth > 0,
+          ),
+        ),
+      )
+      .toBe(true);
+  });
+
+  test("offers a fresh start when an onboarding handoff has expired", async ({
+    page,
+  }) => {
+    await page.route("**/api/onboarding/handoff/redeem", async (route) => {
+      await route.fulfill({
+        status: 410,
+        contentType: "application/json",
+        body: JSON.stringify({ ok: false, error: "handoff_expired" }),
+      });
+    });
+
+    await page.goto("/onboarding/continue?handoff=expired-token");
+    await page.getByRole("button", { name: "復元してホームへ" }).click();
+
+    await expect(page.getByText(/期限が切れました/)).toBeVisible();
+    await expect(page.getByTestId("onboarding-handoff-restart")).toHaveAttribute(
+      "href",
+      "/onboarding?reset_onboarding=1",
+    );
+  });
+
+  test("keeps both recovery choices after a Google callback failure", async ({
+    page,
+  }) => {
+    await page.goto("/account/create?from=onboarding&source=direct&error=auth");
+
+    await expect(
+      page.getByText("Googleログインを完了できませんでした。少し時間をおいてもう一度お試しください。"),
+    ).toBeVisible();
+    await expect(page.getByTestId("account-create-google")).toBeVisible();
+    await expect(page.getByTestId("account-create-handoff")).toBeVisible();
+  });
+
   test("shows an external browser guide for Instagram bio links opened in an embedded browser", async ({
     page,
   }) => {
@@ -1714,6 +1893,21 @@ async function readKeptExchangePhotoCount(page: Page) {
     try {
       const parsed = JSON.parse(
         window.localStorage.getItem("nyaruhodo_exchange_kept_photos") ?? "[]",
+      );
+
+      return Array.isArray(parsed) ? parsed.length : 0;
+    } catch {
+      return 0;
+    }
+  });
+}
+
+async function readOwnSleepingPhotoCount(page: Page) {
+  return page.evaluate(() => {
+    try {
+      const parsed = JSON.parse(
+        window.localStorage.getItem("nyaruhodo_exchange_own_sleeping_photos") ??
+          "[]",
       );
 
       return Array.isArray(parsed) ? parsed.length : 0;

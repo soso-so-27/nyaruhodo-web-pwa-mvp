@@ -194,6 +194,16 @@ function OnboardingContinueContent() {
               </AppButton>
             )}
           </div>
+          {status === "error" ? (
+            <AppButton
+              href="/onboarding?reset_onboarding=1"
+              variant="quiet"
+              size="md"
+              data-testid="onboarding-handoff-restart"
+            >
+              はじめからやり直す
+            </AppButton>
+          ) : null}
         </AppCard>
       </div>
     </main>
@@ -217,14 +227,14 @@ function OnboardingContinueShell() {
 
 function getRestoreErrorMessage(errorMessage: string) {
   if (errorMessage === "handoff_expired") {
-    return "このつづきのリンクは期限が切れました。もう一度、招待リンクからお試しください。";
+    return "このつづきのリンクは期限が切れました。元の端末でリンクを作り直すか、この端末ではじめからお試しください。";
   }
 
   if (errorMessage === "handoff_already_used") {
     return "このつづきのリンクは使用済みです。すでに復元したホーム画面アプリから開いてください。";
   }
 
-  return "つづきの復元ができませんでした。もう一度、招待リンクからお試しください。";
+  return "つづきの復元ができませんでした。通信を確認してもう一度試すか、この端末ではじめからお試しください。";
 }
 
 function detectEmbeddedBrowser() {

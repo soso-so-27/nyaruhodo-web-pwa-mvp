@@ -83,6 +83,8 @@
 
 ## 手動デプロイ時の確認
 
+オンボーディングを変更した便は、公開案内前に `docs/onboarding-owner-final-test-checklist.md` の必須項目を実機で確認する。
+
 ### 1. migration差分確認
 
 ```bash

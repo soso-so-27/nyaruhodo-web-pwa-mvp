@@ -1,4 +1,5 @@
 import type { CSSProperties } from "react";
+import { OfflineRetryButton } from "./OfflineRetryButton";
 
 export const metadata = {
   title: "オフライン | ねてるねこ",
@@ -15,6 +16,7 @@ export default function OfflinePage() {
         <p style={styles.body}>
           電波が戻ったら、もう一度ひらいてください。保存済みの画面は端末に残っています。
         </p>
+        <OfflineRetryButton />
       </section>
     </main>
   );
