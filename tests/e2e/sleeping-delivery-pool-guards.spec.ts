@@ -1626,6 +1626,115 @@ test.describe("sleeping delivery pool guards", () => {
     }
   });
 
+  test("keeps a backed-up photo approved through retry and evening exchange", async ({
+    request,
+  }) => {
+    await skipIfLocalSupabaseUnavailable();
+    const adminSupabase = createAdminSupabaseClientFromEnv();
+    test.skip(!adminSupabase, "SUPABASE_SERVICE_ROLE_KEY is required.");
+    if (!adminSupabase) return;
+
+    const createdAt = Date.now();
+    const anonymousId = `backup-idempotent-anon-${createdAt}`;
+    const localMomentId = `backup-idempotent-own-${createdAt}`;
+    const candidateId = `backup-idempotent-candidate-${createdAt}`;
+    const photo = {
+      id: localMomentId,
+      catId: `backup-idempotent-cat-${createdAt}`,
+      ownerCatId: `backup-idempotent-cat-${createdAt}`,
+      src: normalCatLikePhotoUrl,
+      state: "sleeping",
+      visibility: "shared",
+      deliveryStatus: "available",
+      triggerLabel: "sleeping",
+      theme: "sleeping",
+      shared: true,
+      createdAt,
+    };
+
+    try {
+      const firstBackup = await request.post("/api/sleeping-delivery/backup", {
+        data: { anonymousId, photo },
+      });
+      expect(firstBackup.status()).toBe(200);
+
+      const { error: approveError } = await adminSupabase
+        .from("cat_moments")
+        .update({
+          moderation_status: "approved",
+          moderated_at: new Date().toISOString(),
+          moderated_by: "e2e",
+        })
+        .eq("anonymous_id", anonymousId)
+        .eq("local_moment_id", localMomentId);
+      expect(approveError).toBeNull();
+
+      const retryBackup = await request.post("/api/sleeping-delivery/backup", {
+        data: { anonymousId, photo },
+      });
+      expect(retryBackup.status()).toBe(200);
+
+      const { error: candidateError } = await adminSupabase
+        .from("cat_moments")
+        .insert({
+          anonymous_id: `backup-idempotent-source-${createdAt}`,
+          local_moment_id: candidateId,
+          local_cat_id: `backup-idempotent-source-cat-${createdAt}`,
+          owner_cat_id: `backup-idempotent-source-cat-${createdAt}`,
+          photo_url: normalCatLikePhotoUrl,
+          state: "sleeping",
+          visibility: "shared",
+          delivery_status: "available",
+          moderation_status: "approved",
+          moderated_at: new Date().toISOString(),
+          moderated_by: "e2e",
+          metadata: { source: "e2e", pool_kind: "user_shared" },
+          captured_at: new Date(createdAt - 60_000).toISOString(),
+          created_at: new Date(createdAt - 60_000).toISOString(),
+        });
+      expect(candidateError).toBeNull();
+
+      const exchange = await request.post("/api/sleeping-delivery/exchange", {
+        data: {
+          ownPhoto: photo,
+          triggerLabel: "sleeping",
+          theme: "sleeping",
+          category: "sleeping",
+          seed: `backup-idempotent-${createdAt}`,
+          deliveryDateKey: getYesterdayJstDateKey(),
+          recipientCatId: photo.catId,
+          anonymousId,
+          preferredSourcePhotoId: candidateId,
+          blockedPhotoIds: [],
+        },
+      });
+      expect(exchange.status()).toBe(200);
+
+      const { data: ownRows, error: readError } = await adminSupabase
+        .from("cat_moments")
+        .select("moderation_status, delivery_status, visibility, metadata")
+        .eq("anonymous_id", anonymousId)
+        .eq("local_moment_id", localMomentId);
+      expect(readError).toBeNull();
+      expect(ownRows).toHaveLength(1);
+      expect(ownRows?.[0]).toMatchObject({
+        moderation_status: "approved",
+        delivery_status: "available",
+        visibility: "shared",
+      });
+      expect(ownRows?.[0]?.metadata).toMatchObject({ source: "user_backup" });
+    } finally {
+      await adminSupabase
+        .from("cat_moment_deliveries")
+        .delete()
+        .eq("anonymous_id", anonymousId);
+      await adminSupabase
+        .from("cat_moments")
+        .delete()
+        .in("local_moment_id", [localMomentId, candidateId]);
+    }
+  });
+
   test("accepts only delivered photo reports and counts distinct reporters", async ({
     request,
   }) => {

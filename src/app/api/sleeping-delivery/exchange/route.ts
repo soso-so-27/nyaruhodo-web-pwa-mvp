@@ -44,6 +44,7 @@ type ExchangeRequest = {
     createdAt?: number;
     triggerLabel?: string;
     theme?: string;
+    shared?: boolean;
   };
   triggerLabel?: string;
   theme?: string;
@@ -185,7 +186,9 @@ async function handleExchangePost(request: Request) {
   const ownerCatId = ownPhoto.ownerCatId || ownPhoto.catId;
   const ownPhotoStoragePath = getStoragePhotoPath(ownPhoto.src);
   const shouldAddOwnPhotoToPool =
-    !ownPhotoStoragePath && !isBlockedDeliveryPhotoUrl(ownPhoto.src);
+    ownPhoto.shared !== false &&
+    !ownPhotoStoragePath &&
+    !isBlockedDeliveryPhotoUrl(ownPhoto.src);
   const debugDryRunRequested = input.debugDryRun === true;
   const debugDryRun = debugDryRunRequested && isExchangeDebugDryRunAllowed();
 
@@ -306,52 +309,60 @@ async function handleExchangePost(request: Request) {
   }
 
   if (!debugDryRun && shouldAddOwnPhotoToPool) {
-    const ownPhotoUrl = await prepareExchangeMomentPhotoUrl({
-      supabase,
-      userId,
-      anonymousId,
-      ownerCatId,
-      localMomentId: ownPhoto.id,
-      src: ownPhoto.src,
-      canUseStorage: Boolean(adminSupabase),
-    });
-
-    await deleteExistingMoment({
+    const existingOwnMoment = await readExistingOwnMoment({
       supabase,
       userId,
       anonymousId,
       localMomentId: ownPhoto.id,
     });
 
-    const { error: momentError } = await supabase.from("cat_moments").insert({
-      user_id: userId,
-      anonymous_id: anonymousId,
-      local_moment_id: ownPhoto.id,
-      local_cat_id: ownPhoto.catId,
-      owner_cat_id: ownerCatId,
-      photo_url: ownPhotoUrl,
-      state: "sleeping",
-      visibility: "shared",
-      delivery_status: "available",
-      moderation_status: "pending",
-      source_moment_id: null,
-      metadata: {
-        source: "user",
-        pool_kind: "user_shared",
-        trigger_label: input.triggerLabel,
-        theme: input.theme,
-        category: input.category,
-        shared: true,
-      },
-      captured_at: createdAt,
-      created_at: createdAt,
-    });
-
-    if (momentError) {
+    if (existingOwnMoment.error) {
       return NextResponse.json(
-        { photo: null, source: "none", error: momentError.message },
+        { photo: null, source: "none", error: "own_photo_lookup_failed" },
         { status: 500 },
       );
+    }
+
+    if (!existingOwnMoment.data) {
+      const ownPhotoUrl = await prepareExchangeMomentPhotoUrl({
+        supabase,
+        userId,
+        anonymousId,
+        ownerCatId,
+        localMomentId: ownPhoto.id,
+        src: ownPhoto.src,
+        canUseStorage: Boolean(adminSupabase),
+      });
+      const { error: momentError } = await supabase.from("cat_moments").insert({
+        user_id: userId,
+        anonymous_id: anonymousId,
+        local_moment_id: ownPhoto.id,
+        local_cat_id: ownPhoto.catId,
+        owner_cat_id: ownerCatId,
+        photo_url: ownPhotoUrl,
+        state: "sleeping",
+        visibility: "shared",
+        delivery_status: "available",
+        moderation_status: "pending",
+        source_moment_id: null,
+        metadata: {
+          source: "user",
+          pool_kind: "user_shared",
+          trigger_label: input.triggerLabel,
+          theme: input.theme,
+          category: input.category,
+          shared: true,
+        },
+        captured_at: createdAt,
+        created_at: createdAt,
+      });
+
+      if (momentError && momentError.code !== "23505") {
+        return NextResponse.json(
+          { photo: null, source: "none", error: momentError.message },
+          { status: 500 },
+        );
+      }
     }
   }
   markExchangeTiming(timing, "own_photo");
@@ -642,6 +653,7 @@ function isValidOwnPhotoInput(
     ownerCatId?: string;
     src: string;
     createdAt?: number;
+    shared?: boolean;
   };
 } {
   return Boolean(
@@ -685,6 +697,13 @@ function validateExchangeRequest(
   ].filter((value): value is string => typeof value === "string");
 
   if (textFields.some((value) => value.length > MAX_TEXT_LENGTH)) {
+    return { ok: false, status: 400, error: "invalid_exchange_request" };
+  }
+
+  if (
+    ownPhoto.shared !== undefined &&
+    typeof ownPhoto.shared !== "boolean"
+  ) {
     return { ok: false, status: 400, error: "invalid_exchange_request" };
   }
 
@@ -1110,7 +1129,7 @@ function isUniqueDeliveryError(error: { code?: string; message?: string }) {
   );
 }
 
-async function deleteExistingMoment({
+async function readExistingOwnMoment({
   supabase,
   userId,
   anonymousId,
@@ -1121,7 +1140,11 @@ async function deleteExistingMoment({
   anonymousId: string | null;
   localMomentId: string;
 }) {
-  let query = supabase.from("cat_moments").delete().eq("local_moment_id", localMomentId);
+  let query = supabase
+    .from("cat_moments")
+    .select("id")
+    .eq("local_moment_id", localMomentId)
+    .limit(1);
 
   if (userId) {
     query = query.eq("user_id", userId);
@@ -1129,13 +1152,15 @@ async function deleteExistingMoment({
     query = query.is("user_id", null).eq("anonymous_id", anonymousId);
   }
 
-  const { error } = await query;
+  const { data, error } = await query.maybeSingle();
 
   if (error) {
-    console.warn("[sleeping-delivery/exchange] existing moment delete failed", {
+    console.warn("[sleeping-delivery/exchange] existing moment lookup failed", {
       code: error.code,
     });
   }
+
+  return { data: data as { id: string } | null, error };
 }
 
 async function readRemoteCandidateRows(

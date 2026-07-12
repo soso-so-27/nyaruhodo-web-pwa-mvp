@@ -362,6 +362,133 @@ test.describe("onboarding delivery flow", () => {
     await expect(page.getByTestId("onboarding-second-photo-primary")).toBeVisible();
   });
 
+  test("continues from onboarding through the home photo to the 8pm letter", async ({
+    page,
+  }) => {
+    const beforeDelivery = Date.parse("2026-07-06T10:00:00+09:00");
+    const afterDelivery = Date.parse("2026-07-06T20:01:00+09:00");
+    const exchangeBodies: Array<Record<string, any>> = [];
+    let backupCalls = 0;
+
+    await page.addInitScript((now) => {
+      const RealDate = Date;
+      (window as typeof window & { __testNow?: number }).__testNow = now;
+      class AdjustableDate extends RealDate {
+        constructor(...args: unknown[]) {
+          if (args.length === 0) {
+            super(
+              (window as typeof window & { __testNow?: number }).__testNow ??
+                now,
+            );
+            return;
+          }
+          if (args.length === 1) {
+            super(args[0] as string | number | Date);
+            return;
+          }
+          super(...(args as [number, number, number, number?, number?, number?, number?]));
+        }
+        static now() {
+          return (
+            (window as typeof window & { __testNow?: number }).__testNow ?? now
+          );
+        }
+      }
+      Object.setPrototypeOf(AdjustableDate, RealDate);
+      // @ts-expect-error Test-only adjustable browser clock.
+      window.Date = AdjustableDate;
+      window.localStorage.setItem("nyaruhodo_sleeping_safety_accepted", "1");
+    }, beforeDelivery);
+    await page.route("**/api/sleeping-delivery/exchange", async (route) => {
+      exchangeBodies.push(route.request().postDataJSON());
+      const isOnboarding = exchangeBodies.length === 1;
+      await route.fulfill({
+        contentType: "application/json",
+        body: JSON.stringify({
+          photo: {
+            id: isOnboarding ? "onboarding-chain-letter" : "evening-chain-letter",
+            sourcePhotoId: isOnboarding
+              ? "onboarding-chain-source"
+              : "evening-chain-source",
+            src: `data:image/png;base64,${testPng.toString("base64")}`,
+            title: "",
+            subtitle: "",
+            triggerLabel: "sleeping",
+            theme: "sleeping",
+            deliveredAt: isOnboarding ? beforeDelivery : afterDelivery,
+          },
+          source: "remote",
+          diagnostics: {
+            source: "remote",
+            availableCount: 1,
+            candidateCount: 1,
+            normalCandidateCount: 1,
+            fallbackCandidateCount: 0,
+            fallbackActive: false,
+          },
+        }),
+      });
+    });
+    await page.route("**/api/sleeping-delivery/backup", async (route) => {
+      backupCalls += 1;
+      await route.fulfill({
+        contentType: "application/json",
+        body: JSON.stringify({ ok: true }),
+      });
+    });
+
+    await page.goto("/onboarding");
+    await page.waitForLoadState("networkidle");
+    await page.locator("main button").first().click();
+    await page.locator('input[type="file"]').last().setInputFiles({
+      name: "onboarding-chain.png",
+      mimeType: "image/png",
+      buffer: testPng,
+    });
+    await expect.poll(() => exchangeBodies.length).toBe(1);
+    await page.locator("main button").first().click();
+    await page.waitForTimeout(1600);
+    await page.getByTestId("onboarding-delivered-continue").click();
+    await continuePastOptionalOnboardingNamePrompt(page);
+    await page.getByTestId("onboarding-second-photo-primary").click();
+
+    await expect(page).toHaveURL(/\/home\?from=onboarding_second_photo/);
+    await page.getByTestId("home-empty-action").click();
+    await page.locator('input[type="file"]').last().setInputFiles({
+      name: "home-chain.png",
+      mimeType: "image/png",
+      buffer: testPng,
+    });
+    const saveDialog = page.getByRole("dialog");
+    await expect(saveDialog).toBeVisible();
+    await saveDialog.locator("button").last().click();
+
+    await expect.poll(() => backupCalls).toBe(1);
+    const target = await page.evaluate(() => {
+      const store = JSON.parse(
+        window.localStorage.getItem("neteruneko_evening_delivery_days") ?? "{}",
+      );
+      return store["2026-07-06"] ?? null;
+    });
+    expect(target?.targetOwnPhotoId).toBeTruthy();
+    expect(target?.targetPhoto).toBeUndefined();
+
+    await page.evaluate((now) => {
+      (window as typeof window & { __testNow?: number }).__testNow = now;
+      window.dispatchEvent(new Event("focus"));
+      document.dispatchEvent(new Event("visibilitychange"));
+    }, afterDelivery);
+
+    await expect.poll(() => exchangeBodies.length).toBe(2);
+    expect(exchangeBodies[0]?.anonymousId).toBe(exchangeBodies[1]?.anonymousId);
+    await expect(page.getByTestId("home-desk-model")).toHaveAttribute(
+      "data-state",
+      "3",
+    );
+    await page.getByTestId("desk-open-letter").click();
+    await expect(page.getByTestId("evening-opening-pair")).toBeVisible();
+  });
+
 
   test("routes embedded second photo bridge through account handoff", async ({
     page,

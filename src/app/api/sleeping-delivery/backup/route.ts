@@ -31,6 +31,14 @@ type BackupRequest = {
   photo?: Partial<OwnSleepingPhoto> | null;
 };
 
+type ExistingBackupMoment = {
+  id: string;
+  visibility: "private" | "shared";
+  delivery_status: "available" | "hidden" | "reported";
+  moderation_status: "pending" | "approved" | "rejected";
+  metadata: Record<string, unknown> | null;
+};
+
 export async function POST(request: Request) {
   const adminSupabase = createSupabaseAdminClient();
 
@@ -101,6 +109,44 @@ export async function POST(request: Request) {
   const moment = ownSleepingPhotoToCatMoment(photo);
   const record = toCatMomentRecord(moment);
   const visibility = photo.shared ? "shared" : "private";
+  const existing = await readExistingBackupMoment({
+    adminSupabase,
+    userId,
+    anonymousId,
+    localMomentId: record.id,
+  });
+
+  if (existing.error) {
+    return NextResponse.json(
+      { ok: false, error: "backup_lookup_failed" },
+      { status: 500 },
+    );
+  }
+
+  if (existing.data) {
+    const nextMetadata = {
+      ...(existing.data.metadata ?? {}),
+      source: existing.data.metadata?.source ?? "user_backup",
+      pool_kind: visibility === "private" ? "user_private" : "user_shared",
+      trigger_label: photo.triggerLabel,
+      theme: photo.theme,
+      shared: photo.shared,
+    };
+    const { error: updateError } = await adminSupabase
+      .from("cat_moments")
+      .update({ visibility, metadata: nextMetadata })
+      .eq("id", existing.data.id);
+
+    if (updateError) {
+      return NextResponse.json(
+        { ok: false, error: "backup_update_failed" },
+        { status: 500 },
+      );
+    }
+
+    return NextResponse.json({ ok: true, existing: true });
+  }
+
   const photoUrl = await persistBackupPhotoUrl({
     adminSupabase,
     userId,
@@ -109,21 +155,6 @@ export async function POST(request: Request) {
     recordId: record.id,
     photoUrl: record.photo_url,
   });
-
-  if (userId) {
-    const { error: deleteError } = await adminSupabase
-      .from("cat_moments")
-      .delete()
-      .eq("user_id", userId)
-      .eq("local_moment_id", record.id);
-
-    if (deleteError) {
-      return NextResponse.json(
-        { ok: false, error: "backup_delete_failed" },
-        { status: 500 },
-      );
-    }
-  }
 
   const { error } = await adminSupabase.from("cat_moments").insert({
     user_id: userId,
@@ -149,6 +180,18 @@ export async function POST(request: Request) {
   });
 
   if (error) {
+    if (error.code === "23505") {
+      const racedExisting = await readExistingBackupMoment({
+        adminSupabase,
+        userId,
+        anonymousId,
+        localMomentId: record.id,
+      });
+      if (racedExisting.data) {
+        return NextResponse.json({ ok: true, existing: true });
+      }
+    }
+
     return NextResponse.json(
       { ok: false, error: "backup_insert_failed" },
       { status: 500 },
@@ -156,6 +199,31 @@ export async function POST(request: Request) {
   }
 
   return NextResponse.json({ ok: true });
+}
+
+async function readExistingBackupMoment({
+  adminSupabase,
+  userId,
+  anonymousId,
+  localMomentId,
+}: {
+  adminSupabase: NonNullable<ReturnType<typeof createSupabaseAdminClient>>;
+  userId: string | null;
+  anonymousId: string | null;
+  localMomentId: string;
+}) {
+  let query = adminSupabase
+    .from("cat_moments")
+    .select("id, visibility, delivery_status, moderation_status, metadata")
+    .eq("local_moment_id", localMomentId)
+    .limit(1);
+
+  query = userId
+    ? query.eq("user_id", userId)
+    : query.is("user_id", null).eq("anonymous_id", anonymousId ?? "");
+
+  const { data, error } = await query.maybeSingle();
+  return { data: data as ExistingBackupMoment | null, error };
 }
 
 async function getRequestUser(request: Request) {

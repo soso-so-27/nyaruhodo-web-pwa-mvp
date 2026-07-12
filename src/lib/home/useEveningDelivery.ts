@@ -20,7 +20,13 @@ import type { OwnSleepingPhoto } from "./sleepingPhotos";
 
 const EXCHANGE_UPLOAD_MAX_DATA_URL_LENGTH = 500_000;
 const EVENING_DELIVERY_SLOW_MS = 4_000;
-const EVENING_DELIVERY_RETRY_DELAYS_MS = [1_500, 5_000] as const;
+const EVENING_DELIVERY_RETRY_DELAYS_MS = [
+  1_500,
+  5_000,
+  30_000,
+  120_000,
+  300_000,
+] as const;
 
 export type ExchangeUploadResizeStep =
   | "storage_direct"
@@ -356,7 +362,22 @@ export function useEveningDelivery({
           return;
         }
 
-        setEveningDeliveredPhoto(pendingDay.dateKey, result.photo, Date.now());
+        const didPersistDelivery = setEveningDeliveredPhoto(
+          pendingDay.dateKey,
+          result.photo,
+          Date.now(),
+        );
+        if (!didPersistDelivery) {
+          pendingEveningDeliveryKeysRef.current.delete(pendingDay.dateKey);
+          setCheckStatus({ state: "failed", dateKey: pendingDay.dateKey });
+          scheduleAutomaticRetry(pendingDay.dateKey);
+          trackEveningDeliveryCheckEvent("evening_delivery_check_failed", {
+            startedAt: checkStartedAt,
+            source,
+            route,
+          });
+          return;
+        }
         clearAutomaticRetry(pendingDay.dateKey);
         void setAppBadge(1);
         setRefreshToken((value) => value + 1);

@@ -5,7 +5,6 @@ import {
   type ExchangePhotoPoolItem,
   type OwnSleepingPhoto,
 } from "./sleepingPhotos";
-import { getStoragePhotoPath } from "../photoStorage";
 import { createBrowserSupabaseClient } from "../supabase/browser";
 import { getOrCreateAnonymousId } from "../identity/anonymousId";
 
@@ -83,8 +82,7 @@ export async function createSleepingExchange({
 
   try {
     const headers = new Headers({ "Content-Type": "application/json" });
-    const ownPhotoStoragePath = getStoragePhotoPath(ownPhoto.src);
-    const supabase = ownPhotoStoragePath ? createBrowserSupabaseClient() : null;
+    const supabase = createBrowserSupabaseClient();
 
     if (supabase) {
       const { data } = await supabase.auth.getSession();
@@ -108,6 +106,7 @@ export async function createSleepingExchange({
           createdAt: ownPhoto.createdAt,
           triggerLabel: ownPhoto.triggerLabel,
           theme: ownPhoto.theme,
+          shared: ownPhoto.shared ?? ownPhoto.visibility === "shared",
         },
         triggerLabel,
         theme,

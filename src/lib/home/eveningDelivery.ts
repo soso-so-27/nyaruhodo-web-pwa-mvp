@@ -202,7 +202,7 @@ export function setEveningDeliveredPhoto(
     sanitizeExchangePhotoForPersistence(deliveredPhoto);
 
   if (!persistentDeliveredPhoto) {
-    return;
+    return false;
   }
 
   const store = readEveningDeliveryStore();
@@ -228,7 +228,12 @@ export function setEveningDeliveredPhoto(
       };
     }
   }
-  writeEveningDeliveryStore(store);
+  const persisted = writeEveningDeliveryStore(store);
+  return (
+    persisted &&
+    readEveningDeliveryStore()[dateKey]?.deliveredPhoto?.id ===
+      persistentDeliveredPhoto.id
+  );
 }
 
 export function markEveningDeliveryOpened(

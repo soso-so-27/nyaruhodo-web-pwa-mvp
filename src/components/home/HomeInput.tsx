@@ -2098,7 +2098,13 @@ export function HomeInput({
       return null;
     }
 
-    void backupOwnSleepingPhotoMoment(ownPhoto);
+    void backupOwnSleepingPhotoMoment(ownPhoto).then((result) => {
+      if (shared && !result.ok) {
+        showToast(
+          "ねこだよりの予約はできましたが、写真を審査へ送れませんでした。通信を確認して、もう一度おためしください。",
+        );
+      }
+    });
     const deliveryTarget = shared
       ? recordEveningDeliveryTarget(ownPhoto)
       : null;
@@ -2142,7 +2148,13 @@ export function HomeInput({
       showToast(PHOTO_SAVE_FAILURE_MESSAGE);
       return;
     }
-    void backupOwnSleepingPhotoMoment(ownPhoto);
+    void backupOwnSleepingPhotoMoment(ownPhoto).then((result) => {
+      if (!result.ok) {
+        showToast(
+          "ねこだよりの予約はできましたが、写真を審査へ送れませんでした。通信を確認して、もう一度おためしください。",
+        );
+      }
+    });
     const deliveryTarget = recordEveningDeliveryTarget(ownPhoto);
     setCollectionRefreshTick((value) => value + 1);
     setEveningRefreshTick((value) => value + 1);
