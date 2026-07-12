@@ -53,7 +53,7 @@ const variantLabels: Record<CatIllustrationVariant, string> = {
   e7: "e7",
   e8: "e8",
   "e5-original": "原案",
-  "e5-muted": "彩度控えめ",
+  "e5-muted": "彩度控えめ（採用・ナビcurrent）",
   "e5-mono": "単色（ナビ用）",
 };
 

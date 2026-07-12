@@ -212,11 +212,21 @@ export function getCatIllustrationAssets(
 
   if (variant.startsWith("e")) {
     if (variant.startsWith("e5-")) {
+      const navigationAssets =
+        variant === "e5-muted"
+          ? CURRENT_CAT_ILLUSTRATION_ASSETS
+          : {
+              todayNavIcon: "/illustrations/candidates/theme-b/nav-today.webp",
+              uchinokoNavIcon:
+                "/illustrations/candidates/theme-b/nav-uchinoko.webp",
+              catSwitcherIcon:
+                "/illustrations/candidates/theme-b/cat-switcher.webp",
+            };
       return {
         homeEmptyCat: `/illustrations/candidates/theme-e5-direction/${variant.slice(3)}.webp`,
-        todayNavIcon: "/illustrations/candidates/theme-b/nav-today.webp",
-        uchinokoNavIcon: "/illustrations/candidates/theme-b/nav-uchinoko.webp",
-        catSwitcherIcon: "/illustrations/candidates/theme-b/cat-switcher.webp",
+        todayNavIcon: navigationAssets.todayNavIcon,
+        uchinokoNavIcon: navigationAssets.uchinokoNavIcon,
+        catSwitcherIcon: navigationAssets.catSwitcherIcon,
         deliveryFallback: CURRENT_CAT_ILLUSTRATION_ASSETS.deliveryFallback,
       };
     }

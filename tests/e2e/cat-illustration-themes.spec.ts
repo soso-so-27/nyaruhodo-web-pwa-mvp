@@ -33,6 +33,30 @@ test.describe("cat illustration theme prototype", () => {
     ).toBeVisible();
   });
 
+  test("keeps current navigation icons with the selected muted E5 cat", async ({
+    page,
+  }) => {
+    await page.goto("/prototypes/board-v2?illust=e5-muted");
+    await page.getByTestId("board-v2-settings-button").click();
+
+    await expect(
+      page.locator('img[src$="/theme-e5-direction/muted.webp"]'),
+    ).toBeVisible();
+    await expect(
+      page
+        .getByRole("link", { name: "きょう" })
+        .locator('img[src$="/icons/bottom-nav-today.webp"]'),
+    ).toBeVisible();
+    await expect(
+      page
+        .getByRole("link", { name: "うちのこ" })
+        .locator('img[src$="/icons/bottom-nav-uchinoko.webp"]'),
+    ).toBeVisible();
+    await expect(
+      page.locator('img[src$="/theme-b/nav-today.webp"]'),
+    ).toHaveCount(0);
+  });
+
   test("switches the theme from the board prototype settings sheet", async ({
     page,
   }) => {
