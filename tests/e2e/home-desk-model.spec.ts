@@ -196,7 +196,7 @@ test.describe("home desk model", () => {
     await expect(page.getByTestId("home-retake-action")).toBeVisible();
     await expect(page.getByTestId("home-retake-action")).toHaveText("とりなおす");
     await expect(
-      page.getByText("きょうの一枚。よる8時のねこだよりに"),
+      page.getByText("きょうの一枚を、よる8時のねこだよりに。"),
     ).toHaveCount(0);
     await expect(page.getByText("この子の写真をしまう")).toHaveCount(0);
     await expect(page.getByTestId("desk-letter")).toHaveCount(0);
@@ -388,7 +388,9 @@ test.describe("home desk model", () => {
 
     await expect(page.getByText("きょうも すやすや")).toHaveCount(0);
     await expect(page.getByText("ねがおを とる")).toBeVisible();
-    await expect(page.getByText("きょうの一枚。よる8時のねこだよりに")).toBeVisible();
+    await expect(
+      page.getByText("きょうの一枚を、よる8時のねこだよりに。"),
+    ).toBeVisible();
     await expect(
       page.locator('img[src$="/theme-e5-direction/muted.webp"]'),
     ).toBeVisible();

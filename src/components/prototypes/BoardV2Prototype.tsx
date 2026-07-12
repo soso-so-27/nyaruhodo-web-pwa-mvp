@@ -358,7 +358,7 @@ function ThemeEHomePreview({ variant }: { variant: ENavVariant }) {
           ねがおを とる
         </button>
         <p style={styles.homePreviewPromise}>
-          きょうの一枚。よる8時のねこだよりに
+          きょうの一枚を、よる8時のねこだよりに。
         </p>
       </section>
       <nav style={styles.previewNav} aria-label="比較用ナビゲーション">

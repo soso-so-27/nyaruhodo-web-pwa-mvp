@@ -551,8 +551,12 @@ export function HomeDeskModel({
                       <span>ねがおを とる</span>
                     </button>
                     <span style={deskStyles.homeCaptureHint}>
-                      <AppIcon name="mail" size={13} />
-                      きょうの一枚。よる8時のねこだよりに
+                      <AppIcon
+                        name="mail"
+                        size={13}
+                        style={deskStyles.homeCaptureHintIcon}
+                      />
+                      きょうの一枚を、よる8時のねこだよりに。
                     </span>
                   </div>
                 ) : null}
@@ -574,10 +578,9 @@ export function HomeDeskModel({
                 data-testid="desk-empty-frame"
                 style={deskStyles.homeEmptyFrame}
               >
-                <span style={deskStyles.homeEmptyEnvelopeHint} aria-hidden="true" />
                 <SleepingCatPlaceholder />
                 {shouldShowHomeFrameTakeButton ? (
-                  <>
+                  <div style={deskStyles.homeEmptyActionGroup}>
                     <button
                       type="button"
                       data-testid="home-empty-action"
@@ -586,14 +589,22 @@ export function HomeDeskModel({
                       onClick={onTakePhoto}
                       aria-label={`${catName}の ねがおを とる`}
                     >
-                      <AppIcon name="camera" size={16} />
-                      ねがおを とる
+                      <AppIcon
+                        name="camera"
+                        size={16}
+                        style={deskStyles.homeEmptyActionIcon}
+                      />
+                      <span>ねがおを とる</span>
                     </button>
                     <span style={deskStyles.homeCaptureHint}>
-                      <AppIcon name="mail" size={13} />
-                      きょうの一枚。よる8時のねこだよりに
+                      <AppIcon
+                        name="mail"
+                        size={13}
+                        style={deskStyles.homeCaptureHintIcon}
+                      />
+                      きょうの一枚を、よる8時のねこだよりに。
                     </span>
-                  </>
+                  </div>
                 ) : null}
               </div>
             )}
@@ -2287,27 +2298,13 @@ const deskStyles = {
     boxShadow: "none",
     transition: "filter 220ms var(--ease-gentle)",
   },
-  homeEmptyEnvelopeHint: {
-    position: "absolute",
-    zIndex: 0,
-    width: "min(138vw, 660px)",
-    aspectRatio: "852 / 1842",
-    top: "calc(50% - 60px)",
-    left: "50%",
-    transform: "translate(-50%, -50%)",
-    borderRadius: "0",
-    border: "none",
-    backgroundImage: "url('/illustrations/home-envelope-flap-lines.webp')",
-    backgroundRepeat: "no-repeat",
-    backgroundPosition: "50% 50%",
-    backgroundSize: "contain",
-    boxShadow: "none",
-    opacity: "var(--home-envelope-line-opacity, 0.34)",
-    filter:
-      "brightness(0.88) sepia(0.14) saturate(0.84) contrast(0.78) drop-shadow(0 1px 0 color-mix(in srgb, var(--paper-card) 28%, transparent))",
-    mixBlendMode: "multiply",
-    overflow: "hidden",
-    pointerEvents: "none",
+  homeEmptyActionGroup: {
+    position: "relative",
+    zIndex: 1,
+    display: "grid",
+    justifyItems: "center",
+    gap: "8px",
+    width: "100%",
   },
   homeEmptyAction: {
     position: "relative",
@@ -2318,16 +2315,18 @@ const deskStyles = {
     alignItems: "center",
     justifyContent: "center",
     gap: "8px",
+    width: "min(184px, 72vw)",
     minHeight: "48px",
     padding: "0 24px",
-    border: "1px solid color-mix(in srgb, var(--home-wax, #c2745a) 56%, transparent)",
+    border:
+      "1px solid color-mix(in srgb, var(--ink-soft) 14%, transparent)",
     borderRadius: "var(--radius-full)",
     background:
-      "color-mix(in srgb, var(--paper-card) 86%, var(--home-frame-glow, var(--paper-warm)) 14%)",
-    color: "var(--home-wax, #c2745a)",
+      "color-mix(in srgb, var(--home-frame-light, var(--paper-card)) 82%, var(--paper-card) 18%)",
+    color:
+      "color-mix(in srgb, var(--ink) 86%, var(--home-wax, var(--seal)) 14%)",
     boxShadow:
-      "0 1px 0 color-mix(in srgb, var(--paper-card) 72%, transparent) inset, 0 12px 26px -20px color-mix(in srgb, var(--home-wax, #c2745a) 38%, transparent)",
-    backdropFilter: "blur(8px)",
+      "0 1px 0 color-mix(in srgb, var(--paper-card) 68%, transparent) inset, 0 10px 22px -18px color-mix(in srgb, var(--ink) 22%, transparent)",
     fontFamily: "var(--font-ui)",
     fontSize: "var(--home-empty-action-size, 14px)",
     fontWeight: 600,
@@ -2335,7 +2334,10 @@ const deskStyles = {
     cursor: "pointer",
     WebkitTapHighlightColor: "transparent",
     transition:
-      "transform 140ms var(--ease-gentle), box-shadow 140ms var(--ease-gentle), background var(--home-daylight-transition, 1800ms) var(--ease-gentle)",
+      "transform 140ms var(--ease-gentle), box-shadow 140ms var(--ease-gentle), color var(--home-daylight-transition, 1800ms) var(--ease-gentle), border-color var(--home-daylight-transition, 1800ms) var(--ease-gentle), background var(--home-daylight-transition, 1800ms) var(--ease-gentle)",
+  },
+  homeEmptyActionIcon: {
+    color: "var(--home-wax, var(--seal))",
   },
   homeCaptureHint: {
     display: "inline-flex",
@@ -2343,13 +2345,18 @@ const deskStyles = {
     justifyContent: "center",
     gap: "5px",
     maxWidth: "min(260px, 78vw)",
-    color: "color-mix(in srgb, var(--ink-soft) 76%, var(--home-wax, #c2745a))",
+    color:
+      "color-mix(in srgb, var(--ink-soft) 84%, var(--home-frame-light, var(--paper)) 16%)",
     fontFamily: "var(--font-ui)",
-    fontSize: "12px",
-    fontWeight: 500,
-    lineHeight: 1.45,
+    fontSize: "11.5px",
+    fontWeight: 400,
+    lineHeight: 1.5,
     letterSpacing: "var(--tracking-body)",
     textAlign: "center",
+    transition: "color var(--home-daylight-transition, 1800ms) var(--ease-gentle)",
+  },
+  homeCaptureHintIcon: {
+    color: "color-mix(in srgb, var(--home-wax, var(--seal)) 72%, var(--ink-soft))",
   },
   sleepingCatPlaceholder: {
     position: "relative",
