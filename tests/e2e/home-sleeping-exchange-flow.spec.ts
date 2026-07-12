@@ -237,6 +237,312 @@ test.describe("home sleeping exchange flow", () => {
     expect(afterConfirmTargetId).toBeTruthy();
   });
 
+  test("stores an evening target without duplicating the photo payload", async ({
+    page,
+  }) => {
+    const beforeDelivery = Date.parse("2026-06-10T10:30:00.000Z");
+
+    await page.addInitScript((now) => {
+      (window as typeof window & { __testNow?: number }).__testNow = now;
+      const originalDateNow = Date.now.bind(Date);
+      Date.now = () =>
+        (window as typeof window & { __testNow?: number }).__testNow ??
+        originalDateNow();
+      window.localStorage.setItem("nyaruhodo_sleeping_safety_accepted", "1");
+      window.localStorage.setItem("active_cat_id", "android-quota-cat");
+      window.localStorage.setItem(
+        "cat_profiles",
+        JSON.stringify([
+          {
+            id: "android-quota-cat",
+            name: "android quota cat",
+            createdAt: new Date(now).toISOString(),
+            updatedAt: new Date(now).toISOString(),
+          },
+        ]),
+      );
+
+      const originalSetItem = Storage.prototype.setItem;
+      Storage.prototype.setItem = function patchedSetItem(key, value) {
+        if (
+          key === "neteruneko_evening_delivery_days" &&
+          String(value).includes('"targetPhoto"')
+        ) {
+          throw new DOMException("Quota exceeded for test", "QuotaExceededError");
+        }
+        return originalSetItem.call(this, key, value);
+      };
+    }, beforeDelivery);
+
+    await page.route("**/api/sleeping-delivery/backup", async (route) => {
+      await route.fulfill({
+        contentType: "application/json",
+        body: JSON.stringify({ ok: true }),
+      });
+    });
+    await page.goto("/home");
+    await page.waitForLoadState("networkidle");
+
+    await page.getByTestId("home-empty-action").click();
+    await page.locator('input[type="file"]').last().setInputFiles({
+      name: "android-large-photo.png",
+      mimeType: "image/png",
+      buffer: testUploadPng,
+    });
+    await confirmSleepingPhotoShare(page);
+    await waitForOwnSleepingPhotoCount(page, 1);
+
+    const savedTarget = await page.evaluate(() => {
+      const store = JSON.parse(
+        window.localStorage.getItem("neteruneko_evening_delivery_days") ?? "{}",
+      );
+      return store["2026-06-10"] ?? null;
+    });
+    expect(savedTarget?.targetOwnPhotoId).toBeTruthy();
+    expect(savedTarget?.targetCatId).toBe("android-quota-cat");
+    expect(savedTarget?.targetPhoto).toBeUndefined();
+  });
+
+  test("repairs a missing same-day target and delivers after an Android revisit", async ({
+    page,
+  }) => {
+    let exchangeCalls = 0;
+    const afterDelivery = Date.parse("2026-06-10T11:05:00.000Z");
+    const capturedAt = Date.parse("2026-06-10T09:10:00.000Z");
+
+    await seedMissingEveningTarget(page, {
+      now: afterDelivery,
+      capturedAt,
+      catId: "android-repair-cat",
+      photoId: "android-shared-photo",
+      shared: true,
+      captureContext: "daily",
+    });
+    await page.route("**/api/sleeping-delivery/exchange", async (route) => {
+      exchangeCalls += 1;
+      const body = route.request().postDataJSON() as {
+        ownPhoto?: { id?: string };
+        recipientCatId?: string;
+      };
+      expect(body.ownPhoto?.id).toBe("android-shared-photo");
+      expect(body.recipientCatId).toBe("android-repair-cat");
+      await route.fulfill({
+        contentType: "application/json",
+        body: JSON.stringify({
+          photo: {
+            id: "android-repaired-delivery",
+            sourcePhotoId: "android-repaired-source",
+            src: deliveredDataUrl,
+            title: "",
+            subtitle: "",
+            triggerLabel: "sleeping",
+            theme: "sleeping",
+            deliveredAt: afterDelivery,
+          },
+          source: "remote",
+        }),
+      });
+    });
+
+    await page.goto("/home");
+    await page.waitForLoadState("networkidle");
+    await expect.poll(() => exchangeCalls).toBe(1);
+
+    const store = await page.evaluate(() =>
+      JSON.parse(
+        window.localStorage.getItem("neteruneko_evening_delivery_days") ?? "{}",
+      ),
+    );
+    expect(store["2026-06-10"]?.targetOwnPhotoId).toBe(
+      "android-shared-photo",
+    );
+    expect(store["2026-06-10"]?.targetPhoto).toBeUndefined();
+    expect(store["2026-06-10"]?.deliveredPhoto?.id).toBe(
+      "android-repaired-delivery",
+    );
+  });
+
+  test("releases a stalled Android exchange and retries automatically", async ({
+    page,
+  }) => {
+    test.slow();
+    let completedExchangeCalls = 0;
+    const afterDelivery = Date.parse("2026-06-10T11:05:00.000Z");
+    const capturedAt = Date.parse("2026-06-10T09:10:00.000Z");
+
+    await seedMissingEveningTarget(page, {
+      now: afterDelivery,
+      capturedAt,
+      catId: "android-timeout-cat",
+      photoId: "android-timeout-photo",
+      shared: true,
+      captureContext: "daily",
+    });
+    await page.addInitScript(() => {
+      const originalFetch = window.fetch.bind(window);
+      let didStallExchange = false;
+      window.fetch = (input, init) => {
+        const url =
+          typeof input === "string"
+            ? input
+            : input instanceof URL
+              ? input.href
+              : input.url;
+        if (
+          !didStallExchange &&
+          url.includes("/api/sleeping-delivery/exchange")
+        ) {
+          didStallExchange = true;
+          (
+            window as typeof window & { __stalledExchangeAborted?: boolean }
+          ).__stalledExchangeAborted = false;
+          return new Promise<Response>((_resolve, reject) => {
+            init?.signal?.addEventListener(
+              "abort",
+              () => {
+                (
+                  window as typeof window & {
+                    __stalledExchangeAborted?: boolean;
+                  }
+                ).__stalledExchangeAborted = true;
+                reject(new DOMException("Aborted", "AbortError"));
+              },
+              { once: true },
+            );
+          });
+        }
+        return originalFetch(input, init);
+      };
+    });
+    await page.route("**/api/sleeping-delivery/exchange", async (route) => {
+      completedExchangeCalls += 1;
+      await route.fulfill({
+        contentType: "application/json",
+        body: JSON.stringify({
+          photo: {
+            id: "android-timeout-delivery",
+            sourcePhotoId: "android-timeout-source",
+            src: deliveredDataUrl,
+            title: "",
+            subtitle: "",
+            triggerLabel: "sleeping",
+            theme: "sleeping",
+            deliveredAt: afterDelivery,
+          },
+          source: "remote",
+        }),
+      });
+    });
+
+    await page.goto("/home");
+    await page.waitForLoadState("networkidle");
+    await expect
+      .poll(
+        () =>
+          page.evaluate(
+            () =>
+              (
+                window as typeof window & {
+                  __stalledExchangeAborted?: boolean;
+                }
+              ).__stalledExchangeAborted === true,
+          ),
+        { timeout: 20_000 },
+      )
+      .toBe(true);
+    await expect
+      .poll(() => completedExchangeCalls, { timeout: 25_000 })
+      .toBe(1);
+
+    const deliveredId = await page.evaluate(() => {
+      const store = JSON.parse(
+        window.localStorage.getItem("neteruneko_evening_delivery_days") ?? "{}",
+      );
+      return store["2026-06-10"]?.deliveredPhoto?.id ?? null;
+    });
+    expect(deliveredId).toBe("android-timeout-delivery");
+  });
+
+  test("does not repair private or onboarding-only photos into an evening target", async ({
+    page,
+  }) => {
+    let exchangeCalls = 0;
+    const afterDelivery = Date.parse("2026-06-10T11:05:00.000Z");
+    const capturedAt = Date.parse("2026-06-10T09:10:00.000Z");
+
+    await page.addInitScript(
+      ({ now, capturedAtValue, photoSrc }) => {
+        const originalDateNow = Date.now.bind(Date);
+        (window as typeof window & { __testNow?: number }).__testNow = now;
+        Date.now = () =>
+          (window as typeof window & { __testNow?: number }).__testNow ??
+          originalDateNow();
+        window.localStorage.setItem("nyaruhodo_sleeping_safety_accepted", "1");
+        window.localStorage.setItem("active_cat_id", "repair-guard-cat");
+        window.localStorage.setItem(
+          "cat_profiles",
+          JSON.stringify([
+            {
+              id: "repair-guard-cat",
+              name: "repair guard cat",
+              createdAt: new Date(capturedAtValue).toISOString(),
+              updatedAt: new Date(capturedAtValue).toISOString(),
+            },
+          ]),
+        );
+        window.localStorage.setItem(
+          "nyaruhodo_exchange_own_sleeping_photos",
+          JSON.stringify([
+            {
+              id: "private-photo",
+              ownerCatId: "repair-guard-cat",
+              catId: "repair-guard-cat",
+              src: photoSrc,
+              visibility: "private",
+              shared: false,
+              triggerLabel: "sleeping",
+              theme: "sleeping",
+              createdAt: capturedAtValue,
+              captureContext: "daily",
+            },
+            {
+              id: "onboarding-photo",
+              ownerCatId: "repair-guard-cat",
+              catId: "repair-guard-cat",
+              src: photoSrc,
+              visibility: "shared",
+              shared: true,
+              triggerLabel: "sleeping",
+              theme: "sleeping",
+              createdAt: capturedAtValue - 60_000,
+              captureContext: "onboarding",
+            },
+          ]),
+        );
+      },
+      { now: afterDelivery, capturedAtValue: capturedAt, photoSrc: deliveredDataUrl },
+    );
+    await page.route("**/api/sleeping-delivery/exchange", async (route) => {
+      exchangeCalls += 1;
+      await route.fulfill({
+        contentType: "application/json",
+        body: JSON.stringify({ photo: null, source: "none" }),
+      });
+    });
+
+    await page.goto("/home");
+    await page.waitForLoadState("networkidle");
+    await page.waitForTimeout(1_800);
+    expect(exchangeCalls).toBe(0);
+    await expect
+      .poll(() =>
+        page.evaluate(() =>
+          window.localStorage.getItem("neteruneko_evening_delivery_days"),
+        ),
+      )
+      .toBeNull();
+  });
+
   test("updates the save sheet status when switching delivery mode", async ({
     page,
   }) => {
@@ -1859,6 +2165,76 @@ test.describe("home sleeping exchange flow", () => {
     await expect(page.getByTestId("mainichi-board-photo-sent")).toHaveCount(2);
   });
 });
+
+async function seedMissingEveningTarget(
+  page: Page,
+  {
+    now,
+    capturedAt,
+    catId,
+    photoId,
+    shared,
+    captureContext,
+  }: {
+    now: number;
+    capturedAt: number;
+    catId: string;
+    photoId: string;
+    shared: boolean;
+    captureContext: "daily" | "onboarding";
+  },
+) {
+  await page.addInitScript(
+    ({ nowValue, capturedAtValue, catIdValue, photoIdValue, isShared, context, photoSrc }) => {
+      const originalDateNow = Date.now.bind(Date);
+      (window as typeof window & { __testNow?: number }).__testNow = nowValue;
+      Date.now = () =>
+        (window as typeof window & { __testNow?: number }).__testNow ??
+        originalDateNow();
+      window.localStorage.setItem("nyaruhodo_sleeping_safety_accepted", "1");
+      window.localStorage.setItem("neteruneko_onboarding_completed", "true");
+      window.localStorage.setItem("active_cat_id", catIdValue);
+      window.localStorage.setItem(
+        "cat_profiles",
+        JSON.stringify([
+          {
+            id: catIdValue,
+            name: "repair cat",
+            createdAt: new Date(capturedAtValue).toISOString(),
+            updatedAt: new Date(capturedAtValue).toISOString(),
+          },
+        ]),
+      );
+      window.localStorage.setItem(
+        "nyaruhodo_exchange_own_sleeping_photos",
+        JSON.stringify([
+          {
+            id: photoIdValue,
+            ownerCatId: catIdValue,
+            catId: catIdValue,
+            src: photoSrc,
+            visibility: isShared ? "shared" : "private",
+            shared: isShared,
+            triggerLabel: "sleeping",
+            theme: "sleeping",
+            createdAt: capturedAtValue,
+            captureContext: context,
+          },
+        ]),
+      );
+      window.localStorage.removeItem("neteruneko_evening_delivery_days");
+    },
+    {
+      nowValue: now,
+      capturedAtValue: capturedAt,
+      catIdValue: catId,
+      photoIdValue: photoId,
+      isShared: shared,
+      context: captureContext,
+      photoSrc: deliveredDataUrl,
+    },
+  );
+}
 
 async function readKeptExchangePhotoCount(page: Page) {
   return page.evaluate(() => {

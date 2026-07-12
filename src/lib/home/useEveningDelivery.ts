@@ -9,6 +9,7 @@ import {
   getJstDeliveryTime,
   getPendingEveningDeliveryDay,
   readEveningDeliveryStore,
+  repairMissingEveningDeliveryTarget,
   setAppBadge,
   setEveningDeliveredPhoto,
   markEveningDeliverySkipped,
@@ -19,6 +20,7 @@ import type { OwnSleepingPhoto } from "./sleepingPhotos";
 
 const EXCHANGE_UPLOAD_MAX_DATA_URL_LENGTH = 500_000;
 const EVENING_DELIVERY_SLOW_MS = 4_000;
+const EVENING_DELIVERY_RETRY_DELAYS_MS = [1_500, 5_000] as const;
 
 export type ExchangeUploadResizeStep =
   | "storage_direct"
@@ -37,6 +39,7 @@ type EveningDeliveryCheckSource =
   | "visibilitychange"
   | "pageshow"
   | "delivery_time_reached"
+  | "automatic_retry"
   | "retry";
 
 type EveningDeliveryCheckStatus = {
@@ -52,6 +55,8 @@ export function useEveningDelivery({
   ownSleepingPhotos: OwnSleepingPhoto[];
 }) {
   const pendingEveningDeliveryKeysRef = useRef(new Set<string>());
+  const automaticRetryCountsRef = useRef(new Map<string, number>());
+  const automaticRetryTimersRef = useRef(new Map<string, number>());
   const mountedRef = useRef(true);
   const [refreshToken, setRefreshToken] = useState(0);
   const [checkRequest, setCheckRequest] = useState<{
@@ -70,13 +75,65 @@ export function useEveningDelivery({
     }));
   }, []);
 
+  const clearAutomaticRetry = useCallback((dateKey: string) => {
+    const timerId = automaticRetryTimersRef.current.get(dateKey);
+    if (timerId !== undefined) {
+      window.clearTimeout(timerId);
+      automaticRetryTimersRef.current.delete(dateKey);
+    }
+    automaticRetryCountsRef.current.delete(dateKey);
+  }, []);
+
+  const scheduleAutomaticRetry = useCallback(
+    (dateKey: string) => {
+      if (automaticRetryTimersRef.current.has(dateKey)) {
+        return;
+      }
+
+      const attempt = automaticRetryCountsRef.current.get(dateKey) ?? 0;
+      const delay = EVENING_DELIVERY_RETRY_DELAYS_MS[attempt];
+      if (delay === undefined) {
+        return;
+      }
+
+      automaticRetryCountsRef.current.set(dateKey, attempt + 1);
+      const timerId = window.setTimeout(() => {
+        automaticRetryTimersRef.current.delete(dateKey);
+        requestDeliveryCheck("automatic_retry");
+      }, delay);
+      automaticRetryTimersRef.current.set(dateKey, timerId);
+    },
+    [requestDeliveryCheck],
+  );
+
   const ensureEveningDelivery = useCallback(
     async (source: EveningDeliveryCheckSource) => {
       const now = Date.now();
       const todayKey = getJstDateKey(now);
-      const store = readEveningDeliveryStore();
-      const todayDay = store[todayKey];
-      const pendingDay = getPendingEveningDeliveryDay(now);
+      let store = readEveningDeliveryStore();
+      let todayDay = store[todayKey];
+      let pendingDay = getPendingEveningDeliveryDay(now);
+
+      if (!pendingDay) {
+        const repaired = repairMissingEveningDeliveryTarget(
+          ownSleepingPhotos,
+          now,
+        );
+        if (repaired) {
+          trackProductEvent(
+            "evening_delivery_target_repaired",
+            {
+              delivery_date_key: repaired.dateKey,
+              source,
+            },
+            { localCatId: activeCatId },
+          );
+          store = readEveningDeliveryStore();
+          todayDay = store[todayKey];
+          pendingDay = getPendingEveningDeliveryDay(now);
+          setRefreshToken((value) => value + 1);
+        }
+      }
       const recipientCatId = pendingDay?.targetCatId ?? activeCatId;
       const traceBase = buildEveningDeliveryTraceBase({
         activeCatId,
@@ -250,6 +307,7 @@ export function useEveningDelivery({
           pendingEveningDeliveryKeysRef.current.delete(pendingDay.dateKey);
           if (result.error === "delivery_not_yet") {
             setCheckStatus({ state: "idle", dateKey: null });
+            scheduleAutomaticRetry(pendingDay.dateKey);
             trackProductEvent(
               "exchange_rejected_not_yet",
               {
@@ -279,6 +337,7 @@ export function useEveningDelivery({
             return;
           }
           setCheckStatus({ state: "failed", dateKey: pendingDay.dateKey });
+          scheduleAutomaticRetry(pendingDay.dateKey);
           trackProductEvent(
             "delivery_sent",
             {
@@ -298,6 +357,7 @@ export function useEveningDelivery({
         }
 
         setEveningDeliveredPhoto(pendingDay.dateKey, result.photo, Date.now());
+        clearAutomaticRetry(pendingDay.dateKey);
         void setAppBadge(1);
         setRefreshToken((value) => value + 1);
         setCheckStatus({ state: "idle", dateKey: null });
@@ -330,6 +390,7 @@ export function useEveningDelivery({
       } catch {
         pendingEveningDeliveryKeysRef.current.delete(pendingDay.dateKey);
         setCheckStatus({ state: "failed", dateKey: pendingDay.dateKey });
+        scheduleAutomaticRetry(pendingDay.dateKey);
         trackEveningDeliveryCheckEvent("evening_delivery_check_failed", {
           startedAt: checkStartedAt,
           source,
@@ -341,7 +402,12 @@ export function useEveningDelivery({
         }
       }
     },
-    [activeCatId, ownSleepingPhotos],
+    [
+      activeCatId,
+      clearAutomaticRetry,
+      ownSleepingPhotos,
+      scheduleAutomaticRetry,
+    ],
   );
 
   useEffect(() => {
@@ -365,6 +431,10 @@ export function useEveningDelivery({
       window.removeEventListener("focus", handleFocus);
       window.removeEventListener("pageshow", handlePageShow);
       document.removeEventListener("visibilitychange", handleVisibilityChange);
+      for (const timerId of automaticRetryTimersRef.current.values()) {
+        window.clearTimeout(timerId);
+      }
+      automaticRetryTimersRef.current.clear();
     };
   }, [requestDeliveryCheck]);
 

@@ -1,16 +1,16 @@
 import { expect, test } from "@playwright/test";
 
 test.describe("cat illustration theme prototype", () => {
-  test("keeps the current onboarding cat separate from the adopted home cat", async ({
+  test("uses the adopted muted E5 cat in current onboarding", async ({
     page,
   }) => {
     await page.goto("/onboarding?illust=current");
 
     await expect(
-      page.locator('img[src$="/illustrations/sleeping-cat-empty.webp"]'),
+      page.locator('img[src$="/theme-e5-direction/muted.webp"]'),
     ).toBeVisible();
     await expect(
-      page.locator('img[src$="/theme-e5-direction/muted.webp"]'),
+      page.locator('img[src$="/illustrations/sleeping-cat-empty.webp"]'),
     ).toHaveCount(0);
   });
 
@@ -42,7 +42,7 @@ test.describe("cat illustration theme prototype", () => {
     await page.goto("/onboarding?illust=theme-c");
 
     await expect(
-      page.locator('img[src$="/illustrations/sleeping-cat-empty.webp"]'),
+      page.locator('img[src$="/theme-e5-direction/muted.webp"]'),
     ).toBeVisible();
   });
 

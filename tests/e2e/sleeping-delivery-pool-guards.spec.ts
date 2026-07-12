@@ -977,6 +977,9 @@ test.describe("sleeping delivery pool guards", () => {
 
     try {
       const response = await request.post("/api/sleeping-delivery/exchange", {
+        headers: {
+          "x-forwarded-for": `2001:db8::${createdAt.toString(16)}`,
+        },
         data: {
           ...buildExchangeRequest(
             redBlueTestPhotoUrl,
@@ -1029,6 +1032,9 @@ test.describe("sleeping delivery pool guards", () => {
       const onboardingResponse = await request.post(
         "/api/sleeping-delivery/exchange",
         {
+          headers: {
+            "x-forwarded-for": `2001:db8:1::${createdAt.toString(16)}`,
+          },
           data: {
             ...buildExchangeRequest(
               normalCatLikePhotoUrl,
@@ -1180,6 +1186,9 @@ test.describe("sleeping delivery pool guards", () => {
       const onboardingResponse = await request.post(
         "/api/sleeping-delivery/exchange",
         {
+          headers: {
+            "x-forwarded-for": `2001:db8:2::${createdAt.toString(16)}`,
+          },
           data: {
             ...buildExchangeRequest(
               normalCatLikePhotoUrl,

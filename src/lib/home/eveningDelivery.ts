@@ -90,18 +90,23 @@ export function getFirstEveningDeliveryTargetDateKey(): string | null {
 
 export function writeEveningDeliveryStore(store: EveningDeliveryStore) {
   if (typeof window === "undefined") {
-    return;
+    return false;
   }
 
-  try {
-    writeCachedJson(
-      STORAGE_KEYS.eveningDeliveryDays,
-      pruneEveningDeliveryStore(store),
-    );
-    window.dispatchEvent(new Event("neteruneko_evening_delivery_updated"));
-  } catch {
-    // Local delivery state should never block taking or keeping photos.
+  for (const keepCount of [90, 30, 7, 1]) {
+    try {
+      writeCachedJson(
+        STORAGE_KEYS.eveningDeliveryDays,
+        pruneEveningDeliveryStore(store, keepCount),
+      );
+      window.dispatchEvent(new Event("neteruneko_evening_delivery_updated"));
+      return true;
+    } catch {
+      // Keep the newest delivery state when localStorage is nearly full.
+    }
   }
+
+  return false;
 }
 
 export function recordEveningDeliveryTarget(
@@ -112,7 +117,7 @@ export function recordEveningDeliveryTarget(
   const targetDateKey = getEveningDeliveryTargetDateKey(now);
   const day = store[targetDateKey] ?? { dateKey: targetDateKey };
   const canReplaceTarget = !day.deliveredPhoto && !day.openedAt;
-  const isExchangeTarget = canReplaceTarget;
+  let persisted = false;
 
   if (canReplaceTarget) {
     store[targetDateKey] = {
@@ -121,16 +126,71 @@ export function recordEveningDeliveryTarget(
       targetOwnPhotoId: ownPhoto.id,
       targetCatId: ownPhoto.ownerCatId ?? ownPhoto.catId,
       targetCapturedAt: ownPhoto.createdAt,
-      targetPhoto: ownPhoto,
     };
-    writeEveningDeliveryStore(store);
+    persisted = writeEveningDeliveryStore(store);
+    persisted =
+      persisted &&
+      readEveningDeliveryStore()[targetDateKey]?.targetOwnPhotoId === ownPhoto.id;
   }
 
   return {
     dateKey: targetDateKey,
-    isExchangeTarget,
+    isExchangeTarget: canReplaceTarget && persisted,
     isTodayDelivery: targetDateKey === getJstDateKey(now),
+    persisted,
+    targetSaveFailed: canReplaceTarget && !persisted,
   };
+}
+
+export function repairMissingEveningDeliveryTarget(
+  ownPhotos: OwnSleepingPhoto[],
+  now = Date.now(),
+) {
+  const store = readEveningDeliveryStore();
+  const candidate = ownPhotos
+    .filter((photo) => {
+      const shared = photo.shared ?? photo.visibility === "shared";
+      if (!shared || photo.captureContext === "onboarding") {
+        return false;
+      }
+
+      const dateKey = getJstDateKey(photo.createdAt);
+      const deliveryTime = getJstDeliveryTime(dateKey);
+      const day = store[dateKey];
+      return (
+        photo.createdAt < deliveryTime &&
+        now >= deliveryTime &&
+        now < getJstAutoOpenTime(dateKey) &&
+        !day?.targetOwnPhotoId &&
+        !day?.deliveredPhoto &&
+        !day?.openedAt &&
+        !day?.skippedAt
+      );
+    })
+    .sort((a, b) => b.createdAt - a.createdAt)[0];
+
+  if (!candidate) {
+    return null;
+  }
+
+  const dateKey = getJstDateKey(candidate.createdAt);
+  store[dateKey] = {
+    ...(store[dateKey] ?? { dateKey }),
+    dateKey,
+    targetOwnPhotoId: candidate.id,
+    targetCatId: candidate.ownerCatId ?? candidate.catId,
+    targetCapturedAt: candidate.createdAt,
+  };
+
+  const persisted = writeEveningDeliveryStore(store);
+  if (
+    !persisted ||
+    readEveningDeliveryStore()[dateKey]?.targetOwnPhotoId !== candidate.id
+  ) {
+    return null;
+  }
+
+  return { dateKey, photoId: candidate.id };
 }
 
 export function setEveningDeliveredPhoto(
@@ -506,11 +566,15 @@ function getJstDayStartTime(dateKey: string) {
   return Date.UTC(year, month - 1, day) - JST_OFFSET_MS;
 }
 
-function pruneEveningDeliveryStore(store: EveningDeliveryStore) {
+function pruneEveningDeliveryStore(store: EveningDeliveryStore, keepCount = 90) {
   const entries = Object.entries(store)
     .filter(([dateKey, day]) => isValidDateKey(dateKey) && isEveningDeliveryDay(day))
     .sort(([a], [b]) => b.localeCompare(a))
-    .slice(0, 90);
+    .slice(0, keepCount)
+    .map(([dateKey, day]) => {
+      const { targetPhoto: _legacyTargetPhoto, ...compactDay } = day;
+      return [dateKey, compactDay] as const;
+    });
 
   return Object.fromEntries(entries);
 }

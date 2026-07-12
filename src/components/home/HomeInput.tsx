@@ -2149,7 +2149,11 @@ export function HomeInput({
     setPendingExchangeSharePhoto(null);
     setPendingExchangeCatId(null);
 
-    if (!deliveryTarget.isExchangeTarget) {
+    if (deliveryTarget.targetSaveFailed) {
+      showToast(
+        "写真はのこりましたが、ねこだよりの予約を保存できませんでした。もう一度おためしください。",
+      );
+    } else if (!deliveryTarget.isExchangeTarget) {
       showToast("とったねがおに入りました。");
     }
     trackProductEvent(

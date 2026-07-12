@@ -24,6 +24,7 @@ type SleepingExchangeResponse = {
 };
 
 const MAX_BLOCKED_PHOTO_IDS = 100;
+const SLEEPING_EXCHANGE_TIMEOUT_MS = 15_000;
 
 export type SleepingDeliveryDiagnostics = {
   source: "remote" | "none" | "error";
@@ -74,6 +75,12 @@ export async function createSleepingExchange({
     return null;
   }
 
+  const abortController = new AbortController();
+  const timeoutId = window.setTimeout(
+    () => abortController.abort("exchange_timeout"),
+    SLEEPING_EXCHANGE_TIMEOUT_MS,
+  );
+
   try {
     const headers = new Headers({ "Content-Type": "application/json" });
     const ownPhotoStoragePath = getStoragePhotoPath(ownPhoto.src);
@@ -91,6 +98,7 @@ export async function createSleepingExchange({
     const response = await fetch("/api/sleeping-delivery/exchange", {
       method: "POST",
       headers,
+      signal: abortController.signal,
       body: JSON.stringify({
         ownPhoto: {
           id: ownPhoto.id,
@@ -131,8 +139,12 @@ export async function createSleepingExchange({
       photo: null,
       source: "none",
       httpStatus: null,
-      error: formatFetchFailure(error),
+      error: abortController.signal.aborted
+        ? "exchange_timeout"
+        : formatFetchFailure(error),
     };
+  } finally {
+    window.clearTimeout(timeoutId);
   }
 }
 
