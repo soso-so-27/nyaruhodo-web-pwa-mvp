@@ -845,6 +845,68 @@ test("keeps the record tab sections in the intended order", async ({ page }) => 
   expect(yearIndex).toBeGreaterThan(footprintIndex);
 });
 
+test("opens an omoide as a full paper view without cropping the photo", async ({
+  page,
+}) => {
+  await page.goto("about:blank");
+  const portraitPhoto = await buildRasterPhotoDataUrl(page, 900, 1600);
+  await seedCatsProfileWithOpenedMemory(
+    page,
+    Date.parse("2026-06-10T21:30:00+09:00"),
+    12,
+    portraitPhoto,
+  );
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto("/cats#omoide");
+  await page.waitForLoadState("networkidle");
+
+  await page
+    .getByTestId("omoide-bunbako")
+    .getByRole("button", { name: /先週のねがお/ })
+    .click();
+
+  const viewer = page.getByTestId("omoide-memory-viewer");
+  const frame = page.getByTestId("omoide-memory-photo-frame");
+  const stowButton = page.getByTestId("omoide-memory-stow");
+  await expect(viewer).toBeVisible();
+  await expect(stowButton).toHaveText("思い出箱に もどる");
+  await expect
+    .poll(async () => {
+      const box = await frame.boundingBox();
+      return box ? box.width / box.height : 0;
+    })
+    .toBeCloseTo(900 / 1600, 2);
+
+  const layout = await page.evaluate(() => {
+    const viewerElement = document.querySelector<HTMLElement>(
+      '[data-testid="omoide-memory-viewer"]',
+    );
+    const buttonElement = document.querySelector<HTMLElement>(
+      '[data-testid="omoide-memory-stow"]',
+    );
+    const buttonRect = buttonElement?.getBoundingClientRect();
+    return {
+      backgroundImage: viewerElement
+        ? getComputedStyle(viewerElement).backgroundImage
+        : "",
+      buttonHeight: buttonRect?.height ?? 0,
+      buttonBottom: buttonRect?.bottom ?? Number.POSITIVE_INFINITY,
+      viewportHeight: window.innerHeight,
+    };
+  });
+  expect(layout.backgroundImage).not.toBe("none");
+  expect(layout.buttonHeight).toBeGreaterThanOrEqual(54);
+  expect(layout.buttonBottom).toBeLessThanOrEqual(layout.viewportHeight);
+
+  await page.screenshot({
+    path: "artifacts/omoide-viewer-redesign/android-portrait.png",
+    fullPage: true,
+  });
+  await page.goBack();
+  await expect(viewer).toHaveCount(0);
+  await expect(page.getByTestId("omoide-bunbako")).toBeVisible();
+});
+
 test("opens a year summary dashboard from the yearly archive", async ({
   page,
 }) => {
@@ -930,6 +992,7 @@ async function seedCatsProfileWithOpenedMemory(
   page: Page,
   now: number,
   photoCount: number,
+  memoryPhotoSrc = photoDataUrl,
 ) {
   await seedCatsProfile(page, now, photoCount);
   await page.addInitScript(
@@ -973,7 +1036,39 @@ async function seedCatsProfileWithOpenedMemory(
         }),
       );
     },
-    { nowValue: now, src: photoDataUrl },
+    { nowValue: now, src: memoryPhotoSrc },
+  );
+}
+
+async function buildRasterPhotoDataUrl(
+  page: Page,
+  width: number,
+  height: number,
+) {
+  return page.evaluate(
+    ({ width, height }) => {
+      const canvas = document.createElement("canvas");
+      canvas.width = width;
+      canvas.height = height;
+      const context = canvas.getContext("2d");
+      if (!context) throw new Error("canvas_context_unavailable");
+      context.fillStyle = "#b97963";
+      context.fillRect(0, 0, width, height);
+      context.fillStyle = "#ead7ba";
+      context.beginPath();
+      context.ellipse(
+        width * 0.5,
+        height * 0.48,
+        width * 0.32,
+        width * 0.23,
+        -0.18,
+        0,
+        Math.PI * 2,
+      );
+      context.fill();
+      return canvas.toDataURL("image/png");
+    },
+    { width, height },
   );
 }
 
