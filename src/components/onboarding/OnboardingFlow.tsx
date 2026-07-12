@@ -1334,11 +1334,11 @@ export function OnboardingFlow() {
           <section style={styles.hero} aria-label="ねてるねこのはじめかた">
             <div style={styles.introArtifact} aria-hidden="true">
               <img
-                src={catIllustrations.homeEmptyCat}
+                src={catIllustrations.onboardingCat}
                 alt=""
                 style={styles.introCat}
                 onError={(event) =>
-                  fallBackCatIllustrationImage(event.currentTarget, "homeEmptyCat")
+                  fallBackCatIllustrationImage(event.currentTarget, "onboardingCat")
                 }
               />
               <OnboardingEnvelopeArt compact />
@@ -1773,11 +1773,11 @@ function ExternalBrowserGuide({
     <section style={styles.externalBrowserGuide} aria-label="ブラウザで開く案内">
       <div style={styles.externalBrowserArt} aria-hidden="true">
         <img
-          src={catIllustrations.homeEmptyCat}
+          src={catIllustrations.onboardingCat}
           alt=""
           style={styles.externalBrowserCat}
           onError={(event) =>
-            fallBackCatIllustrationImage(event.currentTarget, "homeEmptyCat")
+            fallBackCatIllustrationImage(event.currentTarget, "onboardingCat")
           }
         />
         <OnboardingEnvelopeArt compact />

@@ -1,6 +1,19 @@
 import { expect, test } from "@playwright/test";
 
 test.describe("cat illustration theme prototype", () => {
+  test("keeps the current onboarding cat separate from the adopted home cat", async ({
+    page,
+  }) => {
+    await page.goto("/onboarding?illust=current");
+
+    await expect(
+      page.locator('img[src$="/illustrations/sleeping-cat-empty.webp"]'),
+    ).toBeVisible();
+    await expect(
+      page.locator('img[src$="/theme-e5-direction/muted.webp"]'),
+    ).toHaveCount(0);
+  });
+
   test("applies a query variant and keeps it for the next page", async ({
     page,
   }) => {

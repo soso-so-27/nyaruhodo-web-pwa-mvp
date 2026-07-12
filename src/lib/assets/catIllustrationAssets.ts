@@ -55,6 +55,7 @@ export type E5DirectionVariant =
 
 export type CatIllustrationAssetKey =
   | "homeEmptyCat"
+  | "onboardingCat"
   | "todayNavIcon"
   | "uchinokoNavIcon"
   | "catSwitcherIcon"
@@ -159,7 +160,8 @@ export const CAT_ILLUSTRATION_E5_DIRECTION_VARIANTS = [
 const VARIANT_CHANGE_EVENT = "neteruneko_cat_illustration_variant_changed";
 
 export const CURRENT_CAT_ILLUSTRATION_ASSETS: CatIllustrationAssets = {
-  homeEmptyCat: "/illustrations/sleeping-cat-empty.webp",
+  homeEmptyCat: "/illustrations/candidates/theme-e5-direction/muted.webp",
+  onboardingCat: "/illustrations/sleeping-cat-empty.webp",
   todayNavIcon: "/icons/bottom-nav-today.webp",
   uchinokoNavIcon: "/icons/bottom-nav-uchinoko.webp",
   catSwitcherIcon: "/icons/cat-switch-generated.webp",
@@ -168,6 +170,7 @@ export const CURRENT_CAT_ILLUSTRATION_ASSETS: CatIllustrationAssets = {
 
 const CANDIDATE_FILENAMES = {
   homeEmptyCat: "home-empty-cat.webp",
+  onboardingCat: "home-empty-cat.webp",
   todayNavIcon: "nav-today.webp",
   uchinokoNavIcon: "nav-uchinoko.webp",
   catSwitcherIcon: "cat-switcher.webp",
@@ -192,6 +195,7 @@ export function getCatIllustrationAssets(
     const homeFilename = variant === "b3-ink" ? "b3-ink.svg" : `${variant}.webp`;
     return {
       homeEmptyCat: `/illustrations/candidates/theme-b-variants/${homeFilename}`,
+      onboardingCat: `/illustrations/candidates/theme-b-variants/${homeFilename}`,
       todayNavIcon: "/illustrations/candidates/theme-b/nav-today.webp",
       uchinokoNavIcon: "/illustrations/candidates/theme-b/nav-uchinoko.webp",
       catSwitcherIcon: "/illustrations/candidates/theme-b/cat-switcher.webp",
@@ -203,6 +207,7 @@ export function getCatIllustrationAssets(
     const homeFilename = variant === "d1-ink" ? "d1-ink.svg" : `${variant}.webp`;
     return {
       homeEmptyCat: `/illustrations/candidates/theme-d-silhouette/${homeFilename}`,
+      onboardingCat: `/illustrations/candidates/theme-d-silhouette/${homeFilename}`,
       todayNavIcon: "/illustrations/candidates/theme-b/nav-today.webp",
       uchinokoNavIcon: "/illustrations/candidates/theme-b/nav-uchinoko.webp",
       catSwitcherIcon: "/illustrations/candidates/theme-b/cat-switcher.webp",
@@ -224,6 +229,7 @@ export function getCatIllustrationAssets(
             };
       return {
         homeEmptyCat: `/illustrations/candidates/theme-e5-direction/${variant.slice(3)}.webp`,
+        onboardingCat: `/illustrations/candidates/theme-e5-direction/${variant.slice(3)}.webp`,
         todayNavIcon: navigationAssets.todayNavIcon,
         uchinokoNavIcon: navigationAssets.uchinokoNavIcon,
         catSwitcherIcon: navigationAssets.catSwitcherIcon,
@@ -232,6 +238,7 @@ export function getCatIllustrationAssets(
     }
     return {
       homeEmptyCat: `/illustrations/candidates/theme-e-splash-palette/${variant}.webp`,
+      onboardingCat: `/illustrations/candidates/theme-e-splash-palette/${variant}.webp`,
       todayNavIcon: "/illustrations/candidates/theme-b/nav-today.webp",
       uchinokoNavIcon: "/illustrations/candidates/theme-b/nav-uchinoko.webp",
       catSwitcherIcon: "/illustrations/candidates/theme-b/cat-switcher.webp",
@@ -242,6 +249,7 @@ export function getCatIllustrationAssets(
   const base = `/illustrations/candidates/${variant}`;
   return {
     homeEmptyCat: `${base}/${CANDIDATE_FILENAMES.homeEmptyCat}`,
+    onboardingCat: `${base}/${CANDIDATE_FILENAMES.onboardingCat}`,
     todayNavIcon: `${base}/${CANDIDATE_FILENAMES.todayNavIcon}`,
     uchinokoNavIcon: `${base}/${CANDIDATE_FILENAMES.uchinokoNavIcon}`,
     catSwitcherIcon: `${base}/${CANDIDATE_FILENAMES.catSwitcherIcon}`,

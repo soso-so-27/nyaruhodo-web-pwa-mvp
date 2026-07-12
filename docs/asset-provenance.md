@@ -107,6 +107,6 @@ E5の横たわる猫を原案として、原案そのまま・彩度控えめ・
 | 2026-07-12 | theme-e-nav-sumi | テーマE同輪郭の既存墨版から96pxナビ用に最適化（`--ink`相当 `#3f3a33`） | `public/illustrations/candidates/theme-e-nav/nav-sumi.webp` |
 | 2026-07-12 | theme-e-nav-seal | OpenAI image generation editで同輪郭を封蝋色`#a8584e`へ変更後、クロマキー除去・96px最適化 | `public/illustrations/candidates/theme-e-nav/nav-seal.webp` |
 
-採用決定（2026-07-12）: state1は `e5-muted`（彩度控えめ）、メニューバーと猫切替は `current` を維持する。7月13日20時の投稿3初回配達を確認するまではプロトタイプ候補として保持し、本番既定値は切り替えない。
+採用決定（2026-07-12）: ホームstate1は `e5-muted`（彩度控えめ）を本番既定とする。メニューバーと猫切替は `current` を維持する。オンボーディング、配達失敗、封筒、写真領域には適用しない。
 
 d1を`d1-ink.svg`へ単純化してトレースし、CSS maskの面色を`--home-illustration-ink`へ接続した。朝・昼・夕・夜の4時点で背景と面色が同時に変わることをスクリーンショットとE2Eで検証する。

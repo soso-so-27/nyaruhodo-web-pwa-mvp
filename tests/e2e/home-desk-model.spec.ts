@@ -387,6 +387,14 @@ test.describe("home desk model", () => {
     await expect(page.getByText("きょうも すやすや")).toHaveCount(0);
     await expect(page.getByText("ねがおを とる")).toBeVisible();
     await expect(page.getByText("きょうの一枚。よる8時のねこだよりに")).toBeVisible();
+    await expect(
+      page.locator('img[src$="/theme-e5-direction/muted.webp"]'),
+    ).toBeVisible();
+    await expect(
+      page
+        .getByRole("link", { name: "きょう" })
+        .locator('img[src$="/icons/bottom-nav-today.webp"]'),
+    ).toBeVisible();
     await expect(page.getByText("ねてない子は、アルバムへ")).toHaveCount(0);
     await expect(page.getByText("この子の写真をしまう")).toHaveCount(0);
     await expect(page.getByTestId("desk-letter")).toHaveCount(0);
