@@ -56,4 +56,72 @@ test.describe("cat illustration theme prototype", () => {
       fullPage: true,
     });
   });
+
+  test("compares theme E navigation colors on the state1 home preview", async ({
+    page,
+  }) => {
+    await page.goto("/prototypes/board-v2?illust=e-nav-rainbow");
+
+    const preview = page.getByTestId("theme-e-home-preview");
+    await expect(preview).toBeVisible();
+    await expect(
+      preview.getByRole("img", { name: "眠っている虹色のねこ" }),
+    ).toHaveAttribute(
+      "src",
+      "/illustrations/candidates/theme-e-nav/home-empty-cat.png",
+    );
+    await expect(
+      page.getByTestId("theme-e-preview-nav-きょう").locator("img"),
+    ).toHaveAttribute("width", "44");
+    await expect(
+      page.getByTestId("theme-e-preview-nav-きょう").locator("img"),
+    ).toHaveAttribute(
+      "src",
+      "/illustrations/candidates/theme-e-nav/nav-rainbow.webp",
+    );
+
+    await page.getByRole("button", { name: "夜" }).click();
+    await expect(preview).toHaveAttribute("data-ambient", "night");
+
+    await page.getByTestId("board-v2-settings-button").click();
+    const seal = page.getByTestId("cat-illustration-variant-e-nav-seal");
+    await seal.click();
+    await expect(page).toHaveURL(/illust=e-nav-seal/);
+    await expect(
+      page.getByTestId("theme-e-preview-nav-うちのこ").locator("img"),
+    ).toHaveAttribute(
+      "src",
+      "/illustrations/candidates/theme-e-nav/nav-seal.webp",
+    );
+
+    await page.getByTestId("cat-illustration-variant-theme-b").click();
+    await expect(page).toHaveURL(/illust=theme-b/);
+    await expect(page.getByTestId("theme-e-home-preview")).toHaveCount(0);
+  });
+
+  test("captures the theme E navigation candidates in day and night ambient", async ({
+    page,
+  }) => {
+    for (const variant of [
+      "e-nav-rainbow",
+      "e-nav-sumi",
+      "e-nav-seal",
+    ]) {
+      await page.goto(`/prototypes/board-v2?illust=${variant}`);
+      await expect(page.getByTestId("theme-e-home-preview")).toBeVisible();
+      await page.screenshot({
+        path: `artifacts/cat-illustration-themes/${variant}-day.png`,
+        fullPage: true,
+      });
+      await page.getByRole("button", { name: "夜" }).click();
+      await expect(page.getByTestId("theme-e-home-preview")).toHaveAttribute(
+        "data-ambient",
+        "night",
+      );
+      await page.screenshot({
+        path: `artifacts/cat-illustration-themes/${variant}-night.png`,
+        fullPage: true,
+      });
+    }
+  });
 });

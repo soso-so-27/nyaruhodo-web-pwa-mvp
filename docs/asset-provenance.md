@@ -103,5 +103,8 @@ E5の横たわる猫を原案として、原案そのまま・彩度控えめ・
 | 2026-07-12 | e5-original | 支給原案・起動画面の桜色/黄/青紫 | `public/illustrations/candidates/theme-e5-direction/original.webp` |
 | 2026-07-12 | e5-muted | 原案から彩度を約35%抑えたstate1候補 | `public/illustrations/candidates/theme-e5-direction/muted.webp` |
 | 2026-07-12 | e5-mono | 墨茶`#4a3f35`系・96pxナビ展開候補 | `public/illustrations/candidates/theme-e5-direction/mono.webp` |
+| 2026-07-12 | theme-e-nav-rainbow | 支給された緑背景のテーマE原画をクロマキー除去。虹色と和紙繊維を保持 | `public/illustrations/candidates/theme-e-nav/home-empty-cat.png`, `nav-rainbow.webp` |
+| 2026-07-12 | theme-e-nav-sumi | テーマE同輪郭の既存墨版から96pxナビ用に最適化（`--ink`相当 `#3f3a33`） | `public/illustrations/candidates/theme-e-nav/nav-sumi.webp` |
+| 2026-07-12 | theme-e-nav-seal | OpenAI image generation editで同輪郭を封蝋色`#a8584e`へ変更後、クロマキー除去・96px最適化 | `public/illustrations/candidates/theme-e-nav/nav-seal.webp` |
 
 d1を`d1-ink.svg`へ単純化してトレースし、CSS maskの面色を`--home-illustration-ink`へ接続した。朝・昼・夕・夜の4時点で背景と面色が同時に変わることをスクリーンショットとE2Eで検証する。

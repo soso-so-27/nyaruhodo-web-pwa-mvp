@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 import {
   CAT_ILLUSTRATION_B_DETAIL_VARIANTS,
@@ -57,13 +57,59 @@ const variantLabels: Record<CatIllustrationVariant, string> = {
   "e5-mono": "単色（ナビ用）",
 };
 
+const E_NAV_VARIANTS = [
+  "e-nav-rainbow",
+  "e-nav-sumi",
+  "e-nav-seal",
+] as const;
+type ENavVariant = (typeof E_NAV_VARIANTS)[number];
+
+const eNavLabels: Record<ENavVariant, string> = {
+  "e-nav-rainbow": "虹",
+  "e-nav-sumi": "墨",
+  "e-nav-seal": "封蝋",
+};
+
+const eNavIconPaths: Record<ENavVariant, string> = {
+  "e-nav-rainbow": "/illustrations/candidates/theme-e-nav/nav-rainbow.webp",
+  "e-nav-sumi": "/illustrations/candidates/theme-e-nav/nav-sumi.webp",
+  "e-nav-seal": "/illustrations/candidates/theme-e-nav/nav-seal.webp",
+};
+
 export function BoardV2Prototype() {
   const selectedVariant = useCatIllustrationVariant();
+  const [selectedENavVariant, setSelectedENavVariant] =
+    useState<ENavVariant | null>(null);
   const [isSheetOpen, setIsSheetOpen] = useState(false);
+
+  useEffect(() => {
+    const query = new URLSearchParams(window.location.search).get("illust");
+    setSelectedENavVariant(
+      E_NAV_VARIANTS.includes(query as ENavVariant)
+        ? (query as ENavVariant)
+        : null,
+    );
+  }, []);
+
+  function selectENavVariant(variant: ENavVariant) {
+    setSelectedENavVariant(variant);
+    const url = new URL(window.location.href);
+    url.searchParams.set("illust", variant);
+    window.history.replaceState(null, "", url);
+  }
+
+  function selectExistingVariant(variant: CatIllustrationVariant) {
+    setSelectedENavVariant(null);
+    setCatIllustrationVariant(variant);
+  }
 
   return (
     <>
-      <CollectionPage />
+      {selectedENavVariant ? (
+        <ThemeEHomePreview variant={selectedENavVariant} />
+      ) : (
+        <CollectionPage />
+      )}
       <button
         type="button"
         aria-label="プロトタイプの設定"
@@ -91,7 +137,7 @@ export function BoardV2Prototype() {
                     type="button"
                     data-testid={`cat-illustration-variant-${variant}`}
                     aria-pressed={isSelected}
-                    onClick={() => setCatIllustrationVariant(variant)}
+                    onClick={() => selectExistingVariant(variant)}
                     style={{
                       ...styles.optionButton,
                       ...(isSelected ? styles.optionButtonSelected : {}),
@@ -121,7 +167,7 @@ export function BoardV2Prototype() {
                     data-testid={`cat-illustration-variant-${variant}`}
                     aria-label={`B詳細 ${variantLabels[variant]}`}
                     aria-pressed={isSelected}
-                    onClick={() => setCatIllustrationVariant(variant)}
+                    onClick={() => selectExistingVariant(variant)}
                     style={{
                       ...styles.detailButton,
                       ...(isSelected ? styles.optionButtonSelected : {}),
@@ -151,7 +197,7 @@ export function BoardV2Prototype() {
                     data-testid={`cat-illustration-variant-${variant}`}
                     aria-label={`Dシルエット ${variantLabels[variant]}`}
                     aria-pressed={isSelected}
-                    onClick={() => setCatIllustrationVariant(variant)}
+                    onClick={() => selectExistingVariant(variant)}
                     style={{
                       ...styles.detailButton,
                       ...(isSelected ? styles.optionButtonSelected : {}),
@@ -181,7 +227,7 @@ export function BoardV2Prototype() {
                     data-testid={`cat-illustration-variant-${variant}`}
                     aria-label={`E 起動画面パレット ${variantLabels[variant]}`}
                     aria-pressed={isSelected}
-                    onClick={() => setCatIllustrationVariant(variant)}
+                    onClick={() => selectExistingVariant(variant)}
                     style={{
                       ...styles.detailButton,
                       ...(isSelected ? styles.optionButtonSelected : {}),
@@ -211,7 +257,7 @@ export function BoardV2Prototype() {
                     data-testid={`cat-illustration-variant-${variant}`}
                     aria-label={`E5 方針比較 ${variantLabels[variant]}`}
                     aria-pressed={isSelected}
-                    onClick={() => setCatIllustrationVariant(variant)}
+                    onClick={() => selectExistingVariant(variant)}
                     style={{
                       ...styles.detailButton,
                       ...(isSelected ? styles.optionButtonSelected : {}),
@@ -229,6 +275,35 @@ export function BoardV2Prototype() {
                 );
               })}
             </div>
+            <p style={styles.optionLabel}>E ナビ比較</p>
+            <div style={styles.detailChoices}>
+              {E_NAV_VARIANTS.map((variant) => {
+                const isSelected = selectedENavVariant === variant;
+                return (
+                  <button
+                    key={variant}
+                    type="button"
+                    data-testid={`cat-illustration-variant-${variant}`}
+                    aria-label={`E ナビ ${eNavLabels[variant]}`}
+                    aria-pressed={isSelected}
+                    onClick={() => selectENavVariant(variant)}
+                    style={{
+                      ...styles.detailButton,
+                      ...(isSelected ? styles.optionButtonSelected : {}),
+                    }}
+                  >
+                    <img
+                      src={eNavIconPaths[variant]}
+                      alt=""
+                      width={54}
+                      height={54}
+                      style={styles.detailPreview}
+                    />
+                    <span>{eNavLabels[variant]}</span>
+                  </button>
+                );
+              })}
+            </div>
             <p style={styles.optionHint}>
               選択はこの端末に残ります。通常画面でも同じ候補が表示されます。
             </p>
@@ -239,7 +314,194 @@ export function BoardV2Prototype() {
   );
 }
 
+function ThemeEHomePreview({ variant }: { variant: ENavVariant }) {
+  const [ambient, setAmbient] = useState<"day" | "night">("day");
+  const navIcon = eNavIconPaths[variant];
+
+  return (
+    <main
+      data-testid="theme-e-home-preview"
+      data-ambient={ambient}
+      style={{
+        ...styles.homePreview,
+        ...(ambient === "night"
+          ? styles.homePreviewNight
+          : styles.homePreviewDay),
+      }}
+    >
+      <div style={styles.ambientSwitch} aria-label="背景の時間帯">
+        {(["day", "night"] as const).map((value) => (
+          <button
+            key={value}
+            type="button"
+            aria-pressed={ambient === value}
+            onClick={() => setAmbient(value)}
+            style={{
+              ...styles.ambientButton,
+              ...(ambient === value ? styles.ambientButtonSelected : {}),
+            }}
+          >
+            {value === "day" ? "昼" : "夜"}
+          </button>
+        ))}
+      </div>
+      <section style={styles.homePreviewStage}>
+        <p style={styles.homePreviewDate}>7月12日</p>
+        <img
+          src="/illustrations/candidates/theme-e-nav/home-empty-cat.png"
+          alt="眠っている虹色のねこ"
+          width={152}
+          height={152}
+          style={styles.homePreviewCat}
+        />
+        <button type="button" style={styles.homePreviewCapture}>
+          ねがおを とる
+        </button>
+        <p style={styles.homePreviewPromise}>
+          きょうの一枚。よる8時のねこだよりに
+        </p>
+      </section>
+      <nav style={styles.previewNav} aria-label="比較用ナビゲーション">
+        <PreviewNavItem label="きょう" src={navIcon} active />
+        <PreviewNavItem
+          label="ねこだより"
+          src="/icons/bottom-nav-mainichi.webp"
+        />
+        <PreviewNavItem label="うちのこ" src={navIcon} />
+      </nav>
+    </main>
+  );
+}
+
+function PreviewNavItem({
+  label,
+  src,
+  active = false,
+}: {
+  label: string;
+  src: string;
+  active?: boolean;
+}) {
+  return (
+    <div
+      data-testid={`theme-e-preview-nav-${label}`}
+      style={{
+        ...styles.previewNavItem,
+        ...(active ? styles.previewNavItemActive : {}),
+      }}
+    >
+      <img src={src} alt="" width={44} height={44} style={styles.previewNavIcon} />
+      <span>{label}</span>
+    </div>
+  );
+}
+
 const styles = {
+  homePreview: {
+    minHeight: "100svh",
+    display: "grid",
+    gridTemplateRows: "auto 1fr auto",
+    justifyItems: "center",
+    padding:
+      "calc(12px + env(safe-area-inset-top)) 16px calc(14px + env(safe-area-inset-bottom))",
+    color: "var(--ink)",
+    transition: "background 220ms ease, color 220ms ease",
+  },
+  homePreviewDay: {
+    background:
+      "radial-gradient(circle at 76% 18%, rgba(255,229,199,0.52), transparent 38%), linear-gradient(180deg, #fbf7ed 0%, #f4ecdf 100%)",
+  },
+  homePreviewNight: {
+    background:
+      "radial-gradient(circle at 24% 16%, rgba(179,153,191,0.2), transparent 42%), linear-gradient(180deg, #5d5767 0%, #3f3b49 100%)",
+    color: "#f4eee4",
+  },
+  ambientSwitch: {
+    display: "grid",
+    gridTemplateColumns: "1fr 1fr",
+    gap: "2px",
+    padding: "2px",
+    borderRadius: "999px",
+    background: "color-mix(in srgb, var(--paper-card) 76%, transparent)",
+  },
+  ambientButton: {
+    minWidth: "52px",
+    minHeight: "32px",
+    border: 0,
+    borderRadius: "999px",
+    background: "transparent",
+    color: "inherit",
+    font: "inherit",
+  },
+  ambientButtonSelected: {
+    background: "color-mix(in srgb, var(--paper-card) 94%, transparent)",
+    color: "var(--ink)",
+  },
+  homePreviewStage: {
+    alignSelf: "center",
+    display: "grid",
+    justifyItems: "center",
+    gap: "12px",
+    width: "min(100%, 390px)",
+  },
+  homePreviewDate: {
+    margin: 0,
+    fontSize: "13px",
+    opacity: 0.72,
+  },
+  homePreviewCat: {
+    width: "152px",
+    height: "152px",
+    objectFit: "contain" as const,
+  },
+  homePreviewCapture: {
+    minWidth: "176px",
+    minHeight: "48px",
+    border: "1px solid color-mix(in srgb, var(--seal) 32%, transparent)",
+    borderRadius: "999px",
+    background: "var(--seal)",
+    color: "white",
+    fontFamily: "var(--font-ui)",
+    fontSize: "15px",
+    fontWeight: 600,
+  },
+  homePreviewPromise: {
+    margin: 0,
+    fontSize: "12px",
+    opacity: 0.7,
+  },
+  previewNav: {
+    display: "grid",
+    gridTemplateColumns: "repeat(3, 1fr)",
+    gap: "4px",
+    width: "min(calc(100% - 16px), 410px)",
+    minHeight: "68px",
+    padding: "4px",
+    overflow: "hidden",
+    border: "1px solid color-mix(in srgb, var(--control-border) 92%, transparent)",
+    borderRadius: "999px",
+    background: "color-mix(in srgb, var(--paper) 86%, transparent)",
+    boxShadow: "0 14px 34px -22px rgba(70, 50, 30, 0.24)",
+    color: "var(--ink)",
+  },
+  previewNavItem: {
+    minWidth: 0,
+    display: "grid",
+    placeItems: "center",
+    alignContent: "center",
+    gap: 0,
+    borderRadius: "999px",
+    fontFamily: "var(--font-ui)",
+    fontSize: "10px",
+  },
+  previewNavItemActive: {
+    background: "color-mix(in srgb, var(--paper-card) 82%, transparent)",
+  },
+  previewNavIcon: {
+    width: "44px",
+    height: "44px",
+    objectFit: "contain" as const,
+  },
   settingsButton: {
     position: "fixed" as const,
     zIndex: 45,
