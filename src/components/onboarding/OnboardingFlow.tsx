@@ -51,6 +51,7 @@ import {
   updateCatProfileName,
 } from "../home/homeInputHelpers";
 import { AppButton } from "../ui/AppButton";
+import { CameraIcon, MailIcon } from "../ui/AppIcons";
 import { PhotoTile } from "../ui/PhotoTile";
 import { StoredPhotoImage } from "../ui/StoredPhotoImage";
 import { WordmarkHeader } from "../ui/AppHeader";
@@ -1292,48 +1293,61 @@ export function OnboardingFlow() {
 
         {!shouldShowExternalBrowserGuide && (state === "intro" || state === "saving") ? (
           <section style={styles.hero} aria-label="ねてるねこのはじめかた">
-            <div style={styles.introArtifact} aria-hidden="true">
-              <img
-                src={catIllustrations.onboardingCat}
-                alt=""
-                style={styles.introCat}
-                onError={(event) =>
-                  fallBackCatIllustrationImage(event.currentTarget, "onboardingCat")
-                }
-              />
-              <OnboardingEnvelopeArt compact />
-            </div>
+            {state === "intro" ? (
+              <div style={styles.introArtifact} aria-hidden="true">
+                <img
+                  src={catIllustrations.onboardingCat}
+                  alt=""
+                  style={styles.introCat}
+                  onError={(event) =>
+                    fallBackCatIllustrationImage(event.currentTarget, "onboardingCat")
+                  }
+                />
+              </div>
+            ) : null}
+            {state === "intro" ? <OnboardingExchangeRoute /> : null}
             <h1 style={styles.title}>
-              ねがおを入れると
-              <br />
-              ねこだよりが届きます
+              {state === "saving" ? (
+                "ねこだよりを準備しています"
+              ) : (
+                <>
+                  ねがおを入れると
+                  <br />
+                  ねこだよりが届きます
+                </>
+              )}
             </h1>
-            <p style={styles.lead}>
-              自分のねこの寝顔を1枚入れると、
-              <br />
-              どこかのねこの寝顔が1通届きます。
-              <br />
-              <br />
-              外には出ません。
-              <br />
-              届く前に、すべて確認しています。
-            </p>
+            {state === "intro" ? (
+              <p style={styles.lead}>
+                自分のねこの寝顔を1枚入れると、
+                <br />
+                どこかのねこの寝顔が1通届きます。
+                <br />
+                <br />
+                外には出ません。
+                <br />
+                届く前に、すべて確認しています。
+              </p>
+            ) : null}
             {state === "saving" ? (
               <DeliveryWaiting />
             ) : null}
-            <AppButton
-              type="button"
-              data-testid="onboarding-photo-select"
-              onClick={() => {
-                void handleSelectSleepingPhoto();
-              }}
-              fullWidth
-              style={styles.onboardingCta}
-              disabled={state === "saving"}
-            >
-              {state === "saving" ? "ねこだよりを準備しています…" : "ねがおを1枚入れる"}
-            </AppButton>
-            <p style={styles.ctaFootnote}>無料・ひとりで作っています</p>
+            {state === "intro" ? (
+              <>
+                <AppButton
+                  type="button"
+                  data-testid="onboarding-photo-select"
+                  onClick={() => {
+                    void handleSelectSleepingPhoto();
+                  }}
+                  fullWidth
+                  style={styles.onboardingCta}
+                >
+                  ねがおを1枚入れる
+                </AppButton>
+                <p style={styles.ctaFootnote}>無料・ひとりで作っています</p>
+              </>
+            ) : null}
             {message ? <p style={styles.message}>{message}</p> : null}
             {isPhotoDebugMode ? (
               <OnboardingPhotoDebugPanel info={photoDebugInfo} />
@@ -1343,21 +1357,13 @@ export function OnboardingFlow() {
 
         {state === "naming" ? (
           <section style={styles.result} aria-label="この子の名前">
-            <p style={styles.kicker}>
-              {deliveredPhoto
-                ? "届いたねこだよりをしまいました"
-                : "ねがおをおあずかりしました"}
-            </p>
+            <p style={styles.kicker}>このねがおの子</p>
+            <h2 style={styles.subTitle}>この子の名前は？</h2>
             {selectedPhotoSrc ? (
               <img src={selectedPhotoSrc} alt="" style={styles.namePreviewPhoto} />
             ) : null}
-            <h2 style={styles.subTitle}>この子の名前は？</h2>
             <p style={styles.resultText}>
-              名前を入れると、あとから見返しやすくなります。
-              <br />
-              外には出ません。
-              <br />
-              あとから変えられます。
+              名前だけで大丈夫です。あとから変えられます。
             </p>
             <form
               style={styles.nameForm}
@@ -1656,6 +1662,20 @@ function OnboardingEnvelopeArt({ compact = false }: { compact?: boolean }) {
   );
 }
 
+function OnboardingExchangeRoute() {
+  return (
+    <div style={styles.exchangeRoute} aria-hidden="true">
+      <span style={styles.exchangeRouteIcon}>
+        <CameraIcon size={21} />
+      </span>
+      <span style={styles.exchangeRouteLine} />
+      <span style={styles.exchangeRouteIcon}>
+        <MailIcon size={21} />
+      </span>
+    </div>
+  );
+}
+
 function DeliveryWaiting() {
   return (
     <div style={styles.deliveryWaiting} aria-live="polite">
@@ -1696,7 +1716,6 @@ function ExternalBrowserGuide({
             fallBackCatIllustrationImage(event.currentTarget, "onboardingCat")
           }
         />
-        <OnboardingEnvelopeArt compact />
       </div>
       <p style={styles.kicker}>{kicker}</p>
       <h1 style={styles.title}>
@@ -1705,11 +1724,7 @@ function ExternalBrowserGuide({
         開くと安心です
       </h1>
       <p style={styles.externalBrowserText}>
-        LINEやInstagramの中で始めると、ホーム画面アプリにしたあと、
-        写真を引き継ぐ手順が必要になります。
-      </p>
-      <p style={styles.externalBrowserText}>
-        先にSafariやChromeで開くと、そのままホーム画面アプリへ残せます。
+        先にSafariやChromeで開くと、写真をそのままホーム画面アプリへ残せます。
       </p>
       <div style={styles.externalBrowserActions}>
         <AppButton
@@ -2295,7 +2310,8 @@ const styles = {
   page: {
     position: "relative",
     minHeight: "100dvh",
-    overflow: "hidden",
+    overflowX: "hidden",
+    overflowY: "auto",
     color: "#2f2a25",
     background: "var(--app-paper-background)",
     backgroundSize: "var(--app-paper-background-size)",
@@ -2322,7 +2338,7 @@ const styles = {
     padding:
       "calc(42px + env(safe-area-inset-top)) 28px calc(34px + env(safe-area-inset-bottom))",
     display: "grid",
-    alignContent: "center",
+    alignContent: "safe center",
     boxSizing: "border-box",
   },
   brandHeader: {
@@ -2344,31 +2360,20 @@ const styles = {
     textAlign: "center",
     gap: "12px",
     width: "100%",
-    padding: "22px 18px 24px",
+    padding: "12px 4px 18px",
     boxSizing: "border-box",
-    border: "1px solid rgba(120,108,94,0.12)",
-    borderRadius: "24px",
-    background:
-      "linear-gradient(180deg, rgba(255,253,248,0.86), rgba(250,244,235,0.72))",
-    boxShadow: "0 18px 42px -34px rgba(82, 61, 43, 0.48)",
   },
   externalBrowserArt: {
-    position: "relative",
-    width: "min(62vw, 214px)",
-    height: "122px",
+    width: "min(48vw, 164px)",
+    height: "126px",
     display: "grid",
     placeItems: "center",
-    margin: "-2px 0 4px",
+    margin: "-4px 0 2px",
   },
   externalBrowserCat: {
-    position: "absolute",
-    zIndex: 2,
-    top: "-4px",
-    left: "50%",
-    width: "72px",
-    height: "72px",
+    width: "126px",
+    height: "126px",
     objectFit: "contain",
-    transform: "translateX(-50%)",
     filter: "drop-shadow(0 8px 12px rgba(92,70,46,0.08)) saturate(0.94)",
   },
   externalBrowserText: {
@@ -2387,24 +2392,40 @@ const styles = {
     width: "100%",
   },
   introArtifact: {
-    position: "relative",
-    width: "min(74vw, 260px)",
-    height: "154px",
+    width: "min(52vw, 176px)",
+    height: "136px",
     display: "grid",
     placeItems: "center",
-    margin: "-4px 0 10px",
+    margin: "-4px 0 0",
   },
   introCat: {
-    position: "absolute",
-    zIndex: 2,
-    top: "0",
-    left: "50%",
-    width: "94px",
-    height: "94px",
+    width: "154px",
+    height: "154px",
     objectFit: "contain",
-    transform: "translateX(-50%)",
     filter:
       "drop-shadow(0 10px 14px rgba(92,70,46,0.08)) saturate(0.94)",
+  },
+  exchangeRoute: {
+    display: "grid",
+    gridTemplateColumns: "44px 54px 44px",
+    alignItems: "center",
+    justifyContent: "center",
+    margin: "-2px 0 2px",
+    color: "#756d62",
+  },
+  exchangeRouteIcon: {
+    width: "44px",
+    height: "44px",
+    display: "grid",
+    placeItems: "center",
+    border: "1px solid rgba(120,108,94,0.14)",
+    borderRadius: "50%",
+    background: "rgba(255,253,248,0.5)",
+  },
+  exchangeRouteLine: {
+    height: "2px",
+    background:
+      "repeating-linear-gradient(90deg, rgba(120,108,94,0.3) 0 5px, transparent 5px 11px)",
   },
   onboardingEnvelopeArt: {
     position: "relative",

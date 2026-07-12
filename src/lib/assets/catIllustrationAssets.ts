@@ -161,7 +161,7 @@ const VARIANT_CHANGE_EVENT = "neteruneko_cat_illustration_variant_changed";
 
 export const CURRENT_CAT_ILLUSTRATION_ASSETS: CatIllustrationAssets = {
   homeEmptyCat: "/illustrations/candidates/theme-e5-direction/muted.webp",
-  onboardingCat: "/illustrations/sleeping-cat-empty.webp",
+  onboardingCat: "/illustrations/candidates/theme-e5-direction/muted.webp",
   todayNavIcon: "/icons/bottom-nav-today.webp",
   uchinokoNavIcon: "/icons/bottom-nav-uchinoko.webp",
   catSwitcherIcon: "/icons/cat-switch-generated.webp",

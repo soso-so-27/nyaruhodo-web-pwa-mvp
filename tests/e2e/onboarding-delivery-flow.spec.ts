@@ -669,6 +669,11 @@ test.describe("onboarding delivery flow", () => {
     await expect(
       page.getByRole("button", { name: "ねがおを1枚入れる" }),
     ).toBeVisible();
+    await expect(
+      page.locator(
+        'img[src$="/illustrations/candidates/theme-e5-direction/muted.webp"]',
+      ),
+    ).toHaveCount(1);
 
     await page.getByRole("button", { name: "ねがおを1枚入れる" }).click();
     await page.locator('input[type="file"]').last().setInputFiles({
@@ -970,6 +975,11 @@ test.describe("onboarding delivery flow", () => {
       page.getByRole("heading", { name: "SafariやChromeで 開くと安心です" }),
     ).toBeVisible();
     await expect(page.getByText("アプリ内ブラウザ")).toBeVisible();
+    await expect(
+      page.locator(
+        'img[src$="/illustrations/candidates/theme-e5-direction/muted.webp"]',
+      ),
+    ).toHaveCount(1);
     await expect(
       page.getByRole("button", { name: "ねがおを1枚入れる" }),
     ).toHaveCount(0);
@@ -1661,6 +1671,8 @@ test.describe("onboarding delivery flow", () => {
 
     await expect(page.getByText("このねこの名前は？")).toBeVisible();
     await expect(page.getByRole("button", { name: "アルバムをつくる" })).toBeVisible();
+    await expect(page.getByRole("tab")).toHaveCount(0);
+    await expect(page.getByTestId("cats-tab-scroll")).toHaveCount(0);
   });
 
   test("shows a persistent completion panel after creating an onboarding album", async ({

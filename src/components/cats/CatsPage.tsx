@@ -1379,7 +1379,7 @@ export function CatsPage() {
           <div
             style={
               isOnboardingProfileSetup
-                ? styles.profileCard
+                ? styles.onboardingProfileCard
                 : styles.profilePlaceCard
             }
           >
@@ -1522,7 +1522,15 @@ export function CatsPage() {
               <>
                 {!isOnboardingProfileSetup ? <hr style={styles.divider} /> : null}
                 {isEditingCatName ? (
-                  <AppCard as="div" variant="inset" padding="sm" style={styles.editor}>
+                  <AppCard
+                    as="div"
+                    variant="inset"
+                    padding="sm"
+                    style={{
+                      ...styles.editor,
+                      ...(isOnboardingProfileSetup ? styles.onboardingEditor : {}),
+                    }}
+                  >
                     <AppTextField
                       id="cat-name"
                       type="text"
@@ -1609,7 +1617,9 @@ export function CatsPage() {
           </div>
         ) : null}
 
-        {activeCatProfile && !isOnboardingCompletionView ? (
+        {activeCatProfile &&
+        !isOnboardingProfileSetup &&
+        !isOnboardingCompletionView ? (
           <UchinokoSectionTabs
             value={activeSection}
             onChange={setActiveSection}
@@ -1621,6 +1631,7 @@ export function CatsPage() {
           />
         ) : null}
 
+        {!isOnboardingProfileSetup ? (
         <div
           ref={tabContentScrollerRef}
           data-testid="cats-tab-scroll"
@@ -1765,6 +1776,7 @@ export function CatsPage() {
         {message ? <p style={styles.message}>{message}</p> : null}
         {saveMessage ? <p style={styles.message}>{saveMessage}</p> : null}
         </div>
+        ) : null}
       </div>
       {!isOnboardingProfileSetup && !isOnboardingCompletionView ? (
         <BottomNavigation active="cats" />
@@ -5327,9 +5339,13 @@ const styles = {
     letterSpacing: CATS_BODY_TRACKING,
   },
   onboardingPanel: {
-    padding: "20px 18px 18px",
+    padding: "12px 18px 18px",
     marginBottom: "22px",
     textAlign: "center",
+    border: "none",
+    borderRadius: 0,
+    background: "transparent",
+    boxShadow: "none",
   },
   onboardingKicker: {
     margin: "0 0 8px",
@@ -5375,6 +5391,18 @@ const styles = {
   },
   onboardingHomeButton: {
     marginTop: "18px",
+  },
+  onboardingProfileCard: {
+    marginBottom: 0,
+    padding: 0,
+    borderRadius: 0,
+    background: "transparent",
+    boxShadow: "none",
+  },
+  onboardingEditor: {
+    width: "min(100%, 320px)",
+    margin: "0 auto",
+    padding: "16px",
   },
   profileCard: {
     marginBottom: "12px",

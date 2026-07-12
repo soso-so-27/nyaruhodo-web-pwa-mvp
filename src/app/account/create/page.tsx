@@ -115,8 +115,8 @@ export default function AccountCreatePage() {
     ? `${onboardingCatName.trim()}のアルバムをつくる`
     : "うちのこのアルバムをつくる";
   const onboardingAlbumBody = hasOnboardingCatName
-    ? `${onboardingCatName.trim()}のねがおを\nあとから見返せるようにします。\n\n届いたねこだよりも、あとから見返せます。`
-    : "今日のねがおを\nあとから見返せるようにします。\n\n届いたねこだよりも、あとから見返せます。";
+    ? `${onboardingCatName.trim()}のねがおと、届いたねこだよりを\nあとから見返せるようにします。`
+    : "今日のねがおと、届いたねこだよりを\nあとから見返せるようにします。";
 
   function markOnboardingAlbumCompletionReady() {
     window.sessionStorage.setItem(ONBOARDING_ALBUM_COMPLETION_READY_KEY, "true");
@@ -587,7 +587,14 @@ export default function AccountCreatePage() {
     <main style={styles.page}>
       <div style={styles.container}>
         {isFromOnboarding ? <WordmarkHeader style={styles.wordmarkHeader} /> : null}
-        <AppCard variant="section" padding="lg" style={styles.card}>
+        <AppCard
+          variant="section"
+          padding="lg"
+          style={{
+            ...styles.card,
+            ...(isFromOnboarding ? styles.onboardingCard : {}),
+          }}
+        >
           {isAccountConnected ? (
             <>
               <p style={styles.eyebrow}>アカウント</p>
@@ -687,15 +694,15 @@ export default function AccountCreatePage() {
                   {message}
                 </p>
               ) : null}
-              <p style={styles.authNote}>
-                {isEmbeddedBrowser
-                  ? isFromOnboarding
-                    ? `${embeddedBrowserLabel}の中からは、Googleのログインがひらけない決まりになっています。「つづきのリンクを作る」から、Safari/Chromeまたはホーム画面アプリでつづけられます。`
-                    : `${embeddedBrowserLabel}の中からは、Googleのログインがひらけない決まりになっています。Safari/Chromeで開き直してください。`
-                  : isFromOnboarding
-                  ? "Googleなしでも、つづきのリンクでホーム画面アプリに引き継げます。Googleがひらけないときは、つづきのリンクを作ってSafari/Chromeで開いてください。"
-                  : "Googleの画面が開きます。うまくいかない場合は、Safari/Chromeで開き直してください。"}
-              </p>
+              {!isFromOnboarding || isEmbeddedBrowser ? (
+                <p style={styles.authNote}>
+                  {isEmbeddedBrowser
+                    ? isFromOnboarding
+                      ? `${embeddedBrowserLabel}ではGoogleを開けません。つづきのリンクを作り、SafariかChromeで開いてください。`
+                      : `${embeddedBrowserLabel}の中からはGoogleを開けません。SafariかChromeで開き直してください。`
+                    : "Googleの画面が開きます。うまくいかない場合は、SafariかChromeで開き直してください。"}
+                </p>
+              ) : null}
 
               <div style={styles.actions}>
                 {isFromOnboarding ? (
@@ -865,6 +872,13 @@ const styles = {
   card: {
     padding: "24px 20px 22px",
     background: "rgba(255,253,248,0.62)",
+  },
+  onboardingCard: {
+    padding: "18px 4px 22px",
+    border: "none",
+    borderRadius: 0,
+    background: "transparent",
+    boxShadow: "none",
   },
   eyebrow: {
     margin: "0 0 10px",
