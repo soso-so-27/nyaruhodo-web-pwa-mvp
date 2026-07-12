@@ -287,6 +287,10 @@ const HOME_TODAY_CAT_SELECTION_STORAGE_KEY =
   "neteruneko_home_today_cat_selection";
 const EXCHANGE_SHARE_CAT_SELECTION_STORAGE_KEY =
   "neteruneko_exchange_share_cat_selection";
+const HOME_STARTUP_MIN_VISIBLE_MS = 600;
+const HOME_STARTUP_FADE_MS = 200;
+
+type HomeStartupPhase = "visible" | "fading" | "hidden";
 
 type BeforeInstallPromptEvent = Event & {
   prompt: () => Promise<void>;
@@ -302,6 +306,8 @@ export function HomeInput({
   const [activeCatId, setActiveCatId] = useState<string | null>(null);
   const [activeCat, setActiveCat] = useState<CatProfile | null>(null);
   const [hasHydratedHomeState, setHasHydratedHomeState] = useState(false);
+  const [homeStartupPhase, setHomeStartupPhase] =
+    useState<HomeStartupPhase>("visible");
   const [lockData, setLockData] = useState<LockData>({});
   const [tick, setTick] = useState(initialNow);
   const isHomeClockReady = tick > 0;
@@ -373,6 +379,11 @@ export function HomeInput({
     new Map<string, DeliveredPhotoDecodeEntry>(),
   );
   const openingEveningDeliveryRequestRef = useRef<string | null>(null);
+  const homeStartupStartedAtRef = useRef<number | null>(null);
+
+  useEffect(() => {
+    homeStartupStartedAtRef.current = performance.now();
+  }, []);
 
   useEffect(() => {
     const profiles = readCatProfiles();
@@ -2216,6 +2227,40 @@ export function HomeInput({
     eveningHomeState.kind === "before" || eveningHomeState.kind === "waiting";
   const isHomeReady = isHomeClockReady && hasHydratedHomeState;
 
+  useEffect(() => {
+    if (!isHomeReady) {
+      return;
+    }
+
+    const startedAt = homeStartupStartedAtRef.current ?? performance.now();
+    const remainingMs = Math.max(
+      0,
+      HOME_STARTUP_MIN_VISIBLE_MS - (performance.now() - startedAt),
+    );
+    let fadeTimer: number | null = null;
+    const hideTimer = window.setTimeout(() => {
+      const prefersReducedMotion = window.matchMedia?.(
+        "(prefers-reduced-motion: reduce)",
+      ).matches;
+      if (prefersReducedMotion) {
+        setHomeStartupPhase("hidden");
+        return;
+      }
+
+      setHomeStartupPhase("fading");
+      fadeTimer = window.setTimeout(() => {
+        setHomeStartupPhase("hidden");
+      }, HOME_STARTUP_FADE_MS);
+    }, remainingMs);
+
+    return () => {
+      window.clearTimeout(hideTimer);
+      if (fadeTimer !== null) {
+        window.clearTimeout(fadeTimer);
+      }
+    };
+  }, [isHomeReady]);
+
   return (
     <main
       style={isHomeReady ? styles.page : styles.startupPage}
@@ -2253,9 +2298,11 @@ export function HomeInput({
               deliveredPhotoDecodeStatus={deliveredPhotoDecodeStatus}
             />
           </>
-        ) : (
-          <HomeStartupSkeleton />
-        )}
+        ) : null}
+
+        {homeStartupPhase !== "hidden" ? (
+          <HomeStartupSkeleton phase={homeStartupPhase} />
+        ) : null}
 
         {isHomeReady && shouldShowHomeInstallHint && homeInstallPlatform ? (
           <HomeInstallHintCard
@@ -3068,13 +3115,19 @@ function InfoSheet({
   );
 }
 
-function HomeStartupSkeleton() {
+function HomeStartupSkeleton({ phase }: { phase: HomeStartupPhase }) {
   return (
     <section
       data-testid="home-startup-skeleton"
+      data-startup-min-ms={HOME_STARTUP_MIN_VISIBLE_MS}
+      data-startup-fade-ms={HOME_STARTUP_FADE_MS}
+      data-startup-phase={phase}
       aria-label="きょうを読み込み中"
       aria-busy="true"
-      style={styles.startupSkeleton}
+      style={{
+        ...styles.startupSkeleton,
+        ...(phase === "fading" ? styles.startupSkeletonFading : {}),
+      }}
     >
       <span style={styles.startupSkeletonSettings} aria-hidden="true" />
       <span style={styles.startupSkeletonFrame} aria-hidden="true" />
@@ -5818,14 +5871,19 @@ const styles = {
   startupSkeleton: {
     position: "fixed",
     inset: 0,
-    zIndex: 2,
+    zIndex: 100,
     display: "grid",
     justifyItems: "center",
     alignContent: "start",
     padding: "calc(env(safe-area-inset-top) + 28px) 24px calc(env(safe-area-inset-bottom) + 16px)",
     boxSizing: "border-box",
-    pointerEvents: "none",
+    pointerEvents: "auto",
+    opacity: 1,
+    transition: `opacity ${HOME_STARTUP_FADE_MS}ms ease-out`,
     background: "#f4f1ea",
+  },
+  startupSkeletonFading: {
+    opacity: 0,
   },
   startupSkeletonSettings: {
     position: "absolute",

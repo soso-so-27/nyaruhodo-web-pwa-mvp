@@ -19,6 +19,8 @@ test.describe("home desk model", () => {
       const html = await response.text();
 
       expect(html).toContain('data-testid="home-startup-skeleton"');
+      expect(html).toContain('data-startup-min-ms="600"');
+      expect(html).toContain('data-startup-fade-ms="200"');
       expect(html).not.toContain("startup-envelope-hold-1206-2622-v1.webp");
       expect(html).not.toContain("Googleでつづける");
       expect(html).not.toContain("ログイン");
