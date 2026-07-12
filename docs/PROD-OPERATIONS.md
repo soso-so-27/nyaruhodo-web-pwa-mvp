@@ -94,3 +94,11 @@ Vercel cron schedules are written in UTC. The handoff cleanup schedule in
 `vercel.json` is intentionally kept as `30 18 * * *`, which runs at JST 03:30.
 This is the intended late-night garbage-collection window for expired or
 redeemed onboarding handoffs.
+
+## Cat photo Storage backup
+
+- `/api/admin/storage-backup` runs daily at `18:45 UTC` (`03:45 JST`) after the handoff cleanup window.
+- It copies new or updated objects from private bucket `cat-photos` to private bucket `cat-photos-backup`. The first run copies all existing objects.
+- Production deletions are never mirrored to the backup bucket. The backup route does not mutate the production bucket.
+- The cron response and Vercel log include `scanned`, `copied`, `skipped`, and `failed`. Any object failure makes the request return HTTP 500 so the failed run remains visible and is retried by the next daily run.
+- This is a same-project minimum backup against accidental application deletion. A separate-region or separate-provider backup remains required before treating Storage as disaster-recoverable.

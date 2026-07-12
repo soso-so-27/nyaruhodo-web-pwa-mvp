@@ -16,6 +16,8 @@
 
 - grant hardening 本体 — 出典: `docs/specs/grant-hardening-spec.md`
 - 未参照Storageオブジェクトの定期GC（105件棚卸済み） — 出典: `docs/incident-20260704-bulk-delete.md`
+- 写真Storageの別リージョン・別プロバイダ退避（同一プロジェクト内 `cat-photos-backup` は最小版。災害・アカウント障害には別系統が必要） — 出典: `docs/PROD-OPERATIONS.md`
+- `cat-photos-backup` の保守的GC（90日より古く、かつ本番に存在しないものだけ。復元手順確立後に着手） — 出典: `docs/PROD-OPERATIONS.md`
 - 受信画像読み込み失敗時のグレースフルフォールバック表示 — 出典: `docs/opening-flow-inventory-2026-07.md`
 - 孤児delivery 31件を踏んだ際のUI確認 — 出典: `docs/incident-20260704-bulk-delete.md`
 - E2Eの networkidle 依存除去（既存4failの解消） — 出典: `docs/specs/incident-and-legal-audit-spec-v1.0.md`

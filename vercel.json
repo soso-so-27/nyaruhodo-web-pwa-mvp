@@ -3,6 +3,10 @@
     {
       "path": "/api/admin/onboarding-handoffs/cleanup",
       "schedule": "30 18 * * *"
+    },
+    {
+      "path": "/api/admin/storage-backup",
+      "schedule": "45 18 * * *"
     }
   ]
 }

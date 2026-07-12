@@ -70,6 +70,7 @@ const desktopSpecs = [
   "**/photo-sources.spec.ts",
   "**/sleeping-delivery-request-guards.spec.ts",
   "**/sleeping-delivery-pool-guards.spec.ts",
+  "**/storage-backup.spec.ts",
   "**/sw-image-cache.spec.ts",
 ];
 
