@@ -1476,7 +1476,7 @@ function clampHomePhotoAspect(aspect: number) {
     return HOME_FRAME_TUNING.frameAspectWidthPerHeight;
   }
 
-  return Math.min(1.35, Math.max(0.62, aspect));
+  return Math.min(4, Math.max(0.25, aspect));
 }
 
 function useHomeFrameLayout(

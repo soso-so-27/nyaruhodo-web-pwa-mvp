@@ -1,4 +1,4 @@
-import { expect, test, type Page } from "@playwright/test";
+import { devices, expect, test, type Page } from "@playwright/test";
 
 const ownDataUrl =
   "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAGQAAABkCAYAAABw4pVUAAAAAXNSR0IArs4c6QAAAARnQU1BAACxjwv8YQUAAAAJcEhZcwAADsMAAA7DAcdvqGQAAAEJSURBVHhe7dExEcAgAMBAJKKuTpnpjoLA/fACchlrzv2C+a0njDPsVmfYrQyJMSTGkBhDYgyJMSTGkBhDYgyJMSTGkBhDYgyJMSTGkBhDYgyJMSTGkBhDYgyJMSTGkBhDYgyJMSTGkBhDYgyJMSTGkBhDYgyJMSTGkBhDYgyJMSTGkBhDYgyJMSTGkBhDYgyJMSTGkBhDYgyJMSTGkBhDYgyJMSTGkBhDYgyJMSTGkBhDYgyJMSTGkBhDYgyJMSTGkBhDYgyJMSTmB4RCEqdGtA/tAAAAAElFTkSuQmCC";
@@ -407,6 +407,83 @@ test.describe("home desk model", () => {
       "none",
     );
     await expect(page.getByTestId("desk-empty-frame")).toHaveCSS("cursor", "auto");
+  });
+
+  test("matches Android camera photo ratios and keeps controls inside the viewport", async ({
+    browser,
+  }) => {
+    const ratios = [
+      { name: "portrait", width: 900, height: 1600 },
+      { name: "landscape", width: 1600, height: 900 },
+    ] as const;
+
+    for (const ratio of ratios) {
+      await test.step(ratio.name, async () => {
+        const androidContext = await browser.newContext({
+          ...devices["Pixel 7"],
+          baseURL: process.env.PLAYWRIGHT_BASE_URL ?? "http://localhost:3000",
+        });
+        const androidPage = await androidContext.newPage();
+        try {
+          await androidPage.goto("about:blank");
+          const photoDataUrl = await buildRasterPhotoDataUrl(
+            androidPage,
+            ratio.width,
+            ratio.height,
+          );
+          await seedDeskState(androidPage, "2", { ownPhotoDataUrl: photoDataUrl });
+          await androidPage.goto("/home");
+          await androidPage.waitForLoadState("networkidle");
+
+          const frame = androidPage.getByTestId("desk-home-frame");
+          await expect(frame).toBeVisible();
+          await expect
+            .poll(() =>
+              frame.locator("img").evaluate((image) => {
+                const element = image as HTMLImageElement;
+                return element.naturalWidth / element.naturalHeight;
+              }),
+            )
+            .toBeCloseTo(ratio.width / ratio.height, 3);
+
+          const layout = await androidPage.evaluate(() => {
+            const frameElement = document.querySelector<HTMLElement>(
+              '[data-testid="desk-home-frame"]',
+            );
+            const navElement = document.querySelector<HTMLElement>(
+              'nav[aria-label="下部ナビゲーション"]',
+            );
+            const settingsElement = document.querySelector<HTMLElement>(
+              '[data-testid="home-settings-shortcut"]',
+            );
+            const frameRect = frameElement?.getBoundingClientRect();
+            const navRect = navElement?.getBoundingClientRect();
+            const settingsRect = settingsElement?.getBoundingClientRect();
+            return {
+              frameRatio:
+                frameRect && frameRect.height > 0
+                  ? frameRect.width / frameRect.height
+                  : 0,
+              frameBottom: frameRect?.bottom ?? Number.POSITIVE_INFINITY,
+              navTop: navRect?.top ?? 0,
+              navBottomGap: navRect ? window.innerHeight - navRect.bottom : -1,
+              settingsTop: settingsRect?.top ?? -1,
+            };
+          });
+
+          expect(layout.frameRatio).toBeCloseTo(ratio.width / ratio.height, 2);
+          expect(layout.frameBottom).toBeLessThan(layout.navTop);
+          expect(layout.navBottomGap).toBeGreaterThanOrEqual(12);
+          expect(layout.settingsTop).toBeGreaterThanOrEqual(12);
+          await androidPage.screenshot({
+            path: `artifacts/android-home-layout/state2-${ratio.name}.png`,
+            fullPage: true,
+          });
+        } finally {
+          await androidContext.close();
+        }
+      });
+    }
   });
 
   test("adapts the b3 ink trace across the four ambient periods", async ({
@@ -1073,6 +1150,7 @@ async function seedDeskState(
     withAllCatOmoideCandidates?: boolean;
     withoutOwnPhoto?: boolean;
     openedBySystem?: boolean;
+    ownPhotoDataUrl?: string;
   } = {},
 ) {
   const now =
@@ -1307,7 +1385,7 @@ async function seedDeskState(
     {
       now,
       state,
-      ownDataUrl,
+      ownDataUrl: options.ownPhotoDataUrl ?? ownDataUrl,
       deliveredDataUrl,
       options,
       dateKeyValue: currentJstDateKey,
@@ -1322,6 +1400,30 @@ async function seedDeskState(
       body: JSON.stringify({ count: 124 }),
     });
   });
+}
+
+async function buildRasterPhotoDataUrl(
+  page: Page,
+  width: number,
+  height: number,
+) {
+  return page.evaluate(
+    ({ width, height }) => {
+      const canvas = document.createElement("canvas");
+      canvas.width = width;
+      canvas.height = height;
+      const context = canvas.getContext("2d");
+      if (!context) throw new Error("canvas_context_unavailable");
+      context.fillStyle = "#c98f7b";
+      context.fillRect(0, 0, width, height);
+      context.fillStyle = "#f5e8d8";
+      context.beginPath();
+      context.arc(width / 2, height * 0.45, Math.min(width, height) * 0.2, 0, Math.PI * 2);
+      context.fill();
+      return canvas.toDataURL("image/png");
+    },
+    { width, height },
+  );
 }
 
 function getCurrentJstDateKey() {
