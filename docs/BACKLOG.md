@@ -1,5 +1,7 @@
 # Backlog
 
+- Q6検証と同時に匿名認証設定を整合する（現状: `NEXT_PUBLIC_ENABLE_ANON_AUTH=true` / Supabase匿名サインイン無効。今回の夜便修正では変更せず、2026-07-13週に検証・対応） — 出典: 2026-07-12 Android夜便障害調査
+
 - 猫イラスト旧未使用資産（`cat-avatars` / `CatIcon` / `catAvatarSettle`）の参照確認と掃除 — 出典: `artifacts/cat-illust-inventory.md`（当選テーマ決定後）
 
 - 写真の intrinsic width/height 永続化（表示契約は `docs/photo-display-contract.md` を正とし、保存形式変更は別specで扱う） — 出典: 2026-07-09 写真表示契約棚卸 Drift 6
