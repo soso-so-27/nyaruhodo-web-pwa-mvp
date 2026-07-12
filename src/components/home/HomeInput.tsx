@@ -72,6 +72,7 @@ import {
 } from "../../lib/home/eveningDelivery";
 import {
   ensureOmoideMemoryArrival,
+  readOmoideMemories,
 } from "../../lib/home/omoideDelivery";
 import { useEveningDelivery } from "../../lib/home/useEveningDelivery";
 import {
@@ -859,7 +860,21 @@ export function HomeInput({
       return;
     }
 
-    for (const profile of catProfiles) {
+    const memories = readOmoideMemories();
+    const memoryCountByCat = new Map<string, number>();
+    for (const memory of memories) {
+      memoryCountByCat.set(
+        memory.catId,
+        (memoryCountByCat.get(memory.catId) ?? 0) + 1,
+      );
+    }
+    const profilesByNeed = [...catProfiles].sort(
+      (a, b) =>
+        (memoryCountByCat.get(a.id) ?? 0) -
+        (memoryCountByCat.get(b.id) ?? 0),
+    );
+
+    for (const profile of profilesByNeed) {
       ensureOmoideMemoryArrival({
         catId: profile.id,
         catName: getCatName(profile),

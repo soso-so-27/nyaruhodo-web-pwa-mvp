@@ -8,13 +8,57 @@ import {
   type CatPickupPhoto,
 } from "../../src/lib/cats/pickup";
 import type { CatSleepingMilestone } from "../../src/lib/home/sleepingPhotos";
-import type { OmoideMemory } from "../../src/lib/home/omoideDelivery";
+import {
+  getOmoideHouseholdIntervalDays,
+  getOmoideLookbackDateKeys,
+  type OmoideMemory,
+} from "../../src/lib/home/omoideDelivery";
 
 const now = Date.parse("2026-06-26T20:30:00+09:00");
 const photoSrc =
   "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADElEQVR42mP8z8BQDwAFgwJ/lm6v9wAAAABJRU5ErkJggg==";
 
 test.describe("cat pickup selection", () => {
+  test("slows household omoide cadence after three opened memories", () => {
+    expect(getOmoideHouseholdIntervalDays([])).toBe(7);
+    expect(
+      getOmoideHouseholdIntervalDays([
+        { openedAt: now - 3 },
+        { openedAt: now - 2 },
+        { openedAt: now - 1 },
+      ]),
+    ).toBe(14);
+    expect(
+      getOmoideHouseholdIntervalDays([
+        { openedAt: now - 2 },
+        { openedAt: now - 1 },
+        {},
+      ]),
+    ).toBe(7);
+  });
+
+  test("prefers longer omoide lookbacks over the weekly candidate", () => {
+    expect(
+      getOmoideLookbackDateKeys("2026-07-12").map(
+        ({ lookback, amount }) => `${lookback}:${amount ?? 0}`,
+      ),
+    ).toEqual([
+      "year:1",
+      "n_year:2",
+      "n_year:3",
+      "n_year:4",
+      "n_year:5",
+      "n_year:6",
+      "n_year:7",
+      "n_year:8",
+      "n_year:9",
+      "n_year:10",
+      "half_year:0",
+      "month:0",
+      "week:0",
+    ]);
+  });
+
   test("stays hidden when there is no strong reason to show a pickup", () => {
     expect(
       selectCatPickup({

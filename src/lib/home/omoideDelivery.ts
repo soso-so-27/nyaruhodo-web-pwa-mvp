@@ -50,7 +50,9 @@ export type OmoideMemoryControls = {
   usedSourcePhotoIds?: string[];
 };
 
-const MIN_DELIVERY_INTERVAL_MS = 7 * 24 * 60 * 60 * 1000;
+const EARLY_HOUSEHOLD_INTERVAL_DAYS = 7;
+const SETTLED_HOUSEHOLD_INTERVAL_DAYS = 14;
+const EARLY_EXPERIENCE_TARGET = 3;
 const FIRST_SEED_START_DAY = 7;
 
 export function readOmoideMemories(): OmoideMemory[] {
@@ -127,15 +129,22 @@ export function ensureOmoideMemoryArrival({
     ...Object.values(store).map((memory) => memory.sourcePhotoId),
   ]);
   const todayKey = getJstDateKey(now);
-  const existing = Object.values(store).find(
-    (memory) => memory.catId === catId && memory.deliveryDateKey === todayKey,
+  const storedMemories = Object.values(store).filter(isValidOmoideMemory);
+  const existing = storedMemories.find(
+    (memory) => memory.deliveryDateKey === todayKey,
   );
   if (existing) {
     return existing;
   }
 
-  const latest = readOmoideMemoriesForCat(catId)[0];
-  if (latest && now - latest.deliveredAt < MIN_DELIVERY_INTERVAL_MS) {
+  const latest = [...storedMemories].sort(
+    (a, b) => b.deliveredAt - a.deliveredAt,
+  )[0];
+  const intervalDays = getOmoideHouseholdIntervalDays(storedMemories);
+  if (
+    latest &&
+    now - latest.deliveredAt < intervalDays * 24 * 60 * 60 * 1000
+  ) {
     return null;
   }
 
@@ -177,6 +186,9 @@ export function ensureOmoideMemoryArrival({
     {
       lookback: memory.lookback,
       reason: memory.reason,
+      household_interval_days: intervalDays,
+      household_opened_count: storedMemories.filter((item) => item.openedAt)
+        .length,
       days_since_first_photo: getDaysSinceFirstPhoto(ownPhotos, catId, now),
     },
     { localCatId: catId },
@@ -210,6 +222,17 @@ export function markOmoideMemoryOpened(
     { localCatId: memory.catId },
   );
   return nextMemory;
+}
+
+export function getOmoideHouseholdIntervalDays(
+  memories: readonly Pick<OmoideMemory, "openedAt">[],
+) {
+  const openedCount = memories.filter(
+    (memory) => typeof memory.openedAt === "number",
+  ).length;
+  return openedCount < EARLY_EXPERIENCE_TARGET
+    ? EARLY_HOUSEHOLD_INTERVAL_DAYS
+    : SETTLED_HOUSEHOLD_INTERVAL_DAYS;
 }
 
 export function markOmoideMemoryDismissed(id: string, dismissedAt = Date.now()) {
@@ -360,7 +383,7 @@ function selectOmoideCandidate({
     }
   }
 
-  const lookbacks = getLookbackDateKeys(todayKey);
+  const lookbacks = getOmoideLookbackDateKeys(todayKey);
   for (const lookback of lookbacks) {
     if (hiddenDateKeys.has(lookback.dateKey)) {
       continue;
@@ -455,15 +478,12 @@ function getRepresentativeScore(photo: OwnSleepingPhoto) {
   return score;
 }
 
-function getLookbackDateKeys(todayKey: string) {
+export function getOmoideLookbackDateKeys(todayKey: string) {
   const keys: {
     lookback: OmoideLookback;
     dateKey: string;
     amount?: number;
   }[] = [
-    { lookback: "week", dateKey: addJstDays(todayKey, -7) },
-    { lookback: "month", dateKey: addJstMonths(todayKey, -1) },
-    { lookback: "half_year", dateKey: addJstMonths(todayKey, -6) },
     { lookback: "year", dateKey: addJstMonths(todayKey, -12), amount: 1 },
   ];
 
@@ -474,6 +494,12 @@ function getLookbackDateKeys(todayKey: string) {
       amount: years,
     });
   }
+
+  keys.push(
+    { lookback: "half_year", dateKey: addJstMonths(todayKey, -6) },
+    { lookback: "month", dateKey: addJstMonths(todayKey, -1) },
+    { lookback: "week", dateKey: addJstDays(todayKey, -7) },
+  );
 
   return keys;
 }

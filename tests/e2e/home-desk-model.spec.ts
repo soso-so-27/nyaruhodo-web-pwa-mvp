@@ -956,7 +956,7 @@ test.describe("home desk model", () => {
     const bunbako = page.getByTestId("omoide-bunbako");
     await expect(bunbako).toBeVisible();
     await expect(bunbako.getByText("思い出箱")).toBeVisible();
-    await expect(bunbako.getByText("1週間前の、きょう。")).toBeVisible();
+    await expect(bunbako.getByText("はじめての、ねがお。")).toBeVisible();
   });
 
   test("keeps an already used source photo out of a new omoide delivery", async ({
@@ -1005,11 +1005,13 @@ test.describe("home desk model", () => {
       .toBe(1);
   });
 
-  test("evaluates every registered cat and seeds from each cat's first app photo", async ({
+  test("prioritizes a cat without memories and keeps one household arrival per day", async ({
     page,
   }) => {
     await seedDeskState(page, "1b", {
       withAllCatOmoideCandidates: true,
+      withStoredOmoide: true,
+      storedOmoideDeliveredDaysAgo: 8,
     });
 
     await page.goto("/home");
@@ -1027,7 +1029,7 @@ test.describe("home desk model", () => {
             .sort();
         }),
       )
-      .toEqual(["cat-desk-second:first_seed", "cat-desk:first_seed"]);
+      .toEqual(["cat-desk-second:first_seed", "cat-desk:same_day"]);
   });
 });
 
@@ -1053,6 +1055,7 @@ async function seedDeskState(
     withYesterday?: boolean;
     withOmoideCandidate?: boolean;
     withStoredOmoide?: boolean;
+    storedOmoideDeliveredDaysAgo?: number;
     usedOmoideSourcePhotoIds?: string[];
     omoideDisabled?: boolean;
     withAllCatOmoideCandidates?: boolean;
@@ -1243,7 +1246,16 @@ async function seedDeskState(
               catName: "むぎ",
               sourcePhotoId: memoryPhoto.id,
               sourceDateKey: "2026-06-03",
-              deliveryDateKey: dateKey,
+                deliveryDateKey: new Date(
+                  now -
+                    (options.storedOmoideDeliveredDaysAgo ?? 0) *
+                      24 *
+                      60 *
+                      60 *
+                      1000,
+                )
+                  .toISOString()
+                  .slice(0, 10),
               photo: memoryPhoto,
               lookback: "week",
               reason: "same_day",
@@ -1251,7 +1263,13 @@ async function seedDeskState(
               subtitle: "1週間前の むぎから 届きました。",
               voice: "1回目の 夏の、ある日。",
               bridge: "あれから、7日。",
-              deliveredAt: now,
+              deliveredAt:
+                now -
+                (options.storedOmoideDeliveredDaysAgo ?? 0) *
+                  24 *
+                  60 *
+                  60 *
+                  1000,
             },
           }),
         );
