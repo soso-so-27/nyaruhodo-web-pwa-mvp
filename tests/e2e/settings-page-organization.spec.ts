@@ -20,6 +20,23 @@ test.describe("settings page organization", () => {
     await expect(hiddenNote).toBeVisible();
   });
 
+  test("keeps unavailable feedback hidden and destructive account actions last", async ({
+    page,
+  }) => {
+    await mockSettingsApis(page);
+
+    await page.goto("/settings");
+    await page.waitForLoadState("networkidle");
+
+    await expect(page.getByText("改善メモを送る")).toHaveCount(0);
+    await expect(page.getByRole("link", { name: "ログインして参加する" })).toHaveCount(0);
+    await expect(page.getByRole("link", { name: "解約方法" })).toHaveCount(0);
+    await expect(page.getByRole("link", { name: "データの削除・退会" })).toBeVisible();
+
+    const sectionLabels = await page.locator("main section > p").allTextContents();
+    expect(sectionLabels.at(-1)).toBe("アカウントとデータ");
+  });
+
   test("hides the referral code while keeping share actions", async ({ page }) => {
     await seedLoggedInSession(page);
     await mockSettingsApis(page, {

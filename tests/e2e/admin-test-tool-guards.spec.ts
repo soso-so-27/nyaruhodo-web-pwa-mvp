@@ -90,7 +90,7 @@ test.describe("admin test tool guards", () => {
     await expect(
       page.getByRole("button", { name: "とどくねがおを追加する" }),
     ).toHaveCount(0);
-    await expect(page.getByText("解約・データ削除・退会について")).toBeVisible();
+    await expect(page.getByText("データの削除・退会")).toBeVisible();
     await expect(page.getByText("通知", { exact: true })).toBeVisible();
     await expect(
       page.getByText("Push通知はホーム画面アプリで使えます"),

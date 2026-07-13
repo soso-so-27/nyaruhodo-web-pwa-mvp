@@ -759,11 +759,6 @@ export function SettingsPage() {
                 </div>
               </>
             )}
-            <div style={styles.divider} />
-            <a href="/account-deletion" style={styles.linkRow}>
-              <span style={styles.rowLabel}>解約・データ削除・退会について</span>
-              <span style={styles.rowChevron}>›</span>
-            </a>
           </AppCard>
         </section>
 
@@ -906,36 +901,19 @@ export function SettingsPage() {
                 ) : null}
                 <div style={styles.divider} />
               </>
-            ) : (
-              <>
-                <div style={styles.betaNote}>
-                  <p style={styles.betaNoteTitle}>改善メモを送る</p>
-                  <p style={styles.betaNoteText}>
-                    β参加者は、返信不要の感想や気づきを送れます。
-                    返事が必要な連絡は問い合わせを使ってください。
-                  </p>
-                </div>
-                {!isLoggedIn ? (
-                  <AppButton
-                    href="/account/create"
-                    variant="ghost"
-                    fullWidth
-                    style={styles.settingsActionButton}
-                  >
-                    ログインして参加する
-                  </AppButton>
-                ) : null}
-                <div style={styles.divider} />
-              </>
-            )}
+            ) : null}
             <BetaSupporterPanel
               billingStatus={billingStatus}
             />
-            <div style={styles.divider} />
-            <a href="/cancellation" style={styles.linkRow}>
-              <span style={styles.rowLabel}>解約方法</span>
-              <span style={styles.rowChevron}>›</span>
-            </a>
+            {billingStatus.canManageBilling ? (
+              <>
+                <div style={styles.divider} />
+                <a href="/cancellation" style={styles.linkRow}>
+                  <span style={styles.rowLabel}>支払いを管理・解約</span>
+                  <span style={styles.rowChevron}>›</span>
+                </a>
+              </>
+            ) : null}
           </AppCard>
         </section>
           </>
@@ -1091,11 +1069,6 @@ export function SettingsPage() {
               <span style={styles.rowLabel}>問い合わせ</span>
               <span style={styles.rowChevron}>›</span>
             </a>
-            <div style={styles.divider} />
-            <a href="/cancellation" style={styles.linkRow}>
-              <span style={styles.rowLabel}>解約方法</span>
-              <span style={styles.rowChevron}>›</span>
-            </a>
           </AppCard>
         </section>
 
@@ -1121,6 +1094,16 @@ export function SettingsPage() {
                 現在の写真と猫データは、引き続き大切に扱います。
               </p>
             </div>
+          </AppCard>
+        </section>
+
+        <section style={{ ...styles.section, order: 9 }}>
+          <p style={styles.sectionLabel}>アカウントとデータ</p>
+          <AppCard variant="outlined" padding="sm" style={styles.card}>
+            <a href="/account-deletion" style={styles.linkRow}>
+              <span style={styles.rowLabel}>データの削除・退会</span>
+              <span style={styles.rowChevron}>›</span>
+            </a>
           </AppCard>
         </section>
           </>
