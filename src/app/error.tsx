@@ -2,6 +2,12 @@
 
 import { useEffect } from "react";
 
+import {
+  isAppShellResourceError,
+  recordAppRouteError,
+  recoverAppShell,
+} from "../lib/pwa/recoverAppShell";
+
 export default function AppError({
   error,
   reset,
@@ -11,6 +17,10 @@ export default function AppError({
 }) {
   useEffect(() => {
     console.error("app route error", error);
+    recordAppRouteError(error);
+    if (isAppShellResourceError(error)) {
+      void recoverAppShell({ automatic: true });
+    }
   }, [error]);
 
   return (
@@ -21,8 +31,14 @@ export default function AppError({
         <p style={styles.copy}>
           通信を確認して、もう一度お試しください。保存済みの写真や記録は、そのまま残ります。
         </p>
-        <button type="button" style={styles.primary} onClick={reset}>
-          もう一度読み込む
+        <button
+          type="button"
+          style={styles.primary}
+          onClick={() => {
+            void recoverAppShell().catch(() => reset());
+          }}
+        >
+          更新してひらく
         </button>
         <a href="/" style={styles.link}>
           ホームへ戻る

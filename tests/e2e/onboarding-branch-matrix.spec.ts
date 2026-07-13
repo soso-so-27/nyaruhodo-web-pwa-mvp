@@ -60,6 +60,11 @@ test.describe("onboarding branch matrix", () => {
     let redeemCalls = 0;
     await page.addInitScript(() => {
       window.localStorage.setItem("onboarding_completed", "true");
+      window.localStorage.setItem("active_cat_id", "matrix-restored-cat");
+      window.localStorage.setItem(
+        "cat_profiles",
+        JSON.stringify([{ id: "matrix-restored-cat", name: "むぎ" }]),
+      );
       window.localStorage.setItem(
         "neteruneko_onboarding_progress",
         JSON.stringify({

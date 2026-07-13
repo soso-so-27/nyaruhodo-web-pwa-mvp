@@ -1656,6 +1656,11 @@ test.describe("onboarding delivery flow", () => {
   }) => {
     await page.addInitScript(() => {
       window.localStorage.setItem("onboarding_completed", "true");
+      window.localStorage.setItem("active_cat_id", "restored-cat");
+      window.localStorage.setItem(
+        "cat_profiles",
+        JSON.stringify([{ id: "restored-cat", name: "むぎ" }]),
+      );
     });
     await page.route("**/api/onboarding/handoff/redeem", async (route) => {
       await route.fulfill({
@@ -1674,6 +1679,32 @@ test.describe("onboarding delivery flow", () => {
       page.getByText("この端末には、つづきが復元されています。ホームへ進めます。"),
     ).toBeVisible();
     await expect(page.getByRole("button", { name: "ホームへ" })).toBeVisible();
+  });
+
+  test("does not treat an empty local cat list as a restored handoff", async ({
+    page,
+  }) => {
+    await page.addInitScript(() => {
+      window.localStorage.setItem("onboarding_completed", "true");
+      window.localStorage.setItem("cat_profiles", "[]");
+    });
+    await page.route("**/api/onboarding/handoff/redeem", async (route) => {
+      await route.fulfill({
+        contentType: "application/json",
+        status: 409,
+        body: JSON.stringify({ ok: false, error: "handoff_already_used" }),
+      });
+    });
+
+    await page.goto(
+      "/onboarding/continue?handoff=onb_00000000-0000-4000-8000-000000000000_0123456789abcdef0123",
+    );
+    await page.locator("main button").first().click();
+
+    await expect(
+      page.getByText("このつづきのリンクは使用済みです。"),
+    ).toBeVisible();
+    await expect(page).toHaveURL(/\/onboarding\/continue/);
   });
 
   test("does not keep referral links for users who already completed onboarding", async ({

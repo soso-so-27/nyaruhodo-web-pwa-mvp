@@ -1138,7 +1138,28 @@ function readStorageObject<T extends Record<string, unknown>>(key: string): T {
 }
 
 function writeStorageArray<T>(key: string, value: T[]) {
-  writeCachedJson(key, value);
+  writeCachedJson(key, value.map(compactDuplicatePhotoSources));
+}
+
+function compactDuplicatePhotoSources<T>(value: T): T {
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    return value;
+  }
+
+  const compact = { ...(value as Record<string, unknown>) };
+  const src = compact.src;
+
+  if (typeof src !== "string") {
+    return value;
+  }
+
+  for (const key of ["thumbnailSrc", "displaySrc", "originalSrc"] as const) {
+    if (compact[key] === src) {
+      delete compact[key];
+    }
+  }
+
+  return compact as T;
 }
 
 function writeStorageValue<T>(key: string, value: T) {

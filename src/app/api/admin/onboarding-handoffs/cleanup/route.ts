@@ -53,7 +53,7 @@ async function runCleanup(request: Request) {
   const { data, error } = await supabase
     .from("onboarding_handoffs")
     .select("handoff_token, expires_at, redeemed_at")
-    .or(`expires_at.lt.${nowIso},redeemed_at.not.is.null`)
+    .lt("expires_at", nowIso)
     .order("expires_at", { ascending: true })
     .limit(limit);
 

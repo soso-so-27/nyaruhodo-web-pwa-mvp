@@ -226,6 +226,10 @@ function OnboardingContinueShell() {
 }
 
 function getRestoreErrorMessage(errorMessage: string) {
+  if (errorMessage === "handoff_local_storage_failed") {
+    return "写真を端末に戻せませんでした。空き容量を確認して、同じURLからもう一度お試しください。";
+  }
+
   if (errorMessage === "handoff_expired") {
     return "このつづきのリンクは期限が切れました。元の端末でリンクを作り直すか、この端末ではじめからお試しください。";
   }
@@ -259,11 +263,20 @@ function hasRestoredOnboardingState() {
     return false;
   }
 
-  return Boolean(
-    window.localStorage.getItem(STORAGE_KEYS.onboardingCompleted) === "true" ||
-      window.localStorage.getItem(STORAGE_KEYS.onboardingProgress) ||
-      window.localStorage.getItem(STORAGE_KEYS.catProfiles),
-  );
+  try {
+    const activeCatId = window.localStorage.getItem(STORAGE_KEYS.activeCatId);
+    const profiles = JSON.parse(
+      window.localStorage.getItem(STORAGE_KEYS.catProfiles) ?? "[]",
+    ) as Array<{ id?: unknown }>;
+
+    return Boolean(
+      activeCatId &&
+        Array.isArray(profiles) &&
+        profiles.some((profile) => profile?.id === activeCatId),
+    );
+  } catch {
+    return false;
+  }
 }
 
 const styles = {

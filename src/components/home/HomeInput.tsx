@@ -306,6 +306,8 @@ export function HomeInput({
   const [activeCatId, setActiveCatId] = useState<string | null>(null);
   const [activeCat, setActiveCat] = useState<CatProfile | null>(null);
   const [hasHydratedHomeState, setHasHydratedHomeState] = useState(false);
+  const [hasOnboardingSecondPhotoIntent, setHasOnboardingSecondPhotoIntent] =
+    useState(false);
   const [homeStartupPhase, setHomeStartupPhase] =
     useState<HomeStartupPhase>("visible");
   const [lockData, setLockData] = useState<LockData>({});
@@ -396,6 +398,10 @@ export function HomeInput({
     saveActiveCatId(active.id);
     hydrateCatState(active.id);
     setHasAcceptedSleepingSafety(hasAcceptedSleepingSafetyNotice());
+    setHasOnboardingSecondPhotoIntent(
+      new URLSearchParams(window.location.search).get("from") ===
+        "onboarding_second_photo",
+    );
     setHasHydratedHomeState(true);
   }, []);
 
@@ -1697,6 +1703,7 @@ export function HomeInput({
         setPendingExchangeCatId(
           readStoredExchangeShareCatSelection(catProfiles, activeCatId),
         );
+        clearOnboardingSecondPhotoIntent();
 
         trackProductEvent(
           "home_exchange_sleeping_photo_selected",
@@ -1739,6 +1746,17 @@ export function HomeInput({
   function handlePendingExchangeCatSelect(catId: string) {
     setPendingExchangeCatId(catId);
     saveStoredExchangeShareCatSelection(catId);
+  }
+
+  function clearOnboardingSecondPhotoIntent() {
+    setHasOnboardingSecondPhotoIntent(false);
+    const url = new URL(window.location.href);
+    url.searchParams.delete("from");
+    window.history.replaceState(
+      null,
+      "",
+      `${url.pathname}${url.search}${url.hash}`,
+    );
   }
 
   async function handleSleepingStockPhotoImport() {
@@ -2303,6 +2321,7 @@ export function HomeInput({
                 typeof sleepingPresenceCount === "number" &&
                 isTodaySleepingCounterVisible(sleepingCounterCount)
               }
+              showOnboardingSecondPhotoAction={hasOnboardingSecondPhotoIntent}
               now={homeNow}
               onTakePhoto={() => handleSleepingPhotoStart("camera")}
               onOpenDelivery={handleOpenEveningDelivery}

@@ -1,5 +1,7 @@
 "use client";
 
+import { recoverAppShell } from "../lib/pwa/recoverAppShell";
+
 export default function GlobalError() {
   return (
     <html lang="ja">
@@ -14,9 +16,11 @@ export default function GlobalError() {
             <button
               type="button"
               style={styles.primary}
-              onClick={() => window.location.reload()}
+              onClick={() => {
+                void recoverAppShell();
+              }}
             >
-              もう一度読み込む
+              更新してひらく
             </button>
             <a href="/" style={styles.link}>
               ホームへ戻る

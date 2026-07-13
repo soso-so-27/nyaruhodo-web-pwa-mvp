@@ -64,14 +64,58 @@ test.describe("onboarding handoff restore", () => {
       teardown();
     }
   });
+
+  test("fails visibly when an expected handoff photo cannot be persisted", () => {
+    const teardown = installMemoryWindow({
+      rejectKey: "nyaruhodo_exchange_own_sleeping_photos",
+    });
+    const payload = {
+      version: 1,
+      createdAt: "2026-07-13T00:00:00.000Z",
+      source: "instagram_bio",
+      onboardingCompleted: true,
+      catProfiles: [{ id: "cat-1", name: "むぎ" }],
+      activeCatId: "cat-1",
+      ownSleepingPhotos: [
+        {
+          id: "onboarding-own-1",
+          catId: "cat-1",
+          ownerCatId: "cat-1",
+          src: "data:image/png;base64,AAAA",
+          state: "sleeping",
+          visibility: "shared",
+          deliveryStatus: "available",
+          triggerLabel: "ねがお",
+          theme: "sleeping",
+          shared: true,
+          createdAt: 1_789_000_000_000,
+          captureContext: "onboarding",
+        },
+      ],
+      keptExchangePhotos: [],
+      pendingReferralCode: null,
+      onboardingProgress: null,
+    };
+
+    try {
+      expect(() => restoreOnboardingHandoffPayload(payload)).toThrow(
+        "handoff_local_storage_failed",
+      );
+    } finally {
+      teardown();
+    }
+  });
 });
 
-function installMemoryWindow() {
+function installMemoryWindow({ rejectKey }: { rejectKey?: string } = {}) {
   const originalWindow = (globalThis as { window?: Window }).window;
   const store = new Map<string, string>();
   const localStorage = {
     getItem: (key: string) => store.get(key) ?? null,
     setItem: (key: string, value: string) => {
+      if (key === rejectKey) {
+        throw new DOMException("Quota exceeded", "QuotaExceededError");
+      }
       store.set(key, String(value));
     },
     removeItem: (key: string) => {

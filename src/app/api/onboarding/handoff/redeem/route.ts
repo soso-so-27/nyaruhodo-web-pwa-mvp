@@ -69,13 +69,6 @@ export async function POST(request: Request) {
     );
   }
 
-  if (data.redeemed_at || Number(data.redeem_count) > 0) {
-    return NextResponse.json(
-      { ok: false, error: "handoff_already_used" },
-      { status: 409 },
-    );
-  }
-
   let payload: unknown;
   try {
     payload = await hydrateHandoffStorageRefs(data.payload, token, supabase);
@@ -87,39 +80,20 @@ export async function POST(request: Request) {
   }
 
   const now = new Date().toISOString();
-  const { data: redeemed, error: redeemError } = await supabase
+  const { error: redeemError } = await supabase
     .from("onboarding_handoffs")
     .update({
-      redeemed_at: now,
+      redeemed_at: data.redeemed_at ?? now,
       last_redeemed_at: now,
-      redeem_count: 1,
+      redeem_count: Number(data.redeem_count) + 1,
     })
-    .eq("handoff_token", token)
-    .eq("redeem_count", 0)
-    .is("redeemed_at", null)
-    .select("payload")
-    .maybeSingle();
+    .eq("handoff_token", token);
 
   if (redeemError) {
     return NextResponse.json(
       { ok: false, error: "handoff_redeem_failed" },
       { status: 500 },
     );
-  }
-
-  if (!redeemed) {
-    return NextResponse.json(
-      { ok: false, error: "handoff_already_used" },
-      { status: 409 },
-    );
-  }
-
-  try {
-    await removeHandoffStorageObjects(supabase, token);
-  } catch (error) {
-    console.warn("[onboarding/handoff/redeem] handoff storage cleanup failed", {
-      error: error instanceof Error ? error.message : "unknown",
-    });
   }
 
   return NextResponse.json({

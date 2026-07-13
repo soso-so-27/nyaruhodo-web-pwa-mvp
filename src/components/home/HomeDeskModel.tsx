@@ -72,6 +72,7 @@ type HomeDeskModelProps = {
   sleepingCounter: string;
   showGuidanceCopy: boolean;
   showSleepingCounter: boolean;
+  showOnboardingSecondPhotoAction?: boolean;
   now: number;
   onTakePhoto: () => void;
   onOpenDelivery: (state: Extract<EveningHomeState, { kind: "delivered" }>) => void;
@@ -261,6 +262,7 @@ export function HomeDeskModel({
   eveningState,
   ownSleepingPhotos,
   sleepingCounter,
+  showOnboardingSecondPhotoAction = false,
   now,
   onTakePhoto,
   onOpenDelivery,
@@ -337,7 +339,13 @@ export function HomeDeskModel({
     (homeDay.phase !== "opened" && !shouldSuppressEmptyBeforeNotice);
   const shouldShowNotificationTray = shouldShowBaseNotice;
   const shouldShowHomeFrameTakeButton =
-    deskState === "1" && homeDay.phase === "empty-before";
+    (deskState === "1" && homeDay.phase === "empty-before") ||
+    (showOnboardingSecondPhotoAction &&
+      (deskState === "1" || deskState === "1b"));
+  const homeCaptureHint =
+    homeDay.phase === "empty-before"
+      ? "きょうの一枚を、よる8時のねこだよりに。"
+      : "あしたの一枚を、よる8時のねこだよりに。";
   const shouldShowHomeFrameRetakeLink =
     deskState === "2" && homeDay.phase === "sent-before";
   const shouldHidePresence = true;
@@ -556,7 +564,7 @@ export function HomeDeskModel({
                         size={13}
                         style={deskStyles.homeCaptureHintIcon}
                       />
-                      きょうの一枚を、よる8時のねこだよりに。
+                      {homeCaptureHint}
                     </span>
                   </div>
                 ) : null}
@@ -602,7 +610,7 @@ export function HomeDeskModel({
                         size={13}
                         style={deskStyles.homeCaptureHintIcon}
                       />
-                      きょうの一枚を、よる8時のねこだよりに。
+                      {homeCaptureHint}
                     </span>
                   </div>
                 ) : null}

@@ -110,12 +110,14 @@ async function persistDataUrls({
   supabase,
   depth = 0,
   uploadIndex = { current: 0 },
+  dataUrlPaths = new Map<string, string>(),
 }: {
   value: unknown;
   token: string;
   supabase: NonNullable<ReturnType<typeof createSupabaseAdminClient>>;
   depth?: number;
   uploadIndex?: { current: number };
+  dataUrlPaths?: Map<string, string>;
 }): Promise<unknown> {
   if (depth > MAX_DEPTH) {
     return null;
@@ -138,6 +140,11 @@ async function persistDataUrls({
       throw new Error("data_url_too_large");
     }
 
+    const existingPath = dataUrlPaths.get(value);
+    if (existingPath) {
+      return toStoragePhotoUrl(existingPath);
+    }
+
     const index = uploadIndex.current;
     uploadIndex.current += 1;
     const extension = getDataUrlExtension(value);
@@ -158,6 +165,7 @@ async function persistDataUrls({
       throw new Error("data_url_upload_failed");
     }
 
+    dataUrlPaths.set(value, path);
     return toStoragePhotoUrl(path);
   }
 
@@ -171,6 +179,7 @@ async function persistDataUrls({
           supabase,
           depth: depth + 1,
           uploadIndex,
+          dataUrlPaths,
         }),
       ),
     );
@@ -190,6 +199,7 @@ async function persistDataUrls({
         supabase,
         depth: depth + 1,
         uploadIndex,
+        dataUrlPaths,
       });
     }
 

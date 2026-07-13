@@ -132,12 +132,16 @@ export async function createOnboardingHandoffPayload(
         }
       : onboardingProgress;
   const currentCatId = getCurrentOnboardingCatId(nextOnboardingProgress);
+  const handoffProgress = compactOnboardingProgressForHandoff(
+    nextOnboardingProgress,
+    markCompleted,
+  );
 
   return {
     version: 1,
     createdAt: new Date().toISOString(),
     source,
-    onboardingProgress: nextOnboardingProgress,
+    onboardingProgress: handoffProgress,
     onboardingCompleted:
       markCompleted ||
       window.localStorage.getItem(STORAGE_KEYS.onboardingCompleted) === "true",
@@ -206,7 +210,53 @@ function getCurrentOnboardingOwnPhotos(
     (photo) => photo.id === progress.ownPhoto?.id,
   );
 
-  return [storedPhoto ?? progress.ownPhoto];
+  return [compactPhotoSourcesForHandoff(storedPhoto ?? progress.ownPhoto)];
+}
+
+function compactPhotoSourcesForHandoff<
+  T extends {
+    src: string;
+    thumbnailSrc?: string;
+    displaySrc?: string;
+    originalSrc?: string;
+  },
+>(photo: T): T {
+  const compact = { ...photo };
+
+  if (compact.thumbnailSrc === compact.src) delete compact.thumbnailSrc;
+  if (compact.displaySrc === compact.src) delete compact.displaySrc;
+  if (compact.originalSrc === compact.src) delete compact.originalSrc;
+
+  return compact;
+}
+
+function compactOnboardingProgressForHandoff(
+  progress: OnboardingProgress | null,
+  completed: boolean,
+) {
+  if (!progress) {
+    return null;
+  }
+
+  const compact: OnboardingProgress = {
+    ...progress,
+    ...(progress.deliveredPhoto
+      ? {
+          deliveredPhoto: compactPhotoSourcesForHandoff(
+            progress.deliveredPhoto,
+          ),
+        }
+      : {}),
+  };
+
+  if (completed) {
+    delete compact.ownPhoto;
+    delete compact.selectedPhotoSrc;
+  } else if (compact.ownPhoto) {
+    compact.ownPhoto = compactPhotoSourcesForHandoff(compact.ownPhoto);
+  }
+
+  return compact;
 }
 
 function getCurrentPendingReferralCode(
@@ -233,7 +283,7 @@ export function restoreOnboardingHandoffPayload(payload: unknown) {
     window.localStorage.setItem(STORAGE_KEYS.activeCatId, payload.activeCatId);
   }
 
-  if (payload.onboardingProgress) {
+  if (payload.onboardingProgress && !payload.onboardingCompleted) {
     writeOnboardingProgress(payload.onboardingProgress);
   }
 
@@ -241,11 +291,15 @@ export function restoreOnboardingHandoffPayload(payload: unknown) {
 
   removeCachedJson(ONBOARDING_HANDOFF_OWN_PHOTOS_KEY);
   removeCachedJson(ONBOARDING_HANDOFF_KEPT_PHOTOS_KEY);
-  restoreSyncedSleepingPhotos({
+  const restored = restoreSyncedSleepingPhotos({
     ownPhotos: payload.ownSleepingPhotos,
     keptPhotos,
     mergeLocal: false,
   });
+
+  if (payload.ownSleepingPhotos.length > 0 && restored.ownCount === 0) {
+    throw new Error("handoff_local_storage_failed");
+  }
 
   if (payload.pendingReferralCode) {
     window.localStorage.setItem(
@@ -259,8 +313,8 @@ export function restoreOnboardingHandoffPayload(payload: unknown) {
   }
 
   return {
-    ownSleepingPhotoCount: payload.ownSleepingPhotos.length,
-    keptExchangePhotoCount: keptPhotos.length,
+    ownSleepingPhotoCount: restored.ownCount,
+    keptExchangePhotoCount: restored.keptCount,
     catCount: payload.catProfiles.length,
   };
 }

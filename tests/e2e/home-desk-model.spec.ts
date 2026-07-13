@@ -409,6 +409,19 @@ test.describe("home desk model", () => {
     await expect(page.getByTestId("desk-empty-frame")).toHaveCSS("cursor", "auto");
   });
 
+  test("keeps the onboarding second-photo action visible after 8pm", async ({
+    page,
+  }) => {
+    await seedDeskState(page, "1", { now: getCurrentJstTime(21, 0) });
+    await page.goto("/home?handoff=restored&from=onboarding_second_photo");
+    await page.waitForLoadState("networkidle");
+
+    await expect(page.getByTestId("home-empty-action")).toBeVisible();
+    await expect(
+      page.getByText("あしたの一枚を、よる8時のねこだよりに。"),
+    ).toBeVisible();
+  });
+
   test("matches Android camera photo ratios and keeps controls inside the viewport", async ({
     browser,
   }) => {
