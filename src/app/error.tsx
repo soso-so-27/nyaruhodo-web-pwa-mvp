@@ -23,6 +23,8 @@ export default function AppError({
     }
   }, [error]);
 
+  const diagnosticText = formatAppErrorDiagnostic(error);
+
   return (
     <main style={styles.page}>
       <section style={styles.panel} role="alert">
@@ -40,12 +42,31 @@ export default function AppError({
         >
           更新してひらく
         </button>
+        <details style={styles.details} open>
+          <summary style={styles.summary}>エラー情報</summary>
+          <code style={styles.code} data-testid="app-error-diagnostic">
+            {diagnosticText}
+          </code>
+        </details>
+        <a href="/settings" style={styles.link}>
+          設定をひらく
+        </a>
         <a href="/" style={styles.link}>
           ホームへ戻る
         </a>
       </section>
     </main>
   );
+}
+
+export function formatAppErrorDiagnostic(
+  error: Error & { digest?: string },
+) {
+  const name = error.name || "Error";
+  const message = error.message || "no message";
+  const digest = error.digest ? ` / ${error.digest}` : "";
+
+  return `${name}: ${message}${digest}`.slice(0, 600);
 }
 
 const styles = {
@@ -80,6 +101,22 @@ const styles = {
     color: "#fffdfa",
     font: "inherit",
     cursor: "pointer",
+  },
+  details: {
+    width: "100%",
+    color: "#6f6757",
+    fontSize: "12px",
+    textAlign: "left" as const,
+  },
+  summary: { cursor: "pointer", textAlign: "center" as const },
+  code: {
+    display: "block",
+    marginTop: "10px",
+    padding: "10px",
+    borderRadius: "8px",
+    background: "rgba(74, 63, 53, 0.06)",
+    overflowWrap: "anywhere" as const,
+    whiteSpace: "pre-wrap" as const,
   },
   link: { color: "#6f6757", fontSize: "13px", textDecoration: "underline" },
 };
