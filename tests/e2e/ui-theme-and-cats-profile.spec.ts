@@ -1,4 +1,4 @@
-import { expect, test, type Page } from "@playwright/test";
+import { expect, test, type Locator, type Page } from "@playwright/test";
 
 const photoDataUrl =
   "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAGQAAABkCAYAAABw4pVUAAAAAXNSR0IArs4c6QAAAARnQU1BAACxjwv8YQUAAAAJcEhZcwAADsMAAA7DAcdvqGQAAAEJSURBVHhe7dExEcAgAMBAJKKuTpnpjoLA/fACchlrzv2C+a0njDPsVmfYrQyJMSTGkBhDYgyJMSTGkBhDYgyJMSTGkBhDYgyJMSTGkBhDYgyJMSTGkBhDYgyJMSTGkBhDYgyJMSTGkBhDYgyJMSTGkBhDYgyJMSTGkBhDYgyJMSTGkBhDYgyJMSTGkBhDYgyJMSTGkBhDYgyJMSTGkBhDYgyJMSTGkBhDYgyJMSTGkBhDYgyJMSTmB4RCEqdGtA/tAAAAAElFTkSuQmCC";
@@ -533,7 +533,7 @@ test("shows the custom top cover without over-cropping", async ({
         .first()
         .evaluate((image) => window.getComputedStyle(image).objectFit),
     )
-    .toBe("cover");
+    .toBe("contain");
   await expect
     .poll(() =>
       coverImages
@@ -576,9 +576,6 @@ test("adjusts the exact photo currently shown as the cat cover", async ({
     .poll(() => coverImage.evaluate((image) => (image as HTMLImageElement).naturalWidth))
     .toBeGreaterThan(0);
   const displayedSrc = await coverImage.getAttribute("src");
-  const displayedTransform = await coverImage.evaluate(
-    (image) => window.getComputedStyle(image).transform,
-  );
   const displayedFit = await coverImage.evaluate(
     (image) => window.getComputedStyle(image).objectFit,
   );
@@ -593,14 +590,25 @@ test("adjusts the exact photo currently shown as the cat cover", async ({
   const cropImage = page.getByTestId("cover-crop-preview").locator("img");
   await expect(cropImage).toHaveAttribute("src", displayedSrc ?? "");
   await expect
-    .poll(() => cropImage.evaluate((image) => window.getComputedStyle(image).transform))
-    .toBe(displayedTransform);
-  await expect
     .poll(() => cropImage.evaluate((image) => window.getComputedStyle(image).objectFit))
     .toBe(displayedFit);
   await expect
     .poll(() => cropImage.evaluate((image) => window.getComputedStyle(image).objectPosition))
     .toBe(displayedPosition);
+  const displayedGeometry = await readNormalizedCropGeometry(
+    page.getByTestId("cats-profile-cover"),
+    coverImage,
+  );
+  const cropGeometry = await readNormalizedCropGeometry(
+    page.getByTestId("cover-crop-preview"),
+    cropImage,
+  );
+  expect(cropGeometry.widthRatio).toBeCloseTo(displayedGeometry.widthRatio, 2);
+  expect(cropGeometry.heightRatio).toBeCloseTo(displayedGeometry.heightRatio, 2);
+  expect(cropGeometry.centerX).toBeCloseTo(displayedGeometry.centerX, 2);
+  expect(cropGeometry.centerY).toBeCloseTo(displayedGeometry.centerY, 2);
+  expect(cropGeometry.imageRatio).toBeCloseTo(1, 2);
+  expect(cropGeometry.heightRatio).toBeGreaterThan(1);
 });
 
 test("falls back to automatic cover framing when a custom cover has no crop", async ({
@@ -1171,6 +1179,25 @@ async function seedCatsProfileWithStoragePhotos(
     },
     { nowValue: now, count: photoCount },
   );
+}
+
+async function readNormalizedCropGeometry(frame: Locator, image: Locator) {
+  const frameBox = await frame.boundingBox();
+  const imageBox = await image.boundingBox();
+
+  if (!frameBox || !imageBox) {
+    throw new Error("Cover crop geometry is unavailable");
+  }
+
+  return {
+    widthRatio: imageBox.width / frameBox.width,
+    heightRatio: imageBox.height / frameBox.height,
+    centerX:
+      (imageBox.x + imageBox.width / 2 - frameBox.x) / frameBox.width,
+    centerY:
+      (imageBox.y + imageBox.height / 2 - frameBox.y) / frameBox.height,
+    imageRatio: imageBox.width / imageBox.height,
+  };
 }
 
 async function seedCatsProfileWithCustomStorageCover(

@@ -4462,7 +4462,17 @@ function getCoverCropImageStyle(crop: CatCoverCrop): CSSProperties {
   const normalized = normalizeCoverCrop(crop);
 
   return {
-    transform: `translate(${normalized.offsetX}%, ${normalized.offsetY}%) scale(${normalized.scale})`,
+    position: "absolute",
+    left: `calc(50% + ${normalized.offsetX}%)`,
+    top: `calc(50% + ${normalized.offsetY}%)`,
+    width: "auto",
+    height: "auto",
+    minWidth: "100%",
+    minHeight: "100%",
+    maxWidth: "none",
+    objectFit: "contain",
+    objectPosition: "center",
+    transform: `translate(-50%, -50%) scale(${normalized.scale})`,
     transformOrigin: "center",
     transition: "transform 120ms var(--ease-gentle)",
     willChange: "transform",
@@ -7608,9 +7618,9 @@ const styles = {
   },
   thumbnailCropPreview: {
     position: "relative" as const,
-    width: "100%",
-    maxWidth: "520px",
-    aspectRatio: "390 / 232",
+    width: "calc(100% + 16px)",
+    maxWidth: "414px",
+    height: "232px",
     overflow: "hidden",
     borderRadius: "18px",
     border: "1px solid color-mix(in srgb, var(--line) 78%, transparent)",
