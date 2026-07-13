@@ -86,6 +86,8 @@ const APP_BUILD_SHA =
   process.env.NEXT_PUBLIC_VERCEL_GIT_COMMIT_SHA ??
   process.env.NEXT_PUBLIC_COMMIT_SHA ??
   "local";
+const APP_BUILD_LABEL =
+  APP_BUILD_SHA === "local" ? "local" : APP_BUILD_SHA.slice(0, 7);
 const MAX_UPLOAD_SOURCE_FILE_BYTES = 20 * 1024 * 1024;
 const SUPPORTED_SOURCE_IMAGE_MIME_TYPES = new Set([
   "image/avif",
@@ -666,58 +668,7 @@ export function SettingsPage() {
 
         {activeSettingsTab === "general" ? (
           <>
-        <section style={{ ...styles.section, order: 2 }}>
-          <p style={styles.sectionLabel}>アカウント同期</p>
-          <AppCard variant="outlined" padding="sm" style={styles.card}>
-            {isLoggedIn ? (
-              <>
-                {syncOverview ? (
-                  <SyncStatusPanel overview={syncOverview} />
-                ) : (
-                  <p style={styles.storageNote}>アカウント保存の状態を確認中です。</p>
-                )}
-                <div style={styles.actionStack}>
-                  <AppButton
-                    type="button"
-                    variant="ghost"
-                    fullWidth
-                    style={styles.settingsActionButton}
-                    loading={isSyncing}
-                    onClick={() => {
-                      void handleSyncNow();
-                    }}
-                    disabled={isSyncing}
-                  >
-                    {isSyncing ? "同期中…" : "いますぐ同期する"}
-                  </AppButton>
-                </div>
-                {syncMessage ? (
-                  <p style={styles.syncMessage} role="status">
-                    {syncMessage}
-                  </p>
-                ) : null}
-                {lastSyncResult ? (
-                  <SyncResultDetails result={lastSyncResult.result} />
-                ) : null}
-                <div style={styles.divider} />
-              </>
-            ) : null}
-            <div style={styles.row}>
-              <span style={styles.rowLabel}>
-                いまの入口: {formatDisplayEnvironmentValue(displayEnvironment)}
-              </span>
-            </div>
-            <div style={styles.divider} />
-            <details style={styles.disclosure}>
-              <summary style={styles.disclosureSummary}>写真が見えないとき</summary>
-              <p style={styles.storageNote}>
-                iPhoneでは、ホーム画面アプリとSafari/Webで写真の保存場所が分かれることがあります。写真が見えないときは、撮ったときと同じ入口から開いてください。
-              </p>
-            </details>
-          </AppCard>
-        </section>
-
-        <section style={{ ...styles.section, order: 1 }}>
+        <section style={styles.section}>
           <p style={styles.sectionLabel}>アカウント</p>
           <AppCard variant="outlined" padding="sm" style={styles.card}>
             {isLoading ? (
@@ -742,7 +693,6 @@ export function SettingsPage() {
                 </div>
               </>
             ) : (
-              <>
                 <div style={styles.accountRow}>
                   <div style={styles.rowLeft}>
                     <span style={{ ...styles.statusDot, ...styles.statusDotOff }} />
@@ -754,11 +704,59 @@ export function SettingsPage() {
                     size="sm"
                     style={styles.accountInlineButton}
                   >
-                    作成する
+                    Googleでログイン
                   </AppButton>
                 </div>
-              </>
             )}
+          </AppCard>
+        </section>
+
+        <section style={styles.section}>
+          <p style={styles.sectionLabel}>
+            {isLoggedIn ? "アカウント同期" : "この端末の保存"}
+          </p>
+          <AppCard variant="outlined" padding="sm" style={styles.card}>
+            {isLoggedIn ? (
+              <>
+                {syncOverview ? (
+                  <SyncStatusPanel overview={syncOverview} />
+                ) : (
+                  <p style={styles.storageNote}>アカウント保存の状態を確認中です。</p>
+                )}
+                <div style={styles.actionStack}>
+                  <AppButton
+                    type="button"
+                    variant="ghost"
+                    fullWidth
+                    style={styles.settingsActionButton}
+                    loading={isSyncing}
+                    onClick={() => {
+                      void handleSyncNow();
+                    }}
+                    disabled={isSyncing}
+                  >
+                    {isSyncing ? "同期中…" : "いますぐ同期する"}
+                  </AppButton>
+                </div>
+                {syncMessage ? (
+                  <p style={styles.syncMessage} role="status">{syncMessage}</p>
+                ) : null}
+                {lastSyncResult ? <SyncResultDetails result={lastSyncResult.result} /> : null}
+                <div style={styles.divider} />
+              </>
+            ) : null}
+            <div style={styles.row}>
+              <span style={styles.rowLabel}>
+                いまの入口: {formatDisplayEnvironmentValue(displayEnvironment)}
+              </span>
+            </div>
+            <div style={styles.divider} />
+            <details style={styles.disclosure}>
+              <summary style={styles.disclosureSummary}>写真が見えないとき</summary>
+              <p style={styles.storageNote}>
+                iPhoneでは、ホーム画面アプリとSafari/Webで写真の保存場所が分かれることがあります。写真が見えないときは、撮ったときと同じ入口から開いてください。
+              </p>
+            </details>
           </AppCard>
         </section>
 
@@ -1076,16 +1074,16 @@ export function SettingsPage() {
           <p style={styles.sectionLabel}>アプリについて</p>
           <AppCard variant="outlined" padding="sm" style={styles.card}>
             <div style={styles.row}>
-              <span style={styles.rowLabel}>バージョン</span>
-              <span style={styles.rowValue}>1.0.0-beta.4</span>
+              <span style={styles.rowLabel}>ビルド</span>
+              <span style={styles.rowValue}>{APP_BUILD_LABEL}</span>
             </div>
             <div style={styles.divider} />
-            <div style={styles.betaNote}>
-              <p style={styles.betaNoteTitle}>更新が反映されないとき</p>
+            <details style={styles.disclosure}>
+              <summary style={styles.disclosureSummary}>困ったとき</summary>
               <p style={styles.betaNoteText}>
-                iPhone PWAは古い画面が残ることがあります。ホーム画面から一度閉じて開き直すか、Safariで本番URLを開いてからPWAを起動してください。
+                ホーム画面アプリで古い画面が残るときは、アプリを一度閉じて開き直してください。改善しない場合は、ブラウザで本番URLを開いてから再度起動してください。
               </p>
-            </div>
+            </details>
             <div style={styles.divider} />
             <div style={styles.betaNote}>
               <p style={styles.betaNoteTitle}>現在ベータ版として公開中</p>
@@ -1132,7 +1130,9 @@ function BetaSupporterPanel({
         fullWidth
         style={styles.settingsActionButton}
       >
-        これからの ねてるねこ
+        {billingStatus.isBetaSupporter
+          ? "サポーター特典を見る"
+          : "βサポーターについて"}
       </AppButton>
     </div>
   );

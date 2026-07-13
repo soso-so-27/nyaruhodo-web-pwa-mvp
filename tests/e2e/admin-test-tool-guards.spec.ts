@@ -294,7 +294,7 @@ test.describe("admin test tool guards", () => {
     ).toBeVisible();
     await expect(page.getByText("βサポーター", { exact: true })).toBeVisible();
     await expect(
-      page.getByRole("link", { name: "これからの ねてるねこ" }),
+      page.getByRole("link", { name: "βサポーターについて" }),
     ).toBeVisible();
     await expect(
       page.getByRole("button", { name: "βサポーターになる" }),
@@ -342,11 +342,11 @@ test.describe("admin test tool guards", () => {
 
     await expect(page.getByText("βサポーターです")).toBeVisible();
     await expect(
-      page.getByRole("link", { name: "これからの ねてるねこ" }),
+      page.getByRole("link", { name: "サポーター特典を見る" }),
     ).toBeVisible();
     await expect(page.getByRole("button", { name: "支払いを管理" })).toBeHidden();
 
-    await page.getByRole("link", { name: "これからの ねてるねこ" }).click();
+    await page.getByRole("link", { name: "サポーター特典を見る" }).click();
     await page.waitForURL("**/beta-supporter");
     await expect(page.getByText("これからのねてるねこ").first()).toBeVisible();
     await expect(page.getByRole("button", { name: "支払いを管理" })).toBeVisible();
