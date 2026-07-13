@@ -1592,6 +1592,41 @@ test.describe("onboarding delivery flow", () => {
     expect(keptPhotos).toHaveLength(0);
   });
 
+  test("keeps the second-photo intent for account handoffs without an explicit next", async ({
+    page,
+  }) => {
+    await page.route("**/api/onboarding/handoff/redeem", async (route) => {
+      await route.fulfill({
+        contentType: "application/json",
+        body: JSON.stringify({
+          ok: true,
+          payload: {
+            version: 1,
+            createdAt: new Date().toISOString(),
+            source: "instagram_bio",
+            onboardingProgress: null,
+            onboardingCompleted: true,
+            catProfiles: [{ id: "account-handoff-cat", name: "むぎ" }],
+            activeCatId: "account-handoff-cat",
+            ownSleepingPhotos: [],
+            keptExchangePhotos: [],
+            pendingReferralCode: null,
+          },
+        }),
+      });
+    });
+
+    await page.goto(
+      "/onboarding/continue?handoff=onb_00000000-0000-4000-8000-000000000000_0123456789abcdef0123&handoff_from=account",
+    );
+    await page.locator("main button").first().click();
+
+    await expect(page).toHaveURL(
+      /\/home\?handoff=restored&from=onboarding_second_photo/,
+    );
+    await expect(page.getByTestId("home-empty-action")).toBeVisible();
+  });
+
   test("shows the onboarding delivered photo without adding kept album photos", async ({
     page,
   }) => {

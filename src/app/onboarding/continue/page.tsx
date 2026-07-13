@@ -26,7 +26,11 @@ export default function OnboardingContinuePage() {
 function OnboardingContinueContent() {
   const searchParams = useSearchParams();
   const token = searchParams.get("handoff") ?? "";
-  const next = searchParams.get("next") === "second_photo" ? "second_photo" : "";
+  const next =
+    searchParams.get("next") === "second_photo" ||
+    searchParams.get("handoff_from") === "account"
+      ? "second_photo"
+      : "";
   const [status, setStatus] = useState<RestoreStatus>("ready");
   const [message, setMessage] = useState("");
   const [copied, setCopied] = useState(false);
