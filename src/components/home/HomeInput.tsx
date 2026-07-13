@@ -97,6 +97,7 @@ import {
   getDiscoveryLogKey,
   getLockDataKey,
   getRecordLogKey,
+  compactDuplicatePhotoSourcesInLocalStorage,
   readCachedJson,
   writeCachedJson,
 } from "../../lib/storage";
@@ -388,6 +389,7 @@ export function HomeInput({
   }, []);
 
   useEffect(() => {
+    compactDuplicatePhotoSourcesInLocalStorage();
     const profiles = readCatProfiles();
     const activeId = readActiveCatId();
     const active = getActiveCatProfile(profiles, activeId);

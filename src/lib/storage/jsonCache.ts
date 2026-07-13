@@ -62,6 +62,81 @@ export function invalidateCachedJson(key?: string | null) {
   jsonCache.clear();
 }
 
+export function compactDuplicatePhotoSourcesInLocalStorage() {
+  if (typeof window === "undefined") {
+    return { compactedKeys: 0, releasedCharacters: 0 };
+  }
+
+  let compactedKeys = 0;
+  let releasedCharacters = 0;
+  const keys = Array.from(
+    { length: window.localStorage.length },
+    (_, index) => window.localStorage.key(index),
+  ).filter((key): key is string => Boolean(key));
+
+  for (const key of keys) {
+    const raw = window.localStorage.getItem(key);
+    if (!raw || !raw.includes('"src"')) {
+      continue;
+    }
+
+    try {
+      const parsed = JSON.parse(raw) as unknown;
+      const changed = compactDuplicatePhotoSources(parsed);
+      if (!changed) {
+        continue;
+      }
+
+      const nextRaw = JSON.stringify(parsed);
+      if (nextRaw.length >= raw.length) {
+        continue;
+      }
+
+      window.localStorage.setItem(key, nextRaw);
+      jsonCache.delete(key);
+      compactedKeys += 1;
+      releasedCharacters += raw.length - nextRaw.length;
+    } catch {
+      // Keep every original value when parsing or replacement is unavailable.
+    }
+  }
+
+  return { compactedKeys, releasedCharacters };
+}
+
+function compactDuplicatePhotoSources(value: unknown, depth = 0): boolean {
+  if (!value || typeof value !== "object" || depth > 12) {
+    return false;
+  }
+
+  if (Array.isArray(value)) {
+    return value.reduce(
+      (changed, item) =>
+        compactDuplicatePhotoSources(item, depth + 1) || changed,
+      false,
+    );
+  }
+
+  const record = value as Record<string, unknown>;
+  const src = record.src;
+  let changed = false;
+
+  if (typeof src === "string") {
+    for (const key of ["thumbnailSrc", "displaySrc", "originalSrc"] as const) {
+      if (record[key] === src) {
+        delete record[key];
+        changed = true;
+      }
+    }
+  }
+
+  for (const item of Object.values(record)) {
+    changed = compactDuplicatePhotoSources(item, depth + 1) || changed;
+  }
+
+  return changed;
+}
+
 function ensureStorageListener() {
   if (hasStorageListener || typeof window === "undefined") {
     return;

@@ -422,6 +422,51 @@ test.describe("home desk model", () => {
     ).toBeVisible();
   });
 
+  test("opens a full iOS store and compacts duplicate photo sources", async ({
+    page,
+  }) => {
+    await seedDeskState(page, "2");
+    await page.addInitScript(() => {
+      const originalSetItem = Storage.prototype.setItem;
+      Storage.prototype.setItem = function patchedSetItem(key, value) {
+        if (key === "active_cat_id" && this.getItem(key) !== null) {
+          throw new DOMException("The quota has been exceeded", "QuotaExceededError");
+        }
+        return originalSetItem.call(this, key, value);
+      };
+
+      const photos = JSON.parse(
+        window.localStorage.getItem("nyaruhodo_exchange_own_sleeping_photos") ??
+          "[]",
+      );
+      if (photos[0]?.src) {
+        photos[0].thumbnailSrc = photos[0].src;
+        photos[0].displaySrc = photos[0].src;
+        photos[0].originalSrc = photos[0].src;
+        originalSetItem.call(
+          window.localStorage,
+          "nyaruhodo_exchange_own_sleeping_photos",
+          JSON.stringify(photos),
+        );
+      }
+    });
+
+    await page.goto("/home");
+    await expect(page.getByTestId("home-desk-model")).toBeVisible();
+
+    const storedPhoto = await page.evaluate(() => {
+      const photos = JSON.parse(
+        window.localStorage.getItem("nyaruhodo_exchange_own_sleeping_photos") ??
+          "[]",
+      );
+      return photos[0] ?? null;
+    });
+    expect(storedPhoto?.src).toBeTruthy();
+    expect(storedPhoto?.thumbnailSrc).toBeUndefined();
+    expect(storedPhoto?.displaySrc).toBeUndefined();
+    expect(storedPhoto?.originalSrc).toBeUndefined();
+  });
+
   test("matches Android camera photo ratios and keeps controls inside the viewport", async ({
     browser,
   }) => {

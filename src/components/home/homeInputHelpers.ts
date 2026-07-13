@@ -572,7 +572,11 @@ export function readActiveCatId() {
 }
 
 export function saveActiveCatId(catId: string) {
-  window.localStorage.setItem(ACTIVE_CAT_ID_KEY, catId);
+  try {
+    window.localStorage.setItem(ACTIVE_CAT_ID_KEY, catId);
+  } catch {
+    // A full iOS PWA store must not prevent the existing profile from opening.
+  }
 }
 
 export function readActiveCatTraitMemo(activeCatId: string | null) {
