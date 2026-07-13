@@ -793,7 +793,7 @@ test.describe("home sleeping exchange flow", () => {
   test("updates the save sheet status when switching delivery mode", async ({
     page,
   }) => {
-    await page.setViewportSize({ width: 390, height: 667 });
+    await page.setViewportSize({ width: 320, height: 568 });
     const beforeDelivery = Date.parse("2026-06-10T10:30:00.000Z");
 
     await page.addInitScript((now) => {
@@ -850,6 +850,31 @@ test.describe("home sleeping exchange flow", () => {
           return rect.top >= 0 && rect.bottom <= window.innerHeight;
         }),
       )
+      .toBe(true);
+
+    await expect
+      .poll(async () => {
+        const sharedBox = await page
+          .getByTestId("exchange-share-mode-shared")
+          .boundingBox();
+        const privateBox = await page
+          .getByTestId("exchange-share-mode-private")
+          .boundingBox();
+        const submitBox = await page
+          .getByTestId("exchange-share-submit")
+          .boundingBox();
+
+        if (!sharedBox || !privateBox || !submitBox) {
+          return false;
+        }
+
+        const modeBottom = Math.max(
+          sharedBox.y + sharedBox.height,
+          privateBox.y + privateBox.height,
+        );
+
+        return modeBottom + 8 <= submitBox.y;
+      })
       .toBe(true);
 
     await expect

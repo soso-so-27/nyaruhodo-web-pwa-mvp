@@ -3683,15 +3683,16 @@ function ExchangeSharePermissionSheet({
         </div>
       }
     >
-        <div style={styles.exchangeShareLayout}>
-          <div style={styles.exchangeSharePreview}>
+        <style>{exchangeShareResponsiveStyles}</style>
+        <div data-exchange-share-layout="" style={styles.exchangeShareLayout}>
+          <div data-exchange-share-preview="" style={styles.exchangeSharePreview}>
           <StoredPhotoImage
             src={photo.src}
             alt=""
             style={styles.exchangeSharePhoto}
           />
           </div>
-          <div style={styles.exchangeShareSummary}>
+          <div data-exchange-share-summary="" style={styles.exchangeShareSummary}>
             <span style={styles.exchangeShareSummaryIcon} aria-hidden="true">
               <AppIcon name={isPrivate ? "lock" : "mail"} size={17} />
             </span>
@@ -3701,7 +3702,7 @@ function ExchangeSharePermissionSheet({
           </div>
         </div>
 
-        <div style={styles.exchangeDecisionStack}>
+        <div data-exchange-share-decisions="" style={styles.exchangeDecisionStack}>
         {shouldShowCatPicker ? (
           <div style={styles.exchangeDecisionBlock}>
             <p style={styles.exchangeDecisionLabel}>この子の記録に入れる</p>
@@ -3807,6 +3808,19 @@ function ExchangeSharePermissionSheet({
     </AppSheet>
   );
 }
+
+const exchangeShareResponsiveStyles = `
+@media (max-height: 700px) {
+  [data-exchange-share-layout] {
+    --exchange-share-columns: minmax(96px, 104px) minmax(0, 1fr);
+    --exchange-share-preview-height: 104px;
+    --exchange-share-summary-min-height: 104px;
+  }
+  [data-exchange-share-decisions] {
+    --exchange-share-decision-gap: 6px;
+    --exchange-share-decision-margin: 6px 0 2px;
+  }
+}`;
 
 function CollectionQuickPhotoSheet({
   slot,
@@ -7711,6 +7725,8 @@ const styles = {
   },
   exchangeShareLayout: {
     display: "grid",
+    gridTemplateColumns:
+      "var(--exchange-share-columns, minmax(0, 1fr))",
     gap: "8px",
     minWidth: 0,
   },
@@ -7744,7 +7760,8 @@ const styles = {
   },
   exchangeSharePreview: {
     width: "100%",
-    height: "clamp(156px, 25vh, 190px)",
+    height:
+      "var(--exchange-share-preview-height, clamp(156px, 25vh, 190px))",
     borderRadius: "18px",
     overflow: "hidden",
     padding: "8px",
@@ -7762,7 +7779,7 @@ const styles = {
     gridTemplateColumns: "30px minmax(0, 1fr)",
     alignItems: "center",
     gap: "9px",
-    minHeight: "38px",
+    minHeight: "var(--exchange-share-summary-min-height, 38px)",
     padding: "5px 9px",
     borderRadius: "14px",
     border: "1px solid rgba(144,126,102,0.1)",
@@ -7781,8 +7798,8 @@ const styles = {
   },
   exchangeDecisionStack: {
     display: "grid",
-    gap: "8px",
-    margin: "8px 0 4px",
+    gap: "var(--exchange-share-decision-gap, 8px)",
+    margin: "var(--exchange-share-decision-margin, 8px 0 4px)",
     minWidth: 0,
   },
   exchangeDecisionBlock: {
