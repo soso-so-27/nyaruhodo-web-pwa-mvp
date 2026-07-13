@@ -204,6 +204,7 @@ export function CatsPage() {
   const [coverCropDraft, setCoverCropDraft] = useState<{
     src: string;
     crop: CatCoverCrop;
+    fallbackSrcs?: string[];
   } | null>(null);
   const [isOnboardingMode, setIsOnboardingMode] = useState(false);
   const [isOnboardingCompletionReady, setIsOnboardingCompletionReady] =
@@ -360,6 +361,10 @@ export function CatsPage() {
     : activeCoverPhoto
       ? getLensPhotoThumbnailSrc(activeCoverPhoto)
       : undefined;
+  const activeCoverFallbackSrcs =
+    activeCoverPhoto && !hasCustomCoverPhoto
+      ? getLensPhotoFallbackSrcs(activeCoverPhoto)
+      : [];
   const hasCustomCoverCrop = Boolean(activeCatProfile?.coverCrop);
   const activeCoverCrop = normalizeCoverCrop(activeCatProfile?.coverCrop);
   const activeCoverFit =
@@ -988,7 +993,7 @@ export function CatsPage() {
         const photoSrc = await storeAccountPhotoDataUrl({
           dataUrl,
           pathSegments: [targetCatId, "cover"],
-          fileName: "cover",
+          fileName: `cover-${Date.now()}`,
         });
         if (!isStoragePhotoReference(photoSrc)) {
           setSaveMessage("カバー写真を保存できませんでした。");
@@ -2234,14 +2239,16 @@ export function CatsPage() {
           hasCustomCoverPhoto={hasCustomCoverPhoto}
           currentCoverSrc={activeCoverSrc}
           currentCoverCrop={activeCoverCrop}
-          onAdjustCurrent={(src, crop) => {
-            setCoverCropDraft({ src, crop });
+          currentCoverFallbackSrcs={activeCoverFallbackSrcs}
+          onAdjustCurrent={(src, crop, fallbackSrcs) => {
+            setCoverCropDraft({ src, crop, fallbackSrcs });
             setIsCoverPhotoSheetOpen(false);
           }}
           onPickPhoto={(photo) => {
             setCoverCropDraft({
               src: getLensPhotoDetailSrc(photo),
               crop: DEFAULT_COVER_CROP,
+              fallbackSrcs: getLensPhotoFallbackSrcs(photo),
             });
             setIsCoverPhotoSheetOpen(false);
           }}
@@ -2258,6 +2265,7 @@ export function CatsPage() {
       {coverCropDraft ? (
         <CoverCropSheet
           src={coverCropDraft.src}
+          fallbackSrcs={coverCropDraft.fallbackSrcs}
           crop={coverCropDraft.crop}
           onChange={(crop) =>
             setCoverCropDraft((current) =>
@@ -3561,6 +3569,7 @@ function CoverPhotoSheet({
   hasCustomCoverPhoto,
   currentCoverSrc,
   currentCoverCrop,
+  currentCoverFallbackSrcs,
   onAdjustCurrent,
   onPickPhoto,
   onUpload,
@@ -3572,7 +3581,12 @@ function CoverPhotoSheet({
   hasCustomCoverPhoto: boolean;
   currentCoverSrc?: string;
   currentCoverCrop: CatCoverCrop;
-  onAdjustCurrent: (src: string, crop: CatCoverCrop) => void;
+  currentCoverFallbackSrcs: string[];
+  onAdjustCurrent: (
+    src: string,
+    crop: CatCoverCrop,
+    fallbackSrcs: string[],
+  ) => void;
   onPickPhoto: (photo: LensPhoto) => void;
   onUpload: () => void;
   onReset: () => void;
@@ -3588,7 +3602,13 @@ function CoverPhotoSheet({
               variant="secondary"
               fullWidth
               data-testid="cover-photo-adjust-current"
-              onClick={() => onAdjustCurrent(currentCoverSrc, currentCoverCrop)}
+              onClick={() =>
+                onAdjustCurrent(
+                  currentCoverSrc,
+                  currentCoverCrop,
+                  currentCoverFallbackSrcs,
+                )
+              }
             >
               {"\u3044\u307e\u306e\u5199\u771f\u306e\u4f4d\u7f6e\u3092\u8abf\u6574"}
             </AppButton>
@@ -3655,12 +3675,14 @@ function CoverPhotoSheet({
 
 function CoverCropSheet({
   src,
+  fallbackSrcs,
   crop,
   onChange,
   onSave,
   onBack,
 }: {
   src: string;
+  fallbackSrcs?: string[];
   crop: CatCoverCrop;
   onChange: (crop: CatCoverCrop) => void;
   onSave: () => void;
@@ -3881,6 +3903,7 @@ function CoverCropSheet({
         >
           <StoredPhotoImage
             src={src}
+            fallbackSrcs={fallbackSrcs}
             alt=""
             storageVariant="display"
             loading="eager"

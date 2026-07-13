@@ -548,6 +548,49 @@ test("shows the custom top cover without over-cropping", async ({
   );
 });
 
+test("adjusts the exact photo currently shown as the cat cover", async ({
+  page,
+}) => {
+  await page.route("**/api/photo-storage/signed-url", async (route) => {
+    const body = route.request().postDataJSON() as { variant?: string };
+    await route.fulfill({
+      contentType: "application/json",
+      body: JSON.stringify({
+        bucket: "cat-photos",
+        expiresIn: 86_400,
+        signedUrl: photoDataUrl,
+        variant: body.variant ?? "display",
+      }),
+    });
+  });
+  await seedCatsProfileWithCustomStorageCover(
+    page,
+    Date.parse("2026-06-10T12:30:00+09:00"),
+  );
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto("/cats");
+  await page.waitForLoadState("networkidle");
+
+  const coverImage = page.getByTestId("cats-profile-cover").locator("img").first();
+  await expect
+    .poll(() => coverImage.evaluate((image) => (image as HTMLImageElement).naturalWidth))
+    .toBeGreaterThan(0);
+  const displayedSrc = await coverImage.getAttribute("src");
+  const displayedTransform = await coverImage.evaluate(
+    (image) => window.getComputedStyle(image).transform,
+  );
+
+  await page.getByTestId("cats-section-tab-basic").click();
+  await page.getByTestId("cats-cover-photo-button").click();
+  await page.getByTestId("cover-photo-adjust-current").click();
+
+  const cropImage = page.getByTestId("cover-crop-preview").locator("img");
+  await expect(cropImage).toHaveAttribute("src", displayedSrc ?? "");
+  await expect
+    .poll(() => cropImage.evaluate((image) => window.getComputedStyle(image).transform))
+    .toBe(displayedTransform);
+});
+
 test("falls back to automatic cover framing when a custom cover has no crop", async ({
   page,
 }) => {
