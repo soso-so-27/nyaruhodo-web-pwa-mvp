@@ -5533,7 +5533,7 @@ const styles = {
     display: "block",
     width: "100%",
     height: "100%",
-    objectFit: "contain",
+    objectFit: "cover",
     objectPosition: "50% 30%",
     background:
       "linear-gradient(180deg, color-mix(in srgb, var(--paper-card) 88%, white), color-mix(in srgb, var(--paper) 86%, white))",
@@ -7602,7 +7602,7 @@ const styles = {
   thumbnailCropImageFrame: {
     width: "100%",
     height: "100%",
-    objectFit: "contain",
+    objectFit: "cover",
     objectPosition: "center",
     background: "transparent",
   },

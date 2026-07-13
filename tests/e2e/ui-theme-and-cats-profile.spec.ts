@@ -533,7 +533,7 @@ test("shows the custom top cover without over-cropping", async ({
         .first()
         .evaluate((image) => window.getComputedStyle(image).objectFit),
     )
-    .toBe("contain");
+    .toBe("cover");
   await expect
     .poll(() =>
       coverImages
