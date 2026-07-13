@@ -40,8 +40,27 @@ export function writeCachedJson(key: string, value: unknown) {
   }
 
   const raw = JSON.stringify(value);
-  window.localStorage.setItem(key, raw);
+  writeLocalStorageText(key, raw);
   jsonCache.set(key, { raw, value });
+}
+
+export function writeLocalStorageText(key: string, value: string) {
+  if (typeof window === "undefined") {
+    return;
+  }
+
+  try {
+    window.localStorage.setItem(key, value);
+    return;
+  } catch (error) {
+    if (!isQuotaExceededError(error)) {
+      throw error;
+    }
+  }
+
+  compactDuplicatePhotoSourcesInLocalStorage();
+  clearRecreatableLocalStorage();
+  window.localStorage.setItem(key, value);
 }
 
 export function removeCachedJson(key: string) {
@@ -135,6 +154,26 @@ function compactDuplicatePhotoSources(value: unknown, depth = 0): boolean {
   }
 
   return changed;
+}
+
+const RECREATABLE_STORAGE_KEYS = new Set([
+  "analytics_event_queue",
+  "analytics_session",
+  "neteruneko_admin_evening_delivery_trace",
+  "neteruneko_mainichi_seen_photo_keys",
+  "neteruneko_onboarding_photo_debug",
+]);
+
+function clearRecreatableLocalStorage() {
+  for (const key of RECREATABLE_STORAGE_KEYS) {
+    window.localStorage.removeItem(key);
+    jsonCache.delete(key);
+  }
+}
+
+function isQuotaExceededError(error: unknown) {
+  return error instanceof DOMException &&
+    (error.name === "QuotaExceededError" || error.code === 22);
 }
 
 function ensureStorageListener() {
