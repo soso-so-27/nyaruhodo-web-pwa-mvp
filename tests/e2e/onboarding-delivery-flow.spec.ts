@@ -159,6 +159,18 @@ test.describe("onboarding delivery flow", () => {
     await page.waitForLoadState("networkidle");
     await page.waitForTimeout(1000);
 
+    const introCopy = page
+      .locator("p")
+      .filter({ hasText: "自分のねこの寝顔を1枚入れると、" });
+    await expect(introCopy).toBeVisible();
+    await expect(introCopy).toContainText("どこかのねこの寝顔が1通届きます。");
+    await expect(introCopy).toContainText("入れたねがおも、確認のあと、");
+    await expect(introCopy).toContainText("どこかの人への一通になります。");
+    await expect(introCopy).toContainText(
+      "ねてるねこの外には公開されません。",
+    );
+    await expect(page.getByText("外には出ません。", { exact: true })).toHaveCount(0);
+
     await page.locator("button").first().click();
     await page.locator('input[type="file"]').last().setInputFiles({
       name: "own-sleeping.png",

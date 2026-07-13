@@ -1111,6 +1111,164 @@ test.describe("sleeping delivery pool guards", () => {
     }
   });
 
+  test("stores an owned storage-backed onboarding photo once and rejects another user's path", async ({
+    request,
+  }) => {
+    await skipIfLocalSupabaseUnavailable();
+
+    const adminSupabase = createAdminSupabaseClientFromEnv();
+    const publicSupabase = createPublicSupabaseClientFromEnv();
+
+    test.skip(
+      !adminSupabase || !publicSupabase,
+      "Local Supabase public and service role keys are required for the storage-backed onboarding pool test.",
+    );
+
+    if (!adminSupabase || !publicSupabase) {
+      return;
+    }
+
+    const createdAt = Date.now();
+    const owner = await createConfirmedTestUser(
+      adminSupabase,
+      publicSupabase,
+      `onboarding-storage-owner-${createdAt}@example.test`,
+    );
+    const other = await createConfirmedTestUser(
+      adminSupabase,
+      publicSupabase,
+      `onboarding-storage-other-${createdAt}@example.test`,
+    );
+    const requestId = `onboarding-storage-${createdAt}`;
+    const localMomentId = `guard-own-${requestId}`;
+    const ownerPath = `${owner.userId}/onboarding/cat/display/${requestId}.webp`;
+    const otherPath = `${other.userId}/onboarding/cat/display/${requestId}.webp`;
+    const anonymousId = `onboarding-storage-anon-${createdAt}`;
+    const recipientAnonymousId = `onboarding-storage-recipient-${createdAt}`;
+    const recipientRequestId = `onboarding-storage-recipient-${createdAt}`;
+
+    try {
+      await uploadTestPhoto(adminSupabase, ownerPath);
+      await uploadTestPhoto(adminSupabase, otherPath);
+
+      const requestData = {
+        ...buildExchangeRequest(
+          toStoragePhotoUrl(ownerPath),
+          requestId,
+          anonymousId,
+        ),
+        debugDryRun: false,
+        mode: "onboarding" as const,
+      };
+      const headers = {
+        authorization: `Bearer ${owner.accessToken}`,
+        "x-forwarded-for": `2001:db8:3::${createdAt.toString(16)}`,
+      };
+
+      for (let attempt = 0; attempt < 2; attempt += 1) {
+        const response = await request.post("/api/sleeping-delivery/exchange", {
+          data: requestData,
+          headers,
+        });
+        expect(response.status()).toBe(200);
+      }
+
+      const { data: moments, error: momentsError } = await adminSupabase
+        .from("cat_moments")
+        .select(
+          "local_moment_id, photo_url, visibility, delivery_status, moderation_status, metadata",
+        )
+        .eq("user_id", owner.userId)
+        .eq("local_moment_id", localMomentId);
+
+      expect(momentsError).toBeNull();
+      expect(moments).toHaveLength(1);
+      expect(moments?.[0]).toMatchObject({
+        local_moment_id: localMomentId,
+        photo_url: toStoragePhotoUrl(ownerPath),
+        visibility: "shared",
+        delivery_status: "available",
+        moderation_status: "pending",
+      });
+      expect(moments?.[0]?.metadata?.pool_kind).toBe("user_shared");
+
+      const { error: approveError } = await adminSupabase
+        .from("cat_moments")
+        .update({
+          moderated_at: new Date().toISOString(),
+          moderated_by: "e2e",
+          moderation_status: "approved",
+        })
+        .eq("user_id", owner.userId)
+        .eq("local_moment_id", localMomentId);
+
+      expect(approveError).toBeNull();
+
+      const deliveryResponse = await request.post(
+        "/api/sleeping-delivery/exchange",
+        {
+          data: {
+            ...buildExchangeRequest(
+              normalCatLikePhotoUrl,
+              recipientRequestId,
+              recipientAnonymousId,
+            ),
+            debugDryRun: false,
+            deliveryDateKey: getYesterdayJstDateKey(),
+            preferredSourcePhotoId: localMomentId,
+          },
+        },
+      );
+
+      expect(deliveryResponse.status()).toBe(200);
+      const deliveryBody = (await deliveryResponse.json()) as ExchangeResponse;
+      expect(deliveryBody.photo?.sourcePhotoId).toBe(localMomentId);
+
+      const forbiddenResponse = await request.post(
+        "/api/sleeping-delivery/exchange",
+        {
+          data: {
+            ...buildExchangeRequest(
+              toStoragePhotoUrl(otherPath),
+              `onboarding-storage-forbidden-${createdAt}`,
+              anonymousId,
+            ),
+            debugDryRun: false,
+            mode: "onboarding",
+          },
+          headers,
+        },
+      );
+
+      expect(forbiddenResponse.status()).toBe(403);
+      await expect(forbiddenResponse.json()).resolves.toMatchObject({
+        error: "forbidden_photo",
+      });
+    } finally {
+      await adminSupabase
+        .from("cat_moment_deliveries")
+        .delete()
+        .in("user_id", [owner.userId, other.userId]);
+      await adminSupabase
+        .from("cat_moment_deliveries")
+        .delete()
+        .eq("anonymous_id", recipientAnonymousId);
+      await adminSupabase
+        .from("cat_moments")
+        .delete()
+        .in("user_id", [owner.userId, other.userId]);
+      await adminSupabase
+        .from("cat_moments")
+        .delete()
+        .eq("anonymous_id", recipientAnonymousId);
+      await adminSupabase.storage
+        .from(CAT_PHOTOS_BUCKET)
+        .remove([ownerPath, otherPath]);
+      await adminSupabase.auth.admin.deleteUser(owner.userId);
+      await adminSupabase.auth.admin.deleteUser(other.userId);
+    }
+  });
+
   test("uses admin stock only for immediate onboarding exchange", async ({
     request,
   }) => {

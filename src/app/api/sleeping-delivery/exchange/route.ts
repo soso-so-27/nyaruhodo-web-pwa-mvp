@@ -187,7 +187,6 @@ async function handleExchangePost(request: Request) {
   const ownPhotoStoragePath = getStoragePhotoPath(ownPhoto.src);
   const shouldAddOwnPhotoToPool =
     ownPhoto.shared !== false &&
-    !ownPhotoStoragePath &&
     !isBlockedDeliveryPhotoUrl(ownPhoto.src);
   const debugDryRunRequested = input.debugDryRun === true;
   const debugDryRun = debugDryRunRequested && isExchangeDebugDryRunAllowed();
