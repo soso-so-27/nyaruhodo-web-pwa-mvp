@@ -303,6 +303,10 @@ test("saves a cover photo only after crop confirmation", async ({ page }) => {
   await page.getByTestId("cover-photo-picker-photo").first().click();
 
   await expect(page.getByTestId("cover-crop-sheet")).toBeVisible();
+  const previewImages = page.getByTestId("cover-crop-preview").locator("img");
+  await expect(previewImages).toHaveCount(2);
+  const initialScale = await readCropTransformScale(previewImages.last());
+  expect(initialScale).toBeLessThan(1);
   await expect
     .poll(() =>
       page.evaluate(() => {
@@ -324,6 +328,13 @@ test("saves a cover photo only after crop confirmation", async ({ page }) => {
       }),
     )
     .toBe(photoDataUrl);
+  const savedScale = await page.evaluate(() => {
+    const raw = window.localStorage.getItem("cat_profiles");
+    const [profile] = raw ? JSON.parse(raw) : [];
+    return profile?.coverCrop?.scale ?? 0;
+  });
+  expect(savedScale).toBeCloseTo(initialScale, 4);
+  await expect(page.getByTestId("cats-profile-cover").locator("img")).toHaveCount(2);
 });
 
 test("keeps the previous cover photo when crop is cancelled", async ({ page }) => {
@@ -360,6 +371,9 @@ test("lets the owner drag the cat cover crop directly", async ({ page }) => {
   await page.getByTestId("cover-photo-picker-photo").first().click();
 
   await expect(page.getByTestId("cover-crop-sheet")).toBeVisible();
+  const initialScale = await readCropTransformScale(
+    page.getByTestId("cover-crop-preview").locator("img").last(),
+  );
   await page.getByTestId("cover-crop-preview").evaluate((element) => {
     const rect = element.getBoundingClientRect();
     const startX = rect.left + rect.width / 2;
@@ -391,15 +405,16 @@ test("lets the owner drag the cat cover crop directly", async ({ page }) => {
       page.evaluate(() => {
         const raw = window.localStorage.getItem("cat_profiles");
         const [profile] = raw ? JSON.parse(raw) : [];
-        return profile?.coverCrop ?? null;
+        return profile?.coverCrop?.scale ?? 0;
       }),
     )
-    .toMatchObject({ scale: 1 });
+    .toBeGreaterThan(0);
   const crop = await page.evaluate(() => {
     const raw = window.localStorage.getItem("cat_profiles");
     const [profile] = raw ? JSON.parse(raw) : [];
     return profile?.coverCrop ?? null;
   });
+  expect(crop?.scale).toBeCloseTo(initialScale, 4);
   expect(crop?.offsetX).toBeCloseTo(10, 4);
   expect(crop?.offsetY).toBeCloseTo(-10, 4);
 });
@@ -415,6 +430,9 @@ test("lets the owner pinch to zoom the cat cover crop", async ({ page }) => {
   await page.getByTestId("cover-photo-picker-photo").first().click();
 
   await expect(page.getByTestId("cover-crop-sheet")).toBeVisible();
+  const initialScale = await readCropTransformScale(
+    page.getByTestId("cover-crop-preview").locator("img").last(),
+  );
   await page.getByTestId("cover-crop-preview").evaluate((element) => {
     const rect = element.getBoundingClientRect();
     const centerX = rect.left + rect.width / 2;
@@ -455,7 +473,7 @@ test("lets the owner pinch to zoom the cat cover crop", async ({ page }) => {
         return profile?.coverCrop?.scale ?? 0;
       }),
     )
-    .toBe(2);
+    .toBeCloseTo(initialScale * 2, 4);
 });
 
 test("resets a custom cover photo back to automatic display", async ({ page }) => {
@@ -1198,6 +1216,18 @@ async function readNormalizedCropGeometry(frame: Locator, image: Locator) {
       (imageBox.y + imageBox.height / 2 - frameBox.y) / frameBox.height,
     imageRatio: imageBox.width / imageBox.height,
   };
+}
+
+async function readCropTransformScale(image: Locator) {
+  await expect
+    .poll(() => image.evaluate((element) => (element as HTMLImageElement).naturalWidth))
+    .toBeGreaterThan(0);
+
+  return image.evaluate((element) => {
+    const transform = (element as HTMLImageElement).style.transform;
+    const scale = transform.match(/scale\(([^)]+)\)/)?.[1];
+    return scale ? Number(scale) : 1;
+  });
 }
 
 async function seedCatsProfileWithCustomStorageCover(

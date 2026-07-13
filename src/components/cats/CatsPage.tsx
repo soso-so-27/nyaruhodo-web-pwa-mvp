@@ -183,6 +183,7 @@ const DEFAULT_COVER_CROP: CatCoverCrop = {
   offsetX: 0,
   offsetY: 0,
 };
+const MIN_COVER_CROP_SCALE = 0.25;
 type CatManageEditSource = "basic" | "manage";
 
 export function CatsPage() {
@@ -205,6 +206,7 @@ export function CatsPage() {
     src: string;
     crop: CatCoverCrop;
     fallbackSrcs?: string[];
+    initializeToFit: boolean;
   } | null>(null);
   const [isOnboardingMode, setIsOnboardingMode] = useState(false);
   const [isOnboardingCompletionReady, setIsOnboardingCompletionReady] =
@@ -1003,6 +1005,7 @@ export function CatsPage() {
         setCoverCropDraft({
           src: photoSrc,
           crop: DEFAULT_COVER_CROP,
+          initializeToFit: true,
         });
         setIsCoverPhotoSheetOpen(false);
       } catch {
@@ -1406,24 +1409,24 @@ export function CatsPage() {
                             : undefined
                           }
                       >
-                        <StoredPhotoImage
-                          src={activeCoverSrc}
-                          alt=""
-                          storageVariant="display"
-                          loading="eager"
-                          style={
-                            hasCustomCoverCrop
-                              ? styles.profileCoverCustomCroppedImage
-                              : styles.profileCoverCustomImage
-                          }
-                          imageStyle={
-                            hasCustomCoverCrop
-                              ? getCoverCropImageStyle(activeCoverCrop)
-                              : undefined
-                          }
-                          width={420}
-                          height={232}
-                        />
+                        {hasCustomCoverCrop ? (
+                          <CoverCropPhoto
+                            src={activeCoverSrc}
+                            crop={activeCoverCrop}
+                            alt=""
+                            style={styles.profileCoverCustomCroppedImage}
+                          />
+                        ) : (
+                          <StoredPhotoImage
+                            src={activeCoverSrc}
+                            alt=""
+                            storageVariant="display"
+                            loading="eager"
+                            style={styles.profileCoverCustomImage}
+                            width={420}
+                            height={232}
+                          />
+                        )}
                       </button>
                     ) : (
                       <PhotoTile
@@ -2241,7 +2244,12 @@ export function CatsPage() {
           currentCoverCrop={activeCoverCrop}
           currentCoverFallbackSrcs={activeCoverFallbackSrcs}
           onAdjustCurrent={(src, crop, fallbackSrcs) => {
-            setCoverCropDraft({ src, crop, fallbackSrcs });
+            setCoverCropDraft({
+              src,
+              crop,
+              fallbackSrcs,
+              initializeToFit: false,
+            });
             setIsCoverPhotoSheetOpen(false);
           }}
           onPickPhoto={(photo) => {
@@ -2249,6 +2257,7 @@ export function CatsPage() {
               src: getLensPhotoDetailSrc(photo),
               crop: DEFAULT_COVER_CROP,
               fallbackSrcs: getLensPhotoFallbackSrcs(photo),
+              initializeToFit: true,
             });
             setIsCoverPhotoSheetOpen(false);
           }}
@@ -2267,6 +2276,7 @@ export function CatsPage() {
           src={coverCropDraft.src}
           fallbackSrcs={coverCropDraft.fallbackSrcs}
           crop={coverCropDraft.crop}
+          initializeToFit={coverCropDraft.initializeToFit}
           onChange={(crop) =>
             setCoverCropDraft((current) =>
               current ? { ...current, crop } : current,
@@ -3677,6 +3687,7 @@ function CoverCropSheet({
   src,
   fallbackSrcs,
   crop,
+  initializeToFit,
   onChange,
   onSave,
   onBack,
@@ -3684,11 +3695,14 @@ function CoverCropSheet({
   src: string;
   fallbackSrcs?: string[];
   crop: CatCoverCrop;
+  initializeToFit: boolean;
   onChange: (crop: CatCoverCrop) => void;
   onSave: () => void;
   onBack: () => void;
 }) {
   const cropRef = useRef(crop);
+  const previewRef = useRef<HTMLDivElement | null>(null);
+  const didInitializeFitRef = useRef(!initializeToFit);
   const activePointersRef = useRef(new Map<number, { x: number; y: number }>());
   const gestureStartRef = useRef<{
     mode: "pan" | "pinch";
@@ -3862,6 +3876,29 @@ function CoverCropSheet({
     gestureStartRef.current = null;
   }
 
+  function handleNaturalSize(size: { width: number; height: number }) {
+    if (didInitializeFitRef.current || size.width <= 0 || size.height <= 0) {
+      return;
+    }
+
+    const rect = previewRef.current?.getBoundingClientRect();
+    if (!rect || rect.width <= 0 || rect.height <= 0) {
+      return;
+    }
+
+    didInitializeFitRef.current = true;
+    const frameAspect = rect.width / rect.height;
+    const imageAspect = size.width / size.height;
+    const containScale =
+      imageAspect < frameAspect
+        ? imageAspect / frameAspect
+        : frameAspect / imageAspect;
+    onChange({
+      ...DEFAULT_COVER_CROP,
+      scale: clampNumber(containScale, MIN_COVER_CROP_SCALE, 1),
+    });
+  }
+
   return (
     <div
       role="dialog"
@@ -3894,6 +3931,7 @@ function CoverCropSheet({
 
       <div style={styles.thumbnailCropStage}>
         <div
+          ref={previewRef}
           data-testid="cover-crop-preview"
           style={styles.thumbnailCropPreview}
           onPointerDown={handlePointerDown}
@@ -3901,16 +3939,13 @@ function CoverCropSheet({
           onPointerUp={handlePointerEnd}
           onPointerCancel={handlePointerCancel}
         >
-          <StoredPhotoImage
+          <CoverCropPhoto
             src={src}
             fallbackSrcs={fallbackSrcs}
+            crop={crop}
             alt=""
-            storageVariant="display"
-            loading="eager"
             style={styles.thumbnailCropImageFrame}
-            imageStyle={getCoverCropImageStyle(crop)}
-            width={420}
-            height={232}
+            onNaturalSize={handleNaturalSize}
           />
         </div>
       </div>
@@ -4444,7 +4479,11 @@ function getLensPhotoFallbackSrcs(photo: PhotoSourceSet) {
 
 function normalizeCoverCrop(crop?: Partial<CatCoverCrop>): CatCoverCrop {
   return {
-    scale: clampNumber(crop?.scale ?? DEFAULT_COVER_CROP.scale, 1, 2.8),
+    scale: clampNumber(
+      crop?.scale ?? DEFAULT_COVER_CROP.scale,
+      MIN_COVER_CROP_SCALE,
+      2.8,
+    ),
     offsetX: clampNumber(
       crop?.offsetX ?? DEFAULT_COVER_CROP.offsetX,
       -48,
@@ -4456,6 +4495,60 @@ function normalizeCoverCrop(crop?: Partial<CatCoverCrop>): CatCoverCrop {
       48,
     ),
   };
+}
+
+function CoverCropPhoto({
+  src,
+  fallbackSrcs,
+  crop,
+  alt,
+  style,
+  onNaturalSize,
+}: {
+  src: string;
+  fallbackSrcs?: string[];
+  crop: CatCoverCrop;
+  alt: string;
+  style: CSSProperties;
+  onNaturalSize?: (size: { width: number; height: number }) => void;
+}) {
+  const normalized = normalizeCoverCrop(crop);
+  const showsBackdrop = normalized.scale < 0.999;
+
+  return (
+    <>
+      {showsBackdrop ? (
+        <StoredPhotoImage
+          src={src}
+          fallbackSrcs={fallbackSrcs}
+          alt=""
+          storageVariant="display"
+          loading="eager"
+          style={{
+            ...style,
+            position: "absolute",
+            inset: 0,
+            opacity: 0.5,
+          }}
+          imageStyle={styles.coverCropBackdropImage}
+          width={420}
+          height={232}
+        />
+      ) : null}
+      <StoredPhotoImage
+        src={src}
+        fallbackSrcs={fallbackSrcs}
+        alt={alt}
+        storageVariant="display"
+        loading="eager"
+        style={{ ...style, zIndex: 1 }}
+        imageStyle={getCoverCropImageStyle(normalized)}
+        width={420}
+        height={232}
+        onNaturalSize={onNaturalSize}
+      />
+    </>
+  );
 }
 
 function getCoverCropImageStyle(crop: CatCoverCrop): CSSProperties {
@@ -5573,6 +5666,14 @@ const styles = {
     border: "none",
     borderRadius: 0,
     boxShadow: "none",
+  },
+  coverCropBackdropImage: {
+    width: "100%",
+    height: "100%",
+    objectFit: "cover",
+    objectPosition: "center",
+    transform: "scale(1.04)",
+    filter: "saturate(0.72) brightness(0.86)",
   },
   profileCoverEditButton: {
     position: "absolute" as const,
