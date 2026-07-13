@@ -85,6 +85,7 @@ const mobileSpecs = [
   "**/cat-illustration-themes.spec.ts",
   "**/collection-album-flow.spec.ts",
   "**/board-v2-prototype.spec.ts",
+  "**/beta-supporter-page.spec.ts",
   "**/home-day-cycle-indicator.spec.ts",
   "**/home-desk-model.spec.ts",
   "**/home-sleeping-exchange-flow.spec.ts",

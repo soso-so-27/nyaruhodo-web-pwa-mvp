@@ -2,7 +2,10 @@ import { expect, test, type Page } from "@playwright/test";
 
 test.describe("settings page organization", () => {
   test("keeps the photo storage note folded until requested", async ({ page }) => {
-    await mockSettingsApis(page);
+    await seedLoggedInSession(page);
+    await mockSettingsApis(page, {
+      referral: loggedInReferralSummary(),
+    });
 
     await page.goto("/settings");
     await page.waitForLoadState("networkidle");
@@ -33,25 +36,29 @@ test.describe("settings page organization", () => {
     await expect(page.getByRole("link", { name: "解約方法" })).toHaveCount(0);
     await expect(page.getByRole("link", { name: "データの削除・退会" })).toBeVisible();
     await expect(page.getByRole("link", { name: "Googleでログイン" })).toBeVisible();
-    await expect(page.getByText("この端末の保存", { exact: true })).toBeVisible();
+    await expect(
+      page.getByText("写真と記録は、この端末に保存されています。", {
+        exact: false,
+      }),
+    ).toBeVisible();
+    await expect(
+      page.getByText("ログインして保存すると、別の端末でも戻せます。", {
+        exact: false,
+      }),
+    ).toBeVisible();
+    await expect(page.getByText("写真が見えないとき", { exact: true })).toBeVisible();
+    await expect(page.getByText("写真と記録の保存", { exact: true })).toHaveCount(0);
     await expect(page.getByText("困ったとき", { exact: true })).toBeVisible();
     await expect(page.getByText("古い画面が残るとき")).toBeHidden();
     await expect(page.getByText("ビルド", { exact: true })).toBeVisible();
 
     const accountLabel = page.getByText("アカウント", { exact: true });
-    const storageLabel = page.getByText("この端末の保存", { exact: true });
     const accountDataLabel = page.getByText("アカウントとデータ", {
       exact: true,
     });
     expect(
-      await accountLabel.evaluate((account, storage) =>
-        Boolean(account.compareDocumentPosition(storage as Node) & Node.DOCUMENT_POSITION_FOLLOWING),
-        await storageLabel.elementHandle(),
-      ),
-    ).toBe(true);
-    expect(
-      await storageLabel.evaluate((storage, accountData) =>
-        Boolean(storage.compareDocumentPosition(accountData as Node) & Node.DOCUMENT_POSITION_FOLLOWING),
+      await accountLabel.evaluate((account, accountData) =>
+        Boolean(account.compareDocumentPosition(accountData as Node) & Node.DOCUMENT_POSITION_FOLLOWING),
         await accountDataLabel.elementHandle(),
       ),
     ).toBe(true);
@@ -238,4 +245,14 @@ async function seedLoggedInSession(page: Page) {
       }),
     );
   });
+}
+
+function loggedInReferralSummary() {
+  return {
+    isLoggedIn: true,
+    referralEnabled: false,
+    code: null,
+    shareUrl: null,
+    acceptedCount: 0,
+  };
 }

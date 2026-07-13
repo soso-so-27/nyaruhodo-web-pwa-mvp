@@ -104,6 +104,7 @@ export default function BetaSupporterPage() {
   });
   const [message, setMessage] = useState("");
   const [isLoading, setIsLoading] = useState(false);
+  const [isStatusLoading, setIsStatusLoading] = useState(true);
 
   useEffect(() => {
     let isMounted = true;
@@ -120,6 +121,7 @@ export default function BetaSupporterPage() {
 
       setBillingStatus(nextBillingStatus);
       setBetaCapabilities(nextBetaCapabilities);
+      setIsStatusLoading(false);
     }
 
     void load();
@@ -143,7 +145,7 @@ export default function BetaSupporterPage() {
       return;
     }
 
-    setMessage("支払いページを開けませんでした。ログイン状態を確認してください。");
+    setMessage("支払いページを開けませんでした。少し時間をおいて、もう一度お試しください。");
     setIsLoading(false);
   }
 
@@ -167,6 +169,9 @@ export default function BetaSupporterPage() {
 
   const canStartSupporter =
     billingStatus.billingConfigured && betaCapabilities.isBetaParticipant;
+  const needsBillingAttention = ["past_due", "unpaid", "incomplete"].includes(
+    billingStatus.status,
+  );
 
   return (
     <main style={styles.page}>
@@ -283,7 +288,11 @@ export default function BetaSupporterPage() {
             自分の猫をもっと好きになれる場所を。猫のことを少し知れる場所を。まだ出会っていない猫にも、自然に目が向く場所を。
           </p>
           <p style={styles.closing}>少しずつ育てていきます。</p>
-          {billingStatus.isBetaSupporter ? (
+          {isStatusLoading ? (
+            <p style={styles.note} role="status">サポーター状態を確認中です。</p>
+          ) : billingStatus.isBetaSupporter ? (
+            <>
+              <SupporterStatus status={billingStatus} />
             <AppButton
               type="button"
               variant="secondary"
@@ -293,6 +302,29 @@ export default function BetaSupporterPage() {
             >
               支払いを管理
             </AppButton>
+              {!billingStatus.canManageBilling ? (
+                <p style={styles.note}>
+                  支払い管理を開けません。問い合わせからご連絡ください。
+                </p>
+              ) : null}
+            </>
+          ) : needsBillingAttention ? (
+            <>
+              <p style={styles.message}>
+                支払い状態の確認が必要です。支払い管理から内容を確認してください。
+              </p>
+              {billingStatus.canManageBilling ? (
+                <AppButton
+                  type="button"
+                  variant="secondary"
+                  fullWidth
+                  onClick={handleOpenPortal}
+                  disabled={isLoading}
+                >
+                  支払いを管理
+                </AppButton>
+              ) : null}
+            </>
           ) : canStartSupporter ? (
             <AppButton
               type="button"
@@ -303,13 +335,28 @@ export default function BetaSupporterPage() {
             >
               {isLoading ? "Stripeへ移動しています" : "応援する"}
             </AppButton>
+          ) : !billingStatus.isLoggedIn ? (
+            <>
+              <p style={styles.note}>
+                Googleでログイン後、β参加対象のアカウントから応援できます。
+              </p>
+              <AppButton href="/account/create" variant="secondary" fullWidth>
+                Googleでログイン
+              </AppButton>
+            </>
           ) : (
             <p style={styles.note}>
               {billingStatus.billingConfigured
-                ? "β参加者としてログインすると、サポーター導線を使えます。"
+                ? "現在は、β参加対象のアカウントから応援できます。"
                 : "現在、支払い導線は準備中です。"}
             </p>
           )}
+          <div style={styles.billingTerms}>
+            <p style={styles.note}>毎月自動で更新され、いつでも解約できます。</p>
+            <p style={styles.note}>
+              解約後もその期間の末日まで有効です。保存した写真や、とどいたねこだよりは失われません。
+            </p>
+          </div>
           {message ? <p style={styles.message}>{message}</p> : null}
         </section>
 
@@ -333,6 +380,36 @@ export default function BetaSupporterPage() {
       </div>
     </main>
   );
+}
+
+function SupporterStatus({ status }: { status: ClientBillingStatus }) {
+  if (status.cancelAtPeriodEnd) {
+    return (
+      <p style={styles.note} role="status">
+        解約予定です。
+        {status.currentPeriodEnd
+          ? `${formatBillingDate(status.currentPeriodEnd)}までβサポーターです。`
+          : "現在の期間の末日までβサポーターです。"}
+      </p>
+    );
+  }
+
+  return <p style={styles.note} role="status">βサポーターとして応援中です。</p>;
+}
+
+function formatBillingDate(value: string) {
+  const date = new Date(value);
+
+  if (Number.isNaN(date.getTime())) {
+    return "";
+  }
+
+  return new Intl.DateTimeFormat("ja-JP", {
+    year: "numeric",
+    month: "long",
+    day: "numeric",
+    timeZone: "Asia/Tokyo",
+  }).format(date);
 }
 
 const styles = {
@@ -499,6 +576,11 @@ const styles = {
     fontSize: 13,
     fontWeight: 500,
     lineHeight: 1.9,
+  },
+  billingTerms: {
+    display: "grid",
+    gap: 4,
+    paddingTop: 4,
   },
   closing: {
     margin: 0,

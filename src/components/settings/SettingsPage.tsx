@@ -693,72 +693,74 @@ export function SettingsPage() {
                 </div>
               </>
             ) : (
-                <div style={styles.accountRow}>
-                  <div style={styles.rowLeft}>
-                    <span style={{ ...styles.statusDot, ...styles.statusDotOff }} />
-                    <span style={styles.rowLabel}>ログアウト中</span>
+                <>
+                  <div style={styles.accountRow}>
+                    <div style={styles.rowLeft}>
+                      <span style={{ ...styles.statusDot, ...styles.statusDotOff }} />
+                      <span style={styles.rowLabel}>ログアウト中</span>
+                    </div>
+                    <AppButton
+                      href="/account/create"
+                      variant="quiet"
+                      size="sm"
+                      style={styles.accountInlineButton}
+                    >
+                      Googleでログイン
+                    </AppButton>
                   </div>
-                  <AppButton
-                    href="/account/create"
-                    variant="quiet"
-                    size="sm"
-                    style={styles.accountInlineButton}
-                  >
-                    Googleでログイン
-                  </AppButton>
-                </div>
+                  <div style={styles.divider} />
+                  <p style={styles.storageNote}>
+                    写真と記録は、この端末に保存されています。ログインして保存すると、別の端末でも戻せます。
+                  </p>
+                  <div style={styles.divider} />
+                  <details style={styles.disclosure}>
+                    <summary style={styles.disclosureSummary}>写真が見えないとき</summary>
+                    <p style={styles.storageNote}>
+                      写真をとったときと同じアプリ、またはブラウザから開いてください。
+                    </p>
+                  </details>
+                </>
             )}
           </AppCard>
         </section>
 
+        {isLoggedIn ? (
         <section style={styles.section}>
-          <p style={styles.sectionLabel}>
-            {isLoggedIn ? "アカウント同期" : "この端末の保存"}
-          </p>
+          <p style={styles.sectionLabel}>写真と記録の保存</p>
           <AppCard variant="outlined" padding="sm" style={styles.card}>
-            {isLoggedIn ? (
-              <>
-                {syncOverview ? (
-                  <SyncStatusPanel overview={syncOverview} />
-                ) : (
-                  <p style={styles.storageNote}>アカウント保存の状態を確認中です。</p>
-                )}
-                <div style={styles.actionStack}>
-                  <AppButton
-                    type="button"
-                    variant="ghost"
-                    fullWidth
-                    style={styles.settingsActionButton}
-                    loading={isSyncing}
-                    onClick={() => {
-                      void handleSyncNow();
-                    }}
-                    disabled={isSyncing}
-                  >
-                    {isSyncing ? "同期中…" : "いますぐ同期する"}
-                  </AppButton>
-                </div>
-                {syncMessage ? (
-                  <p style={styles.syncMessage} role="status">{syncMessage}</p>
-                ) : null}
-                {lastSyncResult ? <SyncResultDetails result={lastSyncResult.result} /> : null}
-                <div style={styles.divider} />
-              </>
-            ) : null}
-            <div style={styles.row}>
-              <span style={styles.rowLabel}>
-                いまの入口: {formatDisplayEnvironmentValue(displayEnvironment)}
-              </span>
+            {syncOverview ? (
+              <SyncStatusPanel overview={syncOverview} />
+            ) : (
+              <p style={styles.storageNote}>保存状態を確認中です。</p>
+            )}
+            <div style={styles.actionStack}>
+              <AppButton
+                type="button"
+                variant="ghost"
+                fullWidth
+                style={styles.settingsActionButton}
+                loading={isSyncing}
+                onClick={() => {
+                  void handleSyncNow();
+                }}
+                disabled={isSyncing}
+              >
+                {isSyncing ? "保存中…" : "いまの写真と記録を保存する"}
+              </AppButton>
             </div>
-            <div style={styles.divider} />
+            {syncMessage ? (
+              <p style={styles.syncMessage} role="status">{syncMessage}</p>
+            ) : null}
+            {lastSyncResult ? <SyncResultDetails result={lastSyncResult.result} /> : null}
             <details style={styles.disclosure}>
               <summary style={styles.disclosureSummary}>写真が見えないとき</summary>
               <p style={styles.storageNote}>
-                iPhoneでは、ホーム画面アプリとSafari/Webで写真の保存場所が分かれることがあります。写真が見えないときは、撮ったときと同じ入口から開いてください。
+                写真をとったときと同じアプリ、またはブラウザから開いてください。
               </p>
             </details>
           </AppCard>
         </section>
+        ) : null}
 
         <section style={{ ...styles.section, order: 3 }}>
           <p style={styles.sectionLabel}>通知</p>
@@ -1136,18 +1138,6 @@ function BetaSupporterPanel({
       </AppButton>
     </div>
   );
-}
-
-function formatDisplayEnvironmentValue(environment: DisplayEnvironment) {
-  if (environment === "standalone") {
-    return "ホーム画面アプリ";
-  }
-
-  if (environment === "browser") {
-    return "Safari / Web";
-  }
-
-  return "確認中";
 }
 
 function NotificationSettingsPanel({
@@ -1896,11 +1886,6 @@ function readAdminStockSourceLabel(metadata: Record<string, unknown> | undefined
 }
 
 function SyncStatusPanel({ overview }: { overview: AccountSyncOverview }) {
-  const localPhotoTotal =
-    overview.localCatGalleryPhotos +
-    overview.localCollectionPhotos +
-    overview.localOwnSleepingPhotos +
-    overview.localKeptExchangePhotos;
   const remotePhotoTotal =
     overview.remoteCatGalleryPhotos +
     overview.remoteCollectionPhotos +
@@ -1911,15 +1896,14 @@ function SyncStatusPanel({ overview }: { overview: AccountSyncOverview }) {
   return (
     <div style={styles.syncStatusPanel}>
       <div style={styles.syncMetaGrid}>
-        <span>最終同期: {formatSyncDate(latestSyncAt)}</span>
+        <span>前回の保存: {formatSyncDate(latestSyncAt)}</span>
         <span>
-          この端末: 写真{localPhotoTotal}・猫{overview.localCats} ／ アカウント:
-          写真{remotePhotoTotal}・猫{overview.remoteCats}
+          アカウントに保存: 写真{remotePhotoTotal}枚・猫{overview.remoteCats}匹
         </span>
       </div>
 
       {overview.errors.length > 0 ? (
-        <p style={styles.syncWarning}>一部の同期状態を確認できませんでした。</p>
+        <p style={styles.syncWarning}>一部の保存状態を確認できませんでした。</p>
       ) : null}
     </div>
   );
@@ -1951,7 +1935,7 @@ function SyncResultDetails({
 
   return (
     <div style={styles.syncResultDetails} role="status">
-      <p style={styles.syncResultTitle}>同期結果</p>
+      <p style={styles.syncResultTitle}>保存結果</p>
       <p style={styles.syncResultSummary}>
         {getSyncPhotoSummary(photoTotal, result.status)}
       </p>
@@ -1988,21 +1972,21 @@ function getSyncPhotoSummary(
   status: AccountSyncResult["status"],
 ) {
   if (status === "error") {
-    return "同期できませんでした。あとで もう一度。";
+    return "保存できませんでした。あとで もう一度。";
   }
 
   if (photoTotal > 0) {
-    return `同期しました（写真${photoTotal}枚が新しく揃いました）。`;
+    return `写真${photoTotal}枚を、アカウントとこの端末にそろえました。`;
   }
 
-  return "同期しました。";
+  return "保存しました。";
 }
 
 function getSyncResultMessage(
   result: AccountSyncResult,
 ) {
   if (result.status === "error") {
-    return "同期できませんでした。あとで もう一度。";
+    return "保存できませんでした。あとで もう一度。";
   }
 
   const photoTotal =
@@ -2039,7 +2023,7 @@ function formatSyncError(error: string) {
     return "ログイン状態を確認できませんでした。";
   }
 
-  return "同期中にエラーがありました。";
+  return "保存中にエラーがありました。";
 }
 
 function formatSyncDate(value: string | null) {
