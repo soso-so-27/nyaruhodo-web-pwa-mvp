@@ -656,14 +656,20 @@ test.describe("home sleeping exchange flow", () => {
     });
     await page.addInitScript(() => {
       const originalSetItem = Storage.prototype.setItem;
-      let deliveredWriteFailures = 0;
+      let shouldFailDeliveredWriteBatch = true;
+      let hasScheduledDeliveredWriteRecovery = false;
       Storage.prototype.setItem = function patchedSetItem(key, value) {
         if (
           key === "neteruneko_evening_delivery_days" &&
           String(value).includes('"deliveredPhoto"') &&
-          deliveredWriteFailures < 4
+          shouldFailDeliveredWriteBatch
         ) {
-          deliveredWriteFailures += 1;
+          if (!hasScheduledDeliveredWriteRecovery) {
+            hasScheduledDeliveredWriteRecovery = true;
+            window.setTimeout(() => {
+              shouldFailDeliveredWriteBatch = false;
+            }, 0);
+          }
           throw new DOMException("Quota exceeded for test", "QuotaExceededError");
         }
         return originalSetItem.call(this, key, value);
