@@ -540,7 +540,7 @@ test("shows the custom top cover without over-cropping", async ({
         .first()
         .evaluate((image) => window.getComputedStyle(image).objectPosition),
     )
-    .toBe("50% 30%");
+    .toBe("50% 50%");
   await page.getByTestId("cats-profile-cover").locator("button").click();
   await expect(page.getByRole("dialog", { name: "カバー写真" })).toBeVisible();
   expect(signedUrlRequests.some((request) => request.src?.includes("/cover/"))).toBe(
@@ -579,6 +579,12 @@ test("adjusts the exact photo currently shown as the cat cover", async ({
   const displayedTransform = await coverImage.evaluate(
     (image) => window.getComputedStyle(image).transform,
   );
+  const displayedFit = await coverImage.evaluate(
+    (image) => window.getComputedStyle(image).objectFit,
+  );
+  const displayedPosition = await coverImage.evaluate(
+    (image) => window.getComputedStyle(image).objectPosition,
+  );
 
   await page.getByTestId("cats-section-tab-basic").click();
   await page.getByTestId("cats-cover-photo-button").click();
@@ -589,6 +595,12 @@ test("adjusts the exact photo currently shown as the cat cover", async ({
   await expect
     .poll(() => cropImage.evaluate((image) => window.getComputedStyle(image).transform))
     .toBe(displayedTransform);
+  await expect
+    .poll(() => cropImage.evaluate((image) => window.getComputedStyle(image).objectFit))
+    .toBe(displayedFit);
+  await expect
+    .poll(() => cropImage.evaluate((image) => window.getComputedStyle(image).objectPosition))
+    .toBe(displayedPosition);
 });
 
 test("falls back to automatic cover framing when a custom cover has no crop", async ({
