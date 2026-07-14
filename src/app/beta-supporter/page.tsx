@@ -296,7 +296,6 @@ export default function BetaSupporterPage() {
           <p style={styles.supporterLabel}>βサポーター</p>
           <h2 style={styles.actionTitle}>この場所を支える</h2>
           <p style={styles.price}>月額 1,500円（税別）</p>
-          <p style={styles.priceTax}>お支払い額は月額 1,650円（税込）です。</p>
           <p style={styles.note}>
             ねてるねこを、静かに長く続く場所にするための応援です。
           </p>
@@ -674,13 +673,6 @@ const styles = {
     fontSize: 19,
     fontWeight: 600,
     lineHeight: 1.55,
-  },
-  priceTax: {
-    margin: "-6px 0 2px",
-    color: color.textMuted,
-    fontSize: 12,
-    fontWeight: 500,
-    lineHeight: 1.6,
   },
   message: {
     margin: 0,

@@ -4,7 +4,7 @@ import {
   type StorageSignedUrlVariant,
 } from "./photoStorage";
 
-export type PhotoSourceContext = "list" | "board" | "cover" | "detail";
+export type PhotoSourceContext = "list" | "board" | "hero" | "cover" | "detail";
 
 export const PHOTO_DISPLAY_CONTRACT = {
   list: {
@@ -19,10 +19,16 @@ export const PHOTO_DISPLAY_CONTRACT = {
     storageVariant: "thumbnail",
     usage: "nekodayori board cards",
   },
+  hero: {
+    fit: "contain",
+    source: "display",
+    storageVariant: "hero",
+    usage: "large home photo",
+  },
   cover: {
     fit: "cover",
     source: "display",
-    storageVariant: "display",
+    storageVariant: "hero",
     usage: "cat profile cover",
   },
   detail: {
@@ -38,6 +44,7 @@ export type PhotoSourceSet = {
   thumbnailSrc?: string;
   displaySrc?: string;
   originalSrc?: string;
+  offlineSrc?: string;
 };
 
 export function resolvePhotoSrc(
@@ -69,6 +76,10 @@ export function resolvePhotoStorageVariant(
     return "thumbnail";
   }
 
+  if (context === "hero" || context === "cover") {
+    return "hero";
+  }
+
   if (context !== "list") {
     return "display";
   }
@@ -87,6 +98,7 @@ export function resolvePhotoFallbackSrcs(photo: PhotoSourceSet) {
     photo.thumbnailSrc,
     photo.originalSrc,
     photo.src,
+    photo.offlineSrc,
   ]);
 }
 

@@ -952,10 +952,21 @@ test.describe("collection album flow", () => {
           const photos = JSON.parse(
             window.localStorage.getItem("nyaruhodo_exchange_kept_photos") ?? "[]",
           ) as { src?: string }[];
-          return photos[0]?.src ?? "";
+          const offline = JSON.parse(
+            window.localStorage.getItem("neteruneko_exchange_photo_offline_cache") ?? "[]",
+          ) as { dataUrl?: string; photoId?: string }[];
+          return {
+            offlineSrc: offline.find(
+              (entry) => entry.photoId === "delivered-storage-offline",
+            )?.dataUrl ?? "",
+            src: photos[0]?.src ?? "",
+          };
         }),
       )
-      .toMatch(/^data:image\//);
+      .toEqual({
+        offlineSrc: expect.stringMatching(/^data:image\//),
+        src: "storage:admin-stock/sleeping/offline-delivered.jpg",
+      });
 
     allowSignedUrl = false;
     await page.reload();

@@ -1,4 +1,9 @@
-import { STORAGE_KEYS, invalidateCachedJson, removeCachedJson } from "../storage";
+import {
+  STORAGE_KEYS,
+  invalidateCachedJson,
+  removeCachedJson,
+  writeCachedJson,
+} from "../storage";
 
 const RESET_QUERY_KEY = "reset_onboarding";
 const REFERRAL_QUERY_KEYS = ["ref", "referral", "invite"] as const;
@@ -59,15 +64,19 @@ export function consumeOnboardingTestResetRequest() {
     return false;
   }
 
-  const hasReferralQuery = REFERRAL_QUERY_KEYS.some((key) =>
-    url.searchParams.has(key),
-  );
+  const referralCode = readReferralCodeFromResetUrl(url);
 
   for (const key of ONBOARDING_TEST_RESET_KEYS) {
     removeCachedJson(key);
   }
 
-  if (!hasReferralQuery) {
+  if (referralCode) {
+    writeCachedJson(STORAGE_KEYS.pendingReferralCode, {
+      code: referralCode,
+      capturedAt: new Date().toISOString(),
+      path: url.pathname,
+    });
+  } else {
     removeCachedJson(STORAGE_KEYS.pendingReferralCode);
   }
 
@@ -82,6 +91,22 @@ export function consumeOnboardingTestResetRequest() {
   removeResetQuery(url);
 
   return true;
+}
+
+function readReferralCodeFromResetUrl(url: URL) {
+  for (const key of REFERRAL_QUERY_KEYS) {
+    const code = url.searchParams
+      .get(key)
+      ?.trim()
+      .toUpperCase()
+      .replace(/[^23456789A-Z]/g, "");
+
+    if (code && /^[23456789ABCDEFGHJKLMNPQRSTUVWXYZ]{6,16}$/.test(code)) {
+      return code;
+    }
+  }
+
+  return null;
 }
 
 function removeLocalStorageKeysByPrefix(prefixes: readonly string[]) {

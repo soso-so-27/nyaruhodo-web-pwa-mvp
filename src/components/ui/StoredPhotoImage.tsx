@@ -461,9 +461,9 @@ export function StoredPhotoImage({
           setIsLoaded(false);
           const storagePath = getStoragePhotoPath(currentSource);
 
-          if (storagePath && activeStorageVariant === "thumbnail") {
-            trackTransformFallback();
-            deleteCachedSignedUrl(storagePath, "thumbnail");
+          if (storagePath && activeStorageVariant !== "display") {
+            trackTransformFallback(activeStorageVariant);
+            deleteCachedSignedUrl(storagePath, activeStorageVariant);
             setHasError(false);
             setDisplaySrc("");
             setActiveStorageVariant("display");
@@ -999,9 +999,9 @@ async function readSignedUrlFromApi(
     : null;
 }
 
-function trackTransformFallback() {
+function trackTransformFallback(variant: Exclude<StorageSignedUrlVariant, "display">) {
   trackProductEvent("photo_transform_fallback", {
-    variant: "thumbnail",
+    variant,
   });
 }
 

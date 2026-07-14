@@ -14,11 +14,13 @@ test.describe("photo source resolution", () => {
     expect(Object.keys(PHOTO_DISPLAY_CONTRACT)).toEqual([
       "list",
       "board",
+      "hero",
       "cover",
       "detail",
     ]);
     expect(PHOTO_DISPLAY_CONTRACT.list.fit).toBe("cover");
     expect(PHOTO_DISPLAY_CONTRACT.board.source).toBe("display");
+    expect(PHOTO_DISPLAY_CONTRACT.hero.storageVariant).toBe("hero");
     expect(PHOTO_DISPLAY_CONTRACT.cover.fit).toBe("cover");
     expect(PHOTO_DISPLAY_CONTRACT.detail.fit).toBe("contain");
   });
@@ -36,7 +38,8 @@ test.describe("photo source resolution", () => {
     expect(resolvePhotoSrc(restoredPhoto, "detail")).toBe(restoredPhoto.src);
     expect(resolvePhotoStorageVariant(restoredPhoto, "detail")).toBe("display");
     expect(resolvePhotoSrc(restoredPhoto, "cover")).toBe(restoredPhoto.src);
-    expect(resolvePhotoStorageVariant(restoredPhoto, "cover")).toBe("display");
+    expect(resolvePhotoStorageVariant(restoredPhoto, "cover")).toBe("hero");
+    expect(resolvePhotoStorageVariant(restoredPhoto, "hero")).toBe("hero");
     expect(resolvePhotoSrc(restoredPhoto, "board")).toBe(restoredPhoto.src);
     expect(resolvePhotoStorageVariant(restoredPhoto, "board")).toBe("thumbnail");
   });

@@ -15,6 +15,7 @@ import { trackProductEvent } from "../../lib/analytics/productAnalytics";
 import { hasAuthSessionError } from "../../lib/auth/sessionRecovery";
 import { purgeAllPhotoSwCache } from "../../lib/photoSwCache";
 import { resizeImageFileToDataUrl } from "../../lib/imageResize";
+import { isSupportedImageFile } from "../../lib/imageFileValidation";
 import {
   readClientBetaCapabilities,
   sendBetaFeedback,
@@ -90,16 +91,6 @@ const APP_BUILD_SHA =
   "local";
 const APP_BUILD_LABEL =
   APP_BUILD_SHA === "local" ? "local" : APP_BUILD_SHA.slice(0, 7);
-const MAX_UPLOAD_SOURCE_FILE_BYTES = 20 * 1024 * 1024;
-const SUPPORTED_SOURCE_IMAGE_MIME_TYPES = new Set([
-  "image/avif",
-  "image/gif",
-  "image/heic",
-  "image/heif",
-  "image/jpeg",
-  "image/png",
-  "image/webp",
-]);
 
 export function SettingsPage() {
   const [isLoggedIn, setIsLoggedIn] = useState(false);
@@ -448,7 +439,7 @@ export function SettingsPage() {
 
     input.onchange = async () => {
       const selectedFiles = Array.from(input.files ?? []);
-      const files = selectedFiles.filter(isLikelyImageFile);
+      const files = selectedFiles.filter(isSupportedImageFile);
 
       if (files.length === 0) {
         setStockMessage("写真を選べませんでした。別の写真でもう一度試してください。");
@@ -1363,10 +1354,10 @@ function resizeAndEncode(
 
 async function saveStockPhotoWithFallback(file: File) {
   const attempts = [
-    { maxSize: 560, quality: 0.66 },
-    { maxSize: 420, quality: 0.58 },
-    { maxSize: 320, quality: 0.5 },
-    { maxSize: 240, quality: 0.42 },
+    { maxSize: 1600, quality: 0.86 },
+    { maxSize: 1400, quality: 0.84 },
+    { maxSize: 1200, quality: 0.82 },
+    { maxSize: 900, quality: 0.78 },
   ];
 
   for (const attempt of attempts) {
@@ -1379,18 +1370,6 @@ async function saveStockPhotoWithFallback(file: File) {
   }
 
   return null;
-}
-
-function isLikelyImageFile(file: File) {
-  if (file.size > MAX_UPLOAD_SOURCE_FILE_BYTES) {
-    return false;
-  }
-
-  if (file.type) {
-    return SUPPORTED_SOURCE_IMAGE_MIME_TYPES.has(file.type.toLowerCase());
-  }
-
-  return /\.(avif|gif|heic|heif|jpe?g|png|webp)$/i.test(file.name);
 }
 
 function AuthDebugPanel({ snapshot }: { snapshot: AuthDebugSnapshot | null }) {

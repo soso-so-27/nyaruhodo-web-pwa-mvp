@@ -1,6 +1,8 @@
 import { STORAGE_KEYS, readCachedJson, writeCachedJson } from "../storage";
 import {
+  cacheExchangePhotoOfflineDataUrl,
   sanitizeExchangePhotoForPersistence,
+  withExchangePhotoOfflineSrc,
   type ExchangePhoto,
   type OwnSleepingPhoto,
 } from "./sleepingPhotos";
@@ -67,7 +69,13 @@ export function readEveningDeliveryStore(): EveningDeliveryStore {
     const store: EveningDeliveryStore = {};
     for (const [dateKey, day] of Object.entries(parsed)) {
       if (isValidDateKey(dateKey) && isEveningDeliveryDay(day)) {
-        store[dateKey] = { ...day, dateKey };
+        store[dateKey] = {
+          ...day,
+          dateKey,
+          ...(day.deliveredPhoto
+            ? { deliveredPhoto: withExchangePhotoOfflineSrc(day.deliveredPhoto) }
+            : {}),
+        };
       }
     }
 
@@ -334,27 +342,17 @@ export function updateEveningDeliveredPhotoDataUrl(
   }
 
   if (
-    deliveredPhoto.src === dataUrl &&
-    deliveredPhoto.thumbnailSrc === dataUrl &&
-    deliveredPhoto.displaySrc === dataUrl &&
-    deliveredPhoto.originalSrc === dataUrl
+    deliveredPhoto.offlineSrc &&
+    deliveredPhoto.offlineSrc.length >= dataUrl.length
   ) {
     return deliveredPhoto;
   }
 
   const nextPhoto = {
     ...deliveredPhoto,
-    src: dataUrl,
-    thumbnailSrc: dataUrl,
-    displaySrc: dataUrl,
-    originalSrc: dataUrl,
+    offlineSrc: dataUrl,
   };
-
-  store[dateKey] = {
-    ...day,
-    deliveredPhoto: nextPhoto,
-  };
-  writeEveningDeliveryStore(store);
+  cacheExchangePhotoOfflineDataUrl(deliveredPhoto, dataUrl);
 
   return nextPhoto;
 }

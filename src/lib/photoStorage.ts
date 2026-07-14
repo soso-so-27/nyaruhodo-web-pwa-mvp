@@ -4,7 +4,7 @@ export const CAT_PHOTOS_BUCKET = "cat-photos";
 const STORAGE_PHOTO_PREFIX = "storage:";
 const LEGACY_STORAGE_PHOTO_PREFIX = "storage://";
 export const DISPLAY_SIGNED_URL_SECONDS = 60 * 60 * 24;
-export const STORAGE_SIGNED_URL_VARIANTS = ["display", "thumbnail"] as const;
+export const STORAGE_SIGNED_URL_VARIANTS = ["display", "thumbnail", "hero"] as const;
 export type StorageSignedUrlVariant = (typeof STORAGE_SIGNED_URL_VARIANTS)[number];
 
 export const THUMBNAIL_TRANSFORM = {
@@ -13,6 +13,14 @@ export const THUMBNAIL_TRANSFORM = {
   // width for some JPEGs, which changes the image's natural aspect ratio.
   resize: "contain",
   width: 800,
+} as const;
+
+export const HERO_TRANSFORM = {
+  quality: 84,
+  resize: "contain",
+  // The largest home/cover frame is about 460 CSS px. 1440px keeps it sharp
+  // on 3x mobile displays without downloading the full stored asset.
+  width: 1440,
 } as const;
 
 type BrowserSupabaseClient = NonNullable<
@@ -150,10 +158,7 @@ export async function createSignedStorageUrl(
   path: string,
   variant: StorageSignedUrlVariant = "display",
 ) {
-  const options =
-    variant === "thumbnail"
-      ? { transform: THUMBNAIL_TRANSFORM }
-      : undefined;
+  const options = getStorageTransformOptions(variant);
   const { data, error } = await supabase.storage
     .from(CAT_PHOTOS_BUCKET)
     .createSignedUrl(path, DISPLAY_SIGNED_URL_SECONDS, options);
@@ -176,7 +181,7 @@ export async function createSignedStorageUrls(
     return {};
   }
 
-  if (variant === "thumbnail") {
+  if (variant !== "display") {
     const entries = await Promise.all(
       uniquePaths.map(async (path) => [
         path,
@@ -208,6 +213,18 @@ export async function createSignedStorageUrls(
   }
 
   return signedUrls;
+}
+
+function getStorageTransformOptions(variant: StorageSignedUrlVariant) {
+  if (variant === "thumbnail") {
+    return { transform: THUMBNAIL_TRANSFORM };
+  }
+
+  if (variant === "hero") {
+    return { transform: HERO_TRANSFORM };
+  }
+
+  return undefined;
 }
 
 export async function uploadDataUrl(

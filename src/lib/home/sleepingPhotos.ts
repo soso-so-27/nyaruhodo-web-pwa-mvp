@@ -44,6 +44,7 @@ export type ExchangePhoto = {
   thumbnailSrc?: string;
   displaySrc?: string;
   originalSrc?: string;
+  offlineSrc?: string;
   title: string;
   subtitle: string;
   triggerLabel: string;
@@ -100,6 +101,13 @@ type ExchangePhotoHistoryEntry = {
   createdAt: number;
 };
 
+type ExchangePhotoOfflineCacheEntry = {
+  photoId: string;
+  sourcePhotoId?: string;
+  dataUrl: string;
+  updatedAt: number;
+};
+
 export type DeliverableSleepingPhotoInput = {
   triggerLabel: string;
   theme: string;
@@ -131,6 +139,8 @@ export type KeptExchangePhotoStorageDebug = {
 export const BOX_PHOTO_STORAGE_EVENT = "nyaruhodo_box_photos_updated";
 
 const KEPT_EXCHANGE_PHOTO_STORAGE_KEY = "nyaruhodo_exchange_kept_photos";
+const EXCHANGE_PHOTO_OFFLINE_CACHE_STORAGE_KEY =
+  "neteruneko_exchange_photo_offline_cache";
 const DISMISSED_EXCHANGE_PHOTO_STORAGE_KEY =
   "nyaruhodo_exchange_dismissed_photos";
 const REPORTED_EXCHANGE_PHOTO_STORAGE_KEY =
@@ -638,7 +648,8 @@ export function readKeptExchangePhotos() {
 export function readAllKeptExchangePhotos() {
   return readStorageArray<ExchangePhoto>(KEPT_EXCHANGE_PHOTO_STORAGE_KEY)
     .map(sanitizeExchangePhotoForPersistence)
-    .filter((photo): photo is ExchangePhoto => Boolean(photo));
+    .filter((photo): photo is ExchangePhoto => Boolean(photo))
+    .map(withExchangePhotoOfflineSrc);
 }
 
 export function readKeptExchangePhotosForSync() {
@@ -757,29 +768,7 @@ export function updateKeptExchangePhotoDataUrl(
     }
 
     const target = saved[targetIndex];
-
-    if (target.src === dataUrl) {
-      return "ignored" as const;
-    }
-
-    const nextPhotos = [...saved];
-    nextPhotos[targetIndex] = {
-      ...target,
-      src: dataUrl,
-      thumbnailSrc: dataUrl,
-      displaySrc: dataUrl,
-      originalSrc: dataUrl,
-    };
-    const savedPhotos = writeStorageArrayWithFallback(
-      KEPT_EXCHANGE_PHOTO_STORAGE_KEY,
-      nextPhotos,
-      [50, 30, 20, 12, 6, 1],
-      saved.length,
-    );
-    const didSave = savedPhotos.some(
-      (savedPhoto) => savedPhoto.id === target.id && savedPhoto.src === dataUrl,
-    );
-    const status = didSave ? "saved" : "quota";
+    const status = cacheExchangePhotoOfflineDataUrl(target, dataUrl);
 
     recordDeliveryStorageWritebackTrace({
       photoId: photo.id,
@@ -787,7 +776,7 @@ export function updateKeptExchangePhotoDataUrl(
       status,
     });
 
-    if (didSave) {
+    if (status === "saved") {
       dispatchBoxPhotoStorageEvent();
     }
 
@@ -815,6 +804,80 @@ function normalizePersistentExchangePhotoSrc(src: string | undefined) {
   return isUsablePhotoSrc(normalized) ? normalized : undefined;
 }
 
+export function cacheExchangePhotoOfflineDataUrl(
+  photo: Pick<ExchangePhoto, "id" | "sourcePhotoId">,
+  dataUrl: string,
+) {
+  if (!dataUrl.startsWith("data:image/")) {
+    return "ignored" as const;
+  }
+
+  try {
+    const entries = readExchangePhotoOfflineCache();
+    const existing = entries.find((entry) => isSameExchangePhoto(entry, photo));
+    if (existing && existing.dataUrl.length >= dataUrl.length) {
+      return "ignored" as const;
+    }
+
+    const nextEntry: ExchangePhotoOfflineCacheEntry = {
+      photoId: photo.id,
+      sourcePhotoId: photo.sourcePhotoId,
+      dataUrl,
+      updatedAt: Date.now(),
+    };
+    const savedEntries = writeStorageArrayWithFallback(
+      EXCHANGE_PHOTO_OFFLINE_CACHE_STORAGE_KEY,
+      [nextEntry, ...entries.filter((entry) => !isSameExchangePhoto(entry, photo))],
+      [8, 4, 2, 1],
+    );
+
+    return savedEntries.some(
+      (entry) => entry.photoId === photo.id && entry.dataUrl === dataUrl,
+    )
+      ? ("saved" as const)
+      : ("quota" as const);
+  } catch {
+    return "quota" as const;
+  }
+}
+
+export function withExchangePhotoOfflineSrc(photo: ExchangePhoto): ExchangePhoto {
+  const cached = readExchangePhotoOfflineCache().find((entry) =>
+    isSameExchangePhoto(entry, photo),
+  );
+
+  if (!cached || (photo.offlineSrc && photo.offlineSrc.length >= cached.dataUrl.length)) {
+    return photo;
+  }
+
+  return { ...photo, offlineSrc: cached.dataUrl };
+}
+
+function readExchangePhotoOfflineCache() {
+  return readStorageArray<ExchangePhotoOfflineCacheEntry>(
+    EXCHANGE_PHOTO_OFFLINE_CACHE_STORAGE_KEY,
+  ).filter(
+    (entry) =>
+      typeof entry.photoId === "string" &&
+      typeof entry.dataUrl === "string" &&
+      entry.dataUrl.startsWith("data:image/"),
+  );
+}
+
+function isSameExchangePhoto(
+  entry: Pick<ExchangePhotoOfflineCacheEntry, "photoId" | "sourcePhotoId">,
+  photo: Pick<ExchangePhoto, "id" | "sourcePhotoId">,
+) {
+  return (
+    entry.photoId === photo.id ||
+    Boolean(
+      entry.sourcePhotoId &&
+        photo.sourcePhotoId &&
+        entry.sourcePhotoId === photo.sourcePhotoId,
+    )
+  );
+}
+
 export function sanitizeExchangePhotoForPersistence(
   photo: ExchangePhoto | null | undefined,
 ): ExchangePhoto | null {
@@ -838,6 +901,7 @@ export function sanitizeExchangePhotoForPersistence(
     thumbnailSrc: normalizePersistentExchangePhotoSrc(photo.thumbnailSrc),
     displaySrc: normalizePersistentExchangePhotoSrc(photo.displaySrc),
     originalSrc: normalizePersistentExchangePhotoSrc(photo.originalSrc),
+    offlineSrc: normalizePersistentExchangePhotoSrc(photo.offlineSrc),
   });
 }
 
@@ -956,6 +1020,7 @@ export function hideKeptExchangePhoto(
           targetPhoto.thumbnailSrc,
           targetPhoto.displaySrc,
           targetPhoto.originalSrc,
+          targetPhoto.offlineSrc,
         ],
         "reported_hidden",
       );

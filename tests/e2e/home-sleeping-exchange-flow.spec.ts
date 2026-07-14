@@ -51,6 +51,50 @@ function readEveningTargetOwnPhotoId(page: Page, dateKey: string) {
   }, dateKey);
 }
 
+function readPendingOriginalPhotos(page: Page) {
+  return page.evaluate(async () => {
+    const databases = await indexedDB.databases();
+    if (!databases.some((database) => database.name === "neteruneko-photo-originals")) {
+      return [];
+    }
+
+    const database = await new Promise<IDBDatabase>((resolve, reject) => {
+      const request = indexedDB.open("neteruneko-photo-originals", 1);
+      request.onsuccess = () => resolve(request.result);
+      request.onerror = () => reject(request.error);
+    });
+
+    if (!database.objectStoreNames.contains("pending-originals")) {
+      database.close();
+      return [];
+    }
+
+    return new Promise<
+      Array<{ blobSize: number; localAssetId: string; sourceSurface: string }>
+    >((resolve, reject) => {
+      const transaction = database.transaction("pending-originals", "readonly");
+      const request = transaction.objectStore("pending-originals").getAll();
+      request.onsuccess = () => {
+        resolve(
+          request.result.map(
+            (entry: {
+              blob?: Blob;
+              localAssetId?: string;
+              sourceSurface?: string;
+            }) => ({
+              blobSize: entry.blob?.size ?? 0,
+              localAssetId: entry.localAssetId ?? "",
+              sourceSurface: entry.sourceSurface ?? "",
+            }),
+          ),
+        );
+      };
+      request.onerror = () => reject(request.error);
+      transaction.oncomplete = () => database.close();
+    });
+  });
+}
+
 test.describe("home sleeping exchange flow", () => {
   test("saves the taken photo, waits until evening, then opens the delivered pair", async ({
     page,
@@ -122,6 +166,15 @@ test.describe("home sleeping exchange flow", () => {
     await confirmSleepingPhotoShare(page);
 
     await waitForOwnSleepingPhotoCount(page, 1);
+
+    await expect
+      .poll(() => readPendingOriginalPhotos(page))
+      .toEqual([
+        expect.objectContaining({
+          blobSize: testUploadPng.length,
+          sourceSurface: "sleeping",
+        }),
+      ]);
 
     expect(exchangeCalls).toBe(0);
     await expect(page.getByTestId("home-desk-model")).toHaveAttribute(

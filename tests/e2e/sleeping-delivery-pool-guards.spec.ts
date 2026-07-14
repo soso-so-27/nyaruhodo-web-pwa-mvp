@@ -34,6 +34,7 @@ import {
   normalizePersistentPhotoSrc,
   toStoragePhotoUrl,
 } from "../../src/lib/photoStorage";
+import { buildOriginalPhotoStoragePath } from "../../src/lib/photoOriginals";
 import {
   getStoragePhotoUrlVariants,
   isAuthorizedStoragePhotoPath,
@@ -439,6 +440,131 @@ test.describe("sleeping delivery pool guards", () => {
     expect(first).not.toBe(second);
   });
 
+  test("preserves exact original photo bytes behind owner-only RLS", async () => {
+    await skipIfLocalSupabaseUnavailable();
+
+    const adminSupabase = createAdminSupabaseClientFromEnv();
+    const publicSupabase = createPublicSupabaseClientFromEnv();
+
+    test.skip(
+      !adminSupabase || !publicSupabase,
+      "Local Supabase public and service role keys are required for original photo integration tests.",
+    );
+
+    if (!adminSupabase || !publicSupabase) {
+      return;
+    }
+
+    const createdAt = Date.now();
+    const owner = await createConfirmedTestUser(
+      adminSupabase,
+      publicSupabase,
+      `original-owner-${createdAt}@example.test`,
+    );
+    const other = await createConfirmedTestUser(
+      adminSupabase,
+      publicSupabase,
+      `original-other-${createdAt}@example.test`,
+    );
+    const ownerSupabase = createAuthenticatedSupabaseClientFromEnv(
+      owner.accessToken,
+    );
+    const otherSupabase = createAuthenticatedSupabaseClientFromEnv(
+      other.accessToken,
+    );
+
+    expect(ownerSupabase).toBeTruthy();
+    expect(otherSupabase).toBeTruthy();
+    if (!ownerSupabase || !otherSupabase) {
+      return;
+    }
+
+    const localAssetId = `original-e2e-${createdAt}`;
+    const originalBytes = Buffer.from([
+      0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a,
+      ...Array.from({ length: 1024 }, (_, index) => index % 251),
+    ]);
+    const originalPath = buildOriginalPhotoStoragePath({
+      fileName: "original-e2e.png",
+      localAssetId,
+      ownerUserId: owner.userId,
+      queuedAt: createdAt,
+      sourceSurface: "sleeping",
+      mimeType: "image/png",
+    });
+
+    try {
+      const { error: uploadError } = await ownerSupabase.storage
+        .from(CAT_PHOTOS_BUCKET)
+        .upload(originalPath, originalBytes, {
+          contentType: "image/png",
+          upsert: true,
+        });
+      expect(uploadError).toBeFalsy();
+
+      const { error: insertError } = await ownerSupabase
+        .from("photo_assets")
+        .insert({
+          user_id: owner.userId,
+          local_asset_id: localAssetId,
+          source_surface: "sleeping",
+          original_storage_path: originalPath,
+          original_file_name: "original-e2e.png",
+          original_mime_type: "image/png",
+          original_bytes: originalBytes.length,
+          pixel_width: 4032,
+          pixel_height: 3024,
+          captured_at: new Date(createdAt).toISOString(),
+          status: "ready",
+        });
+      expect(insertError).toBeFalsy();
+
+      const { data: ownerRow, error: ownerReadError } = await ownerSupabase
+        .from("photo_assets")
+        .select("local_asset_id, original_bytes, original_storage_path, status")
+        .eq("local_asset_id", localAssetId)
+        .single();
+      expect(ownerReadError).toBeFalsy();
+      expect(ownerRow).toMatchObject({
+        local_asset_id: localAssetId,
+        original_bytes: originalBytes.length,
+        original_storage_path: originalPath,
+        status: "ready",
+      });
+
+      const { data: downloaded, error: downloadError } =
+        await ownerSupabase.storage
+          .from(CAT_PHOTOS_BUCKET)
+          .download(originalPath);
+      expect(downloadError).toBeFalsy();
+      expect(Buffer.from(await downloaded!.arrayBuffer())).toEqual(originalBytes);
+
+      const { data: otherRows, error: otherReadError } = await otherSupabase
+        .from("photo_assets")
+        .select("local_asset_id")
+        .eq("local_asset_id", localAssetId);
+      expect(otherReadError).toBeFalsy();
+      expect(otherRows).toEqual([]);
+
+      const { data: otherDownload, error: otherDownloadError } =
+        await otherSupabase.storage
+          .from(CAT_PHOTOS_BUCKET)
+          .download(originalPath);
+      expect(otherDownload).toBeNull();
+      expect(otherDownloadError).toBeTruthy();
+    } finally {
+      await adminSupabase
+        .from("photo_assets")
+        .delete()
+        .eq("user_id", owner.userId);
+      await adminSupabase.storage
+        .from(CAT_PHOTOS_BUCKET)
+        .remove([originalPath]);
+      await adminSupabase.auth.admin.deleteUser(owner.userId);
+      await adminSupabase.auth.admin.deleteUser(other.userId);
+    }
+  });
+
   test("account deletion guide explains delivered photos remain", async ({
     page,
   }) => {
@@ -513,6 +639,20 @@ test.describe("sleeping delivery pool guards", () => {
         eventId: createdAt,
         userId: source.userId,
       });
+      const { error: photoAssetError } = await adminSupabase
+        .from("photo_assets")
+        .insert({
+          user_id: source.userId,
+          local_asset_id: localMomentId,
+          source_surface: "sleeping",
+          original_storage_path: sourcePath,
+          original_file_name: `${localMomentId}.jpg`,
+          original_mime_type: "image/jpeg",
+          original_bytes: 1,
+          captured_at: new Date(createdAt).toISOString(),
+          status: "ready",
+        });
+      expect(photoAssetError).toBeFalsy();
 
       const response = await request.post("/api/account/delete-stored-data", {
         data: { anonymousId, userId: recipient.userId },
@@ -583,6 +723,9 @@ test.describe("sleeping delivery pool guards", () => {
       }, 0);
       await expectTableCount(adminSupabase, "profiles", {
         id: source.userId,
+      }, 0);
+      await expectTableCount(adminSupabase, "photo_assets", {
+        user_id: source.userId,
       }, 0);
       await expectTableCount(adminSupabase, "cat_moments", {
         anonymous_id: anonymousId,

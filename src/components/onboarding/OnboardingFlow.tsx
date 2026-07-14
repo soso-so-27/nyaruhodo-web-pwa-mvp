@@ -37,6 +37,10 @@ import {
 } from "../../lib/onboarding/progress";
 import { consumeOnboardingTestResetRequest } from "../../lib/onboarding/testReset";
 import { trackProductEvent } from "../../lib/analytics/productAnalytics";
+import {
+  validateImageFile,
+  type ImageFileRejectionReason,
+} from "../../lib/imageFileValidation";
 import { resizeImageFileToDataUrl } from "../../lib/imageResize";
 import { isUsablePhotoSrc } from "../../lib/photoStorage";
 import {
@@ -44,6 +48,7 @@ import {
   resolvePhotoSrc,
 } from "../../lib/photoSources";
 import { storeAccountPhotoDataUrl } from "../../lib/photoStorageClient";
+import { queueOriginalPhotoPreservation } from "../../lib/photoOriginals";
 import {
   getActiveCatProfile,
   isCatProfileNameUnset,
@@ -86,17 +91,7 @@ const ONBOARDING_SECOND_PHOTO_INTENT_KEY =
   "neteruneko_onboarding_second_photo_intent";
 const ONBOARDING_PHOTO_DEBUG_STORAGE_KEY = "neteruneko_onboarding_photo_debug";
 const IS_PRODUCTION = process.env.NODE_ENV === "production";
-const MAX_UPLOAD_SOURCE_FILE_BYTES = 20 * 1024 * 1024;
 const ONBOARDING_REVEAL_MS = 1150;
-const SUPPORTED_SOURCE_IMAGE_MIME_TYPES = new Set([
-  "image/avif",
-  "image/gif",
-  "image/heic",
-  "image/heif",
-  "image/jpeg",
-  "image/png",
-  "image/webp",
-]);
 
 export function OnboardingFlow() {
   const catIllustrations = useCatIllustrationAssets();
@@ -490,20 +485,32 @@ export function OnboardingFlow() {
 
     input.onchange = async () => {
       const file = input.files?.[0];
+      const validation = validateImageFile(file);
 
-      if (!file || !isLikelyImageFile(file)) {
+      if (!file || !validation.ok) {
+        const rejectionReason = validation.ok
+          ? "missing_file"
+          : validation.reason;
         if (isPhotoDebugMode) {
           setPhotoDebugInfo(
             createOnboardingPhotoDebugInfo(
               "rejected",
               file,
-              file
-                ? "unsupported_type_or_size"
-                : "missing_file_from_browser_input",
+              rejectionReason,
             ),
           );
         }
-        setMessage("写真を読み込めませんでした。JPEGやPNGの写真で、もう一度試してください。");
+        trackProductEvent("photo_upload_error", {
+          source: getEffectiveEntrySource(),
+          surface: "onboarding",
+          error_code: `onboarding_photo_input_${rejectionReason}`,
+          error_stage: "input",
+          input_rejection_reason: rejectionReason,
+          file_size_bucket: file ? getFileSizeBucket(file.size) : "missing",
+          file_type: file ? sanitizeFileType(file.type) : "missing",
+          file_extension: file ? getSafeFileExtension(file.name) : "missing",
+        });
+        setMessage(getOnboardingPhotoInputErrorMessage(rejectionReason));
         cleanupInput();
         return;
       }
@@ -609,6 +616,10 @@ export function OnboardingFlow() {
           source: getEffectiveEntrySource(),
           submission_id: submissionId,
           delivery_date_key: onboardingDateKey,
+          file_acceptance: validation.acceptedBy,
+          file_size_bucket: getFileSizeBucket(file.size),
+          file_type: sanitizeFileType(file.type),
+          file_extension: getSafeFileExtension(file.name),
         });
         trackProductEvent("photo_submitted", {
           catId,
@@ -860,17 +871,14 @@ export function OnboardingFlow() {
     const progress = readCurrentOnboardingProgress();
     const photoWithDataUrl = {
       ...deliveredPhoto,
-      src: dataUrl,
-      thumbnailSrc: dataUrl,
-      displaySrc: dataUrl,
-      originalSrc: dataUrl,
+      offlineSrc: dataUrl,
     };
 
     setDeliveredPhoto(photoWithDataUrl);
     updateKeptExchangePhotoDataUrl(photoWithDataUrl, dataUrl);
     patchOnboardingProgress({
       stage: progress?.stage ?? "opened",
-      deliveredPhoto: photoWithDataUrl,
+      deliveredPhoto,
       isDeliveredPhotoKept,
     });
   }
@@ -1168,7 +1176,7 @@ export function OnboardingFlow() {
     input.onchange = async () => {
       const file = input.files?.[0];
 
-      if (!file || !isLikelyImageFile(file)) {
+      if (!file || !validateImageFile(file).ok) {
         setMessage("写真を選べませんでした。別の写真でもう一度試してください。");
         cleanupInput();
         return;
@@ -2024,6 +2032,13 @@ async function saveSleepingPhotoWithFallback(file: File, catId: string) {
     });
 
     if (ownPhoto) {
+      void queueOriginalPhotoPreservation({
+        file,
+        localAssetId: ownPhoto.id,
+        sourceSurface: "onboarding",
+        displaySrc: ownPhoto.displaySrc ?? ownPhoto.src,
+        catId,
+      });
       return { dataUrl: exchangeDataUrl, ownPhoto };
     }
   }
@@ -2036,6 +2051,14 @@ async function saveSleepingPhotoWithFallback(file: File, catId: string) {
       ? storedThumbnailSrc
       : undefined,
     createdAt,
+  });
+
+  void queueOriginalPhotoPreservation({
+    file,
+    localAssetId: fallbackOwnPhoto.id,
+    sourceSurface: "onboarding",
+    displaySrc: fallbackOwnPhoto.displaySrc ?? fallbackOwnPhoto.src,
+    catId,
   });
 
   return { dataUrl: exchangeDataUrl, ownPhoto: fallbackOwnPhoto };
@@ -2166,10 +2189,10 @@ function hasCompletedOnboardingEvidence() {
 
 async function saveStockCandidateWithFallback(file: File) {
   const attempts = [
-    { maxSize: 560, quality: 0.66 },
-    { maxSize: 420, quality: 0.58 },
-    { maxSize: 320, quality: 0.5 },
-    { maxSize: 240, quality: 0.42 },
+    { maxSize: 1600, quality: 0.86 },
+    { maxSize: 1400, quality: 0.84 },
+    { maxSize: 1200, quality: 0.82 },
+    { maxSize: 900, quality: 0.78 },
   ];
 
   for (const attempt of attempts) {
@@ -2182,18 +2205,6 @@ async function saveStockCandidateWithFallback(file: File) {
   }
 
   return null;
-}
-
-function isLikelyImageFile(file: File) {
-  if (file.size > MAX_UPLOAD_SOURCE_FILE_BYTES) {
-    return false;
-  }
-
-  if (file.type) {
-    return SUPPORTED_SOURCE_IMAGE_MIME_TYPES.has(file.type.toLowerCase());
-  }
-
-  return /\.(avif|gif|heic|heif|jpe?g|png|webp)$/i.test(file.name);
 }
 
 function getOnboardingPhotoErrorStage(message: string) {
@@ -2214,6 +2225,20 @@ function getOnboardingPhotoErrorStage(message: string) {
   }
 
   return "unknown";
+}
+
+function getOnboardingPhotoInputErrorMessage(
+  reason: ImageFileRejectionReason,
+) {
+  if (reason === "missing_file" || reason === "empty_file") {
+    return "写真を受け取れませんでした。もう一度選んでください。";
+  }
+
+  if (reason === "file_too_large") {
+    return "写真のサイズが大きすぎます。20MB以下の写真でもう一度試してください。";
+  }
+
+  return "写真を読み込めませんでした。JPEGやPNGなどの写真で、もう一度試してください。";
 }
 
 function sanitizeFileType(type: string) {

@@ -530,10 +530,10 @@ export function HomeDeskModel({
                     }}
                   >
                     <StoredPhotoImage
-                      src={getPhotoBoardSrc(homePhoto)}
+                      src={getPhotoHeroSrc(homePhoto)}
                       alt=""
                       style={deskStyles.homeFrameImage}
-                      storageVariant={getPhotoStorageVariant(homePhoto, "board")}
+                      storageVariant={getPhotoStorageVariant(homePhoto, "hero")}
                       fallbackSrcs={getPhotoFallbackSrcs(homePhoto)}
                       onNaturalSize={({ width, height }) => {
                         if (width <= 0 || height <= 0) return;
@@ -2049,6 +2049,10 @@ function getPhotoListSrc(photo: PhotoSourceSet) {
 
 function getPhotoBoardSrc(photo: PhotoSourceSet) {
   return resolvePhotoSrc(photo, "board");
+}
+
+function getPhotoHeroSrc(photo: PhotoSourceSet) {
+  return resolvePhotoSrc(photo, "hero");
 }
 
 function getPhotoDetailSrc(photo: PhotoSourceSet) {

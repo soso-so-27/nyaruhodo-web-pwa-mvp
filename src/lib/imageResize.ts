@@ -29,12 +29,47 @@ export async function resizeImageFileToDataUrl(
   }
 }
 
-async function decodeImageFileForCanvas(file: File): Promise<{
+export async function readImageFileDimensions(file: Blob) {
+  const decoded = await decodeImageFileForCanvas(file);
+
+  try {
+    return {
+      width: decoded.width,
+      height: decoded.height,
+    };
+  } finally {
+    decoded.cleanup();
+  }
+}
+
+async function decodeImageFileForCanvas(file: Blob): Promise<{
   source: CanvasImageSource;
   width: number;
   height: number;
   cleanup: () => void;
 }> {
+  const firstAttempt = await tryDecodeImageFileForCanvas(file);
+
+  if (firstAttempt) {
+    return firstAttempt;
+  }
+
+  await waitForDecodeRetry();
+  const retryAttempt = await tryDecodeImageFileForCanvas(file);
+
+  if (retryAttempt) {
+    return retryAttempt;
+  }
+
+  throw new Error("image_decode_failed: all decoders failed");
+}
+
+async function tryDecodeImageFileForCanvas(file: Blob): Promise<{
+  source: CanvasImageSource;
+  width: number;
+  height: number;
+  cleanup: () => void;
+} | null> {
   const bitmap = await createBitmapFromFile(file);
 
   if (bitmap) {
@@ -58,10 +93,10 @@ async function decodeImageFileForCanvas(file: File): Promise<{
     return dataUrlImage;
   }
 
-  throw new Error("image_decode_failed: all decoders failed");
+  return null;
 }
 
-async function createBitmapFromFile(file: File) {
+async function createBitmapFromFile(file: Blob) {
   if (typeof createImageBitmap !== "function") {
     return null;
   }
@@ -79,13 +114,13 @@ async function createBitmapFromFile(file: File) {
   }
 }
 
-async function loadImageElementFromObjectUrl(file: File) {
+async function loadImageElementFromObjectUrl(file: Blob) {
   const url = URL.createObjectURL(file);
 
   return loadImageElement(url, () => URL.revokeObjectURL(url));
 }
 
-async function loadImageElementFromDataUrl(file: File) {
+async function loadImageElementFromDataUrl(file: Blob) {
   try {
     const dataUrl = await readFileAsDataUrl(file);
 
@@ -120,7 +155,7 @@ function loadImageElement(src: string, cleanup: () => void = () => {}) {
   });
 }
 
-function readFileAsDataUrl(file: File) {
+function readFileAsDataUrl(file: Blob) {
   return new Promise<string>((resolve, reject) => {
     const reader = new FileReader();
 
@@ -136,5 +171,11 @@ function readFileAsDataUrl(file: File) {
       reject(reader.error ?? new Error("FileReader failed"));
     };
     reader.readAsDataURL(file);
+  });
+}
+
+function waitForDecodeRetry() {
+  return new Promise<void>((resolve) => {
+    window.setTimeout(resolve, 180);
   });
 }

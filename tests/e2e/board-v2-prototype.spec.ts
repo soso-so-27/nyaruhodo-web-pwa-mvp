@@ -2,7 +2,10 @@ import fs from "node:fs";
 import path from "node:path";
 import { expect, test, type Page } from "@playwright/test";
 
-import { THUMBNAIL_TRANSFORM } from "../../src/lib/photoStorage";
+import {
+  HERO_TRANSFORM,
+  THUMBNAIL_TRANSFORM,
+} from "../../src/lib/photoStorage";
 
 test.describe("production nekodayori natural board", () => {
   test.beforeEach(async ({ page }) => {
@@ -147,6 +150,14 @@ test.describe("production nekodayori natural board", () => {
       quality: 75,
       resize: "contain",
       width: 800,
+    });
+  });
+
+  test("keeps home and cover photos sharp on 3x mobile displays", () => {
+    expect(HERO_TRANSFORM).toEqual({
+      quality: 84,
+      resize: "contain",
+      width: 1440,
     });
   });
 

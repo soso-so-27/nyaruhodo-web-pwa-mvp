@@ -181,6 +181,7 @@ export async function deleteStoredDataForUser(
     supabase.from("cat_moment_deliveries").delete().eq("user_id", userId),
     supabase.from("cat_moments").delete().eq("user_id", userId),
     supabase.from("collection_photos").delete().eq("user_id", userId),
+    supabase.from("photo_assets").delete().eq("user_id", userId),
     supabase.from("photo_reports").delete().eq("reporter_user_id", userId),
     supabase.from("record_logs").delete().eq("user_id", userId),
     supabase.from("subscriptions").delete().eq("user_id", userId),

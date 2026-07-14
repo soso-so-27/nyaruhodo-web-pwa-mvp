@@ -164,7 +164,7 @@ function getBearerToken(request: Request) {
 }
 
 function normalizeSignedUrlVariant(value: unknown): StorageSignedUrlVariant {
-  return value === "thumbnail" ? "thumbnail" : "display";
+  return value === "thumbnail" || value === "hero" ? value : "display";
 }
 
 function createStorageSignedUrlsResponse(signedUrls: Record<string, string | null>) {

@@ -142,5 +142,5 @@ async function createStorageSignedUrlResponse(
 }
 
 function normalizeSignedUrlVariant(value: unknown): StorageSignedUrlVariant {
-  return value === "thumbnail" ? "thumbnail" : "display";
+  return value === "thumbnail" || value === "hero" ? value : "display";
 }

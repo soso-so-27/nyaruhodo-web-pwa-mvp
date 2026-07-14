@@ -8,6 +8,8 @@ import {
   useCatIllustrationAssets,
 } from "../../lib/assets/catIllustrationAssets";
 import { resizeImageFileToDataUrl } from "../../lib/imageResize";
+import { assertSupportedImageFile } from "../../lib/imageFileValidation";
+import { queueOriginalPhotoPreservation } from "../../lib/photoOriginals";
 import {
   clearAccountCatCoverPhoto,
   deleteAccountCatGalleryPhoto,
@@ -98,18 +100,8 @@ type EditableGender = "male" | "female" | "unknown" | "";
 type EditableCoat = string;
 type UchinokoLens = "cat" | "all";
 type UchinokoSection = "record" | "photos" | "basic";
-const MAX_UPLOAD_SOURCE_FILE_BYTES = 20 * 1024 * 1024;
 const LENS_PHOTO_FIRST_VIEW_COUNT = 12;
 const LENS_PHOTO_REVEAL_TIMEOUT_MS = 800;
-const SUPPORTED_SOURCE_IMAGE_MIME_TYPES = new Set([
-  "image/avif",
-  "image/gif",
-  "image/heic",
-  "image/heif",
-  "image/jpeg",
-  "image/png",
-  "image/webp",
-]);
 
 type LensPhoto = {
   id: string;
@@ -209,6 +201,8 @@ export function CatsPage() {
     crop: CatCoverCrop;
     fallbackSrcs?: string[];
     initializeToFit: boolean;
+    sourceFile?: File;
+    sourceLocalAssetId?: string;
   } | null>(null);
   const [isOnboardingMode, setIsOnboardingMode] = useState(false);
   const [isOnboardingCompletionReady, setIsOnboardingCompletionReady] =
@@ -992,12 +986,13 @@ export function CatsPage() {
       }
 
       try {
-        assertSupportedSourceImage(file);
-        const dataUrl = await resizeAndEncode(file, 800);
+        assertSupportedImageFile(file);
+        const sourceLocalAssetId = `cover-${Date.now()}`;
+        const dataUrl = await resizeAndEncode(file, 2560, 0.9);
         const photoSrc = await storeAccountPhotoDataUrl({
           dataUrl,
           pathSegments: [targetCatId, "cover"],
-          fileName: `cover-${Date.now()}`,
+          fileName: sourceLocalAssetId,
         });
         if (!isStoragePhotoReference(photoSrc)) {
           setSaveMessage("カバー写真を保存できませんでした。");
@@ -1008,6 +1003,8 @@ export function CatsPage() {
           src: photoSrc,
           crop: DEFAULT_COVER_CROP,
           initializeToFit: true,
+          sourceFile: file,
+          sourceLocalAssetId,
         });
         setIsCoverPhotoSheetOpen(false);
       } catch {
@@ -1068,7 +1065,7 @@ export function CatsPage() {
       }
 
       try {
-        assertSupportedSourceImage(file);
+        assertSupportedImageFile(file);
         const [dataUrl, thumbnailDataUrl] = await Promise.all([
           resizeAndEncode(file, 2560, 0.88),
           resizeAndEncode(file, 512, 0.72, "image/webp"),
@@ -1099,6 +1096,14 @@ export function CatsPage() {
           setTimeout(() => setSaveMessage(""), 2400);
           return;
         }
+
+        void queueOriginalPhotoPreservation({
+          file,
+          localAssetId: savedPhoto.id,
+          sourceSurface: "cat_gallery",
+          displaySrc: photoSrc,
+          catId: targetCatId,
+        });
 
         setGalleryRefreshTick((value) => value + 1);
         setActiveSection("photos");
@@ -1416,13 +1421,14 @@ export function CatsPage() {
                             src={activeCoverSrc}
                             crop={activeCoverCrop}
                             alt=""
+                            storageVariant="hero"
                             style={styles.profileCoverCustomCroppedImage}
                           />
                         ) : (
                           <StoredPhotoImage
                             src={activeCoverSrc}
                             alt=""
-                            storageVariant="display"
+                            storageVariant="hero"
                             loading="eager"
                             style={styles.profileCoverCustomImage}
                             width={420}
@@ -2286,6 +2292,18 @@ export function CatsPage() {
             )
           }
           onSave={() => {
+            if (
+              coverCropDraft.sourceFile &&
+              coverCropDraft.sourceLocalAssetId
+            ) {
+              void queueOriginalPhotoPreservation({
+                file: coverCropDraft.sourceFile,
+                localAssetId: coverCropDraft.sourceLocalAssetId,
+                sourceSurface: "cover",
+                displaySrc: coverCropDraft.src,
+                catId: activeCatId,
+              });
+            }
             void saveActiveCatCoverPhoto(
               coverCropDraft.src,
               coverCropDraft.crop,
@@ -4541,6 +4559,7 @@ function CoverCropPhoto({
   fallbackSrcs,
   crop,
   alt,
+  storageVariant = "display",
   style,
   onNaturalSize,
 }: {
@@ -4548,6 +4567,7 @@ function CoverCropPhoto({
   fallbackSrcs?: string[];
   crop: CatCoverCrop;
   alt: string;
+  storageVariant?: "display" | "hero";
   style: CSSProperties;
   onNaturalSize?: (size: { width: number; height: number }) => void;
 }) {
@@ -4561,7 +4581,7 @@ function CoverCropPhoto({
           src={src}
           fallbackSrcs={fallbackSrcs}
           alt=""
-          storageVariant="display"
+          storageVariant={storageVariant}
           loading="eager"
           style={{
             ...style,
@@ -4578,7 +4598,7 @@ function CoverCropPhoto({
         src={src}
         fallbackSrcs={fallbackSrcs}
         alt={alt}
-        storageVariant="display"
+        storageVariant={storageVariant}
         loading="eager"
         style={{ ...style, zIndex: 1 }}
         imageStyle={getCoverCropImageStyle(normalized)}
@@ -5404,24 +5424,6 @@ function LensPhotoGridSkeleton() {
       ))}
     </div>
   );
-}
-
-function assertSupportedSourceImage(file: File) {
-  if (file.size > MAX_UPLOAD_SOURCE_FILE_BYTES) {
-    throw new Error("Image file is too large");
-  }
-
-  if (file.type) {
-    if (!SUPPORTED_SOURCE_IMAGE_MIME_TYPES.has(file.type.toLowerCase())) {
-      throw new Error("Unsupported image file type");
-    }
-
-    return;
-  }
-
-  if (!/\.(avif|gif|heic|heif|jpe?g|png|webp)$/i.test(file.name)) {
-    throw new Error("Unsupported image file type");
-  }
 }
 
 const styles = {

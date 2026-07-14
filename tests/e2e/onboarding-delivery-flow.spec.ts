@@ -628,7 +628,21 @@ test.describe("onboarding delivery flow", () => {
 
     const openedSnapshot = await readOnboardingDeliverySnapshot(page);
     expect(openedSnapshot.deliveredPhoto?.sourcePhotoId).toBe("stock-signed-e2e-fake");
-    expect(openedSnapshot.deliveredPhoto?.src).toMatch(/^data:image\//);
+    expect(openedSnapshot.deliveredPhoto?.src).toBe(
+      "storage:admin-stock/sleeping/onboarding-delivered-signed.jpg",
+    );
+    const offlineCache = await page.evaluate(() =>
+      JSON.parse(
+        window.localStorage.getItem("neteruneko_exchange_photo_offline_cache") ??
+          "[]",
+      ),
+    );
+    expect(offlineCache).toEqual([
+      expect.objectContaining({
+        photoId: openedSnapshot.deliveredPhoto?.id,
+        dataUrl: expect.stringMatching(/^data:image\//),
+      }),
+    ]);
     await expect.poll(() => readKeptExchangePhotoCount(page)).toBe(1);
 
     await page.evaluate(() => {
@@ -917,6 +931,38 @@ test.describe("onboarding delivery flow", () => {
     await expect(page.getByText("アプリでつづける")).toHaveCount(0);
   });
 
+  test("accepts a valid photo with a generic MIME type in LINE onboarding", async ({
+    page,
+  }) => {
+    await page.addInitScript(() => {
+      Object.defineProperty(window.navigator, "userAgent", {
+        configurable: true,
+        get: () =>
+          "Mozilla/5.0 (Linux; Android 14; Pixel 7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Mobile Safari/537.36 Line/14.0.0",
+      });
+    });
+    await routeImmediateDelivery(page);
+
+    await page.goto("/onboarding?source=instagram_dm");
+    await expect(
+      page.getByRole("heading", { name: "SafariやChromeで 開くと安心です" }),
+    ).toBeVisible();
+    await page.getByRole("button", { name: "このまま進む" }).click();
+    await page.getByTestId("onboarding-photo-select").click();
+    await page.locator('input[type="file"]').last().setInputFiles({
+      name: "line-photo.jpg",
+      mimeType: "application/octet-stream",
+      buffer: testPng,
+    });
+
+    await expect(
+      page.getByText(/写真を読み込めませんでした/),
+    ).toHaveCount(0);
+    await expect(
+      page.getByRole("button", { name: "ねこだよりを開く" }),
+    ).toBeVisible();
+  });
+
   test("retries delivery with the already saved onboarding photo", async ({
     page,
   }) => {
@@ -990,6 +1036,23 @@ test.describe("onboarding delivery flow", () => {
     await page.locator('input[type="file"]').last().setInputFiles({
       name: "not-a-photo.txt",
       mimeType: "text/plain",
+      buffer: Buffer.from("not a photo", "utf8"),
+    });
+
+    await expect(
+      page.getByText(
+        "写真を読み込めませんでした。JPEGやPNGなどの写真で、もう一度試してください。",
+      ),
+    ).toBeVisible();
+    await expect(page.getByTestId("onboarding-photo-select")).toBeVisible();
+  });
+
+  test("rejects a renamed non-image after the decoder check", async ({ page }) => {
+    await page.goto("/onboarding");
+    await page.getByTestId("onboarding-photo-select").click();
+    await page.locator('input[type="file"]').last().setInputFiles({
+      name: "not-really-a-photo.jpg",
+      mimeType: "application/octet-stream",
       buffer: Buffer.from("not a photo", "utf8"),
     });
 

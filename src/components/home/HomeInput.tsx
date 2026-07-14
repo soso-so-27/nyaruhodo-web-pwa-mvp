@@ -19,6 +19,8 @@ import {
   type PhotoSourceSet,
 } from "../../lib/photoSources";
 import { resizeImageFileToDataUrl } from "../../lib/imageResize";
+import { assertSupportedImageFile } from "../../lib/imageFileValidation";
+import { queueOriginalPhotoPreservation } from "../../lib/photoOriginals";
 import {
   readCatGalleryPhotos,
 } from "../../lib/cats/catGalleryPhotos";
@@ -156,16 +158,6 @@ const PHOTO_INPUT_FAILURE_MESSAGE =
   "写真を読み込めませんでした。JPEGやPNGの写真で、もう一度試してください";
 const CAMERA_INPUT_STALE_CLEANUP_MS = 10 * 60 * 1000;
 
-const MAX_UPLOAD_SOURCE_FILE_BYTES = 20 * 1024 * 1024;
-const SUPPORTED_SOURCE_IMAGE_MIME_TYPES = new Set([
-  "image/avif",
-  "image/gif",
-  "image/heic",
-  "image/heif",
-  "image/jpeg",
-  "image/png",
-  "image/webp",
-]);
 
 type RecordLogItem = {
   id: string;
@@ -277,6 +269,7 @@ type PendingExchangeSharePhoto = {
   triggerLabel: string;
   theme: string;
   fileSizeBucket: string;
+  sourceFile: File;
 };
 
 type SleepingPhotoSource = "camera";
@@ -1450,11 +1443,12 @@ export function HomeInput({
       if (!file) return;
 
       try {
-        const dataUrl = await resizeAndEncode(file, 1600);
+        const sourceLocalAssetId = `home-cover-${activeCatId}-${Date.now()}`;
+        const dataUrl = await resizeAndEncode(file, 2560, 0.9);
         const photoSrc = await storeAccountPhotoDataUrl({
           dataUrl,
           pathSegments: [activeCatId, "home"],
-          fileName: "home",
+          fileName: sourceLocalAssetId,
         });
         const profiles = readCatProfiles();
         const nextProfiles = profiles.map((profile) =>
@@ -1472,6 +1466,13 @@ export function HomeInput({
         saveCatProfiles(nextProfiles);
         setCatProfiles(nextProfiles);
         setActiveCat(nextActive);
+        void queueOriginalPhotoPreservation({
+          file,
+          localAssetId: sourceLocalAssetId,
+          sourceSurface: "home_cover",
+          displaySrc: photoSrc,
+          catId: activeCatId,
+        });
         trackProductEvent(
           "home_photo_added",
           {
@@ -1515,14 +1516,23 @@ export function HomeInput({
 
       try {
         const slug = getCollectionSlotPhotoSlug(slot);
-        const dataUrl = await resizeAndEncode(file, 560, 0.76);
+        const dataUrl = await resizeAndEncode(file, 1200, 0.82);
         const photoSrc = await storeAccountPhotoDataUrl({
           dataUrl,
           pathSegments: [activeCatId, "collection", slug],
           fileName: `photo-${Date.now()}`,
         });
 
-        saveCollectionPhoto(activeCatId, slug, photoSrc);
+        const savedPhoto = saveCollectionPhoto(activeCatId, slug, photoSrc);
+        if (savedPhoto) {
+          void queueOriginalPhotoPreservation({
+            file,
+            localAssetId: savedPhoto.id,
+            sourceSurface: "collection",
+            displaySrc: photoSrc,
+            catId: activeCatId,
+          });
+        }
         setCollectionRefreshTick((value) => value + 1);
         closeBoardInput(setIsCollectionPhotoSheetOpen, {
           itemId: "daily-collection-target",
@@ -1576,14 +1586,23 @@ export function HomeInput({
 
       try {
         const slug = getCollectionSlotPhotoSlug(slot);
-        const dataUrl = await resizeAndEncode(file, 900);
+        const dataUrl = await resizeAndEncode(file, 1200, 0.82);
         const photoSrc = await storeAccountPhotoDataUrl({
           dataUrl,
           pathSegments: [activeCatId, "collection", slug],
           fileName: `photo-${Date.now()}`,
         });
 
-        saveCollectionPhoto(activeCatId, slug, photoSrc);
+        const savedPhoto = saveCollectionPhoto(activeCatId, slug, photoSrc);
+        if (savedPhoto) {
+          void queueOriginalPhotoPreservation({
+            file,
+            localAssetId: savedPhoto.id,
+            sourceSurface: "collection",
+            displaySrc: photoSrc,
+            catId: activeCatId,
+          });
+        }
         setCollectionRefreshTick((value) => value + 1);
         showToast(`${slot.label}を見つけた`);
         trackProductEvent(
@@ -1702,6 +1721,7 @@ export function HomeInput({
           triggerLabel: "sleeping",
           theme: "sleeping",
           fileSizeBucket,
+          sourceFile: file,
         });
         setPendingExchangeCatId(
           readStoredExchangeShareCatSelection(catProfiles, activeCatId),
@@ -2048,10 +2068,7 @@ export function HomeInput({
       photo
         ? {
             ...photo,
-            src: dataUrl,
-            thumbnailSrc: dataUrl,
-            displaySrc: dataUrl,
-            originalSrc: dataUrl,
+            offlineSrc: dataUrl,
           }
         : photo,
     );
@@ -2118,6 +2135,13 @@ export function HomeInput({
     if (!ownPhoto) {
       return null;
     }
+    void queueOriginalPhotoPreservation({
+      file: photo.sourceFile,
+      localAssetId: ownPhoto.id,
+      sourceSurface: "sleeping",
+      displaySrc: photo.displaySrc ?? photo.src,
+      catId,
+    });
 
     void backupOwnSleepingPhotoMoment(ownPhoto).then((result) => {
       if (shared && !result.ok) {
@@ -2169,6 +2193,13 @@ export function HomeInput({
       showToast(PHOTO_SAVE_FAILURE_MESSAGE);
       return;
     }
+    void queueOriginalPhotoPreservation({
+      file: photo.sourceFile,
+      localAssetId: ownPhoto.id,
+      sourceSurface: "sleeping",
+      displaySrc: photo.displaySrc ?? photo.src,
+      catId: targetCatId,
+    });
     void backupOwnSleepingPhotoMoment(ownPhoto).then((result) => {
       if (!result.ok) {
         showToast(
@@ -2231,6 +2262,13 @@ export function HomeInput({
       showToast(PHOTO_SAVE_FAILURE_MESSAGE);
       return;
     }
+    void queueOriginalPhotoPreservation({
+      file: photo.sourceFile,
+      localAssetId: ownPhoto.id,
+      sourceSurface: "sleeping",
+      displaySrc: photo.displaySrc ?? photo.src,
+      catId: targetCatId,
+    });
     void backupOwnSleepingPhotoMoment(ownPhoto);
     setCollectionRefreshTick((value) => value + 1);
     setPendingExchangeSharePhoto(null);
@@ -5066,7 +5104,7 @@ function saveRecord(
 
 function saveCollectionPhoto(catId: string, slug: string, dataUrl: string) {
   if (isReservedCollectionSlotSlug(slug)) {
-    return;
+    return null;
   }
 
   try {
@@ -5075,11 +5113,11 @@ function saveCollectionPhoto(catId: string, slug: string, dataUrl: string) {
         string,
         Record<string, StoredCollectionPhoto[] | StoredCollectionPhoto | string[] | string>
       >>(STORAGE_KEYS.collectionPhotos) ?? {};
-    const photo: StoredCollectionPhoto = {
+    const photo = {
       id: createCollectionPhotoId(catId, slug),
       src: dataUrl,
       createdAt: new Date().toISOString(),
-    };
+    } satisfies StoredCollectionPhoto;
 
     all[catId] ??= {};
     all[catId][slug] = [
@@ -5087,8 +5125,10 @@ function saveCollectionPhoto(catId: string, slug: string, dataUrl: string) {
       photo,
     ];
     writeCachedJson(STORAGE_KEYS.collectionPhotos, all);
+    return photo;
   } catch {
     // Keep the home flow usable even if local photo storage fails.
+    return null;
   }
 }
 
@@ -5593,27 +5633,9 @@ function resizeAndEncode(
   quality = 0.86,
   mimeType = "image/jpeg",
 ): Promise<string> {
-  assertSupportedSourceImage(file);
+  assertSupportedImageFile(file);
 
   return resizeImageFileToDataUrl(file, maxSize, quality, mimeType);
-}
-
-function assertSupportedSourceImage(file: File) {
-  if (file.size > MAX_UPLOAD_SOURCE_FILE_BYTES) {
-    throw new Error("Image file is too large");
-  }
-
-  if (file.type) {
-    if (!SUPPORTED_SOURCE_IMAGE_MIME_TYPES.has(file.type.toLowerCase())) {
-      throw new Error("Unsupported image file type");
-    }
-
-    return;
-  }
-
-  if (!/\.(avif|gif|heic|heif|jpe?g|png|webp)$/i.test(file.name)) {
-    throw new Error("Unsupported image file type");
-  }
 }
 
 function setLock(catId: string, type: LockType): LockData {

@@ -10,6 +10,8 @@ import type {
 } from "react";
 import { AnimatePresence, MotionConfig, motion } from "motion/react";
 import { resizeImageFileToDataUrl } from "../../lib/imageResize";
+import { assertSupportedImageFile } from "../../lib/imageFileValidation";
+import { queueOriginalPhotoPreservation } from "../../lib/photoOriginals";
 import {
   getCollectionSlotPhotoSlug,
   getDailyCollectionTarget,
@@ -107,17 +109,7 @@ const COLLECTION_SURFACE_SOFT: CSSProperties = {
 };
 const COLLECTION_NAV_ENTRY_STORAGE_KEY = "neteruneko_collection_nav_entry";
 const MAINICHI_SEEN_PHOTO_KEYS_STORAGE_KEY = "neteruneko_mainichi_seen_photo_keys";
-const MAX_UPLOAD_SOURCE_FILE_BYTES = 20 * 1024 * 1024;
 const MAINICHI_CARD_DECODE_TIMEOUT_MS = 800;
-const SUPPORTED_SOURCE_IMAGE_MIME_TYPES = new Set([
-  "image/avif",
-  "image/gif",
-  "image/heic",
-  "image/heif",
-  "image/jpeg",
-  "image/png",
-  "image/webp",
-]);
 const MAINICHI_PASTE_MOTION_CSS = `
 @keyframes mainichiPasteSettle {
   0% {
@@ -1139,6 +1131,14 @@ export function CollectionPage() {
       if (!addedPhoto) {
         return;
       }
+
+      void queueOriginalPhotoPreservation({
+        file,
+        localAssetId: addedPhoto.id,
+        sourceSurface: "collection",
+        displaySrc: photoVariants.displaySrc ?? photoVariants.src,
+        catId: activeCatId,
+      });
 
       setCollectionPhotos((current) => ({
         ...current,
@@ -5476,8 +5476,8 @@ async function createStoredCollectionPhotoVariantSet({
   >
 > {
   const [thumbnailDataUrl, displayDataUrl] = await Promise.all([
-    resizeAndEncode(file, 400, 0.7, "image/webp"),
-    resizeAndEncode(file, 1200, 0.8, "image/webp"),
+    resizeAndEncode(file, 480, 0.72, "image/webp"),
+    resizeAndEncode(file, 1600, 0.84, "image/webp"),
   ]);
   const localDisplaySrc =
     displayDataUrl.length <= 1_900_000
@@ -5516,29 +5516,11 @@ function resizeAndEncode(
   quality = 0.85,
   mimeType = "image/jpeg",
 ): Promise<string> {
-  assertSupportedSourceImage(file);
+  assertSupportedImageFile(file);
 
   return resizeImageFileToDataUrl(file, maxSize, quality, mimeType).catch(
     () => "",
   );
-}
-
-function assertSupportedSourceImage(file: File) {
-  if (file.size > MAX_UPLOAD_SOURCE_FILE_BYTES) {
-    throw new Error("Image file is too large");
-  }
-
-  if (file.type) {
-    if (!SUPPORTED_SOURCE_IMAGE_MIME_TYPES.has(file.type.toLowerCase())) {
-      throw new Error("Unsupported image file type");
-    }
-
-    return;
-  }
-
-  if (!/\.(avif|gif|heic|heif|jpe?g|png|webp)$/i.test(file.name)) {
-    throw new Error("Unsupported image file type");
-  }
 }
 
 function getCollectionGroupLabel(groupId: CollectionGroupId) {
