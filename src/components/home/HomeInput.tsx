@@ -3765,7 +3765,11 @@ function ExchangeSharePermissionSheet({
                 aria-pressed={!isPrivate}
                 data-testid="exchange-share-mode-shared"
               >
-                <span style={styles.exchangeModeIcon} aria-hidden="true">
+                <span
+                  data-exchange-share-mode-icon=""
+                  style={styles.exchangeModeIcon}
+                  aria-hidden="true"
+                >
                   <AppIcon name="mail" size={18} />
                 </span>
                 <span style={styles.exchangeModeText}>
@@ -3783,7 +3787,11 @@ function ExchangeSharePermissionSheet({
                 aria-pressed={isPrivate}
                 data-testid="exchange-share-mode-private"
               >
-                <span style={styles.exchangeModeIcon} aria-hidden="true">
+                <span
+                  data-exchange-share-mode-icon=""
+                  style={styles.exchangeModeIcon}
+                  aria-hidden="true"
+                >
                   <AppIcon name="lock" size={18} />
                 </span>
                 <span style={styles.exchangeModeText}>
@@ -3810,6 +3818,26 @@ function ExchangeSharePermissionSheet({
 }
 
 const exchangeShareResponsiveStyles = `
+[data-testid="exchange-share-submit"],
+[data-testid^="exchange-share-mode-"],
+[data-testid^="exchange-share-cat-"] {
+  transition:
+    background-color var(--dur-instant) var(--ease-gentle),
+    border-color var(--dur-instant) var(--ease-gentle),
+    color var(--dur-instant) var(--ease-gentle),
+    box-shadow var(--dur-instant) var(--ease-gentle);
+}
+[data-testid="exchange-share-submit"]:focus-visible,
+[data-testid^="exchange-share-mode-"]:focus-visible,
+[data-testid^="exchange-share-cat-"]:focus-visible {
+  outline: 3px solid color-mix(in srgb, var(--seal) 58%, var(--paper) 42%);
+  outline-offset: 2px;
+}
+[data-testid^="exchange-share-mode-"][aria-pressed="true"]
+  [data-exchange-share-mode-icon] {
+  color: var(--seal);
+  background: color-mix(in srgb, var(--seal) 8%, transparent);
+}
 @media (max-height: 700px) {
   [data-exchange-share-layout] {
     --exchange-share-columns: minmax(96px, 104px) minmax(0, 1fr);
@@ -7732,7 +7760,7 @@ const styles = {
   },
   exchangeLead: {
     margin: 0,
-    color: "#5f584f",
+    color: "var(--ink-soft)",
     fontSize: "13px",
     fontWeight: 500,
     lineHeight: 1.5,
@@ -7776,25 +7804,22 @@ const styles = {
   },
   exchangeShareSummary: {
     display: "grid",
-    gridTemplateColumns: "30px minmax(0, 1fr)",
+    gridTemplateColumns: "24px minmax(0, 1fr)",
     alignItems: "center",
-    gap: "9px",
-    minHeight: "var(--exchange-share-summary-min-height, 38px)",
-    padding: "5px 9px",
-    borderRadius: "14px",
-    border: "1px solid rgba(144,126,102,0.1)",
-    background: "rgba(255,253,248,0.54)",
+    gap: "7px",
+    minHeight: "var(--exchange-share-summary-min-height, 32px)",
+    padding: "2px",
     boxSizing: "border-box",
   },
   exchangeShareSummaryIcon: {
-    width: "28px",
-    height: "28px",
+    width: "24px",
+    height: "24px",
     borderRadius: "999px",
     display: "inline-flex",
     alignItems: "center",
     justifyContent: "center",
-    color: "#a8493f",
-    background: "rgba(168,73,63,0.08)",
+    color: "var(--seal)",
+    background: "transparent",
   },
   exchangeDecisionStack: {
     display: "grid",
@@ -7965,24 +7990,23 @@ const styles = {
   exchangeModeButton: {
     minWidth: 0,
     minHeight: "56px",
-    border: "1px solid rgba(144,126,102,0.12)",
+    border: "1px solid color-mix(in srgb, var(--line) 64%, transparent)",
     borderRadius: "16px",
-    background: "rgba(255,253,248,0.5)",
-    color: "#716b60",
+    background: "color-mix(in srgb, var(--paper) 18%, transparent)",
+    color: "var(--ink-soft)",
     display: "inline-flex",
     alignItems: "center",
     justifyContent: "flex-start",
     gap: "7px",
     padding: "8px",
     cursor: "pointer",
-    boxShadow: "inset 0 1px 0 rgba(255,255,255,0.48)",
+    boxShadow: "none",
   },
   exchangeModeButtonActive: {
-    border: "1px solid rgba(168,73,63,0.34)",
-    background: "rgba(255,248,240,0.92)",
-    color: "#3b332c",
-    boxShadow:
-      "inset 0 1px 0 rgba(255,255,255,0.58), 0 8px 18px rgba(120,82,58,0.07)",
+    border: "1px solid color-mix(in srgb, var(--seal) 36%, var(--line) 64%)",
+    background: "color-mix(in srgb, var(--seal) 7%, var(--paper-card) 93%)",
+    color: "var(--ink)",
+    boxShadow: "inset 0 0 0 1px color-mix(in srgb, var(--seal) 5%, transparent)",
   },
   exchangeModeIcon: {
     width: "28px",
@@ -7992,8 +8016,8 @@ const styles = {
     alignItems: "center",
     justifyContent: "center",
     flexShrink: 0,
-    color: "#a8493f",
-    background: "rgba(168,73,63,0.08)",
+    color: "var(--ink-soft)",
+    background: "transparent",
   },
   exchangeModeText: {
     minWidth: 0,
@@ -8039,17 +8063,17 @@ const styles = {
   },
   exchangeKeepButton: {
     minHeight: "54px",
-    border: "1px solid rgba(144,126,102,0.14)",
+    border: "1px solid var(--ink)",
     borderRadius: "var(--radius-full)",
-    background:
-      "linear-gradient(180deg, rgba(255,253,248,0.98), rgba(248,242,232,0.94))",
-    color: "#292721",
+    background: "var(--ink)",
+    color: "var(--paper)",
     fontSize: "15px",
     fontWeight: 520,
     letterSpacing: "0.04em",
     cursor: "pointer",
     boxShadow:
-      "inset 0 1px 0 rgba(255,255,255,0.72), 0 12px 26px rgba(90,76,60,0.08)",
+      "inset 0 1px 0 color-mix(in srgb, var(--paper) 14%, transparent), 0 12px 24px -14px color-mix(in srgb, var(--ink) 58%, transparent)",
+    WebkitTapHighlightColor: "transparent",
   },
   exchangePlainButton: {
     minHeight: "28px",

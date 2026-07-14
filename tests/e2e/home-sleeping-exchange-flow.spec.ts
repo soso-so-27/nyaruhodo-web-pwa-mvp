@@ -1,4 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
+import path from "node:path";
 
 const testSvg = Buffer.from(
   `<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="1200" viewBox="0 0 1200 1200">
@@ -15,6 +16,10 @@ const testSvg = Buffer.from(
 const deliveredDataUrl =
   "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAGQAAABkCAYAAABw4pVUAAAAAXNSR0IArs4c6QAAAARnQU1BAACxjwv8YQUAAAAJcEhZcwAADsMAAA7DAcdvqGQAAAEJSURBVHhe7dExEcAgAMBAJKKuTpnpjoLA/fACchlrzv2C+a0njDPsVmfYrQyJMSTGkBhDYgyJMSTGkBhDYgyJMSTGkBhDYgyJMSTGkBhDYgyJMSTGkBhDYgyJMSTGkBhDYgyJMSTGkBhDYgyJMSTGkBhDYgyJMSTGkBhDYgyJMSTGkBhDYgyJMSTGkBhDYgyJMSTGkBhDYgyJMSTGkBhDYgyJMSTGkBhDYgyJMSTGkBhDYgyJMSTGkBhDYgyJMSTGkBhDYgyJMSTGkBhDYgyJMSTGkBhDYgyJMSTmB4RCEqdGtA/tAAAAAElFTkSuQmCC";
 const testUploadPng = Buffer.from(deliveredDataUrl.split(",")[1], "base64");
+const catPhotoFixturePath = path.resolve(
+  process.cwd(),
+  "tests/fixtures/cat-photo-mugi.jpg",
+);
 
 async function waitForOwnSleepingPhotoCount(page: Page, minCount: number) {
   await expect
@@ -827,11 +832,7 @@ test.describe("home sleeping exchange flow", () => {
     await page.waitForLoadState("networkidle");
 
     await page.getByTestId("home-empty-action").click();
-    await page.locator('input[type="file"]').last().setInputFiles({
-      name: "status-sheet.png",
-      mimeType: "image/png",
-      buffer: testUploadPng,
-    });
+    await page.locator('input[type="file"]').last().setInputFiles(catPhotoFixturePath);
 
     const dialog = page.getByRole("dialog");
     await expect(dialog).toBeVisible();
@@ -843,6 +844,50 @@ test.describe("home sleeping exchange flow", () => {
     await expect(page.getByTestId("exchange-share-cat-status-cat-second")).toBeVisible();
     await expect(page.getByTestId("exchange-share-mode-shared")).toBeVisible();
     await expect(page.getByTestId("exchange-share-mode-private")).toBeVisible();
+    const controlMetrics = await page.evaluate(() => {
+      const submit = document.querySelector<HTMLElement>(
+        '[data-testid="exchange-share-submit"]',
+      );
+      const shared = document.querySelector<HTMLElement>(
+        '[data-testid="exchange-share-mode-shared"]',
+      );
+      const privateMode = document.querySelector<HTMLElement>(
+        '[data-testid="exchange-share-mode-private"]',
+      );
+      if (!submit || !shared || !privateMode) {
+        return null;
+      }
+
+      const submitStyle = getComputedStyle(submit);
+      const sharedStyle = getComputedStyle(shared);
+      const privateStyle = getComputedStyle(privateMode);
+      return {
+        submitHeight: submit.getBoundingClientRect().height,
+        sharedHeight: shared.getBoundingClientRect().height,
+        privateHeight: privateMode.getBoundingClientRect().height,
+        submitBackground: submitStyle.backgroundColor,
+        sharedBackground: sharedStyle.backgroundColor,
+        privateBackground: privateStyle.backgroundColor,
+        privateShadow: privateStyle.boxShadow,
+      };
+    });
+    expect(controlMetrics).not.toBeNull();
+    expect(controlMetrics?.submitHeight).toBeGreaterThanOrEqual(44);
+    expect(controlMetrics?.sharedHeight).toBeGreaterThanOrEqual(44);
+    expect(controlMetrics?.privateHeight).toBeGreaterThanOrEqual(44);
+    expect(controlMetrics?.submitBackground).not.toBe(
+      controlMetrics?.sharedBackground,
+    );
+    expect(controlMetrics?.submitBackground).not.toBe(
+      controlMetrics?.privateBackground,
+    );
+    expect(controlMetrics?.privateShadow).toBe("none");
+    if (process.env.CAPTURE_PHOTO_SAVE_SHEET === "1") {
+      await page.screenshot({
+        path: "artifacts/photo-save-sheet-320x568-shared.png",
+        animations: "disabled",
+      });
+    }
     await expect
       .poll(() =>
         page.getByTestId("exchange-share-submit").evaluate((button) => {
@@ -896,11 +941,144 @@ test.describe("home sleeping exchange flow", () => {
     await expect(page.getByTestId("exchange-share-status")).toHaveText(
       "じぶんの記録にのこします。そとには出ません。",
     );
+    if (process.env.CAPTURE_PHOTO_SAVE_SHEET === "1") {
+      await page.screenshot({
+        path: "artifacts/photo-save-sheet-320x568-private.png",
+        animations: "disabled",
+      });
+    }
 
     await page.getByTestId("exchange-share-mode-shared").click();
     await expect(page.getByTestId("exchange-share-status")).toHaveText(
       "よる8時に とどきます。",
     );
+
+    await page.keyboard.press("Tab");
+    await page.keyboard.press("Tab");
+    await expect(page.getByTestId("exchange-share-submit")).toBeFocused();
+    await expect
+      .poll(() =>
+        page.getByTestId("exchange-share-submit").evaluate((button) => {
+          const style = getComputedStyle(button);
+          return style.outlineStyle !== "none" && style.outlineWidth !== "0px";
+        }),
+      )
+      .toBe(true);
+  });
+
+  test("keeps the primary save action readable across home ambient themes", async ({
+    page,
+  }) => {
+    test.setTimeout(60_000);
+    await page.setViewportSize({ width: 390, height: 844 });
+    const phases = [
+      { key: "morning", now: Date.parse("2026-06-10T00:00:00.000Z") },
+      { key: "noon", now: Date.parse("2026-06-10T04:00:00.000Z") },
+      { key: "evening", now: Date.parse("2026-06-10T09:00:00.000Z") },
+      { key: "night", now: Date.parse("2026-06-10T12:00:00.000Z") },
+    ] as const;
+
+    await page.addInitScript((initialNow) => {
+      (window as typeof window & { __testNow?: number }).__testNow = initialNow;
+      const originalDateNow = Date.now.bind(Date);
+      Date.now = () =>
+        (window as typeof window & { __testNow?: number }).__testNow ??
+        originalDateNow();
+      const originalSetInterval = window.setInterval.bind(window);
+      window.setInterval = ((handler: TimerHandler, timeout?: number, ...args: unknown[]) =>
+        originalSetInterval(
+          handler,
+          timeout === 60_000 ? 50 : timeout,
+          ...args,
+        )) as typeof window.setInterval;
+      window.localStorage.setItem("nyaruhodo_sleeping_safety_accepted", "1");
+      window.localStorage.setItem("active_cat_id", "ambient-cat");
+      window.localStorage.setItem(
+        "cat_profiles",
+        JSON.stringify([
+          {
+            id: "ambient-cat",
+            name: "むぎ",
+            createdAt: new Date(initialNow).toISOString(),
+            updatedAt: new Date(initialNow).toISOString(),
+          },
+        ]),
+      );
+    }, phases[0].now);
+
+    await page.goto("/home");
+    await page.waitForLoadState("networkidle");
+    await page.getByTestId("home-empty-action").click();
+    await page.locator('input[type="file"]').last().setInputFiles(catPhotoFixturePath);
+
+    const dialog = page.getByRole("dialog");
+    const submit = page.getByTestId("exchange-share-submit");
+    await expect(dialog).toBeVisible();
+    await expect(submit).toBeVisible();
+
+    for (const phase of phases) {
+      await page.evaluate((now) => {
+        (window as typeof window & { __testNow?: number }).__testNow = now;
+      }, phase.now);
+      await expect(page.locator("html")).toHaveAttribute("data-paper-theme", phase.key);
+
+      const visualState = await submit.evaluate((button) => {
+        const parseRgb = (value: string) =>
+          (value.match(/[\d.]+/g) ?? []).slice(0, 3).map(Number);
+        const luminance = (value: string) => {
+          const channels = parseRgb(value).map((channel) => {
+            const normalized = channel / 255;
+            return normalized <= 0.03928
+              ? normalized / 12.92
+              : ((normalized + 0.055) / 1.055) ** 2.4;
+          });
+          return (
+            0.2126 * channels[0] +
+            0.7152 * channels[1] +
+            0.0722 * channels[2]
+          );
+        };
+        const style = getComputedStyle(button);
+        const foreground = luminance(style.color);
+        const background = luminance(style.backgroundColor);
+        const contrast =
+          (Math.max(foreground, background) + 0.05) /
+          (Math.min(foreground, background) + 0.05);
+        const rect = button.getBoundingClientRect();
+        const preview = document.querySelector<HTMLElement>(
+          "[data-exchange-share-preview]",
+        );
+
+        return {
+          contrast,
+          submitInViewport: rect.top >= 0 && rect.bottom <= window.innerHeight,
+          previewHeight: preview?.getBoundingClientRect().height ?? 0,
+        };
+      });
+
+      expect(visualState.contrast).toBeGreaterThanOrEqual(4.5);
+      expect(visualState.submitInViewport).toBe(true);
+      expect(visualState.previewHeight).toBeGreaterThanOrEqual(156);
+
+      if (process.env.CAPTURE_PHOTO_SAVE_SHEET === "1") {
+        if (phase.key === "morning") {
+          await page.screenshot({
+            path: "artifacts/photo-save-sheet-390x844-shared.png",
+            animations: "disabled",
+          });
+          await page.screenshot({
+            path: "artifacts/photo-save-sheet-ambient-morning.png",
+            animations: "disabled",
+          });
+        }
+        if (phase.key === "night") {
+          await page.screenshot({
+            path: "artifacts/photo-save-sheet-ambient-night.png",
+            animations: "disabled",
+          });
+        }
+      }
+    }
   });
 
   test("keeps a home photo private when the user chooses 自分だけ", async ({
