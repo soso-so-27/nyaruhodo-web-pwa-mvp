@@ -20,6 +20,18 @@ export type ClientBillingStatus = {
   canManageBilling: boolean;
 };
 
+export type BillingNavigationResult =
+  | { ok: true; url: string }
+  | {
+      ok: false;
+      reason:
+        | "login_required"
+        | "forbidden"
+        | "not_found"
+        | "network"
+        | "unavailable";
+    };
+
 export async function readClientBillingStatus() {
   const headers = await buildAuthHeaders();
 
@@ -39,40 +51,52 @@ export async function readClientBillingStatus() {
   }
 }
 
-export async function startBetaSupporterCheckout() {
+export async function startBetaSupporterCheckout(): Promise<BillingNavigationResult> {
   const headers = await buildAuthHeaders({ "Content-Type": "application/json" });
   const response = await fetch("/api/billing/create-checkout-session", {
     method: "POST",
     headers,
-  });
+  }).catch(() => null);
+
+  if (!response) {
+    return { ok: false, reason: "network" };
+  }
 
   if (!response.ok) {
-    return null;
+    return { ok: false, reason: getBillingFailureReason(response.status) };
   }
 
   const data = (await response.json().catch(() => null)) as {
     url?: string;
   } | null;
 
-  return data?.url ?? null;
+  return data?.url
+    ? { ok: true, url: data.url }
+    : { ok: false, reason: "unavailable" };
 }
 
-export async function openBillingPortal() {
+export async function openBillingPortal(): Promise<BillingNavigationResult> {
   const headers = await buildAuthHeaders({ "Content-Type": "application/json" });
   const response = await fetch("/api/billing/create-portal-session", {
     method: "POST",
     headers,
-  });
+  }).catch(() => null);
+
+  if (!response) {
+    return { ok: false, reason: "network" };
+  }
 
   if (!response.ok) {
-    return null;
+    return { ok: false, reason: getBillingFailureReason(response.status) };
   }
 
   const data = (await response.json().catch(() => null)) as {
     url?: string;
   } | null;
 
-  return data?.url ?? null;
+  return data?.url
+    ? { ok: true, url: data.url }
+    : { ok: false, reason: "unavailable" };
 }
 
 async function buildAuthHeaders(init?: HeadersInit) {
@@ -80,11 +104,15 @@ async function buildAuthHeaders(init?: HeadersInit) {
   const supabase = createBrowserSupabaseClient();
 
   if (supabase) {
-    const { data } = await supabase.auth.getSession();
-    const accessToken = data.session?.access_token;
+    try {
+      const { data } = await supabase.auth.getSession();
+      const accessToken = data.session?.access_token;
 
-    if (accessToken) {
-      headers.set("Authorization", `Bearer ${accessToken}`);
+      if (accessToken) {
+        headers.set("Authorization", `Bearer ${accessToken}`);
+      }
+    } catch {
+      // The API will return 401 and the caller can show the login recovery path.
     }
   }
 
@@ -101,4 +129,20 @@ function getDefaultBillingStatus(): ClientBillingStatus {
     cancelAtPeriodEnd: false,
     canManageBilling: false,
   };
+}
+
+function getBillingFailureReason(status: number) {
+  if (status === 401) {
+    return "login_required" as const;
+  }
+
+  if (status === 403) {
+    return "forbidden" as const;
+  }
+
+  if (status === 404) {
+    return "not_found" as const;
+  }
+
+  return "unavailable" as const;
 }

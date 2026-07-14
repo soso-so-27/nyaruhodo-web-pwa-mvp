@@ -1,24 +1,42 @@
 "use client";
 
-import { useEffect, useRef, type KeyboardEvent, type RefObject } from "react";
+import {
+  useCallback,
+  useEffect,
+  useRef,
+  type KeyboardEvent,
+  type RefObject,
+} from "react";
 
 type ModalBehaviorOptions = {
   open: boolean;
   onClose: () => void;
   lockScroll?: boolean;
+  manageHistory?: boolean;
 };
+
+let modalHistorySequence = 0;
 
 export function useModalBehavior<ElementType extends HTMLElement>({
   open,
   onClose,
   lockScroll = true,
+  manageHistory = false,
 }: ModalBehaviorOptions): {
   modalRef: RefObject<ElementType | null>;
   handleModalKeyDown: (event: KeyboardEvent<ElementType>) => void;
+  requestModalClose: () => void;
 } {
   const modalRef = useRef<ElementType | null>(null);
   const previousFocusRef = useRef<HTMLElement | null>(null);
   const onCloseRef = useRef(onClose);
+  const historyMarkerRef = useRef<string | null>(null);
+  if (!historyMarkerRef.current) {
+    modalHistorySequence += 1;
+    historyMarkerRef.current = `neteruneko-modal-${Date.now()}-${modalHistorySequence}`;
+  }
+  const pushedHistoryRef = useRef(false);
+  const historyCleanupTimerRef = useRef<number | null>(null);
 
   useEffect(() => {
     onCloseRef.current = onClose;
@@ -63,11 +81,80 @@ export function useModalBehavior<ElementType extends HTMLElement>({
     };
   }, [lockScroll, open]);
 
+  useEffect(() => {
+    if (!open || !manageHistory || typeof window === "undefined") {
+      return;
+    }
+
+    const marker = historyMarkerRef.current;
+    if (historyCleanupTimerRef.current !== null) {
+      window.clearTimeout(historyCleanupTimerRef.current);
+      historyCleanupTimerRef.current = null;
+    }
+    if (window.history.state?.neterunekoModal !== marker) {
+      window.history.pushState(
+        { ...window.history.state, neterunekoModal: marker },
+        "",
+        window.location.href,
+      );
+    }
+    pushedHistoryRef.current = true;
+
+    function handlePopState(event: PopStateEvent) {
+      if (!pushedHistoryRef.current) {
+        return;
+      }
+
+      if (event.state?.neterunekoModal === marker) {
+        return;
+      }
+
+      pushedHistoryRef.current = false;
+      onCloseRef.current();
+    }
+
+    window.addEventListener("popstate", handlePopState);
+    return () => {
+      window.removeEventListener("popstate", handlePopState);
+      if (
+        pushedHistoryRef.current &&
+        window.history.state?.neterunekoModal === marker
+      ) {
+        // Strict Mode immediately re-runs effects in development. Deferring
+        // cleanup lets the second setup keep the same history entry.
+        historyCleanupTimerRef.current = window.setTimeout(() => {
+          historyCleanupTimerRef.current = null;
+          if (
+            pushedHistoryRef.current &&
+            window.history.state?.neterunekoModal === marker
+          ) {
+            pushedHistoryRef.current = false;
+            window.history.back();
+          }
+        }, 0);
+      }
+    };
+  }, [manageHistory, open]);
+
+  const requestModalClose = useCallback(() => {
+    if (
+      manageHistory &&
+      pushedHistoryRef.current &&
+      typeof window !== "undefined" &&
+      window.history.state?.neterunekoModal === historyMarkerRef.current
+    ) {
+      pushedHistoryRef.current = false;
+      window.history.back();
+    }
+
+    onCloseRef.current();
+  }, [manageHistory]);
+
   function handleModalKeyDown(event: KeyboardEvent<ElementType>) {
     if (event.key === "Escape") {
       event.preventDefault();
       event.stopPropagation();
-      onCloseRef.current();
+      requestModalClose();
       return;
     }
 
@@ -95,7 +182,7 @@ export function useModalBehavior<ElementType extends HTMLElement>({
     }
   }
 
-  return { modalRef, handleModalKeyDown };
+  return { modalRef, handleModalKeyDown, requestModalClose };
 }
 
 function getFocusableElements(root: HTMLElement | null): HTMLElement[] {

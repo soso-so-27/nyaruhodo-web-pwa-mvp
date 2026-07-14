@@ -83,4 +83,33 @@ test.describe("account deletion UI", () => {
       paymentBlock.getByRole("button", { name: "支払いの管理" }),
     ).toBeVisible();
   });
+
+  test("offers a safe login recovery when the billing session expires", async ({
+    page,
+  }) => {
+    await mockBillingStatus(page, {
+      isLoggedIn: true,
+      isBetaSupporter: true,
+      status: "active",
+      canManageBilling: true,
+    });
+    await page.route("**/api/billing/create-portal-session", async (route) => {
+      await route.fulfill({
+        status: 401,
+        contentType: "application/json",
+        body: JSON.stringify({ error: "login_required" }),
+      });
+    });
+
+    await page.goto("/account-deletion");
+    await page.getByRole("button", { name: "支払いの管理" }).click();
+
+    await expect(page.getByTestId("auth-recovery-notice")).toBeVisible();
+    await expect(
+      page.getByRole("link", { name: "Googleでログインし直す" }),
+    ).toHaveAttribute(
+      "href",
+      "/account/create?returnTo=%2Faccount-deletion",
+    );
+  });
 });

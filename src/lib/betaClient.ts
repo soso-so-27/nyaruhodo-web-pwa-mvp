@@ -21,6 +21,18 @@ export type SendBetaFeedbackInput = {
   kind?: "beta_feedback" | "supporter_voice";
 };
 
+export type SendBetaFeedbackResult =
+  | { ok: true }
+  | {
+      ok: false;
+      reason:
+        | "login_required"
+        | "forbidden"
+        | "rate_limited"
+        | "network"
+        | "unavailable";
+    };
+
 export async function readClientBetaCapabilities() {
   const headers = await buildAuthHeaders();
 
@@ -40,7 +52,9 @@ export async function readClientBetaCapabilities() {
   }
 }
 
-export async function sendBetaFeedback(input: SendBetaFeedbackInput) {
+export async function sendBetaFeedback(
+  input: SendBetaFeedbackInput,
+): Promise<SendBetaFeedbackResult> {
   const headers = await buildAuthHeaders({ "Content-Type": "application/json" });
   const response = await fetch("/api/beta/feedback", {
     method: "POST",
@@ -53,13 +67,29 @@ export async function sendBetaFeedback(input: SendBetaFeedbackInput) {
       currentPath: typeof window !== "undefined" ? window.location.href : null,
       userAgent: typeof navigator !== "undefined" ? navigator.userAgent : null,
     }),
-  });
+  }).catch(() => null);
 
-  if (!response.ok) {
-    return false;
+  if (!response) {
+    return { ok: false, reason: "network" };
   }
 
-  return true;
+  if (response.ok) {
+    return { ok: true };
+  }
+
+  if (response.status === 401) {
+    return { ok: false, reason: "login_required" };
+  }
+
+  if (response.status === 403) {
+    return { ok: false, reason: "forbidden" };
+  }
+
+  if (response.status === 429) {
+    return { ok: false, reason: "rate_limited" };
+  }
+
+  return { ok: false, reason: "unavailable" };
 }
 
 async function buildAuthHeaders(init?: HeadersInit) {
@@ -67,11 +97,15 @@ async function buildAuthHeaders(init?: HeadersInit) {
   const supabase = createBrowserSupabaseClient();
 
   if (supabase) {
-    const { data } = await supabase.auth.getSession();
-    const accessToken = data.session?.access_token;
+    try {
+      const { data } = await supabase.auth.getSession();
+      const accessToken = data.session?.access_token;
 
-    if (accessToken) {
-      headers.set("Authorization", `Bearer ${accessToken}`);
+      if (accessToken) {
+        headers.set("Authorization", `Bearer ${accessToken}`);
+      }
+    } catch {
+      // The API will return 401 and the caller can show the login recovery path.
     }
   }
 

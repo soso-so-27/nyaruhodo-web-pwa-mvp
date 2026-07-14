@@ -58,6 +58,51 @@ test.describe("β supporter page", () => {
     await expect(page.getByText("2026年8月13日まで", { exact: false })).toBeVisible();
     await expect(page.getByRole("button", { name: "支払いを管理" })).toBeEnabled();
   });
+
+  test("returns an expired checkout session to the supporter page after login", async ({
+    page,
+  }) => {
+    await mockSupporterApis(page, {
+      billing: {
+        isLoggedIn: true,
+        billingConfigured: true,
+        isBetaSupporter: false,
+        status: "none",
+        currentPeriodEnd: null,
+        cancelAtPeriodEnd: false,
+        canManageBilling: false,
+      },
+      beta: {
+        isLoggedIn: true,
+        isBetaParticipant: true,
+        feedbackEnabled: true,
+        supporterVoiceEnabled: false,
+        isBetaSupporter: false,
+      },
+    });
+    await page.route("**/api/billing/create-checkout-session", async (route) => {
+      await route.fulfill({
+        status: 401,
+        contentType: "application/json",
+        body: JSON.stringify({ error: "login_required" }),
+      });
+    });
+
+    await page.goto("/beta-supporter");
+    await page.waitForLoadState("networkidle");
+    await page.getByRole("button", { name: "応援する" }).click();
+
+    await expect(page.getByTestId("auth-recovery-notice")).toBeVisible();
+    await expect(
+      page.getByRole("link", { name: "Googleでログインし直す" }),
+    ).toHaveAttribute(
+      "href",
+      "/account/create?returnTo=%2Fbeta-supporter",
+    );
+    await expect(
+      page.getByText("保存済みの写真と記録は、そのまま残ります。"),
+    ).toBeVisible();
+  });
 });
 
 async function mockSupporterApis(

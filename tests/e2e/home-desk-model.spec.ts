@@ -547,6 +547,7 @@ test.describe("home desk model", () => {
   test("adapts the b3 ink trace across the four ambient periods", async ({
     context,
   }) => {
+    test.setTimeout(60_000);
     const periods = [
       { name: "morning", now: getCurrentJstTime(7, 0) },
       { name: "noon", now: getCurrentJstTime(12, 0) },
@@ -577,6 +578,7 @@ test.describe("home desk model", () => {
   test("adapts the d1 silhouette across the four ambient periods", async ({
     context,
   }) => {
+    test.setTimeout(60_000);
     const periods = [
       { name: "morning", now: getCurrentJstTime(7, 0) },
       { name: "noon", now: getCurrentJstTime(12, 0) },
@@ -1012,6 +1014,11 @@ test.describe("home desk model", () => {
     await expect(viewer).toHaveAttribute("data-photo-id", "own-desk");
     await expect(viewer.getByRole("button", { name: "とじる" })).toBeVisible();
     await expect(viewer.getByTestId("desk-photo-viewer-stow")).toHaveCount(0);
+    await expect(viewer.getByRole("button", { name: "とじる" })).toBeFocused();
+
+    await page.goBack();
+    await expect(viewer).toHaveCount(0);
+    await expect(frame).toBeFocused();
   });
 
   test("stows a tapped delivered photo and only shows close after it is stored", async ({

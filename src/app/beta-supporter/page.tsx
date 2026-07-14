@@ -13,7 +13,9 @@ import {
   type ClientBetaCapabilities,
 } from "../../lib/betaClient";
 import { AppButton } from "../../components/ui/AppButton";
+import { AuthRecoveryNotice } from "../../components/ui/AuthRecoveryNotice";
 import { color, radius, spacing } from "../../components/ui/designTokens";
+import { buildLoginRecoveryHref } from "../../lib/auth/sessionRecovery";
 
 const openingParagraphs = [
   "ねてるねこは、猫の写真がたくさん流れていく場所ではなく、猫をもっと大切に見られる場所でありたいと思っています。",
@@ -103,6 +105,7 @@ export default function BetaSupporterPage() {
     isBetaSupporter: false,
   });
   const [message, setMessage] = useState("");
+  const [needsAuthRecovery, setNeedsAuthRecovery] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [isStatusLoading, setIsStatusLoading] = useState(true);
 
@@ -138,14 +141,20 @@ export default function BetaSupporterPage() {
 
     setIsLoading(true);
     setMessage("");
+    setNeedsAuthRecovery(false);
 
-    const url = await startBetaSupporterCheckout();
-    if (url) {
-      window.location.href = url;
+    const result = await startBetaSupporterCheckout();
+    if (result.ok) {
+      window.location.href = result.url;
       return;
     }
 
-    setMessage("支払いページを開けませんでした。少し時間をおいて、もう一度お試しください。");
+    if (result.reason === "login_required") {
+      setMessage("ログインの有効期限が切れたため、支払いページを開けませんでした。");
+      setNeedsAuthRecovery(true);
+    } else {
+      setMessage("支払いページを開けませんでした。通信を確認して、もう一度お試しください。");
+    }
     setIsLoading(false);
   }
 
@@ -156,14 +165,20 @@ export default function BetaSupporterPage() {
 
     setIsLoading(true);
     setMessage("");
+    setNeedsAuthRecovery(false);
 
-    const url = await openBillingPortal();
-    if (url) {
-      window.location.href = url;
+    const result = await openBillingPortal();
+    if (result.ok) {
+      window.location.href = result.url;
       return;
     }
 
-    setMessage("支払い管理を開けませんでした。");
+    if (result.reason === "login_required") {
+      setMessage("ログインの有効期限が切れたため、支払い管理を開けませんでした。");
+      setNeedsAuthRecovery(true);
+    } else {
+      setMessage("支払い管理を開けませんでした。通信を確認して、もう一度お試しください。");
+    }
     setIsLoading(false);
   }
 
@@ -340,7 +355,11 @@ export default function BetaSupporterPage() {
               <p style={styles.note}>
                 Googleでログイン後、β参加対象のアカウントから応援できます。
               </p>
-              <AppButton href="/account/create" variant="secondary" fullWidth>
+              <AppButton
+                href={buildLoginRecoveryHref("/beta-supporter")}
+                variant="secondary"
+                fullWidth
+              >
                 Googleでログイン
               </AppButton>
             </>
@@ -357,7 +376,10 @@ export default function BetaSupporterPage() {
               解約後もその期間の末日まで有効です。保存した写真や、とどいたねこだよりは失われません。
             </p>
           </div>
-          {message ? <p style={styles.message}>{message}</p> : null}
+          {message ? <p style={styles.message} role="status">{message}</p> : null}
+          {needsAuthRecovery ? (
+            <AuthRecoveryNotice returnTo="/beta-supporter" />
+          ) : null}
         </section>
 
         <nav style={styles.legalLinks} aria-label="法務リンク">

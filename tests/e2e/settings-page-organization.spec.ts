@@ -123,12 +123,72 @@ test.describe("settings page organization", () => {
         usedSourcePhotoIds: [],
       });
   });
+
+  test("turns a partial storage check failure into an actionable retry state", async ({
+    page,
+  }) => {
+    await seedLoggedInSession(page);
+    await mockSettingsApis(page, {
+      referral: loggedInReferralSummary(),
+      restFailure: true,
+    });
+
+    await page.goto("/settings");
+    await page.waitForLoadState("networkidle");
+
+    await expect(
+      page.getByText("一部の保存状態を確認できませんでした。", {
+        exact: false,
+      }),
+    ).toBeVisible();
+    await expect(page.getByRole("button", { name: "もう一度確認する" })).toBeVisible();
+    await expect(page.getByText("保存状態を確認中です。")).toHaveCount(0);
+  });
+
+  test("recovers an expired feedback session without losing the draft", async ({
+    page,
+  }) => {
+    await seedLoggedInSession(page);
+    await mockSettingsApis(page, {
+      referral: loggedInReferralSummary(),
+      beta: {
+        isLoggedIn: true,
+        isBetaParticipant: true,
+        feedbackEnabled: true,
+        supporterVoiceEnabled: false,
+        isBetaSupporter: false,
+      },
+    });
+    await page.route("**/api/beta/feedback", async (route) => {
+      await route.fulfill({
+        status: 401,
+        contentType: "application/json",
+        body: JSON.stringify({ error: "login_required" }),
+      });
+    });
+
+    await page.goto("/settings");
+    await page.waitForLoadState("networkidle");
+    await page.getByRole("button", { name: "改善メモを書く" }).click();
+    await page.getByLabel("本文").fill("送信前の内容を残してほしいです");
+    await page.getByRole("button", { name: "送る", exact: true }).click();
+
+    await expect(page.getByTestId("auth-recovery-notice")).toBeVisible();
+    await expect(page.getByLabel("本文")).toHaveValue(
+      "送信前の内容を残してほしいです",
+    );
+    await expect(
+      page.getByRole("link", { name: "Googleでログインし直す" }),
+    ).toHaveAttribute("href", "/account/create?returnTo=%2Fsettings");
+  });
 });
 
 async function mockSettingsApis(
   page: Page,
   {
     referral,
+    beta,
+    restFailure = false,
   }: {
     referral?: {
       isLoggedIn: boolean;
@@ -137,8 +197,18 @@ async function mockSettingsApis(
       shareUrl: string | null;
       acceptedCount: number;
     };
+    beta?: {
+      isLoggedIn: boolean;
+      isBetaParticipant: boolean;
+      feedbackEnabled: boolean;
+      supporterVoiceEnabled: boolean;
+      isBetaSupporter: boolean;
+    };
+    restFailure?: boolean;
   } = {},
 ) {
+  const isLoggedIn = Boolean(referral?.isLoggedIn || beta?.isLoggedIn);
+
   await page.route("**/api/admin/capabilities", async (route) => {
     await route.fulfill({
       contentType: "application/json",
@@ -153,11 +223,12 @@ async function mockSettingsApis(
     await route.fulfill({
       contentType: "application/json",
       body: JSON.stringify({
-        isLoggedIn: Boolean(referral?.isLoggedIn),
+        isLoggedIn,
         isBetaParticipant: false,
         feedbackEnabled: false,
         supporterVoiceEnabled: false,
         isBetaSupporter: false,
+        ...beta,
       }),
     });
   });
@@ -165,7 +236,7 @@ async function mockSettingsApis(
     await route.fulfill({
       contentType: "application/json",
       body: JSON.stringify({
-        isLoggedIn: Boolean(referral?.isLoggedIn),
+        isLoggedIn,
         billingConfigured: false,
         isBetaSupporter: false,
         status: "none",
@@ -194,7 +265,7 @@ async function mockSettingsApis(
     });
   });
   await page.route("**/auth/v1/user", async (route) => {
-    if (!referral?.isLoggedIn) {
+    if (!isLoggedIn) {
       await route.fulfill({
         status: 401,
         contentType: "application/json",
@@ -214,6 +285,15 @@ async function mockSettingsApis(
     });
   });
   await page.route("**/rest/v1/**", async (route) => {
+    if (restFailure) {
+      await route.fulfill({
+        status: 503,
+        contentType: "application/json",
+        body: JSON.stringify({ message: "storage check unavailable" }),
+      });
+      return;
+    }
+
     await route.fulfill({
       status: 200,
       headers: {

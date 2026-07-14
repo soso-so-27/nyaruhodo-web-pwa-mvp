@@ -10,6 +10,7 @@ import {
 } from "../../lib/billingClient";
 import { APP_PAGE_BACKGROUND } from "../ui/appTheme";
 import { AppButton } from "../ui/AppButton";
+import { AuthRecoveryNotice } from "../ui/AuthRecoveryNotice";
 
 type LegalSection = {
   title: string;
@@ -404,6 +405,8 @@ export function AccountDeletionPage() {
     useState<ClientBillingStatus>(defaultBillingStatus);
   const [isLoadingBilling, setIsLoadingBilling] = useState(true);
   const [isOpeningPortal, setIsOpeningPortal] = useState(false);
+  const [portalMessage, setPortalMessage] = useState("");
+  const [portalNeedsAuthRecovery, setPortalNeedsAuthRecovery] = useState(false);
   const [confirmText, setConfirmText] = useState("");
   const [deleteState, setDeleteState] = useState<
     "idle" | "deleting" | "completed" | "error"
@@ -448,13 +451,21 @@ export function AccountDeletionPage() {
     }
 
     setIsOpeningPortal(true);
-    const url = await openBillingPortal();
+    setPortalMessage("");
+    setPortalNeedsAuthRecovery(false);
+    const result = await openBillingPortal();
 
-    if (url) {
-      window.location.href = url;
+    if (result.ok) {
+      window.location.href = result.url;
       return;
     }
 
+    if (result.reason === "login_required") {
+      setPortalMessage("ログインの有効期限が切れたため、支払い管理を開けませんでした。");
+      setPortalNeedsAuthRecovery(true);
+    } else {
+      setPortalMessage("支払い管理を開けませんでした。通信を確認して、もう一度お試しください。");
+    }
     setIsOpeningPortal(false);
   }
 
@@ -515,6 +526,12 @@ export function AccountDeletionPage() {
           >
             支払いの管理
           </AppButton>
+          {portalMessage ? (
+            <p role="status" style={styles.errorText}>{portalMessage}</p>
+          ) : null}
+          {portalNeedsAuthRecovery ? (
+            <AuthRecoveryNotice returnTo="/account-deletion" />
+          ) : null}
         </section>
       ) : null}
 

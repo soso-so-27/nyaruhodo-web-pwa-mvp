@@ -30,6 +30,7 @@ import { AppSheet } from "../ui/AppBottomSheet";
 import { AppIcon } from "../ui/AppIcons";
 import { PhotoViewerFrame } from "../ui/PhotoTile";
 import { StoredPhotoImage } from "../ui/StoredPhotoImage";
+import { useModalBehavior } from "../ui/useModalBehavior";
 import { HomeEnvelopeMotionArt } from "./HomeEnvelopeMotionArt";
 import {
   HOME_ENVELOPE_OPEN_MS,
@@ -1232,30 +1233,38 @@ function DeskPhotoViewer({
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [isReportSheetOpen, setIsReportSheetOpen] = useState(false);
   const isOwnPhoto = viewerPhoto.kind === "own";
+  const viewerLabel = isOwnPhoto ? "うちのこの写真" : "どこかのこの写真";
+  const { modalRef, handleModalKeyDown, requestModalClose } =
+    useModalBehavior<HTMLDivElement>({
+      open: true,
+      onClose,
+      manageHistory: true,
+    });
 
   function handleStow() {
     onSave();
-    onClose();
+    requestModalClose();
   }
 
   return (
     <div
+      ref={modalRef}
       data-testid="desk-photo-viewer"
       data-photo-kind={viewerPhoto.kind}
       data-photo-id={viewerPhoto.photo.id}
       style={deskStyles.viewerBackdrop}
-      onClick={onClose}
+      role="dialog"
+      aria-modal="true"
+      aria-label={viewerLabel}
+      tabIndex={-1}
+      onKeyDown={handleModalKeyDown}
+      onClick={requestModalClose}
     >
       <section
         style={{
           ...deskStyles.viewerPanel,
           ...(isOwnPhoto ? deskStyles.viewerPanelOwn : {}),
         }}
-        aria-label={
-          viewerPhoto.kind === "other"
-            ? "どこかのこの写真"
-            : "うちのこの写真"
-        }
         onClick={(event) => event.stopPropagation()}
       >
         {isOwnPhoto ? (
@@ -1265,7 +1274,7 @@ function DeskPhotoViewer({
               variant="quiet"
               size="sm"
               style={deskStyles.viewerOwnCloseButton}
-              onClick={onClose}
+              onClick={requestModalClose}
               aria-label="とじる"
             >
               とじる
@@ -1282,7 +1291,7 @@ function DeskPhotoViewer({
             variant="quiet"
             size="sm"
             style={deskStyles.viewerCloseButton}
-            onClick={onClose}
+            onClick={requestModalClose}
             aria-label="とじる"
           >
             とじる

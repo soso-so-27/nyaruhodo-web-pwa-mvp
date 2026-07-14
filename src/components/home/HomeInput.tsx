@@ -123,6 +123,7 @@ import {
   getStoragePhotoSignedUrl,
   StoredPhotoImage,
 } from "../ui/StoredPhotoImage";
+import { useModalBehavior } from "../ui/useModalBehavior";
 
 type HomeInputProps = {
   initialNow: number;
@@ -2616,7 +2617,15 @@ function HomeMorphSheet({
   onClose: () => void;
   children: ReactNode;
 }) {
-  const panelRef = useRef<HTMLElement | null>(null);
+  const {
+    modalRef: panelRef,
+    handleModalKeyDown,
+    requestModalClose,
+  } = useModalBehavior<HTMLElement>({
+    open: true,
+    onClose,
+    manageHistory: true,
+  });
   const openTimerRef = useRef<number | null>(null);
   const [isContentReady, setIsContentReady] = useState(false);
   const [motionStyle, setMotionStyle] = useState<CSSProperties>(() => ({
@@ -2707,7 +2716,8 @@ function HomeMorphSheet({
           ...styles.morphBackdrop,
           ...(isReturning ? styles.morphBackdropReturning : {}),
         }}
-        onClick={onClose}
+        onClick={requestModalClose}
+        aria-hidden="true"
       />
       <section
         ref={panelRef}
@@ -2717,6 +2727,9 @@ function HomeMorphSheet({
         }}
         role="dialog"
         aria-modal="true"
+        aria-label={title}
+        tabIndex={-1}
+        onKeyDown={handleModalKeyDown}
       >
         <span style={styles.morphBloom} aria-hidden="true" />
         {source ? (

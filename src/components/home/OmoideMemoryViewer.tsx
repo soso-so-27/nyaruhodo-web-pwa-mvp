@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState, type CSSProperties } from "react";
+import { useState, type CSSProperties } from "react";
 
 import type { OmoideMemory } from "../../lib/home/omoideDelivery";
 import {
@@ -9,6 +9,7 @@ import {
   resolvePhotoStorageVariant,
 } from "../../lib/photoSources";
 import { StoredPhotoImage } from "../ui/StoredPhotoImage";
+import { useModalBehavior } from "../ui/useModalBehavior";
 
 export function OmoideMemoryViewer({
   memory,
@@ -20,53 +21,12 @@ export function OmoideMemoryViewer({
   onStow: () => void;
 }) {
   const [photoAspect, setPhotoAspect] = useState(1);
-  const pushedHistoryRef = useRef(false);
-  const ignoreNextPopRef = useRef(false);
-  const requestStowRef = useRef<(syncHistory?: boolean) => void>(() => undefined);
-
-  function requestStow(syncHistory = true) {
-    if (syncHistory && pushedHistoryRef.current) {
-      ignoreNextPopRef.current = true;
-      pushedHistoryRef.current = false;
-      window.history.back();
-    }
-    onStow();
-  }
-  requestStowRef.current = requestStow;
-
-  useEffect(() => {
-    const previousOverflow = document.body.style.overflow;
-    document.body.style.overflow = "hidden";
-    window.history.pushState(
-      { neterunekoOmoideViewer: true },
-      "",
-      window.location.href,
-    );
-    pushedHistoryRef.current = true;
-
-    function handlePopState() {
-      if (ignoreNextPopRef.current) {
-        ignoreNextPopRef.current = false;
-        return;
-      }
-      pushedHistoryRef.current = false;
-      requestStowRef.current(false);
-    }
-
-    function handleKeyDown(event: KeyboardEvent) {
-      if (event.key === "Escape") {
-        requestStowRef.current();
-      }
-    }
-
-    window.addEventListener("popstate", handlePopState);
-    window.addEventListener("keydown", handleKeyDown);
-    return () => {
-      document.body.style.overflow = previousOverflow;
-      window.removeEventListener("popstate", handlePopState);
-      window.removeEventListener("keydown", handleKeyDown);
-    };
-  }, []);
+  const { modalRef, handleModalKeyDown, requestModalClose } =
+    useModalBehavior<HTMLElement>({
+      open: true,
+      onClose: onStow,
+      manageHistory: true,
+    });
 
   const photoWidth =
     photoAspect < 1
@@ -77,11 +37,16 @@ export function OmoideMemoryViewer({
     <div
       data-testid="omoide-memory-viewer"
       style={viewerStyles.backdrop}
-      onClick={() => requestStow()}
+      onClick={requestModalClose}
     >
       <section
+        ref={modalRef}
         style={viewerStyles.stage}
+        role="dialog"
+        aria-modal="true"
         aria-label={memory.title}
+        tabIndex={-1}
+        onKeyDown={handleModalKeyDown}
         onClick={(event) => event.stopPropagation()}
       >
         <h2 style={viewerStyles.title}>{memory.title}</h2>
@@ -116,7 +81,7 @@ export function OmoideMemoryViewer({
           type="button"
           data-testid="omoide-memory-stow"
           style={viewerStyles.stowButton}
-          onClick={() => requestStow()}
+          onClick={requestModalClose}
         >
           思い出箱に もどる
         </button>

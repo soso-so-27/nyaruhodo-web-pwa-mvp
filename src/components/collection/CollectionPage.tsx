@@ -2547,7 +2547,15 @@ function MainichiDaySheet({
   onClose: () => void;
   onOpenPhoto: (photo: MainichiDayPhoto) => void;
 }) {
-  const panelRef = useRef<HTMLElement | null>(null);
+  const {
+    modalRef: panelRef,
+    handleModalKeyDown,
+    requestModalClose,
+  } = useModalBehavior<HTMLElement>({
+    open: true,
+    onClose: handleClose,
+    manageHistory: true,
+  });
   const prefersReducedMotion = usePrefersReducedMotion();
   const closeTimerRef = useRef<number | null>(null);
   const [isClosing, setIsClosing] = useState(false);
@@ -2611,6 +2619,10 @@ function MainichiDaySheet({
   );
 
   function handleClose() {
+    if (isClosing) {
+      return;
+    }
+
     if (prefersReducedMotion || !source) {
       onClose();
       return;
@@ -2634,7 +2646,7 @@ function MainichiDaySheet({
           ...styles.mainichiDayBackdrop,
           ...(isClosing ? styles.mainichiDayBackdropClosing : null),
         }}
-        onClick={handleClose}
+        onClick={requestModalClose}
         aria-hidden="true"
       />
       <section
@@ -2646,6 +2658,8 @@ function MainichiDaySheet({
         role="dialog"
         aria-modal="true"
         aria-label={`${group.label} その日`}
+        tabIndex={-1}
+        onKeyDown={handleModalKeyDown}
         data-testid="mainichi-day-sheet"
       >
         <div style={styles.mainichiDayHeader}>
@@ -2659,9 +2673,9 @@ function MainichiDaySheet({
             size="icon"
             iconOnly
             aria-label="閉じる"
-            onClick={handleClose}
+            onClick={requestModalClose}
           >
-            ×
+            <AppIcon name="close" size={18} />
           </AppButton>
         </div>
         {photos.length > 0 ? (
@@ -2751,10 +2765,12 @@ function MainichiFullscreenPhoto({
   const [pendingAction, setPendingAction] = useState<
     "delete" | "hide" | "report" | null
   >(null);
-  const { modalRef, handleModalKeyDown } = useModalBehavior<HTMLDivElement>({
-    open: true,
-    onClose,
-  });
+  const { modalRef, handleModalKeyDown, requestModalClose } =
+    useModalBehavior<HTMLDivElement>({
+      open: true,
+      onClose,
+      manageHistory: true,
+    });
   const touchStartXRef = useRef<number | null>(null);
   const canNavigate = photoCount > 1;
   const deliveryActionLabel = photo.shared
@@ -2878,7 +2894,7 @@ function MainichiFullscreenPhoto({
           size="icon"
           iconOnly
           aria-label="閉じる"
-          onClick={onClose}
+          onClick={requestModalClose}
         >
           <AppIcon name="close" size={18} />
         </AppButton>

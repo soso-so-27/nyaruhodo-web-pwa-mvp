@@ -1,6 +1,5 @@
 import type { CSSProperties } from "react";
 import { AppButton } from "../components/ui/AppButton";
-import { AppCard } from "../components/ui/AppCard";
 import { WordmarkHeader } from "../components/ui/AppHeader";
 import { EmptyState } from "../components/ui/EmptyState";
 import { color, spacing, typography } from "../components/ui/designTokens";
@@ -9,17 +8,19 @@ export default function NotFound() {
   return (
     <main style={styles.page}>
       <WordmarkHeader />
-      <AppCard variant="outlined" padding="xl" style={styles.card}>
+      <section style={styles.panel} aria-label="ページが見つかりません">
+        <p style={styles.kicker}>ページが見つかりません</p>
         <EmptyState
-          title="ここには、まだねこがいません"
-          description="ページが見つかりませんでした。ねてるねこへ戻れます。"
+          title="このページは見つかりませんでした"
+          description="URLが変わったか、ページがなくなった可能性があります。保存済みの写真や記録には影響ありません。"
           action={
             <AppButton href="/home" variant="primary" size="md">
-              ねてるねこへ
+              ホームへ戻る
             </AppButton>
           }
+          style={styles.emptyState}
         />
-      </AppCard>
+      </section>
     </main>
   );
 }
@@ -33,8 +34,21 @@ const styles = {
     fontFamily: typography.fontSans,
     color: color.text,
   },
-  card: {
-    width: "min(100%, 520px)",
-    margin: "clamp(96px, 20vh, 176px) auto 0",
+  panel: {
+    width: "min(100%, 420px)",
+    margin: "clamp(88px, 18vh, 156px) auto 0",
+    display: "grid",
+    justifyItems: "center",
+    gap: spacing.md,
+  },
+  kicker: {
+    margin: 0,
+    color: color.textFaint,
+    fontSize: typography.caption.fontSize,
+    fontWeight: 400,
+    lineHeight: 1.5,
+  },
+  emptyState: {
+    gap: spacing.md,
   },
 } satisfies Record<string, CSSProperties>;

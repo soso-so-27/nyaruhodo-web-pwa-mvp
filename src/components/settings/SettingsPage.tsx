@@ -12,6 +12,7 @@ import {
   type ClientAdminCapabilities,
 } from "../../lib/adminCapabilitiesClient";
 import { trackProductEvent } from "../../lib/analytics/productAnalytics";
+import { hasAuthSessionError } from "../../lib/auth/sessionRecovery";
 import { purgeAllPhotoSwCache } from "../../lib/photoSwCache";
 import { resizeImageFileToDataUrl } from "../../lib/imageResize";
 import {
@@ -44,6 +45,7 @@ import {
 } from "../ui/appTheme";
 import { AppButton } from "../ui/AppButton";
 import { AppCard } from "../ui/AppCard";
+import { AuthRecoveryNotice } from "../ui/AuthRecoveryNotice";
 import { AppTextField } from "../ui/AppTextField";
 import { PhotoTile } from "../ui/PhotoTile";
 import {
@@ -109,6 +111,10 @@ export function SettingsPage() {
     result: AccountSyncResult;
   } | null>(null);
   const [syncOverview, setSyncOverview] = useState<AccountSyncOverview | null>(null);
+  const [syncOverviewState, setSyncOverviewState] = useState<
+    "loading" | "ready" | "error"
+  >("loading");
+  const [syncNeedsAuthRecovery, setSyncNeedsAuthRecovery] = useState(false);
   const [authDebug, setAuthDebug] = useState<AuthDebugSnapshot | null>(null);
   const [displayEnvironment, setDisplayEnvironment] =
     useState<DisplayEnvironment>("unknown");
@@ -151,6 +157,7 @@ export function SettingsPage() {
   const [feedbackMessage, setFeedbackMessage] = useState("");
   const [feedbackStatus, setFeedbackStatus] = useState("");
   const [isFeedbackSending, setIsFeedbackSending] = useState(false);
+  const [feedbackNeedsAuthRecovery, setFeedbackNeedsAuthRecovery] = useState(false);
   const [billingStatus, setBillingStatus] = useState<ClientBillingStatus>({
     isLoggedIn: false,
     billingConfigured: false,
@@ -232,11 +239,23 @@ export function SettingsPage() {
   }
 
   async function refreshSyncOverview() {
+    setSyncOverviewState("loading");
+    setSyncNeedsAuthRecovery(false);
     try {
       const overview = await getAccountSyncOverview();
       setSyncOverview(overview.isLoggedIn ? overview : null);
-    } catch {
+      setSyncOverviewState(
+        overview.isLoggedIn && overview.errors.length === 0 ? "ready" : "error",
+      );
+      if (hasAuthSessionError(overview.errors)) {
+        setSyncNeedsAuthRecovery(true);
+      }
+    } catch (error) {
       setSyncOverview(null);
+      setSyncOverviewState("error");
+      if (hasAuthSessionError([error])) {
+        setSyncNeedsAuthRecovery(true);
+      }
     }
   }
 
@@ -352,6 +371,8 @@ export function SettingsPage() {
     });
 
     const result = await mergeAccountDataWithAccount();
+    const needsAuthRecovery = hasAuthSessionError(result.errors);
+    setSyncNeedsAuthRecovery(needsAuthRecovery);
 
     if (trigger === "manual" || result.status === "error") {
       setSyncMessage(getSyncResultMessage(result));
@@ -591,7 +612,7 @@ export function SettingsPage() {
     setIsFeedbackSending(true);
     setFeedbackStatus("");
 
-    const ok = await sendBetaFeedback({
+    const result = await sendBetaFeedback({
       category: feedbackCategory,
       message,
       kind: betaCapabilities.supporterVoiceEnabled
@@ -599,11 +620,17 @@ export function SettingsPage() {
         : "beta_feedback",
     });
 
-    if (ok) {
+    if (result.ok) {
       setFeedbackMessage("");
       setFeedbackStatus("届きました。\nβに参加してくれてありがとう。");
+      setFeedbackNeedsAuthRecovery(false);
+    } else if (result.reason === "login_required") {
+      setFeedbackStatus("ログインを確認してから、もう一度送ってください。");
+      setFeedbackNeedsAuthRecovery(true);
+    } else if (result.reason === "rate_limited") {
+      setFeedbackStatus("続けて送信されています。少し時間をおいて、もう一度お試しください。");
     } else {
-      setFeedbackStatus("送信できませんでした。ログイン状態を確認してください。");
+      setFeedbackStatus("送信できませんでした。通信を確認して、もう一度お試しください。");
     }
 
     setIsFeedbackSending(false);
@@ -730,9 +757,42 @@ export function SettingsPage() {
           <AppCard variant="outlined" padding="sm" style={styles.card}>
             {syncOverview ? (
               <SyncStatusPanel overview={syncOverview} />
-            ) : (
+            ) : syncOverviewState === "loading" ? (
               <p style={styles.storageNote}>保存状態を確認中です。</p>
+            ) : (
+              <div style={styles.inlineRecovery} role="status">
+                <p style={styles.storageNote}>
+                  保存状態を確認できませんでした。写真と記録は、この端末に残っています。
+                </p>
+                <AppButton
+                  type="button"
+                  variant="quiet"
+                  size="sm"
+                  onClick={() => {
+                    void refreshSyncOverview();
+                  }}
+                >
+                  もう一度確認する
+                </AppButton>
+              </div>
             )}
+            {syncOverviewState === "error" && syncOverview ? (
+              <div style={styles.inlineRecovery} role="status">
+                <p style={styles.storageNote}>
+                  一部の保存状態を確認できませんでした。表示中の件数は変わる場合があります。
+                </p>
+                <AppButton
+                  type="button"
+                  variant="quiet"
+                  size="sm"
+                  onClick={() => {
+                    void refreshSyncOverview();
+                  }}
+                >
+                  もう一度確認する
+                </AppButton>
+              </div>
+            ) : null}
             <div style={styles.actionStack}>
               <AppButton
                 type="button"
@@ -752,6 +812,9 @@ export function SettingsPage() {
               <p style={styles.syncMessage} role="status">{syncMessage}</p>
             ) : null}
             {lastSyncResult ? <SyncResultDetails result={lastSyncResult.result} /> : null}
+            {syncNeedsAuthRecovery ? (
+              <AuthRecoveryNotice returnTo="/settings" />
+            ) : null}
             <details style={styles.disclosure}>
               <summary style={styles.disclosureSummary}>写真が見えないとき</summary>
               <p style={styles.storageNote}>
@@ -884,6 +947,7 @@ export function SettingsPage() {
                   onClick={() => {
                     setIsFeedbackOpen((open) => !open);
                     setFeedbackStatus("");
+                    setFeedbackNeedsAuthRecovery(false);
                   }}
                 >
                   改善メモを書く
@@ -898,6 +962,9 @@ export function SettingsPage() {
                     onMessageChange={setFeedbackMessage}
                     onSubmit={handleFeedbackSubmit}
                   />
+                ) : null}
+                {feedbackNeedsAuthRecovery ? (
+                  <AuthRecoveryNotice returnTo="/settings" />
                 ) : null}
                 <div style={styles.divider} />
               </>
@@ -2299,6 +2366,12 @@ const styles = {
     fontSize: "12px",
     fontWeight: 500,
     lineHeight: 1.7,
+  },
+  inlineRecovery: {
+    display: "grid",
+    justifyItems: "start",
+    gap: "2px",
+    paddingBottom: "10px",
   },
   disclosure: {
     padding: "8px 0",

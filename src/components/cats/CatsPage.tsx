@@ -70,6 +70,7 @@ import { BottomNavigation } from "../navigation/BottomNavigation";
 import { AppButton } from "../ui/AppButton";
 import { AppBottomSheet } from "../ui/AppBottomSheet";
 import { AppCard } from "../ui/AppCard";
+import { AppIcon } from "../ui/AppIcons";
 import { AppSegmented } from "../ui/AppSegmented";
 import { AppTextField } from "../ui/AppTextField";
 import { PhotoTile } from "../ui/PhotoTile";
@@ -80,6 +81,7 @@ import {
   preloadStoragePhotoSignedUrls,
 } from "../ui/StoredPhotoImage";
 import { OmoideMemoryViewer } from "../home/OmoideMemoryViewer";
+import { useModalBehavior } from "../ui/useModalBehavior";
 import {
   addCatProfile,
   type CatCoverCrop,
@@ -3702,6 +3704,13 @@ function CoverCropSheet({
 }) {
   const cropRef = useRef(crop);
   const previewRef = useRef<HTMLDivElement | null>(null);
+  const { modalRef, handleModalKeyDown, requestModalClose } =
+    useModalBehavior<HTMLDivElement>({
+      open: true,
+      onClose: onBack,
+      lockScroll: false,
+      manageHistory: true,
+    });
   const didInitializeFitRef = useRef(!initializeToFit);
   const activePointersRef = useRef(new Map<number, { x: number; y: number }>());
   const gestureStartRef = useRef<{
@@ -3901,18 +3910,21 @@ function CoverCropSheet({
 
   return (
     <div
+      ref={modalRef}
       role="dialog"
       aria-modal="true"
       aria-label={"\u30ab\u30d0\u30fc\u5199\u771f\u3092\u5408\u308f\u305b\u308b"}
       data-testid="cover-crop-sheet"
       style={styles.thumbnailCropOverlay}
+      tabIndex={-1}
+      onKeyDown={handleModalKeyDown}
     >
       <div style={styles.thumbnailCropHeader}>
         <button
           type="button"
           data-testid="cover-crop-back"
           style={styles.thumbnailCropHeaderButton}
-          onClick={onBack}
+          onClick={requestModalClose}
         >
           {"\u3082\u3069\u308b"}
         </button>
@@ -4020,22 +4032,32 @@ function PhotoFullscreenViewer({
   onRequestDelete?: () => void;
   onClose: () => void;
 }) {
+  const { modalRef, handleModalKeyDown, requestModalClose } =
+    useModalBehavior<HTMLDivElement>({
+      open: true,
+      onClose,
+      manageHistory: true,
+    });
+
   return (
     <div
+      ref={modalRef}
       role="dialog"
       aria-modal="true"
       aria-label={photo.title}
       style={styles.photoViewerOverlay}
-      onClick={onClose}
+      tabIndex={-1}
+      onKeyDown={handleModalKeyDown}
+      onClick={requestModalClose}
     >
       <div style={styles.photoViewerChrome} onClick={(event) => event.stopPropagation()}>
         <button
           type="button"
           style={styles.photoViewerCloseButton}
-          onClick={onClose}
+          onClick={requestModalClose}
           aria-label="写真を閉じる"
         >
-          ×
+          <AppIcon name="close" size={18} />
         </button>
         <div style={styles.photoViewerImageFrame}>
           <StoredPhotoImage

@@ -347,7 +347,11 @@ test("keeps the previous cover photo when crop is cancelled", async ({ page }) =
   await page.getByTestId("cats-cover-photo-button").click();
   await page.getByTestId("cover-photo-picker-photo").first().click();
   await expect(page.getByTestId("cover-crop-sheet")).toBeVisible();
-  await page.getByTestId("cover-crop-back").click();
+  await expect(page.getByTestId("cover-crop-back")).toBeFocused();
+  await page.goBack();
+
+  await expect(page.getByTestId("cover-crop-sheet")).toHaveCount(0);
+  await expect(page.getByTestId("cover-photo-picker-photo").first()).toBeVisible();
 
   await expect
     .poll(() =>
@@ -950,7 +954,9 @@ test("opens an omoide as a full paper view without cropping the photo", async ({
   const frame = page.getByTestId("omoide-memory-photo-frame");
   const stowButton = page.getByTestId("omoide-memory-stow");
   await expect(viewer).toBeVisible();
+  await expect(viewer.getByRole("dialog")).toBeVisible();
   await expect(stowButton).toHaveText("思い出箱に もどる");
+  await expect(stowButton).toBeFocused();
   await expect
     .poll(async () => {
       const box = await frame.boundingBox();

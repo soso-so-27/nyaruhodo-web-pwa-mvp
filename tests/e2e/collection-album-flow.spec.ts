@@ -1544,6 +1544,12 @@ test.describe("collection album flow", () => {
 
     await deliveredPhotoButton.click();
     await expect(photoViewer).toBeVisible();
+    await page.goBack();
+    await expect(photoViewer).toHaveCount(0);
+    await expect(deliveredPhotoButton).toBeFocused();
+
+    await deliveredPhotoButton.click();
+    await expect(photoViewer).toBeVisible();
     await disableNextDevToolsPointerEvents(page);
     const removeButton = page.getByRole("button", { name: "ねこだよりから外す" });
     await removeButton.click();
