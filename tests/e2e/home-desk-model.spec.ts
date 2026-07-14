@@ -1105,6 +1105,10 @@ test.describe("home desk model", () => {
     await page.mouse.click(12, 12);
     await expect(page.getByTestId("omoide-memory-viewer")).toHaveCount(0);
 
+    await page.reload();
+    await page.waitForLoadState("networkidle");
+    await expect(page.getByTestId("cats-nav-unopened-omoide-dot")).toHaveCount(0);
+
     await page.goto("/cats#omoide");
     await page.waitForLoadState("networkidle");
     const bunbako = page.getByTestId("omoide-bunbako");

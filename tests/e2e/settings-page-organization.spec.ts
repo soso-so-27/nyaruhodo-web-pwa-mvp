@@ -23,7 +23,7 @@ test.describe("settings page organization", () => {
     await expect(hiddenNote).toBeVisible();
   });
 
-  test("keeps unavailable feedback hidden and destructive account actions last", async ({
+  test("explains the feedback login requirement and keeps destructive actions last", async ({
     page,
   }) => {
     await mockSettingsApis(page);
@@ -32,6 +32,9 @@ test.describe("settings page organization", () => {
     await page.waitForLoadState("networkidle");
 
     await expect(page.getByText("改善メモを送る")).toHaveCount(0);
+    await expect(
+      page.getByText("改善メモは、ログインすると送れます。"),
+    ).toBeVisible();
     await expect(page.getByRole("link", { name: "ログインして参加する" })).toHaveCount(0);
     await expect(page.getByRole("link", { name: "解約方法" })).toHaveCount(0);
     await expect(page.getByRole("link", { name: "データの削除・退会" })).toBeVisible();
@@ -84,6 +87,27 @@ test.describe("settings page organization", () => {
     await expect(page.getByText("2YYMRWG2")).toHaveCount(0);
     await expect(page.getByRole("button", { name: "共有する" })).toBeVisible();
     await expect(page.getByRole("button", { name: "リンクをコピー" })).toBeVisible();
+  });
+
+  test("shows improvement notes to logged-in users without a beta roster entry", async ({
+    page,
+  }) => {
+    await seedLoggedInSession(page);
+    await mockSettingsApis(page, {
+      referral: loggedInReferralSummary(),
+      beta: {
+        isLoggedIn: true,
+        isBetaParticipant: false,
+        feedbackEnabled: true,
+        supporterVoiceEnabled: false,
+        isBetaSupporter: false,
+      },
+    });
+
+    await page.goto("/settings");
+    await page.waitForLoadState("networkidle");
+
+    await expect(page.getByRole("button", { name: "改善メモを書く" })).toBeVisible();
   });
 
   test("maps the legacy omoide disabled value to the receive switch", async ({

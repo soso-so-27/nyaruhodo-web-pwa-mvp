@@ -1450,6 +1450,7 @@ export function CatsPage() {
                         }
                         loading="eager"
                         style={styles.profileCoverTileRoot}
+                        frameStyle={styles.profileCoverTileFrame}
                         imageStyle={styles.profileCoverImage}
                         onClick={
                           activeCoverRecordPhoto
@@ -2437,8 +2438,17 @@ function RecordOverview({
             今日の1件
           </h2>
           {pickups.map((pickup) => {
-            const hasUnopenedMemory =
-              pickup.target.kind === "memory" && !pickup.target.memory.openedAt;
+            const matchingUnopenedMemory =
+              pickup.target.kind === "memory"
+                ? pickup.target.memory
+                : memories.find(
+                    (memory) =>
+                      memory.sourcePhotoId === pickup.sourceId &&
+                      memory.deliveredAt <= now &&
+                      !memory.openedAt &&
+                      !memory.dismissedAt,
+                  ) ?? null;
+            const hasUnopenedMemory = Boolean(matchingUnopenedMemory);
 
             return (
               <button
@@ -2448,6 +2458,13 @@ function RecordOverview({
                 onClick={() => {
                   markCatPickupSeen(activeCatId, pickup, now);
                   setPickupRefreshTick((value) => value + 1);
+                  if (
+                    pickup.target.kind !== "memory" &&
+                    matchingUnopenedMemory
+                  ) {
+                    onOpenMemory(matchingUnopenedMemory, "pickup");
+                    return;
+                  }
                   openPickupTarget(pickup, {
                     onOpenMemory: (memory) => onOpenMemory(memory, "pickup"),
                     onOpenPhoto,
@@ -5637,6 +5654,11 @@ const styles = {
       "0 1px 0 color-mix(in srgb, var(--paper) 76%, transparent), 0 16px 34px -30px color-mix(in srgb, var(--ink) 30%, transparent)",
   },
   profileCoverTileRoot: {
+    display: "block",
+    width: "100%",
+    height: "100%",
+  },
+  profileCoverTileFrame: {
     display: "block",
     width: "100%",
     height: "100%",

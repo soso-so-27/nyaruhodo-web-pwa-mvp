@@ -46,7 +46,7 @@ export async function getBetaCapabilitiesForRequest(
   return {
     isLoggedIn: Boolean(user),
     isBetaParticipant,
-    feedbackEnabled: isBetaParticipant,
+    feedbackEnabled: Boolean(user),
     supporterVoiceEnabled: isBetaSupporter,
     isBetaSupporter,
   };
@@ -74,15 +74,6 @@ export async function requireBetaFeedbackAccess(
       capabilities,
       status: 403,
       error: "supporter_voice_unavailable",
-    };
-  }
-
-  if (kind === "beta_feedback" && !capabilities.isBetaParticipant) {
-    return {
-      allowed: false,
-      capabilities,
-      status: 403,
-      error: "beta_participant_required",
     };
   }
 

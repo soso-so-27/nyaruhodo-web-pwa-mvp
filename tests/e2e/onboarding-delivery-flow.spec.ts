@@ -240,7 +240,7 @@ test.describe("onboarding delivery flow", () => {
     await expect(
       page.getByRole("button", { name: "つづける" }),
     ).toBeVisible();
-    await expect.poll(() => readKeptExchangePhotoCount(page)).toBe(0);
+    await expect.poll(() => readKeptExchangePhotoCount(page)).toBe(1);
     const eveningDeliveryDays = await page.evaluate(() => {
       const parsed = JSON.parse(
         window.localStorage.getItem("neteruneko_evening_delivery_days") ?? "{}",
@@ -273,12 +273,12 @@ test.describe("onboarding delivery flow", () => {
     });
 
     expect(storage.ownSleepingPhotos.length).toBeGreaterThan(0);
-    expect(storage.keptExchangePhotos).toHaveLength(0);
+    expect(storage.keptExchangePhotos).toHaveLength(1);
     expect(storage.ownSleepingPhotos[0]?.captureContext).toBe("onboarding");
     expect(storage.ownSleepingPhotos[0]?.src).toMatch(/^data:image\//);
   });
 
-  test("marks a delivered photo ready without adding it to the received album", async ({
+  test("keeps a delivered onboarding photo in the received album", async ({
     page,
   }) => {
     await routeImmediateDelivery(page);
@@ -344,9 +344,9 @@ test.describe("onboarding delivery flow", () => {
     );
     expect(deliveredLayout.paddingTop).toBe("6px");
     expect(deliveredLayout.borderRadius).toBe("22px");
-    await expect.poll(() => readKeptExchangePhotoCount(page)).toBe(0);
+    await expect.poll(() => readKeptExchangePhotoCount(page)).toBe(1);
     await expect(page.getByRole("button", { name: "閉じる" })).toHaveCount(0);
-    await expect.poll(() => readKeptExchangePhotoCount(page)).toBe(0);
+    await expect.poll(() => readKeptExchangePhotoCount(page)).toBe(1);
   });
 
   test("shows a second photo bridge before 8pm after onboarding delivery", async ({
@@ -567,7 +567,7 @@ test.describe("onboarding delivery flow", () => {
     await expect(page.getByTestId("onboarding-install-guide")).toHaveCount(0);
   });
 
-  test("falls back to thumbnail for storage-backed onboarding deliveries without adding to the received album", async ({
+  test("falls back to thumbnail and keeps storage-backed onboarding deliveries", async ({
     page,
   }) => {
     await routeStorageDeliveryWithBrokenDisplay(page);
@@ -586,7 +586,7 @@ test.describe("onboarding delivery flow", () => {
     await page.waitForTimeout(1800);
 
     await expectVisibleNonBlackImage(page.locator("main img").last());
-    await expect.poll(() => readKeptExchangePhotoCount(page)).toBe(0);
+    await expect.poll(() => readKeptExchangePhotoCount(page)).toBe(1);
     const openedSnapshot = await readOnboardingDeliverySnapshot(page);
 
     expect(openedSnapshot.ownPhoto?.id).toBeTruthy();
@@ -601,15 +601,15 @@ test.describe("onboarding delivery flow", () => {
     await expect(page.getByTestId("mainichi-board-photo-sent").first()).toBeVisible();
 
     await page.locator('[role="tab"]').nth(1).click();
-    await expect(page.getByTestId("mainichi-board-photo-delivered")).toHaveCount(0);
+    await expect(page.getByTestId("mainichi-board-photo-delivered")).toHaveCount(1);
 
     await markOnboardingAlbumCreatedInBrowser(page);
     await page.goto("/collection");
     await page.locator('[role="tab"]').nth(1).click();
-    await expect(page.getByTestId("mainichi-board-photo-delivered")).toHaveCount(0);
+    await expect(page.getByTestId("mainichi-board-photo-delivered")).toHaveCount(1);
   });
 
-  test("keeps signed onboarding deliveries in onboarding progress only", async ({
+  test("keeps signed onboarding deliveries in the received album", async ({
     page,
   }) => {
     await routeStorageDeliveryWithSignedDisplay(page);
@@ -629,7 +629,7 @@ test.describe("onboarding delivery flow", () => {
     const openedSnapshot = await readOnboardingDeliverySnapshot(page);
     expect(openedSnapshot.deliveredPhoto?.sourcePhotoId).toBe("stock-signed-e2e-fake");
     expect(openedSnapshot.deliveredPhoto?.src).toMatch(/^data:image\//);
-    await expect.poll(() => readKeptExchangePhotoCount(page)).toBe(0);
+    await expect.poll(() => readKeptExchangePhotoCount(page)).toBe(1);
 
     await page.evaluate(() => {
       window.localStorage.setItem("analytics_anonymous_id", "anonymous-other-context");
@@ -637,7 +637,7 @@ test.describe("onboarding delivery flow", () => {
     await page.goto("/collection");
     await page.locator('[role="tab"]').nth(1).click();
 
-    await expect(page.getByTestId("mainichi-board-photo-delivered")).toHaveCount(0);
+    await expect(page.getByTestId("mainichi-board-photo-delivered")).toHaveCount(1);
   });
 
   test("does not show the PWA home install guide inside Instagram browser", async ({
@@ -1705,19 +1705,14 @@ test.describe("onboarding delivery flow", () => {
     await expect(page.getByTestId("home-empty-action")).toBeVisible();
   });
 
-  test("shows the onboarding delivered photo without adding kept album photos", async ({
+  test("migrates a historical onboarding delivery into the received album", async ({
     page,
   }) => {
     const imageDataUrl = `data:image/png;base64,${testPng.toString("base64")}`;
 
     await page.addInitScript(({ imageDataUrl }) => {
       const now = Date.now();
-      const dateKey = new Intl.DateTimeFormat("en-CA", {
-        timeZone: "Asia/Tokyo",
-        year: "numeric",
-        month: "2-digit",
-        day: "2-digit",
-      }).format(new Date(now));
+      const dateKey = "2026-06-01";
 
       window.localStorage.setItem("onboarding_completed", "true");
       window.localStorage.setItem("active_cat_id", "onboarding-visible-cat");
@@ -1761,7 +1756,7 @@ test.describe("onboarding delivery flow", () => {
     const keptPhotos = await page.evaluate(() =>
       JSON.parse(window.localStorage.getItem("nyaruhodo_exchange_kept_photos") ?? "[]"),
     );
-    expect(keptPhotos).toHaveLength(0);
+    expect(keptPhotos).toHaveLength(1);
   });
 
   test("lets locally restored users go home when a handoff token is already used", async ({

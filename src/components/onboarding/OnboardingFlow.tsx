@@ -14,8 +14,10 @@ import {
   saveRemoteDeliveryStockPhoto,
 } from "../../lib/home/deliveryCandidates";
 import {
+  keepExchangePhoto,
   readOwnSleepingPhotos,
   saveOwnSleepingPhoto,
+  updateKeptExchangePhotoDataUrl,
   type ExchangePhoto,
   type OwnSleepingPhoto,
 } from "../../lib/home/sleepingPhotos";
@@ -820,10 +822,12 @@ export function OnboardingFlow() {
       return;
     }
 
+    const savedToReceived = keepExchangePhoto(deliveredPhoto);
+
     trackProductEvent("onboarding_delivered_photo_confirmed", {
       source: getEffectiveEntrySource(),
       source_photo_id: deliveredPhoto.sourcePhotoId ?? null,
-      saved_to_album: false,
+      saved_to_album: savedToReceived,
       test_mode: canShowTestTools,
     });
 
@@ -863,6 +867,7 @@ export function OnboardingFlow() {
     };
 
     setDeliveredPhoto(photoWithDataUrl);
+    updateKeptExchangePhotoDataUrl(photoWithDataUrl, dataUrl);
     patchOnboardingProgress({
       stage: progress?.stage ?? "opened",
       deliveredPhoto: photoWithDataUrl,

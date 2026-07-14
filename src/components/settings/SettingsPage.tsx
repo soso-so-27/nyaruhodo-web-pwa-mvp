@@ -202,6 +202,7 @@ export function SettingsPage() {
   async function checkAuthState() {
     const supabase = createBrowserSupabaseClient();
     if (!supabase) {
+      await Promise.all([refreshBetaCapabilities(), refreshBillingStatus()]);
       await refreshAuthDebug(null);
       setIsLoading(false);
       return;
@@ -210,6 +211,7 @@ export function SettingsPage() {
     const { data } = await supabase.auth.getUser();
     setIsLoggedIn(Boolean(data.user));
     setEmail(data.user?.email ?? null);
+    await Promise.all([refreshBetaCapabilities(), refreshBillingStatus()]);
     await refreshAuthDebug(supabase);
     if (data.user) {
       await claimPendingReferral();
@@ -968,6 +970,16 @@ export function SettingsPage() {
                 ) : null}
                 <div style={styles.divider} />
               </>
+            ) : !isLoading && !isLoggedIn ? (
+              <>
+                <div style={styles.betaNote}>
+                  <p style={styles.betaNoteTitle}>改善メモ</p>
+                  <p style={styles.betaNoteText}>
+                    改善メモは、ログインすると送れます。
+                  </p>
+                </div>
+                <div style={styles.divider} />
+              </>
             ) : null}
             <BetaSupporterPanel
               billingStatus={billingStatus}
@@ -1200,7 +1212,7 @@ function BetaSupporterPanel({
         style={styles.settingsActionButton}
       >
         {billingStatus.isBetaSupporter
-          ? "サポーター特典を見る"
+          ? "応援内容を確認する"
           : "βサポーターについて"}
       </AppButton>
     </div>

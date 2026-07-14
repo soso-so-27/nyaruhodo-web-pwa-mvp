@@ -342,17 +342,16 @@ test.describe("admin test tool guards", () => {
 
     await expect(page.getByText("βサポーターです")).toBeVisible();
     await expect(
-      page.getByRole("link", { name: "サポーター特典を見る" }),
+      page.getByRole("link", { name: "応援内容を確認する" }),
     ).toBeVisible();
     await expect(page.getByRole("button", { name: "支払いを管理" })).toBeHidden();
 
-    await page.getByRole("link", { name: "サポーター特典を見る" }).click();
+    await page.getByRole("link", { name: "応援内容を確認する" }).click();
     await page.waitForURL("**/beta-supporter");
-    await expect(page.getByText("これからのねてるねこ").first()).toBeVisible();
+    await expect(page.getByText("βサポーターについて").first()).toBeVisible();
     await expect(page.getByRole("button", { name: "支払いを管理" })).toBeVisible();
-    await expect(
-      page.getByText("応援してもしなくても、ねてるねこの基本的な体験は変わりません。"),
-    ).toBeVisible();
+    await expect(page.getByRole("heading", { name: "応援しても、しなくても" }))
+      .toBeVisible();
   });
 
   test("shows supporter checkout entry for beta participants who are not supporters yet", async ({
@@ -396,7 +395,7 @@ test.describe("admin test tool guards", () => {
     await page.goto("/beta-supporter");
     await page.waitForLoadState("networkidle");
 
-    await expect(page.getByText("これからのねてるねこ").first()).toBeVisible();
+    await expect(page.getByText("βサポーターについて").first()).toBeVisible();
     await expect(page.getByRole("button", { name: "応援する" })).toBeVisible();
     await expect(page.getByRole("button", { name: "支払いを管理" })).toBeHidden();
   });

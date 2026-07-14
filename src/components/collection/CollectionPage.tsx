@@ -39,6 +39,7 @@ import {
   dismissExchangePhoto,
   hideKeptExchangePhoto,
   isExchangePhotoLocallyBlocked,
+  keepExchangePhoto,
   readKeptExchangePhotosForAlbum,
   readKeptExchangePhotos,
   readOwnSleepingPhotosForAlbum,
@@ -55,7 +56,7 @@ import {
   readEveningDeliveryStore,
 } from "../../lib/home/eveningDelivery";
 import { backupOwnSleepingPhotoMoment } from "../../lib/home/sleepingPhotoBackup";
-import { readCurrentOnboardingProgress } from "../../lib/onboarding/progress";
+import { readOnboardingProgress } from "../../lib/onboarding/progress";
 import { STORAGE_KEYS, readCachedJson, writeCachedJson } from "../../lib/storage";
 import {
   COLLECTION_GROUPS,
@@ -377,6 +378,7 @@ export function CollectionPage() {
   const toastTimerRef = useRef<number | null>(null);
   const trackedViewCatIdRef = useRef<string | null>(null);
   const trackedDailyTargetRef = useRef<string | null>(null);
+  const hasMigratedOnboardingDeliveryRef = useRef(false);
 
   useEffect(() => {
     const profiles = readCatProfiles();
@@ -438,6 +440,24 @@ export function CollectionPage() {
       document.removeEventListener("visibilitychange", refreshBoxesOnVisible);
     };
   }, []);
+
+  useEffect(() => {
+    if (!hasLoaded || hasMigratedOnboardingDeliveryRef.current) {
+      return;
+    }
+
+    hasMigratedOnboardingDeliveryRef.current = true;
+    const progress = readOnboardingProgress();
+    const deliveredPhoto = progress?.deliveredPhoto;
+
+    if (
+      deliveredPhoto &&
+      progress.isDeliveredPhotoKept &&
+      !isExchangePhotoLocallyBlocked(deliveredPhoto)
+    ) {
+      keepExchangePhoto(deliveredPhoto);
+    }
+  }, [hasLoaded]);
 
   const activeCatProfile =
     catProfiles.length > 0
@@ -4964,7 +4984,7 @@ function readOpenedEveningDeliveryBoxPhotos(): BoxPreviewPhoto[] {
 }
 
 function readOnboardingDeliveredBoxPhotos(): BoxPreviewPhoto[] {
-  const progress = readCurrentOnboardingProgress();
+  const progress = readOnboardingProgress();
   const deliveredPhoto = progress?.deliveredPhoto;
 
   if (

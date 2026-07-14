@@ -20,6 +20,11 @@ test.describe("β supporter page", () => {
     await page.goto("/beta-supporter");
     await page.waitForLoadState("networkidle");
 
+    await expect(page.getByRole("heading", { name: "ねてるねこを、一緒に育てる。" })).toBeVisible();
+    await expect(page.getByRole("navigation", { name: "このページの内容" })).toBeVisible();
+    await expect(page.getByText("月額 1,500円（税別）")).toBeVisible();
+    await expect(page.getByText("お支払い額は月額 1,650円（税込）です。"))
+      .toBeVisible();
     await expect(page.getByRole("link", { name: "Googleでログイン" })).toBeVisible();
     await expect(page.getByText("毎月自動で更新され、いつでも解約できます。")).toBeVisible();
     await expect(

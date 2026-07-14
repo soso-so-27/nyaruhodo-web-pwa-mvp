@@ -197,11 +197,28 @@ export default function BetaSupporterPage() {
         </AppButton>
 
         <header style={styles.header}>
-          <p style={styles.kicker}>これからのねてるねこ</p>
-          <h1 style={styles.title}>猫をもっと大切に見られる場所へ。</h1>
+          <p style={styles.kicker}>βサポーターについて</p>
+          <h1 style={styles.title}>ねてるねこを、一緒に育てる。</h1>
+          <p style={styles.headerSummary}>
+            ねてるねこが大切にしていること、これから育てたいこと、応援の使い道をお伝えします。
+          </p>
         </header>
 
-        <section style={styles.hero} aria-label="これからのねてるねこ">
+        <nav style={styles.contentsNav} aria-label="このページの内容">
+          <p style={styles.contentsLabel}>このページでお伝えすること</p>
+          <div style={styles.contentsLinks}>
+            <a href="#beginning" style={styles.contentsLink}>はじまり</a>
+            <a href="#values" style={styles.contentsLink}>大切にしていること</a>
+            <a href="#future" style={styles.contentsLink}>これから</a>
+            <a href="#support" style={styles.contentsLink}>応援について</a>
+          </div>
+        </nav>
+
+        <section id="beginning" style={styles.hero} aria-labelledby="beginning-title">
+          <p style={styles.sectionNumber}>01　はじまり</p>
+          <h2 id="beginning-title" style={styles.heading}>
+            猫を大切に見る時間を増やしたい
+          </h2>
           {openingParagraphs.map((paragraph) => (
             <p key={paragraph} style={styles.lead}>
               {paragraph}
@@ -209,22 +226,9 @@ export default function BetaSupporterPage() {
           ))}
         </section>
 
-        <section style={styles.section}>
-          <h2 style={styles.heading}>小さなきっかけ</h2>
-          <p style={styles.body}>
-            保護猫と暮らすようになってから、猫を見る目が少し変わりました。
-          </p>
-          <p style={styles.body}>好きな場所。安心する距離感。ちょっとしたクセや、表情。</p>
-          <p style={styles.body}>
-            知っていくほど、その子の好きなところが増えていく。
-          </p>
-          <p style={styles.body}>
-            ねてるねこも、そんな小さな発見が増えていく場所にしたいです。
-          </p>
-        </section>
-
-        <section style={styles.section}>
-          <h2 style={styles.heading}>大事にしたいこと</h2>
+        <section id="values" style={styles.section} aria-labelledby="values-title">
+          <p style={styles.sectionNumber}>02　大切にしていること</p>
+          <h2 id="values-title" style={styles.heading}>猫を競わせず、その子らしさを残す</h2>
           {valuesParagraphs.map((paragraph) => (
             <p key={paragraph} style={styles.body}>
               {paragraph}
@@ -232,8 +236,9 @@ export default function BetaSupporterPage() {
           ))}
         </section>
 
-        <section style={styles.section}>
-          <h2 style={styles.heading}>少しずつ育てたいこと</h2>
+        <section id="future" style={styles.section} aria-labelledby="future-title">
+          <p style={styles.sectionNumber}>03　これから</p>
+          <h2 id="future-title" style={styles.heading}>少しずつ育てたいこと</h2>
           <p style={styles.body}>まだ、全部の形は決まっていません。</p>
           <p style={styles.body}>でも、ねてるねこで増やしていきたい時間があります。</p>
           <div style={styles.futureList}>
@@ -248,21 +253,20 @@ export default function BetaSupporterPage() {
               </article>
             ))}
           </div>
+          <div style={styles.commitmentNote}>
+            <h3 style={styles.futureTitle}>まだ形にしすぎないこと</h3>
+            <p style={styles.futureBody}>
+              ここに書いていることは、決まった機能の一覧ではありません。作りながら変わることも、順番が入れ替わることもあります。
+            </p>
+            <p style={styles.closing}>
+              それでも、猫をもっと大切に見られる場所にする気持ちは変わりません。
+            </p>
+          </div>
         </section>
 
-        <section style={styles.section}>
-          <h2 style={styles.heading}>まだ形にしすぎないこと</h2>
-          <p style={styles.body}>ここに書いていることは、決まった機能の一覧ではありません。</p>
-          <p style={styles.body}>作りながら、変わることもあります。順番が入れ替わることもあります。</p>
-          <p style={styles.body}>
-            でも、猫をもっと好きになれる場所にしたい、猫のことを少し知れる場所にしたい、まだ出会っていない猫にも目が向く場所にしたい。
-          </p>
-          <p style={styles.body}>その気持ちは変わりません。</p>
-          <p style={styles.closing}>できたものから、少しずつ届けます。</p>
-        </section>
-
-        <section style={styles.section}>
-          <h2 style={styles.heading}>この場所を続けるために</h2>
+        <section id="support" style={styles.section} aria-labelledby="support-title">
+          <p style={styles.sectionNumber}>04　応援について</p>
+          <h2 id="support-title" style={styles.heading}>βサポーターとは</h2>
           <p style={styles.body}>
             ねてるねこを、広告や数字に寄りすぎない場所として静かに続けていくには、少しずつ支えが必要です。
           </p>
@@ -277,25 +281,22 @@ export default function BetaSupporterPage() {
               </li>
             ))}
           </ul>
-        </section>
-
-        <section style={styles.section}>
-          <h2 style={styles.heading}>応援しても、しなくても</h2>
-          <p style={styles.body}>
-            応援してもしなくても、ねてるねこの基本的な体験は変わりません。
-          </p>
-          <p style={styles.body}>
-            投稿が有利になったり、見える猫が増えたりするものではありません。
-          </p>
-          <p style={styles.body}>
-            これは機能を買うための支払いというより、この場所を一緒に育てるための応援です。
-          </p>
+          <div style={styles.supportPromise}>
+            <h3 style={styles.futureTitle}>応援しても、しなくても</h3>
+            <p style={styles.futureBody}>
+              ねてるねこの基本的な体験は変わりません。投稿が有利になったり、見える猫が増えたりするものでもありません。
+            </p>
+            <p style={styles.futureBody}>
+              機能を買うためというより、この場所を一緒に育てるための応援です。
+            </p>
+          </div>
         </section>
 
         <section style={styles.actionSection}>
           <p style={styles.supporterLabel}>βサポーター</p>
           <h2 style={styles.actionTitle}>この場所を支える</h2>
-          <p style={styles.price}>月額 1,628円（税込）</p>
+          <p style={styles.price}>月額 1,500円（税別）</p>
+          <p style={styles.priceTax}>お支払い額は月額 1,650円（税込）です。</p>
           <p style={styles.note}>
             ねてるねこを、静かに長く続く場所にするための応援です。
           </p>
@@ -485,11 +486,46 @@ const styles = {
     fontWeight: 500,
     lineHeight: 1.48,
   },
+  headerSummary: {
+    margin: "4px 0 0",
+    color: color.textMuted,
+    fontSize: 13,
+    fontWeight: 500,
+    lineHeight: 1.85,
+  },
+  contentsNav: {
+    display: "grid",
+    gap: 10,
+    padding: "16px 0",
+    borderTop: "1px solid rgba(120,108,94,0.14)",
+    borderBottom: "1px solid rgba(120,108,94,0.14)",
+  },
+  contentsLabel: {
+    margin: 0,
+    color: color.textMuted,
+    fontSize: 11,
+    fontWeight: 500,
+    lineHeight: 1.5,
+  },
+  contentsLinks: {
+    display: "grid",
+    gridTemplateColumns: "repeat(2, minmax(0, 1fr))",
+    gap: "8px 14px",
+  },
+  contentsLink: {
+    minWidth: 0,
+    color: color.textStrong,
+    fontSize: 13,
+    fontWeight: 500,
+    lineHeight: 1.6,
+    textDecoration: "underline",
+    textDecorationColor: "rgba(120,108,94,0.28)",
+    textUnderlineOffset: 4,
+  },
   hero: {
     display: "grid",
     gap: 12,
-    padding: "20px 0 22px",
-    borderTop: "1px solid rgba(120,108,94,0.14)",
+    padding: "24px 0 22px",
   },
   section: {
     display: "grid",
@@ -512,6 +548,13 @@ const styles = {
     fontSize: 16,
     fontWeight: 500,
     lineHeight: 1.6,
+  },
+  sectionNumber: {
+    margin: 0,
+    color: color.accentWarm,
+    fontSize: 11,
+    fontWeight: 600,
+    lineHeight: 1.5,
   },
   lead: {
     margin: 0,
@@ -553,6 +596,13 @@ const styles = {
     fontWeight: 500,
     lineHeight: 1.9,
   },
+  commitmentNote: {
+    display: "grid",
+    gap: 8,
+    marginTop: 14,
+    padding: "16px 0 0",
+    borderTop: "1px solid rgba(120,108,94,0.12)",
+  },
   supportList: {
     display: "grid",
     gap: 10,
@@ -577,6 +627,13 @@ const styles = {
     borderRadius: "50%",
     background: color.accentWarm,
     opacity: 0.62,
+  },
+  supportPromise: {
+    display: "grid",
+    gap: 8,
+    marginTop: 10,
+    padding: "16px 0 0",
+    borderTop: "1px solid rgba(120,108,94,0.12)",
   },
   supporterLabel: {
     margin: 0,
@@ -614,9 +671,16 @@ const styles = {
   price: {
     margin: 0,
     color: color.textStrong,
-    fontSize: 15,
+    fontSize: 19,
+    fontWeight: 600,
+    lineHeight: 1.55,
+  },
+  priceTax: {
+    margin: "-6px 0 2px",
+    color: color.textMuted,
+    fontSize: 12,
     fontWeight: 500,
-    lineHeight: 1.7,
+    lineHeight: 1.6,
   },
   message: {
     margin: 0,

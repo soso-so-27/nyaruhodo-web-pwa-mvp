@@ -60,6 +60,7 @@ test("keeps the cats photo tab clear of the fixed bottom navigation", async ({
   const photoItems = grid.locator(":scope > div");
   const tabs = page.getByTestId("cats-section-tabs");
   const cover = page.getByTestId("cats-profile-cover");
+  const automaticCoverFrame = cover.locator("img").first().locator("xpath=..");
   const nav = page.getByRole("navigation");
 
   await expect(grid).toBeVisible();
@@ -129,14 +130,17 @@ test("keeps the cats photo tab clear of the fixed bottom navigation", async ({
   expect(gridMetrics.horizontalGap).toBeCloseTo(2, 5);
   expect(gridMetrics.verticalGap).toBeCloseTo(2, 5);
 
-  const [tabsBox, coverBox, navBoxBeforeScroll] = await Promise.all([
+  const [tabsBox, coverBox, automaticCoverFrameBox, navBoxBeforeScroll] = await Promise.all([
     tabs.boundingBox(),
     cover.boundingBox(),
+    automaticCoverFrame.boundingBox(),
     nav.boundingBox(),
   ]);
   expect(tabsBox?.height).toBe(48);
   expect(coverBox?.height).toBe(232);
   expect(coverBox?.width).toBeGreaterThanOrEqual(370);
+  expect(automaticCoverFrameBox?.width).toBeCloseTo((coverBox?.width ?? 0) - 2, 1);
+  expect(automaticCoverFrameBox?.height).toBeCloseTo((coverBox?.height ?? 0) - 2, 1);
   expect(navBoxBeforeScroll?.height).toBe(60);
 
   const lastPhoto = photoItems.last();
@@ -901,6 +905,74 @@ test("shows celebrations as current milestones instead of a fixed 50-photo card"
   await expect(celebration).toContainText("ねがお");
   await expect(celebration).toContainText("10 / 50枚");
   await expect(celebration).toContainText("誕生日");
+});
+
+test("clears the first sleeping photo memory dot after opening it", async ({
+  page,
+}) => {
+  const now = Date.parse("2026-07-14T21:30:00+09:00");
+  await seedCatsProfile(page, now, 1);
+  await page.addInitScript(
+    ({ nowValue, src }) => {
+      const photo = {
+        id: "own-sleeping-0",
+        ownerCatId: "cat-mugi",
+        catId: "cat-mugi",
+        src,
+        thumbnailSrc: src,
+        displaySrc: src,
+        state: "sleeping",
+        visibility: "private",
+        deliveryStatus: "available",
+        triggerLabel: "sleeping",
+        theme: "sleeping",
+        shared: false,
+        createdAt: nowValue - 7 * 86_400_000,
+      };
+
+      if (
+        window.sessionStorage.getItem("e2e_first_seed_memory_seeded") !== "true"
+      ) {
+        window.localStorage.setItem(
+          "neteruneko_omoide_memories",
+          JSON.stringify({
+            "omoide-first-seed": {
+              id: "omoide-first-seed",
+              catId: "cat-mugi",
+              catName: "\u3080\u304e",
+              sourcePhotoId: photo.id,
+              sourceDateKey: "2026-07-07",
+              deliveryDateKey: "2026-07-13",
+              photo,
+              lookback: "week",
+              reason: "first_seed",
+              title: "\u306f\u3058\u3081\u3066\u306e\u3001\u306d\u304c\u304a\u3002",
+              subtitle: "\u306f\u3058\u3081\u3066\u306e \u306d\u304c\u304a \u304c \u5c4a\u304d\u307e\u3057\u305f\u3002",
+              voice: "\u306f\u3058\u3081\u3066\u306e\u3001\u306d\u304c\u304a\u3002",
+              bridge: "\u3042\u308c\u304b\u3089\u30017\u65e5\u3002",
+              deliveredAt: nowValue - 86_400_000,
+            },
+          }),
+        );
+        window.sessionStorage.setItem("e2e_first_seed_memory_seeded", "true");
+      }
+    },
+    { nowValue: now, src: photoDataUrl },
+  );
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto("/cats");
+  await page.waitForLoadState("networkidle");
+
+  await expect(page.getByText("はじめてのねがお").first()).toBeVisible();
+  await expect(page.getByTestId("cats-nav-unopened-omoide-dot")).toBeVisible();
+
+  await page.getByTestId("cats-pickup-section").locator("button").click();
+  await expect(page.getByTestId("omoide-memory-viewer")).toBeVisible();
+  await expect(page.getByTestId("cats-nav-unopened-omoide-dot")).toHaveCount(0);
+
+  await page.reload();
+  await page.waitForLoadState("networkidle");
+  await expect(page.getByTestId("cats-nav-unopened-omoide-dot")).toHaveCount(0);
 });
 
 test("keeps the record tab sections in the intended order", async ({ page }) => {
