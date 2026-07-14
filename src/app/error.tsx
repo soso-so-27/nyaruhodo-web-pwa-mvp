@@ -42,18 +42,20 @@ export default function AppError({
         >
           更新してひらく
         </button>
-        <details style={styles.details} open>
-          <summary style={styles.summary}>エラー情報</summary>
+        <div style={styles.secondaryActions}>
+          <a href="/" style={styles.link}>
+            ホームへ戻る
+          </a>
+          <a href="/settings" style={styles.link}>
+            設定をひらく
+          </a>
+        </div>
+        <details style={styles.details}>
+          <summary style={styles.summary}>エラー情報を見る</summary>
           <code style={styles.code} data-testid="app-error-diagnostic">
             {diagnosticText}
           </code>
         </details>
-        <a href="/settings" style={styles.link}>
-          設定をひらく
-        </a>
-        <a href="/" style={styles.link}>
-          ホームへ戻る
-        </a>
       </section>
     </main>
   );
@@ -76,10 +78,10 @@ const styles = {
     placeItems: "center",
     padding: "32px 24px",
     boxSizing: "border-box" as const,
-    background: "#f4f1ea",
-    color: "#4a3f35",
+    background: "var(--app-paper-background, #f4f1ea)",
+    color: "var(--ink, #4a3f35)",
     fontFamily:
-      'Outfit, "Zen Kaku Gothic New", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
+      'var(--font-ui, "Zen Kaku Gothic New", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif)',
   },
   panel: {
     width: "min(100%, 360px)",
@@ -89,18 +91,30 @@ const styles = {
     textAlign: "center" as const,
   },
   kicker: { margin: 0, color: "#8a8174", fontSize: "13px" },
-  title: { margin: 0, fontSize: "24px", fontWeight: 500, lineHeight: 1.5 },
+  title: {
+    margin: 0,
+    fontFamily: 'var(--font-display, "Klee One", serif)',
+    fontSize: "24px",
+    fontWeight: 400,
+    lineHeight: 1.5,
+  },
   copy: { margin: 0, color: "#6f6757", fontSize: "14px", lineHeight: 1.9 },
   primary: {
     minWidth: "220px",
     minHeight: "50px",
     padding: "0 24px",
-    border: "1px solid rgba(168,88,78,0.34)",
+    border: "1px solid rgba(74,63,53,0.18)",
     borderRadius: "999px",
-    background: "#a8584e",
-    color: "#fffdfa",
+    background: "var(--ink, #4a3f35)",
+    color: "var(--paper, #fffdfa)",
     font: "inherit",
     cursor: "pointer",
+  },
+  secondaryActions: {
+    display: "flex",
+    flexWrap: "wrap" as const,
+    justifyContent: "center",
+    gap: "12px 20px",
   },
   details: {
     width: "100%",

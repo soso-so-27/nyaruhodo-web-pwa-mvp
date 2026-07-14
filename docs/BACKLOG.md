@@ -13,14 +13,14 @@
 - `手紙` / `一通` / `ねこだより` の外向き語彙ゆれを整理する — 出典: `docs/BRAND-GUIDELINE.md` v1.0 §11（2026-07-07: 確定コピー・実UIの「手紙/おてがみ」は便2で除去済み。残るのはLP等の「一通」表現の統一判断のみ）
 - 旧 `docs/marketing/MARKETING-CANON.md` v0.1 の扱いをアーカイブ/削除/参照停止のどれかに決める — 出典: `docs/BRAND-GUIDELINE.md` v1.0 §11（2026-07-07: 参照は全てv0.2へ付け替え済み。残るのはファイル自体の移動判断）
 - ~~`FEATURE-IDEAS` 相当の「作らないものリスト」を一本化する~~ — **済 2026-07-07**（`docs/FEATURE-IDEAS.md` v2.0 コミット・アンチロードマップ節を含む）
-- 実装内の未定義 `var(--font-serif)` 参照を現行書体トークンへ寄せる — 出典: `docs/BRAND-GUIDELINE.md` v1.0 §6
+- ~~実装内の未定義 `var(--font-serif)` 参照を現行書体トークンへ寄せる~~ — **済 2026-07-14**（オンボ引継ぎ画面を `--font-display` へ統一）
 - 年額プラン検討（フェーズ2後半。一年の現像の予約として。返金は月単位比例で規約に明記。グリーフ時は個別対応） — 出典: `FEATURE-IDEAS` / 事業方針D5 / 2026-07-07退会UI分岐設計
 
 - grant hardening 本体 — 出典: `docs/specs/grant-hardening-spec.md`
 - 未参照Storageオブジェクトの定期GC（105件棚卸済み） — 出典: `docs/incident-20260704-bulk-delete.md`
 - 写真Storageの別リージョン・別プロバイダ退避（同一プロジェクト内 `cat-photos-backup` は最小版。災害・アカウント障害には別系統が必要） — 出典: `docs/PROD-OPERATIONS.md`
 - `cat-photos-backup` の保守的GC（90日より古く、かつ本番に存在しないものだけ。復元手順確立後に着手） — 出典: `docs/PROD-OPERATIONS.md`
-- 受信画像読み込み失敗時のグレースフルフォールバック表示 — 出典: `docs/opening-flow-inventory-2026-07.md`
+- ~~受信画像読み込み失敗時のグレースフルフォールバック表示~~ — **済 2026-07-14確認**（`StoredPhotoImage` のメッセージ表示・再読込案内・複数source fallbackで実装済み）
 - 孤児delivery 31件を踏んだ際のUI確認 — 出典: `docs/incident-20260704-bulk-delete.md`
 - E2Eの networkidle 依存除去（既存4failの解消） — 出典: `docs/specs/incident-and-legal-audit-spec-v1.0.md`
 - 【P3前ゲート】CI上でのSupabase local起動によるDB統合E2E実行 — 出典: `docs/specs/prod-migration-remediation-spec-v1.0.md`

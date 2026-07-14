@@ -33,10 +33,14 @@ function OnboardingContinueContent() {
       : "";
   const [status, setStatus] = useState<RestoreStatus>("ready");
   const [message, setMessage] = useState("");
+  const [restoreErrorCode, setRestoreErrorCode] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
   const [hasCheckedEnvironment, setHasCheckedEnvironment] = useState(false);
   const [isEmbeddedBrowser, setIsEmbeddedBrowser] = useState(false);
-  const shouldShowEmbeddedGuide = hasCheckedEnvironment && isEmbeddedBrowser;
+  const shouldShowEmbeddedGuide =
+    hasCheckedEnvironment && isEmbeddedBrowser && Boolean(token);
+  const hasTerminalRestoreError =
+    status === "error" && isTerminalRestoreError(restoreErrorCode);
   const continueUrl =
     typeof window === "undefined"
       ? ""
@@ -52,7 +56,8 @@ function OnboardingContinueContent() {
   useEffect(() => {
     if (!token) {
       setStatus("error");
-      setMessage("つづきの情報が見つかりませんでした。");
+      setRestoreErrorCode("handoff_missing");
+      setMessage(getRestoreErrorMessage("handoff_missing"));
     }
   }, [token]);
 
@@ -63,6 +68,7 @@ function OnboardingContinueContent() {
 
     setStatus("restoring");
     setMessage("");
+    setRestoreErrorCode(null);
     try {
       const result = await redeemOnboardingHandoff(token);
       trackProductEvent("onboarding_handoff_restored", {
@@ -78,6 +84,7 @@ function OnboardingContinueContent() {
         environment: getDisplayEnvironment(),
       });
       setStatus("restored");
+      setRestoreErrorCode(null);
       setMessage("ねがおを復元しました。ホームへ移動します。");
       window.setTimeout(() => {
         goHome();
@@ -96,11 +103,13 @@ function OnboardingContinueContent() {
         hasRestoredOnboardingState()
       ) {
         setStatus("restored");
+        setRestoreErrorCode(null);
         setMessage("この端末には、つづきが復元されています。ホームへ進めます。");
         return;
       }
 
       setStatus("error");
+      setRestoreErrorCode(errorMessage);
       setMessage(getRestoreErrorMessage(errorMessage));
     }
   }
@@ -139,14 +148,14 @@ function OnboardingContinueContent() {
               ? "ねがおを 確認しています"
               : shouldShowEmbeddedGuide
                 ? "ホーム画面アプリで つづけます"
-                : "ねがおを 復元しています"}
+                : getRestoreHeading(status)}
           </h1>
           <p style={styles.body}>
             {!hasCheckedEnvironment
               ? "少しだけお待ちください。"
               : shouldShowEmbeddedGuide
                 ? "LINEやInstagramの中で入れた写真は、ホーム画面アプリへ自動では渡りません。URLをコピーして、ChromeやSafari、またはホーム画面アプリで開いてください。"
-                : "さっき入れたねがおを、このブラウザに戻しています。"}
+                : getRestoreBody(status)}
           </p>
 
           {shouldShowEmbeddedGuide ? (
@@ -156,31 +165,42 @@ function OnboardingContinueContent() {
           ) : null}
 
           {message ? (
-            <p style={styles.message} role="status">
+            <p
+              style={styles.message}
+              role={status === "error" ? "alert" : "status"}
+            >
               {message}
             </p>
           ) : null}
 
           <div style={styles.actions}>
             {!hasCheckedEnvironment ? null : shouldShowEmbeddedGuide ? (
-              <>
-                <AppButton
-                  type="button"
-                  variant="accent"
-                  fullWidth
-                  onClick={() => {
-                    void copyContinueUrl();
-                  }}
-                >
-                  {copied ? "コピーしました" : "URLをコピー"}
-                </AppButton>
-              </>
+              <AppButton
+                type="button"
+                variant="accent"
+                fullWidth
+                onClick={() => {
+                  void copyContinueUrl();
+                }}
+              >
+                {copied ? "コピーしました" : "URLをコピー"}
+              </AppButton>
+            ) : hasTerminalRestoreError ? (
+              <AppButton
+                href="/onboarding?reset_onboarding=1"
+                variant="accent"
+                fullWidth
+                data-testid="onboarding-handoff-restart"
+              >
+                はじめからやり直す
+              </AppButton>
             ) : (
               <AppButton
                 type="button"
                 variant="accent"
                 fullWidth
                 disabled={status === "restoring"}
+                data-testid="onboarding-handoff-primary"
                 onClick={() => {
                   if (status === "restored") {
                     goHome();
@@ -191,14 +211,16 @@ function OnboardingContinueContent() {
                 }}
               >
                 {status === "restoring"
-                  ? "復元しています..."
+                  ? "戻しています..."
                   : status === "restored"
                     ? "ホームへ"
-                    : "復元してホームへ"}
+                    : status === "error"
+                      ? "もう一度ためす"
+                      : "ねがおを戻して ホームへ"}
               </AppButton>
             )}
           </div>
-          {status === "error" ? (
+          {status === "error" && !hasTerminalRestoreError ? (
             <AppButton
               href="/onboarding?reset_onboarding=1"
               variant="quiet"
@@ -230,6 +252,10 @@ function OnboardingContinueShell() {
 }
 
 function getRestoreErrorMessage(errorMessage: string) {
+  if (errorMessage === "handoff_missing") {
+    return "つづきの情報が見つかりませんでした。この端末ではじめからお試しください。";
+  }
+
   if (errorMessage === "handoff_local_storage_failed") {
     return "写真を端末に戻せませんでした。空き容量を確認して、同じURLからもう一度お試しください。";
   }
@@ -243,6 +269,46 @@ function getRestoreErrorMessage(errorMessage: string) {
   }
 
   return "つづきの復元ができませんでした。通信を確認してもう一度試すか、この端末ではじめからお試しください。";
+}
+
+function getRestoreHeading(status: RestoreStatus) {
+  if (status === "ready") {
+    return "ねがおの つづきを戻します";
+  }
+
+  if (status === "restoring") {
+    return "ねがおを 戻しています";
+  }
+
+  if (status === "restored") {
+    return "ねがおを 戻しました";
+  }
+
+  return "つづきを戻せませんでした";
+}
+
+function getRestoreBody(status: RestoreStatus) {
+  if (status === "ready") {
+    return "さっき入れたねがおを、このブラウザへ戻します。";
+  }
+
+  if (status === "restoring") {
+    return "少しだけお待ちください。";
+  }
+
+  if (status === "restored") {
+    return "この端末に戻せました。ホームへ進みます。";
+  }
+
+  return "状況に合わせて、下の案内から進んでください。";
+}
+
+function isTerminalRestoreError(errorCode: string | null) {
+  return (
+    errorCode === "handoff_missing" ||
+    errorCode === "handoff_expired" ||
+    errorCode === "handoff_already_used"
+  );
 }
 
 function detectEmbeddedBrowser() {
@@ -311,7 +377,7 @@ const styles = {
   },
   title: {
     margin: 0,
-    fontFamily: "var(--font-serif)",
+    fontFamily: "var(--font-display)",
     fontSize: 24,
     lineHeight: 1.45,
     fontWeight: 500,

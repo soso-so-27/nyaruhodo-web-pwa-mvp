@@ -1075,13 +1075,79 @@ test.describe("onboarding delivery flow", () => {
     });
 
     await page.goto("/onboarding/continue?handoff=expired-token");
-    await page.getByRole("button", { name: "復元してホームへ" }).click();
+    await page
+      .getByRole("button", { name: "ねがおを戻して ホームへ" })
+      .click();
 
+    await expect(
+      page.getByRole("heading", { name: "つづきを戻せませんでした" }),
+    ).toBeVisible();
     await expect(page.getByText(/期限が切れました/)).toBeVisible();
     await expect(page.getByTestId("onboarding-handoff-restart")).toHaveAttribute(
       "href",
       "/onboarding?reset_onboarding=1",
     );
+    await expect(
+      page.getByRole("button", { name: "もう一度ためす" }),
+    ).toHaveCount(0);
+  });
+
+  test("does not offer an empty continuation URL when the handoff token is missing", async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width: 320, height: 568 });
+    await page.addInitScript(() => {
+      Object.defineProperty(window.navigator, "userAgent", {
+        get: () =>
+          "Mozilla/5.0 (Linux; Android 14; Pixel 7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Mobile Safari/537.36 Line/14.0.0",
+      });
+    });
+
+    await page.goto("/onboarding/continue");
+
+    await expect(
+      page.getByRole("heading", { name: "つづきを戻せませんでした" }),
+    ).toBeVisible();
+    await expect(page.getByTestId("onboarding-handoff-restart")).toBeVisible();
+    await expect(page.getByRole("button", { name: "URLをコピー" })).toHaveCount(
+      0,
+    );
+    await expect(page.getByTestId("onboarding-handoff-primary")).toHaveCount(0);
+    const restartBox = await page
+      .getByTestId("onboarding-handoff-restart")
+      .boundingBox();
+    expect(restartBox).not.toBeNull();
+    expect((restartBox?.y ?? 0) + (restartBox?.height ?? 0)).toBeLessThanOrEqual(
+      568,
+    );
+  });
+
+  test("keeps retry and fresh-start choices after a temporary handoff failure", async ({
+    page,
+  }) => {
+    let redeemCalls = 0;
+    await page.route("**/api/onboarding/handoff/redeem", async (route) => {
+      redeemCalls += 1;
+      await route.fulfill({
+        status: 503,
+        contentType: "application/json",
+        body: JSON.stringify({ ok: false, error: "handoff_redeem_failed" }),
+      });
+    });
+
+    await page.goto("/onboarding/continue?handoff=temporary-failure-token");
+    await page
+      .getByRole("button", { name: "ねがおを戻して ホームへ" })
+      .click();
+
+    await expect(page.getByText(/通信を確認してもう一度/)).toBeVisible();
+    await expect(
+      page.getByRole("button", { name: "もう一度ためす" }),
+    ).toBeVisible();
+    await expect(page.getByTestId("onboarding-handoff-restart")).toBeVisible();
+
+    await page.getByRole("button", { name: "もう一度ためす" }).click();
+    await expect.poll(() => redeemCalls).toBe(2);
   });
 
   test("keeps both recovery choices after a Google callback failure", async ({
@@ -1751,6 +1817,11 @@ test.describe("onboarding delivery flow", () => {
     await expect(
       page.getByText("このつづきのリンクは使用済みです。"),
     ).toBeVisible();
+    await expect(
+      page.getByRole("heading", { name: "つづきを戻せませんでした" }),
+    ).toBeVisible();
+    await expect(page.getByTestId("onboarding-handoff-restart")).toBeVisible();
+    await expect(page.getByTestId("onboarding-handoff-primary")).toHaveCount(0);
     await expect(page).toHaveURL(/\/onboarding\/continue/);
   });
 

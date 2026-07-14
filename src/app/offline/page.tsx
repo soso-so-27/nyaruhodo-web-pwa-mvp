@@ -9,12 +9,12 @@ export default function OfflinePage() {
   return (
     <main style={styles.page}>
       <section style={styles.panel} aria-labelledby="offline-title">
-        <p style={styles.kicker}>offline</p>
+        <p style={styles.kicker}>ねてるねこ</p>
         <h1 id="offline-title" style={styles.title}>
           いまは通信できません
         </h1>
         <p style={styles.body}>
-          電波が戻ったら、もう一度ひらいてください。保存済みの画面は端末に残っています。
+          電波が戻ったら、もう一度ひらいてください。保存済みの写真や記録は、そのまま残ります。
         </p>
         <OfflineRetryButton />
       </section>
@@ -28,7 +28,11 @@ const styles = {
     display: "grid",
     placeItems: "center",
     padding: "32px 24px",
-    color: "#3f3832",
+    boxSizing: "border-box",
+    background: "var(--app-paper-background, #f4f1ea)",
+    color: "var(--ink, #3f3832)",
+    fontFamily:
+      'var(--font-ui, "Zen Kaku Gothic New", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif)',
   },
   panel: {
     width: "min(100%, 360px)",
@@ -42,14 +46,13 @@ const styles = {
   },
   title: {
     margin: "0 0 14px",
-    fontFamily: "var(--font-klee-one), serif",
+    fontFamily: 'var(--font-display, "Klee One", serif)',
     fontSize: 24,
     fontWeight: 400,
     lineHeight: 1.55,
   },
   body: {
     margin: 0,
-    fontFamily: "var(--font-zen-kaku), sans-serif",
     fontSize: 14,
     fontWeight: 400,
     lineHeight: 1.9,
