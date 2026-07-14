@@ -1,7 +1,13 @@
 "use client";
 
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
-import type { CSSProperties, MouseEvent, TouchEvent, UIEvent } from "react";
+import type {
+  CSSProperties,
+  KeyboardEvent,
+  MouseEvent,
+  TouchEvent,
+  UIEvent,
+} from "react";
 import { AnimatePresence, MotionConfig, motion } from "motion/react";
 import { resizeImageFileToDataUrl } from "../../lib/imageResize";
 import {
@@ -69,6 +75,7 @@ import { BottomNavigation } from "../navigation/BottomNavigation";
 import { AppBottomSheet } from "../ui/AppBottomSheet";
 import { AppButton } from "../ui/AppButton";
 import { AppCard } from "../ui/AppCard";
+import { AppConfirmDialog } from "../ui/AppConfirmDialog";
 import { AppIcon } from "../ui/AppIcons";
 import { EmptyState } from "../ui/EmptyState";
 import { PhotoTile, PhotoViewerFrame } from "../ui/PhotoTile";
@@ -79,6 +86,7 @@ import {
   preloadStoragePhotoSignedUrls,
 } from "../ui/StoredPhotoImage";
 import { color, radius, shadow } from "../ui/designTokens";
+import { useModalBehavior } from "../ui/useModalBehavior";
 
 const COLLECTION_TEXT = "var(--ink)";
 const COLLECTION_TEXT_STRONG = "var(--ink)";
@@ -1351,7 +1359,6 @@ export function CollectionPage() {
       <AnimatePresence>
         {selectedMainichiPhoto ? (
           <MainichiFullscreenPhoto
-            key={`${selectedMainichiPhoto.kind}-${selectedMainichiPhoto.id}-${selectedMainichiPhoto.dateKey}`}
             photo={selectedMainichiPhoto}
             photoCount={selectedMainichiViewer?.photos.length ?? 1}
             currentIndex={selectedMainichiViewer?.index ?? 0}
@@ -2744,6 +2751,10 @@ function MainichiFullscreenPhoto({
   const [pendingAction, setPendingAction] = useState<
     "delete" | "hide" | "report" | null
   >(null);
+  const { modalRef, handleModalKeyDown } = useModalBehavior<HTMLDivElement>({
+    open: true,
+    onClose,
+  });
   const touchStartXRef = useRef<number | null>(null);
   const canNavigate = photoCount > 1;
   const deliveryActionLabel = photo.shared
@@ -2817,10 +2828,33 @@ function MainichiFullscreenPhoto({
     setPendingAction(null);
   }
 
+  function handleViewerKeyDown(event: KeyboardEvent<HTMLDivElement>) {
+    if (!pendingAction && canNavigate && event.key === "ArrowLeft") {
+      event.preventDefault();
+      onPrevious();
+      return;
+    }
+
+    if (!pendingAction && canNavigate && event.key === "ArrowRight") {
+      event.preventDefault();
+      onNext();
+      return;
+    }
+
+    handleModalKeyDown(event);
+  }
+
   return (
     <motion.div
+      ref={modalRef}
       style={styles.mainichiViewerOverlay}
       data-testid="mainichi-photo-viewer"
+      role="dialog"
+      aria-modal="true"
+      aria-label={`${photo.dateLabel}の写真`}
+      aria-hidden={pendingActionCopy ? true : undefined}
+      tabIndex={-1}
+      onKeyDown={handleViewerKeyDown}
       onTouchStart={handleTouchStart}
       onTouchEnd={handleTouchEnd}
       initial={{ opacity: 0 }}
@@ -2846,7 +2880,7 @@ function MainichiFullscreenPhoto({
           aria-label="閉じる"
           onClick={onClose}
         >
-          ×
+          <AppIcon name="close" size={18} />
         </AppButton>
       </div>
       <motion.div
@@ -2967,46 +3001,15 @@ function MainichiFullscreenPhoto({
         )}
       </div>
       {pendingActionCopy ? (
-        <div style={styles.mainichiViewerConfirmBackdrop} role="presentation">
-          <section
-            role="alertdialog"
-            aria-modal="true"
-            aria-labelledby="mainichi-viewer-confirm-title"
-            aria-describedby="mainichi-viewer-confirm-text"
-            style={styles.mainichiViewerConfirm}
-          >
-            <h2
-              id="mainichi-viewer-confirm-title"
-              style={styles.mainichiViewerConfirmTitle}
-            >
-              {pendingActionCopy.title}
-            </h2>
-            <p
-              id="mainichi-viewer-confirm-text"
-              style={styles.mainichiViewerConfirmText}
-            >
-              {pendingActionCopy.text}
-            </p>
-            <div style={styles.mainichiViewerConfirmActions}>
-              <AppButton
-                type="button"
-                variant="ghost"
-                size="sm"
-                onClick={() => setPendingAction(null)}
-              >
-                キャンセル
-              </AppButton>
-              <AppButton
-                type="button"
-                variant={pendingActionCopy.variant}
-                size="sm"
-                onClick={handleConfirmPendingAction}
-              >
-                {pendingActionCopy.confirm}
-              </AppButton>
-            </div>
-          </section>
-        </div>
+        <AppConfirmDialog
+          open
+          title={pendingActionCopy.title}
+          description={pendingActionCopy.text}
+          confirmLabel={pendingActionCopy.confirm}
+          confirmVariant={pendingActionCopy.variant}
+          onCancel={() => setPendingAction(null)}
+          onConfirm={handleConfirmPendingAction}
+        />
       ) : null}
     </motion.div>
   );
@@ -3172,46 +3175,15 @@ function BoxPhotoDetailSheet({
         )
       ) : null}
       {pendingActionCopy ? (
-        <div style={styles.mainichiViewerConfirmBackdrop} role="presentation">
-          <section
-            role="alertdialog"
-            aria-modal="true"
-            aria-labelledby="box-photo-detail-confirm-title"
-            aria-describedby="box-photo-detail-confirm-text"
-            style={styles.mainichiViewerConfirm}
-          >
-            <h2
-              id="box-photo-detail-confirm-title"
-              style={styles.mainichiViewerConfirmTitle}
-            >
-              {pendingActionCopy.title}
-            </h2>
-            <p
-              id="box-photo-detail-confirm-text"
-              style={styles.mainichiViewerConfirmText}
-            >
-              {pendingActionCopy.text}
-            </p>
-            <div style={styles.mainichiViewerConfirmActions}>
-              <AppButton
-                type="button"
-                variant="ghost"
-                size="sm"
-                onClick={() => setPendingAction(null)}
-              >
-                キャンセル
-              </AppButton>
-              <AppButton
-                type="button"
-                variant={pendingActionCopy.variant}
-                size="sm"
-                onClick={handleConfirmPendingAction}
-              >
-                {pendingActionCopy.confirm}
-              </AppButton>
-            </div>
-          </section>
-        </div>
+        <AppConfirmDialog
+          open
+          title={pendingActionCopy.title}
+          description={pendingActionCopy.text}
+          confirmLabel={pendingActionCopy.confirm}
+          confirmVariant={pendingActionCopy.variant}
+          onCancel={() => setPendingAction(null)}
+          onConfirm={handleConfirmPendingAction}
+        />
       ) : null}
     </AppBottomSheet>
   );
@@ -6547,49 +6519,6 @@ const styles = {
     gridTemplateColumns: "minmax(0, 1fr) auto",
     gap: "10px",
     alignItems: "center",
-  },
-  mainichiViewerConfirmBackdrop: {
-    position: "fixed",
-    inset: 0,
-    zIndex: 1,
-    display: "grid",
-    placeItems: "center",
-    padding: "24px",
-    background: "color-mix(in srgb, var(--ink) 18%, transparent)",
-    backdropFilter: "blur(4px)",
-    WebkitBackdropFilter: "blur(4px)",
-  },
-  mainichiViewerConfirm: {
-    width: "min(100%, 360px)",
-    display: "grid",
-    gap: "13px",
-    padding: "20px",
-    border: "1px solid color-mix(in srgb, var(--line) 72%, transparent)",
-    borderRadius: "var(--radius-xl)",
-    background: "color-mix(in srgb, var(--paper-card) 94%, transparent)",
-    boxShadow: "var(--shadow-e2)",
-  },
-  mainichiViewerConfirmTitle: {
-    margin: 0,
-    color: COLLECTION_TEXT_STRONG,
-    fontFamily: "var(--font-ui)",
-    fontSize: "17px",
-    fontWeight: 500,
-    lineHeight: 1.45,
-  },
-  mainichiViewerConfirmText: {
-    margin: 0,
-    color: COLLECTION_MUTED,
-    fontFamily: "var(--font-ui)",
-    fontSize: "13px",
-    fontWeight: 400,
-    lineHeight: 1.6,
-  },
-  mainichiViewerConfirmActions: {
-    display: "grid",
-    gridTemplateColumns: "1fr 1fr",
-    gap: "10px",
-    marginTop: "3px",
   },
   todayAlbumCard: {
     display: "grid",

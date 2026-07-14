@@ -1525,15 +1525,43 @@ test.describe("collection album flow", () => {
     await page.waitForLoadState("networkidle");
 
     await page.getByRole("tab", { name: "とどいた" }).click();
-    await page.getByTestId("mainichi-board-photo-delivered").click();
-    await expect(page.getByTestId("mainichi-photo-viewer")).toBeVisible();
+    const deliveredPhotoButton = page.getByTestId("mainichi-board-photo-delivered");
+    await deliveredPhotoButton.click();
+    const photoViewer = page.getByTestId("mainichi-photo-viewer");
+    await expect(photoViewer).toBeVisible();
+    await expect(photoViewer).toHaveAttribute("role", "dialog");
+    await expect(page.getByRole("button", { name: "閉じる" })).toBeFocused();
+    await expect
+      .poll(() => page.evaluate(() => document.body.style.overflow))
+      .toBe("hidden");
+
+    await page.keyboard.press("Escape");
+    await expect(photoViewer).toHaveCount(0);
+    await expect(deliveredPhotoButton).toBeFocused();
+    await expect
+      .poll(() => page.evaluate(() => document.body.style.overflow))
+      .toBe("");
+
+    await deliveredPhotoButton.click();
+    await expect(photoViewer).toBeVisible();
     await disableNextDevToolsPointerEvents(page);
-    await page.getByRole("button", { name: "ねこだよりから外す" }).click();
-    await page
-      .getByRole("alertdialog")
-      .getByRole("button", { name: "外す" })
-      .click();
-    await expect(page.getByTestId("mainichi-photo-viewer")).toHaveCount(0);
+    const removeButton = page.getByRole("button", { name: "ねこだよりから外す" });
+    await removeButton.click();
+    const confirmDialog = page.getByRole("alertdialog");
+    const cancelButton = confirmDialog.getByRole("button", { name: "キャンセル" });
+    const confirmButton = confirmDialog.getByRole("button", { name: "外す" });
+    await expect(cancelButton).toBeFocused();
+    await page.keyboard.press("Shift+Tab");
+    await expect(confirmButton).toBeFocused();
+    await page.keyboard.press("Tab");
+    await expect(cancelButton).toBeFocused();
+    await page.keyboard.press("Escape");
+    await expect(confirmDialog).toHaveCount(0);
+    await expect(removeButton).toBeFocused();
+
+    await removeButton.click();
+    await confirmDialog.getByRole("button", { name: "外す" }).click();
+    await expect(photoViewer).toHaveCount(0);
     await expect(page.getByTestId("mainichi-board-photo-delivered")).toHaveCount(0);
 
     await expect
