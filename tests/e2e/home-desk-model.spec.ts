@@ -246,7 +246,7 @@ test.describe("home desk model", () => {
     ).toEqual([]);
   });
 
-  test("shows only the active bottom navigation label", async ({ page }) => {
+  test("shows every bottom navigation label and marks the active destination", async ({ page }) => {
     await seedDeskState(page, "1");
     await page.goto("/home");
     await page.waitForLoadState("networkidle");
@@ -257,8 +257,8 @@ test.describe("home desk model", () => {
       "page",
     );
     await expect(nav.getByText("きょう", { exact: true })).toBeVisible();
-    await expect(nav.getByText("ねこだより", { exact: true })).toBeHidden();
-    await expect(nav.getByText("うちのこ", { exact: true })).toBeHidden();
+    await expect(nav.getByText("ねこだより", { exact: true })).toBeVisible();
+    await expect(nav.getByText("うちのこ", { exact: true })).toBeVisible();
 
     await nav.getByRole("link", { name: "ねこだより" }).click();
     await expect(page).toHaveURL(/\/collection$/);
@@ -272,7 +272,7 @@ test.describe("home desk model", () => {
       collectionNav.getByRole("link", { name: "ねこだより" }),
     ).toHaveAttribute("aria-current", "page");
     await expect(collectionNav.getByText("ねこだより", { exact: true })).toBeVisible();
-    await expect(collectionNav.getByText("きょう", { exact: true })).toBeHidden();
+    await expect(collectionNav.getByText("きょう", { exact: true })).toBeVisible();
   });
 
   test("moves the home frame light by time without changing the state2 frame", async ({
@@ -733,8 +733,8 @@ test.describe("home desk model", () => {
     expect(settingsBox).not.toBeNull();
     expect(navBox).not.toBeNull();
 
-    expect(settingsBox?.width).toBe(36);
-    expect(settingsBox?.height).toBe(36);
+    expect(settingsBox?.width).toBe(44);
+    expect(settingsBox?.height).toBe(44);
     expect(actionBox?.height).toBe(48);
     expect(navBox?.height).toBe(60);
 

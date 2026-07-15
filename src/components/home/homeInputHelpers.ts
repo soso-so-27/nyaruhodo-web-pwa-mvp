@@ -35,6 +35,7 @@ export type LatestHypothesisView = {
 export type CatProfile = {
   id: string;
   name: string;
+  nameConfirmedAt?: string;
   createdAt: string;
   updatedAt: string;
   homePhotoDataUrl?: string;
@@ -705,7 +706,9 @@ export function isCatProfileNameUnset(profile: CatProfile | null | undefined) {
 
 function hasUserProfileDetails(profile: CatProfile) {
   return Boolean(
-    profile.coverPhotoDataUrl ||
+    profile.nameConfirmedAt ||
+      profile.updatedAt !== profile.createdAt ||
+      profile.coverPhotoDataUrl ||
       profile.homePhotoDataUrl ||
       profile.basicInfo?.familySinceDate ||
       profile.basicInfo?.birthDate ||
@@ -931,6 +934,7 @@ function normalizeStoredCatProfile(profile: LegacyCatProfile): CatProfile {
   return {
     id: profile.id as string,
     name: profile.name ?? DEFAULT_CAT_NAME,
+    nameConfirmedAt: profile.nameConfirmedAt,
     createdAt: profile.createdAt ?? new Date().toISOString(),
     updatedAt:
       profile.updatedAt ?? profile.createdAt ?? new Date().toISOString(),

@@ -513,6 +513,9 @@ const styles = {
   },
   contentsLink: {
     minWidth: 0,
+    minHeight: 44,
+    display: "flex",
+    alignItems: "center",
     color: color.textStrong,
     fontSize: 13,
     fontWeight: 500,

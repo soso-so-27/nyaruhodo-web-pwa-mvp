@@ -392,13 +392,13 @@ const styles = {
     pointerEvents: "none",
   },
   navLabel: {
-    display: "none",
     color: "currentColor",
     fontFamily: "var(--font-ui)",
     fontSize: "11.5px",
     fontWeight: 500,
     lineHeight: 1,
     letterSpacing: "var(--tracking-label)",
+    opacity: 0.78,
   },
   activeNavLabel: {
     color: "currentColor",

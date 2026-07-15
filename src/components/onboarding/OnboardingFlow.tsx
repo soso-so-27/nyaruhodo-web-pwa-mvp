@@ -1286,6 +1286,33 @@ export function OnboardingFlow() {
           0%, 100% { transform: translateY(0) rotate(-0.8deg); }
           50% { transform: translateY(-5px) rotate(0.5deg); }
         }
+        @media (max-height: 640px) {
+          [data-onboarding-intro="true"] { gap: 6px !important; }
+          [data-onboarding-intro-art="true"] {
+            height: 72px !important;
+            margin: -6px 0 -2px !important;
+          }
+          [data-onboarding-intro-art="true"] img {
+            width: 94px !important;
+            height: 94px !important;
+          }
+          [data-onboarding-exchange-route="true"] {
+            height: 32px !important;
+            margin: -5px 0 !important;
+            transform: scale(0.78);
+          }
+          [data-onboarding-title="true"] {
+            margin-top: 0 !important;
+            font-size: 20px !important;
+            line-height: 1.38 !important;
+          }
+          [data-onboarding-lead="true"] {
+            font-size: 12px !important;
+            line-height: 1.55 !important;
+          }
+          [data-onboarding-cta="true"] { margin-top: 7px !important; }
+          [data-onboarding-footnote="true"] { margin-top: -3px !important; }
+        }
       `}</style>
       <div style={styles.paperBackground} aria-hidden="true" />
       <div style={styles.container}>
@@ -1305,9 +1332,17 @@ export function OnboardingFlow() {
         ) : null}
 
         {!shouldShowExternalBrowserGuide && (state === "intro" || state === "saving") ? (
-          <section style={styles.hero} aria-label="ねてるねこのはじめかた">
+          <section
+            style={styles.hero}
+            aria-label="ねてるねこのはじめかた"
+            data-onboarding-intro={state === "intro" ? "true" : undefined}
+          >
             {state === "intro" ? (
-              <div style={styles.introArtifact} aria-hidden="true">
+              <div
+                style={styles.introArtifact}
+                aria-hidden="true"
+                data-onboarding-intro-art="true"
+              >
                 <img
                   src={catIllustrations.onboardingCat}
                   alt=""
@@ -1319,7 +1354,10 @@ export function OnboardingFlow() {
               </div>
             ) : null}
             {state === "intro" ? <OnboardingExchangeRoute /> : null}
-            <h1 style={styles.title}>
+            <h1
+              style={styles.title}
+              data-onboarding-title={state === "intro" ? "true" : undefined}
+            >
               {state === "saving" ? (
                 "ねこだよりを準備しています"
               ) : (
@@ -1331,7 +1369,7 @@ export function OnboardingFlow() {
               )}
             </h1>
             {state === "intro" ? (
-              <p style={styles.lead}>
+              <p style={styles.lead} data-onboarding-lead="true">
                 自分のねこの寝顔を1枚入れると、
                 <br />
                 どこかのねこの寝顔が1通届きます。
@@ -1357,10 +1395,13 @@ export function OnboardingFlow() {
                   }}
                   fullWidth
                   style={styles.onboardingCta}
+                  data-onboarding-cta="true"
                 >
                   ねがおを1枚入れる
                 </AppButton>
-                <p style={styles.ctaFootnote}>無料・ひとりで作っています</p>
+                <p style={styles.ctaFootnote} data-onboarding-footnote="true">
+                  無料・ひとりで作っています
+                </p>
               </>
             ) : null}
             {message ? <p style={styles.message}>{message}</p> : null}
@@ -1679,7 +1720,11 @@ function OnboardingEnvelopeArt({ compact = false }: { compact?: boolean }) {
 
 function OnboardingExchangeRoute() {
   return (
-    <div style={styles.exchangeRoute} aria-hidden="true">
+    <div
+      style={styles.exchangeRoute}
+      aria-hidden="true"
+      data-onboarding-exchange-route="true"
+    >
       <span style={styles.exchangeRouteIcon}>
         <CameraIcon size={21} />
       </span>
@@ -1741,6 +1786,11 @@ function ExternalBrowserGuide({
       <p style={styles.externalBrowserText}>
         先にSafariやChromeで開くと、写真をそのままホーム画面アプリへ残せます。
       </p>
+      {copied ? (
+        <p style={styles.externalBrowserCopiedText} role="status">
+          コピーしました。SafariやChromeを開き、アドレス欄に貼り付けてください。
+        </p>
+      ) : null}
       <div style={styles.externalBrowserActions}>
         <AppButton
           type="button"
@@ -1749,12 +1799,15 @@ function ExternalBrowserGuide({
           onClick={onCopy}
           style={styles.onboardingCta}
         >
-          {copied ? "URLをコピーしました" : "URLをコピー"}
+          {copied ? "URLをコピーしました" : "URLをコピーする"}
         </AppButton>
         <AppButton type="button" variant="quiet" size="md" onClick={onContinue}>
-          このまま進む
+          このまま試す
         </AppButton>
       </div>
+      <p style={styles.externalBrowserFallbackText}>
+        うまく進まないときは、上の方法でやり直せます。
+      </p>
     </section>
   );
 }
@@ -2417,11 +2470,32 @@ const styles = {
     lineHeight: 1.9,
     letterSpacing: 0,
   },
+  externalBrowserCopiedText: {
+    width: "min(100%, 300px)",
+    margin: 0,
+    padding: "10px 12px",
+    border: "1px solid color-mix(in srgb, var(--seal) 18%, var(--line) 82%)",
+    borderRadius: "var(--radius-md)",
+    background: "color-mix(in srgb, var(--paper-card) 68%, transparent)",
+    color: "var(--ink)",
+    fontFamily: UI_FONT,
+    fontSize: "12px",
+    lineHeight: 1.7,
+    letterSpacing: 0,
+  },
   externalBrowserActions: {
     display: "grid",
     justifyItems: "center",
     gap: "8px",
     width: "100%",
+  },
+  externalBrowserFallbackText: {
+    margin: "-2px 0 0",
+    color: "var(--ink-faint)",
+    fontFamily: UI_FONT,
+    fontSize: "11px",
+    lineHeight: 1.6,
+    letterSpacing: 0,
   },
   introArtifact: {
     width: "min(52vw, 176px)",

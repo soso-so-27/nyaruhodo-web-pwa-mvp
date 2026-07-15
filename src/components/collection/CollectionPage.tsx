@@ -1702,6 +1702,7 @@ function MainichiPhotoBoard({
               <MainichiNaturalMonthBoard
                 month={selectedMonth}
                 pastingPhotoKey={pastingPhotoKey}
+                onOpenDay={onOpenDay}
                 onOpenPhoto={onOpenPhoto}
               />
             </motion.div>
@@ -1984,10 +1985,12 @@ function MainichiMonthPickerSheet({
 function MainichiNaturalMonthBoard({
   month,
   pastingPhotoKey,
+  onOpenDay,
   onOpenPhoto,
 }: {
   month: MainichiBoardMonth;
   pastingPhotoKey: string | null;
+  onOpenDay: (dateKey: string, source?: MainichiMorphSource | null) => void;
   onOpenPhoto: (
     photo: MainichiBoardPhoto,
     month: MainichiBoardMonth,
@@ -1998,6 +2001,7 @@ function MainichiNaturalMonthBoard({
   const [decodedPhotoKeys, setDecodedPhotoKeys] = useState<Set<string>>(
     () => new Set(),
   );
+  const [isDayBrowseOpen, setIsDayBrowseOpen] = useState(false);
 
   useEffect(() => {
     let active = true;
@@ -2080,6 +2084,19 @@ function MainichiNaturalMonthBoard({
       data-testid="mainichi-month-board"
       aria-label={month.label}
     >
+      {photos.length > MAINICHI_BOARD_DIRECT_PHOTO_LIMIT ? (
+        <div style={styles.mainichiDayBrowseAction}>
+          <AppButton
+            type="button"
+            variant="quiet"
+            size="sm"
+            data-testid="mainichi-day-browse-button"
+            onClick={() => setIsDayBrowseOpen(true)}
+          >
+            日ごとに見る
+          </AppButton>
+        </div>
+      ) : null}
       <div
         style={{
           ...styles.mainichiBoardPhotos,
@@ -2166,6 +2183,16 @@ function MainichiNaturalMonthBoard({
           );
         })}
       </div>
+      {isDayBrowseOpen ? (
+        <MainichiMonthBundleSheet
+          month={month}
+          onClose={() => setIsDayBrowseOpen(false)}
+          onOpenDay={(dateKey) => {
+            setIsDayBrowseOpen(false);
+            onOpenDay(dateKey);
+          }}
+        />
+      ) : null}
     </AppCard>
   );
 }
@@ -6181,6 +6208,11 @@ const styles = {
     transformOrigin: "50% 22%",
     transition:
       "transform var(--dur-instant) var(--ease-settle), filter var(--dur-instant) var(--ease-gentle)",
+  },
+  mainichiDayBrowseAction: {
+    display: "flex",
+    justifyContent: "center",
+    padding: "2px 0 10px",
   },
   mainichiNaturalPhotoButton: {
     position: "absolute",

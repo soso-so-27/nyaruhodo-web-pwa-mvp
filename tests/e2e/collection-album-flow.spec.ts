@@ -1459,6 +1459,8 @@ test.describe("collection album flow", () => {
       55,
       { timeout: 10_000 },
     );
+    await page.getByTestId("mainichi-day-browse-button").click();
+    await expect(page.getByTestId("mainichi-month-bundle-day")).toHaveCount(1);
   });
 
   test("opens a delivered mainichi photo directly and hides it from fullscreen", async ({

@@ -35,10 +35,6 @@ import {
   readClientReferralSummary,
   type ClientReferralSummary,
 } from "../../lib/referrals/client";
-import {
-  getDisplayEnvironment,
-  type DisplayEnvironment,
-} from "../../lib/displayEnvironment";
 import { createBrowserSupabaseClient } from "../../lib/supabase/browser";
 import {
   APP_ACCENT,
@@ -107,8 +103,6 @@ export function SettingsPage() {
   >("loading");
   const [syncNeedsAuthRecovery, setSyncNeedsAuthRecovery] = useState(false);
   const [authDebug, setAuthDebug] = useState<AuthDebugSnapshot | null>(null);
-  const [displayEnvironment, setDisplayEnvironment] =
-    useState<DisplayEnvironment>("unknown");
   const [isStockAdding, setIsStockAdding] = useState(false);
   const [isDeliveryDiagnosticsLoading, setIsDeliveryDiagnosticsLoading] =
     useState(false);
@@ -162,9 +156,6 @@ export function SettingsPage() {
     useState<ClientReferralSummary | null>(null);
   const [referralMessage, setReferralMessage] = useState("");
   const [omoideDisabled, setOmoideDisabled] = useState(false);
-  const [notificationPermission, setNotificationPermission] = useState<
-    NotificationPermission | "unsupported"
-  >("default");
   const hasRunAccountAutoSync = useRef(false);
   const showsAdminSection =
     adminCapabilities.isAdmin ||
@@ -174,7 +165,6 @@ export function SettingsPage() {
     useState<SettingsTab>("general");
 
   useEffect(() => {
-    setDisplayEnvironment(getDisplayEnvironment());
     setOmoideDisabled(readOmoideMemoryControls().disabled === true);
     refreshKeptExchangeDebug();
     refreshEveningDeliveryTrace();
@@ -215,16 +205,6 @@ export function SettingsPage() {
     }
     setIsLoading(false);
   }
-
-  useEffect(() => {
-    if (typeof window === "undefined") {
-      return;
-    }
-
-    setNotificationPermission(
-      "Notification" in window ? Notification.permission : "unsupported",
-    );
-  }, []);
 
   async function refreshReferralSummary() {
     const summary = await readClientReferralSummary();
@@ -394,23 +374,6 @@ export function SettingsPage() {
     if (trigger === "manual") {
       setIsSyncing(false);
     }
-  }
-
-  async function handleNotificationPermissionRequest() {
-    if (typeof window === "undefined" || !("Notification" in window)) {
-      setNotificationPermission("unsupported");
-      return;
-    }
-
-    const permission = await Notification.requestPermission().catch(
-      () => Notification.permission,
-    );
-    setNotificationPermission(permission);
-    trackProductEvent("notification_permission_requested", {
-      route: "/settings",
-      permission,
-      surface: "settings",
-    });
   }
 
   async function handleStockPhotoImport() {
@@ -818,19 +781,6 @@ export function SettingsPage() {
         </section>
         ) : null}
 
-        <section style={{ ...styles.section, order: 3 }}>
-          <p style={styles.sectionLabel}>通知</p>
-          <AppCard variant="outlined" padding="sm" style={styles.card}>
-            <NotificationSettingsPanel
-              environment={displayEnvironment}
-              permission={notificationPermission}
-              onRequestPermission={() => {
-                void handleNotificationPermissionRequest();
-              }}
-            />
-          </AppCard>
-        </section>
-
         <section style={{ ...styles.section, order: 4 }}>
           <p style={styles.sectionLabel}>思い出便</p>
           <AppCard variant="outlined" padding="sm" style={styles.card}>
@@ -846,19 +796,23 @@ export function SettingsPage() {
                 role="switch"
                 aria-label="思い出便を 受け取る"
                 aria-checked={!omoideDisabled}
-                style={{
-                  ...styles.switchButton,
-                  ...(!omoideDisabled ? styles.switchButtonOn : {}),
-                }}
+                style={styles.switchButton}
                 onClick={handleOmoideDisabledToggle}
               >
                 <span
                   style={{
-                    ...styles.switchKnob,
-                    ...(!omoideDisabled ? styles.switchKnobOn : {}),
+                    ...styles.switchTrack,
+                    ...(!omoideDisabled ? styles.switchTrackOn : {}),
                   }}
                   aria-hidden="true"
-                />
+                >
+                  <span
+                    style={{
+                      ...styles.switchKnob,
+                      ...(!omoideDisabled ? styles.switchKnobOn : {}),
+                    }}
+                  />
+                </span>
               </button>
             </div>
           </AppCard>
@@ -1205,78 +1159,6 @@ function BetaSupporterPanel({
         {billingStatus.isBetaSupporter
           ? "応援内容を確認する"
           : "βサポーターについて"}
-      </AppButton>
-    </div>
-  );
-}
-
-function NotificationSettingsPanel({
-  environment,
-  permission,
-  onRequestPermission,
-}: {
-  environment: DisplayEnvironment;
-  permission: NotificationPermission | "unsupported";
-  onRequestPermission: () => void;
-}) {
-  if (environment !== "standalone") {
-    return (
-      <div style={styles.betaNote}>
-        <p style={styles.betaNoteTitle}>Push通知はホーム画面アプリで使えます</p>
-        <p style={styles.betaNoteText}>
-          よる8時のPush配信は、アプリ側で準備中です。通知を使うときは、ホーム画面に追加したねてるねこから設定します。
-        </p>
-      </div>
-    );
-  }
-
-  if (permission === "granted") {
-    return (
-      <div style={styles.betaNote}>
-        <p style={styles.betaNoteTitle}>通知は許可されています（この端末の設定）</p>
-        <p style={styles.betaNoteText}>
-          よる8時のPush配信は、アプリ側で準備中です。配信がはじまるまで通知は届きません。
-        </p>
-      </div>
-    );
-  }
-
-  if (permission === "denied") {
-    return (
-      <div style={styles.betaNote}>
-        <p style={styles.betaNoteTitle}>通知はオフです</p>
-        <p style={styles.betaNoteText}>
-          iPhoneの設定 &gt; ねてるねこ &gt; 通知 から変えられます。
-        </p>
-      </div>
-    );
-  }
-
-  if (permission === "unsupported") {
-    return (
-      <div style={styles.betaNote}>
-        <p style={styles.betaNoteTitle}>この端末では通知を使えません</p>
-        <p style={styles.betaNoteText}>
-          ホーム画面アプリで開いているか、端末の通知設定を確認してください。
-        </p>
-      </div>
-    );
-  }
-
-  return (
-    <div style={styles.betaNote}>
-      <p style={styles.betaNoteTitle}>よる8時のPush通知（準備中）</p>
-      <p style={styles.betaNoteText}>
-        ねこだよりの時間を思い出すための通知です。今は許可設定だけ準備しています。
-      </p>
-      <AppButton
-        type="button"
-        variant="ghost"
-        fullWidth
-        style={styles.settingsActionButton}
-        onClick={onRequestPermission}
-      >
-        通知を許可する
       </AppButton>
     </div>
   );
@@ -2290,6 +2172,17 @@ const styles = {
   },
   switchButton: {
     flex: "0 0 auto",
+    width: "54px",
+    height: "44px",
+    padding: 0,
+    border: "none",
+    background: "transparent",
+    display: "grid",
+    placeItems: "center",
+    cursor: "pointer",
+  },
+  switchTrack: {
+    display: "block",
     width: "46px",
     height: "28px",
     padding: "3px",
@@ -2300,8 +2193,9 @@ const styles = {
     background: "rgba(120,108,94,0.12)",
     cursor: "pointer",
     transition: "background 160ms ease, border-color 160ms ease",
+    boxSizing: "border-box",
   },
-  switchButtonOn: {
+  switchTrackOn: {
     borderColor: "color-mix(in srgb, var(--seal) 62%, transparent)",
     background: "color-mix(in srgb, var(--seal) 42%, var(--paper) 58%)",
   },
@@ -2620,7 +2514,7 @@ const styles = {
     cursor: "pointer",
   },
   accountInlineButton: {
-    minHeight: "36px",
+    minHeight: "44px",
     padding: "0 12px",
     border: "1px solid rgba(120, 108, 94, 0.12)",
     background: "rgba(255, 253, 248, 0.3)",

@@ -43,7 +43,7 @@ These rules are permanent. Specs do not restate them. If a spec or doc conflicts
 ### Fixed values
 
 - Delivery: daily 20:00 JST. Exchange opens at server time 19:55:00 (5-minute tolerance). Moderation cutoff is 19:55; the review-schedule canon is `docs/MODERATION-CANON.md` §4.
-- Price: ¥1,480 (tax excluded) = ¥1,628 (tax included) per month.
+- Price: ¥1,500 (tax excluded) = ¥1,650 (tax included) per month.
 
 ### Operational discipline
 

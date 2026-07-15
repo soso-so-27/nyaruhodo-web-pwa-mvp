@@ -128,6 +128,8 @@ test.describe("settings page organization", () => {
       name: /思い出便を 受け取る/,
     });
     await expect(switchControl).toHaveAttribute("aria-checked", "false");
+    const switchBox = await switchControl.boundingBox();
+    expect(switchBox?.height).toBeGreaterThanOrEqual(44);
 
     await switchControl.click();
 

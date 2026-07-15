@@ -209,6 +209,7 @@ export function CatsPage() {
     useState(false);
   const [isOnboardingExistingCat, setIsOnboardingExistingCat] = useState(false);
   const [isOnboardingAlbumCreated, setIsOnboardingAlbumCreated] = useState(false);
+  const [isDirectProfileRecovery, setIsDirectProfileRecovery] = useState(false);
   const [editFamilySinceDate, setEditFamilySinceDate] = useState("");
   const [editBirthDate, setEditBirthDate] = useState("");
   const [editGender, setEditGender] = useState<EditableGender>("");
@@ -287,7 +288,9 @@ export function CatsPage() {
   const isOnboardingProfileSetup = isOnboardingMode && isEditingProfile;
   const isOnboardingCompletionView =
     isOnboardingMode && isOnboardingCompletionReady && !isEditingProfile;
-  const canManageCats = !isOnboardingProfileSetup && !isOnboardingCompletionView;
+  const isFocusedProfileSetup =
+    isOnboardingProfileSetup || isDirectProfileRecovery;
+  const canManageCats = !isFocusedProfileSetup && !isOnboardingCompletionView;
   const shouldShowCatSwitchButton = catProfiles.length > 1 && canManageCats;
   const shouldShowPhotoLensSwitch =
     catProfiles.length > 1 &&
@@ -436,16 +439,21 @@ export function CatsPage() {
 
     const shouldEditOnboardingProfile =
       onboardingMode && isCatProfileNameUnset(activeProfile);
+    const shouldRecoverDirectProfile =
+      !onboardingMode && isCatProfileNameUnset(activeProfile);
 
     setCatProfiles(savedCatProfiles);
     setActiveCatId(activeProfile.id);
     setCatNameInput(
-      shouldEditOnboardingProfile ? "" : getCatName(activeProfile),
+      shouldEditOnboardingProfile || shouldRecoverDirectProfile
+        ? ""
+        : getCatName(activeProfile),
     );
     setIsOnboardingMode(onboardingMode);
     setIsOnboardingCompletionReady(onboardingCompletionReady);
     setIsOnboardingExistingCat(onboardingMode && !shouldEditOnboardingProfile);
-    if (shouldEditOnboardingProfile) {
+    setIsDirectProfileRecovery(shouldRecoverDirectProfile);
+    if (shouldEditOnboardingProfile || shouldRecoverDirectProfile) {
       setIsEditingCatName(true);
       setIsEditingProfile(true);
     }
@@ -835,9 +843,13 @@ export function CatsPage() {
         vaccineDate: editVaccineDate,
         vaccineNote: editVaccineNote,
       });
+      const savedAt = new Date().toISOString();
       const nextProfile = {
         ...profiles[index],
         name: catNameInput.trim() || profiles[index].name,
+        nameConfirmedAt: isFocusedProfileSetup
+          ? savedAt
+          : profiles[index].nameConfirmedAt,
         basicInfo: {
           familySinceDate: editFamilySinceDate || undefined,
           birthDate: editBirthDate || undefined,
@@ -850,7 +862,7 @@ export function CatsPage() {
           ...(profiles[index].appearance ?? {}),
           coat: editCoat.trim() || undefined,
         },
-        updatedAt: new Date().toISOString(),
+        updatedAt: savedAt,
       } satisfies CatProfile;
       const nextProfiles = profiles.map((profile, profileIndex) =>
         profileIndex === index ? nextProfile : profile,
@@ -878,6 +890,9 @@ export function CatsPage() {
       setIsEditingCatName(false);
       setIsEditingProfile(false);
       setIsCatManageEditing(false);
+      if (isDirectProfileRecovery) {
+        setIsDirectProfileRecovery(false);
+      }
       const shouldCloseCatManageAfterSave = catManageEditSource !== "manage";
       setCatManageEditSource(null);
       if (isOnboardingMode) {
@@ -1354,51 +1369,61 @@ export function CatsPage() {
       `}</style>
       <PageBackdrop />
       <div style={styles.container}>
-        {isOnboardingMode ? (
+        {isOnboardingMode || isDirectProfileRecovery ? (
           <AppCard
             variant="section"
             padding="md"
             style={styles.onboardingPanel}
-            aria-label="オンボーディング"
+            aria-label={isDirectProfileRecovery ? "うちのこ登録" : "オンボーディング"}
           >
             <p style={styles.onboardingKicker}>
-              {isEditingProfile
-                ? "このねこの場所"
-                : isOnboardingExistingCat && !isOnboardingAlbumCreated
-                  ? "アルバムに入りました"
-                  : "アルバムができました"}
+              {isDirectProfileRecovery
+                ? "うちのこ"
+                : isEditingProfile
+                  ? "このねこの場所"
+                  : isOnboardingExistingCat && !isOnboardingAlbumCreated
+                    ? "アルバムに入りました"
+                    : "アルバムができました"}
             </p>
             <h2 style={styles.onboardingTitle}>
-              {isEditingProfile ? "このねこの名前は？" : "また寝ていたら、ここへ。"}
+              {isDirectProfileRecovery
+                ? "この子の名前は？"
+                : isEditingProfile
+                  ? "このねこの名前は？"
+                  : "また寝ていたら、ここへ。"}
             </h2>
-            {isEditingProfile ? (
+            {isEditingProfile || isDirectProfileRecovery ? (
               <p style={styles.onboardingText}>
                 名前だけで大丈夫です。あとから変えられます。
               </p>
             ) : null}
             {!isEditingProfile ? (
-              <AppButton
-                href="/home"
-                onClick={clearOnboardingAlbumCompletionReady}
-                variant="secondary"
-                size="md"
-                style={styles.onboardingHomeButton}
-              >
-                ねてるねこへ
-              </AppButton>
+              !isDirectProfileRecovery ? (
+                <AppButton
+                  href="/home"
+                  onClick={clearOnboardingAlbumCompletionReady}
+                  variant="secondary"
+                  size="md"
+                  style={styles.onboardingHomeButton}
+                >
+                  ねてるねこへ
+                </AppButton>
+              ) : null
             ) : null}
           </AppCard>
         ) : null}
 
-        {activeCatProfile && !isOnboardingCompletionView ? (
+        {activeCatProfile &&
+        !isOnboardingCompletionView &&
+        (!isDirectProfileRecovery || isEditingProfile) ? (
           <div
             style={
-              isOnboardingProfileSetup
+              isFocusedProfileSetup
                 ? styles.onboardingProfileCard
                 : styles.profilePlaceCard
             }
           >
-            {!isOnboardingProfileSetup ? (
+            {!isFocusedProfileSetup ? (
               <>
                 <div style={styles.profileCoverHero}>
                   <div
@@ -1537,7 +1562,7 @@ export function CatsPage() {
 
             {isEditingProfile ? (
               <>
-                {!isOnboardingProfileSetup ? <hr style={styles.divider} /> : null}
+                {!isFocusedProfileSetup ? <hr style={styles.divider} /> : null}
                 {isEditingCatName ? (
                   <AppCard
                     as="div"
@@ -1545,7 +1570,7 @@ export function CatsPage() {
                     padding="sm"
                     style={{
                       ...styles.editor,
-                      ...(isOnboardingProfileSetup ? styles.onboardingEditor : {}),
+                      ...(isFocusedProfileSetup ? styles.onboardingEditor : {}),
                     }}
                   >
                     <AppTextField
@@ -1556,7 +1581,7 @@ export function CatsPage() {
                       onChange={(event) => setCatNameInput(event.target.value)}
                       placeholder={isOnboardingProfileSetup ? "例：むぎ" : "例：ミケ"}
                     />
-                    {!isOnboardingProfileSetup ? (
+                    {!isFocusedProfileSetup ? (
                       <>
                         <AppTextField
                           type="date"
@@ -1592,13 +1617,14 @@ export function CatsPage() {
                     ) : null}
 
                     <div style={styles.actions}>
-                      {isOnboardingProfileSetup ? (
+                      {isFocusedProfileSetup ? (
                         <AppButton
                           type="button"
                           onClick={handleSaveProfile}
                           size="md"
+                          disabled={isSavingProfile || !catNameInput.trim()}
                         >
-                          アルバムをつくる
+                          {isDirectProfileRecovery ? "登録する" : "アルバムをつくる"}
                         </AppButton>
                       ) : (
                         <AppButton type="button" onClick={handleSaveProfile} variant="primary" size="md">
@@ -1609,7 +1635,7 @@ export function CatsPage() {
                   </AppCard>
                 ) : null}
 
-                {!isOnboardingProfileSetup ? (
+                {!isFocusedProfileSetup ? (
                   <>
                     <AppTextField
                       type="text"
@@ -1635,7 +1661,7 @@ export function CatsPage() {
         ) : null}
 
         {activeCatProfile &&
-        !isOnboardingProfileSetup &&
+        !isFocusedProfileSetup &&
         !isOnboardingCompletionView ? (
           <UchinokoSectionTabs
             value={activeSection}
@@ -1648,7 +1674,7 @@ export function CatsPage() {
           />
         ) : null}
 
-        {!isOnboardingProfileSetup ? (
+        {!isFocusedProfileSetup ? (
         <div
           ref={tabContentScrollerRef}
           data-testid="cats-tab-scroll"
@@ -1795,7 +1821,7 @@ export function CatsPage() {
         </div>
         ) : null}
       </div>
-      {!isOnboardingProfileSetup && !isOnboardingCompletionView ? (
+      {!isFocusedProfileSetup && !isOnboardingCompletionView ? (
         <BottomNavigation active="cats" />
       ) : null}
       {isCatManageOpen && activeCatProfile ? (

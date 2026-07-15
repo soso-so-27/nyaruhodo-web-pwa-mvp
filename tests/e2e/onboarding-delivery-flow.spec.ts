@@ -520,7 +520,7 @@ test.describe("onboarding delivery flow", () => {
     await expect(
       page.getByRole("heading", { name: "SafariやChromeで 開くと安心です" }),
     ).toBeVisible();
-    await page.getByRole("button", { name: "このまま進む" }).click();
+    await page.getByRole("button", { name: "このまま試す" }).click();
     await page.locator("main button").first().click();
     await page.locator('input[type="file"]').last().setInputFiles({
       name: "own-sleeping.png",
@@ -668,6 +668,20 @@ test.describe("onboarding delivery flow", () => {
     await page.goto("/home");
     await page.waitForLoadState("networkidle");
     await expect(page.getByText("iPhoneでホームに置く")).toHaveCount(0);
+  });
+
+  test("keeps the first photo action inside a compact phone viewport", async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width: 320, height: 568 });
+    await page.goto("/onboarding?reset=1&source=direct");
+
+    const action = page.getByTestId("onboarding-photo-select");
+    await expect(action).toBeVisible();
+    const actionBox = await action.boundingBox();
+    expect(actionBox).not.toBeNull();
+    expect(actionBox!.y).toBeGreaterThanOrEqual(0);
+    expect(actionBox!.y + actionBox!.height).toBeLessThanOrEqual(568);
   });
 
   test("records src attribution on app open and onboarding intro", async ({
@@ -924,7 +938,7 @@ test.describe("onboarding delivery flow", () => {
       page.getByRole("button", { name: "ねがおを1枚入れる" }),
     ).toHaveCount(0);
 
-    await page.getByRole("button", { name: "このまま進む" }).click();
+    await page.getByRole("button", { name: "このまま試す" }).click();
     await expect(
       page.getByRole("button", { name: "ねがおを1枚入れる" }),
     ).toBeVisible();
@@ -947,7 +961,7 @@ test.describe("onboarding delivery flow", () => {
     await expect(
       page.getByRole("heading", { name: "SafariやChromeで 開くと安心です" }),
     ).toBeVisible();
-    await page.getByRole("button", { name: "このまま進む" }).click();
+    await page.getByRole("button", { name: "このまま試す" }).click();
     await page.getByTestId("onboarding-photo-select").click();
     await page.locator('input[type="file"]').last().setInputFiles({
       name: "line-photo.jpg",
@@ -1236,6 +1250,10 @@ test.describe("onboarding delivery flow", () => {
       window.localStorage.removeItem("onboarding_completed");
       window.localStorage.removeItem("neteruneko_onboarding_progress");
       window.localStorage.removeItem("neteruneko_pending_referral_code");
+      Object.defineProperty(window.navigator, "clipboard", {
+        configurable: true,
+        value: { writeText: async () => undefined },
+      });
     });
 
     await page.goto("/onboarding?source=instagram_bio");
@@ -1251,6 +1269,15 @@ test.describe("onboarding delivery flow", () => {
     await expect(
       page.getByRole("button", { name: "ねがおを1枚入れる" }),
     ).toHaveCount(0);
+    await page.getByRole("button", { name: "URLをコピーする" }).click();
+    await expect(
+      page.getByText(
+        "コピーしました。SafariやChromeを開き、アドレス欄に貼り付けてください。",
+      ),
+    ).toBeVisible();
+    await expect(
+      page.getByRole("button", { name: "このまま試す" }),
+    ).toBeVisible();
   });
 
   test("resets local onboarding test data from an explicit reset link", async ({
@@ -1976,6 +2003,30 @@ test.describe("onboarding delivery flow", () => {
     await expect(page.getByText("アルバムができました")).toHaveCount(0);
   });
 
+  test("recovers an unnamed default cat before showing the regular cats tabs", async ({
+    page,
+  }) => {
+    await seedCatProfileBeforeLoad(page, {
+      id: "local-cat-direct-empty",
+      name: "ミケ",
+    });
+
+    await page.goto("/cats");
+
+    await expect(
+      page.getByRole("heading", { name: "この子の名前は？" }),
+    ).toBeVisible();
+    await expect(page.getByRole("tab")).toHaveCount(0);
+    await page.getByLabel("この子の名前").fill("ミケ");
+    await page.getByRole("button", { name: "登録する" }).click();
+    await expect(page.getByRole("radio", { name: "記録" })).toBeVisible();
+
+    await page.reload();
+    await expect(
+      page.getByRole("heading", { name: "この子の名前は？" }),
+    ).toHaveCount(0);
+  });
+
   test("treats the default cat name with profile details as an existing cat", async ({
     page,
   }) => {
@@ -2063,6 +2114,10 @@ async function seedCatProfileBeforeLoad(page: Page, input: {
   coverPhotoDataUrl?: string;
 }) {
   await page.addInitScript((profileInput) => {
+    if (window.localStorage.getItem("cat_profiles")) {
+      return;
+    }
+
     const now = new Date().toISOString();
 
     window.localStorage.setItem(

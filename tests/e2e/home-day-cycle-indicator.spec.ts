@@ -805,6 +805,7 @@ async function seedHomeState(
           {
             id: "cat-home",
             name: "ミケ",
+            nameConfirmedAt: new Date(nowValue).toISOString(),
             createdAt: new Date(nowValue).toISOString(),
             updatedAt: new Date(nowValue).toISOString(),
           },

@@ -22,6 +22,13 @@ test.describe("β supporter page", () => {
 
     await expect(page.getByRole("heading", { name: "ねてるねこを、一緒に育てる。" })).toBeVisible();
     await expect(page.getByRole("navigation", { name: "このページの内容" })).toBeVisible();
+    for (const link of await page
+      .getByRole("navigation", { name: "このページの内容" })
+      .getByRole("link")
+      .all()) {
+      const box = await link.boundingBox();
+      expect(box?.height).toBeGreaterThanOrEqual(44);
+    }
     await expect(page.getByText("月額 1,500円（税別）")).toBeVisible();
     await expect(page.getByText(/1,650円/)).toHaveCount(0);
     await expect(page.getByRole("link", { name: "Googleでログイン" })).toBeVisible();

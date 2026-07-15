@@ -82,6 +82,26 @@ test.describe("beta release smoke", () => {
     }
   });
 
+  test("how-to-use explains delivery and private choices", async ({ page }) => {
+    await page.setViewportSize({ width: 390, height: 844 });
+    await page.addInitScript(() => {
+      Object.defineProperty(window.navigator, "userAgent", {
+        configurable: true,
+        get: () =>
+          "Mozilla/5.0 (iPhone; CPU iPhone OS 18_5 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.5 Mobile/15E148 Safari/604.1",
+      });
+    });
+    await page.goto("/how-to-use");
+
+    await expect(
+      page.getByText(/「届ける」でねがおをのこした日/),
+    ).toBeVisible();
+    await expect(
+      page.getByText(/「自分だけ」でのこした写真/),
+    ).toBeVisible();
+    await expect(page.getByText("きょうの2まい")).toHaveCount(0);
+  });
+
   test("PWA manifest and install icons are reachable", async ({ request }) => {
     const manifestResponse = await request.get("/manifest.webmanifest");
 

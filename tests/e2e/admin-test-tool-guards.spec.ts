@@ -91,10 +91,10 @@ test.describe("admin test tool guards", () => {
       page.getByRole("button", { name: "とどくねがおを追加する" }),
     ).toHaveCount(0);
     await expect(page.getByText("データの削除・退会")).toBeVisible();
-    await expect(page.getByText("通知", { exact: true })).toBeVisible();
+    await expect(page.getByText("通知", { exact: true })).toHaveCount(0);
     await expect(
       page.getByText("Push通知はホーム画面アプリで使えます"),
-    ).toBeVisible();
+    ).toHaveCount(0);
     await expect(
       page.getByRole("button", { name: "この端末をアカウントに保存" }),
     ).toHaveCount(0);
