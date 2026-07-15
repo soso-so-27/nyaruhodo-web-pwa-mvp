@@ -182,19 +182,20 @@ export function UserDeviceGate({ children }: UserDeviceGateProps) {
         .deviceGateLabel {
           margin: 0 0 18px;
           color: var(--seal);
-          font-family: var(--font-display);
-          font-size: 15px;
-          letter-spacing: 0.14em;
+          font-family: var(--font-ui);
+          font-size: 13px;
+          font-weight: 500;
+          letter-spacing: 0.08em;
         }
 
         .deviceGatePanel h1 {
           margin: 0;
           color: var(--ink);
-          font-family: var(--font-display);
+          font-family: var(--font-ui);
           font-size: clamp(28px, 4vw, 40px);
-          font-weight: 400;
-          line-height: 1.55;
-          letter-spacing: 0.06em;
+          font-weight: 500;
+          line-height: 1.5;
+          letter-spacing: 0.02em;
         }
 
         .deviceGateLead,

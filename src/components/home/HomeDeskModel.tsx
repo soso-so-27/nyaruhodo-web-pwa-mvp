@@ -74,6 +74,7 @@ type HomeDeskModelProps = {
   showGuidanceCopy: boolean;
   showSleepingCounter: boolean;
   showOnboardingSecondPhotoAction?: boolean;
+  onDismissOnboardingSecondPhotoAction?: () => void;
   now: number;
   onTakePhoto: () => void;
   onOpenDelivery: (
@@ -267,6 +268,7 @@ export function HomeDeskModel({
   ownSleepingPhotos,
   sleepingCounter,
   showOnboardingSecondPhotoAction = false,
+  onDismissOnboardingSecondPhotoAction,
   now,
   onTakePhoto,
   onOpenDelivery,
@@ -352,10 +354,14 @@ export function HomeDeskModel({
     hasUnopenedDeliveryNotification ||
     (homeDay.phase !== "opened" && !shouldSuppressEmptyBeforeNotice);
   const shouldShowNotificationTray = shouldShowBaseNotice;
+  const isOnboardingSecondPhotoMode =
+    showOnboardingSecondPhotoAction &&
+    (deskState === "1" || deskState === "1b");
+  const isOnboardingSecondPhotoForTomorrow =
+    deskState === "1b" || homeDay.phase === "empty-after";
   const shouldShowHomeFrameTakeButton =
     (deskState === "1" && homeDay.phase === "empty-before") ||
-    (showOnboardingSecondPhotoAction &&
-      (deskState === "1" || deskState === "1b"));
+    isOnboardingSecondPhotoMode;
   const homeCaptureHint =
     homeDay.phase === "empty-before"
       ? "きょうの一枚を、よる8時のねこだよりに。"
@@ -596,6 +602,9 @@ export function HomeDeskModel({
                     style={{
                       ...deskStyles.homeFrame,
                       ...(deskState === "3" ? deskStyles.homeFrameDelivered : {}),
+                      ...(isOnboardingSecondPhotoMode
+                        ? deskStyles.homeFrameOnboardingSecondPhoto
+                        : {}),
                     }}
                   >
                     <StoredPhotoImage
@@ -616,7 +625,14 @@ export function HomeDeskModel({
                     />
                   </span>
                 </button>
-                {shouldShowHomeFrameTakeButton ? (
+                {isOnboardingSecondPhotoMode ? (
+                  <OnboardingSecondPhotoInvitation
+                    forTomorrow={isOnboardingSecondPhotoForTomorrow}
+                    onTakePhoto={onTakePhoto}
+                    onDismiss={onDismissOnboardingSecondPhotoAction}
+                    actionTestId="home-retake-action"
+                  />
+                ) : shouldShowHomeFrameTakeButton ? (
                   <div style={deskStyles.homePhotoActions}>
                     <button
                       type="button"
@@ -654,10 +670,22 @@ export function HomeDeskModel({
             ) : (
               <div
                 data-testid="desk-empty-frame"
-                style={deskStyles.homeEmptyFrame}
+                style={{
+                  ...deskStyles.homeEmptyFrame,
+                  ...(isOnboardingSecondPhotoMode
+                    ? deskStyles.homeEmptyFrameOnboardingSecondPhoto
+                    : {}),
+                }}
               >
-                <SleepingCatPlaceholder />
-                {shouldShowHomeFrameTakeButton ? (
+                <SleepingCatPlaceholder compact={isOnboardingSecondPhotoMode} />
+                {isOnboardingSecondPhotoMode ? (
+                  <OnboardingSecondPhotoInvitation
+                    forTomorrow={isOnboardingSecondPhotoForTomorrow}
+                    onTakePhoto={onTakePhoto}
+                    onDismiss={onDismissOnboardingSecondPhotoAction}
+                    actionTestId="home-empty-action"
+                  />
+                ) : shouldShowHomeFrameTakeButton ? (
                   <div style={deskStyles.homeEmptyActionGroup}>
                     <button
                       type="button"
@@ -1984,7 +2012,66 @@ function HomeLetterTrayText({
   return null;
 }
 
-function SleepingCatPlaceholder() {
+function OnboardingSecondPhotoInvitation({
+  forTomorrow,
+  onTakePhoto,
+  onDismiss,
+  actionTestId,
+}: {
+  forTomorrow: boolean;
+  onTakePhoto: () => void;
+  onDismiss?: () => void;
+  actionTestId: string;
+}) {
+  return (
+    <div
+      style={deskStyles.onboardingSecondPhotoInvitation}
+      data-testid="onboarding-second-photo-invitation"
+    >
+      <p style={deskStyles.onboardingSecondPhotoKicker}>
+        {forTomorrow ? "あしたのぶん" : "きょうのつづき"}
+      </p>
+      <p
+        style={deskStyles.onboardingSecondPhotoTitle}
+        data-testid="onboarding-second-photo-title"
+      >
+        {forTomorrow
+          ? "あしたの一通も、つくりませんか"
+          : "よる8時の一通も、つくりませんか"}
+      </p>
+      <p style={deskStyles.onboardingSecondPhotoBody}>
+        {forTomorrow
+          ? "あしたのねこだよりに入れるねがおを一枚。"
+          : "さっきとは別のねがおを一枚。"}
+      </p>
+      <button
+        type="button"
+        data-testid={actionTestId}
+        style={deskStyles.onboardingSecondPhotoAction}
+        onClick={onTakePhoto}
+      >
+        <AppIcon
+          name="camera"
+          size={16}
+          style={deskStyles.homeEmptyActionIcon}
+        />
+        <span>{forTomorrow ? "あしたの一枚を とる" : "今夜の一枚を とる"}</span>
+      </button>
+      {onDismiss ? (
+        <button
+          type="button"
+          style={deskStyles.onboardingSecondPhotoDismiss}
+          onClick={onDismiss}
+          data-testid="onboarding-second-photo-skip"
+        >
+          今日はここまで
+        </button>
+      ) : null}
+    </div>
+  );
+}
+
+function SleepingCatPlaceholder({ compact = false }: { compact?: boolean }) {
   const catIllustrations = useCatIllustrationAssets();
   const illustrationVariant = useCatIllustrationVariant();
 
@@ -1999,6 +2086,7 @@ function SleepingCatPlaceholder() {
         aria-hidden="true"
         style={{
           ...deskStyles.sleepingCatInkMask,
+          ...(compact ? deskStyles.sleepingCatPlaceholderCompact : {}),
           maskImage: `url('${maskSrc}')`,
           WebkitMaskImage: `url('${maskSrc}')`,
         }}
@@ -2011,7 +2099,10 @@ function SleepingCatPlaceholder() {
       src={catIllustrations.homeEmptyCat}
       alt=""
       aria-hidden="true"
-      style={deskStyles.sleepingCatPlaceholder}
+      style={{
+        ...deskStyles.sleepingCatPlaceholder,
+        ...(compact ? deskStyles.sleepingCatPlaceholderCompact : {}),
+      }}
       draggable={false}
       onError={(event) =>
         fallBackCatIllustrationImage(event.currentTarget, "homeEmptyCat")
@@ -2366,6 +2457,14 @@ const deskStyles = {
     transition:
       "background var(--home-daylight-transition, 1800ms) var(--ease-gentle), box-shadow var(--home-daylight-transition, 1800ms) var(--ease-gentle)",
   },
+  homeFrameOnboardingSecondPhoto: {
+    width: "min(56vw, 210px)",
+    aspectRatio: "1 / 1",
+    padding: "7px",
+    borderRadius: "14px",
+    background:
+      "color-mix(in srgb, var(--home-frame-light, var(--paper-card)) 82%, transparent)",
+  },
   homeFrameDelivered: {
     width: "100%",
   },
@@ -2424,6 +2523,11 @@ const deskStyles = {
     color: "var(--ink-soft)",
     boxShadow: "none",
     transition: "filter 220ms var(--ease-gentle)",
+  },
+  homeEmptyFrameOnboardingSecondPhoto: {
+    minHeight: "min(56dvh, 420px)",
+    gap: "14px",
+    padding: "24px 16px 18px",
   },
   homeEmptyActionGroup: {
     position: "relative",
@@ -2485,6 +2589,88 @@ const deskStyles = {
   homeCaptureHintIcon: {
     color: "color-mix(in srgb, var(--home-wax, var(--seal)) 72%, var(--ink-soft))",
   },
+  onboardingSecondPhotoInvitation: {
+    position: "relative",
+    zIndex: 2,
+    width: "min(100%, 310px)",
+    display: "grid",
+    justifyItems: "center",
+    gap: "7px",
+    margin: "14px auto 0",
+    textAlign: "center",
+  },
+  onboardingSecondPhotoKicker: {
+    margin: 0,
+    color:
+      "color-mix(in srgb, var(--home-wax, var(--seal)) 70%, var(--ink-soft))",
+    fontFamily: "var(--font-ui)",
+    fontSize: "11px",
+    fontWeight: 500,
+    lineHeight: 1.4,
+    letterSpacing: "0.08em",
+  },
+  onboardingSecondPhotoTitle: {
+    margin: 0,
+    color: "var(--ink)",
+    fontFamily: "var(--font-ui)",
+    fontSize: "17px",
+    fontWeight: 500,
+    lineHeight: 1.5,
+    letterSpacing: "0.02em",
+  },
+  onboardingSecondPhotoBody: {
+    margin: 0,
+    color: "var(--ink-soft)",
+    fontFamily: "var(--font-ui)",
+    fontSize: "12px",
+    fontWeight: 400,
+    lineHeight: 1.6,
+    letterSpacing: 0,
+  },
+  onboardingSecondPhotoAction: {
+    appearance: "none",
+    WebkitAppearance: "none",
+    width: "min(228px, 76vw)",
+    minHeight: "48px",
+    marginTop: "3px",
+    padding: "0 20px",
+    border:
+      "1px solid color-mix(in srgb, var(--home-wax, var(--seal)) 26%, transparent)",
+    borderRadius: "var(--radius-full)",
+    background:
+      "color-mix(in srgb, var(--home-frame-light, var(--paper-card)) 86%, var(--paper-card) 14%)",
+    color:
+      "color-mix(in srgb, var(--ink) 84%, var(--home-wax, var(--seal)) 16%)",
+    display: "inline-flex",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: "8px",
+    boxShadow:
+      "0 1px 0 color-mix(in srgb, var(--paper-card) 68%, transparent) inset, 0 14px 28px -22px color-mix(in srgb, var(--ink) 30%, transparent)",
+    fontFamily: "var(--font-ui)",
+    fontSize: "14px",
+    fontWeight: 500,
+    lineHeight: 1,
+    letterSpacing: "0.04em",
+    cursor: "pointer",
+    WebkitTapHighlightColor: "transparent",
+  },
+  onboardingSecondPhotoDismiss: {
+    appearance: "none",
+    WebkitAppearance: "none",
+    minHeight: "40px",
+    padding: "0 12px",
+    border: "none",
+    background: "transparent",
+    color: "color-mix(in srgb, var(--ink-soft) 72%, transparent)",
+    fontFamily: "var(--font-ui)",
+    fontSize: "12px",
+    fontWeight: 500,
+    lineHeight: 1,
+    letterSpacing: 0,
+    cursor: "pointer",
+    WebkitTapHighlightColor: "transparent",
+  },
   sleepingCatPlaceholder: {
     position: "relative",
     zIndex: 1,
@@ -2495,6 +2681,11 @@ const deskStyles = {
     display: "block",
     opacity: 0.96,
     userSelect: "none",
+  },
+  sleepingCatPlaceholderCompact: {
+    width: "96px",
+    minWidth: "96px",
+    maxWidth: "96px",
   },
   sleepingCatInkMask: {
     display: "block",

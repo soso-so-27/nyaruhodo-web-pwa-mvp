@@ -357,12 +357,13 @@ const styles = {
     flex: "0 0 auto",
   },
   title: {
-    fontFamily: "var(--font-display)",
+    fontFamily: "var(--font-ui)",
     fontSize: "18px",
-    fontWeight: 400,
+    fontWeight: 500,
+    lineHeight: 1.4,
     color: "var(--ink)",
     margin: 0,
-    letterSpacing: 0,
+    letterSpacing: "0.02em",
   },
   headerActions: {
     display: "inline-flex",

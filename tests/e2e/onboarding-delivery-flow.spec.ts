@@ -180,15 +180,19 @@ test.describe("onboarding delivery flow", () => {
     await page.waitForLoadState("networkidle");
     await page.waitForTimeout(1000);
 
-    const introCopy = page
-      .locator("p")
-      .filter({ hasText: "自分のねこの寝顔を1枚入れると、" });
+    const introCopy = page.getByTestId("onboarding-exchange-explanation");
     await expect(introCopy).toBeVisible();
-    await expect(introCopy).toContainText("どこかのねこの寝顔が1通届きます。");
     await expect(introCopy).toContainText("入れたねがおも、確認のあと、");
-    await expect(introCopy).toContainText("どこかの人への一通になります。");
-    await expect(introCopy).toContainText(
-      "ねてるねこの外には公開されません。",
+    await expect(introCopy).toContainText("どこかのおうちへ届きます。");
+    await expect(page.getByTestId("onboarding-privacy-note")).toHaveText(
+      "ねてるねこの外には公開されません",
+    );
+    await expect(
+      page.getByText("自分のねこのねがおを1枚入れると、", { exact: true }),
+    ).toHaveCount(0);
+    await expectUsesUiTypography(
+      page.locator('[data-onboarding-title="true"]'),
+      "500",
     );
     await expect(page.getByText("外には出ません。", { exact: true })).toHaveCount(0);
 
@@ -226,6 +230,10 @@ test.describe("onboarding delivery flow", () => {
       return;
     }
 
+    await expect(page.getByLabel("ねがおを保存しました")).toHaveAttribute(
+      "data-delivery-issue",
+      "no_candidate",
+    );
     await addCandidateButton.click();
     await page.locator('input[type="file"]').last().setInputFiles({
       name: "stock-sleeping.png",
@@ -262,7 +270,7 @@ test.describe("onboarding delivery flow", () => {
       page.getByText("どこかのおうちから届いた一通です。"),
     ).toBeVisible();
     await expect(
-      page.getByRole("button", { name: "つづける" }),
+      page.getByRole("button", { name: "ねてるねこを はじめる" }),
     ).toBeVisible();
     await page.screenshot({
       path: "artifacts/onboarding-delivered-opening.png",
@@ -279,9 +287,10 @@ test.describe("onboarding delivery flow", () => {
       ).length;
     });
     expect(eveningDeliveryDays).toBe(0);
-    await page.getByRole("button", { name: "つづける" }).click();
-    await continuePastOptionalOnboardingBridge(page);
-    await expect(page).toHaveURL(/\/account\/create\?from=onboarding/);
+    await page.getByRole("button", { name: "ねてるねこを はじめる" }).click();
+    await continuePastOptionalOnboardingNamePrompt(page);
+    await expect(page).toHaveURL(/\/home\?from=onboarding_second_photo/);
+    await expect(page.getByTestId("onboarding-second-photo-invitation")).toBeVisible();
 
     const storage = await page.evaluate(() => {
       const readArray = (key: string) => {
@@ -326,12 +335,12 @@ test.describe("onboarding delivery flow", () => {
     await page.getByRole("button", { name: "ねこだよりを ひらく" }).click();
     await page.waitForTimeout(1600);
     await expect(
-      page.getByRole("button", { name: "つづける" }),
+      page.getByRole("button", { name: "ねてるねこを はじめる" }),
     ).toBeVisible();
     await expect(
       page.getByText("この一通は、『とどいた』にしまわれました"),
     ).toBeVisible();
-    await expect(page.getByTestId("onboarding-install-guide")).toHaveCount(0);
+    await expect(page.getByTestId("home-install-invitation")).toHaveCount(0);
     await expect(page.getByTestId("onboarding-delivered-photos").locator("img")).toHaveCount(1);
     const deliveredLayout = await page.evaluate(() => {
       const frame = document.querySelector<HTMLElement>(
@@ -402,10 +411,12 @@ test.describe("onboarding delivery flow", () => {
     await expect(
       page.getByTestId("onboarding-delivery-photo-loading"),
     ).toHaveCount(0, { timeout: 4000 });
-    await expect(page.getByRole("button", { name: "つづける" })).toBeEnabled();
+    await expect(
+      page.getByRole("button", { name: "ねてるねこを はじめる" }),
+    ).toBeEnabled();
   });
 
-  test("shows a second photo bridge before 8pm after onboarding delivery", async ({
+  test("shows the second photo invitation on home before 8pm", async ({
     page,
   }) => {
     await mockBrowserDate(page, "2026-07-06T10:00:00+09:00");
@@ -423,11 +434,52 @@ test.describe("onboarding delivery flow", () => {
     await page.locator("main button").first().click();
     await page.waitForTimeout(1600);
 
-    await expect(page.getByTestId("onboarding-second-photo-primary")).toHaveCount(0);
-    await expect(page.getByTestId("onboarding-install-guide")).toHaveCount(0);
+    await expect(page.getByTestId("onboarding-second-photo-invitation")).toHaveCount(0);
+    await expect(page.getByTestId("home-install-invitation")).toHaveCount(0);
     await page.getByTestId("onboarding-delivered-continue").click();
     await continuePastOptionalOnboardingNamePrompt(page);
-    await expect(page.getByTestId("onboarding-second-photo-primary")).toBeVisible();
+    await expect(page).toHaveURL(/\/home\?from=onboarding_second_photo/);
+    await expect(page.getByTestId("onboarding-second-photo-invitation")).toBeVisible();
+    await expectUsesUiTypography(
+      page.getByTestId("onboarding-second-photo-title"),
+      "500",
+    );
+    await expect(
+      page.getByRole("button", { name: "今夜の一枚を とる" }),
+    ).toBeVisible();
+    await expect(page.getByTestId("home-install-invitation")).toHaveCount(0);
+    await page.screenshot({
+      path: "artifacts/onboarding-second-photo-home.png",
+      fullPage: true,
+    });
+  });
+
+  test("keeps the second photo invitation after cancel and defers install after skip", async ({
+    page,
+  }) => {
+    await mockBrowserDate(page, "2026-07-06T10:00:00+09:00");
+    await page.addInitScript(() => {
+      window.localStorage.setItem("onboarding_completed", "true");
+      window.localStorage.setItem("nyaruhodo_sleeping_safety_accepted", "1");
+    });
+
+    await page.goto("/home?from=onboarding_second_photo");
+    await page.getByTestId("home-empty-action").click();
+    await page.locator('input[type="file"]').last().setInputFiles({
+      name: "second-photo-cancel.png",
+      mimeType: "image/png",
+      buffer: testPng,
+    });
+
+    await expect(page.getByRole("dialog")).toBeVisible();
+    await page.getByRole("button", { name: "閉じる" }).click();
+    await expect(page.getByTestId("onboarding-second-photo-invitation")).toBeVisible();
+    await expect(page).toHaveURL(/from=onboarding_second_photo/);
+
+    await page.getByRole("button", { name: "今日はここまで" }).click();
+    await expect(page.getByTestId("onboarding-second-photo-invitation")).toHaveCount(0);
+    await expect(page.getByTestId("home-install-invitation")).toHaveCount(0);
+    await expect(page).not.toHaveURL(/from=onboarding_second_photo/);
   });
 
   test("continues from onboarding through the home photo to the 8pm letter", async ({
@@ -518,9 +570,8 @@ test.describe("onboarding delivery flow", () => {
     await page.waitForTimeout(1600);
     await page.getByTestId("onboarding-delivered-continue").click();
     await continuePastOptionalOnboardingNamePrompt(page);
-    await page.getByTestId("onboarding-second-photo-primary").click();
-
     await expect(page).toHaveURL(/\/home\?from=onboarding_second_photo/);
+    await expect(page.getByTestId("home-install-invitation")).toHaveCount(0);
     await page.getByTestId("home-empty-action").click();
     await page.locator('input[type="file"]').last().setInputFiles({
       name: "home-chain.png",
@@ -530,6 +581,10 @@ test.describe("onboarding delivery flow", () => {
     const saveDialog = page.getByRole("dialog");
     await expect(saveDialog).toBeVisible();
     await saveDialog.locator("button").last().click();
+
+    await expect(page.getByTestId("onboarding-second-photo-invitation")).toHaveCount(0);
+    await expect(page.getByTestId("home-install-invitation")).toBeVisible();
+    await page.getByRole("button", { name: "あとで" }).click();
 
     await expect.poll(() => backupCalls).toBe(1);
     const target = await page.evaluate(() => {
@@ -588,9 +643,6 @@ test.describe("onboarding delivery flow", () => {
     await page.waitForTimeout(1600);
     await page.getByTestId("onboarding-delivered-continue").click();
     await continuePastOptionalOnboardingNamePrompt(page);
-    await expect(page.getByTestId("onboarding-second-photo-primary")).toBeVisible();
-    await page.getByTestId("onboarding-second-photo-primary").click();
-
     await expect(page).toHaveURL(/\/account\/create\?from=onboarding/);
     await expect(page).toHaveURL(/next=second_photo/);
   });
@@ -616,11 +668,13 @@ test.describe("onboarding delivery flow", () => {
     await expect(
       page.getByText("この一通は、『とどいた』にしまわれました"),
     ).toBeVisible();
-    await expect(page.getByRole("button", { name: "つづける" })).toBeVisible();
     await expect(
-      page.getByRole("button", { name: "もう一枚いれておく" }),
+      page.getByRole("button", { name: "ねてるねこを はじめる" }),
+    ).toBeVisible();
+    await expect(
+      page.getByTestId("onboarding-second-photo-invitation"),
     ).toHaveCount(0);
-    await expect(page.getByTestId("onboarding-install-guide")).toHaveCount(0);
+    await expect(page.getByTestId("home-install-invitation")).toHaveCount(0);
   });
 
   test("falls back to thumbnail and keeps storage-backed onboarding deliveries", async ({
@@ -680,7 +734,9 @@ test.describe("onboarding delivery flow", () => {
     });
 
     await page.getByRole("button", { name: "ねこだよりを ひらく" }).click();
-    await expect(page.getByRole("button", { name: "つづける" })).toBeEnabled();
+    await expect(
+      page.getByRole("button", { name: "ねてるねこを はじめる" }),
+    ).toBeEnabled();
 
     const openedSnapshot = await readOnboardingDeliverySnapshot(page);
     expect(openedSnapshot.deliveredPhoto?.sourcePhotoId).toBe("stock-signed-e2e-fake");
@@ -723,7 +779,7 @@ test.describe("onboarding delivery flow", () => {
 
     await page.goto("/home");
     await page.waitForLoadState("networkidle");
-    await expect(page.getByText("iPhoneでホームに置く")).toHaveCount(0);
+    await expect(page.getByText("iPhoneで追加する")).toHaveCount(0);
   });
 
   test("does not show the PWA home install guide inside an Android WebView", async ({
@@ -758,10 +814,19 @@ test.describe("onboarding delivery flow", () => {
 
     await page.goto("/home");
     await expect(page.getByLabel("ホーム画面に追加")).toBeVisible();
-    await page.getByRole("button", { name: "置き方を見る" }).click();
+    await page.screenshot({
+      path: "artifacts/home-install-ios-invitation.png",
+      fullPage: true,
+    });
+    await page.getByRole("button", { name: "追加のしかたを見る" }).click();
 
-    await expect(page.getByText("iPhoneでホームに置く")).toBeVisible();
+    await expect(page.getByText("iPhoneで追加する")).toBeVisible();
+    await expectUsesUiTypography(page.getByText("iPhoneで追加する"), "500");
     await expect(page.getByText("「ホーム画面に追加」を選ぶ")).toBeVisible();
+    await page.screenshot({
+      path: "artifacts/home-install-ios-guide.png",
+      fullPage: true,
+    });
   });
 
   test("shows the Android install guide after daytime onboarding", async ({
@@ -780,12 +845,16 @@ test.describe("onboarding delivery flow", () => {
 
     await page.goto("/home");
     await expect(page.getByLabel("ホーム画面に追加")).toBeVisible();
-    await page.getByRole("button", { name: "置き方を見る" }).click();
+    await page.getByRole("button", { name: "追加のしかたを見る" }).click();
 
-    await expect(page.getByText("Androidでホームに置く")).toBeVisible();
+    await expect(page.getByText("Androidで追加する")).toBeVisible();
     await expect(
       page.getByText("「アプリをインストール」または「ホーム画面に追加」を選ぶ"),
     ).toBeVisible();
+    await page.screenshot({
+      path: "artifacts/home-install-android-guide.png",
+      fullPage: true,
+    });
   });
 
   test("keeps the first photo action inside a compact phone viewport", async ({
@@ -796,6 +865,14 @@ test.describe("onboarding delivery flow", () => {
 
     const action = page.getByTestId("onboarding-photo-select");
     await expect(action).toBeVisible();
+    await expectUsesUiTypography(
+      page.locator('[data-onboarding-title="true"]'),
+      "500",
+    );
+    await page.screenshot({
+      path: "artifacts/onboarding-intro-redesign.png",
+      fullPage: true,
+    });
     const actionBox = await action.boundingBox();
     expect(actionBox).not.toBeNull();
     expect(actionBox!.y).toBeGreaterThanOrEqual(0);
@@ -903,9 +980,9 @@ test.describe("onboarding delivery flow", () => {
     ).toBeVisible();
 
     await page.goto("/onboarding?source=instagram_bio");
-    await expect(page).toHaveURL(/\/account\/create\?from=onboarding&source=instagram_bio/);
+    await expect(page).toHaveURL(/\/home\?from=onboarding_second_photo/);
     await expect(
-      page.getByRole("heading", { name: "うちのこのアルバムをつくる" }),
+      page.getByTestId("onboarding-second-photo-invitation"),
     ).toBeVisible();
 
     await page.evaluate(() => {
@@ -1263,6 +1340,11 @@ test.describe("onboarding delivery flow", () => {
     });
 
     await expect(page.getByTestId("onboarding-delivery-retry")).toBeVisible();
+    await expect(page.getByLabel("ねがおを保存しました")).toHaveAttribute(
+      "data-delivery-issue",
+      "temporary_error",
+    );
+    await expect(page.getByText("候補の確認で止まりました。", { exact: false })).toBeVisible();
     await expect.poll(() => readOwnSleepingPhotoCount(page)).toBe(1);
     await page.getByTestId("onboarding-delivery-retry").click();
 
@@ -2369,37 +2451,6 @@ async function seedCatProfileBeforeLoad(page: Page, input: {
   }, input);
 }
 
-async function continuePastOptionalOnboardingBridge(page: Page) {
-  await continuePastOptionalOnboardingNamePrompt(page);
-
-  const deadline = Date.now() + 30_000;
-  while (Date.now() < deadline) {
-    if (/\/account\/create\?from=onboarding/.test(page.url())) {
-      break;
-    }
-
-    const buttons = page.locator("main button");
-    const buttonCount = await buttons.count();
-    const lastButton = buttons.last();
-    const lastButtonText =
-      buttonCount > 0 ? (await lastButton.textContent())?.trim() ?? "" : "";
-
-    if (
-      buttonCount >= 2 &&
-      lastButtonText &&
-      !lastButtonText.includes("つづける") &&
-      !lastButtonText.includes("名前なしで進む")
-    ) {
-      await lastButton.click();
-      break;
-    }
-
-    await page.waitForTimeout(250);
-  }
-
-  await continuePastOptionalOnboardingNamePrompt(page);
-}
-
 async function continuePastOptionalOnboardingNamePrompt(page: Page) {
   const nameInput = page.locator("main section input").first();
   const didShowNamePrompt = await nameInput
@@ -2834,6 +2885,33 @@ async function expectVisibleNonBlackImage(locator: Locator) {
 
   expect(sample.brightness).toBeGreaterThan(80);
   expect(sample.colorfulPixels).toBeGreaterThan(0);
+}
+
+async function expectUsesUiTypography(
+  locator: Locator,
+  expectedWeight?: string,
+) {
+  const typography = await locator.evaluate((element) => {
+    const rootStyle = window.getComputedStyle(document.documentElement);
+    const uiFamily = rootStyle
+      .getPropertyValue("--font-zen-kaku")
+      .split(",")[0]
+      ?.trim()
+      .replace(/^['"]|['"]$/g, "");
+    const elementStyle = window.getComputedStyle(element);
+
+    return {
+      fontFamily: elementStyle.fontFamily,
+      fontWeight: elementStyle.fontWeight,
+      uiFamily,
+    };
+  });
+
+  expect(typography.uiFamily).toBeTruthy();
+  expect(typography.fontFamily).toContain(typography.uiFamily);
+  if (expectedWeight) {
+    expect(typography.fontWeight).toBe(expectedWeight);
+  }
 }
 
 function readSrcKind(src: unknown) {

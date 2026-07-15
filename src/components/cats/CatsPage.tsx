@@ -147,7 +147,7 @@ const CATS_FAINT = "var(--ink-faint)";
 const CATS_PAPER = "var(--paper)";
 const CATS_UI = "var(--font-ui)";
 const CATS_SERIF = CATS_UI;
-const CATS_BASIC_VALUE_SERIF = "var(--font-display)";
+const CATS_BASIC_VALUE_SERIF = CATS_UI;
 const CATS_TITLE_SIZE = "20px";
 const CATS_DISPLAY_SIZE = "25px";
 const CATS_BODY_SIZE = "13px";
@@ -5579,9 +5579,9 @@ const styles = {
     color: CATS_TEXT,
     textDecoration: "none",
     fontSize: "13px",
-    fontFamily: "var(--font-display)",
-    letterSpacing: "var(--tracking-label)",
-    fontWeight: 400,
+    fontFamily: CATS_UI,
+    letterSpacing: "0.04em",
+    fontWeight: 500,
   },
   onboardingHomeButton: {
     marginTop: "18px",

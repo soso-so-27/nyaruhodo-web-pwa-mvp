@@ -377,10 +377,11 @@ const styles = {
   },
   title: {
     margin: 0,
-    fontFamily: "var(--font-display)",
+    fontFamily: "var(--font-ui)",
     fontSize: 24,
     lineHeight: 1.45,
     fontWeight: 500,
+    letterSpacing: "0.02em",
   },
   body: {
     margin: 0,

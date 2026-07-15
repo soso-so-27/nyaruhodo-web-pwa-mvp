@@ -159,7 +159,7 @@ const styles = {
     fontSize: typography.cta.fontSize,
     fontWeight: typography.cta.fontWeight,
     lineHeight: typography.cta.lineHeight,
-    letterSpacing: "var(--tracking-label)",
+    letterSpacing: "0.04em",
     textDecoration: "none",
     whiteSpace: "nowrap",
     cursor: "pointer",

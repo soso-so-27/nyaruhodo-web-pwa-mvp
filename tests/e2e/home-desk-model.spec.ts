@@ -478,9 +478,17 @@ test.describe("home desk model", () => {
     await page.waitForLoadState("networkidle");
 
     await expect(page.getByTestId("home-empty-action")).toBeVisible();
+    await expect(page.getByTestId("onboarding-second-photo-invitation")).toBeVisible();
     await expect(
-      page.getByText("あしたの一枚を、よる8時のねこだよりに。"),
+      page.getByText("あしたの一通も、つくりませんか"),
     ).toBeVisible();
+    await expect(
+      page.getByText("あしたのねこだよりに入れるねがおを一枚。"),
+    ).toBeVisible();
+    await expect(
+      page.getByRole("button", { name: "あしたの一枚を とる" }),
+    ).toBeVisible();
+    await expect(page.getByRole("button", { name: "今日はここまで" })).toBeVisible();
   });
 
   test("opens a full iOS store and compacts duplicate photo sources", async ({

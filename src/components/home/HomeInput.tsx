@@ -131,7 +131,6 @@ import {
   type AppIconName,
 } from "../ui/AppIcons";
 import { AppButton } from "../ui/AppButton";
-import { AppCard } from "../ui/AppCard";
 import {
   getStoragePhotoSignedUrl,
   StoredPhotoImage,
@@ -298,6 +297,14 @@ type BeforeInstallPromptEvent = Event & {
   userChoice: Promise<{ outcome: "accepted" | "dismissed"; platform: string }>;
 };
 
+function hasOnboardingSecondPhotoIntentInLocation() {
+  return (
+    typeof window !== "undefined" &&
+    new URLSearchParams(window.location.search).get("from") ===
+      "onboarding_second_photo"
+  );
+}
+
 export function HomeInput({
   initialNow,
 }: HomeInputProps) {
@@ -378,6 +385,7 @@ export function HomeInput({
     new Map<string, DeliveredPhotoDecodeEntry>(),
   );
   const openingEveningDeliveryRequestRef = useRef<string | null>(null);
+  const hasTrackedSecondPhotoPromptRef = useRef(false);
 
   useEffect(() => {
     compactDuplicatePhotoSourcesInLocalStorage();
@@ -453,8 +461,27 @@ export function HomeInput({
   }, []);
 
   useEffect(() => {
+    if (
+      !hasHydratedHomeState ||
+      !hasOnboardingSecondPhotoIntent ||
+      hasTrackedSecondPhotoPromptRef.current
+    ) {
+      return;
+    }
+
+    hasTrackedSecondPhotoPromptRef.current = true;
+    trackProductEvent("onboarding_second_photo_prompt_view", {
+      surface: "home",
+    });
+  }, [hasHydratedHomeState, hasOnboardingSecondPhotoIntent]);
+
+  useEffect(() => {
     function refreshHomeInstallHint() {
-      if (isStandaloneDisplay() || isEmbeddedInAppBrowser()) {
+      if (
+        isStandaloneDisplay() ||
+        isEmbeddedInAppBrowser() ||
+        hasOnboardingSecondPhotoIntentInLocation()
+      ) {
         setIsHomeInstallHintVisible(false);
         setIsHomeInstallGuideOpen(false);
         return;
@@ -1728,7 +1755,6 @@ export function HomeInput({
         setPendingExchangeCatId(
           readStoredExchangeShareCatSelection(catProfiles, activeCatId),
         );
-        clearOnboardingSecondPhotoIntent();
 
         trackProductEvent(
           "home_exchange_sleeping_photo_selected",
@@ -1782,6 +1808,32 @@ export function HomeInput({
       "",
       `${url.pathname}${url.search}${url.hash}`,
     );
+  }
+
+  function handleDismissOnboardingSecondPhotoAction() {
+    trackProductEvent("onboarding_second_photo_skipped", {
+      surface: "home",
+    });
+    clearOnboardingSecondPhotoIntent();
+  }
+
+  function revealHomeInstallHint() {
+    if (
+      isStandaloneDisplay() ||
+      isEmbeddedInAppBrowser() ||
+      isHomeInstallHintSnoozed()
+    ) {
+      return;
+    }
+
+    const platform = getHomeInstallPlatform();
+    if (!platform) {
+      return;
+    }
+
+    setHomeInstallPlatform(platform);
+    setIsHomeInstallGuideOpen(false);
+    setIsHomeInstallHintVisible(true);
   }
 
   async function handleSleepingStockPhotoImport() {
@@ -2077,6 +2129,9 @@ export function HomeInput({
   }
 
   function dismissHomeInstallHint() {
+    trackProductEvent("home_install_invitation_dismissed", {
+      platform: homeInstallPlatform,
+    });
     snoozeHomeInstallHint();
     setIsHomeInstallHintVisible(false);
     setIsHomeInstallGuideOpen(false);
@@ -2084,6 +2139,10 @@ export function HomeInput({
   }
 
   async function handleHomeInstallPrimaryAction() {
+    trackProductEvent("home_install_primary_clicked", {
+      platform: homeInstallPlatform,
+      native_prompt_available: Boolean(homeInstallPrompt),
+    });
     if (homeInstallPlatform === "android" && homeInstallPrompt) {
       const promptEvent = homeInstallPrompt;
       setHomeInstallPrompt(null);
@@ -2162,6 +2221,7 @@ export function HomeInput({
   async function handleConfirmExchangeSharePhoto(photo: PendingExchangeSharePhoto) {
     const targetCatId = pendingExchangeCatId ?? activeCatId;
     if (!targetCatId) return;
+    const completesOnboardingSecondPhoto = hasOnboardingSecondPhotoIntent;
 
     saveStoredExchangeShareCatSelection(targetCatId);
     const ownPhoto = await saveOwnSleepingPhotoWithCompressedFallback({
@@ -2199,6 +2259,15 @@ export function HomeInput({
     setPendingExchangeSharePhoto(null);
     setPendingExchangeCatId(null);
 
+    if (completesOnboardingSecondPhoto && !deliveryTarget.targetSaveFailed) {
+      trackProductEvent("onboarding_second_photo_submitted", {
+        surface: "home",
+        delivery_date_key: deliveryTarget.dateKey,
+      });
+      clearOnboardingSecondPhotoIntent();
+      window.setTimeout(revealHomeInstallHint, 220);
+    }
+
     if (deliveryTarget.targetSaveFailed) {
       showToast(
         "写真はのこりましたが、ねこだよりの予約を保存できませんでした。もう一度おためしください。",
@@ -2231,6 +2300,7 @@ export function HomeInput({
   async function handleKeepExchangeSharePhotoPrivate(photo: PendingExchangeSharePhoto) {
     const targetCatId = pendingExchangeCatId ?? activeCatId;
     if (!targetCatId) return;
+    const dismissesOnboardingSecondPhoto = hasOnboardingSecondPhotoIntent;
 
     saveStoredExchangeShareCatSelection(targetCatId);
     const ownPhoto = await saveOwnSleepingPhotoWithCompressedFallback({
@@ -2259,6 +2329,13 @@ export function HomeInput({
     setCollectionRefreshTick((value) => value + 1);
     setPendingExchangeSharePhoto(null);
     setPendingExchangeCatId(null);
+    if (dismissesOnboardingSecondPhoto) {
+      trackProductEvent("onboarding_second_photo_skipped", {
+        surface: "home_save_sheet",
+        reason: "kept_private",
+      });
+      clearOnboardingSecondPhotoIntent();
+    }
     showToast("とったねがおに入りました");
     trackProductEvent(
       "home_exchange_share_photo_declined",
@@ -2278,6 +2355,8 @@ export function HomeInput({
   const shouldShowHomeInstallHint =
     isHomeClockReady &&
     isHomeInstallHintVisible &&
+    !hasOnboardingSecondPhotoIntent &&
+    !isHomeInstallGuideOpen &&
     Boolean(homeInstallPlatform);
   const shouldShowDeskGuidanceCopy = shouldShowGuidanceCopy({
     keptExchangePhotoCount,
@@ -2314,8 +2393,18 @@ export function HomeInput({
                 isTodaySleepingCounterVisible(sleepingCounterCount)
               }
               showOnboardingSecondPhotoAction={hasOnboardingSecondPhotoIntent}
+              onDismissOnboardingSecondPhotoAction={
+                handleDismissOnboardingSecondPhotoAction
+              }
               now={homeNow}
-              onTakePhoto={() => handleSleepingPhotoStart("camera")}
+              onTakePhoto={() => {
+                if (hasOnboardingSecondPhotoIntent) {
+                  trackProductEvent("onboarding_second_photo_cta_clicked", {
+                    surface: "home",
+                  });
+                }
+                handleSleepingPhotoStart("camera");
+              }}
               onOpenDelivery={handleOpenEveningDelivery}
               onKeepOpenedDelivery={handleKeepEveningDelivery}
               onReportOpenedDelivery={handleReportEveningDelivery}
@@ -2331,7 +2420,7 @@ export function HomeInput({
         {!isHomeReady ? <HomeStartupSurface /> : null}
 
         {isHomeReady && shouldShowHomeInstallHint && homeInstallPlatform ? (
-          <HomeInstallHintCard
+          <HomeInstallInvitationSheet
             platform={homeInstallPlatform}
             canPrompt={Boolean(homeInstallPrompt)}
             onPrimary={handleHomeInstallPrimaryAction}
@@ -3464,7 +3553,7 @@ function EveningDeliveryOpening({
   );
 }
 
-function HomeInstallHintCard({
+function HomeInstallInvitationSheet({
   platform,
   canPrompt,
   onPrimary,
@@ -3475,31 +3564,35 @@ function HomeInstallHintCard({
   onPrimary: () => void;
   onDismiss: () => void;
 }) {
-  const primaryLabel = platform === "android" && canPrompt ? "追加する" : "置き方を見る";
+  const deviceLabel = platform === "ios" ? "iPhone" : "Android";
+  const primaryLabel =
+    platform === "android" && canPrompt
+      ? "ホーム画面に追加"
+      : "追加のしかたを見る";
 
   return (
-    <AppCard
-      variant="floating"
-      padding="md"
-      style={styles.homeInstallHintCard}
-      aria-label="ホーム画面に追加"
+    <AppBottomSheet
+      title="よる8時に、ここへ戻れるように"
+      onClose={onDismiss}
+      showCloseButton={false}
+      variant="paper"
     >
-      <div style={styles.homeInstallHintText}>
-        <p style={styles.homeInstallHintTitle}>
-          こんやの ねがおを
+      <div
+        style={styles.homeInstallInvitationBody}
+        data-testid="home-install-invitation"
+        aria-label="ホーム画面に追加"
+      >
+        <p style={styles.homeInstallDeviceLabel}>{deviceLabel}</p>
+        <p style={styles.homeInstallInvitationText}>
+          ねてるねこをホーム画面に置いておけます。
           <br />
-          うけとる ポストを、
-          <br />
-          ホームがめんに おきませんか
+          よる8時のねこだよりへ、すぐ戻れます。
         </p>
-      </div>
-      <div style={styles.homeInstallHintActions}>
         <AppButton
           type="button"
-          variant="secondary"
-          size="md"
-          style={styles.homeInstallHintPrimary}
           onClick={onPrimary}
+          fullWidth
+          style={styles.homeInstallPrimary}
         >
           {primaryLabel}
         </AppButton>
@@ -3507,13 +3600,12 @@ function HomeInstallHintCard({
           type="button"
           variant="quiet"
           size="md"
-          style={styles.homeInstallHintSecondary}
           onClick={onDismiss}
         >
           あとで
         </AppButton>
       </div>
-    </AppCard>
+    </AppBottomSheet>
   );
 }
 
@@ -3524,38 +3616,43 @@ function HomeInstallGuideSheet({
   platform: HomeInstallPlatform;
   onClose: () => void;
 }) {
-  const title =
-    platform === "ios" ? "iPhoneでホームに置く" : "Androidでホームに置く";
+  const title = platform === "ios" ? "iPhoneで追加する" : "Androidで追加する";
+  const lead =
+    platform === "ios"
+      ? "Safariの共有メニューから追加できます。"
+      : "Chromeのメニューから追加できます。";
   const steps =
     platform === "ios"
       ? [
           "画面下の共有ボタンを押す",
           "「ホーム画面に追加」を選ぶ",
-          "追加を押す",
+          "右上の「追加」を押す",
         ]
       : [
-          "Chromeのメニューを開く",
+          "右上のメニューを開く",
           "「アプリをインストール」または「ホーム画面に追加」を選ぶ",
-          "追加を押す",
         ];
 
   return (
     <AppBottomSheet title={title} onClose={onClose} variant="paper">
-      <div style={styles.homeInstallGuideBody}>
-        <ol style={styles.homeInstallGuideList}>
-          {steps.map((step) => (
-            <li key={step} style={styles.homeInstallGuideItem}>
-              {step}
-            </li>
+      <div style={styles.homeInstallGuideBody} data-testid="home-install-guide">
+        <p style={styles.homeInstallGuideLead}>{lead}</p>
+        <div style={styles.homeInstallGuideList}>
+          {steps.map((step, index) => (
+            <div key={step} style={styles.homeInstallGuideItem}>
+              <span style={styles.homeInstallGuideNumber}>{index + 1}</span>
+              <span>{step}</span>
+            </div>
           ))}
-        </ol>
-        <button
+        </div>
+        <AppButton
           type="button"
-          style={styles.homeInstallGuideButton}
           onClick={onClose}
+          fullWidth
+          style={styles.homeInstallPrimary}
         >
           わかりました
-        </button>
+        </AppButton>
       </div>
     </AppBottomSheet>
   );
@@ -5940,105 +6037,81 @@ const styles = {
     pointerEvents: "none",
     background: "#f4f1ea",
   },
-  homeInstallHintCard: {
-    position: "fixed",
-    left: "50%",
-    bottom: "calc(98px + env(safe-area-inset-bottom))",
-    zIndex: 17,
-    width: HOME_NAV_FRAME_WIDTH,
-    maxWidth: "calc(100vw - 32px)",
-    boxSizing: "border-box",
-    transform: "translateX(-50%)",
+  homeInstallInvitationBody: {
     display: "grid",
-    gridTemplateColumns: "minmax(0, 1fr) auto",
-    alignItems: "center",
-    gap: "11px",
-    padding: "11px 12px 11px 14px",
-    backdropFilter: "blur(16px)",
-    WebkitBackdropFilter: "blur(16px)",
+    justifyItems: "center",
+    gap: "14px",
+    padding: "2px 6px 8px",
+    textAlign: "center",
   },
-  homeInstallHintText: {
-    display: "grid",
-    gap: "4px",
-    minWidth: 0,
-  },
-  homeInstallHintTitle: {
+  homeInstallDeviceLabel: {
     margin: 0,
-    color: "#332c26",
-    fontFamily:
-      "var(--font-display)",
-    fontSize: "13px",
-    fontWeight: 500,
-    lineHeight: 1.45,
-    letterSpacing: "0.04em",
-  },
-  homeInstallHintBody: {
-    margin: 0,
-    color: "#746a5f",
-    fontSize: "12px",
-    fontWeight: 440,
-    lineHeight: 1.45,
-    letterSpacing: "0.02em",
-  },
-  homeInstallHintActions: {
-    display: "flex",
-    alignItems: "center",
-    gap: "8px",
-    flexShrink: 0,
-  },
-  homeInstallHintPrimary: {
-    minHeight: "34px",
-    padding: "0 12px",
+    padding: "5px 10px",
     borderRadius: "var(--radius-full)",
-    border: "1px solid rgba(144,126,102,0.12)",
-    background: "rgba(154,134,107,0.62)",
-    color: "#fffdf8",
-    fontSize: "12px",
+    background: "color-mix(in srgb, var(--seal) 9%, transparent)",
+    color: "var(--seal)",
+    fontFamily: "var(--font-ui)",
+    fontSize: "11px",
     fontWeight: 500,
-    letterSpacing: "0.03em",
-    boxShadow: "0 3px 8px rgba(90,76,60,0.035)",
-    cursor: "pointer",
-    whiteSpace: "nowrap",
+    lineHeight: 1.2,
+    letterSpacing: "0.08em",
   },
-  homeInstallHintSecondary: {
-    minHeight: "34px",
-    padding: "0 4px",
-    border: "none",
-    background: "transparent",
-    color: "#9c9286",
-    fontSize: "12px",
-    fontWeight: 500,
-    cursor: "pointer",
-    whiteSpace: "nowrap",
+  homeInstallInvitationText: {
+    margin: 0,
+    color: "var(--ink-soft)",
+    fontFamily: "var(--font-ui)",
+    fontSize: "13px",
+    fontWeight: 400,
+    lineHeight: 1.75,
+    letterSpacing: 0,
+  },
+  homeInstallPrimary: {
+    width: "100%",
+    minHeight: "52px",
   },
   homeInstallGuideBody: {
     display: "grid",
-    gap: "22px",
+    gap: "18px",
     padding: "4px 6px 8px",
   },
-  homeInstallGuideList: {
+  homeInstallGuideLead: {
     margin: 0,
-    padding: "0 0 0 22px",
+    color: "var(--ink-soft)",
+    fontFamily: "var(--font-ui)",
+    fontSize: "13px",
+    lineHeight: 1.7,
+    letterSpacing: 0,
+  },
+  homeInstallGuideList: {
+    display: "grid",
+    gap: "10px",
     color: "#4f463d",
-    fontSize: "15px",
-    lineHeight: 1.85,
-    letterSpacing: "0.02em",
+    fontFamily: "var(--font-ui)",
+    fontSize: "13px",
+    lineHeight: 1.55,
+    letterSpacing: 0,
   },
   homeInstallGuideItem: {
-    paddingLeft: "4px",
+    display: "grid",
+    gridTemplateColumns: "28px minmax(0, 1fr)",
+    alignItems: "center",
+    gap: "10px",
+    minHeight: "48px",
+    padding: "8px 10px",
+    border: "1px solid color-mix(in srgb, var(--line) 74%, transparent)",
+    borderRadius: "var(--radius-md)",
+    background: "color-mix(in srgb, var(--paper-card) 76%, transparent)",
   },
-  homeInstallGuideButton: {
-    width: "100%",
-    minHeight: "52px",
-    borderRadius: "var(--radius-full)",
-    border: "1px solid rgba(144,126,102,0.14)",
-    background: "rgba(255,253,248,0.92)",
-    color: "#332c26",
-    fontSize: "15px",
-    fontWeight: 500,
-    letterSpacing: "0.03em",
-    boxShadow: "0 10px 24px rgba(90,76,60,0.08)",
-    cursor: "pointer",
+  homeInstallGuideNumber: {
+    width: "28px",
+    height: "28px",
+    display: "grid",
+    placeItems: "center",
+    borderRadius: "50%",
+    background: "color-mix(in srgb, var(--seal) 10%, transparent)",
+    color: "var(--seal)",
+    fontSize: "12px",
+    fontWeight: 600,
   },
   boardPeek: {
     position: "fixed",

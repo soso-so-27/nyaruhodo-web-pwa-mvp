@@ -72,11 +72,11 @@ const styles = {
   pageTitle: {
     margin: 0,
     color: color.textMuted,
-    fontFamily: typography.fontDisplay,
-    fontSize: typography.brand.fontSize,
-    fontWeight: typography.brand.fontWeight,
-    lineHeight: typography.brand.lineHeight,
-    letterSpacing: typography.brand.letterSpacing,
+    fontFamily: typography.fontUi,
+    fontSize: typography.title.fontSize,
+    fontWeight: typography.title.fontWeight,
+    lineHeight: typography.title.lineHeight,
+    letterSpacing: "0.04em",
   },
   right: {
     position: "absolute",
