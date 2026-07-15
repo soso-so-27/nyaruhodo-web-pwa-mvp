@@ -62,13 +62,13 @@ import { CameraIcon, MailIcon } from "../ui/AppIcons";
 import { PhotoTile } from "../ui/PhotoTile";
 import { StoredPhotoImage } from "../ui/StoredPhotoImage";
 import { WordmarkHeader } from "../ui/AppHeader";
+import { deliveredLetterStyles } from "../ui/deliveredLetterStyles";
 
 type OnboardingState =
   | "intro"
   | "saving"
   | "naming"
   | "envelope"
-  | "revealing"
   | "delivered"
   | "second_photo_prompt"
   | "empty"
@@ -91,7 +91,7 @@ const ONBOARDING_SECOND_PHOTO_INTENT_KEY =
   "neteruneko_onboarding_second_photo_intent";
 const ONBOARDING_PHOTO_DEBUG_STORAGE_KEY = "neteruneko_onboarding_photo_debug";
 const IS_PRODUCTION = process.env.NODE_ENV === "production";
-const ONBOARDING_REVEAL_MS = 1150;
+const ONBOARDING_REVEAL_MS = 180;
 
 export function OnboardingFlow() {
   const catIllustrations = useCatIllustrationAssets();
@@ -119,6 +119,7 @@ export function OnboardingFlow() {
   const [isOpeningEnvelope, setIsOpeningEnvelope] = useState(false);
   const [isRetryingDelivery, setIsRetryingDelivery] = useState(false);
   const [hasRevealPhotoError, setHasRevealPhotoError] = useState(false);
+  const [isRevealPhotoReady, setIsRevealPhotoReady] = useState(false);
   const [revealPhotoRetryKey, setRevealPhotoRetryKey] = useState(0);
   const [catNameDraft, setCatNameDraft] = useState("");
   const prefersReducedMotion = usePrefersReducedMotion();
@@ -276,7 +277,7 @@ export function OnboardingFlow() {
   }, []);
 
   useEffect(() => {
-    if (state === "envelope" || state === "revealing") {
+    if (state === "envelope") {
       return;
     }
 
@@ -289,6 +290,7 @@ export function OnboardingFlow() {
     revealPhotoLoadedTrackedRef.current = "";
     revealPhotoErrorTrackedRef.current = "";
     setHasRevealPhotoError(false);
+    setIsRevealPhotoReady(false);
     setRevealPhotoRetryKey(0);
   }, [deliveredPhoto?.id]);
 
@@ -924,7 +926,6 @@ export function OnboardingFlow() {
       return;
     }
 
-    setState("revealing");
     revealTimerRef.current = window.setTimeout(() => {
       revealTimerRef.current = null;
       trackOnboardingRevealEvent(
@@ -958,12 +959,13 @@ export function OnboardingFlow() {
       return;
     }
 
+    setIsRevealPhotoReady(true);
+    setHasRevealPhotoError(false);
     if (revealPhotoLoadedTrackedRef.current === deliveredPhoto.id) {
       return;
     }
 
     revealPhotoLoadedTrackedRef.current = deliveredPhoto.id;
-    setHasRevealPhotoError(false);
     trackOnboardingRevealEvent("delivery_reveal_photo_loaded");
   }
 
@@ -972,17 +974,19 @@ export function OnboardingFlow() {
       return;
     }
 
+    setIsRevealPhotoReady(false);
+    setHasRevealPhotoError(true);
     if (revealPhotoErrorTrackedRef.current === deliveredPhoto.id) {
       return;
     }
 
     revealPhotoErrorTrackedRef.current = deliveredPhoto.id;
-    setHasRevealPhotoError(true);
     trackOnboardingRevealEvent("delivery_reveal_photo_error");
   }
 
   function handleRetryRevealPhoto() {
     revealPhotoErrorTrackedRef.current = "";
+    setIsRevealPhotoReady(false);
     setHasRevealPhotoError(false);
     setRevealPhotoRetryKey((value) => value + 1);
     trackProductEvent("onboarding_delivery_photo_retry", {
@@ -1260,7 +1264,6 @@ export function OnboardingFlow() {
     !isExternalBrowserGuideDismissed;
   const shouldShowBrandHeader = ![
     "envelope",
-    "revealing",
     "delivered",
   ].includes(state);
 
@@ -1278,9 +1281,8 @@ export function OnboardingFlow() {
           100% { transform: translateY(0) scale(1); opacity: 1; }
         }
         @keyframes deliveredPhotoIn {
-          0% { transform: translateY(18px) scale(0.9); opacity: 0; filter: blur(5px); }
-          65% { transform: translateY(-2px) scale(1.015); opacity: 1; filter: blur(0); }
-          100% { transform: translateY(0) scale(1); opacity: 1; filter: blur(0); }
+          0% { transform: translateY(8px) scale(0.985); opacity: 0; }
+          100% { transform: translateY(0) scale(1); opacity: 1; }
         }
         @keyframes onboardingEnvelopeFloat {
           0%, 100% { transform: translateY(0) rotate(-0.8deg); }
@@ -1477,7 +1479,7 @@ export function OnboardingFlow() {
             <h2 style={styles.subTitle}>
               ねこだよりが
               <br />
-              届きました
+              とどきました
             </h2>
             <button
               type="button"
@@ -1489,31 +1491,8 @@ export function OnboardingFlow() {
                 ...(isOpeningEnvelope ? styles.deliveryEnvelopeButtonBusy : {}),
               }}
             >
-              ねこだよりを開く
+              {isOpeningEnvelope ? "ひらいています…" : "ねこだよりを ひらく"}
             </button>
-          </section>
-        ) : null}
-
-        {state === "revealing" && deliveredPhoto ? (
-          <section style={styles.result} aria-label="どこかのねがお">
-            <div
-              style={{
-                ...styles.onboardingDeliveredPhotoFrame,
-                ...styles.revealingPhotoFrame,
-              }}
-            >
-              <StoredPhotoImage
-                key={`onboarding-delivery-reveal-${revealPhotoRetryKey}`}
-                src={getExchangePhotoDisplaySrc(deliveredPhoto)}
-                fallbackSrcs={getExchangePhotoFallbackSrcs(deliveredPhoto)}
-                alt=""
-                style={styles.onboardingDeliveredPhoto}
-                storageVariant="display"
-                onStorageDataUrl={handleDeliveredPhotoDataUrl}
-                onLoad={handleRevealPhotoLoaded}
-                onError={handleRevealPhotoError}
-              />
-            </div>
           </section>
         ) : null}
 
@@ -1536,13 +1515,22 @@ export function OnboardingFlow() {
                 key={`onboarding-delivery-opened-${revealPhotoRetryKey}`}
                 src={getExchangePhotoDisplaySrc(deliveredPhoto)}
                 fallbackSrcs={getExchangePhotoFallbackSrcs(deliveredPhoto)}
-                alt=""
+                alt="届いたねがお"
                 style={styles.onboardingDeliveredPhoto}
                 storageVariant="display"
                 onStorageDataUrl={handleDeliveredPhotoDataUrl}
                 onLoad={handleRevealPhotoLoaded}
                 onError={handleRevealPhotoError}
               />
+              {!isRevealPhotoReady && !hasRevealPhotoError ? (
+                <p
+                  data-testid="onboarding-delivery-photo-loading"
+                  style={styles.onboardingDeliveredPhotoLoading}
+                  role="status"
+                >
+                  ひらいています…
+                </p>
+              ) : null}
             </div>
             {hasRevealPhotoError ? (
               <div
@@ -1564,10 +1552,16 @@ export function OnboardingFlow() {
                 </AppButton>
               </div>
             ) : null}
-            <p style={styles.resultText}>
-              {isDeliveredPhotoKept
-                ? "この一通は、『とどいた』にしまわれました"
-                : "この一通を、しまっています。"}
+            <p style={styles.onboardingDeliveredNote}>
+              {isDeliveredPhotoKept ? (
+                <>
+                  どこかのおうちから届いた一通です。
+                  <br />
+                  この一通は、『とどいた』にしまわれました
+                </>
+              ) : (
+                "この一通を、しまっています。"
+              )}
             </p>
             <AppButton
               type="button"
@@ -2803,56 +2797,27 @@ const styles = {
     pointerEvents: "none",
   },
   deliveredResult: {
-    gap: "10px",
+    gap: "11px",
   },
   onboardingDeliveredTitle: {
-    margin: "0 0 2px",
-    color: "#292721",
-    fontFamily: "var(--font-display)",
-    fontSize: "24px",
-    fontWeight: 500,
-    lineHeight: 1.42,
-    letterSpacing: "0.08em",
+    ...deliveredLetterStyles.title,
   },
   onboardingDeliveredPhotoFrame: {
-    width:
-      "min(calc(100vw - 56px), 300px, calc(100dvh - 250px))",
-    aspectRatio: "1 / 1",
-    padding: "6px",
-    borderRadius: "22px",
-    background: "color-mix(in srgb, var(--paper-card) 68%, transparent)",
-    boxShadow:
-      "0 1px 0 rgba(255,255,255,.52) inset, 0 16px 38px rgba(96,78,54,0.12)",
-    boxSizing: "border-box",
-    overflow: "hidden",
-  },
-  revealingPhotoFrame: {
-    animation: "deliveredPhotoIn 780ms cubic-bezier(0.22, 1, 0.36, 1) both",
+    ...deliveredLetterStyles.photoFrame,
+    width: "min(calc(100vw - 48px), 340px, calc(100dvh - 260px))",
   },
   onboardingDeliveredPhoto: {
-    width: "100%",
-    height: "100%",
-    objectFit: "cover",
-    borderRadius: "17px",
-    background: "rgba(255,253,248,0.72)",
+    ...deliveredLetterStyles.photo,
     animation: "deliveredPhotoIn 360ms cubic-bezier(0, 0, 0.2, 1) both",
   },
+  onboardingDeliveredPhotoLoading: {
+    ...deliveredLetterStyles.loadingOverlay,
+  },
+  onboardingDeliveredNote: {
+    ...deliveredLetterStyles.note,
+  },
   onboardingDeliveredContinue: {
-    width: "min(260px, 100%)",
-    minHeight: "54px",
-    marginTop: "4px",
-    border: "1px solid rgba(144,126,102,0.14)",
-    borderRadius: "var(--radius-full)",
-    background:
-      "linear-gradient(180deg, rgba(255,253,248,0.98), rgba(248,242,232,0.94))",
-    color: "#292721",
-    fontFamily: "var(--font-ui)",
-    fontSize: "15px",
-    fontWeight: 520,
-    lineHeight: 1.35,
-    letterSpacing: "0.04em",
-    boxShadow:
-      "inset 0 1px 0 rgba(255,255,255,0.72), 0 12px 26px rgba(90,76,60,0.08)",
+    ...deliveredLetterStyles.action,
   },
   savedPhoto: {
     width: "min(100%, 260px)",
@@ -2863,24 +2828,10 @@ const styles = {
     boxShadow: "0 14px 34px rgba(90,76,60,0.12)",
   },
   recoveryPanel: {
-    width: "min(100%, 286px)",
-    display: "grid",
-    justifyItems: "center",
-    gap: "8px",
-    padding: "12px 14px",
-    boxSizing: "border-box",
-    border: "1px solid rgba(168,88,78,0.18)",
-    borderRadius: "var(--radius-lg)",
-    background: "rgba(255,253,248,0.72)",
+    ...deliveredLetterStyles.recoveryPanel,
   },
   recoveryText: {
-    margin: 0,
-    color: "#6f6757",
-    fontFamily: UI_FONT,
-    fontSize: "12px",
-    fontWeight: 400,
-    lineHeight: 1.7,
-    letterSpacing: 0,
+    ...deliveredLetterStyles.recoveryText,
   },
   resultText: {
     width: "min(100%, 286px)",

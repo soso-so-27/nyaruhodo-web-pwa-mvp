@@ -96,6 +96,42 @@ export function getFirstEveningDeliveryTargetDateKey(): string | null {
   return targetDateKeys[0] ?? null;
 }
 
+export function isFirstEveningDelivery(dateKey: string) {
+  const deliveredDateKeys = Object.values(readEveningDeliveryStore())
+    .filter((day) => Boolean(day.deliveredPhoto))
+    .map((day) => day.dateKey)
+    .sort();
+
+  return deliveredDateKeys[0] === dateKey;
+}
+
+export function getSystemOpenedEveningDeliveryNotice(now = Date.now()) {
+  autoOpenExpiredEveningDeliveries(now);
+  const todayKey = getJstDateKey(now);
+  const todayStart = getJstDayStartTime(todayKey);
+  const noticeStart = todayStart + 5 * 60 * 60 * 1000;
+  const nextDelivery = todayStart + EVENING_DELIVERY_HOUR * 60 * 60 * 1000;
+
+  if (now < noticeStart || now >= nextDelivery) {
+    return null;
+  }
+
+  const day = Object.values(readEveningDeliveryStore())
+    .filter(
+      (candidate) =>
+        candidate.openedBy === "system" &&
+        Boolean(candidate.deliveredPhoto) &&
+        typeof candidate.openedAt === "number" &&
+        candidate.openedAt >= noticeStart &&
+        candidate.openedAt < nextDelivery,
+    )
+    .sort((a, b) => (b.openedAt ?? 0) - (a.openedAt ?? 0))[0];
+
+  return day?.deliveredPhoto
+    ? { dateKey: day.dateKey, deliveredPhoto: day.deliveredPhoto }
+    : null;
+}
+
 export function writeEveningDeliveryStore(store: EveningDeliveryStore) {
   if (typeof window === "undefined") {
     return false;

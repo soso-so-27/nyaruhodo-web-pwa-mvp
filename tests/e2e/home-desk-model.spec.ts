@@ -58,6 +58,46 @@ test.describe("home desk model", () => {
       });
   });
 
+  test("does not request notification permission without a delivery notification service", async ({
+    page,
+  }) => {
+    await page.addInitScript(() => {
+      Object.defineProperty(window.navigator, "standalone", {
+        configurable: true,
+        value: true,
+      });
+      Object.defineProperty(window, "Notification", {
+        configurable: true,
+        value: {
+          permission: "default",
+          requestPermission: () => {
+            const testWindow = window as typeof window & {
+              __notificationPermissionRequests?: number;
+            };
+            testWindow.__notificationPermissionRequests =
+              (testWindow.__notificationPermissionRequests ?? 0) + 1;
+            return Promise.resolve("granted");
+          },
+        },
+      });
+    });
+    await seedDeskState(page, "1");
+    await page.goto("/home");
+    await page.waitForLoadState("networkidle");
+    await page.evaluate(() => window.dispatchEvent(new Event("appinstalled")));
+
+    await expect
+      .poll(() =>
+        page.evaluate(
+          () =>
+            (window as typeof window & {
+              __notificationPermissionRequests?: number;
+            }).__notificationPermissionRequests ?? 0,
+        ),
+      )
+      .toBe(0);
+  });
+
   test("uses a neutral skeleton before restoring a completed handoff home", async ({
     page,
   }) => {
@@ -352,6 +392,26 @@ test.describe("home desk model", () => {
       "data-state",
       "3",
     );
+    await expect(page.getByTestId("desk-open-letter")).toHaveAttribute(
+      "data-arrival-context",
+      "live",
+    );
+  });
+
+  test("shows where an unopened letter went after the 5am system open", async ({
+    page,
+  }) => {
+    await seedDeskState(page, "1", {
+      now: getCurrentJstTime(6, 15),
+      withSystemOpenedYesterday: true,
+    });
+    await page.goto("/home");
+    await page.waitForLoadState("networkidle");
+
+    await expect(page.getByText("きのうの一通は")).toBeVisible();
+    await expect(page.getByText("『とどいた』に しまいました")).toBeVisible();
+    await expect(page.getByTestId("desk-open-letter")).toHaveCount(0);
+    await expect(page.getByTestId("evening-opening-pair")).toHaveCount(0);
   });
 
   test("shows the sent-before line in habit mode without the waiting letter hint", async ({
@@ -818,6 +878,7 @@ test.describe("home desk model", () => {
     await page.waitForLoadState("networkidle");
 
     const letter = page.getByTestId("desk-open-letter");
+    await expect(letter).toHaveAttribute("data-arrival-context", "waiting");
     const box = await letter.boundingBox();
     expect(box).not.toBeNull();
     await expect(letter.locator('[data-envelope-motion-root="true"]')).toHaveCount(0);
@@ -835,13 +896,20 @@ test.describe("home desk model", () => {
     await expect(openingPair).toContainText(
       "この一通は、『とどいた』にしまわれました",
     );
+    await expect(openingPair).toContainText(
+      "どこかのおうちから届いた一通です。",
+    );
     await expect(openingPair.getByRole("button", { name: "閉じる" })).toHaveCount(
       0,
     );
     await expect(openingPair.locator("button")).toHaveCount(1);
     await expect(
-      openingPair.getByRole("button", { name: "とじる" }),
+      openingPair.getByRole("button", { name: "また、あした" }),
     ).toBeVisible();
+    await page.screenshot({
+      path: "artifacts/home-evening-opening.png",
+      fullPage: true,
+    });
     await expect
       .poll(() =>
         page.evaluate(
@@ -913,6 +981,32 @@ test.describe("home desk model", () => {
       .toBe("ready");
   });
 
+  test("names the wait when delivered photo decoding is slow", async ({ page }) => {
+    await page.addInitScript(() => {
+      HTMLImageElement.prototype.decode = function delayedDecode() {
+        return new Promise<void>((resolve) => {
+          window.setTimeout(resolve, 3000);
+        });
+      };
+    });
+    await seedDeskState(page, "3");
+    await page.goto("/home");
+    await page.waitForLoadState("networkidle");
+
+    const letter = page.getByTestId("desk-open-letter");
+    await letter.click();
+    await expect(letter).toHaveAttribute("data-opening-wait", "true", {
+      timeout: 1000,
+    });
+    await expect(letter).toHaveAttribute(
+      "aria-label",
+      "ねこだよりをひらいています",
+    );
+    await expect(page.getByTestId("evening-opening-pair")).toBeVisible({
+      timeout: 2500,
+    });
+  });
+
   test("closes the opening overlay immediately without a flyer when motion is reduced", async ({
     page,
   }) => {
@@ -927,7 +1021,7 @@ test.describe("home desk model", () => {
     await expect(openingPair.getByRole("button", { name: "閉じる" })).toHaveCount(
       0,
     );
-    await openingPair.getByRole("button", { name: "とじる" }).click();
+    await openingPair.getByRole("button", { name: "また、あした" }).click();
 
     await expect(page.getByTestId("evening-opening-flyer")).toHaveCount(0);
     await expect(page.getByTestId("evening-opening-pair")).toHaveCount(0);
@@ -946,7 +1040,7 @@ test.describe("home desk model", () => {
     await expect(openingPair.getByRole("button", { name: "閉じる" })).toHaveCount(
       0,
     );
-    await openingPair.getByRole("button", { name: "とじる" }).click();
+    await openingPair.getByRole("button", { name: "また、あした" }).click();
 
     const flyer = page.getByTestId("evening-opening-flyer");
     await expect(flyer).toHaveCount(0);
@@ -1035,7 +1129,7 @@ test.describe("home desk model", () => {
     await expect(openingPair).toHaveAttribute("data-photo-id", "delivered-desk");
     const closeButton = openingPair.getByTestId("evening-opening-tomorrow");
     await expect(closeButton).toHaveAttribute("data-stow-state", "stowed");
-    await expect(closeButton).toHaveText("とじる");
+    await expect(closeButton).toHaveText("また、あした");
     await expect
       .poll(() =>
         page.evaluate(() => {
@@ -1220,6 +1314,7 @@ async function seedDeskState(
     withAllCatOmoideCandidates?: boolean;
     withoutOwnPhoto?: boolean;
     openedBySystem?: boolean;
+    withSystemOpenedYesterday?: boolean;
     ownPhotoDataUrl?: string;
   } = {},
 ) {
@@ -1357,6 +1452,29 @@ async function seedDeskState(
                 openedBy: options.openedBySystem ? "system" : "user",
               }
             : {}),
+        };
+      }
+
+      if (options.withSystemOpenedYesterday) {
+        const [year, month, day] = dateKeyValue.split("-").map(Number);
+        const todayStart = Date.UTC(year, month - 1, day) - 9 * 60 * 60 * 1000;
+        const yesterdayKey = new Date(Date.UTC(year, month - 1, day) - 86400000)
+          .toISOString()
+          .slice(0, 10);
+        store[yesterdayKey] = {
+          dateKey: yesterdayKey,
+          targetOwnPhotoId: "own-yesterday-system",
+          targetCatId: catId,
+          targetCapturedAt: todayStart - 8 * 60 * 60 * 1000,
+          deliveredPhoto: {
+            ...deliveredPhoto,
+            id: "delivered-yesterday-system",
+            sourcePhotoId: "source-yesterday-system",
+            deliveredAt: todayStart - 4 * 60 * 60 * 1000,
+          },
+          deliveredAt: todayStart - 4 * 60 * 60 * 1000,
+          openedAt: todayStart + 5 * 60 * 60 * 1000,
+          openedBy: "system",
         };
       }
 

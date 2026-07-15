@@ -76,7 +76,9 @@ type HomeDeskModelProps = {
   showOnboardingSecondPhotoAction?: boolean;
   now: number;
   onTakePhoto: () => void;
-  onOpenDelivery: (state: Extract<EveningHomeState, { kind: "delivered" }>) => void;
+  onOpenDelivery: (
+    state: Extract<EveningHomeState, { kind: "delivered" }>,
+  ) => Promise<void> | void;
   onKeepOpenedDelivery: (dateKey: string, photo: ExchangePhoto) => void;
   onReportOpenedDelivery: (
     dateKey: string,
@@ -91,6 +93,7 @@ type HomeDeskModelProps = {
   eveningDeliveryCheckStatus?: EveningDeliveryCheckStatus;
   onRetryEveningDeliveryCheck?: () => void;
   deliveredPhotoDecodeStatus?: "idle" | "loading" | "ready" | "failed";
+  systemOpenedDeliveryNotice?: boolean;
 };
 
 const USE_SIMPLE_HOME_REVEAL = HOME_REVEAL_MODE === "simple";
@@ -273,10 +276,13 @@ export function HomeDeskModel({
   eveningDeliveryCheckStatus,
   onRetryEveningDeliveryCheck,
   deliveredPhotoDecodeStatus = "idle",
+  systemOpenedDeliveryNotice = false,
 }: HomeDeskModelProps) {
   const deskState = getDeskState(eveningState);
   const prefersReducedMotion = usePrefersReducedMotion();
   const [isEnvelopeOpening, setIsEnvelopeOpening] = useState(false);
+  const [showOpeningWait, setShowOpeningWait] = useState(false);
+  const [liveArrivalDateKey, setLiveArrivalDateKey] = useState<string | null>(null);
   const [envelopeOpenPlayKey, setEnvelopeOpenPlayKey] = useState(0);
   const [developPhotoMounted, setDevelopPhotoMounted] = useState(false);
   const [viewerPhoto, setViewerPhoto] = useState<DeskViewerPhoto | null>(null);
@@ -284,7 +290,12 @@ export function HomeDeskModel({
     () => new Set(),
   );
   const envelopeOpenTimerRef = useRef<number | null>(null);
+  const openingWaitTimerRef = useRef<number | null>(null);
+  const liveArrivalTimerRef = useRef<number | null>(null);
   const isOpeningEnvelopeRef = useRef(false);
+  const previousDeliveredDateKeyRef = useRef<string | null>(
+    eveningState.kind === "delivered" ? eveningState.dateKey : null,
+  );
   const revealStartedAtRef = useRef<number | null>(null);
   const revealPhotoLoadedTrackedRef = useRef(false);
   const revealPhotoErrorTrackedRef = useRef(false);
@@ -334,7 +345,9 @@ export function HomeDeskModel({
   const usesTextRibbonTray = !hasTrayActions;
   const usesEnvelopeHome = hasUnopenedDeliveryNotification;
   const shouldSuppressEmptyBeforeNotice =
-    homeDay.phase === "empty-before" && deliveryCheckState === "idle";
+    homeDay.phase === "empty-before" &&
+    deliveryCheckState === "idle" &&
+    !systemOpenedDeliveryNotice;
   const shouldShowBaseNotice =
     hasUnopenedDeliveryNotification ||
     (homeDay.phase !== "opened" && !shouldSuppressEmptyBeforeNotice);
@@ -359,9 +372,34 @@ export function HomeDeskModel({
   }, [homePhoto?.id, homePhoto?.src]);
 
   useEffect(() => {
+    const deliveredDateKey =
+      eveningState.kind === "delivered" ? eveningState.dateKey : null;
+    const previousDateKey = previousDeliveredDateKeyRef.current;
+
+    if (deliveredDateKey && previousDateKey !== deliveredDateKey) {
+      setLiveArrivalDateKey(deliveredDateKey);
+      if (liveArrivalTimerRef.current) {
+        window.clearTimeout(liveArrivalTimerRef.current);
+      }
+      liveArrivalTimerRef.current = window.setTimeout(() => {
+        liveArrivalTimerRef.current = null;
+        setLiveArrivalDateKey(null);
+      }, 1800);
+    }
+
+    previousDeliveredDateKeyRef.current = deliveredDateKey;
+  }, [eveningState.dateKey, eveningState.kind]);
+
+  useEffect(() => {
     return () => {
       if (envelopeOpenTimerRef.current) {
         window.clearTimeout(envelopeOpenTimerRef.current);
+      }
+      if (openingWaitTimerRef.current) {
+        window.clearTimeout(openingWaitTimerRef.current);
+      }
+      if (liveArrivalTimerRef.current) {
+        window.clearTimeout(liveArrivalTimerRef.current);
       }
     };
   }, []);
@@ -372,11 +410,16 @@ export function HomeDeskModel({
     }
 
     setIsEnvelopeOpening(false);
+    setShowOpeningWait(false);
     setDevelopPhotoMounted(false);
     isOpeningEnvelopeRef.current = false;
     if (envelopeOpenTimerRef.current) {
       window.clearTimeout(envelopeOpenTimerRef.current);
       envelopeOpenTimerRef.current = null;
+    }
+    if (openingWaitTimerRef.current) {
+      window.clearTimeout(openingWaitTimerRef.current);
+      openingWaitTimerRef.current = null;
     }
   }, [eveningState.kind]);
 
@@ -385,6 +428,26 @@ export function HomeDeskModel({
     revealPhotoLoadedTrackedRef.current = false;
     revealPhotoErrorTrackedRef.current = false;
   }, [eveningState.dateKey, eveningState.kind]);
+
+  function resetOpeningFeedback() {
+    isOpeningEnvelopeRef.current = false;
+    setIsEnvelopeOpening(false);
+    setShowOpeningWait(false);
+    if (openingWaitTimerRef.current) {
+      window.clearTimeout(openingWaitTimerRef.current);
+      openingWaitTimerRef.current = null;
+    }
+  }
+
+  async function commitDeliveredLetterOpen(
+    deliveryState: Extract<EveningHomeState, { kind: "delivered" }>,
+  ) {
+    try {
+      await onOpenDelivery(deliveryState);
+    } finally {
+      resetOpeningFeedback();
+    }
+  }
 
   function openDeliveredLetter() {
     if (eveningState.kind !== "delivered") {
@@ -399,11 +462,20 @@ export function HomeDeskModel({
     const startedAt = performance.now();
     revealStartedAtRef.current = startedAt;
     trackHomeRevealEvent("delivery_reveal_started", 0);
+    setIsEnvelopeOpening(true);
+    setShowOpeningWait(false);
+    if (openingWaitTimerRef.current) {
+      window.clearTimeout(openingWaitTimerRef.current);
+    }
+    openingWaitTimerRef.current = window.setTimeout(() => {
+      openingWaitTimerRef.current = null;
+      setShowOpeningWait(true);
+    }, 260);
 
     if (prefersReducedMotion) {
       trackHomeRevealEvent("delivery_reveal_skipped", 0);
       void playOpenSound();
-      onOpenDelivery(eveningState);
+      void commitDeliveredLetterOpen(eveningState);
       return;
     }
 
@@ -411,20 +483,17 @@ export function HomeDeskModel({
       setDevelopPhotoMounted(true);
     }
     setEnvelopeOpenPlayKey((value) => value + 1);
-    setIsEnvelopeOpening(true);
     if (envelopeOpenTimerRef.current) {
       window.clearTimeout(envelopeOpenTimerRef.current);
     }
     envelopeOpenTimerRef.current = window.setTimeout(() => {
       envelopeOpenTimerRef.current = null;
-      isOpeningEnvelopeRef.current = false;
-      setIsEnvelopeOpening(false);
       trackHomeRevealEvent(
         "delivery_reveal_completed",
         performance.now() - startedAt,
       );
       void playOpenSound();
-      onOpenDelivery(eveningState);
+      void commitDeliveredLetterOpen(eveningState);
     }, ENVELOPE_OPEN_MS);
   }
 
@@ -630,11 +699,14 @@ export function HomeDeskModel({
               ...(usesEnvelopeHome ? deskStyles.notificationTrayEnvelopeHome : {}),
             }}
             className={
-              hasUnopenedDeliveryNotification && !prefersReducedMotion
+              hasUnopenedDeliveryNotification &&
+              liveArrivalDateKey === eveningState.dateKey &&
+              !prefersReducedMotion
                 ? "home-letter-tray-glow"
                 : undefined
             }
             aria-label="ホームのお知らせ"
+            aria-live={hasUnopenedDeliveryNotification ? "polite" : undefined}
           >
             <div
               style={{
@@ -650,7 +722,18 @@ export function HomeDeskModel({
                   role="button"
                   data-testid="desk-open-letter"
                   data-photo-decode={deliveredPhotoDecodeStatus}
-                  aria-label="ねこだよりをひらく"
+                  data-arrival-context={
+                    liveArrivalDateKey === eveningState.dateKey
+                      ? "live"
+                      : "waiting"
+                  }
+                  data-opening-wait={showOpeningWait ? "true" : undefined}
+                  aria-label={
+                    showOpeningWait
+                      ? "ねこだよりをひらいています"
+                      : "ねこだよりをひらく"
+                  }
+                  aria-busy={isEnvelopeOpening}
                   style={{
                     ...(usesEnvelopeHome
                       ? deskStyles.envelopeHomeButton
@@ -662,6 +745,9 @@ export function HomeDeskModel({
                   }}
                   className={[
                     usesEnvelopeHome ? "desk-envelope-home" : null,
+                    liveArrivalDateKey === eveningState.dateKey
+                      ? "desk-envelope-arrived-live"
+                      : null,
                     isEnvelopeOpening
                       ? usesEnvelopeHome && USE_SIMPLE_HOME_REVEAL
                         ? "desk-letter-simple-opening"
@@ -814,6 +900,7 @@ export function HomeDeskModel({
                     phase={homeDay.phase}
                     deliveryCheckState={deliveryCheckState}
                     onRetry={onRetryEveningDeliveryCheck}
+                    systemOpenedDeliveryNotice={systemOpenedDeliveryNotice}
                   />
                 </div>
               ) : null}
@@ -987,9 +1074,9 @@ export function HomeDeskModel({
           animation: deskEveningSoonCopyIn 1200ms var(--ease-gentle) both;
         }
         .home-letter-tray-glow {
-          animation: homeLetterTrayGlow 2200ms var(--ease-gentle) infinite alternate;
+          animation: homeLetterTrayGlow 900ms var(--ease-gentle) 2 alternate;
         }
-        .desk-envelope-home {
+        .desk-envelope-arrived-live {
           animation: deskEnvelopeArrive 720ms cubic-bezier(0.2, 0.8, 0.2, 1) both;
         }
         .desk-envelope-home:active [data-envelope-body="true"] {
@@ -1011,6 +1098,12 @@ export function HomeDeskModel({
         .desk-letter-opening [data-envelope-action="true"]::before,
         .desk-letter-simple-opening [data-envelope-action="true"]::before {
           animation: deskEnvelopeActionFade 110ms ease-out both;
+        }
+        .desk-letter-opening[data-opening-wait="true"] [data-envelope-action="true"]::before,
+        .desk-letter-simple-opening[data-opening-wait="true"] [data-envelope-action="true"]::before {
+          content: "ひらいています…";
+          animation: none;
+          opacity: 1;
         }
         .desk-letter-simple-opening [data-envelope-art="simple"] {
           animation: deskEnvelopeSimpleFadeOut 260ms 70ms cubic-bezier(0.4, 0, 1, 1) both;
@@ -1194,7 +1287,7 @@ export function HomeDeskModel({
           .desk-frame-breathe,
           .desk-evening-soon-copy,
           .home-letter-tray-glow,
-          .desk-envelope-home,
+          .desk-envelope-arrived-live,
           .desk-letter-simple-opening [data-envelope-action="true"]::before,
           .desk-letter-simple-opening [data-envelope-art="simple"],
           .desk-letter-opening [data-envelope-action="true"]::before,
@@ -1810,10 +1903,12 @@ function HomeLetterTrayText({
   phase,
   deliveryCheckState = "idle",
   onRetry,
+  systemOpenedDeliveryNotice = false,
 }: {
   phase: HomeTodayPhase;
   deliveryCheckState?: EveningDeliveryCheckStatus["state"];
   onRetry?: () => void;
+  systemOpenedDeliveryNotice?: boolean;
 }) {
   const keyword = (children: ReactNode) => (
     <span style={deskStyles.letterTrayKeyword}>{children}</span>
@@ -1843,6 +1938,17 @@ function HomeLetterTrayText({
         >
           もう一度確認する
         </button>
+      </>
+    );
+  }
+
+  if (phase === "empty-before" && systemOpenedDeliveryNotice) {
+    return (
+      <>
+        <strong style={deskStyles.letterTrayTitle}>きのうの一通は</strong>
+        <span style={deskStyles.letterTraySub}>
+          {keyword("『とどいた』")}に しまいました
+        </span>
       </>
     );
   }

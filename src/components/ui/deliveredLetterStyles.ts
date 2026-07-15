@@ -1,0 +1,108 @@
+import type { CSSProperties } from "react";
+
+export const deliveredLetterStyles = {
+  title: {
+    margin: "0 0 2px",
+    color: "var(--ink, #292721)",
+    fontFamily: "var(--font-display)",
+    fontSize: "23px",
+    fontWeight: 500,
+    lineHeight: 1.42,
+    letterSpacing: "0.04em",
+  },
+  photoFrame: {
+    position: "relative",
+    aspectRatio: "1 / 1",
+    padding: "5px",
+    border: "1px solid color-mix(in srgb, var(--line, #b9ad9d) 36%, transparent)",
+    borderRadius: "12px",
+    background:
+      "color-mix(in srgb, var(--paper-card, #fffaf2) 88%, var(--paper-warm, #f4eee3) 12%)",
+    boxShadow:
+      "0 1px 0 rgba(255,255,255,0.58) inset, 0 14px 30px -24px rgba(86,70,52,0.34)",
+    boxSizing: "border-box",
+    overflow: "hidden",
+  },
+  photo: {
+    width: "100%",
+    height: "100%",
+    objectFit: "contain",
+    borderRadius: "8px",
+    background: "var(--paper-card, #fffaf2)",
+  },
+  loadingOverlay: {
+    position: "absolute",
+    inset: "5px",
+    zIndex: 2,
+    display: "grid",
+    placeItems: "center",
+    margin: 0,
+    padding: "16px",
+    boxSizing: "border-box",
+    borderRadius: "8px",
+    background:
+      "color-mix(in srgb, var(--paper-card, #fffaf2) 86%, transparent)",
+    color: "var(--ink-soft, #746a5f)",
+    fontFamily: "var(--font-ui)",
+    fontSize: "13px",
+    fontWeight: 400,
+    lineHeight: 1.6,
+    letterSpacing: 0,
+    textAlign: "center",
+    pointerEvents: "none",
+  },
+  note: {
+    width: "min(100%, 330px)",
+    margin: "3px 0 0",
+    color: "var(--ink-soft, #746a5f)",
+    fontFamily: "var(--font-ui)",
+    fontSize: "13.5px",
+    fontWeight: 400,
+    lineHeight: 1.7,
+    letterSpacing: 0,
+    textAlign: "center",
+  },
+  action: {
+    width: "min(280px, 100%)",
+    minHeight: "54px",
+    marginTop: "4px",
+    border:
+      "1px solid color-mix(in srgb, var(--line, #b9ad9d) 42%, transparent)",
+    borderRadius: "var(--radius-full, 999px)",
+    background:
+      "linear-gradient(180deg, color-mix(in srgb, var(--paper-card, #fffaf2) 98%, white 2%), color-mix(in srgb, var(--paper-warm, #f4eee3) 88%, white 12%))",
+    color: "var(--ink, #292721)",
+    fontFamily: "var(--font-ui)",
+    fontSize: "15px",
+    fontWeight: 520,
+    lineHeight: 1.35,
+    letterSpacing: "0.02em",
+    cursor: "pointer",
+    boxShadow:
+      "inset 0 1px 0 rgba(255,255,255,0.72), 0 12px 24px -20px rgba(80,66,50,0.32)",
+    WebkitTapHighlightColor: "transparent",
+  },
+  recoveryPanel: {
+    width: "min(100%, 330px)",
+    display: "grid",
+    justifyItems: "center",
+    gap: "8px",
+    padding: "11px 14px",
+    boxSizing: "border-box",
+    border:
+      "1px solid color-mix(in srgb, var(--seal, #a8584e) 22%, transparent)",
+    borderRadius: "10px",
+    background:
+      "color-mix(in srgb, var(--paper-card, #fffaf2) 78%, transparent)",
+  },
+  recoveryText: {
+    margin: 0,
+    color: "var(--ink-soft, #746a5f)",
+    fontFamily: "var(--font-ui)",
+    fontSize: "13px",
+    fontWeight: 400,
+    lineHeight: 1.65,
+    letterSpacing: 0,
+    textAlign: "center",
+  },
+} satisfies Record<string, CSSProperties>;

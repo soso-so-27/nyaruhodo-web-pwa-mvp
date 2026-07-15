@@ -62,7 +62,9 @@ import {
 } from "../../lib/home/deliveryCandidates";
 import {
   buildEveningHomeState,
+  getSystemOpenedEveningDeliveryNotice,
   getJstDateKey,
+  isFirstEveningDelivery,
   isTodaySleepingCounterVisible,
   markEveningDeliveryKept,
   readEveningDeliveryStore,
@@ -126,6 +128,7 @@ import {
   StoredPhotoImage,
 } from "../ui/StoredPhotoImage";
 import { useModalBehavior } from "../ui/useModalBehavior";
+import { deliveredLetterStyles } from "../ui/deliveredLetterStyles";
 
 type HomeInputProps = {
   initialNow: number;
@@ -446,7 +449,6 @@ export function HomeInput({
 
   useEffect(() => {
     if (isStandaloneDisplay()) {
-      void requestDeliveryNotificationPermission();
       dismissHomeInstallHint();
       return;
     }
@@ -484,7 +486,6 @@ export function HomeInput({
       }
     };
     const handleAppInstalled = () => {
-      void requestDeliveryNotificationPermission();
       dismissHomeInstallHint();
     };
 
@@ -827,6 +828,10 @@ export function HomeInput({
         now: homeNow,
       }),
     [allOwnSleepingPhotos, eveningDeliveryRefreshTick, homeNow],
+  );
+  const systemOpenedDeliveryNotice = useMemo(
+    () => getSystemOpenedEveningDeliveryNotice(homeNow),
+    [eveningDeliveryRefreshTick, homeNow],
   );
   const deliveredHomePhoto =
     eveningHomeState.kind === "delivered"
@@ -2070,22 +2075,6 @@ export function HomeInput({
     setHomeInstallPrompt(null);
   }
 
-  async function requestDeliveryNotificationPermission() {
-    if (!("Notification" in window) || Notification.permission !== "default") {
-      return;
-    }
-
-    const permission = await Notification.requestPermission().catch(() => null);
-    trackProductEvent(
-      "push_permission",
-      {
-        permission,
-        trigger: "home_install",
-      },
-      { localCatId: activeCatId },
-    );
-  }
-
   async function handleHomeInstallPrimaryAction() {
     if (homeInstallPlatform === "android" && homeInstallPrompt) {
       const promptEvent = homeInstallPrompt;
@@ -2327,6 +2316,7 @@ export function HomeInput({
               eveningDeliveryCheckStatus={eveningDelivery.checkStatus}
               onRetryEveningDeliveryCheck={eveningDelivery.retryEveningDeliveryCheck}
               deliveredPhotoDecodeStatus={deliveredPhotoDecodeStatus}
+              systemOpenedDeliveryNotice={Boolean(systemOpenedDeliveryNotice)}
             />
           </>
         ) : null}
@@ -2353,7 +2343,7 @@ export function HomeInput({
       {openingEveningDelivery ? (
         <EveningDeliveryOpening
           state={openingEveningDelivery}
-          catName={homeCatName}
+          initialDecodeStatus={deliveredPhotoDecodeStatus}
           onStorageDataUrl={(dataUrl) => {
             handleEveningDeliveryDataUrl(openingEveningDelivery.dateKey, dataUrl);
             updateKeptExchangePhotoDataUrl(
@@ -3256,12 +3246,12 @@ function usePrefersReducedMotion() {
 
 function EveningDeliveryOpening({
   state,
-  catName,
+  initialDecodeStatus,
   onStorageDataUrl,
   onClose,
 }: {
   state: Extract<EveningHomeState, { kind: "delivered" }>;
-  catName: string;
+  initialDecodeStatus: DeliveredPhotoDecodeStatus;
   onStorageDataUrl: (dataUrl: string) => void;
   onClose: () => void;
 }) {
@@ -3271,7 +3261,14 @@ function EveningDeliveryOpening({
   const pushedHistoryRef = useRef(false);
   const ignoreNextPopRef = useRef(false);
   const requestCloseRef = useRef<(syncHistory?: boolean) => void>(() => undefined);
+  const actionButtonRef = useRef<HTMLButtonElement | null>(null);
   const [isClosing, setIsClosing] = useState(false);
+  const [isPhotoReady, setIsPhotoReady] = useState(
+    initialDecodeStatus === "ready",
+  );
+  const [hasPhotoError, setHasPhotoError] = useState(false);
+  const [photoRetryKey, setPhotoRetryKey] = useState(0);
+  const [isFirstDelivery] = useState(() => isFirstEveningDelivery(state.dateKey));
 
   function finishClose() {
     if (closeTimerRef.current) {
@@ -3314,6 +3311,10 @@ function EveningDeliveryOpening({
   }, [state.dateKey]);
 
   useEffect(() => {
+    actionButtonRef.current?.focus({ preventScroll: true });
+  }, []);
+
+  useEffect(() => {
     window.history.pushState(
       { neterunekoEveningOpening: true },
       "",
@@ -3344,7 +3345,16 @@ function EveningDeliveryOpening({
     <div
       style={styles.eveningOpeningOverlay}
       aria-live="polite"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="evening-opening-title"
       onClick={() => requestClose()}
+      onKeyDown={(event) => {
+        if (event.key === "Escape") {
+          event.preventDefault();
+          requestClose();
+        }
+      }}
     >
       <div
         style={{
@@ -3362,33 +3372,85 @@ function EveningDeliveryOpening({
         data-photo-id={state.deliveredPhoto.id}
         onClick={(event) => event.stopPropagation()}
       >
-        <p style={styles.eveningOpeningTitle}>ねこだより</p>
+        <p id="evening-opening-title" style={styles.eveningOpeningTitle}>
+          ねこだより
+        </p>
         <div
           style={{
             ...styles.eveningOpeningPhotoFrame,
             ...(isClosing ? styles.eveningOpeningPhotoFrameClosing : {}),
           }}
+          data-testid="evening-opening-photo-frame"
         >
           <StoredPhotoImage
+            key={`evening-opening-photo-${photoRetryKey}`}
             src={getPhotoDetailSrc(state.deliveredPhoto)}
             fallbackSrcs={getPhotoFallbackSrcs(state.deliveredPhoto)}
-            alt=""
+            alt="届いたねがお"
             style={styles.eveningOpeningPhoto}
             storageVariant={getPhotoStorageVariant(state.deliveredPhoto, "detail")}
+            loading="eager"
             onStorageDataUrl={onStorageDataUrl}
+            onLoad={() => {
+              setIsPhotoReady(true);
+              setHasPhotoError(false);
+            }}
+            onError={() => {
+              setIsPhotoReady(false);
+              setHasPhotoError(true);
+            }}
           />
+          {!isPhotoReady && !hasPhotoError ? (
+            <p
+              data-testid="evening-opening-photo-loading"
+              style={styles.eveningOpeningPhotoLoading}
+              role="status"
+            >
+              ひらいています…
+            </p>
+          ) : null}
         </div>
+        {hasPhotoError ? (
+          <div
+            data-testid="evening-opening-photo-error"
+            role="alert"
+            style={styles.eveningOpeningRecoveryPanel}
+          >
+            <p style={styles.eveningOpeningRecoveryText}>
+              写真を表示できませんでした。通信を確認して、もう一度お試しください。
+            </p>
+            <AppButton
+              type="button"
+              variant="quiet"
+              size="md"
+              onClick={() => {
+                setHasPhotoError(false);
+                setIsPhotoReady(false);
+                setPhotoRetryKey((value) => value + 1);
+              }}
+            >
+              写真をもう一度読み込む
+            </AppButton>
+          </div>
+        ) : null}
         <p style={styles.eveningOpeningSavedNote}>
+          {isFirstDelivery ? (
+            <>
+              どこかのおうちから届いた一通です。
+              <br />
+            </>
+          ) : null}
           この一通は、『とどいた』にしまわれました
         </p>
         <button
+          ref={actionButtonRef}
           type="button"
           data-testid="evening-opening-tomorrow"
           data-stow-state="stowed"
           onClick={() => requestClose()}
           style={styles.eveningOpeningTomorrowButton}
         >
-          とじる
+          また、あした
         </button>
       </div>
     </div>
@@ -7530,10 +7592,12 @@ const styles = {
     display: "grid",
     placeItems: "center",
     padding:
-      "calc(44px + env(safe-area-inset-top)) 16px calc(28px + env(safe-area-inset-bottom))",
+      "calc(24px + env(safe-area-inset-top)) 16px calc(20px + env(safe-area-inset-bottom))",
     boxSizing: "border-box",
-    overflow: "hidden",
-    color: "#292721",
+    overflowX: "hidden",
+    overflowY: "auto",
+    color: "var(--ink, #292721)",
+    overscrollBehavior: "contain",
   },
   eveningOpeningBackdrop: {
     position: "absolute",
@@ -7555,26 +7619,18 @@ const styles = {
     justifyItems: "center",
   },
   eveningOpeningPhotoFrame: {
-    width: "min(calc(100vw - 32px), 390px)",
-    aspectRatio: "1 / 1",
-    padding: "6px",
-    borderRadius: "22px",
-    background: "color-mix(in srgb, var(--paper-card) 68%, transparent)",
-    boxShadow:
-      "0 1px 0 rgba(255,255,255,.52) inset, 0 16px 38px rgba(96,78,54,0.12)",
-    boxSizing: "border-box",
-    overflow: "hidden",
+    ...deliveredLetterStyles.photoFrame,
+    width: "min(calc(100vw - 40px), 390px, calc(100dvh - 254px))",
   },
   eveningOpeningPhotoFrameClosing: {
     opacity: 0,
   },
   eveningOpeningPhoto: {
-    width: "100%",
-    height: "100%",
-    objectFit: "cover",
-    borderRadius: "17px",
-    background: "rgba(255,253,248,0.72)",
+    ...deliveredLetterStyles.photo,
     animation: "exchangePhotoIn 360ms cubic-bezier(0, 0, 0.2, 1) both",
+  },
+  eveningOpeningPhotoLoading: {
+    ...deliveredLetterStyles.loadingOverlay,
   },
   eveningOpeningCaption: {
     margin: "8px 0 0",
@@ -7587,9 +7643,9 @@ const styles = {
   eveningOpeningPairStage: {
     position: "relative",
     zIndex: 1,
-    width: "min(calc(100vw - 24px), 460px)",
+    width: "min(calc(100vw - 24px), 440px)",
     display: "grid",
-    gap: "10px",
+    gap: "11px",
     justifyItems: "center",
     animation: "eveningOpeningStageIn 360ms cubic-bezier(0, 0, 0.2, 1) both",
     transition: "opacity 180ms ease",
@@ -7606,41 +7662,19 @@ const styles = {
     gap: "12px",
   },
   eveningOpeningTitle: {
-    margin: "0 0 2px",
-    color: "#292721",
-    fontFamily: "var(--font-display)",
-    fontSize: "24px",
-    fontWeight: 500,
-    lineHeight: 1.42,
-    letterSpacing: "0.08em",
+    ...deliveredLetterStyles.title,
   },
   eveningOpeningSavedNote: {
-    margin: "2px 0 0",
-    color: "#746a5f",
-    fontFamily: "var(--font-display)",
-    fontSize: "12px",
-    fontWeight: 400,
-    lineHeight: 1.5,
-    letterSpacing: "0.04em",
+    ...deliveredLetterStyles.note,
   },
   eveningOpeningTomorrowButton: {
-    width: "min(260px, 100%)",
-    minHeight: "54px",
-    marginTop: "4px",
-    border: "1px solid rgba(144,126,102,0.14)",
-    borderRadius: "var(--radius-full)",
-    background:
-      "linear-gradient(180deg, rgba(255,253,248,0.98), rgba(248,242,232,0.94))",
-    color: "#292721",
-    fontFamily: "var(--font-ui)",
-    fontSize: "15px",
-    fontWeight: 520,
-    lineHeight: 1.35,
-    letterSpacing: "0.04em",
-    cursor: "pointer",
-    boxShadow:
-      "inset 0 1px 0 rgba(255,255,255,0.72), 0 12px 26px rgba(90,76,60,0.08)",
-    WebkitTapHighlightColor: "transparent",
+    ...deliveredLetterStyles.action,
+  },
+  eveningOpeningRecoveryPanel: {
+    ...deliveredLetterStyles.recoveryPanel,
+  },
+  eveningOpeningRecoveryText: {
+    ...deliveredLetterStyles.recoveryText,
   },
   exchangeSheetFrame: {
     left: "14px",
