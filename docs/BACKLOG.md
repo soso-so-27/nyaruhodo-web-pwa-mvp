@@ -23,7 +23,7 @@
 - ~~受信画像読み込み失敗時のグレースフルフォールバック表示~~ — **済 2026-07-14確認**（`StoredPhotoImage` のメッセージ表示・再読込案内・複数source fallbackで実装済み）
 - 孤児delivery 31件を踏んだ際のUI確認 — 出典: `docs/incident-20260704-bulk-delete.md`
 - E2Eの networkidle 依存除去（既存4failの解消） — 出典: `docs/specs/incident-and-legal-audit-spec-v1.0.md`
-- 【P3前ゲート】CI上でのSupabase local起動によるDB統合E2E実行 — 出典: `docs/specs/prod-migration-remediation-spec-v1.0.md`
+- ~~【P3前ゲート】CI上でのSupabase local起動によるDB統合E2E実行~~ — **済 2026-07-15**（`.github/workflows/db-integration-e2e.yml`。初回GitHub Actionsでpool guards＋Storage backup 45件成功）
 - moderation cleanup恒久策（data URL/旧localStorage経路の監査） — 出典: `docs/incident-20260704-bulk-delete.md`
 - 管理画面文言の日本語化（approve/reject→承認/除外） — 出典: `docs/incident-20260704-bulk-delete.md`
 - ~~セルフサービス退会UI（P3前）~~ — **済 2026-07-15確認**（設定末尾の「データの削除・退会」から確認語入力付きの退会画面へ接続。課金中のみ支払い管理を先に案内し、E2Eあり）
