@@ -7,6 +7,7 @@ const requiredTables = [
   "cat_moments",
   "cat_moment_deliveries",
   "account_sync_state",
+  "beta_participants",
 ];
 
 const requiredLegalRoutes = [
@@ -17,10 +18,7 @@ const requiredLegalRoutes = [
   "commercial-transactions",
 ];
 
-const env = {
-  ...process.env,
-  ...readEnvFile(".env.local"),
-};
+const localEnv = readEnvFile(".env.local");
 const supabaseUrl = readEnv("NEXT_PUBLIC_SUPABASE_URL");
 const anonKey = readEnv("NEXT_PUBLIC_SUPABASE_ANON_KEY");
 const siteUrl = readEnv("NEXT_PUBLIC_SITE_URL") || readEnv("NEXT_PUBLIC_APP_URL");
@@ -31,9 +29,7 @@ const localOnly =
 console.log("Checking local release configuration...");
 requireEnv("NEXT_PUBLIC_SUPABASE_URL");
 requireEnv("NEXT_PUBLIC_SUPABASE_ANON_KEY");
-requireEnv("NEXT_PUBLIC_GOOGLE_CLIENT_ID");
 requireEnv("SUPABASE_SERVICE_ROLE_KEY");
-requireEnv("BETA_TESTER_EMAILS");
 
 if (!siteUrl) {
   fail("Missing NEXT_PUBLIC_SITE_URL or NEXT_PUBLIC_APP_URL.");
@@ -69,6 +65,7 @@ console.log("Checking PWA assets...");
 requireFile("src/app/manifest.ts");
 requireReferencedPublicAssets("src/app/manifest.ts");
 requireReferencedPublicAssets("src/app/layout.tsx");
+requireStartupImageAssets("src/app/layout.tsx");
 
 if (localOnly) {
   console.log("Local release readiness checks passed.");
@@ -162,7 +159,9 @@ if (bucketResponse.status === 200) {
 console.log("Release readiness checks passed.");
 
 function readEnv(name) {
-  return normalizeEnvValue(env[name]);
+  return (
+    normalizeEnvValue(localEnv[name]) || normalizeEnvValue(process.env[name])
+  );
 }
 
 function requireEnv(name) {
@@ -185,13 +184,24 @@ function requireReferencedPublicAssets(path) {
     ...source.matchAll(/["'`](\/(?:icons?|splash|favicon)[^"'`)]*)["'`]/g),
   ]
     .map((match) => match[1])
-    .filter((value) => !value.startsWith("http"));
+    .filter((value) => !value.startsWith("http") && !value.includes("${"));
 
   for (const assetPath of assetPaths) {
     const localPath = `public${assetPath}`;
     if (!existsSync(localPath)) {
       fail(`Missing public asset referenced by ${path}: ${assetPath}`);
     }
+  }
+}
+
+function requireStartupImageAssets(path) {
+  const source = readFileSync(path, "utf8");
+  const fileKeys = [...source.matchAll(/\bfile:\s*["']([^"']+)["']/g)].map(
+    (match) => match[1],
+  );
+
+  for (const fileKey of fileKeys) {
+    requireFile(`public/splash/startup-envelope-${fileKey}-v3.png`);
   }
 }
 

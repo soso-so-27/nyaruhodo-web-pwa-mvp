@@ -46,45 +46,8 @@ import { createBrowserSupabaseClient } from "../../../lib/supabase/browser";
 const ACCOUNT_CREATE_PROMPT_DISMISSED_KEY =
   STORAGE_KEYS.accountCreatePromptDismissed;
 const ACCOUNT_CREATE_PROMPT_DISMISSED_MS = 7 * 24 * 60 * 60 * 1000;
-const GOOGLE_CLIENT_ID = process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID ?? "";
-const GOOGLE_ID_SCRIPT_SRC = "https://accounts.google.com/gsi/client";
 const ONBOARDING_ALBUM_COMPLETION_READY_KEY =
   "neteruneko_onboarding_album_completion_ready";
-
-type GoogleCredentialResponse = {
-  credential?: string;
-  select_by?: string;
-};
-
-type GoogleAccountsId = {
-  initialize(options: {
-    client_id: string;
-    callback: (response: GoogleCredentialResponse) => void;
-    use_fedcm_for_prompt?: boolean;
-  }): void;
-  renderButton(
-    parent: HTMLElement,
-    options: {
-      theme?: "outline" | "filled_blue" | "filled_black";
-      size?: "large" | "medium" | "small";
-      shape?: "rectangular" | "pill" | "circle" | "square";
-      text?: "signin_with" | "signup_with" | "continue_with" | "signin";
-      width?: number;
-      locale?: string;
-    },
-  ): void;
-  prompt(): void;
-};
-
-declare global {
-  interface Window {
-    google?: {
-      accounts?: {
-        id?: GoogleAccountsId;
-      };
-    };
-  }
-}
 
 export default function AccountCreatePage() {
   const router = useRouter();
@@ -101,7 +64,6 @@ export default function AccountCreatePage() {
     useState<OnboardingSource>("direct");
   const [onboardingCatName, setOnboardingCatName] = useState("");
   const [returnToPath, setReturnToPath] = useState("");
-  const googleButtonRef = useRef<HTMLDivElement | null>(null);
   const hasTrackedCtaView = useRef(false);
   const hasTrackedOnboardingPromptView = useRef(false);
   const hasTrackedCallbackError = useRef(false);
@@ -135,7 +97,6 @@ export default function AccountCreatePage() {
     );
   }
 
-  const hasInitializedGoogleButton = useRef(false);
   const [handoffNext, setHandoffNext] = useState("");
 
   useEffect(() => {
@@ -409,115 +370,6 @@ export default function AccountCreatePage() {
     });
   }
 
-  async function handleGoogleCredential(response: GoogleCredentialResponse) {
-    trackProductEvent("account_create_cta_clicked", {
-      route: "/account/create",
-      trigger: "google_identity_button",
-    });
-    if (isFromOnboarding) {
-      trackProductEvent("onboarding_google_continue_click", {
-        source: onboardingSource,
-        method: "google_identity_button",
-      });
-    }
-
-    const supabase = createBrowserSupabaseClient();
-
-    if (!supabase) {
-      setMessage("アカウント接続の準備がまだできていません。");
-      return;
-    }
-
-    setPendingAction("google");
-    setMessage("");
-    trackProductEvent("auth_google_started", {
-      route: "/account/create",
-      method: "id_token",
-    });
-
-    if (!response.credential) {
-      writeAuthDebugEvent("gis_credential_missing", {
-        selectBy: response.select_by ?? null,
-      });
-      trackProductEvent("auth_google_failed", {
-        error_type: "missing_google_credential",
-      });
-      setPendingAction(null);
-      setMessage("Googleログイン情報を受け取れませんでした。もう一度お試しください。");
-      return;
-    }
-
-    writeAuthDebugEvent("gis_credential_received", {
-      selectBy: response.select_by ?? null,
-    });
-
-    const { data, error } = await supabase.auth.signInWithIdToken({
-      provider: "google",
-      token: response.credential,
-    });
-
-    if (error) {
-      writeAuthDebugEvent("gis_id_token_failed", {
-        message: error.message,
-      });
-      trackProductEvent("auth_google_failed", {
-        error_type: "id_token_sign_in_failed",
-        error_message: error.message,
-      });
-      setPendingAction(null);
-      setMessage(
-        "Googleログインを開始できませんでした。少し時間をおいてもう一度お試しください。",
-      );
-      return;
-    }
-
-    writeAuthDebugEvent("gis_id_token_succeeded", {
-      hasSession: Boolean(data.session),
-      hasUser: Boolean(data.user),
-      email: data.user?.email ?? null,
-    });
-    window.localStorage.setItem(
-      STORAGE_KEYS.authGooglePending,
-      JSON.stringify({
-        provider: "google",
-        route: "/account/create",
-        method: "id_token",
-        startedAt: new Date().toISOString(),
-      }),
-    );
-    const transfer = await finalizeAnonymousStorageTransfer();
-    if (transfer.copied > 0 || transfer.error) {
-      trackProductEvent("auth_google_anonymous_storage_transfer_completed", {
-        route: "/account/create",
-        copied_storage_refs: transfer.copied,
-        had_error: Boolean(transfer.error),
-      });
-    }
-    if (isFromOnboarding) {
-      markOnboardingAlbumCompletionReady();
-      markOnboardingAlbumCreated(onboardingSource);
-      trackProductEvent("onboarding_album_created", {
-        source: onboardingSource,
-        method: "google",
-      });
-      trackProductEvent("cat_album_created", {
-        source: onboardingSource,
-        method: "google",
-      });
-      trackProductEvent("onboarding_completed", {
-        source: onboardingSource,
-        method: "google",
-      });
-      trackOnboardingAlbumCreatedVariant("google");
-    }
-    await claimPendingReferral();
-    router.replace(
-      isFromOnboarding
-        ? "/cats?onboarding=1"
-        : returnToPath || "/home?auth=google_success",
-    );
-  }
-
   async function handleLater() {
     if (isFromOnboarding) {
       trackProductEvent("onboarding_skip", {
@@ -615,7 +467,6 @@ export default function AccountCreatePage() {
                 <EnvironmentNotice environment={displayEnvironment} />
               ) : null}
               <div style={styles.actions}>
-                <div ref={googleButtonRef} style={styles.googleButtonMount} />
                 {isFromOnboarding ? (
                   <AppButton
                     type="button"
@@ -766,43 +617,6 @@ export default function AccountCreatePage() {
       </div>
     </main>
   );
-}
-
-function loadGoogleIdentityScript() {
-  return new Promise<void>((resolve, reject) => {
-    if (typeof window === "undefined") {
-      reject(new Error("window is not available"));
-      return;
-    }
-
-    if (window.google?.accounts?.id) {
-      resolve();
-      return;
-    }
-
-    const existingScript = document.querySelector<HTMLScriptElement>(
-      `script[src="${GOOGLE_ID_SCRIPT_SRC}"]`,
-    );
-
-    if (existingScript) {
-      existingScript.addEventListener("load", () => resolve(), { once: true });
-      existingScript.addEventListener(
-        "error",
-        () => reject(new Error("Google Identity script failed")),
-        { once: true },
-      );
-      return;
-    }
-
-    const script = document.createElement("script");
-
-    script.src = GOOGLE_ID_SCRIPT_SRC;
-    script.async = true;
-    script.defer = true;
-    script.onload = () => resolve();
-    script.onerror = () => reject(new Error("Google Identity script failed"));
-    document.head.appendChild(script);
-  });
 }
 
 function createAuthCallbackUrl({ nextPath }: { nextPath: string }) {
@@ -986,11 +800,5 @@ const styles = {
   actions: {
     display: "grid",
     gap: "9px",
-  },
-  googleButtonMount: {
-    minHeight: "46px",
-    display: "grid",
-    placeItems: "center",
-    opacity: 0.94,
   },
 } satisfies Record<string, CSSProperties>;

@@ -1,6 +1,6 @@
 # Backlog
 
-- Q6検証と同時に匿名認証設定を整合する（現状: `NEXT_PUBLIC_ANON_AUTH_ENABLED=true` / Supabase匿名サインイン無効。今回の夜便修正では変更せず、2026-07-13週に検証・対応） — 出典: 2026-07-12 Android夜便障害調査
+- 匿名認証のQ6ロールアウト（2026-07-15確認: Vercel Production / Preview は空値で実効OFF、Supabase匿名サインインも無効のため現在は整合。Q6の実機検証・CAPTCHA判断・匿名サインイン有効化と同時に `NEXT_PUBLIC_ANON_AUTH_ENABLED=true` へ切り替える） — 出典: `docs/specs/storage-hardening-b-anonymous-auth.md`
 
 - 猫イラスト旧未使用資産（`cat-avatars` / `CatIcon` / `catAvatarSettle`）の参照確認と掃除 — 出典: `artifacts/cat-illust-inventory.md`（当選テーマ決定後）
 

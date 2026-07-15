@@ -7,12 +7,11 @@
 - [ ] 本番/ベータ用の環境変数を揃える
   - `NEXT_PUBLIC_SUPABASE_URL`
   - `NEXT_PUBLIC_SUPABASE_ANON_KEY`
-  - `NEXT_PUBLIC_GOOGLE_CLIENT_ID`
   - `SUPABASE_SERVICE_ROLE_KEY`
-  - `BETA_TESTER_EMAILS`
   - `NEXT_PUBLIC_SITE_URL` または `NEXT_PUBLIC_APP_URL`
 - [ ] `npm run check:release` を通す
 - [ ] Supabase 側で写真表示と権限を確認する
+  - `beta_participants` テーブルが参照できる
   - `cat_moments` の共有配信プールが anon key で直接読めない
   - `cat-photos` bucket が anon key で一覧取得できない
   - 実機で写真が安定して表示される
