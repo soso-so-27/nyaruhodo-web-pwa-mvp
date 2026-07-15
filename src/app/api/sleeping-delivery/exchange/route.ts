@@ -256,23 +256,21 @@ async function handleExchangePost(request: Request) {
     );
   }
 
-  const idempotentDeliveryIds =
+  const idempotentDeliveryId =
     input.deliveryDateKey && !debugDryRun
-      ? buildIdempotentDeliveryIds({
+      ? buildIdempotentDeliveryId({
           userId,
           anonymousId,
           deliveryDateKey: input.deliveryDateKey,
         })
       : null;
-  const idempotentDeliveryId = idempotentDeliveryIds?.primary ?? null;
 
-  if (idempotentDeliveryIds) {
+  if (idempotentDeliveryId) {
     const existingDelivery = await readExistingDelivery({
       supabase,
       userId,
       anonymousId,
-      localDeliveryId: idempotentDeliveryIds.primary,
-      legacyLocalDeliveryId: idempotentDeliveryIds.legacy,
+      localDeliveryId: idempotentDeliveryId,
     });
 
     if (existingDelivery) {
@@ -518,7 +516,6 @@ async function handleExchangePost(request: Request) {
           userId,
           anonymousId,
           localDeliveryId: idempotentDeliveryId,
-          legacyLocalDeliveryId: idempotentDeliveryIds?.legacy ?? null,
         });
 
         if (existingDelivery) {
@@ -891,65 +888,22 @@ export function buildIdempotentDeliveryId({
   return `delivered-sleeping-${deliveryDateKey}-${digest}`;
 }
 
-export function buildLegacyIdempotentDeliveryId({
-  userId,
-  anonymousId,
-  deliveryDateKey,
-}: {
-  userId: string | null;
-  anonymousId: string | null;
-  deliveryDateKey: string;
-}) {
-  const recipientIdentity = userId ? `user:${userId}` : `anon:${anonymousId ?? ""}`;
-  const digest = hashText(`${recipientIdentity}:${deliveryDateKey}`).toString(36);
-
-  return `delivered-sleeping-${deliveryDateKey}-${digest}`;
-}
-
-export function buildIdempotentDeliveryIds(args: {
-  userId: string | null;
-  anonymousId: string | null;
-  deliveryDateKey: string;
-}) {
-  const primary = buildIdempotentDeliveryId(args);
-  const legacy = buildLegacyIdempotentDeliveryId(args);
-
-  return {
-    primary,
-    legacy,
-    all: primary === legacy ? [primary] : [primary, legacy],
-  };
-}
-
 export async function readExistingDelivery({
   supabase,
   userId,
   anonymousId,
   localDeliveryId,
-  legacyLocalDeliveryId = null,
 }: {
   supabase: SupabaseClient;
   userId: string | null;
   anonymousId: string | null;
   localDeliveryId: string;
-  legacyLocalDeliveryId?: string | null;
 }) {
-  const primary = await readExistingDeliveryByLocalId({
-    supabase,
-    userId,
-    anonymousId,
-    localDeliveryId,
-  });
-
-  if (primary || !legacyLocalDeliveryId || legacyLocalDeliveryId === localDeliveryId) {
-    return primary;
-  }
-
   return readExistingDeliveryByLocalId({
     supabase,
     userId,
     anonymousId,
-    localDeliveryId: legacyLocalDeliveryId,
+    localDeliveryId,
   });
 }
 
@@ -1041,7 +995,7 @@ function toExchangePhotoFromDelivery(
     id: delivery.local_delivery_id,
     sourcePhotoId: delivery.source_photo_id ?? delivery.source_moment_id ?? "",
     src: delivery.photo_url,
-    title: "縺ｻ縺九・迪ｫ縺ｮ縺ｭ縺後♀",
+    title: "ほかの猫のねがお",
     subtitle: "",
     triggerLabel,
     theme,

@@ -21,7 +21,6 @@ import {
   isFastStockCandidateDeliverable,
   isRowDeliverable,
   buildIdempotentDeliveryId,
-  buildIdempotentDeliveryIds,
   readExistingDelivery,
   resetOnboardingExchangeExceptionLimitForTests,
   validateExchangeDeliveryDateKey,
@@ -58,6 +57,7 @@ type ExchangeResponse = {
     id: string;
     sourcePhotoId?: string;
     src: string;
+    title?: string;
   } | null;
   source?: "remote" | "none";
   diagnostics?: {
@@ -367,18 +367,18 @@ test.describe("sleeping delivery pool guards", () => {
     );
   });
 
-  test("replays idempotent exchange deliveries from new or legacy ids", async () => {
-    const ids = buildIdempotentDeliveryIds({
+  test("replays idempotent exchange deliveries from the current id", async () => {
+    const localDeliveryId = buildIdempotentDeliveryId({
       anonymousId: "anon-idempotent",
       deliveryDateKey: "2026-07-05",
       userId: null,
     });
 
-    const legacyDelivery = {
+    const delivery = {
       anonymous_id: "anon-idempotent",
       delivered_at: new Date().toISOString(),
-      id: "delivery-row-legacy",
-      local_delivery_id: ids.legacy,
+      id: "delivery-row-current",
+      local_delivery_id: localDeliveryId,
       metadata: {},
       photo_url: normalCatLikePhotoUrl,
       recipient_local_cat_id: "cat-recipient",
@@ -387,31 +387,14 @@ test.describe("sleeping delivery pool guards", () => {
       status: "delivered",
       user_id: null,
     };
-    const legacyReplay = await readExistingDelivery({
+    const replay = await readExistingDelivery({
       anonymousId: "anon-idempotent",
-      legacyLocalDeliveryId: ids.legacy,
-      localDeliveryId: ids.primary,
-      supabase: createFakeDeliveryLookupSupabase([legacyDelivery]).client,
+      localDeliveryId,
+      supabase: createFakeDeliveryLookupSupabase([delivery]).client,
       userId: null,
     });
 
-    expect(legacyReplay?.local_delivery_id).toBe(ids.legacy);
-
-    const newDelivery = {
-      ...legacyDelivery,
-      id: "delivery-row-new",
-      local_delivery_id: ids.primary,
-    };
-    const newReplay = await readExistingDelivery({
-      anonymousId: "anon-idempotent",
-      legacyLocalDeliveryId: ids.legacy,
-      localDeliveryId: ids.primary,
-      supabase: createFakeDeliveryLookupSupabase([newDelivery, legacyDelivery])
-        .client,
-      userId: null,
-    });
-
-    expect(newReplay?.local_delivery_id).toBe(ids.primary);
+    expect(replay?.local_delivery_id).toBe(localDeliveryId);
   });
 
   test("uses sha256 idempotent ids with distinct 96-bit digests", () => {
@@ -1806,6 +1789,7 @@ test.describe("sleeping delivery pool guards", () => {
 
       expect(secondBody.photo?.id).toBe(firstBody.photo?.id);
       expect(secondBody.photo?.sourcePhotoId).toBe(candidateId);
+      expect(secondBody.photo?.title).toBe("ほかの猫のねがお");
 
       const { count, error: countError } = await adminSupabase
         .from("cat_moment_deliveries")

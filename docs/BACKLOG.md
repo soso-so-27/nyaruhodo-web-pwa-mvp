@@ -26,10 +26,10 @@
 - 【P3前ゲート】CI上でのSupabase local起動によるDB統合E2E実行 — 出典: `docs/specs/prod-migration-remediation-spec-v1.0.md`
 - moderation cleanup恒久策（data URL/旧localStorage経路の監査） — 出典: `docs/incident-20260704-bulk-delete.md`
 - 管理画面文言の日本語化（approve/reject→承認/除外） — 出典: `docs/incident-20260704-bulk-delete.md`
-- セルフサービス退会UI（P3前） — 出典: `docs/legal-docs-inventory-2026-07.md`
+- ~~セルフサービス退会UI（P3前）~~ — **済 2026-07-15確認**（設定末尾の「データの削除・退会」から確認語入力付きの退会画面へ接続。課金中のみ支払い管理を先に案内し、E2Eあり）
 - WebKit/Playwright環境整備 — 出典: `docs/specs/incident-and-legal-audit-spec-v1.0.md`
 - 現像の印刷・発送手段調査＋住所PII法務追補（フェーズ1・business-strategy §8参照） — 出典: `docs/neteruneko-business-strategy-v1.2.md`
 - rejected写真の同一localMomentId再送でpendingへ戻る審査ループ防止（再送時に既存rejectedを引き継ぐ案） — 出典: 2026-07-05コード監査 F1〜F4付帯
 - 退会後Stripe webhookがsubscriptions行を復活させ得る件の確認（FK有無確認、auth user不在ならskip案） — 出典: 2026-07-05コード監査 F1〜F4付帯
-- `toExchangePhotoFromDelivery` のtitle文字化け確認（実害なら修正、抽出時症状なら記録のみ） — 出典: 2026-07-05コード監査 F1〜F4付帯
-- exchange冪等IDの旧32bit ID読み取りを削除（2026-07-13以降。実デプロイ日が遅れた場合はデプロイ日+8日以降） — 出典: 2026-07-05監査フォローアップ #4
+- ~~`toExchangePhotoFromDelivery` のtitle文字化け確認~~ — **済 2026-07-15**（既存配達のリプレイ時に実害あり。`ほかの猫のねがお` へ修正しE2Eで固定）
+- ~~exchange冪等IDの旧32bit ID読み取りを削除~~ — **済 2026-07-15**（本番直近10日を照合し、新方式30件・旧方式は2026-07-06の1件のみ。移行窓経過後に二重読みを撤去）
