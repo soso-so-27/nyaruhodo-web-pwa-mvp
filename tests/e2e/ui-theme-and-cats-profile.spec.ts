@@ -295,8 +295,12 @@ test("switches to the next cat from the cover in one tap", async ({ page }) => {
     .toBe("cat-komugi");
 });
 
-test("keeps a confirmed cover crop after leaving and returning", async ({ page }) => {
-  await seedCatsProfile(page, Date.parse("2026-06-10T12:30:00+09:00"), 3);
+test("keeps a confirmed cover crop after leaving, returning, and reloading", async ({
+  page,
+}) => {
+  await seedCatsProfile(page, Date.parse("2026-06-10T12:30:00+09:00"), 3, {
+    preserveOnReload: true,
+  });
   await page.setViewportSize({ width: 390, height: 844 });
   await page.goto("/cats");
   await page.waitForLoadState("networkidle");
@@ -357,6 +361,22 @@ test("keeps a confirmed cover crop after leaving and returning", async ({ page }
     return profile?.coverCrop?.scale ?? 0;
   });
   expect(reloadedScale).toBeCloseTo(savedScale, 4);
+  expect(
+    await readCropTransformScale(
+      page.getByTestId("cats-profile-cover").locator("img").last(),
+    ),
+  ).toBeCloseTo(savedScale, 4);
+
+  await page.reload();
+  await page.waitForLoadState("networkidle");
+  await page.getByTestId("cats-section-tab-basic").click();
+
+  const restartedScale = await page.evaluate(() => {
+    const raw = window.localStorage.getItem("cat_profiles");
+    const [profile] = raw ? JSON.parse(raw) : [];
+    return profile?.coverCrop?.scale ?? 0;
+  });
+  expect(restartedScale).toBeCloseTo(savedScale, 4);
   expect(
     await readCropTransformScale(
       page.getByTestId("cats-profile-cover").locator("img").last(),
@@ -1114,10 +1134,24 @@ test("opens a year summary dashboard from the yearly archive", async ({
   await expect(dialog).toContainText("10枚目");
 });
 
-async function seedCatsProfile(page: Page, now: number, photoCount: number) {
+async function seedCatsProfile(
+  page: Page,
+  now: number,
+  photoCount: number,
+  options: { preserveOnReload?: boolean } = {},
+) {
   await page.addInitScript(
-    ({ nowValue, src, count }) => {
+    ({ nowValue, src, count, preserveOnReload }) => {
       (window as typeof window & { __testNow?: number }).__testNow = nowValue;
+      const seedMarker = "neteruneko_test_cats_profile_seeded";
+
+      if (
+        preserveOnReload &&
+        window.sessionStorage.getItem(seedMarker) === "true"
+      ) {
+        return;
+      }
+
       const nowIso = new Date(nowValue).toISOString();
       window.localStorage.setItem("active_cat_id", "cat-mugi");
       window.localStorage.setItem(
@@ -1171,8 +1205,17 @@ async function seedCatsProfile(page: Page, now: number, photoCount: number) {
           })),
         ),
       );
+
+      if (preserveOnReload) {
+        window.sessionStorage.setItem(seedMarker, "true");
+      }
     },
-    { nowValue: now, src: photoDataUrl, count: photoCount },
+    {
+      nowValue: now,
+      src: photoDataUrl,
+      count: photoCount,
+      preserveOnReload: options.preserveOnReload ?? false,
+    },
   );
 }
 

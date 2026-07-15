@@ -705,6 +705,52 @@ test.describe("onboarding delivery flow", () => {
     await expect(page.getByText("iPhoneでホームに置く")).toHaveCount(0);
   });
 
+  test("shows the iPhone home-screen guide after daytime onboarding", async ({
+    page,
+  }) => {
+    await mockBrowserDate(page, "2026-07-06T10:00:00+09:00");
+    await page.addInitScript(() => {
+      window.localStorage.setItem("onboarding_completed", "true");
+      window.localStorage.removeItem("neteruneko_home_install_hint_dismissed");
+      Object.defineProperty(window.navigator, "userAgent", {
+        configurable: true,
+        get: () =>
+          "Mozilla/5.0 (iPhone; CPU iPhone OS 17_5 like Mac OS X) AppleWebKit/605.1.15 Version/17.5 Mobile/15E148 Safari/604.1",
+      });
+    });
+
+    await page.goto("/home");
+    await expect(page.getByLabel("ホーム画面に追加")).toBeVisible();
+    await page.getByRole("button", { name: "置き方を見る" }).click();
+
+    await expect(page.getByText("iPhoneでホームに置く")).toBeVisible();
+    await expect(page.getByText("「ホーム画面に追加」を選ぶ")).toBeVisible();
+  });
+
+  test("shows the Android install guide after daytime onboarding", async ({
+    page,
+  }) => {
+    await mockBrowserDate(page, "2026-07-06T10:00:00+09:00");
+    await page.addInitScript(() => {
+      window.localStorage.setItem("onboarding_completed", "true");
+      window.localStorage.removeItem("neteruneko_home_install_hint_dismissed");
+      Object.defineProperty(window.navigator, "userAgent", {
+        configurable: true,
+        get: () =>
+          "Mozilla/5.0 (Linux; Android 14; Pixel 7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Mobile Safari/537.36",
+      });
+    });
+
+    await page.goto("/home");
+    await expect(page.getByLabel("ホーム画面に追加")).toBeVisible();
+    await page.getByRole("button", { name: "置き方を見る" }).click();
+
+    await expect(page.getByText("Androidでホームに置く")).toBeVisible();
+    await expect(
+      page.getByText("「アプリをインストール」または「ホーム画面に追加」を選ぶ"),
+    ).toBeVisible();
+  });
+
   test("keeps the first photo action inside a compact phone viewport", async ({
     page,
   }) => {
@@ -1007,6 +1053,59 @@ test.describe("onboarding delivery flow", () => {
     await expect(
       page.getByText(/写真を読み込めませんでした/),
     ).toHaveCount(0);
+    await expect(
+      page.getByRole("button", { name: "ねこだよりを ひらく" }),
+    ).toBeVisible();
+  });
+
+  test("recovers when LINE image decoders are temporarily unavailable", async ({
+    page,
+  }) => {
+    test.slow();
+    await page.addInitScript(() => {
+      Object.defineProperty(window.navigator, "userAgent", {
+        configurable: true,
+        get: () =>
+          "Mozilla/5.0 (Linux; Android 14; Pixel 7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Mobile Safari/537.36 Line/14.0.0",
+      });
+
+      let firstDecodeAt: number | null = null;
+      const shouldFailDecoder = () => {
+        firstDecodeAt ??= performance.now();
+        return performance.now() - firstDecodeAt < 360;
+      };
+      const originalCreateImageBitmap = window.createImageBitmap.bind(window);
+      window.createImageBitmap = ((...args: Parameters<typeof createImageBitmap>) =>
+        shouldFailDecoder()
+          ? Promise.reject(new DOMException("decoder warming up"))
+          : originalCreateImageBitmap(...args)) as typeof createImageBitmap;
+      const originalCreateObjectUrl = URL.createObjectURL.bind(URL);
+      URL.createObjectURL = ((blob: Blob | MediaSource) =>
+        shouldFailDecoder()
+          ? "data:text/plain;base64,bm90LWFuLWltYWdl"
+          : originalCreateObjectUrl(blob)) as typeof URL.createObjectURL;
+      const originalReadAsDataUrl = FileReader.prototype.readAsDataURL;
+      FileReader.prototype.readAsDataURL = function readAsDataURL(blob: Blob) {
+        return originalReadAsDataUrl.call(
+          this,
+          shouldFailDecoder()
+            ? new Blob(["not-an-image"], { type: "text/plain" })
+            : blob,
+        );
+      };
+    });
+    await routeImmediateDelivery(page);
+
+    await page.goto("/onboarding?source=instagram_dm");
+    await page.getByRole("button", { name: "このまま試す" }).click();
+    await page.getByTestId("onboarding-photo-select").click();
+    await page.locator('input[type="file"]').last().setInputFiles({
+      name: "line-transient-photo.png",
+      mimeType: "image/png",
+      buffer: testPng,
+    });
+
+    await expect(page.getByText(/写真を読み込めませんでした/)).toHaveCount(0);
     await expect(
       page.getByRole("button", { name: "ねこだよりを ひらく" }),
     ).toBeVisible();

@@ -260,7 +260,7 @@ test.describe("home desk state cycle", () => {
             understanding: {},
             avatar_storage_path: null,
             cover_storage_path: restoredCoverPath,
-            cover_crop: { scale: 1.7, offsetX: 12, offsetY: -8 },
+            cover_crop: { scale: 0.55, offsetX: 12, offsetY: -8 },
             home_photo_storage_path: null,
             home_photo_position: null,
             local_created_at: new Date(now).toISOString(),
@@ -323,7 +323,7 @@ test.describe("home desk state cycle", () => {
         profiles: [
           {
             coverPhotoDataUrl: `storage:${restoredCoverPath}`,
-            coverCrop: { scale: 1.7, offsetX: 12, offsetY: -8 },
+            coverCrop: { scale: 0.55, offsetX: 12, offsetY: -8 },
           },
         ],
         ownPhotos: [{ src: restoredPhotoUrl }],

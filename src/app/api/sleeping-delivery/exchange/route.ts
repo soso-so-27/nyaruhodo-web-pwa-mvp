@@ -759,9 +759,7 @@ export async function validateExchangeDeliveryDateKey({
     return { ok: true as const };
   }
 
-  const canUseOnboardingException =
-    mode === "onboarding" &&
-    (await hasNoPriorDeliveries({ supabase, userId, anonymousId }));
+  const canUseOnboardingException = mode === "onboarding";
 
   if (canUseOnboardingException) {
     const onboardingExceptionLimit = checkOnboardingExchangeExceptionLimit(
@@ -873,35 +871,6 @@ function pruneOnboardingExceptionBuckets(now: number) {
       onboardingExceptionBuckets.delete(key);
     }
   }
-}
-
-async function hasNoPriorDeliveries({
-  supabase,
-  userId,
-  anonymousId,
-}: {
-  supabase: SupabaseClient;
-  userId: string | null;
-  anonymousId: string | null;
-}) {
-  let query = supabase
-    .from("cat_moment_deliveries")
-    .select("id", { count: "exact", head: true });
-
-  query = userId
-    ? query.eq("user_id", userId)
-    : query.is("user_id", null).eq("anonymous_id", anonymousId ?? "");
-
-  const { count, error } = await query;
-
-  if (error) {
-    console.warn("[sleeping-delivery/exchange] onboarding delivery count failed", {
-      code: error.code,
-    });
-    return false;
-  }
-
-  return (count ?? 0) === 0;
 }
 
 export function buildIdempotentDeliveryId({

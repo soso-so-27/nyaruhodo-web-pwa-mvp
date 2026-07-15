@@ -30,6 +30,10 @@ import {
   CAT_GALLERY_COLLECTION_SLOT,
   isReservedCollectionSlotSlug,
 } from "./collection/dailyTarget";
+import {
+  normalizeCatCoverCrop,
+  type CatCoverCrop,
+} from "./cats/coverCrop";
 
 type LocalCatProfile = {
   id: string;
@@ -39,11 +43,7 @@ type LocalCatProfile = {
   homePhotoDataUrl?: string;
   homePhotoPosition?: string;
   coverPhotoDataUrl?: string;
-  coverCrop?: {
-    scale?: number;
-    offsetX?: number;
-    offsetY?: number;
-  };
+  coverCrop?: Partial<CatCoverCrop>;
   basicInfo?: Record<string, unknown>;
   appearance?: Record<string, unknown>;
   typeKey?: string;
@@ -1044,7 +1044,7 @@ function normalizeProfiles(
       return {
         ...rest,
         coverPhotoDataUrl: profile.coverPhotoDataUrl ?? avatarDataUrl,
-        coverCrop: normalizeCoverCrop(profile.coverCrop ?? avatarCrop),
+        coverCrop: normalizeCatCoverCrop(profile.coverCrop ?? avatarCrop),
       };
     });
 }
@@ -1859,7 +1859,7 @@ async function restoreRemoteSnapshot(
       coverPhotoDataUrl: (cat.cover_storage_path ?? cat.avatar_storage_path)
         ? toStoragePhotoUrl(cat.cover_storage_path ?? cat.avatar_storage_path ?? "")
         : undefined,
-      coverCrop: normalizeCoverCrop(cat.cover_crop),
+      coverCrop: normalizeCatCoverCrop(cat.cover_crop),
       basicInfo: cat.basic_info ?? undefined,
       appearance: cat.appearance ?? undefined,
       typeKey: cat.type_key ?? undefined,
@@ -2765,32 +2765,6 @@ function buildRestoredPhotoVariants(src: string) {
 
 function toJsonObject(value: Record<string, unknown> | null | undefined) {
   return value && typeof value === "object" && !Array.isArray(value) ? value : {};
-}
-
-function normalizeCoverCrop(
-  crop: Record<string, unknown> | LocalCatProfile["coverCrop"] | null | undefined,
-): LocalCatProfile["coverCrop"] | undefined {
-  if (!crop || typeof crop !== "object" || Array.isArray(crop)) {
-    return undefined;
-  }
-
-  const scale = Number(crop.scale);
-  const offsetX = Number(crop.offsetX);
-  const offsetY = Number(crop.offsetY);
-
-  if (
-    !Number.isFinite(scale) ||
-    !Number.isFinite(offsetX) ||
-    !Number.isFinite(offsetY)
-  ) {
-    return undefined;
-  }
-
-  return {
-    scale: Math.min(2.8, Math.max(1, scale)),
-    offsetX: Math.min(48, Math.max(-48, offsetX)),
-    offsetY: Math.min(48, Math.max(-48, offsetY)),
-  };
 }
 
 function toIsoStringOrNull(value: string | null | undefined) {

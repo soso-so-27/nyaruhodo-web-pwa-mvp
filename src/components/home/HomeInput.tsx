@@ -2270,8 +2270,7 @@ export function HomeInput({
   const shouldShowHomeInstallHint =
     isHomeClockReady &&
     isHomeInstallHintVisible &&
-    Boolean(homeInstallPlatform) &&
-    eveningHomeState.kind !== "before";
+    Boolean(homeInstallPlatform);
   const shouldShowDeskGuidanceCopy = shouldShowGuidanceCopy({
     keptExchangePhotoCount,
     now: homeNow,

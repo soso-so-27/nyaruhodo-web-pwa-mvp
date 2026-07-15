@@ -332,9 +332,9 @@ test.describe("sleeping delivery pool guards", () => {
     expect(isFastStockCandidateDeliverable(fastRow, context)).toBe(false);
   });
 
-  test("limits onboarding instant exchange exceptions per ip key", async () => {
+  test("allows onboarding retries but limits instant exchange exceptions per ip key", async () => {
     resetOnboardingExchangeExceptionLimitForTests();
-    const fakeSupabase = createFakeOnboardingValidationSupabase();
+    const fakeSupabase = createFakeOnboardingValidationSupabase(2);
     const baseArgs = {
       supabase: fakeSupabase.client,
       userId: null,
@@ -349,22 +349,13 @@ test.describe("sleeping delivery pool guards", () => {
       await validateExchangeDeliveryDateKey(baseArgs),
     ).toEqual({ ok: true });
     expect(
-      await validateExchangeDeliveryDateKey({
-        ...baseArgs,
-        anonymousId: "anon-onboarding-2",
-      }),
+      await validateExchangeDeliveryDateKey(baseArgs),
     ).toEqual({ ok: true });
     expect(
-      await validateExchangeDeliveryDateKey({
-        ...baseArgs,
-        anonymousId: "anon-onboarding-3",
-      }),
+      await validateExchangeDeliveryDateKey(baseArgs),
     ).toEqual({ ok: true });
 
-    const fourth = await validateExchangeDeliveryDateKey({
-      ...baseArgs,
-      anonymousId: "anon-onboarding-4",
-    });
+    const fourth = await validateExchangeDeliveryDateKey(baseArgs);
 
     expect(fourth).toMatchObject({
       ok: false,
@@ -2705,7 +2696,7 @@ function createFakeAccountDeletionQuery({
   return query;
 }
 
-function createFakeOnboardingValidationSupabase() {
+function createFakeOnboardingValidationSupabase(priorDeliveryCount = 0) {
   const insertedAppEvents: Array<Record<string, unknown>> = [];
   const client = {
     from: (table: string) => {
@@ -2729,7 +2720,7 @@ function createFakeOnboardingValidationSupabase() {
           return this;
         },
         then(resolve: (value: { count: number; error: null }) => void) {
-          resolve({ count: 0, error: null });
+          resolve({ count: priorDeliveryCount, error: null });
         },
       };
     },

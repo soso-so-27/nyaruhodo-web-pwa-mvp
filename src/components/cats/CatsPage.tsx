@@ -41,6 +41,11 @@ import {
   type CatGalleryPhoto,
 } from "../../lib/cats/catGalleryPhotos";
 import {
+  CAT_COVER_CROP_MIN_SCALE,
+  normalizeCatCoverCrop,
+  type CatCoverCrop,
+} from "../../lib/cats/coverCrop";
+import {
   readCatSleepingMilestones,
   readOwnSleepingPhotos,
   readOwnSleepingPhotosForAlbum,
@@ -86,8 +91,6 @@ import { OmoideMemoryViewer } from "../home/OmoideMemoryViewer";
 import { useModalBehavior } from "../ui/useModalBehavior";
 import {
   addCatProfile,
-  CAT_COVER_CROP_MIN_SCALE,
-  type CatCoverCrop,
   getActiveCatProfile,
   getCatName,
   isCatProfileNameUnset,
@@ -4575,23 +4578,7 @@ function getLensPhotoFallbackSrcs(photo: PhotoSourceSet) {
 }
 
 function normalizeCoverCrop(crop?: Partial<CatCoverCrop>): CatCoverCrop {
-  return {
-    scale: clampNumber(
-      crop?.scale ?? DEFAULT_COVER_CROP.scale,
-      CAT_COVER_CROP_MIN_SCALE,
-      2.8,
-    ),
-    offsetX: clampNumber(
-      crop?.offsetX ?? DEFAULT_COVER_CROP.offsetX,
-      -48,
-      48,
-    ),
-    offsetY: clampNumber(
-      crop?.offsetY ?? DEFAULT_COVER_CROP.offsetY,
-      -48,
-      48,
-    ),
-  };
+  return normalizeCatCoverCrop(crop) ?? DEFAULT_COVER_CROP;
 }
 
 function CoverCropPhoto({

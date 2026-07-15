@@ -42,26 +42,50 @@ export async function readImageFileDimensions(file: Blob) {
   }
 }
 
+const IMAGE_DECODE_RETRY_DELAYS_MS = [0, 220, 650, 1200] as const;
+const failedImageDecodeBlobs = new WeakSet<Blob>();
+
 async function decodeImageFileForCanvas(file: Blob): Promise<{
   source: CanvasImageSource;
   width: number;
   height: number;
   cleanup: () => void;
 }> {
-  const firstAttempt = await tryDecodeImageFileForCanvas(file);
-
-  if (firstAttempt) {
-    return firstAttempt;
+  if (failedImageDecodeBlobs.has(file)) {
+    throw new Error("image_decode_failed: all decoders failed");
   }
 
-  await waitForDecodeRetry();
-  const retryAttempt = await tryDecodeImageFileForCanvas(file);
+  for (const delayMs of IMAGE_DECODE_RETRY_DELAYS_MS) {
+    if (delayMs > 0) {
+      await waitForDecodeRetry(delayMs);
+    }
 
-  if (retryAttempt) {
-    return retryAttempt;
+    const stableBlob = await copyImageBlobForDecode(file);
+    const decoded = await tryDecodeImageFileForCanvas(stableBlob);
+
+    if (decoded) {
+      return decoded;
+    }
   }
 
+  failedImageDecodeBlobs.add(file);
   throw new Error("image_decode_failed: all decoders failed");
+}
+
+async function copyImageBlobForDecode(file: Blob) {
+  if (typeof file.arrayBuffer !== "function") {
+    return file;
+  }
+
+  try {
+    const bytes = await file.arrayBuffer();
+
+    return bytes.byteLength > 0
+      ? new Blob([bytes], { type: file.type || "application/octet-stream" })
+      : file;
+  } catch {
+    return file;
+  }
 }
 
 async function tryDecodeImageFileForCanvas(file: Blob): Promise<{
@@ -174,8 +198,8 @@ function readFileAsDataUrl(file: Blob) {
   });
 }
 
-function waitForDecodeRetry() {
+function waitForDecodeRetry(delayMs: number) {
   return new Promise<void>((resolve) => {
-    window.setTimeout(resolve, 180);
+    window.setTimeout(resolve, delayMs);
   });
 }

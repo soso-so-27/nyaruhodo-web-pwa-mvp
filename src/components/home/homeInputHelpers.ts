@@ -12,6 +12,10 @@ import type {
   CatTypeKey,
   CatTypeLabel,
 } from "../../lib/diagnosisOnboarding/types";
+import {
+  normalizeCatCoverCrop,
+  type CatCoverCrop,
+} from "../../lib/cats/coverCrop";
 
 type OnboardingAnswers = Record<string, unknown> | string[];
 
@@ -64,14 +68,6 @@ export type CatProfile = {
     sourceBreakdown: UnderstandingSourceBreakdown;
   };
 };
-
-export type CatCoverCrop = {
-  scale: number;
-  offsetX: number;
-  offsetY: number;
-};
-
-export const CAT_COVER_CROP_MIN_SCALE = 0.25;
 
 type LegacyCatProfile = Partial<CatProfile> & {
   avatarDataUrl?: string;
@@ -957,32 +953,6 @@ function normalizeStoredCatProfile(profile: LegacyCatProfile): CatProfile {
     modifiers: Array.isArray(profile.modifiers) ? profile.modifiers : undefined,
     onboarding: profile.onboarding,
     understanding: profile.understanding,
-  };
-}
-
-function normalizeCatCoverCrop(
-  crop: Partial<CatCoverCrop> | undefined,
-): CatCoverCrop | undefined {
-  if (!crop || typeof crop !== "object") {
-    return undefined;
-  }
-
-  const scale = Number(crop.scale);
-  const offsetX = Number(crop.offsetX);
-  const offsetY = Number(crop.offsetY);
-
-  if (
-    !Number.isFinite(scale) ||
-    !Number.isFinite(offsetX) ||
-    !Number.isFinite(offsetY)
-  ) {
-    return undefined;
-  }
-
-  return {
-    scale: Math.min(2.8, Math.max(CAT_COVER_CROP_MIN_SCALE, scale)),
-    offsetX: Math.min(48, Math.max(-48, offsetX)),
-    offsetY: Math.min(48, Math.max(-48, offsetY)),
   };
 }
 
