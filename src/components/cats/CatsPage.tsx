@@ -86,6 +86,7 @@ import { OmoideMemoryViewer } from "../home/OmoideMemoryViewer";
 import { useModalBehavior } from "../ui/useModalBehavior";
 import {
   addCatProfile,
+  CAT_COVER_CROP_MIN_SCALE,
   type CatCoverCrop,
   getActiveCatProfile,
   getCatName,
@@ -177,7 +178,6 @@ const DEFAULT_COVER_CROP: CatCoverCrop = {
   offsetX: 0,
   offsetY: 0,
 };
-const MIN_COVER_CROP_SCALE = 0.25;
 type CatManageEditSource = "basic" | "manage";
 
 export function CatsPage() {
@@ -801,6 +801,7 @@ export function CatsPage() {
       const raw = window.localStorage.getItem(STORAGE_KEYS.catProfiles);
 
       if (!raw) {
+        setSaveMessage("保存できませんでした。もう一度お試しください。");
         return;
       }
 
@@ -808,6 +809,7 @@ export function CatsPage() {
       const index = profiles.findIndex((profile) => profile.id === activeCatId);
 
       if (index === -1) {
+        setSaveMessage("保存できませんでした。もう一度お試しください。");
         return;
       }
 
@@ -925,6 +927,7 @@ export function CatsPage() {
       setIsCatManageOpen(!shouldCloseCatManageAfterSave);
       setTimeout(() => setSaveMessage(""), 2000);
     } catch {
+      setSaveMessage("保存できませんでした。もう一度お試しください。");
       return;
     } finally {
       setIsSavingProfile(false);
@@ -1851,6 +1854,35 @@ export function CatsPage() {
           }}
           closeOnOverlay={!isCatManageEditing}
           showCloseButton={!isCatManageEditing}
+          footer={
+            isCatManageEditing ? (
+              <div style={styles.catManageEditorFooter}>
+                {saveMessage ? (
+                  <p style={styles.catManageEditorFooterMessage} role="status">
+                    {saveMessage}
+                  </p>
+                ) : null}
+                <div style={styles.catManageEditorFooterActions}>
+                  <button
+                    type="button"
+                    style={styles.catManageBackButton}
+                    onClick={cancelEditingCatName}
+                    disabled={isSavingProfile}
+                  >
+                    もどる
+                  </button>
+                  <button
+                    type="button"
+                    style={styles.catManageSaveButton}
+                    onClick={handleSaveProfile}
+                    disabled={isSavingProfile}
+                  >
+                    {isSavingProfile ? "保存中" : "保存する"}
+                  </button>
+                </div>
+              </div>
+            ) : undefined
+          }
         >
           <div style={styles.catManageSheet}>
             {isAddingCat ? (
@@ -2087,24 +2119,6 @@ export function CatsPage() {
                   />
                 </section>
 
-                <div style={styles.catManageEditorActions}>
-                  <button
-                    type="button"
-                    style={styles.catManageBackButton}
-                    onClick={cancelEditingCatName}
-                    disabled={isSavingProfile}
-                  >
-                    もどる
-                  </button>
-                  <button
-                    type="button"
-                    style={styles.catManageSaveButton}
-                    onClick={handleSaveProfile}
-                    disabled={isSavingProfile}
-                  >
-                    {isSavingProfile ? "保存中" : "保存する"}
-                  </button>
-                </div>
               </div>
             ) : (
               <>
@@ -3965,7 +3979,7 @@ function CoverCropSheet({
         : frameAspect / imageAspect;
     onChange({
       ...DEFAULT_COVER_CROP,
-      scale: clampNumber(containScale, MIN_COVER_CROP_SCALE, 1),
+      scale: clampNumber(containScale, CAT_COVER_CROP_MIN_SCALE, 1),
     });
   }
 
@@ -4564,7 +4578,7 @@ function normalizeCoverCrop(crop?: Partial<CatCoverCrop>): CatCoverCrop {
   return {
     scale: clampNumber(
       crop?.scale ?? DEFAULT_COVER_CROP.scale,
-      MIN_COVER_CROP_SCALE,
+      CAT_COVER_CROP_MIN_SCALE,
       2.8,
     ),
     offsetX: clampNumber(
@@ -7137,7 +7151,7 @@ const styles = {
     minHeight: "82px",
   },
   catManageSelectedOption: {
-    borderColor: "color-mix(in srgb, var(--seal) 42%, var(--control-border))",
+    border: "1px solid color-mix(in srgb, var(--seal) 42%, var(--control-border))",
     background: "color-mix(in srgb, var(--seal) 13%, var(--paper-card))",
     color: "var(--seal)",
     boxShadow: "inset 0 0 0 1px color-mix(in srgb, var(--seal) 10%, transparent)",
@@ -7151,9 +7165,30 @@ const styles = {
     padding: "14px 0 0",
     borderTop: "1px solid color-mix(in srgb, var(--line) 48%, transparent)",
   },
+  catManageEditorFooter: {
+    display: "grid",
+    gap: "8px",
+    minWidth: 0,
+  },
+  catManageEditorFooterMessage: {
+    margin: 0,
+    color: "var(--danger)",
+    fontFamily: CATS_UI,
+    fontSize: CATS_META_SIZE,
+    fontWeight: 500,
+    lineHeight: 1.5,
+    textAlign: "center",
+  },
+  catManageEditorFooterActions: {
+    display: "grid",
+    gridTemplateColumns: "minmax(0, 0.72fr) minmax(0, 1.28fr)",
+    gap: "10px",
+    minWidth: 0,
+  },
   catManageBackButton: {
-    minWidth: "72px",
-    minHeight: "40px",
+    width: "100%",
+    minWidth: 0,
+    minHeight: "48px",
     padding: "0 8px",
     border: "none",
     borderRadius: "999px",
@@ -7168,8 +7203,9 @@ const styles = {
     WebkitTapHighlightColor: "transparent",
   },
   catManageSaveButton: {
-    minWidth: "112px",
-    minHeight: "40px",
+    width: "100%",
+    minWidth: 0,
+    minHeight: "48px",
     padding: "0 18px",
     border: "1px solid color-mix(in srgb, var(--seal) 48%, transparent)",
     borderRadius: "999px",

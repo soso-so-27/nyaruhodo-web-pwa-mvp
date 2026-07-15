@@ -10,7 +10,7 @@ const beforeEightToday = getCurrentJstTime(19, 30);
 const afterEightToday = getCurrentJstTime(20, 5);
 
 test.describe("home desk model", () => {
-  test("serves a stable home skeleton before client state hydrates", async ({
+  test("serves a plain home surface before client state hydrates", async ({
     request,
   }) => {
     for (const route of ["/", "/home"]) {
@@ -18,9 +18,10 @@ test.describe("home desk model", () => {
       expect(response.ok()).toBe(true);
       const html = await response.text();
 
-      expect(html).toContain('data-testid="home-startup-skeleton"');
-      expect(html).toContain('data-startup-min-ms="600"');
-      expect(html).toContain('data-startup-fade-ms="200"');
+      expect(html).toContain('data-testid="home-startup-surface"');
+      expect(html).not.toContain('data-testid="home-startup-skeleton"');
+      expect(html).not.toContain("data-startup-min-ms");
+      expect(html).not.toContain("data-startup-fade-ms");
       expect(html).not.toContain("startup-envelope-hold-1206-2622-v1.webp");
       expect(html).not.toContain("Googleでつづける");
       expect(html).not.toContain("ログイン");
@@ -77,13 +78,13 @@ test.describe("home desk model", () => {
 
     const response = await page.request.get("/home?handoff=restored");
     const html = await response.text();
-    expect(html).toContain('data-testid="home-startup-skeleton"');
+    expect(html).toContain('data-testid="home-startup-surface"');
     expect(html).not.toContain("Googleでつづける");
     expect(html).not.toContain("ログイン");
 
     await page.goto("/home?handoff=restored");
     await expect(page.getByTestId("home-desk-model")).toBeVisible();
-    await expect(page.getByTestId("home-startup-skeleton")).toHaveCount(0);
+    await expect(page.getByTestId("home-startup-surface")).toHaveCount(0);
     await expect(page.getByText("Googleでつづける")).toHaveCount(0);
   });
 

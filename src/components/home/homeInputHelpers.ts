@@ -71,6 +71,8 @@ export type CatCoverCrop = {
   offsetY: number;
 };
 
+export const CAT_COVER_CROP_MIN_SCALE = 0.25;
+
 type LegacyCatProfile = Partial<CatProfile> & {
   avatarDataUrl?: string;
   avatarCrop?: Partial<CatCoverCrop>;
@@ -978,7 +980,7 @@ function normalizeCatCoverCrop(
   }
 
   return {
-    scale: Math.min(2.8, Math.max(1, scale)),
+    scale: Math.min(2.8, Math.max(CAT_COVER_CROP_MIN_SCALE, scale)),
     offsetX: Math.min(48, Math.max(-48, offsetX)),
     offsetY: Math.min(48, Math.max(-48, offsetY)),
   };

@@ -295,7 +295,7 @@ test("switches to the next cat from the cover in one tap", async ({ page }) => {
     .toBe("cat-komugi");
 });
 
-test("saves a cover photo only after crop confirmation", async ({ page }) => {
+test("keeps a confirmed cover crop after leaving and returning", async ({ page }) => {
   await seedCatsProfile(page, Date.parse("2026-06-10T12:30:00+09:00"), 3);
   await page.setViewportSize({ width: 390, height: 844 });
   await page.goto("/cats");
@@ -338,7 +338,30 @@ test("saves a cover photo only after crop confirmation", async ({ page }) => {
     return profile?.coverCrop?.scale ?? 0;
   });
   expect(savedScale).toBeCloseTo(initialScale, 4);
-  await expect(page.getByTestId("cats-profile-cover").locator("img")).toHaveCount(2);
+  const coverImages = page.getByTestId("cats-profile-cover").locator("img");
+  await expect(coverImages).toHaveCount(2);
+  expect(await readCropTransformScale(coverImages.last())).toBeCloseTo(
+    savedScale,
+    4,
+  );
+
+  await page.getByRole("link", { name: "きょう" }).click();
+  await expect(page.getByTestId("home-desk-model")).toBeVisible();
+  await page.getByRole("link", { name: "うちのこ" }).click();
+  await expect(page.getByTestId("cats-page")).toBeVisible();
+  await page.getByTestId("cats-section-tab-basic").click();
+
+  const reloadedScale = await page.evaluate(() => {
+    const raw = window.localStorage.getItem("cat_profiles");
+    const [profile] = raw ? JSON.parse(raw) : [];
+    return profile?.coverCrop?.scale ?? 0;
+  });
+  expect(reloadedScale).toBeCloseTo(savedScale, 4);
+  expect(
+    await readCropTransformScale(
+      page.getByTestId("cats-profile-cover").locator("img").last(),
+    ),
+  ).toBeCloseTo(savedScale, 4);
 });
 
 test("keeps the previous cover photo when crop is cancelled", async ({ page }) => {
@@ -759,8 +782,14 @@ test("edits weight and mixed coat without showing the old breed field", async ({
   await expect(dialog.getByRole("radio", { name: "女の子" })).toBeVisible();
   await expect(dialog.getByRole("radio", { name: "わからない" })).toBeVisible();
   await expect(dialog.getByLabel("猫種")).toHaveValue("ミックス");
+  await expect(dialog.getByRole("button", { name: "保存する" })).toBeInViewport();
 
   await dialog.getByLabel("毛柄").fill("茶トラ");
+  await dialog.getByLabel("体重（kg）").fill("21");
+  await dialog.getByRole("button", { name: "保存する" }).click();
+  await expect(
+    dialog.getByText("体重は0.5〜20kgの範囲で入力してください。"),
+  ).toBeVisible();
   await dialog.getByLabel("体重（kg）").fill("5.5");
   await dialog.getByLabel("ワクチンを打った日").fill("2026-06-01");
   await dialog.getByLabel("ワクチンのメモ").fill("3種混合");

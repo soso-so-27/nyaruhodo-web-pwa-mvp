@@ -40,6 +40,39 @@ test.describe("β supporter page", () => {
     ).toBeVisible();
   });
 
+  test("moves from the contents to a fully visible section heading", async ({
+    page,
+  }) => {
+    await mockSupporterApis(page);
+    await page.setViewportSize({ width: 390, height: 844 });
+    await page.goto("/beta-supporter");
+    await page.waitForLoadState("networkidle");
+
+    await page
+      .getByRole("navigation", { name: "このページの内容" })
+      .getByRole("link", { name: "これから" })
+      .click();
+
+    await expect(page).toHaveURL(/#future$/);
+    await expect
+      .poll(() =>
+        page.locator("#future").evaluate((element) =>
+          Math.round(element.getBoundingClientRect().top),
+        ),
+      )
+      .toBeGreaterThanOrEqual(20);
+    await expect
+      .poll(() =>
+        page.locator("#future").evaluate((element) =>
+          Math.round(element.getBoundingClientRect().top),
+        ),
+      )
+      .toBeLessThanOrEqual(40);
+    await expect(
+      page.getByRole("heading", { name: "少しずつ育てたいこと" }),
+    ).toBeInViewport();
+  });
+
   test("shows the end date for a supporter scheduled to cancel", async ({
     page,
   }) => {

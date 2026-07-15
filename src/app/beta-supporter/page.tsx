@@ -1,6 +1,6 @@
 "use client";
 
-import type { CSSProperties } from "react";
+import type { CSSProperties, MouseEvent as ReactMouseEvent } from "react";
 import { useEffect, useState } from "react";
 import {
   openBillingPortal,
@@ -188,6 +188,24 @@ export default function BetaSupporterPage() {
     billingStatus.status,
   );
 
+  function handleContentsJump(event: ReactMouseEvent<HTMLAnchorElement>) {
+    const targetId = event.currentTarget.hash.slice(1);
+    const target = document.getElementById(targetId);
+    if (!target) {
+      return;
+    }
+
+    event.preventDefault();
+    const prefersReducedMotion = window.matchMedia?.(
+      "(prefers-reduced-motion: reduce)",
+    ).matches;
+    target.scrollIntoView({
+      behavior: prefersReducedMotion ? "auto" : "smooth",
+      block: "start",
+    });
+    window.history.pushState(null, "", `#${targetId}`);
+  }
+
   return (
     <main style={styles.page}>
       <div style={styles.backdrop} aria-hidden="true" />
@@ -207,10 +225,34 @@ export default function BetaSupporterPage() {
         <nav style={styles.contentsNav} aria-label="このページの内容">
           <p style={styles.contentsLabel}>このページでお伝えすること</p>
           <div style={styles.contentsLinks}>
-            <a href="#beginning" style={styles.contentsLink}>はじまり</a>
-            <a href="#values" style={styles.contentsLink}>大切にしていること</a>
-            <a href="#future" style={styles.contentsLink}>これから</a>
-            <a href="#support" style={styles.contentsLink}>応援について</a>
+            <a
+              href="#beginning"
+              style={styles.contentsLink}
+              onClick={handleContentsJump}
+            >
+              はじまり
+            </a>
+            <a
+              href="#values"
+              style={styles.contentsLink}
+              onClick={handleContentsJump}
+            >
+              大切にしていること
+            </a>
+            <a
+              href="#future"
+              style={styles.contentsLink}
+              onClick={handleContentsJump}
+            >
+              これから
+            </a>
+            <a
+              href="#support"
+              style={styles.contentsLink}
+              onClick={handleContentsJump}
+            >
+              応援について
+            </a>
           </div>
         </nav>
 
@@ -528,12 +570,14 @@ const styles = {
     display: "grid",
     gap: 12,
     padding: "24px 0 22px",
+    scrollMarginTop: "calc(env(safe-area-inset-top) + 20px)",
   },
   section: {
     display: "grid",
     gap: 12,
     padding: "22px 0",
     borderTop: "1px solid rgba(120,108,94,0.14)",
+    scrollMarginTop: "calc(env(safe-area-inset-top) + 20px)",
   },
   actionSection: {
     display: "grid",
