@@ -5,6 +5,27 @@ const testPng = Buffer.from(
   "base64",
 );
 
+const testJpeg = Buffer.from(
+  "/9j/4AAQSkZJRgABAQAAAQABAAD/2wCEAAIBAQEBAQIBAQECAgICAgQDAgICAgUEBAMEBgUGBgYFBgYGBwkIBgcJBwYGCAsICQoKCgoKBggLDAsKDAkKCgoBAgICAgICBQMDBQoHBgcKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCv/AABEIAAIAAwMBEQACEQEDEQH/xAGiAAABBQEBAQEBAQAAAAAAAAAAAQIDBAUGBwgJCgsQAAIBAwMCBAMFBQQEAAABfQECAwAEEQUSITFBBhNRYQcicRQygZGhCCNCscEVUtHwJDNicoIJChYXGBkaJSYnKCkqNDU2Nzg5OkNERUZHSElKU1RVVldYWVpjZGVmZ2hpanN0dXZ3eHl6g4SFhoeIiYqSk5SVlpeYmZqio6Slpqeoqaqys7S1tre4ubrCw8TFxsfIycrS09TV1tfY2drh4uPk5ebn6Onq8fLz9PX29/j5+gEAAwEBAQEBAQEBAQAAAAAAAAECAwQFBgcICQoLEQACAQIEBAMEBwUEBAABAncAAQIDEQQFITEGEkFRB2FxEyIygQgUQpGhscEJIzNS8BVictEKFiQ04SXxFxgZGiYnKCkqNTY3ODk6Q0RFRkdISUpTVFVWV1hZWmNkZWZnaGlqc3R1dnd4eXqCg4SFhoeIiYqSk5SVlpeYmZqio6Slpqeoqaqys7S1tre4ubrCw8TFxsfIycrS09TV1tfY2dri4+Tl5ufo6ery8/T19vf4+fr/2gAMAwEAAhEDEQA/APLPhB8HvhJ/wrPRv+LW+HP+PMf8wS39T/sV+J53nmdf2rW/2mpv/PL/ADP0Hww4j4h/1Ay7/bKv8Nf8vJ935n//2Q==",
+  "base64",
+);
+
+const orientedTestJpeg = withExifOrientation(testJpeg, 6);
+
+function withExifOrientation(jpeg: Buffer, orientation: number) {
+  const app1 = Buffer.from([
+    0xff, 0xe1, 0x00, 0x22,
+    0x45, 0x78, 0x69, 0x66, 0x00, 0x00,
+    0x49, 0x49, 0x2a, 0x00, 0x08, 0x00, 0x00, 0x00,
+    0x01, 0x00,
+    0x12, 0x01, 0x03, 0x00, 0x01, 0x00, 0x00, 0x00,
+    orientation, 0x00, 0x00, 0x00,
+    0x00, 0x00, 0x00, 0x00,
+  ]);
+
+  return Buffer.concat([jpeg.subarray(0, 2), app1, jpeg.subarray(2)]);
+}
+
 test.describe("onboarding delivery flow", () => {
   test.use({
     viewport: devices["iPhone 12 Pro"].viewport,
@@ -705,13 +726,29 @@ test.describe("onboarding delivery flow", () => {
     await expect(page.getByText("iPhoneでホームに置く")).toHaveCount(0);
   });
 
+  test("does not show the PWA home install guide inside an Android WebView", async ({
+    page,
+  }) => {
+    await page.addInitScript(() => {
+      window.localStorage.setItem("onboarding_completed", "true");
+      Object.defineProperty(window.navigator, "userAgent", {
+        configurable: true,
+        get: () =>
+          "Mozilla/5.0 (Linux; Android 14; Pixel 7 Build/UQ1A.240105.004; wv) AppleWebKit/537.36 Version/4.0 Chrome/126.0.0.0 Mobile Safari/537.36",
+      });
+    });
+
+    await page.goto("/home");
+    await expect(page.getByLabel("ホーム画面に追加")).toHaveCount(0);
+  });
+
   test("shows the iPhone home-screen guide after daytime onboarding", async ({
     page,
   }) => {
     await mockBrowserDate(page, "2026-07-06T10:00:00+09:00");
     await page.addInitScript(() => {
       window.localStorage.setItem("onboarding_completed", "true");
-      window.localStorage.removeItem("neteruneko_home_install_hint_dismissed");
+      window.localStorage.setItem("neteruneko_home_install_hint_dismissed", "true");
       Object.defineProperty(window.navigator, "userAgent", {
         configurable: true,
         get: () =>
@@ -733,7 +770,7 @@ test.describe("onboarding delivery flow", () => {
     await mockBrowserDate(page, "2026-07-06T10:00:00+09:00");
     await page.addInitScript(() => {
       window.localStorage.setItem("onboarding_completed", "true");
-      window.localStorage.removeItem("neteruneko_home_install_hint_dismissed");
+      window.localStorage.setItem("neteruneko_home_install_hint_dismissed", "true");
       Object.defineProperty(window.navigator, "userAgent", {
         configurable: true,
         get: () =>
@@ -1109,6 +1146,66 @@ test.describe("onboarding delivery flow", () => {
     await expect(
       page.getByRole("button", { name: "ねこだよりを ひらく" }),
     ).toBeVisible();
+  });
+
+  test("accepts a LINE JPEG when every browser image decoder fails", async ({
+    page,
+  }) => {
+    test.slow();
+    await page.addInitScript(() => {
+      Object.defineProperty(window.navigator, "userAgent", {
+        configurable: true,
+        get: () =>
+          "Mozilla/5.0 (Linux; Android 14; Pixel 7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Mobile Safari/537.36 Line/14.0.0",
+      });
+
+      window.createImageBitmap = (() =>
+        Promise.reject(new DOMException("native decoder unavailable"))) as typeof createImageBitmap;
+      URL.createObjectURL = (() =>
+        "data:text/plain;base64,bm90LWFuLWltYWdl") as typeof URL.createObjectURL;
+      const originalReadAsDataUrl = FileReader.prototype.readAsDataURL;
+      FileReader.prototype.readAsDataURL = function readAsDataURL() {
+        return originalReadAsDataUrl.call(
+          this,
+          new Blob(["not-an-image"], { type: "text/plain" }),
+        );
+      };
+    });
+    await routeImmediateDelivery(page);
+
+    await page.goto("/onboarding?source=instagram_dm");
+    await page.getByRole("button", { name: "このまま試す" }).click();
+    await page.getByTestId("onboarding-photo-select").click();
+    await page.locator('input[type="file"]').last().setInputFiles({
+      name: "line-native-decoder-fallback.jpg",
+      mimeType: "image/jpeg",
+      buffer: orientedTestJpeg,
+    });
+
+    await expect(page.getByText(/写真を読み込めませんでした/)).toHaveCount(0);
+    await expect(
+      page.getByRole("button", { name: "ねこだよりを ひらく" }),
+    ).toBeVisible();
+    const savedDimensions = await page.evaluate(async () => {
+      const photos = JSON.parse(
+        window.localStorage.getItem("nyaruhodo_exchange_own_sleeping_photos") ?? "[]",
+      ) as Array<{ src?: string }>;
+      const src = photos[0]?.src;
+      if (!src?.startsWith("data:image/")) {
+        return null;
+      }
+
+      return new Promise<{ width: number; height: number } | null>((resolve) => {
+        const image = new Image();
+        image.onload = () => resolve({
+          width: image.naturalWidth,
+          height: image.naturalHeight,
+        });
+        image.onerror = () => resolve(null);
+        image.src = src;
+      });
+    });
+    expect(savedDimensions).toEqual({ width: 2, height: 3 });
   });
 
   test("retries delivery with the already saved onboarding photo", async ({

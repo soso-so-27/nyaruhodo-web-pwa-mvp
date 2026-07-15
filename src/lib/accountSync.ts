@@ -269,7 +269,6 @@ const SYNCABLE_LOCAL_STATE_KEYS = new Set([
   "nyaruhodo_exchange_dismissed_photos",
   "nyaruhodo_exchange_reported_photos",
   "nyaruhodo_sleeping_safety_accepted",
-  "neteruneko_home_install_hint_dismissed",
 ]);
 const SYNCABLE_LOCAL_STATE_PREFIXES = [
   "discovery_log_",
@@ -294,6 +293,8 @@ const LOCAL_STATE_SKIP_KEYS = new Set([
   "nyaruhodo_exchange_own_sleeping_photos",
   "nyaruhodo_exchange_kept_photos",
   "neteruneko_mainichi_seen_photo_keys",
+  "neteruneko_home_install_hint_dismissed",
+  "neteruneko_home_install_hint_snoozed_until",
 ]);
 
 export async function getAccountSyncOverview(): Promise<AccountSyncOverview> {

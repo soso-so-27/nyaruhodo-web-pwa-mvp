@@ -47,6 +47,17 @@ export default function HowToUsePage() {
             ねてるねこは、静かに使える場所であることを大切にしています。
           </p>
         </section>
+
+        <section id="home-screen" style={styles.section}>
+          <h2 style={styles.heading}>ホーム画面に置く</h2>
+          <p style={styles.text}>
+            LINEやInstagramの中では追加できません。右上のメニューからSafariまたはChromeで開いてください。
+          </p>
+          <p style={styles.text}>
+            iPhoneはSafari下部の共有ボタンから「ホーム画面に追加」を選びます。
+            AndroidはChromeのメニューから「アプリをインストール」または「ホーム画面に追加」を選びます。
+          </p>
+        </section>
       </div>
     </main>
   );

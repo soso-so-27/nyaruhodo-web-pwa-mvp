@@ -1074,6 +1074,11 @@ export function SettingsPage() {
               <span style={styles.rowChevron}>›</span>
             </a>
             <div style={styles.divider} />
+            <a href="/how-to-use#home-screen" style={styles.linkRow}>
+              <span style={styles.rowLabel}>ホーム画面に追加する</span>
+              <span style={styles.rowChevron}>›</span>
+            </a>
+            <div style={styles.divider} />
             <a href="/terms" style={styles.linkRow}>
               <span style={styles.rowLabel}>利用規約</span>
               <span style={styles.rowChevron}>›</span>

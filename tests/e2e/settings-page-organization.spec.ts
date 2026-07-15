@@ -108,6 +108,10 @@ test.describe("settings page organization", () => {
     await page.waitForLoadState("networkidle");
 
     await expect(page.getByRole("button", { name: "改善メモを書く" })).toBeVisible();
+    await expect(page.getByRole("link", { name: "ホーム画面に追加する" })).toHaveAttribute(
+      "href",
+      "/how-to-use#home-screen",
+    );
   });
 
   test("maps the legacy omoide disabled value to the receive switch", async ({

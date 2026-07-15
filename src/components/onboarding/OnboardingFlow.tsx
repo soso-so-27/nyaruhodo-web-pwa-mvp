@@ -37,6 +37,8 @@ import {
 } from "../../lib/onboarding/progress";
 import { consumeOnboardingTestResetRequest } from "../../lib/onboarding/testReset";
 import { trackProductEvent } from "../../lib/analytics/productAnalytics";
+import { isEmbeddedInAppBrowser } from "../../lib/displayEnvironment";
+import { HOME_INSTALL_ONBOARDING_COMPLETED_EVENT } from "../../lib/homeInstall";
 import {
   validateImageFile,
   type ImageFileRejectionReason,
@@ -855,6 +857,9 @@ export function OnboardingFlow() {
 
     if (!isTestMode) {
       window.localStorage.setItem(STORAGE_KEYS.onboardingCompleted, "true");
+      window.dispatchEvent(
+        new Event(HOME_INSTALL_ONBOARDING_COMPLETED_EVENT),
+      );
       setCompletionCopy(getEveningDeliveryCompletionCopy());
       trackProductEvent("onboarding_completed", {
         source: getEffectiveEntrySource(),
@@ -1888,23 +1893,6 @@ function isBeforeJstHour(hour: number) {
   );
 
   return Number.isFinite(currentHour) && currentHour < hour;
-}
-
-function isEmbeddedInAppBrowser() {
-  if (typeof window === "undefined") {
-    return false;
-  }
-
-  const ua = window.navigator.userAgent.toLowerCase();
-
-  return (
-    ua.includes(" line/") ||
-    ua.includes("instagram") ||
-    ua.includes("fbav") ||
-    ua.includes("fban") ||
-    ua.includes("twitter") ||
-    ua.includes("micromessenger")
-  );
 }
 
 function readOnboardingPhotoDebugEnabled() {

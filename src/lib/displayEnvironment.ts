@@ -55,7 +55,11 @@ export function getEmbeddedBrowserInfo(): EmbeddedBrowserInfo {
     return { isEmbedded: true, label: "Instagram" };
   }
 
-  if (userAgent.includes("fbav") || userAgent.includes("fban")) {
+  if (
+    userAgent.includes("fbav") ||
+    userAgent.includes("fban") ||
+    userAgent.includes("fb_iab")
+  ) {
     return { isEmbedded: true, label: "Facebook" };
   }
 
@@ -67,8 +71,24 @@ export function getEmbeddedBrowserInfo(): EmbeddedBrowserInfo {
     return { isEmbedded: true, label: "X" };
   }
 
-  if (userAgent.includes("tiktok")) {
+  if (userAgent.includes("tiktok") || userAgent.includes("bytedance")) {
     return { isEmbedded: true, label: "TikTok" };
+  }
+
+  if (userAgent.includes("snapchat")) {
+    return { isEmbedded: true, label: "Snapchat" };
+  }
+
+  if (userAgent.includes("pinterest")) {
+    return { isEmbedded: true, label: "Pinterest" };
+  }
+
+  if (
+    userAgent.includes("android") &&
+    (userAgent.includes("; wv)") ||
+      (userAgent.includes("version/4.0") && userAgent.includes("chrome/")))
+  ) {
+    return { isEmbedded: true, label: "アプリ内ブラウザ" };
   }
 
   return { isEmbedded: false, label: "" };

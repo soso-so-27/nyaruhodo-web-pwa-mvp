@@ -8,6 +8,15 @@ import {
   syncLocalDataWithAccount,
 } from "../../lib/accountSync";
 import { trackProductEvent } from "../../lib/analytics/productAnalytics";
+import { isEmbeddedInAppBrowser } from "../../lib/displayEnvironment";
+import {
+  getHomeInstallPlatform,
+  HOME_INSTALL_ONBOARDING_COMPLETED_EVENT,
+  isHomeInstallHintSnoozed,
+  isStandaloneDisplay,
+  snoozeHomeInstallHint,
+  type HomeInstallPlatform,
+} from "../../lib/homeInstall";
 import { getOrCreateAnonymousId } from "../../lib/identity/anonymousId";
 import { purgeAllPhotoSwCache } from "../../lib/photoSwCache";
 import {
@@ -279,8 +288,6 @@ type SleepingPhotoSource = "camera";
 
 const SLEEPING_SAFETY_ACCEPTED_STORAGE_KEY =
   "nyaruhodo_sleeping_safety_accepted";
-const HOME_INSTALL_HINT_DISMISSED_STORAGE_KEY =
-  "neteruneko_home_install_hint_dismissed";
 const HOME_TODAY_CAT_SELECTION_STORAGE_KEY =
   "neteruneko_home_today_cat_selection";
 const EXCHANGE_SHARE_CAT_SELECTION_STORAGE_KEY =
@@ -290,8 +297,6 @@ type BeforeInstallPromptEvent = Event & {
   prompt: () => Promise<void>;
   userChoice: Promise<{ outcome: "accepted" | "dismissed"; platform: string }>;
 };
-
-type HomeInstallPlatform = "ios" | "android";
 
 export function HomeInput({
   initialNow,
@@ -448,53 +453,56 @@ export function HomeInput({
   }, []);
 
   useEffect(() => {
-    if (isStandaloneDisplay()) {
-      dismissHomeInstallHint();
-      return;
-    }
+    function refreshHomeInstallHint() {
+      if (isStandaloneDisplay() || isEmbeddedInAppBrowser()) {
+        setIsHomeInstallHintVisible(false);
+        setIsHomeInstallGuideOpen(false);
+        return;
+      }
 
-    if (isInAppBrowser()) {
-      dismissHomeInstallHint();
-      return;
+      const platform = getHomeInstallPlatform();
+      setHomeInstallPlatform(platform);
+      setIsHomeInstallHintVisible(
+        Boolean(platform) &&
+          window.localStorage.getItem(STORAGE_KEYS.onboardingCompleted) ===
+            "true" &&
+          !isHomeInstallHintSnoozed(),
+      );
     }
-
-    if (
-      window.localStorage.getItem(HOME_INSTALL_HINT_DISMISSED_STORAGE_KEY) ===
-        "true" ||
-      window.localStorage.getItem(STORAGE_KEYS.onboardingCompleted) !== "true"
-    ) {
-      return;
-    }
-
-    const platform = getHomeInstallPlatform();
-    if (!platform) {
-      return;
-    }
-
-    setHomeInstallPlatform(platform);
-    setIsHomeInstallHintVisible(true);
 
     const handleBeforeInstallPrompt = (event: Event) => {
       event.preventDefault();
       setHomeInstallPrompt(event as BeforeInstallPromptEvent);
       if (getHomeInstallPlatform() === "android" && !isStandaloneDisplay()) {
         setHomeInstallPlatform("android");
-        setIsHomeInstallHintVisible(
-          window.localStorage.getItem(HOME_INSTALL_HINT_DISMISSED_STORAGE_KEY) !==
-            "true",
-        );
+        refreshHomeInstallHint();
       }
     };
     const handleAppInstalled = () => {
-      dismissHomeInstallHint();
+      setIsHomeInstallHintVisible(false);
+      setIsHomeInstallGuideOpen(false);
+      setHomeInstallPrompt(null);
     };
 
+    refreshHomeInstallHint();
     window.addEventListener("beforeinstallprompt", handleBeforeInstallPrompt);
     window.addEventListener("appinstalled", handleAppInstalled);
+    window.addEventListener("focus", refreshHomeInstallHint);
+    window.addEventListener("storage", refreshHomeInstallHint);
+    window.addEventListener(
+      HOME_INSTALL_ONBOARDING_COMPLETED_EVENT,
+      refreshHomeInstallHint,
+    );
 
     return () => {
       window.removeEventListener("beforeinstallprompt", handleBeforeInstallPrompt);
       window.removeEventListener("appinstalled", handleAppInstalled);
+      window.removeEventListener("focus", refreshHomeInstallHint);
+      window.removeEventListener("storage", refreshHomeInstallHint);
+      window.removeEventListener(
+        HOME_INSTALL_ONBOARDING_COMPLETED_EVENT,
+        refreshHomeInstallHint,
+      );
     };
   }, []);
 
@@ -2069,7 +2077,7 @@ export function HomeInput({
   }
 
   function dismissHomeInstallHint() {
-    window.localStorage.setItem(HOME_INSTALL_HINT_DISMISSED_STORAGE_KEY, "true");
+    snoozeHomeInstallHint();
     setIsHomeInstallHintVisible(false);
     setIsHomeInstallGuideOpen(false);
     setHomeInstallPrompt(null);
@@ -5280,60 +5288,6 @@ function markSleepingSafetyNoticeAccepted() {
   } catch {
     // The notice is a gentle first-run guard; storage failure should not block use.
   }
-}
-
-function getHomeInstallPlatform(): HomeInstallPlatform | null {
-  if (typeof window === "undefined") {
-    return null;
-  }
-
-  if (isInAppBrowser()) {
-    return null;
-  }
-
-  const userAgent = window.navigator.userAgent.toLowerCase();
-  const isIos =
-    /iphone|ipad|ipod/.test(userAgent) ||
-    (window.navigator.platform === "MacIntel" &&
-      window.navigator.maxTouchPoints > 1);
-
-  if (isIos) {
-    return "ios";
-  }
-
-  if (/android/.test(userAgent)) {
-    return "android";
-  }
-
-  return null;
-}
-
-function isInAppBrowser() {
-  if (typeof window === "undefined") {
-    return false;
-  }
-
-  const userAgent = window.navigator.userAgent.toLowerCase();
-
-  return /instagram|fban|fbav|fb_iab|line\/|micromessenger|twitter|tiktok|bytedance|snapchat|pinterest/.test(
-    userAgent,
-  );
-}
-
-function isStandaloneDisplay() {
-  if (typeof window === "undefined") {
-    return false;
-  }
-
-  const navigatorWithStandalone = window.navigator as Navigator & {
-    standalone?: boolean;
-  };
-
-  return (
-    window.matchMedia?.("(display-mode: standalone)").matches ||
-    window.matchMedia?.("(display-mode: fullscreen)").matches ||
-    navigatorWithStandalone.standalone === true
-  );
 }
 
 type StoredCollectionPhoto = {

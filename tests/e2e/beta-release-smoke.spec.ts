@@ -99,6 +99,8 @@ test.describe("beta release smoke", () => {
     await expect(
       page.getByText(/「自分だけ」でのこした写真/),
     ).toBeVisible();
+    await expect(page.getByRole("heading", { name: "ホーム画面に置く" })).toBeVisible();
+    await expect(page.getByText(/LINEやInstagramの中では追加できません/)).toBeVisible();
     await expect(page.getByText("きょうの2まい")).toHaveCount(0);
   });
 
