@@ -1242,7 +1242,7 @@ test.describe("onboarding delivery flow", () => {
     ).toBeVisible();
   });
 
-  test("recovers when LINE image decoders are temporarily unavailable", async ({
+  test("recovers from a slow Android photo provider without another selection", async ({
     page,
   }) => {
     test.slow();
@@ -1256,7 +1256,7 @@ test.describe("onboarding delivery flow", () => {
       let firstDecodeAt: number | null = null;
       const shouldFailDecoder = () => {
         firstDecodeAt ??= performance.now();
-        return performance.now() - firstDecodeAt < 360;
+        return performance.now() - firstDecodeAt < 2400;
       };
       const originalCreateImageBitmap = window.createImageBitmap.bind(window);
       window.createImageBitmap = ((...args: Parameters<typeof createImageBitmap>) =>
@@ -1277,6 +1277,12 @@ test.describe("onboarding delivery flow", () => {
             : blob,
         );
       };
+      const originalArrayBuffer = Blob.prototype.arrayBuffer;
+      Blob.prototype.arrayBuffer = function arrayBuffer() {
+        return shouldFailDecoder()
+          ? Promise.reject(new DOMException("photo provider is still preparing"))
+          : originalArrayBuffer.call(this);
+      };
     });
     await routeImmediateDelivery(page);
 
@@ -1284,12 +1290,21 @@ test.describe("onboarding delivery flow", () => {
     await page.getByRole("button", { name: "このまま試す" }).click();
     await page.getByTestId("onboarding-photo-select").click();
     await page.locator('input[type="file"]').last().setInputFiles({
-      name: "line-transient-photo.png",
-      mimeType: "image/png",
-      buffer: testPng,
+      name: "line-transient-photo.jpg",
+      mimeType: "application/octet-stream",
+      buffer: orientedTestJpeg,
     });
 
-    await expect(page.getByText(/写真を読み込めませんでした/)).toHaveCount(0);
+    await expect(page.getByTestId("onboarding-saving-photo-preview")).toHaveAttribute(
+      "data-photo-ready",
+      "false",
+    );
+    await expect(page.locator('main img[src^="blob:"]')).toHaveCount(0);
+    await expect(
+      page.getByText(
+        /写真(?:を読み込めませんでした|の読み込みが途中で止まりました)/,
+      ),
+    ).toHaveCount(0);
     await expect(
       page.getByRole("button", { name: "ねこだよりを ひらく" }),
     ).toBeVisible();
@@ -1455,7 +1470,7 @@ test.describe("onboarding delivery flow", () => {
 
     await expect(
       page.getByText(
-        "写真を読み込めませんでした。JPEGやPNGの写真で、もう一度試してください。",
+        "写真の読み込みが途中で止まりました。少し待ってから、同じ写真をもう一度選んでください。",
       ),
     ).toBeVisible();
     await expect(page.getByTestId("onboarding-photo-select")).toBeVisible();

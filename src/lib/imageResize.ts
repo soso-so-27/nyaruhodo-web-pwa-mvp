@@ -42,8 +42,7 @@ export async function readImageFileDimensions(file: Blob) {
   }
 }
 
-const IMAGE_DECODE_RETRY_DELAYS_MS = [0, 220, 650, 1200] as const;
-const failedImageDecodeBlobs = new WeakSet<Blob>();
+const IMAGE_DECODE_RETRY_DELAYS_MS = [0, 200, 500, 900, 1400, 2200] as const;
 const decodedJpegFallbacks = new WeakMap<
   Blob,
   { canvas: HTMLCanvasElement; width: number; height: number }
@@ -60,11 +59,7 @@ async function decodeImageFileForCanvas(file: Blob): Promise<{
     return cachedJpegFallback;
   }
 
-  if (failedImageDecodeBlobs.has(file)) {
-    throw new Error("image_decode_failed: all decoders failed");
-  }
-
-  for (const delayMs of IMAGE_DECODE_RETRY_DELAYS_MS) {
+  for (const [attemptIndex, delayMs] of IMAGE_DECODE_RETRY_DELAYS_MS.entries()) {
     if (delayMs > 0) {
       await waitForDecodeRetry(delayMs);
     }
@@ -75,6 +70,16 @@ async function decodeImageFileForCanvas(file: Blob): Promise<{
     if (decoded) {
       return decoded;
     }
+
+    // Android content providers can need a short warm-up before the same File
+    // becomes decodable. Try the byte-level JPEG path early, then keep waiting
+    // for native decoding instead of making the user select the photo again.
+    if (attemptIndex === 2) {
+      const jpegFallback = await decodeJpegWithoutBrowserImageDecoder(file);
+      if (jpegFallback) {
+        return jpegFallback;
+      }
+    }
   }
 
   const jpegFallback = await decodeJpegWithoutBrowserImageDecoder(file);
@@ -82,7 +87,6 @@ async function decodeImageFileForCanvas(file: Blob): Promise<{
     return jpegFallback;
   }
 
-  failedImageDecodeBlobs.add(file);
   throw new Error("image_decode_failed: all decoders failed");
 }
 

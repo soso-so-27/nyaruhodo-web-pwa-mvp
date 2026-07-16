@@ -141,7 +141,6 @@ export function OnboardingFlow() {
   const revealPhotoErrorTrackedRef = useRef("");
   const catNamePromptTrackedPhotoRef = useRef("");
   const entrySourceRef = useRef<OnboardingSource>(entrySource);
-  const savingPreviewUrlRef = useRef("");
   const canShowTestTools = isTestMode && !IS_PRODUCTION;
 
   function markOnboardingAlbumCompletionReady() {
@@ -262,9 +261,6 @@ export function OnboardingFlow() {
     return () => {
       if (revealTimerRef.current) {
         window.clearTimeout(revealTimerRef.current);
-      }
-      if (savingPreviewUrlRef.current) {
-        URL.revokeObjectURL(savingPreviewUrlRef.current);
       }
     };
   }, []);
@@ -524,19 +520,9 @@ export function OnboardingFlow() {
       setState("saving");
       setSavingStage("saving_photo");
       isSubmittingRef.current = true;
+      setSelectedPhotoSrc("");
       setMessage("");
       setDeliveryIssue(null);
-      if (savingPreviewUrlRef.current) {
-        URL.revokeObjectURL(savingPreviewUrlRef.current);
-        savingPreviewUrlRef.current = "";
-      }
-      try {
-        const previewUrl = URL.createObjectURL(file);
-        savingPreviewUrlRef.current = previewUrl;
-        setSelectedPhotoSrc(previewUrl);
-      } catch {
-        setSelectedPhotoSrc("");
-      }
       if (isPhotoDebugMode) {
         setPhotoDebugInfo(createOnboardingPhotoDebugInfo("selected", file));
       } else {
@@ -552,7 +538,13 @@ export function OnboardingFlow() {
         catId = activeProfile.id;
 
         saveActiveCatId(catId);
-        savedResult = await saveSleepingPhotoWithFallback(file, catId);
+        const exchangeDataUrl = await createOnboardingExchangeDataUrl(file);
+        setSelectedPhotoSrc(exchangeDataUrl);
+        savedResult = await saveSleepingPhotoWithFallback(
+          file,
+          catId,
+          exchangeDataUrl,
+        );
 
         if (!savedResult) {
           if (isPhotoDebugMode) {
@@ -565,10 +557,6 @@ export function OnboardingFlow() {
             );
           }
           setMessage("写真を保存できませんでした。少し時間をおいて、もう一度試してください。");
-          if (savingPreviewUrlRef.current) {
-            URL.revokeObjectURL(savingPreviewUrlRef.current);
-            savingPreviewUrlRef.current = "";
-          }
           setSelectedPhotoSrc("");
           setState("intro");
           return;
@@ -594,13 +582,9 @@ export function OnboardingFlow() {
         });
         setMessage(
           errorStage === "decode"
-            ? "写真を読み込めませんでした。JPEGやPNGの写真で、もう一度試してください。"
+            ? "写真の読み込みが途中で止まりました。少し待ってから、同じ写真をもう一度選んでください。"
             : "写真を保存できませんでした。少し時間をおいて、もう一度試してください。",
         );
-        if (savingPreviewUrlRef.current) {
-          URL.revokeObjectURL(savingPreviewUrlRef.current);
-          savingPreviewUrlRef.current = "";
-        }
         setSelectedPhotoSrc("");
         setState("intro");
         return;
@@ -612,10 +596,6 @@ export function OnboardingFlow() {
 
       try {
         const { dataUrl, ownPhoto } = savedResult;
-        if (savingPreviewUrlRef.current) {
-          URL.revokeObjectURL(savingPreviewUrlRef.current);
-          savingPreviewUrlRef.current = "";
-        }
         setSelectedPhotoSrc(dataUrl);
         setSavingStage("receiving_letter");
         setPendingOwnPhoto(ownPhoto);
@@ -1740,11 +1720,17 @@ function DeliveryWaiting({
 }) {
   return (
     <div style={styles.deliveryWaiting} aria-live="polite" role="status">
-      {photoSrc ? (
-        <span style={styles.deliveryWaitingPhotoFrame}>
+      <span
+        style={styles.deliveryWaitingPhotoFrame}
+        data-testid="onboarding-saving-photo-preview"
+        data-photo-ready={photoSrc ? "true" : "false"}
+      >
+        {photoSrc ? (
           <img src={photoSrc} alt="" style={styles.deliveryWaitingPhoto} />
-        </span>
-      ) : null}
+        ) : (
+          <span style={styles.deliveryWaitingPhotoPlaceholder} aria-hidden="true" />
+        )}
+      </span>
       <span style={styles.deliveryWaitingStatus}>
         <span style={styles.deliveryWaitingLine} aria-hidden="true">
           <span style={styles.deliveryWaitingDot} />
@@ -1980,10 +1966,13 @@ async function resizeAndEncode(
   return resizeImageFileToDataUrl(file, maxSize, quality, mimeType);
 }
 
-async function saveSleepingPhotoWithFallback(file: File, catId: string) {
+async function saveSleepingPhotoWithFallback(
+  file: File,
+  catId: string,
+  exchangeDataUrl: string,
+) {
   const createdAt = Date.now();
   const fileName = `onboarding-${createdAt}`;
-  const exchangeDataUrl = await createOnboardingExchangeDataUrl(file);
   const displayDataUrl =
     (await tryResizeAndEncode(file, 2048, 0.84, "image/webp")) ??
     exchangeDataUrl;
@@ -2106,10 +2095,14 @@ async function createOnboardingExchangeDataUrl(
     return preferredDataUrl;
   }
 
-  let lastUsableDataUrl: string | null = null;
+  const firstAttempt = await resizeAndEncode(file, 1200, 0.8, "image/webp");
+  if (firstAttempt.length <= 1_900_000) {
+    return firstAttempt;
+  }
+
+  let lastUsableDataUrl: string | null = firstAttempt;
 
   for (const attempt of [
-    { maxSize: 1200, quality: 0.8 },
     { maxSize: 900, quality: 0.76 },
     { maxSize: 720, quality: 0.72 },
     { maxSize: 560, quality: 0.68 },
@@ -2588,6 +2581,7 @@ const styles = {
     margin: "4px 0 -2px",
   },
   deliveryWaitingPhotoFrame: {
+    position: "relative",
     display: "block",
     width: "min(calc(100vw - 96px), 240px, calc(100dvh - 300px))",
     aspectRatio: "1 / 1",
@@ -2605,6 +2599,12 @@ const styles = {
     objectFit: "contain",
     borderRadius: "9px",
     background: "rgba(244,241,234,0.46)",
+  },
+  deliveryWaitingPhotoPlaceholder: {
+    position: "absolute",
+    inset: 0,
+    background:
+      "linear-gradient(180deg, rgba(255,253,248,0.38), rgba(235,226,214,0.22))",
   },
   deliveryWaitingStatus: {
     display: "grid",
