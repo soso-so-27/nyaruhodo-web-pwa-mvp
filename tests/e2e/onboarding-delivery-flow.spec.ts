@@ -550,6 +550,17 @@ test.describe("onboarding delivery flow", () => {
     await expect(
       page.getByTestId("onboarding-delivery-photo-loading"),
     ).toHaveCount(0, { timeout: 4000 });
+    await expect
+      .poll(() =>
+        page
+          .getByTestId("onboarding-delivered-photos")
+          .locator("img")
+          .last()
+          .evaluate((image) =>
+            (image as HTMLImageElement).currentSrc.startsWith("data:image/"),
+          ),
+      )
+      .toBe(true);
     expect(
       await page.evaluate(
         () =>

@@ -102,6 +102,10 @@ export function OnboardingFlow() {
   const [state, setState] = useState<OnboardingState>("intro");
   const [selectedPhotoSrc, setSelectedPhotoSrc] = useState("");
   const [deliveredPhoto, setDeliveredPhoto] = useState<ExchangePhoto | null>(null);
+  const [localizedDeliveredPhoto, setLocalizedDeliveredPhoto] = useState<{
+    photoId: string;
+    dataUrl: string;
+  } | null>(null);
   const [isDeliveredPhotoKept, setIsDeliveredPhotoKept] = useState(false);
   const [pendingOwnPhoto, setPendingOwnPhoto] = useState<OwnSleepingPhoto | null>(null);
   const [message, setMessage] = useState("");
@@ -869,7 +873,18 @@ export function OnboardingFlow() {
       return;
     }
 
+    setLocalizedDeliveredPhoto((current) =>
+      current?.photoId === deliveredPhoto.id && current.dataUrl === dataUrl
+        ? current
+        : { photoId: deliveredPhoto.id, dataUrl },
+    );
     updateKeptExchangePhotoDataUrl(deliveredPhoto, dataUrl);
+  }
+
+  function getDeliveredPhotoDisplaySrc(photo: ExchangePhoto) {
+    return localizedDeliveredPhoto?.photoId === photo.id
+      ? localizedDeliveredPhoto.dataUrl
+      : getExchangePhotoDisplaySrc(photo);
   }
 
   function handleOpenEnvelope() {
@@ -1477,7 +1492,7 @@ export function OnboardingFlow() {
             <span style={styles.deliveryPhotoPreload} aria-hidden="true">
               <PhotoTile
                 key={`onboarding-delivery-preload-${revealPhotoRetryKey}`}
-                src={getExchangePhotoDisplaySrc(deliveredPhoto)}
+                src={getDeliveredPhotoDisplaySrc(deliveredPhoto)}
                 fallbackSrcs={getExchangePhotoFallbackSrcs(deliveredPhoto)}
                 loading="eager"
                 onStorageDataUrl={handleDeliveredPhotoDataUrl}
@@ -1540,7 +1555,7 @@ export function OnboardingFlow() {
               >
                 <StoredPhotoImage
                   key={`onboarding-delivery-opened-${revealPhotoRetryKey}`}
-                  src={getExchangePhotoDisplaySrc(deliveredPhoto)}
+                  src={getDeliveredPhotoDisplaySrc(deliveredPhoto)}
                   fallbackSrcs={getExchangePhotoFallbackSrcs(deliveredPhoto)}
                   alt="届いたねがお"
                   style={styles.onboardingDeliveredPhoto}
