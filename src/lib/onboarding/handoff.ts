@@ -7,6 +7,7 @@ import {
   ensureAnonymousSession,
   isAnonymousAuthEnabled,
 } from "../auth/anonymousAuth";
+import { getOrCreateAnonymousId } from "../identity/anonymousId";
 import {
   cacheExchangePhotoOfflineDataUrl,
   readAllOwnSleepingPhotos,
@@ -103,7 +104,10 @@ export async function redeemOnboardingHandoff(token: string) {
     headers: {
       "content-type": "application/json",
     },
-    body: JSON.stringify({ token }),
+    body: JSON.stringify({
+      token,
+      anonymousId: getOrCreateAnonymousId(),
+    }),
   });
   const result = (await response.json().catch(() => null)) as
     | {

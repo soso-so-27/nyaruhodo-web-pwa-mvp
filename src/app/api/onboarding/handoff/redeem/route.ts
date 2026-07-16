@@ -4,12 +4,14 @@ import {
   CAT_PHOTOS_BUCKET,
   getStoragePhotoPath,
 } from "../../../../../lib/photoStorage";
+import { normalizeAnonymousId } from "../../../../../lib/photoStorageAuthorization";
 import { removeHandoffStorageObjects } from "../../../../../lib/server/handoffStorageCleanup";
 import { createSupabaseAdminClient } from "../../../../../lib/supabase/admin";
 
 export const dynamic = "force-dynamic";
 
 type RedeemHandoffBody = {
+  anonymousId?: unknown;
   token?: unknown;
 };
 
@@ -79,6 +81,15 @@ export async function POST(request: Request) {
     );
   }
 
+  const targetAnonymousId = normalizeAnonymousId(body.anonymousId);
+  if (targetAnonymousId) {
+    await transferOnboardingAnonymousRows(
+      supabase,
+      data.payload,
+      targetAnonymousId,
+    );
+  }
+
   const now = new Date().toISOString();
   const { error: redeemError } = await supabase
     .from("onboarding_handoffs")
@@ -100,6 +111,81 @@ export async function POST(request: Request) {
     ok: true,
     payload,
   });
+}
+
+async function transferOnboardingAnonymousRows(
+  supabase: NonNullable<ReturnType<typeof createSupabaseAdminClient>>,
+  payload: unknown,
+  targetAnonymousId: string,
+) {
+  const progress = readOnboardingProgress(payload);
+  const sourceAnonymousId = normalizeAnonymousId(progress?.anonymousId);
+
+  if (!sourceAnonymousId || sourceAnonymousId === targetAnonymousId) {
+    return;
+  }
+
+  const ownPhotoId = normalizeLocalId(progress?.ownPhoto?.id);
+  const deliveryId = normalizeLocalId(progress?.deliveredPhoto?.id);
+
+  if (ownPhotoId) {
+    const { error } = await supabase
+      .from("cat_moments")
+      .update({ anonymous_id: targetAnonymousId })
+      .is("user_id", null)
+      .eq("anonymous_id", sourceAnonymousId)
+      .eq("local_moment_id", ownPhotoId);
+
+    if (error) {
+      console.warn("[onboarding/handoff/redeem] own photo identity transfer failed", {
+        code: error.code,
+      });
+    }
+  }
+
+  if (deliveryId) {
+    const { error } = await supabase
+      .from("cat_moment_deliveries")
+      .update({ anonymous_id: targetAnonymousId })
+      .is("user_id", null)
+      .eq("anonymous_id", sourceAnonymousId)
+      .eq("local_delivery_id", deliveryId);
+
+    if (error) {
+      console.warn("[onboarding/handoff/redeem] delivery identity transfer failed", {
+        code: error.code,
+      });
+    }
+  }
+}
+
+function readOnboardingProgress(payload: unknown) {
+  if (!payload || typeof payload !== "object") {
+    return null;
+  }
+
+  const progress = (payload as {
+    onboardingProgress?: unknown;
+  }).onboardingProgress;
+
+  if (!progress || typeof progress !== "object") {
+    return null;
+  }
+
+  return progress as {
+    anonymousId?: unknown;
+    deliveredPhoto?: { id?: unknown } | null;
+    ownPhoto?: { id?: unknown } | null;
+  };
+}
+
+function normalizeLocalId(value: unknown) {
+  if (typeof value !== "string") {
+    return null;
+  }
+
+  const id = value.trim();
+  return id && id.length <= 240 ? id : null;
 }
 
 async function cleanupExpiredHandoff(
