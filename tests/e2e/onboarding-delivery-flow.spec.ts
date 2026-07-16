@@ -28,6 +28,9 @@ const landscapeTestJpeg = encode(
   { data: landscapeTestJpegPixels, width: 240, height: 160 },
   80,
 ).data;
+const landscapeDeliveryDataUrl = `data:image/jpeg;base64,${landscapeTestJpeg.toString(
+  "base64",
+)}`;
 const portraitDeliveryDataUrl = `data:image/jpeg;base64,${orientedTestJpeg.toString(
   "base64",
 )}`;
@@ -2699,7 +2702,7 @@ test.describe("onboarding delivery flow", () => {
                 id: "handoff-delivered-photo",
                 sourcePhotoId: "handoff-delivered-source",
                 src: deliveredStorageSrc,
-                offlineSrc: imageDataUrl,
+                offlineSrc: landscapeDeliveryDataUrl,
                 title: "",
                 subtitle: "",
                 triggerLabel: "sleeping",
@@ -2820,7 +2823,7 @@ test.describe("onboarding delivery flow", () => {
       expect.arrayContaining([
         expect.objectContaining({
           photoId: "handoff-delivered-photo",
-          dataUrl: imageDataUrl,
+          dataUrl: landscapeDeliveryDataUrl,
         }),
       ]),
     );
@@ -2830,6 +2833,11 @@ test.describe("onboarding delivery flow", () => {
     const deliveredCard = page.getByTestId("mainichi-board-photo-delivered");
     await expect(deliveredCard).toHaveCount(1);
     await expect
+      .poll(async () =>
+        Number(await deliveredCard.getAttribute("data-display-natural-ratio")),
+      )
+      .toBeCloseTo(1.5, 2);
+    await expect
       .poll(() =>
         deliveredCard
           .locator("img")
@@ -2837,6 +2845,26 @@ test.describe("onboarding delivery flow", () => {
             (image: HTMLImageElement) =>
               image.complete && image.naturalWidth > 0,
           ),
+      )
+      .toBe(true);
+    await deliveredCard.click();
+    const viewer = page.getByTestId("mainichi-photo-viewer");
+    await expect(viewer).toBeVisible();
+    await expect(
+      viewer.getByText("写真を表示できません", { exact: true }),
+    ).toHaveCount(0);
+    await expect
+      .poll(() =>
+        viewer.locator("img").evaluateAll((images) =>
+          images.some((element) => {
+            const image = element as HTMLImageElement;
+            return (
+              image.complete &&
+              image.naturalWidth > 0 &&
+              image.naturalWidth / image.naturalHeight > 1.45
+            );
+          }),
+        ),
       )
       .toBe(true);
   });

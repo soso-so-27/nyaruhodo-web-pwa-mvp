@@ -228,6 +228,7 @@ type BoxPreviewPhoto = {
   thumbnailSrc?: string;
   displaySrc?: string;
   originalSrc?: string;
+  offlineSrc?: string;
   catId?: string;
   ownerCatId?: string;
   shared?: boolean;
@@ -277,6 +278,7 @@ type MainichiBoardPhoto = {
   dateLabel: string;
   src: string;
   boardSrc: string;
+  offlineSrc?: string;
   fallbackSrcs?: string[];
   timestamp: number;
   side: MainichiBoardSide;
@@ -327,6 +329,7 @@ type MainichiDayPhoto = {
   thumbnailSrc?: string;
   displaySrc?: string;
   originalSrc?: string;
+  offlineSrc?: string;
   timestamp: number;
   kind: BoxDetailKind;
   sideLabel: string;
@@ -2014,7 +2017,7 @@ function MainichiNaturalMonthBoard({
     void Promise.all(
       month.photos.map(async (photo) => [
         getMainichiBoardPhotoKey(photo),
-        await readMainichiDisplayRatio(photo.boardSrc),
+        await readMainichiDisplayRatio(photo),
       ] as const),
     ).then((values) => {
       if (!active) {
@@ -2156,7 +2159,7 @@ function MainichiNaturalMonthBoard({
             >
               <StoredPhotoImage
                 src={photo.boardSrc}
-                previewSrc={photo.src}
+                previewSrc={photo.offlineSrc ?? photo.src}
                 fallbackSrcs={photo.fallbackSrcs}
                 alt=""
                 loading={index < 8 ? "eager" : "lazy"}
@@ -2963,7 +2966,7 @@ function MainichiFullscreenPhoto({
       >
         <PhotoViewerFrame
           src={getPhotoDetailSrc(photo)}
-          previewSrc={getPhotoThumbnailSrc(photo)}
+          previewSrc={photo.offlineSrc ?? getPhotoThumbnailSrc(photo)}
           fallbackSrcs={getPhotoFallbackSrcs(photo)}
           alt=""
           fit="contain"
@@ -4102,6 +4105,7 @@ function buildMainichiDayPhotos(
         thumbnailSrc: photo.thumbnailSrc,
         displaySrc: photo.displaySrc,
         originalSrc: photo.originalSrc,
+        offlineSrc: photo.offlineSrc,
         timestamp: photo.timestamp,
         kind: "sleeping" as const,
         sideLabel: "おくった",
@@ -4122,6 +4126,7 @@ function buildMainichiDayPhotos(
       thumbnailSrc: photo.thumbnailSrc,
       displaySrc: photo.displaySrc,
       originalSrc: photo.originalSrc,
+      offlineSrc: photo.offlineSrc,
       timestamp: photo.timestamp,
       kind: "other" as const,
       sideLabel: "とどいた",
@@ -4141,6 +4146,7 @@ function createExchangePhotoFromDayPhoto(photo: MainichiDayPhoto): ExchangePhoto
     thumbnailSrc: photo.thumbnailSrc,
     displaySrc: photo.displaySrc,
     originalSrc: photo.originalSrc,
+    offlineSrc: photo.offlineSrc,
     title: "とどいたねがお",
     subtitle: "",
     triggerLabel: "mainichi",
@@ -4262,6 +4268,7 @@ function createMainichiBoardPhoto(
     dateLabel: getAlbumDateLabelFromKey(dateKey),
     src: getPhotoThumbnailSrc(photo),
     boardSrc: getPhotoTransformBaseSrc(photo),
+    offlineSrc: photo.offlineSrc,
     fallbackSrcs: getPhotoFallbackSrcs(photo),
     timestamp: photo.timestamp,
     side,
@@ -4453,12 +4460,31 @@ function getMainichiCurrentCanvasHeight(total: number) {
   return 560;
 }
 
-async function readMainichiDisplayRatio(source: string) {
-  const displaySource = await getStoragePhotoSignedUrl(source, "display");
-  if (!displaySource) {
-    return null;
+async function readMainichiDisplayRatio(photo: MainichiBoardPhoto) {
+  const sources = Array.from(
+    new Set(
+      [photo.boardSrc, photo.offlineSrc, photo.src, ...(photo.fallbackSrcs ?? [])].filter(
+        (source): source is string => Boolean(source),
+      ),
+    ),
+  );
+
+  for (const source of sources) {
+    const displaySource = await getStoragePhotoSignedUrl(source, "display");
+    if (!displaySource) {
+      continue;
+    }
+
+    const ratio = await readImageAspectRatio(displaySource);
+    if (ratio) {
+      return ratio;
+    }
   }
 
+  return null;
+}
+
+function readImageAspectRatio(src: string) {
   return new Promise<number | null>((resolve) => {
     const image = new Image();
     image.onload = () => {
@@ -4469,7 +4495,7 @@ async function readMainichiDisplayRatio(source: string) {
       resolve(image.naturalWidth / image.naturalHeight);
     };
     image.onerror = () => resolve(null);
-    image.src = displaySource;
+    image.src = src;
   });
 }
 
@@ -5212,6 +5238,7 @@ function mergeBoxPhotoVersions(
     thumbnailSrc: preferred.thumbnailSrc ?? fallback.thumbnailSrc,
     displaySrc: preferred.displaySrc ?? fallback.displaySrc,
     originalSrc: preferred.originalSrc ?? fallback.originalSrc,
+    offlineSrc: preferred.offlineSrc ?? fallback.offlineSrc,
     deliveredAt: Math.max(
       existing.deliveredAt ?? 0,
       incoming.deliveredAt ?? 0,
