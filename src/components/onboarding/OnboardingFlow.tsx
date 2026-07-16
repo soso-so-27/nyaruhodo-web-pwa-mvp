@@ -65,6 +65,7 @@ import { PhotoTile } from "../ui/PhotoTile";
 import { StoredPhotoImage } from "../ui/StoredPhotoImage";
 import { WordmarkHeader } from "../ui/AppHeader";
 import { deliveredLetterStyles } from "../ui/deliveredLetterStyles";
+import { useNaturalPhotoFrame } from "../ui/useNaturalPhotoFrame";
 
 type OnboardingState =
   | "intro"
@@ -127,6 +128,16 @@ export function OnboardingFlow() {
   const [hasRevealPhotoError, setHasRevealPhotoError] = useState(false);
   const [isRevealPhotoReady, setIsRevealPhotoReady] = useState(false);
   const [revealPhotoRetryKey, setRevealPhotoRetryKey] = useState(0);
+  const {
+    frameStyle: naturalDeliveredPhotoFrameStyle,
+    handleNaturalSize: handleDeliveredPhotoNaturalSize,
+    photoAspect: deliveredPhotoAspect,
+    resetPhotoAspect: resetDeliveredPhotoAspect,
+  } = useNaturalPhotoFrame({
+    horizontalInsetPx: 48,
+    maxWidthPx: 350,
+    verticalChromePx: 272,
+  });
   const [catNameDraft, setCatNameDraft] = useState("");
   const prefersReducedMotion = usePrefersReducedMotion();
   const autoKeptDeliveredPhotoIdRef = useRef("");
@@ -142,6 +153,10 @@ export function OnboardingFlow() {
   const catNamePromptTrackedPhotoRef = useRef("");
   const entrySourceRef = useRef<OnboardingSource>(entrySource);
   const canShowTestTools = isTestMode && !IS_PRODUCTION;
+
+  useEffect(() => {
+    resetDeliveredPhotoAspect();
+  }, [deliveredPhoto?.id, resetDeliveredPhotoAspect]);
 
   function markOnboardingAlbumCompletionReady() {
     window.sessionStorage.setItem(ONBOARDING_ALBUM_COMPLETION_READY_KEY, "true");
@@ -1509,9 +1524,13 @@ export function OnboardingFlow() {
                 />
               </div>
               <div
-                style={styles.onboardingDeliveredPhotoFrame}
+                style={{
+                  ...styles.onboardingDeliveredPhotoFrame,
+                  ...naturalDeliveredPhotoFrameStyle,
+                }}
                 data-testid="onboarding-delivered-photos"
                 data-photo-frame="f3"
+                data-photo-aspect={deliveredPhotoAspect.toFixed(4)}
               >
                 <StoredPhotoImage
                   key={`onboarding-delivery-opened-${revealPhotoRetryKey}`}
@@ -1521,6 +1540,7 @@ export function OnboardingFlow() {
                   style={styles.onboardingDeliveredPhoto}
                   storageVariant="display"
                   onStorageDataUrl={handleDeliveredPhotoDataUrl}
+                  onNaturalSize={handleDeliveredPhotoNaturalSize}
                   onLoad={handleRevealPhotoLoaded}
                   onError={handleRevealPhotoError}
                 />
@@ -2818,7 +2838,7 @@ const styles = {
   },
   onboardingDeliveredLetter: {
     ...deliveredLetterStyles.sheet,
-    width: "min(calc(100vw - 48px), 350px, calc(100dvh - 238px))",
+    width: "min(calc(100vw - 48px), 350px)",
   },
   onboardingDeliveredMasthead: {
     ...deliveredLetterStyles.masthead,

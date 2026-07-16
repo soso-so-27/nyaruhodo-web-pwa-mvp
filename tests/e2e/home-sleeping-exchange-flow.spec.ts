@@ -1,4 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
+import { readFileSync } from "node:fs";
 import path from "node:path";
 
 const testSvg = Buffer.from(
@@ -20,6 +21,9 @@ const catPhotoFixturePath = path.resolve(
   process.cwd(),
   "tests/fixtures/cat-photo-mugi.jpg",
 );
+const deliveredLandscapeDataUrl = `data:image/jpeg;base64,${readFileSync(
+  catPhotoFixturePath,
+).toString("base64")}`;
 
 async function waitForOwnSleepingPhotoCount(page: Page, minCount: number) {
   await expect
@@ -135,7 +139,7 @@ test.describe("home sleeping exchange flow", () => {
           photo: {
             id: `delivered-test-${Date.now()}`,
             sourcePhotoId: "source-test-photo",
-            src: deliveredDataUrl,
+            src: deliveredLandscapeDataUrl,
             title: "",
             subtitle: "",
             triggerLabel: "sleeping",
@@ -217,6 +221,7 @@ test.describe("home sleeping exchange flow", () => {
       );
       const letterStyle = getComputedStyle(letter);
       const frameStyle = frame ? getComputedStyle(frame) : null;
+      const photo = frame?.querySelector("img") as HTMLImageElement | null;
 
       return {
         letterPaddingTop: letterStyle.paddingTop,
@@ -226,6 +231,14 @@ test.describe("home sleeping exchange flow", () => {
         framePaddingTop: frameStyle?.paddingTop ?? "",
         frameBorderWidth: frameStyle?.borderTopWidth ?? "",
         frameShadow: frameStyle?.boxShadow ?? "",
+        frameAspect:
+          frame && frame.clientHeight > 0
+            ? frame.clientWidth / frame.clientHeight
+            : 0,
+        photoNaturalAspect:
+          photo?.naturalWidth && photo.naturalHeight
+            ? photo.naturalWidth / photo.naturalHeight
+            : 0,
       };
     });
     expect(deliveredLetterStyles.letterPaddingTop).toBe("0px");
@@ -235,6 +248,11 @@ test.describe("home sleeping exchange flow", () => {
     expect(deliveredLetterStyles.framePaddingTop).toBe("0px");
     expect(deliveredLetterStyles.frameBorderWidth).toBe("1px");
     expect(deliveredLetterStyles.frameShadow).not.toBe("none");
+    expect(deliveredLetterStyles.photoNaturalAspect).toBeCloseTo(3 / 2, 2);
+    expect(deliveredLetterStyles.frameAspect).toBeCloseTo(
+      deliveredLetterStyles.photoNaturalAspect,
+      2,
+    );
     if (process.env.CAPTURE_DELIVERED_LETTER === "1") {
       await page.screenshot({
         path: "artifacts/home-evening-opening-letter.png",

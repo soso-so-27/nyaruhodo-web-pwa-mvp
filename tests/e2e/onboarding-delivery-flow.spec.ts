@@ -11,6 +11,9 @@ const testJpeg = Buffer.from(
 );
 
 const orientedTestJpeg = withExifOrientation(testJpeg, 6);
+const portraitDeliveryDataUrl = `data:image/jpeg;base64,${orientedTestJpeg.toString(
+  "base64",
+)}`;
 
 function withExifOrientation(jpeg: Buffer, orientation: number) {
   const app1 = Buffer.from([
@@ -318,7 +321,7 @@ test.describe("onboarding delivery flow", () => {
   test("keeps a delivered onboarding photo in the received album", async ({
     page,
   }) => {
-    await routeImmediateDelivery(page);
+    await routeImmediateDelivery(page, portraitDeliveryDataUrl);
 
     await page.goto("/onboarding");
     await page.waitForLoadState("networkidle");
@@ -367,6 +370,7 @@ test.describe("onboarding delivery flow", () => {
       const photoStyle = frame?.querySelector("img")
         ? window.getComputedStyle(frame.querySelector("img")!)
         : null;
+      const photo = frame?.querySelector("img") as HTMLImageElement | null;
 
       return {
         frameWidth: frameRect?.width ?? 0,
@@ -387,10 +391,23 @@ test.describe("onboarding delivery flow", () => {
         frameBorderWidth: frameStyle?.borderTopWidth ?? "",
         frameShadow: frameStyle?.boxShadow ?? "",
         objectFit: photoStyle?.objectFit ?? "",
+        frameAspect: Number(frame?.dataset.photoAspect ?? 0),
+        photoNaturalAspect:
+          photo?.naturalWidth && photo.naturalHeight
+            ? photo.naturalWidth / photo.naturalHeight
+            : 0,
       };
     });
     expect(deliveredLayout.frameWidth).toBeGreaterThanOrEqual(240);
-    expect(deliveredLayout.frameHeight).toBe(deliveredLayout.frameWidth);
+    expect(deliveredLayout.photoNaturalAspect).toBeCloseTo(2 / 3, 2);
+    expect(deliveredLayout.frameAspect).toBeCloseTo(
+      deliveredLayout.photoNaturalAspect,
+      3,
+    );
+    expect(deliveredLayout.frameWidth / deliveredLayout.frameHeight).toBeCloseTo(
+      deliveredLayout.photoNaturalAspect,
+      2,
+    );
     expect(deliveredLayout.frameRight).toBeLessThanOrEqual(deliveredLayout.viewportWidth);
     expect(deliveredLayout.titleBottom).toBeLessThanOrEqual(
       deliveredLayout.frameTop,
@@ -408,6 +425,12 @@ test.describe("onboarding delivery flow", () => {
     expect(deliveredLayout.frameBorderWidth).toBe("1px");
     expect(deliveredLayout.frameShadow).not.toBe("none");
     expect(deliveredLayout.objectFit).toBe("contain");
+    if (process.env.CAPTURE_ONBOARDING_DELIVERED === "1") {
+      await page.screenshot({
+        path: "artifacts/onboarding-delivered-natural-frame.png",
+        animations: "disabled",
+      });
+    }
     await page.setViewportSize({ width: 320, height: 568 });
     const compactDeliveredLayout = await page
       .getByTestId("onboarding-delivered-continue")
@@ -423,6 +446,12 @@ test.describe("onboarding delivery flow", () => {
     expect(compactDeliveredLayout.bottom).toBeLessThanOrEqual(
       compactDeliveredLayout.viewportHeight,
     );
+    if (process.env.CAPTURE_ONBOARDING_DELIVERED === "1") {
+      await page.screenshot({
+        path: "artifacts/onboarding-delivered-natural-frame-320x568.png",
+        animations: "disabled",
+      });
+    }
     await expect.poll(() => readKeptExchangePhotoCount(page)).toBe(1);
     await expect(page.getByRole("button", { name: "閉じる" })).toHaveCount(0);
     await expect.poll(() => readKeptExchangePhotoCount(page)).toBe(1);
@@ -2550,7 +2579,10 @@ async function continuePastOptionalOnboardingNamePrompt(page: Page) {
   await page.locator("main section button").last().click();
 }
 
-async function routeImmediateDelivery(page: Page) {
+async function routeImmediateDelivery(
+  page: Page,
+  deliveredSrc = `data:image/png;base64,${testPng.toString("base64")}`,
+) {
   await page.route("**/api/sleeping-delivery/exchange", async (route) => {
     await route.fulfill({
       contentType: "application/json",
@@ -2558,7 +2590,7 @@ async function routeImmediateDelivery(page: Page) {
         photo: {
           id: `delivered-test-${Date.now()}`,
           sourcePhotoId: "stock-e2e-fake",
-          src: `data:image/png;base64,${testPng.toString("base64")}`,
+          src: deliveredSrc,
           title: "",
           subtitle: "",
           triggerLabel: "sleeping",

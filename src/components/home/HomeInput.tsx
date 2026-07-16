@@ -137,6 +137,7 @@ import {
 } from "../ui/StoredPhotoImage";
 import { useModalBehavior } from "../ui/useModalBehavior";
 import { deliveredLetterStyles } from "../ui/deliveredLetterStyles";
+import { useNaturalPhotoFrame } from "../ui/useNaturalPhotoFrame";
 
 type HomeInputProps = {
   initialNow: number;
@@ -3365,6 +3366,15 @@ function EveningDeliveryOpening({
   const [hasPhotoError, setHasPhotoError] = useState(false);
   const [photoRetryKey, setPhotoRetryKey] = useState(0);
   const [isFirstDelivery] = useState(() => isFirstEveningDelivery(state.dateKey));
+  const {
+    frameStyle: naturalPhotoFrameStyle,
+    handleNaturalSize: handlePhotoNaturalSize,
+    photoAspect,
+  } = useNaturalPhotoFrame({
+    horizontalInsetPx: 32,
+    maxWidthPx: 406,
+    verticalChromePx: 260,
+  });
 
   function finishClose() {
     if (closeTimerRef.current) {
@@ -3484,10 +3494,12 @@ function EveningDeliveryOpening({
           <div
             style={{
               ...styles.eveningOpeningPhotoFrame,
+              ...naturalPhotoFrameStyle,
               ...(isClosing ? styles.eveningOpeningPhotoFrameClosing : {}),
             }}
             data-testid="evening-opening-photo-frame"
             data-photo-frame="f3"
+            data-photo-aspect={photoAspect.toFixed(4)}
           >
             <StoredPhotoImage
               key={`evening-opening-photo-${photoRetryKey}`}
@@ -3498,6 +3510,7 @@ function EveningDeliveryOpening({
               storageVariant={getPhotoStorageVariant(state.deliveredPhoto, "detail")}
               loading="eager"
               onStorageDataUrl={onStorageDataUrl}
+              onNaturalSize={handlePhotoNaturalSize}
               onLoad={() => {
                 setIsPhotoReady(true);
                 setHasPhotoError(false);
@@ -7661,7 +7674,7 @@ const styles = {
   },
   eveningOpeningLetter: {
     ...deliveredLetterStyles.sheet,
-    width: "min(calc(100vw - 32px), 406px, calc(100dvh - 224px))",
+    width: "min(calc(100vw - 32px), 406px)",
   },
   eveningOpeningMasthead: {
     ...deliveredLetterStyles.masthead,
