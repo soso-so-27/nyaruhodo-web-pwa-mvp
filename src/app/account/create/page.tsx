@@ -1,9 +1,8 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useEffect, useRef, useState } from "react";
+import { use, useEffect, useRef, useState } from "react";
 import type { CSSProperties } from "react";
-import { AppLoadingScreen } from "../../../components/loading/AppLoadingScreen";
 import { AppButton } from "../../../components/ui/AppButton";
 import { AppCard } from "../../../components/ui/AppCard";
 import { WordmarkHeader } from "../../../components/ui/AppHeader";
@@ -22,6 +21,7 @@ import { trackProductEvent } from "../../../lib/analytics/productAnalytics";
 import { writeAuthDebugEvent } from "../../../lib/authDebug";
 import {
   markOnboardingAlbumCreated,
+  normalizeOnboardingSource,
   readOnboardingSourceFromLocation,
   type OnboardingSource,
 } from "../../../lib/onboarding/progress";
@@ -49,7 +49,30 @@ const ACCOUNT_CREATE_PROMPT_DISMISSED_MS = 7 * 24 * 60 * 60 * 1000;
 const ONBOARDING_ALBUM_COMPLETION_READY_KEY =
   "neteruneko_onboarding_album_completion_ready";
 
-export default function AccountCreatePage() {
+type AccountCreatePageProps = {
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
+};
+
+export default function AccountCreatePage({
+  searchParams,
+}: AccountCreatePageProps) {
+  const resolvedSearchParams = use(searchParams);
+  const initialIsFromOnboarding =
+    readSearchParam(resolvedSearchParams, "from") === "onboarding";
+  const initialOnboardingSource = readInitialOnboardingSource(
+    resolvedSearchParams,
+  );
+  const initialHandoffNext =
+    readSearchParam(resolvedSearchParams, "next") === "second_photo"
+      ? "second_photo"
+      : "";
+  const initialReturnToPath = normalizeInternalReturnPath(
+    readSearchParam(resolvedSearchParams, "returnTo"),
+  );
+  const initialEmbeddedBrowserLabel =
+    readSearchParam(resolvedSearchParams, "embedded") === "1"
+      ? "アプリ内ブラウザ"
+      : "";
   const router = useRouter();
   const [message, setMessage] = useState("");
   const [pendingAction, setPendingAction] = useState<"google" | "handoff" | null>(null);
@@ -58,12 +81,16 @@ export default function AccountCreatePage() {
   const [connectedEmail, setConnectedEmail] = useState("");
   const [displayEnvironment, setDisplayEnvironment] =
     useState<DisplayEnvironment>("unknown");
-  const [embeddedBrowserLabel, setEmbeddedBrowserLabel] = useState("");
-  const [isFromOnboarding, setIsFromOnboarding] = useState(false);
+  const [embeddedBrowserLabel, setEmbeddedBrowserLabel] = useState(
+    initialEmbeddedBrowserLabel,
+  );
+  const [isFromOnboarding, setIsFromOnboarding] = useState(
+    initialIsFromOnboarding,
+  );
   const [onboardingSource, setOnboardingSource] =
-    useState<OnboardingSource>("direct");
+    useState<OnboardingSource>(initialOnboardingSource);
   const [onboardingCatName, setOnboardingCatName] = useState("");
-  const [returnToPath, setReturnToPath] = useState("");
+  const [returnToPath, setReturnToPath] = useState(initialReturnToPath);
   const hasTrackedCtaView = useRef(false);
   const hasTrackedOnboardingPromptView = useRef(false);
   const hasTrackedCallbackError = useRef(false);
@@ -97,7 +124,7 @@ export default function AccountCreatePage() {
     );
   }
 
-  const [handoffNext, setHandoffNext] = useState("");
+  const [handoffNext, setHandoffNext] = useState(initialHandoffNext);
 
   useEffect(() => {
     setDisplayEnvironment(getDisplayEnvironment());
@@ -406,8 +433,9 @@ export default function AccountCreatePage() {
         trackOnboardingAlbumCreatedVariant("handoff");
         const nextParam =
           handoffNext === "second_photo" ? "&next=second_photo" : "";
+        const embeddedParam = isEmbeddedBrowser ? "&embedded=1" : "";
         router.push(
-          `${handoff.continueUrl}${nextParam}&handoff_from=account`,
+          `${handoff.continueUrl}${nextParam}&handoff_from=account${embeddedParam}`,
         );
       } catch {
         setPendingAction(null);
@@ -431,12 +459,8 @@ export default function AccountCreatePage() {
     router.push(returnToPath || "/home");
   }
 
-  if (isCheckingAccount) {
-    return <AppLoadingScreen variant="account" />;
-  }
-
   return (
-    <main style={styles.page}>
+    <main style={styles.page} aria-busy={isCheckingAccount}>
       <div style={styles.container}>
         {isFromOnboarding ? <WordmarkHeader style={styles.wordmarkHeader} /> : null}
         <AppCard
@@ -569,7 +593,11 @@ export default function AccountCreatePage() {
                         fullWidth
                         disabled={isStartingAuth || isCheckingAccount}
                       >
-                        {isStartingGoogle ? "Googleを開いています..." : "Googleでつづける"}
+                        {isCheckingAccount
+                          ? "準備しています…"
+                          : isStartingGoogle
+                            ? "Googleを開いています..."
+                            : "Googleでつづける"}
                       </AppButton>
                     ) : null}
                     <AppButton
@@ -581,7 +609,11 @@ export default function AccountCreatePage() {
                       fullWidth
                       disabled={isStartingAuth || isCheckingAccount}
                     >
-                      {isPreparingHandoff ? "リンクを作っています..." : "つづきのリンクを作る"}
+                      {isCheckingAccount
+                        ? "準備しています…"
+                        : isPreparingHandoff
+                          ? "リンクを作っています..."
+                          : "つづきのリンクを作る"}
                     </AppButton>
                   </>
                 ) : (
@@ -596,7 +628,11 @@ export default function AccountCreatePage() {
                       fullWidth
                       disabled={isStartingAuth || isCheckingAccount}
                     >
-                      {isStartingGoogle ? "Googleを開いています..." : "Googleで続ける"}
+                      {isCheckingAccount
+                        ? "準備しています…"
+                        : isStartingGoogle
+                          ? "Googleを開いています..."
+                          : "Googleで続ける"}
                     </AppButton>
                     <AppButton
                       type="button"
@@ -639,6 +675,32 @@ function normalizeInternalReturnPath(value: string | null) {
   } catch {
     return "";
   }
+}
+
+function readSearchParam(
+  searchParams: Record<string, string | string[] | undefined>,
+  key: string,
+) {
+  const value = searchParams[key];
+  return Array.isArray(value) ? (value[0] ?? null) : (value ?? null);
+}
+
+function readInitialOnboardingSource(
+  searchParams: Record<string, string | string[] | undefined>,
+) {
+  if (
+    readSearchParam(searchParams, "ref") ||
+    readSearchParam(searchParams, "referral") ||
+    readSearchParam(searchParams, "invite")
+  ) {
+    return "referral" satisfies OnboardingSource;
+  }
+
+  return normalizeOnboardingSource(
+    readSearchParam(searchParams, "src") ??
+      readSearchParam(searchParams, "source") ??
+      readSearchParam(searchParams, "utm_source"),
+  );
 }
 
 function EnvironmentNotice({

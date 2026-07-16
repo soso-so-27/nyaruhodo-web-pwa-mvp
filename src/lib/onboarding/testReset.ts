@@ -4,8 +4,13 @@ import {
   removeCachedJson,
   writeCachedJson,
 } from "../storage";
+import {
+  AUTH_CODE_VERIFIER_STORAGE_KEY,
+  AUTH_STORAGE_KEY,
+} from "../authDebug";
 
 const RESET_QUERY_KEY = "reset_onboarding";
+const LEGACY_RESET_QUERY_KEY = "reset";
 const REFERRAL_QUERY_KEYS = ["ref", "referral", "invite"] as const;
 
 const ONBOARDING_TEST_RESET_KEYS = [
@@ -14,6 +19,8 @@ const ONBOARDING_TEST_RESET_KEYS = [
   STORAGE_KEYS.activeCatId,
   STORAGE_KEYS.analyticsAnonymousId,
   STORAGE_KEYS.authGooglePending,
+  AUTH_CODE_VERIFIER_STORAGE_KEY,
+  AUTH_STORAGE_KEY,
   STORAGE_KEYS.catGalleryPhotos,
   STORAGE_KEYS.catProfiles,
   STORAGE_KEYS.collectionPhotos,
@@ -59,7 +66,9 @@ export function consumeOnboardingTestResetRequest() {
   }
 
   const url = new URL(window.location.href);
-  const resetValue = url.searchParams.get(RESET_QUERY_KEY);
+  const resetValue =
+    url.searchParams.get(RESET_QUERY_KEY) ??
+    url.searchParams.get(LEGACY_RESET_QUERY_KEY);
 
   if (resetValue !== "1" && resetValue !== "true") {
     return false;
@@ -128,6 +137,7 @@ function removeLocalStorageKeysByPrefix(prefixes: readonly string[]) {
 
 function removeResetQuery(url: URL) {
   url.searchParams.delete(RESET_QUERY_KEY);
+  url.searchParams.delete(LEGACY_RESET_QUERY_KEY);
   const nextUrl = `${url.pathname}${url.search}${url.hash}`;
 
   window.history.replaceState(window.history.state, "", nextUrl);

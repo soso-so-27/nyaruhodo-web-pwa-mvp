@@ -129,6 +129,7 @@ export function OnboardingFlow() {
   const [isEmbeddedBrowser, setIsEmbeddedBrowser] = useState(false);
   const [isOpeningEnvelope, setIsOpeningEnvelope] = useState(false);
   const [isRetryingDelivery, setIsRetryingDelivery] = useState(false);
+  const [isContinuing, setIsContinuing] = useState(false);
   const [hasRevealPhotoError, setHasRevealPhotoError] = useState(false);
   const [isRevealPhotoReady, setIsRevealPhotoReady] = useState(false);
   const [revealPhotoRetryKey, setRevealPhotoRetryKey] = useState(0);
@@ -138,7 +139,7 @@ export function OnboardingFlow() {
     photoAspect: deliveredPhotoAspect,
     resetPhotoAspect: resetDeliveredPhotoAspect,
   } = useNaturalPhotoFrame({
-    horizontalInsetPx: 48,
+    horizontalInsetPx: 56,
     maxWidthPx: 350,
     verticalChromePx: 272,
   });
@@ -150,6 +151,7 @@ export function OnboardingFlow() {
   const hasResolvedProgressRef = useRef(false);
   const isSubmittingRef = useRef(false);
   const isOpeningEnvelopeRef = useRef(false);
+  const isContinuingRef = useRef(false);
   const revealTimerRef = useRef<number | null>(null);
   const revealStartedAtRef = useRef<number | null>(null);
   const revealPhotoLoadedTrackedRef = useRef("");
@@ -230,6 +232,21 @@ export function OnboardingFlow() {
   }, []);
 
   useEffect(() => {
+    if (
+      !isEmbeddedBrowser ||
+      (state !== "delivered" && state !== "naming")
+    ) {
+      return;
+    }
+
+    router.prefetch(
+      `/account/create?from=onboarding&source=${encodeURIComponent(
+        entrySource,
+      )}&next=second_photo&embedded=1`,
+    );
+  }, [entrySource, isEmbeddedBrowser, router, state]);
+
+  useEffect(() => {
     if (!isEmbeddedBrowser || hasTrackedEmbeddedBrowserRef.current) {
       return;
     }
@@ -258,7 +275,9 @@ export function OnboardingFlow() {
       setIsDeliveredPhotoKept(false);
       setCompletionCopy("");
       setState("intro");
-      setMessage("テスト用に、この端末のオンボーディング状態をリセットしました。");
+      setMessage(
+        "テスト用に、この端末のオンボーディング状態とログイン状態をリセットしました。",
+      );
     }
     resolveOnboardingProgress(source);
   }, []);
@@ -786,13 +805,19 @@ export function OnboardingFlow() {
   }
 
   function continueAfterOnboardingLetter() {
+    if (isContinuingRef.current) {
+      return;
+    }
+
+    isContinuingRef.current = true;
+    setIsContinuing(true);
     markOnboardingAlbumCompletionReady();
 
     if (isEmbeddedBrowser) {
       router.push(
         `/account/create?from=onboarding&source=${encodeURIComponent(
           getEffectiveEntrySource(),
-        )}&next=second_photo`,
+        )}&next=second_photo&embedded=1`,
       );
       return;
     }
@@ -801,7 +826,7 @@ export function OnboardingFlow() {
   }
 
   function handleContinueAfterDeliveredPhoto() {
-    if (!isDeliveredPhotoKept) {
+    if (!isDeliveredPhotoKept || isContinuingRef.current) {
       return;
     }
 
@@ -1473,20 +1498,21 @@ export function OnboardingFlow() {
                 type="submit"
                 fullWidth
                 style={styles.onboardingCta}
-                disabled={isSubmittingRef.current}
+                disabled={isSubmittingRef.current || isContinuing}
               >
-                名前を入れて進む
+                {isContinuing ? "準備しています…" : "名前を入れて進む"}
               </AppButton>
             </form>
             <AppButton
               type="button"
               variant="quiet"
               size="md"
+              disabled={isSubmittingRef.current || isContinuing}
               onClick={() => {
                 void handleContinueAfterCatName(true);
               }}
             >
-              名前なしで進む
+              {isContinuing ? "準備しています…" : "名前なしで進む"}
             </AppButton>
           </section>
         ) : null}
@@ -1622,12 +1648,12 @@ export function OnboardingFlow() {
                   ? handleContinueAfterDeliveredPhoto
                   : undefined
               }
-              disabled={!isDeliveredPhotoKept}
+              disabled={!isDeliveredPhotoKept || isContinuing}
               fullWidth
               style={styles.onboardingDeliveredContinue}
               data-testid="onboarding-delivered-continue"
             >
-              ねてるねこを はじめる
+              {isContinuing ? "準備しています…" : "ねてるねこを はじめる"}
             </AppButton>
             {message ? <p style={styles.message}>{message}</p> : null}
           </section>
@@ -2944,6 +2970,7 @@ const styles = {
     width: "min(100%, 350px)",
     maxWidth: "100%",
     minWidth: 0,
+    padding: 0,
   },
   onboardingDeliveredMasthead: {
     ...deliveredLetterStyles.masthead,

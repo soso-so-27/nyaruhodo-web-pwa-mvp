@@ -1,8 +1,7 @@
 "use client";
 
-import { useSearchParams } from "next/navigation";
 import type { CSSProperties } from "react";
-import { Suspense, useEffect, useState } from "react";
+import { use, useEffect, useState } from "react";
 
 import { AppButton } from "../../../components/ui/AppButton";
 import { AppCard } from "../../../components/ui/AppCard";
@@ -15,30 +14,39 @@ import { STORAGE_KEYS } from "../../../lib/storage";
 
 type RestoreStatus = "ready" | "restoring" | "restored" | "error";
 
-export default function OnboardingContinuePage() {
-  return (
-    <Suspense fallback={<OnboardingContinueShell />}>
-      <OnboardingContinueContent />
-    </Suspense>
-  );
+type OnboardingContinuePageProps = {
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
+};
+
+export default function OnboardingContinuePage({
+  searchParams,
+}: OnboardingContinuePageProps) {
+  const resolvedSearchParams = use(searchParams);
+  return <OnboardingContinueContent searchParams={resolvedSearchParams} />;
 }
 
-function OnboardingContinueContent() {
-  const searchParams = useSearchParams();
-  const token = searchParams.get("handoff") ?? "";
+function OnboardingContinueContent({
+  searchParams,
+}: {
+  searchParams: Record<string, string | string[] | undefined>;
+}) {
+  const token = readSearchParam(searchParams, "handoff") ?? "";
   const next =
-    searchParams.get("next") === "second_photo" ||
-    searchParams.get("handoff_from") === "account"
+    readSearchParam(searchParams, "next") === "second_photo" ||
+    readSearchParam(searchParams, "handoff_from") === "account"
       ? "second_photo"
       : "";
+  const initialIsEmbeddedBrowser =
+    readSearchParam(searchParams, "embedded") === "1";
   const [status, setStatus] = useState<RestoreStatus>("ready");
   const [message, setMessage] = useState("");
   const [restoreErrorCode, setRestoreErrorCode] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
-  const [hasCheckedEnvironment, setHasCheckedEnvironment] = useState(false);
-  const [isEmbeddedBrowser, setIsEmbeddedBrowser] = useState(false);
+  const [isEmbeddedBrowser, setIsEmbeddedBrowser] = useState(
+    initialIsEmbeddedBrowser,
+  );
   const shouldShowEmbeddedGuide =
-    hasCheckedEnvironment && isEmbeddedBrowser && Boolean(token);
+    isEmbeddedBrowser && Boolean(token);
   const hasTerminalRestoreError =
     status === "error" && isTerminalRestoreError(restoreErrorCode);
   const continueUrl =
@@ -50,7 +58,6 @@ function OnboardingContinueContent() {
 
   useEffect(() => {
     setIsEmbeddedBrowser(detectEmbeddedBrowser());
-    setHasCheckedEnvironment(true);
   }, []);
 
   useEffect(() => {
@@ -144,18 +151,14 @@ function OnboardingContinueContent() {
         <AppCard variant="section" padding="lg" style={styles.card}>
           <p style={styles.eyebrow}>つづき</p>
           <h1 style={styles.title}>
-            {!hasCheckedEnvironment
-              ? "ねがおを 確認しています"
-              : shouldShowEmbeddedGuide
-                ? "ホーム画面アプリで つづけます"
-                : getRestoreHeading(status)}
+            {shouldShowEmbeddedGuide
+              ? "ホーム画面アプリで つづけます"
+              : getRestoreHeading(status)}
           </h1>
           <p style={styles.body}>
-            {!hasCheckedEnvironment
-              ? "少しだけお待ちください。"
-              : shouldShowEmbeddedGuide
-                ? "LINEやInstagramの中で入れた写真は、ホーム画面アプリへ自動では渡りません。URLをコピーして、ChromeやSafari、またはホーム画面アプリで開いてください。"
-                : getRestoreBody(status)}
+            {shouldShowEmbeddedGuide
+              ? "LINEやInstagramの中で入れた写真は、ホーム画面アプリへ自動では渡りません。URLをコピーして、ChromeやSafari、またはホーム画面アプリで開いてください。"
+              : getRestoreBody(status)}
           </p>
 
           {shouldShowEmbeddedGuide ? (
@@ -174,7 +177,7 @@ function OnboardingContinueContent() {
           ) : null}
 
           <div style={styles.actions}>
-            {!hasCheckedEnvironment ? null : shouldShowEmbeddedGuide ? (
+            {shouldShowEmbeddedGuide ? (
               <AppButton
                 type="button"
                 variant="accent"
@@ -236,19 +239,12 @@ function OnboardingContinueContent() {
   );
 }
 
-function OnboardingContinueShell() {
-  return (
-    <main style={styles.page}>
-      <div style={styles.container}>
-        <WordmarkHeader style={styles.header} />
-        <AppCard variant="section" padding="lg" style={styles.card}>
-          <p style={styles.eyebrow}>つづき</p>
-          <h1 style={styles.title}>ねがおを 確認しています</h1>
-          <p style={styles.body}>少しだけお待ちください。</p>
-        </AppCard>
-      </div>
-    </main>
-  );
+function readSearchParam(
+  searchParams: Record<string, string | string[] | undefined>,
+  key: string,
+) {
+  const value = searchParams[key];
+  return Array.isArray(value) ? (value[0] ?? null) : (value ?? null);
 }
 
 function getRestoreErrorMessage(errorMessage: string) {

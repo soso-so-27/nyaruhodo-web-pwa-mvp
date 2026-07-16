@@ -971,10 +971,38 @@ test.describe("onboarding delivery flow", () => {
 
     await page.locator("main button").first().click();
     await page.waitForTimeout(1600);
+    await page.evaluate(() => {
+      const trackedWindow = window as Window & {
+        __accountLoadingObserver?: MutationObserver;
+        __accountLoadingScreenSeen?: boolean;
+      };
+      const inspect = () => {
+        if (document.querySelector('[aria-label="アカウントを確認中"]')) {
+          trackedWindow.__accountLoadingScreenSeen = true;
+        }
+      };
+
+      trackedWindow.__accountLoadingScreenSeen = false;
+      trackedWindow.__accountLoadingObserver?.disconnect();
+      trackedWindow.__accountLoadingObserver = new MutationObserver(inspect);
+      trackedWindow.__accountLoadingObserver.observe(document.documentElement, {
+        childList: true,
+        subtree: true,
+      });
+      inspect();
+    });
     await page.getByTestId("onboarding-delivered-continue").click();
     await continuePastOptionalOnboardingNamePrompt(page);
     await expect(page).toHaveURL(/\/account\/create\?from=onboarding/);
     await expect(page).toHaveURL(/next=second_photo/);
+    await expect(page.getByTestId("account-create-handoff")).toBeVisible();
+    expect(
+      await page.evaluate(
+        () =>
+          (window as Window & { __accountLoadingScreenSeen?: boolean })
+            .__accountLoadingScreenSeen,
+      ),
+    ).toBe(false);
   });
 
   test("keeps the delivered letter focused after 8pm", async ({
@@ -2119,6 +2147,14 @@ test.describe("onboarding delivery flow", () => {
       window.localStorage.setItem("active_cat_id", "cat-old");
       window.localStorage.setItem("analytics_anonymous_id", "anonymous-reset-e2e");
       window.localStorage.setItem(
+        "nyaruhodo_supabase_auth",
+        JSON.stringify({ access_token: "stale-test-session" }),
+      );
+      window.localStorage.setItem(
+        "nyaruhodo_supabase_auth-code-verifier",
+        "stale-test-verifier",
+      );
+      window.localStorage.setItem(
         "record_log_cat-old",
         JSON.stringify([{ id: "log-old" }]),
       );
@@ -2130,7 +2166,9 @@ test.describe("onboarding delivery flow", () => {
 
     await page.goto("/onboarding?ref=ABC234&reset_onboarding=1");
     await expect(
-      page.getByText("テスト用に、この端末のオンボーディング状態をリセットしました。"),
+      page.getByText(
+        "テスト用に、この端末のオンボーディング状態とログイン状態をリセットしました。",
+      ),
     ).toBeVisible();
     await expect(page).toHaveURL(/\/onboarding\?ref=ABC234$/);
 
@@ -2145,6 +2183,10 @@ test.describe("onboarding delivery flow", () => {
       profiles: window.localStorage.getItem("cat_profiles"),
       activeCatId: window.localStorage.getItem("active_cat_id"),
       anonymousId: window.localStorage.getItem("analytics_anonymous_id"),
+      authSession: window.localStorage.getItem("nyaruhodo_supabase_auth"),
+      authCodeVerifier: window.localStorage.getItem(
+        "nyaruhodo_supabase_auth-code-verifier",
+      ),
       recordLog: window.localStorage.getItem("record_log_cat-old"),
       pendingReferral: window.localStorage.getItem("neteruneko_pending_referral_code"),
       sessionReady: window.sessionStorage.getItem(
@@ -2161,9 +2203,101 @@ test.describe("onboarding delivery flow", () => {
     expect(storage.activeCatId).toBeNull();
     expect(storage.anonymousId).toBeTruthy();
     expect(storage.anonymousId).not.toBe("anonymous-reset-e2e");
+    expect(storage.authSession).toBeNull();
+    expect(storage.authCodeVerifier).toBeNull();
     expect(storage.recordLog).toBeNull();
     expect(storage.sessionReady).toBeNull();
     expect(storage.pendingReferral).toContain("ABC234");
+  });
+
+  test("accepts the legacy reset query without leaving it in the URL", async ({
+    page,
+  }) => {
+    await page.addInitScript(() => {
+      window.localStorage.setItem("onboarding_completed", "true");
+      window.localStorage.setItem(
+        "nyaruhodo_exchange_kept_photos",
+        JSON.stringify([
+          {
+            id: "legacy-reset-letter",
+            src: "data:image/png;base64,AA==",
+            deliveredAt: Date.now(),
+          },
+        ]),
+      );
+    });
+
+    await page.goto("/onboarding?src=instagram_bio&reset=1");
+
+    await expect(
+      page.getByText(
+        "テスト用に、この端末のオンボーディング状態とログイン状態をリセットしました。",
+      ),
+    ).toBeVisible();
+    await expect(page).toHaveURL(/\/onboarding\?src=instagram_bio$/);
+    await expect
+      .poll(() =>
+        page.evaluate(() =>
+          window.localStorage.getItem("nyaruhodo_exchange_kept_photos"),
+        ),
+      )
+      .toBeNull();
+  });
+
+  test("shows only the new received letter after a test reset", async ({
+    page,
+  }) => {
+    const previousLetter = {
+      id: "previous-onboarding-letter",
+      sourcePhotoId: "previous-onboarding-source",
+      src: portraitDeliveryDataUrl,
+      deliveredAt: Date.parse("2026-07-15T20:00:00+09:00"),
+    };
+
+    await page.addInitScript((letter) => {
+      if (window.sessionStorage.getItem("onboarding-reset-letter-seeded")) {
+        return;
+      }
+      window.sessionStorage.setItem("onboarding-reset-letter-seeded", "true");
+      window.localStorage.setItem(
+        "nyaruhodo_exchange_kept_photos",
+        JSON.stringify([letter]),
+      );
+      window.localStorage.setItem(
+        "nyaruhodo_supabase_auth",
+        JSON.stringify({ access_token: "stale-test-session" }),
+      );
+    }, previousLetter);
+    await routeImmediateDelivery(page);
+
+    await page.goto("/onboarding?src=instagram_bio&reset=1");
+    await expect(
+      page.getByText(
+        "テスト用に、この端末のオンボーディング状態とログイン状態をリセットしました。",
+      ),
+    ).toBeVisible();
+
+    await page.evaluate((letter) => {
+      if (window.localStorage.getItem("nyaruhodo_supabase_auth")) {
+        window.localStorage.setItem(
+          "nyaruhodo_exchange_kept_photos",
+          JSON.stringify([letter]),
+        );
+      }
+    }, previousLetter);
+
+    await page.getByTestId("onboarding-photo-select").click();
+    await page.locator('input[type="file"]').last().setInputFiles({
+      name: "fresh-onboarding-photo.png",
+      mimeType: "image/png",
+      buffer: testPng,
+    });
+    await page.getByRole("button", { name: "ねこだよりを ひらく" }).click();
+    await expect(page.getByTestId("onboarding-delivered-continue")).toBeEnabled();
+
+    await page.goto("/collection");
+    await page.getByRole("tab", { name: "とどいた" }).click();
+    await expect(page.getByTestId("mainichi-board-photo-delivered")).toHaveCount(1);
   });
 
   test("hands off only the current onboarding photos", async ({ page }) => {
@@ -2301,9 +2435,37 @@ test.describe("onboarding delivery flow", () => {
     const handoffButton = page.locator("main button").nth(1);
     await expect(handoffButton).toBeVisible();
     await expect(handoffButton).toBeEnabled();
+    await page.evaluate(() => {
+      const trackedWindow = window as Window & {
+        __handoffLoadingObserver?: MutationObserver;
+        __handoffLoadingScreenSeen?: boolean;
+      };
+      const inspect = () => {
+        if (document.body?.textContent?.includes("ねがおを 確認しています")) {
+          trackedWindow.__handoffLoadingScreenSeen = true;
+        }
+      };
+
+      trackedWindow.__handoffLoadingScreenSeen = false;
+      trackedWindow.__handoffLoadingObserver?.disconnect();
+      trackedWindow.__handoffLoadingObserver = new MutationObserver(inspect);
+      trackedWindow.__handoffLoadingObserver.observe(document.documentElement, {
+        childList: true,
+        subtree: true,
+      });
+      inspect();
+    });
     await handoffButton.click();
 
     await expect.poll(() => capturedCreateBodies.length).toBe(1);
+    await expect(page).toHaveURL(/\/onboarding\/continue\?handoff=/);
+    expect(
+      await page.evaluate(
+        () =>
+          (window as Window & { __handoffLoadingScreenSeen?: boolean })
+            .__handoffLoadingScreenSeen,
+      ),
+    ).toBe(false);
     const capturedPayload = capturedCreateBodies[0]?.payload;
 
     expect(capturedPayload?.ownSleepingPhotos).toHaveLength(1);
@@ -3152,6 +3314,25 @@ async function expectOnboardingLayoutWithinViewport(page: Page) {
           )
         : null;
       const exchangeLeadTop = exchangeLead?.getBoundingClientRect().top ?? null;
+      const centeredTargets = [
+        ["delivered letter", '[data-testid="onboarding-delivered-letter"]'],
+        ["delivered title", '[data-testid="onboarding-delivered-title"]'],
+        ["delivered photo", '[data-testid="onboarding-delivered-photos"]'],
+        ["delivered action", '[data-testid="onboarding-delivered-continue"]'],
+      ]
+        .map(([name, selector]) => {
+          const element = container.querySelector<HTMLElement>(selector);
+          if (!element) {
+            return null;
+          }
+
+          const rect = element.getBoundingClientRect();
+          return {
+            name,
+            offset: rect.left + rect.width / 2 - window.innerWidth / 2,
+          };
+        })
+        .filter((target): target is { name: string; offset: number } => Boolean(target));
 
       for (let firstIndex = 0; firstIndex < visibleTextElements.length; firstIndex += 1) {
         for (
@@ -3191,6 +3372,7 @@ async function expectOnboardingLayoutWithinViewport(page: Page) {
         scrollWidth: document.documentElement.scrollWidth,
         outside,
         overlaps,
+        centeredTargets,
         exchangeCopyGap:
           exchangeRouteVisualBottom !== null && exchangeLeadTop !== null
             ? exchangeLeadTop - exchangeRouteVisualBottom
@@ -3206,6 +3388,12 @@ async function expectOnboardingLayoutWithinViewport(page: Page) {
   expect(layout.center).toBeCloseTo(layout.expectedCenter, 1);
   expect(layout.outside).toEqual([]);
   expect(layout.overlaps).toEqual([]);
+  for (const target of layout.centeredTargets) {
+    expect(
+      Math.abs(target.offset),
+      `${target.name} should be centered`,
+    ).toBeLessThanOrEqual(1);
+  }
   if (layout.exchangeCopyGap !== null) {
     expect(layout.exchangeCopyGap).toBeGreaterThanOrEqual(8);
   }
