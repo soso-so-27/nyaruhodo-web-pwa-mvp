@@ -2,6 +2,7 @@
 
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import type { CSSProperties } from "react";
+import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 import { trackProductEvent } from "../../lib/analytics/productAnalytics";
 import {
   fallBackCatIllustrationImage,
@@ -2237,14 +2238,17 @@ export function CatsPage() {
           }}
         />
       ) : null}
-      {selectedRecordPhoto ? (
-        <PhotoFullscreenViewer
-          photo={selectedRecordPhoto}
-          canDelete={selectedRecordPhoto.kind === "photo"}
-          onRequestDelete={() => requestDeleteGalleryPhoto(selectedRecordPhoto)}
-          onClose={() => setSelectedRecordPhoto(null)}
-        />
-      ) : null}
+      <AnimatePresence initial={false}>
+        {selectedRecordPhoto ? (
+          <PhotoFullscreenViewer
+            key={`${selectedRecordPhoto.kind}-${selectedRecordPhoto.id}`}
+            photo={selectedRecordPhoto}
+            canDelete={selectedRecordPhoto.kind === "photo"}
+            onRequestDelete={() => requestDeleteGalleryPhoto(selectedRecordPhoto)}
+            onClose={() => setSelectedRecordPhoto(null)}
+          />
+        ) : null}
+      </AnimatePresence>
       {deleteGalleryPhotoTarget ? (
         <AppBottomSheet
           title="この写真を削除"
@@ -4116,6 +4120,7 @@ function PhotoFullscreenViewer({
   onRequestDelete?: () => void;
   onClose: () => void;
 }) {
+  const reduceMotion = useReducedMotion();
   const { modalRef, handleModalKeyDown, requestModalClose } =
     useModalBehavior<HTMLDivElement>({
       open: true,
@@ -4124,7 +4129,7 @@ function PhotoFullscreenViewer({
     });
 
   return (
-    <div
+    <motion.div
       ref={modalRef}
       role="dialog"
       aria-modal="true"
@@ -4133,8 +4138,31 @@ function PhotoFullscreenViewer({
       tabIndex={-1}
       onKeyDown={handleModalKeyDown}
       onClick={requestModalClose}
+      data-photo-viewer-motion="continuous"
+      initial={{ opacity: reduceMotion ? 1 : 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: reduceMotion ? 1 : 0 }}
+      transition={{ duration: reduceMotion ? 0 : 0.16, ease: "easeOut" }}
     >
-      <div style={styles.photoViewerChrome} onClick={(event) => event.stopPropagation()}>
+      <motion.div
+        style={styles.photoViewerChrome}
+        onClick={(event) => event.stopPropagation()}
+        initial={{
+          opacity: reduceMotion ? 1 : 0,
+          scale: reduceMotion ? 1 : 0.965,
+          y: reduceMotion ? 0 : 8,
+        }}
+        animate={{ opacity: 1, scale: 1, y: 0 }}
+        exit={{
+          opacity: reduceMotion ? 1 : 0,
+          scale: reduceMotion ? 1 : 0.985,
+          y: reduceMotion ? 0 : 4,
+        }}
+        transition={{
+          duration: reduceMotion ? 0 : 0.24,
+          ease: [0.22, 1, 0.36, 1],
+        }}
+      >
         <button
           type="button"
           style={styles.photoViewerCloseButton}
@@ -4167,8 +4195,8 @@ function PhotoFullscreenViewer({
             この写真を削除
           </button>
         ) : null}
-      </div>
-    </div>
+      </motion.div>
+    </motion.div>
   );
 }
 

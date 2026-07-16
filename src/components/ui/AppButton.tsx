@@ -124,6 +124,7 @@ export function AppButton({
         aria-busy={loading || anchorProps["aria-busy"]}
         aria-pressed={pressed ?? anchorProps["aria-pressed"]}
         data-app-pressable={size === "icon" || iconOnly ? "icon" : "button"}
+        data-app-button-variant={variant}
         data-selected={selected || undefined}
         onClick={handleAnchorClick}
         style={buttonStyle}
@@ -141,6 +142,7 @@ export function AppButton({
       aria-busy={loading || buttonProps["aria-busy"]}
       aria-pressed={pressed ?? buttonProps["aria-pressed"]}
       data-app-pressable={size === "icon" || iconOnly ? "icon" : "button"}
+      data-app-button-variant={variant}
       data-selected={selected || undefined}
       disabled={isDisabled || buttonProps.disabled}
       style={buttonStyle}
@@ -203,7 +205,7 @@ const styles = {
   },
   primary: {
     border: "1px solid var(--control-border)",
-    background: "var(--control-surface)",
+    background: "var(--app-press-surface, var(--control-surface))",
     color: color.textStrong,
     boxShadow: "var(--app-press-shadow, var(--shadow-e1))",
   },

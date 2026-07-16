@@ -1,7 +1,7 @@
 import { expect, test, type Locator, type Page } from "@playwright/test";
 
 const photoDataUrl =
-  "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAFgwJ/lp1ZVQAAAABJRU5ErkJggg==";
+  "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAGQAAABkCAYAAABw4pVUAAAAAXNSR0IArs4c6QAAAARnQU1BAACxjwv8YQUAAAAJcEhZcwAADsMAAA7DAcdvqGQAAAEJSURBVHhe7dExEcAgAMBAJKKuTpnpjoLA/fACchlrzv2C+a0njDPsVmfYrQyJMSTGkBhDYgyJMSTGkBhDYgyJMSTGkBhDYgyJMSTGkBhDYgyJMSTGkBhDYgyJMSTGkBhDYgyJMSTGkBhDYgyJMSTGkBhDYgyJMSTGkBhDYgyJMSTGkBhDYgyJMSTGkBhDYgyJMSTGkBhDYgyJMSTGkBhDYgyJMSTGkBhDYgyJMSTGkBhDYgyJMSTmB4RCEqdGtA/tAAAAAElFTkSuQmCC";
 
 test("gives primary controls, navigation, and photos a quiet physical press", async ({
   page,
@@ -34,6 +34,15 @@ test("gives primary controls, navigation, and photos a quiet physical press", as
     scale: 0.99,
     translateY: 1,
   });
+
+  await page.getByTestId("cats-section-tab-photos").click();
+  const photoGrid = page.getByTestId("cats-lens-photo-grid");
+  await expect(photoGrid).toBeVisible();
+  await photoGrid.locator('[data-app-pressable="photo"]').first().click();
+  const photoViewer = page.locator('[data-photo-viewer-motion="continuous"]');
+  await expect(photoViewer).toBeVisible();
+  await photoViewer.getByRole("button", { name: "写真を閉じる" }).click();
+  await expect(photoViewer).toHaveCount(0);
 });
 
 test("keeps reduced-motion feedback still and uses opacity instead", async ({
@@ -62,6 +71,16 @@ test("keeps reduced-motion feedback still and uses opacity instead", async ({
 
   await page.mouse.move(0, 0);
   await page.mouse.up();
+});
+
+test("gives the primary onboarding action a deeper press", async ({ page }) => {
+  await page.goto("/onboarding?reset=1&src=press_feedback");
+
+  const primaryAction = page
+    .locator('[data-app-pressable="button"][data-app-button-variant="primary"]')
+    .first();
+  await expect(primaryAction).toBeVisible();
+  await expectQuietPress(page, primaryAction, { scale: 0.97, translateY: 2 });
 });
 
 async function expectQuietPress(

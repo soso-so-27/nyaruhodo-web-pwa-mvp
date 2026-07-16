@@ -292,6 +292,10 @@ type PendingExchangeSharePhoto = {
   sourceFile: File;
 };
 
+type ExchangeShareSaveResult = "saved" | "partial" | "failed";
+
+const EXCHANGE_SHARE_SAVE_CONFIRMATION_MS = 520;
+
 type SleepingPhotoSource = "camera";
 
 const SLEEPING_SAFETY_ACCEPTED_STORAGE_KEY =
@@ -2265,9 +2269,11 @@ export function HomeInput({
     return { ownPhoto, deliveryTarget };
   }
 
-  async function handleConfirmExchangeSharePhoto(photo: PendingExchangeSharePhoto) {
+  async function handleConfirmExchangeSharePhoto(
+    photo: PendingExchangeSharePhoto,
+  ): Promise<ExchangeShareSaveResult> {
     const targetCatId = pendingExchangeCatId ?? activeCatId;
-    if (!targetCatId) return;
+    if (!targetCatId) return "failed";
     const completesOnboardingSecondPhoto = hasOnboardingSecondPhotoIntent;
 
     saveStoredExchangeShareCatSelection(targetCatId);
@@ -2286,7 +2292,7 @@ export function HomeInput({
 
     if (!ownPhoto) {
       showToast(PHOTO_SAVE_FAILURE_MESSAGE);
-      return;
+      return "failed";
     }
     void queueOriginalPhotoPreservation({
       file: photo.sourceFile,
@@ -2305,9 +2311,6 @@ export function HomeInput({
     const deliveryTarget = recordEveningDeliveryTarget(ownPhoto);
     setCollectionRefreshTick((value) => value + 1);
     setEveningRefreshTick((value) => value + 1);
-    setPendingExchangeSharePhoto(null);
-    setPendingExchangeCatId(null);
-
     if (completesOnboardingSecondPhoto && !deliveryTarget.targetSaveFailed) {
       trackProductEvent("onboarding_second_photo_submitted", {
         surface: "home",
@@ -2344,11 +2347,14 @@ export function HomeInput({
       },
       { localCatId: targetCatId },
     );
+    return deliveryTarget.targetSaveFailed ? "partial" : "saved";
   }
 
-  async function handleKeepExchangeSharePhotoPrivate(photo: PendingExchangeSharePhoto) {
+  async function handleKeepExchangeSharePhotoPrivate(
+    photo: PendingExchangeSharePhoto,
+  ): Promise<ExchangeShareSaveResult> {
     const targetCatId = pendingExchangeCatId ?? activeCatId;
-    if (!targetCatId) return;
+    if (!targetCatId) return "failed";
     const dismissesOnboardingSecondPhoto = hasOnboardingSecondPhotoIntent;
 
     saveStoredExchangeShareCatSelection(targetCatId);
@@ -2367,7 +2373,7 @@ export function HomeInput({
 
     if (!ownPhoto) {
       showToast(PHOTO_SAVE_FAILURE_MESSAGE);
-      return;
+      return "failed";
     }
     void queueOriginalPhotoPreservation({
       file: photo.sourceFile,
@@ -2378,8 +2384,6 @@ export function HomeInput({
     });
     void backupOwnSleepingPhotoMoment(ownPhoto);
     setCollectionRefreshTick((value) => value + 1);
-    setPendingExchangeSharePhoto(null);
-    setPendingExchangeCatId(null);
     if (dismissesOnboardingSecondPhoto) {
       trackProductEvent("onboarding_second_photo_skipped", {
         surface: "home_save_sheet",
@@ -2396,6 +2400,7 @@ export function HomeInput({
       },
       { localCatId: targetCatId },
     );
+    return "saved";
   }
 
   const sleepingPresenceCount = useSleepingPresenceCount();
@@ -2551,6 +2556,7 @@ export function HomeInput({
           onPrivate={() =>
             handleKeepExchangeSharePhotoPrivate(pendingExchangeSharePhoto)
           }
+          onSaveError={() => showToast(PHOTO_SAVE_FAILURE_MESSAGE)}
           onClose={() => {
             setPendingExchangeSharePhoto(null);
             setPendingExchangeCatId(null);
@@ -3871,6 +3877,7 @@ function ExchangeSharePermissionSheet({
   onModeChange,
   onConfirm,
   onPrivate,
+  onSaveError,
   onClose,
 }: {
   photo: PendingExchangeSharePhoto;
@@ -3880,24 +3887,72 @@ function ExchangeSharePermissionSheet({
   deliveryCopy: string;
   onCatSelect: (catId: string) => void;
   onModeChange: (mode: "shared" | "private") => void;
-  onConfirm: () => void;
-  onPrivate: () => void;
+  onConfirm: () => Promise<ExchangeShareSaveResult>;
+  onPrivate: () => Promise<ExchangeShareSaveResult>;
+  onSaveError: () => void;
   onClose: () => void;
 }) {
   const shouldShowCatPicker = catProfiles.length > 1;
   const [mode, setMode] = useState<"shared" | "private">("shared");
+  const [saveState, setSaveState] = useState<"idle" | "saving" | "saved">(
+    "idle",
+  );
+  const closeTimerRef = useRef<number | null>(null);
+  const isMountedRef = useRef(true);
   const isPrivate = mode === "private" || !isExchangeTargetAvailable;
   const selectedCatProfile =
     catProfiles.find((profile) => profile.id === selectedCatId) ??
     catProfiles[0] ??
     null;
-  const statusCopy = isPrivate
-    ? "じぶんの記録にのこします。そとには出ません。"
-    : deliveryCopy;
+  const statusCopy =
+    saveState === "saved"
+      ? "しまいました。"
+      : isPrivate
+        ? "じぶんの記録にのこします。そとには出ません。"
+        : deliveryCopy;
+
+  useEffect(() => {
+    isMountedRef.current = true;
+    return () => {
+      isMountedRef.current = false;
+      if (closeTimerRef.current !== null) {
+        window.clearTimeout(closeTimerRef.current);
+      }
+    };
+  }, []);
 
   function selectMode(nextMode: "shared" | "private") {
+    if (saveState !== "idle") return;
     setMode(nextMode);
     onModeChange(nextMode);
+  }
+
+  async function handleSave() {
+    if (saveState !== "idle") return;
+
+    setSaveState("saving");
+    try {
+      const result = await (isPrivate ? onPrivate() : onConfirm());
+      if (!isMountedRef.current) return;
+      if (result === "failed") {
+        setSaveState("idle");
+        return;
+      }
+      if (result === "partial") {
+        onClose();
+        return;
+      }
+
+      setSaveState("saved");
+      closeTimerRef.current = window.setTimeout(
+        onClose,
+        EXCHANGE_SHARE_SAVE_CONFIRMATION_MS,
+      );
+    } catch {
+      if (!isMountedRef.current) return;
+      onSaveError();
+      setSaveState("idle");
+    }
   }
 
   return (
@@ -3909,21 +3964,38 @@ function ExchangeSharePermissionSheet({
       onClose={onClose}
       style={styles.exchangeSheetFrame}
       footer={
-        <div style={styles.exchangeActions}>
-          <button
+        <div style={styles.exchangeActions} aria-live="polite">
+          <AppButton
             type="button"
-            style={styles.exchangeKeepButton}
-            onClick={isPrivate ? onPrivate : onConfirm}
+            variant="primary"
+            fullWidth
+            style={{
+              ...styles.exchangeKeepButton,
+              ...(saveState === "saved" ? styles.exchangeKeepButtonSaved : {}),
+              opacity: 1,
+            }}
+            onClick={handleSave}
+            loading={saveState === "saving"}
+            loadingLabel="のこしています"
+            disabled={saveState !== "idle"}
             data-testid="exchange-share-submit"
+            data-save-state={saveState}
           >
-            のこす
-          </button>
+            {saveState === "saved" ? "しまいました" : "のこす"}
+          </AppButton>
         </div>
       }
     >
         <style>{exchangeShareResponsiveStyles}</style>
         <div data-exchange-share-layout="" style={styles.exchangeShareLayout}>
-          <div data-exchange-share-preview="" style={styles.exchangeSharePreview}>
+          <div
+            data-exchange-share-preview=""
+            data-save-state={saveState}
+            style={{
+              ...styles.exchangeSharePreview,
+              ...(saveState === "saved" ? styles.exchangeSharePreviewSaved : {}),
+            }}
+          >
           <StoredPhotoImage
             src={photo.src}
             alt=""
@@ -3963,6 +4035,7 @@ function ExchangeSharePermissionSheet({
                       ...(isSelected ? styles.exchangeCatOptionActive : {}),
                     }}
                     onClick={() => onCatSelect(profile.id)}
+                    disabled={saveState !== "idle"}
                     aria-checked={isSelected}
                   >
                     <span style={styles.exchangeCatName}>{getCatName(profile)}</span>
@@ -4000,6 +4073,7 @@ function ExchangeSharePermissionSheet({
                   ...(!isPrivate ? styles.exchangeModeButtonActive : {}),
                 }}
                 onClick={() => selectMode("shared")}
+                disabled={saveState !== "idle"}
                 aria-pressed={!isPrivate}
                 data-testid="exchange-share-mode-shared"
               >
@@ -4022,6 +4096,7 @@ function ExchangeSharePermissionSheet({
                   ...(isPrivate ? styles.exchangeModeButtonActive : {}),
                 }}
                 onClick={() => selectMode("private")}
+                disabled={saveState !== "idle"}
                 aria-pressed={isPrivate}
                 data-testid="exchange-share-mode-private"
               >
@@ -7891,6 +7966,15 @@ const styles = {
     justifyContent: "center",
     boxSizing: "border-box",
     boxShadow: "none",
+    transform: "translateY(0) scale(1)",
+    transformOrigin: "center",
+    transition:
+      "transform 260ms var(--ease-settle), opacity 180ms var(--ease-gentle), border-color 180ms var(--ease-gentle)",
+  },
+  exchangeSharePreviewSaved: {
+    transform: "translateY(4px) scale(0.965)",
+    opacity: 0.9,
+    borderColor: "color-mix(in srgb, var(--seal) 38%, var(--line) 62%)",
   },
   exchangeShareSummary: {
     display: "grid",
@@ -8162,8 +8246,13 @@ const styles = {
     letterSpacing: "0.04em",
     cursor: "pointer",
     boxShadow:
-      "inset 0 1px 0 color-mix(in srgb, var(--paper) 14%, transparent), 0 12px 24px -14px color-mix(in srgb, var(--ink) 58%, transparent)",
+      "var(--app-press-shadow, inset 0 1px 0 color-mix(in srgb, var(--paper) 14%, transparent), 0 12px 24px -14px color-mix(in srgb, var(--ink) 58%, transparent))",
     WebkitTapHighlightColor: "transparent",
+  },
+  exchangeKeepButtonSaved: {
+    borderColor: "color-mix(in srgb, var(--seal) 72%, var(--ink) 28%)",
+    background: "color-mix(in srgb, var(--seal) 78%, var(--ink) 22%)",
+    boxShadow: "var(--shadow-e0)",
   },
   exchangePlainButton: {
     minHeight: "28px",

@@ -1046,6 +1046,11 @@ test.describe("home sleeping exchange flow", () => {
       )
       .toBe(true);
 
+    await expect(page.getByTestId("exchange-share-submit")).toHaveAttribute(
+      "data-app-button-variant",
+      "primary",
+    );
+
     await expect
       .poll(async () => {
         const sharedBox = await page
@@ -1113,6 +1118,16 @@ test.describe("home sleeping exchange flow", () => {
         }),
       )
       .toBe(true);
+
+    await page.getByTestId("exchange-share-submit").click();
+    await expect(page.getByTestId("exchange-share-submit")).toHaveText(
+      "しまいました",
+    );
+    await expect(page.locator("[data-exchange-share-preview]")).toHaveAttribute(
+      "data-save-state",
+      "saved",
+    );
+    await expect(page.getByRole("dialog")).toHaveCount(0);
   });
 
   test("keeps the primary save action readable across home ambient themes", async ({

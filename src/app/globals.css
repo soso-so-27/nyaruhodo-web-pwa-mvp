@@ -80,11 +80,24 @@ body {
   --app-press-y: 0px;
 }
 
+[data-app-pressable="button"][data-app-button-variant="primary"] {
+  --app-press-scale: 0.97;
+  --app-press-y: 2px;
+}
+
 [data-app-pressable]:not(:disabled):not([aria-disabled="true"]):active {
   --app-press-duration: var(--dur-press-in);
   --app-press-shadow: var(--shadow-e0);
   --app-photo-shadow: var(--shadow-e0);
   transform: translateY(var(--app-press-y)) scale(var(--app-press-scale));
+}
+
+[data-app-pressable="button"][data-app-button-variant="primary"]:not(:disabled):not([aria-disabled="true"]):active {
+  --app-press-surface: color-mix(
+    in srgb,
+    var(--control-surface) 92%,
+    var(--ink) 8%
+  );
 }
 
 @keyframes catAvatarSettle {

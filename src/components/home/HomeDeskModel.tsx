@@ -2,6 +2,7 @@
 
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import type { CSSProperties, ReactNode } from "react";
+import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 
 import { type EveningHomeState } from "../../lib/home/eveningDelivery";
 import {
@@ -1009,29 +1010,32 @@ export function HomeDeskModel({
         <BottomNavigation active="today" homeVariant="desk" homeState={deskState} />
       </div>
 
-      {viewerPhoto ? (
-        <DeskPhotoViewer
-          viewerPhoto={viewerPhoto}
-          onClose={() => setViewerPhoto(null)}
-          onSave={() => {
-            if (viewerPhoto.kind === "other") {
-              onKeepOpenedDelivery(viewerPhoto.dateKey, viewerPhoto.photo);
-            }
-          }}
-          onReport={(reason) => {
-            if (viewerPhoto.kind !== "other") {
-              return;
-            }
-            onReportOpenedDelivery(viewerPhoto.dateKey, viewerPhoto.photo, reason);
-            setReportedDeliveredIds((current) => {
-              const next = new Set(current);
-              next.add(getExchangePhotoIdentity(viewerPhoto.photo));
-              return next;
-            });
-            setViewerPhoto(null);
-          }}
-        />
-      ) : null}
+      <AnimatePresence initial={false}>
+        {viewerPhoto ? (
+          <DeskPhotoViewer
+            key={`${viewerPhoto.kind}-${viewerPhoto.dateKey}-${viewerPhoto.photo.id}`}
+            viewerPhoto={viewerPhoto}
+            onClose={() => setViewerPhoto(null)}
+            onSave={() => {
+              if (viewerPhoto.kind === "other") {
+                onKeepOpenedDelivery(viewerPhoto.dateKey, viewerPhoto.photo);
+              }
+            }}
+            onReport={(reason) => {
+              if (viewerPhoto.kind !== "other") {
+                return;
+              }
+              onReportOpenedDelivery(viewerPhoto.dateKey, viewerPhoto.photo, reason);
+              setReportedDeliveredIds((current) => {
+                const next = new Set(current);
+                next.add(getExchangePhotoIdentity(viewerPhoto.photo));
+                return next;
+              });
+              setViewerPhoto(null);
+            }}
+          />
+        ) : null}
+      </AnimatePresence>
 
       <style>{`
         @keyframes deskFrameBreathe {
@@ -1353,6 +1357,7 @@ function DeskPhotoViewer({
 }) {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [isReportSheetOpen, setIsReportSheetOpen] = useState(false);
+  const reduceMotion = useReducedMotion();
   const isOwnPhoto = viewerPhoto.kind === "own";
   const viewerLabel = isOwnPhoto ? "うちのこの写真" : "どこかのこの写真";
   const { modalRef, handleModalKeyDown, requestModalClose } =
@@ -1368,11 +1373,12 @@ function DeskPhotoViewer({
   }
 
   return (
-    <div
+    <motion.div
       ref={modalRef}
       data-testid="desk-photo-viewer"
       data-photo-kind={viewerPhoto.kind}
       data-photo-id={viewerPhoto.photo.id}
+      data-photo-viewer-motion="continuous"
       style={deskStyles.viewerBackdrop}
       role="dialog"
       aria-modal="true"
@@ -1380,13 +1386,32 @@ function DeskPhotoViewer({
       tabIndex={-1}
       onKeyDown={handleModalKeyDown}
       onClick={requestModalClose}
+      initial={{ opacity: reduceMotion ? 1 : 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: reduceMotion ? 1 : 0 }}
+      transition={{ duration: reduceMotion ? 0 : 0.16, ease: "easeOut" }}
     >
-      <section
+      <motion.section
         style={{
           ...deskStyles.viewerPanel,
           ...(isOwnPhoto ? deskStyles.viewerPanelOwn : {}),
         }}
         onClick={(event) => event.stopPropagation()}
+        initial={{
+          opacity: reduceMotion ? 1 : 0,
+          scale: reduceMotion ? 1 : 0.965,
+          y: reduceMotion ? 0 : 8,
+        }}
+        animate={{ opacity: 1, scale: 1, y: 0 }}
+        exit={{
+          opacity: reduceMotion ? 1 : 0,
+          scale: reduceMotion ? 1 : 0.985,
+          y: reduceMotion ? 0 : 4,
+        }}
+        transition={{
+          duration: reduceMotion ? 0 : 0.24,
+          ease: [0.22, 1, 0.36, 1],
+        }}
       >
         {isOwnPhoto ? (
           <div style={deskStyles.viewerOwnTopBar}>
@@ -1488,7 +1513,7 @@ function DeskPhotoViewer({
             しまう
           </AppButton>
         ) : null}
-      </section>
+      </motion.section>
       {isReportSheetOpen && viewerPhoto.kind === "other" ? (
         <AppSheet
           placement="bottom"
@@ -1531,7 +1556,7 @@ function DeskPhotoViewer({
           </div>
         </AppSheet>
       ) : null}
-    </div>
+    </motion.div>
   );
 }
 

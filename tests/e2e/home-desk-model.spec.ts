@@ -1115,6 +1115,7 @@ test.describe("home desk model", () => {
     await expect(viewer).toBeVisible();
     await expect(viewer).toHaveAttribute("data-photo-kind", "own");
     await expect(viewer).toHaveAttribute("data-photo-id", "own-desk");
+    await expect(viewer).toHaveAttribute("data-photo-viewer-motion", "continuous");
     await expect(viewer.getByRole("button", { name: "とじる" })).toBeVisible();
     await expect(viewer.getByTestId("desk-photo-viewer-stow")).toHaveCount(0);
     await expect(viewer.getByRole("button", { name: "とじる" })).toBeFocused();
