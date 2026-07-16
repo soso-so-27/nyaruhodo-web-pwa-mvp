@@ -29,25 +29,16 @@ const kleeOne = localFont({
 });
 
 const zenKakuGothicNew = localFont({
-  src: [
-    {
-      path: "../../public/fonts/zen-kaku-gothic-new-400-subset.woff2",
-      weight: "400",
-      style: "normal",
-    },
-    {
-      path: "../../public/fonts/zen-kaku-gothic-new-500-subset.woff2",
-      weight: "500",
-      style: "normal",
-    },
-  ],
+  src: "../../public/fonts/zen-kaku-gothic-new-400-subset.woff2",
+  weight: "400",
+  style: "normal",
   variable: "--font-zen-kaku",
   display: "swap",
 });
 
 const siteUrl =
   process.env.NEXT_PUBLIC_SITE_URL?.trim() ||
-  "https://nyaruhodo-web-pwa-mvp.vercel.app";
+  "https://nyaruhodo.jp";
 const supabaseOrigin = getOrigin(process.env.NEXT_PUBLIC_SUPABASE_URL);
 const startupImages = [
   { width: 320, height: 568, ratio: 2, file: "640-1136" },
@@ -143,16 +134,6 @@ export default function RootLayout({
             rel="apple-touch-startup-image"
             href={`/splash/startup-envelope-${image.file}-v3.png`}
             media={`screen and (device-width: ${image.width}px) and (device-height: ${image.height}px) and (-webkit-device-pixel-ratio: ${image.ratio}) and (orientation: portrait)`}
-          />
-        ))}
-        {startupImages.map((image) => (
-          <link
-            key={`preload-startup-${image.file}`}
-            rel="preload"
-            as="image"
-            href={`/splash/startup-envelope-${image.file}-v3.png`}
-            media={`screen and (device-width: ${image.width}px) and (device-height: ${image.height}px) and (-webkit-device-pixel-ratio: ${image.ratio}) and (orientation: portrait)`}
-            fetchPriority="high"
           />
         ))}
       </head>

@@ -149,4 +149,49 @@ test.describe("beta release smoke", () => {
       "default-src 'self'",
     );
   });
+
+  test("onboarding exposes a complete social preview", async ({
+    page,
+    request,
+  }) => {
+    await page.goto("/onboarding?src=instagram_bio");
+
+    await expect(page.locator('meta[property="og:title"]')).toHaveAttribute(
+      "content",
+      "ねてるねこ | 猫の寝顔が、よる8時にとどく",
+    );
+    await expect(page.locator('meta[property="og:image"]')).toHaveAttribute(
+      "content",
+      /\/images\/social\/onboarding-og\.webp$/,
+    );
+    await expect(page.locator('meta[name="twitter:card"]')).toHaveAttribute(
+      "content",
+      "summary_large_image",
+    );
+    await expect(page.locator('link[rel="canonical"]')).toHaveAttribute(
+      "href",
+      "https://nyaruhodo.jp/onboarding",
+    );
+
+    const imageResponse = await request.get(
+      "/images/social/onboarding-og.webp",
+    );
+    expect(imageResponse.ok()).toBe(true);
+    expect(imageResponse.headers()["content-type"]).toContain("image/webp");
+  });
+
+  test("regular navigation does not preload the PWA startup artwork", async ({
+    page,
+  }) => {
+    await page.goto("/home");
+
+    await expect(
+      page.locator('link[rel="apple-touch-startup-image"]'),
+    ).not.toHaveCount(0);
+    await expect(
+      page.locator(
+        'link[rel="preload"][href*="/splash/startup-envelope-"]',
+      ),
+    ).toHaveCount(0);
+  });
 });

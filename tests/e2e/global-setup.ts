@@ -7,6 +7,16 @@ const LOCAL_SUPABASE_KEY_MISMATCH = [
   "復旧手順: supabase status の anon key / service role key を .env.local に反映してください。",
 ].join("\n");
 
+const REMOTE_E2E_BLOCKED = [
+  "E2Eの接続先がlocalhostではありません。誤って本番データへ書き込む可能性があるため停止しました。",
+  "意図してリモート環境を検証する場合だけ PLAYWRIGHT_ALLOW_REMOTE_BASE_URL=1 を指定してください。",
+].join("\n");
+
+const TEST_SERVER_MISMATCH = [
+  "起動中のテストサーバーがローカルSupabaseを参照していません。",
+  "既存のdev serverを停止し、.env.localを確認してからE2Eを再実行してください。",
+].join("\n");
+
 function readEnvFile(filePath: string): Record<string, string> {
   if (!fs.existsSync(filePath)) {
     return {};
@@ -52,6 +62,27 @@ function isLocalSupabaseUrl(value: string): boolean {
   }
 }
 
+function isLoopbackUrl(value: string): boolean {
+  try {
+    const hostname = new URL(value).hostname;
+    return (
+      hostname === "127.0.0.1" ||
+      hostname === "localhost" ||
+      hostname === "[::1]"
+    );
+  } catch {
+    return false;
+  }
+}
+
+function getOrigin(value: string): string {
+  try {
+    return new URL(value).origin;
+  } catch {
+    return "";
+  }
+}
+
 function isAuthError(status: number, body: string): boolean {
   return (
     status === 401 ||
@@ -68,9 +99,18 @@ export default async function globalSetup() {
   const localEnv = readEnvFile(path.resolve(process.cwd(), ".env.local"));
   const supabaseUrl = resolveEnv(localEnv, "NEXT_PUBLIC_SUPABASE_URL");
   const anonKey = resolveEnv(localEnv, "NEXT_PUBLIC_SUPABASE_ANON_KEY");
+  const baseUrl = process.env.PLAYWRIGHT_BASE_URL ?? "http://localhost:3000";
+  const isLocalBaseUrl = isLoopbackUrl(baseUrl);
+
+  if (!isLocalBaseUrl) {
+    if (process.env.PLAYWRIGHT_ALLOW_REMOTE_BASE_URL !== "1") {
+      throw new Error(`${REMOTE_E2E_BLOCKED}\nbaseURL=${baseUrl}`);
+    }
+    return;
+  }
 
   if (!isLocalSupabaseUrl(supabaseUrl)) {
-    return;
+    throw new Error(`${TEST_SERVER_MISMATCH}\nexpected=${supabaseUrl || "missing"}`);
   }
 
   if (!anonKey || anonKey === "test-anon-key") {
@@ -96,19 +136,55 @@ export default async function globalSetup() {
   }
 
   const body = await response.text();
-  if (response.ok) {
-    return;
+  if (!response.ok) {
+    if (isAuthError(response.status, body)) {
+      throw new Error(`${LOCAL_SUPABASE_KEY_MISMATCH}\nstatus=${response.status}`);
+    }
+
+    throw new Error(
+      [
+        "ローカルSupabaseのプリフライトクエリに失敗しました。",
+        `status=${response.status}`,
+        body.slice(0, 300),
+      ].join("\n"),
+    );
   }
 
-  if (isAuthError(response.status, body)) {
-    throw new Error(`${LOCAL_SUPABASE_KEY_MISMATCH}\nstatus=${response.status}`);
+  const runtimeConfigUrl = new URL("/api/test/runtime-config", baseUrl);
+  let runtimeResponse: Response;
+  try {
+    runtimeResponse = await fetch(runtimeConfigUrl, { cache: "no-store" });
+  } catch (error) {
+    throw new Error(
+      [
+        "テストサーバーの接続先を確認できませんでした。dev serverを再起動してください。",
+        error instanceof Error ? error.message : String(error),
+      ].join("\n"),
+    );
   }
 
-  throw new Error(
-    [
-      "ローカルSupabaseのプリフライトクエリに失敗しました。",
-      `status=${response.status}`,
-      body.slice(0, 300),
-    ].join("\n"),
-  );
+  if (!runtimeResponse.ok) {
+    throw new Error(
+      `${TEST_SERVER_MISMATCH}\nruntime probe status=${runtimeResponse.status}`,
+    );
+  }
+
+  const runtimeConfig = (await runtimeResponse.json()) as {
+    supabaseOrigin?: unknown;
+  };
+  const expectedOrigin = getOrigin(supabaseUrl);
+  const actualOrigin =
+    typeof runtimeConfig.supabaseOrigin === "string"
+      ? runtimeConfig.supabaseOrigin
+      : "";
+
+  if (!actualOrigin || actualOrigin !== expectedOrigin) {
+    throw new Error(
+      [
+        TEST_SERVER_MISMATCH,
+        `expected=${expectedOrigin}`,
+        `actual=${actualOrigin || "missing"}`,
+      ].join("\n"),
+    );
+  }
 }
