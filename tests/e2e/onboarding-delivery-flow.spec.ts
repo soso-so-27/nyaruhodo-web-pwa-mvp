@@ -1,4 +1,5 @@
 import { devices, expect, test, type Locator, type Page } from "@playwright/test";
+import { encode } from "jpeg-js";
 
 const testPng = Buffer.from(
   "iVBORw0KGgoAAAANSUhEUgAAAGQAAABkCAYAAABw4pVUAAAAAXNSR0IArs4c6QAAAARnQU1BAACxjwv8YQUAAAAJcEhZcwAADsMAAA7DAcdvqGQAAAEJSURBVHhe7dExEcAgAMBAJKKuTpnpjoLA/fACchlrzv2C+a0njDPsVmfYrQyJMSTGkBhDYgyJMSTGkBhDYgyJMSTGkBhDYgyJMSTGkBhDYgyJMSTGkBhDYgyJMSTGkBhDYgyJMSTGkBhDYgyJMSTGkBhDYgyJMSTGkBhDYgyJMSTGkBhDYgyJMSTGkBhDYgyJMSTGkBhDYgyJMSTGkBhDYgyJMSTGkBhDYgyJMSTGkBhDYgyJMSTGkBhDYgyJMSTGkBhDYgyJMSTGkBhDYgyJMSTGkBhDYgyJMSTGkBhDYgyJMSTGkBhDYgyJMSTmB4RCEqdGtA/tAAAAAElFTkSuQmCC",
@@ -11,6 +12,14 @@ const testJpeg = Buffer.from(
 );
 
 const orientedTestJpeg = withExifOrientation(testJpeg, 6);
+const wideTestJpegPixels = Buffer.alloc(1601 * 4, 180);
+for (let offset = 3; offset < wideTestJpegPixels.length; offset += 4) {
+  wideTestJpegPixels[offset] = 255;
+}
+const wideTestJpeg = encode(
+  { data: wideTestJpegPixels, width: 1601, height: 1 },
+  80,
+).data;
 const portraitDeliveryDataUrl = `data:image/jpeg;base64,${orientedTestJpeg.toString(
   "base64",
 )}`;
@@ -1271,6 +1280,104 @@ test.describe("onboarding delivery flow", () => {
     ).toBeVisible();
   });
 
+  test("stabilizes a LINE photo with FileReader when Blob.arrayBuffer is unavailable", async ({
+    page,
+  }) => {
+    await page.addInitScript(() => {
+      Object.defineProperty(window.navigator, "userAgent", {
+        configurable: true,
+        get: () =>
+          "Mozilla/5.0 (Linux; Android 14; Pixel 7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Mobile Safari/537.36 Line/14.0.0",
+      });
+
+      const originalArrayBuffer = Blob.prototype.arrayBuffer;
+      Blob.prototype.arrayBuffer = function arrayBuffer() {
+        return this instanceof File
+          ? Promise.reject(new DOMException("content URI is unavailable to Blob.arrayBuffer"))
+          : originalArrayBuffer.call(this);
+      };
+      const originalCreateImageBitmap = window.createImageBitmap.bind(window);
+      window.createImageBitmap = ((...args: Parameters<typeof createImageBitmap>) => {
+        if (args[0] instanceof Blob && !(args[0] instanceof File)) {
+          (window as typeof window & { __decodedStableLineBlob?: boolean })
+            .__decodedStableLineBlob = true;
+        }
+        return originalCreateImageBitmap(...args);
+      }) as typeof createImageBitmap;
+    });
+    await routeImmediateDelivery(page);
+
+    await page.goto("/onboarding?source=instagram_dm");
+    await page.getByRole("button", { name: "このまま試す" }).click();
+    await page.getByTestId("onboarding-photo-select").click();
+    await page.locator('input[type="file"]').last().setInputFiles({
+      name: "line-filereader-photo.jpg",
+      mimeType: "image/jpeg",
+      buffer: orientedTestJpeg,
+    });
+
+    await expect(
+      page.getByRole("button", { name: "ねこだよりを ひらく" }),
+    ).toBeVisible();
+    expect(
+      await page.evaluate(
+        () =>
+          (window as typeof window & { __decodedStableLineBlob?: boolean })
+            .__decodedStableLineBlob,
+      ),
+    ).toBe(true);
+  });
+
+  test("uses a constrained bitmap decode for a large Android LINE photo", async ({
+    page,
+  }) => {
+    await page.addInitScript(() => {
+      Object.defineProperty(window.navigator, "userAgent", {
+        configurable: true,
+        get: () =>
+          "Mozilla/5.0 (Linux; Android 14; Pixel 7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Mobile Safari/537.36 Line/14.0.0",
+      });
+
+      const originalCreateImageBitmap = window.createImageBitmap.bind(window);
+      window.createImageBitmap = ((...args: Parameters<typeof createImageBitmap>) => {
+        const options = args[1] as ImageBitmapOptions | undefined;
+        const constrainedSize = options?.resizeWidth ?? options?.resizeHeight;
+        if (!constrainedSize) {
+          return Promise.reject(new DOMException("full-size bitmap decode exceeded memory"));
+        }
+
+        (
+          window as typeof window & { __lineBitmapDecodeSizes?: number[] }
+        ).__lineBitmapDecodeSizes ??= [];
+        (
+          window as typeof window & { __lineBitmapDecodeSizes: number[] }
+        ).__lineBitmapDecodeSizes.push(constrainedSize);
+        return originalCreateImageBitmap(args[0]);
+      }) as typeof createImageBitmap;
+    });
+    await routeImmediateDelivery(page);
+
+    await page.goto("/onboarding?source=instagram_dm");
+    await page.getByRole("button", { name: "このまま試す" }).click();
+    await page.getByTestId("onboarding-photo-select").click();
+    await page.locator('input[type="file"]').last().setInputFiles({
+      name: "line-large-photo.jpg",
+      mimeType: "image/jpeg",
+      buffer: wideTestJpeg,
+    });
+
+    await expect(
+      page.getByRole("button", { name: "ねこだよりを ひらく" }),
+    ).toBeVisible();
+    expect(
+      await page.evaluate(
+        () =>
+          (window as typeof window & { __lineBitmapDecodeSizes?: number[] })
+            .__lineBitmapDecodeSizes,
+      ),
+    ).toContain(1200);
+  });
+
   test("recovers from a slow Android photo provider without another selection", async ({
     page,
   }) => {
@@ -1488,7 +1595,11 @@ test.describe("onboarding delivery flow", () => {
     await expect(page.getByTestId("onboarding-photo-select")).toBeVisible();
   });
 
-  test("rejects a renamed non-image after the decoder check", async ({ page }) => {
+  test("allows another selection after rejecting a renamed non-image", async ({
+    page,
+  }) => {
+    test.slow();
+    await routeImmediateDelivery(page);
     await page.goto("/onboarding");
     await page.getByTestId("onboarding-photo-select").click();
     await page.locator('input[type="file"]').last().setInputFiles({
@@ -1503,6 +1614,16 @@ test.describe("onboarding delivery flow", () => {
       ),
     ).toBeVisible();
     await expect(page.getByTestId("onboarding-photo-select")).toBeVisible();
+
+    await page.getByTestId("onboarding-photo-select").click();
+    await page.locator('input[type="file"]').last().setInputFiles({
+      name: "valid-after-decode-error.jpg",
+      mimeType: "image/jpeg",
+      buffer: orientedTestJpeg,
+    });
+    await expect(
+      page.getByRole("button", { name: "ねこだよりを ひらく" }),
+    ).toBeVisible();
   });
 
   test("offers a retry when the delivered onboarding photo cannot load", async ({

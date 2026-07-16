@@ -2,7 +2,10 @@
 
 import { trackProductEvent } from "./analytics/productAnalytics";
 import { isAnonymousSupabaseUser } from "./auth/anonymousAuth";
-import { readImageFileDimensions } from "./imageResize";
+import {
+  getStableImageFileForPersistence,
+  readImageFileDimensions,
+} from "./imageResize";
 import { assertSupportedImageFile } from "./imageFileValidation";
 import {
   getStoragePhotoPath,
@@ -59,17 +62,20 @@ export async function queueOriginalPhotoPreservation({
   displaySrc = null,
   catId = null,
 }: QueueOriginalPhotoInput) {
-  assertSupportedImageFile(file);
+  const stableFile = getStableImageFileForPersistence(file);
+  assertSupportedImageFile(stableFile);
 
   const pending: PendingOriginalPhoto = {
     key: buildOriginalPhotoQueueKey(sourceSurface, localAssetId),
-    blob: file,
+    blob: stableFile,
     catId,
     displaySrc,
-    fileName: file.name || `${sourceSurface}.jpg`,
-    lastModified: Number.isFinite(file.lastModified) ? file.lastModified : null,
+    fileName: stableFile.name || `${sourceSurface}.jpg`,
+    lastModified: Number.isFinite(stableFile.lastModified)
+      ? stableFile.lastModified
+      : null,
     localAssetId,
-    mimeType: resolveOriginalContentType(file.type, file.name),
+    mimeType: resolveOriginalContentType(stableFile.type, stableFile.name),
     ownerUserId: null,
     queuedAt: Date.now(),
     sourceSurface,
@@ -83,7 +89,7 @@ export async function queueOriginalPhotoPreservation({
   trackProductEvent("photo_original_queued", {
     source_surface: sourceSurface,
     queued_locally: queued,
-    file_size_bucket: getOriginalFileSizeBucket(file.size),
+    file_size_bucket: getOriginalFileSizeBucket(stableFile.size),
   });
 
   const ownerUserId = await readSignedInOwnerUserId();

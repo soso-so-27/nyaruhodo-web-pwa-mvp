@@ -499,6 +499,10 @@ export function OnboardingFlow() {
         input.remove();
       }, 0);
     };
+    const releasePhotoSelection = () => {
+      isSubmittingRef.current = false;
+      cleanupInput();
+    };
 
     input.onchange = async () => {
       const file = input.files?.[0];
@@ -574,6 +578,7 @@ export function OnboardingFlow() {
           setMessage("写真を保存できませんでした。少し時間をおいて、もう一度試してください。");
           setSelectedPhotoSrc("");
           setState("intro");
+          releasePhotoSelection();
           return;
         }
       } catch (error) {
@@ -602,10 +607,12 @@ export function OnboardingFlow() {
         );
         setSelectedPhotoSrc("");
         setState("intro");
+        releasePhotoSelection();
         return;
       }
 
       if (!savedResult) {
+        releasePhotoSelection();
         return;
       }
 
@@ -703,8 +710,7 @@ export function OnboardingFlow() {
         );
         setState("empty");
       } finally {
-        isSubmittingRef.current = false;
-        cleanupInput();
+        releasePhotoSelection();
       }
     };
 
