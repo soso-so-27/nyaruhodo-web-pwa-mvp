@@ -89,6 +89,7 @@ import {
   preloadStoragePhotoSignedUrls,
 } from "../ui/StoredPhotoImage";
 import { color, radius, shadow } from "../ui/designTokens";
+import { tayoriPhotoFrameStyles } from "../ui/tayoriPhotoFrameStyles";
 import { useModalBehavior } from "../ui/useModalBehavior";
 
 const COLLECTION_TEXT = "var(--ink)";
@@ -6226,15 +6227,12 @@ const styles = {
   mainichiNaturalFrame: {
     width: "100%",
     height: "100%",
-    border: "1px solid rgba(255, 255, 255, 0.84)",
-    borderRadius: 0,
-    background: "var(--paper-card)",
-    boxShadow: "0 5px 8px rgba(72, 58, 39, 0.16)",
+    ...tayoriPhotoFrameStyles.frame,
   },
   mainichiNaturalPhotoImage: {
     width: "100%",
     height: "100%",
-    display: "block",
+    ...tayoriPhotoFrameStyles.image,
   },
   mainichiBoardTape: {
     position: "absolute",

@@ -3468,76 +3468,91 @@ function EveningDeliveryOpening({
         data-photo-id={state.deliveredPhoto.id}
         onClick={(event) => event.stopPropagation()}
       >
-        <p id="evening-opening-title" style={styles.eveningOpeningTitle}>
-          ねこだより
-        </p>
         <div
-          style={{
-            ...styles.eveningOpeningPhotoFrame,
-            ...(isClosing ? styles.eveningOpeningPhotoFrameClosing : {}),
-          }}
-          data-testid="evening-opening-photo-frame"
+          style={styles.eveningOpeningLetter}
+          data-testid="evening-opening-letter"
         >
-          <StoredPhotoImage
-            key={`evening-opening-photo-${photoRetryKey}`}
-            src={getPhotoDetailSrc(state.deliveredPhoto)}
-            fallbackSrcs={getPhotoFallbackSrcs(state.deliveredPhoto)}
-            alt="届いたねがお"
-            style={styles.eveningOpeningPhoto}
-            storageVariant={getPhotoStorageVariant(state.deliveredPhoto, "detail")}
-            loading="eager"
-            onStorageDataUrl={onStorageDataUrl}
-            onLoad={() => {
-              setIsPhotoReady(true);
-              setHasPhotoError(false);
-            }}
-            onError={() => {
-              setIsPhotoReady(false);
-              setHasPhotoError(true);
-            }}
-          />
-          {!isPhotoReady && !hasPhotoError ? (
-            <p
-              data-testid="evening-opening-photo-loading"
-              style={styles.eveningOpeningPhotoLoading}
-              role="status"
-            >
-              ひらいています…
-            </p>
-          ) : null}
-        </div>
-        {hasPhotoError ? (
           <div
-            data-testid="evening-opening-photo-error"
-            role="alert"
-            style={styles.eveningOpeningRecoveryPanel}
+            style={styles.eveningOpeningMasthead}
+            data-testid="evening-opening-masthead"
           >
-            <p style={styles.eveningOpeningRecoveryText}>
-              写真を表示できませんでした。通信を確認して、もう一度お試しください。
+            <p id="evening-opening-title" style={styles.eveningOpeningTitle}>
+              ねこだより
             </p>
-            <AppButton
-              type="button"
-              variant="quiet"
-              size="md"
-              onClick={() => {
-                setHasPhotoError(false);
-                setIsPhotoReady(false);
-                setPhotoRetryKey((value) => value + 1);
-              }}
-            >
-              写真をもう一度読み込む
-            </AppButton>
+            <span style={styles.eveningOpeningMastheadRule} aria-hidden="true" />
           </div>
-        ) : null}
-        <p style={styles.eveningOpeningSavedNote}>
-          {isFirstDelivery ? (
-            <>
-              どこかのおうちから届いた一通です。
-              <br />
-            </>
+          <div
+            style={{
+              ...styles.eveningOpeningPhotoFrame,
+              ...(isClosing ? styles.eveningOpeningPhotoFrameClosing : {}),
+            }}
+            data-testid="evening-opening-photo-frame"
+            data-photo-frame="f3"
+          >
+            <StoredPhotoImage
+              key={`evening-opening-photo-${photoRetryKey}`}
+              src={getPhotoDetailSrc(state.deliveredPhoto)}
+              fallbackSrcs={getPhotoFallbackSrcs(state.deliveredPhoto)}
+              alt="届いたねがお"
+              style={styles.eveningOpeningPhoto}
+              storageVariant={getPhotoStorageVariant(state.deliveredPhoto, "detail")}
+              loading="eager"
+              onStorageDataUrl={onStorageDataUrl}
+              onLoad={() => {
+                setIsPhotoReady(true);
+                setHasPhotoError(false);
+              }}
+              onError={() => {
+                setIsPhotoReady(false);
+                setHasPhotoError(true);
+              }}
+            />
+            {!isPhotoReady && !hasPhotoError ? (
+              <p
+                data-testid="evening-opening-photo-loading"
+                style={styles.eveningOpeningPhotoLoading}
+                role="status"
+              >
+                ひらいています…
+              </p>
+            ) : null}
+          </div>
+          {hasPhotoError ? (
+            <div
+              data-testid="evening-opening-photo-error"
+              role="alert"
+              style={styles.eveningOpeningRecoveryPanel}
+            >
+              <p style={styles.eveningOpeningRecoveryText}>
+                写真を表示できませんでした。通信を確認して、もう一度お試しください。
+              </p>
+              <AppButton
+                type="button"
+                variant="quiet"
+                size="md"
+                onClick={() => {
+                  setHasPhotoError(false);
+                  setIsPhotoReady(false);
+                  setPhotoRetryKey((value) => value + 1);
+                }}
+              >
+                写真をもう一度読み込む
+              </AppButton>
+            </div>
           ) : null}
-          この一通は、『とどいた』にしまわれました
-        </p>
+          <p style={styles.eveningOpeningSavedNote}>
+            {isFirstDelivery ? (
+              <>
+                どこかのおうちから届いた一通です。
+                <br />
+              </>
+            ) : null}
+            この一通は、
+            <span style={styles.eveningOpeningSavedPhrase}>
+              『とどいた』にしまわれました
+            </span>
+          </p>
+        </div>
         <button
           ref={actionButtonRef}
           type="button"
@@ -7644,9 +7659,15 @@ const styles = {
     gap: "18px",
     justifyItems: "center",
   },
+  eveningOpeningLetter: {
+    ...deliveredLetterStyles.sheet,
+    width: "min(calc(100vw - 32px), 406px, calc(100dvh - 224px))",
+  },
+  eveningOpeningMasthead: {
+    ...deliveredLetterStyles.masthead,
+  },
   eveningOpeningPhotoFrame: {
     ...deliveredLetterStyles.photoFrame,
-    width: "min(calc(100vw - 40px), 390px, calc(100dvh - 254px))",
   },
   eveningOpeningPhotoFrameClosing: {
     opacity: 0,
@@ -7690,8 +7711,14 @@ const styles = {
   eveningOpeningTitle: {
     ...deliveredLetterStyles.title,
   },
+  eveningOpeningMastheadRule: {
+    ...deliveredLetterStyles.mastheadRule,
+  },
   eveningOpeningSavedNote: {
     ...deliveredLetterStyles.note,
+  },
+  eveningOpeningSavedPhrase: {
+    ...deliveredLetterStyles.savedPhrase,
   },
   eveningOpeningTomorrowButton: {
     ...deliveredLetterStyles.action,

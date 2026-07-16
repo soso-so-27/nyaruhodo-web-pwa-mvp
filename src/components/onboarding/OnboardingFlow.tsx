@@ -1509,68 +1509,86 @@ export function OnboardingFlow() {
             style={{ ...styles.result, ...styles.deliveredResult }}
             aria-label="とどいたねがお"
           >
-            <p
-              style={styles.onboardingDeliveredTitle}
-              data-testid="onboarding-delivered-title"
-            >
-              ねこだより
-            </p>
             <div
-              style={styles.onboardingDeliveredPhotoFrame}
-              data-testid="onboarding-delivered-photos"
+              style={styles.onboardingDeliveredLetter}
+              data-testid="onboarding-delivered-letter"
             >
-              <StoredPhotoImage
-                key={`onboarding-delivery-opened-${revealPhotoRetryKey}`}
-                src={getExchangePhotoDisplaySrc(deliveredPhoto)}
-                fallbackSrcs={getExchangePhotoFallbackSrcs(deliveredPhoto)}
-                alt="届いたねがお"
-                style={styles.onboardingDeliveredPhoto}
-                storageVariant="display"
-                onStorageDataUrl={handleDeliveredPhotoDataUrl}
-                onLoad={handleRevealPhotoLoaded}
-                onError={handleRevealPhotoError}
-              />
-              {!isRevealPhotoReady && !hasRevealPhotoError ? (
-                <p
-                  data-testid="onboarding-delivery-photo-loading"
-                  style={styles.onboardingDeliveredPhotoLoading}
-                  role="status"
-                >
-                  ひらいています…
-                </p>
-              ) : null}
-            </div>
-            {hasRevealPhotoError ? (
               <div
-                data-testid="onboarding-delivery-photo-error"
-                role="alert"
-                style={styles.recoveryPanel}
+                style={styles.onboardingDeliveredMasthead}
+                data-testid="onboarding-delivered-masthead"
               >
-                <p style={styles.recoveryText}>
-                  届いた写真を表示できませんでした。通信を確認して、もう一度お試しください。
-                </p>
-                <AppButton
-                  type="button"
-                  variant="quiet"
-                  size="md"
-                  onClick={handleRetryRevealPhoto}
-                  data-testid="onboarding-delivery-photo-retry"
+                <p
+                  style={styles.onboardingDeliveredTitle}
+                  data-testid="onboarding-delivered-title"
                 >
-                  写真をもう一度読み込む
-                </AppButton>
+                  ねこだより
+                </p>
+                <span
+                  style={styles.onboardingDeliveredMastheadRule}
+                  aria-hidden="true"
+                />
               </div>
-            ) : null}
-            <p style={styles.onboardingDeliveredNote}>
-              {isDeliveredPhotoKept ? (
-                <>
-                  どこかのおうちから届いた一通です。
-                  <br />
-                  この一通は、『とどいた』にしまわれました
-                </>
-              ) : (
-                "この一通を、しまっています。"
-              )}
-            </p>
+              <div
+                style={styles.onboardingDeliveredPhotoFrame}
+                data-testid="onboarding-delivered-photos"
+                data-photo-frame="f3"
+              >
+                <StoredPhotoImage
+                  key={`onboarding-delivery-opened-${revealPhotoRetryKey}`}
+                  src={getExchangePhotoDisplaySrc(deliveredPhoto)}
+                  fallbackSrcs={getExchangePhotoFallbackSrcs(deliveredPhoto)}
+                  alt="届いたねがお"
+                  style={styles.onboardingDeliveredPhoto}
+                  storageVariant="display"
+                  onStorageDataUrl={handleDeliveredPhotoDataUrl}
+                  onLoad={handleRevealPhotoLoaded}
+                  onError={handleRevealPhotoError}
+                />
+                {!isRevealPhotoReady && !hasRevealPhotoError ? (
+                  <p
+                    data-testid="onboarding-delivery-photo-loading"
+                    style={styles.onboardingDeliveredPhotoLoading}
+                    role="status"
+                  >
+                    ひらいています…
+                  </p>
+                ) : null}
+              </div>
+              {hasRevealPhotoError ? (
+                <div
+                  data-testid="onboarding-delivery-photo-error"
+                  role="alert"
+                  style={styles.recoveryPanel}
+                >
+                  <p style={styles.recoveryText}>
+                    届いた写真を表示できませんでした。通信を確認して、もう一度お試しください。
+                  </p>
+                  <AppButton
+                    type="button"
+                    variant="quiet"
+                    size="md"
+                    onClick={handleRetryRevealPhoto}
+                    data-testid="onboarding-delivery-photo-retry"
+                  >
+                    写真をもう一度読み込む
+                  </AppButton>
+                </div>
+              ) : null}
+              <p style={styles.onboardingDeliveredNote}>
+                {isDeliveredPhotoKept ? (
+                  <>
+                    どこかのおうちから届いた一通です。
+                    <br />
+                    この一通は、
+                    <span style={styles.onboardingDeliveredSavedPhrase}>
+                      『とどいた』にしまわれました
+                    </span>
+                  </>
+                ) : (
+                  "この一通を、しまっています。"
+                )}
+              </p>
+            </div>
             <AppButton
               type="button"
               onClick={
@@ -2796,14 +2814,23 @@ const styles = {
     pointerEvents: "none",
   },
   deliveredResult: {
-    gap: "11px",
+    gap: "12px",
+  },
+  onboardingDeliveredLetter: {
+    ...deliveredLetterStyles.sheet,
+    width: "min(calc(100vw - 48px), 350px, calc(100dvh - 238px))",
+  },
+  onboardingDeliveredMasthead: {
+    ...deliveredLetterStyles.masthead,
   },
   onboardingDeliveredTitle: {
     ...deliveredLetterStyles.title,
   },
+  onboardingDeliveredMastheadRule: {
+    ...deliveredLetterStyles.mastheadRule,
+  },
   onboardingDeliveredPhotoFrame: {
     ...deliveredLetterStyles.photoFrame,
-    width: "min(calc(100vw - 48px), 340px, calc(100dvh - 260px))",
   },
   onboardingDeliveredPhoto: {
     ...deliveredLetterStyles.photo,
@@ -2814,6 +2841,9 @@ const styles = {
   },
   onboardingDeliveredNote: {
     ...deliveredLetterStyles.note,
+  },
+  onboardingDeliveredSavedPhrase: {
+    ...deliveredLetterStyles.savedPhrase,
   },
   onboardingDeliveredContinue: {
     ...deliveredLetterStyles.action,

@@ -199,8 +199,75 @@ test.describe("home sleeping exchange flow", () => {
     const openButton = page.getByTestId("desk-open-letter");
     await openButton.click();
     const openingPanel = page.getByTestId("evening-opening-pair");
-    await expect(openingPanel.locator("img")).toHaveCount(1);
-    await expect(openingPanel).toContainText("この一通は、『とどいた』にしまわれました");
+    const deliveredLetter = openingPanel.getByTestId("evening-opening-letter");
+    await expect(deliveredLetter.locator("img")).toHaveCount(1);
+    await expect(
+      deliveredLetter.getByTestId("evening-opening-photo-frame"),
+    ).toHaveAttribute("data-photo-frame", "f3");
+    await expect(deliveredLetter).toContainText("ねこだより");
+    await expect(deliveredLetter).toContainText(
+      "この一通は、『とどいた』にしまわれました",
+    );
+    await expect(
+      deliveredLetter.getByRole("button", { name: "また、あした" }),
+    ).toHaveCount(0);
+    const deliveredLetterStyles = await deliveredLetter.evaluate((letter) => {
+      const frame = letter.querySelector<HTMLElement>(
+        '[data-testid="evening-opening-photo-frame"]',
+      );
+      const letterStyle = getComputedStyle(letter);
+      const frameStyle = frame ? getComputedStyle(frame) : null;
+
+      return {
+        letterPaddingTop: letterStyle.paddingTop,
+        letterBorderRadius: letterStyle.borderRadius,
+        letterBorderWidth: letterStyle.borderTopWidth,
+        letterBackgroundImage: letterStyle.backgroundImage,
+        framePaddingTop: frameStyle?.paddingTop ?? "",
+        frameBorderWidth: frameStyle?.borderTopWidth ?? "",
+        frameShadow: frameStyle?.boxShadow ?? "",
+      };
+    });
+    expect(deliveredLetterStyles.letterPaddingTop).toBe("0px");
+    expect(deliveredLetterStyles.letterBorderRadius).toBe("0px");
+    expect(deliveredLetterStyles.letterBorderWidth).toBe("0px");
+    expect(deliveredLetterStyles.letterBackgroundImage).toBe("none");
+    expect(deliveredLetterStyles.framePaddingTop).toBe("0px");
+    expect(deliveredLetterStyles.frameBorderWidth).toBe("1px");
+    expect(deliveredLetterStyles.frameShadow).not.toBe("none");
+    if (process.env.CAPTURE_DELIVERED_LETTER === "1") {
+      await page.screenshot({
+        path: "artifacts/home-evening-opening-letter.png",
+        animations: "disabled",
+      });
+    }
+    await page.setViewportSize({ width: 320, height: 568 });
+    const compactActionBounds = await openingPanel
+      .getByRole("button", { name: "また、あした" })
+      .evaluate((button) => {
+        const rect = button.getBoundingClientRect();
+        return {
+          top: rect.top,
+          bottom: rect.bottom,
+          viewportHeight: window.innerHeight,
+        };
+      });
+    expect(compactActionBounds.top).toBeGreaterThanOrEqual(0);
+    expect(compactActionBounds.bottom).toBeLessThanOrEqual(
+      compactActionBounds.viewportHeight,
+    );
+    if (process.env.CAPTURE_DELIVERED_LETTER === "1") {
+      await page.evaluate(
+        () =>
+          new Promise<void>((resolve) => {
+            requestAnimationFrame(() => requestAnimationFrame(() => resolve()));
+          }),
+      );
+      await page.screenshot({
+        path: "artifacts/home-evening-opening-letter-320x568.png",
+        animations: "disabled",
+      });
+    }
     await expect(openingPanel.getByRole("button", { name: "閉じる" })).toHaveCount(0);
     await expect(openingPanel.locator("button")).toHaveCount(1);
     await openingPanel.getByRole("button", { name: "また、あした" }).click();

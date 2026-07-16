@@ -342,7 +342,14 @@ test.describe("onboarding delivery flow", () => {
     ).toBeVisible();
     await expect(page.getByTestId("home-install-invitation")).toHaveCount(0);
     await expect(page.getByTestId("onboarding-delivered-photos").locator("img")).toHaveCount(1);
+    await expect(page.getByTestId("onboarding-delivered-photos")).toHaveAttribute(
+      "data-photo-frame",
+      "f3",
+    );
     const deliveredLayout = await page.evaluate(() => {
+      const letter = document.querySelector<HTMLElement>(
+        '[data-testid="onboarding-delivered-letter"]',
+      );
       const frame = document.querySelector<HTMLElement>(
         '[data-testid="onboarding-delivered-photos"]',
       );
@@ -355,6 +362,7 @@ test.describe("onboarding delivery flow", () => {
       const frameRect = frame?.getBoundingClientRect();
       const titleRect = title?.getBoundingClientRect();
       const buttonRect = button?.getBoundingClientRect();
+      const letterStyle = letter ? window.getComputedStyle(letter) : null;
       const frameStyle = frame ? window.getComputedStyle(frame) : null;
       const photoStyle = frame?.querySelector("img")
         ? window.getComputedStyle(frame.querySelector("img")!)
@@ -369,8 +377,15 @@ test.describe("onboarding delivery flow", () => {
         buttonBottom: buttonRect?.bottom ?? Number.POSITIVE_INFINITY,
         viewportWidth: window.innerWidth,
         viewportHeight: window.innerHeight,
-        paddingTop: frameStyle?.paddingTop ?? "",
-        borderRadius: frameStyle?.borderRadius ?? "",
+        letterContainsButton: Boolean(letter?.contains(button)),
+        letterPaddingTop: letterStyle?.paddingTop ?? "",
+        letterBorderRadius: letterStyle?.borderRadius ?? "",
+        letterBorderWidth: letterStyle?.borderTopWidth ?? "",
+        letterBackgroundImage: letterStyle?.backgroundImage ?? "",
+        framePaddingTop: frameStyle?.paddingTop ?? "",
+        frameBorderRadius: frameStyle?.borderRadius ?? "",
+        frameBorderWidth: frameStyle?.borderTopWidth ?? "",
+        frameShadow: frameStyle?.boxShadow ?? "",
         objectFit: photoStyle?.objectFit ?? "",
       };
     });
@@ -383,9 +398,31 @@ test.describe("onboarding delivery flow", () => {
     expect(deliveredLayout.buttonBottom).toBeLessThanOrEqual(
       deliveredLayout.viewportHeight,
     );
-    expect(deliveredLayout.paddingTop).toBe("2px");
-    expect(deliveredLayout.borderRadius).toBe("8px");
+    expect(deliveredLayout.letterContainsButton).toBe(false);
+    expect(deliveredLayout.letterPaddingTop).toBe("0px");
+    expect(deliveredLayout.letterBorderRadius).toBe("0px");
+    expect(deliveredLayout.letterBorderWidth).toBe("0px");
+    expect(deliveredLayout.letterBackgroundImage).toBe("none");
+    expect(deliveredLayout.framePaddingTop).toBe("0px");
+    expect(deliveredLayout.frameBorderRadius).toBe("0px");
+    expect(deliveredLayout.frameBorderWidth).toBe("1px");
+    expect(deliveredLayout.frameShadow).not.toBe("none");
     expect(deliveredLayout.objectFit).toBe("contain");
+    await page.setViewportSize({ width: 320, height: 568 });
+    const compactDeliveredLayout = await page
+      .getByTestId("onboarding-delivered-continue")
+      .evaluate((button) => {
+        const rect = button.getBoundingClientRect();
+        return {
+          top: rect.top,
+          bottom: rect.bottom,
+          viewportHeight: window.innerHeight,
+        };
+      });
+    expect(compactDeliveredLayout.top).toBeGreaterThanOrEqual(0);
+    expect(compactDeliveredLayout.bottom).toBeLessThanOrEqual(
+      compactDeliveredLayout.viewportHeight,
+    );
     await expect.poll(() => readKeptExchangePhotoCount(page)).toBe(1);
     await expect(page.getByRole("button", { name: "閉じる" })).toHaveCount(0);
     await expect.poll(() => readKeptExchangePhotoCount(page)).toBe(1);
