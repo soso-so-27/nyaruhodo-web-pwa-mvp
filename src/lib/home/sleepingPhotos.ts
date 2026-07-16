@@ -3,7 +3,10 @@ import {
   isUsablePhotoSrc,
   normalizePersistentPhotoSrc,
 } from "../photoStorage";
-import { completePhotoSourceSet } from "../photoSources";
+import {
+  completePhotoSourceSet,
+  getPhotoContentIdentityKeys,
+} from "../photoSources";
 import { purgePhotoSwCacheForSources } from "../photoSwCache";
 import { readCachedJson, writeCachedJson } from "../storage";
 import { recordDeliveryStorageWritebackTrace } from "./eveningDeliveryTrace";
@@ -713,25 +716,33 @@ export function keepExchangePhoto(photo: ExchangePhoto) {
   }
 
   try {
-    const saved = readKeptExchangePhotos().filter(
+    const existingPhotos = readKeptExchangePhotos();
+    const contentDuplicate = existingPhotos.find((savedPhoto) =>
+      hasMatchingPhotoContent(savedPhoto, persistentPhoto),
+    );
+    const photoToStore = contentDuplicate
+      ? mergeExchangePhotoVersions(contentDuplicate, persistentPhoto)
+      : persistentPhoto;
+    const saved = existingPhotos.filter(
       (savedPhoto) =>
-        savedPhoto.id !== persistentPhoto.id &&
-        (!persistentPhoto.sourcePhotoId ||
-          savedPhoto.sourcePhotoId !== persistentPhoto.sourcePhotoId),
+        savedPhoto.id !== photoToStore.id &&
+        (!photoToStore.sourcePhotoId ||
+          savedPhoto.sourcePhotoId !== photoToStore.sourcePhotoId) &&
+        !hasMatchingPhotoContent(savedPhoto, photoToStore),
     );
     const savedPhotos = writeStorageArrayWithFallback(
       KEPT_EXCHANGE_PHOTO_STORAGE_KEY,
-      [persistentPhoto, ...saved],
+      [photoToStore, ...saved],
       [50, 30, 20, 12, 6, 1],
     );
 
     if (
       savedPhotos.some(
         (savedPhoto) =>
-          savedPhoto.id === persistentPhoto.id ||
+          savedPhoto.id === photoToStore.id ||
           Boolean(
-            persistentPhoto.sourcePhotoId &&
-              savedPhoto.sourcePhotoId === persistentPhoto.sourcePhotoId,
+            photoToStore.sourcePhotoId &&
+              savedPhoto.sourcePhotoId === photoToStore.sourcePhotoId,
           ),
       )
     ) {
@@ -1193,6 +1204,15 @@ function getExchangePhotoIdentityKeys(photo: ExchangePhoto) {
     `id:${photo.id}`,
     photo.sourcePhotoId ? `source:${photo.sourcePhotoId}` : "",
   ].filter(Boolean);
+}
+
+function hasMatchingPhotoContent(
+  first: ExchangePhoto,
+  second: ExchangePhoto,
+) {
+  const firstKeys = new Set(getPhotoContentIdentityKeys(first));
+
+  return getPhotoContentIdentityKeys(second).some((key) => firstKeys.has(key));
 }
 
 function registerExchangePhotoIdentities(

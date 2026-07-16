@@ -1316,9 +1316,14 @@ export function OnboardingFlow() {
             height: 94px !important;
           }
           [data-onboarding-exchange-route="true"] {
-            height: 32px !important;
-            margin: -5px 0 !important;
-            transform: scale(0.78);
+            grid-template-columns: 36px 44px 36px !important;
+            height: 36px !important;
+            margin: 0 0 4px !important;
+            transform: none !important;
+          }
+          [data-onboarding-exchange-route-icon="true"] {
+            width: 36px !important;
+            height: 36px !important;
           }
           [data-onboarding-title="true"] {
             margin-top: 0 !important;
@@ -1334,7 +1339,7 @@ export function OnboardingFlow() {
         }
       `}</style>
       <div style={styles.paperBackground} aria-hidden="true" />
-      <div style={styles.container}>
+      <div style={styles.container} data-testid="onboarding-layout-container">
         {shouldShowBrandHeader ? (
           <WordmarkHeader style={styles.brandHeader} />
         ) : null}
@@ -1741,11 +1746,17 @@ function OnboardingExchangeRoute() {
       aria-hidden="true"
       data-onboarding-exchange-route="true"
     >
-      <span style={styles.exchangeRouteIcon}>
+      <span
+        style={styles.exchangeRouteIcon}
+        data-onboarding-exchange-route-icon="true"
+      >
         <CameraIcon size={21} />
       </span>
       <span style={styles.exchangeRouteLine} />
-      <span style={styles.exchangeRouteIcon}>
+      <span
+        style={styles.exchangeRouteIcon}
+        data-onboarding-exchange-route-icon="true"
+      >
         <MailIcon size={21} />
       </span>
     </div>
@@ -2459,9 +2470,14 @@ const UI_FONT = "var(--font-ui)";
 const styles = {
   page: {
     position: "relative",
+    width: "100%",
+    maxWidth: "100%",
     minHeight: "100dvh",
     overflowX: "hidden",
     overflowY: "auto",
+    boxSizing: "border-box",
+    WebkitTextSizeAdjust: "100%",
+    textSizeAdjust: "100%",
     color: "#2f2a25",
     background: "var(--app-paper-background)",
     backgroundSize: "var(--app-paper-background-size)",
@@ -2482,10 +2498,12 @@ const styles = {
     position: "relative",
     zIndex: 1,
     width: "min(100%, 430px)",
+    maxWidth: "100%",
+    minWidth: 0,
     minHeight: "100dvh",
     margin: "0 auto",
     padding:
-      "calc(42px + env(safe-area-inset-top)) 28px calc(34px + env(safe-area-inset-bottom))",
+      "calc(42px + env(safe-area-inset-top)) clamp(18px, 7vw, 28px) calc(34px + env(safe-area-inset-bottom))",
     display: "grid",
     alignContent: "safe center",
     boxSizing: "border-box",
@@ -2493,15 +2511,21 @@ const styles = {
   brandHeader: {
     position: "fixed",
     top: "calc(42px + env(safe-area-inset-top))",
-    left: "50%",
-    transform: "translateX(-50%)",
+    left: 0,
+    right: 0,
+    width: "100%",
+    transform: "none",
     paddingTop: 0,
+    boxSizing: "border-box",
   },
   hero: {
     display: "grid",
     justifyItems: "center",
     textAlign: "center",
     gap: "12px",
+    width: "100%",
+    minWidth: 0,
+    boxSizing: "border-box",
   },
   externalBrowserGuide: {
     display: "grid",
@@ -2600,7 +2624,7 @@ const styles = {
   onboardingEnvelopeArt: {
     position: "relative",
     display: "block",
-    width: "min(82vw, 304px)",
+    width: "min(100%, 304px)",
     aspectRatio: "1375 / 664",
     margin: "0 auto",
     animation: "onboardingEnvelopeFloat 4.8s ease-in-out infinite",
@@ -2633,6 +2657,7 @@ const styles = {
   },
   title: {
     margin: "8px 0 2px",
+    maxWidth: "100%",
     color: "#3f382e",
     fontFamily: UI_FONT,
     fontSize: "22px",
@@ -2642,6 +2667,7 @@ const styles = {
   },
   lead: {
     margin: 0,
+    width: "100%",
     maxWidth: "286px",
     color: "#6f6757",
     fontFamily: UI_FONT,
@@ -2655,6 +2681,9 @@ const styles = {
     alignItems: "center",
     justifyContent: "center",
     gap: "6px",
+    width: "100%",
+    maxWidth: "286px",
+    flexWrap: "wrap",
     margin: "-2px 0 0",
     color: "#7d7468",
     fontFamily: UI_FONT,
@@ -2673,12 +2702,14 @@ const styles = {
     display: "grid",
     justifyItems: "center",
     gap: "12px",
+    width: "100%",
+    minWidth: 0,
     margin: "4px 0 -2px",
   },
   deliveryWaitingPhotoFrame: {
     ...deliveredLetterStyles.photoFrame,
     display: "block",
-    width: "min(calc(100vw - 96px), 240px, calc(100dvh - 300px))",
+    width: "min(100%, 240px, calc(100dvh - 300px))",
     aspectRatio: "1 / 1",
   },
   deliveryWaitingPhoto: {
@@ -2744,7 +2775,7 @@ const styles = {
   namePreviewPhotoFrame: {
     ...deliveredLetterStyles.photoFrame,
     display: "block",
-    width: "min(calc(100vw - 120px), 220px)",
+    width: "min(100%, 220px)",
     aspectRatio: "1 / 1",
   },
   namePreviewPhoto: {
@@ -2752,6 +2783,8 @@ const styles = {
   },
   nameForm: {
     width: "min(100%, 292px)",
+    maxWidth: "100%",
+    minWidth: 0,
     display: "grid",
     justifyItems: "center",
     gap: "12px",
@@ -2845,9 +2878,13 @@ const styles = {
     justifyItems: "center",
     textAlign: "center",
     gap: "17px",
+    width: "100%",
+    minWidth: 0,
+    boxSizing: "border-box",
   },
   kicker: {
     margin: 0,
+    maxWidth: "100%",
     color: "#6f6757",
     fontFamily: UI_FONT,
     fontSize: "13px",
@@ -2857,6 +2894,7 @@ const styles = {
   },
   subTitle: {
     margin: "6px 0 0",
+    maxWidth: "100%",
     color: "#3f382e",
     fontFamily: UI_FONT,
     fontSize: "22px",
@@ -2903,7 +2941,9 @@ const styles = {
   },
   onboardingDeliveredLetter: {
     ...deliveredLetterStyles.sheet,
-    width: "min(calc(100vw - 48px), 350px)",
+    width: "min(100%, 350px)",
+    maxWidth: "100%",
+    minWidth: 0,
   },
   onboardingDeliveredMasthead: {
     ...deliveredLetterStyles.masthead,
@@ -2929,6 +2969,7 @@ const styles = {
   },
   onboardingDeliveredSavedPhrase: {
     ...deliveredLetterStyles.savedPhrase,
+    whiteSpace: "normal",
   },
   onboardingDeliveredContinue: {
     ...deliveredLetterStyles.action,
@@ -2949,6 +2990,7 @@ const styles = {
   },
   resultText: {
     width: "min(100%, 286px)",
+    maxWidth: "100%",
     margin: 0,
     color: "#6f6757",
     fontFamily: UI_FONT,

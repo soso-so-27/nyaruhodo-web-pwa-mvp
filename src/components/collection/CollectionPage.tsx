@@ -32,6 +32,7 @@ import {
 } from "../../lib/photoStorage";
 import {
   completePhotoSourceSet,
+  getPhotoContentIdentityKeys,
   resolvePhotoFallbackSrcs,
   resolvePhotoSrc,
   resolvePhotoStorageVariant,
@@ -5085,18 +5086,40 @@ function mergeBoxPreviewPhotos(
 ) {
   const photos: Array<BoxPreviewPhoto | null> = [];
   const indexByIdentity = new Map<string, number>();
+  const primaryIndexByContentIdentity = new Map<string, number>();
+  const primaryIndexes = new Set<number>();
 
-  for (const photo of [...primaryPhotos, ...replacementPhotos]) {
+  for (const [source, photo] of [
+    ...primaryPhotos.map((photo) => ["primary", photo] as const),
+    ...replacementPhotos.map((photo) => ["replacement", photo] as const),
+  ]) {
     const matchingIndexes = new Set(
       getBoxPhotoIdentityKeys(photo)
         .map((key) => indexByIdentity.get(key))
         .filter((index): index is number => index !== undefined),
     );
 
+    if (source === "replacement") {
+      for (const key of getPhotoContentIdentityKeys(photo)) {
+        const matchingIndex = primaryIndexByContentIdentity.get(key);
+        if (matchingIndex !== undefined) {
+          matchingIndexes.add(matchingIndex);
+        }
+      }
+    }
+
     if (matchingIndexes.size === 0) {
       const nextIndex = photos.length;
       photos.push(photo);
       registerBoxPhotoIdentities(indexByIdentity, photo, nextIndex);
+      if (source === "primary") {
+        primaryIndexes.add(nextIndex);
+        registerBoxPhotoContentIdentities(
+          primaryIndexByContentIdentity,
+          photo,
+          nextIndex,
+        );
+      }
       continue;
     }
 
@@ -5121,6 +5144,13 @@ function mergeBoxPreviewPhotos(
     mergedPhoto = mergeBoxPhotoVersions(mergedPhoto, photo);
     photos[primaryIndex] = mergedPhoto;
     registerBoxPhotoIdentities(indexByIdentity, mergedPhoto, primaryIndex);
+    if (primaryIndexes.has(primaryIndex)) {
+      registerBoxPhotoContentIdentities(
+        primaryIndexByContentIdentity,
+        mergedPhoto,
+        primaryIndex,
+      );
+    }
   }
 
   return photos
@@ -5151,6 +5181,16 @@ function registerBoxPhotoIdentities(
   index: number,
 ) {
   for (const key of getBoxPhotoIdentityKeys(photo)) {
+    indexByIdentity.set(key, index);
+  }
+}
+
+function registerBoxPhotoContentIdentities(
+  indexByIdentity: Map<string, number>,
+  photo: BoxPreviewPhoto,
+  index: number,
+) {
+  for (const key of getPhotoContentIdentityKeys(photo)) {
     indexByIdentity.set(key, index);
   }
 }

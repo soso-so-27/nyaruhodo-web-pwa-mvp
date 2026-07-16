@@ -18,28 +18,38 @@ test.describe("collection album flow", () => {
           "cat_profiles",
           JSON.stringify([{ id: "onboarding-reset-cat", name: "むぎ" }]),
         );
+        const progressPhoto = {
+          id: "onboarding-delivery-old",
+          sourcePhotoId: "onboarding-progress-source",
+          src,
+          title: "",
+          subtitle: "",
+          triggerLabel: "sleeping",
+          theme: "sleeping",
+          deliveredAt: olderDeliveredAt,
+        };
+        window.localStorage.setItem(
+          "neteruneko_onboarding_progress",
+          JSON.stringify({
+            version: 1,
+            anonymousId: "onboarding-reset-anonymous",
+            dateKey: "2026-07-15",
+            stage: "opened",
+            source: "direct",
+            submissionId: "onboarding-reset-submission",
+            deliveredPhoto: progressPhoto,
+            isDeliveredPhotoKept: true,
+            updatedAt: olderDeliveredAt,
+          }),
+        );
         window.localStorage.setItem(
           "nyaruhodo_exchange_kept_photos",
           JSON.stringify([
             {
+              ...progressPhoto,
               id: "onboarding-delivery-new",
-              sourcePhotoId: "onboarding-shared-source",
-              src,
-              title: "",
-              subtitle: "",
-              triggerLabel: "sleeping",
-              theme: "sleeping",
+              sourcePhotoId: "onboarding-kept-source",
               deliveredAt: newerDeliveredAt,
-            },
-            {
-              id: "onboarding-delivery-old",
-              sourcePhotoId: "onboarding-shared-source",
-              src,
-              title: "",
-              subtitle: "",
-              triggerLabel: "sleeping",
-              theme: "sleeping",
-              deliveredAt: olderDeliveredAt,
             },
           ]),
         );

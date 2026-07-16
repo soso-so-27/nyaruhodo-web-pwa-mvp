@@ -1,6 +1,7 @@
 import {
   getStoragePhotoPath,
   isUsablePhotoSrc,
+  normalizePersistentPhotoSrc,
   type StorageSignedUrlVariant,
 } from "./photoStorage";
 
@@ -46,6 +47,44 @@ export type PhotoSourceSet = {
   originalSrc?: string;
   offlineSrc?: string;
 };
+
+export function getPhotoContentIdentityKeys(photo: PhotoSourceSet) {
+  const keys = new Set<string>();
+
+  for (const source of [
+    photo.src,
+    photo.thumbnailSrc,
+    photo.displaySrc,
+    photo.originalSrc,
+    photo.offlineSrc,
+  ]) {
+    if (!source) {
+      continue;
+    }
+
+    const normalized = normalizePersistentPhotoSrc(source);
+    if (!normalized) {
+      continue;
+    }
+
+    const storagePath = getStoragePhotoPath(normalized);
+    if (storagePath) {
+      keys.add(`content-storage:${storagePath}`);
+
+      const onboardingSourcePath = getOnboardingSourcePath(storagePath);
+      if (onboardingSourcePath) {
+        keys.add(`content-onboarding:${onboardingSourcePath}`);
+      }
+      continue;
+    }
+
+    if (normalized.startsWith("data:image/")) {
+      keys.add(`content-data:${normalized}`);
+    }
+  }
+
+  return [...keys];
+}
 
 export function resolvePhotoSrc(
   photo: PhotoSourceSet,
@@ -123,4 +162,12 @@ function uniquePhotoSources(sources: Array<string | undefined>) {
   return Array.from(
     new Set(sources.filter((source): source is string => Boolean(source))),
   ).filter(isUsablePhotoSrc);
+}
+
+function getOnboardingSourcePath(storagePath: string) {
+  const match = storagePath.match(
+    /^(.*\/onboarding\/[^/]+)\/(?:display|thumbnail)\/([^/]+)$/,
+  );
+
+  return match ? `${match[1]}/${match[2]}` : null;
 }

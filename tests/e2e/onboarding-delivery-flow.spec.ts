@@ -583,6 +583,58 @@ test.describe("onboarding delivery flow", () => {
     }
   });
 
+  test("keeps every onboarding step centered on a narrow Android viewport", async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width: 360, height: 640 });
+    await page.addInitScript(() => {
+      Object.defineProperty(window.navigator, "userAgent", {
+        configurable: true,
+        get: () =>
+          "Mozilla/5.0 (Linux; Android 14; Pixel 7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Mobile Safari/537.36",
+      });
+    });
+
+    const releaseExchange = await routeBlockedExchangeDelivery(page);
+    try {
+      await page.goto("/onboarding");
+      await expectOnboardingLayoutWithinViewport(page);
+      await captureAndroidOnboardingStep(page, "intro");
+
+      await page.getByTestId("onboarding-photo-select").click();
+      await page.locator('input[type="file"]').last().setInputFiles({
+        name: "android-own-sleeping.jpg",
+        mimeType: "image/jpeg",
+        buffer: landscapeTestJpeg,
+      });
+      await expect(
+        page.getByTestId("onboarding-saving-photo-preview"),
+      ).toHaveAttribute("data-photo-ready", "true");
+      await expectOnboardingLayoutWithinViewport(page);
+      await captureAndroidOnboardingStep(page, "waiting");
+
+      releaseExchange();
+      const openButton = page.getByRole("button", {
+        name: "ねこだよりを ひらく",
+      });
+      await expect(openButton).toBeVisible();
+      await expectOnboardingLayoutWithinViewport(page);
+      await captureAndroidOnboardingStep(page, "envelope");
+
+      await openButton.click();
+      await expect(page.getByTestId("onboarding-delivered-continue")).toBeEnabled();
+      await expectOnboardingLayoutWithinViewport(page);
+      await captureAndroidOnboardingStep(page, "delivered");
+
+      await page.getByTestId("onboarding-delivered-continue").click();
+      await expect(page.getByRole("heading", { name: "この子の名前は？" })).toBeVisible();
+      await expectOnboardingLayoutWithinViewport(page);
+      await captureAndroidOnboardingStep(page, "naming");
+    } finally {
+      releaseExchange();
+    }
+  });
+
   test("shows a named loading state when the onboarding delivery photo is slow", async ({
     page,
   }) => {
@@ -3054,6 +3106,121 @@ async function routeBlockedExchangeDelivery(page: Page) {
   });
 
   return releaseExchange;
+}
+
+async function expectOnboardingLayoutWithinViewport(page: Page) {
+  const layout = await page
+    .getByTestId("onboarding-layout-container")
+    .evaluate((container) => {
+      const main = container.closest("main");
+      const containerRect = container.getBoundingClientRect();
+      const visibleTextElements = [
+        ...container.querySelectorAll<HTMLElement>("h1, h2, p, button, input"),
+      ].filter((element) => {
+        const rect = element.getBoundingClientRect();
+        const style = window.getComputedStyle(element);
+        return (
+          rect.width > 0 &&
+          rect.height > 0 &&
+          style.display !== "none" &&
+          style.visibility !== "hidden"
+        );
+      });
+      const outside = visibleTextElements
+        .map((element) => {
+          const rect = element.getBoundingClientRect();
+          return {
+            text: element.textContent?.trim().slice(0, 40) ?? element.tagName,
+            left: rect.left,
+            right: rect.right,
+          };
+        })
+        .filter((rect) => rect.left < -1 || rect.right > window.innerWidth + 1);
+      const overlaps: string[] = [];
+      const exchangeRoute = container.querySelector<HTMLElement>(
+        '[data-onboarding-exchange-route="true"]',
+      );
+      const exchangeLead = container.querySelector<HTMLElement>(
+        '[data-onboarding-lead="true"]',
+      );
+      const exchangeRouteVisualBottom = exchangeRoute
+        ? Math.max(
+            exchangeRoute.getBoundingClientRect().bottom,
+            ...[...exchangeRoute.children].map(
+              (child) => child.getBoundingClientRect().bottom,
+            ),
+          )
+        : null;
+      const exchangeLeadTop = exchangeLead?.getBoundingClientRect().top ?? null;
+
+      for (let firstIndex = 0; firstIndex < visibleTextElements.length; firstIndex += 1) {
+        for (
+          let secondIndex = firstIndex + 1;
+          secondIndex < visibleTextElements.length;
+          secondIndex += 1
+        ) {
+          const first = visibleTextElements[firstIndex];
+          const second = visibleTextElements[secondIndex];
+          if (first.contains(second) || second.contains(first)) {
+            continue;
+          }
+
+          const firstRect = first.getBoundingClientRect();
+          const secondRect = second.getBoundingClientRect();
+          const overlapWidth =
+            Math.min(firstRect.right, secondRect.right) -
+            Math.max(firstRect.left, secondRect.left);
+          const overlapHeight =
+            Math.min(firstRect.bottom, secondRect.bottom) -
+            Math.max(firstRect.top, secondRect.top);
+
+          if (overlapWidth > 1 && overlapHeight > 1) {
+            overlaps.push(
+              `${first.textContent?.trim().slice(0, 24)} / ${second.textContent
+                ?.trim()
+                .slice(0, 24)}`,
+            );
+          }
+        }
+      }
+
+      return {
+        center: containerRect.left + containerRect.width / 2,
+        expectedCenter: window.innerWidth / 2,
+        innerWidth: window.innerWidth,
+        scrollWidth: document.documentElement.scrollWidth,
+        outside,
+        overlaps,
+        exchangeCopyGap:
+          exchangeRouteVisualBottom !== null && exchangeLeadTop !== null
+            ? exchangeLeadTop - exchangeRouteVisualBottom
+            : null,
+        textSizeAdjust: main
+          ? window.getComputedStyle(main).webkitTextSizeAdjust
+          : "",
+      };
+    });
+
+  expect(layout.innerWidth).toBe(360);
+  expect(layout.scrollWidth).toBeLessThanOrEqual(layout.innerWidth);
+  expect(layout.center).toBeCloseTo(layout.expectedCenter, 1);
+  expect(layout.outside).toEqual([]);
+  expect(layout.overlaps).toEqual([]);
+  if (layout.exchangeCopyGap !== null) {
+    expect(layout.exchangeCopyGap).toBeGreaterThanOrEqual(8);
+  }
+  expect(layout.textSizeAdjust).toBe("100%");
+}
+
+async function captureAndroidOnboardingStep(page: Page, step: string) {
+  if (process.env.CAPTURE_ONBOARDING_ANDROID !== "1") {
+    return;
+  }
+
+  await page.screenshot({
+    path: `artifacts/onboarding-android-${step}-360x640.png`,
+    animations: "disabled",
+  });
 }
 
 async function routeDelayedOnboardingDelivery(page: Page) {

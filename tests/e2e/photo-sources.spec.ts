@@ -3,6 +3,7 @@ import { expect, test } from "@playwright/test";
 import {
   PHOTO_DISPLAY_CONTRACT,
   completePhotoSourceSet,
+  getPhotoContentIdentityKeys,
   resolvePhotoFallbackSrcs,
   resolvePhotoSrc,
   resolvePhotoStorageVariant,
@@ -83,5 +84,34 @@ test.describe("photo source resolution", () => {
     expect(repaired.originalSrc).toBe(repaired.src);
     expect(resolvePhotoStorageVariant(repaired, "list")).toBe("thumbnail");
     expect(resolvePhotoStorageVariant(repaired, "detail")).toBe("display");
+  });
+
+  test("identifies the same onboarding photo across stored variants and signed URLs", () => {
+    const displayPath =
+      "user-1/onboarding/cat-1/display/onboarding-1721000000000.webp";
+    const thumbnailPath =
+      "user-1/onboarding/cat-1/thumbnail/onboarding-1721000000000.webp";
+    const signedDisplayUrl =
+      `https://example.supabase.co/storage/v1/object/sign/cat-photos/${displayPath}?token=test`;
+
+    const displayKeys = getPhotoContentIdentityKeys({ src: signedDisplayUrl });
+    const thumbnailKeys = getPhotoContentIdentityKeys({
+      src: `storage:${thumbnailPath}`,
+    });
+
+    expect(displayKeys).toContain(
+      "content-onboarding:user-1/onboarding/cat-1/onboarding-1721000000000.webp",
+    );
+    expect(thumbnailKeys).toContain(
+      "content-onboarding:user-1/onboarding/cat-1/onboarding-1721000000000.webp",
+    );
+  });
+
+  test("uses an exact data image as a stable content identity", () => {
+    const src = "data:image/png;base64,AAAA";
+
+    expect(getPhotoContentIdentityKeys({ src })).toEqual([
+      `content-data:${src}`,
+    ]);
   });
 });
