@@ -646,9 +646,10 @@ export function readKeptExchangePhotos() {
 }
 
 export function readAllKeptExchangePhotos() {
-  return readStorageArray<ExchangePhoto>(KEPT_EXCHANGE_PHOTO_STORAGE_KEY)
-    .map(sanitizeExchangePhotoForPersistence)
-    .filter((photo): photo is ExchangePhoto => Boolean(photo))
+  return mergeExchangePhotos(
+    [],
+    readStorageArray<ExchangePhoto>(KEPT_EXCHANGE_PHOTO_STORAGE_KEY),
+  )
     .map(withExchangePhotoOfflineSrc);
 }
 
@@ -1129,7 +1130,8 @@ function mergeExchangePhotos(
   existingPhotos: ExchangePhoto[],
   restoredPhotos: ExchangePhoto[],
 ) {
-  const byId = new Map<string, ExchangePhoto>();
+  const photos: Array<ExchangePhoto | null> = [];
+  const indexByIdentity = new Map<string, number>();
 
   for (const photo of [...existingPhotos, ...restoredPhotos]) {
     const normalizedPhoto = sanitizeExchangePhotoForPersistence(photo);
@@ -1137,10 +1139,90 @@ function mergeExchangePhotos(
       continue;
     }
 
-    byId.set(normalizedPhoto.id, normalizedPhoto);
+    const matchingIndexes = new Set(
+      getExchangePhotoIdentityKeys(normalizedPhoto)
+        .map((key) => indexByIdentity.get(key))
+        .filter((index): index is number => index !== undefined),
+    );
+
+    if (matchingIndexes.size === 0) {
+      const nextIndex = photos.length;
+      photos.push(normalizedPhoto);
+      registerExchangePhotoIdentities(
+        indexByIdentity,
+        normalizedPhoto,
+        nextIndex,
+      );
+      continue;
+    }
+
+    const [primaryIndex, ...duplicateIndexes] = [...matchingIndexes];
+    let mergedPhoto = photos[primaryIndex] ?? normalizedPhoto;
+
+    for (const duplicateIndex of duplicateIndexes) {
+      const duplicatePhoto = photos[duplicateIndex];
+      if (!duplicatePhoto) {
+        continue;
+      }
+
+      mergedPhoto = mergeExchangePhotoVersions(mergedPhoto, duplicatePhoto);
+      registerExchangePhotoIdentities(
+        indexByIdentity,
+        duplicatePhoto,
+        primaryIndex,
+      );
+      photos[duplicateIndex] = null;
+    }
+
+    mergedPhoto = mergeExchangePhotoVersions(mergedPhoto, normalizedPhoto);
+    photos[primaryIndex] = mergedPhoto;
+    registerExchangePhotoIdentities(
+      indexByIdentity,
+      mergedPhoto,
+      primaryIndex,
+    );
   }
 
-  return [...byId.values()].sort((a, b) => b.deliveredAt - a.deliveredAt);
+  return photos
+    .filter((photo): photo is ExchangePhoto => Boolean(photo))
+    .sort((a, b) => b.deliveredAt - a.deliveredAt);
+}
+
+function getExchangePhotoIdentityKeys(photo: ExchangePhoto) {
+  return [
+    `id:${photo.id}`,
+    photo.sourcePhotoId ? `source:${photo.sourcePhotoId}` : "",
+  ].filter(Boolean);
+}
+
+function registerExchangePhotoIdentities(
+  indexByIdentity: Map<string, number>,
+  photo: ExchangePhoto,
+  index: number,
+) {
+  for (const key of getExchangePhotoIdentityKeys(photo)) {
+    indexByIdentity.set(key, index);
+  }
+}
+
+function mergeExchangePhotoVersions(
+  existing: ExchangePhoto,
+  incoming: ExchangePhoto,
+) {
+  const preferred =
+    incoming.deliveredAt >= existing.deliveredAt ? incoming : existing;
+  const fallback = preferred === incoming ? existing : incoming;
+
+  return completePhotoSourceSet({
+    ...fallback,
+    ...preferred,
+    sourcePhotoId: preferred.sourcePhotoId ?? fallback.sourcePhotoId,
+    thumbnailSrc: preferred.thumbnailSrc ?? fallback.thumbnailSrc,
+    displaySrc: preferred.displaySrc ?? fallback.displaySrc,
+    originalSrc: preferred.originalSrc ?? fallback.originalSrc,
+    offlineSrc: preferred.offlineSrc ?? fallback.offlineSrc,
+    deliveredAt: Math.max(existing.deliveredAt, incoming.deliveredAt),
+  });
 }
 
 function addExchangePhotoIdsFromStorage(blockedIds: Set<string>, key: string) {

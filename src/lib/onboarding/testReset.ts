@@ -32,6 +32,7 @@ const ONBOARDING_TEST_RESET_KEYS = [
   "neteruneko_mainichi_seen_photo_keys",
   "neteruneko_onboarding_album_completion_ready",
   "neteruneko_onboarding_photo_debug",
+  "neteruneko_exchange_photo_offline_cache",
   "neteruneko_open_sound_candidate",
   "neteruneko_open_sound_enabled",
   "nyaruhodo_exchange_dismissed_photos",

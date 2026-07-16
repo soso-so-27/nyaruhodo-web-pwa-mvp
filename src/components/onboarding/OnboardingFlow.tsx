@@ -1442,7 +1442,7 @@ export function OnboardingFlow() {
             <p style={styles.kicker}>このねがおの子</p>
             <h2 style={styles.subTitle}>この子の名前は？</h2>
             {selectedPhotoSrc ? (
-              <img src={selectedPhotoSrc} alt="" style={styles.namePreviewPhoto} />
+              <OnboardingNamePhoto photoSrc={selectedPhotoSrc} />
             ) : null}
             <p style={styles.resultText}>
               名前だけで大丈夫です。あとから変えられます。
@@ -1752,6 +1752,35 @@ function OnboardingExchangeRoute() {
   );
 }
 
+function OnboardingNamePhoto({ photoSrc }: { photoSrc: string }) {
+  const { frameStyle, handleNaturalSize, photoAspect } = useNaturalPhotoFrame({
+    horizontalInsetPx: 120,
+    maxWidthPx: 220,
+    verticalChromePx: 604,
+  });
+
+  return (
+    <span
+      style={{ ...styles.namePreviewPhotoFrame, ...frameStyle }}
+      data-testid="onboarding-name-photo-preview"
+      data-photo-frame="f3"
+      data-photo-aspect={photoAspect.toFixed(4)}
+    >
+      <img
+        src={photoSrc}
+        alt=""
+        style={styles.namePreviewPhoto}
+        onLoad={(event) =>
+          handleNaturalSize({
+            width: event.currentTarget.naturalWidth,
+            height: event.currentTarget.naturalHeight,
+          })
+        }
+      />
+    </span>
+  );
+}
+
 function DeliveryWaiting({
   photoSrc,
   stage,
@@ -1759,15 +1788,40 @@ function DeliveryWaiting({
   photoSrc: string;
   stage: OnboardingSavingStage;
 }) {
+  const {
+    frameStyle,
+    handleNaturalSize,
+    photoAspect,
+  } = useNaturalPhotoFrame({
+    horizontalInsetPx: 96,
+    maxWidthPx: 240,
+    verticalChromePx: 300,
+  });
+
   return (
     <div style={styles.deliveryWaiting} aria-live="polite" role="status">
       <span
-        style={styles.deliveryWaitingPhotoFrame}
+        style={{
+          ...styles.deliveryWaitingPhotoFrame,
+          ...(photoSrc ? frameStyle : {}),
+        }}
         data-testid="onboarding-saving-photo-preview"
         data-photo-ready={photoSrc ? "true" : "false"}
+        data-photo-frame="f3"
+        data-photo-aspect={photoAspect.toFixed(4)}
       >
         {photoSrc ? (
-          <img src={photoSrc} alt="" style={styles.deliveryWaitingPhoto} />
+          <img
+            src={photoSrc}
+            alt=""
+            style={styles.deliveryWaitingPhoto}
+            onLoad={(event) =>
+              handleNaturalSize({
+                width: event.currentTarget.naturalWidth,
+                height: event.currentTarget.naturalHeight,
+              })
+            }
+          />
         ) : (
           <span style={styles.deliveryWaitingPhotoPlaceholder} aria-hidden="true" />
         )}
@@ -2622,24 +2676,13 @@ const styles = {
     margin: "4px 0 -2px",
   },
   deliveryWaitingPhotoFrame: {
-    position: "relative",
+    ...deliveredLetterStyles.photoFrame,
     display: "block",
     width: "min(calc(100vw - 96px), 240px, calc(100dvh - 300px))",
     aspectRatio: "1 / 1",
-    boxSizing: "border-box",
-    border: "1px solid rgba(122,108,90,0.18)",
-    borderRadius: "10px",
-    background: "rgba(244,241,234,0.46)",
-    boxShadow: "none",
-    overflow: "hidden",
   },
   deliveryWaitingPhoto: {
-    width: "100%",
-    height: "100%",
-    display: "block",
-    objectFit: "contain",
-    borderRadius: "9px",
-    background: "rgba(244,241,234,0.46)",
+    ...deliveredLetterStyles.photo,
   },
   deliveryWaitingPhotoPlaceholder: {
     position: "absolute",
@@ -2698,13 +2741,14 @@ const styles = {
     lineHeight: 1.7,
     padding: "9px 11px",
   },
-  namePreviewPhoto: {
-    width: "min(48vw, 168px)",
+  namePreviewPhotoFrame: {
+    ...deliveredLetterStyles.photoFrame,
+    display: "block",
+    width: "min(calc(100vw - 120px), 220px)",
     aspectRatio: "1 / 1",
-    objectFit: "cover",
-    borderRadius: "26px",
-    border: "7px solid rgba(255,253,248,0.82)",
-    boxShadow: "0 16px 36px -24px rgba(66,48,31,0.46)",
+  },
+  namePreviewPhoto: {
+    ...deliveredLetterStyles.photo,
   },
   nameForm: {
     width: "min(100%, 292px)",

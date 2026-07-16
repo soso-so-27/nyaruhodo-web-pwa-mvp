@@ -5,6 +5,59 @@ const photoDataUrl =
 const photoUploadBuffer = Buffer.from(photoDataUrl.split(",")[1], "base64");
 
 test.describe("collection album flow", () => {
+  test("shows a repeated onboarding delivery only once in received", async ({
+    page,
+  }) => {
+    const olderDeliveredAt = Date.parse("2026-07-15T09:30:00+09:00");
+    const newerDeliveredAt = olderDeliveredAt + 60_000;
+
+    await page.addInitScript(
+      ({ src, olderDeliveredAt, newerDeliveredAt }) => {
+        window.localStorage.setItem("active_cat_id", "onboarding-reset-cat");
+        window.localStorage.setItem(
+          "cat_profiles",
+          JSON.stringify([{ id: "onboarding-reset-cat", name: "むぎ" }]),
+        );
+        window.localStorage.setItem(
+          "nyaruhodo_exchange_kept_photos",
+          JSON.stringify([
+            {
+              id: "onboarding-delivery-new",
+              sourcePhotoId: "onboarding-shared-source",
+              src,
+              title: "",
+              subtitle: "",
+              triggerLabel: "sleeping",
+              theme: "sleeping",
+              deliveredAt: newerDeliveredAt,
+            },
+            {
+              id: "onboarding-delivery-old",
+              sourcePhotoId: "onboarding-shared-source",
+              src,
+              title: "",
+              subtitle: "",
+              triggerLabel: "sleeping",
+              theme: "sleeping",
+              deliveredAt: olderDeliveredAt,
+            },
+          ]),
+        );
+      },
+      { src: photoDataUrl, olderDeliveredAt, newerDeliveredAt },
+    );
+
+    await page.goto("/collection");
+    await page.getByRole("tab", { name: "とどいた" }).click();
+
+    const deliveredPhotos = page.getByTestId("mainichi-board-photo-delivered");
+    await expect(deliveredPhotos).toHaveCount(1);
+    await expect(deliveredPhotos).toHaveAttribute(
+      "data-photo-id",
+      "onboarding-delivery-new",
+    );
+  });
+
   test("shows a home sleeping photo in sent after capture", async ({ page }) => {
     const now = Date.parse("2026-07-07T09:30:00+09:00");
 

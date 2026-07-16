@@ -20,6 +20,14 @@ const wideTestJpeg = encode(
   { data: wideTestJpegPixels, width: 1601, height: 1 },
   80,
 ).data;
+const landscapeTestJpegPixels = Buffer.alloc(240 * 160 * 4, 180);
+for (let offset = 3; offset < landscapeTestJpegPixels.length; offset += 4) {
+  landscapeTestJpegPixels[offset] = 255;
+}
+const landscapeTestJpeg = encode(
+  { data: landscapeTestJpegPixels, width: 240, height: 160 },
+  80,
+).data;
 const portraitDeliveryDataUrl = `data:image/jpeg;base64,${orientedTestJpeg.toString(
   "base64",
 )}`;
@@ -464,6 +472,115 @@ test.describe("onboarding delivery flow", () => {
     await expect.poll(() => readKeptExchangePhotoCount(page)).toBe(1);
     await expect(page.getByRole("button", { name: "閉じる" })).toHaveCount(0);
     await expect.poll(() => readKeptExchangePhotoCount(page)).toBe(1);
+  });
+
+  test("uses the tayori frame and selected photo aspect while waiting and naming", async ({
+    page,
+  }) => {
+    const releaseExchange = await routeBlockedExchangeDelivery(page);
+    try {
+      await page.goto("/onboarding");
+      await page.getByTestId("onboarding-photo-select").click();
+      await page.locator('input[type="file"]').last().setInputFiles({
+        name: "wide-own-sleeping.jpg",
+        mimeType: "image/jpeg",
+        buffer: landscapeTestJpeg,
+      });
+
+      const preview = page.getByTestId("onboarding-saving-photo-preview");
+      await expect(preview).toHaveAttribute("data-photo-ready", "true");
+      await expect(preview).toHaveAttribute("data-photo-frame", "f3");
+      await expect
+        .poll(() =>
+          preview.evaluate((frame) =>
+            Number((frame as HTMLElement).dataset.photoAspect ?? 0),
+          ),
+        )
+        .toBeGreaterThan(1.4);
+
+      const waitingLayout = await preview.evaluate((frame) => {
+        const image = frame.querySelector("img") as HTMLImageElement | null;
+        const frameRect = frame.getBoundingClientRect();
+        const frameStyle = window.getComputedStyle(frame);
+        const imageStyle = image ? window.getComputedStyle(image) : null;
+
+        return {
+          frameAspect: frameRect.width / frameRect.height,
+          photoAspect:
+            image?.naturalWidth && image.naturalHeight
+              ? image.naturalWidth / image.naturalHeight
+              : 0,
+          borderRadius: frameStyle.borderRadius,
+          borderWidth: frameStyle.borderTopWidth,
+          boxShadow: frameStyle.boxShadow,
+          objectFit: imageStyle?.objectFit ?? "",
+        };
+      });
+
+      expect(waitingLayout.frameAspect).toBeCloseTo(waitingLayout.photoAspect, 1);
+      expect(waitingLayout.borderRadius).toBe("0px");
+      expect(waitingLayout.borderWidth).toBe("1px");
+      expect(waitingLayout.boxShadow).not.toBe("none");
+      expect(waitingLayout.objectFit).toBe("contain");
+
+      if (process.env.CAPTURE_ONBOARDING_WAITING === "1") {
+        await page.screenshot({
+          path: "artifacts/onboarding-delivery-waiting-photo-frame.png",
+          animations: "disabled",
+        });
+      }
+
+      releaseExchange();
+      await page.getByRole("button", { name: "ねこだよりを ひらく" }).click();
+      await expect(page.getByTestId("onboarding-delivered-continue")).toBeEnabled();
+      await page.getByTestId("onboarding-delivered-continue").click();
+
+      const namePreview = page.getByTestId("onboarding-name-photo-preview");
+      await expect(namePreview).toHaveAttribute("data-photo-frame", "f3");
+      await expect
+        .poll(() =>
+          namePreview.evaluate((frame) =>
+            Number((frame as HTMLElement).dataset.photoAspect ?? 0),
+          ),
+        )
+        .toBeGreaterThan(1.4);
+
+      const nameLayout = await namePreview.evaluate((frame) => {
+        const image = frame.querySelector("img") as HTMLImageElement | null;
+        const frameRect = frame.getBoundingClientRect();
+        const frameStyle = window.getComputedStyle(frame);
+        const imageStyle = image ? window.getComputedStyle(image) : null;
+
+        return {
+          frameAspect: frameRect.width / frameRect.height,
+          frameHeight: frameRect.height,
+          photoAspect:
+            image?.naturalWidth && image.naturalHeight
+              ? image.naturalWidth / image.naturalHeight
+              : 0,
+          borderRadius: frameStyle.borderRadius,
+          borderWidth: frameStyle.borderTopWidth,
+          boxShadow: frameStyle.boxShadow,
+          objectFit: imageStyle?.objectFit ?? "",
+        };
+      });
+
+      expect(nameLayout.frameAspect).toBeCloseTo(nameLayout.photoAspect, 1);
+      expect(nameLayout.frameHeight).toBeLessThanOrEqual(240);
+      expect(nameLayout.borderRadius).toBe("0px");
+      expect(nameLayout.borderWidth).toBe("1px");
+      expect(nameLayout.boxShadow).not.toBe("none");
+      expect(nameLayout.objectFit).toBe("contain");
+
+      if (process.env.CAPTURE_ONBOARDING_NAME === "1") {
+        await page.screenshot({
+          path: "artifacts/onboarding-name-natural-photo-frame.png",
+          animations: "disabled",
+        });
+      }
+    } finally {
+      releaseExchange();
+    }
   });
 
   test("shows a named loading state when the onboarding delivery photo is slow", async ({
@@ -1942,6 +2059,10 @@ test.describe("onboarding delivery flow", () => {
         "nyaruhodo_exchange_kept_photos",
         JSON.stringify([{ id: "kept-old", src: "data:image/png;base64,AA==" }]),
       );
+      window.localStorage.setItem(
+        "neteruneko_exchange_photo_offline_cache",
+        JSON.stringify([{ photoId: "kept-old", dataUrl: "data:image/png;base64,AA==" }]),
+      );
       window.localStorage.setItem("cat_profiles", JSON.stringify([{ id: "cat-old" }]));
       window.localStorage.setItem("active_cat_id", "cat-old");
       window.localStorage.setItem("analytics_anonymous_id", "anonymous-reset-e2e");
@@ -1966,6 +2087,9 @@ test.describe("onboarding delivery flow", () => {
       progress: window.localStorage.getItem("neteruneko_onboarding_progress"),
       ownPhotos: window.localStorage.getItem("nyaruhodo_exchange_own_sleeping_photos"),
       keptPhotos: window.localStorage.getItem("nyaruhodo_exchange_kept_photos"),
+      offlinePhotoCache: window.localStorage.getItem(
+        "neteruneko_exchange_photo_offline_cache",
+      ),
       profiles: window.localStorage.getItem("cat_profiles"),
       activeCatId: window.localStorage.getItem("active_cat_id"),
       anonymousId: window.localStorage.getItem("analytics_anonymous_id"),
@@ -1980,6 +2104,7 @@ test.describe("onboarding delivery flow", () => {
     expect(storage.progress).toBeNull();
     expect(storage.ownPhotos).toBeNull();
     expect(storage.keptPhotos).toBeNull();
+    expect(storage.offlinePhotoCache).toBeNull();
     expect(storage.profiles).toBeNull();
     expect(storage.activeCatId).toBeNull();
     expect(storage.anonymousId).toBeTruthy();
@@ -2892,6 +3017,43 @@ async function routeImmediateDelivery(
       }),
     });
   });
+}
+
+async function routeBlockedExchangeDelivery(page: Page) {
+  let releaseExchange: () => void = () => undefined;
+  const exchangeGate = new Promise<void>((resolve) => {
+    releaseExchange = resolve;
+  });
+
+  await page.route("**/api/sleeping-delivery/exchange", async (route) => {
+    await exchangeGate;
+    await route.fulfill({
+      contentType: "application/json",
+      body: JSON.stringify({
+        photo: {
+          id: `delivered-waiting-${Date.now()}`,
+          sourcePhotoId: "stock-waiting-e2e-fake",
+          src: `data:image/png;base64,${testPng.toString("base64")}`,
+          title: "",
+          subtitle: "",
+          triggerLabel: "sleeping",
+          theme: "sleeping",
+          deliveredAt: Date.now(),
+        },
+        source: "remote",
+        diagnostics: {
+          source: "remote",
+          availableCount: 1,
+          candidateCount: 1,
+          normalCandidateCount: 1,
+          fallbackCandidateCount: 0,
+          fallbackActive: false,
+        },
+      }),
+    });
+  });
+
+  return releaseExchange;
 }
 
 async function routeDelayedOnboardingDelivery(page: Page) {

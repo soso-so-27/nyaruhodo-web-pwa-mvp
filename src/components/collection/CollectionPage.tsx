@@ -26,7 +26,10 @@ import {
 import {
   storeAccountPhotoDataUrl,
 } from "../../lib/photoStorageClient";
-import { isUsablePhotoSrc } from "../../lib/photoStorage";
+import {
+  getStoragePhotoPath,
+  isUsablePhotoSrc,
+} from "../../lib/photoStorage";
 import {
   completePhotoSourceSet,
   resolvePhotoFallbackSrcs,
@@ -5080,19 +5083,100 @@ function mergeBoxPreviewPhotos(
   primaryPhotos: BoxPreviewPhoto[],
   replacementPhotos: BoxPreviewPhoto[],
 ) {
-  const byKey = new Map<string, BoxPreviewPhoto>();
+  const photos: Array<BoxPreviewPhoto | null> = [];
+  const indexByIdentity = new Map<string, number>();
 
   for (const photo of [...primaryPhotos, ...replacementPhotos]) {
-    byKey.set(getBoxPhotoIdentity(photo), photo);
+    const matchingIndexes = new Set(
+      getBoxPhotoIdentityKeys(photo)
+        .map((key) => indexByIdentity.get(key))
+        .filter((index): index is number => index !== undefined),
+    );
+
+    if (matchingIndexes.size === 0) {
+      const nextIndex = photos.length;
+      photos.push(photo);
+      registerBoxPhotoIdentities(indexByIdentity, photo, nextIndex);
+      continue;
+    }
+
+    const [primaryIndex, ...duplicateIndexes] = [...matchingIndexes];
+    let mergedPhoto = photos[primaryIndex] ?? photo;
+
+    for (const duplicateIndex of duplicateIndexes) {
+      const duplicatePhoto = photos[duplicateIndex];
+      if (!duplicatePhoto) {
+        continue;
+      }
+
+      mergedPhoto = mergeBoxPhotoVersions(mergedPhoto, duplicatePhoto);
+      registerBoxPhotoIdentities(
+        indexByIdentity,
+        duplicatePhoto,
+        primaryIndex,
+      );
+      photos[duplicateIndex] = null;
+    }
+
+    mergedPhoto = mergeBoxPhotoVersions(mergedPhoto, photo);
+    photos[primaryIndex] = mergedPhoto;
+    registerBoxPhotoIdentities(indexByIdentity, mergedPhoto, primaryIndex);
   }
 
-  return [...byKey.values()].sort(
-    (a, b) => getBoxPhotoTimestamp(b) - getBoxPhotoTimestamp(a),
-  );
+  return photos
+    .filter((photo): photo is BoxPreviewPhoto => Boolean(photo))
+    .sort((a, b) => getBoxPhotoTimestamp(b) - getBoxPhotoTimestamp(a));
 }
 
-function getBoxPhotoIdentity(photo: BoxPreviewPhoto) {
-  return photo.sourcePhotoId ? `source:${photo.sourcePhotoId}` : `id:${photo.id}`;
+function getBoxPhotoIdentityKeys(photo: BoxPreviewPhoto) {
+  const storagePaths = [
+    photo.src,
+    photo.thumbnailSrc,
+    photo.displaySrc,
+    photo.originalSrc,
+  ]
+    .map((src) => (src ? getStoragePhotoPath(src) : null))
+    .filter((path): path is string => Boolean(path));
+
+  return [
+    `id:${photo.id}`,
+    photo.sourcePhotoId ? `source:${photo.sourcePhotoId}` : "",
+    ...storagePaths.map((path) => `storage:${path}`),
+  ].filter(Boolean);
+}
+
+function registerBoxPhotoIdentities(
+  indexByIdentity: Map<string, number>,
+  photo: BoxPreviewPhoto,
+  index: number,
+) {
+  for (const key of getBoxPhotoIdentityKeys(photo)) {
+    indexByIdentity.set(key, index);
+  }
+}
+
+function mergeBoxPhotoVersions(
+  existing: BoxPreviewPhoto,
+  incoming: BoxPreviewPhoto,
+) {
+  const preferred =
+    getBoxPhotoTimestamp(incoming) >= getBoxPhotoTimestamp(existing)
+      ? incoming
+      : existing;
+  const fallback = preferred === incoming ? existing : incoming;
+
+  return {
+    ...fallback,
+    ...preferred,
+    sourcePhotoId: preferred.sourcePhotoId ?? fallback.sourcePhotoId,
+    thumbnailSrc: preferred.thumbnailSrc ?? fallback.thumbnailSrc,
+    displaySrc: preferred.displaySrc ?? fallback.displaySrc,
+    originalSrc: preferred.originalSrc ?? fallback.originalSrc,
+    deliveredAt: Math.max(
+      existing.deliveredAt ?? 0,
+      incoming.deliveredAt ?? 0,
+    ) || undefined,
+  };
 }
 
 function createEmptyTodayAlbumGroup(): AlbumDayGroup {
