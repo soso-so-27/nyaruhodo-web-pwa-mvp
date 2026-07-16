@@ -2315,6 +2315,7 @@ test.describe("onboarding delivery flow", () => {
           offlineSrc?: string;
         }>;
         pendingReferralCode?: string | null;
+        resetTargetLocalState?: boolean;
       };
     }> = [];
 
@@ -2416,6 +2417,10 @@ test.describe("onboarding delivery flow", () => {
           },
         ]),
       );
+      window.sessionStorage.setItem(
+        "neteruneko_onboarding_test_reset_done",
+        "true",
+      );
     }, { imageDataUrl });
     await page.route("**/api/onboarding/handoff/create", async (route) => {
       capturedCreateBodies.push(route.request().postDataJSON());
@@ -2479,6 +2484,7 @@ test.describe("onboarding delivery flow", () => {
     expect(capturedPayload?.catProfiles?.[0]?.id).toBe("cat-current");
     expect(capturedPayload?.activeCatId).toBe("cat-current");
     expect(capturedPayload?.pendingReferralCode).toContain("LINE234");
+    expect(capturedPayload?.resetTargetLocalState).toBe(true);
     expect(capturedPayload?.ownSleepingPhotos?.[0]?.id).toBe("onboarding-current-own");
     expect(
       capturedPayload?.ownSleepingPhotos?.some(
@@ -2702,6 +2708,7 @@ test.describe("onboarding delivery flow", () => {
               },
             ],
             pendingReferralCode: "LINE234",
+            resetTargetLocalState: true,
           },
         }),
       });
@@ -2741,6 +2748,27 @@ test.describe("onboarding delivery flow", () => {
           },
         ]),
       );
+      window.localStorage.setItem(
+        "neteruneko_evening_delivery_days",
+        JSON.stringify({
+          "2026-07-14": {
+            dateKey: "2026-07-14",
+            deliveredPhoto: {
+              id: "stale-target-evening-delivery",
+              sourcePhotoId: "stale-target-evening-source",
+              src: "storage:delivery-archive/stale-target-evening.webp",
+              title: "stale",
+              subtitle: "",
+              triggerLabel: "sleeping",
+              theme: "sleeping",
+              deliveredAt: Date.now() - 20_000,
+            },
+            deliveredAt: Date.now() - 20_000,
+            openedAt: Date.now() - 10_000,
+            openedBy: "user",
+          },
+        }),
+      );
     }, { imageDataUrl });
     await page.locator("main button").first().click();
 
@@ -2754,11 +2782,15 @@ test.describe("onboarding delivery flow", () => {
           profiles: window.localStorage.getItem("cat_profiles"),
           ownPhotos: window.localStorage.getItem("nyaruhodo_exchange_own_sleeping_photos"),
           keptPhotos: window.localStorage.getItem("nyaruhodo_exchange_kept_photos"),
+          eveningDeliveryDays: window.localStorage.getItem(
+            "neteruneko_evening_delivery_days",
+          ),
         })),
       )
       .toMatchObject({
         activeCatId: "handoff-cat",
         completed: "true",
+        eveningDeliveryDays: null,
       });
     const ownPhotos = await page.evaluate(() =>
       JSON.parse(window.localStorage.getItem("nyaruhodo_exchange_own_sleeping_photos") ?? "[]"),

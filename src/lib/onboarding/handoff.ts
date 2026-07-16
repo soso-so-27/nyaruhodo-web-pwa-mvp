@@ -26,6 +26,10 @@ import {
   type OnboardingProgress,
   type OnboardingSource,
 } from "./progress";
+import {
+  clearOnboardingTestTargetState,
+  hasOnboardingTestResetMarker,
+} from "./testReset";
 
 const ONBOARDING_HANDOFF_OWN_PHOTOS_KEY = "nyaruhodo_exchange_own_sleeping_photos";
 const ONBOARDING_HANDOFF_KEPT_PHOTOS_KEY = "nyaruhodo_exchange_kept_photos";
@@ -41,6 +45,7 @@ export type OnboardingHandoffPayload = {
   ownSleepingPhotos: OwnSleepingPhoto[];
   keptExchangePhotos: ExchangePhoto[];
   pendingReferralCode: string | null;
+  resetTargetLocalState?: boolean;
   session?: {
     accessToken: string;
     refreshToken: string;
@@ -161,6 +166,7 @@ export async function createOnboardingHandoffPayload(
       nextOnboardingProgress,
       source,
     ),
+    resetTargetLocalState: hasOnboardingTestResetMarker(),
     session: await getHandoffSessionPayload(),
   };
 }
@@ -300,9 +306,16 @@ function getCurrentPendingReferralCode(
   return window.localStorage.getItem(STORAGE_KEYS.pendingReferralCode);
 }
 
-export function restoreOnboardingHandoffPayload(payload: unknown) {
+export function restoreOnboardingHandoffPayload(
+  payload: unknown,
+  options?: { skipTargetReset?: boolean },
+) {
   if (!isOnboardingHandoffPayload(payload)) {
     throw new Error("invalid_handoff_payload");
+  }
+
+  if (payload.resetTargetLocalState && !options?.skipTargetReset) {
+    clearOnboardingTestTargetState();
   }
 
   if (payload.catProfiles.length > 0) {
@@ -363,6 +376,10 @@ export async function restoreOnboardingHandoffPayloadWithSession(payload: unknow
     throw new Error("invalid_handoff_payload");
   }
 
+  if (payload.resetTargetLocalState) {
+    clearOnboardingTestTargetState();
+  }
+
   if (payload.session?.accessToken && payload.session.refreshToken) {
     const supabase = createBrowserSupabaseClient();
     const { error } =
@@ -376,7 +393,7 @@ export async function restoreOnboardingHandoffPayloadWithSession(payload: unknow
     }
   }
 
-  return restoreOnboardingHandoffPayload(payload);
+  return restoreOnboardingHandoffPayload(payload, { skipTargetReset: true });
 }
 
 function getRestoredKeptExchangePhotos(
@@ -437,6 +454,8 @@ function isOnboardingHandoffPayload(
     typeof payload.onboardingCompleted === "boolean" &&
     (typeof payload.pendingReferralCode === "string" ||
       payload.pendingReferralCode === null) &&
+    (payload.resetTargetLocalState === undefined ||
+      typeof payload.resetTargetLocalState === "boolean") &&
     (payload.session === undefined ||
       payload.session === null ||
       (typeof payload.session === "object" &&

@@ -12,6 +12,8 @@ import {
 const RESET_QUERY_KEY = "reset_onboarding";
 const LEGACY_RESET_QUERY_KEY = "reset";
 const REFERRAL_QUERY_KEYS = ["ref", "referral", "invite"] as const;
+export const ONBOARDING_TEST_RESET_MARKER_KEY =
+  "neteruneko_onboarding_test_reset_done";
 
 const ONBOARDING_TEST_RESET_KEYS = [
   STORAGE_KEYS.accountCreatePromptDismissed,
@@ -31,6 +33,7 @@ const ONBOARDING_TEST_RESET_KEYS = [
   STORAGE_KEYS.omoideMemoryControls,
   STORAGE_KEYS.onboardingCompleted,
   STORAGE_KEYS.onboardingProgress,
+  STORAGE_KEYS.pendingReferralCode,
   "neteruneko_cat_gallery_intro_acknowledged",
   "neteruneko_cat_gallery_restore_checked",
   "neteruneko_cat_sleeping_milestones",
@@ -76,9 +79,7 @@ export function consumeOnboardingTestResetRequest() {
 
   const referralCode = readReferralCodeFromResetUrl(url);
 
-  for (const key of ONBOARDING_TEST_RESET_KEYS) {
-    removeCachedJson(key);
-  }
+  clearOnboardingTestLocalState();
 
   if (referralCode) {
     writeCachedJson(STORAGE_KEYS.pendingReferralCode, {
@@ -90,17 +91,59 @@ export function consumeOnboardingTestResetRequest() {
     removeCachedJson(STORAGE_KEYS.pendingReferralCode);
   }
 
-  removeLocalStorageKeysByPrefix(ONBOARDING_TEST_RESET_PREFIXES);
-
-  for (const key of ONBOARDING_TEST_RESET_SESSION_KEYS) {
-    window.sessionStorage.removeItem(key);
-  }
-
-  window.sessionStorage.setItem("neteruneko_onboarding_test_reset_done", "true");
-  invalidateCachedJson();
+  markOnboardingTestReset();
   removeResetQuery(url);
 
   return true;
+}
+
+export function hasOnboardingTestResetMarker() {
+  if (typeof window === "undefined") {
+    return false;
+  }
+
+  try {
+    return (
+      window.sessionStorage.getItem(ONBOARDING_TEST_RESET_MARKER_KEY) === "true"
+    );
+  } catch {
+    return false;
+  }
+}
+
+export function clearOnboardingTestTargetState() {
+  if (typeof window === "undefined") {
+    return;
+  }
+
+  clearOnboardingTestLocalState();
+  markOnboardingTestReset();
+}
+
+function clearOnboardingTestLocalState() {
+  for (const key of ONBOARDING_TEST_RESET_KEYS) {
+    removeCachedJson(key);
+  }
+
+  removeLocalStorageKeysByPrefix(ONBOARDING_TEST_RESET_PREFIXES);
+
+  try {
+    for (const key of ONBOARDING_TEST_RESET_SESSION_KEYS) {
+      window.sessionStorage.removeItem(key);
+    }
+  } catch {
+    // Some embedded browsers expose storage but reject access to it.
+  }
+
+  invalidateCachedJson();
+}
+
+function markOnboardingTestReset() {
+  try {
+    window.sessionStorage.setItem(ONBOARDING_TEST_RESET_MARKER_KEY, "true");
+  } catch {
+    // The local reset still applies when sessionStorage is unavailable.
+  }
 }
 
 function readReferralCodeFromResetUrl(url: URL) {
