@@ -491,6 +491,81 @@ test.describe("onboarding delivery flow", () => {
     ).toBeEnabled();
   });
 
+  test("does not keep a false photo error after a delayed LINE image loads", async ({
+    page,
+  }) => {
+    await page.addInitScript(() => {
+      Object.defineProperty(window.navigator, "userAgent", {
+        configurable: true,
+        get: () =>
+          "Mozilla/5.0 (Linux; Android 14; Pixel 7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Mobile Safari/537.36 Line/14.0.0",
+      });
+
+      const completeDescriptor = Object.getOwnPropertyDescriptor(
+        HTMLImageElement.prototype,
+        "complete",
+      );
+      if (!completeDescriptor?.get) {
+        return;
+      }
+
+      let forcedIntermediateState = false;
+      Object.defineProperty(HTMLImageElement.prototype, "complete", {
+        configurable: true,
+        get() {
+          const image = this as HTMLImageElement;
+          if (
+            !forcedIntermediateState &&
+            image.src.includes("delayed-onboarding-delivery.png") &&
+            image.closest('[data-testid="onboarding-delivered-photos"]') &&
+            image.naturalWidth === 0
+          ) {
+            forcedIntermediateState = true;
+            (
+              window as typeof window & {
+                __forcedLineImageIntermediateState?: boolean;
+              }
+            ).__forcedLineImageIntermediateState = true;
+            return true;
+          }
+
+          return completeDescriptor.get?.call(image) ?? false;
+        },
+      });
+    });
+    await routeDelayedOnboardingDelivery(page);
+    await page.goto("/onboarding?source=instagram_bio");
+    await page.getByRole("button", { name: "このまま試す" }).click();
+    await page.getByTestId("onboarding-photo-select").click();
+    await page.locator('input[type="file"]').last().setInputFiles({
+      name: "own-sleeping.png",
+      mimeType: "image/png",
+      buffer: testPng,
+    });
+
+    await page.getByRole("button", { name: "ねこだよりを ひらく" }).click();
+    await expect(
+      page.getByTestId("onboarding-delivery-photo-loading"),
+    ).toBeVisible();
+    await expect(
+      page.getByTestId("onboarding-delivery-photo-loading"),
+    ).toHaveCount(0, { timeout: 4000 });
+    expect(
+      await page.evaluate(
+        () =>
+          (window as typeof window & {
+            __forcedLineImageIntermediateState?: boolean;
+          }).__forcedLineImageIntermediateState,
+      ),
+    ).toBe(true);
+    await expect(
+      page.getByText("写真を表示できません", { exact: true }),
+    ).toHaveCount(0);
+    await expect(
+      page.getByTestId("onboarding-delivery-photo-error"),
+    ).toHaveCount(0);
+  });
+
   test("shows the second photo invitation on home before 8pm", async ({
     page,
   }) => {

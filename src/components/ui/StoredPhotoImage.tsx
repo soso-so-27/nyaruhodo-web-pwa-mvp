@@ -288,11 +288,11 @@ export function StoredPhotoImage({
       if (image.naturalWidth > 0) {
         if (isActive) {
           setIsLoaded(true);
+          setHasError(false);
         }
       } else {
         if (isActive) {
           setIsLoaded(false);
-          setHasError(true);
         }
       }
     };
@@ -443,6 +443,7 @@ export function StoredPhotoImage({
         height={height}
         onLoad={() => {
           setIsLoaded(true);
+          setHasError(false);
           onLoad?.();
           const image = imageRef.current;
           if (image?.naturalWidth && image.naturalHeight) {
