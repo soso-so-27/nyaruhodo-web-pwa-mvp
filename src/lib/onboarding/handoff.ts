@@ -8,7 +8,9 @@ import {
   isAnonymousAuthEnabled,
 } from "../auth/anonymousAuth";
 import {
+  cacheExchangePhotoOfflineDataUrl,
   readAllOwnSleepingPhotos,
+  readKeptExchangePhotosForAlbum,
   restoreSyncedSleepingPhotos,
   type ExchangePhoto,
   type OwnSleepingPhoto,
@@ -148,7 +150,9 @@ export async function createOnboardingHandoffPayload(
     catProfiles: getCurrentOnboardingCatProfiles(currentCatId),
     activeCatId: currentCatId,
     ownSleepingPhotos: getCurrentOnboardingOwnPhotos(nextOnboardingProgress),
-    keptExchangePhotos: [],
+    keptExchangePhotos: getCurrentOnboardingDeliveredPhotos(
+      nextOnboardingProgress,
+    ),
     pendingReferralCode: getCurrentPendingReferralCode(
       nextOnboardingProgress,
       source,
@@ -211,6 +215,28 @@ function getCurrentOnboardingOwnPhotos(
   );
 
   return [compactPhotoSourcesForHandoff(storedPhoto ?? progress.ownPhoto)];
+}
+
+function getCurrentOnboardingDeliveredPhotos(
+  progress: OnboardingProgress | null,
+): ExchangePhoto[] {
+  const deliveredPhoto = progress?.deliveredPhoto;
+
+  if (!deliveredPhoto || !progress.isDeliveredPhotoKept) {
+    return [];
+  }
+
+  const storedPhoto = readKeptExchangePhotosForAlbum().find(
+    (photo) =>
+      photo.id === deliveredPhoto.id ||
+      Boolean(
+        photo.sourcePhotoId &&
+          deliveredPhoto.sourcePhotoId &&
+          photo.sourcePhotoId === deliveredPhoto.sourcePhotoId,
+      ),
+  );
+
+  return [compactPhotoSourcesForHandoff(storedPhoto ?? deliveredPhoto)];
 }
 
 function compactPhotoSourcesForHandoff<
@@ -288,12 +314,21 @@ export function restoreOnboardingHandoffPayload(payload: unknown) {
   }
 
   const keptPhotos = getRestoredKeptExchangePhotos(payload);
+  const keptPhotoMetadata = keptPhotos.map((photo) => {
+    if (photo.offlineSrc?.startsWith("data:image/")) {
+      cacheExchangePhotoOfflineDataUrl(photo, photo.offlineSrc);
+    }
+
+    const metadata = { ...photo };
+    delete metadata.offlineSrc;
+    return metadata;
+  });
 
   removeCachedJson(ONBOARDING_HANDOFF_OWN_PHOTOS_KEY);
   removeCachedJson(ONBOARDING_HANDOFF_KEPT_PHOTOS_KEY);
   const restored = restoreSyncedSleepingPhotos({
     ownPhotos: payload.ownSleepingPhotos,
-    keptPhotos,
+    keptPhotos: keptPhotoMetadata,
     mergeLocal: false,
   });
 

@@ -1998,7 +1998,11 @@ test.describe("onboarding delivery flow", () => {
         catProfiles?: Array<{ id?: string }>;
         activeCatId?: string | null;
         ownSleepingPhotos?: Array<{ id?: string }>;
-        keptExchangePhotos?: Array<{ id?: string; sourcePhotoId?: string }>;
+        keptExchangePhotos?: Array<{
+          id?: string;
+          sourcePhotoId?: string;
+          offlineSrc?: string;
+        }>;
         pendingReferralCode?: string | null;
       };
     }> = [];
@@ -2030,10 +2034,7 @@ test.describe("onboarding delivery flow", () => {
       const currentDeliveredPhoto = {
         id: "onboarding-current-delivered",
         sourcePhotoId: "source-current-delivered",
-        src: imageDataUrl,
-        thumbnailSrc: imageDataUrl,
-        displaySrc: imageDataUrl,
-        originalSrc: imageDataUrl,
+        src: "storage:admin-stock/sleeping/onboarding-current-delivered.jpg",
         title: "",
         subtitle: "",
         triggerLabel: "sleeping",
@@ -2085,14 +2086,22 @@ test.describe("onboarding delivery flow", () => {
       window.localStorage.setItem(
         "nyaruhodo_exchange_kept_photos",
         JSON.stringify([
-          {
-            ...currentDeliveredPhoto,
-            id: "kept-current-copy",
-          },
+          currentDeliveredPhoto,
           {
             ...currentDeliveredPhoto,
             id: "old-kept-photo",
             sourcePhotoId: "old-source-photo",
+          },
+        ]),
+      );
+      window.localStorage.setItem(
+        "neteruneko_exchange_photo_offline_cache",
+        JSON.stringify([
+          {
+            photoId: currentDeliveredPhoto.id,
+            sourcePhotoId: currentDeliveredPhoto.sourcePhotoId,
+            dataUrl: imageDataUrl,
+            updatedAt: Date.now(),
           },
         ]),
       );
@@ -2121,7 +2130,12 @@ test.describe("onboarding delivery flow", () => {
     const capturedPayload = capturedCreateBodies[0]?.payload;
 
     expect(capturedPayload?.ownSleepingPhotos).toHaveLength(1);
-    expect(capturedPayload?.keptExchangePhotos).toHaveLength(0);
+    expect(capturedPayload?.keptExchangePhotos).toHaveLength(1);
+    expect(capturedPayload?.keptExchangePhotos?.[0]).toMatchObject({
+      id: "onboarding-current-delivered",
+      sourcePhotoId: "source-current-delivered",
+      offlineSrc: imageDataUrl,
+    });
     expect(capturedPayload?.catProfiles).toHaveLength(1);
     expect(capturedPayload?.catProfiles?.[0]?.id).toBe("cat-current");
     expect(capturedPayload?.activeCatId).toBe("cat-current");
@@ -2281,6 +2295,21 @@ test.describe("onboarding delivery flow", () => {
   }) => {
     let redeemCalls = 0;
     const imageDataUrl = `data:image/png;base64,${testPng.toString("base64")}`;
+    const deliveredStorageSrc =
+      "storage:admin-stock/sleeping/handoff-delivered.jpg";
+    await page.route("**/api/photo-storage/signed-url", async (route) => {
+      await route.fulfill({
+        status: 403,
+        contentType: "application/json",
+        body: JSON.stringify({ signedUrl: null, error: "forbidden_photo" }),
+      });
+    });
+    await page.route("**/api/photo-storage/signed-urls", async (route) => {
+      await route.fulfill({
+        contentType: "application/json",
+        body: JSON.stringify({ signedUrls: {} }),
+      });
+    });
     await page.route("**/api/onboarding/handoff/redeem", async (route) => {
       redeemCalls += 1;
       await route.fulfill({
@@ -2320,7 +2349,19 @@ test.describe("onboarding delivery flow", () => {
                 captureContext: "onboarding",
               },
             ],
-            keptExchangePhotos: [],
+            keptExchangePhotos: [
+              {
+                id: "handoff-delivered-photo",
+                sourcePhotoId: "handoff-delivered-source",
+                src: deliveredStorageSrc,
+                offlineSrc: imageDataUrl,
+                title: "",
+                subtitle: "",
+                triggerLabel: "sleeping",
+                theme: "sleeping",
+                deliveredAt: Date.now(),
+              },
+            ],
             pendingReferralCode: "LINE234",
           },
         }),
@@ -2391,7 +2432,42 @@ test.describe("onboarding delivery flow", () => {
     expect(ownPhotos.some((photo: { id?: string }) => photo.id === "stale-target-own")).toBe(
       false,
     );
-    expect(keptPhotos).toHaveLength(0);
+    expect(keptPhotos).toHaveLength(1);
+    expect(keptPhotos[0]).toMatchObject({
+      id: "handoff-delivered-photo",
+      sourcePhotoId: "handoff-delivered-source",
+      src: deliveredStorageSrc,
+    });
+    expect(keptPhotos[0]?.offlineSrc).toBeUndefined();
+    const offlineCache = await page.evaluate(() =>
+      JSON.parse(
+        window.localStorage.getItem("neteruneko_exchange_photo_offline_cache") ??
+          "[]",
+      ),
+    );
+    expect(offlineCache).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          photoId: "handoff-delivered-photo",
+          dataUrl: imageDataUrl,
+        }),
+      ]),
+    );
+
+    await page.goto("/collection");
+    await page.getByRole("tab", { name: "とどいた" }).click();
+    const deliveredCard = page.getByTestId("mainichi-board-photo-delivered");
+    await expect(deliveredCard).toHaveCount(1);
+    await expect
+      .poll(() =>
+        deliveredCard
+          .locator("img")
+          .evaluate(
+            (image: HTMLImageElement) =>
+              image.complete && image.naturalWidth > 0,
+          ),
+      )
+      .toBe(true);
   });
 
   test("keeps the second-photo intent for account handoffs without an explicit next", async ({
