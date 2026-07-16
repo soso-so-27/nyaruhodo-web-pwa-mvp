@@ -914,6 +914,10 @@ test.describe("home sleeping exchange flow", () => {
       const submitStyle = getComputedStyle(submit);
       const sharedStyle = getComputedStyle(shared);
       const privateStyle = getComputedStyle(privateMode);
+      const preview = document.querySelector<HTMLElement>(
+        "[data-exchange-share-preview]",
+      );
+      const previewStyle = preview ? getComputedStyle(preview) : null;
       return {
         submitHeight: submit.getBoundingClientRect().height,
         sharedHeight: shared.getBoundingClientRect().height,
@@ -922,6 +926,9 @@ test.describe("home sleeping exchange flow", () => {
         sharedBackground: sharedStyle.backgroundColor,
         privateBackground: privateStyle.backgroundColor,
         privateShadow: privateStyle.boxShadow,
+        previewBorderWidth: previewStyle?.borderTopWidth ?? "",
+        previewPadding: previewStyle?.paddingTop ?? "",
+        previewShadow: previewStyle?.boxShadow ?? "",
       };
     });
     expect(controlMetrics).not.toBeNull();
@@ -935,6 +942,9 @@ test.describe("home sleeping exchange flow", () => {
       controlMetrics?.privateBackground,
     );
     expect(controlMetrics?.privateShadow).toBe("none");
+    expect(controlMetrics?.previewBorderWidth).toBe("1px");
+    expect(controlMetrics?.previewPadding).toBe("0px");
+    expect(controlMetrics?.previewShadow).toBe("none");
     if (process.env.CAPTURE_PHOTO_SAVE_SHEET === "1") {
       await page.screenshot({
         path: "artifacts/photo-save-sheet-320x568-shared.png",

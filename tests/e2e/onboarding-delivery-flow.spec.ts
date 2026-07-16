@@ -383,8 +383,8 @@ test.describe("onboarding delivery flow", () => {
     expect(deliveredLayout.buttonBottom).toBeLessThanOrEqual(
       deliveredLayout.viewportHeight,
     );
-    expect(deliveredLayout.paddingTop).toBe("5px");
-    expect(deliveredLayout.borderRadius).toBe("12px");
+    expect(deliveredLayout.paddingTop).toBe("2px");
+    expect(deliveredLayout.borderRadius).toBe("8px");
     expect(deliveredLayout.objectFit).toBe("contain");
     await expect.poll(() => readKeptExchangePhotoCount(page)).toBe(1);
     await expect(page.getByRole("button", { name: "閉じる" })).toHaveCount(0);
@@ -782,6 +782,12 @@ test.describe("onboarding delivery flow", () => {
       });
     await page.waitForTimeout(1200);
     await expect(deliveredImage).toHaveCSS("opacity", "1");
+    if (process.env.CAPTURE_ONBOARDING_DELIVERED === "1") {
+      await page.screenshot({
+        path: "artifacts/onboarding-delivered-unframed-line.png",
+        animations: "disabled",
+      });
+    }
     await expect.poll(() => readKeptExchangePhotoCount(page)).toBe(1);
 
     await page.evaluate(() => {

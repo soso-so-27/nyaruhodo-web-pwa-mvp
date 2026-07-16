@@ -7754,17 +7754,16 @@ const styles = {
     width: "100%",
     height:
       "var(--exchange-share-preview-height, clamp(156px, 25vh, 190px))",
-    borderRadius: "18px",
+    borderRadius: "12px",
     overflow: "hidden",
-    padding: "8px",
-    background: "rgba(74,63,53,0.075)",
-    border: "1px solid rgba(144,126,102,0.12)",
+    padding: 0,
+    background: "rgba(244,241,234,0.46)",
+    border: "1px solid rgba(122,108,90,0.18)",
     display: "flex",
     alignItems: "center",
     justifyContent: "center",
     boxSizing: "border-box",
-    boxShadow:
-      "inset 0 1px 0 rgba(255,255,255,0.62), 0 12px 28px rgba(90,76,60,0.06)",
+    boxShadow: "none",
   },
   exchangeShareSummary: {
     display: "grid",
