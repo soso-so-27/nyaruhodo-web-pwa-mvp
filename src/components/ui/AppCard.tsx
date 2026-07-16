@@ -37,6 +37,7 @@ export function AppCard({
     <Element
       {...props}
       className={className}
+      data-app-pressable={interactive ? "card" : undefined}
       style={{
         ...styles.base,
         ...styles[variant],
@@ -72,7 +73,7 @@ const styles = {
    */
   section: {
     background: color.surfaceSoft,
-    boxShadow: shadow.card,
+    boxShadow: "var(--app-press-shadow, var(--shadow-e1))",
   },
   outlined: {
     background: color.surfaceSoft,
@@ -88,12 +89,12 @@ const styles = {
   floating: {
     background: color.surfaceSoft,
     borderRadius: radius.xxl24,
-    boxShadow: shadow.floating,
+    boxShadow: "var(--app-press-shadow, var(--shadow-e2))",
   },
   interactive: {
     cursor: "pointer",
     transition:
-      "transform var(--dur-instant) var(--ease-settle), box-shadow var(--dur-instant) var(--ease-gentle)",
+      "transform var(--app-press-duration, var(--dur-press-out)) var(--ease-settle), box-shadow var(--app-press-duration, var(--dur-press-out)) var(--ease-gentle), opacity var(--app-press-duration, var(--dur-press-out)) var(--ease-gentle)",
     WebkitTapHighlightColor: "transparent",
   },
 } satisfies Record<string, CSSProperties>;

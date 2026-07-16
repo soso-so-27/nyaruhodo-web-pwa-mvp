@@ -38,6 +38,9 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      - name: Typecheck
+        run: npm run typecheck
+
       - name: Setup Supabase CLI
         uses: supabase/setup-cli@v2
         with:
@@ -67,8 +70,11 @@ jobs:
             echo "SUPABASE_SERVICE_ROLE_KEY=$(jq -r '.SERVICE_ROLE_KEY' <<< "$status")"
           } >> "$GITHUB_ENV"
 
-      - name: Install Playwright Chromium
-        run: npx playwright install --with-deps chromium
+      - name: Build
+        run: npm run build
+
+      - name: Install Playwright browsers
+        run: npx playwright install --with-deps chromium webkit
 
       - name: Run DB integration E2E
         run: >-
@@ -76,6 +82,9 @@ jobs:
           tests/e2e/sleeping-delivery-pool-guards.spec.ts
           tests/e2e/storage-backup.spec.ts
           --project=desktop
+
+      - name: Run critical Android and iPhone journeys
+        run: npm run e2e:cross-browser
 
       - name: Upload failure artifacts
         if: failure()

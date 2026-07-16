@@ -1,126 +1,126 @@
-# Analytics KPI Inventory
+# Analytics KPI Inventory v2.0
 
-## Purpose
+更新日: 2026-07-16
+対象: Instagram投稿3の初動と、先行期の日次運用
 
-Instagram launch traffic should answer one question first: did a first-time visitor put in one sleeping cat photo and open one cat letter?
+## 1. 先に答える問い
 
-North star KPI:
+初動では、次の順に答える。
 
-- `completed_delivery_user_count`: unique users on the same JST date who have both `photo_submitted` and `delivery_opened`.
+1. bioから来た人が、最初の写真を入れられたか
+2. その場のねこだよりが、届いて開けたか
+3. 次の20時便に向けた一枚を入れられたか
+4. 20時に、対象者全員の便が成立したか
+5. 翌日も写真を入れた人がいるか
 
-Analytics must never block the product experience. If event collection fails, the app should continue silently.
+管理画面: `/admin/analytics`
 
-## Privacy Rules
+管理画面は60秒ごとに自動更新する。投稿直後は `直近60分`、当日全体は `きょう` を使う。率だけで判断せず、必ず人数と母数を一緒に見る。
 
-Do not store these in analytics events:
+## 2. 初回体験ファネル
 
-- photo URLs
-- signed URLs
-- storage paths
-- cat names
-- user names
-- locations
-- email addresses
-- raw secrets or tokens
+同じ人が期間内に順番どおり通過した人数を数える。
 
-Only IDs, safe counters, route names, surfaces, source labels, and sanitized error codes/messages should be stored.
+| 順 | イベント | 意味 |
+| --- | --- | --- |
+| 1 | `onboarding_intro_view` | オンボの入口を見た |
+| 2 | `onboarding_photo_select_click` | OSの写真選択を開いた |
+| 3 | `onboarding_photo_submitted` | 最初の写真を保存できた |
+| 4 | `onboarding_delivery_arrived` | 即時のねこだよりを用意できた |
+| 5 | `onboarding_delivery_opened` | 即時便を開いた |
+| 6 | `onboarding_completed` | 即時便を確認し、オンボを終えた |
+| 7 | `onboarding_second_photo_prompt_view` | ホームで今夜の一枚を見た |
+| 8 | `onboarding_second_photo_submitted` | 次の20時便に向けた一枚を保存した |
 
-## Source Values
+`photo_submitted` は `onboarding_photo_submitted` の汎用別名なので、継続回数には重ねて数えない。
 
-Allowed values:
+## 3. 初動で見る順序
 
-- `instagram`
-- `instagram_story`
-- `instagram_bio`
-- `instagram_dm`
-- `direct`
-- `unknown`
+### 投稿直後から15分
 
-Unknown or unsupported source values should be rounded to `unknown`. `source` is attribution only and must not reset onboarding state.
+1. `Instagram bio` のオンボ人数が増えているか
+2. 写真選択から写真保存まで、どこで人数が落ちているか
+3. 写真保存人数と即時便到着人数が一致しているか
+4. `要確認` に同じエラーが複数人で出ていないか
+5. iPhone / Android、Instagram内 / LINE内 / Safari・Chromeのどこで起きたか
 
-## P0 Events
+入口が5人未満の間は率で良否を決めず、一人ずつの経路を見る。5人以上になったら、写真保存率と即時便到着率を補助線として使う。
 
-| Event | Screen / Action | Priority | Notes |
-| --- | --- | --- | --- |
-| `app_opened` | App shell loaded | P0 | Includes route, display mode, in-app browser, PWA state. |
-| `onboarding_intro_view` | Onboarding intro displayed | P0 | First Instagram funnel step. |
-| `onboarding_photo_select_click` | User taps first photo select CTA | P0 | Measures CTA intent before OS picker. |
-| `onboarding_photo_submitted` | Onboarding photo saved | P0 | Includes `submission_id`; no photo URL. |
-| `photo_submitted` | Generic photo submitted | P0 | Used for cross-surface north star calculations. |
-| `onboarding_delivery_arrived` | Onboarding letter becomes available | P0 | Delivery exists before open. |
-| `onboarding_delivery_opened` | Onboarding letter opened | P0 | Includes delivered photo ID only. |
-| `onboarding_album_prompt_view` | Account/album prompt displayed | P0 | Alias of older prompt event for KPI. |
-| `onboarding_google_continue_click` | Google continue clicked or credential callback received | P0 | External Google button clicks can be hard to observe, so callback is also counted. |
-| `onboarding_skip_click` | User chooses later/skip | P0 | Keeps drop-off measurable. |
-| `onboarding_completed` | Onboarding marked complete | P0 | Fired after delivered photo keep or album/account continuation. |
-| `home_view` | Home screen viewed | P0 | Alias of older `home_viewed`. |
-| `home_photo_submit_click` | Home sleeping-photo CTA tapped | P0 | Before picker/safety gate. |
-| `home_photo_submitted` | Home sleeping photo selected and stored | P0 | No image URL. |
-| `delivery_opened` | A delivered cat letter is opened | P0 | Generic delivery event for app KPI. |
-| `collection_view` | Cat letter/collection screen viewed | P0 | Alias of older `collection_viewed`. |
-| `collection_sent_tab_view` | Sent side displayed | P0 | Tracks board side. |
-| `collection_received_tab_view` | Received side displayed | P0 | Tracks empty received-side problem. |
-| `cat_album_created` | Cat album/profile created | P0 | No cat name. |
-| `cat_name_saved` | Cat name/profile save happened | P0 | Name value is not sent. |
-| `app_error` | Generic app error | P0 | Not fully implemented yet. |
-| `photo_upload_error` | Photo save/upload error | P0 | Implemented for onboarding/home photo save failure. |
-| `photo_compress_error` | Compression-specific error | P0 | Not fully implemented yet; currently grouped into upload error. |
-| `signed_url_error` | Signed URL generation/display error | P0 | Not fully implemented yet. |
-| `delivery_error` | Delivery creation/opening error | P0 | Not fully implemented yet. |
+### 19時まで
 
-## P1 Events
+1. `今夜の一枚を保存した` 人数を確認
+2. 管理画面のモデレーションキューで pending を全件確認
+3. 写真保存失敗、原本保全失敗、夜便予約の自動修復が増えていないか確認
 
-Inventory only for launch; implement when improving each surface:
+モデレーション待ち件数は `app_events` ではなく、管理画面の実データを正とする。
 
-- `pwa_install_prompt_view`
-- `pwa_install_prompt_click`
-- `settings_view`
-- `beta_supporter_page_view`
-- `beta_supporter_checkout_click`
-- `report_photo_click`
-- `report_photo_submitted`
-- `notification_permission_prompt_view`
-- `notification_permission_accepted`
-- `notification_permission_denied`
-- `share_card_view`
-- `share_card_click`
+### 20:00から20:15
 
-## P2 Events
+1. `20時便の確認を開始` と `20時便が成立` の人数を比較
+2. 失敗・長時間化が0か確認
+3. 成立後に `20時便の封筒を表示` が増えるか確認
+4. 開封人数は体験指標として見る。未開封だけでは障害と断定しない
 
-Future quality signals:
+画面を開かない人は20時便の確認自体が走らない。予約人数と開始人数の差は「未再訪」、開始人数と成立人数の差は「技術的な要確認」と分ける。
 
-- animation start/end events for the opening letter
-- tab switch animation completion
-- image load retry count
-- offline recovery success
-- repeat weekly active submitter
-- paid supporter conversion source
+### 翌朝
 
-## Admin KPI Page
+1. `翌日も写真を入れた` 人数
+2. 前夜の失敗が再訪時の自動修復で回復したか
+3. PWAとして起動した人数
 
-Admin URL:
+## 4. 止める判断
 
-- `/admin/analytics`
+次は率に関係なくP0として公開を止め、個別確認する。
 
-Periods:
+- 写真の消失、他人への誤配、共有範囲の誤りが1件でもある
+- 最初の写真保存または即時便で、同じ停止エラーが別の2人に出る
+- 20時便の確認を開始した人に対し、再試行後も成立しない人がいる
+- 操作不能や復帰不能の白画面がある
 
-- today
-- yesterday
-- last 7 days
-- last 28 days
+次は改善シグナルだが、単独では公開停止にしない。
 
-Minimum displayed sections:
+- 写真選択後の離脱
+- 即時便は届いたが開かない
+- 2枚目を入れない
+- アプリ追加案内を閉じる
 
-- event count cards
-- onboarding funnel
-- source breakdown
-- app KPI table
-- recent errors
-- recent events with shortened IDs
-- rough retention: active users, repeat submitters, D1 return submitters
+## 5. 20時便の主要イベント
 
-## Known Gaps
+| イベント | 意味 |
+| --- | --- |
+| `home_exchange_share_photo_confirmed` | 共有する一枚を保存した |
+| `evening_delivery_check_started` | 20時便の確認を開始した |
+| `evening_delivery_check_succeeded` | 配達を保存できた |
+| `evening_delivery_check_failed` | 確認または保存に失敗した |
+| `evening_delivery_check_timeout` | 確認が長時間化した |
+| `evening_delivery_target_repaired` | 軽量予約を再訪時に修復した |
+| `envelope_shown` + `surface=home` | 20時便の封筒を表示した |
+| `delivery_opened` | 20時便を開いた |
 
-- `app_error`, `photo_compress_error`, `signed_url_error`, and `delivery_error` need broader instrumentation.
-- The north star is implemented as a view-level definition over `app_events`; it should be validated against production data after launch.
-- D1 retention is rough and based on local event IDs, not a fully modeled user table.
+## 6. 環境と流入
+
+新規イベントには、個人を特定しない粗い分類だけを付ける。
+
+- `device_os`: `ios` / `android` / `desktop` / `other`
+- `browser_context`: `instagram` / `line` / `facebook` / `wechat` / `embedded_other` / `browser` / `standalone`
+- `source`: `instagram_bio` / `instagram_story` / `instagram_dm` / `instagram` / `referral` / `direct` / `unknown`
+
+User-Agent全文、写真URL、Storageパス、猫の名前、メール、位置情報は保存しない。
+
+## 7. 継続の定義
+
+- 利用した人: 期間内に何らかのイベントがある人
+- 写真を入れた人: 初回写真またはホームの保存操作がある人
+- 期間内に2枚以上: 同じ人に正規の写真保存操作が2回以上ある
+- 翌日も写真を入れた: JSTで連続する2日に写真保存がある
+
+ホームの共有保存は `home_exchange_share_photo_confirmed`、自分だけ保存は `home_exchange_share_photo_declined` を1操作として数える。
+
+## 8. 既知の限界
+
+- iOSは「ホーム画面に追加した瞬間」の完了イベントをWeb側で取得できない。後日の `standalone` 起動で確認する
+- 旧イベントには `device_os` / `browser_context` がないため「不明・旧記録」になる
+- 1期間5,000件を超えると管理画面に警告を出す。先行期の規模では十分だが、増加時はサーバ集計へ移す
+- 匿名からGoogleログインへ切り替わる前後は、同じ人が別IDとして見える場合がある
+- アナリティクス送信失敗は製品体験を止めず、ローカルキューから後で再送する

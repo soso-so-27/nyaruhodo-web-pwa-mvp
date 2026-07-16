@@ -6,8 +6,14 @@ import {
 import {
   completePhotoSourceSet,
   getPhotoContentIdentityKeys,
+  getPhotoIdentityKeys,
 } from "../photoSources";
 import { purgePhotoSwCacheForSources } from "../photoSwCache";
+import {
+  readCachedPhotoHistoryEntries,
+  removePhotoHistoryEntry,
+  upsertPhotoHistoryEntries,
+} from "../photoHistoryLedger";
 import { readCachedJson, writeCachedJson } from "../storage";
 import { recordDeliveryStorageWritebackTrace } from "./eveningDeliveryTrace";
 
@@ -22,6 +28,8 @@ export type CatMoment = {
   thumbnailSrc?: string;
   displaySrc?: string;
   originalSrc?: string;
+  width?: number;
+  height?: number;
   state: CatMomentState;
   visibility: CatMomentVisibility;
   deliveryStatus: CatMomentDeliveryStatus;
@@ -48,6 +56,8 @@ export type ExchangePhoto = {
   displaySrc?: string;
   originalSrc?: string;
   offlineSrc?: string;
+  width?: number;
+  height?: number;
   title: string;
   subtitle: string;
   triggerLabel: string;
@@ -63,6 +73,8 @@ export type ExchangePhotoPoolItem = {
   thumbnailSrc?: string;
   displaySrc?: string;
   originalSrc?: string;
+  width?: number;
+  height?: number;
   title: string;
   subtitle: string;
   tags: readonly string[];
@@ -179,9 +191,16 @@ export function readOwnSleepingPhotosForAlbum(activeCatId: string | null = null)
 }
 
 export function readAllOwnSleepingPhotos() {
-  return readStorageArray<OwnSleepingPhoto>(OWN_SLEEPING_PHOTO_STORAGE_KEY)
+  const cachedPhotos = readStorageArray<OwnSleepingPhoto>(
+    OWN_SLEEPING_PHOTO_STORAGE_KEY,
+  )
     .filter(isValidOwnSleepingPhoto)
     .map(normalizeOwnSleepingPhoto);
+  const ledgerPhotos = readCachedPhotoHistoryEntries<OwnSleepingPhoto>("own")
+    .filter(isValidOwnSleepingPhoto)
+    .map(normalizeOwnSleepingPhoto);
+
+  return mergeOwnSleepingPhotos(cachedPhotos, ledgerPhotos);
 }
 
 export function isOnboardingOwnSleepingPhoto(
@@ -294,6 +313,10 @@ export function restoreSyncedSleepingPhotos({
   const existingKeptPhotos = mergeLocal ? readKeptExchangePhotos() : [];
   const restoredOwnPhotos = mergeOwnSleepingPhotos(existingOwnPhotos, ownPhotos);
   const restoredKeptPhotos = mergeExchangePhotos(existingKeptPhotos, keptPhotos);
+  void upsertPhotoHistoryEntries("own", restoredOwnPhotos).catch(() => undefined);
+  void upsertPhotoHistoryEntries("kept", restoredKeptPhotos).catch(
+    () => undefined,
+  );
   const minimumOwnRetainedCount = mergeLocal
     ? getValidOwnSleepingPhotoCount(existingOwnPhotos)
     : 1;
@@ -448,6 +471,7 @@ export function writeOwnSleepingPhotosWithFallback(
   const normalizedPhotos = photos
     .filter(isValidOwnSleepingPhoto)
     .map(normalizeOwnSleepingPhoto);
+  void upsertPhotoHistoryEntries("own", normalizedPhotos).catch(() => undefined);
   const minimumCount = Math.max(
     1,
     Math.min(minRetainedCount, normalizedPhotos.length),
@@ -516,12 +540,14 @@ export function fromCatMomentRecord(record: CatMomentRecord): CatMoment {
   };
 }
 
-export function saveOwnSleepingPhoto({
+export async function saveOwnSleepingPhoto({
   catId,
   src,
   thumbnailSrc,
   displaySrc,
   originalSrc,
+  width,
+  height,
   triggerLabel,
   theme,
   shared,
@@ -533,6 +559,8 @@ export function saveOwnSleepingPhoto({
   thumbnailSrc?: string | null;
   displaySrc?: string | null;
   originalSrc?: string | null;
+  width?: number | null;
+  height?: number | null;
   triggerLabel: string;
   theme: string;
   shared: boolean;
@@ -544,9 +572,7 @@ export function saveOwnSleepingPhoto({
   }
 
   try {
-    const saved = readStorageArray<OwnSleepingPhoto>(OWN_SLEEPING_PHOTO_STORAGE_KEY)
-      .filter(isValidOwnSleepingPhoto)
-      .map(normalizeOwnSleepingPhoto);
+    const saved = readAllOwnSleepingPhotos();
     const previousTakenCount = getOwnSleepingPhotoCountForCat(catId, saved);
     const createdAt = Date.now();
     const normalizedThumbnailSrc = normalizeOptionalPhotoSrc(thumbnailSrc);
@@ -560,6 +586,8 @@ export function saveOwnSleepingPhoto({
       ...(normalizedThumbnailSrc ? { thumbnailSrc: normalizedThumbnailSrc } : {}),
       ...(normalizedDisplaySrc ? { displaySrc: normalizedDisplaySrc } : {}),
       ...(normalizedOriginalSrc ? { originalSrc: normalizedOriginalSrc } : {}),
+      ...(isValidPhotoDimension(width) ? { width } : {}),
+      ...(isValidPhotoDimension(height) ? { height } : {}),
       state: "sleeping",
       visibility: shared ? "shared" : "private",
       deliveryStatus: "available",
@@ -571,6 +599,13 @@ export function saveOwnSleepingPhoto({
     };
     const normalizedOwnPhoto = normalizeOwnSleepingPhoto(ownPhoto);
     const nextPhotos = [normalizedOwnPhoto, ...saved];
+    let wasSavedDurably = false;
+    try {
+      await upsertPhotoHistoryEntries("own", [normalizedOwnPhoto]);
+      wasSavedDurably = true;
+    } catch {
+      // The compact local cache remains a fallback when IndexedDB is unavailable.
+    }
     const savedPhotos = writeStorageArrayWithFallback(
       OWN_SLEEPING_PHOTO_STORAGE_KEY,
       nextPhotos,
@@ -578,12 +613,15 @@ export function saveOwnSleepingPhoto({
       minRetainedCount,
     );
 
-    if (savedPhotos.some((photo) => photo.id === normalizedOwnPhoto.id)) {
+    if (
+      wasSavedDurably ||
+      savedPhotos.some((photo) => photo.id === normalizedOwnPhoto.id)
+    ) {
       if (isRegularOwnSleepingPhoto(normalizedOwnPhoto)) {
         recordOwnSleepingPhotoTaken(normalizedOwnPhoto, previousTakenCount + 1);
       }
       dispatchBoxPhotoStorageEvent();
-        return normalizedOwnPhoto;
+      return normalizedOwnPhoto;
     }
   } catch {
     // The calling flow handles a null result.
@@ -594,7 +632,7 @@ export function saveOwnSleepingPhoto({
 
 export function updateOwnSleepingPhotoDelivery(photoId: string, shared: boolean) {
   try {
-    const photos = readStorageArray<OwnSleepingPhoto>(OWN_SLEEPING_PHOTO_STORAGE_KEY);
+    const photos = readAllOwnSleepingPhotos();
     const targetPhoto = photos.find((photo) => photo.id === photoId);
     const updatedTargetPhoto = targetPhoto
       ? normalizeOwnSleepingPhoto({
@@ -608,6 +646,11 @@ export function updateOwnSleepingPhotoDelivery(photoId: string, shared: boolean)
     );
 
     writeStorageArray(OWN_SLEEPING_PHOTO_STORAGE_KEY, nextPhotos);
+    if (updatedTargetPhoto) {
+      void upsertPhotoHistoryEntries("own", [updatedTargetPhoto]).catch(
+        () => undefined,
+      );
+    }
 
     dispatchBoxPhotoStorageEvent();
     return updatedTargetPhoto;
@@ -620,13 +663,14 @@ export function updateOwnSleepingPhotoDelivery(photoId: string, shared: boolean)
 
 export function deleteOwnSleepingPhoto(photoId: string) {
   try {
-    const photos = readStorageArray<OwnSleepingPhoto>(OWN_SLEEPING_PHOTO_STORAGE_KEY);
+    const photos = readAllOwnSleepingPhotos();
     const targetPhoto = photos.find((photo) => photo.id === photoId);
     const nextPhotos = photos.filter((photo) => photo.id !== photoId);
 
     writeStorageArray(OWN_SLEEPING_PHOTO_STORAGE_KEY, nextPhotos);
 
     if (targetPhoto) {
+      void removePhotoHistoryEntry("own", targetPhoto).catch(() => undefined);
       purgePhotoSwCacheForSources(
         [
           targetPhoto.src,
@@ -644,6 +688,46 @@ export function deleteOwnSleepingPhoto(photoId: string) {
   }
 }
 
+export function updateOwnSleepingPhotoDimensions(
+  photo: Pick<OwnSleepingPhoto, "id" | "sourceMomentId">,
+  size: { width: number; height: number },
+) {
+  if (!isValidPhotoDimension(size.width) || !isValidPhotoDimension(size.height)) {
+    return false;
+  }
+
+  const photos = readAllOwnSleepingPhotos();
+  const targetIndex = photos.findIndex(
+    (candidate) =>
+      candidate.id === photo.id ||
+      Boolean(
+        photo.sourceMomentId &&
+          candidate.sourceMomentId === photo.sourceMomentId,
+      ),
+  );
+  if (targetIndex < 0) {
+    return false;
+  }
+
+  const updatedPhoto = {
+    ...photos[targetIndex],
+    width: size.width,
+    height: size.height,
+  };
+  const nextPhotos = photos.map((candidate, index) =>
+    index === targetIndex ? updatedPhoto : candidate,
+  );
+
+  void upsertPhotoHistoryEntries("own", [updatedPhoto]).catch(() => undefined);
+  writeStorageArrayWithFallback(
+    OWN_SLEEPING_PHOTO_STORAGE_KEY,
+    nextPhotos,
+    [24, 12, 6, 1],
+  );
+  dispatchBoxPhotoStorageEvent();
+  return true;
+}
+
 export function readKeptExchangePhotos() {
   return readAllKeptExchangePhotos().slice(0, 50);
 }
@@ -651,7 +735,10 @@ export function readKeptExchangePhotos() {
 export function readAllKeptExchangePhotos() {
   return mergeExchangePhotos(
     [],
-    readStorageArray<ExchangePhoto>(KEPT_EXCHANGE_PHOTO_STORAGE_KEY),
+    [
+      ...readStorageArray<ExchangePhoto>(KEPT_EXCHANGE_PHOTO_STORAGE_KEY),
+      ...readCachedPhotoHistoryEntries<ExchangePhoto>("kept"),
+    ],
   )
     .map(withExchangePhotoOfflineSrc);
 }
@@ -662,6 +749,18 @@ export function readKeptExchangePhotosForSync() {
 
 export function readKeptExchangePhotosForAlbum() {
   return readAllKeptExchangePhotos();
+}
+
+export function persistOwnSleepingPhotoHistory(photo: OwnSleepingPhoto) {
+  return upsertPhotoHistoryEntries("own", [normalizeOwnSleepingPhoto(photo)]);
+}
+
+export function persistKeptExchangePhotoHistory(photo: ExchangePhoto) {
+  const normalized = sanitizeExchangePhotoForPersistence(photo);
+
+  return normalized
+    ? upsertPhotoHistoryEntries("kept", [normalized])
+    : Promise.reject(new Error("invalid_kept_exchange_photo"));
 }
 
 export function readKeptExchangePhotoCount() {
@@ -716,7 +815,7 @@ export function keepExchangePhoto(photo: ExchangePhoto) {
   }
 
   try {
-    const existingPhotos = readKeptExchangePhotos();
+    const existingPhotos = readAllKeptExchangePhotos();
     const contentDuplicate = existingPhotos.find((savedPhoto) =>
       hasMatchingPhotoContent(savedPhoto, persistentPhoto),
     );
@@ -734,6 +833,9 @@ export function keepExchangePhoto(photo: ExchangePhoto) {
       KEPT_EXCHANGE_PHOTO_STORAGE_KEY,
       [photoToStore, ...saved],
       [50, 30, 20, 12, 6, 1],
+    );
+    void upsertPhotoHistoryEntries("kept", [photoToStore]).catch(
+      () => undefined,
     );
 
     if (
@@ -814,6 +916,43 @@ function normalizePersistentExchangePhotoSrc(src: string | undefined) {
   }
 
   return isUsablePhotoSrc(normalized) ? normalized : undefined;
+}
+
+export function updateKeptExchangePhotoDimensions(
+  photo: Pick<ExchangePhoto, "id" | "sourcePhotoId">,
+  size: { width: number; height: number },
+) {
+  if (!isValidPhotoDimension(size.width) || !isValidPhotoDimension(size.height)) {
+    return false;
+  }
+
+  const saved = readAllKeptExchangePhotos();
+  const targetIndex = saved.findIndex((savedPhoto) =>
+    getPhotoIdentityKeys(savedPhoto).some((key) =>
+      getPhotoIdentityKeys({ ...photo, src: "" }).includes(key),
+    ),
+  );
+  if (targetIndex < 0) {
+    return false;
+  }
+
+  const updatedPhoto = {
+    ...saved[targetIndex],
+    width: size.width,
+    height: size.height,
+  };
+  const nextPhotos = saved.map((savedPhoto, index) =>
+    index === targetIndex ? updatedPhoto : savedPhoto,
+  );
+
+  void upsertPhotoHistoryEntries("kept", [updatedPhoto]).catch(() => undefined);
+  writeStorageArrayWithFallback(
+    KEPT_EXCHANGE_PHOTO_STORAGE_KEY,
+    nextPhotos,
+    [50, 30, 20, 12, 6, 1],
+  );
+  dispatchBoxPhotoStorageEvent();
+  return true;
 }
 
 export function cacheExchangePhotoOfflineDataUrl(
@@ -1019,13 +1158,14 @@ export function hideKeptExchangePhoto(
   reason: HiddenExchangePhotoReason,
 ) {
   try {
-    const photos = readKeptExchangePhotos();
+    const photos = readAllKeptExchangePhotos();
     const targetPhoto = photos.find((photo) => photo.id === photoId);
     const nextPhotos = photos.filter((photo) => photo.id !== photoId);
 
     writeStorageArray(KEPT_EXCHANGE_PHOTO_STORAGE_KEY, nextPhotos);
 
     if (targetPhoto) {
+      void removePhotoHistoryEntry("kept", targetPhoto).catch(() => undefined);
       purgePhotoSwCacheForSources(
         [
           targetPhoto.src,
@@ -1200,10 +1340,7 @@ function mergeExchangePhotos(
 }
 
 function getExchangePhotoIdentityKeys(photo: ExchangePhoto) {
-  return [
-    `id:${photo.id}`,
-    photo.sourcePhotoId ? `source:${photo.sourcePhotoId}` : "",
-  ].filter(Boolean);
+  return getPhotoIdentityKeys(photo);
 }
 
 function hasMatchingPhotoContent(
@@ -1241,6 +1378,8 @@ function mergeExchangePhotoVersions(
     displaySrc: preferred.displaySrc ?? fallback.displaySrc,
     originalSrc: preferred.originalSrc ?? fallback.originalSrc,
     offlineSrc: preferred.offlineSrc ?? fallback.offlineSrc,
+    width: preferred.width ?? fallback.width,
+    height: preferred.height ?? fallback.height,
     deliveredAt: Math.max(existing.deliveredAt, incoming.deliveredAt),
   });
 }
@@ -1387,6 +1526,8 @@ function normalizeOwnSleepingPhoto(photo: OwnSleepingPhoto): OwnSleepingPhoto {
     ...(thumbnailSrc ? { thumbnailSrc } : {}),
     ...(displaySrc ? { displaySrc } : {}),
     ...(originalSrc ? { originalSrc } : {}),
+    ...(isValidPhotoDimension(photo.width) ? { width: photo.width } : {}),
+    ...(isValidPhotoDimension(photo.height) ? { height: photo.height } : {}),
     state: photo.state ?? "sleeping",
     visibility: photo.visibility ?? (shared ? "shared" : "private"),
     deliveryStatus: photo.deliveryStatus ?? "available",
@@ -1418,4 +1559,8 @@ function normalizeOptionalPhotoSrc(src: string | null | undefined) {
 
   const normalized = normalizePersistentPhotoSrc(src);
   return normalized && isUsablePhotoSrc(normalized) ? normalized : null;
+}
+
+function isValidPhotoDimension(value: number | null | undefined): value is number {
+  return typeof value === "number" && Number.isFinite(value) && value > 0;
 }

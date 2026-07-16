@@ -82,6 +82,7 @@ test("keeps the cats photo tab clear of the fixed bottom navigation", async ({
   await expect(page.getByTestId("cats-photo-lens-filter")).toHaveCount(0);
   await expect(page.getByRole("button", { name: "写真をしまう" })).toBeVisible();
   await expect(photoItems).toHaveCount(16);
+  await expect(grid.locator('[data-app-pressable="photo"]')).toHaveCount(16);
   await expect
     .poll(() =>
       page.evaluate(() =>

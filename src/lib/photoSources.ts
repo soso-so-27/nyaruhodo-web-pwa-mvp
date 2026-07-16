@@ -46,7 +46,33 @@ export type PhotoSourceSet = {
   displaySrc?: string;
   originalSrc?: string;
   offlineSrc?: string;
+  width?: number;
+  height?: number;
 };
+
+export type PhotoIdentitySet = PhotoSourceSet & {
+  id?: string;
+  sourcePhotoId?: string;
+  sourceMomentId?: string;
+};
+
+export function getPhotoIdentityKeys(photo: PhotoIdentitySet) {
+  return [
+    photo.id ? `id:${photo.id}` : "",
+    photo.sourcePhotoId ? `source:${photo.sourcePhotoId}` : "",
+    photo.sourceMomentId ? `moment:${photo.sourceMomentId}` : "",
+    ...getPhotoContentIdentityKeys(photo),
+  ].filter(Boolean);
+}
+
+export function getPhotoAspectRatio(
+  photo: Partial<PhotoSourceSet> | null | undefined,
+) {
+  const width = Number(photo?.width);
+  const height = Number(photo?.height);
+
+  return width > 0 && height > 0 ? width / height : null;
+}
 
 export function getPhotoContentIdentityKeys(photo: PhotoSourceSet) {
   const keys = new Set<string>();

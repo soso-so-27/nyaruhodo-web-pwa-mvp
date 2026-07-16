@@ -3,6 +3,7 @@
 import {
   useCallback,
   useEffect,
+  useLayoutEffect,
   useMemo,
   useState,
   type CSSProperties,
@@ -16,16 +17,25 @@ export function useNaturalPhotoFrame({
   horizontalInsetPx,
   maxWidthPx,
   verticalChromePx,
+  initialAspect,
+  photoKey,
 }: {
   horizontalInsetPx: number;
   maxWidthPx: number;
   verticalChromePx: number;
+  initialAspect?: number | null;
+  photoKey?: string | null;
 }) {
-  const [photoAspect, setPhotoAspect] = useState(1);
+  const normalizedInitialAspect = normalizePhotoAspect(initialAspect);
+  const [photoAspect, setPhotoAspect] = useState(normalizedInitialAspect);
   const [viewportSize, setViewportSize] = useState({
     width: DEFAULT_VIEWPORT_WIDTH,
     height: DEFAULT_VIEWPORT_HEIGHT,
   });
+
+  useLayoutEffect(() => {
+    setPhotoAspect(normalizedInitialAspect);
+  }, [normalizedInitialAspect, photoKey]);
 
   useEffect(() => {
     let frameId: number | null = null;
@@ -93,7 +103,10 @@ export function useNaturalPhotoFrame({
     [],
   );
 
-  const resetPhotoAspect = useCallback(() => setPhotoAspect(1), []);
+  const resetPhotoAspect = useCallback(
+    () => setPhotoAspect(normalizedInitialAspect),
+    [normalizedInitialAspect],
+  );
 
   return {
     frameStyle,
@@ -101,4 +114,8 @@ export function useNaturalPhotoFrame({
     photoAspect,
     resetPhotoAspect,
   };
+}
+
+function normalizePhotoAspect(aspect: number | null | undefined) {
+  return Number.isFinite(aspect) && Number(aspect) > 0 ? Number(aspect) : 1;
 }

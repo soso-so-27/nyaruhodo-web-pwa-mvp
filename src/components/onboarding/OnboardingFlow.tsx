@@ -15,9 +15,11 @@ import {
 } from "../../lib/home/deliveryCandidates";
 import {
   keepExchangePhoto,
+  persistOwnSleepingPhotoHistory,
   readOwnSleepingPhotos,
   saveOwnSleepingPhoto,
   updateKeptExchangePhotoDataUrl,
+  updateKeptExchangePhotoDimensions,
   type ExchangePhoto,
   type OwnSleepingPhoto,
 } from "../../lib/home/sleepingPhotos";
@@ -29,13 +31,16 @@ import {
   createOnboardingSubmissionId,
   getOrCreateOnboardingAnonymousId,
   patchOnboardingProgress,
+  patchOnboardingProgressDurably,
   readCurrentOnboardingProgress,
+  readCurrentOnboardingProgressDurably,
   readOnboardingSourceFromLocation,
-  writeOnboardingProgress,
+  writeOnboardingProgressDurably,
   type OnboardingProgress,
   type OnboardingSource,
 } from "../../lib/onboarding/progress";
 import { consumeOnboardingTestResetRequest } from "../../lib/onboarding/testReset";
+import { resolveOnboardingResumeDecision } from "../../lib/onboarding/stateMachine";
 import { trackProductEvent } from "../../lib/analytics/productAnalytics";
 import { isEmbeddedInAppBrowser } from "../../lib/displayEnvironment";
 import { HOME_INSTALL_ONBOARDING_COMPLETED_EVENT } from "../../lib/homeInstall";
@@ -43,9 +48,13 @@ import {
   validateImageFile,
   type ImageFileRejectionReason,
 } from "../../lib/imageFileValidation";
-import { resizeImageFileToDataUrl } from "../../lib/imageResize";
+import {
+  readImageFileDimensions,
+  resizeImageFileToDataUrl,
+} from "../../lib/imageResize";
 import { isUsablePhotoSrc } from "../../lib/photoStorage";
 import {
+  getPhotoAspectRatio,
   resolvePhotoFallbackSrcs,
   resolvePhotoSrc,
 } from "../../lib/photoSources";
@@ -135,13 +144,15 @@ export function OnboardingFlow() {
   const [revealPhotoRetryKey, setRevealPhotoRetryKey] = useState(0);
   const {
     frameStyle: naturalDeliveredPhotoFrameStyle,
-    handleNaturalSize: handleDeliveredPhotoNaturalSize,
+    handleNaturalSize: applyDeliveredPhotoNaturalSize,
     photoAspect: deliveredPhotoAspect,
     resetPhotoAspect: resetDeliveredPhotoAspect,
   } = useNaturalPhotoFrame({
     horizontalInsetPx: 56,
     maxWidthPx: 350,
     verticalChromePx: 272,
+    initialAspect: getPhotoAspectRatio(deliveredPhoto),
+    photoKey: deliveredPhoto?.id,
   });
   const [catNameDraft, setCatNameDraft] = useState("");
   const prefersReducedMotion = usePrefersReducedMotion();
@@ -263,12 +274,21 @@ export function OnboardingFlow() {
       return;
     }
 
-    const didReset = consumeOnboardingTestResetRequest();
-    const source = readOnboardingSourceFromLocation();
-    setEntrySource(source);
-    entrySourceRef.current = source;
     hasResolvedProgressRef.current = true;
-    if (didReset) {
+    void (async () => {
+      const didReset = await consumeOnboardingTestResetRequest();
+      const source = readOnboardingSourceFromLocation();
+      setEntrySource(source);
+      entrySourceRef.current = source;
+
+      if (!didReset) {
+        const progress = await readCurrentOnboardingProgressDurably().catch(() =>
+          readCurrentOnboardingProgress(),
+        );
+        resolveOnboardingProgress(source, progress);
+        return;
+      }
+
       setSelectedPhotoSrc("");
       setDeliveredPhoto(null);
       setPendingOwnPhoto(null);
@@ -278,8 +298,8 @@ export function OnboardingFlow() {
       setMessage(
         "テスト用に、この端末のオンボーディング状態とログイン状態をリセットしました。",
       );
-    }
-    resolveOnboardingProgress(source);
+      resolveOnboardingProgress(source, null);
+    })();
   }, []);
 
   useEffect(() => {
@@ -321,8 +341,10 @@ export function OnboardingFlow() {
     setRevealPhotoRetryKey(0);
   }, [deliveredPhoto?.id]);
 
-  function resolveOnboardingProgress(source: OnboardingSource) {
-    const progress = readCurrentOnboardingProgress();
+  function resolveOnboardingProgress(
+    source: OnboardingSource,
+    progress = readCurrentOnboardingProgress(),
+  ) {
 
     if (restoreExistingProgress(progress, source)) {
       return;
@@ -353,16 +375,18 @@ export function OnboardingFlow() {
     progress: OnboardingProgress | null,
     source: OnboardingSource,
   ) {
-    if (!progress) {
+    const decision = resolveOnboardingResumeDecision(progress);
+
+    if (decision.kind === "intro") {
       return false;
     }
 
-    if (progress.stage === "album_created") {
+    if (decision.kind === "home") {
       router.replace("/home");
       return true;
     }
 
-    if (progress.stage === "opened") {
+    if (decision.kind === "second_photo") {
       markOnboardingAlbumCompletionReady();
       router.replace(
         isEmbeddedInAppBrowser()
@@ -372,44 +396,36 @@ export function OnboardingFlow() {
       return true;
     }
 
-    if (progress.stage === "arrived" && progress.deliveredPhoto) {
-      setSelectedPhotoSrc(progress.selectedPhotoSrc ?? "");
-      setPendingOwnPhoto(progress.ownPhoto ?? null);
-      setDeliveredPhoto(progress.deliveredPhoto);
-      setIsDeliveredPhotoKept(progress.isDeliveredPhotoKept ?? true);
-      setCompletionCopy(progress.completionCopy ?? "");
+    const resumedProgress = decision.progress;
+
+    if (decision.kind === "envelope") {
+      setSelectedPhotoSrc(resumedProgress.selectedPhotoSrc ?? "");
+      setPendingOwnPhoto(resumedProgress.ownPhoto ?? null);
+      setDeliveredPhoto(resumedProgress.deliveredPhoto ?? null);
+      setIsDeliveredPhotoKept(resumedProgress.isDeliveredPhotoKept ?? true);
+      setCompletionCopy(resumedProgress.completionCopy ?? "");
       setState("envelope");
       return true;
     }
 
-    if (progress.stage === "name_pending" && progress.ownPhoto && progress.deliveredPhoto) {
-      setSelectedPhotoSrc(progress.selectedPhotoSrc ?? "");
-      setPendingOwnPhoto(progress.ownPhoto);
-      setDeliveredPhoto(progress.deliveredPhoto);
+    if (decision.kind === "naming") {
+      setSelectedPhotoSrc(resumedProgress.selectedPhotoSrc ?? "");
+      setPendingOwnPhoto(resumedProgress.ownPhoto ?? null);
+      setDeliveredPhoto(resumedProgress.deliveredPhoto ?? null);
       setIsDeliveredPhotoKept(false);
       setCatNameDraft("");
       setState("naming");
-      trackCatNamePromptView(progress.ownPhoto.id);
+      trackCatNamePromptView(resumedProgress.ownPhoto?.id);
       return true;
     }
 
-    if (progress.stage === "name_pending" && progress.ownPhoto) {
-      setSelectedPhotoSrc(progress.selectedPhotoSrc ?? "");
-      setPendingOwnPhoto(progress.ownPhoto);
+    if (decision.kind === "resume_submission") {
+      setSelectedPhotoSrc(resumedProgress.selectedPhotoSrc ?? "");
+      setPendingOwnPhoto(resumedProgress.ownPhoto ?? null);
       setIsDeliveredPhotoKept(false);
       setState("saving");
       setSavingStage("receiving_letter");
-      void resumeSubmittedProgress({ ...progress, stage: "submitted" });
-      return true;
-    }
-
-    if (progress.stage === "submitted" && progress.ownPhoto) {
-      setSelectedPhotoSrc(progress.selectedPhotoSrc ?? "");
-      setPendingOwnPhoto(progress.ownPhoto);
-      setIsDeliveredPhotoKept(false);
-      setState("saving");
-      setSavingStage("receiving_letter");
-      void resumeSubmittedProgress(progress);
+      void resumeSubmittedProgress(resumedProgress);
       return true;
     }
 
@@ -652,7 +668,7 @@ export function OnboardingFlow() {
           anonymousId,
           onboardingDateKey,
         );
-        writeOnboardingProgress({
+        await writeOnboardingProgressDurably({
           version: 1,
           anonymousId,
           dateKey: onboardingDateKey,
@@ -793,7 +809,7 @@ export function OnboardingFlow() {
       });
     }
 
-    patchOnboardingProgress({
+    await patchOnboardingProgressDurably({
       stage: "opened",
       source: getEffectiveEntrySource(),
       ownPhoto,
@@ -904,6 +920,19 @@ export function OnboardingFlow() {
         : { photoId: deliveredPhoto.id, dataUrl },
     );
     updateKeptExchangePhotoDataUrl(deliveredPhoto, dataUrl);
+  }
+
+  function handleDeliveredPhotoNaturalSize(size: {
+    width: number;
+    height: number;
+  }) {
+    applyDeliveredPhotoNaturalSize(size);
+    if (!deliveredPhoto) {
+      return;
+    }
+
+    setDeliveredPhoto((current) => (current ? { ...current, ...size } : current));
+    updateKeptExchangePhotoDimensions(deliveredPhoto, size);
   }
 
   function getDeliveredPhotoDisplaySrc(photo: ExchangePhoto) {
@@ -1163,7 +1192,7 @@ export function OnboardingFlow() {
     setDeliveryIssue(null);
     setDeliveredPhoto(nextPhoto);
     setIsDeliveredPhotoKept(false);
-    patchOnboardingProgress({
+    await patchOnboardingProgressDurably({
       stage: "arrived",
       source: getEffectiveEntrySource(),
       dateKey: deliveryDateKey ?? undefined,
@@ -2104,6 +2133,7 @@ async function saveSleepingPhotoWithFallback(
   exchangeDataUrl: string,
 ) {
   const createdAt = Date.now();
+  const dimensions = await readImageFileDimensions(file);
   const fileName = `onboarding-${createdAt}`;
   const displayDataUrl =
     (await tryResizeAndEncode(file, 2048, 0.84, "image/webp")) ??
@@ -2169,12 +2199,14 @@ async function saveSleepingPhotoWithFallback(
     }
 
     triedSrcs.add(attempt.src);
-    const ownPhoto = saveOwnSleepingPhoto({
+    const ownPhoto = await saveOwnSleepingPhoto({
       catId,
       src: attempt.src,
       thumbnailSrc: attempt.thumbnailSrc,
       displaySrc: attempt.displaySrc,
       originalSrc: canUseStorage ? storedDisplaySrc : undefined,
+      width: dimensions.width,
+      height: dimensions.height,
       triggerLabel: "ねがお",
       theme: "sleeping",
       shared: true,
@@ -2201,9 +2233,12 @@ async function saveSleepingPhotoWithFallback(
     thumbnailSrc: isStoragePhotoReference(storedThumbnailSrc)
       ? storedThumbnailSrc
       : undefined,
+    width: dimensions.width,
+    height: dimensions.height,
     createdAt,
   });
 
+  await persistOwnSleepingPhotoHistory(fallbackOwnPhoto);
   void queueOriginalPhotoPreservation({
     file,
     localAssetId: fallbackOwnPhoto.id,
@@ -2305,12 +2340,16 @@ function createOnboardingOwnPhotoFallback({
   src,
   displaySrc,
   thumbnailSrc,
+  width,
+  height,
   createdAt,
 }: {
   catId: string;
   src: string;
   displaySrc?: string;
   thumbnailSrc?: string;
+  width?: number;
+  height?: number;
   createdAt: number;
 }): OwnSleepingPhoto {
   return {
@@ -2321,6 +2360,8 @@ function createOnboardingOwnPhotoFallback({
     ...(thumbnailSrc ? { thumbnailSrc } : {}),
     ...(displaySrc ? { displaySrc } : {}),
     ...(displaySrc ? { originalSrc: displaySrc } : {}),
+    ...(width ? { width } : {}),
+    ...(height ? { height } : {}),
     state: "sleeping",
     visibility: "shared",
     deliveryStatus: "available",

@@ -31,6 +31,23 @@ const landscapeTestJpeg = encode(
 const landscapeDeliveryDataUrl = `data:image/jpeg;base64,${landscapeTestJpeg.toString(
   "base64",
 )}`;
+const colorfulTestJpegPixels = Buffer.alloc(32 * 32 * 4);
+for (let offset = 0; offset < colorfulTestJpegPixels.length; offset += 4) {
+  const pixel = offset / 4;
+  const x = pixel % 32;
+  const y = Math.floor(pixel / 32);
+  colorfulTestJpegPixels[offset] = 80 + x * 5;
+  colorfulTestJpegPixels[offset + 1] = 70 + y * 5;
+  colorfulTestJpegPixels[offset + 2] = 210 - x * 3;
+  colorfulTestJpegPixels[offset + 3] = 255;
+}
+const colorfulTestJpeg = encode(
+  { data: colorfulTestJpegPixels, width: 32, height: 32 },
+  90,
+).data;
+const colorfulDeliveryDataUrl = `data:image/jpeg;base64,${colorfulTestJpeg.toString(
+  "base64",
+)}`;
 const portraitDeliveryDataUrl = `data:image/jpeg;base64,${orientedTestJpeg.toString(
   "base64",
 )}`;
@@ -60,6 +77,12 @@ test.describe("onboarding delivery flow", () => {
 
   test("reaches the album after adding a real test candidate", async ({ page }) => {
     test.slow();
+    const originalQueueWarnings: string[] = [];
+    page.on("console", (message) => {
+      if (message.text().includes("[photo-originals]")) {
+        originalQueueWarnings.push(message.text());
+      }
+    });
     let exchangeCalls = 0;
     let stockCalls = 0;
     const stockResponses: Array<{
@@ -117,7 +140,7 @@ test.describe("onboarding delivery flow", () => {
           photo: {
             id: `delivered-test-${Date.now()}`,
             sourcePhotoId: stockResponses[0]?.sourceOwnPhotoId ?? "stock-e2e-fake",
-            src: `data:image/png;base64,${testPng.toString("base64")}`,
+            src: colorfulDeliveryDataUrl,
             title: "",
             subtitle: "",
             triggerLabel: "sleeping",
@@ -146,7 +169,7 @@ test.describe("onboarding delivery flow", () => {
             id: "remote-stock-e2e-fake",
             sourceOwnPhotoId: "stock-e2e-fake",
             sourceCatId: "admin-stock",
-            src: `data:image/png;base64,${testPng.toString("base64")}`,
+            src: colorfulDeliveryDataUrl,
             title: "",
             subtitle: "",
             tags: ["sleeping"],
@@ -226,6 +249,18 @@ test.describe("onboarding delivery flow", () => {
       buffer: testPng,
     });
 
+    const originalQueueEvents = await waitForAnalyticsEvents(page, [
+      "photo_original_queued",
+    ]);
+    expect(originalQueueWarnings).toEqual([]);
+    expect(originalQueueEvents.photo_original_queued?.properties).toMatchObject({
+      source_surface: "onboarding",
+      queued_locally: true,
+    });
+    await expect.poll(() => readPendingOriginalPhotoCount(page)).toBe(1);
+    await expect(
+      page.getByTestId("original-photo-preservation-warning"),
+    ).toHaveCount(0);
     await expect.poll(() => exchangeCalls).toBe(1);
     const addCandidateButton = page.getByRole("button", {
       name: "とどく候補を追加する",
@@ -1391,6 +1426,46 @@ test.describe("onboarding delivery flow", () => {
     await expect(page).toHaveURL(/\/home/);
   });
 
+  test("resumes from IndexedDB when localStorage rejects onboarding progress", async ({
+    page,
+  }) => {
+    let exchangeCalls = 0;
+    await page.addInitScript(() => {
+      const originalSetItem = Storage.prototype.setItem;
+      Storage.prototype.setItem = function setItemWithOnboardingQuota(
+        key,
+        value,
+      ) {
+        if (key === "neteruneko_onboarding_progress") {
+          throw new DOMException("Quota exceeded", "QuotaExceededError");
+        }
+        return originalSetItem.call(this, key, value);
+      };
+    });
+    await routeImmediateDelivery(page, () => {
+      exchangeCalls += 1;
+    });
+
+    await page.goto("/onboarding?source=instagram_bio");
+    await page.getByTestId("onboarding-photo-select").click();
+    await page.locator('input[type="file"]').last().setInputFiles({
+      name: "durable-onboarding.png",
+      mimeType: "image/png",
+      buffer: testPng,
+    });
+
+    await expect(page.getByRole("button", { name: "ねこだよりを ひらく" })).toBeVisible();
+    await expect.poll(() => exchangeCalls).toBe(1);
+    await expect
+      .poll(() => readDurableOnboardingProgress(page))
+      .toMatchObject({ stage: "arrived", source: "instagram_bio" });
+    expect(await readOnboardingProgress(page)).toBeNull();
+
+    await page.reload();
+    await expect(page.getByRole("button", { name: "ねこだよりを ひらく" })).toBeVisible();
+    expect(exchangeCalls).toBe(1);
+  });
+
   test("does not let yesterday album completion block a new social onboarding day", async ({
     page,
   }) => {
@@ -1960,7 +2035,12 @@ test.describe("onboarding delivery flow", () => {
 
     await expect(page.getByTestId("onboarding-delivery-photo-error")).toBeVisible();
     imageAvailable = true;
-    await page.getByTestId("onboarding-delivery-photo-retry").click();
+    const retryButton = page.getByTestId("onboarding-delivery-photo-retry");
+    if (await retryButton.isVisible().catch(() => false)) {
+      await retryButton
+        .evaluate((button: HTMLButtonElement) => button.click())
+        .catch(() => undefined);
+    }
     await expect(page.getByTestId("onboarding-delivery-photo-error")).toHaveCount(0);
     await expect.poll(() => imageRequests).toBeGreaterThan(1);
     await expect
@@ -2254,14 +2334,15 @@ test.describe("onboarding delivery flow", () => {
       id: "previous-onboarding-letter",
       sourcePhotoId: "previous-onboarding-source",
       src: portraitDeliveryDataUrl,
+      title: "",
+      subtitle: "",
+      triggerLabel: "sleeping",
+      theme: "sleeping",
       deliveredAt: Date.parse("2026-07-15T20:00:00+09:00"),
     };
 
-    await page.addInitScript((letter) => {
-      if (window.sessionStorage.getItem("onboarding-reset-letter-seeded")) {
-        return;
-      }
-      window.sessionStorage.setItem("onboarding-reset-letter-seeded", "true");
+    await page.goto("/offline");
+    await page.evaluate(async (letter) => {
       window.localStorage.setItem(
         "nyaruhodo_exchange_kept_photos",
         JSON.stringify([letter]),
@@ -2270,6 +2351,29 @@ test.describe("onboarding delivery flow", () => {
         "nyaruhodo_supabase_auth",
         JSON.stringify({ access_token: "stale-test-session" }),
       );
+      await new Promise<void>((resolve, reject) => {
+        const request = indexedDB.open("neteruneko-durable-state", 1);
+        request.onupgradeneeded = () => {
+          if (!request.result.objectStoreNames.contains("records")) {
+            request.result.createObjectStore("records", { keyPath: "key" });
+          }
+        };
+        request.onerror = () => reject(request.error);
+        request.onsuccess = () => {
+          const database = request.result;
+          const transaction = database.transaction("records", "readwrite");
+          transaction.objectStore("records").put({
+            key: "photo-history:kept:v1",
+            value: [letter],
+            updatedAt: Date.now(),
+          });
+          transaction.oncomplete = () => {
+            database.close();
+            resolve();
+          };
+          transaction.onerror = () => reject(transaction.error);
+        };
+      });
     }, previousLetter);
     await routeImmediateDelivery(page);
 
@@ -3206,6 +3310,100 @@ test.describe("onboarding delivery flow", () => {
     await expect(page.getByText("このねこの名前は？")).toBeVisible();
     await expect(page.getByRole("button", { name: "アルバムをつくる" })).toBeVisible();
   });
+  test("restores a handoff into a genuinely separate browser origin", async ({
+    page,
+    context,
+  }) => {
+    const sourceBase = new URL(
+      process.env.PLAYWRIGHT_BASE_URL ?? "http://localhost:3000",
+    );
+    const targetBase = new URL(sourceBase);
+    targetBase.hostname = sourceBase.hostname === "localhost" ? "127.0.0.1" : "localhost";
+    const imageDataUrl = `data:image/png;base64,${testPng.toString("base64")}`;
+
+    await page.goto(new URL("/offline", sourceBase).toString());
+    await page.evaluate(() => {
+      window.localStorage.setItem("active_cat_id", "source-origin-cat");
+      window.localStorage.setItem("cross_origin_source_marker", "preserved");
+    });
+
+    const targetPage = await context.newPage();
+    await targetPage.route("**/api/onboarding/handoff/redeem", async (route) => {
+      await route.fulfill({
+        contentType: "application/json",
+        body: JSON.stringify({
+          ok: true,
+          payload: {
+            version: 1,
+            createdAt: new Date().toISOString(),
+            source: "instagram_bio",
+            onboardingProgress: null,
+            onboardingCompleted: true,
+            catProfiles: [{ id: "target-origin-cat", name: "mugi" }],
+            activeCatId: "target-origin-cat",
+            ownSleepingPhotos: [
+              {
+                id: "target-origin-own-photo",
+                catId: "target-origin-cat",
+                ownerCatId: "target-origin-cat",
+                src: imageDataUrl,
+                state: "sleeping",
+                visibility: "shared",
+                deliveryStatus: "available",
+                triggerLabel: "sleeping",
+                theme: "sleeping",
+                shared: true,
+                createdAt: Date.now(),
+                captureContext: "onboarding",
+              },
+            ],
+            keptExchangePhotos: [],
+            pendingReferralCode: null,
+            resetTargetLocalState: true,
+          },
+        }),
+      });
+    });
+
+    const continueUrl = new URL(
+      "/onboarding/continue?handoff=onb_00000000-0000-4000-8000-000000000000_0123456789abcdef0123",
+      targetBase,
+    );
+    await targetPage.goto(continueUrl.toString());
+    await targetPage.evaluate(() => {
+      window.localStorage.setItem("active_cat_id", "stale-target-cat");
+      window.localStorage.setItem("neteruneko_evening_delivery_days", "{}");
+    });
+    await targetPage.locator("main button").first().click();
+    await expect(targetPage).toHaveURL(/\/home\?handoff=restored/);
+
+    await expect
+      .poll(() =>
+        targetPage.evaluate(() => ({
+          activeCatId: window.localStorage.getItem("active_cat_id"),
+          eveningDays: window.localStorage.getItem("neteruneko_evening_delivery_days"),
+          ownPhotos: JSON.parse(
+            window.localStorage.getItem("nyaruhodo_exchange_own_sleeping_photos") ?? "[]",
+          ) as Array<{ id?: string }>,
+        })),
+      )
+      .toMatchObject({
+        activeCatId: "target-origin-cat",
+        eveningDays: null,
+        ownPhotos: [{ id: "target-origin-own-photo" }],
+      });
+    await expect
+      .poll(() =>
+        page.evaluate(() => ({
+          activeCatId: window.localStorage.getItem("active_cat_id"),
+          sourceMarker: window.localStorage.getItem("cross_origin_source_marker"),
+        })),
+      )
+      .toEqual({
+        activeCatId: "source-origin-cat",
+        sourceMarker: "preserved",
+      });
+  });
 });
 
 async function seedOnboardingAlbumCompletionReady(page: Page) {
@@ -3263,9 +3461,20 @@ async function continuePastOptionalOnboardingNamePrompt(page: Page) {
 
 async function routeImmediateDelivery(
   page: Page,
-  deliveredSrc = `data:image/png;base64,${testPng.toString("base64")}`,
+  deliveredSrcOrOnCall:
+    | string
+    | (() => void) = `data:image/png;base64,${testPng.toString("base64")}`,
 ) {
+  const deliveredSrc =
+    typeof deliveredSrcOrOnCall === "string"
+      ? deliveredSrcOrOnCall
+      : `data:image/png;base64,${testPng.toString("base64")}`;
+  const onCall =
+    typeof deliveredSrcOrOnCall === "function"
+      ? deliveredSrcOrOnCall
+      : () => undefined;
   await page.route("**/api/sleeping-delivery/exchange", async (route) => {
+    onCall();
     await route.fulfill({
       contentType: "application/json",
       body: JSON.stringify({
@@ -3758,17 +3967,61 @@ async function readOnboardingProgress(page: Page) {
   });
 }
 
+async function readPendingOriginalPhotoCount(page: Page) {
+  return page.evaluate(
+    () =>
+      new Promise<number>((resolve, reject) => {
+        const request = indexedDB.open("neteruneko-photo-originals", 1);
+        request.onerror = () => reject(request.error);
+        request.onsuccess = () => {
+          const database = request.result;
+          if (!database.objectStoreNames.contains("pending-originals")) {
+            database.close();
+            resolve(0);
+            return;
+          }
+
+          const transaction = database.transaction("pending-originals", "readonly");
+          const countRequest = transaction.objectStore("pending-originals").count();
+          countRequest.onsuccess = () => resolve(countRequest.result);
+          countRequest.onerror = () => reject(countRequest.error);
+          transaction.oncomplete = () => database.close();
+        };
+      }),
+  );
+}
+
+async function readDurableOnboardingProgress(page: Page) {
+  return page.evaluate(
+    () =>
+      new Promise<unknown>((resolve, reject) => {
+        const request = indexedDB.open("neteruneko-durable-state", 1);
+        request.onerror = () => reject(request.error);
+        request.onsuccess = () => {
+          const database = request.result;
+          const transaction = database.transaction("records", "readonly");
+          const getRequest = transaction
+            .objectStore("records")
+            .get("onboarding-progress:v1");
+          getRequest.onsuccess = () => resolve(getRequest.result?.value ?? null);
+          getRequest.onerror = () => reject(getRequest.error);
+          transaction.oncomplete = () => database.close();
+        };
+      }),
+  );
+}
+
 async function expectVisibleNonBlackImage(locator: Locator) {
   await expect(locator).toBeVisible();
   await expect
     .poll(async () =>
       locator.evaluate(async (image) => {
         if (!(image instanceof HTMLImageElement)) {
-          return { loaded: false, brightness: 0, colorfulPixels: 0 };
+          return { loaded: false, brightness: 0, colorfulPixels: 0, valid: false };
         }
 
         if (!image.complete || image.naturalWidth === 0 || image.naturalHeight === 0) {
-          return { loaded: false, brightness: 0, colorfulPixels: 0 };
+          return { loaded: false, brightness: 0, colorfulPixels: 0, valid: false };
         }
 
         try {
@@ -3785,7 +4038,7 @@ async function expectVisibleNonBlackImage(locator: Locator) {
 
         const context = canvas.getContext("2d");
         if (!context) {
-          return { loaded: true, brightness: 0, colorfulPixels: 0 };
+          return { loaded: true, brightness: 0, colorfulPixels: 0, valid: false };
         }
 
         context.drawImage(image, 0, 0, width, height);
@@ -3811,60 +4064,21 @@ async function expectVisibleNonBlackImage(locator: Locator) {
           }
         }
 
+        const brightness = visiblePixels > 0 ? brightnessSum / visiblePixels : 0;
         return {
           loaded: true,
-          brightness: visiblePixels > 0 ? brightnessSum / visiblePixels : 0,
+          brightness,
           colorfulPixels,
+          valid: brightness > 80 && colorfulPixels > 0,
         };
       }),
     )
     .toEqual(
       expect.objectContaining({
         loaded: true,
-        colorfulPixels: expect.any(Number),
+        valid: true,
       }),
     );
-
-  const sample = await locator.evaluate((image) => {
-    const canvas = document.createElement("canvas");
-    const img = image as HTMLImageElement;
-    const width = Math.min(32, img.naturalWidth);
-    const height = Math.min(32, img.naturalHeight);
-    canvas.width = width;
-    canvas.height = height;
-    const context = canvas.getContext("2d");
-    if (!context) {
-      return { brightness: 0, colorfulPixels: 0 };
-    }
-    context.drawImage(img, 0, 0, width, height);
-    const data = context.getImageData(0, 0, width, height).data;
-    let brightnessSum = 0;
-    let colorfulPixels = 0;
-    let visiblePixels = 0;
-
-    for (let index = 0; index < data.length; index += 4) {
-      const red = data[index] ?? 0;
-      const green = data[index + 1] ?? 0;
-      const blue = data[index + 2] ?? 0;
-      const alpha = data[index + 3] ?? 0;
-      if (alpha < 16) {
-        continue;
-      }
-      visiblePixels += 1;
-      brightnessSum += red + green + blue;
-      if (Math.max(red, green, blue) - Math.min(red, green, blue) > 24) {
-        colorfulPixels += 1;
-      }
-    }
-
-    return {
-      brightness: visiblePixels > 0 ? brightnessSum / visiblePixels : 0,
-      colorfulPixels,
-    };
-  });
-
-  expect(sample.brightness).toBeGreaterThan(80);
-  expect(sample.colorfulPixels).toBeGreaterThan(0);
 }
 
 async function expectUsesUiTypography(

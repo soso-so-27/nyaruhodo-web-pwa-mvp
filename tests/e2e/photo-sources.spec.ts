@@ -3,7 +3,9 @@ import { expect, test } from "@playwright/test";
 import {
   PHOTO_DISPLAY_CONTRACT,
   completePhotoSourceSet,
+  getPhotoAspectRatio,
   getPhotoContentIdentityKeys,
+  getPhotoIdentityKeys,
   resolvePhotoFallbackSrcs,
   resolvePhotoSrc,
   resolvePhotoStorageVariant,
@@ -113,5 +115,24 @@ test.describe("photo source resolution", () => {
     expect(getPhotoContentIdentityKeys({ src })).toEqual([
       `content-data:${src}`,
     ]);
+  });
+
+  test("deduplicates one delivered photo even when local ids differ", () => {
+    const src = "storage:user-1/onboarding/cat-1/display/photo-1.webp";
+    const first = getPhotoIdentityKeys({ id: "delivery-1", src });
+    const second = getPhotoIdentityKeys({ id: "handoff-2", src });
+
+    expect(first.some((key) => second.includes(key))).toBe(true);
+  });
+
+  test("uses persisted pixel dimensions before an image finishes loading", () => {
+    expect(
+      getPhotoAspectRatio({
+        src: "storage:user-1/photo.webp",
+        width: 4032,
+        height: 3024,
+      }),
+    ).toBeCloseTo(4 / 3);
+    expect(getPhotoAspectRatio({ src: "storage:user-1/legacy.webp" })).toBeNull();
   });
 });

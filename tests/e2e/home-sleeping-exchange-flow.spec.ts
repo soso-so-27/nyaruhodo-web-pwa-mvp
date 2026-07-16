@@ -82,11 +82,12 @@ function readPendingOriginalPhotos(page: Page) {
         resolve(
           request.result.map(
             (entry: {
+              bytes?: ArrayBuffer;
               blob?: Blob;
               localAssetId?: string;
               sourceSurface?: string;
             }) => ({
-              blobSize: entry.blob?.size ?? 0,
+              blobSize: entry.bytes?.byteLength ?? entry.blob?.size ?? 0,
               localAssetId: entry.localAssetId ?? "",
               sourceSurface: entry.sourceSurface ?? "",
             }),
@@ -2554,7 +2555,7 @@ test.describe("home sleeping exchange flow", () => {
     expect(store["2026-06-11"]?.deliveredPhoto?.id).toBe("restored-delivered");
   });
 
-  test("keeps multiple taken photos when iOS storage rejects the first multi-photo write", async ({
+  test("keeps the full photo ledger when iOS storage shrinks the local cache", async ({
     page,
   }) => {
     let exchangeCalls = 0;
@@ -2644,7 +2645,28 @@ test.describe("home sleeping exchange flow", () => {
       buffer: testUploadPng,
     });
     await confirmSleepingPhotoShare(page);
-    await waitForOwnSleepingPhotoCount(page, 2);
+    await expect
+      .poll(() =>
+        page.evaluate(async () => {
+          const database = await new Promise<IDBDatabase>((resolve, reject) => {
+            const request = indexedDB.open("neteruneko-durable-state", 1);
+            request.onsuccess = () => resolve(request.result);
+            request.onerror = () => reject(request.error);
+          });
+          const entries = await new Promise<unknown[]>((resolve, reject) => {
+            const transaction = database.transaction("records", "readonly");
+            const request = transaction
+              .objectStore("records")
+              .get("photo-history:own:v1");
+            request.onsuccess = () =>
+              resolve(Array.isArray(request.result?.value) ? request.result.value : []);
+            request.onerror = () => reject(request.error);
+          });
+          database.close();
+          return entries.length;
+        }),
+      )
+      .toBeGreaterThanOrEqual(2);
 
     expect(exchangeCalls).toBe(0);
 
@@ -2664,17 +2686,11 @@ test.describe("home sleeping exchange flow", () => {
       }));
     });
 
-    expect(storage).toHaveLength(2);
-    expect(new Set(storage.map((photo) => photo.id)).size).toBe(2);
-    expect(storage.every((photo) => String(photo.src).startsWith("data:image/"))).toBe(true);
-    expect(storage.some((photo) => photo.id === "existing-large-sleeping-photo")).toBe(true);
-    expect(
-      storage.some(
-        (photo) =>
-          photo.id === "existing-large-sleeping-photo" &&
-          String(photo.src) !== existingLargePhotoSrc,
-      ),
-    ).toBe(true);
+    expect(storage).toHaveLength(1);
+    expect(String(storage[0]?.src)).toMatch(/^data:image\//);
+
+    await page.goto("/collection");
+    await expect(page.getByTestId("mainichi-board-photo-sent")).toHaveCount(2);
   });
 
   test("keeps separate taken photos even when saved in the same millisecond", async ({

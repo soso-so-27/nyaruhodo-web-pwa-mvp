@@ -1,8 +1,29 @@
 import { expect, test, type Page } from "@playwright/test";
+import { encode } from "jpeg-js";
 
 const photoDataUrl =
   "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAGQAAABkCAYAAABw4pVUAAAAAXNSR0IArs4c6QAAAARnQU1BAACxjwv8YQUAAAAJcEhZcwAADsMAAA7DAcdvqGQAAAEJSURBVHhe7dExEcAgAMBAJKKuTpnpjoLA/fACchlrzv2C+a0njDPsVmfYrQyJMSTGkBhDYgyJMSTGkBhDYgyJMSTGkBhDYgyJMSTGkBhDYgyJMSTGkBhDYgyJMSTGkBhDYgyJMSTGkBhDYgyJMSTGkBhDYgyJMSTGkBhDYgyJMSTGkBhDYgyJMSTGkBhDYgyJMSTGkBhDYgyJMSTGkBhDYgyJMSTGkBhDYgyJMSTGkBhDYgyJMSTGkBhDYgyJMSTmB4RCEqdGtA/tAAAAAElFTkSuQmCC";
 const photoUploadBuffer = Buffer.from(photoDataUrl.split(",")[1], "base64");
+
+function createHistoryPhotoDataUrl(index: number) {
+  const width = 32;
+  const height = 24;
+  const pixels = Buffer.alloc(width * height * 4);
+
+  for (let y = 0; y < height; y += 1) {
+    for (let x = 0; x < width; x += 1) {
+      const offset = (y * width + x) * 4;
+      const bit = (index >> ((Math.floor(x / 8) + Math.floor(y / 8)) % 6)) & 1;
+      pixels[offset] = (index * 47 + (bit ? 96 : 0)) % 256;
+      pixels[offset + 1] = (index * 83 + (bit ? 32 : 144)) % 256;
+      pixels[offset + 2] = (index * 127 + (bit ? 176 : 48)) % 256;
+      pixels[offset + 3] = 255;
+    }
+  }
+
+  const jpeg = encode({ data: pixels, width, height }, 70).data;
+  return `data:image/jpeg;base64,${jpeg.toString("base64")}`;
+}
 
 test.describe("collection album flow", () => {
   test("shows a repeated onboarding delivery only once in received", async ({
@@ -1478,9 +1499,22 @@ test.describe("collection album flow", () => {
   }) => {
     const now = Date.parse("2026-07-08T12:00:00.000Z");
     await page.clock.setFixedTime(new Date(now));
+    const deliveredPhotos = Array.from({ length: 55 }, (_, index) => {
+      return {
+        id: `delivered-history-${index + 1}`,
+        sourcePhotoId: `source-history-${index + 1}`,
+        src: createHistoryPhotoDataUrl(index),
+        title: "とどいたねがお",
+        subtitle: "",
+        triggerLabel: "sleeping",
+        theme: "sleeping",
+        deliveredAt: now - index * 60_000,
+      };
+    });
 
-    await page.addInitScript(
-      ({ currentCatId, deliveredPhotos, nowValue }) => {
+    await page.goto("/offline");
+    await page.evaluate(
+      async ({ currentCatId, deliveredPhotos: photos, nowValue }) => {
         window.localStorage.setItem("active_cat_id", currentCatId);
         window.localStorage.setItem(
           "cat_profiles",
@@ -1495,21 +1529,36 @@ test.describe("collection album flow", () => {
         );
         window.localStorage.setItem(
           "nyaruhodo_exchange_kept_photos",
-          JSON.stringify(deliveredPhotos),
+          JSON.stringify(photos.slice(0, 50)),
         );
+
+        await new Promise<void>((resolve, reject) => {
+          const request = indexedDB.open("neteruneko-durable-state", 1);
+          request.onupgradeneeded = () => {
+            if (!request.result.objectStoreNames.contains("records")) {
+              request.result.createObjectStore("records", { keyPath: "key" });
+            }
+          };
+          request.onerror = () => reject(request.error);
+          request.onsuccess = () => {
+            const database = request.result;
+            const transaction = database.transaction("records", "readwrite");
+            transaction.objectStore("records").put({
+              key: "photo-history:kept:v1",
+              value: photos,
+              updatedAt: nowValue,
+            });
+            transaction.oncomplete = () => {
+              database.close();
+              resolve();
+            };
+            transaction.onerror = () => reject(transaction.error);
+          };
+        });
       },
       {
         currentCatId: "current-cat",
-        deliveredPhotos: Array.from({ length: 55 }, (_, index) => ({
-          id: `delivered-history-${index + 1}`,
-          sourcePhotoId: `source-history-${index + 1}`,
-          src: photoDataUrl,
-          title: "とどいたねがお",
-          subtitle: "",
-          triggerLabel: "sleeping",
-          theme: "sleeping",
-          deliveredAt: now - index * 60_000,
-        })),
+        deliveredPhotos,
         nowValue: now,
       },
     );
@@ -1519,11 +1568,18 @@ test.describe("collection album flow", () => {
     await page.getByRole("tab", { name: "とどいた" }).click();
 
     await expect(page.getByTestId("mainichi-board-photo-delivered")).toHaveCount(
-      55,
+      18,
       { timeout: 10_000 },
     );
     await page.getByTestId("mainichi-day-browse-button").click();
-    await expect(page.getByTestId("mainichi-month-bundle-day")).toHaveCount(1);
+    const dayBundle = page.getByTestId("mainichi-month-bundle-day");
+    await expect(dayBundle).toHaveCount(1);
+    await expect(dayBundle).toHaveAttribute("data-photo-count", "55");
+    await dayBundle.click();
+    await expect(page.getByTestId("mainichi-day-photo-delivered")).toHaveCount(55);
+    await expect(
+      page.locator('[data-testid="mainichi-day-photo-delivered"][data-photo-id="delivered-history-55"]'),
+    ).toBeVisible();
   });
 
   test("opens a delivered mainichi photo directly and hides it from fullscreen", async ({

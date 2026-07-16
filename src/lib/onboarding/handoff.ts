@@ -8,11 +8,13 @@ import {
   isAnonymousAuthEnabled,
 } from "../auth/anonymousAuth";
 import { getOrCreateAnonymousId } from "../identity/anonymousId";
+import { getPhotoIdentityKeys } from "../photoSources";
 import {
   cacheExchangePhotoOfflineDataUrl,
   readAllOwnSleepingPhotos,
   readKeptExchangePhotosForAlbum,
   restoreSyncedSleepingPhotos,
+  withExchangePhotoOfflineSrc,
   type ExchangePhoto,
   type OwnSleepingPhoto,
 } from "../home/sleepingPhotos";
@@ -246,7 +248,11 @@ function getCurrentOnboardingDeliveredPhotos(
       ),
   );
 
-  return [compactPhotoSourcesForHandoff(storedPhoto ?? deliveredPhoto)];
+  return [
+    compactPhotoSourcesForHandoff(
+      withExchangePhotoOfflineSrc(storedPhoto ?? deliveredPhoto),
+    ),
+  ];
 }
 
 function compactPhotoSourcesForHandoff<
@@ -315,7 +321,7 @@ export function restoreOnboardingHandoffPayload(
   }
 
   if (payload.resetTargetLocalState && !options?.skipTargetReset) {
-    clearOnboardingTestTargetState();
+    throw new Error("handoff_reset_requires_session_restore");
   }
 
   if (payload.catProfiles.length > 0) {
@@ -377,7 +383,7 @@ export async function restoreOnboardingHandoffPayloadWithSession(payload: unknow
   }
 
   if (payload.resetTargetLocalState) {
-    clearOnboardingTestTargetState();
+    await clearOnboardingTestTargetState();
   }
 
   if (payload.session?.accessToken && payload.session.refreshToken) {
@@ -425,13 +431,7 @@ function getRestoredKeptExchangePhotos(
 }
 
 function getExchangePhotoDedupeKeys(photo: ExchangePhoto) {
-  return [
-    `id:${photo.id}`,
-    photo.sourcePhotoId ? `source:${photo.sourcePhotoId}` : "",
-    photo.src ? `src:${photo.src}` : "",
-    photo.displaySrc ? `display:${photo.displaySrc}` : "",
-    photo.originalSrc ? `original:${photo.originalSrc}` : "",
-  ].filter(Boolean);
+  return getPhotoIdentityKeys(photo);
 }
 
 function isOnboardingHandoffPayload(

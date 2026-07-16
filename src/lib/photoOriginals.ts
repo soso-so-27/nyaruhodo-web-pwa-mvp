@@ -19,6 +19,9 @@ const ORIGINAL_QUEUE_DB_VERSION = 1;
 const ORIGINAL_QUEUE_STORE = "pending-originals";
 const MAX_FLUSH_ITEMS = 8;
 
+export const ORIGINAL_PHOTO_PRESERVATION_FAILED_EVENT =
+  "neteruneko_original_photo_preservation_failed";
+
 export const ORIGINAL_PHOTO_SOURCE_SURFACES = [
   "sleeping",
   "onboarding",
@@ -33,7 +36,8 @@ export type OriginalPhotoSourceSurface =
 
 type PendingOriginalPhoto = {
   key: string;
-  blob: Blob;
+  bytes?: ArrayBuffer;
+  blob?: Blob;
   catId: string | null;
   displaySrc: string | null;
   fileName: string;
@@ -64,10 +68,33 @@ export async function queueOriginalPhotoPreservation({
 }: QueueOriginalPhotoInput) {
   const stableFile = getStableImageFileForPersistence(file);
   assertSupportedImageFile(stableFile);
+  const mimeType = resolveOriginalContentType(stableFile.type, stableFile.name);
+  // WebKit can reject File instances backed by a transient file picker when
+  // IndexedDB performs its structured clone. A full Blob slice keeps the
+  // original bytes while removing that picker-backed File wrapper.
+  const stableBlob = stableFile.slice(0, stableFile.size, mimeType);
+  let stableBytes: ArrayBuffer;
+  try {
+    stableBytes = await readOriginalBlobBytes(stableBlob);
+  } catch (error) {
+    const queueErrorCode = getOriginalQueueErrorCode(error);
+    trackProductEvent("photo_original_queued", {
+      source_surface: sourceSurface,
+      queued_locally: false,
+      queue_error_code: queueErrorCode,
+      file_size_bucket: getOriginalFileSizeBucket(stableBlob.size),
+    });
+    console.warn(
+      `[photo-originals] Original byte copy failed: ${queueErrorCode}`,
+      error,
+    );
+    notifyOriginalPhotoQueueFailure("failed", sourceSurface);
+    return "failed";
+  }
 
   const pending: PendingOriginalPhoto = {
     key: buildOriginalPhotoQueueKey(sourceSurface, localAssetId),
-    blob: stableFile,
+    bytes: stableBytes,
     catId,
     displaySrc,
     fileName: stableFile.name || `${sourceSurface}.jpg`,
@@ -75,21 +102,30 @@ export async function queueOriginalPhotoPreservation({
       ? stableFile.lastModified
       : null,
     localAssetId,
-    mimeType: resolveOriginalContentType(stableFile.type, stableFile.name),
+    mimeType,
     ownerUserId: null,
     queuedAt: Date.now(),
     sourceSurface,
   };
 
+  let queueErrorCode: string | null = null;
   const queued = await putPendingOriginalPhoto(pending).then(
     () => true,
-    () => false,
+    (error: unknown) => {
+      queueErrorCode = getOriginalQueueErrorCode(error);
+      console.warn(
+        `[photo-originals] IndexedDB queue failed: ${queueErrorCode}`,
+        error,
+      );
+      return false;
+    },
   );
 
   trackProductEvent("photo_original_queued", {
     source_surface: sourceSurface,
     queued_locally: queued,
-    file_size_bucket: getOriginalFileSizeBucket(stableFile.size),
+    queue_error_code: queueErrorCode,
+    file_size_bucket: getOriginalFileSizeBucket(stableBlob.size),
   });
 
   const ownerUserId = await readSignedInOwnerUserId();
@@ -102,10 +138,32 @@ export async function queueOriginalPhotoPreservation({
     if (uploaded && queued) {
       await deletePendingOriginalPhoto(pending.key).catch(() => undefined);
     }
-    return uploaded ? "preserved" : queued ? "queued" : "failed";
+    const result = uploaded ? "preserved" : queued ? "queued" : "failed";
+    notifyOriginalPhotoQueueFailure(result, sourceSurface);
+    return result;
   }
 
-  return queued ? "queued" : "failed";
+  const result = queued ? "queued" : "failed";
+  notifyOriginalPhotoQueueFailure(result, sourceSurface);
+  return result;
+}
+
+function notifyOriginalPhotoQueueFailure(
+  result: "preserved" | "queued" | "failed",
+  sourceSurface: OriginalPhotoSourceSurface,
+) {
+  if (result !== "failed" || typeof window === "undefined") {
+    return;
+  }
+
+  trackProductEvent("photo_original_queue_failed", {
+    source_surface: sourceSurface,
+  });
+  window.dispatchEvent(
+    new CustomEvent(ORIGINAL_PHOTO_PRESERVATION_FAILED_EVENT, {
+      detail: { sourceSurface },
+    }),
+  );
 }
 
 export function startOriginalPhotoPreservationQueue() {
@@ -178,6 +236,12 @@ async function uploadPendingOriginalPhoto(
     return false;
   }
 
+  const originalBlob = getPendingOriginalBlob(pending);
+  if (!originalBlob) {
+    trackOriginalPreservationFailure(pending, "invalid_queued_payload");
+    return false;
+  }
+
   const originalStoragePath = buildOriginalPhotoStoragePath({
     fileName: pending.fileName,
     localAssetId: pending.localAssetId,
@@ -186,7 +250,7 @@ async function uploadPendingOriginalPhoto(
     sourceSurface: pending.sourceSurface,
     mimeType: pending.mimeType,
   });
-  const dimensions = await readImageFileDimensions(pending.blob).catch(() => null);
+  const dimensions = await readImageFileDimensions(originalBlob).catch(() => null);
   const row = {
     user_id: ownerUserId,
     local_asset_id: pending.localAssetId,
@@ -198,7 +262,7 @@ async function uploadPendingOriginalPhoto(
     original_storage_path: originalStoragePath,
     original_file_name: pending.fileName,
     original_mime_type: pending.mimeType,
-    original_bytes: pending.blob.size,
+    original_bytes: originalBlob.size,
     pixel_width: dimensions?.width ?? null,
     pixel_height: dimensions?.height ?? null,
     file_last_modified_at: pending.lastModified
@@ -223,7 +287,7 @@ async function uploadPendingOriginalPhoto(
     await uploadBlob(
       supabase,
       originalStoragePath,
-      pending.blob,
+      originalBlob,
       pending.mimeType,
     );
   } catch {
@@ -251,7 +315,7 @@ async function uploadPendingOriginalPhoto(
 
   trackProductEvent("photo_original_preserved", {
     source_surface: pending.sourceSurface,
-    file_size_bucket: getOriginalFileSizeBucket(pending.blob.size),
+    file_size_bucket: getOriginalFileSizeBucket(originalBlob.size),
     pixel_width: dimensions?.width ?? null,
     pixel_height: dimensions?.height ?? null,
   });
@@ -394,14 +458,54 @@ function getOriginalFileSizeBucket(size: number) {
   return "very_large";
 }
 
+function getPendingOriginalBlob(pending: PendingOriginalPhoto) {
+  if (pending.bytes instanceof ArrayBuffer) {
+    return new Blob([pending.bytes], { type: pending.mimeType });
+  }
+  return pending.blob instanceof Blob ? pending.blob : null;
+}
+
+async function readOriginalBlobBytes(blob: Blob) {
+  if (typeof blob.arrayBuffer === "function") {
+    try {
+      return await blob.arrayBuffer();
+    } catch {
+      // Continue with FileReader for WebViews whose Blob reader is transient.
+    }
+  }
+
+  return new Promise<ArrayBuffer>((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => {
+      if (reader.result instanceof ArrayBuffer) {
+        resolve(reader.result);
+        return;
+      }
+      reject(new Error("original_blob_reader_returned_non_buffer"));
+    };
+    reader.onerror = () =>
+      reject(reader.error ?? new Error("original_blob_reader_failed"));
+    reader.onabort = () => reject(new Error("original_blob_reader_aborted"));
+    reader.readAsArrayBuffer(blob);
+  });
+}
+
+function getOriginalQueueErrorCode(error: unknown) {
+  if (error instanceof DOMException || error instanceof Error) {
+    return error.name || "client_storage_error";
+  }
+  return "unknown_client_storage_error";
+}
+
 function trackOriginalPreservationFailure(
   pending: PendingOriginalPhoto,
   errorCode: string,
 ) {
+  const originalBlob = getPendingOriginalBlob(pending);
   trackProductEvent("photo_original_preservation_failed", {
     source_surface: pending.sourceSurface,
     error_code: errorCode,
-    file_size_bucket: getOriginalFileSizeBucket(pending.blob.size),
+    file_size_bucket: getOriginalFileSizeBucket(originalBlob?.size ?? 0),
   });
 }
 
@@ -455,12 +559,32 @@ function runOriginalQueueRequest<T = IDBValidKey>(
   return new Promise<T>((resolve, reject) => {
     const transaction = db.transaction(ORIGINAL_QUEUE_STORE, mode);
     const request = createRequest(transaction.objectStore(ORIGINAL_QUEUE_STORE));
-    request.onsuccess = () => resolve(request.result);
-    request.onerror = () => reject(request.error ?? new Error("indexeddb_request_failed"));
-    transaction.oncomplete = () => db.close();
+    let result!: T;
+    let settled = false;
+
+    request.onsuccess = () => {
+      result = request.result;
+    };
+    request.onerror = () => {
+      if (!settled) {
+        settled = true;
+        reject(request.error ?? new Error("indexeddb_request_failed"));
+      }
+    };
+    transaction.oncomplete = () => {
+      db.close();
+      if (!settled) {
+        settled = true;
+        resolve(result);
+      }
+    };
     transaction.onerror = () => {
       db.close();
-      reject(transaction.error ?? new Error("indexeddb_transaction_failed"));
+      if (!settled) {
+        settled = true;
+        reject(transaction.error ?? new Error("indexeddb_transaction_failed"));
+      }
     };
+    transaction.onabort = transaction.onerror;
   });
 }

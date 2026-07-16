@@ -1,0 +1,128 @@
+import { expect, test } from "@playwright/test";
+
+import {
+  buildAdminAnalytics,
+  buildAnalyticsPeriodRange,
+  readAnalyticsPeriod,
+  type AdminAnalyticsEvent,
+} from "../../src/lib/analytics/adminAnalytics";
+
+const BASE_TIME = Date.parse("2026-07-16T08:00:00.000Z");
+
+test.describe("admin analytics logic", () => {
+  test("counts an ordered launch funnel without double-counting aliases", () => {
+    const events = [
+      event("actor-a", "onboarding_intro_view", 0, { source: "instagram_bio" }),
+      event("actor-a", "onboarding_intro_view", 1, { source: "instagram_bio" }),
+      event("actor-a", "onboarding_photo_select_click", 2),
+      event("actor-a", "onboarding_photo_submitted", 3),
+      event("actor-a", "photo_submitted", 4),
+      event("actor-a", "onboarding_delivery_arrived", 5),
+      event("actor-a", "onboarding_delivery_opened", 6),
+      event("actor-a", "onboarding_completed", 7),
+      event("actor-a", "onboarding_second_photo_prompt_view", 8),
+      event("actor-a", "home_exchange_share_photo_confirmed", 9),
+      event("actor-a", "onboarding_second_photo_submitted", 10),
+      event("actor-b", "onboarding_intro_view", 0),
+      event("actor-b", "onboarding_photo_select_click", 1),
+      event("actor-c", "onboarding_delivery_arrived", 0),
+      event("actor-d", "onboarding_intro_view", 0),
+      event("actor-d", "onboarding_photo_submitted", 1),
+    ];
+
+    const result = buildAdminAnalytics(events);
+
+    expect(result.funnel.map((step) => step.users)).toEqual([
+      3, 2, 1, 1, 1, 1, 1, 1,
+    ]);
+    expect(result.funnel[1]).toMatchObject({
+      previousUsers: 3,
+      fromPreviousRate: 66.7,
+    });
+    expect(result.overview.find((item) => item.key === "first_photo")).toMatchObject({
+      users: 2,
+      events: 2,
+    });
+    expect(result.retention).toMatchObject({
+      photoSubmitters: 2,
+      repeatSubmitters: 1,
+    });
+  });
+
+  test("groups impact events and privacy-safe environment labels", () => {
+    const events = [
+      event("actor-a", "photo_upload_error", 0, {
+        errorCode: "onboarding_photo_save_failed",
+        metadata: { device_os: "android", browser_context: "line" },
+        inAppBrowser: true,
+      }),
+      event("actor-a", "photo_upload_error", 1, {
+        errorCode: "onboarding_photo_save_failed",
+        metadata: { device_os: "android", browser_context: "line" },
+        inAppBrowser: true,
+      }),
+      event("actor-b", "evening_delivery_check_failed", 2, {
+        metadata: { device_os: "ios", browser_context: "browser" },
+      }),
+    ];
+
+    const result = buildAdminAnalytics(events);
+
+    expect(result.overview.find((item) => item.key === "needs_attention")).toMatchObject({
+      users: 2,
+      events: 3,
+    });
+    expect(result.errorSummary[0]).toMatchObject({
+      eventName: "photo_upload_error",
+      errorCode: "onboarding_photo_save_failed",
+      users: 1,
+      events: 2,
+    });
+    expect(result.environment.devices).toEqual([
+      { key: "android", users: 1 },
+      { key: "ios", users: 1 },
+    ]);
+    expect(result.environment.contexts).toEqual([
+      { key: "browser", users: 1 },
+      { key: "line", users: 1 },
+    ]);
+  });
+
+  test("supports a rolling 60 minute launch window", () => {
+    const now = new Date("2026-07-16T08:30:00.000Z");
+    const range = buildAnalyticsPeriodRange("60m", now);
+
+    expect(readAnalyticsPeriod("60m")).toBe("60m");
+    expect(range.to.toISOString()).toBe("2026-07-16T08:30:00.000Z");
+    expect(range.from.toISOString()).toBe("2026-07-16T07:30:00.000Z");
+  });
+});
+
+function event(
+  actorId: string,
+  eventName: string,
+  minuteOffset: number,
+  options: {
+    source?: string;
+    errorCode?: string | null;
+    metadata?: Record<string, unknown>;
+    inAppBrowser?: boolean;
+  } = {},
+): AdminAnalyticsEvent {
+  return {
+    event_name: eventName,
+    source: options.source ?? "direct",
+    anonymous_id: actorId,
+    user_id: null,
+    session_id: `session-${actorId}`,
+    submission_id: null,
+    route: eventName.startsWith("onboarding_") ? "/onboarding" : "/home",
+    surface: eventName.startsWith("onboarding_") ? "onboarding" : "home",
+    is_in_app_browser: options.inAppBrowser ?? false,
+    is_standalone_pwa: false,
+    error_code: options.errorCode ?? null,
+    error_message: null,
+    metadata: options.metadata ?? {},
+    created_at: new Date(BASE_TIME + minuteOffset * 60_000).toISOString(),
+  };
+}

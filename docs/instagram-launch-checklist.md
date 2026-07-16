@@ -1,62 +1,89 @@
-# Instagram Launch Checklist
+# Instagram 投稿3 公開チェックリスト
 
-Target URL:
+更新日: 2026-07-16
+最終コピー・当日運用: `docs/instagram-post3-final-2026-07.md`
 
-```txt
-https://nyaruhodo.jp/onboarding?source=instagram_story
-```
+## 入口
 
-## Before Posting
+- 本番URL: `https://neteruneko.jp/onboarding?src=instagram_bio`
+- bioのリンク名: `ねてるねこ｜さきに使ってみる`
+- リダイレクト後もパス `/onboarding` と `src=instagram_bio` が残ること。
+- 旧形式の `?source=instagram_story` は投稿3で使わない。
 
-- Confirm Vercel Production is Ready and `nyaruhodo.jp` points to the latest Production deployment.
-- Confirm Supabase migrations are applied with `supabase migration list`.
-- Confirm Google login succeeds in Safari/Chrome/PWA. If it fails there too, fix Google Cloud OAuth redirect URI / Supabase callback settings before testing Instagram handoff.
-- Confirm `npm run check:release`, `npm run typecheck`, and `npm run build` pass locally or in CI.
-- Local `npm run check:release` needs a valid `.env.local`. Pull Preview/Production env from Vercel or fill the required values first; empty values stop with `Missing NEXT_PUBLIC_SUPABASE_URL.` and no secret values are printed.
-- Confirm Vercel plan, spend limit, and alert emails with the project owner before posting broadly.
-- Confirm Supabase Pro usage dashboard: Egress, Storage, Database Size, and Auth MAU.
+## 投稿前
 
-## iPhone Instagram Browser
+- [ ] Vercel Productionが最新コミットでReadyになっている。
+- [ ] `npm run check:release`、`npm run typecheck`、`npm run build`が成功している。
+- [ ] migration差分がなく、必要なmigrationが本番へ適用済みである。
+- [ ] Vercel Productionの`ENABLE_BETA_SUPPORTER_BILLING`が、決めた公開状態になっている。
+- [ ] 19:00から審査、20:00から配達確認を行える。
+- [ ] Threadsの自動シェアがオフになっている。
+- [ ] 投稿に使う実写真と代替テキストが決まっている。
+- [ ] bioへ確定URLを入れ、Instagramアプリ内から一度開いている。
 
-- Open the Story URL inside the Instagram iPhone app.
-- Confirm the intro screen appears for a new anonymous session.
-- Select one cat photo and confirm upload does not freeze.
-- Confirm one `ねこだより` arrives and can be opened.
-- Confirm `うちのこのアルバムをつくる` appears after opening.
-- Confirm Google login is not the main path inside Instagram; the handoff link path appears and continues in Safari/Chrome/PWA.
-- Reopen the same URL and confirm the flow resumes instead of restarting.
-- Open `?source=instagram_bio` after submitting and confirm state is not reset.
+## 現行オンボの正しい順序
 
-## Production UI Safety
+1. Instagram内ブラウザでは「SafariやChromeで開く」案内が先に出る。
+2. 写真を1枚入れると、オンボ用のねこだよりがその場で届く。
+3. 封筒をひらき、「ねてるねこを はじめる」で先へ進む。
+4. 猫の名前を入れる（名前なしでも進める）。
+5. ホームで、20時前は「今夜の一枚」、20時以降は「あしたの一枚」を案内する。
+6. 2枚目を「届ける」→「のこす」と、通常の20時便の対象になる。
+7. 2枚目をのこした後、端末に応じたホーム画面追加案内が出る。
 
-Confirm none of these appear in Production:
+「最初の写真を入れると、初めての一通が20時に届く」は旧説明であり使わない。
 
-- Candidate-empty test copy.
-- Test candidate add controls.
-- Red/blue placeholder images.
-- Debug source, anonymous ID, submission ID, or deployment URL.
-- PWA home-screen prompt during the first onboarding flow.
+## Instagram内ブラウザ
 
-## Privacy
+- [ ] 初回表示に外部ブラウザ案内が出る。
+- [ ] 「URLをコピーする」で `src=instagram_bio` を含むURLをコピーできる。
+- [ ] 「このまま試す」でも写真選択から即時便の開封まで進める。
+- [ ] 対応するJPEG/PNG/HEICが一度目から読み込め、選択し直しもできる。
+- [ ] 再訪時に、完了した状態を不必要に最初からやり直さない。
+- [ ] GoogleログインをInstagram内ブラウザの主導線にしない。
 
-- Uploaded user photos are resized/re-encoded before app storage use.
-- New saved photos do not store the original File/Blob as-is.
-- EXIF/location metadata is not preserved in newly saved app variants.
-- Delivered `ねこだより` does not show sender name, location, account, or external SNS identity.
-- No automatic sharing to Instagram or other external SNS occurs.
-- Supabase `cat-photos` bucket remains private.
-- Photo display uses signed URLs only, with short-lived display URLs.
+## Android Chrome
 
-## Cost Controls
+- [ ] reset入口から匿名でオンボを完走できる。
+- [ ] 初回写真から即時便が届き、写真を表示できる。
+- [ ] ホームの2枚目を「届ける」→「のこす」まで進められる。
+- [ ] `QuotaExceededError`や、成功表示後の保存失敗がない。
+- [ ] 通常タブではAndroid向けの「アプリをインストール／ホーム画面に追加」案内が出る。
+- [ ] PWAを起動し直して、猫、送った写真、届いた写真が残る。
 
-- User-generated photos are rendered with normal image tags or signed URLs, not Next Image Optimization.
-- Cache Storage does not contain API responses, signed URLs, Supabase Storage responses, or personal JSON.
-- Vercel usage and Supabase egress should be checked after the first small Story test.
-- Start with a limited/private Story or DM test before broad posting.
+## iPhone Safari
 
-## Manual Browser Checks
+- [ ] reset入口から匿名でオンボを完走できる。
+- [ ] 初回写真から即時便が届き、写真を表示できる。
+- [ ] ホームの2枚目を「届ける」→「のこす」まで進められる。
+- [ ] Safari向けの共有ボタンと「ホーム画面に追加」の案内が出る。
+- [ ] PWAを起動し直して、猫、送った写真、届いた写真が残る。
 
-- Chrome DevTools Console: no repeated CSP Report-Only violations.
-- Application > Service Workers: current SW active, no unexpected old worker controlling the app.
-- Application > Cache Storage: only static public app assets/offline page are cached.
-- Network: `/api/*` and Supabase signed URL responses are not served from Cache Storage.
+## 本番に出してはいけないもの
+
+- 候補なしを作るためのテスト操作や候補追加ボタン。
+- 赤・青のプレースホルダー画像。
+- anonymous ID、submission ID、Storage path、deployment URLなどのデバッグ情報。
+- 初回写真を入れる前のPWA追加要求。
+- 空の通知許可要求。
+- 読込中に説明のない無言画面。
+
+## 写真とプライバシー
+
+- [ ] 写真はユーザーが選んだ共有範囲で保存される。
+- [ ] 「自分だけ」の写真は配達候補にならない。
+- [ ] ねこだよりに送り主の名前、場所、アカウント、SNS情報を出さない。
+- [ ] `cat-photos`は非公開で、表示は権限確認済みのURLを使う。
+- [ ] Instagramなど外部SNSへ自動共有しない。
+
+## 当日の停止条件
+
+次のいずれかがあれば投稿を順延する。
+
+- はじめられない。
+- 初回便または20時便が成立しない。
+- 写真の消失、誤表示、重複保存が起きる。
+- 共有範囲や他人の写真について疑義がある。
+- 操作不能から復帰できない。
+
+軽い見た目のずれだけなら証跡を残し、初週内のP1として扱う。

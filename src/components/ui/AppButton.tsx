@@ -123,6 +123,7 @@ export function AppButton({
         aria-disabled={isDisabled || anchorProps["aria-disabled"]}
         aria-busy={loading || anchorProps["aria-busy"]}
         aria-pressed={pressed ?? anchorProps["aria-pressed"]}
+        data-app-pressable={size === "icon" || iconOnly ? "icon" : "button"}
         data-selected={selected || undefined}
         onClick={handleAnchorClick}
         style={buttonStyle}
@@ -139,6 +140,7 @@ export function AppButton({
       {...buttonProps}
       aria-busy={loading || buttonProps["aria-busy"]}
       aria-pressed={pressed ?? buttonProps["aria-pressed"]}
+      data-app-pressable={size === "icon" || iconOnly ? "icon" : "button"}
       data-selected={selected || undefined}
       disabled={isDisabled || buttonProps.disabled}
       style={buttonStyle}
@@ -164,6 +166,8 @@ const styles = {
     whiteSpace: "nowrap",
     cursor: "pointer",
     WebkitTapHighlightColor: "transparent",
+    transition:
+      "transform var(--app-press-duration, var(--dur-press-out)) var(--ease-settle), box-shadow var(--app-press-duration, var(--dur-press-out)) var(--ease-gentle), background var(--dur-instant) var(--ease-gentle), border-color var(--dur-instant) var(--ease-gentle), color var(--dur-instant) var(--ease-gentle), opacity var(--app-press-duration, var(--dur-press-out)) var(--ease-gentle)",
   },
   pill: {
     borderRadius: radius.pill,
@@ -201,19 +205,19 @@ const styles = {
     border: "1px solid var(--control-border)",
     background: "var(--control-surface)",
     color: color.textStrong,
-    boxShadow: shadow.soft,
+    boxShadow: "var(--app-press-shadow, var(--shadow-e1))",
   },
   accent: {
     border: "1px solid var(--control-border)",
     background: "color-mix(in srgb, var(--paper-card) 96%, transparent)",
     color: color.text,
-    boxShadow: shadow.soft,
+    boxShadow: "var(--app-press-shadow, var(--shadow-e1))",
   },
   secondary: {
     border: "1px solid var(--control-border)",
     background: "color-mix(in srgb, var(--paper) 82%, transparent)",
     color: color.textMuted,
-    boxShadow: shadow.soft,
+    boxShadow: "var(--app-press-shadow, var(--shadow-e1))",
   },
   quiet: {
     border: "1px solid transparent",
@@ -236,7 +240,7 @@ const styles = {
   active: {
     color: color.textStrong,
     background: "var(--control-surface-selected)",
-    boxShadow: shadow.soft,
+    boxShadow: "var(--app-press-shadow, var(--shadow-e1))",
   },
   disabled: {
     opacity: 0.55,

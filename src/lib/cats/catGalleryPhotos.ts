@@ -2,6 +2,11 @@ import { isUsablePhotoSrc, normalizePersistentPhotoSrc } from "../photoStorage";
 import { completePhotoSourceSet } from "../photoSources";
 import { purgePhotoSwCacheForSources } from "../photoSwCache";
 import { STORAGE_KEYS, readCachedJson, writeCachedJson } from "../storage";
+import {
+  readCachedPhotoHistoryEntries,
+  removePhotoHistoryEntry,
+  upsertPhotoHistoryEntries,
+} from "../photoHistoryLedger";
 
 export type CatGalleryPhoto = {
   id: string;
@@ -10,6 +15,8 @@ export type CatGalleryPhoto = {
   thumbnailSrc?: string;
   displaySrc?: string;
   originalSrc?: string;
+  width?: number;
+  height?: number;
   createdAt: number;
 };
 
@@ -20,28 +27,41 @@ const CAT_GALLERY_INTRO_ACKNOWLEDGED_STORAGE_KEY =
   "neteruneko_cat_gallery_intro_acknowledged";
 
 export function readCatGalleryPhotos(activeCatId: string | null = null) {
-  const photos = readStorageArray<CatGalleryPhoto>(STORAGE_KEYS.catGalleryPhotos)
-    .filter(isValidCatGalleryPhoto)
-    .map(normalizeCatGalleryPhoto)
-    .sort((left, right) => right.createdAt - left.createdAt);
+  const photoMap = new Map<string, CatGalleryPhoto>();
+  for (const photo of [
+    ...readStorageArray<CatGalleryPhoto>(STORAGE_KEYS.catGalleryPhotos),
+    ...readCachedPhotoHistoryEntries<CatGalleryPhoto>("gallery"),
+  ]) {
+    if (isValidCatGalleryPhoto(photo)) {
+      const normalized = normalizeCatGalleryPhoto(photo);
+      photoMap.set(normalized.id, normalized);
+    }
+  }
+  const photos = [...photoMap.values()].sort(
+    (left, right) => right.createdAt - left.createdAt,
+  );
 
   return activeCatId
     ? photos.filter((photo) => photo.catId === activeCatId)
     : photos;
 }
 
-export function saveCatGalleryPhoto({
+export async function saveCatGalleryPhoto({
   catId,
   src,
   thumbnailSrc,
   displaySrc,
   originalSrc,
+  width,
+  height,
 }: {
   catId: string;
   src: string;
   thumbnailSrc?: string | null;
   displaySrc?: string | null;
   originalSrc?: string | null;
+  width?: number | null;
+  height?: number | null;
 }) {
   const normalizedSrc = normalizePersistentPhotoSrc(src) || src;
   const normalizedThumbnailSrc =
@@ -69,24 +89,27 @@ export function saveCatGalleryPhoto({
     ...(normalizedOriginalSrc && isUsablePhotoSrc(normalizedOriginalSrc)
       ? { originalSrc: normalizedOriginalSrc }
       : {}),
+    ...(isValidPhotoDimension(width) ? { width } : {}),
+    ...(isValidPhotoDimension(height) ? { height } : {}),
     createdAt,
   };
 
-  try {
-    const saved = readCatGalleryPhotos(null);
-    const savedForCat = saved.filter((savedPhoto) => savedPhoto.catId === catId);
-    if (savedForCat.length >= CAT_GALLERY_PHOTO_LIMIT) {
-      return null;
-    }
+  const savedBeforeInsert = readCatGalleryPhotos(null);
+  await upsertPhotoHistoryEntries("gallery", [photo]);
 
+  try {
     writeStorageArray(
       STORAGE_KEYS.catGalleryPhotos,
-      limitCatGalleryPhotosPerCat([photo, ...saved]),
+      limitCatGalleryPhotosPerCat([
+        photo,
+        ...savedBeforeInsert.filter((savedPhoto) => savedPhoto.id !== photo.id),
+      ]),
     );
     dispatchCatGalleryPhotosUpdated();
     return photo;
   } catch {
-    return null;
+    dispatchCatGalleryPhotosUpdated();
+    return photo;
   }
 }
 
@@ -106,6 +129,7 @@ export function deleteCatGalleryPhoto(photoId: string) {
     STORAGE_KEYS.catGalleryPhotos,
     saved.filter((photo) => photo.id !== photoId),
   );
+  void removePhotoHistoryEntry("gallery", target).catch(() => undefined);
   purgePhotoSwCacheForSources(
     [target.src, target.thumbnailSrc, target.displaySrc, target.originalSrc],
     "cat_gallery_photo_deleted",
@@ -142,6 +166,9 @@ export function updateCatGalleryPhotoThumbnail(photoId: string, thumbnailSrc: st
   }
 
   writeStorageArray(STORAGE_KEYS.catGalleryPhotos, nextPhotos);
+  void upsertPhotoHistoryEntries("gallery", [updatedPhoto]).catch(
+    () => undefined,
+  );
   dispatchCatGalleryPhotosUpdated();
   return updatedPhoto;
 }
@@ -189,7 +216,11 @@ export function restoreSyncedCatGalleryPhotos({
     photoMap.set(normalized.id, normalized);
   }
 
-  const nextPhotos = limitCatGalleryPhotosPerCat([...photoMap.values()]);
+  const fullPhotoHistory = [...photoMap.values()];
+  void upsertPhotoHistoryEntries("gallery", fullPhotoHistory).catch(
+    () => undefined,
+  );
+  const nextPhotos = limitCatGalleryPhotosPerCat(fullPhotoHistory);
 
   writeStorageArray(STORAGE_KEYS.catGalleryPhotos, nextPhotos);
   dispatchCatGalleryPhotosUpdated();
@@ -220,8 +251,14 @@ function normalizeCatGalleryPhoto(photo: CatGalleryPhoto): CatGalleryPhoto {
             normalizePersistentPhotoSrc(photo.originalSrc) || photo.originalSrc,
         }
       : {}),
+    ...(isValidPhotoDimension(photo.width) ? { width: photo.width } : {}),
+    ...(isValidPhotoDimension(photo.height) ? { height: photo.height } : {}),
     createdAt: photo.createdAt,
   });
+}
+
+function isValidPhotoDimension(value: number | null | undefined): value is number {
+  return typeof value === "number" && Number.isFinite(value) && value > 0;
 }
 
 function isValidCatGalleryPhoto(

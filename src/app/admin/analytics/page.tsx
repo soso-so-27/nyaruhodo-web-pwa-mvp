@@ -5,7 +5,7 @@ export const dynamic = "force-dynamic";
 
 export default function AdminAnalyticsPage() {
   return (
-    <AdminAccessGate title="Analytics">
+    <AdminAccessGate title="初動アナリティクス">
       <AdminAnalyticsClient />
     </AdminAccessGate>
   );

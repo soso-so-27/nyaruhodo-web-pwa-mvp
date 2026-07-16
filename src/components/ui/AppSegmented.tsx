@@ -50,6 +50,7 @@ export function AppSegmented<T extends string>({
             type="button"
             role="radio"
             aria-checked={selected}
+            data-app-pressable="button"
             disabled={option.disabled}
             onClick={() => onChange(option.value)}
             style={{
@@ -96,7 +97,7 @@ const styles = {
     lineHeight: 1.2,
     padding: `0 ${spacing.md}px`,
     transition:
-      "background var(--dur-instant) var(--ease-gentle), border-color var(--dur-instant) var(--ease-gentle), color var(--dur-instant) var(--ease-gentle)",
+      "transform var(--app-press-duration, var(--dur-press-out)) var(--ease-settle), background var(--dur-instant) var(--ease-gentle), border-color var(--dur-instant) var(--ease-gentle), color var(--dur-instant) var(--ease-gentle), opacity var(--app-press-duration, var(--dur-press-out)) var(--ease-gentle)",
   },
   optionSelected: {
     background: "var(--control-surface-selected)",

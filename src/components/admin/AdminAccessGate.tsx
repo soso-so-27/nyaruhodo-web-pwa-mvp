@@ -66,7 +66,7 @@ function AdminState({
       }}
     >
       <section style={{ maxWidth: 720, margin: "0 auto" }}>
-        <p style={{ margin: 0, color: "#a65045", fontSize: 13 }}>Admin</p>
+        <p style={{ margin: 0, color: "#a65045", fontSize: 13 }}>管理画面</p>
         <h1 style={{ margin: "8px 0 12px", fontSize: 32, fontWeight: 500 }}>
           {title}
         </h1>

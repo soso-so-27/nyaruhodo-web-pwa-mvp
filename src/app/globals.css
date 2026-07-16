@@ -49,6 +49,44 @@ body {
   overscroll-behavior-x: none;
 }
 
+[data-app-pressable] {
+  --app-press-duration: var(--dur-press-out);
+  --app-press-scale: 0.985;
+  --app-press-y: 1px;
+  transform: translateY(0) scale(1);
+  transform-origin: center;
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+}
+
+[data-app-pressable="icon"] {
+  --app-press-scale: 0.94;
+  --app-press-y: 1px;
+}
+
+[data-app-pressable="nav"] {
+  --app-press-scale: 0.96;
+  --app-press-y: 1px;
+}
+
+[data-app-pressable="photo"],
+[data-app-pressable="card"] {
+  --app-press-scale: 0.99;
+  --app-press-y: 1px;
+}
+
+[data-app-pressable="toggle"] {
+  --app-press-scale: 0.97;
+  --app-press-y: 0px;
+}
+
+[data-app-pressable]:not(:disabled):not([aria-disabled="true"]):active {
+  --app-press-duration: var(--dur-press-in);
+  --app-press-shadow: var(--shadow-e0);
+  --app-photo-shadow: var(--shadow-e0);
+  transform: translateY(var(--app-press-y)) scale(var(--app-press-scale));
+}
+
 @keyframes catAvatarSettle {
   from {
     opacity: 0.72;
@@ -94,6 +132,16 @@ body {
 }
 
 @media (prefers-reduced-motion: reduce) {
+  [data-app-pressable] {
+    --app-press-duration: 0ms;
+    transition-duration: 0ms !important;
+  }
+
+  [data-app-pressable]:not(:disabled):not([aria-disabled="true"]):active {
+    transform: none;
+    opacity: 0.82;
+  }
+
   ::view-transition-old(root),
   ::view-transition-new(root),
   ::view-transition-old(bottom-nav),

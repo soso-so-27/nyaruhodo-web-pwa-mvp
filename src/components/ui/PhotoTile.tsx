@@ -120,7 +120,12 @@ export function PhotoTile({
 
   if (onClick) {
     return (
-      <button type="button" style={rootStyle} onClick={onClick}>
+      <button
+        type="button"
+        data-app-pressable="photo"
+        style={rootStyle}
+        onClick={onClick}
+      >
         {content}
       </button>
     );
@@ -140,6 +145,8 @@ type PhotoViewerFrameProps = {
   fallbackSrcs?: string[];
   onStorageDataUrl?: (dataUrl: string) => void;
   onNaturalSize?: (size: { width: number; height: number }) => void;
+  onLoad?: () => void;
+  onError?: () => void;
   storageVariant?: StorageSignedUrlVariant;
   style?: CSSProperties;
   imageStyle?: CSSProperties;
@@ -152,11 +159,13 @@ export function PhotoViewerFrame({
   src,
   previewSrc,
   alt = "",
-  aspect = "1 / 1",
-  fit = "cover",
+  aspect = "auto",
+  fit = "contain",
   fallbackSrcs,
   onStorageDataUrl,
   onNaturalSize,
+  onLoad,
+  onError,
   storageVariant = "display",
   style,
   imageStyle,
@@ -184,6 +193,8 @@ export function PhotoViewerFrame({
         fallbackSrcs={fallbackSrcs}
         onStorageDataUrl={onStorageDataUrl}
         onNaturalSize={onNaturalSize}
+        onLoad={onLoad}
+        onError={onError}
       />
       {children}
     </span>
@@ -204,6 +215,8 @@ const styles = {
     padding: 0,
     cursor: "pointer",
     WebkitTapHighlightColor: "transparent",
+    transition:
+      "transform var(--app-press-duration, var(--dur-press-out)) var(--ease-settle), opacity var(--app-press-duration, var(--dur-press-out)) var(--ease-gentle)",
   },
   frame: {
     display: "inline-flex",
@@ -212,7 +225,7 @@ const styles = {
     objectFit: "cover",
     border: `6px solid ${color.paper}`,
     background: color.surfaceSoft,
-    boxShadow: shadow.e1,
+    boxShadow: "var(--app-photo-shadow, var(--shadow-e1))",
     overflow: "hidden",
   },
   rounded: {

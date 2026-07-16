@@ -7,7 +7,10 @@ import {
   fallBackCatIllustrationImage,
   useCatIllustrationAssets,
 } from "../../lib/assets/catIllustrationAssets";
-import { resizeImageFileToDataUrl } from "../../lib/imageResize";
+import {
+  readImageFileDimensions,
+  resizeImageFileToDataUrl,
+} from "../../lib/imageResize";
 import { assertSupportedImageFile } from "../../lib/imageFileValidation";
 import { queueOriginalPhotoPreservation } from "../../lib/photoOriginals";
 import {
@@ -1087,9 +1090,10 @@ export function CatsPage() {
 
       try {
         assertSupportedImageFile(file);
-        const [dataUrl, thumbnailDataUrl] = await Promise.all([
+        const [dataUrl, thumbnailDataUrl, dimensions] = await Promise.all([
           resizeAndEncode(file, 2560, 0.88),
           resizeAndEncode(file, 512, 0.72, "image/webp"),
+          readImageFileDimensions(file),
         ]);
         const photoSrc = await storeAccountPhotoDataUrl({
           dataUrl,
@@ -1106,10 +1110,12 @@ export function CatsPage() {
           setTimeout(() => setSaveMessage(""), 2400);
           return;
         }
-        const savedPhoto = saveCatGalleryPhoto({
+        const savedPhoto = await saveCatGalleryPhoto({
           catId: targetCatId,
           src: photoSrc,
           thumbnailSrc: isStoragePhotoReference(thumbnailSrc) ? thumbnailSrc : null,
+          width: dimensions.width,
+          height: dimensions.height,
         });
 
         if (!savedPhoto) {
@@ -6340,7 +6346,9 @@ const styles = {
     alignItems: "center",
     justifyContent: "center",
     borderRadius: "999px",
-    border: "1px solid color-mix(in srgb, var(--line-strong) 76%, transparent)",
+    borderWidth: "1px",
+    borderStyle: "solid",
+    borderColor: "color-mix(in srgb, var(--line-strong) 76%, transparent)",
     background: "color-mix(in srgb, var(--paper-card) 78%, transparent)",
     boxShadow: "0 1px 2px color-mix(in srgb, var(--ink) 8%, transparent)",
   },
@@ -6668,7 +6676,9 @@ const styles = {
     gap: "4px",
     padding: "8px 12px",
     borderRadius: "var(--radius-lg)",
-    border: "1px solid color-mix(in srgb, var(--line-strong) 58%, transparent)",
+    borderWidth: 1,
+    borderStyle: "solid",
+    borderColor: "color-mix(in srgb, var(--line-strong) 58%, transparent)",
     background: "color-mix(in srgb, var(--paper) 40%, transparent)",
   },
   summaryTileAccent: {
@@ -7491,7 +7501,9 @@ const styles = {
     alignContent: "center",
     padding: "10px",
     borderRadius: "10px",
-    border: "1px solid color-mix(in srgb, var(--line) 78%, transparent)",
+    borderWidth: "1px",
+    borderStyle: "solid",
+    borderColor: "color-mix(in srgb, var(--line) 78%, transparent)",
     background: "color-mix(in srgb, var(--paper-card) 32%, transparent)",
   },
   yearSummaryStatButton: {

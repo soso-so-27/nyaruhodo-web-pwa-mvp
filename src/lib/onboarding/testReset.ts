@@ -8,6 +8,9 @@ import {
   AUTH_CODE_VERIFIER_STORAGE_KEY,
   AUTH_STORAGE_KEY,
 } from "../authDebug";
+import { clearDurableOnboardingProgress } from "./progress";
+import { clearPhotoHistoryLedger } from "../photoHistoryLedger";
+import { clearCollectionPhotoLedger } from "../collection/photoHistoryLedger";
 
 const RESET_QUERY_KEY = "reset_onboarding";
 const LEGACY_RESET_QUERY_KEY = "reset";
@@ -63,7 +66,7 @@ const ONBOARDING_TEST_RESET_SESSION_KEYS = [
   "neteruneko_onboarding_album_completion_ready",
 ] as const;
 
-export function consumeOnboardingTestResetRequest() {
+export async function consumeOnboardingTestResetRequest() {
   if (typeof window === "undefined") {
     return false;
   }
@@ -79,7 +82,7 @@ export function consumeOnboardingTestResetRequest() {
 
   const referralCode = readReferralCodeFromResetUrl(url);
 
-  clearOnboardingTestLocalState();
+  await clearOnboardingTestLocalState();
 
   if (referralCode) {
     writeCachedJson(STORAGE_KEYS.pendingReferralCode, {
@@ -111,16 +114,22 @@ export function hasOnboardingTestResetMarker() {
   }
 }
 
-export function clearOnboardingTestTargetState() {
+export async function clearOnboardingTestTargetState() {
   if (typeof window === "undefined") {
     return;
   }
 
-  clearOnboardingTestLocalState();
+  await clearOnboardingTestLocalState();
   markOnboardingTestReset();
 }
 
-function clearOnboardingTestLocalState() {
+async function clearOnboardingTestLocalState() {
+  await Promise.all([
+    clearDurableOnboardingProgress().catch(() => undefined),
+    clearPhotoHistoryLedger().catch(() => undefined),
+    clearCollectionPhotoLedger().catch(() => undefined),
+  ]);
+
   for (const key of ONBOARDING_TEST_RESET_KEYS) {
     removeCachedJson(key);
   }

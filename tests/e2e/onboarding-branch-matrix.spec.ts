@@ -1,5 +1,8 @@
 import { expect, test, type Page } from "@playwright/test";
 
+import { resolveOnboardingResumeDecision } from "../../src/lib/onboarding/stateMachine";
+import type { OnboardingProgress } from "../../src/lib/onboarding/progress";
+
 const IOS_SAFARI_UA =
   "Mozilla/5.0 (iPhone; CPU iPhone OS 18_5 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.5 Mobile/15E148 Safari/604.1";
 const LINE_ANDROID_UA =
@@ -8,6 +11,27 @@ const INSTAGRAM_IOS_UA =
   "Mozilla/5.0 (iPhone; CPU iPhone OS 18_5 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Mobile/15E148 Instagram 385.0.0.25.75";
 
 test.describe("onboarding branch matrix", () => {
+  test("maps every persisted stage to one deterministic resume branch", () => {
+    const base = createResumeProgress();
+
+    expect(resolveOnboardingResumeDecision(null).kind).toBe("intro");
+    expect(
+      resolveOnboardingResumeDecision({ ...base, stage: "submitted" }).kind,
+    ).toBe("resume_submission");
+    expect(
+      resolveOnboardingResumeDecision({ ...base, stage: "name_pending" }).kind,
+    ).toBe("naming");
+    expect(
+      resolveOnboardingResumeDecision({ ...base, stage: "arrived" }).kind,
+    ).toBe("envelope");
+    expect(
+      resolveOnboardingResumeDecision({ ...base, stage: "opened" }).kind,
+    ).toBe("second_photo");
+    expect(
+      resolveOnboardingResumeDecision({ ...base, stage: "album_created" }).kind,
+    ).toBe("home");
+  });
+
   for (const scenario of [
     {
       name: "regular Safari before 20時",
@@ -97,6 +121,40 @@ test.describe("onboarding branch matrix", () => {
     await page.waitForURL(/\/home\?handoff=restored/, { timeout: 5_000 });
   });
 });
+
+function createResumeProgress(): OnboardingProgress {
+  return {
+    version: 1,
+    anonymousId: "resume-matrix-anonymous",
+    dateKey: "2026-07-16",
+    stage: "submitted",
+    source: "direct",
+    submissionId: "resume-matrix-submission",
+    ownPhoto: {
+      id: "resume-own",
+      ownerCatId: "resume-cat",
+      catId: "resume-cat",
+      src: "data:image/png;base64,AAAA",
+      state: "sleeping",
+      visibility: "shared",
+      deliveryStatus: "available",
+      triggerLabel: "sleeping",
+      theme: "sleeping",
+      shared: true,
+      createdAt: 1,
+    },
+    deliveredPhoto: {
+      id: "resume-delivered",
+      src: "data:image/png;base64,BBBB",
+      title: "",
+      subtitle: "",
+      triggerLabel: "sleeping",
+      theme: "sleeping",
+      deliveredAt: 2,
+    },
+    updatedAt: 3,
+  };
+}
 
 async function installBrowserScenario(
   page: Page,

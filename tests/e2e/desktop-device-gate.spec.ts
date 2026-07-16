@@ -12,7 +12,9 @@ test.describe("user device gate", () => {
     await page.goto("/admin/analytics");
 
     await expect(page.getByText("スマホで使うアプリ")).toHaveCount(0);
-    await expect(page.getByText("Admin")).toBeVisible();
+    await expect(
+      page.getByRole("heading", { name: "初動アナリティクス" }),
+    ).toBeVisible();
   });
 });
 

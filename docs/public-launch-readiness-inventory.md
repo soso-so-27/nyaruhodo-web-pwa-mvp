@@ -2,7 +2,11 @@
 
 Last updated: 2026-06-28
 
-Scope: small Instagram launch for `https://nyaruhodo.jp/onboarding?source=instagram_story`.
+> Historical inventory. This document preserves the 2026-06-28 audit and is not the current
+> launch gate. For 投稿3, use `docs/instagram-post3-final-2026-07.md` and
+> `docs/instagram-launch-checklist.md` as the source of truth.
+
+Current Instagram bio entry: `https://neteruneko.jp/onboarding?src=instagram_bio`.
 
 Decision guide:
 
@@ -63,7 +67,7 @@ Do not put secrets, signed URLs, photo URLs, storage paths, cat names, emails, o
 - Risk: anon insert to `app_events` can be spammed. Admin data is empty until production users generate events. If env is missing, admin page/API show an error.
 - Priority: P0 for guard and privacy, P1 for rate limiting/event whitelist.
 - Current action: implemented. `app_error` capture added.
-- Human confirmation: yes. Confirm admin can view; non-admin cannot; empty table does not crash; `source=instagram_story` appears.
+- Human confirmation: yes. Confirm admin can view; non-admin cannot; empty table does not crash; `src=instagram_bio` appears.
 - Related files: `src/app/admin/analytics/page.tsx`, `src/app/admin/analytics/AdminAnalyticsClient.tsx`, `src/app/api/admin/analytics/route.ts`, `src/lib/adminAccess.ts`, `supabase/migrations/20260628120000_create_app_events.sql`, `docs/analytics-kpi-inventory.md`.
 
 ## 7. Privacy / Terms / Contact
@@ -147,7 +151,7 @@ Do not put secrets, signed URLs, photo URLs, storage paths, cat names, emails, o
 - [ ] `/admin/analytics` opens for admin and does not expose sensitive values.
 - [ ] Non-admin cannot view `/admin/analytics` data.
 - [ ] Instagram in-app browser flow works: intro -> photo -> arrived -> opened -> account prompt -> later/home.
-- [ ] `source=instagram_story` appears in `app_events`/admin analytics.
+- [ ] `src=instagram_bio` appears in `app_events`/admin analytics.
 - [ ] Sent tab shows the submitted photo; received tab shows the delivered cat letter.
 - [ ] No PWA install guide appears in Instagram in-app browser.
 - [ ] Candidate/fallback photo quality is acceptable.

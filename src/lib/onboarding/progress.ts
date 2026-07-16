@@ -9,6 +9,11 @@ import {
   type ExchangePhoto,
   type OwnSleepingPhoto,
 } from "../home/sleepingPhotos";
+import {
+  readDurableClientValue,
+  removeDurableClientValue,
+  writeDurableClientValue,
+} from "../storage/durableClientStore";
 
 export type OnboardingSource =
   | "direct"
@@ -51,6 +56,9 @@ const ALLOWED_SOURCES = new Set<OnboardingSource>([
 ]);
 
 const ONBOARDING_SOURCE_QUERY_KEYS = ["src", "source", "utm_source"] as const;
+const DURABLE_ONBOARDING_PROGRESS_KEY = "onboarding-progress:v1";
+let durableProgressCache: OnboardingProgress | null = null;
+let durableProgressWriteQueue = Promise.resolve();
 
 export function normalizeOnboardingSource(value: string | null) {
   if (!value) {
@@ -118,14 +126,23 @@ export function readOnboardingProgress() {
     const raw = window.localStorage.getItem(STORAGE_KEYS.onboardingProgress);
     const parsed = raw ? (JSON.parse(raw) as Partial<OnboardingProgress>) : null;
 
-    if (!isValidOnboardingProgress(parsed)) {
-      return null;
-    }
-
-    return parsed;
+    const localProgress = isValidOnboardingProgress(parsed) ? parsed : null;
+    return getNewestOnboardingProgress(localProgress, durableProgressCache);
   } catch {
-    return null;
+    return durableProgressCache;
   }
+}
+
+export async function readOnboardingProgressDurably() {
+  await durableProgressWriteQueue.catch(() => undefined);
+  const durableProgress = await readDurableClientValue<OnboardingProgress>(
+    DURABLE_ONBOARDING_PROGRESS_KEY,
+  ).catch(() => null);
+  durableProgressCache = isValidOnboardingProgress(durableProgress)
+    ? durableProgress
+    : null;
+
+  return readOnboardingProgress();
 }
 
 export function readTodayOnboardingProgress(now = Date.now()) {
@@ -155,29 +172,85 @@ export function readCurrentOnboardingProgress(now = Date.now()) {
   return progress;
 }
 
+export async function readCurrentOnboardingProgressDurably(now = Date.now()) {
+  await readOnboardingProgressDurably();
+  return readCurrentOnboardingProgress(now);
+}
+
 export function writeOnboardingProgress(progress: OnboardingProgress) {
   if (typeof window === "undefined") {
-    return;
+    return false;
   }
 
+  const persistentProgress = prepareOnboardingProgressForPersistence(progress);
+  durableProgressCache = persistentProgress;
+  void queueDurableOnboardingProgressWrite(persistentProgress).catch(
+    () => undefined,
+  );
+
   try {
-    const deliveredPhoto = sanitizeOptionalDeliveredPhoto(
-      progress.deliveredPhoto,
-    );
     window.localStorage.setItem(
       STORAGE_KEYS.onboardingProgress,
-      JSON.stringify({
-        ...progress,
-        ...(deliveredPhoto ? { deliveredPhoto } : { deliveredPhoto: undefined }),
-        updatedAt: Date.now(),
-      }),
+      JSON.stringify(persistentProgress),
     );
+    return true;
   } catch {
-    // Onboarding persistence should never block the first experience.
+    return false;
+  }
+}
+
+export async function writeOnboardingProgressDurably(
+  progress: OnboardingProgress,
+) {
+  if (typeof window === "undefined") {
+    return false;
+  }
+
+  const persistentProgress = prepareOnboardingProgressForPersistence(progress);
+  durableProgressCache = persistentProgress;
+  await queueDurableOnboardingProgressWrite(persistentProgress);
+
+  if (durableProgressCache === persistentProgress) {
+    try {
+      window.localStorage.setItem(
+        STORAGE_KEYS.onboardingProgress,
+        JSON.stringify(persistentProgress),
+      );
+    } catch {
+      // IndexedDB is the durable source; localStorage is only the synchronous cache.
+    }
+  }
+
+  return true;
+}
+
+export async function clearDurableOnboardingProgress() {
+  durableProgressCache = null;
+  const clearOperation = durableProgressWriteQueue
+    .catch(() => undefined)
+    .then(() => removeDurableClientValue(DURABLE_ONBOARDING_PROGRESS_KEY));
+  durableProgressWriteQueue = clearOperation;
+  await clearOperation;
+
+  if (durableProgressWriteQueue === clearOperation) {
+    durableProgressCache = null;
+    durableProgressWriteQueue = Promise.resolve();
   }
 }
 
 export function patchOnboardingProgress(
+  patch: Partial<OnboardingProgress> & Pick<OnboardingProgress, "stage">,
+) {
+  writeOnboardingProgress(buildPatchedOnboardingProgress(patch));
+}
+
+export function patchOnboardingProgressDurably(
+  patch: Partial<OnboardingProgress> & Pick<OnboardingProgress, "stage">,
+) {
+  return writeOnboardingProgressDurably(buildPatchedOnboardingProgress(patch));
+}
+
+function buildPatchedOnboardingProgress(
   patch: Partial<OnboardingProgress> & Pick<OnboardingProgress, "stage">,
 ) {
   const current = readOnboardingProgress();
@@ -188,7 +261,7 @@ export function patchOnboardingProgress(
     patch.deliveredPhoto ?? current?.deliveredPhoto,
   );
 
-  writeOnboardingProgress({
+  return {
     version: 1,
     anonymousId,
     dateKey,
@@ -205,11 +278,48 @@ export function patchOnboardingProgress(
     completionCopy: patch.completionCopy ?? current?.completionCopy,
     stage: patch.stage,
     updatedAt: Date.now(),
-  });
+  } satisfies OnboardingProgress;
 }
 
 function sanitizeOptionalDeliveredPhoto(photo: ExchangePhoto | undefined) {
   return sanitizeExchangePhotoForPersistence(photo) ?? undefined;
+}
+
+function prepareOnboardingProgressForPersistence(
+  progress: OnboardingProgress,
+): OnboardingProgress {
+  const deliveredPhoto = sanitizeOptionalDeliveredPhoto(progress.deliveredPhoto);
+
+  return {
+    ...progress,
+    ...(deliveredPhoto ? { deliveredPhoto } : { deliveredPhoto: undefined }),
+    updatedAt: Date.now(),
+  };
+}
+
+function queueDurableOnboardingProgressWrite(progress: OnboardingProgress) {
+  const nextWrite = durableProgressWriteQueue
+    .catch(() => undefined)
+    .then(() =>
+      writeDurableClientValue(DURABLE_ONBOARDING_PROGRESS_KEY, progress),
+    );
+  durableProgressWriteQueue = nextWrite;
+  return nextWrite;
+}
+
+function getNewestOnboardingProgress(
+  first: OnboardingProgress | null,
+  second: OnboardingProgress | null,
+) {
+  if (!first) {
+    return second;
+  }
+
+  if (!second) {
+    return first;
+  }
+
+  return first.updatedAt >= second.updatedAt ? first : second;
 }
 
 export function markOnboardingAlbumCreated(source: OnboardingSource) {

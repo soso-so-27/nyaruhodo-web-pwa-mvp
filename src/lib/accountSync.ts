@@ -15,6 +15,14 @@ import {
   type ExchangePhoto,
   type OwnSleepingPhoto,
 } from "./home/sleepingPhotos";
+import { hydratePhotoHistoryLedger } from "./photoHistoryLedger";
+import {
+  hydrateCollectionPhotoLedger,
+  mergeCollectionPhotoStores,
+  persistCollectionPhotoStore,
+  readCachedCollectionPhotoLedger,
+  type DurableCollectionPhotoStore,
+} from "./collection/photoHistoryLedger";
 import {
   CAT_PHOTOS_BUCKET,
   getDataUrlExtension,
@@ -78,6 +86,8 @@ type LocalCollectionPhoto =
       thumbnailSrc?: string;
       displaySrc?: string;
       originalSrc?: string;
+      width?: number;
+      height?: number;
       createdAt?: string;
     };
 type NormalizedLocalCollectionPhoto = {
@@ -86,6 +96,8 @@ type NormalizedLocalCollectionPhoto = {
   thumbnailSrc?: string;
   displaySrc?: string;
   originalSrc?: string;
+  width?: number;
+  height?: number;
   createdAt?: string;
 };
 type LocalCollectionStore = Record<
@@ -325,7 +337,7 @@ export async function getAccountSyncOverview(): Promise<AccountSyncOverview> {
     return emptyOverview;
   }
 
-  const snapshot = readLocalSnapshot();
+  const snapshot = await readCompleteLocalSnapshot();
   const localCats = snapshot.profiles.length;
   const localRecords = countLocalRecords(snapshot.recordLogsByCatId);
   const localCatGalleryPhotos = snapshot.catGalleryPhotos.length;
@@ -513,8 +525,6 @@ export async function syncLocalDataWithAccount(options?: {
     };
   }
 
-  const snapshot = readLocalSnapshot();
-  const shouldPush = hasMeaningfulLocalData(snapshot);
   const shouldRestore = options?.restoreIfLocalEmpty ?? true;
   const shouldForceRestore = options?.forceRestore ?? false;
 
@@ -539,17 +549,6 @@ export async function syncLocalDataWithAccount(options?: {
       return { ...result, status: "skipped" };
     }
 
-    if (shouldPush) {
-      await pushLocalSnapshot(supabase, data.user.id, snapshot, result);
-      if (result.errors.length > 0) {
-        return { ...result, status: "error" };
-      }
-      await saveSyncState(supabase, data.user.id, {
-        last_push_at: new Date().toISOString(),
-      });
-      return { ...result, status: "synced" };
-    }
-
     if (shouldRestore) {
       await restoreRemoteSnapshot(supabase, data.user.id, result, {
         mergeLocal: true,
@@ -557,12 +556,28 @@ export async function syncLocalDataWithAccount(options?: {
       if (result.errors.length > 0) {
         return { ...result, status: "error" };
       }
-      if (hasRestoredAccountData(result)) {
-        await saveSyncState(supabase, data.user.id, {
-          last_pull_at: new Date().toISOString(),
-        });
-        return { ...result, status: "restored" };
+    }
+
+    const mergedSnapshot = await readCompleteLocalSnapshot();
+    const hasMergedLocalData = hasMeaningfulLocalData(mergedSnapshot);
+
+    if (hasMergedLocalData) {
+      await pushLocalSnapshot(supabase, data.user.id, mergedSnapshot, result);
+      if (result.errors.length > 0) {
+        return { ...result, status: "error" };
       }
+    }
+
+    if (hasMergedLocalData || hasRestoredAccountData(result)) {
+      const now = new Date().toISOString();
+      await saveSyncState(supabase, data.user.id, {
+        ...(shouldRestore ? { last_pull_at: now } : {}),
+        ...(hasMergedLocalData ? { last_push_at: now } : {}),
+      });
+      return {
+        ...result,
+        status: hasRestoredAccountData(result) ? "restored" : "synced",
+      };
     }
 
     return { ...result, status: "skipped" };
@@ -614,7 +629,7 @@ export async function mergeAccountDataWithAccount(): Promise<AccountSyncResult> 
       return { ...result, status: "error" };
     }
 
-    const snapshot = readLocalSnapshot();
+    const snapshot = await readCompleteLocalSnapshot();
 
     if (hasMeaningfulLocalData(snapshot)) {
       await pushLocalSnapshot(supabase, data.user.id, snapshot, result);
@@ -989,14 +1004,26 @@ function createEmptyResult(): AccountSyncResult {
   };
 }
 
+async function readCompleteLocalSnapshot() {
+  await Promise.all([
+    hydratePhotoHistoryLedger().catch(() => undefined),
+    hydrateCollectionPhotoLedger().catch(() => undefined),
+  ]);
+  return readLocalSnapshot();
+}
+
 function readLocalSnapshot(): LocalSnapshot {
   const profiles = normalizeProfiles(
     readJson<LocalCatProfile[] | Record<string, LocalCatProfile>>(
       STORAGE_KEYS.catProfiles,
     ),
   );
-  const collectionPhotos =
+  const localCollectionPhotos =
     readJson<LocalCollectionStore>(STORAGE_KEYS.collectionPhotos) ?? {};
+  const collectionPhotos = mergeCollectionPhotoStores(
+    normalizeCollectionStoreForLedger(localCollectionPhotos),
+    readCachedCollectionPhotoLedger(),
+  ) as LocalCollectionStore;
   const catGalleryPhotos = readCatGalleryPhotos(null);
   const ownSleepingPhotos = readOwnSleepingPhotosForSync();
   const keptExchangePhotos = readKeptExchangePhotosForSync();
@@ -2692,6 +2719,10 @@ function serializeLocalStateValue(value: unknown) {
 }
 
 function writeCollectionStoreWithFallback(collectionStore: LocalCollectionStore) {
+  void persistCollectionPhotoStore(
+    normalizeCollectionStoreForLedger(collectionStore),
+  ).catch(() => undefined);
+
   for (const maxPhotosPerSlot of [Number.POSITIVE_INFINITY, 24, 12, 8, 4, 2, 1]) {
     const trimmedStore = Number.isFinite(maxPhotosPerSlot)
       ? trimCollectionStore(collectionStore, maxPhotosPerSlot)
@@ -2709,6 +2740,25 @@ function writeCollectionStoreWithFallback(collectionStore: LocalCollectionStore)
   }
 
   return 0;
+}
+
+function normalizeCollectionStoreForLedger(
+  collectionStore: LocalCollectionStore,
+): DurableCollectionPhotoStore {
+  return Object.fromEntries(
+    Object.entries(collectionStore).map(([catId, photosBySlot]) => [
+      catId,
+      Object.fromEntries(
+        Object.entries(photosBySlot).map(([slotSlug, rawPhotos]) => [
+          slotSlug,
+          normalizeCollectionPhotoEntries(rawPhotos).map((photo, index) => ({
+            ...photo,
+            id: photo.id || `${catId}:${slotSlug}:${index}`,
+          })),
+        ]),
+      ),
+    ]),
+  );
 }
 
 function trimCollectionStore(
@@ -2747,6 +2797,8 @@ function normalizeCollectionPhotoEntries(
           ...(photo.thumbnailSrc ? { thumbnailSrc: photo.thumbnailSrc } : {}),
           ...(photo.displaySrc ? { displaySrc: photo.displaySrc } : {}),
           ...(photo.originalSrc ? { originalSrc: photo.originalSrc } : {}),
+          ...(isValidPhotoDimension(photo.width) ? { width: photo.width } : {}),
+          ...(isValidPhotoDimension(photo.height) ? { height: photo.height } : {}),
           createdAt: photo.createdAt,
         };
       }
@@ -2754,6 +2806,10 @@ function normalizeCollectionPhotoEntries(
       return null;
     })
     .filter((photo): photo is NormalizedLocalCollectionPhoto => Boolean(photo));
+}
+
+function isValidPhotoDimension(value: number | null | undefined): value is number {
+  return typeof value === "number" && Number.isFinite(value) && value > 0;
 }
 
 function buildRestoredPhotoVariants(src: string) {

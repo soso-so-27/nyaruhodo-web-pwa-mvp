@@ -74,6 +74,8 @@
   /* ===== 動き ===== */
   --ease-settle: cubic-bezier(0.22, 1, 0.36, 1);
   --ease-gentle: cubic-bezier(0.4, 0, 0.2, 1);
+  --dur-press-in: 72ms;
+  --dur-press-out: 160ms;
   --dur-instant: 180ms;
   --dur-move: 420ms;
   --dur-reveal: 900ms;

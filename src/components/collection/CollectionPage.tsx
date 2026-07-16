@@ -9,7 +9,10 @@ import type {
   UIEvent,
 } from "react";
 import { AnimatePresence, MotionConfig, motion } from "motion/react";
-import { resizeImageFileToDataUrl } from "../../lib/imageResize";
+import {
+  readImageFileDimensions,
+  resizeImageFileToDataUrl,
+} from "../../lib/imageResize";
 import { assertSupportedImageFile } from "../../lib/imageFileValidation";
 import { queueOriginalPhotoPreservation } from "../../lib/photoOriginals";
 import {
@@ -17,6 +20,13 @@ import {
   getDailyCollectionTarget,
   isReservedCollectionSlotSlug,
 } from "../../lib/collection/dailyTarget";
+import {
+  mergeCollectionPhotoStores,
+  readCachedCollectionPhotoLedger,
+  removeCollectionPhotoHistory,
+  upsertCollectionPhotoHistory,
+  type DurableCollectionPhotoStore,
+} from "../../lib/collection/photoHistoryLedger";
 import { trackProductEvent } from "../../lib/analytics/productAnalytics";
 import {
   deleteAccountCollectionPhoto,
@@ -32,6 +42,7 @@ import {
 } from "../../lib/photoStorage";
 import {
   completePhotoSourceSet,
+  getPhotoAspectRatio,
   getPhotoContentIdentityKeys,
   resolvePhotoFallbackSrcs,
   resolvePhotoSrc,
@@ -51,6 +62,8 @@ import {
   readOwnSleepingPhotosForAlbum,
   reportExchangePhoto,
   updateKeptExchangePhotoDataUrl,
+  updateKeptExchangePhotoDimensions,
+  updateOwnSleepingPhotoDimensions,
   updateOwnSleepingPhotoDelivery,
   type ExchangePhoto,
 } from "../../lib/home/sleepingPhotos";
@@ -202,6 +215,8 @@ type CollectionPhoto = {
   thumbnailSrc?: string;
   displaySrc?: string;
   originalSrc?: string;
+  width?: number;
+  height?: number;
   localIndex?: number;
   storageSlug?: string;
   createdAt?: string;
@@ -228,6 +243,8 @@ type BoxPreviewPhoto = {
   thumbnailSrc?: string;
   displaySrc?: string;
   originalSrc?: string;
+  width?: number;
+  height?: number;
   offlineSrc?: string;
   catId?: string;
   ownerCatId?: string;
@@ -243,6 +260,8 @@ type StoredCollectionPhotoEntry = {
   thumbnailSrc?: string;
   displaySrc?: string;
   originalSrc?: string;
+  width?: number;
+  height?: number;
   createdAt?: string;
 };
 
@@ -280,6 +299,8 @@ type MainichiBoardPhoto = {
   boardSrc: string;
   offlineSrc?: string;
   fallbackSrcs?: string[];
+  width?: number;
+  height?: number;
   timestamp: number;
   side: MainichiBoardSide;
   catName?: string;
@@ -329,6 +350,8 @@ type MainichiDayPhoto = {
   thumbnailSrc?: string;
   displaySrc?: string;
   originalSrc?: string;
+  width?: number;
+  height?: number;
   offlineSrc?: string;
   timestamp: number;
   kind: BoxDetailKind;
@@ -541,6 +564,8 @@ export function CollectionPage() {
         thumbnailSrc: photo.thumbnailSrc,
         displaySrc: resolvePhotoSrc(photo, "detail"),
         originalSrc: resolvePhotoSrc(photo, "detail"),
+        width: photo.width,
+        height: photo.height,
         createdAt: getCollectionPhotoTimestamp(photo),
         sourcePhotoId: photo.slotId,
       })),
@@ -1135,7 +1160,7 @@ export function CollectionPage() {
         return;
       }
 
-      const addedPhoto = addCollectionPhoto(activeCatId, slug, photoVariants);
+      const addedPhoto = await addCollectionPhoto(activeCatId, slug, photoVariants);
       if (!addedPhoto) {
         return;
       }
@@ -1274,6 +1299,9 @@ export function CollectionPage() {
 
       writeCachedJson(STORAGE_KEYS.collectionPhotos, all);
       if (photoToDelete?.id) {
+        void removeCollectionPhotoHistory(activeCatId, slug, photoToDelete).catch(
+          () => undefined,
+        );
         void deleteAccountCollectionPhoto(photoToDelete.id).catch(() => {
           // The local album should update immediately; account checks surface sync issues.
         });
@@ -2005,7 +2033,9 @@ function MainichiNaturalMonthBoard({
     source?: MainichiMorphSource | null,
   ) => void;
 }) {
-  const [ratios, setRatios] = useState<Record<string, number>>({});
+  const [ratios, setRatios] = useState<Record<string, number>>(() =>
+    getKnownMainichiPhotoRatios(month.photos),
+  );
   const [decodedPhotoKeys, setDecodedPhotoKeys] = useState<Set<string>>(
     () => new Set(),
   );
@@ -2026,7 +2056,7 @@ function MainichiNaturalMonthBoard({
       setRatios((current) => {
         const next = { ...current };
         for (const [key, value] of values) {
-          next[key] = value ?? 1;
+          next[key] = value ?? next[key] ?? 1;
         }
         return next;
       });
@@ -2041,9 +2071,13 @@ function MainichiNaturalMonthBoard({
     setDecodedPhotoKeys(new Set());
   }, [month.key]);
 
-  const photos = useMemo(
+  const allPhotos = useMemo(
     () => [...month.photos].sort((a, b) => b.timestamp - a.timestamp),
     [month.photos],
+  );
+  const photos = useMemo(
+    () => getMainichiBoardVisiblePhotos(allPhotos),
+    [allPhotos],
   );
   const placements = useMemo(
     () => buildMainichiCurrentNaturalPlacements(photos, ratios),
@@ -2092,7 +2126,7 @@ function MainichiNaturalMonthBoard({
       data-testid="mainichi-month-board"
       aria-label={month.label}
     >
-      {photos.length > MAINICHI_BOARD_DIRECT_PHOTO_LIMIT ? (
+      {allPhotos.length > MAINICHI_BOARD_DIRECT_PHOTO_LIMIT ? (
         <div style={styles.mainichiDayBrowseAction}>
           <AppButton
             type="button"
@@ -2186,6 +2220,16 @@ function MainichiNaturalMonthBoard({
                         )
                     : undefined
                 }
+                onNaturalSize={({ width, height }) => {
+                  if (width <= 0 || height <= 0) {
+                    return;
+                  }
+                  setRatios((current) => ({
+                    ...current,
+                    [key]: width / height,
+                  }));
+                  persistMainichiPhotoDimensions(photo, { width, height });
+                }}
               />
             </motion.button>
           );
@@ -2422,6 +2466,7 @@ function MainichiMonthBundleSheet({
               damping: 25,
             }}
             data-testid="mainichi-month-bundle-day"
+            data-photo-count={bundle.photos.length}
             aria-label={`${bundle.label} ${bundle.photos.length}枚`}
           >
             <span style={styles.mainichiMonthBundleDayPhotos} aria-hidden="true">
@@ -2758,6 +2803,7 @@ function MainichiDaySheet({
                       ? "mainichi-day-photo-sent"
                       : "mainichi-day-photo-delivered"
                   }
+                  data-photo-id={photo.id}
                 >
                 <PhotoTile
                   src={getPhotoThumbnailSrc(photo)}
@@ -2816,7 +2862,11 @@ function MainichiFullscreenPhoto({
   onHideDeliveredPhoto: (photo: MainichiDayPhoto) => void;
   onReportDeliveredPhoto: (photo: MainichiDayPhoto) => void;
 }) {
-  const [photoAspectRatio, setPhotoAspectRatio] = useState("1 / 1");
+  const [photoAspectRatio, setPhotoAspectRatio] = useState(() =>
+    getPhotoAspectCss(photo),
+  );
+  const [hasPhotoError, setHasPhotoError] = useState(false);
+  const [photoRetryKey, setPhotoRetryKey] = useState(0);
   const [pendingAction, setPendingAction] = useState<
     "delete" | "hide" | "report" | null
   >(null);
@@ -2855,8 +2905,10 @@ function MainichiFullscreenPhoto({
             }
           : null;
 
-  useEffect(() => {
-    setPhotoAspectRatio("1 / 1");
+  useLayoutEffect(() => {
+    setPhotoAspectRatio(getPhotoAspectCss(photo));
+    setHasPhotoError(false);
+    setPhotoRetryKey(0);
     setPendingAction(null);
   }, [photo.id, photo.kind, photo.sourcePhotoId]);
 
@@ -2965,6 +3017,7 @@ function MainichiFullscreenPhoto({
         }}
       >
         <PhotoViewerFrame
+          key={`${photo.id}:${photoRetryKey}`}
           src={getPhotoDetailSrc(photo)}
           previewSrc={photo.offlineSrc ?? getPhotoThumbnailSrc(photo)}
           fallbackSrcs={getPhotoFallbackSrcs(photo)}
@@ -2981,9 +3034,25 @@ function MainichiFullscreenPhoto({
           onNaturalSize={({ width, height }) => {
             if (width > 0 && height > 0) {
               setPhotoAspectRatio(`${width} / ${height}`);
+              persistMainichiDayPhotoDimensions(photo, { width, height });
             }
           }}
+          onLoad={() => setHasPhotoError(false)}
+          onError={() => setHasPhotoError(true)}
         />
+        {hasPhotoError ? (
+          <AppButton
+            type="button"
+            variant="quiet"
+            size="sm"
+            onClick={() => {
+              setHasPhotoError(false);
+              setPhotoRetryKey((current) => current + 1);
+            }}
+          >
+            もう一度表示する
+          </AppButton>
+        ) : null}
         {canNavigate ? (
           <div style={styles.mainichiViewerPager} aria-label="写真を切り替える">
             <AppButton
@@ -4105,6 +4174,8 @@ function buildMainichiDayPhotos(
         thumbnailSrc: photo.thumbnailSrc,
         displaySrc: photo.displaySrc,
         originalSrc: photo.originalSrc,
+        width: photo.width,
+        height: photo.height,
         offlineSrc: photo.offlineSrc,
         timestamp: photo.timestamp,
         kind: "sleeping" as const,
@@ -4126,6 +4197,8 @@ function buildMainichiDayPhotos(
       thumbnailSrc: photo.thumbnailSrc,
       displaySrc: photo.displaySrc,
       originalSrc: photo.originalSrc,
+      width: photo.width,
+      height: photo.height,
       offlineSrc: photo.offlineSrc,
       timestamp: photo.timestamp,
       kind: "other" as const,
@@ -4147,6 +4220,8 @@ function createExchangePhotoFromDayPhoto(photo: MainichiDayPhoto): ExchangePhoto
     displaySrc: photo.displaySrc,
     originalSrc: photo.originalSrc,
     offlineSrc: photo.offlineSrc,
+    width: photo.width,
+    height: photo.height,
     title: "とどいたねがお",
     subtitle: "",
     triggerLabel: "mainichi",
@@ -4270,10 +4345,44 @@ function createMainichiBoardPhoto(
     boardSrc: getPhotoTransformBaseSrc(photo),
     offlineSrc: photo.offlineSrc,
     fallbackSrcs: getPhotoFallbackSrcs(photo),
+    width: photo.width,
+    height: photo.height,
     timestamp: photo.timestamp,
     side,
     catName: side === "sent" && catId ? catNameById.get(catId) : undefined,
   };
+}
+
+function persistMainichiPhotoDimensions(
+  photo: MainichiBoardPhoto,
+  size: { width: number; height: number },
+) {
+  if (photo.side === "delivered") {
+    updateKeptExchangePhotoDimensions(photo, size);
+    return;
+  }
+
+  updateOwnSleepingPhotoDimensions(
+    { id: photo.id, sourceMomentId: photo.sourcePhotoId },
+    size,
+  );
+}
+
+function persistMainichiDayPhotoDimensions(
+  photo: MainichiDayPhoto,
+  size: { width: number; height: number },
+) {
+  if (photo.kind === "other") {
+    updateKeptExchangePhotoDimensions(photo, size);
+    return;
+  }
+
+  if (photo.kind === "sleeping") {
+    updateOwnSleepingPhotoDimensions(
+      { id: photo.id, sourceMomentId: photo.sourcePhotoId },
+      size,
+    );
+  }
 }
 
 function getMainichiMonthKey(dateKey: string) {
@@ -4461,6 +4570,11 @@ function getMainichiCurrentCanvasHeight(total: number) {
 }
 
 async function readMainichiDisplayRatio(photo: MainichiBoardPhoto) {
+  const knownAspect = getPhotoAspectRatio(photo);
+  if (knownAspect) {
+    return knownAspect;
+  }
+
   const sources = Array.from(
     new Set(
       [photo.boardSrc, photo.offlineSrc, photo.src, ...(photo.fallbackSrcs ?? [])].filter(
@@ -4482,6 +4596,22 @@ async function readMainichiDisplayRatio(photo: MainichiBoardPhoto) {
   }
 
   return null;
+}
+
+function getKnownMainichiPhotoRatios(photos: MainichiBoardPhoto[]) {
+  return Object.fromEntries(
+    photos.flatMap((photo) => {
+      const aspect = getPhotoAspectRatio(photo);
+      return aspect ? [[getMainichiBoardPhotoKey(photo), aspect] as const] : [];
+    }),
+  );
+}
+
+function getPhotoAspectCss(
+  photo: Pick<PhotoSourceSet, "width" | "height">,
+) {
+  const aspect = getPhotoAspectRatio(photo);
+  return aspect ? `${photo.width} / ${photo.height}` : "1 / 1";
 }
 
 function readImageAspectRatio(src: string) {
@@ -5425,6 +5555,8 @@ function buildStoredCollectionPhotos(
           thumbnailSrc: photo.thumbnailSrc,
           displaySrc: photo.displaySrc,
           originalSrc: photo.originalSrc,
+          width: photo.width,
+          height: photo.height,
           storageSlug: slug,
           localIndex: index,
           createdAt: photo.createdAt,
@@ -5482,14 +5614,40 @@ function buildNextCollectionTargets(
     .slice(0, 4);
 }
 
+function normalizeCollectionStoreForLedger(
+  store: Record<
+    string,
+    Record<
+      string,
+      StoredCollectionPhotoEntry[] | StoredCollectionPhotoEntry | string[] | string
+    >
+  >,
+): DurableCollectionPhotoStore {
+  return Object.fromEntries(
+    Object.entries(store).map(([catId, slots]) => [
+      catId,
+      Object.fromEntries(
+        Object.entries(slots).map(([slug, photos]) => [
+          slug,
+          normalizeStoredPhotoList(photos, catId, slug),
+        ]),
+      ),
+    ]),
+  );
+}
+
 function readCollectionPhotos(catId: string): Record<string, StoredCollectionPhotoEntry[]> {
   try {
-    const all = readCachedJson<Record<
+    const localStore = readCachedJson<Record<
       string,
       Record<string, StoredCollectionPhotoEntry[] | StoredCollectionPhotoEntry | string[] | string>
-    >>(STORAGE_KEYS.collectionPhotos);
+    >>(STORAGE_KEYS.collectionPhotos) ?? {};
+    const all = mergeCollectionPhotoStores(
+      normalizeCollectionStoreForLedger(localStore),
+      readCachedCollectionPhotoLedger(),
+    );
 
-    if (!all) {
+    if (Object.keys(all).length === 0) {
       return {};
     }
     const catPhotos = all[catId] ?? {};
@@ -5509,12 +5667,12 @@ function readCollectionPhotos(catId: string): Record<string, StoredCollectionPho
   }
 }
 
-function addCollectionPhoto(
+async function addCollectionPhoto(
   catId: string,
   slug: string,
   photoInput: Pick<
     StoredCollectionPhotoEntry,
-    "src" | "thumbnailSrc" | "displaySrc" | "originalSrc"
+    "src" | "thumbnailSrc" | "displaySrc" | "originalSrc" | "width" | "height"
   >,
 ) {
   if (isReservedCollectionSlotSlug(slug)) {
@@ -5526,6 +5684,14 @@ function addCollectionPhoto(
     ...photoInput,
     createdAt: new Date().toISOString(),
   };
+
+  let wasSavedDurably = false;
+  try {
+    await upsertCollectionPhotoHistory(catId, slug, photo);
+    wasSavedDurably = true;
+  } catch {
+    // The compact local cache remains available when IndexedDB is unavailable.
+  }
 
   try {
     const all =
@@ -5540,11 +5706,10 @@ function addCollectionPhoto(
 
     all[catId][slug] = [...normalizeStoredPhotoList(all[catId][slug], catId, slug), photo];
     writeCachedJson(STORAGE_KEYS.collectionPhotos, all);
+    return photo;
   } catch {
-    // Ignore localStorage quota or parse failures for this MVP fallback.
+    return wasSavedDurably ? photo : null;
   }
-
-  return photo;
 }
 
 function normalizeStoredPhotoList(
@@ -5584,6 +5749,8 @@ function normalizeStoredPhotoList(
           ...(isUsableStoredPhotoSrc(photo.originalSrc)
             ? { originalSrc: photo.originalSrc }
             : {}),
+          ...(isValidPhotoDimension(photo.width) ? { width: photo.width } : {}),
+          ...(isValidPhotoDimension(photo.height) ? { height: photo.height } : {}),
           ...(parsedCreatedAt ? { createdAt: parsedCreatedAt } : {}),
         });
       }
@@ -5651,12 +5818,13 @@ async function createStoredCollectionPhotoVariantSet({
 }): Promise<
   Pick<
     StoredCollectionPhotoEntry,
-    "src" | "thumbnailSrc" | "displaySrc" | "originalSrc"
+    "src" | "thumbnailSrc" | "displaySrc" | "originalSrc" | "width" | "height"
   >
 > {
-  const [thumbnailDataUrl, displayDataUrl] = await Promise.all([
+  const [thumbnailDataUrl, displayDataUrl, dimensions] = await Promise.all([
     resizeAndEncode(file, 480, 0.72, "image/webp"),
     resizeAndEncode(file, 1600, 0.84, "image/webp"),
+    readImageFileDimensions(file),
   ]);
   const localDisplaySrc =
     displayDataUrl.length <= 1_900_000
@@ -5682,7 +5850,13 @@ async function createStoredCollectionPhotoVariantSet({
     ...(thumbnailSrc && isStoragePhotoReference(thumbnailSrc)
       ? { thumbnailSrc }
       : {}),
+    width: dimensions.width,
+    height: dimensions.height,
   };
+}
+
+function isValidPhotoDimension(value: number | null | undefined): value is number {
+  return typeof value === "number" && Number.isFinite(value) && value > 0;
 }
 
 function isStoragePhotoReference(src: string | null | undefined) {
@@ -6108,7 +6282,9 @@ const styles = {
     alignItems: "center",
     gap: "10px",
     minHeight: "46px",
-    border: "1px solid color-mix(in srgb, var(--line) 52%, transparent)",
+    borderWidth: "1px",
+    borderStyle: "solid",
+    borderColor: "color-mix(in srgb, var(--line) 52%, transparent)",
     borderRadius: "var(--radius-full)",
     background:
       "linear-gradient(135deg, color-mix(in srgb, var(--paper-card) 28%, transparent), color-mix(in srgb, var(--paper-warm) 12%, transparent))",

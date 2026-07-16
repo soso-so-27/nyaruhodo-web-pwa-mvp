@@ -19,7 +19,7 @@ const contentSecurityPolicyReportOnly = [
 
 const nextConfig: NextConfig = {
   poweredByHeader: false,
-  allowedDevOrigins: ["192.168.11.28"],
+  allowedDevOrigins: ["192.168.11.28", "127.0.0.1", "localhost"],
   env: {
     NEXT_PUBLIC_VERCEL_GIT_COMMIT_SHA:
       process.env.NEXT_PUBLIC_VERCEL_GIT_COMMIT_SHA ??

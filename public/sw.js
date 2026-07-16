@@ -1,6 +1,6 @@
 // Deliberately bump when a photo delivery semantic changes so an installed PWA
 // claims the new worker and drops stale signed-image responses on next launch.
-const CACHE_VERSION = "2026-07-13-03";
+const CACHE_VERSION = "2026-07-16-01";
 const STATIC_CACHE = `neteruneko-static-${CACHE_VERSION}`;
 const RUNTIME_CACHE = `neteruneko-runtime-${CACHE_VERSION}`;
 const OFFLINE_URL = "/offline";
@@ -22,6 +22,7 @@ const PHOTO_CACHE_META_PREFIX = "/__sw-photo-cache/meta/";
 const PHOTO_CACHE_TTL_MS = 7 * 24 * 60 * 60 * 1000;
 const PHOTO_CACHE_MAX_ENTRIES = 200;
 const PHOTO_CACHE_MAX_BYTES = 50 * 1024 * 1024;
+const NAVIGATION_TIMEOUT_MS = 8000;
 
 let photoImageCacheEnabled = null;
 let photoImageCacheEnabledPromise = null;
@@ -594,8 +595,11 @@ function isPublicAppAsset(pathname) {
 }
 
 async function networkFirstNavigation(request) {
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), NAVIGATION_TIMEOUT_MS);
+
   try {
-    return await fetch(request);
+    return await fetch(request, { signal: controller.signal });
   } catch {
     const cachedOffline = await caches.match(OFFLINE_URL);
 
@@ -606,6 +610,8 @@ async function networkFirstNavigation(request) {
         headers: { "content-type": "text/plain; charset=utf-8" },
       })
     );
+  } finally {
+    clearTimeout(timeoutId);
   }
 }
 

@@ -8,6 +8,7 @@ import { UserDeviceGate } from "../components/device/UserDeviceGate";
 import { PhotoSwCacheController } from "../components/performance/PhotoSwCacheController";
 import { PhotoStartupPrefetcher } from "../components/performance/PhotoStartupPrefetcher";
 import { OriginalPhotoPreservationController } from "../components/performance/OriginalPhotoPreservationController";
+import { PhotoHistoryLedgerController } from "../components/performance/PhotoHistoryLedgerController";
 import { ServiceWorkerRegistrar } from "../components/pwa/ServiceWorkerRegistrar";
 import { AppPaperTheme } from "../components/ui/AppPaperTheme";
 
@@ -143,6 +144,7 @@ export default function RootLayout({
         <AppReferralTracker />
         <PhotoSwCacheController />
         <PhotoStartupPrefetcher />
+        <PhotoHistoryLedgerController />
         <OriginalPhotoPreservationController />
         <ServiceWorkerRegistrar />
         <UserDeviceGate>{children}</UserDeviceGate>

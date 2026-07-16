@@ -26,6 +26,7 @@ export function AppToggle({
       role="switch"
       aria-checked={checked}
       aria-label={label}
+      data-app-pressable="toggle"
       disabled={disabled}
       onClick={() => onChange(!checked)}
       style={{
@@ -77,7 +78,7 @@ const styles = {
     fontWeight: 500,
     lineHeight: 1,
     transition:
-      "background var(--dur-instant) var(--ease-gentle), color var(--dur-instant) var(--ease-gentle), border-color var(--dur-instant) var(--ease-gentle)",
+      "transform var(--app-press-duration, var(--dur-press-out)) var(--ease-settle), background var(--dur-instant) var(--ease-gentle), color var(--dur-instant) var(--ease-gentle), border-color var(--dur-instant) var(--ease-gentle), opacity var(--app-press-duration, var(--dur-press-out)) var(--ease-gentle)",
   },
   rootChecked: {
     background: color.text,

@@ -161,6 +161,7 @@ export function BottomNavigation({
             key={item.key}
             href={item.href}
             prefetch={true}
+            data-app-pressable="nav"
             style={isActive ? styles.activeNavButton : styles.navButton}
             aria-label={displayLabel}
             aria-current={activeKey === item.key ? "page" : undefined}
@@ -301,7 +302,7 @@ const styles = {
     textDecoration: "none",
     cursor: "pointer",
     transition:
-      "color var(--dur-instant) var(--ease-gentle), transform var(--dur-instant) var(--ease-settle)",
+      "color var(--dur-instant) var(--ease-gentle), transform var(--app-press-duration, var(--dur-press-out)) var(--ease-settle), opacity var(--app-press-duration, var(--dur-press-out)) var(--ease-gentle)",
   },
   activeNavButton: {
     position: "relative",
@@ -318,7 +319,7 @@ const styles = {
     textDecoration: "none",
     cursor: "pointer",
     transition:
-      "color var(--dur-instant) var(--ease-gentle), transform var(--dur-instant) var(--ease-settle)",
+      "color var(--dur-instant) var(--ease-gentle), transform var(--app-press-duration, var(--dur-press-out)) var(--ease-settle), opacity var(--app-press-duration, var(--dur-press-out)) var(--ease-gentle)",
   },
   navIcon: {
     position: "relative",

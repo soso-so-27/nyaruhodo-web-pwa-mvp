@@ -73,6 +73,7 @@ export function trackProductEvent(
   try {
     const propertiesForStorage = sanitizeProperties({
       ...getAttributionProperties(),
+      ...getAnalyticsEnvironmentProperties(),
       ...properties,
     });
     const event: ProductAnalyticsEvent = {
@@ -545,12 +546,76 @@ function isStandalonePwa() {
 }
 
 function isInAppBrowser() {
+  const context = getBrowserContext();
+  return context !== "browser" && context !== "standalone";
+}
+
+function getAnalyticsEnvironmentProperties() {
+  return {
+    device_os: getDeviceOs(),
+    browser_context: getBrowserContext(),
+  };
+}
+
+function getDeviceOs() {
   const userAgent = window.navigator.userAgent.toLowerCase();
-  return (
-    userAgent.includes("instagram") ||
+  const navigatorWithTouch = window.navigator as Navigator & {
+    maxTouchPoints?: number;
+  };
+
+  if (
+    /iphone|ipad|ipod/.test(userAgent) ||
+    (userAgent.includes("macintosh") &&
+      (navigatorWithTouch.maxTouchPoints ?? 0) > 1)
+  ) {
+    return "ios";
+  }
+
+  if (userAgent.includes("android")) {
+    return "android";
+  }
+
+  if (/windows|macintosh|linux/.test(userAgent)) {
+    return "desktop";
+  }
+
+  return "other";
+}
+
+function getBrowserContext() {
+  if (isStandalonePwa()) {
+    return "standalone";
+  }
+
+  const userAgent = window.navigator.userAgent.toLowerCase();
+
+  if (userAgent.includes("line/") || userAgent.includes(" line")) {
+    return "line";
+  }
+
+  if (userAgent.includes("instagram")) {
+    return "instagram";
+  }
+
+  if (
     userAgent.includes("fbav") ||
     userAgent.includes("fban") ||
-    userAgent.includes("line/") ||
-    userAgent.includes("micromessenger")
-  );
+    userAgent.includes("fb_iab")
+  ) {
+    return "facebook";
+  }
+
+  if (userAgent.includes("micromessenger")) {
+    return "wechat";
+  }
+
+  if (
+    userAgent.includes("android") &&
+    (userAgent.includes("; wv)") ||
+      (userAgent.includes("version/4.0") && userAgent.includes("chrome/")))
+  ) {
+    return "embedded_other";
+  }
+
+  return "browser";
 }

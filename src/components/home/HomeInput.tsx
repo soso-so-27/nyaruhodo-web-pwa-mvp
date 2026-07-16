@@ -21,13 +21,17 @@ import { getOrCreateAnonymousId } from "../../lib/identity/anonymousId";
 import { purgeAllPhotoSwCache } from "../../lib/photoSwCache";
 import {
   completePhotoSourceSet,
+  getPhotoAspectRatio,
   resolvePhotoFallbackSrcs,
   resolvePhotoSrc,
   resolvePhotoStorageVariant,
   type PhotoSourceContext,
   type PhotoSourceSet,
 } from "../../lib/photoSources";
-import { resizeImageFileToDataUrl } from "../../lib/imageResize";
+import {
+  readImageFileDimensions,
+  resizeImageFileToDataUrl,
+} from "../../lib/imageResize";
 import { assertSupportedImageFile } from "../../lib/imageFileValidation";
 import { queueOriginalPhotoPreservation } from "../../lib/photoOriginals";
 import {
@@ -43,6 +47,7 @@ import {
   isReservedCollectionSlotSlug,
   readStoredCollectionPhotos,
 } from "../../lib/collection/dailyTarget";
+import { upsertCollectionPhotoHistory } from "../../lib/collection/photoHistoryLedger";
 import {
   COLLECTION_GROUPS,
   type CollectionSlot,
@@ -99,6 +104,7 @@ import {
   reportExchangePhoto,
   saveOwnSleepingPhoto,
   updateKeptExchangePhotoDataUrl,
+  updateKeptExchangePhotoDimensions,
   writeOwnSleepingPhotosWithFallback,
   type ExchangePhoto,
   type ExchangePhotoReportReason,
@@ -278,6 +284,8 @@ type PendingExchangeSharePhoto = {
   thumbnailSrc?: string;
   displaySrc?: string;
   originalSrc?: string;
+  width?: number;
+  height?: number;
   triggerLabel: string;
   theme: string;
   fileSizeBucket: string;
@@ -387,6 +395,7 @@ export function HomeInput({
   );
   const openingEveningDeliveryRequestRef = useRef<string | null>(null);
   const hasTrackedSecondPhotoPromptRef = useRef(false);
+  const hasTrackedHomeInstallHintRef = useRef(false);
 
   useEffect(() => {
     compactDuplicatePhotoSourcesInLocalStorage();
@@ -507,6 +516,9 @@ export function HomeInput({
       }
     };
     const handleAppInstalled = () => {
+      trackProductEvent("home_install_completed", {
+        platform: getHomeInstallPlatform() ?? "unknown",
+      });
       setIsHomeInstallHintVisible(false);
       setIsHomeInstallGuideOpen(false);
       setHomeInstallPrompt(null);
@@ -533,6 +545,22 @@ export function HomeInput({
       );
     };
   }, []);
+
+  useEffect(() => {
+    if (
+      !isHomeInstallHintVisible ||
+      !homeInstallPlatform ||
+      hasTrackedHomeInstallHintRef.current
+    ) {
+      return;
+    }
+
+    hasTrackedHomeInstallHintRef.current = true;
+    trackProductEvent("home_install_invitation_viewed", {
+      platform: homeInstallPlatform,
+      native_prompt_available: Boolean(homeInstallPrompt),
+    });
+  }, [homeInstallPlatform, homeInstallPrompt, isHomeInstallHintVisible]);
 
   useEffect(() => {
     const root = document.documentElement;
@@ -1546,14 +1574,22 @@ export function HomeInput({
 
       try {
         const slug = getCollectionSlotPhotoSlug(slot);
-        const dataUrl = await resizeAndEncode(file, 1200, 0.82);
+        const [dataUrl, dimensions] = await Promise.all([
+          resizeAndEncode(file, 1200, 0.82),
+          readImageFileDimensions(file),
+        ]);
         const photoSrc = await storeAccountPhotoDataUrl({
           dataUrl,
           pathSegments: [activeCatId, "collection", slug],
           fileName: `photo-${Date.now()}`,
         });
 
-        const savedPhoto = saveCollectionPhoto(activeCatId, slug, photoSrc);
+        const savedPhoto = await saveCollectionPhoto(
+          activeCatId,
+          slug,
+          photoSrc,
+          dimensions,
+        );
         if (savedPhoto) {
           void queueOriginalPhotoPreservation({
             file,
@@ -1616,14 +1652,22 @@ export function HomeInput({
 
       try {
         const slug = getCollectionSlotPhotoSlug(slot);
-        const dataUrl = await resizeAndEncode(file, 1200, 0.82);
+        const [dataUrl, dimensions] = await Promise.all([
+          resizeAndEncode(file, 1200, 0.82),
+          readImageFileDimensions(file),
+        ]);
         const photoSrc = await storeAccountPhotoDataUrl({
           dataUrl,
           pathSegments: [activeCatId, "collection", slug],
           fileName: `photo-${Date.now()}`,
         });
 
-        const savedPhoto = saveCollectionPhoto(activeCatId, slug, photoSrc);
+        const savedPhoto = await saveCollectionPhoto(
+          activeCatId,
+          slug,
+          photoSrc,
+          dimensions,
+        );
         if (savedPhoto) {
           void queueOriginalPhotoPreservation({
             file,
@@ -2173,6 +2217,8 @@ export function HomeInput({
       thumbnailSrc: photo.thumbnailSrc,
       displaySrc: photo.displaySrc,
       originalSrc: photo.originalSrc,
+      width: photo.width,
+      height: photo.height,
       triggerLabel: photo.triggerLabel,
       theme: photo.theme,
       shared,
@@ -2231,6 +2277,8 @@ export function HomeInput({
       thumbnailSrc: photo.thumbnailSrc,
       displaySrc: photo.displaySrc,
       originalSrc: photo.originalSrc,
+      width: photo.width,
+      height: photo.height,
       triggerLabel: photo.triggerLabel,
       theme: photo.theme,
       shared: true,
@@ -2310,6 +2358,8 @@ export function HomeInput({
       thumbnailSrc: photo.thumbnailSrc,
       displaySrc: photo.displaySrc,
       originalSrc: photo.originalSrc,
+      width: photo.width,
+      height: photo.height,
       triggerLabel: photo.triggerLabel,
       theme: photo.theme,
       shared: false,
@@ -3368,13 +3418,20 @@ function EveningDeliveryOpening({
   const [isFirstDelivery] = useState(() => isFirstEveningDelivery(state.dateKey));
   const {
     frameStyle: naturalPhotoFrameStyle,
-    handleNaturalSize: handlePhotoNaturalSize,
+    handleNaturalSize: applyPhotoNaturalSize,
     photoAspect,
   } = useNaturalPhotoFrame({
     horizontalInsetPx: 32,
     maxWidthPx: 406,
     verticalChromePx: 260,
+    initialAspect: getPhotoAspectRatio(state.deliveredPhoto),
+    photoKey: state.deliveredPhoto.id,
   });
+
+  function handlePhotoNaturalSize(size: { width: number; height: number }) {
+    applyPhotoNaturalSize(size);
+    updateKeptExchangePhotoDimensions(state.deliveredPhoto, size);
+  }
 
   function finishClose() {
     if (closeTimerRef.current) {
@@ -5232,9 +5289,29 @@ function saveRecord(
   );
 }
 
-function saveCollectionPhoto(catId: string, slug: string, dataUrl: string) {
+async function saveCollectionPhoto(
+  catId: string,
+  slug: string,
+  dataUrl: string,
+  dimensions?: { width: number; height: number },
+) {
   if (isReservedCollectionSlotSlug(slug)) {
     return null;
+  }
+
+  const photo = {
+    id: createCollectionPhotoId(catId, slug),
+    src: dataUrl,
+    ...(dimensions ? dimensions : {}),
+    createdAt: new Date().toISOString(),
+  } satisfies StoredCollectionPhoto;
+  let wasSavedDurably = false;
+
+  try {
+    await upsertCollectionPhotoHistory(catId, slug, photo);
+    wasSavedDurably = true;
+  } catch {
+    // The local cache below remains available when IndexedDB is unavailable.
   }
 
   try {
@@ -5243,12 +5320,6 @@ function saveCollectionPhoto(catId: string, slug: string, dataUrl: string) {
         string,
         Record<string, StoredCollectionPhoto[] | StoredCollectionPhoto | string[] | string>
       >>(STORAGE_KEYS.collectionPhotos) ?? {};
-    const photo = {
-      id: createCollectionPhotoId(catId, slug),
-      src: dataUrl,
-      createdAt: new Date().toISOString(),
-    } satisfies StoredCollectionPhoto;
-
     all[catId] ??= {};
     all[catId][slug] = [
       ...normalizeStoredPhotoList(all[catId][slug], catId, slug),
@@ -5257,8 +5328,7 @@ function saveCollectionPhoto(catId: string, slug: string, dataUrl: string) {
     writeCachedJson(STORAGE_KEYS.collectionPhotos, all);
     return photo;
   } catch {
-    // Keep the home flow usable even if local photo storage fails.
-    return null;
+    return wasSavedDurably ? photo : null;
   }
 }
 
@@ -5421,6 +5491,8 @@ type StoredCollectionPhoto = {
   thumbnailSrc?: string;
   displaySrc?: string;
   originalSrc?: string;
+  width?: number;
+  height?: number;
   createdAt?: string;
 };
 
@@ -5450,6 +5522,8 @@ function normalizeStoredPhotoList(
           ...(photo.thumbnailSrc ? { thumbnailSrc: photo.thumbnailSrc } : {}),
           ...(photo.displaySrc ? { displaySrc: photo.displaySrc } : {}),
           ...(photo.originalSrc ? { originalSrc: photo.originalSrc } : {}),
+          ...(photo.width ? { width: photo.width } : {}),
+          ...(photo.height ? { height: photo.height } : {}),
           createdAt: photo.createdAt,
         });
       }
@@ -5473,6 +5547,8 @@ async function saveOwnSleepingPhotoWithCompressedFallback({
   thumbnailSrc,
   displaySrc,
   originalSrc,
+  width,
+  height,
   triggerLabel,
   theme,
   shared,
@@ -5482,6 +5558,8 @@ async function saveOwnSleepingPhotoWithCompressedFallback({
   thumbnailSrc?: string;
   displaySrc?: string;
   originalSrc?: string;
+  width?: number;
+  height?: number;
   triggerLabel: string;
   theme: string;
   shared: boolean;
@@ -5507,12 +5585,14 @@ async function saveOwnSleepingPhotoWithCompressedFallback({
     }
 
     triedSrcs.add(candidateSrc);
-    const ownPhoto = saveOwnSleepingPhoto({
+    const ownPhoto = await saveOwnSleepingPhoto({
       catId,
       src: candidateSrc,
       thumbnailSrc,
       displaySrc,
       originalSrc,
+      width,
+      height,
       triggerLabel,
       theme,
       shared,
@@ -5537,12 +5617,14 @@ async function saveOwnSleepingPhotoWithCompressedFallback({
       continue;
     }
 
-    const ownPhoto = saveOwnSleepingPhoto({
+    const ownPhoto = await saveOwnSleepingPhoto({
       catId,
       src: candidateSrc,
       thumbnailSrc,
       displaySrc,
       originalSrc,
+      width,
+      height,
       triggerLabel,
       theme,
       shared,
@@ -5663,9 +5745,10 @@ async function createStoredPhotoVariantSet({
   pathSegments: string[];
   fileName: string;
 }) {
-  const [thumbnailDataUrl, displayDataUrl] = await Promise.all([
+  const [thumbnailDataUrl, displayDataUrl, dimensions] = await Promise.all([
     resizeAndEncode(file, 512, 0.72, "image/webp"),
     resizeAndEncode(file, 2048, 0.84, "image/webp"),
+    readImageFileDimensions(file),
   ]);
   const exchangeDataUrl =
     displayDataUrl.length <= 1_900_000
@@ -5696,6 +5779,8 @@ async function createStoredPhotoVariantSet({
     ...(thumbnailSrc && isStoragePhotoReference(thumbnailSrc)
       ? { thumbnailSrc }
       : {}),
+    width: dimensions.width,
+    height: dimensions.height,
   };
 }
 
@@ -7090,7 +7175,9 @@ const styles = {
     alignItems: "center",
     justifyContent: "center",
     boxSizing: "border-box",
-    border: "1px solid rgba(120,108,94,0.22)",
+    borderWidth: 1,
+    borderStyle: "solid",
+    borderColor: "rgba(120,108,94,0.22)",
     background: "rgba(255,253,248,0.18)",
     color: "#8b8173",
     overflow: "hidden",

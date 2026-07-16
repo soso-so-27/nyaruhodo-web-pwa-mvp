@@ -60,6 +60,8 @@ const useExternalServer = Boolean(process.env.PLAYWRIGHT_BASE_URL);
 
 const desktopSpecs = [
   "**/beta-release-smoke.spec.ts",
+  "**/admin-analytics-logic.spec.ts",
+  "**/admin-analytics-ui.spec.ts",
   "**/cat-celebrations-logic.spec.ts",
   "**/cat-footprints-logic.spec.ts",
   "**/cat-pickup-logic.spec.ts",
@@ -93,6 +95,7 @@ const mobileSpecs = [
   "**/home-sleeping-exchange-flow.spec.ts",
   "**/onboarding-branch-matrix.spec.ts",
   "**/onboarding-delivery-flow.spec.ts",
+  "**/press-feedback.spec.ts",
   "**/settings-page-organization.spec.ts",
   "**/ui-theme-and-cats-profile.spec.ts",
 ];

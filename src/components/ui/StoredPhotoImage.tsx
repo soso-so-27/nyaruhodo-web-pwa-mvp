@@ -2,6 +2,7 @@
 
 import {
   useEffect,
+  useLayoutEffect,
   useMemo,
   useRef,
   useState,
@@ -155,6 +156,7 @@ export function StoredPhotoImage({
   const imageRef = useRef<HTMLImageElement | null>(null);
   const loadStartedAtRef = useRef<number>(performance.now());
   const trackedDisplaySrcRef = useRef("");
+  const trackedFailureKeyRef = useRef("");
   const persistedDataUrlRef = useRef("");
   const signedUrlRetryCountsRef = useRef(new Map<string, number>());
   const isInlineImage = displaySrc.startsWith("data:image/");
@@ -172,11 +174,20 @@ export function StoredPhotoImage({
     [containerStyle],
   );
 
-  useEffect(() => {
+  useLayoutEffect(() => {
+    const nextSource = sourceQueue[0] ?? src;
+
     setSourceIndex(0);
     setActiveStorageVariant(storageVariant);
+    setDisplaySrc(getInitialDisplaySrc(nextSource, storageVariant));
+    setPreviewDisplaySrc("");
+    setIsPreviewLoaded(false);
+    setIsLoaded(initiallyLoaded);
+    setHasError(false);
+    setStorageDataUrl(null);
+    trackedFailureKeyRef.current = "";
     signedUrlRetryCountsRef.current.clear();
-  }, [fallbackSrcKey, src, storageVariant]);
+  }, [fallbackSrcKey, initiallyLoaded, sourceQueue, src, storageVariant]);
 
   useEffect(() => {
     let isActive = true;
@@ -255,6 +266,15 @@ export function StoredPhotoImage({
         } else {
           setDisplaySrc("");
           setHasError(true);
+          trackImageLoadFailure({
+            currentSource,
+            displaySrc: "",
+            storageVariant: activeStorageVariant,
+            sourceCount: sourceQueue.length,
+            startedAt: loadStartedAtRef.current,
+            trackedRef: trackedFailureKeyRef,
+          });
+          onError?.();
         }
       }
     });
@@ -441,7 +461,10 @@ export function StoredPhotoImage({
         fetchPriority={fetchPriority}
         width={width}
         height={height}
-        onLoad={() => {
+        onLoad={(event) => {
+          if (event.currentTarget.getAttribute("src") !== displaySrc) {
+            return;
+          }
           setIsLoaded(true);
           setHasError(false);
           onLoad?.();
@@ -458,7 +481,10 @@ export function StoredPhotoImage({
             trackedRef: trackedDisplaySrcRef,
           });
         }}
-        onError={() => {
+        onError={(event) => {
+          if (event.currentTarget.getAttribute("src") !== displaySrc) {
+            return;
+          }
           setIsLoaded(false);
           const storagePath = getStoragePhotoPath(currentSource);
 
@@ -484,6 +510,14 @@ export function StoredPhotoImage({
             setSourceIndex((index) => Math.min(index + 1, sourceQueue.length - 1));
           } else {
             setHasError(true);
+            trackImageLoadFailure({
+              currentSource,
+              displaySrc,
+              storageVariant: activeStorageVariant,
+              sourceCount: sourceQueue.length,
+              startedAt: loadStartedAtRef.current,
+              trackedRef: trackedFailureKeyRef,
+            });
             onError?.();
           }
         }}
@@ -603,6 +637,36 @@ function shouldRetrySignedUrl(
 
   retryCountsRef.current.set(storagePath, currentCount + 1);
   return true;
+}
+
+function trackImageLoadFailure({
+  currentSource,
+  displaySrc,
+  storageVariant,
+  sourceCount,
+  startedAt,
+  trackedRef,
+}: {
+  currentSource: string;
+  displaySrc: string;
+  storageVariant: StorageSignedUrlVariant;
+  sourceCount: number;
+  startedAt: number;
+  trackedRef: MutableRefObject<string>;
+}) {
+  const failureKey = `${currentSource}\u0000${displaySrc}\u0000${storageVariant}`;
+  if (trackedRef.current === failureKey) {
+    return;
+  }
+
+  trackedRef.current = failureKey;
+  trackProductEvent("photo_image_load_failed", {
+    source_kind: getImageSourceKind(displaySrc || currentSource),
+    storage_reference: Boolean(getStoragePhotoPath(currentSource)),
+    storage_variant: storageVariant,
+    source_count: sourceCount,
+    elapsed_ms: Math.max(0, Math.round(performance.now() - startedAt)),
+  });
 }
 
 function PhotoFallback({

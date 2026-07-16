@@ -77,13 +77,25 @@ test.describe("production nekodayori natural board", () => {
     await page.goto("/collection");
 
     const photos = page.getByTestId("mainichi-board-photo-sent");
-    await expect(photos).toHaveCount(31);
+    await expect(photos).toHaveCount(18);
     await expect(page.getByTestId("mainichi-natural-board")).toHaveAttribute(
       "data-board-algorithm",
       "current",
     );
     await photos.last().scrollIntoViewIfNeeded();
     await expect(photos.last()).toBeVisible();
+    await page.getByTestId("mainichi-day-browse-button").click();
+    const dayBundle = page.getByTestId("mainichi-month-bundle-day");
+    await expect(dayBundle).toHaveCount(2);
+    const dayPhotoCounts = await dayBundle.evaluateAll((bundles) =>
+      bundles.map((bundle) => Number(bundle.getAttribute("data-photo-count"))),
+    );
+    expect(dayPhotoCounts.reduce((total, count) => total + count, 0)).toBe(31);
+    const largestDayIndex = dayPhotoCounts.indexOf(Math.max(...dayPhotoCounts));
+    await dayBundle.nth(largestDayIndex).click();
+    await expect(page.getByTestId("mainichi-day-photo-sent")).toHaveCount(
+      dayPhotoCounts[largestDayIndex],
+    );
   });
 
   test("uses plain display dimensions as the card ratio source", async ({ page }) => {
