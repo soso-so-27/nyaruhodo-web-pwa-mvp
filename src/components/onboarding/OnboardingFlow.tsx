@@ -868,19 +868,7 @@ export function OnboardingFlow() {
       return;
     }
 
-    const progress = readCurrentOnboardingProgress();
-    const photoWithDataUrl = {
-      ...deliveredPhoto,
-      offlineSrc: dataUrl,
-    };
-
-    setDeliveredPhoto(photoWithDataUrl);
-    updateKeptExchangePhotoDataUrl(photoWithDataUrl, dataUrl);
-    patchOnboardingProgress({
-      stage: progress?.stage ?? "opened",
-      deliveredPhoto,
-      isDeliveredPhotoKept,
-    });
+    updateKeptExchangePhotoDataUrl(deliveredPhoto, dataUrl);
   }
 
   function handleOpenEnvelope() {

@@ -722,10 +722,17 @@ test.describe("onboarding delivery flow", () => {
   test("keeps signed onboarding deliveries in the received album", async ({
     page,
   }) => {
+    await page.addInitScript(() => {
+      Object.defineProperty(window.navigator, "userAgent", {
+        get: () =>
+          "Mozilla/5.0 (Linux; Android 14; Pixel 7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Mobile Safari/537.36 Line/14.0.0",
+      });
+    });
     await routeStorageDeliveryWithSignedDisplay(page);
 
     await page.goto("/onboarding?source=line");
     await page.waitForLoadState("networkidle");
+    await page.getByRole("button", { name: "このまま試す" }).click();
     await page.locator("main button").first().click();
     await page.locator('input[type="file"]').last().setInputFiles({
       name: "sleeping-cat.png",
@@ -743,18 +750,38 @@ test.describe("onboarding delivery flow", () => {
     expect(openedSnapshot.deliveredPhoto?.src).toBe(
       "storage:admin-stock/sleeping/onboarding-delivered-signed.jpg",
     );
-    const offlineCache = await page.evaluate(() =>
-      JSON.parse(
-        window.localStorage.getItem("neteruneko_exchange_photo_offline_cache") ??
-          "[]",
-      ),
-    );
-    expect(offlineCache).toEqual([
-      expect.objectContaining({
-        photoId: openedSnapshot.deliveredPhoto?.id,
-        dataUrl: expect.stringMatching(/^data:image\//),
-      }),
-    ]);
+    await expect
+      .poll(() =>
+        page.evaluate(() =>
+          JSON.parse(
+            window.localStorage.getItem(
+              "neteruneko_exchange_photo_offline_cache",
+            ) ?? "[]",
+          ),
+        ),
+      )
+      .toEqual([
+        expect.objectContaining({
+          photoId: openedSnapshot.deliveredPhoto?.id,
+          dataUrl: expect.stringMatching(/^data:image\//),
+        }),
+      ]);
+    const deliveredImage = page
+      .getByTestId("onboarding-delivered-photos")
+      .locator('img[alt="届いたねがお"]');
+    await expect
+      .poll(() =>
+        deliveredImage.evaluate((image) => ({
+          naturalWidth: (image as HTMLImageElement).naturalWidth,
+          opacity: window.getComputedStyle(image).opacity,
+        })),
+      )
+      .toEqual({
+        naturalWidth: 100,
+        opacity: "1",
+      });
+    await page.waitForTimeout(1200);
+    await expect(deliveredImage).toHaveCSS("opacity", "1");
     await expect.poll(() => readKeptExchangePhotoCount(page)).toBe(1);
 
     await page.evaluate(() => {
@@ -2608,6 +2635,9 @@ async function routeStorageDeliveryWithBrokenDisplay(page: Page) {
 
 async function routeStorageDeliveryWithSignedDisplay(page: Page) {
   await page.route("https://example.com/signed-delivery-display.jpg", async (route) => {
+    if (route.request().resourceType() !== "image") {
+      await new Promise((resolve) => setTimeout(resolve, 900));
+    }
     await route.fulfill({
       status: 200,
       headers: {
