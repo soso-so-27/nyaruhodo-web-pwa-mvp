@@ -9,40 +9,45 @@ type DurableClientRecord<T = unknown> = {
 };
 
 let databasePromise: Promise<IDBDatabase> | null = null;
+let activeDatabase: IDBDatabase | null = null;
 
 export async function readDurableClientValue<T>(key: string) {
-  const database = await openDurableClientDatabase();
-  const record = await runDurableRequest<DurableClientRecord<T> | undefined>(
-    database,
-    "readonly",
-    (store) => store.get(key),
+  const record = await runWithDurableClientDatabase((database) =>
+    runDurableRequest<DurableClientRecord<T> | undefined>(
+      database,
+      "readonly",
+      (store) => store.get(key),
+    ),
   );
 
   return record?.value ?? null;
 }
 
 export async function writeDurableClientValue<T>(key: string, value: T) {
-  const database = await openDurableClientDatabase();
-  await runDurableRequest(
-    database,
-    "readwrite",
-    (store) =>
-      store.put({
-        key,
-        value,
-        updatedAt: Date.now(),
-      } satisfies DurableClientRecord<T>),
+  await runWithDurableClientDatabase((database) =>
+    runDurableRequest(
+      database,
+      "readwrite",
+      (store) =>
+        store.put({
+          key,
+          value,
+          updatedAt: Date.now(),
+        } satisfies DurableClientRecord<T>),
+    ),
   );
 }
 
 export async function removeDurableClientValue(key: string) {
-  const database = await openDurableClientDatabase();
-  await runDurableRequest(database, "readwrite", (store) => store.delete(key));
+  await runWithDurableClientDatabase((database) =>
+    runDurableRequest(database, "readwrite", (store) => store.delete(key)),
+  );
 }
 
 export function clearDurableClientStore() {
   databasePromise?.then((database) => database.close()).catch(() => undefined);
   databasePromise = null;
+  activeDatabase = null;
 
   return new Promise<void>((resolve, reject) => {
     if (typeof indexedDB === "undefined") {
@@ -82,9 +87,13 @@ function openDurableClientDatabase() {
     };
     request.onsuccess = () => {
       const database = request.result;
+      activeDatabase = database;
+      database.addEventListener("close", () => {
+        forgetDurableClientDatabase(database);
+      });
       database.onversionchange = () => {
+        forgetDurableClientDatabase(database);
         database.close();
-        databasePromise = null;
       };
       resolve(database);
     };
@@ -95,6 +104,60 @@ function openDurableClientDatabase() {
   });
 
   return databasePromise;
+}
+
+async function runWithDurableClientDatabase<T>(
+  operation: (database: IDBDatabase) => Promise<T>,
+) {
+  const database = await openDurableClientDatabase();
+
+  try {
+    return await operation(database);
+  } catch (error) {
+    if (!isClosedDatabaseError(error)) {
+      throw error;
+    }
+
+    invalidateDurableClientDatabase(database);
+    return operation(await openDurableClientDatabase());
+  }
+}
+
+function invalidateDurableClientDatabase(database: IDBDatabase) {
+  forgetDurableClientDatabase(database);
+  try {
+    database.close();
+  } catch {
+    // The browser may already have closed this connection.
+  }
+}
+
+function forgetDurableClientDatabase(database: IDBDatabase) {
+  if (activeDatabase !== database) {
+    return;
+  }
+
+  activeDatabase = null;
+  databasePromise = null;
+}
+
+function isClosedDatabaseError(error: unknown) {
+  const name =
+    typeof DOMException !== "undefined" && error instanceof DOMException
+      ? error.name
+      : error instanceof Error
+        ? error.name
+        : "";
+  const message = error instanceof Error ? error.message.toLowerCase() : "";
+
+  return Boolean(
+    name === "InvalidStateError" ||
+      name === "TransactionInactiveError" ||
+      message.includes("database connection is closing") ||
+      message.includes("database connection is closed") ||
+      message.includes("database is closing") ||
+      message.includes("database is closed"),
+  );
 }
 
 function runDurableRequest<T = IDBValidKey>(

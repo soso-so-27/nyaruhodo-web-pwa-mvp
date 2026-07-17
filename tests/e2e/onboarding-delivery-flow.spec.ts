@@ -1442,6 +1442,7 @@ test.describe("onboarding delivery flow", () => {
     page,
   }) => {
     let exchangeCalls = 0;
+    await page.clock.setFixedTime(new Date("2026-07-17T23:59:50+09:00"));
 
     await page.route("**/api/sleeping-delivery/exchange", async (route) => {
       exchangeCalls += 1;
@@ -1492,6 +1493,7 @@ test.describe("onboarding delivery flow", () => {
     });
     expect(submittedProgress.submissionId).toContain(submittedProgress.dateKey);
 
+    await page.clock.setFixedTime(new Date("2026-07-18T00:00:10+09:00"));
     await page.goto("/onboarding?source=instagram_dm");
     await expect(page.getByRole("button", { name: "ねこだよりを ひらく" })).toBeVisible();
     await expect.poll(() => exchangeCalls).toBe(1);
@@ -1565,9 +1567,124 @@ test.describe("onboarding delivery flow", () => {
     expect(exchangeCalls).toBe(1);
   });
 
+  test("reopens durable IndexedDB when its connection closes during onboarding", async ({
+    page,
+  }) => {
+    let exchangeCalls = 0;
+    await page.addInitScript(() => {
+      const originalSetItem = Storage.prototype.setItem;
+      Storage.prototype.setItem = function setItemWithOnboardingQuota(
+        key,
+        value,
+      ) {
+        if (key === "neteruneko_onboarding_progress") {
+          throw new DOMException("Quota exceeded", "QuotaExceededError");
+        }
+        return originalSetItem.call(this, key, value);
+      };
+
+      const originalTransaction = IDBDatabase.prototype.transaction;
+      let didCloseConnection = false;
+      IDBDatabase.prototype.transaction = function transactionWithClosingFailure(
+        storeNames,
+        mode,
+        options,
+      ) {
+        if (
+          this.name === "neteruneko-durable-state" &&
+          mode === "readwrite" &&
+          !didCloseConnection
+        ) {
+          didCloseConnection = true;
+          throw new DOMException(
+            "The database connection is closing.",
+            "InvalidStateError",
+          );
+        }
+
+        return Reflect.apply(originalTransaction, this, [
+          storeNames,
+          mode,
+          options,
+        ]);
+      };
+    });
+    await routeImmediateDelivery(page, () => {
+      exchangeCalls += 1;
+    });
+
+    await page.goto("/onboarding?source=instagram_story");
+    await page.getByTestId("onboarding-photo-select").click();
+    await page.locator('input[type="file"]').last().setInputFiles({
+      name: "closing-indexeddb.png",
+      mimeType: "image/png",
+      buffer: testPng,
+    });
+
+    await expect(page.getByTestId("onboarding-envelope-open")).toBeVisible();
+    await expect.poll(() => exchangeCalls).toBe(1);
+    await expect
+      .poll(() => readDurableOnboardingProgress(page))
+      .toMatchObject({ stage: "arrived", source: "instagram_story" });
+    expect(await readOnboardingProgress(page)).toBeNull();
+
+    await page.reload();
+    await expect(page.getByTestId("onboarding-envelope-open")).toBeVisible();
+    expect(exchangeCalls).toBe(1);
+  });
+
+  test("uses localStorage when durable IndexedDB remains closed", async ({ page }) => {
+    let exchangeCalls = 0;
+    await page.addInitScript(() => {
+      const originalTransaction = IDBDatabase.prototype.transaction;
+      IDBDatabase.prototype.transaction = function transactionWithClosedDatabase(
+        storeNames,
+        mode,
+        options,
+      ) {
+        if (this.name === "neteruneko-durable-state" && mode === "readwrite") {
+          throw new DOMException(
+            "The database connection is closing.",
+            "InvalidStateError",
+          );
+        }
+
+        return Reflect.apply(originalTransaction, this, [
+          storeNames,
+          mode,
+          options,
+        ]);
+      };
+    });
+    await routeImmediateDelivery(page, () => {
+      exchangeCalls += 1;
+    });
+
+    await page.goto("/onboarding?source=instagram_story");
+    await page.getByTestId("onboarding-photo-select").click();
+    await page.locator('input[type="file"]').last().setInputFiles({
+      name: "closed-indexeddb.png",
+      mimeType: "image/png",
+      buffer: testPng,
+    });
+
+    await expect(page.getByTestId("onboarding-envelope-open")).toBeVisible();
+    await expect.poll(() => exchangeCalls).toBe(1);
+    expect(await readOnboardingProgress(page)).toMatchObject({
+      stage: "arrived",
+      source: "instagram_story",
+    });
+    await expect(page.getByTestId("onboarding-delivery-retry")).toHaveCount(0);
+
+    await page.reload();
+    await expect(page.getByTestId("onboarding-envelope-open")).toBeVisible();
+    expect(exchangeCalls).toBe(1);
+  });
+
   test("does not let yesterday album completion block a new social onboarding day", async ({
     page,
   }) => {
+    await page.clock.setFixedTime(new Date("2026-07-18T12:00:00+09:00"));
     await routeImmediateDelivery(page);
     await page.addInitScript(() => {
       const now = new Date();

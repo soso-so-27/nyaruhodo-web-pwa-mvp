@@ -1611,6 +1611,7 @@ export function OnboardingFlow() {
             </h2>
             <button
               type="button"
+              data-testid="onboarding-envelope-open"
               onClick={handleOpenEnvelope}
               disabled={isOpeningEnvelope}
               aria-busy={isOpeningEnvelope}

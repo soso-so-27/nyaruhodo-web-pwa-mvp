@@ -1,8 +1,10 @@
 import { STORAGE_KEYS } from "../storage";
 import { getOrCreateAnonymousId } from "../identity/anonymousId";
 import {
+  addJstDays,
   getEveningDeliveryTargetDateKey,
   getJstDateKey,
+  getJstHour,
 } from "../home/eveningDelivery";
 import {
   sanitizeExchangePhotoForPersistence,
@@ -164,8 +166,14 @@ export function readCurrentOnboardingProgress(now = Date.now()) {
 
   const todayKey = getJstDateKey(now);
   const targetKey = getEveningDeliveryTargetDateKey(now);
+  const previousNightKey =
+    getJstHour(now) < 5 ? addJstDays(todayKey, -1) : null;
 
-  if (progress.dateKey !== todayKey && progress.dateKey !== targetKey) {
+  if (
+    progress.dateKey !== todayKey &&
+    progress.dateKey !== targetKey &&
+    progress.dateKey !== previousNightKey
+  ) {
     return null;
   }
 
@@ -208,16 +216,15 @@ export async function writeOnboardingProgressDurably(
 
   const persistentProgress = prepareOnboardingProgressForPersistence(progress);
   durableProgressCache = persistentProgress;
-  await queueDurableOnboardingProgressWrite(persistentProgress);
+  const localStorageWritten = writeOnboardingProgressToLocalStorage(
+    persistentProgress,
+  );
 
-  if (durableProgressCache === persistentProgress) {
-    try {
-      window.localStorage.setItem(
-        STORAGE_KEYS.onboardingProgress,
-        JSON.stringify(persistentProgress),
-      );
-    } catch {
-      // IndexedDB is the durable source; localStorage is only the synchronous cache.
+  try {
+    await queueDurableOnboardingProgressWrite(persistentProgress);
+  } catch (error) {
+    if (!localStorageWritten) {
+      throw error;
     }
   }
 
@@ -305,6 +312,22 @@ function queueDurableOnboardingProgressWrite(progress: OnboardingProgress) {
     );
   durableProgressWriteQueue = nextWrite;
   return nextWrite;
+}
+
+function writeOnboardingProgressToLocalStorage(progress: OnboardingProgress) {
+  if (durableProgressCache !== progress) {
+    return false;
+  }
+
+  try {
+    window.localStorage.setItem(
+      STORAGE_KEYS.onboardingProgress,
+      JSON.stringify(progress),
+    );
+    return true;
+  } catch {
+    return false;
+  }
 }
 
 function getNewestOnboardingProgress(
