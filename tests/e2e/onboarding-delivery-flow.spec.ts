@@ -621,6 +621,92 @@ test.describe("onboarding delivery flow", () => {
     }
   });
 
+  test("opens one photo picker and stores one sent photo after rapid taps", async ({
+    page,
+  }) => {
+    await page.addInitScript(() => {
+      window.localStorage.setItem(
+        "analytics_anonymous_id",
+        "e2e-onboarding-anonymous",
+      );
+      const originalClick = HTMLInputElement.prototype.click;
+      HTMLInputElement.prototype.click = function click() {
+        if (this.type === "file") {
+          return;
+        }
+
+        return originalClick.call(this);
+      };
+    });
+    await routeImmediateDelivery(page);
+    await page.goto("/onboarding?source=direct");
+
+    const action = page.getByTestId("onboarding-photo-select");
+    await expect(action).toBeVisible();
+    const existingPhotoId = await page.evaluate(() => {
+      const catId = window.localStorage.getItem("active_cat_id") ?? "default-cat";
+      const dateKey = new Intl.DateTimeFormat("en-CA", {
+        timeZone: "Asia/Tokyo",
+        year: "numeric",
+        month: "2-digit",
+        day: "2-digit",
+      }).format(new Date());
+      const id = `onboarding-e2e-onboarding-anonymous-${dateKey}`;
+      window.localStorage.setItem(
+        "nyaruhodo_exchange_own_sleeping_photos",
+        JSON.stringify([
+          {
+            id,
+            ownerCatId: catId,
+            catId,
+            src: "data:image/png;base64,AAAA",
+            state: "sleeping",
+            visibility: "shared",
+            deliveryStatus: "available",
+            triggerLabel: "sleeping",
+            theme: "sleeping",
+            shared: true,
+            createdAt: Date.now() - 1000,
+            captureContext: "onboarding",
+          },
+        ]),
+      );
+      return id;
+    });
+    await action.dispatchEvent("click");
+    await action.dispatchEvent("click");
+
+    const inputs = page.locator('input[type="file"]');
+    await expect(inputs).toHaveCount(1);
+    await inputs.setInputFiles({
+      name: "one-onboarding-photo.png",
+      mimeType: "image/png",
+      buffer: testPng,
+    });
+
+    await expect
+      .poll(() =>
+        page.evaluate(() => {
+          const raw = window.localStorage.getItem("neteruneko_onboarding_progress");
+          return raw ? JSON.parse(raw).stage : null;
+        }),
+      )
+      .toBe("arrived");
+    const result = await page.evaluate(() => ({
+      ownPhotos: JSON.parse(
+        window.localStorage.getItem("nyaruhodo_exchange_own_sleeping_photos") ??
+          "[]",
+      ),
+      progress: JSON.parse(
+        window.localStorage.getItem("neteruneko_onboarding_progress") ?? "null",
+      ),
+    }));
+
+    expect(result.ownPhotos).toHaveLength(1);
+    expect(result.ownPhotos[0]?.id).toBe(existingPhotoId);
+    expect(result.progress?.ownPhoto?.id).toBe(existingPhotoId);
+  });
+
   test("keeps every onboarding step centered on a narrow Android viewport", async ({
     page,
   }) => {

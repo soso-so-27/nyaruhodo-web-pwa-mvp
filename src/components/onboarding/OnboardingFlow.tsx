@@ -161,6 +161,7 @@ export function OnboardingFlow() {
   const hasTrackedEmbeddedBrowserRef = useRef(false);
   const hasResolvedProgressRef = useRef(false);
   const isSubmittingRef = useRef(false);
+  const isPhotoPickerOpenRef = useRef(false);
   const isOpeningEnvelopeRef = useRef(false);
   const isContinuingRef = useRef(false);
   const revealTimerRef = useRef<number | null>(null);
@@ -501,7 +502,11 @@ export function OnboardingFlow() {
   }
 
   async function handleSelectSleepingPhoto() {
-    if (state === "saving" || isSubmittingRef.current) {
+    if (
+      state === "saving" ||
+      isSubmittingRef.current ||
+      isPhotoPickerOpenRef.current
+    ) {
       return;
     }
 
@@ -540,10 +545,16 @@ export function OnboardingFlow() {
     };
     const releasePhotoSelection = () => {
       isSubmittingRef.current = false;
+      isPhotoPickerOpenRef.current = false;
       cleanupInput();
     };
+    let hasHandledSelection = false;
 
     input.onchange = async () => {
+      if (hasHandledSelection) {
+        return;
+      }
+      hasHandledSelection = true;
       const file = input.files?.[0];
       const validation = validateImageFile(file);
 
@@ -571,7 +582,7 @@ export function OnboardingFlow() {
           file_extension: file ? getSafeFileExtension(file.name) : "missing",
         });
         setMessage(getOnboardingPhotoInputErrorMessage(rejectionReason));
-        cleanupInput();
+        releasePhotoSelection();
         return;
       }
 
@@ -589,6 +600,13 @@ export function OnboardingFlow() {
 
       let savedResult: Awaited<ReturnType<typeof saveSleepingPhotoWithFallback>> | null = null;
       let catId = "";
+      const onboardingDateKey = getJstDateKey();
+      const anonymousId = getOrCreateOnboardingAnonymousId();
+      const submissionId = createOnboardingSubmissionId(
+        anonymousId,
+        onboardingDateKey,
+      );
+      const ownPhotoId = createOnboardingOwnPhotoId(submissionId);
 
       try {
         const profiles = readCatProfiles();
@@ -602,6 +620,7 @@ export function OnboardingFlow() {
           file,
           catId,
           exchangeDataUrl,
+          ownPhotoId,
         );
 
         if (!savedResult) {
@@ -662,12 +681,6 @@ export function OnboardingFlow() {
         setPendingOwnPhoto(ownPhoto);
         setIsDeliveredPhotoKept(false);
         autoKeptDeliveredPhotoIdRef.current = "";
-        const onboardingDateKey = getJstDateKey();
-        const anonymousId = getOrCreateOnboardingAnonymousId();
-        const submissionId = createOnboardingSubmissionId(
-          anonymousId,
-          onboardingDateKey,
-        );
         await writeOnboardingProgressDurably({
           version: 1,
           anonymousId,
@@ -752,9 +765,26 @@ export function OnboardingFlow() {
         releasePhotoSelection();
       }
     };
+    input.oncancel = () => {
+      if (hasHandledSelection) {
+        return;
+      }
+      isPhotoPickerOpenRef.current = false;
+      window.setTimeout(() => {
+        if (!hasHandledSelection) {
+          hasHandledSelection = true;
+          cleanupInput();
+        }
+      }, 5000);
+    };
 
     document.body.appendChild(input);
-    input.click();
+    isPhotoPickerOpenRef.current = true;
+    try {
+      input.click();
+    } catch {
+      releasePhotoSelection();
+    }
   }
 
   function trackCatNamePromptView(photoId?: string | null) {
@@ -2131,10 +2161,11 @@ async function saveSleepingPhotoWithFallback(
   file: File,
   catId: string,
   exchangeDataUrl: string,
+  ownPhotoId: string,
 ) {
   const createdAt = Date.now();
   const dimensions = await readImageFileDimensions(file);
-  const fileName = `onboarding-${createdAt}`;
+  const fileName = ownPhotoId;
   const displayDataUrl =
     (await tryResizeAndEncode(file, 2048, 0.84, "image/webp")) ??
     exchangeDataUrl;
@@ -2200,6 +2231,7 @@ async function saveSleepingPhotoWithFallback(
 
     triedSrcs.add(attempt.src);
     const ownPhoto = await saveOwnSleepingPhoto({
+      photoId: ownPhotoId,
       catId,
       src: attempt.src,
       thumbnailSrc: attempt.thumbnailSrc,
@@ -2236,6 +2268,7 @@ async function saveSleepingPhotoWithFallback(
     width: dimensions.width,
     height: dimensions.height,
     createdAt,
+    photoId: ownPhotoId,
   });
 
   await persistOwnSleepingPhotoHistory(fallbackOwnPhoto);
@@ -2336,6 +2369,7 @@ async function tryResizeAndEncode(
 }
 
 function createOnboardingOwnPhotoFallback({
+  photoId,
   catId,
   src,
   displaySrc,
@@ -2344,6 +2378,7 @@ function createOnboardingOwnPhotoFallback({
   height,
   createdAt,
 }: {
+  photoId: string;
   catId: string;
   src: string;
   displaySrc?: string;
@@ -2353,7 +2388,7 @@ function createOnboardingOwnPhotoFallback({
   createdAt: number;
 }): OwnSleepingPhoto {
   return {
-    id: `onboarding-${createdAt}-${Math.random().toString(16).slice(2)}`,
+    id: photoId,
     ownerCatId: catId,
     catId,
     src,
@@ -2371,6 +2406,14 @@ function createOnboardingOwnPhotoFallback({
     createdAt,
     captureContext: "onboarding",
   };
+}
+
+function createOnboardingOwnPhotoId(submissionId: string) {
+  const suffix = submissionId
+    .replace(/^onboarding:/, "")
+    .replace(/[^a-zA-Z0-9_-]/g, "-");
+
+  return `onboarding-${suffix}`;
 }
 
 function hasCompletedOnboardingEvidence() {

@@ -142,6 +142,62 @@ test.describe("collection album flow", () => {
     await expect(sentPhotos).toHaveAttribute("data-photo-id", "handoff-photo-new");
   });
 
+  test("shows only the latest record when one onboarding created separate storage photos", async ({
+    page,
+  }) => {
+    const olderCreatedAt = Date.parse("2026-07-17T13:40:00+09:00");
+    const newerCreatedAt = olderCreatedAt + 60_000;
+
+    await page.addInitScript(
+      ({ olderCreatedAt, newerCreatedAt }) => {
+        const createPhoto = (
+          id: string,
+          catId: string,
+          createdAt: number,
+        ) => ({
+          id,
+          ownerCatId: catId,
+          catId,
+          src: `storage:user-1/${catId}/sleeping/${id}.webp`,
+          state: "sleeping",
+          visibility: "shared",
+          deliveryStatus: "available",
+          triggerLabel: "sleeping",
+          theme: "sleeping",
+          shared: true,
+          createdAt,
+          captureContext: "onboarding",
+        });
+
+        window.localStorage.setItem("active_cat_id", "onboarding-cat-new");
+        window.localStorage.setItem(
+          "cat_profiles",
+          JSON.stringify([
+            { id: "onboarding-cat-new", name: "new cat" },
+            { id: "onboarding-cat-old", name: "old cat" },
+          ]),
+        );
+        window.localStorage.setItem(
+          "nyaruhodo_exchange_own_sleeping_photos",
+          JSON.stringify([
+            createPhoto("onboarding-photo-new", "onboarding-cat-new", newerCreatedAt),
+            createPhoto("onboarding-photo-old", "onboarding-cat-old", olderCreatedAt),
+          ]),
+        );
+      },
+      { olderCreatedAt, newerCreatedAt },
+    );
+
+    await page.goto("/collection");
+
+    const sentPhotos = page.getByTestId("mainichi-board-photo-sent");
+    await expect(sentPhotos).toHaveCount(1);
+    await expect(sentPhotos).toHaveAttribute(
+      "data-photo-id",
+      "onboarding-photo-new",
+    );
+  });
+
   test("shows a home sleeping photo in sent after capture", async ({ page }) => {
     const now = Date.parse("2026-07-07T09:30:00+09:00");
 

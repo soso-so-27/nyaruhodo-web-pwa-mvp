@@ -192,11 +192,19 @@ export function readOwnSleepingPhotosForAlbum(activeCatId: string | null = null)
 
 function dedupeOwnSleepingPhotosForAlbum(photos: OwnSleepingPhoto[]) {
   const seenContent = new Set<string>();
+  const seenOnboardingDates = new Set<string>();
 
   return photos.filter((photo) => {
     const ownerCatId = photo.ownerCatId ?? photo.catId;
     const date = new Date(photo.createdAt + 9 * 60 * 60 * 1000);
     const dateKey = date.toISOString().slice(0, 10);
+    if (photo.captureContext === "onboarding") {
+      if (seenOnboardingDates.has(dateKey)) {
+        return false;
+      }
+
+      seenOnboardingDates.add(dateKey);
+    }
     const contentKeys = getPhotoContentIdentityKeys(photo).map(
       (key) => `${ownerCatId}:${dateKey}:${key}`,
     );
@@ -567,6 +575,7 @@ export function fromCatMomentRecord(record: CatMomentRecord): CatMoment {
 }
 
 export async function saveOwnSleepingPhoto({
+  photoId,
   catId,
   src,
   thumbnailSrc,
@@ -580,6 +589,7 @@ export async function saveOwnSleepingPhoto({
   captureContext = "daily",
   minRetainedCount = 1,
 }: {
+  photoId?: string;
   catId: string;
   src: string;
   thumbnailSrc?: string | null;
@@ -600,12 +610,15 @@ export async function saveOwnSleepingPhoto({
   try {
     const saved = readAllOwnSleepingPhotos();
     const previousTakenCount = getOwnSleepingPhotoCountForCat(catId, saved);
-    const createdAt = Date.now();
+    const existingPhoto = photoId
+      ? saved.find((photo) => photo.id === photoId)
+      : undefined;
+    const createdAt = existingPhoto?.createdAt ?? Date.now();
     const normalizedThumbnailSrc = normalizeOptionalPhotoSrc(thumbnailSrc);
     const normalizedDisplaySrc = normalizeOptionalPhotoSrc(displaySrc);
     const normalizedOriginalSrc = normalizeOptionalPhotoSrc(originalSrc);
     const ownPhoto: OwnSleepingPhoto = {
-      id: createOwnSleepingPhotoId(createdAt),
+      id: photoId ?? createOwnSleepingPhotoId(createdAt),
       ownerCatId: catId,
       catId,
       src,
@@ -624,7 +637,10 @@ export async function saveOwnSleepingPhoto({
       captureContext,
     };
     const normalizedOwnPhoto = normalizeOwnSleepingPhoto(ownPhoto);
-    const nextPhotos = [normalizedOwnPhoto, ...saved];
+    const nextPhotos = [
+      normalizedOwnPhoto,
+      ...saved.filter((photo) => photo.id !== normalizedOwnPhoto.id),
+    ];
     let wasSavedDurably = false;
     try {
       await upsertPhotoHistoryEntries("own", [normalizedOwnPhoto]);
@@ -643,7 +659,7 @@ export async function saveOwnSleepingPhoto({
       wasSavedDurably ||
       savedPhotos.some((photo) => photo.id === normalizedOwnPhoto.id)
     ) {
-      if (isRegularOwnSleepingPhoto(normalizedOwnPhoto)) {
+      if (!existingPhoto && isRegularOwnSleepingPhoto(normalizedOwnPhoto)) {
         recordOwnSleepingPhotoTaken(normalizedOwnPhoto, previousTakenCount + 1);
       }
       dispatchBoxPhotoStorageEvent();
