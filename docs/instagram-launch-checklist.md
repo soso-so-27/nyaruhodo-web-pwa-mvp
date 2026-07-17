@@ -1,7 +1,8 @@
 # Instagram 投稿3 公開チェックリスト
 
-更新日: 2026-07-16
+更新日: 2026-07-17
 最終コピー・当日運用: `docs/instagram-post3-final-2026-07.md`
+公開後の緊急対応・DM・仮説: `docs/instagram-post3-live-operations-2026-07-17.md`
 
 ## 入口
 
