@@ -1300,6 +1300,42 @@ test.describe("home desk model", () => {
       .toBe(1);
   });
 
+  test("keeps a delivered photo visible after its offline copy is written", async ({
+    page,
+  }) => {
+    const remotePhotoUrl = "https://photos.test/evening-delivered.png";
+
+    await page.route(remotePhotoUrl, async (route) => {
+      await route.fulfill({
+        contentType: "image/png",
+        headers: { "access-control-allow-origin": "*" },
+        body: Buffer.from(deliveredDataUrl.split(",")[1], "base64"),
+      });
+    });
+    await seedDeskState(page, "3", { deliveredPhotoSrc: remotePhotoUrl });
+    await page.goto("/home");
+    await page.waitForLoadState("networkidle");
+
+    await page.getByTestId("desk-open-letter").click();
+    const deliveredPhoto = page
+      .getByTestId("evening-opening-photo-frame")
+      .locator('img[alt="届いたねがお"]');
+
+    await expect
+      .poll(() =>
+        page.evaluate(() => {
+          const cached = JSON.parse(
+            window.localStorage.getItem(
+              "neteruneko_exchange_photo_offline_cache",
+            ) ?? "[]",
+          );
+          return Array.isArray(cached) ? cached.length : 0;
+        }),
+      )
+      .toBe(1);
+    await expect(deliveredPhoto).toHaveCSS("opacity", "1");
+  });
+
   test("prioritizes a cat without memories and keeps one household arrival per day", async ({
     page,
   }) => {
@@ -1359,6 +1395,7 @@ async function seedDeskState(
     openedBySystem?: boolean;
     withSystemOpenedYesterday?: boolean;
     ownPhotoDataUrl?: string;
+    deliveredPhotoSrc?: string;
   } = {},
 ) {
   const now =
@@ -1411,7 +1448,7 @@ async function seedDeskState(
       const deliveredPhoto = {
         id: "delivered-desk",
         sourcePhotoId: "source-desk",
-        src: deliveredDataUrl,
+        src: options.deliveredPhotoSrc ?? deliveredDataUrl,
         title: "",
         subtitle: "",
         triggerLabel: "sleeping",

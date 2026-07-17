@@ -176,13 +176,15 @@ export function StoredPhotoImage({
 
   useLayoutEffect(() => {
     const nextSource = sourceQueue[0] ?? src;
+    const nextDisplaySrc = getInitialDisplaySrc(nextSource, storageVariant);
+    const keepLoadedImage = isImageLoadedForSrc(imageRef.current, nextDisplaySrc);
 
     setSourceIndex(0);
     setActiveStorageVariant(storageVariant);
-    setDisplaySrc(getInitialDisplaySrc(nextSource, storageVariant));
+    setDisplaySrc(nextDisplaySrc);
     setPreviewDisplaySrc("");
     setIsPreviewLoaded(false);
-    setIsLoaded(initiallyLoaded);
+    setIsLoaded(initiallyLoaded || keepLoadedImage);
     setHasError(false);
     setStorageDataUrl(null);
     trackedFailureKeyRef.current = "";
@@ -231,10 +233,11 @@ export function StoredPhotoImage({
   useEffect(() => {
     let isActive = true;
     const storagePath = getStoragePhotoPath(currentSource);
+    const keepLoadedImage = isImageLoadedForSrc(imageRef.current, displaySrc);
 
     loadStartedAtRef.current = performance.now();
     trackedDisplaySrcRef.current = "";
-    setIsLoaded(initiallyLoaded);
+    setIsLoaded(initiallyLoaded || keepLoadedImage);
     setHasError(false);
     setStorageDataUrl(null);
 
@@ -590,6 +593,19 @@ function getUniquePhotoSources(sources: Array<string | null | undefined>) {
   }
 
   return values;
+}
+
+function isImageLoadedForSrc(
+  image: HTMLImageElement | null,
+  expectedSrc: string,
+) {
+  return Boolean(
+    image &&
+      expectedSrc &&
+      image.getAttribute("src") === expectedSrc &&
+      image.complete &&
+      image.naturalWidth > 0,
+  );
 }
 
 function trackImageLoadCompleted({
