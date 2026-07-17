@@ -897,6 +897,23 @@ export function HomeInput({
       }),
     [allOwnSleepingPhotos, eveningDeliveryRefreshTick, homeNow],
   );
+  useEffect(() => {
+    if (
+      !hasOnboardingSecondPhotoIntent ||
+      eveningHomeState.kind === "before"
+    ) {
+      return;
+    }
+
+    setHasOnboardingSecondPhotoIntent(false);
+    const url = new URL(window.location.href);
+    url.searchParams.delete("from");
+    window.history.replaceState(
+      null,
+      "",
+      `${url.pathname}${url.search}${url.hash}`,
+    );
+  }, [eveningHomeState.kind, hasOnboardingSecondPhotoIntent]);
   const systemOpenedDeliveryNotice = useMemo(
     () => getSystemOpenedEveningDeliveryNotice(homeNow),
     [eveningDeliveryRefreshTick, homeNow],

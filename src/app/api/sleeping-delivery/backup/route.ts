@@ -131,6 +131,7 @@ export async function POST(request: Request) {
       trigger_label: photo.triggerLabel,
       theme: photo.theme,
       shared: photo.shared,
+      capture_context: photo.captureContext ?? "daily",
     };
     const { error: updateError } = await adminSupabase
       .from("cat_moments")
@@ -174,6 +175,7 @@ export async function POST(request: Request) {
       trigger_label: photo.triggerLabel,
       theme: photo.theme,
       shared: photo.shared,
+      capture_context: photo.captureContext ?? "daily",
     },
     captured_at: record.created_at,
     created_at: record.created_at,
@@ -308,6 +310,7 @@ function normalizeBackupPhoto(
     ...(typeof photo.sourceMomentId === "string"
       ? { sourceMomentId: photo.sourceMomentId }
       : {}),
+    captureContext: photo.captureContext === "onboarding" ? "onboarding" : "daily",
   };
 }
 

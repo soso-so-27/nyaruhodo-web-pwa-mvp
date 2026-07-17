@@ -305,7 +305,7 @@ export function HomeDeskModel({
   const daylightStyle = useDaylight(now);
   const [homePhotoAspect, setHomePhotoAspect] = useState<number | null>(null);
   useHomeViewportBackground(daylightStyle);
-  const targetPhoto =
+  const scheduledTargetPhoto =
     eveningState.kind === "waiting" ||
     eveningState.kind === "delivered" ||
     eveningState.kind === "opened"
@@ -315,14 +315,15 @@ export function HomeDeskModel({
     () => findLatestHomeDisplayPhoto(ownSleepingPhotos, now),
     [now, ownSleepingPhotos],
   );
-  const displayPhoto = latestHomePhoto ?? targetPhoto;
+  const displayPhoto =
+    eveningState.kind === "before" ? latestHomePhoto : scheduledTargetPhoto;
   const deliveredPhoto =
     eveningState.kind === "delivered" || eveningState.kind === "opened"
       ? eveningState.deliveredPhoto
       : null;
   const homeDay = getHomeDayPresentation({
     eveningState,
-    targetPhoto: displayPhoto,
+    displayPhoto,
     now,
   });
   const deliveryCheckState =
@@ -1889,11 +1890,11 @@ function getDeskState(eveningState: EveningHomeState): DeskState {
 
 function getHomeDayPresentation({
   eveningState,
-  targetPhoto,
+  displayPhoto,
   now,
 }: {
   eveningState: EveningHomeState;
-  targetPhoto: OwnSleepingPhoto | null;
+  displayPhoto: OwnSleepingPhoto | null;
   now: number;
 }): {
   phase: HomeTodayPhase;
@@ -1904,51 +1905,34 @@ function getHomeDayPresentation({
   if (eveningState.kind === "delivered") {
     return {
       phase: "delivered",
-      photo: targetPhoto,
+      photo: displayPhoto,
     };
   }
 
   if (eveningState.kind === "opened") {
     return {
       phase: "opened",
-      photo: targetPhoto,
+      photo: displayPhoto,
     };
   }
 
-  if (targetPhoto) {
-    if (eveningState.kind === "waiting" && !eveningState.isTodayDelivery) {
-      return {
-        phase: "late-sent",
-        photo: targetPhoto,
-      };
-    }
-
-    if (
-      eveningState.kind === "before" &&
-      (afterDelivery || eveningState.afterTodayDelivery)
-    ) {
-      return {
-        phase: "late-sent",
-        photo: targetPhoto,
-      };
-    }
-
+  if (eveningState.kind === "waiting") {
     return {
-      phase: "sent-before",
-      photo: targetPhoto,
+      phase: eveningState.isTodayDelivery ? "sent-before" : "late-sent",
+      photo: displayPhoto,
     };
   }
 
-  if (afterDelivery || eveningState.kind === "before" && eveningState.afterTodayDelivery) {
+  if (afterDelivery || eveningState.afterTodayDelivery) {
     return {
       phase: "empty-after",
-      photo: null,
+      photo: displayPhoto,
     };
   }
 
   return {
     phase: "empty-before",
-    photo: null,
+    photo: displayPhoto,
   };
 }
 

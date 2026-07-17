@@ -185,6 +185,7 @@ async function handleExchangePost(request: Request) {
   const createdAt = new Date(ownPhoto.createdAt ?? Date.now()).toISOString();
   const ownerCatId = ownPhoto.ownerCatId || ownPhoto.catId;
   const ownPhotoStoragePath = getStoragePhotoPath(ownPhoto.src);
+  const isOnboardingExchange = input.mode === "onboarding";
   const shouldAddOwnPhotoToPool =
     ownPhoto.shared !== false &&
     !isBlockedDeliveryPhotoUrl(ownPhoto.src);
@@ -349,6 +350,7 @@ async function handleExchangePost(request: Request) {
           theme: input.theme,
           category: input.category,
           shared: true,
+          capture_context: isOnboardingExchange ? "onboarding" : "daily",
         },
         captured_at: createdAt,
         created_at: createdAt,
@@ -381,7 +383,6 @@ async function handleExchangePost(request: Request) {
     deliveredSourceMomentIds,
   };
 
-  const isOnboardingExchange = input.mode === "onboarding";
   const fastCandidateMode = isOnboardingExchange ? "tiered" : readFastCandidateMode();
   const fastRows =
     fastCandidateMode === "admin_storage"

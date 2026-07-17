@@ -282,7 +282,7 @@ test.describe("home desk state cycle", () => {
             visibility: "shared",
             delivery_status: "available",
             source_moment_id: null,
-            metadata: {},
+            metadata: { capture_context: "onboarding" },
             captured_at: new Date(now).toISOString(),
             created_at: new Date(now).toISOString(),
           },
@@ -315,7 +315,7 @@ test.describe("home desk state cycle", () => {
           ownPhotos: JSON.parse(
             window.localStorage.getItem("nyaruhodo_exchange_own_sleeping_photos") ??
               "[]",
-          ) as Array<{ src?: string }>,
+          ) as Array<{ src?: string; captureContext?: string }>,
         })),
       )
       .toMatchObject({
@@ -326,7 +326,7 @@ test.describe("home desk state cycle", () => {
             coverCrop: { scale: 0.55, offsetX: 12, offsetY: -8 },
           },
         ],
-        ownPhotos: [{ src: restoredPhotoUrl }],
+        ownPhotos: [{ src: restoredPhotoUrl, captureContext: "onboarding" }],
       });
   });
 

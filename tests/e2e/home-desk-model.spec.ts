@@ -491,6 +491,39 @@ test.describe("home desk model", () => {
     await expect(page.getByRole("button", { name: "今日はここまで" })).toBeVisible();
   });
 
+  test("does not label an unscheduled onboarding photo as tonight's sent photo", async ({
+    page,
+  }) => {
+    await seedDeskState(page, "1", { withUnscheduledOwnPhoto: true });
+    await page.goto("/home?handoff=restored&from=onboarding_second_photo");
+    await page.waitForLoadState("networkidle");
+
+    await expect(page.getByTestId("home-desk-model")).toHaveAttribute(
+      "data-state",
+      "1",
+    );
+    await expect(page.getByTestId("desk-home-frame")).toHaveAttribute(
+      "data-photo-id",
+      "own-desk",
+    );
+    await expect(page.getByTestId("onboarding-second-photo-invitation")).toBeVisible();
+    await expect(page.getByTestId("home-letter-tray")).toHaveCount(0);
+    await expect(page.getByText("おくった", { exact: true })).toHaveCount(0);
+    await expect(page.getByText("よる8時に とどく", { exact: true })).toHaveCount(0);
+  });
+
+  test("clears the second-photo intent after a tonight photo is already scheduled", async ({
+    page,
+  }) => {
+    await seedDeskState(page, "2");
+    await page.goto("/home?handoff=restored&from=onboarding_second_photo");
+    await page.waitForLoadState("networkidle");
+
+    await expect(page.getByTestId("onboarding-second-photo-invitation")).toHaveCount(0);
+    await expect(page).not.toHaveURL(/from=onboarding_second_photo/);
+    await expect(page.getByText("よる8時に とどく", { exact: true })).toBeVisible();
+  });
+
   test("opens a full iOS store and compacts duplicate photo sources", async ({
     page,
   }) => {
@@ -1322,6 +1355,7 @@ async function seedDeskState(
     omoideDisabled?: boolean;
     withAllCatOmoideCandidates?: boolean;
     withoutOwnPhoto?: boolean;
+    withUnscheduledOwnPhoto?: boolean;
     openedBySystem?: boolean;
     withSystemOpenedYesterday?: boolean;
     ownPhotoDataUrl?: string;
@@ -1408,10 +1442,11 @@ async function seedDeskState(
       }
       window.localStorage.setItem("cat_profiles", JSON.stringify(profiles));
 
-      const ownPhotos =
-        state === "1" || state === "1b" || options.withoutOwnPhoto
-          ? []
-          : [ownPhoto];
+      const ownPhotos = options.withoutOwnPhoto
+        ? []
+        : options.withUnscheduledOwnPhoto || (state !== "1" && state !== "1b")
+          ? [ownPhoto]
+          : [];
       const omoidePhoto = {
         ...ownPhoto,
         id: "own-omoide-week",

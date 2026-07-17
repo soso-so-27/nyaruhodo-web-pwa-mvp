@@ -1308,6 +1308,7 @@ test.describe("sleeping delivery pool guards", () => {
         moderation_status: "pending",
       });
       expect(moments?.[0]?.metadata?.pool_kind).toBe("user_shared");
+      expect(moments?.[0]?.metadata?.capture_context).toBe("onboarding");
 
       const { error: approveError } = await adminSupabase
         .from("cat_moments")
@@ -1846,6 +1847,7 @@ test.describe("sleeping delivery pool guards", () => {
             triggerLabel: "sleeping",
             theme: "sleeping",
             shared: false,
+            captureContext: "onboarding",
             createdAt,
           },
         },
@@ -1871,6 +1873,7 @@ test.describe("sleeping delivery pool guards", () => {
         source: "user_backup",
         pool_kind: "user_private",
         shared: false,
+        capture_context: "onboarding",
       });
 
       const { count: queueCount, error: queueError } = await adminSupabase

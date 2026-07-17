@@ -89,6 +89,59 @@ test.describe("collection album flow", () => {
     );
   });
 
+  test("shows the same sent photo only once when handoff left separate records", async ({
+    page,
+  }) => {
+    const olderCreatedAt = Date.parse("2026-07-17T13:40:00+09:00");
+    const newerCreatedAt = olderCreatedAt + 60_000;
+
+    await page.addInitScript(
+      ({ src, olderCreatedAt, newerCreatedAt }) => {
+        const catId = "onboarding-handoff-cat";
+        const basePhoto = {
+          ownerCatId: catId,
+          catId,
+          src,
+          state: "sleeping",
+          visibility: "shared",
+          deliveryStatus: "available",
+          triggerLabel: "sleeping",
+          theme: "sleeping",
+          shared: true,
+        };
+        window.localStorage.setItem("active_cat_id", catId);
+        window.localStorage.setItem(
+          "cat_profiles",
+          JSON.stringify([{ id: catId, name: "むぎ" }]),
+        );
+        window.localStorage.setItem(
+          "nyaruhodo_exchange_own_sleeping_photos",
+          JSON.stringify([
+            {
+              ...basePhoto,
+              id: "handoff-photo-new",
+              createdAt: newerCreatedAt,
+              captureContext: "daily",
+            },
+            {
+              ...basePhoto,
+              id: "handoff-photo-old",
+              createdAt: olderCreatedAt,
+              captureContext: "onboarding",
+            },
+          ]),
+        );
+      },
+      { src: photoDataUrl, olderCreatedAt, newerCreatedAt },
+    );
+
+    await page.goto("/collection");
+
+    const sentPhotos = page.getByTestId("mainichi-board-photo-sent");
+    await expect(sentPhotos).toHaveCount(1);
+    await expect(sentPhotos).toHaveAttribute("data-photo-id", "handoff-photo-new");
+  });
+
   test("shows a home sleeping photo in sent after capture", async ({ page }) => {
     const now = Date.parse("2026-07-07T09:30:00+09:00");
 

@@ -1558,6 +1558,7 @@ async function syncSleepingPhotos(
               trigger_label: photo.triggerLabel,
               theme: photo.theme,
               shared: photo.shared,
+              capture_context: photo.captureContext ?? "daily",
             },
             captured_at: new Date(photo.createdAt).toISOString(),
             created_at: new Date(photo.createdAt).toISOString(),
@@ -2174,6 +2175,8 @@ async function restoreSleepingPhotos(
           typeof metadata.trigger_label === "string" ? metadata.trigger_label : "",
         theme: typeof metadata.theme === "string" ? metadata.theme : "sleeping",
         shared: moment.visibility === "shared" || metadata.shared === true,
+        captureContext:
+          metadata.capture_context === "onboarding" ? "onboarding" : "daily",
         createdAt,
       };
         },

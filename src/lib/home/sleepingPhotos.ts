@@ -181,13 +181,39 @@ export function readOwnSleepingPhotosForSync() {
 }
 
 export function readOwnSleepingPhotosForAlbum(activeCatId: string | null = null) {
-  const photos = readAllOwnSleepingPhotos();
+  const photos = dedupeOwnSleepingPhotosForAlbum(readAllOwnSleepingPhotos());
 
   const activeCatPhotos = activeCatId
     ? photos.filter((photo) => photo.ownerCatId === activeCatId)
     : photos;
 
   return activeCatPhotos.length > 0 ? activeCatPhotos : photos;
+}
+
+function dedupeOwnSleepingPhotosForAlbum(photos: OwnSleepingPhoto[]) {
+  const seenContent = new Set<string>();
+
+  return photos.filter((photo) => {
+    const ownerCatId = photo.ownerCatId ?? photo.catId;
+    const date = new Date(photo.createdAt + 9 * 60 * 60 * 1000);
+    const dateKey = date.toISOString().slice(0, 10);
+    const contentKeys = getPhotoContentIdentityKeys(photo).map(
+      (key) => `${ownerCatId}:${dateKey}:${key}`,
+    );
+
+    if (contentKeys.length === 0) {
+      return true;
+    }
+
+    if (contentKeys.some((key) => seenContent.has(key))) {
+      return false;
+    }
+
+    for (const key of contentKeys) {
+      seenContent.add(key);
+    }
+    return true;
+  });
 }
 
 export function readAllOwnSleepingPhotos() {
