@@ -4,7 +4,11 @@ import type { CSSProperties, ReactNode } from "react";
 import { useEffect, useState } from "react";
 
 import { createBrowserSupabaseClient } from "../../../lib/supabase/browser";
-import type { AnalyticsPeriodKey } from "../../../lib/analytics/adminAnalytics";
+import { getOrCreateAnonymousId } from "../../../lib/identity/anonymousId";
+import type {
+  AnalyticsAudience,
+  AnalyticsPeriodKey,
+} from "../../../lib/analytics/adminAnalytics";
 
 type Metric = {
   key: string;
@@ -21,6 +25,7 @@ type FunnelStep = Metric & {
 
 type AnalyticsResponse = {
   period: AnalyticsPeriodKey;
+  audience: AnalyticsAudience;
   generatedAt: string;
   range: { from: string; to: string };
   totalEvents: number;
@@ -53,8 +58,26 @@ type AnalyticsResponse = {
     users: number;
     latestAt: string;
   }>;
+  issueSummary: {
+    recovered: IssueSummaryRow[];
+    expected: IssueSummaryRow[];
+  };
+  diagnosticEventsExcluded: boolean;
+  audienceCounts: {
+    productEvents: number;
+    internalEvents: number;
+    internalActors: number;
+  };
   recentErrors: SafeEvent[];
   recentEvents: SafeEvent[];
+};
+
+type IssueSummaryRow = {
+  eventName: string;
+  errorCode: string | null;
+  events: number;
+  users: number;
+  latestAt: string;
 };
 
 type SafeEvent = {
@@ -76,6 +99,11 @@ const PERIODS: Array<{ key: AnalyticsPeriodKey; label: string }> = [
   { key: "yesterday", label: "きのう" },
   { key: "7d", label: "7日" },
   { key: "28d", label: "28日" },
+];
+
+const AUDIENCES: Array<{ key: AnalyticsAudience; label: string }> = [
+  { key: "product", label: "利用者" },
+  { key: "internal", label: "内部・QA" },
 ];
 
 const SOURCE_LABELS: Record<string, string> = {
@@ -111,6 +139,7 @@ const EVENT_LABELS: Record<string, string> = {
   onboarding_delivery_blocked: "最初のねこだよりを用意できなかった",
   onboarding_handoff_restore_failed: "外部ブラウザへの引き継ぎ失敗",
   delivery_reveal_photo_error: "届いた写真の表示失敗",
+  delivery_reveal_photo_rendered: "届いた写真を実表示",
   evening_delivery_check_failed: "20時便の確認失敗",
   evening_delivery_check_timeout: "20時便の確認が長時間化",
   exchange_rejected_expired: "20時便の受取期限超過",
@@ -123,6 +152,7 @@ const EVENT_LABELS: Record<string, string> = {
 
 export default function AdminAnalyticsClient() {
   const [period, setPeriod] = useState<AnalyticsPeriodKey>("60m");
+  const [audience, setAudience] = useState<AnalyticsAudience>("product");
   const [refreshToken, setRefreshToken] = useState(0);
   const [data, setData] = useState<AnalyticsResponse | null>(null);
   const [error, setError] = useState("");
@@ -146,11 +176,15 @@ export default function AdminAnalyticsClient() {
         if (accessToken) {
           headers.set("Authorization", `Bearer ${accessToken}`);
         }
+        headers.set("X-Analytics-Anonymous-Id", getOrCreateAnonymousId());
 
-        const response = await fetch(`/api/admin/analytics?period=${period}`, {
-          cache: "no-store",
-          headers,
-        });
+        const response = await fetch(
+          `/api/admin/analytics?period=${period}&audience=${audience}`,
+          {
+            cache: "no-store",
+            headers,
+          },
+        );
 
         if (!response.ok) {
           if (!isCancelled) {
@@ -187,11 +221,13 @@ export default function AdminAnalyticsClient() {
       isCancelled = true;
       window.clearInterval(refreshInterval);
     };
-  }, [period, refreshToken]);
+  }, [audience, period, refreshToken]);
 
   const attentionMetric = data?.overview.find(
     (metric) => metric.key === "needs_attention",
   );
+  const recoveredIssues = data?.issueSummary?.recovered ?? [];
+  const expectedIssues = data?.issueSummary?.expected ?? [];
 
   return (
     <main style={styles.page}>
@@ -214,21 +250,39 @@ export default function AdminAnalyticsClient() {
       </header>
 
       <section style={styles.toolbar} aria-label="集計期間">
-        <div style={styles.periodTabs}>
-          {PERIODS.map((item) => (
-            <button
-              key={item.key}
-              type="button"
-              onClick={() => setPeriod(item.key)}
-              aria-pressed={period === item.key}
-              style={{
-                ...styles.periodButton,
-                ...(period === item.key ? styles.periodButtonActive : {}),
-              }}
-            >
-              {item.label}
-            </button>
-          ))}
+        <div style={styles.filterGroups}>
+          <div style={styles.periodTabs} aria-label="集計対象">
+            {AUDIENCES.map((item) => (
+              <button
+                key={item.key}
+                type="button"
+                onClick={() => setAudience(item.key)}
+                aria-pressed={audience === item.key}
+                style={{
+                  ...styles.periodButton,
+                  ...(audience === item.key ? styles.periodButtonActive : {}),
+                }}
+              >
+                {item.label}
+              </button>
+            ))}
+          </div>
+          <div style={styles.periodTabs} aria-label="集計期間">
+            {PERIODS.map((item) => (
+              <button
+                key={item.key}
+                type="button"
+                onClick={() => setPeriod(item.key)}
+                aria-pressed={period === item.key}
+                style={{
+                  ...styles.periodButton,
+                  ...(period === item.key ? styles.periodButtonActive : {}),
+                }}
+              >
+                {item.label}
+              </button>
+            ))}
+          </div>
         </div>
         <div style={styles.refreshGroup}>
           {data ? (
@@ -252,6 +306,11 @@ export default function AdminAnalyticsClient() {
 
       {data ? (
         <>
+          <Notice tone={data.audience === "product" ? "success" : "warning"}>
+            {data.audience === "product"
+              ? "管理者に結びつく端末、リセットURLの検証、管理画面を除いた利用者集計です。"
+              : "管理者端末、リセットURLの検証、管理画面だけを表示しています。"}
+          </Notice>
           {data.eventLimitReached ? (
             <Notice tone="warning">
               5,000件の取得上限に達しています。この期間の数字は一部です。
@@ -447,6 +506,35 @@ export default function AdminAnalyticsClient() {
             )}
           </section>
 
+          {recoveredIssues.length > 0 || expectedIssues.length > 0 ? (
+            <section style={styles.section} aria-labelledby="operational-notes-title">
+              <SectionHeading
+                id="operational-notes-title"
+                title="回復済み・想定内"
+                note="利用者の失敗として数えず、運用上の記録として残しているもの"
+              />
+              <AnalyticsTable
+                columns={["扱い", "内容", "人数", "件数", "最新"]}
+                rows={[
+                  ...recoveredIssues.map((item) => [
+                    "回復済み",
+                    getEventLabel(item.eventName),
+                    `${item.users}人`,
+                    `${item.events}件`,
+                    formatDate(item.latestAt),
+                  ]),
+                  ...expectedIssues.map((item) => [
+                    "想定内",
+                    getEventLabel(item.eventName),
+                    `${item.users}人`,
+                    `${item.events}件`,
+                    formatDate(item.latestAt),
+                  ]),
+                ]}
+              />
+            </section>
+          ) : null}
+
           <details style={styles.details}>
             <summary style={styles.summary}>直近の生イベントを見る</summary>
             <EventTable events={data.recentEvents} />
@@ -631,10 +719,13 @@ function EventTable({
 }
 
 function getDeliveryMetricTone(metricKey: string) {
-  if (metricKey === "evening_check_failed" || metricKey === "evening_check_timeout") {
+  if (metricKey === "evening_check_failed") {
     return "danger" as const;
   }
-  if (metricKey === "evening_target_repaired") {
+  if (
+    metricKey === "evening_target_repaired" ||
+    metricKey === "evening_check_timeout"
+  ) {
     return "warning" as const;
   }
   if (metricKey === "evening_check_succeeded") {
@@ -743,6 +834,12 @@ const styles = {
     flexWrap: "wrap",
     alignItems: "center",
     justifyContent: "space-between",
+    gap: 12,
+  },
+  filterGroups: {
+    display: "flex",
+    flexWrap: "wrap",
+    alignItems: "center",
     gap: 12,
   },
   periodTabs: {

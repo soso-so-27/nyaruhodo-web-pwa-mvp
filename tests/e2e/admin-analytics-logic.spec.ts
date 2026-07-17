@@ -3,6 +3,8 @@ import { expect, test } from "@playwright/test";
 import {
   buildAdminAnalytics,
   buildAnalyticsPeriodRange,
+  classifyAnalyticsIssues,
+  isInternalAnalyticsEvent,
   readAnalyticsPeriod,
   type AdminAnalyticsEvent,
 } from "../../src/lib/analytics/adminAnalytics";
@@ -96,6 +98,74 @@ test.describe("admin analytics logic", () => {
     expect(range.to.toISOString()).toBe("2026-07-16T08:30:00.000Z");
     expect(range.from.toISOString()).toBe("2026-07-16T07:30:00.000Z");
   });
+
+  test("separates internal traffic from product users", () => {
+    const internalIds = new Set(["admin-browser"]);
+    const context = {
+      adminUserId: "admin-user",
+      internalAnonymousIds: internalIds,
+    };
+
+    expect(
+      isInternalAnalyticsEvent(
+        event("admin-browser", "onboarding_intro_view", 0),
+        context,
+      ),
+    ).toBe(true);
+    expect(
+      isInternalAnalyticsEvent(
+        event("qa-reset", "onboarding_intro_view", 0, {
+          metadata: { traffic_kind: "internal" },
+        }),
+        context,
+      ),
+    ).toBe(true);
+    expect(
+      isInternalAnalyticsEvent(
+        event("public-user", "onboarding_intro_view", 0),
+        context,
+      ),
+    ).toBe(false);
+  });
+
+  test("keeps only unresolved failures in needs-attention counts", () => {
+    const events = [
+      event("fallback-user", "anonymous_auth_failed", 0, {
+        errorCode: "sign_in_failed",
+        errorMessage: "Anonymous sign-ins are disabled",
+      }),
+      event("no-session", "cat_gallery_restore_failed", 1, {
+        errorCode: "AuthSessionMissingError",
+        metadata: { has_session: false },
+      }),
+      event("ios-browser", "app_error", 1.5, {
+        errorCode: "TypeError",
+        errorMessage:
+          "undefined is not an object (evaluating window.webkit.messageHandlers)",
+      }),
+      event("recovered-user", "evening_delivery_check_timeout", 2, {
+        errorCode: "timeout",
+        sessionId: "delivery-session",
+      }),
+      event("recovered-user", "evening_delivery_check_succeeded", 2.1, {
+        sessionId: "delivery-session",
+      }),
+      event("blocked-user", "photo_upload_error", 3, {
+        errorCode: "decode_failed",
+      }),
+    ];
+
+    const issues = classifyAnalyticsIssues(events);
+    const result = buildAdminAnalytics(events);
+
+    expect(issues.expected).toHaveLength(3);
+    expect(issues.recovered).toHaveLength(1);
+    expect(issues.actionable).toHaveLength(1);
+    expect(result.overview.find((item) => item.key === "needs_attention")).toMatchObject({
+      users: 1,
+      events: 1,
+    });
+  });
 });
 
 function event(
@@ -105,8 +175,10 @@ function event(
   options: {
     source?: string;
     errorCode?: string | null;
+    errorMessage?: string | null;
     metadata?: Record<string, unknown>;
     inAppBrowser?: boolean;
+    sessionId?: string;
   } = {},
 ): AdminAnalyticsEvent {
   return {
@@ -114,14 +186,14 @@ function event(
     source: options.source ?? "direct",
     anonymous_id: actorId,
     user_id: null,
-    session_id: `session-${actorId}`,
+    session_id: options.sessionId ?? `session-${actorId}`,
     submission_id: null,
     route: eventName.startsWith("onboarding_") ? "/onboarding" : "/home",
     surface: eventName.startsWith("onboarding_") ? "onboarding" : "home",
     is_in_app_browser: options.inAppBrowser ?? false,
     is_standalone_pwa: false,
     error_code: options.errorCode ?? null,
-    error_message: null,
+    error_message: options.errorMessage ?? null,
     metadata: options.metadata ?? {},
     created_at: new Date(BASE_TIME + minuteOffset * 60_000).toISOString(),
   };

@@ -604,7 +604,9 @@ export function CatsPage() {
             ? "cat_gallery_remote_empty"
             : result.status === "error"
               ? "cat_gallery_restore_failed"
-              : "cat_gallery_local_merged";
+              : result.status === "skipped"
+                ? "cat_gallery_restore_skipped"
+                : "cat_gallery_local_merged";
 
       trackProductEvent(
         eventName,

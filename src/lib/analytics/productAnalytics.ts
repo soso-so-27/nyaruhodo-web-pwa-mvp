@@ -1,6 +1,7 @@
 import { STORAGE_KEYS, readCachedJson, writeCachedJson } from "../storage";
 import { getOrCreateAnonymousId } from "../identity/anonymousId";
 import { createBrowserSupabaseClient } from "../supabase/browser";
+import { readAnalyticsTrafficKind } from "./traffic";
 
 const SESSION_TIMEOUT_MS = 30 * 60 * 1000;
 const MAX_QUEUE_SIZE = 200;
@@ -75,6 +76,7 @@ export function trackProductEvent(
       ...getAttributionProperties(),
       ...getAnalyticsEnvironmentProperties(),
       ...properties,
+      traffic_kind: readAnalyticsTrafficKind(),
     });
     const event: ProductAnalyticsEvent = {
       id: createId(),

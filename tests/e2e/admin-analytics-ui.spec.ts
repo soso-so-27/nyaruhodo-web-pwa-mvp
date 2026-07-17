@@ -29,6 +29,10 @@ test("shows the launch dashboard in Japanese with actionable sections", async ({
     "aria-pressed",
     "true",
   );
+  await expect(page.getByRole("button", { name: "利用者" })).toHaveAttribute(
+    "aria-pressed",
+    "true",
+  );
   await expect(page.getByRole("heading", { name: "最初の一通まで" })).toBeVisible();
   await expect(page.getByRole("heading", { name: "今夜の一通" })).toBeVisible();
   await expect(page.getByRole("heading", { name: "端末と入口" })).toBeVisible();
@@ -54,6 +58,7 @@ const metric = (key: string, label: string, users: number, events = users) => ({
 
 const mockAnalyticsResponse = {
   period: "60m",
+  audience: "product",
   generatedAt: "2026-07-16T08:30:00.000Z",
   range: {
     from: "2026-07-16T07:30:00.000Z",
@@ -129,6 +134,16 @@ const mockAnalyticsResponse = {
       latestAt: "2026-07-16T08:20:00.000Z",
     },
   ],
+  issueSummary: {
+    recovered: [],
+    expected: [],
+  },
+  diagnosticEventsExcluded: true,
+  audienceCounts: {
+    productEvents: 48,
+    internalEvents: 12,
+    internalActors: 1,
+  },
   recentErrors: [
     {
       createdAt: "2026-07-16T08:20:00.000Z",

@@ -681,6 +681,21 @@ export async function restoreCatGalleryPhotosFromAccount(): Promise<CatGalleryAc
     return emptyResult;
   }
 
+  const { data: sessionData, error: sessionError } =
+    await supabase.auth.getSession();
+
+  if (sessionError) {
+    return {
+      ...emptyResult,
+      status: "error",
+      errors: [sessionError.message],
+    };
+  }
+
+  if (!sessionData.session) {
+    return emptyResult;
+  }
+
   const { data, error } = await supabase.auth.getUser();
 
   if (error || !data.user) {

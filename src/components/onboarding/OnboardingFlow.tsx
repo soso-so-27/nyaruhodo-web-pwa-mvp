@@ -167,6 +167,7 @@ export function OnboardingFlow() {
   const revealTimerRef = useRef<number | null>(null);
   const revealStartedAtRef = useRef<number | null>(null);
   const revealPhotoLoadedTrackedRef = useRef("");
+  const revealPhotoRenderedTrackedRef = useRef("");
   const revealPhotoErrorTrackedRef = useRef("");
   const catNamePromptTrackedPhotoRef = useRef("");
   const entrySourceRef = useRef<OnboardingSource>(entrySource);
@@ -336,6 +337,7 @@ export function OnboardingFlow() {
   useEffect(() => {
     revealStartedAtRef.current = null;
     revealPhotoLoadedTrackedRef.current = "";
+    revealPhotoRenderedTrackedRef.current = "";
     revealPhotoErrorTrackedRef.current = "";
     setHasRevealPhotoError(false);
     setIsRevealPhotoReady(false);
@@ -1070,6 +1072,18 @@ export function OnboardingFlow() {
     trackOnboardingRevealEvent("delivery_reveal_photo_error");
   }
 
+  function handleRevealPhotoVisible() {
+    if (
+      !deliveredPhoto ||
+      revealPhotoRenderedTrackedRef.current === deliveredPhoto.id
+    ) {
+      return;
+    }
+
+    revealPhotoRenderedTrackedRef.current = deliveredPhoto.id;
+    trackOnboardingRevealEvent("delivery_reveal_photo_rendered");
+  }
+
   function handleRetryRevealPhoto() {
     revealPhotoErrorTrackedRef.current = "";
     setIsRevealPhotoReady(false);
@@ -1653,6 +1667,7 @@ export function OnboardingFlow() {
                   onStorageDataUrl={handleDeliveredPhotoDataUrl}
                   onNaturalSize={handleDeliveredPhotoNaturalSize}
                   onLoad={handleRevealPhotoLoaded}
+                  onVisible={handleRevealPhotoVisible}
                   onError={handleRevealPhotoError}
                 />
                 {!isRevealPhotoReady && !hasRevealPhotoError ? (

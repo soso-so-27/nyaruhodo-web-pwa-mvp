@@ -4,7 +4,9 @@ import { requireAdminAccess } from "../../../../lib/adminAccess";
 import {
   buildAdminAnalytics,
   buildAnalyticsPeriodRange,
-  isImpactEvent,
+  classifyAnalyticsIssues,
+  isInternalAnalyticsEvent,
+  readAnalyticsAudience,
   readAnalyticsPeriod,
   type AdminAnalyticsEvent,
 } from "../../../../lib/analytics/adminAnalytics";
@@ -13,6 +15,11 @@ import { createSupabaseAdminClient } from "../../../../lib/supabase/admin";
 export const dynamic = "force-dynamic";
 
 const EVENT_QUERY_LIMIT = 5000;
+const DIAGNOSTIC_EVENT_NAMES = [
+  "image_load_completed",
+  "photo_sw_cache_configured",
+  "photo_sw_cache_hit",
+] as const;
 
 export async function GET(request: Request) {
   const access = await requireAdminAccess(request);
@@ -35,7 +42,33 @@ export async function GET(request: Request) {
 
   const url = new URL(request.url);
   const period = readAnalyticsPeriod(url.searchParams.get("period"));
+  const audience = readAnalyticsAudience(url.searchParams.get("audience"));
   const range = buildAnalyticsPeriodRange(period);
+  const { data: linkedAdminRows, error: linkedAdminError } = await supabase
+    .from("app_events")
+    .select("anonymous_id")
+    .eq("user_id", access.user.id)
+    .not("anonymous_id", "is", null)
+    .limit(1000);
+
+  if (linkedAdminError) {
+    return NextResponse.json(
+      { error: "analytics_internal_identity_query_failed" },
+      { status: 500 },
+    );
+  }
+
+  const internalAnonymousIds = new Set(
+    (linkedAdminRows ?? [])
+      .map((row) => row.anonymous_id)
+      .filter((value): value is string => Boolean(value)),
+  );
+  const requestingAnonymousId = readAnonymousIdHeader(request);
+  if (requestingAnonymousId) {
+    internalAnonymousIds.add(requestingAnonymousId);
+  }
+
+  const diagnosticFilter = `(${DIAGNOSTIC_EVENT_NAMES.map((name) => `"${name}"`).join(",")})`;
   const { data, error } = await supabase
     .from("app_events")
     .select(
@@ -43,6 +76,7 @@ export async function GET(request: Request) {
     )
     .gte("created_at", range.from.toISOString())
     .lt("created_at", range.to.toISOString())
+    .not("event_name", "in", diagnosticFilter)
     .order("created_at", { ascending: false })
     .limit(EVENT_QUERY_LIMIT);
 
@@ -53,27 +87,52 @@ export async function GET(request: Request) {
     );
   }
 
-  const events = ((data ?? []) as AdminAnalyticsEvent[]).filter((event) =>
+  const readableEvents = ((data ?? []) as AdminAnalyticsEvent[]).filter((event) =>
     Boolean(event.event_name),
   );
+  const internalEvents = readableEvents.filter((event) =>
+    isInternalAnalyticsEvent(event, {
+      adminUserId: access.user.id,
+      internalAnonymousIds,
+    }),
+  );
+  const internalEventSet = new Set(internalEvents);
+  const productEvents = readableEvents.filter(
+    (event) => !internalEventSet.has(event),
+  );
+  const events = audience === "internal" ? internalEvents : productEvents;
   const summary = buildAdminAnalytics(events);
+  const issues = classifyAnalyticsIssues(events);
 
   return NextResponse.json({
     period,
+    audience,
     generatedAt: new Date().toISOString(),
     range: {
       from: range.from.toISOString(),
       to: range.to.toISOString(),
     },
     totalEvents: events.length,
-    eventLimitReached: events.length >= EVENT_QUERY_LIMIT,
+    eventLimitReached: readableEvents.length >= EVENT_QUERY_LIMIT,
+    diagnosticEventsExcluded: true,
+    audienceCounts: {
+      productEvents: productEvents.length,
+      internalEvents: internalEvents.length,
+      internalActors: internalAnonymousIds.size,
+    },
     ...summary,
-    recentErrors: events
-      .filter(isImpactEvent)
+    recentErrors: issues.actionable
       .slice(0, 30)
       .map(toSafeEvent),
     recentEvents: events.slice(0, 50).map(toSafeEvent),
   });
+}
+
+function readAnonymousIdHeader(request: Request) {
+  const value = request.headers.get("x-analytics-anonymous-id")?.trim() ?? "";
+  return value && value.length <= 128 && /^[a-zA-Z0-9-]+$/.test(value)
+    ? value
+    : null;
 }
 
 function toSafeEvent(event: AdminAnalyticsEvent) {

@@ -191,7 +191,7 @@ export function readOwnSleepingPhotosForAlbum(activeCatId: string | null = null)
 }
 
 function dedupeOwnSleepingPhotosForAlbum(photos: OwnSleepingPhoto[]) {
-  const seenContent = new Set<string>();
+  const seenContent = new Map<string, boolean>();
   const seenOnboardingDates = new Set<string>();
 
   return photos.filter((photo) => {
@@ -213,12 +213,19 @@ function dedupeOwnSleepingPhotosForAlbum(photos: OwnSleepingPhoto[]) {
       return true;
     }
 
-    if (contentKeys.some((key) => seenContent.has(key))) {
+    const isOnboardingPhoto = photo.captureContext === "onboarding";
+    const matchesOnboardingPhoto = contentKeys.some(
+      (key) => seenContent.get(key) === true,
+    );
+    if (
+      contentKeys.some((key) => seenContent.has(key)) &&
+      (isOnboardingPhoto || matchesOnboardingPhoto)
+    ) {
       return false;
     }
 
     for (const key of contentKeys) {
-      seenContent.add(key);
+      seenContent.set(key, seenContent.get(key) === true || isOnboardingPhoto);
     }
     return true;
   });

@@ -102,6 +102,7 @@ export function StoredPhotoImage({
   onStorageDataUrl,
   onNaturalSize,
   onLoad,
+  onVisible,
   onError,
   fallbackSrcs = EMPTY_FALLBACK_SRCS,
   fallbackVariant = "message",
@@ -121,6 +122,7 @@ export function StoredPhotoImage({
   onStorageDataUrl?: (dataUrl: string) => void;
   onNaturalSize?: (size: { width: number; height: number }) => void;
   onLoad?: () => void;
+  onVisible?: () => void;
   onError?: () => void;
   fallbackSrcs?: string[];
   fallbackVariant?: "message" | "quiet";
@@ -158,9 +160,19 @@ export function StoredPhotoImage({
   const trackedDisplaySrcRef = useRef("");
   const trackedFailureKeyRef = useRef("");
   const persistedDataUrlRef = useRef("");
+  const visibleDisplaySrcRef = useRef("");
+  const visibleCheckTimerRef = useRef<number | null>(null);
   const signedUrlRetryCountsRef = useRef(new Map<string, number>());
   const isInlineImage = displaySrc.startsWith("data:image/");
   const hasNextSource = sourceIndex < sourceQueue.length - 1;
+
+  useEffect(() => {
+    return () => {
+      if (visibleCheckTimerRef.current) {
+        window.clearTimeout(visibleCheckTimerRef.current);
+      }
+    };
+  }, []);
   const frameStyle = useMemo<CSSProperties>(
     () => ({
       ...containerStyle,
@@ -478,6 +490,15 @@ export function StoredPhotoImage({
               height: image.naturalHeight,
             });
           }
+          if (image && onVisible) {
+            scheduleVisibleImageConfirmation({
+              image,
+              displaySrc,
+              onVisible,
+              trackedRef: visibleDisplaySrcRef,
+              timerRef: visibleCheckTimerRef,
+            });
+          }
           trackImageLoadCompleted({
             displaySrc,
             startedAt: loadStartedAtRef.current,
@@ -556,6 +577,83 @@ export function StoredPhotoImage({
       ) : null}
     </span>
   );
+}
+
+function scheduleVisibleImageConfirmation({
+  image,
+  displaySrc,
+  onVisible,
+  trackedRef,
+  timerRef,
+}: {
+  image: HTMLImageElement;
+  displaySrc: string;
+  onVisible: () => void;
+  trackedRef: MutableRefObject<string>;
+  timerRef: MutableRefObject<number | null>;
+}) {
+  if (trackedRef.current === displaySrc) {
+    return;
+  }
+
+  if (timerRef.current) {
+    window.clearTimeout(timerRef.current);
+    timerRef.current = null;
+  }
+
+  const confirm = () => {
+    if (
+      trackedRef.current !== displaySrc &&
+      isImageVisiblyRendered(image)
+    ) {
+      trackedRef.current = displaySrc;
+      onVisible();
+      return true;
+    }
+    return false;
+  };
+
+  window.requestAnimationFrame(() => {
+    window.requestAnimationFrame(() => {
+      if (!confirm()) {
+        timerRef.current = window.setTimeout(() => {
+          timerRef.current = null;
+          confirm();
+        }, 450);
+      }
+    });
+  });
+}
+
+function isImageVisiblyRendered(image: HTMLImageElement) {
+  if (
+    !image.isConnected ||
+    !image.complete ||
+    image.naturalWidth <= 0 ||
+    image.naturalHeight <= 0
+  ) {
+    return false;
+  }
+
+  const rect = image.getBoundingClientRect();
+  if (rect.width <= 1 || rect.height <= 1) {
+    return false;
+  }
+
+  let element: HTMLElement | null = image;
+  while (element) {
+    const style = window.getComputedStyle(element);
+    if (
+      style.display === "none" ||
+      style.visibility === "hidden" ||
+      Number.parseFloat(style.opacity || "1") <= 0.01
+    ) {
+      return false;
+    }
+    element = element.parentElement;
+  }
+
+  return true;
 }
 
 function usePrefersReducedMotion() {

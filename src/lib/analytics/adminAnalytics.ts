@@ -1,4 +1,5 @@
 export type AnalyticsPeriodKey = "60m" | "today" | "yesterday" | "7d" | "28d";
+export type AnalyticsAudience = "product" | "internal";
 
 export type AdminAnalyticsEvent = {
   event_name: string;
@@ -161,7 +162,8 @@ const SOURCE_ORDER = [
 ];
 
 export function buildAdminAnalytics(events: AdminAnalyticsEvent[]) {
-  const impactEvents = events.filter(isImpactEvent);
+  const issues = classifyAnalyticsIssues(events);
+  const impactEvents = issues.actionable;
 
   return {
     overview: [
@@ -196,7 +198,15 @@ export function buildAdminAnalytics(events: AdminAnalyticsEvent[]) {
     environment: buildEnvironmentBreakdown(events),
     retention: buildRetention(events),
     errorSummary: buildErrorSummary(impactEvents),
+    issueSummary: {
+      recovered: buildErrorSummary(issues.recovered),
+      expected: buildErrorSummary(issues.expected),
+    },
   };
+}
+
+export function readAnalyticsAudience(value: string | null): AnalyticsAudience {
+  return value === "internal" ? "internal" : "product";
 }
 
 export function readAnalyticsPeriod(value: string | null): AnalyticsPeriodKey {
@@ -243,6 +253,105 @@ export function isImpactEvent(event: AdminAnalyticsEvent) {
       event.event_name === "anonymous_auth_unavailable" ||
       event.event_name === "exchange_rejected_expired",
   );
+}
+
+export function classifyAnalyticsIssues(events: AdminAnalyticsEvent[]) {
+  const actionable: AdminAnalyticsEvent[] = [];
+  const recovered: AdminAnalyticsEvent[] = [];
+  const expected: AdminAnalyticsEvent[] = [];
+
+  for (const event of events) {
+    if (!isImpactEvent(event)) {
+      continue;
+    }
+
+    if (isExpectedOperationalEvent(event)) {
+      expected.push(event);
+      continue;
+    }
+
+    if (isRecoveredOperationalEvent(event, events)) {
+      recovered.push(event);
+      continue;
+    }
+
+    actionable.push(event);
+  }
+
+  return { actionable, recovered, expected };
+}
+
+export function isInternalAnalyticsEvent(
+  event: AdminAnalyticsEvent,
+  {
+    adminUserId,
+    internalAnonymousIds,
+  }: {
+    adminUserId: string;
+    internalAnonymousIds: ReadonlySet<string>;
+  },
+) {
+  return Boolean(
+    event.route?.startsWith("/admin") ||
+      readMetadataString(event, "traffic_kind") === "internal" ||
+      event.user_id === adminUserId ||
+      (event.anonymous_id && internalAnonymousIds.has(event.anonymous_id)),
+  );
+}
+
+function isExpectedOperationalEvent(event: AdminAnalyticsEvent) {
+  if (
+    event.event_name === "app_error" &&
+    event.error_message
+      ?.toLowerCase()
+      .includes("window.webkit.messagehandlers")
+  ) {
+    return true;
+  }
+
+  if (
+    event.event_name === "cat_gallery_restore_failed" &&
+    event.metadata?.has_session === false
+  ) {
+    return true;
+  }
+
+  return Boolean(
+    event.event_name === "anonymous_auth_failed" &&
+      event.error_code === "sign_in_failed" &&
+      event.error_message
+        ?.toLowerCase()
+        .includes("anonymous sign-ins are disabled"),
+  );
+}
+
+function isRecoveredOperationalEvent(
+  event: AdminAnalyticsEvent,
+  events: AdminAnalyticsEvent[],
+) {
+  if (event.event_name !== "evening_delivery_check_timeout") {
+    return false;
+  }
+
+  const actorId = getActorId(event);
+  const occurredAt = Date.parse(event.created_at);
+  if (!actorId || !Number.isFinite(occurredAt)) {
+    return false;
+  }
+
+  return events.some((candidate) => {
+    if (
+      candidate.event_name !== "evening_delivery_check_succeeded" ||
+      getActorId(candidate) !== actorId ||
+      (event.session_id && candidate.session_id !== event.session_id)
+    ) {
+      return false;
+    }
+
+    const recoveredAt = Date.parse(candidate.created_at);
+    const recoveryMs = recoveredAt - occurredAt;
+    return recoveryMs >= 0 && recoveryMs <= 60_000;
+  });
 }
 
 function buildMetric(

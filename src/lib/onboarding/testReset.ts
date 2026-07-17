@@ -11,6 +11,7 @@ import {
 import { clearDurableOnboardingProgress } from "./progress";
 import { clearPhotoHistoryLedger } from "../photoHistoryLedger";
 import { clearCollectionPhotoLedger } from "../collection/photoHistoryLedger";
+import { markInternalAnalyticsSession } from "../analytics/traffic";
 
 const RESET_QUERY_KEY = "reset_onboarding";
 const LEGACY_RESET_QUERY_KEY = "reset";
@@ -148,6 +149,8 @@ async function clearOnboardingTestLocalState() {
 }
 
 function markOnboardingTestReset() {
+  markInternalAnalyticsSession();
+
   try {
     window.sessionStorage.setItem(ONBOARDING_TEST_RESET_MARKER_KEY, "true");
   } catch {

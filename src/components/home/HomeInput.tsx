@@ -764,7 +764,9 @@ export function HomeInput({
           ? "cat_gallery_remote_empty"
           : catGalleryRestoreResult.status === "error"
             ? "cat_gallery_restore_failed"
-            : "cat_gallery_local_merged";
+            : catGalleryRestoreResult.status === "skipped"
+              ? "cat_gallery_restore_skipped"
+              : "cat_gallery_local_merged";
 
     trackProductEvent(
       catGalleryRestoreEvent,
@@ -3432,6 +3434,7 @@ function EveningDeliveryOpening({
   const ignoreNextPopRef = useRef(false);
   const requestCloseRef = useRef<(syncHistory?: boolean) => void>(() => undefined);
   const actionButtonRef = useRef<HTMLButtonElement | null>(null);
+  const photoRenderedTrackedRef = useRef(false);
   const [isClosing, setIsClosing] = useState(false);
   const [isPhotoReady, setIsPhotoReady] = useState(
     initialDecodeStatus === "ready",
@@ -3594,6 +3597,19 @@ function EveningDeliveryOpening({
               onLoad={() => {
                 setIsPhotoReady(true);
                 setHasPhotoError(false);
+              }}
+              onVisible={() => {
+                if (photoRenderedTrackedRef.current) {
+                  return;
+                }
+                photoRenderedTrackedRef.current = true;
+                trackProductEvent("delivery_reveal_photo_rendered", {
+                  route: "/home",
+                  surface: "home",
+                  source: "evening_delivery",
+                  photo_id: state.deliveredPhoto.id,
+                  delivery_date_key: state.dateKey,
+                });
               }}
               onError={() => {
                 setIsPhotoReady(false);

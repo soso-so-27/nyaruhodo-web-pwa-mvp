@@ -58,12 +58,15 @@ export function AppAnalyticsTracker() {
         return;
       }
 
+      const message = event.message || event.error?.message || "window error";
+      if (isInjectedBrowserBridgeError(message)) {
+        return;
+      }
+
       trackProductEvent("app_error", {
         surface: "window_error",
         error_code: event.error?.name ?? "window_error",
-        error_message: sanitizeAnalyticsErrorMessage(
-          event.message || "window error",
-        ),
+        error_message: sanitizeAnalyticsErrorMessage(message),
         route: window.location.pathname,
       });
     }
@@ -141,6 +144,10 @@ function getDisplayMode(): "browser" | "standalone" | "unknown" {
   } catch {
     return "unknown";
   }
+}
+
+function isInjectedBrowserBridgeError(message: string) {
+  return message.toLowerCase().includes("window.webkit.messagehandlers");
 }
 
 function sanitizeAnalyticsErrorMessage(message: string) {

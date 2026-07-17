@@ -75,6 +75,7 @@ test("keeps reduced-motion feedback still and uses opacity instead", async ({
 
 test("gives the primary onboarding action a deeper press", async ({ page }) => {
   await page.goto("/onboarding?reset=1&src=press_feedback");
+  await expect(page).toHaveURL(/\/onboarding\?src=press_feedback$/);
 
   const primaryAction = page
     .locator('[data-app-pressable="button"][data-app-button-variant="primary"]')

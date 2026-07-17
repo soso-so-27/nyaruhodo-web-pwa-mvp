@@ -376,6 +376,13 @@ test.describe("onboarding delivery flow", () => {
   test("keeps a delivered onboarding photo in the received album", async ({
     page,
   }) => {
+    await page.route("**/rest/v1/product_analytics_events*", async (route) => {
+      await route.fulfill({
+        contentType: "application/json",
+        status: 500,
+        body: JSON.stringify({ error: "keep analytics queued for assertions" }),
+      });
+    });
     await routeImmediateDelivery(page, portraitDeliveryDataUrl);
 
     await page.goto("/onboarding");
@@ -400,6 +407,12 @@ test.describe("onboarding delivery flow", () => {
     ).toBeVisible();
     await expect(page.getByTestId("home-install-invitation")).toHaveCount(0);
     await expect(page.getByTestId("onboarding-delivered-photos").locator("img")).toHaveCount(1);
+    const revealEvents = await waitForAnalyticsEvents(page, [
+      "delivery_reveal_photo_loaded",
+      "delivery_reveal_photo_rendered",
+    ]);
+    expect(revealEvents.delivery_reveal_photo_loaded).toBeTruthy();
+    expect(revealEvents.delivery_reveal_photo_rendered).toBeTruthy();
     await expect(page.getByTestId("onboarding-delivered-photos")).toHaveAttribute(
       "data-photo-frame",
       "f3",
@@ -2361,6 +2374,9 @@ test.describe("onboarding delivery flow", () => {
       sessionReady: window.sessionStorage.getItem(
         "neteruneko_onboarding_album_completion_ready",
       ),
+      analyticsTrafficKind: window.sessionStorage.getItem(
+        "neteruneko_internal_analytics_session",
+      ),
     }));
 
     expect(storage.completed).toBeNull();
@@ -2376,6 +2392,7 @@ test.describe("onboarding delivery flow", () => {
     expect(storage.authCodeVerifier).toBeNull();
     expect(storage.recordLog).toBeNull();
     expect(storage.sessionReady).toBeNull();
+    expect(storage.analyticsTrafficKind).toBe("true");
     expect(storage.pendingReferral).toContain("ABC234");
   });
 
