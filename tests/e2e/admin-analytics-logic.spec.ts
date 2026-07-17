@@ -5,6 +5,7 @@ import {
   buildAnalyticsPeriodRange,
   classifyAnalyticsIssues,
   isInternalAnalyticsEvent,
+  PUBLIC_LAUNCH_AT_ISO,
   readAnalyticsPeriod,
   type AdminAnalyticsEvent,
 } from "../../src/lib/analytics/adminAnalytics";
@@ -48,7 +49,52 @@ test.describe("admin analytics logic", () => {
     expect(result.retention).toMatchObject({
       photoSubmitters: 2,
       repeatSubmitters: 1,
+      returningDaySubmitters: 0,
     });
+  });
+
+  test("counts one saved photo once across related events", () => {
+    const events = [
+      event("actor-a", "onboarding_photo_submitted", 0, {
+        submissionId: "same-photo",
+      }),
+      event("actor-a", "home_exchange_share_photo_confirmed", 1, {
+        submissionId: "same-photo",
+      }),
+    ];
+
+    expect(buildAdminAnalytics(events).retention).toMatchObject({
+      photoSubmitters: 1,
+      repeatSubmitters: 0,
+      returningDaySubmitters: 0,
+    });
+  });
+
+  test("uses source_param to distinguish Threads from untagged direct traffic", () => {
+    const events = [
+      event("threads-user", "onboarding_intro_view", 0, {
+        source: "direct",
+        metadata: { source_param: "threads" },
+      }),
+      event("direct-user", "onboarding_intro_view", 1, { source: "direct" }),
+    ];
+
+    expect(buildAdminAnalytics(events).sourceBreakdown).toEqual([
+      {
+        source: "threads",
+        introUsers: 1,
+        submittedUsers: 0,
+        openedUsers: 0,
+        secondPhotoUsers: 0,
+      },
+      {
+        source: "direct",
+        introUsers: 1,
+        submittedUsers: 0,
+        openedUsers: 0,
+        secondPhotoUsers: 0,
+      },
+    ]);
   });
 
   test("groups impact events and privacy-safe environment labels", () => {
@@ -97,6 +143,16 @@ test.describe("admin analytics logic", () => {
     expect(readAnalyticsPeriod("60m")).toBe("60m");
     expect(range.to.toISOString()).toBe("2026-07-16T08:30:00.000Z");
     expect(range.from.toISOString()).toBe("2026-07-16T07:30:00.000Z");
+  });
+
+  test("defaults to the public launch window", () => {
+    const now = new Date("2026-07-17T13:30:00.000Z");
+    const range = buildAnalyticsPeriodRange("launch", now);
+
+    expect(readAnalyticsPeriod(null)).toBe("launch");
+    expect(readAnalyticsPeriod("invalid")).toBe("launch");
+    expect(range.from.toISOString()).toBe(PUBLIC_LAUNCH_AT_ISO);
+    expect(range.to.toISOString()).toBe("2026-07-17T13:30:00.000Z");
   });
 
   test("separates internal traffic from product users", () => {
@@ -179,6 +235,7 @@ function event(
     metadata?: Record<string, unknown>;
     inAppBrowser?: boolean;
     sessionId?: string;
+    submissionId?: string;
   } = {},
 ): AdminAnalyticsEvent {
   return {
@@ -187,7 +244,7 @@ function event(
     anonymous_id: actorId,
     user_id: null,
     session_id: options.sessionId ?? `session-${actorId}`,
-    submission_id: null,
+    submission_id: options.submissionId ?? null,
     route: eventName.startsWith("onboarding_") ? "/onboarding" : "/home",
     surface: eventName.startsWith("onboarding_") ? "onboarding" : "home",
     is_in_app_browser: options.inAppBrowser ?? false,

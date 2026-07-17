@@ -46,9 +46,9 @@ type AnalyticsResponse = {
     contexts: Array<{ key: string; users: number }>;
   };
   retention: {
-    uniqueActiveUsers: number;
     photoSubmitters: number;
     repeatSubmitters: number;
+    returningDaySubmitters: number;
     d1ReturnSubmitters: number;
   };
   errorSummary: Array<{
@@ -94,6 +94,7 @@ type SafeEvent = {
 };
 
 const PERIODS: Array<{ key: AnalyticsPeriodKey; label: string }> = [
+  { key: "launch", label: "公開後" },
   { key: "60m", label: "直近60分" },
   { key: "today", label: "きょう" },
   { key: "yesterday", label: "きのう" },
@@ -102,7 +103,7 @@ const PERIODS: Array<{ key: AnalyticsPeriodKey; label: string }> = [
 ];
 
 const AUDIENCES: Array<{ key: AnalyticsAudience; label: string }> = [
-  { key: "product", label: "利用者" },
+  { key: "product", label: "公開側" },
   { key: "internal", label: "内部・QA" },
 ];
 
@@ -112,8 +113,9 @@ const SOURCE_LABELS: Record<string, string> = {
   instagram_dm: "Instagram DM",
   instagram: "Instagram",
   referral: "紹介リンク",
-  direct: "直接・保存URL",
-  unknown: "不明",
+  threads: "Threads",
+  direct: "流入元不明（srcなし）",
+  unknown: "流入元不明（旧記録）",
 };
 
 const ENVIRONMENT_LABELS: Record<string, string> = {
@@ -151,7 +153,7 @@ const EVENT_LABELS: Record<string, string> = {
 };
 
 export default function AdminAnalyticsClient() {
-  const [period, setPeriod] = useState<AnalyticsPeriodKey>("60m");
+  const [period, setPeriod] = useState<AnalyticsPeriodKey>("launch");
   const [audience, setAudience] = useState<AnalyticsAudience>("product");
   const [refreshToken, setRefreshToken] = useState(0);
   const [data, setData] = useState<AnalyticsResponse | null>(null);
@@ -236,7 +238,7 @@ export default function AdminAnalyticsClient() {
           <p style={styles.kicker}>運用</p>
           <h1 style={styles.title}>初動アナリティクス</h1>
           <p style={styles.intro}>
-            投稿3の入口から、最初の一通と次の20時便までを人数で確認します。
+            投稿3の入口から、最初の一通と次の20時便までを識別IDとイベントで確認します。
           </p>
         </div>
         <nav style={styles.adminLinks} aria-label="管理画面">
@@ -308,9 +310,14 @@ export default function AdminAnalyticsClient() {
         <>
           <Notice tone={data.audience === "product" ? "success" : "warning"}>
             {data.audience === "product"
-              ? "管理者に結びつく端末、リセットURLの検証、管理画面を除いた利用者集計です。"
+              ? "公開側の記録です。数字は実人数ではなく、ログインIDまたは匿名ブラウザIDです。ブラウザを移ると同じ人でも別IDになります。"
               : "管理者端末、リセットURLの検証、管理画面だけを表示しています。"}
           </Notice>
+          {data.audience === "product" ? (
+            <Notice tone="warning">
+              過去の匿名QAは自動判別できない場合があります。「公開後」を公開実績の基準にしてください。
+            </Notice>
+          ) : null}
           {data.eventLimitReached ? (
             <Notice tone="warning">
               5,000件の取得上限に達しています。この期間の数字は一部です。
@@ -318,8 +325,8 @@ export default function AdminAnalyticsClient() {
           ) : null}
           {attentionMetric && attentionMetric.users > 0 ? (
             <Notice tone="danger">
-              要確認の記録が {attentionMetric.users}人・{attentionMetric.events}
-              件あります。下の「要確認」で同じ失敗が続いていないか確認してください。
+              要確認の記録が {attentionMetric.users} ID・{attentionMetric.events}
+              イベントあります。下の「要確認」で同じ失敗が続いていないか確認してください。
             </Notice>
           ) : (
             <Notice tone="success">
@@ -331,7 +338,7 @@ export default function AdminAnalyticsClient() {
             <SectionHeading
               id="overview-title"
               title="いまの入口"
-              note={`${formatRange(data.range.from, data.range.to)}・全 ${data.totalEvents.toLocaleString()} 記録`}
+              note={`${formatRange(data.range.from, data.range.to)}・全 ${data.totalEvents.toLocaleString()} イベント`}
             />
             <div style={styles.metricGrid}>
               {data.overview.map((metric) => (
@@ -348,13 +355,13 @@ export default function AdminAnalyticsClient() {
             <SectionHeading
               id="funnel-title"
               title="最初の一通まで"
-              note="同じ人が、この期間内に順番どおり進んだ人数"
+              note="同じ識別IDが、この期間内に順番どおり進んだ記録"
             />
             <AnalyticsTable
-              columns={["段階", "人数", "前の段階から", "入口から"]}
+              columns={["段階", "識別ID", "前の段階から", "入口から"]}
               rows={data.funnel.map((step) => [
                 step.label,
-                `${step.users}人`,
+                `${step.users} ID`,
                 step.previousUsers === null
                   ? "-"
                   : formatRate(step.fromPreviousRate, step.users, step.previousUsers),
@@ -367,7 +374,7 @@ export default function AdminAnalyticsClient() {
             <SectionHeading
               id="delivery-title"
               title="今夜の一通"
-              note="20時以降は、開始人数と成立人数が一致するかを最優先で確認"
+              note="20時以降は、開始した識別IDと成立した識別IDが一致するかを確認"
             />
             <div style={styles.metricGridCompact}>
               {data.deliveryHealth.map((metric) => (
@@ -386,7 +393,7 @@ export default function AdminAnalyticsClient() {
               <SectionHeading
                 id="environment-title"
                 title="端末と入口"
-                note="同じ人が複数環境で開いた場合は重複します"
+                note="同じ人が複数環境で開くと、別の識別IDとして重複します"
               />
               <div style={styles.environmentGrid}>
                 <BreakdownList
@@ -417,17 +424,17 @@ export default function AdminAnalyticsClient() {
             <SectionHeading
               id="source-title"
               title="どこから来たか"
-              note="投稿3は Instagram bio の行を見る"
+              note="URLのsrc記録です。Threads返信やコピーURLは、srcがなければ「流入元不明」になります"
             />
             {data.sourceBreakdown.length > 0 ? (
               <AnalyticsTable
-                columns={["入口", "オンボ", "写真保存", "即時便開封", "今夜の一枚"]}
+                columns={["入口", "オンボ表示ID", "写真保存ID", "即時便開封ID", "今夜の一枚ID"]}
                 rows={data.sourceBreakdown.map((row) => [
                   SOURCE_LABELS[row.source] ?? row.source,
-                  `${row.introUsers}人`,
-                  `${row.submittedUsers}人`,
-                  `${row.openedUsers}人`,
-                  `${row.secondPhotoUsers}人`,
+                  `${row.introUsers} ID`,
+                  `${row.submittedUsers} ID`,
+                  `${row.openedUsers} ID`,
+                  `${row.secondPhotoUsers} ID`,
                 ])}
               />
             ) : (
@@ -438,23 +445,14 @@ export default function AdminAnalyticsClient() {
           <section style={styles.section} aria-labelledby="retention-title">
             <SectionHeading
               id="retention-title"
-              title="もう一度使ったか"
-              note="初回写真の重複イベントを除外した人数"
+              title="写真をもう一度入れたか"
+              note="活動しただけのIDは数えず、写真保存の記録だけを使用"
             />
             <div style={styles.metricGridCompact}>
               <MetricCard
                 metric={{
-                  key: "active",
-                  label: "利用した人",
-                  users: data.retention.uniqueActiveUsers,
-                  events: 0,
-                }}
-                compact
-              />
-              <MetricCard
-                metric={{
                   key: "submitters",
-                  label: "写真を入れた人",
+                  label: "写真保存があるID",
                   users: data.retention.photoSubmitters,
                   events: 0,
                 }}
@@ -471,8 +469,17 @@ export default function AdminAnalyticsClient() {
               />
               <MetricCard
                 metric={{
+                  key: "returning-day",
+                  label: "別の日にも保存",
+                  users: data.retention.returningDaySubmitters,
+                  events: 0,
+                }}
+                compact
+              />
+              <MetricCard
+                metric={{
                   key: "d1",
-                  label: "翌日も写真を入れた",
+                  label: "翌日も保存",
                   users: data.retention.d1ReturnSubmitters,
                   events: 0,
                 }}
@@ -485,17 +492,17 @@ export default function AdminAnalyticsClient() {
             <SectionHeading
               id="errors-title"
               title="要確認"
-              note="率より先に、同じエラーが複数人へ広がっていないかを見る"
+              note="率より先に、同じエラーが複数の識別IDへ広がっていないかを見る"
             />
             {data.errorSummary.length > 0 ? (
               <>
                 <AnalyticsTable
-                  columns={["内容", "コード", "人数", "件数", "最新"]}
+                  columns={["内容", "コード", "識別ID", "イベント", "最新"]}
                   rows={data.errorSummary.map((item) => [
                     getEventLabel(item.eventName),
                     item.errorCode ?? "-",
-                    `${item.users}人`,
-                    `${item.events}件`,
+                    `${item.users} ID`,
+                    `${item.events} 回`,
                     formatDate(item.latestAt),
                   ])}
                 />
@@ -511,23 +518,23 @@ export default function AdminAnalyticsClient() {
               <SectionHeading
                 id="operational-notes-title"
                 title="回復済み・想定内"
-                note="利用者の失敗として数えず、運用上の記録として残しているもの"
+                note="利用上の失敗として数えず、運用記録として残しているもの"
               />
               <AnalyticsTable
-                columns={["扱い", "内容", "人数", "件数", "最新"]}
+                columns={["扱い", "内容", "識別ID", "イベント", "最新"]}
                 rows={[
                   ...recoveredIssues.map((item) => [
                     "回復済み",
                     getEventLabel(item.eventName),
-                    `${item.users}人`,
-                    `${item.events}件`,
+                    `${item.users} ID`,
+                    `${item.events} 回`,
                     formatDate(item.latestAt),
                   ]),
                   ...expectedIssues.map((item) => [
                     "想定内",
                     getEventLabel(item.eventName),
-                    `${item.users}人`,
-                    `${item.events}件`,
+                    `${item.users} ID`,
+                    `${item.events} 回`,
                     formatDate(item.latestAt),
                   ]),
                 ]}
@@ -607,10 +614,10 @@ function MetricCard({
       <p style={styles.metricLabel}>{metric.label}</p>
       <p style={{ ...styles.metricValue, ...(compact ? styles.metricValueCompact : {}) }}>
         {metric.users.toLocaleString()}
-        <span style={styles.metricUnit}>人</span>
+        <span style={styles.metricUnit}>ID</span>
       </p>
       {metric.events > 0 ? (
-        <p style={styles.metricDetail}>{metric.events.toLocaleString()}件の記録</p>
+        <p style={styles.metricDetail}>{metric.events.toLocaleString()}イベント</p>
       ) : null}
     </article>
   );
@@ -631,7 +638,7 @@ function BreakdownList({
           {rows.map((row) => (
             <div key={row.key} style={styles.breakdownRow}>
               <dt>{ENVIRONMENT_LABELS[row.key] ?? row.key}</dt>
-              <dd style={styles.breakdownValue}>{row.users}人</dd>
+              <dd style={styles.breakdownValue}>{row.users} ID</dd>
             </div>
           ))}
         </dl>
@@ -688,8 +695,8 @@ function EventTable({
     <AnalyticsTable
       columns={
         showError
-          ? ["時刻", "内容", "コード", "メッセージ", "入口", "画面", "人"]
-          : ["時刻", "イベント", "入口", "画面", "人", "submission"]
+          ? ["時刻", "内容", "コード", "メッセージ", "入口", "画面", "識別子"]
+          : ["時刻", "イベント", "入口", "画面", "識別子", "submission"]
       }
       rows={events.map((event) => {
         const actor = event.userId ?? event.anonymousId ?? "-";
@@ -742,7 +749,7 @@ function formatRate(rate: number | null, users: number, denominator: number) {
   if (rate === null) {
     return "-";
   }
-  return `${rate}%（${users}/${denominator}人）`;
+  return `${rate}%（${users}/${denominator} ID）`;
 }
 
 function formatPercent(rate: number | null) {

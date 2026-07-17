@@ -2333,6 +2333,7 @@ export function HomeInput({
     if (completesOnboardingSecondPhoto && !deliveryTarget.targetSaveFailed) {
       trackProductEvent("onboarding_second_photo_submitted", {
         surface: "home",
+        submission_id: ownPhoto.id,
         delivery_date_key: deliveryTarget.dateKey,
       });
       clearOnboardingSecondPhotoIntent();
@@ -2358,6 +2359,7 @@ export function HomeInput({
     trackProductEvent(
       "home_exchange_share_photo_confirmed",
       {
+        submission_id: ownPhoto.id,
         theme: photo.theme,
         trigger_label: photo.triggerLabel,
         file_size_bucket: photo.fileSizeBucket,
@@ -2414,6 +2416,7 @@ export function HomeInput({
     trackProductEvent(
       "home_exchange_share_photo_declined",
       {
+        submission_id: ownPhoto.id,
         theme: photo.theme,
         trigger_label: photo.triggerLabel,
       },

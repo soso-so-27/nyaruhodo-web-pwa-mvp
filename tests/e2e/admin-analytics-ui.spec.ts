@@ -3,6 +3,7 @@ import { expect, test } from "@playwright/test";
 test("shows the launch dashboard in Japanese with actionable sections", async ({
   page,
 }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
   await page.route("**/api/admin/capabilities", async (route) => {
     await route.fulfill({
       contentType: "application/json",
@@ -25,11 +26,11 @@ test("shows the launch dashboard in Japanese with actionable sections", async ({
   await expect(
     page.getByRole("heading", { name: "初動アナリティクス" }),
   ).toBeVisible();
-  await expect(page.getByRole("button", { name: "直近60分" })).toHaveAttribute(
+  await expect(page.getByRole("button", { name: "公開後" })).toHaveAttribute(
     "aria-pressed",
     "true",
   );
-  await expect(page.getByRole("button", { name: "利用者" })).toHaveAttribute(
+  await expect(page.getByRole("button", { name: "公開側" })).toHaveAttribute(
     "aria-pressed",
     "true",
   );
@@ -40,9 +41,22 @@ test("shows the launch dashboard in Japanese with actionable sections", async ({
     page.getByLabel("どこから来たか").getByText("Instagram bio", { exact: true }),
   ).toBeVisible();
   await expect(
+    page
+      .getByLabel("どこから来たか")
+      .getByText("流入元不明（srcなし）", { exact: true }),
+  ).toBeVisible();
+  await expect(page.getByText(/数字は実人数ではなく/)).toBeVisible();
+  await expect(page.getByText("利用した人", { exact: true })).toHaveCount(0);
+  await expect(page.getByRole("heading", { name: "写真をもう一度入れたか" })).toBeVisible();
+  await expect(
     page.getByLabel("要確認").getByText("写真の読み込み・保存失敗").first(),
   ).toBeVisible();
   await expect(page.getByText(/繝|縺|蜿/)).toHaveCount(0);
+  expect(
+    await page.evaluate(
+      () => document.documentElement.scrollWidth <= window.innerWidth,
+    ),
+  ).toBe(true);
   await page.screenshot({
     path: "artifacts/admin-analytics-launch.png",
     fullPage: true,
@@ -57,12 +71,12 @@ const metric = (key: string, label: string, users: number, events = users) => ({
 });
 
 const mockAnalyticsResponse = {
-  period: "60m",
+  period: "launch",
   audience: "product",
-  generatedAt: "2026-07-16T08:30:00.000Z",
+  generatedAt: "2026-07-17T13:30:00.000Z",
   range: {
-    from: "2026-07-16T07:30:00.000Z",
-    to: "2026-07-16T08:30:00.000Z",
+    from: "2026-07-17T08:00:00.000Z",
+    to: "2026-07-17T13:30:00.000Z",
   },
   totalEvents: 48,
   eventLimitReached: false,
@@ -72,7 +86,7 @@ const mockAnalyticsResponse = {
     metric("instant_arrival", "最初のねこだよりが届いた", 8),
     metric("instant_open", "最初のねこだよりを開いた", 7),
     metric("second_photo", "今夜の一枚を保存した", 5),
-    metric("needs_attention", "要確認の人", 1),
+    metric("needs_attention", "要確認の識別ID", 1),
   ],
   funnel: [
     {
@@ -95,6 +109,13 @@ const mockAnalyticsResponse = {
       submittedUsers: 8,
       openedUsers: 7,
       secondPhotoUsers: 5,
+    },
+    {
+      source: "direct",
+      introUsers: 2,
+      submittedUsers: 1,
+      openedUsers: 1,
+      secondPhotoUsers: 0,
     },
   ],
   deliveryHealth: [
@@ -120,9 +141,9 @@ const mockAnalyticsResponse = {
     ],
   },
   retention: {
-    uniqueActiveUsers: 10,
     photoSubmitters: 8,
     repeatSubmitters: 5,
+    returningDaySubmitters: 2,
     d1ReturnSubmitters: 0,
   },
   errorSummary: [

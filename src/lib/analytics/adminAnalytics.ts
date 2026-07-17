@@ -1,5 +1,13 @@
-export type AnalyticsPeriodKey = "60m" | "today" | "yesterday" | "7d" | "28d";
+export type AnalyticsPeriodKey =
+  | "launch"
+  | "60m"
+  | "today"
+  | "yesterday"
+  | "7d"
+  | "28d";
 export type AnalyticsAudience = "product" | "internal";
+
+export const PUBLIC_LAUNCH_AT_ISO = "2026-07-17T08:00:00.000Z";
 
 export type AdminAnalyticsEvent = {
   event_name: string;
@@ -146,7 +154,6 @@ const INSTALL_METRICS: readonly EventDefinition[] = [
 
 const CANONICAL_PHOTO_SUBMIT_EVENTS = new Set([
   "onboarding_photo_submitted",
-  "home_photo_submitted",
   "home_exchange_share_photo_confirmed",
   "home_exchange_share_photo_declined",
 ]);
@@ -156,6 +163,7 @@ const SOURCE_ORDER = [
   "instagram_story",
   "instagram_dm",
   "instagram",
+  "threads",
   "referral",
   "direct",
   "unknown",
@@ -172,7 +180,7 @@ export function buildAdminAnalytics(events: AdminAnalyticsEvent[]) {
       ),
       {
         key: "needs_attention",
-        label: "要確認の人",
+        label: "要確認の識別ID",
         events: impactEvents.length,
         users: countUniqueActors(impactEvents),
       },
@@ -210,18 +218,29 @@ export function readAnalyticsAudience(value: string | null): AnalyticsAudience {
 }
 
 export function readAnalyticsPeriod(value: string | null): AnalyticsPeriodKey {
-  return value === "60m" ||
+  return value === "launch" ||
+    value === "60m" ||
     value === "yesterday" ||
     value === "7d" ||
     value === "28d"
     ? value
-    : "today";
+    : value === "today"
+      ? "today"
+      : "launch";
 }
 
 export function buildAnalyticsPeriodRange(
   period: AnalyticsPeriodKey,
   now = new Date(),
 ) {
+  if (period === "launch") {
+    const launchAt = new Date(PUBLIC_LAUNCH_AT_ISO);
+    return {
+      from: launchAt.getTime() < now.getTime() ? launchAt : now,
+      to: now,
+    };
+  }
+
   if (period === "60m") {
     return { from: new Date(now.getTime() - 60 * 60 * 1000), to: now };
   }
@@ -443,12 +462,12 @@ function buildOrderedFunnel(events: AdminAnalyticsEvent[]) {
 }
 
 function buildSourceBreakdown(events: AdminAnalyticsEvent[]) {
-  const sources = new Set(events.map((event) => event.source ?? "unknown"));
+  const sources = new Set(events.map(readAnalyticsSource));
 
   return [...sources]
     .map((source) => {
       const sourceEvents = events.filter(
-        (event) => (event.source ?? "unknown") === source,
+        (event) => readAnalyticsSource(event) === source,
       );
 
       return {
@@ -477,6 +496,14 @@ function buildSourceBreakdown(events: AdminAnalyticsEvent[]) {
       const bIndex = SOURCE_ORDER.indexOf(b.source);
       return (aIndex === -1 ? 99 : aIndex) - (bIndex === -1 ? 99 : bIndex);
     });
+}
+
+function readAnalyticsSource(event: AdminAnalyticsEvent) {
+  const sourceParam = readMetadataString(event, "source_param")?.toLowerCase();
+  if (sourceParam === "threads") {
+    return "threads";
+  }
+  return event.source ?? "unknown";
 }
 
 function countDefinitionUsers(
@@ -536,8 +563,7 @@ function buildValueBreakdown(
 }
 
 function buildRetention(events: AdminAnalyticsEvent[]) {
-  const activeUsers = new Set<string>();
-  const submitCountByActor = new Map<string, number>();
+  const submissionsByActor = new Map<string, Set<string>>();
   const submitDaysByActor = new Map<string, Set<string>>();
 
   for (const event of events) {
@@ -546,19 +572,24 @@ function buildRetention(events: AdminAnalyticsEvent[]) {
       continue;
     }
 
-    activeUsers.add(actorId);
-
     if (!CANONICAL_PHOTO_SUBMIT_EVENTS.has(event.event_name)) {
       continue;
     }
 
-    submitCountByActor.set(actorId, (submitCountByActor.get(actorId) ?? 0) + 1);
+    const submissionKey = readSubmissionKey(event);
+    const submissions = submissionsByActor.get(actorId) ?? new Set<string>();
+    submissions.add(submissionKey);
+    submissionsByActor.set(actorId, submissions);
+
     const day = toJstDateKey(new Date(event.created_at));
     const days = submitDaysByActor.get(actorId) ?? new Set<string>();
     days.add(day);
     submitDaysByActor.set(actorId, days);
   }
 
+  const returningDaySubmitters = [...submitDaysByActor.values()].filter(
+    (days) => days.size >= 2,
+  ).length;
   let d1ReturnSubmitters = 0;
   for (const days of submitDaysByActor.values()) {
     const sortedDays = [...days].sort();
@@ -572,12 +603,21 @@ function buildRetention(events: AdminAnalyticsEvent[]) {
   }
 
   return {
-    uniqueActiveUsers: activeUsers.size,
-    photoSubmitters: submitCountByActor.size,
-    repeatSubmitters: [...submitCountByActor.values()].filter((count) => count >= 2)
-      .length,
+    photoSubmitters: submissionsByActor.size,
+    repeatSubmitters: [...submissionsByActor.values()].filter(
+      (submissions) => submissions.size >= 2,
+    ).length,
+    returningDaySubmitters,
     d1ReturnSubmitters,
   };
+}
+
+function readSubmissionKey(event: AdminAnalyticsEvent) {
+  const submissionId =
+    event.submission_id ?? readMetadataString(event, "submission_id");
+  return submissionId
+    ? `submission:${submissionId}`
+    : `event:${event.event_name}:${event.created_at}`;
 }
 
 function buildErrorSummary(events: AdminAnalyticsEvent[]) {
