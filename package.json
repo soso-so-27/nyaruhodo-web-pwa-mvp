@@ -12,6 +12,7 @@
     "e2e:prod": "playwright test -c playwright.prod.config.ts",
     "e2e:headed": "playwright test --headed",
     "shots": "node scripts/run-shots.mjs",
+    "analytics:read": "node --no-warnings --experimental-strip-types scripts/read-production-analytics.mjs",
     "check:release": "node scripts/check-release-readiness.mjs",
     "check:release:local": "node scripts/check-release-readiness.mjs --local"
   },
