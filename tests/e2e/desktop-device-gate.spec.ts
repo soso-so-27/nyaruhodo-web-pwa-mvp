@@ -34,3 +34,15 @@ test.describe("mobile user pages", () => {
     await expect(page.locator(".deviceGateMobileApp main").first()).toBeVisible();
   });
 });
+
+test.describe("desktop OAuth callback", () => {
+  test.use({ javaScriptEnabled: false });
+
+  test("does not hide the existing auth callback behind the phone guide", async ({
+    page,
+  }) => {
+    await page.goto("/auth/callback?next=/admin/analytics");
+
+    await expect(page.getByText("スマホで使うアプリ")).toHaveCount(0);
+  });
+});

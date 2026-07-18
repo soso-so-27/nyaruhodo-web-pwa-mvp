@@ -15,7 +15,10 @@ const FINE_POINTER_QUERY = "(hover: hover) and (pointer: fine)";
 export function UserDeviceGate({ children }: UserDeviceGateProps) {
   const pathname = usePathname() ?? "/";
   const isAdminRoute = pathname === "/admin" || pathname.startsWith("/admin/");
+  const isAuthCallbackRoute = pathname === "/auth/callback";
   const isPrototypeRoute = pathname.startsWith("/prototypes/");
+  const isDeviceGateExempt =
+    isAdminRoute || isAuthCallbackRoute || isPrototypeRoute;
   const [isRuntimeDesktop, setIsRuntimeDesktop] = useState(false);
   const [currentUrl, setCurrentUrl] = useState("");
   const [copyState, setCopyState] = useState<"idle" | "copied" | "failed">(
@@ -24,7 +27,7 @@ export function UserDeviceGate({ children }: UserDeviceGateProps) {
   const trackedRoutesRef = useRef<Set<string>>(new Set());
 
   useEffect(() => {
-    if (isAdminRoute || isPrototypeRoute) {
+    if (isDeviceGateExempt) {
       return;
     }
 
@@ -46,10 +49,10 @@ export function UserDeviceGate({ children }: UserDeviceGateProps) {
       desktopMedia.removeEventListener("change", update);
       finePointerMedia.removeEventListener("change", update);
     };
-  }, [isAdminRoute, isPrototypeRoute, pathname]);
+  }, [isDeviceGateExempt, pathname]);
 
   useEffect(() => {
-    if (isAdminRoute || isPrototypeRoute || !isRuntimeDesktop) {
+    if (isDeviceGateExempt || !isRuntimeDesktop) {
       return;
     }
 
@@ -66,9 +69,9 @@ export function UserDeviceGate({ children }: UserDeviceGateProps) {
       is_in_app_browser: isInAppBrowser(),
       is_standalone_pwa: isStandalonePwa(),
     });
-  }, [isAdminRoute, isPrototypeRoute, isRuntimeDesktop, pathname]);
+  }, [isDeviceGateExempt, isRuntimeDesktop, pathname]);
 
-  if (isAdminRoute || isPrototypeRoute) {
+  if (isDeviceGateExempt) {
     return <>{children}</>;
   }
 

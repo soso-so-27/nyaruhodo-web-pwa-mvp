@@ -83,6 +83,67 @@ test("shows the launch dashboard in Japanese with actionable sections", async ({
   });
 });
 
+test("offers a one-time Google login on the desktop admin page", async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 1280, height: 800 });
+  await page.route("**/api/admin/capabilities", async (route) => {
+    await route.fulfill({
+      contentType: "application/json",
+      body: JSON.stringify({
+        isAdmin: false,
+        testToolsEnabled: false,
+        stockAdminEnabled: false,
+      }),
+    });
+  });
+
+  let authorizeUrl = "";
+  await page.route("**/auth/v1/authorize?**", async (route) => {
+    authorizeUrl = route.request().url();
+    await route.fulfill({ contentType: "text/plain", body: "oauth handoff" });
+  });
+
+  await page.goto("/admin/analytics");
+
+  const loginButton = page.getByRole("button", { name: "管理者でログイン" });
+  await expect(loginButton).toBeVisible();
+  await loginButton.click();
+  await expect.poll(() => authorizeUrl).not.toBe("");
+
+  const parsedAuthorizeUrl = new URL(authorizeUrl);
+  expect(parsedAuthorizeUrl.searchParams.get("provider")).toBe("google");
+  expect(parsedAuthorizeUrl.searchParams.get("prompt")).toBe("select_account");
+  const redirectTo = new URL(
+    parsedAuthorizeUrl.searchParams.get("redirect_to") ?? "",
+  );
+  expect(redirectTo.pathname).toBe("/auth/callback");
+  expect(redirectTo.searchParams.get("next")).toBe("/admin/analytics");
+});
+
+test("returns a cancelled desktop admin login to the admin login action", async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 1280, height: 800 });
+  await page.route("**/api/admin/capabilities", async (route) => {
+    await route.fulfill({
+      contentType: "application/json",
+      body: JSON.stringify({
+        isAdmin: false,
+        testToolsEnabled: false,
+        stockAdminEnabled: false,
+      }),
+    });
+  });
+
+  await page.goto("/auth/callback?next=/admin/analytics");
+
+  await expect(page).toHaveURL(/\/admin\/analytics\?error=auth$/);
+  await expect(
+    page.getByRole("button", { name: "管理者でログイン" }),
+  ).toBeVisible();
+});
+
 const metric = (key: string, label: string, users: number, events = users) => ({
   key,
   label,

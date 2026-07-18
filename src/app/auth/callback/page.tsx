@@ -168,6 +168,13 @@ function getSafeNextPath(next: string | null) {
 }
 
 function getAuthErrorPath(next: string) {
+  if (next === "/admin" || next.startsWith("/admin/")) {
+    const url = new URL(next, window.location.origin);
+
+    url.searchParams.set("error", "auth");
+    return `${url.pathname}${url.search}`;
+  }
+
   if (next.startsWith("/account/create")) {
     const url = new URL(next, window.location.origin);
 
