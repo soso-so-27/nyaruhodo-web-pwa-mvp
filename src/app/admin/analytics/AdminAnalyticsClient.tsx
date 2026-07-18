@@ -561,6 +561,19 @@ export default function AdminAnalyticsClient() {
           ) : null}
 
           <details style={styles.details}>
+            <summary style={styles.summary}>Codex分析用データ</summary>
+            <p style={styles.exportNote}>
+              公開側・期間・未解決判定を含む構造化データです。生の識別子と認証情報は含みません。
+            </p>
+            <pre
+              data-codex-analytics-export="true"
+              style={styles.exportPre}
+            >
+              {JSON.stringify(buildCodexAnalyticsExport(data), null, 2)}
+            </pre>
+          </details>
+
+          <details style={styles.details}>
             <summary style={styles.summary}>直近の生イベントを見る</summary>
             <EventTable events={data.recentEvents} />
           </details>
@@ -722,6 +735,31 @@ function getIssueAction(eventName: string) {
 function isWithinMinutes(value: string, nowValue: string, minutes: number) {
   const ageMs = Date.parse(nowValue) - Date.parse(value);
   return Number.isFinite(ageMs) && ageMs >= -5 * 60_000 && ageMs <= minutes * 60_000;
+}
+
+function buildCodexAnalyticsExport(data: AnalyticsResponse) {
+  return {
+    schemaVersion: 1,
+    generatedAt: data.generatedAt,
+    period: data.period,
+    audience: data.audience,
+    range: data.range,
+    totalEvents: data.totalEvents,
+    eventLimitReached: data.eventLimitReached,
+    diagnosticEventsExcluded: data.diagnosticEventsExcluded,
+    audienceCounts: data.audienceCounts,
+    operationalStatus: data.operationalStatus,
+    overview: data.overview,
+    funnel: data.funnel,
+    sourceBreakdown: data.sourceBreakdown,
+    deliveryHealth: data.deliveryHealth,
+    installHealth: data.installHealth,
+    environment: data.environment,
+    retention: data.retention,
+    errorSummary: data.errorSummary,
+    issueSummary: data.issueSummary,
+    recentErrors: data.recentErrors,
+  };
 }
 
 function Notice({
@@ -1360,6 +1398,26 @@ const styles = {
     color: "#786d64",
     fontSize: 11,
     lineHeight: 1.6,
+  },
+  exportNote: {
+    margin: "12px 0 8px",
+    color: "#786d64",
+    fontSize: 12,
+    lineHeight: 1.6,
+  },
+  exportPre: {
+    maxHeight: 360,
+    margin: 0,
+    padding: 12,
+    overflow: "auto",
+    border: "1px solid rgba(74, 63, 53, 0.14)",
+    borderRadius: 6,
+    background: "rgba(255, 253, 249, 0.82)",
+    color: "#4f443c",
+    fontSize: 10,
+    lineHeight: 1.55,
+    whiteSpace: "pre-wrap",
+    overflowWrap: "anywhere",
   },
   environmentGrid: {
     display: "grid",

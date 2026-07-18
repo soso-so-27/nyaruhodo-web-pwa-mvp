@@ -61,6 +61,16 @@ test("shows the launch dashboard in Japanese with actionable sections", async ({
       .first(),
   ).toBeVisible();
   await expect(page.getByText("3イベントを1件に集約")).toBeVisible();
+  const exportPayload = JSON.parse(
+    (await page.locator("[data-codex-analytics-export]").textContent()) ?? "{}",
+  );
+  expect(exportPayload).toMatchObject({
+    schemaVersion: 1,
+    audience: "product",
+    period: "launch",
+    operationalStatus: { level: "action" },
+  });
+  expect(exportPayload.recentEvents).toBeUndefined();
   await expect(page.getByText(/繝|縺|蜿/)).toHaveCount(0);
   expect(
     await page.evaluate(
