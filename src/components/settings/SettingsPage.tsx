@@ -1069,6 +1069,11 @@ export function SettingsPage() {
         <section style={{ ...styles.section, order: 7 }}>
           <p style={styles.sectionLabel}>ヘルプと規約</p>
           <AppCard variant="outlined" padding="sm" style={styles.card}>
+            <a href="/about" style={styles.linkRow}>
+              <span style={styles.rowLabel}>ねてるねことは</span>
+              <span style={styles.rowChevron}>›</span>
+            </a>
+            <div style={styles.divider} />
             <a href="/how-to-use" style={styles.linkRow}>
               <span style={styles.rowLabel}>使い方</span>
               <span style={styles.rowChevron}>›</span>

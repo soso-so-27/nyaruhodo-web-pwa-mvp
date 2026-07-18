@@ -76,6 +76,7 @@ const desktopSpecs = [
   "**/image-file-validation.spec.ts",
   "**/photo-sources.spec.ts",
   "**/print-photo-quality.spec.ts",
+  "**/service-site.spec.ts",
   "**/sleeping-delivery-request-guards.spec.ts",
   "**/sleeping-delivery-pool-guards.spec.ts",
   "**/storage-backup.spec.ts",

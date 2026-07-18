@@ -11,14 +11,26 @@ type UserDeviceGateProps = {
 
 const DESKTOP_QUERY = "(min-width: 768px)";
 const FINE_POINTER_QUERY = "(hover: hover) and (pointer: fine)";
+const PUBLIC_READING_ROUTES = new Set([
+  "/about",
+  "/cancellation",
+  "/commercial-transactions",
+  "/contact",
+  "/privacy",
+  "/terms",
+]);
 
 export function UserDeviceGate({ children }: UserDeviceGateProps) {
   const pathname = usePathname() ?? "/";
   const isAdminRoute = pathname === "/admin" || pathname.startsWith("/admin/");
   const isAuthCallbackRoute = pathname === "/auth/callback";
   const isPrototypeRoute = pathname.startsWith("/prototypes/");
+  const isPublicReadingRoute = PUBLIC_READING_ROUTES.has(pathname);
   const isDeviceGateExempt =
-    isAdminRoute || isAuthCallbackRoute || isPrototypeRoute;
+    isAdminRoute ||
+    isAuthCallbackRoute ||
+    isPrototypeRoute ||
+    isPublicReadingRoute;
   const [isRuntimeDesktop, setIsRuntimeDesktop] = useState(false);
   const [currentUrl, setCurrentUrl] = useState("");
   const [copyState, setCopyState] = useState<"idle" | "copied" | "failed">(
