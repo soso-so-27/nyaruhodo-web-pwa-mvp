@@ -101,13 +101,14 @@ export async function GET(request: Request) {
     (event) => !internalEventSet.has(event),
   );
   const events = audience === "internal" ? internalEvents : productEvents;
-  const summary = buildAdminAnalytics(events);
+  const generatedAt = new Date();
+  const summary = buildAdminAnalytics(events, generatedAt);
   const issues = classifyAnalyticsIssues(events);
 
   return NextResponse.json({
     period,
     audience,
-    generatedAt: new Date().toISOString(),
+    generatedAt: generatedAt.toISOString(),
     range: {
       from: range.from.toISOString(),
       to: range.to.toISOString(),
@@ -121,9 +122,16 @@ export async function GET(request: Request) {
       internalActors: internalAnonymousIds.size,
     },
     ...summary,
-    recentErrors: issues.actionable
+    recentErrors: issues.incidents.actionable
       .slice(0, 30)
-      .map(toSafeEvent),
+      .map((incident) => ({
+        ...toSafeEvent(incident.representativeEvent),
+        createdAt: incident.latestAt,
+        eventName: incident.eventName,
+        errorCode: incident.errorCode,
+        incidentEvents: incident.events.length,
+        incidentFirstAt: incident.firstAt,
+      })),
     recentEvents: events.slice(0, 50).map(toSafeEvent),
   });
 }

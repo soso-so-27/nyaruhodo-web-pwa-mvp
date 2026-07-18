@@ -136,6 +136,99 @@ test.describe("admin analytics logic", () => {
     ]);
   });
 
+  test("collapses duplicate telemetry into logical incidents", () => {
+    const events = [
+      event("onboarding-user", "onboarding_delivery_error", 0, {
+        errorCode: "onboarding_delivery_failed_after_photo_save",
+      }),
+      event("onboarding-user", "photo_upload_error", 0.01, {
+        errorCode: "onboarding_delivery_failed_after_photo_save",
+      }),
+      event("evening-user", "evening_delivery_check_failed", 1),
+      event("evening-user", "evening_delivery_check_timeout", 1.001),
+      event("evening-user", "evening_delivery_check_failed", 1.002),
+    ];
+
+    const result = buildAdminAnalytics(
+      events,
+      new Date(BASE_TIME + 10 * 60_000),
+    );
+
+    expect(result.overview.find((item) => item.key === "needs_attention")).toMatchObject({
+      users: 2,
+      events: 2,
+    });
+    expect(result.errorSummary).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          eventName: "onboarding_delivery_failure",
+          incidents: 1,
+          events: 2,
+          users: 1,
+        }),
+        expect.objectContaining({
+          eventName: "evening_delivery_check_failure",
+          incidents: 1,
+          events: 3,
+          users: 1,
+        }),
+      ]),
+    );
+  });
+
+  test("moves a user-visible recovery out of unresolved incidents", () => {
+    const events = [
+      event("recovered-user", "onboarding_delivery_error", 0, {
+        errorCode: "onboarding_delivery_failed_after_photo_save",
+      }),
+      event("recovered-user", "photo_upload_error", 0.01, {
+        errorCode: "onboarding_delivery_failed_after_photo_save",
+      }),
+      event("recovered-user", "onboarding_sleeping_photo_delivered", 0.05),
+      event("recovered-user", "onboarding_delivery_arrived", 0.1),
+      event("blocked-user", "onboarding_sleeping_photo_delivered", 1),
+      event("blocked-user", "onboarding_delivery_blocked", 1.1, {
+        metadata: { reason: "no_delivery_photo" },
+      }),
+    ];
+
+    const issues = classifyAnalyticsIssues(events);
+    const result = buildAdminAnalytics(
+      events,
+      new Date(BASE_TIME + 10 * 60_000),
+    );
+
+    expect(issues.incidents.recovered).toHaveLength(1);
+    expect(issues.incidents.recovered[0]).toMatchObject({
+      eventName: "onboarding_delivery_failure",
+    });
+    expect(issues.incidents.actionable).toHaveLength(1);
+    expect(issues.incidents.actionable[0]).toMatchObject({
+      eventName: "onboarding_delivery_failure",
+    });
+    expect(result.overview.find((item) => item.key === "needs_attention")).toMatchObject({
+      users: 1,
+      events: 1,
+    });
+  });
+
+  test("uses action only for fresh or spreading unresolved incidents", () => {
+    const events = [
+      event("actor-a", "onboarding_delivery_blocked", 0, {
+        metadata: { reason: "no_delivery_photo" },
+      }),
+    ];
+
+    expect(
+      buildAdminAnalytics(events, new Date(BASE_TIME + 20 * 60_000))
+        .operationalStatus,
+    ).toMatchObject({ level: "action", freshIncidents: 1 });
+    expect(
+      buildAdminAnalytics(events, new Date(BASE_TIME + 40 * 60_000))
+        .operationalStatus,
+    ).toMatchObject({ level: "watch", freshIncidents: 0 });
+  });
+
   test("supports a rolling 60 minute launch window", () => {
     const now = new Date("2026-07-16T08:30:00.000Z");
     const range = buildAnalyticsPeriodRange("60m", now);

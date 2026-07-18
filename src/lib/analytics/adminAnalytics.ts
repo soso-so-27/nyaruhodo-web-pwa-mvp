@@ -26,6 +26,24 @@ export type AdminAnalyticsEvent = {
   created_at: string;
 };
 
+export type AnalyticsOperationalLevel = "ok" | "watch" | "action";
+
+type AnalyticsIssueIncident = {
+  key: string;
+  actorId: string | null;
+  eventName: string;
+  errorCode: string | null;
+  events: AdminAnalyticsEvent[];
+  firstAt: string;
+  latestAt: string;
+  representativeEvent: AdminAnalyticsEvent;
+};
+
+const ISSUE_DEDUP_WINDOW_MS = 15_000;
+const ISSUE_RECOVERY_WINDOW_MS = 30 * 60_000;
+const ACTION_WINDOW_MS = 30 * 60_000;
+const SPREAD_WINDOW_MS = 60 * 60_000;
+
 type EventDefinition = {
   key: string;
   label: string;
@@ -169,9 +187,12 @@ const SOURCE_ORDER = [
   "unknown",
 ];
 
-export function buildAdminAnalytics(events: AdminAnalyticsEvent[]) {
+export function buildAdminAnalytics(
+  events: AdminAnalyticsEvent[],
+  now = new Date(),
+) {
   const issues = classifyAnalyticsIssues(events);
-  const impactEvents = issues.actionable;
+  const unresolvedIncidents = issues.incidents.actionable;
 
   return {
     overview: [
@@ -180,9 +201,9 @@ export function buildAdminAnalytics(events: AdminAnalyticsEvent[]) {
       ),
       {
         key: "needs_attention",
-        label: "要確認の識別ID",
-        events: impactEvents.length,
-        users: countUniqueActors(impactEvents),
+        label: "未解決の識別ID",
+        events: unresolvedIncidents.length,
+        users: countIncidentActors(unresolvedIncidents),
       },
     ],
     funnel: buildOrderedFunnel(events),
@@ -205,9 +226,10 @@ export function buildAdminAnalytics(events: AdminAnalyticsEvent[]) {
     }),
     environment: buildEnvironmentBreakdown(events),
     retention: buildRetention(events),
-    errorSummary: buildErrorSummary(impactEvents),
+    operationalStatus: buildOperationalStatus(unresolvedIncidents, now),
+    errorSummary: buildIncidentSummary(unresolvedIncidents),
     issueSummary: {
-      recovered: buildErrorSummary(issues.recovered),
+      recovered: buildIncidentSummary(issues.incidents.recovered),
       expected: buildErrorSummary(issues.expected),
     },
   };
@@ -275,9 +297,8 @@ export function isImpactEvent(event: AdminAnalyticsEvent) {
 }
 
 export function classifyAnalyticsIssues(events: AdminAnalyticsEvent[]) {
-  const actionable: AdminAnalyticsEvent[] = [];
-  const recovered: AdminAnalyticsEvent[] = [];
   const expected: AdminAnalyticsEvent[] = [];
+  const incidentCandidates: AdminAnalyticsEvent[] = [];
 
   for (const event of events) {
     if (!isImpactEvent(event)) {
@@ -289,15 +310,37 @@ export function classifyAnalyticsIssues(events: AdminAnalyticsEvent[]) {
       continue;
     }
 
-    if (isRecoveredOperationalEvent(event, events)) {
-      recovered.push(event);
-      continue;
-    }
-
-    actionable.push(event);
+    incidentCandidates.push(event);
   }
 
-  return { actionable, recovered, expected };
+  const incidents = buildIssueIncidents(incidentCandidates);
+  const recoveredIncidents: AnalyticsIssueIncident[] = [];
+  const actionableIncidents: AnalyticsIssueIncident[] = [];
+
+  for (const incident of incidents) {
+    if (isRecoveredOperationalIncident(incident, events)) {
+      recoveredIncidents.push(incident);
+    } else {
+      actionableIncidents.push(incident);
+    }
+  }
+
+  const sortLatestFirst = (
+    a: AnalyticsIssueIncident,
+    b: AnalyticsIssueIncident,
+  ) => Date.parse(b.latestAt) - Date.parse(a.latestAt);
+  recoveredIncidents.sort(sortLatestFirst);
+  actionableIncidents.sort(sortLatestFirst);
+
+  return {
+    actionable: actionableIncidents.flatMap((incident) => incident.events),
+    recovered: recoveredIncidents.flatMap((incident) => incident.events),
+    expected,
+    incidents: {
+      actionable: actionableIncidents,
+      recovered: recoveredIncidents,
+    },
+  };
 }
 
 export function isInternalAnalyticsEvent(
@@ -344,33 +387,166 @@ function isExpectedOperationalEvent(event: AdminAnalyticsEvent) {
   );
 }
 
-function isRecoveredOperationalEvent(
-  event: AdminAnalyticsEvent,
+function buildIssueIncidents(events: AdminAnalyticsEvent[]) {
+  const incidents: AnalyticsIssueIncident[] = [];
+  const latestByGroup = new Map<string, AnalyticsIssueIncident>();
+  const sortedEvents = [...events].sort(
+    (a, b) => Date.parse(a.created_at) - Date.parse(b.created_at),
+  );
+
+  for (const event of sortedEvents) {
+    const issue = readLogicalIssue(event);
+    const actorId = getActorId(event);
+    const actorKey =
+      actorId ??
+      event.session_id ??
+      event.submission_id ??
+      `unattributed:${event.route ?? "unknown"}`;
+    const groupKey = `${actorKey}:${issue.key}`;
+    const latest = latestByGroup.get(groupKey);
+    const eventAt = Date.parse(event.created_at);
+    const latestAt = latest ? Date.parse(latest.latestAt) : Number.NaN;
+
+    if (
+      latest &&
+      Number.isFinite(eventAt) &&
+      Number.isFinite(latestAt) &&
+      eventAt - latestAt >= 0 &&
+      eventAt - latestAt <= ISSUE_DEDUP_WINDOW_MS
+    ) {
+      latest.events.push(event);
+      latest.latestAt = event.created_at;
+      if (
+        event.error_message ||
+        !latest.representativeEvent.error_message
+      ) {
+        latest.representativeEvent = event;
+      }
+      continue;
+    }
+
+    const incident: AnalyticsIssueIncident = {
+      key: issue.key,
+      actorId,
+      eventName: issue.eventName,
+      errorCode: issue.errorCode,
+      events: [event],
+      firstAt: event.created_at,
+      latestAt: event.created_at,
+      representativeEvent: event,
+    };
+    incidents.push(incident);
+    latestByGroup.set(groupKey, incident);
+  }
+
+  return incidents;
+}
+
+function readLogicalIssue(event: AdminAnalyticsEvent) {
+  if (
+    event.event_name === "onboarding_delivery_blocked" ||
+    (event.error_code === "onboarding_delivery_failed_after_photo_save" &&
+      (event.event_name === "onboarding_delivery_error" ||
+        event.event_name === "photo_upload_error"))
+  ) {
+    return {
+      key: "onboarding_delivery_failure",
+      eventName: "onboarding_delivery_failure",
+      errorCode:
+        event.error_code ??
+        readMetadataString(event, "reason") ??
+        "delivery_blocked",
+    };
+  }
+
+  if (
+    event.event_name === "evening_delivery_check_failed" ||
+    event.event_name === "evening_delivery_check_timeout"
+  ) {
+    return {
+      key: "evening_delivery_check_failure",
+      eventName: "evening_delivery_check_failure",
+      errorCode: event.error_code,
+    };
+  }
+
+  return {
+    key: `${event.event_name}:${event.error_code ?? "none"}`,
+    eventName: event.event_name,
+    errorCode: event.error_code,
+  };
+}
+
+function isRecoveredOperationalIncident(
+  incident: AnalyticsIssueIncident,
   events: AdminAnalyticsEvent[],
 ) {
-  if (event.event_name !== "evening_delivery_check_timeout") {
+  const recoveryEvents = getRecoveryEventNames(incident.eventName);
+  if (recoveryEvents.length === 0) {
     return false;
   }
 
-  const actorId = getActorId(event);
-  const occurredAt = Date.parse(event.created_at);
+  const actorId = incident.actorId;
+  const occurredAt = Date.parse(incident.latestAt);
   if (!actorId || !Number.isFinite(occurredAt)) {
     return false;
   }
 
   return events.some((candidate) => {
     if (
-      candidate.event_name !== "evening_delivery_check_succeeded" ||
-      getActorId(candidate) !== actorId ||
-      (event.session_id && candidate.session_id !== event.session_id)
+      !recoveryEvents.includes(candidate.event_name) ||
+      getActorId(candidate) !== actorId
     ) {
       return false;
     }
 
     const recoveredAt = Date.parse(candidate.created_at);
     const recoveryMs = recoveredAt - occurredAt;
-    return recoveryMs >= 0 && recoveryMs <= 60_000;
+    return recoveryMs >= 0 && recoveryMs <= ISSUE_RECOVERY_WINDOW_MS;
   });
+}
+
+function getRecoveryEventNames(eventName: string) {
+  if (
+    eventName === "onboarding_delivery_failure" ||
+    eventName === "onboarding_delivery_blocked"
+  ) {
+    return [
+      "onboarding_delivery_arrived",
+      "onboarding_delivery_opened",
+      "onboarding_completed",
+    ];
+  }
+
+  if (
+    eventName === "evening_delivery_check_failure" ||
+    eventName === "evening_delivery_check_failed" ||
+    eventName === "evening_delivery_check_timeout"
+  ) {
+    return [
+      "evening_delivery_check_succeeded",
+      "envelope_shown",
+      "delivery_opened",
+    ];
+  }
+
+  if (eventName === "delivery_reveal_photo_error") {
+    return ["delivery_reveal_photo_rendered"];
+  }
+
+  if (eventName === "onboarding_handoff_restore_failed") {
+    return ["onboarding_handoff_restored"];
+  }
+
+  if (eventName === "photo_upload_error") {
+    return [
+      "onboarding_photo_submitted",
+      "home_exchange_share_photo_confirmed",
+      "home_exchange_share_photo_declined",
+    ];
+  }
+
+  return [];
 }
 
 function buildMetric(
@@ -620,6 +796,116 @@ function readSubmissionKey(event: AdminAnalyticsEvent) {
     : `event:${event.event_name}:${event.created_at}`;
 }
 
+function buildOperationalStatus(
+  incidents: AnalyticsIssueIncident[],
+  now: Date,
+) {
+  const nowMs = now.getTime();
+  const freshIncidents = incidents.filter((incident) =>
+    isWithinRecentWindow(incident.latestAt, nowMs, ACTION_WINDOW_MS),
+  );
+  const spreadGroups = new Map<string, Set<string>>();
+
+  for (const incident of incidents) {
+    if (
+      !incident.actorId ||
+      !isWithinRecentWindow(incident.latestAt, nowMs, SPREAD_WINDOW_MS)
+    ) {
+      continue;
+    }
+
+    const actors = spreadGroups.get(incident.key) ?? new Set<string>();
+    actors.add(incident.actorId);
+    spreadGroups.set(incident.key, actors);
+  }
+
+  const spreadIssueCount = [...spreadGroups.values()].filter(
+    (actors) => actors.size >= 2,
+  ).length;
+  const level: AnalyticsOperationalLevel =
+    freshIncidents.length > 0 || spreadIssueCount > 0
+      ? "action"
+      : incidents.length > 0
+        ? "watch"
+        : "ok";
+  const latestAt = incidents.reduce<string | null>((latest, incident) => {
+    if (!latest || Date.parse(incident.latestAt) > Date.parse(latest)) {
+      return incident.latestAt;
+    }
+    return latest;
+  }, null);
+
+  return {
+    level,
+    unresolvedIncidents: incidents.length,
+    affectedActors: countIncidentActors(incidents),
+    freshIncidents: freshIncidents.length,
+    spreadIssueCount,
+    latestAt,
+  };
+}
+
+function isWithinRecentWindow(value: string, nowMs: number, windowMs: number) {
+  const eventMs = Date.parse(value);
+  if (!Number.isFinite(eventMs)) {
+    return false;
+  }
+
+  const ageMs = nowMs - eventMs;
+  return ageMs >= -5 * 60_000 && ageMs <= windowMs;
+}
+
+function buildIncidentSummary(incidents: AnalyticsIssueIncident[]) {
+  const groups = new Map<
+    string,
+    {
+      eventName: string;
+      errorCode: string | null;
+      incidents: number;
+      events: number;
+      actors: Set<string>;
+      latestAt: string;
+    }
+  >();
+
+  for (const incident of incidents) {
+    const key = `${incident.eventName}:${incident.errorCode ?? "none"}`;
+    const current = groups.get(key) ?? {
+      eventName: incident.eventName,
+      errorCode: incident.errorCode,
+      incidents: 0,
+      events: 0,
+      actors: new Set<string>(),
+      latestAt: incident.latestAt,
+    };
+    current.incidents += 1;
+    current.events += incident.events.length;
+    if (incident.actorId) {
+      current.actors.add(incident.actorId);
+    }
+    if (Date.parse(incident.latestAt) > Date.parse(current.latestAt)) {
+      current.latestAt = incident.latestAt;
+    }
+    groups.set(key, current);
+  }
+
+  return [...groups.values()]
+    .map((group) => ({
+      eventName: group.eventName,
+      errorCode: group.errorCode,
+      incidents: group.incidents,
+      events: group.events,
+      users: group.actors.size,
+      latestAt: group.latestAt,
+    }))
+    .sort(
+      (a, b) =>
+        b.users - a.users ||
+        b.incidents - a.incidents ||
+        Date.parse(b.latestAt) - Date.parse(a.latestAt),
+    );
+}
+
 function buildErrorSummary(events: AdminAnalyticsEvent[]) {
   const groups = new Map<
     string,
@@ -675,6 +961,12 @@ function readMetadataString(event: AdminAnalyticsEvent, key: string) {
 
 function countUniqueActors(events: AdminAnalyticsEvent[]) {
   return new Set(events.map(getActorId).filter(Boolean)).size;
+}
+
+function countIncidentActors(incidents: AnalyticsIssueIncident[]) {
+  return new Set(
+    incidents.map((incident) => incident.actorId).filter(Boolean),
+  ).size;
 }
 
 function getActorId(event: AdminAnalyticsEvent) {

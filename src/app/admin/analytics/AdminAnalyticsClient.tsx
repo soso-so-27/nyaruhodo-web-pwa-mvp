@@ -51,9 +51,18 @@ type AnalyticsResponse = {
     returningDaySubmitters: number;
     d1ReturnSubmitters: number;
   };
+  operationalStatus: {
+    level: "ok" | "watch" | "action";
+    unresolvedIncidents: number;
+    affectedActors: number;
+    freshIncidents: number;
+    spreadIssueCount: number;
+    latestAt: string | null;
+  };
   errorSummary: Array<{
     eventName: string;
     errorCode: string | null;
+    incidents: number;
     events: number;
     users: number;
     latestAt: string;
@@ -75,6 +84,7 @@ type AnalyticsResponse = {
 type IssueSummaryRow = {
   eventName: string;
   errorCode: string | null;
+  incidents?: number;
   events: number;
   users: number;
   latestAt: string;
@@ -91,6 +101,8 @@ type SafeEvent = {
   anonymousId: string | null;
   userId: string | null;
   submissionId: string | null;
+  incidentEvents?: number;
+  incidentFirstAt?: string;
 };
 
 const PERIODS: Array<{ key: AnalyticsPeriodKey; label: string }> = [
@@ -137,11 +149,13 @@ const ENVIRONMENT_LABELS: Record<string, string> = {
 const EVENT_LABELS: Record<string, string> = {
   app_error: "画面エラー",
   photo_upload_error: "写真の読み込み・保存失敗",
+  onboarding_delivery_failure: "最初のねこだより準備失敗",
   onboarding_delivery_error: "最初のねこだより作成失敗",
   onboarding_delivery_blocked: "最初のねこだよりを用意できなかった",
   onboarding_handoff_restore_failed: "外部ブラウザへの引き継ぎ失敗",
   delivery_reveal_photo_error: "届いた写真の表示失敗",
   delivery_reveal_photo_rendered: "届いた写真を実表示",
+  evening_delivery_check_failure: "20時便の確認失敗",
   evening_delivery_check_failed: "20時便の確認失敗",
   evening_delivery_check_timeout: "20時便の確認が長時間化",
   exchange_rejected_expired: "20時便の受取期限超過",
@@ -225,9 +239,7 @@ export default function AdminAnalyticsClient() {
     };
   }, [audience, period, refreshToken]);
 
-  const attentionMetric = data?.overview.find(
-    (metric) => metric.key === "needs_attention",
-  );
+  const operationalStatus = data?.operationalStatus;
   const recoveredIssues = data?.issueSummary?.recovered ?? [];
   const expectedIssues = data?.issueSummary?.expected ?? [];
 
@@ -323,16 +335,7 @@ export default function AdminAnalyticsClient() {
               5,000件の取得上限に達しています。この期間の数字は一部です。
             </Notice>
           ) : null}
-          {attentionMetric && attentionMetric.users > 0 ? (
-            <Notice tone="danger">
-              要確認の記録が {attentionMetric.users} ID・{attentionMetric.events}
-              イベントあります。下の「要確認」で同じ失敗が続いていないか確認してください。
-            </Notice>
-          ) : (
-            <Notice tone="success">
-              この期間に要確認の記録はありません。
-            </Notice>
-          )}
+          <OperationalStatusPanel status={data.operationalStatus} />
 
           <section style={styles.section} aria-labelledby="overview-title">
             <SectionHeading
@@ -345,7 +348,11 @@ export default function AdminAnalyticsClient() {
                 <MetricCard
                   key={metric.key}
                   metric={metric}
-                  tone={metric.key === "needs_attention" ? "danger" : "default"}
+                  tone={
+                    metric.key === "needs_attention"
+                      ? getOperationalTone(operationalStatus?.level)
+                      : "default"
+                  }
                 />
               ))}
             </div>
@@ -491,25 +498,36 @@ export default function AdminAnalyticsClient() {
           <section style={styles.section} aria-labelledby="errors-title">
             <SectionHeading
               id="errors-title"
-              title="要確認"
-              note="率より先に、同じエラーが複数の識別IDへ広がっていないかを見る"
+              title="未解決の出来事"
+              note="同じID・同じ原因の連続記録は、一つの出来事にまとめています"
             />
             {data.errorSummary.length > 0 ? (
               <>
                 <AnalyticsTable
-                  columns={["内容", "コード", "識別ID", "イベント", "最新"]}
+                  columns={[
+                    "内容",
+                    "コード",
+                    "識別ID",
+                    "出来事",
+                    "生イベント",
+                    "最新",
+                  ]}
                   rows={data.errorSummary.map((item) => [
                     getEventLabel(item.eventName),
                     item.errorCode ?? "-",
                     `${item.users} ID`,
+                    `${item.incidents} 件`,
                     `${item.events} 回`,
                     formatDate(item.latestAt),
                   ])}
                 />
-                <EventTable events={data.recentErrors} showError />
+                <IssueList
+                  events={data.recentErrors}
+                  generatedAt={data.generatedAt}
+                />
               </>
             ) : (
-              <p style={styles.emptyText}>要確認の記録はありません。</p>
+              <p style={styles.emptyText}>未解決の出来事はありません。</p>
             )}
           </section>
 
@@ -550,6 +568,160 @@ export default function AdminAnalyticsClient() {
       ) : null}
     </main>
   );
+}
+
+function OperationalStatusPanel({
+  status,
+}: {
+  status: AnalyticsResponse["operationalStatus"];
+}) {
+  const content =
+    status.level === "action"
+      ? {
+          eyebrow: "赤・いま確認",
+          title: "新しい未解決があります",
+          body: `直近30分の未解決が ${status.freshIncidents} 件あります。下の一覧で対象IDの後続に、到着や成功の記録があるか確認してください。`,
+        }
+      : status.level === "watch"
+        ? {
+            eyebrow: "黄・経過観察",
+            title: "過去の未解決だけが残っています",
+            body: `未解決は ${status.unresolvedIncidents} 件ありますが、直近30分に新しい記録はありません。再発が増えないか見守る状態です。`,
+          }
+        : {
+            eyebrow: "緑・通常運転",
+            title: "いま新しい異常は見えていません",
+            body: "未解決の出来事はありません。回復した記録と想定内の記録は、赤から除いて別欄に残しています。",
+          };
+  const toneStyle =
+    status.level === "action"
+      ? styles.operationalAction
+      : status.level === "watch"
+        ? styles.operationalWatch
+        : styles.operationalOk;
+
+  return (
+    <section
+      aria-labelledby="operational-status-title"
+      style={{ ...styles.operationalPanel, ...toneStyle }}
+    >
+      <div style={styles.operationalCopy}>
+        <p style={styles.operationalEyebrow}>{content.eyebrow}</p>
+        <h2 id="operational-status-title" style={styles.operationalTitle}>
+          {content.title}
+        </h2>
+        <p style={styles.operationalBody}>{content.body}</p>
+        {status.spreadIssueCount > 0 ? (
+          <p style={styles.operationalSpread}>
+            60分以内に同じ失敗が2 ID以上へ広がっています。
+          </p>
+        ) : null}
+      </div>
+      <dl style={styles.operationalCounts}>
+        <div style={styles.operationalCountRow}>
+          <dt>未解決</dt>
+          <dd>{status.unresolvedIncidents}件</dd>
+        </div>
+        <div style={styles.operationalCountRow}>
+          <dt>影響ID</dt>
+          <dd>{status.affectedActors} ID</dd>
+        </div>
+        <div style={styles.operationalCountRow}>
+          <dt>最新</dt>
+          <dd>{status.latestAt ? formatDate(status.latestAt) : "なし"}</dd>
+        </div>
+      </dl>
+      <div style={styles.decisionGuide} aria-label="色の判断基準">
+        <span><b style={styles.guideRed}>赤</b> 直近30分の未解決、または60分で同じ失敗が2 ID以上</span>
+        <span><b style={styles.guideYellow}>黄</b> 30分より前の未解決だけ</span>
+        <span><b style={styles.guideGreen}>緑</b> 未解決なし</span>
+      </div>
+    </section>
+  );
+}
+
+function IssueList({
+  events,
+  generatedAt,
+}: {
+  events: SafeEvent[];
+  generatedAt: string;
+}) {
+  return (
+    <div style={styles.issueList} aria-label="未解決の詳細">
+      {events.map((event, index) => {
+        const actor = event.userId ?? event.anonymousId ?? "識別子なし";
+        const isFresh = isWithinMinutes(event.createdAt, generatedAt, 30);
+        const incidentEvents = event.incidentEvents ?? 1;
+
+        return (
+          <article
+            key={`${event.createdAt}-${event.eventName}-${actor}-${index}`}
+            style={styles.issueCard}
+          >
+            <div style={styles.issueCardHeader}>
+              <div>
+                <p style={styles.issueTime}>{formatDate(event.createdAt)}</p>
+                <h3 style={styles.issueTitle}>{getEventLabel(event.eventName)}</h3>
+              </div>
+              <span
+                style={{
+                  ...styles.issueBadge,
+                  ...(isFresh ? styles.issueBadgeAction : styles.issueBadgeWatch),
+                }}
+              >
+                {isFresh ? "いま確認" : "経過観察"}
+              </span>
+            </div>
+            <p style={styles.issueMeta}>
+              {actor}・{SOURCE_LABELS[event.source] ?? event.source}・
+              {incidentEvents > 1
+                ? `${incidentEvents}イベントを1件に集約`
+                : "1イベント"}
+            </p>
+            <p style={styles.issueAction}>{getIssueAction(event.eventName)}</p>
+            <details style={styles.issueDetails}>
+              <summary>技術情報</summary>
+              <p>コード: {event.errorCode ?? "なし"}</p>
+              <p>画面: {event.surface ?? event.route ?? "不明"}</p>
+              {event.errorMessage ? <p>記録: {event.errorMessage}</p> : null}
+            </details>
+          </article>
+        );
+      })}
+    </div>
+  );
+}
+
+function getIssueAction(eventName: string) {
+  if (
+    eventName === "onboarding_delivery_failure" ||
+    eventName === "onboarding_delivery_blocked"
+  ) {
+    return "見ること: 同じIDの後続に「最初のねこだよりが届いた」がなければ、オンボの到着経路を確認。";
+  }
+  if (
+    eventName === "evening_delivery_check_failure" ||
+    eventName === "evening_delivery_check_failed" ||
+    eventName === "evening_delivery_check_timeout"
+  ) {
+    return "見ること: 同じIDの後続に「20時便が成立」がなければ、夜便予約とexchangeを確認。";
+  }
+  if (eventName === "delivery_reveal_photo_error") {
+    return "見ること: 同じIDで写真の実表示が続いていなければ、署名URLと画像読み込みを確認。";
+  }
+  if (eventName === "photo_upload_error") {
+    return "見ること: 同じ入口・端末で写真保存まで進めたかを確認。複数IDへ広がれば公開を止めて調査。";
+  }
+  if (eventName === "onboarding_handoff_restore_failed") {
+    return "見ること: 外部ブラウザへの引き継ぎ完了が後続にあるか確認。";
+  }
+  return "見ること: 同じIDの後続に成功記録があるか確認し、複数IDへ広がっていないかを見る。";
+}
+
+function isWithinMinutes(value: string, nowValue: string, minutes: number) {
+  const ageMs = Date.parse(nowValue) - Date.parse(value);
+  return Number.isFinite(ageMs) && ageMs >= -5 * 60_000 && ageMs <= minutes * 60_000;
 }
 
 function Notice({
@@ -617,7 +789,10 @@ function MetricCard({
         <span style={styles.metricUnit}>ID</span>
       </p>
       {metric.events > 0 ? (
-        <p style={styles.metricDetail}>{metric.events.toLocaleString()}イベント</p>
+        <p style={styles.metricDetail}>
+          {metric.events.toLocaleString()}
+          {metric.key === "needs_attention" ? "件" : "イベント"}
+        </p>
       ) : null}
     </article>
   );
@@ -736,6 +911,21 @@ function getDeliveryMetricTone(metricKey: string) {
     return "warning" as const;
   }
   if (metricKey === "evening_check_succeeded") {
+    return "success" as const;
+  }
+  return "default" as const;
+}
+
+function getOperationalTone(
+  level: AnalyticsResponse["operationalStatus"]["level"] | undefined,
+) {
+  if (level === "action") {
+    return "danger" as const;
+  }
+  if (level === "watch") {
+    return "warning" as const;
+  }
+  if (level === "ok") {
     return "success" as const;
   }
   return "default" as const;
@@ -922,6 +1112,91 @@ const styles = {
     color: "#84352e",
     background: "rgba(244, 221, 217, 0.68)",
   },
+  operationalPanel: {
+    maxWidth: 1180,
+    boxSizing: "border-box",
+    margin: "18px auto 0",
+    padding: 18,
+    border: "1px solid",
+    borderRadius: 6,
+    display: "grid",
+    gridTemplateColumns:
+      "repeat(auto-fit, minmax(min(100%, 320px), 1fr))",
+    gap: "16px 24px",
+  },
+  operationalAction: {
+    borderColor: "rgba(168, 79, 69, 0.52)",
+    background: "rgba(250, 236, 232, 0.84)",
+  },
+  operationalWatch: {
+    borderColor: "rgba(165, 123, 53, 0.52)",
+    background: "rgba(249, 240, 216, 0.84)",
+  },
+  operationalOk: {
+    borderColor: "rgba(82, 116, 93, 0.48)",
+    background: "rgba(232, 241, 233, 0.84)",
+  },
+  operationalCopy: {
+    minWidth: 0,
+  },
+  operationalEyebrow: {
+    margin: "0 0 3px",
+    color: "#6d5f55",
+    fontSize: 12,
+    fontWeight: 600,
+  },
+  operationalTitle: {
+    margin: 0,
+    fontSize: 21,
+    lineHeight: 1.45,
+    fontWeight: 600,
+  },
+  operationalBody: {
+    margin: "7px 0 0",
+    color: "#5f544c",
+    fontSize: 13,
+    lineHeight: 1.7,
+  },
+  operationalSpread: {
+    margin: "8px 0 0",
+    color: "#84352e",
+    fontSize: 13,
+    fontWeight: 600,
+  },
+  operationalCounts: {
+    minWidth: 0,
+    margin: 0,
+    padding: "3px 0",
+  },
+  operationalCountRow: {
+    display: "flex",
+    alignItems: "baseline",
+    justifyContent: "space-between",
+    gap: 20,
+    padding: "3px 0",
+    color: "#5f544c",
+    fontSize: 12,
+  },
+  decisionGuide: {
+    gridColumn: "1 / -1",
+    paddingTop: 12,
+    borderTop: "1px solid rgba(74, 63, 53, 0.14)",
+    display: "flex",
+    flexWrap: "wrap",
+    gap: "6px 18px",
+    color: "#70645b",
+    fontSize: 11,
+    lineHeight: 1.6,
+  },
+  guideRed: {
+    color: "#9b4038",
+  },
+  guideYellow: {
+    color: "#8a651f",
+  },
+  guideGreen: {
+    color: "#466850",
+  },
   section: {
     maxWidth: 1180,
     margin: "28px auto 0",
@@ -1021,6 +1296,70 @@ const styles = {
     margin: "7px 0 0",
     color: "#887b70",
     fontSize: 11,
+  },
+  issueList: {
+    marginTop: 12,
+    display: "grid",
+    gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 320px), 1fr))",
+    gap: 8,
+  },
+  issueCard: {
+    minWidth: 0,
+    border: "1px solid rgba(74, 63, 53, 0.18)",
+    borderRadius: 6,
+    background: "rgba(255, 253, 249, 0.82)",
+    padding: 14,
+  },
+  issueCardHeader: {
+    display: "flex",
+    alignItems: "flex-start",
+    justifyContent: "space-between",
+    gap: 12,
+  },
+  issueTime: {
+    margin: 0,
+    color: "#786d64",
+    fontSize: 11,
+  },
+  issueTitle: {
+    margin: "3px 0 0",
+    fontSize: 15,
+    lineHeight: 1.5,
+    fontWeight: 600,
+  },
+  issueBadge: {
+    flexShrink: 0,
+    borderRadius: 999,
+    padding: "3px 8px",
+    fontSize: 10,
+    fontWeight: 600,
+  },
+  issueBadgeAction: {
+    color: "#84352e",
+    background: "rgba(244, 221, 217, 0.9)",
+  },
+  issueBadgeWatch: {
+    color: "#72551f",
+    background: "rgba(246, 233, 202, 0.9)",
+  },
+  issueMeta: {
+    margin: "9px 0 0",
+    color: "#786d64",
+    fontSize: 11,
+    lineHeight: 1.6,
+    overflowWrap: "anywhere",
+  },
+  issueAction: {
+    margin: "9px 0 0",
+    color: "#4f443c",
+    fontSize: 12,
+    lineHeight: 1.7,
+  },
+  issueDetails: {
+    marginTop: 9,
+    color: "#786d64",
+    fontSize: 11,
+    lineHeight: 1.6,
   },
   environmentGrid: {
     display: "grid",

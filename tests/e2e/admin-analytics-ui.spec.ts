@@ -46,11 +46,21 @@ test("shows the launch dashboard in Japanese with actionable sections", async ({
       .getByText("流入元不明（srcなし）", { exact: true }),
   ).toBeVisible();
   await expect(page.getByText(/数字は実人数ではなく/)).toBeVisible();
+  await expect(
+    page.getByRole("heading", { name: "新しい未解決があります" }),
+  ).toBeVisible();
+  await expect(
+    page.getByText("赤 直近30分の未解決、または60分で同じ失敗が2 ID以上"),
+  ).toBeVisible();
   await expect(page.getByText("利用した人", { exact: true })).toHaveCount(0);
   await expect(page.getByRole("heading", { name: "写真をもう一度入れたか" })).toBeVisible();
   await expect(
-    page.getByLabel("要確認").getByText("写真の読み込み・保存失敗").first(),
+    page
+      .getByLabel("未解決の出来事")
+      .getByText("写真の読み込み・保存失敗")
+      .first(),
   ).toBeVisible();
+  await expect(page.getByText("3イベントを1件に集約")).toBeVisible();
   await expect(page.getByText(/繝|縺|蜿/)).toHaveCount(0);
   expect(
     await page.evaluate(
@@ -146,13 +156,22 @@ const mockAnalyticsResponse = {
     returningDaySubmitters: 2,
     d1ReturnSubmitters: 0,
   },
+  operationalStatus: {
+    level: "action",
+    unresolvedIncidents: 1,
+    affectedActors: 1,
+    freshIncidents: 1,
+    spreadIssueCount: 0,
+    latestAt: "2026-07-17T13:20:00.000Z",
+  },
   errorSummary: [
     {
       eventName: "photo_upload_error",
       errorCode: "onboarding_photo_save_failed",
-      events: 1,
+      incidents: 1,
+      events: 3,
       users: 1,
-      latestAt: "2026-07-16T08:20:00.000Z",
+      latestAt: "2026-07-17T13:20:00.000Z",
     },
   ],
   issueSummary: {
@@ -167,7 +186,7 @@ const mockAnalyticsResponse = {
   },
   recentErrors: [
     {
-      createdAt: "2026-07-16T08:20:00.000Z",
+      createdAt: "2026-07-17T13:20:00.000Z",
       eventName: "photo_upload_error",
       source: "instagram_bio",
       route: "/onboarding",
@@ -177,6 +196,8 @@ const mockAnalyticsResponse = {
       anonymousId: "actor...0001",
       userId: null,
       submissionId: null,
+      incidentEvents: 3,
+      incidentFirstAt: "2026-07-17T13:19:58.000Z",
     },
   ],
   recentEvents: [],
