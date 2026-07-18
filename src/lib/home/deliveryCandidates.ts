@@ -65,10 +65,17 @@ export async function createSleepingExchange({
   recipientCatId,
   preferredSourcePhotoId,
   mode,
+  onboardingSubmission,
 }: DeliverableSleepingPhotoInput & {
   ownPhoto: OwnSleepingPhoto;
   preferredSourcePhotoId?: string | null;
   mode?: "onboarding";
+  onboardingSubmission?: {
+    dateKey: string;
+    resumeToken: string;
+    source: string;
+    submissionId: string;
+  } | null;
 }): Promise<SleepingExchangeResponse | null> {
   if (typeof window === "undefined") {
     return null;
@@ -118,6 +125,7 @@ export async function createSleepingExchange({
         blockedPhotoIds: readBlockedExchangePhotoIdList(),
         preferredSourcePhotoId,
         mode,
+        onboardingSubmission,
       }),
     });
 

@@ -71,6 +71,7 @@ const desktopSpecs = [
   "**/app-shell-recovery.spec.ts",
   "**/onboarding-handoff-api.spec.ts",
   "**/onboarding-handoff-restore.spec.ts",
+  "**/onboarding-submission-ledger.spec.ts",
   "**/json-cache.spec.ts",
   "**/image-file-validation.spec.ts",
   "**/photo-sources.spec.ts",

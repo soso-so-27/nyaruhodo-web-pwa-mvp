@@ -16,6 +16,11 @@ import {
   removeDurableClientValue,
   writeDurableClientValue,
 } from "../storage/durableClientStore";
+import { queueOnboardingSubmissionShadowSync } from "./submissionClient";
+import {
+  createOnboardingResumeToken,
+  isOnboardingResumeToken,
+} from "./submissionContract";
 
 export type OnboardingSource =
   | "direct"
@@ -40,6 +45,7 @@ export type OnboardingProgress = {
   stage: OnboardingProgressStage;
   source: OnboardingSource;
   submissionId: string;
+  resumeToken?: string;
   ownPhoto?: OwnSleepingPhoto;
   selectedPhotoSrc?: string;
   deliveredPhoto?: ExchangePhoto;
@@ -192,6 +198,7 @@ export function writeOnboardingProgress(progress: OnboardingProgress) {
 
   const persistentProgress = prepareOnboardingProgressForPersistence(progress);
   durableProgressCache = persistentProgress;
+  void queueOnboardingSubmissionShadowSync(persistentProgress);
   void queueDurableOnboardingProgressWrite(persistentProgress).catch(
     () => undefined,
   );
@@ -216,6 +223,7 @@ export async function writeOnboardingProgressDurably(
 
   const persistentProgress = prepareOnboardingProgressForPersistence(progress);
   durableProgressCache = persistentProgress;
+  void queueOnboardingSubmissionShadowSync(persistentProgress);
   const localStorageWritten = writeOnboardingProgressToLocalStorage(
     persistentProgress,
   );
@@ -277,6 +285,7 @@ function buildPatchedOnboardingProgress(
       patch.submissionId ??
       current?.submissionId ??
       createOnboardingSubmissionId(anonymousId, dateKey),
+    resumeToken: patch.resumeToken ?? current?.resumeToken,
     ownPhoto: patch.ownPhoto ?? current?.ownPhoto,
     selectedPhotoSrc: patch.selectedPhotoSrc ?? current?.selectedPhotoSrc,
     ...(deliveredPhoto ? { deliveredPhoto } : {}),
@@ -299,6 +308,7 @@ function prepareOnboardingProgressForPersistence(
 
   return {
     ...progress,
+    resumeToken: progress.resumeToken ?? createOnboardingResumeToken(),
     ...(deliveredPhoto ? { deliveredPhoto } : { deliveredPhoto: undefined }),
     updatedAt: Date.now(),
   };
@@ -383,6 +393,8 @@ function isValidOnboardingProgress(
     /^\d{4}-\d{2}-\d{2}$/.test(value.dateKey) &&
     typeof value.submissionId === "string" &&
     value.submissionId.length > 0 &&
+    (value.resumeToken === undefined ||
+      isOnboardingResumeToken(value.resumeToken)) &&
     isOnboardingProgressStage(value.stage) &&
     isOnboardingSource(value.source) &&
     typeof value.updatedAt === "number"

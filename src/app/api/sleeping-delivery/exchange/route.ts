@@ -32,6 +32,8 @@ import {
   isServerDateKey,
   validateServerDeliveryDateKey,
 } from "../../../../lib/home/eveningDeliveryServer";
+import { isOnboardingResumeToken } from "../../../../lib/onboarding/submissionContract";
+import { advanceOnboardingSubmission } from "../../../../lib/server/onboardingSubmissionLedger";
 
 export const dynamic = "force-dynamic";
 
@@ -57,6 +59,12 @@ type ExchangeRequest = {
   preferredSourcePhotoId?: string | null;
   debugDryRun?: boolean;
   mode?: "onboarding" | null;
+  onboardingSubmission?: {
+    dateKey?: string | null;
+    resumeToken?: string | null;
+    source?: string | null;
+    submissionId?: string | null;
+  } | null;
 };
 
 type RemoteCatMomentRow = {
@@ -284,6 +292,13 @@ async function handleExchangePost(request: Request) {
         toExchangePhotoFromDelivery(existingDelivery, input),
         supabase,
       );
+      await recordOnboardingDeliveryProgress({
+        adminSupabase,
+        anonymousId,
+        delivery: existingDelivery,
+        input,
+        userId,
+      });
       return NextResponse.json({
         photo: existingPhoto,
         source: "remote",
@@ -529,6 +544,13 @@ async function handleExchangePost(request: Request) {
             toExchangePhotoFromDelivery(existingDelivery, input),
             supabase,
           );
+          await recordOnboardingDeliveryProgress({
+            adminSupabase,
+            anonymousId,
+            delivery: existingDelivery,
+            input,
+            userId,
+          });
           return NextResponse.json({
             photo: existingPhoto,
             source: "remote",
@@ -565,6 +587,16 @@ async function handleExchangePost(request: Request) {
     await incrementDeliveryCount({
       supabase,
       row: selected.row,
+    });
+    await recordOnboardingDeliveryProgress({
+      adminSupabase,
+      anonymousId,
+      delivery: {
+        local_delivery_id: localDeliveryId,
+        source_photo_id: selected.row.local_moment_id,
+      },
+      input,
+      userId,
     });
   }
   markExchangeTiming(timing, "insert_delivery");
@@ -637,6 +669,17 @@ async function readExchangeRequest(request: Request): Promise<ExchangeRequestPar
       preferredSourcePhotoId: toStringOrNull(body.preferredSourcePhotoId),
       debugDryRun: body.debugDryRun === true,
       mode: body.mode === "onboarding" ? "onboarding" : null,
+      onboardingSubmission:
+        body.onboardingSubmission && typeof body.onboardingSubmission === "object"
+          ? {
+              dateKey: toStringOrNull(body.onboardingSubmission.dateKey),
+              resumeToken: toStringOrNull(body.onboardingSubmission.resumeToken),
+              source: toStringOrNull(body.onboardingSubmission.source),
+              submissionId: toStringOrNull(
+                body.onboardingSubmission.submissionId,
+              ),
+            }
+          : null,
     },
   };
 }
@@ -718,6 +761,24 @@ function validateExchangeRequest(
     return { ok: false, status: 400, error: "invalid_exchange_request" };
   }
 
+  const onboardingSubmission = input.onboardingSubmission;
+  if (
+    onboardingSubmission &&
+    (input.mode !== "onboarding" ||
+      typeof onboardingSubmission.submissionId !== "string" ||
+      onboardingSubmission.submissionId.length > 240 ||
+      typeof onboardingSubmission.resumeToken !== "string" ||
+      !isOnboardingResumeToken(onboardingSubmission.resumeToken) ||
+      typeof onboardingSubmission.dateKey !== "string" ||
+      !isServerDateKey(onboardingSubmission.dateKey) ||
+      (input.deliveryDateKey !== null &&
+        input.deliveryDateKey !== onboardingSubmission.dateKey) ||
+      typeof onboardingSubmission.source !== "string" ||
+      !isOnboardingSource(onboardingSubmission.source))
+  ) {
+    return { ok: false, status: 400, error: "invalid_exchange_request" };
+  }
+
   if (
     typeof ownPhoto.createdAt === "number" &&
     (!Number.isFinite(ownPhoto.createdAt) ||
@@ -728,6 +789,71 @@ function validateExchangeRequest(
   }
 
   return validateOwnPhotoSrc(ownPhoto.src);
+}
+
+async function recordOnboardingDeliveryProgress({
+  adminSupabase,
+  anonymousId,
+  delivery,
+  input,
+  userId,
+}: {
+  adminSupabase: ReturnType<typeof createSupabaseAdminClient>;
+  anonymousId: string | null;
+  delivery: {
+    id?: string;
+    local_delivery_id?: string;
+    sourcePhotoId?: string;
+    source_photo_id?: string | null;
+  };
+  input: Required<ExchangeRequest>;
+  userId: string | null;
+}) {
+  const ledger = input.onboardingSubmission;
+  if (!adminSupabase || !ledger || input.debugDryRun) {
+    return;
+  }
+
+  const deliveryId = delivery.local_delivery_id ?? delivery.id ?? null;
+  if (!deliveryId) {
+    return;
+  }
+
+  const result = await advanceOnboardingSubmission({
+    supabase: adminSupabase,
+    userId,
+    input: {
+      anonymousId,
+      dateKey: ledger.dateKey!,
+      deliveryId,
+      ownPhotoId: input.ownPhoto.id ?? null,
+      resumeToken: ledger.resumeToken!,
+      source: ledger.source!,
+      sourcePhotoId:
+        delivery.source_photo_id ?? delivery.sourcePhotoId ?? null,
+      stage: "delivered",
+      submissionId: ledger.submissionId!,
+    },
+  });
+
+  if (!result.ok) {
+    console.warn("[sleeping-delivery/exchange] onboarding ledger update failed", {
+      error: result.error,
+      code: result.code,
+    });
+  }
+}
+
+function isOnboardingSource(value: string) {
+  return [
+    "direct",
+    "instagram",
+    "instagram_story",
+    "instagram_bio",
+    "instagram_dm",
+    "referral",
+    "unknown",
+  ].includes(value);
 }
 
 function exchangeError(error: string, status: 400 | 401 | 403 | 413 | 415 | 429) {

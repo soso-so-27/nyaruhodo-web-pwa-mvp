@@ -39,6 +39,7 @@ import {
   type OnboardingProgress,
   type OnboardingSource,
 } from "../../lib/onboarding/progress";
+import { getOnboardingExchangeLedgerInput } from "../../lib/onboarding/submissionClient";
 import { consumeOnboardingTestResetRequest } from "../../lib/onboarding/testReset";
 import { resolveOnboardingResumeDecision } from "../../lib/onboarding/stateMachine";
 import { trackProductEvent } from "../../lib/analytics/productAnalytics";
@@ -1158,6 +1159,11 @@ export function OnboardingFlow() {
     submissionId?: string | null;
     selectedPhotoSrc?: string;
   }) {
+    const currentProgress = readCurrentOnboardingProgress();
+    const onboardingSubmission =
+      currentProgress?.submissionId === submissionId
+        ? getOnboardingExchangeLedgerInput(currentProgress)
+        : null;
     const exchangeResult = await createSleepingExchange({
       ownPhoto,
       triggerLabel: "ねがお",
@@ -1168,6 +1174,7 @@ export function OnboardingFlow() {
       recipientCatId,
       preferredSourcePhotoId,
       mode: "onboarding",
+      onboardingSubmission,
     });
 
     let nextPhoto = exchangeResult?.photo ?? null;
