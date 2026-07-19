@@ -33,6 +33,11 @@ import {
   validateServerDeliveryDateKey,
 } from "../../../../lib/home/eveningDeliveryServer";
 import { isOnboardingResumeToken } from "../../../../lib/onboarding/submissionContract";
+import {
+  createOnboardingJourneySubmissionId,
+  createOnboardingOwnPhotoId,
+  isOnboardingJourneyId,
+} from "../../../../lib/onboarding/journeyContract";
 import { advanceOnboardingSubmission } from "../../../../lib/server/onboardingSubmissionLedger";
 
 export const dynamic = "force-dynamic";
@@ -61,6 +66,7 @@ type ExchangeRequest = {
   mode?: "onboarding" | null;
   onboardingSubmission?: {
     dateKey?: string | null;
+    journeyId?: string | null;
     resumeToken?: string | null;
     source?: string | null;
     submissionId?: string | null;
@@ -265,24 +271,96 @@ async function handleExchangePost(request: Request) {
     );
   }
 
+  const onboardingLedger = input.onboardingSubmission;
+  if (onboardingLedger && !debugDryRun) {
+    if (!adminSupabase) {
+      return NextResponse.json(
+        { photo: null, source: "none", error: "onboarding_ledger_unavailable" },
+        { status: 503 },
+      );
+    }
+
+    const authorization = await advanceOnboardingSubmission({
+      supabase: adminSupabase,
+      userId,
+      input: {
+        anonymousId,
+        dateKey: onboardingLedger.dateKey!,
+        journeyId: onboardingLedger.journeyId,
+        ownPhotoId: ownPhoto.id ?? null,
+        resumeToken: onboardingLedger.resumeToken!,
+        source: onboardingLedger.source!,
+        stage: "submitted",
+        submissionId: onboardingLedger.submissionId!,
+      },
+    });
+
+    if (!authorization.ok) {
+      const status = authorization.error === "conflict" ? 409 :
+        authorization.error === "forbidden" ? 403 : 503;
+      return NextResponse.json(
+        {
+          photo: null,
+          source: "none",
+          error:
+            authorization.error === "conflict"
+              ? "onboarding_submission_conflict"
+              : authorization.error === "forbidden"
+                ? "onboarding_submission_forbidden"
+                : "onboarding_ledger_unavailable",
+        },
+        { status },
+      );
+    }
+  }
+
+  const onboardingJourneyId = onboardingLedger?.journeyId ?? null;
+  const onboardingJourneyMetadata = onboardingJourneyId
+    ? {
+        onboarding_journey_id: onboardingJourneyId,
+        onboarding_submission_id: onboardingLedger!.submissionId!,
+      }
+    : {};
+
   const idempotentDeliveryId =
     input.deliveryDateKey && !debugDryRun
-      ? buildIdempotentDeliveryId({
-          userId,
-          anonymousId,
-          deliveryDateKey: input.deliveryDateKey,
-        })
+      ? onboardingJourneyId
+        ? buildOnboardingJourneyDeliveryId({
+            journeyId: onboardingJourneyId,
+            deliveryDateKey: input.deliveryDateKey,
+          })
+        : buildIdempotentDeliveryId({
+            userId,
+            anonymousId,
+            deliveryDateKey: input.deliveryDateKey,
+          })
       : null;
 
   if (idempotentDeliveryId) {
-    const existingDelivery = await readExistingDelivery({
-      supabase,
-      userId,
-      anonymousId,
-      localDeliveryId: idempotentDeliveryId,
-    });
+    const existingDelivery = onboardingJourneyId
+      ? await readExistingOnboardingDelivery({
+          supabase,
+          localDeliveryId: idempotentDeliveryId,
+          submissionId: onboardingLedger!.submissionId!,
+        })
+      : await readExistingDelivery({
+          supabase,
+          userId,
+          anonymousId,
+          localDeliveryId: idempotentDeliveryId,
+        });
 
     if (existingDelivery) {
+      if (onboardingJourneyId) {
+        await transferOnboardingExchangeRows({
+          supabase,
+          anonymousId,
+          deliveryId: existingDelivery.local_delivery_id,
+          ownPhotoId: ownPhoto.id,
+          submissionId: onboardingLedger!.submissionId!,
+          userId,
+        });
+      }
       markExchangeTiming(timing, "read_existing_delivery");
       logExchangeTiming(timing, {
         result: "existing",
@@ -322,18 +400,34 @@ async function handleExchangePost(request: Request) {
   }
 
   if (!debugDryRun && shouldAddOwnPhotoToPool) {
-    const existingOwnMoment = await readExistingOwnMoment({
-      supabase,
-      userId,
-      anonymousId,
-      localMomentId: ownPhoto.id,
-    });
+    const existingOwnMoment = onboardingJourneyId
+      ? await readExistingOnboardingOwnMoment({
+          supabase,
+          localMomentId: ownPhoto.id,
+          submissionId: onboardingLedger!.submissionId!,
+        })
+      : await readExistingOwnMoment({
+          supabase,
+          userId,
+          anonymousId,
+          localMomentId: ownPhoto.id,
+        });
 
     if (existingOwnMoment.error) {
       return NextResponse.json(
         { photo: null, source: "none", error: "own_photo_lookup_failed" },
         { status: 500 },
       );
+    }
+
+    if (existingOwnMoment.data && onboardingJourneyId) {
+      await transferOnboardingExchangeRows({
+        supabase,
+        anonymousId,
+        ownPhotoId: ownPhoto.id,
+        submissionId: onboardingLedger!.submissionId!,
+        userId,
+      });
     }
 
     if (!existingOwnMoment.data) {
@@ -366,6 +460,7 @@ async function handleExchangePost(request: Request) {
           category: input.category,
           shared: true,
           capture_context: isOnboardingExchange ? "onboarding" : "daily",
+          ...onboardingJourneyMetadata,
         },
         captured_at: createdAt,
         created_at: createdAt,
@@ -376,6 +471,29 @@ async function handleExchangePost(request: Request) {
           { photo: null, source: "none", error: momentError.message },
           { status: 500 },
         );
+      }
+
+      if (momentError && onboardingJourneyId) {
+        const racedMoment = await readExistingOnboardingOwnMoment({
+          supabase,
+          localMomentId: ownPhoto.id,
+          submissionId: onboardingLedger!.submissionId!,
+        });
+
+        if (racedMoment.error || !racedMoment.data) {
+          return NextResponse.json(
+            { photo: null, source: "none", error: "own_photo_race_lookup_failed" },
+            { status: 500 },
+          );
+        }
+
+        await transferOnboardingExchangeRows({
+          supabase,
+          anonymousId,
+          ownPhotoId: ownPhoto.id,
+          submissionId: onboardingLedger!.submissionId!,
+          userId,
+        });
       }
     }
   }
@@ -521,20 +639,37 @@ async function handleExchangePost(request: Request) {
           category: input.category,
           delivery_date_key: input.deliveryDateKey,
           delivery_tier: selected.tier,
+          ...onboardingJourneyMetadata,
         },
         delivered_at: deliveredAt.toISOString(),
       });
 
     if (deliveryError) {
       if (idempotentDeliveryId && isUniqueDeliveryError(deliveryError)) {
-        const existingDelivery = await readExistingDelivery({
-          supabase,
-          userId,
-          anonymousId,
-          localDeliveryId: idempotentDeliveryId,
-        });
+        const existingDelivery = onboardingJourneyId
+          ? await readExistingOnboardingDelivery({
+              supabase,
+              localDeliveryId: idempotentDeliveryId,
+              submissionId: onboardingLedger!.submissionId!,
+            })
+          : await readExistingDelivery({
+              supabase,
+              userId,
+              anonymousId,
+              localDeliveryId: idempotentDeliveryId,
+            });
 
         if (existingDelivery) {
+          if (onboardingJourneyId) {
+            await transferOnboardingExchangeRows({
+              supabase,
+              anonymousId,
+              deliveryId: existingDelivery.local_delivery_id,
+              ownPhotoId: ownPhoto.id,
+              submissionId: onboardingLedger!.submissionId!,
+              userId,
+            });
+          }
           markExchangeTiming(timing, "read_duplicate_delivery");
           logExchangeTiming(timing, {
             result: "existing_after_duplicate",
@@ -673,6 +808,7 @@ async function readExchangeRequest(request: Request): Promise<ExchangeRequestPar
         body.onboardingSubmission && typeof body.onboardingSubmission === "object"
           ? {
               dateKey: toStringOrNull(body.onboardingSubmission.dateKey),
+              journeyId: toStringOrNull(body.onboardingSubmission.journeyId),
               resumeToken: toStringOrNull(body.onboardingSubmission.resumeToken),
               source: toStringOrNull(body.onboardingSubmission.source),
               submissionId: toStringOrNull(
@@ -771,6 +907,16 @@ function validateExchangeRequest(
       !isOnboardingResumeToken(onboardingSubmission.resumeToken) ||
       typeof onboardingSubmission.dateKey !== "string" ||
       !isServerDateKey(onboardingSubmission.dateKey) ||
+      (onboardingSubmission.journeyId !== null &&
+        (typeof onboardingSubmission.journeyId !== "string" ||
+          !isOnboardingJourneyId(onboardingSubmission.journeyId) ||
+          onboardingSubmission.submissionId !==
+            createOnboardingJourneySubmissionId(
+              onboardingSubmission.journeyId,
+              onboardingSubmission.dateKey,
+            ) ||
+          ownPhoto.id !==
+            createOnboardingOwnPhotoId(onboardingSubmission.submissionId))) ||
       (input.deliveryDateKey !== null &&
         input.deliveryDateKey !== onboardingSubmission.dateKey) ||
       typeof onboardingSubmission.source !== "string" ||
@@ -1015,6 +1161,21 @@ export function buildIdempotentDeliveryId({
   return `delivered-sleeping-${deliveryDateKey}-${digest}`;
 }
 
+export function buildOnboardingJourneyDeliveryId({
+  journeyId,
+  deliveryDateKey,
+}: {
+  journeyId: string;
+  deliveryDateKey: string;
+}) {
+  const digest = createHash("sha256")
+    .update(`${journeyId}:${deliveryDateKey}`)
+    .digest("hex")
+    .slice(0, 24);
+
+  return `delivered-onboarding-${deliveryDateKey}-${digest}`;
+}
+
 export async function readExistingDelivery({
   supabase,
   userId,
@@ -1032,6 +1193,36 @@ export async function readExistingDelivery({
     anonymousId,
     localDeliveryId,
   });
+}
+
+async function readExistingOnboardingDelivery({
+  supabase,
+  localDeliveryId,
+  submissionId,
+}: {
+  supabase: SupabaseClient;
+  localDeliveryId: string;
+  submissionId: string;
+}) {
+  const { data, error } = await supabase
+    .from("cat_moment_deliveries")
+    .select(
+      "id, local_delivery_id, source_moment_id, source_photo_id, recipient_local_cat_id, photo_url, status, metadata, delivered_at",
+    )
+    .eq("local_delivery_id", localDeliveryId)
+    .contains("metadata", { onboarding_submission_id: submissionId })
+    .limit(1)
+    .maybeSingle();
+
+  if (error) {
+    console.warn(
+      "[sleeping-delivery/exchange] onboarding delivery lookup failed",
+      { code: error.code },
+    );
+    return null;
+  }
+
+  return data as RemoteDeliveryRow | null;
 }
 
 async function readExistingDeliveryByLocalId({
@@ -1210,6 +1401,90 @@ async function readExistingOwnMoment({
   }
 
   return { data: data as { id: string } | null, error };
+}
+
+async function readExistingOnboardingOwnMoment({
+  supabase,
+  localMomentId,
+  submissionId,
+}: {
+  supabase: SupabaseClient;
+  localMomentId: string;
+  submissionId: string;
+}) {
+  const { data, error } = await supabase
+    .from("cat_moments")
+    .select("id")
+    .eq("local_moment_id", localMomentId)
+    .contains("metadata", { onboarding_submission_id: submissionId })
+    .limit(1)
+    .maybeSingle();
+
+  if (error) {
+    console.warn(
+      "[sleeping-delivery/exchange] onboarding moment lookup failed",
+      { code: error.code },
+    );
+  }
+
+  return { data: data as { id: string } | null, error };
+}
+
+async function transferOnboardingExchangeRows({
+  supabase,
+  anonymousId,
+  deliveryId,
+  ownPhotoId,
+  submissionId,
+  userId,
+}: {
+  supabase: SupabaseClient;
+  anonymousId: string | null;
+  deliveryId?: string | null;
+  ownPhotoId?: string | null;
+  submissionId: string;
+  userId: string | null;
+}) {
+  const identity = userId
+    ? { user_id: userId, anonymous_id: null }
+    : { anonymous_id: anonymousId };
+  const operations: Array<PromiseLike<{ error: { code?: string } | null }>> = [];
+
+  if (ownPhotoId) {
+    let query = supabase
+      .from("cat_moments")
+      .update(identity)
+      .eq("local_moment_id", ownPhotoId)
+      .contains("metadata", { onboarding_submission_id: submissionId });
+
+    if (!userId) {
+      query = query.is("user_id", null);
+    }
+    operations.push(query);
+  }
+
+  if (deliveryId) {
+    let query = supabase
+      .from("cat_moment_deliveries")
+      .update(identity)
+      .eq("local_delivery_id", deliveryId)
+      .contains("metadata", { onboarding_submission_id: submissionId });
+
+    if (!userId) {
+      query = query.is("user_id", null);
+    }
+    operations.push(query);
+  }
+
+  const results = await Promise.all(operations);
+  for (const result of results) {
+    if (result.error) {
+      console.warn(
+        "[sleeping-delivery/exchange] onboarding identity transfer failed",
+        { code: result.error.code },
+      );
+    }
+  }
 }
 
 async function readRemoteCandidateRows(

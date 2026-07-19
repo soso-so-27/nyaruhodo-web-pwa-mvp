@@ -100,6 +100,7 @@ type SafeEvent = {
   errorMessage?: string | null;
   anonymousId: string | null;
   userId: string | null;
+  journeyId: string | null;
   submissionId: string | null;
   incidentEvents?: number;
   incidentFirstAt?: string;
@@ -912,7 +913,7 @@ function EventTable({
           : ["時刻", "イベント", "入口", "画面", "識別子", "submission"]
       }
       rows={events.map((event) => {
-        const actor = event.userId ?? event.anonymousId ?? "-";
+        const actor = event.journeyId ?? event.userId ?? event.anonymousId ?? "-";
         const location = event.surface ?? event.route ?? "-";
 
         return showError

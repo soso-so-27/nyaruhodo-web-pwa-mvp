@@ -1034,22 +1034,20 @@ test("keeps the record tab sections in the intended order", async ({ page }) => 
   await page.setViewportSize({ width: 390, height: 844 });
   await page.goto("/cats");
   await page.waitForLoadState("networkidle");
+  await expect(page.locator("#cats-milestones-heading")).toBeVisible();
 
-  const sectionOrder = await page.evaluate(() =>
-    Array.from(document.querySelectorAll("main h2")).map(
-      (heading) => heading.textContent?.trim() ?? "",
-    ),
-  );
+  const sectionOrder = await page
+    .locator(
+      "#cats-milestones-heading, #cats-omoide-heading, #cats-recent-heading, #cats-archive-heading",
+    )
+    .evaluateAll((headings) => headings.map((heading) => heading.id));
 
-  const celebrationIndex = sectionOrder.indexOf("記念");
-  const footprintIndex = sectionOrder.indexOf("足あと");
-  const memoryIndex = sectionOrder.indexOf("思い出箱");
-  const yearIndex = sectionOrder.indexOf("年ごと");
-
-  expect(celebrationIndex).toBeGreaterThanOrEqual(0);
-  expect(memoryIndex).toBeGreaterThan(celebrationIndex);
-  expect(footprintIndex).toBeGreaterThan(memoryIndex);
-  expect(yearIndex).toBeGreaterThan(footprintIndex);
+  expect(sectionOrder).toEqual([
+    "cats-milestones-heading",
+    "cats-omoide-heading",
+    "cats-recent-heading",
+    "cats-archive-heading",
+  ]);
 });
 
 test("opens an omoide as a full paper view without cropping the photo", async ({

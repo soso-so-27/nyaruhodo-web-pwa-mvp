@@ -1,6 +1,7 @@
 import { STORAGE_KEYS, readCachedJson, writeCachedJson } from "../storage";
 import { getOrCreateAnonymousId } from "../identity/anonymousId";
 import { createBrowserSupabaseClient } from "../supabase/browser";
+import { readOnboardingJourney } from "../onboarding/journey";
 import { readAnalyticsTrafficKind } from "./traffic";
 
 const SESSION_TIMEOUT_MS = 30 * 60 * 1000;
@@ -76,6 +77,7 @@ export function trackProductEvent(
       ...getAttributionProperties(),
       ...getAnalyticsEnvironmentProperties(),
       ...properties,
+      ...getOnboardingJourneyProperties(name),
       traffic_kind: readAnalyticsTrafficKind(),
     });
     const event: ProductAnalyticsEvent = {
@@ -161,6 +163,18 @@ export function readAnalyticsEventQueue(): ProductAnalyticsEvent[] {
   } catch {
     return [];
   }
+}
+
+function getOnboardingJourneyProperties(name: string) {
+  if (
+    !name.startsWith("onboarding_") &&
+    !window.location.pathname.startsWith("/onboarding")
+  ) {
+    return {};
+  }
+
+  const journey = readOnboardingJourney();
+  return journey ? { journey_id: journey.id } : {};
 }
 
 function sanitizeQueuedAnalyticsEvent(

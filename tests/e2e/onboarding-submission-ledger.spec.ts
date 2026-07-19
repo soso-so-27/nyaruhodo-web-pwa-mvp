@@ -5,12 +5,46 @@ import path from "node:path";
 
 import { createOnboardingResumeToken } from "../../src/lib/onboarding/submissionContract";
 import { queueOnboardingSubmissionShadowSync } from "../../src/lib/onboarding/submissionClient";
+import {
+  createOnboardingJourneySubmissionId,
+  createOnboardingOwnPhotoId,
+} from "../../src/lib/onboarding/journeyContract";
 
 const catPhotoDataUrl = `data:image/jpeg;base64,${fs
   .readFileSync(path.resolve(process.cwd(), "tests/fixtures/cat-photo-letter.jpg"))
   .toString("base64")}`;
 
 test.describe("onboarding submission ledger", () => {
+  test("rejects a submission ID that belongs to another onboarding journey", async ({
+    request,
+  }) => {
+    const journeyId = `onbj_${crypto.randomUUID()}`;
+    const dateKey = getJstDateKey();
+    const response = await request.put("/api/onboarding/submission", {
+      data: {
+        anonymousId: `journey-binding-${crypto.randomUUID()}`,
+        dateKey,
+        journeyId,
+        ownPhotoId: createOnboardingOwnPhotoId(
+          createOnboardingJourneySubmissionId(journeyId, dateKey),
+        ),
+        resumeToken: createOnboardingResumeToken(),
+        source: "instagram_bio",
+        stage: "submitted",
+        submissionId: createOnboardingJourneySubmissionId(
+          `onbj_${crypto.randomUUID()}`,
+          dateKey,
+        ),
+      },
+    });
+
+    expect(response.status()).toBe(400);
+    await expect(response.json()).resolves.toMatchObject({
+      ok: false,
+      error: "invalid_submission",
+    });
+  });
+
   test("shadows only compact progress metadata from the browser", async () => {
     const originalFlag = process.env.NEXT_PUBLIC_ENABLE_ONBOARDING_SERVER_LEDGER;
     const originalFetch = globalThis.fetch;
@@ -278,6 +312,144 @@ test.describe("onboarding submission ledger", () => {
         .from("cat_moment_deliveries")
         .delete()
         .eq("anonymous_id", anonymousId);
+      await adminSupabase
+        .from("cat_moments")
+        .delete()
+        .in("local_moment_id", [candidateId, ownPhotoId]);
+    }
+  });
+
+  test("keeps one own photo and one delivery when the same journey crosses browsers", async ({
+    request,
+  }) => {
+    const adminSupabase = createAdminSupabaseClientFromEnv();
+    test.skip(!adminSupabase, "Local Supabase service role is required.");
+    if (!adminSupabase) return;
+
+    const stamp = `${Date.now()}-${crypto.randomUUID()}`;
+    const firstAnonymousId = `journey-first-${stamp}`;
+    const secondAnonymousId = `journey-second-${stamp}`;
+    const journeyId = `onbj_${crypto.randomUUID()}`;
+    const dateKey = getJstDateKey();
+    const submissionId = createOnboardingJourneySubmissionId(
+      journeyId,
+      dateKey,
+    );
+    const ownPhotoId = createOnboardingOwnPhotoId(submissionId);
+    const resumeToken = createOnboardingResumeToken();
+    const candidateId = `journey-stock-${stamp}`;
+
+    const exchangeData = (anonymousId: string) => ({
+      ownPhoto: {
+        id: ownPhotoId,
+        catId: `journey-cat-${stamp}`,
+        ownerCatId: `journey-cat-${stamp}`,
+        src: catPhotoDataUrl,
+        createdAt: Date.now(),
+        shared: true,
+      },
+      triggerLabel: "sleeping",
+      theme: "sleeping",
+      category: "sleeping",
+      seed: submissionId,
+      deliveryDateKey: dateKey,
+      recipientCatId: `journey-cat-${stamp}`,
+      anonymousId,
+      preferredSourcePhotoId: candidateId,
+      blockedPhotoIds: [],
+      mode: "onboarding",
+      onboardingSubmission: {
+        dateKey,
+        journeyId,
+        resumeToken,
+        source: "instagram_bio",
+        submissionId,
+      },
+    });
+
+    try {
+      const { error: candidateError } = await adminSupabase
+        .from("cat_moments")
+        .insert({
+          anonymous_id: `journey-source-${stamp}`,
+          local_moment_id: candidateId,
+          local_cat_id: `journey-source-cat-${stamp}`,
+          owner_cat_id: `journey-source-cat-${stamp}`,
+          photo_url: catPhotoDataUrl,
+          state: "sleeping",
+          visibility: "shared",
+          delivery_status: "available",
+          moderation_status: "approved",
+          moderated_at: new Date().toISOString(),
+          moderated_by: "e2e",
+          metadata: { source: "e2e", pool_kind: "admin_stock" },
+          captured_at: new Date(Date.now() - 60_000).toISOString(),
+          created_at: new Date(Date.now() - 60_000).toISOString(),
+        });
+      expect(candidateError).toBeNull();
+
+      const first = await request.post("/api/sleeping-delivery/exchange", {
+        headers: { "x-forwarded-for": `198.51.100.${Date.now() % 200}` },
+        data: exchangeData(firstAnonymousId),
+      });
+      expect(first.status()).toBe(200);
+      const firstBody = (await first.json()) as {
+        photo?: { id?: string; sourcePhotoId?: string } | null;
+      };
+      expect(firstBody.photo?.sourcePhotoId).toBe(candidateId);
+
+      const second = await request.post("/api/sleeping-delivery/exchange", {
+        headers: { "x-forwarded-for": `203.0.113.${Date.now() % 200}` },
+        data: exchangeData(secondAnonymousId),
+      });
+      expect(second.status()).toBe(200);
+      const secondBody = (await second.json()) as {
+        diagnostics?: { idempotentReplay?: boolean };
+        photo?: { id?: string; sourcePhotoId?: string } | null;
+      };
+      expect(secondBody.photo?.id).toBe(firstBody.photo?.id);
+      expect(secondBody.photo?.sourcePhotoId).toBe(candidateId);
+      expect(secondBody.diagnostics?.idempotentReplay).toBe(true);
+
+      const { data: ownRows, count: ownCount, error: ownError } =
+        await adminSupabase
+          .from("cat_moments")
+          .select("id, anonymous_id, user_id", { count: "exact" })
+          .contains("metadata", { onboarding_submission_id: submissionId });
+      expect(ownError).toBeNull();
+      expect(ownCount).toBe(1);
+      expect(ownRows).toEqual([
+        expect.objectContaining({
+          anonymous_id: secondAnonymousId,
+          user_id: null,
+        }),
+      ]);
+
+      const {
+        data: deliveryRows,
+        count: deliveryCount,
+        error: deliveryError,
+      } = await adminSupabase
+        .from("cat_moment_deliveries")
+        .select("id, anonymous_id, user_id", { count: "exact" })
+        .contains("metadata", { onboarding_submission_id: submissionId });
+      expect(deliveryError).toBeNull();
+      expect(deliveryCount).toBe(1);
+      expect(deliveryRows).toEqual([
+        expect.objectContaining({
+          anonymous_id: secondAnonymousId,
+          user_id: null,
+        }),
+      ]);
+    } finally {
+      await adminSupabase
+        .from("onboarding_submissions")
+        .delete()
+        .eq("submission_id", submissionId);
+      await adminSupabase
+        .from("cat_moment_deliveries")
+        .delete()
+        .contains("metadata", { onboarding_submission_id: submissionId });
       await adminSupabase
         .from("cat_moments")
         .delete()

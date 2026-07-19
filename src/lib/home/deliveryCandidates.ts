@@ -72,6 +72,7 @@ export async function createSleepingExchange({
   mode?: "onboarding";
   onboardingSubmission?: {
     dateKey: string;
+    journeyId?: string | null;
     resumeToken: string;
     source: string;
     submissionId: string;

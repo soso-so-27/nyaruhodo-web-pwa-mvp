@@ -29,6 +29,15 @@ import {
   type OnboardingSource,
 } from "./progress";
 import {
+  getOrCreateOnboardingJourney,
+  readOnboardingJourney,
+  restoreOnboardingJourney,
+} from "./journey";
+import {
+  isOnboardingJourney,
+  type OnboardingJourney,
+} from "./journeyContract";
+import {
   clearOnboardingTestTargetState,
   hasOnboardingTestResetMarker,
 } from "./testReset";
@@ -36,10 +45,14 @@ import {
 const ONBOARDING_HANDOFF_OWN_PHOTOS_KEY = "nyaruhodo_exchange_own_sleeping_photos";
 const ONBOARDING_HANDOFF_KEPT_PHOTOS_KEY = "nyaruhodo_exchange_kept_photos";
 
+export type OnboardingHandoffEntryPoint = "onboarding_intro";
+
 export type OnboardingHandoffPayload = {
   version: 1;
   createdAt: string;
   source: OnboardingSource;
+  entryPoint?: OnboardingHandoffEntryPoint;
+  journey?: OnboardingJourney | null;
   onboardingProgress: OnboardingProgress | null;
   onboardingCompleted: boolean;
   catProfiles: unknown[];
@@ -63,12 +76,18 @@ export type CreateOnboardingHandoffResult = {
 export async function createOnboardingHandoff({
   source,
   markCompleted = false,
+  entryPoint,
 }: {
   source: OnboardingSource;
   markCompleted?: boolean;
+  entryPoint?: OnboardingHandoffEntryPoint;
 }): Promise<CreateOnboardingHandoffResult> {
   await ensureAnonymousSession("handoff_create");
-  const payload = await createOnboardingHandoffPayload(source, markCompleted);
+  const payload = await createOnboardingHandoffPayload(
+    source,
+    markCompleted,
+    entryPoint,
+  );
   const response = await fetch("/api/onboarding/handoff/create", {
     method: "POST",
     headers: {
@@ -134,7 +153,31 @@ export async function redeemOnboardingHandoff(token: string) {
 export async function createOnboardingHandoffPayload(
   source: OnboardingSource,
   markCompleted = false,
+  entryPoint?: OnboardingHandoffEntryPoint,
 ): Promise<OnboardingHandoffPayload> {
+  if (entryPoint === "onboarding_intro") {
+    const journey = getOrCreateOnboardingJourney({
+      dateKey: getCurrentOnboardingDateKey(),
+      source,
+    });
+
+    return {
+      version: 1,
+      createdAt: new Date().toISOString(),
+      source,
+      entryPoint,
+      journey,
+      onboardingProgress: null,
+      onboardingCompleted: false,
+      catProfiles: [],
+      activeCatId: null,
+      ownSleepingPhotos: [],
+      keptExchangePhotos: [],
+      pendingReferralCode: getCurrentPendingReferralCode(null, source),
+      session: null,
+    };
+  }
+
   const onboardingProgress = readOnboardingProgress();
   const nextOnboardingProgress =
     markCompleted && onboardingProgress
@@ -154,6 +197,7 @@ export async function createOnboardingHandoffPayload(
     version: 1,
     createdAt: new Date().toISOString(),
     source,
+    journey: getOnboardingJourneyForHandoff(nextOnboardingProgress, source),
     onboardingProgress: handoffProgress,
     onboardingCompleted:
       markCompleted ||
@@ -324,6 +368,32 @@ export function restoreOnboardingHandoffPayload(
     throw new Error("handoff_reset_requires_session_restore");
   }
 
+  if (payload.entryPoint === "onboarding_intro") {
+    if (payload.journey) {
+      restoreOnboardingJourney(payload.journey);
+    }
+
+    if (payload.pendingReferralCode) {
+      window.localStorage.setItem(
+        STORAGE_KEYS.pendingReferralCode,
+        payload.pendingReferralCode,
+      );
+    }
+
+    return {
+      ownSleepingPhotoCount: 0,
+      keptExchangePhotoCount: 0,
+      catCount: 0,
+      source: payload.source,
+      entryPoint: payload.entryPoint,
+      journeyId: payload.journey?.id ?? null,
+    };
+  }
+
+  if (payload.journey) {
+    restoreOnboardingJourney(payload.journey);
+  }
+
   if (payload.catProfiles.length > 0) {
     writeCachedJson(STORAGE_KEYS.catProfiles, payload.catProfiles);
   }
@@ -374,6 +444,10 @@ export function restoreOnboardingHandoffPayload(
     ownSleepingPhotoCount: restored.ownCount,
     keptExchangePhotoCount: restored.keptCount,
     catCount: payload.catProfiles.length,
+    source: payload.source,
+    entryPoint: payload.entryPoint ?? null,
+    journeyId:
+      payload.journey?.id ?? payload.onboardingProgress?.journeyId ?? null,
   };
 }
 
@@ -382,11 +456,18 @@ export async function restoreOnboardingHandoffPayloadWithSession(payload: unknow
     throw new Error("invalid_handoff_payload");
   }
 
-  if (payload.resetTargetLocalState) {
+  if (
+    payload.entryPoint !== "onboarding_intro" &&
+    payload.resetTargetLocalState
+  ) {
     await clearOnboardingTestTargetState();
   }
 
-  if (payload.session?.accessToken && payload.session.refreshToken) {
+  if (
+    payload.entryPoint !== "onboarding_intro" &&
+    payload.session?.accessToken &&
+    payload.session.refreshToken
+  ) {
     const supabase = createBrowserSupabaseClient();
     const { error } =
       (await supabase?.auth.setSession({
@@ -447,6 +528,11 @@ function isOnboardingHandoffPayload(
     payload.version === 1 &&
     typeof payload.createdAt === "string" &&
     normalizeOnboardingSource(String(payload.source ?? "")) === payload.source &&
+    (payload.entryPoint === undefined ||
+      payload.entryPoint === "onboarding_intro") &&
+    (payload.journey === undefined ||
+      payload.journey === null ||
+      isOnboardingJourney(payload.journey)) &&
     Array.isArray(payload.catProfiles) &&
     (typeof payload.activeCatId === "string" || payload.activeCatId === null) &&
     Array.isArray(payload.ownSleepingPhotos) &&
@@ -462,4 +548,35 @@ function isOnboardingHandoffPayload(
         typeof payload.session.accessToken === "string" &&
         typeof payload.session.refreshToken === "string"))
   );
+}
+
+function getCurrentOnboardingDateKey() {
+  const parts = new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Asia/Tokyo",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).formatToParts(new Date());
+  const values = Object.fromEntries(parts.map((part) => [part.type, part.value]));
+  return `${values.year}-${values.month}-${values.day}`;
+}
+
+function getOnboardingJourneyForHandoff(
+  progress: OnboardingProgress | null,
+  source: OnboardingSource,
+) {
+  if (progress?.journeyId && progress.resumeToken) {
+    return getOrCreateOnboardingJourney({
+      dateKey: progress.dateKey,
+      source: progress.source,
+      journeyId: progress.journeyId,
+      resumeToken: progress.resumeToken,
+    });
+  }
+
+  return readOnboardingJourney() ??
+    getOrCreateOnboardingJourney({
+      dateKey: progress?.dateKey ?? getCurrentOnboardingDateKey(),
+      source,
+    });
 }

@@ -656,15 +656,28 @@ test.describe("onboarding delivery flow", () => {
 
     const action = page.getByTestId("onboarding-photo-select");
     await expect(action).toBeVisible();
+    await expect
+      .poll(() =>
+        page.evaluate(() =>
+          window.localStorage.getItem("neteruneko_onboarding_journey"),
+        ),
+      )
+      .not.toBeNull();
     const existingPhotoId = await page.evaluate(() => {
       const catId = window.localStorage.getItem("active_cat_id") ?? "default-cat";
+      const journey = JSON.parse(
+        window.localStorage.getItem("neteruneko_onboarding_journey") ?? "null",
+      ) as { id?: string } | null;
       const dateKey = new Intl.DateTimeFormat("en-CA", {
         timeZone: "Asia/Tokyo",
         year: "numeric",
         month: "2-digit",
         day: "2-digit",
       }).format(new Date());
-      const id = `onboarding-e2e-onboarding-anonymous-${dateKey}`;
+      if (!journey?.id) {
+        throw new Error("onboarding journey was not created");
+      }
+      const id = `onboarding-${journey.id}-${dateKey}`;
       window.localStorage.setItem(
         "nyaruhodo_exchange_own_sleeping_photos",
         JSON.stringify([
@@ -1436,6 +1449,9 @@ test.describe("onboarding delivery flow", () => {
       source_param: "instagram_bio",
       src: "instagram_bio",
     });
+    expect(events.onboarding_intro_view?.properties?.journey_id).toMatch(
+      /^onbj_[A-Za-z0-9_-]+$/,
+    );
   });
 
   test("restores the current onboarding state across repeated social URL visits", async ({
@@ -2372,6 +2388,7 @@ test.describe("onboarding delivery flow", () => {
   test("shows an external browser guide for Instagram bio links opened in an embedded browser", async ({
     page,
   }) => {
+    const capturedCreateBodies: Array<Record<string, any>> = [];
     await page.addInitScript(() => {
       Object.defineProperty(window.navigator, "userAgent", {
         get: () =>
@@ -2383,6 +2400,20 @@ test.describe("onboarding delivery flow", () => {
       Object.defineProperty(window.navigator, "clipboard", {
         configurable: true,
         value: { writeText: async () => undefined },
+      });
+    });
+    await page.route("**/api/onboarding/handoff/create", async (route) => {
+      capturedCreateBodies.push(route.request().postDataJSON());
+      await route.fulfill({
+        contentType: "application/json",
+        body: JSON.stringify({
+          ok: true,
+          token:
+            "onb_00000000-0000-4000-8000-000000000000_introhandoff0123456789",
+          expiresAt: new Date(Date.now() + 60_000).toISOString(),
+          continueUrl:
+            "/onboarding/continue?handoff=onb_00000000-0000-4000-8000-000000000000_introhandoff0123456789",
+        }),
       });
     });
 
@@ -2399,15 +2430,35 @@ test.describe("onboarding delivery flow", () => {
     await expect(
       page.getByRole("button", { name: "ねがおを1枚入れる" }),
     ).toHaveCount(0);
-    await page.getByRole("button", { name: "URLをコピーする" }).click();
+    await page
+      .getByRole("button", { name: "Safari／Chromeでつづける" })
+      .click();
+
+    await expect.poll(() => capturedCreateBodies.length).toBe(1);
+    expect(capturedCreateBodies[0]).toMatchObject({
+      source: "instagram_bio",
+      payload: {
+        entryPoint: "onboarding_intro",
+        source: "instagram_bio",
+        onboardingProgress: null,
+        onboardingCompleted: false,
+        catProfiles: [],
+        activeCatId: null,
+        ownSleepingPhotos: [],
+        keptExchangePhotos: [],
+        session: null,
+      },
+    });
+    await expect(page).toHaveURL(
+      /\/onboarding\/continue\?handoff=.*handoff_from=intro&source=instagram_bio&embedded=1/,
+    );
     await expect(
-      page.getByText(
-        "コピーしました。SafariやChromeを開き、アドレス欄に貼り付けてください。",
-      ),
+      page.getByRole("heading", { name: "SafariやChromeで つづけます" }),
     ).toBeVisible();
+    await expect(page.getByRole("button", { name: "URLをコピー" })).toBeVisible();
     await expect(
       page.getByRole("button", { name: "このまま試す" }),
-    ).toBeVisible();
+    ).toHaveCount(0);
   });
 
   test("resets local onboarding test data from an explicit reset link", async ({
@@ -3226,6 +3277,81 @@ test.describe("onboarding delivery flow", () => {
       /\/home\?handoff=restored&from=onboarding_second_photo/,
     );
     await expect(page.getByTestId("home-empty-action")).toBeVisible();
+  });
+
+  test("continues an intro handoff without replacing existing target-browser photos", async ({
+    page,
+  }) => {
+    await page.route("**/api/onboarding/handoff/redeem", async (route) => {
+      await route.fulfill({
+        contentType: "application/json",
+        body: JSON.stringify({
+          ok: true,
+          payload: {
+            version: 1,
+            createdAt: new Date().toISOString(),
+            source: "instagram_bio",
+            entryPoint: "onboarding_intro",
+            onboardingProgress: null,
+            onboardingCompleted: false,
+            catProfiles: [],
+            activeCatId: null,
+            ownSleepingPhotos: [],
+            keptExchangePhotos: [],
+            pendingReferralCode: null,
+            session: null,
+          },
+        }),
+      });
+    });
+
+    await page.goto(
+      "/onboarding/continue?handoff=onb_00000000-0000-4000-8000-000000000000_introhandoff0123456789&handoff_from=intro&source=instagram_bio",
+    );
+    await page.evaluate(() => {
+      window.localStorage.setItem(
+        "nyaruhodo_exchange_own_sleeping_photos",
+        JSON.stringify([{ id: "existing-target-own" }]),
+      );
+      window.localStorage.setItem(
+        "nyaruhodo_exchange_kept_photos",
+        JSON.stringify([{ id: "existing-target-kept" }]),
+      );
+    });
+
+    await expect(
+      page.getByRole("heading", { name: "このブラウザで つづけます" }),
+    ).toBeVisible();
+    await page
+      .getByRole("button", { name: "このブラウザで つづける" })
+      .click();
+
+    await expect(page).toHaveURL(
+      /\/onboarding\?source=instagram_bio&handoff=restored/,
+    );
+    await expect(
+      page.getByRole("button", { name: "ねがおを1枚入れる" }),
+    ).toBeVisible();
+    await expect
+      .poll(() =>
+        page.evaluate(() => ({
+          own: JSON.parse(
+            window.localStorage.getItem(
+              "nyaruhodo_exchange_own_sleeping_photos",
+            ) ?? "[]",
+          ),
+          kept: JSON.parse(
+            window.localStorage.getItem("nyaruhodo_exchange_kept_photos") ??
+              "[]",
+          ),
+          completed: window.localStorage.getItem("onboarding_completed"),
+        })),
+      )
+      .toEqual({
+        own: [{ id: "existing-target-own" }],
+        kept: [{ id: "existing-target-kept" }],
+        completed: null,
+      });
   });
 
   test("migrates a historical onboarding delivery into the received album", async ({

@@ -39,6 +39,9 @@ import {
   type OnboardingProgress,
   type OnboardingSource,
 } from "../../lib/onboarding/progress";
+import { createOnboardingHandoff } from "../../lib/onboarding/handoff";
+import { getOrCreateOnboardingJourney } from "../../lib/onboarding/journey";
+import { createOnboardingOwnPhotoId } from "../../lib/onboarding/journeyContract";
 import { getOnboardingExchangeLedgerInput } from "../../lib/onboarding/submissionClient";
 import { consumeOnboardingTestResetRequest } from "../../lib/onboarding/testReset";
 import { resolveOnboardingResumeDecision } from "../../lib/onboarding/stateMachine";
@@ -134,8 +137,10 @@ export function OnboardingFlow() {
   );
   const [isExternalBrowserGuideDismissed, setIsExternalBrowserGuideDismissed] =
     useState(false);
-  const [hasCopiedExternalBrowserUrl, setHasCopiedExternalBrowserUrl] =
+  const [isPreparingExternalBrowserHandoff, setIsPreparingExternalBrowserHandoff] =
     useState(false);
+  const [externalBrowserHandoffError, setExternalBrowserHandoffError] =
+    useState("");
   const [isEmbeddedBrowser, setIsEmbeddedBrowser] = useState(false);
   const [isOpeningEnvelope, setIsOpeningEnvelope] = useState(false);
   const [isRetryingDelivery, setIsRetryingDelivery] = useState(false);
@@ -476,24 +481,53 @@ export function OnboardingFlow() {
     }
 
     hasTrackedIntroViewRef.current = true;
+    getOrCreateOnboardingJourney({
+      dateKey: getJstDateKey(),
+      source,
+    });
     trackProductEvent("onboarding_intro_view", {
       source,
     });
   }
 
-  async function handleCopyOnboardingUrl() {
-    if (typeof window === "undefined") {
+  async function handleContinueInExternalBrowser() {
+    if (
+      typeof window === "undefined" ||
+      isPreparingExternalBrowserHandoff
+    ) {
       return;
     }
 
+    const source = getEffectiveEntrySource();
+    setIsPreparingExternalBrowserHandoff(true);
+    setExternalBrowserHandoffError("");
+
     try {
-      await navigator.clipboard.writeText(window.location.href);
-      setHasCopiedExternalBrowserUrl(true);
-      trackProductEvent("onboarding_external_browser_url_copied", {
-        source: getEffectiveEntrySource(),
+      const result = await createOnboardingHandoff({
+        source,
+        entryPoint: "onboarding_intro",
       });
-    } catch {
-      setHasCopiedExternalBrowserUrl(false);
+      const continueUrl = new URL(result.continueUrl, window.location.origin);
+      continueUrl.searchParams.set("handoff_from", "intro");
+      continueUrl.searchParams.set("source", source);
+      continueUrl.searchParams.set("embedded", "1");
+
+      trackProductEvent("onboarding_external_browser_handoff_created", {
+        source,
+      });
+      window.location.replace(continueUrl.toString());
+    } catch (error) {
+      setExternalBrowserHandoffError(
+        "つづきの準備ができませんでした。通信を確認して、もう一度お試しください。",
+      );
+      trackProductEvent("onboarding_external_browser_handoff_failed", {
+        source,
+        error:
+          error instanceof Error
+            ? error.message.slice(0, 120)
+            : "handoff_create_failed",
+      });
+      setIsPreparingExternalBrowserHandoff(false);
     }
   }
 
@@ -605,9 +639,14 @@ export function OnboardingFlow() {
       let catId = "";
       const onboardingDateKey = getJstDateKey();
       const anonymousId = getOrCreateOnboardingAnonymousId();
+      const onboardingJourney = getOrCreateOnboardingJourney({
+        dateKey: onboardingDateKey,
+        source: getEffectiveEntrySource(),
+      });
       const submissionId = createOnboardingSubmissionId(
         anonymousId,
         onboardingDateKey,
+        onboardingJourney.id,
       );
       const ownPhotoId = createOnboardingOwnPhotoId(submissionId);
 
@@ -690,7 +729,9 @@ export function OnboardingFlow() {
           dateKey: onboardingDateKey,
           stage: "submitted",
           source: getEffectiveEntrySource(),
+          journeyId: onboardingJourney.id,
           submissionId,
+          resumeToken: onboardingJourney.resumeToken,
           ownPhoto,
           selectedPhotoSrc: dataUrl,
           updatedAt: Date.now(),
@@ -820,9 +861,19 @@ export function OnboardingFlow() {
     const deliveryDateKey = progress?.dateKey ?? getJstDateKey();
     const anonymousId =
       progress?.anonymousId ?? getOrCreateOnboardingAnonymousId();
+    const onboardingJourney = getOrCreateOnboardingJourney({
+      dateKey: deliveryDateKey,
+      source: progress?.source ?? getEffectiveEntrySource(),
+      journeyId: progress?.journeyId,
+      resumeToken: progress?.resumeToken,
+    });
     const submissionId =
       progress?.submissionId ??
-      createOnboardingSubmissionId(anonymousId, deliveryDateKey);
+      createOnboardingSubmissionId(
+        anonymousId,
+        deliveryDateKey,
+        onboardingJourney.id,
+      );
     const selectedPhotoSrcForProgress =
       selectedPhotoSrc || progress?.selectedPhotoSrc || ownPhoto.src;
     const nextName = skip ? "" : catNameDraft.trim();
@@ -845,6 +896,11 @@ export function OnboardingFlow() {
     await patchOnboardingProgressDurably({
       stage: "opened",
       source: getEffectiveEntrySource(),
+      anonymousId,
+      dateKey: deliveryDateKey,
+      journeyId: progress?.journeyId ?? onboardingJourney.id,
+      submissionId,
+      resumeToken: progress?.resumeToken ?? onboardingJourney.resumeToken,
       ownPhoto,
       selectedPhotoSrc: selectedPhotoSrcForProgress,
       deliveredPhoto: deliveredPhoto ?? progress?.deliveredPhoto,
@@ -1452,9 +1508,10 @@ export function OnboardingFlow() {
         {shouldShowExternalBrowserGuide ? (
           <ExternalBrowserGuide
             source={entrySource}
-            copied={hasCopiedExternalBrowserUrl}
-            onCopy={() => {
-              void handleCopyOnboardingUrl();
+            isPreparing={isPreparingExternalBrowserHandoff}
+            errorMessage={externalBrowserHandoffError}
+            onOpenExternalBrowser={() => {
+              void handleContinueInExternalBrowser();
             }}
             onContinue={handleContinueInEmbeddedBrowser}
           />
@@ -1961,13 +2018,15 @@ function DeliveryWaiting({
 
 function ExternalBrowserGuide({
   source,
-  copied,
-  onCopy,
+  isPreparing,
+  errorMessage,
+  onOpenExternalBrowser,
   onContinue,
 }: {
   source: OnboardingSource;
-  copied: boolean;
-  onCopy: () => void;
+  isPreparing: boolean;
+  errorMessage: string;
+  onOpenExternalBrowser: () => void;
   onContinue: () => void;
 }) {
   const catIllustrations = useCatIllustrationAssets();
@@ -1992,11 +2051,11 @@ function ExternalBrowserGuide({
         開くと安心です
       </h1>
       <p style={styles.externalBrowserText}>
-        先にSafariやChromeで開くと、写真をそのままホーム画面アプリへ残せます。
+        先にSafariやChromeへ移ると、このあと入れる写真をそのままアプリに残せます。
       </p>
-      {copied ? (
-        <p style={styles.externalBrowserCopiedText} role="status">
-          コピーしました。SafariやChromeを開き、アドレス欄に貼り付けてください。
+      {errorMessage ? (
+        <p style={styles.externalBrowserCopiedText} role="alert">
+          {errorMessage}
         </p>
       ) : null}
       <div style={styles.externalBrowserActions}>
@@ -2004,17 +2063,24 @@ function ExternalBrowserGuide({
           type="button"
           variant="accent"
           fullWidth
-          onClick={onCopy}
+          disabled={isPreparing}
+          onClick={onOpenExternalBrowser}
           style={styles.onboardingCta}
         >
-          {copied ? "URLをコピーしました" : "URLをコピーする"}
+          {isPreparing ? "つづきを用意しています..." : "Safari／Chromeでつづける"}
         </AppButton>
-        <AppButton type="button" variant="quiet" size="md" onClick={onContinue}>
+        <AppButton
+          type="button"
+          variant="quiet"
+          size="md"
+          disabled={isPreparing}
+          onClick={onContinue}
+        >
           このまま試す
         </AppButton>
       </div>
       <p style={styles.externalBrowserFallbackText}>
-        うまく進まないときは、上の方法でやり直せます。
+        次の画面でURLをコピーし、SafariやChromeに貼り付けます。
       </p>
     </section>
   );
@@ -2429,14 +2495,6 @@ function createOnboardingOwnPhotoFallback({
     createdAt,
     captureContext: "onboarding",
   };
-}
-
-function createOnboardingOwnPhotoId(submissionId: string) {
-  const suffix = submissionId
-    .replace(/^onboarding:/, "")
-    .replace(/[^a-zA-Z0-9_-]/g, "-");
-
-  return `onboarding-${suffix}`;
 }
 
 function hasCompletedOnboardingEvidence() {

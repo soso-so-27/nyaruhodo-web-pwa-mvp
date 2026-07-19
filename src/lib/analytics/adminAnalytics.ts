@@ -959,6 +959,11 @@ function readMetadataString(event: AdminAnalyticsEvent, key: string) {
   return typeof value === "string" && value.trim() ? value.trim() : null;
 }
 
+export function readAnalyticsJourneyId(event: AdminAnalyticsEvent) {
+  const value = readMetadataString(event, "journey_id");
+  return value && /^onbj_[A-Za-z0-9_-]{15,155}$/.test(value) ? value : null;
+}
+
 function countUniqueActors(events: AdminAnalyticsEvent[]) {
   return new Set(events.map(getActorId).filter(Boolean)).size;
 }
@@ -970,6 +975,11 @@ function countIncidentActors(incidents: AnalyticsIssueIncident[]) {
 }
 
 function getActorId(event: AdminAnalyticsEvent) {
+  const journeyId = readAnalyticsJourneyId(event);
+  if (journeyId) {
+    return `journey:${journeyId}`;
+  }
+
   return event.user_id ? `user:${event.user_id}` : event.anonymous_id;
 }
 

@@ -7,6 +7,11 @@ import {
   type OnboardingSubmissionAdvanceInput,
 } from "../../../../lib/onboarding/submissionContract";
 import {
+  createOnboardingJourneySubmissionId,
+  createOnboardingOwnPhotoId,
+  isOnboardingJourneyId,
+} from "../../../../lib/onboarding/journeyContract";
+import {
   advanceOnboardingSubmission,
   readOnboardingSubmission,
 } from "../../../../lib/server/onboardingSubmissionLedger";
@@ -124,6 +129,7 @@ function normalizeAdvanceInput(body: unknown): OnboardingSubmissionAdvanceInput 
   const ownPhotoId = normalizeOptionalId(value.ownPhotoId, 240);
   const deliveryId = normalizeOptionalId(value.deliveryId, 240);
   const sourcePhotoId = normalizeOptionalId(value.sourcePhotoId, 240);
+  const journeyId = normalizeOptionalId(value.journeyId, 160);
   const source = normalizeSource(value.source);
   const dateKey = normalizeDateKey(value.dateKey);
 
@@ -136,7 +142,14 @@ function normalizeAdvanceInput(body: unknown): OnboardingSubmissionAdvanceInput 
     anonymousId === undefined ||
     ownPhotoId === undefined ||
     deliveryId === undefined ||
-    sourcePhotoId === undefined
+    sourcePhotoId === undefined ||
+    journeyId === undefined ||
+    (journeyId !== null &&
+      (!isOnboardingJourneyId(journeyId) ||
+        submissionId !==
+          createOnboardingJourneySubmissionId(journeyId, dateKey) ||
+        (ownPhotoId !== null &&
+          ownPhotoId !== createOnboardingOwnPhotoId(submissionId))))
   ) {
     return null;
   }
@@ -145,6 +158,7 @@ function normalizeAdvanceInput(body: unknown): OnboardingSubmissionAdvanceInput 
     anonymousId,
     dateKey,
     deliveryId,
+    journeyId,
     ownPhotoId,
     resumeToken: value.resumeToken,
     source,

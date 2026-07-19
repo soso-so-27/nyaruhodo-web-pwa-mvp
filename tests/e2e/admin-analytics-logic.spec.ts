@@ -97,6 +97,54 @@ test.describe("admin analytics logic", () => {
     ]);
   });
 
+  test("stitches embedded and external browsers into one onboarding journey", () => {
+    const journeyId = "onbj_00000000-0000-4000-8000-000000000001";
+    const events = [
+      event("line-browser", "onboarding_intro_view", 0, {
+        source: "instagram_bio",
+        metadata: {
+          journey_id: journeyId,
+          browser_context: "line",
+        },
+        inAppBrowser: true,
+      }),
+      event("safari-browser", "onboarding_photo_select_click", 1, {
+        source: "instagram_bio",
+        metadata: {
+          journey_id: journeyId,
+          browser_context: "browser",
+        },
+      }),
+      event("safari-browser", "onboarding_photo_submitted", 2, {
+        source: "instagram_bio",
+        metadata: { journey_id: journeyId },
+      }),
+      event("safari-browser", "onboarding_delivery_arrived", 3, {
+        source: "instagram_bio",
+        metadata: { journey_id: journeyId },
+      }),
+      event("safari-browser", "onboarding_delivery_opened", 4, {
+        source: "instagram_bio",
+        metadata: { journey_id: journeyId },
+      }),
+    ];
+
+    const result = buildAdminAnalytics(events);
+
+    expect(result.funnel.slice(0, 5).map((step) => step.users)).toEqual([
+      1, 1, 1, 1, 1,
+    ]);
+    expect(result.sourceBreakdown).toEqual([
+      {
+        source: "instagram_bio",
+        introUsers: 1,
+        submittedUsers: 1,
+        openedUsers: 1,
+        secondPhotoUsers: 0,
+      },
+    ]);
+  });
+
   test("groups impact events and privacy-safe environment labels", () => {
     const events = [
       event("actor-a", "photo_upload_error", 0, {

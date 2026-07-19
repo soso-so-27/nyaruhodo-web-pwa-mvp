@@ -21,6 +21,11 @@ import {
   createOnboardingResumeToken,
   isOnboardingResumeToken,
 } from "./submissionContract";
+import { getOrCreateOnboardingJourney } from "./journey";
+import {
+  createOnboardingJourneySubmissionId,
+  isOnboardingJourneyId,
+} from "./journeyContract";
 
 export type OnboardingSource =
   | "direct"
@@ -44,6 +49,7 @@ export type OnboardingProgress = {
   dateKey: string;
   stage: OnboardingProgressStage;
   source: OnboardingSource;
+  journeyId?: string;
   submissionId: string;
   resumeToken?: string;
   ownPhoto?: OwnSleepingPhoto;
@@ -275,16 +281,18 @@ function buildPatchedOnboardingProgress(
   const deliveredPhoto = sanitizeOptionalDeliveredPhoto(
     patch.deliveredPhoto ?? current?.deliveredPhoto,
   );
+  const journeyId = patch.journeyId ?? current?.journeyId;
 
   return {
     version: 1,
     anonymousId,
     dateKey,
     source: patch.source ?? current?.source ?? "direct",
+    ...(journeyId ? { journeyId } : {}),
     submissionId:
       patch.submissionId ??
       current?.submissionId ??
-      createOnboardingSubmissionId(anonymousId, dateKey),
+      createOnboardingSubmissionId(anonymousId, dateKey, journeyId),
     resumeToken: patch.resumeToken ?? current?.resumeToken,
     ownPhoto: patch.ownPhoto ?? current?.ownPhoto,
     selectedPhotoSrc: patch.selectedPhotoSrc ?? current?.selectedPhotoSrc,
@@ -305,10 +313,20 @@ function prepareOnboardingProgressForPersistence(
   progress: OnboardingProgress,
 ): OnboardingProgress {
   const deliveredPhoto = sanitizeOptionalDeliveredPhoto(progress.deliveredPhoto);
+  const resumeToken = progress.resumeToken ?? createOnboardingResumeToken();
+
+  if (isOnboardingJourneyId(progress.journeyId)) {
+    getOrCreateOnboardingJourney({
+      dateKey: progress.dateKey,
+      source: progress.source,
+      journeyId: progress.journeyId,
+      resumeToken,
+    });
+  }
 
   return {
     ...progress,
-    resumeToken: progress.resumeToken ?? createOnboardingResumeToken(),
+    resumeToken,
     ...(deliveredPhoto ? { deliveredPhoto } : { deliveredPhoto: undefined }),
     updatedAt: Date.now(),
   };
@@ -378,7 +396,12 @@ export function getOrCreateOnboardingAnonymousId() {
 export function createOnboardingSubmissionId(
   anonymousId: string,
   dateKey = getJstDateKey(),
+  journeyId?: string | null,
 ) {
+  if (isOnboardingJourneyId(journeyId)) {
+    return createOnboardingJourneySubmissionId(journeyId, dateKey);
+  }
+
   return `onboarding:${anonymousId}:${dateKey}`;
 }
 
@@ -393,6 +416,8 @@ function isValidOnboardingProgress(
     /^\d{4}-\d{2}-\d{2}$/.test(value.dateKey) &&
     typeof value.submissionId === "string" &&
     value.submissionId.length > 0 &&
+    (value.journeyId === undefined ||
+      isOnboardingJourneyId(value.journeyId)) &&
     (value.resumeToken === undefined ||
       isOnboardingResumeToken(value.resumeToken)) &&
     isOnboardingProgressStage(value.stage) &&

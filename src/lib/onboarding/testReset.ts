@@ -12,6 +12,7 @@ import { clearDurableOnboardingProgress } from "./progress";
 import { clearPhotoHistoryLedger } from "../photoHistoryLedger";
 import { clearCollectionPhotoLedger } from "../collection/photoHistoryLedger";
 import { markInternalAnalyticsSession } from "../analytics/traffic";
+import { clearOnboardingJourney } from "./journey";
 
 const RESET_QUERY_KEY = "reset_onboarding";
 const LEGACY_RESET_QUERY_KEY = "reset";
@@ -36,6 +37,7 @@ const ONBOARDING_TEST_RESET_KEYS = [
   STORAGE_KEYS.omoideMemories,
   STORAGE_KEYS.omoideMemoryControls,
   STORAGE_KEYS.onboardingCompleted,
+  STORAGE_KEYS.onboardingJourney,
   STORAGE_KEYS.onboardingProgress,
   STORAGE_KEYS.pendingReferralCode,
   "neteruneko_cat_gallery_intro_acknowledged",
@@ -125,6 +127,7 @@ export async function clearOnboardingTestTargetState() {
 }
 
 async function clearOnboardingTestLocalState() {
+  clearOnboardingJourney();
   await Promise.all([
     clearDurableOnboardingProgress().catch(() => undefined),
     clearPhotoHistoryLedger().catch(() => undefined),

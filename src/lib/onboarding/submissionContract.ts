@@ -13,6 +13,7 @@ export type OnboardingSubmissionAdvanceInput = {
   anonymousId: string | null;
   dateKey: string;
   deliveryId?: string | null;
+  journeyId?: string | null;
   ownPhotoId?: string | null;
   resumeToken: string;
   source: string;

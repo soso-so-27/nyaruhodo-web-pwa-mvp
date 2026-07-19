@@ -6,6 +6,7 @@ import {
   buildAnalyticsPeriodRange,
   classifyAnalyticsIssues,
   isInternalAnalyticsEvent,
+  readAnalyticsJourneyId,
   readAnalyticsAudience,
   readAnalyticsPeriod,
   type AdminAnalyticsEvent,
@@ -90,11 +91,27 @@ export async function GET(request: Request) {
   const readableEvents = ((data ?? []) as AdminAnalyticsEvent[]).filter((event) =>
     Boolean(event.event_name),
   );
-  const internalEvents = readableEvents.filter((event) =>
+  const directlyInternalEvents = readableEvents.filter((event) =>
     isInternalAnalyticsEvent(event, {
       adminUserId: access.user.id,
       internalAnonymousIds,
     }),
+  );
+  const internalJourneyIds = new Set(
+    directlyInternalEvents
+      .map(readAnalyticsJourneyId)
+      .filter((value): value is string => Boolean(value)),
+  );
+  const directlyInternalEventSet = new Set(directlyInternalEvents);
+  const internalEvents = readableEvents.filter(
+    (event) => {
+      if (directlyInternalEventSet.has(event)) {
+        return true;
+      }
+
+      const journeyId = readAnalyticsJourneyId(event);
+      return Boolean(journeyId && internalJourneyIds.has(journeyId));
+    },
   );
   const internalEventSet = new Set(internalEvents);
   const productEvents = readableEvents.filter(
@@ -154,6 +171,7 @@ function toSafeEvent(event: AdminAnalyticsEvent) {
     errorMessage: event.error_message,
     anonymousId: shortenId(event.anonymous_id),
     userId: shortenId(event.user_id),
+    journeyId: shortenId(readAnalyticsJourneyId(event)),
     submissionId: shortenId(event.submission_id),
   };
 }

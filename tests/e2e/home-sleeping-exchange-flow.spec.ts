@@ -2102,7 +2102,7 @@ test.describe("home sleeping exchange flow", () => {
       "1",
       { timeout: 15000 },
     );
-    expect(exchangeCalls).toBe(1);
+    await expect.poll(() => exchangeCalls, { timeout: 15000 }).toBe(1);
 
     const store = await page.evaluate(() =>
       JSON.parse(

@@ -9,7 +9,7 @@ const submissionSyncQueues = new Map<string, Promise<boolean>>();
 const SHADOW_SYNC_TIMEOUT_MS = 4_000;
 
 export function isOnboardingServerLedgerEnabled() {
-  return process.env.NEXT_PUBLIC_ENABLE_ONBOARDING_SERVER_LEDGER === "true";
+  return process.env.NEXT_PUBLIC_ENABLE_ONBOARDING_SERVER_LEDGER !== "false";
 }
 
 export function queueOnboardingSubmissionShadowSync(
@@ -69,6 +69,7 @@ export function getOnboardingExchangeLedgerInput(
 
   return {
     dateKey: progress.dateKey,
+    journeyId: progress.journeyId ?? null,
     resumeToken: progress.resumeToken,
     source: progress.source,
     submissionId: progress.submissionId,
@@ -105,6 +106,7 @@ function toAdvanceInput(
     anonymousId: progress.anonymousId,
     dateKey: progress.dateKey,
     deliveryId: progress.deliveredPhoto?.id ?? null,
+    ...(progress.journeyId ? { journeyId: progress.journeyId } : {}),
     ownPhotoId: progress.ownPhoto?.id ?? null,
     resumeToken: progress.resumeToken!,
     source: progress.source,

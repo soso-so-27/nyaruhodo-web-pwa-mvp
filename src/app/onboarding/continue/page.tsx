@@ -10,9 +10,11 @@ import { APP_PAGE_BACKGROUND } from "../../../components/ui/appTheme";
 import { trackProductEvent } from "../../../lib/analytics/productAnalytics";
 import { getDisplayEnvironment } from "../../../lib/displayEnvironment";
 import { redeemOnboardingHandoff } from "../../../lib/onboarding/handoff";
+import { normalizeOnboardingSource } from "../../../lib/onboarding/progress";
 import { STORAGE_KEYS } from "../../../lib/storage";
 
 type RestoreStatus = "ready" | "restoring" | "restored" | "error";
+type RestoreDestination = "home" | "onboarding";
 
 type OnboardingContinuePageProps = {
   searchParams: Promise<Record<string, string | string[] | undefined>>;
@@ -31,9 +33,14 @@ function OnboardingContinueContent({
   searchParams: Record<string, string | string[] | undefined>;
 }) {
   const token = readSearchParam(searchParams, "handoff") ?? "";
+  const handoffFrom = readSearchParam(searchParams, "handoff_from") ?? "";
+  const isIntroHandoff = handoffFrom === "intro";
+  const onboardingSource = normalizeOnboardingSource(
+    readSearchParam(searchParams, "source"),
+  );
   const next =
     readSearchParam(searchParams, "next") === "second_photo" ||
-    readSearchParam(searchParams, "handoff_from") === "account"
+    handoffFrom === "account"
       ? "second_photo"
       : "";
   const initialIsEmbeddedBrowser =
@@ -45,16 +52,25 @@ function OnboardingContinueContent({
   const [isEmbeddedBrowser, setIsEmbeddedBrowser] = useState(
     initialIsEmbeddedBrowser,
   );
-  const shouldShowEmbeddedGuide =
-    isEmbeddedBrowser && Boolean(token);
+  const [restoredDestination, setRestoredDestination] =
+    useState<RestoreDestination>(isIntroHandoff ? "onboarding" : "home");
+  const [restoredSource, setRestoredSource] = useState(onboardingSource);
+  const shouldShowEmbeddedGuide = isEmbeddedBrowser && Boolean(token);
   const hasTerminalRestoreError =
     status === "error" && isTerminalRestoreError(restoreErrorCode);
+  const restartHref = isIntroHandoff
+    ? `/onboarding?source=${encodeURIComponent(onboardingSource)}`
+    : "/onboarding?reset_onboarding=1";
   const continueUrl =
     typeof window === "undefined"
       ? ""
-      : `${window.location.origin}/onboarding/continue?handoff=${encodeURIComponent(
+      : buildContinueUrl({
+          origin: window.location.origin,
           token,
-        )}${next ? `&next=${encodeURIComponent(next)}` : ""}`;
+          next,
+          isIntroHandoff,
+          source: onboardingSource,
+        });
 
   useEffect(() => {
     setIsEmbeddedBrowser(detectEmbeddedBrowser());
@@ -68,7 +84,7 @@ function OnboardingContinueContent({
     }
   }, [token]);
 
-  async function restoreAndGoHome(method: "auto" | "manual") {
+  async function restoreAndContinue(method: "auto" | "manual") {
     if (!token || status === "restoring") {
       return;
     }
@@ -90,11 +106,20 @@ function OnboardingContinueContent({
         method,
         environment: getDisplayEnvironment(),
       });
+      const destination =
+        result.entryPoint === "onboarding_intro" ? "onboarding" : "home";
+      const source = result.source ?? onboardingSource;
+      setRestoredDestination(destination);
+      setRestoredSource(source);
       setStatus("restored");
       setRestoreErrorCode(null);
-      setMessage("ねがおを復元しました。ホームへ移動します。");
+      setMessage(
+        destination === "onboarding"
+          ? "準備できました。このブラウザでつづけます。"
+          : "ねがおを復元しました。ホームへ移動します。",
+      );
       window.setTimeout(() => {
-        goHome();
+        goNext(destination, source);
       }, 350);
     } catch (error) {
       const errorMessage =
@@ -121,7 +146,17 @@ function OnboardingContinueContent({
     }
   }
 
-  function goHome() {
+  function goNext(
+    destination = restoredDestination,
+    source = restoredSource,
+  ) {
+    if (destination === "onboarding") {
+      window.location.assign(
+        `/onboarding?source=${encodeURIComponent(source)}&handoff=restored`,
+      );
+      return;
+    }
+
     const suffix =
       next === "second_photo" ? "&from=onboarding_second_photo" : "";
     window.location.assign(`/home?handoff=restored${suffix}`);
@@ -149,16 +184,22 @@ function OnboardingContinueContent({
       <div style={styles.container}>
         <WordmarkHeader style={styles.header} />
         <AppCard variant="section" padding="lg" style={styles.card}>
-          <p style={styles.eyebrow}>つづき</p>
+          <p style={styles.eyebrow}>
+            {isIntroHandoff ? "ブラウザをかえる" : "つづき"}
+          </p>
           <h1 style={styles.title}>
             {shouldShowEmbeddedGuide
-              ? "ホーム画面アプリで つづけます"
-              : getRestoreHeading(status)}
+              ? isIntroHandoff
+                ? "SafariやChromeで つづけます"
+                : "ホーム画面アプリで つづけます"
+              : getRestoreHeading(status, isIntroHandoff)}
           </h1>
           <p style={styles.body}>
             {shouldShowEmbeddedGuide
-              ? "LINEやInstagramの中で入れた写真は、ホーム画面アプリへ自動では渡りません。URLをコピーして、ChromeやSafari、またはホーム画面アプリで開いてください。"
-              : getRestoreBody(status)}
+              ? isIntroHandoff
+                ? "下のURLをコピーして、SafariやChromeのアドレス欄に貼り付けてください。同じ入口からつづけられます。"
+                : "LINEやInstagramの中で入れた写真は、ホーム画面アプリへ自動では渡りません。URLをコピーして、ChromeやSafari、またはホーム画面アプリで開いてください。"
+              : getRestoreBody(status, isIntroHandoff)}
           </p>
 
           {shouldShowEmbeddedGuide ? (
@@ -190,12 +231,14 @@ function OnboardingContinueContent({
               </AppButton>
             ) : hasTerminalRestoreError ? (
               <AppButton
-                href="/onboarding?reset_onboarding=1"
+                href={restartHref}
                 variant="accent"
                 fullWidth
                 data-testid="onboarding-handoff-restart"
               >
-                はじめからやり直す
+                {isIntroHandoff
+                  ? "このブラウザで はじめる"
+                  : "はじめからやり直す"}
               </AppButton>
             ) : (
               <AppButton
@@ -206,31 +249,39 @@ function OnboardingContinueContent({
                 data-testid="onboarding-handoff-primary"
                 onClick={() => {
                   if (status === "restored") {
-                    goHome();
+                    goNext();
                     return;
                   }
 
-                  void restoreAndGoHome("manual");
+                  void restoreAndContinue("manual");
                 }}
               >
                 {status === "restoring"
-                  ? "戻しています..."
+                  ? isIntroHandoff
+                    ? "準備しています..."
+                    : "戻しています..."
                   : status === "restored"
-                    ? "ホームへ"
+                    ? isIntroHandoff
+                      ? "つづける"
+                      : "ホームへ"
                     : status === "error"
                       ? "もう一度ためす"
-                      : "ねがおを戻して ホームへ"}
+                      : isIntroHandoff
+                        ? "このブラウザで つづける"
+                        : "ねがおを戻して ホームへ"}
               </AppButton>
             )}
           </div>
           {status === "error" && !hasTerminalRestoreError ? (
             <AppButton
-              href="/onboarding?reset_onboarding=1"
+              href={restartHref}
               variant="quiet"
               size="md"
               data-testid="onboarding-handoff-restart"
             >
-              はじめからやり直す
+              {isIntroHandoff
+                ? "このブラウザで はじめる"
+                : "はじめからやり直す"}
             </AppButton>
           ) : null}
         </AppCard>
@@ -245,6 +296,34 @@ function readSearchParam(
 ) {
   const value = searchParams[key];
   return Array.isArray(value) ? (value[0] ?? null) : (value ?? null);
+}
+
+function buildContinueUrl({
+  origin,
+  token,
+  next,
+  isIntroHandoff,
+  source,
+}: {
+  origin: string;
+  token: string;
+  next: string;
+  isIntroHandoff: boolean;
+  source: string;
+}) {
+  const url = new URL("/onboarding/continue", origin);
+  url.searchParams.set("handoff", token);
+
+  if (next) {
+    url.searchParams.set("next", next);
+  }
+
+  if (isIntroHandoff) {
+    url.searchParams.set("handoff_from", "intro");
+    url.searchParams.set("source", source);
+  }
+
+  return url.toString();
 }
 
 function getRestoreErrorMessage(errorMessage: string) {
@@ -267,7 +346,23 @@ function getRestoreErrorMessage(errorMessage: string) {
   return "つづきの復元ができませんでした。通信を確認してもう一度試すか、この端末ではじめからお試しください。";
 }
 
-function getRestoreHeading(status: RestoreStatus) {
+function getRestoreHeading(status: RestoreStatus, isIntroHandoff: boolean) {
+  if (isIntroHandoff) {
+    if (status === "ready") {
+      return "このブラウザで つづけます";
+    }
+
+    if (status === "restoring") {
+      return "つづきを 準備しています";
+    }
+
+    if (status === "restored") {
+      return "準備できました";
+    }
+
+    return "つづけられませんでした";
+  }
+
   if (status === "ready") {
     return "ねがおの つづきを戻します";
   }
@@ -283,7 +378,23 @@ function getRestoreHeading(status: RestoreStatus) {
   return "つづきを戻せませんでした";
 }
 
-function getRestoreBody(status: RestoreStatus) {
+function getRestoreBody(status: RestoreStatus, isIntroHandoff: boolean) {
+  if (isIntroHandoff) {
+    if (status === "ready") {
+      return "InstagramやLINEで開いたつづきです。ここから写真を入れられます。";
+    }
+
+    if (status === "restoring") {
+      return "少しだけお待ちください。";
+    }
+
+    if (status === "restored") {
+      return "同じ入口を、このブラウザに引き継ぎました。";
+    }
+
+    return "通信を確認して、もう一度お試しください。";
+  }
+
   if (status === "ready") {
     return "さっき入れたねがおを、このブラウザへ戻します。";
   }
