@@ -29,7 +29,8 @@ test.describe("cat photo storage backup", () => {
     });
     await ensureSourceBucket(supabase);
 
-    const objectPath = `e2e/storage-backup/${crypto.randomUUID()}.png`;
+    const backupPrefix = "e2e/storage-backup";
+    const objectPath = `${backupPrefix}/${crypto.randomUUID()}.png`;
     const body = new Uint8Array([137, 80, 78, 71, Date.now() % 255]);
 
     try {
@@ -38,7 +39,9 @@ test.describe("cat photo storage backup", () => {
         .upload(objectPath, body, { contentType: "image/png", upsert: true });
       expect(uploadError).toBeNull();
 
-      const firstRun = await runCatPhotosBackup(supabase);
+      const firstRun = await runCatPhotosBackup(supabase, {
+        prefix: backupPrefix,
+      });
       expect(firstRun.failed).toBe(0);
       expect(firstRun.copied).toBeGreaterThanOrEqual(1);
 
@@ -48,7 +51,9 @@ test.describe("cat photo storage backup", () => {
       expect(downloadError).toBeNull();
       expect(new Uint8Array(await backupData!.arrayBuffer())).toEqual(body);
 
-      const secondRun = await runCatPhotosBackup(supabase);
+      const secondRun = await runCatPhotosBackup(supabase, {
+        prefix: backupPrefix,
+      });
       expect(secondRun.failed).toBe(0);
       expect(secondRun.skipped).toBeGreaterThanOrEqual(1);
 
@@ -57,7 +62,9 @@ test.describe("cat photo storage backup", () => {
         .remove([objectPath]);
       expect(sourceDeleteError).toBeNull();
 
-      const afterDeleteRun = await runCatPhotosBackup(supabase);
+      const afterDeleteRun = await runCatPhotosBackup(supabase, {
+        prefix: backupPrefix,
+      });
       expect(afterDeleteRun.failed).toBe(0);
       const { data: retainedBackup, error: retainedError } =
         await supabase.storage

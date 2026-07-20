@@ -34,7 +34,9 @@ test("shows the launch dashboard in Japanese with actionable sections", async ({
     "aria-pressed",
     "true",
   );
-  await expect(page.getByRole("heading", { name: "最初の一通まで" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "新規オンボ" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "既存・再訪" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "引き継ぎ・復元" })).toBeVisible();
   await expect(page.getByRole("heading", { name: "今夜の一通" })).toBeVisible();
   await expect(page.getByRole("heading", { name: "端末と入口" })).toBeVisible();
   await expect(

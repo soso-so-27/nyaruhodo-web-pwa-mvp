@@ -21,11 +21,13 @@ export type StorageBackupResult = {
 
 export async function runCatPhotosBackup(
   supabase: SupabaseClient,
+  options: { prefix?: string } = {},
 ): Promise<StorageBackupResult> {
   const bucketCreated = await ensurePrivateBackupBucket(supabase);
+  const prefix = options.prefix ?? "";
   const [sourceObjects, backupObjects] = await Promise.all([
-    listAllObjects(supabase, CAT_PHOTOS_BUCKET),
-    listAllObjects(supabase, CAT_PHOTOS_BACKUP_BUCKET),
+    listAllObjects(supabase, CAT_PHOTOS_BUCKET, prefix),
+    listAllObjects(supabase, CAT_PHOTOS_BACKUP_BUCKET, prefix),
   ]);
   const backupsByPath = new Map(
     backupObjects.map((object) => [object.path, object]),
