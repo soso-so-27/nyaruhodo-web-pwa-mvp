@@ -399,6 +399,30 @@ async function handleExchangePost(request: Request) {
     }
   }
 
+  if (isOnboardingExchange && !debugDryRun) {
+    const priorDelivery = await readPriorExchangeForIdentity({
+      supabase,
+      userId,
+      senderAnonymousId,
+      excludeLocalDeliveryId: idempotentDeliveryId,
+    });
+
+    if (priorDelivery.error) {
+      console.warn(
+        "[sleeping-delivery/exchange] prior onboarding delivery lookup failed",
+        { code: priorDelivery.error.code },
+      );
+      return exchangeError("prior_delivery_lookup_failed", 500);
+    }
+
+    if (priorDelivery.data) {
+      console.warn(
+        "[sleeping-delivery/exchange] blocked repeat onboarding after delivery",
+      );
+      return exchangeError("onboarding_already_completed", 409);
+    }
+  }
+
   if (!debugDryRun && shouldAddOwnPhotoToPool) {
     const existingOwnMoment = onboardingJourneyId
       ? await readExistingOnboardingOwnMoment({
@@ -1002,7 +1026,10 @@ function isOnboardingSource(value: string) {
   ].includes(value);
 }
 
-function exchangeError(error: string, status: 400 | 401 | 403 | 413 | 415 | 429) {
+function exchangeError(
+  error: string,
+  status: 400 | 401 | 403 | 409 | 413 | 415 | 429 | 500,
+) {
   return NextResponse.json({ photo: null, source: "none", error }, { status });
 }
 
@@ -1258,6 +1285,66 @@ async function readExistingDeliveryByLocalId({
   }
 
   return data as RemoteDeliveryRow | null;
+}
+
+async function readPriorExchangeForIdentity({
+  supabase,
+  userId,
+  senderAnonymousId,
+  excludeLocalDeliveryId,
+}: {
+  supabase: SupabaseClient;
+  userId: string | null;
+  senderAnonymousId: string | null;
+  excludeLocalDeliveryId: string | null;
+}) {
+  if (userId) {
+    const result = await readPriorExchange({
+      supabase,
+      identityColumn: "user_id",
+      identityValue: userId,
+      excludeLocalDeliveryId,
+    });
+
+    if (result.error || result.data) {
+      return result;
+    }
+  }
+
+  if (senderAnonymousId) {
+    return readPriorExchange({
+      supabase,
+      identityColumn: "anonymous_id",
+      identityValue: senderAnonymousId,
+      excludeLocalDeliveryId,
+    });
+  }
+
+  return { data: null, error: null };
+}
+
+async function readPriorExchange({
+  supabase,
+  identityColumn,
+  identityValue,
+  excludeLocalDeliveryId,
+}: {
+  supabase: SupabaseClient;
+  identityColumn: "anonymous_id" | "user_id";
+  identityValue: string;
+  excludeLocalDeliveryId: string | null;
+}) {
+  let query = supabase
+    .from("cat_moment_deliveries")
+    .select("id")
+    .eq(identityColumn, identityValue)
+    .limit(1);
+
+  if (excludeLocalDeliveryId) {
+    query = query.neq("local_delivery_id", excludeLocalDeliveryId);
+  }
+
+  return query.maybeSingle<{ id: string }>();
 }
 
 async function readDeliveredSourceMomentIds({

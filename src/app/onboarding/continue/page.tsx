@@ -9,6 +9,7 @@ import { WordmarkHeader } from "../../../components/ui/AppHeader";
 import { APP_PAGE_BACKGROUND } from "../../../components/ui/appTheme";
 import { trackProductEvent } from "../../../lib/analytics/productAnalytics";
 import { getDisplayEnvironment } from "../../../lib/displayEnvironment";
+import { hasCompletedOnboardingState } from "../../../lib/onboarding/completion";
 import { redeemOnboardingHandoff } from "../../../lib/onboarding/handoff";
 import { normalizeOnboardingSource } from "../../../lib/onboarding/progress";
 import { STORAGE_KEYS } from "../../../lib/storage";
@@ -107,8 +108,20 @@ function OnboardingContinueContent({
         environment: getDisplayEnvironment(),
       });
       const destination =
-        result.entryPoint === "onboarding_intro" ? "onboarding" : "home";
+        result.entryPoint === "onboarding_intro" &&
+        !hasCompletedOnboardingState()
+          ? "onboarding"
+          : "home";
       const source = result.source ?? onboardingSource;
+      if (
+        result.entryPoint === "onboarding_intro" &&
+        destination === "home"
+      ) {
+        trackProductEvent("onboarding_completed_reentry_blocked", {
+          source,
+          surface: "handoff_continue",
+        });
+      }
       setRestoredDestination(destination);
       setRestoredSource(source);
       setStatus("restored");
@@ -150,7 +163,7 @@ function OnboardingContinueContent({
     destination = restoredDestination,
     source = restoredSource,
   ) {
-    if (destination === "onboarding") {
+    if (destination === "onboarding" && !hasCompletedOnboardingState()) {
       window.location.assign(
         `/onboarding?source=${encodeURIComponent(source)}&handoff=restored`,
       );

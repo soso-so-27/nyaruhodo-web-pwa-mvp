@@ -457,6 +457,99 @@ test.describe("onboarding submission ledger", () => {
     }
   });
 
+  test("blocks a new onboarding journey after the same identity already received a delivery", async ({
+    request,
+  }) => {
+    const adminSupabase = createAdminSupabaseClientFromEnv();
+    test.skip(!adminSupabase, "Local Supabase service role is required.");
+    if (!adminSupabase) return;
+
+    const stamp = `${Date.now()}-${crypto.randomUUID()}`;
+    const anonymousId = `repeat-onboarding-${stamp}`;
+    const journeyId = `onbj_${crypto.randomUUID()}`;
+    const dateKey = getJstDateKey();
+    const submissionId = createOnboardingJourneySubmissionId(
+      journeyId,
+      dateKey,
+    );
+    const ownPhotoId = createOnboardingOwnPhotoId(submissionId);
+    const priorDeliveryId = `repeat-prior-delivery-${stamp}`;
+
+    try {
+      const { error: priorDeliveryError } = await adminSupabase
+        .from("cat_moment_deliveries")
+        .insert({
+          anonymous_id: anonymousId,
+          local_delivery_id: priorDeliveryId,
+          metadata: { source: "e2e-prior-onboarding" },
+          photo_url: catPhotoDataUrl,
+          recipient_local_cat_id: `repeat-cat-${stamp}`,
+          source_photo_id: `repeat-source-${stamp}`,
+          status: "kept",
+          user_id: null,
+        });
+      expect(priorDeliveryError).toBeNull();
+
+      const exchange = await request.post("/api/sleeping-delivery/exchange", {
+        headers: {
+          "x-forwarded-for": `192.0.2.${Date.now() % 200}`,
+        },
+        data: {
+          ownPhoto: {
+            id: ownPhotoId,
+            catId: `repeat-cat-${stamp}`,
+            ownerCatId: `repeat-cat-${stamp}`,
+            src: catPhotoDataUrl,
+            createdAt: Date.now(),
+            shared: true,
+          },
+          triggerLabel: "sleeping",
+          theme: "sleeping",
+          category: "sleeping",
+          seed: submissionId,
+          deliveryDateKey: dateKey,
+          recipientCatId: `repeat-cat-${stamp}`,
+          anonymousId,
+          blockedPhotoIds: [],
+          mode: "onboarding",
+          onboardingSubmission: {
+            dateKey,
+            journeyId,
+            resumeToken: createOnboardingResumeToken(),
+            source: "instagram_bio",
+            submissionId,
+          },
+        },
+      });
+
+      expect(exchange.status()).toBe(409);
+      await expect(exchange.json()).resolves.toMatchObject({
+        error: "onboarding_already_completed",
+        photo: null,
+      });
+
+      const { count, error: ownMomentError } = await adminSupabase
+        .from("cat_moments")
+        .select("id", { count: "exact", head: true })
+        .eq("local_moment_id", ownPhotoId);
+      expect(ownMomentError).toBeNull();
+      expect(count).toBe(0);
+    } finally {
+      await adminSupabase
+        .from("onboarding_submissions")
+        .delete()
+        .eq("submission_id", submissionId);
+      await adminSupabase
+        .from("cat_moment_deliveries")
+        .delete()
+        .eq("local_delivery_id", priorDeliveryId);
+      await adminSupabase
+        .from("cat_moments")
+        .delete()
+        .eq("local_moment_id", ownPhotoId);
+    }
+  });
+
   test("does not regress when later stages arrive concurrently", async ({
     request,
   }) => {

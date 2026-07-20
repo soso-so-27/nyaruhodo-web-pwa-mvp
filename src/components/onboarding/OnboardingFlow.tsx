@@ -14,9 +14,9 @@ import {
   saveRemoteDeliveryStockPhoto,
 } from "../../lib/home/deliveryCandidates";
 import {
+  deleteOwnSleepingPhoto,
   keepExchangePhoto,
   persistOwnSleepingPhotoHistory,
-  readOwnSleepingPhotos,
   saveOwnSleepingPhoto,
   updateKeptExchangePhotoDataUrl,
   updateKeptExchangePhotoDimensions,
@@ -34,12 +34,18 @@ import {
   patchOnboardingProgressDurably,
   readCurrentOnboardingProgress,
   readCurrentOnboardingProgressDurably,
+  readOnboardingProgress,
   readOnboardingSourceFromLocation,
   writeOnboardingProgressDurably,
   type OnboardingProgress,
   type OnboardingSource,
 } from "../../lib/onboarding/progress";
 import { createOnboardingHandoff } from "../../lib/onboarding/handoff";
+import {
+  clearOnboardingCompletionMarker,
+  hasCompletedOnboardingEvidence,
+  hasOnboardingCompletionMarker,
+} from "../../lib/onboarding/completion";
 import { getOrCreateOnboardingJourney } from "../../lib/onboarding/journey";
 import { createOnboardingOwnPhotoId } from "../../lib/onboarding/journeyContract";
 import { getOnboardingExchangeLedgerInput } from "../../lib/onboarding/submissionClient";
@@ -354,30 +360,46 @@ export function OnboardingFlow() {
     source: OnboardingSource,
     progress = readCurrentOnboardingProgress(),
   ) {
+    if (redirectCompletedOnboarding(source)) {
+      return;
+    }
 
     if (restoreExistingProgress(progress, source)) {
       return;
     }
 
-    if (
-      (source === "direct" || source === "referral") &&
-      window.localStorage.getItem(STORAGE_KEYS.onboardingCompleted) === "true"
-    ) {
-      if (!hasCompletedOnboardingEvidence()) {
-        window.localStorage.removeItem(STORAGE_KEYS.onboardingCompleted);
-        trackProductEvent("onboarding_stale_completion_cleared", {
-          source,
-          surface: "onboarding",
-        });
-        trackOnboardingIntroView(source);
-        return;
-      }
+    trackOnboardingIntroView(source);
+  }
 
-      router.replace("/home");
-      return;
+  function redirectCompletedOnboarding(source: OnboardingSource) {
+    if (!hasOnboardingCompletionMarker()) {
+      return false;
     }
 
-    trackOnboardingIntroView(source);
+    if (!hasCompletedOnboardingEvidence()) {
+      clearOnboardingCompletionMarker();
+      trackProductEvent("onboarding_stale_completion_cleared", {
+        source,
+        surface: "onboarding",
+      });
+      return false;
+    }
+
+    trackProductEvent("onboarding_completed_reentry_blocked", {
+      source,
+      surface: "onboarding",
+    });
+    if (readOnboardingProgress()?.stage === "opened") {
+      markOnboardingAlbumCompletionReady();
+      router.replace(
+        isEmbeddedInAppBrowser()
+          ? `/account/create?from=onboarding&source=${encodeURIComponent(source)}&next=second_photo`
+          : "/home?from=onboarding_second_photo",
+      );
+    } else {
+      router.replace("/home");
+    }
+    return true;
   }
 
   function restoreExistingProgress(
@@ -547,9 +569,15 @@ export function OnboardingFlow() {
       return;
     }
 
+    const source = getEffectiveEntrySource();
+
+    if (redirectCompletedOnboarding(source)) {
+      return;
+    }
+
     const restored = restoreExistingProgress(
       readCurrentOnboardingProgress(),
-      getEffectiveEntrySource(),
+      source,
     );
 
     if (restored) {
@@ -1232,6 +1260,17 @@ export function OnboardingFlow() {
       mode: "onboarding",
       onboardingSubmission,
     });
+
+    if (exchangeResult?.error === "onboarding_already_completed") {
+      deleteOwnSleepingPhoto(ownPhoto.id);
+      window.localStorage.setItem(STORAGE_KEYS.onboardingCompleted, "true");
+      trackProductEvent("onboarding_completed_reentry_blocked", {
+        source: getEffectiveEntrySource(),
+        surface: "exchange",
+      });
+      router.replace("/home");
+      return true;
+    }
 
     let nextPhoto = exchangeResult?.photo ?? null;
     let deliverySource = exchangeResult?.photo ? "exchange" : "illustration_fallback";
@@ -2495,16 +2534,6 @@ function createOnboardingOwnPhotoFallback({
     createdAt,
     captureContext: "onboarding",
   };
-}
-
-function hasCompletedOnboardingEvidence() {
-  const progress = readCurrentOnboardingProgress();
-
-  if (progress?.stage === "album_created" || progress?.stage === "opened") {
-    return true;
-  }
-
-  return readOwnSleepingPhotos().length > 0;
 }
 
 async function saveStockCandidateWithFallback(file: File) {

@@ -1699,11 +1699,10 @@ test.describe("onboarding delivery flow", () => {
     expect(exchangeCalls).toBe(1);
   });
 
-  test("does not let yesterday album completion block a new social onboarding day", async ({
+  test("does not reopen social onboarding after completion on a previous day", async ({
     page,
   }) => {
     await page.clock.setFixedTime(new Date("2026-07-18T12:00:00+09:00"));
-    await routeImmediateDelivery(page);
     await page.addInitScript(() => {
       const now = new Date();
       const yesterday = new Date(now.getTime() - 24 * 60 * 60 * 1000);
@@ -1730,40 +1729,36 @@ test.describe("onboarding delivery flow", () => {
     });
 
     await page.goto("/onboarding?source=instagram_story");
-    await expect(page).not.toHaveURL(/\/home/);
-    await expect(
-      page.getByRole("button", { name: "ねがおを1枚入れる" }),
-    ).toBeVisible();
-    await expect(
-      page.locator(
-        'img[src$="/illustrations/candidates/theme-e5-direction/muted.webp"]',
-      ),
-    ).toHaveCount(1);
+    await expect(page).toHaveURL(/\/home/);
+    await expect(page.getByTestId("onboarding-photo-select")).toHaveCount(0);
+  });
 
-    await page.getByRole("button", { name: "ねがおを1枚入れる" }).click();
-    await page.locator('input[type="file"]').last().setInputFiles({
-      name: "today-own-sleeping.png",
-      mimeType: "image/png",
-      buffer: testPng,
+  test("blocks the photo picker when completion appears after the onboarding page opened", async ({
+    page,
+  }) => {
+    await page.goto("/onboarding?source=instagram_bio");
+    await expect(page.getByTestId("onboarding-photo-select")).toBeVisible();
+
+    await page.evaluate(() => {
+      const previousDate = "2026-07-17";
+      window.localStorage.setItem("onboarding_completed", "true");
+      window.localStorage.setItem(
+        "neteruneko_onboarding_progress",
+        JSON.stringify({
+          version: 1,
+          anonymousId: "completed-after-load",
+          dateKey: previousDate,
+          stage: "opened",
+          source: "instagram_bio",
+          submissionId: `onboarding:completed-after-load:${previousDate}`,
+          updatedAt: Date.now() - 24 * 60 * 60 * 1000,
+        }),
+      );
     });
 
-    await expect(page.getByRole("button", { name: "ねこだよりを ひらく" })).toBeVisible();
-    const progress = await readOnboardingProgress(page);
-    const todayKey = await page.evaluate(() =>
-      new Intl.DateTimeFormat("en-CA", {
-        timeZone: "Asia/Tokyo",
-        year: "numeric",
-        month: "2-digit",
-        day: "2-digit",
-      }).format(new Date()),
-    );
-
-    expect(progress).toMatchObject({
-      dateKey: todayKey,
-      stage: "arrived",
-      source: "instagram_story",
-    });
-    expect(progress.submissionId).toContain(todayKey);
+    await page.getByTestId("onboarding-photo-select").click();
+    await expect(page).toHaveURL(/\/home/);
+    await expect(page.locator('input[type="file"]')).toHaveCount(0);
   });
 
   test("normalizes unknown social source without blocking onboarding", async ({
@@ -2169,6 +2164,34 @@ test.describe("onboarding delivery flow", () => {
       page.getByRole("button", { name: "ねこだよりを ひらく" }),
     ).toBeVisible();
     await expect.poll(() => readOwnSleepingPhotoCount(page)).toBe(1);
+  });
+
+  test("removes the staged photo when the server blocks repeat onboarding", async ({
+    page,
+  }) => {
+    await page.route("**/api/sleeping-delivery/exchange", async (route) => {
+      await route.fulfill({
+        status: 409,
+        contentType: "application/json",
+        body: JSON.stringify({
+          photo: null,
+          source: "none",
+          error: "onboarding_already_completed",
+        }),
+      });
+    });
+
+    await page.goto("/onboarding");
+    await page.getByTestId("onboarding-photo-select").click();
+    await page.locator('input[type="file"]').last().setInputFiles({
+      name: "repeat-onboarding.png",
+      mimeType: "image/png",
+      buffer: testPng,
+    });
+
+    await expect(page).toHaveURL(/\/home$/);
+    await expect.poll(() => readOwnSleepingPhotoCount(page)).toBe(0);
+    await expect(page.getByTestId("onboarding-photo-select")).toHaveCount(0);
   });
 
   test("returns to photo selection after an unsupported onboarding file", async ({
@@ -3354,6 +3377,58 @@ test.describe("onboarding delivery flow", () => {
         kept: [{ id: "existing-target-kept" }],
         completed: null,
       });
+  });
+
+  test("sends a completed target browser home instead of reopening an intro handoff", async ({
+    page,
+  }) => {
+    await page.addInitScript(() => {
+      window.localStorage.setItem("onboarding_completed", "true");
+      window.localStorage.setItem(
+        "neteruneko_onboarding_progress",
+        JSON.stringify({
+          version: 1,
+          anonymousId: "completed-handoff-target",
+          dateKey: "2026-07-17",
+          stage: "opened",
+          source: "instagram_bio",
+          submissionId: "onboarding:completed-handoff-target:2026-07-17",
+          updatedAt: Date.now() - 24 * 60 * 60 * 1000,
+        }),
+      );
+    });
+    await page.route("**/api/onboarding/handoff/redeem", async (route) => {
+      await route.fulfill({
+        contentType: "application/json",
+        body: JSON.stringify({
+          ok: true,
+          payload: {
+            version: 1,
+            createdAt: new Date().toISOString(),
+            source: "instagram_bio",
+            entryPoint: "onboarding_intro",
+            onboardingProgress: null,
+            onboardingCompleted: false,
+            catProfiles: [],
+            activeCatId: null,
+            ownSleepingPhotos: [],
+            keptExchangePhotos: [],
+            pendingReferralCode: null,
+            session: null,
+          },
+        }),
+      });
+    });
+
+    await page.goto(
+      "/onboarding/continue?handoff=onb_00000000-0000-4000-8000-000000000000_completedhandoff012345&handoff_from=intro&source=instagram_bio",
+    );
+    await page
+      .getByRole("button", { name: "このブラウザで つづける" })
+      .click();
+
+    await expect(page).toHaveURL(/\/home\?handoff=restored/);
+    await expect(page.getByTestId("onboarding-photo-select")).toHaveCount(0);
   });
 
   test("migrates a historical onboarding delivery into the received album", async ({
