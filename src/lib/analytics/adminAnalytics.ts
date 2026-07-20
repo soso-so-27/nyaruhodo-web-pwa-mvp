@@ -147,6 +147,74 @@ const DELIVERY_HEALTH_METRICS: readonly EventDefinition[] = [
   },
 ];
 
+const RETURNING_FUNNEL_STEPS: readonly EventDefinition[] = [
+  {
+    key: "home_view",
+    label: "ホームを見た",
+    eventNames: ["home_viewed", "home_view"],
+    route: "/home",
+  },
+  {
+    key: "second_prompt",
+    label: "今夜の一枚の案内を見た",
+    eventNames: ["onboarding_second_photo_prompt_view"],
+    route: "/home",
+  },
+  {
+    key: "evening_reserved",
+    label: "20時便に写真を入れた",
+    eventNames: ["home_exchange_share_photo_confirmed"],
+  },
+  {
+    key: "evening_check_started",
+    label: "20時便の確認を開始",
+    eventNames: ["evening_delivery_check_started"],
+  },
+  {
+    key: "evening_check_succeeded",
+    label: "20時便が成立",
+    eventNames: ["evening_delivery_check_succeeded"],
+  },
+  {
+    key: "evening_envelope",
+    label: "20時便の封筒を表示",
+    eventNames: ["envelope_shown"],
+    route: "/home",
+  },
+  {
+    key: "evening_opened",
+    label: "20時便を開封",
+    eventNames: ["delivery_opened"],
+  },
+];
+
+const HANDOFF_FUNNEL_STEPS: readonly EventDefinition[] = [
+  {
+    key: "created",
+    label: "引き継ぎリンクを作成",
+    eventNames: [
+      "onboarding_external_browser_handoff_created",
+      "onboarding_completed",
+    ],
+  },
+  {
+    key: "continue_opened",
+    label: "引き継ぎページを開いた",
+    eventNames: ["route_viewed", "app_opened"],
+    route: "/onboarding/continue",
+  },
+  {
+    key: "restored",
+    label: "復元できた",
+    eventNames: ["onboarding_handoff_restored"],
+  },
+  {
+    key: "restore_failed",
+    label: "復元に失敗した",
+    eventNames: ["onboarding_handoff_restore_failed"],
+  },
+];
+
 const INSTALL_METRICS: readonly EventDefinition[] = [
   {
     key: "install_invitation",
@@ -207,6 +275,9 @@ export function buildAdminAnalytics(
       },
     ],
     funnel: buildOrderedFunnel(events),
+    newOnboardingFunnel: buildOrderedFunnel(events, LAUNCH_FUNNEL_STEPS),
+    returningFunnel: buildReturningFunnel(events),
+    handoffFunnel: buildHandoffFunnel(events),
     sourceBreakdown: buildSourceBreakdown(events),
     deliveryHealth: DELIVERY_HEALTH_METRICS.map((definition) =>
       buildMetric(events, definition),
@@ -486,16 +557,16 @@ function isRecoveredOperationalIncident(
     return false;
   }
 
-  const actorId = incident.actorId;
+  const incidentLinkIds = getIncidentLinkIds(incident);
   const occurredAt = Date.parse(incident.latestAt);
-  if (!actorId || !Number.isFinite(occurredAt)) {
+  if (incidentLinkIds.size === 0 || !Number.isFinite(occurredAt)) {
     return false;
   }
 
   return events.some((candidate) => {
     if (
       !recoveryEvents.includes(candidate.event_name) ||
-      getActorId(candidate) !== actorId
+      !hasAnyLinkId(candidate, incidentLinkIds)
     ) {
       return false;
     }
@@ -504,6 +575,55 @@ function isRecoveredOperationalIncident(
     const recoveryMs = recoveredAt - occurredAt;
     return recoveryMs >= 0 && recoveryMs <= ISSUE_RECOVERY_WINDOW_MS;
   });
+}
+
+function getIncidentLinkIds(incident: AnalyticsIssueIncident) {
+  const ids = new Set<string>();
+  if (incident.actorId) {
+    ids.add(incident.actorId);
+  }
+
+  for (const event of incident.events) {
+    addEventLinkIds(ids, event);
+  }
+
+  return ids;
+}
+
+function hasAnyLinkId(
+  event: AdminAnalyticsEvent,
+  linkIds: ReadonlySet<string>,
+) {
+  const ids = new Set<string>();
+  addEventLinkIds(ids, event);
+
+  for (const id of ids) {
+    if (linkIds.has(id)) {
+      return true;
+    }
+  }
+
+  return false;
+}
+
+function addEventLinkIds(ids: Set<string>, event: AdminAnalyticsEvent) {
+  const actorId = getActorId(event);
+  if (actorId) {
+    ids.add(actorId);
+  }
+  if (event.anonymous_id) {
+    ids.add(`anonymous:${event.anonymous_id}`);
+  }
+  if (event.user_id) {
+    ids.add(`user:${event.user_id}`);
+  }
+  if (event.session_id) {
+    ids.add(`session:${event.session_id}`);
+  }
+  const journeyId = readAnalyticsJourneyId(event);
+  if (journeyId) {
+    ids.add(`journey:${journeyId}`);
+  }
 }
 
 function getRecoveryEventNames(eventName: string) {
@@ -535,7 +655,13 @@ function getRecoveryEventNames(eventName: string) {
   }
 
   if (eventName === "onboarding_handoff_restore_failed") {
-    return ["onboarding_handoff_restored"];
+    return [
+      "onboarding_handoff_restored",
+      "home_viewed",
+      "home_view",
+      "evening_delivery_check_succeeded",
+      "delivery_opened",
+    ];
   }
 
   if (eventName === "photo_upload_error") {
@@ -582,7 +708,10 @@ function matchesDefinition(
   );
 }
 
-function buildOrderedFunnel(events: AdminAnalyticsEvent[]) {
+function buildOrderedFunnel(
+  events: AdminAnalyticsEvent[],
+  steps: readonly EventDefinition[] = LAUNCH_FUNNEL_STEPS,
+) {
   const eventsByActor = new Map<string, AdminAnalyticsEvent[]>();
 
   for (const event of events) {
@@ -596,7 +725,7 @@ function buildOrderedFunnel(events: AdminAnalyticsEvent[]) {
     eventsByActor.set(actorId, actorEvents);
   }
 
-  const usersByStep = LAUNCH_FUNNEL_STEPS.map(() => 0);
+  const usersByStep = steps.map(() => 0);
 
   for (const actorEvents of eventsByActor.values()) {
     const chronological = [...actorEvents].sort(
@@ -605,18 +734,18 @@ function buildOrderedFunnel(events: AdminAnalyticsEvent[]) {
     let nextStep = 0;
 
     for (const event of chronological) {
-      if (nextStep >= LAUNCH_FUNNEL_STEPS.length) {
+      if (nextStep >= steps.length) {
         break;
       }
 
-      if (matchesDefinition(event, LAUNCH_FUNNEL_STEPS[nextStep]!)) {
+      if (matchesDefinition(event, steps[nextStep]!)) {
         usersByStep[nextStep] += 1;
         nextStep += 1;
       }
     }
   }
 
-  return LAUNCH_FUNNEL_STEPS.map((definition, index) => {
+  return steps.map((definition, index) => {
     const users = usersByStep[index] ?? 0;
     const previousUsers = index > 0 ? usersByStep[index - 1] ?? 0 : null;
     const startUsers = usersByStep[0] ?? 0;
@@ -635,6 +764,40 @@ function buildOrderedFunnel(events: AdminAnalyticsEvent[]) {
         startUsers > 0 ? Math.round((users / startUsers) * 1000) / 10 : null,
     };
   });
+}
+
+function buildReturningFunnel(events: AdminAnalyticsEvent[]) {
+  const completedActors = new Set(
+    events
+      .filter(isCompletedOnboardingEvent)
+      .map(getActorId)
+      .filter((value): value is string => Boolean(value)),
+  );
+  const returningEvents = events.filter((event) => {
+    const actorId = getActorId(event);
+    return Boolean(
+      actorId &&
+        (completedActors.has(actorId) ||
+          readMetadataBoolean(event, "has_completed_onboarding") === true ||
+          event.event_name === "onboarding_second_photo_prompt_view" ||
+          DELIVERY_HEALTH_METRICS.some((definition) =>
+            matchesDefinition(event, definition),
+          )),
+    );
+  });
+
+  return buildOrderedFunnel(returningEvents, RETURNING_FUNNEL_STEPS);
+}
+
+function buildHandoffFunnel(events: AdminAnalyticsEvent[]) {
+  const handoffEvents = events.filter(
+    (event) =>
+      event.route === "/onboarding/continue" ||
+      event.event_name.includes("handoff") ||
+      readMetadataString(event, "handoff_from") !== null,
+  );
+
+  return buildOrderedFunnel(handoffEvents, HANDOFF_FUNNEL_STEPS);
 }
 
 function buildSourceBreakdown(events: AdminAnalyticsEvent[]) {
@@ -957,6 +1120,18 @@ function buildErrorSummary(events: AdminAnalyticsEvent[]) {
 function readMetadataString(event: AdminAnalyticsEvent, key: string) {
   const value = event.metadata?.[key];
   return typeof value === "string" && value.trim() ? value.trim() : null;
+}
+
+function readMetadataBoolean(event: AdminAnalyticsEvent, key: string) {
+  const value = event.metadata?.[key];
+  return typeof value === "boolean" ? value : null;
+}
+
+function isCompletedOnboardingEvent(event: AdminAnalyticsEvent) {
+  return (
+    event.event_name === "onboarding_completed" ||
+    readMetadataBoolean(event, "has_completed_onboarding") === true
+  );
 }
 
 export function readAnalyticsJourneyId(event: AdminAnalyticsEvent) {

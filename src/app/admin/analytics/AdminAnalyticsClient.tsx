@@ -32,6 +32,9 @@ type AnalyticsResponse = {
   eventLimitReached: boolean;
   overview: Metric[];
   funnel: FunnelStep[];
+  newOnboardingFunnel: FunnelStep[];
+  returningFunnel: FunnelStep[];
+  handoffFunnel: FunnelStep[];
   sourceBreakdown: Array<{
     source: string;
     introUsers: number;
@@ -362,20 +365,28 @@ export default function AdminAnalyticsClient() {
           <section style={styles.section} aria-labelledby="funnel-title">
             <SectionHeading
               id="funnel-title"
-              title="最初の一通まで"
-              note="同じ識別IDが、この期間内に順番どおり進んだ記録"
+              title="新規オンボ"
+              note="はじめて来た人が、最初の一通まで順番どおり進んだ記録"
             />
-            <AnalyticsTable
-              columns={["段階", "識別ID", "前の段階から", "入口から"]}
-              rows={data.funnel.map((step) => [
-                step.label,
-                `${step.users} ID`,
-                step.previousUsers === null
-                  ? "-"
-                  : formatRate(step.fromPreviousRate, step.users, step.previousUsers),
-                formatPercent(step.fromStartRate),
-              ])}
+            <FunnelTable steps={data.newOnboardingFunnel ?? data.funnel} />
+          </section>
+
+          <section style={styles.section} aria-labelledby="returning-title">
+            <SectionHeading
+              id="returning-title"
+              title="既存・再訪"
+              note="オンボ後の人が、今夜の一枚と20時便まで進んだ記録"
             />
+            <FunnelTable steps={data.returningFunnel ?? []} />
+          </section>
+
+          <section style={styles.section} aria-labelledby="handoff-title">
+            <SectionHeading
+              id="handoff-title"
+              title="引き継ぎ・復元"
+              note="LINEやInstagram内ブラウザから、Safari/Chromeへ渡した流れ"
+            />
+            <FunnelTable steps={data.handoffFunnel ?? []} />
           </section>
 
           <section style={styles.section} aria-labelledby="delivery-title">
@@ -752,6 +763,9 @@ function buildCodexAnalyticsExport(data: AnalyticsResponse) {
     operationalStatus: data.operationalStatus,
     overview: data.overview,
     funnel: data.funnel,
+    newOnboardingFunnel: data.newOnboardingFunnel,
+    returningFunnel: data.returningFunnel,
+    handoffFunnel: data.handoffFunnel,
     sourceBreakdown: data.sourceBreakdown,
     deliveryHealth: data.deliveryHealth,
     installHealth: data.installHealth,
@@ -895,6 +909,22 @@ function AnalyticsTable({
         </tbody>
       </table>
     </div>
+  );
+}
+
+function FunnelTable({ steps }: { steps: FunnelStep[] }) {
+  return (
+    <AnalyticsTable
+      columns={["段階", "識別ID", "前の段階から", "入口から"]}
+      rows={steps.map((step) => [
+        step.label,
+        `${step.users} ID`,
+        step.previousUsers === null
+          ? "-"
+          : formatRate(step.fromPreviousRate, step.users, step.previousUsers),
+        formatPercent(step.fromStartRate),
+      ])}
+    />
   );
 }
 

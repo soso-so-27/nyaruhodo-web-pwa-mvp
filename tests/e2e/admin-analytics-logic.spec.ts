@@ -363,6 +363,78 @@ test.describe("admin analytics logic", () => {
       events: 1,
     });
   });
+
+  test("separates new onboarding, returning, and handoff funnels", () => {
+    const journeyId = "onbj_11111111-1111-4111-8111-111111111111";
+    const events = [
+      event("new-user", "onboarding_intro_view", 0),
+      event("new-user", "onboarding_photo_select_click", 1),
+      event("new-user", "onboarding_photo_submitted", 2),
+      event("new-user", "onboarding_delivery_arrived", 3),
+      event("new-user", "onboarding_delivery_opened", 4),
+      event("new-user", "onboarding_completed", 5),
+      event("returning-user", "onboarding_completed", 0),
+      event("returning-user", "home_viewed", 1, { route: "/home", surface: "home" }),
+      event("returning-user", "onboarding_second_photo_prompt_view", 2, {
+        route: "/home",
+        surface: "home",
+      }),
+      event("returning-user", "home_exchange_share_photo_confirmed", 3),
+      event("returning-user", "evening_delivery_check_started", 4),
+      event("returning-user", "evening_delivery_check_succeeded", 5),
+      event("returning-user", "envelope_shown", 6, { route: "/home", surface: "home" }),
+      event("returning-user", "delivery_opened", 7),
+      event("handoff-user", "onboarding_external_browser_handoff_created", 0, {
+        metadata: { journey_id: journeyId },
+      }),
+      event("handoff-user", "route_viewed", 1, {
+        route: "/onboarding/continue",
+        surface: "onboarding",
+        metadata: { journey_id: journeyId },
+      }),
+      event("handoff-user", "onboarding_handoff_restored", 2, {
+        metadata: { journey_id: journeyId },
+      }),
+    ];
+
+    const result = buildAdminAnalytics(events);
+
+    expect(result.newOnboardingFunnel.slice(0, 6).map((step) => step.users)).toEqual([
+      1, 1, 1, 1, 1, 1,
+    ]);
+    expect(result.returningFunnel.map((step) => step.users)).toEqual([
+      1, 1, 1, 1, 1, 1, 1,
+    ]);
+    expect(result.handoffFunnel.map((step) => step.users)).toEqual([1, 1, 1, 0]);
+  });
+
+  test("treats expired handoff followed by app progress as recovered", () => {
+    const journeyId = "onbj_22222222-2222-4222-8222-222222222222";
+    const events = [
+      event("handoff-user", "onboarding_handoff_restore_failed", 0, {
+        errorCode: "handoff_expired",
+        errorMessage: "handoff_expired",
+        metadata: { journey_id: journeyId, error: "handoff_expired" },
+        route: "/onboarding/continue",
+        surface: "onboarding",
+      }),
+      event("handoff-user", "home_viewed", 1, {
+        route: "/home",
+        surface: "home",
+      }),
+      event("handoff-user", "delivery_opened", 2),
+    ];
+
+    const issues = classifyAnalyticsIssues(events);
+    const result = buildAdminAnalytics(events);
+
+    expect(issues.recovered).toHaveLength(1);
+    expect(issues.actionable).toHaveLength(0);
+    expect(result.overview.find((item) => item.key === "needs_attention")).toMatchObject({
+      users: 0,
+      events: 0,
+    });
+  });
 });
 
 function event(
@@ -377,6 +449,8 @@ function event(
     inAppBrowser?: boolean;
     sessionId?: string;
     submissionId?: string;
+    route?: string;
+    surface?: string;
   } = {},
 ): AdminAnalyticsEvent {
   return {
@@ -386,8 +460,8 @@ function event(
     user_id: null,
     session_id: options.sessionId ?? `session-${actorId}`,
     submission_id: options.submissionId ?? null,
-    route: eventName.startsWith("onboarding_") ? "/onboarding" : "/home",
-    surface: eventName.startsWith("onboarding_") ? "onboarding" : "home",
+    route: options.route ?? (eventName.startsWith("onboarding_") ? "/onboarding" : "/home"),
+    surface: options.surface ?? (eventName.startsWith("onboarding_") ? "onboarding" : "home"),
     is_in_app_browser: options.inAppBrowser ?? false,
     is_standalone_pwa: false,
     error_code: options.errorCode ?? null,
