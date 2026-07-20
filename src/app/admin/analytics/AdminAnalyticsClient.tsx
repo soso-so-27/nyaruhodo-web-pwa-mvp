@@ -333,7 +333,7 @@ export default function AdminAnalyticsClient() {
           ) : null}
           {data.eventLimitReached ? (
             <Notice tone="warning">
-              5,000件の取得上限に達しています。この期間の数字は一部です。
+              20,000件の取得上限に達しています。この期間の数字は一部です。
             </Notice>
           ) : null}
           <OperationalStatusPanel status={data.operationalStatus} />

@@ -15,7 +15,8 @@ import { createSupabaseAdminClient } from "../../../../lib/supabase/admin";
 
 export const dynamic = "force-dynamic";
 
-const EVENT_QUERY_LIMIT = 5000;
+const EVENT_QUERY_LIMIT = 20000;
+const EVENT_QUERY_PAGE_SIZE = 1000;
 const DIAGNOSTIC_EVENT_NAMES = [
   "image_load_completed",
   "photo_sw_cache_configured",
@@ -70,16 +71,12 @@ export async function GET(request: Request) {
   }
 
   const diagnosticFilter = `(${DIAGNOSTIC_EVENT_NAMES.map((name) => `"${name}"`).join(",")})`;
-  const { data, error } = await supabase
-    .from("app_events")
-    .select(
-      "event_name, source, anonymous_id, user_id, session_id, submission_id, route, surface, is_in_app_browser, is_standalone_pwa, error_code, error_message, metadata, created_at",
-    )
-    .gte("created_at", range.from.toISOString())
-    .lt("created_at", range.to.toISOString())
-    .not("event_name", "in", diagnosticFilter)
-    .order("created_at", { ascending: false })
-    .limit(EVENT_QUERY_LIMIT);
+  const { data, error } = await readAnalyticsEvents({
+    supabase,
+    fromIso: range.from.toISOString(),
+    toIso: range.to.toISOString(),
+    diagnosticFilter,
+  });
 
   if (error) {
     return NextResponse.json(
@@ -151,6 +148,54 @@ export async function GET(request: Request) {
       })),
     recentEvents: events.slice(0, 50).map(toSafeEvent),
   });
+}
+
+async function readAnalyticsEvents({
+  supabase,
+  fromIso,
+  toIso,
+  diagnosticFilter,
+}: {
+  supabase: NonNullable<ReturnType<typeof createSupabaseAdminClient>>;
+  fromIso: string;
+  toIso: string;
+  diagnosticFilter: string;
+}) {
+  const rows: AdminAnalyticsEvent[] = [];
+
+  for (
+    let offset = 0;
+    offset < EVENT_QUERY_LIMIT;
+    offset += EVENT_QUERY_PAGE_SIZE
+  ) {
+    const to = Math.min(
+      offset + EVENT_QUERY_PAGE_SIZE - 1,
+      EVENT_QUERY_LIMIT - 1,
+    );
+    const { data, error } = await supabase
+      .from("app_events")
+      .select(
+        "event_name, source, anonymous_id, user_id, session_id, submission_id, route, surface, is_in_app_browser, is_standalone_pwa, error_code, error_message, metadata, created_at",
+      )
+      .gte("created_at", fromIso)
+      .lt("created_at", toIso)
+      .not("event_name", "in", diagnosticFilter)
+      .order("created_at", { ascending: false })
+      .range(offset, to);
+
+    if (error) {
+      return { data: null, error };
+    }
+
+    const page = (data ?? []) as AdminAnalyticsEvent[];
+    rows.push(...page);
+
+    if (page.length < to - offset + 1) {
+      break;
+    }
+  }
+
+  return { data: rows, error: null };
 }
 
 function readAnonymousIdHeader(request: Request) {
