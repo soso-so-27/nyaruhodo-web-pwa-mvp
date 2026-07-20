@@ -925,7 +925,7 @@ test.describe("onboarding delivery flow", () => {
       "500",
     );
     await expect(
-      page.getByRole("button", { name: "今夜の一枚を とる" }),
+      page.getByRole("button", { name: "今夜の一枚を入れる" }),
     ).toBeVisible();
     await expect(page.getByTestId("home-install-invitation")).toHaveCount(0);
     await page.screenshot({
@@ -945,6 +945,7 @@ test.describe("onboarding delivery flow", () => {
 
     await page.goto("/home?from=onboarding_second_photo");
     await page.getByTestId("home-empty-action").click();
+    await page.getByTestId("home-sleeping-source-camera").click();
     await page.locator('input[type="file"]').last().setInputFiles({
       name: "second-photo-cancel.png",
       mimeType: "image/png",
@@ -1053,6 +1054,7 @@ test.describe("onboarding delivery flow", () => {
     await expect(page).toHaveURL(/\/home\?from=onboarding_second_photo/);
     await expect(page.getByTestId("home-install-invitation")).toHaveCount(0);
     await page.getByTestId("home-empty-action").click();
+    await page.getByTestId("home-sleeping-source-camera").click();
     await page.locator('input[type="file"]').last().setInputFiles({
       name: "home-chain.png",
       mimeType: "image/png",

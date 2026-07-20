@@ -228,6 +228,7 @@ test.describe("collection album flow", () => {
     await page.goto("/home");
     await page.waitForLoadState("networkidle");
     await page.getByTestId("home-empty-action").click();
+    await page.getByTestId("home-sleeping-source-camera").click();
     await page.locator('input[type="file"]').last().setInputFiles({
       name: "sleeping.png",
       mimeType: "image/png",

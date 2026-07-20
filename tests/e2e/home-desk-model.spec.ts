@@ -448,7 +448,7 @@ test.describe("home desk model", () => {
     await page.waitForLoadState("networkidle");
 
     await expect(page.getByText("きょうも すやすや")).toHaveCount(0);
-    await expect(page.getByText("ねがおを とる")).toBeVisible();
+    await expect(page.getByText("ねがおを入れる")).toBeVisible();
     await expect(
       page.getByText("きょうの一枚を、よる8時のねこだよりに。"),
     ).toBeVisible();
@@ -468,6 +468,9 @@ test.describe("home desk model", () => {
       "none",
     );
     await expect(page.getByTestId("desk-empty-frame")).toHaveCSS("cursor", "auto");
+    await page.getByTestId("home-empty-action").click();
+    await expect(page.getByTestId("home-sleeping-source-camera")).toBeVisible();
+    await expect(page.getByTestId("home-sleeping-source-library")).toBeVisible();
   });
 
   test("keeps the onboarding second-photo action visible after 8pm", async ({
@@ -486,7 +489,7 @@ test.describe("home desk model", () => {
       page.getByText("あしたのねこだよりに入れるねがおを一枚。"),
     ).toBeVisible();
     await expect(
-      page.getByRole("button", { name: "あしたの一枚を とる" }),
+      page.getByRole("button", { name: "あしたの一枚を入れる" }),
     ).toBeVisible();
     await expect(page.getByRole("button", { name: "今日はここまで" })).toBeVisible();
   });

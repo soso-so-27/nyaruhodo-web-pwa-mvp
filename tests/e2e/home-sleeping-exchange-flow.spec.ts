@@ -163,6 +163,7 @@ test.describe("home sleeping exchange flow", () => {
     await page.waitForLoadState("networkidle");
 
     await page.getByTestId("home-empty-action").click();
+    await page.getByTestId("home-sleeping-source-camera").click();
     await page.locator('input[type="file"]').last().setInputFiles({
       name: "home-sleeping.png",
       mimeType: "image/png",
@@ -352,6 +353,7 @@ test.describe("home sleeping exchange flow", () => {
     await page.waitForLoadState("networkidle");
 
     await page.getByTestId("home-empty-action").click();
+    await page.getByTestId("home-sleeping-source-camera").click();
     await page.locator('input[type="file"]').last().setInputFiles({
       name: "needs-confirmation.png",
       mimeType: "image/png",
@@ -428,6 +430,7 @@ test.describe("home sleeping exchange flow", () => {
     await page.waitForLoadState("networkidle");
 
     await page.getByTestId("home-empty-action").click();
+    await page.getByTestId("home-sleeping-source-camera").click();
     await page.locator('input[type="file"]').last().setInputFiles({
       name: "android-large-photo.png",
       mimeType: "image/png",
@@ -488,6 +491,7 @@ test.describe("home sleeping exchange flow", () => {
     await page.goto("/home");
     await page.waitForLoadState("networkidle");
     await page.getByTestId("home-empty-action").click();
+    await page.getByTestId("home-sleeping-source-camera").click();
     await page.locator('input[type="file"]').last().setInputFiles({
       name: "backup-retry.png",
       mimeType: "image/png",
@@ -545,6 +549,7 @@ test.describe("home sleeping exchange flow", () => {
     await page.goto("/home");
     await page.waitForLoadState("networkidle");
     await page.getByTestId("home-empty-action").click();
+    await page.getByTestId("home-sleeping-source-camera").click();
     await page.locator('input[type="file"]').last().setInputFiles({
       name: "backup-failure.png",
       mimeType: "image/png",
@@ -971,6 +976,7 @@ test.describe("home sleeping exchange flow", () => {
     await page.waitForLoadState("networkidle");
 
     await page.getByTestId("home-empty-action").click();
+    await page.getByTestId("home-sleeping-source-camera").click();
     await page.locator('input[type="file"]').last().setInputFiles(catPhotoFixturePath);
 
     const dialog = page.getByRole("dialog");
@@ -1173,6 +1179,7 @@ test.describe("home sleeping exchange flow", () => {
     await page.goto("/home");
     await page.waitForLoadState("networkidle");
     await page.getByTestId("home-empty-action").click();
+    await page.getByTestId("home-sleeping-source-camera").click();
     await page.locator('input[type="file"]').last().setInputFiles(catPhotoFixturePath);
 
     const dialog = page.getByRole("dialog");
@@ -1275,6 +1282,7 @@ test.describe("home sleeping exchange flow", () => {
     await page.waitForLoadState("networkidle");
 
     await page.getByTestId("home-empty-action").click();
+    await page.getByTestId("home-sleeping-source-camera").click();
     await page.locator('input[type="file"]').last().setInputFiles({
       name: "private-home-photo.png",
       mimeType: "image/png",
@@ -1350,6 +1358,7 @@ test.describe("home sleeping exchange flow", () => {
     await page.waitForLoadState("networkidle");
 
     await page.getByTestId("home-empty-action").click();
+    await page.getByTestId("home-sleeping-source-camera").click();
     await page.locator('input[type="file"]').last().setInputFiles({
       name: "remember-cat.png",
       mimeType: "image/png",
@@ -1397,6 +1406,7 @@ test.describe("home sleeping exchange flow", () => {
     await page.waitForLoadState("networkidle");
 
     await page.getByTestId("home-empty-action").click();
+    await page.getByTestId("home-sleeping-source-camera").click();
     await page.locator('input[type="file"]').last().setInputFiles({
       name: "first-sleeping.png",
       mimeType: "image/png",
@@ -1415,6 +1425,7 @@ test.describe("home sleeping exchange flow", () => {
       beforeDelivery + 60_000,
     );
     await page.getByTestId("home-retake-action").click();
+    await page.getByTestId("home-sleeping-source-camera").click();
     await page.locator('input[type="file"]').last().setInputFiles({
       name: "second-sleeping.png",
       mimeType: "image/png",
@@ -1765,6 +1776,7 @@ test.describe("home sleeping exchange flow", () => {
     await expect(page.getByTestId("desk-letter")).toHaveCount(0);
 
     await page.getByTestId("home-empty-action").click();
+    await page.getByTestId("home-sleeping-source-camera").click();
     await page.locator('input[type="file"]').last().setInputFiles({
       name: "home-sleeping.png",
       mimeType: "image/png",
@@ -1837,6 +1849,7 @@ test.describe("home sleeping exchange flow", () => {
     await page.waitForLoadState("networkidle");
 
     await page.getByTestId("home-empty-action").click();
+    await page.getByTestId("home-sleeping-source-camera").click();
     await page.locator('input[type="file"]').last().setInputFiles({
       name: "after-eight.png",
       mimeType: "image/png",
@@ -2654,6 +2667,7 @@ test.describe("home sleeping exchange flow", () => {
     await page.waitForLoadState("networkidle");
 
     await page.getByTestId("home-empty-action").click();
+    await page.getByTestId("home-sleeping-source-camera").click();
     await page.locator('input[type="file"]').last().setInputFiles({
       name: "home-sleeping-new.png",
       mimeType: "image/png",
@@ -2737,6 +2751,7 @@ test.describe("home sleeping exchange flow", () => {
 
     for (const index of [1, 2]) {
       await page.getByTestId("home-empty-action").click();
+      await page.getByTestId("home-sleeping-source-camera").click();
       await page.locator('input[type="file"]').last().setInputFiles({
         name: `same-ms-${index}.png`,
         mimeType: "image/png",

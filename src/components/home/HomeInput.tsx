@@ -296,7 +296,7 @@ type ExchangeShareSaveResult = "saved" | "partial" | "failed";
 
 const EXCHANGE_SHARE_SAVE_CONFIRMATION_MS = 520;
 
-type SleepingPhotoSource = "camera";
+type SleepingPhotoSource = "camera" | "library";
 
 const SLEEPING_SAFETY_ACCEPTED_STORAGE_KEY =
   "nyaruhodo_sleeping_safety_accepted";
@@ -376,6 +376,8 @@ export function HomeInput({
   const [hasAcceptedSleepingSafety, setHasAcceptedSleepingSafety] =
     useState(false);
   const [isSleepingSafetySheetOpen, setIsSleepingSafetySheetOpen] =
+    useState(false);
+  const [isSleepingPhotoSourceSheetOpen, setIsSleepingPhotoSourceSheetOpen] =
     useState(false);
   const [isSleepingSafetyChecked, setIsSleepingSafetyChecked] = useState(false);
   const [pendingSleepingPhotoSource, setPendingSleepingPhotoSource] =
@@ -1740,7 +1742,7 @@ export function HomeInput({
       return;
     }
     if (actionType === "add_sleeping") {
-      handleSleepingPhotoStart("camera");
+      openSleepingPhotoSourceSheet();
       return;
     }
     if (actionType === "open_photo") {
@@ -1983,7 +1985,21 @@ export function HomeInput({
     }, 60000);
   }
 
+  function openSleepingPhotoSourceSheet() {
+    trackProductEvent(
+      "home_sleeping_photo_source_sheet_viewed",
+      {
+        has_accepted_safety: hasAcceptedSleepingSafety,
+        delivery_available: !sleepingCounterRemaining,
+        delivery_remaining: sleepingCounterRemaining ?? null,
+      },
+      { localCatId: activeCatId },
+    );
+    setIsSleepingPhotoSourceSheetOpen(true);
+  }
+
   function handleSleepingPhotoStart(source: SleepingPhotoSource = "camera") {
+    setIsSleepingPhotoSourceSheetOpen(false);
     trackProductEvent(
       "home_sleeping_photo_start_clicked",
       {
@@ -2481,7 +2497,7 @@ export function HomeInput({
                     surface: "home",
                   });
                 }
-                handleSleepingPhotoStart("camera");
+                openSleepingPhotoSourceSheet();
               }}
               onOpenDelivery={handleOpenEveningDelivery}
               onKeepOpenedDelivery={handleKeepEveningDelivery}
@@ -2540,6 +2556,14 @@ export function HomeInput({
             setIsSleepingSafetyChecked(false);
             setPendingSleepingPhotoSource("camera");
           }}
+        />
+      ) : null}
+
+      {isSleepingPhotoSourceSheetOpen ? (
+        <SleepingPhotoSourceSheet
+          isBusy={isExchangePhotoAdding}
+          onSelect={handleSleepingPhotoStart}
+          onClose={() => setIsSleepingPhotoSourceSheetOpen(false)}
         />
       ) : null}
 
@@ -3782,6 +3806,67 @@ function HomeInstallGuideSheet({
         </AppButton>
       </div>
     </AppBottomSheet>
+  );
+}
+
+function SleepingPhotoSourceSheet({
+  isBusy,
+  onSelect,
+  onClose,
+}: {
+  isBusy: boolean;
+  onSelect: (source: SleepingPhotoSource) => void;
+  onClose: () => void;
+}) {
+  return (
+    <AppSheet
+      placement="bottom"
+      title="今夜の一枚を入れる"
+      variant="dim"
+      onClose={onClose}
+      style={styles.exchangeSheetFrame}
+    >
+      <div style={styles.sleepingSourceSheet}>
+        <p style={styles.sleepingSourceLead}>
+          いま撮っても、写真からえらんでも大丈夫です。
+        </p>
+        <div style={styles.sleepingSourceOptions}>
+          <button
+            type="button"
+            style={{
+              ...styles.sleepingSourceOption,
+              ...styles.sleepingSourceOptionPrimary,
+            }}
+            onClick={() => onSelect("camera")}
+            disabled={isBusy}
+            data-testid="home-sleeping-source-camera"
+          >
+            <span style={styles.sleepingSourceIcon} aria-hidden="true">
+              <AppIcon name="camera" size={18} />
+            </span>
+            <span style={styles.sleepingSourceText}>
+              <span style={styles.sleepingSourceTitle}>いま撮る</span>
+              <span style={styles.sleepingSourceBody}>寝ているところを、そのまま。</span>
+            </span>
+          </button>
+          <button
+            type="button"
+            style={styles.sleepingSourceOption}
+            onClick={() => onSelect("library")}
+            disabled={isBusy}
+            data-testid="home-sleeping-source-library"
+          >
+            <span style={styles.sleepingSourceIcon} aria-hidden="true">
+              <AppIcon name="photo" size={18} />
+            </span>
+            <span style={styles.sleepingSourceText}>
+              <span style={styles.sleepingSourceTitle}>写真からえらぶ</span>
+              <span style={styles.sleepingSourceBody}>さっき撮ったねがおも使えます。</span>
+            </span>
+          </button>
+        </div>
+      </div>
+    </AppSheet>
   );
 }
 
@@ -8049,6 +8134,71 @@ const styles = {
     fontWeight: 500,
     lineHeight: 1.35,
     letterSpacing: "0.04em",
+  },
+  sleepingSourceSheet: {
+    display: "grid",
+    gap: "14px",
+    padding: "2px 0 6px",
+  },
+  sleepingSourceLead: {
+    margin: 0,
+    color: "#746b60",
+    fontSize: "13px",
+    fontWeight: 500,
+    lineHeight: 1.7,
+    textAlign: "center",
+  },
+  sleepingSourceOptions: {
+    display: "grid",
+    gap: "9px",
+  },
+  sleepingSourceOption: {
+    width: "100%",
+    minHeight: "64px",
+    border: "1px solid rgba(144,126,102,0.16)",
+    borderRadius: "18px",
+    background: "rgba(255,253,248,0.56)",
+    color: "#3b332c",
+    padding: "12px 14px",
+    display: "grid",
+    gridTemplateColumns: "34px minmax(0, 1fr)",
+    alignItems: "center",
+    gap: "11px",
+    textAlign: "left",
+    cursor: "pointer",
+    boxShadow:
+      "inset 0 1px 0 rgba(255,255,255,0.62), 0 10px 22px rgba(120,82,58,0.055)",
+  },
+  sleepingSourceOptionPrimary: {
+    border: "1px solid rgba(168,73,63,0.30)",
+    background: "rgba(255,248,240,0.90)",
+  },
+  sleepingSourceIcon: {
+    width: "34px",
+    height: "34px",
+    borderRadius: "999px",
+    display: "inline-flex",
+    alignItems: "center",
+    justifyContent: "center",
+    color: "var(--seal)",
+    background: "rgba(255,255,255,0.64)",
+  },
+  sleepingSourceText: {
+    display: "grid",
+    gap: "3px",
+    minWidth: 0,
+  },
+  sleepingSourceTitle: {
+    color: "#3b332c",
+    fontSize: "15px",
+    fontWeight: 600,
+    lineHeight: 1.35,
+  },
+  sleepingSourceBody: {
+    color: "#877d70",
+    fontSize: "12px",
+    fontWeight: 500,
+    lineHeight: 1.45,
   },
   exchangeCatPicker: {
     display: "flex",

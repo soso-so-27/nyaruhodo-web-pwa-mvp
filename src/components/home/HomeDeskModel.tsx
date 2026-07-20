@@ -641,10 +641,10 @@ export function HomeDeskModel({
                       data-testid="home-retake-action"
                       style={deskStyles.homeAddPhotoButton}
                       onClick={onTakePhoto}
-                      aria-label="ねがおを とる"
+                      aria-label="ねがおを入れる"
                     >
                       <AppIcon name="camera" size={15} />
-                      <span>ねがおを とる</span>
+                      <span>ねがおを入れる</span>
                     </button>
                     <span style={deskStyles.homeCaptureHint}>
                       <AppIcon
@@ -695,14 +695,14 @@ export function HomeDeskModel({
                       className="home-empty-cta-action"
                       style={deskStyles.homeEmptyAction}
                       onClick={onTakePhoto}
-                      aria-label={`${catName}の ねがおを とる`}
+                      aria-label={`${catName}の ねがおを入れる`}
                     >
                       <AppIcon
                         name="camera"
                         size={16}
                         style={deskStyles.homeEmptyActionIcon}
                       />
-                      <span>ねがおを とる</span>
+                      <span>ねがおを入れる</span>
                     </button>
                     <span style={deskStyles.homeCaptureHint}>
                       <AppIcon
@@ -2064,7 +2064,7 @@ function OnboardingSecondPhotoInvitation({
           size={16}
           style={deskStyles.homeEmptyActionIcon}
         />
-        <span>{forTomorrow ? "あしたの一枚を とる" : "今夜の一枚を とる"}</span>
+        <span>{forTomorrow ? "あしたの一枚を入れる" : "今夜の一枚を入れる"}</span>
       </button>
       {onDismiss ? (
         <button
