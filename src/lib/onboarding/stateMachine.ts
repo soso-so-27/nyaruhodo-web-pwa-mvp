@@ -3,7 +3,6 @@ import type { OnboardingProgress } from "./progress";
 export type OnboardingResumeDecision =
   | { kind: "intro" }
   | { kind: "home" }
-  | { kind: "second_photo" }
   | { kind: "envelope"; progress: OnboardingProgress }
   | { kind: "naming"; progress: OnboardingProgress }
   | { kind: "resume_submission"; progress: OnboardingProgress };
@@ -20,7 +19,7 @@ export function resolveOnboardingResumeDecision(
   }
 
   if (progress.stage === "opened") {
-    return { kind: "second_photo" };
+    return { kind: "home" };
   }
 
   if (progress.stage === "arrived" && progress.deliveredPhoto) {

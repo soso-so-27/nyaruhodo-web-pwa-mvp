@@ -3,6 +3,7 @@ import { getOrCreateAnonymousId } from "../identity/anonymousId";
 import {
   addJstDays,
   getEveningDeliveryTargetDateKey,
+  getJstAutoOpenTime,
   getJstDateKey,
   getJstHour,
 } from "../home/eveningDelivery";
@@ -180,11 +181,22 @@ export function readCurrentOnboardingProgress(now = Date.now()) {
   const targetKey = getEveningDeliveryTargetDateKey(now);
   const previousNightKey =
     getJstHour(now) < 5 ? addJstDays(todayKey, -1) : null;
+  const ownPhotoCreatedAt = progress.ownPhoto?.createdAt;
+  const ownPhotoTargetKey =
+    typeof ownPhotoCreatedAt === "number"
+      ? getEveningDeliveryTargetDateKey(ownPhotoCreatedAt)
+      : null;
+  const isOwnPhotoTargetRecoverable =
+    typeof ownPhotoCreatedAt === "number" &&
+    ownPhotoTargetKey !== null &&
+    ownPhotoCreatedAt <= now &&
+    now < getJstAutoOpenTime(ownPhotoTargetKey);
 
   if (
     progress.dateKey !== todayKey &&
     progress.dateKey !== targetKey &&
-    progress.dateKey !== previousNightKey
+    progress.dateKey !== previousNightKey &&
+    !isOwnPhotoTargetRecoverable
   ) {
     return null;
   }

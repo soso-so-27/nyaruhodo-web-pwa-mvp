@@ -344,11 +344,12 @@ test.describe("onboarding delivery flow", () => {
         Boolean((day as { targetOwnPhotoId?: string }).targetOwnPhotoId),
       ).length;
     });
-    expect(eveningDeliveryDays).toBe(0);
+    expect(eveningDeliveryDays).toBe(1);
     await page.getByRole("button", { name: "ねてるねこを はじめる" }).click();
     await continuePastOptionalOnboardingNamePrompt(page);
-    await expect(page).toHaveURL(/\/home\?from=onboarding_second_photo/);
-    await expect(page.getByTestId("onboarding-second-photo-invitation")).toBeVisible();
+    await expect(page).toHaveURL(/\/home(?:\?|$)/);
+    await expect(page).not.toHaveURL(/from=onboarding_second_photo/);
+    await expect(page.getByTestId("onboarding-second-photo-invitation")).toHaveCount(0);
 
     const storage = await page.evaluate(() => {
       const readArray = (key: string) => {
@@ -896,10 +897,17 @@ test.describe("onboarding delivery flow", () => {
     ).toHaveCount(0);
   });
 
-  test("shows the second photo invitation on home before 8pm", async ({
+  test("uses the onboarding photo for tonight without asking for a second photo", async ({
     page,
   }) => {
     await mockBrowserDate(page, "2026-07-06T10:00:00+09:00");
+    await page.route("**/rest/v1/product_analytics_events*", async (route) => {
+      await route.fulfill({
+        contentType: "application/json",
+        status: 500,
+        body: JSON.stringify({ error: "keep analytics queued for assertions" }),
+      });
+    });
     await routeImmediateDelivery(page);
 
     await page.goto("/onboarding");
@@ -918,23 +926,120 @@ test.describe("onboarding delivery flow", () => {
     await expect(page.getByTestId("home-install-invitation")).toHaveCount(0);
     await page.getByTestId("onboarding-delivered-continue").click();
     await continuePastOptionalOnboardingNamePrompt(page);
-    await expect(page).toHaveURL(/\/home\?from=onboarding_second_photo/);
-    await expect(page.getByTestId("onboarding-second-photo-invitation")).toBeVisible();
-    await expectUsesUiTypography(
-      page.getByTestId("onboarding-second-photo-title"),
-      "500",
+    await expect(page).toHaveURL(/\/home(?:\?|$)/);
+    await expect(page).not.toHaveURL(/from=onboarding_second_photo/);
+    await expect(page.getByTestId("onboarding-second-photo-invitation")).toHaveCount(0);
+    const reservation = await page.evaluate(() => {
+      const store = JSON.parse(
+        window.localStorage.getItem("neteruneko_evening_delivery_days") ?? "{}",
+      );
+      const ownPhotos = JSON.parse(
+        window.localStorage.getItem("nyaruhodo_exchange_own_sleeping_photos") ??
+          "[]",
+      );
+      const reservedDay = Object.values(store).find((day) =>
+        Boolean((day as { targetOwnPhotoId?: string }).targetOwnPhotoId),
+      ) as { targetOwnPhotoId?: string } | undefined;
+      return {
+        reservedCount: Object.values(store).filter((day) =>
+          Boolean((day as { targetOwnPhotoId?: string }).targetOwnPhotoId),
+        ).length,
+        targetOwnPhotoId: reservedDay?.targetOwnPhotoId ?? null,
+        onboardingPhotoId: ownPhotos[0]?.id ?? null,
+      };
+    });
+    expect(reservation.reservedCount).toBe(1);
+    expect(reservation.targetOwnPhotoId).toBe(reservation.onboardingPhotoId);
+    const reservationEvents = await waitForAnalyticsEvents(page, [
+      "evening_delivery_reserved",
+    ]);
+    expect(reservationEvents.evening_delivery_reserved?.properties).toMatchObject({
+      reservation_origin: "onboarding_first_photo",
+      reservation_trigger: "initial",
+      delivery_date_key: "2026-07-06",
+      is_today_delivery: true,
+      own_photo_id: reservation.onboardingPhotoId,
+    });
+    expect(
+      reservationEvents.evening_delivery_reserved?.properties?.submission_id,
+    ).toMatch(/^onboarding:onbj_/);
+    await expect(page.getByTestId("desk-home-frame")).toHaveAttribute(
+      "data-photo-id",
+      reservation.onboardingPhotoId,
     );
-    await expect(
-      page.getByRole("button", { name: "今夜の一枚を入れる" }),
-    ).toBeVisible();
-    await expect(page.getByTestId("home-install-invitation")).toHaveCount(0);
     await page.screenshot({
-      path: "artifacts/onboarding-second-photo-home.png",
+      path: "artifacts/onboarding-one-photo-home.png",
       fullPage: true,
     });
   });
 
-  test("keeps the second photo invitation after cancel and defers install after skip", async ({
+  test("preserves an existing evening target without reporting a save failure", async ({
+    page,
+  }) => {
+    await mockBrowserDate(page, "2026-07-06T10:00:00+09:00");
+    await page.addInitScript(() => {
+      window.localStorage.setItem(
+        "neteruneko_evening_delivery_days",
+        JSON.stringify({
+          "2026-07-06": {
+            dateKey: "2026-07-06",
+            targetOwnPhotoId: "existing-evening-photo",
+            targetCatId: "existing-cat",
+            targetCapturedAt: Date.parse("2026-07-06T09:00:00+09:00"),
+          },
+        }),
+      );
+    });
+    await page.route("**/rest/v1/product_analytics_events*", async (route) => {
+      await route.fulfill({
+        contentType: "application/json",
+        status: 500,
+        body: JSON.stringify({ error: "keep analytics queued for assertions" }),
+      });
+    });
+    await routeImmediateDelivery(page);
+
+    await page.goto("/onboarding");
+    await page.waitForLoadState("networkidle");
+    await page.locator("main button").first().click();
+    await page.locator('input[type="file"]').last().setInputFiles({
+      name: "own-sleeping.png",
+      mimeType: "image/png",
+      buffer: testPng,
+    });
+    await expect(
+      page.getByRole("button", { name: "ねこだよりを ひらく" }),
+    ).toBeVisible();
+
+    const targetOwnPhotoId = await page.evaluate(() => {
+      const store = JSON.parse(
+        window.localStorage.getItem("neteruneko_evening_delivery_days") ?? "{}",
+      );
+      return store["2026-07-06"]?.targetOwnPhotoId ?? null;
+    });
+    expect(targetOwnPhotoId).toBe("existing-evening-photo");
+
+    const events = await waitForAnalyticsEvents(page, [
+      "evening_delivery_reservation_skipped",
+    ]);
+    expect(events.evening_delivery_reservation_skipped?.properties).toMatchObject({
+      reason: "existing_target_preserved",
+      delivery_date_key: "2026-07-06",
+    });
+    expect(
+      await page.evaluate(() => {
+        const queue = JSON.parse(
+          window.localStorage.getItem("analytics_event_queue") ?? "[]",
+        );
+        return queue.some(
+          (event: { name?: string }) =>
+            event.name === "evening_delivery_reservation_failed",
+        );
+      }),
+    ).toBe(false);
+  });
+
+  test("clears a legacy second-photo URL without showing the old invitation", async ({
     page,
   }) => {
     await mockBrowserDate(page, "2026-07-06T10:00:00+09:00");
@@ -944,32 +1049,16 @@ test.describe("onboarding delivery flow", () => {
     });
 
     await page.goto("/home?from=onboarding_second_photo");
-    await page.getByTestId("home-empty-action").click();
-    await page.getByTestId("home-sleeping-source-camera").click();
-    await page.locator('input[type="file"]').last().setInputFiles({
-      name: "second-photo-cancel.png",
-      mimeType: "image/png",
-      buffer: testPng,
-    });
-
-    await expect(page.getByRole("dialog")).toBeVisible();
-    await page.getByRole("button", { name: "閉じる" }).click();
-    await expect(page.getByTestId("onboarding-second-photo-invitation")).toBeVisible();
-    await expect(page).toHaveURL(/from=onboarding_second_photo/);
-
-    await page.getByRole("button", { name: "今日はここまで" }).click();
     await expect(page.getByTestId("onboarding-second-photo-invitation")).toHaveCount(0);
-    await expect(page.getByTestId("home-install-invitation")).toHaveCount(0);
     await expect(page).not.toHaveURL(/from=onboarding_second_photo/);
   });
 
-  test("continues from onboarding through the home photo to the 8pm letter", async ({
+  test("continues from the onboarding photo to the 8pm letter", async ({
     page,
   }) => {
     const beforeDelivery = Date.parse("2026-07-06T10:00:00+09:00");
     const afterDelivery = Date.parse("2026-07-06T20:01:00+09:00");
     const exchangeBodies: Array<Record<string, any>> = [];
-    let backupCalls = 0;
 
     await page.addInitScript((now) => {
       const RealDate = Date;
@@ -1030,14 +1119,6 @@ test.describe("onboarding delivery flow", () => {
         }),
       });
     });
-    await page.route("**/api/sleeping-delivery/backup", async (route) => {
-      backupCalls += 1;
-      await route.fulfill({
-        contentType: "application/json",
-        body: JSON.stringify({ ok: true }),
-      });
-    });
-
     await page.goto("/onboarding");
     await page.waitForLoadState("networkidle");
     await page.locator("main button").first().click();
@@ -1051,24 +1132,9 @@ test.describe("onboarding delivery flow", () => {
     await page.waitForTimeout(1600);
     await page.getByTestId("onboarding-delivered-continue").click();
     await continuePastOptionalOnboardingNamePrompt(page);
-    await expect(page).toHaveURL(/\/home\?from=onboarding_second_photo/);
-    await expect(page.getByTestId("home-install-invitation")).toHaveCount(0);
-    await page.getByTestId("home-empty-action").click();
-    await page.getByTestId("home-sleeping-source-camera").click();
-    await page.locator('input[type="file"]').last().setInputFiles({
-      name: "home-chain.png",
-      mimeType: "image/png",
-      buffer: testPng,
-    });
-    const saveDialog = page.getByRole("dialog");
-    await expect(saveDialog).toBeVisible();
-    await saveDialog.locator("button").last().click();
-
+    await expect(page).toHaveURL(/\/home(?:\?|$)/);
+    await expect(page).not.toHaveURL(/from=onboarding_second_photo/);
     await expect(page.getByTestId("onboarding-second-photo-invitation")).toHaveCount(0);
-    await expect(page.getByTestId("home-install-invitation")).toBeVisible();
-    await page.getByRole("button", { name: "あとで" }).click();
-
-    await expect.poll(() => backupCalls).toBe(1);
     const target = await page.evaluate(() => {
       const store = JSON.parse(
         window.localStorage.getItem("neteruneko_evening_delivery_days") ?? "{}",
@@ -1077,6 +1143,10 @@ test.describe("onboarding delivery flow", () => {
     });
     expect(target?.targetOwnPhotoId).toBeTruthy();
     expect(target?.targetPhoto).toBeUndefined();
+    const installLater = page.getByRole("button", { name: "あとで" });
+    if (await installLater.isVisible()) {
+      await installLater.click();
+    }
 
     await page.evaluate((now) => {
       (window as typeof window & { __testNow?: number }).__testNow = now;
@@ -1095,7 +1165,7 @@ test.describe("onboarding delivery flow", () => {
   });
 
 
-  test("routes embedded second photo bridge through account handoff", async ({
+  test("routes the embedded onboarding completion through account handoff", async ({
     page,
   }) => {
     await page.addInitScript(() => {
@@ -1146,7 +1216,7 @@ test.describe("onboarding delivery flow", () => {
     await page.getByTestId("onboarding-delivered-continue").click();
     await continuePastOptionalOnboardingNamePrompt(page);
     await expect(page).toHaveURL(/\/account\/create\?from=onboarding/);
-    await expect(page).toHaveURL(/next=second_photo/);
+    await expect(page).not.toHaveURL(/next=second_photo/);
     await expect(page.getByTestId("account-create-handoff")).toBeVisible();
     expect(
       await page.evaluate(
@@ -1511,7 +1581,10 @@ test.describe("onboarding delivery flow", () => {
     });
     expect(submittedProgress.submissionId).toContain(submittedProgress.dateKey);
 
-    await page.clock.setFixedTime(new Date("2026-07-18T00:00:10+09:00"));
+    await page.clock.setFixedTime(new Date("2026-07-18T06:00:10+09:00"));
+    await page.evaluate(() => {
+      window.localStorage.removeItem("neteruneko_evening_delivery_days");
+    });
     await page.goto("/onboarding?source=instagram_dm");
     await expect(page.getByRole("button", { name: "ねこだよりを ひらく" })).toBeVisible();
     await expect.poll(() => exchangeCalls).toBe(1);
@@ -1520,6 +1593,14 @@ test.describe("onboarding delivery flow", () => {
       source: "instagram_story",
       submissionId: submittedProgress.submissionId,
     });
+    expect(
+      await page.evaluate(() => {
+        const store = JSON.parse(
+          window.localStorage.getItem("neteruneko_evening_delivery_days") ?? "{}",
+        );
+        return store["2026-07-18"]?.targetOwnPhotoId ?? null;
+      }),
+    ).toBe(submittedProgress.ownPhoto.id);
 
     await page.getByRole("button", { name: "ねこだよりを ひらく" }).click();
     await page.waitForTimeout(1600);
@@ -1528,10 +1609,11 @@ test.describe("onboarding delivery flow", () => {
     ).toBeVisible();
 
     await page.goto("/onboarding?source=instagram_bio");
-    await expect(page).toHaveURL(/\/home\?from=onboarding_second_photo/);
+    await expect(page).toHaveURL(/\/home(?:\?|$)/);
+    await expect(page).not.toHaveURL(/from=onboarding_second_photo/);
     await expect(
       page.getByTestId("onboarding-second-photo-invitation"),
-    ).toBeVisible();
+    ).toHaveCount(0);
 
     await page.evaluate(() => {
       const raw = window.localStorage.getItem("neteruneko_onboarding_progress");
@@ -2191,6 +2273,15 @@ test.describe("onboarding delivery flow", () => {
 
     await expect(page).toHaveURL(/\/home$/);
     await expect.poll(() => readOwnSleepingPhotoCount(page)).toBe(0);
+    const remainingEveningTargetIds = await page.evaluate(() => {
+      const store = JSON.parse(
+        window.localStorage.getItem("neteruneko_evening_delivery_days") ?? "{}",
+      ) as Record<string, { targetOwnPhotoId?: string }>;
+      return Object.values(store)
+        .map((day) => day.targetOwnPhotoId)
+        .filter((photoId): photoId is string => Boolean(photoId));
+    });
+    expect(remainingEveningTargetIds).toEqual([]);
     await expect(page.getByTestId("onboarding-photo-select")).toHaveCount(0);
   });
 
@@ -3193,7 +3284,7 @@ test.describe("onboarding delivery flow", () => {
       .toMatchObject({
         activeCatId: "handoff-cat",
         completed: "true",
-        eveningDeliveryDays: null,
+        eveningDeliveryDays: expect.any(String),
       });
     const ownPhotos = await page.evaluate(() =>
       JSON.parse(window.localStorage.getItem("nyaruhodo_exchange_own_sleeping_photos") ?? "[]"),
@@ -3201,7 +3292,17 @@ test.describe("onboarding delivery flow", () => {
     const keptPhotos = await page.evaluate(() =>
       JSON.parse(window.localStorage.getItem("nyaruhodo_exchange_kept_photos") ?? "[]"),
     );
+    const eveningDeliveryDays = await page.evaluate(() =>
+      JSON.parse(
+        window.localStorage.getItem("neteruneko_evening_delivery_days") ?? "{}",
+      ),
+    );
     expect(ownPhotos).toHaveLength(1);
+    expect(Object.values(eveningDeliveryDays)).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ targetOwnPhotoId: "handoff-own-photo" }),
+      ]),
+    );
     expect(ownPhotos[0]?.src).toMatch(/^data:image\//);
     expect(ownPhotos.some((photo: { id?: string }) => photo.id === "stale-target-own")).toBe(
       false,
@@ -3269,7 +3370,7 @@ test.describe("onboarding delivery flow", () => {
       .toBe(true);
   });
 
-  test("keeps the second-photo intent for account handoffs without an explicit next", async ({
+  test("lands old account handoffs on home without restoring the second-photo intent", async ({
     page,
   }) => {
     await page.route("**/api/onboarding/handoff/redeem", async (route) => {
@@ -3298,9 +3399,8 @@ test.describe("onboarding delivery flow", () => {
     );
     await page.locator("main button").first().click();
 
-    await expect(page).toHaveURL(
-      /\/home\?handoff=restored&from=onboarding_second_photo/,
-    );
+    await expect(page).toHaveURL(/\/home\?handoff=restored/);
+    await expect(page).not.toHaveURL(/from=onboarding_second_photo/);
     await expect(page.getByTestId("home-empty-action")).toBeVisible();
   });
 
@@ -3812,9 +3912,21 @@ test.describe("onboarding delivery flow", () => {
       )
       .toMatchObject({
         activeCatId: "target-origin-cat",
-        eveningDays: null,
+        eveningDays: expect.any(String),
         ownPhotos: [{ id: "target-origin-own-photo" }],
       });
+    const restoredEveningDays = await targetPage.evaluate(() =>
+      JSON.parse(
+        window.localStorage.getItem("neteruneko_evening_delivery_days") ?? "{}",
+      ),
+    );
+    expect(Object.values(restoredEveningDays)).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          targetOwnPhotoId: "target-origin-own-photo",
+        }),
+      ]),
+    );
     await expect
       .poll(() =>
         page.evaluate(() => ({

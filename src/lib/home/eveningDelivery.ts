@@ -186,6 +186,83 @@ export function recordEveningDeliveryTarget(
   };
 }
 
+export function recordOnboardingEveningDeliveryTarget(
+  ownPhoto: OwnSleepingPhoto,
+  now = Date.now(),
+) {
+  const intendedDateKey = getEveningDeliveryTargetDateKey(ownPhoto.createdAt);
+
+  if (now >= getJstAutoOpenTime(intendedDateKey)) {
+    return null;
+  }
+
+  const existingDay = readEveningDeliveryStore()[intendedDateKey];
+  if (existingDay?.targetOwnPhotoId) {
+    const isSameTarget = existingDay.targetOwnPhotoId === ownPhoto.id;
+    return {
+      dateKey: intendedDateKey,
+      isExchangeTarget: isSameTarget,
+      isTodayDelivery: intendedDateKey === getJstDateKey(now),
+      persisted: true,
+      targetSaveFailed: false,
+      alreadyReserved: true,
+      outcome: isSameTarget
+        ? ("already_reserved" as const)
+        : ("existing_target_preserved" as const),
+    };
+  }
+
+  const recorded = recordEveningDeliveryTarget(ownPhoto, ownPhoto.createdAt);
+  return {
+    ...recorded,
+    alreadyReserved: false,
+    outcome: recorded.isExchangeTarget
+      ? ("reserved" as const)
+      : recorded.targetSaveFailed
+        ? ("write_failed" as const)
+        : ("delivery_slot_unavailable" as const),
+  };
+}
+
+export function clearEveningDeliveryTargetForPhoto(photoId: string) {
+  const store = readEveningDeliveryStore();
+  let changed = false;
+
+  for (const [dateKey, day] of Object.entries(store)) {
+    if (
+      day.targetOwnPhotoId !== photoId ||
+      day.deliveredPhoto ||
+      day.openedAt
+    ) {
+      continue;
+    }
+
+    const {
+      targetOwnPhotoId: _targetOwnPhotoId,
+      targetCatId: _targetCatId,
+      targetCapturedAt: _targetCapturedAt,
+      targetPhoto: _targetPhoto,
+      ...remainingDay
+    } = day;
+    store[dateKey] = { ...remainingDay, dateKey };
+    changed = true;
+  }
+
+  if (!changed) {
+    return true;
+  }
+
+  return (
+    writeEveningDeliveryStore(store) &&
+    !Object.values(readEveningDeliveryStore()).some(
+      (day) =>
+        day.targetOwnPhotoId === photoId &&
+        !day.deliveredPhoto &&
+        !day.openedAt,
+    )
+  );
+}
+
 export function repairMissingEveningDeliveryTarget(
   ownPhotos: OwnSleepingPhoto[],
   now = Date.now(),
@@ -506,7 +583,7 @@ export function getJstDeliveryTime(dateKey: string) {
   return getJstDayStartTime(dateKey) + EVENING_DELIVERY_HOUR * 60 * 60 * 1000;
 }
 
-function getJstAutoOpenTime(dateKey: string) {
+export function getJstAutoOpenTime(dateKey: string) {
   return getJstDayStartTime(addJstDays(dateKey, 1)) + 5 * 60 * 60 * 1000;
 }
 

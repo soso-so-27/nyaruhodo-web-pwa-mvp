@@ -1,6 +1,6 @@
 # Analytics KPI Inventory v2.0
 
-更新日: 2026-07-16
+更新日: 2026-07-21
 対象: Instagram投稿3の初動と、先行期の日次運用
 
 ## 1. 先に答える問い
@@ -9,7 +9,7 @@
 
 1. bioから来た人が、最初の写真を入れられたか
 2. その場のねこだよりが、届いて開けたか
-3. 次の20時便に向けた一枚を入れられたか
+3. 最初の写真で、次の20時便を自動予約できたか
 4. 20時に、対象者全員の便が成立したか
 5. 翌日も写真を入れた人がいるか
 
@@ -29,10 +29,24 @@
 | 4 | `onboarding_delivery_arrived` | 即時のねこだよりを用意できた |
 | 5 | `onboarding_delivery_opened` | 即時便を開いた |
 | 6 | `onboarding_completed` | 即時便を確認し、オンボを終えた |
-| 7 | `onboarding_second_photo_prompt_view` | ホームで今夜の一枚を見た |
-| 8 | `onboarding_second_photo_submitted` | 次の20時便に向けた一枚を保存した |
 
 `photo_submitted` は `onboarding_photo_submitted` の汎用別名なので、継続回数には重ねて数えない。
+
+次の20時便の予約は2枚目の入力ではなく、最初の写真保存時に自動で行う。`evening_delivery_reserved` はオンボ完了順序から独立した成果指標として見る。旧 `onboarding_second_photo_prompt_view` / `onboarding_second_photo_submitted` はPhase 1以降の新規体験では発火させず、過去記録としてだけ残す。
+
+### 初回夜便ファネル
+
+同じ利用者が、オンボで予約した次の20時便を開くまでを次の順で数える。
+
+| 順 | イベント | 意味 |
+| --- | --- | --- |
+| 1 | `evening_delivery_reserved` | 最初の写真で次の20時便を予約できた |
+| 2 | `evening_delivery_check_started` | 対象時刻以降に20時便の確認を開始した |
+| 3 | `evening_delivery_check_succeeded` | 20時便が成立した |
+| 4 | `envelope_shown` + `surface=home` | ホームに20時便の封筒を表示した |
+| 5 | `delivery_opened` | 20時便を開いた |
+
+UIと管理画面の呼称は `次の20時便` に統一する。20:00より前の初回写真は当日、20:00以降は翌日の便を対象にする。
 
 ## 3. 初動で見る順序
 
@@ -48,7 +62,7 @@
 
 ### 19時まで
 
-1. `今夜の一枚を保存した` 人数を確認
+1. `次の20時便を予約した` 人数を確認
 2. 管理画面のモデレーションキューで pending を全件確認
 3. 写真保存失敗、原本保全失敗、夜便予約の自動修復が増えていないか確認
 
@@ -82,13 +96,16 @@
 
 - 写真選択後の離脱
 - 即時便は届いたが開かない
-- 2枚目を入れない
+- 自動予約後、対象時刻に再訪しない
 - アプリ追加案内を閉じる
 
 ## 5. 20時便の主要イベント
 
 | イベント | 意味 |
 | --- | --- |
+| `evening_delivery_reserved` | オンボの最初の写真で次の20時便を予約した |
+| `evening_delivery_reservation_skipped` | 既存の別予約を維持した、または補完期限を過ぎたため予約を見送った |
+| `evening_delivery_reservation_failed` | 初回写真の夜便予約を保存できなかった、または予約枠を利用できなかった |
 | `home_exchange_share_photo_confirmed` | 共有する一枚を保存した |
 | `evening_delivery_check_started` | 20時便の確認を開始した |
 | `evening_delivery_check_succeeded` | 配達を保存できた |
@@ -97,6 +114,10 @@
 | `evening_delivery_target_repaired` | 軽量予約を再訪時に修復した |
 | `envelope_shown` + `surface=home` | 20時便の封筒を表示した |
 | `delivery_opened` | 20時便を開いた |
+
+オンボ起点の予約イベントには、最初の写真保存で作った正規の `submission_id` を共通で入れる。`own_photo_id` を `submission_id` の代わりに使わない。`reservation_origin=onboarding_first_photo`、`experience_version=one_photo_v1`、対象日の `delivery_date_key` も確認に使う。
+
+再開・再訪・端末間引き継ぎでは、対象便の翌日05:00まで、予約が欠けている場合だけ補完する。既存の別写真の予約は上書きしない。旧2枚目URLは現行導線へ静かに正規化し、旧プロンプトを成果として数えない。
 
 ## 6. 環境と流入
 

@@ -1,7 +1,7 @@
 # screen-flows.md — システム地図 成果物5（画面遷移図）
 
 > 出典はコードのみ（辺=リンク・router.push/replace・redirect・window.location）。全て `ファイル:行` 付き。
-> 作成: 2026-07-07 / 対象: HEAD ワークツリー（`4efcab6` 時点）。
+> 作成: 2026-07-07 / 最終更新: 2026-07-21（Phase 1: 初回写真の夜便自動予約）。
 > 図1=俯瞰、図2=オンボーディング詳細、図3=ホーム状態機械、図4=課金・退会。
 
 ---
@@ -102,37 +102,36 @@ flowchart TD
 
 ```mermaid
 flowchart TD
-  ENTRY["/onboarding 入口"] --> RESUME{"進行状態の復元<br/>resolveOnboardingProgress<br/>OnboardingFlow.tsx:350-376"}
-  RESUME -- "stage=album_created" --> RHOME["replace /home<br/>:386-388"]
-  RESUME -- "stage=opened" --> RACCT["replace /account/create?from=onboarding<br/>:391-396"]
+  ENTRY["/onboarding 入口"] --> REPAIR["保存済み初回写真があれば夜便予約を修復<br/>OnboardingFlow.tsx:480-527"]
+  REPAIR --> RESUME{"進行状態の復元<br/>resolveOnboardingResumeDecision"}
+  RESUME -- "stage=album_created" --> RHOME["replace /home"]
+  RESUME -- "stage=opened + 通常環境" --> RHOME
+  RESUME -- "stage=opened + アプリ内ブラウザ" --> RACCT["replace /account/create?from=onboarding"]
   RESUME -- "stage=arrived+delivered" --> ENV
   RESUME -- "stage=name_pending(+delivered)" --> NAMING
   RESUME -- "stage=name_pending/submitted(+ownPhoto)" --> SAVING
-  RESUME -- "completed(direct/referral)+実証あり" --> RHOME2["replace /home :357-372"]
+  RESUME -- "completed(direct/referral)+実証あり" --> RHOME2["replace /home"]
   RESUME -- "completedだが実証なし→フラグ破棄" --> INTRO
   RESUME -- "進行なし" --> INTRO["intro"]
 
   INTRO -- "referral & アプリ内ブラウザ & 未dismiss<br/>shouldShowExternalBrowserGuide :1275-1279" --> EXTG["外部ブラウザ案内<br/>(URLコピー/このまま進む)"]
   EXTG --> INTRO
   INTRO -- "写真選択" --> SAVING["saving"]
-  SAVING -- "exchange mode=onboarding 成功" --> ENV["envelope"]
-  SAVING -- "候補なし/失敗" --> EMPTY["empty :688,721,1236"]
+  SAVING --> RESERVE["初回写真を直近の夜便へ自動予約<br/>20時前=当日 / 20時以降=翌日<br/>OnboardingFlow.tsx:856-881"]
+  RESERVE -. "同日既存targetは上書きしない<br/>予約日の翌朝05:00以降は修復しない" .-> RULE["recordOnboardingEveningDeliveryTarget<br/>eveningDelivery.ts:189-225"]
+  RESERVE -- "exchange mode=onboarding 成功" --> ENV["envelope"]
+  RESERVE -- "候補なし/失敗" --> EMPTY["empty"]
   EMPTY -- "handleGoHome: test時→/settings, 通常→/home :1267-1272" --> GOHOME["/home or /settings"]
 
   ENV -- "タップ handleOpenEnvelope :961" --> REV{"prefers-reduced-motion?<br/>:996-999"}
   REV -- yes --> DELIV
   REV -- no --> REVEAL["revealing (1150ms :89)"] --> DELIV["delivered"]
 
-  DELIV -- "PWA設置案内の表示条件:<br/>kept && installPlatform有 && !embedded && !dismissed<br/>:150-156 (standalone/embeddedでは非表示 :224-226)" --> PWAG["インストール案内<br/>android=prompt() / iOS=手順 :870-894"]
-  PWAG --> DELIV
-  DELIV -- "つづける: 猫名未設定<br/>:823-836" --> NAMING["naming"]
-  DELIV -- "つづける: 猫名設定済み<br/>:838" --> SPCHECK
-  NAMING --> SPCHECK{"20時前?<br/>isBeforeJstHour(20) :145-149"}
-  SPCHECK -- "yes → second_photo_prompt :795-797" --> SP["2枚目プロンプト"]
-  SPCHECK -- no --> ACCT2["/account/create?from=onboarding"]
-  SP -- "もう1枚: 埋め込みブラウザ<br/>:858-864" --> ACCT_SP["/account/create?…&next=second_photo<br/>(handoff経由で母艦へ)"]
-  SP -- "もう1枚: 通常ブラウザ :867" --> HOME_SP["/home?from=onboarding_second_photo"]
-  SP -- あとで --> ACCT2
+  DELIV -- "つづける: 猫名未設定" --> NAMING["naming"]
+  DELIV -- "つづける: 猫名設定済み" --> FINISH{"実行環境"}
+  NAMING --> FINISH
+  FINISH -- "通常ブラウザ/PWA" --> HOME2["/home<br/>OnboardingFlow.tsx:1055-1074"]
+  FINISH -- "LINE/IGなどアプリ内ブラウザ" --> ACCT2["/account/create?from=onboarding<br/>保存/handoff導線"]
 
   ACCT2 -- "Googleでつづける" --> OAUTH["signInWithOAuth<br/>redirectTo=/auth/callback?next=…"]
   OAUTH --> CB{"auth/callback<br/>page.tsx:26-92"}
@@ -145,22 +144,26 @@ flowchart TD
   HOFF --> CONT["/onboarding/continue?handoff=…"]
   CONT -- "アプリ内ブラウザで開いた<br/>continue/page.tsx:35,44" --> COPY["URLコピー案内のみ<br/>(この環境では復元しない)"]
   CONT -- "Safari/Chrome/PWA" --> REDEEM{"redeem (1回限り)"}
-  REDEEM -- 成功 --> RESTORED["/home?handoff=restored<br/>(+&from=onboarding_second_photo) :104-108"]
+  REDEEM -- 成功 --> HREPAIR["初回写真の夜便予約を修復<br/>handoff.ts:423-435"]
+  HREPAIR --> RESTORED["/home?handoff=restored"]
   REDEEM -- "already_used & 端末に復元済み :90-97" --> RESTORED
   REDEEM -- "期限切れ/不明token" --> CERR["エラー表示(その場)"]
+
+  LEGACY["互換入力のみ:<br/>next=second_photo / from=onboarding_second_photo"] -. "旧handoff URLを受理" .-> HREPAIR
+  LEGACY -. "HomeInputで予約修復後、queryを除去" .-> HOME2
 ```
 
 ### 既存 `docs/onboarding-transition-map-2026-07-06.md` との照合（コードが正・mapの改訂必要箇所）
 
 | # | map側の記述 | コードの現実 | 出典 |
 |---|---|---|---|
-| 1 | 順序が「delivered→2枚目予告→PWA案内→猫名判定→naming」（map:54-63） | 現行は「delivered（PWA案内はdelivered中に併出）→猫名判定→naming→**その後に**second_photo_prompt（20時前のみ）」。d8bde81 "Move second photo prompt after onboarding letter" で順序変更済み | `OnboardingFlow.tsx:823-838,795-797,145-156` |
-| 2 | 2枚目導線は `/home?from=onboarding_second_photo` 直行のみ（map:93） | 埋め込みブラウザ時は `/account/create?…&next=second_photo` を経由（handoffで母艦に渡す。ace8081） | `OnboardingFlow.tsx:858-864` |
+| 1 | 2枚目予告と2枚目入力が現行フロー | Phase 1では初回写真を直近の夜便へ自動予約し、2枚目は要求しない | `OnboardingFlow.tsx:856-881`, `eveningDelivery.ts:189-225` |
+| 2 | 完了後は保存方法選択へ進む | 通常ブラウザ/PWAは `/home` へ直行。アプリ内ブラウザだけ保存・handoffのため `/account/create` へ進む | `OnboardingFlow.tsx:1055-1074` |
 | 3 | Google成功: `/auth/callback` → `/cats?onboarding=1`（map:67-68,97） | callbackは `next`（既定 `/home`）へ `auth=google_success` 付きで戻るだけ。`/cats?onboarding=1` は account/create 側の分岐 | `auth/callback/page.tsx:89-91,162-168`, `account/create/page.tsx:625` |
-| 4 | handoff復元後は `/home?handoff=restored`（map:75,99） | `next=second_photo` 引き継ぎ時は `&from=onboarding_second_photo` が付く | `continue/page.tsx:104-108` |
-| 5 | 再訪・復元経路（progress stageによる resume 分岐）がmapに無い | album_created→/home、opened→/account/create、arrived→envelope、name_pending→naming/saving、submitted→saving、stale-completed→フラグ破棄しintro | `OnboardingFlow.tsx:350-438` |
+| 4 | handoff復元後は `/home?handoff=restored` | 復元した初回写真から夜便予約も修復する。旧 `next=second_photo` は互換入力としてのみ残り、Home側で通常URLへ正規化する | `handoff.ts:423-435`, `HomeInput.tsx:406-424` |
+| 5 | 再訪・復元経路（progress stageによる resume 分岐）がmapに無い | 初回写真があれば予約を冪等修復し、album_created/openedは通常環境でhome、openedのアプリ内ブラウザだけaccount/create。arrived→envelope、name_pending→naming/saving、submitted→saving | `OnboardingFlow.tsx:480-539`, `stateMachine.ts:10-50` |
 | 6 | empty→「ホームへ」= /home のみ（map:77-78,89） | test tools有効時は /settings へ | `OnboardingFlow.tsx:1267-1272` |
-| 7 | PWA案内の表示条件が「delivered内」とだけ（map:94） | 条件は kept && installPlatform有 && **!embedded** && !dismissed。standalone/embeddedではplatform自体を設定しない | `OnboardingFlow.tsx:150-156,224-226` |
+| 7 | 初回写真の予約修復条件が未記載 | 同日既存targetを上書きせず、予約日の翌朝05:00以降は古い初回写真から修復しない | `eveningDelivery.ts:189-225` |
 
 map §0の裁定（admin_stockのみ・seed分散・通常プール合流）はコードと一致（`exchange route.ts:396-401,1453-1455,312-334`）。
 
@@ -243,6 +246,6 @@ flowchart TD
 
 - 俯瞰図: ノード24ページ／孤立4（offline・prototypes・onboarding/continue・onboarding本体の通常導線）／
   行き止まり2（offline・prototypes/taimen）。
-- オンボ詳細: 分岐条件11種を辺ラベル化。既存mapとの乖離 **7件**（改訂リスト提示。コードが正）。
+- オンボ詳細: 初回写真の夜便自動予約、resume/re-entry/handoff修復、完了後の環境別遷移、旧2枚目URLの互換正規化を反映。照合項目 **7件**（コードが正）。
 - ホーム: 5状態＋checkサブ状態4、トリガー3種（とる/20時/翌朝5時）。
 - 課金・退会: 画面×API対応6本。退会はAPIのみ存在しUI未配線（issues追補へ）。

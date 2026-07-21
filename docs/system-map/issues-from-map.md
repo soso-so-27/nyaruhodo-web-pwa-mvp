@@ -158,19 +158,22 @@
   フォールバック先が未定義の典型。
 - 対処案: home側で「初回状態（onboardingCompleted無し＋写真0）→ onboardingへの静かな案内」を検討。
 
-**P2-8. 2枚目プロンプトの無反応分岐（サイレントno-op）**
-- 出典: `OnboardingFlow.tsx:841-843`（`handleStartSecondPhoto` は `!isDeliveredPhotoKept` で
-  無言のreturn）
-- 事故: 条件が崩れた状態でボタンが表示されると、押しても何も起きないUIになる
-  （現状は表示条件 `:145-149` が守っているが、フォールバック未定義のまま表示条件だけに依存）。
-- 対処案: no-op分岐にトラッキングかdisabled表示を入れ、表示条件と実行条件の二重化を明示。
+**解消: P2-8（2枚目プロンプトの無反応分岐）**
+- Phase 1でオンボ完了後の2枚目プロンプト自体を現行フローから除外した。初回写真は保存直後に
+  `recordOnboardingEveningDeliveryTarget()` で直近の夜便へ自動予約され、完了後は通常環境なら `/home`、
+  アプリ内ブラウザなら保存・handoff用の `/account/create` へ進む。
+- 出典: `OnboardingFlow.tsx:856-881,1055-1074`、`eveningDelivery.ts:189-225`。
+- 旧 `next=second_photo` / `from=onboarding_second_photo` は既存handoff URL・ブックマーク互換の読取だけ残る。
+  Homeで初回写真の予約を修復してqueryを除去し、2枚目UIは表示しない（`HomeInput.tsx:406-424`）。
+- 残る作業は、互換URLの利用がなくなったことを計測で確認した後に account/create・continue の
+  legacy parameter parsingを削除する低優先度の掃除であり、無反応UIの事故はクローズ。
 
 ### 更新後サマリ
 
 - P0: **1**（P0-1 退会削除の取りこぼし。P0-2はクローズ）
 - P1: **4**（+P1-5 退会UI未配線 / P1-4は `ed61dd5` でクローズ）
-- P2: **8**（+P2-6〜P2-8）
-- 合計: **14（うちクローズ2・オープン12）**
+- P2: **8**（+P2-6〜P2-8。P2-8はPhase 1でクローズ）
+- 合計: **14（うちクローズ3・オープン11）**
 
 補足: これらは「地図を描いて初めて見えた構造」に限定。個別APIのバリデーション等の細部は
 `feature-inventory.md` / `data-flows.md` の出典に委ね、ここには挙げていない。

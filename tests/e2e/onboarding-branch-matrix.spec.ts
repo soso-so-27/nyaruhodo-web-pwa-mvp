@@ -26,7 +26,7 @@ test.describe("onboarding branch matrix", () => {
     ).toBe("envelope");
     expect(
       resolveOnboardingResumeDecision({ ...base, stage: "opened" }).kind,
-    ).toBe("second_photo");
+    ).toBe("home");
     expect(
       resolveOnboardingResumeDecision({ ...base, stage: "album_created" }).kind,
     ).toBe("home");

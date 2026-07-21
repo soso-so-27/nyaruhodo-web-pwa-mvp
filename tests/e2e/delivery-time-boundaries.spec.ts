@@ -3,7 +3,9 @@ import { expect, test } from "@playwright/test";
 import {
   getEveningDeliveryTargetDateKey,
   getJstDateKey,
+  recordOnboardingEveningDeliveryTarget,
 } from "../../src/lib/home/eveningDelivery";
+import type { OwnSleepingPhoto } from "../../src/lib/home/sleepingPhotos";
 import {
   getServerJstDateKey,
   validateServerDeliveryDateKey,
@@ -62,4 +64,40 @@ test.describe("20時 and day-reset boundaries", () => {
       "2026-07-10",
     );
   });
+
+  test("keeps a missed onboarding target recoverable until 5am", () => {
+    const ownPhoto = createOnboardingPhoto(
+      Date.parse("2026-07-10T19:59:00+09:00"),
+    );
+
+    expect(
+      recordOnboardingEveningDeliveryTarget(
+        ownPhoto,
+        Date.parse("2026-07-11T04:59:59+09:00"),
+      ),
+    ).toMatchObject({ dateKey: "2026-07-10" });
+    expect(
+      recordOnboardingEveningDeliveryTarget(
+        ownPhoto,
+        Date.parse("2026-07-11T05:00:00+09:00"),
+      ),
+    ).toBeNull();
+  });
 });
+
+function createOnboardingPhoto(createdAt: number): OwnSleepingPhoto {
+  return {
+    id: "onboarding-boundary-photo",
+    catId: "boundary-cat",
+    ownerCatId: "boundary-cat",
+    src: "data:image/png;base64,AA==",
+    state: "sleeping",
+    visibility: "shared",
+    deliveryStatus: "available",
+    triggerLabel: "ねがお",
+    theme: "sleeping",
+    shared: true,
+    createdAt,
+    captureContext: "onboarding",
+  };
+}

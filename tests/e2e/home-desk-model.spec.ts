@@ -473,25 +473,28 @@ test.describe("home desk model", () => {
     await expect(page.getByTestId("home-sleeping-source-library")).toBeVisible();
   });
 
-  test("keeps the onboarding second-photo action visible after 8pm", async ({
+  test("clears the legacy second-photo action after 8pm", async ({
     page,
   }) => {
     await seedDeskState(page, "1", { now: getCurrentJstTime(21, 0) });
     await page.goto("/home?handoff=restored&from=onboarding_second_photo");
     await page.waitForLoadState("networkidle");
 
-    await expect(page.getByTestId("home-empty-action")).toBeVisible();
-    await expect(page.getByTestId("onboarding-second-photo-invitation")).toBeVisible();
+    await expect(page.getByTestId("home-desk-model")).toHaveAttribute(
+      "data-state",
+      "1b",
+    );
+    await expect(page.getByTestId("onboarding-second-photo-invitation")).toHaveCount(0);
+    await expect(page).not.toHaveURL(/from=onboarding_second_photo/);
     await expect(
       page.getByText("あしたの一通も、つくりませんか"),
-    ).toBeVisible();
+    ).toHaveCount(0);
     await expect(
       page.getByText("あしたのねこだよりに入れるねがおを一枚。"),
-    ).toBeVisible();
+    ).toHaveCount(0);
     await expect(
       page.getByRole("button", { name: "あしたの一枚を入れる" }),
-    ).toBeVisible();
-    await expect(page.getByRole("button", { name: "今日はここまで" })).toBeVisible();
+    ).toHaveCount(0);
   });
 
   test("does not label an unscheduled onboarding photo as tonight's sent photo", async ({
@@ -509,7 +512,8 @@ test.describe("home desk model", () => {
       "data-photo-id",
       "own-desk",
     );
-    await expect(page.getByTestId("onboarding-second-photo-invitation")).toBeVisible();
+    await expect(page.getByTestId("onboarding-second-photo-invitation")).toHaveCount(0);
+    await expect(page).not.toHaveURL(/from=onboarding_second_photo/);
     await expect(page.getByTestId("home-letter-tray")).toHaveCount(0);
     await expect(page.getByText("おくった", { exact: true })).toHaveCount(0);
     await expect(page.getByText("よる8時に とどく", { exact: true })).toHaveCount(0);

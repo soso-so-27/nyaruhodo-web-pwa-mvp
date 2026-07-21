@@ -40,7 +40,7 @@ type AnalyticsResponse = {
     introUsers: number;
     submittedUsers: number;
     openedUsers: number;
-    secondPhotoUsers: number;
+    reservedUsers: number;
   }>;
   deliveryHealth: Metric[];
   installHealth: Metric[];
@@ -374,8 +374,8 @@ export default function AdminAnalyticsClient() {
           <section style={styles.section} aria-labelledby="returning-title">
             <SectionHeading
               id="returning-title"
-              title="既存・再訪"
-              note="オンボ後の人が、今夜の一枚と20時便まで進んだ記録"
+              title="初回夜便"
+              note="オンボで次の20時便を予約した人が、便を開くまで"
             />
             <FunnelTable steps={data.returningFunnel ?? []} />
           </section>
@@ -447,13 +447,13 @@ export default function AdminAnalyticsClient() {
             />
             {data.sourceBreakdown.length > 0 ? (
               <AnalyticsTable
-                columns={["入口", "オンボ表示ID", "写真保存ID", "即時便開封ID", "今夜の一枚ID"]}
+                columns={["入口", "オンボ表示ID", "写真保存ID", "即時便開封ID", "次便予約ID"]}
                 rows={data.sourceBreakdown.map((row) => [
                   SOURCE_LABELS[row.source] ?? row.source,
                   `${row.introUsers} ID`,
                   `${row.submittedUsers} ID`,
                   `${row.openedUsers} ID`,
-                  `${row.secondPhotoUsers} ID`,
+                  `${row.reservedUsers} ID`,
                 ])}
               />
             ) : (

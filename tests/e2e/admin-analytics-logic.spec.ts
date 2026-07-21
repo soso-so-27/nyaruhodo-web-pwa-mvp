@@ -20,12 +20,10 @@ test.describe("admin analytics logic", () => {
       event("actor-a", "onboarding_photo_select_click", 2),
       event("actor-a", "onboarding_photo_submitted", 3),
       event("actor-a", "photo_submitted", 4),
-      event("actor-a", "onboarding_delivery_arrived", 5),
-      event("actor-a", "onboarding_delivery_opened", 6),
-      event("actor-a", "onboarding_completed", 7),
-      event("actor-a", "onboarding_second_photo_prompt_view", 8),
-      event("actor-a", "home_exchange_share_photo_confirmed", 9),
-      event("actor-a", "onboarding_second_photo_submitted", 10),
+      event("actor-a", "evening_delivery_reserved", 5),
+      event("actor-a", "onboarding_delivery_arrived", 6),
+      event("actor-a", "onboarding_delivery_opened", 7),
+      event("actor-a", "onboarding_completed", 8),
       event("actor-b", "onboarding_intro_view", 0),
       event("actor-b", "onboarding_photo_select_click", 1),
       event("actor-c", "onboarding_delivery_arrived", 0),
@@ -35,9 +33,7 @@ test.describe("admin analytics logic", () => {
 
     const result = buildAdminAnalytics(events);
 
-    expect(result.funnel.map((step) => step.users)).toEqual([
-      3, 2, 1, 1, 1, 1, 1, 1,
-    ]);
+    expect(result.funnel.map((step) => step.users)).toEqual([3, 2, 1, 1, 1, 1]);
     expect(result.funnel[1]).toMatchObject({
       previousUsers: 3,
       fromPreviousRate: 66.7,
@@ -48,8 +44,12 @@ test.describe("admin analytics logic", () => {
     });
     expect(result.retention).toMatchObject({
       photoSubmitters: 2,
-      repeatSubmitters: 1,
+      repeatSubmitters: 0,
       returningDaySubmitters: 0,
+    });
+    expect(result.overview.find((item) => item.key === "evening_reserved")).toMatchObject({
+      users: 1,
+      events: 1,
     });
   });
 
@@ -85,14 +85,14 @@ test.describe("admin analytics logic", () => {
         introUsers: 1,
         submittedUsers: 0,
         openedUsers: 0,
-        secondPhotoUsers: 0,
+        reservedUsers: 0,
       },
       {
         source: "direct",
         introUsers: 1,
         submittedUsers: 0,
         openedUsers: 0,
-        secondPhotoUsers: 0,
+        reservedUsers: 0,
       },
     ]);
   });
@@ -140,7 +140,7 @@ test.describe("admin analytics logic", () => {
         introUsers: 1,
         submittedUsers: 1,
         openedUsers: 1,
-        secondPhotoUsers: 0,
+        reservedUsers: 0,
       },
     ]);
   });
@@ -374,16 +374,13 @@ test.describe("admin analytics logic", () => {
       event("new-user", "onboarding_delivery_opened", 4),
       event("new-user", "onboarding_completed", 5),
       event("returning-user", "onboarding_completed", 0),
-      event("returning-user", "home_viewed", 1, { route: "/home", surface: "home" }),
-      event("returning-user", "onboarding_second_photo_prompt_view", 2, {
-        route: "/home",
-        surface: "home",
+      event("returning-user", "evening_delivery_reserved", 1, {
+        metadata: { journey_id: journeyId },
       }),
-      event("returning-user", "home_exchange_share_photo_confirmed", 3),
-      event("returning-user", "evening_delivery_check_started", 4),
-      event("returning-user", "evening_delivery_check_succeeded", 5),
-      event("returning-user", "envelope_shown", 6, { route: "/home", surface: "home" }),
-      event("returning-user", "delivery_opened", 7),
+      event("returning-user", "evening_delivery_check_started", 2),
+      event("returning-user", "evening_delivery_check_succeeded", 3),
+      event("returning-user", "envelope_shown", 4, { route: "/home", surface: "home" }),
+      event("returning-user", "delivery_opened", 5),
       event("handoff-user", "onboarding_external_browser_handoff_created", 0, {
         metadata: { journey_id: journeyId },
       }),
@@ -402,9 +399,7 @@ test.describe("admin analytics logic", () => {
     expect(result.newOnboardingFunnel.slice(0, 6).map((step) => step.users)).toEqual([
       1, 1, 1, 1, 1, 1,
     ]);
-    expect(result.returningFunnel.map((step) => step.users)).toEqual([
-      1, 1, 1, 1, 1, 1, 1,
-    ]);
+    expect(result.returningFunnel.map((step) => step.users)).toEqual([1, 1, 1, 1, 1]);
     expect(result.handoffFunnel.map((step) => step.users)).toEqual([1, 1, 1, 0]);
   });
 

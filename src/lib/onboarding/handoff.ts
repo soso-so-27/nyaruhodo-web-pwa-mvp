@@ -8,6 +8,7 @@ import {
   isAnonymousAuthEnabled,
 } from "../auth/anonymousAuth";
 import { getOrCreateAnonymousId } from "../identity/anonymousId";
+import { recordOnboardingEveningDeliveryTarget } from "../home/eveningDelivery";
 import { getPhotoIdentityKeys } from "../photoSources";
 import {
   cacheExchangePhotoOfflineDataUrl,
@@ -427,6 +428,11 @@ export function restoreOnboardingHandoffPayload(
 
   if (payload.ownSleepingPhotos.length > 0 && restored.ownCount === 0) {
     throw new Error("handoff_local_storage_failed");
+  }
+
+  const onboardingOwnPhoto = payload.ownSleepingPhotos[0];
+  if (onboardingOwnPhoto) {
+    recordOnboardingEveningDeliveryTarget(onboardingOwnPhoto);
   }
 
   if (payload.pendingReferralCode) {

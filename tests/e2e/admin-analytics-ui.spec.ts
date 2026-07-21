@@ -35,7 +35,7 @@ test("shows the launch dashboard in Japanese with actionable sections", async ({
     "true",
   );
   await expect(page.getByRole("heading", { name: "新規オンボ" })).toBeVisible();
-  await expect(page.getByRole("heading", { name: "既存・再訪" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "初回夜便" })).toBeVisible();
   await expect(page.getByRole("heading", { name: "引き継ぎ・復元" })).toBeVisible();
   await expect(page.getByRole("heading", { name: "今夜の一通" })).toBeVisible();
   await expect(page.getByRole("heading", { name: "端末と入口" })).toBeVisible();
@@ -168,7 +168,7 @@ const mockAnalyticsResponse = {
     metric("first_photo", "最初の写真を保存した", 8),
     metric("instant_arrival", "最初のねこだよりが届いた", 8),
     metric("instant_open", "最初のねこだよりを開いた", 7),
-    metric("second_photo", "今夜の一枚を保存した", 5),
+    metric("evening_reserved", "次の20時便を予約した", 5),
     metric("needs_attention", "要確認の識別ID", 1),
   ],
   funnel: [
@@ -191,18 +191,18 @@ const mockAnalyticsResponse = {
       introUsers: 10,
       submittedUsers: 8,
       openedUsers: 7,
-      secondPhotoUsers: 5,
+      reservedUsers: 5,
     },
     {
       source: "direct",
       introUsers: 2,
       submittedUsers: 1,
       openedUsers: 1,
-      secondPhotoUsers: 0,
+      reservedUsers: 0,
     },
   ],
   deliveryHealth: [
-    metric("evening_reserved", "20時便に写真を入れた", 5),
+    metric("evening_reserved", "20時便を予約した", 5),
     metric("evening_check_started", "20時便の確認を開始", 0, 0),
     metric("evening_check_succeeded", "20時便が成立", 0, 0),
     metric("evening_check_failed", "20時便の確認失敗", 0, 0),

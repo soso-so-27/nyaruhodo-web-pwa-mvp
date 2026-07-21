@@ -24,12 +24,15 @@ import {
   type OwnSleepingPhoto,
 } from "../../lib/home/sleepingPhotos";
 import {
+  clearEveningDeliveryTargetForPhoto,
   getEveningDeliveryCompletionCopy,
   getJstDateKey,
+  recordOnboardingEveningDeliveryTarget,
 } from "../../lib/home/eveningDelivery";
 import {
   createOnboardingSubmissionId,
   getOrCreateOnboardingAnonymousId,
+  markOnboardingAlbumCreated,
   patchOnboardingProgress,
   patchOnboardingProgressDurably,
   readCurrentOnboardingProgress,
@@ -225,6 +228,92 @@ export function OnboardingFlow() {
     return currentSource;
   }
 
+  function ensureOnboardingEveningDeliveryReservation({
+    ownPhoto,
+    submissionId,
+    source,
+    trigger,
+  }: {
+    ownPhoto: OwnSleepingPhoto;
+    submissionId: string;
+    source: OnboardingSource;
+    trigger: "initial" | "resume" | "reentry";
+  }) {
+    const target = recordOnboardingEveningDeliveryTarget(ownPhoto);
+    const commonProperties = {
+      surface: "onboarding",
+      source,
+      reservation_origin: "onboarding_first_photo",
+      reservation_trigger: trigger,
+      experience_version: "one_photo_v1",
+      submission_id: submissionId,
+      own_photo_id: ownPhoto.id,
+    };
+    const options = {
+      localCatId: ownPhoto.ownerCatId ?? ownPhoto.catId,
+    };
+
+    if (!target) {
+      trackProductEvent(
+        trigger === "initial"
+          ? "evening_delivery_reservation_failed"
+          : "evening_delivery_reservation_skipped",
+        {
+          ...commonProperties,
+          ...(trigger === "initial"
+            ? { error_code: "onboarding_target_expired" }
+            : { reason: "onboarding_target_expired" }),
+        },
+        options,
+      );
+      return null;
+    }
+
+    if (target.outcome === "already_reserved") {
+      return target;
+    }
+
+    if (target.outcome === "existing_target_preserved") {
+      trackProductEvent(
+        "evening_delivery_reservation_skipped",
+        {
+          ...commonProperties,
+          delivery_date_key: target.dateKey,
+          reason: "existing_target_preserved",
+        },
+        options,
+      );
+      return target;
+    }
+
+    if (target.outcome === "reserved") {
+      trackProductEvent(
+        "evening_delivery_reserved",
+        {
+          ...commonProperties,
+          delivery_date_key: target.dateKey,
+          is_today_delivery: target.isTodayDelivery,
+        },
+        options,
+      );
+      return target;
+    }
+
+    trackProductEvent(
+      "evening_delivery_reservation_failed",
+      {
+        ...commonProperties,
+        delivery_date_key: target.dateKey,
+        error_code:
+          target.outcome === "write_failed"
+            ? "local_target_save_failed"
+            : "delivery_slot_unavailable",
+      },
+      options,
+    );
+    return target;
+  }
+
   useEffect(() => {
     let isMounted = true;
 
@@ -267,7 +356,7 @@ export function OnboardingFlow() {
     router.prefetch(
       `/account/create?from=onboarding&source=${encodeURIComponent(
         entrySource,
-      )}&next=second_photo&embedded=1`,
+      )}&embedded=1`,
     );
   }, [entrySource, isEmbeddedBrowser, router, state]);
 
@@ -389,12 +478,22 @@ export function OnboardingFlow() {
       source,
       surface: "onboarding",
     });
-    if (readOnboardingProgress()?.stage === "opened") {
+    const completedProgress = readOnboardingProgress();
+    if (completedProgress?.ownPhoto) {
+      ensureOnboardingEveningDeliveryReservation({
+        ownPhoto: completedProgress.ownPhoto,
+        submissionId: completedProgress.submissionId,
+        source,
+        trigger: "reentry",
+      });
+    }
+    if (completedProgress?.stage === "opened") {
       markOnboardingAlbumCompletionReady();
+      markOnboardingAlbumCreated(source);
       router.replace(
         isEmbeddedInAppBrowser()
-          ? `/account/create?from=onboarding&source=${encodeURIComponent(source)}&next=second_photo`
-          : "/home?from=onboarding_second_photo",
+          ? `/account/create?from=onboarding&source=${encodeURIComponent(source)}`
+          : "/home",
       );
     } else {
       router.replace("/home");
@@ -406,6 +505,14 @@ export function OnboardingFlow() {
     progress: OnboardingProgress | null,
     source: OnboardingSource,
   ) {
+    if (progress?.ownPhoto) {
+      ensureOnboardingEveningDeliveryReservation({
+        ownPhoto: progress.ownPhoto,
+        submissionId: progress.submissionId,
+        source,
+        trigger: "resume",
+      });
+    }
     const decision = resolveOnboardingResumeDecision(progress);
 
     if (decision.kind === "intro") {
@@ -413,17 +520,20 @@ export function OnboardingFlow() {
     }
 
     if (decision.kind === "home") {
-      router.replace("/home");
-      return true;
-    }
-
-    if (decision.kind === "second_photo") {
-      markOnboardingAlbumCompletionReady();
-      router.replace(
-        isEmbeddedInAppBrowser()
-          ? `/account/create?from=onboarding&source=${encodeURIComponent(source)}&next=second_photo`
-          : "/home?from=onboarding_second_photo",
-      );
+      if (progress?.stage === "opened") {
+        if (progress.ownPhoto) {
+          recordOnboardingEveningDeliveryTarget(progress.ownPhoto);
+        }
+        markOnboardingAlbumCompletionReady();
+        markOnboardingAlbumCreated(source);
+        router.replace(
+          isEmbeddedInAppBrowser()
+            ? `/account/create?from=onboarding&source=${encodeURIComponent(source)}`
+            : "/home",
+        );
+      } else {
+        router.replace("/home");
+      }
       return true;
     }
 
@@ -764,6 +874,12 @@ export function OnboardingFlow() {
           selectedPhotoSrc: dataUrl,
           updatedAt: Date.now(),
         });
+        ensureOnboardingEveningDeliveryReservation({
+          ownPhoto,
+          submissionId,
+          source: getEffectiveEntrySource(),
+          trigger: "initial",
+        });
         trackProductEvent("take_photo", {
           catId,
           hour: new Date().getHours(),
@@ -945,17 +1061,18 @@ export function OnboardingFlow() {
     isContinuingRef.current = true;
     setIsContinuing(true);
     markOnboardingAlbumCompletionReady();
+    markOnboardingAlbumCreated(getEffectiveEntrySource());
 
     if (isEmbeddedBrowser) {
       router.push(
         `/account/create?from=onboarding&source=${encodeURIComponent(
           getEffectiveEntrySource(),
-        )}&next=second_photo&embedded=1`,
+        )}&embedded=1`,
       );
       return;
     }
 
-    router.push("/home?from=onboarding_second_photo");
+    router.push("/home");
   }
 
   function handleContinueAfterDeliveredPhoto() {
@@ -1262,7 +1379,9 @@ export function OnboardingFlow() {
     });
 
     if (exchangeResult?.error === "onboarding_already_completed") {
-      deleteOwnSleepingPhoto(ownPhoto.id);
+      if (clearEveningDeliveryTargetForPhoto(ownPhoto.id)) {
+        deleteOwnSleepingPhoto(ownPhoto.id);
+      }
       window.localStorage.setItem(STORAGE_KEYS.onboardingCompleted, "true");
       trackProductEvent("onboarding_completed_reentry_blocked", {
         source: getEffectiveEntrySource(),

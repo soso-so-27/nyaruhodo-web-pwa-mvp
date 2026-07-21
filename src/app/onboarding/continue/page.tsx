@@ -40,8 +40,7 @@ function OnboardingContinueContent({
     readSearchParam(searchParams, "source"),
   );
   const next =
-    readSearchParam(searchParams, "next") === "second_photo" ||
-    handoffFrom === "account"
+    readSearchParam(searchParams, "next") === "second_photo"
       ? "second_photo"
       : "";
   const initialIsEmbeddedBrowser =

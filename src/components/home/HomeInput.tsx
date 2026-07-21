@@ -83,6 +83,7 @@ import {
   markEveningDeliveryKept,
   readEveningDeliveryStore,
   recordEveningDeliveryTarget,
+  recordOnboardingEveningDeliveryTarget,
   setEveningDeliveredPhoto,
   shouldShowGuidanceCopy,
   updateEveningDeliveredPhotoDataUrl,
@@ -97,6 +98,7 @@ import {
   BOX_PHOTO_STORAGE_EVENT,
   dismissExchangePhoto,
   keepExchangePhoto,
+  readAllOwnSleepingPhotos,
   readKeptExchangePhotoCount,
   readOwnSleepingPhotos,
   readOwnSleepingPhotosForSync,
@@ -111,6 +113,7 @@ import {
   type OwnSleepingPhoto,
 } from "../../lib/home/sleepingPhotos";
 import { backupOwnSleepingPhotoMoment } from "../../lib/home/sleepingPhotoBackup";
+import { readOnboardingProgress } from "../../lib/onboarding/progress";
 import {
   STORAGE_KEYS,
   getDiscoveryLogKey,
@@ -325,8 +328,6 @@ export function HomeInput({
   const [activeCatId, setActiveCatId] = useState<string | null>(null);
   const [activeCat, setActiveCat] = useState<CatProfile | null>(null);
   const [hasHydratedHomeState, setHasHydratedHomeState] = useState(false);
-  const [hasOnboardingSecondPhotoIntent, setHasOnboardingSecondPhotoIntent] =
-    useState(false);
   const [lockData, setLockData] = useState<LockData>({});
   const [tick, setTick] = useState(initialNow);
   const isHomeClockReady = tick > 0;
@@ -400,7 +401,6 @@ export function HomeInput({
     new Map<string, DeliveredPhotoDecodeEntry>(),
   );
   const openingEveningDeliveryRequestRef = useRef<string | null>(null);
-  const hasTrackedSecondPhotoPromptRef = useRef(false);
   const hasTrackedHomeInstallHintRef = useRef(false);
 
   useEffect(() => {
@@ -415,10 +415,13 @@ export function HomeInput({
     saveActiveCatId(active.id);
     hydrateCatState(active.id);
     setHasAcceptedSleepingSafety(hasAcceptedSleepingSafetyNotice());
-    setHasOnboardingSecondPhotoIntent(
-      new URLSearchParams(window.location.search).get("from") ===
-        "onboarding_second_photo",
-    );
+    if (hasOnboardingSecondPhotoIntentInLocation()) {
+      const onboardingOwnPhoto = readOnboardingProgress()?.ownPhoto;
+      if (onboardingOwnPhoto) {
+        recordOnboardingEveningDeliveryTarget(onboardingOwnPhoto);
+      }
+      clearOnboardingSecondPhotoIntent();
+    }
     setHasHydratedHomeState(true);
   }, []);
 
@@ -475,21 +478,6 @@ export function HomeInput({
       window.removeEventListener("storage", refreshEveningDeliveryState);
     };
   }, []);
-
-  useEffect(() => {
-    if (
-      !hasHydratedHomeState ||
-      !hasOnboardingSecondPhotoIntent ||
-      hasTrackedSecondPhotoPromptRef.current
-    ) {
-      return;
-    }
-
-    hasTrackedSecondPhotoPromptRef.current = true;
-    trackProductEvent("onboarding_second_photo_prompt_view", {
-      surface: "home",
-    });
-  }, [hasHydratedHomeState, hasOnboardingSecondPhotoIntent]);
 
   useEffect(() => {
     function refreshHomeInstallHint() {
@@ -885,7 +873,10 @@ export function HomeInput({
         : readOwnSleepingPhotos(null),
     [allOwnSleepingPhotos, homeDisplayCatId],
   );
-  const ownSleepingPhotosForDelivery = allOwnSleepingPhotos;
+  const ownSleepingPhotosForDelivery = useMemo(
+    () => readAllOwnSleepingPhotos(),
+    [collectionRefreshTick, eveningRefreshTick],
+  );
   const eveningDelivery = useEveningDelivery({
     activeCatId,
     ownSleepingPhotos: ownSleepingPhotosForDelivery,
@@ -896,28 +887,11 @@ export function HomeInput({
     () =>
       buildEveningHomeState({
         activeCatId: null,
-        ownPhotos: allOwnSleepingPhotos,
+        ownPhotos: ownSleepingPhotosForDelivery,
         now: homeNow,
       }),
-    [allOwnSleepingPhotos, eveningDeliveryRefreshTick, homeNow],
+    [ownSleepingPhotosForDelivery, eveningDeliveryRefreshTick, homeNow],
   );
-  useEffect(() => {
-    if (
-      !hasOnboardingSecondPhotoIntent ||
-      eveningHomeState.kind === "before"
-    ) {
-      return;
-    }
-
-    setHasOnboardingSecondPhotoIntent(false);
-    const url = new URL(window.location.href);
-    url.searchParams.delete("from");
-    window.history.replaceState(
-      null,
-      "",
-      `${url.pathname}${url.search}${url.hash}`,
-    );
-  }, [eveningHomeState.kind, hasOnboardingSecondPhotoIntent]);
   const systemOpenedDeliveryNotice = useMemo(
     () => getSystemOpenedEveningDeliveryNotice(homeNow),
     [eveningDeliveryRefreshTick, homeNow],
@@ -1870,7 +1844,6 @@ export function HomeInput({
   }
 
   function clearOnboardingSecondPhotoIntent() {
-    setHasOnboardingSecondPhotoIntent(false);
     const url = new URL(window.location.href);
     url.searchParams.delete("from");
     window.history.replaceState(
@@ -1878,13 +1851,6 @@ export function HomeInput({
       "",
       `${url.pathname}${url.search}${url.hash}`,
     );
-  }
-
-  function handleDismissOnboardingSecondPhotoAction() {
-    trackProductEvent("onboarding_second_photo_skipped", {
-      surface: "home",
-    });
-    clearOnboardingSecondPhotoIntent();
   }
 
   function revealHomeInstallHint() {
@@ -2309,7 +2275,6 @@ export function HomeInput({
   ): Promise<ExchangeShareSaveResult> {
     const targetCatId = pendingExchangeCatId ?? activeCatId;
     if (!targetCatId) return "failed";
-    const completesOnboardingSecondPhoto = hasOnboardingSecondPhotoIntent;
 
     saveStoredExchangeShareCatSelection(targetCatId);
     const ownPhoto = await saveOwnSleepingPhotoWithCompressedFallback({
@@ -2346,15 +2311,6 @@ export function HomeInput({
     const deliveryTarget = recordEveningDeliveryTarget(ownPhoto);
     setCollectionRefreshTick((value) => value + 1);
     setEveningRefreshTick((value) => value + 1);
-    if (completesOnboardingSecondPhoto && !deliveryTarget.targetSaveFailed) {
-      trackProductEvent("onboarding_second_photo_submitted", {
-        surface: "home",
-        submission_id: ownPhoto.id,
-        delivery_date_key: deliveryTarget.dateKey,
-      });
-      clearOnboardingSecondPhotoIntent();
-      window.setTimeout(revealHomeInstallHint, 220);
-    }
 
     if (deliveryTarget.targetSaveFailed) {
       showToast(
@@ -2392,7 +2348,6 @@ export function HomeInput({
   ): Promise<ExchangeShareSaveResult> {
     const targetCatId = pendingExchangeCatId ?? activeCatId;
     if (!targetCatId) return "failed";
-    const dismissesOnboardingSecondPhoto = hasOnboardingSecondPhotoIntent;
 
     saveStoredExchangeShareCatSelection(targetCatId);
     const ownPhoto = await saveOwnSleepingPhotoWithCompressedFallback({
@@ -2421,13 +2376,6 @@ export function HomeInput({
     });
     void backupOwnSleepingPhotoMoment(ownPhoto);
     setCollectionRefreshTick((value) => value + 1);
-    if (dismissesOnboardingSecondPhoto) {
-      trackProductEvent("onboarding_second_photo_skipped", {
-        surface: "home_save_sheet",
-        reason: "kept_private",
-      });
-      clearOnboardingSecondPhotoIntent();
-    }
     showToast("とったねがおに入りました");
     trackProductEvent(
       "home_exchange_share_photo_declined",
@@ -2449,7 +2397,6 @@ export function HomeInput({
   const shouldShowHomeInstallHint =
     isHomeClockReady &&
     isHomeInstallHintVisible &&
-    !hasOnboardingSecondPhotoIntent &&
     !isHomeInstallGuideOpen &&
     Boolean(homeInstallPlatform);
   const shouldShowDeskGuidanceCopy = shouldShowGuidanceCopy({
@@ -2486,19 +2433,8 @@ export function HomeInput({
                 typeof sleepingPresenceCount === "number" &&
                 isTodaySleepingCounterVisible(sleepingCounterCount)
               }
-              showOnboardingSecondPhotoAction={hasOnboardingSecondPhotoIntent}
-              onDismissOnboardingSecondPhotoAction={
-                handleDismissOnboardingSecondPhotoAction
-              }
               now={homeNow}
-              onTakePhoto={() => {
-                if (hasOnboardingSecondPhotoIntent) {
-                  trackProductEvent("onboarding_second_photo_cta_clicked", {
-                    surface: "home",
-                  });
-                }
-                openSleepingPhotoSourceSheet();
-              }}
+              onTakePhoto={openSleepingPhotoSourceSheet}
               onOpenDelivery={handleOpenEveningDelivery}
               onKeepOpenedDelivery={handleKeepEveningDelivery}
               onReportOpenedDelivery={handleReportEveningDelivery}

@@ -83,31 +83,30 @@ const LAUNCH_FUNNEL_STEPS: readonly EventDefinition[] = [
     label: "オンボを終えた",
     eventNames: ["onboarding_completed"],
   },
-  {
-    key: "second_prompt",
-    label: "今夜の一枚を見た",
-    eventNames: ["onboarding_second_photo_prompt_view"],
-  },
-  {
-    key: "second_photo",
-    label: "今夜の一枚を保存した",
-    eventNames: ["onboarding_second_photo_submitted"],
-  },
 ];
+
+const ONBOARDING_EVENING_RESERVED_METRIC: EventDefinition = {
+  key: "evening_reserved",
+  label: "次の20時便を予約した",
+  eventNames: ["evening_delivery_reserved"],
+};
 
 const OVERVIEW_METRICS: readonly EventDefinition[] = [
   LAUNCH_FUNNEL_STEPS[0]!,
   LAUNCH_FUNNEL_STEPS[2]!,
   LAUNCH_FUNNEL_STEPS[3]!,
   LAUNCH_FUNNEL_STEPS[4]!,
-  LAUNCH_FUNNEL_STEPS[7]!,
+  ONBOARDING_EVENING_RESERVED_METRIC,
 ];
 
 const DELIVERY_HEALTH_METRICS: readonly EventDefinition[] = [
   {
     key: "evening_reserved",
-    label: "20時便に写真を入れた",
-    eventNames: ["home_exchange_share_photo_confirmed"],
+    label: "20時便を予約した",
+    eventNames: [
+      "evening_delivery_reserved",
+      "home_exchange_share_photo_confirmed",
+    ],
   },
   {
     key: "evening_check_started",
@@ -149,21 +148,9 @@ const DELIVERY_HEALTH_METRICS: readonly EventDefinition[] = [
 
 const RETURNING_FUNNEL_STEPS: readonly EventDefinition[] = [
   {
-    key: "home_view",
-    label: "ホームを見た",
-    eventNames: ["home_viewed", "home_view"],
-    route: "/home",
-  },
-  {
-    key: "second_prompt",
-    label: "今夜の一枚の案内を見た",
-    eventNames: ["onboarding_second_photo_prompt_view"],
-    route: "/home",
-  },
-  {
     key: "evening_reserved",
-    label: "20時便に写真を入れた",
-    eventNames: ["home_exchange_share_photo_confirmed"],
+    label: "オンボで次の20時便を予約",
+    eventNames: ["evening_delivery_reserved"],
   },
   {
     key: "evening_check_started",
@@ -672,6 +659,10 @@ function getRecoveryEventNames(eventName: string) {
     ];
   }
 
+  if (eventName === "evening_delivery_reservation_failed") {
+    return ["evening_delivery_reserved"];
+  }
+
   return [];
 }
 
@@ -711,11 +702,12 @@ function matchesDefinition(
 function buildOrderedFunnel(
   events: AdminAnalyticsEvent[],
   steps: readonly EventDefinition[] = LAUNCH_FUNNEL_STEPS,
+  readActorId: (event: AdminAnalyticsEvent) => string | null = getActorId,
 ) {
   const eventsByActor = new Map<string, AdminAnalyticsEvent[]>();
 
   for (const event of events) {
-    const actorId = getActorId(event);
+    const actorId = readActorId(event);
     if (!actorId) {
       continue;
     }
@@ -767,26 +759,84 @@ function buildOrderedFunnel(
 }
 
 function buildReturningFunnel(events: AdminAnalyticsEvent[]) {
+  const readLinkedActorId = createLinkedActorIdReader(events);
   const completedActors = new Set(
     events
       .filter(isCompletedOnboardingEvent)
-      .map(getActorId)
+      .map(readLinkedActorId)
       .filter((value): value is string => Boolean(value)),
   );
   const returningEvents = events.filter((event) => {
-    const actorId = getActorId(event);
+    const actorId = readLinkedActorId(event);
     return Boolean(
       actorId &&
         (completedActors.has(actorId) ||
           readMetadataBoolean(event, "has_completed_onboarding") === true ||
-          event.event_name === "onboarding_second_photo_prompt_view" ||
           DELIVERY_HEALTH_METRICS.some((definition) =>
             matchesDefinition(event, definition),
           )),
     );
   });
 
-  return buildOrderedFunnel(returningEvents, RETURNING_FUNNEL_STEPS);
+  return buildOrderedFunnel(
+    returningEvents,
+    RETURNING_FUNNEL_STEPS,
+    readLinkedActorId,
+  );
+}
+
+function createLinkedActorIdReader(events: AdminAnalyticsEvent[]) {
+  const parent = new Map<string, string>();
+
+  function find(identity: string): string {
+    const currentParent = parent.get(identity);
+    if (!currentParent) {
+      parent.set(identity, identity);
+      return identity;
+    }
+    if (currentParent === identity) {
+      return identity;
+    }
+
+    const root = find(currentParent);
+    parent.set(identity, root);
+    return root;
+  }
+
+  function union(first: string, second: string) {
+    const firstRoot = find(first);
+    const secondRoot = find(second);
+    if (firstRoot !== secondRoot) {
+      parent.set(secondRoot, firstRoot);
+    }
+  }
+
+  for (const event of events) {
+    const identities = getActorIdentityCandidates(event);
+    const first = identities[0];
+    if (!first) {
+      continue;
+    }
+
+    find(first);
+    for (const identity of identities.slice(1)) {
+      union(first, identity);
+    }
+  }
+
+  return (event: AdminAnalyticsEvent) => {
+    const identity = getActorIdentityCandidates(event)[0];
+    return identity ? find(identity) : null;
+  };
+}
+
+function getActorIdentityCandidates(event: AdminAnalyticsEvent) {
+  const journeyId = readAnalyticsJourneyId(event);
+  return [
+    journeyId ? `journey:${journeyId}` : null,
+    event.user_id ? `user:${event.user_id}` : null,
+    event.anonymous_id ? `anonymous:${event.anonymous_id}` : null,
+  ].filter((value): value is string => Boolean(value));
 }
 
 function buildHandoffFunnel(events: AdminAnalyticsEvent[]) {
@@ -817,9 +867,9 @@ function buildSourceBreakdown(events: AdminAnalyticsEvent[]) {
           LAUNCH_FUNNEL_STEPS[2]!,
         ),
         openedUsers: countDefinitionUsers(sourceEvents, LAUNCH_FUNNEL_STEPS[4]!),
-        secondPhotoUsers: countDefinitionUsers(
+        reservedUsers: countDefinitionUsers(
           sourceEvents,
-          LAUNCH_FUNNEL_STEPS[7]!,
+          ONBOARDING_EVENING_RESERVED_METRIC,
         ),
       };
     })
@@ -828,7 +878,7 @@ function buildSourceBreakdown(events: AdminAnalyticsEvent[]) {
         row.introUsers > 0 ||
         row.submittedUsers > 0 ||
         row.openedUsers > 0 ||
-        row.secondPhotoUsers > 0,
+        row.reservedUsers > 0,
     )
     .sort((a, b) => {
       const aIndex = SOURCE_ORDER.indexOf(a.source);
