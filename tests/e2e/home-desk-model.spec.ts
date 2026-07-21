@@ -760,8 +760,8 @@ test.describe("home desk model", () => {
     );
     await expect(page.getByTestId("desk-empty-frame")).toBeVisible();
     await expect(page.getByTestId("desk-letter")).toHaveCount(0);
-    await expect(page.getByText("きょうは とどかない")).toBeVisible();
-    await expect(page.getByText("また あした")).toBeVisible();
+    await expect(page.getByText("また、あした")).toBeVisible();
+    await expect(page.getByText("きょうは とどかない")).toHaveCount(0);
   });
 
   test("keeps the home frame, tray, and bottom navigation separated", async ({

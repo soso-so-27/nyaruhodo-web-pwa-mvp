@@ -28,6 +28,20 @@ export type AdminAnalyticsEvent = {
 
 export type AnalyticsOperationalLevel = "ok" | "watch" | "action";
 
+export type FourChoiceCohortMetric = {
+  key: string;
+  label: string;
+  cohorts: number;
+  actors: number;
+  events: number;
+};
+
+export type FourChoiceFunnelStep = FourChoiceCohortMetric & {
+  previousCohorts: number | null;
+  fromPreviousRate: number | null;
+  fromAssignedRate: number | null;
+};
+
 type AnalyticsIssueIncident = {
   key: string;
   actorId: string | null;
@@ -43,6 +57,17 @@ const ISSUE_DEDUP_WINDOW_MS = 15_000;
 const ISSUE_RECOVERY_WINDOW_MS = 30 * 60_000;
 const ACTION_WINDOW_MS = 30 * 60_000;
 const SPREAD_WINDOW_MS = 60 * 60_000;
+const EVENING_CHOICE_EXPERIENCE_VERSION = "evening_choice_v1";
+const FOUR_CHOICE_VARIANT = "four_choice_v1";
+const SINGLE_CHOICE_VARIANT = "single_v1";
+
+const FOUR_CHOICE_EVENTS = {
+  assigned: "evening_delivery_check_succeeded",
+  shown: "evening_delivery_choices_shown",
+  selected: "evening_delivery_choice_selected",
+  saved: "evening_delivery_choice_saved",
+  dismissed: "evening_delivery_choices_dismissed",
+} as const;
 
 type EventDefinition = {
   key: string;
@@ -265,6 +290,7 @@ export function buildAdminAnalytics(
     newOnboardingFunnel: buildOrderedFunnel(events, LAUNCH_FUNNEL_STEPS),
     returningFunnel: buildReturningFunnel(events),
     handoffFunnel: buildHandoffFunnel(events),
+    fourChoiceHealth: buildFourChoiceHealth(events),
     sourceBreakdown: buildSourceBreakdown(events),
     deliveryHealth: DELIVERY_HEALTH_METRICS.map((definition) =>
       buildMetric(events, definition),
@@ -850,6 +876,368 @@ function buildHandoffFunnel(events: AdminAnalyticsEvent[]) {
   return buildOrderedFunnel(handoffEvents, HANDOFF_FUNNEL_STEPS);
 }
 
+type FourChoiceCohort = {
+  key: string;
+  actorId: string;
+  deliveryDateKey: string;
+  bundleId: string | null;
+  checkEvents: AdminAnalyticsEvent[];
+  assignedAt: number;
+  exactFourServed: boolean;
+  fallbackSingle: boolean;
+};
+
+type FourChoiceStage = {
+  cohortKeys: Set<string>;
+  firstAtByCohort: Map<string, number>;
+  rows: AdminAnalyticsEvent[];
+};
+
+function buildFourChoiceHealth(events: AdminAnalyticsEvent[]) {
+  const readActorId = createLinkedActorIdReader(events);
+  const checkEventsByCohort = new Map<string, AdminAnalyticsEvent[]>();
+
+  for (const event of events) {
+    if (
+      event.event_name !== FOUR_CHOICE_EVENTS.assigned ||
+      readMetadataString(event, "assigned_variant") !== FOUR_CHOICE_VARIANT
+    ) {
+      continue;
+    }
+
+    const actorId = readActorId(event);
+    const deliveryDateKey = readDeliveryDateKey(event);
+    if (!actorId || !deliveryDateKey) {
+      continue;
+    }
+
+    const key = buildFourChoiceCohortKey({
+      actorId,
+      deliveryDateKey,
+      bundleId: readMetadataString(event, "delivery_bundle_id"),
+    });
+    const cohortEvents = checkEventsByCohort.get(key) ?? [];
+    cohortEvents.push(event);
+    checkEventsByCohort.set(key, cohortEvents);
+  }
+
+  const cohorts = new Map<string, FourChoiceCohort>();
+  for (const [key, checkEvents] of checkEventsByCohort) {
+    const latest = [...checkEvents].sort(compareEventsByCreatedAt).at(-1)!;
+    const actorId = readActorId(latest);
+    const deliveryDateKey = readDeliveryDateKey(latest);
+    if (!actorId || !deliveryDateKey) {
+      continue;
+    }
+
+    cohorts.set(key, {
+      key,
+      actorId,
+      deliveryDateKey,
+      bundleId: readMetadataString(latest, "delivery_bundle_id"),
+      checkEvents,
+      assignedAt: readEventTime(latest),
+      exactFourServed: isExactFourChoiceDelivery(latest),
+      fallbackSingle: isSingleFallbackDelivery(latest),
+    });
+  }
+
+  const assignedKeys = new Set(cohorts.keys());
+  const exactFourKeys = new Set(
+    [...cohorts.values()]
+      .filter((cohort) => cohort.exactFourServed)
+      .map((cohort) => cohort.key),
+  );
+  const fallbackSingleKeys = new Set(
+    [...cohorts.values()]
+      .filter((cohort) => cohort.fallbackSingle)
+      .map((cohort) => cohort.key),
+  );
+  const assignedAtByCohort = new Map(
+    [...cohorts.values()].map((cohort) => [cohort.key, cohort.assignedAt]),
+  );
+  const shown = buildFourChoiceStage({
+    events,
+    eventName: FOUR_CHOICE_EVENTS.shown,
+    eligibleCohortKeys: exactFourKeys,
+    afterByCohort: assignedAtByCohort,
+    cohorts,
+    readActorId,
+  });
+  const selected = buildFourChoiceStage({
+    events,
+    eventName: FOUR_CHOICE_EVENTS.selected,
+    eligibleCohortKeys: shown.cohortKeys,
+    afterByCohort: shown.firstAtByCohort,
+    cohorts,
+    readActorId,
+  });
+  const saved = buildFourChoiceStage({
+    events,
+    eventName: FOUR_CHOICE_EVENTS.saved,
+    eligibleCohortKeys: selected.cohortKeys,
+    afterByCohort: selected.firstAtByCohort,
+    cohorts,
+    readActorId,
+  });
+  const dismissed = buildFourChoiceStage({
+    events,
+    eventName: FOUR_CHOICE_EVENTS.dismissed,
+    eligibleCohortKeys: shown.cohortKeys,
+    afterByCohort: shown.firstAtByCohort,
+    cohorts,
+    readActorId,
+  });
+
+  const assignedRows = [...cohorts.values()].flatMap(
+    (cohort) => cohort.checkEvents,
+  );
+  const exactFourRows = [...cohorts.values()]
+    .filter((cohort) => exactFourKeys.has(cohort.key))
+    .flatMap((cohort) =>
+      cohort.checkEvents.filter(isExactFourChoiceDelivery),
+    );
+  const fallbackSingleRows = [...cohorts.values()]
+    .filter((cohort) => fallbackSingleKeys.has(cohort.key))
+    .flatMap((cohort) =>
+      cohort.checkEvents.filter(isSingleFallbackDelivery),
+    );
+  const metrics = [
+    buildFourChoiceMetric({
+      key: "four_choice_assigned",
+      label: "4匹を割り当て",
+      cohortKeys: assignedKeys,
+      rows: assignedRows,
+      cohorts,
+    }),
+    buildFourChoiceMetric({
+      key: "four_choice_exact_four_served",
+      label: "4匹で配信",
+      cohortKeys: exactFourKeys,
+      rows: exactFourRows,
+      cohorts,
+    }),
+    buildFourChoiceMetric({
+      key: "four_choice_fallback_single",
+      label: "1匹へフォールバック",
+      cohortKeys: fallbackSingleKeys,
+      rows: fallbackSingleRows,
+      cohorts,
+    }),
+    buildFourChoiceMetric({
+      key: "four_choice_choices_shown",
+      label: "選択画面を表示",
+      cohortKeys: shown.cohortKeys,
+      rows: shown.rows,
+      cohorts,
+    }),
+    buildFourChoiceMetric({
+      key: "four_choice_choice_selected",
+      label: "1匹を選択",
+      cohortKeys: selected.cohortKeys,
+      rows: selected.rows,
+      cohorts,
+    }),
+    buildFourChoiceMetric({
+      key: "four_choice_choice_saved",
+      label: "選んだ1匹を保存",
+      cohortKeys: saved.cohortKeys,
+      rows: saved.rows,
+      cohorts,
+    }),
+    buildFourChoiceMetric({
+      key: "four_choice_dismissed",
+      label: "選ばずに閉じた",
+      cohortKeys: dismissed.cohortKeys,
+      rows: dismissed.rows,
+      cohorts,
+    }),
+  ];
+  const funnelMetricKeys = [
+    "four_choice_assigned",
+    "four_choice_exact_four_served",
+    "four_choice_choices_shown",
+    "four_choice_choice_selected",
+    "four_choice_choice_saved",
+  ];
+  const funnelMetrics = funnelMetricKeys.map(
+    (key) => metrics.find((metric) => metric.key === key)!,
+  );
+
+  return {
+    metrics,
+    funnel: funnelMetrics.map((metric, index) => {
+      const previousCohorts =
+        index > 0 ? funnelMetrics[index - 1]!.cohorts : null;
+      const assignedCohorts = funnelMetrics[0]?.cohorts ?? 0;
+      return {
+        ...metric,
+        previousCohorts,
+        fromPreviousRate: calculateCohortRate(
+          metric.cohorts,
+          previousCohorts,
+        ),
+        fromAssignedRate: calculateCohortRate(
+          metric.cohorts,
+          assignedCohorts,
+        ),
+      } satisfies FourChoiceFunnelStep;
+    }),
+  };
+}
+
+function buildFourChoiceStage({
+  events,
+  eventName,
+  eligibleCohortKeys,
+  afterByCohort,
+  cohorts,
+  readActorId,
+}: {
+  events: AdminAnalyticsEvent[];
+  eventName: string;
+  eligibleCohortKeys: ReadonlySet<string>;
+  afterByCohort: ReadonlyMap<string, number>;
+  cohorts: ReadonlyMap<string, FourChoiceCohort>;
+  readActorId: (event: AdminAnalyticsEvent) => string | null;
+}): FourChoiceStage {
+  const firstAtByCohort = new Map<string, number>();
+  const rows: AdminAnalyticsEvent[] = [];
+
+  for (const event of [...events].sort(compareEventsByCreatedAt)) {
+    const experienceVersion = readMetadataString(
+      event,
+      "experience_version",
+    );
+    // The pre-release client used the variant name as the experience version.
+    // Keep that alias readable while new clients emit evening_choice_v1.
+    if (
+      event.event_name !== eventName ||
+      (experienceVersion !== EVENING_CHOICE_EXPERIENCE_VERSION &&
+        experienceVersion !== FOUR_CHOICE_VARIANT) ||
+      readMetadataNumber(event, "candidate_count") !== 4
+    ) {
+      continue;
+    }
+
+    const actorId = readActorId(event);
+    const deliveryDateKey = readDeliveryDateKey(event);
+    if (!actorId || !deliveryDateKey) {
+      continue;
+    }
+
+    const cohortKey = buildFourChoiceCohortKey({
+      actorId,
+      deliveryDateKey,
+      bundleId: readMetadataString(event, "delivery_bundle_id"),
+    });
+    const cohort = cohorts.get(cohortKey);
+    const after = afterByCohort.get(cohortKey);
+    const occurredAt = readEventTime(event);
+    if (
+      !cohort ||
+      !eligibleCohortKeys.has(cohortKey) ||
+      after === undefined ||
+      !Number.isFinite(occurredAt) ||
+      occurredAt < after
+    ) {
+      continue;
+    }
+
+    rows.push(event);
+    if (!firstAtByCohort.has(cohortKey)) {
+      firstAtByCohort.set(cohortKey, occurredAt);
+    }
+  }
+
+  return {
+    cohortKeys: new Set(firstAtByCohort.keys()),
+    firstAtByCohort,
+    rows,
+  };
+}
+
+function buildFourChoiceMetric({
+  key,
+  label,
+  cohortKeys,
+  rows,
+  cohorts,
+}: {
+  key: string;
+  label: string;
+  cohortKeys: ReadonlySet<string>;
+  rows: AdminAnalyticsEvent[];
+  cohorts: ReadonlyMap<string, FourChoiceCohort>;
+}): FourChoiceCohortMetric {
+  return {
+    key,
+    label,
+    cohorts: cohortKeys.size,
+    actors: new Set(
+      [...cohortKeys]
+        .map((cohortKey) => cohorts.get(cohortKey)?.actorId)
+        .filter((actorId): actorId is string => Boolean(actorId)),
+    ).size,
+    events: rows.length,
+  };
+}
+
+function buildFourChoiceCohortKey({
+  actorId,
+  deliveryDateKey,
+  bundleId,
+}: {
+  actorId: string;
+  deliveryDateKey: string;
+  bundleId: string | null;
+}) {
+  return JSON.stringify([
+    actorId,
+    deliveryDateKey,
+    FOUR_CHOICE_VARIANT,
+    bundleId,
+  ]);
+}
+
+function readDeliveryDateKey(event: AdminAnalyticsEvent) {
+  const value = readMetadataString(event, "delivery_date_key");
+  return value && /^\d{4}-\d{2}-\d{2}$/.test(value) ? value : null;
+}
+
+function isExactFourChoiceDelivery(event: AdminAnalyticsEvent) {
+  return (
+    readMetadataString(event, "assigned_variant") === FOUR_CHOICE_VARIANT &&
+    readMetadataString(event, "served_variant") === FOUR_CHOICE_VARIANT &&
+    readMetadataNumber(event, "served_count") === 4
+  );
+}
+
+function isSingleFallbackDelivery(event: AdminAnalyticsEvent) {
+  return (
+    readMetadataString(event, "assigned_variant") === FOUR_CHOICE_VARIANT &&
+    readMetadataString(event, "served_variant") === SINGLE_CHOICE_VARIANT &&
+    readMetadataNumber(event, "served_count") === 1
+  );
+}
+
+function readEventTime(event: AdminAnalyticsEvent) {
+  return Date.parse(event.created_at);
+}
+
+function compareEventsByCreatedAt(
+  first: AdminAnalyticsEvent,
+  second: AdminAnalyticsEvent,
+) {
+  return readEventTime(first) - readEventTime(second);
+}
+
+function calculateCohortRate(numerator: number, denominator: number | null) {
+  return denominator && denominator > 0
+    ? Math.round((numerator / denominator) * 1000) / 10
+    : null;
+}
+
 function buildSourceBreakdown(events: AdminAnalyticsEvent[]) {
   const sources = new Set(events.map(readAnalyticsSource));
 
@@ -1175,6 +1563,11 @@ function readMetadataString(event: AdminAnalyticsEvent, key: string) {
 function readMetadataBoolean(event: AdminAnalyticsEvent, key: string) {
   const value = event.metadata?.[key];
   return typeof value === "boolean" ? value : null;
+}
+
+function readMetadataNumber(event: AdminAnalyticsEvent, key: string) {
+  const value = event.metadata?.[key];
+  return typeof value === "number" && Number.isFinite(value) ? value : null;
 }
 
 function isCompletedOnboardingEvent(event: AdminAnalyticsEvent) {

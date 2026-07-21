@@ -84,9 +84,13 @@ import {
   readEveningDeliveryStore,
   recordEveningDeliveryTarget,
   recordOnboardingEveningDeliveryTarget,
+  selectEveningDeliveredPhoto,
+  setEveningDeliveryDraftSelection,
   setEveningDeliveredPhoto,
+  skipEveningDeliverySelection,
   shouldShowGuidanceCopy,
   updateEveningDeliveredPhotoDataUrl,
+  writeEveningDeliveryStore,
   type EveningHomeState,
 } from "../../lib/home/eveningDelivery";
 import {
@@ -98,6 +102,7 @@ import {
   BOX_PHOTO_STORAGE_EVENT,
   dismissExchangePhoto,
   keepExchangePhoto,
+  readBlockedExchangePhotoIds,
   readAllOwnSleepingPhotos,
   readKeptExchangePhotoCount,
   readOwnSleepingPhotos,
@@ -2061,6 +2066,36 @@ export function HomeInput({
     }
 
     openingEveningDeliveryRequestRef.current = deliveryState.dateKey;
+    const choicePhotos = deliveryState.deliveredPhotos ?? [];
+    const isFourChoice = choicePhotos.length === 4;
+
+    if (isFourChoice) {
+      setDeliveredPhotoDecodeStatus("idle");
+      setOpeningEveningDelivery(deliveryState);
+      openingEveningDeliveryRequestRef.current = null;
+      trackProductEvent(
+        "envelope_opened",
+        {
+          delivery_date_key: deliveryState.dateKey,
+          auto_saved: false,
+          photo_id: deliveryState.deliveredPhoto.id,
+          delivery_bundle_id: deliveryState.deliveryBundleId ?? null,
+          experience_version:
+            deliveryState.experienceVersion ?? "evening_choice_v1",
+          candidate_count: choicePhotos.length,
+          assigned_variant: deliveryState.assignedVariant ?? "four_choice_v1",
+          served_variant: deliveryState.servedVariant ?? "four_choice_v1",
+          requested_count: deliveryState.requestedCount ?? 4,
+          served_count: deliveryState.servedCount ?? choicePhotos.length,
+          fallback_reason: deliveryState.fallbackReason ?? null,
+        },
+        {
+          localCatId: activeCatId,
+        },
+      );
+      return;
+    }
+
     const decodeStatus = await waitForDeliveredPhotoDecode(
       deliveredPhotoDecodeCacheRef.current,
       deliveryState.deliveredPhoto,
@@ -2068,6 +2103,7 @@ export function HomeInput({
     );
     setDeliveredPhotoDecodeStatus(decodeStatus);
     setOpeningEveningDelivery(deliveryState);
+
     const wasSaved = keepExchangePhoto(deliveryState.deliveredPhoto);
     markEveningDeliveryKept(deliveryState.dateKey);
     openingEveningDeliveryRequestRef.current = null;
@@ -2079,6 +2115,13 @@ export function HomeInput({
         delivery_date_key: deliveryState.dateKey,
         auto_saved: wasSaved,
         photo_id: deliveryState.deliveredPhoto.id,
+        delivery_bundle_id: deliveryState.deliveryBundleId ?? null,
+        experience_version: deliveryState.experienceVersion ?? null,
+        assigned_variant: deliveryState.assignedVariant ?? "single_v1",
+        served_variant: deliveryState.servedVariant ?? "single_v1",
+        requested_count: deliveryState.requestedCount ?? 1,
+        served_count: deliveryState.servedCount ?? 1,
+        fallback_reason: deliveryState.fallbackReason ?? null,
       },
       {
         localCatId: activeCatId,
@@ -2091,11 +2134,160 @@ export function HomeInput({
         auto_saved: wasSaved,
         photo_id: deliveryState.deliveredPhoto.id,
         delivery_photo_id: deliveryState.deliveredPhoto.id,
+        delivery_bundle_id: deliveryState.deliveryBundleId ?? null,
+        experience_version: deliveryState.experienceVersion ?? null,
+        assigned_variant: deliveryState.assignedVariant ?? "single_v1",
+        served_variant: deliveryState.servedVariant ?? "single_v1",
+        requested_count: deliveryState.requestedCount ?? 1,
+        served_count: deliveryState.servedCount ?? 1,
+        fallback_reason: deliveryState.fallbackReason ?? null,
         surface: "home",
       },
       {
         localCatId: activeCatId,
       },
+    );
+  }
+
+  function handleChooseEveningDelivery(
+    deliveryState: Extract<EveningHomeState, { kind: "delivered" }>,
+    photo: ExchangePhoto,
+  ) {
+    const choicePhotos = deliveryState.deliveredPhotos ?? [];
+    const selectedIndex = choicePhotos.findIndex(
+      (candidate) => candidate.id === photo.id,
+    );
+    const selectedPosition = selectedIndex >= 0 ? selectedIndex + 1 : null;
+    const previousDay = readEveningDeliveryStore()[deliveryState.dateKey];
+    const wasSelectionPersisted = selectEveningDeliveredPhoto(
+      deliveryState.dateKey,
+      photo.id,
+      Date.now(),
+    );
+    const wasSaved = wasSelectionPersisted && keepExchangePhoto(photo);
+
+    if (!wasSelectionPersisted || !wasSaved) {
+      let rollbackSucceeded: boolean | null = null;
+      if (wasSelectionPersisted && previousDay) {
+        const store = readEveningDeliveryStore();
+        store[deliveryState.dateKey] = previousDay;
+        rollbackSucceeded = writeEveningDeliveryStore(store);
+      }
+      trackProductEvent(
+        "evening_delivery_choice_save_failed",
+        {
+          delivery_date_key: deliveryState.dateKey,
+          delivery_bundle_id: deliveryState.deliveryBundleId ?? null,
+          experience_version:
+            deliveryState.experienceVersion ?? "evening_choice_v1",
+          candidate_count: choicePhotos.length,
+          assigned_variant: deliveryState.assignedVariant ?? "four_choice_v1",
+          served_variant: deliveryState.servedVariant ?? "four_choice_v1",
+          requested_count: deliveryState.requestedCount ?? 4,
+          served_count: deliveryState.servedCount ?? choicePhotos.length,
+          fallback_reason: deliveryState.fallbackReason ?? null,
+          selected_position: selectedPosition,
+          photo_id: photo.id,
+          error_code: wasSelectionPersisted
+            ? "album_write_failed"
+            : "delivery_state_write_failed",
+          rollback_succeeded: rollbackSucceeded,
+        },
+        { localCatId: activeCatId },
+      );
+      return false;
+    }
+
+    setCollectionRefreshTick((value) => value + 1);
+    setEveningRefreshTick((value) => value + 1);
+    trackProductEvent(
+      "evening_delivery_choice_saved",
+      {
+        delivery_date_key: deliveryState.dateKey,
+        delivery_bundle_id: deliveryState.deliveryBundleId ?? null,
+        experience_version:
+          deliveryState.experienceVersion ?? "evening_choice_v1",
+        candidate_count: choicePhotos.length,
+        assigned_variant: deliveryState.assignedVariant ?? "four_choice_v1",
+        served_variant: deliveryState.servedVariant ?? "four_choice_v1",
+        requested_count: deliveryState.requestedCount ?? 4,
+        served_count: deliveryState.servedCount ?? choicePhotos.length,
+        fallback_reason: deliveryState.fallbackReason ?? null,
+        selected_position: selectedPosition,
+        photo_id: photo.id,
+        delivery_photo_id: photo.id,
+        save_succeeded: true,
+      },
+      { localCatId: activeCatId },
+    );
+    trackProductEvent(
+      "delivery_opened",
+      {
+        delivery_date_key: deliveryState.dateKey,
+        auto_saved: false,
+        photo_id: photo.id,
+        delivery_photo_id: photo.id,
+        delivery_bundle_id: deliveryState.deliveryBundleId ?? null,
+        experience_version:
+          deliveryState.experienceVersion ?? "evening_choice_v1",
+        candidate_count: choicePhotos.length,
+        assigned_variant: deliveryState.assignedVariant ?? "four_choice_v1",
+        served_variant: deliveryState.servedVariant ?? "four_choice_v1",
+        requested_count: deliveryState.requestedCount ?? 4,
+        served_count: deliveryState.servedCount ?? choicePhotos.length,
+        fallback_reason: deliveryState.fallbackReason ?? null,
+        surface: "home",
+      },
+      { localCatId: activeCatId },
+    );
+    return true;
+  }
+
+  function handleDraftEveningDeliveryChoice(
+    deliveryState: Extract<EveningHomeState, { kind: "delivered" }>,
+    photoId: string | null,
+  ) {
+    return setEveningDeliveryDraftSelection(deliveryState.dateKey, photoId);
+  }
+
+  function handleSkipEveningDeliveryChoice(
+    deliveryState: Extract<EveningHomeState, { kind: "delivered" }>,
+  ) {
+    const didSkip = skipEveningDeliverySelection(
+      deliveryState.dateKey,
+      Date.now(),
+    );
+    if (!didSkip) {
+      return false;
+    }
+
+    setEveningRefreshTick((value) => value + 1);
+    showToast("今回は保存しませんでした");
+    return true;
+  }
+
+  function handleReportEveningChoiceCandidate(
+    deliveryState: Extract<EveningHomeState, { kind: "delivered" }>,
+    photo: ExchangePhoto,
+    reason: ExchangePhotoReportReason,
+  ) {
+    reportExchangePhoto(photo, reason);
+    showToast("うけつけました");
+    void sendPhotoReport(photo, reason).catch(() => {
+      // The local report blocks this photo immediately; remote moderation can retry later.
+    });
+    trackProductEvent(
+      "home_evening_choice_candidate_reported",
+      {
+        delivery_date_key: deliveryState.dateKey,
+        delivery_bundle_id: deliveryState.deliveryBundleId ?? null,
+        experience_version:
+          deliveryState.experienceVersion ?? "evening_choice_v1",
+        photo_id: photo.id,
+        source_photo_id: photo.sourcePhotoId ?? null,
+        reason,
+      },
+      { localCatId: activeCatId },
     );
   }
 
@@ -2140,8 +2332,16 @@ export function HomeInput({
     );
   }
 
-  function handleEveningDeliveryDataUrl(dateKey: string, dataUrl: string) {
-    const nextPhoto = updateEveningDeliveredPhotoDataUrl(dateKey, dataUrl);
+  function handleEveningDeliveryDataUrl(
+    dateKey: string,
+    dataUrl: string,
+    photo?: ExchangePhoto,
+  ) {
+    const nextPhoto = updateEveningDeliveredPhotoDataUrl(
+      dateKey,
+      dataUrl,
+      photo?.id,
+    );
 
     if (!nextPhoto) {
       return;
@@ -2151,7 +2351,13 @@ export function HomeInput({
       current?.dateKey === dateKey
         ? {
             ...current,
-            deliveredPhoto: nextPhoto,
+            deliveredPhoto:
+              current.deliveredPhoto.id === nextPhoto.id
+                ? nextPhoto
+                : current.deliveredPhoto,
+            deliveredPhotos: current.deliveredPhotos?.map((candidate) =>
+              candidate.id === nextPhoto.id ? nextPhoto : candidate,
+            ),
           }
         : current,
     );
@@ -2163,7 +2369,7 @@ export function HomeInput({
     photo: ExchangePhoto,
     dataUrl: string,
   ) {
-    handleEveningDeliveryDataUrl(dateKey, dataUrl);
+    handleEveningDeliveryDataUrl(dateKey, dataUrl, photo);
     updateKeptExchangePhotoDataUrl(photo, dataUrl);
   }
 
@@ -2470,13 +2676,38 @@ export function HomeInput({
         <EveningDeliveryOpening
           state={openingEveningDelivery}
           initialDecodeStatus={deliveredPhotoDecodeStatus}
-          onStorageDataUrl={(dataUrl) => {
-            handleEveningDeliveryDataUrl(openingEveningDelivery.dateKey, dataUrl);
-            updateKeptExchangePhotoDataUrl(
-              openingEveningDelivery.deliveredPhoto,
+          onChoose={(photo) =>
+            handleChooseEveningDelivery(openingEveningDelivery, photo)
+          }
+          onDraftChange={(photoId) =>
+            handleDraftEveningDeliveryChoice(openingEveningDelivery, photoId)
+          }
+          onSkip={() =>
+            handleSkipEveningDeliveryChoice(openingEveningDelivery)
+          }
+          onReport={(photo, reason) =>
+            handleReportEveningChoiceCandidate(
+              openingEveningDelivery,
+              photo,
+              reason,
+            )
+          }
+          onStorageDataUrl={(photo, dataUrl) => {
+            handleEveningDeliveryDataUrl(
+              openingEveningDelivery.dateKey,
               dataUrl,
+              photo,
             );
-            setCollectionRefreshTick((value) => value + 1);
+            const persistedDay = readEveningDeliveryStore()[
+              openingEveningDelivery.dateKey
+            ];
+            if (
+              (openingEveningDelivery.deliveredPhotos?.length ?? 0) !== 4 ||
+              persistedDay?.selectedPhotoId === photo.id
+            ) {
+              updateKeptExchangePhotoDataUrl(photo, dataUrl);
+              setCollectionRefreshTick((value) => value + 1);
+            }
           }}
           onClose={() => setOpeningEveningDelivery(null)}
         />
@@ -3379,17 +3610,31 @@ function usePrefersReducedMotion() {
   return prefersReducedMotion;
 }
 
-function EveningDeliveryOpening({
+type EveningDeliveryOpeningProps = {
+  state: Extract<EveningHomeState, { kind: "delivered" }>;
+  initialDecodeStatus: DeliveredPhotoDecodeStatus;
+  onChoose: (photo: ExchangePhoto) => boolean | Promise<boolean>;
+  onDraftChange: (photoId: string | null) => boolean;
+  onSkip: () => boolean | Promise<boolean>;
+  onReport: (photo: ExchangePhoto, reason: ExchangePhotoReportReason) => void;
+  onStorageDataUrl: (photo: ExchangePhoto, dataUrl: string) => void;
+  onClose: () => void;
+};
+
+function EveningDeliveryOpening(props: EveningDeliveryOpeningProps) {
+  if ((props.state.deliveredPhotos?.length ?? 0) === 4) {
+    return <EveningDeliveryFourChoice {...props} />;
+  }
+
+  return <EveningDeliverySingleOpening {...props} />;
+}
+
+function EveningDeliverySingleOpening({
   state,
   initialDecodeStatus,
   onStorageDataUrl,
   onClose,
-}: {
-  state: Extract<EveningHomeState, { kind: "delivered" }>;
-  initialDecodeStatus: DeliveredPhotoDecodeStatus;
-  onStorageDataUrl: (dataUrl: string) => void;
-  onClose: () => void;
-}) {
+}: EveningDeliveryOpeningProps) {
   const prefersReducedMotion = usePrefersReducedMotion();
   const closeTimerRef = useRef<number | null>(null);
   const isClosingRef = useRef(false);
@@ -3459,8 +3704,24 @@ function EveningDeliveryOpening({
   useEffect(() => {
     trackProductEvent("envelope_shown", {
       delivery_date_key: state.dateKey,
+      delivery_bundle_id: state.deliveryBundleId ?? null,
+      experience_version: state.experienceVersion ?? null,
+      assigned_variant: state.assignedVariant ?? "single_v1",
+      served_variant: state.servedVariant ?? "single_v1",
+      requested_count: state.requestedCount ?? 1,
+      served_count: state.servedCount ?? 1,
+      fallback_reason: state.fallbackReason ?? null,
     });
-  }, [state.dateKey]);
+  }, [
+    state.assignedVariant,
+    state.dateKey,
+    state.deliveryBundleId,
+    state.experienceVersion,
+    state.fallbackReason,
+    state.requestedCount,
+    state.servedCount,
+    state.servedVariant,
+  ]);
 
   useEffect(() => {
     actionButtonRef.current?.focus({ preventScroll: true });
@@ -3555,7 +3816,9 @@ function EveningDeliveryOpening({
               style={styles.eveningOpeningPhoto}
               storageVariant={getPhotoStorageVariant(state.deliveredPhoto, "detail")}
               loading="eager"
-              onStorageDataUrl={onStorageDataUrl}
+              onStorageDataUrl={(dataUrl) =>
+                onStorageDataUrl(state.deliveredPhoto, dataUrl)
+              }
               onNaturalSize={handlePhotoNaturalSize}
               onLoad={() => {
                 setIsPhotoReady(true);
@@ -3636,6 +3899,559 @@ function EveningDeliveryOpening({
           また、あした
         </button>
       </div>
+    </div>
+  );
+}
+
+function EveningDeliveryFourChoice({
+  state,
+  onChoose,
+  onDraftChange,
+  onSkip,
+  onReport,
+  onStorageDataUrl,
+  onClose,
+}: EveningDeliveryOpeningProps) {
+  const photos = state.deliveredPhotos ?? [];
+  const prefersReducedMotion = usePrefersReducedMotion();
+  const closeTimerRef = useRef<number | null>(null);
+  const isClosingRef = useRef(false);
+  const pushedHistoryRef = useRef(false);
+  const ignoreNextPopRef = useRef(false);
+  const requestCloseRef = useRef<(syncHistory?: boolean) => void>(() => undefined);
+  const optionRefs = useRef<Array<HTMLButtonElement | null>>([]);
+  const closeButtonRef = useRef<HTMLButtonElement | null>(null);
+  const shownAtRef = useRef(Date.now());
+  const selectionChangeCountRef = useRef(0);
+  const dismissedTrackedRef = useRef(false);
+  const resolutionRef = useRef<"open" | "saved" | "skipped">("open");
+  const finishButtonRef = useRef<HTMLButtonElement | null>(null);
+  const [selectedPhotoId, setSelectedPhotoId] = useState<string | null>(() =>
+    photos.some((photo) => photo.id === state.draftSelectedPhotoId)
+      ? (state.draftSelectedPhotoId ?? null)
+      : null,
+  );
+  const [savedPhoto, setSavedPhoto] = useState<ExchangePhoto | null>(null);
+  const [isSaving, setIsSaving] = useState(false);
+  const [isSkipping, setIsSkipping] = useState(false);
+  const [saveError, setSaveError] = useState(false);
+  const [skipError, setSkipError] = useState(false);
+  const [reportingPhoto, setReportingPhoto] = useState<ExchangePhoto | null>(null);
+  const [reportedPhotoIds, setReportedPhotoIds] = useState<Set<string>>(
+    () => readBlockedExchangePhotoIds(),
+  );
+  const [failedPhotoIds, setFailedPhotoIds] = useState<Set<string>>(
+    () => new Set(),
+  );
+  const [isClosing, setIsClosing] = useState(false);
+  const selectedPhoto =
+    photos.find((photo) => photo.id === selectedPhotoId) ?? null;
+  const choiceEventProperties = {
+    delivery_bundle_id: state.deliveryBundleId ?? null,
+    experience_version: state.experienceVersion ?? "evening_choice_v1",
+    assigned_variant: state.assignedVariant ?? "four_choice_v1",
+    served_variant: state.servedVariant ?? "four_choice_v1",
+    requested_count: state.requestedCount ?? 4,
+    served_count: state.servedCount ?? photos.length,
+    fallback_reason: state.fallbackReason ?? null,
+    candidate_count: photos.length,
+  };
+  const { modalRef, handleModalKeyDown } = useModalBehavior<HTMLDivElement>({
+    open: true,
+    onClose: () => requestCloseRef.current(),
+    manageHistory: false,
+  });
+
+  function isUnavailablePhoto(photo: ExchangePhoto) {
+    return (
+      failedPhotoIds.has(photo.id) ||
+      reportedPhotoIds.has(photo.id) ||
+      Boolean(
+        photo.sourcePhotoId && reportedPhotoIds.has(photo.sourcePhotoId),
+      )
+    );
+  }
+  function finishClose() {
+    if (closeTimerRef.current) {
+      window.clearTimeout(closeTimerRef.current);
+      closeTimerRef.current = null;
+    }
+    onClose();
+  }
+
+  function requestClose(syncHistory = true) {
+    if (isClosingRef.current || isSaving || isSkipping) {
+      return;
+    }
+
+    if (
+      resolutionRef.current === "open" &&
+      !dismissedTrackedRef.current
+    ) {
+      dismissedTrackedRef.current = true;
+      trackProductEvent("evening_delivery_choices_dismissed", {
+        delivery_date_key: state.dateKey,
+        ...choiceEventProperties,
+        had_selection: Boolean(selectedPhotoId),
+      });
+    }
+
+    if (syncHistory && pushedHistoryRef.current) {
+      ignoreNextPopRef.current = true;
+      pushedHistoryRef.current = false;
+      window.history.back();
+    }
+
+    if (prefersReducedMotion) {
+      finishClose();
+      return;
+    }
+
+    isClosingRef.current = true;
+    setIsClosing(true);
+    closeTimerRef.current = window.setTimeout(finishClose, 160);
+  }
+  requestCloseRef.current = requestClose;
+
+  function choosePhoto(photo: ExchangePhoto, position: number) {
+    if (isUnavailablePhoto(photo) || isSaving || savedPhoto) {
+      return;
+    }
+
+    if (selectedPhotoId && selectedPhotoId !== photo.id) {
+      selectionChangeCountRef.current += 1;
+    }
+    setSelectedPhotoId(photo.id);
+    onDraftChange(photo.id);
+    setSaveError(false);
+    setSkipError(false);
+    trackProductEvent("evening_delivery_choice_selected", {
+      delivery_date_key: state.dateKey,
+      ...choiceEventProperties,
+      selected_position: position,
+      photo_id: photo.id,
+      selection_elapsed_ms: Math.max(0, Date.now() - shownAtRef.current),
+      change_count: selectionChangeCountRef.current,
+    });
+  }
+
+  function moveChoiceFocus(currentIndex: number, direction: -1 | 1) {
+    for (let offset = 1; offset <= photos.length; offset += 1) {
+      const nextIndex =
+        (currentIndex + direction * offset + photos.length) % photos.length;
+      const nextPhoto = photos[nextIndex];
+      if (!nextPhoto || isUnavailablePhoto(nextPhoto)) {
+        continue;
+      }
+      choosePhoto(nextPhoto, nextIndex + 1);
+      optionRefs.current[nextIndex]?.focus();
+      return;
+    }
+  }
+
+  async function saveChoice() {
+    if (!selectedPhoto || isUnavailablePhoto(selectedPhoto) || isSaving) {
+      return;
+    }
+
+    setIsSaving(true);
+    setSaveError(false);
+    try {
+      const didSave = await onChoose(selectedPhoto);
+      if (!didSave) {
+        setSaveError(true);
+        return;
+      }
+      resolutionRef.current = "saved";
+      setSavedPhoto(selectedPhoto);
+    } catch {
+      setSaveError(true);
+    } finally {
+      setIsSaving(false);
+    }
+  }
+
+  async function skipChoice() {
+    if (isSaving || isSkipping || savedPhoto) {
+      return;
+    }
+
+    setIsSkipping(true);
+    setSkipError(false);
+    try {
+      const didSkip = await onSkip();
+      if (!didSkip) {
+        setSkipError(true);
+        return;
+      }
+      resolutionRef.current = "skipped";
+      trackProductEvent("evening_delivery_choice_skipped", {
+        delivery_date_key: state.dateKey,
+        ...choiceEventProperties,
+        had_selection: Boolean(selectedPhotoId),
+        selection_elapsed_ms: Math.max(0, Date.now() - shownAtRef.current),
+      });
+      requestClose();
+    } catch {
+      setSkipError(true);
+    } finally {
+      setIsSkipping(false);
+    }
+  }
+
+  function reportChoice(reason: ExchangePhotoReportReason) {
+    if (!reportingPhoto) {
+      return;
+    }
+
+    onReport(reportingPhoto, reason);
+    setReportedPhotoIds((current) => {
+      const next = new Set(current);
+      next.add(reportingPhoto.id);
+      if (reportingPhoto.sourcePhotoId) {
+        next.add(reportingPhoto.sourcePhotoId);
+      }
+      return next;
+    });
+    if (selectedPhotoId === reportingPhoto.id) {
+      setSelectedPhotoId(null);
+      onDraftChange(null);
+    }
+    setReportingPhoto(null);
+  }
+
+  useEffect(() => {
+    trackProductEvent("envelope_shown", {
+      delivery_date_key: state.dateKey,
+      ...choiceEventProperties,
+    });
+    trackProductEvent("evening_delivery_choices_shown", {
+      delivery_date_key: state.dateKey,
+      ...choiceEventProperties,
+    });
+  }, [
+    photos.length,
+    state.assignedVariant,
+    state.dateKey,
+    state.deliveryBundleId,
+    state.experienceVersion,
+    state.fallbackReason,
+    state.requestedCount,
+    state.servedCount,
+    state.servedVariant,
+  ]);
+
+  useEffect(() => {
+    if (savedPhoto) {
+      finishButtonRef.current?.focus({ preventScroll: true });
+    }
+  }, [savedPhoto]);
+
+  useEffect(() => {
+    window.history.pushState(
+      { neterunekoEveningFourChoice: true },
+      "",
+      window.location.href,
+    );
+    pushedHistoryRef.current = true;
+
+    function handlePopState() {
+      if (ignoreNextPopRef.current) {
+        ignoreNextPopRef.current = false;
+        return;
+      }
+      pushedHistoryRef.current = false;
+      requestCloseRef.current(false);
+    }
+
+    window.addEventListener("popstate", handlePopState);
+    return () => {
+      window.removeEventListener("popstate", handlePopState);
+      if (closeTimerRef.current) {
+        window.clearTimeout(closeTimerRef.current);
+      }
+    };
+  }, []);
+
+  return (
+    <div
+      ref={modalRef}
+      tabIndex={-1}
+      style={styles.eveningOpeningOverlay}
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="evening-four-choice-title"
+      onClick={() => requestClose()}
+      onKeyDown={(event) => {
+        handleModalKeyDown(event);
+      }}
+    >
+      <div
+        style={{
+          ...styles.eveningOpeningBackdrop,
+          ...(isClosing ? styles.eveningOpeningBackdropClosing : {}),
+        }}
+        aria-hidden="true"
+      />
+      <div
+        data-testid="evening-four-choice"
+        data-bundle-id={state.deliveryBundleId ?? undefined}
+        data-saved={savedPhoto ? "true" : "false"}
+        style={{
+          ...styles.eveningFourChoiceStage,
+          ...(isClosing ? styles.eveningOpeningPairStageClosing : {}),
+        }}
+        onClick={(event) => event.stopPropagation()}
+      >
+        <section style={styles.eveningFourChoiceLetter}>
+          <button
+            ref={closeButtonRef}
+            type="button"
+            data-testid="evening-four-choice-close"
+            aria-label="閉じる"
+            disabled={isSaving || isSkipping}
+            onClick={() => requestClose()}
+            style={styles.eveningFourChoiceClose}
+          >
+            <span aria-hidden="true">×</span>
+          </button>
+          <div style={styles.eveningOpeningMasthead}>
+            <p id="evening-four-choice-title" style={styles.eveningOpeningTitle}>
+              {savedPhoto ? "保存しました" : "今夜の4匹"}
+            </p>
+            <span style={styles.eveningOpeningMastheadRule} aria-hidden="true" />
+          </div>
+
+          {savedPhoto ? (
+            <div
+              data-testid="evening-four-choice-saved"
+              role="status"
+              aria-live="polite"
+              style={styles.eveningFourSavedBody}
+            >
+              <div style={styles.eveningFourSavedPhotoFrame}>
+                <StoredPhotoImage
+                  src={getPhotoDetailSrc(savedPhoto)}
+                  fallbackSrcs={getPhotoFallbackSrcs(savedPhoto)}
+                  alt="今夜残した猫"
+                  storageVariant={getPhotoStorageVariant(savedPhoto, "detail")}
+                  loading="eager"
+                  onStorageDataUrl={(dataUrl) => onStorageDataUrl(savedPhoto, dataUrl)}
+                  style={styles.eveningFourSavedPhoto}
+                />
+              </div>
+              <p style={styles.eveningFourSavedCopy}>
+                この写真を「とどいた」に保存しました
+              </p>
+            </div>
+          ) : (
+            <>
+              <p style={styles.eveningFourChoiceLead}>
+                残したい写真を1枚えらんでください
+              </p>
+              <div
+                role="radiogroup"
+                aria-label="今夜残す猫"
+                style={styles.eveningFourChoiceGrid}
+              >
+                {photos.map((photo, index) => {
+                  const isSelected = photo.id === selectedPhotoId;
+                  const hasFailed = failedPhotoIds.has(photo.id);
+                  const hasReported =
+                    reportedPhotoIds.has(photo.id) ||
+                    Boolean(
+                      photo.sourcePhotoId &&
+                        reportedPhotoIds.has(photo.sourcePhotoId),
+                    );
+                  const isUnavailable = hasFailed || hasReported;
+                  return (
+                    <button
+                      key={photo.id}
+                      ref={(element) => {
+                        optionRefs.current[index] = element;
+                      }}
+                      type="button"
+                      role="radio"
+                      aria-checked={isSelected}
+                      aria-label={`${index + 1}枚目の写真をえらぶ`}
+                      disabled={isUnavailable || isSaving || isSkipping}
+                      tabIndex={
+                        isSelected || (!selectedPhotoId && index === 0) ? 0 : -1
+                      }
+                      data-testid="evening-four-choice-option"
+                      data-photo-id={photo.id}
+                      data-position={index + 1}
+                      data-selected={isSelected ? "true" : "false"}
+                      style={{
+                        ...styles.eveningFourChoiceOption,
+                        ...(isSelected ? styles.eveningFourChoiceOptionSelected : {}),
+                      }}
+                      onClick={() => choosePhoto(photo, index + 1)}
+                      onKeyDown={(event) => {
+                        if (event.key === "ArrowLeft" || event.key === "ArrowUp") {
+                          event.preventDefault();
+                          moveChoiceFocus(index, -1);
+                        } else if (
+                          event.key === "ArrowRight" ||
+                          event.key === "ArrowDown"
+                        ) {
+                          event.preventDefault();
+                          moveChoiceFocus(index, 1);
+                        }
+                      }}
+                    >
+                      <StoredPhotoImage
+                        src={getPhotoDetailSrc(photo)}
+                        fallbackSrcs={getPhotoFallbackSrcs(photo)}
+                        alt=""
+                        storageVariant={getPhotoStorageVariant(photo, "list")}
+                        loading="eager"
+                        onError={() => {
+                          if (selectedPhotoId === photo.id) {
+                            setSelectedPhotoId(null);
+                            onDraftChange(null);
+                          }
+                          setFailedPhotoIds((current) => {
+                            const next = new Set(current);
+                            next.add(photo.id);
+                            return next;
+                          });
+                        }}
+                        style={styles.eveningFourChoicePhoto}
+                      />
+                      {isUnavailable || isSelected ? (
+                        <span
+                          aria-hidden="true"
+                          style={{
+                            ...styles.eveningFourChoiceMark,
+                            ...(isSelected
+                              ? styles.eveningFourChoiceMarkSelected
+                              : {}),
+                          }}
+                        >
+                          {hasReported
+                            ? "報告済み"
+                            : hasFailed
+                              ? "読込失敗"
+                              : "選択中"}
+                        </span>
+                      ) : null}
+                    </button>
+                  );
+                })}
+              </div>
+              {selectedPhoto ? (
+                <button
+                  type="button"
+                  data-testid="evening-four-choice-report"
+                  style={styles.eveningFourChoiceReport}
+                  onClick={() => setReportingPhoto(selectedPhoto)}
+                >
+                  この写真を報告
+                </button>
+              ) : null}
+              {saveError ? (
+                <p role="alert" style={styles.eveningFourChoiceError}>
+                  保存できませんでした。もう一度お試しください。
+                </p>
+              ) : null}
+              {skipError ? (
+                <p role="alert" style={styles.eveningFourChoiceError}>
+                  操作できませんでした。もう一度お試しください。
+                </p>
+              ) : null}
+              <button
+                type="button"
+                data-testid="evening-four-choice-save"
+                disabled={
+                  !selectedPhoto ||
+                  isUnavailablePhoto(selectedPhoto) ||
+                  isSaving ||
+                  isSkipping
+                }
+                onClick={() => void saveChoice()}
+                style={{
+                  ...styles.eveningFourChoiceSave,
+                  ...(!selectedPhoto ||
+                  isUnavailablePhoto(selectedPhoto) ||
+                  isSaving ||
+                  isSkipping
+                    ? styles.eveningFourChoiceSaveDisabled
+                    : {}),
+                }}
+              >
+                {isSaving ? "保存しています…" : "この写真を保存"}
+              </button>
+              <button
+                type="button"
+                data-testid="evening-four-choice-skip"
+                disabled={isSaving || isSkipping}
+                onClick={() => void skipChoice()}
+                style={styles.eveningFourChoiceSkip}
+              >
+                {isSkipping
+                  ? "処理しています…"
+                  : "今回はどの写真も保存しない"}
+              </button>
+            </>
+          )}
+        </section>
+        {savedPhoto ? (
+          <button
+            ref={finishButtonRef}
+            type="button"
+            data-testid="evening-four-choice-finish"
+            onClick={() => requestClose()}
+            style={styles.eveningOpeningTomorrowButton}
+          >
+            閉じる
+          </button>
+        ) : null}
+      </div>
+      {reportingPhoto ? (
+        <div onClick={(event) => event.stopPropagation()}>
+          <AppSheet
+            placement="bottom"
+            title="この写真を報告"
+            onClose={() => setReportingPhoto(null)}
+          >
+            <div style={styles.eveningFourReportActions}>
+              <AppButton
+                type="button"
+                variant="danger"
+                fullWidth
+                onClick={() => reportChoice("not_cat")}
+              >
+                ねこの写真ではない
+              </AppButton>
+              <AppButton
+                type="button"
+                variant="danger"
+                fullWidth
+                onClick={() => reportChoice("uncomfortable")}
+              >
+                不快な内容
+              </AppButton>
+              <AppButton
+                type="button"
+                variant="danger"
+                fullWidth
+                onClick={() => reportChoice("other")}
+              >
+                その他
+              </AppButton>
+              <AppButton
+                type="button"
+                variant="quiet"
+                fullWidth
+                onClick={() => setReportingPhoto(null)}
+              >
+                キャンセル
+              </AppButton>
+            </div>
+          </AppSheet>
+        </div>
+      ) : null}
     </div>
   );
 }
@@ -7960,6 +8776,184 @@ const styles = {
   },
   eveningOpeningRecoveryText: {
     ...deliveredLetterStyles.recoveryText,
+  },
+  eveningFourChoiceStage: {
+    position: "relative",
+    zIndex: 1,
+    width: "min(calc(100vw - 24px), 440px)",
+    display: "grid",
+    gap: "11px",
+    justifyItems: "center",
+    animation: "eveningOpeningStageIn 360ms cubic-bezier(0, 0, 0.2, 1) both",
+    transition: "opacity 180ms ease",
+  },
+  eveningFourChoiceLetter: {
+    ...deliveredLetterStyles.sheet,
+    position: "relative",
+    width: "min(calc(100vw - 32px), 406px)",
+    boxSizing: "border-box",
+  },
+  eveningFourChoiceClose: {
+    position: "absolute",
+    top: "8px",
+    right: "8px",
+    zIndex: 2,
+    width: "44px",
+    height: "44px",
+    padding: 0,
+    border: 0,
+    borderRadius: "999px",
+    background: "transparent",
+    color: "var(--ink-soft)",
+    fontFamily: "inherit",
+    fontSize: "24px",
+    fontWeight: 300,
+    lineHeight: 1,
+    cursor: "pointer",
+  },
+  eveningFourChoiceLead: {
+    margin: "12px 0 14px",
+    color: "var(--ink-soft)",
+    fontSize: "13px",
+    lineHeight: 1.65,
+    textAlign: "center",
+  },
+  eveningFourChoiceGrid: {
+    display: "grid",
+    gridTemplateColumns: "repeat(2, minmax(0, 1fr))",
+    gap: "9px",
+  },
+  eveningFourChoiceOption: {
+    position: "relative",
+    minWidth: 0,
+    aspectRatio: "1 / 1",
+    padding: 0,
+    overflow: "hidden",
+    border: "2px solid color-mix(in srgb, var(--line) 82%, transparent)",
+    borderRadius: "16px",
+    background: "var(--paper-warm)",
+    boxShadow: "0 4px 14px rgba(70, 50, 30, 0.10)",
+    cursor: "pointer",
+    transition: "border-color 140ms ease, transform 140ms ease, box-shadow 140ms ease",
+  },
+  eveningFourChoiceOptionSelected: {
+    border: "2px solid var(--seal)",
+    transform: "translateY(-2px)",
+    boxShadow:
+      "0 0 0 2px color-mix(in srgb, var(--seal) 18%, transparent), 0 8px 20px rgba(70, 50, 30, 0.18)",
+  },
+  eveningFourChoicePhoto: {
+    width: "100%",
+    height: "100%",
+    display: "block",
+    objectFit: "cover",
+  },
+  eveningFourChoiceMark: {
+    position: "absolute",
+    right: "8px",
+    bottom: "8px",
+    minWidth: "26px",
+    height: "26px",
+    padding: "0 8px",
+    display: "inline-flex",
+    alignItems: "center",
+    justifyContent: "center",
+    borderRadius: "999px",
+    background: "rgba(36, 32, 28, 0.72)",
+    color: "#fff",
+    fontSize: "11px",
+    fontWeight: 700,
+    boxSizing: "border-box",
+    backdropFilter: "blur(6px)",
+  },
+  eveningFourChoiceMarkSelected: {
+    background: "var(--seal)",
+  },
+  eveningFourChoiceSave: {
+    width: "100%",
+    minHeight: "48px",
+    marginTop: "14px",
+    border: 0,
+    borderRadius: "999px",
+    background: "var(--seal)",
+    color: "var(--paper-card)",
+    fontSize: "14px",
+    fontWeight: 700,
+    letterSpacing: "0.04em",
+    cursor: "pointer",
+    transition: "opacity 140ms ease, transform 140ms ease",
+  },
+  eveningFourChoiceSaveDisabled: {
+    opacity: 0.42,
+    cursor: "default",
+  },
+  eveningFourChoiceSkip: {
+    display: "block",
+    minHeight: "44px",
+    margin: "7px auto -4px",
+    padding: "8px 12px",
+    border: 0,
+    background: "transparent",
+    color: "var(--ink-soft)",
+    fontFamily: "inherit",
+    fontSize: "12px",
+    lineHeight: 1.5,
+    textDecoration: "underline",
+    textUnderlineOffset: "3px",
+    cursor: "pointer",
+  },
+  eveningFourChoiceError: {
+    margin: "10px 0 0",
+    color: "var(--danger, #9f3f36)",
+    fontSize: "12px",
+    lineHeight: 1.5,
+    textAlign: "center",
+  },
+  eveningFourChoiceReport: {
+    display: "block",
+    minHeight: "36px",
+    margin: "8px auto -4px",
+    padding: "6px 12px",
+    border: 0,
+    background: "transparent",
+    color: "var(--ink-soft)",
+    fontSize: "12px",
+    textDecoration: "underline",
+    textUnderlineOffset: "3px",
+    cursor: "pointer",
+  },
+  eveningFourReportActions: {
+    display: "grid",
+    gap: "10px",
+  },
+  eveningFourSavedBody: {
+    display: "grid",
+    gap: "12px",
+    justifyItems: "center",
+    marginTop: "14px",
+  },
+  eveningFourSavedPhotoFrame: {
+    width: "min(72vw, 286px)",
+    aspectRatio: "1 / 1",
+    overflow: "hidden",
+    border: "1px solid var(--line)",
+    borderRadius: "18px",
+    background: "var(--paper-warm)",
+    boxShadow: "0 8px 24px rgba(70, 50, 30, 0.16)",
+  },
+  eveningFourSavedPhoto: {
+    width: "100%",
+    height: "100%",
+    display: "block",
+    objectFit: "cover",
+  },
+  eveningFourSavedCopy: {
+    margin: 0,
+    color: "var(--ink-soft)",
+    fontSize: "13px",
+    fontWeight: 600,
+    lineHeight: 1.6,
+    textAlign: "center",
   },
   exchangeSheetFrame: {
     left: "14px",

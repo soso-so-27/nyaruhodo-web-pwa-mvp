@@ -20,9 +20,12 @@ import { isAccountDeletionStripeCancellationRequired } from "../../src/lib/accou
 import {
   isFastStockCandidateDeliverable,
   isRowDeliverable,
+  buildEveningChoiceDeliverySlotId,
   buildIdempotentDeliveryId,
+  isIdentityInEveningChoiceRollout,
   readExistingDelivery,
   resetOnboardingExchangeExceptionLimitForTests,
+  shouldUseEveningChoiceBundlePath,
   validateExchangeDeliveryDateKey,
 } from "../../src/app/api/sleeping-delivery/exchange/route";
 import { resolveExchangePhotoUploadSrc } from "../../src/lib/home/useEveningDelivery";
@@ -59,7 +62,20 @@ type ExchangeResponse = {
     src: string;
     title?: string;
   } | null;
+  photos?: Array<{
+    id: string;
+    sourcePhotoId?: string;
+    src: string;
+    title?: string;
+  }>;
   source?: "remote" | "none";
+  bundleId?: string | null;
+  experienceVersion?: string;
+  assignedVariant?: string;
+  servedVariant?: string;
+  requestedCount?: number;
+  servedCount?: number;
+  fallbackReason?: string | null;
   diagnostics?: {
     normalCandidateCount?: number;
   };
@@ -69,6 +85,46 @@ type ExchangeResponse = {
 type LocalEnv = Record<string, string>;
 
 test.describe("sleeping delivery pool guards", () => {
+  test("assigns the four-choice rollout and slot ids deterministically", () => {
+    const identity = "anon:stable-evening-choice";
+    const first = isIdentityInEveningChoiceRollout(identity, 37);
+
+    expect(isIdentityInEveningChoiceRollout(identity, 37)).toBe(first);
+    expect(isIdentityInEveningChoiceRollout(identity, 0)).toBe(false);
+    expect(isIdentityInEveningChoiceRollout(identity, 100)).toBe(true);
+    expect(
+      buildEveningChoiceDeliverySlotId({
+        bundleId: "delivered-sleeping-2026-07-22-test",
+        position: 4,
+      }),
+    ).toBe("delivered-sleeping-2026-07-22-test-choice-4");
+  });
+
+  test("keeps capable rollout-zero requests on the legacy single path", () => {
+    const assignedVariant = isIdentityInEveningChoiceRollout(
+      "anon:rollout-zero-evening-choice",
+      0,
+    )
+      ? "four_choice_v1"
+      : "single_v1";
+
+    expect(assignedVariant).toBe("single_v1");
+    expect(
+      shouldUseEveningChoiceBundlePath({
+        isCapableRequest: true,
+        assignedVariant,
+        idempotentDeliveryId: "delivered-sleeping-2026-07-22-rollout-zero",
+      }),
+    ).toBe(false);
+    expect(
+      shouldUseEveningChoiceBundlePath({
+        isCapableRequest: true,
+        assignedVariant: "four_choice_v1",
+        idempotentDeliveryId: "delivered-sleeping-2026-07-22-rollout-enabled",
+      }),
+    ).toBe(true);
+  });
+
   test("normalizes expiring storage urls before persistent photo saves", () => {
     const storageSrc = "storage:user/cat/sleeping/photo.jpg";
     const signedUrl =
@@ -1809,6 +1865,141 @@ test.describe("sleeping delivery pool guards", () => {
         .from("cat_moments")
         .delete()
         .in("local_moment_id", [candidateId, ownId]);
+    }
+  });
+
+  test("returns one stable four-photo bundle for an eligible evening choice request", async ({
+    request,
+  }) => {
+    await skipIfLocalSupabaseUnavailable();
+
+    const adminSupabase = createAdminSupabaseClientFromEnv();
+    test.skip(
+      !adminSupabase,
+      "SUPABASE_SERVICE_ROLE_KEY is required for the four-choice smoke test.",
+    );
+    if (!adminSupabase) {
+      return;
+    }
+
+    const createdAt = Date.now();
+    const anonymousId = `four-choice-anonymous-${createdAt}`;
+    const candidateIds = Array.from(
+      { length: 4 },
+      (_, index) => `four-choice-candidate-${createdAt}-${index + 1}`,
+    );
+    const candidateStoragePaths = candidateIds.map(
+      (candidateId) => `e2e/four-choice/${candidateId}.png`,
+    );
+    const deliveryDateKey = getYesterdayJstDateKey();
+
+    try {
+      await Promise.all(
+        candidateStoragePaths.map((storagePath) =>
+          uploadTestPhoto(adminSupabase, storagePath),
+        ),
+      );
+      const { error: insertError } = await adminSupabase.from("cat_moments").insert(
+        candidateIds.map((candidateId, index) => ({
+          anonymous_id: `four-choice-source-${createdAt}-${index + 1}`,
+          local_moment_id: candidateId,
+          local_cat_id: `four-choice-source-cat-${createdAt}-${index + 1}`,
+          owner_cat_id: `four-choice-source-cat-${createdAt}-${index + 1}`,
+          photo_url: toStoragePhotoUrl(candidateStoragePaths[index]),
+          state: "sleeping",
+          visibility: "shared",
+          delivery_status: "available",
+          moderation_status: "approved",
+          moderated_at: new Date(createdAt - 60_000).toISOString(),
+          moderated_by: "e2e",
+          source_moment_id: null,
+          metadata: {
+            source: "e2e-four-choice",
+            pool_kind: "user_shared",
+            theme: "sleeping",
+            trigger_label: "sleeping",
+          },
+          captured_at: new Date(createdAt - 60_000).toISOString(),
+          created_at: new Date(createdAt - 60_000 - index).toISOString(),
+        })),
+      );
+      expect(insertError).toBeNull();
+
+      const payload = {
+        ...buildExchangeRequest(
+          normalCatLikePhotoUrl,
+          `four-choice-own-${createdAt}`,
+          anonymousId,
+        ),
+        ownPhoto: {
+          ...buildExchangeRequest(
+            normalCatLikePhotoUrl,
+            `four-choice-own-${createdAt}`,
+            anonymousId,
+          ).ownPhoto,
+          shared: false,
+        },
+        capability: "evening_choice_v1",
+        requestedCandidateCount: 4,
+        debugDryRun: false,
+        deliveryDateKey,
+        preferredSourcePhotoId: candidateIds[0],
+        seed: `${deliveryDateKey}:four-choice-own-${createdAt}`,
+        recipientCatId: `four-choice-recipient-${createdAt}`,
+      };
+
+      const firstResponse = await request.post("/api/sleeping-delivery/exchange", {
+        data: payload,
+      });
+      expect(firstResponse.status()).toBe(200);
+      const firstBody = (await firstResponse.json()) as ExchangeResponse;
+
+      expect(firstBody.experienceVersion).toBe("evening_choice_v1");
+      expect(firstBody.assignedVariant).toBe("four_choice_v1");
+      expect(firstBody.servedVariant).toBe("four_choice_v1");
+      expect(firstBody.requestedCount).toBe(4);
+      expect(firstBody.servedCount).toBe(4);
+      expect(firstBody.fallbackReason).toBeNull();
+      expect(firstBody.photos).toHaveLength(4);
+      expect(firstBody.photo?.id).toBe(firstBody.photos?.[0]?.id);
+      expect(firstBody.photo?.title).toBe("ほかの猫のねがお");
+      expect(new Set(firstBody.photos?.map((photo) => photo.id)).size).toBe(4);
+      expect(
+        new Set(firstBody.photos?.map((photo) => photo.sourcePhotoId)).size,
+      ).toBe(4);
+
+      const secondResponse = await request.post("/api/sleeping-delivery/exchange", {
+        data: payload,
+      });
+      expect(secondResponse.status()).toBe(200);
+      const secondBody = (await secondResponse.json()) as ExchangeResponse;
+      expect(secondBody.bundleId).toBe(firstBody.bundleId);
+      expect(secondBody.photos?.map((photo) => photo.id)).toEqual(
+        firstBody.photos?.map((photo) => photo.id),
+      );
+      expect(secondBody.photos?.map((photo) => photo.sourcePhotoId)).toEqual(
+        firstBody.photos?.map((photo) => photo.sourcePhotoId),
+      );
+
+      const { count, error: countError } = await adminSupabase
+        .from("cat_moment_deliveries")
+        .select("id", { count: "exact", head: true })
+        .eq("anonymous_id", anonymousId)
+        .contains("metadata", { bundle_id: firstBody.bundleId });
+      expect(countError).toBeNull();
+      expect(count).toBe(4);
+    } finally {
+      await adminSupabase
+        .from("cat_moment_deliveries")
+        .delete()
+        .eq("anonymous_id", anonymousId);
+      await adminSupabase
+        .from("cat_moments")
+        .delete()
+        .in("local_moment_id", candidateIds);
+      await adminSupabase.storage
+        .from(CAT_PHOTOS_BUCKET)
+        .remove(candidateStoragePaths);
     }
   });
 

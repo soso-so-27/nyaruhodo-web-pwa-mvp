@@ -14,8 +14,18 @@ type RemoteStockResponse = {
 
 type SleepingExchangeResponse = {
   photo?: ExchangePhoto | null;
+  photos?: ExchangePhoto[];
   source?: "remote" | "none";
   tier?: 1 | 2 | 3 | null;
+  requestedCandidateCount?: number;
+  returnedCandidateCount?: number;
+  bundleId?: string | null;
+  experienceVersion?: "evening_choice_v1";
+  assignedVariant?: "four_choice_v1" | "single_v1";
+  servedVariant?: "four_choice_v1" | "single_v1";
+  requestedCount?: number;
+  servedCount?: number;
+  fallbackReason?: string | null;
   diagnostics?: SleepingDeliveryDiagnostics;
   httpStatus?: number | null;
   error?: string | null;
@@ -64,11 +74,15 @@ export async function createSleepingExchange({
   deliveryDateKey,
   recipientCatId,
   preferredSourcePhotoId,
+  requestedCandidateCount,
+  capability,
   mode,
   onboardingSubmission,
 }: DeliverableSleepingPhotoInput & {
   ownPhoto: OwnSleepingPhoto;
   preferredSourcePhotoId?: string | null;
+  requestedCandidateCount?: number;
+  capability?: "evening_choice_v1";
   mode?: "onboarding";
   onboardingSubmission?: {
     dateKey: string;
@@ -125,6 +139,8 @@ export async function createSleepingExchange({
         anonymousId: getOrCreateAnonymousId(),
         blockedPhotoIds: readBlockedExchangePhotoIdList(),
         preferredSourcePhotoId,
+        requestedCandidateCount,
+        capability,
         mode,
         onboardingSubmission,
       }),

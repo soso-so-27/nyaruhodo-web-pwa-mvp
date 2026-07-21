@@ -317,6 +317,10 @@ export function HomeDeskModel({
     eveningState.kind === "delivered" || eveningState.kind === "opened"
       ? eveningState.deliveredPhoto
       : null;
+  const deliveredCandidateCount =
+    eveningState.kind === "delivered" || eveningState.kind === "opened"
+      ? eveningState.deliveredPhotos.length
+      : 0;
   const homeDay = getHomeDayPresentation({
     eveningState,
     displayPhoto,
@@ -720,6 +724,7 @@ export function HomeDeskModel({
                   role="button"
                   data-testid="desk-open-letter"
                   data-photo-decode={deliveredPhotoDecodeStatus}
+                  data-candidate-count={deliveredCandidateCount || undefined}
                   data-arrival-context={
                     liveArrivalDateKey === eveningState.dateKey
                       ? "live"
@@ -729,7 +734,9 @@ export function HomeDeskModel({
                   aria-label={
                     showOpeningWait
                       ? "ねこだよりをひらいています"
-                      : "ねこだよりをひらく"
+                      : deliveredCandidateCount === 4
+                        ? "4匹から今夜残す1匹をえらぶ"
+                        : "ねこだよりをひらく"
                   }
                   aria-busy={isEnvelopeOpening}
                   style={{
@@ -828,13 +835,17 @@ export function HomeDeskModel({
                           loading="eager"
                           onLoad={handleRevealPhotoLoaded}
                           onError={handleRevealPhotoError}
-                          onStorageDataUrl={(dataUrl) => {
-                            onDeliveredStorageDataUrl(
-                              eveningState.dateKey,
-                              deliveredPhoto,
-                              dataUrl,
-                            );
-                          }}
+                          onStorageDataUrl={
+                            deliveredCandidateCount === 4
+                              ? undefined
+                              : (dataUrl) => {
+                                  onDeliveredStorageDataUrl(
+                                    eveningState.dateKey,
+                                    deliveredPhoto,
+                                    dataUrl,
+                                  );
+                                }
+                          }
                           style={{
                             ...deskStyles.selectionLockedStage,
                             ...deskStyles.developImage,
@@ -866,7 +877,9 @@ export function HomeDeskModel({
                             }),
                       }}
                     >
-                      ねこだより、とどいた
+                      {deliveredCandidateCount === 4
+                        ? "4匹のねこだより、とどいた"
+                        : "ねこだより、とどいた"}
                     </strong>
                     <span
                       data-envelope-action={usesEnvelopeHome ? "true" : undefined}
@@ -882,7 +895,7 @@ export function HomeDeskModel({
                             }),
                       }}
                     >
-                      ひらく
+                      {deliveredCandidateCount === 4 ? "えらぶ" : "ひらく"}
                     </span>
                   </div>
                 </button>
@@ -1968,10 +1981,7 @@ function HomeLetterTrayText({
 
   if (phase === "late-sent" || phase === "empty-after") {
     return (
-      <>
-        <strong style={deskStyles.letterTrayTitle}>きょうは とどかない</strong>
-        <span style={deskStyles.letterTraySub}>また あした</span>
-      </>
+      <strong style={deskStyles.letterTrayTitle}>また、あした</strong>
     );
   }
 
