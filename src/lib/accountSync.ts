@@ -1618,6 +1618,13 @@ async function syncSleepingPhotos(
     const deliveryRows = (
       await Promise.all(
         snapshot.keptExchangePhotos.map(async (photo) => {
+          // Four-choice delivery rows are created and finalized by the server.
+          // Rewriting them from a device would erase bundle metadata and could
+          // let stale local state disagree with the canonical resolution ledger.
+          if (isServerEveningChoiceDeliveryId(photo.id)) {
+            return null;
+          }
+
           const photoUrl = await prepareRemoteSleepingPhotoUrl(
             supabase,
             userId,
@@ -1690,6 +1697,12 @@ async function syncSleepingPhotos(
       error instanceof Error ? error.message : "Sleeping photo sync failed",
     );
   }
+}
+
+function isServerEveningChoiceDeliveryId(photoId: string) {
+  return /^delivered-sleeping-\d{4}-\d{2}-\d{2}-[a-f0-9]{24}-choice-[1-4]$/.test(
+    photoId,
+  );
 }
 
 async function syncCatMomentCatLinks(

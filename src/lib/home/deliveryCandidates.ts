@@ -26,6 +26,9 @@ type SleepingExchangeResponse = {
   requestedCount?: number;
   servedCount?: number;
   fallbackReason?: string | null;
+  choiceResolution?: "kept" | "skipped" | "expired" | null;
+  selectedPhotoId?: string | null;
+  choiceResolvedAt?: string | null;
   diagnostics?: SleepingDeliveryDiagnostics;
   httpStatus?: number | null;
   error?: string | null;
@@ -34,6 +37,13 @@ type SleepingExchangeResponse = {
 
 const MAX_BLOCKED_PHOTO_IDS = 100;
 const SLEEPING_EXCHANGE_TIMEOUT_MS = 15_000;
+
+export type EveningChoiceCanonicalResult = {
+  state: "kept" | "skipped" | "expired";
+  selectedPhotoId: string | null;
+  resolvedAt: string;
+  conflict: boolean;
+};
 
 export type SleepingDeliveryDiagnostics = {
   source: "remote" | "none" | "error";
@@ -53,6 +63,11 @@ export type SleepingDeliveryDiagnostics = {
   tier2CandidateCount?: number;
   tier3CandidateCount?: number;
   duplicateExcludedCount?: number;
+  recirculationPolicy?: string;
+  permanentExcludedCount?: number;
+  recentExposureExcludedCount?: number;
+  eligibleRecycledCount?: number;
+  servedRecycledCount?: number;
   totalSharedRows?: number;
   blockedRows?: number;
   storageExcludedRows?: number;
@@ -172,6 +187,84 @@ export async function createSleepingExchange({
   }
 }
 
+export async function finalizeEveningDeliveryChoice({
+  operation,
+  bundleId,
+  deliveryDateKey,
+  selectedPhotoId,
+}: {
+  operation: "keep" | "skip";
+  bundleId: string;
+  deliveryDateKey: string;
+  selectedPhotoId?: string | null;
+}): Promise<EveningChoiceCanonicalResult | null> {
+  if (typeof window === "undefined") {
+    return null;
+  }
+
+  const abortController = new AbortController();
+  const timeoutId = window.setTimeout(
+    () => abortController.abort("choice_timeout"),
+    SLEEPING_EXCHANGE_TIMEOUT_MS,
+  );
+
+  try {
+    const headers = new Headers({ "Content-Type": "application/json" });
+    const supabase = createBrowserSupabaseClient();
+
+    if (supabase) {
+      const { data } = await supabase.auth.getSession();
+      const accessToken = data.session?.access_token;
+      if (accessToken) {
+        headers.set("Authorization", `Bearer ${accessToken}`);
+      }
+    }
+
+    const response = await fetch("/api/sleeping-delivery/choice", {
+      method: "POST",
+      headers,
+      signal: abortController.signal,
+      body: JSON.stringify({
+        operation,
+        bundleId,
+        deliveryDateKey,
+        selectedPhotoId: operation === "keep" ? selectedPhotoId : null,
+        anonymousId: getOrCreateAnonymousId(),
+      }),
+    });
+
+    if (response.status !== 200 && response.status !== 409) {
+      return null;
+    }
+
+    const body = (await response.json()) as {
+      state?: unknown;
+      selectedPhotoId?: unknown;
+      resolvedAt?: unknown;
+      canonical?: {
+        state?: unknown;
+        selectedPhotoId?: unknown;
+        resolvedAt?: unknown;
+      };
+    };
+    const canonical = response.status === 409 ? body.canonical : body;
+    if (!isEveningChoiceCanonical(canonical)) {
+      return null;
+    }
+
+    return {
+      state: canonical.state,
+      selectedPhotoId: canonical.selectedPhotoId,
+      resolvedAt: canonical.resolvedAt,
+      conflict: response.status === 409,
+    };
+  } catch {
+    return null;
+  } finally {
+    window.clearTimeout(timeoutId);
+  }
+}
+
 async function readExchangeError(response: Response) {
   try {
     const body = (await response.json()) as { error?: unknown };
@@ -267,4 +360,23 @@ export async function readSleepingDeliveryDiagnostics() {
 
 function readBlockedExchangePhotoIdList() {
   return [...readBlockedExchangePhotoIds()].slice(0, MAX_BLOCKED_PHOTO_IDS);
+}
+
+function isEveningChoiceCanonical(value: unknown): value is {
+  state: "kept" | "skipped" | "expired";
+  selectedPhotoId: string | null;
+  resolvedAt: string;
+} {
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    return false;
+  }
+  const canonical = value as Record<string, unknown>;
+  const state = canonical.state;
+  const selectedPhotoId = canonical.selectedPhotoId;
+  return (
+    (state === "kept" || state === "skipped" || state === "expired") &&
+    typeof canonical.resolvedAt === "string" &&
+    (selectedPhotoId === null || typeof selectedPhotoId === "string") &&
+    (state !== "kept" || typeof selectedPhotoId === "string")
+  );
 }

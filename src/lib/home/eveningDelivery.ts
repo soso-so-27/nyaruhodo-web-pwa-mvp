@@ -531,6 +531,80 @@ export function skipEveningDeliverySelection(
   );
 }
 
+export function resolveEveningDeliveryWithoutSelection(
+  dateKey: string,
+  resolvedAt = Date.now(),
+) {
+  const store = readEveningDeliveryStore();
+  const day = store[dateKey];
+
+  if (!day) {
+    return false;
+  }
+
+  store[dateKey] = {
+    ...day,
+    deliveredPhoto: undefined,
+    deliveredPhotos: undefined,
+    draftSelectedPhotoId: undefined,
+    selectedPhotoId: undefined,
+    openedAt: undefined,
+    openedBy: undefined,
+    keptAt: undefined,
+    skippedAt: resolvedAt,
+  };
+  const persisted = writeEveningDeliveryStore(store);
+  if (persisted) {
+    clearAppBadge();
+  }
+  const persistedDay = readEveningDeliveryStore()[dateKey];
+  return Boolean(
+    persisted &&
+      persistedDay?.skippedAt === resolvedAt &&
+      !hasEveningDeliveryArrival(persistedDay),
+  );
+}
+
+export function resolveEveningDeliveryWithPhoto(
+  dateKey: string,
+  deliveredPhoto: ExchangePhoto,
+  resolvedAt = Date.now(),
+  metadata: EveningDeliveryBundleMetadata = {},
+) {
+  const sanitizedPhoto = sanitizeExchangePhotoForPersistence(deliveredPhoto);
+  const store = readEveningDeliveryStore();
+  const day = store[dateKey];
+
+  if (!day || !sanitizedPhoto) {
+    return false;
+  }
+
+  store[dateKey] = {
+    ...day,
+    ...clearEveningDeliveryBundleMetadata(),
+    ...sanitizeEveningDeliveryBundleMetadata(metadata),
+    dateKey,
+    deliveredPhoto: sanitizedPhoto,
+    deliveredPhotos: undefined,
+    draftSelectedPhotoId: undefined,
+    selectedPhotoId: sanitizedPhoto.id,
+    deliveredAt: sanitizedPhoto.deliveredAt,
+    openedAt: resolvedAt,
+    openedBy: "system",
+    keptAt: resolvedAt,
+    skippedAt: undefined,
+  };
+  const persisted = writeEveningDeliveryStore(store);
+  const persistedDay = readEveningDeliveryStore()[dateKey];
+  return Boolean(
+    persisted &&
+      persistedDay?.deliveredPhoto?.id === sanitizedPhoto.id &&
+      persistedDay.selectedPhotoId === sanitizedPhoto.id &&
+      persistedDay.openedAt === resolvedAt &&
+      persistedDay.keptAt === resolvedAt,
+  );
+}
+
 export function selectEveningDeliveredPhoto(
   dateKey: string,
   photoId: string,

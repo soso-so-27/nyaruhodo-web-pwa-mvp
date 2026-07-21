@@ -322,10 +322,167 @@ test.describe("20時便の4匹選択", () => {
       hasKeptAt: true,
     });
   });
+
+  test("別端末で先に選ばれた1匹へ静かに収束する", async ({ page }) => {
+    await seedPendingEveningDelivery(page, "canonical-server-choice");
+    await mockFourChoiceExchange(page, {
+      canonical: {
+        state: "kept",
+        selectedPhotoId: "four-choice-delivery-2",
+      },
+    });
+
+    await page.goto("/home");
+    await page.getByTestId("desk-open-letter").click();
+    const choiceDialog = page.getByTestId("evening-four-choice");
+    await choiceDialog
+      .locator(
+        '[data-testid="evening-four-choice-option"][data-photo-id="four-choice-delivery-4"]',
+      )
+      .click();
+    await choiceDialog.getByTestId("evening-four-choice-save").click();
+
+    await expect.poll(() => readEveningSelection(page)).toEqual({
+      keptPhotoIds: ["four-choice-delivery-2"],
+      selectedPhotoId: "four-choice-delivery-2",
+      hasKeptAt: true,
+    });
+    await expect(choiceDialog.getByTestId("evening-four-choice-saved")).toBeVisible();
+  });
+
+  test("サーバー確定に失敗したら仮選択を残して保存しない", async ({ page }) => {
+    await seedPendingEveningDelivery(page, "server-choice-failure");
+    await mockFourChoiceExchange(page);
+    await page.route("**/api/sleeping-delivery/choice", async (route) => {
+      await route.fulfill({
+        status: 503,
+        contentType: "application/json",
+        body: JSON.stringify({ ok: false, error: "choice_unavailable" }),
+      });
+    });
+
+    await page.goto("/home");
+    await page.getByTestId("desk-open-letter").click();
+    const choiceDialog = page.getByTestId("evening-four-choice");
+    const selectedPhotoId = "four-choice-delivery-3";
+    await choiceDialog
+      .locator(
+        `[data-testid="evening-four-choice-option"][data-photo-id="${selectedPhotoId}"]`,
+      )
+      .click();
+    await choiceDialog.getByTestId("evening-four-choice-save").click();
+
+    await expect(choiceDialog).toBeVisible();
+    await expect(choiceDialog.getByRole("alert")).toBeVisible();
+    await expect.poll(() => readKeptPhotoIds(page)).toEqual([]);
+    await expect.poll(() => readEveningDraftSelection(page)).toBe(selectedPhotoId);
+  });
+
+  test("確定済みbundleの再取得では4匹を再表示しない", async ({ page }) => {
+    const selectedPhotoId = "four-choice-delivery-2";
+    await seedPendingEveningDelivery(page, "resolved-bundle-replay");
+    await mockFourChoiceExchange(page, {
+      exchangeResolution: {
+        state: "kept",
+        selectedPhotoId,
+      },
+    });
+
+    await page.goto("/home");
+
+    await expect.poll(() => readEveningSelection(page)).toEqual({
+      keptPhotoIds: [selectedPhotoId],
+      selectedPhotoId,
+      hasKeptAt: true,
+    });
+    await expect(page.getByTestId("desk-open-letter")).toHaveCount(0);
+    await expect(page.getByTestId("evening-four-choice")).toHaveCount(0);
+  });
+
+  test("確定後に報告された写真は別端末で復元しない", async ({ page }) => {
+    const unavailablePhotoId = "four-choice-delivery-2";
+    await seedPendingEveningDelivery(page, "reported-resolution-replay");
+    await mockFourChoiceExchange(page, {
+      photos: fourCandidates.filter((photo) => photo.id !== unavailablePhotoId),
+      exchangeResolution: {
+        state: "kept",
+        selectedPhotoId: unavailablePhotoId,
+      },
+    });
+
+    await page.goto("/home");
+
+    await expect.poll(() => readSkippedEveningDelivery(page)).toEqual({
+      hasArrival: false,
+      hasDraftSelection: false,
+      hasSkippedAt: true,
+    });
+    await expect.poll(() => readKeptPhotoIds(page)).toEqual([]);
+    await expect(page.getByTestId("desk-open-letter")).toHaveCount(0);
+  });
+
+  test("候補が3匹になっても有効な確定写真を復元する", async ({ page }) => {
+    const selectedPhotoId = "four-choice-delivery-4";
+    await seedPendingEveningDelivery(page, "partial-resolution-replay");
+    await mockFourChoiceExchange(page, {
+      photos: fourCandidates.filter(
+        (photo) => photo.id !== "four-choice-delivery-2",
+      ),
+      exchangeResolution: {
+        state: "kept",
+        selectedPhotoId,
+      },
+    });
+
+    await page.goto("/home");
+
+    await expect.poll(() => readEveningSelection(page)).toEqual({
+      keptPhotoIds: [selectedPhotoId],
+      selectedPhotoId,
+      hasKeptAt: true,
+    });
+    await expect(page.getByTestId("desk-open-letter")).toHaveCount(0);
+  });
+
+  test("確定写真を含む全候補が除外済みでも再試行を続けない", async ({ page }) => {
+    await seedPendingEveningDelivery(page, "empty-resolution-replay");
+    const readExchangeCalls = await mockFourChoiceExchange(page, {
+      photos: [],
+      exchangeResolution: {
+        state: "kept",
+        selectedPhotoId: "four-choice-delivery-2",
+      },
+    });
+
+    await page.goto("/home");
+
+    await expect.poll(() => readSkippedEveningDelivery(page)).toEqual({
+      hasArrival: false,
+      hasDraftSelection: false,
+      hasSkippedAt: true,
+    });
+    await expect.poll(readExchangeCalls).toBe(1);
+    await expect(page.getByTestId("desk-open-letter")).toHaveCount(0);
+  });
 });
 
-async function mockFourChoiceExchange(page: Page) {
+async function mockFourChoiceExchange(
+  page: Page,
+  options: {
+    photos?: typeof fourCandidates;
+    canonical?: {
+      state: "kept" | "skipped" | "expired";
+      selectedPhotoId: string | null;
+    };
+    exchangeResolution?: {
+      state: "kept" | "skipped" | "expired";
+      selectedPhotoId: string | null;
+    };
+  } = {},
+) {
   let exchangeCalls = 0;
+  let canonical = options.canonical ?? null;
+  const responsePhotos = options.photos ?? fourCandidates;
 
   await page.route("**/api/sleeping-delivery/exchange", async (route) => {
     exchangeCalls += 1;
@@ -333,8 +490,8 @@ async function mockFourChoiceExchange(page: Page) {
       status: 200,
       contentType: "application/json",
       body: JSON.stringify({
-        photo: fourCandidates[0],
-        photos: fourCandidates,
+        photo: responsePhotos[0] ?? null,
+        photos: responsePhotos,
         source: "remote",
         tier: 1,
         bundleId: BUNDLE_ID,
@@ -342,10 +499,52 @@ async function mockFourChoiceExchange(page: Page) {
         assignedVariant: "four_choice_v1",
         servedVariant: "four_choice_v1",
         requestedCount: 4,
-        servedCount: 4,
+        servedCount: responsePhotos.length,
         requestedCandidateCount: 4,
-        returnedCandidateCount: 4,
+        returnedCandidateCount: responsePhotos.length,
+        choiceResolution: options.exchangeResolution?.state ?? null,
+        selectedPhotoId: options.exchangeResolution?.selectedPhotoId ?? null,
+        choiceResolvedAt: options.exchangeResolution
+          ? "2026-07-22T11:06:00.000Z"
+          : null,
       }),
+    });
+  });
+
+  await page.route("**/api/sleeping-delivery/choice", async (route) => {
+    const request = route.request().postDataJSON() as {
+      operation?: string;
+      selectedPhotoId?: string | null;
+    };
+    const requested = {
+      state: request.operation === "keep" ? ("kept" as const) : ("skipped" as const),
+      selectedPhotoId:
+        request.operation === "keep" ? (request.selectedPhotoId ?? null) : null,
+    };
+    const isFirstResolution = canonical === null;
+    canonical ??= requested;
+    const isSame =
+      canonical.state === requested.state &&
+      canonical.selectedPhotoId === requested.selectedPhotoId;
+    const resolvedAt = "2026-07-22T11:06:00.000Z";
+
+    await route.fulfill({
+      status: isSame ? 200 : 409,
+      contentType: "application/json",
+      body: JSON.stringify(
+        isSame
+          ? {
+              ok: true,
+              ...canonical,
+              resolvedAt,
+              idempotent: !isFirstResolution,
+            }
+          : {
+              ok: false,
+              error: "choice_already_resolved",
+              canonical: { ...canonical, resolvedAt },
+            },
+      ),
     });
   });
 

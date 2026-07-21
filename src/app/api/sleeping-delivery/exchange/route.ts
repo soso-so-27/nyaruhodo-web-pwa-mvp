@@ -39,6 +39,14 @@ import {
   isOnboardingJourneyId,
 } from "../../../../lib/onboarding/journeyContract";
 import { advanceOnboardingSubmission } from "../../../../lib/server/onboardingSubmissionLedger";
+import {
+  EVENING_CHOICE_RECIRCULATION_POLICY,
+  buildFourChoiceExcludedSourceIds,
+  classifyDeliveryExposureHistory,
+  readCandidateLastShownAt,
+  type DeliveryExposureHistory,
+  type DeliveryExposureRow,
+} from "../../../../lib/server/deliveryRecirculation";
 
 export const dynamic = "force-dynamic";
 
@@ -136,6 +144,8 @@ const TRANSIENT_DELIVERY_SIGNED_URL_SECONDS = 10 * 60;
 const EVENING_CHOICE_CAPABILITY = "evening_choice_v1";
 const EVENING_CHOICE_REQUESTED_COUNT = 4;
 const EVENING_CHOICE_MAX_COUNT = 4;
+const DELIVERY_HISTORY_PAGE_SIZE = 1000;
+const MAX_PERMANENT_DELIVERY_HISTORY_ROWS = 10_000;
 type FastCandidateMode = "admin_storage" | "tiered";
 type EveningChoiceVariant = "four_choice_v1" | "single_v1";
 
@@ -209,6 +219,8 @@ async function handleExchangePost(request: Request) {
   const shouldAddOwnPhotoToPool =
     ownPhoto.shared !== false &&
     !isBlockedDeliveryPhotoUrl(ownPhoto.src);
+  const shouldResolveEveningChoiceIdentity =
+    !isOnboardingExchange && input.capability === EVENING_CHOICE_CAPABILITY;
   const debugDryRunRequested = input.debugDryRun === true;
   const debugDryRun = debugDryRunRequested && isExchangeDebugDryRunAllowed();
 
@@ -216,9 +228,12 @@ async function handleExchangePost(request: Request) {
     return exchangeError("debug_dry_run_disabled", 403);
   }
 
-  const user = shouldAddOwnPhotoToPool || ownPhotoStoragePath
-    ? await getAuthenticatedUserForRequest(request)
-    : null;
+  const user =
+    shouldAddOwnPhotoToPool ||
+    ownPhotoStoragePath ||
+    shouldResolveEveningChoiceIdentity
+      ? await getAuthenticatedUserForRequest(request)
+      : null;
   markExchangeTiming(timing, "auth");
 
   if (ownPhotoStoragePath) {
@@ -375,6 +390,8 @@ async function handleExchangePost(request: Request) {
         isEveningChoiceCapableRequest,
         supabase,
         timing,
+        userId,
+        anonymousId,
       });
     }
   }
@@ -581,11 +598,17 @@ async function handleExchangePost(request: Request) {
   markExchangeTiming(timing, "own_photo");
 
   const blockedPhotoIds = new Set(input.blockedPhotoIds ?? []);
-  const deliveredSourceMomentIds = await readDeliveredSourceMomentIds({
+  const deliveryExposureHistory = await readDeliveryExposureHistory({
     supabase,
     userId,
     anonymousId,
+    currentDateKey: input.deliveryDateKey || getServerJstDateKey(),
   });
+  const deliveredSourceMomentIds =
+    isEveningChoiceCapableRequest &&
+    eveningChoiceAssignedVariant === "four_choice_v1"
+      ? buildFourChoiceExcludedSourceIds(deliveryExposureHistory)
+      : deliveryExposureHistory.allSourceIds;
   markExchangeTiming(timing, "read_delivered_sources");
   const deliverableContext = {
     userId,
@@ -616,6 +639,7 @@ async function handleExchangePost(request: Request) {
       timing,
       userId,
       anonymousId,
+      deliveryExposureHistory,
     });
   }
 
@@ -879,6 +903,7 @@ async function handleEveningChoiceExchange({
   timing,
   userId,
   anonymousId,
+  deliveryExposureHistory,
 }: {
   assignedVariant: EveningChoiceVariant;
   blockedPhotoIds: Set<string>;
@@ -890,6 +915,7 @@ async function handleEveningChoiceExchange({
   timing: ReturnType<typeof createExchangeTiming>;
   userId: string | null;
   anonymousId: string | null;
+  deliveryExposureHistory: DeliveryExposureHistory;
 }) {
   const remoteRows = await readRemoteCandidateRows(supabase);
   markExchangeTiming(timing, "read_choice_pool");
@@ -901,7 +927,15 @@ async function handleEveningChoiceExchange({
         isPersistableEveningChoiceSource(row.photo_url),
     ),
     input,
+    deliveryExposureHistory,
   );
+  const eligibleRecycledCount = candidatePool.filter(
+    (row) =>
+      readCandidateLastShownAt(deliveryExposureHistory, [
+        row.id,
+        row.local_moment_id,
+      ]) !== null,
+  ).length;
   const assignedCount =
     assignedVariant === "four_choice_v1" ? EVENING_CHOICE_REQUESTED_COUNT : 1;
   let selectedCandidates = await selectCandidates(
@@ -956,6 +990,13 @@ async function handleEveningChoiceExchange({
         choiceRequestedCount: EVENING_CHOICE_REQUESTED_COUNT,
         choiceServedCount: 0,
         choiceFallbackReason: fallbackReason ?? "no_candidate",
+        recirculationPolicy: EVENING_CHOICE_RECIRCULATION_POLICY,
+        permanentExcludedCount:
+          deliveryExposureHistory.permanentSourceIds.size,
+        recentExposureExcludedCount:
+          deliveryExposureHistory.recentSourceIds.size,
+        eligibleRecycledCount,
+        servedRecycledCount: 0,
         timing,
       },
     });
@@ -964,6 +1005,13 @@ async function handleEveningChoiceExchange({
   const deliveredAt = new Date();
   const deliveredAtMs = deliveredAt.getTime();
   const servedCount = selectedCandidates.length;
+  const servedRecycledCount = selectedCandidates.filter(
+    (candidate) =>
+      readCandidateLastShownAt(deliveryExposureHistory, [
+        candidate.row.id,
+        candidate.row.local_moment_id,
+      ]) !== null,
+  ).length;
   const prepared = await Promise.all(
     selectedCandidates.map(async (selected, index) => {
       const localDeliveryId = buildEveningChoiceDeliverySlotId({
@@ -1045,6 +1093,8 @@ async function handleEveningChoiceExchange({
           isEveningChoiceCapableRequest: true,
           supabase,
           timing,
+          userId,
+          anonymousId,
         });
       }
     }
@@ -1107,6 +1157,13 @@ async function handleEveningChoiceExchange({
         diagnosticsBase.availableCount - candidatePool.length,
       ),
       duplicateExcludedCount: deliverableContext.deliveredSourceMomentIds.size,
+      recirculationPolicy: EVENING_CHOICE_RECIRCULATION_POLICY,
+      permanentExcludedCount:
+        deliveryExposureHistory.permanentSourceIds.size,
+      recentExposureExcludedCount:
+        deliveryExposureHistory.recentSourceIds.size,
+      eligibleRecycledCount,
+      servedRecycledCount,
       choiceExperienceVersion: EVENING_CHOICE_CAPABILITY,
       choiceAssignedVariant: assignedVariant,
       choiceServedVariant: servedVariant,
@@ -1135,11 +1192,33 @@ function isEveningChoiceRolloutAssigned({
   userId: string | null;
   anonymousId: string | null;
 }) {
+  if (
+    !isEveningChoiceIdentityEligible({
+      userId,
+      anonymousId,
+      productionDeployment: isProductionDeployment(),
+    })
+  ) {
+    return false;
+  }
+
   const identity = userId ? `user:${userId}` : `anon:${anonymousId ?? ""}`;
   return isIdentityInEveningChoiceRollout(
     identity,
     readEveningChoiceRolloutPercent(),
   );
+}
+
+export function isEveningChoiceIdentityEligible({
+  userId,
+  anonymousId,
+  productionDeployment,
+}: {
+  userId: string | null;
+  anonymousId: string | null;
+  productionDeployment: boolean;
+}) {
+  return Boolean(userId || (!productionDeployment && anonymousId));
 }
 
 export function isIdentityInEveningChoiceRollout(
@@ -1176,11 +1255,7 @@ export function shouldUseEveningChoiceBundlePath({
 export function readEveningChoiceRolloutPercent() {
   const raw = process.env.EVENING_DELIVERY_FOUR_CHOICE_ROLLOUT_PERCENT;
   if (raw === undefined || raw.trim() === "") {
-    const isProduction =
-      process.env.NODE_ENV === "production" &&
-      process.env.VERCEL_ENV !== "preview" &&
-      process.env.VERCEL_ENV !== "development";
-    return isProduction ? 0 : 100;
+    return isProductionDeployment() ? 0 : 100;
   }
 
   const parsed = Number(raw);
@@ -1188,6 +1263,14 @@ export function readEveningChoiceRolloutPercent() {
     return 0;
   }
   return Math.min(100, Math.max(0, Math.floor(parsed)));
+}
+
+function isProductionDeployment() {
+  return (
+    process.env.NODE_ENV === "production" &&
+    process.env.VERCEL_ENV !== "preview" &&
+    process.env.VERCEL_ENV !== "development"
+  );
 }
 
 async function readExistingDeliveryBundle({
@@ -1236,15 +1319,22 @@ async function buildExistingBundleResponse({
   isEveningChoiceCapableRequest,
   supabase,
   timing,
+  userId,
+  anonymousId,
 }: {
   deliveries: RemoteDeliveryRow[];
   input: Required<ExchangeRequest>;
   isEveningChoiceCapableRequest: boolean;
   supabase: SupabaseClient;
   timing: ReturnType<typeof createExchangeTiming>;
+  userId: string | null;
+  anonymousId: string | null;
 }) {
+  const visibleDeliveries = deliveries.filter(
+    (delivery) => delivery.status !== "hidden" && delivery.status !== "reported",
+  );
   const photos = await Promise.all(
-    deliveries.map((delivery) =>
+    visibleDeliveries.map((delivery) =>
       attachTransientDeliverySignedUrl(
         toExchangePhotoFromDelivery(delivery, input),
         supabase,
@@ -1276,6 +1366,14 @@ async function buildExistingBundleResponse({
       ? metadata.fallback_reason
       : null;
   const tier = readDeliveryTier(metadata.delivery_tier);
+  const resolution = bundleId
+    ? await readEveningChoiceResolution({
+        supabase,
+        userId,
+        anonymousId,
+        bundleId,
+      })
+    : null;
 
   return NextResponse.json({
     photo: photos[0] ?? null,
@@ -1291,6 +1389,9 @@ async function buildExistingBundleResponse({
           fallbackReason,
           requestedCandidateCount: requestedCount,
           returnedCandidateCount: servedCount,
+          choiceResolution: resolution?.outcome ?? null,
+          selectedPhotoId: resolution?.selected_local_delivery_id ?? null,
+          choiceResolvedAt: resolution?.resolved_at ?? null,
         }
       : {}),
     source: photos.length > 0 ? "remote" : "none",
@@ -1308,6 +1409,51 @@ async function buildExistingBundleResponse({
       timing,
     },
   });
+}
+
+async function readEveningChoiceResolution({
+  supabase,
+  userId,
+  anonymousId,
+  bundleId,
+}: {
+  supabase: SupabaseClient;
+  userId: string | null;
+  anonymousId: string | null;
+  bundleId: string;
+}) {
+  let query = supabase
+    .from("evening_delivery_choice_resolutions")
+    .select("outcome, selected_local_delivery_id, resolved_at")
+    .eq("bundle_id", bundleId)
+    .limit(1);
+
+  query = userId
+    ? query.eq("user_id", userId)
+    : query.is("user_id", null).eq("anonymous_id", anonymousId ?? "");
+
+  const { data, error } = await query.maybeSingle();
+  if (error) {
+    console.warn("[sleeping-delivery/exchange] choice resolution lookup failed", {
+      code: error.code,
+    });
+    return null;
+  }
+
+  if (
+    !data ||
+    (data.outcome !== "kept" &&
+      data.outcome !== "skipped" &&
+      data.outcome !== "expired")
+  ) {
+    return null;
+  }
+
+  return data as {
+    outcome: "kept" | "skipped" | "expired";
+    selected_local_delivery_id: string | null;
+    resolved_at: string;
+  };
 }
 
 function readDeliveryPosition(metadata: Record<string, unknown> | null) {
@@ -1904,19 +2050,21 @@ async function readPriorExchange({
   return query.maybeSingle<{ id: string }>();
 }
 
-async function readDeliveredSourceMomentIds({
+async function readDeliveryExposureHistory({
   supabase,
   userId,
   anonymousId,
+  currentDateKey,
 }: {
   supabase: SupabaseClient;
   userId: string | null;
   anonymousId: string | null;
+  currentDateKey: string;
 }) {
   let query = supabase
     .from("cat_moment_deliveries")
-    .select("source_moment_id")
-    .not("source_moment_id", "is", null)
+    .select("source_moment_id, source_photo_id, status, metadata, delivered_at")
+    .order("delivered_at", { ascending: false })
     .limit(1000);
 
   query = userId
@@ -1929,16 +2077,70 @@ async function readDeliveredSourceMomentIds({
     console.warn("[sleeping-delivery/exchange] delivered source lookup failed", {
       code: error.code,
     });
-    return new Set<string>();
+    return classifyDeliveryExposureHistory({
+      rows: [],
+      currentDateKey,
+    });
   }
 
-  return new Set(
-    (data ?? [])
-      .map((row) =>
-        typeof row.source_moment_id === "string" ? row.source_moment_id : null,
-      )
-      .filter((value): value is string => Boolean(value)),
-  );
+  const permanentRows = await readPermanentDeliveryExposureRows({
+    supabase,
+    userId,
+    anonymousId,
+  });
+
+  return classifyDeliveryExposureHistory({
+    rows: [
+      ...((data ?? []) as DeliveryExposureRow[]),
+      ...permanentRows,
+    ],
+    currentDateKey,
+  });
+}
+
+async function readPermanentDeliveryExposureRows({
+  supabase,
+  userId,
+  anonymousId,
+}: {
+  supabase: SupabaseClient;
+  userId: string | null;
+  anonymousId: string | null;
+}) {
+  const rows: DeliveryExposureRow[] = [];
+
+  for (
+    let from = 0;
+    from < MAX_PERMANENT_DELIVERY_HISTORY_ROWS;
+    from += DELIVERY_HISTORY_PAGE_SIZE
+  ) {
+    let query = supabase
+      .from("cat_moment_deliveries")
+      .select("source_moment_id, source_photo_id, status, metadata, delivered_at")
+      .in("status", ["kept", "dismissed", "hidden", "reported"])
+      .order("delivered_at", { ascending: false })
+      .range(from, from + DELIVERY_HISTORY_PAGE_SIZE - 1);
+
+    query = userId
+      ? query.eq("user_id", userId)
+      : query.is("user_id", null).eq("anonymous_id", anonymousId ?? "");
+
+    const { data, error } = await query;
+    if (error) {
+      console.warn(
+        "[sleeping-delivery/exchange] permanent delivery history lookup failed",
+        { code: error.code },
+      );
+      break;
+    }
+
+    rows.push(...((data ?? []) as DeliveryExposureRow[]));
+    if ((data?.length ?? 0) < DELIVERY_HISTORY_PAGE_SIZE) {
+      break;
+    }
+  }
+
+  return rows;
 }
 
 function toExchangePhotoFromDelivery(
@@ -2406,12 +2608,38 @@ async function incrementDeliveryCount({
 function sortTieredCandidates(
   rows: RemoteCatMomentRow[],
   input: Required<ExchangeRequest>,
+  deliveryExposureHistory?: DeliveryExposureHistory,
 ) {
   return [...rows].sort((a, b) => {
     const tierDelta = getDeliveryTier(a, input) - getDeliveryTier(b, input);
 
     if (tierDelta !== 0) {
       return tierDelta;
+    }
+
+    if (deliveryExposureHistory) {
+      const firstShownAt = readCandidateLastShownAt(
+        deliveryExposureHistory,
+        [a.id, a.local_moment_id],
+      );
+      const secondShownAt = readCandidateLastShownAt(
+        deliveryExposureHistory,
+        [b.id, b.local_moment_id],
+      );
+
+      if (firstShownAt === null && secondShownAt !== null) {
+        return -1;
+      }
+      if (firstShownAt !== null && secondShownAt === null) {
+        return 1;
+      }
+      if (
+        firstShownAt !== null &&
+        secondShownAt !== null &&
+        firstShownAt !== secondShownAt
+      ) {
+        return firstShownAt - secondShownAt;
+      }
     }
 
     const countDelta = (a.delivery_count ?? 0) - (b.delivery_count ?? 0);
@@ -2501,10 +2729,10 @@ async function selectCandidates(
     }
   }
 
-  const startIndex =
-    hashText(`${input.seed}:${input.triggerLabel}:${input.theme}`) % rows.length;
-  for (let offset = 0; offset < rows.length; offset += 1) {
-    orderedRows.push(rows[(startIndex + offset) % rows.length]);
+  for (const row of rows) {
+    if (!orderedRows.includes(row)) {
+      orderedRows.push(row);
+    }
   }
 
   const selected: Candidate[] = [];

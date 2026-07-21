@@ -72,6 +72,7 @@ import {
   submitMikkeWindowAnswer,
 } from "../../lib/home/mikkeWindowResults";
 import {
+  finalizeEveningDeliveryChoice,
   saveRemoteDeliveryStockPhoto,
 } from "../../lib/home/deliveryCandidates";
 import {
@@ -2149,22 +2150,69 @@ export function HomeInput({
     );
   }
 
-  function handleChooseEveningDelivery(
+  async function handleChooseEveningDelivery(
     deliveryState: Extract<EveningHomeState, { kind: "delivered" }>,
     photo: ExchangePhoto,
   ) {
+    const bundleId = deliveryState.deliveryBundleId;
+    if (!bundleId) {
+      return null;
+    }
+
+    const canonical = await finalizeEveningDeliveryChoice({
+      operation: "keep",
+      bundleId,
+      deliveryDateKey: deliveryState.dateKey,
+      selectedPhotoId: photo.id,
+    });
+    if (!canonical) {
+      trackProductEvent(
+        "evening_delivery_choice_save_failed",
+        {
+          delivery_date_key: deliveryState.dateKey,
+          delivery_bundle_id: bundleId,
+          error_code: "server_choice_unavailable",
+          photo_id: photo.id,
+        },
+        { localCatId: activeCatId },
+      );
+      return null;
+    }
+
+    if (canonical.state !== "kept" || !canonical.selectedPhotoId) {
+      const didSkip = skipEveningDeliverySelection(
+        deliveryState.dateKey,
+        Date.now(),
+      );
+      if (didSkip) {
+        setEveningRefreshTick((value) => value + 1);
+        return {
+          kind: "skipped" as const,
+          conflict: canonical.conflict,
+        };
+      }
+      return null;
+    }
+
     const choicePhotos = deliveryState.deliveredPhotos ?? [];
+    const canonicalPhoto = choicePhotos.find(
+      (candidate) => candidate.id === canonical.selectedPhotoId,
+    );
+    if (!canonicalPhoto) {
+      return null;
+    }
     const selectedIndex = choicePhotos.findIndex(
-      (candidate) => candidate.id === photo.id,
+      (candidate) => candidate.id === canonicalPhoto.id,
     );
     const selectedPosition = selectedIndex >= 0 ? selectedIndex + 1 : null;
     const previousDay = readEveningDeliveryStore()[deliveryState.dateKey];
     const wasSelectionPersisted = selectEveningDeliveredPhoto(
       deliveryState.dateKey,
-      photo.id,
+      canonicalPhoto.id,
       Date.now(),
     );
-    const wasSaved = wasSelectionPersisted && keepExchangePhoto(photo);
+    const wasSaved =
+      wasSelectionPersisted && keepExchangePhoto(canonicalPhoto);
 
     if (!wasSelectionPersisted || !wasSaved) {
       let rollbackSucceeded: boolean | null = null;
@@ -2187,7 +2235,9 @@ export function HomeInput({
           served_count: deliveryState.servedCount ?? choicePhotos.length,
           fallback_reason: deliveryState.fallbackReason ?? null,
           selected_position: selectedPosition,
-          photo_id: photo.id,
+          photo_id: canonicalPhoto.id,
+          requested_photo_id: photo.id,
+          server_conflict: canonical.conflict,
           error_code: wasSelectionPersisted
             ? "album_write_failed"
             : "delivery_state_write_failed",
@@ -2195,7 +2245,7 @@ export function HomeInput({
         },
         { localCatId: activeCatId },
       );
-      return false;
+      return null;
     }
 
     setCollectionRefreshTick((value) => value + 1);
@@ -2214,8 +2264,10 @@ export function HomeInput({
         served_count: deliveryState.servedCount ?? choicePhotos.length,
         fallback_reason: deliveryState.fallbackReason ?? null,
         selected_position: selectedPosition,
-        photo_id: photo.id,
-        delivery_photo_id: photo.id,
+        photo_id: canonicalPhoto.id,
+        delivery_photo_id: canonicalPhoto.id,
+        requested_photo_id: photo.id,
+        server_conflict: canonical.conflict,
         save_succeeded: true,
       },
       { localCatId: activeCatId },
@@ -2225,8 +2277,8 @@ export function HomeInput({
       {
         delivery_date_key: deliveryState.dateKey,
         auto_saved: false,
-        photo_id: photo.id,
-        delivery_photo_id: photo.id,
+        photo_id: canonicalPhoto.id,
+        delivery_photo_id: canonicalPhoto.id,
         delivery_bundle_id: deliveryState.deliveryBundleId ?? null,
         experience_version:
           deliveryState.experienceVersion ?? "evening_choice_v1",
@@ -2240,7 +2292,11 @@ export function HomeInput({
       },
       { localCatId: activeCatId },
     );
-    return true;
+    return {
+      kind: "kept" as const,
+      photo: canonicalPhoto,
+      conflict: canonical.conflict,
+    };
   }
 
   function handleDraftEveningDeliveryChoice(
@@ -2250,20 +2306,69 @@ export function HomeInput({
     return setEveningDeliveryDraftSelection(deliveryState.dateKey, photoId);
   }
 
-  function handleSkipEveningDeliveryChoice(
+  async function handleSkipEveningDeliveryChoice(
     deliveryState: Extract<EveningHomeState, { kind: "delivered" }>,
   ) {
+    const bundleId = deliveryState.deliveryBundleId;
+    if (!bundleId) {
+      return null;
+    }
+
+    const canonical = await finalizeEveningDeliveryChoice({
+      operation: "skip",
+      bundleId,
+      deliveryDateKey: deliveryState.dateKey,
+    });
+    if (!canonical) {
+      return null;
+    }
+
+    if (canonical.state === "kept" && canonical.selectedPhotoId) {
+      const canonicalPhoto = (deliveryState.deliveredPhotos ?? []).find(
+        (candidate) => candidate.id === canonical.selectedPhotoId,
+      );
+      if (!canonicalPhoto) {
+        return null;
+      }
+      const previousDay = readEveningDeliveryStore()[deliveryState.dateKey];
+      const wasSelectionPersisted = selectEveningDeliveredPhoto(
+        deliveryState.dateKey,
+        canonicalPhoto.id,
+        Date.now(),
+      );
+      const wasSaved =
+        wasSelectionPersisted && keepExchangePhoto(canonicalPhoto);
+      if (!wasSaved) {
+        if (wasSelectionPersisted && previousDay) {
+          const store = readEveningDeliveryStore();
+          store[deliveryState.dateKey] = previousDay;
+          writeEveningDeliveryStore(store);
+        }
+        return null;
+      }
+      setCollectionRefreshTick((value) => value + 1);
+      setEveningRefreshTick((value) => value + 1);
+      return {
+        kind: "kept" as const,
+        photo: canonicalPhoto,
+        conflict: canonical.conflict,
+      };
+    }
+
     const didSkip = skipEveningDeliverySelection(
       deliveryState.dateKey,
       Date.now(),
     );
     if (!didSkip) {
-      return false;
+      return null;
     }
 
     setEveningRefreshTick((value) => value + 1);
     showToast("今回は保存しませんでした");
-    return true;
+    return {
+      kind: "skipped" as const,
+      conflict: canonical.conflict,
+    };
   }
 
   function handleReportEveningChoiceCandidate(
@@ -3610,12 +3715,18 @@ function usePrefersReducedMotion() {
   return prefersReducedMotion;
 }
 
+type EveningDeliveryChoiceUiResult =
+  | { kind: "kept"; photo: ExchangePhoto; conflict: boolean }
+  | { kind: "skipped"; conflict: boolean };
+
 type EveningDeliveryOpeningProps = {
   state: Extract<EveningHomeState, { kind: "delivered" }>;
   initialDecodeStatus: DeliveredPhotoDecodeStatus;
-  onChoose: (photo: ExchangePhoto) => boolean | Promise<boolean>;
+  onChoose: (
+    photo: ExchangePhoto,
+  ) => Promise<EveningDeliveryChoiceUiResult | null>;
   onDraftChange: (photoId: string | null) => boolean;
-  onSkip: () => boolean | Promise<boolean>;
+  onSkip: () => Promise<EveningDeliveryChoiceUiResult | null>;
   onReport: (photo: ExchangePhoto, reason: ExchangePhotoReportReason) => void;
   onStorageDataUrl: (photo: ExchangePhoto, dataUrl: string) => void;
   onClose: () => void;
@@ -4057,13 +4168,18 @@ function EveningDeliveryFourChoice({
     setIsSaving(true);
     setSaveError(false);
     try {
-      const didSave = await onChoose(selectedPhoto);
-      if (!didSave) {
+      const result = await onChoose(selectedPhoto);
+      if (!result) {
         setSaveError(true);
         return;
       }
-      resolutionRef.current = "saved";
-      setSavedPhoto(selectedPhoto);
+      if (result.kind === "kept") {
+        resolutionRef.current = "saved";
+        setSavedPhoto(result.photo);
+      } else {
+        resolutionRef.current = "skipped";
+        requestClose();
+      }
     } catch {
       setSaveError(true);
     } finally {
@@ -4079,9 +4195,14 @@ function EveningDeliveryFourChoice({
     setIsSkipping(true);
     setSkipError(false);
     try {
-      const didSkip = await onSkip();
-      if (!didSkip) {
+      const result = await onSkip();
+      if (!result) {
         setSkipError(true);
+        return;
+      }
+      if (result.kind === "kept") {
+        resolutionRef.current = "saved";
+        setSavedPhoto(result.photo);
         return;
       }
       resolutionRef.current = "skipped";
