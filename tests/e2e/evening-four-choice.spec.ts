@@ -8,7 +8,10 @@ import { sendPhotoReport } from "../../src/lib/home/photoReports";
  * - `evening-four-choice`: the four-candidate selection dialog.
  * - `evening-four-choice-option`: one candidate button with `data-photo-id`.
  * - `evening-four-choice-save`: saves the currently selected candidate.
- * - `evening-four-choice-close`: closes while preserving the bundle and draft.
+ * - `evening-four-choice-close`: asks before leaving an unresolved choice.
+ * - `evening-four-choice-exit-confirm`: the unresolved-choice confirmation.
+ * - `evening-four-choice-exit-continue`: returns to the same four candidates.
+ * - `evening-four-choice-exit-skip`: resolves the delivery without saving.
  * - `evening-four-choice-skip`: explicitly resolves without saving a photo.
  * - Exchange response: `experienceVersion: "evening_choice_v1"`, `bundleId`,
  *   `photos`, plus the legacy-compatible `photo` field.
@@ -191,6 +194,17 @@ test.describe("20時便の4枚選択", () => {
       selectedPhotoId,
       hasKeptAt: true,
     });
+    await expect(
+      choiceDialog.getByTestId("evening-four-choice-saved"),
+    ).toBeVisible();
+    await choiceDialog.getByTestId("evening-four-choice-finish").click();
+
+    await expect(choiceDialog).toHaveCount(0);
+    await expect(page.getByTestId("home-desk-model")).toHaveAttribute(
+      "data-state",
+      "4",
+    );
+    await expect(page.getByTestId("desk-open-letter")).toHaveCount(0);
 
     await page.reload();
     await expect.poll(() => readEveningSelection(page)).toEqual({
@@ -203,9 +217,10 @@ test.describe("20時便の4枚選択", () => {
       "data-state",
       "4",
     );
+    await expect(page.getByTestId("desk-open-letter")).toHaveCount(0);
   });
 
-  test("閉じても同じ4枚と仮選択を保ち、ホームから再開できる", async ({
+  test("閉じる前に確認し、選択に戻るか今回分を保存せず終了できる", async ({
     page,
   }) => {
     await page.setViewportSize({ width: 320, height: 568 });
@@ -247,38 +262,36 @@ test.describe("20時便の4枚選択", () => {
     ).toBe(true);
     await choiceDialog.getByTestId("evening-four-choice-close").click();
 
-    await expect(choiceDialog).toHaveCount(0);
+    const exitConfirm = page.getByTestId("evening-four-choice-exit-confirm");
+    await expect(exitConfirm).toBeVisible();
+    await exitConfirm.getByTestId("evening-four-choice-exit-continue").click();
+
+    await expect(exitConfirm).toHaveCount(0);
+    await expect(choiceDialog).toBeVisible();
+    await expect(
+      choiceDialog.locator(
+        `[data-testid="evening-four-choice-option"][data-photo-id="${draftPhotoId}"]`,
+      ),
+    ).toHaveAttribute("aria-checked", "true");
     await expect.poll(() => readEveningSelection(page)).toEqual({
       keptPhotoIds: [],
       selectedPhotoId: null,
       hasKeptAt: false,
     });
     await expect.poll(() => readEveningDraftSelection(page)).toBe(draftPhotoId);
-    await expect(page.getByTestId("desk-open-letter")).toBeVisible();
 
-    await page.getByTestId("desk-open-letter").click();
-    const reopenedDialog = page.getByTestId("evening-four-choice");
-    await expect(reopenedDialog).toBeVisible();
-    await expect(reopenedDialog.getByTestId("evening-four-choice-option")).toHaveCount(4);
-    await expect
-      .poll(() =>
-        readChoicePhotoIds(
-          reopenedDialog.getByTestId("evening-four-choice-option"),
-        ),
-      )
-      .toEqual([
-        "four-choice-delivery-1",
-        "four-choice-delivery-2",
-        "four-choice-delivery-3",
-        "four-choice-delivery-4",
-      ]);
-    await expect(
-      reopenedDialog.locator(
-        `[data-testid="evening-four-choice-option"][data-photo-id="${draftPhotoId}"]`,
-      ),
-    ).toHaveAttribute("aria-checked", "true");
-    await expect(reopenedDialog.getByTestId("evening-four-choice-save")).toBeEnabled();
-    await expect(reopenedDialog.getByText("あとでえらぶ")).toHaveCount(0);
+    await page.goBack();
+    await expect(exitConfirm).toBeVisible();
+    await exitConfirm.getByTestId("evening-four-choice-exit-skip").click();
+
+    await expect(choiceDialog).toHaveCount(0);
+    await expect.poll(() => readSkippedEveningDelivery(page)).toEqual({
+      hasArrival: false,
+      hasDraftSelection: false,
+      hasSkippedAt: true,
+    });
+    await expect.poll(() => readKeptPhotoIds(page)).toEqual([]);
+    await expect(page.getByTestId("desk-open-letter")).toHaveCount(0);
     expect(readExchangeCalls()).toBe(1);
   });
 

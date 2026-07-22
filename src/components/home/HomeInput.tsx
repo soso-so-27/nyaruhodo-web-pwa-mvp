@@ -4061,7 +4061,6 @@ export function EveningDeliveryFourChoice({
   const closeButtonRef = useRef<HTMLButtonElement | null>(null);
   const shownAtRef = useRef(Date.now());
   const selectionChangeCountRef = useRef(0);
-  const dismissedTrackedRef = useRef(false);
   const resolutionRef = useRef<"open" | "saved" | "skipped">("open");
   const finishButtonRef = useRef<HTMLButtonElement | null>(null);
   const [selectedPhotoId, setSelectedPhotoId] = useState<string | null>(() =>
@@ -4074,6 +4073,7 @@ export function EveningDeliveryFourChoice({
   const [isSkipping, setIsSkipping] = useState(false);
   const [saveError, setSaveError] = useState(false);
   const [skipError, setSkipError] = useState(false);
+  const [isExitConfirmOpen, setIsExitConfirmOpen] = useState(false);
   const [reportingPhoto, setReportingPhoto] = useState<ExchangePhoto | null>(null);
   const [reportedPhotoIds, setReportedPhotoIds] = useState<Set<string>>(
     () => readBlockedExchangePhotoIds(),
@@ -4122,18 +4122,17 @@ export function EveningDeliveryFourChoice({
       return;
     }
 
-    if (
-      resolutionRef.current === "open" &&
-      !dismissedTrackedRef.current
-    ) {
-      dismissedTrackedRef.current = true;
-      if (analyticsEnabled) {
-        trackProductEvent("evening_delivery_choices_dismissed", {
-          delivery_date_key: state.dateKey,
-          ...choiceEventProperties,
-          had_selection: Boolean(selectedPhotoId),
-        });
+    if (resolutionRef.current === "open") {
+      setIsExitConfirmOpen(true);
+      if (!syncHistory && !pushedHistoryRef.current) {
+        window.history.pushState(
+          { neterunekoEveningFourChoice: true },
+          "",
+          window.location.href,
+        );
+        pushedHistoryRef.current = true;
       }
+      return;
     }
 
     if (syncHistory && pushedHistoryRef.current) {
@@ -4233,10 +4232,12 @@ export function EveningDeliveryFourChoice({
       }
       if (result.kind === "kept") {
         resolutionRef.current = "saved";
+        setIsExitConfirmOpen(false);
         setSavedPhoto(result.photo);
         return;
       }
       resolutionRef.current = "skipped";
+      setIsExitConfirmOpen(false);
       if (analyticsEnabled) {
         trackProductEvent("evening_delivery_choice_skipped", {
           delivery_date_key: state.dateKey,
@@ -4366,7 +4367,7 @@ export function EveningDeliveryFourChoice({
             ref={closeButtonRef}
             type="button"
             data-testid="evening-four-choice-close"
-            aria-label="閉じる"
+            aria-label="選ぶのをやめる"
             disabled={isSaving || isSkipping}
             onClick={() => requestClose()}
             style={styles.eveningFourChoiceClose}
@@ -4614,6 +4615,50 @@ export function EveningDeliveryFourChoice({
                 onClick={() => setReportingPhoto(null)}
               >
                 キャンセル
+              </AppButton>
+            </div>
+          </AppSheet>
+        </div>
+      ) : null}
+      {isExitConfirmOpen ? (
+        <div onClick={(event) => event.stopPropagation()}>
+          <AppSheet
+            placement="bottom"
+            title="選ぶのをやめますか？"
+            onClose={() => setIsExitConfirmOpen(false)}
+            closeOnOverlay={false}
+            showCloseButton={false}
+          >
+            <div
+              data-testid="evening-four-choice-exit-confirm"
+              style={styles.eveningFourReportActions}
+            >
+              <p style={styles.eveningFourSavedCopy}>
+                選んだだけでは、まだ保存されていません。
+              </p>
+              {skipError ? (
+                <p role="alert" style={styles.eveningFourChoiceError}>
+                  保存しない処理に失敗しました。もう一度お試しください。
+                </p>
+              ) : null}
+              <AppButton
+                type="button"
+                variant="primary"
+                fullWidth
+                data-testid="evening-four-choice-exit-continue"
+                onClick={() => setIsExitConfirmOpen(false)}
+              >
+                選ぶ画面にもどる
+              </AppButton>
+              <AppButton
+                type="button"
+                variant="quiet"
+                fullWidth
+                disabled={isSkipping}
+                data-testid="evening-four-choice-exit-skip"
+                onClick={() => void skipChoice()}
+              >
+                {isSkipping ? "処理しています…" : "今回は保存しない"}
               </AppButton>
             </div>
           </AppSheet>
