@@ -1095,7 +1095,7 @@ test.describe("collection album flow", () => {
               id: "delivered-storage-offline",
               sourcePhotoId: "stock-offline",
               src: "storage:admin-stock/sleeping/offline-delivered.jpg",
-              title: "とどいたねがお",
+              title: "ねこだより",
               subtitle: "",
               triggerLabel: "sleeping",
               theme: "sleeping",
@@ -1115,7 +1115,7 @@ test.describe("collection album flow", () => {
                 id: "delivered-storage-offline",
                 sourcePhotoId: "stock-offline",
                 src: "storage:admin-stock/sleeping/offline-delivered.jpg",
-                title: "とどいたねがお",
+                title: "ねこだより",
                 subtitle: "",
                 triggerLabel: "sleeping",
                 theme: "sleeping",
@@ -1614,7 +1614,7 @@ test.describe("collection album flow", () => {
         id: `delivered-history-${index + 1}`,
         sourcePhotoId: `source-history-${index + 1}`,
         src: createHistoryPhotoDataUrl(index),
-        title: "とどいたねがお",
+        title: "ねこだより",
         subtitle: "",
         triggerLabel: "sleeping",
         theme: "sleeping",
@@ -1743,7 +1743,7 @@ test.describe("collection album flow", () => {
                 id: "delivered-mainichi-day",
                 sourcePhotoId: "stock-mainichi-day",
                 src,
-                title: "とどいたねがお",
+                title: "ねこだより",
                 subtitle: "",
                 triggerLabel: "sleeping",
                 theme: "sleeping",
@@ -1793,7 +1793,7 @@ test.describe("collection album flow", () => {
     await deliveredPhotoButton.click();
     await expect(photoViewer).toBeVisible();
     await disableNextDevToolsPointerEvents(page);
-    const removeButton = page.getByRole("button", { name: "ねこだよりから外す" });
+    const removeButton = page.getByRole("button", { name: "「とどいた」から外す" });
     await removeButton.click();
     const confirmDialog = page.getByRole("alertdialog");
     const cancelButton = confirmDialog.getByRole("button", { name: "キャンセル" });
@@ -1833,10 +1833,36 @@ test.describe("collection album flow", () => {
     page,
   }) => {
     const now = Date.parse("2026-06-14T11:05:00.000Z");
+    const userId = "collection-mainichi-action-user";
     await page.clock.setFixedTime(new Date(now));
+    await page.route("**/api/sleeping-delivery/backup", async (route) => {
+      await route.fulfill({
+        contentType: "application/json",
+        body: JSON.stringify({ ok: true, existing: true }),
+      });
+    });
+    await page.route("**/auth/v1/user", async (route) => {
+      await route.fulfill({
+        contentType: "application/json",
+        body: JSON.stringify({
+          id: userId,
+          aud: "authenticated",
+          role: "authenticated",
+          email: "collection-mainichi-action@example.test",
+          app_metadata: {},
+          user_metadata: {},
+        }),
+      });
+    });
+    await page.route("**/rest/v1/cat_moments**", async (route) => {
+      await route.fulfill({
+        contentType: "application/json",
+        body: "[]",
+      });
+    });
 
     await page.addInitScript(
-      ({ currentCatId, src, createdAt }) => {
+      ({ currentCatId, src, createdAt, userId }) => {
         window.localStorage.setItem("active_cat_id", currentCatId);
         window.localStorage.setItem(
           "cat_profiles",
@@ -1867,11 +1893,30 @@ test.describe("collection album flow", () => {
             },
           ]),
         );
+        window.localStorage.setItem(
+          "nyaruhodo_supabase_auth",
+          JSON.stringify({
+            access_token: "collection-mainichi-action-token",
+            refresh_token: "collection-mainichi-action-refresh-token",
+            expires_at: Math.floor(Date.now() / 1000) + 3600,
+            expires_in: 3600,
+            token_type: "bearer",
+            user: {
+              id: userId,
+              aud: "authenticated",
+              role: "authenticated",
+              email: "collection-mainichi-action@example.test",
+              app_metadata: {},
+              user_metadata: {},
+            },
+          }),
+        );
       },
       {
         currentCatId: "current-cat",
         src: photoDataUrl,
         createdAt: now,
+        userId,
       },
     );
 
@@ -1882,7 +1927,13 @@ test.describe("collection album flow", () => {
     await expect(page.getByTestId("mainichi-photo-viewer")).toBeVisible();
 
     await page.getByRole("button", { name: "自分だけにする" }).click();
-    await expect(page.getByRole("button", { name: "ねこだよりに使う" })).toBeVisible();
+    await expect(page.getByText("自分だけの写真にしました")).toBeVisible();
+    await expect(page.getByRole("button", { name: "ねこだよりにする" })).toBeVisible();
+    await page.getByRole("button", { name: "ねこだよりにする" }).click();
+    await expect(
+      page.getByText("ねこだよりの候補として運営確認に送りました"),
+    ).toBeVisible();
+    await page.getByRole("button", { name: "自分だけにする" }).click();
     await expect
       .poll(() =>
         page.evaluate(() => {
@@ -1901,6 +1952,411 @@ test.describe("collection album flow", () => {
     await page.getByRole("alertdialog").getByRole("button", { name: "削除" }).click();
     await expect(page.getByTestId("mainichi-photo-viewer")).toHaveCount(0);
     await expect(page.getByTestId("mainichi-board-photo-sent")).toHaveCount(0);
+  });
+
+  test("keeps an own photo shared when changing it to private fails remotely", async ({
+    page,
+  }) => {
+    const now = Date.parse("2026-06-14T11:05:00.000Z");
+    await page.clock.setFixedTime(new Date(now));
+    await page.route("**/api/sleeping-delivery/backup", async (route) => {
+      await route.fulfill({
+        status: 400,
+        contentType: "application/json",
+        body: JSON.stringify({ ok: false, error: "forced_backup_failure" }),
+      });
+    });
+    await page.addInitScript(
+      ({ currentCatId, src, createdAt }) => {
+        window.localStorage.setItem("active_cat_id", currentCatId);
+        window.localStorage.setItem(
+          "cat_profiles",
+          JSON.stringify([{ id: currentCatId, name: "current cat" }]),
+        );
+        window.localStorage.setItem(
+          "nyaruhodo_exchange_own_sleeping_photos",
+          JSON.stringify([
+            {
+              id: "own-private-failure",
+              ownerCatId: currentCatId,
+              catId: currentCatId,
+              src,
+              state: "sleeping",
+              visibility: "shared",
+              deliveryStatus: "available",
+              triggerLabel: "sleeping",
+              theme: "sleeping",
+              shared: true,
+              createdAt,
+            },
+          ]),
+        );
+      },
+      {
+        currentCatId: "current-cat",
+        src: photoDataUrl,
+        createdAt: now,
+      },
+    );
+
+    await page.goto("/collection");
+    await page.getByTestId("mainichi-board-photo-sent").click();
+    await page.getByRole("button", { name: "自分だけにする" }).click();
+
+    await expect(
+      page.getByText(
+        "自分だけに変更できませんでした。写真はねこだよりの候補のままです。通信を確認して、もう一度お試しください。",
+      ),
+    ).toBeVisible();
+    await expect(page.getByRole("button", { name: "自分だけにする" })).toBeVisible();
+    await expect
+      .poll(() =>
+        page.evaluate(() => {
+          const photos = JSON.parse(
+            window.localStorage.getItem("nyaruhodo_exchange_own_sleeping_photos") ??
+              "[]",
+          ) as { id?: string; shared?: boolean; visibility?: string }[];
+          const photo = photos.find((candidate) => candidate.id === "own-private-failure");
+
+          return photo?.shared === true && photo.visibility === "shared";
+        }),
+      )
+      .toBe(true);
+
+  });
+
+  test("shows an own photo as shared when the remote share result stays uncertain", async ({
+    page,
+  }) => {
+    const now = Date.parse("2026-06-14T11:05:00.000Z");
+    await page.clock.setFixedTime(new Date(now));
+    await page.route("**/api/sleeping-delivery/backup", async (route) => {
+      await route.fulfill({
+        status: 400,
+        contentType: "application/json",
+        body: JSON.stringify({ ok: false, error: "forced_backup_failure" }),
+      });
+    });
+    await page.addInitScript(
+      ({ currentCatId, src, createdAt }) => {
+        window.localStorage.setItem("active_cat_id", currentCatId);
+        window.localStorage.setItem(
+          "cat_profiles",
+          JSON.stringify([{ id: currentCatId, name: "current cat" }]),
+        );
+        window.localStorage.setItem(
+          "nyaruhodo_exchange_own_sleeping_photos",
+          JSON.stringify([
+            {
+              id: "own-share-failure",
+              ownerCatId: currentCatId,
+              catId: currentCatId,
+              src,
+              state: "sleeping",
+              visibility: "private",
+              deliveryStatus: "private",
+              triggerLabel: "sleeping",
+              theme: "sleeping",
+              shared: false,
+              createdAt,
+            },
+          ]),
+        );
+      },
+      {
+        currentCatId: "current-cat",
+        src: photoDataUrl,
+        createdAt: now,
+      },
+    );
+
+    await page.goto("/collection");
+    await page.getByTestId("mainichi-board-photo-sent").click();
+    await page.getByRole("button", { name: "ねこだよりにする" }).click();
+
+    await expect(
+      page.getByText(
+        "変更結果を確認できませんでした。安全のため、ねこだよりの候補として表示しています。通信を確認して「自分だけにする」を押してください。",
+      ),
+    ).toBeVisible();
+    await expect(page.getByRole("button", { name: "自分だけにする" })).toBeVisible();
+    await expect
+      .poll(() =>
+        page.evaluate(() => {
+          const photos = JSON.parse(
+            window.localStorage.getItem("nyaruhodo_exchange_own_sleeping_photos") ??
+              "[]",
+          ) as { id?: string; shared?: boolean; visibility?: string }[];
+          const photo = photos.find((candidate) => candidate.id === "own-share-failure");
+
+          return photo?.shared === true && photo.visibility === "shared";
+        }),
+      )
+      .toBe(true);
+  });
+
+  test("restores a private photo after the failed share is confirmed private remotely", async ({
+    page,
+  }) => {
+    const now = Date.parse("2026-06-14T11:05:00.000Z");
+    let backupRequestCount = 0;
+    await page.clock.setFixedTime(new Date(now));
+    await page.route("**/api/sleeping-delivery/backup", async (route) => {
+      backupRequestCount += 1;
+      await route.fulfill({
+        status: backupRequestCount === 1 ? 400 : 200,
+        contentType: "application/json",
+        body: JSON.stringify(
+          backupRequestCount === 1
+            ? { ok: false, error: "forced_share_failure" }
+            : { ok: true },
+        ),
+      });
+    });
+    await page.addInitScript(
+      ({ currentCatId, src, createdAt }) => {
+        window.localStorage.setItem("active_cat_id", currentCatId);
+        window.localStorage.setItem(
+          "cat_profiles",
+          JSON.stringify([{ id: currentCatId, name: "current cat" }]),
+        );
+        window.localStorage.setItem(
+          "nyaruhodo_exchange_own_sleeping_photos",
+          JSON.stringify([
+            {
+              id: "own-share-compensated",
+              ownerCatId: currentCatId,
+              catId: currentCatId,
+              src,
+              state: "sleeping",
+              visibility: "private",
+              deliveryStatus: "private",
+              triggerLabel: "sleeping",
+              theme: "sleeping",
+              shared: false,
+              createdAt,
+            },
+          ]),
+        );
+      },
+      {
+        currentCatId: "current-cat",
+        src: photoDataUrl,
+        createdAt: now,
+      },
+    );
+
+    await page.goto("/collection");
+    await page.getByTestId("mainichi-board-photo-sent").click();
+    await page.getByRole("button", { name: "ねこだよりにする" }).click();
+
+    await expect(
+      page.getByText(
+        "ねこだよりに変更できませんでした。写真は自分だけのままです。通信を確認して、もう一度お試しください。",
+      ),
+    ).toBeVisible();
+    expect(backupRequestCount).toBe(2);
+    await expect(page.getByRole("button", { name: "ねこだよりにする" })).toBeVisible();
+    await expect
+      .poll(() =>
+        page.evaluate(() => {
+          const photos = JSON.parse(
+            window.localStorage.getItem("nyaruhodo_exchange_own_sleeping_photos") ??
+              "[]",
+          ) as { id?: string; shared?: boolean; visibility?: string }[];
+          const photo = photos.find(
+            (candidate) => candidate.id === "own-share-compensated",
+          );
+
+          return photo?.shared === false && photo.visibility === "private";
+        }),
+      )
+      .toBe(true);
+  });
+
+  test("keeps an own photo when no deletion session is available", async ({ page }) => {
+    const now = Date.parse("2026-06-14T11:05:00.000Z");
+    await page.clock.setFixedTime(new Date(now));
+    await page.addInitScript(
+      ({ currentCatId, src, createdAt }) => {
+        window.localStorage.setItem("active_cat_id", currentCatId);
+        window.localStorage.setItem(
+          "cat_profiles",
+          JSON.stringify([{ id: currentCatId, name: "current cat" }]),
+        );
+        window.localStorage.setItem(
+          "nyaruhodo_exchange_own_sleeping_photos",
+          JSON.stringify([
+            {
+              id: "own-delete-without-session",
+              ownerCatId: currentCatId,
+              catId: currentCatId,
+              src,
+              state: "sleeping",
+              visibility: "shared",
+              deliveryStatus: "available",
+              triggerLabel: "sleeping",
+              theme: "sleeping",
+              shared: true,
+              createdAt,
+            },
+          ]),
+        );
+      },
+      {
+        currentCatId: "current-cat",
+        src: photoDataUrl,
+        createdAt: now,
+      },
+    );
+
+    await page.goto("/collection");
+    await page.getByTestId("mainichi-board-photo-sent").click();
+    await page.getByRole("button", { name: "削除" }).click();
+    await page.getByRole("alertdialog").getByRole("button", { name: "削除" }).click();
+
+    await expect(
+      page.getByText(
+        "ログイン状態を確認できないため、写真を削除できませんでした。ログインして、もう一度お試しください。",
+      ),
+    ).toBeVisible();
+    await expect(page.getByTestId("mainichi-photo-viewer")).toBeVisible();
+    await expect(page.getByTestId("mainichi-board-photo-sent")).toHaveCount(1);
+  });
+
+  test("keeps an own photo when account authentication or deletion fails remotely", async ({
+    page,
+  }) => {
+    const now = Date.parse("2026-06-14T11:05:00.000Z");
+    const userId = "collection-delete-user";
+    let failAuthRequest = true;
+    let authRequestCount = 0;
+    let deleteRequestCount = 0;
+    await page.clock.setFixedTime(new Date(now));
+    await page.route("**/auth/v1/user", async (route) => {
+      authRequestCount += 1;
+      if (failAuthRequest) {
+        await route.fulfill({
+          status: 503,
+          contentType: "application/json",
+          body: JSON.stringify({ message: "forced auth failure" }),
+        });
+        return;
+      }
+
+      await route.fulfill({
+        contentType: "application/json",
+        body: JSON.stringify({
+          id: userId,
+          aud: "authenticated",
+          role: "authenticated",
+          email: "collection-delete@example.test",
+          app_metadata: {},
+          user_metadata: {},
+        }),
+      });
+    });
+    await page.route("**/rest/v1/cat_moments**", async (route) => {
+      if (route.request().method() === "DELETE") {
+        deleteRequestCount += 1;
+        await route.fulfill({
+          status: 503,
+          contentType: "application/json",
+          body: JSON.stringify({ message: "forced delete failure" }),
+        });
+        return;
+      }
+
+      await route.fulfill({
+        contentType: "application/json",
+        body: "[]",
+      });
+    });
+    await page.addInitScript(
+      ({ currentCatId, src, createdAt, userId }) => {
+        window.localStorage.setItem("active_cat_id", currentCatId);
+        window.localStorage.setItem(
+          "cat_profiles",
+          JSON.stringify([{ id: currentCatId, name: "current cat" }]),
+        );
+        window.localStorage.setItem(
+          "nyaruhodo_exchange_own_sleeping_photos",
+          JSON.stringify([
+            {
+              id: "own-delete-failure",
+              ownerCatId: currentCatId,
+              catId: currentCatId,
+              src,
+              state: "sleeping",
+              visibility: "shared",
+              deliveryStatus: "available",
+              triggerLabel: "sleeping",
+              theme: "sleeping",
+              shared: true,
+              createdAt,
+            },
+          ]),
+        );
+        window.localStorage.setItem(
+          "nyaruhodo_supabase_auth",
+          JSON.stringify({
+            access_token: "collection-delete-token",
+            refresh_token: "collection-delete-refresh-token",
+            expires_at: Math.floor(Date.now() / 1000) + 3600,
+            expires_in: 3600,
+            token_type: "bearer",
+            user: {
+              id: userId,
+              aud: "authenticated",
+              role: "authenticated",
+              email: "collection-delete@example.test",
+              app_metadata: {},
+              user_metadata: {},
+            },
+          }),
+        );
+      },
+      {
+        currentCatId: "current-cat",
+        src: photoDataUrl,
+        createdAt: now,
+        userId,
+      },
+    );
+
+    await page.goto("/collection");
+    await page.getByTestId("mainichi-board-photo-sent").click();
+    await page.getByRole("button", { name: "削除" }).click();
+    await page.getByRole("alertdialog").getByRole("button", { name: "削除" }).click();
+
+    await expect(
+      page.getByText(
+        "写真を削除できませんでした。写真は残っています。通信を確認して、もう一度お試しください。",
+      ),
+    ).toBeVisible();
+    expect(authRequestCount).toBe(1);
+    expect(deleteRequestCount).toBe(0);
+    await expect(page.getByTestId("mainichi-photo-viewer")).toBeVisible();
+    await expect(page.getByTestId("mainichi-board-photo-sent")).toHaveCount(1);
+
+    failAuthRequest = false;
+    await page.getByRole("button", { name: "削除" }).click();
+    await page.getByRole("alertdialog").getByRole("button", { name: "削除" }).click();
+    await expect.poll(() => deleteRequestCount).toBe(1);
+    await expect(page.getByTestId("mainichi-photo-viewer")).toBeVisible();
+    await expect(page.getByTestId("mainichi-board-photo-sent")).toHaveCount(1);
+    await expect
+      .poll(() =>
+        page.evaluate(() => {
+          const photos = JSON.parse(
+            window.localStorage.getItem("nyaruhodo_exchange_own_sleeping_photos") ??
+              "[]",
+          ) as { id?: string }[];
+
+          return photos.some((photo) => photo.id === "own-delete-failure");
+        }),
+      )
+      .toBe(true);
   });
 });
 

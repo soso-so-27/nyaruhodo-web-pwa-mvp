@@ -135,9 +135,13 @@ test("deletes a cat after confirmation and moves the active cat", async ({
 
   await page.getByTestId("cats-section-tab-basic").click();
   await page.getByRole("button", { name: "猫を追加・管理" }).click();
-  await page.getByRole("button", { name: "この子を消す" }).click();
-  await expect(page.getByText("ムギ・写真1枚 を消しますか？")).toBeVisible();
-  await page.getByRole("button", { name: /^消す$/ }).click();
+  await page.getByRole("button", { name: "この子の登録を削除" }).click();
+  await expect(page.getByText("ムギの登録を削除しますか？")).toBeVisible();
+  await expect(
+    page.getByText("写真1枚は削除せず、このプロフィールとの関連付けだけ外します。"),
+  ).toBeVisible();
+  await page.getByRole("button", { name: "登録を削除", exact: true }).click();
+  await expect(page.getByText("ムギの登録を削除しました")).toBeVisible();
 
   await expect
     .poll(() =>
@@ -162,7 +166,7 @@ test("deletes a cat after confirmation and moves the active cat", async ({
       photoCount: 1,
     });
   await page.getByRole("button", { name: "猫を追加・管理" }).click();
-  await expect(page.getByRole("button", { name: "この子を消す" })).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "この子の登録を削除" })).toHaveCount(0);
 });
 
 async function seedCatProfile(

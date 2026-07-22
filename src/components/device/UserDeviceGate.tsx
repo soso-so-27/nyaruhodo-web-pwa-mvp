@@ -114,14 +114,14 @@ export function UserDeviceGate({ children }: UserDeviceGateProps) {
             スマホで使うアプリです。
           </h1>
           <p className="deviceGateLead">
-            スマホで開くと、
+            スマホでひらくと、
             <br />
-            ねがおを1枚入れて
+            ねがおの写真を1枚選んで
             <br />
-            ねこだよりを受け取れます。
+            ねこだよりがとどきます。
           </p>
           <p className="deviceGateCopy">
-            このページをスマホで開いてください。
+            このページをスマホでひらいてください。
           </p>
           {currentUrl ? (
             <div className="deviceGateUrlBox">
@@ -135,10 +135,10 @@ export function UserDeviceGate({ children }: UserDeviceGateProps) {
           ) : null}
           <p className="deviceGateStatus" aria-live="polite">
             {copyState === "copied"
-              ? "コピーしました。スマホに送って開いてください。"
+              ? "コピーしました。スマホに送ってひらいてください。"
               : copyState === "failed"
                 ? "コピーできませんでした。アドレスバーのURLを使ってください。"
-                : "InstagramやLINEでスマホへ送ると開きやすいです。"}
+                : "InstagramやLINEでスマホへ送るとひらきやすいです。"}
           </p>
         </section>
       </main>

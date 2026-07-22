@@ -6,7 +6,7 @@ import { AppButton } from "./AppButton";
 
 export function AuthRecoveryNotice({
   returnTo,
-  message = "ログインの有効期限が切れた可能性があります。もう一度ログインすると、この画面へ戻ります。",
+  message = "Googleログインの有効期限が切れました。もう一度ログインすると、この画面へ戻ります。",
 }: {
   returnTo: string;
   message?: string;
@@ -14,7 +14,7 @@ export function AuthRecoveryNotice({
   return (
     <div style={styles.root} role="status" data-testid="auth-recovery-notice">
       <div style={styles.copy}>
-        <p style={styles.title}>ログインをもう一度確認してください</p>
+        <p style={styles.title}>Googleログインが必要です</p>
         <p style={styles.description}>{message}</p>
         <p style={styles.safety}>この端末に保存済みの写真と記録は、そのまま残ります。</p>
       </div>
@@ -24,7 +24,7 @@ export function AuthRecoveryNotice({
         size="md"
         fullWidth
       >
-        Googleでログインし直す
+        Googleで再ログインする
       </AppButton>
     </div>
   );

@@ -1002,8 +1002,8 @@ export function getJstAutoOpenTime(dateKey: string) {
 
 export function getEveningDeliveryCompletionCopy(now = Date.now()) {
   return getEveningDeliveryTargetDateKey(now) === getJstDateKey(now)
-    ? "こんやの よる8時ごろ、もう1まい とどきます。"
-    : "あしたの よる8時ごろ、つぎの ねがおが とどきます。";
+    ? "きょうの よる8時ごろ、ねこだよりが とどきます。"
+    : "あしたの よる8時ごろ、ねこだよりが とどきます。";
 }
 
 export function isTodaySleepingCounterVisible(countText: string) {

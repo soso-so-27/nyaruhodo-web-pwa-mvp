@@ -696,7 +696,7 @@ export function OnboardingFlow() {
       window.location.replace(continueUrl.toString());
     } catch (error) {
       setExternalBrowserHandoffError(
-        "つづきの準備ができませんでした。通信を確認して、もう一度お試しください。",
+        "ブラウザ移動の準備ができませんでした。通信を確認して、もう一度お試しください。",
       );
       trackProductEvent("onboarding_external_browser_handoff_failed", {
         source,
@@ -1216,7 +1216,9 @@ export function OnboardingFlow() {
     const progress = readCurrentOnboardingProgress();
     const deliveryDateKey = progress?.dateKey;
     if (!deliveryDateKey) {
-      setDeliveryChoiceError("保存できませんでした。もう一度お試しください。");
+      setDeliveryChoiceError(
+        "選んだ写真を「とどいた」に保存できませんでした。もう一度お試しください。",
+      );
       return;
     }
 
@@ -1224,7 +1226,9 @@ export function OnboardingFlow() {
     setDeliveryChoiceError("");
     try {
       if (!progress?.journeyId || !progress.resumeToken) {
-        setDeliveryChoiceError("保存できませんでした。もう一度お試しください。");
+        setDeliveryChoiceError(
+          "選んだ写真を「とどいた」に保存できませんでした。もう一度お試しください。",
+        );
         return;
       }
       const canonical = await finalizeOnboardingDeliveryChoice({
@@ -1242,7 +1246,9 @@ export function OnboardingFlow() {
         : null;
 
       if (canonical?.state !== "kept" || !selectedPhoto) {
-        setDeliveryChoiceError("保存できませんでした。もう一度お試しください。");
+        setDeliveryChoiceError(
+          "選んだ写真を「とどいた」に保存できませんでした。もう一度お試しください。",
+        );
         return;
       }
 
@@ -1260,7 +1266,9 @@ export function OnboardingFlow() {
       });
       markDeliveredPhotoReadyForOnboarding(selectedPhoto);
     } catch {
-      setDeliveryChoiceError("保存できませんでした。もう一度お試しください。");
+      setDeliveryChoiceError(
+        "選んだ写真を「とどいた」に保存できませんでした。もう一度お試しください。",
+      );
     } finally {
       setIsFinalizingDeliveryChoice(false);
     }
@@ -1514,7 +1522,7 @@ export function OnboardingFlow() {
 
     if (exchangeResult?.error === "onboarding_already_completed") {
       if (clearEveningDeliveryTargetForPhoto(ownPhoto.id)) {
-        deleteOwnSleepingPhoto(ownPhoto.id);
+        await deleteOwnSleepingPhoto(ownPhoto.id);
       }
       window.localStorage.setItem(STORAGE_KEYS.onboardingCompleted, "true");
       trackProductEvent("onboarding_completed_reentry_blocked", {
@@ -1715,7 +1723,9 @@ export function OnboardingFlow() {
         });
 
         if (!pendingOwnPhoto) {
-          setMessage("とどく候補を追加しました。もう一度ねてるねこを入れるととどきます。");
+          setMessage(
+            "とどく候補を追加しました。もう一度ねがおの写真を選ぶと、ねこだよりがとどきます。",
+          );
           setState("intro");
           return;
         }
@@ -1878,13 +1888,13 @@ export function OnboardingFlow() {
             >
               {state === "saving" ? (
                 savingStage === "saving_photo"
-                  ? "ねがおを のこしています"
-                  : "ねこだよりを 迎えています"
+                  ? "写真を保存しています"
+                  : "写真を用意しています"
               ) : (
                 <>
-                  ねがおを入れると
+                  ねがおの写真を1枚選ぶと
                   <br />
-                  ねこだよりが届きます
+                  猫の写真が最大4枚とどく
                 </>
               )}
             </h1>
@@ -1896,9 +1906,9 @@ export function OnboardingFlow() {
                   data-onboarding-lead="true"
                   data-testid="onboarding-exchange-explanation"
                 >
-                  入れたねがおも、確認のあと、
+                  とどいた写真から1枚を選んで保存できます。
                   <br />
-                  どこかのおうちへ届きます。
+                  最初に選んだねがおの写真は、運営確認後にほかの利用者へとどくことがあります。
                 </p>
                 <p
                   style={styles.privacyNote}
@@ -1907,7 +1917,7 @@ export function OnboardingFlow() {
                   <span aria-hidden="true" style={styles.privacyNoteIcon}>
                     <LockIcon size={14} />
                   </span>
-                  ねてるねこの外には公開されません
+                  公開一覧やSNSには表示されません
                 </p>
               </>
             ) : null}
@@ -1926,7 +1936,7 @@ export function OnboardingFlow() {
                   style={styles.onboardingCta}
                   data-onboarding-cta="true"
                 >
-                  ねがおを1枚入れる
+                  ねがおの写真を1枚選ぶ
                 </AppButton>
               </>
             ) : null}
@@ -1939,13 +1949,13 @@ export function OnboardingFlow() {
 
         {state === "naming" ? (
           <section style={styles.result} aria-label="この子の名前">
-            <p style={styles.kicker}>このねがおの子</p>
+            <p style={styles.kicker}>写真に写っている猫</p>
             <h2 style={styles.subTitle}>この子の名前は？</h2>
             {selectedPhotoSrc ? (
               <OnboardingNamePhoto photoSrc={selectedPhotoSrc} />
             ) : null}
             <p style={styles.resultText}>
-              名前だけで大丈夫です。あとから変えられます。
+              名前はあとから登録・変更できます。
             </p>
             <form
               style={styles.nameForm}
@@ -1970,7 +1980,7 @@ export function OnboardingFlow() {
                 style={styles.onboardingCta}
                 disabled={isSubmittingRef.current || isContinuing}
               >
-                {isContinuing ? "準備しています…" : "名前を入れて進む"}
+                {isContinuing ? "準備しています…" : "名前を決めて進む"}
               </AppButton>
             </form>
             <AppButton
@@ -1988,7 +1998,7 @@ export function OnboardingFlow() {
         ) : null}
 
         {state === "envelope" && deliveredPhoto ? (
-          <section style={styles.result} aria-label="ねがおがとどいています">
+          <section style={styles.result} aria-label="ねこだよりがとどいています">
             <OnboardingEnvelopeArt />
             <span style={styles.deliveryPhotoPreload} aria-hidden="true">
               <PhotoTile
@@ -2027,14 +2037,14 @@ export function OnboardingFlow() {
         !isDeliveredPhotoKept ? (
           <section
             style={{ ...styles.result, ...styles.deliveredResult }}
-            aria-label={`${deliveredPhotos.length}匹のねこだより`}
+            aria-label={`${deliveredPhotos.length}枚のねこだより`}
             data-testid="onboarding-four-choice"
             data-bundle-id={deliveryBundleId ?? undefined}
           >
             <div style={styles.onboardingFourChoiceLetter}>
               <div style={styles.onboardingDeliveredMasthead}>
                 <p style={styles.onboardingDeliveredTitle}>
-                  {deliveredPhotos.length}匹のねこだより
+                  {deliveredPhotos.length}枚のねこだより
                 </p>
                 <span
                   style={styles.onboardingDeliveredMastheadRule}
@@ -2042,11 +2052,11 @@ export function OnboardingFlow() {
                 />
               </div>
               <p style={styles.onboardingFourChoiceLead}>
-                残したい写真を1枚えらんでください
+                「とどいた」に保存する1枚をえらんでください
               </p>
               <div
                 role="radiogroup"
-                aria-label="残したい猫"
+                aria-label="保存する写真"
                 style={styles.onboardingFourChoiceGrid}
               >
                 {deliveredPhotos.map((photo, index) => {
@@ -2118,7 +2128,7 @@ export function OnboardingFlow() {
               >
                 {isFinalizingDeliveryChoice
                   ? "保存しています…"
-                  : "この写真を保存"}
+                  : "この1枚を保存"}
               </AppButton>
             </div>
           </section>
@@ -2129,7 +2139,7 @@ export function OnboardingFlow() {
         (!hasOnboardingPhotoChoice || isDeliveredPhotoKept) ? (
           <section
             style={{ ...styles.result, ...styles.deliveredResult }}
-            aria-label="とどいたねがお"
+            aria-label="ねこだより"
           >
             <div
               style={styles.onboardingDeliveredLetter}
@@ -2163,7 +2173,7 @@ export function OnboardingFlow() {
                   key={`onboarding-delivery-opened-${revealPhotoRetryKey}`}
                   src={getDeliveredPhotoDisplaySrc(deliveredPhoto)}
                   fallbackSrcs={getExchangePhotoFallbackSrcs(deliveredPhoto)}
-                  alt="届いたねがお"
+                  alt="ねこだより"
                   style={styles.onboardingDeliveredPhoto}
                   storageVariant="display"
                   onStorageDataUrl={handleDeliveredPhotoDataUrl}
@@ -2189,7 +2199,7 @@ export function OnboardingFlow() {
                   style={styles.recoveryPanel}
                 >
                   <p style={styles.recoveryText}>
-                    届いた写真を表示できませんでした。通信を確認して、もう一度お試しください。
+                    ねこだよりを表示できませんでした。通信を確認して、もう一度お試しください。
                   </p>
                   <AppButton
                     type="button"
@@ -2205,15 +2215,14 @@ export function OnboardingFlow() {
               <p style={styles.onboardingDeliveredNote}>
                 {isDeliveredPhotoKept ? (
                   <>
-                    どこかのおうちから届いた一通です。
+                    ほかのおうちからとどいたねこだよりです。
                     <br />
-                    この一通は、
                     <span style={styles.onboardingDeliveredSavedPhrase}>
-                      『とどいた』にしまわれました
+                      「とどいた」に保存しました
                     </span>
                   </>
                 ) : (
-                  "この一通を、しまっています。"
+                  "この写真を保存しています。"
                 )}
               </p>
             </div>
@@ -2229,7 +2238,7 @@ export function OnboardingFlow() {
               style={styles.onboardingDeliveredContinue}
               data-testid="onboarding-delivered-continue"
             >
-              {isContinuing ? "準備しています…" : "ねてるねこを はじめる"}
+              {isContinuing ? "準備しています…" : "ホームへ進む"}
             </AppButton>
             {message ? <p style={styles.message}>{message}</p> : null}
           </section>
@@ -2240,19 +2249,19 @@ export function OnboardingFlow() {
             aria-label="ねがおを保存しました"
             data-delivery-issue={deliveryIssue ?? undefined}
           >
-            <p style={styles.kicker}>ねがおは残っています</p>
+            <p style={styles.kicker}>ねがおは保存されています</p>
             {selectedPhotoSrc ? (
               <img src={selectedPhotoSrc} alt="" style={styles.savedPhoto} />
             ) : null}
-            <h2 style={styles.subTitle}>ねこだよりだけ、もう一度</h2>
+            <h2 style={styles.subTitle}>ねこだよりを読み込めませんでした</h2>
             <p style={styles.resultText}>
               {canShowTestTools
                 ? deliveryIssue === "temporary_error"
                   ? "候補の確認で止まりました。テスト用に、ここで候補を追加できます。"
                   : "とどく候補がまだありません。テスト用に、ここで候補を追加できます。"
                 : deliveryIssue === "no_candidate"
-                  ? "ねこだよりは、まだ迎えられませんでした。少し時間をおいて、もう一度迎えられます。"
-                  : "通信が途中で止まりました。ねがおは消えていません。通信を確認して、もう一度迎えてください。"}
+                  ? "ねこだよりを用意できませんでした。少し時間をおいて、もう一度お試しください。"
+                  : "通信が途中で止まりました。ねがおは保存されています。通信を確認して、もう一度お試しください。"}
             </p>
             {canShowTestTools ? (
               <AppButton
@@ -2278,26 +2287,26 @@ export function OnboardingFlow() {
               data-testid="onboarding-delivery-retry"
             >
               {isRetryingDelivery
-                ? "もう一度迎えています..."
-                : "ねこだよりを もう一度迎える"}
+                ? "読み込んでいます..."
+                : "ねこだよりを もう一度読み込む"}
             </AppButton>
             <AppButton type="button" variant="quiet" size="md" onClick={handleGoHome}>
-              ねてるねこへ
+              ホームへ
             </AppButton>
             {message ? <p style={styles.message}>{message}</p> : null}
           </section>
         ) : null}
 
         {state === "kept" ? (
-          <section style={styles.result} aria-label="しまいました">
-            <p style={styles.kicker}>しまいました</p>
+          <section style={styles.result} aria-label="写真を保存しました">
+            <p style={styles.kicker}>保存しました</p>
             {completionCopy ? (
               <p style={styles.resultText}>{completionCopy}</p>
             ) : null}
             <h2 style={styles.subTitle}>
               また寝ていたら、
               <br />
-              ホームから送れます
+              ホームからねがおの写真を選べます
             </h2>
             <AppButton
               type="button"
@@ -2313,7 +2322,7 @@ export function OnboardingFlow() {
               size="md"
               onClick={markOnboardingAlbumCompletionReady}
             >
-              うちのこを登録する
+              アルバムを作る
             </AppButton>
           </section>
         ) : null}
@@ -2446,7 +2455,7 @@ function DeliveryWaiting({
         <span style={styles.deliveryWaitingText}>
           {stage === "saving_photo"
             ? "写真を読み込んでいます"
-            : "ねがおを のこしました"}
+            : "写真を保存しました"}
         </span>
       </span>
     </div>
@@ -2467,10 +2476,10 @@ function ExternalBrowserGuide({
   onContinue: () => void;
 }) {
   const catIllustrations = useCatIllustrationAssets();
-  const kicker = source === "referral" ? "紹介リンク" : "アプリ内ブラウザ";
+  const kicker = source === "referral" ? "紹介リンク" : "アプリの中でひらいています";
 
   return (
-    <section style={styles.externalBrowserGuide} aria-label="ブラウザで開く案内">
+    <section style={styles.externalBrowserGuide} aria-label="ブラウザでひらく案内">
       <div style={styles.externalBrowserArt} aria-hidden="true">
         <img
           src={catIllustrations.onboardingCat}
@@ -2485,10 +2494,10 @@ function ExternalBrowserGuide({
       <h1 style={styles.title}>
         SafariやChromeで
         <br />
-        開くと安心です
+        つづけられます
       </h1>
       <p style={styles.externalBrowserText}>
-        先にSafariやChromeへ移ると、このあと入れる写真をそのままアプリに残せます。
+        このあと選ぶ写真を、そのまま「ねてるねこ」に保存できます。
       </p>
       {errorMessage ? (
         <p style={styles.externalBrowserCopiedText} role="alert">
@@ -2504,7 +2513,7 @@ function ExternalBrowserGuide({
           onClick={onOpenExternalBrowser}
           style={styles.onboardingCta}
         >
-          {isPreparing ? "つづきを用意しています..." : "Safari／Chromeでつづける"}
+          {isPreparing ? "ブラウザ移動を準備しています..." : "Safari／Chromeでつづける"}
         </AppButton>
         <AppButton
           type="button"
@@ -2513,7 +2522,7 @@ function ExternalBrowserGuide({
           disabled={isPreparing}
           onClick={onContinue}
         >
-          このまま試す
+          このブラウザで先に試す
         </AppButton>
       </div>
       <p style={styles.externalBrowserFallbackText}>
@@ -2978,7 +2987,7 @@ function getOnboardingPhotoInputErrorMessage(
   reason: ImageFileRejectionReason,
 ) {
   if (reason === "missing_file" || reason === "empty_file") {
-    return "写真を受け取れませんでした。もう一度選んでください。";
+    return "写真を読み込めませんでした。もう一度選んでください。";
   }
 
   if (reason === "file_too_large") {

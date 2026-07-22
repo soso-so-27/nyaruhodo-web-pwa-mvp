@@ -443,8 +443,8 @@ function createOmoideCandidate({
     title,
     subtitle:
       reason === "first_seed"
-        ? "はじめての ねがお が 届きました。"
-        : `${title.replace("、きょう。", "")} の ${catName}から 届きました。`,
+        ? "はじめて記録した ねがおです。"
+        : `${catName}の、${title.replace("、きょう。", "")}の ねがおです。`,
     voice:
       reason === "first_seed"
         ? "はじめての、ねがお。"

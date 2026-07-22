@@ -66,6 +66,7 @@ import {
   updateOwnSleepingPhotoDimensions,
   updateOwnSleepingPhotoDelivery,
   type ExchangePhoto,
+  type OwnSleepingPhoto,
 } from "../../lib/home/sleepingPhotos";
 import {
   autoOpenExpiredEveningDeliveries,
@@ -75,8 +76,14 @@ import {
   readEveningDeliveryStore,
 } from "../../lib/home/eveningDelivery";
 import { backupOwnSleepingPhotoMoment } from "../../lib/home/sleepingPhotoBackup";
+import { sendPhotoReport } from "../../lib/home/photoReports";
 import { readOnboardingProgress } from "../../lib/onboarding/progress";
 import { STORAGE_KEYS, readCachedJson, writeCachedJson } from "../../lib/storage";
+
+type OwnPhotoDeliveryPersistResult = {
+  photo: OwnSleepingPhoto;
+  confirmed: boolean;
+};
 import {
   COLLECTION_GROUPS,
   type CollectionGroup,
@@ -402,6 +409,7 @@ export function CollectionPage() {
   const trackedViewCatIdRef = useRef<string | null>(null);
   const trackedDailyTargetRef = useRef<string | null>(null);
   const hasMigratedOnboardingDeliveryRef = useRef(false);
+  const pendingOwnPhotoActionsRef = useRef(new Set<string>());
 
   useEffect(() => {
     const profiles = readCatProfiles();
@@ -892,17 +900,163 @@ export function CollectionPage() {
     });
   }
 
-  function handleToggleMainichiSleepingDelivery(photo: MainichiDayPhoto) {
+  async function persistOwnSleepingPhotoDelivery(
+    photoId: string,
+    nextShared: boolean,
+  ): Promise<OwnPhotoDeliveryPersistResult | null> {
+    if (pendingOwnPhotoActionsRef.current.has(photoId)) {
+      showToast("写真の保存状態を更新しています。完了してから、もう一度お試しください。");
+      return null;
+    }
+
+    pendingOwnPhotoActionsRef.current.add(photoId);
+
+    try {
+      const currentPhoto = readOwnSleepingPhotosForAlbum().find(
+        (candidate) => candidate.id === photoId,
+      );
+
+      if (!currentPhoto) {
+        showToast(
+          "写真の保存状態を確認できませんでした。画面をひらき直して、もう一度お試しください。",
+        );
+        return null;
+      }
+
+      if (nextShared) {
+        const updatedPhoto = updateOwnSleepingPhotoDelivery(photoId, true);
+
+        if (!updatedPhoto) {
+          showToast(
+            "ねこだよりに変更できませんでした。写真は自分だけのままです。画面をひらき直して、もう一度お試しください。",
+          );
+          return null;
+        }
+
+        const backupResult = await backupOwnSleepingPhotoMoment(updatedPhoto);
+
+        if (!backupResult.ok) {
+          const previousShared =
+            currentPhoto.shared ?? currentPhoto.visibility === "shared";
+          const previousPhoto = {
+            ...currentPhoto,
+            shared: previousShared,
+            visibility: previousShared ? ("shared" as const) : ("private" as const),
+          };
+          const compensationResult = await backupOwnSleepingPhotoMoment(previousPhoto);
+          const restoredPhoto = compensationResult.ok
+            ? updateOwnSleepingPhotoDelivery(photoId, previousShared)
+            : null;
+          showToast(
+            restoredPhoto
+              ? "ねこだよりに変更できませんでした。写真は自分だけのままです。通信を確認して、もう一度お試しください。"
+              : "変更結果を確認できませんでした。安全のため、ねこだよりの候補として表示しています。通信を確認して「自分だけにする」を押してください。",
+          );
+          return restoredPhoto
+            ? null
+            : {
+                photo: updatedPhoto,
+                confirmed: false,
+              };
+        }
+
+        return {
+          photo: updatedPhoto,
+          confirmed: true,
+        };
+      }
+
+      const backupResult = await backupOwnSleepingPhotoMoment({
+        ...currentPhoto,
+        shared: false,
+        visibility: "private",
+      });
+
+      if (!backupResult.ok) {
+        showToast(
+          "自分だけに変更できませんでした。写真はねこだよりの候補のままです。通信を確認して、もう一度お試しください。",
+        );
+        return null;
+      }
+
+      const updatedPhoto = updateOwnSleepingPhotoDelivery(photoId, false);
+
+      if (!updatedPhoto) {
+        showToast(
+          "写真は自分だけに変更しましたが、この端末の表示を更新できませんでした。画面をひらき直してください。",
+        );
+        return null;
+      }
+
+      return {
+        photo: updatedPhoto,
+        confirmed: true,
+      };
+    } finally {
+      pendingOwnPhotoActionsRef.current.delete(photoId);
+    }
+  }
+
+  async function deleteOwnSleepingPhotoAfterAccount(photoId: string) {
+    if (pendingOwnPhotoActionsRef.current.has(photoId)) {
+      showToast("写真の保存状態を更新しています。完了してから、もう一度お試しください。");
+      return false;
+    }
+
+    pendingOwnPhotoActionsRef.current.add(photoId);
+
+    try {
+      try {
+        await deleteAccountSleepingPhoto(photoId);
+      } catch (error) {
+        const needsLogin =
+          error instanceof Error && error.message.includes("session missing");
+        showToast(
+          needsLogin
+            ? "ログイン状態を確認できないため、写真を削除できませんでした。ログインして、もう一度お試しください。"
+            : "写真を削除できませんでした。写真は残っています。通信を確認して、もう一度お試しください。",
+        );
+        return false;
+      }
+
+      const deletedLocally = await deleteOwnSleepingPhoto(photoId);
+      if (!deletedLocally) {
+        showToast(
+          "この端末の写真を削除できませんでした。写真は残っています。画面をひらき直して、もう一度お試しください。",
+        );
+        return false;
+      }
+      const remainsLocally = readOwnSleepingPhotosForAlbum().some(
+        (candidate) => candidate.id === photoId,
+      );
+
+      if (remainsLocally) {
+        showToast(
+          "この端末の写真を削除できませんでした。写真は残っています。画面をひらき直して、もう一度お試しください。",
+        );
+        return false;
+      }
+
+      return true;
+    } finally {
+      pendingOwnPhotoActionsRef.current.delete(photoId);
+    }
+  }
+
+  async function handleToggleMainichiSleepingDelivery(photo: MainichiDayPhoto) {
     if (photo.kind !== "sleeping") {
       return;
     }
 
     const nextShared = !photo.shared;
-    const updatedPhoto = updateOwnSleepingPhotoDelivery(photo.id, nextShared);
+    const result = await persistOwnSleepingPhotoDelivery(photo.id, nextShared);
 
-    if (updatedPhoto) {
-      void backupOwnSleepingPhotoMoment(updatedPhoto);
+    if (!result) {
+      return;
     }
+
+    const displayedShared =
+      result.photo.shared ?? result.photo.visibility === "shared";
 
     setBoxRefreshTick((value) => value + 1);
     setSelectedMainichiViewer((current) =>
@@ -911,32 +1065,43 @@ export function CollectionPage() {
             ...current,
             photos: current.photos.map((candidate) =>
               candidate.kind === "sleeping" && candidate.id === photo.id
-                ? { ...candidate, shared: nextShared }
+                ? { ...candidate, shared: displayedShared }
                 : candidate,
             ),
           }
         : current,
     );
-    showToast(nextShared ? "ねこだよりに使うようにしました" : "自分だけにしました");
+
+    if (!result.confirmed) {
+      return;
+    }
+
+    showToast(
+      displayedShared
+        ? "ねこだよりの候補として運営確認に送りました"
+        : "自分だけの写真にしました",
+    );
     trackProductEvent(
       "collection_mainichi_sleeping_delivery_toggled",
       {
         photo_id: photo.id,
-        shared: nextShared,
+        shared: displayedShared,
       },
       { localCatId: activeCatId },
     );
   }
 
-  function handleDeleteMainichiSleepingPhoto(photo: MainichiDayPhoto) {
+  async function handleDeleteMainichiSleepingPhoto(photo: MainichiDayPhoto) {
     if (photo.kind !== "sleeping") {
       return;
     }
 
-    deleteOwnSleepingPhoto(photo.id);
-    void deleteAccountSleepingPhoto(photo.id).catch(() => {
-      // Local delete should still feel immediate; restore checks expose remote issues.
-    });
+    const wasDeleted = await deleteOwnSleepingPhotoAfterAccount(photo.id);
+
+    if (!wasDeleted) {
+      return;
+    }
+
     setBoxRefreshTick((value) => value + 1);
     setSelectedMainichiViewer((current) => {
       if (!current) {
@@ -957,7 +1122,7 @@ export function CollectionPage() {
         index: Math.min(current.index, photos.length - 1),
       };
     });
-    showToast("ねこだよりから外しました");
+    showToast("写真を削除しました");
     trackProductEvent(
       "collection_mainichi_sleeping_photo_deleted",
       { photo_id: photo.id },
@@ -992,9 +1157,7 @@ export function CollectionPage() {
       }
     }
 
-    void hideAccountKeptExchangePhoto(photo.id, reason).catch(() => {
-      // Local hide/report should stay instant even if the account sync retries later.
-    });
+    void hideAccountKeptExchangePhoto(photo.id, reason).catch(() => undefined);
     setBoxRefreshTick((value) => value + 1);
     setSelectedMainichiViewer((current) => {
       if (!current) {
@@ -1023,11 +1186,20 @@ export function CollectionPage() {
         index: Math.min(current.index, photos.length - 1),
       };
     });
-    showToast(
-      reason === "report"
-        ? "通報してねこだよりから外しました"
-        : "ねこだよりから外しました",
-    );
+    if (reason === "report") {
+      showToast("この写真を「とどいた」から外し、運営へ報告しています");
+      void sendPhotoReport(exchangePhoto, "other")
+        .then(() => {
+          showToast("運営に報告し、この写真を「とどいた」から外しました");
+        })
+        .catch(() => {
+          showToast(
+            "この写真は「とどいた」から外しましたが、運営に報告できませんでした。必要な場合は設定の「問い合わせ」からお知らせください。",
+          );
+        });
+    } else {
+      showToast("「とどいた」から外しました");
+    }
     trackProductEvent(
       "collection_mainichi_delivered_photo_hidden",
       {
@@ -1048,36 +1220,49 @@ export function CollectionPage() {
     }
   }
 
-  function handleToggleSleepingPhotoDelivery(photo: BoxPreviewPhoto) {
+  async function handleToggleSleepingPhotoDelivery(photo: BoxPreviewPhoto) {
     const nextShared = !photo.shared;
+    const result = await persistOwnSleepingPhotoDelivery(photo.id, nextShared);
 
-    const updatedPhoto = updateOwnSleepingPhotoDelivery(photo.id, nextShared);
-
-    if (updatedPhoto) {
-      void backupOwnSleepingPhotoMoment(updatedPhoto);
+    if (!result) {
+      return;
     }
+
     setBoxRefreshTick((value) => value + 1);
-    showToast(nextShared ? "とどくようにしました" : "自分だけにしました");
+
+    if (!result.confirmed) {
+      return;
+    }
+
+    const displayedShared =
+      result.photo.shared ?? result.photo.visibility === "shared";
+    showToast(
+      displayedShared
+        ? "ねこだよりの候補として運営確認に送りました"
+        : "自分だけの写真にしました",
+    );
     trackProductEvent(
       "collection_sleeping_photo_delivery_toggled",
       {
         photo_id: photo.id,
-        shared: nextShared,
+        shared: displayedShared,
       },
       { localCatId: activeCatId },
     );
   }
 
-  function handleDeleteSleepingPhoto(photo: BoxPreviewPhoto) {
-    deleteOwnSleepingPhoto(photo.id);
-    void deleteAccountSleepingPhoto(photo.id).catch(() => {
-      // Local delete should still feel immediate; restore checks expose remote issues.
-    });
+  async function handleDeleteSleepingPhoto(photo: BoxPreviewPhoto) {
+    const wasDeleted = await deleteOwnSleepingPhotoAfterAccount(photo.id);
+
+    if (!wasDeleted) {
+      return;
+    }
+
     setBoxRefreshTick((value) => value + 1);
     setCurrentBoxPhotoIndex((current) =>
       Math.max(0, Math.min(current, sleepingBoxPhotos.length - 2)),
     );
-    showToast("とったねがおから外しました");
+    showToast("写真を削除しました");
     trackProductEvent(
       "collection_sleeping_photo_deleted",
       { photo_id: photo.id },
@@ -1087,14 +1272,25 @@ export function CollectionPage() {
 
   function handleHideOtherPhoto(photo: BoxPreviewPhoto, reason: "hide" | "report") {
     hideKeptExchangePhoto(photo.id, reason);
-    void hideAccountKeptExchangePhoto(photo.id, reason).catch(() => {
-      // Local hide/report should stay instant even if the account sync retries later.
-    });
+    void hideAccountKeptExchangePhoto(photo.id, reason).catch(() => undefined);
     setBoxRefreshTick((value) => value + 1);
     setCurrentBoxPhotoIndex((current) =>
       Math.max(0, Math.min(current, otherBoxPhotos.length - 2)),
     );
-    showToast(reason === "report" ? "通報して非表示にしました" : "アルバムから外しました");
+    if (reason === "report") {
+      showToast("この写真を「とどいた」から外し、運営へ報告しています");
+      void sendPhotoReport(createExchangePhotoFromBoxPhoto(photo), "other")
+        .then(() => {
+          showToast("運営に報告し、この写真を「とどいた」から外しました");
+        })
+        .catch(() => {
+          showToast(
+            "この写真は「とどいた」から外しましたが、運営に報告できませんでした。必要な場合は設定の「問い合わせ」からお知らせください。",
+          );
+        });
+    } else {
+      showToast("「とどいた」から外しました");
+    }
     trackProductEvent(
       "collection_other_photo_hidden",
       {
@@ -1811,12 +2007,12 @@ function MainichiSideTabs({
   onSideChange: (side: MainichiBoardSide) => void;
 }) {
   const tabs = [
-    { value: "sent" as const, label: "おくった" },
+    { value: "sent" as const, label: "わたしのねがお" },
     { value: "delivered" as const, label: "とどいた" },
   ];
 
   return (
-    <div style={styles.mainichiBoardTabs} role="tablist" aria-label="ねこだよりの面">
+    <div style={styles.mainichiBoardTabs} role="tablist" aria-label="写真の種類">
       {tabs.map((tab) => {
         const selected = activeSide === tab.value;
 
@@ -1846,7 +2042,7 @@ function MainichiBoardEmptyState({ activeSide }: { activeSide: MainichiBoardSide
   const isSent = activeSide === "sent";
 
   return (
-    <section style={styles.mainichiBoardEmpty} aria-label="ねこだよりの空の状態">
+    <section style={styles.mainichiBoardEmpty} aria-label="写真がない状態">
       <span style={styles.mainichiBoardEmptyStack} aria-hidden="true">
         <span
           style={{
@@ -1869,7 +2065,9 @@ function MainichiBoardEmptyState({ activeSide }: { activeSide: MainichiBoardSide
           <AppIcon name={isSent ? "camera" : "mail"} size={19} />
         </span>
       </span>
-      <p style={styles.mainichiBoardEmptyTitle}>{isSent ? "最初の一枚へ" : "届いたら、ここに"}</p>
+      <p style={styles.mainichiBoardEmptyTitle}>
+        {isSent ? "まだねがおはありません" : "選んで保存した写真がここに並びます"}
+      </p>
       <AppButton
         href="/home"
         variant="secondary"
@@ -1877,7 +2075,7 @@ function MainichiBoardEmptyState({ activeSide }: { activeSide: MainichiBoardSide
         iconStart={<AppIcon name={isSent ? "camera" : "home"} size={14} />}
         style={styles.mainichiBoardEmptyButton}
       >
-        {isSent ? "きょうへ" : "ホームへ"}
+        {isSent ? "ねがおを とる" : "ホームへ"}
       </AppButton>
     </section>
   );
@@ -2189,7 +2387,7 @@ function MainichiNaturalMonthBoard({
                   photoKey: key,
                 });
               }}
-              aria-label={photo.side === "sent" ? "おくった ねがおをひらく" : "とどいた ねがおをひらく"}
+              aria-label={photo.side === "sent" ? "わたしのねがおをひらく" : "ねこだよりをひらく"}
             >
               <StoredPhotoImage
                 src={photo.boardSrc}
@@ -2591,7 +2789,7 @@ function MainichiBoardPhotoCard({
       whileTap={cardMotion.whileTap}
       transition={cardMotion.transition}
       onClick={handleClick}
-      aria-label={photo.side === "sent" ? "おくった ねがおをひらく" : "とどいた ねがおをひらく"}
+      aria-label={photo.side === "sent" ? "わたしのねがおをひらく" : "ねこだよりをひらく"}
     >
       {showTape ? (
         <motion.span
@@ -2880,26 +3078,26 @@ function MainichiFullscreenPhoto({
   const canNavigate = photoCount > 1;
   const deliveryActionLabel = photo.shared
     ? "自分だけにする"
-    : "ねこだよりに使う";
+    : "ねこだよりにする";
   const pendingActionCopy =
     pendingAction === "delete"
       ? {
-          title: "このねがおを削除しますか",
-          text: "この写真は、とったねがおから削除され、ねこだよりの候補からも外れます。",
+          title: "この写真を削除しますか",
+          text: "この写真は「わたしのねがお」から削除され、今後のねこだよりには使われません。すでにほかの人へとどいたねこだよりは、その人の「とどいた」に残ります。",
           confirm: "削除",
           variant: "danger" as const,
         }
       : pendingAction === "report"
         ? {
-            title: "この写真を通報しますか",
-            text: "この写真はあなたのねこだよりに表示されなくなり、確認対象として送られます。",
-            confirm: "通報",
+            title: "運営に報告しますか",
+            text: "この写真は「とどいた」から外れ、運営の確認対象になります。",
+            confirm: "報告",
             variant: "danger" as const,
           }
         : pendingAction === "hide"
           ? {
-              title: "ねこだよりから外しますか",
-              text: "この写真はあなたのねこだよりに表示されなくなります。写真そのものや相手側の記録は削除されません。",
+              title: "「とどいた」から外しますか",
+              text: "この写真は「とどいた」に表示されなくなります。写真そのものや相手側の記録は削除されません。",
               confirm: "外す",
               variant: "secondary" as const,
             }
@@ -3120,8 +3318,8 @@ function MainichiFullscreenPhoto({
               variant="ghost"
               size="icon"
               iconOnly
-              aria-label="ねこだよりから外す"
-              title="ねこだよりから外す"
+              aria-label="「とどいた」から外す"
+              title="「とどいた」から外す"
               onClick={() => setPendingAction("hide")}
             >
               <AppIcon name="eyeOff" size={18} />
@@ -3131,8 +3329,8 @@ function MainichiFullscreenPhoto({
               variant="danger"
               size="icon"
               iconOnly
-              aria-label="通報"
-              title="通報"
+              aria-label="運営に報告"
+              title="運営に報告"
               onClick={() => setPendingAction("report")}
             >
               <AppIcon name="flag" size={18} />
@@ -3184,19 +3382,19 @@ function BoxPhotoDetailSheet({
     photos[Math.max(0, Math.min(currentPhotoIndex, photos.length - 1))] ?? null;
   const deliveryActionLabel = currentPhoto?.shared
     ? "自分だけにする"
-    : "とどくようにする";
+    : "ねこだよりにする";
   const pendingActionCopy =
     pendingAction === "delete"
       ? {
-          title: "とったねがおから削除しますか",
-          text: "この写真は、とったねがおから削除され、ねこだよりの候補からも外れます。",
+          title: "この写真を削除しますか",
+          text: "この写真は「わたしのねがお」から削除され、今後のねこだよりには使われません。すでにほかの人へとどいたねこだよりは、その人の「とどいた」に残ります。",
           confirm: "削除",
           variant: "danger" as const,
         }
       : pendingAction === "hide"
         ? {
-            title: "アルバムから外しますか",
-            text: "この写真は、この端末のアルバムに表示されなくなります。写真そのものや相手側の記録は削除されません。",
+            title: "「とどいた」から外しますか",
+            text: "この写真は「とどいた」に表示されなくなります。写真そのものや相手側の記録は削除されません。",
             confirm: "外す",
             variant: "secondary" as const,
           }
@@ -3260,7 +3458,9 @@ function BoxPhotoDetailSheet({
       ) : (
         <div style={styles.photoEmpty}>
           <span style={styles.photoEmptyText}>
-            {kind === "sleeping" ? "ねがおをとると、ここに並びます" : "しまうと、ここに並びます"}
+            {kind === "sleeping"
+              ? "ねがおを とると、ここに並びます"
+              : "「とどいた」に保存すると、ここに並びます"}
           </span>
         </div>
       )}
@@ -3285,8 +3485,8 @@ function BoxPhotoDetailSheet({
               </AppButton>
               <AppButton
                 type="button"
-                aria-label="とったねがおから外す"
-                title="とったねがおから外す"
+                aria-label="写真を削除"
+                title="写真を削除"
                 variant="danger"
                 size="icon"
                 iconOnly
@@ -3301,8 +3501,8 @@ function BoxPhotoDetailSheet({
             <div style={styles.boxIconActionBar} aria-label="写真の操作">
               <AppButton
                 type="button"
-                aria-label="アルバムから外す"
-                title="アルバムから外す"
+                aria-label="「とどいた」から外す"
+                title="「とどいた」から外す"
                 variant="danger"
                 size="icon"
                 iconOnly
@@ -3339,7 +3539,7 @@ function CollectionViewTabs({
   const tabs: Array<{ key: CollectionView; label: string }> = [
     { key: "collect", label: "とったねがお" },
     { key: "album", label: "おきてる写真" },
-    { key: "share", label: "とどいたねがお" },
+    { key: "share", label: "とどいた" },
   ];
 
   return (
@@ -3461,7 +3661,7 @@ function CollectionShareView({
         <p style={styles.shareEmptyTitle}>まだ写真がありません</p>
         <p style={styles.shareEmptyText}>写真を見つけると、ここに自分の一枚が並びます。</p>
         <AppButton type="button" variant="primary" fullWidth onClick={onGoCollect}>
-          写真を入れる
+          写真を選ぶ
         </AppButton>
       </AppCard>
     );
@@ -3796,7 +3996,7 @@ function CollectionPhotoSheet({
         </div>
       ) : (
         <div style={styles.photoEmpty}>
-          <span style={styles.photoEmptyText}>見つけたら写真を入れる</span>
+          <span style={styles.photoEmptyText}>写真を選ぶと、ここに表示されます</span>
         </div>
       )}
 
@@ -4179,7 +4379,7 @@ function buildMainichiDayPhotos(
         offlineSrc: photo.offlineSrc,
         timestamp: photo.timestamp,
         kind: "sleeping" as const,
-        sideLabel: "おくった",
+        sideLabel: "わたしのねがお",
         catName: catId ? catNameById.get(catId) : undefined,
         shared: photo.shared,
       };
@@ -4222,11 +4422,30 @@ function createExchangePhotoFromDayPhoto(photo: MainichiDayPhoto): ExchangePhoto
     offlineSrc: photo.offlineSrc,
     width: photo.width,
     height: photo.height,
-    title: "とどいたねがお",
+    title: "ねこだより",
     subtitle: "",
     triggerLabel: "mainichi",
     theme: "mainichi",
     deliveredAt: photo.deliveredAt ?? photo.timestamp,
+  };
+}
+
+function createExchangePhotoFromBoxPhoto(photo: BoxPreviewPhoto): ExchangePhoto {
+  return {
+    id: photo.id,
+    sourcePhotoId: photo.sourcePhotoId,
+    src: getPhotoDetailSrc(photo),
+    thumbnailSrc: photo.thumbnailSrc,
+    displaySrc: photo.displaySrc,
+    originalSrc: photo.originalSrc,
+    offlineSrc: photo.offlineSrc,
+    width: photo.width,
+    height: photo.height,
+    title: "ねこだより",
+    subtitle: "",
+    triggerLabel: "collection",
+    theme: "mainichi",
+    deliveredAt: photo.deliveredAt ?? photo.createdAt ?? Date.now(),
   };
 }
 

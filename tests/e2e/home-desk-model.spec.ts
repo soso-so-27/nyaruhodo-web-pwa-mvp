@@ -232,14 +232,16 @@ test.describe("home desk model", () => {
       "sent-before",
     );
     await expect(page.getByTestId("desk-home-frame")).toBeVisible();
-    await expect(page.getByText("おくった")).toBeVisible();
-    await expect(page.getByText("よる8時に とどく").first()).toBeVisible();
+    await expect(page.getByText("ねがおを保存しました")).toBeVisible();
+    await expect(
+      page.getByText("よる8時ごろ、ねこだよりがとどきます"),
+    ).toBeVisible();
     await expect(page.getByTestId("home-retake-action")).toBeVisible();
     await expect(page.getByTestId("home-retake-action")).toHaveText("とりなおす");
     await expect(
       page.getByText("きょうの一枚を、よる8時のねこだよりに。"),
     ).toHaveCount(0);
-    await expect(page.getByText("この子の写真をしまう")).toHaveCount(0);
+    await expect(page.getByText("この子の写真を追加")).toHaveCount(0);
     await expect(page.getByTestId("desk-letter")).toHaveCount(0);
     await expect(page.getByTestId("today-pair-nav-icon")).toBeVisible();
     await expect(page.getByTestId("today-pair-nav-slot")).toHaveCount(2);
@@ -248,6 +250,14 @@ test.describe("home desk model", () => {
       expect(box?.width).toBeGreaterThanOrEqual(8);
       expect(box?.height).toBeGreaterThanOrEqual(11);
     }
+    await page
+      .getByRole("button", { name: "むぎのきょうのねがおを大きく見る" })
+      .click();
+    await expect(
+      page.getByText(
+        "「わたしのねがお」に自分だけで保存しています",
+      ),
+    ).toBeVisible();
   });
 
   test("hydrates the clock-dependent home state without mismatch warnings", async ({
@@ -362,7 +372,9 @@ test.describe("home desk model", () => {
     await page.waitForLoadState("networkidle");
 
     await expect(page.getByText("もうすぐ、とどく")).toHaveCount(0);
-    await expect(page.getByText("よる8時に とどく")).toBeVisible();
+    await expect(
+      page.getByText("よる8時ごろ、ねこだよりがとどきます"),
+    ).toBeVisible();
 
     await page.evaluate(() => {
       const [year, month, day] = new Date(Date.now() + 9 * 60 * 60 * 1000)
@@ -375,7 +387,9 @@ test.describe("home desk model", () => {
       );
     });
     await expect(page.getByText("もうすぐ、とどく")).toHaveCount(0);
-    await expect(page.getByText("よる8時に とどく")).toBeVisible();
+    await expect(
+      page.getByText("よる8時ごろ、ねこだよりがとどきます"),
+    ).toBeVisible();
 
     await page.evaluate(() => {
       const [year, month, day] = new Date(Date.now() + 9 * 60 * 60 * 1000)
@@ -408,8 +422,8 @@ test.describe("home desk model", () => {
     await page.goto("/home");
     await page.waitForLoadState("networkidle");
 
-    await expect(page.getByText("きのうの一通は")).toBeVisible();
-    await expect(page.getByText("『とどいた』に しまいました")).toBeVisible();
+    await expect(page.getByText("きのう選んだ写真は")).toBeVisible();
+    await expect(page.getByText("「とどいた」に保存しました")).toBeVisible();
     await expect(page.getByTestId("desk-open-letter")).toHaveCount(0);
     await expect(page.getByTestId("evening-opening-pair")).toHaveCount(0);
   });
@@ -426,7 +440,9 @@ test.describe("home desk model", () => {
     await page.waitForLoadState("networkidle");
 
     await expect(page.getByText("もうすぐ、とどく")).toHaveCount(0);
-    await expect(page.getByText("よる8時に とどく")).toBeVisible();
+    await expect(
+      page.getByText("よる8時ごろ、ねこだよりがとどきます"),
+    ).toBeVisible();
     await expect(page.getByTestId("desk-letter")).toHaveCount(0);
     await expect(page.getByTestId("desk-letter-hint")).toHaveCount(0);
   });
@@ -448,9 +464,11 @@ test.describe("home desk model", () => {
     await page.waitForLoadState("networkidle");
 
     await expect(page.getByText("きょうも すやすや")).toHaveCount(0);
-    await expect(page.getByText("ねがおを入れる")).toBeVisible();
+    await expect(page.getByText("ねがおを とる", { exact: true })).toBeVisible();
     await expect(
-      page.getByText("きょうの一枚を、よる8時のねこだよりに。"),
+      page.getByText(
+        "「ねこだよりにする」で保存すると、よる8時ごろねこだよりがとどきます。",
+      ),
     ).toBeVisible();
     await expect(
       page.locator('img[src$="/theme-e5-direction/muted.webp"]'),
@@ -461,7 +479,7 @@ test.describe("home desk model", () => {
         .locator('img[src$="/icons/bottom-nav-today.webp"]'),
     ).toBeVisible();
     await expect(page.getByText("ねてない子は、アルバムへ")).toHaveCount(0);
-    await expect(page.getByText("この子の写真をしまう")).toHaveCount(0);
+    await expect(page.getByText("この子の写真を追加")).toHaveCount(0);
     await expect(page.getByTestId("desk-letter")).toHaveCount(0);
     await expect(page.getByTestId("desk-empty-frame")).toHaveCSS(
       "border-style",
@@ -528,7 +546,9 @@ test.describe("home desk model", () => {
 
     await expect(page.getByTestId("onboarding-second-photo-invitation")).toHaveCount(0);
     await expect(page).not.toHaveURL(/from=onboarding_second_photo/);
-    await expect(page.getByText("よる8時に とどく", { exact: true })).toBeVisible();
+    await expect(
+      page.getByText("よる8時ごろ、ねこだよりがとどきます", { exact: true }),
+    ).toBeVisible();
   });
 
   test("opens a full iOS store and compacts duplicate photo sources", async ({
@@ -760,7 +780,9 @@ test.describe("home desk model", () => {
     );
     await expect(page.getByTestId("desk-empty-frame")).toBeVisible();
     await expect(page.getByTestId("desk-letter")).toHaveCount(0);
-    await expect(page.getByText("また、あした")).toBeVisible();
+    await expect(page.getByTestId("home-letter-tray")).toContainText(
+      "保存すると、次のよる8時ごろにねこだよりがとどきます",
+    );
     await expect(page.getByText("きょうは とどかない")).toHaveCount(0);
   });
 
@@ -939,20 +961,22 @@ test.describe("home desk model", () => {
     await expect(letter.locator('[data-envelope-art="simple"]')).toHaveCount(0);
 
     const openingPair = page.getByTestId("evening-opening-pair");
-    await expect(openingPair.getByText("ねこだより")).toBeVisible();
+    await expect(openingPair.getByTestId("evening-opening-masthead")).toHaveText(
+      "ねこだより",
+    );
     await expect(openingPair.locator("img")).toHaveCount(1);
     await expect(openingPair).toContainText(
-      "この一通は、『とどいた』にしまわれました",
+      "この写真は、「とどいた」に保存しました",
     );
     await expect(openingPair).toContainText(
-      "どこかのおうちから届いた一通です。",
+      "どこかのおうちからとどいたねこだよりです。",
     );
     await expect(openingPair.getByRole("button", { name: "閉じる" })).toHaveCount(
       0,
     );
     await expect(openingPair.locator("button")).toHaveCount(1);
     await expect(
-      openingPair.getByRole("button", { name: "また、あした" }),
+      openingPair.getByRole("button", { name: "ホームへ" }),
     ).toBeVisible();
     await page.screenshot({
       path: "artifacts/home-evening-opening.png",
@@ -1069,7 +1093,7 @@ test.describe("home desk model", () => {
     await expect(openingPair.getByRole("button", { name: "閉じる" })).toHaveCount(
       0,
     );
-    await openingPair.getByRole("button", { name: "また、あした" }).click();
+    await openingPair.getByRole("button", { name: "ホームへ" }).click();
 
     await expect(page.getByTestId("evening-opening-flyer")).toHaveCount(0);
     await expect(page.getByTestId("evening-opening-pair")).toHaveCount(0);
@@ -1088,7 +1112,7 @@ test.describe("home desk model", () => {
     await expect(openingPair.getByRole("button", { name: "閉じる" })).toHaveCount(
       0,
     );
-    await openingPair.getByRole("button", { name: "また、あした" }).click();
+    await openingPair.getByRole("button", { name: "ホームへ" }).click();
 
     const flyer = page.getByTestId("evening-opening-flyer");
     await expect(flyer).toHaveCount(0);
@@ -1178,7 +1202,7 @@ test.describe("home desk model", () => {
     await expect(openingPair).toHaveAttribute("data-photo-id", "delivered-desk");
     const closeButton = openingPair.getByTestId("evening-opening-tomorrow");
     await expect(closeButton).toHaveAttribute("data-stow-state", "stowed");
-    await expect(closeButton).toHaveText("また、あした");
+    await expect(closeButton).toHaveText("ホームへ");
     await expect
       .poll(() =>
         page.evaluate(() => {
@@ -1326,7 +1350,7 @@ test.describe("home desk model", () => {
     await page.getByTestId("desk-open-letter").click();
     const deliveredPhoto = page
       .getByTestId("evening-opening-photo-frame")
-      .locator('img[alt="届いたねがお"]');
+      .locator('img[alt="ねこだより"]');
 
     await expect
       .poll(() =>
@@ -1626,7 +1650,7 @@ async function seedDeskState(
               lookback: "week",
               reason: "same_day",
               title: "1週間前の、きょう",
-              subtitle: "1週間前の むぎから 届きました。",
+              subtitle: "1週間前の むぎから ねがおが とどきました。",
               voice: "1回目の 夏の、ある日。",
               bridge: "あれから、7日。",
               deliveredAt:

@@ -1,5 +1,7 @@
 import { expect, test, type Locator, type Page } from "@playwright/test";
 
+import { sendPhotoReport } from "../../src/lib/home/photoReports";
+
 /**
  * Proposed four-choice UI/API contract used by this specification:
  *
@@ -11,8 +13,8 @@ import { expect, test, type Locator, type Page } from "@playwright/test";
  * - Exchange response: `experienceVersion: "evening_choice_v1"`, `bundleId`,
  *   `photos`, plus the legacy-compatible `photo` field.
  *
- * The onboarding instant delivery is intentionally outside this specification;
- * it remains a single-photo experience.
+ * Onboarding has its own server-confirmed four-choice flow and is covered by
+ * onboarding-delivery-flow.spec.ts.
  */
 
 const DATE_KEY = "2026-07-22";
@@ -35,8 +37,33 @@ const fourCandidates = Array.from({ length: 4 }, (_, index) => ({
   deliveredAt: AFTER_DELIVERY + index,
 }));
 
-test.describe("20時便の4匹選択", () => {
-  test("4匹から選んだ1匹だけを保存し、再読込後も選択結果を保つ", async ({
+test("photo report client requires an explicit JSON success response", async () => {
+  const originalFetch = globalThis.fetch;
+
+  try {
+    globalThis.fetch = async () =>
+      new Response(JSON.stringify({ ok: true }), { status: 200 });
+    await expect(
+      sendPhotoReport(fourCandidates[0]!, "other"),
+    ).resolves.toBeUndefined();
+
+    globalThis.fetch = async () =>
+      new Response(JSON.stringify({ ok: false }), { status: 200 });
+    await expect(sendPhotoReport(fourCandidates[0]!, "other")).rejects.toThrow(
+      "Photo report failed with 200",
+    );
+
+    globalThis.fetch = async () => new Response("not-json", { status: 200 });
+    await expect(sendPhotoReport(fourCandidates[0]!, "other")).rejects.toThrow(
+      "Photo report failed with 200",
+    );
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test.describe("20時便の4枚選択", () => {
+  test("4枚から選んだ1枚だけを保存し、再読込後も選択結果を保つ", async ({
     page,
   }) => {
     await seedPendingEveningDelivery(page, "save-and-reload");
@@ -178,7 +205,7 @@ test.describe("20時便の4匹選択", () => {
     );
   });
 
-  test("閉じても同じ4匹と仮選択を保ち、封筒から再開できる", async ({
+  test("閉じても同じ4枚と仮選択を保ち、ホームから再開できる", async ({
     page,
   }) => {
     await page.setViewportSize({ width: 320, height: 568 });
@@ -255,7 +282,7 @@ test.describe("20時便の4匹選択", () => {
     expect(readExchangeCalls()).toBe(1);
   });
 
-  test("明示的に保存しないを選ぶと、4匹を残さず今夜分を終了する", async ({
+  test("明示的に保存しないを選ぶと、4枚を残さず今夜分を終了する", async ({
     page,
   }) => {
     await seedPendingEveningDelivery(page, "skip-without-saving");
@@ -286,11 +313,13 @@ test.describe("20時便の4匹選択", () => {
       "data-phase",
       "empty-after",
     );
-    await expect(page.getByText("また、あした")).toBeVisible();
+    await expect(page.getByTestId("home-letter-tray")).toContainText(
+      "保存すると、次のよる8時ごろにねこだよりがとどきます",
+    );
     await expect(page.getByText("きょうは とどかない")).toHaveCount(0);
   });
 
-  test("期限後に戻っても古い4匹を取得せず、その日の便を終了する", async ({
+  test("期限後に戻っても古い4枚を取得せず、その日の便を終了する", async ({
     page,
   }) => {
     await seedPendingEveningDelivery(
@@ -351,6 +380,9 @@ test.describe("20時便の4匹選択", () => {
       .poll(() => readReportedPhotoIds(page))
       .toContain(reportedPhotoId);
     await expect.poll(() => reportedRequests.length).toBe(1);
+    await expect(
+      page.getByText("運営に報告し、この写真を今回の選択から外しました"),
+    ).toBeVisible();
     expect(reportedRequests[0]).toMatchObject({
       photoId: reportedPhotoId,
       sourcePhotoId: "four-choice-source-2",
@@ -466,7 +498,7 @@ test.describe("20時便の4匹選択", () => {
     await expect.poll(() => readEveningDraftSelection(page)).toBe(selectedPhotoId);
   });
 
-  test("確定済みbundleの再取得では4匹を再表示しない", async ({ page }) => {
+  test("確定済みbundleの再取得では4枚を再表示しない", async ({ page }) => {
     const selectedPhotoId = "four-choice-delivery-2";
     await seedPendingEveningDelivery(page, "resolved-bundle-replay");
     await mockFourChoiceExchange(page, {
@@ -509,7 +541,7 @@ test.describe("20時便の4匹選択", () => {
     await expect(page.getByTestId("desk-open-letter")).toHaveCount(0);
   });
 
-  test("候補が3匹になっても有効な確定写真を復元する", async ({ page }) => {
+  test("候補が3枚になっても有効な確定写真を復元する", async ({ page }) => {
     const selectedPhotoId = "four-choice-delivery-4";
     await seedPendingEveningDelivery(page, "partial-resolution-replay");
     await mockFourChoiceExchange(page, {

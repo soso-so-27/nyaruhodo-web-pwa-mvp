@@ -68,10 +68,7 @@ export function trackProductEvent(
     userId?: string | null;
   } = {},
 ) {
-  if (typeof window === "undefined") {
-    return;
-  }
-  if (window.location.pathname.startsWith("/prototypes/")) {
+  if (shouldSkipAnalyticsForCurrentRoute()) {
     return;
   }
 
@@ -108,10 +105,7 @@ export function trackProductEvent(
 }
 
 export async function flushProductAnalyticsEvents() {
-  if (typeof window === "undefined" || isFlushingAnalytics) {
-    return;
-  }
-  if (window.location.pathname.startsWith("/prototypes/")) {
+  if (isFlushingAnalytics || shouldSkipAnalyticsForCurrentRoute()) {
     return;
   }
 
@@ -151,6 +145,19 @@ export async function flushProductAnalyticsEvents() {
     // Keep the local queue and retry later.
   } finally {
     isFlushingAnalytics = false;
+  }
+}
+
+function shouldSkipAnalyticsForCurrentRoute() {
+  if (typeof window === "undefined") {
+    return true;
+  }
+
+  try {
+    const pathname = window.location?.pathname;
+    return typeof pathname !== "string" || pathname.startsWith("/prototypes/");
+  } catch {
+    return true;
   }
 }
 

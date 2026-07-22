@@ -103,7 +103,7 @@ test.describe("settings page organization", () => {
 
     await expect(page.getByText("改善メモを送る")).toHaveCount(0);
     await expect(
-      page.getByText("改善メモは、ログインすると送れます。"),
+      page.getByText("感想・不具合・要望は、ログインすると送れます。"),
     ).toBeVisible();
     await expect(page.getByRole("link", { name: "ログインして参加する" })).toHaveCount(0);
     await expect(page.getByRole("link", { name: "解約方法" })).toHaveCount(0);
@@ -115,15 +115,15 @@ test.describe("settings page organization", () => {
       }),
     ).toBeVisible();
     await expect(
-      page.getByText("ログインして保存すると、別の端末でも戻せます。", {
+      page.getByText("Googleでログインすると、アカウントにも保存でき、別の端末でも見られます。", {
         exact: false,
       }),
     ).toBeVisible();
     await expect(page.getByText("写真が見えないとき", { exact: true })).toBeVisible();
-    await expect(page.getByText("写真と記録の保存", { exact: true })).toHaveCount(0);
+    await expect(page.getByText("アカウント保存", { exact: true })).toHaveCount(0);
     await expect(page.getByText("困ったとき", { exact: true })).toBeVisible();
     await expect(page.getByText("古い画面が残るとき")).toBeHidden();
-    await expect(page.getByText("ビルド", { exact: true })).toBeVisible();
+    await expect(page.getByText("アプリのバージョン", { exact: true })).toBeVisible();
 
     const accountLabel = page.getByText("アカウント", { exact: true });
     const accountDataLabel = page.getByText("アカウントとデータ", {
@@ -177,7 +177,7 @@ test.describe("settings page organization", () => {
     await page.goto("/settings");
     await page.waitForLoadState("networkidle");
 
-    await expect(page.getByRole("button", { name: "改善メモを書く" })).toBeVisible();
+    await expect(page.getByRole("button", { name: "感想・不具合・要望を送る" })).toBeVisible();
     await expect(page.getByRole("link", { name: "ホーム画面に追加する" })).toHaveAttribute(
       "href",
       "/how-to-use#home-screen",
@@ -237,12 +237,12 @@ test.describe("settings page organization", () => {
     await page.waitForLoadState("networkidle");
 
     await expect(
-      page.getByText("一部の保存状態を確認できませんでした。", {
+      page.getByText("アカウントの一部の保存状態を確認できませんでした。", {
         exact: false,
       }),
     ).toBeVisible();
     await expect(page.getByRole("button", { name: "もう一度確認する" })).toBeVisible();
-    await expect(page.getByText("保存状態を確認中です。")).toHaveCount(0);
+    await expect(page.getByText("アカウントの保存状態を確認中です。")).toHaveCount(0);
   });
 
   test("recovers an expired feedback session without losing the draft", async ({
@@ -269,7 +269,7 @@ test.describe("settings page organization", () => {
 
     await page.goto("/settings");
     await page.waitForLoadState("networkidle");
-    await page.getByRole("button", { name: "改善メモを書く" }).click();
+    await page.getByRole("button", { name: "感想・不具合・要望を送る" }).click();
     await page.getByLabel("本文").fill("送信前の内容を残してほしいです");
     await page.getByRole("button", { name: "送る", exact: true }).click();
 
@@ -278,7 +278,7 @@ test.describe("settings page organization", () => {
       "送信前の内容を残してほしいです",
     );
     await expect(
-      page.getByRole("link", { name: "Googleでログインし直す" }),
+      page.getByRole("link", { name: "Googleで再ログインする" }),
     ).toHaveAttribute("href", "/account/create?returnTo=%2Fsettings");
   });
 });

@@ -802,7 +802,7 @@ function PhotoFallback({
     <span style={{ ...fallbackFrameStyle, ...style }}>
       <span style={fallbackTextStyle}>
         写真を表示できません
-        <span style={fallbackHelpStyle}>もう一度開いてみてください</span>
+        <span style={fallbackHelpStyle}>画面をひらき直してください</span>
       </span>
     </span>
   );

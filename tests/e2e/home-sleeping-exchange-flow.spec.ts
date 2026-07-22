@@ -212,10 +212,10 @@ test.describe("home sleeping exchange flow", () => {
     ).toHaveAttribute("data-photo-frame", "f3");
     await expect(deliveredLetter).toContainText("ねこだより");
     await expect(deliveredLetter).toContainText(
-      "この一通は、『とどいた』にしまわれました",
+      "この写真は、「とどいた」に保存しました",
     );
     await expect(
-      deliveredLetter.getByRole("button", { name: "また、あした" }),
+      deliveredLetter.getByRole("button", { name: "ホームへ" }),
     ).toHaveCount(0);
     const deliveredLetterStyles = await deliveredLetter.evaluate((letter) => {
       const frame = letter.querySelector<HTMLElement>(
@@ -263,7 +263,7 @@ test.describe("home sleeping exchange flow", () => {
     }
     await page.setViewportSize({ width: 320, height: 568 });
     const compactActionBounds = await openingPanel
-      .getByRole("button", { name: "また、あした" })
+      .getByRole("button", { name: "ホームへ" })
       .evaluate((button) => {
         const rect = button.getBoundingClientRect();
         return {
@@ -290,7 +290,7 @@ test.describe("home sleeping exchange flow", () => {
     }
     await expect(openingPanel.getByRole("button", { name: "閉じる" })).toHaveCount(0);
     await expect(openingPanel.locator("button")).toHaveCount(1);
-    await openingPanel.getByRole("button", { name: "また、あした" }).click();
+    await openingPanel.getByRole("button", { name: "ホームへ" }).click();
     await expect(page.getByTestId("home-desk-model")).toHaveAttribute(
       "data-state",
       "4",
@@ -509,7 +509,7 @@ test.describe("home sleeping exchange flow", () => {
       .not.toBeNull();
     await expect(
       page.getByText(
-        "ねこだよりの予約はできましたが、写真を審査へ送れませんでした。通信を確認して、もう一度おためしください。",
+        "写真は「わたしのねがお」に保存しましたが、運営確認へ送れませんでした。通信を確認して、もう一度お試しください。",
       ),
     ).toHaveCount(0);
   });
@@ -560,7 +560,7 @@ test.describe("home sleeping exchange flow", () => {
     await expect.poll(() => backupCalls).toBe(3);
     await expect(
       page.getByText(
-        "ねこだよりの予約はできましたが、写真を審査へ送れませんでした。通信を確認して、もう一度おためしください。",
+        "写真は「わたしのねがお」に保存しましたが、運営確認へ送れませんでした。通信を確認して、もう一度お試しください。",
       ),
     ).toBeVisible();
     await expect
@@ -982,9 +982,9 @@ test.describe("home sleeping exchange flow", () => {
     const dialog = page.getByRole("dialog");
     await expect(dialog).toBeVisible();
     await expect(page.getByTestId("exchange-share-status")).toHaveText(
-      "よる8時に とどきます。",
+      "保存すると、よる8時ごろにねこだよりがとどきます。",
     );
-    await expect(page.getByTestId("exchange-share-submit")).toHaveText("のこす");
+    await expect(page.getByTestId("exchange-share-submit")).toHaveText("保存する");
     await expect(page.getByTestId("exchange-share-submit")).toBeVisible();
     await expect(page.getByTestId("exchange-share-cat-status-cat-second")).toBeVisible();
     await expect(page.getByTestId("exchange-share-mode-shared")).toBeVisible();
@@ -1014,6 +1014,8 @@ test.describe("home sleeping exchange flow", () => {
         submitHeight: submit.getBoundingClientRect().height,
         sharedHeight: shared.getBoundingClientRect().height,
         privateHeight: privateMode.getBoundingClientRect().height,
+        sharedFitsWidth: shared.scrollWidth <= shared.clientWidth,
+        privateFitsWidth: privateMode.scrollWidth <= privateMode.clientWidth,
         submitBackground: submitStyle.backgroundColor,
         sharedBackground: sharedStyle.backgroundColor,
         privateBackground: privateStyle.backgroundColor,
@@ -1027,6 +1029,8 @@ test.describe("home sleeping exchange flow", () => {
     expect(controlMetrics?.submitHeight).toBeGreaterThanOrEqual(44);
     expect(controlMetrics?.sharedHeight).toBeGreaterThanOrEqual(44);
     expect(controlMetrics?.privateHeight).toBeGreaterThanOrEqual(44);
+    expect(controlMetrics?.sharedFitsWidth).toBe(true);
+    expect(controlMetrics?.privateFitsWidth).toBe(true);
     expect(controlMetrics?.submitBackground).not.toBe(
       controlMetrics?.sharedBackground,
     );
@@ -1099,7 +1103,7 @@ test.describe("home sleeping exchange flow", () => {
 
     await page.getByTestId("exchange-share-mode-private").click();
     await expect(page.getByTestId("exchange-share-status")).toHaveText(
-      "じぶんの記録にのこします。そとには出ません。",
+      "自分だけに保存します。ほかの人にはとどきません。",
     );
     if (process.env.CAPTURE_PHOTO_SAVE_SHEET === "1") {
       await page.screenshot({
@@ -1110,7 +1114,7 @@ test.describe("home sleeping exchange flow", () => {
 
     await page.getByTestId("exchange-share-mode-shared").click();
     await expect(page.getByTestId("exchange-share-status")).toHaveText(
-      "よる8時に とどきます。",
+      "保存すると、よる8時ごろにねこだよりがとどきます。",
     );
 
     await page.keyboard.press("Tab");
@@ -1127,7 +1131,7 @@ test.describe("home sleeping exchange flow", () => {
 
     await page.getByTestId("exchange-share-submit").click();
     await expect(page.getByTestId("exchange-share-submit")).toHaveText(
-      "しまいました",
+      "保存しました",
     );
     await expect(page.locator("[data-exchange-share-preview]")).toHaveAttribute(
       "data-save-state",
@@ -1292,6 +1296,9 @@ test.describe("home sleeping exchange flow", () => {
     await expect(page.getByRole("dialog")).toBeVisible();
     await page.getByTestId("exchange-share-mode-private").click();
     await page.getByTestId("exchange-share-submit").click();
+    await expect(
+      page.getByText("「わたしのねがお」に自分だけで保存しました"),
+    ).toBeVisible();
     await waitForOwnSleepingPhotoCount(page, 1);
 
     const privatePhotoState = await page.evaluate(() => {
@@ -1682,7 +1689,7 @@ test.describe("home sleeping exchange flow", () => {
     await expect(openingPanel.locator("img")).toHaveCount(1);
     await expect(openingPanel.getByRole("button", { name: "閉じる" })).toHaveCount(0);
     await expect(
-      openingPanel.getByRole("button", { name: "また、あした" }),
+      openingPanel.getByRole("button", { name: "ホームへ" }),
     ).toBeVisible();
 
     await expect
@@ -1708,7 +1715,7 @@ test.describe("home sleeping exchange flow", () => {
     expect(openedDelivery?.openedAt).toBeTruthy();
     expect(openedDelivery?.keptAt).toBeTruthy();
 
-    await openingPanel.getByRole("button", { name: "また、あした" }).click();
+    await openingPanel.getByRole("button", { name: "ホームへ" }).click();
     expect(signedUrlCalls).toBe(0);
   });
 
@@ -2019,7 +2026,7 @@ test.describe("home sleeping exchange flow", () => {
     await expect.poll(() => exchangeCalls).toBe(0);
   });
 
-  test("auto-opens missed delivery after 5am without keeping it on the home desk", async ({
+  test("expires missed deliveries after 5am without fetching old choices", async ({
     page,
   }) => {
     let exchangeCalls = 0;
@@ -2115,7 +2122,21 @@ test.describe("home sleeping exchange flow", () => {
       "1",
       { timeout: 15000 },
     );
-    await expect.poll(() => exchangeCalls, { timeout: 15000 }).toBe(1);
+    await expect
+      .poll(() =>
+        page.evaluate(() => {
+          const days = JSON.parse(
+            window.localStorage.getItem("neteruneko_evening_delivery_days") ?? "{}",
+          );
+
+          return {
+            olderSkipped: Boolean(days["2026-06-09"]?.skippedAt),
+            latestSkipped: Boolean(days["2026-06-10"]?.skippedAt),
+          };
+        }),
+      )
+      .toEqual({ olderSkipped: true, latestSkipped: true });
+    expect(exchangeCalls).toBe(0);
 
     const store = await page.evaluate(() =>
       JSON.parse(
@@ -2123,9 +2144,9 @@ test.describe("home sleeping exchange flow", () => {
       ),
     );
 
-    expect(store["2026-06-10"]?.deliveredPhoto?.id).toBe("missed-delivered");
-    expect(store["2026-06-10"]?.openedAt).toBeTruthy();
-    expect(store["2026-06-10"]?.openedBy).toBe("system");
+    expect(store["2026-06-10"]?.deliveredPhoto).toBeUndefined();
+    expect(store["2026-06-10"]?.openedAt).toBeUndefined();
+    expect(store["2026-06-10"]?.skippedAt).toBeTruthy();
     expect(store["2026-06-09"]?.skippedAt).toBeTruthy();
   });
 

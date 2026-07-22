@@ -360,8 +360,8 @@ export function HomeDeskModel({
     deskState === "1" && homeDay.phase === "empty-before";
   const homeCaptureHint =
     homeDay.phase === "empty-before"
-      ? "きょうの一枚を、よる8時のねこだよりに。"
-      : "あしたの一枚を、よる8時のねこだよりに。";
+      ? "「ねこだよりにする」で保存すると、よる8時ごろねこだよりがとどきます。"
+      : "「ねこだよりにする」で保存すると、あしたねこだよりがとどきます。";
   const shouldShowHomeFrameRetakeLink =
     deskState === "2" && homeDay.phase === "sent-before";
   const shouldHidePresence = true;
@@ -625,10 +625,10 @@ export function HomeDeskModel({
                       data-testid="home-retake-action"
                       style={deskStyles.homeAddPhotoButton}
                       onClick={onTakePhoto}
-                      aria-label="ねがおを入れる"
+                      aria-label="ねがおを とる"
                     >
                       <AppIcon name="camera" size={15} />
-                      <span>ねがおを入れる</span>
+                      <span>ねがおを とる</span>
                     </button>
                     <span style={deskStyles.homeCaptureHint}>
                       <AppIcon
@@ -667,14 +667,14 @@ export function HomeDeskModel({
                       className="home-empty-cta-action"
                       style={deskStyles.homeEmptyAction}
                       onClick={onTakePhoto}
-                      aria-label={`${catName}の ねがおを入れる`}
+                      aria-label={`${catName}の ねがおを とる`}
                     >
                       <AppIcon
                         name="camera"
                         size={16}
                         style={deskStyles.homeEmptyActionIcon}
                       />
-                      <span>ねがおを入れる</span>
+                      <span>ねがおを とる</span>
                     </button>
                     <span style={deskStyles.homeCaptureHint}>
                       <AppIcon
@@ -735,7 +735,7 @@ export function HomeDeskModel({
                     showOpeningWait
                       ? "ねこだよりをひらいています"
                       : deliveredCandidateCount === 4
-                        ? "4匹から今夜残す1匹をえらぶ"
+                        ? "4枚から保存する1枚をえらぶ"
                         : "ねこだよりをひらく"
                   }
                   aria-busy={isEnvelopeOpening}
@@ -878,7 +878,7 @@ export function HomeDeskModel({
                       }}
                     >
                       {deliveredCandidateCount === 4
-                        ? "4匹のねこだより、とどいた"
+                        ? "ねこだよりが4枚とどいた"
                         : "ねこだより、とどいた"}
                     </strong>
                     <span
@@ -1409,7 +1409,11 @@ function DeskPhotoViewer({
             </AppButton>
             <div style={deskStyles.viewerOwnHeader}>
               <p style={deskStyles.viewerOwnKicker}>きょうの ねがお</p>
-              <p style={deskStyles.viewerOwnNote}>写真は、ねこだより と うちのこ に残ります</p>
+              <p style={deskStyles.viewerOwnNote}>
+                {viewerPhoto.kind === "own" && viewerPhoto.photo.shared
+                  ? "「わたしのねがお」に保存しています。運営確認後、ねこだよりの候補になります"
+                  : "「わたしのねがお」に自分だけで保存しています"}
+              </p>
             </div>
             <span style={deskStyles.viewerOwnHeaderSpacer} aria-hidden="true" />
           </div>
@@ -1450,7 +1454,7 @@ function DeskPhotoViewer({
                     setIsReportSheetOpen(true);
                   }}
                 >
-                  この写真を報告
+                  運営に報告
                 </AppButton>
                 <AppButton
                   type="button"
@@ -1492,14 +1496,14 @@ function DeskPhotoViewer({
             style={deskStyles.viewerSaveButtonLayout}
             onClick={handleStow}
           >
-            しまう
+            「とどいた」に保存
           </AppButton>
         ) : null}
       </motion.section>
       {isReportSheetOpen && viewerPhoto.kind === "other" ? (
         <AppSheet
           placement="bottom"
-          title={"この写真を報告"}
+          title={"この写真を運営に報告"}
           onClose={() => setIsReportSheetOpen(false)}
         >
           <div style={deskStyles.reportSheetActions}>
@@ -1938,7 +1942,7 @@ function HomeLetterTrayText({
         <strong style={deskStyles.letterTrayTitle}>
           ねこだよりを確認しています…
         </strong>
-        <span style={deskStyles.letterTraySub}>もうすぐ、とどく</span>
+        <span style={deskStyles.letterTraySub}>とどいているか確認中です</span>
       </>
     );
   }
@@ -1963,9 +1967,9 @@ function HomeLetterTrayText({
   if (phase === "empty-before" && systemOpenedDeliveryNotice) {
     return (
       <>
-        <strong style={deskStyles.letterTrayTitle}>きのうの一通は</strong>
+        <strong style={deskStyles.letterTrayTitle}>きのう選んだ写真は</strong>
         <span style={deskStyles.letterTraySub}>
-          {keyword("『とどいた』")}に しまいました
+          {keyword("「とどいた」")}に保存しました
         </span>
       </>
     );
@@ -1979,18 +1983,34 @@ function HomeLetterTrayText({
     );
   }
 
-  if (phase === "late-sent" || phase === "empty-after") {
+  if (phase === "late-sent") {
     return (
-      <strong style={deskStyles.letterTrayTitle}>また、あした</strong>
+      <>
+        <strong style={deskStyles.letterTrayTitle}>ねがおを保存しました</strong>
+        <span style={deskStyles.letterTraySub}>
+          あしたの よる8時ごろ、ねこだよりがとどきます
+        </span>
+      </>
+    );
+  }
+
+  if (phase === "empty-after") {
+    return (
+      <>
+        <strong style={deskStyles.letterTrayTitle}>ねがおを とる</strong>
+        <span style={deskStyles.letterTraySub}>
+          保存すると、次のよる8時ごろにねこだよりがとどきます
+        </span>
+      </>
     );
   }
 
   if (phase === "sent-before") {
     return (
       <>
-        <strong style={deskStyles.letterTrayTitle}>おくった</strong>
+        <strong style={deskStyles.letterTrayTitle}>ねがおを保存しました</strong>
         <span style={deskStyles.letterTraySub}>
-          よる8時に {keyword("とどく")}
+          よる8時ごろ、ねこだよりがとどきます
         </span>
       </>
     );

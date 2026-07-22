@@ -12,7 +12,7 @@ import styles from "./about.module.css";
 
 const title = "ねてるねこ｜よる8時に、ねこだよりがとどく";
 const description =
-  "じぶんの猫の寝顔を一枚入れると、よる8時に、どこかのおうちの猫の寝顔が一通だけとどく、静かなWebアプリです。";
+  "猫のねがおを1枚選ぶと、初回は最大4枚のねこだよりがとどき、その中から1枚を保存できます。次からは、ねがおを選ぶと、次のよる8時ごろにねこだよりがとどく、静かなWebアプリです。";
 
 export const metadata: Metadata = {
   title,
@@ -32,7 +32,7 @@ export const metadata: Metadata = {
         url: "/images/social/onboarding-og.webp",
         width: 1200,
         height: 630,
-        alt: "猫の封蝋がついた、ねてるねこのねこだより",
+        alt: "ねてるねこのねこだよりのイラスト",
       },
     ],
   },
@@ -49,7 +49,7 @@ const dailySteps = [
     number: "01",
     label: "とる",
     title: "寝ているあの子を、一枚だけ。",
-    copy: "朝でも、昼でも、夜でも。きょう残したい寝顔を一枚とります。",
+    copy: "朝でも、昼でも、夜でも。ねがおを とるか、写真から1枚選びます。",
     image: "/sample-cats/pose-belly.webp",
     imageAlt: "おなかを見せて眠る猫",
     kind: "photo",
@@ -57,17 +57,17 @@ const dailySteps = [
   {
     number: "02",
     label: "よる8時",
-    title: "ポストに、一通とどきます。",
-    copy: "一日一回、その時間にだけ。知らないおうちの寝顔が、ねこだよりになります。",
+    title: "ねこだよりが、とどきます。",
+    copy: "ねがおを選ぶと、次のよる8時ごろに、どこかのおうちのねこだよりがとどきます。",
     image: "/illustrations/onboarding-envelope.webp",
-    imageAlt: "猫の封蝋がついた封筒",
+    imageAlt: "ねてるねこのねこだよりのイラスト",
     kind: "envelope",
   },
   {
     number: "03",
     label: "ひらく",
     title: "きょうも、どこかでよく寝ています。",
-    copy: "封をひらくと、知らないおうちの、知らない猫。届くのは一通だけです。",
+    copy: "ねこだよりが複数あるときは、保存する1枚をえらびます。",
     image: "/sample-cats/mugi-portrait.webp",
     imageAlt: "寝具の上でくつろぐ猫",
     kind: "photo",
@@ -98,18 +98,18 @@ export default function AboutPage() {
         </header>
 
         <div className={styles.heroContent}>
-          <p className={styles.eyebrow}>一日一枚の寝顔と、一日一通のねこだより</p>
+          <p className={styles.eyebrow}>一枚のねがおから始まる、ねこだより</p>
           <h1 id="about-title">ねてるねこ</h1>
           <p className={styles.heroLead}>
-            じぶんの猫の寝顔を一枚入れると、
+            じぶんの猫のねがおを一枚選ぶと、
             <br />
-            どこかのおうちの寝顔が、一通だけとどきます。
+            最初は最大4枚とどき、その中から1枚を保存できます。
           </p>
           <ServiceSiteCta className={styles.heroCta} placement="hero">
-            最初の一通を受け取る
+            ねがおを選んではじめる
           </ServiceSiteCta>
           <p className={styles.heroNote}>
-            最初の一通はその場で。次からは、写真を入れた日のよる8時に。
+            最初はその場で。次からは、写真を選ぶと、次のよる8時ごろに。
           </p>
         </div>
 
@@ -126,7 +126,7 @@ export default function AboutPage() {
           <p>
             たくさん見るための場所ではありません。
             <br />
-            一枚を入れて、一通を待つための場所です。
+            ねがおを一枚選んで、ねこだよりを待つための場所です。
           </p>
         </div>
 
@@ -167,13 +167,13 @@ export default function AboutPage() {
         <div className={styles.keepsakeInner}>
           <div className={styles.keepsakeCopy}>
             <p className={styles.sectionLabel}>そのあと</p>
-            <h2>寝顔は、静かに残っていきます。</h2>
+            <h2>ねがおは、静かに残っていきます。</h2>
             <p>
-              撮った寝顔は「おくった」へ。届いた一通は「とどいた」へ。
+              とったねがおは「わたしのねがお」へ。選んだねこだよりは「とどいた」へ。
               この子の写真や記録といっしょに、日々が少しずつ積もります。
             </p>
             <p>
-              ときどき、前に撮った一枚が「思い出便」として戻ってくることもあります。
+              前に とったねがおが、ときどきホームにとどく「思い出便」もあります。
             </p>
           </div>
 
@@ -214,12 +214,12 @@ export default function AboutPage() {
           <p className={styles.sectionLabel}>この場所に、ないもの</p>
           <h2>くらべない。いそがない。さわがない。</h2>
           <div className={styles.absenceList}>
-            <p>いいねは、ありません。</p>
-            <p>フォロワーも、ランキングもありません。</p>
-            <p>コメントも、広告もありません。</p>
+            <p>写真が並ぶ公開ページはありません。</p>
+            <p>ほかの人の反応を集める機能もありません。</p>
+            <p>広告も表示しません。</p>
           </div>
           <p className={styles.quietClosing}>
-            あるのは、一日一枚の寝顔と、一日一通のねこだよりだけ。
+            あるのは、一日一枚のねがおと、そのあとにとどくねこだよりだけ。
           </p>
         </div>
       </section>
@@ -237,7 +237,7 @@ export default function AboutPage() {
               </span>
               <div>
                 <h3>一枚ずつ確認</h3>
-                <p>ねこだよりになる前に、届けてもよい写真かを確認します。</p>
+                <p>ねこだよりになる前に、とどけてもよい写真かを確認します。</p>
               </div>
             </article>
             <article className={styles.valueRow}>
@@ -245,8 +245,8 @@ export default function AboutPage() {
                 <LockIcon size={24} />
               </span>
               <div>
-                <h3>名前や場所は届けない</h3>
-                <p>相手に届くのは寝顔だけ。猫の名前やメールアドレス、場所は渡しません。</p>
+                <h3>名前や場所はとどけない</h3>
+                <p>相手にとどくのはねがおだけ。猫の名前やメールアドレス、場所は渡しません。</p>
               </div>
             </article>
             <article className={styles.valueRow}>
@@ -254,8 +254,8 @@ export default function AboutPage() {
                 <MailIcon size={24} />
               </span>
               <div>
-                <h3>毎日の一通は無料</h3>
-                <p>寝顔を入れて受け取る毎日の体験は、無料のまま使えます。</p>
+                <h3>ねこだよりの基本体験は無料</h3>
+                <p>ねがおを とると、ねこだよりがとどく体験は、無料のまま使えます。</p>
               </div>
             </article>
           </div>
@@ -274,9 +274,9 @@ export default function AboutPage() {
         </div>
         <div className={styles.storyCopy}>
           <p className={styles.sectionLabel}>はじまり</p>
-          <h2>あめとむぎの寝顔から、作りはじめました。</h2>
+          <h2>あめとむぎのねがおから、作りはじめました。</h2>
           <p>
-            二匹の猫と暮らしながら、ひとりで作っています。寝顔を撮りためているうちに、
+            二匹の猫と暮らしながら、ひとりで作っています。ねがおを撮りためているうちに、
             どこかのおうちにも、いまこうして寝ている猫がいるんだろうな、と思うようになりました。
           </p>
           <p>それが、ねてるねこのはじまりです。</p>
@@ -303,13 +303,13 @@ export default function AboutPage() {
           </div>
           <div className={styles.betaColumns}>
             <p>
-              いまはβ版です。最初はあめやむぎの寝顔が届くこともあります。
-              写真は毎晩ひとつずつ確認しながら、少人数で運営しています。
-              通知はまだないため、よる8時を過ぎたら開いてみてください。
+              いまはβ版です。最初はあめやむぎのねこだよりがとどくこともあります。
+              とどくねこだよりはひとつずつ確認しながら、少人数で運営しています。
+              通知はまだありません。ねこだよりは、よる8時を過ぎるとホームでひらけます。
             </p>
             <p>
               Webアプリなので、アプリストアは通りません。ブラウザから始められ、
-              ホーム画面に追加すると、いつものアプリのように開けます。
+              ホーム画面に追加すると、いつものアプリのようにひらけます。
             </p>
           </div>
         </div>
@@ -323,9 +323,9 @@ export default function AboutPage() {
           height={302}
           className={styles.finalEnvelope}
         />
-        <p className={styles.sectionLabel}>一通目から</p>
-        <h2>今夜、どこかの寝顔を待ってみませんか。</h2>
-        <p>登録せずに始められます。必要なのは、猫の寝顔一枚だけです。</p>
+        <p className={styles.sectionLabel}>最初にとどいたねこだよりから</p>
+        <h2>どこかのねこだよりを、1枚保存してみませんか。</h2>
+        <p>登録せずに始められます。必要なのは、猫のねがお一枚だけです。</p>
         <ServiceSiteCta className={styles.finalCta} placement="footer">
           ねてるねこをはじめる
         </ServiceSiteCta>

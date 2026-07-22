@@ -3,7 +3,7 @@ import path from "node:path";
 import { expect, test } from "@playwright/test";
 
 test.describe("20時前の実機確認フロー", () => {
-  test("本番通信を使わず、送信から4匹選択・保存まで進める", async ({
+  test("本番通信を使わず、送信から4枚選択・保存まで進める", async ({
     page,
   }) => {
     await page.setViewportSize({ width: 390, height: 844 });
@@ -47,7 +47,7 @@ test.describe("20時前の実機確認フロー", () => {
     await dialog.getByTestId("evening-four-choice-finish").click();
 
     await expect(page.getByTestId("evening-preview-done")).toContainText(
-      "1匹を「とどいた」に保存しました",
+      "1枚を「とどいた」に保存しました",
     );
     expect(protectedRequests).toEqual([]);
     expect(
@@ -70,7 +70,7 @@ test.describe("20時前の実機確認フロー", () => {
     await dialog.getByTestId("evening-four-choice-close").click();
 
     await expect(page.getByTestId("evening-preview-arrived")).toContainText(
-      "さっき選んだ1匹から再開します",
+      "さっき選んだ1枚から再開します",
     );
     await page.getByTestId("evening-preview-open").click();
     dialog = page.getByTestId("evening-four-choice");

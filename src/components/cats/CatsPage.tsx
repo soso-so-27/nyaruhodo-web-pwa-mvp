@@ -930,7 +930,7 @@ export function CatsPage() {
 
       setSaveMessage(
         remoteSaveResult.status === "error"
-          ? "この端末には保存しました。Google連携への反映はあとでやり直します。"
+          ? "この端末には保存しました。アカウントには保存できませんでした。設定の「アカウント保存を更新する」から、もう一度お試しください。"
           : "保存しました。",
       );
       setIsCatManageOpen(!shouldCloseCatManageAfterSave);
@@ -981,7 +981,7 @@ export function CatsPage() {
     setSaveMessage(photoSrc ? "カバー写真を変えました。" : "自動表示にもどしました。");
     if (remoteSaveResult.status === "error") {
       setSaveMessage(
-        "この端末には保存しました。Google連携への反映はあとでやり直します。",
+        "この端末には保存しました。アカウントには保存できませんでした。設定の「アカウント保存を更新する」から、もう一度お試しください。",
       );
     }
     setTimeout(() => setSaveMessage(""), 2000);
@@ -1065,7 +1065,7 @@ export function CatsPage() {
     const targetCatId = activeCatId;
     if (readCatGalleryPhotos(targetCatId).length >= CAT_GALLERY_PHOTO_LIMIT) {
       setSaveMessage(
-        "保存できる枚数に達しています。残したい写真を整理してから追加してください。",
+        "保存できる枚数に達しています。保存しておきたい写真を整理してから追加してください。",
       );
       setTimeout(() => setSaveMessage(""), 2400);
       return;
@@ -1267,7 +1267,7 @@ export function CatsPage() {
 
   function startDeleteCat(profile: CatProfile) {
     if (catProfiles.length <= 1) {
-      setMessage("最後の1匹は消せません");
+      setMessage("最後の1匹は削除できません");
       return;
     }
 
@@ -1285,7 +1285,7 @@ export function CatsPage() {
     }
 
     if (catProfiles.length <= 1) {
-      setMessage("最後の1匹は消せません");
+      setMessage("最後の1匹は削除できません");
       setDeleteCatTarget(null);
       return;
     }
@@ -1298,7 +1298,7 @@ export function CatsPage() {
         : getActiveCatProfile(nextProfiles, activeCatId);
 
     if (!nextActiveProfile) {
-      setMessage("最後の1匹は消せません");
+      setMessage("最後の1匹は削除できません");
       setDeleteCatTarget(null);
       return;
     }
@@ -1333,7 +1333,7 @@ export function CatsPage() {
     if (nextProfiles.length <= 1) {
       setActiveLens("cat");
     }
-    setMessage(`${getCatName(target)}を消しました`);
+    setMessage(`${getCatName(target)}の登録を削除しました`);
   }
 
   const selectedCoat = activeCatProfile?.appearance?.coat;
@@ -1405,7 +1405,7 @@ export function CatsPage() {
                 ? "この子の名前は？"
                 : isEditingProfile
                   ? "このねこの名前は？"
-                  : "また寝ていたら、ここへ。"}
+                  : "写真と記録を、あとから見返せます。"}
             </h2>
             {isEditingProfile || isDirectProfileRecovery ? (
               <p style={styles.onboardingText}>
@@ -1421,7 +1421,7 @@ export function CatsPage() {
                   size="md"
                   style={styles.onboardingHomeButton}
                 >
-                  ねてるねこへ
+                  ホームへ
                 </AppButton>
               ) : null
             ) : null}
@@ -1718,7 +1718,7 @@ export function CatsPage() {
           <LensPhotoSection
             title="この子の写真"
             photos={activeCatLensPhotos}
-            emptyCopy="まだ写真はありません。ねがおを とるか、写真をしまうと、ここに並びます。"
+            emptyCopy="まだ写真はありません。ねがおを とるか、写真を追加すると、ここに並びます。"
             lensValue={activeLens}
             onLensChange={shouldShowPhotoLensSwitch ? setActiveLens : undefined}
             onAddPhoto={() => {
@@ -1789,7 +1789,7 @@ export function CatsPage() {
                 <div style={styles.recordRow}>
                   <span style={styles.recordLabel}>思い出箱</span>
                   <span style={styles.recordMetricValue}>
-                    {omoideMemories.length}通
+                    {omoideMemories.length}件
                   </span>
                 </div>
                 <div style={styles.recordRow}>
@@ -1799,7 +1799,7 @@ export function CatsPage() {
                   </span>
                 </div>
                 <div style={{ ...styles.recordRow, ...styles.recordRowLast }}>
-                  <span style={styles.recordLabel}>関係の記録</span>
+                  <span style={styles.recordLabel}>一緒に暮らしている期間</span>
                   <span style={styles.recordMetricValue}>
                     家族になった日から
                   </span>
@@ -1808,7 +1808,7 @@ export function CatsPage() {
             </AppCard>
             <AppCard as="section" variant="section" padding="md" style={styles.daysThread}>
               <p style={styles.bunbakoSectionTitle}>{catName}との 日々</p>
-              <p style={styles.sectionLead}>ねがおがふえるほど、ここも育ちます。</p>
+              <p style={styles.sectionLead}>ねがおや記録を、ここで見返せます。</p>
               <div style={styles.threadLine}>
                 <div style={styles.threadNode}>
                   <span style={styles.threadNodeTitle}>今月の {catName}</span>
@@ -1822,7 +1822,7 @@ export function CatsPage() {
                 <div style={styles.threadNode}>
                   <span style={styles.threadNodeTitle}>これまで</span>
                   <span style={styles.threadNodeText}>
-                    思い出 {omoideMemories.length}通 ・ ねがお{" "}
+                    思い出 {omoideMemories.length}件 ・ ねがお{" "}
                     {takenSleepingPhotoCount}枚
                   </span>
                 </div>
@@ -1906,7 +1906,7 @@ export function CatsPage() {
                   <div style={styles.catManageEditorHeroText}>
                     <p style={styles.catManageEditorKicker}>新しい子</p>
                     <p style={styles.catManageEditorName}>
-                      {newCatNameInput.trim() || "名前を入れる"}
+                      {newCatNameInput.trim() || "猫の名前"}
                     </p>
                   </div>
                 </div>
@@ -2155,7 +2155,7 @@ export function CatsPage() {
                   startDeleteCat(activeCatProfile);
                 }}
               >
-                この子を消す
+                この子の登録を削除
               </AppButton>
             ) : null}
               </>
@@ -2165,7 +2165,7 @@ export function CatsPage() {
       ) : null}
       {deleteCatTarget ? (
         <AppBottomSheet
-          title="この子を消しますか？"
+          title="この子の登録を削除しますか？"
           onClose={() => {
             if (!isDeletingCat) {
               setDeleteCatTarget(null);
@@ -2174,13 +2174,12 @@ export function CatsPage() {
         >
           <div style={styles.deleteCatConfirm}>
             <p style={styles.deleteCatConfirmTitle}>
-              {getCatName(deleteCatTarget.profile)}・写真
-              {deleteCatTarget.photoCount}枚 を消しますか？
+              {getCatName(deleteCatTarget.profile)}の登録を削除しますか？
             </p>
             <p style={styles.deleteCatConfirmText}>
               {deleteCatTarget.photoCount > 0
-                ? "写真がある子です。写真そのものは消さず、この子との紐づきだけ外します。"
-                : "写真がまだない子です。プロフィールだけを消します。"}
+                ? `写真${deleteCatTarget.photoCount}枚は削除せず、このプロフィールとの関連付けだけ外します。`
+                : "写真はありません。プロフィールだけを削除します。"}
             </p>
             <div style={styles.deleteCatConfirmActions}>
               <AppButton
@@ -2190,7 +2189,7 @@ export function CatsPage() {
                 onClick={() => void confirmDeleteCat()}
                 disabled={isDeletingCat}
               >
-                {isDeletingCat ? "消しています" : "消す"}
+                {isDeletingCat ? "削除しています" : "登録を削除"}
               </AppButton>
               <AppButton
                 type="button"
@@ -2261,7 +2260,7 @@ export function CatsPage() {
               この子の写真から削除します。
             </p>
             <p style={styles.deleteCatConfirmText}>
-              ねこだよりや、ほかの人に届いた写真には影響しません。
+              ねこだよりや、ほかの人にとどいたねこだよりには影響しません。
             </p>
             {isGalleryPhotoCover(deleteGalleryPhotoTarget) ? (
               <p style={styles.deleteCatConfirmText}>
@@ -2393,13 +2392,13 @@ function CatGalleryIntroSheet({
   onClose: () => void;
 }) {
   return (
-    <AppBottomSheet title="この子の写真をしまう" onClose={onClose}>
+    <AppBottomSheet title="この子の写真を追加" onClose={onClose}>
       <div style={styles.deleteCatConfirm}>
         <p style={styles.deleteCatConfirmTitle}>
-          ここは、この子の写真を100枚まで。
+          この子の写真を100枚まで追加できます。
         </p>
         <p style={styles.deleteCatConfirmText}>
-          ここにしまった写真は、ねこだよりには使われません。
+          追加した写真は、ねこだよりには使われません。
         </p>
         <div style={styles.deleteCatConfirmActions}>
           <AppButton type="button" variant="primary" fullWidth onClick={onContinue}>
@@ -2788,7 +2787,7 @@ function CatSummaryPanel({
           <span style={styles.summaryTileLabel}>とどけた</span>
         </div>
         <div style={styles.summaryTile}>
-          <span style={styles.summaryTileValue}>{omoideCount}通</span>
+          <span style={styles.summaryTileValue}>{omoideCount}件</span>
           <span style={styles.summaryTileLabel}>思い出</span>
         </div>
         <div style={styles.summaryTileWide}>
@@ -3073,15 +3072,15 @@ function LensPhotoSection({
               data-testid="cats-add-photo-button"
               style={styles.lensAddPhotoButton}
               onClick={onAddPhoto}
-              aria-label="写真をしまう"
-              title="写真をしまう"
+              aria-label="写真を追加"
+              title="写真を追加"
             >
               ＋
             </button>
           </div>
         </div>
         <p style={styles.lensSectionSub}>
-          とっておきたい一枚を、ここにしまっておけます。
+          残しておきたい写真を、ここに追加できます。
         </p>
       </div>
       <LensPhotoGrid
@@ -3564,7 +3563,7 @@ function YearSummaryDetailList({
               type="button"
               style={styles.yearSummaryPhotoButton}
               onClick={() => onOpenPhoto(toRecordPhotoPreview(photo))}
-              aria-label={`${formatLensPhotoDate(photo.createdAt)}の写真を開く`}
+              aria-label={`${formatLensPhotoDate(photo.createdAt)}の写真をひらく`}
             >
               <StoredPhotoImage
                 src={getLensPhotoThumbnailSrc(photo)}
@@ -4104,7 +4103,7 @@ function OmoideBunbako({
         </div>
       ) : (
         <p style={styles.bunbakoEmpty}>
-          はじめての思い出は、これから届きます。
+          はじめての思い出は、これからとどきます。
         </p>
       )}
     </section>

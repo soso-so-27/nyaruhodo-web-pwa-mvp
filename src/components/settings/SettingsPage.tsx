@@ -430,7 +430,7 @@ export function SettingsPage() {
         });
         setStockMessage(
           savedCount > 0
-            ? `とどくねがおを${savedCount}枚入れました。`
+            ? `ねこだよりを${savedCount}枚追加しました。`
             : "写真を保存できませんでした。",
         );
         setStockPhotoCount((count) =>
@@ -440,7 +440,7 @@ export function SettingsPage() {
       } catch {
         setStockMessage(
           savedCount > 0
-            ? `とどくねがおを${savedCount}枚入れました。`
+            ? `ねこだよりを${savedCount}枚追加しました。`
             : "写真を保存できませんでした。",
         );
         setStockPhotoCount((count) =>
@@ -578,7 +578,7 @@ export function SettingsPage() {
 
     if (result.ok) {
       setFeedbackMessage("");
-      setFeedbackStatus("届きました。\nβに参加してくれてありがとう。");
+      setFeedbackStatus("ご意見を送信しました。\nβに参加してくれてありがとう。");
       setFeedbackNeedsAuthRecovery(false);
     } else if (result.reason === "login_required") {
       setFeedbackStatus("ログインを確認してから、もう一度送ってください。");
@@ -680,7 +680,7 @@ export function SettingsPage() {
                   <div style={styles.accountRow}>
                     <div style={styles.rowLeft}>
                       <span style={{ ...styles.statusDot, ...styles.statusDotOff }} />
-                      <span style={styles.rowLabel}>ログアウト中</span>
+                      <span style={styles.rowLabel}>ログインしていません</span>
                     </div>
                     <AppButton
                       href="/account/create"
@@ -693,13 +693,13 @@ export function SettingsPage() {
                   </div>
                   <div style={styles.divider} />
                   <p style={styles.storageNote}>
-                    写真と記録は、この端末に保存されています。ログインして保存すると、別の端末でも戻せます。
+                    写真と記録は、この端末に保存されています。Googleでログインすると、アカウントにも保存でき、別の端末でも見られます。
                   </p>
                   <div style={styles.divider} />
                   <details style={styles.disclosure}>
                     <summary style={styles.disclosureSummary}>写真が見えないとき</summary>
                     <p style={styles.storageNote}>
-                      写真をとったときと同じアプリ、またはブラウザから開いてください。
+                      写真をとったときと同じアプリ、またはブラウザからひらいてください。
                     </p>
                   </details>
                 </>
@@ -709,16 +709,16 @@ export function SettingsPage() {
 
         {isLoggedIn ? (
         <section style={styles.section}>
-          <p style={styles.sectionLabel}>写真と記録の保存</p>
+          <p style={styles.sectionLabel}>アカウント保存</p>
           <AppCard variant="outlined" padding="sm" style={styles.card}>
             {syncOverview ? (
               <SyncStatusPanel overview={syncOverview} />
             ) : syncOverviewState === "loading" ? (
-              <p style={styles.storageNote}>保存状態を確認中です。</p>
+              <p style={styles.storageNote}>アカウントの保存状態を確認中です。</p>
             ) : (
               <div style={styles.inlineRecovery} role="status">
                 <p style={styles.storageNote}>
-                  保存状態を確認できませんでした。写真と記録は、この端末に残っています。
+                  アカウントの保存状態を確認できませんでした。写真と記録は、この端末に残っています。
                 </p>
                 <AppButton
                   type="button"
@@ -735,7 +735,7 @@ export function SettingsPage() {
             {syncOverviewState === "error" && syncOverview ? (
               <div style={styles.inlineRecovery} role="status">
                 <p style={styles.storageNote}>
-                  一部の保存状態を確認できませんでした。表示中の件数は変わる場合があります。
+                  アカウントの一部の保存状態を確認できませんでした。表示中の件数は変わる場合があります。
                 </p>
                 <AppButton
                   type="button"
@@ -761,7 +761,7 @@ export function SettingsPage() {
                 }}
                 disabled={isSyncing}
               >
-                {isSyncing ? "保存中…" : "いまの写真と記録を保存する"}
+                {isSyncing ? "アカウント保存を更新中…" : "アカウント保存を更新する"}
               </AppButton>
             </div>
             {syncMessage ? (
@@ -774,7 +774,7 @@ export function SettingsPage() {
             <details style={styles.disclosure}>
               <summary style={styles.disclosureSummary}>写真が見えないとき</summary>
               <p style={styles.storageNote}>
-                写真をとったときと同じアプリ、またはブラウザから開いてください。
+                写真をとったときと同じアプリ、またはブラウザからひらいてください。
               </p>
             </details>
           </AppCard>
@@ -788,7 +788,7 @@ export function SettingsPage() {
               <span style={styles.rowTextStack}>
                 <span style={styles.rowLabel}>思い出便を 受け取る</span>
                 <span style={styles.rowDescription}>
-                  オフにすると、過去のねがおの思い出便は届きません。
+                  前に とったねがおが、ときどきホームにとどきます。オフにするととどきません。
                 </span>
               </span>
               <button
@@ -878,11 +878,9 @@ export function SettingsPage() {
             {betaCapabilities.feedbackEnabled ? (
               <>
                 <div style={styles.betaNote}>
-                  <p style={styles.betaNoteTitle}>改善メモを送る</p>
+                  <p style={styles.betaNoteTitle}>気づいたことを教えてください</p>
                   <p style={styles.betaNoteText}>
-                    {betaCapabilities.supporterVoiceEnabled
-                      ? "βサポーターの声も、ここにまとめて送れます。"
-                      : "返信がいらない感想や気づきを送れます。"}
+                    返信がいらない感想や気づきを送れます。
                     削除・ログイン・支払いなどの連絡は問い合わせへ。
                   </p>
                 </div>
@@ -897,7 +895,7 @@ export function SettingsPage() {
                     setFeedbackNeedsAuthRecovery(false);
                   }}
                 >
-                  改善メモを書く
+                  感想・不具合・要望を送る
                 </AppButton>
                 {isFeedbackOpen ? (
                   <BetaFeedbackForm
@@ -920,7 +918,7 @@ export function SettingsPage() {
                 <div style={styles.betaNote}>
                   <p style={styles.betaNoteTitle}>改善メモ</p>
                   <p style={styles.betaNoteText}>
-                    改善メモは、ログインすると送れます。
+                    感想・不具合・要望は、ログインすると送れます。
                   </p>
                 </div>
                 <div style={styles.divider} />
@@ -1047,11 +1045,11 @@ export function SettingsPage() {
                     }}
                     disabled={isStockAdding}
                   >
-                    {isStockAdding ? "追加中…" : "とどくねがおを追加する"}
+                    {isStockAdding ? "追加中…" : "ねこだよりを追加する"}
                   </AppButton>
                   <div style={styles.divider} />
                   <p style={styles.storageNote}>
-                    本番前の確認用です。ここで入れた写真は、とどくねがおの候補になります。
+                    本番前の確認用です。ここで追加した写真は、ねこだよりの候補になります。
                   </p>
                 </>
               ) : null}
@@ -1110,14 +1108,14 @@ export function SettingsPage() {
           <p style={styles.sectionLabel}>アプリについて</p>
           <AppCard variant="outlined" padding="sm" style={styles.card}>
             <div style={styles.row}>
-              <span style={styles.rowLabel}>ビルド</span>
+              <span style={styles.rowLabel}>アプリのバージョン</span>
               <span style={styles.rowValue}>{APP_BUILD_LABEL}</span>
             </div>
             <div style={styles.divider} />
             <details style={styles.disclosure}>
               <summary style={styles.disclosureSummary}>困ったとき</summary>
               <p style={styles.betaNoteText}>
-                ホーム画面アプリで古い画面が残るときは、アプリを一度閉じて開き直してください。改善しない場合は、ブラウザで本番URLを開いてから再度起動してください。
+                ホーム画面アプリで古い画面が残るときは、アプリを一度閉じてひらき直してください。改善しない場合は、ブラウザでねてるねこのWebページをひらいてから再度起動してください。
               </p>
             </details>
             <div style={styles.divider} />
@@ -1357,7 +1355,7 @@ function EveningDeliveryTracePanel({
     return (
       <AppCard as="div" variant="inset" padding="sm" style={styles.authDebugPanel}>
         <p style={styles.syncOverviewText}>
-          配達トレースはまだありません。ホームを開くと直近20件まで記録されます。
+          配達トレースはまだありません。ホームをひらくと直近20件まで記録されます。
         </p>
       </AppCard>
     );
@@ -1534,7 +1532,7 @@ function AdminStockReviewPanel({
   return (
     <AppCard as="div" variant="inset" padding="sm" style={styles.authDebugPanel}>
       <p style={styles.syncOverviewText}>
-        運営ストックの確認です。新しく来た人の最初の一通にふさわしくない写真だけ
+        運営ストックの確認です。新しく来た人の最初のねこだよりにふさわしくない写真だけ
         rejectしてください。
       </p>
       <div style={styles.authDebugRows}>
@@ -1654,7 +1652,7 @@ function KeptExchangeDebugPanel({
     return (
       <AppCard as="div" variant="inset" padding="sm" style={styles.authDebugPanel}>
         <p style={styles.syncOverviewText}>
-          とどいたねがおの保存状態をまだ確認していません。
+          ねこだよりの保存状態をまだ確認していません。
         </p>
       </AppCard>
     );
@@ -1663,7 +1661,7 @@ function KeptExchangeDebugPanel({
   return (
     <AppCard as="div" variant="inset" padding="sm" style={styles.authDebugPanel}>
       <p style={styles.syncOverviewText}>
-        アルバムに出る「とどいたねがお」の端末内保存状態です。
+        アルバムの「とどいた」に出るねこだよりの端末内保存状態です。
       </p>
       <div style={styles.authDebugRows}>
         <AuthDebugRow label="保存件数" value={`${debug.validCount}枚`} />
@@ -1846,14 +1844,14 @@ function SyncStatusPanel({ overview }: { overview: AccountSyncOverview }) {
   return (
     <div style={styles.syncStatusPanel}>
       <div style={styles.syncMetaGrid}>
-        <span>前回の保存: {formatSyncDate(latestSyncAt)}</span>
+        <span>前回のアカウント更新: {formatSyncDate(latestSyncAt)}</span>
         <span>
           アカウントに保存: 写真{remotePhotoTotal}枚・猫{overview.remoteCats}匹
         </span>
       </div>
 
       {overview.errors.length > 0 ? (
-        <p style={styles.syncWarning}>一部の保存状態を確認できませんでした。</p>
+        <p style={styles.syncWarning}>アカウントの一部の保存状態を確認できませんでした。</p>
       ) : null}
     </div>
   );
@@ -1867,8 +1865,8 @@ function SyncResultDetails({
   const rows = [
     ["この子の写真", result.restoredCatGalleryPhotos + result.pushedCatGalleryPhotos, "枚"],
     ["アルバム写真", result.restoredCollectionPhotos + result.pushedCollectionPhotos, "枚"],
-    ["とったねがお", result.restoredOwnSleepingPhotos + result.pushedOwnSleepingPhotos, "枚"],
-    ["とどいたねがお", result.restoredKeptExchangePhotos + result.pushedKeptExchangePhotos, "枚"],
+    ["わたしのねがお", result.restoredOwnSleepingPhotos + result.pushedOwnSleepingPhotos, "枚"],
+    ["とどいた ねこだより", result.restoredKeptExchangePhotos + result.pushedKeptExchangePhotos, "枚"],
     ["猫", result.restoredCats + result.pushedCats, "匹"],
     ["記録", result.restoredRecords + result.pushedRecords, "件"],
   ];
@@ -1885,7 +1883,7 @@ function SyncResultDetails({
 
   return (
     <div style={styles.syncResultDetails} role="status">
-      <p style={styles.syncResultTitle}>保存結果</p>
+      <p style={styles.syncResultTitle}>アカウント保存の結果</p>
       <p style={styles.syncResultSummary}>
         {getSyncPhotoSummary(photoTotal, result.status)}
       </p>
@@ -1900,7 +1898,7 @@ function SyncResultDetails({
         </div>
       ) : (
         <p style={styles.syncResultEmpty}>
-          新しく揃えたデータはありません。
+          更新する内容はありませんでした。
         </p>
       )}
       {result.errors.length > 0 ? (
@@ -1922,21 +1920,21 @@ function getSyncPhotoSummary(
   status: AccountSyncResult["status"],
 ) {
   if (status === "error") {
-    return "保存できませんでした。あとで もう一度。";
+    return "アカウント保存を更新できませんでした。時間をおいて、もう一度お試しください。";
   }
 
   if (photoTotal > 0) {
-    return `写真${photoTotal}枚を、アカウントとこの端末にそろえました。`;
+    return `写真${photoTotal}枚を、アカウントへ保存またはこの端末へ取り込みました。`;
   }
 
-  return "保存しました。";
+  return "アカウントの保存状態を確認しました。";
 }
 
 function getSyncResultMessage(
   result: AccountSyncResult,
 ) {
   if (result.status === "error") {
-    return "保存できませんでした。あとで もう一度。";
+    return "アカウント保存を更新できませんでした。時間をおいて、もう一度お試しください。";
   }
 
   const photoTotal =
@@ -1954,11 +1952,11 @@ function getSyncResultMessage(
 
 function formatSyncError(error: string) {
   if (error.includes("cat_moments") || error.includes("Sleeping photo")) {
-    return "とったねがおの保存先を確認できませんでした。";
+    return "「わたしのねがお」の保存先を確認できませんでした。";
   }
 
   if (error.includes("cat_moment_deliveries") || error.includes("Kept photo")) {
-    return "とどいたねがおの保存先を確認できませんでした。";
+    return "「とどいた」の保存先を確認できませんでした。";
   }
 
   if (error.includes("collection_photos") || error.includes("Collection photo")) {

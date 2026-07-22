@@ -240,7 +240,7 @@ test("marks a cat pickup as seen in local storage", () => {
         type: "first_photo",
         sourceId: "first",
         title: "はじめてのねがお",
-        body: "最初の1枚を残せました",
+        body: "最初の1枚を保存しました",
         actionLabel: "見る",
         score: 80,
         scoredAt: now,

@@ -127,8 +127,8 @@ function OnboardingContinueContent({
       setRestoreErrorCode(null);
       setMessage(
         destination === "onboarding"
-          ? "準備できました。このブラウザでつづけます。"
-          : "ねがおを復元しました。ホームへ移動します。",
+          ? "引き継ぎました。このブラウザでつづけます。"
+          : "写真と入力内容を引き継ぎました。ホームへ移動します。",
       );
       window.setTimeout(() => {
         goNext(destination, source);
@@ -148,7 +148,7 @@ function OnboardingContinueContent({
       ) {
         setStatus("restored");
         setRestoreErrorCode(null);
-        setMessage("この端末には、つづきが復元されています。ホームへ進めます。");
+        setMessage("写真と入力内容は引き継ぎ済みです。ホームへ進めます。");
         return;
       }
 
@@ -197,7 +197,7 @@ function OnboardingContinueContent({
         <WordmarkHeader style={styles.header} />
         <AppCard variant="section" padding="lg" style={styles.card}>
           <p style={styles.eyebrow}>
-            {isIntroHandoff ? "ブラウザをかえる" : "つづき"}
+            ブラウザの引き継ぎ
           </p>
           <h1 style={styles.title}>
             {shouldShowEmbeddedGuide
@@ -209,8 +209,8 @@ function OnboardingContinueContent({
           <p style={styles.body}>
             {shouldShowEmbeddedGuide
               ? isIntroHandoff
-                ? "下のURLをコピーして、SafariやChromeのアドレス欄に貼り付けてください。同じ入口からつづけられます。"
-                : "LINEやInstagramの中で入れた写真は、ホーム画面アプリへ自動では渡りません。URLをコピーして、ChromeやSafari、またはホーム画面アプリで開いてください。"
+                ? "下のURLをコピーし、SafariやChromeのアドレス欄に貼り付けてください。"
+                : "写真と入力内容を引き継ぐには、URLをコピーして、ChromeやSafari、またはホーム画面アプリでひらいてください。"
               : getRestoreBody(status, isIntroHandoff)}
           </p>
 
@@ -270,17 +270,17 @@ function OnboardingContinueContent({
               >
                 {status === "restoring"
                   ? isIntroHandoff
-                    ? "準備しています..."
-                    : "戻しています..."
+                    ? "引き継いでいます..."
+                    : "引き継いでいます..."
                   : status === "restored"
                     ? isIntroHandoff
-                      ? "つづける"
+                      ? "写真を選ぶ"
                       : "ホームへ"
                     : status === "error"
-                      ? "もう一度ためす"
+                      ? "引き継ぎをもう一度試す"
                       : isIntroHandoff
                         ? "このブラウザで つづける"
-                        : "ねがおを戻して ホームへ"}
+                        : "引き継いで ホームへ"}
               </AppButton>
             )}
           </div>
@@ -340,22 +340,22 @@ function buildContinueUrl({
 
 function getRestoreErrorMessage(errorMessage: string) {
   if (errorMessage === "handoff_missing") {
-    return "つづきの情報が見つかりませんでした。この端末ではじめからお試しください。";
+    return "引き継ぎ情報が見つかりませんでした。このブラウザではじめからお試しください。";
   }
 
   if (errorMessage === "handoff_local_storage_failed") {
-    return "写真を端末に戻せませんでした。空き容量を確認して、同じURLからもう一度お試しください。";
+    return "写真をこのブラウザに保存できませんでした。空き容量を確認し、同じURLをもう一度ひらいてください。";
   }
 
   if (errorMessage === "handoff_expired") {
-    return "このつづきのリンクは期限が切れました。元の端末でリンクを作り直すか、この端末ではじめからお試しください。";
+    return "引き継ぎリンクの期限が切れました。リンクを作ったブラウザで作り直すか、このブラウザではじめからお試しください。";
   }
 
   if (errorMessage === "handoff_already_used") {
-    return "このつづきのリンクは使用済みです。すでに復元したホーム画面アプリから開いてください。";
+    return "この引き継ぎリンクは使用済みです。すでに引き継いだブラウザからひらいてください。";
   }
 
-  return "つづきの復元ができませんでした。通信を確認してもう一度試すか、この端末ではじめからお試しください。";
+  return "写真と入力内容を引き継げませんでした。通信を確認してもう一度試すか、このブラウザではじめからお試しください。";
 }
 
 function getRestoreHeading(status: RestoreStatus, isIntroHandoff: boolean) {
@@ -365,35 +365,35 @@ function getRestoreHeading(status: RestoreStatus, isIntroHandoff: boolean) {
     }
 
     if (status === "restoring") {
-      return "つづきを 準備しています";
+      return "このブラウザへ 引き継いでいます";
     }
 
     if (status === "restored") {
-      return "準備できました";
+      return "引き継ぎました";
     }
 
-    return "つづけられませんでした";
+    return "引き継げませんでした";
   }
 
   if (status === "ready") {
-    return "ねがおの つづきを戻します";
+    return "写真と入力内容を 引き継ぎます";
   }
 
   if (status === "restoring") {
-    return "ねがおを 戻しています";
+    return "このブラウザへ 引き継いでいます";
   }
 
   if (status === "restored") {
-    return "ねがおを 戻しました";
+    return "引き継ぎました";
   }
 
-  return "つづきを戻せませんでした";
+  return "引き継げませんでした";
 }
 
 function getRestoreBody(status: RestoreStatus, isIntroHandoff: boolean) {
   if (isIntroHandoff) {
     if (status === "ready") {
-      return "InstagramやLINEで開いたつづきです。ここから写真を入れられます。";
+      return "InstagramやLINEから、このブラウザへ移動します。";
     }
 
     if (status === "restoring") {
@@ -401,14 +401,14 @@ function getRestoreBody(status: RestoreStatus, isIntroHandoff: boolean) {
     }
 
     if (status === "restored") {
-      return "同じ入口を、このブラウザに引き継ぎました。";
+      return "このブラウザで写真を選べます。";
     }
 
-    return "通信を確認して、もう一度お試しください。";
+    return "引き継ぎ情報を確認できませんでした。";
   }
 
   if (status === "ready") {
-    return "さっき入れたねがおを、このブラウザへ戻します。";
+    return "写真と入力内容を、このブラウザへ引き継ぎます。";
   }
 
   if (status === "restoring") {
@@ -416,10 +416,10 @@ function getRestoreBody(status: RestoreStatus, isIntroHandoff: boolean) {
   }
 
   if (status === "restored") {
-    return "この端末に戻せました。ホームへ進みます。";
+    return "このブラウザに引き継ぎました。ホームへ進みます。";
   }
 
-  return "状況に合わせて、下の案内から進んでください。";
+  return "写真と入力内容を引き継げませんでした。";
 }
 
 function isTerminalRestoreError(errorCode: string | null) {

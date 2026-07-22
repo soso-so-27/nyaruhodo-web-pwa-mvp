@@ -71,7 +71,7 @@ export default function AccountCreatePage({
   );
   const initialEmbeddedBrowserLabel =
     readSearchParam(resolvedSearchParams, "embedded") === "1"
-      ? "アプリ内ブラウザ"
+      ? "今ひらいているアプリ"
       : "";
   const router = useRouter();
   const [message, setMessage] = useState("");
@@ -104,8 +104,8 @@ export default function AccountCreatePage({
     ? `${onboardingCatName.trim()}のアルバムをつくる`
     : "うちのこのアルバムをつくる";
   const onboardingAlbumBody = hasOnboardingCatName
-    ? `${onboardingCatName.trim()}のねがおと、届いたねこだよりを\nあとから見返せるようにします。`
-    : "今日のねがおと、届いたねこだよりを\nあとから見返せるようにします。";
+    ? `${onboardingCatName.trim()}のねがおと、とどいたねこだよりを\nあとから見返せるようにします。`
+    : "今日のねがおと、とどいたねこだよりを\nあとから見返せるようにします。";
 
   function markOnboardingAlbumCompletionReady() {
     window.sessionStorage.setItem(ONBOARDING_ALBUM_COMPLETION_READY_KEY, "true");
@@ -256,11 +256,11 @@ export default function AccountCreatePage({
       });
       if (isFromOnboarding) {
         setMessage(
-          `${browserLabel}の中からは、Googleのログインがひらけない決まりになっています。「つづきのリンクを作る」から、Safari/Chromeまたはホーム画面アプリでつづけられます。`,
+          `${browserLabel}の中からはGoogleにログインできません。「Safari／Chromeへ引き継ぐ」から、Safari／Chromeまたはホーム画面アプリでつづけられます。`,
         );
       } else {
         setMessage(
-          `${browserLabel}の中からは、Googleのログインがひらけない決まりになっています。Safari/Chromeで開き直してからお試しください。`,
+          `${browserLabel}の中からはGoogleにログインできません。Safari／Chromeでひらき直してからお試しください。`,
         );
       }
       return;
@@ -276,7 +276,7 @@ export default function AccountCreatePage({
     const supabase = createBrowserSupabaseClient();
 
     if (!supabase) {
-      setMessage("アカウント接続の準備がまだできていません。");
+      setMessage("Googleログインを開始できませんでした。少し時間をおいてお試しください。");
       return;
     }
 
@@ -440,7 +440,7 @@ export default function AccountCreatePage({
       } catch {
         setPendingAction(null);
         setMessage(
-          "つづきの準備ができませんでした。少し時間をおいて、もう一度お試しください。",
+          "引き継ぎリンクを作れませんでした。少し時間をおいて、もう一度お試しください。",
         );
       }
 
@@ -477,12 +477,12 @@ export default function AccountCreatePage({
               <h1 style={styles.title}>
                 {isFromOnboarding
                   ? onboardingAlbumTitle
-                  : "Googleアカウントにログイン中です"}
+                  : "Googleアカウントにログインしています"}
               </h1>
               <p style={styles.body}>
                 {isFromOnboarding
                   ? onboardingAlbumBody
-                  : "この端末のねがおを、アカウントに保存できます。別の端末でも復元できます。"}
+                  : "写真と記録をアカウントに保存できます。別の端末でも見られます。"}
               </p>
               {connectedEmail ? (
                 <p style={styles.connectedEmail}>{connectedEmail}</p>
@@ -533,23 +533,23 @@ export default function AccountCreatePage({
           ) : (
             <>
               <p style={styles.eyebrow}>
-                {isFromOnboarding ? "つづき" : "ねてるねこの保存"}
+                写真と記録の保存
               </p>
               <h1 style={styles.title}>
                 {isFromOnboarding
                   ? onboardingAlbumTitle
-                  : "ねがおを、あとから見返せるように"}
+                  : "写真と記録を、あとから見返せるように"}
               </h1>
               <p style={styles.body}>
                 {isFromOnboarding
                   ? onboardingAlbumBody
-                  : "Googleアカウントで接続すると、この端末のねがおを保存できます。別の端末でも、とったねがおやとどいたねがおを復元できます。"}
+                  : "Googleでログインすると、写真と記録をアカウントに保存できます。別の端末でも見られます。"}
               </p>
               {!isFromOnboarding ? (
                 <div style={styles.valueList} aria-label="保存できるもの">
                   {[
-                    "とったねがお",
-                    "とどいたねがお",
+                    "わたしのねがお",
+                    "とどいた ねこだより",
                     "猫のプロフィール",
                     "写真と記録",
                   ].map((item) => (
@@ -573,9 +573,9 @@ export default function AccountCreatePage({
                 <p style={styles.authNote}>
                   {isEmbeddedBrowser
                     ? isFromOnboarding
-                      ? `${embeddedBrowserLabel}ではGoogleを開けません。つづきのリンクを作り、SafariかChromeで開いてください。`
-                      : `${embeddedBrowserLabel}の中からはGoogleを開けません。SafariかChromeで開き直してください。`
-                    : "Googleの画面が開きます。うまくいかない場合は、SafariかChromeで開き直してください。"}
+                      ? `${embeddedBrowserLabel}ではGoogleにログインできません。「Safari／Chromeへ引き継ぐ」からひらいてください。`
+                      : `${embeddedBrowserLabel}の中からはGoogleをひらけません。SafariかChromeでひらき直してください。`
+                    : "Googleの画面がひらきます。うまくいかない場合は、SafariかChromeでひらき直してください。"}
                 </p>
               ) : null}
 
@@ -596,8 +596,8 @@ export default function AccountCreatePage({
                         {isCheckingAccount
                           ? "準備しています…"
                           : isStartingGoogle
-                            ? "Googleを開いています..."
-                            : "Googleでつづける"}
+                            ? "Googleをひらいています..."
+                            : "Googleでログインして保存"}
                       </AppButton>
                     ) : null}
                     <AppButton
@@ -612,8 +612,8 @@ export default function AccountCreatePage({
                       {isCheckingAccount
                         ? "準備しています…"
                         : isPreparingHandoff
-                          ? "リンクを作っています..."
-                          : "つづきのリンクを作る"}
+                          ? "引き継ぎリンクを作っています..."
+                          : "Safari／Chromeへ引き継ぐ"}
                     </AppButton>
                   </>
                 ) : (
@@ -631,8 +631,8 @@ export default function AccountCreatePage({
                       {isCheckingAccount
                         ? "準備しています…"
                         : isStartingGoogle
-                          ? "Googleを開いています..."
-                          : "Googleで続ける"}
+                          ? "Googleをひらいています..."
+                          : "Googleでログインして保存"}
                     </AppButton>
                     <AppButton
                       type="button"
@@ -642,7 +642,7 @@ export default function AccountCreatePage({
                       size="md"
                       fullWidth
                     >
-                      あとで
+                      今はログインしない
                     </AppButton>
                   </>
                 )}
@@ -713,12 +713,12 @@ function EnvironmentNotice({
   return (
     <div style={isStandalone ? styles.environmentNote : styles.environmentWarning}>
       <p style={styles.environmentTitle}>
-        {getDisplayEnvironmentLabel(environment)}で開いています
+        {getDisplayEnvironmentLabel(environment)}でひらいています
       </p>
       <p style={styles.environmentText}>
         {isStandalone
-          ? "この中の写真と記録をアカウントに保存できます。"
-          : "ホーム画面アプリで撮った写真を保存したい場合は、ホーム画面のねてるねこから開いてください。"}
+          ? "ホーム画面アプリの写真と記録をアカウントに保存できます。"
+          : "ホーム画面アプリで撮った写真を保存したい場合は、ホーム画面のねてるねこからひらいてください。"}
       </p>
     </div>
   );

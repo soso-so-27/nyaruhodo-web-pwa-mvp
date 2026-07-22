@@ -9,7 +9,7 @@ test.describe("service site", () => {
     await expect(page.getByText("一日は、こんなふうに。" )).toBeVisible();
     await expect(page.getByText("くらべない。いそがない。さわがない。" )).toBeVisible();
 
-    const cta = page.getByRole("link", { name: "最初の一通を受け取る" });
+    const cta = page.getByRole("link", { name: "ねがおを選んではじめる" });
     await expect(cta).toHaveAttribute("href", "/onboarding?src=threads");
   });
 

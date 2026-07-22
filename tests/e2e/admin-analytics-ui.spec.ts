@@ -37,14 +37,14 @@ test("shows the launch dashboard in Japanese with actionable sections", async ({
   await expect(page.getByRole("heading", { name: "新規オンボ" })).toBeVisible();
   await expect(page.getByRole("heading", { name: "初回夜便" })).toBeVisible();
   await expect(page.getByRole("heading", { name: "引き継ぎ・復元" })).toBeVisible();
-  await expect(page.getByRole("heading", { name: "今夜の一通" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "今夜のねこだより" })).toBeVisible();
   await expect(
-    page.getByRole("heading", { name: "4匹から1匹を選ぶ" }),
+    page.getByRole("heading", { name: "4枚から1枚を選ぶ" }),
   ).toBeVisible();
-  const fourChoiceSection = page.getByLabel("4匹から1匹を選ぶ");
-  await expect(fourChoiceSection.getByText("4匹で配信").first()).toBeVisible();
+  const fourChoiceSection = page.getByLabel("4枚から1枚を選ぶ");
+  await expect(fourChoiceSection.getByText("4枚で配信").first()).toBeVisible();
   await expect(
-    fourChoiceSection.getByText("1匹へフォールバック"),
+    fourChoiceSection.getByText("1枚へフォールバック"),
   ).toBeVisible();
   await expect(fourChoiceSection.getByText("1/2 便", { exact: false })).toBeVisible();
   await expect(page.getByRole("heading", { name: "端末と入口" })).toBeVisible();
@@ -64,7 +64,7 @@ test("shows the launch dashboard in Japanese with actionable sections", async ({
     page.getByText("赤 直近30分の未解決、または60分で同じ失敗が2 ID以上"),
   ).toBeVisible();
   await expect(page.getByText("利用した人", { exact: true })).toHaveCount(0);
-  await expect(page.getByRole("heading", { name: "写真をもう一度入れたか" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "写真をもう一度追加したか" })).toBeVisible();
   await expect(
     page
       .getByLabel("未解決の出来事")
@@ -183,7 +183,7 @@ const mockAnalyticsResponse = {
   overview: [
     metric("intro", "オンボを見た", 10),
     metric("first_photo", "最初の写真を保存した", 8),
-    metric("instant_arrival", "最初のねこだよりが届いた", 8),
+    metric("instant_arrival", "最初のねこだよりがとどいた", 8),
     metric("instant_open", "最初のねこだよりを開いた", 7),
     metric("evening_reserved", "次の20時便を予約した", 5),
     metric("needs_attention", "要確認の識別ID", 1),
@@ -228,21 +228,21 @@ const mockAnalyticsResponse = {
     metrics: [
       {
         key: "four_choice_assigned",
-        label: "4匹を割り当て",
+        label: "4枚を割り当て",
         cohorts: 3,
         actors: 2,
         events: 3,
       },
       {
         key: "four_choice_exact_four_served",
-        label: "4匹で配信",
+        label: "4枚で配信",
         cohorts: 2,
         actors: 2,
         events: 2,
       },
       {
         key: "four_choice_fallback_single",
-        label: "1匹へフォールバック",
+        label: "1枚へフォールバック",
         cohorts: 1,
         actors: 1,
         events: 1,
@@ -256,14 +256,14 @@ const mockAnalyticsResponse = {
       },
       {
         key: "four_choice_choice_selected",
-        label: "1匹を選択",
+        label: "1枚を選択",
         cohorts: 1,
         actors: 1,
         events: 1,
       },
       {
         key: "four_choice_choice_saved",
-        label: "選んだ1匹を保存",
+        label: "選んだ1枚を保存",
         cohorts: 1,
         actors: 1,
         events: 1,
@@ -279,7 +279,7 @@ const mockAnalyticsResponse = {
     funnel: [
       {
         key: "four_choice_assigned",
-        label: "4匹を割り当て",
+        label: "4枚を割り当て",
         cohorts: 3,
         actors: 2,
         events: 3,
@@ -289,7 +289,7 @@ const mockAnalyticsResponse = {
       },
       {
         key: "four_choice_exact_four_served",
-        label: "4匹で配信",
+        label: "4枚で配信",
         cohorts: 2,
         actors: 2,
         events: 2,
@@ -309,7 +309,7 @@ const mockAnalyticsResponse = {
       },
       {
         key: "four_choice_choice_selected",
-        label: "1匹を選択",
+        label: "1枚を選択",
         cohorts: 1,
         actors: 1,
         events: 1,
@@ -319,7 +319,7 @@ const mockAnalyticsResponse = {
       },
       {
         key: "four_choice_choice_saved",
-        label: "選んだ1匹を保存",
+        label: "選んだ1枚を保存",
         cohorts: 1,
         actors: 1,
         events: 1,

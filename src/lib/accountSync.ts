@@ -775,21 +775,42 @@ export async function restoreCatGalleryPhotosFromAccount(): Promise<CatGalleryAc
   }
 }
 
-export async function deleteAccountSleepingPhoto(photoId: string) {
+export type AccountSleepingPhotoDeleteResult = {
+  status: "deleted" | "local_only";
+};
+
+export async function deleteAccountSleepingPhoto(
+  photoId: string,
+): Promise<AccountSleepingPhotoDeleteResult> {
   if (typeof window === "undefined") {
-    return;
+    return { status: "local_only" };
   }
 
   const supabase = createBrowserSupabaseClient();
 
   if (!supabase) {
-    return;
+    return { status: "local_only" };
+  }
+
+  const { data: sessionData, error: sessionError } =
+    await supabase.auth.getSession();
+
+  if (sessionError) {
+    throw new Error(`Sleeping photo delete session failed: ${sessionError.message}`);
+  }
+
+  if (!sessionData.session) {
+    throw new Error("Sleeping photo delete auth failed: session missing");
   }
 
   const { data, error: authError } = await supabase.auth.getUser();
 
-  if (authError || !data.user) {
-    return;
+  if (authError) {
+    throw new Error(`Sleeping photo delete auth failed: ${authError.message}`);
+  }
+
+  if (!data.user) {
+    throw new Error("Sleeping photo delete auth failed: signed-in user missing");
   }
 
   const { error } = await supabase
@@ -801,6 +822,8 @@ export async function deleteAccountSleepingPhoto(photoId: string) {
   if (error) {
     throw new Error(`Sleeping photo delete failed: ${error.message}`);
   }
+
+  return { status: "deleted" };
 }
 
 export async function hideAccountKeptExchangePhoto(
@@ -2231,7 +2254,7 @@ async function restoreSleepingPhotos(
           delivery.source_photo_id ?? delivery.source_moment_id ?? undefined,
         src: photoSrc,
         ...buildRestoredPhotoVariants(photoSrc),
-        title: typeof metadata.title === "string" ? metadata.title : "とどいたねがお",
+        title: typeof metadata.title === "string" ? metadata.title : "ねこだより",
         subtitle: typeof metadata.subtitle === "string" ? metadata.subtitle : "",
         triggerLabel:
           typeof metadata.trigger_label === "string" ? metadata.trigger_label : "",

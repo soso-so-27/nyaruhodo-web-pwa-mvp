@@ -95,7 +95,7 @@ const LAUNCH_FUNNEL_STEPS: readonly EventDefinition[] = [
   },
   {
     key: "instant_arrival",
-    label: "最初のねこだよりが届いた",
+    label: "最初のねこだよりがとどいた",
     eventNames: ["onboarding_delivery_arrived"],
   },
   {
@@ -155,13 +155,13 @@ const DELIVERY_HEALTH_METRICS: readonly EventDefinition[] = [
   },
   {
     key: "evening_envelope",
-    label: "20時便の封筒を表示",
+    label: "20時便をひらく画面を表示",
     eventNames: ["envelope_shown"],
     route: "/home",
   },
   {
     key: "evening_opened",
-    label: "20時便を開封",
+    label: "20時便をひらいた",
     eventNames: ["delivery_opened"],
   },
   {
@@ -189,13 +189,13 @@ const RETURNING_FUNNEL_STEPS: readonly EventDefinition[] = [
   },
   {
     key: "evening_envelope",
-    label: "20時便の封筒を表示",
+    label: "20時便をひらく画面を表示",
     eventNames: ["envelope_shown"],
     route: "/home",
   },
   {
     key: "evening_opened",
-    label: "20時便を開封",
+    label: "20時便をひらいた",
     eventNames: ["delivery_opened"],
   },
 ];
@@ -1005,21 +1005,21 @@ function buildFourChoiceHealth(events: AdminAnalyticsEvent[]) {
   const metrics = [
     buildFourChoiceMetric({
       key: "four_choice_assigned",
-      label: "4匹を割り当て",
+      label: "4枚を割り当て",
       cohortKeys: assignedKeys,
       rows: assignedRows,
       cohorts,
     }),
     buildFourChoiceMetric({
       key: "four_choice_exact_four_served",
-      label: "4匹で配信",
+      label: "4枚で配信",
       cohortKeys: exactFourKeys,
       rows: exactFourRows,
       cohorts,
     }),
     buildFourChoiceMetric({
       key: "four_choice_fallback_single",
-      label: "1匹へフォールバック",
+      label: "1枚へフォールバック",
       cohortKeys: fallbackSingleKeys,
       rows: fallbackSingleRows,
       cohorts,
@@ -1033,14 +1033,14 @@ function buildFourChoiceHealth(events: AdminAnalyticsEvent[]) {
     }),
     buildFourChoiceMetric({
       key: "four_choice_choice_selected",
-      label: "1匹を選択",
+      label: "1枚を選択",
       cohortKeys: selected.cohortKeys,
       rows: selected.rows,
       cohorts,
     }),
     buildFourChoiceMetric({
       key: "four_choice_choice_saved",
-      label: "選んだ1匹を保存",
+      label: "選んだ1枚を保存",
       cohortKeys: saved.cohortKeys,
       rows: saved.rows,
       cohorts,

@@ -65,7 +65,7 @@ export function OriginalPhotoPreservationController() {
         textAlign: "center",
       }}
     >
-      元の画質で写真を保管できませんでした。通信を確認して、もう一度写真を入れてください。
+      元の画質で写真を保管できませんでした。通信を確認して、もう一度写真を選んでください。
     </p>
   );
 }

@@ -710,30 +710,44 @@ export function updateOwnSleepingPhotoDelivery(photoId: string, shared: boolean)
   return null;
 }
 
-export function deleteOwnSleepingPhoto(photoId: string) {
+export async function deleteOwnSleepingPhoto(photoId: string) {
+  let targetPhoto: OwnSleepingPhoto | undefined;
+  let photos: OwnSleepingPhoto[] = [];
+
   try {
-    const photos = readAllOwnSleepingPhotos();
-    const targetPhoto = photos.find((photo) => photo.id === photoId);
-    const nextPhotos = photos.filter((photo) => photo.id !== photoId);
+    photos = readAllOwnSleepingPhotos();
+    targetPhoto = photos.find((photo) => photo.id === photoId);
 
-    writeStorageArray(OWN_SLEEPING_PHOTO_STORAGE_KEY, nextPhotos);
-
-    if (targetPhoto) {
-      void removePhotoHistoryEntry("own", targetPhoto).catch(() => undefined);
-      purgePhotoSwCacheForSources(
-        [
-          targetPhoto.src,
-          targetPhoto.thumbnailSrc,
-          targetPhoto.displaySrc,
-          targetPhoto.originalSrc,
-        ],
-        "own_photo_deleted",
-      );
+    if (!targetPhoto) {
+      return true;
     }
 
+    await removePhotoHistoryEntry("own", targetPhoto);
+    writeStorageArray(
+      OWN_SLEEPING_PHOTO_STORAGE_KEY,
+      photos.filter((photo) => photo.id !== photoId),
+    );
+    purgePhotoSwCacheForSources(
+      [
+        targetPhoto.src,
+        targetPhoto.thumbnailSrc,
+        targetPhoto.displaySrc,
+        targetPhoto.originalSrc,
+      ],
+      "own_photo_deleted",
+    );
     dispatchBoxPhotoStorageEvent();
+    return true;
   } catch {
-    // Local MVP storage should not block album use.
+    if (targetPhoto) {
+      await upsertPhotoHistoryEntries("own", [targetPhoto]).catch(() => undefined);
+      try {
+        writeStorageArray(OWN_SLEEPING_PHOTO_STORAGE_KEY, photos);
+      } catch {
+        // Keep the durable copy as the source of truth when local cache recovery fails.
+      }
+    }
+    return false;
   }
 }
 

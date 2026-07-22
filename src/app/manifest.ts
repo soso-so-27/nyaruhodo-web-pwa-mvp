@@ -4,7 +4,7 @@ export default function manifest(): MetadataRoute.Manifest {
   return {
     name: "ねてるねこ",
     short_name: "ねてるねこ",
-    description: "ねがおを一枚とると、よる8時にねこだよりがとどく、静かなアプリ",
+    description: "猫のねがおを1枚選ぶと、ほかの猫のねこだよりが最大4枚とどくアプリ",
     start_url: "/home",
     scope: "/",
     display: "standalone",

@@ -18,7 +18,7 @@ import { color, radius, spacing } from "../../components/ui/designTokens";
 import { buildLoginRecoveryHref } from "../../lib/auth/sessionRecovery";
 
 const openingParagraphs = [
-  "ねてるねこは、猫の写真がたくさん流れていく場所ではなく、猫をもっと大切に見られる場所でありたいと思っています。",
+  "ねてるねこは、猫をもっと大切に見られる場所でありたいと思っています。",
   "毎日見ている猫を、もう一度かわいいと思えたり。",
   "知らなかったその子らしさに、少しずつ気づけたり。",
   "まだ出会っていない猫にも、自然に目が向いたり。",
@@ -28,7 +28,7 @@ const openingParagraphs = [
 const valuesParagraphs = [
   "ねてるねこが大事にしたいのは、猫をたくさん見せることよりも、猫を大切に見る時間を増やすことです。",
   "かわいさを競わせるより、その子らしさに気づけること。",
-  "流れて消えていくより、あとからそっと見返せること。",
+  "あとから、そっと見返せること。",
   "誰かに見せるためだけではなく、自分の猫をもっと好きになれること。",
   "そんな場所でありたいと思っています。",
 ] as const;
@@ -65,7 +65,7 @@ const futureItems = [
       "猫との毎日は、特別な日ばかりではありません。",
       "いつもの場所にいること。同じような表情をしていること。なんでもない写真が増えていくこと。",
       "でも、あとから見返すと、そういう時間ほど大切だったりします。",
-      "ねてるねこは、猫との日々が流れて消えず、あとから静かに見返せる場所でありたいです。",
+      "猫との日々を、あとから静かに見返せる場所でありたいです。",
     ],
   },
   {
@@ -150,10 +150,10 @@ export default function BetaSupporterPage() {
     }
 
     if (result.reason === "login_required") {
-      setMessage("ログインの有効期限が切れたため、支払いページを開けませんでした。");
+      setMessage("ログインの有効期限が切れたため、支払いページをひらけませんでした。");
       setNeedsAuthRecovery(true);
     } else {
-      setMessage("支払いページを開けませんでした。通信を確認して、もう一度お試しください。");
+      setMessage("支払いページをひらけませんでした。通信を確認して、もう一度お試しください。");
     }
     setIsLoading(false);
   }
@@ -174,10 +174,10 @@ export default function BetaSupporterPage() {
     }
 
     if (result.reason === "login_required") {
-      setMessage("ログインの有効期限が切れたため、支払い管理を開けませんでした。");
+      setMessage("ログインの有効期限が切れたため、支払い管理をひらけませんでした。");
       setNeedsAuthRecovery(true);
     } else {
-      setMessage("支払い管理を開けませんでした。通信を確認して、もう一度お試しください。");
+      setMessage("支払い管理をひらけませんでした。通信を確認して、もう一度お試しください。");
     }
     setIsLoading(false);
   }
@@ -337,7 +337,7 @@ export default function BetaSupporterPage() {
         <section style={styles.actionSection}>
           <p style={styles.supporterLabel}>βサポーター</p>
           <h2 style={styles.actionTitle}>この場所を支える</h2>
-          <p style={styles.price}>月額 1,500円（税別）</p>
+          <p style={styles.price}>月額 1,650円（税込）</p>
           <p style={styles.note}>
             ねてるねこを、静かに長く続く場所にするための応援です。
           </p>
@@ -361,7 +361,7 @@ export default function BetaSupporterPage() {
             </AppButton>
               {!billingStatus.canManageBilling ? (
                 <p style={styles.note}>
-                  支払い管理を開けません。問い合わせからご連絡ください。
+                  支払い管理をひらけません。問い合わせからご連絡ください。
                 </p>
               ) : null}
             </>
@@ -390,7 +390,7 @@ export default function BetaSupporterPage() {
               onClick={handleStartSupporter}
               disabled={isLoading}
             >
-              {isLoading ? "Stripeへ移動しています" : "応援する"}
+              {isLoading ? "Stripeへ移動しています" : "月額1,650円で応援する"}
             </AppButton>
           ) : !billingStatus.isLoggedIn ? (
             <>
@@ -413,9 +413,9 @@ export default function BetaSupporterPage() {
             </p>
           )}
           <div style={styles.billingTerms}>
-            <p style={styles.note}>毎月自動で更新され、いつでも解約できます。</p>
+            <p style={styles.note}>月額1,650円（税込）で毎月自動更新され、いつでも解約できます。</p>
             <p style={styles.note}>
-              解約後もその期間の末日まで有効です。保存した写真や、とどいたねこだよりは失われません。
+              解約後もその期間の末日までβサポーターです。保存した写真と、とどいたねこだよりは引き続き見られます。
             </p>
           </div>
           {message ? <p style={styles.message} role="status">{message}</p> : null}

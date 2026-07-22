@@ -29,7 +29,7 @@ export default function AppError({
     <main style={styles.page}>
       <section style={styles.panel} role="alert">
         <p style={styles.kicker}>ねてるねこ</p>
-        <h1 style={styles.title}>うまく開けませんでした</h1>
+        <h1 style={styles.title}>うまくひらけませんでした</h1>
         <p style={styles.copy}>
           通信を確認して、もう一度お試しください。保存済みの写真や記録は、そのまま残ります。
         </p>
@@ -40,7 +40,7 @@ export default function AppError({
             void recoverAppShell().catch(() => reset());
           }}
         >
-          更新してひらく
+          最新版を読み込む
         </button>
         <div style={styles.secondaryActions}>
           <a href="/" style={styles.link}>

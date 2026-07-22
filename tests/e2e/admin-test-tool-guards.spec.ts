@@ -88,7 +88,7 @@ test.describe("admin test tool guards", () => {
 
     await expect(page.locator('a[href="/onboarding?test=1"]')).toHaveCount(0);
     await expect(
-      page.getByRole("button", { name: "とどくねがおを追加する" }),
+      page.getByRole("button", { name: "ねこだよりを追加する" }),
     ).toHaveCount(0);
     await expect(page.getByText("データの削除・退会")).toBeVisible();
     await expect(page.getByText("通知", { exact: true })).toHaveCount(0);
@@ -246,7 +246,7 @@ test.describe("admin test tool guards", () => {
 
     await expect(page.locator('a[href="/onboarding?test=1"]')).toHaveCount(1);
     await expect(
-      page.getByRole("button", { name: "とどくねがおを追加する" }),
+      page.getByRole("button", { name: "ねこだよりを追加する" }),
     ).toBeVisible();
   });
 
@@ -290,7 +290,7 @@ test.describe("admin test tool guards", () => {
     await page.waitForLoadState("networkidle");
 
     await expect(
-      page.getByRole("button", { name: "改善メモを書く" }),
+      page.getByRole("button", { name: "感想・不具合・要望を送る" }),
     ).toBeVisible();
     await expect(page.getByText("βサポーター", { exact: true })).toBeVisible();
     await expect(
@@ -396,7 +396,9 @@ test.describe("admin test tool guards", () => {
     await page.waitForLoadState("networkidle");
 
     await expect(page.getByText("βサポーターについて").first()).toBeVisible();
-    await expect(page.getByRole("button", { name: "応援する" })).toBeVisible();
+    await expect(
+      page.getByRole("button", { name: "月額1,650円で応援する" }),
+    ).toBeVisible();
     await expect(page.getByRole("button", { name: "支払いを管理" })).toBeHidden();
   });
 });

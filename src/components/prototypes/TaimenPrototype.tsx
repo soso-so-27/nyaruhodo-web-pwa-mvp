@@ -56,7 +56,7 @@ const modes: Array<{ id: PrototypeMode; label: string; caption: string }> = [
   {
     id: "b1",
     label: "改1",
-    caption: "便箋として下に敷く",
+    caption: "下に敷く",
   },
   {
     id: "b2",
@@ -107,7 +107,7 @@ export function TaimenPrototype() {
         <span style={styles.kicker}>taimen b refine</span>
         <h1 style={styles.title}>対面表示 Bリファイン</h1>
         <p style={styles.lead}>
-          むぎを主役にしたまま、届いたねこだよりを「便箋に敷く」か「隅にそえる」かで比べる静止比較です。実機では下の入力から、むぎの実写真に差し替えられます。
+          むぎを主役にしたまま、ねこだよりを「下に敷く」か「隅にそえる」かで比べる静止比較です。実機では下の入力から、むぎの実写真に差し替えられます。
         </p>
       </section>
 
@@ -157,7 +157,7 @@ export function TaimenPrototype() {
             />
           </label>
           <label style={styles.fileInput}>
-            <span>届いた写真</span>
+            <span>ねこだより</span>
             <span style={styles.fileButton}>写真を選ぶ</span>
             <span style={styles.fileState}>
               {deliveredOverride ? "差し替え済み" : "サンプル表示中"}
@@ -188,11 +188,11 @@ export function TaimenPrototype() {
       <section style={styles.notes}>
         <PrototypeNote
           title="改1"
-          body="むぎ写真の下に便箋を置き、届いた寝顔を読める大きさで添えます。2匹を両方見る寄りです。"
+          body="むぎ写真の下にねこだよりを置き、読める大きさで添えます。2匹を両方見る寄りです。"
         />
         <PrototypeNote
           title="改2"
-          body="むぎ写真を絵葉書の主役にし、届いた寝顔は小さなねこだよりとして隅にそえます。"
+          body="むぎ写真を大きく見せ、ねこだよりは小さく隅にそえます。"
         />
       </section>
     </main>
@@ -207,7 +207,7 @@ function LetterBelow({
   return (
     <div style={styles.letterBelowWrap} data-testid="taimen-mode-b1">
       <HeroPhoto photo={photos.own} aspect="3 / 4" fit="cover" />
-      <div style={styles.stationeryCard} aria-label="届いた便箋">
+      <div style={styles.stationeryCard} aria-label="ねこだよりを下に敷く案">
         <div style={styles.stationeryPhotoFrame}>
           <img
             src={photos.delivered.src}
@@ -245,7 +245,7 @@ function TayoriCorner({
         </div>
       </div>
       <p style={styles.variantCaption}>
-        むぎの絵葉書に、とどいた ねこだよりをそえます。
+        むぎの写真に、ねこだよりをそえます。
       </p>
     </div>
   );

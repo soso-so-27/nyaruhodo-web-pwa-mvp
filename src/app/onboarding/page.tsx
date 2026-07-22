@@ -1,9 +1,9 @@
 import type { Metadata } from "next";
 import { OnboardingFlow } from "../../components/onboarding/OnboardingFlow";
 
-const title = "ねてるねこ | 猫の寝顔が、よる8時にとどく";
+const title = "ねてるねこ | ねこだよりが、よる8時にとどく";
 const description =
-  "じぶんの猫の寝顔を一枚入れると、知らないおうちの猫の寝顔が一通とどく、静かなWebアプリです。";
+  "じぶんの猫のねがおを1枚選ぶと、ほかの猫のねこだよりが最大4枚とどき、その中から1枚を「とどいた」に保存できるWebアプリです。";
 const socialImage = "/images/social/onboarding-og.webp";
 
 export const metadata: Metadata = {
@@ -24,7 +24,7 @@ export const metadata: Metadata = {
         url: socialImage,
         width: 1200,
         height: 630,
-        alt: "猫の封蝋がついた、ねてるねこのねこだより",
+        alt: "ねてるねこのねこだよりのイラスト",
       },
     ],
   },

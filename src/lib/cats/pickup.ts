@@ -328,7 +328,7 @@ function createFirstPhotoCandidate({
     type: "first_photo",
     sourceId: firstPhoto.id,
     title: "はじめてのねがお",
-    body: "最初の1枚を残せました",
+    body: "最初の1枚を保存しました",
     actionLabel: "見る",
     score: 80,
     scoredAt: firstPhoto.createdAt || now,

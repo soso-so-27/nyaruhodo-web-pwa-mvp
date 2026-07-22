@@ -117,9 +117,9 @@ export default function AdminAnimationPreviewClient() {
           Analyticsへ戻る
         </a>
         <p style={styles.kicker}>Admin preview</p>
-        <h1 style={styles.title}>開封アニメーション確認</h1>
+        <h1 style={styles.title}>ねこだよりをひらく動きの確認</h1>
         <p style={styles.description}>
-          実機でねこだより開封の見え方を確認できます。通常ユーザーには表示されません。
+          実機でねこだよりをひらくときの見え方を確認できます。通常ユーザーには表示されません。
         </p>
       </section>
 
@@ -167,7 +167,7 @@ export default function AdminAnimationPreviewClient() {
         </section>
       ) : null}
 
-      <section style={styles.previewShell} aria-label="開封アニメーション確認">
+      <section style={styles.previewShell} aria-label="ねこだよりをひらく動きの確認">
         <div
           style={{
             ...styles.phoneFrame,
@@ -263,7 +263,7 @@ export default function AdminAnimationPreviewClient() {
                   <div style={styles.resultPhotoFrame}>
                     <img
                       src={PREVIEW_PHOTO_SRC}
-                      alt="開封アニメーション確認用の猫写真"
+                      alt="ねこだよりをひらく動きの確認用猫写真"
                       draggable={false}
                       style={styles.resultPhoto}
                     />

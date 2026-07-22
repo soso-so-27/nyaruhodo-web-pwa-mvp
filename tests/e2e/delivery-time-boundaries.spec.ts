@@ -469,7 +469,7 @@ function createDeliveredPhotos(count: number): ExchangePhoto[] {
     id: `delivery-photo-${index + 1}`,
     sourcePhotoId: `source-photo-${index + 1}`,
     src: `storage:admin-stock/sleeping/delivery-photo-${index + 1}.jpg`,
-    title: "とどいたねがお",
+    title: "ねこだより",
     subtitle: "",
     triggerLabel: "sleeping",
     theme: "sleeping",

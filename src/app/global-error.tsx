@@ -9,9 +9,9 @@ export default function GlobalError() {
         <main style={styles.page}>
           <section style={styles.panel} role="alert">
             <p style={styles.kicker}>ねてるねこ</p>
-            <h1 style={styles.title}>画面を開けませんでした</h1>
+            <h1 style={styles.title}>画面をひらけませんでした</h1>
             <p style={styles.copy}>
-              通信を確認して、もう一度お試しください。直らない場合は、アプリを閉じて開き直してください。
+              通信を確認して、もう一度お試しください。直らない場合は、アプリを閉じてひらき直してください。
             </p>
             <button
               type="button"
@@ -20,7 +20,7 @@ export default function GlobalError() {
                 void recoverAppShell();
               }}
             >
-              更新してひらく
+              最新版を読み込む
             </button>
             <a href="/" style={styles.link}>
               ホームへ戻る

@@ -67,7 +67,7 @@ type ENavVariant = (typeof E_NAV_VARIANTS)[number];
 const eNavLabels: Record<ENavVariant, string> = {
   "e-nav-rainbow": "虹",
   "e-nav-sumi": "墨",
-  "e-nav-seal": "封蝋",
+  "e-nav-seal": "赤茶",
 };
 
 const eNavIconPaths: Record<ENavVariant, string> = {

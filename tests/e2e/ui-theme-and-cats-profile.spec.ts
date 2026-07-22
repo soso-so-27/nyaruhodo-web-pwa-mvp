@@ -77,10 +77,10 @@ test("keeps the cats photo tab clear of the fixed bottom navigation", async ({
     .toBe(true);
   await expect(page.getByText("この子の写真")).toBeVisible();
   await expect(
-    page.getByText("とっておきたい一枚を、ここにしまっておけます。"),
+    page.getByText("残しておきたい写真を、ここに追加できます。"),
   ).toBeVisible();
   await expect(page.getByTestId("cats-photo-lens-filter")).toHaveCount(0);
-  await expect(page.getByRole("button", { name: "写真をしまう" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "写真を追加" })).toBeVisible();
   await expect(photoItems).toHaveCount(16);
   await expect(grid.locator('[data-app-pressable="photo"]')).toHaveCount(16);
   await expect
@@ -157,9 +157,9 @@ test("keeps the cats photo tab clear of the fixed bottom navigation", async ({
     navBox?.y ?? 0,
   );
 
-  await page.getByRole("button", { name: "写真をしまう" }).click();
+  await page.getByRole("button", { name: "写真を追加" }).click();
   await expect(
-    page.getByText("ここにしまった写真は、ねこだよりには使われません。"),
+    page.getByText("追加した写真は、ねこだよりには使われません。"),
   ).toBeVisible();
 });
 

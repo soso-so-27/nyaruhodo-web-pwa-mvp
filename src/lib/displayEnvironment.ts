@@ -88,7 +88,7 @@ export function getEmbeddedBrowserInfo(): EmbeddedBrowserInfo {
     (userAgent.includes("; wv)") ||
       (userAgent.includes("version/4.0") && userAgent.includes("chrome/")))
   ) {
-    return { isEmbedded: true, label: "アプリ内ブラウザ" };
+    return { isEmbedded: true, label: "今ひらいているアプリ" };
   }
 
   return { isEmbedded: false, label: "" };

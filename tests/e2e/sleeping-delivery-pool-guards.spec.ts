@@ -709,10 +709,10 @@ test.describe("sleeping delivery pool guards", () => {
     await page.goto("/account-deletion");
 
     await expect(
-      page.getByText("すでにお届けしたねがおは、受け取った方の記録に残ります。"),
+      page.getByText("すでにおとどけしたねこだよりは、受け取った方の記録に残ります。"),
     ).toHaveCount(1);
     await expect(
-      page.getByText("保存されている写真ファイル（すでにお届けしたねがおを除く）"),
+      page.getByText("保存されている写真ファイル（すでにねこだよりとして相手にとどいた写真を除く）"),
     ).toHaveCount(1);
   });
 

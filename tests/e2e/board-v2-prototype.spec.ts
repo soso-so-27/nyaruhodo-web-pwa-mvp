@@ -266,7 +266,7 @@ async function seedBoard(page: Page, sentCount: number, includeDelivered: boolea
               id: "delivered-board",
               sourcePhotoId: "stock-board",
               src: makeDataUrl("#8b6f62", 48, 32),
-              title: "とどいたねがお",
+              title: "ねこだより",
               subtitle: "",
               triggerLabel: "sleeping",
               theme: "sleeping",

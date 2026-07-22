@@ -17,7 +17,6 @@ import {
   snoozeHomeInstallHint,
   type HomeInstallPlatform,
 } from "../../lib/homeInstall";
-import { getOrCreateAnonymousId } from "../../lib/identity/anonymousId";
 import { purgeAllPhotoSwCache } from "../../lib/photoSwCache";
 import {
   completePhotoSourceSet,
@@ -119,6 +118,7 @@ import {
   type OwnSleepingPhoto,
 } from "../../lib/home/sleepingPhotos";
 import { backupOwnSleepingPhotoMoment } from "../../lib/home/sleepingPhotoBackup";
+import { sendPhotoReport } from "../../lib/home/photoReports";
 import { readOnboardingProgress } from "../../lib/onboarding/progress";
 import {
   STORAGE_KEYS,
@@ -1375,17 +1375,17 @@ export function HomeInput({
         String(Date.now()),
       );
       setIsAccountRestoreSheetOpen(false);
-      showToast("復元しました");
+      showToast("この端末に読み込みました");
       return;
     }
 
     if (result.status === "error") {
-      showToast("復元できませんでした");
+      showToast("この端末に読み込めませんでした");
       return;
     }
 
     setIsAccountRestoreSheetOpen(false);
-    showToast("復元できるデータはありません");
+    showToast("読み込める写真や記録はありません");
   }
 
   async function recordMikkeWindowAnswer(
@@ -1548,7 +1548,7 @@ export function HomeInput({
           },
           { localCatId: activeCatId },
         );
-        showToast("写真を残したよ");
+        showToast("写真を保存しました");
       } catch {
         showToast(PHOTO_SAVE_FAILURE_MESSAGE);
       }
@@ -1937,13 +1937,13 @@ export function HomeInput({
         );
         showToast(
           savedCount > 0
-            ? `とどくねがおを${savedCount}枚入れました`
+            ? `ねこだよりを${savedCount}枚追加しました`
             : PHOTO_SAVE_FAILURE_MESSAGE,
         );
       } catch {
         showToast(
           savedCount > 0
-            ? `とどくねがおを${savedCount}枚入れました`
+            ? `ねこだよりを${savedCount}枚追加しました`
             : PHOTO_SAVE_FAILURE_MESSAGE,
         );
       } finally {
@@ -2021,7 +2021,7 @@ export function HomeInput({
     keepExchangePhoto(photo);
     setCollectionRefreshTick((value) => value + 1);
     setDeliveredExchangePhoto(null);
-    showToast("アルバムに入りました");
+    showToast("「とどいた」に保存しました");
     trackProductEvent(
       "home_exchange_photo_kept",
       {
@@ -2050,7 +2050,16 @@ export function HomeInput({
   function handleReportExchangePhoto(photo: ExchangePhoto) {
     reportExchangePhoto(photo);
     setDeliveredExchangePhoto(null);
-    showToast("通報して閉じました");
+    showToast("この写真を表示から外し、運営へ報告しています");
+    void sendPhotoReport(photo, "other")
+      .then(() => {
+        showToast("運営に報告し、この写真を表示から外しました");
+      })
+      .catch(() => {
+        showToast(
+          "この写真は表示から外しましたが、運営に報告できませんでした。必要な場合は設定の「問い合わせ」からお知らせください。",
+        );
+      });
     trackProductEvent(
       "home_exchange_photo_reported",
       {
@@ -2381,10 +2390,16 @@ export function HomeInput({
     reason: ExchangePhotoReportReason,
   ) {
     reportExchangePhoto(photo, reason);
-    showToast("うけつけました");
-    void sendPhotoReport(photo, reason).catch(() => {
-      // The local report blocks this photo immediately; remote moderation can retry later.
-    });
+    showToast("この写真を今回の選択から外し、運営へ報告しています");
+    void sendPhotoReport(photo, reason)
+      .then(() => {
+        showToast("運営に報告し、この写真を今回の選択から外しました");
+      })
+      .catch(() => {
+        showToast(
+          "この写真は今回の選択から外しましたが、運営に報告できませんでした。必要な場合は設定の「問い合わせ」からお知らせください。",
+        );
+      });
     trackProductEvent(
       "home_evening_choice_candidate_reported",
       {
@@ -2425,10 +2440,16 @@ export function HomeInput({
     setOpeningEveningDelivery(null);
     setCollectionRefreshTick((value) => value + 1);
     setEveningRefreshTick((value) => value + 1);
-    showToast("うけつけました");
-    void sendPhotoReport(photo, reason).catch(() => {
-      // Local reporting hides the photo immediately; remote moderation can retry later.
-    });
+    showToast("この写真を表示から外し、運営へ報告しています");
+    void sendPhotoReport(photo, reason)
+      .then(() => {
+        showToast("運営に報告し、この写真を表示から外しました");
+      })
+      .catch(() => {
+        showToast(
+          "この写真は表示から外しましたが、運営に報告できませんでした。必要な場合は設定の「問い合わせ」からお知らせください。",
+        );
+      });
     trackProductEvent(
       "home_evening_delivery_photo_reported",
       {
@@ -2558,7 +2579,7 @@ export function HomeInput({
     void backupOwnSleepingPhotoMoment(ownPhoto).then((result) => {
       if (shared && !result.ok) {
         showToast(
-          "ねこだよりの予約はできましたが、写真を審査へ送れませんでした。通信を確認して、もう一度おためしください。",
+          "写真は保存しましたが、運営確認へ送れませんでした。通信を確認して、もう一度お試しください。",
         );
       }
     });
@@ -2619,7 +2640,7 @@ export function HomeInput({
     void backupOwnSleepingPhotoMoment(ownPhoto).then((result) => {
       if (!result.ok) {
         showToast(
-          "ねこだよりの予約はできましたが、写真を審査へ送れませんでした。通信を確認して、もう一度おためしください。",
+          "写真は「わたしのねがお」に保存しましたが、運営確認へ送れませんでした。通信を確認して、もう一度お試しください。",
         );
       }
     });
@@ -2629,10 +2650,10 @@ export function HomeInput({
 
     if (deliveryTarget.targetSaveFailed) {
       showToast(
-        "写真はのこりましたが、ねこだよりの予約を保存できませんでした。もう一度おためしください。",
+        "写真は「わたしのねがお」に保存しましたが、次のねこだよりがとどく設定に失敗しました。もう一度お試しください。",
       );
     } else if (!deliveryTarget.isExchangeTarget) {
-      showToast("とったねがおに入りました。");
+      showToast("「わたしのねがお」に保存しました。");
     }
     trackProductEvent(
       "take_photo",
@@ -2691,7 +2712,7 @@ export function HomeInput({
     });
     void backupOwnSleepingPhotoMoment(ownPhoto);
     setCollectionRefreshTick((value) => value + 1);
-    showToast("とったねがおに入りました");
+    showToast("「わたしのねがお」に自分だけで保存しました");
     trackProductEvent(
       "home_exchange_share_photo_declined",
       {
@@ -2859,7 +2880,7 @@ export function HomeInput({
           catProfiles={catProfiles}
           selectedCatId={pendingExchangeCatId ?? activeCatId}
           isExchangeTargetAvailable={canUsePendingPhotoAsDeliveryTarget}
-          deliveryCopy="よる8時に とどきます。"
+          deliveryCopy="保存すると、よる8時ごろにねこだよりがとどきます。"
           onCatSelect={handlePendingExchangeCatSelect}
           onModeChange={(mode) => {
             trackProductEvent(
@@ -3347,7 +3368,7 @@ function MikkeAllSheet({
                   <span style={styles.mikkeLockedSummaryText}>
                     {lastLabel ? `${lastLabel}、みっけ` : "みっけ済み"}
                   </span>
-                  <span style={styles.mikkeLockedSummarySub}>開く</span>
+                  <span style={styles.mikkeLockedSummarySub}>ひらく</span>
                 </button>
               ) : null}
               {isLocked && isExpandedLocked ? (
@@ -3591,7 +3612,7 @@ function MikkeWindowContent({
               onClick={() => onAddPhoto(photoSlot)}
               disabled={isPhotoAdding}
             >
-              {isPhotoAdding ? "追加中..." : "写真も入れる"}
+              {isPhotoAdding ? "追加中..." : "写真も追加する"}
             </button>
           ) : null}
         </div>
@@ -3928,7 +3949,7 @@ function EveningDeliverySingleOpening({
               key={`evening-opening-photo-${photoRetryKey}`}
               src={getPhotoDetailSrc(state.deliveredPhoto)}
               fallbackSrcs={getPhotoFallbackSrcs(state.deliveredPhoto)}
-              alt="届いたねがお"
+              alt="ねこだより"
               style={styles.eveningOpeningPhoto}
               storageVariant={getPhotoStorageVariant(state.deliveredPhoto, "detail")}
               loading="eager"
@@ -3994,13 +4015,13 @@ function EveningDeliverySingleOpening({
           <p style={styles.eveningOpeningSavedNote}>
             {isFirstDelivery ? (
               <>
-                どこかのおうちから届いた一通です。
+                どこかのおうちからとどいたねこだよりです。
                 <br />
               </>
             ) : null}
-            この一通は、
+            この写真は、
             <span style={styles.eveningOpeningSavedPhrase}>
-              『とどいた』にしまわれました
+              「とどいた」に保存しました
             </span>
           </p>
         </div>
@@ -4012,7 +4033,7 @@ function EveningDeliverySingleOpening({
           onClick={() => requestClose()}
           style={styles.eveningOpeningTomorrowButton}
         >
-          また、あした
+          ホームへ
         </button>
       </div>
     </div>
@@ -4360,7 +4381,7 @@ export function EveningDeliveryFourChoice({
                 ...styles.eveningFourChoiceTitle,
               }}
             >
-              {savedPhoto ? "保存しました" : "今夜の4匹"}
+              {savedPhoto ? "「とどいた」に保存しました" : "4枚のねこだより"}
             </p>
             <span style={styles.eveningOpeningMastheadRule} aria-hidden="true" />
           </div>
@@ -4376,7 +4397,7 @@ export function EveningDeliveryFourChoice({
                 <StoredPhotoImage
                   src={getPhotoDetailSrc(savedPhoto)}
                   fallbackSrcs={getPhotoFallbackSrcs(savedPhoto)}
-                  alt="今夜残した猫"
+                  alt="「とどいた」に保存したねこだより"
                   storageVariant={getPhotoStorageVariant(savedPhoto, "detail")}
                   loading="eager"
                   onStorageDataUrl={(dataUrl) => onStorageDataUrl(savedPhoto, dataUrl)}
@@ -4393,11 +4414,11 @@ export function EveningDeliveryFourChoice({
                 data-testid="evening-four-choice-lead"
                 style={styles.eveningFourChoiceLead}
               >
-                残したい写真を1枚えらんでください
+                「とどいた」に保存する1枚をえらんでください
               </p>
               <div
                 role="radiogroup"
-                aria-label="今夜残す猫"
+                aria-label="「とどいた」に保存するねこだよりをえらぶ"
                 style={styles.eveningFourChoiceGrid}
               >
                 {photos.map((photo, index) => {
@@ -4493,17 +4514,17 @@ export function EveningDeliveryFourChoice({
                   style={styles.eveningFourChoiceReport}
                   onClick={() => setReportingPhoto(selectedPhoto)}
                 >
-                  この写真を報告
+                  運営に報告
                 </button>
               ) : null}
               {saveError ? (
                 <p role="alert" style={styles.eveningFourChoiceError}>
-                  保存できませんでした。もう一度お試しください。
+                  選んだ写真を「とどいた」に保存できませんでした。もう一度お試しください。
                 </p>
               ) : null}
               {skipError ? (
                 <p role="alert" style={styles.eveningFourChoiceError}>
-                  操作できませんでした。もう一度お試しください。
+                  保存しない処理に失敗しました。もう一度お試しください。
                 </p>
               ) : null}
               <button
@@ -4526,7 +4547,7 @@ export function EveningDeliveryFourChoice({
                     : {}),
                 }}
               >
-                {isSaving ? "保存しています…" : "この写真を保存"}
+                {isSaving ? "保存しています…" : "この1枚を保存"}
               </button>
               <button
                 type="button"
@@ -4550,7 +4571,7 @@ export function EveningDeliveryFourChoice({
             onClick={() => requestClose()}
             style={styles.eveningOpeningTomorrowButton}
           >
-            閉じる
+            ホームへ
           </button>
         ) : null}
       </div>
@@ -4558,7 +4579,7 @@ export function EveningDeliveryFourChoice({
         <div onClick={(event) => event.stopPropagation()}>
           <AppSheet
             placement="bottom"
-            title="この写真を報告"
+            title="この写真を運営に報告"
             onClose={() => setReportingPhoto(null)}
           >
             <div style={styles.eveningFourReportActions}>
@@ -4621,7 +4642,7 @@ function HomeInstallInvitationSheet({
 
   return (
     <AppBottomSheet
-      title="よる8時に、ここへ戻れるように"
+      title="ねてるねこをホーム画面に追加"
       onClose={onDismiss}
       showCloseButton={false}
       variant="paper"
@@ -4633,9 +4654,9 @@ function HomeInstallInvitationSheet({
       >
         <p style={styles.homeInstallDeviceLabel}>{deviceLabel}</p>
         <p style={styles.homeInstallInvitationText}>
-          ねてるねこをホーム画面に置いておけます。
+          ホーム画面にアイコンを追加できます。
           <br />
-          よる8時のねこだよりへ、すぐ戻れます。
+          アプリのように、すぐひらけます。
         </p>
         <AppButton
           type="button"
@@ -4651,7 +4672,7 @@ function HomeInstallInvitationSheet({
           size="md"
           onClick={onDismiss}
         >
-          あとで
+          今は追加しない
         </AppButton>
       </div>
     </AppBottomSheet>
@@ -4678,7 +4699,7 @@ function HomeInstallGuideSheet({
           "右上の「追加」を押す",
         ]
       : [
-          "右上のメニューを開く",
+          "右上のメニューをひらく",
           "「アプリをインストール」または「ホーム画面に追加」を選ぶ",
         ];
 
@@ -4700,7 +4721,7 @@ function HomeInstallGuideSheet({
           fullWidth
           style={styles.homeInstallPrimary}
         >
-          わかりました
+          手順を閉じる
         </AppButton>
       </div>
     </AppBottomSheet>
@@ -4719,7 +4740,7 @@ function SleepingPhotoSourceSheet({
   return (
     <AppSheet
       placement="bottom"
-      title="今夜の一枚を入れる"
+      title="ねがおの写真を選ぶ"
       variant="dim"
       onClose={onClose}
       style={styles.exchangeSheetFrame}
@@ -4743,7 +4764,7 @@ function SleepingPhotoSourceSheet({
               <AppIcon name="camera" size={18} />
             </span>
             <span style={styles.sleepingSourceText}>
-              <span style={styles.sleepingSourceTitle}>いま撮る</span>
+              <span style={styles.sleepingSourceTitle}>いま とる</span>
               <span style={styles.sleepingSourceBody}>寝ているところを、そのまま。</span>
             </span>
           </button>
@@ -4759,7 +4780,7 @@ function SleepingPhotoSourceSheet({
             </span>
             <span style={styles.sleepingSourceText}>
               <span style={styles.sleepingSourceTitle}>写真からえらぶ</span>
-              <span style={styles.sleepingSourceBody}>さっき撮ったねがおも使えます。</span>
+              <span style={styles.sleepingSourceBody}>前に とったねがおも選べます。</span>
             </span>
           </button>
         </div>
@@ -4788,20 +4809,20 @@ function SleepingSafetySheet({
       <div style={styles.sleepingSafetyBody}>
         <div style={styles.sleepingSafetyList}>
           <p style={styles.sleepingSafetyItem}>
-            <span style={styles.sleepingSafetyLine}>送る写真は、どこかのおうちに</span>
-            <span style={styles.sleepingSafetyLine}>ねこだよりとして届きます。</span>
+            <span style={styles.sleepingSafetyLine}>ねこだよりにする写真は、運営確認後</span>
+            <span style={styles.sleepingSafetyLine}>ほかの利用者へとどくことがあります。</span>
           </p>
           <p style={styles.sleepingSafetyItem}>
             <span style={styles.sleepingSafetyLine}>人の顔・住所・名前が写る写真は</span>
             <span style={styles.sleepingSafetyLine}>送らないでください。</span>
           </p>
           <p style={styles.sleepingSafetyItem}>
-            <span style={styles.sleepingSafetyLine}>とどいた写真は、SNSなどに</span>
+            <span style={styles.sleepingSafetyLine}>ねこだよりは、SNSなどに</span>
             <span style={styles.sleepingSafetyLine}>公開しないでください。</span>
           </p>
           <p style={styles.sleepingSafetyItem}>
             <span style={styles.sleepingSafetyLine}>人の顔・住所・名前が写っていたら</span>
-            <span style={styles.sleepingSafetyLine}>報告してください。</span>
+            <span style={styles.sleepingSafetyLine}>運営に報告してください。</span>
           </p>
         </div>
         <label style={styles.sleepingSafetyCheck}>
@@ -4845,15 +4866,15 @@ function ExchangePhotoSheet({
   return (
     <AppSheet
       placement="bottom"
-      title={"ねがおがとどきました"}
+      title={"ねこだよりがとどきました"}
       variant="dim"
       onClose={onClose}
       style={styles.exchangeSheetFrame}
       headerAction={
         <AppButton
           type="button"
-          aria-label={"通報して閉じる"}
-          title={"通報して閉じる"}
+          aria-label={"運営に報告"}
+          title={"運営に報告"}
           variant="ghost"
           size="icon"
           iconOnly
@@ -4873,10 +4894,10 @@ function ExchangePhotoSheet({
             onStorageDataUrl={onStorageDataUrl}
           />
         </div>
-        <p style={styles.exchangeAssurance}>しまうと、アルバムに入ります。</p>
+        <p style={styles.exchangeAssurance}>保存すると「とどいた」で見返せます。</p>
         <div style={styles.exchangeActions}>
           <button type="button" style={styles.exchangeKeepButton} onClick={onKeep}>
-            しまう
+            保存する
           </button>
           <button type="button" style={styles.exchangePlainButton} onClick={onClose}>
             閉じる
@@ -4925,9 +4946,9 @@ function ExchangeSharePermissionSheet({
     null;
   const statusCopy =
     saveState === "saved"
-      ? "しまいました。"
+      ? "保存しました。"
       : isPrivate
-        ? "じぶんの記録にのこします。そとには出ません。"
+        ? "自分だけに保存します。ほかの人にはとどきません。"
         : deliveryCopy;
 
   useEffect(() => {
@@ -4977,7 +4998,7 @@ function ExchangeSharePermissionSheet({
   return (
     <AppSheet
       placement="bottom"
-      title={"このねがおを のこす"}
+      title={"このねがおの保存方法"}
       variant="dim"
       closeOnOverlay={false}
       onClose={onClose}
@@ -4995,12 +5016,12 @@ function ExchangeSharePermissionSheet({
             }}
             onClick={handleSave}
             loading={saveState === "saving"}
-            loadingLabel="のこしています"
+            loadingLabel="保存しています"
             disabled={saveState !== "idle"}
             data-testid="exchange-share-submit"
             data-save-state={saveState}
           >
-            {saveState === "saved" ? "しまいました" : "のこす"}
+            {saveState === "saved" ? "保存しました" : "保存する"}
           </AppButton>
         </div>
       }
@@ -5034,11 +5055,11 @@ function ExchangeSharePermissionSheet({
         <div data-exchange-share-decisions="" style={styles.exchangeDecisionStack}>
         {shouldShowCatPicker ? (
           <div style={styles.exchangeDecisionBlock}>
-            <p style={styles.exchangeDecisionLabel}>この子の記録に入れる</p>
+            <p style={styles.exchangeDecisionLabel}>保存先の猫</p>
             <div
               style={styles.exchangeCatPicker}
               role="radiogroup"
-              aria-label="入れる猫"
+              aria-label="保存先の猫を選ぶ"
             >
               {catProfiles.map((profile) => {
                 const isSelected = profile.id === selectedCatId;
@@ -5076,7 +5097,7 @@ function ExchangeSharePermissionSheet({
             }}
           >
             <span style={styles.exchangeSelectedCatText}>
-              {getCatName(selectedCatProfile)}の記録に入ります
+              {getCatName(selectedCatProfile)}の記録として保存します
             </span>
           </div>
         ) : null}
@@ -5084,7 +5105,12 @@ function ExchangeSharePermissionSheet({
         {isExchangeTargetAvailable ? (
           <div style={styles.exchangeDecisionBlock}>
             <p style={styles.exchangeDecisionLabel}>ねこだより</p>
-            <div style={styles.exchangeModeGroup} role="group" aria-label="ねこだより">
+            <div
+              data-exchange-share-mode-group=""
+              style={styles.exchangeModeGroup}
+              role="group"
+              aria-label="ねこだより"
+            >
               <button
                 type="button"
                 style={{
@@ -5104,8 +5130,8 @@ function ExchangeSharePermissionSheet({
                   <AppIcon name="mail" size={18} />
                 </span>
                 <span style={styles.exchangeModeText}>
-                  <span style={styles.exchangeModeLabel}>届ける</span>
-                  <span style={styles.exchangeModeSub}>よる8時の便りに使う</span>
+                  <span style={styles.exchangeModeLabel}>ねこだよりにする</span>
+                  <span style={styles.exchangeModeSub}>運営確認後、ほかの利用者へとどくことがあります</span>
                 </span>
               </button>
               <button
@@ -5128,7 +5154,7 @@ function ExchangeSharePermissionSheet({
                 </span>
                 <span style={styles.exchangeModeText}>
                   <span style={styles.exchangeModeLabel}>自分だけ</span>
-                  <span style={styles.exchangeModeSub}>ねこだよりに使わない</span>
+                  <span style={styles.exchangeModeSub}>ほかの人にはとどきません</span>
                 </span>
               </button>
             </div>
@@ -5139,7 +5165,7 @@ function ExchangeSharePermissionSheet({
               <AppIcon name="lock" size={17} />
             </span>
             <span style={styles.exchangeSelectedCatText}>
-              きょうの便りは届いたので、自分だけの記録にします
+              きょうのねこだよりはとどいているため、自分だけに保存します
             </span>
           </div>
         )}
@@ -5179,6 +5205,11 @@ const exchangeShareResponsiveStyles = `
   [data-exchange-share-decisions] {
     --exchange-share-decision-gap: 6px;
     --exchange-share-decision-margin: 6px 0 2px;
+  }
+}
+@media (max-width: 359px) {
+  [data-exchange-share-mode-group] [data-exchange-share-mode-icon] {
+    display: none !important;
   }
 }`;
 
@@ -5253,10 +5284,10 @@ function AccountRestoreSheet({
   onClose: () => void;
 }) {
   return (
-    <AppBottomSheet title="アカウントのデータがあります" onClose={onClose}>
+    <AppBottomSheet title="アカウントの写真と記録があります" onClose={onClose}>
       <div style={styles.accountRestoreBody}>
         <p style={styles.accountRestoreLead}>
-          別の端末で保存した猫データを、この端末に復元できます。
+          アカウントに保存した写真と記録を、この端末に読み込みます。
         </p>
         {summary ? (
           <div style={styles.accountRestoreStats}>
@@ -5264,8 +5295,8 @@ function AccountRestoreSheet({
             <span>記録 {summary.remoteRecords}</span>
             <span>この子の写真 {summary.remoteCatGalleryPhotos}</span>
             <span>写真 {summary.remoteCollectionPhotos}</span>
-            <span>とったねがお {summary.remoteOwnSleepingPhotos}</span>
-            <span>とどいたねがお {summary.remoteKeptExchangePhotos}</span>
+            <span>わたしのねがお {summary.remoteOwnSleepingPhotos}</span>
+            <span>とどいた ねこだより {summary.remoteKeptExchangePhotos}</span>
           </div>
         ) : null}
         <div style={styles.accountRestoreActions}>
@@ -5275,7 +5306,7 @@ function AccountRestoreSheet({
             disabled={isRestoring}
             style={styles.accountRestorePrimary}
           >
-            {isRestoring ? "復元中..." : "復元する"}
+            {isRestoring ? "読み込み中..." : "この端末に読み込む"}
           </button>
           <button
             type="button"
@@ -5283,7 +5314,7 @@ function AccountRestoreSheet({
             disabled={isRestoring}
             style={styles.accountRestoreSecondary}
           >
-            あとで
+            今は読み込まない
           </button>
         </div>
       </div>
@@ -5428,7 +5459,7 @@ function HomeBulletinBoard({
       onTouchStart={handleTouchStart}
       onTouchEnd={handleTouchEnd}
       onClick={isOpen ? () => setIsOpen(false) : undefined}
-      aria-label={isOpen ? "うちの子らしさ" : "すぐ入れる"}
+      aria-label={isOpen ? "うちの子らしさ" : "おすすめと写真の記録"}
     >
       <div
         style={{
@@ -5442,7 +5473,7 @@ function HomeBulletinBoard({
             type="button"
             style={styles.boardDockHeader}
             onClick={() => setIsOpen(true)}
-            aria-label="おすすめを開く"
+            aria-label="おすすめをひらく"
           >
             <span style={styles.boardDockLiftHandle} aria-hidden="true" />
           </button>
@@ -5785,42 +5816,6 @@ function getBoardCounterSecondaryText(surfaceText?: string) {
 
 function formatSleepingCounterCount(count: number) {
   return String(count);
-}
-
-async function sendPhotoReport(
-  photo: ExchangePhoto,
-  reason: ExchangePhotoReportReason,
-) {
-  const headers = new Headers({ "content-type": "application/json" });
-  const supabase = createBrowserSupabaseClient();
-
-  if (supabase) {
-    const { data } = await supabase.auth.getSession();
-    const accessToken = data.session?.access_token;
-
-    if (accessToken) {
-      headers.set("authorization", `Bearer ${accessToken}`);
-    }
-  }
-
-  await fetch("/api/reports", {
-    method: "POST",
-    headers,
-    body: JSON.stringify({
-      photoId: photo.id,
-      sourcePhotoId: photo.sourcePhotoId ?? null,
-      anonymousId: getOrCreateReportAnonymousId(),
-      reason,
-    }),
-  });
-}
-
-function getOrCreateReportAnonymousId() {
-  try {
-    return getOrCreateAnonymousId();
-  } catch {
-    return `anon-${Date.now()}-${Math.random().toString(16).slice(2)}`;
-  }
 }
 
 function buildHomeCatCounters({
@@ -6297,9 +6292,9 @@ function buildHomeBoardItems({
       kind: "collection",
       priority: 45,
       title: "今日の1枚",
-      body: "写真を入れる",
+      body: "写真を追加する",
       icon: "camera",
-      actionLabel: "写真を入れる",
+      actionLabel: "写真を追加する",
       actionType: "open_collection_photo",
       surfaceText: collectionTargetLabel,
     });

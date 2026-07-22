@@ -90,12 +90,6 @@ export function removePhotoHistoryEntry(
   kind: PhotoHistoryLedgerKind,
   photo: Pick<PhotoHistoryLedgerEntry, "id" | "sourcePhotoId">,
 ) {
-  const cached = ledgerCache.get(kind) ?? [];
-  ledgerCache.set(
-    kind,
-    cached.filter((entry) => !hasMatchingLedgerIdentity(entry, photo)),
-  );
-
   return queueLedgerWrite(kind, async () => {
     const persisted = await readDurableClientValue<PhotoHistoryLedgerEntry[]>(
       getLedgerStorageKey(kind),

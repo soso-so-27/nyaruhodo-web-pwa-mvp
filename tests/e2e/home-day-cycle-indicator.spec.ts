@@ -667,7 +667,9 @@ test.describe("home desk state cycle", () => {
       "data-state",
       "1b",
     );
-    await expect(page.getByText("また、あした")).toBeVisible();
+    await expect(page.getByTestId("home-letter-tray")).toContainText(
+      "保存すると、次のよる8時ごろにねこだよりがとどきます",
+    );
     await expect(page.getByText("きょうは とどかない")).toHaveCount(0);
   });
 

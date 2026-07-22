@@ -106,7 +106,7 @@ test.describe("account deletion UI", () => {
 
     await expect(page.getByTestId("auth-recovery-notice")).toBeVisible();
     await expect(
-      page.getByRole("link", { name: "Googleでログインし直す" }),
+      page.getByRole("link", { name: "Googleで再ログインする" }),
     ).toHaveAttribute(
       "href",
       "/account/create?returnTo=%2Faccount-deletion",

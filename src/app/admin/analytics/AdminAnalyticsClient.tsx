@@ -175,8 +175,8 @@ const EVENT_LABELS: Record<string, string> = {
   onboarding_delivery_error: "最初のねこだより作成失敗",
   onboarding_delivery_blocked: "最初のねこだよりを用意できなかった",
   onboarding_handoff_restore_failed: "外部ブラウザへの引き継ぎ失敗",
-  delivery_reveal_photo_error: "届いた写真の表示失敗",
-  delivery_reveal_photo_rendered: "届いた写真を実表示",
+  delivery_reveal_photo_error: "とどいた写真の表示失敗",
+  delivery_reveal_photo_rendered: "とどいた写真を実表示",
   evening_delivery_check_failure: "20時便の確認失敗",
   evening_delivery_check_failed: "20時便の確認失敗",
   evening_delivery_check_timeout: "20時便の確認が長時間化",
@@ -272,12 +272,12 @@ export default function AdminAnalyticsClient() {
           <p style={styles.kicker}>運用</p>
           <h1 style={styles.title}>初動アナリティクス</h1>
           <p style={styles.intro}>
-            投稿3の入口から、最初の一通と次の20時便までを識別IDとイベントで確認します。
+            投稿3の入口から、最初のねこだよりと次の20時便までを識別IDとイベントで確認します。
           </p>
         </div>
         <nav style={styles.adminLinks} aria-label="管理画面">
           <a href="/admin/animation-preview" style={styles.adminLink}>
-            開封確認
+            ひらいたか確認
           </a>
           <a href="/admin/board-v2" style={styles.adminLink}>
             ねこだより確認
@@ -384,7 +384,7 @@ export default function AdminAnalyticsClient() {
             <SectionHeading
               id="funnel-title"
               title="新規オンボ"
-              note="はじめて来た人が、最初の一通まで順番どおり進んだ記録"
+              note="はじめて来た人が、最初のねこだよりまで順番どおり進んだ記録"
             />
             <FunnelTable steps={data.newOnboardingFunnel ?? data.funnel} />
           </section>
@@ -410,7 +410,7 @@ export default function AdminAnalyticsClient() {
           <section style={styles.section} aria-labelledby="delivery-title">
             <SectionHeading
               id="delivery-title"
-              title="今夜の一通"
+              title="今夜のねこだより"
               note="20時以降は、開始した識別IDと成立した識別IDが一致するかを確認"
             />
             <div style={styles.metricGridCompact}>
@@ -432,7 +432,7 @@ export default function AdminAnalyticsClient() {
             >
               <SectionHeading
                 id="four-choice-title"
-                title="4匹から1匹を選ぶ"
+                title="4枚から1枚を選ぶ"
                 note="同じ識別ID・配達日・割当・便IDが一致した記録だけを、1便単位で集計"
               />
               <AnalyticsTable
@@ -497,7 +497,7 @@ export default function AdminAnalyticsClient() {
             />
             {data.sourceBreakdown.length > 0 ? (
               <AnalyticsTable
-                columns={["入口", "オンボ表示ID", "写真保存ID", "即時便開封ID", "次便予約ID"]}
+                columns={["入口", "オンボ表示ID", "写真保存ID", "即時便をひらいたID", "次便予約ID"]}
                 rows={data.sourceBreakdown.map((row) => [
                   SOURCE_LABELS[row.source] ?? row.source,
                   `${row.introUsers} ID`,
@@ -514,7 +514,7 @@ export default function AdminAnalyticsClient() {
           <section style={styles.section} aria-labelledby="retention-title">
             <SectionHeading
               id="retention-title"
-              title="写真をもう一度入れたか"
+              title="写真をもう一度追加したか"
               note="活動しただけのIDは数えず、写真保存の記録だけを使用"
             />
             <div style={styles.metricGridCompact}>
@@ -561,7 +561,7 @@ export default function AdminAnalyticsClient() {
             <SectionHeading
               id="errors-title"
               title="未解決の出来事"
-              note="同じID・同じ原因の連続記録は、一つの出来事にまとめています"
+              note="同じID・同じ原因で重複した記録は、一つの出来事にまとめています"
             />
             {data.errorSummary.length > 0 ? (
               <>
@@ -773,7 +773,7 @@ function getIssueAction(eventName: string) {
     eventName === "onboarding_delivery_failure" ||
     eventName === "onboarding_delivery_blocked"
   ) {
-    return "見ること: 同じIDの後続に「最初のねこだよりが届いた」がなければ、オンボの到着経路を確認。";
+    return "見ること: 同じIDの後続に「最初のねこだよりがとどいた」がなければ、オンボの到着経路を確認。";
   }
   if (
     eventName === "evening_delivery_check_failure" ||

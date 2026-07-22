@@ -94,10 +94,10 @@ test.describe("beta release smoke", () => {
     await page.goto("/how-to-use");
 
     await expect(
-      page.getByText(/「届ける」でねがおをのこした日/),
+      page.getByText(/「ねこだよりにする」で保存すると、次のよる8時ごろ/),
     ).toBeVisible();
     await expect(
-      page.getByText(/「自分だけ」でのこした写真/),
+      page.getByText(/「自分だけ」で保存した写真/),
     ).toBeVisible();
     await expect(page.getByRole("heading", { name: "ホーム画面に置く" })).toBeVisible();
     await expect(page.getByText(/LINEやInstagramの中では追加できません/)).toBeVisible();
@@ -158,7 +158,7 @@ test.describe("beta release smoke", () => {
 
     await expect(page.locator('meta[property="og:title"]')).toHaveAttribute(
       "content",
-      "ねてるねこ | 猫の寝顔が、よる8時にとどく",
+      "ねてるねこ | ねこだよりが、よる8時にとどく",
     );
     await expect(page.locator('meta[property="og:image"]')).toHaveAttribute(
       "content",
