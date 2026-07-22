@@ -4353,7 +4353,13 @@ export function EveningDeliveryFourChoice({
             <span aria-hidden="true">×</span>
           </button>
           <div style={styles.eveningOpeningMasthead}>
-            <p id="evening-four-choice-title" style={styles.eveningOpeningTitle}>
+            <p
+              id="evening-four-choice-title"
+              style={{
+                ...styles.eveningOpeningTitle,
+                ...styles.eveningFourChoiceTitle,
+              }}
+            >
               {savedPhoto ? "保存しました" : "今夜の4匹"}
             </p>
             <span style={styles.eveningOpeningMastheadRule} aria-hidden="true" />
@@ -4383,7 +4389,10 @@ export function EveningDeliveryFourChoice({
             </div>
           ) : (
             <>
-              <p style={styles.eveningFourChoiceLead}>
+              <p
+                data-testid="evening-four-choice-lead"
+                style={styles.eveningFourChoiceLead}
+              >
                 残したい写真を1枚えらんでください
               </p>
               <div
@@ -7185,8 +7194,7 @@ const styles = {
     backgroundPosition: "var(--app-paper-background-position)",
     backgroundRepeat: "var(--app-paper-background-repeat)",
     color: "#202020",
-    fontFamily:
-      'Outfit, "Zen Kaku Gothic New", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
+    fontFamily: "var(--font-ui)",
   },
   startupPage: {
     position: "fixed",
@@ -7197,8 +7205,7 @@ const styles = {
     overflow: "hidden",
     background: "#f4f1ea",
     color: "var(--ink-soft)",
-    fontFamily:
-      'Outfit, "Zen Kaku Gothic New", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
+    fontFamily: "var(--font-ui)",
   },
   homeContentLayer: {
     display: "contents",
@@ -7309,7 +7316,7 @@ const styles = {
     background: "color-mix(in srgb, var(--seal) 10%, transparent)",
     color: "var(--seal)",
     fontSize: "12px",
-    fontWeight: 600,
+    fontWeight: 500,
   },
   boardPeek: {
     position: "fixed",
@@ -7515,7 +7522,7 @@ const styles = {
   boardSleepCounterSub: {
     color: "#746a5f",
     fontSize: "11.2px",
-    fontWeight: 430,
+    fontWeight: 400,
     lineHeight: 1.16,
     whiteSpace: "nowrap",
     overflow: "hidden",
@@ -7964,7 +7971,7 @@ const styles = {
   boardDockSub: {
     color: "#746a5f",
     fontSize: "11.2px",
-    fontWeight: 430,
+    fontWeight: 400,
     lineHeight: 1.18,
     fontVariantNumeric: "tabular-nums",
     overflow: "hidden",
@@ -8068,7 +8075,7 @@ const styles = {
     whiteSpace: "nowrap",
     color: "#746a5f",
     fontSize: "12px",
-    fontWeight: 590,
+    fontWeight: 500,
   },
   boardMemoList: {
     display: "grid",
@@ -8722,7 +8729,7 @@ const styles = {
     color: "#5b4d40",
     fontFamily: "var(--font-display)",
     fontSize: "13px",
-    fontWeight: 430,
+    fontWeight: 400,
     lineHeight: 1.2,
     letterSpacing: "0.02em",
   },
@@ -8869,7 +8876,7 @@ const styles = {
     color: "#746a5f",
     fontFamily: "var(--font-display)",
     fontSize: "18px",
-    fontWeight: 430,
+    fontWeight: 400,
     letterSpacing: "0.08em",
   },
   eveningOpeningPairStage: {
@@ -8930,6 +8937,10 @@ const styles = {
     width: "min(calc(100vw - 32px), 406px)",
     boxSizing: "border-box",
   },
+  eveningFourChoiceTitle: {
+    fontFamily: "var(--font-ui)",
+    fontWeight: 500,
+  },
   eveningFourChoiceClose: {
     position: "absolute",
     top: "8px",
@@ -8942,16 +8953,18 @@ const styles = {
     borderRadius: "999px",
     background: "transparent",
     color: "var(--ink-soft)",
-    fontFamily: "inherit",
+    fontFamily: "var(--font-ui)",
     fontSize: "24px",
-    fontWeight: 300,
+    fontWeight: 400,
     lineHeight: 1,
     cursor: "pointer",
   },
   eveningFourChoiceLead: {
     margin: "12px 0 14px",
     color: "var(--ink-soft)",
+    fontFamily: "var(--font-ui)",
     fontSize: "13px",
+    fontWeight: 400,
     lineHeight: 1.65,
     textAlign: "center",
   },
@@ -8998,8 +9011,9 @@ const styles = {
     borderRadius: "999px",
     background: "rgba(36, 32, 28, 0.72)",
     color: "#fff",
+    fontFamily: "var(--font-ui)",
     fontSize: "11px",
-    fontWeight: 700,
+    fontWeight: 500,
     boxSizing: "border-box",
     backdropFilter: "blur(6px)",
   },
@@ -9014,8 +9028,9 @@ const styles = {
     borderRadius: "999px",
     background: "var(--seal)",
     color: "var(--paper-card)",
+    fontFamily: "var(--font-ui)",
     fontSize: "14px",
-    fontWeight: 700,
+    fontWeight: 500,
     letterSpacing: "0.04em",
     cursor: "pointer",
     transition: "opacity 140ms ease, transform 140ms ease",
@@ -9032,8 +9047,9 @@ const styles = {
     border: 0,
     background: "transparent",
     color: "var(--ink-soft)",
-    fontFamily: "inherit",
+    fontFamily: "var(--font-ui)",
     fontSize: "12px",
+    fontWeight: 400,
     lineHeight: 1.5,
     textDecoration: "underline",
     textUnderlineOffset: "3px",
@@ -9042,7 +9058,9 @@ const styles = {
   eveningFourChoiceError: {
     margin: "10px 0 0",
     color: "var(--danger, #9f3f36)",
+    fontFamily: "var(--font-ui)",
     fontSize: "12px",
+    fontWeight: 400,
     lineHeight: 1.5,
     textAlign: "center",
   },
@@ -9054,7 +9072,9 @@ const styles = {
     border: 0,
     background: "transparent",
     color: "var(--ink-soft)",
+    fontFamily: "var(--font-ui)",
     fontSize: "12px",
+    fontWeight: 400,
     textDecoration: "underline",
     textUnderlineOffset: "3px",
     cursor: "pointer",
@@ -9087,8 +9107,9 @@ const styles = {
   eveningFourSavedCopy: {
     margin: 0,
     color: "var(--ink-soft)",
+    fontFamily: "var(--font-ui)",
     fontSize: "13px",
-    fontWeight: 600,
+    fontWeight: 500,
     lineHeight: 1.6,
     textAlign: "center",
   },
@@ -9258,7 +9279,7 @@ const styles = {
   sleepingSourceTitle: {
     color: "#3b332c",
     fontSize: "15px",
-    fontWeight: 600,
+    fontWeight: 500,
     lineHeight: 1.35,
   },
   sleepingSourceBody: {
@@ -9309,7 +9330,7 @@ const styles = {
   exchangeCatSelectedMark: {
     color: "#a8493f",
     fontSize: "12px",
-    fontWeight: 720,
+    fontWeight: 500,
     lineHeight: 1,
   },
   exchangeSelectedCatCard: {
@@ -9454,7 +9475,7 @@ const styles = {
   },
   exchangeModeLabel: {
     fontSize: "13px",
-    fontWeight: 520,
+    fontWeight: 500,
     lineHeight: 1.25,
     whiteSpace: "nowrap",
   },
@@ -9495,7 +9516,7 @@ const styles = {
     background: "var(--ink)",
     color: "var(--paper)",
     fontSize: "15px",
-    fontWeight: 520,
+    fontWeight: 500,
     letterSpacing: "0.04em",
     cursor: "pointer",
     boxShadow:

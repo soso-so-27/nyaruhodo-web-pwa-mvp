@@ -1,6 +1,76 @@
 import { expect, test, type Page } from "@playwright/test";
 
 test.describe("settings page organization", () => {
+  test("keeps the mobile type scale and control font consistent", async ({ page }) => {
+    await seedLoggedInSession(page);
+    await mockSettingsApis(page, {
+      referral: loggedInReferralSummary(),
+      beta: {
+        isLoggedIn: true,
+        isBetaParticipant: false,
+        feedbackEnabled: true,
+        supporterVoiceEnabled: false,
+        isBetaSupporter: false,
+      },
+    });
+
+    await page.goto("/settings");
+    await page.waitForLoadState("networkidle");
+    await page.evaluate(() => document.fonts.ready);
+
+    const typography = await page.evaluate(() => {
+      const title = Array.from(
+        document.querySelectorAll<HTMLElement>("h1"),
+      ).find((element) => element.getClientRects().length > 0);
+      if (!title) {
+        throw new Error("Missing settings title");
+      }
+      const bodyFamily = window.getComputedStyle(document.body).fontFamily;
+      const titleStyle = window.getComputedStyle(title);
+      const range = document.createRange();
+      range.selectNodeContents(title);
+      const titleLineCount = new Set(
+        Array.from(range.getClientRects())
+          .filter((rect) => rect.width > 0 && rect.height > 0)
+          .map((rect) => Math.round(rect.top * 2) / 2),
+      ).size;
+      const mismatchedControls = Array.from(
+        document.querySelectorAll<HTMLElement>("button, input, select, textarea"),
+      )
+        .filter((element) => element.getClientRects().length > 0)
+        .filter(
+          (element) => window.getComputedStyle(element).fontFamily !== bodyFamily,
+        )
+        .map((element) => ({
+          tag: element.tagName.toLowerCase(),
+          text: element.textContent?.trim().slice(0, 40) ?? "",
+          fontFamily: window.getComputedStyle(element).fontFamily,
+        }));
+
+      return {
+        bodyFamily,
+        title: {
+          fontFamily: titleStyle.fontFamily,
+          fontSize: titleStyle.fontSize,
+          fontWeight: titleStyle.fontWeight,
+          lineCount: titleLineCount,
+        },
+        mismatchedControls,
+        hasHorizontalOverflow:
+          document.documentElement.scrollWidth > window.innerWidth,
+      };
+    });
+
+    expect(typography.title).toEqual({
+      fontFamily: typography.bodyFamily,
+      fontSize: "24px",
+      fontWeight: "500",
+      lineCount: 1,
+    });
+    expect(typography.mismatchedControls).toEqual([]);
+    expect(typography.hasHorizontalOverflow).toBe(false);
+  });
+
   test("keeps the photo storage note folded until requested", async ({ page }) => {
     await seedLoggedInSession(page);
     await mockSettingsApis(page, {

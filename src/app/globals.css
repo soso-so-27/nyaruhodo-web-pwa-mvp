@@ -37,6 +37,13 @@ body {
   font-synthesis-weight: none;
 }
 
+button,
+input,
+select,
+textarea {
+  font-family: inherit;
+}
+
 @media all and (display-mode: standalone) {
   html,
   body {

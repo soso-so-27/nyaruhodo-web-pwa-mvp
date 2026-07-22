@@ -188,7 +188,7 @@ const viewerStyles = {
     color: "var(--ink)",
     fontFamily: "var(--font-ui)",
     fontSize: "15px",
-    fontWeight: 520,
+    fontWeight: 500,
     lineHeight: 1.35,
     letterSpacing: "0.04em",
     cursor: "pointer",

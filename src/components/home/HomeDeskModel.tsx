@@ -2473,7 +2473,7 @@ const deskStyles = {
       "0 1px 0 color-mix(in srgb, var(--paper-card) 68%, transparent) inset, 0 10px 22px -18px color-mix(in srgb, var(--ink) 22%, transparent)",
     fontFamily: "var(--font-ui)",
     fontSize: "var(--home-empty-action-size, 14px)",
-    fontWeight: 600,
+    fontWeight: 500,
     letterSpacing: "var(--tracking-body)",
     cursor: "pointer",
     WebkitTapHighlightColor: "transparent",

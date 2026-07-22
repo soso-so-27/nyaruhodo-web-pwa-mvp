@@ -3186,7 +3186,7 @@ const styles = {
   photoDebugSummary: {
     cursor: "pointer",
     color: "var(--seal)",
-    fontWeight: 600,
+    fontWeight: 500,
     letterSpacing: "0.03em",
   },
   photoDebugText: {
@@ -3205,7 +3205,7 @@ const styles = {
   },
   photoDebugLabel: {
     color: "#8a7d70",
-    fontWeight: 600,
+    fontWeight: 500,
   },
   photoDebugValue: {
     minWidth: 0,

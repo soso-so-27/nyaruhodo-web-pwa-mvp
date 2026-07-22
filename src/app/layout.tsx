@@ -30,9 +30,18 @@ const kleeOne = localFont({
 });
 
 const zenKakuGothicNew = localFont({
-  src: "../../public/fonts/zen-kaku-gothic-new-400-subset.woff2",
-  weight: "400",
-  style: "normal",
+  src: [
+    {
+      path: "../../public/fonts/zen-kaku-gothic-new-400-subset.woff2",
+      weight: "400",
+      style: "normal",
+    },
+    {
+      path: "../../public/fonts/zen-kaku-gothic-new-500-subset.woff2",
+      weight: "500",
+      style: "normal",
+    },
+  ],
   variable: "--font-zen-kaku",
   display: "swap",
 });

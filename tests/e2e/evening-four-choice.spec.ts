@@ -50,6 +50,94 @@ test.describe("20時便の4匹選択", () => {
     const choices = choiceDialog.getByTestId("evening-four-choice-option");
     await expect(choiceDialog).toBeVisible();
     await expect(choices).toHaveCount(4);
+    await page.evaluate(() => document.fonts.ready);
+    const typography = await choiceDialog.evaluate((dialog) => {
+      const elements = {
+        title: dialog.querySelector<HTMLElement>("#evening-four-choice-title"),
+        lead: dialog.querySelector<HTMLElement>(
+          '[data-testid="evening-four-choice-lead"]',
+        ),
+        save: dialog.querySelector<HTMLElement>(
+          '[data-testid="evening-four-choice-save"]',
+        ),
+        skip: dialog.querySelector<HTMLElement>(
+          '[data-testid="evening-four-choice-skip"]',
+        ),
+      };
+      const lineCount = (element: HTMLElement) => {
+        const range = document.createRange();
+        range.selectNodeContents(element);
+        return new Set(
+          Array.from(range.getClientRects())
+            .filter((rect) => rect.width > 0 && rect.height > 0)
+            .map((rect) => Math.round(rect.top * 2) / 2),
+        ).size;
+      };
+      const bodyFamily = window.getComputedStyle(document.body).fontFamily;
+      const primaryFamily = bodyFamily
+        .split(",")[0]
+        .trim()
+        .replace(/^["']|["']$/g, "");
+      const loadedUiFaces = Array.from(document.fonts)
+        .filter(
+          (face) =>
+            face.family.replace(/^["']|["']$/g, "") === primaryFamily,
+        )
+        .map((face) => ({ status: face.status, weight: face.weight }));
+      return {
+        bodyFamily,
+        loadedUiFaces,
+        fontChecks: {
+          normal: document.fonts.check(
+            `400 13px "${primaryFamily}"`,
+            elements.lead?.textContent ?? "",
+          ),
+          medium: document.fonts.check(
+            `500 14px "${primaryFamily}"`,
+            elements.save?.textContent ?? "",
+          ),
+        },
+        entries: Object.fromEntries(
+          Object.entries(elements).map(([key, element]) => {
+            if (!element) {
+              throw new Error(`Missing typography target: ${key}`);
+            }
+            const computed = window.getComputedStyle(element);
+            return [
+              key,
+              {
+                fontFamily: computed.fontFamily,
+                fontSize: computed.fontSize,
+                fontWeight: computed.fontWeight,
+                lineCount: lineCount(element),
+                overflows: element.scrollWidth > element.clientWidth,
+              },
+            ];
+          }),
+        ),
+      };
+    });
+    expect(
+      Object.values(typography.entries).map((entry) => entry.fontFamily),
+    ).toEqual([
+      typography.bodyFamily,
+      typography.bodyFamily,
+      typography.bodyFamily,
+      typography.bodyFamily,
+    ]);
+    expect(typography.loadedUiFaces).toEqual(
+      expect.arrayContaining([
+        { status: "loaded", weight: "400" },
+        { status: "loaded", weight: "500" },
+      ]),
+    );
+    expect(typography.fontChecks).toEqual({ normal: true, medium: true });
+    expect(typography.entries).toMatchObject({
+      title: { fontSize: "22px", fontWeight: "500", lineCount: 1, overflows: false },
+      lead: { fontSize: "13px", fontWeight: "400", lineCount: 1, overflows: false },
+      save: { fontSize: "14px", fontWeight: "500", lineCount: 1, overflows: false },
+      skip: { fontSize: "12px", fontWeight: "400", lineCount: 1, overflows: false },
+    });
     await expect.poll(() => readChoicePhotoIds(choices)).toEqual([
       "four-choice-delivery-1",
       "four-choice-delivery-2",
