@@ -56,6 +56,8 @@ export type OnboardingProgress = {
   ownPhoto?: OwnSleepingPhoto;
   selectedPhotoSrc?: string;
   deliveredPhoto?: ExchangePhoto;
+  deliveredPhotos?: ExchangePhoto[];
+  deliveryBundleId?: string;
   isDeliveredPhotoKept?: boolean;
   completionCopy?: string;
   updatedAt: number;
@@ -293,6 +295,9 @@ function buildPatchedOnboardingProgress(
   const deliveredPhoto = sanitizeOptionalDeliveredPhoto(
     patch.deliveredPhoto ?? current?.deliveredPhoto,
   );
+  const deliveredPhotos = sanitizeOptionalDeliveredPhotos(
+    patch.deliveredPhotos ?? current?.deliveredPhotos,
+  );
   const journeyId = patch.journeyId ?? current?.journeyId;
 
   return {
@@ -309,6 +314,8 @@ function buildPatchedOnboardingProgress(
     ownPhoto: patch.ownPhoto ?? current?.ownPhoto,
     selectedPhotoSrc: patch.selectedPhotoSrc ?? current?.selectedPhotoSrc,
     ...(deliveredPhoto ? { deliveredPhoto } : {}),
+    ...(deliveredPhotos ? { deliveredPhotos } : {}),
+    deliveryBundleId: patch.deliveryBundleId ?? current?.deliveryBundleId,
     isDeliveredPhotoKept:
       patch.isDeliveredPhotoKept ?? current?.isDeliveredPhotoKept,
     completionCopy: patch.completionCopy ?? current?.completionCopy,
@@ -321,10 +328,30 @@ function sanitizeOptionalDeliveredPhoto(photo: ExchangePhoto | undefined) {
   return sanitizeExchangePhotoForPersistence(photo) ?? undefined;
 }
 
+function sanitizeOptionalDeliveredPhotos(photos: ExchangePhoto[] | undefined) {
+  if (!Array.isArray(photos)) {
+    return undefined;
+  }
+
+  const sanitized = photos
+    .map((photo) => sanitizeExchangePhotoForPersistence(photo))
+    .filter((photo): photo is ExchangePhoto => Boolean(photo))
+    .filter(
+      (photo, index, allPhotos) =>
+        allPhotos.findIndex((candidate) => candidate.id === photo.id) === index,
+    )
+    .slice(0, 4);
+
+  return sanitized.length > 0 ? sanitized : undefined;
+}
+
 function prepareOnboardingProgressForPersistence(
   progress: OnboardingProgress,
 ): OnboardingProgress {
   const deliveredPhoto = sanitizeOptionalDeliveredPhoto(progress.deliveredPhoto);
+  const deliveredPhotos = sanitizeOptionalDeliveredPhotos(
+    progress.deliveredPhotos,
+  );
   const resumeToken = progress.resumeToken ?? createOnboardingResumeToken();
 
   if (isOnboardingJourneyId(progress.journeyId)) {
@@ -340,6 +367,9 @@ function prepareOnboardingProgressForPersistence(
     ...progress,
     resumeToken,
     ...(deliveredPhoto ? { deliveredPhoto } : { deliveredPhoto: undefined }),
+    ...(deliveredPhotos
+      ? { deliveredPhotos }
+      : { deliveredPhotos: undefined }),
     updatedAt: Date.now(),
   };
 }
@@ -432,6 +462,17 @@ function isValidOnboardingProgress(
       isOnboardingJourneyId(value.journeyId)) &&
     (value.resumeToken === undefined ||
       isOnboardingResumeToken(value.resumeToken)) &&
+    (value.deliveryBundleId === undefined ||
+      (typeof value.deliveryBundleId === "string" &&
+        value.deliveryBundleId.length > 0 &&
+        value.deliveryBundleId.length <= 160)) &&
+    (value.deliveredPhotos === undefined ||
+      (Array.isArray(value.deliveredPhotos) &&
+        value.deliveredPhotos.length > 0 &&
+        value.deliveredPhotos.length <= 4 &&
+        value.deliveredPhotos.every((photo) =>
+          Boolean(sanitizeExchangePhotoForPersistence(photo)),
+        ))) &&
     isOnboardingProgressStage(value.stage) &&
     isOnboardingSource(value.source) &&
     typeof value.updatedAt === "number"

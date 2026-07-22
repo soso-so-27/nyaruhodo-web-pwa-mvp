@@ -11,7 +11,7 @@ import {
 import {
   copyPreservedDeliveryPhotos,
   deleteStoredDataForUser,
-} from "../../src/app/api/account/delete-stored-data/route";
+} from "../../src/app/api/account/delete-stored-data/handler";
 import {
   buildAccountStorageDeletionPlan,
   getArchivedDeliveryStoragePath,
@@ -28,7 +28,7 @@ import {
   resetOnboardingExchangeExceptionLimitForTests,
   shouldUseEveningChoiceBundlePath,
   validateExchangeDeliveryDateKey,
-} from "../../src/app/api/sleeping-delivery/exchange/route";
+} from "../../src/app/api/sleeping-delivery/exchange/handler";
 import { resolveExchangePhotoUploadSrc } from "../../src/lib/home/useEveningDelivery";
 import {
   CAT_PHOTOS_BUCKET,

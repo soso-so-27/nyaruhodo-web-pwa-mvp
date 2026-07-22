@@ -334,11 +334,19 @@ function compactOnboardingProgressForHandoff(
           ),
         }
       : {}),
+    ...(progress.deliveredPhotos
+      ? {
+          deliveredPhotos: progress.deliveredPhotos.map((photo) =>
+            compactPhotoSourcesForHandoff(photo),
+          ),
+        }
+      : {}),
   };
 
   if (completed) {
     delete compact.ownPhoto;
     delete compact.selectedPhotoSrc;
+    delete compact.deliveredPhotos;
   } else if (compact.ownPhoto) {
     compact.ownPhoto = compactPhotoSourcesForHandoff(compact.ownPhoto);
   }

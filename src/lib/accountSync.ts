@@ -1618,10 +1618,11 @@ async function syncSleepingPhotos(
     const deliveryRows = (
       await Promise.all(
         snapshot.keptExchangePhotos.map(async (photo) => {
-          // Four-choice delivery rows are created and finalized by the server.
+          // Four-choice delivery rows are created and finalized by the server
+          // for both nightly delivery and onboarding.
           // Rewriting them from a device would erase bundle metadata and could
           // let stale local state disagree with the canonical resolution ledger.
-          if (isServerEveningChoiceDeliveryId(photo.id)) {
+          if (isServerChoiceDeliveryId(photo.id)) {
             return null;
           }
 
@@ -1699,8 +1700,8 @@ async function syncSleepingPhotos(
   }
 }
 
-function isServerEveningChoiceDeliveryId(photoId: string) {
-  return /^delivered-sleeping-\d{4}-\d{2}-\d{2}-[a-f0-9]{24}-choice-[1-4]$/.test(
+function isServerChoiceDeliveryId(photoId: string) {
+  return /^delivered-(?:sleeping|onboarding)-\d{4}-\d{2}-\d{2}-[a-f0-9]{24}-choice-[1-4]$/.test(
     photoId,
   );
 }

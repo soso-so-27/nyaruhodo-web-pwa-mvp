@@ -11,6 +11,7 @@ import {
 import { STORAGE_KEYS } from "../../lib/storage";
 import {
   createSleepingExchange,
+  finalizeOnboardingDeliveryChoice,
   saveRemoteDeliveryStockPhoto,
 } from "../../lib/home/deliveryCandidates";
 import {
@@ -124,6 +125,14 @@ export function OnboardingFlow() {
   const [state, setState] = useState<OnboardingState>("intro");
   const [selectedPhotoSrc, setSelectedPhotoSrc] = useState("");
   const [deliveredPhoto, setDeliveredPhoto] = useState<ExchangePhoto | null>(null);
+  const [deliveredPhotos, setDeliveredPhotos] = useState<ExchangePhoto[]>([]);
+  const [deliveryBundleId, setDeliveryBundleId] = useState<string | null>(null);
+  const [selectedDeliveryPhotoId, setSelectedDeliveryPhotoId] = useState<
+    string | null
+  >(null);
+  const [isFinalizingDeliveryChoice, setIsFinalizingDeliveryChoice] =
+    useState(false);
+  const [deliveryChoiceError, setDeliveryChoiceError] = useState("");
   const [localizedDeliveredPhoto, setLocalizedDeliveredPhoto] = useState<{
     photoId: string;
     dataUrl: string;
@@ -187,6 +196,14 @@ export function OnboardingFlow() {
   const catNamePromptTrackedPhotoRef = useRef("");
   const entrySourceRef = useRef<OnboardingSource>(entrySource);
   const canShowTestTools = isTestMode && !IS_PRODUCTION;
+  const hasOnboardingPhotoChoice = Boolean(
+    deliveryBundleId &&
+      deliveredPhotos.length > 0 &&
+      deliveredPhotos.length <= 4,
+  );
+  const selectedDeliveryPhoto =
+    deliveredPhotos.find((photo) => photo.id === selectedDeliveryPhotoId) ??
+    null;
 
   useEffect(() => {
     resetDeliveredPhotoAspect();
@@ -245,7 +262,7 @@ export function OnboardingFlow() {
       source,
       reservation_origin: "onboarding_first_photo",
       reservation_trigger: trigger,
-      experience_version: "one_photo_v1",
+      experience_version: "onboarding_choice_v1",
       submission_id: submissionId,
       own_photo_id: ownPhoto.id,
     };
@@ -394,6 +411,9 @@ export function OnboardingFlow() {
 
       setSelectedPhotoSrc("");
       setDeliveredPhoto(null);
+      setDeliveredPhotos([]);
+      setDeliveryBundleId(null);
+      setSelectedDeliveryPhotoId(null);
       setPendingOwnPhoto(null);
       setIsDeliveredPhotoKept(false);
       setCompletionCopy("");
@@ -406,7 +426,12 @@ export function OnboardingFlow() {
   }, []);
 
   useEffect(() => {
-    if (state !== "delivered" || !deliveredPhoto || isDeliveredPhotoKept) {
+    if (
+      state !== "delivered" ||
+      !deliveredPhoto ||
+      isDeliveredPhotoKept ||
+      hasOnboardingPhotoChoice
+    ) {
       return;
     }
 
@@ -416,7 +441,12 @@ export function OnboardingFlow() {
 
     autoKeptDeliveredPhotoIdRef.current = deliveredPhoto.id;
     markDeliveredPhotoReadyForOnboarding();
-  }, [state, deliveredPhoto, isDeliveredPhotoKept]);
+  }, [
+    state,
+    deliveredPhoto,
+    isDeliveredPhotoKept,
+    hasOnboardingPhotoChoice,
+  ]);
 
   useEffect(() => {
     return () => {
@@ -543,6 +573,14 @@ export function OnboardingFlow() {
       setSelectedPhotoSrc(resumedProgress.selectedPhotoSrc ?? "");
       setPendingOwnPhoto(resumedProgress.ownPhoto ?? null);
       setDeliveredPhoto(resumedProgress.deliveredPhoto ?? null);
+      setDeliveredPhotos(
+        resumedProgress.deliveredPhotos ??
+          (resumedProgress.deliveredPhoto
+            ? [resumedProgress.deliveredPhoto]
+            : []),
+      );
+      setDeliveryBundleId(resumedProgress.deliveryBundleId ?? null);
+      setSelectedDeliveryPhotoId(null);
       setIsDeliveredPhotoKept(resumedProgress.isDeliveredPhotoKept ?? true);
       setCompletionCopy(resumedProgress.completionCopy ?? "");
       setState("envelope");
@@ -553,6 +591,11 @@ export function OnboardingFlow() {
       setSelectedPhotoSrc(resumedProgress.selectedPhotoSrc ?? "");
       setPendingOwnPhoto(resumedProgress.ownPhoto ?? null);
       setDeliveredPhoto(resumedProgress.deliveredPhoto ?? null);
+      setDeliveredPhotos(
+        resumedProgress.deliveredPhoto ? [resumedProgress.deliveredPhoto] : [],
+      );
+      setDeliveryBundleId(null);
+      setSelectedDeliveryPhotoId(null);
       setIsDeliveredPhotoKept(false);
       setCatNameDraft("");
       setState("naming");
@@ -563,6 +606,9 @@ export function OnboardingFlow() {
     if (decision.kind === "resume_submission") {
       setSelectedPhotoSrc(resumedProgress.selectedPhotoSrc ?? "");
       setPendingOwnPhoto(resumedProgress.ownPhoto ?? null);
+      setDeliveredPhotos([]);
+      setDeliveryBundleId(null);
+      setSelectedDeliveryPhotoId(null);
       setIsDeliveredPhotoKept(false);
       setState("saving");
       setSavingStage("receiving_letter");
@@ -859,6 +905,11 @@ export function OnboardingFlow() {
         setSelectedPhotoSrc(dataUrl);
         setSavingStage("receiving_letter");
         setPendingOwnPhoto(ownPhoto);
+        setDeliveredPhoto(null);
+        setDeliveredPhotos([]);
+        setDeliveryBundleId(null);
+        setSelectedDeliveryPhotoId(null);
+        setDeliveryChoiceError("");
         setIsDeliveredPhotoKept(false);
         autoKeptDeliveredPhotoIdRef.current = "";
         await writeOnboardingProgressDurably({
@@ -1105,25 +1156,32 @@ export function OnboardingFlow() {
     continueAfterOnboardingLetter();
   }
 
-  function markDeliveredPhotoReadyForOnboarding() {
-    if (!deliveredPhoto) {
+  function markDeliveredPhotoReadyForOnboarding(
+    selectedPhoto = deliveredPhoto,
+  ) {
+    if (!selectedPhoto) {
       return;
     }
 
-    const savedToReceived = keepExchangePhoto(deliveredPhoto);
+    const savedToReceived = keepExchangePhoto(selectedPhoto);
 
     trackProductEvent("onboarding_delivered_photo_confirmed", {
       source: getEffectiveEntrySource(),
-      source_photo_id: deliveredPhoto.sourcePhotoId ?? null,
+      source_photo_id: selectedPhoto.sourcePhotoId ?? null,
       saved_to_album: savedToReceived,
       test_mode: canShowTestTools,
+      delivery_bundle_id: deliveryBundleId,
+      candidate_count: deliveredPhotos.length || 1,
     });
 
+    setDeliveredPhoto(selectedPhoto);
     setIsDeliveredPhotoKept(true);
     patchOnboardingProgress({
       stage: "opened",
       source: getEffectiveEntrySource(),
-      deliveredPhoto,
+      deliveredPhoto: selectedPhoto,
+      deliveredPhotos,
+      deliveryBundleId: deliveryBundleId ?? undefined,
       isDeliveredPhotoKept: true,
       completionCopy: getEveningDeliveryCompletionCopy(),
     });
@@ -1137,9 +1195,74 @@ export function OnboardingFlow() {
       trackProductEvent("onboarding_completed", {
         source: getEffectiveEntrySource(),
         method: "delivery_confirmed",
-        photo_id: deliveredPhoto.id,
-        delivery_photo_id: deliveredPhoto.id,
+        photo_id: selectedPhoto.id,
+        delivery_photo_id: selectedPhoto.id,
+        delivery_bundle_id: deliveryBundleId,
       });
+    }
+  }
+
+  async function handleSaveOnboardingDeliveryChoice() {
+    if (
+      !deliveryBundleId ||
+      deliveredPhotos.length === 0 ||
+      deliveredPhotos.length > 4 ||
+      !selectedDeliveryPhotoId ||
+      isFinalizingDeliveryChoice
+    ) {
+      return;
+    }
+
+    const progress = readCurrentOnboardingProgress();
+    const deliveryDateKey = progress?.dateKey;
+    if (!deliveryDateKey) {
+      setDeliveryChoiceError("保存できませんでした。もう一度お試しください。");
+      return;
+    }
+
+    setIsFinalizingDeliveryChoice(true);
+    setDeliveryChoiceError("");
+    try {
+      if (!progress?.journeyId || !progress.resumeToken) {
+        setDeliveryChoiceError("保存できませんでした。もう一度お試しください。");
+        return;
+      }
+      const canonical = await finalizeOnboardingDeliveryChoice({
+        bundleId: deliveryBundleId,
+        deliveryDateKey,
+        journeyId: progress.journeyId,
+        resumeToken: progress.resumeToken,
+        selectedPhotoId: selectedDeliveryPhotoId,
+        submissionId: progress.submissionId,
+      });
+      const selectedPhoto = canonical?.selectedPhotoId
+        ? deliveredPhotos.find(
+            (photo) => photo.id === canonical.selectedPhotoId,
+          ) ?? null
+        : null;
+
+      if (canonical?.state !== "kept" || !selectedPhoto) {
+        setDeliveryChoiceError("保存できませんでした。もう一度お試しください。");
+        return;
+      }
+
+      const selectedPosition =
+        deliveredPhotos.findIndex((photo) => photo.id === selectedPhoto.id) + 1;
+      trackProductEvent("onboarding_delivery_choice_saved", {
+        source: getEffectiveEntrySource(),
+        delivery_bundle_id: deliveryBundleId,
+        delivery_date_key: deliveryDateKey,
+        photo_id: selectedPhoto.id,
+        delivery_photo_id: selectedPhoto.id,
+        selected_position: selectedPosition,
+        candidate_count: deliveredPhotos.length,
+        server_conflict: canonical.conflict,
+      });
+      markDeliveredPhotoReadyForOnboarding(selectedPhoto);
+    } catch {
+      setDeliveryChoiceError("保存できませんでした。もう一度お試しください。");
+    } finally {
+      setIsFinalizingDeliveryChoice(false);
     }
   }
 
@@ -1192,16 +1315,25 @@ export function OnboardingFlow() {
     trackProductEvent("envelope_opened", {
       source: "onboarding",
       photo_id: deliveredPhoto.id,
+      delivery_bundle_id: deliveryBundleId,
+      candidate_count: deliveredPhotos.length || 1,
     });
     trackProductEvent("onboarding_delivery_opened", {
       source: getEffectiveEntrySource(),
       photo_id: deliveredPhoto.id,
       delivery_photo_id: deliveredPhoto.id,
+      delivery_bundle_id: deliveryBundleId,
+      candidate_count: deliveredPhotos.length || 1,
     });
     patchOnboardingProgress({
-      stage: "opened",
+      stage:
+        hasOnboardingPhotoChoice && !isDeliveredPhotoKept
+          ? "arrived"
+          : "opened",
       source: getEffectiveEntrySource(),
       deliveredPhoto,
+      deliveredPhotos,
+      deliveryBundleId: deliveryBundleId ?? undefined,
       isDeliveredPhotoKept,
     });
 
@@ -1374,6 +1506,8 @@ export function OnboardingFlow() {
       deliveryDateKey: deliveryDateKey ?? undefined,
       recipientCatId,
       preferredSourcePhotoId,
+      requestedCandidateCount: 4,
+      capability: "onboarding_choice_v1",
       mode: "onboarding",
       onboardingSubmission,
     });
@@ -1391,7 +1525,21 @@ export function OnboardingFlow() {
       return true;
     }
 
-    let nextPhoto = exchangeResult?.photo ?? null;
+    const responsePhotos = (exchangeResult?.photos ?? []).filter(
+      (photo) => photo && isUsablePhotoSrc(photo.src),
+    );
+    const hasServerOnboardingPhotoChoice = Boolean(
+      exchangeResult?.bundleId &&
+        exchangeResult?.experienceVersion === "onboarding_choice_v1" &&
+        responsePhotos.length > 0 &&
+        responsePhotos.length <= 4 &&
+        responsePhotos.every((photo) =>
+          photo.id.startsWith(`${exchangeResult.bundleId}-choice-`),
+        ),
+    );
+    let nextPhoto = hasServerOnboardingPhotoChoice
+      ? responsePhotos[0]
+      : (exchangeResult?.photo ?? null);
     let deliverySource = exchangeResult?.photo ? "exchange" : "illustration_fallback";
     const exchangeFailed =
       Boolean(exchangeResult?.error) ||
@@ -1411,7 +1559,14 @@ export function OnboardingFlow() {
       return false;
     }
 
-    if (IS_PRODUCTION && (!nextPhoto || !isUsablePhotoSrc(nextPhoto.src))) {
+    if (
+      IS_PRODUCTION &&
+      (!nextPhoto ||
+        !isUsablePhotoSrc(nextPhoto.src) ||
+        (exchangeResult?.experienceVersion === "onboarding_choice_v1" &&
+          exchangeResult?.servedVariant === "four_choice_v1" &&
+          !hasServerOnboardingPhotoChoice))
+    ) {
       trackProductEvent("onboarding_delivery_blocked", {
         source: getEffectiveEntrySource(),
         reason: nextPhoto ? "unusable_photo_src" : "no_delivery_photo",
@@ -1456,6 +1611,14 @@ export function OnboardingFlow() {
 
     setDeliveryIssue(null);
     setDeliveredPhoto(nextPhoto);
+    setDeliveredPhotos(
+      hasServerOnboardingPhotoChoice ? responsePhotos : [nextPhoto],
+    );
+    setDeliveryBundleId(
+      hasServerOnboardingPhotoChoice ? (exchangeResult?.bundleId ?? null) : null,
+    );
+    setSelectedDeliveryPhotoId(null);
+    setDeliveryChoiceError("");
     setIsDeliveredPhotoKept(false);
     await patchOnboardingProgressDurably({
       stage: "arrived",
@@ -1465,24 +1628,36 @@ export function OnboardingFlow() {
       ownPhoto,
       selectedPhotoSrc: selectedPhotoSrcForProgress,
       deliveredPhoto: nextPhoto,
+      deliveredPhotos: hasServerOnboardingPhotoChoice
+        ? responsePhotos
+        : [nextPhoto],
+      deliveryBundleId: hasServerOnboardingPhotoChoice
+        ? (exchangeResult?.bundleId ?? undefined)
+        : undefined,
       isDeliveredPhotoKept: false,
     });
     trackProductEvent("onboarding_delivery_ready", {
       source: getEffectiveEntrySource(),
       delivery_source: deliverySource,
       photo_id: nextPhoto.id,
+      delivery_bundle_id: exchangeResult?.bundleId ?? null,
+      candidate_count: hasServerOnboardingPhotoChoice ? responsePhotos.length : 1,
     });
     trackProductEvent("onboarding_delivery_arrived", {
       source: getEffectiveEntrySource(),
       delivery_source: deliverySource,
       photo_id: nextPhoto.id,
       delivery_photo_id: nextPhoto.id,
+      delivery_bundle_id: exchangeResult?.bundleId ?? null,
+      candidate_count: hasServerOnboardingPhotoChoice ? responsePhotos.length : 1,
       submission_id: submissionId ?? null,
       delivery_date_key: deliveryDateKey ?? null,
     });
     trackProductEvent("envelope_shown", {
       source: "onboarding",
       photo_id: nextPhoto.id,
+      delivery_bundle_id: exchangeResult?.bundleId ?? null,
+      candidate_count: hasServerOnboardingPhotoChoice ? responsePhotos.length : 1,
     });
     setState("envelope");
     return true;
@@ -1847,7 +2022,111 @@ export function OnboardingFlow() {
           </section>
         ) : null}
 
-        {state === "delivered" && deliveredPhoto ? (
+        {state === "delivered" &&
+        hasOnboardingPhotoChoice &&
+        !isDeliveredPhotoKept ? (
+          <section
+            style={{ ...styles.result, ...styles.deliveredResult }}
+            aria-label={`${deliveredPhotos.length}匹のねこだより`}
+            data-testid="onboarding-four-choice"
+            data-bundle-id={deliveryBundleId ?? undefined}
+          >
+            <div style={styles.onboardingFourChoiceLetter}>
+              <div style={styles.onboardingDeliveredMasthead}>
+                <p style={styles.onboardingDeliveredTitle}>
+                  {deliveredPhotos.length}匹のねこだより
+                </p>
+                <span
+                  style={styles.onboardingDeliveredMastheadRule}
+                  aria-hidden="true"
+                />
+              </div>
+              <p style={styles.onboardingFourChoiceLead}>
+                残したい写真を1枚えらんでください
+              </p>
+              <div
+                role="radiogroup"
+                aria-label="残したい猫"
+                style={styles.onboardingFourChoiceGrid}
+              >
+                {deliveredPhotos.map((photo, index) => {
+                  const isSelected = photo.id === selectedDeliveryPhotoId;
+                  return (
+                    <button
+                      key={photo.id}
+                      type="button"
+                      role="radio"
+                      aria-checked={isSelected}
+                      aria-label={`${index + 1}枚目の写真をえらぶ`}
+                      disabled={isFinalizingDeliveryChoice}
+                      data-testid="onboarding-four-choice-option"
+                      data-photo-id={photo.id}
+                      data-position={index + 1}
+                      data-selected={isSelected ? "true" : "false"}
+                      style={{
+                        ...styles.onboardingFourChoiceOption,
+                        ...(isSelected
+                          ? styles.onboardingFourChoiceOptionSelected
+                          : {}),
+                      }}
+                      onClick={() => {
+                        setSelectedDeliveryPhotoId(photo.id);
+                        setDeliveryChoiceError("");
+                        trackProductEvent("onboarding_delivery_choice_selected", {
+                          source: getEffectiveEntrySource(),
+                          delivery_bundle_id: deliveryBundleId,
+                          photo_id: photo.id,
+                          selected_position: index + 1,
+                          candidate_count: deliveredPhotos.length,
+                        });
+                      }}
+                    >
+                      <StoredPhotoImage
+                        src={getExchangePhotoDisplaySrc(photo)}
+                        fallbackSrcs={getExchangePhotoFallbackSrcs(photo)}
+                        alt=""
+                        storageVariant="thumbnail"
+                        loading="eager"
+                        style={styles.onboardingFourChoicePhoto}
+                      />
+                      {isSelected ? (
+                        <span
+                          aria-hidden="true"
+                          style={styles.onboardingFourChoiceMark}
+                        >
+                          選択中
+                        </span>
+                      ) : null}
+                    </button>
+                  );
+                })}
+              </div>
+              {deliveryChoiceError ? (
+                <p role="alert" style={styles.onboardingFourChoiceError}>
+                  {deliveryChoiceError}
+                </p>
+              ) : null}
+              <AppButton
+                type="button"
+                fullWidth
+                disabled={!selectedDeliveryPhoto || isFinalizingDeliveryChoice}
+                onClick={() => {
+                  void handleSaveOnboardingDeliveryChoice();
+                }}
+                style={styles.onboardingFourChoiceSave}
+                data-testid="onboarding-four-choice-save"
+              >
+                {isFinalizingDeliveryChoice
+                  ? "保存しています…"
+                  : "この写真を保存"}
+              </AppButton>
+            </div>
+          </section>
+        ) : null}
+
+        {state === "delivered" &&
+        deliveredPhoto &&
+        (!hasOnboardingPhotoChoice || isDeliveredPhotoKept) ? (
           <section
             style={{ ...styles.result, ...styles.deliveredResult }}
             aria-label="とどいたねがお"
@@ -3277,6 +3556,84 @@ const styles = {
   },
   deliveredResult: {
     gap: "12px",
+  },
+  onboardingFourChoiceLetter: {
+    ...deliveredLetterStyles.sheet,
+    width: "min(100%, 406px)",
+    maxWidth: "100%",
+    minWidth: 0,
+    boxSizing: "border-box",
+  },
+  onboardingFourChoiceLead: {
+    margin: "12px 0 14px",
+    color: "var(--ink-soft)",
+    fontFamily: UI_FONT,
+    fontSize: "13px",
+    fontWeight: 400,
+    lineHeight: 1.65,
+    textAlign: "center",
+  },
+  onboardingFourChoiceGrid: {
+    display: "grid",
+    gridTemplateColumns: "repeat(2, minmax(0, 1fr))",
+    gap: "9px",
+  },
+  onboardingFourChoiceOption: {
+    position: "relative",
+    minWidth: 0,
+    aspectRatio: "1 / 1",
+    padding: 0,
+    overflow: "hidden",
+    border: "2px solid color-mix(in srgb, var(--line) 82%, transparent)",
+    borderRadius: "16px",
+    background: "var(--paper-warm)",
+    boxShadow: "0 4px 14px rgba(70, 50, 30, 0.10)",
+    cursor: "pointer",
+    transition:
+      "border-color 140ms ease, transform 140ms ease, box-shadow 140ms ease",
+  },
+  onboardingFourChoiceOptionSelected: {
+    border: "2px solid var(--seal)",
+    transform: "translateY(-2px)",
+    boxShadow:
+      "0 0 0 2px color-mix(in srgb, var(--seal) 18%, transparent), 0 8px 20px rgba(70, 50, 30, 0.18)",
+  },
+  onboardingFourChoicePhoto: {
+    width: "100%",
+    height: "100%",
+    display: "block",
+    objectFit: "cover",
+  },
+  onboardingFourChoiceMark: {
+    position: "absolute",
+    right: "8px",
+    bottom: "8px",
+    minWidth: "26px",
+    height: "26px",
+    padding: "0 8px",
+    display: "inline-flex",
+    alignItems: "center",
+    justifyContent: "center",
+    borderRadius: "999px",
+    background: "var(--seal)",
+    color: "#fff",
+    fontFamily: UI_FONT,
+    fontSize: "11px",
+    fontWeight: 500,
+    boxSizing: "border-box",
+  },
+  onboardingFourChoiceSave: {
+    width: "100%",
+    marginTop: "14px",
+  },
+  onboardingFourChoiceError: {
+    margin: "10px 0 0",
+    color: "var(--danger, #9f3f36)",
+    fontFamily: UI_FONT,
+    fontSize: "12px",
+    fontWeight: 400,
+    lineHeight: 1.5,
+    textAlign: "center",
   },
   onboardingDeliveredLetter: {
     ...deliveredLetterStyles.sheet,

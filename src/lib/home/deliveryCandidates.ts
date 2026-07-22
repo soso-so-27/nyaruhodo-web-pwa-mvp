@@ -20,7 +20,7 @@ type SleepingExchangeResponse = {
   requestedCandidateCount?: number;
   returnedCandidateCount?: number;
   bundleId?: string | null;
-  experienceVersion?: "evening_choice_v1";
+  experienceVersion?: "evening_choice_v1" | "onboarding_choice_v1";
   assignedVariant?: "four_choice_v1" | "single_v1";
   servedVariant?: "four_choice_v1" | "single_v1";
   requestedCount?: number;
@@ -97,7 +97,7 @@ export async function createSleepingExchange({
   ownPhoto: OwnSleepingPhoto;
   preferredSourcePhotoId?: string | null;
   requestedCandidateCount?: number;
-  capability?: "evening_choice_v1";
+  capability?: "evening_choice_v1" | "onboarding_choice_v1";
   mode?: "onboarding";
   onboardingSubmission?: {
     dateKey: string;
@@ -230,6 +230,78 @@ export async function finalizeEveningDeliveryChoice({
         deliveryDateKey,
         selectedPhotoId: operation === "keep" ? selectedPhotoId : null,
         anonymousId: getOrCreateAnonymousId(),
+      }),
+    });
+
+    if (response.status !== 200 && response.status !== 409) {
+      return null;
+    }
+
+    const body = (await response.json()) as {
+      state?: unknown;
+      selectedPhotoId?: unknown;
+      resolvedAt?: unknown;
+      canonical?: {
+        state?: unknown;
+        selectedPhotoId?: unknown;
+        resolvedAt?: unknown;
+      };
+    };
+    const canonical = response.status === 409 ? body.canonical : body;
+    if (!isEveningChoiceCanonical(canonical)) {
+      return null;
+    }
+
+    return {
+      state: canonical.state,
+      selectedPhotoId: canonical.selectedPhotoId,
+      resolvedAt: canonical.resolvedAt,
+      conflict: response.status === 409,
+    };
+  } catch {
+    return null;
+  } finally {
+    window.clearTimeout(timeoutId);
+  }
+}
+
+export async function finalizeOnboardingDeliveryChoice({
+  bundleId,
+  deliveryDateKey,
+  journeyId,
+  resumeToken,
+  selectedPhotoId,
+  submissionId,
+}: {
+  bundleId: string;
+  deliveryDateKey: string;
+  journeyId: string;
+  resumeToken: string;
+  selectedPhotoId: string;
+  submissionId: string;
+}): Promise<EveningChoiceCanonicalResult | null> {
+  if (typeof window === "undefined") {
+    return null;
+  }
+
+  const abortController = new AbortController();
+  const timeoutId = window.setTimeout(
+    () => abortController.abort("choice_timeout"),
+    SLEEPING_EXCHANGE_TIMEOUT_MS,
+  );
+
+  try {
+    const response = await fetch("/api/onboarding/choice", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      signal: abortController.signal,
+      body: JSON.stringify({
+        bundleId,
+        deliveryDateKey,
+        journeyId,
+        resumeToken,
+        selectedPhotoId,
+        submissionId,
       }),
     });
 

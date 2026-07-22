@@ -102,15 +102,23 @@ async function advanceOnboardingSubmission(input: OnboardingSubmissionAdvanceInp
 function toAdvanceInput(
   progress: OnboardingProgress,
 ): OnboardingSubmissionAdvanceInput {
+  const isUnresolvedFourChoice = Boolean(
+    progress.deliveryBundleId && !progress.isDeliveredPhotoKept,
+  );
+
   return {
     anonymousId: progress.anonymousId,
     dateKey: progress.dateKey,
-    deliveryId: progress.deliveredPhoto?.id ?? null,
+    deliveryId: isUnresolvedFourChoice
+      ? null
+      : (progress.deliveredPhoto?.id ?? null),
     ...(progress.journeyId ? { journeyId: progress.journeyId } : {}),
     ownPhotoId: progress.ownPhoto?.id ?? null,
     resumeToken: progress.resumeToken!,
     source: progress.source,
-    sourcePhotoId: progress.deliveredPhoto?.sourcePhotoId ?? null,
+    sourcePhotoId: isUnresolvedFourChoice
+      ? null
+      : (progress.deliveredPhoto?.sourcePhotoId ?? null),
     stage: mapProgressStage(progress.stage),
     submissionId: progress.submissionId,
   };

@@ -2,6 +2,7 @@ import { expect, test } from "@playwright/test";
 import { createClient } from "@supabase/supabase-js";
 import fs from "node:fs";
 import path from "node:path";
+import { encode } from "jpeg-js";
 
 import { createOnboardingResumeToken } from "../../src/lib/onboarding/submissionContract";
 import { queueOnboardingSubmissionShadowSync } from "../../src/lib/onboarding/submissionClient";
@@ -411,6 +412,24 @@ test.describe("onboarding submission ledger", () => {
       expect(secondBody.photo?.sourcePhotoId).toBe(candidateId);
       expect(secondBody.diagnostics?.idempotentReplay).toBe(true);
 
+      const upgradedReplay = await request.post(
+        "/api/sleeping-delivery/exchange",
+        {
+          headers: { "x-forwarded-for": `203.0.113.${(Date.now() + 1) % 200}` },
+          data: {
+            ...exchangeData(secondAnonymousId),
+            requestedCandidateCount: 4,
+            capability: "onboarding_choice_v1",
+          },
+        },
+      );
+      expect(upgradedReplay.status()).toBe(200);
+      await expect(upgradedReplay.json()).resolves.toMatchObject({
+        photo: { id: firstBody.photo?.id, sourcePhotoId: candidateId },
+        photos: [{ id: firstBody.photo?.id }],
+        servedVariant: "single_v1",
+      });
+
       const { data: ownRows, count: ownCount, error: ownError } =
         await adminSupabase
           .from("cat_moments")
@@ -550,6 +569,381 @@ test.describe("onboarding submission ledger", () => {
     }
   });
 
+  test("replays one onboarding four-photo bundle and keeps one canonical choice", async ({
+    request,
+  }) => {
+    const adminSupabase = createAdminSupabaseClientFromEnv();
+    test.skip(!adminSupabase, "Local Supabase service role is required.");
+    if (!adminSupabase) return;
+
+    const stamp = `${Date.now()}-${crypto.randomUUID()}`;
+    const firstAnonymousId = `onboarding-four-first-${stamp}`;
+    const secondAnonymousId = `onboarding-four-second-${stamp}`;
+    const journeyId = `onbj_${crypto.randomUUID()}`;
+    const dateKey = getJstDateKey();
+    const submissionId = createOnboardingJourneySubmissionId(
+      journeyId,
+      dateKey,
+    );
+    const ownPhotoId = createOnboardingOwnPhotoId(submissionId);
+    const resumeToken = createOnboardingResumeToken();
+    const candidateIds = Array.from(
+      { length: 4 },
+      (_, index) => `onboarding-four-stock-${stamp}-${index + 1}`,
+    );
+    const { data: existingStockRows, error: existingStockError } =
+      await adminSupabase
+        .from("cat_moments")
+        .select("id, local_moment_id, metadata")
+        .eq("visibility", "shared")
+        .eq("delivery_status", "available")
+        .eq("moderation_status", "approved");
+    expect(existingStockError).toBeNull();
+    const blockedPhotoIds = (existingStockRows ?? [])
+      .filter((row) => {
+        const metadata = (row.metadata ?? {}) as Record<string, unknown>;
+        return (
+          metadata.pool_kind === "admin_stock" ||
+          metadata.pool_kind === "admin-stock" ||
+          metadata.source === "admin-stock"
+        );
+      })
+      .flatMap((row) => [row.id, row.local_moment_id])
+      .filter((id): id is string => typeof id === "string")
+      .slice(0, 96);
+    const exchangeData = (anonymousId: string) => ({
+      ownPhoto: {
+        id: ownPhotoId,
+        catId: `onboarding-four-cat-${stamp}`,
+        ownerCatId: `onboarding-four-cat-${stamp}`,
+        src: catPhotoDataUrl,
+        createdAt: Date.now(),
+        shared: true,
+      },
+      triggerLabel: "sleeping",
+      theme: "sleeping",
+      category: "sleeping",
+      seed: submissionId,
+      deliveryDateKey: dateKey,
+      recipientCatId: `onboarding-four-cat-${stamp}`,
+      anonymousId,
+      blockedPhotoIds,
+      preferredSourcePhotoId: candidateIds[0],
+      requestedCandidateCount: 4,
+      capability: "onboarding_choice_v1",
+      mode: "onboarding",
+      onboardingSubmission: {
+        dateKey,
+        journeyId,
+        resumeToken,
+        source: "instagram_bio",
+        submissionId,
+      },
+    });
+
+    try {
+      const { error: candidateError } = await adminSupabase
+        .from("cat_moments")
+        .insert(
+          candidateIds.map((candidateId, index) => ({
+            anonymous_id: `onboarding-four-source-${stamp}-${index + 1}`,
+            local_moment_id: candidateId,
+            local_cat_id: `onboarding-four-source-cat-${stamp}-${index + 1}`,
+            owner_cat_id: `onboarding-four-source-cat-${stamp}-${index + 1}`,
+            photo_url: createSolidTestJpegDataUrl(index),
+            state: "sleeping",
+            visibility: "shared",
+            delivery_status: "available",
+            moderation_status: "approved",
+            moderated_at: new Date().toISOString(),
+            moderated_by: "e2e",
+            metadata: {
+              source: "admin-stock",
+              pool_kind: "admin_stock",
+              source_cat_key: `onboarding-four-real-cat-${stamp}-${index + 1}`,
+            },
+            captured_at: new Date(Date.now() - 60_000 - index).toISOString(),
+            created_at: new Date(Date.now() - 60_000 - index).toISOString(),
+          })),
+        );
+      expect(candidateError).toBeNull();
+
+      const first = await request.post("/api/sleeping-delivery/exchange", {
+        headers: { "x-forwarded-for": `198.51.100.${Date.now() % 200}` },
+        data: exchangeData(firstAnonymousId),
+      });
+      expect(first.status()).toBe(200);
+      const firstBody = (await first.json()) as {
+        bundleId?: string;
+        experienceVersion?: string;
+        servedVariant?: string;
+        photos?: Array<{ id: string; sourcePhotoId?: string }>;
+      };
+      expect(firstBody.experienceVersion).toBe("onboarding_choice_v1");
+      expect(firstBody.servedVariant).toBe("four_choice_v1");
+      expect(firstBody.photos).toHaveLength(4);
+      expect(firstBody.photos?.map((photo) => photo.sourcePhotoId).sort()).toEqual(
+        [...candidateIds].sort(),
+      );
+
+      const second = await request.post("/api/sleeping-delivery/exchange", {
+        headers: { "x-forwarded-for": `203.0.113.${Date.now() % 200}` },
+        data: exchangeData(secondAnonymousId),
+      });
+      expect(second.status()).toBe(200);
+      const secondBody = (await second.json()) as typeof firstBody;
+      expect(secondBody.bundleId).toBe(firstBody.bundleId);
+      expect(secondBody.photos?.map((photo) => photo.id)).toEqual(
+        firstBody.photos?.map((photo) => photo.id),
+      );
+
+      const choices = [firstBody.photos?.[1]?.id, firstBody.photos?.[3]?.id];
+      expect(choices.every(Boolean)).toBe(true);
+      const competing = await Promise.all(
+        choices.map((selectedPhotoId) =>
+          request.post("/api/onboarding/choice", {
+            data: {
+              bundleId: firstBody.bundleId,
+              deliveryDateKey: dateKey,
+              journeyId,
+              resumeToken,
+              selectedPhotoId,
+              submissionId,
+            },
+          }),
+        ),
+      );
+      expect(competing.map((response) => response.status()).sort()).toEqual([
+        200,
+        409,
+      ]);
+      const choiceBodies = await Promise.all(
+        competing.map((response) => response.json()),
+      );
+      const canonicalPhotoIds = choiceBodies.map(
+        (body) => body.selectedPhotoId ?? body.canonical?.selectedPhotoId,
+      );
+      expect(new Set(canonicalPhotoIds).size).toBe(1);
+      const canonicalPhotoId = canonicalPhotoIds[0];
+
+      const {
+        capability: _legacyCapability,
+        requestedCandidateCount: _legacyRequestedCount,
+        ...legacyExchangeData
+      } = exchangeData(secondAnonymousId);
+      const legacyReplay = await request.post(
+        "/api/sleeping-delivery/exchange",
+        {
+          headers: { "x-forwarded-for": `203.0.113.${(Date.now() + 2) % 200}` },
+          data: legacyExchangeData,
+        },
+      );
+      expect(legacyReplay.status()).toBe(200);
+      const legacyReplayBody = (await legacyReplay.json()) as {
+        photo?: { id?: string } | null;
+        photos?: unknown[];
+      };
+      expect(legacyReplayBody.photo?.id).toBe(canonicalPhotoId);
+      expect(legacyReplayBody.photos).toBeUndefined();
+
+      const { data: deliveryRows, error: deliveryError } = await adminSupabase
+        .from("cat_moment_deliveries")
+        .select("anonymous_id, local_delivery_id, status")
+        .contains("metadata", { onboarding_submission_id: submissionId })
+        .order("local_delivery_id");
+      expect(deliveryError).toBeNull();
+      expect(deliveryRows).toHaveLength(4);
+      expect(
+        deliveryRows?.filter((row) => row.status === "kept").map((row) => row.local_delivery_id),
+      ).toEqual([canonicalPhotoId]);
+      expect(
+        deliveryRows?.every((row) => row.anonymous_id === secondAnonymousId),
+      ).toBe(true);
+
+      const { data: ledger, error: ledgerError } = await adminSupabase
+        .from("onboarding_submissions")
+        .select("delivery_id, source_photo_id, stage")
+        .eq("submission_id", submissionId)
+        .single();
+      expect(ledgerError).toBeNull();
+      expect(ledger?.delivery_id).toBe(canonicalPhotoId);
+      expect(ledger?.source_photo_id).toBeTruthy();
+      expect(ledger?.stage).toBe("delivered");
+
+      const unavailablePhotoId = firstBody.photos?.find(
+        (photo) => photo.id !== canonicalPhotoId,
+      )?.id;
+      expect(unavailablePhotoId).toBeTruthy();
+      const { error: unavailableError } = await adminSupabase
+        .from("cat_moment_deliveries")
+        .update({ status: "reported" })
+        .eq("local_delivery_id", unavailablePhotoId!);
+      expect(unavailableError).toBeNull();
+
+      const degradedReplay = await request.post(
+        "/api/sleeping-delivery/exchange",
+        {
+          headers: { "x-forwarded-for": `198.51.100.${(Date.now() + 3) % 200}` },
+          data: exchangeData(secondAnonymousId),
+        },
+      );
+      expect(degradedReplay.status()).toBe(200);
+      await expect(degradedReplay.json()).resolves.toMatchObject({
+        bundleId: firstBody.bundleId,
+        experienceVersion: "onboarding_choice_v1",
+        photos: expect.arrayContaining([
+          expect.objectContaining({ id: canonicalPhotoId }),
+        ]),
+        returnedCandidateCount: 3,
+      });
+    } finally {
+      await adminSupabase
+        .from("onboarding_submissions")
+        .delete()
+        .eq("submission_id", submissionId);
+      await adminSupabase
+        .from("cat_moment_deliveries")
+        .delete()
+        .contains("metadata", { onboarding_submission_id: submissionId });
+      await adminSupabase
+        .from("cat_moments")
+        .delete()
+        .in("local_moment_id", [...candidateIds, ownPhotoId]);
+    }
+  });
+
+  test("auto-keeps one legacy delivery when the onboarding pool cannot supply four", async ({
+    request,
+  }) => {
+    const adminSupabase = createAdminSupabaseClientFromEnv();
+    test.skip(!adminSupabase, "Local Supabase service role is required.");
+    if (!adminSupabase) return;
+
+    const stamp = `${Date.now()}-${crypto.randomUUID()}`;
+    const anonymousId = `onboarding-fallback-${stamp}`;
+    const journeyId = `onbj_${crypto.randomUUID()}`;
+    const dateKey = getJstDateKey();
+    const submissionId = createOnboardingJourneySubmissionId(
+      journeyId,
+      dateKey,
+    );
+    const ownPhotoId = createOnboardingOwnPhotoId(submissionId);
+    const resumeToken = createOnboardingResumeToken();
+    const candidateId = `onboarding-fallback-stock-${stamp}`;
+    const blockedPhotoIds = await readCurrentAdminStockIdentityIds(
+      adminSupabase,
+    );
+    expect(blockedPhotoIds.length).toBeLessThanOrEqual(100);
+
+    try {
+      const { error: candidateError } = await adminSupabase
+        .from("cat_moments")
+        .insert({
+          anonymous_id: `onboarding-fallback-source-${stamp}`,
+          local_moment_id: candidateId,
+          local_cat_id: `onboarding-fallback-cat-${stamp}`,
+          owner_cat_id: `onboarding-fallback-cat-${stamp}`,
+          photo_url: createSolidTestJpegDataUrl(8),
+          state: "sleeping",
+          visibility: "shared",
+          delivery_status: "available",
+          moderation_status: "approved",
+          moderated_at: new Date().toISOString(),
+          moderated_by: "e2e",
+          metadata: {
+            source: "admin-stock",
+            pool_kind: "admin_stock",
+            source_cat_key: `onboarding-fallback-real-cat-${stamp}`,
+          },
+          captured_at: new Date(Date.now() - 60_000).toISOString(),
+          created_at: new Date(Date.now() - 60_000).toISOString(),
+        });
+      expect(candidateError).toBeNull();
+
+      const response = await request.post("/api/sleeping-delivery/exchange", {
+        headers: { "x-forwarded-for": `192.0.2.${Date.now() % 200}` },
+        data: {
+          ownPhoto: {
+            id: ownPhotoId,
+            catId: `onboarding-fallback-owner-${stamp}`,
+            ownerCatId: `onboarding-fallback-owner-${stamp}`,
+            src: catPhotoDataUrl,
+            createdAt: Date.now(),
+            shared: true,
+          },
+          triggerLabel: "sleeping",
+          theme: "sleeping",
+          category: "sleeping",
+          seed: submissionId,
+          deliveryDateKey: dateKey,
+          recipientCatId: `onboarding-fallback-owner-${stamp}`,
+          anonymousId,
+          blockedPhotoIds,
+          preferredSourcePhotoId: candidateId,
+          requestedCandidateCount: 4,
+          capability: "onboarding_choice_v1",
+          mode: "onboarding",
+          onboardingSubmission: {
+            dateKey,
+            journeyId,
+            resumeToken,
+            source: "direct",
+            submissionId,
+          },
+        },
+      });
+      expect(response.status()).toBe(200);
+      const body = (await response.json()) as {
+        bundleId?: string;
+        photo?: { id: string; sourcePhotoId?: string } | null;
+        photos?: Array<{ id: string }>;
+        servedVariant?: string;
+      };
+      expect(body.servedVariant).toBe("single_v1");
+      expect(body.photos).toHaveLength(1);
+      expect(body.photo?.id).toBe(body.bundleId);
+      expect(body.photo?.id).not.toContain("-choice-");
+      expect(body.photo?.sourcePhotoId).toBe(candidateId);
+
+      const { data: deliveries, error: deliveryError } = await adminSupabase
+        .from("cat_moment_deliveries")
+        .select("local_delivery_id, status")
+        .contains("metadata", { onboarding_submission_id: submissionId });
+      expect(deliveryError).toBeNull();
+      expect(deliveries).toEqual([
+        expect.objectContaining({
+          local_delivery_id: body.photo?.id,
+          status: "kept",
+        }),
+      ]);
+
+      const { data: ledger, error: ledgerError } = await adminSupabase
+        .from("onboarding_submissions")
+        .select("delivery_id, source_photo_id, stage")
+        .eq("submission_id", submissionId)
+        .single();
+      expect(ledgerError).toBeNull();
+      expect(ledger).toMatchObject({
+        delivery_id: body.photo?.id,
+        source_photo_id: candidateId,
+        stage: "delivered",
+      });
+    } finally {
+      await adminSupabase
+        .from("onboarding_submissions")
+        .delete()
+        .eq("submission_id", submissionId);
+      await adminSupabase
+        .from("cat_moment_deliveries")
+        .delete()
+        .contains("metadata", { onboarding_submission_id: submissionId });
+      await adminSupabase
+        .from("cat_moments")
+        .delete()
+        .in("local_moment_id", [candidateId, ownPhotoId]);
+    }
+  });
+
   test("does not regress when later stages arrive concurrently", async ({
     request,
   }) => {
@@ -630,4 +1024,40 @@ function getJstDateKey(now = Date.now()) {
   }).formatToParts(now);
   const values = Object.fromEntries(parts.map((part) => [part.type, part.value]));
   return `${values.year}-${values.month}-${values.day}`;
+}
+
+async function readCurrentAdminStockIdentityIds(
+  adminSupabase: NonNullable<ReturnType<typeof createAdminSupabaseClientFromEnv>>,
+) {
+  const { data, error } = await adminSupabase
+    .from("cat_moments")
+    .select("id, local_moment_id, metadata")
+    .eq("visibility", "shared")
+    .eq("delivery_status", "available")
+    .eq("moderation_status", "approved");
+  expect(error).toBeNull();
+
+  return (data ?? [])
+    .filter((row) => {
+      const metadata = (row.metadata ?? {}) as Record<string, unknown>;
+      return (
+        metadata.pool_kind === "admin_stock" ||
+        metadata.pool_kind === "admin-stock" ||
+        metadata.source === "admin-stock"
+      );
+    })
+    .flatMap((row) => [row.id, row.local_moment_id])
+    .filter((id): id is string => typeof id === "string");
+}
+
+function createSolidTestJpegDataUrl(index: number) {
+  const pixels = Buffer.alloc(8 * 8 * 4);
+  for (let offset = 0; offset < pixels.length; offset += 4) {
+    pixels[offset] = 50 + index * 40;
+    pixels[offset + 1] = 80 + index * 20;
+    pixels[offset + 2] = 180 - index * 30;
+    pixels[offset + 3] = 255;
+  }
+  const jpeg = encode({ data: pixels, width: 8, height: 8 }, 85).data;
+  return `data:image/jpeg;base64,${jpeg.toString("base64")}`;
 }
