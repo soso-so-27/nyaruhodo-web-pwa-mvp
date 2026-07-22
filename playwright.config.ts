@@ -94,6 +94,8 @@ const mobileSpecs = [
   "**/beta-supporter-page.spec.ts",
   "**/home-day-cycle-indicator.spec.ts",
   "**/home-desk-model.spec.ts",
+  "**/evening-four-choice.spec.ts",
+  "**/evening-flow-preview.spec.ts",
   "**/home-sleeping-exchange-flow.spec.ts",
   "**/onboarding-branch-matrix.spec.ts",
   "**/onboarding-delivery-flow.spec.ts",

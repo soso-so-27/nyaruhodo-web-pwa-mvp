@@ -403,6 +403,136 @@ test.describe("admin analytics logic", () => {
     expect(result.handoffFunnel.map((step) => step.users)).toEqual([1, 1, 1, 0]);
   });
 
+  test("scopes the four-choice funnel to actor, delivery day, variant, and bundle", () => {
+    const assignedFour = (
+      deliveryDateKey: string,
+      bundleId: string,
+      servedVariant: "four_choice_v1" | "single_v1",
+      servedCount: number,
+    ) => ({
+      delivery_date_key: deliveryDateKey,
+      delivery_bundle_id: bundleId,
+      assigned_variant: "four_choice_v1",
+      served_variant: servedVariant,
+      requested_count: 4,
+      served_count: servedCount,
+    });
+    const choice = (deliveryDateKey: string, bundleId: string) => ({
+      delivery_date_key: deliveryDateKey,
+      delivery_bundle_id: bundleId,
+      experience_version: "evening_choice_v1",
+      candidate_count: 4,
+    });
+    const events = [
+      event("actor-a", "evening_delivery_check_succeeded", 0, {
+        metadata: assignedFour(
+          "2026-07-16",
+          "bundle-a-16",
+          "four_choice_v1",
+          4,
+        ),
+      }),
+      event("actor-a", "evening_delivery_check_succeeded", 0.01, {
+        metadata: assignedFour(
+          "2026-07-16",
+          "bundle-a-16",
+          "four_choice_v1",
+          4,
+        ),
+      }),
+      event("actor-a", "evening_delivery_choices_shown", 0.1, {
+        metadata: choice("2026-07-16", "bundle-a-16"),
+      }),
+      event("actor-a", "evening_delivery_choice_selected", 0.2, {
+        metadata: choice("2026-07-16", "bundle-a-16"),
+      }),
+      event("actor-a", "evening_delivery_choice_saved", 0.3, {
+        metadata: choice("2026-07-16", "bundle-a-16"),
+      }),
+      event("actor-a", "evening_delivery_check_succeeded", 1, {
+        metadata: assignedFour(
+          "2026-07-17",
+          "bundle-a-17",
+          "four_choice_v1",
+          4,
+        ),
+      }),
+      event("actor-a", "evening_delivery_choices_shown", 1.1, {
+        metadata: choice("2026-07-17", "bundle-a-17"),
+      }),
+      event("actor-a", "evening_delivery_choices_dismissed", 1.2, {
+        metadata: choice("2026-07-17", "bundle-a-17"),
+      }),
+      event("actor-b", "evening_delivery_check_succeeded", 2, {
+        metadata: assignedFour(
+          "2026-07-16",
+          "bundle-b-16",
+          "single_v1",
+          1,
+        ),
+      }),
+      event("actor-b", "evening_delivery_choices_shown", 2.1, {
+        metadata: choice("2026-07-16", "bundle-b-16"),
+      }),
+      event("actor-c", "evening_delivery_check_succeeded", 3, {
+        metadata: {
+          delivery_date_key: "2026-07-16",
+          delivery_bundle_id: "bundle-c-16",
+          assigned_variant: "single_v1",
+          served_variant: "single_v1",
+          requested_count: 1,
+          served_count: 1,
+        },
+      }),
+      event("actor-a", "evening_delivery_choice_saved", 4, {
+        metadata: choice("2026-07-16", "wrong-bundle"),
+      }),
+      event("actor-a", "evening_delivery_choice_saved", 5, {
+        metadata: choice("2026-07-18", "bundle-a-16"),
+      }),
+    ];
+
+    const result = buildAdminAnalytics(events);
+    const metrics = Object.fromEntries(
+      result.fourChoiceHealth.metrics.map((metric) => [metric.key, metric]),
+    );
+
+    expect(metrics.four_choice_assigned).toMatchObject({
+      cohorts: 3,
+      actors: 2,
+      events: 4,
+    });
+    expect(metrics.four_choice_exact_four_served).toMatchObject({
+      cohorts: 2,
+      actors: 1,
+      events: 3,
+    });
+    expect(metrics.four_choice_fallback_single).toMatchObject({
+      cohorts: 1,
+      actors: 1,
+      events: 1,
+    });
+    expect(metrics.four_choice_choices_shown).toMatchObject({ cohorts: 2 });
+    expect(metrics.four_choice_choice_selected).toMatchObject({ cohorts: 1 });
+    expect(metrics.four_choice_choice_saved).toMatchObject({ cohorts: 1 });
+    expect(metrics.four_choice_dismissed).toMatchObject({ cohorts: 1 });
+    expect(
+      result.fourChoiceHealth.funnel.map((step) => step.cohorts),
+    ).toEqual([3, 2, 2, 1, 1]);
+    expect(result.fourChoiceHealth.funnel[1]).toMatchObject({
+      previousCohorts: 3,
+      fromPreviousRate: 66.7,
+      fromAssignedRate: 66.7,
+    });
+    expect(result.returningFunnel.map((step) => step.key)).toEqual([
+      "evening_reserved",
+      "evening_check_started",
+      "evening_check_succeeded",
+      "evening_envelope",
+      "evening_opened",
+    ]);
+  });
+
   test("treats expired handoff followed by app progress as recovered", () => {
     const journeyId = "onbj_22222222-2222-4222-8222-222222222222";
     const events = [

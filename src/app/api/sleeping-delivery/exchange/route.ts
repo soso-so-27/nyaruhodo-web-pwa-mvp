@@ -39,6 +39,14 @@ import {
   isOnboardingJourneyId,
 } from "../../../../lib/onboarding/journeyContract";
 import { advanceOnboardingSubmission } from "../../../../lib/server/onboardingSubmissionLedger";
+import {
+  EVENING_CHOICE_RECIRCULATION_POLICY,
+  buildFourChoiceExcludedSourceIds,
+  classifyDeliveryExposureHistory,
+  readCandidateLastShownAt,
+  type DeliveryExposureHistory,
+  type DeliveryExposureRow,
+} from "../../../../lib/server/deliveryRecirculation";
 
 export const dynamic = "force-dynamic";
 
@@ -62,6 +70,8 @@ type ExchangeRequest = {
   anonymousId?: string | null;
   blockedPhotoIds?: string[];
   preferredSourcePhotoId?: string | null;
+  requestedCandidateCount?: number | null;
+  capability?: string | null;
   debugDryRun?: boolean;
   mode?: "onboarding" | null;
   onboardingSubmission?: {
@@ -131,7 +141,13 @@ const FAST_STORAGE_CANDIDATE_LIMIT = 80;
 const FAST_STORAGE_CANDIDATE_PROBE_LIMIT = 12;
 const TIERED_CANDIDATE_LIMIT = 240;
 const TRANSIENT_DELIVERY_SIGNED_URL_SECONDS = 10 * 60;
+const EVENING_CHOICE_CAPABILITY = "evening_choice_v1";
+const EVENING_CHOICE_REQUESTED_COUNT = 4;
+const EVENING_CHOICE_MAX_COUNT = 4;
+const DELIVERY_HISTORY_PAGE_SIZE = 1000;
+const MAX_PERMANENT_DELIVERY_HISTORY_ROWS = 10_000;
 type FastCandidateMode = "admin_storage" | "tiered";
+type EveningChoiceVariant = "four_choice_v1" | "single_v1";
 
 type OnboardingExceptionBucket = {
   startedAt: number;
@@ -203,6 +219,8 @@ async function handleExchangePost(request: Request) {
   const shouldAddOwnPhotoToPool =
     ownPhoto.shared !== false &&
     !isBlockedDeliveryPhotoUrl(ownPhoto.src);
+  const shouldResolveEveningChoiceIdentity =
+    !isOnboardingExchange && input.capability === EVENING_CHOICE_CAPABILITY;
   const debugDryRunRequested = input.debugDryRun === true;
   const debugDryRun = debugDryRunRequested && isExchangeDebugDryRunAllowed();
 
@@ -210,9 +228,12 @@ async function handleExchangePost(request: Request) {
     return exchangeError("debug_dry_run_disabled", 403);
   }
 
-  const user = shouldAddOwnPhotoToPool || ownPhotoStoragePath
-    ? await getAuthenticatedUserForRequest(request)
-    : null;
+  const user =
+    shouldAddOwnPhotoToPool ||
+    ownPhotoStoragePath ||
+    shouldResolveEveningChoiceIdentity
+      ? await getAuthenticatedUserForRequest(request)
+      : null;
   markExchangeTiming(timing, "auth");
 
   if (ownPhotoStoragePath) {
@@ -335,6 +356,45 @@ async function handleExchangePost(request: Request) {
             deliveryDateKey: input.deliveryDateKey,
           })
       : null;
+  const isEveningChoiceCapableRequest = Boolean(
+    !isOnboardingExchange &&
+      !debugDryRun &&
+      input.deliveryDateKey &&
+      input.capability === EVENING_CHOICE_CAPABILITY &&
+      input.requestedCandidateCount === EVENING_CHOICE_REQUESTED_COUNT,
+  );
+  const eveningChoiceAssignedVariant: EveningChoiceVariant =
+    isEveningChoiceCapableRequest &&
+    isEveningChoiceRolloutAssigned({ userId, anonymousId })
+      ? "four_choice_v1"
+      : "single_v1";
+
+  if (idempotentDeliveryId && !isOnboardingExchange) {
+    const existingBundle = await readExistingDeliveryBundle({
+      supabase,
+      userId,
+      anonymousId,
+      bundleId: idempotentDeliveryId,
+    });
+
+    if (existingBundle.length > 0) {
+      markExchangeTiming(timing, "read_existing_bundle");
+      logExchangeTiming(timing, {
+        result: "existing_bundle",
+        deliveryDateKey: input.deliveryDateKey,
+        servedCount: existingBundle.length,
+      });
+      return buildExistingBundleResponse({
+        deliveries: existingBundle,
+        input,
+        isEveningChoiceCapableRequest,
+        supabase,
+        timing,
+        userId,
+        anonymousId,
+      });
+    }
+  }
 
   if (idempotentDeliveryId) {
     const existingDelivery = onboardingJourneyId
@@ -379,6 +439,20 @@ async function handleExchangePost(request: Request) {
       });
       return NextResponse.json({
         photo: existingPhoto,
+        ...(isEveningChoiceCapableRequest
+          ? {
+              photos: [existingPhoto],
+              bundleId: idempotentDeliveryId,
+              experienceVersion: EVENING_CHOICE_CAPABILITY,
+              assignedVariant: "single_v1" satisfies EveningChoiceVariant,
+              servedVariant: "single_v1" satisfies EveningChoiceVariant,
+              requestedCount: EVENING_CHOICE_REQUESTED_COUNT,
+              servedCount: 1,
+              fallbackReason: "legacy_delivery",
+              requestedCandidateCount: EVENING_CHOICE_REQUESTED_COUNT,
+              returnedCandidateCount: 1,
+            }
+          : {}),
         source: "remote",
         diagnostics: {
           ...buildDiagnostics([], new Set(input.blockedPhotoIds ?? [])),
@@ -524,11 +598,17 @@ async function handleExchangePost(request: Request) {
   markExchangeTiming(timing, "own_photo");
 
   const blockedPhotoIds = new Set(input.blockedPhotoIds ?? []);
-  const deliveredSourceMomentIds = await readDeliveredSourceMomentIds({
+  const deliveryExposureHistory = await readDeliveryExposureHistory({
     supabase,
     userId,
     anonymousId,
+    currentDateKey: input.deliveryDateKey || getServerJstDateKey(),
   });
+  const deliveredSourceMomentIds =
+    isEveningChoiceCapableRequest &&
+    eveningChoiceAssignedVariant === "four_choice_v1"
+      ? buildFourChoiceExcludedSourceIds(deliveryExposureHistory)
+      : deliveryExposureHistory.allSourceIds;
   markExchangeTiming(timing, "read_delivered_sources");
   const deliverableContext = {
     userId,
@@ -539,6 +619,29 @@ async function handleExchangePost(request: Request) {
     blockedPhotoIds,
     deliveredSourceMomentIds,
   };
+
+  if (
+    idempotentDeliveryId &&
+    shouldUseEveningChoiceBundlePath({
+      isCapableRequest: isEveningChoiceCapableRequest,
+      assignedVariant: eveningChoiceAssignedVariant,
+      idempotentDeliveryId,
+    })
+  ) {
+    return handleEveningChoiceExchange({
+      assignedVariant: eveningChoiceAssignedVariant,
+      blockedPhotoIds,
+      bundleId: idempotentDeliveryId,
+      canUseStorage: Boolean(adminSupabase),
+      deliverableContext,
+      input,
+      supabase,
+      timing,
+      userId,
+      anonymousId,
+      deliveryExposureHistory,
+    });
+  }
 
   const fastCandidateMode = isOnboardingExchange ? "tiered" : readFastCandidateMode();
   const fastRows =
@@ -789,6 +892,591 @@ async function handleExchangePost(request: Request) {
   });
 }
 
+async function handleEveningChoiceExchange({
+  assignedVariant,
+  blockedPhotoIds,
+  bundleId,
+  canUseStorage,
+  deliverableContext,
+  input,
+  supabase,
+  timing,
+  userId,
+  anonymousId,
+  deliveryExposureHistory,
+}: {
+  assignedVariant: EveningChoiceVariant;
+  blockedPhotoIds: Set<string>;
+  bundleId: string;
+  canUseStorage: boolean;
+  deliverableContext: Parameters<typeof isRowDeliverable>[1];
+  input: Required<ExchangeRequest>;
+  supabase: SupabaseClient;
+  timing: ReturnType<typeof createExchangeTiming>;
+  userId: string | null;
+  anonymousId: string | null;
+  deliveryExposureHistory: DeliveryExposureHistory;
+}) {
+  const remoteRows = await readRemoteCandidateRows(supabase);
+  markExchangeTiming(timing, "read_choice_pool");
+  const diagnosticsBase = buildDiagnostics(remoteRows, blockedPhotoIds);
+  const candidatePool = sortTieredCandidates(
+    remoteRows.filter(
+      (row) =>
+        isRowDeliverable(row, deliverableContext) &&
+        isPersistableEveningChoiceSource(row.photo_url),
+    ),
+    input,
+    deliveryExposureHistory,
+  );
+  const eligibleRecycledCount = candidatePool.filter(
+    (row) =>
+      readCandidateLastShownAt(deliveryExposureHistory, [
+        row.id,
+        row.local_moment_id,
+      ]) !== null,
+  ).length;
+  const assignedCount =
+    assignedVariant === "four_choice_v1" ? EVENING_CHOICE_REQUESTED_COUNT : 1;
+  let selectedCandidates = await selectCandidates(
+    candidatePool,
+    input,
+    supabase,
+    assignedCount,
+  );
+  let servedVariant: EveningChoiceVariant = assignedVariant;
+  let fallbackReason: string | null = null;
+
+  if (
+    assignedVariant === "four_choice_v1" &&
+    selectedCandidates.length < EVENING_CHOICE_REQUESTED_COUNT
+  ) {
+    fallbackReason =
+      selectedCandidates.length === 0 ? "no_candidate" : "candidate_shortage";
+    selectedCandidates = selectedCandidates.slice(0, 1);
+    servedVariant = "single_v1";
+  }
+
+  if (selectedCandidates.length === 0) {
+    logExchangeTiming(timing, {
+      result: "choice_none",
+      candidateCount: candidatePool.length,
+      assignedVariant,
+    });
+    return NextResponse.json({
+      photo: null,
+      photos: [],
+      source: "none",
+      bundleId,
+      experienceVersion: EVENING_CHOICE_CAPABILITY,
+      assignedVariant,
+      servedVariant,
+      requestedCount: EVENING_CHOICE_REQUESTED_COUNT,
+      servedCount: 0,
+      fallbackReason: fallbackReason ?? "no_candidate",
+      requestedCandidateCount: EVENING_CHOICE_REQUESTED_COUNT,
+      returnedCandidateCount: 0,
+      diagnostics: {
+        ...diagnosticsBase,
+        source: "none",
+        candidateCount: candidatePool.length,
+        excludedCount: Math.max(
+          0,
+          diagnosticsBase.availableCount - candidatePool.length,
+        ),
+        choiceExperienceVersion: EVENING_CHOICE_CAPABILITY,
+        choiceAssignedVariant: assignedVariant,
+        choiceServedVariant: servedVariant,
+        choiceRequestedCount: EVENING_CHOICE_REQUESTED_COUNT,
+        choiceServedCount: 0,
+        choiceFallbackReason: fallbackReason ?? "no_candidate",
+        recirculationPolicy: EVENING_CHOICE_RECIRCULATION_POLICY,
+        permanentExcludedCount:
+          deliveryExposureHistory.permanentSourceIds.size,
+        recentExposureExcludedCount:
+          deliveryExposureHistory.recentSourceIds.size,
+        eligibleRecycledCount,
+        servedRecycledCount: 0,
+        timing,
+      },
+    });
+  }
+
+  const deliveredAt = new Date();
+  const deliveredAtMs = deliveredAt.getTime();
+  const servedCount = selectedCandidates.length;
+  const servedRecycledCount = selectedCandidates.filter(
+    (candidate) =>
+      readCandidateLastShownAt(deliveryExposureHistory, [
+        candidate.row.id,
+        candidate.row.local_moment_id,
+      ]) !== null,
+  ).length;
+  const prepared = await Promise.all(
+    selectedCandidates.map(async (selected, index) => {
+      const localDeliveryId = buildEveningChoiceDeliverySlotId({
+        bundleId,
+        position: index + 1,
+      });
+      const deliveryPhotoSrc = await prepareExchangeDeliveryPhotoSrc({
+        supabase,
+        row: selected.row,
+        resolvedSrc: selected.src,
+        canUseStorage,
+      });
+      const metadata = {
+        source: "server_exchange",
+        source_pool_kind: readPoolKind(selected.row.metadata),
+        trigger_label: input.triggerLabel,
+        theme: input.theme,
+        category: input.category,
+        delivery_date_key: input.deliveryDateKey,
+        delivery_tier: selected.tier,
+        bundle_id: bundleId,
+        experience_version: EVENING_CHOICE_CAPABILITY,
+        assigned_variant: assignedVariant,
+        served_variant: servedVariant,
+        requested_count: EVENING_CHOICE_REQUESTED_COUNT,
+        served_count: servedCount,
+        fallback_reason: fallbackReason,
+        delivery_position: index + 1,
+      };
+      const photo: ExchangePhoto = {
+        id: localDeliveryId,
+        sourcePhotoId: selected.row.local_moment_id,
+        src: deliveryPhotoSrc,
+        title: "ほかの猫のねがお",
+        subtitle: "",
+        triggerLabel: input.triggerLabel,
+        theme: input.theme,
+        deliveredAt: deliveredAtMs,
+      };
+
+      return {
+        photo,
+        selected,
+        row: {
+          user_id: userId,
+          anonymous_id: anonymousId,
+          local_delivery_id: localDeliveryId,
+          source_moment_id: selected.row.id,
+          source_photo_id: selected.row.local_moment_id,
+          recipient_local_cat_id: input.recipientCatId,
+          photo_url: deliveryPhotoSrc,
+          status: "delivered",
+          metadata,
+          delivered_at: deliveredAt.toISOString(),
+        },
+      };
+    }),
+  );
+  markExchangeTiming(timing, "choice_delivery_photos");
+
+  const { error: deliveryError } = await supabase
+    .from("cat_moment_deliveries")
+    .insert(prepared.map((item) => item.row));
+
+  if (deliveryError) {
+    if (isUniqueDeliveryError(deliveryError)) {
+      const existingBundle = await readExistingDeliveryBundle({
+        supabase,
+        userId,
+        anonymousId,
+        bundleId,
+      });
+
+      if (existingBundle.length > 0) {
+        markExchangeTiming(timing, "read_duplicate_bundle");
+        return buildExistingBundleResponse({
+          deliveries: existingBundle,
+          input,
+          isEveningChoiceCapableRequest: true,
+          supabase,
+          timing,
+          userId,
+          anonymousId,
+        });
+      }
+    }
+
+    return NextResponse.json(
+      {
+        photo: null,
+        photos: [],
+        source: "none",
+        error: deliveryError.message,
+        bundleId,
+        experienceVersion: EVENING_CHOICE_CAPABILITY,
+        assignedVariant,
+        servedVariant,
+        requestedCount: EVENING_CHOICE_REQUESTED_COUNT,
+        servedCount: 0,
+        fallbackReason: "delivery_insert_failed",
+      },
+      { status: 500 },
+    );
+  }
+
+  await Promise.all(
+    prepared.map(({ selected }) =>
+      incrementDeliveryCount({ supabase, row: selected.row }),
+    ),
+  );
+  markExchangeTiming(timing, "insert_choice_bundle");
+  const photos = await Promise.all(
+    prepared.map(({ photo }) => attachTransientDeliverySignedUrl(photo, supabase)),
+  );
+  logExchangeTiming(timing, {
+    result: "choice_remote",
+    candidateCount: candidatePool.length,
+    assignedVariant,
+    servedVariant,
+    servedCount,
+  });
+
+  return NextResponse.json({
+    photo: photos[0] ?? null,
+    photos,
+    source: "remote",
+    tier: selectedCandidates[0]?.tier ?? null,
+    bundleId,
+    experienceVersion: EVENING_CHOICE_CAPABILITY,
+    assignedVariant,
+    servedVariant,
+    requestedCount: EVENING_CHOICE_REQUESTED_COUNT,
+    servedCount,
+    fallbackReason,
+    requestedCandidateCount: EVENING_CHOICE_REQUESTED_COUNT,
+    returnedCandidateCount: servedCount,
+    diagnostics: {
+      ...diagnosticsBase,
+      source: "remote",
+      candidateCount: candidatePool.length,
+      excludedCount: Math.max(
+        0,
+        diagnosticsBase.availableCount - candidatePool.length,
+      ),
+      duplicateExcludedCount: deliverableContext.deliveredSourceMomentIds.size,
+      recirculationPolicy: EVENING_CHOICE_RECIRCULATION_POLICY,
+      permanentExcludedCount:
+        deliveryExposureHistory.permanentSourceIds.size,
+      recentExposureExcludedCount:
+        deliveryExposureHistory.recentSourceIds.size,
+      eligibleRecycledCount,
+      servedRecycledCount,
+      choiceExperienceVersion: EVENING_CHOICE_CAPABILITY,
+      choiceAssignedVariant: assignedVariant,
+      choiceServedVariant: servedVariant,
+      choiceRequestedCount: EVENING_CHOICE_REQUESTED_COUNT,
+      choiceServedCount: servedCount,
+      choiceFallbackReason: fallbackReason,
+      timing,
+    },
+  });
+}
+
+export function buildEveningChoiceDeliverySlotId({
+  bundleId,
+  position,
+}: {
+  bundleId: string;
+  position: number;
+}) {
+  return `${bundleId}-choice-${position}`;
+}
+
+function isEveningChoiceRolloutAssigned({
+  userId,
+  anonymousId,
+}: {
+  userId: string | null;
+  anonymousId: string | null;
+}) {
+  if (
+    !isEveningChoiceIdentityEligible({
+      userId,
+      anonymousId,
+      productionDeployment: isProductionDeployment(),
+    })
+  ) {
+    return false;
+  }
+
+  const identity = userId ? `user:${userId}` : `anon:${anonymousId ?? ""}`;
+  return isIdentityInEveningChoiceRollout(
+    identity,
+    readEveningChoiceRolloutPercent(),
+  );
+}
+
+export function isEveningChoiceIdentityEligible({
+  userId,
+  anonymousId,
+  productionDeployment,
+}: {
+  userId: string | null;
+  anonymousId: string | null;
+  productionDeployment: boolean;
+}) {
+  return Boolean(userId || (!productionDeployment && anonymousId));
+}
+
+export function isIdentityInEveningChoiceRollout(
+  identity: string,
+  rolloutPercent: number,
+) {
+  if (rolloutPercent <= 0) {
+    return false;
+  }
+  if (rolloutPercent >= 100) {
+    return true;
+  }
+
+  const digest = createHash("sha256").update(identity).digest();
+  return digest.readUInt32BE(0) % 100 < rolloutPercent;
+}
+
+export function shouldUseEveningChoiceBundlePath({
+  isCapableRequest,
+  assignedVariant,
+  idempotentDeliveryId,
+}: {
+  isCapableRequest: boolean;
+  assignedVariant: EveningChoiceVariant;
+  idempotentDeliveryId: string | null;
+}) {
+  return Boolean(
+    isCapableRequest &&
+      assignedVariant === "four_choice_v1" &&
+      idempotentDeliveryId,
+  );
+}
+
+export function readEveningChoiceRolloutPercent() {
+  const raw = process.env.EVENING_DELIVERY_FOUR_CHOICE_ROLLOUT_PERCENT;
+  if (raw === undefined || raw.trim() === "") {
+    return isProductionDeployment() ? 0 : 100;
+  }
+
+  const parsed = Number(raw);
+  if (!Number.isFinite(parsed)) {
+    return 0;
+  }
+  return Math.min(100, Math.max(0, Math.floor(parsed)));
+}
+
+function isProductionDeployment() {
+  return (
+    process.env.NODE_ENV === "production" &&
+    process.env.VERCEL_ENV !== "preview" &&
+    process.env.VERCEL_ENV !== "development"
+  );
+}
+
+async function readExistingDeliveryBundle({
+  supabase,
+  userId,
+  anonymousId,
+  bundleId,
+}: {
+  supabase: SupabaseClient;
+  userId: string | null;
+  anonymousId: string | null;
+  bundleId: string;
+}) {
+  const slotIds = Array.from({ length: EVENING_CHOICE_MAX_COUNT }, (_, index) =>
+    buildEveningChoiceDeliverySlotId({ bundleId, position: index + 1 }),
+  );
+  let query = supabase
+    .from("cat_moment_deliveries")
+    .select(
+      "id, local_delivery_id, source_moment_id, source_photo_id, recipient_local_cat_id, photo_url, status, metadata, delivered_at",
+    )
+    .in("local_delivery_id", slotIds);
+
+  query = userId
+    ? query.eq("user_id", userId)
+    : query.eq("anonymous_id", anonymousId ?? "").is("user_id", null);
+
+  const { data, error } = await query;
+  if (error) {
+    console.warn("[sleeping-delivery/exchange] existing bundle lookup failed", {
+      code: error.code,
+    });
+    return [];
+  }
+
+  return ((data ?? []) as RemoteDeliveryRow[]).sort(
+    (first, second) =>
+      readDeliveryPosition(first.metadata) - readDeliveryPosition(second.metadata) ||
+      first.local_delivery_id.localeCompare(second.local_delivery_id),
+  );
+}
+
+async function buildExistingBundleResponse({
+  deliveries,
+  input,
+  isEveningChoiceCapableRequest,
+  supabase,
+  timing,
+  userId,
+  anonymousId,
+}: {
+  deliveries: RemoteDeliveryRow[];
+  input: Required<ExchangeRequest>;
+  isEveningChoiceCapableRequest: boolean;
+  supabase: SupabaseClient;
+  timing: ReturnType<typeof createExchangeTiming>;
+  userId: string | null;
+  anonymousId: string | null;
+}) {
+  const visibleDeliveries = deliveries.filter(
+    (delivery) => delivery.status !== "hidden" && delivery.status !== "reported",
+  );
+  const photos = await Promise.all(
+    visibleDeliveries.map((delivery) =>
+      attachTransientDeliverySignedUrl(
+        toExchangePhotoFromDelivery(delivery, input),
+        supabase,
+      ),
+    ),
+  );
+  const metadata = deliveries[0]?.metadata ?? {};
+  const bundleId =
+    typeof metadata.bundle_id === "string" ? metadata.bundle_id : null;
+  const assignedVariant = readEveningChoiceVariant(
+    metadata.assigned_variant,
+    photos.length >= EVENING_CHOICE_REQUESTED_COUNT
+      ? "four_choice_v1"
+      : "single_v1",
+  );
+  const servedVariant = readEveningChoiceVariant(
+    metadata.served_variant,
+    photos.length >= EVENING_CHOICE_REQUESTED_COUNT
+      ? "four_choice_v1"
+      : "single_v1",
+  );
+  const requestedCount = readPositiveInteger(
+    metadata.requested_count,
+    EVENING_CHOICE_REQUESTED_COUNT,
+  );
+  const servedCount = photos.length;
+  const fallbackReason =
+    typeof metadata.fallback_reason === "string"
+      ? metadata.fallback_reason
+      : null;
+  const tier = readDeliveryTier(metadata.delivery_tier);
+  const resolution = bundleId
+    ? await readEveningChoiceResolution({
+        supabase,
+        userId,
+        anonymousId,
+        bundleId,
+      })
+    : null;
+
+  return NextResponse.json({
+    photo: photos[0] ?? null,
+    ...(isEveningChoiceCapableRequest
+      ? {
+          photos,
+          bundleId,
+          experienceVersion: EVENING_CHOICE_CAPABILITY,
+          assignedVariant,
+          servedVariant,
+          requestedCount,
+          servedCount,
+          fallbackReason,
+          requestedCandidateCount: requestedCount,
+          returnedCandidateCount: servedCount,
+          choiceResolution: resolution?.outcome ?? null,
+          selectedPhotoId: resolution?.selected_local_delivery_id ?? null,
+          choiceResolvedAt: resolution?.resolved_at ?? null,
+        }
+      : {}),
+    source: photos.length > 0 ? "remote" : "none",
+    tier,
+    diagnostics: {
+      ...buildDiagnostics([], new Set(input.blockedPhotoIds ?? [])),
+      source: photos.length > 0 ? "remote" : "none",
+      candidateCount: photos.length,
+      normalCandidateCount: photos.length,
+      fallbackCandidateCount: 0,
+      fallbackActive: servedVariant === "single_v1" && requestedCount > 1,
+      excludedCount: 0,
+      idempotentReplay: true,
+      tier,
+      timing,
+    },
+  });
+}
+
+async function readEveningChoiceResolution({
+  supabase,
+  userId,
+  anonymousId,
+  bundleId,
+}: {
+  supabase: SupabaseClient;
+  userId: string | null;
+  anonymousId: string | null;
+  bundleId: string;
+}) {
+  let query = supabase
+    .from("evening_delivery_choice_resolutions")
+    .select("outcome, selected_local_delivery_id, resolved_at")
+    .eq("bundle_id", bundleId)
+    .limit(1);
+
+  query = userId
+    ? query.eq("user_id", userId)
+    : query.is("user_id", null).eq("anonymous_id", anonymousId ?? "");
+
+  const { data, error } = await query.maybeSingle();
+  if (error) {
+    console.warn("[sleeping-delivery/exchange] choice resolution lookup failed", {
+      code: error.code,
+    });
+    return null;
+  }
+
+  if (
+    !data ||
+    (data.outcome !== "kept" &&
+      data.outcome !== "skipped" &&
+      data.outcome !== "expired")
+  ) {
+    return null;
+  }
+
+  return data as {
+    outcome: "kept" | "skipped" | "expired";
+    selected_local_delivery_id: string | null;
+    resolved_at: string;
+  };
+}
+
+function readDeliveryPosition(metadata: Record<string, unknown> | null) {
+  return readPositiveInteger(metadata?.delivery_position, Number.MAX_SAFE_INTEGER);
+}
+
+function readEveningChoiceVariant(
+  value: unknown,
+  fallback: EveningChoiceVariant,
+): EveningChoiceVariant {
+  return value === "four_choice_v1" || value === "single_v1" ? value : fallback;
+}
+
+function readPositiveInteger(value: unknown, fallback: number) {
+  return typeof value === "number" && Number.isInteger(value) && value > 0
+    ? value
+    : fallback;
+}
+
+function readDeliveryTier(value: unknown): DeliveryTier | null {
+  return value === 1 || value === 2 || value === 3 ? value : null;
+}
+
 async function readExchangeRequest(request: Request): Promise<ExchangeRequestParseResult> {
   const rawBody = await request.text().catch(() => "");
 
@@ -826,6 +1514,11 @@ async function readExchangeRequest(request: Request): Promise<ExchangeRequestPar
         ? body.blockedPhotoIds.filter((id) => typeof id === "string")
         : [],
       preferredSourcePhotoId: toStringOrNull(body.preferredSourcePhotoId),
+      requestedCandidateCount:
+        typeof body.requestedCandidateCount === "number"
+          ? body.requestedCandidateCount
+          : null,
+      capability: toStringOrNull(body.capability),
       debugDryRun: body.debugDryRun === true,
       mode: body.mode === "onboarding" ? "onboarding" : null,
       onboardingSubmission:
@@ -879,6 +1572,7 @@ function validateExchangeRequest(
     input.anonymousId,
     input.recipientCatId,
     input.preferredSourcePhotoId,
+    input.capability,
   ].filter((value): value is string => typeof value === "string");
 
   if (stringFields.some((value) => value.length > MAX_ID_LENGTH)) {
@@ -910,6 +1604,15 @@ function validateExchangeRequest(
   if (
     input.blockedPhotoIds.length > MAX_BLOCKED_PHOTO_IDS ||
     input.blockedPhotoIds.some((id) => id.length > MAX_ID_LENGTH)
+  ) {
+    return { ok: false, status: 400, error: "invalid_exchange_request" };
+  }
+
+  if (
+    input.requestedCandidateCount !== null &&
+    (!Number.isInteger(input.requestedCandidateCount) ||
+      input.requestedCandidateCount < 1 ||
+      input.requestedCandidateCount > EVENING_CHOICE_MAX_COUNT)
   ) {
     return { ok: false, status: 400, error: "invalid_exchange_request" };
   }
@@ -1347,19 +2050,21 @@ async function readPriorExchange({
   return query.maybeSingle<{ id: string }>();
 }
 
-async function readDeliveredSourceMomentIds({
+async function readDeliveryExposureHistory({
   supabase,
   userId,
   anonymousId,
+  currentDateKey,
 }: {
   supabase: SupabaseClient;
   userId: string | null;
   anonymousId: string | null;
+  currentDateKey: string;
 }) {
   let query = supabase
     .from("cat_moment_deliveries")
-    .select("source_moment_id")
-    .not("source_moment_id", "is", null)
+    .select("source_moment_id, source_photo_id, status, metadata, delivered_at")
+    .order("delivered_at", { ascending: false })
     .limit(1000);
 
   query = userId
@@ -1372,16 +2077,70 @@ async function readDeliveredSourceMomentIds({
     console.warn("[sleeping-delivery/exchange] delivered source lookup failed", {
       code: error.code,
     });
-    return new Set<string>();
+    return classifyDeliveryExposureHistory({
+      rows: [],
+      currentDateKey,
+    });
   }
 
-  return new Set(
-    (data ?? [])
-      .map((row) =>
-        typeof row.source_moment_id === "string" ? row.source_moment_id : null,
-      )
-      .filter((value): value is string => Boolean(value)),
-  );
+  const permanentRows = await readPermanentDeliveryExposureRows({
+    supabase,
+    userId,
+    anonymousId,
+  });
+
+  return classifyDeliveryExposureHistory({
+    rows: [
+      ...((data ?? []) as DeliveryExposureRow[]),
+      ...permanentRows,
+    ],
+    currentDateKey,
+  });
+}
+
+async function readPermanentDeliveryExposureRows({
+  supabase,
+  userId,
+  anonymousId,
+}: {
+  supabase: SupabaseClient;
+  userId: string | null;
+  anonymousId: string | null;
+}) {
+  const rows: DeliveryExposureRow[] = [];
+
+  for (
+    let from = 0;
+    from < MAX_PERMANENT_DELIVERY_HISTORY_ROWS;
+    from += DELIVERY_HISTORY_PAGE_SIZE
+  ) {
+    let query = supabase
+      .from("cat_moment_deliveries")
+      .select("source_moment_id, source_photo_id, status, metadata, delivered_at")
+      .in("status", ["kept", "dismissed", "hidden", "reported"])
+      .order("delivered_at", { ascending: false })
+      .range(from, from + DELIVERY_HISTORY_PAGE_SIZE - 1);
+
+    query = userId
+      ? query.eq("user_id", userId)
+      : query.is("user_id", null).eq("anonymous_id", anonymousId ?? "");
+
+    const { data, error } = await query;
+    if (error) {
+      console.warn(
+        "[sleeping-delivery/exchange] permanent delivery history lookup failed",
+        { code: error.code },
+      );
+      break;
+    }
+
+    rows.push(...((data ?? []) as DeliveryExposureRow[]));
+    if ((data?.length ?? 0) < DELIVERY_HISTORY_PAGE_SIZE) {
+      break;
+    }
+  }
+
+  return rows;
 }
 
 function toExchangePhotoFromDelivery(
@@ -1849,12 +2608,38 @@ async function incrementDeliveryCount({
 function sortTieredCandidates(
   rows: RemoteCatMomentRow[],
   input: Required<ExchangeRequest>,
+  deliveryExposureHistory?: DeliveryExposureHistory,
 ) {
   return [...rows].sort((a, b) => {
     const tierDelta = getDeliveryTier(a, input) - getDeliveryTier(b, input);
 
     if (tierDelta !== 0) {
       return tierDelta;
+    }
+
+    if (deliveryExposureHistory) {
+      const firstShownAt = readCandidateLastShownAt(
+        deliveryExposureHistory,
+        [a.id, a.local_moment_id],
+      );
+      const secondShownAt = readCandidateLastShownAt(
+        deliveryExposureHistory,
+        [b.id, b.local_moment_id],
+      );
+
+      if (firstShownAt === null && secondShownAt !== null) {
+        return -1;
+      }
+      if (firstShownAt !== null && secondShownAt === null) {
+        return 1;
+      }
+      if (
+        firstShownAt !== null &&
+        secondShownAt !== null &&
+        firstShownAt !== secondShownAt
+      ) {
+        return firstShownAt - secondShownAt;
+      }
     }
 
     const countDelta = (a.delivery_count ?? 0) - (b.delivery_count ?? 0);
@@ -1920,6 +2705,107 @@ async function selectCandidate(
   }
 
   return null;
+}
+
+async function selectCandidates(
+  rows: RemoteCatMomentRow[],
+  input: Required<ExchangeRequest>,
+  supabase: SupabaseClient,
+  requestedCount: number,
+) {
+  if (rows.length === 0 || requestedCount <= 0) {
+    return [];
+  }
+
+  const orderedRows: RemoteCatMomentRow[] = [];
+  if (input.preferredSourcePhotoId) {
+    const preferredRow = rows.find(
+      (row) =>
+        row.id === input.preferredSourcePhotoId ||
+        row.local_moment_id === input.preferredSourcePhotoId,
+    );
+    if (preferredRow) {
+      orderedRows.push(preferredRow);
+    }
+  }
+
+  for (const row of rows) {
+    if (!orderedRows.includes(row)) {
+      orderedRows.push(row);
+    }
+  }
+
+  const selected: Candidate[] = [];
+  const usedPhotoKeys = new Set<string>();
+  const usedCatKeys = new Set<string>();
+  for (const row of orderedRows) {
+    if (selected.length >= requestedCount) {
+      break;
+    }
+
+    const rowKeys = getCandidatePhotoKeys(row);
+    const catKey = getCandidateCatKey(row);
+    if (
+      rowKeys.some((key) => usedPhotoKeys.has(key)) ||
+      usedCatKeys.has(catKey)
+    ) {
+      continue;
+    }
+
+    const candidate = await toResolvedCandidate(
+      row,
+      supabase,
+      getDeliveryTier(row, input),
+    );
+    if (!candidate) {
+      continue;
+    }
+
+    const candidateKeys = [...rowKeys, `resolved:${candidate.src}`];
+    if (candidateKeys.some((key) => usedPhotoKeys.has(key))) {
+      continue;
+    }
+
+    selected.push(candidate);
+    for (const key of candidateKeys) {
+      usedPhotoKeys.add(key);
+    }
+    usedCatKeys.add(catKey);
+  }
+
+  return selected;
+}
+
+function getCandidatePhotoKeys(row: RemoteCatMomentRow) {
+  return [
+    `row:${row.id}`,
+    `local:${row.local_moment_id}`,
+    `photo:${row.photo_url}`,
+  ];
+}
+
+function isPersistableEveningChoiceSource(photoUrl: string) {
+  return Boolean(
+    getStoragePhotoPath(photoUrl) || photoUrl.startsWith("data:image/"),
+  );
+}
+
+function getCandidateCatKey(row: RemoteCatMomentRow) {
+  const metadataCatKey = row.metadata?.source_cat_key;
+  if (typeof metadataCatKey === "string" && metadataCatKey.trim()) {
+    return `metadata:${metadataCatKey.trim()}`;
+  }
+
+  if (readPoolKind(row.metadata) === "admin_stock") {
+    // Existing curated stock predates cat-level metadata. Treat each curated
+    // stock moment as one cat until source_cat_key is populated.
+    return `admin-stock-moment:${row.local_moment_id}`;
+  }
+
+  const ownerIdentity = row.user_id
+    ? `user:${row.user_id}`
+    : `anonymous:${row.anonymous_id ?? "unknown"}`;
+  return `${ownerIdentity}:cat:${row.owner_cat_id || row.local_cat_id}`;
 }
 
 async function selectFastStorageCandidate(

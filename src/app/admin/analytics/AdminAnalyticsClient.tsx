@@ -23,6 +23,20 @@ type FunnelStep = Metric & {
   fromStartRate: number | null;
 };
 
+type FourChoiceMetric = {
+  key: string;
+  label: string;
+  cohorts: number;
+  actors: number;
+  events: number;
+};
+
+type FourChoiceFunnelStep = FourChoiceMetric & {
+  previousCohorts: number | null;
+  fromPreviousRate: number | null;
+  fromAssignedRate: number | null;
+};
+
 type AnalyticsResponse = {
   period: AnalyticsPeriodKey;
   audience: AnalyticsAudience;
@@ -35,6 +49,10 @@ type AnalyticsResponse = {
   newOnboardingFunnel: FunnelStep[];
   returningFunnel: FunnelStep[];
   handoffFunnel: FunnelStep[];
+  fourChoiceHealth?: {
+    metrics: FourChoiceMetric[];
+    funnel: FourChoiceFunnelStep[];
+  };
   sourceBreakdown: Array<{
     source: string;
     introUsers: number;
@@ -407,6 +425,38 @@ export default function AdminAnalyticsClient() {
             </div>
           </section>
 
+          {data.fourChoiceHealth ? (
+            <section
+              style={styles.section}
+              aria-labelledby="four-choice-title"
+            >
+              <SectionHeading
+                id="four-choice-title"
+                title="4匹から1匹を選ぶ"
+                note="同じ識別ID・配達日・割当・便IDが一致した記録だけを、1便単位で集計"
+              />
+              <AnalyticsTable
+                columns={["配信状態", "便", "識別ID", "イベント"]}
+                rows={data.fourChoiceHealth.metrics
+                  .filter((metric) =>
+                    [
+                      "four_choice_assigned",
+                      "four_choice_exact_four_served",
+                      "four_choice_fallback_single",
+                      "four_choice_dismissed",
+                    ].includes(metric.key),
+                  )
+                  .map((metric) => [
+                    metric.label,
+                    `${metric.cohorts} 便`,
+                    `${metric.actors} ID`,
+                    `${metric.events} イベント`,
+                  ])}
+              />
+              <FourChoiceFunnelTable steps={data.fourChoiceHealth.funnel} />
+            </section>
+          ) : null}
+
           <section style={styles.twoColumnSection}>
             <div style={styles.column}>
               <SectionHeading
@@ -766,6 +816,7 @@ function buildCodexAnalyticsExport(data: AnalyticsResponse) {
     newOnboardingFunnel: data.newOnboardingFunnel,
     returningFunnel: data.returningFunnel,
     handoffFunnel: data.handoffFunnel,
+    fourChoiceHealth: data.fourChoiceHealth,
     sourceBreakdown: data.sourceBreakdown,
     deliveryHealth: data.deliveryHealth,
     installHealth: data.installHealth,
@@ -928,6 +979,31 @@ function FunnelTable({ steps }: { steps: FunnelStep[] }) {
   );
 }
 
+function FourChoiceFunnelTable({
+  steps,
+}: {
+  steps: FourChoiceFunnelStep[];
+}) {
+  return (
+    <AnalyticsTable
+      columns={["選択ファネル", "便", "前の段階から", "割当から"]}
+      rows={steps.map((step) => [
+        step.label,
+        `${step.cohorts} 便`,
+        step.previousCohorts === null
+          ? "-"
+          : formatRate(
+              step.fromPreviousRate,
+              step.cohorts,
+              step.previousCohorts,
+              "便",
+            ),
+        formatPercent(step.fromAssignedRate),
+      ])}
+    />
+  );
+}
+
 function EventTable({
   events,
   showError = false,
@@ -1004,11 +1080,16 @@ function getEventLabel(eventName: string) {
   return EVENT_LABELS[eventName] ?? eventName;
 }
 
-function formatRate(rate: number | null, users: number, denominator: number) {
+function formatRate(
+  rate: number | null,
+  users: number,
+  denominator: number,
+  unit = "ID",
+) {
   if (rate === null) {
     return "-";
   }
-  return `${rate}%（${users}/${denominator} ID）`;
+  return `${rate}%（${users}/${denominator} ${unit}）`;
 }
 
 function formatPercent(rate: number | null) {

@@ -6,6 +6,7 @@ import {
   HERO_TRANSFORM,
   THUMBNAIL_TRANSFORM,
 } from "../../src/lib/photoStorage";
+import { isPublicProductionDeployment } from "../../src/lib/deploymentEnvironment";
 
 test.describe("production nekodayori natural board", () => {
   test.beforeEach(async ({ page }) => {
@@ -202,8 +203,19 @@ test.describe("production nekodayori natural board", () => {
       path.resolve(process.cwd(), "src/app/prototypes/layout.tsx"),
       "utf8",
     );
-    expect(layout).toContain('process.env.VERCEL_ENV === "production"');
+    const proxy = fs.readFileSync(
+      path.resolve(process.cwd(), "src/proxy.ts"),
+      "utf8",
+    );
+
+    expect(isPublicProductionDeployment({ vercelEnv: "production" })).toBe(true);
+    expect(isPublicProductionDeployment({ vercelEnv: "preview" })).toBe(false);
+    expect(isPublicProductionDeployment({ vercelEnv: "development" })).toBe(false);
+    expect(isPublicProductionDeployment({ nodeEnv: "production" })).toBe(true);
+    expect(isPublicProductionDeployment({ nodeEnv: "development" })).toBe(false);
     expect(layout).toContain("notFound()");
+    expect(proxy).toContain('pathname.startsWith("/prototypes/")');
+    expect(proxy).toContain("status: 404");
   });
 });
 

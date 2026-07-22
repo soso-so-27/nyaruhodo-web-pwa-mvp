@@ -2175,7 +2175,7 @@ const styles = {
     background: "rgba(255,253,248,0.68)",
     color: "var(--ink)",
     fontSize: "12px",
-    fontWeight: 600,
+    fontWeight: 500,
     letterSpacing: "0.12em",
     lineHeight: 1,
     padding: "7px 10px",

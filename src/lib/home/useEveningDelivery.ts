@@ -6,17 +6,22 @@ import { trackProductEvent } from "../analytics/productAnalytics";
 import { createSleepingExchange } from "./deliveryCandidates";
 import {
   getJstDateKey,
+  getJstAutoOpenTime,
   getJstDeliveryTime,
   getPendingEveningDeliveryDay,
   readEveningDeliveryStore,
   repairMissingEveningDeliveryTarget,
+  clearAppBadge,
   setAppBadge,
-  setEveningDeliveredPhoto,
+  setEveningDeliveredPhotos,
   markEveningDeliverySkipped,
+  resolveEveningDeliveryWithoutSelection,
+  resolveEveningDeliveryWithPhoto,
+  writeEveningDeliveryStore,
   type EveningDeliveryDay,
 } from "./eveningDelivery";
 import { recordEveningDeliveryTrace } from "./eveningDeliveryTrace";
-import type { OwnSleepingPhoto } from "./sleepingPhotos";
+import { keepExchangePhoto, type OwnSleepingPhoto } from "./sleepingPhotos";
 
 const EXCHANGE_UPLOAD_MAX_DATA_URL_LENGTH = 500_000;
 const EVENING_DELIVERY_SLOW_MS = 4_000;
@@ -149,6 +154,28 @@ export function useEveningDelivery({
         todayKey,
       });
 
+      if (
+        pendingDay?.targetOwnPhotoId &&
+        now >= getJstAutoOpenTime(pendingDay.dateKey)
+      ) {
+        const expiredAt = getJstAutoOpenTime(pendingDay.dateKey);
+        markEveningDeliverySkipped(pendingDay.dateKey, expiredAt);
+        clearAutomaticRetry(pendingDay.dateKey);
+        setCheckStatus({ state: "idle", dateKey: null });
+        setRefreshToken((value) => value + 1);
+        trackProductEvent(
+          "evening_delivery_choice_expired",
+          {
+            delivery_date_key: pendingDay.dateKey,
+            had_bundle: false,
+            expired_at: expiredAt,
+            source,
+          },
+          { localCatId: recipientCatId },
+        );
+        return;
+      }
+
       if (!pendingDay?.targetOwnPhotoId || !recipientCatId) {
         if (todayDay && now >= getJstDeliveryTime(todayKey)) {
           recordEveningDeliveryTrace({
@@ -207,6 +234,7 @@ export function useEveningDelivery({
           startedAt: now,
           source,
           route: getCurrentRoute(),
+          deliveryDateKey: pendingDay.dateKey,
         });
         return;
       }
@@ -221,6 +249,7 @@ export function useEveningDelivery({
         startedAt: checkStartedAt,
         source,
         route,
+        deliveryDateKey: pendingDay.dateKey,
       });
 
       slowTimer = window.setTimeout(() => {
@@ -236,6 +265,7 @@ export function useEveningDelivery({
           startedAt: checkStartedAt,
           source,
           route,
+          deliveryDateKey: pendingDay.dateKey,
         });
       }, EVENING_DELIVERY_SLOW_MS);
 
@@ -264,6 +294,7 @@ export function useEveningDelivery({
             startedAt: checkStartedAt,
             source,
             route,
+            deliveryDateKey: pendingDay.dateKey,
           });
           return;
         }
@@ -309,6 +340,92 @@ export function useEveningDelivery({
           exchangePhotoReceived: Boolean(result.photo),
         });
 
+        const bundleMetadata = {
+          deliveryBundleId: result.bundleId ?? undefined,
+          experienceVersion: result.experienceVersion ?? undefined,
+          assignedVariant: result.assignedVariant ?? undefined,
+          servedVariant: result.servedVariant ?? undefined,
+          requestedCount: result.requestedCount,
+          servedCount: result.photos.length,
+          fallbackReason: result.fallbackReason ?? null,
+        };
+
+        if (result.choiceResolution) {
+          const resolvedAtValue = result.choiceResolvedAt
+            ? Date.parse(result.choiceResolvedAt)
+            : Number.NaN;
+          const resolvedAt = Number.isFinite(resolvedAtValue)
+            ? resolvedAtValue
+            : Date.now();
+          const availablePhotos = result.photos.length > 0
+            ? result.photos
+            : result.photo
+              ? [result.photo]
+              : [];
+          const canonicalPhoto =
+            result.choiceResolution === "kept" && result.selectedPhotoId
+              ? availablePhotos.find(
+                  (photo) => photo.id === result.selectedPhotoId,
+                ) ?? null
+              : null;
+          const previousDay = readEveningDeliveryStore()[pendingDay.dateKey];
+          let didPersistCanonicalPhoto = false;
+          let didApplyCanonicalResolution = false;
+
+          if (canonicalPhoto) {
+            didPersistCanonicalPhoto = resolveEveningDeliveryWithPhoto(
+              pendingDay.dateKey,
+              canonicalPhoto,
+              resolvedAt,
+              bundleMetadata,
+            );
+            didApplyCanonicalResolution = Boolean(
+              didPersistCanonicalPhoto && keepExchangePhoto(canonicalPhoto),
+            );
+          } else {
+            // A skipped/expired bundle, or a kept photo that is now reported or
+            // hidden, must finish without restoring an unavailable photo.
+            didApplyCanonicalResolution =
+              resolveEveningDeliveryWithoutSelection(
+                pendingDay.dateKey,
+                resolvedAt,
+              );
+          }
+
+          if (
+            !didApplyCanonicalResolution &&
+            didPersistCanonicalPhoto &&
+            previousDay
+          ) {
+            const store = readEveningDeliveryStore();
+            store[pendingDay.dateKey] = previousDay;
+            writeEveningDeliveryStore(store);
+          }
+
+          if (!didApplyCanonicalResolution) {
+            pendingEveningDeliveryKeysRef.current.delete(pendingDay.dateKey);
+            setCheckStatus({ state: "failed", dateKey: pendingDay.dateKey });
+            scheduleAutomaticRetry(pendingDay.dateKey);
+            return;
+          }
+
+          clearAutomaticRetry(pendingDay.dateKey);
+          void clearAppBadge();
+          setRefreshToken((value) => value + 1);
+          setCheckStatus({ state: "idle", dateKey: null });
+          trackProductEvent(
+            "evening_delivery_choice_reconciled",
+            {
+              delivery_date_key: pendingDay.dateKey,
+              delivery_bundle_id: result.bundleId,
+              resolution: result.choiceResolution,
+              resolved_at: result.choiceResolvedAt,
+            },
+            { localCatId: recipientCatId },
+          );
+          return;
+        }
+
         if (!result.photo) {
           pendingEveningDeliveryKeysRef.current.delete(pendingDay.dateKey);
           if (result.error === "delivery_not_yet") {
@@ -339,6 +456,7 @@ export function useEveningDelivery({
               startedAt: checkStartedAt,
               source,
               route,
+              deliveryDateKey: pendingDay.dateKey,
             });
             return;
           }
@@ -358,14 +476,20 @@ export function useEveningDelivery({
             startedAt: checkStartedAt,
             source,
             route,
+            deliveryDateKey: pendingDay.dateKey,
           });
           return;
         }
 
-        const didPersistDelivery = setEveningDeliveredPhoto(
+        const deliveredPhotos =
+          result.servedVariant === "four_choice_v1" && result.photos.length === 4
+            ? result.photos
+            : [result.photo];
+        const didPersistDelivery = setEveningDeliveredPhotos(
           pendingDay.dateKey,
-          result.photo,
+          deliveredPhotos,
           Date.now(),
+          { ...bundleMetadata, servedCount: deliveredPhotos.length },
         );
         if (!didPersistDelivery) {
           pendingEveningDeliveryKeysRef.current.delete(pendingDay.dateKey);
@@ -375,9 +499,19 @@ export function useEveningDelivery({
             startedAt: checkStartedAt,
             source,
             route,
+            deliveryDateKey: pendingDay.dateKey,
           });
           return;
         }
+
+        const persistedDay = readEveningDeliveryStore()[pendingDay.dateKey];
+        const persistedServedCount = persistedDay?.deliveredPhotos?.length ??
+          (persistedDay?.deliveredPhoto ? 1 : 0);
+        const persistedServedVariant =
+          persistedDay?.servedVariant ??
+          (persistedServedCount === 4 ? "four_choice_v1" : "single_v1");
+        const persistedFallbackReason =
+          persistedDay?.fallbackReason ?? result.fallbackReason ?? null;
         clearAutomaticRetry(pendingDay.dateKey);
         void setAppBadge(1);
         setRefreshToken((value) => value + 1);
@@ -386,6 +520,14 @@ export function useEveningDelivery({
           startedAt: checkStartedAt,
           source,
           route,
+          deliveryDateKey: pendingDay.dateKey,
+          deliveryBundleId: result.bundleId,
+          experienceVersion: result.experienceVersion,
+          assignedVariant: result.assignedVariant,
+          servedVariant: persistedServedVariant,
+          requestedCount: result.requestedCount,
+          servedCount: persistedServedCount,
+          fallbackReason: persistedFallbackReason,
         });
         trackProductEvent(
           "delivery_sent",
@@ -395,6 +537,13 @@ export function useEveningDelivery({
             isOnboardingInstant: false,
             isDay1Evening: false,
             tier: result.tier ?? null,
+            delivery_bundle_id: result.bundleId ?? null,
+            experience_version: result.experienceVersion ?? null,
+            assigned_variant: result.assignedVariant ?? "single_v1",
+            served_variant: persistedServedVariant,
+            requested_count: result.requestedCount,
+            served_count: persistedServedCount,
+            fallback_reason: persistedFallbackReason,
           },
           { localCatId: recipientCatId },
         );
@@ -416,6 +565,7 @@ export function useEveningDelivery({
           startedAt: checkStartedAt,
           source,
           route,
+          deliveryDateKey: pendingDay.dateKey,
         });
       } finally {
         if (slowTimer !== null) {
@@ -522,16 +672,40 @@ function trackEveningDeliveryCheckEvent(
     startedAt,
     source,
     route,
+    deliveryDateKey,
+    deliveryBundleId,
+    experienceVersion,
+    assignedVariant,
+    servedVariant,
+    requestedCount,
+    servedCount,
+    fallbackReason,
   }: {
     startedAt: number;
     source: EveningDeliveryCheckSource;
     route: string;
+    deliveryDateKey: string;
+    deliveryBundleId?: string | null;
+    experienceVersion?: string | null;
+    assignedVariant?: string | null;
+    servedVariant?: string | null;
+    requestedCount?: number;
+    servedCount?: number;
+    fallbackReason?: string | null;
   },
 ) {
   trackProductEvent(eventName, {
     latency_ms: Math.max(0, Date.now() - startedAt),
     source,
     route,
+    delivery_date_key: deliveryDateKey,
+    delivery_bundle_id: deliveryBundleId ?? null,
+    experience_version: experienceVersion ?? null,
+    assigned_variant: assignedVariant ?? null,
+    served_variant: servedVariant ?? null,
+    requested_count: requestedCount ?? null,
+    served_count: servedCount ?? null,
+    fallback_reason: fallbackReason ?? null,
   });
 }
 
@@ -636,22 +810,78 @@ async function createEveningExchangePhoto({
     seed,
     deliveryDateKey,
     recipientCatId,
+    requestedCandidateCount: 4,
+    capability: "evening_choice_v1",
   });
 
-  if (!result?.photo) {
+  if (!result || (!result.photo && !result.choiceResolution)) {
     return {
       photo: null,
       httpStatus: result?.httpStatus ?? null,
       error: result?.error ?? null,
       tier: null,
+      photos: [],
+      bundleId: null,
+      experienceVersion: null,
+      assignedVariant: null,
+      servedVariant: null,
+      requestedCount: 4,
+      servedCount: 0,
+      fallbackReason: null,
+      choiceResolution: null,
+      selectedPhotoId: null,
+      choiceResolvedAt: null,
     };
   }
 
+  const responsePhotos =
+    result.photos && result.photos.length > 0
+      ? result.photos
+      : result.photo
+        ? [result.photo]
+        : [];
+  const returnedPhotos = responsePhotos
+    .filter((photo) => Boolean(photo?.id && photo.src))
+    .filter(
+      (photo, index, photos) =>
+        photos.findIndex(
+          (candidate) =>
+            candidate.id === photo.id ||
+            Boolean(
+              candidate.sourcePhotoId &&
+                photo.sourcePhotoId &&
+                candidate.sourcePhotoId === photo.sourcePhotoId,
+            ),
+        ) === index,
+    );
+  const photos = result.choiceResolution
+    ? returnedPhotos
+    : result.servedVariant === "four_choice_v1" && returnedPhotos.length === 4
+      ? returnedPhotos
+      : result.photo
+        ? [result.photo]
+        : [];
+
   return {
-    photo: result.photo,
+    photo: result.photo ?? photos[0] ?? null,
+    photos,
     httpStatus: result.httpStatus ?? null,
     error: result.error ?? null,
     tier: result.tier ?? null,
+    bundleId: result.bundleId ?? null,
+    experienceVersion: result.experienceVersion ?? null,
+    assignedVariant: result.assignedVariant ?? "single_v1",
+    servedVariant: result.choiceResolution
+      ? (result.servedVariant ?? "four_choice_v1")
+      : result.servedVariant === "four_choice_v1" && photos.length === 4
+        ? "four_choice_v1"
+        : "single_v1",
+    requestedCount: result.requestedCount ?? result.requestedCandidateCount ?? 4,
+    servedCount: photos.length,
+    fallbackReason: result.fallbackReason ?? null,
+    choiceResolution: result.choiceResolution ?? null,
+    selectedPhotoId: result.selectedPhotoId ?? null,
+    choiceResolvedAt: result.choiceResolvedAt ?? null,
   };
 }
 

@@ -172,6 +172,12 @@ export async function deleteStoredDataForUser(
   ];
 
   await deleteStoragePaths(supabase, deletablePaths, errors);
+  await deleteEveningChoiceResolutions({
+    supabase,
+    userId,
+    anonymousIds: authorizedAnonymousIds,
+    errors,
+  });
 
   // Intentionally out of scope: admin-only seed/stock rows, aggregate views, and
   // handoff/transfer audit rows. Handoffs are cleaned by their cron GC; admin
@@ -251,6 +257,50 @@ function buildAnonymousDeleteSteps(
     supabase.from("mikke_window_answers").delete().eq("anonymous_id", anonymousId),
     supabase.from("referral_claims").delete().eq("anonymous_id", anonymousId),
   ]);
+}
+
+async function deleteEveningChoiceResolutions({
+  supabase,
+  userId,
+  anonymousIds,
+  errors,
+}: {
+  supabase: SupabaseClient;
+  userId: string;
+  anonymousIds: string[];
+  errors: string[];
+}) {
+  const results = await Promise.all([
+    supabase
+      .from("evening_delivery_choice_resolutions")
+      .delete()
+      .eq("user_id", userId),
+    ...anonymousIds.map((anonymousId) =>
+      supabase
+        .from("evening_delivery_choice_resolutions")
+        .delete()
+        .eq("anonymous_id", anonymousId),
+    ),
+  ]);
+
+  for (const result of results) {
+    if (result.error && !isMissingEveningChoiceResolutionTable(result.error)) {
+      errors.push(`choice resolution delete: ${result.error.message}`);
+    }
+  }
+}
+
+function isMissingEveningChoiceResolutionTable(error: {
+  code?: string;
+  message?: string;
+}) {
+  return (
+    error.code === "42P01" ||
+    error.code === "PGRST205" ||
+    /evening_delivery_choice_resolutions.*(?:not exist|schema cache)/i.test(
+      error.message ?? "",
+    )
+  );
 }
 
 async function resolveAuthorizedAnonymousIds({

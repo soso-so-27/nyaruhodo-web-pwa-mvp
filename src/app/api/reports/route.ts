@@ -87,6 +87,7 @@ export async function POST(request: Request) {
   });
 
   if (existingReport) {
+    await markVerifiedDeliveryReported(supabase, verifiedTarget.deliveryId);
     await maybeExcludeReportedPhoto(verifiedTarget.sourcePhotoId);
     return NextResponse.json({ ok: true, duplicate: true });
   }
@@ -105,6 +106,7 @@ export async function POST(request: Request) {
 
   if (error) {
     if (isUniqueReportError(error)) {
+      await markVerifiedDeliveryReported(supabase, verifiedTarget.deliveryId);
       await maybeExcludeReportedPhoto(verifiedTarget.sourcePhotoId);
       return NextResponse.json({ ok: true, duplicate: true });
     }
@@ -112,9 +114,26 @@ export async function POST(request: Request) {
     return NextResponse.json({ ok: false }, { status: 200 });
   }
 
+  await markVerifiedDeliveryReported(supabase, verifiedTarget.deliveryId);
   await maybeExcludeReportedPhoto(verifiedTarget.sourcePhotoId);
 
   return NextResponse.json({ ok: true });
+}
+
+async function markVerifiedDeliveryReported(
+  supabase: SupabaseClient,
+  deliveryId: string,
+) {
+  const { error } = await supabase
+    .from("cat_moment_deliveries")
+    .update({ status: "reported" })
+    .eq("id", deliveryId);
+
+  if (error) {
+    console.warn("[reports] delivery report status update failed", {
+      code: error.code,
+    });
+  }
 }
 
 async function maybeExcludeReportedPhoto(sourcePhotoId: string) {

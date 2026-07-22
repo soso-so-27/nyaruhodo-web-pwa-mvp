@@ -599,7 +599,7 @@ const styles = {
     margin: 0,
     color: color.accentWarm,
     fontSize: 11,
-    fontWeight: 600,
+    fontWeight: 500,
     lineHeight: 1.5,
   },
   lead: {
@@ -718,7 +718,7 @@ const styles = {
     margin: 0,
     color: color.textStrong,
     fontSize: 19,
-    fontWeight: 600,
+    fontWeight: 500,
     lineHeight: 1.55,
   },
   message: {

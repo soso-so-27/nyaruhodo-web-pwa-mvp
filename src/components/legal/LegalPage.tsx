@@ -786,7 +786,7 @@ const styles = {
     background: "rgba(145, 76, 69, 0.08)",
     color: "#4f473a",
     fontSize: "14px",
-    fontWeight: 600,
+    fontWeight: 500,
     lineHeight: 1.8,
   },
   actionRow: {
@@ -800,7 +800,7 @@ const styles = {
     margin: "18px 0 8px",
     color: "#6f6658",
     fontSize: "12px",
-    fontWeight: 600,
+    fontWeight: 500,
     letterSpacing: "0.04em",
     lineHeight: 1.6,
   },
@@ -814,8 +814,7 @@ const styles = {
     borderRadius: "14px",
     background: "rgba(255, 255, 250, 0.84)",
     color: "#332f28",
-    fontFamily:
-      '"Zen Kaku Gothic New", "Hiragino Sans", "Yu Gothic", sans-serif',
+    fontFamily: "var(--font-ui)",
     fontSize: "16px",
     fontWeight: 500,
     padding: "10px 12px",

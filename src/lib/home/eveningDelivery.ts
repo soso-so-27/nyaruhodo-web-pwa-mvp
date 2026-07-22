@@ -1,4 +1,5 @@
 import { STORAGE_KEYS, readCachedJson, writeCachedJson } from "../storage";
+import { trackProductEvent } from "../analytics/productAnalytics";
 import {
   cacheExchangePhotoOfflineDataUrl,
   sanitizeExchangePhotoForPersistence,
@@ -13,6 +14,16 @@ export const EVENING_DELIVERY_VISIBLE_THRESHOLD = 30;
 
 const JST_OFFSET_MS = 9 * 60 * 60 * 1000;
 
+export type EveningDeliveryBundleMetadata = {
+  deliveryBundleId?: string;
+  experienceVersion?: string;
+  assignedVariant?: string;
+  servedVariant?: string;
+  requestedCount?: number;
+  servedCount?: number;
+  fallbackReason?: string | null;
+};
+
 export type EveningDeliveryDay = {
   dateKey: string;
   targetOwnPhotoId?: string;
@@ -20,12 +31,15 @@ export type EveningDeliveryDay = {
   targetCapturedAt?: number;
   targetPhoto?: OwnSleepingPhoto;
   deliveredPhoto?: ExchangePhoto;
+  deliveredPhotos?: ExchangePhoto[];
+  draftSelectedPhotoId?: string;
+  selectedPhotoId?: string;
   deliveredAt?: number;
   openedAt?: number;
   openedBy?: "user" | "system";
   keptAt?: number;
   skippedAt?: number;
-};
+} & EveningDeliveryBundleMetadata;
 
 export type EveningDeliveryStore = Record<string, EveningDeliveryDay>;
 
@@ -42,18 +56,22 @@ export type EveningHomeState =
       isTodayDelivery: boolean;
       targetPhoto: OwnSleepingPhoto | null;
     }
-  | {
+  | ({
       kind: "delivered";
       dateKey: string;
       targetPhoto: OwnSleepingPhoto | null;
       deliveredPhoto: ExchangePhoto;
-    }
-  | {
+      deliveredPhotos: ExchangePhoto[];
+      draftSelectedPhotoId?: string;
+    } & EveningDeliveryBundleMetadata)
+  | ({
       kind: "opened";
       dateKey: string;
       targetPhoto: OwnSleepingPhoto | null;
       deliveredPhoto: ExchangePhoto;
-    };
+      deliveredPhotos: ExchangePhoto[];
+      draftSelectedPhotoId?: string;
+    } & EveningDeliveryBundleMetadata);
 
 export function readEveningDeliveryStore(): EveningDeliveryStore {
   if (typeof window === "undefined") {
@@ -69,11 +87,57 @@ export function readEveningDeliveryStore(): EveningDeliveryStore {
     const store: EveningDeliveryStore = {};
     for (const [dateKey, day] of Object.entries(parsed)) {
       if (isValidDateKey(dateKey) && isEveningDeliveryDay(day)) {
+        const sanitizedCandidates = sanitizeEveningDeliveredPhotos(
+          day.deliveredPhotos,
+        );
+        const sanitizedDeliveredPhoto = sanitizeExchangePhotoForPersistence(
+          day.deliveredPhoto,
+        ) ?? readLegacySingleDeliveredPhoto(day.deliveredPhoto, day.deliveredPhotos);
+        const hasResolvedSelection = Boolean(day.openedAt || day.selectedPhotoId);
+        const hasMalformedBundle = Boolean(
+          !hasResolvedSelection &&
+            Array.isArray(day.deliveredPhotos) &&
+            day.deliveredPhotos.length > 1 &&
+            sanitizedCandidates.length !== 4,
+        );
+        const deliveredPhotos =
+          !hasResolvedSelection && sanitizedCandidates.length === 4
+            ? sanitizedCandidates.map(withExchangePhotoOfflineSrc)
+            : [];
+        const canonicalDeliveredPhoto = hasResolvedSelection
+          ? sanitizedDeliveredPhoto ??
+            sanitizedCandidates.find((photo) =>
+              matchesExchangePhotoId(photo, day.selectedPhotoId ?? ""),
+            ) ??
+            sanitizedCandidates[0]
+          : deliveredPhotos[0] ??
+            sanitizedDeliveredPhoto ??
+            sanitizedCandidates[0];
+        const deliveredPhoto = canonicalDeliveredPhoto
+          ? withExchangePhotoOfflineSrc(canonicalDeliveredPhoto)
+          : undefined;
+        const draftSelectedPhotoId =
+          !hasResolvedSelection &&
+          deliveredPhotos.some((photo) =>
+            matchesExchangePhotoId(photo, day.draftSelectedPhotoId ?? ""),
+          )
+            ? day.draftSelectedPhotoId
+            : undefined;
+
         store[dateKey] = {
           ...day,
           dateKey,
-          ...(day.deliveredPhoto
-            ? { deliveredPhoto: withExchangePhotoOfflineSrc(day.deliveredPhoto) }
+          deliveredPhoto,
+          deliveredPhotos:
+            deliveredPhotos.length === 4 ? deliveredPhotos : undefined,
+          draftSelectedPhotoId,
+          ...(hasMalformedBundle
+            ? {
+                servedVariant: "single_v1",
+                servedCount: deliveredPhoto ? 1 : 0,
+                fallbackReason:
+                  day.fallbackReason ?? "client_persistence_filter",
+              }
             : {}),
         };
       }
@@ -98,7 +162,7 @@ export function getFirstEveningDeliveryTargetDateKey(): string | null {
 
 export function isFirstEveningDelivery(dateKey: string) {
   const deliveredDateKeys = Object.values(readEveningDeliveryStore())
-    .filter((day) => Boolean(day.deliveredPhoto))
+    .filter((day) => hasEveningDeliveryArrival(day) || Boolean(day.deliveredAt))
     .map((day) => day.dateKey)
     .sort();
 
@@ -160,7 +224,7 @@ export function recordEveningDeliveryTarget(
   const store = readEveningDeliveryStore();
   const targetDateKey = getEveningDeliveryTargetDateKey(now);
   const day = store[targetDateKey] ?? { dateKey: targetDateKey };
-  const canReplaceTarget = !day.deliveredPhoto && !day.openedAt;
+  const canReplaceTarget = !hasEveningDeliveryArrival(day) && !day.openedAt;
   let persisted = false;
 
   if (canReplaceTarget) {
@@ -231,7 +295,7 @@ export function clearEveningDeliveryTargetForPhoto(photoId: string) {
   for (const [dateKey, day] of Object.entries(store)) {
     if (
       day.targetOwnPhotoId !== photoId ||
-      day.deliveredPhoto ||
+      hasEveningDeliveryArrival(day) ||
       day.openedAt
     ) {
       continue;
@@ -257,7 +321,7 @@ export function clearEveningDeliveryTargetForPhoto(photoId: string) {
     !Object.values(readEveningDeliveryStore()).some(
       (day) =>
         day.targetOwnPhotoId === photoId &&
-        !day.deliveredPhoto &&
+        !hasEveningDeliveryArrival(day) &&
         !day.openedAt,
     )
   );
@@ -283,7 +347,7 @@ export function repairMissingEveningDeliveryTarget(
         now >= deliveryTime &&
         now < getJstAutoOpenTime(dateKey) &&
         !day?.targetOwnPhotoId &&
-        !day?.deliveredPhoto &&
+        !hasEveningDeliveryArrival(day) &&
         !day?.openedAt &&
         !day?.skippedAt
       );
@@ -319,27 +383,71 @@ export function setEveningDeliveredPhoto(
   deliveredPhoto: ExchangePhoto,
   deliveredAt = Date.now(),
 ) {
-  const persistentDeliveredPhoto =
-    sanitizeExchangePhotoForPersistence(deliveredPhoto);
+  return setEveningDeliveredPhotos(dateKey, [deliveredPhoto], deliveredAt);
+}
 
-  if (!persistentDeliveredPhoto) {
+export function setEveningDeliveredPhotos(
+  dateKey: string,
+  deliveredPhotos: ExchangePhoto[],
+  deliveredAtOrMetadata: number | EveningDeliveryBundleMetadata = Date.now(),
+  metadata: EveningDeliveryBundleMetadata = {},
+) {
+  const sanitizedDeliveredPhotos = sanitizeEveningDeliveredPhotos(deliveredPhotos);
+  if (sanitizedDeliveredPhotos.length === 0) {
     return false;
   }
 
+  const shouldFallbackToSingle =
+    deliveredPhotos.length > 1 && sanitizedDeliveredPhotos.length !== 4;
+  const persistentDeliveredPhotos = shouldFallbackToSingle
+    ? sanitizedDeliveredPhotos.slice(0, 1)
+    : sanitizedDeliveredPhotos;
+
+  const deliveredAt =
+    typeof deliveredAtOrMetadata === "number"
+      ? deliveredAtOrMetadata
+      : Date.now();
+  const bundleMetadata = sanitizeEveningDeliveryBundleMetadata(
+    typeof deliveredAtOrMetadata === "number"
+      ? metadata
+      : deliveredAtOrMetadata,
+  );
+  const persistedMetadata = shouldFallbackToSingle
+    ? {
+        ...bundleMetadata,
+        servedVariant: "single_v1",
+        servedCount: 1,
+        fallbackReason:
+          bundleMetadata.fallbackReason ?? "client_persistence_filter",
+      }
+    : bundleMetadata;
   const store = readEveningDeliveryStore();
   const day = store[dateKey] ?? { dateKey };
+  const firstPhoto = persistentDeliveredPhotos[0];
 
   store[dateKey] = {
     ...day,
+    ...clearEveningDeliveryBundleMetadata(),
+    ...persistedMetadata,
     dateKey,
-    deliveredPhoto: persistentDeliveredPhoto,
+    deliveredPhoto: firstPhoto,
+    deliveredPhotos:
+      persistentDeliveredPhotos.length > 1
+        ? persistentDeliveredPhotos
+        : undefined,
+    draftSelectedPhotoId: undefined,
+    selectedPhotoId: undefined,
     deliveredAt,
+    openedAt: undefined,
+    openedBy: undefined,
+    keptAt: undefined,
+    skippedAt: undefined,
   };
   for (const [otherDateKey, otherDay] of Object.entries(store)) {
     if (
       otherDateKey < dateKey &&
       otherDay.targetOwnPhotoId &&
-      !otherDay.deliveredPhoto &&
+      !hasEveningDeliveryArrival(otherDay) &&
       !otherDay.skippedAt
     ) {
       store[otherDateKey] = {
@@ -353,7 +461,201 @@ export function setEveningDeliveredPhoto(
   return (
     persisted &&
     readEveningDeliveryStore()[dateKey]?.deliveredPhoto?.id ===
-      persistentDeliveredPhoto.id
+      firstPhoto.id
+  );
+}
+
+export function setEveningDeliveryDraftSelection(
+  dateKey: string,
+  photoId: string | null,
+) {
+  const store = readEveningDeliveryStore();
+  const day = store[dateKey];
+
+  if (!day || !hasUnresolvedEveningDeliverySelection(day)) {
+    return false;
+  }
+
+  if (
+    photoId &&
+    !getEveningDeliveredPhotos(day).some((photo) =>
+      matchesExchangePhotoId(photo, photoId),
+    )
+  ) {
+    return false;
+  }
+
+  store[dateKey] = {
+    ...day,
+    draftSelectedPhotoId: photoId ?? undefined,
+  };
+  const persisted = writeEveningDeliveryStore(store);
+  return Boolean(
+    persisted &&
+      readEveningDeliveryStore()[dateKey]?.draftSelectedPhotoId ===
+        (photoId ?? undefined),
+  );
+}
+
+export function skipEveningDeliverySelection(
+  dateKey: string,
+  skippedAt = Date.now(),
+) {
+  const store = readEveningDeliveryStore();
+  const day = store[dateKey];
+
+  if (!day || !hasUnresolvedEveningDeliverySelection(day)) {
+    return false;
+  }
+
+  store[dateKey] = {
+    ...day,
+    deliveredPhoto: undefined,
+    deliveredPhotos: undefined,
+    draftSelectedPhotoId: undefined,
+    selectedPhotoId: undefined,
+    openedAt: undefined,
+    openedBy: undefined,
+    keptAt: undefined,
+    skippedAt,
+  };
+  const persisted = writeEveningDeliveryStore(store);
+  if (persisted) {
+    clearAppBadge();
+  }
+  const persistedDay = readEveningDeliveryStore()[dateKey];
+  return Boolean(
+    persisted &&
+      persistedDay?.skippedAt === skippedAt &&
+      !hasEveningDeliveryArrival(persistedDay),
+  );
+}
+
+export function resolveEveningDeliveryWithoutSelection(
+  dateKey: string,
+  resolvedAt = Date.now(),
+) {
+  const store = readEveningDeliveryStore();
+  const day = store[dateKey];
+
+  if (!day) {
+    return false;
+  }
+
+  store[dateKey] = {
+    ...day,
+    deliveredPhoto: undefined,
+    deliveredPhotos: undefined,
+    draftSelectedPhotoId: undefined,
+    selectedPhotoId: undefined,
+    openedAt: undefined,
+    openedBy: undefined,
+    keptAt: undefined,
+    skippedAt: resolvedAt,
+  };
+  const persisted = writeEveningDeliveryStore(store);
+  if (persisted) {
+    clearAppBadge();
+  }
+  const persistedDay = readEveningDeliveryStore()[dateKey];
+  return Boolean(
+    persisted &&
+      persistedDay?.skippedAt === resolvedAt &&
+      !hasEveningDeliveryArrival(persistedDay),
+  );
+}
+
+export function resolveEveningDeliveryWithPhoto(
+  dateKey: string,
+  deliveredPhoto: ExchangePhoto,
+  resolvedAt = Date.now(),
+  metadata: EveningDeliveryBundleMetadata = {},
+) {
+  const sanitizedPhoto = sanitizeExchangePhotoForPersistence(deliveredPhoto);
+  const store = readEveningDeliveryStore();
+  const day = store[dateKey];
+
+  if (!day || !sanitizedPhoto) {
+    return false;
+  }
+
+  store[dateKey] = {
+    ...day,
+    ...clearEveningDeliveryBundleMetadata(),
+    ...sanitizeEveningDeliveryBundleMetadata(metadata),
+    dateKey,
+    deliveredPhoto: sanitizedPhoto,
+    deliveredPhotos: undefined,
+    draftSelectedPhotoId: undefined,
+    selectedPhotoId: sanitizedPhoto.id,
+    deliveredAt: sanitizedPhoto.deliveredAt,
+    openedAt: resolvedAt,
+    openedBy: "system",
+    keptAt: resolvedAt,
+    skippedAt: undefined,
+  };
+  const persisted = writeEveningDeliveryStore(store);
+  const persistedDay = readEveningDeliveryStore()[dateKey];
+  return Boolean(
+    persisted &&
+      persistedDay?.deliveredPhoto?.id === sanitizedPhoto.id &&
+      persistedDay.selectedPhotoId === sanitizedPhoto.id &&
+      persistedDay.openedAt === resolvedAt &&
+      persistedDay.keptAt === resolvedAt,
+  );
+}
+
+export function selectEveningDeliveredPhoto(
+  dateKey: string,
+  photoId: string,
+  selectedAt = Date.now(),
+) {
+  const store = readEveningDeliveryStore();
+  const day = store[dateKey];
+
+  if (!day || !photoId) {
+    return false;
+  }
+
+  if (day.openedAt) {
+    return Boolean(
+      day.selectedPhotoId &&
+        day.deliveredPhoto &&
+        matchesExchangePhotoId(day.deliveredPhoto, photoId),
+    );
+  }
+
+  const deliveredPhotos = getEveningDeliveredPhotos(day);
+  if (deliveredPhotos.length <= 1) {
+    return false;
+  }
+
+  const selectedPhoto = deliveredPhotos.find((photo) =>
+    matchesExchangePhotoId(photo, photoId),
+  );
+  if (!selectedPhoto) {
+    return false;
+  }
+
+  store[dateKey] = {
+    ...day,
+    deliveredPhoto: selectedPhoto,
+    deliveredPhotos: undefined,
+    draftSelectedPhotoId: undefined,
+    selectedPhotoId: selectedPhoto.id,
+    openedAt: selectedAt,
+    openedBy: "user",
+    keptAt: selectedAt,
+  };
+  const persisted = writeEveningDeliveryStore(store);
+  const persistedDay = readEveningDeliveryStore()[dateKey];
+  return Boolean(
+    persisted &&
+      persistedDay?.deliveredPhoto?.id === selectedPhoto.id &&
+      persistedDay.selectedPhotoId === selectedPhoto.id &&
+      persistedDay.openedBy === "user" &&
+      persistedDay.openedAt === selectedAt &&
+      persistedDay.keptAt === selectedAt,
   );
 }
 
@@ -366,16 +668,35 @@ export function markEveningDeliveryOpened(
   const day = store[dateKey];
 
   if (!day) {
-    return;
+    return false;
   }
 
-  store[dateKey] = {
-    ...day,
-    openedAt,
-    openedBy,
-  };
-  writeEveningDeliveryStore(store);
+  if (hasUnresolvedEveningDeliverySelection(day)) {
+    if (openedBy === "user") {
+      return false;
+    }
+
+    store[dateKey] = {
+      ...day,
+      deliveredPhoto: undefined,
+      deliveredPhotos: undefined,
+      draftSelectedPhotoId: undefined,
+      selectedPhotoId: undefined,
+      openedAt: undefined,
+      openedBy: undefined,
+      keptAt: undefined,
+      skippedAt: openedAt,
+    };
+  } else {
+    store[dateKey] = {
+      ...day,
+      openedAt,
+      openedBy,
+    };
+  }
+  const persisted = writeEveningDeliveryStore(store);
   clearAppBadge();
+  return persisted;
 }
 
 export function markEveningDeliverySkipped(dateKey: string, skippedAt = Date.now()) {
@@ -383,38 +704,98 @@ export function markEveningDeliverySkipped(dateKey: string, skippedAt = Date.now
   const day = store[dateKey];
 
   if (!day) {
-    return;
+    return false;
   }
 
   store[dateKey] = {
     ...day,
     skippedAt,
   };
-  writeEveningDeliveryStore(store);
+  const persisted = writeEveningDeliveryStore(store);
+  return Boolean(
+    persisted && readEveningDeliveryStore()[dateKey]?.skippedAt === skippedAt,
+  );
 }
 
 export function autoOpenExpiredEveningDeliveries(now = Date.now()) {
   const store = readEveningDeliveryStore();
   let hasChanged = false;
+  const autoSkippedBundles: Array<{
+    dateKey: string;
+    day: EveningDeliveryDay;
+    reason: "selection_expired" | "all_candidates_blocked";
+  }> = [];
 
   for (const [dateKey, day] of Object.entries(store)) {
     if (
-      day.deliveredPhoto &&
+      hasEveningDeliveryArrival(day) &&
       !day.openedAt &&
       now >= getJstAutoOpenTime(dateKey)
     ) {
+      const isUnresolvedBundle = hasUnresolvedEveningDeliverySelection(day);
+      const deliveredPhotos = getEveningDeliveredPhotos(day);
+      const openedAt = getJstAutoOpenTime(dateKey);
+
+      if (isUnresolvedBundle) {
+        store[dateKey] = {
+          ...day,
+          deliveredPhoto: undefined,
+          deliveredPhotos: undefined,
+          draftSelectedPhotoId: undefined,
+          selectedPhotoId: undefined,
+          openedAt: undefined,
+          openedBy: undefined,
+          keptAt: undefined,
+          skippedAt: openedAt,
+        };
+        autoSkippedBundles.push({
+          dateKey,
+          day,
+          reason: "selection_expired",
+        });
+        hasChanged = true;
+        continue;
+      }
+
+      const firstPhoto = deliveredPhotos[0];
+      if (!firstPhoto) {
+        continue;
+      }
+
       store[dateKey] = {
         ...day,
-        openedAt: getJstAutoOpenTime(dateKey),
+        deliveredPhoto: firstPhoto,
+        deliveredPhotos: undefined,
+        draftSelectedPhotoId: undefined,
+        selectedPhotoId: day.selectedPhotoId,
+        openedAt,
         openedBy: "system",
+        keptAt: day.keptAt,
       };
       hasChanged = true;
     }
   }
 
   if (hasChanged) {
-    writeEveningDeliveryStore(store);
+    const persisted = writeEveningDeliveryStore(store);
+    if (!persisted) {
+      return false;
+    }
     clearAppBadge();
+    for (const { dateKey, day, reason } of autoSkippedBundles) {
+      trackProductEvent("evening_delivery_choice_auto_skipped", {
+        delivery_date_key: dateKey,
+        delivery_bundle_id: day.deliveryBundleId ?? null,
+        experience_version: day.experienceVersion ?? "evening_choice_v1",
+        assigned_variant: day.assignedVariant ?? "four_choice_v1",
+        served_variant: day.servedVariant ?? "four_choice_v1",
+        requested_count: day.requestedCount ?? 4,
+        served_count: day.servedCount ?? 4,
+        candidate_count: getEveningDeliveredPhotos(day).length,
+        selection_method: "system_auto",
+        skip_reason: reason,
+      });
+    }
   }
 
   return hasChanged;
@@ -425,7 +806,11 @@ export function markEveningDeliveryKept(dateKey: string, keptAt = Date.now()) {
   const day = store[dateKey];
 
   if (!day) {
-    return;
+    return false;
+  }
+
+  if (hasUnresolvedEveningDeliverySelection(day)) {
+    return false;
   }
 
   store[dateKey] = {
@@ -434,13 +819,15 @@ export function markEveningDeliveryKept(dateKey: string, keptAt = Date.now()) {
     openedBy: day.openedBy ?? "user",
     keptAt,
   };
-  writeEveningDeliveryStore(store);
+  const persisted = writeEveningDeliveryStore(store);
   clearAppBadge();
+  return persisted;
 }
 
 export function updateEveningDeliveredPhotoDataUrl(
   dateKey: string,
   dataUrl: string,
+  photoId?: string,
 ) {
   if (!dataUrl.startsWith("data:image/")) {
     return null;
@@ -448,24 +835,42 @@ export function updateEveningDeliveredPhotoDataUrl(
 
   const store = readEveningDeliveryStore();
   const day = store[dateKey];
-  const deliveredPhoto = day?.deliveredPhoto;
+  const deliveredPhoto = day
+    ? photoId
+      ? getEveningDeliveredPhotos(day).find((photo) =>
+          matchesExchangePhotoId(photo, photoId),
+        )
+      : day.deliveredPhoto
+    : undefined;
 
   if (!day || !deliveredPhoto) {
     return deliveredPhoto ?? null;
   }
 
-  if (
+  const nextPhoto =
     deliveredPhoto.offlineSrc &&
     deliveredPhoto.offlineSrc.length >= dataUrl.length
-  ) {
-    return deliveredPhoto;
+      ? deliveredPhoto
+      : {
+          ...deliveredPhoto,
+          offlineSrc: dataUrl,
+        };
+  if (nextPhoto !== deliveredPhoto) {
+    cacheExchangePhotoOfflineDataUrl(deliveredPhoto, dataUrl);
   }
 
-  const nextPhoto = {
-    ...deliveredPhoto,
-    offlineSrc: dataUrl,
+  const nextDeliveredPhotos = day.deliveredPhotos?.map((photo) =>
+    isSameExchangePhoto(photo, deliveredPhoto) ? nextPhoto : photo,
+  );
+  store[dateKey] = {
+    ...day,
+    deliveredPhoto:
+      day.deliveredPhoto && isSameExchangePhoto(day.deliveredPhoto, deliveredPhoto)
+        ? nextPhoto
+        : day.deliveredPhoto,
+    deliveredPhotos: nextDeliveredPhotos,
   };
-  cacheExchangePhotoOfflineDataUrl(deliveredPhoto, dataUrl);
+  writeEveningDeliveryStore(store);
 
   return nextPhoto;
 }
@@ -486,24 +891,32 @@ export function buildEveningHomeState({
 
   if (visibleDeliveredDay?.deliveredPhoto) {
     const targetPhoto = findTargetPhoto(visibleDeliveredDay, ownPhotos, activeCatId);
+    const deliveredPhotos = getEveningDeliveredPhotos(visibleDeliveredDay);
+    const bundleMetadata = pickEveningDeliveryBundleMetadata(visibleDeliveredDay);
     return visibleDeliveredDay.openedAt
       ? {
+          ...bundleMetadata,
           kind: "opened",
           dateKey: visibleDeliveredDay.dateKey,
           targetPhoto,
           deliveredPhoto: visibleDeliveredDay.deliveredPhoto,
+          deliveredPhotos,
+          draftSelectedPhotoId: visibleDeliveredDay.draftSelectedPhotoId,
         }
       : {
+          ...bundleMetadata,
           kind: "delivered",
           dateKey: visibleDeliveredDay.dateKey,
           targetPhoto,
           deliveredPhoto: visibleDeliveredDay.deliveredPhoto,
+          deliveredPhotos,
+          draftSelectedPhotoId: visibleDeliveredDay.draftSelectedPhotoId,
         };
   }
 
   const todayDay = store[todayKey];
 
-  if (todayDay?.targetOwnPhotoId) {
+  if (todayDay?.targetOwnPhotoId && !todayDay.skippedAt) {
     return {
       kind: "waiting",
       dateKey: todayKey,
@@ -514,7 +927,7 @@ export function buildEveningHomeState({
 
   const targetDateKey = getEveningDeliveryTargetDateKey(now);
   const targetDay = store[targetDateKey];
-  if (targetDay?.targetOwnPhotoId) {
+  if (targetDay?.targetOwnPhotoId && !targetDay.skippedAt) {
     return {
       kind: "waiting",
       dateKey: targetDateKey,
@@ -538,7 +951,7 @@ export function getPendingEveningDeliveryDay(now = Date.now()) {
       .filter(
         (day) =>
           day.targetOwnPhotoId &&
-          !day.deliveredPhoto &&
+          !hasEveningDeliveryArrival(day) &&
           !day.skippedAt &&
           now >= getJstDeliveryTime(day.dateKey),
       )
@@ -669,7 +1082,7 @@ function findLatestVisibleDeliveredDay(store: EveningDeliveryStore, now: number)
     Object.values(store)
       .filter(
         (day) =>
-          day.deliveredPhoto &&
+          hasEveningDeliveryArrival(day) &&
           now >= getJstDeliveryTime(day.dateKey) &&
           now < getJstAutoOpenTime(day.dateKey),
       )
@@ -706,6 +1119,16 @@ function isEveningDeliveryDay(value: unknown): value is EveningDeliveryDay {
     isValidDateKey(day.dateKey) &&
     isOptionalString(day.targetOwnPhotoId) &&
     isOptionalString(day.targetCatId) &&
+    isOptionalString(day.draftSelectedPhotoId) &&
+    isOptionalString(day.selectedPhotoId) &&
+    isOptionalString(day.deliveryBundleId) &&
+    isOptionalString(day.experienceVersion) &&
+    isOptionalString(day.assignedVariant) &&
+    isOptionalString(day.servedVariant) &&
+    isOptionalFiniteNumber(day.requestedCount) &&
+    isOptionalFiniteNumber(day.servedCount) &&
+    isOptionalNullableString(day.fallbackReason) &&
+    isOptionalExchangePhotoArray(day.deliveredPhotos) &&
     isOptionalFiniteNumber(day.targetCapturedAt) &&
     isOptionalFiniteNumber(day.deliveredAt) &&
     isOptionalFiniteNumber(day.openedAt) &&
@@ -729,4 +1152,140 @@ function isOptionalFiniteNumber(value: unknown) {
 
 function isOptionalOpenedBy(value: unknown) {
   return value === undefined || value === "user" || value === "system";
+}
+
+function isOptionalNullableString(value: unknown) {
+  return value === undefined || value === null || typeof value === "string";
+}
+
+function isOptionalExchangePhotoArray(value: unknown) {
+  return value === undefined || Array.isArray(value);
+}
+
+function hasEveningDeliveryArrival(
+  day: EveningDeliveryDay | null | undefined,
+) {
+  return Boolean(day?.deliveredPhoto || day?.deliveredPhotos?.length);
+}
+
+function hasUnresolvedEveningDeliverySelection(day: EveningDeliveryDay) {
+  return Boolean(
+    day.deliveredPhotos &&
+      day.deliveredPhotos.length > 1 &&
+      !day.selectedPhotoId &&
+      !day.openedAt,
+  );
+}
+
+function getEveningDeliveredPhotos(day: EveningDeliveryDay) {
+  if (day.deliveredPhotos && day.deliveredPhotos.length > 0) {
+    return day.deliveredPhotos;
+  }
+
+  return day.deliveredPhoto ? [day.deliveredPhoto] : [];
+}
+
+function sanitizeEveningDeliveredPhotos(photos: unknown) {
+  if (!Array.isArray(photos)) {
+    return [];
+  }
+
+  const sanitized: ExchangePhoto[] = [];
+  const identities = new Set<string>();
+  for (const candidate of photos) {
+    const photo = sanitizeExchangePhotoForPersistence(
+      candidate as ExchangePhoto | null | undefined,
+    );
+    if (!photo) {
+      continue;
+    }
+
+    const identity = photo.sourcePhotoId ?? photo.id;
+    if (identities.has(identity)) {
+      continue;
+    }
+
+    identities.add(identity);
+    sanitized.push(photo);
+  }
+
+  return sanitized;
+}
+
+function readLegacySingleDeliveredPhoto(
+  photo: unknown,
+  deliveredPhotos: unknown,
+): ExchangePhoto | undefined {
+  if (
+    Array.isArray(deliveredPhotos) ||
+    !photo ||
+    typeof photo !== "object"
+  ) {
+    return undefined;
+  }
+
+  const candidate = photo as Partial<ExchangePhoto>;
+  return typeof candidate.id === "string" && typeof candidate.src === "string"
+    ? (photo as ExchangePhoto)
+    : undefined;
+}
+
+function matchesExchangePhotoId(photo: ExchangePhoto, photoId: string) {
+  return photo.id === photoId || photo.sourcePhotoId === photoId;
+}
+
+function isSameExchangePhoto(first: ExchangePhoto, second: ExchangePhoto) {
+  return (
+    first.id === second.id ||
+    Boolean(
+      first.sourcePhotoId &&
+        second.sourcePhotoId &&
+        first.sourcePhotoId === second.sourcePhotoId,
+    )
+  );
+}
+
+function sanitizeEveningDeliveryBundleMetadata(
+  metadata: EveningDeliveryBundleMetadata,
+): EveningDeliveryBundleMetadata {
+  return {
+    deliveryBundleId: sanitizeOptionalString(metadata.deliveryBundleId),
+    experienceVersion: sanitizeOptionalString(metadata.experienceVersion),
+    assignedVariant: sanitizeOptionalString(metadata.assignedVariant),
+    servedVariant: sanitizeOptionalString(metadata.servedVariant),
+    requestedCount: sanitizeOptionalCount(metadata.requestedCount),
+    servedCount: sanitizeOptionalCount(metadata.servedCount),
+    fallbackReason:
+      metadata.fallbackReason === null
+        ? null
+        : sanitizeOptionalString(metadata.fallbackReason),
+  };
+}
+
+function pickEveningDeliveryBundleMetadata(
+  day: EveningDeliveryDay,
+): EveningDeliveryBundleMetadata {
+  return sanitizeEveningDeliveryBundleMetadata(day);
+}
+
+function clearEveningDeliveryBundleMetadata(): EveningDeliveryBundleMetadata {
+  return {
+    deliveryBundleId: undefined,
+    experienceVersion: undefined,
+    assignedVariant: undefined,
+    servedVariant: undefined,
+    requestedCount: undefined,
+    servedCount: undefined,
+    fallbackReason: undefined,
+  };
+}
+
+function sanitizeOptionalString(value: unknown) {
+  return typeof value === "string" && value.length > 0 ? value : undefined;
+}
+
+function sanitizeOptionalCount(value: unknown) {
+  return typeof value === "number" && Number.isFinite(value) && value >= 0
+    ? Math.floor(value)
+    : undefined;
 }

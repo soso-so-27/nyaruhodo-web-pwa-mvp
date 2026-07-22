@@ -38,6 +38,15 @@ test("shows the launch dashboard in Japanese with actionable sections", async ({
   await expect(page.getByRole("heading", { name: "初回夜便" })).toBeVisible();
   await expect(page.getByRole("heading", { name: "引き継ぎ・復元" })).toBeVisible();
   await expect(page.getByRole("heading", { name: "今夜の一通" })).toBeVisible();
+  await expect(
+    page.getByRole("heading", { name: "4匹から1匹を選ぶ" }),
+  ).toBeVisible();
+  const fourChoiceSection = page.getByLabel("4匹から1匹を選ぶ");
+  await expect(fourChoiceSection.getByText("4匹で配信").first()).toBeVisible();
+  await expect(
+    fourChoiceSection.getByText("1匹へフォールバック"),
+  ).toBeVisible();
+  await expect(fourChoiceSection.getByText("1/2 便", { exact: false })).toBeVisible();
   await expect(page.getByRole("heading", { name: "端末と入口" })).toBeVisible();
   await expect(
     page.getByLabel("どこから来たか").getByText("Instagram bio", { exact: true }),
@@ -71,6 +80,14 @@ test("shows the launch dashboard in Japanese with actionable sections", async ({
     audience: "product",
     period: "launch",
     operationalStatus: { level: "action" },
+    fourChoiceHealth: {
+      metrics: expect.arrayContaining([
+        expect.objectContaining({
+          key: "four_choice_exact_four_served",
+          cohorts: 2,
+        }),
+      ]),
+    },
   });
   expect(exportPayload.recentEvents).toBeUndefined();
   await expect(page.getByText(/繝|縺|蜿/)).toHaveCount(0);
@@ -207,6 +224,111 @@ const mockAnalyticsResponse = {
     metric("evening_check_succeeded", "20時便が成立", 0, 0),
     metric("evening_check_failed", "20時便の確認失敗", 0, 0),
   ],
+  fourChoiceHealth: {
+    metrics: [
+      {
+        key: "four_choice_assigned",
+        label: "4匹を割り当て",
+        cohorts: 3,
+        actors: 2,
+        events: 3,
+      },
+      {
+        key: "four_choice_exact_four_served",
+        label: "4匹で配信",
+        cohorts: 2,
+        actors: 2,
+        events: 2,
+      },
+      {
+        key: "four_choice_fallback_single",
+        label: "1匹へフォールバック",
+        cohorts: 1,
+        actors: 1,
+        events: 1,
+      },
+      {
+        key: "four_choice_choices_shown",
+        label: "選択画面を表示",
+        cohorts: 2,
+        actors: 2,
+        events: 2,
+      },
+      {
+        key: "four_choice_choice_selected",
+        label: "1匹を選択",
+        cohorts: 1,
+        actors: 1,
+        events: 1,
+      },
+      {
+        key: "four_choice_choice_saved",
+        label: "選んだ1匹を保存",
+        cohorts: 1,
+        actors: 1,
+        events: 1,
+      },
+      {
+        key: "four_choice_dismissed",
+        label: "選ばずに閉じた",
+        cohorts: 1,
+        actors: 1,
+        events: 1,
+      },
+    ],
+    funnel: [
+      {
+        key: "four_choice_assigned",
+        label: "4匹を割り当て",
+        cohorts: 3,
+        actors: 2,
+        events: 3,
+        previousCohorts: null,
+        fromPreviousRate: null,
+        fromAssignedRate: 100,
+      },
+      {
+        key: "four_choice_exact_four_served",
+        label: "4匹で配信",
+        cohorts: 2,
+        actors: 2,
+        events: 2,
+        previousCohorts: 3,
+        fromPreviousRate: 66.7,
+        fromAssignedRate: 66.7,
+      },
+      {
+        key: "four_choice_choices_shown",
+        label: "選択画面を表示",
+        cohorts: 2,
+        actors: 2,
+        events: 2,
+        previousCohorts: 2,
+        fromPreviousRate: 100,
+        fromAssignedRate: 66.7,
+      },
+      {
+        key: "four_choice_choice_selected",
+        label: "1匹を選択",
+        cohorts: 1,
+        actors: 1,
+        events: 1,
+        previousCohorts: 2,
+        fromPreviousRate: 50,
+        fromAssignedRate: 33.3,
+      },
+      {
+        key: "four_choice_choice_saved",
+        label: "選んだ1匹を保存",
+        cohorts: 1,
+        actors: 1,
+        events: 1,
+        previousCohorts: 1,
+        fromPreviousRate: 100,
+        fromAssignedRate: 33.3,
+      },
+    ],
+  },
   installHealth: [
     metric("install_invitation", "アプリ追加案内を表示", 5),
     metric("install_action", "追加手順へ進んだ", 2),

@@ -20,9 +20,13 @@ import { isAccountDeletionStripeCancellationRequired } from "../../src/lib/accou
 import {
   isFastStockCandidateDeliverable,
   isRowDeliverable,
+  buildEveningChoiceDeliverySlotId,
   buildIdempotentDeliveryId,
+  isEveningChoiceIdentityEligible,
+  isIdentityInEveningChoiceRollout,
   readExistingDelivery,
   resetOnboardingExchangeExceptionLimitForTests,
+  shouldUseEveningChoiceBundlePath,
   validateExchangeDeliveryDateKey,
 } from "../../src/app/api/sleeping-delivery/exchange/route";
 import { resolveExchangePhotoUploadSrc } from "../../src/lib/home/useEveningDelivery";
@@ -40,6 +44,13 @@ import {
   isSafeStoragePath,
   normalizeAnonymousId,
 } from "../../src/lib/photoStorageAuthorization";
+import {
+  EVENING_CHOICE_RECIRCULATION_POLICY,
+  buildFourChoiceExcludedSourceIds,
+  classifyDeliveryExposureHistory,
+  readCandidateLastShownAt,
+  type DeliveryExposureRow,
+} from "../../src/lib/server/deliveryRecirculation";
 
 const redBlueTestPhotoUrl =
   "data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD/4gHYSUNDX1BST0ZJTEUAAQEAAAHIAAAAAAQwAABtbnRyUkdCIFhZWiAH4AABAAEAAAAAAABhY3NwAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAQAA9tYAAQAAAADTLQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAlkZXNjAAAA8AAAACRyWFlaAAABFAAAABRnWFlaAAABKAAAABRiWFlaAAABPAAAABR3dHB0AAABUAAAABRyVFJDAAABZAAAAChnVFJDAAABZAAAAChiVFJDAAABZAAAAChjcHJ0AAABjAAAADxtbHVjAAAAAAAAAAEAAAAMZW5VUwAAAAgAAAAcAHMAUgBHAEJYWVogAAAAAAAAb6IAADj1AAADkFhZWiAAAAAAAABimQAAt4UAABjaWFlaIAAAAAAAACSgAAAPhAAAts9YWVogAAAAAAAA9tYAAQAAAADTLXBhcmEAAAAAAAQAAAACZmYAAPKnAAANWQAAE9AAAApbAAAAAAAAAABtbHVjAAAAAAAAAAEAAAAMZW5VUwAAACAAAAAcAEcAbwBvAGcAbABlACAASQBuAGMALgAgADIAMAAxADb/2wBDAAsHCAoIBwsKCQoMDAsNEBsSEA8PECEYGRQbJyMpKScjJiUsMT81LC47LyUmNko3O0FDRkdGKjRNUkxEUj9FRkP/2wBDAQwMDBAOECASEiBDLSYtQ0NDQ0NDQ0NDQ0NDQ0NDQ0NDQ0NDQ0NDQ0NDQ0NDQ0NDQ0NDQ0NDQ0NDQ0NDQ0NDQ0P/wAARCABkAGQDASIAAhEBAxEB/8QAGQABAQEBAQEAAAAAAAAAAAAAAAIHAwQB/8QAFxABAAMAAAAAAAAAAAAAAAAAAAEDMv/EABkBAQADAQEAAAAAAAAAAAAAAAADBgcEBf/EACgRAQAAAggGAwEAAAAAAAAAAAABBAIDFBViobHhETM0YXFyEhMxkf/aAAwDAQACEQMRAD8A+gPMXcAAAB2rxCk14hS5yvIoeIaM2nuqrfaOsQBO5AAAAHnAUVqgAAADtXiFJrxClzleRQ8Q0ZtPdVW+0dYgCdyAAAAPOAorVAAAAHavEKTXiFLnK8ih4hozae6qt9o6xAE7kAAAAecBRWqAAAAO1eIUmvEKXOV5FDxDRm091Vb7R1iAJ3IAAAA84CitUAAAAdq8QpNeIUucryKHiGjNp7qq32jrEATuQAAAB5xkIp9n7rxfODPZrwyELP3L5wZ7NeGQhZ+5fODPZsleIUxkezVT/wBdXRofH8hCH7srdfL/AHVtKs48OMYx/sWzDGRJeWHPZFYsWTZhjIXlhz2LFiybMMZC8sOexYsWQA8t3AAAAAAAAAAAAP/Z";
@@ -59,7 +70,20 @@ type ExchangeResponse = {
     src: string;
     title?: string;
   } | null;
+  photos?: Array<{
+    id: string;
+    sourcePhotoId?: string;
+    src: string;
+    title?: string;
+  }>;
   source?: "remote" | "none";
+  bundleId?: string | null;
+  experienceVersion?: string;
+  assignedVariant?: string;
+  servedVariant?: string;
+  requestedCount?: number;
+  servedCount?: number;
+  fallbackReason?: string | null;
   diagnostics?: {
     normalCandidateCount?: number;
   };
@@ -68,7 +92,147 @@ type ExchangeResponse = {
 
 type LocalEnv = Record<string, string>;
 
+function createFourChoiceExposure(
+  sourceId: string,
+  deliveryDateKey: string,
+): DeliveryExposureRow {
+  return {
+    source_moment_id: sourceId,
+    source_photo_id: sourceId,
+    status: "delivered",
+    metadata: {
+      bundle_id: `bundle-${deliveryDateKey}`,
+      delivery_date_key: deliveryDateKey,
+      delivery_position: 1,
+      experience_version: "evening_choice_v1",
+      served_variant: "four_choice_v1",
+    },
+    delivered_at: `${deliveryDateKey}T11:00:00.000Z`,
+  };
+}
+
 test.describe("sleeping delivery pool guards", () => {
+  test("assigns the four-choice rollout and slot ids deterministically", () => {
+    const identity = "anon:stable-evening-choice";
+    const first = isIdentityInEveningChoiceRollout(identity, 37);
+
+    expect(isIdentityInEveningChoiceRollout(identity, 37)).toBe(first);
+    expect(isIdentityInEveningChoiceRollout(identity, 0)).toBe(false);
+    expect(isIdentityInEveningChoiceRollout(identity, 100)).toBe(true);
+    expect(
+      buildEveningChoiceDeliverySlotId({
+        bundleId: "delivered-sleeping-2026-07-22-test",
+        position: 4,
+      }),
+    ).toBe("delivered-sleeping-2026-07-22-test-choice-4");
+  });
+
+  test("limits production four-choice delivery to account identities", () => {
+    expect(
+      isEveningChoiceIdentityEligible({
+        userId: "account-user",
+        anonymousId: null,
+        productionDeployment: true,
+      }),
+    ).toBe(true);
+    expect(
+      isEveningChoiceIdentityEligible({
+        userId: null,
+        anonymousId: "raw-anonymous-device",
+        productionDeployment: true,
+      }),
+    ).toBe(false);
+    expect(
+      isEveningChoiceIdentityEligible({
+        userId: null,
+        anonymousId: "preview-anonymous-device",
+        productionDeployment: false,
+      }),
+    ).toBe(true);
+  });
+
+  test("keeps capable rollout-zero requests on the legacy single path", () => {
+    const assignedVariant = isIdentityInEveningChoiceRollout(
+      "anon:rollout-zero-evening-choice",
+      0,
+    )
+      ? "four_choice_v1"
+      : "single_v1";
+
+    expect(assignedVariant).toBe("single_v1");
+    expect(
+      shouldUseEveningChoiceBundlePath({
+        isCapableRequest: true,
+        assignedVariant,
+        idempotentDeliveryId: "delivered-sleeping-2026-07-22-rollout-zero",
+      }),
+    ).toBe(false);
+    expect(
+      shouldUseEveningChoiceBundlePath({
+        isCapableRequest: true,
+        assignedVariant: "four_choice_v1",
+        idempotentDeliveryId: "delivered-sleeping-2026-07-22-rollout-enabled",
+      }),
+    ).toBe(true);
+  });
+
+  test("recirculates only unselected four-choice exposures after fourteen clear nights", () => {
+    const recentHistory = classifyDeliveryExposureHistory({
+      currentDateKey: "2026-07-15",
+      rows: [createFourChoiceExposure("source-a", "2026-07-01")],
+    });
+    expect(EVENING_CHOICE_RECIRCULATION_POLICY).toBe(
+      "unselected_14_nights_v1",
+    );
+    expect(buildFourChoiceExcludedSourceIds(recentHistory)).toContain(
+      "source-a",
+    );
+
+    const eligibleHistory = classifyDeliveryExposureHistory({
+      currentDateKey: "2026-07-16",
+      rows: [createFourChoiceExposure("source-a", "2026-07-01")],
+    });
+    expect(buildFourChoiceExcludedSourceIds(eligibleHistory)).not.toContain(
+      "source-a",
+    );
+    expect(readCandidateLastShownAt(eligibleHistory, ["source-a"])).toBe(
+      Date.parse("2026-07-01T11:00:00.000Z"),
+    );
+  });
+
+  test("kept, reported, legacy, and source-photo-only history remain permanent", () => {
+    const rows: DeliveryExposureRow[] = [
+      { ...createFourChoiceExposure("kept-source", "2026-06-01"), status: "kept" },
+      {
+        ...createFourChoiceExposure("reported-source", "2026-06-01"),
+        status: "reported",
+      },
+      {
+        ...createFourChoiceExposure("legacy-source", "2026-06-01"),
+        metadata: { served_variant: "single_v1" },
+      },
+      {
+        ...createFourChoiceExposure("ignored-uuid", "2026-06-01"),
+        source_moment_id: null,
+        source_photo_id: "local-source-only",
+        status: "hidden",
+      },
+    ];
+    const history = classifyDeliveryExposureHistory({
+      currentDateKey: "2026-07-20",
+      rows,
+    });
+
+    expect(history.permanentSourceIds).toEqual(
+      new Set([
+        "kept-source",
+        "reported-source",
+        "legacy-source",
+        "local-source-only",
+      ]),
+    );
+  });
+
   test("normalizes expiring storage urls before persistent photo saves", () => {
     const storageSrc = "storage:user/cat/sleeping/photo.jpg";
     const signedUrl =
@@ -1812,6 +1976,461 @@ test.describe("sleeping delivery pool guards", () => {
     }
   });
 
+  test("returns one stable four-photo bundle for an eligible evening choice request", async ({
+    request,
+  }) => {
+    await skipIfLocalSupabaseUnavailable();
+
+    const adminSupabase = createAdminSupabaseClientFromEnv();
+    test.skip(
+      !adminSupabase,
+      "SUPABASE_SERVICE_ROLE_KEY is required for the four-choice smoke test.",
+    );
+    if (!adminSupabase) {
+      return;
+    }
+
+    const createdAt = Date.now();
+    const anonymousId = `four-choice-anonymous-${createdAt}`;
+    const candidateIds = Array.from(
+      { length: 4 },
+      (_, index) => `four-choice-candidate-${createdAt}-${index + 1}`,
+    );
+    const candidateStoragePaths = candidateIds.map(
+      (candidateId) => `e2e/four-choice/${candidateId}.png`,
+    );
+    const deliveryDateKey = getYesterdayJstDateKey();
+
+    try {
+      await Promise.all(
+        candidateStoragePaths.map((storagePath) =>
+          uploadTestPhoto(adminSupabase, storagePath),
+        ),
+      );
+      const { error: insertError } = await adminSupabase.from("cat_moments").insert(
+        candidateIds.map((candidateId, index) => ({
+          anonymous_id: `four-choice-source-${createdAt}-${index + 1}`,
+          local_moment_id: candidateId,
+          local_cat_id: `four-choice-source-cat-${createdAt}-${index + 1}`,
+          owner_cat_id: `four-choice-source-cat-${createdAt}-${index + 1}`,
+          photo_url: toStoragePhotoUrl(candidateStoragePaths[index]),
+          state: "sleeping",
+          visibility: "shared",
+          delivery_status: "available",
+          moderation_status: "approved",
+          moderated_at: new Date(createdAt - 60_000).toISOString(),
+          moderated_by: "e2e",
+          source_moment_id: null,
+          metadata: {
+            source: "e2e-four-choice",
+            pool_kind: "user_shared",
+            theme: "sleeping",
+            trigger_label: "sleeping",
+          },
+          captured_at: new Date(createdAt - 60_000).toISOString(),
+          created_at: new Date(createdAt - 60_000 - index).toISOString(),
+        })),
+      );
+      expect(insertError).toBeNull();
+
+      const payload = {
+        ...buildExchangeRequest(
+          normalCatLikePhotoUrl,
+          `four-choice-own-${createdAt}`,
+          anonymousId,
+        ),
+        ownPhoto: {
+          ...buildExchangeRequest(
+            normalCatLikePhotoUrl,
+            `four-choice-own-${createdAt}`,
+            anonymousId,
+          ).ownPhoto,
+          shared: false,
+        },
+        capability: "evening_choice_v1",
+        requestedCandidateCount: 4,
+        debugDryRun: false,
+        deliveryDateKey,
+        preferredSourcePhotoId: candidateIds[0],
+        seed: `${deliveryDateKey}:four-choice-own-${createdAt}`,
+        recipientCatId: `four-choice-recipient-${createdAt}`,
+      };
+
+      const firstResponse = await request.post("/api/sleeping-delivery/exchange", {
+        data: payload,
+      });
+      expect(firstResponse.status()).toBe(200);
+      const firstBody = (await firstResponse.json()) as ExchangeResponse;
+
+      expect(firstBody.experienceVersion).toBe("evening_choice_v1");
+      expect(firstBody.assignedVariant).toBe("four_choice_v1");
+      expect(firstBody.servedVariant).toBe("four_choice_v1");
+      expect(firstBody.requestedCount).toBe(4);
+      expect(firstBody.servedCount).toBe(4);
+      expect(firstBody.fallbackReason).toBeNull();
+      expect(firstBody.photos).toHaveLength(4);
+      expect(firstBody.photo?.id).toBe(firstBody.photos?.[0]?.id);
+      expect(firstBody.photo?.title).toBe("ほかの猫のねがお");
+      expect(new Set(firstBody.photos?.map((photo) => photo.id)).size).toBe(4);
+      expect(
+        new Set(firstBody.photos?.map((photo) => photo.sourcePhotoId)).size,
+      ).toBe(4);
+
+      const secondResponse = await request.post("/api/sleeping-delivery/exchange", {
+        data: payload,
+      });
+      expect(secondResponse.status()).toBe(200);
+      const secondBody = (await secondResponse.json()) as ExchangeResponse;
+      expect(secondBody.bundleId).toBe(firstBody.bundleId);
+      expect(secondBody.photos?.map((photo) => photo.id)).toEqual(
+        firstBody.photos?.map((photo) => photo.id),
+      );
+      expect(secondBody.photos?.map((photo) => photo.sourcePhotoId)).toEqual(
+        firstBody.photos?.map((photo) => photo.sourcePhotoId),
+      );
+
+      const { count, error: countError } = await adminSupabase
+        .from("cat_moment_deliveries")
+        .select("id", { count: "exact", head: true })
+        .eq("anonymous_id", anonymousId)
+        .contains("metadata", { bundle_id: firstBody.bundleId });
+      expect(countError).toBeNull();
+      expect(count).toBe(4);
+    } finally {
+      await adminSupabase
+        .from("cat_moment_deliveries")
+        .delete()
+        .eq("anonymous_id", anonymousId);
+      await adminSupabase
+        .from("cat_moments")
+        .delete()
+        .in("local_moment_id", candidateIds);
+      await adminSupabase.storage
+        .from(CAT_PHOTOS_BUCKET)
+        .remove(candidateStoragePaths);
+    }
+  });
+
+  test("rejects malformed evening bundle ids without crashing", async ({
+    request,
+  }) => {
+    const response = await request.post("/api/sleeping-delivery/choice", {
+      data: {
+        operation: "keep",
+        bundleId: "[",
+        deliveryDateKey: getTodayJstDateKey(),
+        selectedPhotoId: "[-choice-1",
+        anonymousId: "malformed-choice-anonymous-id",
+      },
+    });
+
+    expect(response.status()).toBe(400);
+    expect(await response.json()).toMatchObject({
+      ok: false,
+      error: "invalid_identity",
+    });
+  });
+
+  test("finalizes one canonical photo for an evening bundle", async ({
+    request,
+  }) => {
+    await skipIfLocalSupabaseUnavailable();
+    const adminSupabase = createAdminSupabaseClientFromEnv();
+    test.skip(!adminSupabase, "SUPABASE_SERVICE_ROLE_KEY is required.");
+    if (!adminSupabase) return;
+
+    const createdAt = Date.now();
+    const anonymousId = `choice-resolution-anon-${createdAt}`;
+    const deliveryDateKey = getTodayJstDateKey();
+    const bundleId = buildIdempotentDeliveryId({
+      userId: null,
+      anonymousId,
+      deliveryDateKey,
+    });
+    const deliveryIds = Array.from(
+      { length: 4 },
+      (_, index) =>
+        buildEveningChoiceDeliverySlotId({
+          bundleId,
+          position: index + 1,
+        }),
+    );
+    let transientUserId: string | null = null;
+
+    try {
+      const { error: insertError } = await adminSupabase
+        .from("cat_moment_deliveries")
+        .insert(
+          deliveryIds.map((localDeliveryId, index) => ({
+            anonymous_id: anonymousId,
+            local_delivery_id: localDeliveryId,
+            source_moment_id: null,
+            source_photo_id: `choice-resolution-source-${createdAt}-${index + 1}`,
+            recipient_local_cat_id: `choice-resolution-cat-${createdAt}`,
+            photo_url: normalCatLikePhotoUrl,
+            status: "delivered",
+            metadata: {
+              bundle_id: bundleId,
+              delivery_date_key: deliveryDateKey,
+              delivery_position: index + 1,
+              experience_version: "evening_choice_v1",
+              served_variant: "four_choice_v1",
+            },
+            delivered_at: new Date().toISOString(),
+          })),
+      );
+      expect(insertError).toBeNull();
+
+      const publicSupabase = createPublicSupabaseClientFromEnv();
+      expect(publicSupabase).toBeTruthy();
+      if (publicSupabase) {
+        const { error: directTableError } = await publicSupabase
+          .from("evening_delivery_choice_resolutions")
+          .select("id")
+          .limit(1);
+        expect(directTableError).toBeTruthy();
+
+        const { error: directRpcError } = await publicSupabase.rpc(
+          "finalize_evening_delivery_choice",
+          {
+            p_user_id: null,
+            p_anonymous_id: anonymousId,
+            p_bundle_id: bundleId,
+            p_delivery_date_key: deliveryDateKey,
+            p_outcome: "skipped",
+            p_selected_local_delivery_id: null,
+          },
+        );
+        expect(directRpcError).toBeTruthy();
+      }
+
+      const { error: legacyMetadataError } = await adminSupabase
+        .from("cat_moment_deliveries")
+        .update({ metadata: { source: "legacy-device-sync" } })
+        .eq("anonymous_id", anonymousId)
+        .eq("local_delivery_id", deliveryIds[0]);
+      expect(legacyMetadataError).toBeNull();
+
+      const competingPhotoIds = [deliveryIds[1], deliveryIds[3]];
+      const competingResponses = await Promise.all(
+        competingPhotoIds.map((selectedPhotoId) =>
+          request.post("/api/sleeping-delivery/choice", {
+            data: {
+              operation: "keep",
+              bundleId,
+              deliveryDateKey,
+              selectedPhotoId,
+              anonymousId,
+            },
+          }),
+        ),
+      );
+      expect(competingResponses.map((response) => response.status()).sort()).toEqual([
+        200,
+        409,
+      ]);
+      const competingBodies = await Promise.all(
+        competingResponses.map((response) => response.json()),
+      );
+      const winningBody = competingBodies.find((body) => body.ok === true) as {
+        selectedPhotoId: string;
+      };
+      const losingBody = competingBodies.find((body) => body.ok === false);
+      const winningPhotoId = winningBody.selectedPhotoId;
+      expect(competingPhotoIds).toContain(winningPhotoId);
+      expect(losingBody).toMatchObject({
+        ok: false,
+        error: "choice_already_resolved",
+        canonical: {
+          state: "kept",
+          selectedPhotoId: winningPhotoId,
+        },
+      });
+
+      const retry = await request.post("/api/sleeping-delivery/choice", {
+        data: {
+          operation: "keep",
+          bundleId,
+          deliveryDateKey,
+          selectedPhotoId: winningPhotoId,
+          anonymousId,
+        },
+      });
+      expect(retry.status()).toBe(200);
+      expect(await retry.json()).toMatchObject({
+        ok: true,
+        state: "kept",
+        selectedPhotoId: winningPhotoId,
+        idempotent: true,
+      });
+
+      const { error: staleSyncError } = await adminSupabase
+        .from("cat_moment_deliveries")
+        .update({ metadata: { source: "stale-account-sync" } })
+        .eq("anonymous_id", anonymousId)
+        .eq("local_delivery_id", winningPhotoId);
+      expect(staleSyncError).toBeNull();
+
+      const retryAfterMetadataOverwrite = await request.post(
+        "/api/sleeping-delivery/choice",
+        {
+          data: {
+            operation: "keep",
+            bundleId,
+            deliveryDateKey,
+            selectedPhotoId: winningPhotoId,
+            anonymousId,
+          },
+        },
+      );
+      expect(retryAfterMetadataOverwrite.status()).toBe(200);
+      expect(await retryAfterMetadataOverwrite.json()).toMatchObject({
+        ok: true,
+        state: "kept",
+        selectedPhotoId: winningPhotoId,
+        idempotent: true,
+      });
+
+      const authenticatedSupabase = createPublicSupabaseClientFromEnv();
+      expect(authenticatedSupabase).toBeTruthy();
+      if (authenticatedSupabase) {
+        const signedIn = await createConfirmedTestUser(
+          adminSupabase,
+          authenticatedSupabase,
+          `choice-after-login-${createdAt}@example.test`,
+        );
+        transientUserId = signedIn.userId;
+
+        const authenticatedRetry = await request.post(
+          "/api/sleeping-delivery/choice",
+          {
+            headers: { Authorization: `Bearer ${signedIn.accessToken}` },
+            data: {
+              operation: "keep",
+              bundleId,
+              deliveryDateKey,
+              selectedPhotoId: winningPhotoId,
+              anonymousId,
+            },
+          },
+        );
+        expect(authenticatedRetry.status()).toBe(200);
+        expect(await authenticatedRetry.json()).toMatchObject({
+          ok: true,
+          state: "kept",
+          selectedPhotoId: winningPhotoId,
+          idempotent: true,
+        });
+
+        const { error: authenticatedTableError } = await authenticatedSupabase
+          .from("evening_delivery_choice_resolutions")
+          .select("id")
+          .limit(1);
+        expect(authenticatedTableError).toBeTruthy();
+
+        const { error: authenticatedRpcError } = await authenticatedSupabase.rpc(
+          "finalize_evening_delivery_choice",
+          {
+            p_user_id: null,
+            p_anonymous_id: anonymousId,
+            p_bundle_id: bundleId,
+            p_delivery_date_key: deliveryDateKey,
+            p_outcome: "kept",
+            p_selected_local_delivery_id: winningPhotoId,
+          },
+        );
+        expect(authenticatedRpcError).toBeTruthy();
+      }
+
+      const { data: resolutionRows, error: resolutionError } =
+        await adminSupabase
+          .from("evening_delivery_choice_resolutions")
+          .select("outcome, selected_local_delivery_id")
+          .eq("anonymous_id", anonymousId);
+      expect(resolutionError).toBeNull();
+      expect(resolutionRows).toEqual([
+        {
+          outcome: "kept",
+          selected_local_delivery_id: winningPhotoId,
+        },
+      ]);
+
+      const { data: deliveryRows, error: deliveryError } = await adminSupabase
+        .from("cat_moment_deliveries")
+        .select("local_delivery_id, status")
+        .eq("anonymous_id", anonymousId)
+        .order("local_delivery_id");
+      expect(deliveryError).toBeNull();
+      expect(deliveryRows).toEqual(
+        deliveryIds.map((localDeliveryId) => ({
+          local_delivery_id: localDeliveryId,
+          status: localDeliveryId === winningPhotoId ? "kept" : "delivered",
+        })),
+      );
+
+      const { error: reportedStatusError } = await adminSupabase
+        .from("cat_moment_deliveries")
+        .update({ status: "reported" })
+        .eq("anonymous_id", anonymousId)
+        .eq("local_delivery_id", winningPhotoId);
+      expect(reportedStatusError).toBeNull();
+
+      const staleKeepRetry = await request.post(
+        "/api/sleeping-delivery/choice",
+        {
+          data: {
+            operation: "keep",
+            bundleId,
+            deliveryDateKey,
+            selectedPhotoId: winningPhotoId,
+            anonymousId,
+          },
+        },
+      );
+      expect(staleKeepRetry.status()).toBe(409);
+      expect(await staleKeepRetry.json()).toMatchObject({
+        ok: false,
+        error: "choice_already_resolved",
+        canonical: {
+          state: "skipped",
+          selectedPhotoId: null,
+        },
+      });
+
+      const staleSkipRetry = await request.post(
+        "/api/sleeping-delivery/choice",
+        {
+          data: {
+            operation: "skip",
+            bundleId,
+            deliveryDateKey,
+            selectedPhotoId: null,
+            anonymousId,
+          },
+        },
+      );
+      expect(staleSkipRetry.status()).toBe(200);
+      expect(await staleSkipRetry.json()).toMatchObject({
+        ok: true,
+        state: "skipped",
+        selectedPhotoId: null,
+        idempotent: true,
+      });
+    } finally {
+      await adminSupabase
+        .from("evening_delivery_choice_resolutions")
+        .delete()
+        .eq("anonymous_id", anonymousId);
+      await adminSupabase
+        .from("cat_moment_deliveries")
+        .delete()
+        .eq("anonymous_id", anonymousId);
+      if (transientUserId) {
+        await adminSupabase.auth.admin.deleteUser(transientUserId);
+      }
+    }
+  });
+
   test("backs up private own sleeping photos without exposing them to queue or delivery", async ({
     request,
   }) => {
@@ -2826,6 +3445,14 @@ function createAdminSupabaseClientFromEnv() {
       persistSession: false,
     },
   });
+}
+
+function getTodayJstDateKey() {
+  const date = new Date(Date.now() + 9 * 60 * 60 * 1000);
+  const year = date.getUTCFullYear();
+  const month = String(date.getUTCMonth() + 1).padStart(2, "0");
+  const day = String(date.getUTCDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
 }
 
 function createPublicSupabaseClientFromEnv() {
