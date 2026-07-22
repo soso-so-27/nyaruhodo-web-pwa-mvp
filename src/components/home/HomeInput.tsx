@@ -158,7 +158,11 @@ type HomeInputProps = {
   initialNow: number;
 };
 
-type DeliveredPhotoDecodeStatus = "idle" | "loading" | "ready" | "failed";
+export type DeliveredPhotoDecodeStatus =
+  | "idle"
+  | "loading"
+  | "ready"
+  | "failed";
 type DeliveredPhotoDecodeEntry = {
   status: DeliveredPhotoDecodeStatus;
   promise: Promise<DeliveredPhotoDecodeStatus>;
@@ -3715,11 +3719,11 @@ function usePrefersReducedMotion() {
   return prefersReducedMotion;
 }
 
-type EveningDeliveryChoiceUiResult =
+export type EveningDeliveryChoiceUiResult =
   | { kind: "kept"; photo: ExchangePhoto; conflict: boolean }
   | { kind: "skipped"; conflict: boolean };
 
-type EveningDeliveryOpeningProps = {
+export type EveningDeliveryOpeningProps = {
   state: Extract<EveningHomeState, { kind: "delivered" }>;
   initialDecodeStatus: DeliveredPhotoDecodeStatus;
   onChoose: (
@@ -3730,6 +3734,7 @@ type EveningDeliveryOpeningProps = {
   onReport: (photo: ExchangePhoto, reason: ExchangePhotoReportReason) => void;
   onStorageDataUrl: (photo: ExchangePhoto, dataUrl: string) => void;
   onClose: () => void;
+  analyticsEnabled?: boolean;
 };
 
 function EveningDeliveryOpening(props: EveningDeliveryOpeningProps) {
@@ -4014,7 +4019,7 @@ function EveningDeliverySingleOpening({
   );
 }
 
-function EveningDeliveryFourChoice({
+export function EveningDeliveryFourChoice({
   state,
   onChoose,
   onDraftChange,
@@ -4022,6 +4027,7 @@ function EveningDeliveryFourChoice({
   onReport,
   onStorageDataUrl,
   onClose,
+  analyticsEnabled = true,
 }: EveningDeliveryOpeningProps) {
   const photos = state.deliveredPhotos ?? [];
   const prefersReducedMotion = usePrefersReducedMotion();
@@ -4100,11 +4106,13 @@ function EveningDeliveryFourChoice({
       !dismissedTrackedRef.current
     ) {
       dismissedTrackedRef.current = true;
-      trackProductEvent("evening_delivery_choices_dismissed", {
-        delivery_date_key: state.dateKey,
-        ...choiceEventProperties,
-        had_selection: Boolean(selectedPhotoId),
-      });
+      if (analyticsEnabled) {
+        trackProductEvent("evening_delivery_choices_dismissed", {
+          delivery_date_key: state.dateKey,
+          ...choiceEventProperties,
+          had_selection: Boolean(selectedPhotoId),
+        });
+      }
     }
 
     if (syncHistory && pushedHistoryRef.current) {
@@ -4136,14 +4144,16 @@ function EveningDeliveryFourChoice({
     onDraftChange(photo.id);
     setSaveError(false);
     setSkipError(false);
-    trackProductEvent("evening_delivery_choice_selected", {
-      delivery_date_key: state.dateKey,
-      ...choiceEventProperties,
-      selected_position: position,
-      photo_id: photo.id,
-      selection_elapsed_ms: Math.max(0, Date.now() - shownAtRef.current),
-      change_count: selectionChangeCountRef.current,
-    });
+    if (analyticsEnabled) {
+      trackProductEvent("evening_delivery_choice_selected", {
+        delivery_date_key: state.dateKey,
+        ...choiceEventProperties,
+        selected_position: position,
+        photo_id: photo.id,
+        selection_elapsed_ms: Math.max(0, Date.now() - shownAtRef.current),
+        change_count: selectionChangeCountRef.current,
+      });
+    }
   }
 
   function moveChoiceFocus(currentIndex: number, direction: -1 | 1) {
@@ -4206,12 +4216,14 @@ function EveningDeliveryFourChoice({
         return;
       }
       resolutionRef.current = "skipped";
-      trackProductEvent("evening_delivery_choice_skipped", {
-        delivery_date_key: state.dateKey,
-        ...choiceEventProperties,
-        had_selection: Boolean(selectedPhotoId),
-        selection_elapsed_ms: Math.max(0, Date.now() - shownAtRef.current),
-      });
+      if (analyticsEnabled) {
+        trackProductEvent("evening_delivery_choice_skipped", {
+          delivery_date_key: state.dateKey,
+          ...choiceEventProperties,
+          had_selection: Boolean(selectedPhotoId),
+          selection_elapsed_ms: Math.max(0, Date.now() - shownAtRef.current),
+        });
+      }
       requestClose();
     } catch {
       setSkipError(true);
@@ -4242,6 +4254,9 @@ function EveningDeliveryFourChoice({
   }
 
   useEffect(() => {
+    if (!analyticsEnabled) {
+      return;
+    }
     trackProductEvent("envelope_shown", {
       delivery_date_key: state.dateKey,
       ...choiceEventProperties,
@@ -4251,6 +4266,7 @@ function EveningDeliveryFourChoice({
       ...choiceEventProperties,
     });
   }, [
+    analyticsEnabled,
     photos.length,
     state.assignedVariant,
     state.dateKey,

@@ -71,6 +71,9 @@ export function trackProductEvent(
   if (typeof window === "undefined") {
     return;
   }
+  if (window.location.pathname.startsWith("/prototypes/")) {
+    return;
+  }
 
   try {
     const propertiesForStorage = sanitizeProperties({
@@ -106,6 +109,9 @@ export function trackProductEvent(
 
 export async function flushProductAnalyticsEvents() {
   if (typeof window === "undefined" || isFlushingAnalytics) {
+    return;
+  }
+  if (window.location.pathname.startsWith("/prototypes/")) {
     return;
   }
 
