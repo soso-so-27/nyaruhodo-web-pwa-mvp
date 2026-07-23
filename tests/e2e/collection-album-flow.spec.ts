@@ -26,6 +26,70 @@ function createHistoryPhotoDataUrl(index: number) {
 }
 
 test.describe("collection album flow", () => {
+  test("opens received cats first while keeping own sent photos available", async ({
+    page,
+  }) => {
+    const createdAt = Date.parse("2026-07-22T09:30:00+09:00");
+    const deliveredAt = Date.parse("2026-07-22T20:00:00+09:00");
+
+    await page.addInitScript(
+      ({ src, createdAt, deliveredAt }) => {
+        const catId = "collection-default-side-cat";
+        window.localStorage.setItem("active_cat_id", catId);
+        window.localStorage.setItem(
+          "cat_profiles",
+          JSON.stringify([{ id: catId, name: "むぎ" }]),
+        );
+        window.localStorage.setItem(
+          "nyaruhodo_exchange_own_sleeping_photos",
+          JSON.stringify([
+            {
+              id: "collection-default-own",
+              ownerCatId: catId,
+              catId,
+              src,
+              state: "sleeping",
+              visibility: "shared",
+              deliveryStatus: "available",
+              shared: true,
+              triggerLabel: "sleeping",
+              theme: "sleeping",
+              createdAt,
+            },
+          ]),
+        );
+        window.localStorage.setItem(
+          "nyaruhodo_exchange_kept_photos",
+          JSON.stringify([
+            {
+              id: "collection-default-delivered",
+              sourcePhotoId: "collection-default-source",
+              src,
+              title: "",
+              subtitle: "",
+              triggerLabel: "sleeping",
+              theme: "sleeping",
+              deliveredAt,
+            },
+          ]),
+        );
+      },
+      { src: photoDataUrl, createdAt, deliveredAt },
+    );
+
+    await page.goto("/collection");
+
+    await expect(
+      page.getByRole("tab", { name: "とどいた" }),
+    ).toHaveAttribute("aria-selected", "true");
+    await expect(
+      page.getByTestId("mainichi-board-photo-delivered"),
+    ).toBeVisible();
+    await expect(page.getByTestId("mainichi-board-photo-sent")).toHaveCount(0);
+    await page.getByRole("tab", { name: "わたしのねがお" }).click();
+    await expect(page.getByTestId("mainichi-board-photo-sent")).toBeVisible();
+  });
+
   test("shows a repeated onboarding delivery only once in received", async ({
     page,
   }) => {

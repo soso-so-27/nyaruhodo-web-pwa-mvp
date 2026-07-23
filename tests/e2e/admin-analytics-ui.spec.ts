@@ -47,6 +47,12 @@ test("shows the launch dashboard in Japanese with actionable sections", async ({
     fourChoiceSection.getByText("1枚へフォールバック"),
   ).toBeVisible();
   await expect(fourChoiceSection.getByText("1/2 便", { exact: false })).toBeVisible();
+  const journeySection = page.getByLabel("一人ずつの流れ");
+  await expect(journeySection.getByText("ケース 01")).toBeVisible();
+  await expect(journeySection.getByText(/オンボ・/)).toBeVisible();
+  await expect(journeySection.getByText(/保存・/)).toBeVisible();
+  await expect(journeySection.getByText(/導線後・/)).toBeVisible();
+  await expect(journeySection.getByText("保存しない・", { exact: false })).toBeVisible();
   await expect(page.getByRole("heading", { name: "端末と入口" })).toBeVisible();
   await expect(
     page.getByLabel("どこから来たか").getByText("Instagram bio", { exact: true }),
@@ -88,6 +94,19 @@ test("shows the launch dashboard in Japanese with actionable sections", async ({
         }),
       ]),
     },
+    journeyCases: [
+      expect.objectContaining({
+        caseNumber: 1,
+        fourChoiceSurface: "onboarding",
+        fourChoiceResolution: "saved",
+        ownCatViewViaCta: true,
+      }),
+      expect.objectContaining({
+        caseNumber: 2,
+        fourChoiceSurface: "evening",
+        fourChoiceResolution: "skipped",
+      }),
+    ],
   });
   expect(exportPayload.recentEvents).toBeUndefined();
   await expect(page.getByText(/繝|縺|蜿/)).toHaveCount(0);
@@ -345,11 +364,47 @@ const mockAnalyticsResponse = {
       { key: "browser", users: 3 },
     ],
   },
+  journeyCases: [
+    {
+      caseNumber: 1,
+      firstRecordedAt: "2026-07-16T08:00:00.000Z",
+      fourChoiceSurface: "onboarding",
+      fourChoiceShownAt: "2026-07-16T08:01:00.000Z",
+      fourChoiceSelectedAt: "2026-07-16T08:02:00.000Z",
+      fourChoiceResolution: "saved",
+      fourChoiceResolvedAt: "2026-07-16T08:03:00.000Z",
+      ownRecordCtaClickedAt: "2026-07-16T08:04:00.000Z",
+      ownCatViewedAt: "2026-07-16T08:05:00.000Z",
+      ownCatViewViaCta: true,
+      laterRevisitedAt: "2026-07-17T08:00:00.000Z",
+      laterRecordedAt: "2026-07-17T08:01:00.000Z",
+    },
+    {
+      caseNumber: 2,
+      firstRecordedAt: "2026-07-16T09:00:00.000Z",
+      fourChoiceSurface: "evening",
+      fourChoiceShownAt: "2026-07-16T11:00:00.000Z",
+      fourChoiceSelectedAt: "2026-07-16T11:01:00.000Z",
+      fourChoiceResolution: "skipped",
+      fourChoiceResolvedAt: "2026-07-16T11:02:00.000Z",
+      ownRecordCtaClickedAt: null,
+      ownCatViewedAt: null,
+      ownCatViewViaCta: false,
+      laterRevisitedAt: null,
+      laterRecordedAt: null,
+    },
+  ],
   retention: {
     photoSubmitters: 8,
     repeatSubmitters: 5,
     returningDaySubmitters: 2,
+    d1EligibleSubmitters: 6,
+    d1Revisiters: 4,
     d1ReturnSubmitters: 0,
+    d1ExchangeReturnSubmitters: 0,
+    d1RevisitRate: 66.7,
+    d1ReturnRate: 0,
+    d1ExchangeReturnRate: 0,
   },
   operationalStatus: {
     level: "action",

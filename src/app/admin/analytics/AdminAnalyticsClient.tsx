@@ -7,6 +7,7 @@ import { createBrowserSupabaseClient } from "../../../lib/supabase/browser";
 import { getOrCreateAnonymousId } from "../../../lib/identity/anonymousId";
 import type {
   AnalyticsAudience,
+  AnalyticsJourneyCase,
   AnalyticsPeriodKey,
 } from "../../../lib/analytics/adminAnalytics";
 
@@ -66,11 +67,18 @@ type AnalyticsResponse = {
     devices: Array<{ key: string; users: number }>;
     contexts: Array<{ key: string; users: number }>;
   };
+  journeyCases: AnalyticsJourneyCase[];
   retention: {
     photoSubmitters: number;
     repeatSubmitters: number;
     returningDaySubmitters: number;
+    d1EligibleSubmitters: number;
+    d1Revisiters: number;
     d1ReturnSubmitters: number;
+    d1ExchangeReturnSubmitters: number;
+    d1RevisitRate: number | null;
+    d1ReturnRate: number | null;
+    d1ExchangeReturnRate: number | null;
   };
   operationalStatus: {
     level: "ok" | "watch" | "action";
@@ -186,6 +194,7 @@ const EVENT_LABELS: Record<string, string> = {
   sleeping_photo_backup_failed: "投稿写真のバックアップ失敗",
   photo_original_preservation_failed: "原本写真の保全失敗",
   cat_gallery_restore_failed: "うちのこ写真の復元失敗",
+  evening_choice_own_record_clicked: "4匹保存後にうちのこを開いた",
 };
 
 export default function AdminAnalyticsClient() {
@@ -444,6 +453,8 @@ export default function AdminAnalyticsClient() {
                       "four_choice_exact_four_served",
                       "four_choice_fallback_single",
                       "four_choice_dismissed",
+                      "four_choice_skipped",
+                      "four_choice_auto_skipped",
                     ].includes(metric.key),
                   )
                   .map((metric) => [
@@ -456,6 +467,21 @@ export default function AdminAnalyticsClient() {
               <FourChoiceFunnelTable steps={data.fourChoiceHealth.funnel} />
             </section>
           ) : null}
+
+          <section style={styles.section} aria-labelledby="journey-cases-title">
+            <SectionHeading
+              id="journey-cases-title"
+              title="一人ずつの流れ"
+              note="率ではなく、期間内の最初の写真記録から別日の行動までを最大10ケースで確認"
+            />
+            {data.journeyCases.length > 0 ? (
+              <JourneyCasesList cases={data.journeyCases} />
+            ) : (
+              <p style={styles.emptyText}>
+                この期間には、写真記録から始まるケースがまだありません。
+              </p>
+            )}
+          </section>
 
           <section style={styles.twoColumnSection}>
             <div style={styles.column}>
@@ -555,6 +581,29 @@ export default function AdminAnalyticsClient() {
                 compact
               />
             </div>
+            <AnalyticsTable
+              columns={["翌日の行動", "対象ID", "実行ID", "率"]}
+              rows={[
+                [
+                  "アプリへ再訪",
+                  `${data.retention.d1EligibleSubmitters} ID`,
+                  `${data.retention.d1Revisiters} ID`,
+                  formatPercent(data.retention.d1RevisitRate),
+                ],
+                [
+                  "写真を記録（非共有を含む）",
+                  `${data.retention.d1EligibleSubmitters} ID`,
+                  `${data.retention.d1ReturnSubmitters} ID`,
+                  formatPercent(data.retention.d1ReturnRate),
+                ],
+                [
+                  "写真を交換へ送る",
+                  `${data.retention.d1EligibleSubmitters} ID`,
+                  `${data.retention.d1ExchangeReturnSubmitters} ID`,
+                  formatPercent(data.retention.d1ExchangeReturnRate),
+                ],
+              ]}
+            />
           </section>
 
           <section style={styles.section} aria-labelledby="errors-title">
@@ -821,6 +870,7 @@ function buildCodexAnalyticsExport(data: AnalyticsResponse) {
     deliveryHealth: data.deliveryHealth,
     installHealth: data.installHealth,
     environment: data.environment,
+    journeyCases: data.journeyCases,
     retention: data.retention,
     errorSummary: data.errorSummary,
     issueSummary: data.issueSummary,
@@ -1002,6 +1052,138 @@ function FourChoiceFunnelTable({
       ])}
     />
   );
+}
+
+function JourneyCasesList({ cases }: { cases: AnalyticsJourneyCase[] }) {
+  return (
+    <div style={styles.journeyCaseGrid}>
+      {cases.map((journeyCase) => (
+        <article
+          key={journeyCase.caseNumber}
+          style={styles.journeyCaseCard}
+        >
+          <div style={styles.journeyCaseHeader}>
+            <h3 style={styles.journeyCaseTitle}>
+              ケース {String(journeyCase.caseNumber).padStart(2, "0")}
+            </h3>
+            <p style={styles.journeyCaseStatus}>
+              {getJourneyCaseStatus(journeyCase)}
+            </p>
+          </div>
+          <dl style={styles.journeyCaseList}>
+            <JourneyCaseRow
+              label="写真記録"
+              value={formatDate(journeyCase.firstRecordedAt)}
+            />
+            <JourneyCaseRow
+              label="4匹表示"
+              value={formatJourneyMilestone(
+                journeyCase.fourChoiceShownAt,
+                journeyCase.fourChoiceSurface === "onboarding"
+                  ? "オンボ"
+                  : journeyCase.fourChoiceSurface === "evening"
+                    ? "20時便"
+                    : null,
+              )}
+            />
+            <JourneyCaseRow
+              label="1匹選択"
+              value={formatJourneyMilestone(
+                journeyCase.fourChoiceSelectedAt,
+              )}
+            />
+            <JourneyCaseRow
+              label="結果"
+              value={formatJourneyResolution(journeyCase)}
+            />
+            <JourneyCaseRow
+              label="うちのこ導線"
+              value={formatJourneyMilestone(
+                journeyCase.ownRecordCtaClickedAt,
+              )}
+            />
+            <JourneyCaseRow
+              label="うちのこ表示"
+              value={formatJourneyMilestone(
+                journeyCase.ownCatViewedAt,
+                journeyCase.ownCatViewViaCta ? "導線後" : null,
+              )}
+            />
+            <JourneyCaseRow
+              label="別日再訪"
+              value={formatJourneyMilestone(journeyCase.laterRevisitedAt)}
+            />
+            <JourneyCaseRow
+              label="別日記録"
+              value={formatJourneyMilestone(journeyCase.laterRecordedAt)}
+            />
+          </dl>
+        </article>
+      ))}
+    </div>
+  );
+}
+
+function JourneyCaseRow({ label, value }: { label: string; value: string }) {
+  return (
+    <div style={styles.journeyCaseRow}>
+      <dt style={styles.journeyCaseLabel}>{label}</dt>
+      <dd style={styles.journeyCaseValue}>{value}</dd>
+    </div>
+  );
+}
+
+function getJourneyCaseStatus(journeyCase: AnalyticsJourneyCase) {
+  if (journeyCase.laterRecordedAt) {
+    return "別日も記録";
+  }
+  if (journeyCase.laterRevisitedAt) {
+    return "別日に再訪";
+  }
+  if (journeyCase.ownCatViewedAt) {
+    return "うちのこを表示";
+  }
+  if (journeyCase.ownRecordCtaClickedAt) {
+    return "うちのこへ移動中";
+  }
+  if (journeyCase.fourChoiceResolution === "saved") {
+    return "1匹を保存";
+  }
+  if (journeyCase.fourChoiceResolution === "skipped") {
+    return "保存しない";
+  }
+  if (journeyCase.fourChoiceResolution === "auto_skipped") {
+    return "期限まで未選択";
+  }
+  if (journeyCase.fourChoiceSelectedAt) {
+    return "1匹を選択中";
+  }
+  if (journeyCase.fourChoiceShownAt) {
+    return "4匹を表示";
+  }
+  return "写真記録まで";
+}
+
+function formatJourneyResolution(journeyCase: AnalyticsJourneyCase) {
+  const label =
+    journeyCase.fourChoiceResolution === "saved"
+      ? "保存"
+      : journeyCase.fourChoiceResolution === "skipped"
+        ? "保存しない"
+        : journeyCase.fourChoiceResolution === "auto_skipped"
+          ? "期限切れ"
+          : null;
+
+  return formatJourneyMilestone(journeyCase.fourChoiceResolvedAt, label);
+}
+
+function formatJourneyMilestone(value: string | null, label: string | null = null) {
+  if (!value) {
+    return "-";
+  }
+
+  const timestamp = formatDate(value);
+  return label ? `${label}・${timestamp}` : timestamp;
 }
 
 function EventTable({
@@ -1446,6 +1628,61 @@ const styles = {
     margin: "7px 0 0",
     color: "#887b70",
     fontSize: 11,
+  },
+  journeyCaseGrid: {
+    display: "grid",
+    gridTemplateColumns:
+      "repeat(auto-fit, minmax(min(100%, 340px), 1fr))",
+    gap: 8,
+  },
+  journeyCaseCard: {
+    minWidth: 0,
+    border: "1px solid rgba(74, 63, 53, 0.18)",
+    borderRadius: 6,
+    background: "rgba(255, 253, 249, 0.82)",
+    padding: 14,
+  },
+  journeyCaseHeader: {
+    display: "flex",
+    alignItems: "baseline",
+    justifyContent: "space-between",
+    gap: 12,
+    paddingBottom: 8,
+    borderBottom: "1px solid rgba(74, 63, 53, 0.12)",
+  },
+  journeyCaseTitle: {
+    margin: 0,
+    fontSize: 15,
+    lineHeight: 1.4,
+    fontWeight: 600,
+  },
+  journeyCaseStatus: {
+    margin: 0,
+    color: "#705048",
+    fontSize: 11,
+    fontWeight: 600,
+  },
+  journeyCaseList: {
+    margin: "6px 0 0",
+  },
+  journeyCaseRow: {
+    display: "grid",
+    gridTemplateColumns: "92px minmax(0, 1fr)",
+    gap: 10,
+    padding: "5px 0",
+    borderBottom: "1px solid rgba(74, 63, 53, 0.08)",
+    fontSize: 12,
+    lineHeight: 1.5,
+  },
+  journeyCaseLabel: {
+    color: "#786d64",
+  },
+  journeyCaseValue: {
+    minWidth: 0,
+    margin: 0,
+    color: "#4f443c",
+    fontVariantNumeric: "tabular-nums",
+    overflowWrap: "anywhere",
   },
   issueList: {
     marginTop: 12,

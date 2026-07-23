@@ -238,13 +238,16 @@ test.describe("onboarding delivery flow", () => {
 
     const introCopy = page.getByTestId("onboarding-exchange-explanation");
     await expect(introCopy).toBeVisible();
-    await expect(introCopy).toContainText("とどいた写真から1枚を選んで保存できます。");
+    await expect(introCopy).toContainText("最初の1枚は、この子の記録に残ります。");
     await expect(introCopy).toContainText(
-      "最初に選んだねがおの写真は、運営確認後にほかの利用者へとどくことがあります。",
+      "とどいた写真から、好きな1枚も保存できます。",
     );
     await expect(page.getByTestId("onboarding-privacy-note")).toHaveText(
-      "公開一覧やSNSには表示されません",
+      "最初の1枚は、運営確認後にほかの利用者へとどくことがあります。公開一覧やSNSには表示されません",
     );
+    await expect(
+      page.locator('[data-onboarding-title="true"]'),
+    ).toHaveText("うちの猫のねがおを1枚残すと猫の写真が最大4枚とどく");
     await expect(
       page.getByText("自分のねこのねがおの写真を1枚選ぶと、", { exact: true }),
     ).toHaveCount(0);
@@ -1424,15 +1427,15 @@ test.describe("onboarding delivery flow", () => {
     expect(openedSnapshot.deliveredPhoto?.id).not.toBe(openedSnapshot.ownPhoto?.id);
 
     await page.goto("/collection");
-    await page.locator('[role="tab"]').nth(0).click();
+    await page.getByRole("tab", { name: "わたしのねがお" }).click();
     await expect(page.getByTestId("mainichi-board-photo-sent").first()).toBeVisible();
 
-    await page.locator('[role="tab"]').nth(1).click();
+    await page.getByRole("tab", { name: "とどいた" }).click();
     await expect(page.getByTestId("mainichi-board-photo-delivered")).toHaveCount(1);
 
     await markOnboardingAlbumCreatedInBrowser(page);
     await page.goto("/collection");
-    await page.locator('[role="tab"]').nth(1).click();
+    await page.getByRole("tab", { name: "とどいた" }).click();
     await expect(page.getByTestId("mainichi-board-photo-delivered")).toHaveCount(1);
   });
 
@@ -1511,7 +1514,7 @@ test.describe("onboarding delivery flow", () => {
       window.localStorage.setItem("analytics_anonymous_id", "anonymous-other-context");
     });
     await page.goto("/collection");
-    await page.locator('[role="tab"]').nth(1).click();
+    await page.getByRole("tab", { name: "とどいた" }).click();
 
     await expect(page.getByTestId("mainichi-board-photo-delivered")).toHaveCount(1);
   });
@@ -3858,7 +3861,11 @@ test.describe("onboarding delivery flow", () => {
     await page.goto("/cats?onboarding=1");
 
     await expect(page.getByText("アルバムに入りました")).toBeVisible();
-    await expect(page.getByText("また寝ていたら、ここへ。")).toBeVisible();
+    await expect(
+      page.getByRole("heading", {
+        name: "写真と記録を、あとから見返せます。",
+      }),
+    ).toBeVisible();
     await expect(page.getByText("このねこの名前は？")).toHaveCount(0);
     await expect(page.getByText("プロフィール")).toHaveCount(0);
     await expect(page.getByText("うちの背景")).toHaveCount(0);
@@ -3953,7 +3960,11 @@ test.describe("onboarding delivery flow", () => {
     await page.getByRole("button", { name: "アルバムをつくる" }).click();
 
     await expect(page.getByText("アルバムができました")).toBeVisible();
-    await expect(page.getByText("また寝ていたら、ここへ。")).toBeVisible();
+    await expect(
+      page.getByRole("heading", {
+        name: "写真と記録を、あとから見返せます。",
+      }),
+    ).toBeVisible();
     await expect(page.getByRole("link", { name: "ホームへ" })).toBeVisible();
     await expect(page.getByText("このねこの名前は？")).toHaveCount(0);
     await expect(page.getByText("プロフィール")).toHaveCount(0);

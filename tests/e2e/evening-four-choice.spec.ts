@@ -13,6 +13,7 @@ import { sendPhotoReport } from "../../src/lib/home/photoReports";
  * - `evening-four-choice-exit-continue`: returns to the same four candidates.
  * - `evening-four-choice-exit-skip`: resolves the delivery without saving.
  * - `evening-four-choice-skip`: explicitly resolves without saving a photo.
+ * - `evening-four-choice-own-record`: opens the own-cat record after saving.
  * - Exchange response: `experienceVersion: "evening_choice_v1"`, `bundleId`,
  *   `photos`, plus the legacy-compatible `photo` field.
  *
@@ -197,6 +198,9 @@ test.describe("20時便の4枚選択", () => {
     await expect(
       choiceDialog.getByTestId("evening-four-choice-saved"),
     ).toBeVisible();
+    await expect(
+      choiceDialog.getByTestId("evening-four-choice-own-record"),
+    ).toHaveText("きょう撮った写真を「うちのこ」で見る›");
     await choiceDialog.getByTestId("evening-four-choice-finish").click();
 
     await expect(choiceDialog).toHaveCount(0);
@@ -218,6 +222,41 @@ test.describe("20時便の4枚選択", () => {
       "4",
     );
     await expect(page.getByTestId("desk-open-letter")).toHaveCount(0);
+  });
+
+  test("保存後にきょう撮ったうちの猫へ移動できる", async ({ page }) => {
+    await page.setViewportSize({ width: 320, height: 568 });
+    await seedPendingEveningDelivery(page, "open-own-record");
+    await mockFourChoiceExchange(page);
+
+    await page.goto("/home");
+    await page.getByTestId("desk-open-letter").click();
+    const choiceDialog = page.getByTestId("evening-four-choice");
+    await choiceDialog
+      .locator(
+        '[data-testid="evening-four-choice-option"][data-photo-id="four-choice-delivery-1"]',
+      )
+      .click();
+    await choiceDialog.getByTestId("evening-four-choice-save").click();
+    const ownRecordLink = choiceDialog.getByTestId(
+      "evening-four-choice-own-record",
+    );
+    await expect(ownRecordLink).toBeVisible();
+    const ownRecordLinkBox = await ownRecordLink.boundingBox();
+    expect(ownRecordLinkBox).not.toBeNull();
+    expect(ownRecordLinkBox!.x).toBeGreaterThanOrEqual(0);
+    expect(ownRecordLinkBox!.x + ownRecordLinkBox!.width).toBeLessThanOrEqual(
+      320,
+    );
+    await ownRecordLink.click();
+
+    await expect(page).toHaveURL(/\/cats$/);
+    await expect(page.getByTestId("cats-page")).toBeVisible();
+    await expect
+      .poll(() =>
+        page.evaluate(() => window.localStorage.getItem("active_cat_id")),
+      )
+      .toBe(CAT_ID);
   });
 
   test("閉じる前に確認し、選択に戻るか今回分を保存せず終了できる", async ({

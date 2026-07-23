@@ -1718,7 +1718,7 @@ function BoxOverview({
   ) => void;
 }) {
   const [activeBoardSide, setActiveBoardSide] =
-    useState<MainichiBoardSide>("sent");
+    useState<MainichiBoardSide>("delivered");
 
   return (
     <section style={styles.boxOverview} aria-label="ねこだより">
@@ -2007,8 +2007,8 @@ function MainichiSideTabs({
   onSideChange: (side: MainichiBoardSide) => void;
 }) {
   const tabs = [
-    { value: "sent" as const, label: "わたしのねがお" },
     { value: "delivered" as const, label: "とどいた" },
+    { value: "sent" as const, label: "わたしのねがお" },
   ];
 
   return (

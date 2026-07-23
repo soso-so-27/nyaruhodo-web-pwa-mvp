@@ -2,17 +2,18 @@
 
 ## Project Goal
 
-This repository implements `ねてるねこ`, a quiet Web/PWA where a user takes a cat sleeping photo, leaves it with the app, and receives another sleeping photo around 8pm.
+This repository implements `ねてるねこ`, a quiet Web/PWA where a user leaves one cat sleeping photo, receives four server-selected sleeping cats around 8pm, and chooses one ねこだより to keep.
 
 The core product model is:
 
-- Take a sleeping photo.
+- Take or choose one sleeping photo.
 - Keep the user's own photo locally and, when account sync is enabled, in the user's account.
 - Share only the server-selected delivery flow through `/api/sleeping-delivery/exchange`.
-- Deliver one sleeping photo as a small evening letter.
-- Let the user keep the delivered photo in the album.
+- Deliver four sleeping-cat candidates as the evening ねこだより.
+- Let the user choose one to keep; choosing none is also valid.
+- Grow the user's own-cat record without requiring a separate organizing task.
 
-The app should feel calm, private, and small. Avoid adding loud engagement loops, feed-like browsing, public galleries, or growth mechanics.
+The user's own cat is the product center. The four-cat exchange is the reason to return, not the final purpose. The app should feel calm, private, and small. Avoid adding loud engagement loops, feed-like browsing, public galleries, task-management burdens, or growth mechanics.
 
 ## Permanent Rules (owner-approved 2026-07-07)
 
@@ -35,15 +36,21 @@ These rules are permanent. Specs do not restate them. If a spec or doc conflicts
 - The daily exchange (receiving ねこだより) stays free forever.
 - No loss-aversion copy ("消えてしまいます" etc.) and no retention dialogs.
 
-### Billing rules (owner decision 2026-07-06)
+### Billing rules (owner decisions 2026-07-06 and latest 2026-07-23)
 
 - During beta, payment is support (応援) with no feature differences; the beta-supporter page copy is canonical.
-- Post-launch paid-plan contents are UNDECIDED. Do not present paid perks as settled in copy, specs, terms, or UI. Business-strategy price-table items are candidates, not promises. Only the owner decides paid contents.
+- Post-launch business validation targets a separate digital plan at ¥980 (tax included) per household, but the paying user, paid value, and entitlement bundle are UNDECIDED.
+- Family sharing, no per-cat surcharge for a household, digital booklets/albums, PDF export, exchange enhancements, and automatic photo insights are hypotheses, not approved promises.
+- The daily exchange, the user's originals, kept ねこだより, cat-specific photo lists, and existing year views stay free. Existing cats, originals, and kept ねこだより must never be hidden or locked.
+- Physical products may be tested later as optional, separately priced offers. They are not the substitute for proving digital recurring value and must not be promised before vendor, margin, and operations validation.
+- Paid-plan prototypes are owner-facing internal hypothesis artifacts. They are not customer-facing price pages, applications, reservations, votes, or evidence that a plan will ship.
+- Do not build live checkout, terms changes, production entitlements, or paid-plan data architecture until one concrete value experience and ¥980 willingness are separately validated and the owner approves release readiness.
 
 ### Fixed values
 
 - Delivery: daily 20:00 JST. Exchange opens at server time 19:55:00 (5-minute tolerance). Moderation cutoff is 19:55; the review-schedule canon is `docs/MODERATION-CANON.md` §4.
-- Price: ¥1,500 (tax excluded) = ¥1,650 (tax included) per month.
+- Beta-supporter price: ¥1,500 (tax excluded) = ¥1,650 (tax included) per month.
+- Post-launch digital-plan validation target: ¥980 (tax included) per household per month. This fixes the test price, not the contents.
 
 ### Operational discipline
 
@@ -81,7 +88,7 @@ Photo SW cache purges are wired for own-photo deletion, cat-gallery photo deleti
 - The current home v3 model has no standalone heading, no central camera button, and no separate day-cycle motif.
 - Night delivery is centered around the 8pm letter model.
 - Do not expose the delivery pool directly to the browser. Use server APIs for selection.
-- Do not turn supporter/payment features into functional restrictions. Supporter copy may explain what support helps sustain, but core features remain available.
+- Do not turn the beta-supporter payment into functional restrictions. Supporter copy may explain what support helps sustain, but beta core features remain available.
 - Write user-facing copy in natural Japanese. `ねてるねこ` user-facing screens intentionally use a quiet, hiragana-forward voice; settings, legal, diagnostics, and admin surfaces should stay clearer and less childlike.
 - The design reference is 日とと記 (`diary.aaaaaso.com`): colorless quiet, serif + tracking, buttons as words, at most one filled surface per screen, and specialness made by copy and spacing rather than decoration. Use paper and ink only; photos carry color.
 

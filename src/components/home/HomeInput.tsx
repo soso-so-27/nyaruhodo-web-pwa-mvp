@@ -4084,6 +4084,10 @@ export function EveningDeliveryFourChoice({
   const [isClosing, setIsClosing] = useState(false);
   const selectedPhoto =
     photos.find((photo) => photo.id === selectedPhotoId) ?? null;
+  const targetOwnCatId =
+    state.targetPhoto?.ownerCatId ??
+    state.targetPhoto?.catId ??
+    null;
   const choiceEventProperties = {
     delivery_bundle_id: state.deliveryBundleId ?? null,
     experience_version: state.experienceVersion ?? "evening_choice_v1",
@@ -4109,6 +4113,26 @@ export function EveningDeliveryFourChoice({
       )
     );
   }
+
+  function prepareTargetOwnCatRecord() {
+    if (!state.targetPhoto || !targetOwnCatId) {
+      return;
+    }
+
+    saveActiveCatId(targetOwnCatId);
+    if (analyticsEnabled) {
+      trackProductEvent(
+        "evening_choice_own_record_clicked",
+        {
+          delivery_date_key: state.dateKey,
+          delivery_bundle_id: state.deliveryBundleId ?? null,
+          source: "four_choice_saved",
+        },
+        { localCatId: targetOwnCatId },
+      );
+    }
+  }
+
   function finishClose() {
     if (closeTimerRef.current) {
       window.clearTimeout(closeTimerRef.current);
@@ -4408,6 +4432,17 @@ export function EveningDeliveryFourChoice({
               <p style={styles.eveningFourSavedCopy}>
                 この写真を「とどいた」に保存しました
               </p>
+              {state.targetPhoto && targetOwnCatId ? (
+                <a
+                  href="/cats"
+                  data-testid="evening-four-choice-own-record"
+                  onClick={prepareTargetOwnCatRecord}
+                  style={styles.eveningFourOwnRecordLink}
+                >
+                  きょう撮った写真を「うちのこ」で見る
+                  <span aria-hidden="true">›</span>
+                </a>
+              ) : null}
             </div>
           ) : (
             <>
@@ -9152,6 +9187,24 @@ const styles = {
     fontWeight: 500,
     lineHeight: 1.6,
     textAlign: "center",
+  },
+  eveningFourOwnRecordLink: {
+    minHeight: "44px",
+    padding: "7px 9px",
+    display: "inline-flex",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: "7px",
+    border: 0,
+    background: "transparent",
+    color: "var(--ink)",
+    fontFamily: "var(--font-ui)",
+    fontSize: "13px",
+    fontWeight: 500,
+    lineHeight: 1.5,
+    textDecoration: "underline",
+    textUnderlineOffset: "4px",
+    cursor: "pointer",
   },
   exchangeSheetFrame: {
     left: "14px",

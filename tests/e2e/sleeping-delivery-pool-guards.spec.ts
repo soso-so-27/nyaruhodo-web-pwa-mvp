@@ -26,6 +26,7 @@ import {
   isIdentityInEveningChoiceRollout,
   readExistingDelivery,
   resetOnboardingExchangeExceptionLimitForTests,
+  shuffleOnboardingCandidatePool,
   shouldUseEveningChoiceBundlePath,
   validateExchangeDeliveryDateKey,
 } from "../../src/app/api/sleeping-delivery/exchange/handler";
@@ -112,6 +113,24 @@ function createFourChoiceExposure(
 }
 
 test.describe("sleeping delivery pool guards", () => {
+  test("shuffles a fresh onboarding pool without changing the source order", () => {
+    const sourcePool = ["cat-a", "cat-b", "cat-c", "cat-d"];
+    const upperBounds: number[] = [];
+    const swapIndexes = [0, 1, 0];
+
+    const shuffledPool = shuffleOnboardingCandidatePool(
+      sourcePool,
+      (upperExclusive) => {
+        upperBounds.push(upperExclusive);
+        return swapIndexes.shift() ?? 0;
+      },
+    );
+
+    expect(shuffledPool).toEqual(["cat-c", "cat-d", "cat-b", "cat-a"]);
+    expect(upperBounds).toEqual([4, 3, 2]);
+    expect(sourcePool).toEqual(["cat-a", "cat-b", "cat-c", "cat-d"]);
+  });
+
   test("assigns the four-choice rollout and slot ids deterministically", () => {
     const identity = "anon:stable-evening-choice";
     const first = isIdentityInEveningChoiceRollout(identity, 37);

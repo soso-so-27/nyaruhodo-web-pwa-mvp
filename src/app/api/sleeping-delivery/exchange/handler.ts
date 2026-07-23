@@ -1,4 +1,4 @@
-import { createHash } from "node:crypto";
+import { createHash, randomInt } from "node:crypto";
 import { NextResponse } from "next/server";
 import type { SupabaseClient } from "@supabase/supabase-js";
 
@@ -1052,15 +1052,18 @@ async function handleEveningChoiceExchange({
         isRowDeliverable(row, deliverableContext) &&
         isPersistableEveningChoiceSource(row.photo_url),
     );
-  const candidatePool = sortTieredCandidates(
-    isOnboardingExchange
-      ? deliverableRows.filter(
-          (row) => readPoolKind(row.metadata) === "admin_stock",
-        )
-      : deliverableRows,
-    input,
-    deliveryExposureHistory,
-  );
+  const eligibleCandidatePool = isOnboardingExchange
+    ? deliverableRows.filter(
+        (row) => readPoolKind(row.metadata) === "admin_stock",
+      )
+    : deliverableRows;
+  const candidatePool = isOnboardingExchange
+    ? shuffleOnboardingCandidatePool(eligibleCandidatePool)
+    : sortTieredCandidates(
+        eligibleCandidatePool,
+        input,
+        deliveryExposureHistory,
+      );
   const eligibleRecycledCount = candidatePool.filter(
     (row) =>
       readCandidateLastShownAt(deliveryExposureHistory, [
@@ -2990,6 +2993,23 @@ function sortTieredCandidates(
       hashText(`${input.seed}:${b.id}:${b.local_moment_id}`)
     );
   });
+}
+
+export function shuffleOnboardingCandidatePool<T>(
+  rows: readonly T[],
+  nextIndex: (upperExclusive: number) => number = randomInt,
+) {
+  const shuffled = [...rows];
+
+  for (let index = shuffled.length - 1; index > 0; index -= 1) {
+    const swapIndex = nextIndex(index + 1);
+    [shuffled[index], shuffled[swapIndex]] = [
+      shuffled[swapIndex],
+      shuffled[index],
+    ];
+  }
+
+  return shuffled;
 }
 
 function getDeliveryTier(

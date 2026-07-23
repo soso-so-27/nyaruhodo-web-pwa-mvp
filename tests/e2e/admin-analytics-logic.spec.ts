@@ -70,6 +70,250 @@ test.describe("admin analytics logic", () => {
     });
   });
 
+  test("links onboarding journey identity to the next-day anonymous revisit and resubmission", () => {
+    const journeyId = "onbj_33333333-3333-4333-8333-333333333333";
+    const events = [
+      event("same-browser", "onboarding_photo_submitted", 0, {
+        submissionId: "first-photo",
+        metadata: { journey_id: journeyId },
+      }),
+      event("same-browser", "home_viewed", 24 * 60, {
+        route: "/home",
+        surface: "home",
+      }),
+      event("same-browser", "home_exchange_share_photo_confirmed", 24 * 60 + 1, {
+        submissionId: "second-photo",
+      }),
+    ];
+
+    expect(
+      buildAdminAnalytics(
+        events,
+        new Date(BASE_TIME + 3 * 24 * 60 * 60_000),
+      ).retention,
+    ).toMatchObject({
+      photoSubmitters: 1,
+      repeatSubmitters: 1,
+      d1EligibleSubmitters: 1,
+      d1Revisiters: 1,
+      d1ReturnSubmitters: 1,
+      d1ExchangeReturnSubmitters: 1,
+      d1RevisitRate: 100,
+      d1ReturnRate: 100,
+      d1ExchangeReturnRate: 100,
+    });
+  });
+
+  test("does not count a later adjacent-day pair as first-submit D1", () => {
+    const events = [
+      event("actor-a", "onboarding_photo_submitted", 0, {
+        submissionId: "day-zero",
+      }),
+      event("actor-a", "home_exchange_share_photo_confirmed", 2 * 24 * 60, {
+        submissionId: "day-two",
+      }),
+      event("actor-a", "home_exchange_share_photo_confirmed", 3 * 24 * 60, {
+        submissionId: "day-three",
+      }),
+    ];
+
+    expect(
+      buildAdminAnalytics(
+        events,
+        new Date(BASE_TIME + 5 * 24 * 60 * 60_000),
+      ).retention,
+    ).toMatchObject({
+      repeatSubmitters: 1,
+      returningDaySubmitters: 1,
+      d1EligibleSubmitters: 1,
+      d1ReturnSubmitters: 0,
+      d1ExchangeReturnSubmitters: 0,
+      d1ReturnRate: 0,
+      d1ExchangeReturnRate: 0,
+    });
+  });
+
+  test("separates next-day record continuation from exchange continuation", () => {
+    const events = [
+      event("record-only", "onboarding_photo_submitted", 0, {
+        submissionId: "record-first",
+      }),
+      event("record-only", "home_exchange_share_photo_declined", 24 * 60, {
+        submissionId: "record-private",
+      }),
+      event("exchange", "onboarding_photo_submitted", 0, {
+        submissionId: "exchange-first",
+      }),
+      event("exchange", "home_exchange_share_photo_confirmed", 24 * 60, {
+        submissionId: "exchange-second",
+      }),
+    ];
+
+    expect(
+      buildAdminAnalytics(
+        events,
+        new Date(BASE_TIME + 3 * 24 * 60 * 60_000),
+      ).retention,
+    ).toMatchObject({
+      d1EligibleSubmitters: 2,
+      d1ReturnSubmitters: 2,
+      d1ExchangeReturnSubmitters: 1,
+      d1ReturnRate: 100,
+      d1ExchangeReturnRate: 50,
+    });
+  });
+
+  test("builds privacy-safe individual journeys across onboarding and evening four-choice flows", () => {
+    const journeyId = "onbj_44444444-4444-4444-8444-444444444444";
+    const onboardingChoice = {
+      journey_id: journeyId,
+      delivery_bundle_id: "onboarding-bundle",
+      delivery_date_key: "2026-07-16",
+      candidate_count: 4,
+    };
+    const eveningChoice = {
+      delivery_bundle_id: "evening-bundle",
+      delivery_date_key: "2026-07-16",
+      candidate_count: 4,
+    };
+    const savedEveningChoice = {
+      delivery_bundle_id: "evening-saved-bundle",
+      delivery_date_key: "2026-07-16",
+      candidate_count: 4,
+    };
+    const events = [
+      event("embedded-browser", "onboarding_photo_submitted", 0, {
+        submissionId: "first-photo",
+        metadata: { journey_id: journeyId },
+      }),
+      event("safari-browser", "onboarding_delivery_opened", 1, {
+        metadata: onboardingChoice,
+      }),
+      event("safari-browser", "onboarding_delivery_choice_selected", 2, {
+        metadata: onboardingChoice,
+      }),
+      event("safari-browser", "onboarding_delivery_choice_saved", 3, {
+        metadata: onboardingChoice,
+      }),
+      event("safari-browser", "route_viewed", 5, {
+        route: "/cats",
+        surface: "cats",
+      }),
+      event("safari-browser", "app_opened", 24 * 60, {
+        route: "/home",
+        surface: "home",
+      }),
+      event("safari-browser", "home_exchange_share_photo_declined", 24 * 60 + 1, {
+        submissionId: "later-private-photo",
+      }),
+      event("evening-skip", "home_exchange_share_photo_confirmed", 10, {
+        submissionId: "evening-first-photo",
+      }),
+      event("evening-skip", "evening_delivery_choices_shown", 11, {
+        metadata: eveningChoice,
+      }),
+      event("evening-skip", "evening_delivery_choice_selected", 12, {
+        metadata: eveningChoice,
+      }),
+      event("evening-skip", "evening_delivery_choice_skipped", 13, {
+        metadata: eveningChoice,
+      }),
+      event("evening-saved", "home_exchange_share_photo_confirmed", 20, {
+        submissionId: "evening-saved-first-photo",
+      }),
+      event("evening-saved", "evening_delivery_choices_shown", 21, {
+        metadata: savedEveningChoice,
+      }),
+      event("evening-saved", "evening_delivery_choice_selected", 22, {
+        metadata: savedEveningChoice,
+      }),
+      event("evening-saved", "evening_delivery_choice_saved", 23, {
+        metadata: savedEveningChoice,
+      }),
+      event("evening-saved", "evening_choice_own_record_clicked", 24, {
+        metadata: savedEveningChoice,
+      }),
+      event("evening-saved", "route_viewed", 25, {
+        route: "/cats",
+        surface: "cats",
+      }),
+    ];
+
+    const cases = buildAdminAnalytics(events).journeyCases;
+    const onboardingCase = cases.find(
+      (journeyCase) => journeyCase.fourChoiceSurface === "onboarding",
+    );
+    const skippedEveningCase = cases.find(
+      (journeyCase) =>
+        journeyCase.fourChoiceSurface === "evening" &&
+        journeyCase.fourChoiceResolution === "skipped",
+    );
+    const savedEveningCase = cases.find(
+      (journeyCase) =>
+        journeyCase.fourChoiceSurface === "evening" &&
+        journeyCase.fourChoiceResolution === "saved",
+    );
+
+    expect(cases).toHaveLength(3);
+    expect(onboardingCase).toMatchObject({
+      firstRecordedAt: new Date(BASE_TIME).toISOString(),
+      fourChoiceSurface: "onboarding",
+      fourChoiceShownAt: new Date(BASE_TIME + 1 * 60_000).toISOString(),
+      fourChoiceSelectedAt: new Date(BASE_TIME + 2 * 60_000).toISOString(),
+      fourChoiceResolution: "saved",
+      fourChoiceResolvedAt: new Date(BASE_TIME + 3 * 60_000).toISOString(),
+      ownRecordCtaClickedAt: null,
+      ownCatViewedAt: new Date(BASE_TIME + 5 * 60_000).toISOString(),
+      ownCatViewViaCta: false,
+      laterRevisitedAt: new Date(
+        BASE_TIME + 24 * 60 * 60_000,
+      ).toISOString(),
+      laterRecordedAt: new Date(
+        BASE_TIME + (24 * 60 + 1) * 60_000,
+      ).toISOString(),
+    });
+    expect(skippedEveningCase).toMatchObject({
+      fourChoiceSurface: "evening",
+      fourChoiceResolution: "skipped",
+      ownRecordCtaClickedAt: null,
+      ownCatViewedAt: null,
+      laterRevisitedAt: null,
+      laterRecordedAt: null,
+    });
+    expect(savedEveningCase).toMatchObject({
+      fourChoiceSurface: "evening",
+      fourChoiceResolution: "saved",
+      ownRecordCtaClickedAt: new Date(
+        BASE_TIME + 24 * 60_000,
+      ).toISOString(),
+      ownCatViewedAt: new Date(BASE_TIME + 25 * 60_000).toISOString(),
+      ownCatViewViaCta: true,
+    });
+    const serialized = JSON.stringify(cases);
+    expect(serialized).not.toContain("embedded-browser");
+    expect(serialized).not.toContain("safari-browser");
+    expect(serialized).not.toContain("evening-skip");
+    expect(serialized).not.toContain("evening-saved");
+    expect(serialized).not.toContain(journeyId);
+    expect(serialized).not.toContain("onboarding-bundle");
+  });
+
+  test("limits individual journeys to ten anonymous case numbers", () => {
+    const events = Array.from({ length: 12 }, (_, index) =>
+      event(`actor-${index}`, "onboarding_photo_submitted", index, {
+        submissionId: `photo-${index}`,
+      }),
+    );
+
+    const cases = buildAdminAnalytics(events).journeyCases;
+
+    expect(cases).toHaveLength(10);
+    expect(cases.map((journeyCase) => journeyCase.caseNumber)).toEqual([
+      1, 2, 3, 4, 5, 6, 7, 8, 9, 10,
+    ]);
+    expect(Object.keys(cases[0] ?? {})).not.toContain("actorId");
+  });
+
   test("uses source_param to distinguish Threads from untagged direct traffic", () => {
     const events = [
       event("threads-user", "onboarding_intro_view", 0, {
@@ -531,6 +775,58 @@ test.describe("admin analytics logic", () => {
       "evening_envelope",
       "evening_opened",
     ]);
+  });
+
+  test("counts explicit and automatic four-choice skips separately", () => {
+    const assignedFour = (deliveryDateKey: string, bundleId: string) => ({
+      delivery_date_key: deliveryDateKey,
+      delivery_bundle_id: bundleId,
+      assigned_variant: "four_choice_v1",
+      served_variant: "four_choice_v1",
+      requested_count: 4,
+      served_count: 4,
+    });
+    const choice = (deliveryDateKey: string, bundleId: string) => ({
+      delivery_date_key: deliveryDateKey,
+      delivery_bundle_id: bundleId,
+      experience_version: "evening_choice_v1",
+      candidate_count: 4,
+    });
+    const events = [
+      event("explicit-skip", "evening_delivery_check_succeeded", 0, {
+        metadata: assignedFour("2026-07-16", "bundle-explicit"),
+      }),
+      event("explicit-skip", "evening_delivery_choices_shown", 1, {
+        metadata: choice("2026-07-16", "bundle-explicit"),
+      }),
+      event("explicit-skip", "evening_delivery_choice_skipped", 2, {
+        metadata: choice("2026-07-16", "bundle-explicit"),
+      }),
+      event("automatic-skip", "evening_delivery_check_succeeded", 3, {
+        metadata: assignedFour("2026-07-16", "bundle-automatic"),
+      }),
+      event("automatic-skip", "evening_delivery_choice_auto_skipped", 4, {
+        metadata: choice("2026-07-16", "bundle-automatic"),
+      }),
+    ];
+
+    const metrics = Object.fromEntries(
+      buildAdminAnalytics(events).fourChoiceHealth.metrics.map((metric) => [
+        metric.key,
+        metric,
+      ]),
+    );
+
+    expect(metrics.four_choice_skipped).toMatchObject({
+      cohorts: 1,
+      actors: 1,
+      events: 1,
+    });
+    expect(metrics.four_choice_auto_skipped).toMatchObject({
+      cohorts: 1,
+      actors: 1,
+      events: 1,
+    });
   });
 
   test("treats expired handoff followed by app progress as recovered", () => {

@@ -42,6 +42,21 @@ export type FourChoiceFunnelStep = FourChoiceCohortMetric & {
   fromAssignedRate: number | null;
 };
 
+export type AnalyticsJourneyCase = {
+  caseNumber: number;
+  firstRecordedAt: string;
+  fourChoiceSurface: "onboarding" | "evening" | null;
+  fourChoiceShownAt: string | null;
+  fourChoiceSelectedAt: string | null;
+  fourChoiceResolution: "saved" | "skipped" | "auto_skipped" | null;
+  fourChoiceResolvedAt: string | null;
+  ownRecordCtaClickedAt: string | null;
+  ownCatViewedAt: string | null;
+  ownCatViewViaCta: boolean;
+  laterRevisitedAt: string | null;
+  laterRecordedAt: string | null;
+};
+
 type AnalyticsIssueIncident = {
   key: string;
   actorId: string | null;
@@ -66,6 +81,8 @@ const FOUR_CHOICE_EVENTS = {
   shown: "evening_delivery_choices_shown",
   selected: "evening_delivery_choice_selected",
   saved: "evening_delivery_choice_saved",
+  skipped: "evening_delivery_choice_skipped",
+  autoSkipped: "evening_delivery_choice_auto_skipped",
   dismissed: "evening_delivery_choices_dismissed",
 } as const;
 
@@ -250,11 +267,25 @@ const INSTALL_METRICS: readonly EventDefinition[] = [
   },
 ];
 
-const CANONICAL_PHOTO_SUBMIT_EVENTS = new Set([
+const RECORD_PHOTO_SUBMIT_EVENTS = new Set([
   "onboarding_photo_submitted",
   "home_exchange_share_photo_confirmed",
   "home_exchange_share_photo_declined",
 ]);
+const EXCHANGE_PHOTO_SUBMIT_EVENTS = new Set([
+  "onboarding_photo_submitted",
+  "home_exchange_share_photo_confirmed",
+]);
+const REVISIT_EVENTS = new Set([
+  "app_opened",
+  "home_viewed",
+  "home_view",
+]);
+const JOURNEY_REVISIT_EVENTS = new Set([
+  ...REVISIT_EVENTS,
+  "route_viewed",
+]);
+const JOURNEY_CASE_LIMIT = 10;
 
 const SOURCE_ORDER = [
   "instagram_bio",
@@ -309,7 +340,8 @@ export function buildAdminAnalytics(
       return buildMetricFromRows(definition, standaloneEvents);
     }),
     environment: buildEnvironmentBreakdown(events),
-    retention: buildRetention(events),
+    journeyCases: buildJourneyCases(events),
+    retention: buildRetention(events, now),
     operationalStatus: buildOperationalStatus(unresolvedIncidents, now),
     errorSummary: buildIncidentSummary(unresolvedIncidents),
     issueSummary: {
@@ -988,6 +1020,22 @@ function buildFourChoiceHealth(events: AdminAnalyticsEvent[]) {
     cohorts,
     readActorId,
   });
+  const skipped = buildFourChoiceStage({
+    events,
+    eventName: FOUR_CHOICE_EVENTS.skipped,
+    eligibleCohortKeys: shown.cohortKeys,
+    afterByCohort: shown.firstAtByCohort,
+    cohorts,
+    readActorId,
+  });
+  const autoSkipped = buildFourChoiceStage({
+    events,
+    eventName: FOUR_CHOICE_EVENTS.autoSkipped,
+    eligibleCohortKeys: exactFourKeys,
+    afterByCohort: assignedAtByCohort,
+    cohorts,
+    readActorId,
+  });
 
   const assignedRows = [...cohorts.values()].flatMap(
     (cohort) => cohort.checkEvents,
@@ -1050,6 +1098,20 @@ function buildFourChoiceHealth(events: AdminAnalyticsEvent[]) {
       label: "選ばずに閉じた",
       cohortKeys: dismissed.cohortKeys,
       rows: dismissed.rows,
+      cohorts,
+    }),
+    buildFourChoiceMetric({
+      key: "four_choice_skipped",
+      label: "保存しないを選んだ",
+      cohortKeys: skipped.cohortKeys,
+      rows: skipped.rows,
+      cohorts,
+    }),
+    buildFourChoiceMetric({
+      key: "four_choice_auto_skipped",
+      label: "期限まで選ばなかった",
+      cohortKeys: autoSkipped.cohortKeys,
+      rows: autoSkipped.rows,
       cohorts,
     }),
   ];
@@ -1339,43 +1401,296 @@ function buildValueBreakdown(
     .sort((a, b) => b.users - a.users || a.key.localeCompare(b.key));
 }
 
-function buildRetention(events: AdminAnalyticsEvent[]) {
-  const submissionsByActor = new Map<string, Set<string>>();
-  const submitDaysByActor = new Map<string, Set<string>>();
+type NormalizedJourneyChoiceEvent = {
+  event: AdminAnalyticsEvent;
+  phase: "shown" | "selected" | "saved" | "skipped" | "auto_skipped";
+  surface: "onboarding" | "evening";
+  bundleId: string | null;
+  deliveryDateKey: string | null;
+  occurredAt: number;
+};
+
+function buildJourneyCases(
+  events: AdminAnalyticsEvent[],
+): AnalyticsJourneyCase[] {
+  const readActorId = createLinkedActorIdReader(events);
+  const eventsByActor = new Map<string, AdminAnalyticsEvent[]>();
 
   for (const event of events) {
-    const actorId = getActorId(event);
+    const actorId = readActorId(event);
+    const occurredAt = Date.parse(event.created_at);
+    if (!actorId || !Number.isFinite(occurredAt)) {
+      continue;
+    }
+
+    const actorEvents = eventsByActor.get(actorId) ?? [];
+    actorEvents.push(event);
+    eventsByActor.set(actorId, actorEvents);
+  }
+
+  const drafts: Array<Omit<AnalyticsJourneyCase, "caseNumber">> = [];
+
+  for (const actorEvents of eventsByActor.values()) {
+    actorEvents.sort(
+      (first, second) =>
+        Date.parse(first.created_at) - Date.parse(second.created_at),
+    );
+    const firstRecord = actorEvents.find((event) =>
+      RECORD_PHOTO_SUBMIT_EVENTS.has(event.event_name),
+    );
+    if (!firstRecord) {
+      continue;
+    }
+
+    const firstRecordedAtMs = Date.parse(firstRecord.created_at);
+    const firstRecordedDay = toJstDateKey(new Date(firstRecordedAtMs));
+    const flowEvents = actorEvents.filter(
+      (event) => Date.parse(event.created_at) >= firstRecordedAtMs,
+    );
+    const normalizedChoiceEvents = flowEvents
+      .map(normalizeJourneyChoiceEvent)
+      .filter(
+        (event): event is NormalizedJourneyChoiceEvent => event !== null,
+      )
+      .sort((first, second) => first.occurredAt - second.occurredAt);
+    const choiceAnchor = normalizedChoiceEvents[0] ?? null;
+    const choiceEpisode = choiceAnchor
+      ? normalizedChoiceEvents.filter((event) =>
+          isSameJourneyChoiceEpisode(event, choiceAnchor),
+        )
+      : [];
+    const shown = choiceEpisode.find((event) => event.phase === "shown") ?? null;
+    const selected =
+      choiceEpisode.find((event) => event.phase === "selected") ?? null;
+    const resolved =
+      choiceEpisode.find(
+        (event) =>
+          event.phase === "saved" ||
+          event.phase === "skipped" ||
+          event.phase === "auto_skipped",
+      ) ?? null;
+    const ownRecordCta =
+      choiceAnchor?.surface === "evening"
+        ? flowEvents.find(
+            (event) =>
+              event.event_name === "evening_choice_own_record_clicked" &&
+              Date.parse(event.created_at) >=
+                (resolved?.occurredAt ?? choiceAnchor.occurredAt) &&
+              matchesJourneyChoiceReference(event, choiceAnchor),
+          )
+        : null;
+    const ownCatViewThreshold = ownRecordCta
+      ? Date.parse(ownRecordCta.created_at)
+      : (resolved?.occurredAt ?? choiceAnchor?.occurredAt ?? firstRecordedAtMs);
+    const ownCatView =
+      flowEvents.find(
+        (event) =>
+          event.event_name === "route_viewed" &&
+          Boolean(event.route?.startsWith("/cats")) &&
+          Date.parse(event.created_at) >= ownCatViewThreshold,
+      ) ?? null;
+    const laterRevisit =
+      flowEvents.find(
+        (event) =>
+          JOURNEY_REVISIT_EVENTS.has(event.event_name) &&
+          toJstDateKey(new Date(event.created_at)) > firstRecordedDay,
+      ) ?? null;
+    const laterRecord =
+      flowEvents.find(
+        (event) =>
+          RECORD_PHOTO_SUBMIT_EVENTS.has(event.event_name) &&
+          toJstDateKey(new Date(event.created_at)) > firstRecordedDay,
+      ) ?? null;
+
+    drafts.push({
+      firstRecordedAt: firstRecord.created_at,
+      fourChoiceSurface: choiceAnchor?.surface ?? null,
+      fourChoiceShownAt: shown?.event.created_at ?? null,
+      fourChoiceSelectedAt: selected?.event.created_at ?? null,
+      fourChoiceResolution:
+        resolved?.phase === "saved" ||
+        resolved?.phase === "skipped" ||
+        resolved?.phase === "auto_skipped"
+          ? resolved.phase
+          : null,
+      fourChoiceResolvedAt: resolved?.event.created_at ?? null,
+      ownRecordCtaClickedAt: ownRecordCta?.created_at ?? null,
+      ownCatViewedAt: ownCatView?.created_at ?? null,
+      ownCatViewViaCta: Boolean(ownRecordCta && ownCatView),
+      laterRevisitedAt: laterRevisit?.created_at ?? null,
+      laterRecordedAt: laterRecord?.created_at ?? null,
+    });
+  }
+
+  return drafts
+    .sort(
+      (first, second) =>
+        Date.parse(second.firstRecordedAt) -
+        Date.parse(first.firstRecordedAt),
+    )
+    .slice(0, JOURNEY_CASE_LIMIT)
+    .map((draft, index) => ({
+      caseNumber: index + 1,
+      ...draft,
+    }));
+}
+
+function normalizeJourneyChoiceEvent(
+  event: AdminAnalyticsEvent,
+): NormalizedJourneyChoiceEvent | null {
+  const candidateCount = readMetadataNumber(event, "candidate_count");
+  const common = {
+    event,
+    bundleId: readMetadataString(event, "delivery_bundle_id"),
+    deliveryDateKey: readMetadataString(event, "delivery_date_key"),
+    occurredAt: Date.parse(event.created_at),
+  };
+
+  if (
+    event.event_name === "onboarding_delivery_opened" &&
+    candidateCount === 4
+  ) {
+    return { ...common, phase: "shown", surface: "onboarding" };
+  }
+  if (
+    event.event_name === "onboarding_delivery_choice_selected" &&
+    candidateCount === 4
+  ) {
+    return { ...common, phase: "selected", surface: "onboarding" };
+  }
+  if (
+    event.event_name === "onboarding_delivery_choice_saved" &&
+    candidateCount === 4
+  ) {
+    return { ...common, phase: "saved", surface: "onboarding" };
+  }
+  if (event.event_name === FOUR_CHOICE_EVENTS.shown) {
+    return { ...common, phase: "shown", surface: "evening" };
+  }
+  if (event.event_name === FOUR_CHOICE_EVENTS.selected) {
+    return { ...common, phase: "selected", surface: "evening" };
+  }
+  if (event.event_name === FOUR_CHOICE_EVENTS.saved) {
+    return { ...common, phase: "saved", surface: "evening" };
+  }
+  if (event.event_name === FOUR_CHOICE_EVENTS.skipped) {
+    return { ...common, phase: "skipped", surface: "evening" };
+  }
+  if (event.event_name === FOUR_CHOICE_EVENTS.autoSkipped) {
+    return { ...common, phase: "auto_skipped", surface: "evening" };
+  }
+
+  return null;
+}
+
+function isSameJourneyChoiceEpisode(
+  candidate: NormalizedJourneyChoiceEvent,
+  anchor: NormalizedJourneyChoiceEvent,
+) {
+  if (candidate.surface !== anchor.surface) {
+    return false;
+  }
+  if (anchor.bundleId && candidate.bundleId) {
+    return candidate.bundleId === anchor.bundleId;
+  }
+  if (anchor.deliveryDateKey && candidate.deliveryDateKey) {
+    return candidate.deliveryDateKey === anchor.deliveryDateKey;
+  }
+
+  return true;
+}
+
+function matchesJourneyChoiceReference(
+  event: AdminAnalyticsEvent,
+  anchor: NormalizedJourneyChoiceEvent,
+) {
+  const bundleId = readMetadataString(event, "delivery_bundle_id");
+  if (anchor.bundleId && bundleId) {
+    return anchor.bundleId === bundleId;
+  }
+
+  const deliveryDateKey = readMetadataString(event, "delivery_date_key");
+  if (anchor.deliveryDateKey && deliveryDateKey) {
+    return anchor.deliveryDateKey === deliveryDateKey;
+  }
+
+  return false;
+}
+
+function buildRetention(events: AdminAnalyticsEvent[], now: Date) {
+  const readActorId = createLinkedActorIdReader(events);
+  const submissionsByActor = new Map<string, Set<string>>();
+  const submitDaysByActor = new Map<string, Set<string>>();
+  const exchangeSubmitDaysByActor = new Map<string, Set<string>>();
+  const revisitDaysByActor = new Map<string, Set<string>>();
+
+  for (const event of events) {
+    const actorId = readActorId(event);
     if (!actorId) {
       continue;
     }
 
-    if (!CANONICAL_PHOTO_SUBMIT_EVENTS.has(event.event_name)) {
+    const occurredAt = new Date(event.created_at);
+    if (!Number.isFinite(occurredAt.getTime())) {
       continue;
     }
 
-    const submissionKey = readSubmissionKey(event);
-    const submissions = submissionsByActor.get(actorId) ?? new Set<string>();
-    submissions.add(submissionKey);
-    submissionsByActor.set(actorId, submissions);
+    const day = toJstDateKey(occurredAt);
 
-    const day = toJstDateKey(new Date(event.created_at));
-    const days = submitDaysByActor.get(actorId) ?? new Set<string>();
-    days.add(day);
-    submitDaysByActor.set(actorId, days);
+    if (RECORD_PHOTO_SUBMIT_EVENTS.has(event.event_name)) {
+      const submissionKey = readSubmissionKey(event);
+      const submissions = submissionsByActor.get(actorId) ?? new Set<string>();
+      submissions.add(submissionKey);
+      submissionsByActor.set(actorId, submissions);
+
+      const days = submitDaysByActor.get(actorId) ?? new Set<string>();
+      days.add(day);
+      submitDaysByActor.set(actorId, days);
+    }
+
+    if (EXCHANGE_PHOTO_SUBMIT_EVENTS.has(event.event_name)) {
+      const days = exchangeSubmitDaysByActor.get(actorId) ?? new Set<string>();
+      days.add(day);
+      exchangeSubmitDaysByActor.set(actorId, days);
+    }
+
+    if (REVISIT_EVENTS.has(event.event_name)) {
+      const days = revisitDaysByActor.get(actorId) ?? new Set<string>();
+      days.add(day);
+      revisitDaysByActor.set(actorId, days);
+    }
   }
 
   const returningDaySubmitters = [...submitDaysByActor.values()].filter(
     (days) => days.size >= 2,
   ).length;
+  const todayKey = toJstDateKey(now);
+  let d1EligibleSubmitters = 0;
+  let d1Revisiters = 0;
   let d1ReturnSubmitters = 0;
-  for (const days of submitDaysByActor.values()) {
+  let d1ExchangeReturnSubmitters = 0;
+
+  for (const [actorId, days] of submitDaysByActor) {
     const sortedDays = [...days].sort();
-    if (
-      sortedDays.some((day, index) =>
-        index > 0 ? isNextJstDay(sortedDays[index - 1]!, day) : false,
-      )
-    ) {
+    const firstSubmitDay = sortedDays[0];
+    if (!firstSubmitDay) {
+      continue;
+    }
+
+    const d1Day = addJstDays(firstSubmitDay, 1);
+    if (d1Day >= todayKey) {
+      continue;
+    }
+
+    d1EligibleSubmitters += 1;
+    if (revisitDaysByActor.get(actorId)?.has(d1Day)) {
+      d1Revisiters += 1;
+    }
+    if (days.has(d1Day)) {
       d1ReturnSubmitters += 1;
+    }
+    if (exchangeSubmitDaysByActor.get(actorId)?.has(d1Day)) {
+      d1ExchangeReturnSubmitters += 1;
     }
   }
 
@@ -1385,7 +1700,19 @@ function buildRetention(events: AdminAnalyticsEvent[]) {
       (submissions) => submissions.size >= 2,
     ).length,
     returningDaySubmitters,
+    d1EligibleSubmitters,
+    d1Revisiters,
     d1ReturnSubmitters,
+    d1ExchangeReturnSubmitters,
+    d1RevisitRate: calculateCohortRate(d1Revisiters, d1EligibleSubmitters),
+    d1ReturnRate: calculateCohortRate(
+      d1ReturnSubmitters,
+      d1EligibleSubmitters,
+    ),
+    d1ExchangeReturnRate: calculateCohortRate(
+      d1ExchangeReturnSubmitters,
+      d1EligibleSubmitters,
+    ),
   };
 }
 
@@ -1626,9 +1953,8 @@ function toJstDateKey(date: Date) {
   }).format(date);
 }
 
-function isNextJstDay(previous: string, current: string) {
-  const previousDate = new Date(`${previous}T00:00:00+09:00`);
-  const currentDate = new Date(`${current}T00:00:00+09:00`);
-
-  return currentDate.getTime() - previousDate.getTime() === 24 * 60 * 60 * 1000;
+function addJstDays(dateKey: string, days: number) {
+  const date = new Date(`${dateKey}T00:00:00+09:00`);
+  date.setUTCDate(date.getUTCDate() + days);
+  return toJstDateKey(date);
 }

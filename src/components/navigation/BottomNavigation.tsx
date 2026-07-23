@@ -52,12 +52,6 @@ export function BottomNavigation({
       ),
     },
     {
-      key: "collection",
-      href: "/collection",
-      label: "ねこだより",
-      icon: <GeneratedNavIcon src="/icons/bottom-nav-mainichi.webp" />,
-    },
-    {
       key: "cats",
       href: "/cats",
       label: "うちのこ",
@@ -67,6 +61,12 @@ export function BottomNavigation({
           fallbackKey="uchinokoNavIcon"
         />
       ),
+    },
+    {
+      key: "collection",
+      href: "/collection",
+      label: "ねこだより",
+      icon: <GeneratedNavIcon src="/icons/bottom-nav-mainichi.webp" />,
     },
   ];
   const displayActiveKey = pendingKey ?? activeKey;

@@ -359,9 +359,7 @@ export function HomeDeskModel({
   const shouldShowHomeFrameTakeButton =
     deskState === "1" && homeDay.phase === "empty-before";
   const homeCaptureHint =
-    homeDay.phase === "empty-before"
-      ? "「ねこだよりにする」で保存すると、よる8時ごろねこだよりがとどきます。"
-      : "「ねこだよりにする」で保存すると、あしたねこだよりがとどきます。";
+    "写真は「うちのこ」に残ります。「ねこだよりにする」と、よる8時ごろ4枚とどきます。";
   const shouldShowHomeFrameRetakeLink =
     deskState === "2" && homeDay.phase === "sent-before";
   const shouldHidePresence = true;
@@ -1986,9 +1984,11 @@ function HomeLetterTrayText({
   if (phase === "late-sent") {
     return (
       <>
-        <strong style={deskStyles.letterTrayTitle}>ねがおを保存しました</strong>
+        <strong style={deskStyles.letterTrayTitle}>
+          {keyword("「うちのこ」")}に保存しました
+        </strong>
         <span style={deskStyles.letterTraySub}>
-          あしたの よる8時ごろ、ねこだよりがとどきます
+          あしたの よる8時ごろ、4枚とどきます
         </span>
       </>
     );
@@ -2008,9 +2008,11 @@ function HomeLetterTrayText({
   if (phase === "sent-before") {
     return (
       <>
-        <strong style={deskStyles.letterTrayTitle}>ねがおを保存しました</strong>
+        <strong style={deskStyles.letterTrayTitle}>
+          {keyword("「うちのこ」")}に保存しました
+        </strong>
         <span style={deskStyles.letterTraySub}>
-          よる8時ごろ、ねこだよりがとどきます
+          よる8時ごろ、4枚のねこだよりがとどきます
         </span>
       </>
     );

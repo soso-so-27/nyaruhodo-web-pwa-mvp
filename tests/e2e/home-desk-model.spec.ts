@@ -232,9 +232,9 @@ test.describe("home desk model", () => {
       "sent-before",
     );
     await expect(page.getByTestId("desk-home-frame")).toBeVisible();
-    await expect(page.getByText("ねがおを保存しました")).toBeVisible();
+    await expect(page.getByText("「うちのこ」に保存しました")).toBeVisible();
     await expect(
-      page.getByText("よる8時ごろ、ねこだよりがとどきます"),
+      page.getByText("よる8時ごろ、4枚のねこだよりがとどきます"),
     ).toBeVisible();
     await expect(page.getByTestId("home-retake-action")).toBeVisible();
     await expect(page.getByTestId("home-retake-action")).toHaveText("とりなおす");
@@ -310,6 +310,11 @@ test.describe("home desk model", () => {
     await expect(nav.getByText("きょう", { exact: true })).toBeVisible();
     await expect(nav.getByText("ねこだより", { exact: true })).toBeVisible();
     await expect(nav.getByText("うちのこ", { exact: true })).toBeVisible();
+    const navLinks = nav.getByRole("link");
+    await expect(navLinks).toHaveCount(3);
+    await expect(navLinks.nth(0)).toHaveAccessibleName("きょう");
+    await expect(navLinks.nth(1)).toHaveAccessibleName("うちのこ");
+    await expect(navLinks.nth(2)).toHaveAccessibleName("ねこだより");
 
     await nav.getByRole("link", { name: "ねこだより" }).click();
     await expect(page).toHaveURL(/\/collection$/);
@@ -373,7 +378,7 @@ test.describe("home desk model", () => {
 
     await expect(page.getByText("もうすぐ、とどく")).toHaveCount(0);
     await expect(
-      page.getByText("よる8時ごろ、ねこだよりがとどきます"),
+      page.getByText("よる8時ごろ、4枚のねこだよりがとどきます"),
     ).toBeVisible();
 
     await page.evaluate(() => {
@@ -388,7 +393,7 @@ test.describe("home desk model", () => {
     });
     await expect(page.getByText("もうすぐ、とどく")).toHaveCount(0);
     await expect(
-      page.getByText("よる8時ごろ、ねこだよりがとどきます"),
+      page.getByText("よる8時ごろ、4枚のねこだよりがとどきます"),
     ).toBeVisible();
 
     await page.evaluate(() => {
@@ -441,7 +446,7 @@ test.describe("home desk model", () => {
 
     await expect(page.getByText("もうすぐ、とどく")).toHaveCount(0);
     await expect(
-      page.getByText("よる8時ごろ、ねこだよりがとどきます"),
+      page.getByText("よる8時ごろ、4枚のねこだよりがとどきます"),
     ).toBeVisible();
     await expect(page.getByTestId("desk-letter")).toHaveCount(0);
     await expect(page.getByTestId("desk-letter-hint")).toHaveCount(0);
@@ -467,7 +472,7 @@ test.describe("home desk model", () => {
     await expect(page.getByText("ねがおを とる", { exact: true })).toBeVisible();
     await expect(
       page.getByText(
-        "「ねこだよりにする」で保存すると、よる8時ごろねこだよりがとどきます。",
+        "写真は「うちのこ」に残ります。「ねこだよりにする」と、よる8時ごろ4枚とどきます。",
       ),
     ).toBeVisible();
     await expect(
@@ -547,7 +552,9 @@ test.describe("home desk model", () => {
     await expect(page.getByTestId("onboarding-second-photo-invitation")).toHaveCount(0);
     await expect(page).not.toHaveURL(/from=onboarding_second_photo/);
     await expect(
-      page.getByText("よる8時ごろ、ねこだよりがとどきます", { exact: true }),
+      page.getByText("よる8時ごろ、4枚のねこだよりがとどきます", {
+        exact: true,
+      }),
     ).toBeVisible();
   });
 

@@ -94,7 +94,7 @@ test.describe("beta release smoke", () => {
     await page.goto("/how-to-use");
 
     await expect(
-      page.getByText(/「ねこだよりにする」で保存すると、次のよる8時ごろ/),
+      page.getByText(/写真は「うちのこ」に残ります。/),
     ).toBeVisible();
     await expect(
       page.getByText(/「自分だけ」で保存した写真/),

@@ -1892,7 +1892,7 @@ export function OnboardingFlow() {
                   : "写真を用意しています"
               ) : (
                 <>
-                  ねがおの写真を1枚選ぶと
+                  うちの猫のねがおを1枚残すと
                   <br />
                   猫の写真が最大4枚とどく
                 </>
@@ -1906,9 +1906,9 @@ export function OnboardingFlow() {
                   data-onboarding-lead="true"
                   data-testid="onboarding-exchange-explanation"
                 >
-                  とどいた写真から1枚を選んで保存できます。
+                  最初の1枚は、この子の記録に残ります。
                   <br />
-                  最初に選んだねがおの写真は、運営確認後にほかの利用者へとどくことがあります。
+                  とどいた写真から、好きな1枚も保存できます。
                 </p>
                 <p
                   style={styles.privacyNote}
@@ -1917,7 +1917,7 @@ export function OnboardingFlow() {
                   <span aria-hidden="true" style={styles.privacyNoteIcon}>
                     <LockIcon size={14} />
                   </span>
-                  公開一覧やSNSには表示されません
+                  最初の1枚は、運営確認後にほかの利用者へとどくことがあります。公開一覧やSNSには表示されません
                 </p>
               </>
             ) : null}
