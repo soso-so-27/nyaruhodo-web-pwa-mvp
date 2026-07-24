@@ -1869,13 +1869,12 @@ function NekodayoriOverview({
           data-testid="nekodayori-history"
           aria-labelledby="nekodayori-history-title"
         >
-          <h2 id="nekodayori-history-title" style={styles.nekodayoriHistoryTitle}>
-            これまで
-          </h2>
           <BoxOverview
             dayGroups={dayGroups}
             side="delivered"
             catProfiles={catProfiles}
+            heading="これまで"
+            headingId="nekodayori-history-title"
             playNavEntryMotion={playNavEntryMotion}
             onNavEntryMotionPlayed={onNavEntryMotionPlayed}
             onOpenMainichiDay={onOpenMainichiDay}
@@ -2017,6 +2016,8 @@ function BoxOverview({
   dayGroups,
   side,
   catProfiles,
+  heading,
+  headingId,
   playNavEntryMotion,
   onNavEntryMotionPlayed,
   onOpenMainichiDay,
@@ -2025,6 +2026,8 @@ function BoxOverview({
   dayGroups: AlbumDayGroup[];
   side: MainichiBoardSide;
   catProfiles: CatProfile[];
+  heading?: string;
+  headingId?: string;
   playNavEntryMotion: boolean;
   onNavEntryMotionPlayed: () => void;
   onOpenMainichiDay: (
@@ -2048,6 +2051,8 @@ function BoxOverview({
         dayGroups={dayGroups}
         side={side}
         catProfiles={catProfiles}
+        heading={heading}
+        headingId={headingId}
         playNavEntryMotion={playNavEntryMotion}
         onNavEntryMotionPlayed={onNavEntryMotionPlayed}
         onOpenDay={onOpenMainichiDay}
@@ -2061,6 +2066,8 @@ function MainichiPhotoBoard({
   dayGroups,
   side,
   catProfiles,
+  heading,
+  headingId,
   playNavEntryMotion,
   onNavEntryMotionPlayed,
   onOpenDay,
@@ -2069,6 +2076,8 @@ function MainichiPhotoBoard({
   dayGroups: AlbumDayGroup[];
   side: MainichiBoardSide;
   catProfiles: CatProfile[];
+  heading?: string;
+  headingId?: string;
   playNavEntryMotion: boolean;
   onNavEntryMotionPlayed: () => void;
   onOpenDay: (dateKey: string, source?: MainichiMorphSource | null) => void;
@@ -2181,11 +2190,18 @@ function MainichiPhotoBoard({
   return (
     <section style={styles.mainichiBoard} data-testid="mainichi-photo-board">
       <style>{MAINICHI_PASTE_MOTION_CSS}</style>
-      {(selectedMonth || hasAnyBoardMonths) &&
-      (side === "sent" || months.length > 1) ? (
+      {side === "delivered" && heading ? (
+        <MainichiBoardHeader
+          month={months.length > 1 ? selectedMonth : null}
+          compact
+          title={heading}
+          titleId={headingId}
+          onOpenMonthPicker={() => setIsMonthPickerOpen(true)}
+        />
+      ) : (selectedMonth || hasAnyBoardMonths) && side === "sent" ? (
         <MainichiBoardHeader
           month={selectedMonth}
-          compact={side === "delivered"}
+          compact={false}
           onOpenMonthPicker={() => setIsMonthPickerOpen(true)}
         />
       ) : null}
@@ -2200,12 +2216,21 @@ function MainichiPhotoBoard({
               exit={{ opacity: 0, y: -8, scale: 0.996 }}
               transition={{ duration: 0.28, ease: [0.22, 1, 0.36, 1] }}
             >
-              <MainichiNaturalMonthBoard
-                month={selectedMonth}
-                pastingPhotoKey={pastingPhotoKey}
-                onOpenDay={onOpenDay}
-                onOpenPhoto={onOpenPhoto}
-              />
+              {side === "delivered" ? (
+                <NekodayoriHistoryMonthGallery
+                  month={selectedMonth}
+                  pastingPhotoKey={pastingPhotoKey}
+                  onOpenDay={onOpenDay}
+                  onOpenPhoto={onOpenPhoto}
+                />
+              ) : (
+                <MainichiNaturalMonthBoard
+                  month={selectedMonth}
+                  pastingPhotoKey={pastingPhotoKey}
+                  onOpenDay={onOpenDay}
+                  onOpenPhoto={onOpenPhoto}
+                />
+              )}
             </motion.div>
           ) : (
             <motion.div
@@ -2239,10 +2264,14 @@ function MainichiPhotoBoard({
 function MainichiBoardHeader({
   month,
   compact,
+  title,
+  titleId,
   onOpenMonthPicker,
 }: {
   month: MainichiBoardMonth | null;
   compact: boolean;
+  title?: string;
+  titleId?: string;
   onOpenMonthPicker: () => void;
 }) {
   return (
@@ -2250,8 +2279,14 @@ function MainichiBoardHeader({
       style={{
         ...styles.mainichiBoardHeader,
         ...(compact ? styles.mainichiBoardHeaderCompact : {}),
+        ...(title ? styles.nekodayoriHistoryToolbar : {}),
       }}
     >
+      {title ? (
+        <h2 id={titleId} style={styles.nekodayoriHistoryTitle}>
+          {title}
+        </h2>
+      ) : null}
       {month ? (
         <button
           type="button"
@@ -2469,6 +2504,280 @@ function MainichiMonthPickerSheet({
         ))}
       </div>
     </AppBottomSheet>
+  );
+}
+
+function NekodayoriHistoryMonthGallery({
+  month,
+  pastingPhotoKey,
+  onOpenDay,
+  onOpenPhoto,
+}: {
+  month: MainichiBoardMonth;
+  pastingPhotoKey: string | null;
+  onOpenDay: (dateKey: string, source?: MainichiMorphSource | null) => void;
+  onOpenPhoto: (
+    photo: MainichiBoardPhoto,
+    month: MainichiBoardMonth,
+    source?: MainichiMorphSource | null,
+  ) => void;
+}) {
+  const [ratios, setRatios] = useState<Record<string, number>>(() =>
+    getKnownMainichiPhotoRatios(month.photos),
+  );
+  const [decodedPhotoKeys, setDecodedPhotoKeys] = useState<Set<string>>(
+    () => new Set(),
+  );
+  const [isDayBrowseOpen, setIsDayBrowseOpen] = useState(false);
+  const galleryRef = useRef<HTMLDivElement | null>(null);
+  const [galleryWidth, setGalleryWidth] = useState(340);
+
+  useEffect(() => {
+    let active = true;
+
+    void Promise.all(
+      month.photos.map(
+        async (photo) =>
+          [
+            getMainichiBoardPhotoKey(photo),
+            await readMainichiDisplayRatio(photo),
+          ] as const,
+      ),
+    ).then((values) => {
+      if (!active) {
+        return;
+      }
+
+      setRatios((current) => {
+        const next = { ...current };
+        for (const [key, value] of values) {
+          next[key] = value ?? next[key] ?? 1;
+        }
+        return next;
+      });
+    });
+
+    return () => {
+      active = false;
+    };
+  }, [month.photos]);
+
+  useEffect(() => {
+    setDecodedPhotoKeys(new Set());
+  }, [month.key]);
+
+  useLayoutEffect(() => {
+    const gallery = galleryRef.current;
+
+    if (!gallery) {
+      return;
+    }
+
+    const updateWidth = () => {
+      const nextWidth = gallery.getBoundingClientRect().width;
+      if (nextWidth > 0) {
+        setGalleryWidth(nextWidth);
+      }
+    };
+
+    updateWidth();
+    const observer = new ResizeObserver(updateWidth);
+    observer.observe(gallery);
+
+    return () => {
+      observer.disconnect();
+    };
+  }, []);
+
+  const allPhotos = useMemo(
+    () => [...month.photos].sort((a, b) => b.timestamp - a.timestamp),
+    [month.photos],
+  );
+  const photos = useMemo(
+    () => getMainichiBoardVisiblePhotos(allPhotos),
+    [allPhotos],
+  );
+
+  useEffect(() => {
+    let active = true;
+
+    for (const photo of photos) {
+      const key = getMainichiBoardPhotoKey(photo);
+      void decodePhotoSourcesForDisplay(
+        [photo.boardSrc, photo.src, ...(photo.fallbackSrcs ?? [])],
+        getPhotoStorageVariant(photo, "board"),
+        MAINICHI_CARD_DECODE_TIMEOUT_MS,
+      ).then(() => {
+        if (!active) {
+          return;
+        }
+
+        setDecodedPhotoKeys((current) => {
+          if (current.has(key)) {
+            return current;
+          }
+
+          const next = new Set(current);
+          next.add(key);
+          return next;
+        });
+      });
+    }
+
+    return () => {
+      active = false;
+    };
+  }, [photos]);
+
+  const revealedPhotos = photos.filter((photo) => {
+    const key = getMainichiBoardPhotoKey(photo);
+    return decodedPhotoKeys.has(key) && Object.hasOwn(ratios, key);
+  });
+
+  return (
+    <AppCard
+      as="section"
+      variant="section"
+      padding="md"
+      style={styles.nekodayoriHistoryMonthBoard}
+      data-testid="mainichi-month-board"
+      aria-label={month.label}
+    >
+      {allPhotos.length > MAINICHI_BOARD_DIRECT_PHOTO_LIMIT ? (
+        <div style={styles.mainichiDayBrowseAction}>
+          <AppButton
+            type="button"
+            variant="quiet"
+            size="sm"
+            data-testid="mainichi-day-browse-button"
+            onClick={() => setIsDayBrowseOpen(true)}
+          >
+            日ごとに見る
+          </AppButton>
+        </div>
+      ) : null}
+
+      <div
+        ref={galleryRef}
+        style={styles.nekodayoriHistoryGallery}
+        data-testid="nekodayori-history-gallery"
+        data-layout="two-column"
+      >
+        {revealedPhotos.map((photo, index) => {
+          const key = getMainichiBoardPhotoKey(photo);
+          const ratio = Math.max(ratios[key] ?? 1, 0.01);
+          const dateLabel = formatMainichiHistoryDateLabel(photo.dateKey);
+          const delay = Math.min(index * 0.03, 0.24);
+
+          return (
+            <motion.button
+              key={key}
+              type="button"
+              data-testid="mainichi-board-photo-delivered"
+              data-mainichi-photo-card="true"
+              data-mainichi-motion="paste"
+              data-mainichi-motion-delay={delay}
+              data-mainichi-motion-from-opacity={0}
+              data-mainichi-motion-from-scale={0.97}
+              data-photo-id={photo.id}
+              data-source-photo-id={photo.sourcePhotoId ?? undefined}
+              data-photo-timestamp={photo.timestamp}
+              data-photo-decode-ready="true"
+              data-photo-frame="gallery"
+              data-mainichi-paste={key === pastingPhotoKey ? "true" : undefined}
+              data-display-natural-ratio={ratio.toFixed(6)}
+              style={{
+                ...styles.nekodayoriHistoryPhotoButton,
+                gridRowEnd: `span ${getNekodayoriHistoryRowSpan(
+                  ratio,
+                  galleryWidth,
+                )}`,
+              }}
+              initial={{ opacity: 0, y: 12, scale: 0.97 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              exit={{ opacity: 0, y: -6, scale: 0.985 }}
+              whileTap={{ scale: 0.985 }}
+              transition={{
+                duration: 0.28,
+                delay,
+                ease: [0.22, 1, 0.36, 1],
+              }}
+              onClick={(event) => {
+                const rect = event.currentTarget.getBoundingClientRect();
+                onOpenPhoto(photo, month, {
+                  rect: {
+                    left: rect.left,
+                    top: rect.top,
+                    width: rect.width,
+                    height: rect.height,
+                  },
+                  photoKey: key,
+                });
+              }}
+              aria-label={`${dateLabel}のねこだよりをひらく`}
+            >
+              <StoredPhotoImage
+                src={photo.boardSrc}
+                previewSrc={photo.offlineSrc ?? photo.src}
+                fallbackSrcs={photo.fallbackSrcs}
+                alt=""
+                loading={index < 8 ? "eager" : "lazy"}
+                decoding="async"
+                storageVariant={getPhotoStorageVariant(photo, "board")}
+                style={{
+                  ...styles.nekodayoriHistoryPhotoFrame,
+                  aspectRatio: String(ratio),
+                  objectFit: "contain",
+                }}
+                imageStyle={styles.nekodayoriHistoryPhotoImage}
+                width={320}
+                height={Math.max(1, Math.round(320 / ratio))}
+                initiallyLoaded
+                onStorageDataUrl={(dataUrl) =>
+                  writeBackDeliveredPhotoDataUrl(
+                    {
+                      id: photo.id,
+                      sourcePhotoId: photo.sourcePhotoId,
+                      src: photo.src,
+                    },
+                    dataUrl,
+                  )
+                }
+                onNaturalSize={({ width, height }) => {
+                  if (width <= 0 || height <= 0) {
+                    return;
+                  }
+
+                  setRatios((current) => ({
+                    ...current,
+                    [key]: width / height,
+                  }));
+                  persistMainichiPhotoDimensions(photo, { width, height });
+                }}
+              />
+              <span
+                data-testid="nekodayori-history-date"
+                data-date-key={photo.dateKey}
+                style={styles.nekodayoriHistoryPhotoDate}
+              >
+                {dateLabel}
+              </span>
+            </motion.button>
+          );
+        })}
+      </div>
+
+      {isDayBrowseOpen ? (
+        <MainichiMonthBundleSheet
+          month={month}
+          onClose={() => setIsDayBrowseOpen(false)}
+          onOpenDay={(dateKey) => {
+            setIsDayBrowseOpen(false);
+            onOpenDay(dateKey);
+          }}
+        />
+      ) : null}
+    </AppCard>
   );
 }
 
@@ -4891,6 +5200,36 @@ function formatMainichiMonthLabel(monthKey: string) {
   return `${year}年${Number(month)}月`;
 }
 
+function formatMainichiHistoryDateLabel(dateKey: string) {
+  const [, month, day] = dateKey.split("-");
+  const monthNumber = Number(month);
+  const dayNumber = Number(day);
+
+  if (!Number.isFinite(monthNumber) || !Number.isFinite(dayNumber)) {
+    return dateKey;
+  }
+
+  return `${monthNumber}月${dayNumber}日`;
+}
+
+function getNekodayoriHistoryRowSpan(
+  aspectRatio: number,
+  galleryWidth: number,
+) {
+  const columnGap = 10;
+  const rowGap = 10;
+  const rowHeight = 4;
+  const dateAreaHeight = 21;
+  const columnWidth = Math.max(1, (galleryWidth - columnGap) / 2);
+  const photoHeight = columnWidth / Math.max(aspectRatio, 0.01);
+  const cardHeight = photoHeight + dateAreaHeight;
+
+  return Math.max(
+    1,
+    Math.ceil((cardHeight + rowGap) / (rowHeight + rowGap)),
+  );
+}
+
 function formatMainichiMonthShortLabel(monthKey: string) {
   const [, month] = monthKey.split("-");
   return `${Number(month)}月`;
@@ -6770,16 +7109,83 @@ const styles = {
   },
   nekodayoriHistory: {
     display: "grid",
-    gap: "6px",
+    gap: 0,
+  },
+  nekodayoriHistoryToolbar: {
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: "12px",
+    minHeight: "44px",
+    padding: "0 4px",
   },
   nekodayoriHistoryTitle: {
-    margin: "0 4px",
+    margin: 0,
     color: COLLECTION_TEXT_STRONG,
     fontFamily: "var(--font-ui)",
     fontSize: "15px",
     fontWeight: 500,
     lineHeight: 1.35,
     letterSpacing: "0.03em",
+  },
+  nekodayoriHistoryMonthBoard: {
+    display: "grid",
+    gap: 0,
+    padding: "2px 4px calc(18px + env(safe-area-inset-bottom))",
+    overflow: "visible",
+    borderRadius: 0,
+    border: "none",
+    background: "transparent",
+    boxShadow: "none",
+  },
+  nekodayoriHistoryGallery: {
+    display: "grid",
+    gridTemplateColumns: "repeat(2, minmax(0, 1fr))",
+    gridAutoFlow: "row dense",
+    gridAutoRows: "4px",
+    alignItems: "start",
+    columnGap: "10px",
+    rowGap: "10px",
+    width: "100%",
+  },
+  nekodayoriHistoryPhotoButton: {
+    display: "grid",
+    alignSelf: "start",
+    gap: "6px",
+    minWidth: 0,
+    padding: 0,
+    border: "none",
+    background: "transparent",
+    color: COLLECTION_TEXT,
+    font: "inherit",
+    textAlign: "left",
+    cursor: "pointer",
+    WebkitTapHighlightColor: "transparent",
+  },
+  nekodayoriHistoryPhotoFrame: {
+    width: "100%",
+    border: "none",
+    borderRadius: "12px",
+    overflow: "hidden",
+    background:
+      "color-mix(in srgb, var(--paper-card) 84%, var(--paper-warm) 16%)",
+    boxShadow:
+      "0 1px 2px rgba(74,56,34,0.08), 0 12px 22px -19px rgba(76,62,42,0.38)",
+  },
+  nekodayoriHistoryPhotoImage: {
+    width: "100%",
+    height: "100%",
+    display: "block",
+    borderRadius: "12px",
+  },
+  nekodayoriHistoryPhotoDate: {
+    margin: "0 2px",
+    color: COLLECTION_MUTED,
+    fontFamily: "var(--font-ui)",
+    fontSize: "11px",
+    fontWeight: 400,
+    lineHeight: 1.35,
+    letterSpacing: "0.01em",
   },
   nekodayoriManageLink: {
     justifySelf: "center",

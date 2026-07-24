@@ -4,9 +4,7 @@ import { encode } from "jpeg-js";
 const photoDataUrl =
   "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAGQAAABkCAYAAABw4pVUAAAAAXNSR0IArs4c6QAAAARnQU1BAACxjwv8YQUAAAAJcEhZcwAADsMAAA7DAcdvqGQAAAEJSURBVHhe7dExEcAgAMBAJKKuTpnpjoLA/fACchlrzv2C+a0njDPsVmfYrQyJMSTGkBhDYgyJMSTGkBhDYgyJMSTGkBhDYgyJMSTGkBhDYgyJMSTGkBhDYgyJMSTGkBhDYgyJMSTGkBhDYgyJMSTGkBhDYgyJMSTGkBhDYgyJMSTGkBhDYgyJMSTGkBhDYgyJMSTGkBhDYgyJMSTGkBhDYgyJMSTGkBhDYgyJMSTGkBhDYgyJMSTmB4RCEqdGtA/tAAAAAElFTkSuQmCC";
 
-function createPhotoDataUrl(index: number) {
-  const width = 32;
-  const height = 24;
+function createPhotoDataUrl(index: number, width = 32, height = 24) {
   const pixels = Buffer.alloc(width * height * 4);
 
   for (let y = 0; y < height; y += 1) {
@@ -221,6 +219,13 @@ test.describe("nekodayori redesign", () => {
       "data-photo-id",
       "selected-same-day-earlier",
     );
+    await expect(page.getByTestId("nekodayori-history-gallery")).toHaveAttribute(
+      "data-layout",
+      "two-column",
+    );
+    await expect(page.getByTestId("nekodayori-history-date")).toHaveText(
+      "7月24日",
+    );
     const monthSelect = page.getByTestId("mainichi-month-select");
     await expect(monthSelect).toContainText("2026年7月");
     await monthSelect.click();
@@ -228,6 +233,14 @@ test.describe("nekodayori redesign", () => {
       page.getByTestId("mainichi-month-picker-row-2026-06"),
     ).toBeVisible();
     await page.getByTestId("mainichi-month-picker-row-2026-07").click();
+
+    if (process.env.CAPTURE_NEKODAYORI_HISTORY_GALLERY === "1") {
+      await page.screenshot({
+        path: "artifacts/nekodayori-history-with-current-mobile-2026-07-24.png",
+        fullPage: true,
+        animations: "disabled",
+      });
+    }
 
     await page.getByTestId("nekodayori-current-saved-photo").click();
     const photoScroll = page.getByTestId("box-photo-scroll");
@@ -255,7 +268,124 @@ test.describe("nekodayori redesign", () => {
     await expect(page.getByTestId("mainichi-board-photo-delivered")).toHaveCount(
       1,
     );
+    await expect(page.getByTestId("nekodayori-history-date")).toHaveText(
+      "6月15日",
+    );
     await expect(page.getByTestId("mainichi-board-empty")).toHaveCount(0);
+  });
+
+  test("shows older cats in a two-column dated gallery", async ({ page }) => {
+    const now = Date.parse("2026-07-24T12:00:00+09:00");
+    await page.clock.setFixedTime(new Date(now));
+    await seedCat(page);
+    await page.addInitScript(
+      ({ photos }) => {
+        window.localStorage.setItem(
+          "nyaruhodo_exchange_kept_photos",
+          JSON.stringify(photos),
+        );
+      },
+      {
+        photos: [
+          {
+            id: "history-jul-21",
+            sourcePhotoId: "history-jul-21-source",
+            src: createPhotoDataUrl(21, 24, 36),
+            title: "ねこだより",
+            subtitle: "",
+            triggerLabel: "sleeping",
+            theme: "sleeping",
+            deliveredAt: Date.parse("2026-07-21T20:00:00+09:00"),
+          },
+          {
+            id: "history-jul-23",
+            sourcePhotoId: "history-jul-23-source",
+            src: createPhotoDataUrl(23, 40, 24),
+            title: "ねこだより",
+            subtitle: "",
+            triggerLabel: "sleeping",
+            theme: "sleeping",
+            deliveredAt: Date.parse("2026-07-23T20:00:00+09:00"),
+          },
+          {
+            id: "history-jul-20",
+            sourcePhotoId: "history-jul-20-source",
+            src: createPhotoDataUrl(20, 32, 32),
+            title: "ねこだより",
+            subtitle: "",
+            triggerLabel: "sleeping",
+            theme: "sleeping",
+            deliveredAt: Date.parse("2026-07-20T20:00:00+09:00"),
+          },
+          {
+            id: "history-jul-22",
+            sourcePhotoId: "history-jul-22-source",
+            src: createPhotoDataUrl(22, 24, 32),
+            title: "ねこだより",
+            subtitle: "",
+            triggerLabel: "sleeping",
+            theme: "sleeping",
+            deliveredAt: Date.parse("2026-07-22T20:00:00+09:00"),
+          },
+        ],
+      },
+    );
+
+    await page.goto("/collection");
+
+    const gallery = page.getByTestId("nekodayori-history-gallery");
+    const cards = page.getByTestId("mainichi-board-photo-delivered");
+    await expect(gallery).toHaveAttribute("data-layout", "two-column");
+    await expect(cards).toHaveCount(4);
+    await expect(cards.first()).toHaveAttribute("data-photo-frame", "gallery");
+    expect(
+      await cards.evaluateAll((elements) =>
+        elements.map((element) => element.getAttribute("data-photo-id")),
+      ),
+    ).toEqual([
+      "history-jul-23",
+      "history-jul-22",
+      "history-jul-21",
+      "history-jul-20",
+    ]);
+    await expect(page.getByTestId("nekodayori-history-date")).toHaveText([
+      "7月23日",
+      "7月22日",
+      "7月21日",
+      "7月20日",
+    ]);
+
+    const positions = await cards.evaluateAll((elements) =>
+      elements.map((element) => {
+        const rect = element.getBoundingClientRect();
+        return { left: rect.left, top: rect.top };
+      }),
+    );
+    expect(Math.abs(positions[0].top - positions[1].top)).toBeLessThan(2);
+    expect(positions[0].left).toBeLessThan(positions[1].left);
+    expect(positions[2].top).toBeGreaterThan(positions[0].top);
+
+    await page.evaluate(() => {
+      window.scrollTo(0, document.documentElement.scrollHeight);
+    });
+    const lastDateBox = await page
+      .getByTestId("nekodayori-history-date")
+      .nth(3)
+      .boundingBox();
+    const bottomNavBox = await page.locator("[data-app-bottom-nav]").boundingBox();
+    expect(lastDateBox).not.toBeNull();
+    expect(bottomNavBox).not.toBeNull();
+    expect(lastDateBox!.y + lastDateBox!.height).toBeLessThan(
+      bottomNavBox!.y - 8,
+    );
+
+    if (process.env.CAPTURE_NEKODAYORI_HISTORY_GALLERY === "1") {
+      await page.screenshot({
+        path: "artifacts/nekodayori-history-gallery-mobile-2026-07-24.png",
+        fullPage: true,
+        animations: "disabled",
+      });
+    }
   });
 
   test("does not turn a skipped delivery into a saved cat", async ({ page }) => {
