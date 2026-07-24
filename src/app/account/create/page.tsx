@@ -548,7 +548,7 @@ export default function AccountCreatePage({
               {!isFromOnboarding ? (
                 <div style={styles.valueList} aria-label="保存できるもの">
                   {[
-                    "わたしのねがお",
+                    "うちのこのねがお",
                     "とどいた ねこだより",
                     "猫のプロフィール",
                     "写真と記録",

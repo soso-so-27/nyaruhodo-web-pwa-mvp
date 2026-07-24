@@ -1217,7 +1217,7 @@ export function OnboardingFlow() {
     const deliveryDateKey = progress?.dateKey;
     if (!deliveryDateKey) {
       setDeliveryChoiceError(
-        "選んだ写真を「とどいた」に保存できませんでした。もう一度お試しください。",
+        "選んだ写真を「ねこだより」に残せませんでした。もう一度お試しください。",
       );
       return;
     }
@@ -1227,7 +1227,7 @@ export function OnboardingFlow() {
     try {
       if (!progress?.journeyId || !progress.resumeToken) {
         setDeliveryChoiceError(
-          "選んだ写真を「とどいた」に保存できませんでした。もう一度お試しください。",
+          "選んだ写真を「ねこだより」に残せませんでした。もう一度お試しください。",
         );
         return;
       }
@@ -1247,7 +1247,7 @@ export function OnboardingFlow() {
 
       if (canonical?.state !== "kept" || !selectedPhoto) {
         setDeliveryChoiceError(
-          "選んだ写真を「とどいた」に保存できませんでした。もう一度お試しください。",
+          "選んだ写真を「ねこだより」に残せませんでした。もう一度お試しください。",
         );
         return;
       }
@@ -1267,7 +1267,7 @@ export function OnboardingFlow() {
       markDeliveredPhotoReadyForOnboarding(selectedPhoto);
     } catch {
       setDeliveryChoiceError(
-        "選んだ写真を「とどいた」に保存できませんでした。もう一度お試しください。",
+        "選んだ写真を「ねこだより」に残せませんでした。もう一度お試しください。",
       );
     } finally {
       setIsFinalizingDeliveryChoice(false);
@@ -1894,7 +1894,7 @@ export function OnboardingFlow() {
                 <>
                   うちの猫のねがおを1枚残すと
                   <br />
-                  猫の写真が最大4枚とどく
+                  ほかの猫の写真がとどく
                 </>
               )}
             </h1>
@@ -2037,14 +2037,17 @@ export function OnboardingFlow() {
         !isDeliveredPhotoKept ? (
           <section
             style={{ ...styles.result, ...styles.deliveredResult }}
-            aria-label={`${deliveredPhotos.length}枚のねこだより`}
+            aria-labelledby="onboarding-delivered-title"
             data-testid="onboarding-four-choice"
             data-bundle-id={deliveryBundleId ?? undefined}
           >
             <div style={styles.onboardingFourChoiceLetter}>
               <div style={styles.onboardingDeliveredMasthead}>
-                <p style={styles.onboardingDeliveredTitle}>
-                  {deliveredPhotos.length}枚のねこだより
+                <p
+                  id="onboarding-delivered-title"
+                  style={styles.onboardingDeliveredTitle}
+                >
+                  最初のねこだより
                 </p>
                 <span
                   style={styles.onboardingDeliveredMastheadRule}
@@ -2052,7 +2055,7 @@ export function OnboardingFlow() {
                 />
               </div>
               <p style={styles.onboardingFourChoiceLead}>
-                「とどいた」に保存する1枚をえらんでください
+                「ねこだより」に残す1枚をえらんでください
               </p>
               <div
                 role="radiogroup"
@@ -2218,7 +2221,7 @@ export function OnboardingFlow() {
                     ほかのおうちからとどいたねこだよりです。
                     <br />
                     <span style={styles.onboardingDeliveredSavedPhrase}>
-                      「とどいた」に保存しました
+                      「ねこだより」に残しました
                     </span>
                   </>
                 ) : (

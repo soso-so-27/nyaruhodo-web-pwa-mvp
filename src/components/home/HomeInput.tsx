@@ -2021,7 +2021,7 @@ export function HomeInput({
     keepExchangePhoto(photo);
     setCollectionRefreshTick((value) => value + 1);
     setDeliveredExchangePhoto(null);
-    showToast("「とどいた」に保存しました");
+    showToast("「ねこだより」に残しました");
     trackProductEvent(
       "home_exchange_photo_kept",
       {
@@ -2640,7 +2640,7 @@ export function HomeInput({
     void backupOwnSleepingPhotoMoment(ownPhoto).then((result) => {
       if (!result.ok) {
         showToast(
-          "写真は「わたしのねがお」に保存しましたが、運営確認へ送れませんでした。通信を確認して、もう一度お試しください。",
+          "写真は「うちのこ」に保存しましたが、運営確認へ送れませんでした。通信を確認して、もう一度お試しください。",
         );
       }
     });
@@ -2650,10 +2650,10 @@ export function HomeInput({
 
     if (deliveryTarget.targetSaveFailed) {
       showToast(
-        "写真は「わたしのねがお」に保存しましたが、次のねこだよりがとどく設定に失敗しました。もう一度お試しください。",
+        "写真は「うちのこ」に保存しましたが、次のねこだよりがとどく設定に失敗しました。もう一度お試しください。",
       );
     } else if (!deliveryTarget.isExchangeTarget) {
-      showToast("「わたしのねがお」に保存しました。");
+      showToast("「うちのこ」に保存しました。");
     }
     trackProductEvent(
       "take_photo",
@@ -2712,7 +2712,7 @@ export function HomeInput({
     });
     void backupOwnSleepingPhotoMoment(ownPhoto);
     setCollectionRefreshTick((value) => value + 1);
-    showToast("「わたしのねがお」に自分だけで保存しました");
+    showToast("「うちのこ」に自分だけで保存しました");
     trackProductEvent(
       "home_exchange_share_photo_declined",
       {
@@ -4021,7 +4021,7 @@ function EveningDeliverySingleOpening({
             ) : null}
             この写真は、
             <span style={styles.eveningOpeningSavedPhrase}>
-              「とどいた」に保存しました
+              「ねこだより」に残しました
             </span>
           </p>
         </div>
@@ -4406,7 +4406,7 @@ export function EveningDeliveryFourChoice({
                 ...styles.eveningFourChoiceTitle,
               }}
             >
-              {savedPhoto ? "「とどいた」に保存しました" : "4枚のねこだより"}
+              {savedPhoto ? "「ねこだより」に残しました" : "今夜のねこだより"}
             </p>
             <span style={styles.eveningOpeningMastheadRule} aria-hidden="true" />
           </div>
@@ -4422,7 +4422,7 @@ export function EveningDeliveryFourChoice({
                 <StoredPhotoImage
                   src={getPhotoDetailSrc(savedPhoto)}
                   fallbackSrcs={getPhotoFallbackSrcs(savedPhoto)}
-                  alt="「とどいた」に保存したねこだより"
+                  alt="「ねこだより」に残した写真"
                   storageVariant={getPhotoStorageVariant(savedPhoto, "detail")}
                   loading="eager"
                   onStorageDataUrl={(dataUrl) => onStorageDataUrl(savedPhoto, dataUrl)}
@@ -4430,7 +4430,7 @@ export function EveningDeliveryFourChoice({
                 />
               </div>
               <p style={styles.eveningFourSavedCopy}>
-                この写真を「とどいた」に保存しました
+                この写真を「ねこだより」に残しました
               </p>
               {state.targetPhoto && targetOwnCatId ? (
                 <a
@@ -4450,11 +4450,11 @@ export function EveningDeliveryFourChoice({
                 data-testid="evening-four-choice-lead"
                 style={styles.eveningFourChoiceLead}
               >
-                「とどいた」に保存する1枚をえらんでください
+                「ねこだより」に残す1枚をえらんでください
               </p>
               <div
                 role="radiogroup"
-                aria-label="「とどいた」に保存するねこだよりをえらぶ"
+                aria-label="「ねこだより」に残す写真をえらぶ"
                 style={styles.eveningFourChoiceGrid}
               >
                 {photos.map((photo, index) => {
@@ -4555,7 +4555,7 @@ export function EveningDeliveryFourChoice({
               ) : null}
               {saveError ? (
                 <p role="alert" style={styles.eveningFourChoiceError}>
-                  選んだ写真を「とどいた」に保存できませんでした。もう一度お試しください。
+                  選んだ写真を「ねこだより」に残せませんでした。もう一度お試しください。
                 </p>
               ) : null}
               {skipError ? (
@@ -4974,7 +4974,7 @@ function ExchangePhotoSheet({
             onStorageDataUrl={onStorageDataUrl}
           />
         </div>
-        <p style={styles.exchangeAssurance}>保存すると「とどいた」で見返せます。</p>
+        <p style={styles.exchangeAssurance}>残すと「ねこだより」で見返せます。</p>
         <div style={styles.exchangeActions}>
           <button type="button" style={styles.exchangeKeepButton} onClick={onKeep}>
             保存する
@@ -5375,7 +5375,7 @@ function AccountRestoreSheet({
             <span>記録 {summary.remoteRecords}</span>
             <span>この子の写真 {summary.remoteCatGalleryPhotos}</span>
             <span>写真 {summary.remoteCollectionPhotos}</span>
-            <span>わたしのねがお {summary.remoteOwnSleepingPhotos}</span>
+            <span>うちのこのねがお {summary.remoteOwnSleepingPhotos}</span>
             <span>とどいた ねこだより {summary.remoteKeptExchangePhotos}</span>
           </div>
         ) : null}

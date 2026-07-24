@@ -95,6 +95,7 @@ const mobileSpecs = [
   "**/home-day-cycle-indicator.spec.ts",
   "**/home-desk-model.spec.ts",
   "**/evening-four-choice.spec.ts",
+  "**/nekodayori-redesign.spec.ts",
   "**/evening-flow-preview.spec.ts",
   "**/home-sleeping-exchange-flow.spec.ts",
   "**/onboarding-branch-matrix.spec.ts",

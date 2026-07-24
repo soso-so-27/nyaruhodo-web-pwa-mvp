@@ -3346,8 +3346,8 @@ function UchinokoPhotoSection({
         >
           <span>
             {keptFourChoiceSourcePhoto.id === todayPhoto?.id
-              ? `きょうの${catName}から、4匹が届きました`
-              : `${formatUchinokoHighlightDate(keptFourChoiceSourcePhoto.createdAt)}の${catName}から、きょうの4匹が届きました`}
+              ? `きょうの${catName}から、ねこだよりが届きました`
+              : `${formatUchinokoHighlightDate(keptFourChoiceSourcePhoto.createdAt)}の${catName}から、ねこだよりが届きました`}
           </span>
           <a href="/collection" style={styles.uchinokoPhotoBridgeLink}>
             ねこだよりを見る
@@ -3361,7 +3361,7 @@ function UchinokoPhotoSection({
           data-testid="cats-photo-today-link"
           style={styles.uchinokoTodayLink}
         >
-          きょうの一枚を撮ると、4匹が届きます
+          きょうの一枚を撮ると、ねこだよりが届きます
         </a>
       ) : null}
 

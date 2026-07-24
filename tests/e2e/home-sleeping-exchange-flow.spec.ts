@@ -212,7 +212,7 @@ test.describe("home sleeping exchange flow", () => {
     ).toHaveAttribute("data-photo-frame", "f3");
     await expect(deliveredLetter).toContainText("ねこだより");
     await expect(deliveredLetter).toContainText(
-      "この写真は、「とどいた」に保存しました",
+      "この写真は、「ねこだより」に残しました",
     );
     await expect(
       deliveredLetter.getByRole("button", { name: "ホームへ" }),
@@ -509,7 +509,7 @@ test.describe("home sleeping exchange flow", () => {
       .not.toBeNull();
     await expect(
       page.getByText(
-        "写真は「わたしのねがお」に保存しましたが、運営確認へ送れませんでした。通信を確認して、もう一度お試しください。",
+        "写真は「うちのこ」に保存しましたが、運営確認へ送れませんでした。通信を確認して、もう一度お試しください。",
       ),
     ).toHaveCount(0);
   });
@@ -560,7 +560,7 @@ test.describe("home sleeping exchange flow", () => {
     await expect.poll(() => backupCalls).toBe(3);
     await expect(
       page.getByText(
-        "写真は「わたしのねがお」に保存しましたが、運営確認へ送れませんでした。通信を確認して、もう一度お試しください。",
+        "写真は「うちのこ」に保存しましたが、運営確認へ送れませんでした。通信を確認して、もう一度お試しください。",
       ),
     ).toBeVisible();
     await expect
@@ -1297,7 +1297,7 @@ test.describe("home sleeping exchange flow", () => {
     await page.getByTestId("exchange-share-mode-private").click();
     await page.getByTestId("exchange-share-submit").click();
     await expect(
-      page.getByText("「わたしのねがお」に自分だけで保存しました"),
+      page.getByText("「うちのこ」に自分だけで保存しました"),
     ).toBeVisible();
     await waitForOwnSleepingPhotoCount(page, 1);
 
@@ -2740,6 +2740,9 @@ test.describe("home sleeping exchange flow", () => {
     expect(String(storage[0]?.src)).toMatch(/^data:image\//);
 
     await page.goto("/collection");
+    await page
+      .getByRole("button", { name: "ねこだよりに送る写真の設定" })
+      .click();
     await expect(page.getByTestId("mainichi-board-photo-sent")).toHaveCount(2);
   });
 
@@ -2829,6 +2832,9 @@ test.describe("home sleeping exchange flow", () => {
     await page.goto("/collection");
     await page.waitForLoadState("networkidle");
 
+    await page
+      .getByRole("button", { name: "ねこだよりに送る写真の設定" })
+      .click();
     await expect(page.getByTestId("mainichi-board-photo-sent")).toHaveCount(2);
   });
 });

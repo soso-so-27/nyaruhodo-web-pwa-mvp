@@ -80,14 +80,15 @@ test.describe("collection album flow", () => {
     await page.goto("/collection");
 
     await expect(
-      page.getByRole("tab", { name: "とどいた" }),
-    ).toHaveAttribute("aria-selected", "true");
+      page.getByRole("heading", { name: "ねこだより", exact: true }),
+    ).toBeVisible();
     await expect(
       page.getByTestId("mainichi-board-photo-delivered"),
     ).toBeVisible();
     await expect(page.getByTestId("mainichi-board-photo-sent")).toHaveCount(0);
-    await page.getByRole("tab", { name: "わたしのねがお" }).click();
+    await openOwnPhotoSettings(page);
     await expect(page.getByTestId("mainichi-board-photo-sent")).toBeVisible();
+    await expect(page.getByTestId("mainichi-board-photo-delivered")).toHaveCount(0);
   });
 
   test("shows a repeated onboarding delivery only once in received", async ({
@@ -143,7 +144,6 @@ test.describe("collection album flow", () => {
     );
 
     await page.goto("/collection");
-    await page.getByRole("tab", { name: "とどいた" }).click();
 
     const deliveredPhotos = page.getByTestId("mainichi-board-photo-delivered");
     await expect(deliveredPhotos).toHaveCount(1);
@@ -200,6 +200,7 @@ test.describe("collection album flow", () => {
     );
 
     await page.goto("/collection");
+    await openOwnPhotoSettings(page);
 
     const sentPhotos = page.getByTestId("mainichi-board-photo-sent");
     await expect(sentPhotos).toHaveCount(1);
@@ -211,6 +212,25 @@ test.describe("collection album flow", () => {
   }) => {
     const olderCreatedAt = Date.parse("2026-07-17T13:40:00+09:00");
     const newerCreatedAt = olderCreatedAt + 60_000;
+
+    await page.route("**/api/photo-storage/signed-urls", async (route) => {
+      const body = route.request().postDataJSON() as { paths?: string[] };
+
+      await route.fulfill({
+        contentType: "application/json",
+        body: JSON.stringify({
+          signedUrls: Object.fromEntries(
+            (body.paths ?? []).map((path) => [path, photoDataUrl]),
+          ),
+        }),
+      });
+    });
+    await page.route("**/api/photo-storage/signed-url", async (route) => {
+      await route.fulfill({
+        contentType: "application/json",
+        body: JSON.stringify({ signedUrl: photoDataUrl }),
+      });
+    });
 
     await page.addInitScript(
       ({ olderCreatedAt, newerCreatedAt }) => {
@@ -253,6 +273,7 @@ test.describe("collection album flow", () => {
     );
 
     await page.goto("/collection");
+    await openOwnPhotoSettings(page);
 
     const sentPhotos = page.getByTestId("mainichi-board-photo-sent");
     await expect(sentPhotos).toHaveCount(1);
@@ -313,6 +334,7 @@ test.describe("collection album flow", () => {
       .toBeGreaterThanOrEqual(1);
 
     await page.goto("/collection");
+    await openOwnPhotoSettings(page);
     await expect(page.getByTestId("mainichi-board-photo-sent")).toHaveCount(1);
   });
 
@@ -346,6 +368,9 @@ test.describe("collection album flow", () => {
     await page.emulateMedia({ reducedMotion: "reduce" });
     await page.goto("/collection");
     await page.waitForLoadState("networkidle");
+    await expect(
+      page.getByRole("button", { name: "ねこだよりに送る写真の設定" }),
+    ).toHaveCount(0);
     await expect(page.getByTestId("mainichi-board-photo-sent")).toHaveCount(0);
 
     await page.evaluate(({ currentCatId, src, createdAt }) => {
@@ -374,6 +399,7 @@ test.describe("collection album flow", () => {
       createdAt: now,
     });
 
+    await openOwnPhotoSettings(page);
     await expect(page.getByTestId("mainichi-board-photo-sent")).toHaveCount(1);
   });
 
@@ -445,6 +471,7 @@ test.describe("collection album flow", () => {
     await page.emulateMedia({ reducedMotion: "reduce" });
     await page.goto("/collection");
     await page.waitForLoadState("networkidle");
+    await openOwnPhotoSettings(page);
     const firstSentPhoto = page.getByTestId("mainichi-board-photo-sent").first();
     await expect(page.getByTestId("mainichi-board-photo-sent")).toHaveCount(2);
     await expect(firstSentPhoto).not.toHaveAttribute("data-mainichi-paste", "true");
@@ -555,6 +582,7 @@ test.describe("collection album flow", () => {
 
     await page.goto("/collection");
     await page.waitForLoadState("networkidle");
+    await openOwnPhotoSettings(page);
 
     await expect(page.getByTestId("mainichi-board-photo-sent")).toHaveCount(2);
   });
@@ -681,6 +709,7 @@ test.describe("collection album flow", () => {
     );
 
     await page.goto("/collection", { waitUntil: "domcontentloaded" });
+    await openOwnPhotoSettings(page);
     await expect(page.getByTestId("mainichi-board-photo-sent")).toHaveCount(0, {
       timeout: 250,
     });
@@ -890,6 +919,7 @@ test.describe("collection album flow", () => {
     const storageSrc = `storage:${storagePath}`;
     let batchSignedUrlCalls = 0;
     let singleSignedUrlCalls = 0;
+    const signedUrlRequestKeys: string[] = [];
 
     await page.route("**/api/photo-storage/signed-urls", async (route) => {
       batchSignedUrlCalls += 1;
@@ -898,6 +928,9 @@ test.describe("collection album flow", () => {
         variant?: string;
       };
       expect(body.variant).toBe("thumbnail");
+      for (const path of body.paths ?? []) {
+        signedUrlRequestKeys.push(`batch:${body.variant ?? "plain"}:${path}`);
+      }
       const signedUrls = Object.fromEntries(
         (body.paths ?? []).map((path) => [path, path === storagePath ? photoDataUrl : null]),
       );
@@ -911,6 +944,9 @@ test.describe("collection album flow", () => {
     await page.route("**/api/photo-storage/signed-url", async (route) => {
       singleSignedUrlCalls += 1;
       const body = route.request().postDataJSON() as { src?: string; variant?: string };
+      signedUrlRequestKeys.push(
+        `single:${body.variant ?? "plain"}:${body.src ?? ""}`,
+      );
 
       await route.fulfill({
         contentType: "application/json",
@@ -963,19 +999,32 @@ test.describe("collection album flow", () => {
 
     await page.goto("/collection");
     await page.waitForLoadState("networkidle");
+    await openOwnPhotoSettings(page);
     await expect(page.getByTestId("mainichi-board-photo-sent")).toHaveCount(1);
     const callsAfterFirstView = batchSignedUrlCalls + singleSignedUrlCalls;
-    const thumbnailBatchCallsAfterFirstView = batchSignedUrlCalls;
+    const targetRequestCountsAfterFirstView = countRequestKeys(
+      signedUrlRequestKeys,
+      storagePath,
+    );
     expect(callsAfterFirstView).toBeGreaterThan(0);
 
-    await page.locator('a[href="/cats"]').click();
+    await page.getByRole("link", { name: "うちのこ" }).click();
     await page.waitForURL("**/cats");
-    await page.locator('a[href="/collection"]').click();
+    await page.getByRole("link", { name: "ねこだより" }).click();
     await page.waitForURL("**/collection");
     await page.waitForLoadState("networkidle");
+    await openOwnPhotoSettings(page);
     await expect(page.getByTestId("mainichi-board-photo-sent")).toHaveCount(1);
 
-    expect(batchSignedUrlCalls).toBe(thumbnailBatchCallsAfterFirstView);
+    const targetRequestCountsAfterRevisit = countRequestKeys(
+      signedUrlRequestKeys,
+      storagePath,
+    );
+    for (const [requestKey, count] of Object.entries(
+      targetRequestCountsAfterFirstView,
+    )) {
+      expect(targetRequestCountsAfterRevisit[requestKey]).toBe(count);
+    }
   });
 
   test("falls back to plain signed url when thumbnail transform is unavailable", async ({
@@ -1070,6 +1119,7 @@ test.describe("collection album flow", () => {
 
     await page.goto("/collection");
     await page.waitForLoadState("networkidle");
+    await openOwnPhotoSettings(page);
     await expect(page.getByTestId("mainichi-board-photo-sent")).toHaveCount(1);
     await page.getByTestId("mainichi-board-photo-sent").first().scrollIntoViewIfNeeded();
 
@@ -1201,8 +1251,19 @@ test.describe("collection album flow", () => {
 
     await page.goto("/collection");
     await page.waitForLoadState("networkidle");
-    await page.getByRole("tab", { name: "とどいた" }).click();
-    await expect(page.getByTestId("mainichi-board-photo-delivered")).toBeVisible();
+    await expect(page.getByTestId("nekodayori-current")).toHaveAttribute(
+      "data-state",
+      "saved",
+    );
+    await expect(
+      page.getByTestId("nekodayori-current-saved-photo"),
+    ).toHaveAttribute("data-photo-id", "delivered-storage-offline");
+    await page.getByTestId("nekodayori-current-saved-photo").click();
+    await expect(
+      page.locator(
+        '[data-testid="box-detail-photo"][data-photo-id="delivered-storage-offline"]',
+      ),
+    ).toBeVisible();
 
     await expect
       .poll(() =>
@@ -1229,9 +1290,10 @@ test.describe("collection album flow", () => {
     allowSignedUrl = false;
     await page.reload();
     await page.waitForLoadState("networkidle");
-    await page.getByRole("tab", { name: "とどいた" }).click();
 
-    await expect(page.locator('main img[src^="data:image/"]')).toHaveCount(1);
+    await expect(
+      page.getByTestId("nekodayori-current-saved-photo").locator("img"),
+    ).toHaveAttribute("src", /^data:image\//);
   });
 
   test("prefers delivered storage refs over stale signed display urls", async ({
@@ -1333,14 +1395,19 @@ test.describe("collection album flow", () => {
 
     await page.goto("/collection");
     await page.waitForLoadState("networkidle");
-    await page.getByRole("tab", { name: "とどいた" }).click();
 
-    await expect(page.getByTestId("mainichi-board-photo-delivered")).toBeVisible();
+    await expect(page.getByTestId("nekodayori-current")).toHaveAttribute(
+      "data-state",
+      "saved",
+    );
+    await expect(
+      page.getByTestId("nekodayori-current-saved-photo"),
+    ).toHaveAttribute("data-photo-id", "delivered-stale-signed-url");
     await expect.poll(() => signedUrlRequests).toContain(storageSrc);
     expect(signedUrlRequests).not.toContain(staleSignedSrc);
   });
 
-  test("keeps unopened evening deliveries as a sealed envelope until opened", async ({
+  test("shows an unopened evening delivery as current, then features it after opening", async ({
     page,
   }) => {
     const now = Date.parse("2026-06-10T11:05:00.000Z");
@@ -1355,10 +1422,11 @@ test.describe("collection album flow", () => {
     await page.goto("/collection");
     await page.waitForLoadState("networkidle");
 
-    await expect(page.getByTestId("mainichi-photo-board")).toBeVisible();
-    await expect(page.getByTestId("album-sealed-delivery")).toHaveCount(0);
+    await expect(page.getByTestId("nekodayori-current")).toHaveAttribute(
+      "data-state",
+      "pending",
+    );
     await expect(page.getByTestId("mainichi-board-photo-delivered")).toHaveCount(0);
-    await expect(page.getByTestId("mainichi-board-photo-sent")).toHaveCount(1);
 
     await seedCollectionEveningDelivery(page, {
       now,
@@ -1369,10 +1437,14 @@ test.describe("collection album flow", () => {
     await page.reload();
     await page.waitForLoadState("networkidle");
 
-    await expect(page.getByTestId("album-sealed-delivery")).toHaveCount(0);
-    await page.getByRole("tab", { name: "とどいた" }).click();
-    await expect(page.getByTestId("mainichi-board-photo-delivered")).toBeVisible();
-    await expect(page.getByTestId("mainichi-board-photo-delivered")).toHaveCount(1);
+    await expect(page.getByTestId("nekodayori-current")).toHaveAttribute(
+      "data-state",
+      "saved",
+    );
+    await expect(
+      page.getByTestId("nekodayori-current-saved-photo"),
+    ).toHaveAttribute("data-photo-id", "delivered-unopened-test");
+    await expect(page.getByTestId("mainichi-board-photo-delivered")).toHaveCount(0);
   });
 
   test("auto-opens yesterday's unopened evening delivery after 5am", async ({
@@ -1389,10 +1461,11 @@ test.describe("collection album flow", () => {
     await page.goto("/collection");
     await page.waitForLoadState("networkidle");
 
-    await expect(page.getByTestId("album-sealed-delivery")).toHaveCount(0);
-    await page.getByRole("tab", { name: "とどいた" }).click();
-    await expect(page.getByTestId("mainichi-board-photo-delivered")).toBeVisible();
-    await expect(page.getByTestId("mainichi-board-photo-delivered")).toHaveCount(1);
+    await expect(page.getByTestId("nekodayori-current")).toHaveCount(0);
+    await expect(page.getByTestId("mainichi-board-photo-delivered")).toHaveAttribute(
+      "data-photo-id",
+      "delivered-unopened-test",
+    );
     await expect
       .poll(() =>
         page.evaluate(() => {
@@ -1488,11 +1561,12 @@ test.describe("collection album flow", () => {
 
     await page.goto("/collection");
     await page.waitForLoadState("networkidle");
+    await openOwnPhotoSettings(page);
 
     await expect(page.getByTestId("mainichi-board-photo-sent")).toHaveCount(2);
   });
 
-  test("hides the other slot before the first evening delivery target day", async ({
+  test("shows the next evening delivery as the current waiting state", async ({
     page,
   }) => {
     const now = Date.parse("2026-06-10T10:00:00.000Z");
@@ -1575,9 +1649,14 @@ test.describe("collection album flow", () => {
     await page.goto("/collection");
     await page.waitForLoadState("networkidle");
 
+    await expect(page.getByTestId("nekodayori-current")).toHaveAttribute(
+      "data-state",
+      "waiting",
+    );
+    await expect(page.getByTestId("nekodayori-current")).toContainText(
+      "よる8時ごろ、ねこだよりが届きます。",
+    );
     await expect(page.getByTestId("mainichi-board-photo-delivered")).toHaveCount(0);
-    await expect(page.getByText("この日の ねがおは ありません")).toHaveCount(0);
-    await expect(page.getByTestId("album-daily-missing-letter")).toHaveCount(0);
   });
 
   test("renders daily entries as a month board without missing slots", async ({
@@ -1648,6 +1727,7 @@ test.describe("collection album flow", () => {
 
     await page.goto("/collection");
     await page.waitForLoadState("networkidle");
+    await openOwnPhotoSettings(page);
 
     await expect(page.getByTestId("mainichi-photo-board")).toBeVisible();
     await expect(page.getByTestId("mainichi-month-board")).toBeVisible();
@@ -1661,6 +1741,7 @@ test.describe("collection album flow", () => {
 
     await page.reload();
     await page.waitForLoadState("networkidle");
+    await openOwnPhotoSettings(page);
     await expect(page.getByTestId("mainichi-board-photo-sent")).toBeVisible();
     await expect(page.getByTestId("mainichi-board-photo-sent")).not.toHaveAttribute(
       "data-mainichi-paste",
@@ -1739,7 +1820,6 @@ test.describe("collection album flow", () => {
 
     await page.goto("/collection");
     await page.waitForLoadState("networkidle");
-    await page.getByRole("tab", { name: "とどいた" }).click();
 
     await expect(page.getByTestId("mainichi-board-photo-delivered")).toHaveCount(
       18,
@@ -1759,7 +1839,8 @@ test.describe("collection album flow", () => {
   test("opens a delivered mainichi photo directly and hides it from fullscreen", async ({
     page,
   }) => {
-    const now = Date.parse("2026-06-13T11:05:00.000Z");
+    const deliveredAt = Date.parse("2026-06-13T11:05:00.000Z");
+    const now = Date.parse("2026-06-14T03:00:00.000Z");
     const dateKey = "2026-06-13";
     await page.clock.setFixedTime(new Date(now));
 
@@ -1822,7 +1903,7 @@ test.describe("collection album flow", () => {
       {
         currentCatId: "current-cat",
         src: photoDataUrl,
-        createdAt: now,
+        createdAt: deliveredAt,
         targetDateKey: dateKey,
       },
     );
@@ -1830,7 +1911,6 @@ test.describe("collection album flow", () => {
     await page.goto("/collection");
     await page.waitForLoadState("networkidle");
 
-    await page.getByRole("tab", { name: "とどいた" }).click();
     const deliveredPhotoButton = page.getByTestId("mainichi-board-photo-delivered");
     await deliveredPhotoButton.click();
     const photoViewer = page.getByTestId("mainichi-photo-viewer");
@@ -1857,7 +1937,7 @@ test.describe("collection album flow", () => {
     await deliveredPhotoButton.click();
     await expect(photoViewer).toBeVisible();
     await disableNextDevToolsPointerEvents(page);
-    const removeButton = page.getByRole("button", { name: "「とどいた」から外す" });
+    const removeButton = page.getByRole("button", { name: "「ねこだより」から外す" });
     await removeButton.click();
     const confirmDialog = page.getByRole("alertdialog");
     const cancelButton = confirmDialog.getByRole("button", { name: "キャンセル" });
@@ -1986,6 +2066,7 @@ test.describe("collection album flow", () => {
 
     await page.goto("/collection");
     await page.waitForLoadState("networkidle");
+    await openOwnPhotoSettings(page);
 
     await page.getByTestId("mainichi-board-photo-sent").click();
     await expect(page.getByTestId("mainichi-photo-viewer")).toBeVisible();
@@ -2064,6 +2145,7 @@ test.describe("collection album flow", () => {
     );
 
     await page.goto("/collection");
+    await openOwnPhotoSettings(page);
     await page.getByTestId("mainichi-board-photo-sent").click();
     await page.getByRole("button", { name: "自分だけにする" }).click();
 
@@ -2135,6 +2217,7 @@ test.describe("collection album flow", () => {
     );
 
     await page.goto("/collection");
+    await openOwnPhotoSettings(page);
     await page.getByTestId("mainichi-board-photo-sent").click();
     await page.getByRole("button", { name: "ねこだよりにする" }).click();
 
@@ -2211,6 +2294,7 @@ test.describe("collection album flow", () => {
     );
 
     await page.goto("/collection");
+    await openOwnPhotoSettings(page);
     await page.getByTestId("mainichi-board-photo-sent").click();
     await page.getByRole("button", { name: "ねこだよりにする" }).click();
 
@@ -2275,6 +2359,7 @@ test.describe("collection album flow", () => {
     );
 
     await page.goto("/collection");
+    await openOwnPhotoSettings(page);
     await page.getByTestId("mainichi-board-photo-sent").click();
     await page.getByRole("button", { name: "削除" }).click();
     await page.getByRole("alertdialog").getByRole("button", { name: "削除" }).click();
@@ -2389,6 +2474,7 @@ test.describe("collection album flow", () => {
     );
 
     await page.goto("/collection");
+    await openOwnPhotoSettings(page);
     await page.getByTestId("mainichi-board-photo-sent").click();
     await page.getByRole("button", { name: "削除" }).click();
     await page.getByRole("alertdialog").getByRole("button", { name: "削除" }).click();
@@ -2423,6 +2509,27 @@ test.describe("collection album flow", () => {
       .toBe(true);
   });
 });
+
+async function openOwnPhotoSettings(page: Page) {
+  await page
+    .getByRole("button", { name: "ねこだよりに送る写真の設定" })
+    .click();
+  await expect(
+    page.getByRole("heading", {
+      name: "ねこだよりに送る写真の設定",
+      exact: true,
+    }),
+  ).toBeVisible();
+}
+
+function countRequestKeys(requestKeys: string[], storagePath: string) {
+  return requestKeys
+    .filter((key) => key.endsWith(`:${storagePath}`))
+    .reduce<Record<string, number>>((counts, key) => {
+      counts[key] = (counts[key] ?? 0) + 1;
+      return counts;
+    }, {});
+}
 
 async function confirmSleepingPhotoShare(page: Page) {
   const dialog = page.getByRole("dialog");

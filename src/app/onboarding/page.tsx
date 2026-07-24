@@ -3,7 +3,7 @@ import { OnboardingFlow } from "../../components/onboarding/OnboardingFlow";
 
 const title = "ねてるねこ | ねこだよりが、よる8時にとどく";
 const description =
-  "じぶんの猫のねがおを1枚選ぶと、ほかの猫のねこだよりが最大4枚とどき、その中から1枚を「とどいた」に保存できるWebアプリです。";
+  "じぶんの猫のねがおを1枚選ぶと、ほかの猫のねこだよりがとどき、残したい1枚を「ねこだより」に残せるWebアプリです。";
 const socialImage = "/images/social/onboarding-og.webp";
 
 export const metadata: Metadata = {

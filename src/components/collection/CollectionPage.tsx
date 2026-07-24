@@ -69,10 +69,12 @@ import {
   type OwnSleepingPhoto,
 } from "../../lib/home/sleepingPhotos";
 import {
+  addJstDays,
   autoOpenExpiredEveningDeliveries,
-  getFirstEveningDeliveryTargetDateKey,
+  buildEveningHomeState,
   getJstDateKey,
   getJstDeliveryTime,
+  getJstHour,
   readEveningDeliveryStore,
 } from "../../lib/home/eveningDelivery";
 import { backupOwnSleepingPhotoMoment } from "../../lib/home/sleepingPhotoBackup";
@@ -375,6 +377,31 @@ type MainichiViewerState = {
   monthLabel: string | null;
 };
 
+type NekodayoriCurrentState =
+  | {
+      kind: "none";
+      dateKey: null;
+    }
+  | {
+      kind: "skipped";
+      dateKey: string;
+    }
+  | {
+      kind: "waiting";
+      dateKey: string;
+      isTodayDelivery: boolean;
+    }
+  | {
+      kind: "pending";
+      dateKey: string;
+      candidateCount: number;
+    }
+  | {
+      kind: "saved";
+      dateKey: string;
+      photo: BoxPreviewPhoto;
+    };
+
 export function CollectionPage() {
   const [catProfiles, setCatProfiles] = useState<CatProfile[]>([]);
   const [activeCatId, setActiveCatId] = useState<string | null>(null);
@@ -402,8 +429,11 @@ export function CollectionPage() {
     useState<MainichiMorphSource | null>(null);
   const [selectedMainichiViewer, setSelectedMainichiViewer] =
     useState<MainichiViewerState | null>(null);
+  const [isOwnPhotoManagementOpen, setIsOwnPhotoManagementOpen] =
+    useState(false);
   const [shouldPlayMainichiNavEntry, setShouldPlayMainichiNavEntry] =
     useState(false);
+  const [clientNow, setClientNow] = useState(() => Date.now());
   const [currentBoxPhotoIndex, setCurrentBoxPhotoIndex] = useState(0);
   const toastTimerRef = useRef<number | null>(null);
   const trackedViewCatIdRef = useRef<string | null>(null);
@@ -450,6 +480,7 @@ export function CollectionPage() {
 
   useEffect(() => {
     function refreshBoxes() {
+      setClientNow(Date.now());
       setBoxRefreshTick((value) => value + 1);
     }
 
@@ -463,12 +494,14 @@ export function CollectionPage() {
     window.addEventListener("storage", refreshBoxes);
     window.addEventListener("focus", refreshBoxes);
     document.addEventListener("visibilitychange", refreshBoxesOnVisible);
+    const timerId = window.setInterval(refreshBoxes, 60_000);
 
     return () => {
       window.removeEventListener(BOX_PHOTO_STORAGE_EVENT, refreshBoxes);
       window.removeEventListener("storage", refreshBoxes);
       window.removeEventListener("focus", refreshBoxes);
       document.removeEventListener("visibilitychange", refreshBoxesOnVisible);
+      window.clearInterval(timerId);
     };
   }, []);
 
@@ -561,8 +594,28 @@ export function CollectionPage() {
           readOnboardingDeliveredBoxPhotos(),
         ),
         readKeptExchangePhotosForAlbum(),
-      ),
+    ),
     [boxRefreshTick, hasLoaded, openedEveningDeliveryPhotos],
+  );
+  const nekodayoriCurrentState = useMemo(
+    () =>
+      buildNekodayoriCurrentState({
+        activeCatId,
+        ownPhotos: sleepingBoxPhotos,
+        otherPhotos: otherBoxPhotos,
+        now: clientNow,
+      }),
+    [activeCatId, clientNow, otherBoxPhotos, sleepingBoxPhotos],
+  );
+  const archivedOtherBoxPhotos = useMemo(
+    () =>
+      nekodayoriCurrentState.kind === "saved"
+        ? otherBoxPhotos.filter(
+            (photo) =>
+              !isSameBoxPreviewPhoto(photo, nekodayoriCurrentState.photo),
+          )
+        : otherBoxPhotos,
+    [nekodayoriCurrentState, otherBoxPhotos],
   );
   const awakeBoxPhotos = useMemo(
     () =>
@@ -584,21 +637,17 @@ export function CollectionPage() {
       buildAlbumDayGroups(
         sleepingBoxPhotos,
         awakeBoxPhotos,
-        otherBoxPhotos,
+        archivedOtherBoxPhotos,
         unopenedEveningDeliveryDateKeys,
         undeliverableEveningDeliveryDateKeys,
       ),
     [
       awakeBoxPhotos,
-      otherBoxPhotos,
+      archivedOtherBoxPhotos,
       sleepingBoxPhotos,
       unopenedEveningDeliveryDateKeys,
       undeliverableEveningDeliveryDateKeys,
     ],
-  );
-  const firstEveningDeliveryTargetDateKey = useMemo(
-    () => getFirstEveningDeliveryTargetDateKey(),
-    [boxRefreshTick],
   );
   const selectedBoxPhotos =
     selectedBoxKind === "sleeping"
@@ -617,9 +666,13 @@ export function CollectionPage() {
   const selectedMainichiDayPhotos = useMemo(
     () =>
       selectedMainichiDayGroup
-        ? buildMainichiDayPhotos(selectedMainichiDayGroup, catNameById)
+        ? buildMainichiDayPhotos(selectedMainichiDayGroup, catNameById).filter(
+            (photo) =>
+              getMainichiPhotoSide(photo) ===
+              (isOwnPhotoManagementOpen ? "sent" : "delivered"),
+          )
         : [],
-    [catNameById, selectedMainichiDayGroup],
+    [catNameById, isOwnPhotoManagementOpen, selectedMainichiDayGroup],
   );
   const selectedMainichiPhoto =
     selectedMainichiViewer?.photos[selectedMainichiViewer.index] ?? null;
@@ -717,13 +770,29 @@ export function CollectionPage() {
     setSelectedSlug(null);
   }
 
-  function openBoxDetail(kind: BoxDetailKind, dateKey: string | null = null) {
+  function openBoxDetail(
+    kind: BoxDetailKind,
+    dateKey: string | null = null,
+    targetPhoto: BoxPreviewPhoto | null = null,
+  ) {
+    const photos =
+      kind === "sleeping"
+        ? filterBoxPhotosByDate(sleepingBoxPhotos, dateKey)
+        : filterBoxPhotosByDate(otherBoxPhotos, dateKey);
+    const targetIndex = targetPhoto
+      ? photos.findIndex((photo) => isSameBoxPreviewPhoto(photo, targetPhoto))
+      : -1;
+
     setSelectedBoxKind(kind);
     setSelectedBoxDateKey(dateKey);
-    setCurrentBoxPhotoIndex(0);
+    setCurrentBoxPhotoIndex(targetIndex >= 0 ? targetIndex : 0);
     trackProductEvent(
       "collection_box_detail_opened",
-      { kind, date_key: dateKey },
+      {
+        kind,
+        date_key: dateKey,
+        photo_id: targetPhoto?.id ?? null,
+      },
       { localCatId: activeCatId },
     );
   }
@@ -1187,18 +1256,18 @@ export function CollectionPage() {
       };
     });
     if (reason === "report") {
-      showToast("この写真を「とどいた」から外し、運営へ報告しています");
+      showToast("この写真を「ねこだより」から外し、運営へ報告しています");
       void sendPhotoReport(exchangePhoto, "other")
         .then(() => {
-          showToast("運営に報告し、この写真を「とどいた」から外しました");
+          showToast("運営に報告し、この写真を「ねこだより」から外しました");
         })
         .catch(() => {
           showToast(
-            "この写真は「とどいた」から外しましたが、運営に報告できませんでした。必要な場合は設定の「問い合わせ」からお知らせください。",
+            "この写真は「ねこだより」から外しましたが、運営に報告できませんでした。必要な場合は設定の「問い合わせ」からお知らせください。",
           );
         });
     } else {
-      showToast("「とどいた」から外しました");
+      showToast("「ねこだより」から外しました");
     }
     trackProductEvent(
       "collection_mainichi_delivered_photo_hidden",
@@ -1278,18 +1347,18 @@ export function CollectionPage() {
       Math.max(0, Math.min(current, otherBoxPhotos.length - 2)),
     );
     if (reason === "report") {
-      showToast("この写真を「とどいた」から外し、運営へ報告しています");
+      showToast("この写真を「ねこだより」から外し、運営へ報告しています");
       void sendPhotoReport(createExchangePhotoFromBoxPhoto(photo), "other")
         .then(() => {
-          showToast("運営に報告し、この写真を「とどいた」から外しました");
+          showToast("運営に報告し、この写真を「ねこだより」から外しました");
         })
         .catch(() => {
           showToast(
-            "この写真は「とどいた」から外しましたが、運営に報告できませんでした。必要な場合は設定の「問い合わせ」からお知らせください。",
+            "この写真は「ねこだより」から外しましたが、運営に報告できませんでした。必要な場合は設定の「問い合わせ」からお知らせください。",
           );
         });
     } else {
-      showToast("「とどいた」から外しました");
+      showToast("「ねこだより」から外しました");
     }
     trackProductEvent(
       "collection_other_photo_hidden",
@@ -1567,7 +1636,12 @@ export function CollectionPage() {
     );
   }
 
-  if (!activeCatProfile) {
+  const hasCurrentNekodayori =
+    nekodayoriCurrentState.kind === "waiting" ||
+    nekodayoriCurrentState.kind === "pending" ||
+    nekodayoriCurrentState.kind === "saved";
+
+  if (!activeCatProfile && otherBoxPhotos.length === 0 && !hasCurrentNekodayori) {
     return (
       <main style={styles.page}>
         <PageBackdrop />
@@ -1586,18 +1660,58 @@ export function CollectionPage() {
   }
 
   return (
-    <main style={styles.page}>
+    <main
+      style={styles.page}
+      data-testid="nekodayori-page"
+      data-current-state={nekodayoriCurrentState.kind}
+    >
       <PageBackdrop />
       <div style={styles.container}>
-        <BoxOverview
-          dayGroups={albumDayGroups}
-          firstEveningDeliveryTargetDateKey={firstEveningDeliveryTargetDateKey}
-          catProfiles={catProfiles}
-          playNavEntryMotion={shouldPlayMainichiNavEntry}
-          onNavEntryMotionPlayed={() => setShouldPlayMainichiNavEntry(false)}
-          onOpenMainichiDay={openMainichiDay}
-          onOpenMainichiPhoto={openMainichiBoardPhoto}
-        />
+        {isOwnPhotoManagementOpen ? (
+          <>
+            <header style={styles.nekodayoriManageHeader}>
+              <button
+                type="button"
+                style={styles.nekodayoriBackButton}
+                onClick={() => setIsOwnPhotoManagementOpen(false)}
+              >
+                ねこだよりへ戻る
+              </button>
+              <h1 style={styles.nekodayoriManageTitle}>
+                ねこだよりに送る写真の設定
+              </h1>
+              <p style={styles.nekodayoriManageLead}>
+                ほかの人へ送ってよい写真を、確認・変更できます。
+              </p>
+            </header>
+            <BoxOverview
+              dayGroups={albumDayGroups}
+              side="sent"
+              catProfiles={catProfiles}
+              playNavEntryMotion={false}
+              onNavEntryMotionPlayed={() => undefined}
+              onOpenMainichiDay={openMainichiDay}
+              onOpenMainichiPhoto={openMainichiBoardPhoto}
+            />
+          </>
+        ) : (
+          <NekodayoriOverview
+            currentState={nekodayoriCurrentState}
+            dayGroups={albumDayGroups}
+            catProfiles={catProfiles}
+            playNavEntryMotion={shouldPlayMainichiNavEntry}
+            showOwnPhotoManagement={Boolean(
+              activeCatProfile && sleepingBoxPhotos.length > 0,
+            )}
+            onNavEntryMotionPlayed={() => setShouldPlayMainichiNavEntry(false)}
+            onOpenCurrentSaved={(dateKey, photo) =>
+              openBoxDetail("other", dateKey, photo)
+            }
+            onOpenMainichiDay={openMainichiDay}
+            onOpenMainichiPhoto={openMainichiBoardPhoto}
+            onOpenOwnPhotoManagement={() => setIsOwnPhotoManagementOpen(true)}
+          />
+        )}
       </div>
       {selectedMainichiDayGroup ? (
         <MainichiDaySheet
@@ -1678,7 +1792,10 @@ export function CollectionPage() {
         />
       ) : null}
       {toastText ? <div style={styles.toast}>{toastText}</div> : null}
-      <BottomNavigation active="collection" />
+      <BottomNavigation
+        active="collection"
+        onActiveItemClick={() => setIsOwnPhotoManagementOpen(false)}
+      />
     </main>
   );
 }
@@ -1693,9 +1810,212 @@ function PageBackdrop() {
   );
 }
 
+function NekodayoriOverview({
+  currentState,
+  dayGroups,
+  catProfiles,
+  playNavEntryMotion,
+  showOwnPhotoManagement,
+  onNavEntryMotionPlayed,
+  onOpenCurrentSaved,
+  onOpenMainichiDay,
+  onOpenMainichiPhoto,
+  onOpenOwnPhotoManagement,
+}: {
+  currentState: NekodayoriCurrentState;
+  dayGroups: AlbumDayGroup[];
+  catProfiles: CatProfile[];
+  playNavEntryMotion: boolean;
+  showOwnPhotoManagement: boolean;
+  onNavEntryMotionPlayed: () => void;
+  onOpenCurrentSaved: (dateKey: string, photo: BoxPreviewPhoto) => void;
+  onOpenMainichiDay: (
+    dateKey: string,
+    source?: MainichiMorphSource | null,
+  ) => void;
+  onOpenMainichiPhoto: (
+    photo: MainichiBoardPhoto,
+    month: MainichiBoardMonth,
+    source?: MainichiMorphSource | null,
+  ) => void;
+  onOpenOwnPhotoManagement: () => void;
+}) {
+  const hasHistory = dayGroups.some((group) =>
+    group.sections.some(
+      (section) => section.kind === "other" && section.photos.length > 0,
+    ),
+  );
+
+  return (
+    <section style={styles.nekodayoriOverview} aria-labelledby="nekodayori-title">
+      <header style={styles.nekodayoriHeader}>
+        <h1 id="nekodayori-title" style={styles.nekodayoriTitle}>
+          ねこだより
+        </h1>
+        <p style={styles.nekodayoriLead}>
+          ほかのおうちから届いた猫。
+        </p>
+      </header>
+
+      <NekodayoriCurrentCard
+        state={currentState}
+        hasHistory={hasHistory}
+        onOpenSaved={onOpenCurrentSaved}
+      />
+
+      {hasHistory ? (
+        <section
+          style={styles.nekodayoriHistory}
+          data-testid="nekodayori-history"
+          aria-labelledby="nekodayori-history-title"
+        >
+          <h2 id="nekodayori-history-title" style={styles.nekodayoriHistoryTitle}>
+            これまで
+          </h2>
+          <BoxOverview
+            dayGroups={dayGroups}
+            side="delivered"
+            catProfiles={catProfiles}
+            playNavEntryMotion={playNavEntryMotion}
+            onNavEntryMotionPlayed={onNavEntryMotionPlayed}
+            onOpenMainichiDay={onOpenMainichiDay}
+            onOpenMainichiPhoto={onOpenMainichiPhoto}
+          />
+        </section>
+      ) : null}
+
+      {showOwnPhotoManagement ? (
+        <button
+          type="button"
+          style={styles.nekodayoriManageLink}
+          onClick={onOpenOwnPhotoManagement}
+        >
+          ねこだよりに送る写真の設定
+        </button>
+      ) : null}
+    </section>
+  );
+}
+
+function NekodayoriCurrentCard({
+  state,
+  hasHistory,
+  onOpenSaved,
+}: {
+  state: NekodayoriCurrentState;
+  hasHistory: boolean;
+  onOpenSaved: (dateKey: string, photo: BoxPreviewPhoto) => void;
+}) {
+  if (state.kind === "none" && !hasHistory) {
+    return (
+      <section
+        data-testid="nekodayori-current"
+        data-state="empty"
+        style={styles.nekodayoriCurrent}
+        aria-labelledby="nekodayori-current-title"
+      >
+        <h2 id="nekodayori-current-title" style={styles.nekodayoriCurrentTitle}>
+          ここから、最初のねこだより
+        </h2>
+        <p style={styles.nekodayoriCurrentCopy}>
+          「きょう」で写真を1枚撮ると、今夜ねこだよりが届きます。
+        </p>
+        <AppButton href="/home" variant="primary" fullWidth>
+          きょうの一枚を撮る
+        </AppButton>
+      </section>
+    );
+  }
+
+  if (state.kind === "none" || state.kind === "skipped") {
+    return null;
+  }
+
+  if (state.kind === "saved") {
+    const isToday = state.dateKey === getJstDateKey();
+
+    return (
+      <section
+        data-testid="nekodayori-current"
+        data-state="saved"
+        data-delivery-date-key={state.dateKey}
+        style={styles.nekodayoriSaved}
+        aria-labelledby="nekodayori-current-title"
+      >
+        <h2 id="nekodayori-current-title" style={styles.nekodayoriSavedTitle}>
+          {isToday ? "きょうのねこだより" : "前回のねこだより"}
+        </h2>
+        <button
+          type="button"
+          data-testid="nekodayori-current-saved-photo"
+          data-photo-id={state.photo.id}
+          style={styles.nekodayoriCurrentPhotoButton}
+          onClick={() => onOpenSaved(state.dateKey, state.photo)}
+          aria-label="えらんだねこだよりをひらく"
+        >
+          <StoredPhotoImage
+            src={getPhotoDetailSrc(state.photo)}
+            fallbackSrcs={getPhotoFallbackSrcs(state.photo)}
+            alt="えらんだねこだより"
+            style={styles.nekodayoriCurrentPhoto}
+            storageVariant={getPhotoStorageVariant(state.photo, "detail")}
+            loading="eager"
+          />
+        </button>
+      </section>
+    );
+  }
+
+  if (state.kind === "pending") {
+    return (
+      <section
+        data-testid="nekodayori-current"
+        data-state="pending"
+        data-delivery-date-key={state.dateKey}
+        style={styles.nekodayoriCurrent}
+        aria-labelledby="nekodayori-current-title"
+      >
+        <div style={styles.nekodayoriCurrentHeader}>
+          <h2 id="nekodayori-current-title" style={styles.nekodayoriCurrentTitle}>
+            ねこだよりが届きました
+          </h2>
+        </div>
+        <p
+          data-testid="nekodayori-pending-count"
+          style={styles.nekodayoriCurrentCopy}
+        >
+          ひらいて、残したい猫を選べます。
+        </p>
+        <AppButton href="/home" variant="primary" fullWidth>
+          ねこだよりを見る
+        </AppButton>
+      </section>
+    );
+  }
+
+  return (
+    <section
+      data-testid="nekodayori-current"
+      data-state="waiting"
+      data-delivery-date-key={state.dateKey}
+      style={styles.nekodayoriWaiting}
+      aria-labelledby="nekodayori-current-title"
+    >
+      <p style={styles.nekodayoriCurrentKicker}>
+        {state.isTodayDelivery ? "今夜のねこだより" : "あしたのねこだより"}
+      </p>
+      <h2 id="nekodayori-current-title" style={styles.nekodayoriWaitingTitle}>
+        {state.isTodayDelivery
+          ? "よる8時ごろ、ねこだよりが届きます。"
+          : "あしたのよる8時ごろ、ねこだよりが届きます。"}
+      </h2>
+    </section>
+  );
+}
+
 function BoxOverview({
   dayGroups,
-  firstEveningDeliveryTargetDateKey,
+  side,
   catProfiles,
   playNavEntryMotion,
   onNavEntryMotionPlayed,
@@ -1703,7 +2023,7 @@ function BoxOverview({
   onOpenMainichiPhoto,
 }: {
   dayGroups: AlbumDayGroup[];
-  firstEveningDeliveryTargetDateKey: string | null;
+  side: MainichiBoardSide;
   catProfiles: CatProfile[];
   playNavEntryMotion: boolean;
   onNavEntryMotionPlayed: () => void;
@@ -1717,16 +2037,16 @@ function BoxOverview({
     source?: MainichiMorphSource | null,
   ) => void;
 }) {
-  const [activeBoardSide, setActiveBoardSide] =
-    useState<MainichiBoardSide>("delivered");
-
   return (
-    <section style={styles.boxOverview} aria-label="ねこだより">
+    <section
+      style={styles.boxOverview}
+      aria-label={
+        side === "sent" ? "ねこだよりに送る写真の設定" : "ねこだより"
+      }
+    >
       <MainichiPhotoBoard
         dayGroups={dayGroups}
-        activeSide={activeBoardSide}
-        onSideChange={setActiveBoardSide}
-        firstEveningDeliveryTargetDateKey={firstEveningDeliveryTargetDateKey}
+        side={side}
         catProfiles={catProfiles}
         playNavEntryMotion={playNavEntryMotion}
         onNavEntryMotionPlayed={onNavEntryMotionPlayed}
@@ -1739,9 +2059,7 @@ function BoxOverview({
 
 function MainichiPhotoBoard({
   dayGroups,
-  activeSide,
-  onSideChange,
-  firstEveningDeliveryTargetDateKey,
+  side,
   catProfiles,
   playNavEntryMotion,
   onNavEntryMotionPlayed,
@@ -1749,9 +2067,7 @@ function MainichiPhotoBoard({
   onOpenPhoto,
 }: {
   dayGroups: AlbumDayGroup[];
-  activeSide: MainichiBoardSide;
-  onSideChange: (side: MainichiBoardSide) => void;
-  firstEveningDeliveryTargetDateKey: string | null;
+  side: MainichiBoardSide;
   catProfiles: CatProfile[];
   playNavEntryMotion: boolean;
   onNavEntryMotionPlayed: () => void;
@@ -1764,55 +2080,25 @@ function MainichiPhotoBoard({
 }) {
   const contentMonths = useMemo(
     () =>
-      buildMainichiBoardMonths(
-        dayGroups,
-        activeSide,
-        firstEveningDeliveryTargetDateKey,
-        catProfiles,
-      ),
-    [
-      activeSide,
-      catProfiles,
-      dayGroups,
-      firstEveningDeliveryTargetDateKey,
-    ],
+      buildMainichiBoardMonths(dayGroups, side, null, catProfiles),
+    [catProfiles, dayGroups, side],
   );
-  const months = useMemo(
-    () => includeCurrentMainichiMonth(contentMonths),
-    [contentMonths],
-  );
-  const alternateContentMonths = useMemo(
-    () =>
-      buildMainichiBoardMonths(
-        dayGroups,
-        activeSide === "sent" ? "delivered" : "sent",
-        firstEveningDeliveryTargetDateKey,
-        catProfiles,
-      ),
-    [
-      activeSide,
-      catProfiles,
-      dayGroups,
-      firstEveningDeliveryTargetDateKey,
-    ],
-  );
+  const months = contentMonths;
   const prefersReducedMotion = usePrefersReducedMotion();
   const [pastingPhotoKey, setPastingPhotoKey] = useState<string | null>(null);
   const [selectedMonthKey, setSelectedMonthKey] = useState<string | null>(null);
   const [isMonthPickerOpen, setIsMonthPickerOpen] = useState(false);
-  const hasAutoSelectedBoardSideRef = useRef(false);
-  const hasUserSelectedBoardSideRef = useRef(false);
   const hasPlayedNavEntryMotionRef = useRef(false);
   const trackedBoardSideRef = useRef<MainichiBoardSide | null>(null);
 
   useEffect(() => {
-    if (trackedBoardSideRef.current === activeSide) {
+    if (trackedBoardSideRef.current === side) {
       return;
     }
 
-    trackedBoardSideRef.current = activeSide;
+    trackedBoardSideRef.current = side;
     trackProductEvent(
-      activeSide === "sent"
+      side === "sent"
         ? "collection_sent_tab_view"
         : "collection_received_tab_view",
       {
@@ -1820,21 +2106,7 @@ function MainichiPhotoBoard({
         month_count: months.length,
       },
     );
-  }, [activeSide, months.length]);
-
-  useEffect(() => {
-    if (
-      hasAutoSelectedBoardSideRef.current ||
-      hasUserSelectedBoardSideRef.current ||
-      contentMonths.length > 0 ||
-      alternateContentMonths.length === 0
-    ) {
-      return;
-    }
-
-    hasAutoSelectedBoardSideRef.current = true;
-    onSideChange(activeSide === "sent" ? "delivered" : "sent");
-  }, [activeSide, alternateContentMonths.length, contentMonths.length, onSideChange]);
+  }, [months.length, side]);
 
   useEffect(() => {
     if (months.length === 0) {
@@ -1909,14 +2181,11 @@ function MainichiPhotoBoard({
   return (
     <section style={styles.mainichiBoard} data-testid="mainichi-photo-board">
       <style>{MAINICHI_PASTE_MOTION_CSS}</style>
-      {selectedMonth || hasAnyBoardMonths ? (
+      {(selectedMonth || hasAnyBoardMonths) &&
+      (side === "sent" || months.length > 1) ? (
         <MainichiBoardHeader
           month={selectedMonth}
-          activeSide={activeSide}
-          onSideChange={(side) => {
-            hasUserSelectedBoardSideRef.current = true;
-            onSideChange(side);
-          }}
+          compact={side === "delivered"}
           onOpenMonthPicker={() => setIsMonthPickerOpen(true)}
         />
       ) : null}
@@ -1924,7 +2193,7 @@ function MainichiPhotoBoard({
         <AnimatePresence mode="wait" initial={shouldUseNavEntryMotion}>
           {selectedMonth && selectedMonth.photos.length > 0 ? (
             <motion.div
-              key={`${activeSide}-${selectedMonth.key}`}
+              key={`${side}-${selectedMonth.key}`}
               style={styles.mainichiMonthList}
               initial={{ opacity: 0, y: 12, scale: 0.992 }}
               animate={{ opacity: 1, y: 0, scale: 1 }}
@@ -1940,14 +2209,14 @@ function MainichiPhotoBoard({
             </motion.div>
           ) : (
             <motion.div
-              key={`empty-${activeSide}`}
+              key={`empty-${side}`}
               data-testid="mainichi-board-empty"
               initial={{ opacity: 0, y: 10 }}
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: -6 }}
               transition={{ duration: 0.24, ease: [0.22, 1, 0.36, 1] }}
             >
-              <MainichiBoardEmptyState activeSide={activeSide} />
+              <MainichiBoardEmptyState activeSide={side} />
             </motion.div>
           )}
         </AnimatePresence>
@@ -1969,72 +2238,51 @@ function MainichiPhotoBoard({
 
 function MainichiBoardHeader({
   month,
-  activeSide,
-  onSideChange,
+  compact,
   onOpenMonthPicker,
 }: {
   month: MainichiBoardMonth | null;
-  activeSide: MainichiBoardSide;
-  onSideChange: (side: MainichiBoardSide) => void;
+  compact: boolean;
   onOpenMonthPicker: () => void;
 }) {
   return (
-    <header style={styles.mainichiBoardHeader}>
+    <header
+      style={{
+        ...styles.mainichiBoardHeader,
+        ...(compact ? styles.mainichiBoardHeaderCompact : {}),
+      }}
+    >
       {month ? (
         <button
           type="button"
           data-testid="mainichi-month-select"
-          style={styles.mainichiMonthSelectButton}
+          style={{
+            ...styles.mainichiMonthSelectButton,
+            ...(compact ? styles.mainichiMonthSelectButtonCompact : {}),
+          }}
           onClick={onOpenMonthPicker}
           aria-label={`${month.label}をえらぶ`}
         >
-          <span style={styles.mainichiMonthSelectLabel}>{month.label}</span>
-          <span style={styles.mainichiMonthSelectChevron} aria-hidden="true">
+          <span
+            style={{
+              ...styles.mainichiMonthSelectLabel,
+              ...(compact ? styles.mainichiMonthSelectLabelCompact : {}),
+            }}
+          >
+            {month.label}
+          </span>
+          <span
+            style={{
+              ...styles.mainichiMonthSelectChevron,
+              ...(compact ? styles.mainichiMonthSelectChevronCompact : {}),
+            }}
+            aria-hidden="true"
+          >
             ⌄
           </span>
         </button>
       ) : null}
-      <MainichiSideTabs activeSide={activeSide} onSideChange={onSideChange} />
     </header>
-  );
-}
-
-function MainichiSideTabs({
-  activeSide,
-  onSideChange,
-}: {
-  activeSide: MainichiBoardSide;
-  onSideChange: (side: MainichiBoardSide) => void;
-}) {
-  const tabs = [
-    { value: "delivered" as const, label: "とどいた" },
-    { value: "sent" as const, label: "わたしのねがお" },
-  ];
-
-  return (
-    <div style={styles.mainichiBoardTabs} role="tablist" aria-label="写真の種類">
-      {tabs.map((tab) => {
-        const selected = activeSide === tab.value;
-
-        return (
-          <motion.button
-            key={tab.value}
-            type="button"
-            role="tab"
-            aria-selected={selected}
-            style={{
-              ...styles.mainichiBoardTab,
-              ...(selected ? styles.mainichiBoardTabActive : {}),
-            }}
-            onClick={() => onSideChange(tab.value)}
-            whileTap={{ scale: 0.96 }}
-            transition={{ duration: 0.14, ease: "easeOut" }}
-          >
-            {tab.label}
-          </motion.button>
-        );
-      })}
-    </div>
   );
 }
 
@@ -2066,17 +2314,25 @@ function MainichiBoardEmptyState({ activeSide }: { activeSide: MainichiBoardSide
         </span>
       </span>
       <p style={styles.mainichiBoardEmptyTitle}>
-        {isSent ? "まだねがおはありません" : "選んで保存した写真がここに並びます"}
+        {isSent
+          ? "まだねがおはありません"
+          : "まだ残したねこだよりはありません"}
       </p>
-      <AppButton
-        href="/home"
-        variant="secondary"
-        size="sm"
-        iconStart={<AppIcon name={isSent ? "camera" : "home"} size={14} />}
-        style={styles.mainichiBoardEmptyButton}
-      >
-        {isSent ? "ねがおを とる" : "ホームへ"}
-      </AppButton>
+      {isSent ? (
+        <AppButton
+          href="/home"
+          variant="secondary"
+          size="sm"
+          iconStart={<AppIcon name="camera" size={14} />}
+          style={styles.mainichiBoardEmptyButton}
+        >
+          ねがおを とる
+        </AppButton>
+      ) : (
+        <p style={styles.mainichiBoardEmptyCopy}>
+          えらんだ猫が、ここに増えていきます。
+        </p>
+      )}
     </section>
   );
 }
@@ -2387,7 +2643,7 @@ function MainichiNaturalMonthBoard({
                   photoKey: key,
                 });
               }}
-              aria-label={photo.side === "sent" ? "わたしのねがおをひらく" : "ねこだよりをひらく"}
+              aria-label={photo.side === "sent" ? "送る写真をひらく" : "ねこだよりをひらく"}
             >
               <StoredPhotoImage
                 src={photo.boardSrc}
@@ -2789,7 +3045,7 @@ function MainichiBoardPhotoCard({
       whileTap={cardMotion.whileTap}
       transition={cardMotion.transition}
       onClick={handleClick}
-      aria-label={photo.side === "sent" ? "わたしのねがおをひらく" : "ねこだよりをひらく"}
+      aria-label={photo.side === "sent" ? "送る写真をひらく" : "ねこだよりをひらく"}
     >
       {showTape ? (
         <motion.span
@@ -3083,21 +3339,21 @@ function MainichiFullscreenPhoto({
     pendingAction === "delete"
       ? {
           title: "この写真を削除しますか",
-          text: "この写真は「わたしのねがお」から削除され、今後のねこだよりには使われません。すでにほかの人へとどいたねこだよりは、その人の「とどいた」に残ります。",
+          text: "この写真は「うちのこ」と送る写真の設定から削除され、今後のねこだよりには使われません。すでにほかの人へとどいた写真は、その人の「ねこだより」に残ります。",
           confirm: "削除",
           variant: "danger" as const,
         }
       : pendingAction === "report"
         ? {
             title: "運営に報告しますか",
-            text: "この写真は「とどいた」から外れ、運営の確認対象になります。",
+            text: "この写真は「ねこだより」から外れ、運営の確認対象になります。",
             confirm: "報告",
             variant: "danger" as const,
           }
         : pendingAction === "hide"
           ? {
-              title: "「とどいた」から外しますか",
-              text: "この写真は「とどいた」に表示されなくなります。写真そのものや相手側の記録は削除されません。",
+              title: "「ねこだより」から外しますか",
+              text: "この写真は「ねこだより」に表示されなくなります。写真そのものや相手側の記録は削除されません。",
               confirm: "外す",
               variant: "secondary" as const,
             }
@@ -3318,8 +3574,8 @@ function MainichiFullscreenPhoto({
               variant="ghost"
               size="icon"
               iconOnly
-              aria-label="「とどいた」から外す"
-              title="「とどいた」から外す"
+              aria-label="「ねこだより」から外す"
+              title="「ねこだより」から外す"
               onClick={() => setPendingAction("hide")}
             >
               <AppIcon name="eyeOff" size={18} />
@@ -3377,6 +3633,7 @@ function BoxPhotoDetailSheet({
   const [pendingAction, setPendingAction] = useState<
     "delete" | "hide" | null
   >(null);
+  const photoScrollRef = useRef<HTMLDivElement>(null);
   const title = dayLabel ?? "ねこだより";
   const currentPhoto =
     photos[Math.max(0, Math.min(currentPhotoIndex, photos.length - 1))] ?? null;
@@ -3387,14 +3644,14 @@ function BoxPhotoDetailSheet({
     pendingAction === "delete"
       ? {
           title: "この写真を削除しますか",
-          text: "この写真は「わたしのねがお」から削除され、今後のねこだよりには使われません。すでにほかの人へとどいたねこだよりは、その人の「とどいた」に残ります。",
+          text: "この写真は「うちのこ」と送る写真の設定から削除され、今後のねこだよりには使われません。すでにほかの人へとどいた写真は、その人の「ねこだより」に残ります。",
           confirm: "削除",
           variant: "danger" as const,
         }
       : pendingAction === "hide"
         ? {
-            title: "「とどいた」から外しますか",
-            text: "この写真は「とどいた」に表示されなくなります。写真そのものや相手側の記録は削除されません。",
+            title: "「ねこだより」から外しますか",
+            text: "この写真は「ねこだより」に表示されなくなります。写真そのものや相手側の記録は削除されません。",
             confirm: "外す",
             variant: "secondary" as const,
           }
@@ -3403,6 +3660,16 @@ function BoxPhotoDetailSheet({
   useEffect(() => {
     setPendingAction(null);
   }, [currentPhoto?.id, kind]);
+
+  useLayoutEffect(() => {
+    const element = photoScrollRef.current;
+
+    if (!element) {
+      return;
+    }
+
+    element.scrollLeft = currentPhotoIndex * element.clientWidth;
+  }, [currentPhotoIndex]);
 
   function handleConfirmPendingAction() {
     if (!currentPhoto) {
@@ -3422,9 +3689,20 @@ function BoxPhotoDetailSheet({
     <AppBottomSheet title={title} onClose={onClose} variant="paper">
       {photos.length > 0 ? (
         <div style={styles.sheetPhotoArea}>
-          <div style={styles.photoScroll} onScroll={onPhotoScroll}>
+          <div
+            ref={photoScrollRef}
+            style={styles.photoScroll}
+            onScroll={onPhotoScroll}
+            data-testid="box-photo-scroll"
+            data-current-photo-id={currentPhoto?.id ?? undefined}
+          >
             {photos.map((photo) => (
-              <div key={photo.id} style={styles.photoSlide}>
+              <div
+                key={photo.id}
+                style={styles.photoSlide}
+                data-testid="box-detail-photo"
+                data-photo-id={photo.id}
+              >
                 <StoredPhotoImage
                   src={getPhotoDetailSrc(photo)}
                   fallbackSrcs={getPhotoFallbackSrcs(photo)}
@@ -3460,7 +3738,7 @@ function BoxPhotoDetailSheet({
           <span style={styles.photoEmptyText}>
             {kind === "sleeping"
               ? "ねがおを とると、ここに並びます"
-              : "「とどいた」に保存すると、ここに並びます"}
+              : "「ねこだより」に残すと、ここに並びます"}
           </span>
         </div>
       )}
@@ -3501,8 +3779,8 @@ function BoxPhotoDetailSheet({
             <div style={styles.boxIconActionBar} aria-label="写真の操作">
               <AppButton
                 type="button"
-                aria-label="「とどいた」から外す"
-                title="「とどいた」から外す"
+                aria-label="「ねこだより」から外す"
+                title="「ねこだより」から外す"
                 variant="danger"
                 size="icon"
                 iconOnly
@@ -4379,7 +4657,7 @@ function buildMainichiDayPhotos(
         offlineSrc: photo.offlineSrc,
         timestamp: photo.timestamp,
         kind: "sleeping" as const,
-        sideLabel: "わたしのねがお",
+        sideLabel: "送る写真",
         catName: catId ? catNameById.get(catId) : undefined,
         shared: photo.shared,
       };
@@ -5278,6 +5556,140 @@ function shouldShowMainichiBoardTape(index: number, total: number) {
   return [0, 4, 6, 8, 10, 14].includes(index);
 }
 
+function buildNekodayoriCurrentState({
+  activeCatId,
+  ownPhotos,
+  otherPhotos,
+  now,
+}: {
+  activeCatId: string | null;
+  ownPhotos: OwnSleepingPhoto[];
+  otherPhotos: BoxPreviewPhoto[];
+  now: number;
+}): NekodayoriCurrentState {
+  const eveningState = buildEveningHomeState({
+    activeCatId,
+    ownPhotos,
+    now,
+  });
+  const eveningStore = readEveningDeliveryStore();
+
+  if (
+    eveningState.kind === "delivered" &&
+    eveningState.deliveredPhotos.length > 0
+  ) {
+    return {
+      kind: "pending",
+      dateKey: eveningState.dateKey,
+      candidateCount: eveningState.deliveredPhotos.length,
+    };
+  }
+
+  if (eveningState.kind === "opened") {
+    const day = eveningStore[eveningState.dateKey];
+    const photo = findMatchingBoxPreviewPhoto(
+      otherPhotos,
+      eveningState.deliveredPhoto,
+    );
+
+    if (day && isKeptEveningDeliveryDay(day) && photo) {
+      return {
+        kind: "saved",
+        dateKey: eveningState.dateKey,
+        photo,
+      };
+    }
+  }
+
+  const displayDateKey = getNekodayoriDisplayDateKey(now);
+  const onboardingProgress = readOnboardingProgress();
+  const todayKey = getJstDateKey(now);
+  const isCurrentOnboardingProgress =
+    onboardingProgress?.dateKey === todayKey ||
+    onboardingProgress?.dateKey === displayDateKey;
+  const onboardingPhoto =
+    isCurrentOnboardingProgress &&
+    onboardingProgress?.isDeliveredPhotoKept &&
+    onboardingProgress.deliveredPhoto
+      ? findMatchingBoxPreviewPhoto(
+          otherPhotos,
+          onboardingProgress.deliveredPhoto,
+        )
+      : null;
+
+  if (onboardingProgress && onboardingPhoto) {
+    return {
+      kind: "saved",
+      dateKey: onboardingProgress.dateKey,
+      photo: onboardingPhoto,
+    };
+  }
+
+  if (eveningState.kind === "waiting") {
+    return {
+      kind: "waiting",
+      dateKey: eveningState.dateKey,
+      isTodayDelivery: eveningState.dateKey === getJstDateKey(now),
+    };
+  }
+
+  if (eveningStore[displayDateKey]?.skippedAt) {
+    return {
+      kind: "skipped",
+      dateKey: displayDateKey,
+    };
+  }
+
+  return {
+    kind: "none",
+    dateKey: null,
+  };
+}
+
+function getNekodayoriDisplayDateKey(now: number) {
+  const todayKey = getJstDateKey(now);
+  return getJstHour(now) < 5 ? addJstDays(todayKey, -1) : todayKey;
+}
+
+function isKeptEveningDeliveryDay(
+  day: ReturnType<typeof readEveningDeliveryStore>[string],
+) {
+  if (!day.deliveredPhoto || !day.openedAt || day.skippedAt) {
+    return false;
+  }
+
+  const isChoiceDelivery =
+    Boolean(day.selectedPhotoId) ||
+    day.servedVariant === "four_choice_v1";
+
+  return isChoiceDelivery
+    ? Boolean(day.selectedPhotoId && day.keptAt)
+    : true;
+}
+
+function findMatchingBoxPreviewPhoto(
+  photos: BoxPreviewPhoto[],
+  target: Pick<BoxPreviewPhoto, "id" | "sourcePhotoId" | "src">,
+) {
+  return photos.find((photo) => isSameBoxPreviewPhoto(photo, target)) ?? null;
+}
+
+function isSameBoxPreviewPhoto(
+  left: Pick<BoxPreviewPhoto, "id" | "sourcePhotoId" | "src">,
+  right: Pick<BoxPreviewPhoto, "id" | "sourcePhotoId" | "src">,
+) {
+  const rightIdentityKeys = new Set(getBoxPhotoIdentityKeys(right));
+
+  if (getBoxPhotoIdentityKeys(left).some((key) => rightIdentityKeys.has(key))) {
+    return true;
+  }
+
+  const rightContentKeys = new Set(getPhotoContentIdentityKeys(right));
+  return getPhotoContentIdentityKeys(left).some((key) =>
+    rightContentKeys.has(key),
+  );
+}
+
 function buildAlbumDayGroups(
   sleepingPhotos: BoxPreviewPhoto[],
   awakePhotos: BoxPreviewPhoto[],
@@ -5366,7 +5778,7 @@ function readOpenedEveningDeliveryBoxPhotos(): BoxPreviewPhoto[] {
   const store = readEveningDeliveryStore();
 
   return Object.values(store)
-    .filter((day) => Boolean(day.deliveredPhoto && day.openedAt))
+    .filter(isKeptEveningDeliveryDay)
     .filter((day) => !isExchangePhotoLocallyBlocked(day.deliveredPhoto!))
     .map((day) => {
       const deliveredPhoto = day.deliveredPhoto!;
@@ -5700,17 +6112,12 @@ function isUsableStoredPhotoSrc(src: string | null | undefined): src is string {
 }
 
 function getLocalDateKey(timestamp: number) {
-  const date = new Date(timestamp);
-  const year = date.getFullYear();
-  const month = `${date.getMonth() + 1}`.padStart(2, "0");
-  const day = `${date.getDate()}`.padStart(2, "0");
-
-  return `${year}-${month}-${day}`;
+  return getJstDateKey(timestamp);
 }
 
 function getAlbumDateLabelFromKey(key: string) {
-  const todayKey = getLocalDateKey(Date.now());
-  const yesterdayKey = getLocalDateKey(Date.now() - 24 * 60 * 60 * 1000);
+  const todayKey = getJstDateKey();
+  const yesterdayKey = addJstDays(todayKey, -1);
 
   if (key === todayKey) {
     return "今日";
@@ -6246,6 +6653,182 @@ const styles = {
     padding:
       "calc(18px + env(safe-area-inset-top)) 24px calc(var(--bottom-nav-height) + var(--bottom-nav-bottom-offset) + 96px + env(safe-area-inset-bottom))",
   },
+  nekodayoriOverview: {
+    display: "grid",
+    gap: "24px",
+  },
+  nekodayoriHeader: {
+    display: "grid",
+    gap: "7px",
+    padding: "8px 4px 0",
+  },
+  nekodayoriTitle: {
+    margin: 0,
+    color: COLLECTION_TEXT_STRONG,
+    fontFamily: "var(--font-ui)",
+    fontSize: "22px",
+    fontWeight: 500,
+    lineHeight: 1.25,
+    letterSpacing: "0.04em",
+  },
+  nekodayoriLead: {
+    margin: 0,
+    color: COLLECTION_MUTED,
+    fontFamily: "var(--font-ui)",
+    fontSize: "13px",
+    fontWeight: 400,
+    lineHeight: 1.65,
+    letterSpacing: "0.02em",
+  },
+  nekodayoriCurrent: {
+    display: "grid",
+    gap: "15px",
+    padding: "20px",
+    border: "1px solid color-mix(in srgb, var(--line) 74%, transparent)",
+    borderRadius: "var(--radius-xl)",
+    background:
+      "color-mix(in srgb, var(--paper-card) 78%, transparent)",
+    boxShadow:
+      "0 1px 0 color-mix(in srgb, white 42%, transparent) inset, 0 18px 34px -30px rgba(72,58,38,0.42)",
+  },
+  nekodayoriSaved: {
+    display: "grid",
+    gap: "10px",
+  },
+  nekodayoriSavedTitle: {
+    margin: "0 4px",
+    color: COLLECTION_TEXT_STRONG,
+    fontFamily: "var(--font-ui)",
+    fontSize: "15px",
+    fontWeight: 500,
+    lineHeight: 1.35,
+    letterSpacing: "0.03em",
+  },
+  nekodayoriCurrentHeader: {
+    display: "grid",
+    gap: "4px",
+  },
+  nekodayoriCurrentKicker: {
+    margin: 0,
+    color: "color-mix(in srgb, var(--seal) 78%, var(--ink-soft) 22%)",
+    fontFamily: "var(--font-ui)",
+    fontSize: "11px",
+    fontWeight: 500,
+    lineHeight: 1.3,
+    letterSpacing: "0.08em",
+  },
+  nekodayoriCurrentTitle: {
+    margin: 0,
+    color: COLLECTION_TEXT_STRONG,
+    fontFamily: "var(--font-ui)",
+    fontSize: "18px",
+    fontWeight: 500,
+    lineHeight: 1.35,
+    letterSpacing: "0.03em",
+  },
+  nekodayoriCurrentPhotoButton: {
+    width: "100%",
+    aspectRatio: "3 / 2",
+    padding: 0,
+    border: "none",
+    borderRadius: "18px",
+    background: "transparent",
+    boxShadow: "0 14px 26px -22px rgba(72,58,38,0.46)",
+    overflow: "hidden",
+    cursor: "pointer",
+  },
+  nekodayoriCurrentPhoto: {
+    display: "block",
+    width: "100%",
+    height: "100%",
+    objectFit: "cover",
+  },
+  nekodayoriCurrentCopy: {
+    margin: 0,
+    color: COLLECTION_MUTED,
+    fontFamily: "var(--font-ui)",
+    fontSize: "13px",
+    fontWeight: 400,
+    lineHeight: 1.55,
+    letterSpacing: "0.01em",
+  },
+  nekodayoriWaiting: {
+    display: "grid",
+    gap: "5px",
+    padding: "16px 18px",
+    borderTop: "1px solid color-mix(in srgb, var(--line) 62%, transparent)",
+    borderBottom: "1px solid color-mix(in srgb, var(--line) 62%, transparent)",
+  },
+  nekodayoriWaitingTitle: {
+    margin: 0,
+    color: COLLECTION_TEXT,
+    fontFamily: "var(--font-ui)",
+    fontSize: "15px",
+    fontWeight: 500,
+    lineHeight: 1.5,
+    letterSpacing: "0.02em",
+  },
+  nekodayoriHistory: {
+    display: "grid",
+    gap: "6px",
+  },
+  nekodayoriHistoryTitle: {
+    margin: "0 4px",
+    color: COLLECTION_TEXT_STRONG,
+    fontFamily: "var(--font-ui)",
+    fontSize: "15px",
+    fontWeight: 500,
+    lineHeight: 1.35,
+    letterSpacing: "0.03em",
+  },
+  nekodayoriManageLink: {
+    justifySelf: "center",
+    minHeight: "44px",
+    padding: "0 8px",
+    border: "none",
+    background: "transparent",
+    color: COLLECTION_MUTED,
+    font: "inherit",
+    fontSize: "12px",
+    fontWeight: 400,
+    lineHeight: 1.4,
+    textDecoration: "underline",
+    textUnderlineOffset: "4px",
+    cursor: "pointer",
+  },
+  nekodayoriManageHeader: {
+    display: "grid",
+    gap: "7px",
+    padding: "8px 4px 14px",
+  },
+  nekodayoriBackButton: {
+    justifySelf: "start",
+    minHeight: "44px",
+    padding: 0,
+    border: "none",
+    background: "transparent",
+    color: COLLECTION_MUTED,
+    font: "inherit",
+    fontSize: "12px",
+    fontWeight: 400,
+    cursor: "pointer",
+  },
+  nekodayoriManageTitle: {
+    margin: 0,
+    color: COLLECTION_TEXT_STRONG,
+    fontFamily: "var(--font-ui)",
+    fontSize: "20px",
+    fontWeight: 500,
+    lineHeight: 1.3,
+  },
+  nekodayoriManageLead: {
+    margin: 0,
+    color: COLLECTION_MUTED,
+    fontFamily: "var(--font-ui)",
+    fontSize: "12px",
+    fontWeight: 400,
+    lineHeight: 1.55,
+  },
   header: {
     marginBottom: "24px",
     paddingTop: "2px",
@@ -6306,6 +6889,9 @@ const styles = {
     padding: "18px 4px 2px",
     boxSizing: "border-box",
   },
+  mainichiBoardHeaderCompact: {
+    padding: "0 4px",
+  },
   mainichiMonthSelectButton: {
     justifySelf: "start",
     display: "inline-grid",
@@ -6325,12 +6911,26 @@ const styles = {
     cursor: "pointer",
     WebkitTapHighlightColor: "transparent",
   },
+  mainichiMonthSelectButtonCompact: {
+    minHeight: "44px",
+    border: "none",
+    background: "transparent",
+    boxShadow: "none",
+    padding: "0 4px",
+  },
   mainichiMonthSelectLabel: {
     fontFamily: "var(--font-display)",
     fontSize: "22px",
     fontWeight: 400,
     lineHeight: 1.1,
     letterSpacing: "0.06em",
+  },
+  mainichiMonthSelectLabelCompact: {
+    fontFamily: "var(--font-ui)",
+    fontSize: "13px",
+    fontWeight: 500,
+    lineHeight: 1.3,
+    letterSpacing: "0.02em",
   },
   mainichiMonthSelectChevron: {
     color: "color-mix(in srgb, var(--seal) 74%, var(--ink-soft) 26%)",
@@ -6339,6 +6939,9 @@ const styles = {
     fontWeight: 500,
     lineHeight: 1,
     transform: "translateY(-1px)",
+  },
+  mainichiMonthSelectChevronCompact: {
+    fontSize: "13px",
   },
   mainichiBoardTabs: {
     position: "relative",
@@ -6883,6 +7486,16 @@ const styles = {
     fontWeight: 400,
     lineHeight: 1.45,
     letterSpacing: "0.08em",
+  },
+  mainichiBoardEmptyCopy: {
+    maxWidth: "240px",
+    margin: "-6px 0 0",
+    color: COLLECTION_MUTED,
+    fontFamily: "var(--font-ui)",
+    fontSize: "12px",
+    fontWeight: 400,
+    lineHeight: 1.55,
+    letterSpacing: "0.01em",
   },
   mainichiBoardEmptyButton: {
     marginTop: "0",

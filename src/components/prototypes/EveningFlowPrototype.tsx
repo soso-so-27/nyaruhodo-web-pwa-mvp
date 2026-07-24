@@ -124,7 +124,7 @@ export function EveningFlowPrototype() {
       <header className={styles.header}>
         <span className={styles.badge}>確認専用・本番保存なし</span>
         <h1>よる8時を、いま試す</h1>
-        <p>写真を選んで、4枚から1枚を保存するところまで実機で確認できます。</p>
+        <p>写真を選んで、届いたねこだよりを残すところまで実機で確認できます。</p>
       </header>
 
       <section className={styles.phone} aria-live="polite">
@@ -195,7 +195,7 @@ export function EveningFlowPrototype() {
             {draftPhotoId ? (
               <p className={styles.draftNote}>さっき選んだ1枚から再開します。</p>
             ) : (
-              <p className={styles.draftNote}>今夜とどいた4枚のねこだよりを見てみましょう。</p>
+              <p className={styles.draftNote}>今夜とどいたねこだよりを見てみましょう。</p>
             )}
           </div>
         ) : null}
@@ -209,7 +209,7 @@ export function EveningFlowPrototype() {
                   {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img src={resolution.photo.src} alt="保存した猫" />
                 </div>
-                <h2>1枚を「とどいた」に保存しました</h2>
+                <h2>1枚を「ねこだより」に残しました</h2>
               </>
             ) : (
               <>

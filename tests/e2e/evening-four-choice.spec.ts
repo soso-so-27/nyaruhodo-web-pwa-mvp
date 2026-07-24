@@ -257,14 +257,14 @@ test.describe("20時便の4枚選択", () => {
       "true",
     );
     await expect(page.getByTestId("cats-active-cat-name")).toHaveText(
-      "4匹テスト猫",
+      "選択テスト猫",
     );
     await expect(page.getByTestId("cats-photo-today-card")).toContainText(
-      "きょうの4匹テスト猫",
+      "きょうの選択テスト猫",
     );
     const deliveryBridge = page.getByTestId("cats-photo-delivery-bridge");
     await expect(deliveryBridge).toContainText(
-      "きょうの4匹テスト猫から、4匹が届きました",
+      "きょうの選択テスト猫から、ねこだよりが届きました",
     );
     await expect(
       deliveryBridge.getByRole("link", { name: "ねこだよりを見る" }),
@@ -322,7 +322,7 @@ test.describe("20時便の4枚選択", () => {
       OWN_PHOTO_ID,
     );
     await expect(nextDayBridge).toContainText(
-      "7月22日の4匹テスト猫から、きょうの4匹が届きました",
+      "7月22日の選択テスト猫から、ねこだよりが届きました",
     );
     await expect(page.getByTestId("cats-photo-today-link")).toHaveCount(0);
   });
@@ -826,7 +826,7 @@ async function seedPendingEveningDelivery(
         JSON.stringify([
           {
             id: catId,
-            name: "4匹テスト猫",
+            name: "選択テスト猫",
             createdAt: new Date(capturedAt).toISOString(),
             updatedAt: new Date(capturedAt).toISOString(),
           },

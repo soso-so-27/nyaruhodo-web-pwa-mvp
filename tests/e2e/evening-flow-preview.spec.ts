@@ -47,7 +47,7 @@ test.describe("20時前の実機確認フロー", () => {
     await dialog.getByTestId("evening-four-choice-finish").click();
 
     await expect(page.getByTestId("evening-preview-done")).toContainText(
-      "1枚を「とどいた」に保存しました",
+      "1枚を「ねこだより」に残しました",
     );
     expect(protectedRequests).toEqual([]);
     expect(
@@ -55,7 +55,7 @@ test.describe("20時前の実機確認フロー", () => {
     ).toBeLessThanOrEqual(390);
   });
 
-  test("閉じて再開すると仮選択を保ち、保存しないでも終了できる", async ({
+  test("閉じる確認から戻っても仮選択を保ち、保存しないで終了できる", async ({
     page,
   }) => {
     await page.setViewportSize({ width: 320, height: 568 });
@@ -69,11 +69,10 @@ test.describe("20時前の実機確認フロー", () => {
     await selected.click();
     await dialog.getByTestId("evening-four-choice-close").click();
 
-    await expect(page.getByTestId("evening-preview-arrived")).toContainText(
-      "さっき選んだ1枚から再開します",
-    );
-    await page.getByTestId("evening-preview-open").click();
-    dialog = page.getByTestId("evening-four-choice");
+    await expect(
+      page.getByRole("dialog", { name: "選ぶのをやめますか？" }),
+    ).toBeVisible();
+    await page.getByRole("button", { name: "選ぶ画面にもどる" }).click();
     await expect(dialog.getByTestId("evening-four-choice-option").nth(1)).toHaveAttribute(
       "aria-checked",
       "true",

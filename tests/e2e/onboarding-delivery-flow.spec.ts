@@ -247,7 +247,7 @@ test.describe("onboarding delivery flow", () => {
     );
     await expect(
       page.locator('[data-onboarding-title="true"]'),
-    ).toHaveText("うちの猫のねがおを1枚残すと猫の写真が最大4枚とどく");
+    ).toHaveText("うちの猫のねがおを1枚残すとほかの猫の写真がとどく");
     await expect(
       page.getByText("自分のねこのねがおの写真を1枚選ぶと、", { exact: true }),
     ).toHaveCount(0);
@@ -338,7 +338,7 @@ test.describe("onboarding delivery flow", () => {
     await page.waitForTimeout(1600);
     await expectVisibleNonBlackImage(page.locator("main img").last());
     await expect(
-      page.getByText("「とどいた」に保存しました"),
+      page.getByText("「ねこだより」に残しました"),
     ).toBeVisible();
     await expect(
       page.getByText("ほかのおうちからとどいたねこだよりです。"),
@@ -420,7 +420,7 @@ test.describe("onboarding delivery flow", () => {
       page.getByRole("button", { name: "ホームへ進む" }),
     ).toBeVisible();
     await expect(
-      page.getByText("「とどいた」に保存しました"),
+      page.getByText("「ねこだより」に残しました"),
     ).toBeVisible();
     await expect(page.getByTestId("home-install-invitation")).toHaveCount(0);
     await expect(page.getByTestId("onboarding-delivered-photos").locator("img")).toHaveCount(1);
@@ -1386,7 +1386,7 @@ test.describe("onboarding delivery flow", () => {
     await page.waitForTimeout(1600);
 
     await expect(
-      page.getByText("「とどいた」に保存しました"),
+      page.getByText("「ねこだより」に残しました"),
     ).toBeVisible();
     await expect(
       page.getByRole("button", { name: "ホームへ進む" }),
@@ -1427,16 +1427,27 @@ test.describe("onboarding delivery flow", () => {
     expect(openedSnapshot.deliveredPhoto?.id).not.toBe(openedSnapshot.ownPhoto?.id);
 
     await page.goto("/collection");
-    await page.getByRole("tab", { name: "わたしのねがお" }).click();
+    await page
+      .getByRole("button", { name: "ねこだよりに送る写真の設定" })
+      .click();
     await expect(page.getByTestId("mainichi-board-photo-sent").first()).toBeVisible();
 
-    await page.getByRole("tab", { name: "とどいた" }).click();
-    await expect(page.getByTestId("mainichi-board-photo-delivered")).toHaveCount(1);
+    await page.getByRole("button", { name: "ねこだよりへ戻る" }).click();
+    await expect(page.getByTestId("nekodayori-current")).toHaveAttribute(
+      "data-state",
+      "saved",
+    );
+    await expect(page.getByTestId("nekodayori-current-saved-photo")).toHaveAttribute(
+      "data-photo-id",
+      openedSnapshot.deliveredPhoto?.id ?? "",
+    );
 
     await markOnboardingAlbumCreatedInBrowser(page);
     await page.goto("/collection");
-    await page.getByRole("tab", { name: "とどいた" }).click();
-    await expect(page.getByTestId("mainichi-board-photo-delivered")).toHaveCount(1);
+    await expect(page.getByTestId("nekodayori-current-saved-photo")).toHaveAttribute(
+      "data-photo-id",
+      openedSnapshot.deliveredPhoto?.id ?? "",
+    );
   });
 
   test("keeps signed onboarding deliveries in the received album", async ({
@@ -1514,9 +1525,11 @@ test.describe("onboarding delivery flow", () => {
       window.localStorage.setItem("analytics_anonymous_id", "anonymous-other-context");
     });
     await page.goto("/collection");
-    await page.getByRole("tab", { name: "とどいた" }).click();
 
-    await expect(page.getByTestId("mainichi-board-photo-delivered")).toHaveCount(1);
+    await expect(page.getByTestId("nekodayori-current-saved-photo")).toHaveAttribute(
+      "data-photo-id",
+      openedSnapshot.deliveredPhoto?.id ?? "",
+    );
   });
 
   test("does not show the PWA home install guide inside Instagram browser", async ({
@@ -1750,7 +1763,7 @@ test.describe("onboarding delivery flow", () => {
     await page.getByRole("button", { name: "ねこだよりを ひらく" }).click();
     await page.waitForTimeout(1600);
     await expect(
-      page.getByText("「とどいた」に保存しました"),
+      page.getByText("「ねこだより」に残しました"),
     ).toBeVisible();
 
     await page.goto("/onboarding?source=instagram_bio");
@@ -2933,10 +2946,14 @@ test.describe("onboarding delivery flow", () => {
     });
     await page.getByRole("button", { name: "ねこだよりを ひらく" }).click();
     await expect(page.getByTestId("onboarding-delivered-continue")).toBeEnabled();
+    const openedSnapshot = await readOnboardingDeliverySnapshot(page);
 
     await page.goto("/collection");
-    await page.getByRole("tab", { name: "とどいた" }).click();
-    await expect(page.getByTestId("mainichi-board-photo-delivered")).toHaveCount(1);
+    await expect(page.getByTestId("nekodayori-current-saved-photo")).toHaveAttribute(
+      "data-photo-id",
+      openedSnapshot.deliveredPhoto?.id ?? "",
+    );
+    await expect(page.getByTestId("mainichi-board-photo-delivered")).toHaveCount(0);
   });
 
   test("hands off only the current onboarding photos", async ({ page }) => {
@@ -3475,7 +3492,6 @@ test.describe("onboarding delivery flow", () => {
     );
 
     await page.goto("/collection");
-    await page.getByRole("tab", { name: "とどいた" }).click();
     const deliveredCard = page.getByTestId("mainichi-board-photo-delivered");
     await expect(deliveredCard).toHaveCount(1);
     await expect
@@ -3721,7 +3737,6 @@ test.describe("onboarding delivery flow", () => {
     }, { imageDataUrl });
 
     await page.goto("/collection");
-    await page.getByRole("tab", { name: "とどいた" }).click();
 
     await expect(page.getByTestId("mainichi-board-photo-delivered")).toHaveCount(1);
     const keptPhotos = await page.evaluate(() =>

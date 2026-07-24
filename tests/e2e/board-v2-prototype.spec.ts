@@ -10,13 +10,14 @@ import { isPublicProductionDeployment } from "../../src/lib/deploymentEnvironmen
 
 test.describe("production nekodayori natural board", () => {
   test.beforeEach(async ({ page }) => {
-    await seedBoard(page, 3, true);
+    await seedBoard(page, 3, 1);
   });
 
   test("uses natural ratios, f3 frames, no date badges, and newest-first order", async ({
     page,
   }) => {
     await page.goto("/collection");
+    await openSentPhotoSettings(page);
 
     const photos = page.getByTestId("mainichi-board-photo-sent");
     const board = page.getByTestId("mainichi-natural-board");
@@ -42,18 +43,19 @@ test.describe("production nekodayori natural board", () => {
     await expect(page.locator('[data-mainichi-paste-tape="true"]')).toHaveCount(0);
     await expect(page.locator('[data-testid="mainichi-date-badge"]')).toHaveCount(0);
 
-    await page.getByRole("tab", { name: "とどいた" }).click();
+    await page.getByRole("button", { name: "ねこだよりへ戻る" }).click();
     await expect(page.getByTestId("mainichi-board-photo-delivered")).toHaveCount(1);
   });
 
   test("pastes every decoded photo onto the board with the staggered motion", async ({
     page,
   }) => {
+    await seedBoard(page, 3, 3);
     await page.addInitScript(() => {
       sessionStorage.setItem("neteruneko_collection_nav_entry", "1");
     });
     await page.goto("/collection");
-    const photos = page.getByTestId("mainichi-board-photo-sent");
+    const photos = page.getByTestId("mainichi-board-photo-delivered");
     await expect(photos).toHaveCount(3);
     const motion = await photos.evaluateAll((items) =>
       items.map((item) => ({
@@ -74,8 +76,9 @@ test.describe("production nekodayori natural board", () => {
   test("keeps the selected current placement for a dense 31-photo month", async ({
     page,
   }) => {
-    await seedBoard(page, 31, false);
+    await seedBoard(page, 31, 0);
     await page.goto("/collection");
+    await openSentPhotoSettings(page);
 
     const photos = page.getByTestId("mainichi-board-photo-sent");
     await expect(photos).toHaveCount(18);
@@ -148,6 +151,7 @@ test.describe("production nekodayori natural board", () => {
     }, { src: displaySrc });
 
     await page.goto("/collection");
+    await openSentPhotoSettings(page);
     const photo = page.getByTestId("mainichi-board-photo-sent");
     await expect(photo).toHaveAttribute("data-display-natural-ratio", "2.000000");
     expect(requests).toEqual(
@@ -219,9 +223,15 @@ test.describe("production nekodayori natural board", () => {
   });
 });
 
-async function seedBoard(page: Page, sentCount: number, includeDelivered: boolean) {
+async function openSentPhotoSettings(page: Page) {
+  await page
+    .getByRole("button", { name: "ねこだよりに送る写真の設定" })
+    .click();
+}
+
+async function seedBoard(page: Page, sentCount: number, deliveredCount: number) {
   await page.addInitScript(
-    ({ count, delivered }) => {
+    ({ count, deliveredCount }) => {
       function makeDataUrl(color: string, width: number, height: number) {
         const canvas = document.createElement("canvas");
         canvas.width = width;
@@ -260,26 +270,26 @@ async function seedBoard(page: Page, sentCount: number, includeDelivered: boolea
           shared: true,
         };
       });
-      const kept = delivered
-        ? [
-            {
-              id: "delivered-board",
-              sourcePhotoId: "stock-board",
-              src: makeDataUrl("#8b6f62", 48, 32),
-              title: "ねこだより",
-              subtitle: "",
-              triggerLabel: "sleeping",
-              theme: "sleeping",
-              deliveredAt: newest - 90_000,
-            },
-          ]
-        : [];
+      const kept = Array.from({ length: deliveredCount }, (_, index) => ({
+        id: `delivered-board-${index + 1}`,
+        sourcePhotoId: `stock-board-${index + 1}`,
+        src: makeDataUrl(
+          `hsl(${(index * 53 + 24) % 360} 32% 52%)`,
+          shapes[index % shapes.length].width,
+          shapes[index % shapes.length].height,
+        ),
+        title: "ねこだより",
+        subtitle: "",
+        triggerLabel: "sleeping",
+        theme: "sleeping",
+        deliveredAt: newest - (index + 1) * 90_000,
+      }));
 
       window.localStorage.setItem("active_cat_id", catId);
       window.localStorage.setItem("cat_profiles", JSON.stringify([{ id: catId, name: "むぎ" }]));
       window.localStorage.setItem("nyaruhodo_exchange_own_sleeping_photos", JSON.stringify(sent));
       window.localStorage.setItem("nyaruhodo_exchange_kept_photos", JSON.stringify(kept));
     },
-    { count: sentCount, delivered: includeDelivered },
+    { count: sentCount, deliveredCount },
   );
 }

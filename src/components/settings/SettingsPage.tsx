@@ -1661,7 +1661,7 @@ function KeptExchangeDebugPanel({
   return (
     <AppCard as="div" variant="inset" padding="sm" style={styles.authDebugPanel}>
       <p style={styles.syncOverviewText}>
-        アルバムの「とどいた」に出るねこだよりの端末内保存状態です。
+        「ねこだより」に残した写真の端末内保存状態です。
       </p>
       <div style={styles.authDebugRows}>
         <AuthDebugRow label="保存件数" value={`${debug.validCount}枚`} />
@@ -1865,7 +1865,7 @@ function SyncResultDetails({
   const rows = [
     ["この子の写真", result.restoredCatGalleryPhotos + result.pushedCatGalleryPhotos, "枚"],
     ["アルバム写真", result.restoredCollectionPhotos + result.pushedCollectionPhotos, "枚"],
-    ["わたしのねがお", result.restoredOwnSleepingPhotos + result.pushedOwnSleepingPhotos, "枚"],
+    ["うちのこのねがお", result.restoredOwnSleepingPhotos + result.pushedOwnSleepingPhotos, "枚"],
     ["とどいた ねこだより", result.restoredKeptExchangePhotos + result.pushedKeptExchangePhotos, "枚"],
     ["猫", result.restoredCats + result.pushedCats, "匹"],
     ["記録", result.restoredRecords + result.pushedRecords, "件"],
@@ -1952,11 +1952,11 @@ function getSyncResultMessage(
 
 function formatSyncError(error: string) {
   if (error.includes("cat_moments") || error.includes("Sleeping photo")) {
-    return "「わたしのねがお」の保存先を確認できませんでした。";
+    return "「うちのこのねがお」の保存先を確認できませんでした。";
   }
 
   if (error.includes("cat_moment_deliveries") || error.includes("Kept photo")) {
-    return "「とどいた」の保存先を確認できませんでした。";
+    return "「ねこだより」の保存先を確認できませんでした。";
   }
 
   if (error.includes("collection_photos") || error.includes("Collection photo")) {

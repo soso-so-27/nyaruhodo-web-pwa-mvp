@@ -12,7 +12,7 @@ import styles from "./about.module.css";
 
 const title = "ねてるねこ｜よる8時に、ねこだよりがとどく";
 const description =
-  "猫のねがおを1枚選ぶと、初回は最大4枚のねこだよりがとどき、その中から1枚を保存できます。次からは、ねがおを選ぶと、次のよる8時ごろにねこだよりがとどく、静かなWebアプリです。";
+  "猫のねがおを1枚選ぶと、ほかのおうちのねこだよりがとどき、残したい1枚を保存できます。次からは、ねがおを選ぶと、次のよる8時ごろにねこだよりがとどく、静かなWebアプリです。";
 
 export const metadata: Metadata = {
   title,
@@ -103,7 +103,7 @@ export default function AboutPage() {
           <p className={styles.heroLead}>
             じぶんの猫のねがおを一枚選ぶと、
             <br />
-            最初は最大4枚とどき、その中から1枚を保存できます。
+            どこかのおうちのねこだよりがとどき、気になる一枚を残せます。
           </p>
           <ServiceSiteCta className={styles.heroCta} placement="hero">
             ねがおを選んではじめる
@@ -169,7 +169,7 @@ export default function AboutPage() {
             <p className={styles.sectionLabel}>そのあと</p>
             <h2>ねがおは、静かに残っていきます。</h2>
             <p>
-              とったねがおは「わたしのねがお」へ。選んだねこだよりは「とどいた」へ。
+              とった写真は「うちのこ」へ。選んだ猫は「ねこだより」へ。
               この子の写真や記録といっしょに、日々が少しずつ積もります。
             </p>
             <p>

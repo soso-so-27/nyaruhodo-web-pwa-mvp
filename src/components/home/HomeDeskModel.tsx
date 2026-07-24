@@ -359,7 +359,7 @@ export function HomeDeskModel({
   const shouldShowHomeFrameTakeButton =
     deskState === "1" && homeDay.phase === "empty-before";
   const homeCaptureHint =
-    "写真は「うちのこ」に残ります。「ねこだよりにする」と、よる8時ごろ4枚とどきます。";
+    "写真は「うちのこ」に残ります。「ねこだよりにする」と、よる8時ごろ届きます。";
   const shouldShowHomeFrameRetakeLink =
     deskState === "2" && homeDay.phase === "sent-before";
   const shouldHidePresence = true;
@@ -733,7 +733,7 @@ export function HomeDeskModel({
                     showOpeningWait
                       ? "ねこだよりをひらいています"
                       : deliveredCandidateCount === 4
-                        ? "4枚から保存する1枚をえらぶ"
+                        ? "残す猫をえらぶ"
                         : "ねこだよりをひらく"
                   }
                   aria-busy={isEnvelopeOpening}
@@ -875,9 +875,7 @@ export function HomeDeskModel({
                             }),
                       }}
                     >
-                      {deliveredCandidateCount === 4
-                        ? "ねこだよりが4枚とどいた"
-                        : "ねこだより、とどいた"}
+                      ねこだより、とどいた
                     </strong>
                     <span
                       data-envelope-action={usesEnvelopeHome ? "true" : undefined}
@@ -1409,8 +1407,8 @@ function DeskPhotoViewer({
               <p style={deskStyles.viewerOwnKicker}>きょうの ねがお</p>
               <p style={deskStyles.viewerOwnNote}>
                 {viewerPhoto.kind === "own" && viewerPhoto.photo.shared
-                  ? "「わたしのねがお」に保存しています。運営確認後、ねこだよりの候補になります"
-                  : "「わたしのねがお」に自分だけで保存しています"}
+                  ? "「うちのこ」に保存しています。運営確認後、ねこだよりの候補になります"
+                  : "「うちのこ」に自分だけで保存しています"}
               </p>
             </div>
             <span style={deskStyles.viewerOwnHeaderSpacer} aria-hidden="true" />
@@ -1494,7 +1492,7 @@ function DeskPhotoViewer({
             style={deskStyles.viewerSaveButtonLayout}
             onClick={handleStow}
           >
-            「とどいた」に保存
+            ねこだよりに残す
           </AppButton>
         ) : null}
       </motion.section>
@@ -1967,7 +1965,7 @@ function HomeLetterTrayText({
       <>
         <strong style={deskStyles.letterTrayTitle}>きのう選んだ写真は</strong>
         <span style={deskStyles.letterTraySub}>
-          {keyword("「とどいた」")}に保存しました
+          {keyword("「ねこだより」")}に残しました
         </span>
       </>
     );
@@ -1988,7 +1986,7 @@ function HomeLetterTrayText({
           {keyword("「うちのこ」")}に保存しました
         </strong>
         <span style={deskStyles.letterTraySub}>
-          あしたの よる8時ごろ、4枚とどきます
+          あしたの よる8時ごろ、ねこだよりがとどきます
         </span>
       </>
     );
@@ -2012,7 +2010,7 @@ function HomeLetterTrayText({
           {keyword("「うちのこ」")}に保存しました
         </strong>
         <span style={deskStyles.letterTraySub}>
-          よる8時ごろ、4枚のねこだよりがとどきます
+          よる8時ごろ、ねこだよりがとどきます
         </span>
       </>
     );

@@ -325,7 +325,7 @@ test("shows a useful empty state before the first daily photo", async ({ page })
 
   await expect(page.getByTestId("cats-photo-highlights")).toHaveCount(0);
   await expect(page.getByTestId("cats-photo-today-link")).toContainText(
-    "きょうの一枚を撮ると、4匹が届きます",
+    "きょうの一枚を撮ると、ねこだよりが届きます",
   );
   await expect(page.getByTestId("cats-photo-all-dates")).toHaveText("むぎの写真");
   await expect(page.getByText("0枚", { exact: true })).toBeVisible();
@@ -384,7 +384,7 @@ test("links an onboarding four-choice save back to nekodayori", async ({ page })
 
   const bridge = page.getByTestId("cats-photo-delivery-bridge");
   await expect(bridge).toContainText(
-    "きょうのむぎから、4匹が届きました",
+    "きょうのむぎから、ねこだよりが届きました",
   );
   await expect(
     bridge.getByRole("link", { name: "ねこだよりを見る" }),

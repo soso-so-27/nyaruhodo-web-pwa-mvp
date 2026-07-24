@@ -69,7 +69,7 @@ const startupImages = [
 export const metadata: Metadata = {
   metadataBase: new URL(siteUrl),
   title: "ねてるねこ",
-  description: "猫のねがおを1枚選ぶと、ほかの猫のねこだよりが最大4枚とどくアプリ",
+  description: "猫のねがおを1枚選ぶと、ほかのおうちからねこだよりがとどくアプリ",
   applicationName: "ねてるねこ",
   manifest: "/manifest.webmanifest",
   appleWebApp: {
