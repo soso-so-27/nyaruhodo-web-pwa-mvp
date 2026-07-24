@@ -15,6 +15,7 @@ type BottomNavigationProps = {
   active: "home" | "today" | "collection" | "cats";
   homeVariant?: "default" | "desk";
   homeState?: "1" | "1b" | "2" | "3" | "4";
+  onActiveItemClick?: () => void;
 };
 
 type NavItem = {
@@ -35,6 +36,7 @@ const COLLECTION_NAV_ENTRY_STORAGE_KEY = "neteruneko_collection_nav_entry";
 export function BottomNavigation({
   active,
   homeState = "1",
+  onActiveItemClick,
 }: BottomNavigationProps) {
   const catIllustrations = useCatIllustrationAssets();
   const router = useRouter();
@@ -109,7 +111,10 @@ export function BottomNavigation({
     item: NavItem,
     isActive: boolean,
   ) {
-    if (isActive) return;
+    if (isActive) {
+      onActiveItemClick?.();
+      return;
+    }
     if (event.defaultPrevented || event.button !== 0) return;
     if (event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
 

@@ -1267,6 +1267,10 @@ test.describe("home desk model", () => {
 
     await page.goto("/cats");
     await page.waitForLoadState("networkidle");
+    await expect(
+      page.getByTestId("cats-section-tab-record-dot"),
+    ).toBeVisible();
+    await page.getByTestId("cats-section-tab-record").click();
     await expect(page.getByTestId("cats-nav-unopened-omoide-dot")).toBeVisible();
     await expect(page.getByTestId("cats-pickup-unopened-omoide-dot")).toBeVisible();
 
@@ -1277,6 +1281,7 @@ test.describe("home desk model", () => {
     await expect(page.getByTestId("omoide-memory-cue")).toHaveCount(0);
     await expect(page.getByTestId("cats-nav-unopened-omoide-dot")).toHaveCount(0);
     await expect(page.getByTestId("cats-pickup-unopened-omoide-dot")).toHaveCount(0);
+    await expect(page.getByTestId("cats-section-tab-record-dot")).toHaveCount(0);
     await page.mouse.click(12, 12);
     await expect(page.getByTestId("omoide-memory-viewer")).toHaveCount(0);
 
@@ -1290,6 +1295,13 @@ test.describe("home desk model", () => {
     await expect(bunbako).toBeVisible();
     await expect(bunbako.getByText("思い出箱")).toBeVisible();
     await expect(bunbako.getByText("はじめての、ねがお。")).toBeVisible();
+
+    await page.getByRole("link", { name: "うちのこ" }).click();
+    await expect(page).toHaveURL(/\/cats$/);
+    await expect(page.getByTestId("cats-section-tab-photos")).toHaveAttribute(
+      "aria-checked",
+      "true",
+    );
   });
 
   test("keeps an already used source photo out of a new omoide delivery", async ({
@@ -1326,6 +1338,7 @@ test.describe("home desk model", () => {
 
     await page.goto("/cats");
     await page.waitForLoadState("networkidle");
+    await page.getByTestId("cats-section-tab-record").click();
     await expect(page.getByTestId("cats-pickup-unopened-omoide-dot")).toHaveCount(0);
     await expect(page.getByTestId("omoide-bunbako")).toHaveCount(0);
     await expect

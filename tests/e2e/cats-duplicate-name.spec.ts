@@ -66,6 +66,7 @@ test("shows birthday countdown on the cat page", async ({
 
   await page.goto("/cats");
   await page.waitForLoadState("networkidle");
+  await page.getByTestId("cats-section-tab-record").click();
 
   const celebrations = page.getByRole("region", { name: "記念" });
   await expect(celebrations).toContainText("誕生日");
@@ -82,6 +83,7 @@ test("shows the special birthday text on the cat birthday", async ({ page }) => 
 
   await page.goto("/cats");
   await page.waitForLoadState("networkidle");
+  await page.getByTestId("cats-section-tab-record").click();
 
   await expect(page.getByText("きょうは 誕生日")).toBeVisible();
 });

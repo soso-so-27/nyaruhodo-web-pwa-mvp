@@ -252,11 +252,79 @@ test.describe("20時便の4枚選択", () => {
 
     await expect(page).toHaveURL(/\/cats$/);
     await expect(page.getByTestId("cats-page")).toBeVisible();
+    await expect(page.getByTestId("cats-section-tab-photos")).toHaveAttribute(
+      "aria-checked",
+      "true",
+    );
+    await expect(page.getByTestId("cats-active-cat-name")).toHaveText(
+      "4匹テスト猫",
+    );
+    await expect(page.getByTestId("cats-photo-today-card")).toContainText(
+      "きょうの4匹テスト猫",
+    );
+    const deliveryBridge = page.getByTestId("cats-photo-delivery-bridge");
+    await expect(deliveryBridge).toContainText(
+      "きょうの4匹テスト猫から、4匹が届きました",
+    );
+    await expect(
+      deliveryBridge.getByRole("link", { name: "ねこだよりを見る" }),
+    ).toHaveAttribute("href", "/collection");
+    const firstOwnPhoto = page
+      .getByTestId("cats-lens-photo-grid")
+      .locator(":scope > div")
+      .first();
+    await expect(firstOwnPhoto.getByText("7/22", { exact: true })).toBeVisible();
     await expect
       .poll(() =>
         page.evaluate(() => window.localStorage.getItem("active_cat_id")),
       )
       .toBe(CAT_ID);
+  });
+
+  test("20時以降に撮った前日の一枚にも、翌日の4匹を結びつける", async ({
+    page,
+  }) => {
+    const nextDeliveryDateKey = "2026-07-23";
+    const nextDeliveryNow = Date.parse("2026-07-23T11:05:00.000Z");
+    const capturedAfterEight = Date.parse("2026-07-22T11:30:00.000Z");
+    await page.setViewportSize({ width: 320, height: 568 });
+    await seedPendingEveningDelivery(
+      page,
+      "next-day-own-record",
+      nextDeliveryNow,
+      {
+        dateKey: nextDeliveryDateKey,
+        capturedAt: capturedAfterEight,
+      },
+    );
+    await mockFourChoiceExchange(page);
+
+    await page.goto("/home");
+    await page.getByTestId("desk-open-letter").click();
+    const choiceDialog = page.getByTestId("evening-four-choice");
+    await choiceDialog
+      .locator(
+        '[data-testid="evening-four-choice-option"][data-photo-id="four-choice-delivery-1"]',
+      )
+      .click();
+    await choiceDialog.getByTestId("evening-four-choice-save").click();
+    await choiceDialog.getByTestId("evening-four-choice-own-record").click();
+
+    await expect(page).toHaveURL(/\/cats$/);
+    await expect(page.getByTestId("cats-photo-today-card")).toHaveCount(0);
+    await expect(page.getByTestId("cats-photo-memory-card")).toHaveAttribute(
+      "data-photo-id",
+      OWN_PHOTO_ID,
+    );
+    const nextDayBridge = page.getByTestId("cats-photo-delivery-bridge");
+    await expect(nextDayBridge).toHaveAttribute(
+      "data-source-photo-id",
+      OWN_PHOTO_ID,
+    );
+    await expect(nextDayBridge).toContainText(
+      "7月22日の4匹テスト猫から、きょうの4匹が届きました",
+    );
+    await expect(page.getByTestId("cats-photo-today-link")).toHaveCount(0);
   });
 
   test("閉じる前に確認し、選択に戻るか今回分を保存せず終了できる", async ({
@@ -727,6 +795,10 @@ async function seedPendingEveningDelivery(
   page: Page,
   seedName: string,
   now = AFTER_DELIVERY,
+  options: {
+    dateKey?: string;
+    capturedAt?: number;
+  } = {},
 ) {
   await page.addInitScript(
     ({
@@ -794,9 +866,9 @@ async function seedPendingEveningDelivery(
     },
     {
       afterDelivery: now,
-      capturedAt: CAPTURED_AT,
+      capturedAt: options.capturedAt ?? CAPTURED_AT,
       catId: CAT_ID,
-      dateKey: DATE_KEY,
+      dateKey: options.dateKey ?? DATE_KEY,
       ownPhotoId: OWN_PHOTO_ID,
       photoDataUrl: PHOTO_DATA_URL,
       seedMarker: `neteruneko_e2e_four_choice_seeded_${seedName}`,

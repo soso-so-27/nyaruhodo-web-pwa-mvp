@@ -47,22 +47,21 @@ for (const sample of timeSamples) {
   });
 }
 
-test("keeps the cats photo tab clear of the fixed bottom navigation", async ({
-  page,
-}) => {
+test("keeps the cats photo tab clear of the fixed bottom navigation", async ({ page }) => {
   await seedCatsProfile(page, Date.parse("2026-06-10T12:30:00+09:00"), 8);
   await page.setViewportSize({ width: 390, height: 844 });
   await page.goto("/cats");
   await page.waitForLoadState("networkidle");
-  await page.getByTestId("cats-section-tab-photos").click();
 
   const grid = page.getByTestId("cats-lens-photo-grid");
   const photoItems = grid.locator(":scope > div");
   const tabs = page.getByTestId("cats-section-tabs");
-  const cover = page.getByTestId("cats-profile-cover");
-  const automaticCoverFrame = cover.locator("img").first().locator("xpath=..");
+  const sectionTabs = tabs.getByRole("radio");
   const nav = page.getByRole("navigation");
 
+  await expect(page.getByTestId("cats-section-tab-photos")).toHaveAttribute("aria-checked", "true");
+  await expect(sectionTabs).toHaveText(["写真", "記録", "基本"]);
+  await expect(page.getByTestId("cats-active-cat-name")).toHaveText("むぎ");
   await expect(grid).toBeVisible();
   await expect(grid).toHaveAttribute("data-photo-decode-gate", "ready");
   await expect
@@ -75,26 +74,26 @@ test("keeps the cats photo tab clear of the fixed bottom navigation", async ({
       ),
     )
     .toBe(true);
-  await expect(page.getByText("この子の写真")).toBeVisible();
-  await expect(
-    page.getByText("残しておきたい写真を、ここに追加できます。"),
-  ).toBeVisible();
+  await expect(page.getByTestId("cats-profile-cover")).toHaveCount(0);
+  await expect(page.getByTestId("cats-photo-highlights")).toHaveAttribute("data-layout", "pair");
+  await expect(page.getByTestId("cats-photo-today-card")).toContainText("きょうのむぎ");
+  await expect(page.getByTestId("cats-photo-memory-card")).toBeVisible();
+  await expect(page.getByTestId("cats-photo-delivery-bridge")).toHaveCount(0);
+  await expect(page.getByTestId("cats-photo-current-month")).toHaveText("6月のむぎ");
+  await expect(page.getByText("16枚", { exact: true })).toBeVisible();
+  await expect(photoItems.first().getByText("6/10", { exact: true })).toBeVisible();
   await expect(page.getByTestId("cats-photo-lens-filter")).toHaveCount(0);
   await expect(page.getByRole("button", { name: "写真を追加" })).toBeVisible();
   await expect(photoItems).toHaveCount(16);
   await expect(grid.locator('[data-app-pressable="photo"]')).toHaveCount(16);
   await expect
     .poll(() =>
-      page.evaluate(() =>
-        document.documentElement.classList.contains("cats-scrollbar-quiet"),
-      ),
+      page.evaluate(() => document.documentElement.classList.contains("cats-scrollbar-quiet")),
     )
     .toBe(true);
 
   const gridMetrics = await page.evaluate(() => {
-    const photoGrid = document.querySelector<HTMLElement>(
-      '[data-testid="cats-lens-photo-grid"]',
-    );
+    const photoGrid = document.querySelector<HTMLElement>('[data-testid="cats-lens-photo-grid"]');
     const firstTile = photoGrid?.querySelector<HTMLButtonElement>(":scope > div button");
     const firstFrame = firstTile?.querySelector<HTMLElement>("span");
     const firstImage = firstTile?.querySelector<HTMLImageElement>("img");
@@ -109,16 +108,14 @@ test("keeps the cats photo tab clear of the fixed bottom navigation", async ({
       columnGap: photoGrid ? getComputedStyle(photoGrid).columnGap : "",
       rowGap: photoGrid ? getComputedStyle(photoGrid).rowGap : "",
       frameBorderWidth: firstFrame ? getComputedStyle(firstFrame).borderWidth : "",
-      frameBorderRadius: firstFrame
-        ? getComputedStyle(firstFrame).borderRadius
-        : "",
+      frameBorderRadius: firstFrame ? getComputedStyle(firstFrame).borderRadius : "",
       frameBoxShadow: firstFrame ? getComputedStyle(firstFrame).boxShadow : "",
       imageObjectFit: firstImage ? getComputedStyle(firstImage).objectFit : "",
       itemWidth: firstRect?.width ?? 0,
       frameWidth: frameRect?.width ?? 0,
-      horizontalGap:
-        firstRect && secondRect ? secondRect.left - firstRect.right : 0,
+      horizontalGap: firstRect && secondRect ? secondRect.left - firstRect.right : 0,
       verticalGap: firstRect && fourthRect ? fourthRect.top - firstRect.bottom : 0,
+      verticalPhotoGap: frameRect && fourthRect ? fourthRect.top - frameRect.bottom : 0,
     };
   });
   expect(gridMetrics.columnGap).toBe("2px");
@@ -129,38 +126,269 @@ test("keeps the cats photo tab clear of the fixed bottom navigation", async ({
   expect(gridMetrics.imageObjectFit).toBe("cover");
   expect(gridMetrics.frameWidth).toBeCloseTo(gridMetrics.itemWidth, 5);
   expect(gridMetrics.horizontalGap).toBeCloseTo(2, 5);
-  expect(gridMetrics.verticalGap).toBeCloseTo(2, 5);
+  expect(gridMetrics.verticalGap).toBeGreaterThanOrEqual(2);
+  expect(gridMetrics.verticalPhotoGap).toBeGreaterThan(2);
+  expect(gridMetrics.verticalPhotoGap).toBeLessThan(32);
 
-  const [tabsBox, coverBox, automaticCoverFrameBox, navBoxBeforeScroll] = await Promise.all([
-    tabs.boundingBox(),
-    cover.boundingBox(),
-    automaticCoverFrame.boundingBox(),
-    nav.boundingBox(),
-  ]);
+  const [tabsBox, navBoxBeforeScroll] = await Promise.all([tabs.boundingBox(), nav.boundingBox()]);
   expect(tabsBox?.height).toBe(48);
-  expect(coverBox?.height).toBe(232);
-  expect(coverBox?.width).toBeGreaterThanOrEqual(370);
-  expect(automaticCoverFrameBox?.width).toBeCloseTo((coverBox?.width ?? 0) - 2, 1);
-  expect(automaticCoverFrameBox?.height).toBeCloseTo((coverBox?.height ?? 0) - 2, 1);
   expect(navBoxBeforeScroll?.height).toBe(60);
 
   const lastPhoto = photoItems.last();
   await lastPhoto.scrollIntoViewIfNeeded();
-  const [lastPhotoBox, navBox] = await Promise.all([
-    lastPhoto.boundingBox(),
-    nav.boundingBox(),
-  ]);
+  const [lastPhotoBox, navBox] = await Promise.all([lastPhoto.boundingBox(), nav.boundingBox()]);
 
   expect(lastPhotoBox).not.toBeNull();
   expect(navBox).not.toBeNull();
-  expect((lastPhotoBox?.y ?? 0) + (lastPhotoBox?.height ?? 0)).toBeLessThan(
-    navBox?.y ?? 0,
-  );
+  expect((lastPhotoBox?.y ?? 0) + (lastPhotoBox?.height ?? 0)).toBeLessThan(navBox?.y ?? 0);
 
   await page.getByRole("button", { name: "写真を追加" }).click();
+  await expect(page.getByText("追加した写真は、ねこだよりには使われません。")).toBeVisible();
+});
+
+test("does not treat a same-day gallery photo as today's daily photo", async ({ page }) => {
+  const now = Date.parse("2026-07-23T20:30:00+09:00");
+  await seedCatsPhotoTabState(page, {
+    now,
+    sleepingPhotos: [
+      {
+        id: "own-sleeping-yesterday",
+        createdAt: Date.parse("2026-07-22T19:00:00+09:00"),
+      },
+    ],
+    galleryPhotos: [
+      {
+        id: "cat-gallery-today",
+        createdAt: Date.parse("2026-07-23T20:00:00+09:00"),
+      },
+    ],
+  });
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto("/cats");
+  await page.waitForLoadState("networkidle");
+
+  await expect(page.getByTestId("cats-photo-highlights")).toHaveAttribute("data-layout", "single");
+  await expect(page.getByTestId("cats-photo-today-card")).toHaveCount(0);
+  await expect(page.getByTestId("cats-photo-memory-card")).toHaveAttribute(
+    "data-photo-id",
+    "own-sleeping-yesterday",
+  );
+  await expect(page.getByTestId("cats-photo-today-link")).toHaveAttribute("href", "/home");
+  await expect(page.getByTestId("cats-photo-delivery-bridge")).toHaveCount(0);
+  await expect(page.getByTestId("cats-photo-current-month")).toHaveText("7月のむぎ");
+  await expect(page.getByTestId("cats-lens-photo-grid").locator(":scope > div")).toHaveCount(2);
+  await expect(page.getByTestId("cats-photo-older")).toHaveCount(0);
+});
+
+test("does not offer a second household daily photo from another cat", async ({ page }) => {
+  const now = Date.parse("2026-07-23T20:30:00+09:00");
+  await seedCatsPhotoTabState(page, {
+    now,
+    sleepingPhotos: [],
+    galleryPhotos: [],
+  });
+  await page.addInitScript(
+    ({ nowValue, src }) => {
+      const nowIso = new Date(nowValue).toISOString();
+      window.localStorage.setItem(
+        "cat_profiles",
+        JSON.stringify([
+          {
+            id: "cat-mugi",
+            name: "むぎ",
+            createdAt: nowIso,
+            updatedAt: nowIso,
+          },
+          {
+            id: "cat-komugi",
+            name: "こむぎ",
+            createdAt: nowIso,
+            updatedAt: nowIso,
+          },
+        ]),
+      );
+      window.localStorage.setItem(
+        "nyaruhodo_exchange_own_sleeping_photos",
+        JSON.stringify([
+          {
+            id: "komugi-today",
+            ownerCatId: "cat-komugi",
+            catId: "cat-komugi",
+            src,
+            state: "sleeping",
+            createdAt: nowValue - 60_000,
+          },
+        ]),
+      );
+    },
+    { nowValue: now, src: photoDataUrl },
+  );
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto("/cats");
+  await page.waitForLoadState("networkidle");
+
+  await expect(page.getByTestId("cats-active-cat-name")).toHaveText("むぎ");
+  await expect(page.getByTestId("cats-photo-today-card")).toHaveCount(0);
+  await expect(page.getByTestId("cats-photo-today-link")).toHaveCount(0);
+});
+
+test("keeps photos outside the current month in the older photo section", async ({ page }) => {
+  const now = Date.parse("2026-07-23T20:30:00+09:00");
+  await seedCatsPhotoTabState(page, {
+    now,
+    sleepingPhotos: [
+      {
+        id: "own-sleeping-today",
+        createdAt: Date.parse("2026-07-23T19:00:00+09:00"),
+      },
+      {
+        id: "own-sleeping-previous-month",
+        createdAt: Date.parse("2026-06-23T19:00:00+09:00"),
+      },
+      {
+        id: "own-sleeping-two-months-ago",
+        createdAt: Date.parse("2026-05-12T19:00:00+09:00"),
+      },
+    ],
+    galleryPhotos: [],
+  });
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto("/cats");
+  await page.waitForLoadState("networkidle");
+
+  await expect(page.getByTestId("cats-photo-highlights")).toHaveAttribute("data-layout", "pair");
+  await expect(page.getByTestId("cats-photo-today-card")).toHaveAttribute(
+    "data-photo-id",
+    "own-sleeping-today",
+  );
+  await expect(page.getByTestId("cats-photo-memory-card")).toHaveAttribute(
+    "data-photo-id",
+    "own-sleeping-previous-month",
+  );
+  await expect(page.getByTestId("cats-photo-memory-card")).toContainText("1か月前のむぎ");
+  await expect(page.getByTestId("cats-photo-current-month")).toHaveText("7月のむぎ");
+  await expect(page.getByTestId("cats-lens-photo-grid").locator(":scope > div")).toHaveCount(1);
+  await expect(page.getByTestId("cats-photo-older")).toContainText("これまでの写真");
+  await expect(page.getByTestId("cats-lens-photo-grid-older").locator(":scope > div")).toHaveCount(
+    2,
+  );
+});
+
+test("refreshes today and month grouping after returning on a new JST day", async ({ page }) => {
+  const julyNow = Date.parse("2026-07-31T23:55:00+09:00");
+  await seedCatsPhotoTabState(page, {
+    now: julyNow,
+    sleepingPhotos: [
+      {
+        id: "july-last-photo",
+        createdAt: Date.parse("2026-07-31T20:00:00+09:00"),
+      },
+    ],
+    galleryPhotos: [],
+  });
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto("/cats");
+  await page.waitForLoadState("networkidle");
+
+  await expect(page.getByTestId("cats-photo-today-card")).toHaveAttribute(
+    "data-photo-id",
+    "july-last-photo",
+  );
+  await page.evaluate(() => {
+    (
+      window as typeof window & {
+        __testNow?: number;
+      }
+    ).__testNow = Date.parse("2026-08-01T08:00:00+09:00");
+    window.dispatchEvent(new Event("focus"));
+  });
+
+  await expect(page.getByTestId("cats-photo-today-card")).toHaveCount(0);
+  await expect(page.getByTestId("cats-photo-memory-card")).toHaveAttribute(
+    "data-photo-id",
+    "july-last-photo",
+  );
+  await expect(page.getByTestId("cats-photo-all-dates")).toHaveText(
+    "むぎの写真",
+  );
+});
+
+test("shows a useful empty state before the first daily photo", async ({ page }) => {
+  await seedCatsPhotoTabState(page, {
+    now: Date.parse("2026-07-23T12:30:00+09:00"),
+    sleepingPhotos: [],
+    galleryPhotos: [],
+  });
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto("/cats");
+  await page.waitForLoadState("networkidle");
+
+  await expect(page.getByTestId("cats-photo-highlights")).toHaveCount(0);
+  await expect(page.getByTestId("cats-photo-today-link")).toContainText(
+    "きょうの一枚を撮ると、4匹が届きます",
+  );
+  await expect(page.getByTestId("cats-photo-all-dates")).toHaveText("むぎの写真");
+  await expect(page.getByText("0枚", { exact: true })).toBeVisible();
   await expect(
-    page.getByText("追加した写真は、ねこだよりには使われません。"),
+    page.getByText(
+      "まだ写真はありません。ねがおを とるか、写真を追加すると、ここに並びます。",
+    ),
   ).toBeVisible();
+  await expect(page.getByRole("button", { name: "写真を追加" })).toBeVisible();
+});
+
+test("links an onboarding four-choice save back to nekodayori", async ({ page }) => {
+  const now = Date.parse("2026-07-23T12:30:00+09:00");
+  const ownPhotoId = "onboarding-own-today";
+  await seedCatsPhotoTabState(page, {
+    now,
+    sleepingPhotos: [{ id: ownPhotoId, createdAt: now - 60_000 }],
+    galleryPhotos: [],
+  });
+  await page.addInitScript(
+    ({ nowValue, ownId, src }) => {
+      const deliveredPhotos = Array.from({ length: 4 }, (_, index) => ({
+        id: `onboarding-delivered-${index + 1}`,
+        src,
+        deliveredAt: nowValue + index,
+      }));
+      window.localStorage.setItem(
+        "neteruneko_onboarding_progress",
+        JSON.stringify({
+          version: 1,
+          anonymousId: "onboarding-bridge-test",
+          dateKey: "2026-07-23",
+          stage: "album_created",
+          source: "direct",
+          submissionId: "onboarding-bridge-submission",
+          ownPhoto: {
+            id: ownId,
+            ownerCatId: "cat-mugi",
+            catId: "cat-mugi",
+            src,
+            createdAt: nowValue - 60_000,
+          },
+          deliveredPhoto: deliveredPhotos[2],
+          deliveredPhotos,
+          deliveryBundleId: "onboarding-bridge-bundle",
+          isDeliveredPhotoKept: true,
+          updatedAt: nowValue,
+        }),
+      );
+    },
+    { nowValue: now, ownId: ownPhotoId, src: photoDataUrl },
+  );
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto("/cats");
+  await page.waitForLoadState("networkidle");
+
+  const bridge = page.getByTestId("cats-photo-delivery-bridge");
+  await expect(bridge).toContainText(
+    "きょうのむぎから、4匹が届きました",
+  );
+  await expect(
+    bridge.getByRole("link", { name: "ねこだよりを見る" }),
+  ).toHaveAttribute("href", "/collection");
 });
 
 test("reflects an added cat gallery photo immediately", async ({ page }) => {
@@ -281,18 +509,17 @@ test("shows a quiet photo grid skeleton while cats photo thumbnails resolve", as
     .toBe(true);
 });
 
-test("switches to the next cat from the cover in one tap", async ({ page }) => {
+test("switches to the next cat from the photo header in one tap", async ({ page }) => {
   await seedMultipleCatsProfile(page, Date.parse("2026-06-10T12:30:00+09:00"));
   await page.setViewportSize({ width: 390, height: 844 });
   await page.goto("/cats");
   await page.waitForLoadState("networkidle");
 
+  await expect(page.getByTestId("cats-profile-cover")).toHaveCount(0);
   await page.getByRole("button", { name: "次のねこに切り替える" }).click();
 
   await expect
-    .poll(() =>
-      page.evaluate(() => window.localStorage.getItem("active_cat_id")),
-    )
+    .poll(() => page.evaluate(() => window.localStorage.getItem("active_cat_id")))
     .toBe("cat-komugi");
 });
 
@@ -585,6 +812,7 @@ test("shows the custom top cover without over-cropping", async ({
   await page.setViewportSize({ width: 390, height: 844 });
   await page.goto("/cats");
   await page.waitForLoadState("networkidle");
+  await page.getByTestId("cats-section-tab-basic").click();
 
   const coverImages = page.getByTestId("cats-profile-cover").locator("img");
 
@@ -611,7 +839,10 @@ test("shows the custom top cover without over-cropping", async ({
         .evaluate((image) => window.getComputedStyle(image).objectPosition),
     )
     .toBe("50% 50%");
-  await page.getByTestId("cats-profile-cover").locator("button").click();
+  await page
+    .getByTestId("cats-profile-cover")
+    .getByRole("button", { name: "カバー写真", exact: true })
+    .click();
   await expect(page.getByRole("dialog", { name: "カバー写真" })).toBeVisible();
   expect(signedUrlRequests.some((request) => request.src?.includes("/cover/"))).toBe(
     true,
@@ -640,6 +871,7 @@ test("adjusts the exact photo currently shown as the cat cover", async ({
   await page.setViewportSize({ width: 390, height: 844 });
   await page.goto("/cats");
   await page.waitForLoadState("networkidle");
+  await page.getByTestId("cats-section-tab-basic").click();
 
   const coverImage = page.getByTestId("cats-profile-cover").locator("img").first();
   await expect
@@ -653,7 +885,6 @@ test("adjusts the exact photo currently shown as the cat cover", async ({
     (image) => window.getComputedStyle(image).objectPosition,
   );
 
-  await page.getByTestId("cats-section-tab-basic").click();
   await page.getByTestId("cats-cover-photo-button").click();
   await page.getByTestId("cover-photo-adjust-current").click();
 
@@ -709,6 +940,7 @@ test("falls back to automatic cover framing when a custom cover has no crop", as
   await page.setViewportSize({ width: 390, height: 844 });
   await page.goto("/cats");
   await page.waitForLoadState("networkidle");
+  await page.getByTestId("cats-section-tab-basic").click();
 
   const coverImage = page.getByTestId("cats-profile-cover").locator("img").first();
 
@@ -885,6 +1117,7 @@ test("prioritizes a birthday and carries its losing milestone into the next day"
   await page.setViewportSize({ width: 390, height: 844 });
   await page.goto("/cats");
   await page.waitForLoadState("networkidle");
+  await page.getByTestId("cats-section-tab-record").click();
 
   const pickup = page.getByTestId("cats-pickup-section");
   await expect(pickup).toBeVisible();
@@ -912,6 +1145,7 @@ test("prioritizes a birthday and carries its losing milestone into the next day"
   }, tomorrow);
   await page.reload();
   await page.waitForLoadState("networkidle");
+  await page.getByTestId("cats-section-tab-record").click();
 
   await expect(pickup).toContainText("10枚目のねがお");
   await pickup.getByRole("button").click();
@@ -931,6 +1165,7 @@ test("renders footprints as recent cat events instead of a photo-only list", asy
   await page.setViewportSize({ width: 390, height: 844 });
   await page.goto("/cats");
   await page.waitForLoadState("networkidle");
+  await page.getByTestId("cats-section-tab-record").click();
 
   await expect(page.getByRole("heading", { name: "足あと" })).toBeVisible();
   await expect(page.getByText("2026年6月")).toBeVisible();
@@ -946,6 +1181,7 @@ test("shows celebrations as current milestones instead of a fixed 50-photo card"
   await page.setViewportSize({ width: 390, height: 844 });
   await page.goto("/cats");
   await page.waitForLoadState("networkidle");
+  await page.getByTestId("cats-section-tab-record").click();
 
   const celebration = page
     .getByRole("heading", { name: "記念" })
@@ -1012,6 +1248,7 @@ test("clears the first sleeping photo memory dot after opening it", async ({
   await page.setViewportSize({ width: 390, height: 844 });
   await page.goto("/cats");
   await page.waitForLoadState("networkidle");
+  await page.getByTestId("cats-section-tab-record").click();
 
   await expect(page.getByText("はじめてのねがお").first()).toBeVisible();
   await expect(page.getByTestId("cats-nav-unopened-omoide-dot")).toBeVisible();
@@ -1034,6 +1271,7 @@ test("keeps the record tab sections in the intended order", async ({ page }) => 
   await page.setViewportSize({ width: 390, height: 844 });
   await page.goto("/cats");
   await page.waitForLoadState("networkidle");
+  await page.getByTestId("cats-section-tab-record").click();
   await expect(page.locator("#cats-milestones-heading")).toBeVisible();
 
   const sectionOrder = await page
@@ -1064,6 +1302,10 @@ test("opens an omoide as a full paper view without cropping the photo", async ({
   await page.setViewportSize({ width: 390, height: 844 });
   await page.goto("/cats#omoide");
   await page.waitForLoadState("networkidle");
+  await expect(page.getByTestId("cats-section-tab-record")).toHaveAttribute(
+    "aria-checked",
+    "true",
+  );
 
   await page
     .getByTestId("omoide-bunbako")
@@ -1121,6 +1363,7 @@ test("opens a year summary dashboard from the yearly archive", async ({
   await page.setViewportSize({ width: 390, height: 844 });
   await page.goto("/cats");
   await page.waitForLoadState("networkidle");
+  await page.getByTestId("cats-section-tab-record").click();
 
   await page.getByRole("button", { name: /2026年/ }).click();
 
@@ -1132,6 +1375,74 @@ test("opens a year summary dashboard from the yearly archive", async ({
   await expect(dialog).toContainText("6月によく とりました");
   await expect(dialog).toContainText("10枚目");
 });
+
+async function seedCatsPhotoTabState(
+  page: Page,
+  {
+    now,
+    sleepingPhotos,
+    galleryPhotos,
+  }: {
+    now: number;
+    sleepingPhotos: Array<{ id: string; createdAt: number }>;
+    galleryPhotos: Array<{ id: string; createdAt: number }>;
+  },
+) {
+  await page.addInitScript(
+    ({ nowValue, sleeping, gallery, src }) => {
+      (window as typeof window & { __testNow?: number }).__testNow = nowValue;
+      const nowIso = new Date(nowValue).toISOString();
+
+      window.localStorage.setItem("active_cat_id", "cat-mugi");
+      window.localStorage.setItem(
+        "cat_profiles",
+        JSON.stringify([
+          {
+            id: "cat-mugi",
+            name: "\u3080\u304e",
+            createdAt: nowIso,
+            updatedAt: nowIso,
+          },
+        ]),
+      );
+      window.localStorage.setItem(
+        "nyaruhodo_exchange_own_sleeping_photos",
+        JSON.stringify(
+          sleeping.map((photo) => ({
+            ...photo,
+            ownerCatId: "cat-mugi",
+            catId: "cat-mugi",
+            src,
+            thumbnailSrc: src,
+            displaySrc: src,
+            state: "sleeping",
+            visibility: "private",
+            deliveryStatus: "available",
+            triggerLabel: "sleeping",
+            theme: "sleeping",
+            shared: false,
+          })),
+        ),
+      );
+      window.localStorage.setItem(
+        "neteruneko_cat_gallery_photos",
+        JSON.stringify(
+          gallery.map((photo) => ({
+            ...photo,
+            catId: "cat-mugi",
+            src,
+          })),
+        ),
+      );
+    },
+    {
+      nowValue: now,
+      sleeping: sleepingPhotos,
+      gallery: galleryPhotos,
+      src: photoDataUrl,
+    },
+  );
+}
 
 async function seedCatsProfile(
   page: Page,

@@ -58,6 +58,11 @@ import {
   type OwnSleepingPhoto,
 } from "../../lib/home/sleepingPhotos";
 import {
+  getJstDateKey,
+  readEveningDeliveryStore,
+} from "../../lib/home/eveningDelivery";
+import { readTodayOnboardingProgress } from "../../lib/onboarding/progress";
+import {
   readCatMomentsForCat,
   type CatMomentForCat,
 } from "../../lib/supabase/catMomentCats";
@@ -128,11 +133,9 @@ type DeleteCatTarget = {
   photoCount: number;
 };
 type RemoteCatDeleteResult =
-  | { status: "deleted" | "skipped" }
-  | { status: "error"; message: string };
+  { status: "deleted" | "skipped" } | { status: "error"; message: string };
 type RemoteCatSaveResult =
-  | { status: "saved" | "skipped" }
-  | { status: "error"; message: string };
+  { status: "saved" | "skipped" } | { status: "error"; message: string };
 type PhotoSheetLens = "cat" | "all";
 type YearSummaryDetailKind = "photos" | "pickups" | "milestones";
 type RecordPhotoPreview = {
@@ -193,8 +196,9 @@ export function CatsPage() {
   const [activeCatId, setActiveCatId] = useState<string | null>(null);
   const [catNameInput, setCatNameInput] = useState("");
   const [newCatNameInput, setNewCatNameInput] = useState("");
-  const [duplicateCatNameToConfirm, setDuplicateCatNameToConfirm] =
-    useState<string | null>(null);
+  const [duplicateCatNameToConfirm, setDuplicateCatNameToConfirm] = useState<
+    string | null
+  >(null);
   const [isEditingCatName, setIsEditingCatName] = useState(false);
   const [isEditingProfile, setIsEditingProfile] = useState(false);
   const [isAddingCat, setIsAddingCat] = useState(false);
@@ -215,7 +219,8 @@ export function CatsPage() {
   const [isOnboardingCompletionReady, setIsOnboardingCompletionReady] =
     useState(false);
   const [isOnboardingExistingCat, setIsOnboardingExistingCat] = useState(false);
-  const [isOnboardingAlbumCreated, setIsOnboardingAlbumCreated] = useState(false);
+  const [isOnboardingAlbumCreated, setIsOnboardingAlbumCreated] =
+    useState(false);
   const [isDirectProfileRecovery, setIsDirectProfileRecovery] = useState(false);
   const [editFamilySinceDate, setEditFamilySinceDate] = useState("");
   const [editBirthDate, setEditBirthDate] = useState("");
@@ -240,8 +245,8 @@ export function CatsPage() {
   const catGalleryThumbnailBackfillAttemptedRef = useRef(new Set<string>());
   const tabContentScrollerRef = useRef<HTMLDivElement | null>(null);
   const [activeLens, setActiveLens] = useState<UchinokoLens>("cat");
-  const [activeSection, setActiveSection] =
-    useState<UchinokoSection>("record");
+  const [activeSection, setActiveSection] = useState<UchinokoSection>("photos");
+  const [clientNow, setClientNow] = useState(() => getClientNow());
   const [deleteCatTarget, setDeleteCatTarget] =
     useState<DeleteCatTarget | null>(null);
   const [isDeletingCat, setIsDeletingCat] = useState(false);
@@ -258,12 +263,11 @@ export function CatsPage() {
     useState(false);
   const [selectedRecordPhoto, setSelectedRecordPhoto] =
     useState<RecordPhotoPreview | null>(null);
-  const [selectedOmoideMemory, setSelectedOmoideMemory] =
-    useState<{
-      memory: OmoideMemory;
-      source: OmoideOpenSource;
-      isRevisit: boolean;
-    } | null>(null);
+  const [selectedOmoideMemory, setSelectedOmoideMemory] = useState<{
+    memory: OmoideMemory;
+    source: OmoideOpenSource;
+    isRevisit: boolean;
+  } | null>(null);
   const [deleteGalleryPhotoTarget, setDeleteGalleryPhotoTarget] =
     useState<RecordPhotoPreview | null>(null);
   const [isDeletingGalleryPhoto, setIsDeletingGalleryPhoto] = useState(false);
@@ -278,7 +282,6 @@ export function CatsPage() {
   const familyDuration = formatFamilyDuration(
     activeCatProfile?.basicInfo?.familySinceDate,
   );
-  const clientNow = getClientNow();
   const birthdayStatus = getBirthdayStatus(
     activeCatProfile?.basicInfo?.birthDate,
     clientNow,
@@ -291,6 +294,9 @@ export function CatsPage() {
     ? readOwnSleepingPhotoCount(activeCatId)
     : 0;
   const omoideMemories = readOmoideMemoriesForCat(activeCatId);
+  const hasUnopenedOmoide = omoideMemories.some(
+    (memory) => !memory.openedAt,
+  );
   const sleepingMilestones = readCatSleepingMilestones(activeCatId);
   const isOnboardingProfileSetup = isOnboardingMode && isEditingProfile;
   const isOnboardingCompletionView =
@@ -314,8 +320,29 @@ export function CatsPage() {
     hasRemoteLensPhotosLoaded,
   );
   const activeCatLensPhotos = activeCatId
-    ? lensPhotosByCat[activeCatId] ?? []
+    ? (lensPhotosByCat[activeCatId] ?? [])
     : [];
+  const todaySleepingPhoto = selectTodaySleepingPhoto(
+    activeCatLensPhotos,
+    clientNow,
+  );
+  const hasAnyTodaySleepingPhoto = Object.values(lensPhotosByCat).some(
+    (photos) =>
+      photos.some(
+        (photo) =>
+          photo.kind === "sleeping" &&
+          isSameJstCalendarDay(photo.createdAt, clientNow),
+      ),
+  );
+  const keptFourChoiceSourcePhoto = selectKeptFourChoiceSourcePhoto(
+    activeCatLensPhotos,
+    clientNow,
+  );
+  const memoryPhoto = selectUchinokoMemoryPhoto(
+    activeCatLensPhotos,
+    clientNow,
+    keptFourChoiceSourcePhoto,
+  );
   const activeCatGalleryLensPhotos = useMemo(
     () => activeCatLensPhotos.filter(isCatGalleryLensPhoto),
     [activeCatLensPhotos],
@@ -338,12 +365,14 @@ export function CatsPage() {
       catGalleryThumbnailBackfillAttemptedRef.current.add(photo.id);
     }
 
-    void backfillCatGalleryThumbnails(missingThumbnailPhotos, () => isCancelled)
-      .then((updatedCount) => {
-        if (!isCancelled && updatedCount > 0) {
-          setGalleryRefreshTick((value) => value + 1);
-        }
-      });
+    void backfillCatGalleryThumbnails(
+      missingThumbnailPhotos,
+      () => isCancelled,
+    ).then((updatedCount) => {
+      if (!isCancelled && updatedCount > 0) {
+        setGalleryRefreshTick((value) => value + 1);
+      }
+    });
 
     return () => {
       isCancelled = true;
@@ -375,8 +404,7 @@ export function CatsPage() {
       : [];
   const hasCustomCoverCrop = Boolean(activeCatProfile?.coverCrop);
   const activeCoverCrop = normalizeCoverCrop(activeCatProfile?.coverCrop);
-  const activeCoverFit =
-    activeCoverSrc ? "cover" : "contain";
+  const activeCoverFit = activeCoverSrc ? "cover" : "contain";
   const activeCoverRecordPhoto =
     activeCoverPhoto && !hasCustomCoverPhoto
       ? toRecordPhotoPreview(activeCoverPhoto)
@@ -386,7 +414,9 @@ export function CatsPage() {
             title: "カバー写真",
             timestamp:
               Date.parse(
-                activeCatProfile?.updatedAt ?? activeCatProfile?.createdAt ?? "",
+                activeCatProfile?.updatedAt ??
+                  activeCatProfile?.createdAt ??
+                  "",
               ) || Date.now(),
           }
         : null;
@@ -428,15 +458,54 @@ export function CatsPage() {
     };
   }, []);
 
+  useEffect(() => {
+    let nextDayTimer: number | undefined;
+
+    const scheduleNextDayRefresh = () => {
+      if (nextDayTimer) {
+        window.clearTimeout(nextDayTimer);
+      }
+      nextDayTimer = window.setTimeout(() => {
+        setClientNow(getClientNow());
+        scheduleNextDayRefresh();
+      }, getMsUntilNextJstCalendarDay(getClientNow()));
+    };
+    const refreshNow = () => {
+      setClientNow(getClientNow());
+      scheduleNextDayRefresh();
+    };
+    const refreshWhenVisible = () => {
+      if (document.visibilityState === "visible") {
+        refreshNow();
+      }
+    };
+
+    window.addEventListener("focus", refreshNow);
+    document.addEventListener("visibilitychange", refreshWhenVisible);
+    scheduleNextDayRefresh();
+
+    return () => {
+      window.removeEventListener("focus", refreshNow);
+      document.removeEventListener("visibilitychange", refreshWhenVisible);
+      if (nextDayTimer) {
+        window.clearTimeout(nextDayTimer);
+      }
+    };
+  }, []);
+
   useLayoutEffect(() => {
+    const selectLinkedSection = () => {
+      setActiveSection(
+        window.location.hash === "#omoide" ? "record" : "photos",
+      );
+    };
     const requestedOnboardingMode =
       new URLSearchParams(window.location.search).get("onboarding") === "1";
     const onboardingCompletionReady =
       requestedOnboardingMode &&
       window.sessionStorage.getItem(ONBOARDING_ALBUM_COMPLETION_READY_KEY) ===
         "true";
-    const onboardingMode =
-      requestedOnboardingMode && onboardingCompletionReady;
+    const onboardingMode = requestedOnboardingMode && onboardingCompletionReady;
     const savedCatProfiles = readCatProfiles();
     const savedActiveCatId = readActiveCatId();
     const activeProfile = getActiveCatProfile(
@@ -465,6 +534,13 @@ export function CatsPage() {
       setIsEditingProfile(true);
     }
     saveActiveCatId(activeProfile.id);
+
+    selectLinkedSection();
+    window.addEventListener("hashchange", selectLinkedSection);
+
+    return () => {
+      window.removeEventListener("hashchange", selectLinkedSection);
+    };
   }, []);
 
   useEffect(() => {
@@ -519,7 +595,10 @@ export function CatsPage() {
 
       const remoteByLocalCatId = new Map<string, string>();
 
-      for (const row of remoteCats as { id: string; local_cat_id: string | null }[]) {
+      for (const row of remoteCats as {
+        id: string;
+        local_cat_id: string | null;
+      }[]) {
         if (row.local_cat_id && row.id) {
           remoteByLocalCatId.set(row.local_cat_id, row.id);
         }
@@ -556,7 +635,10 @@ export function CatsPage() {
   }, [catProfiles]);
 
   useEffect(() => {
-    if (catProfiles.length === 0 || isCatGalleryRestoreCheckRunningRef.current) {
+    if (
+      catProfiles.length === 0 ||
+      isCatGalleryRestoreCheckRunningRef.current
+    ) {
       return;
     }
 
@@ -978,7 +1060,9 @@ export function CatsPage() {
     saveCatProfiles(nextProfiles);
     setCatProfiles(nextProfiles);
     const remoteSaveResult = await saveRemoteCatProfile(nextProfile);
-    setSaveMessage(photoSrc ? "カバー写真を変えました。" : "自動表示にもどしました。");
+    setSaveMessage(
+      photoSrc ? "カバー写真を変えました。" : "自動表示にもどしました。",
+    );
     if (remoteSaveResult.status === "error") {
       setSaveMessage(
         "この端末には保存しました。アカウントには保存できませんでした。設定の「アカウント保存を更新する」から、もう一度お試しください。",
@@ -1108,7 +1192,10 @@ export function CatsPage() {
           pathSegments: [targetCatId, "photos"],
           fileName: `photo-${Date.now()}-thumb`,
         });
-        if (!isStoragePhotoReference(photoSrc) && !photoSrc.startsWith("data:image/")) {
+        if (
+          !isStoragePhotoReference(photoSrc) &&
+          !photoSrc.startsWith("data:image/")
+        ) {
           setSaveMessage("写真を追加できませんでした。");
           setTimeout(() => setSaveMessage(""), 2400);
           return;
@@ -1116,7 +1203,9 @@ export function CatsPage() {
         const savedPhoto = await saveCatGalleryPhoto({
           catId: targetCatId,
           src: photoSrc,
-          thumbnailSrc: isStoragePhotoReference(thumbnailSrc) ? thumbnailSrc : null,
+          thumbnailSrc: isStoragePhotoReference(thumbnailSrc)
+            ? thumbnailSrc
+            : null,
           width: dimensions.width,
           height: dimensions.height,
         });
@@ -1291,7 +1380,9 @@ export function CatsPage() {
     }
 
     const target = deleteCatTarget.profile;
-    const nextProfiles = catProfiles.filter((profile) => profile.id !== target.id);
+    const nextProfiles = catProfiles.filter(
+      (profile) => profile.id !== target.id,
+    );
     const nextActiveProfile =
       activeCatId === target.id
         ? nextProfiles[0]
@@ -1389,7 +1480,9 @@ export function CatsPage() {
             variant="section"
             padding="md"
             style={styles.onboardingPanel}
-            aria-label={isDirectProfileRecovery ? "うちのこ登録" : "オンボーディング"}
+            aria-label={
+              isDirectProfileRecovery ? "うちのこ登録" : "オンボーディング"
+            }
           >
             <p style={styles.onboardingKicker}>
               {isDirectProfileRecovery
@@ -1440,138 +1533,191 @@ export function CatsPage() {
           >
             {!isFocusedProfileSetup ? (
               <>
-                <div style={styles.profileCoverHero}>
-                  <div
-                    data-testid="cats-profile-cover"
-                    style={styles.profileCoverFrame}
-                  >
-                    {activeCoverSrc && hasCustomCoverPhoto ? (
-                      <button
-                        type="button"
-                        aria-label={activeCoverRecordPhoto?.title}
-                        style={styles.profileCoverCustomButton}
-                        onClick={
-                          activeCoverRecordPhoto
-                            ? () => setSelectedRecordPhoto(activeCoverRecordPhoto)
-                            : undefined
-                          }
-                      >
-                        {hasCustomCoverCrop ? (
-                          <CoverCropPhoto
-                            src={activeCoverSrc}
-                            crop={activeCoverCrop}
-                            alt=""
-                            storageVariant="hero"
-                            style={styles.profileCoverCustomCroppedImage}
-                          />
-                        ) : (
-                          <StoredPhotoImage
-                            src={activeCoverSrc}
-                            alt=""
-                            storageVariant="hero"
-                            loading="eager"
-                            style={styles.profileCoverCustomImage}
-                            width={420}
-                            height={232}
-                          />
-                        )}
-                      </button>
-                    ) : (
-                      <PhotoTile
-                        src={activeCoverSrc}
-                        previewSrc={activeCoverPreviewSrc}
+                <header style={styles.profileIdentity}>
+                  <div style={styles.profileIdentityText}>
+                    <p style={styles.profileIdentityKicker}>うちのこ</p>
+                    <h1
+                      data-testid="cats-active-cat-name"
+                      style={styles.profileIdentityName}
+                    >
+                      {catName}
+                    </h1>
+                  </div>
+                  {activeSection === "photos" && shouldShowCatSwitchButton ? (
+                    <button
+                      type="button"
+                      style={styles.profileIdentitySwitchButton}
+                      onClick={handleCycleCat}
+                      aria-label="次のねこに切り替える"
+                    >
+                      <img
+                        src={catIllustrations.catSwitcherIcon}
                         alt=""
-                        variant="bare"
-                        fit={activeCoverFit}
-                        aspect="auto"
-                        storageVariant={
-                          activeCoverPhoto
-                            ? getLensPhotoStorageVariant(activeCoverPhoto, "cover")
-                            : "display"
-                        }
-                        fallbackSrcs={
-                          activeCoverPhoto
-                            ? getLensPhotoFallbackSrcs(activeCoverPhoto)
-                            : undefined
-                        }
-                        loading="eager"
-                        style={styles.profileCoverTileRoot}
-                        frameStyle={styles.profileCoverTileFrame}
-                        imageStyle={styles.profileCoverImage}
-                        onClick={
-                          activeCoverRecordPhoto
-                            ? () => setSelectedRecordPhoto(activeCoverRecordPhoto)
-                            : undefined
+                        style={styles.profileCoverSwitchIcon}
+                        onError={(event) =>
+                          fallBackCatIllustrationImage(
+                            event.currentTarget,
+                            "catSwitcherIcon",
+                          )
                         }
                       />
-                    )}
-                    {activeSection === "basic" ? (
-                      <div style={styles.profileCoverActionStack}>
-                        {shouldShowCatSwitchButton ? (
+                    </button>
+                  ) : null}
+                </header>
+                <UchinokoSectionTabs
+                  value={activeSection}
+                  onChange={setActiveSection}
+                  options={[
+                    { value: "photos", label: "写真" },
+                    {
+                      value: "record",
+                      label: "記録",
+                      hasIndicator: hasUnopenedOmoide,
+                    },
+                    { value: "basic", label: "基本" },
+                  ]}
+                />
+                {activeSection !== "photos" ? (
+                  <div style={styles.profileCoverHero}>
+                    <div
+                      data-testid="cats-profile-cover"
+                      style={styles.profileCoverFrame}
+                    >
+                      {activeCoverSrc && hasCustomCoverPhoto ? (
+                        <button
+                          type="button"
+                          aria-label={activeCoverRecordPhoto?.title}
+                          style={styles.profileCoverCustomButton}
+                          onClick={
+                            activeCoverRecordPhoto
+                              ? () =>
+                                  setSelectedRecordPhoto(activeCoverRecordPhoto)
+                              : undefined
+                          }
+                        >
+                          {hasCustomCoverCrop ? (
+                            <CoverCropPhoto
+                              src={activeCoverSrc}
+                              crop={activeCoverCrop}
+                              alt=""
+                              storageVariant="hero"
+                              style={styles.profileCoverCustomCroppedImage}
+                            />
+                          ) : (
+                            <StoredPhotoImage
+                              src={activeCoverSrc}
+                              alt=""
+                              storageVariant="hero"
+                              loading="eager"
+                              style={styles.profileCoverCustomImage}
+                              width={420}
+                              height={232}
+                            />
+                          )}
+                        </button>
+                      ) : (
+                        <PhotoTile
+                          src={activeCoverSrc}
+                          previewSrc={activeCoverPreviewSrc}
+                          alt=""
+                          variant="bare"
+                          fit={activeCoverFit}
+                          aspect="auto"
+                          storageVariant={
+                            activeCoverPhoto
+                              ? getLensPhotoStorageVariant(
+                                  activeCoverPhoto,
+                                  "cover",
+                                )
+                              : "display"
+                          }
+                          fallbackSrcs={
+                            activeCoverPhoto
+                              ? getLensPhotoFallbackSrcs(activeCoverPhoto)
+                              : undefined
+                          }
+                          loading="eager"
+                          style={styles.profileCoverTileRoot}
+                          frameStyle={styles.profileCoverTileFrame}
+                          imageStyle={styles.profileCoverImage}
+                          onClick={
+                            activeCoverRecordPhoto
+                              ? () =>
+                                  setSelectedRecordPhoto(activeCoverRecordPhoto)
+                              : undefined
+                          }
+                        />
+                      )}
+                      {activeSection === "basic" ? (
+                        <div style={styles.profileCoverActionStack}>
+                          {shouldShowCatSwitchButton ? (
+                            <button
+                              type="button"
+                              style={styles.profileCoverActionButton}
+                              onClick={handleCycleCat}
+                              aria-label="次のねこに切り替える"
+                            >
+                              <img
+                                src={catIllustrations.catSwitcherIcon}
+                                alt=""
+                                style={styles.profileCoverSwitchIcon}
+                                onError={(event) =>
+                                  fallBackCatIllustrationImage(
+                                    event.currentTarget,
+                                    "catSwitcherIcon",
+                                  )
+                                }
+                              />
+                            </button>
+                          ) : null}
+                          <button
+                            type="button"
+                            data-testid="cats-cover-photo-button"
+                            style={styles.profileCoverActionButton}
+                            onClick={() => setIsCoverPhotoSheetOpen(true)}
+                            aria-label={
+                              "\u30ab\u30d0\u30fc\u5199\u771f\u3092\u5909\u3048\u308b"
+                            }
+                          >
+                            <PhotoSmallIcon />
+                          </button>
                           <button
                             type="button"
                             style={styles.profileCoverActionButton}
-                            onClick={handleCycleCat}
-                            aria-label="次のねこに切り替える"
+                            onClick={() => {
+                              setIsCatManageEditing(false);
+                              setCatManageEditSource(null);
+                              setIsAddingCat(false);
+                              setIsCatManageOpen(true);
+                            }}
+                            aria-label="猫を追加・管理"
                           >
-                            <img
-                              src={catIllustrations.catSwitcherIcon}
-                              alt=""
-                              style={styles.profileCoverSwitchIcon}
-                              onError={(event) =>
-                                fallBackCatIllustrationImage(
-                                  event.currentTarget,
-                                  "catSwitcherIcon",
-                                )
-                              }
-                            />
+                            <AddSmallIcon />
                           </button>
-                        ) : null}
+                        </div>
+                      ) : shouldShowCatSwitchButton ? (
                         <button
                           type="button"
-                          data-testid="cats-cover-photo-button"
-                          style={styles.profileCoverActionButton}
-                          onClick={() => setIsCoverPhotoSheetOpen(true)}
-                          aria-label={"\u30ab\u30d0\u30fc\u5199\u771f\u3092\u5909\u3048\u308b"}
+                          style={styles.profileCoverSwitchButton}
+                          onClick={handleCycleCat}
+                          aria-label="次のねこに切り替える"
                         >
-                          <PhotoSmallIcon />
+                          <img
+                            src={catIllustrations.catSwitcherIcon}
+                            alt=""
+                            style={styles.profileCoverSwitchIcon}
+                            onError={(event) =>
+                              fallBackCatIllustrationImage(
+                                event.currentTarget,
+                                "catSwitcherIcon",
+                              )
+                            }
+                          />
                         </button>
-                        <button
-                          type="button"
-                          style={styles.profileCoverActionButton}
-                          onClick={() => {
-                            setIsCatManageEditing(false);
-                            setCatManageEditSource(null);
-                            setIsAddingCat(false);
-                            setIsCatManageOpen(true);
-                          }}
-                          aria-label="猫を追加・管理"
-                        >
-                          <AddSmallIcon />
-                        </button>
-                      </div>
-                    ) : shouldShowCatSwitchButton ? (
-                      <button
-                        type="button"
-                        style={styles.profileCoverSwitchButton}
-                        onClick={handleCycleCat}
-                        aria-label="次のねこに切り替える"
-                      >
-                        <img
-                          src={catIllustrations.catSwitcherIcon}
-                          alt=""
-                          style={styles.profileCoverSwitchIcon}
-                          onError={(event) =>
-                            fallBackCatIllustrationImage(
-                              event.currentTarget,
-                              "catSwitcherIcon",
-                            )
-                          }
-                        />
-                      </button>
-                    ) : null}
+                      ) : null}
+                    </div>
                   </div>
-                </div>
+                ) : null}
               </>
             ) : null}
 
@@ -1594,7 +1740,9 @@ export function CatsPage() {
                       label="この子の名前"
                       value={catNameInput}
                       onChange={(event) => setCatNameInput(event.target.value)}
-                      placeholder={isOnboardingProfileSetup ? "例：むぎ" : "例：ミケ"}
+                      placeholder={
+                        isOnboardingProfileSetup ? "例：むぎ" : "例：ミケ"
+                      }
                     />
                     {!isFocusedProfileSetup ? (
                       <>
@@ -1612,7 +1760,9 @@ export function CatsPage() {
                           type="date"
                           label="誕生日"
                           value={editBirthDate}
-                          onChange={(event) => setEditBirthDate(event.target.value)}
+                          onChange={(event) =>
+                            setEditBirthDate(event.target.value)
+                          }
                           max={new Date().toISOString().split("T")[0]}
                         />
 
@@ -1627,7 +1777,6 @@ export function CatsPage() {
                             { value: "unknown", label: "わからない" },
                           ]}
                         />
-
                       </>
                     ) : null}
 
@@ -1639,10 +1788,17 @@ export function CatsPage() {
                           size="md"
                           disabled={isSavingProfile || !catNameInput.trim()}
                         >
-                          {isDirectProfileRecovery ? "登録する" : "アルバムをつくる"}
+                          {isDirectProfileRecovery
+                            ? "登録する"
+                            : "アルバムをつくる"}
                         </AppButton>
                       ) : (
-                        <AppButton type="button" onClick={handleSaveProfile} variant="primary" size="md">
+                        <AppButton
+                          type="button"
+                          onClick={handleSaveProfile}
+                          variant="primary"
+                          size="md"
+                        >
                           保存
                         </AppButton>
                       )}
@@ -1675,169 +1831,196 @@ export function CatsPage() {
           </div>
         ) : null}
 
-        {activeCatProfile &&
-        !isFocusedProfileSetup &&
-        !isOnboardingCompletionView ? (
-          <UchinokoSectionTabs
-            value={activeSection}
-            onChange={setActiveSection}
-            options={[
-              { value: "record", label: "記録" },
-              { value: "photos", label: "写真" },
-              { value: "basic", label: "基本" },
-            ]}
-          />
-        ) : null}
-
         {!isFocusedProfileSetup ? (
-        <div
-          ref={tabContentScrollerRef}
-          data-testid="cats-tab-scroll"
-          style={styles.tabContentScroller}
-        >
-        {activeCatProfile &&
-        !isOnboardingCompletionView &&
-        activeSection === "basic" ? (
-          <AppCard
-            as="section"
-            variant="section"
-            padding="md"
-            style={styles.basicInfoPanel}
+          <div
+            ref={tabContentScrollerRef}
+            data-testid="cats-tab-scroll"
+            style={styles.tabContentScroller}
           >
-            <CatBasicProfilePanel
-              profile={activeCatProfile}
-              onEdit={() => openCatManageEditor("basic")}
-            />
-          </AppCard>
-        ) : null}
-
-        {activeCatProfile &&
-        !isOnboardingCompletionView &&
-        activeSection === "photos" &&
-        activeLens === "cat" ? (
-          <LensPhotoSection
-            title="この子の写真"
-            photos={activeCatLensPhotos}
-            emptyCopy="まだ写真はありません。ねがおを とるか、写真を追加すると、ここに並びます。"
-            lensValue={activeLens}
-            onLensChange={shouldShowPhotoLensSwitch ? setActiveLens : undefined}
-            onAddPhoto={() => {
-              requestAddCatPhoto();
-            }}
-            onOpenPhoto={(photo) => setSelectedRecordPhoto(toRecordPhotoPreview(photo))}
-            isListSettled={hasRemoteLensPhotosLoaded || activeCatLensPhotos.length > 0}
-          />
-        ) : null}
-
-        {activeCatProfile &&
-        !isOnboardingCompletionView &&
-        activeSection === "photos" &&
-        activeLens === "all" ? (
-          <AllCatsLensView
-            photos={allLensPhotos}
-            catCount={catProfiles.length}
-            lensValue={activeLens}
-            onLensChange={shouldShowPhotoLensSwitch ? setActiveLens : undefined}
-            onOpenPhoto={(photo) => setSelectedRecordPhoto(toRecordPhotoPreview(photo))}
-            isListSettled={hasRemoteLensPhotosLoaded || allLensPhotos.length > 0}
-          />
-        ) : null}
-
-        {activeCatProfile &&
-        !isOnboardingCompletionView &&
-        activeSection === "record" ? (
-          <RecordOverview
-            activeCatId={activeCatId}
-            photos={activeCatLensPhotos}
-            milestones={sleepingMilestones}
-            memories={omoideMemories}
-            familyDuration={familyDuration}
-            birthdayStatus={birthdayStatus}
-            familyAnniversaryStatus={familyAnniversaryStatus}
-            takenSleepingPhotoCount={takenSleepingPhotoCount}
-            onOpenMemory={openOmoideMemory}
-            onOpenPhoto={(photo) => setSelectedRecordPhoto(photo)}
-            onOpenPhotos={() => setPhotoSheetLens("cat")}
-            onOpenYear={(summary) => setSelectedYearSummary(summary)}
-          />
-        ) : null}
-
-        {activeCatProfile &&
-        !isOnboardingCompletionView &&
-        activeSection === "record" &&
-        SHOW_LEGACY_DETAIL_SECTIONS ? (
-          <>
-            <AppCard
-              as="section"
-              variant="section"
-              padding="md"
-              style={styles.recordPanel}
-            >
-              <p style={styles.bunbakoSectionTitle}>記録</p>
-              <p style={styles.sectionLead}>写真と思い出から、自動でたまります。</p>
-              <AppCard as="div" variant="inset" padding="sm" style={styles.recordList}>
-                <div style={styles.recordRow}>
-                  <span style={styles.recordLabel}>
-                    {getCurrentSeasonCountLabel(
-                      activeCatProfile.basicInfo?.familySinceDate,
-                    )}
-                  </span>
-                  <span style={styles.recordMetricValue}>
-                    {getCurrentSeasonName()}
-                  </span>
-                </div>
-                <div style={styles.recordRow}>
-                  <span style={styles.recordLabel}>思い出箱</span>
-                  <span style={styles.recordMetricValue}>
-                    {omoideMemories.length}件
-                  </span>
-                </div>
-                <div style={styles.recordRow}>
-                  <span style={styles.recordLabel}>とったねがお</span>
-                  <span style={styles.recordMetricValue}>
-                    {takenSleepingPhotoCount}枚
-                  </span>
-                </div>
-                <div style={{ ...styles.recordRow, ...styles.recordRowLast }}>
-                  <span style={styles.recordLabel}>一緒に暮らしている期間</span>
-                  <span style={styles.recordMetricValue}>
-                    家族になった日から
-                  </span>
-                </div>
+            {activeCatProfile &&
+            !isOnboardingCompletionView &&
+            activeSection === "basic" ? (
+              <AppCard
+                as="section"
+                variant="section"
+                padding="md"
+                style={styles.basicInfoPanel}
+              >
+                <CatBasicProfilePanel
+                  profile={activeCatProfile}
+                  onEdit={() => openCatManageEditor("basic")}
+                />
               </AppCard>
-            </AppCard>
-            <AppCard as="section" variant="section" padding="md" style={styles.daysThread}>
-              <p style={styles.bunbakoSectionTitle}>{catName}との 日々</p>
-              <p style={styles.sectionLead}>ねがおや記録を、ここで見返せます。</p>
-              <div style={styles.threadLine}>
-                <div style={styles.threadNode}>
-                  <span style={styles.threadNodeTitle}>今月の {catName}</span>
-                  <span style={styles.threadNodeText}>
-                    {getDaysThreadIntro(
-                      catName,
-                      activeCatProfile.basicInfo?.familySinceDate,
-                    )}
-                  </span>
-                </div>
-                <div style={styles.threadNode}>
-                  <span style={styles.threadNodeTitle}>これまで</span>
-                  <span style={styles.threadNodeText}>
-                    思い出 {omoideMemories.length}件 ・ ねがお{" "}
-                    {takenSleepingPhotoCount}枚
-                  </span>
-                </div>
-              </div>
-            </AppCard>
-          </>
-        ) : null}
+            ) : null}
 
-        {message ? <p style={styles.message}>{message}</p> : null}
-        {saveMessage ? <p style={styles.message}>{saveMessage}</p> : null}
-        </div>
+            {activeCatProfile &&
+            !isOnboardingCompletionView &&
+            activeSection === "photos" &&
+            activeLens === "cat" ? (
+              <UchinokoPhotoSection
+                catName={catName}
+                photos={activeCatLensPhotos}
+                todayPhoto={todaySleepingPhoto}
+                memoryPhoto={memoryPhoto}
+                now={clientNow}
+                keptFourChoiceSourcePhoto={keptFourChoiceSourcePhoto}
+                hasAnyTodaySleepingPhoto={hasAnyTodaySleepingPhoto}
+                isRemotePhotoStateSettled={hasRemoteLensPhotosLoaded}
+                emptyCopy="まだ写真はありません。ねがおを とるか、写真を追加すると、ここに並びます。"
+                lensValue={activeLens}
+                onLensChange={
+                  shouldShowPhotoLensSwitch ? setActiveLens : undefined
+                }
+                onAddPhoto={() => {
+                  requestAddCatPhoto();
+                }}
+                onOpenPhoto={(photo) =>
+                  setSelectedRecordPhoto(toRecordPhotoPreview(photo))
+                }
+                isListSettled={
+                  hasRemoteLensPhotosLoaded || activeCatLensPhotos.length > 0
+                }
+              />
+            ) : null}
+
+            {activeCatProfile &&
+            !isOnboardingCompletionView &&
+            activeSection === "photos" &&
+            activeLens === "all" ? (
+              <AllCatsLensView
+                photos={allLensPhotos}
+                catCount={catProfiles.length}
+                lensValue={activeLens}
+                onLensChange={
+                  shouldShowPhotoLensSwitch ? setActiveLens : undefined
+                }
+                onOpenPhoto={(photo) =>
+                  setSelectedRecordPhoto(toRecordPhotoPreview(photo))
+                }
+                isListSettled={
+                  hasRemoteLensPhotosLoaded || allLensPhotos.length > 0
+                }
+              />
+            ) : null}
+
+            {activeCatProfile &&
+            !isOnboardingCompletionView &&
+            activeSection === "record" ? (
+              <RecordOverview
+                activeCatId={activeCatId}
+                photos={activeCatLensPhotos}
+                milestones={sleepingMilestones}
+                memories={omoideMemories}
+                familyDuration={familyDuration}
+                birthdayStatus={birthdayStatus}
+                familyAnniversaryStatus={familyAnniversaryStatus}
+                takenSleepingPhotoCount={takenSleepingPhotoCount}
+                onOpenMemory={openOmoideMemory}
+                onOpenPhoto={(photo) => setSelectedRecordPhoto(photo)}
+                onOpenPhotos={() => setPhotoSheetLens("cat")}
+                onOpenYear={(summary) => setSelectedYearSummary(summary)}
+              />
+            ) : null}
+
+            {activeCatProfile &&
+            !isOnboardingCompletionView &&
+            activeSection === "record" &&
+            SHOW_LEGACY_DETAIL_SECTIONS ? (
+              <>
+                <AppCard
+                  as="section"
+                  variant="section"
+                  padding="md"
+                  style={styles.recordPanel}
+                >
+                  <p style={styles.bunbakoSectionTitle}>記録</p>
+                  <p style={styles.sectionLead}>
+                    写真と思い出から、自動でたまります。
+                  </p>
+                  <AppCard
+                    as="div"
+                    variant="inset"
+                    padding="sm"
+                    style={styles.recordList}
+                  >
+                    <div style={styles.recordRow}>
+                      <span style={styles.recordLabel}>
+                        {getCurrentSeasonCountLabel(
+                          activeCatProfile.basicInfo?.familySinceDate,
+                        )}
+                      </span>
+                      <span style={styles.recordMetricValue}>
+                        {getCurrentSeasonName()}
+                      </span>
+                    </div>
+                    <div style={styles.recordRow}>
+                      <span style={styles.recordLabel}>思い出箱</span>
+                      <span style={styles.recordMetricValue}>
+                        {omoideMemories.length}件
+                      </span>
+                    </div>
+                    <div style={styles.recordRow}>
+                      <span style={styles.recordLabel}>とったねがお</span>
+                      <span style={styles.recordMetricValue}>
+                        {takenSleepingPhotoCount}枚
+                      </span>
+                    </div>
+                    <div
+                      style={{ ...styles.recordRow, ...styles.recordRowLast }}
+                    >
+                      <span style={styles.recordLabel}>
+                        一緒に暮らしている期間
+                      </span>
+                      <span style={styles.recordMetricValue}>
+                        家族になった日から
+                      </span>
+                    </div>
+                  </AppCard>
+                </AppCard>
+                <AppCard
+                  as="section"
+                  variant="section"
+                  padding="md"
+                  style={styles.daysThread}
+                >
+                  <p style={styles.bunbakoSectionTitle}>{catName}との 日々</p>
+                  <p style={styles.sectionLead}>
+                    ねがおや記録を、ここで見返せます。
+                  </p>
+                  <div style={styles.threadLine}>
+                    <div style={styles.threadNode}>
+                      <span style={styles.threadNodeTitle}>
+                        今月の {catName}
+                      </span>
+                      <span style={styles.threadNodeText}>
+                        {getDaysThreadIntro(
+                          catName,
+                          activeCatProfile.basicInfo?.familySinceDate,
+                        )}
+                      </span>
+                    </div>
+                    <div style={styles.threadNode}>
+                      <span style={styles.threadNodeTitle}>これまで</span>
+                      <span style={styles.threadNodeText}>
+                        思い出 {omoideMemories.length}件 ・ ねがお{" "}
+                        {takenSleepingPhotoCount}枚
+                      </span>
+                    </div>
+                  </div>
+                </AppCard>
+              </>
+            ) : null}
+
+            {message ? <p style={styles.message}>{message}</p> : null}
+            {saveMessage ? <p style={styles.message}>{saveMessage}</p> : null}
+          </div>
         ) : null}
       </div>
       {!isFocusedProfileSetup && !isOnboardingCompletionView ? (
-        <BottomNavigation active="cats" />
+        <BottomNavigation
+          active="cats"
+          onActiveItemClick={() => setActiveSection("photos")}
+        />
       ) : null}
       {isCatManageOpen && activeCatProfile ? (
         <AppBottomSheet
@@ -2040,7 +2223,9 @@ export function CatsPage() {
                     label="好きな場所"
                     value={editFavoritePlace}
                     maxLength={40}
-                    onChange={(event) => setEditFavoritePlace(event.target.value)}
+                    onChange={(event) =>
+                      setEditFavoritePlace(event.target.value)
+                    }
                     placeholder="例：ソファの右端"
                   />
                   <AppTextField
@@ -2048,7 +2233,9 @@ export function CatsPage() {
                     label="好きな遊び"
                     value={editFavoritePlay}
                     maxLength={40}
-                    onChange={(event) => setEditFavoritePlay(event.target.value)}
+                    onChange={(event) =>
+                      setEditFavoritePlay(event.target.value)
+                    }
                     placeholder="例：ひも、追いかけっこ"
                   />
                   <AppTextField
@@ -2056,7 +2243,9 @@ export function CatsPage() {
                     label="なでられると好きなところ"
                     value={editFavoriteTouch}
                     maxLength={40}
-                    onChange={(event) => setEditFavoriteTouch(event.target.value)}
+                    onChange={(event) =>
+                      setEditFavoriteTouch(event.target.value)
+                    }
                     placeholder="例：あごの下"
                   />
                   <AppTextField
@@ -2130,34 +2319,33 @@ export function CatsPage() {
                     fieldStyle={styles.catManageCareNoteField}
                   />
                 </section>
-
               </div>
             ) : (
               <>
-            <AppButton
-              type="button"
-              variant="secondary"
-              fullWidth
-              iconStart={<AddSmallIcon />}
-              onClick={() => {
-                startAddingCat();
-              }}
-            >
-              ねこをふやす
-            </AppButton>
-            {canManageCats && catProfiles.length > 1 ? (
-              <AppButton
-                type="button"
-                variant="danger"
-                fullWidth
-                onClick={() => {
-                  setIsCatManageOpen(false);
-                  startDeleteCat(activeCatProfile);
-                }}
-              >
-                この子の登録を削除
-              </AppButton>
-            ) : null}
+                <AppButton
+                  type="button"
+                  variant="secondary"
+                  fullWidth
+                  iconStart={<AddSmallIcon />}
+                  onClick={() => {
+                    startAddingCat();
+                  }}
+                >
+                  ねこをふやす
+                </AppButton>
+                {canManageCats && catProfiles.length > 1 ? (
+                  <AppButton
+                    type="button"
+                    variant="danger"
+                    fullWidth
+                    onClick={() => {
+                      setIsCatManageOpen(false);
+                      startDeleteCat(activeCatProfile);
+                    }}
+                  >
+                    この子の登録を削除
+                  </AppButton>
+                ) : null}
               </>
             )}
           </div>
@@ -2209,7 +2397,9 @@ export function CatsPage() {
           title={photoSheetTitle}
           photos={photoSheetPhotos}
           showCatNames={photoSheetLens === "all"}
-          onOpenPhoto={(photo) => setSelectedRecordPhoto(toRecordPhotoPreview(photo))}
+          onOpenPhoto={(photo) =>
+            setSelectedRecordPhoto(toRecordPhotoPreview(photo))
+          }
           onClose={() => setPhotoSheetLens(null)}
         />
       ) : null}
@@ -2245,7 +2435,9 @@ export function CatsPage() {
             key={`${selectedRecordPhoto.kind}-${selectedRecordPhoto.id}`}
             photo={selectedRecordPhoto}
             canDelete={selectedRecordPhoto.kind === "photo"}
-            onRequestDelete={() => requestDeleteGalleryPhoto(selectedRecordPhoto)}
+            onRequestDelete={() =>
+              requestDeleteGalleryPhoto(selectedRecordPhoto)
+            }
             onClose={() => setSelectedRecordPhoto(null)}
           />
         ) : null}
@@ -2277,7 +2469,9 @@ export function CatsPage() {
                 }}
                 disabled={isDeletingGalleryPhoto}
               >
-                {isDeletingGalleryPhoto ? "削除しています..." : "この写真を削除"}
+                {isDeletingGalleryPhoto
+                  ? "削除しています..."
+                  : "この写真を削除"}
               </AppButton>
               <AppButton
                 type="button"
@@ -2401,7 +2595,12 @@ function CatGalleryIntroSheet({
           追加した写真は、ねこだよりには使われません。
         </p>
         <div style={styles.deleteCatConfirmActions}>
-          <AppButton type="button" variant="primary" fullWidth onClick={onContinue}>
+          <AppButton
+            type="button"
+            variant="primary"
+            fullWidth
+            onClick={onContinue}
+          >
             写真を選ぶ
           </AppButton>
           <AppButton type="button" variant="quiet" fullWidth onClick={onClose}>
@@ -2456,7 +2655,8 @@ function RecordOverview({
   });
   const pickupIds = pickups.map((pickup) => pickup.id).join(",");
   const pickupHasUnopenedMemory = pickups.some(
-    (pickup) => pickup.target.kind === "memory" && !pickup.target.memory.openedAt,
+    (pickup) =>
+      pickup.target.kind === "memory" && !pickup.target.memory.openedAt,
   );
   const shouldShowUnopenedOmoideHint =
     pickupHasUnopenedMemory && !hasSeenUnopenedOmoideHint;
@@ -2513,13 +2713,13 @@ function RecordOverview({
             const matchingUnopenedMemory =
               pickup.target.kind === "memory"
                 ? pickup.target.memory
-                : memories.find(
+                : (memories.find(
                     (memory) =>
                       memory.sourcePhotoId === pickup.sourceId &&
                       memory.deliveredAt <= now &&
                       !memory.openedAt &&
                       !memory.dismissedAt,
-                  ) ?? null;
+                  ) ?? null);
             const hasUnopenedMemory = Boolean(matchingUnopenedMemory);
 
             return (
@@ -2586,7 +2786,10 @@ function RecordOverview({
         </section>
       ) : null}
 
-      <section style={styles.recordBlock} aria-labelledby="cats-milestones-heading">
+      <section
+        style={styles.recordBlock}
+        aria-labelledby="cats-milestones-heading"
+      >
         <h2 id="cats-milestones-heading" style={styles.recordBlockTitle}>
           <span style={styles.recordBlockTitleMark} aria-hidden="true" />
           記念
@@ -2673,7 +2876,10 @@ function RecordOverview({
         )}
       </section>
 
-      <section style={styles.recordBlock} aria-labelledby="cats-archive-heading">
+      <section
+        style={styles.recordBlock}
+        aria-labelledby="cats-archive-heading"
+      >
         <h2 id="cats-archive-heading" style={styles.recordBlockTitle}>
           <span style={styles.recordBlockTitleMark} aria-hidden="true" />
           年ごと
@@ -3022,7 +3228,10 @@ function BasicInfoSubsection({
               <span
                 style={
                   row.valueTone === "numeric"
-                    ? { ...styles.basicInfoValue, ...styles.basicInfoValueNumeric }
+                    ? {
+                        ...styles.basicInfoValue,
+                        ...styles.basicInfoValueNumeric,
+                      }
                     : styles.basicInfoValue
                 }
               >
@@ -3039,9 +3248,15 @@ function BasicInfoSubsection({
   );
 }
 
-function LensPhotoSection({
-  title,
+function UchinokoPhotoSection({
+  catName,
   photos,
+  todayPhoto,
+  memoryPhoto,
+  now,
+  keptFourChoiceSourcePhoto,
+  hasAnyTodaySleepingPhoto,
+  isRemotePhotoStateSettled,
   emptyCopy,
   lensValue,
   onLensChange,
@@ -3049,8 +3264,14 @@ function LensPhotoSection({
   onOpenPhoto,
   isListSettled,
 }: {
-  title: string;
+  catName: string;
   photos: LensPhoto[];
+  todayPhoto: LensPhoto | null;
+  memoryPhoto: LensPhoto | null;
+  now: number;
+  keptFourChoiceSourcePhoto: LensPhoto | null;
+  hasAnyTodaySleepingPhoto: boolean;
+  isRemotePhotoStateSettled: boolean;
   emptyCopy: string;
   lensValue: UchinokoLens;
   onLensChange?: (value: UchinokoLens) => void;
@@ -3058,11 +3279,109 @@ function LensPhotoSection({
   onOpenPhoto: (photo: LensPhoto) => void;
   isListSettled: boolean;
 }) {
+  const currentMonthPhotos = photos.filter((photo) =>
+    isSameJstCalendarMonth(photo.createdAt, now),
+  );
+  const olderPhotos = photos.filter(
+    (photo) => !isSameJstCalendarMonth(photo.createdAt, now),
+  );
+  const hasCurrentMonthPhotos = currentMonthPhotos.length > 0;
+  const primaryPhotos = hasCurrentMonthPhotos ? currentMonthPhotos : photos;
+  const primaryTitle = hasCurrentMonthPhotos
+    ? `${getJstMonth(now)}月の${catName}`
+    : `${catName}の写真`;
+  const highlightState =
+    todayPhoto && memoryPhoto
+      ? "today-with-past"
+      : todayPhoto
+        ? "today-only"
+        : "past-only";
+
   return (
     <section style={styles.lensPhotoSection}>
+      {todayPhoto || memoryPhoto ? (
+        <div
+          data-testid="cats-photo-highlights"
+          data-state={highlightState}
+          data-layout={todayPhoto && memoryPhoto ? "pair" : "single"}
+          style={styles.uchinokoHighlights}
+        >
+          <div
+            style={
+              todayPhoto && memoryPhoto
+                ? styles.uchinokoHighlightGrid
+                : {
+                    ...styles.uchinokoHighlightGrid,
+                    ...styles.uchinokoHighlightGridSingle,
+                  }
+            }
+          >
+            {todayPhoto ? (
+              <UchinokoPhotoHighlightCard
+                testId="cats-photo-today-card"
+                title={`きょうの${catName}`}
+                photo={todayPhoto}
+                wide={!memoryPhoto}
+                onOpenPhoto={onOpenPhoto}
+              />
+            ) : null}
+            {memoryPhoto ? (
+              <UchinokoPhotoHighlightCard
+                testId="cats-photo-memory-card"
+                title={getUchinokoMemoryTitle(memoryPhoto, now, catName)}
+                photo={memoryPhoto}
+                wide={!todayPhoto}
+                onOpenPhoto={onOpenPhoto}
+              />
+            ) : null}
+          </div>
+        </div>
+      ) : null}
+
+      {keptFourChoiceSourcePhoto ? (
+        <div
+          data-testid="cats-photo-delivery-bridge"
+          data-source-photo-id={keptFourChoiceSourcePhoto.id}
+          style={styles.uchinokoPhotoBridge}
+        >
+          <span>
+            {keptFourChoiceSourcePhoto.id === todayPhoto?.id
+              ? `きょうの${catName}から、4匹が届きました`
+              : `${formatUchinokoHighlightDate(keptFourChoiceSourcePhoto.createdAt)}の${catName}から、きょうの4匹が届きました`}
+          </span>
+          <a href="/collection" style={styles.uchinokoPhotoBridgeLink}>
+            ねこだよりを見る
+          </a>
+        </div>
+      ) : !todayPhoto &&
+        !hasAnyTodaySleepingPhoto &&
+        isRemotePhotoStateSettled ? (
+        <a
+          href="/home"
+          data-testid="cats-photo-today-link"
+          style={styles.uchinokoTodayLink}
+        >
+          きょうの一枚を撮ると、4匹が届きます
+        </a>
+      ) : null}
+
       <div style={styles.lensSectionHeader}>
         <div style={styles.lensSectionTitleRow}>
-          <p style={styles.lensSectionTitle}>{title}</p>
+          <div style={styles.lensSectionHeadingGroup}>
+            <p
+              data-testid={
+                hasCurrentMonthPhotos
+                  ? "cats-photo-current-month"
+                  : "cats-photo-all-dates"
+              }
+              style={styles.lensSectionTitle}
+            >
+              {primaryTitle}
+            </p>
+            <span style={styles.lensSectionCount}>
+              {primaryPhotos.length}枚
+            </span>
+          </div>
           <div style={styles.lensSectionTitleActions}>
             {onLensChange ? (
               <PhotoLensFilter value={lensValue} onChange={onLensChange} />
@@ -3079,18 +3398,85 @@ function LensPhotoSection({
             </button>
           </div>
         </div>
-        <p style={styles.lensSectionSub}>
-          残しておきたい写真を、ここに追加できます。
-        </p>
       </div>
       <LensPhotoGrid
-        photos={photos}
+        photos={primaryPhotos}
         emptyCopy={emptyCopy}
         showCatNames={false}
         onOpenPhoto={onOpenPhoto}
         isListSettled={isListSettled}
       />
+      {hasCurrentMonthPhotos && olderPhotos.length > 0 ? (
+        <section
+          data-testid="cats-photo-older"
+          style={styles.uchinokoOlderPhotos}
+        >
+          <div style={styles.uchinokoOlderHeader}>
+            <p style={styles.uchinokoOlderTitle}>これまでの写真</p>
+            <span style={styles.lensSectionCount}>{olderPhotos.length}枚</span>
+          </div>
+          <LensPhotoGrid
+            photos={olderPhotos}
+            emptyCopy=""
+            showCatNames={false}
+            onOpenPhoto={onOpenPhoto}
+            isListSettled={isListSettled}
+            testId="cats-lens-photo-grid-older"
+            analyticsSurface="cats_lens_photo_grid_older"
+          />
+        </section>
+      ) : null}
     </section>
+  );
+}
+
+function UchinokoPhotoHighlightCard({
+  testId,
+  title,
+  photo,
+  wide,
+  onOpenPhoto,
+}: {
+  testId: string;
+  title: string;
+  photo: LensPhoto;
+  wide: boolean;
+  onOpenPhoto: (photo: LensPhoto) => void;
+}) {
+  return (
+    <article
+      data-testid={testId}
+      data-photo-id={photo.id}
+      style={styles.uchinokoHighlightCard}
+    >
+      <div style={styles.uchinokoHighlightHeader}>
+        <p style={styles.uchinokoHighlightTitle}>{title}</p>
+        <time
+          dateTime={getJstDateKey(photo.createdAt)}
+          style={styles.uchinokoHighlightDate}
+        >
+          {formatUchinokoHighlightDate(photo.createdAt)}
+        </time>
+      </div>
+      <PhotoTile
+        src={resolvePhotoSrc(photo, "board")}
+        previewSrc={getLensPhotoThumbnailSrc(photo)}
+        alt={`${formatUchinokoHighlightDate(photo.createdAt)}の${photo.catNames[0] ?? "ねこ"}`}
+        variant="bare"
+        aspect={wide ? "16 / 9" : "4 / 5"}
+        fit="cover"
+        storageVariant={getLensPhotoStorageVariant(photo, "board")}
+        fallbackSrcs={getLensPhotoFallbackSrcs(photo)}
+        loading="eager"
+        onClick={() => onOpenPhoto(photo)}
+        style={styles.uchinokoHighlightPhotoRoot}
+        frameStyle={{
+          ...styles.uchinokoHighlightPhotoFrame,
+          ...(wide ? styles.uchinokoHighlightPhotoFrameWide : {}),
+        }}
+        imageStyle={styles.uchinokoHighlightPhoto}
+      />
+    </article>
   );
 }
 
@@ -3118,9 +3504,7 @@ function AllCatsLensView({
             <PhotoLensFilter value={lensValue} onChange={onLensChange} />
           ) : null}
         </div>
-        <p style={styles.lensSectionSub}>
-          {catCount}ひきの写真を、日付順に。
-        </p>
+        <p style={styles.lensSectionSub}>{catCount}ひきの写真を、日付順に。</p>
       </div>
       <LensPhotoGrid
         photos={photos}
@@ -3140,7 +3524,11 @@ function UchinokoSectionTabs({
 }: {
   value: UchinokoSection;
   onChange: (value: UchinokoSection) => void;
-  options: { value: UchinokoSection; label: string }[];
+  options: {
+    value: UchinokoSection;
+    label: string;
+    hasIndicator?: boolean;
+  }[];
 }) {
   return (
     <div
@@ -3162,11 +3550,23 @@ function UchinokoSectionTabs({
             onClick={() => onChange(option.value)}
             style={
               selected
-                ? { ...styles.sectionTabButton, ...styles.sectionTabButtonActive }
+                ? {
+                    ...styles.sectionTabButton,
+                    ...styles.sectionTabButtonActive,
+                  }
                 : styles.sectionTabButton
             }
           >
-            {option.label}
+            <span style={styles.sectionTabLabel}>
+              {option.label}
+              {option.hasIndicator ? (
+                <span
+                  data-testid={`cats-section-tab-${option.value}-dot`}
+                  aria-label="未開封あり"
+                  style={styles.sectionTabIndicator}
+                />
+              ) : null}
+            </span>
           </button>
         );
       })}
@@ -3204,7 +3604,10 @@ function PhotoLensFilter({
             aria-checked={selected}
             style={
               selected
-                ? { ...styles.photoLensFilterButton, ...styles.photoLensFilterButtonActive }
+                ? {
+                    ...styles.photoLensFilterButton,
+                    ...styles.photoLensFilterButtonActive,
+                  }
                 : styles.photoLensFilterButton
             }
             onClick={() => onChange(option.value)}
@@ -3223,12 +3626,16 @@ function LensPhotoGrid({
   showCatNames,
   onOpenPhoto,
   isListSettled,
+  testId = "cats-lens-photo-grid",
+  analyticsSurface = "cats_lens_photo_grid",
 }: {
   photos: LensPhoto[];
   emptyCopy: string;
   showCatNames: boolean;
   onOpenPhoto: (photo: LensPhoto) => void;
   isListSettled: boolean;
+  testId?: string;
+  analyticsSurface?: string;
 }) {
   const [isFirstViewReady, setIsFirstViewReady] = useState(false);
   const mountedAtRef = useRef(performance.now());
@@ -3252,7 +3659,7 @@ function LensPhotoGrid({
     if (firstViewPhotos.length === 0) {
       setIsFirstViewReady(true);
       trackProductEvent("tab_reveal_wait_ms", {
-        surface: "cats_lens_photo_grid",
+        surface: analyticsSurface,
         wait_ms: 0,
         list_resolved_ms: Math.max(
           0,
@@ -3288,9 +3695,12 @@ function LensPhotoGrid({
       );
       setIsFirstViewReady(true);
       trackProductEvent("tab_reveal_wait_ms", {
-        surface: "cats_lens_photo_grid",
+        surface: analyticsSurface,
         wait_ms: Math.max(0, Math.round(performance.now() - startedAt)),
-        list_resolved_ms: Math.max(0, Math.round(startedAt - mountedAtRef.current)),
+        list_resolved_ms: Math.max(
+          0,
+          Math.round(startedAt - mountedAtRef.current),
+        ),
         photo_count: firstViewPhotos.length,
         ready_count: decodeResults.filter((result) => result.ok).length,
         timeout_count: decodeResults.filter((result) => result.timedOut).length,
@@ -3308,10 +3718,10 @@ function LensPhotoGrid({
     return () => {
       isCancelled = true;
     };
-  }, [firstViewSignature, isListSettled]);
+  }, [analyticsSurface, firstViewSignature, isListSettled]);
 
   if (!isListSettled) {
-    return <LensPhotoGridSkeleton />;
+    return <LensPhotoGridSkeleton testId={testId} />;
   }
 
   if (photos.length === 0) {
@@ -3319,30 +3729,32 @@ function LensPhotoGrid({
   }
 
   if (!isFirstViewReady) {
-    return <LensPhotoGridSkeleton />;
+    return <LensPhotoGridSkeleton testId={testId} />;
   }
 
   return (
     <div
-      data-testid="cats-lens-photo-grid"
+      data-testid={testId}
       data-photo-decode-gate="ready"
       style={styles.lensPhotoGrid}
     >
       {photos.map((photo) => (
         <div key={photo.id} style={styles.lensPhotoItem}>
-          <PhotoTile
-            src={getLensPhotoThumbnailSrc(photo)}
-            alt=""
-            variant="bare"
-            aspect="1 / 1"
-            fit="cover"
-            onClick={() => onOpenPhoto(photo)}
-            style={styles.lensPhotoTileRoot}
-            frameStyle={styles.lensPhotoTileFrame}
-            imageStyle={styles.lensPhotoTile}
-          />
+          <div style={styles.lensPhotoTileWrap}>
+            <PhotoTile
+              src={getLensPhotoThumbnailSrc(photo)}
+              alt={`${formatLensPhotoGridDate(photo.createdAt)}の${photo.catNames[0] ?? "ねこ"}`}
+              variant="bare"
+              aspect="1 / 1"
+              fit="cover"
+              onClick={() => onOpenPhoto(photo)}
+              style={styles.lensPhotoTileRoot}
+              frameStyle={styles.lensPhotoTileFrame}
+              imageStyle={styles.lensPhotoTile}
+            />
+          </div>
           <span style={styles.lensPhotoDate}>
-            {formatLensPhotoDate(photo.createdAt)}
+            {formatLensPhotoGridDate(photo.createdAt)}
           </span>
           {showCatNames && photo.catNames.length > 0 ? (
             <span style={styles.lensPhotoCats}>
@@ -3434,7 +3846,8 @@ function YearSummarySheet({
   );
   const yearMilestones = milestones.filter(
     (milestone) =>
-      milestone.reachedAt && isTimestampInYear(milestone.reachedAt, summary.year),
+      milestone.reachedAt &&
+      isTimestampInYear(milestone.reachedAt, summary.year),
   );
 
   return (
@@ -3594,7 +4007,10 @@ function YearSummaryDetailList({
                   src={resolvePhotoSrc(memory.photo, "list")}
                   alt=""
                   style={styles.yearSummaryRowImage}
-                  storageVariant={resolvePhotoStorageVariant(memory.photo, "list")}
+                  storageVariant={resolvePhotoStorageVariant(
+                    memory.photo,
+                    "list",
+                  )}
                   fallbackSrcs={resolvePhotoFallbackSrcs(memory.photo)}
                 />
               </span>
@@ -3646,13 +4062,18 @@ function YearSummaryDetailList({
                     style={styles.yearSummaryRowImage}
                   />
                 ) : (
-                  <span style={styles.yearSummaryRowFallback} aria-hidden="true" />
+                  <span
+                    style={styles.yearSummaryRowFallback}
+                    aria-hidden="true"
+                  />
                 )}
               </span>
               <span style={styles.yearSummaryRowText}>
                 <span style={styles.yearSummaryRowTitle}>{title}</span>
                 <span style={styles.yearSummaryRowMeta}>
-                  {milestone.reachedAt ? formatFootprintDate(milestone.reachedAt) : ""}
+                  {milestone.reachedAt
+                    ? formatFootprintDate(milestone.reachedAt)
+                    : ""}
                 </span>
               </span>
               {hasPhoto ? <ChevronRightSmallIcon /> : null}
@@ -3694,7 +4115,10 @@ function CoverPhotoSheet({
   onClose: () => void;
 }) {
   return (
-    <AppBottomSheet title={"\u30ab\u30d0\u30fc\u5199\u771f\u3092\u5909\u3048\u308b"} onClose={onClose}>
+    <AppBottomSheet
+      title={"\u30ab\u30d0\u30fc\u5199\u771f\u3092\u5909\u3048\u308b"}
+      onClose={onClose}
+    >
       <div style={styles.thumbnailPicker}>
         <div style={styles.thumbnailPickerActions}>
           {currentCoverSrc ? (
@@ -3711,7 +4135,9 @@ function CoverPhotoSheet({
                 )
               }
             >
-              {"\u3044\u307e\u306e\u5199\u771f\u306e\u4f4d\u7f6e\u3092\u8abf\u6574"}
+              {
+                "\u3044\u307e\u306e\u5199\u771f\u306e\u4f4d\u7f6e\u3092\u8abf\u6574"
+              }
             </AppButton>
           ) : null}
           <AppButton
@@ -3739,7 +4165,9 @@ function CoverPhotoSheet({
 
         <div style={styles.thumbnailPickerSection}>
           <p style={styles.thumbnailPickerTitle}>
-            {"\u3053\u306e\u5b50\u306e\u5199\u771f\u304b\u3089\u3048\u3089\u3076"}
+            {
+              "\u3053\u306e\u5b50\u306e\u5199\u771f\u304b\u3089\u3048\u3089\u3076"
+            }
           </p>
           {photos.length > 0 ? (
             <div style={styles.thumbnailPickerGrid}>
@@ -3765,7 +4193,9 @@ function CoverPhotoSheet({
             </div>
           ) : (
             <p style={styles.thumbnailPickerEmpty}>
-              {"\u3068\u3063\u3066\u304a\u304d\u3084\u5bdd\u9854\u304c\u3042\u308b\u3068\u3001\u3053\u3053\u304b\u3089\u9078\u3079\u307e\u3059\u3002"}
+              {
+                "\u3068\u3063\u3066\u304a\u304d\u3084\u5bdd\u9854\u304c\u3042\u308b\u3068\u3001\u3053\u3053\u304b\u3089\u9078\u3079\u307e\u3059\u3002"
+              }
             </p>
           )}
         </div>
@@ -3824,7 +4254,8 @@ function CoverCropSheet({
 
     return () => {
       document.body.style.overflow = previousBodyOverflow;
-      document.documentElement.style.overscrollBehavior = previousHtmlOverscroll;
+      document.documentElement.style.overscrollBehavior =
+        previousHtmlOverscroll;
     };
   }, []);
 
@@ -3916,7 +4347,8 @@ function CoverCropSheet({
       const deltaX = ((centerX - start.centerX) / rect.width) * 100;
       const deltaY = ((centerY - start.centerY) / rect.height) * 100;
       const nextDistance = getPointDistance(first, second);
-      const distanceRatio = start.distance > 0 ? nextDistance / start.distance : 1;
+      const distanceRatio =
+        start.distance > 0 ? nextDistance / start.distance : 1;
 
       onChange(
         normalizeCoverCrop({
@@ -4002,7 +4434,9 @@ function CoverCropSheet({
       ref={modalRef}
       role="dialog"
       aria-modal="true"
-      aria-label={"\u30ab\u30d0\u30fc\u5199\u771f\u3092\u5408\u308f\u305b\u308b"}
+      aria-label={
+        "\u30ab\u30d0\u30fc\u5199\u771f\u3092\u5408\u308f\u305b\u308b"
+      }
       data-testid="cover-crop-sheet"
       style={styles.thumbnailCropOverlay}
       tabIndex={-1}
@@ -4087,7 +4521,10 @@ function OmoideBunbako({
                   src={resolvePhotoSrc(memory.photo, "list")}
                   alt=""
                   style={styles.bunbakoPhoto}
-                  storageVariant={resolvePhotoStorageVariant(memory.photo, "list")}
+                  storageVariant={resolvePhotoStorageVariant(
+                    memory.photo,
+                    "list",
+                  )}
                   fallbackSrcs={resolvePhotoFallbackSrcs(memory.photo)}
                 />
               </span>
@@ -4185,7 +4622,9 @@ function PhotoFullscreenViewer({
         </div>
         <div style={styles.photoViewerMeta}>
           <p style={styles.photoViewerTitle}>{photo.title}</p>
-          <p style={styles.photoViewerDate}>{formatFootprintDate(photo.timestamp)}</p>
+          <p style={styles.photoViewerDate}>
+            {formatFootprintDate(photo.timestamp)}
+          </p>
         </div>
         {canDelete && onRequestDelete ? (
           <button
@@ -4515,7 +4954,10 @@ function mergeLensPhotoSources(
   return merged;
 }
 
-function mergeAllLensPhotos(remotePhotos: LensPhoto[], localPhotos: LensPhoto[]) {
+function mergeAllLensPhotos(
+  remotePhotos: LensPhoto[],
+  localPhotos: LensPhoto[],
+) {
   return dedupeLensPhotos([...remotePhotos, ...localPhotos]);
 }
 
@@ -4539,7 +4981,10 @@ function dedupeLensPhotos(photos: LensPhoto[]) {
       createdAt: Math.max(existing.createdAt, photo.createdAt),
       catIds: uniqueStrings([...existing.catIds, ...photo.catIds]),
       catNames: uniqueStrings([...existing.catNames, ...photo.catNames]),
-      thumbnailSrc: preferPhotoVariant(existing.thumbnailSrc, photo.thumbnailSrc),
+      thumbnailSrc: preferPhotoVariant(
+        existing.thumbnailSrc,
+        photo.thumbnailSrc,
+      ),
       displaySrc: preferPhotoVariant(existing.displaySrc, photo.displaySrc),
       originalSrc: preferPhotoVariant(existing.originalSrc, photo.originalSrc),
       deliveryCount: Math.max(
@@ -4580,6 +5025,210 @@ function formatLensPhotoDate(timestamp: number) {
   }
 
   return formatFootprintDate(timestamp);
+}
+
+function formatLensPhotoGridDate(timestamp: number) {
+  if (!timestamp) {
+    return "";
+  }
+
+  const date = new Date(timestamp + 9 * 60 * 60 * 1000);
+
+  if (Number.isNaN(date.getTime())) {
+    return "";
+  }
+
+  return `${date.getUTCMonth() + 1}/${date.getUTCDate()}`;
+}
+
+function isSameJstCalendarDay(leftTimestamp: number, rightTimestamp: number) {
+  if (!leftTimestamp || !rightTimestamp) {
+    return false;
+  }
+
+  const jstOffsetMs = 9 * 60 * 60 * 1000;
+  const leftDate = new Date(leftTimestamp + jstOffsetMs);
+  const rightDate = new Date(rightTimestamp + jstOffsetMs);
+
+  if (Number.isNaN(leftDate.getTime()) || Number.isNaN(rightDate.getTime())) {
+    return false;
+  }
+
+  return (
+    leftDate.getUTCFullYear() === rightDate.getUTCFullYear() &&
+    leftDate.getUTCMonth() === rightDate.getUTCMonth() &&
+    leftDate.getUTCDate() === rightDate.getUTCDate()
+  );
+}
+
+function isSameJstCalendarMonth(leftTimestamp: number, rightTimestamp: number) {
+  const left = getJstDateParts(leftTimestamp);
+  const right = getJstDateParts(rightTimestamp);
+
+  return Boolean(
+    left && right && left.year === right.year && left.month === right.month,
+  );
+}
+
+function getJstMonth(timestamp: number) {
+  return (
+    getJstDateParts(timestamp)?.month ?? new Date(timestamp).getMonth() + 1
+  );
+}
+
+function getJstDateParts(timestamp: number) {
+  if (!timestamp) {
+    return null;
+  }
+
+  const date = new Date(timestamp + 9 * 60 * 60 * 1000);
+  if (Number.isNaN(date.getTime())) {
+    return null;
+  }
+
+  return {
+    year: date.getUTCFullYear(),
+    month: date.getUTCMonth() + 1,
+    day: date.getUTCDate(),
+  };
+}
+
+function formatUchinokoHighlightDate(timestamp: number) {
+  const parts = getJstDateParts(timestamp);
+  return parts ? `${parts.month}月${parts.day}日` : "";
+}
+
+function selectTodaySleepingPhoto(photos: LensPhoto[], now: number) {
+  const candidates = photos.filter(
+    (photo) =>
+      photo.kind === "sleeping" && isSameJstCalendarDay(photo.createdAt, now),
+  );
+
+  if (candidates.length === 0) {
+    return null;
+  }
+
+  const todayKey = getJstDateKey(now);
+  const eveningTargetId =
+    readEveningDeliveryStore()[todayKey]?.targetOwnPhotoId;
+  const onboardingTargetId = readTodayOnboardingProgress(now)?.ownPhoto?.id;
+
+  return (
+    candidates.find((photo) => photo.id === eveningTargetId) ??
+    candidates.find((photo) => photo.id === onboardingTargetId) ??
+    candidates.sort((left, right) => right.createdAt - left.createdAt)[0] ??
+    null
+  );
+}
+
+function selectKeptFourChoiceSourcePhoto(
+  photos: LensPhoto[],
+  now: number,
+) {
+  const todayKey = getJstDateKey(now);
+  const day = readEveningDeliveryStore()[todayKey];
+  const hasResolvedEveningDelivery = Boolean(
+    day &&
+      day.targetOwnPhotoId &&
+      day.servedVariant === "four_choice_v1" &&
+      day.deliveredPhoto &&
+      day.selectedPhotoId &&
+      day.deliveredPhoto.id === day.selectedPhotoId &&
+      typeof day.openedAt === "number" &&
+      typeof day.keptAt === "number" &&
+      !day.skippedAt,
+  );
+
+  if (hasResolvedEveningDelivery) {
+    const eveningSource = photos.find(
+      (photo) =>
+        photo.kind === "sleeping" && photo.id === day?.targetOwnPhotoId,
+    );
+    if (eveningSource) {
+      return eveningSource;
+    }
+  }
+
+  const progress = readTodayOnboardingProgress(now);
+  const hasResolvedOnboardingDelivery = Boolean(
+    progress &&
+      progress.ownPhoto?.id &&
+      progress.deliveryBundleId &&
+      progress.deliveredPhotos?.length === 4 &&
+      progress.isDeliveredPhotoKept === true &&
+      progress.deliveredPhoto &&
+      progress.deliveredPhotos.some(
+        (deliveredPhoto) => deliveredPhoto.id === progress.deliveredPhoto?.id,
+      ),
+  );
+
+  return hasResolvedOnboardingDelivery
+    ? (photos.find(
+        (photo) =>
+          photo.kind === "sleeping" &&
+          photo.id === progress?.ownPhoto?.id,
+      ) ?? null)
+    : null;
+}
+
+function selectUchinokoMemoryPhoto(
+  photos: LensPhoto[],
+  now: number,
+  preferredPhoto: LensPhoto | null = null,
+) {
+  const candidates = photos.filter(
+    (photo) =>
+      photo.createdAt < now && !isSameJstCalendarDay(photo.createdAt, now),
+  );
+
+  if (candidates.length === 0) {
+    return null;
+  }
+
+  const preferredCandidate = preferredPhoto
+    ? candidates.find((photo) => photo.id === preferredPhoto.id)
+    : null;
+  if (preferredCandidate) {
+    return preferredCandidate;
+  }
+
+  const targetTimestamp = getPreviousJstMonthTimestamp(now);
+
+  return (
+    [...candidates].sort((left, right) => {
+      const leftDistance = Math.abs(left.createdAt - targetTimestamp);
+      const rightDistance = Math.abs(right.createdAt - targetTimestamp);
+      return leftDistance - rightDistance || right.createdAt - left.createdAt;
+    })[0] ?? null
+  );
+}
+
+function getUchinokoMemoryTitle(
+  photo: LensPhoto,
+  now: number,
+  catName: string,
+) {
+  const targetKey = getJstDateKey(getPreviousJstMonthTimestamp(now));
+  return getJstDateKey(photo.createdAt) === targetKey
+    ? `1か月前の${catName}`
+    : `前の${catName}`;
+}
+
+function getPreviousJstMonthTimestamp(now: number) {
+  const parts = getJstDateParts(now);
+  if (!parts) {
+    return now - 30 * 24 * 60 * 60 * 1000;
+  }
+
+  const previousMonthIndex = parts.month - 2;
+  const targetYear = previousMonthIndex < 0 ? parts.year - 1 : parts.year;
+  const targetMonthIndex = previousMonthIndex < 0 ? 11 : previousMonthIndex;
+  const daysInTargetMonth = new Date(
+    Date.UTC(targetYear, targetMonthIndex + 1, 0),
+  ).getUTCDate();
+  const targetDay = Math.min(parts.day, daysInTargetMonth);
+
+  return Date.UTC(targetYear, targetMonthIndex, targetDay, 3, 0, 0, 0);
 }
 
 function toRecordPhotoPreview(photo: LensPhoto): RecordPhotoPreview {
@@ -4708,7 +5357,9 @@ function clampNumber(value: number, min: number, max: number) {
   return Math.min(max, Math.max(min, value));
 }
 
-function toRecordPhotoPreviewFromMemory(memory: OmoideMemory): RecordPhotoPreview {
+function toRecordPhotoPreviewFromMemory(
+  memory: OmoideMemory,
+): RecordPhotoPreview {
   return {
     id: memory.id,
     src: resolvePhotoSrc(memory.photo, "detail"),
@@ -4844,7 +5495,9 @@ function countStoredSleepingPhotosForCat(catId: string) {
   }
 
   try {
-    const raw = window.localStorage.getItem("nyaruhodo_exchange_own_sleeping_photos");
+    const raw = window.localStorage.getItem(
+      "nyaruhodo_exchange_own_sleeping_photos",
+    );
     const photos = raw ? (JSON.parse(raw) as unknown) : [];
 
     if (!Array.isArray(photos)) {
@@ -4884,6 +5537,19 @@ function getClientNow() {
     : Date.now();
 }
 
+function getMsUntilNextJstCalendarDay(now: number) {
+  const jstOffsetMs = 9 * 60 * 60 * 1000;
+  const shifted = new Date(now + jstOffsetMs);
+  const nextMidnightUtc =
+    Date.UTC(
+      shifted.getUTCFullYear(),
+      shifted.getUTCMonth(),
+      shifted.getUTCDate() + 1,
+    ) - jstOffsetMs;
+
+  return Math.max(1_000, nextMidnightUtc - now + 250);
+}
+
 function formatRecordShortDate(timestamp: number) {
   const date = new Date(timestamp);
   if (Number.isNaN(date.getTime())) {
@@ -4895,7 +5561,9 @@ function formatRecordShortDate(timestamp: number) {
 
 function hasSeenUnopenedOmoideDotHint() {
   try {
-    return window.localStorage.getItem(UNOPENED_OMOIDE_DOT_HINT_STORAGE_KEY) === "1";
+    return (
+      window.localStorage.getItem(UNOPENED_OMOIDE_DOT_HINT_STORAGE_KEY) === "1"
+    );
   } catch {
     return true;
   }
@@ -5375,11 +6043,10 @@ function getFamilyAnniversaryStatus(
 
   const now = new Date(nowValue);
   const isToday =
-    familySince.getMonth() === now.getMonth() && familySince.getDate() === now.getDate();
+    familySince.getMonth() === now.getMonth() &&
+    familySince.getDate() === now.getDate();
 
-  return isToday
-    ? { copy: "きょうは 家族になった日", isToday: true }
-    : null;
+  return isToday ? { copy: "きょうは 家族になった日", isToday: true } : null;
 }
 
 function getCelebrationToneStyle(tone: CatCelebrationTone) {
@@ -5473,10 +6140,14 @@ function resizeAndEncode(
   );
 }
 
-function LensPhotoGridSkeleton() {
+function LensPhotoGridSkeleton({
+  testId = "cats-lens-photo-grid",
+}: {
+  testId?: string;
+}) {
   return (
     <div
-      data-testid="cats-lens-photo-grid"
+      data-testid={testId}
       data-photo-decode-gate="waiting"
       style={styles.lensPhotoGrid}
       aria-hidden="true"
@@ -5541,8 +6212,7 @@ const styles = {
     boxSizing: "border-box" as const,
     margin: "0 auto",
     fontSynthesis: "none",
-    padding:
-      "calc(20px + env(safe-area-inset-top)) 24px 0",
+    padding: "calc(20px + env(safe-area-inset-top)) 24px 0",
   },
   pageKicker: {
     margin: "0 0 5px",
@@ -5638,7 +6308,8 @@ const styles = {
     padding: "12px 16px",
     borderRadius: "28px",
     background: "color-mix(in srgb, var(--paper-card) 46%, transparent)",
-    boxShadow: "0 10px 30px -26px color-mix(in srgb, var(--ink) 22%, transparent)",
+    boxShadow:
+      "0 10px 30px -26px color-mix(in srgb, var(--ink) 22%, transparent)",
     backdropFilter: "none",
   },
   profilePlaceCard: {
@@ -5648,6 +6319,59 @@ const styles = {
     background: "transparent",
     boxShadow: "none",
     backdropFilter: "none",
+  },
+  profileIdentity: {
+    display: "grid",
+    gridTemplateColumns: "minmax(0, 1fr) auto",
+    alignItems: "end",
+    gap: "12px",
+    minHeight: "48px",
+    margin: "0 0 10px",
+  },
+  profileIdentityText: {
+    minWidth: 0,
+    display: "grid",
+    gap: "2px",
+  },
+  profileIdentityKicker: {
+    margin: 0,
+    color: CATS_MUTED,
+    fontFamily: CATS_UI,
+    fontSize: CATS_META_SIZE,
+    fontWeight: 400,
+    lineHeight: 1.35,
+    letterSpacing: CATS_META_TRACKING,
+  },
+  profileIdentityName: {
+    minWidth: 0,
+    margin: 0,
+    overflow: "hidden",
+    color: CATS_TEXT_STRONG,
+    fontFamily: CATS_UI,
+    fontSize: "26px",
+    fontWeight: 500,
+    lineHeight: 1.3,
+    letterSpacing: CATS_TITLE_TRACKING,
+    textOverflow: "ellipsis",
+    whiteSpace: "nowrap",
+  },
+  profileIdentitySwitchButton: {
+    width: "40px",
+    height: "40px",
+    minWidth: "40px",
+    minHeight: "40px",
+    display: "inline-flex",
+    alignItems: "center",
+    justifyContent: "center",
+    padding: "7px",
+    borderRadius: "999px",
+    border:
+      "1px solid color-mix(in srgb, var(--control-border) 68%, transparent)",
+    background: "color-mix(in srgb, var(--paper-card) 64%, transparent)",
+    color: CATS_MUTED,
+    boxShadow: "var(--shadow-e0)",
+    cursor: "pointer",
+    WebkitTapHighlightColor: "transparent",
   },
   sectionSwitch: {
     margin: "0 0 12px",
@@ -5699,16 +6423,33 @@ const styles = {
     background: "transparent",
     boxShadow: "none",
   },
+  sectionTabLabel: {
+    position: "relative" as const,
+    display: "inline-flex",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  sectionTabIndicator: {
+    position: "absolute" as const,
+    top: "-2px",
+    right: "-9px",
+    width: "6px",
+    height: "6px",
+    borderRadius: "999px",
+    background: "var(--seal)",
+    boxShadow:
+      "0 0 0 2px color-mix(in srgb, var(--paper) 84%, transparent)",
+  },
   profileCoverHero: {
     position: "relative" as const,
     display: "block",
-    minHeight: "240px",
+    minHeight: "clamp(168px, 23dvh, 184px)",
   },
   profileCoverFrame: {
     position: "relative" as const,
     display: "block",
     width: "calc(100% + 32px)",
-    height: "232px",
+    height: "clamp(168px, 23dvh, 184px)",
     marginLeft: "-16px",
     overflow: "hidden",
     borderRadius: "18px",
@@ -5943,7 +6684,8 @@ const styles = {
   profileHeroAvatarPhotoTile: {
     width: "48px",
     height: "48px",
-    border: "1.5px solid color-mix(in srgb, var(--paper-card) 88%, transparent)",
+    border:
+      "1.5px solid color-mix(in srgb, var(--paper-card) 88%, transparent)",
     boxShadow:
       "0 1px 3px color-mix(in srgb, var(--ink) 8%, transparent), 0 6px 16px -14px color-mix(in srgb, var(--ink) 20%, transparent)",
   },
@@ -5952,7 +6694,8 @@ const styles = {
     height: "48px",
     padding: "4px",
     boxSizing: "border-box",
-    border: "1.5px solid color-mix(in srgb, var(--paper-card) 88%, transparent)",
+    border:
+      "1.5px solid color-mix(in srgb, var(--paper-card) 88%, transparent)",
     boxShadow:
       "0 1px 3px color-mix(in srgb, var(--ink) 8%, transparent), 0 6px 16px -14px color-mix(in srgb, var(--ink) 20%, transparent)",
   },
@@ -5998,7 +6741,8 @@ const styles = {
     justifyContent: "center",
     padding: "4px",
     borderRadius: "999px",
-    border: "1px solid color-mix(in srgb, var(--control-border) 74%, transparent)",
+    border:
+      "1px solid color-mix(in srgb, var(--control-border) 74%, transparent)",
     background: "color-mix(in srgb, var(--paper-card) 64%, transparent)",
     color: CATS_MUTED,
     boxShadow: "none",
@@ -6070,7 +6814,8 @@ const styles = {
     alignItems: "center",
     gap: "12px",
     minHeight: "38px",
-    borderBottom: "1px solid color-mix(in srgb, var(--line-strong) 58%, transparent)",
+    borderBottom:
+      "1px solid color-mix(in srgb, var(--line-strong) 58%, transparent)",
   },
   recordRowLast: {
     borderBottom: "none",
@@ -6137,8 +6882,7 @@ const styles = {
     height: "7px",
     borderRadius: "999px",
     background: "var(--seal)",
-    boxShadow:
-      "0 0 0 4px color-mix(in srgb, var(--seal) 10%, transparent)",
+    boxShadow: "0 0 0 4px color-mix(in srgb, var(--seal) 10%, transparent)",
   },
   recordMonthLabel: {
     margin: "-2px 0 2px",
@@ -6397,8 +7141,7 @@ const styles = {
   },
   milestoneDotUpcoming: {
     borderColor: "color-mix(in srgb, var(--seal) 46%, var(--line-strong))",
-    background:
-      "color-mix(in srgb, var(--seal) 8%, var(--paper-card))",
+    background: "color-mix(in srgb, var(--seal) 8%, var(--paper-card))",
   },
   milestoneDotToday: {
     borderColor: "var(--seal)",
@@ -6408,8 +7151,7 @@ const styles = {
   },
   milestoneDotRecent: {
     borderColor: "color-mix(in srgb, var(--seal) 38%, var(--line-strong))",
-    background:
-      "color-mix(in srgb, var(--paper-warm) 64%, var(--paper-card))",
+    background: "color-mix(in srgb, var(--paper-warm) 64%, var(--paper-card))",
   },
   milestoneDotUnset: {
     borderStyle: "dashed",
@@ -6757,9 +7499,9 @@ const styles = {
     padding: "0 2px 2px 0",
     scrollSnapType: "x proximity",
     scrollbarWidth: "none",
-      contentVisibility: "auto",
+    contentVisibility: "auto",
     containIntrinsicSize: "180px",
-},
+  },
   footprintCard: {
     width: "132px",
     minHeight: "128px",
@@ -6979,7 +7721,8 @@ const styles = {
     gap: "5px",
     minHeight: "auto",
     padding: "12px",
-    borderBottom: "1px solid color-mix(in srgb, var(--line-strong) 40%, transparent)",
+    borderBottom:
+      "1px solid color-mix(in srgb, var(--line-strong) 40%, transparent)",
   },
   basicInfoNoteLabel: {
     color: CATS_FAINT,
@@ -7056,7 +7799,8 @@ const styles = {
     borderRadius: "var(--radius-lg)",
     background:
       "linear-gradient(135deg, color-mix(in srgb, var(--paper) 72%, transparent), color-mix(in srgb, var(--paper-warm) 48%, transparent))",
-    boxShadow: "inset 0 0 0 1px color-mix(in srgb, var(--line) 52%, transparent)",
+    boxShadow:
+      "inset 0 0 0 1px color-mix(in srgb, var(--line) 52%, transparent)",
   },
   catManageEditorAvatar: {
     width: "44px",
@@ -7177,10 +7921,12 @@ const styles = {
     minHeight: "82px",
   },
   catManageSelectedOption: {
-    border: "1px solid color-mix(in srgb, var(--seal) 42%, var(--control-border))",
+    border:
+      "1px solid color-mix(in srgb, var(--seal) 42%, var(--control-border))",
     background: "color-mix(in srgb, var(--seal) 13%, var(--paper-card))",
     color: "var(--seal)",
-    boxShadow: "inset 0 0 0 1px color-mix(in srgb, var(--seal) 10%, transparent)",
+    boxShadow:
+      "inset 0 0 0 1px color-mix(in srgb, var(--seal) 10%, transparent)",
   },
   catManageEditorActions: {
     display: "flex",
@@ -7242,7 +7988,8 @@ const styles = {
     fontWeight: 500,
     lineHeight: 1,
     letterSpacing: CATS_BODY_TRACKING,
-    boxShadow: "0 8px 18px -16px color-mix(in srgb, var(--seal) 44%, transparent)",
+    boxShadow:
+      "0 8px 18px -16px color-mix(in srgb, var(--seal) 44%, transparent)",
     cursor: "pointer",
     WebkitTapHighlightColor: "transparent",
   },
@@ -7281,6 +8028,117 @@ const styles = {
     margin: "0 -8px 20px",
     padding: "0 8px",
   },
+  uchinokoHighlights: {
+    margin: "0 8px 12px",
+  },
+  uchinokoHighlightGrid: {
+    display: "grid",
+    gridTemplateColumns: "repeat(2, minmax(0, 1fr))",
+    gap: "8px",
+  },
+  uchinokoHighlightGridSingle: {
+    gridTemplateColumns: "minmax(0, 1fr)",
+  },
+  uchinokoHighlightCard: {
+    minWidth: 0,
+    display: "grid",
+    gap: "8px",
+  },
+  uchinokoHighlightHeader: {
+    minWidth: 0,
+    display: "grid",
+    gridTemplateColumns: "minmax(0, 1fr) auto",
+    alignItems: "baseline",
+    gap: "8px",
+    padding: "0 2px",
+  },
+  uchinokoHighlightTitle: {
+    minWidth: 0,
+    margin: 0,
+    overflow: "hidden",
+    color: CATS_TEXT,
+    fontFamily: CATS_UI,
+    fontSize: "14px",
+    fontWeight: 500,
+    lineHeight: 1.4,
+    letterSpacing: CATS_BODY_TRACKING,
+    textOverflow: "ellipsis",
+    whiteSpace: "nowrap",
+  },
+  uchinokoHighlightDate: {
+    margin: 0,
+    color: CATS_FAINT,
+    fontFamily: CATS_UI,
+    fontSize: CATS_TINY_SIZE,
+    fontWeight: 400,
+    lineHeight: 1.35,
+    letterSpacing: CATS_META_TRACKING,
+    whiteSpace: "nowrap",
+  },
+  uchinokoHighlightPhotoRoot: {
+    width: "100%",
+    minWidth: 0,
+  },
+  uchinokoHighlightPhotoFrame: {
+    width: "100%",
+    height: "auto",
+    overflow: "hidden",
+    borderRadius: "15px",
+    border: "1px solid color-mix(in srgb, var(--line) 72%, transparent)",
+    background: "color-mix(in srgb, var(--paper-card) 76%, transparent)",
+    boxShadow:
+      "0 1px 0 color-mix(in srgb, var(--paper) 72%, transparent), 0 14px 28px -26px color-mix(in srgb, var(--ink) 28%, transparent)",
+  },
+  uchinokoHighlightPhotoFrameWide: {
+    borderRadius: "17px",
+  },
+  uchinokoHighlightPhoto: {
+    width: "100%",
+    height: "100%",
+    border: 0,
+    borderRadius: "inherit",
+    objectFit: "cover",
+    boxShadow: "none",
+  },
+  uchinokoPhotoBridge: {
+    display: "flex",
+    flexWrap: "wrap",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: "6px 12px",
+    minHeight: "38px",
+    margin: "2px 8px 22px",
+    padding: "0 2px",
+    color: CATS_MUTED,
+    fontFamily: CATS_UI,
+    fontSize: CATS_META_SIZE,
+    fontWeight: 400,
+    lineHeight: 1.5,
+    letterSpacing: CATS_BODY_TRACKING,
+  },
+  uchinokoPhotoBridgeLink: {
+    color: "var(--seal)",
+    fontWeight: 500,
+    textDecoration: "underline",
+    textDecorationColor: "color-mix(in srgb, var(--seal) 42%, transparent)",
+    textUnderlineOffset: "3px",
+  },
+  uchinokoTodayLink: {
+    display: "inline-flex",
+    alignItems: "center",
+    minHeight: "36px",
+    margin: "0 8px 22px",
+    padding: "0 2px",
+    color: CATS_MUTED,
+    fontFamily: CATS_UI,
+    fontSize: CATS_META_SIZE,
+    fontWeight: 400,
+    lineHeight: 1.5,
+    letterSpacing: CATS_BODY_TRACKING,
+    textDecoration: "underline",
+    textDecorationColor: "color-mix(in srgb, var(--ink-soft) 30%, transparent)",
+    textUnderlineOffset: "3px",
+  },
   allLensCard: {
     margin: "0 -8px 24px",
     padding: "0 8px",
@@ -7302,6 +8160,12 @@ const styles = {
     alignItems: "center",
     gap: "6px",
   },
+  lensSectionHeadingGroup: {
+    minWidth: 0,
+    display: "inline-flex",
+    alignItems: "baseline",
+    gap: "8px",
+  },
   lensSectionTitle: {
     margin: 0,
     minWidth: 0,
@@ -7313,13 +8177,24 @@ const styles = {
     letterSpacing: CATS_TITLE_TRACKING,
     whiteSpace: "nowrap",
   },
+  lensSectionCount: {
+    flex: "0 0 auto",
+    color: CATS_FAINT,
+    fontFamily: CATS_UI,
+    fontSize: CATS_TINY_SIZE,
+    fontWeight: 400,
+    lineHeight: 1.35,
+    letterSpacing: CATS_META_TRACKING,
+    whiteSpace: "nowrap",
+  },
   lensAddPhotoButton: {
     flex: "0 0 auto",
     width: "34px",
     height: "34px",
     minHeight: "34px",
     padding: 0,
-    border: "1px solid color-mix(in srgb, var(--control-border) 76%, transparent)",
+    border:
+      "1px solid color-mix(in srgb, var(--control-border) 76%, transparent)",
     borderRadius: "999px",
     background: "color-mix(in srgb, var(--paper) 72%, transparent)",
     color: CATS_TEXT,
@@ -7355,11 +8230,16 @@ const styles = {
     borderRadius: "1px",
     background:
       "linear-gradient(180deg, color-mix(in srgb, var(--paper-card) 84%, transparent), color-mix(in srgb, var(--paper-warm) 42%, transparent))",
-    boxShadow: "0 0 0 1px color-mix(in srgb, var(--control-border) 28%, transparent) inset",
+    boxShadow:
+      "0 0 0 1px color-mix(in srgb, var(--control-border) 28%, transparent) inset",
   },
   lensPhotoItem: {
     display: "grid",
-    gap: 0,
+    gap: "4px",
+    minWidth: 0,
+  },
+  lensPhotoTileWrap: {
+    position: "relative",
     minWidth: 0,
   },
   lensPhotoTileRoot: {
@@ -7380,12 +8260,34 @@ const styles = {
     boxShadow: "none",
   },
   lensPhotoDate: {
-    display: "none",
-    color: CATS_MUTED,
-    fontSize: "12px",
+    display: "block",
+    margin: "0 2px",
+    color: CATS_FAINT,
+    fontFamily: CATS_UI,
+    fontSize: "11px",
     fontWeight: 400,
-    lineHeight: 1.2,
-    letterSpacing: 0,
+    lineHeight: 1.3,
+    letterSpacing: CATS_META_TRACKING,
+  },
+  lensPhotoTodayMarker: {
+    position: "absolute",
+    top: "6px",
+    left: "6px",
+    zIndex: 1,
+    display: "inline-flex",
+    alignItems: "center",
+    minHeight: "22px",
+    padding: "0 7px",
+    border: "1px solid color-mix(in srgb, var(--paper) 68%, transparent)",
+    borderRadius: "var(--radius-full)",
+    background: "color-mix(in srgb, var(--paper-card) 84%, transparent)",
+    color: "var(--seal)",
+    fontFamily: CATS_UI,
+    fontSize: "10px",
+    fontWeight: 500,
+    lineHeight: 1,
+    letterSpacing: CATS_META_TRACKING,
+    pointerEvents: "none",
   },
   lensPhotoCats: {
     display: "none",
@@ -7404,6 +8306,27 @@ const styles = {
     fontSize: CATS_BODY_SIZE,
     fontWeight: 400,
     lineHeight: 1.7,
+    letterSpacing: CATS_BODY_TRACKING,
+  },
+  uchinokoOlderPhotos: {
+    display: "grid",
+    gap: "12px",
+    margin: "30px 0 0",
+    padding: "0",
+  },
+  uchinokoOlderHeader: {
+    display: "flex",
+    alignItems: "baseline",
+    gap: "8px",
+    margin: "0 8px",
+  },
+  uchinokoOlderTitle: {
+    margin: 0,
+    color: CATS_TEXT,
+    fontFamily: CATS_UI,
+    fontSize: "15px",
+    fontWeight: 500,
+    lineHeight: 1.4,
     letterSpacing: CATS_BODY_TRACKING,
   },
   lensPhotoMore: {
@@ -7428,7 +8351,8 @@ const styles = {
     flex: "0 0 auto",
     minHeight: "40px",
     padding: "0 16px",
-    border: "1px solid color-mix(in srgb, var(--control-border) 76%, transparent)",
+    border:
+      "1px solid color-mix(in srgb, var(--control-border) 76%, transparent)",
     background: "color-mix(in srgb, var(--paper) 70%, transparent)",
     color: CATS_TEXT,
   },
@@ -7451,9 +8375,9 @@ const styles = {
     gridTemplateColumns: "repeat(3, minmax(0, 1fr))",
     gap: "2px",
     minWidth: 0,
-      contentVisibility: "auto",
+    contentVisibility: "auto",
     containIntrinsicSize: "720px",
-},
+  },
   photoListItem: {
     position: "relative",
     minWidth: 0,
@@ -7587,9 +8511,9 @@ const styles = {
     display: "grid",
     gridTemplateColumns: "repeat(3, minmax(0, 1fr))",
     gap: "6px",
-      contentVisibility: "auto",
+    contentVisibility: "auto",
     containIntrinsicSize: "420px",
-},
+  },
   yearSummaryPhotoButton: {
     width: "100%",
     aspectRatio: "1 / 1",
@@ -7610,9 +8534,9 @@ const styles = {
   yearSummaryRows: {
     display: "grid",
     gap: "7px",
-      contentVisibility: "auto",
+    contentVisibility: "auto",
     containIntrinsicSize: "480px",
-},
+  },
   yearSummaryRow: {
     display: "grid",
     gridTemplateColumns: "44px minmax(0, 1fr) auto",
@@ -7857,7 +8781,7 @@ const styles = {
     position: "relative" as const,
     width: "calc(100% + 16px)",
     maxWidth: "414px",
-    height: "232px",
+    height: "clamp(168px, 23dvh, 184px)",
     overflow: "hidden",
     borderRadius: "18px",
     border: "1px solid color-mix(in srgb, var(--line) 78%, transparent)",
@@ -8153,9 +9077,9 @@ const styles = {
   },
   bunbakoList: {
     display: "grid",
-      contentVisibility: "auto",
+    contentVisibility: "auto",
     containIntrinsicSize: "360px",
-},
+  },
   bunbakoRow: {
     width: "100%",
     minHeight: "60px",
