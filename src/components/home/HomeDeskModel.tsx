@@ -131,9 +131,9 @@ const HOME_FRAME_TUNING = {
   frameMinWidthPx: 248,
   frameInitialWidth: "312px",
   frameAspectWidthPerHeight: 9 / 14,
-  emptyIllustrationWidth: "min(42vw, 152px)",
-  emptyIllustrationMinWidth: "128px",
-  emptyActionSize: "14px",
+  emptyIllustrationWidth: "min(46vw, 168px)",
+  emptyIllustrationMinWidth: "136px",
+  emptyActionSize: "15px",
 } as const;
 const HOME_SKY_BACKGROUND =
   "linear-gradient(180deg, color-mix(in srgb, var(--paper-card) 34%, transparent) 0%, color-mix(in srgb, var(--paper) 20%, transparent) 52%, color-mix(in srgb, var(--paper-warm) 18%, transparent) 100%), radial-gradient(88% 62% at var(--home-ambient-warm-x, 18%) var(--home-ambient-warm-y, 8%), color-mix(in srgb, var(--home-ambient-warm, var(--home-sky-glow)) var(--home-ambient-warm-strength, 26%), transparent) 0%, transparent 68%), radial-gradient(86% 58% at var(--home-ambient-cool-x, 86%) var(--home-ambient-cool-y, 94%), color-mix(in srgb, var(--home-ambient-cool, var(--home-sky-bottom)) var(--home-ambient-cool-strength, 16%), transparent) 0%, transparent 72%), var(--home-sky-image), radial-gradient(circle at var(--home-sky-glow-x, 50%) var(--home-sky-glow-y, 12%), color-mix(in srgb, var(--home-sky-glow, var(--paper-warm)) 24%, transparent) 0%, transparent 58%), linear-gradient(180deg, var(--home-sky-top, var(--paper)) 0%, var(--home-sky-mid, var(--paper)) 44%, var(--home-sky-bottom, var(--paper-warm)) 100%)";
@@ -357,14 +357,19 @@ export function HomeDeskModel({
     (homeDay.phase !== "opened" && !shouldSuppressEmptyBeforeNotice);
   const shouldShowNotificationTray = shouldShowBaseNotice;
   const shouldShowHomeFrameTakeButton =
-    homeDay.phase === "empty-before" || homeDay.phase === "empty-after";
+    !homePhoto &&
+    (homeDay.phase === "empty-before" || homeDay.phase === "empty-after");
   const homeDeliveryTiming =
     eveningState.dateKey === getJstDateKey(now)
       ? "よる8時ごろ"
       : "あしたのよる8時ごろ";
-  const homeCaptureHint = `写真は「うちのこ」に残ります。「ねこだよりにする」と、${homeDeliveryTiming}、4匹から1匹をえらべます。`;
+  const homeCaptureTitle =
+    catName === "この子" ? "きょうの写真を1枚" : `きょうの${catName}を1枚`;
   const shouldShowHomeFrameRetakeLink =
-    deskState === "2" && homeDay.phase === "sent-before";
+    Boolean(homePhoto) &&
+    ((deskState === "2" && homeDay.phase === "sent-before") ||
+      homeDay.phase === "empty-before" ||
+      homeDay.phase === "empty-after");
   const shouldHidePresence = true;
   useEffect(() => {
     trackDeskStateShown(deskState, eveningState.dateKey);
@@ -619,28 +624,6 @@ export function HomeDeskModel({
                     />
                   </span>
                 </button>
-                {shouldShowHomeFrameTakeButton ? (
-                  <div style={deskStyles.homePhotoActions}>
-                    <button
-                      type="button"
-                      data-testid="home-retake-action"
-                      style={deskStyles.homeAddPhotoButton}
-                      onClick={onTakePhoto}
-                      aria-label="きょうのねがおを残す"
-                    >
-                      <AppIcon name="camera" size={15} />
-                      <span>きょうのねがおを残す</span>
-                    </button>
-                    <span style={deskStyles.homeCaptureHint}>
-                      <AppIcon
-                        name="mail"
-                        size={13}
-                        style={deskStyles.homeCaptureHintIcon}
-                      />
-                      {homeCaptureHint}
-                    </span>
-                  </div>
-                ) : null}
                 {shouldShowHomeFrameRetakeLink ? (
                   <div style={deskStyles.homeRetakeRow}>
                     <button
@@ -662,29 +645,27 @@ export function HomeDeskModel({
                 <SleepingCatPlaceholder />
                 {shouldShowHomeFrameTakeButton ? (
                   <div style={deskStyles.homeEmptyActionGroup}>
+                    <h1
+                      data-testid="home-empty-title"
+                      style={deskStyles.homeEmptyActionTitle}
+                    >
+                      {homeCaptureTitle}
+                    </h1>
                     <button
                       type="button"
                       data-testid="home-empty-action"
                       className="home-empty-cta-action"
                       style={deskStyles.homeEmptyAction}
                       onClick={onTakePhoto}
-                      aria-label={`${catName}のきょうのねがおを残す`}
+                      aria-label={`${catName}の写真を撮る・選ぶ`}
                     >
                       <AppIcon
                         name="camera"
                         size={16}
                         style={deskStyles.homeEmptyActionIcon}
                       />
-                      <span>きょうのねがおを残す</span>
+                      <span>写真を撮る・選ぶ</span>
                     </button>
-                    <span style={deskStyles.homeCaptureHint}>
-                      <AppIcon
-                        name="mail"
-                        size={13}
-                        style={deskStyles.homeCaptureHintIcon}
-                      />
-                      {homeCaptureHint}
-                    </span>
                   </div>
                 ) : null}
               </div>
@@ -1083,6 +1064,10 @@ export function HomeDeskModel({
           box-shadow:
             0 1px 0 color-mix(in srgb, var(--paper-card) 72%, transparent) inset,
             0 8px 18px -16px color-mix(in srgb, var(--home-wax, #c2745a) 44%, transparent);
+        }
+        .home-empty-cta-action:focus-visible {
+          outline: 3px solid color-mix(in srgb, var(--home-wax, #c2745a) 58%, var(--paper) 42%);
+          outline-offset: 3px;
         }
         .desk-evening-soon-copy {
           animation: deskEveningSoonCopyIn 1200ms var(--ease-gentle) both;
@@ -1992,7 +1977,7 @@ function HomeLetterTrayText({
           {keyword("「うちのこ」")}に保存しました
         </strong>
         <span style={deskStyles.letterTraySub}>
-          {deliveryTiming}、4匹から1匹をえらべます
+          {deliveryTiming}、ねこだよりがとどきます
         </span>
       </>
     );
@@ -2340,16 +2325,6 @@ const deskStyles = {
     cursor: "pointer",
     WebkitTapHighlightColor: "transparent",
   },
-  homePhotoActions: {
-    position: "absolute",
-    right: "clamp(8px, 3%, 12px)",
-    bottom: "clamp(8px, 3%, 12px)",
-    zIndex: 2,
-    display: "grid",
-    justifyItems: "end",
-    gap: "6px",
-    maxWidth: "calc(100% - 16px)",
-  },
   homeRetakeRow: {
     display: "flex",
     justifyContent: "center",
@@ -2409,32 +2384,6 @@ const deskStyles = {
       "color-mix(in srgb, var(--home-frame-light, var(--paper)) 24%, transparent)",
     boxShadow: "var(--home-frame-hairline)",
   },
-  homeAddPhotoButton: {
-    minHeight: "36px",
-    maxWidth: "100%",
-    display: "inline-flex",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: "6px",
-    padding: "8px clamp(10px, 3.5vw, 12px)",
-    border: "1px solid color-mix(in srgb, var(--home-wax, var(--seal)) 26%, transparent)",
-    borderRadius: "var(--radius-full)",
-    background: "color-mix(in srgb, var(--paper-card) 82%, transparent)",
-    color: "var(--home-wax, var(--seal))",
-    boxShadow:
-      "0 1px 0 color-mix(in srgb, var(--paper-card) 64%, transparent) inset, 0 10px 22px -18px rgba(70, 50, 30, 0.28)",
-    backdropFilter: "blur(12px)",
-    fontFamily: "var(--font-ui)",
-    fontSize: "12px",
-    fontWeight: 500,
-    lineHeight: 1,
-    letterSpacing: "var(--tracking-label)",
-    whiteSpace: "nowrap",
-    overflow: "hidden",
-    textOverflow: "ellipsis",
-    cursor: "pointer",
-    WebkitTapHighlightColor: "transparent",
-  },
   homeEmptyFrame: {
     width: "min(100%, 390px)",
     minHeight: "clamp(360px, 56dvh, 500px)",
@@ -2453,15 +2402,29 @@ const deskStyles = {
     background: "transparent",
     color: "var(--ink-soft)",
     boxShadow: "none",
-    transition: "filter 220ms var(--ease-gentle)",
+    transform: "translateY(clamp(-72px, -6dvh, -40px))",
+    transition:
+      "filter 220ms var(--ease-gentle), transform 220ms var(--ease-gentle)",
   },
   homeEmptyActionGroup: {
     position: "relative",
     zIndex: 1,
     display: "grid",
     justifyItems: "center",
-    gap: "8px",
+    gap: "12px",
     width: "100%",
+  },
+  homeEmptyActionTitle: {
+    maxWidth: "min(300px, 84vw)",
+    margin: 0,
+    color: "color-mix(in srgb, var(--ink) 90%, var(--ink-soft) 10%)",
+    fontFamily: "var(--font-ui)",
+    fontSize: "17px",
+    fontWeight: 500,
+    lineHeight: 1.5,
+    letterSpacing: "var(--tracking-body)",
+    overflowWrap: "anywhere",
+    textAlign: "center",
   },
   homeEmptyAction: {
     position: "relative",
@@ -2472,8 +2435,8 @@ const deskStyles = {
     alignItems: "center",
     justifyContent: "center",
     gap: "8px",
-    width: "min(184px, 72vw)",
-    minHeight: "48px",
+    width: "min(224px, 78vw)",
+    minHeight: "52px",
     padding: "0 24px",
     border:
       "1px solid color-mix(in srgb, var(--ink-soft) 14%, transparent)",
@@ -2485,7 +2448,7 @@ const deskStyles = {
     boxShadow:
       "0 1px 0 color-mix(in srgb, var(--paper-card) 68%, transparent) inset, 0 10px 22px -18px color-mix(in srgb, var(--ink) 22%, transparent)",
     fontFamily: "var(--font-ui)",
-    fontSize: "var(--home-empty-action-size, 14px)",
+    fontSize: "var(--home-empty-action-size, 15px)",
     fontWeight: 500,
     letterSpacing: "var(--tracking-body)",
     cursor: "pointer",
@@ -2496,34 +2459,16 @@ const deskStyles = {
   homeEmptyActionIcon: {
     color: "var(--home-wax, var(--seal))",
   },
-  homeCaptureHint: {
-    display: "inline-flex",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: "5px",
-    maxWidth: "min(260px, 78vw)",
-    color:
-      "color-mix(in srgb, var(--ink-soft) 84%, var(--home-frame-light, var(--paper)) 16%)",
-    fontFamily: "var(--font-ui)",
-    fontSize: "11.5px",
-    fontWeight: 400,
-    lineHeight: 1.5,
-    letterSpacing: "var(--tracking-body)",
-    textAlign: "center",
-    transition: "color var(--home-daylight-transition, 1800ms) var(--ease-gentle)",
-  },
-  homeCaptureHintIcon: {
-    color: "color-mix(in srgb, var(--home-wax, var(--seal)) 72%, var(--ink-soft))",
-  },
   sleepingCatPlaceholder: {
     position: "relative",
     zIndex: 1,
     width: "var(--home-empty-illustration-width, min(40vw, 136px))",
-    maxWidth: "152px",
+    maxWidth: "168px",
     minWidth: "var(--home-empty-illustration-min-width, 112px)",
     height: "auto",
     display: "block",
-    opacity: 0.96,
+    opacity: 1,
+    filter: "saturate(1.12) contrast(1.06)",
     userSelect: "none",
   },
   sleepingCatInkMask: {

@@ -4850,7 +4850,7 @@ function SleepingPhotoSourceSheet({
   return (
     <AppSheet
       placement="bottom"
-      title="ねがおの写真を選ぶ"
+      title="写真を撮る・選ぶ"
       variant="dim"
       onClose={onClose}
       style={styles.exchangeSheetFrame}
@@ -5056,10 +5056,14 @@ function ExchangeSharePermissionSheet({
     null;
   const statusCopy =
     saveState === "saved"
-      ? "保存しました。"
+      ? `${selectedCatProfile ? `${getCatName(selectedCatProfile)}の写真` : "写真"}を保存しました。`
       : isPrivate
-        ? "自分だけに保存します。ほかの人にはとどきません。"
+        ? "「うちのこ」だけに残します。ほかの人にはとどきません。"
         : deliveryCopy;
+  const sheetTitle = selectedCatProfile
+    ? `${getCatName(selectedCatProfile)}の写真を残す`
+    : "写真を残す";
+  const submitLabel = isPrivate ? "自分だけに保存する" : "送って保存する";
 
   useEffect(() => {
     isMountedRef.current = true;
@@ -5108,7 +5112,7 @@ function ExchangeSharePermissionSheet({
   return (
     <AppSheet
       placement="bottom"
-      title={"このねがおの保存方法"}
+      title={sheetTitle}
       variant="dim"
       closeOnOverlay={false}
       onClose={onClose}
@@ -5131,7 +5135,7 @@ function ExchangeSharePermissionSheet({
             data-testid="exchange-share-submit"
             data-save-state={saveState}
           >
-            {saveState === "saved" ? "保存しました" : "保存する"}
+            {saveState === "saved" ? "保存しました" : submitLabel}
           </AppButton>
         </div>
       }
@@ -5214,7 +5218,9 @@ function ExchangeSharePermissionSheet({
 
         {isExchangeTargetAvailable ? (
           <div style={styles.exchangeDecisionBlock}>
-            <p style={styles.exchangeDecisionLabel}>ねこだより</p>
+            <p style={styles.exchangeDecisionLabel}>
+              ねこだよりに送りますか？
+            </p>
             <div
               data-exchange-share-mode-group=""
               style={styles.exchangeModeGroup}
@@ -5240,7 +5246,7 @@ function ExchangeSharePermissionSheet({
                   <AppIcon name="mail" size={18} />
                 </span>
                 <span style={styles.exchangeModeText}>
-                  <span style={styles.exchangeModeLabel}>ねこだよりにする</span>
+                  <span style={styles.exchangeModeLabel}>送る</span>
                   <span style={styles.exchangeModeSub}>運営確認後、ほかの利用者へとどくことがあります</span>
                 </span>
               </button>
@@ -5263,8 +5269,8 @@ function ExchangeSharePermissionSheet({
                   <AppIcon name="lock" size={18} />
                 </span>
                 <span style={styles.exchangeModeText}>
-                  <span style={styles.exchangeModeLabel}>自分だけ</span>
-                  <span style={styles.exchangeModeSub}>ほかの人にはとどきません</span>
+                  <span style={styles.exchangeModeLabel}>送らない</span>
+                  <span style={styles.exchangeModeSub}>「うちのこ」だけに残します</span>
                 </span>
               </button>
             </div>

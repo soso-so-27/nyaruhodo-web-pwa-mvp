@@ -156,7 +156,7 @@ test.describe("home sleeping exchange flow", () => {
       "2",
     );
     await expect(page.getByTestId("home-letter-tray")).toContainText(
-      "あしたのよる8時ごろ、4匹から1匹をえらべます",
+      "あしたのよる8時ごろ、ねこだよりがとどきます",
     );
   });
 
@@ -1040,14 +1040,24 @@ test.describe("home sleeping exchange flow", () => {
 
     const dialog = page.getByRole("dialog");
     await expect(dialog).toBeVisible();
+    await expect(dialog.getByText("status catの写真を残す")).toBeVisible();
+    await expect(dialog.getByText("ねこだよりに送りますか？")).toBeVisible();
     await expect(page.getByTestId("exchange-share-status")).toHaveText(
       "保存すると、よる8時ごろにねこだよりがとどきます。",
     );
-    await expect(page.getByTestId("exchange-share-submit")).toHaveText("保存する");
+    await expect(page.getByTestId("exchange-share-submit")).toHaveText(
+      "送って保存する",
+    );
     await expect(page.getByTestId("exchange-share-submit")).toBeVisible();
     await expect(page.getByTestId("exchange-share-cat-status-cat-second")).toBeVisible();
     await expect(page.getByTestId("exchange-share-mode-shared")).toBeVisible();
     await expect(page.getByTestId("exchange-share-mode-private")).toBeVisible();
+    await expect(page.getByTestId("exchange-share-mode-shared")).toContainText(
+      "送る",
+    );
+    await expect(page.getByTestId("exchange-share-mode-private")).toContainText(
+      "送らない",
+    );
     const controlMetrics = await page.evaluate(() => {
       const submit = document.querySelector<HTMLElement>(
         '[data-testid="exchange-share-submit"]',
@@ -1162,7 +1172,10 @@ test.describe("home sleeping exchange flow", () => {
 
     await page.getByTestId("exchange-share-mode-private").click();
     await expect(page.getByTestId("exchange-share-status")).toHaveText(
-      "自分だけに保存します。ほかの人にはとどきません。",
+      "「うちのこ」だけに残します。ほかの人にはとどきません。",
+    );
+    await expect(page.getByTestId("exchange-share-submit")).toHaveText(
+      "自分だけに保存する",
     );
     if (process.env.CAPTURE_PHOTO_SAVE_SHEET === "1") {
       await page.screenshot({
@@ -1174,6 +1187,9 @@ test.describe("home sleeping exchange flow", () => {
     await page.getByTestId("exchange-share-mode-shared").click();
     await expect(page.getByTestId("exchange-share-status")).toHaveText(
       "保存すると、よる8時ごろにねこだよりがとどきます。",
+    );
+    await expect(page.getByTestId("exchange-share-submit")).toHaveText(
+      "送って保存する",
     );
 
     await page.keyboard.press("Tab");
@@ -1359,6 +1375,10 @@ test.describe("home sleeping exchange flow", () => {
       page.getByText("「うちのこ」に自分だけで保存しました"),
     ).toBeVisible();
     await waitForOwnSleepingPhotoCount(page, 1);
+    await expect(page.getByTestId("desk-home-frame")).toBeVisible();
+    await expect(page.getByTestId("home-empty-action")).toHaveCount(0);
+    await expect(page.getByTestId("home-retake-action")).toBeVisible();
+    await expect(page.getByText(/4匹から1匹/)).toHaveCount(0);
 
     const privatePhotoState = await page.evaluate(() => {
       const photos = JSON.parse(

@@ -469,14 +469,14 @@ test.describe("home desk model", () => {
     await page.waitForLoadState("networkidle");
 
     await expect(page.getByText("きょうも すやすや")).toHaveCount(0);
+    await expect(page.getByTestId("home-empty-title")).toHaveText(
+      "きょうのむぎを1枚",
+    );
     await expect(
-      page.getByText("きょうのねがおを残す", { exact: true }),
+      page.getByRole("button", { name: "むぎの写真を撮る・選ぶ" }),
     ).toBeVisible();
-    await expect(
-      page.getByText(
-        "写真は「うちのこ」に残ります。「ねこだよりにする」と、よる8時ごろ、4匹から1匹をえらべます。",
-      ),
-    ).toBeVisible();
+    await expect(page.getByText(/4匹から1匹/)).toHaveCount(0);
+    await expect(page.getByText(/ねこだよりにする/)).toHaveCount(0);
     await expect(
       page.locator('img[src$="/theme-e5-direction/muted.webp"]'),
     ).toBeVisible();
@@ -848,7 +848,7 @@ test.describe("home desk model", () => {
     );
     const captureAction = page.getByTestId("home-empty-action");
     await expect(captureAction).toHaveAccessibleName(
-      "むぎのきょうのねがおを残す",
+      "むぎの写真を撮る・選ぶ",
     );
     await captureAction.click();
     await expect(page.getByTestId("home-sleeping-source-camera")).toBeVisible();
@@ -865,7 +865,7 @@ test.describe("home desk model", () => {
 
     const tray = page.getByTestId("home-letter-tray");
     await expect(tray).toContainText(
-      "よる8時ごろ、4匹から1匹をえらべます",
+      "よる8時ごろ、ねこだよりがとどきます",
     );
     await expect(tray).not.toContainText("あした");
   });
@@ -1018,7 +1018,7 @@ test.describe("home desk model", () => {
 
     expect(settingsBox?.width).toBe(44);
     expect(settingsBox?.height).toBe(44);
-    expect(actionBox?.height).toBe(48);
+    expect(actionBox?.height).toBe(52);
     expect(navBox?.height).toBe(60);
 
     const centers = [frameBox!, navBox!].map(
