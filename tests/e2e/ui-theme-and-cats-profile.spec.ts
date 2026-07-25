@@ -2,6 +2,8 @@ import { expect, test, type Page } from "@playwright/test";
 
 const photoDataUrl =
   "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAGQAAABkCAYAAABw4pVUAAAAAXNSR0IArs4c6QAAAARnQU1BAACxjwv8YQUAAAAJcEhZcwAADsMAAA7DAcdvqGQAAAEJSURBVHhe7dExEcAgAMBAJKKuTpnpjoLA/fACchlrzv2C+a0njDPsVmfYrQyJMSTGkBhDYgyJMSTGkBhDYgyJMSTGkBhDYgyJMSTGkBhDYgyJMSTGkBhDYgyJMSTGkBhDYgyJMSTGkBhDYgyJMSTGkBhDYgyJMSTGkBhDYgyJMSTGkBhDYgyJMSTGkBhDYgyJMSTGkBhDYgyJMSTGkBhDYgyJMSTGkBhDYgyJMSTGkBhDYgyJMSTmB4RCEqdGtA/tAAAAAElFTkSuQmCC";
+const portraitPhotoDataUrl =
+  "data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD/2wCEAAoHBwgHBgoICAgLCgoLDhgQDg0NDh0VFhEYIx8lJCIfIiEmKzcvJik0KSEiMEExNDk7Pj4+JS5ESUM8SDc9PjsBCgsLDg0OHBAQHDsoIig7Ozs7Ozs7Ozs7Ozs7Ozs7Ozs7Ozs7Ozs7Ozs7Ozs7Ozs7Ozs7Ozs7Ozs7Ozs7Ozs7O//AABEIACgAHgMBEQACEQEDEQH/xAGiAAABBQEBAQEBAQAAAAAAAAAAAQIDBAUGBwgJCgsQAAIBAwMCBAMFBQQEAAABfQECAwAEEQUSITFBBhNRYQcicRQygZGhCCNCscEVUtHwJDNicoIJChYXGBkaJSYnKCkqNDU2Nzg5OkNERUZHSElKU1RVVldYWVpjZGVmZ2hpanN0dXZ3eHl6g4SFhoeIiYqSk5SVlpeYmZqio6Slpqeoqaqys7S1tre4ubrCw8TFxsfIycrS09TV1tfY2drh4uPk5ebn6Onq8fLz9PX29/j5+gEAAwEBAQEBAQEBAQAAAAAAAAECAwQFBgcICQoLEQACAQIEBAMEBwUEBAABAncAAQIDEQQFITEGEkFRB2FxEyIygQgUQpGhscEJIzNS8BVictEKFiQ04SXxFxgZGiYnKCkqNTY3ODk6Q0RFRkdISUpTVFVWV1hZWmNkZWZnaGlqc3R1dnd4eXqCg4SFhoeIiYqSk5SVlpeYmZqio6Slpqeoqaqys7S1tre4ubrCw8TFxsfIycrS09TV1tfY2dri4+Tl5ufo6ery8/T19vf4+fr/2gAMAwEAAhEDEQA/AJlFeU2exFkirUtm0WSKtS2bRY8LU3N0yBVrRs8mLJFWpbNoskVals3ix4WpubJkCitGzyYseq1LZvFkirUtm0WSBals2TK6rWjZ5UWSKtS2bRZIq1LZtFkgFTc2TK6rWjZ5UWSKtS2bRZIq1LZvFjwtTc2TP//Z";
 const photoUploadBuffer = Buffer.from(photoDataUrl.split(",")[1], "base64");
 
 const timeSamples = [
@@ -309,6 +311,7 @@ for (const viewport of [
     });
     await seedCatsPhotoTabState(page, {
       now,
+      src: portraitPhotoDataUrl,
       sleepingPhotos: [
         {
           id: `own-sleeping-${viewport.width}`,
@@ -344,6 +347,7 @@ for (const viewport of [
 
     await expect(viewer).toBeVisible();
     await expect(image).toBeVisible();
+    await expect(image).toHaveAttribute("data-fit-ready", "true");
     await expect(setting).toBeVisible();
     await expect(closeButton).toHaveText("とじる");
     await expect(deleteButton).toBeVisible();
@@ -421,6 +425,44 @@ for (const viewport of [
     expect(closeHitHeight).toBeGreaterThanOrEqual(44);
     expect(deleteHitHeight).toBeGreaterThanOrEqual(44);
     expect(toggleHitHeight).toBeGreaterThanOrEqual(44);
+
+    const photoFit = await image.evaluate((frame) => {
+      const renderedImage = Array.from(frame.querySelectorAll("img")).find(
+        (candidate) =>
+          candidate.getAttribute("aria-hidden") !== "true" &&
+          candidate.naturalWidth > 0 &&
+          candidate.naturalHeight > 0,
+      );
+
+      if (!renderedImage) {
+        return null;
+      }
+
+      const frameRect = frame.getBoundingClientRect();
+      const imageRect = renderedImage.getBoundingClientRect();
+      const scale = Math.min(
+        imageRect.width / renderedImage.naturalWidth,
+        imageRect.height / renderedImage.naturalHeight,
+      );
+      const paintedWidth = renderedImage.naturalWidth * scale;
+      const paintedHeight = renderedImage.naturalHeight * scale;
+
+      return {
+        objectFit: getComputedStyle(renderedImage).objectFit,
+        naturalAspect:
+          renderedImage.naturalWidth / renderedImage.naturalHeight,
+        frameAspect: frameRect.width / frameRect.height,
+        horizontalEmpty: frameRect.width - paintedWidth,
+        verticalEmpty: frameRect.height - paintedHeight,
+      };
+    });
+    expect(photoFit).not.toBeNull();
+    if (photoFit) {
+      expect(photoFit.objectFit).toBe("contain");
+      expect(photoFit.frameAspect).toBeCloseTo(photoFit.naturalAspect, 2);
+      expect(photoFit.horizontalEmpty).toBeLessThanOrEqual(2);
+      expect(photoFit.verticalEmpty).toBeLessThanOrEqual(2);
+    }
 
     const checkedTrackColor = await sharingToggle.evaluate(
       (element) => getComputedStyle(element).backgroundColor,
@@ -1503,6 +1545,7 @@ async function seedCatsPhotoTabState(
     now,
     sleepingPhotos,
     galleryPhotos,
+    src = photoDataUrl,
   }: {
     now: number;
     sleepingPhotos: Array<{
@@ -1511,6 +1554,7 @@ async function seedCatsPhotoTabState(
       shared?: boolean;
     }>;
     galleryPhotos: Array<{ id: string; createdAt: number }>;
+    src?: string;
   },
 ) {
   await page.addInitScript(
@@ -1568,7 +1612,7 @@ async function seedCatsPhotoTabState(
       nowValue: now,
       sleeping: sleepingPhotos,
       gallery: galleryPhotos,
-      src: photoDataUrl,
+      src,
     },
   );
 }

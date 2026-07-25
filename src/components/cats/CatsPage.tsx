@@ -4717,6 +4717,15 @@ function PhotoFullscreenViewer({
   onClose: () => void;
 }) {
   const reduceMotion = useReducedMotion();
+  const photoStageRef = useRef<HTMLDivElement | null>(null);
+  const [photoNaturalSize, setPhotoNaturalSize] = useState<{
+    width: number;
+    height: number;
+  } | null>(null);
+  const [photoStageSize, setPhotoStageSize] = useState({
+    width: 0,
+    height: 0,
+  });
   const { modalRef, handleModalKeyDown, requestModalClose } =
     useModalBehavior<HTMLDivElement>({
       open: true,
@@ -4730,6 +4739,66 @@ function PhotoFullscreenViewer({
   const isShared = Boolean(photo.shared);
   const hasFooter =
     canManageSharing || (canDelete && Boolean(onRequestDelete));
+  const fittedPhotoFrameSize = useMemo(() => {
+    if (
+      !photoNaturalSize ||
+      photoNaturalSize.width <= 0 ||
+      photoNaturalSize.height <= 0 ||
+      photoStageSize.width <= 0 ||
+      photoStageSize.height <= 0
+    ) {
+      return null;
+    }
+
+    const scale = Math.min(
+      photoStageSize.width / photoNaturalSize.width,
+      photoStageSize.height / photoNaturalSize.height,
+    );
+
+    return {
+      width: photoNaturalSize.width * scale,
+      height: photoNaturalSize.height * scale,
+    };
+  }, [photoNaturalSize, photoStageSize]);
+
+  useLayoutEffect(() => {
+    const stage = photoStageRef.current;
+
+    if (!stage) {
+      return;
+    }
+
+    const updateStageSize = () => {
+      const rect = stage.getBoundingClientRect();
+
+      setPhotoStageSize((current) => {
+        if (
+          Math.abs(current.width - rect.width) < 0.5 &&
+          Math.abs(current.height - rect.height) < 0.5
+        ) {
+          return current;
+        }
+
+        return {
+          width: rect.width,
+          height: rect.height,
+        };
+      });
+    };
+
+    updateStageSize();
+    const resizeObserver =
+      typeof ResizeObserver === "undefined"
+        ? null
+        : new ResizeObserver(updateStageSize);
+    resizeObserver?.observe(stage);
+    window.addEventListener("resize", updateStageSize);
+
+    return () => {
+      resizeObserver?.disconnect();
+      window.removeEventListener("resize", updateStageSize);
+    };
+  }, []);
 
   return (
     <motion.div
@@ -4792,18 +4861,39 @@ function PhotoFullscreenViewer({
           </button>
         </div>
         <div
-          style={styles.photoViewerImageFrame}
-          data-testid="cats-photo-viewer-image"
+          ref={photoStageRef}
+          style={styles.photoViewerImageStage}
+          data-testid="cats-photo-viewer-image-stage"
         >
-          <StoredPhotoImage
-            src={photo.src}
-            alt=""
-            style={styles.photoViewerImage}
-            loading="eager"
-            fetchPriority="high"
-            width={390}
-            height={390}
-          />
+          <div
+            style={{
+              ...styles.photoViewerImageFrame,
+              ...(fittedPhotoFrameSize ??
+                styles.photoViewerImageFramePending),
+            }}
+            data-testid="cats-photo-viewer-image"
+            data-fit-ready={fittedPhotoFrameSize ? "true" : "false"}
+          >
+            <StoredPhotoImage
+              src={photo.src}
+              alt=""
+              style={styles.photoViewerImage}
+              loading="eager"
+              fetchPriority="high"
+              width={390}
+              height={390}
+              onNaturalSize={(size) => {
+                if (size.width > 0 && size.height > 0) {
+                  setPhotoNaturalSize((current) =>
+                    current?.width === size.width &&
+                    current.height === size.height
+                      ? current
+                      : size,
+                  );
+                }
+              }}
+            />
+          </div>
         </div>
         {hasFooter ? (
           <div style={styles.photoViewerFooter}>
@@ -7454,6 +7544,8 @@ const styles = {
   photoViewerImageFrame: {
     width: "100%",
     height: "100%",
+    maxWidth: "100%",
+    maxHeight: "100%",
     minHeight: 0,
     display: "grid",
     alignItems: "center",
@@ -7462,6 +7554,19 @@ const styles = {
     borderRadius: "18px",
     background: "color-mix(in srgb, var(--paper-card) 18%, transparent)",
     boxShadow: "0 18px 52px rgba(0,0,0,0.24)",
+  },
+  photoViewerImageFramePending: {
+    background: "transparent",
+    boxShadow: "none",
+  },
+  photoViewerImageStage: {
+    width: "100%",
+    height: "100%",
+    minHeight: 0,
+    display: "grid",
+    alignItems: "center",
+    justifyItems: "center",
+    overflow: "hidden",
   },
   photoViewerImage: {
     width: "100%",
