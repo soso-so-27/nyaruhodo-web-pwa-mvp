@@ -4728,6 +4728,8 @@ function PhotoFullscreenViewer({
     photo.shareManageable === true &&
     Boolean(onSharingChange);
   const isShared = Boolean(photo.shared);
+  const hasFooter =
+    canManageSharing || (canDelete && Boolean(onRequestDelete));
 
   return (
     <motion.div
@@ -4748,8 +4750,14 @@ function PhotoFullscreenViewer({
       transition={{ duration: reduceMotion ? 0 : 0.16, ease: "easeOut" }}
     >
       <motion.div
-        style={styles.photoViewerChrome}
+        style={{
+          ...styles.photoViewerChrome,
+          gridTemplateRows: hasFooter
+            ? "auto minmax(0, 1fr) auto"
+            : "auto minmax(0, 1fr)",
+        }}
         onClick={(event) => event.stopPropagation()}
+        data-testid="cats-photo-viewer-content"
         initial={{
           opacity: reduceMotion ? 1 : 0,
           scale: reduceMotion ? 1 : 0.965,
@@ -4766,95 +4774,111 @@ function PhotoFullscreenViewer({
           ease: [0.22, 1, 0.36, 1],
         }}
       >
-        <button
-          type="button"
-          style={styles.photoViewerCloseButton}
-          onClick={requestModalClose}
-          aria-label="写真を閉じる"
-        >
-          <AppIcon name="close" size={18} />
-        </button>
+        <div style={styles.photoViewerHeader}>
+          <div style={styles.photoViewerMeta}>
+            <p style={styles.photoViewerTitle}>{photo.title}</p>
+            <p style={styles.photoViewerDate}>
+              {formatFootprintDate(photo.timestamp)}
+            </p>
+          </div>
+          <button
+            type="button"
+            style={styles.photoViewerCloseButton}
+            onClick={requestModalClose}
+            aria-label="写真を閉じる"
+            data-testid="cats-photo-viewer-close"
+          >
+            とじる
+          </button>
+        </div>
         <div
-          style={{
-            ...styles.photoViewerImageFrame,
-            ...(canManageSharing
-              ? styles.photoViewerImageFrameWithSharing
-              : null),
-          }}
+          style={styles.photoViewerImageFrame}
+          data-testid="cats-photo-viewer-image"
         >
           <StoredPhotoImage
             src={photo.src}
             alt=""
-            style={{
-              ...styles.photoViewerImage,
-              ...(canManageSharing
-                ? styles.photoViewerImageWithSharing
-                : null),
-            }}
+            style={styles.photoViewerImage}
             loading="eager"
             fetchPriority="high"
             width={390}
             height={390}
           />
         </div>
-        <div style={styles.photoViewerMeta}>
-          <p style={styles.photoViewerTitle}>{photo.title}</p>
-          <p style={styles.photoViewerDate}>
-            {formatFootprintDate(photo.timestamp)}
-          </p>
-        </div>
-        {canManageSharing ? (
-          <div
-            style={styles.photoViewerSharing}
-            data-testid="cats-photo-delivery-setting"
-          >
-            <div style={styles.photoViewerSharingCopy}>
-              <p style={styles.photoViewerSharingTitle}>
-                ほかのおうちへ送る
-              </p>
-              <p
-                style={styles.photoViewerSharingStatus}
-                data-testid="cats-photo-delivery-status"
-                role="status"
-                aria-live="polite"
+        {hasFooter ? (
+          <div style={styles.photoViewerFooter}>
+            {canManageSharing ? (
+              <div
+                style={styles.photoViewerSharing}
+                data-testid="cats-photo-delivery-setting"
               >
-                {isSharingPending
-                  ? "変更しています…"
-                  : isShared
-                    ? "ねこだよりとして届く候補です"
-                    : "この写真は今後送られません"}
-              </p>
-            </div>
-            <AppToggle
-              checked={isShared}
-              disabled={isSharingPending}
-              label="この写真をほかのおうちへ送る"
-              showStateText={false}
-              onChange={(nextShared) => onSharingChange?.(nextShared)}
-              style={styles.photoViewerSharingToggle}
-            />
-            <p style={styles.photoViewerSharingNote}>
-              変更はこれから届く分に反映されます。すでに届いた写真は、相手の記録に残ります。
-            </p>
-            {sharingFeedback ? (
-              <p
-                style={styles.photoViewerSharingFeedback}
-                role="alert"
-                data-testid="cats-photo-delivery-feedback"
+                <div style={styles.photoViewerSharingCopy}>
+                  <p style={styles.photoViewerSharingTitle}>
+                    ほかのおうちへ送る
+                  </p>
+                  <p
+                    style={styles.photoViewerSharingStatus}
+                    data-testid="cats-photo-delivery-status"
+                    role="status"
+                    aria-live="polite"
+                  >
+                    {isSharingPending
+                      ? "変更しています…"
+                      : isShared
+                        ? "ねこだよりとして届く候補です"
+                        : "この写真は今後送られません"}
+                  </p>
+                </div>
+                <div style={styles.photoViewerSharingControl}>
+                  <span
+                    style={styles.photoViewerSharingState}
+                    data-testid="cats-photo-delivery-state"
+                    aria-hidden="true"
+                  >
+                    {isSharingPending
+                      ? "変更中"
+                      : isShared
+                        ? "送る"
+                        : "送らない"}
+                  </span>
+                  <AppToggle
+                    checked={isShared}
+                    disabled={isSharingPending}
+                    label="この写真をほかのおうちへ送る"
+                    showStateText={false}
+                    onChange={(nextShared) => onSharingChange?.(nextShared)}
+                    style={{
+                      ...styles.photoViewerSharingToggle,
+                      ...(isShared
+                        ? styles.photoViewerSharingToggleChecked
+                        : styles.photoViewerSharingToggleUnchecked),
+                    }}
+                  />
+                </div>
+                <p style={styles.photoViewerSharingNote}>
+                  変更はこれから届く分に反映されます。すでに届いた写真は、相手の記録に残ります。
+                </p>
+                {sharingFeedback ? (
+                  <p
+                    style={styles.photoViewerSharingFeedback}
+                    role="alert"
+                    data-testid="cats-photo-delivery-feedback"
+                  >
+                    {sharingFeedback}
+                  </p>
+                ) : null}
+              </div>
+            ) : null}
+            {canDelete && onRequestDelete ? (
+              <button
+                type="button"
+                style={styles.photoViewerDeleteButton}
+                onClick={onRequestDelete}
               >
-                {sharingFeedback}
-              </p>
+                この写真を削除
+              </button>
             ) : null}
           </div>
-        ) : null}
-        {canDelete && onRequestDelete ? (
-          <button
-            type="button"
-            style={styles.photoViewerDeleteButton}
-            onClick={onRequestDelete}
-          >
-            この写真を削除
-          </button>
         ) : null}
       </motion.div>
     </motion.div>
@@ -7385,41 +7409,52 @@ const styles = {
     display: "grid",
     alignItems: "center",
     justifyItems: "center",
+    boxSizing: "border-box",
     padding:
-      "calc(18px + env(safe-area-inset-top)) 18px calc(22px + env(safe-area-inset-bottom))",
+      "calc(10px + env(safe-area-inset-top)) 12px calc(12px + env(safe-area-inset-bottom))",
     background:
       "color-mix(in srgb, var(--app-night-ink, #1d1a18) 78%, transparent)",
     backdropFilter: "blur(10px)",
   },
   photoViewerChrome: {
     width: "min(100%, 540px)",
+    height: "min(100%, 900px)",
     maxHeight: "100%",
+    minHeight: 0,
     display: "grid",
-    gap: "12px",
-    alignContent: "center",
-    overflowY: "auto",
+    gap: "8px",
+    overflow: "hidden",
     overscrollBehavior: "contain",
     WebkitOverflowScrolling: "touch",
   },
+  photoViewerHeader: {
+    minHeight: "44px",
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: "12px",
+  },
   photoViewerCloseButton: {
-    justifySelf: "end",
-    width: "44px",
+    flex: "0 0 auto",
+    minWidth: "56px",
     height: "44px",
-    border: "1px solid color-mix(in srgb, var(--paper) 72%, transparent)",
-    borderRadius: "50%",
-    background: "color-mix(in srgb, var(--paper) 86%, transparent)",
-    color: CATS_TEXT,
+    border: "none",
+    borderRadius: "10px",
+    background: "transparent",
+    color: "color-mix(in srgb, var(--paper) 90%, transparent)",
     fontFamily: CATS_UI,
-    fontSize: "24px",
-    fontWeight: 400,
-    lineHeight: 1,
+    fontSize: "13px",
+    fontWeight: 500,
+    lineHeight: 1.4,
+    letterSpacing: "0.04em",
+    padding: "0 6px",
     cursor: "pointer",
-    boxShadow: "var(--shadow-e1)",
     WebkitTapHighlightColor: "transparent",
   },
   photoViewerImageFrame: {
     width: "100%",
-    maxHeight: "min(72dvh, 720px)",
+    height: "100%",
+    minHeight: 0,
     display: "grid",
     alignItems: "center",
     justifyItems: "center",
@@ -7430,17 +7465,13 @@ const styles = {
   },
   photoViewerImage: {
     width: "100%",
-    maxHeight: "min(72dvh, 720px)",
+    height: "100%",
+    minHeight: 0,
     objectFit: "contain",
     borderRadius: "18px",
   },
-  photoViewerImageFrameWithSharing: {
-    maxHeight: "min(56dvh, 560px)",
-  },
-  photoViewerImageWithSharing: {
-    maxHeight: "min(56dvh, 560px)",
-  },
   photoViewerMeta: {
+    minWidth: 0,
     display: "grid",
     gap: "2px",
     padding: "0 4px",
@@ -7461,6 +7492,16 @@ const styles = {
     fontWeight: 400,
     lineHeight: 1.5,
   },
+  photoViewerFooter: {
+    minHeight: 0,
+    maxHeight: "min(46dvh, 300px)",
+    display: "grid",
+    gap: "8px",
+    overflowY: "auto",
+    overscrollBehavior: "contain",
+    paddingRight: "2px",
+    WebkitOverflowScrolling: "touch",
+  },
   photoViewerSharing: {
     display: "grid",
     gridTemplateColumns: "minmax(0, 1fr) auto",
@@ -7468,10 +7509,10 @@ const styles = {
     gap: "8px 12px",
     padding: "12px 14px",
     border:
-      "1px solid color-mix(in srgb, var(--paper) 24%, transparent)",
+      "1px solid color-mix(in srgb, var(--paper) 34%, transparent)",
     borderRadius: "14px",
     background:
-      "color-mix(in srgb, var(--app-night-ink, #1d1a18) 58%, transparent)",
+      "color-mix(in srgb, var(--app-night-ink, #1d1a18) 68%, transparent)",
   },
   photoViewerSharingCopy: {
     minWidth: 0,
@@ -7488,19 +7529,48 @@ const styles = {
   },
   photoViewerSharingStatus: {
     margin: 0,
-    color: "color-mix(in srgb, var(--paper) 78%, transparent)",
+    color: "color-mix(in srgb, var(--paper) 88%, transparent)",
     fontFamily: CATS_UI,
     fontSize: "12px",
     fontWeight: 400,
     lineHeight: 1.5,
   },
+  photoViewerSharingControl: {
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "flex-end",
+    gap: "8px",
+  },
+  photoViewerSharingState: {
+    minWidth: "4em",
+    color: "color-mix(in srgb, var(--paper) 94%, transparent)",
+    fontFamily: CATS_UI,
+    fontSize: "12px",
+    fontWeight: 600,
+    lineHeight: 1.4,
+    textAlign: "right",
+    whiteSpace: "nowrap",
+  },
   photoViewerSharingToggle: {
     flexShrink: 0,
+  },
+  photoViewerSharingToggleChecked: {
+    borderColor:
+      "color-mix(in srgb, var(--paper) 72%, var(--seal) 28%)",
+    background: "var(--seal)",
+    boxShadow:
+      "0 0 0 2px color-mix(in srgb, var(--seal) 26%, transparent)",
+  },
+  photoViewerSharingToggleUnchecked: {
+    borderColor: "color-mix(in srgb, var(--paper) 72%, transparent)",
+    background: "color-mix(in srgb, var(--paper) 26%, transparent)",
+    boxShadow:
+      "inset 0 0 0 1px color-mix(in srgb, var(--app-night-ink, #1d1a18) 22%, transparent)",
   },
   photoViewerSharingNote: {
     gridColumn: "1 / -1",
     margin: 0,
-    color: "color-mix(in srgb, var(--paper) 62%, transparent)",
+    color: "color-mix(in srgb, var(--paper) 72%, transparent)",
     fontFamily: CATS_UI,
     fontSize: "11px",
     fontWeight: 400,
@@ -7517,6 +7587,9 @@ const styles = {
   },
   photoViewerDeleteButton: {
     justifySelf: "start",
+    minHeight: "44px",
+    display: "inline-flex",
+    alignItems: "center",
     border: "none",
     background: "transparent",
     color: "color-mix(in srgb, var(--danger) 72%, var(--paper))",
@@ -7524,7 +7597,7 @@ const styles = {
     fontSize: "12px",
     fontWeight: 500,
     lineHeight: 1.5,
-    padding: "4px",
+    padding: "0 4px",
     cursor: "pointer",
     WebkitTapHighlightColor: "transparent",
   },

@@ -292,6 +292,156 @@ test("changes sharing only from a sleeping photo detail", async ({ page }) => {
   await expect(page.getByTestId("cats-photo-delivery-setting")).toHaveCount(0);
 });
 
+for (const viewport of [
+  { width: 320, height: 568, label: "small mobile" },
+  { width: 390, height: 844, label: "standard mobile" },
+] as const) {
+  test(`keeps the photo detail controls in view on ${viewport.label}`, async ({
+    page,
+  }, testInfo) => {
+    const now = Date.parse("2026-07-23T20:30:00+09:00");
+
+    await page.route("**/api/sleeping-delivery/backup", async (route) => {
+      await route.fulfill({
+        contentType: "application/json",
+        body: JSON.stringify({ ok: true, existing: true }),
+      });
+    });
+    await seedCatsPhotoTabState(page, {
+      now,
+      sleepingPhotos: [
+        {
+          id: `own-sleeping-${viewport.width}`,
+          createdAt: Date.parse("2026-07-23T19:00:00+09:00"),
+          shared: true,
+        },
+      ],
+      galleryPhotos: [],
+    });
+    await page.setViewportSize({
+      width: viewport.width,
+      height: viewport.height,
+    });
+    await page.goto("/cats");
+    await page.waitForLoadState("networkidle");
+
+    await page
+      .getByTestId("cats-lens-photo-grid")
+      .getByRole("button", { name: "7/23のむぎ" })
+      .click();
+
+    const viewer = page.getByTestId("cats-photo-viewer");
+    const content = page.getByTestId("cats-photo-viewer-content");
+    const image = page.getByTestId("cats-photo-viewer-image");
+    const setting = page.getByTestId("cats-photo-delivery-setting");
+    const closeButton = page.getByTestId("cats-photo-viewer-close");
+    const deleteButton = viewer.getByRole("button", {
+      name: "この写真を削除",
+    });
+    const sharingToggle = viewer.getByRole("switch", {
+      name: "この写真をほかのおうちへ送る",
+    });
+
+    await expect(viewer).toBeVisible();
+    await expect(image).toBeVisible();
+    await expect(setting).toBeVisible();
+    await expect(closeButton).toHaveText("とじる");
+    await expect(deleteButton).toBeVisible();
+    await expect(page.getByTestId("cats-photo-delivery-state")).toHaveText(
+      "送る",
+    );
+
+    const layout = await page.evaluate(() => {
+      const readRect = (testId: string) => {
+        const element = document.querySelector<HTMLElement>(
+          `[data-testid="${testId}"]`,
+        );
+        const rect = element?.getBoundingClientRect();
+
+        return rect
+          ? {
+              top: rect.top,
+              right: rect.right,
+              bottom: rect.bottom,
+              left: rect.left,
+              width: rect.width,
+              height: rect.height,
+            }
+          : null;
+      };
+      const deleteElement = Array.from(
+        document.querySelectorAll<HTMLButtonElement>("button"),
+      ).find((button) => button.textContent?.trim() === "この写真を削除");
+      const deleteRect = deleteElement?.getBoundingClientRect();
+
+      return {
+        viewportWidth: window.innerWidth,
+        viewportHeight: window.innerHeight,
+        rects: {
+          content: readRect("cats-photo-viewer-content"),
+          image: readRect("cats-photo-viewer-image"),
+          setting: readRect("cats-photo-delivery-setting"),
+          close: readRect("cats-photo-viewer-close"),
+          delete: deleteRect
+            ? {
+                top: deleteRect.top,
+                right: deleteRect.right,
+                bottom: deleteRect.bottom,
+                left: deleteRect.left,
+                width: deleteRect.width,
+                height: deleteRect.height,
+              }
+            : null,
+        },
+      };
+    });
+
+    for (const rect of Object.values(layout.rects)) {
+      expect(rect).not.toBeNull();
+      if (!rect) {
+        continue;
+      }
+      expect(rect.top).toBeGreaterThanOrEqual(0);
+      expect(rect.left).toBeGreaterThanOrEqual(0);
+      expect(rect.right).toBeLessThanOrEqual(layout.viewportWidth);
+      expect(rect.bottom).toBeLessThanOrEqual(layout.viewportHeight);
+    }
+    const [closeHitHeight, deleteHitHeight, toggleHitHeight] =
+      await Promise.all([
+        closeButton.evaluate((element) =>
+          Number.parseFloat(getComputedStyle(element).height),
+        ),
+        deleteButton.evaluate((element) =>
+          Number.parseFloat(getComputedStyle(element).height),
+        ),
+        sharingToggle.evaluate((element) =>
+          Number.parseFloat(getComputedStyle(element).height),
+        ),
+      ]);
+    expect(closeHitHeight).toBeGreaterThanOrEqual(44);
+    expect(deleteHitHeight).toBeGreaterThanOrEqual(44);
+    expect(toggleHitHeight).toBeGreaterThanOrEqual(44);
+
+    const checkedTrackColor = await sharingToggle.evaluate(
+      (element) => getComputedStyle(element).backgroundColor,
+    );
+    await sharingToggle.click();
+    await expect(sharingToggle).not.toBeChecked();
+    await expect(page.getByTestId("cats-photo-delivery-state")).toHaveText(
+      "送らない",
+    );
+    const uncheckedTrackColor = await sharingToggle.evaluate(
+      (element) => getComputedStyle(element).backgroundColor,
+    );
+    expect(uncheckedTrackColor).not.toBe(checkedTrackColor);
+
+    await testInfo.attach(`photo-detail-${viewport.width}x${viewport.height}`, {
+      body: await page.screenshot(),
+      contentType: "image/png",
+    });
+  });
+}
+
 test("deletes a sleeping photo from its うちのこ detail", async ({ page }) => {
   const now = Date.parse("2026-07-23T20:30:00+09:00");
   const sleepingPhotoId = "own-sleeping-delete-detail";
